@@ -1,0 +1,65 @@
+# Backend Docs
+
+## 목적
+
+- 이 디렉터리는 `hondigagae/backend` 작업의 기준 문서 모음이다.
+- 백엔드 공통 규칙, 서비스별 책임, 완료 기준, 운영 체크리스트를 문서로 관리한다.
+- `backend/AGENTS.md`, `backend/CLAUDE.md`는 이 문서들의 엔트리 역할만 수행한다.
+
+## 문서 구성
+
+- `architecture-guide.md`
+  - Hexagonal 구조, 계층 책임, 패키지 템플릿, Port/Adapter 경계
+- `coding-conventions.md`
+  - 메서드 파라미터 줄바꿈, primitive/wrapper, MapStruct, 네이밍, Swagger, 예외/검증/로그 규칙
+- `api-design-guide.md`
+  - RESTful 경로, 응답 모델, Controller -> WebUseCase -> WebFacade -> Processor -> Presenter 흐름, 비동기 작업 패턴
+- `bootstrap-conventions.md`
+  - 서비스 Application 클래스, Global Config 구성 템플릿
+- `modules.md`
+  - core / cloud / service 모듈 구조와 역할, 공유 모듈 추가 기준
+- `external-api-guide.md`
+  - TourAPI, 반려동물 동반여행, 두루누비, 혼잡도, 기상청, 카카오 등 외부 API 연동 기준
+- `service-playbook.md`
+  - 새 서비스, 컨텍스트 추가, 리팩토링, 문서/검증 절차
+- `done-checklist.md`
+  - 기능 단위 완료 기준과 QA 체크리스트
+- `team-playbook.md`
+  - 큰 작업에서 멀티 에이전트 역할 분리와 검증 흐름 기준
+- `service-inventory.md`
+  - 현재 서비스 책임, 상태, 주의점 요약
+- `services/*.md`
+  - 서비스별 책임과 구현 주의점
+
+## 권장 읽기 순서
+
+1. `../AGENTS.md` 또는 `../CLAUDE.md`
+2. `README.md`
+3. `architecture-guide.md`
+4. `coding-conventions.md`
+5. `api-design-guide.md`
+6. `external-api-guide.md` (외부 데이터 연동 작업 시)
+7. `service-playbook.md`
+8. `done-checklist.md`
+9. `team-playbook.md`
+10. `service-inventory.md`
+11. 필요 시 `services/*.md`
+
+## 현재 작업 원칙
+
+- 백엔드는 공통 규칙과 서비스별 책임이 함께 유지되어야 하므로 규칙은 `docs/`에 모으고 구현 차이는 서비스 문서로 보강한다.
+- 새 기능 구현 전에 API 경로, 계층 책임, 보안 방식부터 정리한다.
+- 코드 변경과 문서 변경은 같이 움직여야 한다.
+- 문서는 추상 지침만 적지 않고, 현재 구현 중인 서비스의 패턴을 예시로 포함한다.
+- 서비스 추가나 대형 리팩토링처럼 범위가 큰 작업은 `team-playbook.md` 기준으로 역할을 나눠 검토할 수 있다.
+
+## 스킬 사용 예시
+
+Claude Code는 `/스킬명`(`.claude/skills/*`)으로 호출한다.
+
+- `/backend-api-check`: REST 경로, Swagger, Presenter 흐름 점검
+- `/hexagonal-guard`: Hexagonal 계층 경계 점검
+- `/backend-feature-bootstrap`: 새 서비스/컨텍스트 시작 가이드
+- `/backend-multi-agent`: 큰 작업을 역할별로 나눠 설계/구현/검증
+- `/issue`, `/pr`, `/mr`: 이슈/PR/MR 초안 작성
+- 자연어 요청도 가능하지만 스킬 호출 형식이 가장 확실하다.
