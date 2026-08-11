@@ -1,0 +1,17 @@
+* text=auto eol=lf
+
+*.java working-tree-encoding=UTF-8
+*.kt working-tree-encoding=UTF-8
+*.md working-tree-encoding=UTF-8
+*.yml working-tree-encoding=UTF-8
+*.yaml working-tree-encoding=UTF-8
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.jar binary

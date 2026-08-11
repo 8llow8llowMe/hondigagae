@@ -1,0 +1,28 @@
+# Claude Code local settings
+.claude/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Java / Gradle (backend)
+backend/**/build/
+backend/.gradle/
+backend/.gradle-home/
+*.class
+hs_err_pid*.log
+
+# Node (frontend)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# env / secrets
+.env
+.env.*
+!.env.example
