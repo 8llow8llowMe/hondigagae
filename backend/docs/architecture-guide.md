@@ -60,6 +60,10 @@ domainlayer/<context>
 - 유스케이스 진입점의 메인 오케스트레이터다.
 - 여러 Processor와 Presenter를 조합한다.
 - 읽기는 `@Transactional(readOnly = true)`, 쓰기는 `@Transactional`을 기본으로 검토한다.
+- **예외**: 유스케이스에 외부 I/O(OAuth·LLM·공공 API 호출)가 섞이면 트랜잭션을 Facade에 걸지 않는다.
+  DB 커넥션을 잡은 채 원격 응답을 기다리게 되기 때문이다. 이때는 외부 호출을 트랜잭션 밖에 두고
+  DB 접근 구간만 Processor 단위로 `@Transactional`을 건다 (예: `KakaoLoginProcessor.login`).
+  이 경우 왜 좁혔는지 메서드 주석으로 남긴다.
 
 ### Processor
 
@@ -77,7 +81,12 @@ domainlayer/<context>
 
 - `application/port/out`은 외부 시스템에 대한 계약만 노출한다.
 - `adapter/out/*`는 JPA, Redis, 외부 API(TourAPI, 기상청, 카카오, LLM 등), 내부 서비스 호출 세부사항을 숨긴다.
-- `application` 계층이 `adapter` 구현 타입에 의존하면 안 된다.
+- `application` 계층이 `adapter` 구현 타입에 의존하면 안 된다. 단 아래 셋은 **문서화된 예외**다.
+  - `port/in`(`*WebUseCase`)의 반환 타입은 `adapter/in/web/dto`의 Response/Item DTO를 쓴다.
+  - `*WebFacade`는 Presenter를 주입받아 조합한다 (WebFacade의 책임 자체가 조합이다).
+  - `application/mapper`의 MapStruct 매퍼는 Entity ↔ Domain 변환이므로 Entity를 참조한다.
+- 예외에 해당하지 않는 방향, 특히 **out-adapter 타입(외부 API 응답 DTO, Feign 래퍼)이 application으로 새는 것**은 금지한다.
+  out-port 반환 타입에는 `QueryResult` 또는 domain model을 쓰고, `Info`를 노출하지 않는다.
 
 ## 4. Query / Model 경계
 
