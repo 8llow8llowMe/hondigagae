@@ -1,0 +1,49 @@
+# 로컬 개발용 미들웨어 (MySQL + Redis)
+#
+# 서비스 애플리케이션은 IDE 나 `./gradlew :service:auth-service:bootRun` 으로 직접 띄우고,
+# 이 compose 는 의존 미들웨어만 올린다. local 프로파일의 기본값과 계정/포트를 맞췄다.
+#
+#   기동: docker compose -f docker-compose-local.yml up -d
+#   종료: docker compose -f docker-compose-local.yml down
+#   초기화: docker compose -f docker-compose-local.yml down -v   (데이터까지 삭제)
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: hondigagae-mysql-local
+    environment:
+      MYSQL_ROOT_PASSWORD: root123!
+      MYSQL_DATABASE: hondigagae
+      MYSQL_USER: hondigagae
+      MYSQL_PASSWORD: hondigagae123!
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - hondigagae-mysql-local-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123!"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: hondigagae-redis-local
+    environment:
+      TZ: Asia/Seoul
+    ports:
+      - "6379:6379"
+    volumes:
+      - hondigagae-redis-local-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  hondigagae-mysql-local-data:
+  hondigagae-redis-local-data:

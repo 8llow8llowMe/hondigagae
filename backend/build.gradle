@@ -1,0 +1,99 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.5'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+bootJar { enabled = false }
+jar { enabled = false }
+
+allprojects {
+    group = 'com.hondigagae'
+    version = '0.0.1-SNAPSHOT'
+
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects { project ->
+    // 껍데기 그룹 프로젝트(core/cloud/service)에는 Spring Boot 플러그인을 붙이지 않는다.
+    // 빠뜨리면 main class 없이 bootJar 를 만들려다 루트 `./gradlew build` 가 실패한다.
+    if (project.name in ['core', 'cloud', 'service']) {
+        apply plugin: 'java'
+        bootJar { enabled = false }
+        jar { enabled = false }
+        return
+    }
+
+    apply plugin: 'java'
+    apply plugin: 'org.springframework.boot'
+    apply plugin: 'io.spring.dependency-management'
+
+    bootJar { enabled = true }
+    jar { enabled = false }
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+
+    // Windows CP949 혼입 방지 — 전 모듈 UTF-8 강제
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+    tasks.withType(Test).configureEach {
+        systemProperty 'file.encoding', 'UTF-8'
+        useJUnitPlatform()
+    }
+    tasks.withType(Javadoc).configureEach {
+        options.encoding = 'UTF-8'
+    }
+
+    configurations {
+        compileOnly {
+            extendsFrom annotationProcessor
+        }
+    }
+
+    dependencies {
+        implementation 'org.springframework.boot:spring-boot-starter'
+
+        compileOnly 'org.projectlombok:lombok'
+        annotationProcessor 'org.projectlombok:lombok'
+
+        developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+        testImplementation 'org.springframework.boot:spring-boot-starter-test'
+        testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    }
+}
+
+// 앱(실행) 모듈에만 Spring Cloud BOM + 공통 클라우드 의존성 적용
+def cloudAppModules = [
+        'api-gateway', 'service-discovery',
+        'auth-service', 'tour-service', 'plan-service', 'ai-service', 'batch-service'
+]
+
+subprojects { project ->
+    if (!(project.name in cloudAppModules)) {
+        return
+    }
+
+    ext {
+        springCloudVersion = '2024.0.0'
+    }
+
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+        }
+    }
+
+    dependencies {
+        implementation 'org.springframework.cloud:spring-cloud-starter-bootstrap'
+        implementation 'org.springframework.boot:spring-boot-starter-actuator'
+        runtimeOnly 'io.micrometer:micrometer-registry-prometheus'
+    }
+}

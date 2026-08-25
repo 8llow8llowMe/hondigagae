@@ -1,0 +1,18 @@
+rootProject.name = 'backend'
+
+// Cores
+include 'core:common-core'
+include 'core:persistence-core'
+include 'core:redis-core'
+include 'core:security-core'
+
+// Cloud
+include 'cloud:api-gateway'
+include 'cloud:service-discovery'
+
+// Services
+include 'service:auth-service'
+include 'service:tour-service'
+include 'service:plan-service'
+include 'service:ai-service'
+include 'service:batch-service'
