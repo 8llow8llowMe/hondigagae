@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: ${SPRING_APPLICATION_NAME:tour-service}
+  config:
+    import: optional:classpath:observability-common.yml
+  profiles:
+    active: local
+
+infra:
+  redis:
+    key-prefix: ${REDIS_KEY_PREFIX:hondigagae}
+
+logging:
+  level:
+    # Eureka 클라이언트가 주기적으로 Eureka 서버 엔드포인트를 확인할 때 출력하는 반복 로그를 줄이기 위한 설정
+    com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
