@@ -34,8 +34,8 @@
 ## 5. 네이밍 기준
 
 - Controller: `*WebController`
-- UseCase: `*WebUseCase`, `*InternalUseCase`
-- Facade: `*WebFacade`, `*InternalFacade`
+- UseCase: `*WebUseCase`, `*InternalUseCase`, 배치 진입점은 `*UseCase`
+- Facade: `*WebFacade`, `*InternalFacade`, 배치 진입점은 `*Facade`
 - Processor: `*Processor`
 - Presenter: `*Presenter`
 - Out client interface: `*Client`
