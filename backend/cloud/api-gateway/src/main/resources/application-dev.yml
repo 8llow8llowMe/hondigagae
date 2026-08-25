@@ -1,0 +1,105 @@
+server:
+  port: ${API_GATEWAY_PORT}
+  shutdown: graceful
+
+spring:
+  cloud:
+    config:
+      enabled: false
+    gateway:
+      routes:
+        - id: auth-service-auth
+          uri: lb://${AUTH_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: auth-service-members
+          uri: lb://${AUTH_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/members/**
+        - id: tour-service-places
+          uri: lb://${TOUR_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/places/**
+        - id: tour-service-walk-courses
+          uri: lb://${TOUR_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/walk-courses/**
+        - id: tour-service-emergencies
+          uri: lb://${TOUR_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/emergencies/**
+        - id: plan-service-plans
+          uri: lb://${PLAN_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/plans/**
+        - id: ai-service-ai-plans
+          uri: lb://${AI_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/ai-plans/**
+        - id: ai-service-assistant
+          uri: lb://${AI_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/assistant/**
+        - id: auth-service-docs
+          uri: lb://${AUTH_SERVICE_APP_NAME}
+          predicates:
+            - Path=/auth-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+        - id: tour-service-docs
+          uri: lb://${TOUR_SERVICE_APP_NAME}
+          predicates:
+            - Path=/tour-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+        - id: plan-service-docs
+          uri: lb://${PLAN_SERVICE_APP_NAME}
+          predicates:
+            - Path=/plan-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+        - id: ai-service-docs
+          uri: lb://${AI_SERVICE_APP_NAME}
+          predicates:
+            - Path=/ai-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+eureka:
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+  client:
+    serviceUrl:
+      defaultZone: http://${SERVICE_DISCOVERY_HOSTNAME}:${SERVICE_DISCOVERY_PORT}/eureka/
+
+jwt:
+  access-key: ${JWT_ACCESS_KEY}
+  blacklist-fail-open: ${JWT_BLACKLIST_FAIL_OPEN}
+
+infra:
+  redis:
+    mode: ${REDIS_MODE}
+    host: ${REDIS_HOST}
+    port: ${REDIS_PORT}
+    password: ${REDIS_PASSWORD}
+    key-prefix: ${REDIS_KEY_PREFIX}
+
+springdoc:
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    config-url: /v3/api-docs/swagger-config
+    urls:
+      - name: 인증/회원 서비스 API
+        url: /auth-service/v3/api-docs
+      - name: 관광 데이터 서비스 API
+        url: /tour-service/v3/api-docs
+      - name: 여행 일정 서비스 API
+        url: /plan-service/v3/api-docs
+      - name: AI 서비스 API
+        url: /ai-service/v3/api-docs
+    operationsSorter: none
+    displayRequestDuration: true

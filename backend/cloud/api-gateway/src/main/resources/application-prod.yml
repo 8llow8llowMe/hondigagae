@@ -1,0 +1,78 @@
+# ============================================================================
+# prod 프로파일
+#
+# dev 와 같은 구조를 유지하고, 운영에서 위험한 항목만 다르게 둔다.
+#   - Swagger UI / api-docs 비활성화 — 운영에 문서 노출 금지, 문서 라우트도 두지 않는다.
+#
+# 값은 dev 와 동일한 env 키를 쓰되 Vault prod secret(kv/hondigagae/backend/prod/env)에서 주입된다.
+# ============================================================================
+server:
+  port: ${API_GATEWAY_PORT}
+  shutdown: graceful
+
+spring:
+  cloud:
+    config:
+      enabled: false
+    gateway:
+      routes:
+        - id: auth-service-auth
+          uri: lb://${AUTH_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: auth-service-members
+          uri: lb://${AUTH_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/members/**
+        - id: tour-service-places
+          uri: lb://${TOUR_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/places/**
+        - id: tour-service-walk-courses
+          uri: lb://${TOUR_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/walk-courses/**
+        - id: tour-service-emergencies
+          uri: lb://${TOUR_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/emergencies/**
+        - id: plan-service-plans
+          uri: lb://${PLAN_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/plans/**
+        - id: ai-service-ai-plans
+          uri: lb://${AI_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/ai-plans/**
+        - id: ai-service-assistant
+          uri: lb://${AI_SERVICE_APP_NAME}
+          predicates:
+            - Path=/api/v1/assistant/**
+
+eureka:
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+  client:
+    serviceUrl:
+      defaultZone: http://${SERVICE_DISCOVERY_HOSTNAME}:${SERVICE_DISCOVERY_PORT}/eureka/
+
+jwt:
+  access-key: ${JWT_ACCESS_KEY}
+  blacklist-fail-open: ${JWT_BLACKLIST_FAIL_OPEN}
+
+infra:
+  redis:
+    mode: ${REDIS_MODE}
+    host: ${REDIS_HOST}
+    port: ${REDIS_PORT}
+    password: ${REDIS_PASSWORD}
+    key-prefix: ${REDIS_KEY_PREFIX}
+
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false

@@ -1,0 +1,15 @@
+server:
+  port: 8761  # Eureka 서버의 기본 포트
+  shutdown: graceful
+
+spring:
+  cloud:
+    config:
+      enabled: false  # 로컬에서만 Config Server 비활성화
+
+eureka:
+  client:
+    register-with-eureka: false  # Eureka 서버는 다른 Eureka 서버에 등록하지 않음
+    fetch-registry: false        # 자체적으로 레지스트리를 가져오지 않음 (중앙 서버 역할)
+  server:
+    enable-self-preservation: false  # 개발 중에는 self-preservation 비활성화

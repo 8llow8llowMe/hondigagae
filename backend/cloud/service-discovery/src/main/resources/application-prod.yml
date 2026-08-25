@@ -1,0 +1,25 @@
+# ============================================================================
+# prod 프로파일
+#
+# dev 와 같은 구조를 유지하고, 운영에서 위험한 항목만 다르게 둔다.
+#   - ddl-auto: none — 애플리케이션이 운영 DB 스키마를 바꾸지 않는다.
+#     스키마 변경은 scripts/migration 런북으로 사람이 적용한다.
+#   - Swagger: 서비스의 *SwaggerConfig 가 @Profile("!prod") 라 이 프로파일에서는 빈이 등록되지 않는다.
+#
+# 값은 dev 와 동일한 env 키를 쓰되 Vault prod secret(kv/hondigagae/backend/prod/env)에서 주입된다.
+# ============================================================================
+server:
+  port: ${SERVICE_DISCOVERY_PORT}
+  shutdown: graceful
+
+spring:
+  cloud:
+    config:
+      enabled: false
+
+eureka:
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+  server:
+    enable-self-preservation: false
