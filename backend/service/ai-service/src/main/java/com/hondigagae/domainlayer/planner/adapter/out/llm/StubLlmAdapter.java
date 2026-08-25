@@ -2,12 +2,12 @@ package com.hondigagae.domainlayer.planner.adapter.out.llm;
 
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
-import com.hondigagae.domainlayer.planner.application.info.AiPlanDraftInfo;
-import com.hondigagae.domainlayer.planner.application.info.AiPlanDraftInfo.AiPlanDayInfo;
-import com.hondigagae.domainlayer.planner.application.info.AiPlanDraftInfo.AiPlanItemInfo;
-import com.hondigagae.domainlayer.planner.application.info.AiPlanDraftInfo.AiPlanReasonInfo;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
+import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft;
+import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft.AiPlanDraftDay;
+import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft.AiPlanDraftItem;
+import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft.AiPlanDraftReason;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,29 +27,29 @@ import org.springframework.stereotype.Component;
 public class StubLlmAdapter implements AiLlmPort {
 
     @Override
-    public AiPlanDraftInfo generatePlanDraft(AiPlanGenerationQuery query) {
+    public AiPlanDraft generatePlanDraft(AiPlanGenerationQuery query) {
         simulateLatency();
 
         int days = resolveDayCount(query);
-        List<AiPlanDayInfo> dayInfos = new ArrayList<>();
+        List<AiPlanDraftDay> draftDays = new ArrayList<>();
         for (int day = 1; day <= days; day++) {
-            dayInfos.add(sampleDay(day, days));
+            draftDays.add(sampleDay(day, days));
         }
 
-        return AiPlanDraftInfo.builder()
-            .days(dayInfos)
+        return AiPlanDraft.builder()
+            .days(draftDays)
             .reasons(List.of(
-                AiPlanReasonInfo.builder()
+                AiPlanDraftReason.builder()
                     .code("PET_ALLOWED")
                     .name("반려견 동반 가능")
                     .description("추천 장소는 모두 반려견 출입이 가능한 시설로만 구성했습니다.")
                     .build(),
-                AiPlanReasonInfo.builder()
+                AiPlanDraftReason.builder()
                     .code("LOW_CONGESTION")
                     .name("혼잡도 낮음")
                     .description("관광지 집중률 예측이 낮은 시간대 위주로 동선을 배치했습니다.")
                     .build(),
-                AiPlanReasonInfo.builder()
+                AiPlanDraftReason.builder()
                     .code("WEATHER_OK")
                     .name("기온 적정")
                     .description("여행 기간 예보 기온이 반려견 야외 활동에 적합한 범위입니다.")
@@ -58,8 +58,8 @@ public class StubLlmAdapter implements AiLlmPort {
             .build();
     }
 
-    private AiPlanDayInfo sampleDay(int day, int totalDays) {
-        List<AiPlanItemInfo> items = new ArrayList<>();
+    private AiPlanDraftDay sampleDay(int day, int totalDays) {
+        List<AiPlanDraftItem> items = new ArrayList<>();
         if (day == 1) {
             items.add(item("MEAL", "애견 동반 식당 점심", "테라스 좌석 반려견 동반 가능"));
             items.add(item("LODGING", "숙소 체크인", "반려견 동반 가능 숙소"));
@@ -74,11 +74,11 @@ public class StubLlmAdapter implements AiLlmPort {
             items.add(item("MEAL", "향토 음식점 저녁", "야외 좌석 반려견 동반 가능"));
             items.add(item("PLACE", "해변 산책", "백사장 반려견 출입 가능 구역"));
         }
-        return AiPlanDayInfo.builder().day(day).items(items).build();
+        return AiPlanDraftDay.builder().day(day).items(items).build();
     }
 
-    private AiPlanItemInfo item(String itemType, String title, String note) {
-        return AiPlanItemInfo.builder().itemType(itemType).title(title).note(note).build();
+    private AiPlanDraftItem item(String itemType, String title, String note) {
+        return AiPlanDraftItem.builder().itemType(itemType).title(title).note(note).build();
     }
 
     private int resolveDayCount(AiPlanGenerationQuery query) {

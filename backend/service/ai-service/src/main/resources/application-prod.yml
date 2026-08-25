@@ -39,3 +39,10 @@ app:
     jwt:
       resource:
         access-key: ${JWT_ACCESS_KEY}
+
+# Eureka 등록명은 환경별 접미사가 붙으므로 하드코딩하지 않고 앱 이름 env 를 참조한다.
+# (tour/plan 조회 Feign 클라이언트 추가 시 바로 쓰인다)
+feign-client:
+  target-services:
+    tour-service: ${TOUR_SERVICE_APP_NAME}
+    plan-service: ${PLAN_SERVICE_APP_NAME}

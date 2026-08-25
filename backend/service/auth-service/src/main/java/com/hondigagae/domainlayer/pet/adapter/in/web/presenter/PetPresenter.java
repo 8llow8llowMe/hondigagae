@@ -1,12 +1,14 @@
 package com.hondigagae.domainlayer.pet.adapter.in.web.presenter;
 
 import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
+import com.hondigagae.domainlayer.pet.adapter.in.web.dto.item.PetItem;
 import com.hondigagae.domainlayer.pet.adapter.in.web.dto.response.PetResponse;
 import com.hondigagae.domainlayer.pet.adapter.in.web.dto.response.PetsResponse;
 import com.hondigagae.domainlayer.pet.application.info.PetInfo;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -14,8 +16,8 @@ import org.springframework.stereotype.Component;
 public class PetPresenter {
 
     public PetsResponse toPetsResponse(List<PetInfo> infos) {
-        List<PetResponse> pets = infos.stream()
-            .map(this::toPetResponse)
+        List<PetItem> pets = infos.stream()
+            .map(this::toPetItem)
             .toList();
         return PetsResponse.builder()
             .pets(pets)
@@ -30,17 +32,46 @@ public class PetPresenter {
             .breed(info.breed())
             .birthYm(info.birthYm())
             .age(resolveAge(info.birthYm()))
-            .sizeType(CodeNameDescriptionMetadata.of(
-                info.sizeType().name(), info.sizeType().getDisplayName(), info.sizeType().getDescription()))
+            .sizeType(toSizeTypeMetadata(info))
             .heatSensitive(info.heatSensitive())
             .coldSensitive(info.coldSensitive())
             .noiseSensitive(info.noiseSensitive())
-            .activityLevel(CodeNameDescriptionMetadata.of(
-                info.activityLevel().name(), info.activityLevel().getDisplayName(), info.activityLevel().getDescription()))
+            .activityLevel(toActivityLevelMetadata(info))
             .walkPreferred(info.walkPreferred())
-            .sociality(CodeNameDescriptionMetadata.of(
-                info.sociality().name(), info.sociality().getDisplayName(), info.sociality().getDescription()))
+            .sociality(toSocialityMetadata(info))
             .build();
+    }
+
+    private PetItem toPetItem(PetInfo info) {
+        return PetItem.builder()
+            .petId(String.valueOf(info.petId()))
+            .name(info.name())
+            .breed(info.breed())
+            .birthYm(info.birthYm())
+            .age(resolveAge(info.birthYm()))
+            .sizeType(toSizeTypeMetadata(info))
+            .heatSensitive(info.heatSensitive())
+            .coldSensitive(info.coldSensitive())
+            .noiseSensitive(info.noiseSensitive())
+            .activityLevel(toActivityLevelMetadata(info))
+            .walkPreferred(info.walkPreferred())
+            .sociality(toSocialityMetadata(info))
+            .build();
+    }
+
+    private CodeNameDescriptionMetadata toSizeTypeMetadata(PetInfo info) {
+        return CodeNameDescriptionMetadata.of(
+            info.sizeType().name(), info.sizeType().getDisplayName(), info.sizeType().getDescription());
+    }
+
+    private CodeNameDescriptionMetadata toActivityLevelMetadata(PetInfo info) {
+        return CodeNameDescriptionMetadata.of(
+            info.activityLevel().name(), info.activityLevel().getDisplayName(), info.activityLevel().getDescription());
+    }
+
+    private CodeNameDescriptionMetadata toSocialityMetadata(PetInfo info) {
+        return CodeNameDescriptionMetadata.of(
+            info.sociality().name(), info.sociality().getDisplayName(), info.sociality().getDescription());
     }
 
     /**
@@ -55,7 +86,7 @@ public class PetPresenter {
         try {
             YearMonth birth = YearMonth.parse(birthYm);
             YearMonth now = YearMonth.from(LocalDate.now());
-            int months = (int) birth.until(now, java.time.temporal.ChronoUnit.MONTHS);
+            int months = (int) birth.until(now, ChronoUnit.MONTHS);
             return months < 0 ? null : months / 12;
         } catch (DateTimeParseException exception) {
             return null;

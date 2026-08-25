@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.planner.application.info.AiPlanDraftInfo;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobStorePort;
+import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJob;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStatus;
 import java.time.Instant;
@@ -45,8 +46,9 @@ public class AiPlanWorker {
         }
 
         try {
-            AiPlanDraftInfo draft = aiLlmPort.generatePlanDraft(toQuery(running.requestParams()));
-            aiPlanJobStorePort.save(running.completedWithDraft(draft, Instant.now()));
+            // LLM 포트는 domain model을 준다. 저장·응답에 쓰는 Info 변환은 이 계층에서 수행한다.
+            AiPlanDraft draft = aiLlmPort.generatePlanDraft(toQuery(running.requestParams()));
+            aiPlanJobStorePort.save(running.completedWithDraft(AiPlanDraftInfo.from(draft), Instant.now()));
         } catch (AiPlanException domainException) {
             log.error("AI plan job failed jobId={} memberId={} errorCode={} cause={}",
                 running.jobId(), running.memberId(),

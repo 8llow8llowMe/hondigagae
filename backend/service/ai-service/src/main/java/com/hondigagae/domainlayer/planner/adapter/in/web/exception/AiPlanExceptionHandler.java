@@ -12,7 +12,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-@RestControllerAdvice(basePackages = "com.hondigagae.domainlayer.planner")
+/**
+ * ai-service 의 기본(catch-all) advice. 서비스에 컨텍스트가 하나뿐이라 domainlayer 전체를 범위로 잡는다.
+ */
+@RestControllerAdvice(basePackages = "com.hondigagae.domainlayer")
 public class AiPlanExceptionHandler {
 
     @ExceptionHandler(AiPlanException.class)

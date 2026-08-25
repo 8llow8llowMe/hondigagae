@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.planner.adapter.in.web.dto.request;
 
+import com.hondigagae.domainlayer.planner.application.command.AiPlanCreateCommand;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanValidationMessage;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
@@ -39,4 +40,14 @@ public record AiPlanCreateRequest(
     String requestNote
 ) {
 
+    public AiPlanCreateCommand toCommand() {
+        return AiPlanCreateCommand.builder()
+            .areaCode(areaCode)
+            .startDate(startDate)
+            .endDate(endDate)
+            .budget(budget)
+            .petId(petId)
+            .requestNote(requestNote)
+            .build();
+    }
 }

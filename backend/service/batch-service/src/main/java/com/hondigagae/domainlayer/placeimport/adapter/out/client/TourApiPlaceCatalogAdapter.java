@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportErrorCode;
 import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportException;
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceCatalogPort;
-import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceCatalogPage;
+import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceCatalogQueryResult;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceContentType;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlace;
 import com.hondigagae.global.properties.TourApiProperties;
@@ -47,7 +47,7 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
     private final TourApiProperties tourApiProperties;
 
     @Override
-    public PlaceCatalogPage fetchAreaBasedPlaces(String areaCode, PlaceContentType contentType, int pageNo, int numOfRows) {
+    public PlaceCatalogQueryResult fetchAreaBasedPlaces(String areaCode, PlaceContentType contentType, int pageNo, int numOfRows) {
         String rawBody = requestRaw(buildAreaBasedListUri(areaCode, contentType, pageNo, numOfRows));
         JsonNode body = parseAndValidate(rawBody);
 
@@ -55,7 +55,7 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
         for (JsonNode item : extractItems(body)) {
             places.add(toImportedPlace(item));
         }
-        return new PlaceCatalogPage(places, pageNo, numOfRows, body.path("totalCount").asInt(0));
+        return new PlaceCatalogQueryResult(places, pageNo, numOfRows, body.path("totalCount").asInt(0));
     }
 
     /**
