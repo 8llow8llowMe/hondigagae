@@ -1,0 +1,223 @@
+package com.hondigagae.common.exception;
+
+import com.hondigagae.common.dto.Response;
+import com.hondigagae.common.dto.ValidationErrorBody;
+import com.hondigagae.common.dto.ValidationErrorItem;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import java.lang.reflect.RecordComponent;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.springframework.context.MessageSourceResolvable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+
+/**
+ * Bean Validation 실패를 필드별 에러코드가 담긴 응답으로 변환한다.
+ *
+ * <p>검증 메시지는 {@code "DOMAIN_101:사용자에게 보여줄 메시지"} 규약을 사용한다.
+ * 코드를 앞에 두면 DTO 선언 옆에서 코드를 바로 확인할 수 있고, 필드가 늘어도 매핑 테이블을
+ * 따로 관리하지 않는다. 코드 접두어가 없는 메시지는 호출부가 넘긴 기본 코드를 사용한다.
+ *
+ * <p>한 필드에 제약이 여러 개 걸리면 오류도 여러 개 나온다(예: 비밀번호의 길이와 문자 구성).
+ * 오류를 버리지 않고 모두 담되, <b>순서를 고정</b>해서 내려준다. Bean Validation 스펙은 제약
+ * 평가 순서를 보장하지 않으므로 정렬하지 않으면 같은 요청에 resultCode가 바뀔 수 있다.
+ *
+ * <p>정렬 기준은 (1) DTO 선언 순서 → (2) 제약 우선순위(필수 → 길이 → 범위 → 형식) →
+ * (3) 메시지 순이다. resultCode와 대표 메시지는 정렬된 첫 번째 오류를 사용한다.
+ * 클라이언트는 입력 항목별로 해당 field의 첫 오류를 보여주면 된다.
+ */
+public final class ValidationErrorSupport {
+
+    private static final String CODE_DELIMITER = ":";
+    private static final String UNKNOWN_FIELD = "request";
+
+    /**
+     * 제약 애노테이션별 표시 우선순위. 값이 작을수록 먼저 보여준다.
+     * 값이 비어 있는지(필수) → 길이 → 범위 → 형식 순으로, 사용자가 먼저 고쳐야 하는 것을 앞에 둔다.
+     */
+    private static final Map<String, Integer> CONSTRAINT_PRIORITY = Map.ofEntries(
+        Map.entry("NotNull", 0),
+        Map.entry("NotBlank", 0),
+        Map.entry("NotEmpty", 0),
+        Map.entry("Size", 1),
+        Map.entry("Length", 1),
+        Map.entry("Min", 2),
+        Map.entry("Max", 2),
+        Map.entry("DecimalMin", 2),
+        Map.entry("DecimalMax", 2),
+        Map.entry("Positive", 2),
+        Map.entry("PositiveOrZero", 2),
+        Map.entry("Negative", 2),
+        Map.entry("NegativeOrZero", 2),
+        Map.entry("Range", 2),
+        Map.entry("Email", 3),
+        Map.entry("Pattern", 3),
+        Map.entry("URL", 3)
+    );
+    private static final int UNKNOWN_CONSTRAINT_PRIORITY = 9;
+
+    private ValidationErrorSupport() {
+    }
+
+    public static ResponseEntity<Response<Void>> toResponse(MethodArgumentNotValidException exception, String defaultCode) {
+        List<RawError> rawErrors = new ArrayList<>();
+        for (ObjectError error : exception.getBindingResult().getAllErrors()) {
+            String field = error instanceof FieldError fieldError ? fieldError.getField() : error.getObjectName();
+            rawErrors.add(new RawError(field, error.getDefaultMessage(), resolveConstraint(error)));
+        }
+        // record DTO면 컴포넌트 선언 순서를 알 수 있어 필드 순서까지 고정할 수 있다.
+        return build(rawErrors, resolveFieldOrder(exception.getBindingResult().getTarget()), defaultCode);
+    }
+
+    public static ResponseEntity<Response<Void>> toResponse(ConstraintViolationException exception, String defaultCode) {
+        List<RawError> rawErrors = new ArrayList<>();
+        for (ConstraintViolation<?> violation : exception.getConstraintViolations()) {
+            rawErrors.add(new RawError(resolveLeafField(violation), violation.getMessage(), resolveConstraint(violation)));
+        }
+        return build(rawErrors, Map.of(), defaultCode);
+    }
+
+    public static ResponseEntity<Response<Void>> toResponse(HandlerMethodValidationException exception, String defaultCode) {
+        // 컨트롤러 파라미터(@RequestParam 등) 단위 검증 결과에서 필드명과 메시지를 수집한다.
+        List<RawError> rawErrors = new ArrayList<>();
+        exception.getParameterValidationResults().forEach(result -> {
+            String parameterName = result.getMethodParameter().getParameterName();
+            String field = parameterName == null ? UNKNOWN_FIELD : parameterName;
+            result.getResolvableErrors()
+                .forEach(error -> rawErrors.add(new RawError(field, error.getDefaultMessage(), resolveConstraint(error))));
+        });
+        return build(rawErrors, Map.of(), defaultCode);
+    }
+
+    public static ResponseEntity<Response<Void>> toResponse(MethodArgumentTypeMismatchException exception, String defaultCode) {
+        String message = "%s 파라미터 형식이 올바르지 않습니다.".formatted(exception.getName());
+        return respond(List.of(new ValidationErrorItem(defaultCode, exception.getName(), message)));
+    }
+
+    /**
+     * 제약 애노테이션 단순명을 뽑아낸다. Spring은 코드를 {@code "Size.dto.field"}처럼 만들어 두므로
+     * 첫 마디만 취하면 애노테이션 이름이 된다.
+     */
+    private static String resolveConstraint(MessageSourceResolvable error) {
+        String[] codes = error.getCodes();
+        if (codes == null || codes.length == 0 || codes[0] == null) {
+            return "";
+        }
+        String code = codes[0];
+        int dotIndex = code.indexOf('.');
+        return dotIndex < 0 ? code : code.substring(0, dotIndex);
+    }
+
+    private static String resolveConstraint(ConstraintViolation<?> violation) {
+        if (violation.getConstraintDescriptor() == null || violation.getConstraintDescriptor().getAnnotation() == null) {
+            return "";
+        }
+        return violation.getConstraintDescriptor().getAnnotation().annotationType().getSimpleName();
+    }
+
+    /**
+     * record DTO의 컴포넌트 선언 순서를 필드명 -> 순번으로 만든다. record가 아니면 빈 맵을 준다.
+     * 리플렉션의 필드 순서는 스펙상 보장되지 않으므로, 보장되는 record 컴포넌트 순서만 사용한다.
+     */
+    private static Map<String, Integer> resolveFieldOrder(Object target) {
+        if (target == null || !target.getClass().isRecord()) {
+            return Map.of();
+        }
+
+        Map<String, Integer> fieldOrder = new LinkedHashMap<>();
+        RecordComponent[] components = target.getClass().getRecordComponents();
+        for (int index = 0; index < components.length; index++) {
+            fieldOrder.put(components[index].getName(), index);
+        }
+        return fieldOrder;
+    }
+
+    private static ValidationErrorItem toItem(String field, String rawMessage, String defaultCode) {
+        if (rawMessage == null || rawMessage.isBlank()) {
+            return new ValidationErrorItem(defaultCode, field, "요청 값이 올바르지 않습니다.");
+        }
+
+        int delimiterIndex = rawMessage.indexOf(CODE_DELIMITER);
+        if (delimiterIndex <= 0) {
+            return new ValidationErrorItem(defaultCode, field, rawMessage);
+        }
+
+        String candidateCode = rawMessage.substring(0, delimiterIndex);
+        if (!isErrorCode(candidateCode)) {
+            return new ValidationErrorItem(defaultCode, field, rawMessage);
+        }
+        return new ValidationErrorItem(candidateCode, field, rawMessage.substring(delimiterIndex + 1).trim());
+    }
+
+    /**
+     * DOMAIN_NNN 형태(대문자/숫자/밑줄)만 코드로 인정한다. 메시지 안의 일반 콜론과 구분하기 위함이다.
+     */
+    private static boolean isErrorCode(String candidate) {
+        return candidate.matches("[A-Z][A-Z0-9_]*_[0-9]{3}");
+    }
+
+    private static String resolveLeafField(ConstraintViolation<?> violation) {
+        String path = violation.getPropertyPath() == null ? "" : violation.getPropertyPath().toString();
+        if (path.isBlank()) {
+            return UNKNOWN_FIELD;
+        }
+        int lastDot = path.lastIndexOf('.');
+        return lastDot < 0 ? path : path.substring(lastDot + 1);
+    }
+
+    private static ResponseEntity<Response<Void>> build(List<RawError> rawErrors, Map<String, Integer> fieldOrder, String defaultCode) {
+        if (rawErrors.isEmpty()) {
+            return respond(List.of(new ValidationErrorItem(defaultCode, UNKNOWN_FIELD, "요청 값이 올바르지 않습니다.")));
+        }
+
+        List<String> appearanceOrder = new ArrayList<>();
+        for (RawError rawError : rawErrors) {
+            if (!appearanceOrder.contains(rawError.field())) {
+                appearanceOrder.add(rawError.field());
+            }
+        }
+
+        List<RawError> sorted = new ArrayList<>(rawErrors);
+        sorted.sort(Comparator
+            .comparingInt((RawError rawError) -> fieldIndex(rawError.field(), fieldOrder, appearanceOrder))
+            .thenComparingInt(rawError -> CONSTRAINT_PRIORITY.getOrDefault(rawError.constraint(), UNKNOWN_CONSTRAINT_PRIORITY))
+            // 같은 필드에 같은 우선순위 제약이 둘 이상이어도 순서가 흔들리지 않도록 메시지로 마무리한다.
+            .thenComparing(rawError -> rawError.rawMessage() == null ? "" : rawError.rawMessage()));
+
+        List<ValidationErrorItem> errors = new ArrayList<>();
+        for (RawError rawError : sorted) {
+            errors.add(toItem(rawError.field(), rawError.rawMessage(), defaultCode));
+        }
+        return respond(errors);
+    }
+
+    private static int fieldIndex(String field, Map<String, Integer> fieldOrder, List<String> appearanceOrder) {
+        Integer declaredIndex = fieldOrder.get(field);
+        if (declaredIndex != null) {
+            return declaredIndex;
+        }
+        // DTO 선언 순서를 모르는 필드(파라미터 검증 등)는 선언된 필드 뒤에 등장 순서대로 둔다.
+        return fieldOrder.size() + Math.max(appearanceOrder.indexOf(field), 0);
+    }
+
+    private static ResponseEntity<Response<Void>> respond(List<ValidationErrorItem> errors) {
+        ValidationErrorItem first = errors.getFirst();
+        ValidationErrorBody body = new ValidationErrorBody(first.message(), errors);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Response.fail(first.code(), body));
+    }
+
+    /**
+     * 정렬 전 원본 오류. 제약 애노테이션 이름을 함께 들고 있어야 우선순위를 매길 수 있다.
+     */
+    private record RawError(String field, String rawMessage, String constraint) {
+    }
+}

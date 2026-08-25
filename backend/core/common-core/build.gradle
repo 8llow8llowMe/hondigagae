@@ -1,0 +1,8 @@
+dependencies {
+    implementation 'com.github.ulisesbocchio:jasypt-spring-boot-starter:3.0.5'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+}
+
+jar { enabled = true }
+bootJar { enabled = false }
