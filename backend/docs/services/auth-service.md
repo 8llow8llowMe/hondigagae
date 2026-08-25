@@ -23,7 +23,7 @@ AI 여행 플래너 입력에 필요한 필드를 기준으로 설계한다.
 
 ## 주요 API (계획)
 
-- `POST /api/v1/auth/login/kakao` — 카카오 인가코드 → JWT 발급
+- `GET /api/v1/auth/kakao/login` — 카카오 인가코드(code, state) → JWT 발급
 - `POST /api/v1/auth/token/reissue`
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/members/me`

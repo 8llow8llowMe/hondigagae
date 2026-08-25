@@ -10,7 +10,7 @@
 - 컨텍스트: `auth`, `member`, `pet`
 - 특징: `AuthSecurityConfigurer` 기반 인증/인가 서비스. 반려견 프로필(품종, 크기, 더위/추위/소음 민감도, 활동량, 사회성)은 AI 추천의 핵심 입력이므로 이 서비스가 단일 원천이다.
 - 구현 API
-  - `GET /api/v1/auth/login/kakao/authorize`, `POST /api/v1/auth/login/kakao`
+  - `GET /api/v1/auth/kakao/authorize`, `GET /api/v1/auth/kakao/login`
   - `POST /api/v1/auth/token/reissue`, `POST /api/v1/auth/logout`
   - `GET /api/v1/members/me`, `POST /api/v1/members/me/withdraw`
   - `GET|POST /api/v1/members/me/pets`, `GET|PUT|DELETE /api/v1/members/me/pets/{petId}`

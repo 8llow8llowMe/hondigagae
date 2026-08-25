@@ -114,7 +114,7 @@ backend/
 **역할**: 인증·회원·반려견 프로필
 
 **주요 API (계획):**
-- `POST /api/v1/auth/login/kakao` — 카카오 소셜 로그인
+- `GET /api/v1/auth/kakao/authorize`, `GET /api/v1/auth/kakao/login` — 카카오 소셜 로그인
 - `POST /api/v1/auth/logout`, `POST /api/v1/auth/token/reissue`
 - `GET /api/v1/members/me`
 - `GET|POST|PUT|DELETE /api/v1/members/me/pets` — 반려견 프로필 (품종, 나이, 더위/추위 민감도, 활동 성향)

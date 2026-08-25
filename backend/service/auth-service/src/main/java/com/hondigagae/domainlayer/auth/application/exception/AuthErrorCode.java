@@ -15,8 +15,9 @@ public enum AuthErrorCode {
     OAUTH_PROVIDER_UNAVAILABLE("AUTH_005", "소셜 로그인 제공자와 통신할 수 없습니다. 잠시 후 다시 시도해주세요.", HttpStatus.BAD_GATEWAY),
     OAUTH_PROFILE_REQUIRED("AUTH_006", "카카오 계정의 프로필(닉네임) 제공 동의가 필요합니다.", HttpStatus.BAD_REQUEST),
 
-    // 요청 검증(Bean Validation) 대역 — 1xx.
-    // 필드별 코드(AUTH_101~102)는 AuthValidationMessage 가 단일 기준점이며, 여기서는 중복 정의하지 않는다.
+    // 요청 검증 대역 — 1xx.
+    // 현재 auth 요청은 인가코드/state 를 @RequestParam 으로만 받아 필드별 코드가 없다.
+    // RequestBody DTO 가 생기면 AuthValidationMessage 를 만들어 필드별 코드(AUTH_101~)를 그곳에 모은다.
     INVALID_REQUEST("AUTH_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
     PARAMETER_TYPE_INVALID("AUTH_105", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
 
