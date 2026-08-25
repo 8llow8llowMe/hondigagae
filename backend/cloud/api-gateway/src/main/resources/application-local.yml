@@ -1,0 +1,104 @@
+server:
+  port: 8000
+  shutdown: graceful
+
+spring:
+  cloud:
+    config:
+      enabled: false  # 로컬에서만 Config Server 비활성화
+    gateway:
+      routes:
+        - id: auth-service-auth
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: auth-service-members
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/v1/members/**
+        - id: tour-service-places
+          uri: lb://tour-service
+          predicates:
+            - Path=/api/v1/places/**
+        - id: tour-service-walk-courses
+          uri: lb://tour-service
+          predicates:
+            - Path=/api/v1/walk-courses/**
+        - id: tour-service-emergencies
+          uri: lb://tour-service
+          predicates:
+            - Path=/api/v1/emergencies/**
+        - id: plan-service-plans
+          uri: lb://plan-service
+          predicates:
+            - Path=/api/v1/plans/**
+        - id: ai-service-ai-plans
+          uri: lb://ai-service
+          predicates:
+            - Path=/api/v1/ai-plans/**
+        - id: ai-service-assistant
+          uri: lb://ai-service
+          predicates:
+            - Path=/api/v1/assistant/**
+        # Swagger 문서용 라우트
+        - id: auth-service-docs
+          uri: http://localhost:8081
+          predicates:
+            - Path=/auth-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+        - id: tour-service-docs
+          uri: http://localhost:8082
+          predicates:
+            - Path=/tour-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+        - id: plan-service-docs
+          uri: http://localhost:8083
+          predicates:
+            - Path=/plan-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+        - id: ai-service-docs
+          uri: http://localhost:8085
+          predicates:
+            - Path=/ai-service/v3/api-docs/**
+          filters:
+            - StripPrefix=1
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+
+jwt:
+  # 로컬 개발 전용 기본 키 (HS512 — 64바이트 이상). 운영/개발 서버는 env 로 주입한다.
+  access-key: ${JWT_ACCESS_KEY:hondigagae-local-jwt-access-key-0123456789abcdef0123456789abcdef0123456789abcdef}
+  blacklist-fail-open: false
+
+# Redis
+infra:
+  redis:
+    mode: standalone
+    host: localhost
+    port: 6379
+    password:
+    key-prefix: ${REDIS_KEY_PREFIX:hondigagae-local}
+
+# SpringDoc (Swagger) Aggregation
+springdoc:
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    config-url: /v3/api-docs/swagger-config
+    urls:
+      - name: 인증/회원 서비스 API
+        url: /auth-service/v3/api-docs
+      - name: 관광 데이터 서비스 API
+        url: /tour-service/v3/api-docs
+      - name: 여행 일정 서비스 API
+        url: /plan-service/v3/api-docs
+      - name: AI 서비스 API
+        url: /ai-service/v3/api-docs
+    operationsSorter: none
+    displayRequestDuration: true
