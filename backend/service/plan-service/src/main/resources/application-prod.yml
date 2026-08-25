@@ -1,0 +1,61 @@
+# ============================================================================
+# prod 프로파일
+#
+# dev 와 같은 구조를 유지하고, 운영에서 위험한 항목만 다르게 둔다.
+#   - ddl-auto: none — 애플리케이션이 운영 DB 스키마를 바꾸지 않는다.
+#   - Swagger: PlanServiceSwaggerConfig 가 @Profile("!prod") 라 빈이 등록되지 않는다.
+#
+# 값은 dev 와 동일한 env 키를 쓰되 Vault prod secret(kv/hondigagae/backend/prod/env)에서 주입된다.
+# ============================================================================
+server:
+  port: ${PLAN_SERVICE_PORT}
+  shutdown: graceful
+
+spring:
+  cloud:
+    config:
+      enabled: false
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${PLAN_DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    defer-datasource-initialization: true
+    generate-ddl: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: false
+        use_sql_comments: false
+        show_sql: false
+        jdbc:
+          batch_size: 100
+        default_batch_fetch_size: 100
+
+eureka:
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+  client:
+    serviceUrl:
+      defaultZone: http://${SERVICE_DISCOVERY_HOSTNAME}:${SERVICE_DISCOVERY_PORT}/eureka/
+
+# Resource Server 검증 키. auth-service 가 발급에 쓰는 JWT_ACCESS_KEY 와 같은 값을 주입한다.
+app:
+  security:
+    jwt:
+      resource:
+        access-key: ${JWT_ACCESS_KEY}
+
+snowflake:
+  datacenter-id: ${SNOWFLAKE_DATACENTER_ID}
+  worker-id: ${SNOWFLAKE_WORKER_ID}
+
+feign-client:
+  target-services:
+    tour-service: ${TOUR_SERVICE_APP_NAME}
