@@ -2,7 +2,7 @@ package com.hondigagae.domainlayer.placeimport.application.service.processor;
 
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceBulkPort;
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceCatalogPort;
-import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceCatalogPage;
+import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceCatalogQueryResult;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceContentType;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -42,7 +42,7 @@ public class PlaceImportProcessor {
         int upserted = 0;
         int pageNo = 1;
         while (true) {
-            PlaceCatalogPage page = placeCatalogPort.fetchAreaBasedPlaces(areaCode, contentType, pageNo, PAGE_SIZE);
+            PlaceCatalogQueryResult page = placeCatalogPort.fetchAreaBasedPlaces(areaCode, contentType, pageNo, PAGE_SIZE);
             if (!page.places().isEmpty()) {
                 placeBulkPort.upsertAll(page.places());
                 upserted += page.places().size();

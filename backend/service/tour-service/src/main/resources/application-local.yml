@@ -14,7 +14,7 @@ spring:
     password: ${DB_PASSWORD:hondigagae123!}
 
   jpa:
-    open-in-view: true
+    open-in-view: false
     defer-datasource-initialization: true
     generate-ddl: true
     hibernate:

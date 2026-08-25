@@ -1,6 +1,6 @@
 package com.hondigagae.domainlayer.placeimport.application.port.out;
 
-import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceCatalogPage;
+import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceCatalogQueryResult;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceContentType;
 
 /**
@@ -9,5 +9,5 @@ import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceContentType;
  */
 public interface PlaceCatalogPort {
 
-    PlaceCatalogPage fetchAreaBasedPlaces(String areaCode, PlaceContentType contentType, int pageNo, int numOfRows);
+    PlaceCatalogQueryResult fetchAreaBasedPlaces(String areaCode, PlaceContentType contentType, int pageNo, int numOfRows);
 }

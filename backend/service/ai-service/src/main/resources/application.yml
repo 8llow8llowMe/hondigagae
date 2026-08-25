@@ -5,6 +5,14 @@ spring:
     import: optional:classpath:observability-common.yml
   profiles:
     active: local
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            # 기본 read timeout 60초는 장애 전파에 취약하므로 공통 타임아웃을 명시한다.
+            connectTimeout: ${INTERNAL_CLIENT_CONNECT_TIMEOUT_MS:2000}
+            readTimeout: ${INTERNAL_CLIENT_READ_TIMEOUT_MS:5000}
 
 infra:
   redis:
@@ -21,3 +29,30 @@ ai:
 logging:
   level:
     com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
+
+# 내부 서비스(tour/plan) 조회와 LLM 호출용 서킷브레이커.
+# 아직 Feign 클라이언트와 실제 LLM 어댑터가 없지만, 추가 시 타임아웃·서킷이 빠지지 않도록 먼저 둔다.
+# LLM 은 정상 응답이 수십 초라 slow-call 임계를 별도로 완화한다 (coding-conventions §10).
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        slow-call-duration-threshold: 3s
+        slow-call-rate-threshold: 80
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - com.hondigagae.domainlayer.planner.application.exception.AiPlanException
+    instances:
+      tour-service:
+        base-config: default
+      plan-service:
+        base-config: default
+      llm:
+        base-config: default
+        slow-call-duration-threshold: 30s

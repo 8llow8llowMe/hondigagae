@@ -1,13 +1,14 @@
 package com.hondigagae.domainlayer.planner.application.info;
 
+import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft;
 import java.util.List;
 import lombok.Builder;
 
 /**
- * AI가 생성한 여행 일정 초안.
+ * AI가 생성한 여행 일정 초안의 application 표현.
  *
- * <p>일정의 소유권은 plan-service에 있다. 이 모델은 "제안(draft)"이며,
- * 사용자가 확정하면 plan-service 저장 API를 통해 정식 일정이 된다 (services/ai-service.md).
+ * <p>{@link AiPlanDraft}(domain model)를 Presenter가 쓰기 좋은 모양으로 옮긴 것이며,
+ * {@code AiPlanJob}의 필드로 Redis에 함께 저장된다.
  */
 @Builder
 public record AiPlanDraftInfo(
@@ -15,12 +16,32 @@ public record AiPlanDraftInfo(
     List<AiPlanReasonInfo> reasons
 ) {
 
+    public static AiPlanDraftInfo from(AiPlanDraft draft) {
+        if (draft == null) {
+            return null;
+        }
+        List<AiPlanDayInfo> days = draft.days() == null ? List.of()
+            : draft.days().stream().map(AiPlanDayInfo::from).toList();
+        List<AiPlanReasonInfo> reasons = draft.reasons() == null ? List.of()
+            : draft.reasons().stream().map(AiPlanReasonInfo::from).toList();
+
+        return AiPlanDraftInfo.builder()
+            .days(days)
+            .reasons(reasons)
+            .build();
+    }
+
     @Builder
     public record AiPlanDayInfo(
         int day,
         List<AiPlanItemInfo> items
     ) {
 
+        public static AiPlanDayInfo from(AiPlanDraft.AiPlanDraftDay day) {
+            List<AiPlanItemInfo> items = day.items() == null ? List.of()
+                : day.items().stream().map(AiPlanItemInfo::from).toList();
+            return AiPlanDayInfo.builder().day(day.day()).items(items).build();
+        }
     }
 
     @Builder
@@ -31,10 +52,17 @@ public record AiPlanDraftInfo(
         String note
     ) {
 
+        public static AiPlanItemInfo from(AiPlanDraft.AiPlanDraftItem item) {
+            return AiPlanItemInfo.builder()
+                .itemType(item.itemType())
+                .title(item.title())
+                .note(item.note())
+                .build();
+        }
     }
 
     /**
-     * XAI 추천 이유 (api-design-guide §9). 데이터 근거를 코드에서 조립하고 문장화만 LLM에 맡기는 방향을 우선한다.
+     * XAI 추천 이유 (api-design-guide §9).
      */
     @Builder
     public record AiPlanReasonInfo(
@@ -43,5 +71,12 @@ public record AiPlanDraftInfo(
         String description
     ) {
 
+        public static AiPlanReasonInfo from(AiPlanDraft.AiPlanDraftReason reason) {
+            return AiPlanReasonInfo.builder()
+                .code(reason.code())
+                .name(reason.name())
+                .description(reason.description())
+                .build();
+        }
     }
 }

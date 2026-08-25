@@ -67,3 +67,5 @@ jwt:
   refresh-key: ${JWT_REFRESH_KEY:hondigagae-local-jwt-refresh-key-fedcba9876543210fedcba9876543210fedcba9876543210}
   access-expiration: ${JWT_ACCESS_EXPIRATION:PT1H}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:P14D}
+  # 블랙리스트 조회 실패 시 정책. 게이트웨이의 동일 키와 정렬한다. (false = fail-closed, 503 응답)
+  blacklist-fail-open: ${JWT_BLACKLIST_FAIL_OPEN:false}

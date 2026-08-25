@@ -4,7 +4,6 @@ import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.request.AiPlanCreateRequest;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanJobStatusResponse;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanSubmitResponse;
-import com.hondigagae.domainlayer.planner.application.command.AiPlanCreateCommand;
 import com.hondigagae.domainlayer.planner.application.port.in.AiPlanWebUseCase;
 import com.hondigagae.security.common.dto.MemberLoginActive;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,7 +42,7 @@ public class AiPlanWebController {
         @AuthenticationPrincipal MemberLoginActive loginActive,
         @Valid @RequestBody AiPlanCreateRequest request
     ) {
-        AiPlanSubmitResponse response = aiPlanWebUseCase.submitPlan(loginActive.memberId(), AiPlanCreateCommand.from(request));
+        AiPlanSubmitResponse response = aiPlanWebUseCase.submitPlan(loginActive.memberId(), request.toCommand());
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(Response.success(response));
     }
 
