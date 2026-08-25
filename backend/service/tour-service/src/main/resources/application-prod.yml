@@ -1,0 +1,59 @@
+# ============================================================================
+# prod 프로파일
+#
+# dev 와 같은 구조를 유지하고, 운영에서 위험한 항목만 다르게 둔다.
+#   - ddl-auto: none — 애플리케이션이 운영 DB 스키마를 바꾸지 않는다.
+#     스키마 변경은 마이그레이션 런북으로 사람이 적용한다.
+#   - Swagger: TourServiceSwaggerConfig 가 @Profile("!prod") 라 이 프로파일에서는 빈이 등록되지 않는다.
+#
+# 값은 dev 와 동일한 env 키를 쓰되 Vault prod secret(kv/hondigagae/backend/prod/env)에서 주입된다.
+# ============================================================================
+server:
+  port: ${TOUR_SERVICE_PORT}
+  shutdown: graceful
+
+spring:
+  cloud:
+    config:
+      enabled: false
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${TOUR_DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: true
+    defer-datasource-initialization: true
+    generate-ddl: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        show_sql: false
+        jdbc:
+          batch_size: 100
+        default_batch_fetch_size: 100
+
+eureka:
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+  client:
+    serviceUrl:
+      defaultZone: http://${SERVICE_DISCOVERY_HOSTNAME}:${SERVICE_DISCOVERY_PORT}/eureka/
+
+infra:
+  redis:
+    mode: ${REDIS_MODE}
+    host: ${REDIS_HOST}
+    port: ${REDIS_PORT}
+    password: ${REDIS_PASSWORD}
+    key-prefix: ${REDIS_KEY_PREFIX}
+
+snowflake:
+  datacenter-id: ${SNOWFLAKE_DATACENTER_ID}
+  worker-id: ${SNOWFLAKE_WORKER_ID}

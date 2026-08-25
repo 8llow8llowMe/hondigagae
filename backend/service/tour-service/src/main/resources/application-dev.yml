@@ -1,0 +1,51 @@
+server:
+  port: ${TOUR_SERVICE_PORT}
+  shutdown: graceful
+
+spring:
+  cloud:
+    config:
+      enabled: false
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${TOUR_DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: true
+    defer-datasource-initialization: true
+    generate-ddl: true
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        show_sql: false
+        jdbc:
+          batch_size: 100
+        default_batch_fetch_size: 100
+
+eureka:
+  instance:
+    # Docker 컨테이너 환경: 컨테이너 IP로 등록해야 게이트웨이 lb:// 라우팅이
+    # 컨테이너 hostname(컨테이너 ID) DNS 해석 실패 없이 연결된다.
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+  client:
+    serviceUrl:
+      defaultZone: http://${SERVICE_DISCOVERY_HOSTNAME}:${SERVICE_DISCOVERY_PORT}/eureka/
+
+infra:
+  redis:
+    mode: ${REDIS_MODE}
+    host: ${REDIS_HOST}
+    port: ${REDIS_PORT}
+    password: ${REDIS_PASSWORD}
+    key-prefix: ${REDIS_KEY_PREFIX}
+
+snowflake:
+  datacenter-id: ${SNOWFLAKE_DATACENTER_ID}
+  worker-id: ${SNOWFLAKE_WORKER_ID}
