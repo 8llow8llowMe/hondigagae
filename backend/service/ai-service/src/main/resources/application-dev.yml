@@ -1,0 +1,33 @@
+server:
+  port: ${AI_SERVICE_PORT}
+  shutdown: graceful
+
+spring:
+  cloud:
+    config:
+      enabled: false
+
+eureka:
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+  client:
+    serviceUrl:
+      defaultZone: http://${SERVICE_DISCOVERY_HOSTNAME}:${SERVICE_DISCOVERY_PORT}/eureka/
+
+infra:
+  redis:
+    mode: ${REDIS_MODE}
+    host: ${REDIS_HOST}
+    port: ${REDIS_PORT}
+    password: ${REDIS_PASSWORD}
+    key-prefix: ${REDIS_KEY_PREFIX}
+
+# Resource Server 검증 키. auth-service 가 발급에 쓰는 JWT_ACCESS_KEY 와 같은 값을 주입한다.
+app:
+  security:
+    jwt:
+      resource:
+        access-key: ${JWT_ACCESS_KEY}
