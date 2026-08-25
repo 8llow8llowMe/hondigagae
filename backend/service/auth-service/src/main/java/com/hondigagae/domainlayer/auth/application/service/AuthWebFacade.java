@@ -4,7 +4,6 @@ import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthLoginResp
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthOAuthAuthorizeResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.presenter.AuthPresenter;
-import com.hondigagae.domainlayer.auth.application.command.KakaoLoginCommand;
 import com.hondigagae.domainlayer.auth.application.command.TokenReissueCommand;
 import com.hondigagae.domainlayer.auth.application.info.AuthCookieResult;
 import com.hondigagae.domainlayer.auth.application.info.JwtTokenIssueInfo;
@@ -33,9 +32,9 @@ public class AuthWebFacade implements AuthWebUseCase {
     }
 
     @Override
-    public AuthCookieResult<AuthLoginResponse> kakaoLogin(KakaoLoginCommand command) {
+    public AuthCookieResult<AuthLoginResponse> kakaoLogin(String code, String state) {
         // 1. state 검증 + 카카오 프로필 조회 — 외부 HTTP 왕복이므로 트랜잭션 밖에서 수행한다.
-        OAuthMemberQueryResult kakaoMember = kakaoLoginProcessor.fetchKakaoMember(command.authCode(), command.state());
+        OAuthMemberQueryResult kakaoMember = kakaoLoginProcessor.fetchKakaoMember(code, state);
 
         // 2. 회원 조회/생성 (Processor의 트랜잭션 경계) 후 토큰 발급
         LoginInfo loginInfo = kakaoLoginProcessor.login(kakaoMember);

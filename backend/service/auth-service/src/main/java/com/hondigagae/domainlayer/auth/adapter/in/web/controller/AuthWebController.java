@@ -1,20 +1,18 @@
 package com.hondigagae.domainlayer.auth.adapter.in.web.controller;
 
 import com.hondigagae.common.dto.Response;
-import com.hondigagae.domainlayer.auth.adapter.in.web.dto.request.KakaoLoginRequest;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthLoginResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthOAuthAuthorizeResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.provider.RefreshCookieProvider;
-import com.hondigagae.domainlayer.auth.application.command.KakaoLoginCommand;
 import com.hondigagae.domainlayer.auth.application.command.TokenReissueCommand;
 import com.hondigagae.domainlayer.auth.application.info.AuthCookieResult;
 import com.hondigagae.domainlayer.auth.application.port.in.AuthWebUseCase;
 import com.hondigagae.security.common.dto.MemberLoginActive;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -23,8 +21,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -40,7 +38,7 @@ public class AuthWebController {
 
     @Operation(summary = "카카오 로그인 인가 URL 생성",
         description = "카카오 인가 페이지 URL을 생성합니다. CSRF 방어용 state가 포함되며 10분간 유효합니다. 프론트는 이 URL로 리다이렉트합니다.")
-    @GetMapping("/login/kakao/authorize")
+    @GetMapping("/kakao/authorize")
     public ResponseEntity<Response<AuthOAuthAuthorizeResponse>> generateKakaoAuthorizationUrl() {
         AuthOAuthAuthorizeResponse response = authWebUseCase.generateKakaoAuthorizationUrl();
         return ResponseEntity.ok().body(Response.success(response));
@@ -48,9 +46,12 @@ public class AuthWebController {
 
     @Operation(summary = "카카오 로그인",
         description = "카카오 콜백의 인가코드와 state로 로그인합니다. 미가입 카카오 계정이면 자동 회원가입 후 로그인합니다. accessToken과 refresh 쿠키를 발급합니다.")
-    @PostMapping("/login/kakao")
-    public ResponseEntity<Response<AuthLoginResponse>> loginWithKakao(@Valid @RequestBody KakaoLoginRequest request) {
-        AuthCookieResult<AuthLoginResponse> result = authWebUseCase.kakaoLogin(KakaoLoginCommand.of(request.code(), request.state()));
+    @GetMapping("/kakao/login")
+    public ResponseEntity<Response<AuthLoginResponse>> loginWithKakaoCode(
+        @Parameter(description = "카카오가 콜백으로 전달한 인가코드", required = true) @RequestParam("code") String code,
+        @Parameter(description = "인가 URL 생성 시 발급된 state", required = true) @RequestParam("state") String state
+    ) {
+        AuthCookieResult<AuthLoginResponse> result = authWebUseCase.kakaoLogin(code, state);
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, refreshCookieProvider.createRefreshCookie(result.refreshToken()).toString())
             .body(Response.success(result.response()));
