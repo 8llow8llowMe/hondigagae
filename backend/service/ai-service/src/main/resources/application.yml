@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: ${SPRING_APPLICATION_NAME:ai-service}
+  config:
+    import: optional:classpath:observability-common.yml
+  profiles:
+    active: local
+
+infra:
+  redis:
+    key-prefix: ${REDIS_KEY_PREFIX:hondigagae}
+
+# AI 일정 생성 작업 상태 보관 정책. Redis Hash + TTL (api-design-guide §7)
+ai:
+  plan:
+    job:
+      ttl-seconds: ${AI_PLAN_JOB_TTL_SECONDS:86400}
+      pending-timeout-seconds: ${AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS:30}
+      running-timeout-seconds: ${AI_PLAN_JOB_RUNNING_TIMEOUT_SECONDS:300}
+
+logging:
+  level:
+    com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
