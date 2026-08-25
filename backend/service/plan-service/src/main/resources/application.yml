@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: ${SPRING_APPLICATION_NAME:plan-service}
+  config:
+    import: optional:classpath:observability-common.yml
+  profiles:
+    active: local
+  cloud:
+    openfeign:
+      client:
+        config:
+          default:
+            # 기본 read timeout 60초는 장애 전파에 취약하므로 공통 타임아웃을 명시한다.
+            connectTimeout: ${INTERNAL_CLIENT_CONNECT_TIMEOUT_MS:2000}
+            readTimeout: ${INTERNAL_CLIENT_READ_TIMEOUT_MS:5000}
+
+logging:
+  level:
+    com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
+
+# tour-service 내부 호출 서킷브레이커.
+# 서킷은 Feign 호출만 감싸 전송 실패(5xx·타임아웃)만 집계하고, 4xx는 호출한 쪽의 요청 문제이므로
+# InternalResponseSupport 안에서 도메인 예외로 변환한 뒤 ignore-exceptions로 제외한다.
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 20
+        minimum-number-of-calls: 10
+        failure-rate-threshold: 50
+        slow-call-duration-threshold: 3s
+        slow-call-rate-threshold: 80
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - com.hondigagae.domainlayer.plan.application.exception.PlanException
+    instances:
+      tour-service:
+        base-config: default
