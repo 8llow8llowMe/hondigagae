@@ -1,18 +1,22 @@
 package com.hondigagae.domainlayer.auth.application.service;
 
-import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthLoginResponse;
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthGeneralLoginResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthOAuthAuthorizeResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.presenter.AuthPresenter;
+import com.hondigagae.domainlayer.auth.application.command.AuthGeneralLoginCommand;
 import com.hondigagae.domainlayer.auth.application.command.TokenReissueCommand;
 import com.hondigagae.domainlayer.auth.application.info.AuthCookieResult;
+import com.hondigagae.domainlayer.auth.application.info.GeneralLoginInfo;
 import com.hondigagae.domainlayer.auth.application.info.JwtTokenIssueInfo;
 import com.hondigagae.domainlayer.auth.application.info.JwtTokenReissueInfo;
-import com.hondigagae.domainlayer.auth.application.info.LoginInfo;
 import com.hondigagae.domainlayer.auth.application.port.in.AuthWebUseCase;
 import com.hondigagae.domainlayer.auth.application.port.out.query.OAuthMemberQueryResult;
+import com.hondigagae.domainlayer.auth.application.service.processor.EmailVerificationProcessor;
+import com.hondigagae.domainlayer.auth.application.service.processor.GeneralLoginProcessor;
 import com.hondigagae.domainlayer.auth.application.service.processor.JwtTokenProcessor;
-import com.hondigagae.domainlayer.auth.application.service.processor.KakaoLoginProcessor;
+import com.hondigagae.domainlayer.auth.application.service.processor.OAuthLoginProcessor;
+import com.hondigagae.domainlayer.member.domain.enums.OAuthProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,29 +25,30 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthWebFacade implements AuthWebUseCase {
 
-    private final KakaoLoginProcessor kakaoLoginProcessor;
+    private final GeneralLoginProcessor generalLoginProcessor;
+    private final OAuthLoginProcessor oAuthLoginProcessor;
     private final JwtTokenProcessor jwtTokenProcessor;
+    private final EmailVerificationProcessor emailVerificationProcessor;
     private final AuthPresenter authPresenter;
 
     @Override
-    public AuthOAuthAuthorizeResponse generateKakaoAuthorizationUrl() {
-        String authorizationUrl = kakaoLoginProcessor.generateAuthorizationUrl();
-        return authPresenter.toOAuthAuthorizeResponse(authorizationUrl);
+    @Transactional
+    public AuthCookieResult<AuthGeneralLoginResponse> generalLogin(AuthGeneralLoginCommand command) {
+        // 1. 일반 로그인 자격 검증
+        GeneralLoginInfo generalLoginInfo = generalLoginProcessor.generalLogin(command);
+
+        // 2. 토큰 발급
+        JwtTokenIssueInfo jwtTokenIssueInfo = jwtTokenProcessor.issueTokens(generalLoginInfo.memberId(), generalLoginInfo.role());
+
+        // 3. Presenter를 통한 Info -> Response 변환
+        AuthGeneralLoginResponse response = authPresenter.toGeneralLoginResponse(jwtTokenIssueInfo);
+
+        return AuthCookieResult.of(response, jwtTokenIssueInfo.refreshToken());
     }
 
     @Override
-    public AuthCookieResult<AuthLoginResponse> kakaoLogin(String code, String state) {
-        // 1. state 검증 + 카카오 프로필 조회 — 외부 HTTP 왕복이므로 트랜잭션 밖에서 수행한다.
-        OAuthMemberQueryResult kakaoMember = kakaoLoginProcessor.fetchKakaoMember(code, state);
-
-        // 2. 회원 조회/생성 (Processor의 트랜잭션 경계) 후 토큰 발급
-        LoginInfo loginInfo = kakaoLoginProcessor.login(kakaoMember);
-        JwtTokenIssueInfo jwtTokenIssueInfo = jwtTokenProcessor.issueTokens(loginInfo.memberId(), loginInfo.role());
-
-        // 3. Presenter를 통한 Info -> Response 변환
-        AuthLoginResponse response = authPresenter.toLoginResponse(jwtTokenIssueInfo);
-
-        return AuthCookieResult.of(response, jwtTokenIssueInfo.refreshToken());
+    public void logout(long memberId, String tokenId) {
+        jwtTokenProcessor.revokeToken(memberId, tokenId);
     }
 
     @Override
@@ -59,7 +64,34 @@ public class AuthWebFacade implements AuthWebUseCase {
     }
 
     @Override
-    public void logout(long memberId, String tokenId) {
-        jwtTokenProcessor.revokeToken(memberId, tokenId);
+    public void sendEmailVerificationCode(String email) {
+        // Redis/메일 중심 흐름이라 트랜잭션 경계를 두지 않는다 (DB 조회는 단건 findByEmail뿐).
+        emailVerificationProcessor.sendCode(email);
+    }
+
+    @Override
+    public void verifyEmailVerificationCode(String email, String code) {
+        emailVerificationProcessor.verifyCode(email, code);
+    }
+
+    @Override
+    public AuthOAuthAuthorizeResponse generateOAuthAuthorizationUrl(OAuthProvider provider) {
+        String authorizationUrl = oAuthLoginProcessor.generateAuthorizationUrl(provider);
+        return authPresenter.toOAuthAuthorizeResponse(authorizationUrl);
+    }
+
+    @Override
+    public AuthCookieResult<AuthGeneralLoginResponse> oauthLogin(OAuthProvider provider, String authCode, String state) {
+        // 1. state 검증 + provider 프로필 조회 — 외부 HTTP 왕복이므로 트랜잭션 밖에서 수행한다.
+        OAuthMemberQueryResult oAuthMember = oAuthLoginProcessor.fetchOAuthMember(provider, authCode, state);
+
+        // 2. 회원 조회/생성 (Processor의 트랜잭션 경계) 후 토큰 발급
+        GeneralLoginInfo loginInfo = oAuthLoginProcessor.login(provider, oAuthMember);
+        JwtTokenIssueInfo jwtTokenIssueInfo = jwtTokenProcessor.issueTokens(loginInfo.memberId(), loginInfo.role());
+
+        // 3. Presenter를 통한 Info -> Response 변환
+        AuthGeneralLoginResponse response = authPresenter.toGeneralLoginResponse(jwtTokenIssueInfo);
+
+        return AuthCookieResult.of(response, jwtTokenIssueInfo.refreshToken());
     }
 }

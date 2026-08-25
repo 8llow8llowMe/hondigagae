@@ -9,7 +9,7 @@ backend/
 │   ├── persistence-core     JPA / QueryDSL / Snowflake ID
 │   ├── redis-core           Redis 설정
 │   ├── security-core        JWT 인증/인가 공통
-│   └── (storage-core)       오브젝트 스토리지 — 후기 사진/프로필 이미지 업로드 필요 시 추가
+│   └── storage-core         MinIO 오브젝트 스토리지 (업로드/삭제/키 생성/이미지 검증)
 ├── cloud/          (실행 모듈 — bootJar on)
 │   ├── api-gateway          Spring Cloud Gateway
 │   └── service-discovery    Eureka 서버
@@ -88,6 +88,24 @@ backend/
 
 ---
 
+## core/storage-core
+
+**역할**: MinIO(S3 호환) 오브젝트 스토리지 접근 공통 모듈
+
+**포함:**
+- `config.StorageConfigurer` — `MinioClient`, `ObjectStorageClient`, `StorageBucketInitializer` 빈
+- `client.ObjectStorageClient` — 업로드/삭제/공개 URL 조립. 삭제는 `deleteAfterCommit` 으로 커밋 이후 지연 실행
+- `model.ImageFileType` — 매직 바이트 기반 이미지 형식 판정 (확장자/Content-Type 불신)
+- `util.ObjectKeyFactory` — 서버 생성 키 `{prefix}/{memberId}/{yyyy}/{MM}/{uuid}.{ext}` + 소유권 검증
+- `support.MultipartFileSupport` — `MultipartFile` → 도메인 자료형 변환 (어댑터 경계 전용)
+
+**존재 이유**: 업로드 로직을 서비스마다 복사하면 검증 누락과 라이브러리 버전 분기가 생긴다.
+검증(크기·형식)을 클라이언트 내부에 두어 호출부가 빠뜨릴 수 없게 했다.
+
+**사용처**: auth-service(프로필 이미지). 여행 후기 사진이 생기면 plan-service 도 사용한다.
+
+---
+
 ## cloud/api-gateway
 
 **역할**: Spring Cloud Gateway — 외부 요청 라우팅 + JWT 검증
@@ -114,12 +132,15 @@ backend/
 **역할**: 인증·회원·반려견 프로필
 
 **주요 API (계획):**
-- `GET /api/v1/auth/kakao/authorize`, `GET /api/v1/auth/kakao/login` — 카카오 소셜 로그인
+- `POST /api/v1/auth/login` — 일반 로그인
+- `GET /api/v1/auth/{provider}/authorize`, `GET /api/v1/auth/{provider}/login` — 소셜 로그인 (kakao/naver)
+- `POST /api/v1/auth/email/send-code|verify-code` — 이메일 인증코드
 - `POST /api/v1/auth/logout`, `POST /api/v1/auth/token/reissue`
-- `GET /api/v1/members/me`
-- `GET|POST|PUT|DELETE /api/v1/members/me/pets` — 반려견 프로필 (품종, 나이, 더위/추위 민감도, 활동 성향)
+- `POST /api/v1/members/signup`, `GET|PATCH /api/v1/members/me`
+- `POST|DELETE /api/v1/members/me/profile-image`, `POST /api/v1/members/me/password`
+- `GET|POST|PUT|DELETE /api/v1/members/me/pets` — 반려견 프로필 (품종, 크기, 민감도, 활동 성향)
 
-**특수 의존**: `core:security-core`의 `auth/` 패키지 (JWT 발급 전용), `core:redis-core` (토큰/OAuth state 저장)
+**특수 의존**: `core:security-core`의 `auth/` 패키지 (JWT 발급 전용), `core:redis-core` (토큰/OAuth state/이메일 인증/로그인 잠금), `core:storage-core` (프로필 이미지)
 
 ---
 

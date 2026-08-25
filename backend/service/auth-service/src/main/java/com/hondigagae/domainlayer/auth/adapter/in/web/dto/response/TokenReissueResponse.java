@@ -7,7 +7,7 @@ import lombok.Builder;
 @Schema(description = "토큰 재발급 응답 DTO")
 public record TokenReissueResponse(
 
-    @Schema(description = "JWT 액세스 토큰", example = "eyJhbGciOiJIUzUxMiJ9...")
+    @Schema(description = "JWT 액세스 토큰", example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
     String accessToken
 ) {
 

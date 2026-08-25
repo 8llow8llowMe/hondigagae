@@ -14,8 +14,12 @@ cd backend
 docker compose -f docker-compose-local.yml up -d
 ```
 
-MySQL(3306, DB `hondigagae`, 계정 `hondigagae` / `hondigagae123!`)과 Redis(6379)가 뜬다.
+MySQL(3306, DB `hondigagae`, 계정 `hondigagae` / `hondigagae123!`), Redis(6379),
+MinIO(9000, 콘솔 9001, `minioadmin` / `minioadmin`)가 뜬다.
 local 프로파일 기본값이 이 값에 맞춰져 있어 별도 설정이 필요 없다.
+
+MinIO는 auth-service의 프로필 이미지 업로드에 쓰인다. 버킷(`hondigagae-local`)은
+`StorageBucketInitializer`가 기동 시 없으면 만든다.
 
 ## 3. 기동 순서
 
@@ -76,5 +80,8 @@ $env:TOUR_API_SERVICE_KEY = "<디코딩된 인증키>"
   `localhost:8888` 을 먼저 찾는다. 경고일 뿐 기동에는 영향이 없다.
 - **Eureka 연결 거부 로그** — service-discovery 를 먼저 띄우지 않으면 나온다. 재시도하므로
   나중에 띄워도 자동으로 등록된다.
-- **Gradle 데몬 크래시** — 기본 힙으로는 데몬이 죽은 이력이 있어 `gradle.properties` 에서
-  `-Xmx2g` 로 올려 두었다. 이 파일을 지우지 말 것.
+- **Gradle 데몬 크래시** — `gradle.properties` 에서 힙을 `-Xmx2g` 로 올려 두었다(이 파일을 지우지 말 것).
+  그래도 JDK 21.0.4 에서 `EXCEPTION_ACCESS_VIOLATION` 으로 데몬이 죽는 경우가 간헐적으로 있다.
+  `./gradlew --stop` 후 다시 실행하면 통과한다.
+- **소셜 로그인/메일 발송이 로컬에서 실패** — `OAUTH_*`, `MAIL_*` 자격증명이 없으면 기동은 되고
+  해당 기능 호출 시점에만 실패하도록 되어 있다. 필요할 때 환경변수로 넣는다 (`.env.example` 참고).

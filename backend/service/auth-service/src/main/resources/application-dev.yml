@@ -6,6 +6,21 @@ spring:
   cloud:
     config:
       enabled: false
+  # 이메일 인증코드 발송용 SMTP. 자격증명 미설정 시에도 기동은 가능하며 발송 시점에만 실패한다.
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${AUTH_DB_URL}
@@ -45,6 +60,15 @@ infra:
     port: ${REDIS_PORT}
     password: ${REDIS_PASSWORD}
     key-prefix: ${REDIS_KEY_PREFIX}
+  storage:
+    # 백엔드는 MinIO 와 다른 호스트에 있으므로 컨테이너명이 아니라 사설 IP 로 접속한다.
+    endpoint: ${MINIO_ENDPOINT}
+    # 브라우저가 이미지를 조회할 공개 주소. DB 에는 key 만 저장하고 응답 시 이 값으로 URL 을 조립한다.
+    public-url: ${MINIO_PUBLIC_URL}
+    bucket: ${MINIO_BUCKET}
+    access-key: ${MINIO_ACCESS_KEY}
+    secret-key: ${MINIO_SECRET_KEY}
+    max-file-bytes: ${MINIO_MAX_FILE_BYTES:5242880}
 
 jwt:
   access-key: ${JWT_ACCESS_KEY}
@@ -58,7 +82,13 @@ snowflake:
   datacenter-id: ${SNOWFLAKE_DATACENTER_ID}
   worker-id: ${SNOWFLAKE_WORKER_ID}
 
-# 카카오 로그인 설정. 자격증명 미설정 시에도 기동은 가능하며 소셜 로그인 시점에만 실패한다.
+# 일반 로그인 실패 횟수 제한 / 잠금
+auth:
+  login:
+    max-failure-count: ${AUTH_LOGIN_MAX_FAILURE_COUNT}
+    lock-duration: ${AUTH_LOGIN_LOCK_DURATION}
+
+# 소셜 로그인 provider 설정. 자격증명 미설정 시에도 기동은 가능하며 소셜 로그인 시점에만 실패한다.
 oauth:
   kakao:
     client-id: ${OAUTH_KAKAO_CLIENT_ID:}
@@ -68,3 +98,7 @@ oauth:
       - profile_nickname
       - profile_image
       - account_email
+  naver:
+    client-id: ${OAUTH_NAVER_CLIENT_ID:}
+    client-secret: ${OAUTH_NAVER_CLIENT_SECRET:}
+    redirect-uri: ${OAUTH_NAVER_REDIRECT_URI:}

@@ -3,15 +3,16 @@ package com.hondigagae.domainlayer.auth.application.port.out.query;
 import lombok.Builder;
 
 /**
- * 카카오에게서 조회한 사용자 프로필. adapter가 외부 응답을 이 형태로 변환해 넘긴다.
+ * 소셜 제공자에게서 조회한 사용자 프로필. adapter가 외부 응답을 이 형태로 변환해 넘긴다.
  *
- * <p>회원 식별 기준은 kakaoId(카카오 회원번호)다. 이메일은 동의 항목이라 없을 수 있으며
- * 참고 정보로만 저장한다.
+ * <p>emailVerified는 "제공자가 이메일 소유를 검증했는지"를 뜻한다. 미검증 이메일로
+ * 기존 계정을 연결하면 계정 탈취가 가능하므로, 신규 가입/계정 연결 판단에 반드시 사용한다.
  */
 @Builder
 public record OAuthMemberQueryResult(
-    long kakaoId,
     String email,
+    boolean emailVerified,
+    String name,
     String nickname,
     String profileImageUrl
 ) {

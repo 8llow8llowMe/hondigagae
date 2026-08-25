@@ -5,17 +5,28 @@ spring:
     import: optional:classpath:observability-common.yml
   profiles:
     active: local
+  servlet:
+    multipart:
+      # 업로드 상한. 스토리지 자체 검증(infra.storage.max-file-bytes)과 함께 2중으로 막는다.
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:5MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:30MB}
 
 infra:
   redis:
     key-prefix: ${REDIS_KEY_PREFIX:hondigagae}
+
+# 일반 로그인 brute-force 방어. 프로필별 override 가 없어도 동작하도록 공통 기본값을 둔다.
+auth:
+  login:
+    max-failure-count: ${AUTH_LOGIN_MAX_FAILURE_COUNT:5}
+    lock-duration: ${AUTH_LOGIN_LOCK_DURATION:PT10M}
 
 logging:
   level:
     # Eureka 클라이언트가 주기적으로 Eureka 서버 엔드포인트를 확인할 때 출력하는 반복 로그를 줄이기 위한 설정
     com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
 
-# 카카오 OAuth 호출 서킷브레이커.
+# 소셜 로그인 provider(OAuth) 호출 서킷브레이커.
 # 4xx(인가코드 만료·재사용 등 사용자 조작 문제)는 OAuthApiCallSupport가 서킷 안에서
 # AuthException으로 변환하므로, ignore 처리해 provider 장애로 집계하지 않는다.
 resilience4j:
@@ -35,4 +46,6 @@ resilience4j:
           - com.hondigagae.domainlayer.auth.application.exception.AuthException
     instances:
       kakao:
+        base-config: default
+      naver:
         base-config: default
