@@ -4,10 +4,10 @@ import com.hondigagae.domainlayer.auth.application.port.out.JwtTokenStorePort;
 import com.hondigagae.redis.properties.RedisProperties;
 import com.hondigagae.security.auth.blacklist.AccessTokenBlacklistVerifier;
 import com.hondigagae.security.auth.jwt.JwtAuthProperties;
-import com.hondigagae.security.common.exception.SecurityErrorCode;
-import com.hondigagae.security.common.exception.SecurityJwtException;
 import java.time.Duration;
 import java.util.Optional;
+import com.hondigagae.security.common.exception.SecurityErrorCode;
+import com.hondigagae.security.common.exception.SecurityJwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -58,7 +58,7 @@ public class RedisJwtTokenStoreAdapter implements JwtTokenStorePort, AccessToken
     }
 
     /**
-     * 세션 무효화(탈퇴/로그아웃)의 핵심 연산이므로 Redis 실패를 삼키지 않고 전파한다.
+     * 세션 무효화(탈퇴/비밀번호 변경/로그아웃)의 핵심 연산이므로 Redis 실패를 삼키지 않고 전파한다.
      * 관용 처리가 필요한 호출부(로그아웃)는 상위에서 예외를 처리한다.
      */
     @Override

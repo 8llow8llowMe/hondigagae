@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
 @JsonNaming(SnakeCaseStrategy.class)
 public record KakaoAccount(
     KakaoProfile profile,
+    String name,
     boolean isEmailValid,
     boolean isEmailVerified,
     String email

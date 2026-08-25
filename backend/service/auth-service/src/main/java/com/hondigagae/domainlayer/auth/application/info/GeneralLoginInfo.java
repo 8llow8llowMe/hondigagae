@@ -4,13 +4,13 @@ import com.hondigagae.security.common.enums.SecurityRole;
 import lombok.Builder;
 
 @Builder
-public record LoginInfo(
+public record GeneralLoginInfo(
     long memberId,
     SecurityRole role
 ) {
 
-    public static LoginInfo of(long memberId, SecurityRole role) {
-        return LoginInfo.builder()
+    public static GeneralLoginInfo of(long memberId, SecurityRole role) {
+        return GeneralLoginInfo.builder()
             .memberId(memberId)
             .role(role)
             .build();

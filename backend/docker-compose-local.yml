@@ -44,6 +44,28 @@ services:
       timeout: 5s
       retries: 10
 
+  # 프로필 이미지 저장소. auth-service local 프로파일의 infra.storage 기본값과 맞췄다.
+  # 콘솔은 http://localhost:9001 (minioadmin / minioadmin)
+  minio:
+    image: minio/minio:latest
+    container_name: hondigagae-minio-local
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      TZ: Asia/Seoul
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - hondigagae-minio-local-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   hondigagae-mysql-local-data:
   hondigagae-redis-local-data:
+  hondigagae-minio-local-data:

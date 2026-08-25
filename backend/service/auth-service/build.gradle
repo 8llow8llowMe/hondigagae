@@ -2,15 +2,18 @@ dependencies {
     implementation project(':core:common-core')
     implementation project(':core:persistence-core')
     implementation project(':core:security-core')
+    implementation project(':core:storage-core')
     implementation project(':core:redis-core')
 
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    // 카카오 OAuth HTTP Interface 용 WebClient
+    // 소셜 로그인 provider 호출용 HTTP Interface (WebClient)
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    // 이메일 인증코드 발송
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'

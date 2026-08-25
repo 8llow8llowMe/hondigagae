@@ -16,6 +16,20 @@ spring:
   cloud:
     config:
       enabled: false
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${AUTH_DB_URL}
@@ -53,18 +67,29 @@ infra:
     port: ${REDIS_PORT}
     password: ${REDIS_PASSWORD}
     key-prefix: ${REDIS_KEY_PREFIX}
+  storage:
+    endpoint: ${MINIO_ENDPOINT}
+    public-url: ${MINIO_PUBLIC_URL}
+    bucket: ${MINIO_BUCKET}
+    access-key: ${MINIO_ACCESS_KEY}
+    secret-key: ${MINIO_SECRET_KEY}
+    max-file-bytes: ${MINIO_MAX_FILE_BYTES:5242880}
 
 jwt:
   access-key: ${JWT_ACCESS_KEY}
   refresh-key: ${JWT_REFRESH_KEY}
   access-expiration: ${JWT_ACCESS_EXPIRATION}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION}
-  # 블랙리스트 조회 실패 시 정책. 게이트웨이의 동일 키와 정렬한다. (false = fail-closed, 503 응답)
   blacklist-fail-open: ${JWT_BLACKLIST_FAIL_OPEN:false}
 
 snowflake:
   datacenter-id: ${SNOWFLAKE_DATACENTER_ID}
   worker-id: ${SNOWFLAKE_WORKER_ID}
+
+auth:
+  login:
+    max-failure-count: ${AUTH_LOGIN_MAX_FAILURE_COUNT}
+    lock-duration: ${AUTH_LOGIN_LOCK_DURATION}
 
 oauth:
   kakao:
@@ -75,3 +100,7 @@ oauth:
       - profile_nickname
       - profile_image
       - account_email
+  naver:
+    client-id: ${OAUTH_NAVER_CLIENT_ID}
+    client-secret: ${OAUTH_NAVER_CLIENT_SECRET}
+    redirect-uri: ${OAUTH_NAVER_REDIRECT_URI}

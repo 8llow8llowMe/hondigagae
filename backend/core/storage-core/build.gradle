@@ -1,0 +1,13 @@
+dependencies {
+    // MinIO(S3 호환) 클라이언트. 버전은 이 모듈에서만 선언한다.
+    // 서비스는 ObjectStorageClient 만 사용하므로 minio 를 직접 의존하지 않는다
+    // (서비스마다 중복 선언하면 버전이 갈라진다 — TripMarble 은 8.6.0/8.5.17 로 갈라져 있었다).
+    implementation 'io.minio:minio:8.6.0'
+    // MultipartFile -> 도메인 자료형 변환은 어댑터 경계(MultipartFileSupport)에서만 일어난다.
+    implementation 'org.springframework:spring-web'
+    // 삭제를 커밋 이후로 미루기 위한 TransactionSynchronizationManager
+    implementation 'org.springframework:spring-tx'
+}
+
+jar { enabled = true }
+bootJar { enabled = false }

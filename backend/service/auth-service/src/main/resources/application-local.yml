@@ -2,7 +2,7 @@ server:
   port: 8081
   shutdown: graceful
 
-# 카카오 로그인 설정. 로컬은 자격증명이 없으면 소셜 로그인 시점에만 실패한다.
+# 소셜 로그인 provider 설정. 로컬은 자격증명이 없으면 소셜 로그인 시점에만 실패한다.
 oauth:
   kakao:
     client-id: ${OAUTH_KAKAO_CLIENT_ID:}
@@ -12,11 +12,31 @@ oauth:
       - profile_nickname
       - profile_image
       - account_email
+  naver:
+    client-id: ${OAUTH_NAVER_CLIENT_ID:}
+    client-secret: ${OAUTH_NAVER_CLIENT_SECRET:}
+    redirect-uri: ${OAUTH_NAVER_REDIRECT_URI:http://localhost:3000/oauth/naver/callback}
 
 spring:
   cloud:
     config:
       enabled: false  # 로컬에서만 Config Server 비활성화
+
+  # 이메일 인증코드 발송용 SMTP. 로컬은 자격증명이 없으면 발송 시점에만 실패한다.
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -54,6 +74,13 @@ infra:
     port: 6379
     password:
     key-prefix: ${REDIS_KEY_PREFIX:hondigagae-local}
+  storage:
+    endpoint: http://localhost:9000
+    public-url: http://localhost:9000
+    bucket: hondigagae-local
+    access-key: minioadmin
+    secret-key: minioadmin
+    max-file-bytes: 5242880
 
 eureka:
   client:
@@ -69,3 +96,9 @@ jwt:
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:P14D}
   # 블랙리스트 조회 실패 시 정책. 게이트웨이의 동일 키와 정렬한다. (false = fail-closed, 503 응답)
   blacklist-fail-open: ${JWT_BLACKLIST_FAIL_OPEN:false}
+
+# 일반 로그인 실패 횟수 제한 / 잠금
+auth:
+  login:
+    max-failure-count: ${AUTH_LOGIN_MAX_FAILURE_COUNT:5}
+    lock-duration: ${AUTH_LOGIN_LOCK_DURATION:PT10M}

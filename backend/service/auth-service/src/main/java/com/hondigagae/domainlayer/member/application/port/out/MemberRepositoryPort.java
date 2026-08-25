@@ -7,7 +7,9 @@ public interface MemberRepositoryPort {
 
     Member save(Member domain);
 
-    Optional<Member> findById(long memberId);
+    boolean existsByEmail(String email);
 
-    Optional<Member> findByKakaoId(long kakaoId);
+    Optional<Member> findByEmail(String email);
+
+    Optional<Member> findById(long memberId);
 }

@@ -6,5 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MemberRepository extends JpaRepository<MemberEntity, Long> {
 
-    Optional<MemberEntity> findByKakaoId(long kakaoId);
+    boolean existsByEmail(String email);
+
+    Optional<MemberEntity> findByEmail(String email);
 }

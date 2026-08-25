@@ -50,7 +50,7 @@ public class JwtTokenProcessor {
     }
 
     /**
-     * 보안 이벤트(탈퇴)용 revoke. 실패를 전파해 호출 트랜잭션을 롤백시킨다 —
+     * 보안 이벤트(탈퇴/비밀번호 변경)용 revoke. 실패를 전파해 호출 트랜잭션을 롤백시킨다 —
      * "세션 무효화 없이 성공한 것처럼 보이는" 상태를 만들지 않기 위함이다.
      */
     public void revokeAllSessions(long memberId, String tokenId) {
@@ -81,7 +81,7 @@ public class JwtTokenProcessor {
             throw new AuthException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
 
-        // 3. Lookup member and validate status (탈퇴 회원의 토큰 재발급 차단)
+        // 3. Lookup member and validate status (정지/탈퇴 회원의 토큰 재발급 차단)
         Member member = memberRepositoryPort.findById(memberId)
             .orElseThrow(() -> new MemberException(MemberErrorCode.NOT_FOUND_MEMBER));
         validateReissuableStatus(member);
@@ -99,6 +99,10 @@ public class JwtTokenProcessor {
             case WITHDRAWN -> {
                 jwtTokenStorePort.delete(member.id());
                 throw new MemberException(MemberErrorCode.MEMBER_ALREADY_WITHDRAWN);
+            }
+            case SUSPENDED -> {
+                jwtTokenStorePort.delete(member.id());
+                throw new MemberException(MemberErrorCode.MEMBER_SUSPENDED);
             }
             case ACTIVE -> {
             } // 정상

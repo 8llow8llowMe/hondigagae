@@ -24,14 +24,19 @@ public class MemberRepositoryAdapter implements MemberRepositoryPort {
     }
 
     @Override
-    public Optional<Member> findById(long memberId) {
-        return memberRepository.findById(memberId)
+    public boolean existsByEmail(String email) {
+        return memberRepository.existsByEmail(email);
+    }
+
+    @Override
+    public Optional<Member> findByEmail(String email) {
+        return memberRepository.findByEmail(email)
             .map(memberMapper::toDomainFromEntity);
     }
 
     @Override
-    public Optional<Member> findByKakaoId(long kakaoId) {
-        return memberRepository.findByKakaoId(kakaoId)
+    public Optional<Member> findById(long memberId) {
+        return memberRepository.findById(memberId)
             .map(memberMapper::toDomainFromEntity);
     }
 }

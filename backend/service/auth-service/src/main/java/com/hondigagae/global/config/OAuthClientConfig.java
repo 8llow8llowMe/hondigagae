@@ -2,6 +2,8 @@ package com.hondigagae.global.config;
 
 import com.hondigagae.domainlayer.auth.adapter.out.oauth.kakao.KakaoApiClient;
 import com.hondigagae.domainlayer.auth.adapter.out.oauth.kakao.properties.KakaoOAuthProperties;
+import com.hondigagae.domainlayer.auth.adapter.out.oauth.naver.NaverApiClient;
+import com.hondigagae.domainlayer.auth.adapter.out.oauth.naver.properties.NaverOAuthProperties;
 import io.netty.channel.ChannelOption;
 import java.time.Duration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -14,7 +16,7 @@ import org.springframework.web.service.invoker.HttpServiceProxyFactory;
 import reactor.netty.http.client.HttpClient;
 
 @Configuration
-@EnableConfigurationProperties(KakaoOAuthProperties.class)
+@EnableConfigurationProperties({KakaoOAuthProperties.class, NaverOAuthProperties.class})
 public class OAuthClientConfig {
 
     private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(10);
@@ -23,6 +25,11 @@ public class OAuthClientConfig {
     @Bean
     public KakaoApiClient kakaoApiClient() {
         return createHttpInterface(KakaoApiClient.class);
+    }
+
+    @Bean
+    public NaverApiClient naverApiClient() {
+        return createHttpInterface(NaverApiClient.class);
     }
 
     private <T> T createHttpInterface(Class<T> serviceClass) {
