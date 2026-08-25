@@ -20,6 +20,12 @@
   - core / cloud / service 모듈 구조와 역할, 공유 모듈 추가 기준
 - `external-api-guide.md`
   - TourAPI, 반려동물 동반여행, 두루누비, 혼잡도, 기상청, 카카오 등 외부 API 연동 기준
+- `entity-design.md`
+  - 실호출로 검증한 공공 API 응답 기준의 DB 엔티티 설계 (컬럼·인덱스·적재 전략)
+- `data-api-analysis.md`
+  - 공공데이터 API 7종의 실제 응답 구조와 연동 시 함정
+- `local-run-guide.md`
+  - 로컬 기동 절차, 포트 맵, Swagger 접근, 자주 겪는 문제
 - `service-playbook.md`
   - 새 서비스, 컨텍스트 추가, 리팩토링, 문서/검증 절차
 - `done-checklist.md`
@@ -35,11 +41,12 @@
 
 1. `../AGENTS.md` 또는 `../CLAUDE.md`
 2. `README.md`
-3. `architecture-guide.md`
-4. `coding-conventions.md`
-5. `api-design-guide.md`
-6. `external-api-guide.md` (외부 데이터 연동 작업 시)
-7. `service-playbook.md`
+3. `local-run-guide.md` (처음 띄워볼 때)
+4. `architecture-guide.md`
+5. `coding-conventions.md`
+6. `api-design-guide.md`
+7. `external-api-guide.md`, `data-api-analysis.md`, `entity-design.md` (외부 데이터 연동 작업 시)
+8. `service-playbook.md`
 8. `done-checklist.md`
 9. `team-playbook.md`
 10. `service-inventory.md`
