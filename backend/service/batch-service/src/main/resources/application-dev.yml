@@ -1,0 +1,31 @@
+server:
+  port: ${BATCH_SERVICE_PORT}
+  shutdown: graceful
+
+spring:
+  cloud:
+    config:
+      enabled: false
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${BATCH_DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  batch:
+    jdbc:
+      initialize-schema: always
+
+tour-api:
+  service-key: ${TOUR_API_SERVICE_KEY}
+
+eureka:
+  instance:
+    # Docker 컨테이너 환경: 컨테이너 IP로 등록해야 게이트웨이 lb:// 라우팅이
+    # 컨테이너 hostname(컨테이너 ID) DNS 해석 실패 없이 연결된다.
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+  client:
+    serviceUrl:
+      defaultZone: http://${SERVICE_DISCOVERY_HOSTNAME}:${SERVICE_DISCOVERY_PORT}/eureka/

@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: ${SPRING_APPLICATION_NAME:batch-service}
+  config:
+    import: optional:classpath:observability-common.yml
+  profiles:
+    active: local
+  batch:
+    job:
+      # 기동 시 잡 자동 실행 금지 — 잡 이름을 지정한 수동 실행만 허용한다.
+      # 예) --spring.batch.job.enabled=true --spring.batch.job.name=placeImportJob areaCode=39
+      enabled: false
+
+tour-api:
+  base-url: ${TOUR_API_BASE_URL:https://apis.data.go.kr/B551011}
+  # 공공데이터포털 "디코딩(원문)" 키. 절대 커밋하지 않는다 — env 또는 Jasypt ENC()로만 주입.
+  service-key: ${TOUR_API_SERVICE_KEY:}
+  mobile-os: ETC
+  mobile-app: hondigagae
+
+logging:
+  level:
+    # Eureka 클라이언트가 주기적으로 Eureka 서버 엔드포인트를 확인할 때 출력하는 반복 로그를 줄이기 위한 설정
+    com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
