@@ -1,0 +1,69 @@
+server:
+  port: 8081
+  shutdown: graceful
+
+# 카카오 로그인 설정. 로컬은 자격증명이 없으면 소셜 로그인 시점에만 실패한다.
+oauth:
+  kakao:
+    client-id: ${OAUTH_KAKAO_CLIENT_ID:}
+    client-secret: ${OAUTH_KAKAO_CLIENT_SECRET:}
+    redirect-uri: ${OAUTH_KAKAO_REDIRECT_URI:http://localhost:3000/oauth/kakao/callback}
+    scope:
+      - profile_nickname
+      - profile_image
+      - account_email
+
+spring:
+  cloud:
+    config:
+      enabled: false  # 로컬에서만 Config Server 비활성화
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/hondigagae?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Seoul&zeroDateTimeBehavior=convertToNull&rewriteBatchedStatements=true
+    username: ${DB_USERNAME:hondigagae}
+    password: ${DB_PASSWORD:hondigagae123!}
+
+  jpa:
+    open-in-view: false
+    defer-datasource-initialization: true
+    generate-ddl: true
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        show_sql: true
+        jdbc:
+          batch_size: 100
+        default_batch_fetch_size: 100
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+
+snowflake:
+  datacenter-id: 1
+  worker-id: 1
+
+infra:
+  redis:
+    mode: standalone
+    host: localhost
+    port: 6379
+    password:
+    key-prefix: ${REDIS_KEY_PREFIX:hondigagae-local}
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+
+jwt:
+  # 로컬 개발 전용 기본 키 (HS512 — 64바이트 이상).
+  # access-key는 API Gateway 및 Resource Server 서비스와 반드시 동일해야 한다.
+  access-key: ${JWT_ACCESS_KEY:hondigagae-local-jwt-access-key-0123456789abcdef0123456789abcdef0123456789abcdef}
+  refresh-key: ${JWT_REFRESH_KEY:hondigagae-local-jwt-refresh-key-fedcba9876543210fedcba9876543210fedcba9876543210}
+  access-expiration: ${JWT_ACCESS_EXPIRATION:PT1H}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:P14D}
