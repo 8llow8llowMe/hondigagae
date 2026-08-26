@@ -21,6 +21,7 @@ public interface PlaceRepository extends JpaRepository<PlaceEntity, Long> {
           and (:petAllowanceType is null or p.petAllowanceType = :petAllowanceType)
           and (:indoor is null or p.indoor = :indoor)
           and (:allowedPetSize is null or p.allowedPetSize = :allowedPetSize)
+          and (:sourceCategory is null or p.sourceCategory = :sourceCategory)
           and (:lastPlaceId is null or p.id < :lastPlaceId)
         order by p.id desc
         """)
@@ -28,6 +29,7 @@ public interface PlaceRepository extends JpaRepository<PlaceEntity, Long> {
         @Param("areaCode") String areaCode, @Param("sigunguCode") String sigunguCode,
         @Param("contentTypeId") String contentTypeId, @Param("petAllowanceType") PetAllowanceType petAllowanceType,
         @Param("indoor") Boolean indoor, @Param("allowedPetSize") AllowedPetSize allowedPetSize,
+        @Param("sourceCategory") String sourceCategory,
         @Param("lastPlaceId") Long lastPlaceId, Pageable pageable
     );
 

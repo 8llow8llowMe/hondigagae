@@ -111,6 +111,7 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             id,
             source,
             source_key,
+            source_category,
             content_type_id,
             title,
             addr1,
@@ -134,8 +135,9 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             synced_at,
             created_at,
             updated_at
-        ) VALUES (?, 'CULTURE_PORTAL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, 'CULTURE_PORTAL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ON DUPLICATE KEY UPDATE
+            source_category = VALUES(source_category),
             content_type_id = VALUES(content_type_id),
             title = VALUES(title),
             addr1 = VALUES(addr1),
@@ -156,6 +158,33 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             pet_restriction = VALUES(pet_restriction),
             pet_extra_fee = VALUES(pet_extra_fee),
             source_modified_at = VALUES(source_modified_at),
+            synced_at = VALUES(synced_at),
+            updated_at = NOW()
+        """;
+
+
+    /**
+     * 운영시간·휴무일·주차·입장료는 place 가 아니라 place_intro 가 갖는다.
+     * 문화정보원은 이 네 값이 230곳 전부 채워져 있어 버리면 손실이 크다.
+     * place_intro 의 PK 는 place_id 와 1:1 이라 place id 를 그대로 쓴다.
+     */
+    private static final String CULTURE_INTRO_UPSERT_SQL = """
+        INSERT INTO place_intro (
+            id,
+            place_id,
+            use_time,
+            rest_date,
+            parking,
+            raw_json,
+            synced_at,
+            created_at,
+            updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE
+            use_time = VALUES(use_time),
+            rest_date = VALUES(rest_date),
+            parking = VALUES(parking),
+            raw_json = VALUES(raw_json),
             synced_at = VALUES(synced_at),
             updated_at = NOW()
         """;
@@ -229,6 +258,7 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
                     int index = 1;
                     ps.setLong(index++, facility.placeId());
                     ps.setString(index++, facility.sourceKey());
+                    ps.setString(index++, facility.sourceCategory());
                     ps.setString(index++, facility.contentTypeId());
                     ps.setString(index++, facility.title());
                     ps.setString(index++, facility.addr1());
@@ -257,7 +287,39 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
                     return chunk.size();
                 }
             });
+
+            upsertCultureIntros(chunk, syncedAt);
         }
+    }
+
+    /** 입장료는 place_intro 의 정규 컬럼이 없어 raw_json 에 넣는다. */
+    private void upsertCultureIntros(List<ImportedCultureFacility> chunk, LocalDateTime syncedAt) {
+        jdbcTemplate.batchUpdate(CULTURE_INTRO_UPSERT_SQL, new BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(PreparedStatement ps, int i) throws SQLException {
+                ImportedCultureFacility facility = chunk.get(i);
+                int index = 1;
+                ps.setLong(index++, facility.placeId());
+                ps.setLong(index++, facility.placeId());
+                ps.setString(index++, facility.useTime());
+                ps.setString(index++, facility.restDate());
+                ps.setString(index++, facility.parking());
+                ps.setString(index++, toRawJson(facility));
+                ps.setTimestamp(index, Timestamp.valueOf(syncedAt));
+            }
+
+            @Override
+            public int getBatchSize() {
+                return chunk.size();
+            }
+        });
+    }
+
+    private String toRawJson(ImportedCultureFacility facility) {
+        if (facility.admissionFee() == null) {
+            return null;
+        }
+        return "{\"admissionFee\":\"" + facility.admissionFee().replace("\"", "'") + "\"}";
     }
 
     private void setNullableDecimal(PreparedStatement ps, int index, java.math.BigDecimal value) throws SQLException {

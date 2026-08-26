@@ -35,6 +35,7 @@ import org.hibernate.annotations.Comment;
         @Index(name = "idx_place_content_type_id_pet_available", columnList = "contentTypeId,petAvailable"),
         // 비 오는 날 실내 대안 추천 경로
         @Index(name = "idx_place_indoor_pet_available", columnList = "indoor,petAvailable"),
+        @Index(name = "idx_place_source_category", columnList = "sourceCategory"),
         @Index(name = "idx_place_lat_lng", columnList = "lat,lng"),
         @Index(name = "idx_place_source_modified_at", columnList = "sourceModifiedAt"),
         // 병합된 행은 조회에서 제외하므로 필터 컬럼에 인덱스를 둔다
@@ -55,6 +56,10 @@ public class PlaceEntity extends BaseEntity {
     @Column(nullable = false, length = 64)
     @Comment("원천 식별자 — TourAPI 는 contentId, 문화정보원은 시설명+주소 해시")
     private String sourceKey;
+
+    @Column(length = 50)
+    @Comment("원천의 원본 분류 (문화정보원 카테고리3: 펜션·카페·박물관 등). contentTypeId 로 뭉개기 전 값을 보존한다")
+    private String sourceCategory;
 
     @Comment("TourAPI 콘텐츠 아이디 (문화정보원 원천이면 null)")
     private Long contentId;
@@ -163,13 +168,13 @@ public class PlaceEntity extends BaseEntity {
     @Comment("반려동물 동반 구분 (가공값)")
     private PetAllowanceType petAllowanceType;
 
-    @Column(nullable = false)
-    @Comment("실내 장소 여부 — 비 오는 날 대안 추천의 근거")
-    private boolean indoor;
+    // 원천이 실내외를 알려주지 않는 경우(관광 API)와 "실외다"를 구분해야 하므로 wrapper 로 둔다.
+    // false 로 뭉개면 관광 API 장소 29곳이 전부 "실외"로 잘못 표시된다.
+    @Comment("실내 장소 여부 — 비 오는 날 대안 추천의 근거. null 이면 원천에 정보가 없다")
+    private Boolean indoor;
 
-    @Column(nullable = false)
-    @Comment("실외 장소 여부")
-    private boolean outdoor;
+    @Comment("실외 장소 여부. null 이면 원천에 정보가 없다")
+    private Boolean outdoor;
 
     @Column(nullable = false)
     @Comment("반려동물 전용 시설 여부")

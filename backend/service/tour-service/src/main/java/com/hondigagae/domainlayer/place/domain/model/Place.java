@@ -12,6 +12,7 @@ public record Place(
     long id,
     PlaceSource source,
     String sourceKey,
+    String sourceCategory,
     // 문화정보원 원천이면 null 이라 wrapper 로 둔다
     Long contentId,
     String contentTypeId,
@@ -40,8 +41,8 @@ public record Place(
     String overview,
     boolean petAvailable,
     PetAllowanceType petAllowanceType,
-    boolean indoor,
-    boolean outdoor,
+    Boolean indoor,
+    Boolean outdoor,
     boolean petOnly,
     AllowedPetSize allowedPetSize,
     String petRestriction,

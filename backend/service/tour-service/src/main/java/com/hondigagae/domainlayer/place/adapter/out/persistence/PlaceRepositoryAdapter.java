@@ -39,7 +39,7 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
             criteria.areaCode(), criteria.sigunguCode(),
             criteria.contentType() == null ? null : criteria.contentType().getCode(),
             criteria.petAllowanceType(), criteria.indoor(), criteria.allowedPetSize(),
-            criteria.lastPlaceId(),
+            criteria.sourceCategory(), criteria.lastPlaceId(),
             PageRequest.of(0, criteria.size())
         );
         return new PlaceSliceQueryResult(placeMapper.toDomains(slice.getContent()), slice.hasNext());

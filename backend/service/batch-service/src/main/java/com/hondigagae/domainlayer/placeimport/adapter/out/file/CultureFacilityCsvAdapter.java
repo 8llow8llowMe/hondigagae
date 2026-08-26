@@ -68,6 +68,8 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
     private static final String COL_OUTDOOR = "장소(실외)여부";
     private static final String COL_DESCRIPTION = "기본 정보_장소설명";
     private static final String COL_PET_FEE = "애견 동반 추가 요금";
+    private static final String COL_PARKING = "주차 가능여부";
+    private static final String COL_ADMISSION_FEE = "입장(이용료)가격 정보";
     private static final String COL_MODIFIED = "최종작성일";
 
     private static final List<String> REQUIRED_COLUMNS = List.of(
@@ -208,6 +210,7 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
 
         return ImportedCultureFacility.builder()
             .sourceKey(PlaceIdFactory.sourceKeyOf(name, address))
+            .sourceCategory(category3)
             .contentTypeId(CultureCategoryMapping.toContentTypeId(category3))
             .title(name)
             .addr1(address)
@@ -230,6 +233,8 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
             .petExtraFee(value(values, header, COL_PET_FEE))
             .useTime(value(values, header, COL_USE_TIME))
             .restDate(value(values, header, COL_REST_DATE))
+            .parking(value(values, header, COL_PARKING))
+            .admissionFee(value(values, header, COL_ADMISSION_FEE))
             .sourceModifiedAt(toDateTime(value(values, header, COL_MODIFIED)))
             .build();
     }
