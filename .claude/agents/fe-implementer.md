@@ -25,6 +25,7 @@ description: 혼디가개(hondigagae) FE(Next.js App Router)의 실제 구현 �
 **데이터 페칭** (정본: `docs/api-integration-guide.md`)
 
 - **전송 계층이 둘이다.** 브라우저는 `src/lib/api/client.ts`(baseURL `/api/bff`, 프록시 경유), 서버 컴포넌트·route handler는 `src/lib/api/server.ts`(게이트웨이 직접, `import 'server-only'`). baseURL을 바꾸지 않는다.
+- **BFF는 브라우저 헤더를 통째로 포워딩하지 않는다.** 필요한 헤더만 새로 구성한다. `Origin` 을 보존해 전달하면 게이트웨이 CORS 허용 목록에 없는 오리진에서 **POST만 빈 403** 이 된다.
 - **서버 컴포넌트가 `/api/bff` 를 부르지 않는다.** 자기 오리진 HTTP 재호출은 왕복 낭비이고 standalone 서버에서 깨진다. 경로·타입·래퍼 판별은 한 곳에 두고 전송만 갈린다.
 - **토큰(access/refresh)은 Next 서버만 보관·주입한다.** `localStorage`/`sessionStorage`에 토큰을 넣지 않는다. 클라이언트 상태는 세션에서 파생된 얕은 값(`memberId`, `isAuthenticated`, `me`)만.
 - 백엔드 공통 래퍼 `{dataHeader:{success,resultCode,resultMessage}, dataBody}` 의 성공/실패 판별을 보존한다 (`src/lib/api/response.ts` 재사용). `dataBody` 를 바로 쓰지 않는다.
@@ -84,7 +85,7 @@ description: 혼디가개(hondigagae) FE(Next.js App Router)의 실제 구현 �
 **라우팅**
 
 - `react-router-dom` 금지. `useRouter`/`usePathname`/`useSearchParams` 를 쓴다. 동적 세그먼트는 `[param]`.
-- header/footer 노출 예외는 route group으로. 보호 경로는 `middleware.ts` 의 `PROTECTED_PATHS` 와 일치시킨다.
+- header/footer 노출 예외는 route group으로. 보호 경로는 **`proxy.ts`** 의 `PROTECTED_PATHS` 와 일치시킨다 (Next 16 에서 `middleware.ts` 는 deprecated. 함수명도 `proxy`, 런타임 nodejs 고정).
 - 같은 오리진 리다이렉트는 `src/lib/http/redirect.ts` 의 헬퍼를 쓴다. `NextResponse.redirect(req.nextUrl…)` 는 standalone 서버에서 `http://0.0.0.0:3000` 으로 나가 깨진다.
 
 **스타일링** (정본: `frontend/DESIGN.md`)

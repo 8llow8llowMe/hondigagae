@@ -107,7 +107,7 @@ grep -rn "QueryClient\|HydrationBoundary\|initialData\|prefetch" frontend/src fr
 ### 9. 라우팅
 
 - `react-router-dom` 임포트가 있는가 → **위반**
-- 보호 화면이 `middleware.ts` `PROTECTED_PATHS` 에 등록됐는가
+- 보호 화면이 `proxy.ts` `PROTECTED_PATHS` 에 등록됐는가
 - `NextResponse.redirect(req.nextUrl…)` 를 쓰는가 → standalone에서 깨진다
 
 ## lint가 이미 막는 것 / 이 스킬이 잡는 것

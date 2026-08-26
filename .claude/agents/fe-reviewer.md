@@ -45,6 +45,7 @@ lint가 못 잡고, 각자 다 "맞아 보이기" 때문에 놓치기 쉬운 것
 - `initialData` 를 썼는가 → `HydrationBoundary` 로 통일한다
 - 모듈 스코프에 `QueryClient` 를 만들었는가 → **요청 간 사용자 데이터 유출**. 최우선 지적
 - 서버 컴포넌트가 `/api/bff` 를 부르는가 → standalone에서 깨진다
+- **BFF가 브라우저 요청 헤더를 통째로 포워딩하도록 바뀌었는가** → `Origin` 이 전달되면 게이트웨이 CORS 허용 목록에 없는 오리진에서 POST만 빈 403 이 된다. 헤더 화이트리스트를 유지해야 한다
 - 서버 프리페치와 클라이언트의 query key가 다른가 → 프리페치가 버려진다
 - **필터·정렬·탭이 Zustand·`useState` 에 있는가** → URL `searchParams` 여야 한다
 - searchParams 배열을 반복 키(`?type=A&type=B`)로 쓰는가 → 콤마 구분 단일 키
