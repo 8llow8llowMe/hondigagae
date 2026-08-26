@@ -1,7 +1,7 @@
 package com.hondigagae.domainlayer.placeimport.adapter.out.persistence;
 
-import com.hondigagae.domainlayer.placeimport.application.port.out.AnimalHospitalBulkPort;
-import com.hondigagae.domainlayer.placeimport.domain.model.ImportedAnimalHospital;
+import com.hondigagae.domainlayer.placeimport.application.port.out.EmergencyFacilityBulkPort;
+import com.hondigagae.domainlayer.placeimport.domain.model.ImportedEmergencyFacility;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -14,23 +14,24 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * animal_hospital 대량 upsert.
+ * emergency_facility 대량 upsert.
  *
- * <p>테이블 스키마의 원천은 tour-service 의 AnimalHospitalEntity(JPA)다.
+ * <p>테이블 스키마의 원천은 tour-service 의 EmergencyFacilityEntity(JPA)다.
  *
- * <p>CSV 에 이름·주소·좌표가 똑같은 중복이 139건 있는데, source_key(이름+주소 해시)가 UK 라
- * 별도 처리 없이 실제 86곳으로 정리된다.
+ * <p>CSV 에 이름·주소·좌표가 똑같은 중복이 많은데 source_key(시설명+주소 해시)가 UK 라
+ * 별도 처리 없이 정리된다 — 제주 841행이 214곳이 된다.
  */
 @Component
 @RequiredArgsConstructor
-public class JdbcAnimalHospitalBulkAdapter implements AnimalHospitalBulkPort {
+public class JdbcEmergencyFacilityBulkAdapter implements EmergencyFacilityBulkPort {
 
     private static final int BATCH_SIZE = 500;
 
     private static final String UPSERT_SQL = """
-        INSERT INTO animal_hospital (
+        INSERT INTO emergency_facility (
             id,
             source_key,
+            facility_type,
             name,
             addr,
             sigungu_code,
@@ -44,8 +45,9 @@ public class JdbcAnimalHospitalBulkAdapter implements AnimalHospitalBulkPort {
             synced_at,
             created_at,
             updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ON DUPLICATE KEY UPDATE
+            facility_type = VALUES(facility_type),
             name = VALUES(name),
             addr = VALUES(addr),
             sigungu_code = VALUES(sigungu_code),
@@ -63,30 +65,31 @@ public class JdbcAnimalHospitalBulkAdapter implements AnimalHospitalBulkPort {
     private final JdbcTemplate jdbcTemplate;
 
     @Override
-    public void upsertAll(List<ImportedAnimalHospital> hospitals) {
+    public void upsertAll(List<ImportedEmergencyFacility> facilitys) {
         LocalDateTime syncedAt = LocalDateTime.now();
 
-        for (int start = 0; start < hospitals.size(); start += BATCH_SIZE) {
-            int end = Math.min(start + BATCH_SIZE, hospitals.size());
-            List<ImportedAnimalHospital> chunk = hospitals.subList(start, end);
+        for (int start = 0; start < facilitys.size(); start += BATCH_SIZE) {
+            int end = Math.min(start + BATCH_SIZE, facilitys.size());
+            List<ImportedEmergencyFacility> chunk = facilitys.subList(start, end);
 
             jdbcTemplate.batchUpdate(UPSERT_SQL, new BatchPreparedStatementSetter() {
                 @Override
                 public void setValues(PreparedStatement ps, int i) throws SQLException {
-                    ImportedAnimalHospital hospital = chunk.get(i);
+                    ImportedEmergencyFacility facility = chunk.get(i);
                     int index = 1;
-                    ps.setLong(index++, hospital.hospitalId());
-                    ps.setString(index++, hospital.sourceKey());
-                    ps.setString(index++, hospital.name());
-                    ps.setString(index++, hospital.addr());
-                    ps.setString(index++, hospital.sigunguCode());
-                    setNullableDecimal(ps, index++, hospital.lat());
-                    setNullableDecimal(ps, index++, hospital.lng());
-                    ps.setString(index++, hospital.tel());
-                    ps.setString(index++, hospital.operatingHours());
-                    ps.setString(index++, hospital.restDate());
-                    ps.setBoolean(index++, hospital.open24());
-                    setNullableDateTime(ps, index++, hospital.sourceModifiedAt());
+                    ps.setLong(index++, facility.facilityId());
+                    ps.setString(index++, facility.sourceKey());
+                    ps.setString(index++, facility.facilityType().name());
+                    ps.setString(index++, facility.name());
+                    ps.setString(index++, facility.addr());
+                    ps.setString(index++, facility.sigunguCode());
+                    setNullableDecimal(ps, index++, facility.lat());
+                    setNullableDecimal(ps, index++, facility.lng());
+                    ps.setString(index++, facility.tel());
+                    ps.setString(index++, facility.operatingHours());
+                    ps.setString(index++, facility.restDate());
+                    ps.setBoolean(index++, facility.open24());
+                    setNullableDateTime(ps, index++, facility.sourceModifiedAt());
                     ps.setTimestamp(index, Timestamp.valueOf(syncedAt));
                 }
 

@@ -1,16 +1,20 @@
 package com.hondigagae.domainlayer.emergency.adapter.in.web.dto.item;
 
+import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
 @Builder
-@Schema(description = "주변 동물병원 항목 DTO")
-public record NearbyHospitalItem(
+@Schema(description = "주변 긴급 시설 항목 DTO")
+public record NearbyFacilityItem(
 
-    @Schema(description = "동물병원 아이디", example = "4611686018427387904")
-    long hospitalId,
+    @Schema(description = "긴급 시설 아이디", example = "4611686018427387904")
+    long facilityId,
 
-    @Schema(description = "병원명", example = "제주동물병원")
+    @Schema(description = "시설 종류 metadata")
+    CodeNameDescriptionMetadata facilityType,
+
+    @Schema(description = "시설명", example = "제주동물병원")
     String name,
 
     @Schema(description = "주소", example = "제주특별자치도 제주시 ...")
