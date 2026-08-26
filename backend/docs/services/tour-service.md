@@ -6,7 +6,8 @@
 - 관광지별 연관 관광지 조회 (코스 생성 기반 데이터)
 - 두루누비 산책·레저 코스 조회
 - 여행 적합도 분석 — 날씨 + 혼잡도 + 반려견 동반 조건 결합, score + XAI reasons
-- 위치 기준 24시 동물병원 조회 (긴급 상황 도우미)
+- 위치 기준 동물병원 반경 조회 (긴급 상황 도우미)
+- 주변 식당·카페 실시간 검색 (카카오 로컬, 저장 없음)
 
 ## 컨텍스트
 
@@ -14,6 +15,7 @@
 - `walkcourse` — 두루누비 코스
 - `insight` — 여행 적합도, 혼잡도, 날씨
 - `emergency` — 동물병원 등 긴급 시설
+- `dining` — 주변 식당·카페 실시간 검색 (외부 지도 검색, 저장 금지)
 
 ## 주요 API (계획)
 
@@ -22,7 +24,8 @@
 - `GET /api/v1/places/{placeId}/related` — 연관 관광지
 - `GET /api/v1/places/{placeId}/suitability` — 여행 적합도 (`score` + `reasons`, `api-design-guide.md` §9)
 - `GET /api/v1/walk-courses` — 산책 코스 검색
-- `GET /api/v1/emergencies/animal-hospitals?lat=&lng=&radius=` — 24시 동물병원
+- `GET /api/v1/places/nearby-dining?lat=&lng=&radius=&type=` — 주변 식당·카페 (실시간, 저장 금지)
+- `GET /api/v1/emergencies/animal-hospitals?lat=&lng=&radius=&open24Only=` — 동물병원 반경 검색
 
 ## 데이터 흐름
 
@@ -36,4 +39,6 @@
 - 조회 중심 서비스 — `QueryResult` / `Info` / Presenter 구조를 사용한다.
 - 기상청 응답 등 외부 원본 스키마는 adapter 밖으로 새지 않는다 (`external-api-guide.md` §3).
 - 적합도 등급은 `SuitabilityLevel`, 동반 구분은 `PetAllowanceType` enum 사용 (`coding-conventions.md` §8-3).
-- 좌표 기반 조회(동물병원, 주변 장소)는 인덱스 전략을 먼저 정리하고 구현한다.
+- 좌표 기반 조회는 DB 사각 범위 필터 + 애플리케이션 하버사인 정렬 조합을 쓴다 (`place-data-integration.md` §9-2). 데이터가 커지면 공간 인덱스로 옮긴다.
+- 동물병원 운영시간은 원천의 49%가 비어 있다. null 을 "휴무"로 표현하지 말고 `operatingHoursKnown=false` 로 "정보 없음"임을 드러낸다.
+- 카카오 로컬 응답은 **DB·캐시 어디에도 저장하지 않는다** (`external-api-guide.md` §2-1).

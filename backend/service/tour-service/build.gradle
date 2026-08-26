@@ -20,4 +20,7 @@ dependencies {
     implementation 'org.mapstruct:mapstruct:1.6.3'
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
     annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+
+    // JPQL 은 컴파일로 검증되지 않아 테스트에서 실제 스키마에 질의해 본다.
+    testRuntimeOnly 'com.h2database:h2'
 }

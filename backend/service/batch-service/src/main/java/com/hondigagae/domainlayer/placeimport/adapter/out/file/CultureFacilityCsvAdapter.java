@@ -5,7 +5,9 @@ import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportE
 import com.hondigagae.domainlayer.placeimport.application.port.out.CultureFacilityCatalogPort;
 import com.hondigagae.domainlayer.placeimport.domain.enums.CultureCategoryMapping;
 import com.hondigagae.domainlayer.placeimport.domain.enums.RegionCodeMapping;
+import com.hondigagae.domainlayer.placeimport.domain.model.ImportedAnimalHospital;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedCultureFacility;
+import com.hondigagae.domainlayer.placeimport.domain.model.OperatingHoursParser;
 import com.hondigagae.domainlayer.placeimport.domain.model.PetFieldParser;
 import com.hondigagae.domainlayer.placeimport.domain.model.PlaceIdFactory;
 import com.hondigagae.global.properties.CultureFacilityProperties;
@@ -71,6 +73,7 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
     private static final String COL_PARKING = "주차 가능여부";
     private static final String COL_ADMISSION_FEE = "입장(이용료)가격 정보";
     private static final String COL_MODIFIED = "최종작성일";
+    private static final String CATEGORY_ANIMAL_HOSPITAL = "동물병원";
 
     private static final List<String> REQUIRED_COLUMNS = List.of(
         COL_NAME, COL_CATEGORY3, COL_SIDO, COL_LAT, COL_LNG, COL_PET_AVAILABLE);
@@ -117,6 +120,66 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
         log.info("culture facility csv read sido={} imported={} skippedNonTravel={} skippedNoCoordinate={}",
             sido, facilities.size(), skippedNonTravel, skippedNoCoordinate);
         return facilities;
+    }
+
+    @Override
+    public List<ImportedAnimalHospital> readAnimalHospitals(String sido) {
+        Path path = Path.of(properties.filePath());
+        if (!Files.exists(path)) {
+            throw new PlaceImportException(PlaceImportErrorCode.CULTURE_CSV_NOT_FOUND, path.toString());
+        }
+
+        List<ImportedAnimalHospital> hospitals = new ArrayList<>();
+        int skippedNoCoordinate = 0;
+
+        try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+            Map<String, Integer> header = readHeader(reader);
+
+            String line;
+            while ((line = readRecord(reader)) != null) {
+                List<String> values = parseLine(line);
+                if (sido != null && !sido.equals(value(values, header, COL_SIDO))) {
+                    continue;
+                }
+                if (!CATEGORY_ANIMAL_HOSPITAL.equals(value(values, header, COL_CATEGORY3))) {
+                    continue;
+                }
+                ImportedAnimalHospital hospital = toHospital(values, header);
+                if (hospital.lat() == null || hospital.lng() == null) {
+                    skippedNoCoordinate++;
+                    continue;
+                }
+                hospitals.add(hospital);
+            }
+        } catch (IOException exception) {
+            throw new PlaceImportException(PlaceImportErrorCode.CULTURE_CSV_READ_FAILED, exception, path.toString());
+        }
+
+        log.info("animal hospital csv read sido={} rows={} skippedNoCoordinate={}",
+            sido, hospitals.size(), skippedNoCoordinate);
+        return hospitals;
+    }
+
+    private ImportedAnimalHospital toHospital(List<String> values, Map<String, Integer> header) {
+        String name = value(values, header, COL_NAME);
+        String roadAddress = value(values, header, COL_ROAD_ADDR);
+        String lotAddress = value(values, header, COL_LOT_ADDR);
+        String address = isBlank(roadAddress) ? lotAddress : roadAddress;
+        String hours = OperatingHoursParser.normalizeHours(value(values, header, COL_USE_TIME));
+
+        return ImportedAnimalHospital.builder()
+            .sourceKey(PlaceIdFactory.sourceKeyOf(name, address))
+            .name(name)
+            .addr(address)
+            .sigunguCode(RegionCodeMapping.toSigunguCode(value(values, header, COL_SIGUNGU)))
+            .lat(toDecimal(value(values, header, COL_LAT)))
+            .lng(toDecimal(value(values, header, COL_LNG)))
+            .tel(value(values, header, COL_TEL))
+            .operatingHours(hours)
+            .restDate(OperatingHoursParser.normalizeHours(value(values, header, COL_REST_DATE)))
+            .open24(OperatingHoursParser.isOpen24(name, hours))
+            .sourceModifiedAt(toDateTime(value(values, header, COL_MODIFIED)))
+            .build();
     }
 
     private Map<String, Integer> readHeader(BufferedReader reader) throws IOException {

@@ -154,9 +154,9 @@ backend/
 - `GET /api/v1/places/{placeId}/related` — 연관 관광지
 - `GET /api/v1/places/{placeId}/suitability` — 여행 적합도 (날씨+혼잡도+반려견 조건, score+reasons)
 - `GET /api/v1/walk-courses` — 두루누비 산책·레저 코스
-- `GET /api/v1/emergencies/animal-hospitals` — 위치 기준 24시 동물병원
+- `GET /api/v1/emergencies/animal-hospitals` — 위치 기준 동물병원 반경 검색 (제주 86곳)
 
-**컨텍스트**: `place`, `walkcourse`, `insight`(적합도·혼잡도·날씨), `emergency`
+**컨텍스트**: `place`, `dining`(카카오 로컬 실시간), `walkcourse`, `insight`(적합도·혼잡도·날씨), `emergency`
 
 **특수 의존**: 외부 공공 API 어댑터 (기상청·혼잡도 실시간), `core:redis-core` (외부 API 응답 캐시)
 
