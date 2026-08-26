@@ -103,6 +103,12 @@ curl -s --max-time 10 http://localhost:8082/v3/api-docs   # tour-service
 
 ## 7. 자주 겪는 문제
 
+- **화면은 보이는데 버튼이 하나도 안 눌린다 / 목록이 계속 스켈레톤이다** — 하이드레이션이 죽은 것이다.
+  Next dev 서버는 `/_next/*` 에 대한 **cross-origin 요청을 기본 차단**한다. `localhost` 가 아닌
+  호스트(`127.0.0.1`, LAN IP, 다른 기기)로 접근하면 JS 청크가 **403** 이 되는데, SSR HTML 은
+  정상이라 겉보기엔 멀쩡하다. 콘솔에 `403 Forbidden` 이 보이거나 dev 로그에
+  `Blocked cross-origin request to Next.js dev resource` 가 있으면 이 경우다.
+  → `localhost` 로 접근하거나 `next.config.ts` 의 `allowedDevOrigins` 에 해당 호스트를 추가한다.
 - **다른 앱이 보인다 / 내 변경이 반영되지 않는다** — 3000 포트가 이미 다른 로컬 앱에 점유된 것이다.
   `next dev -p 3000` 은 이 경우 조용히 실패하지 않고 뜨지만, `localhost:3000` 요청이 먼저 바인딩된
   앱으로 갈 수 있다. `lsof -nP -iTCP:3000 -sTCP:LISTEN` 으로 확인하고 `pnpm dev:alt`(5173)를 쓴다.

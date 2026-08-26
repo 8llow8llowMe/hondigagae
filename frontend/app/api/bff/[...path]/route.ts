@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 
+import { GATEWAY_UNREACHABLE_STATUS, gatewayUnreachablePayload } from '@/lib/api/bff-error'
 import { gatewayUrl } from '@/lib/api/server'
 import { extractRefreshToken, toCookieHeader } from '@/lib/auth/refresh-cookie'
 import { canRetryReissue, isReissuePath } from '@/lib/auth/reissue'
@@ -47,13 +48,24 @@ async function callGateway(
   // reissue 는 게이트웨이가 쿠키에서 refresh 를 읽는다
   if (refreshToken) headers.Cookie = toCookieHeader(refreshToken)
 
-  const response = await globalThis.fetch(`${gatewayUrl(path)}${search}`, {
-    method,
-    headers,
-    body,
-    cache: 'no-store',
-    redirect: 'manual',
-  })
+  let response: Response
+  try {
+    response = await globalThis.fetch(`${gatewayUrl(path)}${search}`, {
+      method,
+      headers,
+      body,
+      cache: 'no-store',
+      redirect: 'manual',
+    })
+  } catch (cause) {
+    // 게이트웨이 미기동 / 네트워크 단절 — 예외를 밖으로 흘리지 않는다
+    console.error('[bff] 게이트웨이 호출 실패', { path, method })
+    return {
+      status: GATEWAY_UNREACHABLE_STATUS,
+      payload: gatewayUnreachablePayload(cause),
+      refreshToken: null,
+    }
+  }
 
   const text = await response.text()
   let payload: unknown = null
