@@ -1,0 +1,39 @@
+name: frontend-ci
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
+      # server/client 경계 오류는 빌드에서만 잡히는 것이 많다
+      # (docs/architecture-guide.md §4)
+      - run: pnpm build
+        env:
+          BACKEND_BASE_URL: http://localhost:8000
+          SESSION_SECRET: ci-placeholder-secret-at-least-32-characters
+          NEXT_PUBLIC_KAKAO_MAP_KEY: ci-placeholder
