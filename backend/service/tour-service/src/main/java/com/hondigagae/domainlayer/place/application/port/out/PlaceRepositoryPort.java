@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.place.application.port.out;
 
+import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceImageQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceIntroQueryResult;
@@ -12,6 +13,9 @@ import java.util.Optional;
 public interface PlaceRepositoryPort {
 
     PlaceSliceQueryResult findPlaces(PlaceSearchCriteria criteria);
+
+    /** 사각 범위 안의 장소. 정확한 반경 필터와 정렬은 호출한 쪽이 한다. */
+    List<Place> findNearby(NearbyPlaceCriteria criteria);
 
     Optional<Place> findPlaceById(long placeId);
 

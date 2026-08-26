@@ -1,17 +1,21 @@
 package com.hondigagae.domainlayer.place.adapter.in.web.presenter;
 
 import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
+import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.NearbyPlaceItem;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlaceImageItem;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlaceIntroItem;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlaceItem;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlacePetInfoItem;
+import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.NearbyPlaceResponse;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.PlaceDetailResponse;
+import com.hondigagae.domainlayer.place.application.info.NearbyPlaceInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceDetailInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceImageInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceIntroInfo;
 import com.hondigagae.domainlayer.place.application.info.PlacePetDetailInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceSummariesInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceSummaryInfo;
+import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
 import com.hondigagae.domainlayer.place.domain.enums.PetAllowanceType;
 import com.hondigagae.domainlayer.place.domain.model.Place;
@@ -28,6 +32,21 @@ public class PlacePresenter {
             .map(this::toItem)
             .toList();
         return new SliceResponse<>(items, summariesInfo.hasNext());
+    }
+
+    public NearbyPlaceResponse toNearbyResponse(List<NearbyPlaceInfo> infos, NearbyPlaceCriteria criteria) {
+        List<NearbyPlaceItem> items = infos.stream()
+            .map(info -> NearbyPlaceItem.builder()
+                .place(toItem(info.place()))
+                .distanceMeters(info.distanceMeters())
+                .build())
+            .toList();
+
+        return NearbyPlaceResponse.builder()
+            .places(items)
+            .totalCount(items.size())
+            .radius(criteria.radius())
+            .build();
     }
 
     public PlaceDetailResponse toDetailResponse(PlaceDetailInfo detailInfo) {

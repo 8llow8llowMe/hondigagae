@@ -2,8 +2,10 @@ package com.hondigagae.domainlayer.place.adapter.in.web.controller;
 
 import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlaceItem;
+import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.NearbyPlaceResponse;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.PlaceDetailResponse;
 import com.hondigagae.domainlayer.place.application.exception.PlaceValidationMessage;
+import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.in.PlaceWebUseCase;
 import com.hondigagae.domainlayer.place.domain.enums.AllowedPetSize;
@@ -14,6 +16,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -64,6 +68,57 @@ public class PlaceWebController {
             .size(size)
             .build();
         SliceResponse<PlaceItem> response = placeWebUseCase.getPlaces(criteria);
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(summary = "주변 장소 검색",
+        description = "좌표 기준 반경 안의 장소를 가까운 순으로 찾습니다. 여행 중 다음 일정을 고를 때 쓰는 조회라 "
+            + "커서가 아니라 상위 N 개를 돌려줍니다. "
+            + "식사할 곳을 찾을 때는 contentType=RESTAURANT 로, 카페만 볼 때는 sourceCategory=카페 를 함께 씁니다. "
+            + "여기 담긴 음식점은 지자체에 반려동물 동반출입 업소로 등록된 곳이라 동반 가능 여부가 확인된 정보입니다.")
+    @GetMapping("/nearby")
+    public ResponseEntity<Response<NearbyPlaceResponse>> getNearbyPlaces(
+        @Parameter(description = "중심 위도", required = true, example = "33.4996213")
+        @NotNull
+        @Min(value = -90, message = PlaceValidationMessage.LAT_RANGE_INVALID)
+        @Max(value = 90, message = PlaceValidationMessage.LAT_RANGE_INVALID)
+        @RequestParam Double lat,
+
+        @Parameter(description = "중심 경도", required = true, example = "126.5311884")
+        @NotNull
+        @Min(value = -180, message = PlaceValidationMessage.LNG_RANGE_INVALID)
+        @Max(value = 180, message = PlaceValidationMessage.LNG_RANGE_INVALID)
+        @RequestParam Double lng,
+
+        @Parameter(description = "검색 반경(m). 최대 50000", example = "5000")
+        @Min(value = 1, message = PlaceValidationMessage.RADIUS_RANGE_INVALID)
+        @Max(value = 50_000, message = PlaceValidationMessage.RADIUS_RANGE_INVALID)
+        @RequestParam(defaultValue = "5000") int radius,
+
+        @Parameter(description = "콘텐츠 타입") @RequestParam(required = false) ContentType contentType,
+        @Parameter(description = "반려동물 동반 구분") @RequestParam(required = false) PetAllowanceType petAllowanceType,
+        @Parameter(description = "실내 여부 — true 면 실내만") @RequestParam(required = false) Boolean indoor,
+        @Parameter(description = "입장 가능 반려동물 크기") @RequestParam(required = false) AllowedPetSize allowedPetSize,
+        @Parameter(description = "원본 분류 (카페·펜션·일반음식점 등)", example = "카페")
+        @RequestParam(required = false) String sourceCategory,
+
+        @Parameter(description = "조회 개수 (1~50)", example = "15")
+        @Positive(message = PlaceValidationMessage.SIZE_POSITIVE)
+        @Max(value = 50, message = PlaceValidationMessage.SIZE_MAX_INVALID)
+        @RequestParam(defaultValue = "15") int size
+    ) {
+        NearbyPlaceCriteria criteria = NearbyPlaceCriteria.builder()
+            .lat(lat)
+            .lng(lng)
+            .radius(radius)
+            .contentType(contentType)
+            .petAllowanceType(petAllowanceType)
+            .indoor(indoor)
+            .allowedPetSize(allowedPetSize)
+            .sourceCategory(sourceCategory)
+            .size(size)
+            .build();
+        NearbyPlaceResponse response = placeWebUseCase.getNearbyPlaces(criteria);
         return ResponseEntity.ok().body(Response.success(response));
     }
 

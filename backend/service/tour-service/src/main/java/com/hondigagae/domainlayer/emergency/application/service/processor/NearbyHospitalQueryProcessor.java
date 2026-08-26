@@ -1,10 +1,10 @@
 package com.hondigagae.domainlayer.emergency.application.service.processor;
 
+import com.hondigagae.common.geo.GeoDistance;
 import com.hondigagae.domainlayer.emergency.application.info.NearbyHospitalInfo;
 import com.hondigagae.domainlayer.emergency.application.model.NearbyHospitalQuery;
 import com.hondigagae.domainlayer.emergency.application.port.out.AnimalHospitalRepositoryPort;
 import com.hondigagae.domainlayer.emergency.application.port.out.query.AnimalHospitalQueryResult;
-import com.hondigagae.domainlayer.emergency.domain.model.GeoDistance;
 import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;

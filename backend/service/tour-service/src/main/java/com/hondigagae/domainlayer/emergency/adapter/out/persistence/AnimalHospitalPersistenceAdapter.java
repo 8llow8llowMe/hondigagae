@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.emergency.adapter.out.persistence;
 
+import com.hondigagae.common.geo.GeoDistance;
 import com.hondigagae.domainlayer.emergency.adapter.out.persistence.entity.AnimalHospitalEntity;
 import com.hondigagae.domainlayer.emergency.adapter.out.persistence.repository.AnimalHospitalRepository;
 import com.hondigagae.domainlayer.emergency.application.model.NearbyHospitalQuery;
@@ -14,18 +15,12 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AnimalHospitalPersistenceAdapter implements AnimalHospitalRepositoryPort {
 
-    /** 위도 1도의 대략 거리(m). 사각 범위를 잡을 때만 쓰므로 이 정도 근사면 충분하다. */
-    private static final double METERS_PER_LAT_DEGREE = 111_320d;
-    /** 고위도에서 cos 가 0에 가까워질 때 경도 폭이 발산하는 것을 막는 하한. */
-    private static final double MIN_COS_LAT = 0.01d;
-
     private final AnimalHospitalRepository animalHospitalRepository;
 
     @Override
     public List<AnimalHospitalQueryResult> findWithinBox(NearbyHospitalQuery query) {
-        double latDelta = query.radius() / METERS_PER_LAT_DEGREE;
-        double cosLat = Math.max(Math.cos(Math.toRadians(query.lat())), MIN_COS_LAT);
-        double lngDelta = query.radius() / (METERS_PER_LAT_DEGREE * cosLat);
+        double latDelta = GeoDistance.latDelta(query.radius());
+        double lngDelta = GeoDistance.lngDelta(query.radius(), query.lat());
 
         return animalHospitalRepository.findWithinBox(
                 BigDecimal.valueOf(query.lat() - latDelta),

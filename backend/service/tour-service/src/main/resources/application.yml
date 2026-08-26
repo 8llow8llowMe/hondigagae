@@ -15,15 +15,6 @@ logging:
     # Eureka 클라이언트가 주기적으로 Eureka 서버 엔드포인트를 확인할 때 출력하는 반복 로그를 줄이기 위한 설정
     com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
 
-# 카카오 로컬 장소 검색 (주변 식당·카페).
-# 응답을 저장하지 않는 실시간 호출 전용이라 캐시 설정을 두지 않는다 (docs/external-api-guide.md §2-1).
-kakao:
-  local:
-    base-url: ${KAKAO_LOCAL_BASE_URL:https://dapi.kakao.com}
-    rest-api-key: ${KAKAO_REST_API_KEY:}
-    connect-timeout-ms: ${KAKAO_LOCAL_CONNECT_TIMEOUT_MS:2000}
-    read-timeout-ms: ${KAKAO_LOCAL_READ_TIMEOUT_MS:3000}
-
 resilience4j:
   circuitbreaker:
     configs:
@@ -37,9 +28,4 @@ resilience4j:
         wait-duration-in-open-state: 10s
         permitted-number-of-calls-in-half-open-state: 3
         automatic-transition-from-open-to-half-open-enabled: true
-        ignore-exceptions:
-          # 키 미설정은 제공처 장애가 아니라 우리 설정 문제라 서킷에 집계하지 않는다.
-          - com.hondigagae.domainlayer.dining.application.exception.DiningException
-    instances:
-      kakao-local:
-        base-config: default
+    # 인스턴스는 외부 API 를 붙일 때 추가한다. 지금은 기본 정책만 정의해 둔다 (기상청 예정).

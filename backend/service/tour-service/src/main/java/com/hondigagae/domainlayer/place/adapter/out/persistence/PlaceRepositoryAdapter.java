@@ -9,6 +9,8 @@ import com.hondigagae.domainlayer.place.adapter.out.persistence.repository.Place
 import com.hondigagae.domainlayer.place.adapter.out.persistence.repository.PlacePetInfoRepository;
 import com.hondigagae.domainlayer.place.adapter.out.persistence.repository.PlaceRepository;
 import com.hondigagae.domainlayer.place.application.mapper.PlaceMapper;
+import com.hondigagae.common.geo.GeoDistance;
+import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.out.PlaceRepositoryPort;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceImageQueryResult;
@@ -16,6 +18,7 @@ import com.hondigagae.domainlayer.place.application.port.out.query.PlaceIntroQue
 import com.hondigagae.domainlayer.place.application.port.out.query.PlacePetInfoQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSliceQueryResult;
 import com.hondigagae.domainlayer.place.domain.model.Place;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +67,26 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
     public List<PlaceImageQueryResult> findImagesByPlaceId(long placeId) {
         return placeImageRepository.findAllByPlaceIdOrderBySerialNumAsc(placeId).stream()
             .map(this::toImageQueryResult)
+            .toList();
+    }
+
+    @Override
+    public List<Place> findNearby(NearbyPlaceCriteria criteria) {
+        double latDelta = GeoDistance.latDelta(criteria.radius());
+        double lngDelta = GeoDistance.lngDelta(criteria.radius(), criteria.lat());
+
+        return placeRepository.findNearby(
+                BigDecimal.valueOf(criteria.lat() - latDelta),
+                BigDecimal.valueOf(criteria.lat() + latDelta),
+                BigDecimal.valueOf(criteria.lng() - lngDelta),
+                BigDecimal.valueOf(criteria.lng() + lngDelta),
+                criteria.contentType() == null ? null : criteria.contentType().getCode(),
+                criteria.petAllowanceType(),
+                criteria.indoor(),
+                criteria.allowedPetSize(),
+                criteria.sourceCategory()
+            ).stream()
+            .map(placeMapper::toDomain)
             .toList();
     }
 
