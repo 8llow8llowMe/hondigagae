@@ -9,4 +9,7 @@ dependencies {
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+
+    // 식약처 반려동물 동반출입 음식점 현황이 xlsx 로만 제공된다.
+    implementation 'org.apache.poi:poi-ooxml:5.4.1'
 }

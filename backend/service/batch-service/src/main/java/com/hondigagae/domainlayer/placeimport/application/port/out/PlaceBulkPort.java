@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.placeimport.application.port.out;
 
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedCultureFacility;
+import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPetRestaurant;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlace;
 import java.util.List;
 
@@ -15,4 +16,12 @@ public interface PlaceBulkPort {
     void upsertAll(List<ImportedPlace> places);
 
     void upsertCultureFacilities(List<ImportedCultureFacility> facilities);
+
+    /**
+     * 식약처 등록 업소를 적재한다.
+     *
+     * <p>동반 가능은 등록 사실 자체로 참이므로 그렇게 넣는다. 반대로 실내/실외와 크기 제한은
+     * 원천에 없으므로 <b>추정하지 않고 NULL 로 둔다</b> — "실외"와 "정보 없음"은 다르다.
+     */
+    void upsertPetRestaurants(List<ImportedPetRestaurant> restaurants);
 }

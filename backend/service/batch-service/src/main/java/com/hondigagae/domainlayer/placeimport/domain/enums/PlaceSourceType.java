@@ -13,7 +13,8 @@ import lombok.RequiredArgsConstructor;
 public enum PlaceSourceType {
 
     TOUR_API("관광정보 API"),
-    CULTURE_PORTAL("문화정보원");
+    CULTURE_PORTAL("문화정보원"),
+    MFDS("식약처");
 
     private final String displayName;
 }
