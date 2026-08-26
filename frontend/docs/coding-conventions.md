@@ -2,16 +2,16 @@
 
 ## 1. 네이밍
 
-| 대상 | 규칙 | 예 |
-|------|------|-----|
-| 파일 / 디렉터리 | kebab-case | `place-list-section.tsx`, `ai-plan/` |
-| 컴포넌트 | PascalCase | `PlaceListSection` |
-| 훅 | `use` + camelCase | `usePlaceList` |
-| 타입 / 인터페이스 | PascalCase | `PlaceDetail`, `SliceResponse` |
-| 상수 | UPPER_SNAKE | `PROTECTED_PATHS` |
-| query key 팩토리 | `<domain>Keys` | `placeKeys`, `planKeys` |
-| API 함수 | 동사 + 대상 | `fetchPlaces`, `createPlan`, `replaceDayItems` |
-| 테스트 | `*.test.ts` (`.tsx` 아님) | `classify-error.test.ts` |
+| 대상              | 규칙                      | 예                                             |
+| ----------------- | ------------------------- | ---------------------------------------------- |
+| 파일 / 디렉터리   | kebab-case                | `place-list-section.tsx`, `ai-plan/`           |
+| 컴포넌트          | PascalCase                | `PlaceListSection`                             |
+| 훅                | `use` + camelCase         | `usePlaceList`                                 |
+| 타입 / 인터페이스 | PascalCase                | `PlaceDetail`, `SliceResponse`                 |
+| 상수              | UPPER_SNAKE               | `PROTECTED_PATHS`                              |
+| query key 팩토리  | `<domain>Keys`            | `placeKeys`, `planKeys`                        |
+| API 함수          | 동사 + 대상               | `fetchPlaces`, `createPlan`, `replaceDayItems` |
+| 테스트            | `*.test.ts` (`.tsx` 아님) | `classify-error.test.ts`                       |
 
 - 백엔드 도메인 용어를 그대로 쓴다: `place`, `plan`, `pet`, `member`, `ai-plan`. 임의 번역을 만들지 않는다.
 - 사용자 노출 용어는 `DESIGN.md` 용어 표를 따른다 (예: "반려견" 고정, "강아지" 혼용 금지).
@@ -19,17 +19,17 @@
 ## 2. 파일 구조
 
 ```ts
-'use client'                      // 필요할 때만, 항상 최상단
+'use client' // 필요할 때만, 항상 최상단
 
-import { useEffect } from 'react'         // 1. react / next
+import { useEffect } from 'react' // 1. react / next
 import { useRouter } from 'next/navigation'
 
-import { useQuery } from '@tanstack/react-query'   // 2. 외부 패키지
+import { useQuery } from '@tanstack/react-query' // 2. 외부 패키지
 
-import { Button } from '@/components/button'       // 3. 내부 (@ = src)
+import { Button } from '@/components/button' // 3. 내부 (@ = src)
 import { fetchPlaces } from '@/lib/api/place'
 
-import type { PlaceSummary } from '@/types/place'  // 4. 타입 전용
+import type { PlaceSummary } from '@/types/place' // 4. 타입 전용
 ```
 
 - import 그룹 사이에 빈 줄 1개. 그룹 내부는 알파벳 순.
@@ -49,7 +49,7 @@ import type { PlaceSummary } from '@/types/place'  // 4. 타입 전용
 type PlaceSummary = {
   placeId: string
   title: string
-  distanceMeters: number | null   // m 단위. 위치 미제공 시 null
+  distanceMeters: number | null // m 단위. 위치 미제공 시 null
 }
 ```
 
@@ -72,7 +72,7 @@ const JOB_STATUS_LABEL = { PENDING: '대기 중', ... }
 
 ```tsx
 const TONE: Record<string, string> = { HIGH: 'text-brand-600', MEDIUM: 'text-warn-600' }
-const tone = TONE[level.code] ?? 'text-fg-muted'   // 기본값 필수
+const tone = TONE[level.code] ?? 'text-fg-muted' // 기본값 필수
 
 return <span className={tone}>{level.name}</span>
 ```
@@ -90,10 +90,10 @@ const t = localStorage.getItem('token')
 localStorage.setItem('accessToken', token)
 
 // 3) dataBody 직접 사용
-const places = res.dataBody.contents          // success 판별 누락
+const places = res.dataBody.contents // success 판별 누락
 
 // 4) 클라이언트 코드에서 게이트웨이 직접 호출
-fetch('http://localhost:8000/api/v1/places')  // /api/bff 우회
+fetch('http://localhost:8000/api/v1/places') // /api/bff 우회
 // (서버 컴포넌트는 예외다. src/lib/api/server.ts 로 게이트웨이를 직접 부른다
 //  — architecture-guide.md §8 "클라이언트가 둘이다")
 
@@ -107,7 +107,9 @@ function handle(data: any) {}
 fetch('/api/bff/places/1/suitability')
 
 // 8) cleanup 없는 effect
-useEffect(() => { window.addEventListener('resize', fn) }, [])
+useEffect(() => {
+  window.addEventListener('resize', fn)
+}, [])
 
 // 9) 디버그 잔재
 console.log(response)
@@ -117,12 +119,12 @@ console.log(response)
 
 모든 데이터 화면은 **4개 상태를 각각** 갖는다. 서로 배타적이어야 한다.
 
-| 상태 | 표현 |
-|------|------|
-| loading | skeleton (실제 콘텐츠와 크기 유사, 레이아웃 점프 없음) |
-| empty / 404 | 안내 문구 + **다음 행동 제안**. **재시도 버튼 없음** |
-| 5xx / 무응답 | 에러 톤 + **재시도 버튼** |
-| success | 콘텐츠 |
+| 상태         | 표현                                                   |
+| ------------ | ------------------------------------------------------ |
+| loading      | skeleton (실제 콘텐츠와 크기 유사, 레이아웃 점프 없음) |
+| empty / 404  | 안내 문구 + **다음 행동 제안**. **재시도 버튼 없음**   |
+| 5xx / 무응답 | 에러 톤 + **재시도 버튼**                              |
+| success      | 콘텐츠                                                 |
 
 - `nullable` 섹션(데이터 없음)은 **에러가 아니라 숨김**이다.
 - 판정 로직은 `src/lib/api/` 순수 함수로 뽑아 테스트한다.

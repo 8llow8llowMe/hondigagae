@@ -6,25 +6,25 @@
 
 ## 1. 규칙 → 강제 수단 매핑
 
-| 규칙 (정본) | 강제 수단 | 강제 불가 시 |
-|---|---|---|
-| `react-router-dom` 금지 | `no-restricted-imports` | — |
-| 계층 역참조 금지 (`lib`→`features`, `components`→`features`) | `no-restricted-imports` (파일별 override) | — |
-| 토큰을 storage에 넣지 않기 | `no-restricted-globals` | — |
-| 컴포넌트에서 `fetch` 직접 호출 금지 | `no-restricted-syntax` | — |
-| `any` 금지 | `@typescript-eslint/no-explicit-any` | — |
-| import 순서 4그룹 | `simple-import-sort` | — |
-| spacing/색 스케일 밖 arbitrary value 금지 | `no-restricted-syntax` (정규식) | 리뷰 (`fe-design-reviewer`) |
-| icon-only 버튼 `aria-label` | `jsx-a11y/control-has-associated-label` | 리뷰 |
-| nullable 응답 안전 접근 | **`noUncheckedIndexedAccess`** | 리뷰 |
-| `import type` 사용 | `verbatimModuleSyntax` | — |
-| Tailwind 클래스 순서 | `prettier-plugin-tailwindcss` (자동 정렬) | — |
-| UTF-8 / LF / 2-space | 루트 `.editorconfig` + `.gitattributes` + Prettier | — |
-| 커밋 prefix `[FE]` | `commit-msg` 훅 | 리뷰 |
-| **문자열 ID를 number로 타이핑** | ✕ 불가 | **리뷰 (`fe-api-contract`)** |
-| **404에 재시도 버튼 금지** | ✕ 불가 | **테스트 (`testing-guide.md`)** |
-| **enum 한국어 매핑 테이블 금지** | ✕ 불가 | **리뷰 (`fe-reviewer`)** |
-| **없는 API 호출 금지** | ✕ 불가 | **`/fe-api-check`** |
+| 규칙 (정본)                                                  | 강제 수단                                          | 강제 불가 시                    |
+| ------------------------------------------------------------ | -------------------------------------------------- | ------------------------------- |
+| `react-router-dom` 금지                                      | `no-restricted-imports`                            | —                               |
+| 계층 역참조 금지 (`lib`→`features`, `components`→`features`) | `no-restricted-imports` (파일별 override)          | —                               |
+| 토큰을 storage에 넣지 않기                                   | `no-restricted-globals`                            | —                               |
+| 컴포넌트에서 `fetch` 직접 호출 금지                          | `no-restricted-syntax`                             | —                               |
+| `any` 금지                                                   | `@typescript-eslint/no-explicit-any`               | —                               |
+| import 순서 4그룹                                            | `simple-import-sort`                               | —                               |
+| spacing/색 스케일 밖 arbitrary value 금지                    | `no-restricted-syntax` (정규식)                    | 리뷰 (`fe-design-reviewer`)     |
+| icon-only 버튼 `aria-label`                                  | `jsx-a11y/control-has-associated-label`            | 리뷰                            |
+| nullable 응답 안전 접근                                      | **`noUncheckedIndexedAccess`**                     | 리뷰                            |
+| `import type` 사용                                           | `verbatimModuleSyntax`                             | —                               |
+| Tailwind 클래스 순서                                         | `prettier-plugin-tailwindcss` (자동 정렬)          | —                               |
+| UTF-8 / LF / 2-space                                         | 루트 `.editorconfig` + `.gitattributes` + Prettier | —                               |
+| 커밋 prefix `[FE]`                                           | `commit-msg` 훅                                    | 리뷰                            |
+| **문자열 ID를 number로 타이핑**                              | ✕ 불가                                             | **리뷰 (`fe-api-contract`)**    |
+| **404에 재시도 버튼 금지**                                   | ✕ 불가                                             | **테스트 (`testing-guide.md`)** |
+| **enum 한국어 매핑 테이블 금지**                             | ✕ 불가                                             | **리뷰 (`fe-reviewer`)**        |
+| **없는 API 호출 금지**                                       | ✕ 불가                                             | **`/fe-api-check`**             |
 
 **아래 4개는 자동화가 불가능하다.** 그래서 리뷰 에이전트와 테스트가 존재한다. 설정이 늘어도 이 4개는 여전히 사람·에이전트의 몫이다.
 
@@ -34,7 +34,7 @@
 // package.json
 {
   "packageManager": "pnpm@<설치된 버전>",
-  "engines": { "node": ">=20.0.0" }
+  "engines": { "node": ">=20.0.0" },
 }
 ```
 
@@ -67,8 +67,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
 
-    "verify": "pnpm lint && pnpm typecheck && pnpm test"
-  }
+    "verify": "pnpm lint && pnpm typecheck && pnpm test",
+  },
 }
 ```
 
@@ -81,12 +81,12 @@
 // tsconfig.json (compilerOptions 발췌)
 {
   "strict": true,
-  "noUncheckedIndexedAccess": true,      // 핵심
+  "noUncheckedIndexedAccess": true, // 핵심
   "exactOptionalPropertyTypes": true,
   "noImplicitOverride": true,
   "noFallthroughCasesInSwitch": true,
   "verbatimModuleSyntax": true,
-  "paths": { "@/*": ["./src/*"] }
+  "paths": { "@/*": ["./src/*"] },
 }
 ```
 
@@ -116,33 +116,50 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/consistent-type-imports': 'error',
 
-      'simple-import-sort/imports': ['error', {
-        // coding-conventions.md §2 의 4그룹과 일치시킨다
-        groups: [
-          ['^react$', '^next', '^next/'],   // 1. react / next
-          ['^@?\\w'],                        // 2. 외부 패키지
-          ['^@/'],                           // 3. 내부
-          ['^\\.'],                          // 3-1. 상대 경로
-          ['^.+\\u0000$'],                   // 4. type-only (verbatim 접미)
-        ],
-      }],
+      'simple-import-sort/imports': [
+        'error',
+        {
+          // coding-conventions.md §2 의 4그룹과 일치시킨다
+          groups: [
+            ['^react$', '^next', '^next/'], // 1. react / next
+            ['^@?\\w'], // 2. 외부 패키지
+            ['^@/'], // 3. 내부
+            ['^\\.'], // 3-1. 상대 경로
+            ['^.+\\u0000$'], // 4. type-only (verbatim 접미)
+          ],
+        },
+      ],
 
-      'no-restricted-imports': ['error', {
-        paths: [
-          { name: 'react-router-dom', message: 'App Router를 쓴다. useRouter/usePathname/useSearchParams (architecture-guide §6)' },
-        ],
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'react-router-dom',
+              message:
+                'App Router를 쓴다. useRouter/usePathname/useSearchParams (architecture-guide §6)',
+            },
+          ],
+        },
+      ],
 
-      'no-restricted-globals': ['error',
-        { name: 'localStorage', message: '토큰·세션을 브라우저 storage에 두지 않는다 (auth-guide §2). UI 편의값이면 eslint-disable + 근거 주석' },
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'localStorage',
+          message:
+            '토큰·세션을 브라우저 storage에 두지 않는다 (auth-guide §2). UI 편의값이면 eslint-disable + 근거 주석',
+        },
         { name: 'sessionStorage', message: '위와 동일' },
       ],
 
-      'no-restricted-syntax': ['error',
+      'no-restricted-syntax': [
+        'error',
         {
           // DESIGN.md §4 spacing 스케일 / §2 색 토큰 밖 값
           selector: 'Literal[value=/\\[[0-9.]+(px|rem|em|%)\\]|\\[#[0-9a-fA-F]{3,8}\\]/]',
-          message: 'DESIGN.md 토큰 밖의 arbitrary value 금지. 스케일 밖 값이 필요하면 DESIGN.md 갱신을 먼저 논의한다',
+          message:
+            'DESIGN.md 토큰 밖의 arbitrary value 금지. 스케일 밖 값이 필요하면 DESIGN.md 갱신을 먼저 논의한다',
         },
         {
           // 하드코딩 hex — 토큰 CSS 변수만 쓴다
@@ -160,9 +177,17 @@ export default tseslint.config(
   {
     files: ['src/lib/**', 'src/components/**', 'src/types/**'],
     rules: {
-      'no-restricted-imports': ['error', {
-        patterns: [{ group: ['@/features/*', '**/features/*'], message: 'lib/components/types → features 역참조 금지 (architecture-guide §3)' }],
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@/features/*', '**/features/*'],
+              message: 'lib/components/types → features 역참조 금지 (architecture-guide §3)',
+            },
+          ],
+        },
+      ],
     },
   },
 
@@ -171,10 +196,13 @@ export default tseslint.config(
     files: ['src/features/**', 'src/components/**', 'app/**'],
     ignores: ['app/api/**'],
     rules: {
-      'no-restricted-syntax': ['error', {
-        selector: 'CallExpression[callee.name="fetch"]',
-        message: 'fetch 직접 호출 금지. src/lib/api/ 를 경유한다 (architecture-guide §7)',
-      }],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'CallExpression[callee.name="fetch"]',
+          message: 'fetch 직접 호출 금지. src/lib/api/ 를 경유한다 (architecture-guide §7)',
+        },
+      ],
     },
   },
 
@@ -204,7 +232,7 @@ export default tseslint.config(
   "trailingComma": "all",
   "tabWidth": 2,
   "endOfLine": "lf",
-  "plugins": ["prettier-plugin-tailwindcss"]
+  "plugins": ["prettier-plugin-tailwindcss"],
 }
 ```
 
@@ -288,6 +316,7 @@ curl -s --max-time 15 "http://localhost:8000/api/v1/places" \
 ```
 
 주의:
+
 - TourAPI 이미지가 **`http`** 로 오는 경우가 있다. https 페이지에서 mixed content로 차단되므로 `protocol` 을 실측대로 등록하고, 필요하면 프록시를 검토한다.
 - 이미지 URL이 빈 문자열/`null` 인 장소가 있다 → `next/image` 에 빈 `src` 를 넘기면 예외다. 폴백 이미지를 둔다.
 - 신규 호스트가 나타나면 이 문서와 `next.config.ts` 를 함께 갱신한다.
@@ -299,8 +328,8 @@ curl -s --max-time 15 "http://localhost:8000/api/v1/places" \
 {
   "lint-staged": {
     "*.{ts,tsx}": ["eslint --fix", "prettier --write"],
-    "*.{json,css,md}": ["prettier --write"]
-  }
+    "*.{json,css,md}": ["prettier --write"],
+  },
 }
 ```
 
@@ -405,17 +434,44 @@ jobs:
 
 폴백 스택은 `DESIGN.md` §3에 정의돼 있다. 폰트 로드 실패 시에도 레이아웃이 깨지지 않는지 확인한다.
 
-## 13. 도입 순서 (Phase 3)
+## 13. 적용 결과 / 스펙과의 편차 (2026-08-26 Phase 3)
 
-1. `create-next-app` (TypeScript + Tailwind + App Router)
-2. `packageManager` / `engines` / `.nvmrc` 고정
-3. tsconfig strict 플래그 적용 → `pnpm typecheck` 통과 확인
-4. Prettier + `prettier-plugin-tailwindcss` → `pnpm format`
-5. ESLint flat config → **의도적 위반 코드로 각 규칙이 실제로 걸리는지 검증**
-6. `.env.example` + env 검증 모듈
-7. `next.config.ts` `remotePatterns` (실측 호스트로)
-8. `vitest.config.ts` + 테스트 헬퍼·fixture (`testing-guide.md` §7)
-9. 폰트 + `tokens.css` + `@theme` 매핑
-10. husky/lint-staged (팀 합의 후)
-11. CI 워크플로
-12. `pnpm verify` 통과 확인
+스펙대로 적용하면서 **실제로 조정이 필요했던 것들**이다. 다음 사람이 같은 곳에서 막히지 않게 남긴다.
+
+| #   | 편차                                                                            | 이유                                                                                                                                                                          |
+| --- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **TypeScript 를 5.9.3 으로 고정**                                               | 레지스트리 최신은 7.0.2 지만 `typescript-eslint` 8.x 의 지원이 확립되지 않았다. 7 로 올릴 때 lint 부터 확인한다                                                               |
+| 2   | `vitest.config` 를 **`.mts`** 로 둔다                                           | `.ts` 는 CJS 로 로드돼 "ESM syntax in a file loaded as CommonJS" 경고가 난다. `package.json` 에 `type: module` 을 넣는 것보다 영향 범위가 작다                                |
+| 3   | `parserOptions.projectService` 에 **`allowDefaultProject: ['*.mjs', '*.mts']`** | 루트 설정 파일들이 tsconfig `include` 밖이라 "was not found by the project service" 파싱 오류가 난다                                                                          |
+| 4   | `**/*.mjs`, `**/*.mts` 에 **`disableTypeChecked`** 적용                         | `eslint-plugin-jsx-a11y` 가 타입 선언을 제공하지 않아 `no-unsafe-member-access` 가 설정 파일 자체를 오탐한다                                                                  |
+| 5   | `jsx-a11y/control-has-associated-label` **명시 활성화**                         | `flatConfigs.recommended` 에 포함되지 않는다. §1 표가 이 규칙을 전제하므로 직접 켠다 (오탐 때문에 `warn`)                                                                     |
+| 6   | `fetch` init 에 **`undefined` 를 명시 전달하지 않는다**                         | `exactOptionalPropertyTypes: true` 아래에서 `body: undefined` 는 타입 오류다. `RequestInit.body` 는 `BodyInit \| null` 이므로 `null` 을 쓰고, 나머지 옵션은 조건부로 대입한다 |
+| 7   | 쿠키 이름을 **`src/lib/auth/cookie-names.ts`** 로 분리                          | `middleware.ts` 는 Edge Runtime 이라 `node:crypto` 를 끌어올 수 없다. 이름만 필요한 곳이 세션 모듈 전체를 임포트하면 빌드 경고가 난다                                         |
+
+**#6 과 #7 은 스펙이 틀린 것이 아니라, 스펙이 강하게 잡아둔 설정(`exactOptionalPropertyTypes`, Edge Runtime 분리)이 실제로 문제를 잡아낸 사례다.** 두 경우 모두 설정을 완화하지 않고 코드를 고쳤다.
+
+### 규칙 발화 검증 (스펙 §13 5단계)
+
+의도적 위반 코드를 넣어 **8종 전부 실제로 걸리는지** 확인했다.
+
+| 규칙                                                   | 결과      |
+| ------------------------------------------------------ | --------- |
+| `no-restricted-globals` (localStorage)                 | ✅        |
+| `no-restricted-syntax` (컴포넌트 `fetch`)              | ✅        |
+| `no-explicit-any`                                      | ✅        |
+| `no-restricted-syntax` (arbitrary value `p-[13px]`)    | ✅        |
+| `no-restricted-syntax` (raw hex `#ff0000`)             | ✅        |
+| `no-restricted-imports` (계층 역참조 `lib`→`features`) | ✅        |
+| `no-restricted-imports` (`react-router-dom`)           | ✅        |
+| `jsx-a11y/control-has-associated-label`                | ✅ (warn) |
+
+**설정을 바꾼 뒤에는 이 검증을 다시 한다.** 설정을 써놓고 안 걸리는 경우가 흔하다.
+
+## 14. 남은 항목
+
+| 항목                                       | 상태                                                                              |
+| ------------------------------------------ | --------------------------------------------------------------------------------- |
+| husky / lint-staged (§9)                   | **미적용** — `commit-msg` 훅이 백엔드 커밋에도 적용되므로 팀 합의 후 도입한다     |
+| Pretendard 폰트 (§12)                      | **미적용** — 폴백 스택만 적용. `app/globals.css` 에 `TODO(FONT)` 로 표시          |
+| `next.config` `remotePatterns` 호스트 (§8) | **가등록** — `tong.visitkorea.or.kr` 만 넣었다. 백엔드 기동 후 실호출로 확인·보강 |
+| `docs/api/openapi/` 스냅샷                 | **미생성** — 백엔드 기동 후                                                       |

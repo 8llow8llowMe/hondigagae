@@ -39,10 +39,10 @@ GET|PATCH /api/v1/members/me
 
 ## 2. 토큰 보관 (절대 규칙)
 
-| 토큰 | 백엔드 전달 방식 | FE 보관 위치 |
-|------|------------------|--------------|
-| access | 응답 **body** (`dataBody.accessToken`) | **Next 서버 세션만** |
-| refresh | **`Set-Cookie` (HttpOnly)** | **Next 서버만** (프록시가 흡수) |
+| 토큰    | 백엔드 전달 방식                       | FE 보관 위치                    |
+| ------- | -------------------------------------- | ------------------------------- |
+| access  | 응답 **body** (`dataBody.accessToken`) | **Next 서버 세션만**            |
+| refresh | **`Set-Cookie` (HttpOnly)**            | **Next 서버만** (프록시가 흡수) |
 
 - **`localStorage` / `sessionStorage` 에 토큰을 넣지 않는다.**
 - **클라이언트 상태(Zustand)에도 토큰을 넣지 않는다.** 세션에서 파생된 얕은 값만 둔다: `memberId`, `isAuthenticated`, `me`.
@@ -77,10 +77,10 @@ GET|PATCH /api/v1/members/me
 
 ```ts
 export const PROTECTED_PATHS = [
-  '/mypage',      // 내 정보
-  '/pets',        // 반려견 프로필
-  '/plans',       // 여행 일정
-  '/ai-plans',    // AI 일정 생성
+  '/mypage', // 내 정보
+  '/pets', // 반려견 프로필
+  '/plans', // 여행 일정
+  '/ai-plans', // AI 일정 생성
 ]
 ```
 
@@ -105,8 +105,39 @@ POST /api/v1/auth/logout   (인증 필요)
 
 FE는 **서버 세션도 함께 비운다.** 백엔드 쿠키만 지우고 서버 세션이 남으면 유령 로그인 상태가 된다.
 
-## 8. 미결 / BE 후속 요청
+## 8. refresh 쿠키 실측 (확정)
+
+백엔드 `RefreshCookieProvider` 실측 — 2026-08-26.
+
+| 속성     | 값                              |
+| -------- | ------------------------------- |
+| name     | `refreshToken`                  |
+| HttpOnly | `true`                          |
+| SameSite | `Strict`                        |
+| Path     | `/api/v1/auth/token/reissue`    |
+| Secure   | prod 프로파일에서만 `true`      |
+| Max-Age  | `jwt.refresh-expiration` 설정값 |
+
+**이 두 속성이 BFF 설계를 결정한다.**
+
+- `Path` 가 reissue 로 제한된다 → 브라우저가 이 쿠키를 들고 있어도 다른 요청에는 전송되지 않는다.
+- `SameSite=Strict` → **소셜 로그인 리다이렉트로 복귀할 때 쿠키가 전송되지 않는다.**
+
+따라서 브라우저가 refresh 쿠키를 직접 보관하는 구성은 성립하지 않는다.
+BFF가 게이트웨이 응답의 `Set-Cookie` 에서 값을 꺼내 **자체 세션에 봉인**하고,
+reissue 를 호출할 때 `Cookie: refreshToken=...` 헤더로 되돌려준다.
+
+구현: `src/lib/auth/refresh-cookie.ts` (파싱), `src/lib/auth/session.ts` (봉인),
+`app/api/bff/[...path]/route.ts` (주입). 각각 테스트가 있다.
+
+### BFF의 토큰 차단
+
+BFF는 응답 `dataBody` 에서 `accessToken` / `refreshToken` 필드를 **제거한 뒤** 브라우저로
+내려보낸다 (`stripTokens`). 로그인 응답의 body 에 access token 이 들어 있으므로,
+제거하지 않으면 BFF를 쓰는 의미가 없다. 브라우저에는 `memberId` 만 남는다.
+
+## 9. 미결 / BE 후속 요청
 
 - 배포 도메인 확정 시 게이트웨이 `ApiGatewayCorsConfig` 허용 목록 등록 필요 (미등록이면 **POST만 빈 403**).
-- refresh 쿠키의 `SameSite`/`Domain`/만료 값은 Swagger·응답 헤더 실측으로 확인 후 이 문서에 기록한다.
 - 소셜 콜백 redirect URI 를 카카오/네이버 개발자 콘솔에 등록하는 주체와 값 확정 필요.
+- `jwt.refresh-expiration` 실제 값 확인 후 세션 쿠키 만료를 맞춘다.

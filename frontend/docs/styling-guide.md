@@ -21,18 +21,18 @@
 
 새 UI를 만들기 전에 아래를 확인한다. **없으면 만들고, 있으면 확장한다.** 화면마다 비슷한 버튼을 새로 만들지 않는다.
 
-| 컴포넌트 | 위치 | 비고 |
-|----------|------|------|
-| `Button` | `src/components/button.tsx` | variant: primary / secondary / ghost / danger, size: sm / md / lg |
-| `Card` | `src/components/card.tsx` | radius-lg + shadow-sm |
-| `Input`, `Textarea`, `Select` | `src/components/` | 라벨·에러 메시지·helper text 슬롯 포함 |
-| `Tab` | `src/components/tab.tsx` | `aria-selected` 필수 |
-| `Badge` | `src/components/badge.tsx` | 반려견 동반 가능, AI 생성, 적합도 등급 |
-| `Chip` | `src/components/chip.tsx` | 필터. radius-full, 터치 44px |
-| `Modal`, `BottomSheet` | `src/components/` | 모바일은 BottomSheet 우선 |
-| `EmptyState` | `src/components/empty-state.tsx` | **404/데이터 부재 전용. 재시도 버튼 슬롯 없음** |
-| `ErrorState` | `src/components/error-state.tsx` | **5xx/일시 장애 전용. 재시도 버튼 필수** |
-| `Skeleton` | `src/components/skeleton.tsx` | 실제 콘텐츠와 크기 유사 |
+| 컴포넌트                      | 위치                             | 비고                                                              |
+| ----------------------------- | -------------------------------- | ----------------------------------------------------------------- |
+| `Button`                      | `src/components/button.tsx`      | variant: primary / secondary / ghost / danger, size: sm / md / lg |
+| `Card`                        | `src/components/card.tsx`        | radius-lg + shadow-sm                                             |
+| `Input`, `Textarea`, `Select` | `src/components/`                | 라벨·에러 메시지·helper text 슬롯 포함                            |
+| `Tab`                         | `src/components/tab.tsx`         | `aria-selected` 필수                                              |
+| `Badge`                       | `src/components/badge.tsx`       | 반려견 동반 가능, AI 생성, 적합도 등급                            |
+| `Chip`                        | `src/components/chip.tsx`        | 필터. radius-full, 터치 44px                                      |
+| `Modal`, `BottomSheet`        | `src/components/`                | 모바일은 BottomSheet 우선                                         |
+| `EmptyState`                  | `src/components/empty-state.tsx` | **404/데이터 부재 전용. 재시도 버튼 슬롯 없음**                   |
+| `ErrorState`                  | `src/components/error-state.tsx` | **5xx/일시 장애 전용. 재시도 버튼 필수**                          |
+| `Skeleton`                    | `src/components/skeleton.tsx`    | 실제 콘텐츠와 크기 유사                                           |
 
 **`EmptyState` 와 `ErrorState` 를 분리한 이유**: 404(데이터 부재)와 5xx(일시 장애)의 시각 언어를 다르게 강제하기 위해서다. 한 컴포넌트에 `hasRetry` 플래그를 두면 반드시 잘못 쓰인다. (`api-integration-guide.md` §3)
 
@@ -42,12 +42,12 @@
 
 ## 3. 상태별 렌더 규칙
 
-| 상태 | 컴포넌트 | 색 톤 | 재시도 버튼 |
-|------|----------|-------|-------------|
-| loading | `Skeleton` | `--bg-subtle` | — |
-| 데이터 부재 / 404 | `EmptyState` | 중립 (`--fg-muted`) | **없음** |
-| 일시 장애 / 5xx | `ErrorState` | `--danger-*` | **있음** |
-| nullable 섹션 | 렌더하지 않음 (숨김) | — | — |
+| 상태              | 컴포넌트             | 색 톤               | 재시도 버튼 |
+| ----------------- | -------------------- | ------------------- | ----------- |
+| loading           | `Skeleton`           | `--bg-subtle`       | —           |
+| 데이터 부재 / 404 | `EmptyState`         | 중립 (`--fg-muted`) | **없음**    |
+| 일시 장애 / 5xx   | `ErrorState`         | `--danger-*`        | **있음**    |
+| nullable 섹션     | 렌더하지 않음 (숨김) | —                   | —           |
 
 ## 4. 반응형
 

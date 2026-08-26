@@ -1,7 +1,7 @@
 # Frontend Local Run Guide
 
-> **프로젝트 부트스트랩 전이다.** 이 문서는 `package.json` 생성 시점에 실제 값으로 확정한다.
 > 백엔드 기동 절차는 `backend/docs/local-run-guide.md`.
+> 도구 설정의 근거와 적용 편차는 `tooling-guide.md`.
 
 ## 1. 사전 준비
 
@@ -21,15 +21,21 @@ pnpm dev            # http://localhost:3000
 
 ## 3. 명령
 
-| 명령 | 용도 |
-|------|------|
-| `pnpm dev` | 개발 서버 |
-| `pnpm build` | 프로덕션 빌드 |
-| `pnpm lint` | ESLint |
-| `pnpm typecheck` | `tsc --noEmit` |
-| `pnpm test` | Vitest |
+| 명령                 | 용도                                |
+| -------------------- | ----------------------------------- |
+| `pnpm dev`           | 개발 서버 (`http://localhost:3000`) |
+| `pnpm build`         | 프로덕션 빌드                       |
+| `pnpm lint`          | ESLint                              |
+| `pnpm lint:fix`      | ESLint 자동 수정                    |
+| `pnpm typecheck`     | `tsc --noEmit`                      |
+| `pnpm format`        | Prettier 적용                       |
+| `pnpm format:check`  | Prettier 검사                       |
+| `pnpm test`          | Vitest 1회 실행                     |
+| `pnpm test:watch`    | Vitest 감시 모드                    |
+| `pnpm test:coverage` | 커버리지 리포트                     |
+| `pnpm verify`        | `lint && typecheck && test`         |
 
-**커밋 전 최소 3개**: `pnpm lint && pnpm typecheck && pnpm test`
+**커밋 전 게이트**: `pnpm verify && pnpm format:check`
 
 ## 4. 백엔드 동시 기동
 
@@ -49,18 +55,21 @@ docker compose -f docker-compose-local.yml up -d       # MySQL / Redis / MinIO
 
 기동 순서: **service-discovery → 나머지 서비스 → api-gateway**
 
-| 화면 | 필요한 서비스 |
-|------|---------------|
-| 로그인·회원·반려견 | discovery + auth + gateway |
-| 장소 탐색 | discovery + tour + gateway |
-| 여행 일정 | discovery + auth + tour + plan + gateway |
-| AI 일정 생성 | 위 + ai |
+| 화면               | 필요한 서비스                            |
+| ------------------ | ---------------------------------------- |
+| 로그인·회원·반려견 | discovery + auth + gateway               |
+| 장소 탐색          | discovery + tour + gateway               |
+| 여행 일정          | discovery + auth + tour + plan + gateway |
+| AI 일정 생성       | 위 + ai                                  |
 
 **장소 데이터가 비어 있으면** batch-service로 적재해야 한다. `TOUR_API_SERVICE_KEY` 환경변수가 필요하다 (`backend/docs/local-run-guide.md` §6).
 
 ## 5. `.env.local`
 
 `.env*` 는 `.gitignore` 대상이다. **커밋하지 않는다.** `.env.example` 만 커밋한다.
+
+`.env.example` 을 복사해 시작한다. 값이 없거나 형식이 틀리면 **부팅 시점에 즉시 실패**한다
+(`src/lib/env.server.ts` / `env.client.ts` 의 zod 스키마).
 
 ```bash
 # 백엔드 게이트웨이 (BFF가 서버에서만 사용 — NEXT_PUBLIC_ 아님)
@@ -91,7 +100,7 @@ curl -s --max-time 10 http://localhost:8082/v3/api-docs   # tour-service
 - **조회는 되는데 등록만 빈 403** — 게이트웨이 CORS 허용 목록에 현재 오리진이 없다. `3000`/`5173` 을 쓰거나 `ApiGatewayCorsConfig` 에 추가(BE 요청). 브라우저는 같은 출처라도 POST에 `Origin` 을 붙이고, GET은 붙이지 않아 이 형태로 나타난다.
 - **로그인 직후 401** — refresh 쿠키의 `SameSite`/도메인 문제. BFF 경유가 아니라 게이트웨이를 직접 부르고 있는지 확인한다.
 - **지도가 빈 회색 박스** — ① `NEXT_PUBLIC_KAKAO_MAP_KEY` 누락 ② 카카오 콘솔에 `http://localhost:3000` 미등록 ③ `ssr:false` 누락. 브라우저 콘솔을 먼저 본다.
-- **지도가 바다 한가운데** — `LatLng(위도, 경도)` 순서. `mapy` 가 먼저다 (`external-api-guide.md`).
+- **지도가 바다 한가운데** — `LatLng(위도, 경도)` 순서. `lat` 이 먼저다. `src/lib/geo/coord.ts` 의 `toLatLng()` 을 쓴다 (`external-api-guide.md`).
 - **장소 목록이 항상 비어 있음** — 백엔드는 떴지만 batch로 데이터를 적재하지 않았다.
 - **AI 일정이 항상 같은 결과** — 정상이다. 현재 `StubLlmAdapter` 고정 샘플이다 (`backend/docs/service-inventory.md`).
 - **`jwtDecoder` NPE로 백엔드 기동 실패** — FE 문제가 아니다. `backend/docs/local-run-guide.md` §7.

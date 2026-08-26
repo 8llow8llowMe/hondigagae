@@ -23,15 +23,15 @@
 
 `.claude/agents/fe-*.md` 에 정의돼 있다.
 
-| 에이전트 | 책임 | 코드 수정 |
-|----------|------|-----------|
-| `fe-spec-writer` | 기능 명세 작성·갱신. Swagger 실측으로 계약 확정 | ✕ (문서만) |
-| `fe-implementer` | 구현 워크호스. 검증 명령까지 통과시킨다 | ○ |
-| `fe-test-author` | vitest 테스트 작성·보강 | ○ (테스트만) |
-| `fe-reviewer` | 변경 diff를 저장소 규약 기준으로 검토 | ✕ |
-| `fe-api-contract` | FE 호출부 ↔ Swagger 계약 대조 | ✕ |
-| `fe-design-reviewer` | 실제 화면을 띄워 `DESIGN.md` 기준 검토 | ✕ |
-| `fe-map-reviewer` | 카카오 지도 연동 전용 검토 | ✕ |
+| 에이전트             | 책임                                            | 코드 수정    |
+| -------------------- | ----------------------------------------------- | ------------ |
+| `fe-spec-writer`     | 기능 명세 작성·갱신. Swagger 실측으로 계약 확정 | ✕ (문서만)   |
+| `fe-implementer`     | 구현 워크호스. 검증 명령까지 통과시킨다         | ○            |
+| `fe-test-author`     | vitest 테스트 작성·보강                         | ○ (테스트만) |
+| `fe-reviewer`        | 변경 diff를 저장소 규약 기준으로 검토           | ✕            |
+| `fe-api-contract`    | FE 호출부 ↔ Swagger 계약 대조                   | ✕            |
+| `fe-design-reviewer` | 실제 화면을 띄워 `DESIGN.md` 기준 검토          | ✕            |
+| `fe-map-reviewer`    | 카카오 지도 연동 전용 검토                      | ✕            |
 
 > **주의**: 사용자 전역(`~/.claude/agents/`)에 같은 이름의 다른 프로젝트용(BossPickSeoul) 정의가 있다. 프로젝트 스코프가 우선하지만, **에이전트 출력에 `bosspickseoul` 이나 `commercial-service` 가 등장하면 잘못된 정의를 읽고 있는 것이다.** 즉시 중단하고 보고한다.
 

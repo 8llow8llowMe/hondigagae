@@ -6,12 +6,12 @@
 
 ## 1. 진입점
 
-| 항목 | 값 |
-|------|-----|
-| 게이트웨이 | `http://localhost:8000` (dev `6000`, prod `9000`) |
-| FE dev 서버 | `http://localhost:3000` |
+| 항목          | 값                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------ |
+| 게이트웨이    | `http://localhost:8000` (dev `6000`, prod `9000`)                                    |
+| FE dev 서버   | `http://localhost:3000`                                                              |
 | 라우팅 prefix | `/api/v1/{auth,members,places,walk-courses,emergencies,plans,ai-plans,assistant}/**` |
-| BFF 매핑 | `/api/bff/{path}` → `{GATEWAY}/api/v1/{path}` |
+| BFF 매핑      | `/api/bff/{path}` → `{GATEWAY}/api/v1/{path}`                                        |
 
 서비스 개별 Swagger: auth `8081` / tour `8082` / plan `8083` / ai `8085`
 
@@ -22,7 +22,7 @@ export type ApiResponse<T> = {
   dataHeader: {
     success: boolean
     resultCode: string | null
-    resultMessage: unknown | null   // 백엔드 타입이 Object 다. string 으로 타이핑하지 않는다
+    resultMessage: unknown | null // 백엔드 타입이 Object 다. string 으로 타이핑하지 않는다
   }
   dataBody: T | null
 }
@@ -53,13 +53,13 @@ export function toMessage(raw: unknown, fallback: string): string {
 
 ## 3. 에러 처리 규약
 
-| HTTP | 의미 | UI |
-|------|------|-----|
-| 400 | 요청 검증 실패 (`{도메인}_1xx` 대역) | 입력 수정 유도. 가능하면 필드 매핑 |
-| 401 | 토큰 만료/무효 | 재발급 **1회** → 실패 시 세션 비우고 로그인 유도 |
-| 404 | 데이터 부재 **또는 타인 리소스** | **재시도 버튼 금지.** `resultMessage` 그대로 노출 + 다음 행동 안내 |
-| 그 외 4xx | 요청 문제 | 입력 수정 / 권한 안내 |
-| 5xx · 무응답 | 일시 장애 | **재시도 버튼 제공** |
+| HTTP         | 의미                                 | UI                                                                 |
+| ------------ | ------------------------------------ | ------------------------------------------------------------------ |
+| 400          | 요청 검증 실패 (`{도메인}_1xx` 대역) | 입력 수정 유도. 가능하면 필드 매핑                                 |
+| 401          | 토큰 만료/무효                       | 재발급 **1회** → 실패 시 세션 비우고 로그인 유도                   |
+| 404          | 데이터 부재 **또는 타인 리소스**     | **재시도 버튼 금지.** `resultMessage` 그대로 노출 + 다음 행동 안내 |
+| 그 외 4xx    | 요청 문제                            | 입력 수정 / 권한 안내                                              |
+| 5xx · 무응답 | 일시 장애                            | **재시도 버튼 제공**                                               |
 
 **핵심**
 
@@ -140,10 +140,19 @@ useQuery({
 
 ```json
 {
-  "suitabilityLevel": { "code": "HIGH", "name": "여행 적합", "description": "...", "scoreDescription": "..." },
+  "suitabilityLevel": {
+    "code": "HIGH",
+    "name": "여행 적합",
+    "description": "...",
+    "scoreDescription": "..."
+  },
   "score": 82,
   "reasons": [
-    { "code": "WEATHER_OK", "name": "기온 적정", "description": "현재 기온 24℃로 반려견 활동에 적합합니다." }
+    {
+      "code": "WEATHER_OK",
+      "name": "기온 적정",
+      "description": "현재 기온 24℃로 반려견 활동에 적합합니다."
+    }
   ]
 }
 ```
@@ -183,10 +192,10 @@ new QueryClient({
       staleTime: 60_000,
       gcTime: 10 * 60_000,
       retry: (count, error) => (isRetriable(error) ? count < 2 : false),
-      refetchOnWindowFocus: false,   // 모바일에서 앱 전환마다 재조회하면 데이터를 낭비한다
+      refetchOnWindowFocus: false, // 모바일에서 앱 전환마다 재조회하면 데이터를 낭비한다
     },
     mutations: {
-      retry: 0,                      // 중복 생성 위험. 재시도는 사용자가 결정한다
+      retry: 0, // 중복 생성 위험. 재시도는 사용자가 결정한다
     },
   },
 })
@@ -202,13 +211,13 @@ new QueryClient({
 
 기본값이 없으면 각자 정하고, 그게 곧 불일치다. **아래 표를 따르고, 벗어날 때는 주석으로 근거를 남긴다.**
 
-| 도메인 | `staleTime` | `gcTime` | `retry` | 근거 |
-|---|---|---|---|---|
-| 장소 목록·상세 | **5분** | 30분 | 2 | batch 적재 데이터. 세션 중 거의 불변 |
-| 내 정보 (`me`) | **1분** | 10분 | 1 | 본인이 수정. mutation 후 invalidate가 담당 |
-| 반려견 목록·상세 | **1분** | 10분 | 1 | 위와 동일 |
-| 일정 목록·상세 | **30초** | 10분 | 1 | mutation 빈번 |
-| **AI job 상태** | **0** | 1분 | **0** | 폴링(`refetchInterval`)이 신선도를 담당. retry는 폴링과 중복 |
+| 도메인           | `staleTime` | `gcTime` | `retry` | 근거                                                         |
+| ---------------- | ----------- | -------- | ------- | ------------------------------------------------------------ |
+| 장소 목록·상세   | **5분**     | 30분     | 2       | batch 적재 데이터. 세션 중 거의 불변                         |
+| 내 정보 (`me`)   | **1분**     | 10분     | 1       | 본인이 수정. mutation 후 invalidate가 담당                   |
+| 반려견 목록·상세 | **1분**     | 10분     | 1       | 위와 동일                                                    |
+| 일정 목록·상세   | **30초**    | 10분     | 1       | mutation 빈번                                                |
+| **AI job 상태**  | **0**       | 1분      | **0**   | 폴링(`refetchInterval`)이 신선도를 담당. retry는 폴링과 중복 |
 
 **해석**
 
@@ -220,12 +229,12 @@ new QueryClient({
 
 mutation 후 무효화 대상을 **명세와 코드 양쪽에 명시한다.**
 
-| mutation | invalidate |
-|----------|-----------|
-| 일정 생성/수정/삭제 | `planKeys.all` |
-| 일자 항목 교체 | `planKeys.detail(planId)` |
-| 반려견 등록/수정/삭제 | `petKeys.all` |
-| 프로필 수정 / 이미지 변경 | `memberKeys.me()` |
+| mutation                     | invalidate                                                    |
+| ---------------------------- | ------------------------------------------------------------- |
+| 일정 생성/수정/삭제          | `planKeys.all`                                                |
+| 일자 항목 교체               | `planKeys.detail(planId)`                                     |
+| 반려견 등록/수정/삭제        | `petKeys.all`                                                 |
+| 프로필 수정 / 이미지 변경    | `memberKeys.me()`                                             |
 | **AI 일정 → 일정 확정 저장** | `planKeys.all` (ai job은 무효화하지 않는다 — 완료된 작업이다) |
 
 - **낙관적 업데이트(optimistic update)는 기본으로 쓰지 않는다.** 백엔드 검증(장소 존재 여부 Feign 확인, 반려견 등록 상한)이 실패할 수 있어 롤백이 잦다. 필요한 화면에서만 명세에 근거를 적고 쓴다.

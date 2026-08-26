@@ -51,7 +51,7 @@ describe('PlaceListSection', () => {
 - **비동기 job 상태 판정** — HTTP 200 + `status=FAILED` 를 실패로 판정하는지
 - `SliceResponse` 페이지 병합과 `hasNext` 종료 판정
 - 단위·포맷 함수 (거리 km/m, 기온 ℃, 소요 시간 분, 날짜)
-- 좌표 파싱·검증 (`mapy`=위도가 먼저, `null`·`0`·비수치 배제)
+- 좌표 검증 (`lat`=위도가 먼저, `null`·`0`·범위 밖 배제. 백엔드가 Double 로 정규화해 내려준다)
 - **URL 필터 파싱·직렬화 round-trip** — `parse(toQuery(f)) === f`. 기본값을 URL에서 생략하는 규칙 때문에 직렬화·파싱이 비대칭이 되기 쉽다 (`architecture-guide.md` §10)
 
 **우선순위 2 — 렌더 분기.** loading / error(404) / error(5xx) / empty / success 가 **서로 배타적으로** 나오는지. 특히:

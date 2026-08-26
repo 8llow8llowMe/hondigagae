@@ -9,15 +9,15 @@
 
 ## 스택
 
-| 항목 | 선택 |
-|------|------|
-| 프레임워크 | Next.js (App Router) + TypeScript |
-| 패키지 매니저 | pnpm |
-| 스타일링 | Tailwind CSS (토큰 정본: `DESIGN.md`) |
-| 서버 상태 | React Query |
-| 클라이언트 상태 | Zustand |
-| 지도 | 카카오 지도 SDK |
-| 테스트 | Vitest (`environment: node`) |
+| 항목            | 선택                                  |
+| --------------- | ------------------------------------- |
+| 프레임워크      | Next.js (App Router) + TypeScript     |
+| 패키지 매니저   | pnpm                                  |
+| 스타일링        | Tailwind CSS (토큰 정본: `DESIGN.md`) |
+| 서버 상태       | React Query                           |
+| 클라이언트 상태 | Zustand                               |
+| 지도            | 카카오 지도 SDK                       |
+| 테스트          | Vitest (`environment: node`)          |
 
 선정 근거는 [docs/architecture-guide.md](docs/architecture-guide.md) §1.
 

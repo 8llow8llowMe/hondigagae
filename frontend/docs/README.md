@@ -69,13 +69,13 @@
 
 세부는 `api-integration-guide.md`. 정본은 Swagger이며, 서술 문서는 `backend/docs/api-design-guide.md`.
 
-| 항목 | 값 |
-|------|-----|
-| 게이트웨이 | `http://localhost:8000` (dev `6000`, prod `9000`) |
-| 통합 Swagger | `http://localhost:8000/swagger-ui.html` |
-| 공통 래퍼 | `{dataHeader:{success,resultCode,resultMessage}, dataBody}` |
-| 목록 | `SliceResponse<T> = {contents, hasNext}` 커서 기반 |
-| 에러 | HTTP 상태로 분기. `resultCode` 는 `{도메인}_{번호}` |
+| 항목         | 값                                                          |
+| ------------ | ----------------------------------------------------------- |
+| 게이트웨이   | `http://localhost:8000` (dev `6000`, prod `9000`)           |
+| 통합 Swagger | `http://localhost:8000/swagger-ui.html`                     |
+| 공통 래퍼    | `{dataHeader:{success,resultCode,resultMessage}, dataBody}` |
+| 목록         | `SliceResponse<T> = {contents, hasNext}` 커서 기반          |
+| 에러         | HTTP 상태로 분기. `resultCode` 는 `{도메인}_{번호}`         |
 
 ## 스킬 사용 예시
 
