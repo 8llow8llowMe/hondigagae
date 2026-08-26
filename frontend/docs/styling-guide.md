@@ -84,3 +84,24 @@
 - **다음 행동을 알려준다**: 데이터 없음 → "다른 지역을 선택해 주세요".
 - 서버가 내려준 문구(`resultMessage`, enum `name`/`description`, XAI `reasons[].description`)는 **그대로 노출한다.** FE에서 다시 쓰지 않는다.
 - 용어는 `DESIGN.md` §1 용어 표를 따른다.
+
+### 문구는 상수로 모은다
+
+FE가 만드는 화면 문구는 **`src/lib/messages/` 에만** 둔다. 컴포넌트에 한국어를 직접 쓰지 않는다.
+
+```ts
+import { messages } from '@/lib/messages'
+
+messages.common.retry // '다시 시도'
+messages.place.emptyTitle // '조건에 맞는 장소가 없습니다'
+```
+
+| 구분                                     | 위치                   |
+| ---------------------------------------- | ---------------------- |
+| 여러 화면이 공유 (재시도·로딩·공통 에러) | `messages/common.ts`   |
+| 특정 화면 전용                           | `messages/<domain>.ts` |
+
+- **서버가 내려주는 문구는 여기에 넣지 않는다.** 그대로 렌더한다 — `resultMessage`,
+  enum metadata 의 `name`/`description`, XAI `reasons[].description`.
+- 상수화하는 이유: 같은 뜻이 화면마다 "다시 시도" / "재시도" / "새로고침" 으로 갈리는 것을 막는다.
+- 한국어 단일 언어이므로 i18n 라이브러리는 도입하지 않는다. 다국어가 필요해지면 이 구조에서 옮긴다.

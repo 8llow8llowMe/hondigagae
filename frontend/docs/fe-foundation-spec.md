@@ -446,7 +446,36 @@ Phase 4 를 끝낸 뒤 **문서·에이전트·체크리스트를 실제로 겪�
 - [x] 규약 중 기계로 강제 가능한 항목이 설정 스펙으로 확정된다 (`docs/tooling-guide.md` §1 매핑표)
 - [x] Phase 3 프로젝트 부트스트랩 — Next.js 16 / React 19 / Tailwind 4 / React Query 5 / Zustand 5 / Vitest 4,
       설정 파일 실물(lint 규칙 8종 발화 검증 완료), BFF·세션 파이프라인, 테스트 92개
-- [ ] Phase 4 첫 화면 (장소 목록) — `docs/screen-inventory.md` §3
+- [x] Phase 4 첫 화면 (장소 목록) — 서버 프리페치 + 무한 스크롤 + URL 필터, 테스트 127개
+
+### Phase 4 산출물 (2026-08-26)
+
+| 구분          | 내용                                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------- |
+| 명세          | `docs/features/place/공통명세.md` (S0~S6)                                                                     |
+| 공통 컴포넌트 | `Button` `Badge` `Card` `Chip` `Skeleton` `EmptyState` `ErrorState` — `component-guide.md` 계약 준수          |
+| 화면          | `app/(main)/places/{page,loading,error}.tsx`, `PlaceFilterBar` `PlaceListView` `PlaceListSection` `PlaceCard` |
+| 순수 로직     | `nextPlaceCursor()` `gatewayUnreachablePayload()`                                                             |
+| 문구 (T6)     | `src/lib/messages/{index,common,place}.ts` + `styling-guide.md` §7 규칙                                       |
+| 테스트        | 127개 (렌더 분기 21개 + QueryClient 정책 7개 추가)                                                            |
+
+### Phase 4 에서 고친 결함 3건
+
+| #   | 결함                                                                   | 조치                                                                          |
+| --- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 1   | **BFF가 게이트웨이 미기동 시 예외를 그대로 던져 빈 500 반환**          | 503 + 공통 래퍼로 변환. 순수 함수 `src/lib/api/bff-error.ts` 로 분리해 테스트 |
+| 2   | **서버 프리페치가 전역 `retry` 를 상속해 서버 렌더가 3.1초 블로킹**    | `retry: false`. 실측 3.1초 → 0.03초                                           |
+| 3   | **`127.0.0.1` 로 접근 시 dev 청크가 403 → 하이드레이션만 조용히 죽음** | `allowedDevOrigins` 추가 + `local-run-guide.md` 트러블슈팅                    |
+
+### 미결 (Phase 4 이후)
+
+| 항목                                             | 상태                                                                 |
+| ------------------------------------------------ | -------------------------------------------------------------------- |
+| **T4 폼 규약** (`docs/form-guide.md`)            | **미작성** — 장소 목록에는 폼이 없다. 반려견 등록 화면에서 작성한다  |
+| 브라우저에서 하이드레이션 후 에러 상태 육안 확인 | **미완** — 브라우저 페인 스냅샷이 불안정. 동작은 테스트 127개로 검증 |
+| `contentType` 바인딩 형식 (name vs 코드값)       | 백엔드 기동 후 `/fe-api-check`                                       |
+| 시군구 필터 UI                                   | 백엔드에 시군구 목록 API 없음 → BE 후속 요청                         |
+
 - [ ] Phase 4 첫 화면이 `done-checklist.md` 전 항목을 통과한다
 
 ### Phase 0~2 산출물 (2026-08-26)
