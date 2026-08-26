@@ -1,6 +1,8 @@
 package com.hondigagae.domainlayer.place.adapter.out.persistence.entity;
 
+import com.hondigagae.domainlayer.place.domain.enums.AllowedPetSize;
 import com.hondigagae.domainlayer.place.domain.enums.PetAllowanceType;
+import com.hondigagae.domainlayer.place.domain.enums.PlaceSource;
 import com.hondigagae.persistence.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -26,11 +28,17 @@ import org.hibernate.annotations.Comment;
 @Table(
     name = "place",
     indexes = {
-        @Index(name = "uk_place_content_id", columnList = "contentId", unique = true),
+        // 원천이 둘 이상이라 고유 키는 (source, sourceKey) 다. contentId 는 TourAPI 전용이라 일반 인덱스로 둔다.
+        @Index(name = "uk_place_source_source_key", columnList = "source,sourceKey", unique = true),
+        @Index(name = "idx_place_content_id", columnList = "contentId"),
         @Index(name = "idx_place_area_code_sigungu_code_content_type_id", columnList = "areaCode,sigunguCode,contentTypeId"),
         @Index(name = "idx_place_content_type_id_pet_available", columnList = "contentTypeId,petAvailable"),
+        // 비 오는 날 실내 대안 추천 경로
+        @Index(name = "idx_place_indoor_pet_available", columnList = "indoor,petAvailable"),
         @Index(name = "idx_place_lat_lng", columnList = "lat,lng"),
-        @Index(name = "idx_place_source_modified_at", columnList = "sourceModifiedAt")
+        @Index(name = "idx_place_source_modified_at", columnList = "sourceModifiedAt"),
+        // 병합된 행은 조회에서 제외하므로 필터 컬럼에 인덱스를 둔다
+        @Index(name = "idx_place_merged_into_id", columnList = "mergedIntoId")
     }
 )
 public class PlaceEntity extends BaseEntity {
@@ -39,8 +47,16 @@ public class PlaceEntity extends BaseEntity {
     @Comment("장소 아이디 (Snowflake)")
     private Long id;
 
-    @Column(nullable = false)
-    @Comment("TourAPI 콘텐츠 아이디")
+    @Column(nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
+    @Comment("장소 원천 (TOUR_API / CULTURE_PORTAL)")
+    private PlaceSource source;
+
+    @Column(nullable = false, length = 64)
+    @Comment("원천 식별자 — TourAPI 는 contentId, 문화정보원은 시설명+주소 해시")
+    private String sourceKey;
+
+    @Comment("TourAPI 콘텐츠 아이디 (문화정보원 원천이면 null)")
     private Long contentId;
 
     @Column(nullable = false, length = 2)
@@ -146,6 +162,34 @@ public class PlaceEntity extends BaseEntity {
     @Column(nullable = false, length = 20)
     @Comment("반려동물 동반 구분 (가공값)")
     private PetAllowanceType petAllowanceType;
+
+    @Column(nullable = false)
+    @Comment("실내 장소 여부 — 비 오는 날 대안 추천의 근거")
+    private boolean indoor;
+
+    @Column(nullable = false)
+    @Comment("실외 장소 여부")
+    private boolean outdoor;
+
+    @Column(nullable = false)
+    @Comment("반려동물 전용 시설 여부")
+    private boolean petOnly;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Comment("입장 가능 반려동물 크기 (가공값)")
+    private AllowedPetSize allowedPetSize;
+
+    @Column(length = 500)
+    @Comment("반려동물 제한사항 원문")
+    private String petRestriction;
+
+    @Column(length = 200)
+    @Comment("반려동물 동반 추가 요금 원문")
+    private String petExtraFee;
+
+    @Comment("중복 병합 시 살아남은 장소 아이디 (FK: place.id). 값이 있으면 조회에서 제외한다")
+    private Long mergedIntoId;
 
     @Comment("원천 등록일 (createdtime)")
     private LocalDateTime sourceCreatedAt;

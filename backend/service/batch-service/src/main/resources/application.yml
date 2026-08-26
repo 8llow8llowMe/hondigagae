@@ -22,3 +22,8 @@ logging:
   level:
     # Eureka 클라이언트가 주기적으로 Eureka 서버 엔드포인트를 확인할 때 출력하는 반복 로그를 줄이기 위한 설정
     com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
+
+# 문화정보원 반려동물 동반 가능 문화시설 CSV.
+# 공공데이터포털 파일데이터라 활용신청도 인증키도 필요 없다 (data.go.kr/data/15111389).
+culture-facility:
+  file-path: ${CULTURE_FACILITY_CSV_PATH:data/pet_culture.csv}

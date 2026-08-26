@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.placeimport.adapter.out.persistence;
 
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceBulkPort;
+import com.hondigagae.domainlayer.placeimport.domain.model.ImportedCultureFacility;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlace;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -19,14 +20,13 @@ import org.springframework.stereotype.Component;
  * <p>테이블 스키마의 원천은 tour-service의 PlaceEntity(JPA)다 — 이 배치는 스키마를 만들지 않고
  * upsert만 수행하므로, 로컬에서는 tour-service를 먼저 한 번 기동해 테이블을 생성해야 한다.
  *
- * <p><b>id 전략</b>: id = content_id (원천 식별자 기반 결정적 PK).
- * batch-service는 persistence-core(Snowflake)에 의존하지 않으므로, 랜덤/시간 기반 임시 ID 대신
- * 원천 식별자를 그대로 PK로 써서 재실행 멱등성을 보장한다. TourAPI contentid는 전역 유일이라 충돌이 없다.
- * TODO: 서비스 전체 ID 정책(Snowflake) 일원화 여부 결정 — 도입 시 persistence-core 의존 추가 후
- *       INSERT 시에만 Snowflake 발급으로 전환한다 (content_id UK가 있어 전환해도 멱등성은 유지됨).
+ * <p><b>id 전략</b>: {@code PlaceIdFactory} 가 원천 식별자에서 결정적으로 만든다. 재실행해도 같은 행에 꽂힌다.
  *
- * <p>pet_available / pet_allowance_type은 별도 반려동물 마킹 잡의 소유 컬럼이라
- * INSERT 기본값만 넣고 UPDATE 절에서는 건드리지 않는다.
+ * <p><b>고유 키</b>: {@code (source, source_key)}. 원천이 둘 이상이라 content_id 만으로는 식별할 수 없다.
+ *
+ * <p><b>반려동물 컬럼 소유권</b>: 관광 API 적재는 pet_available / pet_allowance_type 을 INSERT 기본값만 넣고
+ * UPDATE 절에서 건드리지 않는다(별도 마킹 잡의 소유 컬럼이다). 문화정보원 적재는 그 값을 원천 컬럼으로
+ * 직접 갖고 있으므로 자기 행에 한해 UPDATE 에서도 갱신한다. 두 원천은 서로 다른 행이라 충돌하지 않는다.
  */
 @Component
 @RequiredArgsConstructor
@@ -37,6 +37,8 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
     private static final String UPSERT_SQL = """
         INSERT INTO place (
             id,
+            source,
+            source_key,
             content_id,
             content_type_id,
             title,
@@ -62,13 +64,19 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             tel,
             pet_available,
             pet_allowance_type,
+            indoor,
+            outdoor,
+            pet_only,
+            allowed_pet_size,
             source_created_at,
             source_modified_at,
             synced_at,
             created_at,
             updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, 'UNKNOWN', ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, 'TOUR_API', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                  false, 'UNKNOWN', false, false, false, 'UNKNOWN', ?, ?, ?, NOW(), NOW())
         ON DUPLICATE KEY UPDATE
+            content_id = VALUES(content_id),
             content_type_id = VALUES(content_type_id),
             title = VALUES(title),
             addr1 = VALUES(addr1),
@@ -97,6 +105,61 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             updated_at = NOW()
         """;
 
+
+    private static final String CULTURE_UPSERT_SQL = """
+        INSERT INTO place (
+            id,
+            source,
+            source_key,
+            content_type_id,
+            title,
+            addr1,
+            zipcode,
+            area_code,
+            sigungu_code,
+            lat,
+            lng,
+            tel,
+            homepage,
+            overview,
+            pet_available,
+            pet_allowance_type,
+            indoor,
+            outdoor,
+            pet_only,
+            allowed_pet_size,
+            pet_restriction,
+            pet_extra_fee,
+            source_modified_at,
+            synced_at,
+            created_at,
+            updated_at
+        ) VALUES (?, 'CULTURE_PORTAL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE
+            content_type_id = VALUES(content_type_id),
+            title = VALUES(title),
+            addr1 = VALUES(addr1),
+            zipcode = VALUES(zipcode),
+            area_code = VALUES(area_code),
+            sigungu_code = VALUES(sigungu_code),
+            lat = VALUES(lat),
+            lng = VALUES(lng),
+            tel = VALUES(tel),
+            homepage = VALUES(homepage),
+            overview = VALUES(overview),
+            pet_available = VALUES(pet_available),
+            pet_allowance_type = VALUES(pet_allowance_type),
+            indoor = VALUES(indoor),
+            outdoor = VALUES(outdoor),
+            pet_only = VALUES(pet_only),
+            allowed_pet_size = VALUES(allowed_pet_size),
+            pet_restriction = VALUES(pet_restriction),
+            pet_extra_fee = VALUES(pet_extra_fee),
+            source_modified_at = VALUES(source_modified_at),
+            synced_at = VALUES(synced_at),
+            updated_at = NOW()
+        """;
+
     private final JdbcTemplate jdbcTemplate;
 
     @Override
@@ -113,6 +176,7 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
                     ImportedPlace place = chunk.get(i);
                     int index = 1;
                     ps.setLong(index++, place.contentId());
+                    ps.setString(index++, String.valueOf(place.contentId()));
                     ps.setLong(index++, place.contentId());
                     ps.setString(index++, place.contentTypeId());
                     ps.setString(index++, place.title());
@@ -138,6 +202,53 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
                     ps.setString(index++, place.tel());
                     setNullableDateTime(ps, index++, place.sourceCreatedAt());
                     setNullableDateTime(ps, index++, place.sourceModifiedAt());
+                    ps.setTimestamp(index, Timestamp.valueOf(syncedAt));
+                }
+
+                @Override
+                public int getBatchSize() {
+                    return chunk.size();
+                }
+            });
+        }
+    }
+
+
+    @Override
+    public void upsertCultureFacilities(List<ImportedCultureFacility> facilities) {
+        LocalDateTime syncedAt = LocalDateTime.now();
+
+        for (int start = 0; start < facilities.size(); start += BATCH_SIZE) {
+            int end = Math.min(start + BATCH_SIZE, facilities.size());
+            List<ImportedCultureFacility> chunk = facilities.subList(start, end);
+
+            jdbcTemplate.batchUpdate(CULTURE_UPSERT_SQL, new BatchPreparedStatementSetter() {
+                @Override
+                public void setValues(PreparedStatement ps, int i) throws SQLException {
+                    ImportedCultureFacility facility = chunk.get(i);
+                    int index = 1;
+                    ps.setLong(index++, facility.placeId());
+                    ps.setString(index++, facility.sourceKey());
+                    ps.setString(index++, facility.contentTypeId());
+                    ps.setString(index++, facility.title());
+                    ps.setString(index++, facility.addr1());
+                    ps.setString(index++, facility.zipcode());
+                    ps.setString(index++, facility.areaCode());
+                    ps.setString(index++, facility.sigunguCode());
+                    setNullableDecimal(ps, index++, facility.lat());
+                    setNullableDecimal(ps, index++, facility.lng());
+                    ps.setString(index++, facility.tel());
+                    ps.setString(index++, facility.homepage());
+                    ps.setString(index++, facility.overview());
+                    ps.setBoolean(index++, facility.petAvailable());
+                    ps.setString(index++, facility.petAllowanceType());
+                    ps.setBoolean(index++, facility.indoor());
+                    ps.setBoolean(index++, facility.outdoor());
+                    ps.setBoolean(index++, facility.petOnly());
+                    ps.setString(index++, facility.allowedPetSize());
+                    ps.setString(index++, facility.petRestriction());
+                    ps.setString(index++, facility.petExtraFee());
+                    setNullableDateTime(ps, index++, facility.sourceModifiedAt());
                     ps.setTimestamp(index, Timestamp.valueOf(syncedAt));
                 }
 

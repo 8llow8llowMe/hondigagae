@@ -32,8 +32,10 @@ area_visitor_stat                             (Redis 캐시 기본, weather_fore
 
 | 컬럼 | 타입 | Null | 원천 필드 | 설명 |
 |------|------|------|-----------|------|
-| id | BIGINT | N | — | PK (Snowflake) |
-| content_id | BIGINT | N | contentid | 원천 콘텐츠 ID (**UK**) |
+| id | BIGINT | N | — | PK. batch 는 `PlaceIdFactory` 로 원천에서 결정적으로 만든다 |
+| source | VARCHAR(20) | N | (원천 구분) | TOUR_API / CULTURE_PORTAL |
+| source_key | VARCHAR(64) | N | (원천 식별자) | TourAPI=contentId, 문화정보원=시설명+주소 해시. **(source, source_key) 가 UK** |
+| content_id | BIGINT | Y | contentid | TourAPI 콘텐츠 ID (문화정보원이면 null) |
 | content_type_id | VARCHAR(2) | N | contenttypeid | 12관광지/14문화/15축제/25코스/28레포츠/32숙박/38쇼핑/39음식점 (enum `ContentType`) |
 | title | VARCHAR(200) | N | title | 명칭 |
 | addr1 | VARCHAR(200) | Y | addr1 | 주소 |
@@ -58,12 +60,21 @@ area_visitor_stat                             (Redis 캐시 기본, weather_fore
 | pet_allowance_type | VARCHAR(20) | N | (가공) | enum `PetAllowanceType`: ALLOWED / PARTIALLY_ALLOWED / NOT_ALLOWED / UNKNOWN, default UNKNOWN |
 | source_created_at | DATETIME | Y | createdtime | 원천 등록일 (`yyyyMMddHHmmss` 파싱) |
 | source_modified_at | DATETIME | Y | modifiedtime | 원천 수정일 — **증분 동기화 기준** |
+| indoor / outdoor | BOOLEAN | N | (문화정보원) | 실내·실외 여부. 비 오는 날 대안 추천 근거 |
+| pet_only | BOOLEAN | N | (문화정보원) | 반려동물 전용 시설 |
+| allowed_pet_size | VARCHAR(20) | N | (가공) | enum `AllowedPetSize` |
+| pet_restriction | VARCHAR(500) | Y | (문화정보원) | 제한사항 원문 |
+| pet_extra_fee | VARCHAR(200) | Y | (문화정보원) | 동반 추가 요금 원문 |
+| merged_into_id | BIGINT | Y | (가공) | 중복 병합 시 살아남은 행. 값이 있으면 조회 제외 |
 | synced_at | DATETIME | N | — | 적재 시각 |
 
 인덱스:
 
 ```text
-uk_place_content_id                                   (contentId)
+uk_place_source_source_key                            (source, sourceKey)   ← 원천이 둘이라 복합 UK
+idx_place_content_id                                  (contentId)
+idx_place_indoor_pet_available                        (indoor, petAvailable)
+idx_place_merged_into_id                              (mergedIntoId)
 idx_place_area_code_sigungu_code_content_type_id      (areaCode, sigunguCode, contentTypeId)
 idx_place_content_type_id_pet_available               (contentTypeId, petAvailable)
 idx_place_lat_lng                                     (lat, lng)          — 주변 검색용

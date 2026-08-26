@@ -1,6 +1,8 @@
 package com.hondigagae.domainlayer.place.domain.model;
 
+import com.hondigagae.domainlayer.place.domain.enums.AllowedPetSize;
 import com.hondigagae.domainlayer.place.domain.enums.PetAllowanceType;
+import com.hondigagae.domainlayer.place.domain.enums.PlaceSource;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Builder;
@@ -8,7 +10,10 @@ import lombok.Builder;
 @Builder
 public record Place(
     long id,
-    long contentId,
+    PlaceSource source,
+    String sourceKey,
+    // 문화정보원 원천이면 null 이라 wrapper 로 둔다
+    Long contentId,
     String contentTypeId,
     String title,
     String addr1,
@@ -35,6 +40,13 @@ public record Place(
     String overview,
     boolean petAvailable,
     PetAllowanceType petAllowanceType,
+    boolean indoor,
+    boolean outdoor,
+    boolean petOnly,
+    AllowedPetSize allowedPetSize,
+    String petRestriction,
+    String petExtraFee,
+    Long mergedIntoId,
     LocalDateTime sourceCreatedAt,
     LocalDateTime sourceModifiedAt
 ) {

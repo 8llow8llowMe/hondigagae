@@ -24,6 +24,8 @@
   - 실호출로 검증한 공공 API 응답 기준의 DB 엔티티 설계 (컬럼·인덱스·적재 전략)
 - `data-api-analysis.md`
   - 공공데이터 API 7종의 실제 응답 구조와 연동 시 함정
+- `place-data-integration.md`
+  - 장소 데이터를 어느 소스로 어떻게 합치는지 (소스별 저장 가능 여부, 중복 판정, 배치 잡)
 - `local-run-guide.md`
   - 로컬 기동 절차, 포트 맵, Swagger 접근, 자주 겪는 문제
 - `service-playbook.md`

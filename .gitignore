@@ -26,3 +26,6 @@ frontend/out/
 .env
 .env.*
 !.env.example
+
+# 공공데이터 원본 파일 (30MB, data.go.kr 에서 재다운로드 가능)
+backend/data/
