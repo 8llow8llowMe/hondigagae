@@ -34,4 +34,23 @@ public final class RegionCodeMapping {
     public static String toSigunguCode(String sigunguName) {
         return sigunguName == null ? null : SIGUNGU_TO_CODE.get(sigunguName.trim());
     }
+
+    /**
+     * 주소 문자열에서 시군구 코드를 읽는다.
+     *
+     * <p>식약처 원천은 시군구를 따로 주지 않고 전체 주소만 준다. 제주는 시군구가 둘뿐이라
+     * 주소에 이름이 들어 있는지로 판정할 수 있다. 시군구가 많은 시도로 넓힐 때는
+     * 이 방식으로는 부족하니 지오코딩 결과의 정제 주소를 쓰도록 바꿔야 한다.
+     */
+    public static String toSigunguCodeFromAddress(String address) {
+        if (address == null) {
+            return null;
+        }
+        for (Map.Entry<String, String> entry : SIGUNGU_TO_CODE.entrySet()) {
+            if (address.contains(entry.getKey())) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
 }

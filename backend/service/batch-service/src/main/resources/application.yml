@@ -27,3 +27,20 @@ logging:
 # 공공데이터포털 파일데이터라 활용신청도 인증키도 필요 없다 (data.go.kr/data/15111389).
 culture-facility:
   file-path: ${CULTURE_FACILITY_CSV_PATH:data/pet_culture.csv}
+
+# 식약처 반려동물 동반출입 음식점 등록 현황(xlsx).
+# 인증키가 없다. file-path 에 파일이 있으면 그 파일을, 없으면 원천에서 내려받는다.
+mfds:
+  pet-restaurant:
+    base-url: ${MFDS_BASE_URL:https://www.foodsafetykorea.go.kr}
+    download-path: ${MFDS_PET_RESTAURANT_PATH:/portal/petKorea/downloadExcel.do}
+    file-path: ${MFDS_PET_RESTAURANT_FILE_PATH:}
+    connect-timeout-ms: ${MFDS_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${MFDS_READ_TIMEOUT_MS:30000}
+
+# VWorld 지오코더. 식약처 원천이 주소만 주므로 좌표를 여기서 채운다 (일 40,000건 무료).
+vworld:
+  base-url: ${VWORLD_BASE_URL:https://api.vworld.kr}
+  api-key: ${VWORLD_API_KEY:}
+  connect-timeout-ms: ${VWORLD_CONNECT_TIMEOUT_MS:3000}
+  read-timeout-ms: ${VWORLD_READ_TIMEOUT_MS:10000}

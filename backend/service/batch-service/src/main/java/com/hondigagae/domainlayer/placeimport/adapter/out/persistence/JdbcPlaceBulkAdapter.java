@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.placeimport.adapter.out.persistence;
 
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceBulkPort;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedCultureFacility;
+import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPetRestaurant;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlace;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -189,6 +190,52 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             updated_at = NOW()
         """;
 
+    /**
+     * 식약처 등록 업소 upsert.
+     *
+     * <p><b>모르는 값은 넣지 않는다.</b> indoor / outdoor 는 INSERT 컬럼 목록에서 아예 빼 NULL 로 두고,
+     * allowed_pet_size 는 UNKNOWN 으로 넣는다. 이 원천은 "동반 가능하다"는 사실만 알려줄 뿐
+     * 실내인지 크기 제한이 있는지는 말해 주지 않는다.
+     *
+     * <p>UPDATE 절에서 indoor / outdoor / allowed_pet_size 를 건드리지 않는 것도 같은 이유다 —
+     * 병합 잡이 다른 원천에서 옮겨 채워 둔 값을 재실행 때마다 도로 지워 버리면 안 된다.
+     */
+    private static final String MFDS_UPSERT_SQL = """
+        INSERT INTO place (
+            id,
+            source,
+            source_key,
+            source_category,
+            content_type_id,
+            title,
+            addr1,
+            area_code,
+            sigungu_code,
+            lat,
+            lng,
+            pet_available,
+            pet_allowance_type,
+            pet_only,
+            allowed_pet_size,
+            synced_at,
+            created_at,
+            updated_at
+        ) VALUES (?, 'MFDS', ?, ?, ?, ?, ?, ?, ?, ?, ?, true, 'ALLOWED', false, 'UNKNOWN', ?, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE
+            source_category = VALUES(source_category),
+            content_type_id = VALUES(content_type_id),
+            title = VALUES(title),
+            addr1 = VALUES(addr1),
+            area_code = VALUES(area_code),
+            sigungu_code = VALUES(sigungu_code),
+            lat = VALUES(lat),
+            lng = VALUES(lng),
+            pet_available = VALUES(pet_available),
+            pet_allowance_type = VALUES(pet_allowance_type),
+            synced_at = VALUES(synced_at),
+            updated_at = NOW()
+        """;
+
     private final JdbcTemplate jdbcTemplate;
 
     @Override
@@ -289,6 +336,40 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             });
 
             upsertCultureIntros(chunk, syncedAt);
+        }
+    }
+
+    @Override
+    public void upsertPetRestaurants(List<ImportedPetRestaurant> restaurants) {
+        LocalDateTime syncedAt = LocalDateTime.now();
+
+        for (int start = 0; start < restaurants.size(); start += BATCH_SIZE) {
+            int end = Math.min(start + BATCH_SIZE, restaurants.size());
+            List<ImportedPetRestaurant> chunk = restaurants.subList(start, end);
+
+            jdbcTemplate.batchUpdate(MFDS_UPSERT_SQL, new BatchPreparedStatementSetter() {
+                @Override
+                public void setValues(PreparedStatement ps, int i) throws SQLException {
+                    ImportedPetRestaurant restaurant = chunk.get(i);
+                    int index = 1;
+                    ps.setLong(index++, restaurant.placeId());
+                    ps.setString(index++, restaurant.sourceKey());
+                    ps.setString(index++, restaurant.businessType());
+                    ps.setString(index++, ImportedPetRestaurant.CONTENT_TYPE_RESTAURANT);
+                    ps.setString(index++, restaurant.name());
+                    ps.setString(index++, restaurant.address());
+                    ps.setString(index++, restaurant.areaCode());
+                    ps.setString(index++, restaurant.sigunguCode());
+                    setNullableDecimal(ps, index++, restaurant.lat());
+                    setNullableDecimal(ps, index++, restaurant.lng());
+                    ps.setTimestamp(index, Timestamp.valueOf(syncedAt));
+                }
+
+                @Override
+                public int getBatchSize() {
+                    return chunk.size();
+                }
+            });
         }
     }
 
