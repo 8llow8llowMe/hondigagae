@@ -27,10 +27,10 @@
 - 구현 API
   - `GET /api/v1/places` (지역·타입·반려견 동반 조건 필터, 커서 기반 `SliceResponse`)
   - `GET /api/v1/places/{placeId}` (intro/petInfo/images 결합 상세)
-  - `GET /api/v1/places/nearby-dining` (카카오 로컬 실시간 검색, **저장하지 않음**)
-  - `GET /api/v1/emergencies/animal-hospitals` (좌표 반경 검색, 제주 86곳)
-- 컨텍스트: `place`, `dining`, `emergency`
-- 상태: 구현 (`place`, `dining`, `emergency`). **미착수**: `walkcourse`(두루누비), `insight`(적합도·날씨·혼잡도)
+  - `GET /api/v1/places/nearby` (좌표 반경 검색, 식당·카페 포함)
+  - `GET /api/v1/emergencies/facilities` (동물병원·동물약국 반경 검색, 제주 214곳)
+- 컨텍스트: `place`, `emergency`
+- 상태: 구현 (`place`, `emergency`). **미착수**: `walkcourse`(두루누비), `insight`(적합도·날씨·혼잡도)
 
 ## Plan Service
 

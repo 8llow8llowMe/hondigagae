@@ -1,10 +1,12 @@
 package com.hondigagae.domainlayer.emergency.application.info;
 
+import com.hondigagae.domainlayer.emergency.domain.enums.EmergencyFacilityType;
 import lombok.Builder;
 
 @Builder
-public record NearbyHospitalInfo(
-    long hospitalId,
+public record NearbyFacilityInfo(
+    long facilityId,
+    EmergencyFacilityType facilityType,
     String name,
     String addr,
     double lat,

@@ -1,6 +1,6 @@
 package com.hondigagae.domainlayer.placeimport.application.port.out;
 
-import com.hondigagae.domainlayer.placeimport.domain.model.ImportedAnimalHospital;
+import com.hondigagae.domainlayer.placeimport.domain.model.ImportedEmergencyFacility;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedCultureFacility;
 import java.util.List;
 
@@ -19,9 +19,10 @@ public interface CultureFacilityCatalogPort {
     List<ImportedCultureFacility> readTravelFacilities(String sido);
 
     /**
-     * 같은 파일에서 동물병원만 읽는다. 여행 장소가 아니라 긴급 상황용이라 별도 테이블로 간다.
+     * 같은 파일에서 긴급 시설(동물병원·동물약국)만 읽는다. 여행 장소가 아니라 급할 때 찾는 곳이라
+     * 별도 테이블로 간다.
      *
      * @param sido 시도 명칭. null 이면 전국
      */
-    List<ImportedAnimalHospital> readAnimalHospitals(String sido);
+    List<ImportedEmergencyFacility> readEmergencyFacilities(String sido);
 }

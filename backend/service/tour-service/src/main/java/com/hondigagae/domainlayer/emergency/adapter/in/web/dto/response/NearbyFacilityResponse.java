@@ -1,16 +1,16 @@
 package com.hondigagae.domainlayer.emergency.adapter.in.web.dto.response;
 
-import com.hondigagae.domainlayer.emergency.adapter.in.web.dto.item.NearbyHospitalItem;
+import com.hondigagae.domainlayer.emergency.adapter.in.web.dto.item.NearbyFacilityItem;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import lombok.Builder;
 
 @Builder
-@Schema(description = "주변 동물병원 검색 응답 DTO")
-public record NearbyHospitalResponse(
+@Schema(description = "주변 긴급 시설 검색 응답 DTO")
+public record NearbyFacilityResponse(
 
-    @Schema(description = "검색 결과 (가까운 순)")
-    List<NearbyHospitalItem> hospitals,
+    @Schema(description = "검색 결과 (가까운 순). 종류를 지정하지 않으면 동물병원과 동물약국이 섞여 나온다")
+    List<NearbyFacilityItem> facilities,
 
     @Schema(description = "결과 수", example = "5")
     int totalCount,
@@ -19,7 +19,7 @@ public record NearbyHospitalResponse(
     int radius,
 
     @Schema(
-        description = "24시간 운영으로 확인된 곳만 걸렀는지. 제주 전체에 3곳뿐이라 true 로 조회하면 결과가 매우 적다",
+        description = "24시간 운영으로 확인된 곳만 걸렀는지. 제주 동물병원 중 3곳뿐이라 true 로 조회하면 결과가 매우 적다",
         example = "false")
     boolean open24Only,
 
