@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.PlaceDetailR
 import com.hondigagae.domainlayer.place.application.exception.PlaceValidationMessage;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.in.PlaceWebUseCase;
+import com.hondigagae.domainlayer.place.domain.enums.AllowedPetSize;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
 import com.hondigagae.domainlayer.place.domain.enums.PetAllowanceType;
 import com.hondigagae.persistence.dto.SliceResponse;
@@ -32,13 +33,20 @@ public class PlaceWebController {
 
     private final PlaceWebUseCase placeWebUseCase;
 
-    @Operation(summary = "장소 목록 조회", description = "지역/타입/반려동물 동반 조건으로 장소를 검색합니다. lastPlaceId 커서 기반 무한 스크롤 응답입니다.")
+    @Operation(summary = "장소 목록 조회",
+        description = "지역·타입·반려동물 동반 조건으로 장소를 검색합니다. lastPlaceId 커서 기반 무한 스크롤 응답입니다. "
+            + "비 오는 날 대안을 찾을 때는 indoor=true 로, 소형견만 받는 곳을 피할 때는 allowedPetSize 로 거릅니다.")
     @GetMapping
     public ResponseEntity<Response<SliceResponse<PlaceItem>>> getPlaces(
         @Parameter(description = "관광 지역코드 (제주=39)", example = "39") @RequestParam(required = false) String areaCode,
         @Parameter(description = "관광 시군구코드", example = "3") @RequestParam(required = false) String sigunguCode,
         @Parameter(description = "콘텐츠 타입") @RequestParam(required = false) ContentType contentType,
         @Parameter(description = "반려동물 동반 구분") @RequestParam(required = false) PetAllowanceType petAllowanceType,
+        @Parameter(description = "실내 여부 — true 면 실내만. 원천에 정보가 없는 장소는 어느 쪽으로도 잡히지 않는다", example = "true")
+        @RequestParam(required = false) Boolean indoor,
+        @Parameter(description = "입장 가능 반려동물 크기") @RequestParam(required = false) AllowedPetSize allowedPetSize,
+        @Parameter(description = "원본 분류 (펜션·카페·박물관·여행지 등). 콘텐츠 타입으로는 갈리지 않는 구분에 쓴다", example = "카페")
+        @RequestParam(required = false) String sourceCategory,
         @Parameter(description = "커서 — 직전 응답 마지막 placeId", example = "212481712381923328") @RequestParam(required = false) Long lastPlaceId,
         @Parameter(description = "조회 개수 (1~50)", example = "20")
         @Positive(message = PlaceValidationMessage.SIZE_POSITIVE) @Max(value = 50, message = PlaceValidationMessage.SIZE_MAX_INVALID)
@@ -49,6 +57,9 @@ public class PlaceWebController {
             .sigunguCode(sigunguCode)
             .contentType(contentType)
             .petAllowanceType(petAllowanceType)
+            .indoor(indoor)
+            .allowedPetSize(allowedPetSize)
+            .sourceCategory(sourceCategory)
             .lastPlaceId(lastPlaceId)
             .size(size)
             .build();

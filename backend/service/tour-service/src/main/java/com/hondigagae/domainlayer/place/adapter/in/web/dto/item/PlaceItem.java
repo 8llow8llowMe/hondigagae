@@ -39,7 +39,16 @@ public record PlaceItem(
     CodeNameDescriptionMetadata petAllowanceType,
 
     @Schema(description = "전화번호", example = "064-760-6331")
-    String tel
+    String tel,
+
+    @Schema(description = "실내 여부. null 이면 원천에 정보가 없다", example = "true", nullable = true)
+    Boolean indoor,
+
+    @Schema(description = "원본 분류 (원천이 준 값 그대로)", example = "카페", nullable = true)
+    String sourceCategory,
+
+    @Schema(description = "정보 출처", example = "문화정보원")
+    String sourceName
 ) {
 
 }
