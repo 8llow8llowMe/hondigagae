@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.place.application.model;
 
+import com.hondigagae.domainlayer.place.domain.enums.AllowedPetSize;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
 import com.hondigagae.domainlayer.place.domain.enums.PetAllowanceType;
 import lombok.Builder;
@@ -13,6 +14,9 @@ public record PlaceSearchCriteria(
     String sigunguCode,
     ContentType contentType,
     PetAllowanceType petAllowanceType,
+    // 비 오는 날 실내 대안을 고를 때 쓴다. null 이면 실내외를 가리지 않는다.
+    Boolean indoor,
+    AllowedPetSize allowedPetSize,
     Long lastPlaceId,
     int size
 ) {

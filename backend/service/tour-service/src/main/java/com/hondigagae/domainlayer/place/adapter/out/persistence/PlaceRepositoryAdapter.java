@@ -38,7 +38,8 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
         Slice<PlaceEntity> slice = placeRepository.findAllByCriteria(
             criteria.areaCode(), criteria.sigunguCode(),
             criteria.contentType() == null ? null : criteria.contentType().getCode(),
-            criteria.petAllowanceType(), criteria.lastPlaceId(),
+            criteria.petAllowanceType(), criteria.indoor(), criteria.allowedPetSize(),
+            criteria.lastPlaceId(),
             PageRequest.of(0, criteria.size())
         );
         return new PlaceSliceQueryResult(placeMapper.toDomains(slice.getContent()), slice.hasNext());
@@ -46,7 +47,7 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
 
     @Override
     public Optional<Place> findPlaceById(long placeId) {
-        return placeRepository.findById(placeId).map(placeMapper::toDomain);
+        return placeRepository.findByIdAndMergedIntoIdIsNull(placeId).map(placeMapper::toDomain);
     }
 
     @Override

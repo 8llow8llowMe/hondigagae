@@ -27,6 +27,7 @@
 - 구현 API
   - `GET /api/v1/places` (지역·타입·반려견 동반 조건 필터, 커서 기반 `SliceResponse`)
   - `GET /api/v1/places/{placeId}` (intro/petInfo/images 결합 상세)
+- 예정: 문화정보원 데이터 적재로 장소 190곳 확보, `nearby-dining`(카카오 로컬 실시간 조회) 추가 — `place-data-integration.md`
 - 상태: 구현 (place 컨텍스트). **미착수**: `walkcourse`(두루누비), `insight`(적합도·날씨·혼잡도), `emergency`(동물병원)
 
 ## Plan Service
