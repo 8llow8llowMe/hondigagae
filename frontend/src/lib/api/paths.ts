@@ -1,0 +1,39 @@
+/**
+ * 백엔드 경로를 한 곳에 모은다. 전송 계층(client.ts / server.ts)이 갈려도
+ * 경로·타입은 공유한다 — docs/architecture-guide.md §8.
+ *
+ * 여기 적힌 경로는 게이트웨이의 /api/v1 하위 경로다.
+ * (브라우저는 /api/bff 프록시를 거치고, 서버는 게이트웨이를 직접 부른다)
+ */
+export const paths = {
+  auth: {
+    login: '/auth/login',
+    logout: '/auth/logout',
+    reissue: '/auth/token/reissue',
+    oauthAuthorize: (provider: string) => `/auth/${provider}/authorize`,
+    oauthLogin: (provider: string, code: string, state: string) =>
+      `/auth/${provider}/login?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`,
+    emailSendCode: '/auth/email/send-code',
+    emailVerifyCode: '/auth/email/verify-code',
+  },
+  members: {
+    signup: '/members/signup',
+    me: '/members/me',
+    pets: '/members/me/pets',
+    pet: (petId: string) => `/members/me/pets/${petId}`,
+  },
+  places: {
+    list: (query: string) => (query ? `/places?${query}` : '/places'),
+    detail: (placeId: string) => `/places/${placeId}`,
+  },
+  plans: {
+    list: '/plans',
+    create: '/plans',
+    detail: (planId: string) => `/plans/${planId}`,
+    dayItems: (planId: string, day: number) => `/plans/${planId}/days/${day}/items`,
+  },
+  aiPlans: {
+    submit: '/ai-plans',
+    job: (jobId: string) => `/ai-plans/jobs/${jobId}`,
+  },
+} as const
