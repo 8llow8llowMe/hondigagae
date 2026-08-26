@@ -1,6 +1,6 @@
 ---
 name: mr
-description: "혼디가개(hondigagae) Merge Request 본문을 한국어 템플릿으로 작성할 때 사용한다. /mr 요청, MR body, merge request template, MR description, [BE] feat: ... 제목 생성이 트리거다."
+description: "혼디가개(hondigagae) Merge Request 본문을 한국어 템플릿으로 작성할 때 사용한다. /mr 요청, MR body, merge request template, MR description, [BE]/[FE] feat: ... 제목 생성이 트리거다."
 ---
 
 # MR Draft
@@ -10,7 +10,7 @@ description: "혼디가개(hondigagae) Merge Request 본문을 한국어 템플�
 ## Workflow
 
 1. 변경 범위를 확인한다. 가능하면 `git status`, `git diff --stat`, `git log --oneline`을 참고한다.
-2. 제목은 `[영역] type: 요약` 형식으로 만든다. 예: `[BE] feat: AI 여행 플래너 일정 생성 API 구현`
+2. 제목은 `[영역] type: 요약` 형식으로 만든다. 예: `[BE] feat: AI 여행 플래너 일정 생성 API 구현`, `[FE] feat: 장소 목록 무한 스크롤 구현`
 3. 본문은 바로 복사 가능한 Markdown만 출력한다.
 4. 실제 확인하지 않은 체크박스는 체크하지 않는다.
 5. 이슈 번호가 없으면 `Issue Number: #`로 둔다.
@@ -60,6 +60,13 @@ Issue Number: #
 ## Rules
 
 - 한국어로 쓴다.
+- 제목 prefix는 `[BE]` / `[FE]` / `[DOCS]` / `[INFRA]` 중 변경 범위에 맞는 것을 쓴다 (루트 `CLAUDE.md` 기준).
+  - `backend/` 런타임 코드 → `[BE]`
+  - `frontend/` 런타임 코드 → `[FE]`
+  - 문서만 → `[DOCS]` / 빌드·CI·Claude 설정 → `[INFRA]`
 - 기능 단위로 묶고 파일 나열식 changelog를 피한다.
+- 검증 내역은 실제로 돌린 명령을 적는다.
+  - 백엔드: `./gradlew compileJava` / `test` / `check`
+  - 프론트엔드: `pnpm lint` / `pnpm typecheck` / `pnpm test`
 - 검증 실패나 미실행은 숨기지 않는다.
 - secret, token, private key, password는 포함하지 않는다.
