@@ -16,6 +16,8 @@ import lombok.Builder;
 @Builder
 public record ImportedCultureFacility(
     String sourceKey,
+    // 원본 분류(펜션·카페·박물관 …). contentTypeId 로 뭉개기 전 값을 보존한다.
+    String sourceCategory,
     String contentTypeId,
     String title,
     String addr1,
@@ -37,6 +39,8 @@ public record ImportedCultureFacility(
     String petExtraFee,
     String useTime,
     String restDate,
+    String parking,
+    String admissionFee,
     LocalDateTime sourceModifiedAt
 ) {
 
