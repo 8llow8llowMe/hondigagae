@@ -1,0 +1,54 @@
+import { describe, expect, it } from 'vitest'
+
+import { ApiError, classify, isRetriable, shouldOfferRetry } from '@/lib/api/error'
+
+describe('classify', () => {
+  it('404 는 데이터 부재로 분류한다', () => {
+    expect(classify(404)).toBe('not-found')
+  })
+
+  it('401 은 미인증으로 분류한다', () => {
+    expect(classify(401)).toBe('unauthorized')
+  })
+
+  it('400 은 입력 검증 실패로 분류한다', () => {
+    expect(classify(400)).toBe('validation')
+  })
+
+  it('5xx 는 일시 장애로 분류한다', () => {
+    expect(classify(500)).toBe('temporary')
+    expect(classify(503)).toBe('temporary')
+  })
+
+  it('무응답(status 0)은 일시 장애로 분류한다', () => {
+    expect(classify(0)).toBe('temporary')
+  })
+
+  it('403 은 권한 문제로 분류한다', () => {
+    expect(classify(403)).toBe('forbidden')
+  })
+})
+
+describe('shouldOfferRetry', () => {
+  it('데이터 부재(404)에는 재시도를 제안하지 않는다', () => {
+    expect(shouldOfferRetry(new ApiError(404, 'PET_001', '없음'))).toBe(false)
+  })
+
+  it('일시 장애(5xx)에는 재시도를 제안한다', () => {
+    expect(shouldOfferRetry(new ApiError(503, null, null))).toBe(true)
+  })
+
+  it('미인증(401)에는 재시도를 제안하지 않는다 (재발급 흐름이 담당한다)', () => {
+    expect(shouldOfferRetry(new ApiError(401, null, null))).toBe(false)
+  })
+
+  it('입력 검증 실패(400)에는 재시도를 제안하지 않는다', () => {
+    expect(shouldOfferRetry(new ApiError(400, 'PET_100', '올바르지 않음'))).toBe(false)
+  })
+})
+
+describe('isRetriable', () => {
+  it('ApiError 가 아닌 오류는 전송 실패로 보고 재시도 가능으로 판정한다', () => {
+    expect(isRetriable(new Error('boom'))).toBe(true)
+  })
+})
