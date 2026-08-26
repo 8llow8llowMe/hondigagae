@@ -71,7 +71,10 @@ GET|PATCH /api/v1/members/me
 
 ## 5. 보호 경로
 
-`middleware.ts` 의 `PROTECTED_PATHS` 와 실제 화면 목록을 **일치시킨다.** 화면을 추가하고 미들웨어를 빼먹으면 로그인 없이 접근된다.
+`proxy.ts` 의 `PROTECTED_PATHS` 와 실제 화면 목록을 **일치시킨다.** 화면을 추가하고 가드를 빼먹으면 로그인 없이 접근된다.
+
+> Next 16 에서 `middleware.ts` 는 `proxy.ts` 로 이름이 바뀌었고, 내보내는 함수도 `proxy` 다.
+> `proxy` 는 **nodejs 런타임 고정**이며 edge 를 지원하지 않는다.
 
 초기 보호 대상 (구현 범위 기준):
 

@@ -22,7 +22,7 @@ frontend/
 │   ├── api/bff/[...path]/route.ts   백엔드 프록시 (catch-all)
 │   ├── layout.tsx
 │   └── globals.css
-├── middleware.ts               보호 경로 가드 (PROTECTED_PATHS)
+├── proxy.ts                    보호 경로 가드 (PROTECTED_PATHS). Next 16 에서 middleware.ts 를 대체
 ├── src/
 │   ├── components/             공통 UI (button, card, input, tab, badge, modal, empty-state, skeleton)
 │   ├── features/<feature>/     기능별 컴포넌트·훅·쿼리 (place, plan, pet, auth, ai-plan)
@@ -122,14 +122,26 @@ const MapView = dynamic(() => import('@/features/place/map-view'), { ssr: false 
 - refresh가 HttpOnly 쿠키다 → 크로스 오리진 쿠키(`SameSite`/도메인) 문제를 같은 오리진으로 흡수한다.
 - 게이트웨이 CORS는 `localhost:3000`/`5173` 을 이미 허용하므로 직접 호출도 가능하지만, 토큰 보관 책임을 FE가 떠안게 된다.
 
-> **배포 시**: 게이트웨이 `ApiGatewayCorsConfig` 허용 목록에 배포 웹 오리진이 있어야 한다. BFF가 브라우저 `Origin` 헤더를 보존해 전달하면 목록에 없을 때 **POST만 빈 403** 이 되어 "조회는 되는데 등록만 안 되는" 형태로 나타난다. 배포 도메인 확정 시 BE 후속 요청.
+### BFF는 브라우저 헤더를 그대로 전달하지 않는다
+
+프록시는 필요한 헤더(`Accept`, `Content-Type`, `Authorization`, `Cookie`)만 **새로 구성해서** 보낸다.
+브라우저 요청 헤더를 통째로 포워딩하지 않는다.
+
+- **`Origin` 이 붙지 않으므로 게이트웨이 CORS 검사 대상이 아니다.** FE dev 포트를 게이트웨이
+  허용 목록에 등록할 필요가 없다.
+- 브라우저 헤더를 보존해 전달하도록 "개선"하면, 허용 목록에 없는 오리진에서 **POST만 빈 403**
+  이 되어 "조회는 되는데 등록만 안 되는" 형태로 나타난다. `ApiGatewayCorsConfig` 의 주석이
+  경고하는 사례가 정확히 이것이다. **헤더 화이트리스트 방식을 유지한다.**
+- 게이트웨이 CORS 허용 목록은 **브라우저가 게이트웨이를 직접 부를 때만** 의미가 있다
+  (WebSocket 핸드셰이크, Swagger UI). 그런 경로를 새로 만들 때는 BE에 오리진 등록을 요청한다.
 
 ## 6. 라우팅
 
 - `react-router-dom` 금지. `useRouter` / `usePathname` / `useSearchParams` 를 쓴다.
 - 동적 세그먼트는 `[param]`. 예: `app/(main)/places/[placeId]/page.tsx`
 - 헤더·푸터 노출 예외는 route group(`(auth)`)으로 처리한다.
-- 보호 경로는 `middleware.ts` 의 `PROTECTED_PATHS` 와 실제 화면 목록을 **일치시킨다**. 세부는 `auth-guide.md`.
+- 보호 경로는 `proxy.ts` 의 `PROTECTED_PATHS` 와 실제 화면 목록을 **일치시킨다**. 세부는 `auth-guide.md`.
+  (Next 16: `middleware.ts` → `proxy.ts`, 내보내는 함수도 `proxy`, 런타임은 nodejs 고정)
 - 같은 오리진 리다이렉트는 `src/lib/http/redirect.ts` 헬퍼를 쓴다. `NextResponse.redirect(req.nextUrl…)` 는 standalone 서버에서 `http://0.0.0.0:3000` 으로 나가 깨진다.
 
 ## 7. App Router 상태 파일 규약

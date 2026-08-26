@@ -1,7 +1,8 @@
 /**
  * 쿠키 이름만 담는 모듈.
  *
- * middleware.ts 는 Edge Runtime 에서 돌기 때문에 node:crypto 를 쓰는
- * session-crypto.ts 를 끌어올 수 없다. 이름만 필요한 곳은 이 파일을 import 한다.
+ * proxy.ts 처럼 쿠키 이름만 필요한 곳이 session.ts 를 임포트하면
+ * node:crypto 와 env 검증(`env.server.ts` 의 모듈 로드 시점 파싱)까지 함께 끌려온다.
+ * 임포트 표면을 최소로 유지한다.
  */
 export const SESSION_COOKIE_NAME = 'hdg_session'

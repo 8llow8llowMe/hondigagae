@@ -47,3 +47,13 @@
 - **모든 소스 / 설정 / 문서 파일은 반드시 `UTF-8` (no BOM) 로 저장한다.**
 - 루트 `.editorconfig`(`charset = utf-8`, ts/tsx 2-space)와 `.gitattributes`(`*.ts *.tsx *.json *.css` 등 `working-tree-encoding=UTF-8`)가 이미 강제한다. 덮어쓰지 말 것.
 - `git status` 에서 수정한 적 없는데 diff가 잡히면 인코딩 문제를 의심한다.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

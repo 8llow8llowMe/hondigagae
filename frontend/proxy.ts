@@ -4,7 +4,11 @@ import { NextResponse } from 'next/server'
 import { SESSION_COOKIE_NAME } from '@/lib/auth/cookie-names'
 
 /**
- * 보호 경로 가드.
+ * 보호 경로 가드 (Next 16: `middleware.ts` → `proxy.ts`).
+ *
+ * proxy 는 nodejs 런타임에서 돌고 런타임을 바꿀 수 없다. 그래도 세션 모듈 전체를
+ * 임포트하지 않고 `cookie-names.ts` 만 쓴다 — 쿠키 이름만 필요한 곳이 crypto 와
+ * env 검증까지 끌어올 이유가 없다.
  *
  * 화면을 추가하면 이 목록에도 넣는다. 빼먹으면 로그인 없이 접근된다
  * — docs/auth-guide.md §5.
@@ -15,7 +19,7 @@ export const PROTECTED_PATHS = ['/mypage', '/pets', '/plans', '/ai-plans'] as co
 
 const LOGIN_PATH = '/login'
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const isProtected = PROTECTED_PATHS.some(

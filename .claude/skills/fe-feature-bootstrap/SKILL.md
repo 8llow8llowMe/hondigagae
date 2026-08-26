@@ -43,7 +43,7 @@ description: 혼디가개 프론트엔드에 새 화면 또는 기능을 시작�
 
 4. **라우트 / 경계 정의**
    - 경로와 route group (`(main)` / `(auth)`)
-   - 인증 필요 여부 → `middleware.ts` `PROTECTED_PATHS` 등록 여부
+   - 인증 필요 여부 → `proxy.ts` `PROTECTED_PATHS` 등록 여부
    - server / client 컴포넌트 경계 (브라우저 API·hook·지도 사용 여부)
 
 5. **페칭·상태 결정 (선택 규칙 적용)**

@@ -67,7 +67,7 @@
 - [ ] **토큰이 `localStorage`/`sessionStorage`/클라이언트 상태에 없다**
 - [ ] `/api/bff` 를 우회해 게이트웨이를 직접 부르지 않는다
 - [ ] 401 재발급이 1회로 제한되고 동시 요청에서 합쳐진다
-- [ ] 보호 화면이 `middleware.ts` 의 `PROTECTED_PATHS` 에 등록됐다
+- [ ] 보호 화면이 `proxy.ts` 의 `PROTECTED_PATHS` 에 등록됐다
 - [ ] `NEXT_PUBLIC_` 접두사가 시크릿에 붙지 않았다 (JS 지도 키만 허용)
 - [ ] 로그에 토큰·개인정보가 남지 않는다
 
