@@ -69,6 +69,9 @@ public class PlacePresenter {
             .firstImage2(info.firstImage2())
             .petAllowanceType(toPetAllowanceMetadata(info.petAllowanceType()))
             .tel(info.tel())
+            .indoor(info.indoor())
+            .sourceCategory(info.sourceCategory())
+            .sourceName(info.source() == null ? null : info.source().getDisplayName())
             .build();
     }
 

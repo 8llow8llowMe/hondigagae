@@ -94,6 +94,9 @@ public class PlaceQueryProcessor {
             .firstImage2(place.firstImage2())
             .petAllowanceType(place.petAllowanceType())
             .tel(place.tel())
+            .indoor(place.indoor())
+            .sourceCategory(place.sourceCategory())
+            .source(place.source())
             .build();
     }
 }
