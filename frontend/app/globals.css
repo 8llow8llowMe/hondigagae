@@ -1,0 +1,72 @@
+@import 'tailwindcss';
+@import '../src/styles/tokens.css';
+
+@theme {
+  /* 색 — DESIGN.md §2 */
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-300: var(--brand-300);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+
+  --color-accent-100: var(--accent-100);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+
+  --color-bg: var(--bg);
+  --color-bg-subtle: var(--bg-subtle);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-fg-inverse: var(--fg-inverse);
+
+  --color-success-500: var(--success-500);
+  --color-warn-100: var(--warn-100);
+  --color-warn-500: var(--warn-500);
+  --color-danger-100: var(--danger-100);
+  --color-danger-500: var(--danger-500);
+  --color-info-500: var(--info-500);
+
+  /* Radius — DESIGN.md §5 */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  /* Shadow — DESIGN.md §6 */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+
+  /* 타이포 — DESIGN.md §3
+     TODO(FONT): Pretendard 서브셋 woff2 조달 후 next/font/local 로 교체.
+     절차는 docs/tooling-guide.md §12. 지금은 폴백 스택만 적용한다. */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+
+  --text-display: 28px;
+  --text-display--line-height: 36px;
+  --text-title-1: 22px;
+  --text-title-1--line-height: 30px;
+  --text-title-2: 18px;
+  --text-title-2--line-height: 26px;
+  --text-body-1: 16px;
+  --text-body-1--line-height: 24px;
+  --text-body-2: 14px;
+  --text-body-2--line-height: 22px;
+  --text-caption: 12px;
+  --text-caption--line-height: 18px;
+  --text-button: 16px;
+  --text-button--line-height: 24px;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  /* 긴 한국어를 어절 단위로 줄바꿈한다 — DESIGN.md §3 */
+  word-break: keep-all;
+}

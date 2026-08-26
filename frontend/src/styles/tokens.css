@@ -1,0 +1,50 @@
+/**
+ * DESIGN.md 의 토큰을 CSS 변수로 옮긴 파일.
+ * DESIGN.md 가 정본이며, 이 파일은 수동 동기다. 토큰을 바꿀 때 두 파일을 함께 고친다.
+ * (docs/tooling-guide.md §11)
+ */
+
+:root {
+  /* ── 브랜드 (제주 자연) */
+  --brand-50: #eff8f3;
+  --brand-100: #d6ece0;
+  --brand-300: #7fc4a2;
+  --brand-500: #2e9b6b;
+  --brand-600: #237a54;
+  --brand-700: #1a5c3f;
+
+  /* ── Accent (반려견·강조) */
+  --accent-100: #fdeee0;
+  --accent-500: #e8843c;
+  --accent-600: #c86a28;
+
+  /* ── 중립 */
+  --bg: #ffffff;
+  --bg-subtle: #f7f8f7;
+  --bg-elevated: #ffffff;
+  --border: #e3e6e4;
+  --border-strong: #c8cdc9;
+  --fg: #1a1d1b;
+  --fg-muted: #5f6762;
+  --fg-subtle: #8a928c;
+  --fg-inverse: #ffffff;
+
+  /* ── 상태. danger 는 일시 장애(5xx) 전용이며 데이터 부재(404)에 쓰지 않는다 */
+  --success-500: #2e9b6b;
+  --warn-100: #fef4e0;
+  --warn-500: #d99413;
+  --danger-100: #fdecec;
+  --danger-500: #d64545;
+  --info-500: #3b7dd8;
+
+  /* ── Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  /* ── Shadow */
+  --shadow-sm: 0 1px 2px rgb(26 29 27 / 6%);
+  --shadow-md: 0 4px 12px rgb(26 29 27 / 8%);
+  --shadow-lg: 0 12px 32px rgb(26 29 27 / 12%);
+}
