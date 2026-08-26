@@ -2,15 +2,15 @@
 
 ## 1. 스택
 
-| 항목 | 선택 | 근거 |
-|------|------|------|
-| 프레임워크 | Next.js (App Router) + TypeScript | 서버 컴포넌트로 토큰을 서버에 봉인, SEO |
-| 패키지 매니저 | pnpm | 워크트리 다중 체크아웃, 디스크 효율 |
-| 스타일링 | Tailwind CSS | RSC 마찰 0, 런타임 0. styled-components는 모든 스타일 컴포넌트에 `"use client"` 를 강제한다 |
-| 서버 상태 | React Query (`@tanstack/react-query`) | `SliceResponse` 무한 스크롤(`useInfiniteQuery`) + AI job 폴링(`refetchInterval`) |
-| 클라이언트 상태 | Zustand | 세션 파생값만 얕게 |
-| 지도 | 카카오 지도 SDK | `external-api-guide.md` |
-| 테스트 | Vitest (`environment: node`) | `testing-guide.md` |
+| 항목            | 선택                                  | 근거                                                                                        |
+| --------------- | ------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 프레임워크      | Next.js (App Router) + TypeScript     | 서버 컴포넌트로 토큰을 서버에 봉인, SEO                                                     |
+| 패키지 매니저   | pnpm                                  | 워크트리 다중 체크아웃, 디스크 효율                                                         |
+| 스타일링        | Tailwind CSS                          | RSC 마찰 0, 런타임 0. styled-components는 모든 스타일 컴포넌트에 `"use client"` 를 강제한다 |
+| 서버 상태       | React Query (`@tanstack/react-query`) | `SliceResponse` 무한 스크롤(`useInfiniteQuery`) + AI job 폴링(`refetchInterval`)            |
+| 클라이언트 상태 | Zustand                               | 세션 파생값만 얕게                                                                          |
+| 지도            | 카카오 지도 SDK                       | `external-api-guide.md`                                                                     |
+| 테스트          | Vitest (`environment: node`)          | `testing-guide.md`                                                                          |
 
 ## 2. 디렉터리 구조
 
@@ -89,7 +89,7 @@ function readWidth() {
 useEffect(() => {
   const onResize = () => setWidth(window.innerWidth)
   window.addEventListener('resize', onResize)
-  return () => window.removeEventListener('resize', onResize)   // cleanup 필수
+  return () => window.removeEventListener('resize', onResize) // cleanup 필수
 }, [])
 ```
 
@@ -136,15 +136,15 @@ const MapView = dynamic(() => import('@/features/place/map-view'), { ssr: false 
 
 `coding-conventions.md` §6이 4개 상태(loading / empty·404 / 5xx / success)를 정의한다. **그 상태를 App Router의 어느 파일에서 처리하는지** 여기서 고정한다. 규칙이 없으면 구현자마다 다르게 만든다.
 
-| 파일 / 컴포넌트 | 담당 범위 | 어떤 상태 |
-|---|---|---|
-| `loading.tsx` | 라우트 세그먼트 전체 Suspense | **최초 진입** loading |
-| `Skeleton` 컴포넌트 | 섹션 내부 | 재조회·페이지 추가 loading |
-| `not-found.tsx` | `notFound()` 호출 시 | **리소스 자체가 없음** (없는 `planId`, 없는 `placeId`) |
-| `EmptyState` 컴포넌트 | 섹션 내부 | **페이지는 유효하고 결과만 0건** (필터 결과 없음) |
-| `ErrorState` 컴포넌트 | 섹션 내부 | 부분 일시 장애 (5xx). 재시도 버튼 |
-| `error.tsx` | 세그먼트 렌더 예외 | 예상 못 한 예외. `reset()` 을 재시도 버튼에 연결 |
-| `global-error.tsx` | root layout 예외 | 최후 폴백 |
+| 파일 / 컴포넌트       | 담당 범위                     | 어떤 상태                                              |
+| --------------------- | ----------------------------- | ------------------------------------------------------ |
+| `loading.tsx`         | 라우트 세그먼트 전체 Suspense | **최초 진입** loading                                  |
+| `Skeleton` 컴포넌트   | 섹션 내부                     | 재조회·페이지 추가 loading                             |
+| `not-found.tsx`       | `notFound()` 호출 시          | **리소스 자체가 없음** (없는 `planId`, 없는 `placeId`) |
+| `EmptyState` 컴포넌트 | 섹션 내부                     | **페이지는 유효하고 결과만 0건** (필터 결과 없음)      |
+| `ErrorState` 컴포넌트 | 섹션 내부                     | 부분 일시 장애 (5xx). 재시도 버튼                      |
+| `error.tsx`           | 세그먼트 렌더 예외            | 예상 못 한 예외. `reset()` 을 재시도 버튼에 연결       |
+| `global-error.tsx`    | root layout 예외              | 최후 폴백                                              |
 
 ### 판정 규칙
 
@@ -183,9 +183,9 @@ src/features/<f>/*.tsx        렌더
 
 `src/lib/api/` 에는 **두 개의 전송 계층**이 있고, 호출 주체에 따라 다른 것을 쓴다.
 
-| 파일 | 호출 주체 | 경로 | 잠금 |
-|---|---|---|---|
-| `client.ts` | **브라우저** | `/api/bff/{path}` → 프록시 | — |
+| 파일        | 호출 주체                         | 경로                                    | 잠금                   |
+| ----------- | --------------------------------- | --------------------------------------- | ---------------------- |
+| `client.ts` | **브라우저**                      | `/api/bff/{path}` → 프록시              | —                      |
 | `server.ts` | **서버 컴포넌트 / route handler** | `{BACKEND_BASE_URL}/api/v1/{path}` 직접 | `import 'server-only'` |
 
 **서버 컴포넌트가 `/api/bff` 를 부르면 안 된다.** 자기 자신을 HTTP로 다시 호출하는 것이라 왕복이 낭비되고, standalone 서버에서는 자기 오리진을 몰라 깨진다. 서버는 게이트웨이를 직접 부르고 세션에서 토큰을 주입한다.
@@ -194,7 +194,9 @@ src/features/<f>/*.tsx        렌더
 
 ```ts
 // src/lib/api/<domain>.ts — 도메인 함수는 전송 계층을 주입받는다
-export function placesPath(filters: PlaceFilters) { return `/places?${toQuery(filters)}` }
+export function placesPath(filters: PlaceFilters) {
+  return `/places?${toQuery(filters)}`
+}
 
 // 브라우저:  clientFetch(placesPath(f))
 // 서버:      serverFetch(placesPath(f))
@@ -230,7 +232,7 @@ import { HydrationBoundary, dehydrate } from '@tanstack/react-query'
 
 export default async function Page({ searchParams }) {
   const filters = parsePlaceFilters(await searchParams)
-  const queryClient = getServerQueryClient()          // 요청마다 새 인스턴스
+  const queryClient = getServerQueryClient() // 요청마다 새 인스턴스
 
   await queryClient.prefetchInfiniteQuery({
     queryKey: placeKeys.list(filters),
@@ -252,18 +254,18 @@ export default async function Page({ searchParams }) {
 
 ### 화면별 확정표
 
-| 화면 | 초기 데이터 | 이후 | 비고 |
-|---|---|---|---|
-| 장소 목록 | **서버 프리페치** (1페이지) | client `useInfiniteQuery` | 공개 화면 → SEO |
-| 장소 상세 | **서버 프리페치** | client | 지도만 `ssr:false`, 데이터는 캐시 공유 |
-| 지도 뷰 | 목록 캐시 재사용 | client | 별도 조회 금지 |
-| 내 정보 | **서버 프리페치** | client (mutation) | |
-| 반려견 목록/상세 | **서버 프리페치** | client (mutation) | |
-| 일정 목록 | **서버 프리페치** (1페이지) | client `useInfiniteQuery` | |
-| 일정 상세 | **서버 프리페치** | client | |
-| 일정 편집 폼 | **서버 프리페치** (초기값) | client | |
-| AI 조건 입력 | 없음 | client | 폼만 |
-| **AI job 폴링** | **프리페치 금지** | client only | 서버에서 한 번 떠도 즉시 낡는다 |
+| 화면             | 초기 데이터                 | 이후                      | 비고                                   |
+| ---------------- | --------------------------- | ------------------------- | -------------------------------------- |
+| 장소 목록        | **서버 프리페치** (1페이지) | client `useInfiniteQuery` | 공개 화면 → SEO                        |
+| 장소 상세        | **서버 프리페치**           | client                    | 지도만 `ssr:false`, 데이터는 캐시 공유 |
+| 지도 뷰          | 목록 캐시 재사용            | client                    | 별도 조회 금지                         |
+| 내 정보          | **서버 프리페치**           | client (mutation)         |                                        |
+| 반려견 목록/상세 | **서버 프리페치**           | client (mutation)         |                                        |
+| 일정 목록        | **서버 프리페치** (1페이지) | client `useInfiniteQuery` |                                        |
+| 일정 상세        | **서버 프리페치**           | client                    |                                        |
+| 일정 편집 폼     | **서버 프리페치** (초기값)  | client                    |                                        |
+| AI 조건 입력     | 없음                        | client                    | 폼만                                   |
+| **AI job 폴링**  | **프리페치 금지**           | client only               | 서버에서 한 번 떠도 즉시 낡는다        |
 
 화면을 추가하면 이 표에 한 줄을 넣는다. 표에 없는 화면은 **결정 트리로 판단하고 표를 갱신한다.**
 
@@ -271,12 +273,12 @@ export default async function Page({ searchParams }) {
 
 저장소가 네 개다. **선택 규칙이 없으면 화면마다 다른 곳에 같은 성격의 상태가 생긴다.**
 
-| 저장소 | 판단 질문 | 예 |
-|---|---|---|
-| **URL `searchParams`** | 링크로 공유했을 때 같은 화면이 나와야 하는가? | 장소 필터(지역·타입·반려견 동반), 정렬, 탭 |
-| **React Query** | 서버가 소유한 데이터인가? | places, plans, pets, me, job |
-| **Zustand** | 여러 라우트에 걸친 클라이언트 전용 상태인가? | 세션 파생값(`memberId`/`isAuthenticated`/`me`), 전역 토스트 |
-| **`useState`/`useReducer`** | 한 컴포넌트 트리 안에서 끝나는가? | 모달 열림, 아코디언, 입력 중 값 |
+| 저장소                      | 판단 질문                                     | 예                                                          |
+| --------------------------- | --------------------------------------------- | ----------------------------------------------------------- |
+| **URL `searchParams`**      | 링크로 공유했을 때 같은 화면이 나와야 하는가? | 장소 필터(지역·타입·반려견 동반), 정렬, 탭                  |
+| **React Query**             | 서버가 소유한 데이터인가?                     | places, plans, pets, me, job                                |
+| **Zustand**                 | 여러 라우트에 걸친 클라이언트 전용 상태인가?  | 세션 파생값(`memberId`/`isAuthenticated`/`me`), 전역 토스트 |
+| **`useState`/`useReducer`** | 한 컴포넌트 트리 안에서 끝나는가?             | 모달 열림, 아코디언, 입력 중 값                             |
 
 ### 규칙
 
@@ -290,20 +292,22 @@ export default async function Page({ searchParams }) {
 
 규약이 없으면 `?type=CAFE&type=FOOD` 와 `?type=CAFE,FOOD` 가 같은 프로젝트에 섞인다.
 
-| 항목 | 규칙 |
-|---|---|
-| 키 이름 | **백엔드 쿼리 파라미터 이름과 동일하게** (`areaCode`, `contentTypeId`). 매핑 레이어를 없앤다 |
-| 배열 | **콤마 구분 단일 키** — `?contentTypeId=12,39`. 반복 키 금지 (`useSearchParams().get()` 이 첫 값만 반환해 조용히 잘린다) |
-| 기본값 | **URL에서 생략한다.** 빈 URL = 기본 상태 |
-| boolean | `true` 일 때만 키를 넣는다. `?petAllowed=true` / 아니면 키 없음 |
-| 커서 | **URL에 넣지 않는다.** 무한 스크롤 위치는 공유 대상이 아니다 |
-| 읽기 | server: `page.tsx` 의 `searchParams` prop / client: `useSearchParams()` |
-| 쓰기 | `router.replace` 기본 (히스토리 오염 방지). 사용자가 명시적으로 이동한 것(탭 전환)만 `push` |
+| 항목    | 규칙                                                                                                                     |
+| ------- | ------------------------------------------------------------------------------------------------------------------------ |
+| 키 이름 | **백엔드 쿼리 파라미터 이름과 동일하게** (`areaCode`, `contentTypeId`). 매핑 레이어를 없앤다                             |
+| 배열    | **콤마 구분 단일 키** — `?contentTypeId=12,39`. 반복 키 금지 (`useSearchParams().get()` 이 첫 값만 반환해 조용히 잘린다) |
+| 기본값  | **URL에서 생략한다.** 빈 URL = 기본 상태                                                                                 |
+| boolean | `true` 일 때만 키를 넣는다. `?petAllowed=true` / 아니면 키 없음                                                          |
+| 커서    | **URL에 넣지 않는다.** 무한 스크롤 위치는 공유 대상이 아니다                                                             |
+| 읽기    | server: `page.tsx` 의 `searchParams` prop / client: `useSearchParams()`                                                  |
+| 쓰기    | `router.replace` 기본 (히스토리 오염 방지). 사용자가 명시적으로 이동한 것(탭 전환)만 `push`                              |
 
 **파싱·직렬화는 `src/lib/url/<domain>-filters.ts` 순수 함수 한 곳에 둔다.**
 
 ```ts
-export function parsePlaceFilters(sp: URLSearchParams | Record<string, string | string[]>): PlaceFilters
+export function parsePlaceFilters(
+  sp: URLSearchParams | Record<string, string | string[]>,
+): PlaceFilters
 export function toPlaceQuery(filters: PlaceFilters): string
 ```
 

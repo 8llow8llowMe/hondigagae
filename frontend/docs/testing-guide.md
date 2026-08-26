@@ -6,12 +6,12 @@
 - `include`: `src/**/*.test.ts`, `app/**/*.test.ts` — **`.tsx` 는 수집되지 않는다**
 - alias: `@` → `src`
 
-| 항목 | 규칙 |
-|------|------|
-| 파일명 | `*.test.ts` (`.tsx` 아님) |
-| 엘리먼트 생성 | JSX 대신 `createElement` |
-| 렌더 | `renderToStaticMarkup` (react-dom/server) |
-| 검증 | 결과 **마크업 문자열** 에 대한 `toContain` / `not.toContain` / `toMatch` |
+| 항목          | 규칙                                                                     |
+| ------------- | ------------------------------------------------------------------------ |
+| 파일명        | `*.test.ts` (`.tsx` 아님)                                                |
+| 엘리먼트 생성 | JSX 대신 `createElement`                                                 |
+| 렌더          | `renderToStaticMarkup` (react-dom/server)                                |
+| 검증          | 결과 **마크업 문자열** 에 대한 `toContain` / `not.toContain` / `toMatch` |
 
 **왜 이 방식인가**: 설정 부담이 거의 없고, 공모전 일정에서 순수 로직 커버리지를 빠르게 확보할 수 있다. 상호작용(클릭·입력) 테스트가 필요해지면 jsdom + testing-library를 추가 도입하고 이 문서를 갱신한다.
 
@@ -32,7 +32,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'app/**/*.test.ts'],
-    globals: false,                       // describe/it/expect 를 명시적으로 import
+    globals: false, // describe/it/expect 를 명시적으로 import
     setupFiles: ['./src/test/setup.ts'],
     coverage: {
       provider: 'v8',
@@ -102,7 +102,7 @@ describe('PlaceListSection', () => {
 - `SliceResponse` 페이지 병합과 `hasNext` 종료 판정
 - 포맷 함수 (거리 m/km, 기온 ℃, 소요 시간 분, 금액 원, 날짜)
 - 재발급 1회 제한 로직
-- 좌표 파싱·검증 (`mapy`=위도 / `mapx`=경도, `null`·`0`·비수치 배제)
+- 좌표 검증 (`lat`=위도 / `lng`=경도, `null`·`0`·범위 밖 배제 — 백엔드가 이미 Double 로 정규화해 내려준다)
 - **URL 필터 파싱·직렬화 round-trip** (`src/lib/url/**`) — 기본값 생략·콤마 배열 규칙의 비대칭을 잡는다
 
 ### 우선순위 2 — 렌더 분기
@@ -142,15 +142,21 @@ export function failWithFields(resultCode: string, fields: Record<string, string
 ```
 
 ```ts
-// src/test/fixtures/place.ts  — Swagger 실측 응답 기준
+// src/test/fixtures/place.ts  — Swagger / 백엔드 코드 실측 기준
 import type { PlaceSummary } from '@/types/place'
 
 export const placeSummary: PlaceSummary = {
-  placeId: '126508',
-  title: '제주특별자치도립김창열미술관',   // 긴 한국어 실데이터를 기본 fixture로
-  mapx: '126.4106264',                    // 문자열로 온다
-  mapy: '33.3616666',
-  firstImage: null,                       // nullable
+  placeId: '212481712381923328', // 문자열이다 (백엔드 내부는 long, 응답 DTO는 String)
+  title: '제주특별자치도립김창열미술관', // 긴 한국어 실데이터를 기본 fixture 로
+  lat: 33.3608276172, // 백엔드가 Double 로 정규화해 내려준다
+  lng: 126.7818122232,
+  firstImage: null, // nullable
+  contentType: { code: 'TOURIST_SPOT', name: '관광지', description: '자연·문화 관광지' },
+  petAllowanceType: { code: 'PARTIALLY_ALLOWED', name: '부분 동반 가능', description: '...' },
+  addr1: '제주특별자치도 제주시 한림읍 용금로 906-107',
+  sigunguCode: '4',
+  firstImage2: null,
+  tel: null,
 }
 ```
 
@@ -183,13 +189,13 @@ head -60 /tmp/places.json
 
 `superpowers:test-driven-development` 를 **모든 코드에 적용하지 않는다.** 비용 대비 효과로 나눈다.
 
-| 대상 | TDD | 이유 |
-|------|-----|------|
-| `src/lib/**` 순수 로직 (에러 판정, job 상태, 포맷, 좌표) | **적용** | 입출력이 명확하고 회귀 비용이 크다 |
-| `src/lib/api/**` 래퍼 판별 | **적용** | 계약이 명세로 확정돼 있다 |
-| presentational 컴포넌트의 상태 분기 | 구현 후 작성 | 마크업이 먼저 정해져야 assertion을 쓸 수 있다 |
-| 레이아웃·스타일 | 미적용 | `fe-design-reviewer` 의 브라우저 검토가 담당 |
-| React Query hook 배선 | 미적용 | node 환경에서 의미 있는 검증이 어렵다 |
+| 대상                                                     | TDD          | 이유                                          |
+| -------------------------------------------------------- | ------------ | --------------------------------------------- |
+| `src/lib/**` 순수 로직 (에러 판정, job 상태, 포맷, 좌표) | **적용**     | 입출력이 명확하고 회귀 비용이 크다            |
+| `src/lib/api/**` 래퍼 판별                               | **적용**     | 계약이 명세로 확정돼 있다                     |
+| presentational 컴포넌트의 상태 분기                      | 구현 후 작성 | 마크업이 먼저 정해져야 assertion을 쓸 수 있다 |
+| 레이아웃·스타일                                          | 미적용       | `fe-design-reviewer` 의 브라우저 검토가 담당  |
+| React Query hook 배선                                    | 미적용       | node 환경에서 의미 있는 검증이 어렵다         |
 
 버그를 만나면 `superpowers:systematic-debugging` 으로 근본원인을 찾고, **재현 테스트를 먼저 추가한 뒤** 고친다.
 
@@ -230,19 +236,19 @@ pnpm test:coverage     # 커버리지 리포트
 
 프로젝트 부트스트랩과 **함께** 작성한다. 화면보다 먼저 이 순수 함수들이 생기고, 각각 테스트를 가진다.
 
-| # | 대상 | 파일 | 핵심 주장 |
-|---|------|------|-----------|
-| 1 | `unwrap()` 래퍼 판별 | `src/lib/api/response.test.ts` | `success:false` 면 throw, `dataBody:null` 이면 throw |
-| 2 | `toMessage()` 정규화 | `src/lib/api/response.test.ts` | 객체·`null`·빈 문자열 입력에서 폴백 문구 반환 |
-| 3 | `classify(status)` | `src/lib/api/error.test.ts` | 404→`not-found`, 401→`unauthorized`, 400→`validation`, 500·0→`temporary` |
-| 4 | `isJobFailed()` | `src/lib/ai-plan/job.test.ts` | **HTTP 200 + `status:'FAILED'` 를 실패로 판정** |
-| 5 | `shouldKeepPolling()` | `src/lib/ai-plan/job.test.ts` | `COMPLETED`/`FAILED` 에서 `false` |
-| 6 | `mergeSlices()` | `src/lib/api/slice.test.ts` | `contents` 누적, `hasNext:false` 에서 종료 |
-| 7 | `formatDistance()` | `src/lib/format/distance.test.ts` | 999m→`999m`, 1200m→`1.2km`, `null`→`'-'` |
-| 8 | `formatTemperature()` | `src/lib/format/temperature.test.ts` | 단위 `℃` 포함 |
-| 9 | `toLatLng()` | `src/lib/geo/coord.test.ts` | **`mapy` 가 위도로 먼저**, `null`·`'0'`·`''` 는 `null` 반환 |
-| 10 | `canRetryReissue()` | `src/lib/auth/reissue.test.ts` | 2회차 시도에서 `false` |
-| 11 | **필터 round-trip** | `src/lib/url/place-filters.test.ts` | `parse(toQuery(f)) === f` — 기본값 생략·콤마 배열 인코딩 포함 |
+| #   | 대상                  | 파일                                 | 핵심 주장                                                                |
+| --- | --------------------- | ------------------------------------ | ------------------------------------------------------------------------ |
+| 1   | `unwrap()` 래퍼 판별  | `src/lib/api/response.test.ts`       | `success:false` 면 throw, `dataBody:null` 이면 throw                     |
+| 2   | `toMessage()` 정규화  | `src/lib/api/response.test.ts`       | 객체·`null`·빈 문자열 입력에서 폴백 문구 반환                            |
+| 3   | `classify(status)`    | `src/lib/api/error.test.ts`          | 404→`not-found`, 401→`unauthorized`, 400→`validation`, 500·0→`temporary` |
+| 4   | `isJobFailed()`       | `src/lib/ai-plan/job.test.ts`        | **HTTP 200 + `status:'FAILED'` 를 실패로 판정**                          |
+| 5   | `shouldKeepPolling()` | `src/lib/ai-plan/job.test.ts`        | `COMPLETED`/`FAILED` 에서 `false`                                        |
+| 6   | `mergeSlices()`       | `src/lib/api/slice.test.ts`          | `contents` 누적, `hasNext:false` 에서 종료                               |
+| 7   | `formatDistance()`    | `src/lib/format/distance.test.ts`    | 999m→`999m`, 1200m→`1.2km`, `null`→`'-'`                                 |
+| 8   | `formatTemperature()` | `src/lib/format/temperature.test.ts` | 단위 `℃` 포함                                                            |
+| 9   | `toLatLng()`          | `src/lib/geo/coord.test.ts`          | **`lat` 이 위도로 먼저**, `null`·`0`·범위 밖은 `null` 반환               |
+| 10  | `canRetryReissue()`   | `src/lib/auth/reissue.test.ts`       | 2회차 시도에서 `false`                                                   |
+| 11  | **필터 round-trip**   | `src/lib/url/place-filters.test.ts`  | `parse(toQuery(f)) === f` — 기본값 생략·콤마 배열 인코딩 포함            |
 
 이 11개가 통과하면 `docs/done-checklist.md` §7의 절반이 자동으로 충족된다.
 

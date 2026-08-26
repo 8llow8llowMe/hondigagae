@@ -7,9 +7,9 @@
 
 ### 키 관리
 
-| 키 | 노출 | 위치 |
-|----|------|------|
-| JavaScript 앱 키 | 클라이언트 노출 불가피 | `NEXT_PUBLIC_KAKAO_MAP_KEY` |
+| 키                     | 노출                     | 위치                              |
+| ---------------------- | ------------------------ | --------------------------------- |
+| JavaScript 앱 키       | 클라이언트 노출 불가피   | `NEXT_PUBLIC_KAKAO_MAP_KEY`       |
 | REST API 키 / Admin 키 | **절대 클라이언트 금지** | 서버 전용. 필요하면 백엔드가 쓴다 |
 
 - **키를 하드코딩하지 않는다.** 환경변수로만.
@@ -38,21 +38,25 @@ const MapView = dynamic(() => import('@/features/place/map-view'), { ssr: false 
 
 ### 좌표 (틀리기 쉬움)
 
-백엔드가 내려주는 좌표는 TourAPI 원본 기준이다.
+**백엔드가 이미 정규화해서 내려준다.** TourAPI 원본의 `mapx`/`mapy` 문자열이 그대로 오지 않는다.
 
-| 필드 | 의미 | 타입 |
-|------|------|------|
-| `mapx` | **경도** (longitude) | 문자열로 올 수 있음 |
-| `mapy` | **위도** (latitude) | 문자열로 올 수 있음 |
+| 필드  | 의미                 | 타입               | 근거  |
+| ----- | -------------------- | ------------------ | ----- |
+| `lat` | **위도** (latitude)  | `Double` → `number | null` | backend `PlaceItem` |
+| `lng` | **경도** (longitude) | `Double` → `number | null` | backend `PlaceItem` |
+
+> TourAPI 원본은 `mapx`(경도) / `mapy`(위도) 문자열이고, 백엔드가 적재 시 `lat`/`lng` 로 변환한다
+> (`backend/docs/entity-design.md`). **FE는 원본 필드명을 쓰지 않는다.**
 
 ```ts
-// 카카오는 (위도, 경도) 순서다 — mapy 가 먼저다
-new kakao.maps.LatLng(Number(place.mapy), Number(place.mapx))
+// 카카오는 LatLng(위도, 경도) 순서다 — lat 이 먼저다
+new kakao.maps.LatLng(coord.lat, coord.lng)
 ```
 
-- **순서를 뒤집으면 지도가 아프리카 앞바다로 튄다.** 이 프로젝트에서 가장 흔한 실수다.
-- 좌표가 `null` / `0` / 빈 문자열인 장소는 **마커를 그리지 않는다.** 파싱 결과를 `Number.isFinite` 로 검증한다.
-- 좌표 변환·검증은 `src/lib/format/` 또는 `src/lib/geo/` 순수 함수로 뽑아 테스트한다.
+- **순서를 뒤집으면 지도가 기니 만 앞바다로 튄다.** 제주는 위도 33 / 경도 126 이므로 뒤집으면 위도가 126이 되어 범위를 벗어난다.
+- 좌표가 `null` 이거나 `0` 인 장소는 **마커를 그리지 않는다.**
+- 변환·검증은 `src/lib/geo/coord.ts` 의 `toLatLng()` 을 쓴다. 유효하지 않으면 `null` 을 반환하므로 호출부가 마커를 건너뛴다. 폴백 중심은 `JEJU_CENTER` 다.
+- 이 함수에는 테스트가 있다 (`src/lib/geo/coord.test.ts`). 새 좌표 규칙을 추가하면 테스트도 추가한다.
 
 ### 생명주기 (메모리 누수)
 
@@ -62,11 +66,13 @@ useEffect(() => {
   const markers = places.map((p) => new kakao.maps.Marker({ position: toLatLng(p) }))
   markers.forEach((m) => m.setMap(map))
 
-  const onClick = () => { /* ... */ }
+  const onClick = () => {
+    /* ... */
+  }
   kakao.maps.event.addListener(map, 'click', onClick)
 
   return () => {
-    markers.forEach((m) => m.setMap(null))            // 필수
+    markers.forEach((m) => m.setMap(null)) // 필수
     kakao.maps.event.removeListener(map, 'click', onClick)
   }
 }, [places])

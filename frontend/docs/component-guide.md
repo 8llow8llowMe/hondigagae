@@ -5,15 +5,15 @@
 
 ## 1. prop 네이밍 (고정)
 
-| 종류 | 규칙 | 좋음 | 금지 |
-|---|---|---|---|
-| boolean | 접두사 없이 형용사/명사 | `loading`, `disabled`, `selected`, `required`, `readOnly` | `isLoading`, `hasError`, `canEdit` |
-| 이벤트 | `on<Event>` | `onClick`, `onChange`, `onSelect`, `onRetry` | `handleClick`, `clickHandler` |
-| 값 변경 콜백 | `onValueChange` | `onValueChange(next: string)` | `onUpdate`, `setValue` |
-| 아이콘/부가 요소 슬롯 | `leading` / `trailing` | `leading={<PawIcon />}` | `icon`, `iconLeft`, `prefix` |
-| 본문 | `children` | | `content`, `body` |
-| 외형 분기 | `variant` | | `type`, `kind`, `theme`, `color` |
-| 크기 | `size` | | `scale`, `dimension` |
+| 종류                  | 규칙                    | 좋음                                                      | 금지                               |
+| --------------------- | ----------------------- | --------------------------------------------------------- | ---------------------------------- |
+| boolean               | 접두사 없이 형용사/명사 | `loading`, `disabled`, `selected`, `required`, `readOnly` | `isLoading`, `hasError`, `canEdit` |
+| 이벤트                | `on<Event>`             | `onClick`, `onChange`, `onSelect`, `onRetry`              | `handleClick`, `clickHandler`      |
+| 값 변경 콜백          | `onValueChange`         | `onValueChange(next: string)`                             | `onUpdate`, `setValue`             |
+| 아이콘/부가 요소 슬롯 | `leading` / `trailing`  | `leading={<PawIcon />}`                                   | `icon`, `iconLeft`, `prefix`       |
+| 본문                  | `children`              |                                                           | `content`, `body`                  |
+| 외형 분기             | `variant`               |                                                           | `type`, `kind`, `theme`, `color`   |
+| 크기                  | `size`                  |                                                           | `scale`, `dimension`               |
 
 **boolean에 `is`/`has` 를 붙이지 않는 이유**: React DOM 속성(`disabled`, `required`, `checked`)과 일관되고, JSX에서 축약형이 자연스럽게 읽힌다 — `<Button loading>`.
 
@@ -23,13 +23,13 @@
 
 **새 값을 임의로 추가하지 않는다.** 추가는 `DESIGN.md` 갱신과 함께 한다.
 
-| 컴포넌트 | `variant` | `size` | 기본값 |
-|---|---|---|---|
-| `Button` | `primary` \| `secondary` \| `ghost` \| `danger` | `sm` \| `md` \| `lg` | `primary` / `md` |
-| `Badge` | `neutral` \| `brand` \| `accent` \| `warn` \| `danger` \| `info` | `sm` \| `md` | `neutral` / `md` |
-| `Chip` | `default` \| `selected` | `sm` \| `md` | `default` / `md` |
-| `Input`, `Textarea`, `Select` | — (에러는 `error` prop) | `md` \| `lg` | `md` |
-| `Card` | `default` \| `interactive` | — | `default` |
+| 컴포넌트                      | `variant`                                                        | `size`               | 기본값           |
+| ----------------------------- | ---------------------------------------------------------------- | -------------------- | ---------------- |
+| `Button`                      | `primary` \| `secondary` \| `ghost` \| `danger`                  | `sm` \| `md` \| `lg` | `primary` / `md` |
+| `Badge`                       | `neutral` \| `brand` \| `accent` \| `warn` \| `danger` \| `info` | `sm` \| `md`         | `neutral` / `md` |
+| `Chip`                        | `default` \| `selected`                                          | `sm` \| `md`         | `default` / `md` |
+| `Input`, `Textarea`, `Select` | — (에러는 `error` prop)                                          | `md` \| `lg`         | `md`             |
+| `Card`                        | `default` \| `interactive`                                       | —                    | `default`        |
 
 - **같은 의미에 다른 이름을 쓰지 않는다.** 어떤 컴포넌트는 `danger`, 다른 건 `error` 가 되면 사용처에서 매번 확인해야 한다.
 - `size` 값은 항상 `sm`/`md`/`lg` 에서 고른다. `xs`/`xl` 이 필요하면 정말 필요한지 먼저 검토한다.
@@ -48,7 +48,7 @@ const VARIANT: Record<ButtonVariant, string> = {
 
 const SIZE: Record<ButtonSize, string> = {
   sm: 'h-8 px-3 text-body-2',
-  md: 'h-11 px-4 text-button',    // 44px — 모바일 터치 영역 (DESIGN.md §7)
+  md: 'h-11 px-4 text-button', // 44px — 모바일 터치 영역 (DESIGN.md §7)
   lg: 'h-12 px-5 text-button',
 }
 ```
@@ -59,9 +59,9 @@ const SIZE: Record<ButtonSize, string> = {
 
 **허용하되 레이아웃 유틸리티만.** `cn()` 으로 병합한다.
 
-| 허용 | 금지 |
-|---|---|
-`margin`(`mt-4`, `mb-2`), `width`/`flex`/`grid` 배치, `self-*`/`justify-self-*`, `col-span-*` | 색(`bg-*`, `text-*`), `rounded-*`, `shadow-*`, `padding`, `height`, `font-*` |
+| 허용                                                                                          | 금지                                                                         |
+| --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `margin`(`mt-4`, `mb-2`), `width`/`flex`/`grid` 배치, `self-*`/`justify-self-*`, `col-span-*` | 색(`bg-*`, `text-*`), `rounded-*`, `shadow-*`, `padding`, `height`, `font-*` |
 
 **근거**: 배치는 **사용처**가 알고, 외형은 **컴포넌트**가 소유한다. 외형까지 뚫어주면 `<Button className="bg-[#333] p-[13px]">` 로 `DESIGN.md` 토큰 규약 전체가 우회된다.
 
@@ -127,14 +127,14 @@ type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
 
 프로젝트 전체 a11y 규칙은 `styling-guide.md` §6이다. 여기서는 **각 컴포넌트가 자체적으로 보장해야 하는 것**을 정한다.
 
-| 컴포넌트 | 보장 |
-|---|---|
-| `Button` | `type` 기본값 `"button"` (form 안에서 의도치 않은 submit 방지). `loading` 이면 `disabled` + `aria-busy` |
-| `Chip` / `Tab` | `aria-pressed` / `aria-selected` 를 상태와 동기 |
-| `Input` 계열 | `label` 연결(`id`/`htmlFor`), `error` 시 `aria-invalid` + `aria-describedby` |
-| `Modal` / `BottomSheet` | focus trap, `Esc` 닫기, 열릴 때 body 스크롤 잠금, 닫힐 때 트리거로 포커스 복귀 |
-| `Skeleton` | `aria-hidden` (스크린리더에 의미 없는 반복 읽기 방지) |
-| `EmptyState` / `ErrorState` | 제목이 heading 요소여야 한다 |
+| 컴포넌트                    | 보장                                                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `Button`                    | `type` 기본값 `"button"` (form 안에서 의도치 않은 submit 방지). `loading` 이면 `disabled` + `aria-busy` |
+| `Chip` / `Tab`              | `aria-pressed` / `aria-selected` 를 상태와 동기                                                         |
+| `Input` 계열                | `label` 연결(`id`/`htmlFor`), `error` 시 `aria-invalid` + `aria-describedby`                            |
+| `Modal` / `BottomSheet`     | focus trap, `Esc` 닫기, 열릴 때 body 스크롤 잠금, 닫힐 때 트리거로 포커스 복귀                          |
+| `Skeleton`                  | `aria-hidden` (스크린리더에 의미 없는 반복 읽기 방지)                                                   |
+| `EmptyState` / `ErrorState` | 제목이 heading 요소여야 한다                                                                            |
 
 ### icon-only 버튼은 타입으로 강제한다
 
@@ -195,11 +195,11 @@ function resolveTone() { ... }
 
 `styling-guide.md` §2에서 분리한 3종의 계약을 여기서 고정한다. **이 셋을 하나로 합치지 않는다.**
 
-| 컴포넌트 | prop | 재시도 버튼 |
-|---|---|---|
-| `Skeleton` | `count?`, `variant?: 'text' \| 'card' \| 'thumbnail'` | — |
-| `EmptyState` | `title`, `description?`, `action?` | **슬롯 없음** |
-| `ErrorState` | `title`, `description?`, `onRetry` (**필수**) | 필수 |
+| 컴포넌트     | prop                                                  | 재시도 버튼   |
+| ------------ | ----------------------------------------------------- | ------------- |
+| `Skeleton`   | `count?`, `variant?: 'text' \| 'card' \| 'thumbnail'` | —             |
+| `EmptyState` | `title`, `description?`, `action?`                    | **슬롯 없음** |
+| `ErrorState` | `title`, `description?`, `onRetry` (**필수**)         | 필수          |
 
 - `EmptyState` 에 `onRetry` prop을 추가하자는 요청은 거절한다. 404에 재시도 버튼을 붙이는 경로가 열린다 (`api-integration-guide.md` §3).
 - `ErrorState` 의 `onRetry` 는 **필수 prop**이다. optional로 두면 빠진다.
