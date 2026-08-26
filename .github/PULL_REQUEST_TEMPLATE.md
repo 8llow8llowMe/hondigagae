@@ -8,6 +8,11 @@
 2. [주요 변경 2]
 3. [주요 변경 3]
 
+## 제목 규칙
+
+`[영역] type: 요약` — 영역은 `BE` / `FE` / `DOCS` / `INFRA` (루트 `CLAUDE.md` 기준)
+예: `[FE] feat: 장소 목록 무한 스크롤 구현`
+
 ## 타입
 
 - [ ] feat: 새로운 기능 추가
@@ -20,13 +25,16 @@
 
 ## PR 하기 전에 확인해주세요
 
-- [ ] 코딩 컨벤션을 지켰나요?
+- [ ] 코딩 컨벤션을 지켰나요? (BE: `backend/docs/coding-conventions.md` / FE: `frontend/docs/coding-conventions.md`)
 - [ ] local ci test를 진행하셨나요?
+  - BE: `./gradlew compileJava` / `test` / `check`
+  - FE: `pnpm verify` (= `lint && typecheck && test`) / `pnpm format:check`
+- [ ] 완료 체크리스트를 확인하셨나요? (BE: `backend/docs/done-checklist.md` / FE: `frontend/docs/done-checklist.md`)
 - [ ] 팀원들에게 공지하셨나요?
 
 ## 검증 내역
 
-- [검증 명령 또는 확인 내용]
+- [실제로 실행한 명령과 결과. 미실행·실패는 숨기지 않고 적습니다]
 
 ## 참고 사항
 

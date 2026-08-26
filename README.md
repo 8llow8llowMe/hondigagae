@@ -47,11 +47,15 @@
 hondigagae/
 ├── backend/    Spring 기반 백엔드 (MSA + Hexagonal Architecture)
 │   └── docs/   백엔드 기준 문서 (아키텍처, 컨벤션, 플레이북)
-├── frontend/   웹 프론트엔드
-└── .claude/    Claude Code 스킬
+├── frontend/   Next.js 웹 프론트엔드
+│   └── docs/   프론트엔드 기준 문서 (아키텍처, 계약 연동, 화면 현황)
+├── .claude/    Claude Code 스킬 / 에이전트
+├── CLAUDE.md   저장소 루트 엔트리 (워크스페이스 지도, 공통 규칙)
+└── AGENTS.md   위와 동일 (코딩 에이전트용)
 ```
 
 ## 문서 엔트리
 
+- 공통 규칙 / 워크스페이스 지도: [CLAUDE.md](CLAUDE.md)
 - 백엔드: [backend/docs/README.md](backend/docs/README.md)
-- 프론트엔드: [frontend/README.md](frontend/README.md)
+- 프론트엔드: [frontend/docs/README.md](frontend/docs/README.md)
