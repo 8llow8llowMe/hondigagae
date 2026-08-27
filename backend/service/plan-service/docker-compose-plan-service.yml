@@ -1,0 +1,108 @@
+# 혼디가개 plan-service 배포 정의.
+#
+# 배치:
+#   dev  -> main-server (192.168.0.11), 호스트 포트 7083  (혼디가개 dev 는 7xxx 대역)
+#   prod -> backend-1   (192.168.0.13), 호스트 포트 5083  (혼디가개 prod 는 5xxx 대역)
+#
+#   BossPickSeoul 이 dev 6xxx / prod 9xxx 를 이미 점유하고 있어 같은 호스트에 올리려면
+#   대역을 달리해야 한다. (Infra README §4 배치 원칙 5번)
+#   storage(192.168.0.12)에는 올리지 않는다 — 총 1.9GB / swap 0 에 nginx 가 함께 있어
+#   OOM 이 나면 전 도메인의 인그레스가 같이 죽는다.
+#
+# 컨테이너 안에서 앱이 듣는 포트는 dev/prod 가 같다(8083). 호스트 포트만 다르다.
+# 서비스 간 호출과 Eureka 등록은 같은 호스트의 8llow8llowme-net 브리지 안에서 컨테이너명으로 이뤄지므로,
+# SERVICE_DISCOVERY_HOSTNAME 에는 사설 IP 가 아니라 discovery **컨테이너명**을 넣는다.
+
+x-plan-service-environment: &plan_service_environment
+  TIME_ZONE: ${TIME_ZONE}
+  # prod 로 띄우면서 이 값이 dev 로 남아 있으면 ddl-auto:update 로
+  # 운영 스키마가 배포마다 자동 변경된다. 환경별 Vault secret 에서 반드시 갈라 둔다.
+  SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+  SPRING_APPLICATION_NAME: ${PLAN_SERVICE_APP_NAME}
+  PLAN_SERVICE_PORT: ${PLAN_SERVICE_PORT}
+  # 같은 호스트 같은 브리지 안이라 컨테이너명으로 해석된다.
+  # 예) dev = hondigagae-service-discovery-dev / prod = hondigagae-service-discovery-prod
+  SERVICE_DISCOVERY_HOSTNAME: ${SERVICE_DISCOVERY_HOSTNAME}
+  # 컨테이너 내부 포트(8761)다. 호스트 포트(7761/5761)가 아니다.
+  SERVICE_DISCOVERY_PORT: ${SERVICE_DISCOVERY_PORT}
+  PLAN_DB_URL: ${PLAN_DB_URL}
+  DB_USERNAME: ${DB_USERNAME}
+  DB_PASSWORD: ${DB_PASSWORD}
+  # Resource Server 검증 키. 프로퍼티 prefix 가 app.security.jwt.resource.access-key 라
+  # 이름이 auth-service 발급 쪽(jwt.access-key)과 다르지만 값은 같아야 한다.
+  # 다르면 컴파일도 기동도 되다가 첫 인증 요청에서 jwtDecoder NPE 로 죽는다.
+  JWT_ACCESS_KEY: ${JWT_ACCESS_KEY}
+  SNOWFLAKE_DATACENTER_ID: ${SNOWFLAKE_DATACENTER_ID}
+  # 서비스마다 다른 값을 준다. 겹치면 같은 ID 가 두 번 나온다.
+  SNOWFLAKE_WORKER_ID: ${SNOWFLAKE_WORKER_ID}
+  # 내부 호출 대상(lb://).
+  TOUR_SERVICE_APP_NAME: ${TOUR_SERVICE_APP_NAME}
+  INTERNAL_CLIENT_CONNECT_TIMEOUT_MS: ${INTERNAL_CLIENT_CONNECT_TIMEOUT_MS:-2000}
+  INTERNAL_CLIENT_READ_TIMEOUT_MS: ${INTERNAL_CLIENT_READ_TIMEOUT_MS:-5000}
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "5m"
+    max-file: "2"
+
+services:
+  plan-service-dev:
+    image: hondigagae-plan-service:latest
+    container_name: hondigagae-plan-service-dev
+    labels:
+      observability.project: hondigagae
+      observability.group: service
+      observability.service: plan-service
+      observability.env: dev
+      observability.application: ${PLAN_SERVICE_APP_NAME}
+      observability.deployment: hondigagae-plan-service-dev
+    build:
+      context: .
+      dockerfile: plan-service.Dockerfile
+    ports:
+      - "${PLAN_SERVICE_PORT_DEV}:${PLAN_SERVICE_PORT}" # host:container
+    environment:
+      <<: *plan_service_environment
+    # 컨테이너 메모리 상한. JVM heap 은 Dockerfile 의 MaxRAMPercentage 가 이 값을 기준으로 산정한다.
+    deploy:
+      resources:
+        limits:
+          memory: ${PLAN_SERVICE_MEM_LIMIT_DEV:-512m}
+    restart: unless-stopped
+    logging:
+      <<: *default-logging
+    networks:
+      - 8llow8llowme-net
+
+  plan-service-prod:
+    image: hondigagae-plan-service:latest
+    container_name: hondigagae-plan-service-prod
+    labels:
+      observability.project: hondigagae
+      observability.group: service
+      observability.service: plan-service
+      observability.env: prod
+      observability.application: ${PLAN_SERVICE_APP_NAME}
+      observability.deployment: hondigagae-plan-service-prod
+    build:
+      context: .
+      dockerfile: plan-service.Dockerfile
+    ports:
+      - "${PLAN_SERVICE_PORT_PROD}:${PLAN_SERVICE_PORT}" # host:container
+    environment:
+      <<: *plan_service_environment
+    deploy:
+      resources:
+        limits:
+          memory: ${PLAN_SERVICE_MEM_LIMIT_PROD:-768m}
+    restart: unless-stopped
+    logging:
+      <<: *default-logging
+    networks:
+      - 8llow8llowme-net
+
+networks:
+  8llow8llowme-net:
+    name: 8llow8llowme-net
+    external: true

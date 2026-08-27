@@ -1,0 +1,89 @@
+# 혼디가개 service-discovery 배포 정의.
+#
+# 배치:
+#   dev  -> main-server (192.168.0.11), 호스트 포트 7761  (혼디가개 dev 는 7xxx 대역)
+#   prod -> backend-1   (192.168.0.13), 호스트 포트 5761  (혼디가개 prod 는 5xxx 대역)
+#
+#   BossPickSeoul 이 dev 6xxx / prod 9xxx 를 이미 점유하고 있어 같은 호스트에 올리려면
+#   대역을 달리해야 한다. (Infra README §4 배치 원칙 5번)
+#   storage(192.168.0.12)에는 올리지 않는다 — 총 1.9GB / swap 0 에 nginx 가 함께 있어
+#   OOM 이 나면 전 도메인의 인그레스가 같이 죽는다.
+#
+# 컨테이너 안에서 앱이 듣는 포트는 dev/prod 가 같다(8761). 호스트 포트만 다르다.
+# 서비스 간 호출과 Eureka 등록은 같은 호스트의 8llow8llowme-net 브리지 안에서 컨테이너명으로 이뤄지므로,
+# SERVICE_DISCOVERY_HOSTNAME 에는 사설 IP 가 아니라 discovery **컨테이너명**을 넣는다.
+
+x-service-discovery-environment: &service_discovery_environment
+  TIME_ZONE: ${TIME_ZONE}
+  # prod 로 띄우면서 이 값이 dev 로 남아 있으면 ddl-auto:update 로
+  # 운영 스키마가 배포마다 자동 변경된다. 환경별 Vault secret 에서 반드시 갈라 둔다.
+  SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+  SPRING_APPLICATION_NAME: ${SERVICE_DISCOVERY_APP_NAME}
+  SERVICE_DISCOVERY_PORT: ${SERVICE_DISCOVERY_PORT}
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "5m"
+    max-file: "2"
+
+services:
+  service-discovery-dev:
+    image: hondigagae-service-discovery:latest
+    container_name: hondigagae-service-discovery-dev
+    labels:
+      observability.project: hondigagae
+      observability.group: cloud
+      observability.service: service-discovery
+      observability.env: dev
+      observability.application: ${SERVICE_DISCOVERY_APP_NAME}
+      observability.deployment: hondigagae-service-discovery-dev
+    build:
+      context: .
+      dockerfile: service-discovery.Dockerfile
+    ports:
+      - "${SERVICE_DISCOVERY_PORT_DEV}:${SERVICE_DISCOVERY_PORT}" # host:container
+    environment:
+      <<: *service_discovery_environment
+    # 컨테이너 메모리 상한. JVM heap 은 Dockerfile 의 MaxRAMPercentage 가 이 값을 기준으로 산정한다.
+    deploy:
+      resources:
+        limits:
+          memory: ${SERVICE_DISCOVERY_MEM_LIMIT_DEV:-384m}
+    restart: unless-stopped
+    logging:
+      <<: *default-logging
+    networks:
+      - 8llow8llowme-net
+
+  service-discovery-prod:
+    image: hondigagae-service-discovery:latest
+    container_name: hondigagae-service-discovery-prod
+    labels:
+      observability.project: hondigagae
+      observability.group: cloud
+      observability.service: service-discovery
+      observability.env: prod
+      observability.application: ${SERVICE_DISCOVERY_APP_NAME}
+      observability.deployment: hondigagae-service-discovery-prod
+    build:
+      context: .
+      dockerfile: service-discovery.Dockerfile
+    ports:
+      - "${SERVICE_DISCOVERY_PORT_PROD}:${SERVICE_DISCOVERY_PORT}" # host:container
+    environment:
+      <<: *service_discovery_environment
+    deploy:
+      resources:
+        limits:
+          memory: ${SERVICE_DISCOVERY_MEM_LIMIT_PROD:-512m}
+    restart: unless-stopped
+    logging:
+      <<: *default-logging
+    networks:
+      - 8llow8llowme-net
+
+networks:
+  8llow8llowme-net:
+    name: 8llow8llowme-net
+    external: true
