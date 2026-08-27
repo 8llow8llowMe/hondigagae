@@ -30,6 +30,8 @@ public record ImportedEmergencyFacility(
     BigDecimal lng,
     String tel,
     String operatingHours,
+    // 구조화된 주간 스케줄(WeeklySchedule spec). 원문을 풀 수 없으면 null — 판정을 "모름"으로 남긴다.
+    String weeklyHoursSpec,
     String restDate,
     boolean open24,
     LocalDateTime sourceModifiedAt

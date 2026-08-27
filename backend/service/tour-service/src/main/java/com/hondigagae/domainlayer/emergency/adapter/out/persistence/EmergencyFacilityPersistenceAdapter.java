@@ -46,6 +46,7 @@ public class EmergencyFacilityPersistenceAdapter implements EmergencyFacilityRep
             .lng(entity.getLng())
             .tel(entity.getTel())
             .operatingHours(entity.getOperatingHours())
+            .weeklyHoursSpec(entity.getWeeklyHoursSpec())
             .restDate(entity.getRestDate())
             .open24(entity.isOpen24())
             .build();

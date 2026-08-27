@@ -14,6 +14,7 @@ public record EmergencyFacilityQueryResult(
     BigDecimal lng,
     String tel,
     String operatingHours,
+    String weeklyHoursSpec,
     String restDate,
     boolean open24
 ) {

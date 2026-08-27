@@ -16,6 +16,8 @@ public record NearbyFacilityInfo(
     String operatingHours,
     String restDate,
     boolean open24,
+    // 지금 영업 중인가. null 이면 영업시간을 몰라 판정할 수 없는 곳이다 — "닫힘"과 다르다.
+    Boolean openNow,
     int distanceMeters
 ) {
 

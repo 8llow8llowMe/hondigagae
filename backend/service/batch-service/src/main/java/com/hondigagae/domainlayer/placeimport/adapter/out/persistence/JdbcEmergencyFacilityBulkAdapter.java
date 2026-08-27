@@ -39,13 +39,14 @@ public class JdbcEmergencyFacilityBulkAdapter implements EmergencyFacilityBulkPo
             lng,
             tel,
             operating_hours,
+            weekly_hours_spec,
             rest_date,
             open24,
             source_modified_at,
             synced_at,
             created_at,
             updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ON DUPLICATE KEY UPDATE
             facility_type = VALUES(facility_type),
             name = VALUES(name),
@@ -55,6 +56,7 @@ public class JdbcEmergencyFacilityBulkAdapter implements EmergencyFacilityBulkPo
             lng = VALUES(lng),
             tel = VALUES(tel),
             operating_hours = VALUES(operating_hours),
+            weekly_hours_spec = VALUES(weekly_hours_spec),
             rest_date = VALUES(rest_date),
             open24 = VALUES(open24),
             source_modified_at = VALUES(source_modified_at),
@@ -88,6 +90,7 @@ public class JdbcEmergencyFacilityBulkAdapter implements EmergencyFacilityBulkPo
                     setNullableDecimal(ps, index++, facility.lng());
                     ps.setString(index++, facility.tel());
                     ps.setString(index++, facility.operatingHours());
+                    ps.setString(index++, facility.weeklyHoursSpec());
                     ps.setString(index++, facility.restDate());
                     ps.setBoolean(index++, facility.open24());
                     setNullableDateTime(ps, index++, facility.sourceModifiedAt());
