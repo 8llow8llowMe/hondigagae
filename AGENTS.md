@@ -44,6 +44,22 @@
 
 타입은 `feat` / `fix` / `chore` / `refactor` / `style` / `docs` / `test` (`.github/PULL_REQUEST_TEMPLATE.md` 기준).
 
+### Git 협업 워크플로 (필수)
+
+**정본: [docs/git-workflow.md](docs/git-workflow.md)**
+
+```text
+이슈 → 브랜치 → 작업 → PR → CI 통과 → Rebase and merge → 브랜치 삭제
+```
+
+- **이슈 없이 브랜치를 만들지 않는다.** 이슈는 **화면/기능 단위**로 쪼갠다.
+- 브랜치명: `<type>/<영역>/<이슈번호>-<요약>` (예: `feature/fe/12-place-detail`)
+  - `영역` = `fe` / `be` / `infra` / `common`
+- **develop 동기화는 `merge` 가 아니라 `rebase`.** 머지 커밋이 섞이면 선형 히스토리가 깨진다.
+- **`develop` 에 직접 커밋하지 않는다.** 셀프 머지는 허용하되 PR 은 생략하지 않는다.
+- 머지는 **`Rebase and merge`** 만 쓴다. PR 본문의 `Issue Number` 를 반드시 채운다.
+- PR 은 **30파일 이내**를 목표로 하고, 넘으면 이유를 본문에 적는다.
+
 ### 작업 워크플로우
 
 전역 4단계(Specify → Plan → Tasks → Decisions)를 따르고, 각 단계의 실행 방법은 superpowers 스킬을 쓴다.

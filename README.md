@@ -57,5 +57,6 @@ hondigagae/
 ## 문서 엔트리
 
 - 공통 규칙 / 워크스페이스 지도: [CLAUDE.md](CLAUDE.md)
+- Git 협업 워크플로: [docs/git-workflow.md](docs/git-workflow.md)
 - 백엔드: [backend/docs/README.md](backend/docs/README.md)
 - 프론트엔드: [frontend/docs/README.md](frontend/docs/README.md)
