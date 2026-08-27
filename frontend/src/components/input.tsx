@@ -5,7 +5,11 @@ import { cn } from '@/lib/utils/cn'
 
 type NativeProps = Omit<
   InputHTMLAttributes<HTMLInputElement>,
-  'className' | 'value' | 'onChange' | 'aria-invalid' | 'aria-describedby'
+  // 아래 각 필드를 InputProps 가 자체적으로 재정의하거나(className/value/onChange)
+  // Input 이 내부에서 계산해 배선하므로(aria-invalid/aria-describedby) native 타입을 감춘다.
+  // defaultValue: controlled 전용 계약이 깨진다 — value 와 함께 있으면 React 가
+  // "controlled/uncontrolled 혼용" 경고를 낸다 (component-guide.md §5).
+  'className' | 'value' | 'onChange' | 'aria-invalid' | 'aria-describedby' | 'defaultValue'
 >
 
 export type InputProps = NativeProps & {
