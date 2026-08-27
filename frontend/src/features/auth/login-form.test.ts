@@ -11,11 +11,13 @@ function render(overrides: Partial<LoginFormFieldsProps> = {}) {
   const props: LoginFormFieldsProps = {
     values: { email: '', password: '' },
     errors: NO_FORM_ERRORS,
+    errorStatus: null,
     isSubmitting: false,
     showPassword: false,
     onValueChange: () => undefined,
     onTogglePassword: () => undefined,
     onSubmit: () => undefined,
+    onRetry: () => undefined,
     ...overrides,
   }
 
@@ -63,5 +65,32 @@ describe('LoginFormFields', () => {
   it('비밀번호 표시 토글이 aria-pressed 를 반영한다', () => {
     expect(render({ showPassword: false })).toContain('aria-pressed="false"')
     expect(render({ showPassword: true })).toContain('aria-pressed="true"')
+  })
+
+  it('5xx 면 ErrorState 와 재시도 버튼을 렌더한다', () => {
+    const markup = render({ errorStatus: 500 })
+
+    expect(markup).toContain(messages.common.temporaryErrorTitle)
+    expect(markup).toContain(messages.common.retry)
+  })
+
+  it('무응답이면 ErrorState 와 재시도 버튼을 렌더한다', () => {
+    // NO_RESPONSE_STATUS(0) — classify(0) 은 'temporary' 다
+    const markup = render({ errorStatus: 0 })
+
+    expect(markup).toContain(messages.common.temporaryErrorTitle)
+    expect(markup).toContain(messages.common.retry)
+  })
+
+  it('429 면 재시도 버튼 없이 서버 문구를 role=alert 로 렌더한다', () => {
+    const markup = render({
+      errorStatus: 429,
+      errors: { fields: {}, form: '너무 많은 시도가 있었어요. 잠시 후 다시 이용해 주세요.' },
+    })
+
+    expect(markup).toContain('role="alert"')
+    expect(markup).toContain('너무 많은 시도가 있었어요. 잠시 후 다시 이용해 주세요.')
+    expect(markup).not.toContain(messages.common.retry)
+    expect(markup).not.toContain(messages.common.temporaryErrorTitle)
   })
 })

@@ -26,6 +26,18 @@ export type UseFormReturn<TValues> = {
   submit: () => Promise<void>
   /** 제출 실패 시 포커스를 옮길 대상 */
   firstErrorField: string | null
+  /**
+   * 실패로 끝난 제출 횟수. 성공 시에는 증가하지 않는다.
+   *
+   * 포커스 이동 effect 의 유일한 안정적인 트리거다. `errors`/`firstErrorField` 를
+   * 의존성으로 쓰면 두 문제가 생긴다: (1) 오류가 여러 개 남은 상태에서 한 필드를
+   * 고치면 `setValue` 가 그 필드 오류만 지워도 `errors` 객체가 바뀌어 effect 가
+   * 다시 돌며 **입력 중인 필드에서 포커스를 훔친다.** (2) 같은 필드에 같은 오류가
+   * 연속 두 번 나면 값이 안 바뀌어 두 번째 제출에서 포커스가 안 간다.
+   * `submitCount` 는 "제출이 실패로 끝났다"는 이벤트 자체를 신호로 쓰므로 둘 다
+   * 피한다 (react-hook-form 도 같은 방식).
+   */
+  submitCount: number
 }
 
 /**
@@ -44,6 +56,7 @@ export function useForm<TValues extends Record<string, unknown>, TResult>({
   const [errors, setErrors] = useState<FormErrors>(NO_FORM_ERRORS)
   const [isSubmitting, setSubmitting] = useState(false)
   const [isDirty, setDirty] = useState(false)
+  const [submitCount, setSubmitCount] = useState(0)
 
   // disabled 가 반영되기 전에 Enter 제출이 두 번 들어갈 수 있다.
   // 버튼 disabled 와 이 가드를 **둘 다** 건다 — docs/form-guide.md §6
@@ -76,6 +89,7 @@ export function useForm<TValues extends Record<string, unknown>, TResult>({
     const result = validate(schema, values)
     if (!result.ok) {
       setErrors(result.errors)
+      setSubmitCount((count) => count + 1)
       return
     }
 
@@ -90,6 +104,7 @@ export function useForm<TValues extends Record<string, unknown>, TResult>({
       // 클라이언트 오류와 합치지 않고 교체한다. 합치면 이미 고친 필드의
       // 낡은 오류가 남는다 — docs/form-guide.md §5
       setErrors(apiErrorToFormErrors(error, messages.form.submitFailed))
+      setSubmitCount((count) => count + 1)
     } finally {
       submittingRef.current = false
       setSubmitting(false)
@@ -108,5 +123,6 @@ export function useForm<TValues extends Record<string, unknown>, TResult>({
     reset,
     submit,
     firstErrorField,
+    submitCount,
   }
 }
