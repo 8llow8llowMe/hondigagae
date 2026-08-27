@@ -24,6 +24,11 @@ ENV PORT=3000
 # standalone 번들에는 서버 실행에 필요한 node_modules 가 이미 추적되어 들어 있다.
 COPY --chown=node:node .next/standalone ./
 # 정적 자산과 public 은 추적 대상이 아니라 따로 복사해야 한다. 빠뜨리면 JS/CSS 가 전부 404 난다.
+#
+# 이 저장소에는 아직 public/ 이 없다. 파이프라인이 번들을 묶기 전에 `mkdir -p public` 으로
+# 빈 디렉터리를 만들어 주므로 아래 COPY 가 통과한다
+# (Jenkinsfile.frontend-common.groovy 의 번들 생성 단계).
+# 로컬에서 직접 이미지를 빌드한다면 같은 이유로 public/ 을 먼저 만들어야 한다.
 COPY --chown=node:node .next/static ./.next/static
 COPY --chown=node:node public ./public
 

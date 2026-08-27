@@ -794,6 +794,11 @@ fi
                             sh """#!/usr/bin/env bash
 set -euo pipefail
 
+# public/ 이 없는 프로젝트도 있습니다. 없으면 tar 가 여기서 죽고,
+# 통과하더라도 Dockerfile 의 `COPY public ./public` 이 이미지 빌드에서 죽습니다.
+# 빈 디렉터리를 만들어 두면 둘 다 통과하고 런타임 동작도 같습니다.
+mkdir -p public
+
 tar -czf ${config.bundleFile} \\
   .next/standalone \\
   .next/static \\
