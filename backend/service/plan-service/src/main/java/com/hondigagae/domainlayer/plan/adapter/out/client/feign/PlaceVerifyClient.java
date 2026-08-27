@@ -1,18 +1,23 @@
 package com.hondigagae.domainlayer.plan.adapter.out.client.feign;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.hondigagae.common.dto.Response;
+import java.util.List;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 
+/**
+ * tour-service 장소 존재 확인.
+ *
+ * <p>게이트웨이를 거치지 않는 내부 경로({@code /internal/v1})를 부른다. 항목마다 상세 API 를
+ * 부르면 일정 저장 한 번에 HTTP 왕복이 항목 수만큼 생기므로 아이디 목록을 한 번에 확인한다.
+ */
 @FeignClient(
     name = "${feign-client.target-services.tour-service:tour-service}",
     contextId = "placeVerifyClient"
 )
 public interface PlaceVerifyClient {
 
-    // 존재 확인 용도라 본문 스키마에 의존하지 않도록 JsonNode 로 받는다.
-    @GetMapping("/api/v1/places/{placeId}")
-    Response<JsonNode> getPlace(@PathVariable long placeId);
+    @GetMapping("/internal/v1/places/visible-ids")
+    Response<List<Long>> getVisiblePlaceIds(@RequestParam("placeIds") List<Long> placeIds);
 }

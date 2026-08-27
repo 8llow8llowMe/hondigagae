@@ -16,6 +16,7 @@ import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
@@ -117,14 +118,26 @@ public class PlanCommandProcessor {
         }
     }
 
+    /**
+     * 장소를 참조하는 항목들을 <b>한 번의 원격 호출</b>로 검증한다.
+     *
+     * <p>항목마다 따로 부르면 일정 하루(항목 8개 안팎) 저장에 HTTP 왕복이 8번 생긴다.
+     * delisted 장소는 tour-service 가 목록에서 빼고 돌려주므로, 원천에서 사라진 장소를
+     * 새 항목이 참조하는 것도 여기서 함께 막힌다.
+     */
     private void verifyPlaceTargets(List<PlanItemCommand> commands) {
-        commands.stream()
+        Set<Long> targetIds = commands.stream()
             .filter(command -> PLACE_TARGET_TYPES.contains(command.itemType()) && command.targetId() != null)
-            .forEach(command -> {
-                if (!placeVerifyQueryPort.existsPlace(command.targetId())) {
-                    throw new PlanException(PlanErrorCode.NOT_FOUND_PLAN_PLACE);
-                }
-            });
+            .map(PlanItemCommand::targetId)
+            .collect(Collectors.toSet());
+        if (targetIds.isEmpty()) {
+            return;
+        }
+
+        Set<Long> visibleIds = placeVerifyQueryPort.findVisiblePlaceIds(targetIds);
+        if (!visibleIds.containsAll(targetIds)) {
+            throw new PlanException(PlanErrorCode.NOT_FOUND_PLAN_PLACE);
+        }
     }
 
     private List<PlanItem> toItems(long planId, List<PlanItemCommand> commands) {

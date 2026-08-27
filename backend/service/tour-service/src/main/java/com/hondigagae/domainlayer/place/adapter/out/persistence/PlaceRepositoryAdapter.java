@@ -40,6 +40,14 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
     }
 
     @Override
+    public List<Long> findVisibleIds(java.util.Collection<Long> placeIds) {
+        if (placeIds.isEmpty()) {
+            return List.of();
+        }
+        return placeRepository.findVisibleIds(placeIds);
+    }
+
+    @Override
     public Optional<Place> findPlaceById(long placeId) {
         return placeRepository.findByIdAndMergedIntoIdIsNull(placeId).map(placeMapper::toDomain);
     }

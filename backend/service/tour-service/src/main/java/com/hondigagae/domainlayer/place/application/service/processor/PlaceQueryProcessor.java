@@ -59,6 +59,10 @@ public class PlaceQueryProcessor {
             .build();
     }
 
+    public List<Long> findVisibleIds(List<Long> placeIds) {
+        return placeRepositoryPort.findVisibleIds(placeIds);
+    }
+
     public PlaceDetailInfo getPlaceDetail(long placeId) {
         Place place = placeRepositoryPort.findPlaceById(placeId)
             .orElseThrow(() -> new PlaceException(PlaceErrorCode.NOT_FOUND_PLACE));
