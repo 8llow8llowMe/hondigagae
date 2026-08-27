@@ -1,12 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 import { resolveMock } from '@/lib/api/mock'
+import { MOCK_EMAIL_CODE } from '@/lib/api/mock/auth-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
+import { resetMockStore } from '@/lib/api/mock/store'
 import type { SliceResponse } from '@/types/api'
 import type { PlaceDetail, PlaceSummary } from '@/types/place'
 
 function list(search: string) {
-  const result = resolveMock('/places', 'GET', search)
+  const result = resolveMock('/places', 'GET', search, null)
   if (result === null) throw new Error('mock 이 경로를 처리하지 못했다')
   return result
 }
@@ -17,12 +19,12 @@ function body(search: string): SliceResponse<PlaceSummary> {
 
 describe('resolveMock — 처리 범위', () => {
   it('구현되지 않은 경로는 null 을 반환해 실제 게이트웨이로 넘긴다', () => {
-    expect(resolveMock('/plans', 'GET', '')).toBeNull()
-    expect(resolveMock('/emergencies/facilities', 'GET', '')).toBeNull()
+    expect(resolveMock('/plans', 'GET', '', null)).toBeNull()
+    expect(resolveMock('/emergencies/facilities', 'GET', '', null)).toBeNull()
   })
 
-  it('GET 이 아니면 처리하지 않는다', () => {
-    expect(resolveMock('/places', 'POST', '')).toBeNull()
+  it('GET 이 아니면 장소 mock 은 처리하지 않는다', () => {
+    expect(resolveMock('/places', 'POST', '', '{}')).toBeNull()
   })
 })
 
@@ -85,7 +87,7 @@ describe('resolveMock — 필터', () => {
 
 describe('resolveMock — 상세', () => {
   function detail(placeId: string) {
-    const result = resolveMock(`/places/${placeId}`, 'GET', '')
+    const result = resolveMock(`/places/${placeId}`, 'GET', '', null)
     if (result === null) throw new Error('mock 이 경로를 처리하지 못했다')
     return result
   }
@@ -119,13 +121,13 @@ describe('resolveMock — 상세', () => {
   })
 
   it('/places/nearby 는 상세가 아니다 — 실제 게이트웨이로 넘긴다', () => {
-    expect(resolveMock('/places/nearby', 'GET', 'lat=33.5&lng=126.5')).toBeNull()
+    expect(resolveMock('/places/nearby', 'GET', 'lat=33.5&lng=126.5', null)).toBeNull()
   })
 })
 
 describe('mock 상세 데이터 품질', () => {
   function detailOf(placeId: string): PlaceDetail {
-    const result = resolveMock(`/places/${placeId}`, 'GET', '')
+    const result = resolveMock(`/places/${placeId}`, 'GET', '', null)
     return result?.payload.dataBody as PlaceDetail
   }
 
@@ -184,5 +186,142 @@ describe('mock 데이터 품질', () => {
           p.lng < 126.9,
       ),
     ).toBe(true)
+  })
+})
+
+describe('resolveMock — 인증', () => {
+  beforeEach(resetMockStore)
+
+  it('등록된 계정으로 로그인하면 accessToken 과 refreshToken 을 준다', () => {
+    const result = resolveMock(
+      '/auth/login',
+      'POST',
+      '',
+      JSON.stringify({ email: 'demo@hondigagae.dev', password: 'password123!' }),
+    )
+
+    expect(result).not.toBeNull()
+    expect(result?.status).toBe(200)
+    const body = result?.payload.dataBody as { accessToken: string; memberId: string }
+    expect(body.accessToken.length).toBeGreaterThan(0)
+    expect(body.memberId).toBe('900000000000000001')
+    // 이게 없으면 BFF 세션의 refresh 가 빈 문자열이 되어 재발급 흐름이 돌지 않는다
+    expect(result?.refreshToken).toBeTruthy()
+  })
+
+  it('비밀번호가 틀리면 401 AUTH_006 이다', () => {
+    const result = resolveMock(
+      '/auth/login',
+      'POST',
+      '',
+      JSON.stringify({ email: 'demo@hondigagae.dev', password: 'wrong-password' }),
+    )
+
+    expect(result?.status).toBe(401)
+    expect(result?.payload.dataHeader.resultCode).toBe('AUTH_006')
+  })
+
+  it('없는 이메일도 같은 401 이다 — 계정 열거를 막는다', () => {
+    const result = resolveMock(
+      '/auth/login',
+      'POST',
+      '',
+      JSON.stringify({ email: 'nobody@hondigagae.dev', password: 'password123!' }),
+    )
+
+    expect(result?.status).toBe(401)
+    expect(result?.payload.dataHeader.resultCode).toBe('AUTH_006')
+  })
+
+  it('가입되지 않은 이메일도 인증코드 발송은 성공한다', () => {
+    const result = resolveMock(
+      '/auth/email/send-code',
+      'POST',
+      '',
+      JSON.stringify({ email: 'new@hondigagae.dev' }),
+    )
+
+    expect(result?.status).toBe(200)
+    expect(result?.payload.dataHeader.success).toBe(true)
+  })
+
+  it('틀린 인증코드는 400 AUTH_004 다', () => {
+    resolveMock('/auth/email/send-code', 'POST', '', JSON.stringify({ email: 'x@hondigagae.dev' }))
+    const result = resolveMock(
+      '/auth/email/verify-code',
+      'POST',
+      '',
+      JSON.stringify({ email: 'x@hondigagae.dev', code: 'WRONG123' }),
+    )
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('AUTH_004')
+  })
+
+  it('검증 없이 가입하면 400 MEMBER_006 이다', () => {
+    const result = resolveMock(
+      '/members/signup',
+      'POST',
+      '',
+      JSON.stringify({
+        email: 'unverified@hondigagae.dev',
+        password: 'password123!',
+        name: '홍길동',
+        nickname: '길동짱',
+      }),
+    )
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('MEMBER_006')
+  })
+
+  it('이미 가입된 이메일은 409 MEMBER_001 이다', () => {
+    resolveMock(
+      '/auth/email/send-code',
+      'POST',
+      '',
+      JSON.stringify({ email: 'demo@hondigagae.dev' }),
+    )
+    resolveMock(
+      '/auth/email/verify-code',
+      'POST',
+      '',
+      JSON.stringify({ email: 'demo@hondigagae.dev', code: MOCK_EMAIL_CODE }),
+    )
+    const result = resolveMock(
+      '/members/signup',
+      'POST',
+      '',
+      JSON.stringify({
+        email: 'demo@hondigagae.dev',
+        password: 'password123!',
+        name: '홍길동',
+        nickname: '길동짱',
+      }),
+    )
+
+    expect(result?.status).toBe(409)
+    expect(result?.payload.dataHeader.resultCode).toBe('MEMBER_001')
+  })
+
+  it('필드 검증 실패는 ValidationErrorBody 형태로 온다', () => {
+    const result = resolveMock(
+      '/members/signup',
+      'POST',
+      '',
+      JSON.stringify({ email: 'a@b.c', password: 'short', name: '', nickname: '길동짱' }),
+    )
+
+    expect(result?.status).toBe(400)
+    const raw = result?.payload.dataHeader.resultMessage as {
+      message: string
+      errors: { code: string; field: string; message: string }[]
+    }
+    expect(Array.isArray(raw.errors)).toBe(true)
+    expect(raw.errors[0]?.field).toBe('password')
+  })
+
+  it('mock 이 모르는 POST 는 null 이라 게이트웨이로 넘어간다', () => {
+    expect(resolveMock('/plans', 'POST', '', '{}')).toBeNull()
   })
 })
