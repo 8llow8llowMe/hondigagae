@@ -88,6 +88,10 @@ export type CodeStepProps = {
   errorStatus: number | null
   isSubmitting: boolean
   cooldownSeconds: number
+  /** 재전송 요청이 인플라이트인가. 쿨다운과 별개로 이중 클릭을 막는다 (form-guide.md §6) */
+  resending: boolean
+  /** 1단계 성공 안내("메일로 인증코드를 보냈어요."). 없으면 렌더하지 않는다 */
+  notice?: string | undefined
   onValueChange: (key: keyof CodeValues, value: string) => void
   onSubmit: () => void
   onResend: () => void
@@ -102,6 +106,8 @@ export function CodeStep({
   errorStatus,
   isSubmitting,
   cooldownSeconds,
+  resending,
+  notice,
   onValueChange,
   onSubmit,
   onResend,
@@ -133,6 +139,11 @@ export function CodeStep({
       }}
     >
       <p className="text-caption text-fg-muted">{messages.auth.stepOf(2, 3)}</p>
+      {notice !== undefined && (
+        <p role="status" className="text-body-2 text-info-700 bg-info-100 rounded-md px-3 py-2">
+          {notice}
+        </p>
+      )}
       <FormAlert message={errors.form} />
       <p className="text-body-2 text-fg-muted">{email}</p>
 
@@ -155,6 +166,7 @@ export function CodeStep({
           variant="secondary"
           size="sm"
           disabled={isCoolingDown}
+          loading={resending}
           onClick={onResend}
         >
           {isCoolingDown ? messages.auth.resendCooldown(cooldownSeconds) : messages.auth.resendCode}
@@ -183,6 +195,8 @@ export type ProfileStepProps = {
   duplicateEmail: string | null
   /** 로그인 링크에 실을 복귀 경로 */
   returnTo: string
+  /** 2단계 성공 안내("이메일 인증이 완료됐어요."). 없으면 렌더하지 않는다 */
+  notice?: string | undefined
   onValueChange: (key: keyof SignupProfileValues, value: string) => void
   onSubmit: () => void
   onRetry: () => void
@@ -195,6 +209,7 @@ export function ProfileStep({
   isSubmitting,
   duplicateEmail,
   returnTo,
+  notice,
   onValueChange,
   onSubmit,
   onRetry,
@@ -219,6 +234,11 @@ export function ProfileStep({
       }}
     >
       <p className="text-caption text-fg-muted">{messages.auth.stepOf(3, 3)}</p>
+      {notice !== undefined && (
+        <p role="status" className="text-body-2 text-info-700 bg-info-100 rounded-md px-3 py-2">
+          {notice}
+        </p>
+      )}
       <FormAlert message={errors.form} />
 
       {duplicateEmail !== null && (

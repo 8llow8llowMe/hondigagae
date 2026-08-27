@@ -14,6 +14,7 @@ import {
 import { CodeStep, EmailStep, ProfileStep } from '@/features/auth/signup-steps'
 import { sendEmailCode, signup, verifyEmailCode } from '@/lib/api/auth'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
+import { remainingSeconds } from '@/lib/form/cooldown'
 import { apiErrorToFormErrors, type FormErrors } from '@/lib/form/field-errors'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
@@ -37,8 +38,15 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
 
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
-  const [cooldownSeconds, setCooldown] = useState(0)
+  // 쿨다운은 "남은 초"를 직접 감산하는 state 가 아니라 시작 시각을 들고, 렌더마다
+  // remainingSeconds(순수 함수) 로 다시 계산한다 — form-guide.md §2, 회원가입-세부명세.md D7.
+  const [cooldownStartedAt, setCooldownStartedAt] = useState<number | null>(null)
+  // remainingSeconds 는 Date.now() 를 다시 읽어야 값이 바뀐다. 이 값 자체는 쓰지 않고
+  // setInterval 이 1초마다 재렌더를 트리거하는 용도로만 갱신한다
+  const [, forceCooldownTick] = useState(0)
   const [duplicateEmail, setDuplicateEmail] = useState<string | null>(null)
+  const [isResending, setResending] = useState(false)
+  const resendingRef = useRef(false)
 
   // AUTH_005(코드 만료)/MEMBER_006(인증 미완료)로 1단계에 되돌아왔을 때 보여줄 안내.
   // 두 오류 모두 도착 시점엔 codeForm/profileForm 오류로 세팅되지만 그 단계는 더 이상
@@ -54,10 +62,22 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
   const [codeAction, setCodeAction] = useState<'verify' | 'resend'>('verify')
 
   useEffect(() => {
-    if (cooldownSeconds <= 0) return
-    const timer = setTimeout(() => setCooldown((previous) => previous - 1), 1000)
-    return () => clearTimeout(timer)
-  }, [cooldownSeconds])
+    if (cooldownStartedAt === null) return
+    const interval = setInterval(() => {
+      const remaining = remainingSeconds(cooldownStartedAt, RESEND_COOLDOWN_SECONDS, Date.now())
+      if (remaining <= 0) {
+        setCooldownStartedAt(null)
+        return
+      }
+      forceCooldownTick((tick) => tick + 1)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [cooldownStartedAt])
+
+  const cooldownSeconds =
+    cooldownStartedAt === null
+      ? 0
+      : remainingSeconds(cooldownStartedAt, RESEND_COOLDOWN_SECONDS, Date.now())
 
   // 단계 전환 시 새 단계의 첫 입력으로 포커스를 옮긴다 — 회원가입-세부명세.md D6
   useEffect(() => {
@@ -81,7 +101,7 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
     },
     onSuccess: (_result, values) => {
       setEmail(values.email)
-      setCooldown(RESEND_COOLDOWN_SECONDS)
+      setCooldownStartedAt(Date.now())
       setCodeErrorStatus(null)
       setStep('code')
     },
@@ -162,6 +182,10 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
         // submit() 완료 후 stale 한 profileForm.errors 를 읽는 방식은 쓰지 않는다.
         if (error.kind === 'conflict') {
           setDuplicateEmail(email)
+          // 3단계까지 입력한 비밀번호·이름·닉네임은 버린다 — 다른 계정 정보라 유지할
+          // 이유가 없다(정본 D4). submit() 의 catch 가 이 직후 서버 문구로 errors 를
+          // 다시 채우므로(아래 throw), 배너는 남고 값만 비워진다.
+          profileForm.reset()
         } else {
           // 성공 경로와 다른 오류에서는 되돌린다 — 5xx 도 중복으로 오판하지 않는다
           setDuplicateEmail(null)
@@ -178,29 +202,39 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
     },
     onSuccess: () => {
       // dataBody 가 null 이라 자동 로그인이 안 된다. 로그인 화면으로 보내고
-      // 이메일을 미리 채운다 — 정본 D0
-      const params = new URLSearchParams({ returnTo, email })
+      // 이메일을 미리 채운다 — 정본 D0. signedUp=1 은 가입 완료 배너 전용 표식이다.
+      // 409 "로그인하기" 링크와 같은 /login?returnTo=…&email=… 셰이프를 쓰므로
+      // email 유무로는 구분할 수 없다 — 중복 계정 케이스에도 배너가 잘못 뜬다.
+      const params = new URLSearchParams({ returnTo, email, signedUp: '1' })
       router.replace(`/login?${params.toString()}`)
     },
   })
 
   const handleResend = useCallback(() => {
-    if (cooldownSeconds > 0) return
+    // 쿨다운 가드에 더해 재진입 가드(ref)를 겹친다 — disabled 반영 전 빠른 연속
+    // 클릭으로 sendEmailCode 가 중복 호출되는 것을 막는다 (form-guide.md §6)
+    if (cooldownSeconds > 0 || resendingRef.current) return
+    resendingRef.current = true
+    setResending(true)
     setCodeAction('resend')
     void sendEmailCode(email)
       .then(() => {
-        setCooldown(RESEND_COOLDOWN_SECONDS)
+        setCooldownStartedAt(Date.now())
         setCodeErrorStatus(null)
       })
       .catch((error: unknown) => {
         if (error instanceof ApiError && error.kind === 'rate-limited') {
           // 쿨다운을 유지해 재전송 버튼을 계속 비활성 상태로 둔다(D4). ErrorState 가
           // 아니라 FormAlert 로만 보여준다 — codeForm 오류에 실어 CodeStep 이 그대로 렌더한다
-          setCooldown(RESEND_COOLDOWN_SECONDS)
+          setCooldownStartedAt(Date.now())
           codeForm.setErrors(apiErrorToFormErrors(error, messages.form.submitFailed))
           return
         }
         setCodeErrorStatus(error instanceof ApiError ? error.status : NO_RESPONSE_STATUS)
+      })
+      .finally(() => {
+        resendingRef.current = false
+        setResending(false)
       })
   }, [cooldownSeconds, email, codeForm.setErrors])
 
@@ -240,12 +274,14 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
           errorStatus={codeErrorStatus}
           isSubmitting={codeForm.isSubmitting}
           cooldownSeconds={cooldownSeconds}
+          resending={isResending}
+          notice={messages.auth.codeSent}
           onValueChange={(key, value) => codeForm.setValue(key, value)}
           onSubmit={() => void codeForm.submit()}
           onResend={handleResend}
           onChangeEmail={() => {
             codeForm.reset()
-            setCooldown(0)
+            setCooldownStartedAt(null)
             setCodeErrorStatus(null)
             setStep('email')
           }}
@@ -265,8 +301,12 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
         isSubmitting={profileForm.isSubmitting}
         duplicateEmail={duplicateEmail}
         returnTo={returnTo}
+        notice={messages.auth.codeVerified}
         onValueChange={(key, value) => {
-          setDuplicateEmail(null)
+          // duplicateEmail 은 여기서 지우지 않는다 — 409 이후에도 "로그인하기" 링크가
+          // 계속 보여야 한다(정본 D4). 지우는 지점은 profileForm 의 다음 제출 결과
+          // (성공 / 409 아닌 다른 오류)뿐이다 — 그 외에는 값을 고쳐도 이 화면에서
+          // 할 수 있는 일이 없다(이메일은 1단계 값이라 여기서 못 바꾼다).
           profileForm.setValue(key, value)
         }}
         onSubmit={() => void profileForm.submit()}
