@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { Field, fieldErrorId } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
+import { FormNotice } from '@/components/form-notice'
 import { Input } from '@/components/input'
 
 describe('Field', () => {
@@ -86,5 +87,20 @@ describe('FormAlert', () => {
 
   it('메시지가 없으면 아무것도 렌더하지 않는다', () => {
     expect(renderToStaticMarkup(createElement(FormAlert, { message: null }))).toBe('')
+  })
+})
+
+describe('FormNotice', () => {
+  it('메시지가 있으면 role=status 로 렌더한다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(FormNotice, { message: '메일로 인증코드를 보냈어요.' }),
+    )
+
+    expect(markup).toContain('role="status"')
+    expect(markup).toContain('메일로 인증코드를 보냈어요.')
+  })
+
+  it('메시지가 없으면 아무것도 렌더하지 않는다', () => {
+    expect(renderToStaticMarkup(createElement(FormNotice, { message: null }))).toBe('')
   })
 })

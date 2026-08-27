@@ -1,9 +1,12 @@
+'use client'
+
 import Link from 'next/link'
 
 import { Button } from '@/components/button'
 import { ErrorState } from '@/components/error-state'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
+import { FormNotice } from '@/components/form-notice'
 import { Input } from '@/components/input'
 import type { CodeValues, EmailValues, SignupProfileValues } from '@/features/auth/schemas'
 import { classify } from '@/lib/api/error'
@@ -24,7 +27,7 @@ export type EmailStepProps = {
   values: EmailValues
   errors: FormErrors
   errorStatus: number | null
-  isSubmitting: boolean
+  submitting: boolean
   onValueChange: (key: keyof EmailValues, value: string) => void
   onSubmit: () => void
   onRetry: () => void
@@ -34,7 +37,7 @@ export function EmailStep({
   values,
   errors,
   errorStatus,
-  isSubmitting,
+  submitting,
   onValueChange,
   onSubmit,
   onRetry,
@@ -74,8 +77,8 @@ export function EmailStep({
         />
       </Field>
 
-      <Button type="submit" size="lg" loading={isSubmitting} className="mt-2">
-        {isSubmitting ? messages.auth.sendingCode : messages.auth.sendCode}
+      <Button type="submit" size="lg" loading={submitting} className="mt-2">
+        {submitting ? messages.auth.sendingCode : messages.auth.sendCode}
       </Button>
     </form>
   )
@@ -86,7 +89,7 @@ export type CodeStepProps = {
   values: CodeValues
   errors: FormErrors
   errorStatus: number | null
-  isSubmitting: boolean
+  submitting: boolean
   cooldownSeconds: number
   /** 재전송 요청이 인플라이트인가. 쿨다운과 별개로 이중 클릭을 막는다 (form-guide.md §6) */
   resending: boolean
@@ -104,7 +107,7 @@ export function CodeStep({
   values,
   errors,
   errorStatus,
-  isSubmitting,
+  submitting,
   cooldownSeconds,
   resending,
   notice,
@@ -139,13 +142,10 @@ export function CodeStep({
       }}
     >
       <p className="text-caption text-fg-muted">{messages.auth.stepOf(2, 3)}</p>
-      {notice !== undefined && (
-        <p role="status" className="text-body-2 text-info-700 bg-info-100 rounded-md px-3 py-2">
-          {notice}
-        </p>
-      )}
+      <FormNotice message={notice ?? null} />
       <FormAlert message={errors.form} />
-      <p className="text-body-2 text-fg-muted">{email}</p>
+      {/* 이메일은 줄바꿈 기회가 없는 토큰이다 — 긴 이메일이 375px 폭에서 넘치지 않게 break-all */}
+      <p className="text-body-2 text-fg-muted break-all">{email}</p>
 
       <Field id="code" label={messages.auth.codeLabel} error={errors.fields.code} required>
         <Input
@@ -179,8 +179,8 @@ export function CodeStep({
         </Button>
       </div>
 
-      <Button type="submit" size="lg" loading={isSubmitting} className="mt-2">
-        {isSubmitting ? messages.auth.verifyingCode : messages.auth.verifyCode}
+      <Button type="submit" size="lg" loading={submitting} className="mt-2">
+        {submitting ? messages.auth.verifyingCode : messages.auth.verifyCode}
       </Button>
     </form>
   )
@@ -190,7 +190,7 @@ export type ProfileStepProps = {
   values: SignupProfileValues
   errors: FormErrors
   errorStatus: number | null
-  isSubmitting: boolean
+  submitting: boolean
   /** 409(MEMBER_001)로 확인된 이메일. null 이면 중복 안내를 렌더하지 않는다 */
   duplicateEmail: string | null
   /** 로그인 링크에 실을 복귀 경로 */
@@ -206,7 +206,7 @@ export function ProfileStep({
   values,
   errors,
   errorStatus,
-  isSubmitting,
+  submitting,
   duplicateEmail,
   returnTo,
   notice,
@@ -234,11 +234,7 @@ export function ProfileStep({
       }}
     >
       <p className="text-caption text-fg-muted">{messages.auth.stepOf(3, 3)}</p>
-      {notice !== undefined && (
-        <p role="status" className="text-body-2 text-info-700 bg-info-100 rounded-md px-3 py-2">
-          {notice}
-        </p>
-      )}
+      <FormNotice message={notice ?? null} />
       <FormAlert message={errors.form} />
 
       {duplicateEmail !== null && (
@@ -293,8 +289,8 @@ export function ProfileStep({
         />
       </Field>
 
-      <Button type="submit" size="lg" loading={isSubmitting} className="mt-2">
-        {isSubmitting ? messages.auth.signingUp : messages.auth.signupSubmit}
+      <Button type="submit" size="lg" loading={submitting} className="mt-2">
+        {submitting ? messages.auth.signingUp : messages.auth.signupSubmit}
       </Button>
     </form>
   )
