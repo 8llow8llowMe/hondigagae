@@ -37,11 +37,11 @@ export function Field({
   className,
 }: FieldProps) {
   return (
-    <div className={cn('flex flex-col gap-1.5', className)}>
+    <div className={cn('flex flex-col gap-1', className)}>
       <label htmlFor={id} className="text-body-2 text-fg font-medium">
         {label}
         {required && (
-          <span aria-hidden="true" className="text-danger-500 ml-0.5">
+          <span aria-hidden="true" className="text-danger-500 ml-1">
             *
           </span>
         )}

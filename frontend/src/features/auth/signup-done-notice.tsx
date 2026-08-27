@@ -1,3 +1,4 @@
+import { FormNotice } from '@/components/form-notice'
 import { messages } from '@/lib/messages'
 
 /**
@@ -15,9 +16,5 @@ import { messages } from '@/lib/messages'
 export function SignupDoneNotice({ signedUp }: { signedUp: string | undefined }) {
   if (signedUp !== '1') return null
 
-  return (
-    <p role="status" className="text-body-2 text-info-700 bg-info-100 rounded-md px-3 py-2">
-      {messages.auth.signupDone}
-    </p>
-  )
+  return <FormNotice message={messages.auth.signupDone} />
 }
