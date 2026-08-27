@@ -27,7 +27,10 @@
 ## 구현 주의점
 
 - **일정의 소유권은 이 서비스에 있다.** ai-service는 일정안을 생성·제안만 하고, 저장·확정은 이 서비스 API를 통해서만 일어난다.
-- AI가 생성한 일정을 저장할 때도 일반 생성과 같은 검증(장소 존재 여부, 날짜 정합성)을 거친다. 장소 검증은 tour-service Feign 조회(`FeignClient -> Adapter -> QueryResult`)로 수행한다.
+- AI가 생성한 일정을 저장할 때도 일반 생성과 같은 검증(장소 존재 여부, 날짜 정합성)을 거친다.
+  장소 검증은 tour-service 내부 벌크 API(`GET /internal/v1/places/visible-ids`)를 **한 번** 불러
+  수행한다 — 항목마다 따로 부르면 저장 한 번에 원격 왕복이 항목 수만큼 생긴다 (coding-conventions §9-7).
+  delisted 장소는 존재하지 않는 것으로 오므로, 원천에서 사라진 장소를 새 항목이 참조하는 것도 여기서 막힌다.
 - `PlanItem`의 다중 대상 FK는 `@Comment`에 분기 기준을 명시한다 (`coding-conventions.md` §9-4).
 - 후기 사진 업로드가 필요해지면 `storage-core` 모듈 추가를 검토한다 (`modules.md`).
 - 후기 데이터는 반려견 성향 분석(ai-service)의 입력이 되므로, 방문 장소·활동 유형·만족도가 구조화되어 저장되어야 한다.

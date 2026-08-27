@@ -333,6 +333,44 @@ private Long targetId;
 @Index(name = "idx_plan_item_plan_id", columnList = "planId,day,sequence")
 ```
 
+### 9-6. 쿼리 작성 규칙 (필수)
+
+수단을 이 순서로 고른다. 아래 단계로 내려갈수록 비용이 커지므로 위에서 해결되면 내려가지 않는다.
+
+| 상황 | 수단 | 위치 |
+|------|------|------|
+| 조건이 고정된 단순 조회 | 파생 쿼리 (`findByIdAndMergedIntoIdIsNull` 등) | `repository/` |
+| 조건이 고정된 복합 조회 | 정적 JPQL `@Query` | `repository/` |
+| **조건이 동적으로 켜지고 꺼지는 조회, 조인** | **QueryDSL** (`BooleanBuilder`, 엔티티 조인) | `repository/custom/{X}CustomRepository` + `Impl` |
+| DB 방언이 필요한 대량 쓰기 (`ON DUPLICATE KEY UPDATE` 등) | JDBC (`JdbcTemplate.batchUpdate`) | batch-service `adapter/out/persistence/Jdbc*Adapter` |
+| 네이티브 `@Query(nativeQuery = true)` | **쓰지 않는다** | 위 수단으로 안 되면 설계를 다시 본다 |
+
+- 동적 조건을 JPQL 로 쓰면 `(:param is null or ...)` 가 조건 수만큼 늘어 쿼리가 조건 대장이 된다.
+  QueryDSL 은 null 인 조건이 where 에 아예 들어가지 않는다. 본보기: `PlaceCustomRepositoryImpl`.
+- 연관관계 어노테이션을 쓰지 않으므로(§9-1) 조인은 QueryDSL **엔티티 조인**(`.join(entity).on(...)`)으로
+  잇는다. 두 엔티티를 나열하고 where 로 묶는 세타 조인은 조인 의도가 문장에 드러나지 않아 피한다.
+  본보기: `CongestionForecastCustomRepositoryImpl`.
+- `JPAQueryFactory` 는 `persistence-core` 의 `QuerydslConfigurer` 를 서비스 BeansConfig 에서
+  `@Import` 해 얻는다. `@DataJpaTest` 슬라이스에는 이 빈이 없으므로 테스트에도 `@Import` 한다.
+- **`@Param` 은 쓰지 않는다.** Spring Boot 플러그인이 `-parameters` 를 켜 주므로 메서드 파라미터명이
+  쿼리의 이름과 같으면 그대로 바인딩된다 (BossPickSeoul 동일). 바인딩 실패는 리포지터리 생성
+  시점에 터지므로 H2 슬라이스 테스트가 잡는다.
+- **커스텀 구현은 컴파일로 검증되지 않는다.** 동적 조건 조립과 조인은 반드시 H2 슬라이스 테스트로
+  실제 스키마에 질의해 본다.
+
+### 9-7. N+1 금지 (필수)
+
+루프나 스트림 안에서 단건 조회를 부르지 않는다. 항목 수만큼 왕복이 생긴다.
+
+- **DB 단건 조회 반복** → `in` 절 벌크 조회로 바꾼다 (`findVisibleIds(Collection<Long>)`).
+- **원격(Feign) 단건 호출 반복** → 대상 서비스에 벌크 내부 엔드포인트를 연다. 가장 비싼 종류의
+  N+1 이다 — 일정 항목 8개를 저장하며 HTTP 를 8번 왕복하던 자리를
+  `GET /internal/v1/places/visible-ids` 하나로 바꾼 것이 본보기다.
+- 연관관계 어노테이션을 쓰지 않으므로(§9-1) 지연로딩 N+1 은 구조적으로 없다. 남는 것은
+  손으로 쓴 루프뿐이니 리뷰에서 `for`/`stream` 안의 `Port.`/`Repository.` 호출을 본다.
+- 성격상 반복이 맞는 것은 그대로 둔다 — 주소별 지오코딩, 날짜별 날씨 조회처럼 호출 단위가
+  원천의 단위인 경우다. 그 이유를 주석으로 남긴다.
+
 ## 10. Internal / External Client 규칙
 
 - Spring 백엔드 서비스 간 조회 / 연동은 기본적으로 `FeignClient`를 사용합니다.

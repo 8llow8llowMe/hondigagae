@@ -23,10 +23,13 @@ domainlayer/<context>
   |  |  |- dto/item
   |  |  |- exception          (*ExceptionHandler)
   |  |  \- presenter
+  |  |- in/internal           (서비스 간 전용 — 게이트웨이가 라우팅하지 않는 /internal/v1)
+  |  |  \- controller
   |  \- out
   |     |- persistence
   |     |  |- entity
   |     |  |- repository
+  |     |  |  \- custom       (*CustomRepository + Impl — QueryDSL 동적 쿼리·조인)
   |     |  \- *Adapter
   |     \- client
   |- application

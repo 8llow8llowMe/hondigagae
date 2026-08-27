@@ -34,6 +34,8 @@ backend/
 - `dto.metadata.*` — `CodeNameDescribable`, `CodeNameDescriptionMetadata`, 점수형 metadata
 - `enums.OrderType` — 정렬 방향 (ASC/DESC)
 - `exception.ValidationErrorSupport` — 공통 검증 예외 → 응답 변환 유틸
+- `geo.GeoDistance` — 하버사인 거리와 반경 검색용 사각 범위. 좌표 반경 검색을 쓰는 곳이
+  셋(장소·긴급 시설·배치 병합 판정)이라 한곳에 모은다 — 흩어지면 "300m 안"의 뜻이 갈라진다
 - `config.*` — Jasypt, Swagger 공통 설정
 - `properties.*` — 공통 properties 바인딩
 
@@ -238,6 +240,8 @@ backend/
 - `travel.pet` — `PetSizeType`, `ActivityLevel`, `SocialityLevel` (auth ↔ tour ↔ plan)
 - `travel.place` — `PetAllowanceType`, `AllowedPetSize` (tour ↔ ai ↔ batch)
 - `travel.insight` — `SuitabilityLevel`, `WalkSafetyLevel` (tour ↔ ai ↔ plan)
+- `travel.schedule` — `WeeklySchedule` (batch ↔ tour). 요일별 영업시간과 spec 직렬화.
+  배치가 쓰고(문자열 컬럼) 조회가 읽는 계약이라 테이블 스키마와 같은 결로 여기 둔다
 
 **존재 이유**: 위 기준 1번에 해당한다. 적합도를 붙이면서 tour-service 가 반려견 크기를
 장소의 입장 조건과 대조해야 했고, 그 둘은 서로 다른 서비스에 있었다. 복사해 두면
