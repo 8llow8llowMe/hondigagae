@@ -49,8 +49,21 @@ kma-api:
   # 중기예보는 1일 2회(06, 18시) 발표라 회차 간격이 12시간이다.
   mid-term-publish-delay-minutes: ${KMA_MID_TERM_PUBLISH_DELAY_MINUTES:20}
   num-of-rows: ${KMA_NUM_OF_ROWS:1000}
+  # 신선도가 지난 뒤에도 스테일 폴백용으로 키를 남겨 두는 기간.
   stale-cache-seconds: ${KMA_STALE_CACHE_SECONDS:21600}
   mid-term-stale-cache-seconds: ${KMA_MID_TERM_STALE_CACHE_SECONDS:129600}
+  # --- 쿼터 지렛대 (개발계정 일 1,000건) ---
+  # 발표 이후에도 이전 회차를 계속 쓸 시간. 발표 직후에는 일부 category 가 비어 오기도 해서,
+  # 유예를 두면 호출을 아끼면서 부실한 응답도 피한다. 늘릴수록 최신성을 내준다.
+  cache-grace-minutes: ${KMA_CACHE_GRACE_MINUTES:30}
+  mid-term-cache-grace-minutes: ${KMA_MID_TERM_CACHE_GRACE_MINUTES:60}
+  # 인접 격자를 몇 칸씩 묶을지. 1 이면 묶지 않는다.
+  # 기본을 끔으로 둔 이유는 제주 지형이다 - 한라산과 해안이 한 격자로 뭉개지면 고온 판정이
+  # 틀어진다. 쿼터가 실제로 빠듯해졌을 때만 켠다 (KmaGridPoint.coarsenedBy 참고).
+  grid-coarsen-factor: ${KMA_GRID_COARSEN_FACTOR:1}
+  # 발표 직후 여러 인스턴스가 같은 격자를 동시에 부르는 것을 막는 락의 수명.
+  # 원천 왕복보다 길고, 락 주인이 죽었을 때 남들이 오래 막히지 않을 만큼 짧아야 한다.
+  refresh-lock-seconds: ${KMA_REFRESH_LOCK_SECONDS:10}
 
 # 여행 적합도 / 산책 위험도 임계값.
 # 확정된 수의학 기준이 아니라 현재의 판단이므로 배포 없이 조정할 수 있게 프로퍼티로 둔다.

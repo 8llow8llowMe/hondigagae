@@ -82,7 +82,7 @@ yml 목록(`infra.redis.sentinels`)도 계속 받지만 로컬용 탈출구다 �
 
 **포함 기준**: Redis 연동 서비스가 import 해서 쓰는 공통 설정만.
 
-**사용처**: auth-service(토큰/OAuth state), ai-service(작업 상태·결과 캐시), tour-service(날씨·혼잡도 캐시), api-gateway
+**사용처**: auth-service(토큰/OAuth state), ai-service(작업 상태·결과 캐시), tour-service(날씨·혼잡도 캐시 + 예보 갱신 락), api-gateway
 
 ---
 
