@@ -74,6 +74,8 @@ public class PlanWeatherPresenter {
         PlaceSuitabilityQueryResult.DailyWeatherQueryResult weather = suitability.weather();
         return PlanDailyWeatherItem.builder()
             .date(weather.date())
+            .forecastSourceCode(weather.forecastSourceCode())
+            .forecastSourceName(weather.forecastSourceName())
             .minTemperature(weather.minTemperature())
             .maxTemperature(weather.maxTemperature())
             .maxPrecipitationProbability(weather.maxPrecipitationProbability())

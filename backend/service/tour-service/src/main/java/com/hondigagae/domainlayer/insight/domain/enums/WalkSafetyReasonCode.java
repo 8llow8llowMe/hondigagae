@@ -25,7 +25,8 @@ public enum WalkSafetyReasonCode implements CodeNameDescribable {
     WET_SURFACE("젖은 노면", "비나 눈으로 노면이 젖어 있어 미끄러짐에 주의가 필요합니다."),
     WIND_STRONG("강풍 주의", "바람이 강해 소형견 산책에 주의가 필요합니다."),
     SAFE_WINDOW("안전 시간대", "같은 날 안에 더 안전한 산책 시간대가 있습니다."),
-    FORECAST_OUT_OF_RANGE("예보 범위 밖", "단기예보가 닿지 않는 시각이라 판단하지 못했습니다."),
+    FORECAST_OUT_OF_RANGE("시각별 예보 없음",
+        "3일 이후는 오전/오후 단위 중기예보만 제공되어 시각별 노면 상태를 판단할 수 없습니다."),
     FORECAST_UNAVAILABLE("날씨 정보 없음", "날씨 정보를 가져오지 못해 판단하지 못했습니다.");
 
     private final String displayName;

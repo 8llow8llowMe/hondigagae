@@ -60,17 +60,33 @@ public final class SuitabilityEvaluator {
                     ? SuitabilityReasonCode.FORECAST_OUT_OF_RANGE
                     : SuitabilityReasonCode.FORECAST_UNAVAILABLE,
                 input.forecastOutOfRange()
-                    ? "단기예보는 약 3일까지만 제공되어 이 날짜의 날씨는 근거로 쓰지 못했습니다."
+                    ? "예보는 약 11일까지만 제공되어 이 날짜의 날씨는 근거로 쓰지 못했습니다."
                     : "날씨 정보를 가져오지 못해 날씨를 근거로 쓰지 못했습니다."));
             return SuitabilityScore.insufficient(reasons);
         }
 
         penalty += applyWeather(input, reasons);
+        noteMidTermEvidence(input, reasons);
         boolean congestionApplied = input.congestion() != null && input.congestion().isKnown();
         penalty += applyCongestion(input, reasons, congestionApplied);
 
         int score = Math.max(MIN_SCORE, BASE_SCORE - penalty);
         return SuitabilityScore.scored(score, reasons, true, congestionApplied);
+    }
+
+    /**
+     * 중기예보로 판정했으면 그 사실을 근거에 남긴다.
+     *
+     * <p>같은 점수라도 신뢰도가 다르고, 중기예보에는 습도와 풍속이 없어 열지수 보정과 강풍
+     * 감점이 아예 빠진다. 점수만 주고 이 사실을 감추면 사용자가 근거를 과대평가한다.
+     */
+    private static void noteMidTermEvidence(SuitabilityInput input, List<SuitabilityReason> reasons) {
+        DailyWeather weather = input.weather();
+        if (weather == null || weather.source() == null || weather.source().supportsHourlyJudgement()) {
+            return;
+        }
+        reasons.add(SuitabilityReason.informational(SuitabilityReasonCode.MID_TERM_FORECAST,
+            "3일 이후 중기예보로 판정했습니다. 오전/오후 단위라 대략적이고 습도와 바람은 반영되지 않았습니다."));
     }
 
     private static int applyPetAllowance(SuitabilityInput input, List<SuitabilityReason> reasons) {

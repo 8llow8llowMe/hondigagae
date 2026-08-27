@@ -34,6 +34,9 @@ public record PlaceSuitabilityQueryResult(
 
     public record DailyWeatherQueryResult(
         LocalDate date,
+        // 단기/중기 구분. 사용자가 신뢰도를 알아야 한다.
+        String forecastSourceCode,
+        String forecastSourceName,
         Double minTemperature,
         Double maxTemperature,
         Integer maxPrecipitationProbability,

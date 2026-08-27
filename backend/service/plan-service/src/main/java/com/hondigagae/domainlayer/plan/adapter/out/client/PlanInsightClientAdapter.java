@@ -129,6 +129,8 @@ public class PlanInsightClientAdapter implements PetConditionQueryPort, PlaceSui
         }
         return new PlaceSuitabilityQueryResult.DailyWeatherQueryResult(
             weather.date(),
+            weather.forecastSource() == null ? null : weather.forecastSource().code(),
+            weather.forecastSource() == null ? null : weather.forecastSource().name(),
             weather.minTemperature(),
             weather.maxTemperature(),
             weather.maxPrecipitationProbability(),

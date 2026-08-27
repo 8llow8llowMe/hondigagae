@@ -11,6 +11,12 @@ public record PlanDailyWeatherItem(
     @Schema(description = "예보 대상 일자", example = "2026-09-13")
     LocalDate date,
 
+    @Schema(description = "예보 출처 코드. MID_TERM 이면 대략적인 값이다", example = "SHORT_TERM")
+    String forecastSourceCode,
+
+    @Schema(description = "예보 출처 이름", example = "단기예보")
+    String forecastSourceName,
+
     @Schema(description = "최저기온(섭씨)", example = "22.0")
     Double minTemperature,
 
