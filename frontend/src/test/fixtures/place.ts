@@ -27,6 +27,9 @@ export const placeSummary: PlaceSummary = {
     description: '일부 구역 또는 조건부로 반려동물 동반이 가능한 장소입니다.',
   },
   tel: null,
+  indoor: true,
+  sourceCategory: '미술관',
+  sourceName: '문화정보원',
 }
 
 /** 좌표가 없는 장소 — 마커를 그리면 안 된다 */

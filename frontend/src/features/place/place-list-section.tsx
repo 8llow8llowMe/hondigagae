@@ -1,8 +1,8 @@
 import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
-import { Skeleton } from '@/components/skeleton'
 import { PlaceCard } from '@/features/place/place-card'
+import { PlaceCardSkeleton } from '@/features/place/place-card-skeleton'
 import { classify } from '@/lib/api/error'
 import { toMessage } from '@/lib/api/response'
 import { messages } from '@/lib/messages'
@@ -44,7 +44,7 @@ export function PlaceListSection({
     return (
       <div className="flex flex-col gap-3">
         {Array.from({ length: SKELETON_COUNT }, (_, index) => (
-          <Skeleton key={index} variant="card" className="h-28" />
+          <PlaceCardSkeleton key={index} />
         ))}
       </div>
     )

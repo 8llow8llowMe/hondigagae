@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 
 import { GATEWAY_UNREACHABLE_STATUS, gatewayUnreachablePayload } from '@/lib/api/bff-error'
+import { isMockEnabled, resolveMock } from '@/lib/api/mock'
 import { gatewayUrl } from '@/lib/api/server'
 import { extractRefreshToken, toCookieHeader } from '@/lib/auth/refresh-cookie'
 import { canRetryReissue, isReissuePath } from '@/lib/auth/reissue'
@@ -42,6 +43,15 @@ async function callGateway(
   accessToken: string | null,
   refreshToken: string | null,
 ): Promise<GatewayResult> {
+  // 개발용 mock (MOCK_API=true, 프로덕션에서는 항상 비활성).
+  // 여기서 처리하면 게이트웨이를 부르지 않는다. 클라이언트는 차이를 모른다.
+  if (isMockEnabled()) {
+    const mock = resolveMock(path, method, search)
+    if (mock !== null) {
+      return { status: mock.status, payload: mock.payload, refreshToken: null }
+    }
+  }
+
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (body !== null) headers['Content-Type'] = 'application/json'
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`

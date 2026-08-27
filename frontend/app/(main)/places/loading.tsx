@@ -1,4 +1,5 @@
 import { Skeleton } from '@/components/skeleton'
+import { PlaceCardSkeleton } from '@/features/place/place-card-skeleton'
 
 /** 최초 진입 로딩. 섹션 내부 재조회 로딩은 PlaceListSection 이 담당한다 */
 export default function PlacesLoading() {
@@ -8,7 +9,7 @@ export default function PlacesLoading() {
       <Skeleton variant="text" className="h-5 w-72" />
       <div className="flex flex-col gap-3">
         {Array.from({ length: 6 }, (_, index) => (
-          <Skeleton key={index} variant="card" className="h-28" />
+          <PlaceCardSkeleton key={index} />
         ))}
       </div>
     </main>

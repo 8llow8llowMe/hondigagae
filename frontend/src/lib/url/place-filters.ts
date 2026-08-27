@@ -1,4 +1,6 @@
 import {
+  ALLOWED_PET_SIZE_CODES,
+  type AllowedPetSizeCode,
   CONTENT_TYPE_CODES,
   type ContentTypeCode,
   PET_ALLOWANCE_CODES,
@@ -27,6 +29,9 @@ export const DEFAULT_PLACE_FILTERS: PlaceFilters = {
   sigunguCode: null,
   contentType: null,
   petAllowanceType: null,
+  indoor: null,
+  allowedPetSize: null,
+  sourceCategory: null,
 }
 
 type RawParams = URLSearchParams | Record<string, string | string[] | undefined>
@@ -44,6 +49,17 @@ function pickFrom<T extends string>(allowed: readonly T[], value: string | null)
   return allowed.includes(value as T) ? (value as T) : null
 }
 
+/** boolean 은 `true`/`false` 만 인정하고 그 외에는 미지정(null)으로 떨어뜨린다 */
+function readBoolean(value: string | null): boolean | null {
+  if (value === 'true') return true
+  if (value === 'false') return false
+  return null
+}
+
+function readText(value: string | null): string | null {
+  return value !== null && value.trim() !== '' ? value.trim() : null
+}
+
 export function parsePlaceFilters(params: RawParams): PlaceFilters {
   const areaCode = read(params, 'areaCode')
   const sigunguCode = read(params, 'sigunguCode')
@@ -53,6 +69,9 @@ export function parsePlaceFilters(params: RawParams): PlaceFilters {
     sigunguCode: sigunguCode !== null && sigunguCode.trim() !== '' ? sigunguCode : null,
     contentType: pickFrom(CONTENT_TYPE_CODES, read(params, 'contentType')),
     petAllowanceType: pickFrom(PET_ALLOWANCE_CODES, read(params, 'petAllowanceType')),
+    indoor: readBoolean(read(params, 'indoor')),
+    allowedPetSize: pickFrom(ALLOWED_PET_SIZE_CODES, read(params, 'allowedPetSize')),
+    sourceCategory: readText(read(params, 'sourceCategory')),
   }
 }
 
@@ -64,6 +83,9 @@ export function toPlaceFilterQuery(filters: PlaceFilters): string {
   if (filters.sigunguCode !== null) params.set('sigunguCode', filters.sigunguCode)
   if (filters.contentType !== null) params.set('contentType', filters.contentType)
   if (filters.petAllowanceType !== null) params.set('petAllowanceType', filters.petAllowanceType)
+  if (filters.indoor !== null) params.set('indoor', String(filters.indoor))
+  if (filters.allowedPetSize !== null) params.set('allowedPetSize', filters.allowedPetSize)
+  if (filters.sourceCategory !== null) params.set('sourceCategory', filters.sourceCategory)
 
   return params.toString()
 }
@@ -80,6 +102,9 @@ export function toPlaceApiQuery(
   if (filters.sigunguCode !== null) params.set('sigunguCode', filters.sigunguCode)
   if (filters.contentType !== null) params.set('contentType', filters.contentType)
   if (filters.petAllowanceType !== null) params.set('petAllowanceType', filters.petAllowanceType)
+  if (filters.indoor !== null) params.set('indoor', String(filters.indoor))
+  if (filters.allowedPetSize !== null) params.set('allowedPetSize', filters.allowedPetSize)
+  if (filters.sourceCategory !== null) params.set('sourceCategory', filters.sourceCategory)
   if (cursor !== null) params.set('lastPlaceId', cursor)
   params.set('size', String(size))
 
@@ -88,3 +113,4 @@ export function toPlaceApiQuery(
 
 export type ContentTypeFilter = ContentTypeCode | null
 export type PetAllowanceFilter = PetAllowanceCode | null
+export type AllowedPetSizeFilter = AllowedPetSizeCode | null
