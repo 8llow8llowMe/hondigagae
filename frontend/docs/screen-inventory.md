@@ -19,9 +19,9 @@
 
 | 화면          | 경로                                | API                                                                  | 상태                      |
 | ------------- | ----------------------------------- | -------------------------------------------------------------------- | ------------------------- |
-| 로그인        | `/(auth)/login`                     | `POST /auth/login`, `GET /auth/{provider}/authorize`                 | 기획                      |
+| 로그인        | `/(auth)/login`                     | `POST /auth/login`                                                   | **구현** (소셜은 범위 밖) |
 | 소셜 콜백     | `/(auth)/oauth/{provider}/callback` | `GET /auth/{provider}/login?code=&state=`                            | 기획                      |
-| 회원가입      | `/(auth)/signup`                    | `POST /auth/email/send-code`, `/verify-code`, `POST /members/signup` | 기획                      |
+| 회원가입      | `/(auth)/signup`                    | `POST /auth/email/send-code`, `/verify-code`, `POST /members/signup` | **구현**                  |
 | 내 정보       | `/mypage`                           | `GET                                                                 | PATCH /members/me`, `POST | DELETE /members/me/profile-image` | 기획 |
 | 비밀번호 변경 | `/mypage/password`                  | `POST /members/me/password`                                          | 기획                      |
 | 회원 탈퇴     | `/mypage/withdraw`                  | `POST /members/me/withdraw`                                          | 기획                      |
