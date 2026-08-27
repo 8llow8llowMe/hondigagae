@@ -46,7 +46,7 @@ async function callGateway(
   // 개발용 mock (MOCK_API=true, 프로덕션에서는 항상 비활성).
   // 여기서 처리하면 게이트웨이를 부르지 않는다. 클라이언트는 차이를 모른다.
   if (isMockEnabled()) {
-    const mock = resolveMock(path, method, search, body)
+    const mock = resolveMock(path, method, search, body, accessToken)
     if (mock !== null) {
       // mock 에도 refresh 토큰을 실어야 세션이 완성되고 401 재발급 흐름이 돈다
       return { status: mock.status, payload: mock.payload, refreshToken: mock.refreshToken ?? null }
