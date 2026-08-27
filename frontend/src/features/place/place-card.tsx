@@ -1,24 +1,15 @@
 import Image from 'next/image'
 import Link from 'next/link'
 
-import { Badge, type BadgeTone } from '@/components/badge'
+import { Badge } from '@/components/badge'
 import { Card } from '@/components/card'
+import { petTone } from '@/features/place/pet-tone'
+import { isAllowedImageHost } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import type { PlaceSummary } from '@/types/place'
 
-/**
- * 반려견 동반 등급의 **색만** FE가 매핑한다.
- * 표시 문구는 서버 metadata 의 `name` 을 그대로 쓴다 — api-integration-guide.md §6.
- * 모르는 code 는 기본값으로 떨어져 화면이 비지 않는다 (component-guide.md §4).
- */
-const PET_TONE: Record<string, BadgeTone> = {
-  ALLOWED: 'brand',
-  PARTIALLY_ALLOWED: 'warn',
-  NOT_ALLOWED: 'neutral',
-}
-
 export function PlaceCard({ place }: { place: PlaceSummary }) {
-  const petTone = PET_TONE[place.petAllowanceType.code] ?? 'neutral'
+  const tone = petTone(place.petAllowanceType.code)
 
   return (
     <Card variant="interactive">
@@ -27,7 +18,8 @@ export function PlaceCard({ place }: { place: PlaceSummary }) {
         className="focus-visible:ring-brand-500 flex gap-4 rounded-lg p-4 focus-visible:ring-2 focus-visible:outline-none md:gap-5 md:p-5"
       >
         <div className="bg-bg-subtle relative h-20 w-20 shrink-0 overflow-hidden rounded-md md:h-24 md:w-24">
-          {place.firstImage === null ? (
+          {/* 미등록 호스트를 next/image 에 넘기면 런타임에 던진다 — 플레이스홀더로 떨어뜨린다 */}
+          {!isAllowedImageHost(place.firstImage) || place.firstImage === null ? (
             <span className="text-caption text-fg-muted absolute inset-0 flex items-center justify-center">
               {messages.place.noImage}
             </span>
@@ -48,7 +40,7 @@ export function PlaceCard({ place }: { place: PlaceSummary }) {
             <Badge tone="neutral" size="sm">
               {place.contentType.name}
             </Badge>
-            <Badge tone={petTone} size="sm">
+            <Badge tone={tone} size="sm">
               {place.petAllowanceType.name}
             </Badge>
           </div>

@@ -35,6 +35,16 @@ export function classify(status: number): ErrorKind {
   return 'forbidden'
 }
 
+/**
+ * 조회 실패를 UI 분기용 HTTP 상태로 바꾼다. 성공이면 `null`.
+ * `ApiError` 가 아니면 전송 단계 실패로 보고 무응답(0)으로 취급한다.
+ */
+export function toErrorStatus(error: unknown): number | null {
+  if (error === null || error === undefined) return null
+  if (error instanceof ApiError) return error.status
+  return NO_RESPONSE_STATUS
+}
+
 /** 재시도해도 결과가 달라질 수 있는 실패인가. 5xx·무응답만 true */
 export function isRetriable(error: unknown): boolean {
   if (error instanceof ApiError) return error.kind === 'temporary'
