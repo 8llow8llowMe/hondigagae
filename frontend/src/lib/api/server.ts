@@ -33,7 +33,12 @@ export async function serverFetch<T>(path: string, options: ServerRequestOptions
   // 처리 대상이 아니면 null 이라 그대로 게이트웨이로 넘어간다.
   if (isMockEnabled()) {
     const [rawPath, search = ''] = path.split('?')
-    const mock = resolveMock(rawPath ?? path, method, search)
+    const mock = resolveMock(
+      rawPath ?? path,
+      method,
+      search,
+      body === undefined ? null : JSON.stringify(body),
+    )
     if (mock !== null) return unwrap(mock.payload as ApiResponse<T>, mock.status)
   }
 

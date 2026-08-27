@@ -1,3 +1,5 @@
+import type { MockResult } from '@/lib/api/mock/auth-data'
+import { resolveAuthMock } from '@/lib/api/mock/auth-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import { mockPlaceDetail } from '@/lib/api/mock/place-detail-data'
 import type { ApiResponse, SliceResponse } from '@/types/api'
@@ -7,14 +9,15 @@ import type { PlaceSummary } from '@/types/place'
  * 개발용 mock 응답 계층.
  *
  * **없는 API 를 상상해서 만드는 것이 아니다.** origin/develop 의 실제 계약
- * (`PlaceWebController`, `PlaceItem`)을 근거로, 백엔드가 로컬에 뜨지 않은 상태에서
- * 화면을 확인하기 위한 fixture 다. 규약은 `docs/api-integration-guide.md` §9.
+ * (`PlaceWebController`, `PlaceItem`, `AuthWebController`, `MemberWebController`)을
+ * 근거로, 백엔드가 로컬에 뜨지 않은 상태에서 화면을 확인하기 위한 fixture 다.
+ * 규약은 `docs/api-integration-guide.md` §9.
  *
  * BFF 프록시와 `serverFetch` 양쪽에서 이 계층을 먼저 확인한다.
  * 클라이언트 코드는 mock 존재를 모른다 — 전송 계층·래퍼 판별·에러 분기가 실제 경로 그대로다.
  */
 
-export type MockResult = { status: number; payload: ApiResponse<unknown> }
+export type { MockResult }
 
 /**
  * mock 활성 여부.
@@ -45,10 +48,18 @@ const MIN_SIZE = 1
 const MAX_SIZE = 50
 
 /**
- * 경로+쿼리를 mock 응답으로 해석한다. 처리 대상이 아니면 null 을 반환해
+ * 경로+메서드+본문을 mock 응답으로 해석한다. 처리 대상이 아니면 null 을 반환해
  * 호출부가 실제 게이트웨이로 넘어가게 한다.
  */
-export function resolveMock(path: string, method: string, search: string): MockResult | null {
+export function resolveMock(
+  path: string,
+  method: string,
+  search: string,
+  body: string | null,
+): MockResult | null {
+  const auth = resolveAuthMock(path, method, body)
+  if (auth !== null) return auth
+
   if (method !== 'GET') return null
 
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
