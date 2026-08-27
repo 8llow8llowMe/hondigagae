@@ -1,5 +1,5 @@
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
-import { unwrap } from '@/lib/api/response'
+import { unwrap, unwrapVoid } from '@/lib/api/response'
 import type { ApiResponse } from '@/types/api'
 
 /**
@@ -16,7 +16,11 @@ export type RequestOptions = {
   signal?: AbortSignal
 }
 
-export async function clientFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
+/** 전송만 담당한다. 래퍼 판별은 호출부(clientFetch / clientFetchVoid)가 한다 */
+async function request(
+  path: string,
+  options: RequestOptions,
+): Promise<{ payload: ApiResponse<unknown>; status: number }> {
   const { method = 'GET', body, signal } = options
 
   // exactOptionalPropertyTypes 아래에서는 undefined 를 명시적으로 넘길 수 없다.
@@ -36,11 +40,22 @@ export async function clientFetch<T>(path: string, options: RequestOptions = {})
     throw new ApiError(NO_RESPONSE_STATUS, null, cause instanceof Error ? cause.message : null)
   }
 
-  const payload = (await response.json().catch(() => null)) as ApiResponse<T> | null
+  const payload = (await response.json().catch(() => null)) as ApiResponse<unknown> | null
 
   if (payload === null) {
     throw new ApiError(response.status, null, null)
   }
 
-  return unwrap(payload, response.status)
+  return { payload, status: response.status }
+}
+
+export async function clientFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const { payload, status } = await request(path, options)
+  return unwrap(payload as ApiResponse<T>, status)
+}
+
+/** `dataBody` 없이 성공하는 엔드포인트용 (signup / logout / email 인증) */
+export async function clientFetchVoid(path: string, options: RequestOptions = {}): Promise<void> {
+  const { payload, status } = await request(path, options)
+  unwrapVoid(payload, status)
 }
