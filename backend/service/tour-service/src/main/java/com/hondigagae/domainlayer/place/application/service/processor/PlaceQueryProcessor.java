@@ -121,6 +121,8 @@ public class PlaceQueryProcessor {
             .firstImage(place.firstImage())
             .firstImage2(place.firstImage2())
             .petAllowanceType(place.petAllowanceType())
+            .allowedPetSize(place.allowedPetSize())
+            .maxPetWeightKg(place.maxPetWeightKg())
             .tel(place.tel())
             .indoor(place.indoor())
             .sourceCategory(place.sourceCategory())

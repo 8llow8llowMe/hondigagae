@@ -10,6 +10,7 @@ import com.hondigagae.domainlayer.place.adapter.out.persistence.repository.Place
 import com.hondigagae.domainlayer.place.adapter.out.persistence.repository.PlaceRepository;
 import com.hondigagae.domainlayer.place.application.mapper.PlaceMapper;
 import com.hondigagae.common.geo.GeoDistance;
+import com.hondigagae.shared.travel.place.AllowedPetSize;
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.out.PlaceRepositoryPort;
@@ -42,6 +43,8 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
             criteria.areaCode(), criteria.sigunguCode(),
             criteria.contentType() == null ? null : criteria.contentType().getCode(),
             criteria.petAllowanceType(), criteria.indoor(), criteria.allowedPetSize(),
+            // 받아 주는 값의 집합으로 바꿔 in 절에 넣는다. petSizeType 이 null 이면 전체 집합이라 필터가 꺼진다.
+            AllowedPetSize.allowing(criteria.petSizeType()), criteria.petWeightKg(),
             criteria.sourceCategory(), criteria.lastPlaceId(),
             PageRequest.of(0, criteria.size())
         );
@@ -84,6 +87,8 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
                 criteria.petAllowanceType(),
                 criteria.indoor(),
                 criteria.allowedPetSize(),
+                AllowedPetSize.allowing(criteria.petSizeType()),
+                criteria.petWeightKg(),
                 criteria.sourceCategory()
             ).stream()
             .map(placeMapper::toDomain)

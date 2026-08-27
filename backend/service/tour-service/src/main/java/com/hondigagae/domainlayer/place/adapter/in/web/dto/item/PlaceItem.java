@@ -38,6 +38,12 @@ public record PlaceItem(
     @Schema(description = "반려동물 동반 구분 metadata")
     CodeNameDescriptionMetadata petAllowanceType,
 
+    @Schema(description = "입장 가능 반려동물 크기 metadata")
+    CodeNameDescriptionMetadata allowedPetSize,
+
+    @Schema(description = "입장 가능 체중 상한(kg). 원문에 숫자가 있을 때만 온다", example = "12", nullable = true)
+    Integer maxPetWeightKg,
+
     @Schema(description = "전화번호", example = "064-760-6331")
     String tel,
 

@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.place.application.info;
 
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
+import com.hondigagae.shared.travel.place.AllowedPetSize;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
 import com.hondigagae.domainlayer.place.domain.enums.PlaceSource;
 import java.math.BigDecimal;
@@ -18,6 +19,8 @@ public record PlaceSummaryInfo(
     String firstImage,
     String firstImage2,
     PetAllowanceType petAllowanceType,
+    AllowedPetSize allowedPetSize,
+    Integer maxPetWeightKg,
     String tel,
     Boolean indoor,
     String sourceCategory,

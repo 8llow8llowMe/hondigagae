@@ -4,6 +4,7 @@ import com.hondigagae.domainlayer.place.adapter.out.persistence.entity.PlaceEnti
 import com.hondigagae.shared.travel.place.AllowedPetSize;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
@@ -24,6 +25,8 @@ public interface PlaceRepository extends JpaRepository<PlaceEntity, Long> {
           and (:petAllowanceType is null or p.petAllowanceType = :petAllowanceType)
           and (:indoor is null or p.indoor = :indoor)
           and (:allowedPetSize is null or p.allowedPetSize = :allowedPetSize)
+          and p.allowedPetSize in :admittingSizes
+          and (:petWeightKg is null or p.maxPetWeightKg is null or p.maxPetWeightKg >= :petWeightKg)
           and (:sourceCategory is null or p.sourceCategory = :sourceCategory)
           and (:lastPlaceId is null or p.id < :lastPlaceId)
         order by p.id desc
@@ -32,6 +35,8 @@ public interface PlaceRepository extends JpaRepository<PlaceEntity, Long> {
         @Param("areaCode") String areaCode, @Param("sigunguCode") String sigunguCode,
         @Param("contentTypeId") String contentTypeId, @Param("petAllowanceType") PetAllowanceType petAllowanceType,
         @Param("indoor") Boolean indoor, @Param("allowedPetSize") AllowedPetSize allowedPetSize,
+        @Param("admittingSizes") Collection<AllowedPetSize> admittingSizes,
+        @Param("petWeightKg") Integer petWeightKg,
         @Param("sourceCategory") String sourceCategory,
         @Param("lastPlaceId") Long lastPlaceId, Pageable pageable
     );
@@ -54,6 +59,8 @@ public interface PlaceRepository extends JpaRepository<PlaceEntity, Long> {
           and (:petAllowanceType is null or p.petAllowanceType = :petAllowanceType)
           and (:indoor is null or p.indoor = :indoor)
           and (:allowedPetSize is null or p.allowedPetSize = :allowedPetSize)
+          and p.allowedPetSize in :admittingSizes
+          and (:petWeightKg is null or p.maxPetWeightKg is null or p.maxPetWeightKg >= :petWeightKg)
           and (:sourceCategory is null or p.sourceCategory = :sourceCategory)
         """)
     List<PlaceEntity> findNearby(
@@ -61,6 +68,8 @@ public interface PlaceRepository extends JpaRepository<PlaceEntity, Long> {
         @Param("minLng") BigDecimal minLng, @Param("maxLng") BigDecimal maxLng,
         @Param("contentTypeId") String contentTypeId, @Param("petAllowanceType") PetAllowanceType petAllowanceType,
         @Param("indoor") Boolean indoor, @Param("allowedPetSize") AllowedPetSize allowedPetSize,
+        @Param("admittingSizes") Collection<AllowedPetSize> admittingSizes,
+        @Param("petWeightKg") Integer petWeightKg,
         @Param("sourceCategory") String sourceCategory
     );
 

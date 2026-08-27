@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.domainlayer.place.adapter.out.persistence.entity.PlaceEntity;
 import com.hondigagae.shared.travel.place.AllowedPetSize;
+import com.hondigagae.shared.travel.pet.PetSizeType;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
 import com.hondigagae.domainlayer.place.domain.enums.PlaceSource;
 import java.math.BigDecimal;
@@ -56,7 +57,8 @@ class PlaceRepositoryNearbyTest {
         placeRepository.save(placeWithoutCoordinate(4L, "좌표 없는 장소"));
 
         List<PlaceEntity> found = placeRepository.findNearby(
-            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, null, null, null, null, null);
+            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, null, null, null, null,
+            AllowedPetSize.allowing(null), null, null);
 
         assertThat(found).extracting(PlaceEntity::getTitle)
             .containsExactly("제주 애견동반 식당");
@@ -69,7 +71,8 @@ class PlaceRepositoryNearbyTest {
         placeRepository.save(place(11L, "반려동물 카페", "39", "33.5005", "126.5305", null, "카페"));
 
         List<PlaceEntity> cafes = placeRepository.findNearby(
-            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, "39", null, null, null, "카페");
+            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, "39", null, null, null,
+            AllowedPetSize.allowing(null), null, "카페");
 
         assertThat(cafes).extracting(PlaceEntity::getTitle).containsExactly("반려동물 카페");
     }
@@ -82,11 +85,12 @@ class PlaceRepositoryNearbyTest {
         placeRepository.save(place(21L, "실내 미상 음식점", "39", "33.5001", "126.5301", null, "일반음식점", null));
 
         List<PlaceEntity> indoorOnly = placeRepository.findNearby(
-            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, null, null, Boolean.TRUE, null, null);
+            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, null, null, Boolean.TRUE, null, AllowedPetSize.allowing(null), null, null);
         List<PlaceEntity> outdoorOnly = placeRepository.findNearby(
-            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, null, null, Boolean.FALSE, null, null);
+            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, null, null, Boolean.FALSE, null, AllowedPetSize.allowing(null), null, null);
         List<PlaceEntity> noFilter = placeRepository.findNearby(
-            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, null, null, null, null, null);
+            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, null, null, null, null,
+            AllowedPetSize.allowing(null), null, null);
 
         assertThat(indoorOnly).extracting(PlaceEntity::getTitle).containsExactly("실내 확인된 카페");
         assertThat(outdoorOnly).isEmpty();
@@ -105,11 +109,52 @@ class PlaceRepositoryNearbyTest {
                 .build());
 
         List<PlaceEntity> nearby = placeRepository.findNearby(
-            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, null, null, null, null, null);
+            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, null, null, null, null,
+            AllowedPetSize.allowing(null), null, null);
         assertThat(nearby).extracting(PlaceEntity::getTitle).containsExactly("영업 중 식당");
 
         // 기존 일정이 참조할 수 있어 상세는 살아 있어야 한다
         assertThat(placeRepository.findByIdAndMergedIntoIdIsNull(delisted.getId())).isPresent();
+    }
+
+    @Test
+    @DisplayName("내 반려견 크기로 거르면 받아 주지 않는 곳만 빠지고 정보 없음은 남는다")
+    void petSizeFilterKeepsUnknown() {
+        placeRepository.save(baseBuilder(40L, "전 견종 카페").contentTypeId("39")
+            .lat(new BigDecimal("33.5000")).lng(new BigDecimal("126.5300"))
+            .allowedPetSize(AllowedPetSize.ALL).build());
+        placeRepository.save(baseBuilder(41L, "소형견만 카페").contentTypeId("39")
+            .lat(new BigDecimal("33.5001")).lng(new BigDecimal("126.5301"))
+            .allowedPetSize(AllowedPetSize.SMALL_ONLY).build());
+        placeRepository.save(baseBuilder(42L, "크기 정보 없는 식당").contentTypeId("39")
+            .lat(new BigDecimal("33.5002")).lng(new BigDecimal("126.5302"))
+            .allowedPetSize(AllowedPetSize.UNKNOWN).build());
+
+        List<PlaceEntity> forMedium = placeRepository.findNearby(
+            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, null, null, null, null,
+            AllowedPetSize.allowing(PetSizeType.MEDIUM), null, null);
+
+        // 소형견만 받는 곳은 빠지고, 정보 없음은 "불가"로 단정하지 않아 남는다
+        assertThat(forMedium).extracting(PlaceEntity::getTitle)
+            .containsExactlyInAnyOrder("전 견종 카페", "크기 정보 없는 식당");
+    }
+
+    @Test
+    @DisplayName("체중 상한이 명시된 곳은 kg 숫자로 정확히 거른다")
+    void petWeightFilterUsesExplicitLimit() {
+        // "12kg 미만" — enum 으로는 SMALL_MEDIUM 이라 20kg 중형견도 통과해 버리는 자리
+        placeRepository.save(baseBuilder(50L, "12kg 상한 카페").contentTypeId("39")
+            .lat(new BigDecimal("33.5000")).lng(new BigDecimal("126.5300"))
+            .allowedPetSize(AllowedPetSize.SMALL_MEDIUM).maxPetWeightKg(12).build());
+        placeRepository.save(baseBuilder(51L, "상한 없는 카페").contentTypeId("39")
+            .lat(new BigDecimal("33.5001")).lng(new BigDecimal("126.5301"))
+            .allowedPetSize(AllowedPetSize.SMALL_MEDIUM).build());
+
+        List<PlaceEntity> for15kg = placeRepository.findNearby(
+            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, null, null, null, null,
+            AllowedPetSize.allowing(PetSizeType.MEDIUM), 15, null);
+
+        assertThat(for15kg).extracting(PlaceEntity::getTitle).containsExactly("상한 없는 카페");
     }
 
     private PlaceEntity place(long id, String title, String contentTypeId,

@@ -10,6 +10,7 @@ import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.in.PlaceWebUseCase;
 import com.hondigagae.shared.travel.place.AllowedPetSize;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
+import com.hondigagae.shared.travel.pet.PetSizeType;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
 import com.hondigagae.persistence.dto.SliceResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -49,6 +50,12 @@ public class PlaceWebController {
         @Parameter(description = "실내 여부 — true 면 실내만. 원천에 정보가 없는 장소는 어느 쪽으로도 잡히지 않는다", example = "true")
         @RequestParam(required = false) Boolean indoor,
         @Parameter(description = "입장 가능 반려동물 크기") @RequestParam(required = false) AllowedPetSize allowedPetSize,
+        @Parameter(description = "내 반려견 크기. 받아 주지 않는 것으로 확인된 곳만 뺀다 — 정보 없음인 곳은 남는다", example = "MEDIUM")
+        @RequestParam(required = false) PetSizeType petSizeType,
+        @Parameter(description = "내 반려견 체중(kg). 체중 상한이 명시된 곳(12kg 미만 등)을 정확히 거른다", example = "15")
+        @Min(value = 1, message = PlaceValidationMessage.PET_WEIGHT_RANGE_INVALID)
+        @Max(value = 100, message = PlaceValidationMessage.PET_WEIGHT_RANGE_INVALID)
+        @RequestParam(required = false) Integer petWeightKg,
         @Parameter(description = "원본 분류 (펜션·카페·박물관·여행지 등). 콘텐츠 타입으로는 갈리지 않는 구분에 쓴다", example = "카페")
         @RequestParam(required = false) String sourceCategory,
         @Parameter(description = "커서 — 직전 응답 마지막 placeId", example = "212481712381923328") @RequestParam(required = false) Long lastPlaceId,
@@ -63,6 +70,8 @@ public class PlaceWebController {
             .petAllowanceType(petAllowanceType)
             .indoor(indoor)
             .allowedPetSize(allowedPetSize)
+            .petSizeType(petSizeType)
+            .petWeightKg(petWeightKg)
             .sourceCategory(sourceCategory)
             .lastPlaceId(lastPlaceId)
             .size(size)
@@ -99,6 +108,12 @@ public class PlaceWebController {
         @Parameter(description = "반려동물 동반 구분") @RequestParam(required = false) PetAllowanceType petAllowanceType,
         @Parameter(description = "실내 여부 — true 면 실내만") @RequestParam(required = false) Boolean indoor,
         @Parameter(description = "입장 가능 반려동물 크기") @RequestParam(required = false) AllowedPetSize allowedPetSize,
+        @Parameter(description = "내 반려견 크기", example = "MEDIUM")
+        @RequestParam(required = false) PetSizeType petSizeType,
+        @Parameter(description = "내 반려견 체중(kg)", example = "15")
+        @Min(value = 1, message = PlaceValidationMessage.PET_WEIGHT_RANGE_INVALID)
+        @Max(value = 100, message = PlaceValidationMessage.PET_WEIGHT_RANGE_INVALID)
+        @RequestParam(required = false) Integer petWeightKg,
         @Parameter(description = "원본 분류 (카페·펜션·일반음식점 등)", example = "카페")
         @RequestParam(required = false) String sourceCategory,
 
@@ -115,6 +130,8 @@ public class PlaceWebController {
             .petAllowanceType(petAllowanceType)
             .indoor(indoor)
             .allowedPetSize(allowedPetSize)
+            .petSizeType(petSizeType)
+            .petWeightKg(petWeightKg)
             .sourceCategory(sourceCategory)
             .size(size)
             .build();

@@ -185,6 +185,9 @@ public class PlaceEntity extends BaseEntity {
     @Comment("입장 가능 반려동물 크기 (가공값)")
     private AllowedPetSize allowedPetSize;
 
+    @Comment("입장 가능 체중 상한(kg). 원문에 숫자가 있을 때만 채워진다 — enum 은 10kg 경계로 뭉개져 체중 필터에 못 쓴다")
+    private Integer maxPetWeightKg;
+
     @Column(length = 500)
     @Comment("반려동물 제한사항 원문")
     private String petRestriction;

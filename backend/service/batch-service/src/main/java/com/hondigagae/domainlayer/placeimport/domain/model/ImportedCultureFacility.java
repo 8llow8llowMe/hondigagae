@@ -35,6 +35,8 @@ public record ImportedCultureFacility(
     boolean outdoor,
     boolean petOnly,
     String allowedPetSize,
+    // 원문에 kg 숫자가 있으면 보존한다. enum 은 10kg 경계로 뭉개져 체중 필터에 못 쓴다.
+    Integer maxPetWeightKg,
     String petRestriction,
     String petExtraFee,
     String useTime,

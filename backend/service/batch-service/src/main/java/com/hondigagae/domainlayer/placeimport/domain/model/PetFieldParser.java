@@ -87,6 +87,25 @@ public final class PetFieldParser {
         return ALLOWANCE_ALLOWED;
     }
 
+    /**
+     * 입장 가능 체중 상한(kg). "12kg 미만", "5kg 이하" 에서 숫자를 뽑는다. 없으면 null.
+     *
+     * <p>enum({@code parseAllowedPetSize})은 10kg 경계로 뭉개므로 "12kg 미만" 인 곳이
+     * SMALL_MEDIUM(중형까지) 이 되어 20kg 중형견도 통과해 버린다. 숫자를 따로 보존해야
+     * 체중 필터가 정확해진다. 미만/이하는 구분하지 않는다 — 1kg 오차는 크기 구분(enum)의
+     * 오차보다 작고, 경계 체중이면 어차피 현장 확인이 필요하다.
+     */
+    public static Integer parseMaxWeightKg(String raw) {
+        if (isBlank(raw)) {
+            return null;
+        }
+        Matcher matcher = WEIGHT.matcher(raw);
+        if (matcher.find()) {
+            return Integer.parseInt(matcher.group(1));
+        }
+        return null;
+    }
+
     /** 문화정보원의 Y/N 플래그. 빈 값은 false 로 본다. */
     public static boolean parseYn(String raw) {
         return raw != null && "Y".equalsIgnoreCase(raw.trim());
