@@ -17,6 +17,7 @@
   --accent-100: #fdeee0;
   --accent-500: #e8843c;
   --accent-600: #c86a28;
+  --accent-700: #a75921;
 
   /* ── 중립 */
   --bg: #ffffff;
@@ -29,13 +30,22 @@
   --fg-subtle: #8a928c;
   --fg-inverse: #ffffff;
 
-  /* ── 상태. danger 는 일시 장애(5xx) 전용이며 데이터 부재(404)에 쓰지 않는다 */
+  /* ── 상태. danger 는 일시 장애(5xx) 전용이며 데이터 부재(404)에 쓰지 않는다.
+     -500 은 흰 배경 위 텍스트·아이콘·보더용, -700 은 같은 계열 tint 배경 위 텍스트용이다.
+     대비 수치는 DESIGN.md §2 참고. */
   --success-500: #2e9b6b;
+
   --warn-100: #fef4e0;
   --warn-500: #d99413;
+  --warn-700: #97670d;
+
   --danger-100: #fdecec;
-  --danger-500: #d64545;
+  --danger-500: #d54040;
+  --danger-700: #ce2d2d;
+
+  --info-100: #f7f8f7;
   --info-500: #3b7dd8;
+  --info-700: #2a70d2;
 
   /* ── Radius */
   --radius-sm: 6px;

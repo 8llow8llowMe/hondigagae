@@ -60,7 +60,7 @@ export function PlaceListSection({
           title={toMessage(errorMessage, messages.place.emptyTitle)}
           description={messages.place.emptyDescription}
           action={
-            <Button variant="secondary" size="sm" onClick={onResetFilters}>
+            <Button variant="secondary" size="md" onClick={onResetFilters}>
               {messages.place.resetFilters}
             </Button>
           }
@@ -95,7 +95,7 @@ export function PlaceListSection({
         title={messages.place.emptyTitle}
         description={messages.place.emptyDescription}
         action={
-          <Button variant="secondary" size="sm" onClick={onResetFilters}>
+          <Button variant="secondary" size="md" onClick={onResetFilters}>
             {messages.place.resetFilters}
           </Button>
         }
@@ -118,7 +118,7 @@ export function PlaceListSection({
           {messages.common.loadMore}
         </Button>
       ) : (
-        <p className="text-caption text-fg-subtle py-4 text-center font-medium">
+        <p className="text-caption text-fg-muted py-4 text-center font-medium">
           {messages.common.listEnd}
         </p>
       )}

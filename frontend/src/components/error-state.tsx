@@ -23,7 +23,8 @@ export function ErrorState({
     <div className={cn('flex flex-col items-center gap-3 px-4 py-16 text-center', className)}>
       <h2 className="text-title-2 text-danger-500 font-semibold">{title}</h2>
       {description !== undefined && <p className="text-body-2 text-fg-muted">{description}</p>}
-      <Button variant="secondary" size="sm" className="mt-1" onClick={onRetry}>
+      {/* 이 상태에서 화면의 유일한 조작 대상이다. 모바일 터치 영역 44px (DESIGN.md §7) */}
+      <Button variant="secondary" size="md" className="mt-1" onClick={onRetry}>
         {retryLabel}
       </Button>
     </div>

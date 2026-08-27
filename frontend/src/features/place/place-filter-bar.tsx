@@ -99,9 +99,11 @@ export function PlaceFilterBar({ filters }: { filters: PlaceFilters }) {
 function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <section aria-label={label}>
-      <h2 className="text-caption text-fg-subtle mb-2 font-medium">{label}</h2>
-      {/* 좁은 폭에서 body 가 가로로 스크롤되지 않게 자체 컨테이너를 둔다 (styling-guide.md §4) */}
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">{children}</div>
+      <h2 className="text-caption text-fg-muted mb-2 font-medium">{label}</h2>
+      {/* 좁은 폭에서 body 가 가로로 스크롤되지 않게 자체 컨테이너를 둔다 (styling-guide.md §4).
+          overflow-x-auto 는 overflow-y 도 auto 로 만들어 칩의 focus ring 위쪽 4px 을 잘라낸다.
+          py-1 로 여유를 주고 -my-1 로 주변 레이아웃은 그대로 유지한다. */}
+      <div className="-mx-4 -my-1 flex gap-2 overflow-x-auto px-4 py-1">{children}</div>
     </section>
   )
 }

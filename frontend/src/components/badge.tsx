@@ -12,13 +12,17 @@ export type BadgeProps = {
   className?: string
 }
 
+/**
+ * tint 배경 위 12px 텍스트라 전부 4.5:1 이상을 확보해야 한다.
+ * 흰 배경용 -500 을 그대로 쓰면 대비가 부족하므로 -700 계열을 쓴다 (DESIGN.md §2).
+ */
 const TONE: Record<BadgeTone, string> = {
   neutral: 'bg-bg-subtle text-fg-muted',
   brand: 'bg-brand-100 text-brand-700',
-  accent: 'bg-accent-100 text-accent-600',
-  warn: 'bg-warn-100 text-warn-500',
-  danger: 'bg-danger-100 text-danger-500',
-  info: 'bg-bg-subtle text-info-500',
+  accent: 'bg-accent-100 text-accent-700',
+  warn: 'bg-warn-100 text-warn-700',
+  danger: 'bg-danger-100 text-danger-700',
+  info: 'bg-info-100 text-info-700',
 }
 
 const SIZE: Record<BadgeSize, string> = {
