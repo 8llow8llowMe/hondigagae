@@ -1,8 +1,11 @@
 package com.hondigagae.domainlayer.placeimport.application.service;
 
 import com.hondigagae.domainlayer.placeimport.application.port.in.PlaceImportUseCase;
+import com.hondigagae.domainlayer.placeimport.application.service.processor.DelistProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PlaceImportProcessor;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceContentType;
+import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,9 +23,20 @@ import org.springframework.stereotype.Service;
 public class PlaceImportFacade implements PlaceImportUseCase {
 
     private final PlaceImportProcessor placeImportProcessor;
+    private final DelistProcessor delistProcessor;
 
     @Override
     public int importPlaces(String areaCode, List<PlaceContentType> contentTypes) {
-        return placeImportProcessor.importPlaces(areaCode, contentTypes);
+        LocalDateTime runStartedAt = LocalDateTime.now();
+        int imported = placeImportProcessor.importPlaces(areaCode, contentTypes);
+
+        // 일부 타입만 지정한 부분 실행에서는 delist 하지 않는다 — 이번에 안 돈 타입의 행이
+        // 전부 stale 로 보여 통째로 내려간다.
+        boolean fullRun = contentTypes == null || contentTypes.isEmpty()
+            || contentTypes.containsAll(PlaceContentType.DEFAULT_IMPORT_TARGETS);
+        if (fullRun) {
+            delistProcessor.delistPlaces(PlaceSourceType.TOUR_API, runStartedAt, imported);
+        }
+        return imported;
     }
 }

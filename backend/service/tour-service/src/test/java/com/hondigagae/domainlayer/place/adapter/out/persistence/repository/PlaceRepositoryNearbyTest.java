@@ -93,6 +93,25 @@ class PlaceRepositoryNearbyTest {
         assertThat(noFilter).hasSize(2);
     }
 
+    @Test
+    @DisplayName("delisted 장소는 목록·주변 검색에서 빠지지만 상세 조회는 계속 응답한다")
+    void delistedIsHiddenFromSearchButDetailStillWorks() {
+        placeRepository.save(place(30L, "영업 중 식당", "39", "33.5000", "126.5300", null));
+        PlaceEntity delisted = placeRepository.save(
+            baseBuilder(31L, "등록 철회된 식당").contentTypeId("39")
+                .lat(new BigDecimal("33.5005")).lng(new BigDecimal("126.5305"))
+                .indoor(Boolean.TRUE)
+                .delistedAt(LocalDateTime.now())
+                .build());
+
+        List<PlaceEntity> nearby = placeRepository.findNearby(
+            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, null, null, null, null, null);
+        assertThat(nearby).extracting(PlaceEntity::getTitle).containsExactly("영업 중 식당");
+
+        // 기존 일정이 참조할 수 있어 상세는 살아 있어야 한다
+        assertThat(placeRepository.findByIdAndMergedIntoIdIsNull(delisted.getId())).isPresent();
+    }
+
     private PlaceEntity place(long id, String title, String contentTypeId,
         String lat, String lng, Long mergedIntoId) {
         return place(id, title, contentTypeId, lat, lng, mergedIntoId, null, Boolean.TRUE);

@@ -93,6 +93,30 @@ class EmergencyFacilityRepositoryTest {
         assertThat(only24).extracting(EmergencyFacilityEntity::getName).containsExactly("제주24시동물병원");
     }
 
+    @Test
+    @DisplayName("delisted 시설은 조회에서 빠진다")
+    void delistedIsExcluded() {
+        emergencyFacilityRepository.save(
+            facility(30L, "영업 중 병원", EmergencyFacilityType.ANIMAL_HOSPITAL, "33.5000", "126.5300", false));
+        emergencyFacilityRepository.save(
+            facility(31L, "폐업한 병원", EmergencyFacilityType.ANIMAL_HOSPITAL, "33.5005", "126.5305", false));
+        emergencyFacilityRepository.save(EmergencyFacilityEntity.builder()
+            .id(32L).sourceKey("key-32")
+            .facilityType(EmergencyFacilityType.ANIMAL_HOSPITAL)
+            .name("원천에서 빠진 병원").addr("제주특별자치도").sigunguCode("4")
+            .lat(new BigDecimal("33.5010")).lng(new BigDecimal("126.5310"))
+            .tel("064-000-0000").open24(false)
+            .syncedAt(LocalDateTime.now())
+            .delistedAt(LocalDateTime.now())
+            .build());
+
+        List<EmergencyFacilityEntity> found = emergencyFacilityRepository.findWithinBox(
+            MIN_LAT, MAX_LAT, MIN_LNG, MAX_LNG, null, null);
+
+        assertThat(found).extracting(EmergencyFacilityEntity::getName)
+            .containsExactlyInAnyOrder("영업 중 병원", "폐업한 병원");
+    }
+
     private EmergencyFacilityEntity facility(long id, String name, EmergencyFacilityType type,
         String lat, String lng, boolean open24) {
         return EmergencyFacilityEntity.builder()

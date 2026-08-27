@@ -205,4 +205,7 @@ public class PlaceEntity extends BaseEntity {
     @Column(nullable = false)
     @Comment("적재 시각")
     private LocalDateTime syncedAt;
+
+    @Comment("원천에서 사라진 시각. 값이 있으면 목록·주변 검색에서 제외한다. 상세는 기존 일정이 참조할 수 있어 계속 응답한다")
+    private LocalDateTime delistedAt;
 }

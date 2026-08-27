@@ -68,6 +68,7 @@ public class PlacePresenter {
             .homepage(place.homepage())
             .overview(place.overview())
             .petAvailable(place.petAvailable())
+            .delisted(place.delistedAt() != null)
             .petAllowanceType(toPetAllowanceMetadata(place.petAllowanceType()))
             .intro(toIntroItem(detailInfo.intro()))
             .petInfo(toPetInfoItem(detailInfo.petInfo()))

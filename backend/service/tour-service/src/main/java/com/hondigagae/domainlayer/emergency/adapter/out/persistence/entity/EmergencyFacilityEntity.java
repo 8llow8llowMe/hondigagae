@@ -101,4 +101,7 @@ public class EmergencyFacilityEntity extends BaseEntity {
     @Column(nullable = false)
     @Comment("적재 시각")
     private LocalDateTime syncedAt;
+
+    @Comment("원천에서 사라진 시각. 값이 있으면 조회에서 제외한다")
+    private LocalDateTime delistedAt;
 }

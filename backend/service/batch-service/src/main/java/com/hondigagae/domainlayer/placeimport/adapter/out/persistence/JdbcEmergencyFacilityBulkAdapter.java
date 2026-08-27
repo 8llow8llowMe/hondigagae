@@ -59,6 +59,7 @@ public class JdbcEmergencyFacilityBulkAdapter implements EmergencyFacilityBulkPo
             open24 = VALUES(open24),
             source_modified_at = VALUES(source_modified_at),
             synced_at = VALUES(synced_at),
+            delisted_at = NULL,
             updated_at = NOW()
         """;
 
