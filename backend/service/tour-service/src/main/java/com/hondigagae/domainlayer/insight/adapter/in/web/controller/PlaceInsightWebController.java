@@ -45,7 +45,7 @@ public class PlaceInsightWebController {
     @Operation(summary = "장소 여행 적합도",
         description = "날씨(기상청 단기예보) + 반려견 동반 조건 + 혼잡도를 결합해 0~100 점수와 판정 근거를 제공합니다. "
             + "score 는 null 일 수 있으며, 이는 0점이 아니라 판단 근거가 없다는 뜻입니다 "
-            + "(예보는 약 3일까지만 제공되므로 그보다 먼 날짜는 근거가 없습니다). "
+            + "(단기·중기예보를 합쳐 약 11일까지 답하며, 그보다 먼 날짜는 근거가 없습니다). "
             + "이때 suitabilityLevel 은 INSUFFICIENT 이고 reasons 에 그 이유가 담깁니다. "
             + "비 예보가 있고 이 장소에 실내 공간이 없으면 indoorAlternatives 에 실내 대안을 함께 내려 줍니다.")
     @GetMapping("/{placeId}/suitability")

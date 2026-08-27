@@ -37,6 +37,7 @@ public record PlaceSuitabilityClientResponse(
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record DailyWeatherClientResponse(
         LocalDate date,
+        MetadataClientResponse forecastSource,
         Double minTemperature,
         Double maxTemperature,
         Integer maxPrecipitationProbability,

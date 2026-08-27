@@ -46,6 +46,8 @@ public class InsightPresenter {
         }
         return DailyWeatherItem.builder()
             .date(weather.date())
+            // 같은 점수라도 단기/중기는 신뢰도가 다르다. 출처를 감추지 않는다.
+            .forecastSource(weather.source() == null ? null : weather.source().toMetadata())
             .minTemperature(weather.minTemperature())
             .maxTemperature(weather.maxTemperature())
             .maxPrecipitationProbability(weather.maxPrecipitationProbability())

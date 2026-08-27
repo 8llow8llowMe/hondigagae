@@ -38,15 +38,19 @@ resilience4j:
         # 사용자 요청 경로에서 부르는 호출이라 느린 응답을 빨리 실패로 본다.
         slow-call-duration-threshold: 2s
 
-# 기상청 단기예보(VilageFcstInfoService_2.0).
-# serviceKey 는 공공데이터포털 "디코딩(원문)" 키를 그대로 넣는다 - 인코딩은 어댑터가 한다.
-# 관광공사(B551011) 키와 같은 키를 쓸 수 있음이 실호출로 확인되어 있다.
+# 기상청 예보. serviceKey 는 공공데이터포털 "디코딩(원문)" 키를 그대로 넣는다 -
+# 인코딩은 어댑터가 한다. 관광공사(B551011) 키와 같은 키를 쓸 수 있음이 실호출로 확인되어 있다.
 kma-api:
   base-url: ${KMA_API_BASE_URL:https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0}
+  # 중기예보. 단기예보가 닿지 않는 D+3 ~ D+10 을 덮는다. 키는 같은 것을 쓴다.
+  mid-term-base-url: ${KMA_MID_TERM_BASE_URL:https://apis.data.go.kr/1360000/MidFcstInfoService}
   service-key: ${KMA_API_SERVICE_KEY:}
   publish-delay-minutes: ${KMA_PUBLISH_DELAY_MINUTES:10}
+  # 중기예보는 1일 2회(06, 18시) 발표라 회차 간격이 12시간이다.
+  mid-term-publish-delay-minutes: ${KMA_MID_TERM_PUBLISH_DELAY_MINUTES:20}
   num-of-rows: ${KMA_NUM_OF_ROWS:1000}
   stale-cache-seconds: ${KMA_STALE_CACHE_SECONDS:21600}
+  mid-term-stale-cache-seconds: ${KMA_MID_TERM_STALE_CACHE_SECONDS:129600}
 
 # 여행 적합도 / 산책 위험도 임계값.
 # 확정된 수의학 기준이 아니라 현재의 판단이므로 배포 없이 조정할 수 있게 프로퍼티로 둔다.

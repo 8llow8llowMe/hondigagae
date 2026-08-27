@@ -43,7 +43,7 @@
 | GET | `/api/v1/places/nearby` | 좌표 반경 검색 (식당·카페 포함) |
 | GET | `/api/v1/places/{placeId}` | intro·petInfo·images 결합 상세 |
 | GET | `/api/v1/emergencies/facilities` | 동물병원·동물약국 반경 검색, `openNowOnly` 지금 영업 중 필터 |
-| GET | `/api/v1/places/{placeId}/suitability` | 날씨+동반조건+혼잡도 적합도. `score` 가 null 이면 판단 근거 없음 |
+| GET | `/api/v1/places/{placeId}/suitability` | 날씨+동반조건+혼잡도 적합도. 단기+중기 합쳐 약 11일. `score` 가 null 이면 판단 근거 없음 |
 | GET | `/api/v1/places/{placeId}/walk-safety` | 추정 노면온도·열지수 기반 산책 위험도 + 안전 시간대 |
 
 ### plan-service
@@ -98,7 +98,9 @@ API 키와 토큰 비용에 묶이지 않게 하기 위해서다.
 
 | 대상 | 방식 | 커버리지 |
 | --- | --- | --- |
-| 기상청 단기예보 | 실시간 호출 + Redis 격자별 캐시 | 오늘 포함 **약 3일** |
+| 기상청 단기예보 | 실시간 호출 + Redis 격자별 캐시 | 오늘 포함 **약 5일** (실측) |
+| 기상청 중기예보 | 실시간 호출 + Redis 지역별 캐시 | **~ D+10** (실측) |
+| 합계 | 두 예보를 이어 붙임 | **약 11일, 빈 날짜 없음** |
 | 관광지 집중률 | 배치 적재 + DB 조회 | **30일 rolling** |
 
 둘의 커버리지가 다르다. 날씨는 없고 혼잡도만 있는 날짜가 흔하며, 적합도 응답은
@@ -112,7 +114,6 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | 기능 | 상태 | 막는 것 |
 | --- | --- | --- |
 | `walkcourse` (두루누비 산책 코스) | 미착수 | 데이터 확인 필요 |
-| 중기예보(3~10일) 연동 | 미착수 | 단기예보 3일 밖 날짜는 현재 `INSUFFICIENT` 로만 응답 |
 | 기상특보 연동 | 미착수 | 제주는 태풍 경로. 카카오 메시지 연계와 맞물린다 |
 | 항목 단위 산책 위험도 | 미착수 | 일정 브리핑은 일자별 대표 장소 한 곳만 조회한다 |
 | 반려견 프로필 매칭 | **구현** | `petSizeType`/`petWeightKg` 필터. 프로필 체중 입력은 FE 몫 |

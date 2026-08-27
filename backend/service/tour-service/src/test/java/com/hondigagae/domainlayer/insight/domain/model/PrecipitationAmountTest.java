@@ -52,6 +52,26 @@ class PrecipitationAmountTest {
     }
 
     @Test
+    @DisplayName("실측된 값 전부를 해석한다 (2026-08-27 제주 격자 53/38)")
+    void parsesEveryObservedValue() {
+        // 한 회차에서 실제로 관측된 PCP 값 목록이다. 맨숫자와 mm 표기가 섞여 온다.
+        assertThat(PrecipitationAmount.parse("0").hasPrecipitation()).isFalse();
+        assertThat(PrecipitationAmount.parse("강수없음").hasPrecipitation()).isFalse();
+        assertThat(PrecipitationAmount.parse("1mm 미만").millimeters()).isEqualTo(0.5d);
+        assertThat(PrecipitationAmount.parse("1").millimeters()).isEqualTo(1.0d);
+        assertThat(PrecipitationAmount.parse("2").millimeters()).isEqualTo(2.0d);
+        assertThat(PrecipitationAmount.parse("1.0mm").millimeters()).isEqualTo(1.0d);
+        assertThat(PrecipitationAmount.parse("4.0mm").millimeters()).isEqualTo(4.0d);
+        assertThat(PrecipitationAmount.parse("12.0mm").millimeters()).isEqualTo(12.0d);
+    }
+
+    @Test
+    @DisplayName("SNO 는 같은 뜻을 적설없음으로 준다 - 실측 확인")
+    void parsesSnowfallNone() {
+        assertThat(PrecipitationAmount.parse("적설없음").hasPrecipitation()).isFalse();
+    }
+
+    @Test
     @DisplayName("빈 값과 해석 불가 문자열은 강수없음으로 보되 터지지 않는다")
     void toleratesUnknownFormats() {
         assertThat(PrecipitationAmount.parse(null).hasPrecipitation()).isFalse();

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.hondigagae.domainlayer.insight.domain.enums.PrecipitationType;
 import com.hondigagae.domainlayer.insight.domain.enums.SkyState;
 import com.hondigagae.domainlayer.insight.domain.enums.SuitabilityReasonCode;
+import com.hondigagae.shared.travel.insight.ForecastSource;
 import com.hondigagae.shared.travel.insight.SuitabilityLevel;
 import com.hondigagae.shared.travel.pet.PetSizeType;
 import com.hondigagae.shared.travel.place.AllowedPetSize;
@@ -178,6 +179,40 @@ class SuitabilityEvaluatorTest {
         }
     }
 
+    @Nested
+    @DisplayName("예보 출처")
+    class ForecastSourceRules {
+
+        @Test
+        @DisplayName("중기예보로 판정하면 그 사실이 근거에 남는다")
+        void notesMidTermEvidence() {
+            SuitabilityScore score = SuitabilityEvaluator.evaluate(
+                input(midTermWeather(), false, allowedPlace(), pet()));
+
+            // 같은 점수라도 신뢰도가 다르고 습도·바람이 아예 빠진다. 그 사실을 감추면 안 된다.
+            assertThat(score.score()).isNotNull();
+            assertThat(codesOf(score)).contains(SuitabilityReasonCode.MID_TERM_FORECAST);
+        }
+
+        @Test
+        @DisplayName("단기예보로 판정하면 중기예보 안내가 붙지 않는다")
+        void doesNotNoteWhenShortTerm() {
+            SuitabilityScore score = SuitabilityEvaluator.evaluate(
+                input(mildWeather(), false, allowedPlace(), pet()));
+
+            assertThat(codesOf(score)).doesNotContain(SuitabilityReasonCode.MID_TERM_FORECAST);
+        }
+
+        @Test
+        @DisplayName("중기예보에 습도·바람이 없어도 판정은 성립한다")
+        void scoresWithoutHumidityAndWind() {
+            SuitabilityScore score = SuitabilityEvaluator.evaluate(
+                input(midTermWeather(), false, outdoorPlace(), pet()));
+
+            assertThat(score.level()).isNotEqualTo(SuitabilityLevel.INSUFFICIENT);
+        }
+    }
+
     @Test
     @DisplayName("근거는 점수 영향이 큰 순서로 정렬된다")
     void reasonsAreSortedByImpact() {
@@ -272,7 +307,7 @@ class SuitabilityEvaluatorTest {
 
     private static DailyWeather mildWeather() {
         return DailyWeather.builder()
-            .date(DATE).minTemperature(18.0d).maxTemperature(24.0d)
+            .date(DATE).source(ForecastSource.SHORT_TERM).minTemperature(18.0d).maxTemperature(24.0d)
             .maxPrecipitationProbability(10).worstPrecipitationType(PrecipitationType.NONE)
             .representativeSkyState(SkyState.CLEAR).maxWindSpeed(3.0d).maxHumidity(55)
             .hourly(List.of())
@@ -281,16 +316,27 @@ class SuitabilityEvaluatorTest {
 
     private static DailyWeather hotWeather() {
         return DailyWeather.builder()
-            .date(DATE).minTemperature(26.0d).maxTemperature(33.0d)
+            .date(DATE).source(ForecastSource.SHORT_TERM).minTemperature(26.0d).maxTemperature(33.0d)
             .maxPrecipitationProbability(10).worstPrecipitationType(PrecipitationType.NONE)
             .representativeSkyState(SkyState.CLEAR).maxWindSpeed(3.0d).maxHumidity(80)
             .hourly(List.of())
             .build();
     }
 
+    /** 중기예보 — 습도와 바람이 없고 시각별 데이터도 없다. */
+    private static DailyWeather midTermWeather() {
+        return DailyWeather.builder()
+            .date(DATE).source(ForecastSource.MID_TERM)
+            .minTemperature(19.0d).maxTemperature(25.0d)
+            .maxPrecipitationProbability(20).worstPrecipitationType(PrecipitationType.NONE)
+            .representativeSkyState(SkyState.MOSTLY_CLOUDY)
+            .hourly(List.of())
+            .build();
+    }
+
     private static DailyWeather rainyWeather() {
         return DailyWeather.builder()
-            .date(DATE).minTemperature(20.0d).maxTemperature(24.0d)
+            .date(DATE).source(ForecastSource.SHORT_TERM).minTemperature(20.0d).maxTemperature(24.0d)
             .maxPrecipitationProbability(80).worstPrecipitationType(PrecipitationType.RAIN)
             .representativeSkyState(SkyState.OVERCAST).maxWindSpeed(4.0d).maxHumidity(90)
             .hourly(List.of())

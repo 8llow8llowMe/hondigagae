@@ -18,6 +18,8 @@ package com.hondigagae.domainlayer.insight.domain.model;
 public record PrecipitationAmount(double millimeters, String text) {
 
     private static final String NO_PRECIPITATION_TEXT = "강수없음";
+    /** SNO(신적설)는 같은 뜻을 다른 말로 준다. 실측에서 확인했다. */
+    private static final String NO_SNOWFALL_TEXT = "적설없음";
     private static final PrecipitationAmount NONE = new PrecipitationAmount(0d, NO_PRECIPITATION_TEXT);
     /** "1mm 미만" 처럼 하한이 없는 표기에 쓰는 대표값. 0 으로 두면 "비가 안 온다"가 되어 버린다. */
     private static final double TRACE_MILLIMETERS = 0.5d;
@@ -34,7 +36,8 @@ public record PrecipitationAmount(double millimeters, String text) {
             return NONE;
         }
         String value = rawValue.trim();
-        if (value.contains(NO_PRECIPITATION_TEXT) || "-".equals(value) || "0".equals(value)) {
+        if (value.contains(NO_PRECIPITATION_TEXT) || value.contains(NO_SNOWFALL_TEXT)
+            || "-".equals(value) || "0".equals(value)) {
             return NONE;
         }
         if (value.contains("미만")) {

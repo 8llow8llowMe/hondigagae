@@ -40,7 +40,8 @@ public final class WalkSafetyEvaluator {
                 forecastOutOfRange ? WalkSafetyReasonCode.FORECAST_OUT_OF_RANGE
                     : WalkSafetyReasonCode.FORECAST_UNAVAILABLE,
                 forecastOutOfRange
-                    ? "단기예보는 약 3일까지만 제공되어 이 시각의 위험도는 판단하지 못했습니다."
+                    ? "노면 온도는 시각별 기온과 일사로 계산합니다. 3일 이후는 오전/오후 단위 예보만 있어 "
+                        + "판단하지 않았습니다 — 여행이 가까워지면 다시 확인해 주세요."
                     : "날씨 정보를 가져오지 못해 위험도를 판단하지 못했습니다.")));
         }
 

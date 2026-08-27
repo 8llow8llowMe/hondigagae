@@ -84,10 +84,14 @@ public class PlaceSuitabilityProcessor {
      *
      * <p>예보 목록이 돌아왔는데 그 날짜만 없다면 범위 밖(정상)이고, 목록 자체를 못 받았다면
      * 장애다. 사용자에게 할 말이 다르므로 여기서 구분한다.
+     *
+     * <p>단기예보와 중기예보를 합쳐 약 11일을 덮는다. 어느 쪽에서 나온 값인지는
+     * {@code DailyWeather.source} 에 실려 있어 판정과 응답이 그대로 쓴다.
      */
     private WeatherLookup lookupWeather(PlaceCondition place, LocalDate targetDate) {
         try {
-            List<DailyWeather> dailies = weatherForecastProcessor.dailyForecastsAt(place.lat(), place.lng());
+            List<DailyWeather> dailies = weatherForecastProcessor.dailyForecastsAt(
+                place.lat(), place.lng(), place.sigunguCode());
             Optional<DailyWeather> matched = DailyWeather.findByDate(dailies, targetDate);
             if (matched.isPresent()) {
                 return new WeatherLookup(matched.get(), false);

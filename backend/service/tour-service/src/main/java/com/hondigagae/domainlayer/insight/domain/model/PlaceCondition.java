@@ -19,6 +19,10 @@ import lombok.Builder;
 public record PlaceCondition(
     long placeId,
     String title,
+    // 중기예보 예보구역을 고를 때 쓴다(서귀포시=3, 제주시=4).
+    // 원천마다 시군구 매핑 품질이 달라 버어 있는 행이 있으므로 null 을 허용하고,
+    // 그러면 위도로 갈라낸다 (MidTermRegion.of).
+    String sigunguCode,
     Double lat,
     Double lng,
     PetAllowanceType petAllowanceType,
