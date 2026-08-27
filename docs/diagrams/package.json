@@ -1,0 +1,14 @@
+{
+  "name": "hondigagae-diagrams",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "README 아키텍처 다이어그램 생성기",
+  "scripts": {
+    "build": "node generate-diagrams.mjs"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "simple-icons": "^16.28.0"
+  }
+}
