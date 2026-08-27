@@ -66,7 +66,19 @@ backend/
 **포함:**
 - `config.RedisConfigurer` — `RedisConnectionFactory`, `RedisTemplate`, `StringRedisTemplate` 빈
   - 객체 저장 시에는 `StringRedisTemplate` + 서비스 `ObjectMapper` 로 JSON 문자열을 직접 읽고 쓰는 방식을 권장한다. (타입 힌트 없는 순수 JSON, 직렬화 실패를 어댑터에서 명시적으로 처리)
-- `properties.RedisProperties` — host/port/mode
+- `properties.RedisProperties` — mode(standalone/sentinel), 접속 정보, 키 prefix
+
+**모드**: 로컬은 `standalone`, dev/prod 는 **Sentinel 3노드**다.
+
+Sentinel 노드 목록은 `infra.redis.sentinel-nodes` 에 `host:port,host:port,host:port` 문자열
+하나로 넣는다. 목록형 프로퍼티를 환경변수로 넘기려면 인덱스별 키를 나열해야 하는데
+(`..._0_HOST`) Vault·compose 에서 다루기 번거롭고 노드 수가 바뀔 때 빠뜨리기 쉽다.
+yml 목록(`infra.redis.sentinels`)도 계속 받지만 로컬용 탈출구다 — 문자열이 있으면 그쪽이 이긴다.
+
+**설정 누락은 기동 시점에 실패시킨다.** `mode=sentinel` 인데 `master-name` 이나 노드 목록이
+비면 어떤 값을 설정해야 하는지 적힌 `IllegalStateException` 을 던진다. 형식이 깨진 노드
+항목도 조용히 버리지 않고 예외로 올린다 — Sentinel 노드 하나가 조용히 빠지면 평소에는 잘
+돌다가 페일오버 때만 못 따라가고, 그때가 되어서야 드러난다.
 
 **포함 기준**: Redis 연동 서비스가 import 해서 쓰는 공통 설정만.
 

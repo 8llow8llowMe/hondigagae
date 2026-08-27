@@ -66,9 +66,13 @@ jwt:
 infra:
   redis:
     mode: ${REDIS_MODE}
+    # standalone 에서만 쓴다. sentinel 모드에서는 master-name 과 sentinel-nodes 로 접속한다.
     host: ${REDIS_HOST}
     port: ${REDIS_PORT}
     password: ${REDIS_PASSWORD}
+    # sentinel 모드 필수. 둘 중 하나라도 비면 기동 시점에 실패한다.
+    master-name: ${REDIS_MASTER_NAME:}
+    sentinel-nodes: ${REDIS_SENTINEL_NODES:}
     key-prefix: ${REDIS_KEY_PREFIX}
 
 springdoc:

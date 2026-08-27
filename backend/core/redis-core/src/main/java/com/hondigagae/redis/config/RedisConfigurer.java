@@ -42,13 +42,32 @@ public class RedisConfigurer {
         return new StringRedisTemplate(redisConnectionFactory);
     }
 
+    /**
+     * Sentinel 접속 구성.
+     *
+     * <p>설정이 비었을 때 <b>기동 시점에 실패시킨다.</b> 예전에는 masterName 과 노드 목록을
+     * 검사하지 않아, sentinel 모드로 띄우면 노드 목록이 null 인 채로 NPE 가 났다.
+     * 스택트레이스만 보면 원인이 설정 누락이라는 것이 드러나지 않는다.
+     */
     private LettuceConnectionFactory createSentinelConnectionFactory(RedisProperties redisProperties, boolean hasPassword) {
-        RedisSentinelConfiguration sentinelConfig = new RedisSentinelConfiguration()
-            .master(redisProperties.masterName());
+        String masterName = redisProperties.masterName();
+        if (masterName == null || masterName.isBlank()) {
+            throw new IllegalStateException(
+                "infra.redis.mode=sentinel 인데 infra.redis.master-name 이 비어 있습니다. "
+                    + "REDIS_MASTER_NAME 을 설정하세요.");
+        }
 
-        redisProperties.sentinels().forEach(node ->
-            sentinelConfig.sentinel(node.host(), node.port())
-        );
+        var nodes = redisProperties.resolvedSentinels();
+        if (nodes.isEmpty()) {
+            throw new IllegalStateException(
+                "infra.redis.mode=sentinel 인데 Sentinel 노드가 없습니다. "
+                    + "REDIS_SENTINEL_NODES 를 host:port,host:port 형식으로 설정하세요.");
+        }
+
+        RedisSentinelConfiguration sentinelConfig = new RedisSentinelConfiguration()
+            .master(masterName);
+
+        nodes.forEach(node -> sentinelConfig.sentinel(node.host(), node.port()));
 
         if (hasPassword) {
             sentinelConfig.setPassword(RedisPassword.of(redisProperties.password()));
