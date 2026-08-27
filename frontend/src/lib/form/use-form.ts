@@ -20,7 +20,21 @@ export type UseFormReturn<TValues> = {
   errors: FormErrors
   isSubmitting: boolean
   isDirty: boolean
-  setValue: <K extends keyof TValues>(key: K, value: TValues[K]) => void
+  /**
+   * `keepError: true` 면 이 필드의 기존 오류를 지우지 않는다.
+   *
+   * 기본(생략)은 "사용자가 고쳤다" — 오류를 지운다. 프로그램이 값을 비운 것뿐이고
+   * 방금 표시한 오류는 유지해야 하는 경우(예: 코드 불일치 후 코드만 비우고 재입력을
+   * 유도하는 흐름)에만 `keepError: true` 를 쓴다. 안 그러면 이 호출이 바로 뒤이어
+   * 오류를 지워버려 사용자가 "왜 실패했는지" 볼 수 없는 무음 실패가 된다 —
+   * signup-form.tsx 의 AUTH_004(코드 불일치) 처리가 실측으로 겪은 버그.
+   * 새 필드-비우기 흐름을 추가할 때(#12 반려견 폼 포함) 이 구분을 잊지 않는다.
+   */
+  setValue: <K extends keyof TValues>(
+    key: K,
+    value: TValues[K],
+    options?: { keepError?: boolean },
+  ) => void
   setErrors: (errors: FormErrors) => void
   reset: (values?: TValues) => void
   submit: () => Promise<void>
@@ -62,17 +76,23 @@ export function useForm<TValues extends Record<string, unknown>, TResult>({
   // 버튼 disabled 와 이 가드를 **둘 다** 건다 — docs/form-guide.md §6
   const submittingRef = useRef(false)
 
-  const setValue = useCallback(<K extends keyof TValues>(key: K, value: TValues[K]) => {
-    setValues((previous) => ({ ...previous, [key]: value }))
-    setDirty(true)
-    // 고친 필드의 오류만 지운다. 전체를 지우면 아직 안 고친 필드의 안내가 사라진다
-    setErrors((previous) => {
-      if (previous.fields[key as string] === undefined) return previous
-      const fields = { ...previous.fields }
-      delete fields[key as string]
-      return { fields, form: previous.form }
-    })
-  }, [])
+  const setValue = useCallback(
+    <K extends keyof TValues>(key: K, value: TValues[K], options?: { keepError?: boolean }) => {
+      setValues((previous) => ({ ...previous, [key]: value }))
+      setDirty(true)
+      // keepError: 프로그램이 값을 비운 것뿐이라 방금 표시한 오류를 유지해야 한다
+      // (위 UseFormReturn.setValue JSDoc 참고). 기본은 "사용자가 고쳤다" — 고친
+      // 필드의 오류만 지운다. 전체를 지우면 아직 안 고친 필드의 안내가 사라진다
+      if (options?.keepError === true) return
+      setErrors((previous) => {
+        if (previous.fields[key as string] === undefined) return previous
+        const fields = { ...previous.fields }
+        delete fields[key as string]
+        return { fields, form: previous.form }
+      })
+    },
+    [],
+  )
 
   const reset = useCallback(
     (next?: TValues) => {

@@ -156,7 +156,12 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
   useEffect(() => {
     if (codeForm.submitCount === 0) return
     if (codeForm.firstErrorField === 'code') {
-      codeForm.setValue('code', '')
+      // keepError: true — 방금 표시한 코드 필드 오류를 이 호출이 지우면 안 된다.
+      // setValue 의 기본 동작은 "사용자가 고쳤다"로 보고 그 필드 오류를 지우는데,
+      // 여기는 프로그램이 재입력을 유도하려고 비우는 것이라 오류는 남아야 사용자가
+      // 왜 실패했는지 알 수 있다 — 실측에서 이 오류 문구가 통째로 사라지는 무음
+      // 실패를 확인했다(use-form.ts 의 setValue JSDoc 참고).
+      codeForm.setValue('code', '', { keepError: true })
       containerRef.current?.querySelector<HTMLElement>('#code')?.focus()
     }
   }, [codeForm.submitCount])
