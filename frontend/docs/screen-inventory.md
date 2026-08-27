@@ -32,9 +32,9 @@
 
 | 화면             | 경로            | API                     | 상태 |
 | ---------------- | --------------- | ----------------------- | ---- |
-| 반려견 목록      | `/pets`         | `GET /members/me/pets`  | 기획 |
-| 반려견 등록      | `/pets/new`     | `POST /members/me/pets` | 기획 |
-| 반려견 상세·수정 | `/pets/[petId]` | `GET                    | PUT  | DELETE /members/me/pets/{petId}` | 기획 |
+| 반려견 목록      | `/pets`         | `GET /members/me/pets`  | 구현 |
+| 반려견 등록      | `/pets/new`     | `POST /members/me/pets` | 구현 |
+| 반려견 수정·삭제 | `/pets/[petId]` | `GET                    | PUT  | DELETE /members/me/pets/{petId}` | 구현 (읽기 전용 상세는 두지 않는다 — 공통명세 S5-1) |
 
 주의: 등록 상한이 있다 (`PET_002 PET_LIMIT_EXCEEDED`, HTTP 400). 타인 반려견 조회는 **404** 다.
 
