@@ -66,6 +66,9 @@ const SIZE: Record<ButtonSize, string> = {
 **근거**: 배치는 **사용처**가 알고, 외형은 **컴포넌트**가 소유한다. 외형까지 뚫어주면 `<Button className="bg-[#333] p-[13px]">` 로 `DESIGN.md` 토큰 규약 전체가 우회된다.
 
 - arbitrary value(`p-[13px]`, `text-[#333]`)는 lint가 이미 막는다 (`tooling-guide.md` §5).
+- **`cn()` 은 커스텀 타이포 스케일을 `extendTailwindMerge` 로 등록해 두었다.** 등록하지 않으면
+  tailwind-merge 가 `text-caption` 을 글자 색으로 오인해 `text-fg-muted` 를 지운다.
+  **`DESIGN.md` §3-2 에 타이포 토큰을 추가하면 `src/lib/utils/cn.ts` 의 목록도 함께 갱신한다.**
 - **토큰 클래스로 외형을 덮는 것**(`className="bg-danger-500"`)은 lint가 못 잡는다 → `fe-reviewer` 체크 항목이다.
 - 전면 금지하지 않는 이유: 금지하면 배치를 위해 wrapper `<div>` 를 남발하게 되고 DOM이 지저분해진다.
 
