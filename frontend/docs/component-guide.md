@@ -112,7 +112,7 @@ const SIZE: Record<ButtonSize, string> = {
 **상호작용 컴포넌트는 controlled만 제공한다.** `value` + `onValueChange` 쌍.
 
 - uncontrolled(내부 state) 모드를 함께 지원하지 않는다. 두 모드 지원은 "값이 안 바뀌는" 버그의 대표 원인이다.
-- 폼 라이브러리와의 결합도 controlled가 전제다 (`form-guide.md`, 작성 예정).
+- 폼 라이브러리와의 결합도 controlled가 전제다 (`form-guide.md`).
 - 예외: `Modal`/`BottomSheet` 의 열림 상태는 사용처가 항상 소유한다 (`open` + `onClose`).
 
 ## 6. ref
