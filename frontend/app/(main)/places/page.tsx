@@ -37,8 +37,11 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
     })
     .catch(() => undefined)
 
+  // 좌우 여백은 DESIGN.md §4 스케일: 16(모바일) / 24(태블릿) / 40(데스크톱).
+  // 한 컬럼을 유지한다 — 지도 뷰가 붙으면 데스크톱은 '좌측 목록 + 우측 지도' 2단이
+  // 되므로 지금 다단 그리드로 가면 그때 다시 갈아엎어야 한다.
   return (
-    <main className="mx-auto flex max-w-screen-md flex-col gap-6 px-4 py-6">
+    <main className="mx-auto flex max-w-screen-md flex-col gap-6 px-4 py-6 md:px-6 md:py-8 lg:px-10">
       <header>
         <h1 className="text-display text-fg font-extrabold">{messages.place.pageTitle}</h1>
         <p className="text-body-2 text-fg-muted mt-2">{messages.place.pageDescription}</p>

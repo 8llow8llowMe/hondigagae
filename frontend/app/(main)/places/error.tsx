@@ -10,7 +10,7 @@ import { messages } from '@/lib/messages'
  */
 export default function PlacesError({ reset }: { error: Error; reset: () => void }) {
   return (
-    <main className="mx-auto max-w-screen-md px-4 py-6">
+    <main className="mx-auto max-w-screen-md px-4 py-6 md:px-6 md:py-8 lg:px-10">
       <ErrorState
         title={messages.place.errorTitle}
         description={messages.common.temporaryErrorDescription}

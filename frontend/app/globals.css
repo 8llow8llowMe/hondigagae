@@ -76,3 +76,43 @@ body {
   /* 긴 한국어를 어절 단위로 줄바꿈한다 — DESIGN.md §3 */
   word-break: keep-all;
 }
+
+/* 가로 스크롤 컨테이너의 스크롤바를 숨긴다.
+   상시 노출되면 활성 밑줄·진행 표시줄로 오독된다 (디자인 리뷰 #7).
+   스크롤 가능하다는 신호는 우측 fade 마스크가 대신한다. */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* 스크롤 여지가 있는 쪽에만 fade 를 준다.
+   끝까지 스크롤한 뒤에도 fade 가 남으면 마지막 항목이 이유 없이 흐려진다.
+   방향 판정은 src/lib/ui/scroll.ts 의 scrollFadeSide 가 한다. */
+.scroll-fade-right {
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+}
+
+.scroll-fade-left {
+  mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 100%);
+}
+
+.scroll-fade-both {
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 24px,
+    #000 calc(100% - 24px),
+    transparent 100%
+  );
+}
+
+/* md 이상은 flex-wrap 이라 스크롤이 없다 — mask 를 해제한다 */
+@media (width >= 48rem) {
+  .md\:mask-none {
+    mask-image: none;
+  }
+}
