@@ -31,7 +31,8 @@ public class NearbyFacilityPresenter {
     private NearbyFacilityItem toItem(NearbyFacilityInfo info) {
         String hours = info.operatingHours();
         return NearbyFacilityItem.builder()
-            .facilityId(info.facilityId())
+            // Snowflake 아이디는 문자열로 내린다. long 그대로 보내면 JS 가 조용히 절삭한다.
+            .facilityId(String.valueOf(info.facilityId()))
             .facilityType(toFacilityTypeMetadata(info.facilityType()))
             .name(info.name())
             .addr(info.addr())
