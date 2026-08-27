@@ -74,3 +74,23 @@ describe('toErrorStatus', () => {
     expect(toErrorStatus(new Error('boom'))).toBe(NO_RESPONSE_STATUS)
   })
 })
+
+describe('classify — 409 / 429', () => {
+  it('409 는 conflict 다 (이메일 중복 MEMBER_001)', () => {
+    expect(classify(409)).toBe('conflict')
+  })
+
+  it('429 는 rate-limited 다 (로그인 잠금 AUTH_015 / 코드 쿨다운 AUTH_003)', () => {
+    expect(classify(429)).toBe('rate-limited')
+  })
+
+  it('409 / 429 는 재시도 대상이 아니다', () => {
+    expect(isRetriable(new ApiError(409, 'MEMBER_001', '이미 가입된 이메일입니다.'))).toBe(false)
+    expect(isRetriable(new ApiError(429, 'AUTH_015', '로그인 시도가 너무 많습니다.'))).toBe(false)
+    expect(shouldOfferRetry(new ApiError(429, 'AUTH_015', null))).toBe(false)
+  })
+
+  it('403 은 여전히 forbidden 이다', () => {
+    expect(classify(403)).toBe('forbidden')
+  })
+})

@@ -1,5 +1,12 @@
 /** 에러 종류. UI 분기의 단일 기준이다 — docs/api-integration-guide.md §3 */
-export type ErrorKind = 'validation' | 'unauthorized' | 'not-found' | 'forbidden' | 'temporary'
+export type ErrorKind =
+  | 'validation' // 400 — 입력 수정 유도
+  | 'unauthorized' // 401 — 재발급 1회 → 로그인 유도
+  | 'not-found' // 404 — 데이터 부재 또는 타인 리소스
+  | 'conflict' // 409 — 이미 존재 (MEMBER_001 이메일 중복)
+  | 'rate-limited' // 429 — 쿨다운·잠금 (AUTH_003 / AUTH_015)
+  | 'forbidden' // 그 외 4xx
+  | 'temporary' // 5xx · 무응답
 
 /** 네트워크 무응답을 나타내는 status */
 export const NO_RESPONSE_STATUS = 0
@@ -31,6 +38,9 @@ export function classify(status: number): ErrorKind {
   if (status === 404) return 'not-found'
   if (status === 401) return 'unauthorized'
   if (status === 400) return 'validation'
+  if (status === 409) return 'conflict'
+  // 시간이 지나면 풀리지만 즉시 재시도는 무의미하다. 재시도 버튼을 주면 잠금이 연장된다
+  if (status === 429) return 'rate-limited'
   if (status >= 500 || status === NO_RESPONSE_STATUS) return 'temporary'
   return 'forbidden'
 }
