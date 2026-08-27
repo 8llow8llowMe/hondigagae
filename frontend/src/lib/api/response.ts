@@ -17,6 +17,18 @@ export function unwrap<T>(response: ApiResponse<T>, status: number): T {
 }
 
 /**
+ * `dataBody` 가 없는 성공 응답을 판정한다.
+ *
+ * signup / logout / email 인증 계열은 `dataBody: null` 로 성공한다
+ * (`docs/features/auth/공통명세.md` S3). `unwrap()` 은 null 을 실패로 보므로
+ * 이 호출들에 쓰면 성공을 에러로 만든다.
+ */
+export function unwrapVoid(response: ApiResponse<unknown>, status: number): void {
+  const { success, resultCode, resultMessage } = response.dataHeader
+  if (!success) throw new ApiError(status, resultCode, resultMessage)
+}
+
+/**
  * resultMessage 를 화면에 쓸 문자열로 정규화한다.
  * 백엔드 타입이 Object 이므로 문자열이 아닐 수 있다.
  */

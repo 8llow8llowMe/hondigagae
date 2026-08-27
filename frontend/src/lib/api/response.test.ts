@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { ApiError } from '@/lib/api/error'
-import { toFieldErrors, toMessage, unwrap } from '@/lib/api/response'
+import { toFieldErrors, toMessage, unwrap, unwrapVoid } from '@/lib/api/response'
 import { fail, failWithFields, ok } from '@/test/api'
 
 describe('unwrap', () => {
@@ -44,6 +44,33 @@ describe('toMessage', () => {
 
   it('공백만 있는 문자열에는 폴백을 반환한다', () => {
     expect(toMessage('   ', '폴백')).toBe('폴백')
+  })
+})
+
+describe('unwrapVoid', () => {
+  it('dataBody 가 null 이어도 success 면 던지지 않는다', () => {
+    const response = {
+      dataHeader: { success: true, resultCode: null, resultMessage: null },
+      dataBody: null,
+    }
+    expect(() => unwrapVoid(response, 200)).not.toThrow()
+  })
+
+  it('success 가 false 면 ApiError 를 던진다', () => {
+    expect(() => unwrapVoid(fail('MEMBER_006', '이메일 인증이 완료되지 않았습니다.'), 400)).toThrow(
+      ApiError,
+    )
+  })
+
+  it('던진 ApiError 가 status 와 resultCode 를 보존한다', () => {
+    try {
+      unwrapVoid(fail('AUTH_015', '로그인 시도가 너무 많습니다.'), 429)
+      expect.unreachable('던져야 한다')
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApiError)
+      expect((error as ApiError).status).toBe(429)
+      expect((error as ApiError).resultCode).toBe('AUTH_015')
+    }
   })
 })
 
