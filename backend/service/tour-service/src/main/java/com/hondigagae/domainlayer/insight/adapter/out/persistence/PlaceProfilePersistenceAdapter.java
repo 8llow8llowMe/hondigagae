@@ -23,7 +23,8 @@ public class PlaceProfilePersistenceAdapter implements PlaceProfileQueryPort {
 
     @Override
     public Optional<PlaceCondition> findProfile(long placeId) {
-        return placeProfileRepository.findById(placeId)
+        // findById 는 병합으로 값이 흡수된 행도 돌려준다. 상세 조회와 같은 기준으로 거른다.
+        return placeProfileRepository.findByIdAndMergedIntoIdIsNull(placeId)
             // 병합으로 사라진 행은 없는 것으로 본다. place 상세 조회와 같은 규칙이다.
             .filter(entity -> entity.getMergedIntoId() == null)
             .map(insightMapper::toPlaceConditionFromEntity);

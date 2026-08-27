@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.insight.adapter.out.persistence.repository;
 
 import com.hondigagae.domainlayer.place.adapter.out.persistence.entity.PlaceEntity;
 import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -27,6 +28,7 @@ public interface PlaceProfileRepository extends JpaRepository<PlaceEntity, Long>
     @Query("""
         select p from PlaceEntity p
         where p.mergedIntoId is null
+          and p.delistedAt is null
           and p.id <> :excludePlaceId
           and p.indoor = true
           and p.petAvailable = true
@@ -38,4 +40,7 @@ public interface PlaceProfileRepository extends JpaRepository<PlaceEntity, Long>
         @Param("minLng") BigDecimal minLng, @Param("maxLng") BigDecimal maxLng,
         @Param("excludePlaceId") long excludePlaceId
     );
+
+    /** 병합으로 사라진 행은 적합도 대상이 아니다 — 상세 조회와 같은 기준을 쓴다. */
+    Optional<PlaceEntity> findByIdAndMergedIntoIdIsNull(long placeId);
 }
