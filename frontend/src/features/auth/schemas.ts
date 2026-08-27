@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { EMAIL_PATTERN } from '@/lib/form/email-pattern'
 import { messages } from '@/lib/messages'
 
 /**
@@ -9,12 +10,6 @@ import { messages } from '@/lib/messages'
 
 /** MemberGeneralSignupRequest @Pattern 실측 — 백엔드와 문자 하나까지 같아야 한다 */
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+[\]{};:'",.<>/?\\|])\S+$/
-
-/**
- * zod 4 기본 이메일 정규식은 TLD 2자 이상을 요구해 `a@b.c` 같은 1자 TLD를
- * 거부한다. 백엔드는 이런 형식 제약을 두지 않으므로 더 관대한 HTML5 패턴을 쓴다.
- */
-const EMAIL_PATTERN = z.regexes.html5Email
 
 /** AUTH_101 / AUTH_102 — AuthValidationMessage */
 export const emailSchema = z.object({
@@ -38,10 +33,12 @@ export const codeSchema = z.object({
  * 이 스키마가 유일한 방어다 (BE 후속 요청 #24).
  */
 export const loginSchema = z.object({
+  // AUTH_101 / AUTH_102
   email: z
     .string()
     .min(1, messages.form.emailRequired)
     .pipe(z.email({ pattern: EMAIL_PATTERN, message: messages.form.emailInvalid })),
+  // AUTH_103
   password: z.string().min(1, messages.form.passwordRequired),
 })
 
@@ -52,13 +49,16 @@ export const loginSchema = z.object({
  * (@Size 우선순위 1 → @Pattern 우선순위 3)와 같아야 결과가 어긋나지 않는다.
  */
 export const signupProfileSchema = z.object({
+  // MEMBER_103 (필수) / MEMBER_104 (길이) / MEMBER_105 (문자 구성)
   password: z
     .string()
     .min(1, messages.form.passwordRequired)
     .min(8, messages.form.passwordLength)
     .max(20, messages.form.passwordLength)
     .regex(PASSWORD_PATTERN, messages.form.passwordPattern),
+  // MEMBER_106 (필수) / MEMBER_107 (길이)
   name: z.string().min(1, messages.form.nameRequired).max(10, messages.form.nameLength),
+  // MEMBER_108 (필수) / MEMBER_109 (길이)
   nickname: z.string().min(1, messages.form.nicknameRequired).max(10, messages.form.nicknameLength),
 })
 

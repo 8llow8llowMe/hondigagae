@@ -1,4 +1,5 @@
 import { mockStore, nextMemberId } from '@/lib/api/mock/store'
+import { EMAIL_PATTERN } from '@/lib/form/email-pattern'
 import type { ApiResponse } from '@/types/api'
 
 /**
@@ -53,7 +54,9 @@ function text(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+// 이메일 정규식은 자체 정의하지 않고 FE 스키마와 공유하는 lib/form/email-pattern 의
+// EMAIL_PATTERN 을 그대로 쓴다. mock 이 FE 스키마보다 엄격하면 실제로는 통과할
+// 이메일(`a@b`)이 mock 에서만 400 으로 거부되는 드리프트가 생긴다 — 이슈 #24 최종 리뷰 I5.
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+[\]{};:'",.<>/?\\|])\S+$/
 
 /** 백엔드 정렬 순서를 흉내 낸다: DTO 선언 순서 → 필수 → 길이 → 형식 */
