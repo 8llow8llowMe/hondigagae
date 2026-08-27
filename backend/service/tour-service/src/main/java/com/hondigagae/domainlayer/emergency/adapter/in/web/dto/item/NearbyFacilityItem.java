@@ -8,8 +8,10 @@ import lombok.Builder;
 @Schema(description = "주변 긴급 시설 항목 DTO")
 public record NearbyFacilityItem(
 
-    @Schema(description = "긴급 시설 아이디", example = "4611686018427387904")
-    long facilityId,
+    @Schema(
+        description = "긴급 시설 아이디. Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로 문자열로 내린다",
+        example = "4611686018427387904")
+    String facilityId,
 
     @Schema(description = "시설 종류 metadata")
     CodeNameDescriptionMetadata facilityType,

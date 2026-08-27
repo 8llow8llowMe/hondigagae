@@ -21,8 +21,12 @@ public record PlanItemDetailItem(
     @Schema(description = "항목 유형", example = "{\"code\":\"PLACE\",\"name\":\"장소\",\"description\":\"관광지·카페 등 방문 장소 항목입니다.\"}")
     CodeNameDescriptionMetadata itemType,
 
-    @Schema(description = "대상 아이디 (항목 유형에 따라 place.id 또는 walk_course.id)", example = "126439")
-    Long targetId,
+    @Schema(
+        description = "대상 아이디 (항목 유형에 따라 place.id 또는 walk_course.id). "
+            + "Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로 문자열로 내린다. "
+            + "이동 항목처럼 대상이 없으면 null 이다",
+        example = "212481712381923328", nullable = true)
+    String targetId,
 
     @Schema(description = "항목 이름", example = "천지연폭포")
     String title,

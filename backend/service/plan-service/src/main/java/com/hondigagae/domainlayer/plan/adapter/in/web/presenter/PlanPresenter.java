@@ -60,7 +60,8 @@ public class PlanPresenter {
             .day(info.day())
             .sequence(info.sequence())
             .itemType(CodeNameDescriptionMetadata.of(itemType.name(), itemType.getDisplayName(), itemType.getDescription()))
-            .targetId(info.targetId())
+            // Snowflake 아이디는 문자열로 내린다. 대상이 없는 항목(이동 등)은 null 을 유지한다.
+            .targetId(info.targetId() == null ? null : String.valueOf(info.targetId()))
             .title(info.title())
             .memo(info.memo())
             .startTime(info.startTime())
