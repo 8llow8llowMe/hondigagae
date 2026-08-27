@@ -18,7 +18,7 @@ logging:
   level:
     com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
 
-# tour-service 내부 호출 서킷브레이커.
+# tour-service / auth-service 내부 호출 서킷브레이커.
 # 서킷은 Feign 호출만 감싸 전송 실패(5xx·타임아웃)만 집계하고, 4xx는 호출한 쪽의 요청 문제이므로
 # InternalResponseSupport 안에서 도메인 예외로 변환한 뒤 ignore-exceptions로 제외한다.
 resilience4j:
@@ -38,4 +38,7 @@ resilience4j:
           - com.hondigagae.domainlayer.plan.application.exception.PlanException
     instances:
       tour-service:
+        base-config: default
+      # 반려견 특성 조회(내부 경로). 조회에 실패해도 브리핑은 일반 조건으로 나간다.
+      auth-service:
         base-config: default

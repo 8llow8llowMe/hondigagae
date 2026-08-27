@@ -51,3 +51,4 @@ snowflake:
 feign-client:
   target-services:
     tour-service: ${TOUR_SERVICE_APP_NAME}
+    auth-service: ${AUTH_SERVICE_APP_NAME}
