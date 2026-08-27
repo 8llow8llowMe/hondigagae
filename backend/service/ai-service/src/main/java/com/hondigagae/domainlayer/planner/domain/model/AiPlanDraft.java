@@ -30,6 +30,9 @@ public record AiPlanDraft(
     public record AiPlanDraftItem(
         // 일정 항목 종류 코드 (PLACE/MEAL/LODGING/WALK/MOVE) — plan-service의 PlanItemType과 코드 문자열을 맞춘다.
         String itemType,
+        // 장소 식별자. plan-service 저장 시 targetId 가 된다.
+        // 이동(MOVE)처럼 특정 장소가 없거나, 후보 밖 장소라 연결을 끊은 경우 null 이다.
+        Long placeId,
         String title,
         String note
     ) {

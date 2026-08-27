@@ -2,6 +2,7 @@ package com.hondigagae.global.config;
 
 import com.hondigagae.common.config.JasyptPropertiesConfig;
 import com.hondigagae.common.config.SwaggerPropertiesConfig;
+import com.hondigagae.global.properties.AiLlmProperties;
 import com.hondigagae.global.properties.AiPlanJobProperties;
 import com.hondigagae.redis.config.RedisPropertiesConfig;
 import com.hondigagae.security.resourceserver.config.JwtResourceServerPropertiesConfig;
@@ -17,7 +18,8 @@ import org.springframework.context.annotation.Import;
     RedisPropertiesConfig.class
 })
 @EnableConfigurationProperties({
-    AiPlanJobProperties.class
+    AiPlanJobProperties.class,
+    AiLlmProperties.class
 })
 public class AiServicePropertiesConfig {
 

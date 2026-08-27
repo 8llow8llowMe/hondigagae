@@ -10,6 +10,12 @@ public record AiPlanScheduleItem(
     @Schema(description = "일정 항목 종류 코드 (PLACE/MEAL/LODGING/WALK/MOVE)", example = "WALK")
     String itemType,
 
+    @Schema(
+        description = "장소 아이디. plan-service 에 저장할 때 targetId 로 쓴다. "
+            + "이동 항목이거나 검증된 장소가 아니면 null 이다",
+        example = "212481712381923328", nullable = true)
+    String placeId,
+
     @Schema(description = "항목 이름", example = "해안 산책로 산책")
     String title,
 

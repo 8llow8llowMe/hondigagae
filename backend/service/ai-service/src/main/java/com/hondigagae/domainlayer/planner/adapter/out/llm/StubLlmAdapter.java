@@ -12,19 +12,34 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * LLM 스텁 어댑터 — LLM provider 확정 시 교체한다.
+ * LLM 스텁 어댑터 — API 키 없이 파이프라인을 돌려 보기 위한 구현.
  *
- * <p>실제 LLM 미연동 상태에서 비동기 잡 파이프라인(제출→폴링→완료)을 end-to-end로 검증하기 위한
- * 고정 샘플 응답을 반환한다. 교체 시 이 클래스 대신 provider별 어댑터(OpenAI 호환/Ollama 등)를
- * {@link AiLlmPort} 구현으로 등록하고, 서킷 인스턴스 {@code llm}과 timeout을 반드시 적용한다
- * (coding-conventions §10).
+ * <p>비동기 잡 파이프라인(제출→폴링→완료)을 end-to-end 로 검증하기 위한 고정 샘플 응답이다.
+ *
+ * <p><b>삭제하지 않고 남겨 둔다.</b> 실제 구현은
+ * {@code AnthropicClaudeLlmAdapter} 로 들어왔지만, 프론트 개발과 CI 가 API 키와 토큰 비용에
+ * 묶이면 안 되기 때문이다. {@code ai-llm.enabled=false}(기본값)이면 이쪽이 뜨고,
+ * 그 상태에서도 제출→폴링→완료 흐름은 똑같이 동작한다.
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "ai-llm", name = "enabled", havingValue = "false", matchIfMissing = true)
 public class StubLlmAdapter implements AiLlmPort {
+
+    /**
+     * 고정 샘플을 돌려주므로 후보 장소가 필요 없다.
+     *
+     * <p>이걸 선언하지 않으면 워커가 tour-service 에서 후보를 받아 오려다,
+     * tour-service 가 떠 있지 않은 로컬에서 스텁 경로까지 함께 실패한다.
+     */
+    @Override
+    public boolean requiresPlaceCandidates() {
+        return false;
+    }
 
     @Override
     public AiPlanDraft generatePlanDraft(AiPlanGenerationQuery query) {
