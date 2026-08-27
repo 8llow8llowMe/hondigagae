@@ -1,3 +1,5 @@
+import { isRetriable } from '@/lib/api/error'
+
 /**
  * 서버 프리페치와 클라이언트가 **같은 key** 를 써야 하이드레이션이 성립한다
  * (docs/api-integration-guide.md §7).
@@ -15,7 +17,16 @@ export const petKeys = {
 export const PET_QUERY_OPTIONS = {
   staleTime: 60_000,
   gcTime: 10 * 60_000,
-  retry: 1,
+  /**
+   * §7 의 "retry 1" 을 **오류 종류를 보존한 채** 구현한다.
+   *
+   * `retry: 1` 처럼 숫자를 주면 전역의 error-aware retry(`query-client.ts`)를
+   * 통째로 덮어써 **400·404·401 까지 재시도한다.** §7 이 "400 도 retry 대상이
+   * 아니다" 를 명시하는 이유가 여기서 실제로 드러났다 — `/pets/abc` (숫자가 아닌
+   * petId → 400 `PET_113`) 가 실패로 확정되지 않아 화면이 스켈레톤에 머물렀다.
+   * 브라우저 실측으로 잡은 회귀다.
+   */
+  retry: (failureCount: number, error: unknown) => isRetriable(error) && failureCount < 1,
 } as const
 
 /**
