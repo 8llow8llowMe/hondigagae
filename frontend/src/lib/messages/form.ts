@@ -38,8 +38,6 @@ export const authMessages = {
   loginSubmitting: '로그인 중',
   emailLabel: '이메일',
   passwordLabel: '비밀번호',
-  passwordShow: '비밀번호 표시',
-  passwordHide: '비밀번호 숨기기',
   passwordShowShort: '표시',
   passwordHideShort: '숨기기',
   toSignup: '회원가입',
