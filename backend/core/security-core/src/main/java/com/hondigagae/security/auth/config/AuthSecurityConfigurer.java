@@ -122,18 +122,14 @@ public class AuthSecurityConfigurer {
     private CorsConfiguration getCorsConfiguration(long maxAge) {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
+        // 목록을 게이트웨이(ApiGatewayCorsConfig)와 같게 맞춰 둔다.
+        // 이 저장소의 게이트웨이는 /api/v1/auth/**, /api/v1/members/** 를 라우팅하지만,
+        // nginx 가 auth 로 직결하는 구성도 가능하다. 두 경로 어느 쪽이든 같은 출처가 통과해야 한다.
         config.setAllowedOriginPatterns(List.of(
-            "http://localhost:5173",
-            "http://localhost:3000",
-            "http://localhost:8000",
-            // auth-service는 API Gateway를 거치지 않고 단독 호출되므로, 집계 Swagger UI가
-            // 서빙되는 API 도메인 origin을 직접 허용해야 Try it out(same-origin)이 통과된다.
-            // (게이트웨이는 reactive same-origin 우회가 있지만 servlet CORS는 없음)
-            // TODO: 혼디가개 도메인 확정 시 운영 origin 추가
-            "https://hondigagae.com",
-            "https://www.hondigagae.com",
-            "https://api.hondigagae.com",
-            "https://api-dev.hondigagae.com"
+            "http://localhost:5174",           // FE 로컬(next dev). 5173 은 BossPickSeoul 이 쓰고 있어 겹치지 않게 5174
+            "https://dev.hondigagae.com",      // 개발 웹. BFF 가 브라우저 Origin 보존 전달 (빼면 members 쓰기만 403)
+            "https://www.hondigagae.com",      // 운영 웹. 이유는 개발 웹과 동일 — Swagger 용 아님
+            "https://api-dev.hondigagae.com"   // 개발 Swagger Try it out. nginx TLS 종료로 스킴이 달라 교차 출처 판정
         ));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
