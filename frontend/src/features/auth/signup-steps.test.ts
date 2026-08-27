@@ -91,6 +91,7 @@ describe('CodeStep', () => {
         cooldownSeconds: 42,
         onValueChange: noop,
         onSubmit: noop,
+        resending: false,
         onResend: noop,
         onChangeEmail: noop,
         onRetry: noop,
@@ -115,6 +116,7 @@ describe('CodeStep', () => {
         cooldownSeconds: 0,
         onValueChange: noop,
         onSubmit: noop,
+        resending: false,
         onResend: noop,
         onChangeEmail: noop,
         onRetry: noop,
@@ -135,6 +137,7 @@ describe('CodeStep', () => {
         cooldownSeconds: 0,
         onValueChange: noop,
         onSubmit: noop,
+        resending: false,
         onResend: noop,
         onChangeEmail: noop,
         onRetry: noop,
@@ -156,6 +159,7 @@ describe('CodeStep', () => {
         cooldownSeconds: 0,
         onValueChange: noop,
         onSubmit: noop,
+        resending: false,
         onResend: noop,
         onChangeEmail: noop,
         onRetry: noop,
@@ -177,6 +181,7 @@ describe('CodeStep', () => {
         cooldownSeconds: 60,
         onValueChange: noop,
         onSubmit: noop,
+        resending: false,
         onResend: noop,
         onChangeEmail: noop,
         onRetry: noop,
@@ -187,6 +192,72 @@ describe('CodeStep', () => {
     expect(markup).toContain('너무 많은 시도가 있었어요. 잠시 후 다시 이용해 주세요.')
     expect(markup).not.toContain(messages.common.temporaryErrorTitle)
     expect(markup).toContain('disabled')
+  })
+
+  it('재전송이 인플라이트면 쿨다운이 끝났어도 버튼이 비활성이고 aria-busy 다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(CodeStep, {
+        email: 'a@b.c',
+        values: { code: '' },
+        errors: NO_FORM_ERRORS,
+        errorStatus: null,
+        isSubmitting: false,
+        cooldownSeconds: 0,
+        resending: true,
+        onValueChange: noop,
+        onSubmit: noop,
+        onResend: noop,
+        onChangeEmail: noop,
+        onRetry: noop,
+      }),
+    )
+
+    expect(markup).toContain('disabled')
+    expect(markup).toContain('aria-busy="true"')
+  })
+
+  it('notice 가 있으면 role=status 로 렌더한다 — 1단계 성공 안내', () => {
+    const markup = renderToStaticMarkup(
+      createElement(CodeStep, {
+        email: 'a@b.c',
+        values: { code: '' },
+        errors: NO_FORM_ERRORS,
+        errorStatus: null,
+        isSubmitting: false,
+        cooldownSeconds: 0,
+        resending: false,
+        notice: messages.auth.codeSent,
+        onValueChange: noop,
+        onSubmit: noop,
+        onResend: noop,
+        onChangeEmail: noop,
+        onRetry: noop,
+      }),
+    )
+
+    expect(markup).toContain(messages.auth.codeSent)
+    expect(markup).toContain('role="status"')
+  })
+
+  it('notice 가 없으면 안내를 렌더하지 않는다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(CodeStep, {
+        email: 'a@b.c',
+        values: { code: '' },
+        errors: NO_FORM_ERRORS,
+        errorStatus: null,
+        isSubmitting: false,
+        cooldownSeconds: 0,
+        resending: false,
+        onValueChange: noop,
+        onSubmit: noop,
+        onResend: noop,
+        onChangeEmail: noop,
+        onRetry: noop,
+      }),
+    )
+
+    expect(markup).not.toContain('role="status"')
   })
 })
 
@@ -249,5 +320,43 @@ describe('ProfileStep', () => {
 
     expect(markup).toContain(messages.common.temporaryErrorTitle)
     expect(markup).toContain(messages.common.retry)
+  })
+
+  it('notice 가 있으면 role=status 로 렌더한다 — 2단계 성공 안내', () => {
+    const markup = renderToStaticMarkup(
+      createElement(ProfileStep, {
+        values: { password: '', name: '', nickname: '' },
+        errors: NO_FORM_ERRORS,
+        errorStatus: null,
+        isSubmitting: false,
+        duplicateEmail: null,
+        returnTo: '/',
+        notice: messages.auth.codeVerified,
+        onValueChange: noop,
+        onSubmit: noop,
+        onRetry: noop,
+      }),
+    )
+
+    expect(markup).toContain(messages.auth.codeVerified)
+    expect(markup).toContain('role="status"')
+  })
+
+  it('notice 가 없으면 안내를 렌더하지 않는다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(ProfileStep, {
+        values: { password: '', name: '', nickname: '' },
+        errors: NO_FORM_ERRORS,
+        errorStatus: null,
+        isSubmitting: false,
+        duplicateEmail: null,
+        returnTo: '/',
+        onValueChange: noop,
+        onSubmit: noop,
+        onRetry: noop,
+      }),
+    )
+
+    expect(markup).not.toContain('role="status"')
   })
 })
