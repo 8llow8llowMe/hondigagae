@@ -4,7 +4,6 @@ import com.hondigagae.domainlayer.insight.adapter.out.persistence.repository.Con
 import com.hondigagae.domainlayer.insight.application.mapper.InsightMapper;
 import com.hondigagae.domainlayer.insight.application.port.out.CongestionForecastPort;
 import com.hondigagae.domainlayer.insight.domain.enums.NameLinkSourceType;
-import com.hondigagae.domainlayer.insight.domain.enums.NameMatchType;
 import com.hondigagae.domainlayer.insight.domain.model.CongestionSnapshot;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -31,9 +30,9 @@ public class CongestionForecastPersistenceAdapter implements CongestionForecastP
 
     @Override
     public List<CongestionSnapshot> findByPlaceAndDateRange(long placeId, LocalDate from, LocalDate to) {
-        return congestionForecastRepository.findByPlaceIdAndDateRange(
+        return congestionForecastRepository.findLinkedByPlaceIdAndDateRange(
                 placeId, from.format(BASE_YMD_FORMAT), to.format(BASE_YMD_FORMAT),
-                NameLinkSourceType.CONGESTION, NameMatchType.UNMATCHED
+                NameLinkSourceType.CONGESTION
             ).stream()
             .map(insightMapper::toCongestionSnapshotFromEntity)
             .toList();

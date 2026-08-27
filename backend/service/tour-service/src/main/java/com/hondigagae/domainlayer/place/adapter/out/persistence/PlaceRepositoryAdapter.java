@@ -9,8 +9,6 @@ import com.hondigagae.domainlayer.place.adapter.out.persistence.repository.Place
 import com.hondigagae.domainlayer.place.adapter.out.persistence.repository.PlacePetInfoRepository;
 import com.hondigagae.domainlayer.place.adapter.out.persistence.repository.PlaceRepository;
 import com.hondigagae.domainlayer.place.application.mapper.PlaceMapper;
-import com.hondigagae.common.geo.GeoDistance;
-import com.hondigagae.shared.travel.place.AllowedPetSize;
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.out.PlaceRepositoryPort;
@@ -19,11 +17,9 @@ import com.hondigagae.domainlayer.place.application.port.out.query.PlaceIntroQue
 import com.hondigagae.domainlayer.place.application.port.out.query.PlacePetInfoQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSliceQueryResult;
 import com.hondigagae.domainlayer.place.domain.model.Place;
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Component;
 
@@ -39,15 +35,7 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
 
     @Override
     public PlaceSliceQueryResult findPlaces(PlaceSearchCriteria criteria) {
-        Slice<PlaceEntity> slice = placeRepository.findAllByCriteria(
-            criteria.areaCode(), criteria.sigunguCode(),
-            criteria.contentType() == null ? null : criteria.contentType().getCode(),
-            criteria.petAllowanceType(), criteria.indoor(), criteria.allowedPetSize(),
-            // 받아 주는 값의 집합으로 바꿔 in 절에 넣는다. petSizeType 이 null 이면 전체 집합이라 필터가 꺼진다.
-            AllowedPetSize.allowing(criteria.petSizeType()), criteria.petWeightKg(),
-            criteria.sourceCategory(), criteria.lastPlaceId(),
-            PageRequest.of(0, criteria.size())
-        );
+        Slice<PlaceEntity> slice = placeRepository.searchByCriteria(criteria);
         return new PlaceSliceQueryResult(placeMapper.toDomains(slice.getContent()), slice.hasNext());
     }
 
@@ -75,22 +63,7 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
 
     @Override
     public List<Place> findNearby(NearbyPlaceCriteria criteria) {
-        double latDelta = GeoDistance.latDelta(criteria.radius());
-        double lngDelta = GeoDistance.lngDelta(criteria.radius(), criteria.lat());
-
-        return placeRepository.findNearby(
-                BigDecimal.valueOf(criteria.lat() - latDelta),
-                BigDecimal.valueOf(criteria.lat() + latDelta),
-                BigDecimal.valueOf(criteria.lng() - lngDelta),
-                BigDecimal.valueOf(criteria.lng() + lngDelta),
-                criteria.contentType() == null ? null : criteria.contentType().getCode(),
-                criteria.petAllowanceType(),
-                criteria.indoor(),
-                criteria.allowedPetSize(),
-                AllowedPetSize.allowing(criteria.petSizeType()),
-                criteria.petWeightKg(),
-                criteria.sourceCategory()
-            ).stream()
+        return placeRepository.searchNearby(criteria).stream()
             .map(placeMapper::toDomain)
             .toList();
     }
