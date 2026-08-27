@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { resolveMock } from '@/lib/api/mock'
 import { MOCK_EMAIL_CODE } from '@/lib/api/mock/auth-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
-import { resetMockStore } from '@/lib/api/mock/store'
+import { mockStore, resetMockStore } from '@/lib/api/mock/store'
 import type { SliceResponse } from '@/types/api'
 import type { PlaceDetail, PlaceSummary } from '@/types/place'
 
@@ -323,5 +323,128 @@ describe('resolveMock — 인증', () => {
 
   it('mock 이 모르는 POST 는 null 이라 게이트웨이로 넘어간다', () => {
     expect(resolveMock('/plans', 'POST', '', '{}')).toBeNull()
+  })
+
+  it('send-code 공란 이메일은 400 AUTH_101 이다', () => {
+    const result = resolveMock('/auth/email/send-code', 'POST', '', JSON.stringify({ email: '' }))
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('AUTH_101')
+  })
+
+  it('verify-code 공란 이메일은 400 AUTH_101 이다', () => {
+    const result = resolveMock(
+      '/auth/email/verify-code',
+      'POST',
+      '',
+      JSON.stringify({ email: '', code: MOCK_EMAIL_CODE }),
+    )
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('AUTH_101')
+  })
+
+  it('verify-code 공란 코드는 400 AUTH_104 다', () => {
+    resolveMock(
+      '/auth/email/send-code',
+      'POST',
+      '',
+      JSON.stringify({ email: 'blankcode@hondigagae.dev' }),
+    )
+    const result = resolveMock(
+      '/auth/email/verify-code',
+      'POST',
+      '',
+      JSON.stringify({ email: 'blankcode@hondigagae.dev', code: '' }),
+    )
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('AUTH_104')
+  })
+
+  it('새 이메일로 인증 후 가입하면 200 이다', () => {
+    resolveMock(
+      '/auth/email/send-code',
+      'POST',
+      '',
+      JSON.stringify({ email: 'signup1@hondigagae.dev' }),
+    )
+    resolveMock(
+      '/auth/email/verify-code',
+      'POST',
+      '',
+      JSON.stringify({ email: 'signup1@hondigagae.dev', code: MOCK_EMAIL_CODE }),
+    )
+    const result = resolveMock(
+      '/members/signup',
+      'POST',
+      '',
+      JSON.stringify({
+        email: 'signup1@hondigagae.dev',
+        password: 'password123!',
+        name: '김철수',
+        nickname: '철수독',
+      }),
+    )
+
+    expect(result?.status).toBe(200)
+  })
+
+  it('가입 성공을 2회 연속 하면 두 신규 회원의 memberId 가 서로 다르다', () => {
+    function signup(email: string, nickname: string): void {
+      resolveMock('/auth/email/send-code', 'POST', '', JSON.stringify({ email }))
+      resolveMock(
+        '/auth/email/verify-code',
+        'POST',
+        '',
+        JSON.stringify({ email, code: MOCK_EMAIL_CODE }),
+      )
+      const result = resolveMock(
+        '/members/signup',
+        'POST',
+        '',
+        JSON.stringify({ email, password: 'password123!', name: '홍길동', nickname }),
+      )
+      expect(result?.status).toBe(200)
+    }
+
+    signup('first@hondigagae.dev', '첫째')
+    signup('second@hondigagae.dev', '둘째')
+
+    const members = mockStore().members
+    const first = members.find((member) => member.email === 'first@hondigagae.dev')
+    const second = members.find((member) => member.email === 'second@hondigagae.dev')
+
+    expect(first?.memberId).toBeTruthy()
+    expect(second?.memberId).toBeTruthy()
+    expect(first?.memberId).not.toBe(second?.memberId)
+  })
+
+  it('가입 후 로그인하면 가입 시 부여된 memberId 를 그대로 준다', () => {
+    const email = 'loginafter@hondigagae.dev'
+    const password = 'password123!'
+
+    resolveMock('/auth/email/send-code', 'POST', '', JSON.stringify({ email }))
+    resolveMock(
+      '/auth/email/verify-code',
+      'POST',
+      '',
+      JSON.stringify({ email, code: MOCK_EMAIL_CODE }),
+    )
+    resolveMock(
+      '/members/signup',
+      'POST',
+      '',
+      JSON.stringify({ email, password, name: '홍길동', nickname: '길동이' }),
+    )
+
+    const created = mockStore().members.find((member) => member.email === email)
+    expect(created).toBeDefined()
+
+    const loginResult = resolveMock('/auth/login', 'POST', '', JSON.stringify({ email, password }))
+
+    expect(loginResult?.status).toBe(200)
+    const body = loginResult?.payload.dataBody as { memberId: string }
+    expect(body.memberId).toBe(created?.memberId)
   })
 })

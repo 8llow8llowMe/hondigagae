@@ -21,12 +21,32 @@ export type MockStore = {
   verifiedEmails: Set<string>
   /** 코드를 발송한 이메일 */
   pendingEmails: Set<string>
-  nextMemberId: number
+  /** memberId 조립용 순번. Number.MAX_SAFE_INTEGER 안쪽 값만 들고 있는다 — nextMemberId() 참고 */
+  nextMemberSeq: number
 }
 
 const STORE_KEY = Symbol.for('hondigagae.mock.store')
 
 type GlobalWithStore = typeof globalThis & { [STORE_KEY]?: MockStore }
+
+/** 고정 회원(데모 계정)과 같은 자리수로 맞춘 접두사. 순번은 뒤 6자리에 zero-pad 로 채운다 */
+const MEMBER_ID_PREFIX = '900000000000'
+const MEMBER_ID_SEQ_DIGITS = 6
+
+/**
+ * memberId 를 문자열로 안전하게 조립한다.
+ *
+ * **`Number` 로 다루면 안 된다.** `900000000000000002` 는 `Number.MAX_SAFE_INTEGER`
+ * (9007199254740991) 를 훨씬 넘어 파싱 시점에 `900000000000000000` 으로 반올림되고,
+ * 그 뒤로 `++` 를 아무리 해도 값이 바뀌지 않는다 — 회원가입을 두 번 이상 성공시키면
+ * 모든 신규 회원이 같은 memberId 를 받는다. 순번(seq)만 안전한 정수 범위에서 늘리고,
+ * id 자체는 접두사 + zero-pad 문자열 결합으로 만든다.
+ */
+export function nextMemberId(store: MockStore): string {
+  const id = `${MEMBER_ID_PREFIX}${String(store.nextMemberSeq).padStart(MEMBER_ID_SEQ_DIGITS, '0')}`
+  store.nextMemberSeq += 1
+  return id
+}
 
 function createStore(): MockStore {
   return {
@@ -41,7 +61,7 @@ function createStore(): MockStore {
     ],
     verifiedEmails: new Set<string>(),
     pendingEmails: new Set<string>(),
-    nextMemberId: 900000000000000002,
+    nextMemberSeq: 2,
   }
 }
 
