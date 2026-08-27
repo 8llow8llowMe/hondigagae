@@ -39,10 +39,10 @@
 
 | 메서드 | 경로 | 비고 |
 | --- | --- | --- |
-| GET | `/api/v1/places` | 지역·타입·동반조건·실내·크기·원본분류 필터, 커서 기반 |
+| GET | `/api/v1/places` | 지역·타입·동반조건·실내·크기·원본분류·반려견 크기/체중 필터, 커서 기반 |
 | GET | `/api/v1/places/nearby` | 좌표 반경 검색 (식당·카페 포함) |
 | GET | `/api/v1/places/{placeId}` | intro·petInfo·images 결합 상세 |
-| GET | `/api/v1/emergencies/facilities` | 동물병원·동물약국 반경 검색 |
+| GET | `/api/v1/emergencies/facilities` | 동물병원·동물약국 반경 검색, `openNowOnly` 지금 영업 중 필터 |
 | GET | `/api/v1/places/{placeId}/suitability` | 날씨+동반조건+혼잡도 적합도. `score` 가 null 이면 판단 근거 없음 |
 | GET | `/api/v1/places/{placeId}/walk-safety` | 추정 노면온도·열지수 기반 산책 위험도 + 안전 시간대 |
 
@@ -115,9 +115,9 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | 중기예보(3~10일) 연동 | 미착수 | 단기예보 3일 밖 날짜는 현재 `INSUFFICIENT` 로만 응답 |
 | 기상특보 연동 | 미착수 | 제주는 태풍 경로. 카카오 메시지 연계와 맞물린다 |
 | 항목 단위 산책 위험도 | 미착수 | 일정 브리핑은 일자별 대표 장소 한 곳만 조회한다 |
-| 반려견 프로필 매칭 | 미착수 | `max_weight_kg` 컬럼 추가 필요 |
-| 영업시간 구조화 ("지금 문 연 곳") | 미착수 | 파싱 가능 확인됨 (장소 93%, 약국 98%) |
-| 데이터 delisting | **미착수 — 결함** | `data-refresh-guide.md` 2절 |
+| 반려견 프로필 매칭 | **구현** | `petSizeType`/`petWeightKg` 필터. 프로필 체중 입력은 FE 몫 |
+| 영업시간 구조화 | **구현 (긴급 시설)** | `openNowOnly` + 항목별 `openNow`. 여행 장소(place_intro.use_time)는 후속 |
+| 데이터 delisting | **구현** | `delisted_at` 표시 + 급감 가드. `data-refresh-guide.md` 2절 |
 | 배포 파이프라인 | 미착수 | Dockerfile·Jenkinsfile 없음 |
 | 배치 메트릭 | 미착수 | 로그만 있고 Micrometer 미노출 |
 

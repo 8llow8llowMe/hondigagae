@@ -21,9 +21,11 @@
 포털 상세 페이지를 긁지 않는다. CSV 안에 `최종작성일` 컬럼이 있으므로 **적재 시 그 최대값을
 기록해 두고, 다음 파일의 최대값과 비교**하면 새 파일인지 알 수 있다. 같으면 적재를 건너뛴다.
 
-## 2. 지금 있는 결함 — 사라진 것을 지우지 못한다
+## 2. 사라진 것을 지우지 못하던 결함 — 해소됨
 
-**현재 모든 적재는 upsert 뿐이다. DELETE 가 없다.**
+**(구현 완료)** 아래 설계대로 들어갔다. `DelistProcessor` + `DelistGuard`, 파사드 세 곳 연결.
+
+한때 모든 적재가 upsert 뿐이라 DELETE 가 없었다.
 
 식약처에서 등록을 철회한 식당, 문화정보원 파일에서 빠진 시설은 한 번 들어오면 **영원히 남는다.**
 `place`에 `synced_at`은 있지만 그 값을 읽어 판단하는 코드가 없다. 조회에서 제외하는 장치도
@@ -124,8 +126,10 @@ place_import_last_success_timestamp{source="MFDS"}
 
 ## 7. 작업 순서
 
-1. `place` / `emergency_facility` 에 `delisted_at` 추가, 조회에서 제외
-2. 적재 잡에 `runStartedAt` 기반 delisting 스텝 + 급감 가드
+1. ~~`place` / `emergency_facility` 에 `delisted_at` 추가, 조회에서 제외~~ — 완료.
+   상세 조회만 예외로 계속 응답한다(기존 일정 보호), 응답에 `delisted` 플래그
+2. ~~적재 잡에 `runStartedAt` 기반 delisting 스텝 + 급감 가드~~ — 완료.
+   TourAPI 는 부분 실행(contentType 지정) 시 delist 를 건너뛴다
 3. 지오코딩 재사용 (`source_key`로 기존 좌표 조회)
 4. 병합을 독립 잡으로 분리
 5. 스케줄 등록 (cron 또는 scheduler 어댑터)
