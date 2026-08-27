@@ -24,9 +24,9 @@ export function PlaceCard({ place }: { place: PlaceSummary }) {
     <Card variant="interactive">
       <Link
         href={`/places/${place.placeId}`}
-        className="focus-visible:ring-brand-500 flex gap-4 rounded-lg p-4 focus-visible:ring-2 focus-visible:outline-none"
+        className="focus-visible:ring-brand-500 flex gap-4 rounded-lg p-4 focus-visible:ring-2 focus-visible:outline-none md:gap-5 md:p-5"
       >
-        <div className="bg-bg-subtle relative h-20 w-20 shrink-0 overflow-hidden rounded-md">
+        <div className="bg-bg-subtle relative h-20 w-20 shrink-0 overflow-hidden rounded-md md:h-24 md:w-24">
           {place.firstImage === null ? (
             <span className="text-caption text-fg-muted absolute inset-0 flex items-center justify-center">
               {messages.place.noImage}
@@ -36,7 +36,7 @@ export function PlaceCard({ place }: { place: PlaceSummary }) {
               src={place.firstImage}
               alt=""
               fill
-              sizes="80px"
+              sizes="(min-width: 768px) 96px, 80px"
               className="object-cover"
               unoptimized={false}
             />

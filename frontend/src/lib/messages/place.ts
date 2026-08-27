@@ -11,6 +11,9 @@ export const placeMessages = {
   /** 5xx */
   errorTitle: '장소를 불러오지 못했습니다',
 
+  /** 필터가 걸렸을 때만 노출되는 요약 줄. 결과 건수는 백엔드가 주지 않는다(SliceResponse) */
+  activeFilterLabel: '적용된 필터',
+
   filterAll: '전체',
   filterContentTypeLabel: '장소 종류',
   filterPetAllowanceLabel: '반려견 동반',
