@@ -4,7 +4,11 @@
     {
       "name": "frontend-dev",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev"],
+      "runtimeArgs": [
+        "-C",
+        "frontend",
+        "dev"
+      ],
       "port": 3000
     }
   ]
