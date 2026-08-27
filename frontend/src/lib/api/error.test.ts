@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { ApiError, classify, isRetriable, shouldOfferRetry } from '@/lib/api/error'
+import {
+  ApiError,
+  classify,
+  isRetriable,
+  NO_RESPONSE_STATUS,
+  shouldOfferRetry,
+  toErrorStatus,
+} from '@/lib/api/error'
 
 describe('classify', () => {
   it('404 는 데이터 부재로 분류한다', () => {
@@ -50,5 +57,20 @@ describe('shouldOfferRetry', () => {
 describe('isRetriable', () => {
   it('ApiError 가 아닌 오류는 전송 실패로 보고 재시도 가능으로 판정한다', () => {
     expect(isRetriable(new Error('boom'))).toBe(true)
+  })
+})
+
+describe('toErrorStatus', () => {
+  it('성공(에러 없음)이면 null 이다', () => {
+    expect(toErrorStatus(null)).toBeNull()
+    expect(toErrorStatus(undefined)).toBeNull()
+  })
+
+  it('ApiError 는 status 를 그대로 준다', () => {
+    expect(toErrorStatus(new ApiError(404, 'PLACE_002', '존재하지 않는 장소입니다.'))).toBe(404)
+  })
+
+  it('ApiError 가 아니면 무응답으로 취급한다 — 재시도 UI 가 나와야 한다', () => {
+    expect(toErrorStatus(new Error('boom'))).toBe(NO_RESPONSE_STATUS)
   })
 })

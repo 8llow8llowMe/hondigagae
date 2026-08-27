@@ -175,6 +175,31 @@ GET /places?... → 404                           →  EmptyState
 - **`error.tsx` 는 5xx 톤을 쓴다.** 데이터 부재가 여기로 흘러오면 안 된다. `not-found.tsx` 와 `EmptyState` 는 중립 톤이다 (`DESIGN.md` §2).
 - `error.tsx` 는 반드시 client component다. `reset` prop을 재시도 버튼에 연결한다.
 - `loading.tsx` 를 두면 세그먼트 전체가 대체된다. 부분 로딩이 필요한 화면은 `loading.tsx` 대신 섹션별 `Suspense` + `Skeleton` 을 쓴다.
+
+### `loading.tsx` 는 자식 세그먼트까지 감싼다 (soft 404 주의)
+
+**`loading.tsx` 는 그 세그먼트 **와 모든 하위 세그먼트**를 Suspense 로 감싼다.** 경계가 있으면 응답이
+먼저 스트리밍되기 시작하고, 그 뒤에 던진 `notFound()` 는 **not-found UI 는 렌더하지만 HTTP 상태를
+바꾸지 못한다.** 200 + not-found 화면, 즉 soft 404 가 된다.
+
+실측 (2026-08-27, `/places/{없는 id}`):
+
+| 상태                                      | 응답                   |
+| ----------------------------------------- | ---------------------- |
+| `places/loading.tsx` 있음 (자식까지 감쌈) | **200** + not-found UI |
+| 없음                                      | **404** + not-found UI |
+
+공개 화면은 크롤러가 없는 리소스를 정상 페이지로 인식하므로 이걸 방치하면 안 된다.
+
+**규칙**
+
+- **`notFound()` 를 쓰는 세그먼트의 조상에 `loading.tsx` 를 두지 않는다.**
+- 형제 라우트에만 `loading.tsx` 가 필요하면 **route group 으로 스코프를 좁힌다.**
+  `places/loading.tsx` → `places/(list)/loading.tsx` 로 옮기면 `places/[placeId]` 는 감싸지지 않는다.
+  URL 은 그대로다.
+- 그 대가로 상세 화면은 최초 진입 스켈레톤이 없다. 서버 프리페치가 `retry: false` 라 실패해도 즉시
+  넘어가므로 체감 지연이 작고, **상태 코드 정확성을 우선한다.**
+
 - **AI 일정 생성 대기는 `loading.tsx` 가 아니다.** 폴링 중 상태이므로 화면 안에서 진행 표시를 렌더한다 (`api-integration-guide.md` §5).
 
 ## 8. 데이터 페칭 계층

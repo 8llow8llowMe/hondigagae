@@ -31,6 +31,80 @@ export type PlaceSummary = {
   sourceName: string
 }
 
+/**
+ * 장소 상세 (`GET /api/v1/places/{placeId}` — `PlaceDetailResponse`).
+ *
+ * 목록(`PlaceSummary`)과 필드 집합이 다르다. **`sigunguCode` / `indoor` / `sourceCategory` /
+ * `sourceName` 이 상세 응답에는 없다** — 이슈 #16 반영 후 추가한다.
+ * 근거: backend PlaceDetailResponse / PlacePresenter#toDetailResponse (tour-service, 2026-08-27)
+ */
+export type PlaceDetail = {
+  placeId: string
+  /** TODO(BE #17): 원천이 TourAPI 가 아니면 문자열 "null" 이 내려온다 */
+  contentId: string | null
+  contentType: EnumMetadata
+  title: string
+  addr1: string | null
+  addr2: string | null
+  zipcode: string | null
+  lat: number | null
+  lng: number | null
+  firstImage: string | null
+  firstImage2: string | null
+  /** 저작권 유형 (Type1 / Type3 — 출처 표기 의무). TourAPI 원천에서만 채워진다 */
+  cpyrhtDivCd: string | null
+  tel: string | null
+  /** **HTML anchor 포함 원문.** parseHomepage() 로 href 만 뽑아 쓴다 */
+  homepage: string | null
+  /** **HTML 태그가 섞인 원문.** toPlainText() 로 평문화해 쓴다 */
+  overview: string | null
+  petAvailable: boolean
+  petAllowanceType: EnumMetadata
+  /** **객체 통째로 null 이 될 수 있다** — 에러가 아니라 섹션 숨김이다 */
+  intro: PlaceIntro | null
+  /** **객체 통째로 null 이 될 수 있다** */
+  petInfo: PlacePetInfo | null
+  /** null 이 아니다. 최소 빈 배열이다 (백엔드가 .stream().toList() 로 만든다) */
+  images: PlaceImage[]
+}
+
+/** 소개 정보. 원문 그대로 내려오는 값들이라 전부 nullable 이다 */
+export type PlaceIntro = {
+  infoCenter: string | null
+  useTime: string | null
+  restDate: string | null
+  parking: string | null
+  /** 애완동물 동반 가능 원문. **판단은 petInfo 우선** (백엔드 DTO 주석) */
+  chkPet: string | null
+  chkBabyCarriage: string | null
+  chkCreditCard: string | null
+}
+
+/** 반려동물 동반 정보. 원문 9종은 nullable, 가공값 3종은 non-null 이다 */
+export type PlacePetInfo = {
+  acmpyTypeCd: string | null
+  acmpyPsblCpam: string | null
+  acmpyNeedMtr: string | null
+  /** 개행 포함 장문 (TEXT 컬럼) */
+  etcAcmpyInfo: string | null
+  relaAcdntRiskMtr: string | null
+  relaFrnshPrdlst: string | null
+  relaPosesFclty: string | null
+  relaPurcPrdlst: string | null
+  relaRntlPrdlst: string | null
+  /** 가공값 — 엔티티가 nullable = false 다 */
+  allowanceScope: EnumMetadata
+  allowedPetSize: EnumMetadata
+  leashRequired: boolean
+}
+
+export type PlaceImage = {
+  originImgUrl: string | null
+  smallImageUrl: string | null
+  imgName: string | null
+  cpyrhtDivCd: string | null
+}
+
 /** 목록 필터 — 백엔드 PlaceWebController 의 RequestParam 과 이름을 일치시킨다 */
 export type PlaceFilters = {
   areaCode: string

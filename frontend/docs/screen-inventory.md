@@ -42,8 +42,8 @@
 
 | 화면      | 경로                | API                                                               | 상태 |
 | --------- | ------------------- | ----------------------------------------------------------------- | ---- |
-| 장소 목록 | `/places`           | `GET /places` (지역·타입·반려견 동반 필터, `SliceResponse` 커서)  | 기획 |
-| 장소 상세 | `/places/[placeId]` | `GET /places/{placeId}` (intro/petInfo/images 결합, **nullable**) | 기획 |
+| 장소 목록 | `/places`           | `GET /places` (지역·타입·반려견 동반 필터, `SliceResponse` 커서)  | 구현 |
+| 장소 상세 | `/places/[placeId]` | `GET /places/{placeId}` (intro/petInfo/images 결합, **nullable**) | 구현 |
 | 지도 뷰   | `/places` 내        | 위와 동일 + 카카오 지도 SDK                                       | 기획 |
 
 주의:
@@ -61,6 +61,11 @@
 - `PlaceItem` 에 `indoor` / `sourceCategory` / `sourceName`(출처 표시명) 필드가 있다.
 - `contentType` / `petAllowanceType` 은 **응답에서 metadata 객체**(`{code, name, description}`)로 온다 → 서버 문구를 그대로 렌더한다.
 - `placeId` 는 응답에서 **문자열**이다 (백엔드 내부는 long).
+- **상세 컨트롤러는 `@PathVariable long` 이다** → 숫자가 아닌 `placeId` 는 404 가 아니라 **400(`PLACE_113`)** 이다.
+- **상세 응답(`PlaceDetailResponse`)에는 `sigunguCode` / `indoor` / `sourceCategory` / `sourceName` 이 없다.**
+  목록 항목(`PlaceItem`)에만 있다 → [#16](https://github.com/8llow8llowMe/hondigagae/issues/16) 반영 전까지 상세 화면에서 실내 여부·출처명을 표시하지 않는다.
+- 상세의 `contentId` 는 원천이 TourAPI 가 아니면 **문자열 `"null"`** 로 온다 → [#17](https://github.com/8llow8llowMe/hondigagae/issues/17).
+- 상세의 `homepage` / `overview` 는 **HTML 태그가 섞인 원문**이다. `dangerouslySetInnerHTML` 을 쓰지 않는다.
 - 지도 좌표는 백엔드가 `lat`/`lng` (Double) 로 정규화해 내려준다. 카카오는 `LatLng(위도, 경도)` 순서이므로 `lat` 이 먼저다 (`external-api-guide.md`).
 
 ## 4. 여행 일정 — 착수 가능

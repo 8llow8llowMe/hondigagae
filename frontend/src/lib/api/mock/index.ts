@@ -1,4 +1,5 @@
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
+import { mockPlaceDetail } from '@/lib/api/mock/place-detail-data'
 import type { ApiResponse, SliceResponse } from '@/types/api'
 import type { PlaceSummary } from '@/types/place'
 
@@ -36,6 +37,9 @@ function fail(status: number, resultCode: string, resultMessage: string): MockRe
   }
 }
 
+/** `/places/{placeId}` 로 착각하면 안 되는 하위 경로 */
+const SUB_RESOURCES = new Set(['nearby'])
+
 /** 백엔드 `size` 허용 범위 (1~50). 벗어나면 400 이다 */
 const MIN_SIZE = 1
 const MAX_SIZE = 50
@@ -51,8 +55,21 @@ export function resolveMock(path: string, method: string, search: string): MockR
 
   if (path === '/places') return placeList(params)
 
-  const detail = /^\/places\/(\d+)$/.exec(path)
-  if (detail !== null) return placeDetail(detail[1] ?? '')
+  const detail = /^\/places\/([^/]+)$/.exec(path)
+  if (detail !== null) {
+    const rawId = detail[1] ?? ''
+
+    // /places/nearby 는 상세가 아니라 별도 엔드포인트다. mock 이 처리하지 않으므로
+    // null 을 반환해 실제 게이트웨이로 넘긴다
+    if (SUB_RESOURCES.has(rawId)) return null
+
+    // 컨트롤러가 @PathVariable long 이라, 숫자가 아닌 id 는 404 가 아니라 400 이다
+    if (!/^\d+$/.test(rawId)) {
+      return fail(400, 'PLACE_113', '요청 파라미터 형식이 올바르지 않습니다.')
+    }
+
+    return placeDetail(rawId)
+  }
 
   return null
 }
@@ -79,12 +96,12 @@ function placeList(params: URLSearchParams): MockResult {
 }
 
 function placeDetail(placeId: string): MockResult {
-  const place = MOCK_PLACES.find((candidate) => candidate.placeId === placeId)
+  const detail = mockPlaceDetail(placeId)
 
-  // 백엔드는 없는 리소스를 404 로 응답한다
-  if (place === undefined) return fail(404, 'PLACE_001', '존재하지 않는 장소입니다.')
+  // 백엔드는 없는 리소스를 404 로 응답한다 (PlaceErrorCode.NOT_FOUND_PLACE)
+  if (detail === null) return fail(404, 'PLACE_002', '존재하지 않는 장소입니다.')
 
-  return { status: 200, payload: ok(place) }
+  return { status: 200, payload: ok(detail) }
 }
 
 function matches(place: PlaceSummary, params: URLSearchParams): boolean {

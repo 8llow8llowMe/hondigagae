@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 
 import { PlaceListSection } from '@/features/place/place-list-section'
 import { usePlaceList } from '@/features/place/use-place-list'
-import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
+import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
 import type { PlaceFilters } from '@/types/place'
 
@@ -21,7 +21,7 @@ export function PlaceListView({ filters }: { filters: PlaceFilters }) {
     <PlaceListSection
       places={places}
       loading={query.isPending}
-      errorStatus={toStatus(query.error)}
+      errorStatus={toErrorStatus(query.error)}
       errorMessage={query.error instanceof ApiError ? query.error.rawMessage : undefined}
       hasNext={lastPage?.hasNext ?? false}
       loadingMore={query.isFetchingNextPage}
@@ -30,10 +30,4 @@ export function PlaceListView({ filters }: { filters: PlaceFilters }) {
       onResetFilters={() => router.replace(pathname, { scroll: false })}
     />
   )
-}
-
-function toStatus(error: unknown): number | null {
-  if (error === null || error === undefined) return null
-  if (error instanceof ApiError) return error.status
-  return NO_RESPONSE_STATUS
 }

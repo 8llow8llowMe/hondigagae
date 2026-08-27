@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { resolveMock } from '@/lib/api/mock'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import type { SliceResponse } from '@/types/api'
-import type { PlaceSummary } from '@/types/place'
+import type { PlaceDetail, PlaceSummary } from '@/types/place'
 
 function list(search: string) {
   const result = resolveMock('/places', 'GET', search)
@@ -84,18 +84,75 @@ describe('resolveMock — 필터', () => {
 })
 
 describe('resolveMock — 상세', () => {
-  it('존재하는 장소를 반환한다', () => {
-    const id = MOCK_PLACES[0]?.placeId ?? ''
-    const result = resolveMock(`/places/${id}`, 'GET', '')
+  function detail(placeId: string) {
+    const result = resolveMock(`/places/${placeId}`, 'GET', '')
+    if (result === null) throw new Error('mock 이 경로를 처리하지 못했다')
+    return result
+  }
 
-    expect(result?.status).toBe(200)
+  it('목록 타입이 아니라 상세 타입을 반환한다', () => {
+    const id = MOCK_PLACES[0]?.placeId ?? ''
+    const result = detail(id)
+    const body = result.payload.dataBody as PlaceDetail
+
+    expect(result.status).toBe(200)
+    expect(body.placeId).toBe(id)
+    // 목록(PlaceItem)에는 없고 상세(PlaceDetailResponse)에만 있는 필드다
+    expect(body).toHaveProperty('overview')
+    expect(body).toHaveProperty('images')
+    expect(Array.isArray(body.images)).toBe(true)
   })
 
-  it('없는 장소는 404 다', () => {
-    const result = resolveMock('/places/999999999999999999', 'GET', '')
+  it('없는 장소는 404 이고 백엔드와 같은 resultCode 를 쓴다', () => {
+    const result = detail('999999999999999999')
 
-    expect(result?.status).toBe(404)
-    expect(result?.payload.dataHeader.success).toBe(false)
+    expect(result.status).toBe(404)
+    expect(result.payload.dataHeader.success).toBe(false)
+    expect(result.payload.dataHeader.resultCode).toBe('PLACE_002')
+  })
+
+  it('숫자가 아닌 placeId 는 404 가 아니라 400 이다 (@PathVariable long)', () => {
+    const result = detail('abc')
+
+    expect(result.status).toBe(400)
+    expect(result.payload.dataHeader.resultCode).toBe('PLACE_113')
+  })
+
+  it('/places/nearby 는 상세가 아니다 — 실제 게이트웨이로 넘긴다', () => {
+    expect(resolveMock('/places/nearby', 'GET', 'lat=33.5&lng=126.5')).toBeNull()
+  })
+})
+
+describe('mock 상세 데이터 품질', () => {
+  function detailOf(placeId: string): PlaceDetail {
+    const result = resolveMock(`/places/${placeId}`, 'GET', '')
+    return result?.payload.dataBody as PlaceDetail
+  }
+
+  const details = MOCK_PLACES.map((place) => detailOf(place.placeId))
+
+  it('intro 가 통째로 없는 케이스를 포함한다 — 섹션 숨김이 기본 경로에 드러나야 한다', () => {
+    expect(details.some((detail) => detail.intro === null)).toBe(true)
+  })
+
+  it('petInfo 가 통째로 없는 케이스를 포함한다', () => {
+    expect(details.some((detail) => detail.petInfo === null)).toBe(true)
+  })
+
+  it('images 가 비어 있는 케이스를 포함하고, images 는 절대 null 이 아니다', () => {
+    expect(details.some((detail) => detail.images.length === 0)).toBe(true)
+    expect(details.every((detail) => Array.isArray(detail.images))).toBe(true)
+  })
+
+  it('homepage 에 HTML anchor 원문이 들어 있는 케이스를 포함한다', () => {
+    expect(details.some((detail) => detail.homepage?.includes('<a ') === true)).toBe(true)
+  })
+
+  it('목록과 같은 장소를 보여준다 — 상세만 다른 장소면 개발 중에만 있는 착시가 생긴다', () => {
+    const summary = MOCK_PLACES[0]
+    if (summary === undefined) throw new Error('mock 데이터가 비어 있다')
+
+    expect(detailOf(summary.placeId).title).toBe(summary.title)
   })
 })
 
