@@ -7,6 +7,16 @@ description: "혼디가개(hondigagae) GitHub Pull Request 본문을 한국어 �
 
 혼디가개 Pull Request 본문과 제목을 한국어 템플릿으로 작성한다.
 
+## Read First
+
+- [docs/git-workflow.md](../../../docs/git-workflow.md) — PR 규칙과 머지 방식
+
+핵심:
+- **`Issue Number: #N` 을 반드시 채운다.** 비워 두지 않는다.
+- 머지는 **`Rebase and merge`** 만 쓴다 (`gh pr merge <번호> --rebase --delete-branch`).
+- **30파일 / 1,000줄을 넘으면** 쪼갤 수 있는지 검토하고, 넘겨야 하면 **이유를 본문에 적는다.**
+- CI 통과가 머지 조건이다.
+
 ## Workflow
 
 1. 변경 범위를 확인한다. 가능하면 `git status`, `git diff --stat`, `git log --oneline`을 참고한다.
