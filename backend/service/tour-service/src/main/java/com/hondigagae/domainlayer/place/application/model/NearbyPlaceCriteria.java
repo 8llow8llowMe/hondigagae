@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.place.application.model;
 
 import com.hondigagae.shared.travel.place.AllowedPetSize;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
+import com.hondigagae.shared.travel.pet.PetSizeType;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
 import lombok.Builder;
 
@@ -20,6 +21,8 @@ public record NearbyPlaceCriteria(
     PetAllowanceType petAllowanceType,
     Boolean indoor,
     AllowedPetSize allowedPetSize,
+    PetSizeType petSizeType,
+    Integer petWeightKg,
     // 원본 분류로 거른다. contentTypeId 39 에 음식점과 카페가 섞여 있어 이 값이 필요하다.
     String sourceCategory,
     int size

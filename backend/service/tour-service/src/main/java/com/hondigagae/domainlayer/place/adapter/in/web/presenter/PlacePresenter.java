@@ -88,6 +88,8 @@ public class PlacePresenter {
             .firstImage(info.firstImage())
             .firstImage2(info.firstImage2())
             .petAllowanceType(toPetAllowanceMetadata(info.petAllowanceType()))
+            .allowedPetSize(info.allowedPetSize() == null ? null : info.allowedPetSize().toMetadata())
+            .maxPetWeightKg(info.maxPetWeightKg())
             .tel(info.tel())
             .indoor(info.indoor())
             .sourceCategory(info.sourceCategory())

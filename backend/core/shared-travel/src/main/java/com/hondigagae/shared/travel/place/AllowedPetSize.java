@@ -2,6 +2,9 @@ package com.hondigagae.shared.travel.place;
 
 import com.hondigagae.common.dto.metadata.CodeNameDescribable;
 import com.hondigagae.shared.travel.pet.PetSizeType;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -41,6 +44,18 @@ public enum AllowedPetSize implements CodeNameDescribable {
             case SMALL_ONLY -> petSizeType == PetSizeType.SMALL;
             case UNKNOWN -> true;
         };
+    }
+
+    /**
+     * 해당 크기의 반려견을 받아 주는 값들의 집합.
+     *
+     * <p>JPQL 의 in 절에 그대로 넣기 위한 형태다. 판정 자체는 {@link #allows(PetSizeType)}
+     * 하나만 쓰므로 규칙이 두 곳으로 갈라지지 않는다. null 이면 전체 집합 — 필터를 끈 것과 같다.
+     */
+    public static Set<AllowedPetSize> allowing(PetSizeType petSizeType) {
+        Set<AllowedPetSize> allowing = EnumSet.noneOf(AllowedPetSize.class);
+        Arrays.stream(values()).filter(size -> size.allows(petSizeType)).forEach(allowing::add);
+        return allowing;
     }
 
     /** 크기 제한이 실제로 걸려 있는지. 정보 없음은 제한이 아니다. */

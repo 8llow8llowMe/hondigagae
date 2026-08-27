@@ -296,6 +296,7 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
             .outdoor(PetFieldParser.parseYn(value(values, header, COL_OUTDOOR)))
             .petOnly(petOnlyRaw != null && petOnlyRaw.contains("전용"))
             .allowedPetSize(PetFieldParser.parseAllowedPetSize(petSizeRaw))
+            .maxPetWeightKg(PetFieldParser.parseMaxWeightKg(petSizeRaw))
             .petRestriction(value(values, header, COL_PET_RESTRICTION))
             .petExtraFee(value(values, header, COL_PET_FEE))
             .useTime(value(values, header, COL_USE_TIME))

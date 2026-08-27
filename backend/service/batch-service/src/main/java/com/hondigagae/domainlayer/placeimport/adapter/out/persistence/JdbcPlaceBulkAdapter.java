@@ -131,13 +131,14 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             outdoor,
             pet_only,
             allowed_pet_size,
+            max_pet_weight_kg,
             pet_restriction,
             pet_extra_fee,
             source_modified_at,
             synced_at,
             created_at,
             updated_at
-        ) VALUES (?, 'CULTURE_PORTAL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, 'CULTURE_PORTAL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ON DUPLICATE KEY UPDATE
             source_category = VALUES(source_category),
             content_type_id = VALUES(content_type_id),
@@ -157,6 +158,7 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             outdoor = VALUES(outdoor),
             pet_only = VALUES(pet_only),
             allowed_pet_size = VALUES(allowed_pet_size),
+            max_pet_weight_kg = VALUES(max_pet_weight_kg),
             pet_restriction = VALUES(pet_restriction),
             pet_extra_fee = VALUES(pet_extra_fee),
             source_modified_at = VALUES(source_modified_at),
@@ -326,6 +328,7 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
                     ps.setBoolean(index++, facility.outdoor());
                     ps.setBoolean(index++, facility.petOnly());
                     ps.setString(index++, facility.allowedPetSize());
+                    setNullableInt(ps, index++, facility.maxPetWeightKg());
                     ps.setString(index++, facility.petRestriction());
                     ps.setString(index++, facility.petExtraFee());
                     setNullableDateTime(ps, index++, facility.sourceModifiedAt());
@@ -406,20 +409,20 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
         return "{\"admissionFee\":\"" + facility.admissionFee().replace("\"", "'") + "\"}";
     }
 
-    private void setNullableDecimal(PreparedStatement ps, int index, java.math.BigDecimal value) throws SQLException {
-        if (value == null) {
-            ps.setNull(index, Types.DECIMAL);
-            return;
-        }
-        ps.setBigDecimal(index, value);
-    }
-
     private void setNullableInt(PreparedStatement ps, int index, Integer value) throws SQLException {
         if (value == null) {
             ps.setNull(index, Types.INTEGER);
             return;
         }
         ps.setInt(index, value);
+    }
+
+    private void setNullableDecimal(PreparedStatement ps, int index, java.math.BigDecimal value) throws SQLException {
+        if (value == null) {
+            ps.setNull(index, Types.DECIMAL);
+            return;
+        }
+        ps.setBigDecimal(index, value);
     }
 
     private void setNullableDateTime(PreparedStatement ps, int index, LocalDateTime value) throws SQLException {

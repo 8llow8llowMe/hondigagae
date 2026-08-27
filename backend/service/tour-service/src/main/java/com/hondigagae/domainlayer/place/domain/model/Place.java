@@ -45,6 +45,7 @@ public record Place(
     Boolean outdoor,
     boolean petOnly,
     AllowedPetSize allowedPetSize,
+    Integer maxPetWeightKg,
     String petRestriction,
     String petExtraFee,
     Long mergedIntoId,
