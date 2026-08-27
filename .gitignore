@@ -29,3 +29,6 @@ frontend/out/
 
 # 공공데이터 원본 파일 (30MB, data.go.kr 에서 재다운로드 가능)
 backend/data/
+
+# 디자인 작업 파일 (Claude Design 아트보드 소스·브리프)
+.design/
