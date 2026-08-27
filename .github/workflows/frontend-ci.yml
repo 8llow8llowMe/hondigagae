@@ -15,7 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # package.json 이 frontend/ 에 있다. defaults.run.working-directory 는
+      # 액션 입력에 적용되지 않으므로 경로를 명시해야 packageManager 를 읽는다.
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
 
       - uses: actions/setup-node@v4
         with:
