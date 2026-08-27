@@ -1,4 +1,5 @@
 import { commonMessages } from '@/lib/messages/common'
+import { authMessages, formMessages } from '@/lib/messages/form'
 import { placeMessages } from '@/lib/messages/place'
 
 /**
@@ -16,4 +17,6 @@ import { placeMessages } from '@/lib/messages/place'
 export const messages = {
   common: commonMessages,
   place: placeMessages,
+  form: formMessages,
+  auth: authMessages,
 } as const
