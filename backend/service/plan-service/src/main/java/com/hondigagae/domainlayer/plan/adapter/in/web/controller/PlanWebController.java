@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanCreateRequ
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanDayItemsReplaceRequest;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanUpdateRequest;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanDetailResponse;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanWeatherResponse;
 import com.hondigagae.domainlayer.plan.application.exception.PlanValidationMessage;
 import com.hondigagae.domainlayer.plan.application.port.in.PlanWebUseCase;
 import com.hondigagae.persistence.dto.SliceResponse;
@@ -119,6 +120,24 @@ public class PlanWebController {
         @Valid @RequestBody PlanDayItemsReplaceRequest request
     ) {
         PlanDetailResponse response = planWebUseCase.replaceDayItems(loginActive.memberId(), planId, day, request.toCommands());
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(summary = "일정 날씨 브리핑",
+        description = "일정의 날짜별로 날씨와 반려견 여행 적합도를 같이 보여 줍니다. "
+            + "그날 첫 장소 항목을 기준으로 판정하며, 반려견 특성은 등록된 프로필을 자동으로 반영합니다. "
+            + "단기예보는 약 3일까지만 제공되므로 그보다 먼 날짜는 score 가 null 이고 "
+            + "unavailableReason 에 그 이유가 담깁니다 — 점수가 낮은 것이 아니라 판단 근거가 없는 것입니다. "
+            + "비 예보가 있고 그날 장소가 실내가 아니면 indoorAlternatives 에 실내 대안을 함께 내려 줍니다. "
+            + "일정을 실제로 바꾸는 것은 이 API 가 아니라 일자별 항목 교체 API 로 명시적으로 합니다.",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @GetMapping("/{planId}/weather")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<PlanWeatherResponse>> getPlanWeather(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "일정 아이디", required = true, example = "1234567890123456789") @PathVariable long planId
+    ) {
+        PlanWeatherResponse response = planWebUseCase.getPlanWeather(loginActive.memberId(), planId);
         return ResponseEntity.ok().body(Response.success(response));
     }
 }
