@@ -23,6 +23,12 @@ export type PlaceSummary = {
   firstImage2: string | null
   petAllowanceType: EnumMetadata
   tel: string | null
+  /** 실내 여부. **null 이면 원천에 정보가 없다** — indoor 필터의 true/false 어느 쪽에도 잡히지 않는다 */
+  indoor: boolean | null
+  /** 원본 분류 (원천이 준 값 그대로). 콘텐츠 타입으로 갈리지 않는 구분에 쓴다 (예: 카페, 펜션) */
+  sourceCategory: string | null
+  /** 정보 출처 표시명 (예: 문화정보원) */
+  sourceName: string
 }
 
 /** 목록 필터 — 백엔드 PlaceWebController 의 RequestParam 과 이름을 일치시킨다 */
@@ -31,6 +37,11 @@ export type PlaceFilters = {
   sigunguCode: string | null
   contentType: ContentTypeCode | null
   petAllowanceType: PetAllowanceCode | null
+  /** true 면 실내만. **원천에 정보가 없는 장소(indoor === null)는 어느 쪽으로도 잡히지 않는다** */
+  indoor: boolean | null
+  allowedPetSize: AllowedPetSizeCode | null
+  /** 원본 분류 자유 문자열 (예: 카페) */
+  sourceCategory: string | null
 }
 
 /**
@@ -50,6 +61,10 @@ export const CONTENT_TYPE_CODES = [
 ] as const
 export type ContentTypeCode = (typeof CONTENT_TYPE_CODES)[number]
 
+/** 입장 가능 반려견 크기 (backend AllowedPetSize) */
+export const ALLOWED_PET_SIZE_CODES = ['ALL', 'SMALL_ONLY', 'SMALL_MEDIUM', 'UNKNOWN'] as const
+export type AllowedPetSizeCode = (typeof ALLOWED_PET_SIZE_CODES)[number]
+
 export const PET_ALLOWANCE_CODES = [
   'ALLOWED',
   'PARTIALLY_ALLOWED',
@@ -57,3 +72,18 @@ export const PET_ALLOWANCE_CODES = [
   'UNKNOWN',
 ] as const
 export type PetAllowanceCode = (typeof PET_ALLOWANCE_CODES)[number]
+
+/**
+ * 주변 장소 검색 (`GET /api/v1/places/nearby`).
+ * 목록과 달리 커서가 아니라 `totalCount` 를 준다 — 건수 표기가 가능하다.
+ */
+export type NearbyPlaceItem = {
+  place: PlaceSummary
+  distanceMeters: number
+}
+
+export type NearbyPlaceResult = {
+  places: NearbyPlaceItem[]
+  totalCount: number
+  radius: number
+}

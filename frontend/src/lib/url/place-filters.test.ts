@@ -45,6 +45,32 @@ describe('parsePlaceFilters', () => {
   })
 })
 
+describe('parsePlaceFilters — 새 필터', () => {
+  it('indoor 는 true/false 만 인정한다', () => {
+    expect(parsePlaceFilters(new URLSearchParams('indoor=true')).indoor).toBe(true)
+    expect(parsePlaceFilters(new URLSearchParams('indoor=false')).indoor).toBe(false)
+  })
+
+  it('indoor 에 이상한 값이 오면 미지정으로 떨어뜨린다', () => {
+    expect(parsePlaceFilters(new URLSearchParams('indoor=maybe')).indoor).toBeNull()
+    expect(parsePlaceFilters(new URLSearchParams('indoor=1')).indoor).toBeNull()
+  })
+
+  it('허용되지 않은 allowedPetSize 는 null 로 떨어뜨린다', () => {
+    expect(parsePlaceFilters(new URLSearchParams('allowedPetSize=HUGE')).allowedPetSize).toBeNull()
+  })
+
+  it('sourceCategory 는 자유 문자열이라 그대로 받는다', () => {
+    expect(parsePlaceFilters(new URLSearchParams('sourceCategory=카페')).sourceCategory).toBe(
+      '카페',
+    )
+  })
+
+  it('공백뿐인 sourceCategory 는 미지정으로 본다', () => {
+    expect(parsePlaceFilters({ sourceCategory: '   ' }).sourceCategory).toBeNull()
+  })
+})
+
 describe('toPlaceFilterQuery', () => {
   it('기본값은 URL 에서 생략한다 (빈 URL = 기본 상태)', () => {
     expect(toPlaceFilterQuery(DEFAULT_PLACE_FILTERS)).toBe('')
@@ -65,13 +91,29 @@ describe('toPlaceFilterQuery', () => {
 describe('round-trip', () => {
   const cases: PlaceFilters[] = [
     DEFAULT_PLACE_FILTERS,
-    { areaCode: '39', sigunguCode: '4', contentType: null, petAllowanceType: null },
-    { areaCode: '1', sigunguCode: null, contentType: 'RESTAURANT', petAllowanceType: 'ALLOWED' },
+    { ...DEFAULT_PLACE_FILTERS, sigunguCode: '4' },
     {
-      areaCode: '39',
+      ...DEFAULT_PLACE_FILTERS,
+      areaCode: '1',
+      contentType: 'RESTAURANT',
+      petAllowanceType: 'ALLOWED',
+    },
+    {
+      ...DEFAULT_PLACE_FILTERS,
       sigunguCode: '3',
       contentType: 'LODGING',
       petAllowanceType: 'PARTIALLY_ALLOWED',
+    },
+    { ...DEFAULT_PLACE_FILTERS, indoor: true },
+    { ...DEFAULT_PLACE_FILTERS, indoor: false },
+    { ...DEFAULT_PLACE_FILTERS, allowedPetSize: 'SMALL_ONLY' },
+    { ...DEFAULT_PLACE_FILTERS, sourceCategory: '카페' },
+    {
+      ...DEFAULT_PLACE_FILTERS,
+      indoor: true,
+      allowedPetSize: 'ALL',
+      sourceCategory: '펜션',
+      contentType: 'LODGING',
     },
   ]
 

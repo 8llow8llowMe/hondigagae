@@ -2,7 +2,7 @@
 
 > 화면별 담당 API, 상태, 착수 가능 여부. **백엔드 구현 상태와 동기화한다.**
 > 근거: `backend/docs/service-inventory.md` (백엔드 구현 현황), 루트 `README.md` (AI 기능 선정 상태)
-> 최종 확인: 2026-08-26 (백엔드 커밋 `d1696f4` 기준)
+> 최종 확인: 2026-08-26 (백엔드 커밋 `6af13db` = origin/develop 기준)
 
 ## 착수 가능 여부 요약
 
@@ -54,7 +54,11 @@
 - **목록 필터 파라미터 (백엔드 `PlaceWebController` 실측)**: `areaCode`(제주=39), `sigunguCode`,
   `contentType`(enum name — `TOURIST_SPOT` `CULTURE` `FESTIVAL` `COURSE` `LEPORTS` `LODGING` `SHOPPING` `RESTAURANT`),
   `petAllowanceType`(`ALLOWED` `PARTIALLY_ALLOWED` `NOT_ALLOWED` `UNKNOWN`),
-  `lastPlaceId`(커서), `size`(1~50, 기본 20). **모두 단일값이며 배열이 아니다.**
+  `indoor`(true 면 실내만), `allowedPetSize`(`ALL`/`SMALL_ONLY`/`SMALL_MEDIUM`/`UNKNOWN`),
+  `sourceCategory`(원본 분류 자유 문자열, 예: 카페), `lastPlaceId`(커서), `size`(1~50, 기본 20).
+  **모두 단일값이며 배열이 아니다.**
+- **`indoor` 주의**: 원천에 정보가 없는 장소(`indoor: null`)는 true/false **어느 쪽 필터에도 잡히지 않는다.**
+- `PlaceItem` 에 `indoor` / `sourceCategory` / `sourceName`(출처 표시명) 필드가 있다.
 - `contentType` / `petAllowanceType` 은 **응답에서 metadata 객체**(`{code, name, description}`)로 온다 → 서버 문구를 그대로 렌더한다.
 - `placeId` 는 응답에서 **문자열**이다 (백엔드 내부는 long).
 - 지도 좌표는 백엔드가 `lat`/`lng` (Double) 로 정규화해 내려준다. 카카오는 `LatLng(위도, 경도)` 순서이므로 `lat` 이 먼저다 (`external-api-guide.md`).
@@ -90,6 +94,36 @@
 - 현재 LLM은 `StubLlmAdapter` 고정 샘플이다 → **결과가 매번 같은 것이 정상**이다.
 - XAI `reasons` 가 포함된다 → 서버 `description` 을 그대로 노출한다.
 - 저장·확정은 plan-service 몫이다. ai-service에 저장 API가 없다.
+
+## 5-1. 주변 장소 검색 — 착수 가능
+
+| 화면      | 경로   | API                  | 상태 |
+| --------- | ------ | -------------------- | ---- |
+| 주변 장소 | (미정) | `GET /places/nearby` | 기획 |
+
+파라미터: `lat` `lng`(필수), `radius`(기본 5000, 최대 50000), `contentType` `petAllowanceType` `indoor` `allowedPetSize` `sourceCategory`, `size`(1~50, 기본 15)
+
+응답 `NearbyPlaceResponse`: `{ places: [{ place, distanceMeters }], totalCount, radius }`
+
+주의: 목록(`/places`)과 달리 **커서가 아니라 `totalCount`** 를 준다 → 건수 표기가 가능하다.
+
+## 5-2. 긴급 시설 (동물병원·약국) — 착수 가능
+
+| 화면           | 경로   | API                           | 상태 |
+| -------------- | ------ | ----------------------------- | ---- |
+| 주변 긴급 시설 | (미정) | `GET /emergencies/facilities` | 기획 |
+
+파라미터: `lat` `lng`(필수), `radius`(기본 10000, 최대 50000), `type`(`ANIMAL_HOSPITAL`/`ANIMAL_PHARMACY`, 비우면 둘 다), `open24Only`(기본 false), `size`(1~50, 기본 10)
+
+**화면 설계에 직결되는 백엔드 지침** (스키마 설명에 명시돼 있다)
+
+- `operatingHoursKnown: false` → **"영업시간 정보 없음"으로 안내한다.** `operatingHours: null` 은 "휴무"가 아니라 "확인 필요"다
+- `open24Only=true` → **제주 동물병원 중 24시간은 3곳뿐**이라 결과가 매우 적다. 필터 UI에 이 사실을 알려야 한다
+- 응답에 `totalCount` 와 `providerName`(출처)이 있다
+
+> **BE 후속 요청**: `facilityId` 가 `long` 이고 예시값 `4611686018427387904` 는
+> `Number.MAX_SAFE_INTEGER` 를 초과한다. `placeId` 처럼 **String 직렬화가 필요**하다.
+> 그 전까지 이 값을 키·경로에 쓰지 않는다.
 
 ## 6. 대기 — 백엔드 미착수
 

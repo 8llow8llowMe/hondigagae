@@ -1,4 +1,5 @@
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
+import { isMockEnabled, resolveMock } from '@/lib/api/mock'
 import { unwrap } from '@/lib/api/response'
 import { serverEnv } from '@/lib/env.server'
 import type { ApiResponse } from '@/types/api'
@@ -27,6 +28,14 @@ export function gatewayUrl(path: string): string {
 
 export async function serverFetch<T>(path: string, options: ServerRequestOptions = {}): Promise<T> {
   const { method = 'GET', body, accessToken, signal } = options
+
+  // 개발용 mock (MOCK_API=true, 프로덕션에서는 항상 비활성).
+  // 처리 대상이 아니면 null 이라 그대로 게이트웨이로 넘어간다.
+  if (isMockEnabled()) {
+    const [rawPath, search = ''] = path.split('?')
+    const mock = resolveMock(rawPath ?? path, method, search)
+    if (mock !== null) return unwrap(mock.payload as ApiResponse<T>, mock.status)
+  }
 
   const headers: Record<string, string> = {}
   if (body !== undefined) headers['Content-Type'] = 'application/json'
