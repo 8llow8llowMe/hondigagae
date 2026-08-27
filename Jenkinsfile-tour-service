@@ -1,0 +1,29 @@
+// 혼디가개 tour-service 배포 잡.
+// 관광 데이터 조회와 여행 적합도(기상청).
+//
+// Jenkins 멀티브랜치 파이프라인 이름: hondigagae-tour-service
+// 배포 대상 PR 라벨:                  backend-tour-service
+//   dev  -> main-server (192.168.0.11), 호스트 포트 7082
+//   prod -> backend-1   (192.168.0.13), 호스트 포트 5082
+def backendPipeline
+node('builder-backend') {
+    checkout scm
+    backendPipeline = load 'Jenkinsfile.backend-common.groovy'
+}
+
+backendPipeline.run([
+    serviceGroup       : 'service',
+    serviceName        : 'tour-service',
+    modulePath         : 'service:tour-service',
+    fsPath             : 'backend/service/tour-service',
+    dockerfile         : 'tour-service.Dockerfile',
+    composeFile        : 'docker-compose-tour-service.yml',
+    composeServiceName : 'tour-service',
+    containerNamePrefix: 'hondigagae-tour-service',
+    deploySubdir       : 'service/tour-service',
+    buildAgentLabel    : 'builder-backend',
+    deployAgentLabels  : [
+        dev : 'deploy-backend-dev',
+        prod: 'deploy-backend-prod'
+    ]
+])
