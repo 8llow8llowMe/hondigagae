@@ -11,7 +11,7 @@ export type EmergencyFacility = {
   /**
    * **주의: 백엔드가 `long` 으로 내려준다.** 예시값 4611686018427387904 는
    * Number.MAX_SAFE_INTEGER(9007199254740991)를 초과해 JS에서 정밀도가 손상된다.
-   * `placeId` 처럼 String 직렬화를 요청해 둔 상태다 (BE 후속 요청).
+   * `placeId` 처럼 String 직렬화를 요청해 둔 상태다 (8llow8llowMe/hondigagae#8).
    * 그때까지 이 값을 키·경로에 쓰지 않는다.
    */
   facilityId: number

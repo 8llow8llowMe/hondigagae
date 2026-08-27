@@ -121,7 +121,7 @@
 - `open24Only=true` → **제주 동물병원 중 24시간은 3곳뿐**이라 결과가 매우 적다. 필터 UI에 이 사실을 알려야 한다
 - 응답에 `totalCount` 와 `providerName`(출처)이 있다
 
-> **BE 후속 요청**: `facilityId` 가 `long` 이고 예시값 `4611686018427387904` 는
+> **BE 후속 요청** ([#8](https://github.com/8llow8llowMe/hondigagae/issues/8)): `facilityId` 가 `long` 이고 예시값 `4611686018427387904` 는
 > `Number.MAX_SAFE_INTEGER` 를 초과한다. `placeId` 처럼 **String 직렬화가 필요**하다.
 > 그 전까지 이 값을 키·경로에 쓰지 않는다.
 
