@@ -1,4 +1,4 @@
-import { mockStore } from '@/lib/api/mock/store'
+import { mockStore, nextMemberId } from '@/lib/api/mock/store'
 import type { ApiResponse } from '@/types/api'
 
 /**
@@ -149,7 +149,12 @@ export function resolveAuthMock(
 
   if (path === '/auth/email/send-code' && method === 'POST') {
     const email = text(parse(body).email)
-    if (email.length === 0 || !EMAIL_PATTERN.test(email)) {
+
+    // AuthValidationMessage 순서: 필수 → 형식 (AuthEmailCodeSendRequest 의 @NotBlank / @Email)
+    if (email.length === 0) {
+      return failValidation([{ code: 'AUTH_101', field: 'email', message: '이메일은 필수입니다.' }])
+    }
+    if (!EMAIL_PATTERN.test(email)) {
       return failValidation([
         { code: 'AUTH_102', field: 'email', message: '이메일 형식이 올바르지 않습니다.' },
       ])
@@ -163,6 +168,22 @@ export function resolveAuthMock(
     const values = parse(body)
     const email = text(values.email)
     const code = text(values.code)
+
+    // AuthValidationMessage 순서: DTO 선언 순서(email → code) → 필수 → 형식.
+    // pendingEmails 조회보다 먼저 온다 — 공란 입력이 AUTH_005/AUTH_004 로 잘못 떨어지면 안 된다
+    if (email.length === 0) {
+      return failValidation([{ code: 'AUTH_101', field: 'email', message: '이메일은 필수입니다.' }])
+    }
+    if (!EMAIL_PATTERN.test(email)) {
+      return failValidation([
+        { code: 'AUTH_102', field: 'email', message: '이메일 형식이 올바르지 않습니다.' },
+      ])
+    }
+    if (code.length === 0) {
+      return failValidation([
+        { code: 'AUTH_104', field: 'code', message: '인증코드는 필수입니다.' },
+      ])
+    }
 
     if (!store.pendingEmails.has(email)) {
       return fail(
@@ -197,7 +218,7 @@ export function resolveAuthMock(
     }
 
     store.members.push({
-      memberId: String(store.nextMemberId++),
+      memberId: nextMemberId(store),
       email,
       password: text(values.password),
       name: text(values.name),
