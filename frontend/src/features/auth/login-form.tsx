@@ -23,7 +23,7 @@ export type LoginFormFieldsProps = {
   errors: FormErrors
   /** 실패한 요청의 HTTP 상태. 성공했거나 아직 요청을 보내지 않았으면 null */
   errorStatus: number | null
-  isSubmitting: boolean
+  submitting: boolean
   showPassword: boolean
   onValueChange: (key: keyof LoginValues, value: string) => void
   onTogglePassword: () => void
@@ -43,7 +43,7 @@ export function LoginFormFields({
   values,
   errors,
   errorStatus,
-  isSubmitting,
+  submitting,
   showPassword,
   onValueChange,
   onTogglePassword,
@@ -113,8 +113,8 @@ export function LoginFormFields({
         </div>
       </Field>
 
-      <Button type="submit" size="lg" loading={isSubmitting} className="mt-2">
-        {isSubmitting ? messages.auth.loginSubmitting : messages.auth.loginSubmit}
+      <Button type="submit" size="lg" loading={submitting} className="mt-2">
+        {submitting ? messages.auth.loginSubmitting : messages.auth.loginSubmit}
       </Button>
     </form>
   )
@@ -185,9 +185,15 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
         values={values}
         errors={errors}
         errorStatus={errorStatus}
-        isSubmitting={isSubmitting}
+        submitting={isSubmitting}
         showPassword={showPassword}
-        onValueChange={(key, value) => setValue(key, value)}
+        onValueChange={(key, value) => {
+          // 5xx/무응답을 받으면 ErrorState 가 폼을 대체해 입력을 고칠 수단이 사라진다.
+          // 값을 고치면 다시 폼으로 돌아오게 한다 — 로그인-세부명세.md D4/D5(폼은 그대로
+          // 유지), 이슈 #24 최종 리뷰 I1.
+          setErrorStatus(null)
+          setValue(key, value)
+        }}
         onTogglePassword={() => setShowPassword((previous) => !previous)}
         onSubmit={() => void submit()}
         onRetry={() => void submit()}

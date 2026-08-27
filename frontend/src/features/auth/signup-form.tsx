@@ -79,8 +79,21 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
       ? 0
       : remainingSeconds(cooldownStartedAt, RESEND_COOLDOWN_SECONDS, Date.now())
 
-  // 단계 전환 시 새 단계의 첫 입력으로 포커스를 옮긴다 — 회원가입-세부명세.md D6
+  // 단계 전환 시 새 단계의 첫 입력으로 포커스를 옮긴다 — 회원가입-세부명세.md D6.
+  // "전환 시" 이지 "진입 시" 가 아니다: 첫 렌더에도 이 effect 가 돌면 /signup 진입
+  // 즉시 이메일 입력으로 포커스가 가서 스크린리더가 제목·단계 표시를 건너뛴다
+  // — 이슈 #24 최종 리뷰 M8.
+  //
+  // "최초 실행 여부"가 아니라 **직전에 본 step 과 실제로 달라졌는지**로 판정한다.
+  // React StrictMode(dev 기본값)는 마운트 시 이 effect 를 두 번 호출하는데, "최초
+  // 실행만 건너뛴다"는 플래그 방식은 그 두 번째 호출을 "전환"으로 오인해 진입
+  // 즉시 포커스를 훔친다 — 실측(localhost:5174)으로 확인한 회귀. previousStepRef 를
+  // step 값 자체로 초기화하면 (a) 진짜 첫 마운트와 StrictMode 의 재호출 모두
+  // "안 바뀜"으로 판정되고 (b) 실제 단계 전환만 "바뀜"으로 판정된다.
+  const previousStepRef = useRef<Step>(step)
   useEffect(() => {
+    if (previousStepRef.current === step) return
+    previousStepRef.current = step
     const focusId = step === 'email' ? 'email' : step === 'code' ? 'code' : 'password'
     containerRef.current?.querySelector<HTMLElement>(`#${focusId}`)?.focus()
   }, [step])
@@ -215,6 +228,22 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
     },
   })
 
+  // 3단계(비밀번호·이름·닉네임 입력) 이탈 경고. `beforeunload` 로 브라우저 이탈만
+  // 다루고 App Router 내 라우트 이동은 경고하지 않는다 — App Router 에 이동을
+  // 가로채는 공식 API 가 없다 (form-guide.md §7, 회원가입-세부명세.md D8-4).
+  // dirty 이면서 제출 중이 아닐 때만 건다 — 제출 중에 걸면 성공 리다이렉트 직전에도
+  // 경고가 뜬다.
+  useEffect(() => {
+    if (step !== 'profile' || !profileForm.isDirty || profileForm.isSubmitting) return
+
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault()
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [step, profileForm.isDirty, profileForm.isSubmitting])
+
   const handleResend = useCallback(() => {
     // 쿨다운 가드에 더해 재진입 가드(ref)를 겹친다 — disabled 반영 전 빠른 연속
     // 클릭으로 sendEmailCode 가 중복 호출되는 것을 막는다 (form-guide.md §6)
@@ -256,9 +285,11 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
           values={emailForm.values}
           errors={emailStepErrors}
           errorStatus={emailErrorStatus}
-          isSubmitting={emailForm.isSubmitting}
+          submitting={emailForm.isSubmitting}
           onValueChange={(key, value) => {
             setStepBackMessage(null)
+            // 5xx/무응답 ErrorState 에서 입력을 고치면 폼으로 복귀한다 — I1 과 동일한 패턴
+            setEmailErrorStatus(null)
             emailForm.setValue(key, value)
           }}
           onSubmit={() => void emailForm.submit()}
@@ -277,11 +308,15 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
           values={codeForm.values}
           errors={codeForm.errors}
           errorStatus={codeErrorStatus}
-          isSubmitting={codeForm.isSubmitting}
+          submitting={codeForm.isSubmitting}
           cooldownSeconds={cooldownSeconds}
           resending={isResending}
           notice={messages.auth.codeSent}
-          onValueChange={(key, value) => codeForm.setValue(key, value)}
+          onValueChange={(key, value) => {
+            // 5xx/무응답 ErrorState 에서 입력을 고치면 폼으로 복귀한다 — I1 과 동일한 패턴
+            setCodeErrorStatus(null)
+            codeForm.setValue(key, value)
+          }}
           onSubmit={() => void codeForm.submit()}
           onResend={handleResend}
           onChangeEmail={() => {
@@ -303,15 +338,20 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
         values={profileForm.values}
         errors={profileForm.errors}
         errorStatus={profileErrorStatus}
-        isSubmitting={profileForm.isSubmitting}
+        submitting={profileForm.isSubmitting}
         duplicateEmail={duplicateEmail}
         returnTo={returnTo}
-        notice={messages.auth.codeVerified}
+        // errors.form 이 있으면(409 포함) 성공 안내를 끈다 — 안 그러면 "이메일 인증이
+        // 완료됐어요."(role=status) 와 오류(role=alert) 가 동시에 뜬다. 새 state 를
+        // 늘리지 않고 이미 있는 errors.form 으로 판정한다 — 이슈 #24 최종 리뷰 M7.
+        notice={profileForm.errors.form === null ? messages.auth.codeVerified : undefined}
         onValueChange={(key, value) => {
           // duplicateEmail 은 여기서 지우지 않는다 — 409 이후에도 "로그인하기" 링크가
           // 계속 보여야 한다(정본 D4). 지우는 지점은 profileForm 의 다음 제출 결과
           // (성공 / 409 아닌 다른 오류)뿐이다 — 그 외에는 값을 고쳐도 이 화면에서
           // 할 수 있는 일이 없다(이메일은 1단계 값이라 여기서 못 바꾼다).
+          // 5xx/무응답 ErrorState 에서 입력을 고치면 폼으로 복귀한다 — I1 과 동일한 패턴
+          setProfileErrorStatus(null)
           profileForm.setValue(key, value)
         }}
         onSubmit={() => void profileForm.submit()}

@@ -12,7 +12,7 @@ function render(overrides: Partial<LoginFormFieldsProps> = {}) {
     values: { email: '', password: '' },
     errors: NO_FORM_ERRORS,
     errorStatus: null,
-    isSubmitting: false,
+    submitting: false,
     showPassword: false,
     onValueChange: () => undefined,
     onTogglePassword: () => undefined,
@@ -55,7 +55,7 @@ describe('LoginFormFields', () => {
   })
 
   it('제출 중에는 버튼이 비활성이고 aria-busy 다', () => {
-    const markup = render({ isSubmitting: true })
+    const markup = render({ submitting: true })
 
     expect(markup).toContain('disabled')
     expect(markup).toContain('aria-busy="true"')
