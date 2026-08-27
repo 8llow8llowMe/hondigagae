@@ -5,7 +5,7 @@ import { GATEWAY_UNREACHABLE_STATUS, gatewayUnreachablePayload } from '@/lib/api
 import { isMockEnabled, resolveMock } from '@/lib/api/mock'
 import { gatewayUrl } from '@/lib/api/server'
 import { extractRefreshToken, toCookieHeader } from '@/lib/auth/refresh-cookie'
-import { canRetryReissue, isReissuePath } from '@/lib/auth/reissue'
+import { canRetryReissue, isAuthEntryPath, isReissuePath } from '@/lib/auth/reissue'
 import { clearSession, readSession, type Session, writeSession } from '@/lib/auth/session'
 
 /**
@@ -146,8 +146,15 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
     isReissuePath(path) ? (session?.refreshToken ?? null) : null,
   )
 
-  // 401 → reissue 1회 → 원 요청 재시도
-  if (result.status === 401 && session !== null && !isReissuePath(path) && canRetryReissue(0)) {
+  // 401 → reissue 1회 → 원 요청 재시도.
+  // 인증 진입 경로(로그인)의 401 은 로그인 실패라 재발급으로 복구되지 않는다
+  if (
+    result.status === 401 &&
+    session !== null &&
+    !isReissuePath(path) &&
+    !isAuthEntryPath(path) &&
+    canRetryReissue(0)
+  ) {
     const reissued = await callGateway(
       '/auth/token/reissue',
       '',
