@@ -11,12 +11,13 @@ export function fail(resultCode: string, resultMessage: unknown = null): ApiResp
 }
 
 /**
- * Bean Validation 실패처럼 resultMessage 가 문자열이 아닌 경우.
- * 백엔드 타입이 Object 라서 실제로 발생한다.
+ * Bean Validation 실패 응답.
+ * resultMessage 는 문자열이 아니라 ValidationErrorBody 객체다
+ * — backend/core `ValidationErrorSupport` 실측.
  */
 export function failWithFields(
   resultCode: string,
-  fields: Record<string, string>,
+  errors: { code: string; field: string; message: string }[],
 ): ApiResponse<never> {
-  return fail(resultCode, fields)
+  return fail(resultCode, { message: errors[0]?.message ?? '', errors })
 }
