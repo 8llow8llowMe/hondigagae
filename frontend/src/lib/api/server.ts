@@ -38,6 +38,7 @@ export async function serverFetch<T>(path: string, options: ServerRequestOptions
       method,
       search,
       body === undefined ? null : JSON.stringify(body),
+      accessToken ?? null,
     )
     if (mock !== null) return unwrap(mock.payload as ApiResponse<T>, mock.status)
   }

@@ -15,6 +15,28 @@ export type MockMember = {
   nickname: string
 }
 
+/**
+ * 저장된 반려견. 응답 DTO(`PetResponse`)가 아니라 **저장 형태**다 —
+ * enum 은 code 만 들고 있고, 응답을 만들 때 metadata 객체로 부풀린다.
+ * `age` 도 저장하지 않는다. 백엔드가 `birthYm` 으로 계산하는 파생값이다.
+ */
+export type MockPet = {
+  petId: string
+  memberId: string
+  name: string
+  breed: string | null
+  birthYm: string | null
+  sizeType: string
+  heatSensitive: boolean
+  coldSensitive: boolean
+  noiseSensitive: boolean
+  activityLevel: string
+  walkPreferred: boolean
+  sociality: string
+  /** 백엔드가 소프트 삭제다 — 삭제 후에도 행이 남는다 */
+  deleted: boolean
+}
+
 export type MockStore = {
   members: MockMember[]
   /** 인증을 마친 이메일 (백엔드는 30분 TTL — mock 은 만료를 흉내 내지 않는다) */
@@ -23,6 +45,9 @@ export type MockStore = {
   pendingEmails: Set<string>
   /** memberId 조립용 순번. Number.MAX_SAFE_INTEGER 안쪽 값만 들고 있는다 — nextMemberId() 참고 */
   nextMemberSeq: number
+  pets: MockPet[]
+  /** petId 조립용 순번. memberId 와 같은 이유로 Number 로 다루지 않는다 */
+  nextPetSeq: number
 }
 
 const STORE_KEY = Symbol.for('hondigagae.mock.store')
@@ -48,6 +73,16 @@ export function nextMemberId(store: MockStore): string {
   return id
 }
 
+/** 백엔드 petId 는 Snowflake 다. memberId 와 같은 이유로 문자열 조립으로 만든다 */
+const PET_ID_PREFIX = '123456789012'
+const PET_ID_SEQ_DIGITS = 6
+
+export function nextPetId(store: MockStore): string {
+  const id = `${PET_ID_PREFIX}${String(store.nextPetSeq).padStart(PET_ID_SEQ_DIGITS, '0')}`
+  store.nextPetSeq += 1
+  return id
+}
+
 function createStore(): MockStore {
   return {
     members: [
@@ -62,6 +97,56 @@ function createStore(): MockStore {
     verifiedEmails: new Set<string>(),
     pendingEmails: new Set<string>(),
     nextMemberSeq: 2,
+    pets: [
+      {
+        petId: '123456789012000001',
+        memberId: '900000000000000001',
+        name: '몽실이',
+        breed: '말티즈',
+        birthYm: '2017-05',
+        sizeType: 'SMALL',
+        heatSensitive: true,
+        coldSensitive: false,
+        noiseSensitive: true,
+        activityLevel: 'MEDIUM',
+        walkPreferred: true,
+        sociality: 'HIGH',
+        deleted: false,
+      },
+      {
+        // breed / birthYm 이 없는 경우 — 카드에서 숨김 분기를 확인할 수 있어야 한다
+        petId: '123456789012000002',
+        memberId: '900000000000000001',
+        name: '초코',
+        breed: null,
+        birthYm: null,
+        sizeType: 'LARGE',
+        heatSensitive: false,
+        coldSensitive: true,
+        noiseSensitive: false,
+        activityLevel: 'HIGH',
+        walkPreferred: true,
+        sociality: 'LOW',
+        deleted: false,
+      },
+      {
+        // 다른 회원의 반려견 — 조회하면 404 여야 한다 (403 이 아니다)
+        petId: '123456789012000099',
+        memberId: '900000000000000777',
+        name: '남의개',
+        breed: null,
+        birthYm: null,
+        sizeType: 'MEDIUM',
+        heatSensitive: false,
+        coldSensitive: false,
+        noiseSensitive: false,
+        activityLevel: 'LOW',
+        walkPreferred: false,
+        sociality: 'MEDIUM',
+        deleted: false,
+      },
+    ],
+    nextPetSeq: 3,
   }
 }
 

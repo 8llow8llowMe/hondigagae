@@ -1,5 +1,6 @@
 import type { MockResult } from '@/lib/api/mock/auth-data'
 import { resolveAuthMock } from '@/lib/api/mock/auth-data'
+import { resolvePetMock } from '@/lib/api/mock/pet-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import { mockPlaceDetail } from '@/lib/api/mock/place-detail-data'
 import type { ApiResponse, SliceResponse } from '@/types/api'
@@ -56,9 +57,14 @@ export function resolveMock(
   method: string,
   search: string,
   body: string | null,
+  accessToken: string | null = null,
 ): MockResult | null {
   const auth = resolveAuthMock(path, method, body)
   if (auth !== null) return auth
+
+  // 반려견은 보호 리소스다. accessToken 에서 회원을 도출해 소유권을 판정한다
+  const pet = resolvePetMock(path, method, body, accessToken)
+  if (pet !== null) return pet
 
   if (method !== 'GET') return null
 
