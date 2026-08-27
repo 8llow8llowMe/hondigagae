@@ -43,6 +43,12 @@ public record NearbyFacilityItem(
     boolean open24,
 
     @Schema(
+        description = "지금 영업 중인지. null 이면 영업시간 정보가 없어 판정할 수 없는 곳이다 — "
+            + "\"닫힘\"으로 표시하지 말고 전화 확인을 안내해야 한다",
+        example = "true", nullable = true)
+    Boolean openNow,
+
+    @Schema(
         description = "운영시간 정보 보유 여부. false 면 화면에서 \"영업시간 정보 없음\"으로 안내해야 한다",
         example = "true")
     boolean operatingHoursKnown,

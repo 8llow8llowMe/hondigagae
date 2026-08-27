@@ -11,6 +11,7 @@ import com.hondigagae.domainlayer.placeimport.domain.model.ImportedCultureFacili
 import com.hondigagae.domainlayer.placeimport.domain.model.OperatingHoursParser;
 import com.hondigagae.domainlayer.placeimport.domain.model.PetFieldParser;
 import com.hondigagae.domainlayer.placeimport.domain.model.PlaceIdFactory;
+import com.hondigagae.shared.travel.schedule.WeeklySchedule;
 import com.hondigagae.global.properties.CultureFacilityProperties;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -169,6 +170,7 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
         String lotAddress = value(values, header, COL_LOT_ADDR);
         String address = isBlank(roadAddress) ? lotAddress : roadAddress;
         String hours = OperatingHoursParser.normalizeHours(value(values, header, COL_USE_TIME));
+        WeeklySchedule weekly = OperatingHoursParser.parseWeekly(hours);
 
         return ImportedEmergencyFacility.builder()
             .sourceKey(PlaceIdFactory.sourceKeyOf(name, address))
@@ -180,6 +182,7 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
             .lng(toDecimal(value(values, header, COL_LNG)))
             .tel(value(values, header, COL_TEL))
             .operatingHours(hours)
+            .weeklyHoursSpec(weekly == null ? null : weekly.toSpec())
             .restDate(OperatingHoursParser.normalizeHours(value(values, header, COL_REST_DATE)))
             .open24(OperatingHoursParser.isOpen24(name, hours))
             .sourceModifiedAt(toDateTime(value(values, header, COL_MODIFIED)))

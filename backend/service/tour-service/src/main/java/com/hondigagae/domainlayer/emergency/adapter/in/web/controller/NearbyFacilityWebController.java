@@ -61,6 +61,10 @@ public class NearbyFacilityWebController {
         @Parameter(description = "24시간 운영으로 확인된 곳만 볼지", example = "false")
         @RequestParam(defaultValue = "false") boolean open24Only,
 
+        @Parameter(description = "지금 영업 중으로 확인된 곳만 볼지. 영업시간을 모르는 곳도 빠지므로 "
+            + "결과가 줄어든다", example = "false")
+        @RequestParam(defaultValue = "false") boolean openNowOnly,
+
         @Parameter(description = "조회 개수 (1~50)", example = "10")
         @Min(value = 1, message = EmergencyValidationMessage.SIZE_RANGE_INVALID)
         @Max(value = 50, message = EmergencyValidationMessage.SIZE_RANGE_INVALID)
@@ -72,6 +76,7 @@ public class NearbyFacilityWebController {
             .radius(radius)
             .facilityType(type)
             .open24Only(open24Only)
+            .openNowOnly(openNowOnly)
             .size(size)
             .build();
 

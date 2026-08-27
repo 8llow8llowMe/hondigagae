@@ -42,6 +42,7 @@ public class NearbyFacilityPresenter {
             .operatingHours(hours)
             .restDate(info.restDate())
             .open24(info.open24())
+            .openNow(info.openNow())
             // 동물병원은 절반이 운영시간을 주지 않는다(약국은 98%가 준다).
             // null 을 "휴무"로 오해하지 않도록 플래그를 따로 내린다.
             .operatingHoursKnown(hours != null && !hours.isBlank())

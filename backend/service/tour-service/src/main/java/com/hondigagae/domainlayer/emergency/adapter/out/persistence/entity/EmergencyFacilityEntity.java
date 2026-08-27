@@ -91,6 +91,10 @@ public class EmergencyFacilityEntity extends BaseEntity {
     @Comment("휴무일")
     private String restDate;
 
+    @Column(length = 300)
+    @Comment("구조화된 주간 영업시간(WeeklySchedule spec). null 이면 원문을 풀 수 없었던 곳 — 영업 여부를 모름으로 본다")
+    private String weeklyHoursSpec;
+
     @Column(nullable = false)
     @Comment("24시간 운영 여부. 상호에 24시가 있거나 운영시간이 00:00~24:00 인 경우만 true")
     private boolean open24;

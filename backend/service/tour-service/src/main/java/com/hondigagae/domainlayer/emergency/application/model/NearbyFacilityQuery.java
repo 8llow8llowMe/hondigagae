@@ -12,6 +12,8 @@ public record NearbyFacilityQuery(
     EmergencyFacilityType facilityType,
     // true 면 24시간 운영으로 확인된 곳만 본다.
     boolean open24Only,
+    // true 면 지금 영업 중으로 확인된 곳만 본다. 영업시간을 모르는 곳도 빠진다.
+    boolean openNowOnly,
     int size
 ) {
 
