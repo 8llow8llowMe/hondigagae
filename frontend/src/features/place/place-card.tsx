@@ -60,7 +60,9 @@ export function PlaceCard({ place }: { place: PlaceSummary }) {
           {place.addr1 !== null && (
             <p className="text-body-2 text-fg-muted mt-1 line-clamp-1">{place.addr1}</p>
           )}
-          {place.tel !== null && <p className="text-caption text-fg-subtle mt-1">{place.tel}</p>}
+          {place.tel !== null && (
+            <p className="text-caption text-fg-subtle mt-1 font-medium">{place.tel}</p>
+          )}
         </div>
       </Link>
     </Card>

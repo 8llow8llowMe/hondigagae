@@ -422,17 +422,45 @@ jobs:
 - 컴포넌트는 `bg-brand-500` 같은 **토큰 클래스만** 쓴다. raw hex는 §5의 lint 규칙이 막는다.
 - `src/styles/**` 는 색 하드코딩 lint 예외 대상이다 (토큰 정의부).
 
-## 12. 폰트 (Pretendard)
+## 12. 폰트 (Pretendard Variable, dynamic subset)
 
-`DESIGN.md` §3에서 Pretendard를 쓴다고 정했지만 **에셋 조달 절차가 필요하다.**
+**적용 완료.** `pnpm add pretendard` (OFL-1.1) 후 `app/layout.tsx` 가 CSS 를 import 한다.
 
-1. Pretendard 배포판에서 **서브셋 `woff2`** 를 받아 `public/fonts/` 또는 `src/styles/fonts/` 에 둔다.
-2. `next/font/local` 로 선언하고 `display: 'swap'`, `preload` 를 설정한다.
-3. 폰트 파일은 바이너리다 → 루트 `.gitattributes` 에 `*.woff2 binary` 가 이미 있다.
-4. **라이선스(OFL) 고지를 저장소에 포함한다.**
-5. 한글 전체 웨이트를 다 넣으면 용량이 크다. **필요한 weight(400/600/700)만** 넣는다.
+```ts
+// app/layout.tsx — globals.css 보다 먼저 (@font-face 가 먼저 선언되어야 한다)
+import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css'
+```
 
-폴백 스택은 `DESIGN.md` §3에 정의돼 있다. 폰트 로드 실패 시에도 레이아웃이 깨지지 않는지 확인한다.
+`--font-sans` 는 `app/globals.css` 의 `@theme` 에서 `'Pretendard Variable'` 을 첫 순위로 둔다.
+
+### 왜 이 배포본인가 (실측 비교)
+
+| 방식                           | 총량           | 9 weight | 실제 다운로드                          |
+| ------------------------------ | -------------- | -------- | -------------------------------------- |
+| static woff2 × 9 (전체 글리프) | 6.6 MB         | ✅       | 쓴 weight 마다 ~750KB                  |
+| variable woff2 통짜            | 2.0 MB         | ✅       | 무조건 2.0MB                           |
+| static subset × 9              | 2.3 MB         | ✅       | 개당 ~265KB                            |
+| **variable dynamic-subset**    | 3.0MB / 92파일 | ✅       | **등장한 글자 범위만, 조각 평균 31KB** |
+
+여행 중 모바일에서 보는 서비스라 **초기 로드**가 가장 중요하다. dynamic subset 은
+`unicode-range` 로 92개 조각을 선언하고 브라우저가 페이지에 실제 나온 글자 범위만 받는다.
+
+가변 축은 `font-weight: 45 920` 이라 100~900 전 구간이 동작한다.
+
+### 트레이드오프 (알고 선택한 것)
+
+`next/font/local` 을 쓰지 않는다. `unicode-range` 분할을 지원하지 않기 때문이다. 그래서 잃는 것:
+
+| 항목                                               | 상태 | 대응                                                                                               |
+| -------------------------------------------------- | ---- | -------------------------------------------------------------------------------------------------- |
+| 자동 preload                                       | ✕    | 초기 로드가 이미 작아 영향이 제한적                                                                |
+| **폰트 metric 기반 CLS 보정** (`size-adjust` 폴백) | ✕    | `font-display: swap` + 폴백 스택 정렬로 완화. **레이아웃 이동이 문제가 되면 이 결정을 재검토한다** |
+| self-host                                          | ✅   | node_modules → 번들러가 에셋으로 방출                                                              |
+
+### 라이선스
+
+OFL-1.1. `node_modules/pretendard` 에 라이선스가 포함되고 CSS 상단에도 고지가 들어 있다.
+배포물에 별도 고지 페이지가 필요한지는 공모전 제출 요건 확인 후 결정한다.
 
 ## 13. 적용 결과 / 스펙과의 편차 (2026-08-26 Phase 3)
 

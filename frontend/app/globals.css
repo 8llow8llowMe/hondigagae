@@ -43,10 +43,11 @@
   --shadow-lg: var(--shadow-lg);
 
   /* 타이포 — DESIGN.md §3
-     TODO(FONT): Pretendard 서브셋 woff2 조달 후 next/font/local 로 교체.
-     절차는 docs/tooling-guide.md §12. 지금은 폴백 스택만 적용한다. */
+     Pretendard Variable (가변 축 45~920) → weight 100~900 전 구간 사용 가능.
+     @font-face 는 app/layout.tsx 가 import 하는 dynamic subset CSS 가 선언한다. */
   --font-sans:
-    -apple-system, BlinkMacSystemFont, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Malgun Gothic',
+    'Apple SD Gothic Neo', sans-serif;
 
   --text-display: 28px;
   --text-display--line-height: 36px;
