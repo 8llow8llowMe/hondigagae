@@ -13,9 +13,31 @@ description: "혼디가개(hondigagae) GitHub Pull Request 본문을 한국어 �
 
 핵심:
 - **`Issue Number: #N` 을 반드시 채운다.** 비워 두지 않는다.
+- **PR 생성 시 assignee 와 라벨을 함께 지정한다.** 나중에 붙이려고 미루지 않는다 (`git-workflow.md` §6).
 - 머지는 **`Rebase and merge`** 만 쓴다 (`gh pr merge <번호> --rebase --delete-branch`).
 - **30파일 / 1,000줄을 넘으면** 쪼갤 수 있는지 검토하고, 넘겨야 하면 **이유를 본문에 적는다.**
 - CI 통과가 머지 조건이다.
+
+## 생성 명령
+
+```bash
+gh pr create --base develop \
+  --title "[FE] feat: 장소 상세 화면 구현" \
+  --body-file <본문> \
+  --assignee @me \
+  --label frontend-web
+```
+
+| 변경 범위 | 라벨 |
+|-----------|------|
+| `frontend/` | `frontend-web` |
+| `backend/service/<name>-service` | `backend-<name>-service` (`tour` / `auth` / `plan` / `ai` / `batch`) |
+| `backend/core/**` | `backend-core` |
+| 게이트웨이 / 유레카 | `backend-api-gateway` / `backend-service-discovery` |
+| 백엔드 문서 | `backend-docs` |
+
+여러 영역에 걸치면 `--label` 을 반복해 **모두** 붙인다.
+이미 만든 PR 은 `gh pr edit <번호> --add-assignee @me --add-label <라벨>` 로 보정한다.
 
 ## Workflow
 
@@ -24,6 +46,7 @@ description: "혼디가개(hondigagae) GitHub Pull Request 본문을 한국어 �
 3. 본문은 바로 복사 가능한 Markdown만 출력한다.
 4. 실제 확인하지 않은 체크박스는 체크하지 않는다.
 5. 이슈 번호가 없으면 `Issue Number: #`로 둔다.
+6. **assignee(`@me`)와 라벨을 빠뜨리지 않는다.** 라벨은 변경 범위로 정한다 — `git status` 로 어느 워크스페이스가 바뀌었는지 확인한다.
 
 ## Template
 

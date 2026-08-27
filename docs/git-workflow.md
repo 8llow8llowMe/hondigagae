@@ -93,12 +93,50 @@ GitHub 의 `Rebase and merge` 가 히스토리를 예상과 다르게 평탄화�
 
 ```bash
 git push -u origin feature/fe/12-place-detail
-gh pr create --base develop --title "[FE] feat: 장소 상세 화면 구현" --body-file <본문>
+gh pr create --base develop \
+  --title "[FE] feat: 장소 상세 화면 구현" \
+  --body-file <본문> \
+  --assignee @me \
+  --label frontend-web
 ```
 
 - 본문은 `.github/PULL_REQUEST_TEMPLATE.md` 를 채운다. `/pr` 스킬을 쓰면 된다.
 - **`Issue Number: #12` 를 반드시 채운다.** 비워 두지 않는다.
 - 제목은 이슈 제목과 같게 둔다.
+
+### assignee / 라벨 (필수)
+
+> **PR 을 만들 때 assignee 와 라벨을 함께 지정한다.** 나중에 붙이려고 미루지 않는다.
+
+| 항목 | 값 |
+|------|-----|
+| assignee | **작성자 본인** (`--assignee @me`). 여럿이 작업했으면 전부 추가한다 |
+| 라벨 | **이슈와 같은 서비스 라벨** (`--label frontend-web` 등) |
+
+라벨은 이슈(§2)와 같은 목록을 쓴다.
+
+| 변경 범위 | 라벨 |
+|-----------|------|
+| `frontend/` | `frontend-web` |
+| `backend/service/tour-service` | `backend-tour-service` |
+| `backend/service/auth-service` | `backend-auth-service` |
+| `backend/service/plan-service` | `backend-plan-service` |
+| `backend/service/ai-service` | `backend-ai-service` |
+| `backend/service/batch-service` | `backend-batch-service` |
+| `backend/core/**` | `backend-core` |
+| 게이트웨이 / 유레카 | `backend-api-gateway` / `backend-service-discovery` |
+| 백엔드 문서 | `backend-docs` |
+
+여러 영역에 걸치면 해당 라벨을 **모두** 붙인다 (`--label frontend-web --label backend-tour-service`).
+
+**이유**: 이 저장소는 브랜치 보호를 쓸 수 없어(§8) 자동화로 강제할 수단이 없다. assignee 가 비어
+있으면 "누가 들고 있는 작업인지" 를 PR 목록에서 알 수 없고, 라벨이 없으면 영역별 필터가 무너진다.
+
+이미 만든 PR 에 붙이려면:
+
+```bash
+gh pr edit <번호> --add-assignee @me --add-label frontend-web
+```
 
 ### 크기
 
@@ -161,6 +199,8 @@ PR 올리기 전:
 - [ ] 커밋이 의미 단위이고 prefix 가 맞다
 - [ ] 완료 체크리스트를 통과했다
 - [ ] 30파일을 넘으면 이유를 본문에 적었다
+- [ ] **assignee 를 본인으로 지정했다**
+- [ ] **라벨을 변경 범위에 맞게 붙였다** (이슈와 같은 라벨)
 
 머지할 때:
 
