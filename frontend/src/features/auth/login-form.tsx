@@ -7,12 +7,13 @@ import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/button'
+import { ErrorState } from '@/components/error-state'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
 import { Input } from '@/components/input'
 import { loginSchema, type LoginValues } from '@/features/auth/schemas'
 import { login, type LoginResult } from '@/lib/api/auth'
-import { ApiError } from '@/lib/api/error'
+import { ApiError, classify, NO_RESPONSE_STATUS } from '@/lib/api/error'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
@@ -20,11 +21,14 @@ import { messages } from '@/lib/messages'
 export type LoginFormFieldsProps = {
   values: LoginValues
   errors: FormErrors
+  /** 실패한 요청의 HTTP 상태. 성공했거나 아직 요청을 보내지 않았으면 null */
+  errorStatus: number | null
   isSubmitting: boolean
   showPassword: boolean
   onValueChange: (key: keyof LoginValues, value: string) => void
   onTogglePassword: () => void
   onSubmit: () => void
+  onRetry: () => void
 }
 
 /**
@@ -38,12 +42,28 @@ export type LoginFormFieldsProps = {
 export function LoginFormFields({
   values,
   errors,
+  errorStatus,
   isSubmitting,
   showPassword,
   onValueChange,
   onTogglePassword,
   onSubmit,
+  onRetry,
 }: LoginFormFieldsProps) {
+  // 5xx·무응답만 ErrorState 다. 게이트웨이가 죽었을 때 입력 오류로 오해하지 않게
+  // 재시도 수단을 준다 — 로그인-세부명세.md D4/D5. 429(잠금)는 여기 포함하지 않는다:
+  // classify(429) 는 'rate-limited' 라 시간이 지나야 풀리는데 재시도 버튼을 주면
+  // 오히려 잠금을 연장한다 — 아래 FormAlert 경로로 그대로 둔다.
+  if (errorStatus !== null && classify(errorStatus) === 'temporary') {
+    return (
+      <ErrorState
+        title={messages.common.temporaryErrorTitle}
+        description={messages.common.temporaryErrorDescription}
+        onRetry={onRetry}
+      />
+    )
+  }
+
   return (
     <form
       noValidate
@@ -105,13 +125,13 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
   const queryClient = useQueryClient()
   const [showPassword, setShowPassword] = useState(false)
 
-  // 필드로 좁혀지지 않는 401(AUTH_006) 을 구분하기 위한 값.
-  // useForm 의 onSubmit 클로저 안에서만 상태 코드를 볼 수 있어 ref 에 잠시 담는다.
-  const lastErrorStatusRef = useRef<number | null>(null)
-  // 첫 오류 필드로 포커스를 옮기기 위한 컨테이너 — 필드 id 로 실제 입력 요소를 찾는다.
+  // 필드로 좁혀지지 않는 응답(401 / 429 / 5xx)을 구분하기 위한 값.
+  // FormErrors 는 메시지만 담고 상태 코드를 담지 않아 별도로 추적한다.
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
+  // 첫 오류 필드·비밀번호 재포커스에 쓴다 — 필드 id 로 실제 입력 요소를 찾는다.
   const formContainerRef = useRef<HTMLDivElement>(null)
 
-  const { values, errors, isSubmitting, setValue, submit, firstErrorField } = useForm<
+  const { values, errors, isSubmitting, setValue, submit, firstErrorField, submitCount } = useForm<
     LoginValues,
     LoginResult
   >({
@@ -119,9 +139,12 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
     initialValues: { email: initialEmail, password: '' },
     onSubmit: async (submitted) => {
       try {
-        return await login(submitted)
+        const result = await login(submitted)
+        setErrorStatus(null)
+        return result
       } catch (error) {
-        lastErrorStatusRef.current = error instanceof ApiError ? error.status : null
+        // ApiError 가 아니면 전송 단계 실패(무응답)로 본다 — src/lib/api/error.ts 의 관례와 같다
+        setErrorStatus(error instanceof ApiError ? error.status : NO_RESPONSE_STATUS)
         throw error
       }
     },
@@ -133,19 +156,27 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
     },
   })
 
+  // submitCount 만 의존한다. errors/firstErrorField 를 넣으면 입력 중 setValue 가
+  // 남은 필드 오류를 지우며 errors 객체를 새로 만들 때마다 effect 가 다시 돌아
+  // 타이핑 중인 필드에서 포커스를 훔친다. submitCount 는 "제출이 실패로 끝났다"
+  // 는 이벤트만 신호로 쓰므로 이 문제와, 같은 오류가 연속될 때 값이 안 바뀌어
+  // 재실행이 안 되는 문제를 동시에 피한다 — use-form.ts 의 submitCount 주석 참고.
   useEffect(() => {
+    if (submitCount === 0) return
+
     if (firstErrorField !== null) {
       formContainerRef.current?.querySelector<HTMLElement>(`#${firstErrorField}`)?.focus()
       return
     }
 
-    // 이메일/비밀번호 불일치(AUTH_006)는 필드를 특정하지 못하는 폼 전체 오류로 온다.
-    // 오타는 대개 비밀번호 쪽이라 비밀번호만 비우고 이메일은 남긴다.
-    if (lastErrorStatusRef.current === 401) {
+    // 이메일/비밀번호 불일치(401 AUTH_006)는 필드를 특정하지 못하는 폼 전체
+    // 오류로 온다. 오타는 대개 비밀번호 쪽이라 비밀번호만 비우고 이메일은
+    // 남기며, 비운 자리로 바로 포커스를 옮긴다 — 로그인-세부명세.md D4.
+    if (errorStatus === 401) {
       setValue('password', '')
+      formContainerRef.current?.querySelector<HTMLElement>('#password')?.focus()
     }
-    lastErrorStatusRef.current = null
-  }, [errors, firstErrorField, setValue])
+  }, [submitCount])
 
   return (
     <div ref={formContainerRef} className="flex flex-col gap-6">
@@ -153,11 +184,13 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
       <LoginFormFields
         values={values}
         errors={errors}
+        errorStatus={errorStatus}
         isSubmitting={isSubmitting}
         showPassword={showPassword}
         onValueChange={(key, value) => setValue(key, value)}
         onTogglePassword={() => setShowPassword((previous) => !previous)}
         onSubmit={() => void submit()}
+        onRetry={() => void submit()}
       />
       <Link
         href={`/signup?returnTo=${encodeURIComponent(returnTo)}`}
