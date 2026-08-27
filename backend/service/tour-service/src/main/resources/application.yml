@@ -28,4 +28,38 @@ resilience4j:
         wait-duration-in-open-state: 10s
         permitted-number-of-calls-in-half-open-state: 3
         automatic-transition-from-open-to-half-open-enabled: true
-    # 인스턴스는 외부 API 를 붙일 때 추가한다. 지금은 기본 정책만 정의해 둔다 (기상청 예정).
+        ignore-exceptions:
+          # 사용자 요청 문제(좌표 없음 등)로 생긴 도메인 예외가 서킷을 열지 않게 한다.
+          - com.hondigagae.domainlayer.insight.application.exception.InsightException
+    instances:
+      # 기상청 단기예보. 제공처 단위로 인스턴스를 분리한다 (coding-conventions §10).
+      kma:
+        base-config: default
+        # 사용자 요청 경로에서 부르는 호출이라 느린 응답을 빨리 실패로 본다.
+        slow-call-duration-threshold: 2s
+
+# 기상청 단기예보(VilageFcstInfoService_2.0).
+# serviceKey 는 공공데이터포털 "디코딩(원문)" 키를 그대로 넣는다 - 인코딩은 어댑터가 한다.
+# 관광공사(B551011) 키와 같은 키를 쓸 수 있음이 실호출로 확인되어 있다.
+kma-api:
+  base-url: ${KMA_API_BASE_URL:https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0}
+  service-key: ${KMA_API_SERVICE_KEY:}
+  publish-delay-minutes: ${KMA_PUBLISH_DELAY_MINUTES:10}
+  num-of-rows: ${KMA_NUM_OF_ROWS:1000}
+  stale-cache-seconds: ${KMA_STALE_CACHE_SECONDS:21600}
+
+# 여행 적합도 / 산책 위험도 임계값.
+# 확정된 수의학 기준이 아니라 현재의 판단이므로 배포 없이 조정할 수 있게 프로퍼티로 둔다.
+insight:
+  rain-probability-percent: ${INSIGHT_RAIN_PROBABILITY_PERCENT:60}
+  hot-temperature: ${INSIGHT_HOT_TEMPERATURE:28.0}
+  very-hot-temperature: ${INSIGHT_VERY_HOT_TEMPERATURE:31.0}
+  cold-temperature: ${INSIGHT_COLD_TEMPERATURE:5.0}
+  very-cold-temperature: ${INSIGHT_VERY_COLD_TEMPERATURE:0.0}
+  strong-wind-speed: ${INSIGHT_STRONG_WIND_SPEED:9.0}
+  pavement-caution-celsius: ${INSIGHT_PAVEMENT_CAUTION_CELSIUS:42.0}
+  pavement-danger-celsius: ${INSIGHT_PAVEMENT_DANGER_CELSIUS:52.0}
+  heat-index-caution-celsius: ${INSIGHT_HEAT_INDEX_CAUTION_CELSIUS:27.0}
+  heat-index-danger-celsius: ${INSIGHT_HEAT_INDEX_DANGER_CELSIUS:32.0}
+  alternative-radius-meters: ${INSIGHT_ALTERNATIVE_RADIUS_METERS:5000}
+  alternative-size: ${INSIGHT_ALTERNATIVE_SIZE:5}
