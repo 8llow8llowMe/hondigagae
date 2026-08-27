@@ -2,18 +2,22 @@
 
 > 화면별 담당 API, 상태, 착수 가능 여부. **백엔드 구현 상태와 동기화한다.**
 > 근거: `backend/docs/service-inventory.md` (백엔드 구현 현황), 루트 `README.md` (AI 기능 선정 상태)
-> 최종 확인: 2026-08-26 (백엔드 커밋 `6af13db` = origin/develop 기준)
+> 최종 확인: 2026-08-27 (백엔드 = origin/develop `a360b79` 기준, 컨트롤러 전수 실측)
+> 갱신 방법: `find backend/service -name "*WebController.java"` 로 엔드포인트를 전수 확인한다.
+> **`backend/docs/service-inventory.md` 를 그대로 믿지 않는다** — 그 문서도 낡을 수 있다.
 
 ## 착수 가능 여부 요약
 
-| 영역          | 백엔드          | FE 착수                     |
-| ------------- | --------------- | --------------------------- |
-| 인증 / 회원   | 구현            | **가능**                    |
-| 반려견 프로필 | 구현            | **가능**                    |
-| 장소 탐색     | 구현            | **가능** (batch 적재 필요)  |
-| 여행 일정     | 구현            | **가능**                    |
-| AI 일정 생성  | 골격 (Stub LLM) | **가능** (결과 품질 미보장) |
-| 그 외 전부    | 미착수          | **대기**                    |
+| 영역          | 백엔드            | FE 착수                       |
+| ------------- | ----------------- | ----------------------------- |
+| 인증 / 회원   | 구현              | **가능**                      |
+| 반려견 프로필 | 구현              | **가능**                      |
+| 장소 탐색     | 구현              | **가능** (batch 적재 필요)    |
+| 여행 일정     | 구현              | **가능**                      |
+| AI 일정 생성  | 구현 (LLM 플래그) | **가능** (기본값은 Stub — §5) |
+| 장소 인사이트 | 구현              | **가능** (신규 — §3-1)        |
+| 긴급 시설     | 구현              | **가능** (§5-2)               |
+| 그 외 전부    | 미착수            | **대기** (§6)                 |
 
 ## 1. 인증 / 회원 — 착수 가능
 
@@ -68,6 +72,44 @@
 - 상세의 `homepage` / `overview` 는 **HTML 태그가 섞인 원문**이다. `dangerouslySetInnerHTML` 을 쓰지 않는다.
 - 지도 좌표는 백엔드가 `lat`/`lng` (Double) 로 정규화해 내려준다. 카카오는 `LatLng(위도, 경도)` 순서이므로 `lat` 이 먼저다 (`external-api-guide.md`).
 
+## 3-1. 장소 인사이트 (적합도 · 산책 위험도) — 착수 가능 (신규)
+
+| 화면        | 경로                   | API                                 | 상태 |
+| ----------- | ---------------------- | ----------------------------------- | ---- |
+| 여행 적합도 | `/places/[placeId]` 내 | `GET /places/{placeId}/suitability` | 기획 |
+| 산책 위험도 | `/places/[placeId]` 내 | `GET /places/{placeId}/walk-safety` | 기획 |
+
+근거: tour-service `insight` 컨텍스트 / `PlaceInsightWebController` **실측**.
+이 서비스의 차별점이 담긴 응답이라 계약을 자세히 적어 둔다.
+
+**`GET /places/{placeId}/suitability` — `PlaceSuitabilityResponse`**
+
+| 필드                | 타입                       | 화면 지침                                                         |
+| ------------------- | -------------------------- | ----------------------------------------------------------------- |
+| `score`             | `Integer`                  | 0~100 추정. **단위 없는 숫자를 그대로 두지 않는다** — 등급과 함께 |
+| `suitabilityLevel`  | `ScoreMetricMetadata`      | 등급 metadata. `name` 을 그대로 렌더한다                          |
+| `reasons[]`         | `SuitabilityReasonItem[]`  | **XAI.** `scoreDelta` 가 음수면 감점, `0` 이면 정보성             |
+| `weather`           | `DailyWeatherItem \| null` | **예보 범위 밖이면 null** → 섹션을 숨긴다                         |
+| `congestion`        | `CongestionItem`           | `level` 이 `UNKNOWN` 일 수 있다 (연결 데이터 없음)                |
+| `alternativePlaces` | `AlternativePlaceItem[]`   | **비 예보일 때만 채워진다.** 안 오면 빈 배열 → 숨긴다             |
+
+- `reasons` 는 **점수 영향이 큰 순서**로 온다. 재정렬하지 않는다.
+- `description` 이 데이터 근거를 담은 완성 문장이다 ("최고기온 31도 로, 더위에 약한 아이에게는 부담이 큽니다."). **FE 가 문장을 조립하지 않는다.**
+- `scoreDelta` 부호로 감점/정보성을 시각 구분한다. 숫자를 그대로 노출할지는 디자인 판단.
+
+**`GET /places/{placeId}/walk-safety` — `WalkSafetyResponse`**
+
+| 필드                       | 타입                     | 화면 지침                                      |
+| -------------------------- | ------------------------ | ---------------------------------------------- |
+| `walkSafetyLevel`          | `ScoreMetricMetadata`    | 등급 metadata                                  |
+| `reasons[]`                | `WalkSafetyReasonItem[]` | `scoreDelta` 가 **없다** (적합도와 다르다)     |
+| `estimatedPavementCelsius` | `Double`                 | **단위 ℃ 를 표기한다** (노면 온도)             |
+| `heatIndexCelsius`         | `Double`                 | **단위 ℃ 를 표기한다** (체감 열지수)           |
+| `saferWindowStart/End`     | `LocalTime \| null`      | **없으면 null** → "더 안전한 시간대" 를 숨긴다 |
+
+- 적합도는 **일자 기준**(`targetDate`), 산책 위험도는 **시각 기준**(`targetDateTime`)이다. 같은 화면에 두 값을 나란히 두면 기준이 다른 것을 명시해야 한다.
+- `saferWindowStart/End` 는 **같은 날 안에서만** 제안된다.
+
 ## 4. 여행 일정 — 착수 가능
 
 | 화면                        | 경로                         | API                                                    | 상태                    |
@@ -77,14 +119,16 @@
 | 일정 상세 (타임라인 + 지도) | `/plans/[planId]`            | `GET /plans/{planId}`                                  | 기획                    |
 | 일정 수정                   | `/plans/[planId]/edit`       | `PUT                                                   | DELETE /plans/{planId}` | 기획 |
 | 일자 항목 편집              | `/plans/[planId]/days/[day]` | `PUT /plans/{planId}/days/{day}/items` (**일괄 교체**) | 기획                    |
+| 일정 날씨 브리핑            | `/plans/[planId]` 내         | `GET /plans/{planId}/weather` (신규)                   | 기획                    |
 
 주의:
 
 - 일자 항목은 **부분 수정이 아니라 일괄 교체**다. 화면도 그 모델로 설계한다.
 - 장소 항목은 백엔드가 tour-service Feign으로 존재를 검증한다 → 없는 `placeId` 는 실패한다.
 - **일정의 소유권은 plan-service에 있다.** AI는 제안만 하고 확정은 여기서만 일어난다.
+- **날씨 브리핑(`PlanWeatherResponse`)의 `dailyBriefings` 는 일정 일수만큼 항상 채워진다.** 빈 배열을 방어할 필요가 없다. 대신 각 일자의 예보 필드가 null 일 수 있다 (§3-1 `DailyWeatherItem` 과 같은 타입).
 
-## 5. AI 일정 생성 — 착수 가능 (골격)
+## 5. AI 일정 생성 — 착수 가능
 
 | 화면                  | 경로                     | API                                | 상태 |
 | --------------------- | ------------------------ | ---------------------------------- | ---- |
@@ -96,7 +140,10 @@
 
 - **실패가 HTTP 200 + `status=FAILED`** 다 (`api-integration-guide.md` §5).
 - **SSE는 백엔드 미구현.** 폴링만 쓴다.
-- 현재 LLM은 `StubLlmAdapter` 고정 샘플이다 → **결과가 매번 같은 것이 정상**이다.
+- **LLM 어댑터가 두 개고 플래그로 갈린다** (`ai-llm.enabled`, 기본값 `false`).
+  - `false`(기본) → `StubLlmAdapter` 고정 샘플. **결과가 매번 같은 것이 정상**이다.
+  - `true` → `AnthropicClaudeLlmAdapter` (`claude-opus-5`, 서킷브레이커·환각 방지 경로 포함).
+  - **로컬에서 Stub 결과를 보고 "AI가 고장났다" 고 판단하지 않는다.** `AI_LLM_ENABLED` 를 먼저 확인한다.
 - XAI `reasons` 가 포함된다 → 서버 `description` 을 그대로 노출한다.
 - 저장·확정은 plan-service 몫이다. ai-service에 저장 API가 없다.
 
@@ -134,16 +181,24 @@
 
 **아래 화면은 만들지 않는다.** 호출부·mock도 만들지 않는다.
 
-| 화면                          | 필요한 백엔드                        | 비고                  |
-| ----------------------------- | ------------------------------------ | --------------------- |
-| 산책 코스                     | tour-service `walkcourse` (두루누비) | 미착수                |
-| 여행 적합도 분석 (점수 + XAI) | tour-service `insight` (날씨·혼잡도) | 미착수                |
-| 긴급 동물병원                 | tour-service `emergency`             | 미착수                |
-| 여행 후기 작성·공유           | plan-service `review`                | 미착수                |
-| 일정 공유                     | plan-service                         | 미착수                |
-| AI 여행 상담사 / 비서         | ai-service `assistant`               | 미착수                |
-| 반려견 성향 분석 리포트       | ai-service `analysis`                | 미착수                |
-| 여행 스타일 학습 / 개인화     | —                                    | AI 기능 후보, 선정 전 |
+| 화면                      | 필요한 백엔드                        | 비고                  |
+| ------------------------- | ------------------------------------ | --------------------- |
+| 산책 코스                 | tour-service `walkcourse` (두루누비) | 미착수                |
+| 여행 후기 작성·공유       | plan-service `review`                | 미착수                |
+| 일정 공유                 | plan-service                         | 미착수                |
+| AI 여행 상담사 / 비서     | ai-service `assistant`               | 미착수                |
+| 반려견 성향 분석 리포트   | ai-service `analysis`                | 미착수                |
+| 여행 스타일 학습 / 개인화 | —                                    | AI 기능 후보, 선정 전 |
+
+**이 절에서 빠진 것 (백엔드가 구현했다)**
+
+| 화면                          | 어디로 갔나                       |
+| ----------------------------- | --------------------------------- |
+| 여행 적합도 분석 (점수 + XAI) | **§3-1 로 이동** — 구현됐다       |
+| 긴급 동물병원                 | **§5-2 와 중복이었다** — 구현됐다 |
+
+확인 방법: `tour-service/domainlayer/` 에 `insight` · `emergency` 컨텍스트가 있고 각각 컨트롤러가 있다.
+`walkcourse` · `review` · `assistant` · `analysis` 는 **패키지 자체가 없다** — 그것이 미착수의 근거다.
 
 ## 7. AI 기능 선정 게이트
 
