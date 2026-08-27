@@ -1,5 +1,6 @@
-package com.hondigagae.domainlayer.pet.domain.enums;
+package com.hondigagae.shared.travel.pet;
 
+import com.hondigagae.common.dto.metadata.CodeNameDescribable;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -8,7 +9,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Getter
 @RequiredArgsConstructor
-public enum ActivityLevel {
+public enum ActivityLevel implements CodeNameDescribable {
 
     LOW("낮음", "짧은 산책을 선호하며 장시간 활동을 힘들어합니다."),
     MEDIUM("보통", "일반적인 산책과 관광 일정을 소화합니다."),

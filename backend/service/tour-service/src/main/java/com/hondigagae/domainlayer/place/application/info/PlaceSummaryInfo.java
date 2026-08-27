@@ -1,7 +1,7 @@
 package com.hondigagae.domainlayer.place.application.info;
 
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
-import com.hondigagae.domainlayer.place.domain.enums.PetAllowanceType;
+import com.hondigagae.shared.travel.place.PetAllowanceType;
 import com.hondigagae.domainlayer.place.domain.enums.PlaceSource;
 import java.math.BigDecimal;
 import lombok.Builder;

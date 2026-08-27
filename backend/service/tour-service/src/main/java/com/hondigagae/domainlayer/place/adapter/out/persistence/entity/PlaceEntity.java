@@ -1,7 +1,7 @@
 package com.hondigagae.domainlayer.place.adapter.out.persistence.entity;
 
-import com.hondigagae.domainlayer.place.domain.enums.AllowedPetSize;
-import com.hondigagae.domainlayer.place.domain.enums.PetAllowanceType;
+import com.hondigagae.shared.travel.place.AllowedPetSize;
+import com.hondigagae.shared.travel.place.PetAllowanceType;
 import com.hondigagae.domainlayer.place.domain.enums.PlaceSource;
 import com.hondigagae.persistence.entity.BaseEntity;
 import jakarta.persistence.Column;
