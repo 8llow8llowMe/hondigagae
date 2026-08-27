@@ -130,14 +130,32 @@ type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
 
 프로젝트 전체 a11y 규칙은 `styling-guide.md` §6이다. 여기서는 **각 컴포넌트가 자체적으로 보장해야 하는 것**을 정한다.
 
-| 컴포넌트                    | 보장                                                                                                    |
-| --------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `Button`                    | `type` 기본값 `"button"` (form 안에서 의도치 않은 submit 방지). `loading` 이면 `disabled` + `aria-busy` |
-| `Chip` / `Tab`              | `aria-pressed` / `aria-selected` 를 상태와 동기                                                         |
-| `Input` 계열                | `label` 연결(`id`/`htmlFor`), `error` 시 `aria-invalid` + `aria-describedby`                            |
-| `Modal` / `BottomSheet`     | focus trap, `Esc` 닫기, 열릴 때 body 스크롤 잠금, 닫힐 때 트리거로 포커스 복귀                          |
-| `Skeleton`                  | `aria-hidden` (스크린리더에 의미 없는 반복 읽기 방지)                                                   |
-| `EmptyState` / `ErrorState` | 제목이 heading 요소여야 한다                                                                            |
+| 컴포넌트                    | 보장                                                                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Button`                    | `type` 기본값 `"button"` (form 안에서 의도치 않은 submit 방지). `loading` 이면 `disabled` + `aria-busy`                                     |
+| `Chip` / `Tab`              | `aria-pressed` / `aria-selected` 를 상태와 동기                                                                                             |
+| `Input` 계열                | `label` 연결(`id`/`htmlFor`), `error` 시 `aria-invalid` + `aria-describedby`                                                                |
+| `Modal` / `BottomSheet`     | focus trap, `Esc` 닫기, 열릴 때 body 스크롤 잠금, 닫힐 때 트리거로 포커스 복귀                                                              |
+| `RadioGroup`                | `<fieldset>` + `<legend>` 로 그룹 라벨. 각 항목의 `<label htmlFor>` 가 자기 input 을 가리킴. `error` 시 `aria-invalid` + `aria-describedby` |
+| `Checkbox`                  | 자체 `<label htmlFor>`. `error` 시 `aria-invalid` + `aria-describedby`                                                                      |
+| `Skeleton`                  | `aria-hidden` (스크린리더에 의미 없는 반복 읽기 방지)                                                                                       |
+| `EmptyState` / `ErrorState` | 제목이 heading 요소여야 한다                                                                                                                |
+
+### 선택 계열은 `Field` 로 감싸지 않는다
+
+`Field` 는 `<label htmlFor>` 로 **단일 입력 요소**를 가리킨다. 선택 계열 둘은 그 전제가 깨진다.
+
+| 컴포넌트     | `Field` 를 쓰지 않는 이유                                                 | 대신 쓰는 것              |
+| ------------ | ------------------------------------------------------------------------- | ------------------------- |
+| `RadioGroup` | 라디오 _그룹_ 은 labelable 요소가 아니다. `htmlFor` 가 가리킬 대상이 없다 | `<fieldset>` + `<legend>` |
+| `Checkbox`   | 체크박스는 스스로 labelable 이고, 라벨이 위가 아니라 **옆**에 와야 한다   | 자체 `<label>` 로 감싸기  |
+
+**오류 요소 id 규칙은 공유한다.** 둘 다 `fieldErrorId()` 를 쓴다 — 규칙이 갈리면
+`aria-describedby` 가 실제로 연결됐는지 컴포넌트마다 따로 확인해야 한다.
+
+`RadioGroup` 이 `select` 가 아닌 이유는 선택지의 `description` 이다. "소형견 / 중형견 / 대형견"만
+보여주면 사용자가 체중 기준을 알 수 없는데, `select` 는 그 설명을 숨긴다
+(`docs/features/pet/공통명세.md` S5-2). 선택지가 3~4개를 넘어가면 재검토한다.
 
 ### icon-only 버튼은 타입으로 강제한다
 
