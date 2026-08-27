@@ -192,6 +192,26 @@ Base: `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0` (같은 인증
 - 발표 주기: 단기예보 1일 8회(02,05,08,11,14,17,20,23시), 초단기실황 매시 40분경
 - 사용 방식: Redis 캐시 우선 (`external-api-guide.md` §2), 적합도 계산 입력
 
+#### 연동 시 밟는 지점 (구현하며 드러난 것)
+
+| 함정 | 내용 | 방어 |
+|------|------|------|
+| **위경도를 받지 않는다** | 5km 격자 번호(nx, ny)만 받는다. DFS 격자 변환이 필수다 | `common-core` 의 `KmaGrid` |
+| **category 별 1행** | 같은 시각의 기온/강수확률/하늘상태가 서로 다른 행에 흔어져 온다 | 어댑터에서 시각 기준 피봇 |
+| **PCP/SNO 는 문자열** | `강수없음`, `1mm 미만`, `30.0~50.0mm` 가 섞여 온다. `parseDouble` 하면 터진다 | `PrecipitationAmount` |
+| **발표 회차 공백** | 회차 직후 몇 분은 데이터가 아직 없어 빈 응답이 온다 | 직전 회차로 한 단계 폴백 |
+| **키 오류는 XML** | serviceKey 문제일 때 JSON 이 아니라 `OpenAPI_ServiceResponse` XML | 파싱 전 형태 확인 |
+| **resultCode 가 다르다** | 기상청은 `"00"`, 관광공사 계열은 `"0000"` | 둘 다 수용 |
+
+**예보 범위가 약 3일이라는 점이 기능 설계를 갈랐다.** 다음 달 여행을 계획하는 사용자에게는
+예보가 아예 없으며, 이것이 예외 상황이 아니라 **기본 경로**다.
+그래서 적합도에 `INSUFFICIENT` 등급을 두었다 (`weather-insight-integration.md` §6-1).
+중기예보(`MidFcstInfoService`, 3~10일)는 아직 붙이지 않았다.
+
+> 서귀포 52/33 은 문서에 적힌 기준점 값이고, 서귀포시청 좌표를 변환하면 53/33 이 나온다.
+> 기준점을 어디로 잡느냐의 차이이며, 실제 조회는 고정값이 아니라 장소 좌표를 변환해 쓴다.
+> 제주를 격자 하나로 볼 수 없다 — 제주시(53/38)와 성산일출봉(60/37)은 다른 격자다.
+
 ## 7. 엔티티 설계 초안 (tour-service / batch-service)
 
 컨벤션: raw FK만 사용, 인덱스 명명 규칙, `@Comment` (`coding-conventions.md` §9). 내부 PK는 Snowflake, 원천 식별자는 UK.
@@ -254,7 +274,7 @@ walk_course                    두루누비 코스
 └─ source_created_at, source_modified_at, synced_at
 ```
 
-- 날씨(기상청)는 DB 적재 대신 **Redis 캐시**가 기본 (`external-api-guide.md` §2). 성향 분석용 이력이 필요해지면 그때 테이블 추가.
+- 날씨(기상청)는 DB 적재 대신 **Redis 격자별 캐시**를 쓴다 (`weather-insight-integration.md` §4). 성향 분석용 이력이 필요해지면 그때 테이블 추가.
 - 제주만 대상으로 하면 areaCode=39 필터로 적재량을 크게 줄일 수 있다 (개발계정 일 1,000건 제한 대응).
 
 ## 8. 실호출 검증 결과 (2026-08-24 완료)

@@ -43,10 +43,19 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
 
 ## 구현 주의점
 
-- LLM 호출은 `AiLlmPort` 뒤에 캡슐화하고 provider(OpenAI 호환 / 기타) 어댑터를 분기 가능하게 둔다.
+- LLM 호출은 `AiLlmPort` 뒤에 캡슐화한다. 현재 구현은 `AnthropicClaudeLlmAdapter`(공식 Java SDK,
+  구조화 출력)이고, `ai-llm.enabled=false`(기본)이면 `StubLlmAdapter` 가 대신 뜼다.
+  스텁을 남겨 둔 이유는 프론트 개발과 CI 가 API 키와 토큰 비용에 묶이면 안 되기 때문이다.
 - 서킷 인스턴스 `llm` 단일 인스턴스, `slow-call-duration-threshold` 완화 (`coding-conventions.md` §10).
 - **일정을 소유하지 않는다** — 생성 결과는 제안(draft)이며, 저장·확정의 원천은 plan-service다.
-- LLM이 추천한 장소는 반드시 tour-service 데이터로 존재·동반 가능 여부를 검증한다 (환각 방지).
+- **환각은 사후 검증보다 후보를 먼저 주는 방식으로 막는다.** tour-service 에서 동반 가능으로
+  확인된 장소 목록을 받아 프롬프트에 싫고 "이 안에서만 고르라"고 한다. 검증은 틀린 답을
+  걸러낼 뿐이지만 후보를 주는 방식은 애초에 틀릴 자리를 없앨다.
+- 그럼에도 돌아온 `placeId` 를 후보 집합과 다시 대조한다 — 프롬프트 규칙을 어기는 일이
+  드물게 있고, 그때 생기는 결과가 나쁘다. 후보 밖 항목은 버리지 않고 **장소 연결만 끊는다** —
+  "카페에서 휴식" 같은 항목 자체는 일정의 흐름으로 쓸모가 있다.
 - 프롬프트에 개인정보(회원 식별 정보)는 최소화하고, 반려견 특성·여행 조건 등 필요한 정보만 전달한다.
 - XAI reasons는 LLM 자유 생성이 아니라, 실제 데이터 근거(기온·혼잡도·이동거리·동반 조건)를 코드에서 조립하고 문장화만 LLM에 맡기는 방향을 우선한다.
-- 토큰 사용량 카운터를 두어 운영 비용을 추적한다.
+- 토큰 사용량 카운터를 두어 운영 비용을 추적한다 (어댑터가 호출당·누적 사용량을 로그로 남긴다).
+- 거절(`stop_reason=refusal`)은 HTTP 200 으로 온다. content 를 그냥 읽으면 빈 응답을 파싱 실패로
+  오해하게 되므로 `stopReason` 을 먼저 본다 — 원인과 사용자에게 할 말이 전혀 다르다.

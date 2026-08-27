@@ -26,8 +26,20 @@
   - 공공데이터 API 7종의 실제 응답 구조와 연동 시 함정
 - `place-data-integration.md`
   - 장소 데이터를 어느 소스로 어떻게 합치는지 (소스별 저장 가능 여부, 중복 판정, 배치 잡)
+- `weather-insight-integration.md`
+  - 기상청 예보 연동과 여행 적합도/산책 위험도 판정 규칙 (격자 변환, 캐시 정책, 원천 함정)
+- `data-refresh-guide.md`
+  - 장소 데이터 최신화 — 소스별 갱신 주기, 사라진 장소 처리, 급감 가드
 - `local-run-guide.md`
   - 로컬 기동 절차, 포트 맵, Swagger 접근, 자주 겪는 문제
+- `deploy-guide.md`
+  - 배포 규약 — 명명 규칙, 포트 대역, 환경 변수, 배포 순서와 점검
+- `jenkins-cicd-dev-deploy-guide.md`
+  - Jenkins 파이프라인 구성, Vault secret 구조, 모노레포 빌드 범위
+- `observability-guide.md`
+  - actuator/Prometheus 설정, 데이터 신선도 지표, Grafana 1차 대시보드
+- `feature-status.md`
+  - 무엇이 되고 무엇이 안 되는지의 단일 기준
 - `service-playbook.md`
   - 새 서비스, 컨텍스트 추가, 리팩토링, 문서/검증 절차
 - `done-checklist.md`
@@ -49,10 +61,12 @@
 6. `api-design-guide.md`
 7. `external-api-guide.md`, `data-api-analysis.md`, `entity-design.md` (외부 데이터 연동 작업 시)
 8. `service-playbook.md`
-8. `done-checklist.md`
-9. `team-playbook.md`
-10. `service-inventory.md`
-11. 필요 시 `services/*.md`
+9. `done-checklist.md`
+10. `team-playbook.md`
+11. `feature-status.md`, `service-inventory.md`
+12. 배포·운영 작업 시 `deploy-guide.md`, `jenkins-cicd-dev-deploy-guide.md`, `observability-guide.md`
+13. 배치·데이터 갱신 작업 시 `data-refresh-guide.md`
+14. 필요 시 `services/*.md`
 
 ## 현재 작업 원칙
 
