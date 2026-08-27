@@ -113,7 +113,7 @@ FE 작업을 시작하는 누구나(사람·에이전트) **① 무엇을 만들
 | 라우팅 prefix | `/api/v1/{auth,members,places,walk-courses,emergencies,plans,ai-plans,assistant}/**` |
 | 기동 순서     | service-discovery(8761) → auth(8081)/tour(8082)/plan(8083)/ai(8085) → gateway(8000)  |
 
-**CORS**: 게이트웨이가 `http://localhost:3000`, `http://localhost:5173` 을 `allowCredentials=true` 로 이미 허용한다. 즉 브라우저 직접 호출도 기술적으로 가능하므로, BFF 경유 여부는 **의식적 결정**이어야 한다 (§6-1).
+**CORS**: 게이트웨이가 로컬 출처로 `http://localhost:5174` 만 `allowCredentials=true` 로 허용한다 (나머지는 배포 웹 2개 + 개발 Swagger 1개). 즉 `pnpm dev:alt` 포트에서는 브라우저 직접 호출도 기술적으로 가능하므로, BFF 경유 여부는 **의식적 결정**이어야 한다 (§6-1).
 
 ### 3-2. 공통 응답 래퍼
 
@@ -373,7 +373,7 @@ GET  /api/v1/ai-plans/jobs/{id} → 폴링
 | 카카오 지도/외부 키               | 서버에서 주입·마스킹 가능                                                                            |
 | 검증된 전례                       | BossPickSeoul 이 동일 백엔드 구조로 `/api/bff` catch-all 을 운영 중                                  |
 
-- 대안(직접 호출): 게이트웨이 CORS가 `localhost:3000/5173` 을 이미 허용하므로 초기 속도는 빠르다. 단 토큰 보관 문제를 FE가 직접 떠안는다.
+- 대안(직접 호출): 게이트웨이 CORS가 `localhost:5174` 를 허용하므로 `pnpm dev:alt` 로 띄우면 초기 속도는 빠르다. 단 토큰 보관 문제를 FE가 직접 떠안는다.
 - **주의**: BFF 채택 시 게이트웨이 CORS 허용 목록에 **배포 웹 오리진**이 필요하다 (`ApiGatewayCorsConfig` 주석이 "POST만 403" 함정을 이미 경고한다). 배포 도메인 확정 시 BE 후속 요청 항목.
 
 ### 6-2. 스택 세부 — **권고**

@@ -120,7 +120,7 @@ const MapView = dynamic(() => import('@/features/place/map-view'), { ssr: false 
 
 - access token이 응답 body로 온다 → 클라이언트에 두면 XSS 노출면이 생긴다.
 - refresh가 HttpOnly 쿠키다 → 크로스 오리진 쿠키(`SameSite`/도메인) 문제를 같은 오리진으로 흡수한다.
-- 게이트웨이 CORS는 `localhost:3000`/`5173` 을 이미 허용하므로 직접 호출도 가능하지만, 토큰 보관 책임을 FE가 떠안게 된다.
+- 게이트웨이 CORS는 로컬 출처로 `localhost:5174` 하나만 허용한다 (3000·5173 은 목록에서 빠졌다). `pnpm dev:alt` 포트라면 직접 호출도 가능하지만, 토큰 보관 책임을 FE가 떠안게 된다.
 
 ### BFF는 브라우저 헤더를 그대로 전달하지 않는다
 
