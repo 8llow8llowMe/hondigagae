@@ -6,7 +6,6 @@ import java.util.Optional;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 /**
  * insight 전용 장소 질의.
@@ -36,9 +35,9 @@ public interface PlaceProfileRepository extends JpaRepository<PlaceEntity, Long>
           and p.lng between :minLng and :maxLng
         """)
     List<PlaceEntity> findIndoorWithinBox(
-        @Param("minLat") BigDecimal minLat, @Param("maxLat") BigDecimal maxLat,
-        @Param("minLng") BigDecimal minLng, @Param("maxLng") BigDecimal maxLng,
-        @Param("excludePlaceId") long excludePlaceId
+        BigDecimal minLat, BigDecimal maxLat,
+        BigDecimal minLng, BigDecimal maxLng,
+        long excludePlaceId
     );
 
     /** 병합으로 사라진 행은 적합도 대상이 아니다 — 상세 조회와 같은 기준을 쓴다. */
