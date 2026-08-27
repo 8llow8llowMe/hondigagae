@@ -153,11 +153,12 @@ backend/
 - `GET /api/v1/places/{placeId}` — 장소 상세 (반려견 출입 조건 포함)
 - `GET /api/v1/places/{placeId}/related` — 연관 관광지
 - `GET /api/v1/places/{placeId}/suitability` — 여행 적합도 (날씨+혼잡도+반려견 조건, score+reasons)
+- `GET /api/v1/places/{placeId}/walk-safety` — 산책 위험도 (추정 노면온도·열지수, 안전 시간대 제안)
 - `GET /api/v1/walk-courses` — 두루누비 산책·레저 코스
 - `GET /api/v1/places/nearby` — 좌표 반경 장소 검색 (식당·카페 포함)
 - `GET /api/v1/emergencies/facilities` — 위치 기준 동물병원·동물약국 반경 검색 (제주 214곳)
 
-**컨텍스트**: `place`, `walkcourse`, `insight`(적합도·혼잡도·날씨), `emergency`
+**컨텍스트**: `place`, `insight`(적합도·혼잡도·날씨), `emergency`, `walkcourse`(미착수)
 
 **특수 의존**: 외부 공공 API 어댑터 (기상청·혼잡도 실시간), `core:redis-core` (외부 API 응답 캐시)
 
@@ -170,12 +171,13 @@ backend/
 **주요 API (계획):**
 - `GET|POST /api/v1/plans`, `GET|PUT|DELETE /api/v1/plans/{planId}`
 - `PUT /api/v1/plans/{planId}/days/{day}/items` — 일정 항목 편집
+- `GET /api/v1/plans/{planId}/weather` — 일자별 날씨 브리핑 + 비 오는 날 실내 대안
 - `POST /api/v1/plans/{planId}/reviews` — 여행 후기
 - 일정 공유 링크 (향후 카카오 메시지 연계)
 
 **컨텍스트**: `plan`, `review`
 
-**특수 의존**: `core:security-core` (Resource Server), tour-service Feign 호출 (장소 검증/상세)
+**특수 의존**: `core:security-core` (Resource Server), tour-service Feign 호출 (장소 검증/적합도), auth-service Feign 호출 (반려견 특성, 내부 경로)
 
 ---
 
@@ -209,7 +211,8 @@ backend/
 - 반려동물 동반여행 API 데이터 결합 (출입 가능 여부·이용 조건)
 - 관광지별 연관 관광지 연결성 적재
 - 두루누비 산책 코스 적재
-- 혼잡도/방문자 추이 예측 데이터 주기 적재
+- 혼잡도 예측 주기 적재 + 명칭 매칭 (`congestionImportJob`, 구현)
+- 방문자 추이 예측 데이터 주기 적재 (미착수)
 
 ---
 
@@ -224,3 +227,24 @@ backend/
 → 이 경우 `core/shared-travel` 같은 도메인 공유 모듈로 분리한다.
 
 **단일 서비스 전용이면:** 해당 서비스의 `application/model/` 또는 `domain/model/`에 둔다.
+
+---
+
+## core/shared-travel
+
+**역할**: 서비스를 가로지르는 여행 도메인 enum
+
+**담긴 것:**
+- `travel.pet` — `PetSizeType`, `ActivityLevel`, `SocialityLevel` (auth ↔ tour ↔ plan)
+- `travel.place` — `PetAllowanceType`, `AllowedPetSize` (tour ↔ ai ↔ batch)
+- `travel.insight` — `SuitabilityLevel`, `WalkSafetyLevel` (tour ↔ ai ↔ plan)
+
+**존재 이유**: 위 기준 1번에 해당한다. 적합도를 붙이면서 tour-service 가 반려견 크기를
+장소의 입장 조건과 대조해야 했고, 그 둘은 서로 다른 서비스에 있었다. 복사해 두면
+"소형견만 가능"을 어느 곳에서는 중형견까지 통과시키는 일이 생긴다.
+
+비교 판정은 enum 안에 둔다 (`AllowedPetSize.allows(PetSizeType)`). 판정이 호출부에 흔어지면
+같은 질문에 곳마다 다른 답이 나온다.
+
+**사용처**: auth / tour / plan / ai / batch 전서비스. 이 모듈은 인프라를 알지 않고
+`common-core` 의 metadata 인터페이스만 참조한다.

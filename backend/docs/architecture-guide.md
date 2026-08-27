@@ -4,8 +4,12 @@
 
 - 백엔드는 기본적으로 MSA + Hexagonal Architecture를 기준으로 설계한다.
 - 서비스는 `auth-service`, `tour-service`, `plan-service`, `ai-service`, `batch-service`를 기준으로 유지한다.
-- 공통 모듈은 `common-core`, `persistence-core`, `redis-core`, `security-core`를 사용한다. 복수 서비스가 공유하는 여행 도메인 개념이 생기면 `shared-travel`을 추가한다.
-- 모듈별 사용처: `redis-core`는 ai/auth/api-gateway, `security-core`는 ai/auth/plan/tour가 사용한다.
+- 공통 모듈은 `common-core`, `persistence-core`, `redis-core`, `security-core`, `storage-core`, `shared-travel` 을 사용한다.
+- 모듈별 사용처: `redis-core`는 ai/auth/tour/api-gateway, `security-core`는 ai/auth/plan 이 사용한다.
+- `shared-travel` 은 서비스를 가로지르는 여행 도메인 enum 을 담는다 — `PetSizeType`/`ActivityLevel`/
+  `SocialityLevel`(auth ↔ tour ↔ plan), `PetAllowanceType`/`AllowedPetSize`(tour ↔ ai),
+  `SuitabilityLevel`/`WalkSafetyLevel`(tour ↔ ai ↔ plan). 같은 enum 을 서비스마다 복사하면
+  "소형견만 가능"을 어느 곳에서는 중형견까지 통과시키는 일이 생긴다.
 
 ## 2. 기본 패키지 구조
 

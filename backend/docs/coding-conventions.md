@@ -74,6 +74,49 @@ public record ExampleResponse(
 }
 ```
 
+### 7-1. 응답 DTO 의 식별자는 String 이다 (필수)
+
+**클라이언트로 내보내는 모든 식별자는 `String` 으로 직렬화합니다.** `long` / `Long` 을 그대로
+내보내지 않습니다.
+
+내부 PK 는 Snowflake 라 19자리에 이르는데, 자바스크립트의 `Number` 는 정수를 안전하게 다룰 수
+있는 상한이 `Number.MAX_SAFE_INTEGER`(9,007,199,254,740,991 — 16자리)입니다. 그 위의 값은
+**예외 없이 조용히 반올림됩니다.**
+
+```
+서버가 보낸 값      4611686018427387904
+JS 가 읽은 값       4611686018427388000   ← 예외도 경고도 없다
+```
+
+이 고장의 성질이 규칙을 필수로 만듭니다. 목록 조회는 멀쩡히 되고 화면도 잘 그려지는데,
+그 아이디로 상세를 부르는 순간에만 404 가 납니다. 원인이 직렬화라는 것이 드러나기까지
+오래 걸립니다.
+
+**적용 범위**
+
+| 위치 | 타입 | 이유 |
+| --- | --- | --- |
+| `dto/response`, `dto/item` 의 모든 `*Id` | `String` | 클라이언트가 읽는 값 |
+| `@PathVariable`, `@RequestParam` | `long` / `Long` | 문자열로 와도 Spring 이 변환한다 |
+| `dto/request` 의 `*Id` | `Long` | JSON 문자열도 Jackson 이 변환한다 |
+| `application/info`, `domain/model` | `long` / `Long` | 서버 안에서는 수치가 맞다 |
+
+경계는 **Presenter** 입니다. `Info` 까지는 `long` 으로 두고, `Info -> Response` 변환에서
+`String.valueOf(...)` 로 바꿉니다. nullable 식별자는 null 을 유지합니다.
+
+```java
+// Presenter
+.planId(String.valueOf(info.planId()))
+// 대상이 없는 항목(이동 등)은 null 을 유지한다
+.targetId(info.targetId() == null ? null : String.valueOf(info.targetId()))
+```
+
+**Snowflake 가 아닌 식별자도 String 으로 통일합니다.** TourAPI `contentId` 처럼 지금은 짧은
+값이라도 마찬가지입니다. 타입이 필드마다 갈리면 프론트가 "이건 숫자, 저건 문자열"을 외워야
+하고, 외우는 규칙은 반드시 틀립니다.
+
+`@Schema` 의 `example` 도 따옴표 안의 문자열로 적어 Swagger 문서에서 타입이 드러나게 합니다.
+
 ## 8. 로그 / 예외
 
 - 로그는 검색 가능한 영어 키 + 값 조합을 우선합니다.

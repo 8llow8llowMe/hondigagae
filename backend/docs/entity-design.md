@@ -288,12 +288,14 @@ uk_area_visitor_stat_stat_level_region_code_base_ymd_tou_div_cd (statLevel, regi
 
 - 지역 필터 파라미터가 없어 전국이 내려온다 → batch에서 제주(50, 50110, 50130)만 필터 적재.
 
-## 10. 날씨 — Redis 캐시 기본, 테이블은 선택
+## 10. 날씨 — Redis 격자별 캐시, 테이블은 선택 (구현 완료)
 
 원천: `기상청 VilageFcstInfoService_2.0` — `getVilageFcst`(단기예보, category별 행: TMP/POP/PTY/SKY/REH/WSD/PCP/TMN/TMX...),
 `getUltraSrtNcst`(초단기실황: T1H/RN1/REH/PTY/WSD...) 실호출 확인. 격자 좌표(nx,ny) 기반 (제주시 53/38, 서귀포 52/33).
 
-- 적합도 계산용 실시간 조회는 **Redis 캐시**(TTL ~10분/발표주기)로 충분 — `external-api-guide.md` §2.
+- 적합도 계산용 실시간 조회는 **Redis 캐시**로 충분하며 구현되어 있다.
+  키는 장소가 아니라 **격자(nx, ny)** 단위고, TTL 은 고정값이 아니라 **다음 발표 시각**에 맞춘다.
+  신선도가 지난 뒤에도 스테일 폴백용으로 기본 6시간 남긴다 (`weather-insight-integration.md` §4).
 - 성향 분석·이력이 필요해지면 그때 추가할 테이블 (category 행을 시각 단위로 피벗):
 
 | 컬럼 | 타입 | 원천 | 설명 |

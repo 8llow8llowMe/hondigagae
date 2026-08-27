@@ -85,3 +85,47 @@ $env:TOUR_API_SERVICE_KEY = "<디코딩된 인증키>"
   `./gradlew --stop` 후 다시 실행하면 통과한다.
 - **소셜 로그인/메일 발송이 로컬에서 실패** — `OAUTH_*`, `MAIL_*` 자격증명이 없으면 기동은 되고
   해당 기능 호출 시점에만 실패하도록 되어 있다. 필요할 때 환경변수로 넣는다 (`.env.example` 참고).
+
+## 새로 붙은 외부 연동 환경변수
+
+날씨와 LLM 은 키가 없어도 **기동은 된다.** 로컬에서 서비스를 띄우는 데 키가 필요하지 않게
+설계했다 — 없으면 각각 503 응답과 스텁 어댑터로 떨어진다.
+
+### tour-service — 기상청 단기예보
+
+| 환경변수 | 기본값 | 설명 |
+| --- | --- | --- |
+| `KMA_API_SERVICE_KEY` | (비어 있음) | 공공데이터포털 **디코딩(원문)** 키. 인코딩은 어댑터가 한다 |
+| `KMA_PUBLISH_DELAY_MINUTES` | `10` | 발표시각 이후 데이터가 올라오기까지의 여유(분) |
+| `KMA_STALE_CACHE_SECONDS` | `21600` | 원천 실패 시 허용할 스테일 캐시 수명(6시간) |
+
+관광공사(B551011) 키와 **같은 키를 쓸 수 있음이 실호출로 확인**되어 있다.
+키가 비면 적합도/위험도 API 가 `INSIGHT_004`(503)로 응답하고 나머지 조회는 정상 동작한다.
+
+Redis 가 떠 있어야 캐시가 동작한다. 없어도 기능은 돌지만 매 요청이 원천 호출이 되어
+일 1,000건 제한을 금방 태운다 — 로컬에서 반복 테스트할 때 특히 주의.
+
+### ai-service — LLM
+
+| 환경변수 | 기본값 | 설명 |
+| --- | --- | --- |
+| `AI_LLM_ENABLED` | `false` | `true` 여야 Claude 어댑터가 뜬다. 기본은 스텁 |
+| `ANTHROPIC_API_KEY` | (비어 있음) | `AI_LLM_ENABLED=true` 인데 비어 있으면 **기동에 실패한다** |
+| `AI_LLM_MODEL` | `claude-opus-5` | |
+| `AI_LLM_PLACE_CANDIDATE_SIZE` | `50` | 프롬프트에 싣는 후보 장소 수 |
+| `AI_LLM_TIMEOUT_SECONDS` | `180` | SDK 기본값 10분은 워커 스레드를 너무 오래 잡는다 |
+
+키가 비었는데 `enabled=true` 면 **기동 시점에 실패시킨다.** 그대로 띄우면 사용자가 일정
+생성을 눌렀을 때에야 401 로 드러나고, 원인이 설정 누락이라는 것이 보이지 않는다.
+
+`AI_LLM_ENABLED=true` 로 쓰려면 tour-service 도 함께 떠 있어야 한다 — 후보 장소를
+tour-service 에서 받아 오기 때문이다.
+
+### 실행 순서 (배치)
+
+```
+placeImportJob → cultureFacilityImportJob → petRestaurantImportJob → congestionImportJob
+```
+
+`congestionImportJob` 은 장소 마스터가 채워진 뒤에 돌려야 명칭 매칭이 붙는다.
+비어 있으면 전부 UNMATCHED 로 적재되고 적합도 응답에서 혼잡도가 계속 빠진다.
