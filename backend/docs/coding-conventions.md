@@ -132,6 +132,13 @@ JS 가 읽은 값       4611686018427388000   ← 예외도 경고도 없다
 - `{Domain}ExceptionHandler` (`@RestControllerAdvice`) — ErrorCode 의 HttpStatus 와 code 를 `Response.fail()` 로 변환
 - 위치: `application/exception/{Domain}ErrorCode.java`, `application/exception/{Domain}Exception.java`, `adapter/in/web/exception/{Domain}ExceptionHandler.java`
 
+생성자는 이 조합만 씁니다. 임의 문자열을 잇는 `(errorCode, String detail)` 형태는 만들지 않습니다 —
+상세가 필요하면 메시지에 `(%s)` 자리 표시자를 두고 `Object... args` 로 채웁니다.
+
+- 웹 서비스: `(errorCode)` 필수. 필요 시 `(errorCode, Object... args)`(BossPickSeoul 캐논), `(errorCode, Throwable cause)`
+- 배치 서비스: `(errorCode, Object... args)` + `(errorCode, Throwable cause, Object... args)`.
+  웹 응답이 없으므로 ErrorCode 는 `code`, `message` 2 필드이고 메시지에 `[코드]` 접두어를 붙여 로그에서 바로 찾는다
+
 ```java
 // 1. ErrorCode 정의
 @Getter @RequiredArgsConstructor
