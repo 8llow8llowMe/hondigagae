@@ -72,7 +72,7 @@
 }
 ```
 
-- 포트 `3000` 고정: 게이트웨이 CORS 허용 목록이 `3000`/`5173` 이다 (`local-run-guide.md` §2).
+- 포트 `3000` 은 관례다. BFF 경유라 FE 포트는 게이트웨이 CORS 와 무관하다. 게이트웨이 직접 호출이 필요할 때만 `5174`(`pnpm dev:alt`) 여야 한다 (`local-run-guide.md` §2).
 - `pnpm verify` 가 커밋 전 최소 게이트다.
 
 ## 4. TypeScript
@@ -476,7 +476,7 @@ OFL-1.1. `node_modules/pretendard` 에 라이선스가 포함되고 CSS 상단�
 | 6   | `fetch` init 에 **`undefined` 를 명시 전달하지 않는다**                         | `exactOptionalPropertyTypes: true` 아래에서 `body: undefined` 는 타입 오류다. `RequestInit.body` 는 `BodyInit \| null` 이므로 `null` 을 쓰고, 나머지 옵션은 조건부로 대입한다                                                       |
 | 7   | 쿠키 이름을 **`src/lib/auth/cookie-names.ts`** 로 분리                          | 처음엔 `middleware.ts`(Edge Runtime)가 `node:crypto` 를 끌어와 빌드 경고가 났다. Next 16 의 `proxy.ts` 는 nodejs 런타임이라 그 제약은 사라졌지만, 쿠키 이름만 필요한 곳이 crypto 와 env 검증까지 끌어올 이유가 없어 분리를 유지한다 |
 | 8   | **`middleware.ts` → `proxy.ts`**                                                | Next 16 에서 `middleware` 파일·함수명이 deprecated 됐다. `proxy` 는 **nodejs 런타임 고정**이며 edge 를 지원하지 않는다 (`node_modules/next/dist/docs/01-app/02-guides/upgrading/version-16.md`)                                     |
-| 9   | `dev:alt` 스크립트(포트 5173) 추가                                              | 3000 이 다른 로컬 앱에 점유되면 요청이 그 앱으로 간다. BFF 경유이므로 FE 포트는 게이트웨이 CORS 와 무관하니 아무 빈 포트를 써도 된다                                                                                                |
+| 9   | `dev:alt` 스크립트(포트 5174) 추가                                              | 3000 이 다른 로컬 앱에 점유되면 요청이 그 앱으로 간다. BFF 경유이므로 FE 포트는 게이트웨이 CORS 와 무관하니 아무 빈 포트를 써도 된다                                                                                                |
 
 **#6 과 #7 은 스펙이 틀린 것이 아니라, 스펙이 강하게 잡아둔 설정(`exactOptionalPropertyTypes`, Edge Runtime 분리)이 실제로 문제를 잡아낸 사례다.** 두 경우 모두 설정을 완화하지 않고 코드를 고쳤다.
 

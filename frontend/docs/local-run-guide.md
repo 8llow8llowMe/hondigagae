@@ -19,9 +19,9 @@ pnpm dev            # http://localhost:3000
 
 `3000` 은 관례일 뿐이고 **필수가 아니다.** 브라우저는 항상 Next 서버(같은 오리진)와만 통신하고,
 게이트웨이 호출은 BFF가 서버에서 수행하므로 `Origin` 헤더가 붙지 않는다 → 게이트웨이 CORS 검사 대상이 아니다.
-포트가 점유돼 있으면 `pnpm dev:alt`(5173)나 임의 포트를 써도 된다.
+포트가 점유돼 있으면 `pnpm dev:alt`(5174)나 임의 포트를 써도 된다.
 
-> 게이트웨이 CORS 허용 목록(`localhost:3000`, `localhost:5173`)이 의미를 갖는 경우는
+> 게이트웨이 CORS 허용 목록(로컬 출처는 `localhost:5174` 하나뿐)이 의미를 갖는 경우는
 > **브라우저가 게이트웨이를 직접 부를 때**다 (WebSocket 핸드셰이크, Swagger UI 등).
 > BFF 경유 요청에는 적용되지 않는다.
 
@@ -111,8 +111,8 @@ curl -s --max-time 10 http://localhost:8082/v3/api-docs   # tour-service
   → `localhost` 로 접근하거나 `next.config.ts` 의 `allowedDevOrigins` 에 해당 호스트를 추가한다.
 - **다른 앱이 보인다 / 내 변경이 반영되지 않는다** — 3000 포트가 이미 다른 로컬 앱에 점유된 것이다.
   `next dev -p 3000` 은 이 경우 조용히 실패하지 않고 뜨지만, `localhost:3000` 요청이 먼저 바인딩된
-  앱으로 갈 수 있다. `lsof -nP -iTCP:3000 -sTCP:LISTEN` 으로 확인하고 `pnpm dev:alt`(5173)를 쓴다.
-  게이트웨이 CORS 는 3000 과 5173 을 모두 허용한다.
+  앱으로 갈 수 있다. `lsof -nP -iTCP:3000 -sTCP:LISTEN` 으로 확인하고 `pnpm dev:alt`(5174)를 쓴다.
+  BFF 경유라 FE 포트는 게이트웨이 CORS 와 무관하다. 게이트웨이를 직접 부르는 경우에만 `5174` 여야 한다 — 허용된 로컬 출처가 그것뿐이다.
 - **조회는 되는데 등록만 빈 403** — 브라우저가 게이트웨이를 **직접** 부르고 있고, 그 오리진이 CORS 허용 목록에 없다. 브라우저는 POST에 `Origin` 을 붙이고 GET에는 붙이지 않아 "조회만 되는" 형태로 나타난다. BFF를 우회하는 호출부가 있는지 먼저 확인하고, 정말 직접 호출이 필요하면 `ApiGatewayCorsConfig` 에 오리진 추가를 BE에 요청한다.
 - **로그인 직후 401** — refresh 쿠키의 `SameSite`/도메인 문제. BFF 경유가 아니라 게이트웨이를 직접 부르고 있는지 확인한다.
 - **지도가 빈 회색 박스** — ① `NEXT_PUBLIC_KAKAO_MAP_KEY` 누락 ② 카카오 콘솔에 `http://localhost:3000` 미등록 ③ `ssr:false` 누락. 브라우저 콘솔을 먼저 본다.
