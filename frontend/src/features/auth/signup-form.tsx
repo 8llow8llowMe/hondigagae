@@ -17,6 +17,7 @@ import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
 import { remainingSeconds } from '@/lib/form/cooldown'
 import { apiErrorToFormErrors, type FormErrors } from '@/lib/form/field-errors'
 import { useForm } from '@/lib/form/use-form'
+import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { messages } from '@/lib/messages'
 
 /** 백엔드 send-code 쿨다운 (AuthWebController 문서 실측) */
@@ -228,21 +229,9 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
     },
   })
 
-  // 3단계(비밀번호·이름·닉네임 입력) 이탈 경고. `beforeunload` 로 브라우저 이탈만
-  // 다루고 App Router 내 라우트 이동은 경고하지 않는다 — App Router 에 이동을
-  // 가로채는 공식 API 가 없다 (form-guide.md §7, 회원가입-세부명세.md D8-4).
-  // dirty 이면서 제출 중이 아닐 때만 건다 — 제출 중에 걸면 성공 리다이렉트 직전에도
-  // 경고가 뜬다.
-  useEffect(() => {
-    if (step !== 'profile' || !profileForm.isDirty || profileForm.isSubmitting) return
-
-    function handleBeforeUnload(event: BeforeUnloadEvent) {
-      event.preventDefault()
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [step, profileForm.isDirty, profileForm.isSubmitting])
+  // 3단계(비밀번호·이름·닉네임 입력) 이탈 경고.
+  // 조건과 근거는 useUnsavedWarning 의 JSDoc 에 있다 (form-guide.md §7).
+  useUnsavedWarning(step === 'profile' && profileForm.isDirty && !profileForm.isSubmitting)
 
   const handleResend = useCallback(() => {
     // 쿨다운 가드에 더해 재진입 가드(ref)를 겹친다 — disabled 반영 전 빠른 연속
