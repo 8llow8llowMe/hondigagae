@@ -16,7 +16,7 @@ description: 혼디가개(hondigagae) FE(Next.js App Router)의 실제 구현 �
 ## 저장소 좌표
 
 - git root는 `hondigagae`. **FE 파일 경로에는 `frontend/` 접두사가 붙는다.** 명령은 `frontend/` 에서 실행한다.
-- 패키지 매니저는 **pnpm 전용**. dev 서버는 `3000` (게이트웨이 CORS 허용 목록: `3000`, `5173`).
+- 패키지 매니저는 **pnpm 전용**. dev 서버는 `3000`, 점유 시 `pnpm dev:alt`(`5174`). BFF 경유라 FE 포트는 게이트웨이 CORS 와 무관하다 (허용된 로컬 출처는 `5174` 하나뿐).
 - 스택: Next.js App Router + TypeScript / Tailwind CSS / Zustand / React Query
 - **모든 파일은 UTF-8 (no BOM)** 로 저장한다. 루트 `.gitattributes`/`.editorconfig` 설정을 덮어쓰지 않는다.
 
