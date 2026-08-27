@@ -42,15 +42,10 @@ export function EmailStep({
   onSubmit,
   onRetry,
 }: EmailStepProps) {
-  if (errorStatus !== null && classify(errorStatus) === 'temporary') {
-    return (
-      <ErrorState
-        title={messages.common.temporaryErrorTitle}
-        description={messages.common.temporaryErrorDescription}
-        onRetry={onRetry}
-      />
-    )
-  }
+  // **폼을 대체하지 않고 위에 얹는다.** early return 으로 폼을 통째로 갈아치우면
+  // 명세의 "단계·입력값 유지"(회원가입-세부명세.md D4)를 어긴다 — 이슈 #24 최종
+  // 리뷰 I1 재수정. login-form.tsx 의 LoginFormFields 와 같은 패턴.
+  const isTemporaryError = errorStatus !== null && classify(errorStatus) === 'temporary'
 
   return (
     <form
@@ -61,6 +56,13 @@ export function EmailStep({
         onSubmit()
       }}
     >
+      {isTemporaryError && (
+        <ErrorState
+          title={messages.common.temporaryErrorTitle}
+          description={messages.common.temporaryErrorDescription}
+          onRetry={onRetry}
+        />
+      )}
       {/* 단계 표시는 텍스트로도 읽힌다 — 색·아이콘만으로 표현하지 않는다 (D6) */}
       <p className="text-caption text-fg-muted">{messages.auth.stepOf(1, 3)}</p>
       <FormAlert message={errors.form} />
@@ -117,15 +119,10 @@ export function CodeStep({
   onChangeEmail,
   onRetry,
 }: CodeStepProps) {
-  if (errorStatus !== null && classify(errorStatus) === 'temporary') {
-    return (
-      <ErrorState
-        title={messages.common.temporaryErrorTitle}
-        description={messages.common.temporaryErrorDescription}
-        onRetry={onRetry}
-      />
-    )
-  }
+  // **폼을 대체하지 않고 위에 얹는다.** early return 으로 폼을 통째로 갈아치우면
+  // 명세의 "단계·입력값 유지"(회원가입-세부명세.md D4)를 어긴다 — 이슈 #24 최종
+  // 리뷰 I1 재수정. login-form.tsx 의 LoginFormFields 와 같은 패턴.
+  const isTemporaryError = errorStatus !== null && classify(errorStatus) === 'temporary'
 
   const isCoolingDown = cooldownSeconds > 0
   // 매 초 갱신되는 카운트다운을 그대로 aria-live 에 실으면 초마다 읽힌다.
@@ -141,6 +138,13 @@ export function CodeStep({
         onSubmit()
       }}
     >
+      {isTemporaryError && (
+        <ErrorState
+          title={messages.common.temporaryErrorTitle}
+          description={messages.common.temporaryErrorDescription}
+          onRetry={onRetry}
+        />
+      )}
       <p className="text-caption text-fg-muted">{messages.auth.stepOf(2, 3)}</p>
       <FormNotice message={notice ?? null} />
       <FormAlert message={errors.form} />
@@ -214,15 +218,10 @@ export function ProfileStep({
   onSubmit,
   onRetry,
 }: ProfileStepProps) {
-  if (errorStatus !== null && classify(errorStatus) === 'temporary') {
-    return (
-      <ErrorState
-        title={messages.common.temporaryErrorTitle}
-        description={messages.common.temporaryErrorDescription}
-        onRetry={onRetry}
-      />
-    )
-  }
+  // **폼을 대체하지 않고 위에 얹는다.** early return 으로 폼을 통째로 갈아치우면
+  // 명세의 "단계·입력값 유지"(회원가입-세부명세.md D4)를 어긴다 — 이슈 #24 최종
+  // 리뷰 I1 재수정. login-form.tsx 의 LoginFormFields 와 같은 패턴.
+  const isTemporaryError = errorStatus !== null && classify(errorStatus) === 'temporary'
 
   return (
     <form
@@ -233,6 +232,13 @@ export function ProfileStep({
         onSubmit()
       }}
     >
+      {isTemporaryError && (
+        <ErrorState
+          title={messages.common.temporaryErrorTitle}
+          description={messages.common.temporaryErrorDescription}
+          onRetry={onRetry}
+        />
+      )}
       <p className="text-caption text-fg-muted">{messages.auth.stepOf(3, 3)}</p>
       <FormNotice message={notice ?? null} />
       <FormAlert message={errors.form} />

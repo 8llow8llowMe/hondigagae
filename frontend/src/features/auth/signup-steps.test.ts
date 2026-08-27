@@ -44,6 +44,26 @@ describe('EmailStep', () => {
     expect(markup).toContain(messages.common.retry)
   })
 
+  it('5xx 여도 이메일 입력 필드는 그대로 남아있다 — 폼을 대체하지 않고 위에 얹는다', () => {
+    // 이슈 #24 최종 리뷰 I1 회귀 방지: early return 으로 폼을 통째로 갈아치우면
+    // 회원가입-세부명세.md D4 "단계·입력값 유지"를 어긴다
+    const markup = renderToStaticMarkup(
+      createElement(EmailStep, {
+        values: { email: 'typo@example' },
+        errors: NO_FORM_ERRORS,
+        errorStatus: 500,
+        submitting: false,
+        onValueChange: noop,
+        onSubmit: noop,
+        onRetry: noop,
+      }),
+    )
+
+    expect(markup).toContain('id="email"')
+    expect(markup).toContain(messages.auth.emailLabel)
+    expect(markup).toContain('typo@example')
+  })
+
   it('무응답(0)이면 ErrorState 를 렌더한다', () => {
     const markup = renderToStaticMarkup(
       createElement(EmailStep, {
@@ -168,6 +188,31 @@ describe('CodeStep', () => {
 
     expect(markup).toContain(messages.common.temporaryErrorTitle)
     expect(markup).toContain(messages.common.retry)
+  })
+
+  it('5xx 여도 코드 입력 필드는 그대로 남아있다 — 폼을 대체하지 않고 위에 얹는다', () => {
+    // 이슈 #24 최종 리뷰 I1 회귀 방지: early return 으로 폼을 통째로 갈아치우면
+    // 회원가입-세부명세.md D4 "단계·입력값 유지"를 어긴다
+    const markup = renderToStaticMarkup(
+      createElement(CodeStep, {
+        email: 'a@b.c',
+        values: { code: 'WRONG1' },
+        errors: NO_FORM_ERRORS,
+        errorStatus: 503,
+        submitting: false,
+        cooldownSeconds: 0,
+        onValueChange: noop,
+        onSubmit: noop,
+        resending: false,
+        onResend: noop,
+        onChangeEmail: noop,
+        onRetry: noop,
+      }),
+    )
+
+    expect(markup).toContain('id="code"')
+    expect(markup).toContain(messages.auth.codeLabel)
+    expect(markup).toContain('WRONG1')
   })
 
   it('429(쿨다운) 는 ErrorState 를 쓰지 않고 서버 문구를 role=alert 로 렌더하며 재전송은 비활성 유지한다', () => {
@@ -320,6 +365,30 @@ describe('ProfileStep', () => {
 
     expect(markup).toContain(messages.common.temporaryErrorTitle)
     expect(markup).toContain(messages.common.retry)
+  })
+
+  it('5xx 여도 입력 필드는 그대로 남아있다 — 폼을 대체하지 않고 위에 얹는다', () => {
+    // 이슈 #24 최종 리뷰 I1 회귀 방지: early return 으로 폼을 통째로 갈아치우면
+    // 회원가입-세부명세.md D4 "단계·입력값 유지"를 어긴다
+    const markup = renderToStaticMarkup(
+      createElement(ProfileStep, {
+        values: { password: 'pw', name: '홍길동', nickname: '길동이' },
+        errors: NO_FORM_ERRORS,
+        errorStatus: 500,
+        submitting: false,
+        duplicateEmail: null,
+        returnTo: '/',
+        onValueChange: noop,
+        onSubmit: noop,
+        onRetry: noop,
+      }),
+    )
+
+    expect(markup).toContain('id="password"')
+    expect(markup).toContain('id="name"')
+    expect(markup).toContain('id="nickname"')
+    expect(markup).toContain(messages.auth.passwordLabel)
+    expect(markup).toContain('홍길동')
   })
 
   it('notice 가 있으면 role=status 로 렌더한다 — 2단계 성공 안내', () => {
