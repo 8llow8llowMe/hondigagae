@@ -40,7 +40,7 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
   return (
     <main className="mx-auto flex max-w-screen-md flex-col gap-6 px-4 py-6">
       <header>
-        <h1 className="text-display text-fg font-bold">{messages.place.pageTitle}</h1>
+        <h1 className="text-display text-fg font-extrabold">{messages.place.pageTitle}</h1>
         <p className="text-body-2 text-fg-muted mt-2">{messages.place.pageDescription}</p>
       </header>
 

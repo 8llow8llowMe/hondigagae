@@ -118,7 +118,9 @@ export function PlaceListSection({
           {messages.common.loadMore}
         </Button>
       ) : (
-        <p className="text-caption text-fg-subtle py-4 text-center">{messages.common.listEnd}</p>
+        <p className="text-caption text-fg-subtle py-4 text-center font-medium">
+          {messages.common.listEnd}
+        </p>
       )}
     </div>
   )
