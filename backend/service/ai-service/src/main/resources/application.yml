@@ -26,6 +26,18 @@ ai:
       pending-timeout-seconds: ${AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS:30}
       running-timeout-seconds: ${AI_PLAN_JOB_RUNNING_TIMEOUT_SECONDS:300}
 
+# LLM provider 설정.
+# enabled=false 가 기본이다 - API 키 없이도 기동되고 StubLlmAdapter 가 포트를 채운다.
+# 프론트 개발과 CI 가 키와 토큰 비용에 묶이면 안 되기 때문이다.
+# api-key 는 평문으로 커밋하지 않는다 - 환경변수 또는 Jasypt (external-api-guide §4).
+ai-llm:
+  enabled: ${AI_LLM_ENABLED:false}
+  api-key: ${ANTHROPIC_API_KEY:}
+  model: ${AI_LLM_MODEL:claude-opus-5}
+  max-tokens: ${AI_LLM_MAX_TOKENS:16000}
+  place-candidate-size: ${AI_LLM_PLACE_CANDIDATE_SIZE:50}
+  timeout-seconds: ${AI_LLM_TIMEOUT_SECONDS:180}
+
 logging:
   level:
     com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN

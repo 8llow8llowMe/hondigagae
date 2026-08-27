@@ -69,6 +69,7 @@ public class AiPlanPresenter {
         return items.stream()
             .map(item -> AiPlanScheduleItem.builder()
                 .itemType(item.itemType())
+                .placeId(item.placeId() == null ? null : String.valueOf(item.placeId()))
                 .title(item.title())
                 .note(item.note())
                 .build())

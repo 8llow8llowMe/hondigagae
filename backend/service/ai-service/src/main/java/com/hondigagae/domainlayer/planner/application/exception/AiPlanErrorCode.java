@@ -16,6 +16,10 @@ public enum AiPlanErrorCode {
     JOB_TIMEOUT("AIPLAN_006", "AI 일정 생성 작업이 시간 내에 완료되지 않았습니다.", HttpStatus.GATEWAY_TIMEOUT),
     LLM_UNAVAILABLE("AIPLAN_007", "AI 일정 생성 서비스를 일시적으로 사용할 수 없습니다.", HttpStatus.SERVICE_UNAVAILABLE),
     IDEMPOTENCY_KEY_GENERATION_FAILED("AIPLAN_008", "AI 일정 요청 식별자 생성에 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR),
+    INTERNAL_SERVICE_UNAVAILABLE("AIPLAN_009", "연결된 내부 서비스를 일시적으로 사용할 수 없습니다.", HttpStatus.SERVICE_UNAVAILABLE),
+    LLM_RESPONSE_INVALID("AIPLAN_010", "AI 응답을 일정으로 해석하지 못했습니다.", HttpStatus.INTERNAL_SERVER_ERROR),
+    LLM_REFUSED("AIPLAN_011", "요청 내용이 AI 안전 정책에 걸려 일정을 생성하지 못했습니다.", HttpStatus.UNPROCESSABLE_ENTITY),
+    NO_PLACE_CANDIDATES("AIPLAN_012", "여행 일정에 넣을 반려견 동반 가능 장소를 찾지 못했습니다.", HttpStatus.UNPROCESSABLE_ENTITY),
 
     // 요청 검증(Bean Validation) 전용 코드 — 1xx 대역.
     INVALID_REQUEST("AIPLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),

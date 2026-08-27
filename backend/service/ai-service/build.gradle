@@ -4,8 +4,8 @@ dependencies {
     implementation project(':core:security-core')
 
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    // LLM API 호출용 WebClient (provider 확정 전 — AiLlmPort 뒤에서 분기)
-    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    // LLM provider — Anthropic 공식 Java SDK. AiLlmPort 뒤에 숨어 있어 교체 지점은 어댑터 하나다.
+    implementation 'com.anthropic:anthropic-java:2.34.0'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
