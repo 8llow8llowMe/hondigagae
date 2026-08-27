@@ -20,6 +20,8 @@
   - `DESIGN.md` = 토큰 단일 정본. 이 문서는 적용 규칙과 공통 컴포넌트 목록
 - `component-guide.md`
   - 컴포넌트 계약: prop 네이밍, variant/size 표준 집합, `className` 정책, 합성 기준, 접근성 계약
+- `form-guide.md`
+  - 폼 규약(T4): zod + 자체 훅 결정, **백엔드 400 `resultMessage` → 필드 매핑**, 중복 제출 방지, 이탈 경고
 - `external-api-guide.md`
   - 카카오 지도 SDK 로딩·키 관리·마커/경로 렌더 규약
 - `tooling-guide.md`
@@ -48,7 +50,7 @@
 5. `coding-conventions.md`
 6. `api-integration-guide.md`
 7. `auth-guide.md`
-8. `../DESIGN.md`, `styling-guide.md`, `component-guide.md`
+8. `../DESIGN.md`, `styling-guide.md`, `component-guide.md`, `form-guide.md`
 9. `external-api-guide.md` (지도 작업 시)
 10. `tooling-guide.md` (설정 변경 시)
 11. `testing-guide.md`
