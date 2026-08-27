@@ -82,6 +82,18 @@ describe('LoginFormFields', () => {
     expect(markup).toContain(messages.common.retry)
   })
 
+  it('5xx 여도 입력 필드는 그대로 남아있다 — 폼을 대체하지 않고 위에 얹는다', () => {
+    // 이슈 #24 최종 리뷰 I1 회귀 방지: early return 으로 폼을 통째로 갈아치우면
+    // 로그인-세부명세.md D4 "폼은 그대로 유지"를 어기고 입력을 고칠 수단이 없어진다
+    const markup = render({ errorStatus: 500, values: { email: 'typo@example', password: '' } })
+
+    expect(markup).toContain('id="email"')
+    expect(markup).toContain('id="password"')
+    expect(markup).toContain(messages.auth.emailLabel)
+    expect(markup).toContain(messages.auth.passwordLabel)
+    expect(markup).toContain('typo@example')
+  })
+
   it('429 면 재시도 버튼 없이 서버 문구를 role=alert 로 렌더한다', () => {
     const markup = render({
       errorStatus: 429,

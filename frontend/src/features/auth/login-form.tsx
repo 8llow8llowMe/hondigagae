@@ -54,15 +54,12 @@ export function LoginFormFields({
   // 재시도 수단을 준다 — 로그인-세부명세.md D4/D5. 429(잠금)는 여기 포함하지 않는다:
   // classify(429) 는 'rate-limited' 라 시간이 지나야 풀리는데 재시도 버튼을 주면
   // 오히려 잠금을 연장한다 — 아래 FormAlert 경로로 그대로 둔다.
-  if (errorStatus !== null && classify(errorStatus) === 'temporary') {
-    return (
-      <ErrorState
-        title={messages.common.temporaryErrorTitle}
-        description={messages.common.temporaryErrorDescription}
-        onRetry={onRetry}
-      />
-    )
-  }
+  //
+  // **폼을 대체하지 않고 위에 얹는다.** early return 으로 폼을 통째로 갈아치우면
+  // 명세의 "폼은 그대로 유지"(D4)를 어긴다 — 입력 필드가 사라져 이메일 오타를
+  // 고칠 수단이 없어진다. `onValueChange` 의 `setErrorStatus(null)` 도 입력
+  // 요소가 살아있어야 발동할 수 있다 — 이슈 #24 최종 리뷰 I1 재수정.
+  const isTemporaryError = errorStatus !== null && classify(errorStatus) === 'temporary'
 
   return (
     <form
@@ -73,6 +70,13 @@ export function LoginFormFields({
         onSubmit()
       }}
     >
+      {isTemporaryError && (
+        <ErrorState
+          title={messages.common.temporaryErrorTitle}
+          description={messages.common.temporaryErrorDescription}
+          onRetry={onRetry}
+        />
+      )}
       <FormAlert message={errors.form} />
 
       <Field id="email" label={messages.auth.emailLabel} error={errors.fields.email} required>
