@@ -1,5 +1,6 @@
-package com.hondigagae.domainlayer.pet.domain.enums;
+package com.hondigagae.shared.travel.pet;
 
+import com.hondigagae.common.dto.metadata.CodeNameDescribable;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -8,7 +9,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Getter
 @RequiredArgsConstructor
-public enum PetSizeType {
+public enum PetSizeType implements CodeNameDescribable {
 
     SMALL("소형견", "체중 10kg 미만"),
     MEDIUM("중형견", "체중 10kg 이상 25kg 미만"),

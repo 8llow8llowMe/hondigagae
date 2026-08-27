@@ -17,7 +17,7 @@ import com.hondigagae.domainlayer.place.application.info.PlaceSummariesInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceSummaryInfo;
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
-import com.hondigagae.domainlayer.place.domain.enums.PetAllowanceType;
+import com.hondigagae.shared.travel.place.PetAllowanceType;
 import com.hondigagae.domainlayer.place.domain.model.Place;
 import com.hondigagae.persistence.dto.SliceResponse;
 import java.math.BigDecimal;

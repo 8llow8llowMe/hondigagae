@@ -1,8 +1,8 @@
 package com.hondigagae.domainlayer.place.application.model;
 
-import com.hondigagae.domainlayer.place.domain.enums.AllowedPetSize;
+import com.hondigagae.shared.travel.place.AllowedPetSize;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
-import com.hondigagae.domainlayer.place.domain.enums.PetAllowanceType;
+import com.hondigagae.shared.travel.place.PetAllowanceType;
 import lombok.Builder;
 
 /**

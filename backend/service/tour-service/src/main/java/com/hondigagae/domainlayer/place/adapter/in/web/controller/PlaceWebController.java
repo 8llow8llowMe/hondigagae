@@ -8,9 +8,9 @@ import com.hondigagae.domainlayer.place.application.exception.PlaceValidationMes
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.in.PlaceWebUseCase;
-import com.hondigagae.domainlayer.place.domain.enums.AllowedPetSize;
+import com.hondigagae.shared.travel.place.AllowedPetSize;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
-import com.hondigagae.domainlayer.place.domain.enums.PetAllowanceType;
+import com.hondigagae.shared.travel.place.PetAllowanceType;
 import com.hondigagae.persistence.dto.SliceResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

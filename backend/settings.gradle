@@ -6,6 +6,7 @@ include 'core:persistence-core'
 include 'core:redis-core'
 include 'core:security-core'
 include 'core:storage-core'
+include 'core:shared-travel'
 
 // Cloud
 include 'cloud:api-gateway'

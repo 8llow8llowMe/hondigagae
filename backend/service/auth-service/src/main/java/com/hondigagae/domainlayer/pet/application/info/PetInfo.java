@@ -1,8 +1,8 @@
 package com.hondigagae.domainlayer.pet.application.info;
 
-import com.hondigagae.domainlayer.pet.domain.enums.ActivityLevel;
-import com.hondigagae.domainlayer.pet.domain.enums.PetSizeType;
-import com.hondigagae.domainlayer.pet.domain.enums.SocialityLevel;
+import com.hondigagae.shared.travel.pet.ActivityLevel;
+import com.hondigagae.shared.travel.pet.PetSizeType;
+import com.hondigagae.shared.travel.pet.SocialityLevel;
 import com.hondigagae.domainlayer.pet.domain.model.Pet;
 import lombok.Builder;
 

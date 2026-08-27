@@ -1,5 +1,6 @@
-package com.hondigagae.domainlayer.pet.domain.enums;
+package com.hondigagae.shared.travel.pet;
 
+import com.hondigagae.common.dto.metadata.CodeNameDescribable;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -8,7 +9,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Getter
 @RequiredArgsConstructor
-public enum SocialityLevel {
+public enum SocialityLevel implements CodeNameDescribable {
 
     LOW("낮음", "다른 개나 낯선 사람을 불편해합니다."),
     MEDIUM("보통", "상황에 따라 적응합니다."),

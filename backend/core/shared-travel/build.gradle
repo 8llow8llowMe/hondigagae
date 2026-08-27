@@ -1,0 +1,8 @@
+dependencies {
+    // CodeNameDescribable / ScoreMetricDescribable 만 참조한다. 이 모듈은 인프라를 알지 않는다.
+    // 소비하는 서비스가 common-core 를 이미 직접 선언하므로 implementation 으로 충분하다.
+    implementation project(':core:common-core')
+}
+
+jar { enabled = true }
+bootJar { enabled = false }

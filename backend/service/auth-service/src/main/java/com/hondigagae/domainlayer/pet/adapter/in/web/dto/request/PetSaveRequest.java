@@ -2,9 +2,9 @@ package com.hondigagae.domainlayer.pet.adapter.in.web.dto.request;
 
 import com.hondigagae.domainlayer.pet.application.command.PetSaveCommand;
 import com.hondigagae.domainlayer.pet.application.exception.PetValidationMessage;
-import com.hondigagae.domainlayer.pet.domain.enums.ActivityLevel;
-import com.hondigagae.domainlayer.pet.domain.enums.PetSizeType;
-import com.hondigagae.domainlayer.pet.domain.enums.SocialityLevel;
+import com.hondigagae.shared.travel.pet.ActivityLevel;
+import com.hondigagae.shared.travel.pet.PetSizeType;
+import com.hondigagae.shared.travel.pet.SocialityLevel;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;

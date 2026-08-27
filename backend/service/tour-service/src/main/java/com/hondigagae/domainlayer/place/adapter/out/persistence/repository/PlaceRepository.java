@@ -1,8 +1,8 @@
 package com.hondigagae.domainlayer.place.adapter.out.persistence.repository;
 
 import com.hondigagae.domainlayer.place.adapter.out.persistence.entity.PlaceEntity;
-import com.hondigagae.domainlayer.place.domain.enums.AllowedPetSize;
-import com.hondigagae.domainlayer.place.domain.enums.PetAllowanceType;
+import com.hondigagae.shared.travel.place.AllowedPetSize;
+import com.hondigagae.shared.travel.place.PetAllowanceType;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;

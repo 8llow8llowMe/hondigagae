@@ -1,7 +1,7 @@
 package com.hondigagae.domainlayer.place.domain.model;
 
-import com.hondigagae.domainlayer.place.domain.enums.AllowedPetSize;
-import com.hondigagae.domainlayer.place.domain.enums.PetAllowanceType;
+import com.hondigagae.shared.travel.place.AllowedPetSize;
+import com.hondigagae.shared.travel.place.PetAllowanceType;
 import com.hondigagae.domainlayer.place.domain.enums.PlaceSource;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
