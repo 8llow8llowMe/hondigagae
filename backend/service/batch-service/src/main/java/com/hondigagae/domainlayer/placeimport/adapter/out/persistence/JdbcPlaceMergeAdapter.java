@@ -29,6 +29,7 @@ public class JdbcPlaceMergeAdapter implements PlaceMergePort {
         SELECT id, source, title, lat, lng
           FROM place
          WHERE merged_into_id IS NULL
+           AND delisted_at IS NULL
            AND lat IS NOT NULL
            AND lng IS NOT NULL
            AND (? IS NULL OR area_code = ?)

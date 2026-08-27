@@ -17,6 +17,7 @@ public interface PlaceRepository extends JpaRepository<PlaceEntity, Long> {
     @Query("""
         select p from PlaceEntity p
         where p.mergedIntoId is null
+          and p.delistedAt is null
           and (:areaCode is null or p.areaCode = :areaCode)
           and (:sigunguCode is null or p.sigunguCode = :sigunguCode)
           and (:contentTypeId is null or p.contentTypeId = :contentTypeId)
@@ -46,6 +47,7 @@ public interface PlaceRepository extends JpaRepository<PlaceEntity, Long> {
     @Query("""
         select p from PlaceEntity p
         where p.mergedIntoId is null
+          and p.delistedAt is null
           and p.lat between :minLat and :maxLat
           and p.lng between :minLng and :maxLng
           and (:contentTypeId is null or p.contentTypeId = :contentTypeId)
@@ -62,6 +64,12 @@ public interface PlaceRepository extends JpaRepository<PlaceEntity, Long> {
         @Param("sourceCategory") String sourceCategory
     );
 
-    /** 병합으로 사라진 행은 상세 조회에서도 노출하지 않는다. */
+    /**
+     * 병합으로 사라진 행은 상세 조회에서도 노출하지 않는다.
+     *
+     * <p>delisted 는 반대로 상세에서 계속 노출한다 — 기존 일정(plan_item)이 참조하는
+     * 장소가 원천에서 빠졌다고 일정 화면까지 깨지면 안 된다. 응답의 delisted 플래그로
+     * "더 이상 확인되지 않는 장소"임을 드러낸다.
+     */
     Optional<PlaceEntity> findByIdAndMergedIntoIdIsNull(long placeId);
 }

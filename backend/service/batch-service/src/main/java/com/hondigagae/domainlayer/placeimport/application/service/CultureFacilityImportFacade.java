@@ -1,9 +1,12 @@
 package com.hondigagae.domainlayer.placeimport.application.service;
 
 import com.hondigagae.domainlayer.placeimport.application.port.in.CultureFacilityImportUseCase;
+import com.hondigagae.domainlayer.placeimport.application.service.processor.DelistProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.EmergencyFacilityImportProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.CultureFacilityImportProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PlaceMergeProcessor;
+import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -27,13 +30,17 @@ public class CultureFacilityImportFacade implements CultureFacilityImportUseCase
     private final CultureFacilityImportProcessor cultureFacilityImportProcessor;
     private final EmergencyFacilityImportProcessor emergencyFacilityImportProcessor;
     private final PlaceMergeProcessor placeMergeProcessor;
+    private final DelistProcessor delistProcessor;
 
     @Override
     public int importFacilities(String sido) {
+        LocalDateTime runStartedAt = LocalDateTime.now();
         int imported = cultureFacilityImportProcessor.importFacilities(sido);
+        delistProcessor.delistPlaces(PlaceSourceType.CULTURE_PORTAL, runStartedAt, imported);
         placeMergeProcessor.mergeDuplicates(JEJU_AREA_CODE);
         // 같은 파일에 동물병원·동물약국이 함께 들어 있어 한 번 읽는 김에 같이 적재한다.
-        emergencyFacilityImportProcessor.importFacilities(sido);
+        int facilities = emergencyFacilityImportProcessor.importFacilities(sido);
+        delistProcessor.delistEmergencyFacilities(runStartedAt, facilities);
         return imported;
     }
 }

@@ -60,6 +60,12 @@ public record PlaceDetailResponse(
     @Schema(description = "반려동물 동반 콘텐츠 여부", example = "true")
     boolean petAvailable,
 
+    @Schema(
+        description = "원천에서 사라진 장소인지. true 면 폐업·등록 철회 등으로 더 이상 확인되지 않는 곳이라 "
+            + "화면에서 그렇게 안내해야 한다. 기존 일정이 참조할 수 있어 상세는 계속 응답한다",
+        example = "false")
+    boolean delisted,
+
     @Schema(description = "반려동물 동반 구분 metadata")
     CodeNameDescriptionMetadata petAllowanceType,
 

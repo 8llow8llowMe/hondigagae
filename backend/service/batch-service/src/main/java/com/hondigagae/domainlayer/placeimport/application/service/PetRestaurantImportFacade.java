@@ -1,8 +1,11 @@
 package com.hondigagae.domainlayer.placeimport.application.service;
 
 import com.hondigagae.domainlayer.placeimport.application.port.in.PetRestaurantImportUseCase;
+import com.hondigagae.domainlayer.placeimport.application.service.processor.DelistProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PetRestaurantImportProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PlaceMergeProcessor;
+import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -25,10 +28,15 @@ public class PetRestaurantImportFacade implements PetRestaurantImportUseCase {
 
     private final PetRestaurantImportProcessor petRestaurantImportProcessor;
     private final PlaceMergeProcessor placeMergeProcessor;
+    private final DelistProcessor delistProcessor;
 
     @Override
     public int importPetRestaurants(String region) {
+        LocalDateTime runStartedAt = LocalDateTime.now();
         int imported = petRestaurantImportProcessor.importPetRestaurants(region);
+        // 등록 철회가 실제로 일어나는 원천이다. 이번 파일에 없는 업소를 delist 해야
+        // 폐업한 식당이 "동반 가능 확인됨"으로 남지 않는다.
+        delistProcessor.delistPlaces(PlaceSourceType.MFDS, runStartedAt, imported);
         placeMergeProcessor.mergeDuplicates(JEJU_AREA_CODE);
         return imported;
     }

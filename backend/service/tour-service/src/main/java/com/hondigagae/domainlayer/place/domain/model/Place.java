@@ -48,6 +48,7 @@ public record Place(
     String petRestriction,
     String petExtraFee,
     Long mergedIntoId,
+    LocalDateTime delistedAt,
     LocalDateTime sourceCreatedAt,
     LocalDateTime sourceModifiedAt
 ) {

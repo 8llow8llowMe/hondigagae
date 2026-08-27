@@ -22,7 +22,8 @@ public interface EmergencyFacilityRepository extends JpaRepository<EmergencyFaci
      */
     @Query("""
         select h from EmergencyFacilityEntity h
-        where h.lat between :minLat and :maxLat
+        where h.delistedAt is null
+          and h.lat between :minLat and :maxLat
           and h.lng between :minLng and :maxLng
           and (:facilityType is null or h.facilityType = :facilityType)
           and (:open24 is null or h.open24 = :open24)

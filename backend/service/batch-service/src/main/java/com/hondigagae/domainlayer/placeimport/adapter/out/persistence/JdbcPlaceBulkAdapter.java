@@ -103,6 +103,7 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             source_created_at = VALUES(source_created_at),
             source_modified_at = VALUES(source_modified_at),
             synced_at = VALUES(synced_at),
+            delisted_at = NULL,
             updated_at = NOW()
         """;
 
@@ -160,6 +161,7 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             pet_extra_fee = VALUES(pet_extra_fee),
             source_modified_at = VALUES(source_modified_at),
             synced_at = VALUES(synced_at),
+            delisted_at = NULL,
             updated_at = NOW()
         """;
 
@@ -233,6 +235,7 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             pet_available = VALUES(pet_available),
             pet_allowance_type = VALUES(pet_allowance_type),
             synced_at = VALUES(synced_at),
+            delisted_at = NULL,
             updated_at = NOW()
         """;
 
