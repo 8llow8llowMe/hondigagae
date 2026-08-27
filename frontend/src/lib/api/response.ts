@@ -36,17 +36,3 @@ export function toMessage(raw: unknown, fallback: string): string {
   if (typeof raw === 'string' && raw.trim().length > 0) return raw
   return fallback
 }
-
-/**
- * Bean Validation 실패 응답(필드별 구조)을 필드 → 메시지 맵으로 정규화한다.
- * 형태가 아니면 빈 객체를 반환한다.
- */
-export function toFieldErrors(raw: unknown): Record<string, string> {
-  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return {}
-
-  const result: Record<string, string> = {}
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    if (typeof value === 'string') result[key] = value
-  }
-  return result
-}

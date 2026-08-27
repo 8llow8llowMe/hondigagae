@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { ApiError } from '@/lib/api/error'
-import { toFieldErrors, toMessage, unwrap, unwrapVoid } from '@/lib/api/response'
-import { fail, failWithFields, ok } from '@/test/api'
+import { toMessage, unwrap, unwrapVoid } from '@/lib/api/response'
+import { fail, ok } from '@/test/api'
 
 describe('unwrap', () => {
   it('성공 응답에서 dataBody 를 꺼낸다', () => {
@@ -71,22 +71,5 @@ describe('unwrapVoid', () => {
       expect((error as ApiError).status).toBe(429)
       expect((error as ApiError).resultCode).toBe('AUTH_015')
     }
-  })
-})
-
-describe('toFieldErrors', () => {
-  it('필드별 검증 오류를 맵으로 정규화한다', () => {
-    const response = failWithFields('PET_100', { name: '이름은 필수입니다.' })
-    expect(toFieldErrors(response.dataHeader.resultMessage)).toEqual({
-      name: '이름은 필수입니다.',
-    })
-  })
-
-  it('문자열 resultMessage 에는 빈 객체를 반환한다', () => {
-    expect(toFieldErrors('요청 값이 올바르지 않습니다.')).toEqual({})
-  })
-
-  it('배열에는 빈 객체를 반환한다', () => {
-    expect(toFieldErrors(['a', 'b'])).toEqual({})
   })
 })
