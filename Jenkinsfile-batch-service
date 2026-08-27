@@ -1,0 +1,29 @@
+// 혼디가개 batch-service 배포 잡.
+// 공공 API 적재. 웹 트래픽이 없어 마지막에 배포한다. 잡 실행은 배포와 분리한다.
+//
+// Jenkins 멀티브랜치 파이프라인 이름: hondigagae-batch-service
+// 배포 대상 PR 라벨:                  backend-batch-service
+//   dev  -> main-server (192.168.0.11), 호스트 포트 7080
+//   prod -> backend-1   (192.168.0.13), 호스트 포트 5080
+def backendPipeline
+node('builder-backend') {
+    checkout scm
+    backendPipeline = load 'Jenkinsfile.backend-common.groovy'
+}
+
+backendPipeline.run([
+    serviceGroup       : 'service',
+    serviceName        : 'batch-service',
+    modulePath         : 'service:batch-service',
+    fsPath             : 'backend/service/batch-service',
+    dockerfile         : 'batch-service.Dockerfile',
+    composeFile        : 'docker-compose-batch-service.yml',
+    composeServiceName : 'batch-service',
+    containerNamePrefix: 'hondigagae-batch-service',
+    deploySubdir       : 'service/batch-service',
+    buildAgentLabel    : 'builder-backend',
+    deployAgentLabels  : [
+        dev : 'deploy-backend-dev',
+        prod: 'deploy-backend-prod'
+    ]
+])
