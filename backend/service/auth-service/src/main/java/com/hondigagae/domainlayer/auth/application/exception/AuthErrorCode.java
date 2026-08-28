@@ -28,6 +28,8 @@ public enum AuthErrorCode {
     LOGIN_ATTEMPT_LOCKED("AUTH_015", "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS),
     // 미인증 이메일 발송 API 의 IP 기준 상한 초과. 이메일 쿨다운(AUTH_003)과 별개의 남용 방어다.
     EMAIL_SEND_IP_LIMITED("AUTH_016", "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS),
+    // 비밀번호 재설정 코드 검증 실패 누적 — 브루트포스 방어로 코드를 무효화하고 재요청을 유도한다.
+    PASSWORD_RESET_ATTEMPTS_EXCEEDED("AUTH_017", "인증코드 시도 횟수를 초과했습니다. 인증코드를 다시 요청해주세요.", HttpStatus.BAD_REQUEST),
 
     // 요청 검증(Bean Validation) 대역 — 1xx.
     // 필드별 코드(AUTH_101~104)는 AuthValidationMessage 가 단일 기준점이며, 여기서는 중복 정의하지 않는다.

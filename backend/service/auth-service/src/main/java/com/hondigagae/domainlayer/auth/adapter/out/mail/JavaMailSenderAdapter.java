@@ -16,6 +16,7 @@ public class JavaMailSenderAdapter implements MailSendPort {
 
     private static final String CODE_SUBJECT = "[혼디가개] 이메일 인증코드 안내";
     private static final String NOTICE_SUBJECT = "[혼디가개] 회원가입 안내";
+    private static final String RESET_SUBJECT = "[혼디가개] 비밀번호 재설정 안내";
 
     private final JavaMailSender javaMailSender;
 
@@ -33,6 +34,24 @@ public class JavaMailSenderAdapter implements MailSendPort {
     @Async("authMailTaskExecutor")
     public void sendAlreadyRegisteredNotice(String email) {
         send(email, NOTICE_SUBJECT, buildNoticeBody());
+    }
+
+    @Override
+    @Async("authMailTaskExecutor")
+    public void sendPasswordResetCode(String email, String code) {
+        send(email, RESET_SUBJECT, buildResetCodeBody(code));
+    }
+
+    @Override
+    @Async("authMailTaskExecutor")
+    public void sendPasswordResetNotRegisteredNotice(String email) {
+        send(email, RESET_SUBJECT, buildResetNotRegisteredBody());
+    }
+
+    @Override
+    @Async("authMailTaskExecutor")
+    public void sendPasswordResetSocialOnlyNotice(String email, String providerName) {
+        send(email, RESET_SUBJECT, buildResetSocialOnlyBody(providerName));
     }
 
     private void send(String email, String subject, String body) {
@@ -78,4 +97,38 @@ public class JavaMailSenderAdapter implements MailSendPort {
             </div>
             """;
     }
+
+    private String buildResetCodeBody(String code) {
+        return """
+            <div style="font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+              <h2 style="color: #1a1a2e;">혼디가개 비밀번호 재설정</h2>
+              <p>아래 인증코드를 5분 이내에 입력하고 새 비밀번호를 설정해주세요.</p>
+              <div style="background: #f4f4f8; border-radius: 8px; padding: 16px; text-align: center; font-size: 28px; font-weight: bold; letter-spacing: 6px;">%s</div>
+              <p style="color: #888; font-size: 12px; margin-top: 16px;">본인이 요청하지 않았다면 이 메일을 무시해주세요. 비밀번호는 변경되지 않습니다.</p>
+            </div>
+            """.formatted(code);
+    }
+
+    private String buildResetNotRegisteredBody() {
+        return """
+            <div style="font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+              <h2 style="color: #1a1a2e;">혼디가개 비밀번호 재설정 안내</h2>
+              <p>이 이메일로 가입된 계정이 없습니다.</p>
+              <p>이메일 주소를 다시 확인하시거나, 회원가입을 진행해주세요.</p>
+              <p style="color: #888; font-size: 12px; margin-top: 16px;">본인이 요청하지 않았다면 이 메일을 무시해주세요.</p>
+            </div>
+            """;
+    }
+
+    private String buildResetSocialOnlyBody(String providerName) {
+        return """
+            <div style="font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+              <h2 style="color: #1a1a2e;">혼디가개 비밀번호 재설정 안내</h2>
+              <p>이 계정은 <b>%s 로그인</b>으로 가입되어 별도의 비밀번호가 없습니다.</p>
+              <p>로그인 화면에서 %s 로그인을 이용해주세요.</p>
+              <p style="color: #888; font-size: 12px; margin-top: 16px;">본인이 요청하지 않았다면 이 메일을 무시해주세요.</p>
+            </div>
+            """.formatted(providerName, providerName);
+    }
+
 }

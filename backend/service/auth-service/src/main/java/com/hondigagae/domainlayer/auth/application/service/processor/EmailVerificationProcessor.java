@@ -4,9 +4,9 @@ import com.hondigagae.domainlayer.auth.application.exception.AuthErrorCode;
 import com.hondigagae.domainlayer.auth.application.exception.AuthException;
 import com.hondigagae.domainlayer.auth.application.port.out.EmailVerificationStorePort;
 import com.hondigagae.domainlayer.auth.application.port.out.MailSendPort;
+import com.hondigagae.domainlayer.auth.application.service.support.VerificationCodeGenerator;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
 import com.hondigagae.global.properties.EmailSendLimitProperties;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
@@ -19,14 +19,12 @@ public class EmailVerificationProcessor {
     private static final Duration CODE_TTL = Duration.ofMinutes(5);
     private static final Duration VERIFIED_TTL = Duration.ofMinutes(30);
     private static final Duration RESEND_COOLDOWN = Duration.ofSeconds(60);
-    private static final int CODE_LENGTH = 8;
-    private static final String CODE_CHARACTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
     private final EmailVerificationStorePort emailVerificationStorePort;
     private final MailSendPort mailSendPort;
     private final MemberRepositoryPort memberRepositoryPort;
     private final EmailSendLimitProperties emailSendLimitProperties;
-    private final SecureRandom secureRandom = new SecureRandom();
+    private final VerificationCodeGenerator verificationCodeGenerator;
 
     /**
      * 가입 여부와 무관하게 항상 동일하게 성공 응답한다(계정 열거 방지).
@@ -55,7 +53,7 @@ public class EmailVerificationProcessor {
         }
 
         // 4. 인증코드 생성/저장 후 비동기 발송
-        String code = generateCode();
+        String code = verificationCodeGenerator.generate();
         emailVerificationStorePort.saveCode(email, code, CODE_TTL);
         mailSendPort.sendVerificationCode(email, code);
     }
@@ -81,13 +79,5 @@ public class EmailVerificationProcessor {
      */
     public static String normalize(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private String generateCode() {
-        StringBuilder builder = new StringBuilder(CODE_LENGTH);
-        for (int i = 0; i < CODE_LENGTH; i++) {
-            builder.append(CODE_CHARACTERS.charAt(secureRandom.nextInt(CODE_CHARACTERS.length())));
-        }
-        return builder.toString();
     }
 }
