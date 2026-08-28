@@ -65,6 +65,26 @@ class AiPlanPromptFactoryTest {
     }
 
     @Test
+    @DisplayName("필수 포함 장소는 후보 줄에 표시되고 배치 지시가 실린다")
+    void pinnedPlacesAreMarkedAndInstructed() {
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .areaCode("39")
+            .startDate("2026-09-01")
+            .endDate("2026-09-02")
+            .pinnedPlaceIds(List.of(1L))
+            .placeCandidates(List.of(
+                PlaceCandidate.builder().placeId(1L).title("꼭갈곳").lat(33.5).lng(126.5).build(),
+                PlaceCandidate.builder().placeId(2L).title("보통후보").lat(33.4).lng(126.4).build()))
+            .build();
+
+        String prompt = factory.userPrompt(query);
+
+        assertThat(prompt).contains("[필수 포함] placeId=1");
+        assertThat(prompt).doesNotContain("[필수 포함] placeId=2");
+        assertThat(prompt).contains("1곳을 빠짐없이 일정에 배치할 것");
+    }
+
+    @Test
     @DisplayName("후보의 입장 크기·체중 제한이 있으면 후보 줄에 실린다")
     void candidateEntranceLimitsAppear() {
         String prompt = factory.userPrompt(query(List.of()));

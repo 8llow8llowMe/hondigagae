@@ -40,6 +40,10 @@ public record AiPlanCreateRequest(
     @Size(max = 5, message = AiPlanValidationMessage.PET_IDS_SIZE_INVALID)
     List<@Positive(message = AiPlanValidationMessage.PET_ID_POSITIVE) Long> petIds,
 
+    @Schema(description = "꼭 넣고 싶은 장소 식별자 목록 (선택, 최대 10곳) — 일정에 반드시 배치됩니다.")
+    @Size(max = 10, message = AiPlanValidationMessage.PINNED_PLACE_IDS_SIZE_INVALID)
+    List<@Positive(message = AiPlanValidationMessage.PINNED_PLACE_ID_POSITIVE) Long> pinnedPlaceIds,
+
     @Schema(description = "요청 메모 (선택) — 자연어 요구사항", example = "산책 위주로, 더위에 약한 아이라 실내 위주로 부탁해요")
     @Size(max = 500, message = AiPlanValidationMessage.REQUEST_NOTE_LENGTH_INVALID)
     String requestNote
@@ -52,6 +56,7 @@ public record AiPlanCreateRequest(
             .endDate(endDate)
             .budget(budget)
             .petIds(effectivePetIds())
+            .pinnedPlaceIds(pinnedPlaceIds == null ? List.of() : pinnedPlaceIds.stream().distinct().toList())
             .requestNote(requestNote)
             .build();
     }

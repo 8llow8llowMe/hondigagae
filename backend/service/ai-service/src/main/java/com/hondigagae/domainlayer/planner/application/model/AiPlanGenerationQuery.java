@@ -19,6 +19,8 @@ public record AiPlanGenerationQuery(
     String requestNote,
     // 반려견 특성. 비어 있으면 조회 실패/프로필 부재 — 특성 없이 생성하되 프롬프트에서 반려견 절이 빠진다.
     List<PetCondition> petConditions,
+    // 반드시 일정에 배치할 장소. placeCandidates 에 이미 합쳐져 있고, 프롬프트 표기용으로만 쓴다.
+    List<Long> pinnedPlaceIds,
     // 일정에 넣을 수 있는 장소 전부. 비어 있으면 생성 자체를 하지 않는다.
     List<PlaceCandidate> placeCandidates
 ) {
@@ -29,5 +31,9 @@ public record AiPlanGenerationQuery(
 
     public List<PetCondition> safePetConditions() {
         return petConditions == null ? List.of() : petConditions;
+    }
+
+    public List<Long> safePinnedPlaceIds() {
+        return pinnedPlaceIds == null ? List.of() : pinnedPlaceIds;
     }
 }

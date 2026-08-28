@@ -36,4 +36,13 @@ public interface PlaceRepository extends JpaRepository<PlaceEntity, Long>, Place
           and p.delistedAt is null
         """)
     List<Long> findVisibleIds(Collection<Long> placeIds);
+
+    /** 아이디로 노출 가능한 장소 엔티티를 준다. ai-service 의 필수 포함 후보 조회용. */
+    @Query("""
+        select p from PlaceEntity p
+        where p.id in :placeIds
+          and p.mergedIntoId is null
+          and p.delistedAt is null
+        """)
+    List<PlaceEntity> findVisiblePlaces(Collection<Long> placeIds);
 }
