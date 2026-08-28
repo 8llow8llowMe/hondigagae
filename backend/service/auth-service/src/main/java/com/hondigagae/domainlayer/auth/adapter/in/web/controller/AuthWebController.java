@@ -8,6 +8,7 @@ import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthGeneralLo
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthOAuthAuthorizeResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.provider.RefreshCookieProvider;
+import com.hondigagae.domainlayer.auth.adapter.in.web.support.ClientIpResolver;
 import com.hondigagae.domainlayer.auth.application.command.AuthGeneralLoginCommand;
 import com.hondigagae.domainlayer.auth.application.command.TokenReissueCommand;
 import com.hondigagae.domainlayer.auth.application.info.AuthCookieResult;
@@ -18,6 +19,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -43,6 +45,7 @@ public class AuthWebController {
 
     private final AuthWebUseCase authWebUseCase;
     private final RefreshCookieProvider refreshCookieProvider;
+    private final ClientIpResolver clientIpResolver;
 
     @Operation(
         summary = "일반 로그인",
@@ -96,10 +99,13 @@ public class AuthWebController {
             .body(Response.success(result.response()));
     }
 
-    @Operation(summary = "이메일 인증코드 발송", description = "회원가입용 이메일 인증코드를 발송합니다. 60초 쿨다운이 적용되며, 가입 여부와 무관하게 항상 성공으로 응답합니다(기가입 이메일에는 안내 메일 발송).")
+    @Operation(summary = "이메일 인증코드 발송", description = "회원가입용 이메일 인증코드를 발송합니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 시간당 발송 상한(AUTH_016)이 적용되며, 가입 여부와 무관하게 항상 성공으로 응답합니다(기가입 이메일에는 안내 메일 발송).")
     @PostMapping("/email/send-code")
-    public ResponseEntity<Response<Void>> sendEmailVerificationCode(@Valid @RequestBody AuthEmailCodeSendRequest request) {
-        authWebUseCase.sendEmailVerificationCode(request.email());
+    public ResponseEntity<Response<Void>> sendEmailVerificationCode(
+        @Valid @RequestBody AuthEmailCodeSendRequest request,
+        HttpServletRequest httpServletRequest
+    ) {
+        authWebUseCase.sendEmailVerificationCode(request.email(), clientIpResolver.resolve(httpServletRequest));
         return ResponseEntity.ok().body(Response.success());
     }
 

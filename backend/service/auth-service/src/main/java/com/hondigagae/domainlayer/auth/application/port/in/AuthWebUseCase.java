@@ -17,7 +17,8 @@ public interface AuthWebUseCase {
 
     AuthCookieResult<TokenReissueResponse> reissueToken(TokenReissueCommand command);
 
-    void sendEmailVerificationCode(String email);
+    /** clientIp 는 IP 기준 발송 상한 검사에 쓴다. */
+    void sendEmailVerificationCode(String email, String clientIp);
 
     void verifyEmailVerificationCode(String email, String code);
 

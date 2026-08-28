@@ -65,9 +65,9 @@ public class AuthWebFacade implements AuthWebUseCase {
     }
 
     @Override
-    public void sendEmailVerificationCode(String email) {
+    public void sendEmailVerificationCode(String email, String clientIp) {
         // Redis/메일 중심 흐름이라 트랜잭션 경계를 두지 않는다 (DB 조회는 단건 findByEmail뿐).
-        emailVerificationProcessor.sendCode(email);
+        emailVerificationProcessor.sendCode(email, clientIp);
     }
 
     @Override

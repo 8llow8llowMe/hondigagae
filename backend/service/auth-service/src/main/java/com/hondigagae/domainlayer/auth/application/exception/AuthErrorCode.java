@@ -26,6 +26,8 @@ public enum AuthErrorCode {
     // 로그인 실패 횟수 초과 잠금. 메시지에 계정 존재 여부/잠금 사유를 담지 않는다 —
     // 미존재 이메일도 동일하게 잠기므로 이 응답이 "이 이메일은 가입돼 있다"는 신호가 되지 않아야 한다.
     LOGIN_ATTEMPT_LOCKED("AUTH_015", "로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS),
+    // 미인증 이메일 발송 API 의 IP 기준 상한 초과. 이메일 쿨다운(AUTH_003)과 별개의 남용 방어다.
+    EMAIL_SEND_IP_LIMITED("AUTH_016", "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.", HttpStatus.TOO_MANY_REQUESTS),
 
     // 요청 검증(Bean Validation) 대역 — 1xx.
     // 필드별 코드(AUTH_101~104)는 AuthValidationMessage 가 단일 기준점이며, 여기서는 중복 정의하지 않는다.
