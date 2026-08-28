@@ -1,11 +1,19 @@
+dependencyManagement {
+    imports {
+        mavenBom 'org.springframework.ai:spring-ai-bom:1.1.8'
+    }
+}
+
 dependencies {
     implementation project(':core:common-core')
     implementation project(':core:redis-core')
     implementation project(':core:security-core')
 
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    // LLM provider — Anthropic 공식 Java SDK. AiLlmPort 뒤에 숨어 있어 교체 지점은 어댑터 하나다.
-    implementation 'com.anthropic:anthropic-java:2.34.0'
+    // LLM provider — Spring AI. AiLlmPort 뒤에 숨어 있어 provider 교체 지점은 어댑터 하나다.
+    implementation 'org.springframework.ai:spring-ai-ollama'
+    // OllamaApi 빌더가 WebClient.Builder 를 요구한다 (스트리밍 경로용, call() 은 RestClient)
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
