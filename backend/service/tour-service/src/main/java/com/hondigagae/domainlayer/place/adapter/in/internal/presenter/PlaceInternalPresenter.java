@@ -26,6 +26,7 @@ public class PlaceInternalPresenter {
             .maxPetWeightKg(info.maxPetWeightKg())
             .indoor(info.indoor())
             .sourceCategory(info.sourceCategory())
+            .firstImage(info.firstImage())
             .lat(info.lat() == null ? null : info.lat().doubleValue())
             .lng(info.lng() == null ? null : info.lng().doubleValue())
             .build();
