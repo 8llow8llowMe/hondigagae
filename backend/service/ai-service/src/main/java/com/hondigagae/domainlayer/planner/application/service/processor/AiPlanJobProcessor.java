@@ -44,6 +44,7 @@ public class AiPlanJobProcessor {
         if (command.startDate().isAfter(command.endDate())) {
             throw new AiPlanException(AiPlanErrorCode.DATE_RANGE_INVALID);
         }
+        validateRegenerateRequest(command);
 
         Map<String, String> params = toParams(command);
         String requestHash = computeRequestHash(params);
@@ -154,8 +155,28 @@ public class AiPlanJobProcessor {
         params.put("budget", command.budget() == null ? "" : String.valueOf(command.budget()));
         params.put("petIds", joinIds(command.petIds()));
         params.put("pinnedPlaceIds", joinIds(command.pinnedPlaceIds()));
+        params.put("planId", command.planId() == null ? "" : String.valueOf(command.planId()));
+        params.put("regenerateDay", command.regenerateDay() == null ? "" : String.valueOf(command.regenerateDay()));
         params.put("requestNote", command.requestNote() == null ? "" : command.requestNote());
         return params;
+    }
+
+    /**
+     * 하루 재생성 교차 검증. 필드 단위 검증(Bean Validation)으로는 "둘이 함께"를
+     * 강제할 수 없어 여기서 본다. 일차 범위는 요청의 여행 기간으로 즉시 판정한다 —
+     * 비동기 워커까지 가서야 4xx 성 오류를 돌려주면 사용자가 원인을 늦게 안다.
+     */
+    private void validateRegenerateRequest(AiPlanCreateCommand command) {
+        if (command.planId() == null && command.regenerateDay() == null) {
+            return;
+        }
+        if (command.planId() == null || command.regenerateDay() == null) {
+            throw new AiPlanException(AiPlanErrorCode.REGENERATE_REQUEST_INVALID);
+        }
+        long dayCount = java.time.temporal.ChronoUnit.DAYS.between(command.startDate(), command.endDate()) + 1;
+        if (command.regenerateDay() > dayCount) {
+            throw new AiPlanException(AiPlanErrorCode.REGENERATE_DAY_OUT_OF_RANGE);
+        }
     }
 
     private String joinIds(java.util.List<Long> ids) {

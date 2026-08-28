@@ -21,6 +21,9 @@ public record AiPlanGenerationQuery(
     List<PetCondition> petConditions,
     // 반드시 일정에 배치할 장소. placeCandidates 에 이미 합쳐져 있고, 프롬프트 표기용으로만 쓴다.
     List<Long> pinnedPlaceIds,
+    // 하루 재생성. regenerateDay 가 있으면 planOutline 도 반드시 있다 (워커가 보장).
+    Integer regenerateDay,
+    PlanOutline planOutline,
     // 일정에 넣을 수 있는 장소 전부. 비어 있으면 생성 자체를 하지 않는다.
     List<PlaceCandidate> placeCandidates
 ) {

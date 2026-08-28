@@ -62,7 +62,7 @@
 
 | 메서드 | 경로 | 상태 |
 | --- | --- | --- |
-| POST | `/api/v1/ai-plans` | 일정 생성 제출 (202 + jobId, 멱등) |
+| POST | `/api/v1/ai-plans` | 일정 생성 제출 (202 + jobId, 멱등). 다중 반려견·대표견 기본값·필수 포함 장소·하루 재생성(planId+regenerateDay) 지원 |
 | GET | `/api/v1/ai-plans/jobs/{jobId}` | 폴링 (SSE 폴백) |
 | GET | `/api/v1/ai-plans/jobs/{jobId}/stream` | SSE — 상태 변경 시에만 이벤트, 종결 시 서버가 닫음 |
 

@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.planner.adapter.out.llm;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
+import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import org.springframework.stereotype.Component;
@@ -67,6 +68,7 @@ public class AiPlanPromptFactory {
         }
 
         appendPetSection(prompt, query.safePetConditions());
+        appendRegenerateSection(prompt, query);
 
         prompt.append("\n후보 장소 (이 목록 안에서만 고를 것)\n");
         for (PlaceCandidate candidate : query.safeCandidates()) {
@@ -119,6 +121,33 @@ public class AiPlanPromptFactory {
         }
         // 여러 마리면 입장 제한은 가장 제약이 큰 아이가 기준이다 — 한 마리라도 못 들어가면 그 장소는 못 간다.
         prompt.append("- 입장 제한(크기·체중)은 가장 큰 크기와 가장 무거운 체중 기준으로 판정할 것\n");
+    }
+
+    /**
+     * 하루 재생성 절. 기존 일정 전체를 보여 주고 지정한 날만 새로 짜게 한다 —
+     * 이 절이 없으면 "재생성"이 아니라 완전히 새로운 일정이 나온다.
+     */
+    private void appendRegenerateSection(StringBuilder prompt, AiPlanGenerationQuery query) {
+        PlanOutline outline = query.planOutline();
+        if (outline == null || query.regenerateDay() == null) {
+            return;
+        }
+        prompt.append("\n기존 일정\n");
+        for (PlanOutline.PlanOutlineDay day : outline.safeDays()) {
+            prompt.append("[").append(day.day()).append("일차]");
+            if (day.safeItems().isEmpty()) {
+                prompt.append(" (항목 없음)");
+            }
+            for (PlanOutline.PlanOutlineItem item : day.safeItems()) {
+                prompt.append(" · ").append(item.title() == null ? "이름없음" : item.title());
+                if (item.placeId() != null) {
+                    prompt.append("(placeId=").append(item.placeId()).append(')');
+                }
+            }
+            prompt.append('\n');
+        }
+        prompt.append("- 위 일정에서 ").append(query.regenerateDay())
+            .append("일차만 새로 구성할 것. 나머지 날은 기존 항목을 순서까지 그대로 유지해 전체 일정을 출력할 것\n");
     }
 
     private void appendPetTraits(StringBuilder prompt, PetCondition pet) {

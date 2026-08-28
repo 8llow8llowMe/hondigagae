@@ -11,6 +11,8 @@ public final class AiPlanValidationMessage {
     public static final String PET_IDS_SIZE_INVALID = "AIPLAN_108:동반 반려견은 최대 5마리까지 지정할 수 있습니다.";
     public static final String PINNED_PLACE_IDS_SIZE_INVALID = "AIPLAN_109:필수 포함 장소는 최대 10곳까지 지정할 수 있습니다.";
     public static final String PINNED_PLACE_ID_POSITIVE = "AIPLAN_110:필수 포함 장소 식별자는 양수여야 합니다.";
+    public static final String PLAN_ID_POSITIVE = "AIPLAN_111:일정 식별자는 양수여야 합니다.";
+    public static final String REGENERATE_DAY_POSITIVE = "AIPLAN_112:재생성할 일차는 양수여야 합니다.";
 
     private AiPlanValidationMessage() {
     }

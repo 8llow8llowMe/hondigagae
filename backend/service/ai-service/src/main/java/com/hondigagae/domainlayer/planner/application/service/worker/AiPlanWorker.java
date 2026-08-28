@@ -6,11 +6,13 @@ import com.hondigagae.domainlayer.planner.application.info.AiPlanDraftInfo;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
+import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobEventPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobStorePort;
 import com.hondigagae.domainlayer.planner.application.port.out.PetConditionQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.PlaceCandidateQueryPort;
+import com.hondigagae.domainlayer.planner.application.port.out.PlanOutlineQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.query.PlaceCandidateQueryResult;
 import com.hondigagae.global.properties.AiLlmProperties;
 import java.util.ArrayList;
@@ -38,6 +40,7 @@ public class AiPlanWorker {
     private final AiLlmPort aiLlmPort;
     private final PlaceCandidateQueryPort placeCandidateQueryPort;
     private final PetConditionQueryPort petConditionQueryPort;
+    private final PlanOutlineQueryPort planOutlineQueryPort;
     private final AiLlmProperties aiLlmProperties;
 
     @Async("aiPlanTaskExecutor")
@@ -98,6 +101,7 @@ public class AiPlanWorker {
     private AiPlanGenerationQuery toQuery(Map<String, String> params, Long memberId) {
         String areaCode = params.get("areaCode");
         List<Long> pinnedPlaceIds = parseIdList(params.get("pinnedPlaceIds"));
+        Integer regenerateDay = parseNullableInt(params.get("regenerateDay"));
         return AiPlanGenerationQuery.builder()
             .areaCode(areaCode)
             .startDate(params.get("startDate"))
@@ -106,6 +110,8 @@ public class AiPlanWorker {
             .requestNote(params.get("requestNote"))
             .petConditions(loadPetConditions(params.get("petIds"), memberId))
             .pinnedPlaceIds(pinnedPlaceIds)
+            .regenerateDay(regenerateDay)
+            .planOutline(loadPlanOutline(params.get("planId"), regenerateDay, memberId))
             .placeCandidates(loadCandidates(areaCode, pinnedPlaceIds))
             .build();
     }
@@ -138,6 +144,38 @@ public class AiPlanWorker {
                 () -> log.warn("AI plan generating without pet condition petId={} memberId={}", petId, memberId));
         }
         return List.copyOf(conditions);
+    }
+
+    /**
+     * 하루 재생성이면 기존 일정 개요를 붙인다. 반려견 특성과 달리 <b>없으면 진행하지 않는다</b> —
+     * "2일차만 다시"에서 기존 일정을 모르면 나머지 날을 유지할 방법이 없다.
+     * 삭제됐거나 남의 일정이면(404) 명확한 코드로 잡을 실패시킨다.
+     */
+    private PlanOutline loadPlanOutline(String planIdParam, Integer regenerateDay, Long memberId) {
+        if (regenerateDay == null || planIdParam == null || planIdParam.isBlank() || memberId == null) {
+            return null;
+        }
+        long planId;
+        try {
+            planId = Long.parseLong(planIdParam);
+        } catch (NumberFormatException exception) {
+            log.warn("AI plan job carried an unusable planId={}", planIdParam);
+            throw new AiPlanException(AiPlanErrorCode.PLAN_OUTLINE_UNAVAILABLE);
+        }
+        return planOutlineQueryPort.findOutline(memberId, planId)
+            .orElseThrow(() -> new AiPlanException(AiPlanErrorCode.PLAN_OUTLINE_UNAVAILABLE));
+    }
+
+    private Integer parseNullableInt(String param) {
+        if (param == null || param.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(param.trim());
+        } catch (NumberFormatException exception) {
+            log.warn("AI plan job carried an unusable int param={}", param);
+            return null;
+        }
     }
 
     private List<Long> parseIdList(String csvParam) {
