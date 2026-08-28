@@ -6,7 +6,10 @@ import com.hondigagae.domainlayer.planner.adapter.in.web.presenter.AiPlanPresent
 import com.hondigagae.domainlayer.planner.application.command.AiPlanCreateCommand;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanJobInfo;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanSubmissionInfo;
+import com.hondigagae.domainlayer.planner.application.info.AiPlanJobInfo;
+import com.hondigagae.domainlayer.planner.application.model.AiPlanJobSubscription;
 import com.hondigagae.domainlayer.planner.application.port.in.AiPlanWebUseCase;
+import java.util.function.Consumer;
 import com.hondigagae.domainlayer.planner.application.service.processor.AiPlanJobProcessor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,5 +31,15 @@ public class AiPlanWebFacade implements AiPlanWebUseCase {
     public AiPlanJobStatusResponse getJobStatus(String jobId, long memberId) {
         AiPlanJobInfo jobInfo = aiPlanJobProcessor.getJobInfo(jobId, memberId);
         return aiPlanPresenter.toJobStatusResponse(jobInfo);
+    }
+
+    @Override
+    public AiPlanJobInfo getJobInfo(String jobId, long memberId) {
+        return aiPlanJobProcessor.getJobInfo(jobId, memberId);
+    }
+
+    @Override
+    public AiPlanJobSubscription subscribeJobUpdates(String jobId, long memberId, Consumer<AiPlanJobInfo> onUpdate) {
+        return aiPlanJobProcessor.subscribeJobUpdates(jobId, memberId, onUpdate);
     }
 }

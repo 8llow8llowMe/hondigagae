@@ -69,3 +69,24 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
 - 토큰 사용량 카운터를 두어 운영 비용을 추적한다 (어댑터가 호출당·누적 사용량을 로그로 남긴다).
 - 거절(`stop_reason=refusal`)은 HTTP 200 으로 온다. content 를 그냥 읽으면 빈 응답을 파싱 실패로
   오해하게 되므로 `stopReason` 을 먼저 본다 — 원인과 사용자에게 할 말이 전혀 다르다.
+
+## 작업 상태 전달 — SSE + 폴링 폴백
+
+- `GET /jobs/{jobId}/stream` (text/event-stream) — 구독 즉시 현재 상태 스냅샷, 이후 **상태가
+  바뀔 때만** 이벤트(PENDING→RUNNING→COMPLETED/FAILED), 종결 시 서버가 연결을 닫는다.
+  이벤트 data 는 폴링 응답의 dataBody 와 동일한 JSON 이라 FE 는 처리 코드를 공유한다.
+- 전파는 Redis pub/sub(`AiPlanJobEventPort`) — SSE 연결을 잡은 인스턴스와 워커 인스턴스가
+  다를 수 있어 저장소 밖 브로드캐스트가 필요하다. 메시지에 상태를 싣지 않고 수신 시 저장소를
+  다시 읽는다(발행-저장 순서 역전, 스키마 드리프트 방지).
+- 이벤트는 best-effort 다. 유실돼도 25초 하트비트(3회에 1번 상태 재확인)와 폴링 폴백이
+  종결을 보장한다. 하트비트의 재확인은 멈춘 잡의 타임아웃 처리(expireIfStuck)도 겸한다.
+- 브라우저 기본 EventSource 는 Authorization 헤더를 못 실으므로 fetch 기반 SSE 클라이언트를
+  쓴다. 연결이 끊기면 `GET /jobs/{jobId}` 폴링으로 폴백한다. (BossPickSeoul 동일 구조)
+
+## 반려견 특성 주입
+
+- 워커가 잡의 memberId + petId 로 auth-service 내부 API 를 불러 특성(크기·활동량·더위/추위/
+  소음 민감·산책 선호)을 프롬프트의 "함께 여행하는 반려견" 절로 싣는다. 이 절이 없으면
+  시스템 프롬프트의 "반려견 기준" 규칙이 빈 구호가 된다.
+- 조회 실패·프로필 부재는 특성 없이 진행하되 경고를 남긴다 — auth 장애가 일정 생성 불가로
+  번지면 안 된다. 그 경우 반려견 절 자체를 생략한다(없는 값을 지어 적지 않는다).
