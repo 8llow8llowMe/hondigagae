@@ -23,7 +23,8 @@ public class PetCommandProcessor {
     private final SnowflakeIdGenerator snowflakeIdGenerator;
 
     public PetInfo register(long memberId, PetSaveCommand command) {
-        if (petRepositoryPort.countByMemberId(memberId) >= MAX_PET_COUNT) {
+        long petCount = petRepositoryPort.countByMemberId(memberId);
+        if (petCount >= MAX_PET_COUNT) {
             throw new PetException(PetErrorCode.PET_LIMIT_EXCEEDED);
         }
 
@@ -34,12 +35,15 @@ public class PetCommandProcessor {
             .breed(command.breed())
             .birthYm(command.birthYm())
             .sizeType(command.sizeType())
+            .weightKg(command.weightKg())
             .heatSensitive(command.heatSensitive())
             .coldSensitive(command.coldSensitive())
             .noiseSensitive(command.noiseSensitive())
             .activityLevel(command.activityLevel())
             .walkPreferred(command.walkPreferred())
             .sociality(command.sociality())
+            // 첫 반려견은 자동으로 대표가 된다 - 한 마리만 키우는 사용자가 대표 지정을 모르고 지나가도 AI 기본값이 동작한다
+            .representative(petCount == 0)
             .deleted(false)
             .build();
 
@@ -49,7 +53,7 @@ public class PetCommandProcessor {
     public PetInfo update(long memberId, long petId, PetSaveCommand command) {
         Pet pet = petQueryProcessor.getOwnedPet(memberId, petId);
         Pet updated = pet.update(
-            command.name(), command.breed(), command.birthYm(), command.sizeType(),
+            command.name(), command.breed(), command.birthYm(), command.sizeType(), command.weightKg(),
             command.heatSensitive(), command.coldSensitive(), command.noiseSensitive(),
             command.activityLevel(), command.walkPreferred(), command.sociality()
         );
@@ -73,5 +77,24 @@ public class PetCommandProcessor {
     public void delete(long memberId, long petId) {
         Pet pet = petQueryProcessor.getOwnedPet(memberId, petId);
         petRepositoryPort.save(pet.delete());
+
+        // 대표견을 지웠으면 가장 먼저 등록한 남은 반려견을 대표로 올린다 -
+        // "대표 없음" 상태를 만들지 않아 AI 기본값이 항상 동작하게 한다.
+        if (pet.representative()) {
+            petRepositoryPort.findAllByMemberId(memberId).stream()
+                .filter(remaining -> remaining.id() != petId)
+                .findFirst()
+                .ifPresent(remaining -> petRepositoryPort.save(remaining.markRepresentative()));
+        }
+    }
+
+    /** 대표 반려견 지정. 기존 대표는 해제해 회원당 하나만 유지한다. */
+    public PetInfo markRepresentative(long memberId, long petId) {
+        Pet target = petQueryProcessor.getOwnedPet(memberId, petId);
+        petRepositoryPort.findAllByMemberId(memberId).stream()
+            .filter(Pet::representative)
+            .filter(pet -> pet.id() != petId)
+            .forEach(pet -> petRepositoryPort.save(pet.clearRepresentative()));
+        return PetInfo.from(petRepositoryPort.save(target.markRepresentative()));
     }
 }

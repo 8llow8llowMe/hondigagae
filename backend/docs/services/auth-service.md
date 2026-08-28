@@ -72,6 +72,9 @@
 - `GET|PUT|DELETE /api/v1/members/me/pets/{petId}`
 - `POST|DELETE /api/v1/members/me/pets/{petId}/profile-image` — MinIO 오브젝트 키(`pets/profiles/...`)를
   저장하고 응답 시점에 공개 URL 로 조립한다. 업로드/교체/회수 순서는 회원 프로필 이미지와 동일하다.
+- `PUT /api/v1/members/me/pets/{petId}/representative` — 대표 반려견 지정. 회원당 하나만 유지되며,
+  첫 등록 반려견이 자동 대표가 되고 대표견 삭제 시 가장 먼저 등록한 남은 반려견이 승계한다.
+- 프로필에 체중(`weightKg`, 0.1~99.9kg)을 받는다 — 장소의 입장 체중 제한 판정과 AI 프롬프트에 쓰인다. 미입력 허용.
 
 ## 구현 주의점
 
@@ -87,6 +90,7 @@
 ## 서비스 간 내부 API
 
 `GET /internal/v1/pets/{petId}/condition` — 다른 서비스가 판정에 쓰는 반려견 특성을 준다.
+`GET /internal/v1/pets/representative/condition?memberId=` — 대표 반려견의 특성. 호출부가 petId 없이 요청했을 때의 기본값이다.
 
 - **반려견 프로필의 원천은 이 서비스다.** 다른 서비스가 사본을 두는 대신 필요한 특성만
   가져가게 한다. 사본을 두면 사용자가 프로필을 고쳐도 옛 값으로 판정하는 일이 생긴다.

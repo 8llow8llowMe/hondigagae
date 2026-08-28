@@ -28,4 +28,11 @@ public class PetInternalFacade implements PetInternalUseCase {
         PetInfo petInfo = petQueryProcessor.getMyPet(memberId, petId);
         return petInternalPresenter.toConditionResponse(petInfo);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PetConditionResponse getRepresentativePetCondition(long memberId) {
+        PetInfo petInfo = PetInfo.from(petQueryProcessor.getRepresentativePet(memberId));
+        return petInternalPresenter.toConditionResponse(petInfo);
+    }
 }

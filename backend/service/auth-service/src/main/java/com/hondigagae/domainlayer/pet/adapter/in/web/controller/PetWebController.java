@@ -97,6 +97,20 @@ public class PetWebController {
         return ResponseEntity.ok().body(Response.success());
     }
 
+    @Operation(summary = "대표 반려견 지정",
+        description = "대표 반려견을 지정합니다. 기존 대표는 자동 해제되어 회원당 하나만 유지됩니다. "
+            + "AI 일정 생성에서 반려견을 지정하지 않으면 대표 반려견이 사용됩니다. 본인 소유가 아니면 404로 응답합니다.",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @PutMapping("/{petId}/representative")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<PetResponse>> markRepresentative(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "반려견 아이디", required = true, example = "1234567890123456789") @PathVariable long petId
+    ) {
+        PetResponse response = petWebUseCase.markRepresentative(loginActive.memberId(), petId);
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
     @Operation(
         summary = "반려견 프로필 이미지 업로드",
         description = "반려견 프로필 이미지를 업로드해 즉시 반영합니다. jpg/png/gif/webp 만 허용하며 파일 내용(매직 바이트)으로 형식을 판정합니다. "

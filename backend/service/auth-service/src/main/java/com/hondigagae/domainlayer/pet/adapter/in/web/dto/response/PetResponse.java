@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.pet.adapter.in.web.dto.response;
 
 import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.math.BigDecimal;
 import lombok.Builder;
 
 @Builder
@@ -26,6 +27,9 @@ public record PetResponse(
     @Schema(description = "크기 구분", example = "{\"code\":\"SMALL\",\"name\":\"소형견\",\"description\":\"체중 10kg 미만\"}")
     CodeNameDescriptionMetadata sizeType,
 
+    @Schema(description = "체중 (kg, 미입력 시 null)", example = "3.5")
+    BigDecimal weightKg,
+
     @Schema(description = "더위 민감 여부", example = "true")
     boolean heatSensitive,
 
@@ -46,6 +50,9 @@ public record PetResponse(
 
     @Schema(description = "프로필 이미지 공개 URL (미등록 시 null)",
         example = "https://minio.hondigagae.com/hondigagae/pets/profiles/202507110001/2026/08/3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61.png")
-    String profileImageUrl
+    String profileImageUrl,
+
+    @Schema(description = "대표 반려견 여부 (AI 일정 생성 기본값)", example = "true")
+    boolean representative
 ) {
 }

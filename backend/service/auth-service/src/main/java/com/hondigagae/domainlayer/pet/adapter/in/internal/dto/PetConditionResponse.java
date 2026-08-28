@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.pet.adapter.in.internal.dto;
 
 import com.hondigagae.shared.travel.pet.ActivityLevel;
 import com.hondigagae.shared.travel.pet.PetSizeType;
+import java.math.BigDecimal;
 import lombok.Builder;
 
 /**
@@ -19,6 +20,7 @@ public record PetConditionResponse(
     String petId,
     String breed,
     PetSizeType sizeType,
+    BigDecimal weightKg,
     boolean heatSensitive,
     boolean coldSensitive,
     boolean noiseSensitive,

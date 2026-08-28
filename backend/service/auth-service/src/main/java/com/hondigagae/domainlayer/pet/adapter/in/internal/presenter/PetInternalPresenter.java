@@ -16,6 +16,7 @@ public class PetInternalPresenter {
             .petId(String.valueOf(petInfo.petId()))
             .breed(petInfo.breed())
             .sizeType(petInfo.sizeType())
+            .weightKg(petInfo.weightKg())
             .heatSensitive(petInfo.heatSensitive())
             .coldSensitive(petInfo.coldSensitive())
             .noiseSensitive(petInfo.noiseSensitive())

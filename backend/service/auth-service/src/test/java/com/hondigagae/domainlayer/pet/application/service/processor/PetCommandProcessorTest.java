@@ -3,11 +3,14 @@ package com.hondigagae.domainlayer.pet.application.service.processor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.hondigagae.domainlayer.pet.application.command.PetSaveCommand;
 import com.hondigagae.domainlayer.pet.application.exception.PetErrorCode;
 import com.hondigagae.domainlayer.pet.application.exception.PetException;
 import com.hondigagae.domainlayer.pet.application.info.PetProfileImageChangeResult;
 import com.hondigagae.domainlayer.pet.application.port.out.PetRepositoryPort;
+import com.hondigagae.domainlayer.pet.application.info.PetInfo;
 import com.hondigagae.domainlayer.pet.domain.model.Pet;
+import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import com.hondigagae.shared.travel.pet.ActivityLevel;
 import com.hondigagae.shared.travel.pet.PetSizeType;
 import com.hondigagae.shared.travel.pet.SocialityLevel;
@@ -31,7 +34,7 @@ class PetCommandProcessorTest {
     void setUp() {
         petRepositoryPort = new StubPetRepositoryPort();
         processor = new PetCommandProcessor(
-            new PetQueryProcessor(petRepositoryPort), petRepositoryPort, null);
+            new PetQueryProcessor(petRepositoryPort), petRepositoryPort, new SnowflakeIdGenerator(0, 0));
 
         petRepositoryPort.register(pet(PET_ID, OWNER_ID, "pets/profiles/1/2026/08/old.png"));
     }
@@ -74,12 +77,63 @@ class PetCommandProcessorTest {
         // 일반 프로필 수정이 이미지 키를 지우면 안 된다 (별도 API 로만 변경)
         Pet pet = petRepositoryPort.findById(PET_ID).orElseThrow();
         Pet updated = pet.update(
-            "새이름", pet.breed(), pet.birthYm(), pet.sizeType(),
+            "새이름", pet.breed(), pet.birthYm(), pet.sizeType(), pet.weightKg(),
             pet.heatSensitive(), pet.coldSensitive(), pet.noiseSensitive(),
             pet.activityLevel(), pet.walkPreferred(), pet.sociality());
 
         assertThat(updated.profileImageKey()).isEqualTo("pets/profiles/1/2026/08/old.png");
         assertThat(pet.delete().profileImageKey()).isEqualTo("pets/profiles/1/2026/08/old.png");
+    }
+
+    @Test
+    void register_firstPetBecomesRepresentative() {
+        long newMemberId = 99L;
+
+        PetInfo first = processor.register(newMemberId, saveCommand("첫째"));
+        PetInfo second = processor.register(newMemberId, saveCommand("둘째"));
+
+        // 첫 반려견만 자동으로 대표가 된다
+        assertThat(first.representative()).isTrue();
+        assertThat(second.representative()).isFalse();
+    }
+
+    @Test
+    void markRepresentative_switchesAndKeepsSingleRepresentative() {
+        PetInfo first = processor.register(OWNER_ID, saveCommand("첫째"));
+        processor.markRepresentative(OWNER_ID, first.petId());
+
+        PetInfo second = processor.register(OWNER_ID, saveCommand("둘째"));
+        processor.markRepresentative(OWNER_ID, second.petId());
+
+        // 대표는 항상 한 마리만
+        List<Pet> pets = petRepositoryPort.findAllByMemberId(OWNER_ID);
+        assertThat(pets.stream().filter(Pet::representative).count()).isEqualTo(1);
+        assertThat(petRepositoryPort.findById(second.petId()).orElseThrow().representative()).isTrue();
+    }
+
+    @Test
+    void delete_representative_promotesOldestRemaining() {
+        PetInfo first = processor.register(OWNER_ID, saveCommand("첫째"));
+        PetInfo second = processor.register(OWNER_ID, saveCommand("둘째"));
+        processor.markRepresentative(OWNER_ID, first.petId());
+
+        processor.delete(OWNER_ID, first.petId());
+
+        // 대표견 삭제 시 가장 먼저 등록된 남은 반려견이 대표로 승계된다
+        List<Pet> remaining = petRepositoryPort.findAllByMemberId(OWNER_ID);
+        assertThat(remaining.stream().filter(Pet::representative).count()).isEqualTo(1);
+        long oldestRemainingId = remaining.get(0).id();
+        assertThat(petRepositoryPort.findById(oldestRemainingId).orElseThrow().representative()).isTrue();
+        assertThat(petRepositoryPort.findById(second.petId()).orElseThrow()).isNotNull();
+    }
+
+    private static PetSaveCommand saveCommand(String name) {
+        return PetSaveCommand.builder()
+            .name(name)
+            .sizeType(PetSizeType.SMALL)
+            .activityLevel(ActivityLevel.MEDIUM)
+            .sociality(SocialityLevel.MEDIUM)
+            .build();
     }
 
     private static Pet pet(long id, long memberId, String profileImageKey) {
@@ -119,6 +173,7 @@ class PetCommandProcessorTest {
         public List<Pet> findAllByMemberId(long memberId) {
             return store.values().stream()
                 .filter(pet -> pet.memberId() == memberId && !pet.deleted())
+                .sorted(java.util.Comparator.comparingLong(Pet::id))
                 .toList();
         }
 

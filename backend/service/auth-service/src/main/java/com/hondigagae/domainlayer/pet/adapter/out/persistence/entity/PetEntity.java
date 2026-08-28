@@ -16,6 +16,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import java.math.BigDecimal;
 import org.hibernate.annotations.Comment;
 
 @Entity
@@ -55,6 +56,10 @@ public class PetEntity extends BaseEntity {
     @Comment("크기 구분 (SMALL/MEDIUM/LARGE)")
     private PetSizeType sizeType;
 
+    @Column(precision = 4, scale = 1)
+    @Comment("체중 (kg, 0.1 단위) - 입장 체중 제한 판정에 쓴다. 모르면 null")
+    private BigDecimal weightKg;
+
     @Column(nullable = false)
     @Comment("더위 민감 여부")
     private boolean heatSensitive;
@@ -84,6 +89,10 @@ public class PetEntity extends BaseEntity {
     @Column(length = 512)
     @Comment("프로필 이미지 오브젝트 키 (URL 이 아니라 키를 저장한다)")
     private String profileImageKey;
+
+    @Column(nullable = false)
+    @Comment("대표 반려견 여부 (회원당 하나) - AI 일정 생성 시 기본값")
+    private boolean representative;
 
     @Column(nullable = false)
     @Comment("삭제 여부 (소프트 삭제 — 기존 일정이 참조하므로 물리 삭제하지 않는다)")

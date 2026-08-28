@@ -4,6 +4,7 @@ import com.hondigagae.shared.travel.pet.ActivityLevel;
 import com.hondigagae.shared.travel.pet.PetSizeType;
 import com.hondigagae.shared.travel.pet.SocialityLevel;
 import com.hondigagae.domainlayer.pet.domain.model.Pet;
+import java.math.BigDecimal;
 import lombok.Builder;
 
 @Builder
@@ -13,13 +14,15 @@ public record PetInfo(
     String breed,
     String birthYm,
     PetSizeType sizeType,
+    BigDecimal weightKg,
     boolean heatSensitive,
     boolean coldSensitive,
     boolean noiseSensitive,
     ActivityLevel activityLevel,
     boolean walkPreferred,
     SocialityLevel sociality,
-    String profileImageKey
+    String profileImageKey,
+    boolean representative
 ) {
 
     public static PetInfo from(Pet pet) {
@@ -29,6 +32,7 @@ public record PetInfo(
             .breed(pet.breed())
             .birthYm(pet.birthYm())
             .sizeType(pet.sizeType())
+            .weightKg(pet.weightKg())
             .heatSensitive(pet.heatSensitive())
             .coldSensitive(pet.coldSensitive())
             .noiseSensitive(pet.noiseSensitive())
@@ -36,6 +40,7 @@ public record PetInfo(
             .walkPreferred(pet.walkPreferred())
             .sociality(pet.sociality())
             .profileImageKey(pet.profileImageKey())
+            .representative(pet.representative())
             .build();
     }
 }

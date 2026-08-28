@@ -18,6 +18,8 @@ public interface PetWebUseCase {
 
     void deletePet(long memberId, long petId);
 
+    PetResponse markRepresentative(long memberId, long petId);
+
     PetProfileImageUploadResponse uploadProfileImage(long memberId, long petId, FileUploadCommand command);
 
     PetResponse removeProfileImage(long memberId, long petId);
