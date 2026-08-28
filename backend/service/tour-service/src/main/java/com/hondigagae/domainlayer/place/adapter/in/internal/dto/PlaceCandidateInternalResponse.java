@@ -20,6 +20,8 @@ public record PlaceCandidateInternalResponse(
     Integer maxPetWeightKg,
     Boolean indoor,
     String sourceCategory,
+    // 대표 이미지. 즐겨찾기 카드 등 내부 소비처의 표시용이다.
+    String firstImage,
     Double lat,
     Double lng
 ) {
