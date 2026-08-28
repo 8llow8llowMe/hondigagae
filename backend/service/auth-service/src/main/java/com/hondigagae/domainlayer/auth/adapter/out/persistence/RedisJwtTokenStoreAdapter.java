@@ -1,11 +1,13 @@
 package com.hondigagae.domainlayer.auth.adapter.out.persistence;
 
 import com.hondigagae.domainlayer.auth.application.port.out.JwtTokenStorePort;
+import com.hondigagae.global.properties.AuthSessionProperties;
 import com.hondigagae.redis.properties.RedisProperties;
 import com.hondigagae.security.auth.blacklist.AccessTokenBlacklistVerifier;
 import com.hondigagae.security.auth.jwt.JwtAuthProperties;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.Set;
 import com.hondigagae.security.common.exception.SecurityErrorCode;
 import com.hondigagae.security.common.exception.SecurityJwtException;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +18,18 @@ import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
+/**
+ * 기기(세션)별 refresh 토큰 저장소.
+ *
+ * <ul>
+ *   <li>{@code {prefix}:auth:refreshToken:{memberId}:{sessionId}} — 세션별 refresh 토큰, TTL = refresh 만료</li>
+ *   <li>{@code {prefix}:auth:refreshSessions:{memberId}} — 세션 아이디 ZSET (score = 마지막 갱신 시각).
+ *       상한 초과 시 가장 오래 갱신되지 않은 세션부터 밀어내는 인덱스</li>
+ * </ul>
+ *
+ * <p>토큰 키가 TTL 로 먼저 사라져 인덱스에 세션 아이디만 남을 수 있지만, 조회는 항상 토큰 키
+ * 기준이라 정합성 문제가 없고 잔여 항목은 밀어내기/전체 삭제 때 함께 정리된다.
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -26,19 +40,24 @@ public class RedisJwtTokenStoreAdapter implements JwtTokenStorePort, AccessToken
     private final RedisTemplate<String, String> redisTemplate;
     private final JwtAuthProperties jwtAuthProperties;
     private final RedisProperties redisProperties;
+    private final AuthSessionProperties authSessionProperties;
 
     // 게이트웨이의 JWT_BLACKLIST_FAIL_OPEN 정책과 동일한 키로 정렬한다. (기본 fail-closed)
     @Value("${jwt.blacklist-fail-open:false}")
     private boolean blacklistFailOpen;
 
     @Override
-    public void save(long memberId, String refreshToken) {
+    public void save(long memberId, String sessionId, String refreshToken) {
         try {
-            redisTemplate.opsForValue().set(
-                buildRefreshKey(memberId),
-                refreshToken,
-                jwtAuthProperties.refreshExpiration()
-            );
+            Duration ttl = jwtAuthProperties.refreshExpiration();
+            redisTemplate.opsForValue().set(buildRefreshKey(memberId, sessionId), refreshToken, ttl);
+
+            // 세션 인덱스 갱신 — score 를 현재 시각으로 올려 "가장 오래 갱신되지 않은" 순서를 유지한다.
+            String sessionsKey = buildSessionsKey(memberId);
+            redisTemplate.opsForZSet().add(sessionsKey, sessionId, System.currentTimeMillis());
+            redisTemplate.expire(sessionsKey, ttl);
+
+            evictOldestSessionsOverLimit(memberId, sessionsKey);
         } catch (RedisConnectionFailureException e) {
             log.error("[RedisJwtTokenStoreAdapter] RefreshToken 저장 실패: memberId={}, error={}",
                 memberId, e.getMessage());
@@ -46,9 +65,9 @@ public class RedisJwtTokenStoreAdapter implements JwtTokenStorePort, AccessToken
     }
 
     @Override
-    public Optional<String> find(long memberId) {
+    public Optional<String> find(long memberId, String sessionId) {
         try {
-            String token = redisTemplate.opsForValue().get(buildRefreshKey(memberId));
+            String token = redisTemplate.opsForValue().get(buildRefreshKey(memberId, sessionId));
             return Optional.ofNullable(token);
         } catch (RedisConnectionFailureException e) {
             log.error("[RedisJwtTokenStoreAdapter] RefreshToken 조회 실패: memberId={}, error={}",
@@ -58,12 +77,25 @@ public class RedisJwtTokenStoreAdapter implements JwtTokenStorePort, AccessToken
     }
 
     /**
-     * 세션 무효화(탈퇴/비밀번호 변경/로그아웃)의 핵심 연산이므로 Redis 실패를 삼키지 않고 전파한다.
+     * 세션 무효화의 핵심 연산이므로 Redis 실패를 삼키지 않고 전파한다.
      * 관용 처리가 필요한 호출부(로그아웃)는 상위에서 예외를 처리한다.
      */
     @Override
-    public void delete(long memberId) {
-        redisTemplate.delete(buildRefreshKey(memberId));
+    public void deleteSession(long memberId, String sessionId) {
+        redisTemplate.delete(buildRefreshKey(memberId, sessionId));
+        redisTemplate.opsForZSet().remove(buildSessionsKey(memberId), sessionId);
+    }
+
+    @Override
+    public void deleteAllSessions(long memberId) {
+        String sessionsKey = buildSessionsKey(memberId);
+        Set<String> sessionIds = redisTemplate.opsForZSet().range(sessionsKey, 0, -1);
+        if (sessionIds != null) {
+            for (String sessionId : sessionIds) {
+                redisTemplate.delete(buildRefreshKey(memberId, sessionId));
+            }
+        }
+        redisTemplate.delete(sessionsKey);
     }
 
     @Override
@@ -86,8 +118,28 @@ public class RedisJwtTokenStoreAdapter implements JwtTokenStorePort, AccessToken
         }
     }
 
-    private String buildRefreshKey(long memberId) {
-        return buildKey("auth", "refreshToken", String.valueOf(memberId));
+    private void evictOldestSessionsOverLimit(long memberId, String sessionsKey) {
+        Long count = redisTemplate.opsForZSet().zCard(sessionsKey);
+        long overflow = (count == null ? 0 : count) - authSessionProperties.maxDevices();
+        if (overflow <= 0) {
+            return;
+        }
+        Set<String> oldest = redisTemplate.opsForZSet().range(sessionsKey, 0, overflow - 1);
+        if (oldest == null || oldest.isEmpty()) {
+            return;
+        }
+        for (String sessionId : oldest) {
+            redisTemplate.delete(buildRefreshKey(memberId, sessionId));
+        }
+        redisTemplate.opsForZSet().remove(sessionsKey, oldest.toArray());
+    }
+
+    private String buildRefreshKey(long memberId, String sessionId) {
+        return buildKey("auth", "refreshToken", memberId + ":" + sessionId);
+    }
+
+    private String buildSessionsKey(long memberId) {
+        return buildKey("auth", "refreshSessions", String.valueOf(memberId));
     }
 
     private String buildBlacklistKey(String tokenId) {

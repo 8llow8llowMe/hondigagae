@@ -12,7 +12,8 @@ public interface AuthWebUseCase {
 
     AuthCookieResult<AuthGeneralLoginResponse> generalLogin(AuthGeneralLoginCommand command);
 
-    void logout(long memberId, String tokenId);
+    /** 현재 기기 세션만 로그아웃한다. refreshToken 은 요청 쿠키 값으로, 없으면 access 무효화만 수행한다. */
+    void logout(long memberId, String tokenId, String refreshToken);
 
     AuthCookieResult<TokenReissueResponse> reissueToken(TokenReissueCommand command);
 

@@ -59,13 +59,16 @@ public class AuthWebController {
 
     @Operation(
         summary = "로그아웃",
-        description = "로그아웃하고 리프레시 토큰을 무효화합니다.",
+        description = "현재 기기의 세션만 로그아웃합니다 (리프레시 토큰 무효화 + Access 토큰 블랙리스트). 다른 기기의 로그인은 유지됩니다.",
         security = {@SecurityRequirement(name = "bearerAuth")}
     )
     @PostMapping("/logout")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Response<Void>> logout(@AuthenticationPrincipal MemberLoginActive loginActive) {
-        authWebUseCase.logout(loginActive.memberId(), loginActive.tokenId());
+    public ResponseEntity<Response<Void>> logout(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken
+    ) {
+        authWebUseCase.logout(loginActive.memberId(), loginActive.tokenId(), refreshToken);
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, refreshCookieProvider.clearRefreshCookie().toString())
             .body(Response.success());
