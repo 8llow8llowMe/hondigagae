@@ -12,4 +12,7 @@ import java.util.Optional;
 public interface PetConditionQueryPort {
 
     Optional<PetCondition> findCondition(long memberId, long petId);
+
+    /** 대표 반려견 특성. 요청이 반려견을 지정하지 않았을 때의 기본값이다. */
+    Optional<PetCondition> findRepresentativeCondition(long memberId);
 }

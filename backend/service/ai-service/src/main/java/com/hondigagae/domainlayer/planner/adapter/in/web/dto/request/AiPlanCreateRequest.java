@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
+import java.util.List;
 import lombok.Builder;
 
 @Builder
@@ -30,10 +31,14 @@ public record AiPlanCreateRequest(
     @Positive(message = AiPlanValidationMessage.BUDGET_POSITIVE)
     Long budget,
 
-    @Schema(description = "동반 반려견 식별자", example = "1234567890123456789")
-    @NotNull(message = AiPlanValidationMessage.PET_ID_REQUIRED)
+    @Schema(description = "동반 반려견 식별자 (선택) — petIds 가 있으면 무시됩니다. 둘 다 없으면 대표 반려견이 쓰입니다.",
+        example = "1234567890123456789")
     @Positive(message = AiPlanValidationMessage.PET_ID_POSITIVE)
     Long petId,
+
+    @Schema(description = "동반 반려견 식별자 목록 (선택, 최대 5마리) — 여러 마리와 함께 여행할 때 씁니다.")
+    @Size(max = 5, message = AiPlanValidationMessage.PET_IDS_SIZE_INVALID)
+    List<@Positive(message = AiPlanValidationMessage.PET_ID_POSITIVE) Long> petIds,
 
     @Schema(description = "요청 메모 (선택) — 자연어 요구사항", example = "산책 위주로, 더위에 약한 아이라 실내 위주로 부탁해요")
     @Size(max = 500, message = AiPlanValidationMessage.REQUEST_NOTE_LENGTH_INVALID)
@@ -46,8 +51,19 @@ public record AiPlanCreateRequest(
             .startDate(startDate)
             .endDate(endDate)
             .budget(budget)
-            .petId(petId)
+            .petIds(effectivePetIds())
             .requestNote(requestNote)
             .build();
+    }
+
+    /**
+     * petIds 가 있으면 그것을, 없으면 단일 petId 를 목록으로 만든다. 둘 다 없으면 빈 목록 —
+     * 워커가 대표 반려견으로 대신한다. 중복 지정은 한 마리로 접는다.
+     */
+    private List<Long> effectivePetIds() {
+        if (petIds != null && !petIds.isEmpty()) {
+            return petIds.stream().distinct().toList();
+        }
+        return petId == null ? List.of() : List.of(petId);
     }
 }

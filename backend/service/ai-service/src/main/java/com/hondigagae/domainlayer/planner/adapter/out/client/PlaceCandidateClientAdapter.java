@@ -49,6 +49,8 @@ public class PlaceCandidateClientAdapter implements PlaceCandidateQueryPort {
             .contentTypeName(nameOf(item.contentType()))
             .addr(item.addr1())
             .petAllowanceName(nameOf(item.petAllowanceType()))
+            .allowedPetSizeName(nameOf(item.allowedPetSize()))
+            .maxPetWeightKg(item.maxPetWeightKg())
             .indoor(item.indoor())
             .sourceCategory(item.sourceCategory())
             .lat(item.lat())

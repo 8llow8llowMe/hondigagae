@@ -61,7 +61,7 @@ public class AiPlanPromptFactory {
             prompt.append("- 사용자 요청: ").append(query.requestNote()).append('\n');
         }
 
-        appendPetSection(prompt, query.petCondition());
+        appendPetSection(prompt, query.safePetConditions());
 
         prompt.append("\n후보 장소 (이 목록 안에서만 고를 것)\n");
         for (PlaceCandidate candidate : query.safeCandidates()) {
@@ -70,6 +70,12 @@ public class AiPlanPromptFactory {
                 .append(" | ").append(nullSafe(candidate.contentTypeName()))
                 .append(" | ").append(candidate.indoorText())
                 .append(" | 동반: ").append(nullSafe(candidate.petAllowanceName()));
+            if (candidate.allowedPetSizeName() != null && !candidate.allowedPetSizeName().isBlank()) {
+                prompt.append(" | 입장크기: ").append(candidate.allowedPetSizeName());
+            }
+            if (candidate.maxPetWeightKg() != null) {
+                prompt.append(" | 체중제한: ").append(candidate.maxPetWeightKg()).append("kg");
+            }
             if (candidate.sourceCategory() != null && !candidate.sourceCategory().isBlank()) {
                 prompt.append(" | 분류: ").append(candidate.sourceCategory());
             }
@@ -88,17 +94,35 @@ public class AiPlanPromptFactory {
      * 특성 없이 "반려견 기준으로 짜라"고만 하면 모델은 일반적인 강아지를 상상한다.
      * 특성이 없으면(조회 실패/프로필 부재) 절 자체를 생략한다 — 없는 값을 지어 적지 않는다.
      */
-    private void appendPetSection(StringBuilder prompt, PetCondition pet) {
-        if (pet == null) {
+    private void appendPetSection(StringBuilder prompt, java.util.List<PetCondition> pets) {
+        if (pets == null || pets.isEmpty()) {
             return;
         }
-        prompt.append("\n함께 여행하는 반려견\n");
+        if (pets.size() == 1) {
+            prompt.append("\n함께 여행하는 반려견\n");
+            appendPetTraits(prompt, pets.get(0));
+            return;
+        }
+        prompt.append("\n함께 여행하는 반려견 ").append(pets.size()).append("마리\n");
+        for (int index = 0; index < pets.size(); index++) {
+            prompt.append("[반려견 ").append(index + 1).append("]\n");
+            appendPetTraits(prompt, pets.get(index));
+        }
+        // 여러 마리면 입장 제한은 가장 제약이 큰 아이가 기준이다 — 한 마리라도 못 들어가면 그 장소는 못 간다.
+        prompt.append("- 입장 제한(크기·체중)은 가장 큰 크기와 가장 무거운 체중 기준으로 판정할 것\n");
+    }
+
+    private void appendPetTraits(StringBuilder prompt, PetCondition pet) {
         if (pet.breed() != null && !pet.breed().isBlank()) {
             prompt.append("- 견종: ").append(pet.breed()).append('\n');
         }
         if (pet.sizeName() != null) {
             prompt.append("- 크기: ").append(pet.sizeName())
                 .append(" (입장 조건이 맞는 후보만 고를 것)").append('\n');
+        }
+        if (pet.weightText() != null && !pet.weightText().isBlank()) {
+            prompt.append("- 체중: ").append(pet.weightText())
+                .append("kg (체중제한이 있는 후보는 제한 이내인지 확인할 것)").append('\n');
         }
         if (pet.activityName() != null) {
             prompt.append("- 활동량: ").append(pet.activityName()).append('\n');

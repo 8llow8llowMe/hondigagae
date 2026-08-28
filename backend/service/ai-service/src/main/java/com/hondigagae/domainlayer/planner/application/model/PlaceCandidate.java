@@ -16,6 +16,8 @@ public record PlaceCandidate(
     String contentTypeName,
     String addr,
     String petAllowanceName,
+    String allowedPetSizeName,
+    Integer maxPetWeightKg,
     Boolean indoor,
     String sourceCategory,
     Double lat,

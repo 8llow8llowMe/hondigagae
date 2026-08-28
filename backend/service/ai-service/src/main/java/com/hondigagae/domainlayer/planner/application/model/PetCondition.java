@@ -14,6 +14,8 @@ import lombok.Builder;
 public record PetCondition(
     String breed,
     String sizeName,
+    // 사람이 읽는 kg 표기 ("3.5"). 없으면 null — 지어 적지 않는다.
+    String weightText,
     boolean heatSensitive,
     boolean coldSensitive,
     boolean noiseSensitive,

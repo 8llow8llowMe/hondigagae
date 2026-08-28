@@ -42,20 +42,47 @@ public class PetConditionClientAdapter implements PetConditionQueryPort {
                 log.info("Pet condition not found petId={} memberId={}", petId, memberId);
                 return Optional.empty();
             }
-            return Optional.of(PetCondition.builder()
-                .breed(body.breed())
-                .sizeName(sizeName(body.sizeType()))
-                .heatSensitive(body.heatSensitive())
-                .coldSensitive(body.coldSensitive())
-                .noiseSensitive(body.noiseSensitive())
-                .activityName(activityName(body.activityLevel()))
-                .walkPreferred(body.walkPreferred())
-                .build());
+            return Optional.of(toCondition(body));
         } catch (AiPlanException exception) {
             log.warn("Pet condition lookup failed petId={} errorCode={}",
                 petId, exception.getErrorCode().getCode());
             return Optional.empty();
         }
+    }
+
+    @Override
+    public Optional<PetCondition> findRepresentativeCondition(long memberId) {
+        try {
+            PetConditionClientResponse body = internalResponseSupport.requestAndUnwrapOrNull(
+                AUTH_SERVICE, () -> petConditionClient.getRepresentativePetCondition(memberId));
+            if (body == null) {
+                log.info("Representative pet condition not found memberId={}", memberId);
+                return Optional.empty();
+            }
+            return Optional.of(toCondition(body));
+        } catch (AiPlanException exception) {
+            log.warn("Representative pet condition lookup failed memberId={} errorCode={}",
+                memberId, exception.getErrorCode().getCode());
+            return Optional.empty();
+        }
+    }
+
+    private PetCondition toCondition(PetConditionClientResponse body) {
+        return PetCondition.builder()
+            .breed(body.breed())
+            .sizeName(sizeName(body.sizeType()))
+            .weightText(weightText(body.weightKg()))
+            .heatSensitive(body.heatSensitive())
+            .coldSensitive(body.coldSensitive())
+            .noiseSensitive(body.noiseSensitive())
+            .activityName(activityName(body.activityLevel()))
+            .walkPreferred(body.walkPreferred())
+            .build();
+    }
+
+    /** BigDecimal 을 "3.5" 같은 사람이 읽는 표기로. 값이 없으면 null 유지. */
+    private String weightText(java.math.BigDecimal weightKg) {
+        return weightKg == null ? null : weightKg.stripTrailingZeros().toPlainString();
     }
 
     private String sizeName(String sizeType) {

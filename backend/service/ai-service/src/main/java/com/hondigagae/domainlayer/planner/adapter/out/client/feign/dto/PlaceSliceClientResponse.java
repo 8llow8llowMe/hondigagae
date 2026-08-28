@@ -23,6 +23,8 @@ public record PlaceSliceClientResponse(List<PlaceItemClientResponse> contents, b
         Double lat,
         Double lng,
         MetadataClientResponse petAllowanceType,
+        MetadataClientResponse allowedPetSize,
+        Integer maxPetWeightKg,
         Boolean indoor,
         String sourceCategory
     ) {
