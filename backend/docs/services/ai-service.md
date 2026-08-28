@@ -43,9 +43,19 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
 
 ## 구현 주의점
 
-- LLM 호출은 `AiLlmPort` 뒤에 캡슐화한다. 현재 구현은 `AnthropicClaudeLlmAdapter`(공식 Java SDK,
-  구조화 출력)이고, `ai-llm.enabled=false`(기본)이면 `StubLlmAdapter` 가 대신 뜼다.
-  스텁을 남겨 둔 이유는 프론트 개발과 CI 가 API 키와 토큰 비용에 묶이면 안 되기 때문이다.
+- LLM 호출은 `AiLlmPort` 뒤에 캡슐화한다. 현재 구현은 `OllamaLlmAdapter`(**Spring AI**,
+  공유 인프라의 로컬 LLM)이고, `ai-llm.enabled=false`(기본)이면 `StubLlmAdapter` 가 대신 뜬다.
+  스텁을 남겨 둔 이유는 프론트 개발과 CI 가 로컬 LLM 기동 여부에 묶이면 안 되기 때문이다.
+- **모델 교체는 `AI_LLM_MODEL` 값 하나로 끝난다** (gpt-oss:20b / qwen2.5:7b-instruct / llama3.1:8b 등,
+  Infra/ollama 참고). provider 교체(예: ANTHROPIC)는 spring-ai-{provider} 의존 + 모델 빈 +
+  어댑터를 더하는 것으로 끝난다 — application 계층은 손대지 않는다 (BossPickSeoul 동일 구조).
+- 구조화 출력은 `BeanOutputConverter` 가 응답 DTO 에서 JSON 스키마를 유도해 프롬프트에 싣고
+  파싱까지 맡는다. Ollama `format=json` 이 "JSON 만"을, 스키마 지시가 "어떤 JSON 인지"를 강제한다.
+  마크다운 코드 펜스로 감싼 응답도 관용 처리된다(로컬 모델이 자주 내는 형태).
+- gpt-oss 계열 추론 강도는 `AI_LLM_REASONING_EFFORT`(기본 low) — medium 은 추론에 생성 토큰
+  대부분을 소모한다. 미지원 모델은 이 값을 무시한다.
+- Spring AI 내장 재시도(기본 10회)는 끈다. 타임아웃된 생성은 다시 보내도 똑같이 느려서
+  GPU 와 워커 스레드만 점유한다 — 실패 처리는 서킷 + 잡 상태로 일원화한다.
 - 서킷 인스턴스 `llm` 단일 인스턴스, `slow-call-duration-threshold` 완화 (`coding-conventions.md` §10).
 - **일정을 소유하지 않는다** — 생성 결과는 제안(draft)이며, 저장·확정의 원천은 plan-service다.
 - **환각은 사후 검증보다 후보를 먼저 주는 방식으로 막는다.** tour-service 에서 동반 가능으로

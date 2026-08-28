@@ -26,17 +26,21 @@ ai:
       pending-timeout-seconds: ${AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS:30}
       running-timeout-seconds: ${AI_PLAN_JOB_RUNNING_TIMEOUT_SECONDS:300}
 
-# LLM provider 설정.
-# enabled=false 가 기본이다 - API 키 없이도 기동되고 StubLlmAdapter 가 포트를 채운다.
-# 프론트 개발과 CI 가 키와 토큰 비용에 묶이면 안 되기 때문이다.
-# api-key 는 평문으로 커밋하지 않는다 - 환경변수 또는 Jasypt (external-api-guide §4).
+# LLM provider 설정 (Spring AI).
+# enabled=false 가 기본이다 - 로컬 LLM 없이도 기동되고 StubLlmAdapter 가 포트를 채운다.
+# 프론트 개발과 CI 가 LLM 기동 여부에 묶이면 안 되기 때문이다.
+# provider 는 Spring AI 모듈 스위치, 모델 교체는 model 값 하나로 끝난다.
 ai-llm:
   enabled: ${AI_LLM_ENABLED:false}
-  api-key: ${ANTHROPIC_API_KEY:}
-  model: ${AI_LLM_MODEL:claude-opus-5}
-  max-tokens: ${AI_LLM_MAX_TOKENS:16000}
+  provider: ${AI_LLM_PROVIDER:OLLAMA}
+  base-url: ${AI_LLM_BASE_URL:http://localhost:11434}
+  api-key: ${AI_LLM_API_KEY:}
+  model: ${AI_LLM_MODEL:qwen2.5:7b-instruct}
+  timeout-ms: ${AI_LLM_TIMEOUT_MS:120000}
+  max-tokens: ${AI_LLM_MAX_TOKENS:4000}
+  temperature: ${AI_LLM_TEMPERATURE:0.2}
+  reasoning-effort: ${AI_LLM_REASONING_EFFORT:low}
   place-candidate-size: ${AI_LLM_PLACE_CANDIDATE_SIZE:50}
-  timeout-seconds: ${AI_LLM_TIMEOUT_SECONDS:180}
 
 logging:
   level:
@@ -67,4 +71,7 @@ resilience4j:
         base-config: default
       llm:
         base-config: default
-        slow-call-duration-threshold: 30s
+        # LLM 생성은 수십 초가 정상 범위라 slow-call 판정이 의미가 없다. 기준을 read
+        # timeout 과 동일하게 연동해 사실상 비활성화하고 실패율 기준만 쓴다 — 값을 하드코딩하면
+        # 타임아웃만 올렸을 때 정상 호출이 slow 로 집계되어 서킷이 열리는 사고가 난다.
+        slow-call-duration-threshold: ${AI_LLM_TIMEOUT_MS:120000}ms

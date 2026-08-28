@@ -11,7 +11,7 @@
 | tour-service | `place`, `emergency`, `insight` | 구현 |
 | tour-service | `walkcourse` | **미착수** |
 | plan-service | `plan` | 구현 (날씨 브리핑 포함) |
-| ai-service | `planner` | 구현 (Claude 연동, 기본값은 스텁) |
+| ai-service | `planner` | 구현 (Spring AI + 로컬 LLM(Ollama), 기본값은 스텁) |
 | batch-service | `placeimport`, `congestionimport` | 구현 |
 | api-gateway / service-discovery | — | 구현 |
 
@@ -65,9 +65,10 @@
 | POST | `/api/v1/ai-plans` | 일정 생성 제출 (202 + jobId, 멱등) |
 | GET | `/api/v1/ai-plans/jobs/{jobId}` | 폴링 |
 
-LLM 연동 완료(Anthropic 공식 Java SDK, 구조화 출력). `ai-llm.enabled=false` 가 기본이라
-키 없이도 기동되며 그때는 `StubLlmAdapter` 가 포트를 채운다 — 프론트 개발과 CI 가
-API 키와 토큰 비용에 묶이지 않게 하기 위해서다.
+LLM 연동 완료(**Spring AI + Ollama**, 공유 인프라 로컬 LLM, 구조화 출력).
+모델 교체는 `AI_LLM_MODEL` 값 하나, provider 교체는 어댑터·모델 빈 추가로 끝난다.
+`ai-llm.enabled=false` 가 기본이라 LLM 없이도 기동되며 그때는 `StubLlmAdapter` 가
+포트를 채운다 — 프론트 개발과 CI 가 로컬 LLM 기동 여부에 묶이지 않게 하기 위해서다.
 
 환각 방지는 **후보 장소 목록을 먼저 주는 방식**이다. tour-service 에서 동반 가능으로
 확인된 장소를 받아 프롬프트에 싫고, 돌아온 `placeId` 를 다시 후보 집합과 대조해

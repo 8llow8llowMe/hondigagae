@@ -1,10 +1,5 @@
 package com.hondigagae.domainlayer.planner.adapter.out.llm;
 
-import com.anthropic.client.AnthropicClient;
-import com.anthropic.models.messages.MessageCreateParams;
-import com.anthropic.models.messages.StructuredMessage;
-import com.anthropic.models.messages.StructuredMessageCreateParams;
-import com.anthropic.models.messages.ThinkingConfigAdaptive;
 import com.hondigagae.domainlayer.planner.adapter.out.llm.dto.LlmPlanDraftResponse;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
@@ -20,50 +15,62 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.converter.BeanOutputConverter;
+import org.springframework.ai.ollama.OllamaChatModel;
+import org.springframework.ai.ollama.api.OllamaChatOptions;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Claude 기반 일정 생성 어댑터.
+ * Spring AI(Ollama) 기반 일정 생성 어댑터.
  *
- * <p>{@code StubLlmAdapter} 를 대신하는 실제 구현이다. provider 세부사항은 전부 이 클래스
- * 안에 있고, application 계층은 {@link AiLlmPort} 와 {@link AiPlanDraft} 만 안다.
+ * <p>provider 세부사항은 전부 이 클래스 안에 있고, application 계층은 {@link AiLlmPort} 와
+ * {@link AiPlanDraft} 만 안다. 모델 교체는 {@code ai-llm.model} 값 하나로 끝나고,
+ * provider 교체는 이 어댑터와 모델 빈을 갈아 끼우는 것으로 끝난다 — BossPickSeoul 과 같은 구조다.
  *
  * <p>설계에서 신경 쓴 지점 넷:
  * <ul>
- *   <li><b>구조화 출력</b> - 스키마({@link LlmPlanDraftResponse})로 응답 형태를 강제한다.
- *       모델이 낸 문자열을 정규식으로 뜯는 코드가 없다</li>
+ *   <li><b>구조화 출력</b> - {@link BeanOutputConverter} 가 {@link LlmPlanDraftResponse} 에서
+ *       JSON 스키마를 유도해 프롬프트에 싣고, 응답 파싱까지 맡는다. Ollama 의 {@code format=json}
+ *       과 함께 걸어 모델이 낸 문자열을 정규식으로 뜯는 코드가 없게 한다</li>
  *   <li><b>환각 방지</b> - 후보 장소를 프롬프트로 주고, 돌아온 placeId 를 다시 후보 집합과
  *       대조한다. 프롬프트만으로는 부족하다 - 규칙을 어기는 일이 드물게 있다</li>
- *   <li><b>서킷</b> - 인스턴스 {@code llm}. 정상 응답이 수십 초라 slow-call 임계를 따로 완화해 둔다</li>
- *   <li><b>토큰 카운터</b> - 운영 비용을 추적한다 (services/ai-service.md)</li>
+ *   <li><b>서킷</b> - 인스턴스 {@code llm}. 정상 응답이 수십 초라 slow-call 임계를 read
+ *       timeout 과 연동해 사실상 끈다</li>
+ *   <li><b>토큰 카운터</b> - 로컬 LLM 이라 비용은 없지만 GPU 점유의 근거 데이터로 남긴다</li>
  * </ul>
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "ai-llm", name = "enabled", havingValue = "true")
-public class AnthropicClaudeLlmAdapter implements AiLlmPort {
+public class OllamaLlmAdapter implements AiLlmPort {
 
     /** 서킷 인스턴스명. provider 와 무관한 단일 인스턴스다 (coding-conventions §10). */
     public static final String CIRCUIT_NAME = "llm";
 
-    private static final String REFUSAL_STOP_REASON = "refusal";
-
-    private final AnthropicClient anthropicClient;
+    private final OllamaChatModel ollamaChatModel;
     private final AiPlanPromptFactory aiPlanPromptFactory;
     private final AiLlmProperties aiLlmProperties;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
 
-    /** 누적 토큰 사용량. 운영 비용 추적용이라 프로세스 수명 동안만 유지한다. */
+    private final BeanOutputConverter<LlmPlanDraftResponse> outputConverter =
+        new BeanOutputConverter<>(LlmPlanDraftResponse.class);
+
+    // 누적 사용량. 로컬 LLM 은 과금이 없지만 GPU 점유·모델 교체 판단의 근거로 남긴다.
     private final AtomicLong totalInputTokens = new AtomicLong();
     private final AtomicLong totalOutputTokens = new AtomicLong();
 
@@ -75,25 +82,25 @@ public class AnthropicClaudeLlmAdapter implements AiLlmPort {
             throw new AiPlanException(AiPlanErrorCode.NO_PLACE_CANDIDATES);
         }
 
-        StructuredMessage<LlmPlanDraftResponse> message = request(query);
-        LlmPlanDraftResponse draft = extractDraft(message);
+        ChatResponse response = request(query);
+        LlmPlanDraftResponse draft = extractDraft(response);
         return toDomain(draft, candidates);
     }
 
-    private StructuredMessage<LlmPlanDraftResponse> request(AiPlanGenerationQuery query) {
-        StructuredMessageCreateParams<LlmPlanDraftResponse> params = MessageCreateParams.builder()
-            .model(aiLlmProperties.model())
-            .maxTokens(aiLlmProperties.maxTokens())
-            // 일정 설계는 제약이 여럿 얽히는 작업이라 적응형 사고를 켠다.
-            .thinking(ThinkingConfigAdaptive.builder().build())
-            .system(aiPlanPromptFactory.systemPrompt())
-            .outputConfig(LlmPlanDraftResponse.class)
-            .addUserMessage(aiPlanPromptFactory.userPrompt(query))
-            .build();
+    private ChatResponse request(AiPlanGenerationQuery query) {
+        // 스키마 지시를 사용자 프롬프트 끝에 싣는다. Anthropic SDK 의 outputConfig 가 하던
+        // 스키마 강제를 provider 중립으로 옮긴 자리다 — format=json 이 "JSON 만" 을 강제하고,
+        // 이 지시가 "어떤 JSON 인지" 를 강제한다.
+        String userPrompt = aiPlanPromptFactory.userPrompt(query)
+            + "\n\n" + outputConverter.getFormat();
+
+        Prompt prompt = new Prompt(
+            List.of(new SystemMessage(aiPlanPromptFactory.systemPrompt()), new UserMessage(userPrompt)),
+            buildRequestOptions());
 
         try {
             return circuitBreakerRegistry.circuitBreaker(CIRCUIT_NAME)
-                .executeSupplier(() -> anthropicClient.messages().create(params));
+                .executeSupplier(() -> ollamaChatModel.call(prompt));
         } catch (CallNotPermittedException exception) {
             log.warn("LLM circuit open, skipping call");
             throw new AiPlanException(AiPlanErrorCode.LLM_UNAVAILABLE, exception);
@@ -105,37 +112,60 @@ public class AnthropicClaudeLlmAdapter implements AiLlmPort {
         }
     }
 
+    private OllamaChatOptions buildRequestOptions() {
+        OllamaChatOptions.Builder builder = OllamaChatOptions.builder().format("json");
+        // gpt-oss 계열은 low/medium/high 추론 강도를 지원한다. 미지원 모델로 교체해도
+        // 기동이 깨지지 않도록 알 수 없는 값은 모델 기본값에 맡긴다.
+        String reasoningEffort = aiLlmProperties.reasoningEffort();
+        if (reasoningEffort != null) {
+            switch (reasoningEffort.toLowerCase(Locale.ROOT)) {
+                case "low" -> builder.thinkLow();
+                case "medium" -> builder.thinkMedium();
+                case "high" -> builder.thinkHigh();
+                default -> { }
+            }
+        }
+        return builder.build();
+    }
+
     /**
      * 응답에서 일정안을 꺼내고 사용량을 기록한다.
      *
-     * <p>거절(refusal)을 먼저 본다. 거절은 HTTP 200 으로 오기 때문에 content 를 그냥 읽으면
-     * 비어 있는 응답을 파싱 실패로 오해하게 된다 - 원인이 전혀 다르고 사용자에게 할 말도 다르다.
+     * <p>본문이 비는 지점(응답 자체/결과/텍스트)을 구분해 남긴다 — 원인 추적이 갈라지는 자리다.
      */
-    private LlmPlanDraftResponse extractDraft(StructuredMessage<LlmPlanDraftResponse> message) {
-        recordUsage(message);
+    private LlmPlanDraftResponse extractDraft(ChatResponse response) {
+        recordUsage(response);
 
-        boolean refused = message.stopReason()
-            .map(stopReason -> REFUSAL_STOP_REASON.equalsIgnoreCase(stopReason.toString()))
-            .orElse(false);
-        if (refused) {
-            log.warn("LLM refused the request stopReason=refusal");
-            throw new AiPlanException(AiPlanErrorCode.LLM_REFUSED);
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            log.error("LLM 응답에 결과가 없습니다. model={} reason={}",
+                aiLlmProperties.model(),
+                response == null ? "response null" : response.getResult() == null ? "result null" : "output null");
+            throw new AiPlanException(AiPlanErrorCode.LLM_RESPONSE_INVALID);
+        }
+        String text = response.getResult().getOutput().getText();
+        if (text == null || text.isBlank()) {
+            log.error("LLM 응답 본문이 비어 있습니다. model={} finishReason={}",
+                aiLlmProperties.model(),
+                response.getResult().getMetadata() == null ? "unknown" : response.getResult().getMetadata().getFinishReason());
+            throw new AiPlanException(AiPlanErrorCode.LLM_RESPONSE_INVALID);
         }
 
-        return message.content().stream()
-            .flatMap(block -> block.text().stream())
-            .map(textBlock -> textBlock.text())
-            .filter(Objects::nonNull)
-            .findFirst()
-            .orElseThrow(() -> {
-                log.error("LLM response carried no structured content stopReason={}", message.stopReason());
-                return new AiPlanException(AiPlanErrorCode.LLM_RESPONSE_INVALID);
-            });
+        try {
+            return outputConverter.convert(text);
+        } catch (RuntimeException exception) {
+            log.error("LLM 응답을 스키마로 해석할 수 없습니다. model={} reason={}",
+                aiLlmProperties.model(), exception.getMessage());
+            throw new AiPlanException(AiPlanErrorCode.LLM_RESPONSE_INVALID, exception);
+        }
     }
 
-    private void recordUsage(StructuredMessage<LlmPlanDraftResponse> message) {
-        long input = message.usage().inputTokens();
-        long output = message.usage().outputTokens();
+    private void recordUsage(ChatResponse response) {
+        if (response == null || response.getMetadata() == null || response.getMetadata().getUsage() == null) {
+            return;
+        }
+        Usage usage = response.getMetadata().getUsage();
+        long input = usage.getPromptTokens() == null ? 0 : usage.getPromptTokens();
+        long output = usage.getCompletionTokens() == null ? 0 : usage.getCompletionTokens();
         log.info("LLM usage model={} inputTokens={} outputTokens={} cumulativeInput={} cumulativeOutput={}",
             aiLlmProperties.model(), input, output,
             totalInputTokens.addAndGet(input), totalOutputTokens.addAndGet(output));
