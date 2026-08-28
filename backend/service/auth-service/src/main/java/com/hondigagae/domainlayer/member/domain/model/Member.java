@@ -64,6 +64,14 @@ public record Member(
     }
 
     /**
+     * 비밀번호를 제거해 소셜 전용 계정으로 전환한다.
+     * 호출 전 소셜 연결 여부 검증은 프로세서 책임이다 (마지막 로그인 수단 제거 방지).
+     */
+    public Member removePassword() {
+        return toBuilder().password(null).build();
+    }
+
+    /**
      * 일반 계정을 소셜 계정으로 연결한다. (동일 이메일의 소셜 로그인 시 자동 연결 정책)
      */
     public Member withProvider(OAuthProvider newProvider) {

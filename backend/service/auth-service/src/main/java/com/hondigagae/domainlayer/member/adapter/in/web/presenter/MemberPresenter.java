@@ -25,6 +25,7 @@ public class MemberPresenter {
             .profileImageUrl(resolveProfileImageUrl(info))
             .role(CodeNameDescriptionMetadata.of(role.name(), role.getDisplayName(), role.getDisplayName()))
             .provider(info.provider() == null ? null : info.provider().name())
+            .hasPassword(info.hasPassword())
             .build();
     }
 

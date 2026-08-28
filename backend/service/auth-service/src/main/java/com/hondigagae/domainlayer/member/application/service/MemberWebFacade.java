@@ -7,7 +7,9 @@ import com.hondigagae.domainlayer.member.application.command.MemberGeneralSignup
 import com.hondigagae.domainlayer.member.application.info.MemberMyInfo;
 import com.hondigagae.domainlayer.member.application.info.MemberProfileImageChangeResult;
 import com.hondigagae.domainlayer.member.application.port.in.MemberWebUseCase;
+import com.hondigagae.domainlayer.member.application.port.out.MemberMailNotifyPort;
 import com.hondigagae.domainlayer.member.application.port.out.MemberSessionRevokePort;
+import com.hondigagae.domainlayer.member.domain.model.Member;
 import com.hondigagae.domainlayer.member.application.service.processor.MemberCommandProcessor;
 import com.hondigagae.domainlayer.member.application.service.processor.MemberGeneralSignupProcessor;
 import com.hondigagae.domainlayer.member.application.service.processor.MemberQueryProcessor;
@@ -27,6 +29,7 @@ public class MemberWebFacade implements MemberWebUseCase {
     private final MemberQueryProcessor memberQueryProcessor;
     private final MemberCommandProcessor memberCommandProcessor;
     private final MemberSessionRevokePort memberSessionRevokePort;
+    private final MemberMailNotifyPort memberMailNotifyPort;
     private final MemberPresenter memberPresenter;
     private final ObjectStorageClient objectStorageClient;
 
@@ -92,6 +95,27 @@ public class MemberWebFacade implements MemberWebUseCase {
         // 2. 세션 무효화 (refresh 삭제 + 현재 access 블랙리스트).
         //    실패 시 예외가 전파되어 비밀번호 변경도 함께 롤백된다 — 무효화 없는 성공을 만들지 않는다.
         memberSessionRevokePort.revokeAllSessions(memberId, tokenId);
+    }
+
+    @Override
+    @Transactional
+    public void setupPassword(long memberId, String newPassword) {
+        // 로그인 수단 "추가"라 기존 세션과 무관 — 비밀번호 변경과 달리 세션을 무효화하지 않는다.
+        memberCommandProcessor.setupPassword(memberId, newPassword);
+    }
+
+    @Override
+    @Transactional
+    public void removePassword(long memberId, String tokenId) {
+        // 1. 비밀번호 제거 (소셜 연결 계정만 허용 — 마지막 로그인 수단 제거 방지)
+        Member converted = memberCommandProcessor.removePassword(memberId);
+
+        // 2. 세션 무효화 — 로그인 수단이 줄어드는 보안 이벤트라 비밀번호 변경과 동일하게
+        //    전 기기를 무효화하고, 실패 시 전파되어 제거도 함께 롤백된다.
+        memberSessionRevokePort.revokeAllSessions(memberId, tokenId);
+
+        // 3. 전환 사실 통보 (비동기 발송 — 실패해도 전환은 유효)
+        memberMailNotifyPort.notifyPasswordRemoved(converted.email(), converted.provider().getDescription());
     }
 
     @Override

@@ -17,4 +17,7 @@ public interface MailSendPort {
 
     /** 일반 계정에 소셜 로그인이 연결된 사실을 통보한다 (계정 탈취 감지 수단). */
     void sendSocialLinkedNotice(String email, String providerName);
+
+    /** 비밀번호가 제거되어 소셜 전용 계정으로 전환된 사실을 통보한다. */
+    void sendPasswordRemovedNotice(String email, String providerName);
 }

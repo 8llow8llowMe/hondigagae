@@ -54,7 +54,7 @@ public class MemberCommandProcessor {
     public void changePassword(long memberId, String currentPassword, String newPassword) {
         Member member = memberQueryProcessor.getActiveMember(memberId);
 
-        // 소셜 계정은 비밀번호가 없으므로 명확한 사유로 거부한다.
+        // 소셜 계정은 비밀번호가 없으므로 명확한 사유로 거부한다. (최초 설정은 setupPassword 가 담당)
         if (member.password() == null) {
             throw new MemberException(MemberErrorCode.SOCIAL_ACCOUNT_PASSWORD_UNSUPPORTED);
         }
@@ -64,5 +64,37 @@ public class MemberCommandProcessor {
         }
 
         memberRepositoryPort.save(member.changePassword(passwordEncoder.encode(newPassword)));
+    }
+
+    /**
+     * 소셜 전용 계정(비밀번호 없음)에 비밀번호를 최초 설정해 이메일 로그인 수단을 추가한다.
+     * 로그인된 본인의 수단 "추가"라 기존 세션 위험과 무관하므로 세션 무효화는 하지 않는다.
+     */
+    public void setupPassword(long memberId, String newPassword) {
+        Member member = memberQueryProcessor.getActiveMember(memberId);
+
+        if (member.password() != null) {
+            throw new MemberException(MemberErrorCode.PASSWORD_ALREADY_SET);
+        }
+
+        memberRepositoryPort.save(member.changePassword(passwordEncoder.encode(newPassword)));
+    }
+
+    /**
+     * 비밀번호를 제거해 소셜 전용 계정으로 전환한다. 소셜이 연결된 계정만 허용한다 —
+     * 일반 전용 계정의 비밀번호를 지우면 로그인 수단이 사라진다(마지막 수단 제거 방지).
+     * 통보 메일에 쓸 수 있도록 전환된 회원을 반환한다.
+     */
+    public Member removePassword(long memberId) {
+        Member member = memberQueryProcessor.getActiveMember(memberId);
+
+        if (member.password() == null) {
+            throw new MemberException(MemberErrorCode.SOCIAL_ACCOUNT_PASSWORD_UNSUPPORTED);
+        }
+        if (member.provider() == null) {
+            throw new MemberException(MemberErrorCode.PASSWORD_REMOVAL_NOT_ALLOWED);
+        }
+
+        return memberRepositoryPort.save(member.removePassword());
     }
 }

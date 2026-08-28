@@ -16,7 +16,9 @@ public record MemberMyInfo(
     // 직접 업로드본의 오브젝트 키. 공개 URL 조립은 Presenter 책임이다.
     String profileImageKey,
     SecurityRole role,
-    OAuthProvider provider
+    OAuthProvider provider,
+    // 비밀번호 설정 여부. FE가 (일반/소셜 전용/연결됨) 상태를 구분해 비밀번호 메뉴를 분기하는 데 쓴다.
+    boolean hasPassword
 ) {
 
     public static MemberMyInfo from(Member member) {
@@ -29,6 +31,7 @@ public record MemberMyInfo(
             .profileImageKey(member.profileImageKey())
             .role(member.role())
             .provider(member.provider())
+            .hasPassword(member.password() != null)
             .build();
     }
 }

@@ -271,6 +271,10 @@ class PasswordResetProcessorTest {
         @Override
         public void sendSocialLinkedNotice(String email, String providerName) {
         }
+
+        @Override
+        public void sendPasswordRemovedNotice(String email, String providerName) {
+        }
     }
 
     private static class StubMemberRepositoryPort implements MemberRepositoryPort {
