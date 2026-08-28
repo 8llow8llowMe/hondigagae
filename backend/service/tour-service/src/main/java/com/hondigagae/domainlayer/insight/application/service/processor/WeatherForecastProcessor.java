@@ -185,7 +185,7 @@ public class WeatherForecastProcessor {
      */
     private List<DailyWeather> midTermDailies(MidTermRegion region) {
         return loadWithRefreshLock(
-            "midterm:" + region.name(),
+            "midterm:" + region.cacheKey(),
             () -> midTermForecastCachePort.find(region).map(WeatherForecastProcessor::asView),
             () -> fetchMidTerm(region));
     }
