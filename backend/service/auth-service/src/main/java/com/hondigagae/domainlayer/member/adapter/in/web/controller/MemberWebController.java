@@ -5,6 +5,7 @@ import com.hondigagae.domainlayer.auth.adapter.in.web.provider.RefreshCookieProv
 import com.hondigagae.domainlayer.member.adapter.in.web.dto.request.MemberGeneralSignupRequest;
 import com.hondigagae.domainlayer.member.adapter.in.web.dto.request.MemberMyInfoUpdateRequest;
 import com.hondigagae.domainlayer.member.adapter.in.web.dto.request.MemberPasswordChangeRequest;
+import com.hondigagae.domainlayer.member.adapter.in.web.dto.request.MemberPasswordSetupRequest;
 import com.hondigagae.domainlayer.member.adapter.in.web.dto.response.MemberMyInfoResponse;
 import com.hondigagae.domainlayer.member.adapter.in.web.dto.response.MemberProfileImageUploadResponse;
 import com.hondigagae.domainlayer.member.application.command.MemberGeneralSignupCommand;
@@ -122,6 +123,35 @@ public class MemberWebController {
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, refreshCookieProvider.clearRefreshCookie().toString())
             .body(Response.success());
+    }
+
+    @Operation(
+        summary = "소셜 전용 계정 전환 (비밀번호 제거)",
+        description = "소셜 로그인이 연결된 계정의 비밀번호를 제거해 소셜 전용 계정으로 전환합니다. 전환 후 이메일 로그인은 불가하며, 모든 기기에서 로그아웃됩니다. 소셜이 연결되지 않은 일반 계정은 400(MEMBER_009), 이미 소셜 전용이면 400(MEMBER_007)으로 응답합니다.",
+        security = {@SecurityRequirement(name = "bearerAuth")}
+    )
+    @DeleteMapping("/me/password")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<Void>> removePassword(@AuthenticationPrincipal MemberLoginActive loginActive) {
+        memberWebUseCase.removePassword(loginActive.memberId(), loginActive.tokenId());
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, refreshCookieProvider.clearRefreshCookie().toString())
+            .body(Response.success());
+    }
+
+    @Operation(
+        summary = "비밀번호 최초 설정",
+        description = "소셜 로그인으로 가입해 비밀번호가 없는 계정에 비밀번호를 설정합니다. 설정 후에는 이메일 로그인과 소셜 로그인 모두 사용할 수 있습니다. 이미 비밀번호가 있는 계정은 400(MEMBER_008)으로 응답합니다.",
+        security = {@SecurityRequirement(name = "bearerAuth")}
+    )
+    @PostMapping("/me/password/setup")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<Void>> setupPassword(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Valid @RequestBody MemberPasswordSetupRequest request
+    ) {
+        memberWebUseCase.setupPassword(loginActive.memberId(), request.newPassword());
+        return ResponseEntity.ok().body(Response.success());
     }
 
     @Operation(

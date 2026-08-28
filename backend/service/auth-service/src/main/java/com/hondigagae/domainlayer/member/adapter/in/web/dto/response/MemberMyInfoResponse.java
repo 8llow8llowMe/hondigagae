@@ -28,7 +28,11 @@ public record MemberMyInfoResponse(
     CodeNameDescriptionMetadata role,
 
     @Schema(description = "소셜 로그인 제공자 (일반 계정이면 null)", example = "KAKAO", nullable = true)
-    String provider
+    String provider,
+
+    @Schema(description = "비밀번호 설정 여부 — provider 와 조합해 계정 상태를 구분한다 (true+null=일반, false+KAKAO=소셜 전용, true+KAKAO=연결됨)",
+        example = "true")
+    boolean hasPassword
 ) {
 
 }
