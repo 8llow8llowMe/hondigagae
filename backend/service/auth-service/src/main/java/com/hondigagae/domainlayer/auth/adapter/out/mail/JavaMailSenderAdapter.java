@@ -17,6 +17,7 @@ public class JavaMailSenderAdapter implements MailSendPort {
     private static final String CODE_SUBJECT = "[혼디가개] 이메일 인증코드 안내";
     private static final String NOTICE_SUBJECT = "[혼디가개] 회원가입 안내";
     private static final String RESET_SUBJECT = "[혼디가개] 비밀번호 재설정 안내";
+    private static final String SOCIAL_LINKED_SUBJECT = "[혼디가개] 소셜 로그인 연결 안내";
 
     private final JavaMailSender javaMailSender;
 
@@ -52,6 +53,12 @@ public class JavaMailSenderAdapter implements MailSendPort {
     @Async("authMailTaskExecutor")
     public void sendPasswordResetSocialOnlyNotice(String email, String providerName) {
         send(email, RESET_SUBJECT, buildResetSocialOnlyBody(providerName));
+    }
+
+    @Override
+    @Async("authMailTaskExecutor")
+    public void sendSocialLinkedNotice(String email, String providerName) {
+        send(email, SOCIAL_LINKED_SUBJECT, buildSocialLinkedBody(providerName));
     }
 
     private void send(String email, String subject, String body) {
@@ -131,4 +138,14 @@ public class JavaMailSenderAdapter implements MailSendPort {
             """.formatted(providerName, providerName);
     }
 
+    private String buildSocialLinkedBody(String providerName) {
+        return """
+            <div style="font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+              <h2 style="color: #1a1a2e;">혼디가개 소셜 로그인 연결 안내</h2>
+              <p>회원님의 계정에 <b>%s 로그인</b>이 연결되었습니다.</p>
+              <p>이제 기존 이메일 로그인과 %s 로그인 모두 사용할 수 있습니다.</p>
+              <p style="color: #d32f2f; font-size: 13px; margin-top: 16px;">본인이 한 것이 아니라면 즉시 비밀번호를 변경해주세요.</p>
+            </div>
+            """.formatted(providerName, providerName);
+    }
 }

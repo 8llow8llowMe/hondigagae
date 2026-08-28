@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.auth.application.service.processor;
 import com.hondigagae.domainlayer.auth.application.exception.AuthErrorCode;
 import com.hondigagae.domainlayer.auth.application.exception.AuthException;
 import com.hondigagae.domainlayer.auth.application.info.GeneralLoginInfo;
+import com.hondigagae.domainlayer.auth.application.port.out.MailSendPort;
 import com.hondigagae.domainlayer.auth.application.port.out.OAuthStateStorePort;
 import com.hondigagae.domainlayer.auth.application.port.out.query.OAuthMemberQueryResult;
 import com.hondigagae.domainlayer.auth.application.service.oauth.OAuthAuthorizationUrlRouter;
@@ -36,6 +37,7 @@ public class OAuthLoginProcessor {
     private final OAuthMemberQueryRouter memberQueryRouter;
     private final OAuthStateStorePort oAuthStateStorePort;
     private final MemberRepositoryPort memberRepositoryPort;
+    private final MailSendPort mailSendPort;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -121,7 +123,11 @@ public class OAuthLoginProcessor {
         // 검증된 이메일만 여기 도달하므로(validateRequiredProfile) 계정 탈취 경로가 아니다.
         if (existing.provider() == null) {
             log.info("[OAuthLoginProcessor] 일반 계정을 소셜 계정으로 연결: memberId={}, provider={}", existing.id(), provider);
-            return memberRepositoryPort.save(existing.withProvider(provider));
+            Member linked = memberRepositoryPort.save(existing.withProvider(provider));
+            // 연결 사실을 메일로 통보한다 — 본인이 한 게 아니면 즉시 알아챌 수 있는 탈취 감지 수단.
+            // 비동기 발송이라 로그인 흐름을 막지 않고, 실패해도 로그인은 성공한다.
+            mailSendPort.sendSocialLinkedNotice(linked.email(), provider.getDescription());
+            return linked;
         }
 
         // 다른 provider로 가입된 계정이면 차단

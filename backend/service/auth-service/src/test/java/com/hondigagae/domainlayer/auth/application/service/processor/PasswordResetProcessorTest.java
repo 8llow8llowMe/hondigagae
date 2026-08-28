@@ -268,6 +268,9 @@ class PasswordResetProcessorTest {
             socialOnlyMails.add(email);
         }
 
+        @Override
+        public void sendSocialLinkedNotice(String email, String providerName) {
+        }
     }
 
     private static class StubMemberRepositoryPort implements MemberRepositoryPort {
