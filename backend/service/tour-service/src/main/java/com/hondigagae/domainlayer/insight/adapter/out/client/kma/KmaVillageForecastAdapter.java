@@ -46,6 +46,9 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  *   <li><b>키 오류는 XML</b> - serviceKey 문제일 때 JSON 이 아니라 OpenAPI_ServiceResponse
  *       XML 이 온다. 파싱 전에 형태를 본다</li>
  *   <li><b>resultCode 는 00</b> - 관광공사 계열의 0000 과 다르다. 둘 다 받아 준다</li>
+ *   <li><b>numOfRows 로 잘린다</b> - 한 회차가 1,000행을 넘는다. 잘리면 오류가 아니라
+ *       마지막 날이 반쪽으로 오는데, 그 반쪽으로 하루를 접으면 최고기온이 실제보다 낮게 나온다.
+ *       {@code totalCount} 와 받은 행 수를 비교해 잡는다</li>
  * </ul>
  */
 @Slf4j
@@ -103,7 +106,46 @@ public class KmaVillageForecastAdapter implements WeatherObservationPort {
         if (body == null) {
             return List.of();
         }
-        return pivotByForecastTime(grid, baseTime, extractItems(body));
+
+        List<JsonNode> items = extractItems(body);
+        List<WeatherForecast> forecasts = pivotByForecastTime(grid, baseTime, items);
+
+        int totalCount = body.path("totalCount").asInt(items.size());
+        if (totalCount > items.size()) {
+            log.warn("KMA forecast truncated by numOfRows totalCount={} received={} numOfRows={} grid={}",
+                totalCount, items.size(), kmaApiProperties.numOfRows(), grid.cacheKey());
+            return dropIncompleteTailDay(forecasts);
+        }
+        return forecasts;
+    }
+
+    /**
+     * 잘린 응답의 <b>마지막 날짜를 버린다.</b>
+     *
+     * <p>행이 (fcstDate, fcstTime) 오름차순으로 오는 것을 실측으로 확인했다. 그래서 잘림은
+     * 항상 꼬리를 자르고, <b>마지막 날짜만 반쪽이 된다.</b> 앞쪽 날짜는 온전하다.
+     *
+     * <p>반쪽인 채로 두면 조용히 틀린다. 실측 예: 09-01 이 21시까지 오던 것이 12시까지만 오면
+     * TMX 가 사라져 최고기온이 시각별 기온의 최대값(30.0)으로 대체되는데, 실제 TMX 는 31.0 이다.
+     * 1도 차이지만 고온 임계값이 31.0 이라 판정이 정확히 갈리고, 방향이 <b>"실제보다 안전하다"</b> 다.
+     * {@code DailyWeather.hasDaySummary} 도 이것을 막지 못한다 - 12시 예보가 있으니 온전해 보인다.
+     *
+     * <p>버려도 커버리지가 비지 않는다. 그 날짜는 중기예보가 덮는다.
+     *
+     * <p>물론 근본 대응은 {@code numOfRows} 를 넉넉히 주는 것이고 기본값이 그렇게 잡혀 있다.
+     * 이 메서드는 원천이 예보 범위를 늘렸을 때의 안전망이다 - 그때 WARN 로그가 먼저 뜬다.
+     */
+    static List<WeatherForecast> dropIncompleteTailDay(List<WeatherForecast> forecasts) {
+        if (forecasts.isEmpty()) {
+            return forecasts;
+        }
+        LocalDate lastDate = forecasts.get(forecasts.size() - 1).forecastAt().toLocalDate();
+        List<WeatherForecast> kept = forecasts.stream()
+            .filter(forecast -> !forecast.forecastAt().toLocalDate().equals(lastDate))
+            .toList();
+        // 받은 것이 한 날짜뿐이면 버릴 수 없다. 반쪽이라도 없는 것보다는 낫고,
+        // 온전하지 않다는 사실은 hasDaySummary 가 시각 수로 다시 판정한다.
+        return kept.isEmpty() ? forecasts : kept;
     }
 
     /**
