@@ -28,6 +28,8 @@
   - 장소 데이터를 어느 소스로 어떻게 합치는지 (소스별 저장 가능 여부, 중복 판정, 배치 잡)
 - `weather-insight-integration.md`
   - 기상청 예보 연동과 여행 적합도/산책 위험도 판정 규칙 (격자 변환, 캐시 정책, 원천 함정)
+- `auth-account-frontend-guide.md`
+  - FE 계정 UX 연동 — 비밀번호 재설정, 일반↔소셜 연결/전환, hasPassword 분기, 에러 표
 - `data-refresh-guide.md`
   - 장소 데이터 최신화 — 소스별 갱신 주기, 사라진 장소 처리, 급감 가드
 - `local-run-guide.md`

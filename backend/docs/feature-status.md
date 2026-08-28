@@ -22,15 +22,16 @@
 | 메서드 | 경로 | 비고 |
 | --- | --- | --- |
 | POST | `/api/v1/auth/login` | 일반 로그인 |
-| POST | `/api/v1/auth/logout` | |
+| POST | `/api/v1/auth/logout` | 현재 기기만. 다른 기기 로그인 유지 |
 | GET | `/api/v1/auth/{provider}/authorize` | 소셜 인가 URL |
 | GET | `/api/v1/auth/{provider}/login` | `code`, `state` 쿼리 파라미터 |
 | POST | `/api/v1/auth/email/send-code` · `/verify-code` | 이메일 인증 |
-| POST | `/api/v1/auth/token/reissue` | |
+| POST | `/api/v1/auth/password/reset/send-code` · `/password/reset` | 재설정 (계정 열거 방지, 5회 오입력 무효화) |
+| POST | `/api/v1/auth/token/reissue` | 세션별 회전, 이전 refresh 즉시 무효 |
 | POST | `/api/v1/members/signup` | |
 | GET·PATCH | `/api/v1/members/me` | |
 | POST·DELETE | `/api/v1/members/me/profile-image` | |
-| POST | `/api/v1/members/me/password` · `/me/withdraw` | |
+| POST | `/api/v1/members/me/password` · `/password/setup` · DELETE `/password` · `/me/withdraw` | 변경/최초 설정/소셜 전용 전환/탈퇴 |
 | GET·POST·PUT·DELETE | `/api/v1/members/me/pets[/{petId}]` | 반려견 프로필 |
 
 소셜 로그인은 provider 를 경로 변수로 받아 kakao·naver 를 같은 흐름으로 처리한다.
