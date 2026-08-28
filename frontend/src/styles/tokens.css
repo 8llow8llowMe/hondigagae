@@ -1,60 +1,106 @@
 /**
  * DESIGN.md 의 토큰을 CSS 변수로 옮긴 파일.
  * DESIGN.md 가 정본이며, 이 파일은 수동 동기다. 토큰을 바꿀 때 두 파일을 함께 고친다.
+ * DESIGN.md 의 상위 정본은 `혼디가개 디자인 가이드.dc.html` 이다.
  * (docs/tooling-guide.md §11)
+ *
+ * 3차 세트 — 디자인 가이드(아트보드) 실측 반영. 이슈 #50.
  */
 
 :root {
-  /* ── 브랜드 (제주 자연) */
-  --brand-50: #eff8f3;
-  --brand-100: #d6ece0;
-  --brand-300: #7fc4a2;
-  --brand-500: #2e9b6b;
-  --brand-600: #237a54;
-  --brand-700: #1a5c3f;
-
-  /* ── Accent (반려견·강조) */
-  --accent-100: #fdeee0;
-  --accent-500: #e8843c;
-  --accent-600: #c86a28;
-  --accent-700: #a75921;
-
-  /* ── 중립 */
+  /* ── 표면 · 테두리 — DESIGN.md §2-1
+     화면 안에서 묶음을 끊는 유일한 회색은 --band 다.
+     --bg-sunken 은 모형 밖 자료 전용이며 화면 안에서 쓰지 않는다. */
   --bg: #ffffff;
-  --bg-subtle: #f7f8f7;
-  --bg-elevated: #ffffff;
-  --border: #e3e6e4;
-  --border-strong: #c8cdc9;
-  --fg: #1a1d1b;
-  --fg-muted: #5f6762;
-  --fg-subtle: #8a928c;
+  --band: #eef0f3;
+  --bg-sunken: #f5f6f8;
+  --border: #e3e5ea;
+  --border-strong: #c4c8d0;
+  --row-selected: #f0f7f3;
+
+  /* ── 텍스트 3단 — DESIGN.md §2-2
+     읽는 회색 텍스트는 --fg / --fg-muted 두 단계뿐이다.
+     --fg-subtle 은 placeholder·비활성·장식 전용이며 단위에도 쓰지 않는다. */
+  --fg: #15181d;
+  --fg-muted: #596069;
+  --fg-subtle: #878d96;
   --fg-inverse: #ffffff;
 
-  /* ── 상태. danger 는 일시 장애(5xx) 전용이며 데이터 부재(404)에 쓰지 않는다.
-     -500 은 흰 배경 위 텍스트·아이콘·보더용, -700 은 같은 계열 tint 배경 위 텍스트용이다.
-     대비 수치는 DESIGN.md §2 참고. */
-  --success-500: #2e9b6b;
+  /* ── 등급 --metric-* — DESIGN.md §2-3
+     5톤 × 3층. -100 tint 배경 / -500 흰 배경 위 마크·큰 숫자 / -700 텍스트.
+     상호작용 색(브랜드·링크)과 분리된 스케일이다. */
+  --metric-critical-100: #fdecec;
+  --metric-critical-500: #d54040;
+  --metric-critical-700: #ce2d2d;
 
-  --warn-100: #fef4e0;
-  --warn-500: #d99413;
-  --warn-700: #97670d;
+  --metric-high-100: #e4f0ea;
+  --metric-high-500: #1f7a55;
+  --metric-high-700: #16563c;
 
+  --metric-mid-100: #fef4e0;
+  --metric-mid-500: #b0761a;
+  --metric-mid-700: #8a5f0f;
+
+  --metric-low-100: #eef0f3;
+  --metric-low-500: #6b7280;
+  --metric-low-700: #4b5563;
+
+  /* UNKNOWN 에는 tint 가 없다. 점선 테두리 전용이고 문구는 --fg-muted 로 쓴다. */
+  --metric-unknown-500: #a8aeb8;
+
+  /* ── 액션 · 링크 — DESIGN.md §2-4
+     --link 는 --metric-high-500 과 값이 같다. 토큰명을 분리해 둔 것은
+     나중에 갈라야 할 때 한 줄만 고치기 위해서다. 값이 같아도 이름을 지킨다. */
+  --brand-500: #2e9b6b;
+  --brand-600: #237a54;
+  --link: #1f7a55;
+  --link-hover: #16563c;
+
+  /* ── AI 표시 전용 — DESIGN.md §2-5. 장식 배지에 쓰지 않는다. */
+  --accent-100: #fdeee0;
+  --accent-700: #a75921;
+
+  /* ── 시스템 상태 — DESIGN.md §2-6
+     일시 장애(5xx) 전용이다. 데이터 부재(404)에 쓰지 않는다.
+     산책 위험 판정에는 --metric-critical-* 을 쓴다. */
   --danger-100: #fdecec;
   --danger-500: #d54040;
   --danger-700: #ce2d2d;
+  --danger-900: #b91c1c;
 
-  --info-100: #f7f8f7;
-  --info-500: #3b7dd8;
-  --info-700: #2a70d2;
+  /* ── 소셜 브랜드 예외 — DESIGN.md §2-8. 로그인 버튼에만. */
+  --kakao-bg: #fee500;
+  --kakao-fg: #191600;
+  --naver-mark: #03c75a;
 
-  /* ── Radius */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  /* ── Radius — DESIGN.md §5. 목록·섹션·행에는 라운드가 없다. */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
 
-  /* ── Shadow */
-  --shadow-sm: 0 1px 2px rgb(26 29 27 / 6%);
-  --shadow-md: 0 4px 12px rgb(26 29 27 / 8%);
-  --shadow-lg: 0 12px 32px rgb(26 29 27 / 12%);
+  /* ── Shadow — DESIGN.md §6. 실제로 떠 있는 것에만. */
+  --shadow-md: 0 4px 12px rgb(21 24 29 / 8%);
+  --shadow-lg: 0 12px 32px rgb(21 24 29 / 12%);
+
+  /* ── 레이아웃 — DESIGN.md §7 */
+  --header-h: 56px;
+  --header-h-search: 64px;
+  --tabbar-h: 64px;
+  --rail-context: 400px;
+  --rail-filter: 280px;
+  --band-h: 8px;
+}
+
+@media (width >= 48rem) {
+  :root {
+    --header-h: 64px;
+  }
+}
+
+@media (width >= 99rem) {
+  :root {
+    --rail-context: 480px;
+  }
 }

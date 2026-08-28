@@ -1,8 +1,9 @@
 import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
-import { PlaceCard } from '@/features/place/place-card'
-import { PlaceCardSkeleton } from '@/features/place/place-card-skeleton'
+import { RowList } from '@/components/surface'
+import { PlaceRow } from '@/features/place/place-row'
+import { PlaceRowSkeleton } from '@/features/place/place-row-skeleton'
 import { classify } from '@/lib/api/error'
 import { toMessage } from '@/lib/api/response'
 import { messages } from '@/lib/messages'
@@ -42,11 +43,11 @@ export function PlaceListSection({
 }: PlaceListSectionProps) {
   if (loading) {
     return (
-      <div className="flex flex-col gap-3">
+      <RowList>
         {Array.from({ length: SKELETON_COUNT }, (_, index) => (
-          <PlaceCardSkeleton key={index} />
+          <PlaceRowSkeleton key={index} last={index === SKELETON_COUNT - 1} />
         ))}
-      </div>
+      </RowList>
     )
   }
 
@@ -104,17 +105,21 @@ export function PlaceListSection({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <ul className="flex flex-col gap-3">
-        {places.map((place) => (
-          <li key={place.placeId}>
-            <PlaceCard place={place} />
-          </li>
+    <div className="flex flex-col">
+      <RowList>
+        {places.map((place, index) => (
+          <PlaceRow key={place.placeId} place={place} last={index === places.length - 1} />
         ))}
-      </ul>
+      </RowList>
 
       {hasNext ? (
-        <Button variant="secondary" size="md" loading={loadingMore} onClick={onLoadMore}>
+        <Button
+          variant="secondary"
+          size="md"
+          className="mx-4 mt-4 md:mx-10"
+          loading={loadingMore}
+          onClick={onLoadMore}
+        >
           {messages.common.loadMore}
         </Button>
       ) : (

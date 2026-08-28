@@ -1,10 +1,14 @@
 # Frontend Styling Guide
 
 > **토큰 정본은 `../DESIGN.md` 다.** 이 문서는 그 토큰을 코드에 적용하는 규칙과 공통 컴포넌트 목록이다.
+> `DESIGN.md` 의 상위 정본은 `혼디가개 디자인 가이드.dc.html`(Claude Design 산출물)이다.
 
 ## 1. Tailwind + 토큰 연결
 
 - `DESIGN.md` 의 토큰을 `src/styles/tokens.css` 의 CSS 변수로 선언하고, Tailwind 테마에서 그 변수를 참조한다.
+- **`app/globals.css` 는 `@theme inline` 을 쓴다.** 일반 `@theme` 은 `--radius-sm: var(--radius-sm)`
+  처럼 같은 이름으로 되받을 때 `:root` 에 **자기참조**를 내보내 값이 무효가 된다.
+  `inline` 은 사용처에 값을 꽂으므로 `tokens.css` 의 정의를 그대로 가리킨다.
 - **컴포넌트에서 raw 색상값(`#2E9B6B`)을 쓰지 않는다.** 토큰 클래스만 쓴다.
 - **arbitrary value 금지**: `p-[13px]`, `text-[#333]`, `rounded-[7px]`. 스케일 밖 값이 필요하면 먼저 `DESIGN.md` 갱신을 논의한다.
 - 조건부 클래스는 `clsx`/`cn` 헬퍼로 조립한다. 문자열 템플릿 연결로 클래스를 만들지 않는다 (Tailwind가 감지하지 못한다).
@@ -21,18 +25,24 @@
 
 새 UI를 만들기 전에 아래를 확인한다. **없으면 만들고, 있으면 확장한다.** 화면마다 비슷한 버튼을 새로 만들지 않는다.
 
-| 컴포넌트                      | 위치                             | 비고                                                              |
-| ----------------------------- | -------------------------------- | ----------------------------------------------------------------- |
-| `Button`                      | `src/components/button.tsx`      | variant: primary / secondary / ghost / danger, size: sm / md / lg |
-| `Card`                        | `src/components/card.tsx`        | radius-lg + shadow-sm                                             |
-| `Input`, `Textarea`, `Select` | `src/components/`                | 라벨·에러 메시지·helper text 슬롯 포함                            |
-| `Tab`                         | `src/components/tab.tsx`         | `aria-selected` 필수                                              |
-| `Badge`                       | `src/components/badge.tsx`       | 반려견 동반 가능, AI 생성, 적합도 등급                            |
-| `Chip`                        | `src/components/chip.tsx`        | 필터. radius-full, 터치 44px                                      |
-| `Modal`, `BottomSheet`        | `src/components/`                | 모바일은 BottomSheet 우선                                         |
-| `EmptyState`                  | `src/components/empty-state.tsx` | **404/데이터 부재 전용. 재시도 버튼 슬롯 없음**                   |
-| `ErrorState`                  | `src/components/error-state.tsx` | **5xx/일시 장애 전용. 재시도 버튼 필수**                          |
-| `Skeleton`                    | `src/components/skeleton.tsx`    | 실제 콘텐츠와 크기 유사                                           |
+| 컴포넌트                                   | 위치                                | 비고                                                                   |
+| ------------------------------------------ | ----------------------------------- | ---------------------------------------------------------------------- |
+| `Button`                                   | `src/components/button.tsx`         | variant: primary / secondary / ghost / danger, size: sm / md / lg      |
+| `Band`, `Section`, `Row`, `RowList`        | `src/components/surface.tsx`        | **표면 프리미티브.** 8px 밴드 · 전폭 섹션 · 전폭 행(구분선 인셋 16/40) |
+| `MetricBadge`, `MetricValue`, `metricTone` | `src/components/metric.tsx`         | 등급 배지·지표 값. 문구는 서버 `name`, FE 는 색만 매핑                 |
+| `ReasonList`                               | `src/components/reason-list.tsx`    | XAI 근거. 서버 순서를 재정렬하지 않는다                                |
+| `Banner`                                   | `src/components/banner.tsx`         | 상시 진입점(병원·약국). 흰 표면 + 아이콘만 danger                      |
+| `SegmentedTabs`                            | `src/components/segmented-tabs.tsx` | 모바일 배타 축. 48px 전폭 균등 밑줄 탭                                 |
+| `Toast` / `ToastProvider`                  | `src/components/toast.tsx`          | 끝난 일. **undo 금지 · 오류 금지 · 동시에 하나만**                     |
+| `BottomSheet`                              | `src/components/bottom-sheet.tsx`   | 모바일 선택. 단계는 같은 시트를 밀어 넣는다                            |
+| `ConfirmModal`                             | `src/components/confirm-modal.tsx`  | **되돌릴 수 없는 일만.** 영향 범위를 개수로                            |
+| `Menu` / `MenuAnchor`                      | `src/components/menu.tsx`           | 데스크톱 팝오버 3–5항목. 모바일에서는 쓰지 않는다                      |
+| `Input`, `Textarea`, `Select`              | `src/components/`                   | 라벨·에러 메시지·helper text 슬롯 포함                                 |
+| `Badge`                                    | `src/components/badge.tsx`          | 중립 태그·AI 표시. **등급은 `MetricBadge` 를 쓴다**                    |
+| `Chip`, `ChipGroup`                        | `src/components/chip.tsx`           | 필터. **radius-md(8), 원형 아님.** 배타 축은 `exclusive` 필수          |
+| `EmptyState`                               | `src/components/empty-state.tsx`    | **404/데이터 부재 전용. 재시도 버튼 슬롯 없음**                        |
+| `ErrorState`                               | `src/components/error-state.tsx`    | **5xx/일시 장애 전용. 재시도 버튼 필수**                               |
+| `Skeleton`                                 | `src/components/skeleton.tsx`       | 실제 콘텐츠와 크기 유사                                                |
 
 **`EmptyState` 와 `ErrorState` 를 분리한 이유**: 404(데이터 부재)와 5xx(일시 장애)의 시각 언어를 다르게 강제하기 위해서다. 한 컴포넌트에 `hasRetry` 플래그를 두면 반드시 잘못 쓰인다. (`api-integration-guide.md` §3)
 
@@ -42,12 +52,52 @@
 
 ## 3. 상태별 렌더 규칙
 
-| 상태              | 컴포넌트             | 색 톤               | 재시도 버튼 |
-| ----------------- | -------------------- | ------------------- | ----------- |
-| loading           | `Skeleton`           | `--bg-subtle`       | —           |
-| 데이터 부재 / 404 | `EmptyState`         | 중립 (`--fg-muted`) | **없음**    |
-| 일시 장애 / 5xx   | `ErrorState`         | `--danger-*`        | **있음**    |
-| nullable 섹션     | 렌더하지 않음 (숨김) | —                   | —           |
+| 상태              | 컴포넌트                                   | 색 톤                           | 재시도 버튼 |
+| ----------------- | ------------------------------------------ | ------------------------------- | ----------- |
+| loading           | `Skeleton`                                 | `--band`                        | —           |
+| refetching        | 이전 값 유지 + `opacity .55` + `aria-busy` | —                               | —           |
+| 데이터 부재 / 404 | `EmptyState`                               | 중립 (`--fg-muted`)             | **없음**    |
+| 일시 장애 / 5xx   | `ErrorState`                               | 중립 표면 + `--danger-*` 아이콘 | **있음**    |
+| unknown           | "정보 없음" 표시                           | 점선 + `--fg-muted`             | —           |
+| nullable 섹션     | 렌더하지 않음 (숨김)                       | —                               | —           |
+
+**`refetching` 에 스켈레톤을 쓰지 않는다** (가이드 §6). 반려견 전환처럼 값만 바뀌는
+재조회에서 스켈레톤을 깔면 화면이 통째로 사라졌다 돌아온다. 이전 값을 남기고 흐리게만 한다.
+헤더·프로필은 즉시 새 값으로 바꾼다.
+
+**`ErrorState` 의 제목을 붉게 칠하지 않는다.** 표면은 흰색으로 두고 danger 는 아이콘에만
+쓴다 — 배경·제목까지 붉히면 일시 장애가 경보처럼 읽힌다.
+
+## 3-1. 표면 규칙 (DESIGN.md §0)
+
+**카드를 만들지 않는다.** `Card` 컴포넌트는 3차 세트에서 폐기했다.
+
+| 하려는 것             | 쓰는 것                                    |
+| --------------------- | ------------------------------------------ |
+| 묶음 경계를 끊는다    | `<Band />` (8px `--band`)                  |
+| 같은 묶음 안을 나눈다 | `<Row />` 의 1px 구분선 (인셋 16/40)       |
+| 목록을 그린다         | `<RowList>` + `<Row as="li">`              |
+| 섹션을 그린다         | `<Section title=...>` — 라운드·그림자 없음 |
+
+- **회색 배경 위에 둥근 흰 카드를 띄우지 않는다.** 대시보드처럼 읽힌다.
+- **`--bg-sunken`(`#F5F6F8`) 을 화면 안에서 쓰지 않는다.** 화면 안의 유일한 회색은 `--band` 다.
+- **평평한 행에 그림자를 쓰지 않는다.** `--shadow-*` 는 실제로 떠 있는 것에만.
+- 라운드는 사진·아바타·버튼·입력·썸네일까지다. **목록·섹션·행에는 없다.**
+
+## 3-2. 오버레이는 4종만 (가이드 §5-2)
+
+| 상황                        | 쓰는 것            |
+| --------------------------- | ------------------ |
+| 이미 끝났다                 | `Toast`            |
+| 값을 골라야 한다 (모바일)   | `BottomSheet`      |
+| 값을 골라야 한다 (데스크톱) | `Menu` · 좌측 레일 |
+| 되돌릴 수 없다              | `ConfirmModal`     |
+| 읽을 것이 많다              | 페이지             |
+
+- **오버레이 위에 오버레이를 쌓지 않는다.** 시트 안에서 단계를 미는 것은 같은 시트다.
+- **오류를 토스트로 말하지 않는다.** 오류는 섹션 안에 남아야 다시 시도할 수 있다.
+- **되돌리기(undo)를 토스트에 담지 않는다.** 사라지는 UI 에 유일한 복구 수단을 두지 않는다.
+- **주요 버튼에 결과를 쓴다** — "적용" 이 아니라 "27곳 보기", "2일차에 담기".
 
 ## 4. 반응형
 

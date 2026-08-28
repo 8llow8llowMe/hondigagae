@@ -26,17 +26,18 @@ type WithLabel = { iconOnly?: false; children: ReactNode }
 export type ButtonProps = BaseProps & (IconOnly | WithLabel)
 
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-500 text-fg-inverse hover:bg-brand-600 active:bg-brand-700',
-  secondary: 'border border-border-strong bg-bg text-fg hover:bg-bg-subtle',
-  ghost: 'text-fg-muted hover:bg-bg-subtle',
-  danger: 'bg-danger-500 text-fg-inverse hover:opacity-90',
+  primary: 'bg-brand-500 text-fg-inverse hover:bg-brand-600 active:bg-brand-600',
+  secondary: 'border border-border-strong bg-bg text-fg hover:bg-band',
+  ghost: 'text-fg-muted hover:bg-band',
+  // 파괴 버튼 채움은 danger-700 이다 — 가이드 §5-2 ConfirmModal
+  danger: 'bg-danger-700 text-fg-inverse hover:opacity-90',
 }
 
 const SIZE: Record<ButtonSize, string> = {
   sm: 'h-8 gap-1 px-3 text-body-2',
   // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
-  md: 'h-11 gap-2 px-4 text-button',
-  lg: 'h-12 gap-2 px-5 text-button',
+  md: 'h-11 gap-2 px-4 text-body-1',
+  lg: 'h-12 gap-2 px-5 text-body-1',
 }
 
 const ICON_ONLY_SIZE: Record<ButtonSize, string> = {

@@ -9,9 +9,9 @@ import { cn } from '@/lib/utils/cn'
 describe('cn — 타이포 토큰과 색 토큰이 서로를 지우지 않는다', () => {
   it.each([
     ['text-caption', 'text-fg-muted'],
-    ['text-caption', 'text-brand-700'],
-    ['text-body-2', 'text-warn-700'],
-    ['text-button', 'text-fg-inverse'],
+    ['text-caption', 'text-metric-high-700'],
+    ['text-body-2', 'text-metric-mid-700'],
+    ['text-page', 'text-fg-inverse'],
     ['text-display', 'text-danger-500'],
     ['text-title-1', 'text-fg'],
   ])('%s 와 %s 를 함께 유지한다', (size, color) => {
