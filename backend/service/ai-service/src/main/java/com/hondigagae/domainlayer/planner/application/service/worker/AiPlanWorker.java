@@ -4,9 +4,11 @@ import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanDraftInfo;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
+import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobStorePort;
+import com.hondigagae.domainlayer.planner.application.port.out.PetConditionQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.PlaceCandidateQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.query.PlaceCandidateQueryResult;
 import com.hondigagae.global.properties.AiLlmProperties;
@@ -30,6 +32,7 @@ public class AiPlanWorker {
     private final AiPlanJobStorePort aiPlanJobStorePort;
     private final AiLlmPort aiLlmPort;
     private final PlaceCandidateQueryPort placeCandidateQueryPort;
+    private final PetConditionQueryPort petConditionQueryPort;
     private final AiLlmProperties aiLlmProperties;
 
     @Async("aiPlanTaskExecutor")
@@ -54,7 +57,7 @@ public class AiPlanWorker {
 
         try {
             // LLM 포트는 domain model을 준다. 저장·응답에 쓰는 Info 변환은 이 계층에서 수행한다.
-            AiPlanDraft draft = aiLlmPort.generatePlanDraft(toQuery(running.requestParams()));
+            AiPlanDraft draft = aiLlmPort.generatePlanDraft(toQuery(running.requestParams(), running.memberId()));
             log.info("AI plan draft generated jobId={} days={}", running.jobId(),
                 draft.days() == null ? 0 : draft.days().size());
             aiPlanJobStorePort.save(running.completedWithDraft(AiPlanDraftInfo.from(draft), Instant.now()));
@@ -84,7 +87,7 @@ public class AiPlanWorker {
      * provider 세부사항이 아니라 <b>유스케이스의 결정</b>이기 때문이다. provider 를 바꿔도
      * "실제 DB 에 있는 동반 가능 장소 안에서만 고른다"는 규칙은 그대로 남아야 한다.
      */
-    private AiPlanGenerationQuery toQuery(Map<String, String> params) {
+    private AiPlanGenerationQuery toQuery(Map<String, String> params, Long memberId) {
         String areaCode = params.get("areaCode");
         return AiPlanGenerationQuery.builder()
             .areaCode(areaCode)
@@ -93,8 +96,32 @@ public class AiPlanWorker {
             .budget(params.get("budget"))
             .petId(params.get("petId"))
             .requestNote(params.get("requestNote"))
+            .petCondition(loadPetCondition(params.get("petId"), memberId))
             .placeCandidates(loadCandidates(areaCode))
             .build();
+    }
+
+    /**
+     * 반려견 특성을 붙인다. "반려견 맞춤"의 근거가 되는 값이라 여기서 조회하지 않으면
+     * 프롬프트가 어떤 반려견인지 모른 채 일정을 짠다 — 소형견 전용 카페가 대형견 일정에
+     * 들어가는 종류의 오류다. 조회 실패는 특성 없이 진행하되 경고를 남긴다.
+     */
+    private PetCondition loadPetCondition(String petIdParam, Long memberId) {
+        if (petIdParam == null || petIdParam.isBlank() || memberId == null) {
+            return null;
+        }
+        long petId;
+        try {
+            petId = Long.parseLong(petIdParam);
+        } catch (NumberFormatException exception) {
+            log.warn("AI plan job carried an unusable petId={}", petIdParam);
+            return null;
+        }
+        PetCondition condition = petConditionQueryPort.findCondition(memberId, petId).orElse(null);
+        if (condition == null) {
+            log.warn("AI plan generating without pet condition petId={} memberId={}", petId, memberId);
+        }
+        return condition;
     }
 
     /**

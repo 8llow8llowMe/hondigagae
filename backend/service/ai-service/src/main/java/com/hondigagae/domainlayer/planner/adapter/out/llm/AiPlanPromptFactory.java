@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.planner.adapter.out.llm;
 
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
+import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -60,6 +61,8 @@ public class AiPlanPromptFactory {
             prompt.append("- 사용자 요청: ").append(query.requestNote()).append('\n');
         }
 
+        appendPetSection(prompt, query.petCondition());
+
         prompt.append("\n후보 장소 (이 목록 안에서만 고를 것)\n");
         for (PlaceCandidate candidate : query.safeCandidates()) {
             prompt.append("- placeId=").append(candidate.placeId())
@@ -78,6 +81,40 @@ public class AiPlanPromptFactory {
 
         prompt.append("\n위 조건으로 ").append(resolveDayCount(query)).append("일 일정을 만들어 주세요.");
         return prompt.toString();
+    }
+
+    /**
+     * 반려견 특성 절. 이 값이 시스템 프롬프트의 "반려견 기준" 규칙에 실체를 준다 —
+     * 특성 없이 "반려견 기준으로 짜라"고만 하면 모델은 일반적인 강아지를 상상한다.
+     * 특성이 없으면(조회 실패/프로필 부재) 절 자체를 생략한다 — 없는 값을 지어 적지 않는다.
+     */
+    private void appendPetSection(StringBuilder prompt, PetCondition pet) {
+        if (pet == null) {
+            return;
+        }
+        prompt.append("\n함께 여행하는 반려견\n");
+        if (pet.breed() != null && !pet.breed().isBlank()) {
+            prompt.append("- 견종: ").append(pet.breed()).append('\n');
+        }
+        if (pet.sizeName() != null) {
+            prompt.append("- 크기: ").append(pet.sizeName())
+                .append(" (입장 조건이 맞는 후보만 고를 것)").append('\n');
+        }
+        if (pet.activityName() != null) {
+            prompt.append("- 활동량: ").append(pet.activityName()).append('\n');
+        }
+        if (pet.heatSensitive()) {
+            prompt.append("- 더위에 민감함: 한낮 야외 일정을 피하고 실내나 그늘 위주로 짤 것\n");
+        }
+        if (pet.coldSensitive()) {
+            prompt.append("- 추위에 민감함: 겨울철 장시간 야외 일정을 피할 것\n");
+        }
+        if (pet.noiseSensitive()) {
+            prompt.append("- 소음에 민감함: 붐비는 장소를 연달아 배치하지 말 것\n");
+        }
+        if (pet.walkPreferred()) {
+            prompt.append("- 산책을 좋아함: 하루에 한 번은 걷는 일정을 넣을 것\n");
+        }
     }
 
     /**
