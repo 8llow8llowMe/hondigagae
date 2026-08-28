@@ -21,6 +21,8 @@ public record AiPlanGenerationQuery(
     List<PetCondition> petConditions,
     // 반드시 일정에 배치할 장소. placeCandidates 에 이미 합쳐져 있고, 프롬프트 표기용으로만 쓴다.
     List<Long> pinnedPlaceIds,
+    // 즐겨찾기 장소(선호). 필수가 아니라 조건이 맞을 때 우선 배치하라는 신호다.
+    List<Long> favoritePlaceIds,
     // 하루 재생성. regenerateDay 가 있으면 planOutline 도 반드시 있다 (워커가 보장).
     Integer regenerateDay,
     PlanOutline planOutline,
@@ -38,5 +40,9 @@ public record AiPlanGenerationQuery(
 
     public List<Long> safePinnedPlaceIds() {
         return pinnedPlaceIds == null ? List.of() : pinnedPlaceIds;
+    }
+
+    public List<Long> safeFavoritePlaceIds() {
+        return favoritePlaceIds == null ? List.of() : favoritePlaceIds;
     }
 }

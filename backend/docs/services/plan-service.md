@@ -53,9 +53,17 @@
 - 항목 단위 판정이 필요해지는 순간은 **산책 위험도**다. 그것은 시각에 따라 갈리므로 같은
   방식으로 접을 수 없고, 별도 조회 설계가 필요하다.
 
+## 장소 즐겨찾기 (favorite 컨텍스트)
+
+- `GET|POST|DELETE /api/v1/favorites/places[/{placeId}]` — 찜 목록/저장/해제. 저장·해제 모두
+  멱등이고 회원당 최대 100곳이다. 저장 시 tour-service 조회로 장소 존재를 검증한다.
+- 목록의 장소 요약(제목·주소·동반조건·대표 이미지)은 tour-service 내부 후보 API 로 붙인다.
+  조회 실패 시 placeId 만으로 응답한다 — tour 장애가 찜 목록 조회 실패로 번지지 않는다.
+
 ## 서비스 간 내부 API
 
 `GET /internal/v1/plans/{planId}/outline?memberId=` — ai-service 의 하루 재생성용 일정 개요.
+`GET /internal/v1/favorites/place-ids?memberId=` — ai-service 의 즐겨찾기 우선 반영용 아이디 목록.
 
 - 일차별 항목의 제목·유형·placeId 만 내보낸다. 메모·시간대 같은 개인 기록은 경계를 넘기지 않는다.
 - 내부 호출이라도 memberId 로 소유권을 다시 확인한다 — 남의 planId 로는 404.

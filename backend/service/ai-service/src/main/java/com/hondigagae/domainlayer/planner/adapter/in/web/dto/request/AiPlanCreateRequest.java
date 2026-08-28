@@ -48,6 +48,10 @@ public record AiPlanCreateRequest(
     @Size(max = 500, message = AiPlanValidationMessage.REQUEST_NOTE_LENGTH_INVALID)
     String requestNote,
 
+    @Schema(description = "즐겨찾기 우선 반영 (선택, 기본 false) — 찜한 장소를 후보에 합치고 조건이 맞으면 우선 배치합니다.",
+        example = "true")
+    Boolean preferFavorites,
+
     @Schema(description = "하루 재생성 대상 일정 식별자 (선택) — regenerateDay 와 함께 지정합니다.", example = "1234567890123456789")
     @Positive(message = AiPlanValidationMessage.PLAN_ID_POSITIVE)
     Long planId,
@@ -66,6 +70,7 @@ public record AiPlanCreateRequest(
             .petIds(effectivePetIds())
             .pinnedPlaceIds(pinnedPlaceIds == null ? List.of() : pinnedPlaceIds.stream().distinct().toList())
             .requestNote(requestNote)
+            .preferFavorites(Boolean.TRUE.equals(preferFavorites))
             .planId(planId)
             .regenerateDay(regenerateDay)
             .build();

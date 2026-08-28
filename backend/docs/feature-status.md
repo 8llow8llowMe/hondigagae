@@ -55,6 +55,7 @@
 | GET·PUT·DELETE | `/api/v1/plans/{planId}` |
 | PUT | `/api/v1/plans/{planId}/days/{day}/items` |
 | GET | `/api/v1/plans/{planId}/weather` | 일자별 날씨 브리핑 + 비 오는 날 실내 대안 |
+| GET·POST·DELETE | `/api/v1/favorites/places[/{placeId}]` | 장소 즐겨찾기 (멱등, 회원당 100곳) |
 
 일정의 소유권은 이 서비스에 있다. ai-service 는 제안만 하고 저장·확정은 여기서만 일어난다.
 
