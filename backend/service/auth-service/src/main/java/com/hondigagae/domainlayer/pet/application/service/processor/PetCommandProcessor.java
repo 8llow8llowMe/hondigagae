@@ -4,6 +4,7 @@ import com.hondigagae.domainlayer.pet.application.command.PetSaveCommand;
 import com.hondigagae.domainlayer.pet.application.exception.PetErrorCode;
 import com.hondigagae.domainlayer.pet.application.exception.PetException;
 import com.hondigagae.domainlayer.pet.application.info.PetInfo;
+import com.hondigagae.domainlayer.pet.application.info.PetProfileImageChangeResult;
 import com.hondigagae.domainlayer.pet.application.port.out.PetRepositoryPort;
 import com.hondigagae.domainlayer.pet.domain.model.Pet;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
@@ -53,6 +54,20 @@ public class PetCommandProcessor {
             command.activityLevel(), command.walkPreferred(), command.sociality()
         );
         return PetInfo.from(petRepositoryPort.save(updated));
+    }
+
+    public PetProfileImageChangeResult updateProfileImage(long memberId, long petId, String objectKey) {
+        Pet pet = petQueryProcessor.getOwnedPet(memberId, petId);
+        String previousObjectKey = pet.profileImageKey();
+        Pet updated = petRepositoryPort.save(pet.updateProfileImageKey(objectKey));
+        return new PetProfileImageChangeResult(PetInfo.from(updated), previousObjectKey);
+    }
+
+    public PetProfileImageChangeResult removeProfileImage(long memberId, long petId) {
+        Pet pet = petQueryProcessor.getOwnedPet(memberId, petId);
+        String previousObjectKey = pet.profileImageKey();
+        Pet updated = petRepositoryPort.save(pet.removeProfileImage());
+        return new PetProfileImageChangeResult(PetInfo.from(updated), previousObjectKey);
     }
 
     public void delete(long memberId, long petId) {

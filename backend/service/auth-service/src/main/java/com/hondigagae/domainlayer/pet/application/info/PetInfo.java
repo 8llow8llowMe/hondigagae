@@ -18,7 +18,8 @@ public record PetInfo(
     boolean noiseSensitive,
     ActivityLevel activityLevel,
     boolean walkPreferred,
-    SocialityLevel sociality
+    SocialityLevel sociality,
+    String profileImageKey
 ) {
 
     public static PetInfo from(Pet pet) {
@@ -34,6 +35,7 @@ public record PetInfo(
             .activityLevel(pet.activityLevel())
             .walkPreferred(pet.walkPreferred())
             .sociality(pet.sociality())
+            .profileImageKey(pet.profileImageKey())
             .build();
     }
 }

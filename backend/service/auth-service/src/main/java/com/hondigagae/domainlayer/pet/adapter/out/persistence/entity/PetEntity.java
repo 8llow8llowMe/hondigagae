@@ -81,6 +81,10 @@ public class PetEntity extends BaseEntity {
     @Comment("사회성 (LOW/MEDIUM/HIGH)")
     private SocialityLevel sociality;
 
+    @Column(length = 512)
+    @Comment("프로필 이미지 오브젝트 키 (URL 이 아니라 키를 저장한다)")
+    private String profileImageKey;
+
     @Column(nullable = false)
     @Comment("삭제 여부 (소프트 삭제 — 기존 일정이 참조하므로 물리 삭제하지 않는다)")
     private boolean deleted;

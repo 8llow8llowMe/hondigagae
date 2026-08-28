@@ -47,6 +47,10 @@ public record PetItem(
     boolean walkPreferred,
 
     @Schema(description = "사회성", example = "{\"code\":\"MEDIUM\",\"name\":\"보통\",\"description\":\"상황에 따라 적응합니다.\"}")
-    CodeNameDescriptionMetadata sociality
+    CodeNameDescriptionMetadata sociality,
+
+    @Schema(description = "프로필 이미지 공개 URL (미등록 시 null)",
+        example = "https://minio.hondigagae.com/hondigagae/pets/profiles/202507110001/2026/08/3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61.png")
+    String profileImageUrl
 ) {
 }
