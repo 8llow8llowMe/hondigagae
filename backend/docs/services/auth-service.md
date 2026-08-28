@@ -86,6 +86,9 @@
 - 로그인 실패 응답은 계정 존재 여부를 노출하지 않는다 (미존재/비밀번호 불일치를 `AUTH_006` 하나로 통합).
 - pet은 member와 raw FK(`memberId`)로만 연결한다. JPA 연관관계 어노테이션 금지 (`coding-conventions.md` §9-1).
 - 로컬 실행에는 MySQL·Redis에 더해 **MinIO**가 필요하다 (`docker-compose-local.yml`).
+- 고아 프로필 이미지(업로드 후 DB 반영 전에 프로세스가 죽어 남은 파일)는 새벽 스케줄러가
+  회수한다 — 2일보다 오래됐고 DB 어디에서도 참조되지 않는 객체만 지운다. 삭제가 멱등이라
+  다중 인스턴스 동시 실행도 안전하다 (`storage-cleanup.member-cron`/`pet-cron`).
 
 ## 서비스 간 내부 API
 

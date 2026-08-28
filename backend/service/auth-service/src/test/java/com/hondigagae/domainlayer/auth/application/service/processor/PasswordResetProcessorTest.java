@@ -305,6 +305,11 @@ class PasswordResetProcessorTest {
         public Optional<Member> findById(long memberId) {
             return members.values().stream().filter(member -> member.id() == memberId).findFirst();
         }
+    
+        @Override
+        public java.util.List<String> findAllProfileImageKeys() {
+            return java.util.List.of();
+        }
     }
 
     private static class StubJwtTokenStorePort implements JwtTokenStorePort {

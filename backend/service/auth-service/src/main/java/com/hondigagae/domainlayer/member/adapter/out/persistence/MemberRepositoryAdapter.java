@@ -39,4 +39,9 @@ public class MemberRepositoryAdapter implements MemberRepositoryPort {
         return memberRepository.findById(memberId)
             .map(memberMapper::toDomainFromEntity);
     }
+
+    @Override
+    public java.util.List<String> findAllProfileImageKeys() {
+        return memberRepository.findAllProfileImageKeys();
+    }
 }

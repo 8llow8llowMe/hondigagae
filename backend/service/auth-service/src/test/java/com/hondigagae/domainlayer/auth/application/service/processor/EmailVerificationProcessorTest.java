@@ -201,5 +201,10 @@ class EmailVerificationProcessorTest {
         public Optional<Member> findById(long memberId) {
             return Optional.empty();
         }
+    
+        @Override
+        public java.util.List<String> findAllProfileImageKeys() {
+            return java.util.List.of();
+        }
     }
 }

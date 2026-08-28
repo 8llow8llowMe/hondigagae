@@ -197,5 +197,10 @@ class JwtTokenProcessorTest {
         public Optional<Member> findById(long memberId) {
             return Optional.ofNullable(members.get(memberId));
         }
+    
+        @Override
+        public java.util.List<String> findAllProfileImageKeys() {
+            return java.util.List.of();
+        }
     }
 }

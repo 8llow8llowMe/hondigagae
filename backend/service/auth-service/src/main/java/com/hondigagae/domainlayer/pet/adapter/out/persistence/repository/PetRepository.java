@@ -12,4 +12,8 @@ public interface PetRepository extends JpaRepository<PetEntity, Long> {
     Optional<PetEntity> findByIdAndDeletedFalse(long petId);
 
     long countByMemberIdAndDeletedFalse(long memberId);
+
+    /** 고아 이미지 청소용 — 소프트 삭제된 반려견의 키도 행이 남아 있는 한 참조로 본다. */
+    @org.springframework.data.jpa.repository.Query("select p.profileImageKey from PetEntity p where p.profileImageKey is not null")
+    java.util.List<String> findAllProfileImageKeys();
 }
