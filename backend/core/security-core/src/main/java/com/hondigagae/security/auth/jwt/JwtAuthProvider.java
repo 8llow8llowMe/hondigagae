@@ -33,17 +33,29 @@ public class JwtAuthProvider {
     }
 
     public String issueRefreshToken(long memberId) {
+        return issueRefreshToken(memberId, UUID.randomUUID().toString());
+    }
+
+    /**
+     * 지정한 tokenId(jti)로 refresh 토큰을 발급한다.
+     * 토큰 회전 시 같은 세션 아이디를 유지해 기기별 세션 저장 키가 흔들리지 않게 하기 위한 오버로드다.
+     */
+    public String issueRefreshToken(long memberId, String tokenId) {
         Claims claims = Jwts.claims()
-            .id(UUID.randomUUID().toString())
+            .id(tokenId)
             .subject(String.valueOf(memberId))
             .build();
 
         return issueToken(claims, jwtAuthProperties.refreshExpiration(), jwtAuthProperties.refreshKey());
     }
 
-    public long parseRefreshToken(String refreshToken) {
+    public RefreshTokenClaims parseRefreshToken(String refreshToken) {
         Claims payload = parseToken(refreshToken, jwtAuthProperties.refreshKey());
-        return Long.parseLong(payload.getSubject());
+        return new RefreshTokenClaims(Long.parseLong(payload.getSubject()), payload.getId());
+    }
+
+    /** refresh 토큰의 핵심 클레임. tokenId(jti)는 기기별 세션 식별자로 쓴다. */
+    public record RefreshTokenClaims(long memberId, String tokenId) {
     }
 
     public MemberLoginActive parseAccessToken(String accessToken) {

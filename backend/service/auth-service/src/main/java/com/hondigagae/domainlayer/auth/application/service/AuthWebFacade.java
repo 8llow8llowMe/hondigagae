@@ -47,8 +47,9 @@ public class AuthWebFacade implements AuthWebUseCase {
     }
 
     @Override
-    public void logout(long memberId, String tokenId) {
-        jwtTokenProcessor.revokeToken(memberId, tokenId);
+    public void logout(long memberId, String tokenId, String refreshToken) {
+        // 다중 기기 로그인을 지원하므로 현재 기기 세션만 무효화한다. 전 기기 무효화는 보안 이벤트 경로 전용.
+        jwtTokenProcessor.revokeCurrentSession(memberId, tokenId, refreshToken);
     }
 
     @Override

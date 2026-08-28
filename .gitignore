@@ -32,3 +32,5 @@ backend/data/
 
 # 디자인 작업 파일 (Claude Design 아트보드 소스·브리프)
 .design/
+replay_pid*.log
+hs_err_pid*.log
