@@ -15,6 +15,9 @@ public record PlaceCandidateQueryResult(
     String contentTypeName,
     String addr,
     String petAllowanceName,
+    // 입장 가능 크기 표시명 / 체중 상한(kg). 없으면 제한 정보 없음이다.
+    String allowedPetSizeName,
+    Integer maxPetWeightKg,
     // 원천에 정보가 없으면 null 이다. 비 오는 날 대안 판단에 쓰이므로 모른다는 사실을 그대로 넘긴다.
     Boolean indoor,
     String sourceCategory,

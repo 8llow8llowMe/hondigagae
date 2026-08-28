@@ -8,6 +8,7 @@ public record PetConditionClientResponse(
     String petId,
     String breed,
     String sizeType,
+    java.math.BigDecimal weightKg,
     boolean heatSensitive,
     boolean coldSensitive,
     boolean noiseSensitive,

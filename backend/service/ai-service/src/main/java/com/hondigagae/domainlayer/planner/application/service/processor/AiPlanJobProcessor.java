@@ -152,7 +152,8 @@ public class AiPlanJobProcessor {
         params.put("startDate", command.startDate().toString());
         params.put("endDate", command.endDate().toString());
         params.put("budget", command.budget() == null ? "" : String.valueOf(command.budget()));
-        params.put("petId", String.valueOf(command.petId()));
+        params.put("petIds", command.petIds() == null ? "" : command.petIds().stream()
+            .map(String::valueOf).collect(java.util.stream.Collectors.joining(",")));
         params.put("requestNote", command.requestNote() == null ? "" : command.requestNote());
         return params;
     }

@@ -13,6 +13,7 @@ import com.hondigagae.domainlayer.planner.application.port.out.PetConditionQuery
 import com.hondigagae.domainlayer.planner.application.port.out.PlaceCandidateQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.query.PlaceCandidateQueryResult;
 import com.hondigagae.global.properties.AiLlmProperties;
+import java.util.ArrayList;
 import java.util.List;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJob;
@@ -99,9 +100,8 @@ public class AiPlanWorker {
             .startDate(params.get("startDate"))
             .endDate(params.get("endDate"))
             .budget(params.get("budget"))
-            .petId(params.get("petId"))
             .requestNote(params.get("requestNote"))
-            .petCondition(loadPetCondition(params.get("petId"), memberId))
+            .petConditions(loadPetConditions(params.get("petIds"), memberId))
             .placeCandidates(loadCandidates(areaCode))
             .build();
     }
@@ -110,23 +110,45 @@ public class AiPlanWorker {
      * 반려견 특성을 붙인다. "반려견 맞춤"의 근거가 되는 값이라 여기서 조회하지 않으면
      * 프롬프트가 어떤 반려견인지 모른 채 일정을 짠다 — 소형견 전용 카페가 대형견 일정에
      * 들어가는 종류의 오류다. 조회 실패는 특성 없이 진행하되 경고를 남긴다.
+     *
+     * <p>요청이 반려견을 지정하지 않았으면 <b>대표 반려견</b>으로 대신한다 — 한 마리만
+     * 키우는 사용자가 매번 petId 를 고르게 하지 않기 위한 기본값이다.
      */
-    private PetCondition loadPetCondition(String petIdParam, Long memberId) {
-        if (petIdParam == null || petIdParam.isBlank() || memberId == null) {
-            return null;
+    private List<PetCondition> loadPetConditions(String petIdsParam, Long memberId) {
+        if (memberId == null) {
+            return List.of();
         }
-        long petId;
-        try {
-            petId = Long.parseLong(petIdParam);
-        } catch (NumberFormatException exception) {
-            log.warn("AI plan job carried an unusable petId={}", petIdParam);
-            return null;
+        List<Long> petIds = parsePetIds(petIdsParam);
+        if (petIds.isEmpty()) {
+            PetCondition representative = petConditionQueryPort.findRepresentativeCondition(memberId).orElse(null);
+            if (representative == null) {
+                log.warn("AI plan generating without pet condition (no representative) memberId={}", memberId);
+                return List.of();
+            }
+            return List.of(representative);
         }
-        PetCondition condition = petConditionQueryPort.findCondition(memberId, petId).orElse(null);
-        if (condition == null) {
-            log.warn("AI plan generating without pet condition petId={} memberId={}", petId, memberId);
+        List<PetCondition> conditions = new ArrayList<>();
+        for (Long petId : petIds) {
+            petConditionQueryPort.findCondition(memberId, petId).ifPresentOrElse(
+                conditions::add,
+                () -> log.warn("AI plan generating without pet condition petId={} memberId={}", petId, memberId));
         }
-        return condition;
+        return List.copyOf(conditions);
+    }
+
+    private List<Long> parsePetIds(String petIdsParam) {
+        if (petIdsParam == null || petIdsParam.isBlank()) {
+            return List.of();
+        }
+        List<Long> petIds = new ArrayList<>();
+        for (String token : petIdsParam.split(",")) {
+            try {
+                petIds.add(Long.parseLong(token.trim()));
+            } catch (NumberFormatException exception) {
+                log.warn("AI plan job carried an unusable petId token={}", token);
+            }
+        }
+        return List.copyOf(petIds);
     }
 
     /**

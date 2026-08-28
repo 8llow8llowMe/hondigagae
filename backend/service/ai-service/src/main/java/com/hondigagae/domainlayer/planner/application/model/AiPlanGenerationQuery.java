@@ -16,15 +16,18 @@ public record AiPlanGenerationQuery(
     String startDate,
     String endDate,
     String budget,
-    String petId,
     String requestNote,
-    // 반려견 특성. null 이면 조회 실패/프로필 부재 — 특성 없이 생성하되 프롬프트에서 반려견 절이 빠진다.
-    PetCondition petCondition,
+    // 반려견 특성. 비어 있으면 조회 실패/프로필 부재 — 특성 없이 생성하되 프롬프트에서 반려견 절이 빠진다.
+    List<PetCondition> petConditions,
     // 일정에 넣을 수 있는 장소 전부. 비어 있으면 생성 자체를 하지 않는다.
     List<PlaceCandidate> placeCandidates
 ) {
 
     public List<PlaceCandidate> safeCandidates() {
         return placeCandidates == null ? List.of() : placeCandidates;
+    }
+
+    public List<PetCondition> safePetConditions() {
+        return petConditions == null ? List.of() : petConditions;
     }
 }

@@ -151,6 +151,6 @@ class OllamaLlmAdapterTest {
     }
 
     private PlaceCandidate candidate(long placeId, String title) {
-        return new PlaceCandidate(placeId, title, "관광지", "제주특별자치도", "동반 가능", true, "여행지", 33.5, 126.5);
+        return new PlaceCandidate(placeId, title, "관광지", "제주특별자치도", "동반 가능", null, null, true, "여행지", 33.5, 126.5);
     }
 }

@@ -23,4 +23,9 @@ public interface PetConditionClient {
     @GetMapping("/internal/v1/pets/{petId}/condition")
     Response<PetConditionClientResponse> getPetCondition(
         @PathVariable long petId, @RequestParam("memberId") long memberId);
+
+    /** 대표 반려견 특성. 요청이 petId 를 지정하지 않았을 때의 기본값이다. 없으면 404. */
+    @GetMapping("/internal/v1/pets/representative/condition")
+    Response<PetConditionClientResponse> getRepresentativePetCondition(
+        @RequestParam("memberId") long memberId);
 }
