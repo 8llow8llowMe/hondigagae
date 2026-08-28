@@ -34,6 +34,7 @@
 | POST | `/api/v1/members/me/password` · `/password/setup` · DELETE `/password` · `/me/withdraw` | 변경/최초 설정/소셜 전용 전환/탈퇴 |
 | GET·POST·PUT·DELETE | `/api/v1/members/me/pets[/{petId}]` | 반려견 프로필 |
 | POST·DELETE | `/api/v1/members/me/pets/{petId}/profile-image` | 반려견 프로필 사진 (MinIO) |
+| PUT | `/api/v1/members/me/pets/{petId}/representative` | 대표 반려견 지정 (회원당 하나) |
 
 소셜 로그인은 provider 를 경로 변수로 받아 kakao·naver 를 같은 흐름으로 처리한다.
 

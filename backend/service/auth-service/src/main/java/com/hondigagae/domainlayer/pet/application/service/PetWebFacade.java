@@ -62,6 +62,13 @@ public class PetWebFacade implements PetWebUseCase {
         petCommandProcessor.delete(memberId, petId);
     }
 
+    @Override
+    @Transactional
+    public PetResponse markRepresentative(long memberId, long petId) {
+        PetInfo petInfo = petCommandProcessor.markRepresentative(memberId, petId);
+        return petPresenter.toPetResponse(petInfo);
+    }
+
     /**
      * 프로필 이미지 업로드.
      *

@@ -18,6 +18,8 @@ public final class PetValidationMessage {
     public static final String SIZE_TYPE_REQUIRED = "PET_105:크기 구분은 필수입니다.";
     public static final String ACTIVITY_LEVEL_REQUIRED = "PET_106:활동량은 필수입니다.";
     public static final String SOCIALITY_REQUIRED = "PET_107:사회성은 필수입니다.";
+    public static final String WEIGHT_RANGE_INVALID = "PET_108:체중은 0.1 ~ 99.9kg 범위여야 합니다.";
+    public static final String WEIGHT_SCALE_INVALID = "PET_109:체중은 소수점 한 자리까지만 입력할 수 있습니다.";
 
     public static final String BIRTH_YM_PATTERN = "^\\d{4}-(0[1-9]|1[0-2])$";
 

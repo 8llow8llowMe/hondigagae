@@ -39,4 +39,12 @@ public class PetInternalController {
     ) {
         return ResponseEntity.ok().body(Response.success(petInternalUseCase.getPetCondition(memberId, petId)));
     }
+
+    /** 대표 반려견 특성 - 호출부가 petId 없이 요청했을 때의 기본값. 없으면 404. */
+    @GetMapping("/representative/condition")
+    public ResponseEntity<Response<PetConditionResponse>> getRepresentativePetCondition(
+        @RequestParam long memberId
+    ) {
+        return ResponseEntity.ok().body(Response.success(petInternalUseCase.getRepresentativePetCondition(memberId)));
+    }
 }

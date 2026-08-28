@@ -6,10 +6,14 @@ import com.hondigagae.shared.travel.pet.ActivityLevel;
 import com.hondigagae.shared.travel.pet.PetSizeType;
 import com.hondigagae.shared.travel.pet.SocialityLevel;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
 
 @Schema(description = "반려견 등록/수정 요청 DTO")
 public record PetSaveRequest(
@@ -30,6 +34,12 @@ public record PetSaveRequest(
     @Schema(description = "크기 구분", example = "SMALL")
     @NotNull(message = PetValidationMessage.SIZE_TYPE_REQUIRED)
     PetSizeType sizeType,
+
+    @Schema(description = "체중 (kg). 장소의 입장 체중 제한 판정에 쓰입니다. 모르면 생략", example = "3.5")
+    @DecimalMin(value = "0.1", message = PetValidationMessage.WEIGHT_RANGE_INVALID)
+    @DecimalMax(value = "99.9", message = PetValidationMessage.WEIGHT_RANGE_INVALID)
+    @Digits(integer = 2, fraction = 1, message = PetValidationMessage.WEIGHT_SCALE_INVALID)
+    BigDecimal weightKg,
 
     @Schema(description = "더위 민감 여부", example = "true")
     boolean heatSensitive,
@@ -58,6 +68,7 @@ public record PetSaveRequest(
             .breed(breed)
             .birthYm(birthYm)
             .sizeType(sizeType)
+            .weightKg(weightKg)
             .heatSensitive(heatSensitive)
             .coldSensitive(coldSensitive)
             .noiseSensitive(noiseSensitive)

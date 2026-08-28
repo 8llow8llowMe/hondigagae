@@ -39,6 +39,7 @@ public class PetPresenter {
             .birthYm(info.birthYm())
             .age(resolveAge(info.birthYm()))
             .sizeType(toSizeTypeMetadata(info))
+            .weightKg(info.weightKg())
             .heatSensitive(info.heatSensitive())
             .coldSensitive(info.coldSensitive())
             .noiseSensitive(info.noiseSensitive())
@@ -46,6 +47,7 @@ public class PetPresenter {
             .walkPreferred(info.walkPreferred())
             .sociality(toSocialityMetadata(info))
             .profileImageUrl(resolveProfileImageUrl(info))
+            .representative(info.representative())
             .build();
     }
 
@@ -64,6 +66,7 @@ public class PetPresenter {
             .birthYm(info.birthYm())
             .age(resolveAge(info.birthYm()))
             .sizeType(toSizeTypeMetadata(info))
+            .weightKg(info.weightKg())
             .heatSensitive(info.heatSensitive())
             .coldSensitive(info.coldSensitive())
             .noiseSensitive(info.noiseSensitive())
@@ -71,6 +74,7 @@ public class PetPresenter {
             .walkPreferred(info.walkPreferred())
             .sociality(toSocialityMetadata(info))
             .profileImageUrl(resolveProfileImageUrl(info))
+            .representative(info.representative())
             .build();
     }
 

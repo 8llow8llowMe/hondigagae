@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.pet.domain.model;
 import com.hondigagae.shared.travel.pet.ActivityLevel;
 import com.hondigagae.shared.travel.pet.PetSizeType;
 import com.hondigagae.shared.travel.pet.SocialityLevel;
+import java.math.BigDecimal;
 import lombok.Builder;
 
 /**
@@ -19,6 +20,7 @@ public record Pet(
     String breed,
     String birthYm,
     PetSizeType sizeType,
+    BigDecimal weightKg,
     boolean heatSensitive,
     boolean coldSensitive,
     boolean noiseSensitive,
@@ -26,22 +28,29 @@ public record Pet(
     boolean walkPreferred,
     SocialityLevel sociality,
     String profileImageKey,
+    boolean representative,
     boolean deleted
 ) {
 
     public Pet update(
-        String name, String breed, String birthYm, PetSizeType sizeType,
+        String name, String breed, String birthYm, PetSizeType sizeType, BigDecimal weightKg,
         boolean heatSensitive, boolean coldSensitive, boolean noiseSensitive,
         ActivityLevel activityLevel, boolean walkPreferred, SocialityLevel sociality
     ) {
-        return Pet.builder()
-            .id(id).memberId(memberId)
-            .name(name).breed(breed).birthYm(birthYm).sizeType(sizeType)
+        return toBuilder()
+            .name(name).breed(breed).birthYm(birthYm).sizeType(sizeType).weightKg(weightKg)
             .heatSensitive(heatSensitive).coldSensitive(coldSensitive).noiseSensitive(noiseSensitive)
             .activityLevel(activityLevel).walkPreferred(walkPreferred).sociality(sociality)
-            .profileImageKey(profileImageKey)
-            .deleted(deleted)
             .build();
+    }
+
+    /** 대표 반려견 지정. 회원당 하나만 대표가 되도록 해제는 Processor 가 책임진다. */
+    public Pet markRepresentative() {
+        return toBuilder().representative(true).build();
+    }
+
+    public Pet clearRepresentative() {
+        return toBuilder().representative(false).build();
     }
 
     public Pet updateProfileImageKey(String profileImageKey) {
@@ -56,14 +65,7 @@ public record Pet(
      * 소프트 삭제. 이미 생성된 여행 일정이 petId를 참조하므로 물리 삭제하지 않는다.
      */
     public Pet delete() {
-        return Pet.builder()
-            .id(id).memberId(memberId)
-            .name(name).breed(breed).birthYm(birthYm).sizeType(sizeType)
-            .heatSensitive(heatSensitive).coldSensitive(coldSensitive).noiseSensitive(noiseSensitive)
-            .activityLevel(activityLevel).walkPreferred(walkPreferred).sociality(sociality)
-            .profileImageKey(profileImageKey)
-            .deleted(true)
-            .build();
+        return toBuilder().deleted(true).build();
     }
 
     public boolean isOwnedBy(long memberId) {
