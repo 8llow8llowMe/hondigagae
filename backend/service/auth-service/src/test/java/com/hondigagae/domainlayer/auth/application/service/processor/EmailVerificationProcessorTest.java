@@ -170,6 +170,10 @@ class EmailVerificationProcessorTest {
         @Override
         public void sendPasswordResetSocialOnlyNotice(String email, String providerName) {
         }
+
+        @Override
+        public void sendSocialLinkedNotice(String email, String providerName) {
+        }
     }
 
     private static class StubMemberRepositoryPort implements MemberRepositoryPort {
