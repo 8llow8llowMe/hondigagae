@@ -9,7 +9,7 @@ package com.hondigagae.storage.model;
 public enum StorageDomain {
 
     MEMBER_PROFILE("members/profiles"),
-    COMMUNITY_POST("community/posts");
+    PET_PROFILE("pets/profiles");
 
     private final String prefix;
 

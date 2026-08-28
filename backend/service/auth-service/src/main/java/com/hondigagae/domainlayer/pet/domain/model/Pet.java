@@ -11,7 +11,7 @@ import lombok.Builder;
  * <p>{@code birthYm}은 생년월(yyyy-MM) 문자열로 다룬다. 일 단위 정보는 필요 없고,
  * 사용자가 정확한 생일을 모르는 경우가 많아 월 단위까지만 받는다.
  */
-@Builder
+@Builder(toBuilder = true)
 public record Pet(
     long id,
     long memberId,
@@ -25,6 +25,7 @@ public record Pet(
     ActivityLevel activityLevel,
     boolean walkPreferred,
     SocialityLevel sociality,
+    String profileImageKey,
     boolean deleted
 ) {
 
@@ -38,8 +39,17 @@ public record Pet(
             .name(name).breed(breed).birthYm(birthYm).sizeType(sizeType)
             .heatSensitive(heatSensitive).coldSensitive(coldSensitive).noiseSensitive(noiseSensitive)
             .activityLevel(activityLevel).walkPreferred(walkPreferred).sociality(sociality)
+            .profileImageKey(profileImageKey)
             .deleted(deleted)
             .build();
+    }
+
+    public Pet updateProfileImageKey(String profileImageKey) {
+        return toBuilder().profileImageKey(profileImageKey).build();
+    }
+
+    public Pet removeProfileImage() {
+        return toBuilder().profileImageKey(null).build();
     }
 
     /**
@@ -51,6 +61,7 @@ public record Pet(
             .name(name).breed(breed).birthYm(birthYm).sizeType(sizeType)
             .heatSensitive(heatSensitive).coldSensitive(coldSensitive).noiseSensitive(noiseSensitive)
             .activityLevel(activityLevel).walkPreferred(walkPreferred).sociality(sociality)
+            .profileImageKey(profileImageKey)
             .deleted(true)
             .build();
     }

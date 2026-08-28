@@ -2,16 +2,19 @@ package com.hondigagae.domainlayer.pet.adapter.in.web.controller;
 
 import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.pet.adapter.in.web.dto.request.PetSaveRequest;
+import com.hondigagae.domainlayer.pet.adapter.in.web.dto.response.PetProfileImageUploadResponse;
 import com.hondigagae.domainlayer.pet.adapter.in.web.dto.response.PetResponse;
 import com.hondigagae.domainlayer.pet.adapter.in.web.dto.response.PetsResponse;
 import com.hondigagae.domainlayer.pet.application.port.in.PetWebUseCase;
 import com.hondigagae.security.common.dto.MemberLoginActive;
+import com.hondigagae.storage.support.MultipartFileSupport;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,8 +24,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequiredArgsConstructor
@@ -90,5 +95,38 @@ public class PetWebController {
     ) {
         petWebUseCase.deletePet(loginActive.memberId(), petId);
         return ResponseEntity.ok().body(Response.success());
+    }
+
+    @Operation(
+        summary = "반려견 프로필 이미지 업로드",
+        description = "반려견 프로필 이미지를 업로드해 즉시 반영합니다. jpg/png/gif/webp 만 허용하며 파일 내용(매직 바이트)으로 형식을 판정합니다. "
+            + "기존 이미지가 있으면 교체 후 이전 파일은 삭제됩니다. 본인 소유가 아니면 404로 응답합니다.",
+        security = {@SecurityRequirement(name = "bearerAuth")}
+    )
+    @PostMapping(value = "/{petId}/profile-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<PetProfileImageUploadResponse>> uploadProfileImage(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "반려견 아이디", required = true, example = "1234567890123456789") @PathVariable long petId,
+        @Parameter(description = "업로드할 이미지 파일") @RequestPart("imageFile") MultipartFile imageFile
+    ) {
+        PetProfileImageUploadResponse response = petWebUseCase.uploadProfileImage(
+            loginActive.memberId(), petId, MultipartFileSupport.toCommand(imageFile));
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(
+        summary = "반려견 프로필 이미지 삭제",
+        description = "반려견 프로필 이미지를 제거합니다. 저장된 파일도 함께 삭제됩니다. 본인 소유가 아니면 404로 응답합니다.",
+        security = {@SecurityRequirement(name = "bearerAuth")}
+    )
+    @DeleteMapping("/{petId}/profile-image")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<PetResponse>> removeProfileImage(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "반려견 아이디", required = true, example = "1234567890123456789") @PathVariable long petId
+    ) {
+        PetResponse response = petWebUseCase.removeProfileImage(loginActive.memberId(), petId);
+        return ResponseEntity.ok().body(Response.success(response));
     }
 }

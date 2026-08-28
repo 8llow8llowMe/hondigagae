@@ -70,6 +70,8 @@
 
 - `GET|POST /api/v1/members/me/pets`
 - `GET|PUT|DELETE /api/v1/members/me/pets/{petId}`
+- `POST|DELETE /api/v1/members/me/pets/{petId}/profile-image` — MinIO 오브젝트 키(`pets/profiles/...`)를
+  저장하고 응답 시점에 공개 URL 로 조립한다. 업로드/교체/회수 순서는 회원 프로필 이미지와 동일하다.
 
 ## 구현 주의점
 
@@ -77,7 +79,7 @@
 - OAuth state, refresh token, 로그아웃 블랙리스트, 이메일 인증코드, 로그인 실패 카운터는 Redis에 저장한다.
 - provider 호출은 서킷 인스턴스(`kakao`, `naver`)로 감싸고, 인가코드 만료 같은 사용자 4xx는
   `OAuthApiCallSupport`가 `AuthException`으로 변환한 뒤 `ignore-exceptions`로 서킷에서 제외한다.
-- 프로필 이미지 업로드는 트랜잭션 밖에서 수행한다 — 업로드 → DB 반영 → 이전 파일 삭제(실패 시 방금 올린 파일 회수) 순서다.
+- 프로필 이미지 업로드(회원·반려견 공통)는 트랜잭션 밖에서 수행한다 — 업로드 → DB 반영 → 이전 파일 삭제(실패 시 방금 올린 파일 회수) 순서다.
 - 로그인 실패 응답은 계정 존재 여부를 노출하지 않는다 (미존재/비밀번호 불일치를 `AUTH_006` 하나로 통합).
 - pet은 member와 raw FK(`memberId`)로만 연결한다. JPA 연관관계 어노테이션 금지 (`coding-conventions.md` §9-1).
 - 로컬 실행에는 MySQL·Redis에 더해 **MinIO**가 필요하다 (`docker-compose-local.yml`).

@@ -2,18 +2,24 @@ package com.hondigagae.domainlayer.pet.adapter.in.web.presenter;
 
 import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
 import com.hondigagae.domainlayer.pet.adapter.in.web.dto.item.PetItem;
+import com.hondigagae.domainlayer.pet.adapter.in.web.dto.response.PetProfileImageUploadResponse;
 import com.hondigagae.domainlayer.pet.adapter.in.web.dto.response.PetResponse;
 import com.hondigagae.domainlayer.pet.adapter.in.web.dto.response.PetsResponse;
 import com.hondigagae.domainlayer.pet.application.info.PetInfo;
+import com.hondigagae.storage.client.ObjectStorageClient;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class PetPresenter {
+
+    private final ObjectStorageClient objectStorageClient;
 
     public PetsResponse toPetsResponse(List<PetInfo> infos) {
         List<PetItem> pets = infos.stream()
@@ -39,6 +45,14 @@ public class PetPresenter {
             .activityLevel(toActivityLevelMetadata(info))
             .walkPreferred(info.walkPreferred())
             .sociality(toSocialityMetadata(info))
+            .profileImageUrl(resolveProfileImageUrl(info))
+            .build();
+    }
+
+    public PetProfileImageUploadResponse toProfileImageUploadResponse(PetInfo info) {
+        return PetProfileImageUploadResponse.builder()
+            .profileImageKey(info.profileImageKey())
+            .profileImageUrl(resolveProfileImageUrl(info))
             .build();
     }
 
@@ -56,7 +70,19 @@ public class PetPresenter {
             .activityLevel(toActivityLevelMetadata(info))
             .walkPreferred(info.walkPreferred())
             .sociality(toSocialityMetadata(info))
+            .profileImageUrl(resolveProfileImageUrl(info))
             .build();
+    }
+
+    /**
+     * 오브젝트 키로 공개 URL 을 조립한다. URL 을 DB 에 넣지 않으므로
+     * 스토리지 도메인이 바뀌어도 응답만 달라진다. 업로드본이 없으면 null.
+     */
+    private String resolveProfileImageUrl(PetInfo info) {
+        if (info.profileImageKey() != null && !info.profileImageKey().isBlank()) {
+            return objectStorageClient.toPublicUrl(info.profileImageKey());
+        }
+        return null;
     }
 
     private CodeNameDescriptionMetadata toSizeTypeMetadata(PetInfo info) {
