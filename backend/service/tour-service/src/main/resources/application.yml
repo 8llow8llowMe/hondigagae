@@ -48,7 +48,9 @@ kma-api:
   publish-delay-minutes: ${KMA_PUBLISH_DELAY_MINUTES:10}
   # 중기예보는 1일 2회(06, 18시) 발표라 회차 간격이 12시간이다.
   mid-term-publish-delay-minutes: ${KMA_MID_TERM_PUBLISH_DELAY_MINUTES:20}
-  num-of-rows: ${KMA_NUM_OF_ROWS:1000}
+  # 한 회차 전체를 받는 데 필요한 행 수. 실측 907~1052행이라 1000 으로는 잘린다.
+  # 잘리면 마지막 날이 반쪽으로 와서 최고기온이 실제보다 낮게 나온다 - 여유를 둔다.
+  num-of-rows: ${KMA_NUM_OF_ROWS:1500}
   # 신선도가 지난 뒤에도 스테일 폴백용으로 키를 남겨 두는 기간.
   stale-cache-seconds: ${KMA_STALE_CACHE_SECONDS:21600}
   mid-term-stale-cache-seconds: ${KMA_MID_TERM_STALE_CACHE_SECONDS:129600}

@@ -38,7 +38,9 @@ public record KmaApiProperties(
     Integer publishDelayMinutes,
     // 중기예보는 1일 2회(06, 18시)라 회차 간격이 12시간이다. 여유를 조금 더 준다.
     Integer midTermPublishDelayMinutes,
-    // 단기예보 한 번에 받아올 행 수. 한 회차의 5일치 전 category 를 받으려면 넉넉해야 한다.
+    // 단기예보 한 번에 받아올 행 수.
+    // 실측(2026-08-28, 제주 격자 53:38): 회차마다 907~1052행이라 1000 으로는 잘린다.
+    // 잘리면 오류가 아니라 마지막 날이 반쪽으로 와서 최고기온이 낮게 나온다. 여유를 둔다.
     Integer numOfRows,
     // 캐시가 만료됐고 원천도 실패했을 때 허용할 스테일 캐시 수명(초). 기본 6시간.
     Integer staleCacheSeconds,
@@ -74,7 +76,7 @@ public record KmaApiProperties(
             midTermPublishDelayMinutes = 20;
         }
         if (numOfRows == null || numOfRows <= 0) {
-            numOfRows = 1000;
+            numOfRows = 1500;
         }
         if (staleCacheSeconds == null || staleCacheSeconds <= 0) {
             staleCacheSeconds = 21_600;
