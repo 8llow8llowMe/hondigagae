@@ -67,6 +67,8 @@ resilience4j:
     instances:
       tour-service:
         base-config: default
+      auth-service:
+        base-config: default
       plan-service:
         base-config: default
       llm:
