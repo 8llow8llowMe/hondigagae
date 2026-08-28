@@ -70,7 +70,9 @@ export const placeMessages = {
    * 저작권 출처 표기. cpyrhtDivCd 는 TourAPI 원천에서만 채워지므로
    * 값이 있으면 제공처가 한국관광공사다 (세부명세 D5-2).
    */
-  detailCopyrightPrefix: '사진·정보 출처: 한국관광공사',
+  /** 갤러리 바로 아래. 정보 출처와 분리한다 — 각각 자기 자료 옆에서 읽힌다 (가이드 §5) */
+  photoSource: '사진 출처: 한국관광공사',
+  detailCopyrightPrefix: '정보 출처: 한국관광공사',
   detailCopyrightType1: '공공누리 제1유형 (출처 표시)',
   detailCopyrightType3: '공공누리 제3유형 (출처 표시·변경 금지)',
   detailCopyrightUnknown: '출처 표시 대상',

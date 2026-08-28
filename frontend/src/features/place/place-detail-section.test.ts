@@ -91,7 +91,6 @@ describe('PlaceDetailSection — nullable 섹션은 숨긴다', () => {
 
     expect(markup).not.toContain(messages.place.detailSectionIntro)
     expect(markup).not.toContain(messages.place.detailSectionPet)
-    expect(markup).not.toContain(messages.place.detailSectionImages)
     expect(markup).not.toContain(messages.place.detailSectionOverview)
   })
 
@@ -198,10 +197,29 @@ describe('PlaceDetailSection — 외부 원문 처리', () => {
     expect(markup).not.toContain(messages.place.detailLeashRequired)
   })
 
-  it('대표 이미지가 없으면 플레이스홀더를 렌더하고 레이아웃을 유지한다', () => {
+  it('사진이 없으면 갤러리 섹션 자체를 렌더하지 않는다 (가이드 §5 PhotoGallery)', () => {
+    const markup = render({ place: { ...placeDetail, images: [] } })
+
+    // 상세는 목록과 반대다 — 회색 "이미지 없음" 면이 첫 화면을 덮지 않게 제목부터 시작한다.
+    // (목록 행은 행 높이를 지켜야 하므로 같은 크기의 타일을 남긴다 — PlaceRow)
+    expect(markup).not.toContain(messages.place.noImage)
+    expect(markup).not.toContain(messages.place.photoSource)
+    // 사진이 없어도 본문은 그대로 보인다
+    expect(markup).toContain(placeDetail.title)
+  })
+
+  it('사진이 있으면 갤러리 바로 아래에 사진 출처를 붙인다', () => {
     const markup = render()
 
-    expect(markup).toContain(messages.place.noImage)
-    expect(markup).toContain('aspect-video')
+    expect(markup).toContain(messages.place.photoSource)
+  })
+
+  it('전폭 히어로를 쓰지 않는다 — 표시 폭에 상한이 있다', () => {
+    const markup = render()
+
+    // 전폭으로 늘리지 않는다 — 표시 폭이 토큰 상한에 묶여 있다.
+    // 장수별 분기는 photo-gallery.test.ts 가 본다.
+    expect(markup).not.toContain('aspect-video')
+    expect(markup).toContain('--gallery-w-mobile')
   })
 })
