@@ -40,4 +40,9 @@ public class PetRepositoryAdapter implements PetRepositoryPort {
     public long countByMemberId(long memberId) {
         return petRepository.countByMemberIdAndDeletedFalse(memberId);
     }
+
+    @Override
+    public List<String> findAllProfileImageKeys() {
+        return petRepository.findAllProfileImageKeys();
+    }
 }

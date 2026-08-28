@@ -187,5 +187,13 @@ class PetCommandProcessorTest {
         public long countByMemberId(long memberId) {
             return findAllByMemberId(memberId).size();
         }
+    
+        @Override
+        public List<String> findAllProfileImageKeys() {
+            return store.values().stream()
+                .map(Pet::profileImageKey)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        }
     }
 }
