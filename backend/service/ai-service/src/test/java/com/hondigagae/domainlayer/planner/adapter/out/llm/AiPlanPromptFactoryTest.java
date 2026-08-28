@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
+import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -82,6 +83,32 @@ class AiPlanPromptFactoryTest {
         assertThat(prompt).contains("[필수 포함] placeId=1");
         assertThat(prompt).doesNotContain("[필수 포함] placeId=2");
         assertThat(prompt).contains("1곳을 빠짐없이 일정에 배치할 것");
+    }
+
+    @Test
+    @DisplayName("하루 재생성이면 기존 일정과 해당 일차만 새로 짜라는 지시가 실린다")
+    void regenerateSectionCarriesOutlineAndInstruction() {
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .areaCode("39")
+            .startDate("2026-09-01")
+            .endDate("2026-09-02")
+            .regenerateDay(2)
+            .planOutline(PlanOutline.builder()
+                .planId(7L)
+                .days(List.of(
+                    PlanOutline.PlanOutlineDay.builder().day(1).items(List.of(
+                        PlanOutline.PlanOutlineItem.builder().title("사려니숲길").placeId(11L).build())).build(),
+                    PlanOutline.PlanOutlineDay.builder().day(2).items(List.of()).build()))
+                .build())
+            .placeCandidates(List.of(
+                PlaceCandidate.builder().placeId(11L).title("사려니숲길").lat(33.4).lng(126.6).build()))
+            .build();
+
+        String prompt = factory.userPrompt(query);
+
+        assertThat(prompt).contains("기존 일정");
+        assertThat(prompt).contains("사려니숲길(placeId=11)");
+        assertThat(prompt).contains("2일차만 새로 구성할 것");
     }
 
     @Test

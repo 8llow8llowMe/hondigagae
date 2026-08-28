@@ -46,7 +46,15 @@ public record AiPlanCreateRequest(
 
     @Schema(description = "요청 메모 (선택) — 자연어 요구사항", example = "산책 위주로, 더위에 약한 아이라 실내 위주로 부탁해요")
     @Size(max = 500, message = AiPlanValidationMessage.REQUEST_NOTE_LENGTH_INVALID)
-    String requestNote
+    String requestNote,
+
+    @Schema(description = "하루 재생성 대상 일정 식별자 (선택) — regenerateDay 와 함께 지정합니다.", example = "1234567890123456789")
+    @Positive(message = AiPlanValidationMessage.PLAN_ID_POSITIVE)
+    Long planId,
+
+    @Schema(description = "다시 구성할 일차 (선택, 1부터) — 지정한 날만 새로 짜고 나머지 날은 기존 일정을 유지합니다.", example = "2")
+    @Positive(message = AiPlanValidationMessage.REGENERATE_DAY_POSITIVE)
+    Integer regenerateDay
 ) {
 
     public AiPlanCreateCommand toCommand() {
@@ -58,6 +66,8 @@ public record AiPlanCreateRequest(
             .petIds(effectivePetIds())
             .pinnedPlaceIds(pinnedPlaceIds == null ? List.of() : pinnedPlaceIds.stream().distinct().toList())
             .requestNote(requestNote)
+            .planId(planId)
+            .regenerateDay(regenerateDay)
             .build();
     }
 

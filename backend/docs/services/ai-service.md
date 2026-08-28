@@ -24,6 +24,10 @@ LLM 기반 AI 기능 전담. 선정된 AI 기능의 LLM 호출·프롬프트·�
 > 선정에서 제외된 기능의 API는 구현하지 않는다.
 
 - `POST /api/v1/ai-plans` — 일정 생성 제출 (`202` + jobId, 멱등)
+  - `petIds`(최대 5) / `petId` 선택 — 둘 다 없으면 **대표 반려견**이 기본값
+  - `pinnedPlaceIds`(최대 10) — 필수 포함 장소. 검색 후보에 강제 합류, 없으면 AIPLAN_013 실패
+  - `planId` + `regenerateDay` — 하루 재생성. 기존 일정을 plan-service 내부 API 로 받아
+    지정한 날만 새로 짠다. 일차 범위는 제출 시점에 검증(AIPLAN_014/015)
 - `GET /api/v1/ai-plans/jobs/{jobId}` — 폴링
 - `GET /api/v1/ai-plans/jobs/{jobId}/stream` — SSE
 - `POST /api/v1/ai-plans/{planId}/revisions` — 자연어 일정 수정 ("카페 말고 다른 곳")
@@ -85,8 +89,12 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
 
 ## 반려견 특성 주입
 
-- 워커가 잡의 memberId + petId 로 auth-service 내부 API 를 불러 특성(크기·활동량·더위/추위/
-  소음 민감·산책 선호)을 프롬프트의 "함께 여행하는 반려견" 절로 싣는다. 이 절이 없으면
-  시스템 프롬프트의 "반려견 기준" 규칙이 빈 구호가 된다.
+- 워커가 잡의 memberId + petIds 로 auth-service 내부 API 를 불러 특성(크기·체중·활동량·
+  더위/추위/소음 민감·산책 선호)을 프롬프트의 "함께 여행하는 반려견" 절로 싣는다. 이 절이
+  없으면 시스템 프롬프트의 "반려견 기준" 규칙이 빈 구호가 된다.
+- 여러 마리면 마리별 절을 싣고 "입장 제한은 가장 큰 크기·가장 무거운 체중 기준" 규칙을
+  덧붙인다. 반려견 지정이 없으면 대표 반려견 특성(`/internal/v1/pets/representative/condition`)을 쓴다.
+- 후보 장소 줄에는 입장 크기·체중 제한(allowedPetSize·maxPetWeightKg)을 함께 싣는다 —
+  "입장 조건이 맞는 후보만 고를 것" 지시의 판정 근거다.
 - 조회 실패·프로필 부재는 특성 없이 진행하되 경고를 남긴다 — auth 장애가 일정 생성 불가로
   번지면 안 된다. 그 경우 반려견 절 자체를 생략한다(없는 값을 지어 적지 않는다).

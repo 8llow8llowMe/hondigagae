@@ -14,7 +14,10 @@ public record AiPlanCreateCommand(
     List<Long> petIds,
     // 반드시 일정에 배치할 장소. 후보 목록에 강제로 합쳐진다.
     List<Long> pinnedPlaceIds,
-    String requestNote
+    String requestNote,
+    // 하루 재생성. 둘 다 있어야 하며, 지정한 일차만 새로 짜고 나머지는 기존 일정을 유지한다.
+    Long planId,
+    Integer regenerateDay
 ) {
 
 }
