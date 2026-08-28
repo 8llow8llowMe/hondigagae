@@ -40,6 +40,8 @@
   - 기능별 명세 정본
 - `fe-foundation-spec.md`
   - FE 기반(문서·에이전트·워크플로우) 구축 명세 및 결정 기록
+- `design-system-adoption.md`
+  - Claude Design 산출물을 코드 정본으로 옮긴 작업의 결정 기록 (3차 토큰 세트, 이슈 #50)
 
 ## 권장 읽기 순서
 
