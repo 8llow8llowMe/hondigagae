@@ -86,6 +86,28 @@ class AiPlanPromptFactoryTest {
     }
 
     @Test
+    @DisplayName("선호 장소는 [선호]로 표시되고, 필수 포함과 겹치면 필수 표시가 이긴다")
+    void favoritePlacesAreMarkedSoftly() {
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .areaCode("39")
+            .startDate("2026-09-01")
+            .endDate("2026-09-02")
+            .pinnedPlaceIds(List.of(1L))
+            .favoritePlaceIds(List.of(1L, 2L))
+            .placeCandidates(List.of(
+                PlaceCandidate.builder().placeId(1L).title("필수이자선호").lat(33.5).lng(126.5).build(),
+                PlaceCandidate.builder().placeId(2L).title("선호만").lat(33.4).lng(126.4).build()))
+            .build();
+
+        String prompt = factory.userPrompt(query);
+
+        assertThat(prompt).contains("[필수 포함] placeId=1");
+        assertThat(prompt).contains("[선호] placeId=2");
+        assertThat(prompt).doesNotContain("[선호] placeId=1");
+        assertThat(prompt).contains("우선 배치할 것. 필수는 아님");
+    }
+
+    @Test
     @DisplayName("하루 재생성이면 기존 일정과 해당 일차만 새로 짜라는 지시가 실린다")
     void regenerateSectionCarriesOutlineAndInstruction() {
         AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()

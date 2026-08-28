@@ -66,6 +66,9 @@ public class AiPlanPromptFactory {
                 .append(query.safePinnedPlaceIds().size())
                 .append("곳을 빠짐없이 일정에 배치할 것\n");
         }
+        if (!query.safeFavoritePlaceIds().isEmpty()) {
+            prompt.append("- 선호 장소: [선호] 표시가 붙은 장소는 조건(입장 제한·동선·날씨)이 맞으면 우선 배치할 것. 필수는 아님\n");
+        }
 
         appendPetSection(prompt, query.safePetConditions());
         appendRegenerateSection(prompt, query);
@@ -75,6 +78,8 @@ public class AiPlanPromptFactory {
             prompt.append("- ");
             if (query.safePinnedPlaceIds().contains(candidate.placeId())) {
                 prompt.append("[필수 포함] ");
+            } else if (query.safeFavoritePlaceIds().contains(candidate.placeId())) {
+                prompt.append("[선호] ");
             }
             prompt.append("placeId=").append(candidate.placeId())
                 .append(" | ").append(candidate.title())

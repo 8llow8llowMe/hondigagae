@@ -10,6 +10,7 @@ import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobEventPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobStorePort;
+import com.hondigagae.domainlayer.planner.application.port.out.FavoritePlaceIdsQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.PetConditionQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.PlaceCandidateQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.PlanOutlineQueryPort;
@@ -41,6 +42,7 @@ public class AiPlanWorker {
     private final PlaceCandidateQueryPort placeCandidateQueryPort;
     private final PetConditionQueryPort petConditionQueryPort;
     private final PlanOutlineQueryPort planOutlineQueryPort;
+    private final FavoritePlaceIdsQueryPort favoritePlaceIdsQueryPort;
     private final AiLlmProperties aiLlmProperties;
 
     @Async("aiPlanTaskExecutor")
@@ -101,6 +103,7 @@ public class AiPlanWorker {
     private AiPlanGenerationQuery toQuery(Map<String, String> params, Long memberId) {
         String areaCode = params.get("areaCode");
         List<Long> pinnedPlaceIds = parseIdList(params.get("pinnedPlaceIds"));
+        List<Long> favoritePlaceIds = loadFavoritePlaceIds(params.get("preferFavorites"), memberId);
         Integer regenerateDay = parseNullableInt(params.get("regenerateDay"));
         return AiPlanGenerationQuery.builder()
             .areaCode(areaCode)
@@ -110,9 +113,10 @@ public class AiPlanWorker {
             .requestNote(params.get("requestNote"))
             .petConditions(loadPetConditions(params.get("petIds"), memberId))
             .pinnedPlaceIds(pinnedPlaceIds)
+            .favoritePlaceIds(favoritePlaceIds)
             .regenerateDay(regenerateDay)
             .planOutline(loadPlanOutline(params.get("planId"), regenerateDay, memberId))
-            .placeCandidates(loadCandidates(areaCode, pinnedPlaceIds))
+            .placeCandidates(loadCandidates(areaCode, pinnedPlaceIds, favoritePlaceIds))
             .build();
     }
 
@@ -199,7 +203,15 @@ public class AiPlanWorker {
      * <p>스텁은 후보를 쓰지 않으므로 부르지 않는다. 무조건 불러 두면 키 없이 띄운 로컬에서
      * tour-service 까지 함께 떠 있어야 일정 생성이 도는 셈이 되어, 스텁을 남겨 둔 이유가 사라진다.
      */
-    private List<PlaceCandidate> loadCandidates(String areaCode, List<Long> pinnedPlaceIds) {
+    /** 즐겨찾기는 선호일 뿐이라 조회 실패를 삼킨다(어댑터가 빈 목록으로 바꾼다). */
+    private List<Long> loadFavoritePlaceIds(String preferFavoritesParam, Long memberId) {
+        if (memberId == null || !Boolean.parseBoolean(preferFavoritesParam)) {
+            return List.of();
+        }
+        return favoritePlaceIdsQueryPort.findFavoritePlaceIds(memberId);
+    }
+
+    private List<PlaceCandidate> loadCandidates(String areaCode, List<Long> pinnedPlaceIds, List<Long> favoritePlaceIds) {
         if (!aiLlmPort.requiresPlaceCandidates()) {
             return List.of();
         }
@@ -208,7 +220,7 @@ public class AiPlanWorker {
             .map(this::toCandidate)
             .toList();
         if (pinnedPlaceIds.isEmpty()) {
-            return searched;
+            return mergeFavorites(searched, favoritePlaceIds);
         }
 
         // 필수 포함 장소는 검색 상위 N 에 없어도 후보에 있어야 한다. 아이디로 직접 가져와 합친다.
@@ -225,6 +237,34 @@ public class AiPlanWorker {
 
         List<PlaceCandidate> merged = new ArrayList<>(pinned);
         searched.stream().filter(candidate -> !pinnedFound.contains(candidate.placeId())).forEach(merged::add);
+        return mergeFavorites(List.copyOf(merged), favoritePlaceIds);
+    }
+
+    /**
+     * 즐겨찾기 장소를 후보에 합친다. 필수 포함과 달리 <b>없어도 실패하지 않는다</b> —
+     * 선호는 신호일 뿐이고, 원천에서 사라진 장소는 조용히 빠진다.
+     */
+    private List<PlaceCandidate> mergeFavorites(List<PlaceCandidate> candidates, List<Long> favoritePlaceIds) {
+        if (favoritePlaceIds.isEmpty()) {
+            return candidates;
+        }
+        Set<Long> existing = candidates.stream().map(PlaceCandidate::placeId).collect(Collectors.toSet());
+        List<Long> missingIds = favoritePlaceIds.stream().filter(id -> !existing.contains(id)).toList();
+        if (missingIds.isEmpty()) {
+            return candidates;
+        }
+        List<PlaceCandidate> extras;
+        try {
+            extras = placeCandidateQueryPort.findCandidatesByIds(missingIds).stream()
+                .map(this::toCandidate)
+                .toList();
+        } catch (AiPlanException exception) {
+            log.warn("Favorite candidates lookup failed, continuing without them. errorCode={}",
+                exception.getErrorCode().getCode());
+            return candidates;
+        }
+        List<PlaceCandidate> merged = new ArrayList<>(candidates);
+        merged.addAll(extras);
         return List.copyOf(merged);
     }
 

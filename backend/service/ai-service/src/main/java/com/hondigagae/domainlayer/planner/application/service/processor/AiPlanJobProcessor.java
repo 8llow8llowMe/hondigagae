@@ -155,6 +155,7 @@ public class AiPlanJobProcessor {
         params.put("budget", command.budget() == null ? "" : String.valueOf(command.budget()));
         params.put("petIds", joinIds(command.petIds()));
         params.put("pinnedPlaceIds", joinIds(command.pinnedPlaceIds()));
+        params.put("preferFavorites", String.valueOf(command.preferFavorites()));
         params.put("planId", command.planId() == null ? "" : String.valueOf(command.planId()));
         params.put("regenerateDay", command.regenerateDay() == null ? "" : String.valueOf(command.regenerateDay()));
         params.put("requestNote", command.requestNote() == null ? "" : command.requestNote());
