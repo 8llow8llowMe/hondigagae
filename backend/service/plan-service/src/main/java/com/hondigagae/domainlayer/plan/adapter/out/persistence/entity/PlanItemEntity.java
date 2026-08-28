@@ -66,4 +66,8 @@ public class PlanItemEntity extends BaseEntity {
 
     @Comment("시작 시각")
     private LocalTime startTime;
+
+    @Column(nullable = false)
+    @Comment("방문 체크 (다녀옴) - 일차 항목을 교체하면 새 항목이라 체크가 초기화된다")
+    private boolean visited;
 }

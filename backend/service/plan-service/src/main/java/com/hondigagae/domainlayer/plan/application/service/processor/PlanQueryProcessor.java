@@ -51,9 +51,9 @@ public class PlanQueryProcessor {
             .build();
     }
 
-    public Slice<PlanSummaryInfo> getMyPlans(long memberId, Long lastPlanId, int size) {
+    public Slice<PlanSummaryInfo> getMyPlans(long memberId, Long petId, Long lastPlanId, int size) {
         long cursor = lastPlanId == null ? Long.MAX_VALUE : lastPlanId;
-        return planRepositoryPort.findMyPlans(memberId, cursor, size)
+        return planRepositoryPort.findMyPlans(memberId, petId, cursor, size)
             .map(this::toSummaryInfo);
     }
 
@@ -67,6 +67,7 @@ public class PlanQueryProcessor {
             .title(item.title())
             .memo(item.memo())
             .startTime(item.startTime())
+            .visited(item.visited())
             .build();
     }
 

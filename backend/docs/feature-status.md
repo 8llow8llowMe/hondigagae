@@ -51,11 +51,13 @@
 
 | 메서드 | 경로 |
 | --- | --- |
-| POST·GET | `/api/v1/plans` |
+| POST·GET | `/api/v1/plans` (`petId` 필터 = 반려견별 히스토리) |
 | GET·PUT·DELETE | `/api/v1/plans/{planId}` |
 | PUT | `/api/v1/plans/{planId}/days/{day}/items` |
 | GET | `/api/v1/plans/{planId}/weather` | 일자별 날씨 브리핑 + 비 오는 날 실내 대안 |
 | GET·POST·DELETE | `/api/v1/favorites/places[/{placeId}]` | 장소 즐겨찾기 (멱등, 회원당 100곳) |
+| PUT | `/api/v1/plans/{planId}/items/{planItemId}/visited` | 항목 방문 체크 (다녀옴) |
+| GET | `/api/v1/plans/{planId}/emergency` | 일자별 방문 장소 주변 동물병원·약국 브리핑 |
 
 일정의 소유권은 이 서비스에 있다. ai-service 는 제안만 하고 저장·확정은 여기서만 일어난다.
 

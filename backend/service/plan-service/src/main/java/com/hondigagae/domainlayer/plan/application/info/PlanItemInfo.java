@@ -13,7 +13,8 @@ public record PlanItemInfo(
     Long targetId,
     String title,
     String memo,
-    LocalTime startTime
+    LocalTime startTime,
+    boolean visited
 ) {
 
 }

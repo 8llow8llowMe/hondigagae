@@ -4,6 +4,8 @@ import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanItemDetailItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanSummaryItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanDetailResponse;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanEmergencyResponse;
+import com.hondigagae.domainlayer.plan.application.info.PlanEmergencyInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanSummaryInfo;
@@ -53,6 +55,38 @@ public class PlanPresenter {
             .build();
     }
 
+    public PlanEmergencyResponse toEmergencyResponse(PlanEmergencyInfo info) {
+        return PlanEmergencyResponse.builder()
+            .planId(String.valueOf(info.planId()))
+            .radiusMeters(info.radiusMeters())
+            .days(info.days().stream()
+                .map(day -> PlanEmergencyResponse.DayItem.builder()
+                    .day(day.day())
+                    .spots(day.spots().stream().map(this::toEmergencySpot).toList())
+                    .build())
+                .toList())
+            .build();
+    }
+
+    private PlanEmergencyResponse.SpotItem toEmergencySpot(PlanEmergencyInfo.SpotEmergencyInfo spot) {
+        return PlanEmergencyResponse.SpotItem.builder()
+            .planItemId(String.valueOf(spot.planItemId()))
+            .placeId(String.valueOf(spot.placeId()))
+            .title(spot.title())
+            .facilities(spot.facilities().stream()
+                .map(facility -> PlanEmergencyResponse.FacilityItem.builder()
+                    .name(facility.name())
+                    .typeName(facility.typeName())
+                    .addr(facility.addr())
+                    .tel(facility.tel())
+                    .distanceMeters(facility.distanceMeters())
+                    .open24(facility.open24())
+                    .operatingHoursKnown(facility.operatingHoursKnown())
+                    .build())
+                .toList())
+            .build();
+    }
+
     private PlanItemDetailItem toItemDetail(PlanItemInfo info) {
         PlanItemType itemType = info.itemType();
         return PlanItemDetailItem.builder()
@@ -65,6 +99,7 @@ public class PlanPresenter {
             .title(info.title())
             .memo(info.memo())
             .startTime(info.startTime())
+            .visited(info.visited())
             .build();
     }
 

@@ -35,6 +35,9 @@ public record PlanItemDetailItem(
     String memo,
 
     @Schema(description = "시작 시각", example = "10:30:00")
-    LocalTime startTime
+    LocalTime startTime,
+
+    @Schema(description = "방문 체크 (다녀옴). 일차 항목을 교체하면 초기화됩니다", example = "false")
+    boolean visited
 ) {
 }

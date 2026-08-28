@@ -53,6 +53,15 @@
 - 항목 단위 판정이 필요해지는 순간은 **산책 위험도**다. 그것은 시각에 따라 갈리므로 같은
   방식으로 접을 수 없고, 별도 조회 설계가 필요하다.
 
+## 여행 동행 기능
+
+- `PUT /api/v1/plans/{planId}/items/{planItemId}/visited` — 항목 방문 체크. 일차 항목을
+  교체(delete+insert)하면 새 항목이라 그 날의 체크는 초기화된다.
+- `GET /api/v1/plans/{planId}/emergency` — 일자별 방문 장소마다 가까운 동물병원·동물약국
+  (반경 10km, 최대 3곳). 같은 장소는 한 번만 검색하고, 좌표가 없는(delisted) 장소는 건너뛴다.
+  시설 검색 실패는 삼키지 않는다 — 시설 없는 브리핑은 안전하다는 착각만 준다.
+- `GET /api/v1/plans?petId=` — 반려견별 여행 히스토리. or-null 조건 대신 메서드를 나눠 조회한다.
+
 ## 장소 즐겨찾기 (favorite 컨텍스트)
 
 - `GET|POST|DELETE /api/v1/favorites/places[/{placeId}]` — 찜 목록/저장/해제. 저장·해제 모두
