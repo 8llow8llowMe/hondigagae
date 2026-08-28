@@ -5,6 +5,8 @@ import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanJobInfo;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanSubmissionInfo;
+import com.hondigagae.domainlayer.planner.application.model.AiPlanJobSubscription;
+import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobEventPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobStorePort;
 import com.hondigagae.domainlayer.planner.application.service.worker.AiPlanWorker;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJob;
@@ -34,6 +36,7 @@ public class AiPlanJobProcessor {
     private static final String JOB_TYPE = "AI_PLAN";
 
     private final AiPlanJobStorePort aiPlanJobStorePort;
+    private final AiPlanJobEventPort aiPlanJobEventPort;
     private final AiPlanWorker aiPlanWorker;
     private final AiPlanJobProperties aiPlanJobProperties;
 
@@ -76,6 +79,7 @@ public class AiPlanJobProcessor {
                 newJobId, memberId, errorCode.getCode(), dispatchFailure.getMessage());
             aiPlanJobStorePort.save(pendingJob.failed(errorCode.getCode(), errorCode.getMessage(), Instant.now()));
             aiPlanJobStorePort.releaseIdempotencyKey(memberId, requestHash);
+            aiPlanJobEventPort.publishJobUpdated(newJobId);
         }
 
         return AiPlanSubmissionInfo.accepted(newJobId);
@@ -123,7 +127,23 @@ public class AiPlanJobProcessor {
         );
         aiPlanJobStorePort.save(expired);
         aiPlanJobStorePort.releaseIdempotencyKey(job.memberId(), job.requestHash());
+        aiPlanJobEventPort.publishJobUpdated(job.jobId());
         return expired;
+    }
+
+    /**
+     * 잡 상태 변경 구독. 이벤트 수신 시마다 저장소에서 최신 상태를 다시 읽어 전달하므로
+     * pub/sub 메시지 자체에는 상태를 싣지 않는다(발행-저장 순서 역전, 스키마 드리프트 방지).
+     */
+    public AiPlanJobSubscription subscribeJobUpdates(String jobId, long memberId, java.util.function.Consumer<com.hondigagae.domainlayer.planner.application.info.AiPlanJobInfo> onUpdate) {
+        return aiPlanJobEventPort.subscribe(jobId, () -> {
+            try {
+                onUpdate.accept(getJobInfo(jobId, memberId));
+            } catch (RuntimeException exception) {
+                // 구독 콜백은 pub/sub 리스너 스레드에서 실행되므로 예외를 전파하지 않는다.
+                log.warn("AI 일정 잡 이벤트 처리에 실패했습니다. jobId={} reason={}", jobId, exception.getMessage());
+            }
+        });
     }
 
     private Map<String, String> toParams(AiPlanCreateCommand command) {

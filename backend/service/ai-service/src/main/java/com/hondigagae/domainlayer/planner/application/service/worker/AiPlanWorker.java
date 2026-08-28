@@ -7,6 +7,7 @@ import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuer
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
+import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobEventPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobStorePort;
 import com.hondigagae.domainlayer.planner.application.port.out.PetConditionQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.PlaceCandidateQueryPort;
@@ -30,6 +31,7 @@ import org.springframework.stereotype.Component;
 public class AiPlanWorker {
 
     private final AiPlanJobStorePort aiPlanJobStorePort;
+    private final AiPlanJobEventPort aiPlanJobEventPort;
     private final AiLlmPort aiLlmPort;
     private final PlaceCandidateQueryPort placeCandidateQueryPort;
     private final PetConditionQueryPort petConditionQueryPort;
@@ -50,6 +52,7 @@ public class AiPlanWorker {
                 return;
             }
             running = aiPlanJobStorePort.save(job.withStatus(AiPlanJobStatus.RUNNING, Instant.now()));
+            aiPlanJobEventPort.publishJobUpdated(jobId);
         } catch (RuntimeException pickupFailure) {
             log.error("AI plan job pickup failed jobId={} reason={}", jobId, pickupFailure.getMessage(), pickupFailure);
             return;
@@ -77,6 +80,8 @@ public class AiPlanWorker {
             ));
         } finally {
             aiPlanJobStorePort.releaseIdempotencyKey(running.memberId(), running.requestHash());
+            // 종결(완료/실패) 저장은 위 모든 경로에서 finally 이전에 끝난다. 여기서 한 번만 알린다.
+            aiPlanJobEventPort.publishJobUpdated(running.jobId());
         }
     }
 

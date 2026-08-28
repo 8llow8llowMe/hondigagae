@@ -63,7 +63,8 @@
 | 메서드 | 경로 | 상태 |
 | --- | --- | --- |
 | POST | `/api/v1/ai-plans` | 일정 생성 제출 (202 + jobId, 멱등) |
-| GET | `/api/v1/ai-plans/jobs/{jobId}` | 폴링 |
+| GET | `/api/v1/ai-plans/jobs/{jobId}` | 폴링 (SSE 폴백) |
+| GET | `/api/v1/ai-plans/jobs/{jobId}/stream` | SSE — 상태 변경 시에만 이벤트, 종결 시 서버가 닫음 |
 
 LLM 연동 완료(**Spring AI + Ollama**, 공유 인프라 로컬 LLM, 구조화 출력).
 모델 교체는 `AI_LLM_MODEL` 값 하나, provider 교체는 어댑터·모델 빈 추가로 끝난다.

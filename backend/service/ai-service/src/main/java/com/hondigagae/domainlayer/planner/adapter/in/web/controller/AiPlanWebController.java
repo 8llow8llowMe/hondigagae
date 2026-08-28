@@ -4,7 +4,9 @@ import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.request.AiPlanCreateRequest;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanJobStatusResponse;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanSubmitResponse;
+import com.hondigagae.domainlayer.planner.adapter.in.web.sse.AiPlanJobSseStreamer;
 import com.hondigagae.domainlayer.planner.application.port.in.AiPlanWebUseCase;
+import jakarta.servlet.http.HttpServletResponse;
 import com.hondigagae.security.common.dto.MemberLoginActive;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -13,6 +15,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AiPlanWebController {
 
     private final AiPlanWebUseCase aiPlanWebUseCase;
+    private final AiPlanJobSseStreamer aiPlanJobSseStreamer;
 
     @Operation(summary = "AI 여행 일정 생성 제출",
         description = "여행 조건과 반려견 정보를 받아 일정 생성 작업을 큐에 올리고 202와 함께 jobId를 반환합니다. "
@@ -58,6 +63,34 @@ public class AiPlanWebController {
     ) {
         AiPlanJobStatusResponse response = aiPlanWebUseCase.getJobStatus(jobId, loginActive.memberId());
         return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(
+        summary = "일정 생성 작업 상태 스트리밍 (SSE)",
+        description = """
+            비동기 일정 생성 작업의 상태 변경을 Server-Sent Events 로 스트리밍합니다.
+            이벤트 data 는 작업 상태 조회 응답의 dataBody 와 동일한 JSON 입니다. 본인이 제출한 작업만 구독할 수 있습니다.
+
+            수신 주기: 이벤트는 주기적으로 오지 않고 상태가 바뀔 때만 전송됩니다.
+            일반적으로 구독 즉시 현재 상태 스냅샷 1회 -> RUNNING 전이 1회 -> COMPLETED/FAILED 1회, 총 2~3회 수신 후
+            서버가 연결을 종료합니다 (일정 생성은 로컬 LLM 기준 수십 초 소요).
+            25초 간격 하트비트는 SSE 코멘트 프레임이라 onmessage 로 수신되지 않으며 클라이언트 처리가 필요 없습니다.
+
+            브라우저 기본 EventSource 는 Authorization 헤더를 지원하지 않으므로
+            fetch 기반 SSE 클라이언트(예: @microsoft/fetch-event-source)를 사용하세요.
+            연결이 끊기면 GET /jobs/{jobId} 폴링으로 폴백하면 됩니다.""",
+        security = {@SecurityRequirement(name = "bearerAuth")}
+    )
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping(value = "/jobs/{jobId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamJobStatus(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "작업 식별자", required = true) @PathVariable String jobId,
+        HttpServletResponse response
+    ) {
+        // nginx 등 리버스 프록시가 이 응답을 버퍼링하지 않도록 응답 단위로 지시한다 (프록시 설정과 이중 방어).
+        response.setHeader("X-Accel-Buffering", "no");
+        return aiPlanJobSseStreamer.stream(jobId, loginActive.memberId());
     }
 
     // TODO: SSE 스트림(GET /jobs/{jobId}/stream, text/event-stream) — 폴링 외 실시간 구독 제공 (api-design-guide §7)
