@@ -91,6 +91,17 @@
   --rail-context: 400px;
   --rail-filter: 280px;
   --band-h: 8px;
+
+  /* ── PhotoGallery 표시 크기 — DESIGN.md §7-3.
+     TourAPI 이미지는 해상도가 고르지 않아(가로 500–800px 가 흔함) 전폭으로 늘리면
+     업스케일이 드러난다. 그래서 표시 폭에 상한을 둔다. 높이는 항상 고정이다. */
+  --gallery-w-mobile: 342px;
+  --gallery-h-mobile: 214px;
+  --gallery-w-lead: 590px;
+  --gallery-h-desktop: 300px;
+  --gallery-w-thumb: 362px;
+  --gallery-h-thumb: 146px;
+  --gallery-w-single-max: 660px;
 }
 
 @media (width >= 48rem) {

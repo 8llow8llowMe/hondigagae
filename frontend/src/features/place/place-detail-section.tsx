@@ -1,15 +1,13 @@
-import Image from 'next/image'
-
 import type { ReactNode } from 'react'
 
 import { Badge } from '@/components/badge'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
+import { PhotoGallery } from '@/features/place/photo-gallery'
 import { PlaceBackLink } from '@/features/place/place-back-link'
 import { PlaceDetailSkeleton } from '@/features/place/place-detail-skeleton'
 import { classify } from '@/lib/api/error'
 import { toMessage } from '@/lib/api/response'
-import { isAllowedImageHost } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { copyrightLabel } from '@/lib/place/copyright'
 import { parseHomepage } from '@/lib/place/homepage'
@@ -88,7 +86,7 @@ export function PlaceDetailSection({
 
   return (
     <article className="flex flex-col gap-8">
-      <HeroImage title={place.title} url={place.firstImage} />
+      <PhotoGallery images={place.images} title={place.title} />
 
       <header className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-1">
@@ -131,33 +129,6 @@ export function PlaceDetailSection({
 
       {place.petInfo !== null && (
         <PetInfoSection petInfo={place.petInfo} sourceText={place.intro?.chkPet ?? null} />
-      )}
-
-      {place.images.length > 0 && (
-        <Section title={messages.place.detailSectionImages}>
-          <ul className="grid grid-cols-2 gap-3 md:grid-cols-3">
-            {place.images.map((image, index) => (
-              <li
-                key={image.originImgUrl ?? index}
-                className="bg-band relative aspect-square overflow-hidden rounded-md"
-              >
-                {isAllowedImageHost(image.originImgUrl) && image.originImgUrl !== null ? (
-                  <Image
-                    src={image.originImgUrl}
-                    alt={image.imgName ?? ''}
-                    fill
-                    sizes="(min-width: 768px) 33vw, 50vw"
-                    className="object-cover"
-                  />
-                ) : (
-                  <span className="text-caption text-fg-muted absolute inset-0 flex items-center justify-center">
-                    {messages.place.noImage}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Section>
       )}
 
       {copyright !== null && (
@@ -255,30 +226,6 @@ function InfoRow({
       <dt className="text-caption text-fg-muted md:w-28 md:shrink-0">{label}</dt>
       {/* 개행이 있는 원문(etcAcmpyInfo)이 한 줄로 뭉치지 않게 한다 */}
       <dd className="text-body-2 text-fg whitespace-pre-line">{children ?? text}</dd>
-    </div>
-  )
-}
-
-function HeroImage({ title, url }: { title: string; url: string | null }) {
-  const usable = isAllowedImageHost(url) && url !== null
-
-  return (
-    <div className="bg-band relative aspect-video w-full overflow-hidden rounded-md">
-      {usable ? (
-        // 대표 이미지는 장식이 아니라 콘텐츠다 — 장소명을 alt 로 준다
-        <Image
-          src={url}
-          alt={title}
-          fill
-          sizes="(min-width: 768px) 768px, 100vw"
-          priority
-          className="object-cover"
-        />
-      ) : (
-        <span className="text-body-2 text-fg-muted absolute inset-0 flex items-center justify-center">
-          {messages.place.noImage}
-        </span>
-      )}
     </div>
   )
 }
