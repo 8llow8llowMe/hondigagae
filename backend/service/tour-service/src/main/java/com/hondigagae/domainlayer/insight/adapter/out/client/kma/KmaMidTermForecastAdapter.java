@@ -351,7 +351,10 @@ public class KmaMidTermForecastAdapter implements MidTermForecastPort {
             return null;
         }
         try {
-            return Integer.valueOf(node.asText().trim());
+            int value = Integer.parseInt(node.asText().trim());
+            // 값 없음을 -999 로 주는 원천 규약은 기온뿐 아니라 강수확률에도 적용된다.
+            // 그대로 두면 강수확률 -999% 가 된다.
+            return value <= -900 ? null : value;
         } catch (RuntimeException exception) {
             return null;
         }
