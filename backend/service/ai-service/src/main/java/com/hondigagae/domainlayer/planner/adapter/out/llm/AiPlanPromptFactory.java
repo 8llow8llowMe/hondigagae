@@ -60,12 +60,21 @@ public class AiPlanPromptFactory {
         if (query.requestNote() != null && !query.requestNote().isBlank()) {
             prompt.append("- 사용자 요청: ").append(query.requestNote()).append('\n');
         }
+        if (!query.safePinnedPlaceIds().isEmpty()) {
+            prompt.append("- 필수 포함: 후보 목록에서 [필수 포함] 표시가 붙은 장소 ")
+                .append(query.safePinnedPlaceIds().size())
+                .append("곳을 빠짐없이 일정에 배치할 것\n");
+        }
 
         appendPetSection(prompt, query.safePetConditions());
 
         prompt.append("\n후보 장소 (이 목록 안에서만 고를 것)\n");
         for (PlaceCandidate candidate : query.safeCandidates()) {
-            prompt.append("- placeId=").append(candidate.placeId())
+            prompt.append("- ");
+            if (query.safePinnedPlaceIds().contains(candidate.placeId())) {
+                prompt.append("[필수 포함] ");
+            }
+            prompt.append("placeId=").append(candidate.placeId())
                 .append(" | ").append(candidate.title())
                 .append(" | ").append(nullSafe(candidate.contentTypeName()))
                 .append(" | ").append(candidate.indoorText())

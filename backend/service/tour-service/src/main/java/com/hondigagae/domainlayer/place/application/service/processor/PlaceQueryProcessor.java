@@ -63,6 +63,16 @@ public class PlaceQueryProcessor {
         return placeRepositoryPort.findVisibleIds(placeIds);
     }
 
+    /**
+     * 아이디로 장소 요약을 준다. 노출 불가(병합·delisted) 장소는 조용히 빠진다 —
+     * 호출한 쪽이 요청 아이디와 대조해 누락을 판단한다.
+     */
+    public List<PlaceSummaryInfo> getVisiblePlaceSummaries(List<Long> placeIds) {
+        return placeRepositoryPort.findVisiblePlaces(placeIds).stream()
+            .map(this::toSummaryInfo)
+            .toList();
+    }
+
     public PlaceDetailInfo getPlaceDetail(long placeId) {
         Place place = placeRepositoryPort.findPlaceById(placeId)
             .orElseThrow(() -> new PlaceException(PlaceErrorCode.NOT_FOUND_PLACE));

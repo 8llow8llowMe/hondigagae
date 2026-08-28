@@ -21,6 +21,8 @@ import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStatus;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -95,6 +97,7 @@ public class AiPlanWorker {
      */
     private AiPlanGenerationQuery toQuery(Map<String, String> params, Long memberId) {
         String areaCode = params.get("areaCode");
+        List<Long> pinnedPlaceIds = parseIdList(params.get("pinnedPlaceIds"));
         return AiPlanGenerationQuery.builder()
             .areaCode(areaCode)
             .startDate(params.get("startDate"))
@@ -102,7 +105,8 @@ public class AiPlanWorker {
             .budget(params.get("budget"))
             .requestNote(params.get("requestNote"))
             .petConditions(loadPetConditions(params.get("petIds"), memberId))
-            .placeCandidates(loadCandidates(areaCode))
+            .pinnedPlaceIds(pinnedPlaceIds)
+            .placeCandidates(loadCandidates(areaCode, pinnedPlaceIds))
             .build();
     }
 
@@ -118,7 +122,7 @@ public class AiPlanWorker {
         if (memberId == null) {
             return List.of();
         }
-        List<Long> petIds = parsePetIds(petIdsParam);
+        List<Long> petIds = parseIdList(petIdsParam);
         if (petIds.isEmpty()) {
             PetCondition representative = petConditionQueryPort.findRepresentativeCondition(memberId).orElse(null);
             if (representative == null) {
@@ -136,19 +140,19 @@ public class AiPlanWorker {
         return List.copyOf(conditions);
     }
 
-    private List<Long> parsePetIds(String petIdsParam) {
-        if (petIdsParam == null || petIdsParam.isBlank()) {
+    private List<Long> parseIdList(String csvParam) {
+        if (csvParam == null || csvParam.isBlank()) {
             return List.of();
         }
-        List<Long> petIds = new ArrayList<>();
-        for (String token : petIdsParam.split(",")) {
+        List<Long> ids = new ArrayList<>();
+        for (String token : csvParam.split(",")) {
             try {
-                petIds.add(Long.parseLong(token.trim()));
+                ids.add(Long.parseLong(token.trim()));
             } catch (NumberFormatException exception) {
-                log.warn("AI plan job carried an unusable petId token={}", token);
+                log.warn("AI plan job carried an unusable id token={}", token);
             }
         }
-        return List.copyOf(petIds);
+        return List.copyOf(ids);
     }
 
     /**
@@ -157,14 +161,33 @@ public class AiPlanWorker {
      * <p>스텁은 후보를 쓰지 않으므로 부르지 않는다. 무조건 불러 두면 키 없이 띄운 로컬에서
      * tour-service 까지 함께 떠 있어야 일정 생성이 도는 셈이 되어, 스텁을 남겨 둔 이유가 사라진다.
      */
-    private List<PlaceCandidate> loadCandidates(String areaCode) {
+    private List<PlaceCandidate> loadCandidates(String areaCode, List<Long> pinnedPlaceIds) {
         if (!aiLlmPort.requiresPlaceCandidates()) {
             return List.of();
         }
-        return placeCandidateQueryPort
+        List<PlaceCandidate> searched = placeCandidateQueryPort
             .findPetFriendlyCandidates(areaCode, aiLlmProperties.placeCandidateSize()).stream()
             .map(this::toCandidate)
             .toList();
+        if (pinnedPlaceIds.isEmpty()) {
+            return searched;
+        }
+
+        // 필수 포함 장소는 검색 상위 N 에 없어도 후보에 있어야 한다. 아이디로 직접 가져와 합친다.
+        List<PlaceCandidate> pinned = placeCandidateQueryPort.findCandidatesByIds(pinnedPlaceIds).stream()
+            .map(this::toCandidate)
+            .toList();
+        Set<Long> pinnedFound = pinned.stream().map(PlaceCandidate::placeId).collect(Collectors.toSet());
+        List<Long> missing = pinnedPlaceIds.stream().filter(id -> !pinnedFound.contains(id)).toList();
+        if (!missing.isEmpty()) {
+            // 사용자가 "꼭 넣어 달라"고 한 장소다. 조용히 빼고 생성하면 결과를 믿을 수 없게 된다 — 명확한 실패가 낫다.
+            log.warn("AI plan pinned places unavailable missing={}", missing);
+            throw new AiPlanException(AiPlanErrorCode.PINNED_PLACE_UNAVAILABLE);
+        }
+
+        List<PlaceCandidate> merged = new ArrayList<>(pinned);
+        searched.stream().filter(candidate -> !pinnedFound.contains(candidate.placeId())).forEach(merged::add);
+        return List.copyOf(merged);
     }
 
     private PlaceCandidate toCandidate(PlaceCandidateQueryResult result) {

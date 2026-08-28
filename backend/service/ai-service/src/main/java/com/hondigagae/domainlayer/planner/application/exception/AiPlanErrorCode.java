@@ -20,6 +20,7 @@ public enum AiPlanErrorCode {
     LLM_RESPONSE_INVALID("AIPLAN_010", "AI 응답을 일정으로 해석하지 못했습니다.", HttpStatus.INTERNAL_SERVER_ERROR),
     LLM_REFUSED("AIPLAN_011", "요청 내용이 AI 안전 정책에 걸려 일정을 생성하지 못했습니다.", HttpStatus.UNPROCESSABLE_ENTITY),
     NO_PLACE_CANDIDATES("AIPLAN_012", "여행 일정에 넣을 반려견 동반 가능 장소를 찾지 못했습니다.", HttpStatus.UNPROCESSABLE_ENTITY),
+    PINNED_PLACE_UNAVAILABLE("AIPLAN_013", "필수 포함으로 지정한 장소를 찾을 수 없습니다. 삭제되었거나 잘못된 장소입니다.", HttpStatus.UNPROCESSABLE_ENTITY),
 
     // 요청 검증(Bean Validation) 전용 코드 — 1xx 대역.
     INVALID_REQUEST("AIPLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),

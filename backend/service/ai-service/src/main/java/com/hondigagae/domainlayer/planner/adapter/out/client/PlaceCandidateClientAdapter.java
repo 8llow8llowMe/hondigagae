@@ -1,6 +1,8 @@
 package com.hondigagae.domainlayer.planner.adapter.out.client;
 
+import com.hondigagae.domainlayer.planner.adapter.out.client.feign.PinnedPlaceCandidateClient;
 import com.hondigagae.domainlayer.planner.adapter.out.client.feign.PlaceCandidateClient;
+import com.hondigagae.domainlayer.planner.adapter.out.client.feign.dto.PlaceCandidateInternalClientResponse;
 import com.hondigagae.domainlayer.planner.adapter.out.client.feign.dto.PlaceSliceClientResponse;
 import com.hondigagae.domainlayer.planner.adapter.out.client.feign.dto.PlaceSliceClientResponse.MetadataClientResponse;
 import com.hondigagae.domainlayer.planner.adapter.out.client.feign.dto.PlaceSliceClientResponse.PlaceItemClientResponse;
@@ -21,6 +23,7 @@ public class PlaceCandidateClientAdapter implements PlaceCandidateQueryPort {
     private static final String PET_ALLOWED = "ALLOWED";
 
     private final PlaceCandidateClient placeCandidateClient;
+    private final PinnedPlaceCandidateClient pinnedPlaceCandidateClient;
     private final InternalResponseSupport internalResponseSupport;
 
     @Override
@@ -40,6 +43,40 @@ public class PlaceCandidateClientAdapter implements PlaceCandidateQueryPort {
             .filter(item -> item.lat() != null && item.lng() != null)
             .map(this::toQueryResult)
             .toList();
+    }
+
+    @Override
+    public List<PlaceCandidateQueryResult> findCandidatesByIds(List<Long> placeIds) {
+        if (placeIds == null || placeIds.isEmpty()) {
+            return List.of();
+        }
+        List<PlaceCandidateInternalClientResponse> body = internalResponseSupport.requestAndUnwrapOrNull(
+            InternalResponseSupport.TOUR_SERVICE,
+            () -> pinnedPlaceCandidateClient.getCandidates(placeIds));
+        if (body == null) {
+            return List.of();
+        }
+        return body.stream()
+            .filter(item -> item.placeId() != null)
+            .filter(item -> item.lat() != null && item.lng() != null)
+            .map(this::toQueryResult)
+            .toList();
+    }
+
+    private PlaceCandidateQueryResult toQueryResult(PlaceCandidateInternalClientResponse item) {
+        return PlaceCandidateQueryResult.builder()
+            .placeId(item.placeId())
+            .title(item.title())
+            .contentTypeName(item.contentTypeName())
+            .addr(item.addr())
+            .petAllowanceName(item.petAllowanceName())
+            .allowedPetSizeName(item.allowedPetSizeName())
+            .maxPetWeightKg(item.maxPetWeightKg())
+            .indoor(item.indoor())
+            .sourceCategory(item.sourceCategory())
+            .lat(item.lat())
+            .lng(item.lng())
+            .build();
     }
 
     private PlaceCandidateQueryResult toQueryResult(PlaceItemClientResponse item) {

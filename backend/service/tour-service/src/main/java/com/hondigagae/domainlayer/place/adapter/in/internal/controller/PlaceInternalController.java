@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.place.adapter.in.internal.controller;
 
 import com.hondigagae.common.dto.Response;
+import com.hondigagae.domainlayer.place.adapter.in.internal.dto.PlaceCandidateInternalResponse;
 import com.hondigagae.domainlayer.place.application.port.in.PlaceInternalUseCase;
 import io.swagger.v3.oas.annotations.Hidden;
 import java.util.List;
@@ -39,5 +40,16 @@ public class PlaceInternalController {
         @RequestParam List<Long> placeIds
     ) {
         return ResponseEntity.ok().body(Response.success(placeInternalUseCase.findVisiblePlaceIds(placeIds)));
+    }
+
+    /**
+     * 아이디로 후보 요약을 준다. ai-service 가 사용자가 필수 포함으로 지정한 장소를
+     * 프롬프트 후보 목록에 합칠 때 쓴다. 노출 불가 장소는 응답에서 빠진다.
+     */
+    @GetMapping("/candidates")
+    public ResponseEntity<Response<List<PlaceCandidateInternalResponse>>> getPlaceCandidates(
+        @RequestParam List<Long> placeIds
+    ) {
+        return ResponseEntity.ok().body(Response.success(placeInternalUseCase.findPlaceCandidates(placeIds)));
     }
 }

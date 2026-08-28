@@ -152,10 +152,15 @@ public class AiPlanJobProcessor {
         params.put("startDate", command.startDate().toString());
         params.put("endDate", command.endDate().toString());
         params.put("budget", command.budget() == null ? "" : String.valueOf(command.budget()));
-        params.put("petIds", command.petIds() == null ? "" : command.petIds().stream()
-            .map(String::valueOf).collect(java.util.stream.Collectors.joining(",")));
+        params.put("petIds", joinIds(command.petIds()));
+        params.put("pinnedPlaceIds", joinIds(command.pinnedPlaceIds()));
         params.put("requestNote", command.requestNote() == null ? "" : command.requestNote());
         return params;
+    }
+
+    private String joinIds(java.util.List<Long> ids) {
+        return ids == null ? "" : ids.stream()
+            .map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
     }
 
     private boolean isQueueFull(RuntimeException dispatchFailure) {

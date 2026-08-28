@@ -12,6 +12,8 @@ public record AiPlanCreateCommand(
     Long budget,
     // 동반 반려견. 비어 있으면 워커가 대표 반려견으로 대신한다.
     List<Long> petIds,
+    // 반드시 일정에 배치할 장소. 후보 목록에 강제로 합쳐진다.
+    List<Long> pinnedPlaceIds,
     String requestNote
 ) {
 

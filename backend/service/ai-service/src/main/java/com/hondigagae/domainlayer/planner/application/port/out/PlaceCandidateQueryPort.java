@@ -20,4 +20,10 @@ public interface PlaceCandidateQueryPort {
      * @param size     후보 개수. 프롬프트 토큰과 선택지 다양성의 절충이다
      */
     List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, int size);
+
+    /**
+     * 아이디로 후보를 직접 가져온다 — 사용자가 필수 포함으로 지정한 장소는 검색 상위 N 에
+     * 없어도 후보에 넣어야 하기 때문이다. 노출 불가 장소는 결과에서 빠진다.
+     */
+    List<PlaceCandidateQueryResult> findCandidatesByIds(List<Long> placeIds);
 }

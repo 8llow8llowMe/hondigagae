@@ -21,6 +21,9 @@ public interface PlaceRepositoryPort {
     /** 주어진 아이디 중 노출 가능한(병합·delisted 아님) 것만. 일정 항목 검증용. */
     List<Long> findVisibleIds(Collection<Long> placeIds);
 
+    /** 아이디로 노출 가능한 장소를 준다. 없는 아이디는 조용히 빠진다. */
+    List<Place> findVisiblePlaces(Collection<Long> placeIds);
+
     Optional<Place> findPlaceById(long placeId);
 
     Optional<PlaceIntroQueryResult> findIntroByPlaceId(long placeId);
