@@ -10,5 +10,6 @@ public interface PlanRepositoryPort {
 
     Optional<Plan> findActiveById(long planId);
 
-    Slice<Plan> findMyPlans(long memberId, long lastPlanId, int size);
+    /** petId 가 null 이 아니면 그 반려견과 함께한 일정만 — 반려견별 여행 히스토리다. */
+    Slice<Plan> findMyPlans(long memberId, Long petId, long lastPlanId, int size);
 }

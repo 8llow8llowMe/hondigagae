@@ -140,6 +140,17 @@ public class PlanCommandProcessor {
         }
     }
 
+    /**
+     * 방문 체크. 소유권은 일정 기준으로 보고, 항목이 그 일정의 것인지 다시 확인한다 —
+     * planItemId 만 믿으면 남의 일정 항목을 내 planId 로 체크할 수 있다.
+     */
+    public PlanItem markItemVisited(Plan plan, long planItemId, boolean visited) {
+        PlanItem item = planItemRepositoryPort.findById(planItemId)
+            .filter(found -> found.planId() == plan.id())
+            .orElseThrow(() -> new PlanException(PlanErrorCode.NOT_FOUND_PLAN_ITEM));
+        return planItemRepositoryPort.save(item.withVisited(visited));
+    }
+
     private List<PlanItem> toItems(long planId, List<PlanItemCommand> commands) {
         return commands.stream()
             .map(command -> PlanItem.builder()

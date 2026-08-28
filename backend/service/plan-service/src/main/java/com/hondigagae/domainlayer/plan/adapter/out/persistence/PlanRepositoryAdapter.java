@@ -28,8 +28,14 @@ public class PlanRepositoryAdapter implements PlanRepositoryPort {
     }
 
     @Override
-    public Slice<Plan> findMyPlans(long memberId, long lastPlanId, int size) {
-        return planRepository.findByMemberIdAndDeletedFalseAndIdLessThanOrderByIdDesc(memberId, lastPlanId, PageRequest.of(0, size))
+    public Slice<Plan> findMyPlans(long memberId, Long petId, long lastPlanId, int size) {
+        if (petId == null) {
+            return planRepository.findByMemberIdAndDeletedFalseAndIdLessThanOrderByIdDesc(
+                    memberId, lastPlanId, PageRequest.of(0, size))
+                .map(planMapper::toDomainFromEntity);
+        }
+        return planRepository.findByMemberIdAndPetIdAndDeletedFalseAndIdLessThanOrderByIdDesc(
+                memberId, petId, lastPlanId, PageRequest.of(0, size))
             .map(planMapper::toDomainFromEntity);
     }
 }

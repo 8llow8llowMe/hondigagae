@@ -5,6 +5,7 @@ import com.hondigagae.domainlayer.plan.application.mapper.PlanMapper;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPort;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +25,16 @@ public class PlanItemRepositoryAdapter implements PlanItemRepositoryPort {
     @Override
     public List<PlanItem> findByPlanId(long planId) {
         return planMapper.toItemDomainListFromEntityList(planItemRepository.findByPlanIdOrderByDayAscSequenceAsc(planId));
+    }
+
+    @Override
+    public Optional<PlanItem> findById(long planItemId) {
+        return planItemRepository.findById(planItemId).map(planMapper::toDomainFromEntity);
+    }
+
+    @Override
+    public PlanItem save(PlanItem item) {
+        return planMapper.toDomainFromEntity(planItemRepository.save(planMapper.toEntityFromDomain(item)));
     }
 
     @Override

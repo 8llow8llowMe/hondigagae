@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.plan.application.port.in;
 
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanSummaryItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanDetailResponse;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanEmergencyResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanWeatherResponse;
 import com.hondigagae.domainlayer.plan.application.command.PlanCreateCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanItemCommand;
@@ -13,7 +14,7 @@ public interface PlanWebUseCase {
 
     PlanDetailResponse createPlan(long memberId, PlanCreateCommand command);
 
-    SliceResponse<PlanSummaryItem> getMyPlans(long memberId, Long lastPlanId, int size);
+    SliceResponse<PlanSummaryItem> getMyPlans(long memberId, Long petId, Long lastPlanId, int size);
 
     PlanDetailResponse getPlan(long memberId, long planId);
 
@@ -22,6 +23,10 @@ public interface PlanWebUseCase {
     void deletePlan(long memberId, long planId);
 
     PlanDetailResponse replaceDayItems(long memberId, long planId, int day, List<PlanItemCommand> commands);
+
+    void markItemVisited(long memberId, long planId, long planItemId, boolean visited);
+
+    PlanEmergencyResponse getPlanEmergencyBriefing(long memberId, long planId);
 
     /**
      * 일정의 날씨 브리핑. 본인 일정만 조회된다.

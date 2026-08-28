@@ -5,7 +5,9 @@ import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanSummaryItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanCreateRequest;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanDayItemsReplaceRequest;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanUpdateRequest;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanItemVisitedRequest;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanDetailResponse;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanEmergencyResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanWeatherResponse;
 import com.hondigagae.domainlayer.plan.application.exception.PlanValidationMessage;
 import com.hondigagae.domainlayer.plan.application.port.in.PlanWebUseCase;
@@ -61,13 +63,15 @@ public class PlanWebController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Response<SliceResponse<PlanSummaryItem>>> getMyPlans(
         @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "반려견 아이디 — 지정하면 그 반려견과 함께한 일정만 조회합니다 (반려견별 여행 히스토리)",
+            example = "1234567890123456789") @RequestParam(required = false) Long petId,
         @Parameter(description = "마지막으로 받은 일정 아이디 (첫 페이지는 생략)", example = "1234567890123456789") @RequestParam(required = false) Long lastPlanId,
         @Parameter(description = "조회 개수", example = "10")
         @RequestParam(defaultValue = "10")
         @Min(value = 1, message = PlanValidationMessage.SIZE_RANGE_INVALID)
         @Max(value = 50, message = PlanValidationMessage.SIZE_RANGE_INVALID) int size
     ) {
-        SliceResponse<PlanSummaryItem> response = planWebUseCase.getMyPlans(loginActive.memberId(), lastPlanId, size);
+        SliceResponse<PlanSummaryItem> response = planWebUseCase.getMyPlans(loginActive.memberId(), petId, lastPlanId, size);
         return ResponseEntity.ok().body(Response.success(response));
     }
 
@@ -138,6 +142,37 @@ public class PlanWebController {
         @Parameter(description = "일정 아이디", required = true, example = "1234567890123456789") @PathVariable long planId
     ) {
         PlanWeatherResponse response = planWebUseCase.getPlanWeather(loginActive.memberId(), planId);
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(summary = "일정 항목 방문 체크",
+        description = "여행 중 항목별로 '다녀옴'을 표시합니다. 해제도 같은 API 로 합니다(visited=false). "
+            + "일차 항목을 교체하면 새 항목이 되므로 그 날의 체크는 초기화됩니다.",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @PutMapping("/{planId}/items/{planItemId}/visited")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<Void>> markItemVisited(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "일정 아이디", required = true, example = "1234567890123456789") @PathVariable long planId,
+        @Parameter(description = "일정 항목 아이디", required = true, example = "1234567890123456789") @PathVariable long planItemId,
+        @Valid @RequestBody PlanItemVisitedRequest request
+    ) {
+        planWebUseCase.markItemVisited(loginActive.memberId(), planId, planItemId, request.visited());
+        return ResponseEntity.ok().body(Response.success());
+    }
+
+    @Operation(summary = "일정 응급 브리핑",
+        description = "일자별 방문 장소마다 가까운 동물병원·동물약국(반경 10km, 가까운 순 최대 3곳)을 미리 묶어 보여 줍니다. "
+            + "급할 때 검색을 시작하면 늦기 때문에 출발 전 확인 용도입니다. "
+            + "운영시간 정보가 없는 시설(operatingHoursKnown=false)은 휴무가 아니라 확인 필요이므로 전화 확인을 안내해야 합니다.",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @GetMapping("/{planId}/emergency")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<PlanEmergencyResponse>> getPlanEmergencyBriefing(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "일정 아이디", required = true, example = "1234567890123456789") @PathVariable long planId
+    ) {
+        PlanEmergencyResponse response = planWebUseCase.getPlanEmergencyBriefing(loginActive.memberId(), planId);
         return ResponseEntity.ok().body(Response.success(response));
     }
 }

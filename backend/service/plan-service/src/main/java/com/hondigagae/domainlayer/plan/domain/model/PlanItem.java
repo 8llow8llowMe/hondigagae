@@ -4,7 +4,7 @@ import com.hondigagae.domainlayer.plan.domain.enums.PlanItemType;
 import java.time.LocalTime;
 import lombok.Builder;
 
-@Builder
+@Builder(toBuilder = true)
 public record PlanItem(
     long id,
     long planId,
@@ -14,7 +14,11 @@ public record PlanItem(
     Long targetId,
     String title,
     String memo,
-    LocalTime startTime
+    LocalTime startTime,
+    boolean visited
 ) {
 
+    public PlanItem withVisited(boolean visited) {
+        return toBuilder().visited(visited).build();
+    }
 }

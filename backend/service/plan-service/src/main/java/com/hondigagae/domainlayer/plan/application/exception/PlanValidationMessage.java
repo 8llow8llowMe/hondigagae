@@ -15,6 +15,7 @@ public final class PlanValidationMessage {
     public static final String ITEM_DAY_MIN_INVALID = "PLAN_111:일차는 1 이상이어야 합니다.";
     public static final String MEMO_LENGTH_INVALID = "PLAN_112:메모는 500자 이하만 가능합니다.";
     public static final String SIZE_RANGE_INVALID = "PLAN_113:조회 개수는 1 이상 50 이하만 가능합니다.";
+    public static final String VISITED_REQUIRED = "PLAN_115:방문 여부는 필수입니다.";
 
     private PlanValidationMessage() {
     }
