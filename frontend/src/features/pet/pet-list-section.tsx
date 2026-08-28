@@ -4,7 +4,8 @@ import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { Skeleton } from '@/components/skeleton'
-import { PetCard } from '@/features/pet/pet-card'
+import { RowList } from '@/components/surface'
+import { PetRow } from '@/features/pet/pet-row'
 import { MAX_PET_COUNT } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
 import type { Pet } from '@/types/pet'
@@ -95,13 +96,11 @@ export function PetListSection({
         )}
       </div>
 
-      <ul className="flex flex-col gap-3">
-        {pets.map((pet) => (
-          <li key={pet.petId}>
-            <PetCard pet={pet} />
-          </li>
+      <RowList>
+        {pets.map((pet, index) => (
+          <PetRow key={pet.petId} pet={pet} last={index === pets.length - 1} />
         ))}
-      </ul>
+      </RowList>
     </div>
   )
 }

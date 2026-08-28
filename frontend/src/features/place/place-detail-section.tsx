@@ -3,10 +3,8 @@ import Image from 'next/image'
 import type { ReactNode } from 'react'
 
 import { Badge } from '@/components/badge'
-import { Card } from '@/components/card'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
-import { petTone } from '@/features/place/pet-tone'
 import { PlaceBackLink } from '@/features/place/place-back-link'
 import { PlaceDetailSkeleton } from '@/features/place/place-detail-skeleton'
 import { classify } from '@/lib/api/error'
@@ -97,7 +95,7 @@ export function PlaceDetailSection({
           <Badge tone="neutral" size="sm">
             {place.contentType.name}
           </Badge>
-          <Badge tone={petTone(place.petAllowanceType.code)} size="sm">
+          <Badge tone="neutral" size="sm">
             {place.petAllowanceType.name}
           </Badge>
         </div>
@@ -110,7 +108,7 @@ export function PlaceDetailSection({
         )}
       </header>
 
-      <Card className="p-4 md:p-5">
+      <div className="border-border border-y py-4">
         <dl className="flex flex-col gap-3">
           <InfoRow label={messages.place.detailAddress} value={fullAddress(place)} />
           <InfoRow label={messages.place.detailTel} value={place.tel}>
@@ -120,7 +118,7 @@ export function PlaceDetailSection({
             {homepage !== null && <HomepageLink href={homepage.href} label={homepage.label} />}
           </InfoRow>
         </dl>
-      </Card>
+      </div>
 
       {/* nullable 은 에러가 아니라 숨김이다 */}
       {overview !== null && (
@@ -141,7 +139,7 @@ export function PlaceDetailSection({
             {place.images.map((image, index) => (
               <li
                 key={image.originImgUrl ?? index}
-                className="bg-bg-subtle relative aspect-square overflow-hidden rounded-md"
+                className="bg-band relative aspect-square overflow-hidden rounded-md"
               >
                 {isAllowedImageHost(image.originImgUrl) && image.originImgUrl !== null ? (
                   <Image
@@ -200,9 +198,11 @@ function PetInfoSection({
     <Section title={messages.place.detailSectionPet}>
       {/* 색만으로 정보를 전달하지 않는다 — 서버 name 텍스트를 함께 쓴다 (styling-guide.md §6) */}
       <div className="mb-4 flex flex-wrap items-center gap-1">
-        <Badge tone="brand">{petInfo.allowanceScope.name}</Badge>
+        <Badge tone="neutral">{petInfo.allowanceScope.name}</Badge>
         <Badge tone="neutral">{petInfo.allowedPetSize.name}</Badge>
-        {petInfo.leashRequired && <Badge tone="warn">{messages.place.detailLeashRequired}</Badge>}
+        {petInfo.leashRequired && (
+          <Badge tone="neutral">{messages.place.detailLeashRequired}</Badge>
+        )}
       </div>
 
       {scopeDescription !== null && (
@@ -229,7 +229,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-title-1 text-fg font-bold">{title}</h2>
-      <Card className="p-4 md:p-5">{children}</Card>
+      {children}
     </section>
   )
 }
@@ -263,7 +263,7 @@ function HeroImage({ title, url }: { title: string; url: string | null }) {
   const usable = isAllowedImageHost(url) && url !== null
 
   return (
-    <div className="bg-bg-subtle relative aspect-video w-full overflow-hidden rounded-lg">
+    <div className="bg-band relative aspect-video w-full overflow-hidden rounded-md">
       {usable ? (
         // 대표 이미지는 장식이 아니라 콘텐츠다 — 장소명을 alt 로 준다
         <Image
@@ -287,7 +287,7 @@ function TelLink({ tel }: { tel: string }) {
   return (
     <a
       href={`tel:${tel.replace(/[^\d+]/g, '')}`}
-      className="text-brand-600 focus-visible:ring-brand-500 rounded-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
+      className="text-link hover:text-link-hover focus-visible:ring-brand-500 rounded-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
     >
       {tel}
     </a>
@@ -301,7 +301,7 @@ function HomepageLink({ href, label }: { href: string; label: string }) {
       target="_blank"
       // 원문이 외부 링크다. opener 를 넘기지 않는다
       rel="noopener noreferrer"
-      className="text-brand-600 focus-visible:ring-brand-500 rounded-sm font-semibold break-all focus-visible:ring-2 focus-visible:outline-none"
+      className="text-link hover:text-link-hover focus-visible:ring-brand-500 rounded-sm font-semibold break-all focus-visible:ring-2 focus-visible:outline-none"
     >
       {label}
     </a>

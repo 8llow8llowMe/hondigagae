@@ -23,13 +23,21 @@
 
 **새 값을 임의로 추가하지 않는다.** 추가는 `DESIGN.md` 갱신과 함께 한다.
 
-| 컴포넌트                      | `variant`                                                        | `size`               | 기본값           |
-| ----------------------------- | ---------------------------------------------------------------- | -------------------- | ---------------- |
-| `Button`                      | `primary` \| `secondary` \| `ghost` \| `danger`                  | `sm` \| `md` \| `lg` | `primary` / `md` |
-| `Badge`                       | `neutral` \| `brand` \| `accent` \| `warn` \| `danger` \| `info` | `sm` \| `md`         | `neutral` / `md` |
-| `Chip`                        | `default` \| `selected`                                          | `sm` \| `md`         | `default` / `md` |
-| `Input`, `Textarea`, `Select` | — (에러는 `error` prop)                                          | `md` \| `lg`         | `md`             |
-| `Card`                        | `default` \| `interactive`                                       | —                    | `default`        |
+| 컴포넌트                      | `variant`                                                   | `size`               | 기본값           |
+| ----------------------------- | ----------------------------------------------------------- | -------------------- | ---------------- |
+| `Button`                      | `primary` \| `secondary` \| `ghost` \| `danger`             | `sm` \| `md` \| `lg` | `primary` / `md` |
+| `Badge`                       | `neutral` \| `brand` \| `accent` \| `danger`                | `sm` \| `md`         | `neutral` / `md` |
+| `MetricBadge`                 | `tone`: `critical` \| `high` \| `mid` \| `low` \| `unknown` | —                    | 없음 (필수)      |
+| `MetricValue`                 | `tone` 위와 동일 (생략 = 중립)                              | `hero` \| `row`      | `row`            |
+| `Chip`                        | `selected` \| `exclusive` (외형 variant 없음)               | —                    | 다중 축          |
+| `Input`, `Textarea`, `Select` | — (에러는 `error` prop)                                     | `md` \| `lg`         | `md`             |
+
+> **`Badge` 의 `warn` · `info` 톤은 3차 세트에서 폐기했다** (DESIGN.md §2-7).
+> 측정값은 경고가 아니므로 등급은 `MetricBadge` 로 가고, 파란 정보 톤은 팔레트에 없다.
+> **`Badge` 의 `brand` 톤을 등급 표시로 전용하지 않는다.**
+>
+> **`Card` 는 폐기했다** — `Band` / `Section` / `Row` / `RowList` 를 쓴다
+> (`src/components/surface.tsx`, DESIGN.md §0).
 
 - **같은 의미에 다른 이름을 쓰지 않는다.** 어떤 컴포넌트는 `danger`, 다른 건 `error` 가 되면 사용처에서 매번 확인해야 한다.
 - `size` 값은 항상 `sm`/`md`/`lg` 에서 고른다. `xs`/`xl` 이 필요하면 정말 필요한지 먼저 검토한다.
@@ -41,15 +49,15 @@
 ```tsx
 const VARIANT: Record<ButtonVariant, string> = {
   primary: 'bg-brand-500 text-fg-inverse hover:bg-brand-600',
-  secondary: 'border border-border-strong text-fg hover:bg-bg-subtle',
-  ghost: 'text-fg-muted hover:bg-bg-subtle',
-  danger: 'bg-danger-500 text-fg-inverse',
+  secondary: 'border border-border-strong text-fg hover:bg-band',
+  ghost: 'text-fg-muted hover:bg-band',
+  danger: 'bg-danger-700 text-fg-inverse',
 }
 
 const SIZE: Record<ButtonSize, string> = {
   sm: 'h-8 px-3 text-body-2',
-  md: 'h-11 px-4 text-button', // 44px — 모바일 터치 영역 (DESIGN.md §7)
-  lg: 'h-12 px-5 text-button',
+  md: 'h-11 px-4 text-body-1', // 44px — 모바일 터치 영역 (DESIGN.md §7)
+  lg: 'h-12 px-5 text-body-1',
 }
 ```
 
@@ -88,19 +96,19 @@ const SIZE: Record<ButtonSize, string> = {
 
 ```tsx
 // prop 폭발 — 전환 대상
-<PlaceCard
+<PlaceRow
   showImage showBadge showDistance showPetInfo showBookmark
   title={...} imageUrl={...} />
 
 // 합성
-<PlaceCard>
-  <PlaceCard.Image src={...} />
-  <PlaceCard.Title>{...}</PlaceCard.Title>
-  <PlaceCard.Meta>
+<PlaceRow>
+  <PlaceRow.Image src={...} />
+  <PlaceRow.Title>{...}</PlaceRow.Title>
+  <PlaceRow.Meta>
     <Badge>반려견 동반 가능</Badge>
-    <PlaceCard.Distance meters={1200} />
-  </PlaceCard.Meta>
-</PlaceCard>
+    <PlaceRow.Distance meters={1200} />
+  </PlaceRow.Meta>
+</PlaceRow>
 ```
 
 - 데이터 prop(`title`, `imageUrl`)은 개수에 포함하지 않는다. **표시 토글(`showX`, `hideX`, `withX`)만** 센다.

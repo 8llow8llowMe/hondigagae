@@ -19,10 +19,7 @@ export function FormNotice({ message, className }: FormNoticeProps) {
   if (message === null) return null
 
   return (
-    <p
-      role="status"
-      className={cn('text-body-2 text-info-700 bg-info-100 rounded-md px-3 py-2', className)}
-    >
+    <p role="status" className={cn('text-body-2 text-fg bg-band rounded-md px-3 py-2', className)}>
       {message}
     </p>
   )

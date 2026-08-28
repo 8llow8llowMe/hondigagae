@@ -15,13 +15,13 @@ import { extendTailwindMerge } from 'tailwind-merge'
  * 회귀 방지 테스트는 `cn.test.ts`.
  */
 const TYPOGRAPHY_SCALE = [
+  'page',
   'display',
   'title-1',
   'title-2',
   'body-1',
   'body-2',
   'caption',
-  'button',
 ] as const
 
 const twMerge = extendTailwindMerge({

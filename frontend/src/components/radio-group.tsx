@@ -78,7 +78,7 @@ export function RadioGroup<T extends string>({
                 'flex min-h-11 cursor-pointer items-start gap-3 rounded-md border px-3 py-2',
                 'focus-within:ring-brand-500 focus-within:ring-2 focus-within:ring-offset-1',
                 disabled && 'cursor-not-allowed opacity-50',
-                value === option.value ? 'border-brand-500 bg-brand-50' : 'border-border-strong',
+                value === option.value ? 'border-fg bg-row-selected' : 'border-border-strong',
                 invalid && 'border-danger-500',
               )}
             >

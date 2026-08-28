@@ -10,6 +10,10 @@ import type { Pet } from '@/types/pet'
  *
  * 크기·활동량·사회성은 항상 값이 있으므로 **서버 metadata 의 `name` 을 그대로** 쓴다.
  * FE 가 한국어 매핑 테이블을 만들지 않는다 (api-integration-guide.md §6).
+ *
+ * **전부 중립 태그다** (DESIGN.md §0 · §2-5). 이전에는 성향 배지가 `accent` 를 썼는데
+ * accent 는 **AI 가 생성·판단한 것** 표시 전용이다. 장식으로 쓰면 사용자가 AI 표시를
+ * 알아볼 근거가 사라진다 — DESIGN.md 가 명시적으로 지적한 항목이다.
  */
 export function PetTraitBadges({ pet }: { pet: Pet }) {
   const labels = messages.pet.labels
@@ -23,7 +27,7 @@ export function PetTraitBadges({ pet }: { pet: Pet }) {
   return (
     <ul className="flex flex-wrap gap-1.5">
       <li>
-        <Badge tone="brand">{pet.sizeType.name}</Badge>
+        <Badge tone="neutral">{pet.sizeType.name}</Badge>
       </li>
       <li>
         <Badge tone="neutral">
@@ -37,7 +41,7 @@ export function PetTraitBadges({ pet }: { pet: Pet }) {
       </li>
       {flags.map((flag) => (
         <li key={flag.key}>
-          <Badge tone="accent">{flag.label}</Badge>
+          <Badge tone="neutral">{flag.label}</Badge>
         </li>
       ))}
     </ul>

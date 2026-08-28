@@ -45,7 +45,7 @@ export function LoggedInNotice({ returnTo }: { returnTo: string }) {
        */}
       <Link
         href={returnTo}
-        className="bg-brand-500 text-fg-inverse hover:bg-brand-600 active:bg-brand-700 focus-visible:ring-brand-500 inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-center font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+        className="bg-brand-500 text-fg-inverse hover:bg-brand-600 active:bg-brand-600 focus-visible:ring-brand-500 inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-center font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
       >
         {messages.auth.goBack}
       </Link>
