@@ -4,6 +4,8 @@ import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.request.AuthEmailCodeSendRequest;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.request.AuthEmailCodeVerifyRequest;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.request.AuthGeneralLoginRequest;
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.request.AuthPasswordResetCodeSendRequest;
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.request.AuthPasswordResetRequest;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthGeneralLoginResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthOAuthAuthorizeResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueResponse;
@@ -113,6 +115,28 @@ public class AuthWebController {
     @PostMapping("/email/verify-code")
     public ResponseEntity<Response<Void>> verifyEmailVerificationCode(@Valid @RequestBody AuthEmailCodeVerifyRequest request) {
         authWebUseCase.verifyEmailVerificationCode(request.email(), request.code());
+        return ResponseEntity.ok().body(Response.success());
+    }
+
+    @Operation(summary = "비밀번호 재설정 코드 발송", description = """
+        비밀번호 재설정 인증코드를 메일로 발송합니다. 일반(이메일+비밀번호) 계정 전용입니다.
+        계정 존재 여부와 무관하게 항상 성공으로 응답하며, 미가입 이메일과 소셜 전용 계정에는
+        각각 안내 메일이 발송됩니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 발송 상한(AUTH_016)이 적용됩니다.""")
+    @PostMapping("/password/reset/send-code")
+    public ResponseEntity<Response<Void>> sendPasswordResetCode(
+        @Valid @RequestBody AuthPasswordResetCodeSendRequest request,
+        HttpServletRequest httpServletRequest
+    ) {
+        authWebUseCase.sendPasswordResetCode(request.email(), clientIpResolver.resolve(httpServletRequest));
+        return ResponseEntity.ok().body(Response.success());
+    }
+
+    @Operation(summary = "비밀번호 재설정", description = """
+        메일로 받은 인증코드로 비밀번호를 재설정합니다. 성공 시 전 기기 세션이 무효화되어 재로그인이 필요합니다.
+        코드 불일치는 AUTH_004, 만료/미발급은 AUTH_005, 5회 실패 시 코드가 무효화되고 AUTH_017 로 응답합니다.""")
+    @PostMapping("/password/reset")
+    public ResponseEntity<Response<Void>> resetPassword(@Valid @RequestBody AuthPasswordResetRequest request) {
+        authWebUseCase.resetPassword(request.email(), request.code(), request.newPassword());
         return ResponseEntity.ok().body(Response.success());
     }
 

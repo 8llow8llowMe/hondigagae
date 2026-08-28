@@ -15,6 +15,10 @@ public final class AuthValidationMessage {
     public static final String EMAIL_FORMAT_INVALID = "AUTH_102:이메일 형식이 올바르지 않습니다.";
     public static final String PASSWORD_REQUIRED = "AUTH_103:비밀번호는 필수입니다.";
     public static final String EMAIL_CODE_REQUIRED = "AUTH_104:인증코드는 필수입니다.";
+    // 비밀번호 재설정 요청용 — 규칙은 member 의 비밀번호 정책과 동일하게 유지한다.
+    public static final String NEW_PASSWORD_REQUIRED = "AUTH_106:새 비밀번호는 필수입니다.";
+    public static final String PASSWORD_LENGTH_INVALID = "AUTH_107:비밀번호는 8자 이상 20자 이하여야 합니다.";
+    public static final String PASSWORD_PATTERN_INVALID = "AUTH_108:비밀번호는 공백 없이 영문자, 숫자, 특수문자를 각각 1자 이상 포함해야 합니다.";
 
     private AuthValidationMessage() {
     }

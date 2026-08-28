@@ -20,6 +20,12 @@ public interface AuthWebUseCase {
     /** clientIp 는 IP 기준 발송 상한 검사에 쓴다. */
     void sendEmailVerificationCode(String email, String clientIp);
 
+    /** 비밀번호 재설정 코드 발송. 계정 존재 여부와 무관하게 항상 성공으로 응답한다. */
+    void sendPasswordResetCode(String email, String clientIp);
+
+    /** 코드 검증 후 비밀번호를 재설정하고 전 기기 세션을 무효화한다. */
+    void resetPassword(String email, String code, String newPassword);
+
     void verifyEmailVerificationCode(String email, String code);
 
     AuthOAuthAuthorizeResponse generateOAuthAuthorizationUrl(OAuthProvider provider);

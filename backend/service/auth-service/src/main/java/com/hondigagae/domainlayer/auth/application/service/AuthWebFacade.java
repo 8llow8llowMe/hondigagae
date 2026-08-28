@@ -16,6 +16,7 @@ import com.hondigagae.domainlayer.auth.application.service.processor.EmailVerifi
 import com.hondigagae.domainlayer.auth.application.service.processor.GeneralLoginProcessor;
 import com.hondigagae.domainlayer.auth.application.service.processor.JwtTokenProcessor;
 import com.hondigagae.domainlayer.auth.application.service.processor.OAuthLoginProcessor;
+import com.hondigagae.domainlayer.auth.application.service.processor.PasswordResetProcessor;
 import com.hondigagae.domainlayer.member.domain.enums.OAuthProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class AuthWebFacade implements AuthWebUseCase {
     private final OAuthLoginProcessor oAuthLoginProcessor;
     private final JwtTokenProcessor jwtTokenProcessor;
     private final EmailVerificationProcessor emailVerificationProcessor;
+    private final PasswordResetProcessor passwordResetProcessor;
     private final AuthPresenter authPresenter;
 
     @Override
@@ -73,6 +75,18 @@ public class AuthWebFacade implements AuthWebUseCase {
     @Override
     public void verifyEmailVerificationCode(String email, String code) {
         emailVerificationProcessor.verifyCode(email, code);
+    }
+
+    @Override
+    public void sendPasswordResetCode(String email, String clientIp) {
+        // Redis/메일 중심 흐름이라 트랜잭션 경계를 두지 않는다 (DB 조회는 단건 findByEmail뿐).
+        passwordResetProcessor.sendResetCode(email, clientIp);
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(String email, String code, String newPassword) {
+        passwordResetProcessor.resetPassword(email, code, newPassword);
     }
 
     @Override
