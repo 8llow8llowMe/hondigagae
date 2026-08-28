@@ -46,10 +46,11 @@ public class AuthWebController {
 
     @Operation(
         summary = "일반 로그인",
-        description = "이메일과 비밀번호로 로그인합니다. 실패가 누적되면 해당 이메일이 일정 시간 잠깁니다(AUTH_015, 429)."
+        description = "이메일과 비밀번호로 로그인합니다. 형식 오류는 400(필드별 검증 코드), 자격증명 불일치는 401(AUTH_006)로 "
+            + "구분됩니다. 실패가 누적되면 해당 이메일이 일정 시간 잠깁니다(AUTH_015, 429)."
     )
     @PostMapping("/login")
-    public ResponseEntity<Response<AuthGeneralLoginResponse>> loginWithCredentials(@RequestBody AuthGeneralLoginRequest request) {
+    public ResponseEntity<Response<AuthGeneralLoginResponse>> loginWithCredentials(@Valid @RequestBody AuthGeneralLoginRequest request) {
         AuthCookieResult<AuthGeneralLoginResponse> result = authWebUseCase.generalLogin(AuthGeneralLoginCommand.from(request));
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, refreshCookieProvider.createRefreshCookie(result.refreshToken()).toString())
