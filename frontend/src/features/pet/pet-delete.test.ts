@@ -32,10 +32,13 @@ describe('PetDeleteConfirm — 1단계', () => {
 })
 
 describe('PetDeleteConfirm — 확인 단계', () => {
-  it('확인 문구를 role="alert" 로 낸다 — 전환이 시각적으로만 전달되면 안 된다', () => {
+  it('alertdialog 로 낸다 — 전환이 시각적으로만 전달되면 안 된다', () => {
     const markup = render({ confirming: true })
 
-    expect(markup).toContain('role="alert"')
+    // 인라인 `role="alert"` 였던 것을 `ConfirmModal` 로 옮겼다 (이슈 #70).
+    // 되돌릴 수 없는 일이라 화면을 잡아두는 것이 맞다 (가이드 §5-2)
+    expect(markup).toContain('role="alertdialog"')
+    expect(markup).toContain('aria-modal="true"')
     expect(markup).toContain('되돌릴 수 없어요')
   })
 
@@ -55,16 +58,15 @@ describe('PetDeleteConfirm — 확인 단계', () => {
     expect(markup).toContain(messages.pet.delete)
   })
 
-  it('autoFocus 는 취소에 있다 — 파괴적 동작에 포커스를 두지 않는다', () => {
+  /**
+   * **초기 포커스는 `ConfirmModal` 의 계약이다** (`initialFocusRef` → `useOverlay`).
+   * effect 로 옮기므로 정적 마크업에는 `autofocus` 속성이 없다 — 여기서는 **취소가
+   * 먼저 오는 순서**만 지킨다. 실제 포커스 이동은 브라우저 실렌더로 확인한다.
+   */
+  it('취소가 삭제보다 먼저 온다 — 파괴적 동작을 첫 타깃으로 두지 않는다', () => {
     const markup = render({ confirming: true })
-    const cancelIndex = markup.indexOf('취소')
-    const autofocusIndex = markup.indexOf('autofocus')
 
-    expect(autofocusIndex).toBeGreaterThan(-1)
-    // autofocus 속성이 취소 버튼의 여는 태그 안에 있어야 한다
-    expect(autofocusIndex).toBeLessThan(cancelIndex)
-    // 삭제 버튼은 취소 뒤에 온다 — autofocus 가 그쪽이 아님을 확인한다
-    expect(markup.lastIndexOf(messages.pet.delete)).toBeGreaterThan(cancelIndex)
+    expect(markup.indexOf('취소')).toBeLessThan(markup.lastIndexOf(messages.pet.delete))
   })
 
   it('삭제 중이면 버튼이 disabled 다', () => {

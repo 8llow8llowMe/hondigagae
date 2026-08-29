@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/button'
+import { ConfirmModal } from '@/components/confirm-modal'
 import { FormAlert } from '@/components/form-alert'
 import { PET_INVALIDATE_KEY } from '@/features/pet/queries'
 import { ApiError } from '@/lib/api/error'
@@ -27,9 +28,16 @@ export type PetDeleteConfirmProps = {
 /**
  * 표시 전용.
  *
- * **인라인 2단계 확인이다.** `Modal` 공통 컴포넌트가 없고, `component-guide.md` §7 이
- * `Modal` 에 요구하는 계약(focus trap / `Esc` / 스크롤 잠금 / 포커스 복귀)이 이 화면
- * 하나를 위해 설계할 범위를 넘는다 (수정-세부명세 D8-1).
+ * **`ConfirmModal` 을 쓴다** — 아트보드(`혼디가개 마이페이지·내 반려견.dc.html`)가
+ * `role="dialog" aria-modal="true"` 다이얼로그다.
+ *
+ * 예전에는 인라인 2단계 확인이었고, 그 사유는 "`Modal` 공통 컴포넌트가 없고 그 계약
+ * (focus trap / Esc / 스크롤 잠금 / 포커스 복귀)이 이 화면 하나를 위해 설계할 범위를
+ * 넘는다"(수정-세부명세 D8-1)였다. **그 사유는 낡았다** — `ConfirmModal` 이 그 뒤에
+ * 생겼고 계약을 이미 지킨다 (이슈 #70).
+ *
+ * 취소가 좌측이고 기본 포커스가 취소인 것도 `ConfirmModal` 이 보장한다 — 파괴 버튼에
+ * 포커스를 두면 Enter 한 번에 되돌릴 수 없는 일이 일어난다.
  */
 export function PetDeleteConfirm({
   petName,
@@ -40,44 +48,26 @@ export function PetDeleteConfirm({
   onCancel,
   onConfirm,
 }: PetDeleteConfirmProps) {
-  if (!confirming) {
-    return (
-      <div className="border-border mt-2 border-t pt-4">
-        <Button variant="danger" onClick={onStart}>
-          {messages.pet.delete}
-        </Button>
-      </div>
-    )
-  }
-
   return (
-    <div className="border-border mt-2 flex flex-col gap-3 border-t pt-4">
-      {/*
-        전환이 시각적으로만 전달되면 스크린리더 사용자가 무엇을 확인하는지 모른다
-        — 수정-세부명세 D6.
+    <div className="border-border mt-2 border-t pt-4">
+      <Button variant="danger" onClick={onStart}>
+        {messages.pet.delete}
+      </Button>
 
-        "되돌릴 수 없어요" 라고 쓴다. 백엔드는 소프트 삭제지만 **사용자에게 복원
-        수단이 없다.** 서버 구현을 근거로 복원을 약속하면 거짓이 된다 (D4-2).
-      */}
-      <p role="alert" className="text-body-2 text-fg">
-        삭제하면 되돌릴 수 없어요. {withObjectParticle(petName)} 삭제할까요?
-      </p>
-
-      <FormAlert message={errorMessage} />
-
-      <div className="flex gap-2">
-        {/*
-          파괴적 동작에 포커스를 놓으면 Enter 연타로 실수한다.
-          autoFocus 는 "취소" 에 둔다 — 수정-세부명세 D6.
-        */}
-        {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
-        <Button variant="secondary" onClick={onCancel} autoFocus>
-          취소
-        </Button>
-        <Button variant="danger" onClick={onConfirm} loading={deleting}>
-          {messages.pet.delete}
-        </Button>
-      </div>
+      <ConfirmModal
+        open={confirming}
+        onClose={onCancel}
+        onConfirm={onConfirm}
+        title={messages.pet.deleteConfirmTitle.replace('{name}', withObjectParticle(petName))}
+        description={messages.pet.deleteConfirmDescription}
+        confirmLabel={messages.pet.delete}
+        cancelLabel={messages.pet.cancel}
+        confirmLoading={deleting}
+        destructive
+      >
+        {/* 삭제 실패는 모달 안에서 말한다 — 모달을 닫고 뒤에서 알리면 무엇이 실패했는지 모른다 */}
+        <FormAlert message={errorMessage} />
+      </ConfirmModal>
     </div>
   )
 }

@@ -12,7 +12,8 @@ import { useOverlay } from '@/lib/ui/overlay'
  * **되돌릴 수 있는 일에는 모달을 쓰지 않는다.**
  *
  * **영향 범위를 개수로 센다** — "초코가 들어간 일정 1개는 그대로 남지만, 판정은 다시
- * 계산돼요". 세지 못하면 모달을 띄우지 말고 **그 값을 먼저 구한다.**
+ * 계산돼요". 세지 못하면 **그 값을 먼저 구한다.** 구할 수 없으면 셀 수 있는 것만 말하고
+ * **셀 수 없는 것을 숫자로 적지 않는다** — 틀린 개수는 없는 개수보다 나쁘다.
  *
  * 취소가 좌측이고 **기본 포커스는 취소**다 — 파괴 버튼에 포커스를 두면 Enter 한 번에
  * 되돌릴 수 없는 일이 일어난다.
@@ -30,6 +31,8 @@ export function ConfirmModal({
   destructive = false,
   /** 확인 버튼을 잠글 때 (예: "탈퇴" 타이핑 확인 미완료) */
   confirmDisabled = false,
+  /** 요청 진행 중. 잠그는 것과 다르다 — 이쪽은 "누른 것이 처리되고 있다" 를 말한다 */
+  confirmLoading = false,
   children,
 }: {
   open: boolean
@@ -42,6 +45,7 @@ export function ConfirmModal({
   cancelLabel?: string
   destructive?: boolean
   confirmDisabled?: boolean
+  confirmLoading?: boolean
   /** 추가 확인 입력(예: "탈퇴" 타이핑) */
   children?: ReactNode
 }) {
@@ -89,6 +93,7 @@ export function ConfirmModal({
           <Button
             variant={destructive ? 'danger' : 'primary'}
             disabled={confirmDisabled}
+            loading={confirmLoading}
             onClick={onConfirm}
           >
             {confirmLabel}

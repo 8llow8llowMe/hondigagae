@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
+import { Banner } from '@/components/banner'
+import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
+import { EmergencyIcon } from '@/components/icons'
 import { Skeleton } from '@/components/skeleton'
-import { EmergencyRow } from '@/features/home/emergency-row'
 import { PlaceInsightRow } from '@/features/home/place-insight-row'
 import { ProfileCard } from '@/features/home/profile-card'
 import { UpcomingPlanRow } from '@/features/home/upcoming-plan-row'
@@ -136,7 +138,14 @@ export function HomeView({
           )}
 
           <Band />
-          <EmergencyRow />
+          {/* 상시 진입점. 오류·빈 화면에서도 제거하지 않는다 (Banner 주석) */}
+          <Banner
+            href="/emergency"
+            title={messages.home.emergencyTitle}
+            description={messages.home.emergencyDesc}
+            leading={<EmergencyIcon size={24} />}
+            inset="rail"
+          />
           {/* 모바일에서는 병원 행이 맨 아래라 아래 밴드가 필요 없다 */}
           <Band className="md:hidden" />
         </div>
@@ -159,12 +168,9 @@ export function HomeView({
               <p className="text-caption text-fg-muted shrink-0 font-medium md:hidden">
                 {messages.home.sortNoteShort}
               </p>
-              <Link
-                href="/places"
-                className="bg-brand-500 text-fg-inverse text-body-1 focus-visible:ring-brand-500 hidden h-11 shrink-0 items-center rounded-md px-5 font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none md:flex"
-              >
+              <ButtonLink href="/places" className="hidden shrink-0 md:inline-flex">
                 {messages.home.findPlaces}
-              </Link>
+              </ButtonLink>
             </div>
 
             {pending && loaded.length === 0 ? (
@@ -214,12 +220,13 @@ export function HomeView({
                 {remaining > 0 && (
                   <div className="border-border border-t px-4 py-3 md:px-10 md:py-4">
                     {/* 모바일은 테두리 버튼, 데스크톱은 텍스트 링크 (아트보드) */}
-                    <Link
+                    <ButtonLink
                       href="/places"
-                      className="border-border-strong text-body-1 text-fg focus-visible:ring-brand-500 flex h-11 items-center justify-center rounded-md border font-semibold tabular-nums focus-visible:ring-2 focus-visible:outline-none md:hidden"
+                      variant="secondary"
+                      className="flex w-full tabular-nums md:hidden"
                     >
                       {messages.home.morePlaces.replace('{n}', String(remaining))}
-                    </Link>
+                    </ButtonLink>
                     <Link
                       href="/places"
                       className="text-body-1 text-link focus-visible:ring-brand-500 hidden min-h-11 items-center font-semibold tabular-nums focus-visible:ring-2 focus-visible:outline-none md:flex"

@@ -31,6 +31,17 @@ export const petMessages = {
   register: '등록하기',
   save: '저장하기',
   delete: '삭제하기',
+  /**
+   * 삭제 확인 — 아트보드 `혼디가개 마이페이지·내 반려견.dc.html` 의 `aria-modal` 다이얼로그.
+   * `{name}` 은 목적격 조사를 붙여 치환한다 (`withObjectParticle`).
+   *
+   * **아트보드의 "일정 1개는 그대로 남지만" 은 쓰지 않는다** — 일정 개수를 주는 API 가 없다.
+   * 셀 수 없는 것을 숫자로 적으면 그 문장이 거짓이 된다.
+   */
+  deleteConfirmTitle: '{name} 삭제할까요?',
+  deleteConfirmDescription: '판정 기준이 사라져요. 되돌릴 수 없어요.',
+  deleteDialogLabel: '반려견 삭제',
+  cancel: '취소',
   backToList: '목록으로',
 
   // 라벨 — 어미는 해요체로 통일한다 (이슈 #15 의 어미 혼용을 되풀이하지 않는다)

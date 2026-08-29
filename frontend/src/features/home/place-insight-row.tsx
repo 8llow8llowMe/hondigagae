@@ -1,12 +1,14 @@
 import Image from 'next/image'
 import Link from 'next/link'
 
+import { Badge } from '@/components/badge'
 import { ImageIcon } from '@/components/icons'
 import { MetricBadge, type MetricTone, MetricValue } from '@/components/metric'
 import { isAllowedImageHost } from '@/lib/image/remote-host'
 import { splitReasons } from '@/lib/insight/reasons'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
+import { shortAddress } from '@/lib/place/address'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceSuitabilityResponse } from '@/types/insight'
 import type { PlaceSummary } from '@/types/place'
@@ -99,13 +101,11 @@ export function PlaceInsightRow({
         {/* 데스크톱 태그 열 — 동반 가능 여부를 첫 태그로, 최대 3개 */}
         {place !== undefined && (
           <div className="hidden w-36 shrink-0 flex-wrap justify-end gap-1.5 md:flex">
-            <span className="text-caption bg-band rounded-sm px-2 py-1 font-medium">
-              {place.petAllowanceType.name}
-            </span>
+            <Badge tone="neutral">{place.petAllowanceType.name}</Badge>
             {place.indoor !== null && (
-              <span className="text-caption bg-band rounded-sm px-2 py-1 font-medium">
+              <Badge tone="neutral">
                 {place.indoor ? messages.home.indoor : messages.home.outdoor}
-              </span>
+              </Badge>
             )}
           </div>
         )}
@@ -185,19 +185,4 @@ function metaLine(place: PlaceSummary | undefined): string {
   return [shortAddress(place.addr1), indoor]
     .filter((part): part is string => part !== null && part !== '')
     .join(' · ')
-}
-
-/**
- * 광역 접두사를 떼고 앞 두 마디만 남긴다.
- * `제주특별자치도 제주시 한림읍 용금로 906-107` → `제주시 한림읍`
- */
-export function shortAddress(addr1: string | null): string | null {
-  if (addr1 === null || addr1.trim() === '') return null
-
-  const parts = addr1.trim().split(/\s+/)
-  // 제주 전용 서비스라 광역 이름은 정보가 없다
-  const withoutProvince =
-    parts[0]?.startsWith('제주') === true && parts.length > 1 ? parts.slice(1) : parts
-
-  return withoutProvince.slice(0, 2).join(' ')
 }
