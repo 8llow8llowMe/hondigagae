@@ -5,9 +5,11 @@ import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
 import { ChevronDownIcon } from '@/components/icons'
+import { PetAvatar } from '@/components/pet-avatar'
 import { useSelectedPetStore } from '@/features/nav/selected-pet-store'
 import { MAX_PET_COUNT } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
+import { describePet } from '@/lib/pet/describe'
 import { useOverlay } from '@/lib/ui/overlay'
 import type { Pet } from '@/types/pet'
 
@@ -66,7 +68,7 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
         onClick={() => setOpen((prev) => !prev)}
         className="focus-visible:ring-brand-500 flex w-full items-center gap-4 px-4 py-4 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:px-6"
       >
-        <PetAvatar name={selected.name} />
+        <PetAvatar size="hero" name={selected.name} />
 
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1">
@@ -74,7 +76,7 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
             <ChevronDownIcon size={18} className="text-fg-subtle shrink-0" />
           </span>
           <span className="text-body-2 text-fg-muted block tabular-nums">
-            {describePet(selected)}
+            {describePet(selected, { size: true })}
           </span>
           <TraitTags pet={selected} />
         </span>
@@ -99,7 +101,7 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
               }}
               className="hover:bg-band focus-visible:bg-band flex h-11 w-full items-center gap-2 px-4 text-left focus-visible:outline-none"
             >
-              <InitialBadge name={pet.name} />
+              <PetAvatar name={pet.name} />
               <span className="text-body-2 text-fg min-w-0 truncate font-medium">
                 {pet.name}
                 <span className="text-fg-muted"> · {firstTrait(pet)}</span>
@@ -132,29 +134,6 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
         </div>
       )}
     </div>
-  )
-}
-
-/** 96(모바일) / 112(데스크톱) 원형. metric-high tint 위에 -700 글자 */
-function PetAvatar({ name }: { name: string }) {
-  return (
-    <span
-      aria-hidden
-      className="bg-metric-high-100 text-metric-high-700 text-avatar md:text-avatar-lg flex size-24 shrink-0 items-center justify-center rounded-full font-extrabold md:size-28"
-    >
-      {name.slice(0, 1)}
-    </span>
-  )
-}
-
-function InitialBadge({ name }: { name: string }) {
-  return (
-    <span
-      aria-hidden
-      className="bg-metric-high-100 text-metric-high-700 text-caption flex size-6 shrink-0 items-center justify-center rounded-full font-bold"
-    >
-      {name.slice(0, 1)}
-    </span>
   )
 }
 
@@ -199,13 +178,6 @@ function RegisterPrompt() {
       </span>
     </Link>
   )
-}
-
-/** `말티즈 · 소형견 · 4살` — 체중을 표기하지 않는다 (백엔드에 필드가 없다) */
-export function describePet(pet: Pet): string {
-  return [pet.breed, pet.sizeType.name, pet.age === null ? null : `${pet.age}살`]
-    .filter((part): part is string => part !== null && part !== '')
-    .join(' · ')
 }
 
 export function petTraits(pet: Pet): string[] {

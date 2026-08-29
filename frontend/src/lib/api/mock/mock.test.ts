@@ -19,7 +19,11 @@ function body(search: string): SliceResponse<PlaceSummary> {
 
 describe('resolveMock — 처리 범위', () => {
   it('구현되지 않은 경로는 null 을 반환해 실제 게이트웨이로 넘긴다', () => {
-    expect(resolveMock('/plans', 'GET', '', null)).toBeNull()
+    expect(resolveMock('/ai-plans', 'POST', '', '{}')).toBeNull()
+  })
+
+  it('일정은 보호 리소스라 토큰 없이는 401 이다 — null 로 넘기지 않는다 (이슈 #75)', () => {
+    expect(resolveMock('/plans', 'GET', '', null)?.status).toBe(401)
   })
 
   it('긴급 시설은 mock 이 처리한다 (이슈 #13)', () => {
@@ -327,7 +331,7 @@ describe('resolveMock — 인증', () => {
   })
 
   it('mock 이 모르는 POST 는 null 이라 게이트웨이로 넘어간다', () => {
-    expect(resolveMock('/plans', 'POST', '', '{}')).toBeNull()
+    expect(resolveMock('/ai-plans', 'POST', '', '{}')).toBeNull()
   })
 
   it('send-code 공란 이메일은 400 AUTH_101 이다', () => {

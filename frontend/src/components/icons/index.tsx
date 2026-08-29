@@ -172,3 +172,12 @@ export function SlidersIcon(props: IconProps) {
     </Svg>
   )
 }
+
+/** 더하기 — 일정 목록 헤더의 새 일정 버튼 (아트보드 `여행 일정` 04) */
+export function PlusIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </Svg>
+  )
+}

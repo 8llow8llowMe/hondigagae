@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 import { ChevronRightIcon } from '@/components/icons'
-import { messages } from '@/lib/messages'
+import { daysUntil } from '@/lib/plan/date'
 import type { PlanSummaryItem } from '@/types/plan'
 
 /**
@@ -39,25 +39,3 @@ export function UpcomingPlanRow({ plan, today }: { plan: PlanSummaryItem; today:
     </Link>
   )
 }
-
-/**
- * 남은 일수. **`today` 를 주입받는다** — 모듈 안에서 `new Date()` 를 부르면 테스트가
- * 실행 시각에 따라 흔들린다.
- */
-export function daysUntil(startDate: string, today: Date): number | null {
-  const start = Date.parse(`${startDate}T00:00:00`)
-  if (Number.isNaN(start)) return null
-
-  const base = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
-  const target = Date.UTC(
-    new Date(start).getFullYear(),
-    new Date(start).getMonth(),
-    new Date(start).getDate(),
-  )
-  const days = Math.round((target - base) / 86_400_000)
-
-  // 이미 시작한 일정은 D-day 를 말하지 않는다
-  return days < 0 ? null : days
-}
-
-export const planMessages = messages.home

@@ -146,7 +146,30 @@ type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
 컴포넌트가 이동을 표현하지 못하면 화면이 우회하고, 우회는 조용히 갈린다.
 `Textarea` · `Select` 는 **아직 만들지 않았다** — 필요한 화면이 생기면 같은 규칙으로 추가한다.
 
-- 순수 표시 컴포넌트(`Badge`, `Skeleton`)는 필요할 때만 추가한다.
+#### icon-only 는 타입이 `aria-label` 을 강제한다 (`Button` · `ButtonLink` 둘 다)
+
+**하이픈이 든 JSX 속성은 TypeScript 가 props 타입과 대조하지 않는다.** props 에 없는
+`aria-label` 을 컴포넌트에 넘기면 **컴파일은 통과하고 값만 조용히 버려진다** — 아이콘
+버튼에 접근 가능한 이름이 사라지는데 타입도 lint 도 잡지 못하는 유일한 경로다.
+`ButtonLink` 에서 실제로 겪었다 (#75).
+
+그래서 두 컴포넌트 모두 유니온으로 강제한다. 아이콘은 `leading` 에 넣고 `children` 은 두지 않는다.
+
+```tsx
+{ iconOnly: true; 'aria-label': string; children?: never } | { iconOnly?: false; children: ReactNode }
+```
+
+- 순수 표시 컴포넌트(`Badge`, `Skeleton`, `PetAvatar`)는 필요할 때만 추가한다.
+
+### 도메인 표시 조각도 `src/components/` 에 둔다
+
+`PetAvatar`(반려견 이니셜 원형)는 홈과 일정 목록이 함께 쓴다. feature 폴더에 두면
+`features/plan` 이 `features/home` 을 임포트하게 되어 경계가 무너진다 — `metric.tsx`
+(등급 표시)가 같은 자리에 있는 이유와 같다.
+
+**뽑기 전에 인라인 복제가 몇 개인지 센다.** `PetAvatar` 는 홈에만 두 벌(96/112 · 24)이
+있었고 일정이 세 벌을 더 만들 참이었다. `describePet`(`src/lib/pet/describe.ts`)도 같은
+경위로 뽑았다 — 크기를 넣는 자리와 빼는 자리가 달라 옵션 하나로 갈린다.
 
 ## 7. 접근성 계약 (컴포넌트가 보장할 것)
 
