@@ -7,12 +7,12 @@ export const placeMessages = {
   pageDescription: '반려견과 함께 갈 수 있는 제주 장소를 찾아보세요.',
 
   /** 결과 0건 또는 404 — 재시도가 아니라 다음 행동을 안내한다 */
-  emptyTitle: '조건에 맞는 장소가 없습니다',
+  emptyTitle: '조건에 맞는 장소가 없어요',
   emptyDescription: '필터를 바꿔 다시 찾아보세요.',
   resetFilters: '필터 초기화',
 
   /** 5xx */
-  errorTitle: '장소를 불러오지 못했습니다',
+  errorTitle: '장소를 불러오지 못했어요',
 
   /**
    * 필터 영역.
@@ -60,11 +60,11 @@ export const placeMessages = {
   backToList: '장소 목록으로',
 
   /** 경로가 가리키는 장소가 없다 — not-found.tsx */
-  detailNotFoundTitle: '장소를 찾을 수 없습니다',
-  detailNotFoundDescription: '주소가 잘못되었거나 삭제된 장소입니다.',
+  detailNotFoundTitle: '장소를 찾을 수 없어요',
+  detailNotFoundDescription: '주소가 잘못되었거나 삭제된 장소예요.',
 
   /** 5xx·무응답 */
-  detailErrorTitle: '장소 정보를 불러오지 못했습니다',
+  detailErrorTitle: '장소 정보를 불러오지 못했어요',
 
   detailSectionOverview: '장소 소개',
   detailSectionIntro: '이용 안내',

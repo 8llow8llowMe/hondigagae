@@ -19,7 +19,7 @@ export const homeMessages = {
   sortNote: '오늘 날씨와 혼잡도 반영',
   moreReasons: '근거 {n}개 더 보기',
   lessReasons: '근거 접기',
-  emptyPlacesTitle: '표시할 장소가 없습니다',
+  emptyPlacesTitle: '표시할 장소가 없어요',
   emptyPlacesDesc: '장소를 찾아보세요.',
   findPlaces: '장소 찾기',
   upcomingHeading: '다가오는 일정',

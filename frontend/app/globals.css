@@ -245,3 +245,27 @@ body {
     mask-image: none;
   }
 }
+
+/*
+  모션 민감 사용자를 존중한다 — DESIGN.md §8 · styling-guide.md §6 (이슈 #15).
+
+  **애니메이션을 지우는 것이 아니라 한 프레임으로 줄인다.** `animation: none` 으로 지우면
+  `animation-fill-mode` 에 의존해 끝 상태를 잡던 요소가 시작 상태로 되돌아간다.
+  아주 짧은 지속시간으로 두면 끝 상태는 그대로 남고 움직임만 사라진다.
+
+  `!important` 를 쓰는 이유: 유틸리티 클래스(`animate-pulse` · `transition-*`)가
+  같은 속성을 직접 걸고 있어 특이도만으로는 이기지 못한다. **이 파일에서 유일하게
+  허용하는 `!important` 다.**
+
+  `scroll-behavior` 도 함께 끈다 — 스크롤 점프가 어지럼을 유발하는 대표 사례다.
+*/
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

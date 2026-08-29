@@ -8,15 +8,19 @@ export const commonMessages = {
   temporaryErrorDescription: '잠시 후 다시 시도해 주세요.',
 
   /** 400 */
-  validationErrorTitle: '요청 조건이 올바르지 않습니다',
+  validationErrorTitle: '요청 조건이 올바르지 않아요',
 
   /** 401 */
-  unauthorizedTitle: '로그인이 필요합니다',
+  unauthorizedTitle: '로그인이 필요해요',
   unauthorizedDescription: '로그인 후 다시 이용해 주세요.',
 
   /** 403 등 */
-  forbiddenTitle: '이용할 수 없는 요청입니다',
+  forbiddenTitle: '이용할 수 없는 요청이에요',
 
-  listEnd: '마지막 장소까지 확인했어요',
+  /**
+   * **사용자가 한 일을 서비스가 대신 서술하지 않는다.** "확인했어요" 는 사용자의 행동이고,
+   * 목록 끝에 붙는 이 줄이 말할 수 있는 것은 목록의 상태뿐이다 (디자인 리뷰 #15).
+   */
+  listEnd: '마지막 장소예요',
   loadMore: '더 보기',
 } as const
