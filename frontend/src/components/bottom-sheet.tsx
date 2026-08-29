@@ -49,7 +49,7 @@ export function BottomSheet({
         aria-hidden
         tabIndex={-1}
         onClick={onClose}
-        className="absolute inset-0 bg-[color-mix(in_srgb,var(--fg)_50%,transparent)]"
+        className="overlay-backdrop absolute inset-0"
       />
 
       <div

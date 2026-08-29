@@ -27,7 +27,7 @@ export function MobileTabBar({ authed }: { authed: boolean }) {
   return (
     <nav
       aria-label="하단"
-      className="border-border bg-bg fixed inset-x-0 bottom-0 z-40 h-16 border-t pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="border-border bg-bg pb-safe fixed inset-x-0 bottom-0 z-40 h-16 border-t md:hidden"
     >
       <ul className="grid h-full grid-cols-4">
         {MOBILE_TAB_ITEMS.map((item, index) => {
