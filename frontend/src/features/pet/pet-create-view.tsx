@@ -20,7 +20,12 @@ export function PetCreateView() {
       initialValues={EMPTY_PET_FORM_VALUES}
       submitLabel={messages.pet.register}
       footer={
-        <Link href="/pets" className="text-body-2 text-fg-muted text-center underline">
+        <Link
+          href="/pets"
+          // 44px — 모바일 최소 터치 영역 (DESIGN.md §7). 텍스트 크기는 그대로 두고
+          // 히트 영역만 키운다
+          className="text-body-2 text-fg-muted inline-flex h-11 items-center justify-center self-center underline"
+        >
           {messages.pet.backToList}
         </Link>
       }

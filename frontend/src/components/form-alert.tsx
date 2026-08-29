@@ -20,10 +20,11 @@ export function FormAlert({ message, className }: FormAlertProps) {
   return (
     <p
       role="alert"
-      // bg-danger-50 는 존재하지 않는 토큰이다 (tokens.css 는 danger-100/500/700 만
-      // 정의한다). DESIGN.md 가 정본이므로 새 토큰을 만들지 않고 danger-100 을 쓴다.
+      // tint 배경 위 텍스트는 -700 이다. -500 은 danger-100 위에서 3.97:1 로 AA 에
+      // 미달한다 (DESIGN.md §2-6). -500 은 흰 배경 위 아이콘·보더용이다.
+      // 회귀는 src/styles/token-usage.test.ts 가 막는다.
       className={cn(
-        'text-body-2 text-danger-500 bg-danger-100 rounded-md px-3 py-2 break-words',
+        'text-body-2 text-danger-700 bg-danger-100 rounded-md px-3 py-2 break-words',
         className,
       )}
     >
