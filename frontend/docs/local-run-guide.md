@@ -90,6 +90,21 @@ NEXT_PUBLIC_KAKAO_MAP_KEY=<JS 앱 키>
 
 **`NEXT_PUBLIC_` 접두사는 클라이언트 번들에 박힌다.** `BACKEND_BASE_URL`, `SESSION_SECRET` 에는 절대 붙이지 않는다.
 
+### 백엔드 없이 화면 보기 — `MOCK_API=true`
+
+`MOCK_API=true` 면 게이트웨이 없이 화면이 뜬다 (프로덕션 빌드에서는 항상 비활성).
+보호 화면(`/plans` · `/pets` · `/mypage`)은 로그인해야 보이므로 **fixture 계정으로 로그인한다.**
+
+| 이메일                | 비밀번호       |
+| --------------------- | -------------- |
+| `demo@hondigagae.dev` | `password123!` |
+
+`src/lib/api/mock/store.ts` 의 `createStore()` 에 하드코딩된 in-memory fixture 다 —
+실제 계정이 아니고 `MOCK_API=true` 일 때만 존재한다. 반려견 2마리와 일정 4건이 함께 들어 있다.
+
+**스토어에 필드를 추가했다면 개발 서버를 다시 띄우지 않아도 된다.** 상태는 HMR 을 넘어
+`globalThis` 에 살아남지만, `mockStore()` 가 모양이 어긋난 상태를 버리고 새로 만든다.
+
 ## 6. Swagger 확인
 
 계약을 확인할 때는 문서가 아니라 실제 Swagger를 본다.
