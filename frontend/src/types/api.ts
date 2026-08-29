@@ -31,5 +31,17 @@ export type EnumMetadata = {
   scoreDescription?: string | null
 }
 
+/**
+ * 백엔드 `CodeNameDescriptionMetadata` — 여러 도메인이 공유하는 3필드 metadata.
+ *
+ * `EnumMetadata` 와 값 모양이 같지만 **`scoreDescription` 이 없다.** 점수 지표는
+ * `ScoreMetricMetadata`(`types/insight.ts`)가 따로 담당한다.
+ */
+export type CodeNameMetadata = {
+  code: string
+  name: string
+  description: string | null
+}
+
 /** XAI 추천 근거 */
 export type Reason = EnumMetadata

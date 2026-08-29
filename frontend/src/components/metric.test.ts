@@ -3,22 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { MetricBadge, metricTone, MetricValue } from '@/components/metric'
-
-describe('metricTone — 서버 code 매핑', () => {
-  it('알려진 code 를 톤으로 떨어뜨린다', () => {
-    expect(metricTone('HIGH')).toBe('high')
-    expect(metricTone('MEDIUM')).toBe('mid')
-    expect(metricTone('LOW')).toBe('low')
-    expect(metricTone('CRITICAL')).toBe('critical')
-  })
-
-  it('모르는 code · null · undefined 는 unknown 이다 — 추측하지 않는다', () => {
-    expect(metricTone('WHATEVER')).toBe('unknown')
-    expect(metricTone(null)).toBe('unknown')
-    expect(metricTone(undefined)).toBe('unknown')
-  })
-})
+import { MetricBadge, MetricValue } from '@/components/metric'
 
 describe('MetricBadge', () => {
   it('tint 배경 위에는 -700 텍스트를 쓴다 (대비 4.5:1)', () => {

@@ -25,12 +25,18 @@ export const paths = {
   places: {
     list: (query: string) => (query ? `/places?${query}` : '/places'),
     detail: (placeId: string) => `/places/${placeId}`,
+    /** 장소 인사이트 — tour-service insight 컨텍스트 */
+    suitability: (placeId: string, query: string) =>
+      query ? `/places/${placeId}/suitability?${query}` : `/places/${placeId}/suitability`,
+    walkSafety: (placeId: string, query: string) =>
+      query ? `/places/${placeId}/walk-safety?${query}` : `/places/${placeId}/walk-safety`,
   },
   plans: {
     list: '/plans',
     create: '/plans',
     detail: (planId: string) => `/plans/${planId}`,
     dayItems: (planId: string, day: number) => `/plans/${planId}/days/${day}/items`,
+    weather: (planId: string) => `/plans/${planId}/weather`,
   },
   aiPlans: {
     submit: '/ai-plans',

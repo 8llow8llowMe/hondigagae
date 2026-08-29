@@ -6,28 +6,15 @@ import { cn } from '@/lib/utils/cn'
  * 등급 표시 — DESIGN.md §2-3.
  *
  * **FE 는 색만 매핑하고 문구는 서버 값(`name`)을 쓴다.** 한국어 매핑 테이블을 만들지
- * 않는다 (api-integration-guide.md §6). 모르는 code 는 `UNKNOWN` 으로 떨어진다.
+ * 않는다 (api-integration-guide.md §6).
+ *
+ * **code → tone 매핑을 여기 두지 않는다.** 축마다 코드 체계가 다르고 의미가 뒤집히기
+ * 때문이다 — 혼잡도의 `LOW` 는 "한산"(좋음)이고 적합도의 `LOW` 는 "주의 필요"(나쁨)다.
+ * 공용 매퍼 하나를 쓰면 "혼잡" 이 초록으로 나간다. 축별 매퍼는
+ * `src/lib/insight/tone.ts` 에 있고, **호출부가 톤을 계산해 넘긴다**.
  */
 
 export type MetricTone = 'critical' | 'high' | 'mid' | 'low' | 'unknown'
-
-/** 서버 code 를 톤으로 떨어뜨린다. 모르는 값은 unknown 이다 — 임의로 추측하지 않는다. */
-export function metricTone(code: string | null | undefined): MetricTone {
-  switch (code) {
-    case 'CRITICAL':
-    case 'DANGER':
-      return 'critical'
-    case 'HIGH':
-      return 'high'
-    case 'MEDIUM':
-    case 'MID':
-      return 'mid'
-    case 'LOW':
-      return 'low'
-    default:
-      return 'unknown'
-  }
-}
 
 /**
  * tint 배경 + `-700` 텍스트. `-500` 을 텍스트에 쓰면 대비가 무너진다.

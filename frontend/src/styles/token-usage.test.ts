@@ -129,11 +129,15 @@ describe('토큰 사용 — 폐기한 토큰이 되살아나지 않는다 (DESIG
 
 describe('토큰 사용 — 표면 규칙 (DESIGN.md §0)', () => {
   it('평평한 행·섹션에 그림자를 쓰지 않는다 — shadow 는 떠 있는 것에만', () => {
+    // 실제로 떠 있는 것만 그림자를 쓴다. 목록에 추가하려면 그것이 페이지 위에 뜨는지
+    // 먼저 확인한다 — 평면 카드를 띄우려고 여기에 넣는 것이 이 규칙을 무너뜨리는 경로다.
     const FLOATING = [
       'src/components/menu.tsx',
       'src/components/toast.tsx',
       'src/components/bottom-sheet.tsx',
       'src/components/confirm-modal.tsx',
+      // 반려견 스위처 드롭다운 — Menu 와 같은 팝오버다
+      'src/features/nav/pet-switcher.tsx',
     ]
 
     const found = FILES.filter(({ path }) => !FLOATING.includes(path.replace(/\\/g, '/'))).flatMap(
