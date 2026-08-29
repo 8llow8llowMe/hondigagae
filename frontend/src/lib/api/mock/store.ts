@@ -261,9 +261,29 @@ function createStore(): MockStore {
   }
 }
 
+/**
+ * 저장된 상태가 **지금 코드의 모양과 맞는지** 본다.
+ *
+ * globalThis 에 심어 둔 상태는 HMR 을 넘어 살아남는데(그것이 목적이다), 스토어에 필드를
+ * 새로 추가하면 **먼저 만들어진 상태에는 그 필드가 없다.** 그대로 쓰면 `store.plans` 가
+ * `undefined` 라 mock 이 500 을 던지고, 원인이 코드가 아니라 켜 둔 개발 서버에 있어서
+ * 찾는 데 오래 걸린다 — 일정 목록(#75)을 붙이며 실제로 겪었다.
+ *
+ * 모양이 어긋나면 버리고 새로 만든다. **`?? []` 로 덮지 않는다** — 그러면 오래된 상태로
+ * 계속 굴러가면서 증상만 사라진다.
+ */
+function isCurrentShape(store: MockStore | undefined): store is MockStore {
+  return (
+    store !== undefined &&
+    Array.isArray(store.members) &&
+    Array.isArray(store.pets) &&
+    Array.isArray(store.plans)
+  )
+}
+
 export function mockStore(): MockStore {
   const scope = globalThis as GlobalWithStore
-  scope[STORE_KEY] ??= createStore()
+  if (!isCurrentShape(scope[STORE_KEY])) scope[STORE_KEY] = createStore()
   return scope[STORE_KEY]
 }
 
