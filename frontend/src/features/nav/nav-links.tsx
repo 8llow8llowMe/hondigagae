@@ -3,27 +3,27 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-import { Badge } from '@/components/badge'
 import { type NavItem, toLoginHref, visibleDesktopItems } from '@/features/nav/menu-items'
 import { isActiveNav } from '@/lib/nav/active'
 import { cn } from '@/lib/utils/cn'
 
 /**
- * 데스크톱 헤더 메뉴 — 전역nav-세부명세 D1 · D4.
+ * 데스크톱 헤더 메뉴 — 아트보드 `03 전역 nav · B` 그대로.
  *
- * `usePathname()` 을 쓰므로 client 다. 헤더 셸(로고·레이아웃)은 서버에 남긴다.
- * `MobileTabBar` 와 **합치지 않는다** — 활성 판정만 같고 구성이 다르다 (D2).
+ * 링크는 16/500 `--fg`, padding 8/12, radius 8. 항목 사이 gap 4.
+ * 활성은 **배경 + weight 600 + `aria-current` 3중**이다 (색만으로 표시하지 않는다).
  *
- * 활성 표시는 **색만이 아니라 weight + `aria-current` 3중**이다 (D6).
+ * **`내 반려견` 은 여기 없다.** nav 의 셋(장소 찾기·여행 일정·AI 일정 생성)은 *할 일*이고,
+ * 내 반려견·마이페이지·로그아웃은 *내 설정*이라 우측 아바타 팝오버가 맡는다.
+ * 같은 줄에 섞으면 nav 의 기준이 흐려져 항목이 계속 늘어난다.
  */
 export function NavLinks({ authed }: { authed: boolean }) {
   const pathname = usePathname()
-  const items = visibleDesktopItems(authed)
 
   return (
     <nav aria-label="주요" className="hidden md:block">
       <ul className="flex items-center gap-1">
-        {items.map((item) => (
+        {visibleDesktopItems(authed).map((item) => (
           <li key={item.href}>
             <DesktopLink item={item} active={isActiveNav(pathname, item.href)} authed={authed} />
           </li>
@@ -49,16 +49,16 @@ function DesktopLink({
       href={href}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'text-body-2 focus-visible:ring-brand-500 inline-flex h-11 items-center gap-1.5 rounded-md px-3 focus-visible:ring-2 focus-visible:outline-none',
-        active ? 'bg-band text-fg font-semibold' : 'text-fg-muted hover:bg-band font-medium',
+        'text-body-1 focus-visible:ring-brand-500 flex items-center gap-1.5 rounded-md px-3 py-2 focus-visible:ring-2 focus-visible:outline-none',
+        active ? 'bg-band text-fg font-semibold' : 'text-fg hover:bg-band font-medium',
       )}
     >
       {item.label}
       {/* accent 는 "AI 가 생성·판단한 것" 표시 전용이다 (DESIGN.md §2-5) */}
       {item.ai === true && (
-        <Badge tone="accent" size="sm">
+        <span className="text-caption bg-accent-100 text-accent-700 rounded-sm px-1.5 py-0.5 font-semibold">
           AI
-        </Badge>
+        </span>
       )}
     </Link>
   )

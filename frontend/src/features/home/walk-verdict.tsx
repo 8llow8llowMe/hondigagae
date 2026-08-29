@@ -1,0 +1,178 @@
+'use client'
+
+import { useState } from 'react'
+
+import { ChevronDownIcon, ClockIcon } from '@/components/icons'
+import type { MetricTone } from '@/components/metric'
+import { formatCelsius } from '@/lib/format/celsius'
+import { walkSafetyTone } from '@/lib/insight/tone'
+import { messages } from '@/lib/messages'
+import { cn } from '@/lib/utils/cn'
+import type { WalkSafetyResponse } from '@/types/insight'
+
+/**
+ * 오늘 산책 판정 — 아트보드 `01 홈 · P1 아래` / `02 홈` 좌측 / `04 ①`.
+ *
+ * **프로필 바로 아래에 1px 선으로 붙인다.** 밴드로 끊거나 별도 블록으로 분리하지 않는다 —
+ * 판정의 화자(누구 기준인가)가 사라진다.
+ *
+ * 접힘/펼침이 폭마다 다르다.
+ * - **모바일**: 접힌 한 줄(등급 + 수치 + 기준 장소). 누르면 펼친다
+ * - **데스크톱**: 펼친 패널이 기본
+ *
+ * **`위험`(DANGER)은 유일하게 접지 않는다** — 자동 펼침이고, 그 줄만 tint 로 강조한다.
+ *
+ * 등급어는 세로 바 없이 **라벨 16/600 `--fg-muted` + 등급어 20/800 등급 색**으로 구분한다.
+ */
+const TONE_TEXT: Record<MetricTone, string> = {
+  critical: 'text-metric-critical-700',
+  high: 'text-metric-high-700',
+  mid: 'text-metric-mid-700',
+  low: 'text-metric-low-700',
+  unknown: 'text-fg-muted',
+}
+
+/** 큰 수치는 22px 이상 + weight 900 이라 `-500` 이 허용된다 (DESIGN.md §2-3) */
+const TONE_VALUE: Record<MetricTone, string> = {
+  critical: 'text-metric-critical-500',
+  high: 'text-metric-high-500',
+  mid: 'text-metric-mid-500',
+  low: 'text-metric-low-500',
+  unknown: 'text-fg-muted',
+}
+
+const TONE_TINT: Record<MetricTone, string> = {
+  critical: 'bg-metric-critical-100',
+  high: 'bg-metric-high-100',
+  mid: 'bg-metric-mid-100',
+  low: 'bg-metric-low-100',
+  unknown: '',
+}
+
+export function WalkVerdict({
+  data,
+  petName,
+  busy = false,
+}: {
+  data: WalkSafetyResponse
+  petName: string | null
+  busy?: boolean
+}) {
+  const tone = walkSafetyTone(data.walkSafetyLevel.code)
+  // 위험은 접지 않는다 — 자동 펼침 (아트보드 04-①)
+  const [open, setOpen] = useState(tone === 'critical')
+
+  const heatIndex = formatCelsius(data.heatIndexCelsius)
+  const summary = [
+    heatIndex === null ? null : `${messages.home.heatIndexLabel} ${heatIndex}℃`,
+    `${data.placeTitle} ${messages.home.basisSuffix}`,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(' · ')
+
+  return (
+    <section
+      aria-busy={busy || undefined}
+      aria-label={messages.home.walkTodayLabel}
+      className={cn('border-border border-t', busy && 'opacity-55')}
+    >
+      {/* 모바일 — 접힌 한 줄. 누르면 펼친다 */}
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((prev) => !prev)}
+        className={cn(
+          'focus-visible:ring-brand-500 flex w-full items-center gap-2.5 px-4 py-3.5 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:hidden',
+          // 위험만 그 줄을 tint 로 강조한다
+          tone === 'critical' && TONE_TINT[tone],
+        )}
+      >
+        <span className="min-w-0 flex-1">
+          <span className="text-body-1 block font-semibold">
+            <span className="text-fg-muted">{messages.home.walkTodayLabel}</span>{' '}
+            <span className={cn('text-emphasis font-extrabold', TONE_TEXT[tone])}>
+              {data.walkSafetyLevel.name}
+            </span>
+          </span>
+          <span className="text-caption text-fg-muted block font-medium tabular-nums">
+            {summary}
+          </span>
+        </span>
+        <ChevronDownIcon
+          size={20}
+          className={cn('text-fg-muted shrink-0 transition-transform', open && 'rotate-180')}
+        />
+      </button>
+
+      {/* 데스크톱 — 펼친 패널이 기본. 모바일은 접힘 상태에 따른다 */}
+      <div
+        className={cn('flex-col gap-3 px-4 pb-4 md:flex md:px-6 md:py-5', open ? 'flex' : 'hidden')}
+      >
+        {/* 데스크톱에만 보이는 등급 줄 — 모바일은 위 버튼이 이미 말했다 */}
+        <div className="hidden items-end justify-between gap-3 md:flex">
+          <span className="text-body-1 font-semibold">
+            <span className="text-fg-muted">{messages.home.walkTodayLabel}</span>{' '}
+            <span className={cn('text-emphasis font-extrabold', TONE_TEXT[tone])}>
+              {data.walkSafetyLevel.name}
+            </span>
+          </span>
+          {heatIndex !== null && (
+            <span className="flex shrink-0 items-baseline gap-1">
+              <span className={cn('text-display font-black tabular-nums', TONE_VALUE[tone])}>
+                {heatIndex}
+              </span>
+              <span className="text-caption text-fg-muted font-medium">℃</span>
+            </span>
+          )}
+        </div>
+        <p className="text-caption text-fg-muted hidden font-medium md:block">
+          {data.placeTitle} {messages.home.basisSuffix}
+          {petName !== null && ` · ${petName} ${messages.home.basisSuffix}`}
+        </p>
+
+        <VerdictReasons reasons={data.reasons} />
+
+        {/* 안전 시간대는 조언의 실체다. 없으면 줄 자체를 렌더하지 않는다 */}
+        {data.saferWindowStart !== null && data.saferWindowEnd !== null && (
+          <p className="bg-metric-high-100 text-metric-high-700 text-body-2 flex items-center gap-2 rounded-md p-3 tabular-nums">
+            <ClockIcon size={20} className="shrink-0" />
+            {messages.home.saferWindowLabel}는 {data.saferWindowStart.slice(0, 5)} –{' '}
+            {data.saferWindowEnd.slice(0, 5)}
+          </p>
+        )}
+      </div>
+    </section>
+  )
+}
+
+/** 기본 2개 + 펼침. 서버 순서를 재정렬하지 않는다 */
+function VerdictReasons({ reasons }: { reasons: { description: string }[] }) {
+  const [expanded, setExpanded] = useState(false)
+
+  if (reasons.length === 0) return null
+
+  const visible = expanded ? reasons : reasons.slice(0, 2)
+  const hidden = reasons.length - visible.length
+
+  return (
+    <div className="flex flex-col gap-2">
+      {visible.map((reason, index) => (
+        <p key={`${index}-${reason.description}`} className="text-body-2 text-fg">
+          {reason.description}
+        </p>
+      ))}
+
+      {hidden > 0 && (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(true)}
+          className="text-body-2 text-link focus-visible:ring-brand-500 flex min-h-11 items-center gap-1 self-start font-semibold focus-visible:ring-2 focus-visible:outline-none"
+        >
+          {messages.home.moreReasons.replace('{n}', String(hidden))}
+          <ChevronDownIcon size={16} />
+        </button>
+      )}
+    </div>
+  )
+}

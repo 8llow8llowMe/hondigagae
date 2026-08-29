@@ -21,12 +21,11 @@ function renderTabs(authed: boolean, path = '/') {
 }
 
 describe('NavLinks — 미로그인 데스크톱 (명세 D7 #1)', () => {
-  it('보호 메뉴 3개를 숨긴다', () => {
+  it('보호 메뉴 2개를 숨긴다', () => {
     const markup = renderNav(false)
 
     expect(markup).not.toContain('여행 일정')
     expect(markup).not.toContain('AI 일정 생성')
-    expect(markup).not.toContain('내 반려견')
   })
 
   it('공개 메뉴는 남는다 — 미로그인도 장소는 볼 수 있다', () => {
@@ -38,7 +37,11 @@ describe('NavLinks — 미로그인 데스크톱 (명세 D7 #1)', () => {
 
     expect(markup).toContain('여행 일정')
     expect(markup).toContain('AI 일정 생성')
-    expect(markup).toContain('내 반려견')
+  })
+
+  it('내 반려견을 nav 에 두지 않는다 — 그것은 "내 설정" 이라 계정 팝오버가 맡는다', () => {
+    // nav 의 셋은 "할 일" 이다. 같은 줄에 설정을 섞으면 항목이 계속 늘어난다 (아트보드 03-B)
+    expect(renderNav(true)).not.toContain('내 반려견')
   })
 })
 

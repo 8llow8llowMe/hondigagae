@@ -76,10 +76,17 @@
   --text-page--line-height: 44px;
   --text-display: 28px;
   --text-display--line-height: 36px;
-  /* 등급어 전용 — DESIGN.md §3-1 이 명시한 스케일 밖 예외 2개 중 하나.
-     18 은 라벨(16/600)과 안 갈리고 22 는 반려견 이름과 겹친다. */
-  --text-verdict: 20px;
-  --text-verdict--line-height: 28px;
+  /* 아바타 이니셜 전용 — DESIGN.md §3-1 의 스케일 밖 예외.
+     텍스트가 아니라 원형 도형 내부 요소라 타입 스케일을 따르지 않는다. */
+  --text-avatar: 32px;
+  --text-avatar--line-height: 32px;
+  --text-avatar-lg: 38px;
+  --text-avatar-lg--line-height: 38px;
+
+  /* 20/800 — DESIGN.md §3-1 이 명시한 스케일 밖 예외. 쓰는 곳은 둘뿐이다:
+     등급어("위험")와 로고. 18 은 라벨(16/600)과 안 갈리고 22 는 반려견 이름과 겹친다. */
+  --text-emphasis: 20px;
+  --text-emphasis--line-height: 28px;
 
   --text-title-1: 22px;
   --text-title-1--line-height: 30px;

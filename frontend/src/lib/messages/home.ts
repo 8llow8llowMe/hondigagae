@@ -38,4 +38,25 @@ export const homeMessages = {
   /** 미로그인 안내 */
   guestVerdictNotice: '반려견을 등록하면 우리 아이 기준으로 판정해요',
   registerPet: '반려견 등록',
+  /**
+   * 프로필 태그는 짧은 표기를 쓴다 — 아트보드 `01 홈 · P1`.
+   * `messages.pet.labels` 의 "더위에 민감해요" 는 문장형이라 태그로는 길다.
+   */
+  traitHeat: '더위 민감',
+  traitCold: '추위 민감',
+  traitNoise: '소리 민감',
+  traitWalk: '산책 선호',
+  /** 미로그인 · 반려견 0마리일 때 프로필 자리 (아트보드 04-②) */
+  guestProfileTitle: '반려견을 등록해 주세요',
+  guestProfileDesc: '크기·민감도까지 반영한 판정을 볼 수 있어요.',
+  /** 섹션 푸터 */
+  morePlaces: '맞는 곳 {n}곳 더 보기',
+  allPlaces: '맞는 곳 {n}곳 전체 보기 ›',
+  allPlans: '일정 전체 보기 ›',
+  /** 메타 줄 · 태그의 실내/야외 표기 */
+  indoor: '실내',
+  outdoor: '야외',
+  /** 모바일 섹션 헤더는 폭이 좁아 짧게 쓴다 */
+  sortNoteShort: '날씨·혼잡도 반영',
+  verdictErrorTitle: '오늘 판정을 불러오지 못했어요.',
 } as const
