@@ -17,11 +17,11 @@ export const petMessages = {
   editTitle: '반려견 정보 수정',
 
   // 빈 상태 / 오류
-  emptyTitle: '등록된 반려견이 없습니다',
+  emptyTitle: '등록된 반려견이 없어요',
   emptyDescription: '반려견을 등록해 맞춤 여행을 받아보세요.',
-  notFoundTitle: '존재하지 않는 반려견입니다',
+  notFoundTitle: '존재하지 않는 반려견이에요',
   notFoundDescription: '목록으로 돌아가 다시 선택해주세요.',
-  loadFailedTitle: '정보를 불러오지 못했습니다',
+  loadFailedTitle: '정보를 불러오지 못했어요',
   loadFailedDescription: '잠시 후 다시 시도해주세요.',
 
   // 상한

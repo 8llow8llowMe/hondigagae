@@ -15,6 +15,15 @@ import { placeMessages } from '@/lib/messages/place'
  *
  * 상수화하는 이유: 같은 뜻의 문구가 화면마다 "다시 시도" / "재시도" / "새로고침" 으로
  * 갈리는 것을 막는다. 용어는 DESIGN.md §1 표를 따른다 ("반려견" 고정).
+ *
+ * **어미는 해요체로 통일한다** (DESIGN.md §1). 예외는 두 가지뿐이고, 둘 다 우리가 쓴
+ * 문장이 아니다:
+ *  1. **백엔드 `ValidationMessage` 복제본** (`form.ts`, `pet.ts` 의 `// XXX_NNN` 주석이
+ *     달린 줄) — 서버가 같은 문구를 내려주므로 여기서 톤을 바꾸면 **같은 폼 안에서
+ *     클라이언트 검증과 서버 검증의 말투가 갈린다**
+ *  2. 서버가 내려주는 문구 자체 (`resultMessage` · enum `name`/`description` · `reasons`)
+ *
+ * 회귀 감시는 `message-tone.test.ts` 가 한다.
  */
 export const messages = {
   common: commonMessages,
