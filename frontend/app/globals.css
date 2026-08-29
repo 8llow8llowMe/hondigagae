@@ -37,6 +37,7 @@
   /* ── 액션 · 링크 — DESIGN.md §2-4 */
   --color-brand-500: var(--brand-500);
   --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
   --color-link: var(--link);
   --color-link-hover: var(--link-hover);
 

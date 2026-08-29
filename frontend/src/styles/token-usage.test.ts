@@ -99,6 +99,11 @@ describe('토큰 사용 — 텍스트로 금지된 값', () => {
 })
 
 describe('토큰 사용 — 폐기한 토큰이 되살아나지 않는다 (DESIGN.md §2-7)', () => {
+  /**
+   * **`brand-700` 은 이 목록에서 빠졌다** — 이슈 #61 에서 되살렸다.
+   * 채운 버튼이 `--brand-500` → `--brand-600` 으로 내려가면서 hover 가 한 단계 더
+   * 필요해졌다. 폐기 사유("아트보드 사용 0회")가 더 이상 성립하지 않는다.
+   */
   const RETIRED = [
     'bg-subtle',
     'warn-100',
@@ -111,7 +116,6 @@ describe('토큰 사용 — 폐기한 토큰이 되살아나지 않는다 (DESIG
     'brand-50',
     'brand-100',
     'brand-300',
-    'brand-700',
     'accent-500',
     'accent-600',
     'shadow-sm',
@@ -193,6 +197,26 @@ describe('등급 톤 매핑은 metric.tsx 가 소유한다', () => {
           return hit.length >= 2 ? [`${path}:${index + 1}`] : []
         })
       },
+    )
+
+    expect(found).toEqual([])
+  })
+})
+
+/**
+ * `--brand-500` 위에 글자를 얹지 않는다 — 이슈 #61.
+ *
+ * 500 위 흰 글자는 **3.49:1** 이라 16px 라벨(본문 취급)에 필요한 4.5:1 에 미달한다.
+ * 채운 버튼은 `--brand-600`(5.27:1)이고, 500 은 포커스 링·선택 표시기처럼 **글자가
+ * 얹히지 않는 비텍스트 요소** 전용이다 (그쪽은 3:1 기준이라 통과한다).
+ *
+ * `contrast.test.ts` 가 **값**을 지키고 이 테스트가 **쓰임**을 지킨다 — 토큰 값이 옳아도
+ * `bg-brand-500` 위에 `text-fg-inverse` 를 얹으면 화면에서는 대비가 무너진다.
+ */
+describe('토큰 사용 — --brand-500 위에 글자를 얹지 않는다 (이슈 #61)', () => {
+  it('bg-brand-500 과 텍스트 색이 같은 요소에 오지 않는다', () => {
+    const found = violations(
+      (literal) => literal.includes('bg-brand-500') && /\btext-(fg-inverse|white)\b/.test(literal),
     )
 
     expect(found).toEqual([])

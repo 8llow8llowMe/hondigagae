@@ -73,6 +73,11 @@ function documented(name: string): boolean {
 }
 
 describe('토큰 동기 — 폐기한 토큰이 되살아나지 않는다', () => {
+  /**
+   * **`brand-700` 은 이 목록에서 빠졌다** — 이슈 #61 에서 되살렸다.
+   * 채운 버튼이 `--brand-500` → `--brand-600` 으로 내려가면서 hover 가 한 단계 더
+   * 필요해졌다. 폐기 사유("아트보드 사용 0회")가 더 이상 성립하지 않는다.
+   */
   const RETIRED = [
     '--bg-subtle',
     '--warn-100',
@@ -85,7 +90,6 @@ describe('토큰 동기 — 폐기한 토큰이 되살아나지 않는다', () =
     '--brand-50',
     '--brand-100',
     '--brand-300',
-    '--brand-700',
     '--accent-500',
     '--accent-600',
     '--shadow-sm',

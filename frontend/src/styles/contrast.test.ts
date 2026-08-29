@@ -85,16 +85,40 @@ describe('토큰 대비 — band · 선택 행 위에서도 읽힌다', () => {
 })
 
 describe('토큰 대비 — 채운 표면 위 흰 글자', () => {
-  it('주요 버튼은 16/600 대형 텍스트라 3:1 기준이다', () => {
+  /**
+   * **주요 버튼 채움은 `--brand-600` 이다** (이슈 #61).
+   *
+   * 라벨은 16px/600 인데 WCAG 대형 텍스트는 24px 이상 또는 18.66px 이상 + bold 다.
+   * 16px 은 bold 여도 본문이라 **4.5:1** 이 필요하다. 디자인 가이드가 이것을
+   * "16px/600 = AA 대형" 으로 잘못 적은 것이 출발점이었다.
+   */
+  it('주요 버튼 채움(--brand-600) 위 흰 글자가 본문 대비를 확보한다', () => {
+    expect(contrastRatio(token('--fg-inverse'), token('--brand-600'))).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('버튼 hover(--brand-700)도 본문 대비를 유지한다', () => {
+    expect(contrastRatio(token('--fg-inverse'), token('--brand-700'))).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it('hover 가 기본 채움보다 실제로 어둡다 — 눌린 것이 보여야 한다', () => {
+    const base = contrastRatio(token('--fg-inverse'), token('--brand-600'))
+    const hover = contrastRatio(token('--fg-inverse'), token('--brand-700'))
+
+    expect(hover).toBeGreaterThan(base)
+  })
+
+  /**
+   * `--brand-500` 은 **글자를 얹지 않는 곳**에만 남는다 — 포커스 링, 선택 표시기.
+   * 비텍스트 요소는 3:1 기준이라 3.49:1 로 통과한다.
+   *
+   * 4.5 미만임을 함께 단언한다. 언젠가 500 이 4.5 를 넘게 바뀌면 이 구분 자체가
+   * 필요 없어지므로, 그때 이 테스트가 먼저 알려준다.
+   */
+  it('--brand-500 은 비텍스트 3:1 만 만족한다 — 글자를 얹지 않는다', () => {
     const ratio = contrastRatio(token('--fg-inverse'), token('--brand-500'))
 
     expect(ratio).toBeGreaterThanOrEqual(3)
-    // 4.5 를 넘지 못하므로 --brand-500 위에 작은 글자를 두면 안 된다
     expect(ratio).toBeLessThan(4.5)
-  })
-
-  it('버튼 hover(--brand-600)는 본문 대비까지 확보한다', () => {
-    expect(contrastRatio(token('--fg-inverse'), token('--brand-600'))).toBeGreaterThanOrEqual(4.5)
   })
 
   it('파괴 버튼 채움 위 흰 글자가 4.5:1 이상이다', () => {
