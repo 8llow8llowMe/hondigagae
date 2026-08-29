@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 
+import { Badge } from '@/components/badge'
 import { ChevronDownIcon } from '@/components/icons'
 import { useSelectedPetStore } from '@/features/nav/selected-pet-store'
 import { MAX_PET_COUNT } from '@/lib/api/pet'
@@ -166,18 +167,18 @@ function TraitTags({ pet }: { pet: Pet }) {
   const rest = traits.length - shown.length
 
   return (
-    <span className="mt-2 flex flex-wrap gap-1.5">
+    <div className="mt-2 flex flex-wrap gap-1.5">
       {shown.map((trait) => (
-        <span key={trait} className="text-caption bg-band rounded-sm px-2 py-1 font-medium">
+        <Badge key={trait} tone="neutral">
           {trait}
-        </span>
+        </Badge>
       ))}
       {rest > 0 && (
-        <span className="text-caption bg-band text-fg-muted rounded-sm px-2 py-1 font-medium tabular-nums">
+        <Badge tone="neutral" className="tabular-nums">
           +{rest}
-        </span>
+        </Badge>
       )}
-    </span>
+    </div>
   )
 }
 

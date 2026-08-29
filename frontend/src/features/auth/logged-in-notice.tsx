@@ -1,12 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { useQueryClient } from '@tanstack/react-query'
 
-import { Button } from '@/components/button'
+import { Button, ButtonLink } from '@/components/button'
 import { logout } from '@/lib/api/auth'
 import { messages } from '@/lib/messages'
 
@@ -37,18 +36,13 @@ export function LoggedInNotice({ returnTo }: { returnTo: string }) {
     <div className="flex flex-col gap-4">
       <h1 className="text-title-1 text-fg font-bold">{messages.auth.alreadyLoggedIn}</h1>
       {/*
-       * 이동이므로 Button onClick 이 아니라 <a> 다 — 새 탭·가운데클릭·history 대체 없는
-       * 이동을 위해서다. `Button` 은 <button> 만 렌더해 href 를 못 받는다
-       * (component-guide.md §3, 이슈 #11 선례 PlaceBackLink). `Button` 의 `primary`/`lg`
-       * 시각을 그대로 복제한다 — 이 화면의 주 행동이라 텍스트 링크가 아니라 버튼처럼
-       * 보여야 한다.
+       * 이동이므로 `Button` 의 onClick 이 아니라 링크다 — 새 탭·가운데클릭·history 대체 없는
+       * 이동을 위해서다. 이 화면의 주 행동이라 텍스트 링크가 아니라 버튼처럼 보여야 하므로
+       * `ButtonLink` 를 쓴다. **외형을 손으로 복제하지 않는다** (이슈 #70).
        */}
-      <Link
-        href={returnTo}
-        className="bg-brand-500 text-fg-inverse hover:bg-brand-600 active:bg-brand-600 focus-visible:ring-brand-500 inline-flex h-12 items-center justify-center gap-2 rounded-md px-5 text-center font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-      >
+      <ButtonLink href={returnTo} size="lg">
         {messages.auth.goBack}
-      </Link>
+      </ButtonLink>
       <Button
         variant="secondary"
         size="lg"

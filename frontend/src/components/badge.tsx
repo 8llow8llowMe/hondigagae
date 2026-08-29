@@ -29,9 +29,17 @@ const TONE: Record<BadgeTone, string> = {
   danger: 'bg-danger-100 text-danger-700',
 }
 
+/**
+ * 크기는 `MetricBadge` 와 **같은 값이어야 한다** (`src/components/metric.tsx`).
+ * 두 배지가 한 줄에 나란히 서는 곳이 있어 값이 갈리면 그 줄이 어긋나 보인다.
+ *
+ * `md` 는 아트보드 값이다 — 8종 전부 `font-size:12px; line-height:18px; padding:4px 8px`
+ * 하나만 쓴다. 예전 `h-6 px-2.5`(24px)는 아트보드에 없는 값이었다.
+ * `MetricBadge` 가 unknown 점선을 위해 `border` 를 갖고 있어 실제 높이는 26+2 = 28 이다.
+ */
 const SIZE: Record<BadgeSize, string> = {
   sm: 'h-5 px-2 text-caption',
-  md: 'h-6 px-2.5 text-caption',
+  md: 'px-2 py-1 text-caption',
 }
 
 export function Badge({ tone = 'neutral', size = 'md', children, className }: BadgeProps) {

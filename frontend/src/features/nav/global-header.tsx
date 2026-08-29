@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { ButtonLink } from '@/components/button'
 import { EmergencyIcon } from '@/components/icons'
 import { AccountMenu } from '@/features/nav/account-menu'
 import { NavLinks } from '@/features/nav/nav-links'
@@ -52,18 +53,10 @@ export function GlobalHeader({ authed }: { authed: boolean }) {
             <AccountMenu />
           ) : (
             <div className="hidden items-center gap-1 md:flex">
-              <Link
-                href="/login"
-                className="text-body-1 text-fg hover:bg-band focus-visible:ring-brand-500 inline-flex h-11 items-center rounded-md px-3 font-medium focus-visible:ring-2 focus-visible:outline-none"
-              >
+              <ButtonLink href="/login" variant="ghost">
                 로그인
-              </Link>
-              <Link
-                href="/signup"
-                className="text-body-1 bg-brand-500 text-fg-inverse hover:bg-brand-600 focus-visible:ring-brand-500 inline-flex h-11 items-center rounded-md px-4 font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-              >
-                회원가입
-              </Link>
+              </ButtonLink>
+              <ButtonLink href="/signup">회원가입</ButtonLink>
             </div>
           )}
         </div>

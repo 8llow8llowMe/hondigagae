@@ -1,6 +1,7 @@
 'use client'
 
 import { type ReactNode, useEffect, useRef } from 'react'
+import Link from 'next/link'
 
 import { useOverlay } from '@/lib/ui/overlay'
 import { cn } from '@/lib/utils/cn'
@@ -18,13 +19,22 @@ import { cn } from '@/lib/utils/cn'
  * 잠그지 않는다.
  */
 
-export type MenuItem = {
+/**
+ * 항목은 **이동이거나 동작이다.** 둘 다 아니거나 둘 다인 항목은 없다.
+ *
+ * `href` 를 받지 않던 시절 `account-menu.tsx` 가 오버레이 배선(`useOverlay` · 바깥 클릭 ·
+ * 패널 마크업)을 통째로 다시 만들었다 — 계정 메뉴 3항목이 전부 이동이기 때문이다.
+ * 이동을 `onSelect` + `router.push` 로 흉내내면 새 탭·가운데클릭·주소 복사가 죽는다.
+ */
+type MenuItemBase = {
   label: string
-  onSelect: () => void
   /** 파괴적 항목. 목록의 마지막에 둔다 */
   destructive?: boolean
   disabled?: boolean
 }
+
+export type MenuItem = MenuItemBase &
+  ({ href: string; onSelect?: never } | { href?: never; onSelect: () => void })
 
 export function Menu({
   open,
@@ -71,27 +81,49 @@ export function Menu({
         className,
       )}
     >
-      {items.map((item) => (
-        <button
-          key={item.label}
-          type="button"
-          role="menuitem"
-          disabled={item.disabled}
-          onClick={() => {
-            item.onSelect()
-            onClose()
-          }}
-          className={cn(
-            // 각 항목 44px — 가이드 §5-2
-            'text-body-2 flex h-11 w-full items-center px-4 text-left font-medium',
-            'hover:bg-band focus-visible:bg-band focus-visible:outline-none',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-            item.destructive === true ? 'text-danger-900' : 'text-fg',
-          )}
-        >
-          {item.label}
-        </button>
-      ))}
+      {items.map((item) => {
+        const itemClass = cn(
+          // 각 항목 44px — 가이드 §5-2
+          'text-body-2 flex h-11 w-full items-center px-4 text-left font-medium',
+          'hover:bg-band focus-visible:bg-band focus-visible:outline-none',
+          'disabled:cursor-not-allowed disabled:opacity-50',
+          // 파괴적 항목은 마지막 + danger-900 (가이드 §5-2)
+          item.destructive === true ? 'text-danger-900' : 'text-fg',
+          // 파괴적 항목 위에 선을 그어 손이 미끄러지는 것을 막는다
+          item.destructive === true && 'border-border mt-1 border-t',
+        )
+
+        // 이동은 `<a>` 여야 새 탭·주소 복사·스크린리더 안내가 성립한다
+        if (item.href !== undefined) {
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              role="menuitem"
+              onClick={onClose}
+              className={itemClass}
+            >
+              {item.label}
+            </Link>
+          )
+        }
+
+        return (
+          <button
+            key={item.label}
+            type="button"
+            role="menuitem"
+            disabled={item.disabled}
+            onClick={() => {
+              item.onSelect()
+              onClose()
+            }}
+            className={itemClass}
+          >
+            {item.label}
+          </button>
+        )
+      })}
     </div>
   )
 }
