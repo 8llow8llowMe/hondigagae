@@ -42,10 +42,16 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
 
   /**
    * **아직 다 받지 않았으면 개수를 말하지 않는다** (공통명세 S3).
+   *
+   * 조건이 둘이다. `hasNext` 는 "더 있는데 안 받았다" 이고, `pages === undefined` 는
+   * "아직 한 장도 못 받았다" 다. **후자를 빼먹으면 조회 중과 실패에 `일정 0개` ·
+   * `전체 0 · 초안 0` 이 뜬다** — 스켈레톤이 도는 옆에서 0 을 단정하는 화면이 된다
+   * (375 실렌더에서 확인).
+   *
    * 상태 개수는 반려견 필터를 적용한 뒤 값이고, 반려견 개수는 상태 필터를 적용한 뒤
    * 값이다 — 두 축이 서로를 기준으로 센다 (아트보드 04 주석).
    */
-  const countable = !hasNext
+  const countable = pages !== undefined && !hasNext
   const statusCounts = countable
     ? countByStatus(filterPlans(allPlans, { ...DEFAULT_PLAN_FILTERS, petIds: filters.petIds }))
     : null

@@ -134,6 +134,13 @@ describe('일정 목록 — 상태 화면', () => {
     expect(html).not.toMatch(/일정 \d+개를 볼 수 있어요/)
   })
 
+  it('조회 중에는 개수를 단정하지 않는다 — 스켈레톤 옆에 0 을 쓰지 않는다', () => {
+    // countable 판정은 PlanListView 가 하고, 섹션은 totalCount=null 을 받는다.
+    // 여기서는 그 null 이 화면에 0 으로 새지 않는지만 본다
+    const html = render({ loading: true, totalCount: null })
+    expect(html).not.toMatch(/일정 \d+개/)
+  })
+
   it('404 가 아닌 일시 장애에만 재시도를 준다', () => {
     const html = render({ errorStatus: 503 })
     expect(html).toContain(messages.common.retry)

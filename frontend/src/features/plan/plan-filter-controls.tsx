@@ -168,6 +168,18 @@ export function PlanFilterRail({
                   onChange({ ...filters, petIds: togglePet(filters.petIds, pet.petId) })
                 }
                 description={describePet(pet) ?? undefined}
+                /*
+                  아트보드 05 의 반려견 행은 `min-height:52px` 다 — `FilterCheck` 기본값
+                  44 보다 크다. 아바타와 두 줄을 담는 행이라서다.
+
+                  **부제가 없는 반려견이 있어 실제로 벌어졌다.** 견종·나이가 둘 다 없으면
+                  `describePet` 이 null 이라 한 줄이 되고, 옆 반려견이 64 일 때 이 행만
+                  44 로 주저앉는다 (1280 실렌더). 52 를 바닥으로 깔아 격차를 줄인다.
+
+                  **높이를 완전히 고정하지는 않는다** — 그러려면 없는 부제 자리를 비워 둬야
+                  하고, 이 저장소는 없는 데이터의 자리를 만들지 않는다.
+                */
+                className="min-h-13"
               >
                 <CountLine
                   label={pet.name}
