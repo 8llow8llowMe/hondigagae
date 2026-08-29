@@ -60,6 +60,12 @@ describe('parsePlaceFilters — 새 필터', () => {
     expect(parsePlaceFilters(new URLSearchParams('allowedPetSize=HUGE')).allowedPetSize).toBeNull()
   })
 
+  it('petSizeType 은 반려견 크기 코드만 받는다', () => {
+    expect(parsePlaceFilters(new URLSearchParams('petSizeType=SMALL')).petSizeType).toBe('SMALL')
+    // 장소 축(`allowedPetSize`)의 코드를 여기 넣으면 백엔드가 400 이다 — 미지정으로 떨군다
+    expect(parsePlaceFilters(new URLSearchParams('petSizeType=SMALL_ONLY')).petSizeType).toBeNull()
+  })
+
   it('sourceCategory 는 자유 문자열이라 그대로 받는다', () => {
     expect(parsePlaceFilters(new URLSearchParams('sourceCategory=카페')).sourceCategory).toBe(
       '카페',
@@ -107,6 +113,7 @@ describe('round-trip', () => {
     { ...DEFAULT_PLACE_FILTERS, indoor: true },
     { ...DEFAULT_PLACE_FILTERS, indoor: false },
     { ...DEFAULT_PLACE_FILTERS, allowedPetSize: 'SMALL_ONLY' },
+    { ...DEFAULT_PLACE_FILTERS, petSizeType: 'MEDIUM' },
     { ...DEFAULT_PLACE_FILTERS, sourceCategory: '카페' },
     {
       ...DEFAULT_PLACE_FILTERS,

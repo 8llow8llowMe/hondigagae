@@ -1,6 +1,8 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 
-import { PlaceFilterBar } from '@/features/place/place-filter-bar'
+import { filterSummaryLine } from '@/features/place/filter-summary-line'
+import { PlaceFilterChips } from '@/features/place/place-filter-chips'
+import { PlaceFilterRail } from '@/features/place/place-filter-rail'
 import { PlaceListView } from '@/features/place/place-list-view'
 import { placeKeys } from '@/features/place/queries'
 import { placeListPath, type PlaceSlice } from '@/lib/api/place'
@@ -37,21 +39,44 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
     })
     .catch(() => undefined)
 
-  // 좌우 여백은 DESIGN.md §4 스케일: 16(모바일) / 24(태블릿) / 40(데스크톱).
-  // 한 컬럼을 유지한다 — 지도 뷰가 붙으면 데스크톱은 '좌측 목록 + 우측 지도' 2단이
-  // 되므로 지금 다단 그리드로 가면 그때 다시 갈아엎어야 한다.
+  /*
+    아트보드 `혼디가개 장소 찾기.dc.html` 03 절 — 데스크톱은 **좌 280 필터 레일(sticky) /
+    우 가변** 2단이다. 레이아웃은 `.rail-layout .rail-layout-filter`(app/globals.css) 이고
+    **열 구분선은 우측 열의 `border-left`** 다 (홈에서 배경 방식이 행에 가려진 전례가 있다).
+
+    2단은 **1024+ 부터**다. 태블릿(768~1023)은 한 컬럼을 유지한다 — 280 레일에 우측 본문을
+    더하면 768 에 들어가지 않아 가로 스크롤이 난다 (홈 이슈 #51 에서 실측으로 확인).
+    그래서 레일은 `hidden lg:block`, 칩은 `lg:hidden` 으로 정확히 갈린다.
+  */
   return (
-    <main className="mx-auto flex max-w-screen-md flex-col gap-6 px-4 py-6 md:px-6 md:py-8 lg:px-10">
-      <header>
-        <h1 className="text-display text-fg font-extrabold">{messages.place.pageTitle}</h1>
-        <p className="text-body-2 text-fg-muted mt-2">{messages.place.pageDescription}</p>
-      </header>
+    <main id="main-content" className="rail-layout rail-layout-filter">
+      {/* `rail-sticky`(globals.css) — 레일이 뷰포트보다 길어도 바닥에 닿을 수 있게
+          자기 스크롤을 준다. 실측: 1280×900 에서 레일 1067px 이라 실내·야외 축이 잘렸다 */}
+      <div className="rail-sticky hidden lg:block">
+        <PlaceFilterRail filters={filters} />
+      </div>
 
-      <PlaceFilterBar filters={filters} />
+      <div className="lg:border-border lg:border-l">
+        {/* 좌우 여백은 `Row`(px-4 md:px-10)와 같은 값이어야 한다 — 어긋나면 제목과
+            행 구분선이 다른 축에서 시작해 목록이 어긋나 보인다 (768 실렌더에서 확인) */}
+        <header className="px-4 pt-5 pb-3 md:px-10 lg:pt-6">
+          <h1 className="text-title-1 text-fg lg:text-display font-bold lg:font-extrabold">
+            {messages.place.pageTitle}
+          </h1>
+          {/* 부제는 데스크톱에서만 — 모바일은 바로 아래 칩이 같은 것을 보여준다 */}
+          <p className="text-caption text-fg-muted mt-1 hidden font-medium lg:block">
+            {filterSummaryLine(filters)}
+          </p>
+        </header>
 
-      <HydrationBoundary state={dehydrate(queryClient)}>
-        <PlaceListView filters={filters} />
-      </HydrationBoundary>
+        <div className="lg:hidden">
+          <PlaceFilterChips filters={filters} />
+        </div>
+
+        <HydrationBoundary state={dehydrate(queryClient)}>
+          <PlaceListView filters={filters} />
+        </HydrationBoundary>
+      </div>
     </main>
   )
 }

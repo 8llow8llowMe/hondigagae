@@ -49,6 +49,25 @@ const PET = {
   },
 } as const
 
+const SIZE = {
+  ALL: { code: 'ALL', name: '전 견종 가능', description: '견종/크기 제한 없이 동반이 가능합니다.' },
+  SMALL_ONLY: {
+    code: 'SMALL_ONLY',
+    name: '소형견만 가능',
+    description: '소형견만 동반이 가능합니다.',
+  },
+  SMALL_MEDIUM: {
+    code: 'SMALL_MEDIUM',
+    name: '중소형견 가능',
+    description: '소형견과 중형견까지 동반이 가능합니다.',
+  },
+  UNKNOWN: {
+    code: 'UNKNOWN',
+    name: '정보 없음',
+    description: '동반 가능 크기 정보가 확인되지 않았습니다.',
+  },
+} as const
+
 type Seed = Omit<PlaceSummary, 'placeId'>
 
 const SEEDS: Seed[] = [
@@ -62,6 +81,8 @@ const SEEDS: Seed[] = [
     firstImage: null,
     firstImage2: null,
     petAllowanceType: PET.PARTIALLY_ALLOWED,
+    allowedPetSize: SIZE.SMALL_ONLY,
+    maxPetWeightKg: 10,
     tel: '064-710-4150',
     indoor: true,
     sourceCategory: '미술관',
@@ -77,6 +98,8 @@ const SEEDS: Seed[] = [
     firstImage: null,
     firstImage2: null,
     petAllowanceType: PET.ALLOWED,
+    allowedPetSize: SIZE.ALL,
+    maxPetWeightKg: null,
     tel: null,
     indoor: false,
     sourceCategory: '여행지',
@@ -92,6 +115,8 @@ const SEEDS: Seed[] = [
     firstImage: null,
     firstImage2: null,
     petAllowanceType: PET.PARTIALLY_ALLOWED,
+    allowedPetSize: SIZE.SMALL_MEDIUM,
+    maxPetWeightKg: 15,
     tel: '064-794-5312',
     indoor: true,
     sourceCategory: '카페',
@@ -107,6 +132,8 @@ const SEEDS: Seed[] = [
     firstImage: null,
     firstImage2: null,
     petAllowanceType: PET.ALLOWED,
+    allowedPetSize: SIZE.ALL,
+    maxPetWeightKg: null,
     tel: '064-799-0000',
     indoor: true,
     sourceCategory: '펜션',
@@ -122,6 +149,8 @@ const SEEDS: Seed[] = [
     firstImage: null,
     firstImage2: null,
     petAllowanceType: PET.ALLOWED,
+    allowedPetSize: SIZE.UNKNOWN,
+    maxPetWeightKg: null,
     tel: null,
     // 원천에 실내 정보가 없다 — indoor 필터 어느 쪽에도 잡히지 않는다
     indoor: null,
@@ -139,6 +168,8 @@ const SEEDS: Seed[] = [
     firstImage: null,
     firstImage2: null,
     petAllowanceType: PET.ALLOWED,
+    allowedPetSize: SIZE.ALL,
+    maxPetWeightKg: null,
     tel: null,
     indoor: false,
     sourceCategory: null,
@@ -154,6 +185,8 @@ const SEEDS: Seed[] = [
     firstImage: null,
     firstImage2: null,
     petAllowanceType: PET.NOT_ALLOWED,
+    allowedPetSize: SIZE.UNKNOWN,
+    maxPetWeightKg: null,
     tel: '064-752-3001',
     indoor: false,
     sourceCategory: '시장',
@@ -169,6 +202,8 @@ const SEEDS: Seed[] = [
     firstImage: null,
     firstImage2: null,
     petAllowanceType: PET.UNKNOWN,
+    allowedPetSize: SIZE.SMALL_ONLY,
+    maxPetWeightKg: 10,
     tel: '064-710-7801',
     indoor: true,
     sourceCategory: '미술관',

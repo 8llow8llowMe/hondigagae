@@ -1,4 +1,5 @@
 import type { EnumMetadata } from '@/types/api'
+import type { PetSizeCode } from '@/types/pet'
 
 /**
  * 근거: backend PlaceItem / PlaceDetailResponse (tour-service)
@@ -22,6 +23,10 @@ export type PlaceSummary = {
   firstImage: string | null
   firstImage2: string | null
   petAllowanceType: EnumMetadata
+  /** 입장 가능 반려견 크기. **상세 응답의 `petInfo.allowedPetSize` 와 같은 축이다** */
+  allowedPetSize: EnumMetadata
+  /** 입장 가능 체중 상한(kg). **원문에 숫자가 있을 때만 온다** — null 은 "제한 없음" 이 아니라 "모름" 이다 */
+  maxPetWeightKg: number | null
   tel: string | null
   /** 실내 여부. **null 이면 원천에 정보가 없다** — indoor 필터의 true/false 어느 쪽에도 잡히지 않는다 */
   indoor: boolean | null
@@ -114,6 +119,14 @@ export type PlaceFilters = {
   /** true 면 실내만. **원천에 정보가 없는 장소(indoor === null)는 어느 쪽으로도 잡히지 않는다** */
   indoor: boolean | null
   allowedPetSize: AllowedPetSizeCode | null
+  /**
+   * 내 반려견 크기. **받아 주지 않는 것으로 확인된 곳만 뺀다** — 정보 없음인 곳은 남는다.
+   * 아트보드의 "몽실이가 들어갈 수 있는 곳만" 이 이 파라미터다 (`PlaceWebController#getPlaces`).
+   *
+   * `allowedPetSize` 와 다르다. 저쪽은 **장소의 속성**을 직접 고르는 축이고, 이쪽은
+   * **내 반려견을 기준**으로 거르는 축이다. 화면에서는 이쪽만 쓴다 — 판정의 화자를 유지한다.
+   */
+  petSizeType: PetSizeCode | null
   /** 원본 분류 자유 문자열 (예: 카페) */
   sourceCategory: string | null
 }

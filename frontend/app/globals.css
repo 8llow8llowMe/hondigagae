@@ -137,6 +137,36 @@ body {
     */
     min-block-size: calc(100dvh - var(--header-h));
   }
+
+  /*
+    목록 화면용 변형 — 좌측이 **맥락 패널이 아니라 필터 레일**이라 폭이 다르다
+    (`--rail-filter: 280px`, DESIGN.md §7-1). 역할이 다르므로 폭도 다르다는 것이
+    디자인 가이드 §4 의 규칙이고, 1584+ 에서 맥락 패널만 480 으로 넓어지는 것과 달리
+    필터 레일은 280 을 유지한다 — 라디오 한 줄에 그 이상이 필요하지 않다.
+  */
+  .rail-layout-filter {
+    grid-template-columns: var(--rail-filter) 1fr;
+  }
+
+  /*
+    sticky 레일 자체가 뷰포트보다 길 때 **바닥에 닿을 수 없는 문제**를 막는다.
+
+    `position: sticky` 는 요소의 위쪽이 `top` 에 닿으면 고정하는데, 요소가 뷰포트보다
+    길면 아래쪽은 영원히 화면 밖에 남는다. 장소 찾기 필터 레일이 실제로 그랬다 —
+    1067px 레일 / 836px 가용 높이라 **실내·야외 축에 손이 닿지 않았다**(1280×900 실측).
+
+    레일에 자기 스크롤을 준다. 세로 스크롤바는 숨기지 않는다 — 가로 칩 줄과 달리
+    활성 밑줄로 오독될 여지가 없고, 더 있다는 유일한 신호다.
+  */
+  .rail-sticky {
+    position: sticky;
+    top: var(--header-h);
+    align-self: start;
+    max-block-size: calc(100dvh - var(--header-h));
+    overflow-y: auto;
+    /* 레일 끝에서 계속 굴려도 뒤 목록이 따라 움직이지 않게 한다 */
+    overscroll-behavior: contain;
+  }
 }
 
 /*

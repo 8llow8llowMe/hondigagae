@@ -153,8 +153,30 @@ function matches(place: PlaceSummary, params: URLSearchParams): boolean {
     if (place.indoor !== (indoor === 'true')) return false
   }
 
+  const allowedPetSize = params.get('allowedPetSize')
+  if (allowedPetSize !== null && place.allowedPetSize.code !== allowedPetSize) return false
+
+  // 내 반려견 크기 — **받아 주지 않는 것으로 확인된 곳만 뺀다.**
+  // `UNKNOWN` 은 남긴다: 정보 없음을 "불가" 로 단정하면 실제로는 갈 수 있는 장소가
+  // 검색에서 사라진다 (backend `AllowedPetSize#allows` 와 같은 규칙이다)
+  const petSizeType = params.get('petSizeType')
+  if (petSizeType !== null && !allowsPetSize(place.allowedPetSize.code, petSizeType)) return false
+
   const sourceCategory = params.get('sourceCategory')
   if (sourceCategory !== null && place.sourceCategory !== sourceCategory) return false
 
   return true
+}
+
+/** backend `AllowedPetSize#allows(PetSizeType)` 의 이식. 규칙이 갈리면 mock 이 거짓말을 한다 */
+function allowsPetSize(allowedPetSize: string, petSizeType: string): boolean {
+  switch (allowedPetSize) {
+    case 'SMALL_ONLY':
+      return petSizeType === 'SMALL'
+    case 'SMALL_MEDIUM':
+      return petSizeType !== 'LARGE'
+    default:
+      // ALL · UNKNOWN
+      return true
+  }
 }

@@ -11,8 +11,8 @@ import { Row } from '@/components/surface'
 export function PlaceRowSkeleton({ last = false }: { last?: boolean }) {
   return (
     <Row as="li" last={last}>
-      <div className="flex gap-4 py-4">
-        <Skeleton variant="thumbnail" className="h-20 w-20 shrink-0 md:h-24 md:w-24" />
+      <div className="flex gap-3 py-3 lg:gap-5 lg:py-4">
+        <Skeleton variant="thumbnail" className="size-20 shrink-0 lg:size-24" />
 
         <div className="min-w-0 flex-1">
           <Skeleton className="h-6 w-full" />

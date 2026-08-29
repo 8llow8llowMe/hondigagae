@@ -113,15 +113,18 @@ export function PlaceListSection({
       </RowList>
 
       {hasNext ? (
-        <Button
-          variant="secondary"
-          size="md"
-          className="mx-4 mt-4 md:mx-10"
-          loading={loadingMore}
-          onClick={onLoadMore}
-        >
-          {messages.common.loadMore}
-        </Button>
+        // 아트보드 01·03 절: 모바일은 전폭, 데스크톱은 내용 폭. 좌우 여백은 행 인셋과 같다
+        <div className="border-border border-t px-4 py-4 md:px-10 lg:py-5">
+          <Button
+            variant="secondary"
+            size="md"
+            className="w-full md:w-auto"
+            loading={loadingMore}
+            onClick={onLoadMore}
+          >
+            {messages.common.loadMore}
+          </Button>
+        </div>
       ) : (
         <p className="text-caption text-fg-muted py-4 text-center font-medium">
           {messages.common.listEnd}

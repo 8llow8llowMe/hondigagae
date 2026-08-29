@@ -53,19 +53,57 @@ describe('PlaceRow — 표면 (DESIGN.md §0)', () => {
   })
 })
 
+describe('PlaceRow — 메타 줄 (아트보드 01·03)', () => {
+  it('주소를 읍·면·동까지 줄이고 실내/야외를 붙인다', () => {
+    const markup = render()
+
+    // fixture 의 addr1 은 `제주특별자치도 제주시 한림읍 용금로 906-107` 이다
+    expect(markup).toContain('제주시 한림읍 · 실내')
+    expect(markup).not.toContain('용금로')
+  })
+
+  it('indoor 가 false 면 야외로 쓴다', () => {
+    expect(render({ ...placeSummary, indoor: false })).toContain(
+      `한림읍 · ${messages.place.rowOutdoor}`,
+    )
+  })
+
+  it('아트보드의 거리(4.1km)는 목록 응답에 없으므로 그리지 않는다', () => {
+    expect(render()).not.toContain('km')
+  })
+})
+
 describe('PlaceRow — nullable 처리', () => {
   it('firstImage 가 null 이면 같은 크기의 "이미지 없음" 타일을 남긴다', () => {
     const markup = render({ ...placeSummary, firstImage: null })
 
     expect(markup).toContain(messages.place.noImage)
     // 행 높이가 흔들리지 않도록 타일 크기는 그대로다
-    expect(markup).toContain('h-20 w-20')
+    expect(markup).toContain('size-20')
   })
 
-  it('addr1 이 null 이면 주소 줄 자체를 렌더하지 않는다', () => {
+  it('addr1 이 null 이면 주소를 빼고 실내/야외만 남긴다', () => {
     const markup = render({ ...placeSummary, addr1: null })
 
-    expect(markup).not.toContain('제주특별자치도 제주시')
+    expect(markup).not.toContain('제주시 한림읍')
+    expect(markup).toContain(messages.place.rowIndoor)
+  })
+
+  it('addr1 · indoor 가 모두 없으면 메타 줄 자체를 렌더하지 않는다', () => {
+    const markup = render({ ...placeSummary, addr1: null, indoor: null })
+
+    expect(markup).not.toContain('tabular-nums')
+  })
+
+  it('indoor 가 null 이면 "모름" 을 점선 배지로 드러낸다', () => {
+    const markup = render({ ...placeSummary, indoor: null })
+
+    expect(markup).toContain(messages.place.rowIndoorUnknown)
+    expect(markup).toContain('border-dashed')
+  })
+
+  it('indoor 를 아는 장소에는 점선 배지를 붙이지 않는다', () => {
+    expect(render()).not.toContain('border-dashed')
   })
 })
 

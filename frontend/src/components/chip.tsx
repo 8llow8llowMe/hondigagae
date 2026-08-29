@@ -23,14 +23,33 @@ export type ChipProps = {
   onSelect: () => void
   /** 배타 축이면 true. 기본은 다중 축이다 */
   exclusive?: boolean
+  /**
+   * 칩이 **값을 고르는 것이 아니라 시트를 여는 트리거**일 때 준다 (아트보드 `01 목록 — 모바일`
+   * 의 "유형" · "지역" · "더보기").
+   *
+   * 주면 `aria-expanded` 를 쓰고 토글/라디오 의미를 **버리며**, `selected` 는 tint 만 정한다.
+   * 시트를 여는 버튼에 `aria-pressed` 를 붙이면 스크린리더가 "선택됨" 으로 읽어 값이 이미
+   * 적용된 것처럼 들린다 — 여는 것과 고르는 것은 다른 일이다.
+   */
+  expanded?: boolean
   children: ReactNode
   className?: string
 }
 
-export function Chip({ selected, onSelect, exclusive = false, children, className }: ChipProps) {
-  const a11y = exclusive
-    ? ({ role: 'radio', 'aria-checked': selected } as const)
-    : ({ 'aria-pressed': selected } as const)
+export function Chip({
+  selected,
+  onSelect,
+  exclusive = false,
+  expanded,
+  children,
+  className,
+}: ChipProps) {
+  const a11y =
+    expanded !== undefined
+      ? ({ 'aria-expanded': expanded, 'aria-haspopup': 'dialog' } as const)
+      : exclusive
+        ? ({ role: 'radio', 'aria-checked': selected } as const)
+        : ({ 'aria-pressed': selected } as const)
 
   return (
     <button
@@ -39,9 +58,14 @@ export function Chip({ selected, onSelect, exclusive = false, children, classNam
       onClick={onSelect}
       className={cn(
         // 모바일 최소 터치 영역 44px (DESIGN.md §7)
-        'text-body-2 inline-flex h-11 items-center rounded-md px-3 whitespace-nowrap transition-colors',
+        'text-body-2 inline-flex h-11 items-center gap-1.5 rounded-md border px-3 whitespace-nowrap transition-colors',
         'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
-        selected ? 'bg-band text-fg font-semibold' : 'text-fg-muted hover:bg-band',
+        // **테두리는 선택 여부와 무관하게 항상 있다** — 없으면 칩이 그냥 글자로 보여
+        // 누를 수 있다는 것을 알 수 없다 (아트보드 `01 목록 — 모바일`: 미선택도 1px 테두리).
+        // 선택은 tint + 진한 테두리 + weight 셋으로 말한다. 색 하나에 기대지 않는다.
+        selected
+          ? 'bg-band border-border-strong text-fg font-semibold'
+          : 'bg-bg border-border text-fg-muted hover:bg-band font-medium',
         className,
       )}
     >
