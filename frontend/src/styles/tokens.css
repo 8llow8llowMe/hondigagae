@@ -94,13 +94,13 @@
 
   /* ── PhotoGallery 표시 크기 — DESIGN.md §7-3.
      TourAPI 이미지는 해상도가 고르지 않아(가로 500–800px 가 흔함) 전폭으로 늘리면
-     업스케일이 드러난다. 그래서 표시 폭에 상한을 둔다. 높이는 항상 고정이다. */
+     업스케일이 드러난다. 그래서 표시 폭에 상한을 둔다. 높이는 항상 고정이다.
+
+     데스크톱 모자이크의 대표/썸네일 폭은 토큰이 아니라 **비율(`1.62fr 1fr`)** 이다 —
+     2단에서 우측 열이 가변이라 고정 px 로는 열을 채우지 못한다. */
   --gallery-w-mobile: 342px;
   --gallery-h-mobile: 214px;
-  --gallery-w-lead: 590px;
   --gallery-h-desktop: 300px;
-  --gallery-w-thumb: 362px;
-  --gallery-h-thumb: 146px;
   --gallery-w-single-max: 660px;
 }
 

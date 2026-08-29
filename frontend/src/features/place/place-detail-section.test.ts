@@ -7,8 +7,20 @@ import {
   PlaceDetailSection,
   type PlaceDetailSectionProps,
 } from '@/features/place/place-detail-section'
+import type { PlaceSuitabilityPanelProps } from '@/features/place/place-suitability-panel'
 import { messages } from '@/lib/messages'
+import { suitability as suitabilityFixture } from '@/test/fixtures/insight'
 import { placeDetail, placeDetailWithoutOptionalSections } from '@/test/fixtures/place'
+
+/** 판정이 이미 도착한 상태. 판정 분기 자체는 `place-suitability-panel.test.ts` 가 본다 */
+const suitability: PlaceSuitabilityPanelProps = {
+  data: suitabilityFixture,
+  loading: false,
+  failed: false,
+  onRetry: () => undefined,
+  petName: '몽실이',
+  authed: true,
+}
 
 function render(overrides: Partial<PlaceDetailSectionProps> = {}) {
   const props: PlaceDetailSectionProps = {
@@ -16,6 +28,10 @@ function render(overrides: Partial<PlaceDetailSectionProps> = {}) {
     loading: false,
     errorStatus: null,
     onRetry: () => undefined,
+    suitability,
+    petName: '몽실이',
+    petSizeCode: 'SMALL',
+    petSizeName: '소형견',
     ...overrides,
   }
 
@@ -86,12 +102,21 @@ describe('PlaceDetailSection — 에러 분기', () => {
 })
 
 describe('PlaceDetailSection — nullable 섹션은 숨긴다', () => {
-  it('intro / petInfo / images / overview 가 없으면 해당 섹션이 렌더되지 않는다', () => {
+  it('intro / images / overview 가 없으면 해당 섹션이 렌더되지 않는다', () => {
     const markup = render({ place: placeDetailWithoutOptionalSections })
 
     expect(markup).not.toContain(messages.place.detailSectionIntro)
-    expect(markup).not.toContain(messages.place.detailSectionPet)
     expect(markup).not.toContain(messages.place.detailSectionOverview)
+  })
+
+  it('petInfo 가 없어도 반려견 동반 정보 섹션은 숨기지 않는다 (아트보드 04-①)', () => {
+    const markup = render({ place: placeDetailWithoutOptionalSections })
+
+    // 동반 여부는 이 서비스의 핵심 질문이다. 섹션이 사라지면 "확인해 봤는데 없더라" 와
+    // "확인조차 안 했다" 를 구분할 수 없다 — 대신 정보 없음을 드러내고 전화로 안내한다
+    expect(markup).toContain(messages.place.detailSectionPet)
+    expect(markup).toContain(messages.place.detailPetInfoEmptyBadge)
+    expect(markup).toContain(messages.place.detailPetInfoEmptyText)
   })
 
   it('결합 데이터가 없어도 에러가 아니라 장소명이 그대로 보인다', () => {
@@ -145,8 +170,9 @@ describe('PlaceDetailSection — 서버 문구를 그대로 쓴다', () => {
 
     expect(markup).toContain(placeDetail.contentType.name)
     expect(markup).toContain(placeDetail.petAllowanceType.name)
-    expect(markup).toContain(placeDetail.petInfo?.allowanceScope.name ?? '')
     expect(markup).toContain(placeDetail.petInfo?.allowedPetSize.name ?? '')
+    // 동반 가능 구역은 배지가 아니라 조건 문장으로 들어간다 — 서버 description 그대로다
+    expect(markup).toContain(placeDetail.petInfo?.allowanceScope.description ?? '')
   })
 
   it('모르는 petAllowanceType code 에서도 화면이 비지 않는다', () => {

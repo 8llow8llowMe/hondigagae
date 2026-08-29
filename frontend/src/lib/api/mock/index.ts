@@ -4,6 +4,7 @@ import { mockSuitability, mockWalkSafety } from '@/lib/api/mock/insight-data'
 import { resolvePetMock } from '@/lib/api/mock/pet-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import { mockPlaceDetail } from '@/lib/api/mock/place-detail-data'
+import { allowsPetSize } from '@/lib/place/pet-size'
 import type { ApiResponse, SliceResponse } from '@/types/api'
 import type { PlaceSummary } from '@/types/place'
 
@@ -166,17 +167,4 @@ function matches(place: PlaceSummary, params: URLSearchParams): boolean {
   if (sourceCategory !== null && place.sourceCategory !== sourceCategory) return false
 
   return true
-}
-
-/** backend `AllowedPetSize#allows(PetSizeType)` 의 이식. 규칙이 갈리면 mock 이 거짓말을 한다 */
-function allowsPetSize(allowedPetSize: string, petSizeType: string): boolean {
-  switch (allowedPetSize) {
-    case 'SMALL_ONLY':
-      return petSizeType === 'SMALL'
-    case 'SMALL_MEDIUM':
-      return petSizeType !== 'LARGE'
-    default:
-      // ALL · UNKNOWN
-      return true
-  }
 }

@@ -139,6 +139,23 @@ const IMAGES: PlaceImage[] = [
     imgName: null,
     cpyrhtDivCd: 'Type1',
   },
+  /*
+    3장부터 데스크톱 배치가 **대표 + 썸네일 2 + `+N`** 으로 갈린다. 2장까지만 두면 그
+    분기가 dev 화면에 한 번도 나타나지 않아, 가장 복잡한 배치를 실렌더로 볼 수 없었다.
+    4장이면 `+1` 오버레이까지 함께 나온다.
+  */
+  {
+    originImgUrl: 'http://tong.visitkorea.or.kr/cms/resource/mock/place-3.jpg',
+    smallImageUrl: null,
+    imgName: '제주_야외 조각공원',
+    cpyrhtDivCd: 'Type1',
+  },
+  {
+    originImgUrl: 'http://tong.visitkorea.or.kr/cms/resource/mock/place-4.jpg',
+    smallImageUrl: null,
+    imgName: null,
+    cpyrhtDivCd: 'Type1',
+  },
 ]
 
 const HOMEPAGE_ANCHOR =

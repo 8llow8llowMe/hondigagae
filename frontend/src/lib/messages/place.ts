@@ -97,6 +97,79 @@ export const placeMessages = {
   /** intro.chkPet — DTO 주석이 "판단은 petInfo 우선" 이라 참고 값으로만 둔다 */
   detailPetSourceText: '원천 표기',
 
+  // ── 장소 상세 · 적합도 패널 (아트보드 `혼디가개 장소 상세` 01·03·04) ──────────
+
+  detailSectionSuitability: '적합도',
+
+  /**
+   * 화자를 반려견으로 고정한다 — `{name}` 을 반려견 이름으로 치환한다.
+   *
+   * **등급 문구는 여기에 없다.** 아트보드의 "적합해요" 자리에는 서버 `suitabilityLevel.name`
+   * 을 그대로 넣는다. FE 가 서버 문구를 다시 쓰지 않는다 (api-integration-guide.md §6).
+   */
+  detailSuitabilitySpeaker: '{name}에게',
+  detailScoreUnit: '/100',
+
+  /** `{date}` · `{name}` 치환. 예보 시각과 반려견이 바뀌면 값이 달라지기 때문에 붙인다 */
+  detailSuitabilityBasis: '{date} 예보 기준 · {name} 기준',
+  detailSuitabilityBasisNoPet: '{date} 예보 기준',
+
+  /** 판정 조회만 실패한 경우. 화면 전체를 에러로 덮지 않는다 */
+  detailSuitabilityErrorTitle: '적합도를 불러오지 못했어요',
+
+  /**
+   * 미로그인·반려견 미등록 (아트보드 04-③). **점수·근거·"몽실이에게" 를 쓰지 않는다** —
+   * 기준이 되는 반려견이 없다. 지역 날씨만 보여주고 등록으로 안내한다.
+   */
+  detailGuestHeading: '오늘 이 지역',
+  detailGuestCta: '반려견을 등록하면 크기·민감도까지 반영한 적합도를 볼 수 있어요.',
+  detailGuestCtaSignup: '가입하고 등록하기 ›',
+  detailGuestCtaPet: '반려견 등록 ›',
+  /** 예보 범위 밖이라 날씨조차 없을 때 */
+  detailGuestNoWeather: '오늘 이 지역의 예보를 가져오지 못했어요.',
+
+  detailMaxTemperature: '최고기온',
+  detailTemperatureUnit: '℃',
+  detailPrecipitationProbability: '강수확률',
+  detailPercentUnit: '%',
+
+  /** 비 예보일 때만 채워진다. 빈 배열이면 섹션을 숨긴다 */
+  detailIndoorAlternatives: '비 예보 · 가까운 실내 장소',
+
+  // ── 장소 상세 · 반려견 동반 정보 ─────────────────────────────────────────
+
+  /** 아트보드 04-① — `petInfo` 가 비어도 섹션을 숨기지 않는다 */
+  detailPetInfoEmptyBadge: '정보 없음',
+  detailPetInfoEmptyText: '동반 가능 여부가 등록되지 않았어요. 방문 전 전화로 확인해 주세요.',
+  /** `{tel}` 치환 */
+  detailPetInfoEmptyTel: '{tel} 전화',
+
+  /**
+   * 동반 조건은 관광 API 값이라 최신이 아닐 수 있다.
+   * **이 한 줄이 없으면 우리가 보증한 것으로 읽힌다** (아트보드 주석).
+   */
+  detailPetInfoDisclaimer:
+    '동반 조건은 현장 사정에 따라 달라질 수 있어요. 방문 전 전화로 확인하는 것을 권해요.',
+
+  /**
+   * 규정을 옮기는 것과 판단을 돕는 것의 차이 — 아트보드가 "몽실이는 소형견이라 해당하지
+   * 않아요" 까지 쓴다. `{name}` · `{size}` 치환.
+   */
+  detailPetSizeAllowed: '{name}({size})는 들어갈 수 있어요.',
+  detailPetSizeBlocked: '{name}({size})는 들어가기 어려울 수 있어요.',
+  /** **`UNKNOWN` 은 "불가" 가 아니라 "모름" 이다** (backend `AllowedPetSize#allows`) */
+  detailPetSizeUnknown: '동반 가능 크기가 등록되지 않아 {name} 기준으로 판단할 수 없어요.',
+
+  // ── 장소 상세 · 본문 ────────────────────────────────────────────────────
+
+  detailSectionBasic: '기본 정보',
+  /** 모바일은 소개를 접는다 — 세로 공간이 없다 */
+  detailOverviewMore: '더 보기',
+  detailOverviewLess: '접기',
+
+  /** 브레드크럼 — `장소 찾기 › {장소명}` */
+  detailBreadcrumbLabel: '현재 위치',
+
   /**
    * 저작권 출처 표기. cpyrhtDivCd 는 TourAPI 원천에서만 채워지므로
    * 값이 있으면 제공처가 한국관광공사다 (세부명세 D5-2).

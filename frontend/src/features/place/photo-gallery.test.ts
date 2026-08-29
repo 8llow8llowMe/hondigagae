@@ -34,22 +34,30 @@ describe('PhotoGallery — 장수별 배치 (가이드 §5)', () => {
     const markup = render(1)
 
     expect(markup).toContain('--gallery-w-single-max')
-    expect(markup).not.toContain('--gallery-w-lead')
-    expect(markup).not.toContain('--gallery-w-thumb')
+    // 열이 하나뿐이다 — 비율 분할이 아니다
+    expect(markup).not.toContain('1.62fr')
   })
 
   it('2장이면 균등 2분할이고 썸네일 열을 만들지 않는다', () => {
     const markup = render(2)
 
-    expect(markup).toContain('calc((100% - 8px) / 2)')
-    expect(markup).not.toContain('--gallery-w-thumb')
+    expect(markup).toContain('grid-template-columns:1fr 1fr')
+    expect(markup).not.toContain('1.62fr')
   })
 
   it('3장 이상이면 대표 + 썸네일 2 로 나눈다', () => {
     const markup = render(3)
 
-    expect(markup).toContain('--gallery-w-lead')
-    expect(markup).toContain('--gallery-w-thumb')
+    // 고정 px 가 아니라 비율이다 — 데스크톱 2단의 우측 열이 가변이기 때문이다
+    expect(markup).toContain('grid-template-columns:1.62fr 1fr')
+    expect(markup).toContain('grid-template-rows:1fr 1fr')
+  })
+
+  it('데스크톱 대표·썸네일 폭을 고정 px 토큰으로 두지 않는다', () => {
+    const markup = render(3)
+
+    expect(markup).not.toContain('--gallery-w-lead')
+    expect(markup).not.toContain('--gallery-w-thumb')
   })
 
   it('썸네일에 담기지 않는 나머지는 +N 으로 얹는다', () => {

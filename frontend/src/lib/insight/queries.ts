@@ -1,22 +1,23 @@
 import { isRetriable } from '@/lib/api/error'
 
 /**
- * 홈이 쓰는 조회 key 와 옵션.
+ * 장소 인사이트(적합도 · 산책 위험도 · 일정 날씨) 조회 key 와 옵션.
+ *
+ * **`features/home` 이 아니라 `lib/insight` 에 둔다.** 홈과 장소 상세가 같은 엔드포인트를
+ * 같은 조건으로 부르므로, key 가 갈리면 홈에서 이미 받아 둔 적합도를 상세가 다시 부른다.
+ * 화면 기능이 아니라 **도메인 계약**에 딸린 key 라 공용 위치가 맞다.
  *
  * 서버 프리페치와 클라이언트가 **같은 key** 를 써야 하이드레이션이 성립한다
  * (docs/api-integration-guide.md §7).
- *
- * 반려견 목록은 `petKeys` 를 **그대로 공유한다** — 별도 key 를 만들면 `/pets` 에서 등록해도
- * 헤더 스위처가 낡는다 (전역nav-세부명세 D3).
  */
-export const homeKeys = {
-  all: ['home'] as const,
+export const insightKeys = {
+  all: ['insight'] as const,
   /** 조건이 달라지면 다른 판정이므로 key 에 포함한다 — 반려견을 바꾸면 재조회된다 */
   walkSafety: (placeId: string, conditionKey: string) =>
-    [...homeKeys.all, 'walk-safety', placeId, conditionKey] as const,
+    [...insightKeys.all, 'walk-safety', placeId, conditionKey] as const,
   suitability: (placeId: string, conditionKey: string) =>
-    [...homeKeys.all, 'suitability', placeId, conditionKey] as const,
-  planWeather: (planId: string) => [...homeKeys.all, 'plan-weather', planId] as const,
+    [...insightKeys.all, 'suitability', placeId, conditionKey] as const,
+  planWeather: (planId: string) => [...insightKeys.all, 'plan-weather', planId] as const,
 }
 
 /**

@@ -4,12 +4,12 @@ import { notFound } from 'next/navigation'
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 import type { Metadata } from 'next'
 
-import { PlaceBackLink } from '@/features/place/place-back-link'
 import { PlaceDetailView } from '@/features/place/place-detail-view'
 import { placeKeys } from '@/features/place/queries'
 import { ApiError } from '@/lib/api/error'
 import { placeDetailPath } from '@/lib/api/place'
 import { serverFetch } from '@/lib/api/server'
+import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { toPlainText } from '@/lib/place/text'
 import { getServerQueryClient } from '@/lib/query/query-client'
@@ -57,6 +57,10 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 export default async function PlaceDetailPage({ params }: { params: Params }) {
   const { placeId } = await params
 
+  // 게스트 블록의 CTA 가 로그인으로 갈지 반려견 등록으로 갈지 가른다.
+  // **토큰을 넘기지 않는다** — 판정은 공개 API 이고 로그인 여부만 필요하다
+  const session = await readSession()
+
   // 요청마다 새 인스턴스 — 모듈 스코프 공유는 요청 간 데이터 유출이다
   const queryClient = getServerQueryClient()
 
@@ -78,15 +82,19 @@ export default async function PlaceDetailPage({ params }: { params: Params }) {
     // 그 외(5xx·무응답·400)는 화면 전체 실패로 만들지 않는다. 클라이언트가 재조회·안내한다
   }
 
-  // 좌우 여백은 DESIGN.md §4 스케일: 16(모바일) / 24(태블릿) / 40(데스크톱).
-  // 목록과 같은 한 컬럼을 유지한다 — 지도가 붙으면 데스크톱이 2단이 되므로
-  // 지금 다단 그리드로 가면 그때 다시 갈아엎어야 한다.
-  return (
-    <main className="mx-auto flex max-w-screen-md flex-col gap-4 px-4 py-6 md:px-6 md:py-8 lg:px-10">
-      <PlaceBackLink />
+  /*
+    아트보드 `혼디가개 장소 상세.dc.html` 03 절 — 데스크톱은 **좌 400 판정·기본 정보(sticky) /
+    우 가변** 2단이다. 폭 상한을 두지 않고 전폭을 쓴다 — 목록·홈과 같은 레일 문법이고,
+    가운데 정렬된 좁은 칼럼으로 두면 좌측 레일이 들어갈 자리가 없다.
 
+    레이아웃·브레드크럼·본문은 전부 `PlaceDetailSection` 이 소유한다. 여기서 감싸지 않는
+    이유는 **열 구분선이 헤더 줄까지 올라오면 안 되기** 때문이다 — 브레드크럼은 2단 위의
+    전폭 줄이다.
+  */
+  return (
+    <main id="main-content">
       <HydrationBoundary state={dehydrate(queryClient)}>
-        <PlaceDetailView placeId={placeId} />
+        <PlaceDetailView placeId={placeId} authed={session !== null} />
       </HydrationBoundary>
     </main>
   )
