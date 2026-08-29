@@ -1,4 +1,5 @@
 import { CheckIcon } from '@/components/icons'
+import { MetricBadge } from '@/components/metric'
 import { messages } from '@/lib/messages'
 import { petSizeVerdict } from '@/lib/place/pet-size'
 import { toPlainText } from '@/lib/place/text'
@@ -93,9 +94,7 @@ function EmptyPetInfo({ tel }: { tel: string | null }) {
   return (
     <div className="flex flex-col items-start gap-2.5">
       {/* 점선 배지로 "모름" 을 드러낸다 — tint 를 주지 않는다 (DESIGN.md §2-3 UNKNOWN) */}
-      <span className="text-caption text-fg-muted border-border-strong inline-flex items-center rounded-sm border border-dashed px-2 py-1 font-semibold">
-        {messages.place.detailPetInfoEmptyBadge}
-      </span>
+      <MetricBadge tone="unknown">{messages.place.detailPetInfoEmptyBadge}</MetricBadge>
       <p className="text-body-2 text-fg-muted break-keep">
         {messages.place.detailPetInfoEmptyText}
       </p>

@@ -29,6 +29,19 @@ const BADGE_TONE: Record<MetricTone, string> = {
 }
 
 /**
+ * 크기는 `Badge` 와 **같은 값**이다 (`src/components/badge.tsx`).
+ *
+ * 두 배지가 한 줄에 나란히 서는 곳이 있다 — 장소 행의 `동반 가능` `문화시설`(속성) 옆에
+ * `실내 여부 미확인`(등급 unknown). 높이가 다르면 그 줄이 어긋나 보인다.
+ */
+const BADGE_SIZE: Record<MetricBadgeSize, string> = {
+  sm: 'h-5 px-2',
+  md: 'px-2 py-1',
+}
+
+export type MetricBadgeSize = 'sm' | 'md'
+
+/**
  * 등급 배지.
  *
  * **세로 바가 없다.** 문구가 등급을 말하므로 색은 보조 채널이고, 바를 달면 목록이
@@ -37,10 +50,13 @@ const BADGE_TONE: Record<MetricTone, string> = {
  */
 export function MetricBadge({
   tone,
+  size = 'md',
   children,
   className,
 }: {
   tone: MetricTone
+  /** `sm` 은 `Badge size="sm"` 과 나란히 설 때 (같은 `h-5`) */
+  size?: MetricBadgeSize
   /** 서버 `name` 을 그대로 넣는다 */
   children: ReactNode
   className?: string
@@ -48,7 +64,10 @@ export function MetricBadge({
   return (
     <span
       className={cn(
-        'text-caption inline-flex items-center rounded-sm px-2 py-1 font-semibold whitespace-nowrap',
+        // `border-transparent` 은 장식이 아니다 — unknown 만 테두리가 있으면 같은 목록에서
+        // 그 배지만 2px 높다. 투명 테두리로 자리를 미리 잡아 톤과 무관하게 높이를 맞춘다
+        'text-caption inline-flex items-center rounded-sm border border-transparent font-semibold whitespace-nowrap',
+        BADGE_SIZE[size],
         BADGE_TONE[tone],
         className,
       )}
@@ -75,10 +94,15 @@ const WORD_TONE: Record<MetricTone, string> = {
 }
 
 /**
- * 등급을 문장 안에서 말하는 단어 — 아트보드 `장소 상세` 01·03 "몽실이에게 **적합해요**".
+ * 등급을 문장 안에서 말하는 단어 — 아트보드 `장소 상세` 01·03 "몽실이에게 **적합해요**",
+ * `홈` 01·02 "오늘 산책 **위험**".
  *
  * 배지(`MetricBadge`)와 역할이 다르다. 배지는 목록에서 훑는 라벨이고, 이쪽은 **한 화면에
  * 하나뿐인 판정 문장의 술어**라 tint 없이 크기와 색으로 선다.
+ *
+ * 크기는 **`emphasis`(20/800) 고정**이다. 아트보드가 두 화면 모두 `font-size:20px;
+ * font-weight:800` 이고, 이것을 호출부가 정하게 두면 화면마다 등급어 크기가 갈린다
+ * (실제로 갈려 있었다 — 홈 20px / 장소 상세 18px).
  *
  * **문구는 서버 `name` 을 그대로 넣는다.** FE 가 등급 한국어를 다시 쓰지 않는다.
  */
@@ -92,7 +116,7 @@ export function MetricWord({
   className?: string
 }) {
   return (
-    <span className={cn('text-title-2 font-extrabold', WORD_TONE[tone], className)}>
+    <span className={cn('text-emphasis font-extrabold', WORD_TONE[tone], className)}>
       {children}
     </span>
   )

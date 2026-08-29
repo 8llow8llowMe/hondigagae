@@ -3,6 +3,7 @@ import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
 import { ChevronRightIcon, ImageIcon } from '@/components/icons'
+import { MetricBadge } from '@/components/metric'
 import { Row } from '@/components/surface'
 import { isAllowedImageHost } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
@@ -101,11 +102,12 @@ function PlaceBadges({ place, className }: { place: PlaceSummary; className?: st
       </Badge>
 
       {/* 실내 여부를 모르면 점선으로 "모름" 을 드러낸다 (styling-guide.md §3 unknown).
-          숨기면 실내만·야외만 필터에서 이 장소가 왜 사라지는지 설명할 길이 없다 */}
+          숨기면 실내만·야외만 필터에서 이 장소가 왜 사라지는지 설명할 길이 없다.
+          `size="sm"` 은 옆의 `Badge size="sm"` 과 높이를 맞추기 위해서다 */}
       {place.indoor === null && (
-        <span className="text-caption text-fg-muted border-border-strong inline-flex h-5 items-center rounded-sm border border-dashed px-2 font-semibold">
+        <MetricBadge tone="unknown" size="sm">
           {messages.place.rowIndoorUnknown}
-        </span>
+        </MetricBadge>
       )}
     </div>
   )

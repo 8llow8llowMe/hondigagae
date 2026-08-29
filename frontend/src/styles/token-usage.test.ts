@@ -154,3 +154,47 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0)', () => {
     expect(found).toEqual([])
   })
 })
+
+/**
+ * 등급 톤 매핑은 **한 곳이 소유한다.**
+ *
+ * `MetricBadge` / `MetricValue` / `MetricWord` 가 이미 있는데 화면이 그것을 쓰지 않고
+ * 같은 `Record<MetricTone, string>` 을 다시 만드는 일이 실제로 세 곳에서 벌어졌다
+ * (`walk-verdict` · `place-insight-row` · 점선 unknown 배지 2곳 — 이슈 #68).
+ *
+ * **등급 색 하나를 바꿀 때 한 곳만 놓치면 화면마다 등급 색이 갈린다.** 위의 토큰 오용
+ * 검사로는 잡히지 않는다 — 복제된 표도 정상 토큰 클래스를 쓰기 때문이다.
+ *
+ * 두 소유자만 허용한다.
+ *  - `src/components/metric.tsx` — 톤 → 클래스
+ *  - `src/lib/insight/tone.ts` — 축별 code → 톤 (축마다 의미가 뒤집혀 공용 매퍼가 함정이다)
+ */
+describe('등급 톤 매핑은 metric.tsx 가 소유한다', () => {
+  const OWNERS = ['src/components/metric.tsx', 'src/lib/insight/tone.ts']
+
+  it('화면 코드가 Record<MetricTone, …> 을 다시 만들지 않는다', () => {
+    const found = FILES.filter(
+      ({ path, text }) =>
+        !OWNERS.includes(path.replaceAll('\\', '/')) && /Record<\s*MetricTone\s*,/.test(text),
+    ).map(({ path }) => path)
+
+    expect(found).toEqual([])
+  })
+
+  it('화면 코드가 metric 토큰 클래스를 직접 나열하지 않는다', () => {
+    // 한 리터럴 안에 서로 다른 등급 계열이 둘 이상 = 톤 표를 손으로 편 것이다
+    const families = ['metric-critical', 'metric-high', 'metric-mid', 'metric-low']
+
+    const found = FILES.filter(({ path }) => !OWNERS.includes(path.replaceAll('\\', '/'))).flatMap(
+      ({ path, text }) => {
+        const lines = text.split('\n')
+        return lines.flatMap((line, index) => {
+          const hit = families.filter((family) => line.includes(`-${family}-`))
+          return hit.length >= 2 ? [`${path}:${index + 1}`] : []
+        })
+      },
+    )
+
+    expect(found).toEqual([])
+  })
+})
