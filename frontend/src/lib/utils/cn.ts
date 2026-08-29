@@ -17,6 +17,7 @@ import { extendTailwindMerge } from 'tailwind-merge'
 const TYPOGRAPHY_SCALE = [
   'page',
   'display',
+  'verdict',
   'title-1',
   'title-2',
   'body-1',

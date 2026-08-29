@@ -1,5 +1,6 @@
 import type { MockResult } from '@/lib/api/mock/auth-data'
 import { resolveAuthMock } from '@/lib/api/mock/auth-data'
+import { mockSuitability, mockWalkSafety } from '@/lib/api/mock/insight-data'
 import { resolvePetMock } from '@/lib/api/mock/pet-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import { mockPlaceDetail } from '@/lib/api/mock/place-detail-data'
@@ -71,6 +72,20 @@ export function resolveMock(
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
 
   if (path === '/places') return placeList(params)
+
+  // 인사이트는 상세보다 먼저 본다 — /places/{id}/suitability 가 상세 정규식에 안 걸리지만
+  // 순서를 명시해 두면 상세 규칙을 넓힐 때 실수하지 않는다
+  const insight = /^\/places\/(\d+)\/(suitability|walk-safety)$/.exec(path)
+  if (insight !== null) {
+    const placeId = insight[1] as string
+
+    if (insight[2] === 'suitability') return { status: 200, payload: ok(mockSuitability(placeId)) }
+
+    return {
+      status: 200,
+      payload: ok(mockWalkSafety(placeId, params.get('heatSensitive') === 'true')),
+    }
+  }
 
   const detail = /^\/places\/([^/]+)$/.exec(path)
   if (detail !== null) {
