@@ -6,7 +6,7 @@ import type { SVGProps } from 'react'
  * 선(line) 스타일, 굵기 1.5, `currentColor` 사용 — 색은 부모의 `text-*` 가 정한다.
  * 장식이므로 `aria-hidden`. 의미가 필요하면 부모 버튼에 `aria-label` 을 준다.
  */
-type IconProps = SVGProps<SVGSVGElement> & { size?: 16 | 18 | 20 | 22 | 24 }
+type IconProps = SVGProps<SVGSVGElement> & { size?: 14 | 16 | 18 | 20 | 22 | 24 }
 
 function Svg({ size = 24, children, ...rest }: IconProps) {
   return (
@@ -133,6 +133,29 @@ export function CloudIcon(props: IconProps) {
   return (
     <Svg {...props}>
       <path d="M6.5 18a4.5 4.5 0 0 1 .4-9 6 6 0 0 1 11.4 1.8A3.9 3.9 0 0 1 17.5 18z" />
+    </Svg>
+  )
+}
+
+/**
+ * 체크 — 선택된 체크박스 안에 들어간다.
+ *
+ * 아트보드는 여기서만 굵기 2 를 쓴다. 20px 표시기 안의 14px 마크라 1.5 로는 형태가 뭉갠다.
+ * 사용처가 `strokeWidth={2}` 를 넘긴다 (`Svg` 의 기본값을 바꾸지 않는다).
+ */
+export function CheckIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M5 12.5l4.5 4.5L19 7" />
+    </Svg>
+  )
+}
+
+/** 필터 "더보기" — 슬라이더 3단 (아트보드 `01 목록 — 모바일`) */
+export function SlidersIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M4 7h16M7 12h10M10 17h4" />
     </Svg>
   )
 }

@@ -26,6 +26,12 @@ export const placeSummary: PlaceSummary = {
     name: '부분 동반 가능',
     description: '일부 구역 또는 조건부로 반려동물 동반이 가능한 장소입니다.',
   },
+  allowedPetSize: {
+    code: 'SMALL_ONLY',
+    name: '소형견만 가능',
+    description: '소형견만 동반이 가능합니다.',
+  },
+  maxPetWeightKg: 10,
   tel: null,
   indoor: true,
   sourceCategory: '미술관',

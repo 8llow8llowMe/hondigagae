@@ -1,3 +1,4 @@
+import { PET_SIZE_CODES } from '@/types/pet'
 import {
   ALLOWED_PET_SIZE_CODES,
   type AllowedPetSizeCode,
@@ -31,6 +32,7 @@ export const DEFAULT_PLACE_FILTERS: PlaceFilters = {
   petAllowanceType: null,
   indoor: null,
   allowedPetSize: null,
+  petSizeType: null,
   sourceCategory: null,
 }
 
@@ -71,6 +73,7 @@ export function parsePlaceFilters(params: RawParams): PlaceFilters {
     petAllowanceType: pickFrom(PET_ALLOWANCE_CODES, read(params, 'petAllowanceType')),
     indoor: readBoolean(read(params, 'indoor')),
     allowedPetSize: pickFrom(ALLOWED_PET_SIZE_CODES, read(params, 'allowedPetSize')),
+    petSizeType: pickFrom(PET_SIZE_CODES, read(params, 'petSizeType')),
     sourceCategory: readText(read(params, 'sourceCategory')),
   }
 }
@@ -85,6 +88,7 @@ export function toPlaceFilterQuery(filters: PlaceFilters): string {
   if (filters.petAllowanceType !== null) params.set('petAllowanceType', filters.petAllowanceType)
   if (filters.indoor !== null) params.set('indoor', String(filters.indoor))
   if (filters.allowedPetSize !== null) params.set('allowedPetSize', filters.allowedPetSize)
+  if (filters.petSizeType !== null) params.set('petSizeType', filters.petSizeType)
   if (filters.sourceCategory !== null) params.set('sourceCategory', filters.sourceCategory)
 
   return params.toString()
@@ -104,6 +108,7 @@ export function toPlaceApiQuery(
   if (filters.petAllowanceType !== null) params.set('petAllowanceType', filters.petAllowanceType)
   if (filters.indoor !== null) params.set('indoor', String(filters.indoor))
   if (filters.allowedPetSize !== null) params.set('allowedPetSize', filters.allowedPetSize)
+  if (filters.petSizeType !== null) params.set('petSizeType', filters.petSizeType)
   if (filters.sourceCategory !== null) params.set('sourceCategory', filters.sourceCategory)
   if (cursor !== null) params.set('lastPlaceId', cursor)
   params.set('size', String(size))

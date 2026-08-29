@@ -39,6 +39,16 @@
 | home    | 혼잡도도 같은 톤 매핑                  | **의미가 반대다** — `LOW` 가 "한산"(좋음), `HIGH` 가 "혼잡" |
 | home    | 일정 날씨 `title` · `dailyBriefings[]` | **`planTitle`** · **`days[]`**                              |
 | home    | 인사이트 조회에 `petId`                | **반려견 속성을 개별 쿼리 파라미터로** 보낸다 (공개 API 다) |
+| place   | 목록 항목에 크기 정보 없음             | **`allowedPetSize`(metadata) · `maxPetWeightKg`** 가 있다   |
+| place   | 목록 필터에 반려견 기준 축 없음        | **`petSizeType` · `petWeightKg`** 파라미터가 있다           |
+
+**`petSizeType` 은 `allowedPetSize` 와 다른 축이다.** 저쪽은 *장소의 속성*을 직접 고르고,
+이쪽은 *내 반려견*을 기준으로 거른다. 그리고 **`UNKNOWN` 인 장소는 걸러내지 않는다** —
+정보 없음을 "불가" 로 단정하면 실제로는 갈 수 있는 장소가 검색에서 사라진다
+(backend `AllowedPetSize#allows`). mock 도 같은 규칙을 이식해 뒀다.
+
+**`petWeightKg` 는 아직 쓰지 않는다** — `Pet` 프로필에 체중 필드가 없다. 크기(`sizeType`)만
+보낸다. 체중이 프로필에 생기면 그때 붙인다.
 
 **톤 매핑이 가장 위험했다.** 공용 매퍼 하나를 쓰면 "혼잡" 이 초록으로, "안전" 이 회색으로
 나간다. 축별 매퍼를 `src/lib/insight/tone.ts` 에 두고 테스트로 고정했다.

@@ -350,6 +350,20 @@
 **폭은 `--rail-context` 하나로 묶는다** — 열과 선이 함께 움직여야 1584+ 에서 레일이
 480 으로 넓어질 때 선만 400 에 남지 않는다. 레이아웃은 `app/globals.css` 의 `.rail-layout`.
 
+**목록 화면은 `.rail-layout` 에 `.rail-layout-filter` 를 함께 준다** — 열 폭만
+`--rail-filter`(280) 로 바꾸는 변형이다. 맥락 패널과 달리 1584+ 에서도 280 을 유지한다
+(라디오 한 줄에 그 이상이 필요하지 않다).
+
+```tsx
+<main className="rail-layout rail-layout-filter">
+  <div className="hidden lg:sticky lg:top-16 lg:block">{/* 필터 */}</div>
+  <div className="lg:border-border lg:border-l">{/* 목록 */}</div>
+</main>
+```
+
+**레일은 `hidden lg:block` 이다.** 2단이 켜지는 폭(1024)과 레일이 보이는 폭이 어긋나면
+태블릿에서 레일이 본문 위에 쌓이거나 가로 스크롤이 난다.
+
 **2단 묶음에 `min-block-size: calc(100dvh - var(--header-h))` 를 준다.**
 구조를 나누는 선이 콘텐츠 길이에 따라 잘리면 구분이 아니라 우연처럼 읽힌다 — 일정이
 없거나 적합도가 0건이면 우측이 짧아져 선이 화면 중간에서 멈춘다.

@@ -14,12 +14,43 @@ export const placeMessages = {
   /** 5xx */
   errorTitle: '장소를 불러오지 못했습니다',
 
-  /** 필터가 걸렸을 때만 노출되는 요약 줄. 결과 건수는 백엔드가 주지 않는다(SliceResponse) */
-  activeFilterLabel: '적용된 필터',
-
+  /**
+   * 필터 영역.
+   *
+   * **"적용된 필터" 칩 줄을 두지 않는다** — 디자인 가이드 §5: "같은 필터 상태를 세 곳에
+   * 두지 않는다. 컨트롤이 이미 보여주면 요약 줄은 없앤다."
+   *
+   * 결과 건수(`34곳`)와 선택지별 건수(`제주시 34`)는 **문구를 만들지 않는다.**
+   * `SliceResponse` 는 `{contents, hasNext}` 뿐이고 facet 집계 API 도 없다.
+   */
+  filterTitle: '필터',
   filterAll: '전체',
-  filterContentTypeLabel: '장소 종류',
+  filterMore: '더보기',
+  filterApply: '이 조건으로 보기',
+  filterCancel: '취소',
+
+  filterContentTypeLabel: '유형',
   filterPetAllowanceLabel: '반려견 동반',
+  filterAllowedOnly: '반려견 동반 가능만',
+
+  filterRegionLabel: '지역',
+  filterRegionAll: '제주 전체',
+
+  filterIndoorLabel: '실내 / 야외',
+  /** `indoor === null` 인 장소가 어느 쪽에도 안 잡히는 것을 설명한다. 건수는 구할 수 없다 */
+  filterIndoorUnknownNote:
+    '실내 여부가 확인되지 않은 곳은 실내만·야외만에 나오지 않아요. 전체에서만 볼 수 있어요.',
+
+  filterPetSizeLabel: '견종 크기 제한',
+  /** `{name}` · `{size}` 를 치환한다 — 화자를 반려견으로 유지한다 (아트보드 02) */
+  filterPetSizeLabelFor: '{name}({size})가 들어갈 수 있는 곳만',
+  filterPetSizeHint: '선택한 반려견 기준으로 걸러요. 반려견을 바꾸면 결과도 바뀝니다.',
+
+  /** 행 메타 줄 — `제주시 한림읍 · 야외` */
+  rowIndoor: '실내',
+  rowOutdoor: '야외',
+  /** `indoor === null`. 점선 배지로 "모름" 을 드러낸다 (styling-guide.md §3 unknown) */
+  rowIndoorUnknown: '실내 여부 미확인',
 
   noImage: '이미지 없음',
   petAllowanceUnknown: '동반 정보 없음',
