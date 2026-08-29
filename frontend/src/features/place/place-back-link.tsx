@@ -18,7 +18,7 @@ export function PlaceBackLink({ className }: { className?: string }) {
       href="/places"
       className={cn(
         // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
-        'text-body-2 text-brand-600 inline-flex h-11 items-center gap-1 font-semibold',
+        'text-body-2 text-link hover:text-link-hover inline-flex h-11 items-center gap-1 font-semibold',
         'focus-visible:ring-brand-500 rounded-md focus-visible:ring-2 focus-visible:outline-none',
         className,
       )}

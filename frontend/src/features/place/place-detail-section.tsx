@@ -234,7 +234,9 @@ function TelLink({ tel }: { tel: string }) {
   return (
     <a
       href={`tel:${tel.replace(/[^\d+]/g, '')}`}
-      className="text-link hover:text-link-hover focus-visible:ring-brand-500 rounded-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
+      // 44px — 모바일 최소 터치 영역 (DESIGN.md §7). 상세에서 전화는 주요 행동이라
+      // 문장 속 인라인 링크가 아니라 독립 타깃으로 다룬다
+      className="text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex min-h-11 items-center rounded-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
     >
       {tel}
     </a>
@@ -248,7 +250,8 @@ function HomepageLink({ href, label }: { href: string; label: string }) {
       target="_blank"
       // 원문이 외부 링크다. opener 를 넘기지 않는다
       rel="noopener noreferrer"
-      className="text-link hover:text-link-hover focus-visible:ring-brand-500 rounded-sm font-semibold break-all focus-visible:ring-2 focus-visible:outline-none"
+      // 전화와 같은 이유로 44px 히트 영역을 준다
+      className="text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex min-h-11 items-center rounded-sm font-semibold break-all focus-visible:ring-2 focus-visible:outline-none"
     >
       {label}
     </a>
