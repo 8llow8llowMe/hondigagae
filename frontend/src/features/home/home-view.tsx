@@ -91,8 +91,8 @@ export function HomeView({
       <h1 className="sr-only">혼디가개 홈</h1>
 
       {/*
-        `rail-layout` 은 `app/globals.css` 에 있다 — 2단 grid + 열 구분선을 한 곳에 묶었다.
-        2단은 **데스크톱(1024+)부터**다. 태블릿(768~1023)은 한 컬럼을 유지한다 —
+        `rail-layout`(`app/globals.css`)이 2단 grid 를 만들고, 열 구분선은 우측 열의
+        `border-left` 가 그린다. 2단은 **데스크톱(1024+)부터**다. 태블릿(768~1023)은 한 컬럼을 유지한다 —
         400px 레일 + 우측 본문이 768 에 안 들어가 가로 스크롤이 난다 (실측으로 확인).
       */}
       <div className="rail-layout">
@@ -141,8 +141,8 @@ export function HomeView({
           <Band className="md:hidden" />
         </div>
 
-        {/* ── 우: 지금 할 일 */}
-        <div>
+        {/* ── 우: 지금 할 일. 열 구분선은 여기 border-left 다 (globals.css `.rail-layout` 주석) */}
+        <div className="lg:border-border lg:border-l">
           <section aria-labelledby="suitability-heading">
             <div className="flex items-end justify-between gap-4 px-4 pt-5 pb-2 md:px-10 md:pt-6 md:pb-3">
               <div>

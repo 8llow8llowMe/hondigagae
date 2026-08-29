@@ -110,13 +110,13 @@ body {
 /*
   2단 레일 레이아웃 — DESIGN.md §7-1 · §7-2.
 
-  **열 구분선을 sticky 열의 `border-right` 로 그리지 않는다.** sticky 열은 자기 콘텐츠
-  높이에서 끝나므로 선이 중간에 끊긴다. 그리드 컨테이너의 background 로 깔아야 우측
-  콘텐츠 전체 높이까지 내려온다.
+  **열 구분선은 우측 열의 `border-left` 로 그린다** (사용처에서 `lg:border-l`).
 
-  Tailwind arbitrary class(`bg-[linear-gradient(...)_400px_0/1px_100%_no-repeat]`)로
-  쓰지 않는다 — `/` 를 투명도 수식자로 읽어 **클래스가 조용히 생성되지 않는다**
-  (실측으로 확인: `background-image: none`). 이런 복합 선언은 CSS 에 둔다.
+  DESIGN.md §7-2 는 "그리드 컨테이너 background 로 깔라" 고 적었는데, 그건 선을
+  **sticky 인 좌측 열**에 걸었을 때 끊기는 것을 피하려는 규칙이었다. 배경으로 깔면
+  이번엔 **우측 열의 불투명한 자식이 그 위를 덮는다** — 목록 행이 흰 배경이라 실제로
+  y=159..569 구간이 가려졌다(실측). 우측 열은 sticky 가 아니므로 border 가 끊기지 않고,
+  border 는 자식의 배경보다 바깥에 그려져 덮이지도 않는다.
 
   폭은 `--rail-context` 하나로 묶어 열과 선이 함께 움직인다 (1584+ 에서 480).
 */
@@ -124,8 +124,6 @@ body {
   .rail-layout {
     display: grid;
     grid-template-columns: var(--rail-context) 1fr;
-    background:
-      linear-gradient(var(--border), var(--border)) var(--rail-context) 0 / 1px 100% no-repeat;
   }
 }
 
