@@ -28,7 +28,9 @@ type WithLabel = { iconOnly?: false; children: ReactNode }
 export type ButtonProps = BaseProps & (IconOnly | WithLabel)
 
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-500 text-fg-inverse hover:bg-brand-600 active:bg-brand-600',
+  // **`--brand-500` 이 아니다** (이슈 #61). 500 위 흰 글자는 3.49:1 이고 라벨은 16px/600 —
+  // WCAG 대형(24px 또는 18.66px+bold)이 아니라 본문이라 4.5:1 이 필요하다. 600 은 5.27:1 이다
+  primary: 'bg-brand-600 text-fg-inverse hover:bg-brand-700 active:bg-brand-700',
   secondary: 'border border-border-strong bg-bg text-fg hover:bg-band',
   ghost: 'text-fg-muted hover:bg-band',
   // 파괴 버튼 채움은 danger-700 이다 — 가이드 §5-2 ConfirmModal
