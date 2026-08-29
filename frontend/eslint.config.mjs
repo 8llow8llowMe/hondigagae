@@ -152,7 +152,13 @@ export default tseslint.config(
     files: ['src/features/**', 'src/components/**', 'app/**'],
     ignores: ['app/api/**'],
     rules: {
-      'no-restricted-syntax': ['error', noArbitraryValue, noComplexArbitrary, noRawHex, noDirectFetch],
+      'no-restricted-syntax': [
+        'error',
+        noArbitraryValue,
+        noComplexArbitrary,
+        noRawHex,
+        noDirectFetch,
+      ],
     },
   },
 
