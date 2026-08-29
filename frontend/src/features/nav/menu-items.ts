@@ -16,13 +16,27 @@ export type NavItem = {
   ai?: boolean
 }
 
-/** 데스크톱 헤더. 홈은 로고가 대신하므로 넣지 않는다 */
+/**
+ * 데스크톱 헤더. 홈은 로고가 대신하므로 넣지 않는다.
+ *
+ * **셋뿐이다 — 전부 "할 일" 이다.** 내 반려견·마이페이지·로그아웃은 "내 설정" 이라
+ * 우측 아바타 팝오버가 맡는다 (`ACCOUNT_MENU_ITEMS`). 같은 줄에 섞으면 nav 의 기준이
+ * 흐려져 항목이 계속 늘어난다 — 아트보드 03-B 의 주석이 이것을 명시한다.
+ */
 export const DESKTOP_NAV_ITEMS: NavItem[] = [
   { href: '/places', label: '장소 찾기', protected: false },
   { href: '/plans', label: '여행 일정', protected: true },
   { href: '/ai-plans/new', label: 'AI 일정 생성', protected: true, ai: true },
-  { href: '/pets', label: '내 반려견', protected: true },
 ]
+
+/**
+ * 우측 아바타 팝오버 3항목 — 아트보드 03-B.
+ * 모바일의 "내 정보 탭 안" 과 같은 구조다. 두 폭이 다른 IA 를 갖지 않는다.
+ */
+export const ACCOUNT_MENU_ITEMS = [
+  { href: '/pets', label: '내 반려견' },
+  { href: '/mypage', label: '마이페이지' },
+] as const
 
 /**
  * 모바일 탭바. **4개로 고정한다** — 5개가 되면 375px 에서 라벨이 줄바꿈된다 (D4-1).

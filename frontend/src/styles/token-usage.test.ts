@@ -138,6 +138,10 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0)', () => {
       'src/components/confirm-modal.tsx',
       // 반려견 스위처 드롭다운 — Menu 와 같은 팝오버다
       'src/features/nav/pet-switcher.tsx',
+      // 홈 프로필 카드의 반려견 전환 팝오버
+      'src/features/home/profile-card.tsx',
+      // 헤더 계정 팝오버
+      'src/features/nav/account-menu.tsx',
     ]
 
     const found = FILES.filter(({ path }) => !FLOATING.includes(path.replace(/\\/g, '/'))).flatMap(

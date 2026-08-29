@@ -11,6 +11,16 @@ import type { SliceResponse } from '@/types/api'
 import type { PlaceSummary } from '@/types/place'
 import type { PlanSummaryItem } from '@/types/plan'
 
+/** `2026-08-29 (금) · 제주시` — 지역은 이 서비스가 제주 전용이라 고정이다 */
+function formatTodayLabel(today: Date): string {
+  const days = ['일', '월', '화', '수', '목', '금', '토']
+  const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
+    today.getDate(),
+  ).padStart(2, '0')}`
+
+  return `${iso} (${days[today.getDay()]}) · 제주시`
+}
+
 export const metadata = {
   title: '혼디가개',
   description: '반려견과 함께하는 제주 여행을 설계합니다.',
@@ -49,9 +59,17 @@ export default async function HomePage() {
 
   const [places, plans] = await Promise.all([placesPromise, plansPromise])
 
+  // 기준 줄은 서버에서 만든다 — 클라이언트에서 new Date() 를 부르면 하이드레이션이 어긋난다
+  const todayLabel = formatTodayLabel(new Date())
+
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <HomeView authed={authed} places={places?.contents ?? []} plans={plans?.contents ?? []} />
+      <HomeView
+        authed={authed}
+        places={places?.contents ?? []}
+        plans={plans?.contents ?? []}
+        todayLabel={todayLabel}
+      />
     </HydrationBoundary>
   )
 }
