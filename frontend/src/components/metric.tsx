@@ -58,6 +58,46 @@ export function MetricBadge({
   )
 }
 
+/**
+ * 흰 배경 위 등급 단어에 쓰는 색. **`-700` 층이다** (DESIGN.md §2-3 — 흰 배경 대비
+ * HIGH 8.64:1 · LOW 7.56:1 · CRITICAL 6.47:1 · MID 5.64:1).
+ *
+ * `-500` 을 쓰지 않는다 — 그 층은 마크와 22px+/900 큰 숫자 전용이고, MID 는 흰 배경에서
+ * 3.85:1 이라 단어에 쓰면 대비가 무너진다.
+ */
+const WORD_TONE: Record<MetricTone, string> = {
+  critical: 'text-metric-critical-700',
+  high: 'text-metric-high-700',
+  mid: 'text-metric-mid-700',
+  low: 'text-metric-low-700',
+  // UNKNOWN 에는 등급 색이 없다. --metric-unknown-500 은 점선 전용이다
+  unknown: 'text-fg-muted',
+}
+
+/**
+ * 등급을 문장 안에서 말하는 단어 — 아트보드 `장소 상세` 01·03 "몽실이에게 **적합해요**".
+ *
+ * 배지(`MetricBadge`)와 역할이 다르다. 배지는 목록에서 훑는 라벨이고, 이쪽은 **한 화면에
+ * 하나뿐인 판정 문장의 술어**라 tint 없이 크기와 색으로 선다.
+ *
+ * **문구는 서버 `name` 을 그대로 넣는다.** FE 가 등급 한국어를 다시 쓰지 않는다.
+ */
+export function MetricWord({
+  tone,
+  children,
+  className,
+}: {
+  tone: MetricTone
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <span className={cn('text-title-2 font-extrabold', WORD_TONE[tone], className)}>
+      {children}
+    </span>
+  )
+}
+
 /** 큰 숫자에 쓰는 등급 색. 22px 이상 + weight 900 에만 허용된다 (DESIGN.md §2-3). */
 const VALUE_TONE: Record<MetricTone, string> = {
   critical: 'text-metric-critical-500',

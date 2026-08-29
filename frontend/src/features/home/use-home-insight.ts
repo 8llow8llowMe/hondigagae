@@ -2,9 +2,9 @@
 
 import { useQueries, useQuery } from '@tanstack/react-query'
 
-import { conditionKey, homeKeys, INSIGHT_QUERY_OPTIONS } from '@/features/home/queries'
 import { clientFetch } from '@/lib/api/client'
 import { suitabilityPath, walkSafetyPath } from '@/lib/api/insight'
+import { conditionKey, INSIGHT_QUERY_OPTIONS, insightKeys } from '@/lib/insight/queries'
 import type { PetCondition, PlaceSuitabilityResponse, WalkSafetyResponse } from '@/types/insight'
 
 /**
@@ -19,7 +19,7 @@ import type { PetCondition, PlaceSuitabilityResponse, WalkSafetyResponse } from 
  */
 export function useWalkSafety(placeId: string | null, condition: PetCondition | null) {
   return useQuery({
-    queryKey: homeKeys.walkSafety(placeId ?? '', conditionKey(condition)),
+    queryKey: insightKeys.walkSafety(placeId ?? '', conditionKey(condition)),
     queryFn: () => clientFetch<WalkSafetyResponse>(walkSafetyPath(placeId as string, condition)),
     enabled: placeId !== null,
     placeholderData: (previous) => previous,
@@ -36,7 +36,7 @@ export function useWalkSafety(placeId: string | null, condition: PetCondition | 
 export function useSuitabilities(placeIds: string[], condition: PetCondition | null) {
   return useQueries({
     queries: placeIds.map((placeId) => ({
-      queryKey: homeKeys.suitability(placeId, conditionKey(condition)),
+      queryKey: insightKeys.suitability(placeId, conditionKey(condition)),
       queryFn: () => clientFetch<PlaceSuitabilityResponse>(suitabilityPath(placeId, condition)),
       placeholderData: (previous: PlaceSuitabilityResponse | undefined) => previous,
       ...INSIGHT_QUERY_OPTIONS,

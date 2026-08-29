@@ -106,6 +106,13 @@ function MobileCarousel({ images, title }: { images: PlaceImage[]; title: string
   )
 }
 
+/**
+ * 데스크톱 모자이크 — 아트보드 `장소 상세` 03. **높이는 300 고정, 폭만 달라진다.**
+ *
+ * `1.62fr 1fr` 은 대표 사진이 썸네일 열보다 눈에 띄게 크되 썸네일이 알아볼 수 없을 만큼
+ * 좁아지지 않는 비율이다. 고정 px(590/362)로 두지 않는 이유는 **우측 열이 가변**이기
+ * 때문이다 — 데스크톱 2단에서 우측 폭은 뷰포트에 따라 달라진다.
+ */
 function DesktopStrip({ images, title }: { images: PlaceImage[]; title: string }) {
   const [lead, ...rest] = images
   if (lead === undefined) return null
@@ -115,74 +122,70 @@ function DesktopStrip({ images, title }: { images: PlaceImage[]; title: string }
   const overflow = images.length - 1 - thumbs.length
 
   return (
-    <div className="hidden gap-2 px-10 md:flex">
+    <div className="hidden px-4 md:block md:px-10">
       <div
-        className="bg-band relative shrink-0 overflow-hidden rounded-md"
+        className="grid gap-2"
         style={{
-          // 1장뿐이면 전폭으로 늘리지 않고 660 에서 멈춘다
-          width:
-            images.length === 1
-              ? 'min(100%, var(--gallery-w-single-max))'
-              : images.length === 2
-                ? 'calc((100% - 8px) / 2)'
-                : 'min(100%, var(--gallery-w-lead))',
           height: 'var(--gallery-h-desktop)',
+          // 1장은 전폭으로 늘리지 않고 660 에서 멈춘다 — TourAPI 저해상도가 드러난다
+          // 2장은 썸네일 열이 1장뿐이라 세로로 길어진다. 균등 2분할이 낫다
+          gridTemplateColumns:
+            images.length === 1
+              ? 'minmax(0, var(--gallery-w-single-max))'
+              : images.length === 2
+                ? '1fr 1fr'
+                : '1.62fr 1fr',
         }}
       >
-        <Image
-          src={lead.originImgUrl as string}
-          alt={title}
-          fill
-          sizes="590px"
-          priority
-          className="object-cover"
-        />
-      </div>
-
-      {/* 2장이면 균등 2분할 — 썸네일 열을 만들지 않는다 */}
-      {images.length === 2 && rest[0] !== undefined && (
-        <div
-          className="bg-band relative overflow-hidden rounded-md"
-          style={{ width: 'calc((100% - 8px) / 2)', height: 'var(--gallery-h-desktop)' }}
-        >
+        <div className="bg-band relative overflow-hidden rounded-md">
           <Image
-            src={rest[0].originImgUrl as string}
-            alt={rest[0].imgName ?? ''}
+            src={lead.originImgUrl as string}
+            alt={title}
             fill
             sizes="590px"
+            priority
             className="object-cover"
           />
         </div>
-      )}
 
-      {images.length >= 3 && (
-        <ul className="flex flex-col gap-2">
-          {thumbs.map((image, position) => (
-            <li
-              key={image.originImgUrl ?? position}
-              className="bg-band relative overflow-hidden rounded-md"
-              style={{
-                width: 'var(--gallery-w-thumb)',
-                height: 'var(--gallery-h-thumb)',
-              }}
-            >
-              <Image
-                src={image.originImgUrl as string}
-                alt={image.imgName ?? ''}
-                fill
-                sizes="362px"
-                className="object-cover"
-              />
-              {/* +N 은 마지막 썸네일 위에 얹는다 */}
-              {overflow > 0 && position === thumbs.length - 1 && (
-                <span className="bg-fg/60 text-fg-inverse text-title-2 absolute inset-0 flex items-center justify-center font-semibold tabular-nums">
-                  +{overflow}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+        {/* 2장이면 썸네일 열을 만들지 않는다 — 같은 크기로 나란히 둔다 */}
+        {images.length === 2 && rest[0] !== undefined && (
+          <div className="bg-band relative overflow-hidden rounded-md">
+            <Image
+              src={rest[0].originImgUrl as string}
+              alt={rest[0].imgName ?? ''}
+              fill
+              sizes="590px"
+              className="object-cover"
+            />
+          </div>
+        )}
+
+        {images.length >= 3 && (
+          <ul className="grid gap-2" style={{ gridTemplateRows: '1fr 1fr' }}>
+            {thumbs.map((image, position) => (
+              <li
+                key={image.originImgUrl ?? position}
+                className="bg-band relative overflow-hidden rounded-md"
+              >
+                <Image
+                  src={image.originImgUrl as string}
+                  alt={image.imgName ?? ''}
+                  fill
+                  sizes="362px"
+                  className="object-cover"
+                />
+                {/* +N 은 마지막 썸네일 위에 얹는다 */}
+                {overflow > 0 && position === thumbs.length - 1 && (
+                  <span className="bg-fg/60 text-fg-inverse text-title-2 absolute inset-0 flex items-center justify-center font-semibold tabular-nums">
+                    +{overflow}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
