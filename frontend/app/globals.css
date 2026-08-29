@@ -107,6 +107,43 @@ body {
   word-break: keep-all;
 }
 
+/*
+  2단 레일 레이아웃 — DESIGN.md §7-1 · §7-2.
+
+  **열 구분선을 sticky 열의 `border-right` 로 그리지 않는다.** sticky 열은 자기 콘텐츠
+  높이에서 끝나므로 선이 중간에 끊긴다. 그리드 컨테이너의 background 로 깔아야 우측
+  콘텐츠 전체 높이까지 내려온다.
+
+  Tailwind arbitrary class(`bg-[linear-gradient(...)_400px_0/1px_100%_no-repeat]`)로
+  쓰지 않는다 — `/` 를 투명도 수식자로 읽어 **클래스가 조용히 생성되지 않는다**
+  (실측으로 확인: `background-image: none`). 이런 복합 선언은 CSS 에 둔다.
+
+  폭은 `--rail-context` 하나로 묶어 열과 선이 함께 움직인다 (1584+ 에서 480).
+*/
+@media (width >= 64rem) {
+  .rail-layout {
+    display: grid;
+    grid-template-columns: var(--rail-context) 1fr;
+    background:
+      linear-gradient(var(--border), var(--border)) var(--rail-context) 0 / 1px 100% no-repeat;
+  }
+}
+
+/*
+  오버레이 배경 덮개 — 디자인 가이드 §5-2. `rgba(21,24,29,.5)` 를 토큰으로 만든다.
+
+  Tailwind arbitrary(`bg-[color-mix(...)]`)로 쓰지 않는다 — 함수가 든 arbitrary 는
+  파서가 조용히 버릴 수 있다. eslint 가 그 형태를 막고 여기로 보낸다.
+*/
+.overlay-backdrop {
+  background: color-mix(in srgb, var(--fg) 50%, transparent);
+}
+
+/* 모바일 하단 안전영역. 홈 인디케이터가 있는 기기에서 탭바가 가려지지 않게 한다 */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* 가로 스크롤 컨테이너의 스크롤바를 숨긴다.
    상시 노출되면 활성 밑줄·진행 표시줄로 오독된다 (디자인 리뷰 #7).
    스크롤 가능하다는 신호는 우측 fade 마스크가 대신한다. */

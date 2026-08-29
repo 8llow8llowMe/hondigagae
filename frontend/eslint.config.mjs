@@ -20,6 +20,20 @@ const noArbitraryValue = {
     'DESIGN.md 토큰 밖의 arbitrary value 금지. 스케일 밖 값이 필요하면 DESIGN.md 갱신을 먼저 논의한다',
 }
 
+/**
+ * 복합 arbitrary value 차단.
+ *
+ * `bg-[linear-gradient(...)_0/1px_100%_no-repeat]` 같은 선언은 Tailwind 가 `/` 를
+ * 투명도 수식자로 읽어 **클래스를 조용히 만들지 않는다.** 에러도 경고도 없이 스타일만
+ * 사라져 브라우저로 보기 전에는 모른다 (실제로 홈 열 구분선이 이렇게 사라졌다).
+ * 함수 호출이 들어가는 복합 선언은 `app/globals.css` 에 이름 있는 클래스로 둔다.
+ */
+const noComplexArbitrary = {
+  selector: 'Literal[value=/\\[[^\\]]*\\([^\\]]*\\)[^\\]]*\\]/]',
+  message:
+    '함수가 들어간 arbitrary value 금지. Tailwind 가 조용히 무시할 수 있다 — globals.css 에 이름 있는 클래스로 둔다',
+}
+
 /** 하드코딩 색상값 차단 — 토큰 CSS 변수만 쓴다 (DESIGN.md §2) */
 const noRawHex = {
   selector: 'Literal[value=/^#[0-9a-fA-F]{6}$/]',
@@ -104,7 +118,7 @@ export default tseslint.config(
         },
       ],
 
-      'no-restricted-syntax': ['error', noArbitraryValue, noRawHex],
+      'no-restricted-syntax': ['error', noArbitraryValue, noComplexArbitrary, noRawHex],
 
       // icon-only 버튼의 라벨. 1차 방어는 타입(component-guide.md §7)이고 이건 보조망이다.
       // 래퍼 컴포넌트에서 오탐이 있어 warn 으로 둔다.
@@ -138,7 +152,7 @@ export default tseslint.config(
     files: ['src/features/**', 'src/components/**', 'app/**'],
     ignores: ['app/api/**'],
     rules: {
-      'no-restricted-syntax': ['error', noArbitraryValue, noRawHex, noDirectFetch],
+      'no-restricted-syntax': ['error', noArbitraryValue, noComplexArbitrary, noRawHex, noDirectFetch],
     },
   },
 

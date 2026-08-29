@@ -91,12 +91,11 @@ export function HomeView({
       <h1 className="sr-only">혼디가개 홈</h1>
 
       {/*
+        `rail-layout` 은 `app/globals.css` 에 있다 — 2단 grid + 열 구분선을 한 곳에 묶었다.
         2단은 **데스크톱(1024+)부터**다. 태블릿(768~1023)은 한 컬럼을 유지한다 —
         400px 레일 + 우측 본문이 768 에 안 들어가 가로 스크롤이 난다 (실측으로 확인).
-        열 구분선은 컨테이너 background 로 깐다 — sticky 열에 border-right 를 주면
-        그 열 높이에서 선이 끊긴다 (DESIGN.md §7-2).
       */}
-      <div className="lg:grid lg:grid-cols-[400px_1fr] lg:bg-[linear-gradient(var(--border),var(--border))_400px_0/1px_100%_no-repeat]">
+      <div className="rail-layout">
         {/* ── 좌: 변하지 않는 맥락 */}
         <div className="lg:sticky lg:top-16 lg:self-start">
           <p className="text-caption text-fg-muted px-4 pt-3 font-medium tabular-nums md:px-6 md:pt-6">
