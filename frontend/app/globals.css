@@ -124,6 +124,18 @@ body {
   .rail-layout {
     display: grid;
     grid-template-columns: var(--rail-context) 1fr;
+
+    /*
+      콘텐츠가 짧아도 열 구분선이 화면 끝까지 내려오게 한다.
+
+      **구조를 나누는 선이 콘텐츠 길이에 따라 잘리면 구분이 아니라 우연처럼 읽힌다.**
+      일정이 없거나 적합도가 0건이면 우측이 짧아져 선이 중간에 멈춘다.
+
+      `dvh` 를 쓴다 — `vh` 는 모바일 브라우저 UI 가 접힐 때 값이 어긋난다.
+      헤더는 sticky 라 뷰포트를 차지하므로 그만큼 뺀다. 데스크톱 전용 규칙이라
+      `--header-h` 는 64 다. 콘텐츠가 더 길면 `min-` 이라 늘어난다.
+    */
+    min-block-size: calc(100dvh - var(--header-h));
   }
 }
 
