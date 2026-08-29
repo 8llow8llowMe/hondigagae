@@ -20,7 +20,12 @@ function body(search: string): SliceResponse<PlaceSummary> {
 describe('resolveMock — 처리 범위', () => {
   it('구현되지 않은 경로는 null 을 반환해 실제 게이트웨이로 넘긴다', () => {
     expect(resolveMock('/plans', 'GET', '', null)).toBeNull()
-    expect(resolveMock('/emergencies/facilities', 'GET', '', null)).toBeNull()
+  })
+
+  it('긴급 시설은 mock 이 처리한다 (이슈 #13)', () => {
+    const result = resolveMock('/emergencies/facilities', 'GET', '?lat=33.5&lng=126.5', null)
+
+    expect(result?.status).toBe(200)
   })
 
   it('GET 이 아니면 장소 mock 은 처리하지 않는다', () => {

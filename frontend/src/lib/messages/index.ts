@@ -1,4 +1,5 @@
 import { commonMessages } from '@/lib/messages/common'
+import { emergencyMessages } from '@/lib/messages/emergency'
 import { authMessages, formMessages } from '@/lib/messages/form'
 import { homeMessages } from '@/lib/messages/home'
 import { petMessages } from '@/lib/messages/pet'
@@ -29,6 +30,7 @@ export const messages = {
   common: commonMessages,
   home: homeMessages,
   place: placeMessages,
+  emergency: emergencyMessages,
   pet: petMessages,
   form: formMessages,
   auth: authMessages,
