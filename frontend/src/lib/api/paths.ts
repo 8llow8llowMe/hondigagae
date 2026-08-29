@@ -31,6 +31,10 @@ export const paths = {
     walkSafety: (placeId: string, query: string) =>
       query ? `/places/${placeId}/walk-safety?${query}` : `/places/${placeId}/walk-safety`,
   },
+  emergencies: {
+    /** 주변 긴급 시설. `lat`/`lng` 가 필수라 쿼리 없이 부르지 않는다 */
+    facilities: (query: string) => `/emergencies/facilities?${query}`,
+  },
   plans: {
     list: '/plans',
     create: '/plans',

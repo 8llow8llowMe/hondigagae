@@ -1,5 +1,6 @@
 import type { MockResult } from '@/lib/api/mock/auth-data'
 import { resolveAuthMock } from '@/lib/api/mock/auth-data'
+import { mockNearbyFacilities } from '@/lib/api/mock/emergency-data'
 import { mockSuitability, mockWalkSafety } from '@/lib/api/mock/insight-data'
 import { resolvePetMock } from '@/lib/api/mock/pet-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
@@ -73,6 +74,12 @@ export function resolveMock(
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
 
   if (path === '/places') return placeList(params)
+
+  // 긴급 시설. `lat`/`lng` 는 mock 이 쓰지 않는다 — 거리는 fixture 가 이미 갖고 있다
+  if (path === '/emergencies/facilities') {
+    const radius = Number.parseInt(params.get('radius') ?? '10000', 10)
+    return { status: 200, payload: ok(mockNearbyFacilities(radius)) }
+  }
 
   // 인사이트는 상세보다 먼저 본다 — /places/{id}/suitability 가 상세 정규식에 안 걸리지만
   // 순서를 명시해 두면 상세 규칙을 넓힐 때 실수하지 않는다
