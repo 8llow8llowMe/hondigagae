@@ -4,6 +4,7 @@ import { authMessages, formMessages } from '@/lib/messages/form'
 import { homeMessages } from '@/lib/messages/home'
 import { petMessages } from '@/lib/messages/pet'
 import { placeMessages } from '@/lib/messages/place'
+import { planMessages } from '@/lib/messages/plan'
 
 /**
  * FE가 만드는 화면 문구의 단일 출처.
@@ -30,6 +31,7 @@ export const messages = {
   common: commonMessages,
   home: homeMessages,
   place: placeMessages,
+  plan: planMessages,
   emergency: emergencyMessages,
   pet: petMessages,
   form: formMessages,

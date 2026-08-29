@@ -1,5 +1,5 @@
 import type { MockResult } from '@/lib/api/mock/auth-data'
-import { type MockPet, mockStore, nextPetId } from '@/lib/api/mock/store'
+import { memberIdOf, type MockPet, mockStore, nextPetId } from '@/lib/api/mock/store'
 import { MAX_PET_COUNT } from '@/lib/api/pet'
 import type { ApiResponse } from '@/types/api'
 import type { Pet, PetList } from '@/types/pet'
@@ -108,19 +108,6 @@ function toPetResponse(pet: MockPet): Pet {
       description: social?.sociality ?? '',
     },
   }
-}
-
-/**
- * access token 에서 memberId 를 꺼낸다.
- *
- * mock 이 발급하는 토큰은 `mock-access-{memberId}` 이고 재발급은 `-reissued` 가 붙는다
- * (`auth-data.ts`). 형식이 다르면 인증되지 않은 것으로 본다 — 게이트웨이의 401 과 같다.
- */
-function memberIdOf(accessToken: string | null): string | null {
-  if (accessToken === null) return null
-
-  const matched = /^mock-access-(\d+)(?:-reissued)?$/.exec(accessToken)
-  return matched?.[1] ?? null
 }
 
 /** 백엔드는 세 필수 enum 을 @NotNull 로 본다. code 목록 밖의 값은 애초에 역직렬화되지 않는다 */

@@ -105,34 +105,42 @@ export function Button({
  * `exactOptionalPropertyTypes` 아래에서 선택 속성의 `undefined` 가 `LinkProps` 와 충돌하고,
  * 애초에 지금 필요한 것은 이것뿐이다. **필요할 때 늘린다** (component-guide.md §6).
  */
-export type ButtonLinkProps = {
+type LinkBaseProps = {
   href: string
   variant?: ButtonVariant
   size?: ButtonSize
   leading?: ReactNode
   trailing?: ReactNode
-  children: ReactNode
   /** 레이아웃 유틸리티만 허용한다. 색·radius·shadow·padding 덮어쓰기 금지 (component-guide.md §3) */
   className?: string
 }
 
-export function ButtonLink({
-  href,
-  variant = 'primary',
-  size = 'md',
-  leading,
-  trailing,
-  className,
-  children,
-}: ButtonLinkProps) {
+/**
+ * `Button` 과 **같은 규칙으로** icon-only 를 타입으로 강제한다 — 아이콘은 `leading` 에
+ * 넣고 `children` 은 두지 않는다.
+ *
+ * 이 유니온이 없으면 하이픈이 든 JSX 속성을 TypeScript 가 props 타입과 대조하지 않아
+ * **`aria-label` 을 넘겨도 컴파일이 통과하고 값만 조용히 버려진다.** 아이콘 버튼에서
+ * 접근 가능한 이름이 사라지는 것을 타입이 못 잡는 유일한 경로다.
+ */
+export type ButtonLinkProps = LinkBaseProps &
+  (
+    | { iconOnly: true; 'aria-label': string; children?: never }
+    | { iconOnly?: false; children: ReactNode }
+  )
+
+export function ButtonLink(props: ButtonLinkProps) {
+  const { href, variant = 'primary', size = 'md', leading, trailing, className, children } = props
+
   return (
     <Link
       href={href}
+      aria-label={props.iconOnly === true ? props['aria-label'] : undefined}
       className={cn(
         'inline-flex items-center justify-center rounded-md font-semibold transition-colors',
         'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
         VARIANT[variant],
-        SIZE[size],
+        props.iconOnly === true ? ICON_ONLY_SIZE[size] : SIZE[size],
         className,
       )}
     >

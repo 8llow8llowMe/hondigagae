@@ -37,6 +37,24 @@ export type MockPet = {
   deleted: boolean
 }
 
+/**
+ * 저장된 일정. 응답 DTO 가 아니라 **저장 형태**다 — `status` 는 code 만 들고 있고
+ * 응답을 만들 때 metadata 객체로 부풀린다 (`MockPet` 과 같은 규칙).
+ */
+export type MockPlan = {
+  planId: string
+  memberId: string
+  petId: string
+  areaCode: string
+  sigunguCode: string | null
+  title: string
+  startDate: string
+  endDate: string
+  budget: number | null
+  status: string
+  deleted: boolean
+}
+
 export type MockStore = {
   members: MockMember[]
   /** 인증을 마친 이메일 (백엔드는 30분 TTL — mock 은 만료를 흉내 내지 않는다) */
@@ -48,6 +66,9 @@ export type MockStore = {
   pets: MockPet[]
   /** petId 조립용 순번. memberId 와 같은 이유로 Number 로 다루지 않는다 */
   nextPetSeq: number
+  plans: MockPlan[]
+  /** planId 조립용 순번. 위와 같은 이유 */
+  nextPlanSeq: number
 }
 
 const STORE_KEY = Symbol.for('hondigagae.mock.store')
@@ -80,6 +101,19 @@ const PET_ID_SEQ_DIGITS = 6
 export function nextPetId(store: MockStore): string {
   const id = `${PET_ID_PREFIX}${String(store.nextPetSeq).padStart(PET_ID_SEQ_DIGITS, '0')}`
   store.nextPetSeq += 1
+  return id
+}
+
+/**
+ * planId. **커서가 `id DESC` 라 순번이 클수록 최근이다** — 백엔드와 같은 성질이어야
+ * mock 에서만 페이지 순서가 뒤집히지 않는다.
+ */
+const PLAN_ID_PREFIX = '223456789012'
+const PLAN_ID_SEQ_DIGITS = 6
+
+export function nextPlanId(store: MockStore): string {
+  const id = `${PLAN_ID_PREFIX}${String(store.nextPlanSeq).padStart(PLAN_ID_SEQ_DIGITS, '0')}`
+  store.nextPlanSeq += 1
   return id
 }
 
@@ -147,6 +181,83 @@ function createStore(): MockStore {
       },
     ],
     nextPetSeq: 3,
+    /*
+      아트보드 `혼디가개 여행 일정` 04·05 의 일정 4건.
+      상태 3종과 다가오는/지난 분리를 둘 다 확인할 수 있게 짰다.
+
+      **`COMPLETED` 를 날짜가 지난 것에만 붙이지 않았다.** 아래 `애월 하루` 는 지났지만
+      `CONFIRMED` 로 남겨 뒀다 — 서버에 자동 전이가 없어 실제로 흔한 상태이고,
+      화면이 상태가 아니라 날짜로 나눈다는 것을 이 fixture 가 증명해야 한다 (공통명세 S4).
+    */
+    plans: [
+      {
+        planId: '223456789012000001',
+        memberId: '900000000000000001',
+        petId: '123456789012000001',
+        areaCode: '39',
+        sigunguCode: '4',
+        title: '몽실이와 제주 2박 3일',
+        startDate: '2026-09-12',
+        endDate: '2026-09-14',
+        budget: 400000,
+        status: 'DRAFT',
+        deleted: false,
+      },
+      {
+        planId: '223456789012000002',
+        memberId: '900000000000000001',
+        petId: '123456789012000002',
+        areaCode: '39',
+        sigunguCode: '3',
+        title: '초코와 가을 서귀포',
+        startDate: '2026-10-03',
+        endDate: '2026-10-04',
+        budget: null,
+        status: 'CONFIRMED',
+        deleted: false,
+      },
+      {
+        planId: '223456789012000003',
+        memberId: '900000000000000001',
+        petId: '123456789012000001',
+        areaCode: '39',
+        sigunguCode: '4',
+        title: '몽실이 첫 제주',
+        startDate: '2026-05-02',
+        endDate: '2026-05-04',
+        budget: 250000,
+        status: 'COMPLETED',
+        deleted: false,
+      },
+      {
+        planId: '223456789012000004',
+        memberId: '900000000000000001',
+        petId: '123456789012000001',
+        areaCode: '39',
+        sigunguCode: '4',
+        title: '애월 하루',
+        startDate: '2026-04-11',
+        endDate: '2026-04-11',
+        budget: null,
+        status: 'CONFIRMED',
+        deleted: false,
+      },
+      {
+        // 다른 회원의 일정 — 목록에 섞여 나오면 안 된다
+        planId: '223456789012000099',
+        memberId: '900000000000000777',
+        petId: '123456789012000099',
+        areaCode: '39',
+        sigunguCode: null,
+        title: '남의 일정',
+        startDate: '2026-09-01',
+        endDate: '2026-09-02',
+        budget: null,
+        status: 'DRAFT',
+        deleted: false,
+      },
+    ],
+    nextPlanSeq: 5,
   }
 }
 
@@ -159,4 +270,19 @@ export function mockStore(): MockStore {
 /** 테스트에서 상태를 초기화한다 */
 export function resetMockStore(): void {
   ;(globalThis as GlobalWithStore)[STORE_KEY] = createStore()
+}
+
+/**
+ * access token 에서 memberId 를 꺼낸다.
+ *
+ * mock 이 발급하는 토큰은 `mock-access-{memberId}` 이고 재발급은 `-reissued` 가 붙는다
+ * (`auth-data.ts`). 형식이 다르면 인증되지 않은 것으로 본다 — 게이트웨이의 401 과 같다.
+ *
+ * 보호 리소스 mock 이 여럿(반려견 · 일정)이라 여기 둔다.
+ */
+export function memberIdOf(accessToken: string | null): string | null {
+  if (accessToken === null) return null
+
+  const matched = /^mock-access-(\d+)(?:-reissued)?$/.exec(accessToken)
+  return matched?.[1] ?? null
 }

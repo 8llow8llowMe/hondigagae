@@ -5,6 +5,7 @@ import { mockSuitability, mockWalkSafety } from '@/lib/api/mock/insight-data'
 import { resolvePetMock } from '@/lib/api/mock/pet-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import { mockPlaceDetail } from '@/lib/api/mock/place-detail-data'
+import { resolvePlanMock } from '@/lib/api/mock/plan-data'
 import { allowsPetSize } from '@/lib/place/pet-size'
 import type { ApiResponse, SliceResponse } from '@/types/api'
 import type { PlaceSummary } from '@/types/place'
@@ -68,6 +69,10 @@ export function resolveMock(
   // 반려견은 보호 리소스다. accessToken 에서 회원을 도출해 소유권을 판정한다
   const pet = resolvePetMock(path, method, body, accessToken)
   if (pet !== null) return pet
+
+  // 일정도 보호 리소스다. GET(커서 목록)과 POST(생성)가 같은 경로라 method 를 함께 넘긴다
+  const plan = resolvePlanMock(path, method, search, body, accessToken)
+  if (plan !== null) return plan
 
   if (method !== 'GET') return null
 
