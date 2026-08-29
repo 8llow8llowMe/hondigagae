@@ -3,7 +3,7 @@
 import { useState } from 'react'
 
 import { ChevronDownIcon, ClockIcon } from '@/components/icons'
-import type { MetricTone } from '@/components/metric'
+import { MetricValue, MetricWord } from '@/components/metric'
 import { formatCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
@@ -24,31 +24,6 @@ import type { WalkSafetyResponse } from '@/types/insight'
  *
  * 등급어는 세로 바 없이 **라벨 16/600 `--fg-muted` + 등급어 20/800 등급 색**으로 구분한다.
  */
-const TONE_TEXT: Record<MetricTone, string> = {
-  critical: 'text-metric-critical-700',
-  high: 'text-metric-high-700',
-  mid: 'text-metric-mid-700',
-  low: 'text-metric-low-700',
-  unknown: 'text-fg-muted',
-}
-
-/** 큰 수치는 22px 이상 + weight 900 이라 `-500` 이 허용된다 (DESIGN.md §2-3) */
-const TONE_VALUE: Record<MetricTone, string> = {
-  critical: 'text-metric-critical-500',
-  high: 'text-metric-high-500',
-  mid: 'text-metric-mid-500',
-  low: 'text-metric-low-500',
-  unknown: 'text-fg-muted',
-}
-
-const TONE_TINT: Record<MetricTone, string> = {
-  critical: 'bg-metric-critical-100',
-  high: 'bg-metric-high-100',
-  mid: 'bg-metric-mid-100',
-  low: 'bg-metric-low-100',
-  unknown: '',
-}
-
 export function WalkVerdict({
   data,
   petName,
@@ -83,16 +58,18 @@ export function WalkVerdict({
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
           'focus-visible:ring-brand-500 flex w-full items-center gap-2.5 px-4 py-3.5 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:hidden',
-          // 위험만 그 줄을 tint 로 강조한다
-          tone === 'critical' && TONE_TINT[tone],
+          /*
+            위험만 그 줄을 tint 로 강조한다. **다섯 톤 표를 만들지 않는다** — 이 조건이
+            `critical` 로 좁혀 실제로 쓰이는 값은 하나뿐이고, 표로 두면 나머지 넷도
+            쓰이는 것처럼 읽힌다.
+          */
+          tone === 'critical' && 'bg-metric-critical-100',
         )}
       >
         <span className="min-w-0 flex-1">
           <span className="text-body-1 block font-semibold">
             <span className="text-fg-muted">{messages.home.walkTodayLabel}</span>{' '}
-            <span className={cn('text-emphasis font-extrabold', TONE_TEXT[tone])}>
-              {data.walkSafetyLevel.name}
-            </span>
+            <MetricWord tone={tone}>{data.walkSafetyLevel.name}</MetricWord>
           </span>
           <span className="text-caption text-fg-muted block font-medium tabular-nums">
             {summary}
@@ -112,17 +89,10 @@ export function WalkVerdict({
         <div className="hidden items-end justify-between gap-3 md:flex">
           <span className="text-body-1 font-semibold">
             <span className="text-fg-muted">{messages.home.walkTodayLabel}</span>{' '}
-            <span className={cn('text-emphasis font-extrabold', TONE_TEXT[tone])}>
-              {data.walkSafetyLevel.name}
-            </span>
+            <MetricWord tone={tone}>{data.walkSafetyLevel.name}</MetricWord>
           </span>
           {heatIndex !== null && (
-            <span className="flex shrink-0 items-baseline gap-1">
-              <span className={cn('text-display font-black tabular-nums', TONE_VALUE[tone])}>
-                {heatIndex}
-              </span>
-              <span className="text-caption text-fg-muted font-medium">℃</span>
-            </span>
+            <MetricValue value={heatIndex} unit="℃" tone={tone} size="hero" className="shrink-0" />
           )}
         </div>
         <p className="text-caption text-fg-muted hidden font-medium md:block">

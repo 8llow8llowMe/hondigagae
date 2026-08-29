@@ -25,25 +25,24 @@
 
 새 UI를 만들기 전에 아래를 확인한다. **없으면 만들고, 있으면 확장한다.** 화면마다 비슷한 버튼을 새로 만들지 않는다.
 
-| 컴포넌트                                   | 위치                                | 비고                                                                                                 |
-| ------------------------------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `Button`                                   | `src/components/button.tsx`         | variant: primary / secondary / ghost / danger, size: sm / md / lg                                    |
-| `Band`, `Section`, `Row`, `RowList`        | `src/components/surface.tsx`        | **표면 프리미티브.** 8px 밴드 · 전폭 섹션 · 전폭 행(구분선 인셋 16/40)                               |
-| `MetricBadge`, `MetricValue`, `metricTone` | `src/components/metric.tsx`         | 등급 배지·지표 값. 문구는 서버 `name`, FE 는 색만 매핑                                               |
-| `ReasonList`                               | `src/components/reason-list.tsx`    | XAI 근거. 서버 순서를 재정렬하지 않는다                                                              |
-| `Banner`                                   | `src/components/banner.tsx`         | 상시 진입점(병원·약국). 흰 표면 + 아이콘만 danger                                                    |
-| `SegmentedTabs`                            | `src/components/segmented-tabs.tsx` | 모바일 배타 축의 **탭 형태**. 48px 전폭 균등 밑줄. 아직 쓰이는 화면이 없다                           |
-| `Toast` / `ToastProvider`                  | `src/components/toast.tsx`          | 끝난 일. **undo 금지 · 오류 금지 · 동시에 하나만**                                                   |
-| `BottomSheet`                              | `src/components/bottom-sheet.tsx`   | 모바일 선택. 단계는 같은 시트를 밀어 넣는다                                                          |
-| `ConfirmModal`                             | `src/components/confirm-modal.tsx`  | **되돌릴 수 없는 일만.** 영향 범위를 개수로                                                          |
-| `Menu` / `MenuAnchor`                      | `src/components/menu.tsx`           | 데스크톱 팝오버 3–5항목. 모바일에서는 쓰지 않는다                                                    |
-| `Input`, `Textarea`, `Select`              | `src/components/`                   | 라벨·에러 메시지·helper text 슬롯 포함                                                               |
-| `Badge`                                    | `src/components/badge.tsx`          | 중립 태그·AI 표시. **등급은 `MetricBadge` 를 쓴다**                                                  |
-| `Chip`, `ChipGroup`                        | `src/components/chip.tsx`           | 모바일 상시 필터(가로). **radius-md(8), 원형 아님.** 배타 축은 `exclusive`, 시트 트리거는 `expanded` |
-| `FilterList`, `FilterRadio`, `FilterCheck` | `src/components/filter-list.tsx`    | 세로 필터 목록(데스크톱 레일 · 바텀시트). 배타=`FilterRadio` / 다중=`FilterCheck`                    |
-| `EmptyState`                               | `src/components/empty-state.tsx`    | **404/데이터 부재 전용. 재시도 버튼 슬롯 없음**                                                      |
-| `ErrorState`                               | `src/components/error-state.tsx`    | **5xx/일시 장애 전용. 재시도 버튼 필수**                                                             |
-| `Skeleton`                                 | `src/components/skeleton.tsx`       | 실제 콘텐츠와 크기 유사                                                                              |
+| 컴포넌트                                   | 위치                               | 비고                                                                                                   |
+| ------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `Button`                                   | `src/components/button.tsx`        | variant: primary / secondary / ghost / danger, size: sm / md / lg                                      |
+| `Band`, `Section`, `Row`, `RowList`        | `src/components/surface.tsx`       | **표면 프리미티브.** 8px 밴드 · 전폭 섹션 · 전폭 행(구분선 인셋 16/40)                                 |
+| `MetricBadge`, `MetricValue`, `MetricWord` | `src/components/metric.tsx`        | 등급 배지(`sm`/`md`)·지표 값·판정 문장의 술어. **톤 표는 여기가 소유한다** (화면이 다시 만들지 않는다) |
+| `ReasonList`                               | `src/components/reason-list.tsx`   | XAI 근거. 서버 순서를 재정렬하지 않는다                                                                |
+| `Banner`                                   | `src/components/banner.tsx`        | 상시 진입점(병원·약국). 흰 표면 + 아이콘만 danger                                                      |
+| `Toast` / `ToastProvider`                  | `src/components/toast.tsx`         | 끝난 일. **undo 금지 · 오류 금지 · 동시에 하나만**                                                     |
+| `BottomSheet`                              | `src/components/bottom-sheet.tsx`  | 모바일 선택. 단계는 같은 시트를 밀어 넣는다                                                            |
+| `ConfirmModal`                             | `src/components/confirm-modal.tsx` | **되돌릴 수 없는 일만.** 영향 범위를 개수로                                                            |
+| `Menu` / `MenuAnchor`                      | `src/components/menu.tsx`          | 데스크톱 팝오버 3–5항목. 모바일에서는 쓰지 않는다                                                      |
+| `Input`                                    | `src/components/input.tsx`         | 라벨·에러·helper text 는 `Field` 가 감싼다                                                             |
+| `Badge`                                    | `src/components/badge.tsx`         | 중립 태그·AI 표시. **등급은 `MetricBadge` 를 쓴다**                                                    |
+| `Chip`, `ChipGroup`                        | `src/components/chip.tsx`          | 모바일 상시 필터(가로). **radius-md(8), 원형 아님.** 배타 축은 `exclusive`, 시트 트리거는 `expanded`   |
+| `FilterList`, `FilterRadio`, `FilterCheck` | `src/components/filter-list.tsx`   | 세로 필터 목록(데스크톱 레일 · 바텀시트). 배타=`FilterRadio` / 다중=`FilterCheck`                      |
+| `EmptyState`                               | `src/components/empty-state.tsx`   | **404/데이터 부재 전용. 재시도 버튼 슬롯 없음**                                                        |
+| `ErrorState`                               | `src/components/error-state.tsx`   | **5xx/일시 장애 전용. 재시도 버튼 필수**                                                               |
+| `Skeleton`                                 | `src/components/skeleton.tsx`      | 실제 콘텐츠와 크기 유사                                                                                |
 
 **`EmptyState` 와 `ErrorState` 를 분리한 이유**: 404(데이터 부재)와 5xx(일시 장애)의 시각 언어를 다르게 강제하기 위해서다. 한 컴포넌트에 `hasRetry` 플래그를 두면 반드시 잘못 쓰인다. (`api-integration-guide.md` §3)
 
@@ -90,8 +89,18 @@
 - **`RadioGroup` / `Checkbox`(폼 입력)를 필터에 쓰지 않는다.** 저쪽은 테두리 박스 · 에러 슬롯 ·
   `name` 배선을 갖는 제출용 컨트롤이다.
 
-`SegmentedTabs`(밑줄 탭)는 가이드가 제시한 또 하나의 모바일 배타 축 형태다. **어느 화면에
-쓸지는 그 화면 아트보드가 정한다** — 장소 찾기 아트보드는 칩 + 시트다.
+**밑줄 탭(`SegmentedTabs`)은 삭제했다** (이슈 #68). 디자인 가이드 §5 가 모바일 배타 축의
+또 다른 형태로 제시했지만, **아트보드 8종 어디에도 그 디자인이 없다.** 장소 찾기는 칩 + 시트고
+(#63 에서 확인) 다른 화면에도 밑줄 탭이 없다.
+
+판정 기준은 **"아트보드에 그 디자인이 있는가"** 이지 코드에 있는가가 아니다. 쓰이지 않는
+컴포넌트를 남겨 두면 다음 사람이 "이걸 쓰라는 뜻이구나" 로 읽고 아트보드와 다른 화면을
+만든다 — 실제로 `design-system-adoption.md` §6-2 가 그렇게 적혀 있었다.
+아트보드에 밑줄 탭이 등장하면 그때 다시 만든다.
+
+**`Textarea` · `Select` 는 만든 적이 없다.** 이 문서와 `component-guide.md` 가 있는 것처럼
+적어 뒀지만 `src/components/` 에 파일이 없다. 필요한 화면이 생기면 그때 `Field` 배선에 맞춰
+추가한다.
 
 ## 3-1. 표면 규칙 (DESIGN.md §0)
 

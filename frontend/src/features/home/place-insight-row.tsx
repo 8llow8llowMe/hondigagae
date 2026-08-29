@@ -2,7 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 import { ImageIcon } from '@/components/icons'
-import type { MetricTone } from '@/components/metric'
+import { MetricBadge, type MetricTone, MetricValue } from '@/components/metric'
 import { isAllowedImageHost } from '@/lib/image/remote-host'
 import { splitReasons } from '@/lib/insight/reasons'
 import { suitabilityTone } from '@/lib/insight/tone'
@@ -25,22 +25,6 @@ import type { PlaceSummary } from '@/types/place'
  * **점수는 제목 아래로 내린다** — 썸네일이 왼쪽 기둥을 잡으므로 오른쪽에 또 기둥을
  * 세우면 제목이 눌린다. 데스크톱은 폭이 있어 우측 열로 뺀다.
  */
-const TONE_TEXT: Record<MetricTone, string> = {
-  critical: 'text-metric-critical-500',
-  high: 'text-metric-high-500',
-  mid: 'text-metric-mid-500',
-  low: 'text-metric-low-500',
-  unknown: 'text-fg-muted',
-}
-
-const TONE_BADGE: Record<MetricTone, string> = {
-  critical: 'bg-metric-critical-100 text-metric-critical-700',
-  high: 'bg-metric-high-100 text-metric-high-700',
-  mid: 'bg-metric-mid-100 text-metric-mid-700',
-  low: 'bg-metric-low-100 text-metric-low-700',
-  unknown: 'border border-dashed border-border-strong text-fg-muted',
-}
-
 export function PlaceInsightRow({
   data,
   place,
@@ -65,58 +49,56 @@ export function PlaceInsightRow({
       >
         <Thumbnail place={place} />
 
-        <span className="min-w-0 flex-1">
+        {/*
+          `<a>` 는 flow content 를 담을 수 있으므로 행 내부 래퍼는 `div` 다.
+          **`span` 으로 두면 안 된다** — `MetricValue` 가 `div` 를 렌더해 `span` 안의 `div`
+          가 되고, 무효 HTML 이라 하이드레이션 경고가 난다.
+        */}
+        <div className="min-w-0 flex-1">
           {/* 모바일: 제목과 배지를 양끝으로. 데스크톱: 붙여서 왼쪽 정렬 */}
-          <span className="flex items-start justify-between gap-2 md:items-center">
+          <div className="flex items-start justify-between gap-2 md:items-center">
             <span className="text-title-2 text-fg min-w-0 flex-1 font-semibold break-words">
               {data.placeTitle}
             </span>
-            <span
-              className={cn(
-                'text-caption shrink-0 rounded-sm px-2 py-1 font-semibold whitespace-nowrap',
-                TONE_BADGE[tone],
-              )}
-            >
-              {/*
-                **서버 `name` 을 그대로 쓴다.** 아트보드는 모바일에서 "높음" 으로 줄였지만,
-                그건 아트보드가 가정한 name 이 "적합도 높음" 이었기 때문이다. 실제 서버 값은
-                "여행 적합" 이라 이미 짧고, 잘라내면 "적합" 이 되어 뜻이 달라진다.
-                FE 가 서버 문구를 다시 쓰지 않는다 (api-integration-guide.md §6).
-              */}
+            {/*
+              **서버 `name` 을 그대로 쓴다.** 아트보드는 모바일에서 "높음" 으로 줄였지만,
+              그건 아트보드가 가정한 name 이 "적합도 높음" 이었기 때문이다. 실제 서버 값은
+              "여행 적합" 이라 이미 짧고, 잘라내면 "적합" 이 되어 뜻이 달라진다.
+              FE 가 서버 문구를 다시 쓰지 않는다 (api-integration-guide.md §6).
+            */}
+            <MetricBadge tone={tone} className="shrink-0">
               {data.suitabilityLevel.name}
-            </span>
-          </span>
+            </MetricBadge>
+          </div>
 
-          <span className="text-caption text-fg-muted mt-0.5 block font-medium tabular-nums">
+          <p className="text-caption text-fg-muted mt-0.5 font-medium tabular-nums">
             {metaLine(place)}
-          </span>
+          </p>
 
           {/* 근거는 데스크톱에만. 모바일은 상세에서 읽는다 */}
           {lines.length > 0 && (
-            <span className="mt-1.5 hidden md:block">
+            <div className="mt-1.5 hidden md:block">
               {lines.map((reason, index) => (
-                <span
+                <p
                   key={`${index}-${reason.code}`}
                   className={cn(
-                    'text-body-2 block break-keep',
+                    'text-body-2 break-keep',
                     reason.scoreDelta === 0 ? 'text-fg-muted' : 'text-fg',
                   )}
                 >
                   {reason.description}
-                </span>
+                </p>
               ))}
-            </span>
+            </div>
           )}
 
           {/* 모바일 점수 — 제목 아래 */}
-          <span className="mt-1 flex items-baseline gap-1 md:hidden">
-            <Score score={data.score} tone={tone} size="row" />
-          </span>
-        </span>
+          <Score score={data.score} tone={tone} size="row" className="mt-1 md:hidden" />
+        </div>
 
         {/* 데스크톱 태그 열 — 동반 가능 여부를 첫 태그로, 최대 3개 */}
         {place !== undefined && (
-          <span className="hidden w-36 shrink-0 flex-wrap justify-end gap-1.5 md:flex">
+          <div className="hidden w-36 shrink-0 flex-wrap justify-end gap-1.5 md:flex">
             <span className="text-caption bg-band rounded-sm px-2 py-1 font-medium">
               {place.petAllowanceType.name}
             </span>
@@ -125,13 +107,16 @@ export function PlaceInsightRow({
                 {place.indoor ? messages.home.indoor : messages.home.outdoor}
               </span>
             )}
-          </span>
+          </div>
         )}
 
         {/* 데스크톱 점수 열 */}
-        <span className="hidden w-20 shrink-0 items-baseline justify-end gap-1 md:flex">
-          <Score score={data.score} tone={tone} size="hero" />
-        </span>
+        <Score
+          score={data.score}
+          tone={tone}
+          size="hero"
+          className="hidden w-20 shrink-0 items-end md:flex"
+        />
       </Link>
     </li>
   )
@@ -141,30 +126,22 @@ function Score({
   score,
   tone,
   size,
+  // `exactOptionalPropertyTypes` 라 undefined 를 그대로 넘길 수 없다 — 기본값으로 받는다
+  className = '',
 }: {
   score: number | null
   tone: MetricTone
   size: 'row' | 'hero'
+  className?: string
 }) {
-  // null 은 0점이 아니라 "점수를 내지 않았다" 는 뜻이다
+  // null 은 0점이 아니라 "점수를 내지 않았다" 는 뜻이다. 자리를 0 으로 채우지 않는다
   if (score === null) {
-    return <span className="text-body-2 text-fg-muted">{messages.home.scoreUnavailable}</span>
+    return (
+      <p className={cn('text-body-2 text-fg-muted', className)}>{messages.home.scoreUnavailable}</p>
+    )
   }
 
-  return (
-    <>
-      <span
-        className={cn(
-          'font-black tabular-nums',
-          size === 'hero' ? 'text-display' : 'text-title-1',
-          TONE_TEXT[tone],
-        )}
-      >
-        {score}
-      </span>
-      <span className="text-caption text-fg-muted font-medium">/100</span>
-    </>
-  )
+  return <MetricValue value={score} unit="/100" tone={tone} size={size} className={className} />
 }
 
 function Thumbnail({ place }: { place: PlaceSummary | undefined }) {

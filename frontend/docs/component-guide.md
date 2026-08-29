@@ -23,14 +23,15 @@
 
 **새 값을 임의로 추가하지 않는다.** 추가는 `DESIGN.md` 갱신과 함께 한다.
 
-| 컴포넌트                      | `variant`                                                   | `size`               | 기본값           |
-| ----------------------------- | ----------------------------------------------------------- | -------------------- | ---------------- |
-| `Button`                      | `primary` \| `secondary` \| `ghost` \| `danger`             | `sm` \| `md` \| `lg` | `primary` / `md` |
-| `Badge`                       | `neutral` \| `brand` \| `accent` \| `danger`                | `sm` \| `md`         | `neutral` / `md` |
-| `MetricBadge`                 | `tone`: `critical` \| `high` \| `mid` \| `low` \| `unknown` | —                    | 없음 (필수)      |
-| `MetricValue`                 | `tone` 위와 동일 (생략 = 중립)                              | `hero` \| `row`      | `row`            |
-| `Chip`                        | `selected` \| `exclusive` (외형 variant 없음)               | —                    | 다중 축          |
-| `Input`, `Textarea`, `Select` | — (에러는 `error` prop)                                     | `md` \| `lg`         | `md`             |
+| 컴포넌트      | `variant`                                                   | `size`               | 기본값                |
+| ------------- | ----------------------------------------------------------- | -------------------- | --------------------- |
+| `Button`      | `primary` \| `secondary` \| `ghost` \| `danger`             | `sm` \| `md` \| `lg` | `primary` / `md`      |
+| `Badge`       | `neutral` \| `brand` \| `accent` \| `danger`                | `sm` \| `md`         | `neutral` / `md`      |
+| `MetricBadge` | `tone`: `critical` \| `high` \| `mid` \| `low` \| `unknown` | `sm` \| `md`         | 톤 없음 (필수) / `md` |
+| `MetricWord`  | `tone` 위와 동일                                            | — (`emphasis` 고정)  | 없음 (필수)           |
+| `MetricValue` | `tone` 위와 동일 (생략 = 중립)                              | `hero` \| `row`      | `row`                 |
+| `Chip`        | `selected` \| `exclusive` (외형 variant 없음)               | —                    | 다중 축               |
+| `Input`       | — (에러는 `error` prop)                                     | `md` \| `lg`         | `md`                  |
 
 > **`Badge` 의 `warn` · `info` 톤은 3차 세트에서 폐기했다** (DESIGN.md §2-7).
 > 측정값은 경고가 아니므로 등급은 `MetricBadge` 로 가고, 파란 정보 톤은 팔레트에 없다.
@@ -131,7 +132,8 @@ const SIZE: Record<ButtonSize, string> = {
 type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
 ```
 
-- 상호작용 컴포넌트(`Button`, `Input`, `Textarea`, `Select`)는 `ref` 를 반드시 받는다. 포커스 이동·스크롤 대상이 된다.
+- 상호작용 컴포넌트(`Button`, `Input`)는 `ref` 를 반드시 받는다. 포커스 이동·스크롤 대상이 된다.
+  `Textarea` · `Select` 는 **아직 만들지 않았다** — 필요한 화면이 생기면 같은 규칙으로 추가한다.
 - 순수 표시 컴포넌트(`Badge`, `Skeleton`)는 필요할 때만 추가한다.
 
 ## 7. 접근성 계약 (컴포넌트가 보장할 것)
