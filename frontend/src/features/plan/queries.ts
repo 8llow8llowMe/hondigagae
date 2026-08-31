@@ -9,6 +9,11 @@ export const planKeys = {
   all: ['plans'] as const,
   list: () => [...planKeys.all, 'list'] as const,
   detail: (planId: string) => [...planKeys.all, 'detail', planId] as const,
+  /**
+   * 일자별 판정. **상세와 key 를 나눈다** — 판정만 5xx 로 실패해도 일정 본문은
+   * 그대로 남아야 하고(D5), 그 섹션만 따로 재조회할 수 있어야 한다.
+   */
+  weather: (planId: string) => [...planKeys.all, 'weather', planId] as const,
 }
 
 /** api-integration-guide.md §7 표준값 — 일정 목록·상세는 30초 / 10분 (mutation 빈번) */

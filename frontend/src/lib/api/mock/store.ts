@@ -47,6 +47,28 @@ export type MockPet = {
 }
 
 /**
+ * 저장된 일정 항목. `itemType` 은 code 만 들고 있고 응답을 만들 때 metadata 로 부풀린다.
+ *
+ * **`day` 가 일정의 `totalDays` 를 넘을 수 있다.** 백엔드가 기간을 줄여도 항목을
+ * 정리하지 않아 고아 항목이 실제로 생긴다 (`PlanCommandProcessor.updatePlan`) —
+ * mock 도 그 상태를 재현해야 화면의 "여행 기간 밖 항목" 경로가 검증된다.
+ */
+export type MockPlanItem = {
+  planItemId: string
+  /** 1부터 */
+  day: number
+  sequence: number
+  /** `PLACE` / `MEAL` / `LODGING` / `WALK` / `MOVE` */
+  itemType: string
+  /** `WALK` 는 walk_course.id, `MOVE` 는 null. 장소가 아닌 값이 섞인다 */
+  targetId: string | null
+  title: string
+  memo: string | null
+  /** `HH:mm:ss` */
+  startTime: string | null
+}
+
+/**
  * 저장된 일정. 응답 DTO 가 아니라 **저장 형태**다 — `status` 는 code 만 들고 있고
  * 응답을 만들 때 metadata 객체로 부풀린다 (`MockPet` 과 같은 규칙).
  */
@@ -62,6 +84,7 @@ export type MockPlan = {
   budget: number | null
   status: string
   deleted: boolean
+  items: MockPlanItem[]
 }
 
 export type MockStore = {
@@ -78,6 +101,8 @@ export type MockStore = {
   plans: MockPlan[]
   /** planId 조립용 순번. 위와 같은 이유 */
   nextPlanSeq: number
+  /** planItemId 조립용 순번 */
+  nextPlanItemSeq: number
 }
 
 const STORE_KEY = Symbol.for('hondigagae.mock.store')
@@ -125,6 +150,23 @@ export function nextPlanId(store: MockStore): string {
   store.nextPlanSeq += 1
   return id
 }
+
+/** planItemId. 저장 때마다 새로 발급된다 — 백엔드가 일괄 교체에서 그렇게 한다 */
+const PLAN_ITEM_ID_PREFIX = '323456789012'
+const PLAN_ITEM_ID_SEQ_DIGITS = 6
+
+export function nextPlanItemId(store: MockStore): string {
+  const id = `${PLAN_ITEM_ID_PREFIX}${String(store.nextPlanItemSeq).padStart(PLAN_ITEM_ID_SEQ_DIGITS, '0')}`
+  store.nextPlanItemSeq += 1
+  return id
+}
+
+/**
+ * 항목 fixture 의 장소 id. `MOCK_PLACES` 와 **같은 기준값에서 파생**시킨다 —
+ * 값을 따로 적으면 place fixture 가 바뀔 때 조용히 어긋나 보강이 전부 404 가 된다.
+ */
+const PLACE_ID_BASE = 212481712381923328n
+const placeId = (ordinal: number) => String(PLACE_ID_BASE + BigInt(ordinal))
 
 function createStore(): MockStore {
   return {
@@ -258,6 +300,77 @@ function createStore(): MockStore {
         budget: 400000,
         status: 'DRAFT',
         deleted: false,
+        /*
+          3일 일정. **거리 규칙 4종을 한 fixture 에서 전부 드러낸다.**
+           - 1일차 첫 항목: 숙소가 앞에 없다 → 거리 문구 없음
+           - 1일차 2번째: 직전 항목 기준
+           - 2일차 첫 항목: 1일차 숙소 기준, **45km 라 긴 이동 경고**
+           - 2일차 WALK: targetId 가 walk_course.id 라 /places 를 부르면 안 된다
+           - 3일차: 항목 0개 (빈 일자 안내)
+        */
+        items: [
+          {
+            planItemId: '323456789012000001',
+            day: 1,
+            sequence: 0,
+            itemType: 'PLACE',
+            targetId: placeId(0),
+            title: '제주특별자치도립김창열미술관',
+            memo: '실내라 비가 와도 괜찮아요',
+            startTime: '10:00:00',
+          },
+          {
+            planItemId: '323456789012000002',
+            day: 1,
+            sequence: 1,
+            itemType: 'MEAL',
+            targetId: placeId(6),
+            title: '동문재래시장',
+            memo: null,
+            startTime: '12:30:00',
+          },
+          {
+            planItemId: '323456789012000003',
+            day: 1,
+            sequence: 2,
+            itemType: 'LODGING',
+            targetId: placeId(3),
+            title: '애월 반려견 동반 독채 펜션 하나로',
+            memo: null,
+            startTime: '17:00:00',
+          },
+          {
+            planItemId: '323456789012000004',
+            day: 2,
+            sequence: 0,
+            itemType: 'PLACE',
+            targetId: placeId(1),
+            title: '가세오름',
+            memo: null,
+            startTime: null,
+          },
+          {
+            planItemId: '323456789012000005',
+            day: 2,
+            sequence: 1,
+            itemType: 'PLACE',
+            targetId: placeId(2),
+            title: '오설록 티뮤지엄 카페',
+            memo: null,
+            startTime: null,
+          },
+          {
+            // WALK 는 walk_course.id 다. 장소 보강 대상이 아니다
+            planItemId: '323456789012000006',
+            day: 2,
+            sequence: 2,
+            itemType: 'WALK',
+            targetId: '777777777777000001',
+            title: '오설록 주변 산책',
+            memo: null,
+            startTime: null,
+          },
+        ],
       },
       {
         planId: '223456789012000002',
@@ -271,6 +384,52 @@ function createStore(): MockStore {
         budget: null,
         status: 'CONFIRMED',
         deleted: false,
+        /*
+          2일 일정인데 **3일차 항목이 남아 있다.** 기간을 줄여도 서버가 항목을 정리하지
+          않아 실제로 생기는 상태다 — 화면의 "여행 기간 밖 항목" 경로를 여기서 확인한다.
+        */
+        items: [
+          {
+            planItemId: '323456789012000007',
+            day: 1,
+            sequence: 0,
+            itemType: 'PLACE',
+            targetId: placeId(4),
+            title: '함덕 서우봉 해변',
+            memo: null,
+            startTime: null,
+          },
+          {
+            planItemId: '323456789012000008',
+            day: 1,
+            sequence: 1,
+            itemType: 'MEAL',
+            targetId: placeId(6),
+            title: '동문재래시장',
+            memo: null,
+            startTime: null,
+          },
+          {
+            planItemId: '323456789012000009',
+            day: 2,
+            sequence: 0,
+            itemType: 'PLACE',
+            targetId: placeId(7),
+            title: '제주현대미술관',
+            memo: null,
+            startTime: null,
+          },
+          {
+            planItemId: '323456789012000010',
+            day: 3,
+            sequence: 0,
+            itemType: 'PLACE',
+            targetId: placeId(5),
+            title: '제주 곶자왈 반려견 산책 트레킹 코스',
+            memo: null,
+            startTime: null,
+          },
+        ],
       },
       {
         planId: '223456789012000003',
@@ -284,6 +443,7 @@ function createStore(): MockStore {
         budget: 250000,
         status: 'COMPLETED',
         deleted: false,
+        items: [],
       },
       {
         planId: '223456789012000004',
@@ -297,6 +457,7 @@ function createStore(): MockStore {
         budget: null,
         status: 'CONFIRMED',
         deleted: false,
+        items: [],
       },
       {
         // 다른 회원의 일정 — 목록에 섞여 나오면 안 된다
@@ -311,9 +472,11 @@ function createStore(): MockStore {
         budget: null,
         status: 'DRAFT',
         deleted: false,
+        items: [],
       },
     ],
     nextPlanSeq: 5,
+    nextPlanItemSeq: 20,
   }
 }
 
@@ -336,7 +499,9 @@ function isCurrentShape(store: MockStore | undefined): store is MockStore {
     Array.isArray(store.plans) &&
     // 계정 상태 3종 fixture 가 들어오며 members 의 모양이 바뀌었다. 이 검사가 없으면
     // 켜 둔 개발 서버의 옛 상태가 그대로 굴러가 provider 가 undefined 로 읽힌다
-    store.members.every((member) => 'provider' in member)
+    store.members.every((member) => 'provider' in member) &&
+    // 일정 항목이 뒤에 추가됐다. HMR 로 살아남은 낡은 스토어는 버린다 (#59 와 같은 사고)
+    store.plans.every((plan) => Array.isArray(plan.items))
   )
 }
 

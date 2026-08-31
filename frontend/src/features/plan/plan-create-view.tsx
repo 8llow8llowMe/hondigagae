@@ -17,7 +17,7 @@ import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
 import { toPlanCreatePayload } from '@/lib/plan/form'
 import type { Pet } from '@/types/pet'
-import { EMPTY_PLAN_FORM_VALUES, type PlanFormValues } from '@/types/plan'
+import { EMPTY_PLAN_FORM_VALUES, type PlanDetail, type PlanFormValues } from '@/types/plan'
 
 /**
  * 직접 만들기 — 공통명세 S9.
@@ -64,7 +64,7 @@ function PlanCreateFormContainer({ pets }: { pets: Pet[] }) {
   const router = useRouter()
   const queryClient = useQueryClient()
 
-  const form = useForm<PlanFormValues, unknown>({
+  const form = useForm<PlanFormValues, PlanDetail>({
     schema: planFormSchema,
     initialValues: {
       ...EMPTY_PLAN_FORM_VALUES,
@@ -72,15 +72,16 @@ function PlanCreateFormContainer({ pets }: { pets: Pet[] }) {
       petId: pets.length === 1 ? (pets[0]?.petId ?? '') : '',
     },
     onSubmit: (values) => createPlan(toPlanCreatePayload(values)),
-    onSuccess: () => {
+    onSuccess: (created) => {
       void queryClient.invalidateQueries({ queryKey: planKeys.all })
       /*
-        **목록으로 돌아간다.** 상세 화면이 아직 없다 — 생기면 `/plans/{planId}` 로 바꾼다.
+        **만든 일정의 상세로 보낸다** (#80 에서 상세가 생겼다. 공통명세 S9 예고 이행).
+        빈 일정을 만든 직후이므로 다음 할 일은 "장소를 담는 것" 이고, 그 자리가 상세다.
 
         `replace` 를 쓴다. `push` 면 뒤로가기로 폼에 돌아와 같은 일정을 두 번 만들 수 있다
         (`PetCreateView` 와 같은 판단).
       */
-      router.replace('/plans')
+      router.replace(`/plans/${created.planId}`)
     },
   })
 

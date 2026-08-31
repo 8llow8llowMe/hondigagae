@@ -1,7 +1,21 @@
 import type { MockResult } from '@/lib/api/mock/auth-data'
-import { memberIdOf, type MockPlan, mockStore, nextPlanId } from '@/lib/api/mock/store'
+import { MOCK_PLACES } from '@/lib/api/mock/place-data'
+import {
+  memberIdOf,
+  type MockPlan,
+  type MockPlanItem,
+  mockStore,
+  nextPlanId,
+} from '@/lib/api/mock/store'
 import type { ApiResponse, CodeNameMetadata, SliceResponse } from '@/types/api'
-import type { PlanDetail, PlanSummaryItem } from '@/types/plan'
+import type { ScoreMetricMetadata } from '@/types/insight'
+import type {
+  PlanDayWeatherItem,
+  PlanDetail,
+  PlanItemDetail,
+  PlanSummaryItem,
+  PlanWeatherResponse,
+} from '@/types/plan'
 
 /**
  * 여행 일정 mock.
@@ -65,17 +79,48 @@ function toSummary(plan: MockPlan): PlanSummaryItem {
   }
 }
 
-function toDetail(plan: MockPlan): PlanDetail {
+/** 백엔드 `PlanItemType` 의 displayName/description 복제본 */
+const ITEM_TYPE: Record<string, CodeNameMetadata> = {
+  PLACE: { code: 'PLACE', name: '장소', description: '관광지·카페 등 방문 장소 항목입니다.' },
+  MEAL: { code: 'MEAL', name: '식사', description: '식당 방문 항목입니다.' },
+  LODGING: { code: 'LODGING', name: '숙박', description: '숙소 체크인/숙박 항목입니다.' },
+  WALK: { code: 'WALK', name: '산책', description: '산책 코스 항목입니다.' },
+  MOVE: { code: 'MOVE', name: '이동', description: '이동 구간 항목입니다.' },
+}
+
+function totalDaysOf(plan: MockPlan): number {
   const start = Date.parse(`${plan.startDate}T00:00:00Z`)
   const end = Date.parse(`${plan.endDate}T00:00:00Z`)
+  return Math.round((end - start) / 86_400_000) + 1
+}
 
+function toItem(item: MockPlanItem): PlanItemDetail {
+  return {
+    planItemId: item.planItemId,
+    day: item.day,
+    sequence: item.sequence,
+    itemType: ITEM_TYPE[item.itemType] ?? {
+      code: item.itemType,
+      name: item.itemType,
+      description: null,
+    },
+    targetId: item.targetId,
+    title: item.title,
+    memo: item.memo,
+    startTime: item.startTime,
+  }
+}
+
+function toDetail(plan: MockPlan): PlanDetail {
   return {
     ...toSummary(plan),
     sigunguCode: plan.sigunguCode,
     budget: plan.budget,
-    totalDays: Math.round((end - start) / 86_400_000) + 1,
-    // 생성 요청에서 items 를 보내지 않으므로 항상 빈 배열이다 (공통명세 S9)
-    items: [],
+    totalDays: totalDaysOf(plan),
+    // 저장 순서를 그대로 주지 않는다 — 백엔드가 day·sequence 로 정렬해 내려준다
+    items: [...plan.items]
+      .sort((a, b) => (a.day === b.day ? a.sequence - b.sequence : a.day - b.day))
+      .map(toItem),
   }
 }
 
@@ -86,16 +131,115 @@ export function resolvePlanMock(
   body: string | null,
   accessToken: string | null,
 ): MockResult | null {
-  if (path !== '/plans') return null
+  if (!path.startsWith('/plans')) return null
 
   // 모든 일정 엔드포인트가 @PreAuthorize("isAuthenticated()") 다
   const memberId = memberIdOf(accessToken)
   if (memberId === null) return UNAUTHORIZED()
 
-  if (method === 'GET') return list(memberId, search)
-  if (method === 'POST') return create(memberId, body)
+  if (path === '/plans') {
+    if (method === 'GET') return list(memberId, search)
+    if (method === 'POST') return create(memberId, body)
+    return null
+  }
+
+  const weather = /^\/plans\/([^/]+)\/weather$/.exec(path)
+  if (weather !== null && method === 'GET') {
+    return withPlan(memberId, weather[1] ?? '', (plan) => ({
+      status: 200,
+      payload: ok(toWeather(plan)),
+    }))
+  }
+
+  const detail = /^\/plans\/([^/]+)$/.exec(path)
+  if (detail !== null) {
+    const rawId = detail[1] ?? ''
+
+    if (method === 'GET') {
+      return withPlan(memberId, rawId, (plan) => ({ status: 200, payload: ok(toDetail(plan)) }))
+    }
+    if (method === 'PUT') return withPlan(memberId, rawId, (plan) => update(plan, body))
+    if (method === 'DELETE') {
+      return withPlan(memberId, rawId, (plan) => {
+        // 백엔드는 소프트 삭제다 — 행이 남고 조회에서만 빠진다
+        plan.deleted = true
+        return { status: 200, payload: ok(null) }
+      })
+    }
+  }
 
   return null
+}
+
+/**
+ * `planId` 를 판정하고 소유한 일정을 넘긴다.
+ *
+ * **숫자가 아닌 id 는 404 가 아니라 400 이다** — 컨트롤러가 `@PathVariable long` 이라
+ * 바인딩 단계에서 걸린다 (장소 상세의 `PLACE_113` 과 같은 상황).
+ * **남의 일정도 404 다** — 컨트롤러 설명이 존재 여부를 흘리지 않겠다고 명시했다.
+ */
+function withPlan(
+  memberId: string,
+  rawId: string,
+  handle: (plan: MockPlan) => MockResult,
+): MockResult {
+  if (!/^\d+$/.test(rawId)) {
+    return fail(400, 'PLAN_114', '요청 파라미터 형식이 올바르지 않습니다.')
+  }
+
+  const plan = mockStore().plans.find(
+    (candidate) =>
+      candidate.planId === rawId && candidate.memberId === memberId && !candidate.deleted,
+  )
+  if (plan === undefined) return fail(404, 'PLAN_001', '존재하지 않는 여행 일정입니다.')
+
+  return handle(plan)
+}
+
+/**
+ * 부분 수정. **보내지 않은 필드는 유지된다** (`PlanCommandProcessor.updatePlan`).
+ *
+ * `budget: null` 은 "지운다" 가 아니라 "유지" 다 — 백엔드와 같아야 화면이 0 을 보내는
+ * 이유(D4)가 mock 에서도 성립한다.
+ */
+function update(plan: MockPlan, body: string | null): MockResult {
+  let parsed: Record<string, unknown>
+  try {
+    parsed = body === null ? {} : (JSON.parse(body) as Record<string, unknown>)
+  } catch {
+    return fail(400, 'PLAN_100', '요청 값이 올바르지 않습니다.')
+  }
+
+  const errors: { code: string; field: string; message: string }[] = []
+
+  // 문자열이 아닌 title 은 Jackson 이 400 으로 거른다. mock 도 문자열만 본다
+  if (parsed.title !== undefined && parsed.title !== null) {
+    const title = typeof parsed.title === 'string' ? parsed.title.trim() : ''
+    if (title.length === 0) {
+      errors.push({ code: 'PLAN_103', field: 'title', message: '일정 제목은 필수입니다.' })
+    } else if (title.length > 60) {
+      errors.push({
+        code: 'PLAN_104',
+        field: 'title',
+        message: '일정 제목은 60자 이하만 가능합니다.',
+      })
+    }
+  }
+
+  if (parsed.budget !== undefined && parsed.budget !== null) {
+    const budget = Number(parsed.budget)
+    if (!Number.isFinite(budget) || budget < 0) {
+      errors.push({ code: 'PLAN_107', field: 'budget', message: '예산은 0 이상이어야 합니다.' })
+    }
+  }
+
+  if (errors.length > 0) return failValidation(errors)
+
+  if (typeof parsed.title === 'string') plan.title = parsed.title.trim()
+  if (typeof parsed.budget === 'number') plan.budget = parsed.budget
+  if (typeof parsed.status === 'string') plan.status = parsed.status
+
+  return { status: 200, payload: ok(toDetail(plan)) }
 }
 
 /**
@@ -216,9 +360,157 @@ function create(memberId: string, body: string | null): MockResult {
     budget,
     // 새 일정은 항상 초안이다 — `PlanCreateRequest` 에 status 가 없다
     status: 'DRAFT',
+    // `items` 를 보내지 않는다 — 빈 일정을 만들고 장소는 일자 편집에서 담는다 (공통명세 S9)
+    items: [],
     deleted: false,
   }
   store.plans.push(plan)
 
   return { status: 200, payload: ok(toDetail(plan)) }
+}
+
+// ─── 일자별 판정 (#80) ────────────────────────────────────────────────────────
+
+/** 백엔드 `SuitabilityLevel` 복제본. `insight-data.ts` 와 같은 값이어야 한다 */
+const SUITABILITY: Record<string, ScoreMetricMetadata> = {
+  HIGH: {
+    code: 'HIGH',
+    name: '여행 적합',
+    description: '반려견과 방문하기 좋은 조건입니다.',
+    scoreDescription: '점수가 높을수록 날씨/동반 조건이 반려견에게 유리합니다.',
+  },
+  MEDIUM: {
+    code: 'MEDIUM',
+    name: '보통',
+    description: '일부 조건을 확인하고 가면 무난합니다.',
+    scoreDescription: '점수가 중간이면 주의할 조건이 한둘 있다는 뜻입니다.',
+  },
+}
+
+/**
+ * 예보가 닿는 일수. 백엔드가 단기+중기를 이어 붙여 **약 11일**까지 준다
+ * (`PlanWebController.getPlanWeather` 설명). mock 은 fixture 안에서 두 경우를 모두
+ * 드러내야 하므로 2일로 줄여 잡는다 — 3일차부터 `score: null` 이다.
+ */
+const MOCK_FORECAST_DAYS = 2
+
+function addDays(date: string, days: number): string {
+  const time = Date.parse(`${date}T00:00:00Z`)
+  return new Date(time + days * 86_400_000).toISOString().slice(0, 10)
+}
+
+/**
+ * 일자별 판정.
+ *
+ * **`days` 는 항상 `totalDays` 길이다.** 배열 길이로 성공/실패를 판단하지 않는다 —
+ * 판정을 못 낸 날은 `score: null` + `unavailableReason` 으로 온다.
+ */
+function toWeather(plan: MockPlan): PlanWeatherResponse {
+  const totalDays = totalDaysOf(plan)
+
+  const days: PlanDayWeatherItem[] = Array.from({ length: totalDays }, (_, index) => {
+    const day = index + 1
+    const date = addDays(plan.startDate, index)
+
+    // 그날 첫 장소 항목이 판정 기준이다 (컨트롤러 설명). 없으면 기준이 없다
+    const basis = [...plan.items]
+      .filter((item) => item.day === day && item.targetId !== null && item.itemType !== 'WALK')
+      .sort((a, b) => a.sequence - b.sequence)[0]
+
+    const representativePlaceId = basis?.targetId ?? null
+    const representativePlaceTitle = basis?.title ?? null
+
+    // 예보 밖 — **점수가 낮은 것이 아니라 판단 근거가 없는 것이다**
+    if (day > MOCK_FORECAST_DAYS || representativePlaceId === null) {
+      return {
+        day,
+        date,
+        representativePlaceId,
+        representativePlaceTitle,
+        score: null,
+        suitabilityLevel: null,
+        reasons: [],
+        weather: null,
+        indoorAlternatives: [],
+        unavailableReason:
+          representativePlaceId === null
+            ? '이 날은 담은 장소가 없어 판정할 기준이 없습니다.'
+            : '기상 예보는 11일까지만 제공돼 이 날은 아직 판단할 수 없습니다.',
+      }
+    }
+
+    // 2일차는 비 예보 + 중기예보 구간이다 — 실내 대안과 출처 문구를 함께 드러낸다
+    const rainy = day === 2
+
+    return {
+      day,
+      date,
+      representativePlaceId,
+      representativePlaceTitle,
+      score: rainy ? 62 : 84,
+      suitabilityLevel: (rainy ? SUITABILITY.MEDIUM : SUITABILITY.HIGH) as ScoreMetricMetadata,
+      reasons: rainy
+        ? [
+            {
+              code: 'RAIN_EXPECTED',
+              name: '비 예보',
+              description: '강수확률이 80%라 야외 활동이 어려울 수 있습니다.',
+            },
+            {
+              code: 'TEMPERATURE_OK',
+              name: '기온 적정',
+              description: '최고기온 24도로 반려견에게 무리가 없습니다.',
+            },
+          ]
+        : [
+            {
+              code: 'PET_ALLOWED',
+              name: '반려견 동반 가능',
+              description: '반려견과 함께 입장할 수 있는 장소입니다.',
+            },
+            {
+              code: 'TEMPERATURE_OK',
+              name: '기온 적정',
+              description: '최고기온 26도로 반려견에게 무리가 없습니다.',
+            },
+            {
+              code: 'CONGESTION_UNKNOWN',
+              name: '혼잡도 정보 없음',
+              description: '이 장소의 혼잡도 자료가 아직 없습니다.',
+            },
+          ],
+      weather: {
+        date,
+        // MID_TERM 이면 대략적인 값이다 — 화면이 출처를 밝힌다
+        forecastSourceCode: rainy ? 'MID_TERM' : 'SHORT_TERM',
+        forecastSourceName: rainy ? '중기예보' : '단기예보',
+        minTemperature: rainy ? 19.0 : 21.0,
+        maxTemperature: rainy ? 24.0 : 26.0,
+        maxPrecipitationProbability: rainy ? 80 : 10,
+        precipitationTypeName: rainy ? '비' : '없음',
+        skyStateName: rainy ? '흐림' : '맑음',
+        maxWindSpeed: rainy ? 7.2 : 3.1,
+        maxHumidity: rainy ? 88 : 60,
+      },
+      // 비 예보가 있고 그날 장소가 실내가 아닐 때만 채워진다 (컨트롤러 설명)
+      indoorAlternatives: rainy ? indoorAlternatives() : [],
+      unavailableReason: null,
+    }
+  })
+
+  return {
+    planId: plan.planId,
+    planTitle: plan.title,
+    startDate: plan.startDate,
+    endDate: plan.endDate,
+    petConditionApplied: true,
+    days,
+  }
+}
+
+/** 실내 대안. `{placeId, title}` 뿐이라 화면이 보강해야 상세를 말할 수 있다 */
+function indoorAlternatives(): { placeId: string; title: string }[] {
+  return MOCK_PLACES.filter((place) => place.indoor === true)
+    .slice(0, 2)
+    .map((place) => ({ placeId: place.placeId, title: place.title }))
 }

@@ -86,3 +86,16 @@ export function isPastPlan(endDate: string, today: Date): boolean {
 
   return end < todayUtc(today)
 }
+
+/**
+ * 시작일에서 `offset` 일 뒤의 날짜(`YYYY-MM-DD`).
+ *
+ * 일자 섹션의 날짜는 **판정 응답이 아니라 일정 기간에서 만든다** — 판정이 실패해도
+ * `2일차 09-13 (일)` 은 그대로 보여야 한다. 날짜를 못 읽으면 `null` 이다.
+ */
+export function addPlanDays(startDate: string, offset: number): string | null {
+  const start = parseDay(startDate)
+  if (start === null) return null
+
+  return new Date(start + offset * 86_400_000).toISOString().slice(0, 10)
+}

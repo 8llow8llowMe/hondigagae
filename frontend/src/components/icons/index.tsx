@@ -186,3 +186,19 @@ export function PlusIcon(props: IconProps) {
     </Svg>
   )
 }
+
+/**
+ * 더보기(세로 점 셋) — 일정 상세의 관리 메뉴 트리거 (아트보드 `여행 일정` 01·02).
+ *
+ * 점은 선이 아니라 면이라 `Svg` 의 stroke 규칙으로는 그려지지 않는다.
+ * `fill="currentColor"` 를 명시하고 stroke 를 끈다.
+ */
+export function MoreIcon(props: IconProps) {
+  return (
+    <Svg {...props} fill="currentColor" stroke="none">
+      <circle cx="12" cy="5" r="1.6" />
+      <circle cx="12" cy="12" r="1.6" />
+      <circle cx="12" cy="19" r="1.6" />
+    </Svg>
+  )
+}

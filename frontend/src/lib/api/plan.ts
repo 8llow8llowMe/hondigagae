@@ -1,7 +1,13 @@
-import { clientFetch } from '@/lib/api/client'
+import { clientFetch, clientFetchVoid } from '@/lib/api/client'
 import { paths } from '@/lib/api/paths'
 import type { SliceResponse } from '@/types/api'
-import type { PlanCreatePayload, PlanDetail, PlanSummaryItem } from '@/types/plan'
+import type {
+  PlanCreatePayload,
+  PlanDetail,
+  PlanSummaryItem,
+  PlanUpdatePayload,
+  PlanWeatherResponse,
+} from '@/types/plan'
 
 /**
  * 여행 일정 API — 경로와 브라우저 호출부.
@@ -48,4 +54,39 @@ export function fetchPlanList(cursor: string | null): Promise<PlanSlice> {
 
 export function createPlan(payload: PlanCreatePayload): Promise<PlanDetail> {
   return clientFetch<PlanDetail>(planCreatePath(), { method: 'POST', body: payload })
+}
+
+// ─── 상세 (#80) ───────────────────────────────────────────────────────────────
+
+export function planDetailPath(planId: string): string {
+  return paths.plans.detail(planId)
+}
+
+export function planWeatherPath(planId: string): string {
+  return paths.plans.weather(planId)
+}
+
+export function fetchPlanDetail(planId: string): Promise<PlanDetail> {
+  return clientFetch<PlanDetail>(planDetailPath(planId))
+}
+
+export function fetchPlanWeather(planId: string): Promise<PlanWeatherResponse> {
+  return clientFetch<PlanWeatherResponse>(planWeatherPath(planId))
+}
+
+/**
+ * 일정 수정. **응답이 `PlanDetailResponse` 전체**라 호출부가 `setQueryData` 로
+ * 캐시를 갈아끼운다 — 다시 조회하지 않는다.
+ */
+export function updatePlan(planId: string, payload: PlanUpdatePayload): Promise<PlanDetail> {
+  return clientFetch<PlanDetail>(planDetailPath(planId), { method: 'PUT', body: payload })
+}
+
+/**
+ * 삭제. 소프트 삭제고 응답이 `Response<Void>` 라 **`clientFetchVoid` 를 써야 한다** —
+ * `unwrap()` 은 `dataBody === null` 을 실패로 보기 때문에 `clientFetch` 로 부르면
+ * **서버는 지웠는데 화면만 실패라고 말한다.** 브라우저 실측으로 잡은 버그다.
+ */
+export function deletePlan(planId: string): Promise<void> {
+  return clientFetchVoid(planDetailPath(planId), { method: 'DELETE' })
 }
