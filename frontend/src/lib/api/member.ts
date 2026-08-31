@@ -1,10 +1,11 @@
-import { clientFetch, clientFetchVoid } from '@/lib/api/client'
+import { clientFetch, clientFetchForm, clientFetchVoid } from '@/lib/api/client'
 import { paths } from '@/lib/api/paths'
 import type {
   MemberMyInfo,
   MemberUpdatePayload,
   PasswordChangePayload,
   PasswordSetupPayload,
+  ProfileImageUploadResult,
 } from '@/types/member'
 
 /**
@@ -28,6 +29,53 @@ export function fetchMyInfo(): Promise<MemberMyInfo> {
  */
 export function updateMyInfo(payload: MemberUpdatePayload): Promise<MemberMyInfo> {
   return clientFetch<MemberMyInfo>(paths.members.me, { method: 'PATCH', body: payload })
+}
+
+/**
+ * 업로드 파트명. **`imageFile` 이어야 한다** — 컨트롤러가
+ * `@RequestPart("imageFile")` 로 받는다. 이름이 다르면 400 이다.
+ */
+export const PROFILE_IMAGE_PART = 'imageFile'
+
+/**
+ * 업로드 상한. 서버 `spring.servlet.multipart.max-file-size` 기본값(5MB)과
+ * `infra.storage.max-file-bytes`(5242880) 의 복제본이다.
+ *
+ * **화면이 먼저 막는 이유**: BFF 가 재시도를 위해 본문을 통째로 메모리에 올린다
+ * (`forwarded-body.ts`). 서버가 거부할 파일이 거기까지 가지 않게 하는 첫 방어선이다.
+ * 서버 검증을 대신하는 것이 아니다 — 서버는 `STORAGE_002` 로 다시 막는다.
+ */
+export const MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024
+
+/**
+ * 허용 형식. 화면의 `accept` 속성에 쓴다.
+ *
+ * **검증이 아니라 편의다.** 서버는 확장자나 클라이언트가 보낸 `Content-Type` 이 아니라
+ * **매직 바이트**로 판정한다 (`ImageFileType`) — 위조할 수 있기 때문이다.
+ */
+export const PROFILE_IMAGE_ACCEPT = 'image/jpeg,image/png,image/gif,image/webp'
+
+/**
+ * 프로필 이미지 업로드.
+ *
+ * **응답이 `{profileImageKey, profileImageUrl}` 뿐이다** — 삭제와 달리 회원 정보 전체가
+ * 오지 않는다. 그래서 캐시는 `profileImageUrl` 만 갈아끼운다 (공통명세 S1).
+ *
+ * 실패: `STORAGE_002`(크기 초과) · `STORAGE_003`(형식) · `STORAGE_001`(파일 없음) — 전부 400.
+ */
+export function uploadProfileImage(file: File): Promise<ProfileImageUploadResult> {
+  const form = new FormData()
+  form.append(PROFILE_IMAGE_PART, file)
+
+  return clientFetchForm<ProfileImageUploadResult>(paths.members.profileImage, { body: form })
+}
+
+/**
+ * 프로필 이미지 삭제. **응답이 회원 정보 전체다** — 업로드와 모양이 다르다.
+ * 저장된 파일도 함께 지워진다.
+ */
+export function removeProfileImage(): Promise<MemberMyInfo> {
+  return clientFetch<MemberMyInfo>(paths.members.profileImage, { method: 'DELETE' })
 }
 
 /**

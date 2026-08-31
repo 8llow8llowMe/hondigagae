@@ -26,6 +26,7 @@ export type MyPageSectionsProps = {
   petsTotalCount: number
   onRetry: () => void
   onLogout: () => void
+  onEditProfile: () => void
 }
 
 /**
@@ -44,6 +45,7 @@ export function MyPageSections({
   petsTotalCount,
   onRetry,
   onLogout,
+  onEditProfile,
 }: MyPageSectionsProps) {
   if (loading) {
     return (
@@ -70,7 +72,22 @@ export function MyPageSections({
   return (
     <>
       <Section>
-        <MyProfileSection member={member} />
+        <MyProfileSection
+          member={member}
+          trailing={
+            /*
+              `수정` 은 이동이 아니라 모달을 여는 **동작**이라 `<a>` 가 아니라 `<button>`
+              이다 (D6). 아트보드 01 은 `14/600` 브랜드 색 텍스트다 — 채움 버튼이 아니다.
+            */
+            <button
+              type="button"
+              onClick={onEditProfile}
+              className="text-body-2 text-brand-600 focus-visible:ring-brand-500 flex min-h-11 shrink-0 items-center px-1 font-semibold focus-visible:ring-2 focus-visible:outline-none"
+            >
+              {messages.member.edit}
+            </button>
+          }
+        />
       </Section>
 
       <Band />

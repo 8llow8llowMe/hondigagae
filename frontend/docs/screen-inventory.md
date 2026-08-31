@@ -22,15 +22,15 @@
 
 ## 1. 인증 / 회원 — 착수 가능
 
-| 화면          | 경로                                | API                                                                          | 상태                                                      |
-| ------------- | ----------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------- |
-| 로그인        | `/(auth)/login`                     | `POST /auth/login`                                                           | **구현** (소셜은 범위 밖)                                 |
-| 소셜 콜백     | `/(auth)/oauth/{provider}/callback` | `GET /auth/{provider}/authorize` → `GET /auth/{provider}/login?code=&state=` | **명세 완료** (`features/auth/소셜콜백-세부명세.md`)      |
-| 회원가입      | `/(auth)/signup`                    | `POST /auth/email/send-code`, `/verify-code`, `POST /members/signup`         | **구현**                                                  |
-| 내 정보       | `/mypage`                           | `GET`·`PATCH /members/me`, `POST`·`DELETE /members/me/profile-image`         | **구현 완료** — 프로필 수정 모달·이미지 업로드는 #79 대기 |
-| 비밀번호 관리 | `/mypage/password`                  | `POST`·`DELETE /members/me/password`, `POST /members/me/password/setup`      | **구현 완료** — 계정 상태 3종 분기                        |
-| 회원 탈퇴     | `/mypage/withdraw`                  | `POST /members/me/withdraw`                                                  | **구현 완료**                                             |
-| 비밀번호 찾기 | `/(auth)/password/reset`            | `POST /auth/password/reset/send-code`, `/auth/password/reset`                | **명세 완료** (`features/auth/비밀번호찾기-세부명세.md`)  |
+| 화면          | 경로                                | API                                                                          | 상태                                                     |
+| ------------- | ----------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------- |
+| 로그인        | `/(auth)/login`                     | `POST /auth/login`                                                           | **구현** (소셜은 범위 밖)                                |
+| 소셜 콜백     | `/(auth)/oauth/{provider}/callback` | `GET /auth/{provider}/authorize` → `GET /auth/{provider}/login?code=&state=` | **명세 완료** (`features/auth/소셜콜백-세부명세.md`)     |
+| 회원가입      | `/(auth)/signup`                    | `POST /auth/email/send-code`, `/verify-code`, `POST /members/signup`         | **구현**                                                 |
+| 내 정보       | `/mypage`                           | `GET`·`PATCH /members/me`, `POST`·`DELETE /members/me/profile-image`         | **구현 완료**                                            |
+| 비밀번호 관리 | `/mypage/password`                  | `POST`·`DELETE /members/me/password`, `POST /members/me/password/setup`      | **구현 완료** — 계정 상태 3종 분기                       |
+| 회원 탈퇴     | `/mypage/withdraw`                  | `POST /members/me/withdraw`                                                  | **구현 완료**                                            |
+| 비밀번호 찾기 | `/(auth)/password/reset`            | `POST /auth/password/reset/send-code`, `/auth/password/reset`                | **명세 완료** (`features/auth/비밀번호찾기-세부명세.md`) |
 
 주의: 소셜 로그인은 **2-step API 흐름** (`auth-guide.md` §1). 서버 리다이렉트가 아니다.
 

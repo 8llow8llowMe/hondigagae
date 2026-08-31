@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import { ConfirmModal } from '@/components/confirm-modal'
 import { MyPageSections } from '@/features/member/my-page-sections'
+import { MyProfileEditModal } from '@/features/member/my-profile-edit-modal'
 import { useMyInfo } from '@/features/member/use-my-info'
 import { useSessionExit } from '@/features/member/use-session-exit'
 import { usePetList } from '@/features/pet/use-pet-list'
@@ -24,6 +25,7 @@ export function MyPageView() {
 
   const [logoutOpen, setLogoutOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
 
   async function handleLogout() {
     if (loggingOut) return
@@ -48,7 +50,17 @@ export function MyPageView() {
         petsTotalCount={petsQuery.data?.totalCount ?? 0}
         onRetry={() => void query.refetch()}
         onLogout={() => setLogoutOpen(true)}
+        onEditProfile={() => setEditOpen(true)}
       />
+
+      {/* 회원 정보가 없으면 채울 값이 없다 — 조회 성공 뒤에만 연다 */}
+      {query.data !== undefined && (
+        <MyProfileEditModal
+          open={editOpen}
+          onClose={() => setEditOpen(false)}
+          member={query.data}
+        />
+      )}
 
       <ConfirmModal
         open={logoutOpen}
