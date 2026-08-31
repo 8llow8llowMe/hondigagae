@@ -146,6 +146,41 @@ export type PlanCreatePayload = {
   endDate: string
   /** 생략 가능. 0 이상 */
   budget?: number
+  /**
+   * 생략 가능. **직접 만들기는 보내지 않고**(빈 일정) AI 초안 담기만 채운다
+   * (`src/lib/ai-plan/draft-to-plan.ts`).
+   */
+  items?: PlanItemRequest[]
+}
+
+/** 백엔드 `PlanItemType` — 요청의 `itemType` 은 **이 다섯 중 하나여야 한다** */
+export const PLAN_ITEM_TYPES = ['PLACE', 'MEAL', 'LODGING', 'WALK', 'MOVE'] as const
+export type PlanItemTypeCode = (typeof PLAN_ITEM_TYPES)[number]
+
+/**
+ * 일정 항목 요청. 근거: backend plan-service `PlanItemRequest` **소스 실측**.
+ *
+ * **응답(`PlanItemDetail`)과 모양이 다르다.** `planItemId` 가 없고 `itemType` 이 metadata
+ * 객체가 아니라 **enum 값 문자열**이다 — 서버가 `PlanItemType` 으로 역직렬화하므로
+ * 목록에 없는 값을 보내면 항목 하나 때문에 요청 전체가 400 이 된다.
+ */
+export type PlanItemRequest = {
+  /** 1부터. `@Min(1)` */
+  day: number
+  /** 0부터 */
+  sequence: number
+  itemType: PlanItemTypeCode
+  /**
+   * `PLACE`/`MEAL`/`LODGING` = `place.id`, `WALK` = **`walk_course.id`**.
+   * **문자열로 보낸다** — Snowflake 라 `Number()` 를 거치면 정밀도를 잃는다.
+   */
+  targetId?: string
+  /** `@NotBlank` · 100자 이하 */
+  title: string
+  /** 500자 이하 */
+  memo?: string
+  /** `HH:mm:ss` */
+  startTime?: string
 }
 
 /**

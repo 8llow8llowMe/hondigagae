@@ -115,3 +115,94 @@ describe('일정 mock — 생성', () => {
     expect(result?.payload.dataHeader.resultCode).toBe('PLAN_003')
   })
 })
+
+describe('일정 mock — items 를 함께 받는다 (AI 초안 담기, 이슈 #84)', () => {
+  function detail(result: ReturnType<typeof create>): PlanDetail {
+    return (result?.payload as ApiResponse<PlanDetail>).dataBody!
+  }
+
+  const ITEM = {
+    day: 1,
+    sequence: 0,
+    itemType: 'PLACE',
+    targetId: '212481712381923328',
+    title: '협재해수욕장',
+    memo: '오전이라 노면이 덜 뜨거워요.',
+  }
+
+  it('items 를 생략하면 빈 배열이다 — 직접 만들기 경로다', () => {
+    expect(detail(create(VALID)).items).toEqual([])
+  })
+
+  it('보낸 항목을 되돌려 준다 — 버리면 담은 직후 빈 일정이 보인다', () => {
+    const items = detail(create({ ...VALID, items: [ITEM] })).items
+
+    expect(items).toHaveLength(1)
+    expect(items[0]?.title).toBe('협재해수욕장')
+    expect(items[0]?.memo).toBe('오전이라 노면이 덜 뜨거워요.')
+  })
+
+  it('응답의 itemType 은 metadata 객체다 — 요청은 enum 값 문자열이었다', () => {
+    const items = detail(create({ ...VALID, items: [ITEM] })).items
+
+    expect(items[0]?.itemType.code).toBe('PLACE')
+    expect(items[0]?.itemType.name).toBe('장소')
+  })
+
+  it('targetId 를 문자열로 보존한다 — Snowflake 정밀도', () => {
+    const items = detail(create({ ...VALID, items: [ITEM] })).items
+    expect(items[0]?.targetId).toBe('212481712381923328')
+  })
+
+  it('planItemId 를 새로 발급한다 — 요청에는 없는 값이다', () => {
+    const items = detail(create({ ...VALID, items: [ITEM] })).items
+    expect(items[0]?.planItemId).toMatch(/^\d+$/)
+  })
+
+  it('targetId 가 없는 항목(이동)도 받는다', () => {
+    const items = detail(
+      create({ ...VALID, items: [{ ...ITEM, itemType: 'MOVE', targetId: undefined }] }),
+    ).items
+
+    expect(items[0]?.targetId).toBeNull()
+  })
+
+  it('PlanItemType 에 없는 itemType 은 400 이다 — 하나가 어긋나면 요청 전체가 막힌다', () => {
+    expect(create({ ...VALID, items: [{ ...ITEM, itemType: 'CAFE' }] })?.status).toBe(400)
+  })
+
+  it('항목 이름이 비면 400 이다 (@NotBlank)', () => {
+    expect(create({ ...VALID, items: [{ ...ITEM, title: '   ' }] })?.status).toBe(400)
+  })
+
+  it('항목 이름이 100자를 넘으면 400 이다', () => {
+    expect(create({ ...VALID, items: [{ ...ITEM, title: '가'.repeat(101) }] })?.status).toBe(400)
+  })
+
+  it('메모가 500자를 넘으면 400 이다', () => {
+    expect(create({ ...VALID, items: [{ ...ITEM, memo: '나'.repeat(501) }] })?.status).toBe(400)
+  })
+
+  it('일차가 1 미만이면 400 이다 (@Min(1))', () => {
+    expect(create({ ...VALID, items: [{ ...ITEM, day: 0 }] })?.status).toBe(400)
+  })
+
+  it('여러 일자의 항목을 순서대로 저장한다', () => {
+    const items = detail(
+      create({
+        ...VALID,
+        items: [
+          { ...ITEM, day: 1, sequence: 0, title: '가' },
+          { ...ITEM, day: 1, sequence: 1, title: '나' },
+          { ...ITEM, day: 2, sequence: 0, title: '다' },
+        ],
+      }),
+    ).items
+
+    expect(items.map((item) => [item.day, item.sequence, item.title])).toEqual([
+      [1, 0, '가'],
+      [1, 1, '나'],
+      [2, 0, '다'],
+    ])
+  })
+})

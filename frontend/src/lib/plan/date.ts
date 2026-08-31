@@ -99,3 +99,19 @@ export function addPlanDays(startDate: string, offset: number): string | null {
 
   return new Date(start + offset * 86_400_000).toISOString().slice(0, 10)
 }
+
+/**
+ * 여행 총 일수 (양끝 포함). 날짜를 못 읽거나 역전이면 `null`.
+ *
+ * **담기 전에는 서버가 `totalDays` 를 주지 않는다** — AI 초안 화면이 "3일 중 2일만
+ * 만들었어요" 를 말하려면 기간에서 직접 세야 한다 (ai-plan 명세 S6).
+ * 백엔드 `PlanDetailResponse.totalDays` 와 같은 셈이어야 두 화면이 같은 일수를 말한다.
+ */
+export function totalDaysBetween(startDate: string, endDate: string): number | null {
+  const start = parseDay(startDate)
+  const end = parseDay(endDate)
+  if (start === null || end === null) return null
+  if (end < start) return null
+
+  return Math.round((end - start) / 86_400_000) + 1
+}

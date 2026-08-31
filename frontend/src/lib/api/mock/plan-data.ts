@@ -6,6 +6,7 @@ import {
   type MockPlanItem,
   mockStore,
   nextPlanId,
+  nextPlanItemId,
 } from '@/lib/api/mock/store'
 import type { ApiResponse, CodeNameMetadata, SliceResponse } from '@/types/api'
 import type { ScoreMetricMetadata } from '@/types/insight'
@@ -67,6 +68,9 @@ const DEFAULT_SIZE = 10
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
+const ITEM_TITLE_MAX = 100
+const ITEM_MEMO_MAX = 500
+
 function toSummary(plan: MockPlan): PlanSummaryItem {
   return {
     planId: plan.planId,
@@ -117,11 +121,104 @@ function toDetail(plan: MockPlan): PlanDetail {
     sigunguCode: plan.sigunguCode,
     budget: plan.budget,
     totalDays: totalDaysOf(plan),
-    // 저장 순서를 그대로 주지 않는다 — 백엔드가 day·sequence 로 정렬해 내려준다
+    /*
+      저장 순서를 그대로 주지 않는다 — 백엔드가 day·sequence 로 정렬해 내려준다.
+
+      **직접 만들기는 빈 배열이지만 AI 초안 담기는 항목을 함께 보낸다**
+      (`PlanCreateRequest.items`, ai-plan 명세 S5). 보낸 것을 그대로 되돌려 주지 않으면
+      담은 직후 화면이 빈 일정을 보여 준다.
+    */
     items: [...plan.items]
       .sort((a, b) => (a.day === b.day ? a.sequence - b.sequence : a.day - b.day))
       .map(toItem),
   }
+}
+
+/**
+ * 요청 항목 검증 + 저장 형태로 변환.
+ *
+ * **백엔드와 같은 경계여야 한다.** `itemType` 은 `PlanItemType` enum 으로 역직렬화되고
+ * `title` 에 `@NotBlank`, `day` 에 `@Min(1)` 이 걸려 있어 **항목 하나가 어긋나면 요청
+ * 전체가 400** 이다. mock 이 느슨하면 FE 가 "걸러서 보낸다" 는 판단을 검증하지 못한다.
+ */
+function toItems(
+  raw: unknown,
+  store: ReturnType<typeof mockStore>,
+  errors: { code: string; field: string; message: string }[],
+): MockPlanItem[] {
+  if (raw === undefined || raw === null) return []
+
+  if (!Array.isArray(raw)) {
+    errors.push({ code: 'PLAN_100', field: 'items', message: '요청 값이 올바르지 않습니다.' })
+    return []
+  }
+
+  return raw.map((entry, index) => {
+    const item = (entry ?? {}) as Record<string, unknown>
+    const field = `items[${index}]`
+
+    const day = Number(item.day)
+    if (!Number.isInteger(day) || day < 1) {
+      errors.push({
+        code: 'PLAN_108',
+        field: `${field}.day`,
+        message: '일차는 1 이상이어야 합니다.',
+      })
+    }
+
+    const itemType = typeof item.itemType === 'string' ? item.itemType : ''
+    if (ITEM_TYPE[itemType] === undefined) {
+      errors.push({
+        code: 'PLAN_109',
+        field: `${field}.itemType`,
+        message: '항목 유형은 필수입니다.',
+      })
+    }
+
+    const title = typeof item.title === 'string' ? item.title.trim() : ''
+    if (title === '') {
+      errors.push({
+        code: 'PLAN_110',
+        field: `${field}.title`,
+        message: '항목 이름은 필수입니다.',
+      })
+    } else if (title.length > ITEM_TITLE_MAX) {
+      errors.push({
+        code: 'PLAN_111',
+        field: `${field}.title`,
+        message: '항목 이름은 100자 이하만 가능합니다.',
+      })
+    }
+
+    const memo = typeof item.memo === 'string' ? item.memo : null
+    if (memo !== null && memo.length > ITEM_MEMO_MAX) {
+      errors.push({
+        code: 'PLAN_112',
+        field: `${field}.memo`,
+        message: '메모는 500자 이하만 가능합니다.',
+      })
+    }
+
+    // targetId 는 Long 이지만 FE 가 정밀도 때문에 문자열로 보낸다 — 양쪽을 받는다
+    const rawTarget = item.targetId
+    const targetId =
+      typeof rawTarget === 'string' && rawTarget !== ''
+        ? rawTarget
+        : typeof rawTarget === 'number'
+          ? String(rawTarget)
+          : null
+
+    return {
+      planItemId: nextPlanItemId(store),
+      day,
+      sequence: Number.isInteger(Number(item.sequence)) ? Number(item.sequence) : index,
+      itemType,
+      targetId,
+      title: title.slice(0, ITEM_TITLE_MAX),
+      memo: memo === null || memo.trim() === '' ? null : memo,
+      startTime: typeof item.startTime === 'string' ? item.startTime : null,
+    }
+  })
 }
 
 export function resolvePlanMock(
@@ -337,6 +434,15 @@ function create(memberId: string, body: string | null): MockResult {
   }
 
   const store = mockStore()
+
+  /*
+    **항목 검증을 반려견 소유권보다 먼저 한다.** 백엔드는 Bean Validation 이 도메인
+    검증보다 먼저 돌기 때문이다 — 순서가 뒤바뀌면 FE 가 실제로는 못 보는 오류를 본다.
+  */
+  const itemErrors: { code: string; field: string; message: string }[] = []
+  const items = toItems(parsed.items, store, itemErrors)
+  if (itemErrors.length > 0) return failValidation(itemErrors)
+
   const pet = store.pets.find(
     (candidate) =>
       candidate.petId === petId && candidate.memberId === memberId && !candidate.deleted,
@@ -360,8 +466,12 @@ function create(memberId: string, body: string | null): MockResult {
     budget,
     // 새 일정은 항상 초안이다 — `PlanCreateRequest` 에 status 가 없다
     status: 'DRAFT',
-    // `items` 를 보내지 않는다 — 빈 일정을 만들고 장소는 일자 편집에서 담는다 (공통명세 S9)
-    items: [],
+    /*
+      **`items` 를 버리지 않는다.** 직접 만들기는 빈 배열을 보내지만(공통명세 S9 — 장소는
+      일자 편집에서 담는다), **AI 초안 담기는 항목을 함께 보낸다** (ai-plan 명세 S5).
+      `[]` 로 고정하면 담은 직후 빈 일정이 보이고 항목 검증도 확인할 수 없다.
+    */
+    items,
     deleted: false,
   }
   store.plans.push(plan)
