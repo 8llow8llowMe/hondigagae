@@ -3,7 +3,7 @@
 import { type ReactNode, useRef } from 'react'
 
 import { Button } from '@/components/button'
-import { useOverlay } from '@/lib/ui/overlay'
+import { Modal } from '@/components/modal'
 
 /**
  * ConfirmModal — **되돌릴 수 없는 일만** (디자인 가이드 §5-2).
@@ -17,6 +17,9 @@ import { useOverlay } from '@/lib/ui/overlay'
  *
  * 취소가 좌측이고 **기본 포커스는 취소**다 — 파괴 버튼에 포커스를 두면 Enter 한 번에
  * 되돌릴 수 없는 일이 일어난다.
+ *
+ * 다이얼로그 계약(focus trap · Esc · 스크롤 잠금 · 포커스 복귀 · `aria-modal`)은
+ * `Modal` 이 갖는다. 여기는 **확인 다이얼로그의 규칙**만 남긴다.
  */
 export function ConfirmModal({
   open,
@@ -49,44 +52,22 @@ export function ConfirmModal({
   /** 추가 확인 입력(예: "탈퇴" 타이핑) */
   children?: ReactNode
 }) {
-  const panelRef = useRef<HTMLDivElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
-  useOverlay({ open, onClose, containerRef: panelRef, initialFocusRef: cancelRef })
-
-  if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center px-4 pt-8 md:items-center md:pt-0">
-      {/* 배경 덮개. Esc 와 바깥 클릭이 닫기를 맡으므로 a11y 트리에서 뺀다 —
-          전면을 덮는 버튼이 스크린리더에 거대한 버튼으로 읽히면 방해만 된다. */}
-      <button
-        type="button"
-        aria-hidden
-        tabIndex={-1}
-        onClick={onClose}
-        className="overlay-backdrop absolute inset-0"
-      />
-
-      <div
-        ref={panelRef}
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="confirm-title"
-        aria-describedby="confirm-desc"
-        tabIndex={-1}
-        className="bg-bg relative w-full max-w-sm rounded-xl p-5 shadow-lg outline-none"
-      >
-        <h2 id="confirm-title" className="text-body-1 text-fg font-semibold">
-          {title}
-        </h2>
-        <div id="confirm-desc" className="text-body-2 text-fg-muted mt-2">
-          {description}
-        </div>
-
-        {children !== undefined && <div className="mt-4">{children}</div>}
-
-        {/* 취소가 좌측 — 가이드 §5-2 */}
-        <div className="mt-5 flex justify-end gap-2">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={title}
+      description={description}
+      // 되돌릴 수 없는 확인이라 alertdialog 다 — 스크린리더가 즉시 읽어 사용자를 붙잡는다
+      role="alertdialog"
+      // 기존 DOM id 를 지킨다. 이 모달은 한 번에 하나만 뜨므로 고정이어도 충돌하지 않는다
+      idBase="confirm"
+      initialFocusRef={cancelRef}
+      footer={
+        // 취소가 좌측 — 가이드 §5-2
+        <>
           <Button ref={cancelRef} variant="secondary" onClick={onClose}>
             {cancelLabel}
           </Button>
@@ -98,8 +79,10 @@ export function ConfirmModal({
           >
             {confirmLabel}
           </Button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      {children}
+    </Modal>
   )
 }

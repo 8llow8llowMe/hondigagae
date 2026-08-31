@@ -2,6 +2,7 @@ import type { MockResult } from '@/lib/api/mock/auth-data'
 import { resolveAuthMock } from '@/lib/api/mock/auth-data'
 import { mockNearbyFacilities } from '@/lib/api/mock/emergency-data'
 import { mockSuitability, mockWalkSafety } from '@/lib/api/mock/insight-data'
+import { resolveMemberMock } from '@/lib/api/mock/member-data'
 import { resolvePetMock } from '@/lib/api/mock/pet-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import { mockPlaceDetail } from '@/lib/api/mock/place-detail-data'
@@ -65,6 +66,11 @@ export function resolveMock(
 ): MockResult | null {
   const auth = resolveAuthMock(path, method, body)
   if (auth !== null) return auth
+
+  // 회원(마이페이지). 프로필 이미지 업로드는 multipart 라 `body` 가 null 로 온다 —
+  // 경로와 메서드만 보고 판정한다 (`forwarded-body.ts` toMockBody)
+  const member = resolveMemberMock(path, method, accessToken)
+  if (member !== null) return member
 
   // 반려견은 보호 리소스다. accessToken 에서 회원을 도출해 소유권을 판정한다
   const pet = resolvePetMock(path, method, body, accessToken)
