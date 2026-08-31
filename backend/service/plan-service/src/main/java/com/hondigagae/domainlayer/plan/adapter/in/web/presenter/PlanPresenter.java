@@ -2,12 +2,14 @@ package com.hondigagae.domainlayer.plan.adapter.in.web.presenter;
 
 import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanItemDetailItem;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanItemPlaceItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanSummaryItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanDetailResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanEmergencyResponse;
 import com.hondigagae.domainlayer.plan.application.info.PlanEmergencyInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemInfo;
+import com.hondigagae.domainlayer.plan.application.info.PlanItemPlaceInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanSummaryInfo;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanItemType;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
@@ -100,6 +102,21 @@ public class PlanPresenter {
             .memo(info.memo())
             .startTime(info.startTime())
             .visited(info.visited())
+            .place(toPlaceItem(info.place()))
+            .build();
+    }
+
+    /** 요약이 없으면 객체 통째로 null 이다 — 빈 껍데기를 내려 화면이 값 없음을 못 알아채게 하지 않는다 */
+    private PlanItemPlaceItem toPlaceItem(PlanItemPlaceInfo place) {
+        if (place == null) {
+            return null;
+        }
+        return PlanItemPlaceItem.builder()
+            .addr1(place.addr1())
+            .indoor(place.indoor())
+            .firstImage(place.firstImage())
+            .lat(place.lat())
+            .lng(place.lng())
             .build();
     }
 

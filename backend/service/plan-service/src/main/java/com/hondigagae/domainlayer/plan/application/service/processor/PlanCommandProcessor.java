@@ -25,10 +25,6 @@ import org.springframework.util.CollectionUtils;
 @RequiredArgsConstructor
 public class PlanCommandProcessor {
 
-    // targetId 가 place.id 를 참조하는 항목 유형. WALK 는 walk_course.id 라 tour-service 코스 조회 API 가
-    // 준비되면 검증을 추가한다. TODO: walk-course 존재 검증
-    private static final Set<PlanItemType> PLACE_TARGET_TYPES = Set.of(PlanItemType.PLACE, PlanItemType.MEAL, PlanItemType.LODGING);
-
     private final PlanRepositoryPort planRepositoryPort;
     private final PlanItemRepositoryPort planItemRepositoryPort;
     private final PlaceVerifyQueryPort placeVerifyQueryPort;
@@ -127,7 +123,7 @@ public class PlanCommandProcessor {
      */
     private void verifyPlaceTargets(List<PlanItemCommand> commands) {
         Set<Long> targetIds = commands.stream()
-            .filter(command -> PLACE_TARGET_TYPES.contains(command.itemType()) && command.targetId() != null)
+            .filter(command -> command.itemType().isPlaceTarget() && command.targetId() != null)
             .map(PlanItemCommand::targetId)
             .collect(Collectors.toSet());
         if (targetIds.isEmpty()) {

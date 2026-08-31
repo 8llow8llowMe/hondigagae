@@ -141,6 +141,9 @@
 - **`COMPLETED` 로 가는 경로가 없다.** enum 에는 있으나 서버에 자동 전이가 없어, 여행이 끝나도 상태가 바뀌지 않는다. 다가오는/지난은 **날짜**로 나눈다 (S4).
 - **목록 정렬은 `id DESC`(만든 역순)** 이고 날짜순이 아니다 (`findByMemberIdAndDeletedFalseAndIdLessThanOrderByIdDesc`).
 - 일자 항목은 **부분 수정이 아니라 일괄 교체**다. 화면도 그 모델로 설계한다.
+- **`PlanItemDetail.place` 가 주소·실내 여부·대표 이미지·좌표를 함께 준다** ([#86](https://github.com/8llow8llowMe/hondigagae/issues/86) 반영). 장소를 가리키지 않는 항목(`WALK`·`MOVE`)이거나
+  원천에서 사라진 장소면 **객체 통째로 null** 이고, 그때도 항목은 남는다.
+  **화면은 아직 항목당 `GET /places/{placeId}` 로 보강한다** — 걷어내는 것은 FE 후속 작업이다.
 - 장소 항목은 백엔드가 tour-service Feign으로 존재를 검증한다 → 없는 `placeId` 는 실패한다.
 - **일정의 소유권은 plan-service에 있다.** AI는 제안만 하고 확정은 여기서만 일어난다.
 - **기간을 줄여도 백엔드가 항목을 정리하지 않는다.** `PlanCommandProcessor.updatePlan` 은 `startDate`/`endDate` 만 바꾸고 `day > totalDays` 가 된 항목을 그대로 둔다 → 상세 응답에 기간 밖 항목이 섞여 온다. **그래서 화면은 기간 수정을 열지 않는다** (BE 후속 요청). 다른 경로로 생긴 기간 밖 항목은 상세 화면이 별도 섹션으로 드러낸다.
