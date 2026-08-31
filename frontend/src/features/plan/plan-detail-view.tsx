@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { usePetList } from '@/features/pet/use-pet-list'
 import { PlanDetailSection } from '@/features/plan/plan-detail-section'
+import { useAnchorScroll } from '@/features/plan/use-anchor-scroll'
 import { usePlaceEnrichment, usePlanDetail, usePlanWeather } from '@/features/plan/use-plan-detail'
 import { ApiError } from '@/lib/api/error'
 import { messages } from '@/lib/messages'
@@ -34,7 +35,23 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
     새 id 만 요청이 나간다.
   */
   const alternatives = weather.data?.days.flatMap((day) => day.indoorAlternatives) ?? []
-  const { places, missing } = usePlaceEnrichment(enrichTargetIds(items, alternatives))
+  const {
+    places,
+    missing,
+    pending: enriching,
+  } = usePlaceEnrichment(enrichTargetIds(items, alternatives))
+
+  /*
+    **세 조회가 모두 앉은 뒤** 해시 앵커로 다시 맞춘다. 늦게 도착하는 것이 전부 앵커 위
+    콘텐츠를 키우기 때문이다 — 보강은 행마다 주소·거리 줄을 더하고, **판정은 일자마다
+    브리핑 블록을 통째로 더한다.**
+
+    **`weather.isFetching` 까지 봐야 한다.** 담기 성공은 판정을 invalidate 하므로
+    (항목이 늘면 그날 기준 장소가 바뀐다) 돌아온 직후 판정이 다시 날아온다. 보강만 보고
+    맞추면 판정이 늦게 도착하며 `#day3` 이 다시 밀린다 — 실측에서 938px 로 뷰포트를
+    벗어났다.
+  */
+  useAnchorScroll(!detail.isPending && !weather.isFetching && !enriching)
 
   if (detail.isPending) return null
 

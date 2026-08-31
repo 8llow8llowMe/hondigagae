@@ -1,6 +1,11 @@
 import type { PlanDayAdd } from '@/features/plan/plan-day-section'
 import type { Pet } from '@/types/pet'
-import type { PlanDayWeatherItem, PlanDetail, PlanItemDetail } from '@/types/plan'
+import type {
+  PlanAlternativePlaceItem,
+  PlanDayWeatherItem,
+  PlanDetail,
+  PlanItemDetail,
+} from '@/types/plan'
 
 /**
  * 일정 상세 fixture.
@@ -115,4 +120,21 @@ export const planDayAdd: PlanDayAdd = {
   busy: false,
   error: null,
   onAdd: () => undefined,
+}
+
+/**
+ * 실내 대안 하나. **서버가 좌표와 거리까지 준다** — `{placeId, title}` 두 필드가 아니다.
+ * `distanceMeters` 는 그날 기준 장소로부터의 **직선거리(m)** 다.
+ */
+export function planAlternative(
+  overrides: Partial<PlanAlternativePlaceItem> = {},
+): PlanAlternativePlaceItem {
+  return {
+    placeId: '212481712381923328',
+    title: '제주특별자치도립김창열미술관',
+    lat: 33.3608276172,
+    lng: 126.7818122232,
+    distanceMeters: 12_400,
+    ...overrides,
+  }
 }

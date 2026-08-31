@@ -25,9 +25,14 @@ export type PlanDayAdd = {
   href: string
   /** **이 일자에** 이미 담긴 장소 */
   addedPlaceIds: Set<string>
+  /**
+   * **이 일자에서** 담는 중인 장소. 호출부가 일자로 좁혀 넘긴다 — 같은 장소가 두 일자의
+   * 실내 대안일 수 있어(연속 우천일) 좁히지 않으면 두 행이 함께 진행 표시를 낸다.
+   */
   pendingPlaceId: string | null
-  /** 다른 일자를 포함해 담기가 진행 중이다 */
+  /** 다른 일자를 포함해 담기가 진행 중이다. 그동안 모든 담기 버튼을 잠근다 */
   busy: boolean
+  /** **이 일자에서** 난 실패만. 좁히지 않으면 안 누른 일자에도 오류가 남는다 */
   error: PlanDaySaveError | null
   onAdd: (alternative: PlanAlternativePlaceItem) => void
 }

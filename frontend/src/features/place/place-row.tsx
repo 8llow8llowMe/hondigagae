@@ -44,9 +44,19 @@ export function PlaceRow({ place, last = false }: { place: PlaceSummary; last?: 
  *
  * 링크 래퍼에서 떼어낸 이유: 일정에 담는 화면(#82)은 행에 `담기` 버튼을 두어야 하는데
  * **`<a>` 안에 `<button>` 을 넣을 수 없다.** 그쪽은 내용을 링크로 감싸지 않고
- * 제목만 링크로 만든다. 내용을 복제하면 두 목록의 행이 갈리므로 여기서 공유한다.
+ * `titleHref` 로 제목만 링크로 만든다. 내용을 복제하면 두 목록의 행이 갈리므로 여기서 공유한다.
  */
-export function PlaceRowContent({ place }: { place: PlaceSummary }) {
+export function PlaceRowContent({
+  place,
+  titleHref,
+}: {
+  place: PlaceSummary
+  /**
+   * 주면 제목만 링크가 된다. **행 전체가 링크인 쪽(`PlaceRow`)은 주지 않는다** —
+   * 링크 안에 링크가 중첩된다.
+   */
+  titleHref?: string
+}) {
   const hasImage = isAllowedImageHost(place.firstImage) && place.firstImage !== null
   const meta = [shortAddress(place.addr1), indoorLabel(place.indoor)].filter(
     (part): part is string => part !== null,
@@ -77,7 +87,16 @@ export function PlaceRowContent({ place }: { place: PlaceSummary }) {
               끊으므로 `제주특별자치도립김창열미술관` 처럼 공백 없는 긴 이름이 넘친다.
               break-words 로 "다른 방법이 없을 때만" 어절 안에서 끊게 한다. */}
         <h3 className="text-title-2 text-fg line-clamp-2 font-semibold break-words">
-          {place.title}
+          {titleHref === undefined ? (
+            place.title
+          ) : (
+            <Link
+              href={titleHref}
+              className="hover:text-link focus-visible:ring-brand-500 rounded-sm focus-visible:ring-2 focus-visible:outline-none"
+            >
+              {place.title}
+            </Link>
+          )}
         </h3>
 
         {/* nullable 은 에러가 아니라 숨김이다. 둘 다 없으면 줄 자체가 사라진다 */}

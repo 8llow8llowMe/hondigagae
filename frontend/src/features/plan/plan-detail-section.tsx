@@ -151,9 +151,15 @@ export function PlanDetailSection({
               add={{
                 href: `/plans/${plan.planId}/days/${group.day}/add`,
                 addedPlaceIds: placeIdsOf(group.items),
-                pendingPlaceId: addPlace.pendingPlaceId,
+                /*
+                  **일자로 좁혀 넘긴다.** 훅은 화면 전체에 하나뿐이라, 좁히지 않으면
+                  3일차에서 난 실패가 실내 대안 블록이 있는 **모든 일자**에 뜨고
+                  같은 장소가 두 일자의 대안일 때 두 행이 함께 스피너를 낸다.
+                */
+                pendingPlaceId:
+                  addPlace.pending?.day === group.day ? addPlace.pending.placeId : null,
                 busy: addPlace.adding,
-                error: addPlace.error,
+                error: addPlace.failure?.target.day === group.day ? addPlace.failure.error : null,
                 onAdd: (alternative) =>
                   addPlace.add({
                     day: group.day,

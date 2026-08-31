@@ -2,11 +2,12 @@
 
 import { useRouter } from 'next/navigation'
 
+import type { ReactNode } from 'react'
+
 import { BackLink } from '@/components/back-link'
 import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
-import { FormAlert } from '@/components/form-alert'
 import { PlaceFilterChips } from '@/features/place/place-filter-chips'
 import { PlaceListSection } from '@/features/place/place-list-section'
 import { usePlaceList } from '@/features/place/use-place-list'
@@ -58,25 +59,49 @@ export function PlanAddPlaceView({
 
   const backHref = `/plans/${planId}#${planDayAnchorId(day)}`
 
-  if (detail.isPending) return null
+  /*
+    **`return null` 이 아니라 껍데기를 세운다.** 이 세그먼트에는 `loading.tsx` 를
+    의도적으로 두지 않았으므로(soft 404 회피) 여기서 비우면 프리페치가 실패했을 때
+    화면이 통째로 빈다. 제목은 `day` 만으로 쓸 수 있어 기다릴 이유가 없다.
+  */
+  if (detail.isPending) {
+    return (
+      <PlanAddPlaceShell day={day} backHref={backHref}>
+        <PlaceListSection
+          places={[]}
+          loading
+          errorStatus={null}
+          hasNext={false}
+          loadingMore={false}
+          onLoadMore={() => undefined}
+          onRetry={() => undefined}
+          onResetFilters={() => undefined}
+        />
+      </PlanAddPlaceShell>
+    )
+  }
 
   if (detail.isError) {
     // 400(숫자가 아닌 planId)은 재시도로 풀리지 않는다 — 상세 화면과 같은 판단 (D5)
     if (detail.error instanceof ApiError && detail.error.status === 400) {
       return (
-        <PlanAddPlaceEmpty
-          title={messages.plan.detailBadRequestTitle}
-          description={messages.plan.detailBadRequestDescription}
-        />
+        <PlanAddPlaceShell day={day} backHref={backHref}>
+          <EmptyState
+            title={messages.plan.detailBadRequestTitle}
+            description={messages.plan.detailBadRequestDescription}
+          />
+        </PlanAddPlaceShell>
       )
     }
 
     return (
-      <ErrorState
-        title={messages.plan.detailErrorTitle}
-        description={messages.plan.errorDescription}
-        onRetry={() => void detail.refetch()}
-      />
+      <PlanAddPlaceShell day={day} backHref={backHref}>
+        <ErrorState
+          title={messages.plan.detailErrorTitle}
+          description={messages.plan.errorDescription}
+          onRetry={() => void detail.refetch()}
+        />
+      </PlanAddPlaceShell>
     )
   }
 
@@ -92,14 +117,20 @@ export function PlanAddPlaceView({
   */
   if (group === undefined) {
     return (
-      <PlanAddPlaceEmpty
-        title={messages.plan.addPlaceDayMissingTitle.replace('{day}', String(day))}
-        description={messages.plan.addPlaceDayMissingDescription.replace(
-          '{totalDays}',
-          String(detail.data.totalDays),
-        )}
-        backHref={`/plans/${planId}`}
-      />
+      <PlanAddPlaceShell day={day} backHref={`/plans/${planId}`}>
+        <EmptyState
+          title={messages.plan.addPlaceDayMissingTitle.replace('{day}', String(day))}
+          description={messages.plan.addPlaceDayMissingDescription.replace(
+            '{totalDays}',
+            String(detail.data.totalDays),
+          )}
+          action={
+            <ButtonLink href={`/plans/${planId}`} variant="secondary">
+              {messages.plan.addPlaceBack}
+            </ButtonLink>
+          }
+        />
+      </PlanAddPlaceShell>
     )
   }
 
@@ -108,29 +139,7 @@ export function PlanAddPlaceView({
   const addedPlaceIds = placeIdsOf(group.items)
 
   return (
-    <>
-      <header className="px-4 pt-5 pb-3 md:px-10 lg:pt-6">
-        <BackLink href={backHref} label={messages.plan.addPlaceBack} className="-ml-1" />
-        <h1 className="text-title-1 text-fg lg:text-display mt-1 font-bold lg:font-extrabold">
-          {messages.plan.addPlaceTitle.replace('{day}', String(day))}
-        </h1>
-        <p className="text-caption text-fg-muted mt-1 font-medium">
-          {detail.data.title} · {messages.plan.addPlaceSubtitle.replace('{day}', String(day))}
-        </p>
-
-        {/* 담기 실패는 토스트가 아니라 이 자리에 남는다 — 재시도는 같은 버튼이다 */}
-        {addPlace.error !== null && (
-          <FormAlert
-            className="mt-3"
-            message={
-              addPlace.error.retriable
-                ? `${messages.plan.addPlaceErrorTitle} ${addPlace.error.message}`
-                : addPlace.error.message
-            }
-          />
-        )}
-      </header>
-
+    <PlanAddPlaceShell day={day} backHref={backHref} planTitle={detail.data.title}>
       {/* 데스크톱은 좌측 레일이 같은 일을 한다 (페이지가 렌더) */}
       <div className="lg:hidden">
         <PlaceFilterChips filters={filters} />
@@ -152,8 +161,12 @@ export function PlanAddPlaceView({
             place={place}
             last={last}
             added={addedPlaceIds.has(place.placeId)}
-            pending={addPlace.pendingPlaceId === place.placeId}
+            pending={addPlace.pending?.placeId === place.placeId}
             disabled={addPlace.adding}
+            /* 실패를 그 행에 남긴다 — 헤더에 모으면 스크롤 아래에서는 보이지 않는다 (F4) */
+            error={
+              addPlace.failure?.target.placeId === place.placeId ? addPlace.failure.error : null
+            }
             onAdd={(selected) =>
               addPlace.add({
                 day,
@@ -165,30 +178,43 @@ export function PlanAddPlaceView({
           />
         )}
       />
-    </>
+    </PlanAddPlaceShell>
   )
 }
 
-function PlanAddPlaceEmpty({
-  title,
-  description,
+/**
+ * 모든 변형이 공유하는 껍데기 — 뒤로가기 · `h1` · 부제.
+ *
+ * **오류·빈 상태에도 `h1` 이 있어야 한다.** 없으면 문서의 최상위 제목이 필터의
+ * `h2 "필터"` 가 되어, 스크린리더 사용자가 무슨 화면인지 알 수 없다 (실측으로 잡았다).
+ */
+function PlanAddPlaceShell({
+  day,
   backHref,
+  planTitle,
+  children,
 }: {
-  title: string
-  description: string
-  backHref?: string
+  day: number
+  backHref: string
+  /** 아직 못 받았으면 생략한다 — 제목은 `day` 만으로 쓸 수 있다 */
+  planTitle?: string
+  children: ReactNode
 }) {
+  const subtitle = messages.plan.addPlaceSubtitle.replace('{day}', String(day))
+
   return (
-    <EmptyState
-      title={title}
-      description={description}
-      action={
-        backHref === undefined ? undefined : (
-          <ButtonLink href={backHref} variant="secondary">
-            {messages.plan.addPlaceBack}
-          </ButtonLink>
-        )
-      }
-    />
+    <>
+      <header className="px-4 pt-5 pb-3 md:px-10 lg:pt-6">
+        <BackLink href={backHref} label={messages.plan.addPlaceBack} className="-ml-1" />
+        <h1 className="text-title-1 text-fg lg:text-display mt-1 font-bold lg:font-extrabold">
+          {messages.plan.addPlaceTitle.replace('{day}', String(day))}
+        </h1>
+        <p className="text-caption text-fg-muted mt-1 font-medium">
+          {planTitle === undefined ? subtitle : `${planTitle} · ${subtitle}`}
+        </p>
+      </header>
+
+      {children}
+    </>
   )
 }

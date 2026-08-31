@@ -7,7 +7,7 @@ import { PlanDayEditor } from '@/features/plan/plan-day-editor'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { messages } from '@/lib/messages'
 import { toEditItems, toggleRemoved } from '@/lib/plan/day-items'
-import { planDayAdd, planDetail, planVerdict } from '@/test/fixtures/plan'
+import { planAlternative, planDayAdd, planDetail, planVerdict } from '@/test/fixtures/plan'
 import type { PlaceDetail } from '@/types/place'
 
 const ITEMS = toEditItems(planDetail.items)
@@ -144,7 +144,7 @@ describe('PlanDaySection — 편집 진입', () => {
         places: new Map<string, PlaceDetail>(),
         verdict: {
           ...planVerdict,
-          indoorAlternatives: [{ placeId: '212481712381923330', title: '오설록' }],
+          indoorAlternatives: [planAlternative({ placeId: '212481712381923330', title: '오설록' })],
         },
         petConditionApplied: true,
         verdictFailed: false,

@@ -11,17 +11,10 @@ import { messages } from '@/lib/messages'
 
 export type PlanDaySaveError = {
   message: string
-  /** `false` 면 `다시 시도` 를 주지 않는다 — 같은 본문이 같은 400 을 받는다 */
+  /** `false` 면 `다시 시도` 를 주지 않는다 — 같은 본문이 같은 실패를 받는다 */
   retriable: boolean
 }
 
-/**
- * 저장 실패를 문구와 재시도 가능 여부로 옮긴다.
- *
- * **`PLAN_004` 와 `PLAN_002` 에는 재시도를 주지 않는다.** 둘 다 같은 본문을 다시
- * 보내면 같은 400 이다 — `PLAN_004` 는 원천에서 사라진 장소가 담겨 있는 것이고,
- * `PLAN_002` 는 들고 있는 상세가 낡은 것이다 (일자편집-세부명세 E1).
- */
 /**
  * 화면마다 다른 문구. **분류는 공유하고 문구만 호출부가 준다.**
  *
@@ -30,12 +23,23 @@ export type PlanDaySaveError = {
  * 문구까지 공유하면 한쪽에 "할 수 없는 일" 을 지시하게 된다.
  */
 export type PlanDaySaveCopy = {
-  /** 5xx·무응답 */
+  /** 일시 장애(5xx·무응답) */
   retriable: string
   /** `PLAN_004` — 원천에서 사라진 장소가 그 일자에 담겨 있다 */
   missingPlace: string
 }
 
+/**
+ * 저장 실패를 문구와 재시도 가능 여부로 옮긴다.
+ *
+ * **재시도를 주는 것은 일시 장애뿐이다.** `ApiError.kind === 'temporary'`(5xx · 무응답 ·
+ * tour-service 연동 실패 `PLAN_900` 503)만 다시 눌러서 풀린다.
+ *
+ * **4xx 는 전부 재시도를 주지 않는다.** 같은 본문을 다시 보내면 같은 실패다 —
+ * `PLAN_004`(사라진 장소) · `PLAN_002`(기간 밖 일자) · `PLAN_001`(404, 지워졌거나 남의 일정) ·
+ * `PLAN_114`(경로 형식) · `PLAN_108`~`PLAN_112`(Bean Validation)가 모두 그렇다.
+ * 근거: `PlanErrorCode.java` · `ValidationErrorSupport.java` 소스 실측.
+ */
 export function toPlanDaySaveError(cause: unknown, copy: PlanDaySaveCopy): PlanDaySaveError {
   if (cause instanceof ApiError) {
     if (cause.resultCode === 'PLAN_004') {
@@ -47,6 +51,14 @@ export function toPlanDaySaveError(cause: unknown, copy: PlanDaySaveCopy): PlanD
     */
     if (cause.resultCode === 'PLAN_002') {
       return { message: messages.plan.editDayOutOfRangeError, retriable: false }
+    }
+
+    /*
+      나머지 4xx. 코드별 문구를 만들지 않는다 — 사용자가 할 일이 "이 화면을 다시 여는 것"
+      으로 같고, 코드마다 문장을 늘리면 서버가 실제로 내지 않는 조합까지 떠안게 된다.
+    */
+    if (cause.kind !== 'temporary') {
+      return { message: messages.plan.saveStaleError, retriable: false }
     }
   }
 

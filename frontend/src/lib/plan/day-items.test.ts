@@ -185,7 +185,7 @@ describe('placeIdsOf — 같은 일자 중복 담기 판정 (#82)', () => {
     expect(placeIdsOf(ITEMS).size).toBe(2)
   })
 
-  it('itemType 을 가리지 않는다 — MEAL 로 담긴 곳도 또 담을 이유가 없다', () => {
+  it('MEAL·LODGING 은 포함한다 — 같은 곳이 식사로 담겨 있어도 또 담을 이유가 없다', () => {
     const meal = planItem({
       planItemId: 'd',
       day: 2,
@@ -196,6 +196,25 @@ describe('placeIdsOf — 같은 일자 중복 담기 판정 (#82)', () => {
     })
 
     expect(placeIdsOf([meal]).has('212481712381923340')).toBe(true)
+  })
+
+  /*
+    회귀 방지 — `WALK` 의 `targetId` 는 `walk_course.id` 라 **장소 id 가 아니다.**
+    걸러내지 않으면 우연히 값이 겹치는 장소가 `이미 담았어요` 로 잠겨, 담을 수 있는 곳을
+    담지 못한다. 버튼이 사라져 우회로도 없다.
+  */
+  it('WALK 의 targetId 는 walk_course.id 라 장소로 세지 않는다', () => {
+    const walk = planItem({
+      planItemId: 'e',
+      day: 2,
+      sequence: 4,
+      title: '산책 코스',
+      itemType: { code: 'WALK', name: '산책', description: null },
+      targetId: '777777777777000001',
+    })
+
+    expect(placeIdsOf([walk]).has('777777777777000001')).toBe(false)
+    expect(placeIdsOf([walk]).size).toBe(0)
   })
 })
 

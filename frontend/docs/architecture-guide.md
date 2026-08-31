@@ -318,6 +318,7 @@ export default async function Page({ searchParams }) {
 | 홈               | **서버 프리페치** (3종 병렬) | client                    | 인사이트는 client. 판정이 반려견 조건에 딸린다                                  |
 | 일정 목록        | **서버 프리페치** (1페이지)  | client `useInfiniteQuery` | 필터를 query key 에 넣지 않는다 — 서버 파라미터가 없다                          |
 | 일정 상세        | **서버 프리페치**            | client                    |                                                                                 |
+| 일정에 장소 담기 | **서버 프리페치** (2종)      | client `useInfiniteQuery` | 일정 상세는 `fetchQuery`+404 판별, 장소는 1페이지                               |
 | 일정 만들기 폼   | 없음                         | client (mutation)         | 폼만. 반려견 목록만 client 조회                                                 |
 | 일정 편집 폼     | **서버 프리페치** (초기값)   | client                    |                                                                                 |
 | 긴급 시설        | **없음**                     | client                    | 좌표가 브라우저에만 있어 서버가 무엇을 조회할지 모른다                          |

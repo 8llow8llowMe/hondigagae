@@ -33,6 +33,16 @@ export type PlanWeatherReasonItem = {
 export type PlanAlternativePlaceItem = {
   placeId: string
   title: string
+  lat: number
+  lng: number
+  /**
+   * **그날 기준 장소로부터의 직선거리(m).** 서버가 이미 계산해 준다 — 화면이 재지 않는다.
+   *
+   * 기준점은 그 일자의 `representativePlaceId` 이고(`PlanWeatherPresenter`), 계산은
+   * `GeoDistance.meters()` 하버사인이라 **직선거리다**. 그래서 표기에 `직선` 을 반드시
+   * 붙인다 — 제주는 산간·해안도로가 많아 주행거리와 크게 다르다 (일정상세-세부명세 D3).
+   */
+  distanceMeters: number
 }
 
 /**
