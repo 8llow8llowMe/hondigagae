@@ -43,7 +43,7 @@ function render(overrides: Partial<AiPlanDraftPreviewProps> = {}) {
     endDate: '2026-09-14',
     budget: 300_000,
     totalDays: 3,
-    addresses: new Map([['212481712381923328', '제주시 한림읍']]),
+    metaLines: new Map([['212481712381923328', '제주시 한림읍 · 야외']]),
     // 좌표는 기본으로 비운다 — 거리 문구는 전용 describe 에서만 켠다
     coords: EMPTY_COORDS,
     delistedPlaceIds: EMPTY_SET,
@@ -107,12 +107,12 @@ describe('AiPlanDraftPreview — 일자와 항목', () => {
     expect(html).toContain('아라리오뮤지엄')
   })
 
-  it('보강으로 얻은 주소를 붙인다 — 초안에는 없는 값이다', () => {
-    expect(render()).toContain('제주시 한림읍')
+  it('보강으로 얻은 메타 줄(주소 · 실내)을 붙인다 — 초안에는 없는 값이다', () => {
+    expect(render()).toContain('제주시 한림읍 · 야외')
   })
 
-  it('보강이 아직 없는 항목은 주소 없이 그린다 — 항목을 감추지 않는다', () => {
-    const html = render({ addresses: new Map() })
+  it('보강이 아직 없는 항목은 메타 줄 없이 그린다 — 항목을 감추지 않는다', () => {
+    const html = render({ metaLines: new Map() })
 
     expect(html).toContain('협재해수욕장')
     expect(html).not.toContain('제주시 한림읍')
@@ -122,14 +122,19 @@ describe('AiPlanDraftPreview — 일자와 항목', () => {
     expect(render()).toContain('오전이라 노면이 덜 뜨거워요.')
   })
 
-  it('실내 여부는 여전히 만들지 않는다 — 상세 응답에 indoor 가 없다 (#16)', () => {
-    const html = render()
+  it('아트보드 행 서식이 채워졌다 — `주소 · 실내여부` + 거리 (#112 · #100)', () => {
+    // 아트보드 03 의 행 서식은 `제주시 한림읍 · 야외 · 4.1km` 다. 실내는 #112,
+    // 거리는 #100 에서 붙였다. 거리는 별도 줄이라 여기서는 메타 줄만 본다
+    expect(render()).toContain('제주시 한림읍 · 야외')
+  })
 
-    // 아트보드 03 의 행 서식은 `제주시 한림읍 · 야외 · 4.1km` 다. 거리는 #100 에서
-    // 붙였고 실내 조각만 남아 있다 — "야외" 는 서버가 준 근거 문장에도 들어 있어
-    // 낱말만으로는 가릴 수 없어 구분자와 함께 본다
-    expect(html).not.toContain('· 야외')
-    expect(html).not.toContain('· 실내')
+  it('메타 줄 조립은 이 컴포넌트가 하지 않는다 — 받은 문자열을 그대로 쓴다', () => {
+    // `indoor` 의 null 판정은 use-draft-places.ts 가 갖는다. 행이 다시 조립하면
+    // 두 곳이 갈린다 — 주소만 온 메타 줄에 낱말을 덧붙이지 않는 것으로 확인한다
+    const html = render({ metaLines: new Map([['212481712381923328', '제주시 한림읍']]) })
+
+    expect(html).toContain('제주시 한림읍')
+    expect(html).not.toContain('제주시 한림읍 ·')
   })
 })
 

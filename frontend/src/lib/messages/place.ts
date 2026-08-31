@@ -74,6 +74,8 @@ export const placeMessages = {
   detailAddress: '주소',
   detailTel: '전화',
   detailHomepage: '홈페이지',
+  /** 원본 분류(`카페`·`펜션`) — `contentType` 으로 갈리지 않는 구분이다 (#112) */
+  detailSourceCategory: '분류',
 
   detailInfoCenter: '문의처',
   detailUseTime: '운영시간',
@@ -177,6 +179,12 @@ export const placeMessages = {
   /** 갤러리 바로 아래. 정보 출처와 분리한다 — 각각 자기 자료 옆에서 읽힌다 (가이드 §5) */
   photoSource: '사진 출처: 한국관광공사',
   detailCopyrightPrefix: '정보 출처: 한국관광공사',
+  /**
+   * `cpyrhtDivCd` 가 없는 원천(문화정보원·식약처)의 출처 줄. `{source}` 는 서버가 준
+   * `sourceName` 표시명이다 — **위 줄과 겹치지 않는다**: 공공누리 표기 의무가 있는 쪽은
+   * 기관명(한국관광공사)을 써야 하고, 여기는 그 의무가 없는 원천이다 (#112).
+   */
+  detailSourcePrefix: '정보 출처: {source}',
   detailCopyrightType1: '공공누리 제1유형 (출처 표시)',
   detailCopyrightType3: '공공누리 제3유형 (출처 표시·변경 금지)',
   detailCopyrightUnknown: '출처 표시 대상',

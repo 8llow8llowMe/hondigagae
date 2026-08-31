@@ -21,8 +21,11 @@ export type AiPlanDraftPreviewProps = {
   budget: number | null
   /** 기간에서 센 총 일수. 못 셌으면 null */
   totalDays: number | null
-  /** `placeId` → 주소. 보강 결과 (명세 S6) */
-  addresses: ReadonlyMap<string, string>
+  /**
+   * `placeId` → 메타 줄 (`제주시 한림읍 · 야외`). 보강 결과 (명세 S6 · #112).
+   * 조립은 `use-draft-places.ts` 가 한다 — 이 컴포넌트는 표시 전용이다.
+   */
+  metaLines: ReadonlyMap<string, string>
   /**
    * `placeId` → 좌표. 같은 보강 결과에서 나온다 (#100). **없는 항목은 거리 줄이 없다** —
    * 보강이 아직이거나 실패했거나 원천에 좌표가 없는 경우다.
@@ -56,7 +59,7 @@ export function AiPlanDraftPreview({
   endDate,
   budget,
   totalDays,
-  addresses,
+  metaLines,
   coords,
   delistedPlaceIds,
   excludedPlaceIds,
@@ -168,7 +171,7 @@ export function AiPlanDraftPreview({
                   key={`${dayItem.day}-${index}-${item.title}`}
                   item={item}
                   ordinal={index + 1}
-                  address={item.placeId === null ? undefined : addresses.get(item.placeId)}
+                  meta={item.placeId === null ? undefined : metaLines.get(item.placeId)}
                   distanceMeters={distances[index] ?? null}
                   delisted={item.placeId !== null && delistedPlaceIds.has(item.placeId)}
                   excluded={item.placeId !== null && excludedPlaceIds.has(item.placeId)}

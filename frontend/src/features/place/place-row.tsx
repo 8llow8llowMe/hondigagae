@@ -7,7 +7,7 @@ import { MetricBadge } from '@/components/metric'
 import { Row } from '@/components/surface'
 import { isAllowedImageHost } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
-import { shortAddress } from '@/lib/place/address'
+import { placeMetaLine } from '@/lib/place/meta'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceSummary } from '@/types/place'
 
@@ -58,9 +58,7 @@ export function PlaceRowContent({
   titleHref?: string
 }) {
   const hasImage = isAllowedImageHost(place.firstImage) && place.firstImage !== null
-  const meta = [shortAddress(place.addr1), indoorLabel(place.indoor)].filter(
-    (part): part is string => part !== null,
-  )
+  const meta = placeMetaLine(place.addr1, place.indoor)
 
   return (
     <>
@@ -100,9 +98,9 @@ export function PlaceRowContent({
         </h3>
 
         {/* nullable 은 에러가 아니라 숨김이다. 둘 다 없으면 줄 자체가 사라진다 */}
-        {meta.length > 0 && (
+        {meta !== null && (
           <p className="text-caption text-fg-muted mt-0.5 line-clamp-1 font-medium tabular-nums">
-            {meta.join(' · ')}
+            {meta}
           </p>
         )}
 
@@ -142,10 +140,4 @@ function PlaceBadges({ place, className }: { place: PlaceSummary; className?: st
       )}
     </div>
   )
-}
-
-/** `null` 은 "야외" 가 아니라 "모름" 이다 — 메타 줄에서 빼고 배지가 대신 말한다 */
-function indoorLabel(indoor: boolean | null): string | null {
-  if (indoor === null) return null
-  return indoor ? messages.place.rowIndoor : messages.place.rowOutdoor
 }

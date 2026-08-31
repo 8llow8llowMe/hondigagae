@@ -228,7 +228,7 @@ export function mockPlaceDetail(placeId: string): PlaceDetail | null {
 
   return {
     placeId: summary.placeId,
-    // TODO(BE #17): 백엔드는 원천이 TourAPI 가 아니면 문자열 "null" 을 내려준다
+    // 원천이 TourAPI 가 아니면 null 이다 (#17 반영 — 그전에는 문자열 "null" 이었다)
     contentId: index % 3 === 0 ? String(126439 + index) : null,
     contentType: summary.contentType,
     title: summary.title,
@@ -245,6 +245,17 @@ export function mockPlaceDetail(placeId: string): PlaceDetail | null {
     overview: variant.overview,
     petAvailable: summary.petAllowanceType.code !== 'NOT_ALLOWED',
     petAllowanceType: summary.petAllowanceType,
+    /*
+      **목록과 같은 값을 넘긴다** (#16). 백엔드도 같은 `Place` 도메인 모델을 보고
+      `toItem` 과 `toDetailResponse` 가 같은 매핑을 쓴다 — 여기서 다른 값을 만들면
+      목록에서 상세로 넘어갈 때 실내 여부가 바뀐다.
+
+      `MOCK_PLACES` 에 `indoor: null` · `sourceCategory: null` 장소가 이미 있어
+      "정보 없음" 분기를 로컬에서 볼 수 있다 (`place-data.ts` 주석).
+    */
+    indoor: summary.indoor,
+    sourceCategory: summary.sourceCategory,
+    sourceName: summary.sourceName,
     intro: variant.intro,
     petInfo: variant.petInfo,
     images: variant.images,

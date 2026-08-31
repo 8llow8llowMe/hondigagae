@@ -39,9 +39,8 @@ export type PlaceSummary = {
 /**
  * 장소 상세 (`GET /api/v1/places/{placeId}` — `PlaceDetailResponse`).
  *
- * 목록(`PlaceSummary`)과 필드 집합이 다르다. **`indoor` / `sourceCategory` / `sourceName` 은
- * 이슈 #16 으로 상세 응답에 들어왔지만 이 타입에는 아직 없다** — 화면 세 곳(장소 상세 · AI 초안 행 ·
- * 일정 항목 행)에 함께 붙이는 FE 후속 작업이다. **`sigunguCode` 는 여전히 상세 응답에 없다.**
+ * 목록(`PlaceSummary`)과 필드 집합이 다르다. **`sigunguCode` 는 상세 응답에 없다** — 목록 항목에만
+ * 있고 #16 범위가 아니었다. 상세에서 시군구로 갈리는 표시를 만들지 않는다.
  * 근거: backend PlaceDetailResponse / PlacePresenter#toDetailResponse (tour-service, 2026-08-31)
  */
 export type PlaceDetail = {
@@ -66,6 +65,15 @@ export type PlaceDetail = {
   overview: string | null
   petAvailable: boolean
   petAllowanceType: EnumMetadata
+  /**
+   * 실내 여부. **`null` 은 "야외" 가 아니라 "원천에 정보 없음" 이다** — `false` 와 다르게 다룬다
+   * (#16 · #112). 판정은 `lib/place/indoor.ts` 가 갖고 있다.
+   */
+  indoor: boolean | null
+  /** 원본 분류 (원천이 준 값 그대로 — `카페` `펜션` `미술관`). `contentType` 으로 갈리지 않는 구분이다 */
+  sourceCategory: string | null
+  /** 정보 출처 **표시명** (`문화정보원` `관광정보 API` `식약처`). 코드가 아니라 서버 문구다 */
+  sourceName: string | null
   /** **객체 통째로 null 이 될 수 있다** — 에러가 아니라 섹션 숨김이다 */
   intro: PlaceIntro | null
   /** **객체 통째로 null 이 될 수 있다** */

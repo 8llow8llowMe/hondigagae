@@ -22,6 +22,7 @@ import { messages } from '@/lib/messages'
 import { shortAddress } from '@/lib/place/address'
 import { copyrightLabel } from '@/lib/place/copyright'
 import { parseHomepage } from '@/lib/place/homepage'
+import { indoorLabel } from '@/lib/place/indoor'
 import { toPlainText } from '@/lib/place/text'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceDetail, PlaceIntro } from '@/types/place'
@@ -59,8 +60,10 @@ export type PlaceDetailSectionProps = {
  * 여기서 404 를 다루는 것은 클라이언트 재조회에서 리소스가 사라진 경우다.
  *
  * 아트보드에 있으나 **구현하지 않은 것**: 하단 sticky "일정에 담기"(일정 화면 없음) ·
- * "저장"(API 없음) · "지도 보기"·"길찾기"(#14) · 메타의 거리·`실내`(상세 응답에 없다, #16) ·
- * 입장료. **없는 값을 지어내지 않는다.**
+ * "저장"(API 없음) · "지도 보기"·"길찾기"([#14](https://github.com/8llow8llowMe/hondigagae/issues/14)) ·
+ * 메타의 거리(상세는 기준점이 없다) · 입장료. **없는 값을 지어내지 않는다.**
+ *
+ * `실내` 와 정보 출처명은 #16 으로 상세 응답에 들어와 붙였다 (#112).
  */
 export function PlaceDetailSection({
   place,
@@ -117,6 +120,7 @@ export function PlaceDetailSection({
   const homepage = parseHomepage(place.homepage)
   const copyright = copyrightLabel(place.cpyrhtDivCd)
   const suitabilityBadge = suitability.data?.suitabilityLevel ?? null
+  const sourceLine = infoSourceLine(place, copyright)
 
   return (
     <article>
@@ -157,7 +161,7 @@ export function PlaceDetailSection({
               )}
             </div>
 
-            {/* 거리·실내는 상세 응답에 없다 (#16). 있는 것만 쓴다 */}
+            {/* 거리는 기준점이 없어 쓰지 않는다. 실내 여부는 #16 으로 들어왔다 */}
             <p className="text-body-2 text-fg-muted">{metaLine(place)}</p>
 
             <div className="flex flex-wrap items-center gap-1.5">
@@ -175,6 +179,16 @@ export function PlaceDetailSection({
                     </Badge>
                   )}
                 </>
+              )}
+              {/*
+                실내 여부를 모르면 점선으로 "모름" 을 드러낸다 — 목록 행과 같은 처리다
+                (`place-row.tsx`). 숨기면 실내만·야외만 필터에서 이 장소가 왜 사라지는지
+                설명할 길이 없고, 여기는 그 필터를 가진 목록에서 들어오는 화면이다.
+              */}
+              {place.indoor === null && (
+                <MetricBadge tone="unknown" size="sm">
+                  {messages.place.rowIndoorUnknown}
+                </MetricBadge>
               )}
             </div>
           </header>
@@ -194,6 +208,8 @@ export function PlaceDetailSection({
           <DetailSection title={messages.place.detailSectionBasic} padding="rail">
             <dl className="flex flex-col gap-3">
               <InfoRow label={messages.place.detailAddress} value={fullAddress(place)} />
+              {/* 원천이 준 분류. `contentType`(문화시설)로는 카페·펜션이 갈리지 않는다 (#112) */}
+              <InfoRow label={messages.place.detailSourceCategory} value={place.sourceCategory} />
               <InfoRow label={messages.place.detailTel} value={place.tel}>
                 {place.tel !== null && <TelLink tel={place.tel} />}
               </InfoRow>
@@ -251,10 +267,8 @@ export function PlaceDetailSection({
           )}
 
           {/* 사진 출처는 갤러리 바로 아래, 정보 출처는 본문 끝 (DESIGN.md §7-3) */}
-          {copyright !== null && (
-            <p className="text-caption text-fg-muted px-4 pt-2 pb-8 md:px-10">
-              {messages.place.detailCopyrightPrefix} · {copyright}
-            </p>
+          {sourceLine !== null && (
+            <p className="text-caption text-fg-muted px-4 pt-2 pb-8 md:px-10">{sourceLine}</p>
           )}
         </div>
       </div>
@@ -364,15 +378,40 @@ function HomepageLink({ href, label }: { href: string; label: string }) {
 }
 
 /**
- * 제목 아래 메타 줄 — `제주시 한경면 · 문화시설`.
+ * 제목 아래 메타 줄 — `제주시 한경면 · 문화시설 · 야외`.
  *
  * **전체 주소를 쓰지 않는다.** 그것은 기본 정보의 몫이고, 여기는 "어디쯤인지" 만 말한다.
- * 아트보드의 `실내` 와 `2.3km` 는 **상세 응답에 없어 넣지 않는다** (#16 · 거리 없음).
+ * 아트보드의 `2.3km` 는 넣지 않는다 — 상세는 어디서부터 잰 거리인지 기준이 없다.
+ *
+ * **`indoor` 가 null 이면 낱말이 빠진다** (`indoorLabel`). 그 경우는 속성 배지 줄의
+ * "실내 여부 미확인" 이 대신 말한다 — 메타 줄에서 "야외" 라고 단정하지 않는다.
  */
 function metaLine(place: PlaceDetail): string {
-  return [shortAddress(place.addr1), place.contentType.name]
+  return [shortAddress(place.addr1), place.contentType.name, indoorLabel(place.indoor)]
     .filter((part): part is string => part !== null && part !== '')
     .join(' · ')
+}
+
+/**
+ * 본문 끝 정보 출처 줄.
+ *
+ * **두 원천을 겹쳐 쓰지 않는다.** `cpyrhtDivCd` 가 있으면 원천이 TourAPI 라는 뜻이고
+ * (배치의 `TourApiPlaceCatalogAdapter` 에서만 채워진다) 그때는 **공공누리 출처 표시 의무**가
+ * 있어 기관명 "한국관광공사" 와 유형을 함께 적는다 (세부명세 D5-2). `sourceName` 의
+ * "관광정보 API" 로 바꾸면 표기 의무를 만족하지 못한다.
+ *
+ * 그 값이 없는 원천(문화정보원·식약처)은 지금까지 **출처 줄이 아예 없었다.** #16 으로
+ * `sourceName` 이 들어와 그 자리를 채운다 (#112).
+ */
+function infoSourceLine(place: PlaceDetail, copyright: string | null): string | null {
+  if (copyright !== null) {
+    return `${messages.place.detailCopyrightPrefix} · ${copyright}`
+  }
+
+  const source = place.sourceName?.trim()
+  if (source === undefined || source === '') return null
+
+  return messages.place.detailSourcePrefix.replace('{source}', source)
 }
 
 /** `addr2` 는 `addr1` 이 있을 때만 뒤에 붙인다 */

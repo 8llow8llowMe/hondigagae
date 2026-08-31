@@ -81,6 +81,9 @@ export const placeDetail: PlaceDetail = {
     name: '부분 동반 가능',
     description: '일부 구역 또는 조건부로 반려동물 동반이 가능한 장소입니다.',
   },
+  indoor: true,
+  sourceCategory: '미술관',
+  sourceName: '문화정보원',
   intro: {
     infoCenter: '064-710-4150',
     useTime: '09:00~18:00 (입장 마감 17:30)',
@@ -139,7 +142,29 @@ export const placeDetailWithoutOptionalSections: PlaceDetail = {
   overview: null,
   cpyrhtDivCd: null,
   contentId: null,
+  /*
+    **`indoor: null` 을 여기서 노출한다.** 원천에 정보가 없는 장소가 실제로 흔한데
+    fixture 가 항상 true/false 를 채우면 화면이 `null` 을 "야외" 로 뭉개는 버그를
+    테스트가 영원히 못 잡는다 (`testing-guide.md` §5 · 이슈 #112).
+  */
+  indoor: null,
+  sourceCategory: null,
+  sourceName: null,
   intro: null,
   petInfo: null,
   images: [],
+}
+
+/**
+ * 관광정보 API 원천 상세 — `cpyrhtDivCd` 가 채워져 **공공누리 출처 표기 의무가 있는** 경우다.
+ * 그 줄은 기관명(한국관광공사)을 쓰고 `sourceName` 을 겹쳐 쓰지 않는다 (세부명세 D5-2).
+ */
+export const placeDetailFromTourApi: PlaceDetail = {
+  ...placeDetail,
+  placeId: '212481712381923331',
+  title: '성산일출봉',
+  cpyrhtDivCd: 'Type1',
+  indoor: false,
+  sourceCategory: '여행지',
+  sourceName: '관광정보 API',
 }
