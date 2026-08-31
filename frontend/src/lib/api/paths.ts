@@ -44,6 +44,12 @@ export const paths = {
     /** 주변 긴급 시설. `lat`/`lng` 가 필수라 쿼리 없이 부르지 않는다 */
     facilities: (query: string) => `/emergencies/facilities?${query}`,
   },
+  favorites: {
+    /** 저장한 장소 목록. 커서가 없다 — 회원당 100곳 상한이라 전량이 온다 */
+    places: '/favorites/places',
+    /** 저장(POST) · 해제(DELETE) 가 같은 경로다. **둘 다 멱등이다** */
+    place: (placeId: string) => `/favorites/places/${placeId}`,
+  },
   plans: {
     list: '/plans',
     create: '/plans',

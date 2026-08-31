@@ -8,6 +8,10 @@ import { MetricBadge } from '@/components/metric'
 import { Band } from '@/components/surface'
 import { PhotoGallery } from '@/features/place/photo-gallery'
 import { PlaceBackLink } from '@/features/place/place-back-link'
+import {
+  PlaceDetailActionBar,
+  type PlaceDetailActions,
+} from '@/features/place/place-detail-action-bar'
 import { PlaceDetailSkeleton } from '@/features/place/place-detail-skeleton'
 import { PlaceOverview } from '@/features/place/place-overview'
 import { PlacePetInfoSection } from '@/features/place/place-pet-info'
@@ -41,6 +45,8 @@ export type PlaceDetailSectionProps = {
   petName: string | null
   petSizeCode: string | null
   petSizeName: string | null
+  /** 하단 바(담기 + 저장)가 쓰는 것 전부 — #118 */
+  actions: PlaceDetailActions
 }
 
 /**
@@ -59,9 +65,17 @@ export type PlaceDetailSectionProps = {
  * **404 의 정상 경로는 여기가 아니다.** 서버 컴포넌트가 `notFound()` 로 보낸다.
  * 여기서 404 를 다루는 것은 클라이언트 재조회에서 리소스가 사라진 경우다.
  *
- * 아트보드에 있으나 **구현하지 않은 것**: 하단 sticky "일정에 담기"(일정 화면 없음) ·
- * "저장"(API 없음) · "지도 보기"·"길찾기"([#14](https://github.com/8llow8llowMe/hondigagae/issues/14)) ·
- * 메타의 거리(상세는 기준점이 없다) · 입장료. **없는 값을 지어내지 않는다.**
+ * 아트보드에 있으나 **구현하지 않은 것**: "지도 보기"·"길찾기"
+ * ([#14](https://github.com/8llow8llowMe/hondigagae/issues/14)) · 메타의 거리(상세는 기준점이
+ * 없다) · 입장료. **없는 값을 지어내지 않는다.**
+ *
+ * 하단 바(담기 + 저장)는 #118 로 붙었다 — 막고 있던 사유가 둘 다 소멸했다 (일정 화면은
+ * #80·#82, 즐겨찾기 API 는 `/api/v1/favorites/places`).
+ *
+ * **하단 바만 폭마다 두 곳에 그린다** — 모바일은 sticky 바닥(01), 데스크톱은 좌측 레일의
+ * 판정 아래(03) 라 위치가 아예 다르다. `hidden`(`display:none`) 으로 갈라 **어느 폭에서든
+ * a11y 트리에 하나만 남는다** — 본문 트리를 둘로 나누지 않는 이유(중복 낭독)가 여기에는
+ * 걸리지 않는다.
  *
  * `실내` 와 정보 출처명은 #16 으로 상세 응답에 들어와 붙였다 (#112).
  */
@@ -75,6 +89,7 @@ export function PlaceDetailSection({
   petName,
   petSizeCode,
   petSizeName,
+  actions,
 }: PlaceDetailSectionProps) {
   if (loading) return <PlaceDetailSkeleton />
 
@@ -203,6 +218,9 @@ export function PlaceDetailSection({
           <Band className="lg:hidden" />
           <PlaceSuitabilityPanel {...suitability} />
 
+          {/* 데스크톱 하단 바 — 판정 바로 아래, 기본 정보 위 (아트보드 03) */}
+          <PlaceDetailActionBar {...actions} className="hidden lg:block" />
+
           <Band className="lg:hidden" />
           <div className="border-border hidden border-t lg:block" />
           <DetailSection title={messages.place.detailSectionBasic} padding="rail">
@@ -272,6 +290,17 @@ export function PlaceDetailSection({
           )}
         </div>
       </div>
+
+      {/*
+        모바일 하단 바 — 아트보드 01 의 `position:sticky; bottom:0`.
+
+        **`bottom-16` 이다.** 고정 탭바(h-16)가 `(main)` 레이아웃에 있어 `bottom-0` 이면
+        그 아래로 깔려 가려진다.
+
+        **sticky 라 자리를 스스로 차지한다** — 본문 끝에 바 높이만큼 여백을 따로 두지
+        않아도 마지막 줄이 가려지지 않는다 (fixed 였다면 필요했다).
+      */}
+      <PlaceDetailActionBar {...actions} className="sticky bottom-16 z-30 lg:hidden" />
     </article>
   )
 }

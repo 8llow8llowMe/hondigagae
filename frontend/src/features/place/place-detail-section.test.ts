@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
+import type { PlaceDetailActions } from '@/features/place/place-detail-action-bar'
 import {
   PlaceDetailSection,
   type PlaceDetailSectionProps,
@@ -26,6 +27,18 @@ const suitability: PlaceSuitabilityPanelProps = {
   authed: true,
 }
 
+/** 하단 바의 기본 상태 — 로그인 · 미저장 · 아직 담지 않음 */
+const actions: PlaceDetailActions = {
+  authed: true,
+  saved: false,
+  savePending: false,
+  saveError: null,
+  onToggleSave: () => undefined,
+  added: false,
+  onAddToPlan: () => undefined,
+  onLogin: () => undefined,
+}
+
 function render(overrides: Partial<PlaceDetailSectionProps> = {}) {
   const props: PlaceDetailSectionProps = {
     place: placeDetail,
@@ -36,6 +49,7 @@ function render(overrides: Partial<PlaceDetailSectionProps> = {}) {
     petName: '몽실이',
     petSizeCode: 'SMALL',
     petSizeName: '소형견',
+    actions,
     ...overrides,
   }
 

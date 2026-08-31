@@ -52,6 +52,17 @@ export function withSubjectParticle(word: string): string {
 }
 
 /**
+ * 주제격 조사 (은/는).
+ *
+ * **주격(이/가)과 바꿔 쓰지 않는다.** 피동문의 주제에는 은/는이 붙는다 —
+ * "가세오름은 1일차에 담겨요" 이고 "가세오름이 담겨요" 가 아니다. 목적격을 쓰면
+ * "가세오름을 담겨요" 라는 비문이 된다 (담기 시트에서 실제로 났다).
+ */
+export function withTopicParticle(word: string): string {
+  return attach(word, '은', '는')
+}
+
+/**
  * 동반격 조사 (와/과).
  *
  * **받침 규칙이 을/를·이/가와 반대다** — 받침이 있으면 "과", 없으면 "와" 다

@@ -50,15 +50,18 @@
 
 ## 3. 장소 탐색 — 착수 가능
 
-| 화면      | 경로                | API                                                                                                     | 상태 |
-| --------- | ------------------- | ------------------------------------------------------------------------------------------------------- | ---- |
-| 장소 목록 | `/places`           | `GET /places` (지역·타입·반려견 동반 필터, `SliceResponse` 커서)                                        | 구현 |
-| 장소 상세 | `/places/[placeId]` | `GET /places/{placeId}` + `GET /places/{placeId}/suitability` (intro/petInfo/images 결합, **nullable**) | 구현 |
-| 지도 뷰   | `/places` 내        | 위와 동일 + 카카오 지도 SDK                                                                             | 기획 |
+| 화면              | 경로                   | API                                                                                                     | 상태                                                                                      |
+| ----------------- | ---------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 장소 목록         | `/places`              | `GET /places` (지역·타입·반려견 동반 필터, `SliceResponse` 커서)                                        | 구현                                                                                      |
+| 장소 상세         | `/places/[placeId]`    | `GET /places/{placeId}` + `GET /places/{placeId}/suitability` (intro/petInfo/images 결합, **nullable**) | 구현                                                                                      |
+| 장소 상세 하단 바 | `/places/[placeId]` 내 | `GET`·`POST`·`DELETE /favorites/places` + `POST /plans` + `PUT /plans/{planId}/days/{day}/items`        | 구현 — 저장 + 일정에 담기 ([#118](https://github.com/8llow8llowMe/hondigagae/issues/118)) |
+| 지도 뷰           | `/places` 내           | 위와 동일 + 카카오 지도 SDK                                                                             | 기획                                                                                      |
 
 주의:
 
 - **공개 API다.** tour-service는 security 의존이 없다 → 보호 경로 아님.
+  **단, 하단 바의 즐겨찾기·담기는 보호 리소스다** — 미로그인에는 조회조차 보내지 않는다
+  (401 이 전역 재발급을 헛돌린다).
 - 무한 스크롤(`hasNext`) 기본.
 - 데이터가 비어 있으면 batch 적재가 안 된 것이다 (`local-run-guide.md` §4).
 - **목록 필터 파라미터 (백엔드 `PlaceWebController` 실측)**: `areaCode`(제주=39), `sigunguCode`,

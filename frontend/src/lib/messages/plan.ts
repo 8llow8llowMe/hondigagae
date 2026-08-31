@@ -284,4 +284,59 @@ export const planMessages = {
   addPlaceDayMissingTitle: '{day}일차는 이 여행에 없어요',
   /** `{totalDays}` 치환 */
   addPlaceDayMissingDescription: '이 여행은 총 {totalDays}일이에요. 일정에서 일자를 골라 주세요.',
+
+  // ── 장소 상세에서 담기 (#118) ──────────────────────────────────────────
+  // 아트보드 `혼디가개 장소 상세` 02. **위의 담기 문구와 한 벌이 아니다** — 그쪽은
+  // "일정 안에서 장소를 고르는" 방향이고 여기는 "장소를 보다가 일정을 고르는" 반대
+  // 방향이라, 고르는 대상도 실패 문구가 가리키는 곳도 다르다.
+
+  /** 하단 바의 주요 액션 */
+  addToPlanAction: '일정에 담기',
+  /**
+   * 담은 뒤 같은 자리의 라벨. **문구가 바뀌는 것이 중복 방지 장치다** — 같은 버튼이
+   * 그대로면 두 번 눌러 같은 일정에 두 번 담는다 (아트보드 02-C).
+   */
+  addToPlanAgainAction: '다른 일정에도 담기',
+
+  /** 시트 1단계 제목 */
+  addToPlanSheetTitle: '어디에 담을까요?',
+  /** `{count}` 치환. 일정 행의 부제 뒤에 붙는 항목 수 */
+  addToPlanPlanItemCount: '항목 {count}개',
+  /** 일정 목록 아래의 두 번째 갈래 */
+  addToPlanCreateAction: '새 일정 만들어서 담기',
+
+  /** 일정을 고른 뒤 나타나는 일자 선택의 제목 */
+  addToPlanDayTitle: '며칠에 담을까요?',
+  /** `{day}` 치환. 일자 버튼의 큰 글자 */
+  addToPlanDayLabel: '{day}일차',
+  /** `{date}` · `{count}` 치환. 일자 버튼의 작은 글자 — 몰림을 알린다 */
+  addToPlanDayMeta: '{date} · {count}곳',
+  /** `{day}` 치환. 일자를 고른 뒤의 안내 */
+  addToPlanDayHint: '{day}일차 마지막에 추가돼요. 순서는 일정에서 바꿀 수 있어요.',
+  /** `{day}` 치환. 시트 하단의 주요 액션 — **결과를 라벨에 쓴다** (디자인 가이드 §5-2) */
+  addToPlanSubmit: '{day}일차에 담기',
+
+  /** 시트 2단계(새 일정) 제목 */
+  addToPlanCreateTitle: '새 일정 만들기',
+  /**
+   * `{title}` 에는 조사를 붙인 이름이 들어간다 — **`withTopicParticle()` (은/는) 이다.**
+   * 피동문이라 목적격을 쓰면 "가세오름을 담겨요" 라는 비문이 된다.
+   */
+  addToPlanCreateHint: '{title} 1일차에 담겨요.',
+  /** 2단계의 제출 버튼. `createSubmit`(직접 만들기 화면)과 하는 일이 다르다 */
+  addToPlanCreateSubmit: '일정 만들고 담기',
+
+  /** 일정이 하나도 없을 때. 1단계에서 곧바로 만들기로 안내한다 */
+  addToPlanEmptyTitle: '아직 만든 일정이 없어요',
+  addToPlanEmptyDescription: '새 일정을 만들면 이 장소를 1일차에 담아 드려요.',
+
+  /** 토스트의 되돌아보기 링크 */
+  addToPlanToastAction: '일정 보기',
+
+  /** 미로그인 시트 — 아트보드 04 ④ */
+  addToPlanLoginTitle: '일정에 담으려면 로그인이 필요해요',
+  /** `{title}` 에는 조사를 붙인 이름이 들어간다 — `withObjectParticle()` */
+  addToPlanLoginDescription: '로그인하면 {title} 담을 수 있어요. 지금 보던 화면으로 돌아와요.',
+  addToPlanLoginAction: '로그인',
+  addToPlanLoginDismiss: '둘러보기 계속',
 } as const

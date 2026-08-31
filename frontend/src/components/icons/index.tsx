@@ -202,3 +202,17 @@ export function MoreIcon(props: IconProps) {
     </Svg>
   )
 }
+
+/**
+ * 저장(즐겨찾기) — 아트보드 `혼디가개 장소 상세` 01·03 하단 바의 북마크.
+ *
+ * **채움으로 저장 여부를 말한다.** 저장된 상태는 `fill="currentColor"` 를 넘겨 안을 채운다 —
+ * 아트보드가 그렇게 그렸고(`fill="#15181D"`), 아이콘 모양을 바꾸지 않아 자리가 흔들리지 않는다.
+ */
+export function BookmarkIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6 4.5h12v15l-6-4-6 4z" />
+    </Svg>
+  )
+}

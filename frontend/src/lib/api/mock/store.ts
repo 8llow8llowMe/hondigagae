@@ -134,6 +134,17 @@ export type MockPasswordResetCode = {
   attempts: number
 }
 
+/**
+ * 저장된 즐겨찾기. 응답 DTO 가 아니라 **저장 형태**다 — 장소 요약(제목·주소 등)은 들고
+ * 있지 않고, 응답을 만들 때 `MOCK_PLACES` 에서 찾아 붙인다. 백엔드도 tour-service 조회로
+ * 붙이므로(`FavoritePlaceLookupPort`) 요약을 복제해 두면 두 곳이 어긋난다.
+ */
+export type MockFavorite = {
+  favoriteId: string
+  memberId: string
+  placeId: string
+}
+
 export type MockStore = {
   members: MockMember[]
   /** 인증을 마친 이메일 (백엔드는 30분 TTL — mock 은 만료를 흉내 내지 않는다) */
@@ -168,6 +179,13 @@ export type MockStore = {
   aiPlanJobs: MockAiPlanJob[]
   /** jobId 조립용 순번 */
   nextAiPlanJobSeq: number
+  /**
+   * 저장한 장소. **배열 순서가 저장 순서다** — 목록은 이것을 뒤집어 최근 저장순으로 낸다.
+   * 시각을 들지 않는 이유는 mock 에 시계를 두면 테스트가 시간에 묶여서다.
+   */
+  favorites: MockFavorite[]
+  /** favoriteId 조립용 순번 */
+  nextFavoriteSeq: number
 }
 
 const STORE_KEY = Symbol.for('hondigagae.mock.store')
@@ -241,6 +259,16 @@ const placeId = (ordinal: number) => String(PLACE_ID_BASE + BigInt(ordinal))
 export function nextAiPlanJobId(store: MockStore): string {
   const id = `8a64f9c0-2f1e-4c1a-9c3e-${String(store.nextAiPlanJobSeq).padStart(12, '0')}`
   store.nextAiPlanJobSeq += 1
+  return id
+}
+
+/** 백엔드 favoriteId 는 Snowflake 다. 다른 id 와 같은 이유로 문자열 조립으로 만든다 */
+const FAVORITE_ID_PREFIX = '345678901234'
+const FAVORITE_ID_SEQ_DIGITS = 6
+
+export function nextFavoriteId(store: MockStore): string {
+  const id = `${FAVORITE_ID_PREFIX}${String(store.nextFavoriteSeq).padStart(FAVORITE_ID_SEQ_DIGITS, '0')}`
+  store.nextFavoriteSeq += 1
   return id
 }
 
@@ -559,6 +587,16 @@ function createStore(): MockStore {
     nextPlanItemSeq: 20,
     aiPlanJobs: [],
     nextAiPlanJobSeq: 1,
+    /*
+      **demo 계정에 2건을 심는다.** 마이페이지의 저장 목록(아직 화면 없음)이 아니라
+      장소 상세의 저장 아이콘이 **이미 저장된 상태**로 뜨는 경로를 확인하기 위해서다 —
+      빈 목록만 있으면 토글의 한쪽 방향밖에 볼 수 없다.
+    */
+    favorites: [
+      { favoriteId: '345678901234000001', memberId: '900000000000000001', placeId: placeId(1) },
+      { favoriteId: '345678901234000002', memberId: '900000000000000001', placeId: placeId(4) },
+    ],
+    nextFavoriteSeq: 3,
   }
 }
 
@@ -589,7 +627,9 @@ function isCurrentShape(store: MockStore | undefined): store is MockStore {
     // 비밀번호 재설정·소셜 로그인 상태가 뒤에 추가됐다 (#85). 낡은 스토어는 버린다 —
     // `?? new Map()` 으로 덮으면 옛 상태로 계속 굴러가며 증상만 사라진다
     store.passwordResetCodes instanceof Map &&
-    store.oauthStates instanceof Set
+    store.oauthStates instanceof Set &&
+    // 즐겨찾기가 뒤에 추가됐다 (#118). 낡은 스토어는 버린다 — 위와 같은 이유다
+    Array.isArray(store.favorites)
   )
 }
 
