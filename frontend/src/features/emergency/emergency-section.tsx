@@ -87,7 +87,11 @@ export function EmergencySection({
       )}
 
       <div className="flex flex-col gap-2 px-4 pt-3 md:px-10">
-        <ChipGroup label={messages.emergency.typeGroupLabel} exclusive>
+        <ChipGroup
+          label={messages.emergency.typeGroupLabel}
+          exclusive
+          className="flex flex-wrap gap-1.5"
+        >
           <Chip
             exclusive
             selected={filters.type === null}
@@ -107,7 +111,7 @@ export function EmergencySection({
           ))}
         </ChipGroup>
 
-        <ChipGroup label={messages.emergency.narrowGroupLabel}>
+        <ChipGroup label={messages.emergency.narrowGroupLabel} className="flex flex-wrap gap-1.5">
           <Chip
             selected={filters.open24Only}
             onSelect={() => onFiltersChange({ ...filters, open24Only: !filters.open24Only })}
