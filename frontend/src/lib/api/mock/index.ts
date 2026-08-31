@@ -67,12 +67,17 @@ export function resolveMock(
   const auth = resolveAuthMock(path, method, body)
   if (auth !== null) return auth
 
-  // 회원(마이페이지). 프로필 이미지 업로드는 multipart 라 `body` 가 null 로 온다 —
-  // 경로와 메서드만 보고 판정한다 (`forwarded-body.ts` toMockBody)
-  const member = resolveMemberMock(path, method, accessToken)
+  /*
+    회원(마이페이지). 프로필 이미지 업로드는 multipart 라 `body` 가 null 로 온다 —
+    그 경로는 경로와 메서드만 보고 판정한다 (`forwarded-body.ts` toMockBody).
+
+    **반려견보다 먼저 본다.** `/members/me/pets` 가 `/members/me` 접두사와 겹치지만,
+    `resolveMemberMock` 이 그 경로를 명시적으로 배제하므로 순서에 기대지 않는다.
+  */
+  const member = resolveMemberMock(path, method, body, accessToken)
   if (member !== null) return member
 
-  // 반려견은 보호 리소스다. accessToken 에서 회원을 도출해 소유권을 판정한다
+  // 반려견도 보호 리소스다. accessToken 에서 회원을 도출해 소유권을 판정한다
   const pet = resolvePetMock(path, method, body, accessToken)
   if (pet !== null) return pet
 

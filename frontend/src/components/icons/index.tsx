@@ -6,7 +6,12 @@ import type { SVGProps } from 'react'
  * 선(line) 스타일, 굵기 1.5, `currentColor` 사용 — 색은 부모의 `text-*` 가 정한다.
  * 장식이므로 `aria-hidden`. 의미가 필요하면 부모 버튼에 `aria-label` 을 준다.
  */
-type IconProps = SVGProps<SVGSVGElement> & { size?: 14 | 16 | 18 | 20 | 22 | 24 }
+/**
+ * `size` 를 열거로 묶어 임의 크기를 막는다 — 아이콘이 화면마다 조금씩 다른 크기로
+ * 흩어지는 것을 타입이 잡는다. **28 은 마이페이지 프로필 아바타(64 원형) 전용**이다
+ * (아트보드 `혼디가개 마이페이지·내 반려견` 01).
+ */
+type IconProps = SVGProps<SVGSVGElement> & { size?: 14 | 16 | 18 | 20 | 22 | 24 | 28 }
 
 function Svg({ size = 24, children, ...rest }: IconProps) {
   return (

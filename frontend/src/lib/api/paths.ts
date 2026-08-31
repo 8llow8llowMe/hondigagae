@@ -21,6 +21,12 @@ export const paths = {
     me: '/members/me',
     pets: '/members/me/pets',
     pet: (petId: string) => `/members/me/pets/${petId}`,
+    profileImage: '/members/me/profile-image',
+    /** 변경 — 현재 비밀번호 확인. DELETE 는 같은 경로로 소셜 전용 전환이다 */
+    password: '/members/me/password',
+    /** 최초 설정 — 소셜 전용 계정에 이메일 로그인 수단을 추가한다 */
+    passwordSetup: '/members/me/password/setup',
+    withdraw: '/members/me/withdraw',
   },
   places: {
     list: (query: string) => (query ? `/places?${query}` : '/places'),

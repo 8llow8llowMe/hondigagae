@@ -10,9 +10,18 @@
 export type MockMember = {
   memberId: string
   email: string
-  password: string
+  /**
+   * **`null` 이면 비밀번호가 없는 계정이다** (소셜 전용). `hasPassword` 를 따로 들지
+   * 않는 이유는 두 값이 어긋날 수 있어서다 — 최초 설정으로 비밀번호가 생기면
+   * `hasPassword` 도 같이 고쳐야 하는데, 한 곳만 고치면 mock 이 실제로는 불가능한
+   * 상태를 낸다. 응답의 `hasPassword` 는 이 필드에서 파생시킨다.
+   */
+  password: string | null
   name: string
   nickname: string
+  profileImageUrl: string | null
+  /** 소셜 로그인 제공자. 일반 계정이면 null — `'KAKAO'` 등 원문 문자열이다 */
+  provider: string | null
 }
 
 /**
@@ -119,18 +128,65 @@ export function nextPlanId(store: MockStore): string {
 
 function createStore(): MockStore {
   return {
+    /*
+      **계정 상태 3종을 모두 낼 수 있어야 한다** (마이페이지-세부명세 D7). 그러지 않으면
+      `/mypage/password` 의 분기(공통명세 S2)를 화면으로 확인할 방법이 없다.
+      로그인해서 상태를 바꾸는 것이 아니라 **계정을 갈아타서** 확인한다 — 비밀번호가
+      없는 계정은 이메일 로그인이 불가능하므로 소셜 전용 계정은 아래 `provider` 만
+      다르고 password 는 있는 `linked` 계정과 짝을 이룬다.
+
+      `(provider: null, password: null)` = 판별 불가 조합은 **fixture 로 만들지 않는다.**
+      서버 결함일 때만 나오는 상태라, 있으면 mock 이 불가능한 계정을 정상인 것처럼
+      제공하게 된다. 그 분기는 렌더 테스트가 직접 값을 넣어 확인한다.
+    */
     members: [
       {
+        // 일반 계정 — provider null + 비밀번호 있음
         memberId: '900000000000000001',
         email: 'demo@hondigagae.dev',
         password: 'password123!',
         name: '김제주',
         nickname: '제주댕댕',
+        profileImageUrl: null,
+        provider: null,
+      },
+      {
+        // 연결됨 — 소셜 + 비밀번호. 변경과 소셜 전용 전환이 둘 다 보인다
+        memberId: '900000000000000002',
+        email: 'linked@hondigagae.dev',
+        password: 'password123!',
+        name: '이연결',
+        nickname: '연결이',
+        profileImageUrl: null,
+        provider: 'KAKAO',
+      },
+      {
+        /*
+          소셜 전용 — 비밀번호가 없다.
+
+          **지금은 브라우저로 이 계정에 로그인할 수 없다.** 이메일 로그인은 비밀번호가
+          있어야 하고, 소셜 로그인 mock(`GET /auth/{provider}/login`)은 아직 없다 —
+          그것은 이슈 #85(소셜 로그인 콜백)의 범위라 여기서 만들면 그 브랜치와 충돌한다.
+          `linked@` 로 로그인해 비밀번호를 없애는 경로도 **서버가 세션을 끊어서**
+          그 화면에 머물 수 없다 (그게 맞는 계약이다).
+
+          그래서 `social-only` 분기는 지금 mock 단위 테스트(`member-mock.test.ts`)와
+          렌더 테스트(`my-page.test.ts` · `password-form.test.ts`)로만 확인된다.
+          **#85 가 소셜 로그인 mock 을 올리면 이 계정으로 화면을 직접 볼 수 있다.**
+          그때까지 이 fixture 는 응답 모양의 정본 역할만 한다.
+        */
+        memberId: '900000000000000003',
+        email: 'social@hondigagae.dev',
+        password: null,
+        name: '박소셜',
+        nickname: '소셜이',
+        profileImageUrl: null,
+        provider: 'KAKAO',
       },
     ],
     verifiedEmails: new Set<string>(),
     pendingEmails: new Set<string>(),
-    nextMemberSeq: 2,
+    nextMemberSeq: 4,
     pets: [
       {
         petId: '123456789012000001',
@@ -277,7 +333,10 @@ function isCurrentShape(store: MockStore | undefined): store is MockStore {
     store !== undefined &&
     Array.isArray(store.members) &&
     Array.isArray(store.pets) &&
-    Array.isArray(store.plans)
+    Array.isArray(store.plans) &&
+    // 계정 상태 3종 fixture 가 들어오며 members 의 모양이 바뀌었다. 이 검사가 없으면
+    // 켜 둔 개발 서버의 옛 상태가 그대로 굴러가 provider 가 undefined 로 읽힌다
+    store.members.every((member) => 'provider' in member)
   )
 }
 
