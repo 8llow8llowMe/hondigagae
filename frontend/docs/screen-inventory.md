@@ -22,14 +22,15 @@
 
 ## 1. 인증 / 회원 — 착수 가능
 
-| 화면          | 경로                                | API                                                                  | 상태                      |
-| ------------- | ----------------------------------- | -------------------------------------------------------------------- | ------------------------- |
-| 로그인        | `/(auth)/login`                     | `POST /auth/login`                                                   | **구현** (소셜은 범위 밖) |
-| 소셜 콜백     | `/(auth)/oauth/{provider}/callback` | `GET /auth/{provider}/login?code=&state=`                            | 기획                      |
-| 회원가입      | `/(auth)/signup`                    | `POST /auth/email/send-code`, `/verify-code`, `POST /members/signup` | **구현**                  |
-| 내 정보       | `/mypage`                           | `GET                                                                 | PATCH /members/me`, `POST | DELETE /members/me/profile-image` | 기획 |
-| 비밀번호 변경 | `/mypage/password`                  | `POST /members/me/password`                                          | 기획                      |
-| 회원 탈퇴     | `/mypage/withdraw`                  | `POST /members/me/withdraw`                                          | 기획                      |
+| 화면          | 경로                                | API                                                                          | 상태                                                     |
+| ------------- | ----------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------- |
+| 로그인        | `/(auth)/login`                     | `POST /auth/login`                                                           | **구현** (소셜은 범위 밖)                                |
+| 소셜 콜백     | `/(auth)/oauth/{provider}/callback` | `GET /auth/{provider}/authorize` → `GET /auth/{provider}/login?code=&state=` | **명세 완료** (`features/auth/소셜콜백-세부명세.md`)     |
+| 회원가입      | `/(auth)/signup`                    | `POST /auth/email/send-code`, `/verify-code`, `POST /members/signup`         | **구현**                                                 |
+| 내 정보       | `/mypage`                           | `GET`·`PATCH /members/me`, `POST`·`DELETE /members/me/profile-image`         | **명세 완료** (`features/member/마이페이지-세부명세.md`) |
+| 비밀번호 관리 | `/mypage/password`                  | `POST`·`DELETE /members/me/password`, `POST /members/me/password/setup`      | **명세 완료** — 계정 상태 3종 분기                       |
+| 회원 탈퇴     | `/mypage/withdraw`                  | `POST /members/me/withdraw`                                                  | **명세 완료**                                            |
+| 비밀번호 찾기 | `/(auth)/password/reset`            | `POST /auth/password/reset/send-code`, `/auth/password/reset`                | **명세 완료** (`features/auth/비밀번호찾기-세부명세.md`) |
 
 주의: 소셜 로그인은 **2-step API 흐름** (`auth-guide.md` §1). 서버 리다이렉트가 아니다.
 
@@ -113,14 +114,14 @@
 
 ## 4. 여행 일정 — 착수 가능
 
-| 화면                        | 경로                         | API                                                    | 상태                    |
-| --------------------------- | ---------------------------- | ------------------------------------------------------ | ----------------------- |
-| 일정 목록                   | `/plans`                     | `GET /plans` (커서)                                    | **구현** (#75)          |
-| 일정 생성                   | `/plans/new`                 | `POST /plans`                                          | **구현** (#75)          |
-| 일정 상세 (타임라인 + 지도) | `/plans/[planId]`            | `GET /plans/{planId}`                                  | 기획                    |
-| 일정 수정                   | `/plans/[planId]/edit`       | `PUT                                                   | DELETE /plans/{planId}` | 기획 |
-| 일자 항목 편집              | `/plans/[planId]/days/[day]` | `PUT /plans/{planId}/days/{day}/items` (**일괄 교체**) | 기획                    |
-| 일정 날씨 브리핑            | `/plans/[planId]` 내         | `GET /plans/{planId}/weather` (신규)                   | 기획                    |
+| 화면                        | 경로                      | API                                                    | 상태                                                                |
+| --------------------------- | ------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------- |
+| 일정 목록                   | `/plans`                  | `GET /plans` (커서)                                    | **구현** (#75)                                                      |
+| 일정 생성                   | `/plans/new`              | `POST /plans`                                          | **구현** (#75)                                                      |
+| 일정 상세 (타임라인 + 판정) | `/plans/[planId]`         | `GET /plans/{planId}` + `GET /plans/{planId}/weather`  | **명세 완료** (`features/plan/일정상세-세부명세.md`)                |
+| 일정 수정·삭제              | `/plans/[planId]` 내      | `PUT` · `DELETE /plans/{planId}`                       | **명세 완료** — 이름·예산·상태만. **기간 수정은 열지 않는다**(아래) |
+| 일자 항목 편집              | `/plans/[planId]` 내 모드 | `PUT /plans/{planId}/days/{day}/items` (**일괄 교체**) | **명세 완료** (`features/plan/일자편집-세부명세.md`)                |
+| 일정 날씨 브리핑            | `/plans/[planId]` 내      | `GET /plans/{planId}/weather`                          | **명세 완료** — 일자 판정으로 통합                                  |
 
 주의:
 
@@ -130,20 +131,21 @@
 - 일자 항목은 **부분 수정이 아니라 일괄 교체**다. 화면도 그 모델로 설계한다.
 - 장소 항목은 백엔드가 tour-service Feign으로 존재를 검증한다 → 없는 `placeId` 는 실패한다.
 - **일정의 소유권은 plan-service에 있다.** AI는 제안만 하고 확정은 여기서만 일어난다.
-- **날씨 브리핑(`PlanWeatherResponse`)의 `dailyBriefings` 는 일정 일수만큼 항상 채워진다.** 빈 배열을 방어할 필요가 없다. 대신 각 일자의 예보 필드가 null 일 수 있다 (§3-1 `DailyWeatherItem` 과 같은 타입).
+- **기간을 줄여도 백엔드가 항목을 정리하지 않는다.** `PlanCommandProcessor.updatePlan` 은 `startDate`/`endDate` 만 바꾸고 `day > totalDays` 가 된 항목을 그대로 둔다 → 상세 응답에 기간 밖 항목이 섞여 온다. **그래서 화면은 기간 수정을 열지 않는다** (BE 후속 요청). 다른 경로로 생긴 기간 밖 항목은 상세 화면이 별도 섹션으로 드러낸다.
+- **날씨 브리핑(`PlanWeatherResponse`)의 `days` 는 일정 일수만큼 항상 채워진다.** (명세의 `dailyBriefings` 는 실제 필드명이 아니다 — `features/_index.md` 드리프트 표) 빈 배열을 방어할 필요가 없다. 대신 각 일자의 예보 필드가 null 일 수 있다 (§3-1 `DailyWeatherItem` 과 같은 타입).
 
 ## 5. AI 일정 생성 — 착수 가능
 
-| 화면                  | 경로                     | API                                | 상태 |
-| --------------------- | ------------------------ | ---------------------------------- | ---- |
-| 조건 입력             | `/ai-plans/new`          | `POST /ai-plans` → 202 + jobId     | 기획 |
-| 생성 대기             | `/ai-plans/jobs/[jobId]` | `GET /ai-plans/jobs/{jobId}` 폴링  | 기획 |
-| 결과 확인 → 일정 저장 | 위 화면 내               | 결과 확인 후 `POST /plans` 로 확정 | 기획 |
+| 화면           | 경로                     | API                                      | 상태                                           |
+| -------------- | ------------------------ | ---------------------------------------- | ---------------------------------------------- |
+| 조건 입력      | `/ai-plans/new`          | `POST /ai-plans` → 202 + jobId           | **명세 완료** (`features/ai-plan/공통명세.md`) |
+| 생성 대기·결과 | `/ai-plans/jobs/[jobId]` | `GET /ai-plans/jobs/{jobId}` **폴링 2s** | **명세 완료**                                  |
+| 결과 → 담기    | 위 화면 내               | `POST /plans` 로 확정                    | **명세 완료** — 매핑은 명세 S5                 |
 
 주의:
 
 - **실패가 HTTP 200 + `status=FAILED`** 다 (`api-integration-guide.md` §5).
-- **SSE는 백엔드 미구현.** 폴링만 쓴다.
+- **SSE 가 백엔드에 생겼다** (`AiPlanWebController` + `AiPlanJobSseStreamer`, 커밋 `b7daa3a`). 이 절은 폴링만 있던 시절에 쓰였다 — **AI 일정 생성 화면에 착수할 때 이 절을 실측으로 다시 확인한다.**
 - **LLM 어댑터가 두 개고 플래그로 갈린다** (`ai-llm.enabled`, 기본값 `false`).
   - `false`(기본) → `StubLlmAdapter` 고정 샘플. **결과가 매번 같은 것이 정상**이다.
   - `true` → `AnthropicClaudeLlmAdapter` (`claude-opus-5`, 서킷브레이커·환각 방지 경로 포함).
