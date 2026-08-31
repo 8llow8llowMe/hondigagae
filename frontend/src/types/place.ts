@@ -39,13 +39,14 @@ export type PlaceSummary = {
 /**
  * 장소 상세 (`GET /api/v1/places/{placeId}` — `PlaceDetailResponse`).
  *
- * 목록(`PlaceSummary`)과 필드 집합이 다르다. **`sigunguCode` / `indoor` / `sourceCategory` /
- * `sourceName` 이 상세 응답에는 없다** — 이슈 #16 반영 후 추가한다.
- * 근거: backend PlaceDetailResponse / PlacePresenter#toDetailResponse (tour-service, 2026-08-27)
+ * 목록(`PlaceSummary`)과 필드 집합이 다르다. **`indoor` / `sourceCategory` / `sourceName` 은
+ * 이슈 #16 으로 상세 응답에 들어왔지만 이 타입에는 아직 없다** — 화면 세 곳(장소 상세 · AI 초안 행 ·
+ * 일정 항목 행)에 함께 붙이는 FE 후속 작업이다. **`sigunguCode` 는 여전히 상세 응답에 없다.**
+ * 근거: backend PlaceDetailResponse / PlacePresenter#toDetailResponse (tour-service, 2026-08-31)
  */
 export type PlaceDetail = {
   placeId: string
-  /** TODO(BE #17): 원천이 TourAPI 가 아니면 문자열 "null" 이 내려온다 */
+  /** 원천이 TourAPI 가 아니면 `null` 이다 (#17 반영 — 그전에는 문자열 `"null"` 이었다) */
   contentId: string | null
   contentType: EnumMetadata
   title: string

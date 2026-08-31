@@ -15,7 +15,10 @@ public record PlaceDetailResponse(
     @Schema(description = "장소 아이디", example = "212481712381923328")
     String placeId,
 
-    @Schema(description = "TourAPI 콘텐츠 아이디", example = "126439")
+    @Schema(
+        description = "TourAPI 콘텐츠 아이디. 원천이 TourAPI 가 아니면(문화정보원·식약처) null 이다",
+        example = "126439",
+        nullable = true)
     String contentId,
 
     @Schema(description = "콘텐츠 타입 metadata")
@@ -68,6 +71,15 @@ public record PlaceDetailResponse(
 
     @Schema(description = "반려동물 동반 구분 metadata")
     CodeNameDescriptionMetadata petAllowanceType,
+
+    @Schema(description = "실내 여부. null 이면 원천에 정보가 없다", example = "true", nullable = true)
+    Boolean indoor,
+
+    @Schema(description = "원본 분류 (원천이 준 값 그대로)", example = "카페", nullable = true)
+    String sourceCategory,
+
+    @Schema(description = "정보 출처", example = "문화정보원")
+    String sourceName,
 
     @Schema(description = "소개 정보 (없으면 null)")
     PlaceIntroItem intro,
