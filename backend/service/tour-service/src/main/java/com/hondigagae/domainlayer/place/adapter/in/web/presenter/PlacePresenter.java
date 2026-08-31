@@ -53,7 +53,7 @@ public class PlacePresenter {
         Place place = detailInfo.place();
         return PlaceDetailResponse.builder()
             .placeId(String.valueOf(place.id()))
-            .contentId(String.valueOf(place.contentId()))
+            .contentId(toStringOrNull(place.contentId()))
             .contentType(toContentTypeMetadata(ContentType.fromCode(place.contentTypeId())))
             .title(place.title())
             .addr1(place.addr1())
@@ -70,6 +70,9 @@ public class PlacePresenter {
             .petAvailable(place.petAvailable())
             .delisted(place.delistedAt() != null)
             .petAllowanceType(toPetAllowanceMetadata(place.petAllowanceType()))
+            .indoor(place.indoor())
+            .sourceCategory(place.sourceCategory())
+            .sourceName(place.source() == null ? null : place.source().getDisplayName())
             .intro(toIntroItem(detailInfo.intro()))
             .petInfo(toPetInfoItem(detailInfo.petInfo()))
             .images(toImageItems(detailInfo.images()))
@@ -155,5 +158,17 @@ public class PlacePresenter {
 
     private Double toDouble(BigDecimal value) {
         return value == null ? null : value.doubleValue();
+    }
+
+    /**
+     * 아이디를 문자열로 내린다. Snowflake·TourAPI 아이디가 자바스크립트 Number 의 안전 정수 범위를
+     * 넘기 때문이다.
+     *
+     * <p><b>{@code String.valueOf} 를 직접 쓰지 않는다.</b> 인자가 null 이면 문자열 {@code "null"}
+     * 을 돌려주는데, 그것은 길이 4의 유효한 문자열이라 클라이언트의 null 검사를 통과해 화면과 링크
+     * 파라미터로 새어 나간다. {@code contentId} 는 원천이 TourAPI 가 아니면 실제로 null 이다.
+     */
+    private String toStringOrNull(Long value) {
+        return value == null ? null : String.valueOf(value);
     }
 }

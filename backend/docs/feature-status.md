@@ -44,7 +44,7 @@
 | --- | --- | --- |
 | GET | `/api/v1/places` | 지역·타입·동반조건·실내·크기·원본분류·반려견 크기/체중 필터, 커서 기반 |
 | GET | `/api/v1/places/nearby` | 좌표 반경 검색 (식당·카페 포함) |
-| GET | `/api/v1/places/{placeId}` | intro·petInfo·images 결합 상세 |
+| GET | `/api/v1/places/{placeId}` | intro·petInfo·images 결합 상세. `indoor`·`sourceCategory`·`sourceName` 포함(목록과 같은 매핑), `contentId` 는 원천이 TourAPI 가 아니면 **null** |
 | GET | `/api/v1/emergencies/facilities` | 동물병원·동물약국 반경 검색, `openNowOnly` 지금 영업 중 필터 |
 | GET | `/api/v1/places/{placeId}/suitability` | 날씨+동반조건+혼잡도 적합도. 단기+중기 합쳐 약 11일. `score` 가 null 이면 판단 근거 없음 |
 | GET | `/api/v1/places/{placeId}/walk-safety` | 추정 노면온도·열지수 기반 산책 위험도 + 안전 시간대 |

@@ -72,9 +72,15 @@
 - `contentType` / `petAllowanceType` 은 **응답에서 metadata 객체**(`{code, name, description}`)로 온다 → 서버 문구를 그대로 렌더한다.
 - `placeId` 는 응답에서 **문자열**이다 (백엔드 내부는 long).
 - **상세 컨트롤러는 `@PathVariable long` 이다** → 숫자가 아닌 `placeId` 는 404 가 아니라 **400(`PLACE_113`)** 이다.
-- **상세 응답(`PlaceDetailResponse`)에는 `sigunguCode` / `indoor` / `sourceCategory` / `sourceName` 이 없다.**
-  목록 항목(`PlaceItem`)에만 있다 → [#16](https://github.com/8llow8llowMe/hondigagae/issues/16) 반영 전까지 상세 화면에서 실내 여부·출처명을 표시하지 않는다.
-- 상세의 `contentId` 는 원천이 TourAPI 가 아니면 **문자열 `"null"`** 로 온다 → [#17](https://github.com/8llow8llowMe/hondigagae/issues/17).
+- **상세 응답(`PlaceDetailResponse`)에 `indoor` / `sourceCategory` / `sourceName` 이 들어왔다**
+  ([#16](https://github.com/8llow8llowMe/hondigagae/issues/16) 반영). 목록(`PlaceItem`)과 **같은 매핑**이고
+  `sourceName` 은 표시명(`문화정보원`)이다. `indoor` 는 `null`(원천에 정보 없음)이 그대로 온다 —
+  `false`(실외)와 다르므로 배지를 숨긴다. **아직 화면에 붙이지 않았다** — 장소 상세·AI 초안 행·일정 항목 행
+  세 곳에 각각 FE 작업이 남아 있다.
+- **`sigunguCode` 는 여전히 상세 응답에 없다.** 목록 항목에만 있다 — #16 범위가 아니었다.
+- 상세의 `contentId` 는 원천이 TourAPI 가 아니면 **`null`** 이다
+  ([#17](https://github.com/8llow8llowMe/hondigagae/issues/17) 반영 — 그전에는 문자열 `"null"` 이었다).
+  타입은 `string | null` 이 맞다.
 - 상세의 `homepage` / `overview` 는 **HTML 태그가 섞인 원문**이다. `dangerouslySetInnerHTML` 을 쓰지 않는다.
 - 지도 좌표는 백엔드가 `lat`/`lng` (Double) 로 정규화해 내려준다. 카카오는 `LatLng(위도, 경도)` 순서이므로 `lat` 이 먼저다 (`external-api-guide.md`).
 
