@@ -14,10 +14,16 @@ import type { PlaceDetail } from '@/types/place'
  * 일정 상세 조회. 서버 프리페치가 심어 둔 캐시를 **같은 key** 로 이어받는다 —
  * key 가 다르면 프리페치가 버려진다 (architecture-guide.md §9).
  */
-export function usePlanDetail(planId: string) {
+export function usePlanDetail(planId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: planKeys.detail(planId),
     queryFn: () => fetchPlanDetail(planId),
+    /*
+      **아직 고르지 않은 일정을 조회하지 않기 위한 스위치다** (#118). 장소 상세의 담기
+      시트는 일정을 고른 뒤에야 그 상세가 필요한데, 훅은 조건부로 부를 수 없다.
+      기본값은 켜짐이라 기존 호출부는 그대로다.
+    */
+    enabled: options?.enabled ?? true,
     staleTime: PLAN_QUERY_OPTIONS.staleTime,
     gcTime: PLAN_QUERY_OPTIONS.gcTime,
   })

@@ -2,6 +2,7 @@ import { resolveAiPlanMock } from '@/lib/api/mock/ai-plan-data'
 import type { MockResult } from '@/lib/api/mock/auth-data'
 import { resolveAuthMock } from '@/lib/api/mock/auth-data'
 import { mockNearbyFacilities } from '@/lib/api/mock/emergency-data'
+import { resolveFavoriteMock } from '@/lib/api/mock/favorite-data'
 import { mockSuitability, mockWalkSafety } from '@/lib/api/mock/insight-data'
 import { resolveMemberMock } from '@/lib/api/mock/member-data'
 import { resolvePetMock } from '@/lib/api/mock/pet-data'
@@ -90,6 +91,10 @@ export function resolveMock(
   // AI 일정도 보호 리소스다. 제출(POST /ai-plans)과 작업 조회(GET /ai-plans/jobs/{id})다
   const aiPlan = resolveAiPlanMock(path, method, body, accessToken)
   if (aiPlan !== null) return aiPlan
+
+  // 즐겨찾기도 보호 리소스다. 목록(GET)·저장(POST)·해제(DELETE) 셋 다 본문이 없어 body 를 넘기지 않는다
+  const favorite = resolveFavoriteMock(path, method, accessToken)
+  if (favorite !== null) return favorite
 
   if (method !== 'GET') return null
 

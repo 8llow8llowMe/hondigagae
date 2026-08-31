@@ -23,6 +23,12 @@ export type PlanCreateFormProps = {
   firstErrorField: string | null
   onValueChange: <K extends keyof PlanFormValues>(key: K, value: PlanFormValues[K]) => void
   onSubmit: () => void
+  /**
+   * 제출 버튼 라벨. **하는 일이 다르면 라벨도 달라야 한다** — 담기 시트 안에서는 만들기가
+   * 끝이 아니라 그 자리에서 장소까지 담으므로 `일정 만들고 담기` 다 (#118, 아트보드 02-B).
+   * 생략하면 직접 만들기 화면의 기본 라벨을 쓴다.
+   */
+  submitLabel?: string
 }
 
 /**
@@ -42,6 +48,7 @@ export function PlanCreateForm({
   firstErrorField,
   onValueChange,
   onSubmit,
+  submitLabel = messages.plan.createSubmit,
 }: PlanCreateFormProps) {
   const formRef = useRef<HTMLFormElement>(null)
 
@@ -154,7 +161,7 @@ export function PlanCreateForm({
       </Field>
 
       <Button type="submit" size="lg" loading={submitting} className="mt-1">
-        {messages.plan.createSubmit}
+        {submitLabel}
       </Button>
     </form>
   )
