@@ -1,3 +1,4 @@
+import { resolveAiPlanMock } from '@/lib/api/mock/ai-plan-data'
 import type { MockResult } from '@/lib/api/mock/auth-data'
 import { resolveAuthMock } from '@/lib/api/mock/auth-data'
 import { mockNearbyFacilities } from '@/lib/api/mock/emergency-data'
@@ -84,6 +85,10 @@ export function resolveMock(
   // 일정도 보호 리소스다. GET(커서 목록)과 POST(생성)가 같은 경로라 method 를 함께 넘긴다
   const plan = resolvePlanMock(path, method, search, body, accessToken)
   if (plan !== null) return plan
+
+  // AI 일정도 보호 리소스다. 제출(POST /ai-plans)과 작업 조회(GET /ai-plans/jobs/{id})다
+  const aiPlan = resolveAiPlanMock(path, method, body, accessToken)
+  if (aiPlan !== null) return aiPlan
 
   if (method !== 'GET') return null
 

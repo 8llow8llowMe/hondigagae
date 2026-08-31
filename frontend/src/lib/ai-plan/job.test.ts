@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { isJobCompleted, isJobFailed, jobPollInterval, shouldKeepPolling } from '@/lib/ai-plan/job'
+import {
+  isJobCompleted,
+  isJobFailed,
+  JOB_POLL_LIMIT_MS,
+  JOB_POLL_SLOW_MS,
+  jobPollInterval,
+  jobPollPhase,
+  shouldKeepPolling,
+} from '@/lib/ai-plan/job'
 
 describe('isJobFailed', () => {
   it('status 가 FAILED 면 실패로 판정한다 (HTTP 200 으로 오는 실패다)', () => {
@@ -55,5 +63,36 @@ describe('jobPollInterval', () => {
 
   it('실패하면 false 를 반환해 폴링을 끝낸다', () => {
     expect(jobPollInterval({ status: 'FAILED' })).toBe(false)
+  })
+})
+
+describe('jobPollPhase — 명세 S7 (30초 · 90초)', () => {
+  it('30초 전에는 아무 말도 하지 않는다 — 정상 소요 시간이다', () => {
+    expect(jobPollPhase(0)).toBe('normal')
+    expect(jobPollPhase(JOB_POLL_SLOW_MS - 1)).toBe('normal')
+  })
+
+  it('30초를 넘기면 기다려 달라고 덧붙인다', () => {
+    expect(jobPollPhase(JOB_POLL_SLOW_MS)).toBe('slow')
+    expect(jobPollPhase(JOB_POLL_LIMIT_MS - 1)).toBe('slow')
+  })
+
+  it('90초를 넘기면 폴링을 끝낸 국면이다', () => {
+    expect(jobPollPhase(JOB_POLL_LIMIT_MS)).toBe('exceeded')
+    expect(jobPollPhase(120_000)).toBe('exceeded')
+  })
+})
+
+describe('jobPollInterval — 상한', () => {
+  it('상한 안에서는 진행 중이면 계속 폴링한다', () => {
+    expect(jobPollInterval({ status: 'RUNNING' }, JOB_POLL_SLOW_MS)).toBe(2000)
+  })
+
+  it('상한을 넘기면 진행 중이어도 멈춘다 — 죽은 작업을 영원히 두드리지 않는다', () => {
+    expect(jobPollInterval({ status: 'RUNNING' }, JOB_POLL_LIMIT_MS)).toBe(false)
+  })
+
+  it('경과 시간을 주지 않으면 상한을 보지 않는다', () => {
+    expect(jobPollInterval({ status: 'RUNNING' })).toBe(2000)
   })
 })

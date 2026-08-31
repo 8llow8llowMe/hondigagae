@@ -134,24 +134,27 @@
 - **기간을 줄여도 백엔드가 항목을 정리하지 않는다.** `PlanCommandProcessor.updatePlan` 은 `startDate`/`endDate` 만 바꾸고 `day > totalDays` 가 된 항목을 그대로 둔다 → 상세 응답에 기간 밖 항목이 섞여 온다. **그래서 화면은 기간 수정을 열지 않는다** (BE 후속 요청). 다른 경로로 생긴 기간 밖 항목은 상세 화면이 별도 섹션으로 드러낸다.
 - **날씨 브리핑(`PlanWeatherResponse`)의 `days` 는 일정 일수만큼 항상 채워진다.** (명세의 `dailyBriefings` 는 실제 필드명이 아니다 — `features/_index.md` 드리프트 표) 빈 배열을 방어할 필요가 없다. 대신 각 일자의 예보 필드가 null 일 수 있다 (§3-1 `DailyWeatherItem` 과 같은 타입).
 
-## 5. AI 일정 생성 — 착수 가능
+## 5. AI 일정 생성 — **구현 완료**
 
-| 화면           | 경로                     | API                                      | 상태                                           |
-| -------------- | ------------------------ | ---------------------------------------- | ---------------------------------------------- |
-| 조건 입력      | `/ai-plans/new`          | `POST /ai-plans` → 202 + jobId           | **명세 완료** (`features/ai-plan/공통명세.md`) |
-| 생성 대기·결과 | `/ai-plans/jobs/[jobId]` | `GET /ai-plans/jobs/{jobId}` **폴링 2s** | **명세 완료**                                  |
-| 결과 → 담기    | 위 화면 내               | `POST /plans` 로 확정                    | **명세 완료** — 매핑은 명세 S5                 |
+| 화면           | 경로                     | API                                      | 상태                           |
+| -------------- | ------------------------ | ---------------------------------------- | ------------------------------ |
+| 조건 입력      | `/ai-plans/new`          | `POST /ai-plans` → 202 + jobId           | **구현 완료** (이슈 #84)       |
+| 생성 대기·결과 | `/ai-plans/jobs/[jobId]` | `GET /ai-plans/jobs/{jobId}` **폴링 2s** | **구현 완료** (이슈 #84)       |
+| 결과 → 담기    | 위 화면 내               | `POST /plans` 로 확정                    | **구현 완료** — 매핑은 명세 S5 |
 
 주의:
 
 - **실패가 HTTP 200 + `status=FAILED`** 다 (`api-integration-guide.md` §5).
-- **SSE 가 백엔드에 생겼다** (`AiPlanWebController` + `AiPlanJobSseStreamer`, 커밋 `b7daa3a`). 이 절은 폴링만 있던 시절에 쓰였다 — **AI 일정 생성 화면에 착수할 때 이 절을 실측으로 다시 확인한다.**
+- **SSE 는 이번 범위가 아니다.** 백엔드에 `GET /ai-plans/jobs/{jobId}/stream` 이 있지만(`b7daa3a`) **BFF 가 응답을 통째로 버퍼링해 스트림을 통과시키지 못한다** — 지금 붙이면 폴링만도 못하다. 이슈 [#91](https://github.com/8llow8llowMe/hondigagae/issues/91) 로 뗐다 (명세 S3).
 - **LLM 어댑터가 두 개고 플래그로 갈린다** (`ai-llm.enabled`, 기본값 `false`).
   - `false`(기본) → `StubLlmAdapter` 고정 샘플. **결과가 매번 같은 것이 정상**이다.
   - `true` → `AnthropicClaudeLlmAdapter` (`claude-opus-5`, 서킷브레이커·환각 방지 경로 포함).
   - **로컬에서 Stub 결과를 보고 "AI가 고장났다" 고 판단하지 않는다.** `AI_LLM_ENABLED` 를 먼저 확인한다.
 - XAI `reasons` 가 포함된다 → 서버 `description` 을 그대로 노출한다.
 - 저장·확정은 plan-service 몫이다. ai-service에 저장 API가 없다.
+- **`AiPlanCreateRequest` 가 `petIds`·`pinnedPlaceIds`·`planId`+`regenerateDay` 를 받는다**
+  (PR #78). 전부 선택이고 **#84 는 단일 `petId` 만 보낸다** — 다중 반려견 UI 와 필수 포함
+  장소 플로우는 아트보드 정본이 없어 별도 FE 이슈다 (명세 S1).
 
 ## 5-1. 주변 장소 검색 — 착수 가능
 

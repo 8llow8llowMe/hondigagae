@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { withObjectParticle, withSubjectParticle } from '@/lib/text/korean'
+import { withCompanionParticle, withObjectParticle, withSubjectParticle } from '@/lib/text/korean'
 
 describe('withObjectParticle (을/를)', () => {
   it('종성이 없으면 를 을 붙인다', () => {
@@ -30,5 +30,25 @@ describe('withSubjectParticle (이/가)', () => {
   it('종성 유무로 갈린다', () => {
     expect(withSubjectParticle('몽실이')).toBe('몽실이가')
     expect(withSubjectParticle('곰')).toBe('곰이')
+  })
+})
+
+describe('withCompanionParticle', () => {
+  it('받침이 없으면 "와" 를 붙인다', () => {
+    expect(withCompanionParticle('몽실이')).toBe('몽실이와')
+    expect(withCompanionParticle('초코')).toBe('초코와')
+  })
+
+  it('받침이 있으면 "과" 를 붙인다 — 을/를·이/가와 규칙이 반대다', () => {
+    expect(withCompanionParticle('곰')).toBe('곰과')
+    expect(withCompanionParticle('방울')).toBe('방울과')
+  })
+
+  it('한글이 아니면 받침 없음으로 본다', () => {
+    expect(withCompanionParticle('Bori')).toBe('Bori와')
+  })
+
+  it('빈 이름에는 아무것도 붙이지 않는다', () => {
+    expect(withCompanionParticle('')).toBe('')
   })
 })

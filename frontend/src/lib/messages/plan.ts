@@ -44,6 +44,16 @@ export const planMessages = {
   createTitle: '일정 만들기',
   createDescription: '빈 일정을 만들고 장소는 나중에 담아요.',
   createSubmit: '만들기',
+
+  /**
+   * 만들기 방식 시트 — 아트보드 04. **AI 화면(#84)이 생겨 항목이 둘이 됐다.**
+   * 그 전에는 선택지가 하나뿐이라 시트를 두지 않았다 (공통명세 S2).
+   */
+  createSheetTitle: '어떻게 만들까요?',
+  createSheetAi: 'AI로 만들기',
+  createSheetAiDescription: '조건만 알려 주면 일자별 일정을 짜 드려요. 20초쯤 걸려요.',
+  createSheetManual: '직접 만들기',
+  createSheetManualDescription: '빈 일정을 만들고 장소를 직접 담아요.',
   createCancel: '취소',
 
   fieldPet: '누구와 가나요',

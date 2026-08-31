@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 
-import { ButtonLink } from '@/components/button'
+import { Button } from '@/components/button'
 import { PlusIcon } from '@/components/icons'
 import { usePetList } from '@/features/pet/use-pet-list'
+import { PlanCreateSheet } from '@/features/plan/plan-create-sheet'
 import { PlanFilterRail, PlanPetChips, PlanStatusTabs } from '@/features/plan/plan-filter-controls'
 import { PlanListSection } from '@/features/plan/plan-list-section'
 import { usePlanList } from '@/features/plan/use-plan-list'
@@ -29,6 +30,8 @@ import { DEFAULT_PLAN_FILTERS, type PlanFilters } from '@/types/plan'
 export function PlanListView({ filters, today }: { filters: PlanFilters; today: Date }) {
   const router = useRouter()
   const pathname = usePathname()
+
+  const [creating, setCreating] = useState(false)
 
   const plansQuery = usePlanList()
   const petsQuery = usePetList()
@@ -116,23 +119,26 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
             반려견이 없으면 만들기로 보내지 않는다 — `POST /plans` 에 `petId` 가 필수라
             폼을 채울 수 없다. 빈 상태(`NoPlans`)가 등록으로 안내한다.
 
-            **만들기 방식 시트를 만들지 않았다.** 아트보드는 AI / 직접 두 항목을 시트로
-            고르게 하지만 AI 화면이 아직 없어 선택지가 하나뿐이다 — 항목이 하나인 시트는
-            한 번 더 누르게 할 뿐이다 (공통명세 S2).
+            **AI 일정 생성 화면(#84)이 생겨 만들기 방식 시트를 켰다.** 아트보드 04 대로
+            AI / 직접 두 항목을 시트로 고르게 한다. 그 전에는 선택지가 하나뿐이어서
+            시트를 두지 않았다 (공통명세 S2).
+
+            링크가 아니라 `Button` 인 이유: 이 버튼은 이동이 아니라 **시트를 여는
+            조작**이다. 이동은 시트 안의 두 링크가 한다 (#70 과 같은 기준).
           */}
           {pets.length > 0 && (
             <>
-              <ButtonLink href="/plans/new" className="hidden shrink-0 lg:inline-flex">
+              <Button className="hidden shrink-0 lg:inline-flex" onClick={() => setCreating(true)}>
                 {messages.plan.createAction}
-              </ButtonLink>
+              </Button>
               {/* 모바일은 44×44 아이콘 버튼 — 라벨이 보이지 않아 aria-label 로 준다 */}
-              <ButtonLink
-                href="/plans/new"
+              <Button
                 variant="ghost"
                 iconOnly
                 aria-label={messages.plan.createActionLabel}
                 leading={<PlusIcon size={24} />}
                 className="shrink-0 lg:hidden"
+                onClick={() => setCreating(true)}
               />
             </>
           )}
@@ -145,6 +151,8 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
 
         {section}
       </div>
+
+      <PlanCreateSheet open={creating} onClose={() => setCreating(false)} />
     </>
   )
 }

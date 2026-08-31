@@ -50,3 +50,14 @@ export function withObjectParticle(word: string): string {
 export function withSubjectParticle(word: string): string {
   return attach(word, '이', '가')
 }
+
+/**
+ * 동반격 조사 (와/과).
+ *
+ * **받침 규칙이 을/를·이/가와 반대다** — 받침이 있으면 "과", 없으면 "와" 다
+ * ("초코와" / "곰과"). AI 일정 제목 기본값이 반려견 이름으로 시작한다
+ * (`src/lib/ai-plan/draft-title.ts`).
+ */
+export function withCompanionParticle(word: string): string {
+  return attach(word, '과', '와')
+}

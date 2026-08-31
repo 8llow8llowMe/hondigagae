@@ -1,3 +1,4 @@
+import { aiPlanMessages } from '@/lib/messages/ai-plan'
 import { commonMessages } from '@/lib/messages/common'
 import { emergencyMessages } from '@/lib/messages/emergency'
 import { authMessages, formMessages } from '@/lib/messages/form'
@@ -33,6 +34,7 @@ export const messages = {
   home: homeMessages,
   place: placeMessages,
   plan: planMessages,
+  aiPlan: aiPlanMessages,
   emergency: emergencyMessages,
   pet: petMessages,
   member: memberMessages,

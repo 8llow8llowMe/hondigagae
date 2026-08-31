@@ -52,6 +52,9 @@ export type MockPet = {
  * **`day` 가 일정의 `totalDays` 를 넘을 수 있다.** 백엔드가 기간을 줄여도 항목을
  * 정리하지 않아 고아 항목이 실제로 생긴다 (`PlanCommandProcessor.updatePlan`) —
  * mock 도 그 상태를 재현해야 화면의 "여행 기간 밖 항목" 경로가 검증된다.
+ *
+ * **`targetId` 는 문자열이다.** 서버는 `Long` 이지만 Snowflake 라 `Number` 로 다루면
+ * 정밀도를 잃는다 (`nextMemberId` 와 같은 이유).
  */
 export type MockPlanItem = {
   planItemId: string
@@ -83,8 +86,35 @@ export type MockPlan = {
   endDate: string
   budget: number | null
   status: string
-  deleted: boolean
+  /**
+   * 일정 항목. **`POST /plans` 가 `items` 를 함께 받는다** — AI 초안 담기가 이 경로로
+   * 항목을 실어 보낸다 (ai-plan 명세 S5). 직접 만들기는 보내지 않아 빈 배열이다.
+   */
   items: MockPlanItem[]
+  deleted: boolean
+}
+
+/**
+ * 저장된 AI 일정 생성 작업.
+ *
+ * **`status` 는 code 만 들고 있다** — 응답을 만들 때 metadata 객체로 부풀린다
+ * (`MockPet`·`MockPlan` 과 같은 규칙).
+ *
+ * `pollCount` 는 조회 횟수다. mock 에 백그라운드 워커가 없으므로 **조회할 때마다
+ * 상태를 한 칸 진행시켜** PENDING → RUNNING → COMPLETED 전이를 재현한다.
+ */
+export type MockAiPlanJob = {
+  jobId: string
+  memberId: string
+  /** 시나리오. `normal` 은 완료, `failed` 는 실패, `partial` 은 일수보다 적은 결과 */
+  scenario: 'normal' | 'failed' | 'partial'
+  petId: string
+  areaCode: string
+  startDate: string
+  endDate: string
+  budget: number | null
+  requestNote: string | null
+  pollCount: number
 }
 
 export type MockStore = {
@@ -103,6 +133,10 @@ export type MockStore = {
   nextPlanSeq: number
   /** planItemId 조립용 순번 */
   nextPlanItemSeq: number
+  /** AI 일정 생성 작업. jobId 는 UUID 라 Snowflake 조립 규칙을 쓰지 않는다 */
+  aiPlanJobs: MockAiPlanJob[]
+  /** jobId 조립용 순번 */
+  nextAiPlanJobSeq: number
 }
 
 const STORE_KEY = Symbol.for('hondigagae.mock.store')
@@ -167,6 +201,17 @@ export function nextPlanItemId(store: MockStore): string {
  */
 const PLACE_ID_BASE = 212481712381923328n
 const placeId = (ordinal: number) => String(PLACE_ID_BASE + BigInt(ordinal))
+
+/**
+ * jobId. **백엔드는 UUID 를 쓴다**(`AiPlanSubmitResponse` 예시) — Snowflake 가 아니라
+ * 정밀도 문제가 없고, 경로 변수도 `@PathVariable String` 이다. 순번을 붙여 예측 가능하게
+ * 만들어 두면 개발 중 같은 작업을 다시 열기 쉽다.
+ */
+export function nextAiPlanJobId(store: MockStore): string {
+  const id = `8a64f9c0-2f1e-4c1a-9c3e-${String(store.nextAiPlanJobSeq).padStart(12, '0')}`
+  store.nextAiPlanJobSeq += 1
+  return id
+}
 
 function createStore(): MockStore {
   return {
@@ -442,8 +487,8 @@ function createStore(): MockStore {
         endDate: '2026-05-04',
         budget: 250000,
         status: 'COMPLETED',
-        deleted: false,
         items: [],
+        deleted: false,
       },
       {
         planId: '223456789012000004',
@@ -456,8 +501,8 @@ function createStore(): MockStore {
         endDate: '2026-04-11',
         budget: null,
         status: 'CONFIRMED',
-        deleted: false,
         items: [],
+        deleted: false,
       },
       {
         // 다른 회원의 일정 — 목록에 섞여 나오면 안 된다
@@ -471,12 +516,15 @@ function createStore(): MockStore {
         endDate: '2026-09-02',
         budget: null,
         status: 'DRAFT',
-        deleted: false,
         items: [],
+        deleted: false,
       },
     ],
     nextPlanSeq: 5,
+    // 항목 fixture 가 1~19 를 이미 쓴다. 1 로 두면 새로 담은 항목이 시드와 같은 id 를 받는다
     nextPlanItemSeq: 20,
+    aiPlanJobs: [],
+    nextAiPlanJobSeq: 1,
   }
 }
 
@@ -501,7 +549,9 @@ function isCurrentShape(store: MockStore | undefined): store is MockStore {
     // 켜 둔 개발 서버의 옛 상태가 그대로 굴러가 provider 가 undefined 로 읽힌다
     store.members.every((member) => 'provider' in member) &&
     // 일정 항목이 뒤에 추가됐다. HMR 로 살아남은 낡은 스토어는 버린다 (#59 와 같은 사고)
-    store.plans.every((plan) => Array.isArray(plan.items))
+    store.plans.every((plan) => Array.isArray(plan.items)) &&
+    // AI 작업 목록도 같은 이유로 본다
+    Array.isArray(store.aiPlanJobs)
   )
 }
 
