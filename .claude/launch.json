@@ -10,6 +10,16 @@
         "dev"
       ],
       "port": 3000
+    },
+    {
+      "name": "frontend-dev-alt",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "-C",
+        "frontend",
+        "dev:alt"
+      ],
+      "port": 5174
     }
   ]
 }

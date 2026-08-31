@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-import { type NavItem, toLoginHref, visibleDesktopItems } from '@/features/nav/menu-items'
+import { DESKTOP_NAV_ITEMS, type NavItem, toLoginHref } from '@/features/nav/menu-items'
 import { isActiveNav } from '@/lib/nav/active'
 import { cn } from '@/lib/utils/cn'
 
@@ -16,6 +16,10 @@ import { cn } from '@/lib/utils/cn'
  * **`내 반려견` 은 여기 없다.** nav 의 셋(장소 찾기·여행 일정·AI 일정 생성)은 *할 일*이고,
  * 내 반려견·마이페이지·로그아웃은 *내 설정*이라 우측 아바타 팝오버가 맡는다.
  * 같은 줄에 섞으면 nav 의 기준이 흐려져 항목이 계속 늘어난다.
+ *
+ * **미로그인에도 셋 다 그린다** (#116). 보호 항목은 `toLoginHref` 로 우회시킨다 — 모바일
+ * 탭이 이미 쓰는 방식이다. 아트보드는 숨기기를 지정했지만 그대로 두면 미로그인 헤더에
+ * `장소 찾기` 하나만 남아 AI 일정 생성의 존재가 드러나지 않는다 (명세 D4-2).
  */
 export function NavLinks({ authed }: { authed: boolean }) {
   const pathname = usePathname()
@@ -23,7 +27,7 @@ export function NavLinks({ authed }: { authed: boolean }) {
   return (
     <nav aria-label="주요" className="hidden md:block">
       <ul className="flex items-center gap-1">
-        {visibleDesktopItems(authed).map((item) => (
+        {DESKTOP_NAV_ITEMS.map((item) => (
           <li key={item.href}>
             <DesktopLink item={item} active={isActiveNav(pathname, item.href)} authed={authed} />
           </li>
