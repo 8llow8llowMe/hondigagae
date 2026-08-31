@@ -38,7 +38,10 @@ export function PlanEditableItemRow({
   entry: PlanDayEditItem
   index: number
   total: number
-  /** 장소 조회가 404 였다 — 저장이 `PLAN_004` 로 막힐 후보다 (E1) */
+  /**
+   * 장소를 가리키는데 `place` 요약이 오지 않았다 — 저장이 `PLAN_004` 로 막힐 후보다 (E1).
+   * **원인은 단정하지 않는다** — delisting 일 수도, tour-service 일시 장애일 수도 있다.
+   */
   missing: boolean
   /** 이동 후 포커스를 따라가게 하려고 호출부가 붙인다 */
   upRef: (node: HTMLButtonElement | null) => void

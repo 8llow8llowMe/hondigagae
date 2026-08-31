@@ -11,7 +11,6 @@ import { messages } from '@/lib/messages'
 import { placeMetaLine } from '@/lib/place/meta'
 import { isPlaceTarget, type PlanItemRowModel } from '@/lib/plan/detail'
 import { cn } from '@/lib/utils/cn'
-import type { PlaceDetail } from '@/types/place'
 
 /**
  * 일정 항목 행 — 아트보드 `혼디가개 여행 일정.dc.html` 01·02.
@@ -19,30 +18,23 @@ import type { PlaceDetail } from '@/types/place'
  * **2열이다** (썸네일 · 텍스트). 순번 원 + 썸네일 + 텍스트로 3열을 만들면 390 에서
  * 제목이 눌린다 — **순번은 썸네일 좌상단 칩**으로 얹는다 (아트보드 01 주석).
  *
- * **주소 · 이미지 · 좌표는 `PlanItemDetail` 에 없다.** 항목당 `GET /places/{placeId}`
- * 보강으로 따라오고, 그 조회가 실패하면 `place` 가 `undefined` 인 채로 온다 —
- * **행을 지우지 않고 제목만 남긴다.** 일정 자료는 우리 DB 이고 장소는 다른 서비스다
- * (공통명세 S8).
+ * **주소 · 이미지 · 좌표는 항목이 직접 들고 온다** (`item.place`, #86·#115). 예전에는
+ * 항목당 `GET /places/{placeId}` 보강으로 따라왔다. **`place` 는 통째로 `null` 일 수
+ * 있다** — `WALK`·`MOVE` 처럼 장소가 아닌 항목, 원천에서 사라진 장소, tour-service
+ * 장애 셋 다 `null` 이다. 그때도 **행을 지우지 않고 제목만 남긴다.** 일정 자료는 우리
+ * DB 이고 장소는 다른 서비스다 (공통명세 S8).
  *
- * **메타 줄은 `주소 · 실내` 다** (명세 D2). `indoor` 는 #16 으로 상세 응답에 들어왔고
- * 보강 결과에서 그대로 온다 (#112). **`null` 이면 낱말이 빠진다** — 여기에는 실내 필터가
- * 없어 "실내 여부 미확인" 배지를 둘 자리가 없다. 배지 없이 단정만 피한다
+ * **메타 줄은 `주소 · 실내` 다** (명세 D2). `indoor` 는 #16 으로 장소 응답에 들어왔고
+ * #86 이 항목 요약에도 실어 준다 (#112). **`null` 이면 낱말이 빠진다** — 여기에는 실내
+ * 필터가 없어 "실내 여부 미확인" 배지를 둘 자리가 없다. 배지 없이 단정만 피한다
  * (`lib/place/indoor.ts`).
  *
  * **`startTime` 을 표시하지 않는다** — 아트보드 헤더 주석이 "시간 없음" 으로 못박았다
  * (일정상세-세부명세 D8-9).
  */
-export function PlanItemRow({
-  model,
-  place,
-  last = false,
-}: {
-  model: PlanItemRowModel
-  /** 보강 결과. 아직 안 왔거나 실패했으면 `undefined` */
-  place: PlaceDetail | undefined
-  last?: boolean
-}) {
+export function PlanItemRow({ model, last = false }: { model: PlanItemRowModel; last?: boolean }) {
   const { item } = model
+  const { place } = item
   const hasImage = isAllowedImageHost(place?.firstImage ?? null)
   const meta = placeMetaLine(place?.addr1 ?? null, place?.indoor ?? null)
 

@@ -15,6 +15,7 @@ import type {
   PlanDayWeatherItem,
   PlanDetail,
   PlanItemDetail,
+  PlanItemPlace,
   PlanSummaryItem,
   PlanWeatherResponse,
 } from '@/types/plan'
@@ -81,6 +82,9 @@ const PLACE_TARGET_TYPES = new Set(['PLACE', 'MEAL', 'LODGING'])
 /** mock 이 아는 장소. 여기 없는 `targetId` 는 백엔드처럼 `PLAN_004` 로 막는다 */
 const KNOWN_PLACE_IDS = new Set(MOCK_PLACES.map((place) => place.placeId))
 
+/** placeId → 장소. 항목의 `place` 요약을 채울 때 쓴다 (#86) */
+const PLACE_BY_ID = new Map(MOCK_PLACES.map((place) => [place.placeId, place]))
+
 /** 총 일수(양끝 포함). `Plan.containsDay()` 와 같은 셈이어야 한다 */
 function daysBetween(startDate: string, endDate: string): number {
   const start = Date.parse(`${startDate}T00:00:00Z`)
@@ -117,6 +121,30 @@ function totalDaysOf(plan: MockPlan): number {
   return Math.round((end - start) / 86_400_000) + 1
 }
 
+/**
+ * 항목의 장소 요약 (#86). **백엔드가 tour-service 에 물어본 결과를 재현한다.**
+ *
+ * `null` 이 세 갈래다 — 화면이 셋을 구분하지 못한다는 사실 자체가 계약이라 mock 도
+ * 세 갈래를 다 낸다:
+ *  - 장소를 가리키지 않는 항목 (`WALK`·`MOVE`) → 물어볼 대상이 없다
+ *  - 원천에서 사라진(delisted) 장소 → `MOCK_PLACES` 에 없는 `targetId`
+ *  - tour-service 장애 → mock 에는 없지만 같은 모양(`place: null`)으로 온다
+ */
+function toItemPlace(item: MockPlanItem): PlanItemPlace | null {
+  if (item.targetId === null || !PLACE_TARGET_TYPES.has(item.itemType)) return null
+
+  const place = PLACE_BY_ID.get(item.targetId)
+  if (place === undefined) return null
+
+  return {
+    addr1: place.addr1,
+    indoor: place.indoor,
+    firstImage: place.firstImage,
+    lat: place.lat,
+    lng: place.lng,
+  }
+}
+
 function toItem(item: MockPlanItem): PlanItemDetail {
   return {
     planItemId: item.planItemId,
@@ -131,6 +159,7 @@ function toItem(item: MockPlanItem): PlanItemDetail {
     title: item.title,
     memo: item.memo,
     startTime: item.startTime,
+    place: toItemPlace(item),
   }
 }
 

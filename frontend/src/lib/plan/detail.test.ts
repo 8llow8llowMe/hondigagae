@@ -3,17 +3,23 @@ import { describe, expect, it } from 'vitest'
 import type { LatLng } from '@/lib/geo/coord'
 import { haversineMeters, isLongTrip, LONG_TRIP_THRESHOLD_M } from '@/lib/geo/distance'
 import {
-  enrichTargetIds,
+  alternativePlaceIds,
   groupItemsByDay,
+  hasUnresolvedPlace,
   isPlaceTarget,
   lodgingBasisFor,
   toItemRows,
 } from '@/lib/plan/detail'
-import type { PlanItemDetail } from '@/types/plan'
+import { planAlternative } from '@/test/fixtures/plan'
+import type { PlanItemDetail, PlanItemPlace } from '@/types/plan'
 
 const JEJU_AIRPORT: LatLng = { lat: 33.507, lng: 126.493 }
 const SEONGSAN: LatLng = { lat: 33.458, lng: 126.9425 }
 
+/**
+ * **`place` 의 기본값은 `null` 이다.** 거리를 보는 테스트만 좌표를 실어 준다 —
+ * 그래야 어느 항목이 좌표를 갖는지가 케이스마다 눈에 보인다.
+ */
 function item(overrides: Partial<PlanItemDetail> & { day: number; sequence: number }) {
   const type = overrides.itemType?.code ?? 'PLACE'
   return {
@@ -22,9 +28,15 @@ function item(overrides: Partial<PlanItemDetail> & { day: number; sequence: numb
     title: '어딘가',
     memo: null,
     startTime: null,
+    place: null,
     ...overrides,
     itemType: overrides.itemType ?? { code: type, name: type, description: '' },
   } satisfies PlanItemDetail
+}
+
+/** 좌표만 있는 장소 요약. 거리 계산에 필요한 것은 lat/lng 뿐이다 */
+function placeAt(coord: LatLng): PlanItemPlace {
+  return { addr1: null, indoor: null, firstImage: null, lat: coord.lat, lng: coord.lng }
 }
 
 describe('haversineMeters', () => {
@@ -66,7 +78,7 @@ describe('isLongTrip — 30km 임계값', () => {
   })
 })
 
-describe('isPlaceTarget · enrichTargetIds — 보강 대상', () => {
+describe('isPlaceTarget — 장소를 가리키는 항목', () => {
   it('PLACE · MEAL · LODGING 만 장소다', () => {
     for (const code of ['PLACE', 'MEAL', 'LODGING']) {
       expect(isPlaceTarget(item({ day: 1, sequence: 0, itemType: meta(code) }))).toBe(true)
@@ -81,19 +93,46 @@ describe('isPlaceTarget · enrichTargetIds — 보강 대상', () => {
     expect(isPlaceTarget(item({ day: 1, sequence: 0, itemType: meta('MOVE') }))).toBe(false)
   })
 
-  it('targetId 가 null 이면 부르지 않는다', () => {
+  it('targetId 가 null 이면 장소가 아니다', () => {
     expect(isPlaceTarget(item({ day: 1, sequence: 0, targetId: null }))).toBe(false)
   })
+})
 
-  it('중복 targetId 는 한 번만 조회한다', () => {
-    const ids = enrichTargetIds([
-      item({ day: 1, sequence: 0, targetId: 'a' }),
-      item({ day: 2, sequence: 0, targetId: 'a' }),
-      item({ day: 2, sequence: 1, targetId: 'b' }),
-      item({ day: 2, sequence: 2, targetId: 'c', itemType: meta('WALK') }),
+describe('hasUnresolvedPlace — 장소 요약이 오지 않은 항목 (#115)', () => {
+  it('장소를 가리키는데 place 가 비면 결손이다 — PLAN_004 후보다', () => {
+    expect(hasUnresolvedPlace(item({ day: 1, sequence: 0, place: null }))).toBe(true)
+  })
+
+  it('요약이 왔으면 결손이 아니다', () => {
+    const resolved = item({ day: 1, sequence: 0, place: placeAt(SEONGSAN) })
+
+    expect(hasUnresolvedPlace(resolved)).toBe(false)
+  })
+
+  it('WALK · MOVE 의 null 은 결손이 아니다 — 애초에 물어볼 장소가 없다', () => {
+    for (const code of ['WALK', 'MOVE']) {
+      expect(hasUnresolvedPlace(item({ day: 1, sequence: 0, itemType: meta(code) }))).toBe(false)
+    }
+  })
+
+  it('targetId 가 없으면 결손이 아니다', () => {
+    expect(hasUnresolvedPlace(item({ day: 1, sequence: 0, targetId: null }))).toBe(false)
+  })
+})
+
+describe('alternativePlaceIds — 실내 대안만 보강한다 (#115)', () => {
+  it('중복 placeId 는 한 번만 조회한다 — 같은 장소가 두 일자의 대안일 수 있다', () => {
+    const ids = alternativePlaceIds([
+      planAlternative({ placeId: 'a' }),
+      planAlternative({ placeId: 'b' }),
+      planAlternative({ placeId: 'a' }),
     ])
 
     expect(ids).toEqual(['a', 'b'])
+  })
+
+  it('대안이 없으면 요청도 없다', () => {
+    expect(alternativePlaceIds([])).toEqual([])
   })
 })
 
@@ -189,47 +228,56 @@ describe('lodgingBasisFor — 숙소 기준점', () => {
   })
 })
 
-describe('toItemRows — 거리', () => {
-  const airport = item({ day: 1, sequence: 0, targetId: 'air', title: '공항' })
-  const seongsan = item({ day: 1, sequence: 1, targetId: 'seong', title: '성산' })
+describe('toItemRows — 거리는 항목이 들고 온 좌표로 잰다 (#115)', () => {
+  const airport = item({ day: 1, sequence: 0, title: '공항', place: placeAt(JEJU_AIRPORT) })
+  const seongsan = item({ day: 1, sequence: 1, title: '성산', place: placeAt(SEONGSAN) })
   const lodging = item({
     day: 1,
     sequence: 2,
-    targetId: 'air',
     title: '숙소',
     itemType: meta('LODGING'),
+    place: placeAt(JEJU_AIRPORT),
   })
 
-  const coords: Record<string, LatLng> = { air: JEJU_AIRPORT, seong: SEONGSAN }
-  const coordOf = (entry: PlanItemDetail) =>
-    entry.targetId === null ? null : (coords[entry.targetId] ?? null)
-
   it('첫 항목은 숙소 기준이다', () => {
-    const [first] = toItemRows([seongsan], coordOf, lodging)
+    const [first] = toItemRows([seongsan], lodging)
 
     expect(first?.distanceKind).toBe('lodging')
     expect(first?.distanceMeters as number).toBeGreaterThan(41_000)
   })
 
   it('숙소가 없으면 첫 항목에 거리를 붙이지 않는다', () => {
-    const [first] = toItemRows([seongsan], coordOf, null)
+    const [first] = toItemRows([seongsan], null)
 
     expect(first?.distanceKind).toBeNull()
     expect(first?.distanceMeters).toBeNull()
   })
 
   it('2번째부터는 직전 항목 기준이다', () => {
-    const rows = toItemRows([airport, seongsan], coordOf, null)
+    const rows = toItemRows([airport, seongsan], null)
 
     expect(rows[1]?.distanceKind).toBe('previous')
     expect(rows[1]?.distanceMeters as number).toBeGreaterThan(41_000)
   })
 
-  it('좌표를 모르면 거리도 기준도 말하지 않는다 — 행은 살아남는다', () => {
-    const unknown = item({ day: 1, sequence: 1, targetId: 'nope', title: '모름' })
-    const rows = toItemRows([airport, unknown], coordOf, null)
+  it('place 가 비면 거리도 기준도 말하지 않는다 — 행은 살아남는다', () => {
+    const unknown = item({ day: 1, sequence: 1, title: '모름', place: null })
+    const rows = toItemRows([airport, unknown], null)
 
     expect(rows).toHaveLength(2)
+    expect(rows[1]?.distanceMeters).toBeNull()
+    expect(rows[1]?.distanceKind).toBeNull()
+  })
+
+  it('place 는 왔는데 좌표가 없으면 거리를 만들지 않는다 — 원천에 좌표가 없는 장소다', () => {
+    const noCoord = item({
+      day: 1,
+      sequence: 1,
+      title: '좌표 없음',
+      place: { addr1: '제주시 어딘가', indoor: null, firstImage: null, lat: null, lng: null },
+    })
+    const rows = toItemRows([airport, noCoord], null)
+
     expect(rows[1]?.distanceMeters).toBeNull()
     expect(rows[1]?.distanceKind).toBeNull()
   })

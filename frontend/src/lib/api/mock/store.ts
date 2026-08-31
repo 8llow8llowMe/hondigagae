@@ -413,6 +413,9 @@ function createStore(): MockStore {
            - 1일차 2번째: 직전 항목 기준
            - 2일차 첫 항목: 1일차 숙소 기준, **45km 라 긴 이동 경고**
            - 2일차 WALK: targetId 가 walk_course.id 라 /places 를 부르면 안 된다
+           - 2일차 마지막: **MOCK_PLACES 에 없는 targetId** — 원천에서 사라진(delisted)
+             장소다. 상세 응답의 `place` 가 null 로 오는 갈래(#86·#115)와, 그 일자를
+             저장하면 PLAN_004 로 막히는 편집모드 안내(E1)를 로컬에서 볼 수 있다
            - 3일차: 항목 0개 (빈 일자 안내)
         */
         items: [
@@ -467,13 +470,28 @@ function createStore(): MockStore {
             startTime: null,
           },
           {
-            // WALK 는 walk_course.id 다. 장소 보강 대상이 아니다
+            // WALK 는 walk_course.id 다. 장소를 가리키지 않아 place 가 null 이다
             planItemId: '323456789012000006',
             day: 2,
             sequence: 2,
             itemType: 'WALK',
             targetId: '777777777777000001',
             title: '오설록 주변 산책',
+            memo: null,
+            startTime: null,
+          },
+          {
+            /*
+              **원천에서 사라진 장소다.** `MOCK_PLACES` 에 없는 id 라 상세 응답의
+              `place` 가 null 로 오고, 그 일자를 저장하면 `PLAN_004` 로 막힌다 —
+              담을 때는 있었지만 그 뒤 delisting 된 항목이 실제로 이 모양이다.
+            */
+            planItemId: '323456789012000011',
+            day: 2,
+            sequence: 3,
+            itemType: 'PLACE',
+            targetId: '212481712381923399',
+            title: '사라진 전시관',
             memo: null,
             startTime: null,
           },

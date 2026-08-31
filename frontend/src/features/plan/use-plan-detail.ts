@@ -5,7 +5,6 @@ import { useQueries, useQuery } from '@tanstack/react-query'
 import { PLACE_QUERY_OPTIONS, placeKeys } from '@/features/place/queries'
 import { PLAN_QUERY_OPTIONS, planKeys } from '@/features/plan/queries'
 import { clientFetch } from '@/lib/api/client'
-import { ApiError } from '@/lib/api/error'
 import { placeDetailPath } from '@/lib/api/place'
 import { fetchPlanDetail, fetchPlanWeather } from '@/lib/api/plan'
 import type { PlaceDetail } from '@/types/place'
@@ -43,25 +42,22 @@ export function usePlanWeather(planId: string) {
 }
 
 /**
- * 항목 보강 — 항목당 `GET /places/{placeId}`.
+ * 장소 보강 — 장소당 `GET /places/{placeId}`.
  *
- * `PlanItemDetail` 에는 주소 · 실내 여부 · 이미지 · 좌표가 없고 배치 조회 API 도 없다.
+ * **실내 대안 전용이다** (#115). 일정 항목은 상세 응답이 `place` 요약을 함께 주므로
+ * (#86) 더 이상 여기 들어오지 않는다 — 3일·6항목이면 왕복 6번이던 것이 0번이 됐다.
+ * 남은 것은 `indoorAlternatives` 뿐인데, 그쪽은 `{placeId, title, lat, lng,
+ * distanceMeters}` 라 주소·실내 여부를 말하려면 여전히 조회가 필요하다.
  *
  * **key 를 `placeKeys.detail` 로 재사용한다** — 장소 상세 화면과 캐시를 공유해서,
- * 상세를 보고 온 항목은 요청이 아예 나가지 않고 여기서 본 장소는 상세로 이동할 때
+ * 상세를 보고 온 장소는 요청이 아예 나가지 않고 여기서 본 장소는 상세로 이동할 때
  * 즉시 뜬다.
  *
- * **실패한 항목은 결과 맵에서 빠질 뿐 행은 살아남는다** — 일정 자료는 우리 DB 이고
+ * **실패한 장소는 결과 맵에서 빠질 뿐 행은 살아남는다** — 일정 자료는 우리 DB 이고
  * 장소는 다른 서비스다 (공통명세 S8).
- *
- * **404 를 낸 id 를 따로 모은다.** 일괄 교체 저장은 delisting 된 장소가 하나라도 섞여
- * 있으면 `PLAN_004` 로 막히는데 **서버가 어느 항목인지 알려주지 않는다.** 여기서 404 가
- * 난 항목이 원인 후보라, 편집모드가 그 행을 미리 짚어 준다 (일자편집-세부명세 E1).
  */
 export function usePlaceEnrichment(placeIds: string[]): {
   places: Map<string, PlaceDetail>
-  /** 조회가 404 로 실패한 placeId. 5xx 는 넣지 않는다 — 그건 일시 장애다 */
-  missing: Set<string>
   pending: boolean
 } {
   const queries = useQueries({
@@ -74,19 +70,9 @@ export function usePlaceEnrichment(placeIds: string[]): {
   })
 
   const places = new Map<string, PlaceDetail>()
-  const missing = new Set<string>()
+  for (const query of queries) {
+    if (query.data !== undefined) places.set(query.data.placeId, query.data)
+  }
 
-  queries.forEach((query, index) => {
-    if (query.data !== undefined) {
-      places.set(query.data.placeId, query.data)
-      return
-    }
-    // 일시 장애(5xx)와 원천에서 사라진 것(404)은 다르다. 404 만 "없는 장소" 다
-    const placeId = placeIds[index]
-    if (placeId !== undefined && query.error instanceof ApiError && query.error.status === 404) {
-      missing.add(placeId)
-    }
-  })
-
-  return { places, missing, pending: queries.some((query) => query.isPending) }
+  return { places, pending: queries.some((query) => query.isPending) }
 }

@@ -5,6 +5,7 @@ import type {
   PlanDayWeatherItem,
   PlanDetail,
   PlanItemDetail,
+  PlanItemPlace,
 } from '@/types/plan'
 
 /**
@@ -19,6 +20,26 @@ function typeMeta(code: string, name: string) {
   return { code, name, description: null }
 }
 
+/**
+ * 항목의 장소 요약 (#86). `placeDetail` fixture 와 **같은 장소**를 쓴다 — 두 화면이
+ * 같은 주소를 다르게 말하면 어느 쪽이 맞는지 테스트가 알려주지 못한다.
+ */
+export function planItemPlace(overrides: Partial<PlanItemPlace> = {}): PlanItemPlace {
+  return {
+    addr1: '제주특별자치도 제주시 한림읍 용금로 906-107',
+    indoor: true,
+    firstImage: null,
+    lat: 33.3608276172,
+    lng: 126.7818122232,
+    ...overrides,
+  }
+}
+
+/**
+ * **`place` 의 기본값은 요약이 온 상태다.** 오지 않은 상태(`null`)를 검증하려면
+ * `planItem({ ..., place: null })` 로 덮어쓴다 — `WALK`·`MOVE`, delisting,
+ * tour-service 장애가 전부 그 모양이다.
+ */
 export function planItem(
   overrides: Partial<PlanItemDetail> & { planItemId: string; day: number; sequence: number },
 ): PlanItemDetail {
@@ -28,6 +49,7 @@ export function planItem(
     title: '제주현대미술관',
     memo: null,
     startTime: null,
+    place: planItemPlace(),
     ...overrides,
   }
 }

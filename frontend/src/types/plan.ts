@@ -224,6 +224,26 @@ export type PlanDetail = {
   items: PlanItemDetail[]
 }
 
+/**
+ * 일정 항목이 가리키는 장소 요약 (#86).
+ *
+ * **필드명이 tour-service 의 장소와 같다** — 백엔드가 일부러 맞췄다
+ * (`PlanItemPlaceItem` javadoc). 같은 값을 두 API 에서 다른 이름으로 받으면 FE 가
+ * 변환 계층을 하나 더 만들게 되므로 **여기서도 이름을 바꾸지 않는다.**
+ */
+export type PlanItemPlace = {
+  addr1: string | null
+  /**
+   * **`null` 은 "실외" 가 아니라 "원천에 정보가 없다" 는 뜻이다** — `false` 와 다르게
+   * 다뤄야 한다. 판정은 `lib/place/indoor.ts` 에 있다 (#112).
+   */
+  indoor: boolean | null
+  firstImage: string | null
+  /** 항목 간 이동 거리 계산에 쓴다 */
+  lat: number | null
+  lng: number | null
+}
+
 /** 일정 항목. `targetId` 는 이동 항목처럼 대상이 없으면 null 이다 */
 export type PlanItemDetail = {
   planItemId: string
@@ -236,6 +256,15 @@ export type PlanItemDetail = {
   memo: string | null
   /** `HH:mm:ss` */
   startTime: string | null
+  /**
+   * 항목이 가리키는 장소 요약 (#86). **객체 통째로 `null` 이 될 수 있다.**
+   *
+   * ① `WALK`·`MOVE` 처럼 장소를 가리키지 않는 항목, ② 원천에서 사라진(delisted) 장소,
+   * ③ **tour-service 장애로 백엔드가 비운 경우** — 셋 다 `null` 이다. 즉 `null` 이
+   * "장소가 없다" 를 뜻하지 않는다. **그때도 항목은 응답에 남고, 화면도 행을 지우지
+   * 않는다** (공통명세 S8).
+   */
+  place: PlanItemPlace | null
 }
 
 /**
