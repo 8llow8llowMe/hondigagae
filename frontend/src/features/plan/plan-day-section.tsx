@@ -68,7 +68,7 @@ export function PlanDaySection({
   /** `YYYY-MM-DD`. 서버 판정의 날짜가 아니라 일정 기간에서 계산한 값이다 */
   date: string | null
   rows: PlanItemRowModel[]
-  /** placeId → 보강 결과. 없으면 그 항목은 제목만 남는다 */
+  /** placeId → 보강 결과. **실내 대안 전용이다** — 항목은 자기 `place` 를 들고 온다 */
   places: Map<string, PlaceDetail>
   verdict: PlanDayWeatherItem | undefined
   petConditionApplied: boolean
@@ -134,12 +134,7 @@ export function PlanDaySection({
       ) : (
         <RowList className="border-border -mx-4 border-t md:-mx-10">
           {rows.map((row, index) => (
-            <PlanItemRow
-              key={row.item.planItemId}
-              model={row}
-              place={row.item.targetId === null ? undefined : places.get(row.item.targetId)}
-              last={index === rows.length - 1}
-            />
+            <PlanItemRow key={row.item.planItemId} model={row} last={index === rows.length - 1} />
           ))}
         </RowList>
       )}

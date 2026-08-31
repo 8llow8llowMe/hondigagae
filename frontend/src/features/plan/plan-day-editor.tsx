@@ -8,6 +8,7 @@ import { PlanEditableItemRow } from '@/features/plan/plan-editable-item-row'
 import type { PlanDayEditFocus } from '@/features/plan/use-plan-day-edit'
 import { messages } from '@/lib/messages'
 import type { PlanDayEditItem } from '@/lib/plan/day-items'
+import { hasUnresolvedPlace } from '@/lib/plan/detail'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 
 /**
@@ -20,7 +21,6 @@ import type { PlanDaySaveError } from '@/lib/plan/save-error'
  */
 export function PlanDayEditor({
   items,
-  missing,
   dirty,
   saving,
   error,
@@ -33,8 +33,6 @@ export function PlanDayEditor({
   onCancel,
 }: {
   items: PlanDayEditItem[]
-  /** 장소 조회가 404 인 placeId — 저장이 `PLAN_004` 로 막힐 후보다 */
-  missing: Set<string>
   dirty: boolean
   saving: boolean
   error: PlanDaySaveError | null
@@ -85,7 +83,7 @@ export function PlanDayEditor({
             entry={entry}
             index={index}
             total={items.length}
-            missing={entry.item.targetId !== null && missing.has(entry.item.targetId)}
+            missing={hasUnresolvedPlace(entry.item)}
             upRef={(node) => {
               upRefs.current[index] = node
             }}

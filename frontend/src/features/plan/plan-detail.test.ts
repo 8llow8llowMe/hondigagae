@@ -136,15 +136,20 @@ function renderItemRow(overrides = {}) {
   return renderToStaticMarkup(
     createElement(PlanItemRow, {
       model: { item: planDetail.items[0]!, distanceMeters: null, distanceKind: null },
-      place: undefined,
       ...overrides,
     }),
   )
 }
 
 describe('PlanItemRow', () => {
-  it('장소 조회가 실패해도 제목을 남기고 행을 지우지 않는다', () => {
-    const markup = renderItemRow()
+  it('place 가 비어 와도 제목을 남기고 행을 지우지 않는다', () => {
+    const markup = renderItemRow({
+      model: {
+        item: { ...planDetail.items[0]!, place: null },
+        distanceMeters: null,
+        distanceKind: null,
+      },
+    })
 
     expect(markup).toContain('김창열미술관')
   })

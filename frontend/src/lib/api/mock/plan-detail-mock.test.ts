@@ -5,7 +5,7 @@ import { resetMockStore } from '@/lib/api/mock/store'
 import type { PlanDetail, PlanWeatherResponse } from '@/types/plan'
 
 const TOKEN = 'mock-access-900000000000000001'
-/** 3일 일정 (2026-09-12 ~ 09-14), 항목 6개 */
+/** 3일 일정 (2026-09-12 ~ 09-14), 항목 7개 — WALK 1개와 delisted 장소 1개를 포함한다 */
 const PLAN = '223456789012000001'
 /** 2일 일정인데 3일차 고아 항목이 있다 */
 const ORPHAN_PLAN = '223456789012000002'
@@ -60,6 +60,31 @@ describe('일정 상세 mock — 조회', () => {
     const walk = detailOf(PLAN).items.find((item) => item.itemType.code === 'WALK')
 
     expect(walk?.itemType.name).toBe('산책')
+  })
+
+  it('장소 항목에 place 요약을 실어 준다 — FE 가 항목마다 조회하지 않게 (#86)', () => {
+    const museum = detailOf(PLAN).items.find(
+      (item) => item.title === '제주특별자치도립김창열미술관',
+    )
+
+    expect(museum?.place?.addr1).toContain('한림읍')
+    expect(museum?.place?.indoor).toBe(true)
+    expect(museum?.place?.lat).not.toBeNull()
+  })
+
+  it('WALK 는 place 가 null 이다 — targetId 가 walk_course.id 라 물어볼 장소가 없다', () => {
+    const walk = detailOf(PLAN).items.find((item) => item.itemType.code === 'WALK')
+
+    expect(walk).toBeDefined()
+    expect(walk?.place).toBeNull()
+  })
+
+  it('사라진(delisted) 장소는 place 가 null 이지만 항목은 남는다', () => {
+    const delisted = detailOf(PLAN).items.find((item) => item.title === '사라진 전시관')
+
+    expect(delisted).toBeDefined()
+    expect(delisted?.targetId).not.toBeNull()
+    expect(delisted?.place).toBeNull()
   })
 
   it('기간 밖 항목을 그대로 내려준다 — 서버가 정리하지 않는 상태를 재현한다', () => {

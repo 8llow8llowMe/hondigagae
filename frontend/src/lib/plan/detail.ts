@@ -1,9 +1,9 @@
-import type { LatLng } from '@/lib/geo/coord'
+import { type LatLng, toLatLng } from '@/lib/geo/coord'
 import { haversineMeters } from '@/lib/geo/distance'
 import type { PlanAlternativePlaceItem, PlanItemDetail } from '@/types/plan'
 
 /**
- * 일정 상세의 순수 로직 — 일자 그룹핑 · 보강 대상 선별 · 거리 계산.
+ * 일정 상세의 순수 로직 — 일자 그룹핑 · 거리 계산 · 결손 판정.
  *
  * **렌더와 분리한다.** 여기 담긴 규칙(어떤 항목이 장소인가, 어디서부터 잰 거리인가,
  * 기간 밖 항목이 무엇인가)은 전부 계약 해석이라 문자열 assertion 이 아니라 값으로
@@ -21,30 +21,44 @@ const PLACE_TARGET_TYPES = new Set(['PLACE', 'MEAL', 'LODGING'])
 
 const LODGING_TYPE = 'LODGING'
 
-/** 장소 보강(`GET /places/{id}`) 대상인가 */
+/**
+ * `targetId` 가 장소를 가리키는 항목인가.
+ *
+ * **더 이상 보강 대상 판정이 아니다** (#115). 항목의 장소 요약은 상세 응답이 함께
+ * 주므로(`item.place`) 여기서 쓰는 곳은 **장소 링크를 걸어도 되는가**와 **`place` 가
+ * 비었을 때 그것이 결손인가**를 가르는 자리다.
+ */
 export function isPlaceTarget(item: PlanItemDetail): boolean {
   return PLACE_TARGET_TYPES.has(item.itemType.code) && item.targetId !== null
 }
 
 /**
- * 보강할 장소 id 목록. **중복을 제거한다** — 같은 장소를 두 일자에 담을 수 있고,
- * 그때 같은 요청을 두 번 보낼 이유가 없다.
+ * 장소를 가리키는데 그 요약이 오지 않은 항목.
  *
- * **실내 대안도 같은 목록에 넣는다** (#82 F1). `indoorAlternatives` 는
- * `{placeId, title}` 뿐이라 주소·실내 여부를 말하려면 똑같이 `GET /places/{id}` 가
- * 필요하다. 별도 `useQueries` 를 두면 **이미 항목으로 담긴 대안을 두 번 조회한다** —
- * 여기서 합쳐 중복을 없앤다.
+ * `place === null` 만으로는 판정할 수 없다 — **`WALK`·`MOVE` 도 `null` 이다.**
+ * 장소를 가리키는 항목에서만 `null` 이 결손을 뜻한다.
+ *
+ * **원인을 단정하지 않는다.** 원천에서 사라졌을(delisted) 수도, tour-service 가
+ * 일시 장애일 수도 있고 응답은 둘을 구분하지 않는다. 편집모드가 `PLAN_004` 후보를
+ * 미리 짚는 데 쓰지만(E1) 문구는 "조회되지 않아요" 까지만 말한다.
  */
-export function enrichTargetIds(
-  items: PlanItemDetail[],
-  alternatives: PlanAlternativePlaceItem[] = [],
-): string[] {
-  const ids = new Set<string>()
-  for (const item of items) {
-    if (isPlaceTarget(item) && item.targetId !== null) ids.add(item.targetId)
-  }
-  for (const alternative of alternatives) ids.add(alternative.placeId)
-  return [...ids]
+export function hasUnresolvedPlace(item: PlanItemDetail): boolean {
+  return isPlaceTarget(item) && item.place === null
+}
+
+/**
+ * 보강할 장소 id 목록 — **실내 대안 전용이다** (#82 F1).
+ *
+ * 항목은 여기 들어오지 않는다. `GET /plans/{planId}` 가 항목마다 `place` 를 함께
+ * 주므로(#86) 항목당 `GET /places/{id}` 는 #115 에서 걷어냈다. 반면
+ * `indoorAlternatives` 는 `{placeId, title, lat, lng, distanceMeters}` 뿐이라
+ * 주소·실내 여부를 말하려면 여전히 조회가 필요하다.
+ *
+ * **중복을 제거한다** — 같은 장소가 두 일자의 대안일 수 있고, 그때 같은 요청을 두 번
+ * 보낼 이유가 없다.
+ */
+export function alternativePlaceIds(alternatives: PlanAlternativePlaceItem[]): string[] {
+  return [...new Set(alternatives.map((alternative) => alternative.placeId))]
 }
 
 export type PlanDayGroup = {
@@ -140,12 +154,14 @@ export type PlanItemRowModel = {
  * - 첫 항목 → 숙소 기준 (`숙소에서 직선 N km`). 숙소가 없거나 좌표가 없으면 문구 없음
  * - 2번째부터 → 직전 항목 기준 (`직선 N km 이동`)
  *
- * `coordOf` 는 보강 결과에서 좌표를 꺼내는 함수다. 아직 안 왔거나 실패했으면 `null` 을
- * 주면 되고, **그 행은 거리 없이 살아남는다** — 장소 조회 실패로 항목을 지우지 않는다.
+ * **좌표는 항목이 직접 들고 온다** (`item.place.lat/lng`, #86). 예전에는 호출부가
+ * 보강 결과 맵을 `coordOf` 로 넘겼는데, 이제 상세 응답 안에 있으므로 주입할 것이 없다.
+ *
+ * `place` 가 비었거나 좌표가 없으면 **그 행은 거리 없이 살아남는다** — 장소 요약이
+ * 없다고 항목을 지우지 않는다 (공통명세 S8).
  */
 export function toItemRows(
   items: PlanItemDetail[],
-  coordOf: (item: PlanItemDetail) => LatLng | null,
   lodgingBasis: PlanItemDetail | null,
 ): PlanItemRowModel[] {
   return items.map((item, index) => {
@@ -162,4 +178,9 @@ export function toItemRows(
       ? { item, distanceMeters: null, distanceKind: null }
       : { item, distanceMeters: meters, distanceKind: kind }
   })
+}
+
+/** 항목의 좌표. `place` 가 없거나 좌표가 비면 `null` 이고 그 행은 거리를 갖지 않는다 */
+function coordOf(item: PlanItemDetail): LatLng | null {
+  return item.place === null ? null : toLatLng(item.place)
 }

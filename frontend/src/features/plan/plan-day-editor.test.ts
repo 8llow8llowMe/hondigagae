@@ -16,7 +16,6 @@ function render(overrides: Record<string, unknown> = {}) {
   return renderToStaticMarkup(
     createElement(PlanDayEditor, {
       items: ITEMS,
-      missing: new Set<string>(),
       dirty: true,
       saving: false,
       error: null,
@@ -79,9 +78,24 @@ describe('PlanDayEditor — 편집 중 화면', () => {
   })
 
   it('조회되지 않는 항목을 편집 진입 시 미리 짚는다 (PLAN_004 후보)', () => {
-    const markup = render({ missing: new Set([planDetail.items[0]?.targetId]) })
+    // 장소를 가리키는데 `place` 가 비었다 — delisting 이거나 tour-service 장애다 (#115)
+    const markup = render({ items: toEditItems([{ ...planDetail.items[0]!, place: null }]) })
 
     expect(markup).toContain(messages.plan.editMissingPlaceMark)
+  })
+
+  it('요약이 온 항목에는 붙이지 않는다 — 멀쩡한 행을 문제처럼 보이게 하지 않는다', () => {
+    expect(render()).not.toContain(messages.plan.editMissingPlaceMark)
+  })
+
+  it('WALK 는 place 가 비어도 짚지 않는다 — 애초에 물어볼 장소가 없다', () => {
+    const walk = {
+      ...planDetail.items[0]!,
+      itemType: { code: 'WALK', name: '산책', description: null },
+      place: null,
+    }
+
+    expect(render({ items: toEditItems([walk]) })).not.toContain(messages.plan.editMissingPlaceMark)
   })
 
   it('변경이 없으면 저장을 잠그고 그 이유를 aria-describedby 로 준다', () => {

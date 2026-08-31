@@ -9,7 +9,7 @@ import { useAnchorScroll } from '@/features/plan/use-anchor-scroll'
 import { usePlaceEnrichment, usePlanDetail, usePlanWeather } from '@/features/plan/use-plan-detail'
 import { ApiError } from '@/lib/api/error'
 import { messages } from '@/lib/messages'
-import { enrichTargetIds } from '@/lib/plan/detail'
+import { alternativePlaceIds } from '@/lib/plan/detail'
 
 /**
  * 일정 상세 — 조회 3종을 묶는 껍데기.
@@ -18,7 +18,7 @@ import { enrichTargetIds } from '@/lib/plan/detail'
  *  - 일정 본문 5xx → 화면 전체 `ErrorState`
  *  - 판정 5xx → **일자 섹션 안에만** 인라인 (아트보드 06 ③)
  *  - 반려견 조회 실패 → 카드만 빠진다
- *  - 항목 장소 조회 실패 → 제목만 남고 행은 유지된다
+ *  - 항목의 `place` 가 비어 옴 → 주소 없이 제목만 남고 행은 유지된다 (#86·#115)
  *
  * 404 는 여기 오지 않는다 — `page.tsx` 가 `notFound()` 로 보낸다.
  */
@@ -27,24 +27,20 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
   const weather = usePlanWeather(planId)
   const pets = usePetList()
 
-  const items = detail.data?.items ?? []
   /*
-    **실내 대안도 같이 보강한다** (#82 F1). `indoorAlternatives` 는 `{placeId, title}` 뿐이라
-    주소를 말하려면 항목과 똑같이 `GET /places/{id}` 가 필요하다. 한 목록으로 합쳐야
-    이미 담긴 대안을 두 번 조회하지 않는다 — 판정이 늦게 오면 목록이 늘어나고 그때
-    새 id 만 요청이 나간다.
+    **보강은 실내 대안만 남았다** (#115). 항목은 상세 응답이 `place` 요약을 함께 주지만
+    (#86) `indoorAlternatives` 는 `{placeId, title, lat, lng, distanceMeters}` 뿐이라
+    주소를 말하려면 여전히 `GET /places/{id}` 가 필요하다. 판정이 늦게 오면 목록이
+    늘어나고 그때 새 id 만 요청이 나간다.
   */
   const alternatives = weather.data?.days.flatMap((day) => day.indoorAlternatives) ?? []
-  const {
-    places,
-    missing,
-    pending: enriching,
-  } = usePlaceEnrichment(enrichTargetIds(items, alternatives))
+  const { places, pending: enriching } = usePlaceEnrichment(alternativePlaceIds(alternatives))
 
   /*
     **세 조회가 모두 앉은 뒤** 해시 앵커로 다시 맞춘다. 늦게 도착하는 것이 전부 앵커 위
-    콘텐츠를 키우기 때문이다 — 보강은 행마다 주소·거리 줄을 더하고, **판정은 일자마다
-    브리핑 블록을 통째로 더한다.**
+    콘텐츠를 키우기 때문이다 — 보강은 실내 대안 행마다 주소 줄을 더하고, **판정은
+    일자마다 브리핑 블록을 통째로 더한다.** (항목의 주소·거리 줄은 #115 이후 상세
+    응답과 함께 오므로 더 이상 늦게 자라지 않는다.)
 
     **`weather.isFetching` 까지 봐야 한다.** 담기 성공은 판정을 invalidate 하므로
     (항목이 늘면 그날 기준 장소가 바뀐다) 돌아온 직후 판정이 다시 날아온다. 보강만 보고
@@ -95,7 +91,6 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
       pet={pet}
       petPending={pets.isPending}
       places={places}
-      missingPlaces={missing}
       weather={weather.data}
       weatherFailed={weather.isError}
       onRetryWeather={() => void weather.refetch()}

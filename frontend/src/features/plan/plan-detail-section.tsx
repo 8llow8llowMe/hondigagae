@@ -18,7 +18,6 @@ import { PlanStatusAction } from '@/features/plan/plan-status-action'
 import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
 import { usePlanDayEdit } from '@/features/plan/use-plan-day-edit'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
-import { toLatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
 import { addPlanDays } from '@/lib/plan/date'
 import { placeIdsOf } from '@/lib/plan/day-items'
@@ -46,7 +45,6 @@ export function PlanDetailSection({
   pet,
   petPending,
   places,
-  missingPlaces,
   weather,
   weatherFailed,
   onRetryWeather,
@@ -55,9 +53,8 @@ export function PlanDetailSection({
   plan: PlanDetail
   pet: Pet | null
   petPending: boolean
+  /** placeId → 보강 결과. **실내 대안 전용이다** — 항목은 자기 `place` 를 들고 온다 */
   places: Map<string, PlaceDetail>
-  /** 장소 조회가 404 인 placeId. 편집모드가 `PLAN_004` 후보를 미리 짚는 데 쓴다 */
-  missingPlaces: Set<string>
   weather: PlanWeatherResponse | undefined
   weatherFailed: boolean
   onRetryWeather: () => void
@@ -114,11 +111,6 @@ export function PlanDetailSection({
     setEditingDay(null)
   }
 
-  const coordOf = (item: { targetId: string | null }) => {
-    const place = item.targetId === null ? undefined : places.get(item.targetId)
-    return place === undefined ? null : toLatLng(place)
-  }
-
   return (
     <div className="rail-layout">
       <aside>
@@ -140,7 +132,7 @@ export function PlanDetailSection({
             <PlanDaySection
               day={group.day}
               date={addPlanDays(plan.startDate, group.day - 1)}
-              rows={toItemRows(group.items, coordOf, lodgingBasisFor(group.day, days))}
+              rows={toItemRows(group.items, lodgingBasisFor(group.day, days))}
               places={places}
               verdict={weather?.days.find((entry) => entry.day === group.day)}
               petConditionApplied={weather?.petConditionApplied ?? true}
@@ -172,7 +164,6 @@ export function PlanDetailSection({
                 editingDay !== group.day ? null : (
                   <PlanDayEditor
                     items={edit.items}
-                    missing={missingPlaces}
                     dirty={edit.dirty}
                     saving={edit.saving}
                     error={edit.error}
@@ -190,7 +181,7 @@ export function PlanDetailSection({
           </div>
         ))}
 
-        <PlanOutOfRangeSection items={outOfRange} places={places} />
+        <PlanOutOfRangeSection items={outOfRange} />
 
         <Band />
         <PlanStatusAction plan={plan} />
@@ -278,13 +269,7 @@ function PlanDetailMenuBar({ plan }: { plan: PlanDetail }) {
  * (`PlanCommandProcessor.updatePlan`). **숨기지 않는다** — 숨기면 사용자가 자료가
  * 사라진 것을 모른다 (D4). 거리는 재지 않는다 — 어느 일자의 흐름에도 속하지 않는다.
  */
-function PlanOutOfRangeSection({
-  items,
-  places,
-}: {
-  items: PlanDetail['items']
-  places: Map<string, PlaceDetail>
-}) {
+function PlanOutOfRangeSection({ items }: { items: PlanDetail['items'] }) {
   if (items.length === 0) return null
 
   const rows: PlanItemRowModel[] = items.map((item) => ({
@@ -304,12 +289,7 @@ function PlanOutOfRangeSection({
 
         <ul className="border-border -mx-4 mt-4 border-t md:-mx-10">
           {rows.map((row, index) => (
-            <PlanItemRow
-              key={row.item.planItemId}
-              model={row}
-              place={row.item.targetId === null ? undefined : places.get(row.item.targetId)}
-              last={index === rows.length - 1}
-            />
+            <PlanItemRow key={row.item.planItemId} model={row} last={index === rows.length - 1} />
           ))}
         </ul>
       </section>
