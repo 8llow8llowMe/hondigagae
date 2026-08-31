@@ -54,7 +54,7 @@
 | 메서드 | 경로 |
 | --- | --- |
 | POST·GET | `/api/v1/plans` (`petId` 필터 = 반려견별 히스토리) |
-| GET·PUT·DELETE | `/api/v1/plans/{planId}` |
+| GET·PUT·DELETE | `/api/v1/plans/{planId}` | 항목마다 장소 요약(주소·실내·대표 이미지·좌표) 포함 |
 | PUT | `/api/v1/plans/{planId}/days/{day}/items` |
 | GET | `/api/v1/plans/{planId}/weather` | 일자별 날씨 브리핑 + 비 오는 날 실내 대안 |
 | GET·POST·DELETE | `/api/v1/favorites/places[/{placeId}]` | 장소 즐겨찾기 (멱등, 회원당 100곳) |

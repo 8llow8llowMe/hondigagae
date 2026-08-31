@@ -31,6 +31,23 @@
   장소 검증은 tour-service 내부 벌크 API(`GET /internal/v1/places/visible-ids`)를 **한 번** 불러
   수행한다 — 항목마다 따로 부르면 저장 한 번에 원격 왕복이 항목 수만큼 생긴다 (coding-conventions §9-7).
   delisted 장소는 존재하지 않는 것으로 오므로, 원천에서 사라진 장소를 새 항목이 참조하는 것도 여기서 막힌다.
+- **일정 상세 항목에 장소 요약이 붙는다** (`addr1` · `indoor` · `firstImage` · `lat` · `lng`).
+  tour-service 내부 후보 API(`GET /internal/v1/places/candidates`)를 **한 번** 부르고 중복
+  아이디는 제거한다 — 프론트가 항목마다 `GET /places/{placeId}` 를 부르던 것을 없애기 위한
+  것이라, 같은 문제를 백엔드로 옮기면 의미가 없다.
+  - `PlanDetailResponse` 를 내려주는 경로는 **전부** 요약을 붙인다(생성·조회·수정·일자 교체).
+    조회에만 붙이면 같은 DTO 가 진입 경로에 따라 주소를 갖거나 안 갖게 되고, 화면은 항목을
+    편집한 직후에만 주소가 사라진다.
+  - 내부 outline 조회와 응급 브리핑은 요약 없는 `getPlanInfo` 를 쓴다 — 쓰지 않는 원격 호출을
+    그 두 경로에 만들지 않는다.
+  - **tour-service 장애를 상세 조회 실패로 번지게 하지 않는다.** 요약을 못 받으면 비운 채
+    응답한다(즐겨찾기 목록과 같은 판단). 응급 브리핑은 반대로 삼키지 않는다 — 그쪽은 시설
+    없는 브리핑이 "가까운 병원이 없다" 는 착각을 준다.
+  - **원천에서 사라진(delisted) 장소는 요약만 null 이고 항목은 남는다.** 사용자가 담아 둔 자료다.
+  - `indoor` 의 null 은 "실외" 가 아니라 "원천에 정보 없음" 이다. `false` 로 바꾸지 않는다.
+- **`targetId` 가 `place.id` 인지의 판정은 `PlanItemType.isPlaceTarget()` 이 갖는다.** 저장 시
+  존재 검증과 상세 요약 조회가 같은 집합을 써야 해서 도메인으로 올렸다 — `WALK` 의 `targetId`
+  는 `walk_course.id` 라 장소로 조회하면 남의 아이디로 없는 장소를 찾는다.
 - `PlanItem`의 다중 대상 FK는 `@Comment`에 분기 기준을 명시한다 (`coding-conventions.md` §9-4).
 - 후기 사진 업로드가 필요해지면 `storage-core` 모듈 추가를 검토한다 (`modules.md`).
 - 후기 데이터는 반려견 성향 분석(ai-service)의 입력이 되므로, 방문 장소·활동 유형·만족도가 구조화되어 저장되어야 한다.
@@ -58,7 +75,8 @@
 - `PUT /api/v1/plans/{planId}/items/{planItemId}/visited` — 항목 방문 체크. 일차 항목을
   교체(delete+insert)하면 새 항목이라 그 날의 체크는 초기화된다.
 - `GET /api/v1/plans/{planId}/emergency` — 일자별 방문 장소마다 가까운 동물병원·동물약국
-  (반경 10km, 최대 3곳). 같은 장소는 한 번만 검색하고, 좌표가 없는(delisted) 장소는 건너뛴다.
+  (반경 10km, 최대 3곳). 같은 장소는 한 번만 검색하고, 좌표가 없는 장소는 건너뛴다 — 원천에서
+  사라진(delisted) 장소는 요약 자체가 오지 않고, 남아 있어도 원천이 좌표를 주지 않은 장소가 있다.
   시설 검색 실패는 삼키지 않는다 — 시설 없는 브리핑은 안전하다는 착각만 준다.
 - `GET /api/v1/plans?petId=` — 반려견별 여행 히스토리. or-null 조건 대신 메서드를 나눠 조회한다.
 

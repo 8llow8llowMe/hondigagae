@@ -41,7 +41,7 @@ public class PlanWebFacade implements PlanWebUseCase {
     @Transactional
     public PlanDetailResponse createPlan(long memberId, PlanCreateCommand command) {
         Plan plan = planCommandProcessor.createPlan(memberId, command);
-        return planPresenter.toDetailResponse(planQueryProcessor.getPlanInfo(plan));
+        return planPresenter.toDetailResponse(planQueryProcessor.getPlanDetailInfo(plan));
     }
 
     @Override
@@ -72,7 +72,7 @@ public class PlanWebFacade implements PlanWebUseCase {
     @Transactional(readOnly = true)
     public PlanDetailResponse getPlan(long memberId, long planId) {
         Plan plan = planQueryProcessor.getOwnedPlan(memberId, planId);
-        PlanInfo planInfo = planQueryProcessor.getPlanInfo(plan);
+        PlanInfo planInfo = planQueryProcessor.getPlanDetailInfo(plan);
         return planPresenter.toDetailResponse(planInfo);
     }
 
@@ -81,7 +81,7 @@ public class PlanWebFacade implements PlanWebUseCase {
     public PlanDetailResponse updatePlan(long memberId, long planId, PlanUpdateCommand command) {
         Plan plan = planQueryProcessor.getOwnedPlan(memberId, planId);
         Plan updated = planCommandProcessor.updatePlan(plan, command);
-        return planPresenter.toDetailResponse(planQueryProcessor.getPlanInfo(updated));
+        return planPresenter.toDetailResponse(planQueryProcessor.getPlanDetailInfo(updated));
     }
 
     @Override
@@ -96,7 +96,7 @@ public class PlanWebFacade implements PlanWebUseCase {
     public PlanDetailResponse replaceDayItems(long memberId, long planId, int day, List<PlanItemCommand> commands) {
         Plan plan = planQueryProcessor.getOwnedPlan(memberId, planId);
         planCommandProcessor.replaceDayItems(plan, day, commands);
-        return planPresenter.toDetailResponse(planQueryProcessor.getPlanInfo(plan));
+        return planPresenter.toDetailResponse(planQueryProcessor.getPlanDetailInfo(plan));
     }
 
     /**

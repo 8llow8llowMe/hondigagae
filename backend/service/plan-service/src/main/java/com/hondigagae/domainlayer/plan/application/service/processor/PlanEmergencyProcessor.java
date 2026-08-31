@@ -9,7 +9,7 @@ import com.hondigagae.domainlayer.plan.application.info.PlanItemInfo;
 import com.hondigagae.domainlayer.plan.application.port.out.EmergencyFacilityQueryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanPlaceLookupPort;
 import com.hondigagae.domainlayer.plan.application.port.out.query.EmergencyFacilityQueryResult;
-import com.hondigagae.domainlayer.plan.application.port.out.query.PlanPlacePointQueryResult;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlanPlaceSummaryQueryResult;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import java.util.HashMap;
 import java.util.List;
@@ -52,18 +52,21 @@ public class PlanEmergencyProcessor {
             .toList();
 
         List<Long> placeIds = placeItems.stream().map(PlanItemInfo::targetId).distinct().toList();
-        Map<Long, PlanPlacePointQueryResult> points = planPlaceLookupPort.findPoints(placeIds).stream()
-            .collect(Collectors.toMap(PlanPlacePointQueryResult::placeId, Function.identity()));
+        Map<Long, PlanPlaceSummaryQueryResult> points = planPlaceLookupPort.findSummaries(placeIds).stream()
+            .collect(Collectors.toMap(PlanPlaceSummaryQueryResult::placeId, Function.identity()));
 
         // 같은 장소는 한 번만 검색한다 — 며칠 연속 같은 숙소여도 시설은 같다.
         Map<Long, List<EmergencyFacilityQueryResult>> facilitiesByPlace = new HashMap<>();
 
         Map<Integer, List<SpotEmergencyInfo>> spotsByDay = new TreeMap<>();
         for (PlanItemInfo item : placeItems) {
-            PlanPlacePointQueryResult point = points.get(item.targetId());
-            if (point == null) {
-                // 원천에서 사라진(delisted) 장소 — 검색 중심점이 없으므로 건너뛴다.
-                log.info("Plan emergency briefing skips missing place planId={} placeId={}", planId, item.targetId());
+            PlanPlaceSummaryQueryResult point = points.get(item.targetId());
+            /*
+              둘 다 검색 중심점이 없는 경우다 — 원천에서 사라진(delisted) 장소는 목록에 아예
+              없고, 남아 있어도 원천이 좌표를 주지 않은 장소가 있다. 브리핑에서만 건너뛴다.
+            */
+            if (point == null || !point.hasPoint()) {
+                log.info("Plan emergency briefing skips place without point planId={} placeId={}", planId, item.targetId());
                 continue;
             }
             List<EmergencyFacilityQueryResult> facilities = facilitiesByPlace.computeIfAbsent(

@@ -38,6 +38,12 @@ public record PlanItemDetailItem(
     LocalTime startTime,
 
     @Schema(description = "방문 체크 (다녀옴). 일차 항목을 교체하면 초기화됩니다", example = "false")
-    boolean visited
+    boolean visited,
+
+    @Schema(
+        description = "항목이 가리키는 장소 요약. 장소를 가리키지 않는 항목(WALK·MOVE)이거나 "
+            + "원천에서 사라진(delisted) 장소면 null 이다 — 그때도 항목 자체는 응답에 남는다",
+        nullable = true)
+    PlanItemPlaceItem place
 ) {
 }
