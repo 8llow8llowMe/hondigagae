@@ -115,6 +115,7 @@ const MapView = dynamic(() => import('@/features/place/map-view'), { ssr: false 
 - 프록시가 서버 세션의 access token을 `Authorization` 헤더로 주입한다. 클라이언트 코드는 토큰을 모른다.
 - 게이트웨이가 내려주는 `Set-Cookie`(refresh)는 프록시가 흡수하고, 브라우저에는 같은 오리진 세션 쿠키만 남는다.
 - **FE 코드의 `/places/...` 는 실제로는 `/api/v1/places/...` 다.** 계약 대조 시 이 매핑을 적용한다.
+- 본문은 **형태 그대로** 통과한다 — JSON 도, `multipart/form-data`(파일 업로드)도. 아래 참고.
 
 **왜 BFF인가**
 
@@ -134,6 +135,20 @@ const MapView = dynamic(() => import('@/features/place/map-view'), { ssr: false 
   경고하는 사례가 정확히 이것이다. **헤더 화이트리스트 방식을 유지한다.**
 - 게이트웨이 CORS 허용 목록은 **브라우저가 게이트웨이를 직접 부를 때만** 의미가 있다
   (WebSocket 핸드셰이크, Swagger UI). 그런 경로를 새로 만들 때는 BE에 오리진 등록을 요청한다.
+
+### 파일 업로드(`multipart/form-data`)
+
+본문을 읽는 책임은 `src/lib/api/forwarded-body.ts` 가 갖는다. 규칙은 셋이다.
+
+- **원본 `Content-Type` 을 그대로 보존한다.** multipart 는 파트 경계(boundary)가 헤더 안에
+  있어서, 값을 새로 만들면 게이트웨이의 파싱이 실패한다.
+- **본문을 `text()` 로 읽지 않는다.** UTF-8 로 해석되면서 바이너리가 깨진다. `ArrayBuffer` 로 읽는다.
+- **스트림이 아니라 버퍼로 들고 있는다.** 401 → reissue 후 원 요청을 재시도할 때 같은 본문을
+  다시 보내야 하는데, 스트림은 한 번 흘리면 끝이다. 대가로 업로드가 통째로 메모리에 올라오므로
+  **화면이 업로드 전에 크기를 검사한다** (서버 상한 `max-file-size: 5MB` / `max-request-size: 30MB`).
+
+multipart 가 아니면 `Content-Type` 을 `application/json` 으로 고정한다 — 브라우저 클라이언트는
+그 둘만 보내고, 그 밖의 타입을 통과시키면 BFF 가 무엇을 넘기는지 모르게 된다.
 
 ## 6. 라우팅
 

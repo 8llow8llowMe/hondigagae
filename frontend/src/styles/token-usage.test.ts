@@ -139,7 +139,8 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0)', () => {
       'src/components/menu.tsx',
       'src/components/toast.tsx',
       'src/components/bottom-sheet.tsx',
-      'src/components/confirm-modal.tsx',
+      // 다이얼로그 표면은 Modal 이 소유한다 — ConfirmModal 은 그림자를 직접 그리지 않는다
+      'src/components/modal.tsx',
       // 반려견 스위처 드롭다운 — Menu 와 같은 팝오버다
       'src/features/nav/pet-switcher.tsx',
       // 홈 프로필 카드의 반려견 전환 팝오버

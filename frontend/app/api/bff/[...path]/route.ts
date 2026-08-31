@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 
 import { GATEWAY_UNREACHABLE_STATUS, gatewayUnreachablePayload } from '@/lib/api/bff-error'
+import { type ForwardedBody, readForwardedBody, toMockBody } from '@/lib/api/forwarded-body'
 import { isMockEnabled, resolveMock } from '@/lib/api/mock'
 import { gatewayUrl } from '@/lib/api/server'
 import { extractRefreshToken, toCookieHeader } from '@/lib/auth/refresh-cookie'
@@ -19,6 +20,8 @@ import { clearSession, readSession, type Session, writeSession } from '@/lib/aut
  *  3. 게이트웨이의 refresh 쿠키를 세션에 봉인한다 (SameSite=Strict / Path 제한 때문에
  *     브라우저가 직접 들고 있을 수 없다 — src/lib/auth/refresh-cookie.ts)
  *  4. 401 이면 reissue 를 1회만 시도하고 원 요청을 재시도한다
+ *  5. 본문을 형태 그대로 통과시킨다 — JSON 도, `multipart/form-data`(파일 업로드)도
+ *     (`@/lib/api/forwarded-body`)
  *
  * docs/architecture-guide.md §5, docs/auth-guide.md
  */
@@ -39,14 +42,14 @@ async function callGateway(
   path: string,
   search: string,
   method: ForwardedMethod,
-  body: string | null,
+  body: ForwardedBody | null,
   accessToken: string | null,
   refreshToken: string | null,
 ): Promise<GatewayResult> {
   // 개발용 mock (MOCK_API=true, 프로덕션에서는 항상 비활성).
   // 여기서 처리하면 게이트웨이를 부르지 않는다. 클라이언트는 차이를 모른다.
   if (isMockEnabled()) {
-    const mock = resolveMock(path, method, search, body, accessToken)
+    const mock = resolveMock(path, method, search, toMockBody(body), accessToken)
     if (mock !== null) {
       // mock 에도 refresh 토큰을 실어야 세션이 완성되고 401 재발급 흐름이 돈다
       return { status: mock.status, payload: mock.payload, refreshToken: mock.refreshToken ?? null }
@@ -54,7 +57,8 @@ async function callGateway(
   }
 
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (body !== null) headers['Content-Type'] = 'application/json'
+  // multipart 는 boundary 가 이 값 안에 있다. 새로 만들지 말고 원본을 그대로 쓴다
+  if (body !== null) headers['Content-Type'] = body.contentType
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`
   // reissue 는 게이트웨이가 쿠키에서 refresh 를 읽는다
   if (refreshToken) headers.Cookie = toCookieHeader(refreshToken)
@@ -64,7 +68,7 @@ async function callGateway(
     response = await globalThis.fetch(`${gatewayUrl(path)}${search}`, {
       method,
       headers,
-      body,
+      body: body?.data ?? null,
       cache: 'no-store',
       redirect: 'manual',
     })
@@ -134,7 +138,8 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
   const { path: segments } = await context.params
   const path = `/${segments.join('/')}`
   const search = request.nextUrl.search
-  const body = method === 'GET' || method === 'DELETE' ? null : await request.text()
+  // 재시도가 같은 본문을 다시 보내야 하므로 스트림이 아니라 버퍼로 들고 있는다
+  const body = await readForwardedBody(request)
 
   const session = await readSession()
 
@@ -142,7 +147,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
     path,
     search,
     method,
-    body === '' ? null : body,
+    body,
     session?.accessToken ?? null,
     isReissuePath(path) ? (session?.refreshToken ?? null) : null,
   )
@@ -174,14 +179,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       }
       await writeSession(next)
 
-      result = await callGateway(
-        path,
-        search,
-        method,
-        body === '' ? null : body,
-        next.accessToken,
-        null,
-      )
+      result = await callGateway(path, search, method, body, next.accessToken, null)
     } else {
       await clearSession()
     }
