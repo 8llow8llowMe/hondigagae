@@ -55,6 +55,10 @@ export const memberMessages = {
    * 5MB 이고 `infra.storage.max-file-bytes` 도 5242880 으로 같다 (공통명세 S5-1 해소).
    */
   profileImageHint: 'jpg · png · gif · webp, 5MB 이하',
+  /** 화면이 먼저 막는 경우. 서버도 STORAGE_002 로 다시 막는다 */
+  profileImageTooLarge: '5MB 이하 파일만 올릴 수 있어요.',
+  save: '저장',
+  cancel: '취소',
 
   /** 비밀번호 관리 */
   passwordTitle: '비밀번호 관리',

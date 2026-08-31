@@ -94,14 +94,27 @@ export function useForm<TValues extends Record<string, unknown>, TResult>({
     [],
   )
 
-  const reset = useCallback(
-    (next?: TValues) => {
-      setValues(next ?? initialValues)
-      setErrors(NO_FORM_ERRORS)
-      setDirty(false)
-    },
-    [initialValues],
-  )
+  /*
+    `initialValues` 를 의존성이 아니라 ref 로 읽는다 — **`reset` 을 항상 안정된 함수로
+    유지하기 위해서다.**
+
+    호출부는 대부분 `initialValues={{ nickname: member.nickname }}` 처럼 객체 리터럴을
+    넘긴다. 그러면 매 렌더마다 새 객체가 되어 `[initialValues]` 의존 `reset` 도 매번
+    새 함수가 되고, `reset` 을 effect 의존성에 넣은 호출부는 **effect → setState →
+    리렌더 → effect** 무한 루프에 빠진다 ("Maximum update depth exceeded").
+    렌더 테스트는 effect 를 돌리지 않으므로 이 버그를 잡지 못한다 — 브라우저 실측으로
+    잡았다 (#83 프로필 수정 모달).
+
+    ref 는 매 렌더 최신값으로 갱신되므로 인자 없는 `reset()` 의 동작은 그대로다.
+  */
+  const initialValuesRef = useRef(initialValues)
+  initialValuesRef.current = initialValues
+
+  const reset = useCallback((next?: TValues) => {
+    setValues(next ?? initialValuesRef.current)
+    setErrors(NO_FORM_ERRORS)
+    setDirty(false)
+  }, [])
 
   const submit = useCallback(async () => {
     if (submittingRef.current) return

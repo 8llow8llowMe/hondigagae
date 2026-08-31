@@ -52,6 +52,7 @@ function render(overrides: Partial<MyPageSectionsProps> = {}) {
       petsTotalCount: 1,
       onRetry: () => undefined,
       onLogout: () => undefined,
+      onEditProfile: () => undefined,
       ...overrides,
     }),
   )
@@ -124,6 +125,11 @@ describe('MyPageSections — 상태별 화면 (D5)', () => {
 
   it('반려견 행은 이동이라 a 다', () => {
     expect(render()).toMatch(/<a[^>]*href="\/pets"/)
+  })
+
+  /** `수정` 은 모달을 여는 동작이라 이동(`<a>`)이 아니다 (D6) */
+  it('수정은 button 이다', () => {
+    expect(render()).toMatch(/<button[^>]*>수정<\/button>/)
   })
 })
 
