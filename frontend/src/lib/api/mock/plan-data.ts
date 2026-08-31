@@ -34,7 +34,10 @@ function failValidation(errors: { code: string; field: string; message: string }
   })
 }
 
-const UNAUTHORIZED = () => fail(401, 'AUTH_011', '인증이 필요합니다.')
+// 토큰이 없거나 유효하지 않은 요청은 도메인에 닿기 전에 security-core 가 막는다 —
+// `SecurityErrorCode.UNAUTHORIZED`. **`AUTH_011` 이 아니다**: 그것은
+// `OAUTH_PROFILE_REQUIRED` 이고 400 이라, 401 과 짝지으면 서버가 내지 않는 조합이 된다 (#83)
+const UNAUTHORIZED = () => fail(401, 'SECURITY_001', '인증이 필요합니다.')
 
 /** 백엔드 `PlanStatus` 의 displayName/description 복제본 */
 const STATUS: Record<string, CodeNameMetadata> = {

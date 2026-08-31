@@ -1,5 +1,6 @@
 import { mockStore, nextMemberId } from '@/lib/api/mock/store'
 import { EMAIL_PATTERN } from '@/lib/form/email-pattern'
+import { PASSWORD_PATTERN } from '@/lib/form/password-pattern'
 import type { ApiResponse } from '@/types/api'
 
 /**
@@ -54,10 +55,10 @@ function text(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
-// 이메일 정규식은 자체 정의하지 않고 FE 스키마와 공유하는 lib/form/email-pattern 의
-// EMAIL_PATTERN 을 그대로 쓴다. mock 이 FE 스키마보다 엄격하면 실제로는 통과할
-// 이메일(`a@b`)이 mock 에서만 400 으로 거부되는 드리프트가 생긴다 — 이슈 #24 최종 리뷰 I5.
-const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+[\]{};:'",.<>/?\\|])\S+$/
+// 이메일·비밀번호 정규식은 자체 정의하지 않고 FE 스키마와 공유하는 lib/form 의
+// EMAIL_PATTERN · PASSWORD_PATTERN 을 그대로 쓴다. mock 이 FE 스키마보다 엄격하면
+// 실제로는 통과할 이메일(`a@b`)이 mock 에서만 400 으로 거부되는 드리프트가 생긴다
+// — 이슈 #24 최종 리뷰 I5.
 
 /** 백엔드 정렬 순서를 흉내 낸다: DTO 선언 순서 → 필수 → 길이 → 형식 */
 function validateSignup(values: Record<string, unknown>): FieldError[] {
@@ -226,6 +227,9 @@ export function resolveAuthMock(
       password: text(values.password),
       name: text(values.name),
       nickname: text(values.nickname),
+      // 일반 가입이라 소셜 연결이 없고 프로필 사진도 아직 없다 (= 계정 상태 general)
+      profileImageUrl: null,
+      provider: null,
     })
     store.verifiedEmails.delete(email)
     return { status: 200, payload: ok(null) }

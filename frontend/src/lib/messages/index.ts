@@ -2,6 +2,7 @@ import { commonMessages } from '@/lib/messages/common'
 import { emergencyMessages } from '@/lib/messages/emergency'
 import { authMessages, formMessages } from '@/lib/messages/form'
 import { homeMessages } from '@/lib/messages/home'
+import { memberMessages } from '@/lib/messages/member'
 import { petMessages } from '@/lib/messages/pet'
 import { placeMessages } from '@/lib/messages/place'
 import { planMessages } from '@/lib/messages/plan'
@@ -34,6 +35,7 @@ export const messages = {
   plan: planMessages,
   emergency: emergencyMessages,
   pet: petMessages,
+  member: memberMessages,
   form: formMessages,
   auth: authMessages,
 } as const

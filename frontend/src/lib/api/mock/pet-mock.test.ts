@@ -127,7 +127,9 @@ describe('반려견 mock — 소유권과 경로', () => {
   })
 
   it('반려견 경로가 아니면 null 을 반환해 게이트웨이로 넘긴다', () => {
-    expect(resolveMock('/members/me', 'GET', '', null, DEMO_TOKEN)).toBeNull()
+    // `/members/me` 는 마이페이지 mock 이 처리하므로 예시로 쓸 수 없다 (#83).
+    // mock 이 다루지 않는 경로여야 이 단언이 의미를 갖는다
+    expect(resolveMock('/members/me/sessions', 'GET', '', null, DEMO_TOKEN)).toBeNull()
   })
 })
 

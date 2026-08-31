@@ -1,15 +1,13 @@
 import { z } from 'zod'
 
 import { EMAIL_PATTERN } from '@/lib/form/email-pattern'
+import { PASSWORD_PATTERN } from '@/lib/form/password-pattern'
 import { messages } from '@/lib/messages'
 
 /**
  * 인증 요청 스키마. **백엔드 제약의 복제본이다** — docs/form-guide.md §5.
  * 필드명은 요청 DTO 와 같게 둔다. 다르면 서버 오류 매핑이 조용히 깨진다.
  */
-
-/** MemberGeneralSignupRequest @Pattern 실측 — 백엔드와 문자 하나까지 같아야 한다 */
-const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+[\]{};:'",.<>/?\\|])\S+$/
 
 /** AUTH_101 / AUTH_102 — AuthValidationMessage */
 export const emailSchema = z.object({
