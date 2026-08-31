@@ -157,6 +157,10 @@
   - **로컬에서 Stub 결과를 보고 "AI가 고장났다" 고 판단하지 않는다.** `AI_LLM_ENABLED` 를 먼저 확인한다.
 - XAI `reasons` 가 포함된다 → 서버 `description` 을 그대로 노출한다.
 - 저장·확정은 plan-service 몫이다. ai-service에 저장 API가 없다.
+- **항목 행에 직선거리가 붙는다** (#100). 계산·30km 임계값·문구를 일정 상세와 **같은 모듈**
+  (`lib/geo/distance.ts`)에서 가져온다 — 두 화면이 같은 초안을 두 말로 말하지 않게 하려는 것이
+  요점이다. 기준은 직전 항목 하나뿐이고(초안 `itemType` 이 LLM raw string 이라 숙소를 못 믿는다)
+  좌표를 모르는 항목은 거리 줄이 없다. **실내 여부는 여전히 없다** ([#16](https://github.com/8llow8llowMe/hondigagae/issues/16) 대기).
 - **`AiPlanCreateRequest` 가 `petIds`·`pinnedPlaceIds`·`planId`+`regenerateDay` 를 받는다**
   (PR #78). 전부 선택이고 **#84 는 단일 `petId` 만 보낸다** — 다중 반려견 UI 와 필수 포함
   장소 플로우는 아트보드 정본이 없어 별도 FE 이슈다 (명세 S1).
