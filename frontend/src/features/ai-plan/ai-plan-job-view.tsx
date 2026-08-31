@@ -306,12 +306,13 @@ function AiPlanCommitContainer({
       void queryClient.invalidateQueries({ queryKey: planKeys.all })
 
       /*
-        **목록으로 보낸다.** 상세 화면(`/plans/{planId}`)이 아직 없어 404 가 된다 —
-        이슈 #80 이 그 라우트를 만들면 `/plans/${plan.planId}` 로 바꾼다
-        (`PlanCreateFormContainer` 에 같은 주석이 있다).
+        **방금 담은 일정으로 보낸다.** 목록이 아니다 — 담기의 결과를 바로 확인해야
+        일자·항목이 의도대로 들어갔는지 알 수 있고, 초안 상태라 확정·수정도 거기서 한다.
+        직접 만들기(`PlanCreateFormContainer`)와 같은 목적지다 (plan 공통명세 S9).
+
+        `#80`(일정 상세)이 머지되기 전에는 이 경로가 404 라 목록으로 보내고 있었다.
       */
-      void plan
-      router.replace('/plans')
+      router.replace(`/plans/${plan.planId}`)
     },
   })
 
