@@ -174,4 +174,47 @@ export const planMessages = {
   deleteConfirmTitle: '{title} 일정을 삭제할까요?',
   deleteConfirmDescription: '담은 장소와 일자별 판정이 함께 사라져요. 되돌릴 수 없어요.',
   deleteError: '삭제하지 못했어요. 잠시 후 다시 시도해 주세요.',
+
+  // ── 일자 편집모드 (#81) ────────────────────────────────────────────────
+  // 정본은 아트보드 `여행 일정` 03 A(모바일) · B(데스크톱) · C(저장 실패).
+
+  editDayAction: '순서 편집',
+  /** 편집 중 상단 안내. 낙관적 업데이트를 하지 않는다는 것을 화면이 말한다 */
+  editHint: '저장하기 전까지는 아무것도 바뀌지 않아요.',
+  /** 거리 자리를 대신한다 — 순서를 옮길 때마다 숫자가 흔들리면 신뢰가 깨진다 */
+  editDistanceNote: '이동 거리는 저장 후 다시 계산돼요',
+
+  editMoveUp: '위로 이동',
+  editMoveDown: '아래로 이동',
+  editRemove: '삭제',
+  editRestore: '복구',
+  /** 취소선(시각)과 함께 간다 — 색·선만으로 알리지 않는다 */
+  editRemoveMark: '저장하면 삭제돼요',
+
+  editSave: '저장',
+  // 취소 문구는 `editCancel`(이름·예산 수정에서 쓰는 것)을 그대로 쓴다
+  /** 저장 버튼이 잠긴 이유. `aria-describedby` 로 준다 */
+  editNoChanges: '순서를 바꾸거나 삭제 표시를 해야 저장할 수 있어요.',
+
+  editSaveErrorTitle: '순서를 저장하지 못했어요',
+  editSaveErrorDescription: '편집한 내용은 그대로 있어요. 다시 시도해 주세요.',
+  /**
+   * `PLAN_004`. **재시도를 주지 않는다** — 같은 본문을 다시 보내면 같은 400 이다.
+   * 서버가 어느 항목인지 알려주지 않아 화면이 조회 404 항목으로 짚는다 (E1).
+   */
+  editMissingPlaceError:
+    '이 곳은 더 이상 조회되지 않아 함께 저장할 수 없어요. 목록에서 빼면 저장할 수 있어요.',
+  /** `PLAN_002`. 상세가 낡았다는 뜻이라 재시도가 아니라 새로고침이다 */
+  editDayOutOfRangeError: '여행 기간을 벗어난 일자예요. 새로고침한 뒤 다시 시도해 주세요.',
+  /** 편집 진입 시 조회되지 않는 항목에 미리 붙인다 */
+  editMissingPlaceMark: '이 곳은 더 이상 조회되지 않아요.',
+
+  editDiscardTitle: '편집한 내용을 버릴까요?',
+  editDiscardDescription: '바꾼 순서와 삭제 표시가 사라져요. 저장한 것은 그대로예요.',
+  editDiscardConfirm: '버리기',
+
+  /** `{position}` 치환. `aria-live` 로 읽힌다 */
+  editAnnounceMoved: '{position}번째로 이동했어요',
+  editAnnounceRemoved: '삭제 예정이에요',
+  editAnnounceRestored: '삭제 표시를 해제했어요',
 } as const

@@ -1,5 +1,8 @@
 'use client'
 
+import type { ReactNode } from 'react'
+
+import { Button } from '@/components/button'
 import { RowList } from '@/components/surface'
 import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
 import { PlanIndoorAlternatives } from '@/features/plan/plan-indoor-alts'
@@ -32,6 +35,9 @@ export function PlanDaySection({
   petConditionApplied,
   verdictFailed,
   onRetryVerdict,
+  editing,
+  onStartEdit,
+  editor,
 }: {
   day: number
   /** `YYYY-MM-DD`. 서버 판정의 날짜가 아니라 일정 기간에서 계산한 값이다 */
@@ -43,6 +49,11 @@ export function PlanDaySection({
   petConditionApplied: boolean
   verdictFailed: boolean
   onRetryVerdict: () => void
+  /** 이 일자가 편집 중이다. **한 번에 한 일자만 연다** — 일괄 교체 단위가 일자다 (E0) */
+  editing: boolean
+  onStartEdit: () => void
+  /** 편집 중일 때 항목 목록 자리에 들어간다 */
+  editor: ReactNode
 }) {
   const anchorId = planDayAnchorId(day)
   const weekday = date === null ? null : weekdayOf(date)
@@ -59,6 +70,13 @@ export function PlanDaySection({
             {weekday === null ? '' : ` (${weekday})`}
           </span>
         )}
+
+        {/* 항목이 없으면 바꿀 순서도 없다 */}
+        {!editing && rows.length > 0 && (
+          <Button variant="secondary" size="sm" className="ml-auto" onClick={onStartEdit}>
+            {messages.plan.editDayAction}
+          </Button>
+        )}
       </div>
 
       <PlanDayVerdict
@@ -68,12 +86,14 @@ export function PlanDaySection({
         onRetry={onRetryVerdict}
       />
 
-      {rows.length === 0 ? (
+      {editing ? (
+        // Row 가 자체 좌우 인셋(px-4 / md:px-10)을 갖는다 — 섹션 인셋을 되돌린다
+        <div className="border-border -mx-4 border-t md:-mx-10">{editor}</div>
+      ) : rows.length === 0 ? (
         <p className="text-body-2 text-fg-muted border-border border-t py-6">
           {messages.plan.dayEmpty}
         </p>
       ) : (
-        // Row 가 자체 좌우 인셋(px-4 / md:px-10)을 갖는다 — 섹션 인셋을 되돌린다
         <RowList className="border-border -mx-4 border-t md:-mx-10">
           {rows.map((row, index) => (
             <PlanItemRow
@@ -86,7 +106,8 @@ export function PlanDaySection({
         </RowList>
       )}
 
-      <PlanIndoorAlternatives alternatives={verdict?.indoorAlternatives ?? []} />
+      {/* 편집 중에는 감춘다 — 순서를 정리하는 중에 다른 조작을 섞지 않는다 */}
+      {!editing && <PlanIndoorAlternatives alternatives={verdict?.indoorAlternatives ?? []} />}
     </section>
   )
 }

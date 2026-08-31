@@ -258,6 +258,13 @@ export function resolvePlanMock(
     return null
   }
 
+  const dayItems = /^\/plans\/([^/]+)\/days\/([^/]+)\/items$/.exec(path)
+  if (dayItems !== null && method === 'PUT') {
+    return withPlan(memberId, dayItems[1] ?? '', (plan) =>
+      replaceDayItems(plan, dayItems[2] ?? '', body),
+    )
+  }
+
   const weather = /^\/plans\/([^/]+)\/weather$/.exec(path)
   if (weather !== null && method === 'GET') {
     return withPlan(memberId, weather[1] ?? '', (plan) => ({
@@ -664,4 +671,137 @@ function indoorAlternatives(): { placeId: string; title: string }[] {
   return MOCK_PLACES.filter((place) => place.indoor === true)
     .slice(0, 2)
     .map((place) => ({ placeId: place.placeId, title: place.title }))
+}
+
+// ─── 일자별 항목 일괄 교체 (#81) ──────────────────────────────────────────────
+
+// `ITEM_TITLE_MAX` · `ITEM_MEMO_MAX` · `PLACE_TARGET_TYPES` · `KNOWN_PLACE_IDS` 는
+// `POST /plans`(항목 동반 생성)가 이미 쓰고 있다. 같은 계약이므로 재사용한다
+
+/** 백엔드 `PlanItemType` 에 있는 코드만 받는다 */
+const ITEM_TYPE_CODES = new Set(Object.keys(ITEM_TYPE))
+
+/**
+ * 해당 일차의 항목을 통째로 교체한다. **부분 수정이 아니다** —
+ * 빈 목록을 보내면 그 일차 항목이 모두 삭제된다.
+ *
+ * 백엔드 `PlanCommandProcessor.replaceDayItems` 의 순서를 그대로 따른다:
+ * `containsDay` → `verifyPlaceTargets` → 삭제 → 재삽입. **순서가 중요하다** —
+ * 장소 검증이 삭제보다 먼저라 `PLAN_004` 로 막히면 기존 항목이 그대로 남는다.
+ */
+function replaceDayItems(plan: MockPlan, rawDay: string, body: string | null): MockResult {
+  // 경로의 day 도 @PathVariable int 다. 숫자가 아니면 400 이다
+  if (!/^\d+$/.test(rawDay)) {
+    return fail(400, 'PLAN_114', '요청 파라미터 형식이 올바르지 않습니다.')
+  }
+  const day = Number(rawDay)
+
+  let parsed: { items?: unknown }
+  try {
+    parsed = body === null ? {} : (JSON.parse(body) as { items?: unknown })
+  } catch {
+    return fail(400, 'PLAN_100', '요청 값이 올바르지 않습니다.')
+  }
+
+  // `items` 가 없으면 서버는 List.of() 로 읽는다 (toCommands 의 null 처리)
+  const raw = Array.isArray(parsed.items) ? (parsed.items as Record<string, unknown>[]) : []
+
+  // Bean Validation 이 먼저 돈다 — 본문 각 항목의 @Min(1)/@NotBlank/@Size
+  const errors = validateItems(raw)
+  if (errors.length > 0) return failValidation(errors)
+
+  // containsDay — 여행 기간 밖이면 PLAN_002
+  if (day < 1 || day > totalDaysOf(plan)) {
+    return fail(400, 'PLAN_002', '여행 기간을 벗어난 일자입니다.')
+  }
+
+  // verifyPlaceTargets — delisting 된 장소도 걸러낸다. **삭제보다 먼저다**
+  const unknown = raw.some((item) => {
+    const targetId = item.targetId
+    if (typeof targetId !== 'string' || !PLACE_TARGET_TYPES.has(String(item.itemType))) return false
+    return !KNOWN_PLACE_IDS.has(targetId)
+  })
+  if (unknown) {
+    return fail(400, 'PLAN_004', '존재하지 않는 장소가 포함되어 있습니다.')
+  }
+
+  // 삭제 후 재삽입 — **planItemId 가 전부 새로 발급된다.** 서버와 같아야
+  // "저장 성공 시 편집 상태를 통째로 버린다" 규칙을 화면이 실제로 검증할 수 있다
+  const store = mockStore()
+  plan.items = [
+    ...plan.items.filter((item) => item.day !== day),
+    ...raw.map((item, index) => toStoredItem(item, day, index, store)),
+  ]
+
+  return { status: 200, payload: ok(toDetail(plan)) }
+}
+
+function validateItems(raw: Record<string, unknown>[]): {
+  code: string
+  field: string
+  message: string
+}[] {
+  const errors: { code: string; field: string; message: string }[] = []
+
+  raw.forEach((item, index) => {
+    const field = `items[${index}]`
+
+    // @Min(1) — 서버가 경로값으로 덮어쓰지만 검증이 먼저 돈다
+    if (typeof item.day !== 'number' || item.day < 1) {
+      errors.push({
+        code: 'PLAN_110',
+        field: `${field}.day`,
+        message: '일차는 1 이상이어야 합니다.',
+      })
+    }
+    // @NotNull + enum 바인딩
+    if (typeof item.itemType !== 'string' || !ITEM_TYPE_CODES.has(item.itemType)) {
+      errors.push({
+        code: 'PLAN_111',
+        field: `${field}.itemType`,
+        message: '항목 유형은 필수입니다.',
+      })
+    }
+    // @NotBlank + @Size(max = 100)
+    const title = typeof item.title === 'string' ? item.title.trim() : ''
+    if (title.length === 0) {
+      errors.push({ code: 'PLAN_105', field: `${field}.title`, message: '항목 이름은 필수입니다.' })
+    } else if (title.length > ITEM_TITLE_MAX) {
+      errors.push({
+        code: 'PLAN_106',
+        field: `${field}.title`,
+        message: '항목 이름은 100자 이하만 가능합니다.',
+      })
+    }
+    // @Size(max = 500)
+    if (typeof item.memo === 'string' && item.memo.length > ITEM_MEMO_MAX) {
+      errors.push({
+        code: 'PLAN_108',
+        field: `${field}.memo`,
+        message: '메모는 500자 이하만 가능합니다.',
+      })
+    }
+  })
+
+  return errors
+}
+
+function toStoredItem(
+  item: Record<string, unknown>,
+  day: number,
+  sequence: number,
+  store: ReturnType<typeof mockStore>,
+): MockPlanItem {
+  return {
+    // 새로 발급한다 — 서버가 삭제 후 재삽입하기 때문이다
+    planItemId: nextPlanItemId(store),
+    day,
+    // 서버는 본문의 sequence 를 그대로 쓴다. 화면이 0부터 다시 매겨 보낸다
+    sequence: typeof item.sequence === 'number' ? item.sequence : sequence,
+    itemType: String(item.itemType),
+    targetId: typeof item.targetId === 'string' ? item.targetId : null,
+    title: String(item.title),
+    memo: typeof item.memo === 'string' ? item.memo : null,
+    startTime: typeof item.startTime === 'string' ? item.startTime : null,
+  }
 }

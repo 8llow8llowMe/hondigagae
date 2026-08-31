@@ -185,3 +185,153 @@ function errorsOf(result: ReturnType<typeof call>): { code: string; field: strin
   }
   return message.errors ?? []
 }
+
+describe('일자별 항목 일괄 교체 mock', () => {
+  beforeEach(resetMockStore)
+
+  /** 3일 일정의 1일차 항목 3개를 그대로 되돌려 보내는 본문 */
+  function currentDayItems(day: number) {
+    return detailOf(PLAN)
+      .items.filter((item) => item.day === day)
+      .map((item, index) => ({
+        day,
+        sequence: index,
+        itemType: item.itemType.code,
+        ...(item.targetId === null ? {} : { targetId: item.targetId }),
+        title: item.title,
+        ...(item.memo === null ? {} : { memo: item.memo }),
+        ...(item.startTime === null ? {} : { startTime: item.startTime }),
+      }))
+  }
+
+  function replace(day: number, items: unknown[], planId = PLAN) {
+    return call(`/plans/${planId}/days/${day}/items`, 'PUT', { items })
+  }
+
+  it('그 일자를 통째로 교체한다 — 다른 일자는 건드리지 않는다', () => {
+    const before = detailOf(PLAN)
+    const day2Before = before.items.filter((item) => item.day === 2).length
+
+    const after = replace(1, currentDayItems(1).slice(0, 1))?.payload.dataBody as PlanDetail
+
+    expect(after.items.filter((item) => item.day === 1)).toHaveLength(1)
+    expect(after.items.filter((item) => item.day === 2)).toHaveLength(day2Before)
+  })
+
+  it('저장하면 planItemId 가 전부 새로 발급된다 — 삭제 후 재삽입이다', () => {
+    const before = detailOf(PLAN)
+      .items.filter((item) => item.day === 1)
+      .map((item) => item.planItemId)
+
+    const after = (replace(1, currentDayItems(1))?.payload.dataBody as PlanDetail).items
+      .filter((item) => item.day === 1)
+      .map((item) => item.planItemId)
+
+    expect(after).toHaveLength(before.length)
+    expect(after.some((id) => before.includes(id))).toBe(false)
+  })
+
+  it('memo · startTime 이 보존된다 — 빼먹으면 순서만 바꿔도 지워진다', () => {
+    const after = replace(1, currentDayItems(1))?.payload.dataBody as PlanDetail
+    const first = after.items.find((item) => item.day === 1 && item.sequence === 0)
+
+    expect(first?.memo).toBe('실내라 비가 와도 괜찮아요')
+    expect(first?.startTime).toBe('10:00:00')
+  })
+
+  it('빈 목록을 보내면 그 일자가 비워진다 — 서버가 허용하는 동작이다', () => {
+    const after = replace(1, [])?.payload.dataBody as PlanDetail
+
+    expect(after.items.filter((item) => item.day === 1)).toEqual([])
+  })
+
+  it('기간 밖 일자는 400 PLAN_002 다', () => {
+    const result = replace(9, currentDayItems(1))
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_002')
+  })
+
+  it('존재하지 않는 장소가 섞이면 400 PLAN_004 다 — delisting 도 걸린다', () => {
+    const result = replace(1, [
+      {
+        day: 1,
+        sequence: 0,
+        itemType: 'PLACE',
+        targetId: '999999999999999999',
+        title: '사라진 곳',
+      },
+    ])
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_004')
+  })
+
+  it('PLAN_004 로 막히면 기존 항목이 그대로 남는다 — 검증이 삭제보다 먼저다', () => {
+    const before = detailOf(PLAN).items.filter((item) => item.day === 1).length
+
+    replace(1, [
+      {
+        day: 1,
+        sequence: 0,
+        itemType: 'PLACE',
+        targetId: '999999999999999999',
+        title: '사라진 곳',
+      },
+    ])
+
+    expect(detailOf(PLAN).items.filter((item) => item.day === 1)).toHaveLength(before)
+  })
+
+  it('day 가 0 이면 @Min(1) 에 걸린다 — 경로값 덮어쓰기보다 검증이 먼저다', () => {
+    const result = replace(1, [
+      { day: 0, sequence: 0, itemType: 'PLACE', targetId: '212481712381923328', title: '미술관' },
+    ])
+
+    expect(result?.status).toBe(400)
+    expect(errorsOf(result)[0]?.code).toBe('PLAN_110')
+  })
+
+  it('빈 제목은 400 PLAN_105 다', () => {
+    const result = replace(1, [{ day: 1, sequence: 0, itemType: 'PLACE', title: '  ' }])
+
+    expect(errorsOf(result)[0]?.code).toBe('PLAN_105')
+  })
+
+  it('100자를 넘는 제목은 400 PLAN_106 이다', () => {
+    const result = replace(1, [{ day: 1, sequence: 0, itemType: 'PLACE', title: '가'.repeat(101) }])
+
+    expect(errorsOf(result)[0]?.code).toBe('PLAN_106')
+  })
+
+  it('500자를 넘는 메모는 400 PLAN_108 이다', () => {
+    const result = replace(1, [
+      { day: 1, sequence: 0, itemType: 'PLACE', title: '미술관', memo: '가'.repeat(501) },
+    ])
+
+    expect(errorsOf(result)[0]?.code).toBe('PLAN_108')
+  })
+
+  it('WALK 는 장소 검증 대상이 아니다 — targetId 가 walk_course.id 다', () => {
+    const result = replace(1, [
+      { day: 1, sequence: 0, itemType: 'WALK', targetId: '777777777777000001', title: '산책' },
+    ])
+
+    expect(result?.status).toBe(200)
+  })
+
+  it('숫자가 아닌 day 는 400 PLAN_114 다', () => {
+    const result = call(`/plans/${PLAN}/days/abc/items`, 'PUT', { items: [] })
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_114')
+  })
+
+  it('남의 일정은 교체할 수 없다', () => {
+    expect(replace(1, [], OTHERS)?.status).toBe(404)
+  })
+
+  it('토큰이 없으면 401 이다', () => {
+    expect(call(`/plans/${PLAN}/days/1/items`, 'PUT', { items: [] }, null)?.status).toBe(401)
+  })
+})

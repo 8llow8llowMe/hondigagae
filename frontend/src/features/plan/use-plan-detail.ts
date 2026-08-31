@@ -5,6 +5,7 @@ import { useQueries, useQuery } from '@tanstack/react-query'
 import { PLACE_QUERY_OPTIONS, placeKeys } from '@/features/place/queries'
 import { PLAN_QUERY_OPTIONS, planKeys } from '@/features/plan/queries'
 import { clientFetch } from '@/lib/api/client'
+import { ApiError } from '@/lib/api/error'
 import { placeDetailPath } from '@/lib/api/place'
 import { fetchPlanDetail, fetchPlanWeather } from '@/lib/api/plan'
 import type { PlaceDetail } from '@/types/place'
@@ -46,9 +47,15 @@ export function usePlanWeather(planId: string) {
  *
  * **실패한 항목은 결과 맵에서 빠질 뿐 행은 살아남는다** — 일정 자료는 우리 DB 이고
  * 장소는 다른 서비스다 (공통명세 S8).
+ *
+ * **404 를 낸 id 를 따로 모은다.** 일괄 교체 저장은 delisting 된 장소가 하나라도 섞여
+ * 있으면 `PLAN_004` 로 막히는데 **서버가 어느 항목인지 알려주지 않는다.** 여기서 404 가
+ * 난 항목이 원인 후보라, 편집모드가 그 행을 미리 짚어 준다 (일자편집-세부명세 E1).
  */
 export function usePlaceEnrichment(placeIds: string[]): {
   places: Map<string, PlaceDetail>
+  /** 조회가 404 로 실패한 placeId. 5xx 는 넣지 않는다 — 그건 일시 장애다 */
+  missing: Set<string>
   pending: boolean
 } {
   const queries = useQueries({
@@ -61,9 +68,19 @@ export function usePlaceEnrichment(placeIds: string[]): {
   })
 
   const places = new Map<string, PlaceDetail>()
-  for (const query of queries) {
-    if (query.data !== undefined) places.set(query.data.placeId, query.data)
-  }
+  const missing = new Set<string>()
 
-  return { places, pending: queries.some((query) => query.isPending) }
+  queries.forEach((query, index) => {
+    if (query.data !== undefined) {
+      places.set(query.data.placeId, query.data)
+      return
+    }
+    // 일시 장애(5xx)와 원천에서 사라진 것(404)은 다르다. 404 만 "없는 장소" 다
+    const placeId = placeIds[index]
+    if (placeId !== undefined && query.error instanceof ApiError && query.error.status === 404) {
+      missing.add(placeId)
+    }
+  })
+
+  return { places, missing, pending: queries.some((query) => query.isPending) }
 }

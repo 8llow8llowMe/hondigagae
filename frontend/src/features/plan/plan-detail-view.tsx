@@ -27,7 +27,7 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
   const pets = usePetList()
 
   const items = detail.data?.items ?? []
-  const { places } = usePlaceEnrichment(enrichTargetIds(items))
+  const { places, missing } = usePlaceEnrichment(enrichTargetIds(items))
 
   if (detail.isPending) return null
 
@@ -71,6 +71,7 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
       pet={pet}
       petPending={pets.isPending}
       places={places}
+      missingPlaces={missing}
       weather={weather.data}
       weatherFailed={weather.isError}
       onRetryWeather={() => void weather.refetch()}
