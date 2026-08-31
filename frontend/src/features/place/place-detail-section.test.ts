@@ -10,7 +10,11 @@ import {
 import type { PlaceSuitabilityPanelProps } from '@/features/place/place-suitability-panel'
 import { messages } from '@/lib/messages'
 import { suitability as suitabilityFixture } from '@/test/fixtures/insight'
-import { placeDetail, placeDetailWithoutOptionalSections } from '@/test/fixtures/place'
+import {
+  placeDetail,
+  placeDetailFromTourApi,
+  placeDetailWithoutOptionalSections,
+} from '@/test/fixtures/place'
 
 /** 판정이 이미 도착한 상태. 판정 분기 자체는 `place-suitability-panel.test.ts` 가 본다 */
 const suitability: PlaceSuitabilityPanelProps = {
@@ -157,10 +161,72 @@ describe('PlaceDetailSection — nullable 섹션은 숨긴다', () => {
     expect(markup).not.toContain(messages.place.detailHomepage)
   })
 
-  it('저작권 코드가 없으면 출처 표기 줄을 숨긴다', () => {
-    const markup = render({ place: { ...placeDetail, cpyrhtDivCd: null } })
+  it('저작권 코드도 출처명도 없으면 출처 줄을 숨긴다', () => {
+    const markup = render({ place: { ...placeDetail, cpyrhtDivCd: null, sourceName: null } })
 
     expect(markup).not.toContain(messages.place.detailCopyrightPrefix)
+    expect(markup).not.toContain('정보 출처')
+  })
+
+  it('분류가 없으면 분류 줄을 렌더하지 않는다', () => {
+    const markup = render({ place: { ...placeDetail, sourceCategory: null } })
+
+    expect(markup).not.toContain(messages.place.detailSourceCategory)
+  })
+})
+
+describe('PlaceDetailSection — 실내 여부 (#112)', () => {
+  it('메타 줄에 실내 낱말을 붙인다', () => {
+    expect(render()).toContain(`문화시설 · ${messages.place.rowIndoor}`)
+  })
+
+  it('야외면 야외라고 쓴다 — 서버 값을 그대로 옮긴다', () => {
+    const markup = render({ place: { ...placeDetail, indoor: false } })
+
+    expect(markup).toContain(`문화시설 · ${messages.place.rowOutdoor}`)
+  })
+
+  it('모르면 메타 줄에서 빼고 "미확인" 배지로 드러낸다 — 야외라고 단정하지 않는다', () => {
+    const markup = render({ place: { ...placeDetail, indoor: null } })
+
+    expect(markup).not.toContain(`문화시설 · ${messages.place.rowOutdoor}`)
+    // 숨기면 실내 필터에서 이 장소가 왜 사라지는지 설명할 길이 없다 (목록 행과 같은 처리)
+    expect(markup).toContain(messages.place.rowIndoorUnknown)
+  })
+
+  it('실내 여부를 알면 미확인 배지를 붙이지 않는다', () => {
+    expect(render()).not.toContain(messages.place.rowIndoorUnknown)
+  })
+})
+
+describe('PlaceDetailSection — 분류와 정보 출처 (#112)', () => {
+  it('원천이 준 분류를 기본 정보에 낸다 — contentType 으로는 카페·펜션이 갈리지 않는다', () => {
+    const markup = render()
+
+    expect(markup).toContain(messages.place.detailSourceCategory)
+    expect(markup).toContain('미술관')
+  })
+
+  it('저작권 코드가 없는 원천은 sourceName 으로 출처를 밝힌다 — 그전에는 줄이 없었다', () => {
+    const markup = render({ place: { ...placeDetail, cpyrhtDivCd: null } })
+
+    expect(markup).toContain('정보 출처: 문화정보원')
+  })
+
+  it('저작권 코드가 있으면 기관명과 유형을 쓰고 sourceName 을 겹쳐 쓰지 않는다 (D5-2)', () => {
+    // 공공누리 출처 표시 의무는 기관명(한국관광공사)이어야 성립한다 —
+    // sourceName 의 "관광정보 API" 로 바꾸면 표기 의무를 만족하지 못한다
+    const markup = render({ place: placeDetailFromTourApi })
+
+    expect(markup).toContain(messages.place.detailCopyrightPrefix)
+    expect(markup).toContain(messages.place.detailCopyrightType1)
+    expect(markup).not.toContain('정보 출처: 관광정보 API')
+  })
+
+  it('출처명이 공백뿐이면 줄을 만들지 않는다', () => {
+    const markup = render({ place: { ...placeDetail, cpyrhtDivCd: null, sourceName: '   ' } })
+
+    expect(markup).not.toContain('정보 출처')
   })
 })
 

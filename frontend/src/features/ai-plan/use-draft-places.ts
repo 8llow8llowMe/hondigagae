@@ -10,6 +10,7 @@ import { clientFetch } from '@/lib/api/client'
 import { ApiError } from '@/lib/api/error'
 import { placeDetailPath } from '@/lib/api/place'
 import { type LatLng, toLatLng } from '@/lib/geo/coord'
+import { placeMetaLine } from '@/lib/place/meta'
 import type { AiPlanDraft } from '@/types/ai-plan'
 import type { PlaceDetail } from '@/types/place'
 
@@ -29,6 +30,9 @@ import type { PlaceDetail } from '@/types/place'
  *
  * 좌표도 같은 응답에서 꺼낸다 (#100). 초안에 좌표가 없어 직선거리를 재려면 이 보강이
  * 유일한 출처다 — 별도 조회를 만들지 않는다.
+ *
+ * 실내 여부도 같은 응답에서 온다 (#112). **행이 쓸 메타 줄을 여기서 조립한다** — 행은
+ * 표시 전용이라 `indoor` 의 null 판정을 컴포넌트에 두면 렌더 테스트에서만 잡힌다.
  */
 export function useDraftPlaces(draft: AiPlanDraft | null) {
   const placeIds = useMemo(() => (draft === null ? [] : draftPlaceIds(draft)), [draft])
@@ -49,7 +53,7 @@ export function useDraftPlaces(draft: AiPlanDraft | null) {
   })
 
   return useMemo(() => {
-    const addresses = new Map<string, string>()
+    const metaLines = new Map<string, string>()
     const coords = new Map<string, LatLng>()
     const delisted = new Set<string>()
 
@@ -65,9 +69,12 @@ export function useDraftPlaces(draft: AiPlanDraft | null) {
       const detail = result.data
       if (detail === undefined) return
 
-      // `addr2` 는 상세 주소라 목록 행에는 붙이지 않는다 — 한 줄이 길어진다
-      const address = detail.addr1?.trim()
-      if (address !== undefined && address !== '') addresses.set(placeId, address)
+      /*
+        `addr2` 는 상세 주소라 목록 행에는 붙이지 않는다 — 한 줄이 길어진다.
+        실내 낱말은 `indoor` 가 null 이면 빠진다 — "야외" 로 단정하지 않는다 (#112).
+      */
+      const meta = placeMetaLine(detail.addr1, detail.indoor)
+      if (meta !== null) metaLines.set(placeId, meta)
 
       /*
         **좌표가 없거나 0 인 장소는 넣지 않는다.** `toLatLng` 가 그 판정을 갖고 있고,
@@ -78,7 +85,7 @@ export function useDraftPlaces(draft: AiPlanDraft | null) {
     })
 
     return {
-      addresses,
+      metaLines,
       coords,
       delistedPlaceIds: delisted,
       /** 아직 채워지는 중인가. 미리보기를 막지는 않는다 — 주소가 늦게 붙을 뿐이다 */

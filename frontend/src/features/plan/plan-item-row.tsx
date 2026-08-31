@@ -8,7 +8,7 @@ import { formatDistance } from '@/lib/format/distance'
 import { isLongTrip } from '@/lib/geo/distance'
 import { isAllowedImageHost } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
-import { shortAddress } from '@/lib/place/address'
+import { placeMetaLine } from '@/lib/place/meta'
 import { isPlaceTarget, type PlanItemRowModel } from '@/lib/plan/detail'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceDetail } from '@/types/place'
@@ -24,11 +24,10 @@ import type { PlaceDetail } from '@/types/place'
  * **행을 지우지 않고 제목만 남긴다.** 일정 자료는 우리 DB 이고 장소는 다른 서비스다
  * (공통명세 S8).
  *
- * **실내 여부는 아직 못 쓴다.** 명세(D2)는 메타 줄에 `주소 · 실내` 를 적었지만
- * **`PlaceDetail` 에 `indoor` 가 없다** — 목록(`PlaceSummary`)에만 있고 상세 응답에는
- * 빠져 있다. 목록 캐시에서 꺼내 쓰는 우회는 쓰지 않는다(링크 직접 진입·새로고침에서
- * 사라져 같은 화면이 진입 경로에 따라 달라진다 — 장소 상세에서 이미 내린 결정).
- * [#16](https://github.com/8llow8llowMe/hondigagae/issues/16) 이 반영되면 붙인다.
+ * **메타 줄은 `주소 · 실내` 다** (명세 D2). `indoor` 는 #16 으로 상세 응답에 들어왔고
+ * 보강 결과에서 그대로 온다 (#112). **`null` 이면 낱말이 빠진다** — 여기에는 실내 필터가
+ * 없어 "실내 여부 미확인" 배지를 둘 자리가 없다. 배지 없이 단정만 피한다
+ * (`lib/place/indoor.ts`).
  *
  * **`startTime` 을 표시하지 않는다** — 아트보드 헤더 주석이 "시간 없음" 으로 못박았다
  * (일정상세-세부명세 D8-9).
@@ -45,8 +44,7 @@ export function PlanItemRow({
 }) {
   const { item } = model
   const hasImage = isAllowedImageHost(place?.firstImage ?? null)
-  // 실내 여부는 상세 응답에 없다 (#16). 주소만 남는다
-  const address = shortAddress(place?.addr1 ?? null)
+  const meta = placeMetaLine(place?.addr1 ?? null, place?.indoor ?? null)
 
   /*
     **`targetId` 가 있다고 링크하지 않는다.** `WALK` 의 `targetId` 는 `walk_course.id`
@@ -90,9 +88,9 @@ export function PlanItemRow({
           {item.itemType.code !== 'PLACE' && <Badge size="sm">{item.itemType.name}</Badge>}
         </div>
 
-        {/* nullable 은 오류가 아니라 숨김이다. 주소가 없으면 줄 자체가 사라진다 */}
-        {address !== null && (
-          <p className="text-caption text-fg-muted mt-0.5 line-clamp-1 font-medium">{address}</p>
+        {/* nullable 은 오류가 아니라 숨김이다. 둘 다 없으면 줄 자체가 사라진다 */}
+        {meta !== null && (
+          <p className="text-caption text-fg-muted mt-0.5 line-clamp-1 font-medium">{meta}</p>
         )}
 
         <PlanItemDistance model={model} />

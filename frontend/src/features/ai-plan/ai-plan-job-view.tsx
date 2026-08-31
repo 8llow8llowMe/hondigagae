@@ -72,7 +72,7 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
   const job = query.data ?? null
   const draft = job?.planDraft ?? null
 
-  const { addresses, coords, delistedPlaceIds } = useDraftPlaces(draft)
+  const { metaLines, coords, delistedPlaceIds } = useDraftPlaces(draft)
 
   const conditionSummary = useMemo(() => summarize(snapshot), [snapshot])
 
@@ -163,7 +163,7 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
         endDate=""
         budget={null}
         totalDays={null}
-        addresses={addresses}
+        metaLines={metaLines}
         coords={coords}
         delistedPlaceIds={delistedPlaceIds}
         excludedPlaceIds={EMPTY_SET}
@@ -185,7 +185,7 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
       jobId={jobId}
       draft={draft}
       snapshot={snapshot}
-      addresses={addresses}
+      metaLines={metaLines}
       coords={coords}
       delistedPlaceIds={delistedPlaceIds}
     />
@@ -253,14 +253,14 @@ function AiPlanCommitContainer({
   jobId,
   draft,
   snapshot,
-  addresses,
+  metaLines,
   coords,
   delistedPlaceIds,
 }: {
   jobId: string
   draft: AiPlanDraft
   snapshot: AiPlanRequestSnapshot
-  addresses: ReadonlyMap<string, string>
+  metaLines: ReadonlyMap<string, string>
   coords: ReadonlyMap<string, LatLng>
   delistedPlaceIds: ReadonlySet<string>
 }) {
@@ -329,7 +329,7 @@ function AiPlanCommitContainer({
       endDate={snapshot.endDate}
       budget={snapshot.budget}
       totalDays={totalDays}
-      addresses={addresses}
+      metaLines={metaLines}
       coords={coords}
       delistedPlaceIds={delistedPlaceIds}
       excludedPlaceIds={excludedPlaceIds}

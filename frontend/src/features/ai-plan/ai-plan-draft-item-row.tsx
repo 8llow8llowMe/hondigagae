@@ -11,10 +11,11 @@ export type AiPlanDraftItemRowProps = {
   /** 그 일자 안의 1부터 시작하는 번호 (아트보드 03 의 원형 숫자) */
   ordinal: number
   /**
-   * 보강으로 얻은 주소. **초안에 없어 항목당 `GET /places/{placeId}` 로 채운다**
-   * (명세 S6). 아직 못 받았거나 `placeId` 가 null 이면 undefined.
+   * 보강으로 얻은 메타 줄 (`제주시 한림읍 · 야외`). **초안에 없어 항목당
+   * `GET /places/{placeId}` 로 채운다** (명세 S6). 아직 못 받았거나 `placeId` 가 null 이면
+   * undefined. 조립은 `use-draft-places.ts` 가 한다.
    */
-  address?: string | undefined
+  meta?: string | undefined
   /**
    * 보강이 **404** 로 실패했는가. `PLAN_004`(delisting) 로 담기가 막힐 때의 원인 후보다
    * (명세 S5 함정 3 · 일자편집 명세 E1).
@@ -32,9 +33,9 @@ export type AiPlanDraftItemRowProps = {
 /**
  * 초안 항목 한 줄 — 아트보드 03.
  *
- * **실내 여부를 표시하지 않는다.** `PlaceDetailResponse` 에 `indoor` 가 없다 (이슈
- * [#16](https://github.com/8llow8llowMe/hondigagae/issues/16)) — 목록(`PlaceSummary`)에만
- * 있고, 목록 캐시에서 꺼내 쓰는 우회는 쓰지 않는다 (`PlanItemRow` 와 같은 결정).
+ * 메타 줄은 `주소 · 실내` 다 — `indoor` 가 #16 으로 상세 응답에 들어왔다 (#112).
+ * **`null` 이면 낱말이 빠진다**: 여기에는 실내 필터가 없어 "미확인" 배지를 둘 자리가 없고,
+ * `false`(야외)로 단정하지도 않는다 (`lib/place/indoor.ts`).
  *
  * 거리는 붙인다 (#100). **문구·임계값을 일정 상세와 공유한다** — 두 화면이 같은 초안을
  * 두 말로 말하지 않게 `messages.plan` 과 `lib/geo/distance.ts` 를 그대로 쓴다.
@@ -44,7 +45,7 @@ export type AiPlanDraftItemRowProps = {
 export function AiPlanDraftItemRow({
   item,
   ordinal,
-  address,
+  meta,
   delisted = false,
   excluded = false,
   distanceMeters = null,
@@ -86,7 +87,7 @@ export function AiPlanDraftItemRow({
           )}
         </div>
 
-        {address !== undefined && <p className="text-caption text-fg-muted mt-0.5">{address}</p>}
+        {meta !== undefined && <p className="text-caption text-fg-muted mt-0.5">{meta}</p>}
 
         <DraftItemDistance meters={distanceMeters} />
 

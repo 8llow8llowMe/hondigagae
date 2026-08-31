@@ -73,10 +73,11 @@
 - `placeId` 는 응답에서 **문자열**이다 (백엔드 내부는 long).
 - **상세 컨트롤러는 `@PathVariable long` 이다** → 숫자가 아닌 `placeId` 는 404 가 아니라 **400(`PLACE_113`)** 이다.
 - **상세 응답(`PlaceDetailResponse`)에 `indoor` / `sourceCategory` / `sourceName` 이 들어왔다**
-  ([#16](https://github.com/8llow8llowMe/hondigagae/issues/16) 반영). 목록(`PlaceItem`)과 **같은 매핑**이고
-  `sourceName` 은 표시명(`문화정보원`)이다. `indoor` 는 `null`(원천에 정보 없음)이 그대로 온다 —
-  `false`(실외)와 다르므로 배지를 숨긴다. **아직 화면에 붙이지 않았다** — 장소 상세·AI 초안 행·일정 항목 행
-  세 곳에 각각 FE 작업이 남아 있다.
+  ([#16](https://github.com/8llow8llowMe/hondigagae/issues/16) 반영) **그리고 화면에 붙였다**
+  ([#112](https://github.com/8llow8llowMe/hondigagae/issues/112)). 목록(`PlaceItem`)과 **같은 매핑**이고
+  `sourceName` 은 표시명(`문화정보원`)이다. `indoor` 의 `null` 은 "원천에 정보 없음" 이라
+  `false`(야외)와 다르게 다룬다 — 메타 줄에서 낱말을 빼고, 실내 필터를 가진 화면(목록 행·장소 상세)만
+  "실내 여부 미확인" 배지로 드러낸다. 조립은 `lib/place/meta.ts` 한 곳이다.
 - **`sigunguCode` 는 여전히 상세 응답에 없다.** 목록 항목에만 있다 — #16 범위가 아니었다.
 - 상세의 `contentId` 는 원천이 TourAPI 가 아니면 **`null`** 이다
   ([#17](https://github.com/8llow8llowMe/hondigagae/issues/17) 반영 — 그전에는 문자열 `"null"` 이었다).
@@ -166,7 +167,7 @@
 - **항목 행에 직선거리가 붙는다** (#100). 계산·30km 임계값·문구를 일정 상세와 **같은 모듈**
   (`lib/geo/distance.ts`)에서 가져온다 — 두 화면이 같은 초안을 두 말로 말하지 않게 하려는 것이
   요점이다. 기준은 직전 항목 하나뿐이고(초안 `itemType` 이 LLM raw string 이라 숙소를 못 믿는다)
-  좌표를 모르는 항목은 거리 줄이 없다. **실내 여부는 여전히 없다** ([#16](https://github.com/8llow8llowMe/hondigagae/issues/16) 대기).
+  좌표를 모르는 항목은 거리 줄이 없다. **실내 여부도 붙였다** ([#112](https://github.com/8llow8llowMe/hondigagae/issues/112)).
 - **`AiPlanCreateRequest` 가 `petIds`·`pinnedPlaceIds`·`planId`+`regenerateDay` 를 받는다**
   (PR #78). 전부 선택이고 **#84 는 단일 `petId` 만 보낸다** — 다중 반려견 UI 와 필수 포함
   장소 플로우는 아트보드 정본이 없어 별도 FE 이슈다 (명세 S1).
