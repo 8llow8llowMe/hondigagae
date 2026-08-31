@@ -21,22 +21,38 @@ function renderTabs(authed: boolean, path = '/') {
 }
 
 describe('NavLinks — 미로그인 데스크톱 (명세 D7 #1)', () => {
-  it('보호 메뉴 2개를 숨긴다', () => {
+  /*
+    **아트보드는 숨기기를 지정했고 그것을 의도적으로 벗어났다** (이슈 #116).
+    숨기면 미로그인 헤더에 `장소 찾기` 하나만 남고, AI 일정 생성으로 가는 링크가
+    저장소 전체에서 그 하나와 `/plans` 안의 시트뿐이라 처음 방문한 사람이 이 서비스의
+    차별점을 알 방법이 없어진다. 되돌리려면 명세 D4-2 부터 고쳐야 한다.
+  */
+  it('보호 메뉴도 그린다 — 숨기지 않는다', () => {
     const markup = renderNav(false)
-
-    expect(markup).not.toContain('여행 일정')
-    expect(markup).not.toContain('AI 일정 생성')
-  })
-
-  it('공개 메뉴는 남는다 — 미로그인도 장소는 볼 수 있다', () => {
-    expect(renderNav(false)).toContain('장소 찾기')
-  })
-
-  it('로그인하면 보호 메뉴가 보인다', () => {
-    const markup = renderNav(true)
 
     expect(markup).toContain('여행 일정')
     expect(markup).toContain('AI 일정 생성')
+  })
+
+  it('보호 메뉴는 returnTo 를 붙여 로그인으로 보낸다 — 모바일 탭과 같은 처리다', () => {
+    const markup = renderNav(false)
+
+    expect(markup).toContain('/login?returnTo=%2Fplans')
+    expect(markup).toContain('/login?returnTo=%2Fai-plans%2Fnew')
+  })
+
+  it('공개 메뉴는 로그인 없이 목적지로 바로 간다', () => {
+    const markup = renderNav(false)
+
+    expect(markup).toContain('href="/places"')
+  })
+
+  it('로그인하면 보호 메뉴가 목적지로 바로 간다', () => {
+    const markup = renderNav(true)
+
+    expect(markup).toContain('href="/plans"')
+    expect(markup).toContain('href="/ai-plans/new"')
+    expect(markup).not.toContain('returnTo')
   })
 
   it('내 반려견을 nav 에 두지 않는다 — 그것은 "내 설정" 이라 계정 팝오버가 맡는다', () => {

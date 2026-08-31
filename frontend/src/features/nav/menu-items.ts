@@ -22,6 +22,9 @@ export type NavItem = {
  * **셋뿐이다 — 전부 "할 일" 이다.** 내 반려견·마이페이지·로그아웃은 "내 설정" 이라
  * 우측 아바타 팝오버가 맡는다 (`ACCOUNT_MENU_ITEMS`). 같은 줄에 섞으면 nav 의 기준이
  * 흐려져 항목이 계속 늘어난다 — 아트보드 03-B 의 주석이 이것을 명시한다.
+ *
+ * **미로그인에도 셋 다 그린다** (이슈 #112 이후 #116). `protected` 는 숨김 여부가 아니라
+ * **로그인으로 우회시킬지**의 표시다 — 아래 `toLoginHref` 를 보라.
  */
 export const DESKTOP_NAV_ITEMS: NavItem[] = [
   { href: '/places', label: '장소 찾기', protected: false },
@@ -50,17 +53,14 @@ export const MOBILE_TAB_ITEMS: NavItem[] = [
 ]
 
 /**
- * 미로그인일 때 보호 경로로 보낼 링크.
+ * 미로그인일 때 보호 경로로 보낼 링크. **데스크톱·모바일이 같은 처리를 쓴다** (#116).
  *
- * **데스크톱은 항목을 숨기고 모바일은 유지한다** (D4-2). 이 비대칭은 의도적이다 —
- * 헤더는 가로 목록이라 항목이 줄어도 나머지 위치가 크게 안 변하지만, 탭은 위치가
- * 근육기억이라 숨기면 남은 탭이 이동해 오조작이 늘어난다.
+ * 원래는 데스크톱만 항목을 숨겼다 (아트보드 `03 전역 nav · A — 미로그인 (보호 메뉴 3개 숨김)`).
+ * **그것을 의도적으로 벗어났다**: 숨기면 미로그인 데스크톱 헤더에 `장소 찾기` 하나만 남고,
+ * `/ai-plans/new` 로 가는 링크가 저장소 전체에서 그 하나와 `/plans` 안의 시트뿐이라
+ * **처음 방문한 사람이 AI 여행 설계의 존재를 알 방법이 없어진다.** 모바일 탭에는 AI 항목이
+ * 애초에 없고 홈에도 링크가 없다 — 근거는 명세 D4-2.
  */
 export function toLoginHref(href: string): string {
   return `/login?returnTo=${encodeURIComponent(href)}`
-}
-
-/** 데스크톱에서 실제로 그릴 항목 */
-export function visibleDesktopItems(authed: boolean): NavItem[] {
-  return authed ? DESKTOP_NAV_ITEMS : DESKTOP_NAV_ITEMS.filter((item) => !item.protected)
 }
