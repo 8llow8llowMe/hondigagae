@@ -181,11 +181,18 @@ export function AiPlanCreateForm({
           {/*
             **레이아웃 클래스를 여기서 준다.** `ChipGroup` 은 role/aria 배선만 하고
             배치를 사용처에 맡긴다 (`place-filter-chips.tsx` 와 같은 규약).
+
+            **간격만 다르다 — `gap-2.5`(10px) 는 아트보드 값이다.** 필터 칩
+            (`place-filter-chips` · `emergency-section`)은 `gap-1.5`(6px)를 쓰는데,
+            그쪽은 여러 줄로 빽빽하게 깔리는 필터 줄이고 이쪽은 한 줄짜리 폼 컨트롤이라
+            정본이 애초에 다른 값을 준다. **규약이 같다고 값까지 맞추지 않는다** —
+            맞추면 아트보드에서 멀어진다 (#96 이 필터 쪽 3곳을 6px 로 통일한 것과
+            이 값은 별개다).
           */}
           <ChipGroup
             label={messages.aiPlan.budgetPresetLabel}
             exclusive
-            className="flex flex-wrap gap-2"
+            className="flex flex-wrap gap-2.5"
           >
             {BUDGET_PRESETS_MANWON.map((preset) => (
               <Chip
