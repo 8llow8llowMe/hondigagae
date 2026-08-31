@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 
-import { Button } from '@/components/button'
+import { Button, ButtonLink } from '@/components/button'
 import { RowList } from '@/components/surface'
 import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
 import { PlanIndoorAlternatives } from '@/features/plan/plan-indoor-alts'
@@ -10,8 +10,27 @@ import { PlanItemRow } from '@/features/plan/plan-item-row'
 import { messages } from '@/lib/messages'
 import { weekdayOf } from '@/lib/plan/date'
 import type { PlanItemRowModel } from '@/lib/plan/detail'
+import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import type { PlaceDetail } from '@/types/place'
-import type { PlanDayWeatherItem } from '@/types/plan'
+import type { PlanAlternativePlaceItem, PlanDayWeatherItem } from '@/types/plan'
+
+/**
+ * 이 일자에 장소를 담는 데 필요한 것 한 묶음.
+ *
+ * **두 진입점(`장소 추가` 라우트 · 실내 대안 `담기`)이 같은 저장을 쓴다** (F0) —
+ * 한 덩어리로 내려야 두 곳이 같은 진행/실패 상태를 본다.
+ */
+export type PlanDayAdd = {
+  /** `장소 추가` 가 가는 곳. 모달이 아니라 라우트다 (F5-1) */
+  href: string
+  /** **이 일자에** 이미 담긴 장소 */
+  addedPlaceIds: Set<string>
+  pendingPlaceId: string | null
+  /** 다른 일자를 포함해 담기가 진행 중이다 */
+  busy: boolean
+  error: PlanDaySaveError | null
+  onAdd: (alternative: PlanAlternativePlaceItem) => void
+}
 
 /** 좌측 목차의 앵커 대상. 목차와 제목이 같은 규칙으로 id 를 만들어야 링크가 맞는다 */
 export function planDayAnchorId(day: number): string {
@@ -38,6 +57,7 @@ export function PlanDaySection({
   editing,
   onStartEdit,
   editor,
+  add,
 }: {
   day: number
   /** `YYYY-MM-DD`. 서버 판정의 날짜가 아니라 일정 기간에서 계산한 값이다 */
@@ -54,6 +74,7 @@ export function PlanDaySection({
   onStartEdit: () => void
   /** 편집 중일 때 항목 목록 자리에 들어간다 */
   editor: ReactNode
+  add: PlanDayAdd
 }) {
   const anchorId = planDayAnchorId(day)
   const weekday = date === null ? null : weekdayOf(date)
@@ -71,11 +92,23 @@ export function PlanDaySection({
           </span>
         )}
 
-        {/* 항목이 없으면 바꿀 순서도 없다 */}
-        {!editing && rows.length > 0 && (
-          <Button variant="secondary" size="sm" className="ml-auto" onClick={onStartEdit}>
-            {messages.plan.editDayAction}
-          </Button>
+        {!editing && (
+          <div className="ml-auto flex items-center gap-2">
+            {/*
+              **빈 일자에도 남는다.** 담을 곳이 없는 날이야말로 이 버튼이 필요하다 —
+              `순서 편집` 과 달리 항목 수를 보지 않는다.
+            */}
+            <ButtonLink href={add.href} variant="secondary" size="sm">
+              {messages.plan.addPlaceAction}
+            </ButtonLink>
+
+            {/* 항목이 없으면 바꿀 순서도 없다 */}
+            {rows.length > 0 && (
+              <Button variant="secondary" size="sm" onClick={onStartEdit}>
+                {messages.plan.editDayAction}
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -107,7 +140,17 @@ export function PlanDaySection({
       )}
 
       {/* 편집 중에는 감춘다 — 순서를 정리하는 중에 다른 조작을 섞지 않는다 */}
-      {!editing && <PlanIndoorAlternatives alternatives={verdict?.indoorAlternatives ?? []} />}
+      {!editing && (
+        <PlanIndoorAlternatives
+          alternatives={verdict?.indoorAlternatives ?? []}
+          places={places}
+          addedPlaceIds={add.addedPlaceIds}
+          pendingPlaceId={add.pendingPlaceId}
+          disabled={add.busy}
+          error={add.error}
+          onAdd={add.onAdd}
+        />
+      )}
     </section>
   )
 }

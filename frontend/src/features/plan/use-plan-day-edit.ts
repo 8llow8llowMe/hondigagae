@@ -5,7 +5,6 @@ import { useCallback, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { planKeys } from '@/features/plan/queries'
-import { ApiError } from '@/lib/api/error'
 import { replaceDayItems } from '@/lib/api/plan'
 import { messages } from '@/lib/messages'
 import {
@@ -17,6 +16,7 @@ import {
   toEditItems,
   toggleRemoved,
 } from '@/lib/plan/day-items'
+import { type PlanDaySaveError, toPlanDaySaveError } from '@/lib/plan/save-error'
 import type { PlanItemDetail } from '@/types/plan'
 
 /**
@@ -32,13 +32,6 @@ import type { PlanItemDetail } from '@/types/plan'
 /** 이동 직후 포커스를 받아야 할 대상 */
 export type PlanDayEditFocus = { index: number; direction: MoveDirection }
 
-/** 저장 실패를 화면이 어떻게 다뤄야 하는가 */
-export type PlanDayEditError = {
-  message: string
-  /** `false` 면 `다시 시도` 를 주지 않는다 — 같은 본문이 같은 400 을 받는다 */
-  retriable: boolean
-}
-
 export function usePlanDayEdit({
   planId,
   onSaved,
@@ -52,7 +45,7 @@ export function usePlanDayEdit({
   const [items, setItems] = useState<PlanDayEditItem[]>([])
   const [original, setOriginal] = useState<PlanItemDetail[]>([])
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<PlanDayEditError | null>(null)
+  const [error, setError] = useState<PlanDaySaveError | null>(null)
   /** 이동·삭제를 스크린리더에 알린다 (E6) */
   const [announcement, setAnnouncement] = useState('')
   /**
@@ -118,7 +111,14 @@ export function usePlanDayEdit({
         setFocusTarget(null)
         onSaved()
       })
-      .catch((cause: unknown) => setError(toEditError(cause)))
+      .catch((cause: unknown) =>
+        setError(
+          toPlanDaySaveError(cause, {
+            retriable: messages.plan.editSaveErrorDescription,
+            missingPlace: messages.plan.editMissingPlaceError,
+          }),
+        ),
+      )
       .finally(() => {
         savingRef.current = false
         setSaving(false)
@@ -138,24 +138,4 @@ export function usePlanDayEdit({
     toggle,
     save,
   }
-}
-
-/**
- * 저장 실패를 문구와 재시도 가능 여부로 옮긴다.
- *
- * **`PLAN_004` 와 `PLAN_002` 에는 재시도를 주지 않는다.** 둘 다 같은 본문을 다시
- * 보내면 같은 400 이다 — `PLAN_004` 는 원천에서 사라진 장소가 담겨 있는 것이고,
- * `PLAN_002` 는 들고 있는 상세가 낡은 것이다.
- */
-function toEditError(cause: unknown): PlanDayEditError {
-  if (cause instanceof ApiError) {
-    if (cause.resultCode === 'PLAN_004') {
-      return { message: messages.plan.editMissingPlaceError, retriable: false }
-    }
-    if (cause.resultCode === 'PLAN_002') {
-      return { message: messages.plan.editDayOutOfRangeError, retriable: false }
-    }
-  }
-
-  return { message: messages.plan.editSaveErrorDescription, retriable: true }
 }

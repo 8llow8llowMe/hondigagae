@@ -5,9 +5,10 @@ import { useEffect, useRef } from 'react'
 import { Button } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
 import { PlanEditableItemRow } from '@/features/plan/plan-editable-item-row'
-import type { PlanDayEditError, PlanDayEditFocus } from '@/features/plan/use-plan-day-edit'
+import type { PlanDayEditFocus } from '@/features/plan/use-plan-day-edit'
 import { messages } from '@/lib/messages'
 import type { PlanDayEditItem } from '@/lib/plan/day-items'
+import type { PlanDaySaveError } from '@/lib/plan/save-error'
 
 /**
  * 편집 중인 일자 — 아트보드 03 A(모바일) · B(데스크톱) · C(저장 실패).
@@ -36,7 +37,7 @@ export function PlanDayEditor({
   missing: Set<string>
   dirty: boolean
   saving: boolean
-  error: PlanDayEditError | null
+  error: PlanDaySaveError | null
   announcement: string
   /** 이동 직후 포커스를 받아야 할 대상. 없으면 `null` */
   focusTarget: PlanDayEditFocus | null

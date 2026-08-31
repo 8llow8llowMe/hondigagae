@@ -26,61 +26,73 @@ import type { PlaceSummary } from '@/types/place'
  * 같은 이유로 아트보드의 **거리(`4.1km`)와 설명 한 줄도 그리지 않는다** — 목록 응답에 없다.
  */
 export function PlaceRow({ place, last = false }: { place: PlaceSummary; last?: boolean }) {
-  const hasImage = isAllowedImageHost(place.firstImage) && place.firstImage !== null
-  const meta = [shortAddress(place.addr1), indoorLabel(place.indoor)].filter(
-    (part): part is string => part !== null,
-  )
-
   return (
     <Row as="li" last={last}>
       <Link
         href={`/places/${place.placeId}`}
         className="focus-visible:ring-brand-500 flex items-center gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none lg:gap-5 lg:py-4"
       >
-        <div className="bg-band relative size-20 shrink-0 overflow-hidden rounded-md lg:size-24">
-          {/* 미등록 호스트를 next/image 에 넘기면 런타임에 던진다 — 플레이스홀더로 떨어뜨린다 */}
-          {hasImage ? (
-            <Image
-              src={place.firstImage as string}
-              alt=""
-              fill
-              sizes="(min-width: 1024px) 96px, 80px"
-              className="object-cover"
-            />
-          ) : (
-            <span className="text-fg-subtle absolute inset-0 flex flex-col items-center justify-center gap-1">
-              <ImageIcon size={20} />
-              <span className="text-caption text-fg-muted font-medium">
-                {messages.place.noImage}
-              </span>
-            </span>
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          {/* 한국어 실데이터는 길다. body 의 word-break: keep-all 은 어절 단위로만
-              끊으므로 `제주특별자치도립김창열미술관` 처럼 공백 없는 긴 이름이 넘친다.
-              break-words 로 "다른 방법이 없을 때만" 어절 안에서 끊게 한다. */}
-          <h3 className="text-title-2 text-fg line-clamp-2 font-semibold break-words">
-            {place.title}
-          </h3>
-
-          {/* nullable 은 에러가 아니라 숨김이다. 둘 다 없으면 줄 자체가 사라진다 */}
-          {meta.length > 0 && (
-            <p className="text-caption text-fg-muted mt-0.5 line-clamp-1 font-medium tabular-nums">
-              {meta.join(' · ')}
-            </p>
-          )}
-
-          <PlaceBadges place={place} className="mt-1.5 lg:hidden" />
-        </div>
-
-        {/* 데스크톱은 태그를 우측 열로 뺀다 — 아트보드 03 절 (폭 220 우측 정렬) */}
-        <PlaceBadges place={place} className="hidden w-56 shrink-0 justify-end lg:flex" />
-
+        <PlaceRowContent place={place} />
         <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
       </Link>
     </Row>
+  )
+}
+
+/**
+ * 행의 **내용**만 — 썸네일 · 제목 · 메타 · 태그.
+ *
+ * 링크 래퍼에서 떼어낸 이유: 일정에 담는 화면(#82)은 행에 `담기` 버튼을 두어야 하는데
+ * **`<a>` 안에 `<button>` 을 넣을 수 없다.** 그쪽은 내용을 링크로 감싸지 않고
+ * 제목만 링크로 만든다. 내용을 복제하면 두 목록의 행이 갈리므로 여기서 공유한다.
+ */
+export function PlaceRowContent({ place }: { place: PlaceSummary }) {
+  const hasImage = isAllowedImageHost(place.firstImage) && place.firstImage !== null
+  const meta = [shortAddress(place.addr1), indoorLabel(place.indoor)].filter(
+    (part): part is string => part !== null,
+  )
+
+  return (
+    <>
+      <div className="bg-band relative size-20 shrink-0 overflow-hidden rounded-md lg:size-24">
+        {/* 미등록 호스트를 next/image 에 넘기면 런타임에 던진다 — 플레이스홀더로 떨어뜨린다 */}
+        {hasImage ? (
+          <Image
+            src={place.firstImage as string}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 96px, 80px"
+            className="object-cover"
+          />
+        ) : (
+          <span className="text-fg-subtle absolute inset-0 flex flex-col items-center justify-center gap-1">
+            <ImageIcon size={20} />
+            <span className="text-caption text-fg-muted font-medium">{messages.place.noImage}</span>
+          </span>
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        {/* 한국어 실데이터는 길다. body 의 word-break: keep-all 은 어절 단위로만
+              끊으므로 `제주특별자치도립김창열미술관` 처럼 공백 없는 긴 이름이 넘친다.
+              break-words 로 "다른 방법이 없을 때만" 어절 안에서 끊게 한다. */}
+        <h3 className="text-title-2 text-fg line-clamp-2 font-semibold break-words">
+          {place.title}
+        </h3>
+
+        {/* nullable 은 에러가 아니라 숨김이다. 둘 다 없으면 줄 자체가 사라진다 */}
+        {meta.length > 0 && (
+          <p className="text-caption text-fg-muted mt-0.5 line-clamp-1 font-medium tabular-nums">
+            {meta.join(' · ')}
+          </p>
+        )}
+
+        <PlaceBadges place={place} className="mt-1.5 lg:hidden" />
+      </div>
+
+      {/* 데스크톱은 태그를 우측 열로 뺀다 — 아트보드 03 절 (폭 220 우측 정렬) */}
+      <PlaceBadges place={place} className="hidden w-56 shrink-0 justify-end lg:flex" />
+    </>
   )
 }
 

@@ -1,6 +1,6 @@
 import type { LatLng } from '@/lib/geo/coord'
 import { haversineMeters } from '@/lib/geo/distance'
-import type { PlanItemDetail } from '@/types/plan'
+import type { PlanAlternativePlaceItem, PlanItemDetail } from '@/types/plan'
 
 /**
  * 일정 상세의 순수 로직 — 일자 그룹핑 · 보강 대상 선별 · 거리 계산.
@@ -29,12 +29,21 @@ export function isPlaceTarget(item: PlanItemDetail): boolean {
 /**
  * 보강할 장소 id 목록. **중복을 제거한다** — 같은 장소를 두 일자에 담을 수 있고,
  * 그때 같은 요청을 두 번 보낼 이유가 없다.
+ *
+ * **실내 대안도 같은 목록에 넣는다** (#82 F1). `indoorAlternatives` 는
+ * `{placeId, title}` 뿐이라 주소·실내 여부를 말하려면 똑같이 `GET /places/{id}` 가
+ * 필요하다. 별도 `useQueries` 를 두면 **이미 항목으로 담긴 대안을 두 번 조회한다** —
+ * 여기서 합쳐 중복을 없앤다.
  */
-export function enrichTargetIds(items: PlanItemDetail[]): string[] {
+export function enrichTargetIds(
+  items: PlanItemDetail[],
+  alternatives: PlanAlternativePlaceItem[] = [],
+): string[] {
   const ids = new Set<string>()
   for (const item of items) {
     if (isPlaceTarget(item) && item.targetId !== null) ids.add(item.targetId)
   }
+  for (const alternative of alternatives) ids.add(alternative.placeId)
   return [...ids]
 }
 

@@ -109,3 +109,69 @@ function toPayloadItem(item: PlanItemDetail, day: number, sequence: number): Pla
     ...(item.startTime === null ? {} : { startTime: item.startTime }),
   }
 }
+
+// ─── 장소 담기 (#82) ──────────────────────────────────────────────────────────
+
+/**
+ * `title` 상한. 백엔드 `PlanItemRequest.title` 의 `@Size(max = 100)` 이다.
+ *
+ * **서버는 넘치면 자르지 않고 `PLAN_100` 을 낸다.** 장소 제목을 그대로 복사하는
+ * 담기 경로에서는 화면이 미리 잘라야 한다 (F3). 사용자가 쓴 글이 아니라 복사해 온
+ * 이름이라 잘라도 잃는 것이 없다.
+ *
+ * mock 의 동명 상수(`src/lib/api/mock/plan-data.ts`)와 값이 같지만 **별개다** —
+ * 그쪽은 서버 역할이라 검증하는 쪽이고, 이쪽은 요청을 만드는 쪽이다.
+ */
+export const ITEM_TITLE_MAX = 100
+
+/**
+ * 그 일자에 이미 담긴 장소 id.
+ *
+ * **서버는 중복을 막지 않는다.** 화면이 먼저 막지 않으면 같은 곳이 두 번 담긴 일정이
+ * 조용히 만들어진다 (F1·F5-4).
+ *
+ * `itemType` 을 보지 않는다 — 같은 장소가 `MEAL` 로 담겨 있어도 또 담을 이유가 없다.
+ * `targetId` 가 null 인 항목(`MOVE`)은 자연히 빠진다.
+ */
+export function placeIdsOf(items: PlanItemDetail[]): Set<string> {
+  const ids = new Set<string>()
+  for (const item of items) {
+    if (item.targetId !== null) ids.add(item.targetId)
+  }
+  return ids
+}
+
+/**
+ * 그 일자의 **맨 끝에** 장소 하나를 붙인 일괄 교체 본문.
+ *
+ * **새 API 가 없다.** 담기도 일자 편집과 같은 `PUT …/days/{day}/items` 라, 기존 항목을
+ * 전부 되싣고 하나를 더한 목록을 보낸다 — 되싣지 않으면 그 일자가 새 항목 하나만
+ * 남기고 비워진다 (E1).
+ *
+ * `itemType` 은 **`PLACE` 고정**이다. 식사·숙박 구분과 `WALK` 는 이 이슈 밖이다
+ * (F3 — `walk_course` 조회 API 가 없다).
+ *
+ * 순서는 **맨 끝**이다. 위치를 고르는 UI 는 두지 않는다 — 순서는 편집모드가 소유한다
+ * (F5-3).
+ */
+export function appendPlaceItemPayload(
+  items: PlanItemDetail[],
+  day: number,
+  place: { placeId: string; title: string },
+): PlanDayItemsReplacePayload {
+  const existing = items.map((item, index) => toPayloadItem(item, day, index))
+
+  return {
+    items: [
+      ...existing,
+      {
+        day,
+        sequence: existing.length,
+        itemType: 'PLACE',
+        // 문자열 그대로다 — Snowflake 라 Number() 를 거치면 정밀도를 잃는다 (E1 규칙 1)
+        targetId: place.placeId,
+        title: place.title.slice(0, ITEM_TITLE_MAX),
+      },
+    ],
+  }
+}

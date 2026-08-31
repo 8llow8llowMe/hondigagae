@@ -1,5 +1,6 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 
+import { ToastProvider } from '@/components/toast'
 import { GlobalHeader } from '@/features/nav/global-header'
 import { MobileTabBar } from '@/features/nav/mobile-tab-bar'
 import { petKeys } from '@/features/pet/queries'
@@ -59,10 +60,17 @@ export default async function MainLayout({ children }: { children: React.ReactNo
 
       <GlobalHeader authed={authed} />
 
-      {/* 탭바가 fixed 라 본문 하단을 그만큼 비운다. md 부터는 탭바가 없다 */}
-      <div id="main" className="pb-16 md:pb-0">
-        {children}
-      </div>
+      {/*
+        토스트는 `(main)` 에만 둔다. 여기에 두면 **라우트를 옮겨도 provider 가 유지돼**
+        장소 추가 화면에서 담고 일정 상세로 돌아온 뒤 토스트가 그대로 뜬다 (#82 F4).
+        `aboveTabBar` 기본값 그대로다 — 이 그룹에만 고정 탭바가 있다.
+      */}
+      <ToastProvider>
+        {/* 탭바가 fixed 라 본문 하단을 그만큼 비운다. md 부터는 탭바가 없다 */}
+        <div id="main" className="pb-16 md:pb-0">
+          {children}
+        </div>
+      </ToastProvider>
 
       <MobileTabBar authed={authed} />
     </HydrationBoundary>
