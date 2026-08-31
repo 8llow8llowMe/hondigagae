@@ -24,6 +24,17 @@ const TICK_MS = 1000
 export function useAiPlanJob(jobId: string) {
   const [elapsedMs, setElapsedMs] = useState(0)
   const startedAt = useRef<number | null>(null)
+  const watchedJobId = useRef(jobId)
+
+  /*
+    `jobId` 가 바뀌면 시계를 처음부터 다시 센다. **렌더 중에 조정한다** — effect 로
+    미루면 한 프레임 동안 이전 작업의 경과 시간이 보인다.
+  */
+  if (watchedJobId.current !== jobId) {
+    watchedJobId.current = jobId
+    startedAt.current = null
+    setElapsedMs(0)
+  }
 
   const query = useQuery({
     queryKey: aiPlanKeys.job(jobId),
@@ -48,11 +59,6 @@ export function useAiPlanJob(jobId: string) {
     바뀔 때 한 프레임 동안 이전 작업의 경과 시간이 보인다.
   */
   useEffect(() => {
-    startedAt.current = null
-    setElapsedMs(0)
-  }, [jobId])
-
-  useEffect(() => {
     if (!polling || phase === 'exceeded') return
 
     startedAt.current ??= Date.now()
@@ -64,7 +70,13 @@ export function useAiPlanJob(jobId: string) {
     }, TICK_MS)
 
     return () => globalThis.clearInterval(timer)
-  }, [polling, phase])
+    /*
+      **`jobId` 를 의존성에 넣는다.** 리셋을 별도 effect 로 분리하면 `jobId` 만 바뀌고
+      `polling`·`phase` 가 그대로일 때 이 effect 가 재실행되지 않아 `startedAt` 이
+      `null` 로 남고, 매 tick 이 early return 해 **경과 시간이 영구히 0** 이 된다 —
+      30초 안내와 90초 상한이 절대 발동하지 않는다.
+    */
+  }, [jobId, polling, phase])
 
   return {
     query,

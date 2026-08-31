@@ -8,16 +8,11 @@ import {
   type AiPlanDraftPreviewProps,
 } from '@/features/ai-plan/ai-plan-draft-preview'
 import { messages } from '@/lib/messages'
+import { aiPlanItem, aiPlanItemWithNulls } from '@/test/fixtures/ai-plan'
 import type { AiPlanDraft, AiPlanScheduleItem } from '@/types/ai-plan'
 
 function item(overrides: Partial<AiPlanScheduleItem> = {}): AiPlanScheduleItem {
-  return {
-    itemType: 'PLACE',
-    placeId: '212481712381923328',
-    title: '협재해수욕장',
-    note: '오전이라 노면이 덜 뜨거워요.',
-    ...overrides,
-  }
+  return aiPlanItem({ title: '협재해수욕장', ...overrides })
 }
 
 const DRAFT: AiPlanDraft = {
@@ -185,5 +180,23 @@ describe('AiPlanDraftPreview — 초안이 비었을 때', () => {
 
     expect(html).toContain(messages.aiPlan.emptyDraftTitle)
     expect(html).not.toContain(messages.common.retry)
+  })
+})
+
+describe('AiPlanDraftPreview — title·note 가 null 로 올 수 있다', () => {
+  it('null 이어도 렌더가 죽지 않는다 — 서버 DTO 에 제약이 없다', () => {
+    const html = render({
+      draft: { days: [{ day: 1, items: [aiPlanItemWithNulls()] }], reasons: [] },
+    })
+
+    expect(html).toContain('1일차')
+  })
+
+  it('이름이 없는 항목도 행을 지우지 않고 대체 문구로 남긴다', () => {
+    const html = render({
+      draft: { days: [{ day: 1, items: [aiPlanItemWithNulls()] }], reasons: [] },
+    })
+
+    expect(html).toContain(messages.aiPlan.itemTitleUnknown)
   })
 })

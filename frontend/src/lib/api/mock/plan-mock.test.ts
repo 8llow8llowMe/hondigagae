@@ -206,3 +206,60 @@ describe('일정 mock — items 를 함께 받는다 (AI 초안 담기, 이슈 #
     ])
   })
 })
+
+describe('일정 mock — 도메인 검증도 백엔드와 같이 돈다', () => {
+  const ITEM = {
+    day: 1,
+    sequence: 0,
+    itemType: 'PLACE',
+    targetId: '212481712381923328',
+    title: '협재해수욕장',
+  }
+
+  function code(result: ReturnType<typeof create>): unknown {
+    return (result?.payload as ApiResponse<null>).dataHeader.resultCode
+  }
+
+  it('일차가 여행 기간을 넘으면 PLAN_002 다 — validateItemDays', () => {
+    // 2026-11-01 ~ 11-03 = 3일
+    const result = create({ ...VALID, items: [{ ...ITEM, day: 4 }] })
+
+    expect(result?.status).toBe(400)
+    expect(code(result)).toBe('PLAN_002')
+  })
+
+  it('경계값(day === totalDays)은 통과한다', () => {
+    expect(create({ ...VALID, items: [{ ...ITEM, day: 3 }] })?.status).toBe(200)
+  })
+
+  it('모르는 장소를 targetId 로 보내면 PLAN_004 다 — verifyPlaceTargets', () => {
+    const result = create({ ...VALID, items: [{ ...ITEM, targetId: '999999999999999999' }] })
+
+    expect(result?.status).toBe(400)
+    expect(code(result)).toBe('PLAN_004')
+  })
+
+  it('WALK 은 장소 검증 대상이 아니다 — targetId 가 walk_course.id 다', () => {
+    const result = create({
+      ...VALID,
+      items: [{ ...ITEM, itemType: 'WALK', targetId: '999999999999999999' }],
+    })
+
+    expect(result?.status).toBe(200)
+  })
+
+  it('targetId 가 없는 항목은 장소 검증을 건너뛴다', () => {
+    const result = create({
+      ...VALID,
+      items: [{ ...ITEM, itemType: 'MOVE', targetId: undefined, title: '이동' }],
+    })
+
+    expect(result?.status).toBe(200)
+  })
+
+  it('Bean Validation 이 도메인 검증보다 먼저 돈다 — 둘 다 어긋나면 PLAN_100 이다', () => {
+    const result = create({ ...VALID, items: [{ ...ITEM, day: 4, itemType: 'CAFE' }] })
+
+    expect(code(result)).toBe('PLAN_100')
+  })
+})

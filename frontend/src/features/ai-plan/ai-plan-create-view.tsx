@@ -136,6 +136,19 @@ function AiPlanCreateFormContainer({ pets, fromJobId }: { pets: Pet[]; fromJobId
  * **저장된 `petId` 가 지금 목록에 없으면 비운다** — 그 사이 반려견을 삭제했을 수 있고,
  * 라디오에 없는 값을 넣으면 아무것도 선택되지 않은 채로 값이 채워져 있다고 보인다.
  */
+/**
+ * 원 단위 예산 → 만원 단위 폼 값.
+ *
+ * **만원 배수가 아니면 비운다.** `205_000 / 10_000` 은 `"20.5"` 인데 스키마가 `/^\d+$/`
+ * 로 막아, 사용자가 고치기 전까지 제출이 불가능한 폼이 된다.
+ */
+function toBudgetManwon(budget: number | null): string {
+  if (budget === null || budget <= 0) return ''
+  if (budget % MANWON !== 0) return ''
+
+  return String(budget / MANWON)
+}
+
 function restoreValues(fromJobId: string | null, pets: Pet[]): AiPlanFormValues {
   const base: AiPlanFormValues = {
     ...EMPTY_AI_PLAN_FORM_VALUES,
@@ -155,6 +168,6 @@ function restoreValues(fromJobId: string | null, pets: Pet[]): AiPlanFormValues 
     startDate: snapshot.startDate,
     endDate: snapshot.endDate,
     petId: known ? snapshot.petId : base.petId,
-    budgetManwon: snapshot.budget === null ? '' : String(snapshot.budget / MANWON),
+    budgetManwon: toBudgetManwon(snapshot.budget),
   }
 }

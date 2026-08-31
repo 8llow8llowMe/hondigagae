@@ -21,10 +21,15 @@ import { formatBudget } from '@/lib/ai-plan/budget'
 import { defaultPlanTitle } from '@/lib/ai-plan/draft-title'
 import { draftToPlanPayload } from '@/lib/ai-plan/draft-to-plan'
 import { isJobFailed } from '@/lib/ai-plan/job'
-import { clearAiPlanRequest, readAiPlanRequest } from '@/lib/ai-plan/request-store'
+import {
+  clearAiPlanRequest,
+  readAiPlanRequest,
+  saveAiPlanRequest,
+} from '@/lib/ai-plan/request-store'
 import { submitAiPlan } from '@/lib/api/ai-plan'
 import { ApiError } from '@/lib/api/error'
 import { createPlan } from '@/lib/api/plan'
+import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
 import { formatPlanDateRange, totalDaysBetween } from '@/lib/plan/date'
@@ -50,9 +55,16 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
   const { query, phase, polling, recheck } = useAiPlanJob(jobId)
 
   /*
-    **조건은 `sessionStorage` 에서 읽는다** (명세 S5 함정 1). 렌더 중에 직접 읽지 않고
-    지연 초기화로 한 번만 읽는다 — 이 컴포넌트는 `'use client'` 이고 첫 렌더가
-    하이드레이션이라, 렌더마다 읽으면 서버·클라이언트가 다른 값을 그린다.
+    **조건은 `sessionStorage` 에서 읽는다** (명세 S5 함정 1). 지연 초기화로 한 번만 읽어
+    폴링 리렌더마다 파싱하지 않는다.
+
+    **지연 초기화가 하이드레이션을 보장하지는 않는다** — client component 도 서버에서
+    렌더되고 그때는 `sessionStorage` 가 없어 항상 `null` 이다. 지금 안전한 실제 이유는
+    **첫 렌더 결과가 `snapshot` 에 의존하지 않는다**는 것이다: job 프리페치가 없어
+    `query.data === undefined` 이고 반드시 진행 분기로 간다.
+
+    **프리페치나 `HydrationBoundary` 를 붙이거나 진행 분기에서 조건을 그리기 시작하면
+    그 순간 mismatch 가 된다.** 그때는 읽기를 effect 로 옮긴다.
   */
   const [snapshot] = useState<AiPlanRequestSnapshot | null>(() => readAiPlanRequest(jobId))
 
@@ -65,7 +77,14 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
 
   // ── 1·2. 조회 실패 ─────────────────────────────────────────────────────
 
-  if (query.error !== null) {
+  /*
+    **폴링 중 일시 실패로 진행 화면을 지우지 않는다.** `retry: false` 라 주기 하나가
+    5xx·무응답이면 즉시 `query.error` 가 채워지는데, 다음 주기(2초)가 성공하면 되돌아온다
+    — 전체를 `ErrorState` 로 바꾸면 그 사이 에러 화면이 깜빡인다. **한 번도 못 받았을
+    때만** 전체 오류로 간다 (명세 S4 "폴링 요청 자체가 5xx 면 다음 주기에 자연히 다시
+    시도한다").
+  */
+  if (query.error !== null && job === null) {
     const status = query.error instanceof ApiError ? query.error.status : null
 
     /*
@@ -206,7 +225,6 @@ function AiPlanFailedContainer({
       })
 
       // 새 작업에도 같은 조건을 붙여 둔다 — 담기가 다시 필요하다
-      const { saveAiPlanRequest } = await import('@/lib/ai-plan/request-store')
       saveAiPlanRequest(result.jobId, snapshot)
 
       router.replace(`/ai-plans/jobs/${result.jobId}`)
@@ -270,6 +288,7 @@ function AiPlanCommitContainer({
             draft,
             snapshot,
             title: values.title.trim(),
+            totalDays,
             excludedPlaceIds,
           }),
         )
@@ -314,12 +333,19 @@ function AiPlanCommitContainer({
             errors={form.errors}
             submitting={form.isSubmitting}
             delistedBlocked={delistedBlocked}
+            hasDelisted={delistedPlaceIds.size > 0}
             excludedCount={excludedPlaceIds.size}
             onTitleChange={(title) => form.setValue('title', title)}
             onSubmit={() => void form.submit()}
             onExcludeDelisted={() => {
               setExcludedPlaceIds(new Set(delistedPlaceIds))
               setDelistedBlocked(false)
+              /*
+                **직전 실패의 서버 문구를 함께 지운다.** 안 지우면 사용자가 이미 조치한
+                오류("일정에 포함된 장소를 찾을 수 없습니다")가 "N개 항목을 빼고 담아요"
+                옆에 남아, 방금 고친 것이 아직 문제인 것처럼 보인다 (실렌더에서 잡았다).
+              */
+              form.setErrors(NO_FORM_ERRORS)
             }}
             onResetExcluded={() => setExcludedPlaceIds(EMPTY_SET)}
             onDiscard={() => setDiscarding(true)}

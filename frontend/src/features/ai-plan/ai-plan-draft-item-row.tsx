@@ -40,7 +40,9 @@ export function AiPlanDraftItemRow({
   excluded = false,
 }: AiPlanDraftItemRowProps) {
   const typeLabel = itemTypeLabel(item.itemType)
-  const note = item.note.trim()
+  // **`title`/`note` 는 nullable 이다** — 서버 DTO 에 제약이 없다 (`types/ai-plan.ts`)
+  const title = (item.title ?? '').trim()
+  const note = (item.note ?? '').trim()
 
   return (
     <li
@@ -60,7 +62,7 @@ export function AiPlanDraftItemRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className={cn('text-body-1 text-fg font-medium', excluded && 'line-through')}>
-            {item.title}
+            {title === '' ? messages.aiPlan.itemTitleUnknown : title}
           </p>
           {typeLabel !== null && (
             <Badge tone="neutral" size="sm">

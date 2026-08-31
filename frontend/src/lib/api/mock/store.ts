@@ -106,8 +106,11 @@ export type MockPlan = {
 export type MockAiPlanJob = {
   jobId: string
   memberId: string
-  /** 시나리오. `normal` 은 완료, `failed` 는 실패, `partial` 은 일수보다 적은 결과 */
-  scenario: 'normal' | 'failed' | 'partial'
+  /**
+   * 시나리오. `normal` 완료 · `failed` 실패 · `partial` 일수 부족 ·
+   * **`delisted` 는 사라진 장소를 섞어 담기를 `PLAN_004` 로 막는다.**
+   */
+  scenario: 'normal' | 'failed' | 'partial' | 'delisted'
   petId: string
   areaCode: string
   startDate: string

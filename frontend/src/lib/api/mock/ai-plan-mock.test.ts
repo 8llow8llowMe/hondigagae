@@ -215,3 +215,29 @@ describe('AI 일정 mock — 초안 항목', () => {
     expect(typeof done.planDraft?.days[0]?.items[0]?.itemType).toBe('string')
   })
 })
+
+describe('AI 일정 mock — 사라진 장소 시나리오 (PLAN_004 복구 경로)', () => {
+  it('첫 항목이 장소 mock 이 모르는 id 라 404 를 낸다', () => {
+    const done = pollTimes(newJob({ ...VALID, requestNote: '사라진 장소 확인' }), 3)
+    const placeId = done.planDraft?.days[0]?.items[0]?.placeId
+
+    expect(placeId).not.toBeNull()
+    expect(resolveMock(`/places/${placeId}`, 'GET', '', null, TOKEN)?.status).toBe(404)
+  })
+
+  it('나머지 항목은 정상 장소다 — 하나만 빼면 담을 수 있어야 한다', () => {
+    const done = pollTimes(newJob({ ...VALID, requestNote: '사라진 장소 확인' }), 3)
+    const second = done.planDraft?.days[0]?.items[1]?.placeId
+
+    expect(resolveMock(`/places/${second}`, 'GET', '', null, TOKEN)?.status).toBe(200)
+  })
+})
+
+describe('AI 일정 mock — 초안의 nullable 필드', () => {
+  it('note 가 null 인 항목을 포함한다 — DTO 에 제약이 없어 실제로 올 수 있다', () => {
+    const done = pollTimes(newJob(), 3)
+    const notes = done.planDraft?.days[0]?.items.map((item) => item.note)
+
+    expect(notes).toContain(null)
+  })
+})
