@@ -108,6 +108,14 @@ export function PasswordResetView() {
       setEmail(values.email)
       setCooldownStartedAt(Date.now())
       setResetErrorStatus(null)
+      /*
+        **2단계 폼을 비운다.** `AUTH_005`·`AUTH_017` 로 되돌아온 뒤 새 코드를 받고 오는 경로가
+        여기다. 비우지 않으면 방금 성공한 발송에 (a) 무효화된 옛 코드가 입력에 남고
+        (b) "시도 횟수를 초과했습니다" 가 `role="alert"` 로 다시 떠서 (c) 아래 `notice` 조건이
+        그것을 오류로 보고 "메일을 보냈어요" 를 지운다 — 정본 D5 의 "발송 성공 → 2단계 + 안내"
+        와 정면으로 어긋난다. 브라우저 실측으로 재현한 회귀다 (`onChangeEmail` 과 같은 처리).
+      */
+      resetForm.reset()
       setStep('code')
     },
   })

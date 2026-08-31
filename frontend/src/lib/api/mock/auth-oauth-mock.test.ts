@@ -74,6 +74,25 @@ describe('GET /auth/{provider}/login', () => {
     expect(created?.provider).toBe('NAVER')
     // 소셜로 만들어진 계정은 비밀번호가 없다 (백엔드 createOAuthMember 도 password(null))
     expect(created?.password).toBeNull()
+    // name 은 프로필의 name, 없으면 nickname 으로 채운다 — 백엔드 createOAuthMember 와 같다
+    expect(created?.name).toBe('박소셜')
+    expect(created?.nickname).toBe('소셜이')
+  })
+
+  it('AUTH_011 은 nickname·name 이 둘 다 빌 때만 난다 — mock 이 백엔드보다 엄격하지 않다', () => {
+    /*
+      백엔드 `validateRequiredProfile` 은 `!hasText(nickname) && !hasText(name)` 이다.
+      `nickname` 만 보고 던지면 실제로는 통과할 프로필이 mock 에서만 400 이 된다.
+
+      **한쪽만 빈 fixture 는 두지 않는다.** 그 조합은 백엔드가 통과시킨 뒤 빈 닉네임으로
+      회원을 만들어 DB 제약에 걸릴 수 있는 상태라(컨트롤러 주석이 그 위험을 적어 뒀다),
+      mock 이 만들면 실제로 존재할 수 없는 계정을 정상인 것처럼 제공하게 된다.
+      여기서 고정하는 것은 "둘 다 빌 때만 던진다" 는 조건뿐이다.
+    */
+    const { state } = issued('kakao')
+    const result = login('kakao', 'profile-denied-1', state)
+
+    expect(result?.payload.dataHeader.resultCode).toBe('AUTH_011')
   })
 
   it('같은 콜백 주소를 두 번 태우면 두 번째는 AUTH_010 이다', () => {

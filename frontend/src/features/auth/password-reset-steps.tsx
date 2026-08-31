@@ -1,3 +1,5 @@
+'use client'
+
 import { Button, ButtonLink } from '@/components/button'
 import { ErrorState } from '@/components/error-state'
 import { Field } from '@/components/field'
