@@ -42,6 +42,28 @@ describe('toPlanDaySaveError', () => {
     expect(toPlanDaySaveError(new Error('boom'), COPY).retriable).toBe(true)
   })
 
+  /*
+    회귀 방지 — 되풀이해도 안 되는 4xx 에 `다시 시도` 를 주면 안 된다.
+    근거: PlanErrorCode.java · ValidationErrorSupport.java 소스 실측.
+  */
+  it('PLAN_001(404, 지워졌거나 남의 일정)에 재시도를 주지 않는다', () => {
+    const error = toPlanDaySaveError(new ApiError(404, 'PLAN_001', null), COPY)
+
+    expect(error.retriable).toBe(false)
+    expect(error.message).toBe(messages.plan.saveStaleError)
+  })
+
+  it('Bean Validation(PLAN_110 등)에도 재시도를 주지 않는다', () => {
+    expect(toPlanDaySaveError(new ApiError(400, 'PLAN_110', null), COPY).retriable).toBe(false)
+  })
+
+  it('PLAN_900(503, tour-service 연동 실패)은 일시 장애라 재시도한다', () => {
+    const error = toPlanDaySaveError(new ApiError(503, 'PLAN_900', null), COPY)
+
+    expect(error.retriable).toBe(true)
+    expect(error.message).toBe(COPY.retriable)
+  })
+
   it('PLAN_002 는 문구를 나누지 않는다 — 어느 화면에서든 할 일이 새로고침으로 같다', () => {
     const error = toPlanDaySaveError(new ApiError(400, 'PLAN_002', null), COPY)
 

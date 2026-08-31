@@ -153,6 +153,11 @@ export const planMessages = {
    */
   distanceFromLodging: '숙소에서 직선 {distance}',
   distanceFromPrevious: '직선 {distance} 이동',
+  /**
+   * `{distance}` 치환. 실내 대안 행 — **그날 기준 장소로부터**의 거리다.
+   * 서버가 하버사인으로 재 주므로 화면이 계산하지 않지만, `직선` 은 똑같이 붙인다.
+   */
+  distanceStraight: '직선 {distance}',
   /** 30km 이상 구간에 덧붙는다 */
   longTripSuffix: ' — 하루 이동이 깁니다.',
 
@@ -196,6 +201,12 @@ export const planMessages = {
   /** 저장 버튼이 잠긴 이유. `aria-describedby` 로 준다 */
   editNoChanges: '순서를 바꾸거나 삭제 표시를 해야 저장할 수 있어요.',
 
+  /**
+   * 재시도로 풀리지 않는 4xx 일반. `PLAN_001`(지워졌거나 남의 일정) · `PLAN_114` ·
+   * Bean Validation 이 여기 온다 — 전부 "들고 있는 화면이 낡았다" 로 귀결된다.
+   */
+  saveStaleError: '화면이 최신이 아니에요. 새로고침한 뒤 다시 시도해 주세요.',
+
   editSaveErrorTitle: '순서를 저장하지 못했어요',
   editSaveErrorDescription: '편집한 내용은 그대로 있어요. 다시 시도해 주세요.',
   /**
@@ -219,7 +230,8 @@ export const planMessages = {
   editAnnounceRestored: '삭제 표시를 해제했어요',
 
   // ── 장소 담기 (#82) ────────────────────────────────────────────────────
-  // 두 진입점이 같은 일괄 교체 저장을 쓴다 — 문구도 한 벌이다 (F절).
+  // 두 진입점(장소 추가 화면 · 실내 대안)이 같은 일괄 교체 저장을 쓰므로 **둘끼리는**
+  // 문구가 한 벌이다. 편집모드와는 나눈다 — `addPlaceMissingPlaceError` 참고 (F절).
 
   /** 일자 섹션의 진입 버튼 */
   addPlaceAction: '장소 추가',
@@ -255,6 +267,8 @@ export const planMessages = {
   addPlaceMissingPlaceError:
     '이 일자에 더 이상 조회되지 않는 장소가 있어 담을 수 없어요. 일정에서 그 항목을 먼저 빼 주세요.',
 
+  /** 탭 제목. 일자를 넣으려면 라우트 파라미터가 필요해 정적 문구다 */
+  addPlacePageTitle: '일정에 장소 담기',
   /** `{day}` 치환. 장소 추가 화면의 제목 */
   addPlaceTitle: '{day}일차에 담을 장소',
   /** 어느 일정인지 밝힌다 — 목록만 보면 어디에 담는지 알 수 없다 */

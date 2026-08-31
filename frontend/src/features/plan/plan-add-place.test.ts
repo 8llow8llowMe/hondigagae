@@ -8,12 +8,12 @@ import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { PlanIndoorAlternatives } from '@/features/plan/plan-indoor-alts'
 import { messages } from '@/lib/messages'
 import { placeDetail, placeSummary } from '@/test/fixtures/place'
-import { planDayAdd, planDetail, planVerdict } from '@/test/fixtures/plan'
+import { planAlternative, planDayAdd, planDetail, planVerdict } from '@/test/fixtures/plan'
 import type { PlaceDetail } from '@/types/place'
 
 /** 명세: docs/features/plan/일자편집-세부명세.md F절 (이슈 #82) */
 
-const ALTERNATIVE = { placeId: '212481712381923328', title: '김창열미술관' }
+const ALTERNATIVE = planAlternative({ title: '김창열미술관', distanceMeters: 12_400 })
 
 function renderAlternatives(overrides: Record<string, unknown> = {}) {
   return renderToStaticMarkup(
@@ -59,10 +59,23 @@ describe('PlanIndoorAlternatives — 실내 대안 담기', () => {
     expect(renderAlternatives()).toContain(ALTERNATIVE.title)
   })
 
-  it('계약에 없는 거리를 만들지 않는다 — 기준점이 정해져 있지 않다', () => {
-    const places = new Map<string, PlaceDetail>([[ALTERNATIVE.placeId, placeDetail]])
+  /*
+    서버가 `distanceMeters` 를 준다 — 그날 기준 장소로부터의 하버사인 거리다.
+    화면이 재지 않고, **`직선` 을 반드시 붙인다** (D3).
+  */
+  it('서버가 준 거리를 직선거리로 밝혀 표시한다', () => {
+    const markup = renderAlternatives()
 
-    expect(renderAlternatives({ places })).not.toContain('km')
+    expect(markup).toContain('직선 12.4km')
+  })
+
+  it('거리는 보강을 기다리지 않는다 — 계약에서 바로 온다', () => {
+    // places 가 비어 주소가 없어도 거리는 나온다
+    expect(renderAlternatives()).toContain('직선 12.4km')
+  })
+
+  it('보강 전에도 44px 터치 영역을 잃지 않는다', () => {
+    expect(renderAlternatives()).toContain('min-h-11')
   })
 
   it('담기 실패는 토스트가 아니라 이 자리에 남는다 — 재시도할 수 있어야 한다', () => {
@@ -96,6 +109,7 @@ function renderRow(overrides: Record<string, unknown> = {}) {
       added: false,
       pending: false,
       disabled: false,
+      error: null,
       onAdd: () => undefined,
       ...overrides,
     }),
@@ -110,11 +124,27 @@ describe('PlanAddPlaceRow — 고르는 목록의 행', () => {
     expect(markup).toContain(placeSummary.petAllowanceType.name)
   })
 
-  it('행 전체를 링크로 감싸지 않는다 — a 안에 button 을 넣을 수 없다', () => {
+  it('행 전체가 아니라 제목만 링크다 — a 안에 button 을 넣을 수 없다', () => {
     const markup = renderRow()
 
     expect(markup).toContain('<button')
-    expect(markup).not.toContain('<a ')
+    // 링크는 하나뿐이고 제목에 걸려 있다
+    expect(markup.match(/<a /g)).toHaveLength(1)
+    expect(markup).toContain(`href="/places/${placeSummary.placeId}"`)
+  })
+
+  it('담기 실패를 그 행에 남긴다 — 헤더에 모으면 스크롤 아래에서 안 보인다', () => {
+    const markup = renderRow({
+      error: { message: messages.plan.addPlaceMissingPlaceError, retriable: false },
+    })
+
+    expect(markup).toContain('role="alert"')
+    expect(markup).toContain(messages.plan.addPlaceMissingPlaceError)
+  })
+
+  it('액션 열이 고정 폭이라 담기/이미 담았어요 사이에 앞 열이 밀리지 않는다', () => {
+    expect(renderRow()).toContain('w-24')
+    expect(renderRow({ added: true })).toContain('w-24')
   })
 
   it('이미 담긴 장소는 버튼이 사라지지 않고 이유가 남는다', () => {

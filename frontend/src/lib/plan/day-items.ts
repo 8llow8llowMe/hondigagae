@@ -1,3 +1,4 @@
+import { isPlaceTarget } from '@/lib/plan/detail'
 import type { PlanDayItemsReplacePayload, PlanItemDetail, PlanItemPayload } from '@/types/plan'
 
 /**
@@ -115,7 +116,7 @@ function toPayloadItem(item: PlanItemDetail, day: number, sequence: number): Pla
 /**
  * `title` 상한. 백엔드 `PlanItemRequest.title` 의 `@Size(max = 100)` 이다.
  *
- * **서버는 넘치면 자르지 않고 `PLAN_100` 을 낸다.** 장소 제목을 그대로 복사하는
+ * **서버는 넘치면 자르지 않고 `PLAN_110` 을 낸다.** 장소 제목을 그대로 복사하는
  * 담기 경로에서는 화면이 미리 잘라야 한다 (F3). 사용자가 쓴 글이 아니라 복사해 온
  * 이름이라 잘라도 잃는 것이 없다.
  *
@@ -125,18 +126,22 @@ function toPayloadItem(item: PlanItemDetail, day: number, sequence: number): Pla
 export const ITEM_TITLE_MAX = 100
 
 /**
- * 그 일자에 이미 담긴 장소 id.
+ * 그 일자에 이미 담긴 **장소** id.
  *
  * **서버는 중복을 막지 않는다.** 화면이 먼저 막지 않으면 같은 곳이 두 번 담긴 일정이
  * 조용히 만들어진다 (F1·F5-4).
  *
- * `itemType` 을 보지 않는다 — 같은 장소가 `MEAL` 로 담겨 있어도 또 담을 이유가 없다.
- * `targetId` 가 null 인 항목(`MOVE`)은 자연히 빠진다.
+ * **`isPlaceTarget` 으로 거른다** — `PLACE`/`MEAL`/`LODGING` 의 `targetId` 만 `place.id` 이고
+ * **`WALK` 의 `targetId` 는 `walk_course.id` 라 다른 네임스페이스다.** 걸러내지 않으면 우연히
+ * 값이 겹치는 장소가 `이미 담았어요` 로 잠겨, 담을 수 있는 곳을 담지 못한다 —
+ * 버튼이 사라져 우회로도 없다. 같은 구분을 항목 보강도 쓴다 (`lib/plan/detail.ts`).
+ *
+ * `MEAL`·`LODGING` 은 포함한다 — 같은 장소가 식사로 담겨 있어도 또 담을 이유가 없다.
  */
 export function placeIdsOf(items: PlanItemDetail[]): Set<string> {
   const ids = new Set<string>()
   for (const item of items) {
-    if (item.targetId !== null) ids.add(item.targetId)
+    if (isPlaceTarget(item) && item.targetId !== null) ids.add(item.targetId)
   }
   return ids
 }

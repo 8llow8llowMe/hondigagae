@@ -11,6 +11,7 @@ import { placeListPath, type PlaceSlice } from '@/lib/api/place'
 import { planDetailPath } from '@/lib/api/plan'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
+import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import { parsePlaceFilters } from '@/lib/url/place-filters'
 import type { PlanDetail } from '@/types/plan'
@@ -26,6 +27,15 @@ import type { PlanDetail } from '@/types/plan'
  * 상세는 `fetchQuery` + try/catch 라 404 를 404 로 낼 수 있고, 목록은 실패해도 화면을
  * 세우고 클라이언트가 다시 조회한다.
  */
+/**
+ * 보호 화면이라 크롤러가 못 들어오지만 **탭 제목은 필요하다** — `(main)` 의 다른 라우트가
+ * 전부 갖고 있고, 없으면 이 화면만 `혼디가개` 로 뜬다. 일정 제목을 넣으려면 백엔드를 한 번
+ * 더 불러야 해서 정적 문구로 둔다.
+ */
+export const metadata = {
+  title: `${messages.plan.addPlacePageTitle} · 혼디가개`,
+}
+
 type Params = Promise<{ planId: string; day: string }>
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 

@@ -4,6 +4,7 @@ import Link from 'next/link'
 
 import { Button } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
+import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
 import { shortAddress } from '@/lib/place/address'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
@@ -16,12 +17,13 @@ import type { PlanAlternativePlaceItem } from '@/types/plan'
  * **비면 블록을 렌더하지 않는다.** 비 예보가 없는 일자에 빈 제목만 남으면
  * "대안이 없다" 로 읽힌다 — 사실은 필요가 없는 것이다.
  *
- * 계약은 `{placeId, title}` 뿐이라 **주소·실내 여부는 보강(`GET /places/{id}`)에서 온다.**
- * 상세 항목 보강과 **같은 캐시**를 쓴다(`placeKeys.detail`) — 이미 담긴 대안은 요청이
- * 아예 나가지 않는다. 보강이 실패하면 제목만 남고 행은 살아 있다.
+ * 계약이 주는 것은 `placeId` · `title` · `lat` · `lng` · `distanceMeters` 다.
+ * **주소·실내 여부만 보강(`GET /places/{id}`)에서 온다** — 상세 항목 보강과 **같은 캐시**를
+ * 쓰므로(`placeKeys.detail`) 이미 담긴 대안은 요청이 아예 나가지 않는다. 보강이 실패하면
+ * 제목과 거리만 남고 행은 살아 있다.
  *
- * **아트보드의 `· 12.4km` 는 붙이지 않는다.** 계약에도 명세에도 그 거리의 기준점이 없다
- * (그날 첫 항목인지 숙소인지 정해지지 않았다). 근거 없는 숫자를 만들지 않는다.
+ * **거리에 `직선` 을 반드시 붙인다.** 서버가 `GeoDistance.meters()` 하버사인으로 재므로
+ * 직선거리이고, 제주는 산간·해안도로가 많아 주행거리와 크게 다르다 (D3).
  *
  * 담기 실패는 **토스트가 아니라 이 자리에 남는다** — `components/toast.tsx` 가
  * "오류를 토스트로 말하지 않는다"(사라지는 UI 에 복구 수단을 두지 않는다)를 못박고 있다.
@@ -37,14 +39,15 @@ export function PlanIndoorAlternatives({
   onAdd,
 }: {
   alternatives: PlanAlternativePlaceItem[]
-  /** placeId → 보강 결과. 없으면 그 행은 제목만 남는다 */
+  /** placeId → 보강 결과. 없으면 그 행은 제목과 거리만 남는다 */
   places: Map<string, PlaceDetail>
   /** **그 일자에** 이미 담긴 장소. 서버가 중복을 막지 않아 화면이 막는다 (F5-4) */
   addedPlaceIds: Set<string>
-  /** 담는 중인 장소. 그 버튼만 진행 표시를 낸다 */
+  /** **이 일자에서** 담는 중인 장소. 다른 일자의 진행이 여기 비치면 안 된다 */
   pendingPlaceId: string | null
   /** 다른 담기가 진행 중이면 전부 잠근다 — 일괄 교체라 동시에 두 개를 보내면 하나가 진다 */
   disabled: boolean
+  /** **이 일자에서** 난 실패만 온다 */
   error: PlanDaySaveError | null
   onAdd: (alternative: PlanAlternativePlaceItem) => void
 }) {
@@ -97,19 +100,27 @@ function PlanIndoorAlternativeRow({
   disabled: boolean
   onAdd: (alternative: PlanAlternativePlaceItem) => void
 }) {
-  // 보강 전·실패면 줄 자체가 사라진다. nullable 은 에러가 아니라 숨김이다
-  const meta = place === undefined ? null : shortAddress(place.addr1)
+  /*
+    주소는 보강에서 오고 거리는 계약에서 온다 — **거리는 보강을 기다리지 않는다.**
+    nullable 은 에러가 아니라 숨김이라, 주소가 없으면 그 조각만 빠진다.
+  */
+  const meta = [
+    place === undefined ? null : shortAddress(place.addr1),
+    messages.plan.distanceStraight.replace(
+      '{distance}',
+      formatDistance(alternative.distanceMeters),
+    ),
+  ].filter((part): part is string => part !== null)
 
   return (
     <li className="flex items-center gap-3">
+      {/* min-h-11 — 보강 전이라 주소 줄이 없어도 44px 터치 영역을 잃지 않는다 (DESIGN.md §7) */}
       <Link
         href={`/places/${alternative.placeId}`}
-        className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 min-w-0 flex-1 py-2 font-medium break-keep focus-visible:ring-2 focus-visible:outline-none"
+        className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 min-h-11 min-w-0 flex-1 py-2 font-medium break-keep focus-visible:ring-2 focus-visible:outline-none"
       >
         <span className="block">{alternative.title}</span>
-        {meta !== null && (
-          <span className="text-caption text-fg-muted block font-medium">{meta}</span>
-        )}
+        <span className="text-caption text-fg-muted block font-medium">{meta.join(' · ')}</span>
       </Link>
 
       {/*

@@ -11,6 +11,7 @@ import {
 import type { ApiResponse, CodeNameMetadata, SliceResponse } from '@/types/api'
 import type { ScoreMetricMetadata } from '@/types/insight'
 import type {
+  PlanAlternativePlaceItem,
   PlanDayWeatherItem,
   PlanDetail,
   PlanItemDetail,
@@ -651,7 +652,7 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
         maxHumidity: rainy ? 88 : 60,
       },
       // 비 예보가 있고 그날 장소가 실내가 아닐 때만 채워진다 (컨트롤러 설명)
-      indoorAlternatives: rainy ? indoorAlternatives() : [],
+      indoorAlternatives: rainy ? indoorAlternatives(representativePlaceId) : [],
       unavailableReason: null,
     }
   })
@@ -666,11 +667,53 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
   }
 }
 
-/** 실내 대안. `{placeId, title}` 뿐이라 화면이 보강해야 상세를 말할 수 있다 */
-function indoorAlternatives(): { placeId: string; title: string }[] {
-  return MOCK_PLACES.filter((place) => place.indoor === true)
-    .slice(0, 2)
-    .map((place) => ({ placeId: place.placeId, title: place.title }))
+/**
+ * 실내 대안.
+ *
+ * **좌표와 거리를 서버가 준다** (`PlanAlternativePlaceItem` 5필드). 거리는 그날 기준
+ * 장소로부터의 하버사인 직선거리라 mock 도 같은 방식으로 잰다 — 주소·실내 여부는
+ * 계약에 없어 화면이 `GET /places/{id}` 로 보강한다.
+ */
+function indoorAlternatives(representativePlaceId: string | null): PlanAlternativePlaceItem[] {
+  const basis = MOCK_PLACES.find((place) => place.placeId === representativePlaceId) ?? null
+  const basisLat = basis?.lat ?? null
+  const basisLng = basis?.lng ?? null
+
+  return (
+    MOCK_PLACES
+      // 좌표 없는 장소는 애초에 반경 검색에 걸리지 않는다 — 서버가 lat/lng 로 조회한다
+      .filter((place) => place.indoor === true && place.lat !== null && place.lng !== null)
+      .slice(0, 2)
+      .map((place) => ({
+        placeId: place.placeId,
+        title: place.title,
+        lat: place.lat as number,
+        lng: place.lng as number,
+        distanceMeters:
+          basisLat === null || basisLng === null
+            ? 0
+            : Math.round(geoMeters(basisLat, basisLng, place.lat as number, place.lng as number)),
+      }))
+  )
+}
+
+/**
+ * 백엔드 `GeoDistance.meters()` 의 복제본 — 하버사인.
+ *
+ * **FE 의 `haversineMeters`(`src/lib/geo/distance.ts`)를 부르지 않는다.** mock 은 서버
+ * 역할이라 화면 코드에 기대면 안 되고, 지구 반지름도 서버 값(6_371_000)을 따른다
+ * (FE 는 WGS84 평균 6_371_008.8 이라 미세하게 다르다).
+ */
+function geoMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const EARTH_RADIUS_M = 6_371_000
+  const rad = (degrees: number) => (degrees * Math.PI) / 180
+
+  const dLat = rad(lat2 - lat1)
+  const dLng = rad(lng2 - lng1)
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2
+
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(a)))
 }
 
 // ─── 일자별 항목 일괄 교체 (#81) ──────────────────────────────────────────────
