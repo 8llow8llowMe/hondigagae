@@ -1,3 +1,4 @@
+import type { PlanDayAdd } from '@/features/plan/plan-day-section'
 import type { Pet } from '@/types/pet'
 import type { PlanDayWeatherItem, PlanDetail, PlanItemDetail } from '@/types/plan'
 
@@ -99,4 +100,19 @@ export const pet: Pet = {
   activityLevel: { code: 'MEDIUM', name: '보통', description: null },
   walkPreferred: true,
   sociality: { code: 'MEDIUM', name: '보통', description: null },
+}
+
+/**
+ * `PlanDaySection` 의 담기 묶음 기본값 (#82).
+ *
+ * 테스트마다 7개 필드를 다시 적으면 **무엇을 검증하는지가 잡음에 묻힌다.**
+ * 검증할 필드만 덮어쓴다.
+ */
+export const planDayAdd: PlanDayAdd = {
+  href: '/plans/312481712381923328/days/1/add',
+  addedPlaceIds: new Set<string>(),
+  pendingPlaceId: null,
+  busy: false,
+  error: null,
+  onAdd: () => undefined,
 }

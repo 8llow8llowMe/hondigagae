@@ -15,11 +15,13 @@ import { PlanEditModal } from '@/features/plan/plan-edit-modal'
 import { PlanItemRow } from '@/features/plan/plan-item-row'
 import { PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
 import { PlanStatusAction } from '@/features/plan/plan-status-action'
+import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
 import { usePlanDayEdit } from '@/features/plan/use-plan-day-edit'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { toLatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
 import { addPlanDays } from '@/lib/plan/date'
+import { placeIdsOf } from '@/lib/plan/day-items'
 import {
   groupItemsByDay,
   lodgingBasisFor,
@@ -75,6 +77,12 @@ export function PlanDetailSection({
     planId: plan.planId,
     onSaved: () => setEditingDay(null),
   })
+
+  /*
+    실내 대안 `담기`. **장소 추가 화면과 같은 훅이다** — 둘 다 같은 일괄 교체 저장이라
+    후처리(캐시 갱신 · 판정 무효화 · 토스트)가 갈리면 안 된다 (F0).
+  */
+  const addPlace = usePlanAddPlace({ planId: plan.planId })
 
   // 편집한 것을 브라우저 이탈로 잃지 않게 한다. 저장 중은 제외한다 (form-guide.md §7)
   useUnsavedWarning(edit.dirty && !edit.saving)
@@ -140,6 +148,20 @@ export function PlanDetailSection({
               onRetryVerdict={onRetryWeather}
               editing={editingDay === group.day}
               onStartEdit={() => requestEditor(group.day)}
+              add={{
+                href: `/plans/${plan.planId}/days/${group.day}/add`,
+                addedPlaceIds: placeIdsOf(group.items),
+                pendingPlaceId: addPlace.pendingPlaceId,
+                busy: addPlace.adding,
+                error: addPlace.error,
+                onAdd: (alternative) =>
+                  addPlace.add({
+                    day: group.day,
+                    // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
+                    dayItems: group.items,
+                    place: alternative,
+                  }),
+              }}
               editor={
                 editingDay !== group.day ? null : (
                   <PlanDayEditor

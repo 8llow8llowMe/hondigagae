@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
@@ -23,6 +25,14 @@ export type PlaceListSectionProps = {
   onLoadMore: () => void
   onRetry: () => void
   onResetFilters: () => void
+  /**
+   * 행을 다르게 그린다. 기본은 장소 상세로 가는 `PlaceRow` 다.
+   *
+   * 일정에 담는 화면(#82)이 같은 4상태(로딩·오류·빈 결과·목록)와 무한 스크롤을
+   * 쓰면서 행만 다르다. **상태 로직을 복제하지 않으려고 행만 갈아끼운다** —
+   * 반대로 이 컴포넌트가 일정 도메인을 알면 place → plan 역참조가 된다.
+   */
+  renderRow?: (place: PlaceSummary, last: boolean) => ReactNode
 }
 
 /**
@@ -40,6 +50,7 @@ export function PlaceListSection({
   onLoadMore,
   onRetry,
   onResetFilters,
+  renderRow = (place, last) => <PlaceRow key={place.placeId} place={place} last={last} />,
 }: PlaceListSectionProps) {
   if (loading) {
     return (
@@ -107,9 +118,7 @@ export function PlaceListSection({
   return (
     <div className="flex flex-col">
       <RowList>
-        {places.map((place, index) => (
-          <PlaceRow key={place.placeId} place={place} last={index === places.length - 1} />
-        ))}
+        {places.map((place, index) => renderRow(place, index === places.length - 1))}
       </RowList>
 
       {hasNext ? (

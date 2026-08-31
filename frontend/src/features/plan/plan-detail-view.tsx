@@ -27,7 +27,14 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
   const pets = usePetList()
 
   const items = detail.data?.items ?? []
-  const { places, missing } = usePlaceEnrichment(enrichTargetIds(items))
+  /*
+    **실내 대안도 같이 보강한다** (#82 F1). `indoorAlternatives` 는 `{placeId, title}` 뿐이라
+    주소를 말하려면 항목과 똑같이 `GET /places/{id}` 가 필요하다. 한 목록으로 합쳐야
+    이미 담긴 대안을 두 번 조회하지 않는다 — 판정이 늦게 오면 목록이 늘어나고 그때
+    새 id 만 요청이 나간다.
+  */
+  const alternatives = weather.data?.days.flatMap((day) => day.indoorAlternatives) ?? []
+  const { places, missing } = usePlaceEnrichment(enrichTargetIds(items, alternatives))
 
   if (detail.isPending) return null
 

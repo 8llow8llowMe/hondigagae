@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  appendPlaceItemPayload,
   hasEditChanges,
+  ITEM_TITLE_MAX,
   moveEditItem,
+  placeIdsOf,
   planDayItemsPayload,
   survivingItems,
   toEditItems,
@@ -167,5 +170,92 @@ describe('survivingItems', () => {
       '미술관',
       '이동',
     ])
+  })
+})
+
+describe('placeIdsOf — 같은 일자 중복 담기 판정 (#82)', () => {
+  it('그 일자에 담긴 장소 id 를 모은다', () => {
+    const ids = placeIdsOf(ITEMS)
+
+    expect(ids.has(BIG_ID)).toBe(true)
+    expect(ids.has('212481712381923334')).toBe(true)
+  })
+
+  it('targetId 가 null 인 항목(MOVE)은 들어가지 않는다', () => {
+    expect(placeIdsOf(ITEMS).size).toBe(2)
+  })
+
+  it('itemType 을 가리지 않는다 — MEAL 로 담긴 곳도 또 담을 이유가 없다', () => {
+    const meal = planItem({
+      planItemId: 'd',
+      day: 2,
+      sequence: 3,
+      title: '점심',
+      itemType: { code: 'MEAL', name: '식사', description: null },
+      targetId: '212481712381923340',
+    })
+
+    expect(placeIdsOf([meal]).has('212481712381923340')).toBe(true)
+  })
+})
+
+describe('appendPlaceItemPayload — 장소 담기 (#82)', () => {
+  const place = { placeId: '212481712381923350', title: '오설록 티뮤지엄' }
+
+  it('기존 항목을 전부 되싣고 새 항목을 맨 끝에 붙인다 — 일괄 교체다', () => {
+    const payload = appendPlaceItemPayload(ITEMS, 2, place)
+
+    expect(payload.items).toHaveLength(4)
+    expect(payload.items.at(-1)?.title).toBe(place.title)
+  })
+
+  it('되싣는 항목의 memo · startTime · itemType 이 살아 있다 — 빼먹으면 조용히 지워진다', () => {
+    const first = appendPlaceItemPayload(ITEMS, 2, place).items[0]
+
+    expect(first?.memo).toBe('실내라 비가 와도 괜찮아요')
+    expect(first?.startTime).toBe('10:00:00')
+    expect(first?.itemType).toBe('PLACE')
+  })
+
+  it('sequence 를 0부터 다시 매기고 새 항목이 마지막 번호를 받는다', () => {
+    const payload = appendPlaceItemPayload(ITEMS, 2, place)
+
+    expect(payload.items.map((item) => item.sequence)).toEqual([0, 1, 2, 3])
+  })
+
+  it('targetId 가 문자열이다 — Snowflake 는 Number() 를 거치면 정밀도를 잃는다', () => {
+    const added = appendPlaceItemPayload([], 1, place).items[0]
+
+    expect(added?.targetId).toBe(place.placeId)
+    expect(typeof added?.targetId).toBe('string')
+    // 직렬화해도 숫자가 되지 않는다
+    expect(JSON.stringify(added)).toContain(`"targetId":"${place.placeId}"`)
+  })
+
+  it('itemType 이 PLACE 고정이다 — 유형 선택 UI 가 없다 (F3)', () => {
+    expect(appendPlaceItemPayload([], 1, place).items[0]?.itemType).toBe('PLACE')
+  })
+
+  it('day 를 경로값 그대로 싣는다 — @Min(1) 이 덮어쓰기보다 먼저 돈다', () => {
+    const payload = appendPlaceItemPayload(ITEMS, 3, place)
+
+    expect(payload.items.every((item) => item.day === 3)).toBe(true)
+  })
+
+  it('title 이 100자를 넘으면 잘라서 보낸다 — 서버는 자르지 않고 PLAN_100 을 낸다', () => {
+    const long = 'ㄱ'.repeat(150)
+    const added = appendPlaceItemPayload([], 1, { placeId: place.placeId, title: long }).items[0]
+
+    expect(added?.title).toHaveLength(ITEM_TITLE_MAX)
+  })
+
+  it('빈 일자에 담으면 항목 하나짜리 목록이 된다', () => {
+    expect(appendPlaceItemPayload([], 1, place).items).toHaveLength(1)
+  })
+
+  it('대상이 없는 항목(MOVE)은 targetId 키 자체가 없다', () => {
+    const move = appendPlaceItemPayload(ITEMS, 2, place).items[2]
+
+    expect(move).not.toHaveProperty('targetId')
   })
 })

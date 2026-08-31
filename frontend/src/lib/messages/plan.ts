@@ -217,4 +217,57 @@ export const planMessages = {
   editAnnounceMoved: '{position}번째로 이동했어요',
   editAnnounceRemoved: '삭제 예정이에요',
   editAnnounceRestored: '삭제 표시를 해제했어요',
+
+  // ── 장소 담기 (#82) ────────────────────────────────────────────────────
+  // 두 진입점이 같은 일괄 교체 저장을 쓴다 — 문구도 한 벌이다 (F절).
+
+  /** 일자 섹션의 진입 버튼 */
+  addPlaceAction: '장소 추가',
+  /** 실내 대안 행·목록 행의 담기 버튼 */
+  addPlaceShort: '담기',
+  /**
+   * `{title}` 치환. 버튼의 `aria-label`.
+   *
+   * 한 화면에 `담기` 버튼이 여러 개라 보이는 글자만으로는 **스크린리더에 전부 "담기" 로
+   * 읽혀 어느 장소인지 알 수 없다.**
+   */
+  addPlaceLabel: '{title} 담기',
+  /**
+   * 같은 일자에 같은 장소가 이미 있을 때. **서버는 중복을 막지 않는다** —
+   * 화면이 먼저 막지 않으면 같은 곳이 두 번 담긴다 (F5-4).
+   */
+  addPlaceAlready: '이미 담았어요',
+
+  /** `{title}`(조사 포함) · `{day}` 치환. 성공만 토스트로 말한다 */
+  addPlaceToast: '{title} {day}일차에 담았어요',
+
+  addPlaceErrorTitle: '담지 못했어요',
+  /**
+   * 5xx·무응답. **`editSaveErrorDescription` 을 쓰지 않는다** — 담기에는 "편집한 내용" 이
+   * 없다. 분류는 `toPlanDaySaveError` 가 공유하고 문구만 화면이 준다.
+   */
+  addPlaceErrorDescription: '잠시 후 다시 시도해 주세요.',
+  /**
+   * `PLAN_004`. **편집모드 문구를 재사용하지 않는다** — 그쪽은 "목록에서 빼면" 인데
+   * 담기 화면에는 뺄 목록이 없다. 원인은 **그 일자에 이미 있던** 조회되지 않는 항목이라
+   * (일괄 교체가 그것까지 되싣는다) 일정으로 돌아가 그 항목을 빼야 풀린다.
+   */
+  addPlaceMissingPlaceError:
+    '이 일자에 더 이상 조회되지 않는 장소가 있어 담을 수 없어요. 일정에서 그 항목을 먼저 빼 주세요.',
+
+  /** `{day}` 치환. 장소 추가 화면의 제목 */
+  addPlaceTitle: '{day}일차에 담을 장소',
+  /** 어느 일정인지 밝힌다 — 목록만 보면 어디에 담는지 알 수 없다 */
+  addPlaceSubtitle: '고른 장소가 {day}일차 맨 뒤에 담겨요.',
+  addPlaceBack: '일정으로 돌아가기',
+
+  /**
+   * `{day}` 치환. 주소를 손으로 고쳐 기간 밖 일자로 들어왔을 때.
+   *
+   * **저장 실패 문구(`editDayOutOfRangeError`)를 재사용하지 않는다** — 그쪽은
+   * "새로고침한 뒤 다시 시도" 인데 여기서는 새로고침해도 없는 일자다.
+   */
+  addPlaceDayMissingTitle: '{day}일차는 이 여행에 없어요',
+  /** `{totalDays}` 치환 */
+  addPlaceDayMissingDescription: '이 여행은 총 {totalDays}일이에요. 일정에서 일자를 골라 주세요.',
 } as const
