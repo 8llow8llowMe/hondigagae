@@ -65,7 +65,8 @@ export function resolveMock(
   body: string | null,
   accessToken: string | null = null,
 ): MockResult | null {
-  const auth = resolveAuthMock(path, method, body)
+  // 소셜 로그인은 GET + 쿼리(code·state)라 search 를 함께 넘긴다
+  const auth = resolveAuthMock(path, method, search, body)
   if (auth !== null) return auth
 
   /*

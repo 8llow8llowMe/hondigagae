@@ -202,12 +202,22 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
         onSubmit={() => void submit()}
         onRetry={() => void submit()}
       />
-      <Link
-        href={`/signup?returnTo=${encodeURIComponent(returnTo)}`}
-        className="text-body-2 text-brand-600 text-center underline"
-      >
-        {messages.auth.toSignup}
-      </Link>
+      <div className="flex flex-col items-center gap-3">
+        <Link
+          href={`/signup?returnTo=${encodeURIComponent(returnTo)}`}
+          className="text-body-2 text-brand-600 underline"
+        >
+          {messages.auth.toSignup}
+        </Link>
+        {/*
+          비밀번호 찾기는 `returnTo` 를 이어받지 않는다. 재설정이 끝나면 전 기기 세션이
+          무효화돼 어차피 로그인부터 다시 해야 하고(AuthWebController), 중간에 경로를
+          들고 다니면 이메일이 오가는 화면에 쿼리를 하나 더 얹는 셈이다 — 정본 D3.
+        */}
+        <Link href="/password/reset" className="text-body-2 text-fg-muted underline">
+          {messages.auth.forgotPassword}
+        </Link>
+      </div>
     </div>
   )
 }

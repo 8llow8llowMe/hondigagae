@@ -120,12 +120,40 @@ export type MockAiPlanJob = {
   pollCount: number
 }
 
+/**
+ * 발급된 비밀번호 재설정 코드.
+ *
+ * **시도 횟수를 함께 든다.** 백엔드가 5회 실패에서 코드를 무효화하고 `AUTH_017` 로
+ * 응답하는데(`AuthErrorCode`), 횟수를 세지 않으면 그 분기를 화면으로 확인할 수 없다.
+ * 회원가입 인증코드(`pendingEmails`)와 **자료구조가 다른 이유**가 이것이다 — 그쪽은
+ * 실패 상한이 없어 Set 으로 충분하다.
+ */
+export type MockPasswordResetCode = {
+  code: string
+  /** 불일치로 실패한 횟수. MAX 에 도달하면 코드가 사라진다 */
+  attempts: number
+}
+
 export type MockStore = {
   members: MockMember[]
   /** 인증을 마친 이메일 (백엔드는 30분 TTL — mock 은 만료를 흉내 내지 않는다) */
   verifiedEmails: Set<string>
   /** 코드를 발송한 이메일 */
   pendingEmails: Set<string>
+  /** 비밀번호 재설정 코드. email → 코드·시도 횟수 */
+  passwordResetCodes: Map<string, MockPasswordResetCode>
+  /**
+   * 발급했지만 아직 쓰지 않은 OAuth state. 원소는 `` `${provider}:${state}` `` 다 —
+   * 백엔드도 state 를 키로 provider 를 값으로 저장하고 둘이 맞는지 대조한다.
+   *
+   * **교환에 성공하든 실패하든 조회 시점에 소비한다** (Redis `GETDEL` —
+   * `RedisOAuthStateStoreAdapter.consume`). 그래서 같은 콜백 URL 을 두 번 태우면
+   * 두 번째는 `AUTH_010` 이다 — **화면의 중복 실행 가드를 확인할 수 있는 성질이 이것이다.**
+   * 10분 TTL 은 흉내 내지 않는다 (mock 에 시계를 두면 테스트가 시간에 묶인다).
+   */
+  oauthStates: Set<string>
+  /** OAuth code·state 조립용 순번 */
+  nextOAuthSeq: number
   /** memberId 조립용 순번. Number.MAX_SAFE_INTEGER 안쪽 값만 들고 있는다 — nextMemberId() 참고 */
   nextMemberSeq: number
   pets: MockPet[]
@@ -276,6 +304,9 @@ function createStore(): MockStore {
     ],
     verifiedEmails: new Set<string>(),
     pendingEmails: new Set<string>(),
+    passwordResetCodes: new Map<string, MockPasswordResetCode>(),
+    oauthStates: new Set<string>(),
+    nextOAuthSeq: 1,
     nextMemberSeq: 4,
     pets: [
       {
@@ -554,7 +585,11 @@ function isCurrentShape(store: MockStore | undefined): store is MockStore {
     // 일정 항목이 뒤에 추가됐다. HMR 로 살아남은 낡은 스토어는 버린다 (#59 와 같은 사고)
     store.plans.every((plan) => Array.isArray(plan.items)) &&
     // AI 작업 목록도 같은 이유로 본다
-    Array.isArray(store.aiPlanJobs)
+    Array.isArray(store.aiPlanJobs) &&
+    // 비밀번호 재설정·소셜 로그인 상태가 뒤에 추가됐다 (#85). 낡은 스토어는 버린다 —
+    // `?? new Map()` 으로 덮으면 옛 상태로 계속 굴러가며 증상만 사라진다
+    store.passwordResetCodes instanceof Map &&
+    store.oauthStates instanceof Set
   )
 }
 
