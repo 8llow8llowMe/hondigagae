@@ -60,7 +60,30 @@ export const signupProfileSchema = z.object({
   nickname: z.string().min(1, messages.form.nicknameRequired).max(10, messages.form.nicknameLength),
 })
 
+/**
+ * 비밀번호 재설정 2단계 (코드 + 새 비밀번호).
+ *
+ * **필드명이 `newPassword` 다** — 요청 DTO(`AuthPasswordResetRequest`)와 같게 둔다.
+ * `password` 로 두면 서버 필드 오류가 어느 입력에도 매핑되지 않아 조용히 사라진다
+ * (form-guide.md §5).
+ *
+ * 검사 순서는 `signupProfileSchema` 와 같다 — 길이(@Size) → 문자 구성(@Pattern).
+ * 정규식은 `lib/form/password-pattern.ts` 하나를 공유한다. 복제본을 만들면 회원가입과
+ * 재설정이 같은 비밀번호를 두고 통과·거부로 갈린다.
+ */
+export const passwordResetSchema = z.object({
+  // AUTH_104
+  code: z.string().min(1, messages.form.codeRequired),
+  newPassword: z
+    .string()
+    .min(1, messages.form.passwordRequired)
+    .min(8, messages.form.passwordLength)
+    .max(20, messages.form.passwordLength)
+    .regex(PASSWORD_PATTERN, messages.form.passwordPattern),
+})
+
 export type LoginValues = z.infer<typeof loginSchema>
 export type EmailValues = z.infer<typeof emailSchema>
 export type CodeValues = z.infer<typeof codeSchema>
 export type SignupProfileValues = z.infer<typeof signupProfileSchema>
+export type PasswordResetValues = z.infer<typeof passwordResetSchema>

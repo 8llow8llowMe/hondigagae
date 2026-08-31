@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { LoggedInNotice } from '@/features/auth/logged-in-notice'
 import { LoginForm } from '@/features/auth/login-form'
 import { SignupDoneNotice } from '@/features/auth/signup-done-notice'
+import { SocialLoginButtons } from '@/features/auth/social-login-buttons'
 import { ReauthNotice } from '@/features/member/reauth-notice'
 import { readSession } from '@/lib/auth/session'
 import { safeReturnTo } from '@/lib/http/redirect'
@@ -28,6 +29,8 @@ export default async function LoginPage({
       {/* 비밀번호 변경·소셜 전용 전환·탈퇴로 세션이 끊긴 경우 그 이유를 알린다 */}
       <ReauthNotice reauth={reauth} />
       <LoginForm returnTo={target} initialEmail={email ?? ''} />
+      {/* 소셜 로그인은 폼 아래에 둔다 — 기본 수단은 이메일 로그인이다 */}
+      <SocialLoginButtons returnTo={target} />
     </div>
   )
 }

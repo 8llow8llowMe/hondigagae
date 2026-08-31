@@ -15,6 +15,9 @@ export const paths = {
       `/auth/${provider}/login?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`,
     emailSendCode: '/auth/email/send-code',
     emailVerifyCode: '/auth/email/verify-code',
+    /** 비밀번호 찾기 — 가입 여부와 무관하게 항상 성공한다 (계정 열거 방지) */
+    passwordResetSendCode: '/auth/password/reset/send-code',
+    passwordReset: '/auth/password/reset',
   },
   members: {
     signup: '/members/signup',

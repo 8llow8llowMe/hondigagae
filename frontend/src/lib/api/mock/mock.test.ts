@@ -344,9 +344,16 @@ describe('resolveMock — 인증', () => {
   })
 
   it('mock 이 모르는 POST 는 null 이라 게이트웨이로 넘어간다', () => {
-    // 비밀번호 재설정은 백엔드도 아직 없다 (#41). mock 이 처리하게 된 경로를 예시로
-    // 쓰면 이 단언이 조용히 무의미해진다 — 위 '구현되지 않은 경로' 와 같은 이유다
-    expect(resolveMock('/auth/password/reset', 'POST', '', '{}')).toBeNull()
+    /*
+      **예시로 실재하는 엔드포인트를 쓰지 않는다.** `/members/me/profile-image`(#79·#83)와
+      `/auth/password/reset`(#85)이 차례로 구현되면서 이 단언이 두 번 무의미해졌다.
+      지금은 **백엔드에 실재하는 POST 엔드포인트가 전부 mock 에 있다** — 컨트롤러
+      5종(auth · member · pet · plan · ai-plan) 실측, 2026-08-31.
+
+      그래서 여기서 고정하는 것은 "아직 구현 안 된 경로" 가 아니라 표에 없는 경로의
+      **통과 계약**이다. 백엔드에 없는 경로를 써야 다음 기능이 구현돼도 흔들리지 않는다.
+    */
+    expect(resolveMock('/auth/password/rotate', 'POST', '', '{}')).toBeNull()
   })
 
   it('send-code 공란 이메일은 400 AUTH_101 이다', () => {

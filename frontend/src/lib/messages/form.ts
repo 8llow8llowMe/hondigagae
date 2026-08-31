@@ -64,4 +64,41 @@ export const authMessages = {
   signupSubmit: '가입하기',
   signingUp: '가입 중',
   signupDone: '가입이 완료됐어요. 로그인해 주세요.',
+
+  /*
+    비밀번호 찾기 (이슈 #85 · 비밀번호찾기-세부명세.md D5).
+
+    **"가입되지 않은 이메일이에요" 류의 문구를 만들지 않는다.** 서버가 계정 존재
+    여부를 일부러 감추는데(항상 성공 응답) 화면이 그것을 흘리면 계정 열거가 된다.
+    발송 성공 문구는 이메일 존재 여부와 무관하게 늘 `resetCodeSent` 하나다.
+  */
+  forgotPassword: '비밀번호를 잊으셨나요?',
+  resetTitle: '비밀번호 찾기',
+  resetEmailHeading: '가입한 이메일을 알려주세요',
+  resetEmailDescription: '비밀번호를 새로 만들 수 있는 코드를 보내드려요.',
+  resetSendCode: '코드 받기',
+  resetSendingCode: '보내는 중',
+  resetCodeSent: '메일을 보냈어요. 받은 편지함을 확인해 주세요.',
+  resetCodeHeading: '메일로 받은 코드를 입력해 주세요',
+  newPasswordLabel: '새 비밀번호',
+  resetSubmit: '비밀번호 재설정',
+  resetSubmitting: '재설정 중',
+  resetDoneTitle: '비밀번호를 바꿨어요',
+  resetDoneDescription:
+    '보안을 위해 모든 기기에서 로그아웃했어요. 새 비밀번호로 다시 로그인해 주세요.',
+  toLoginScreen: '로그인으로',
+
+  /*
+    소셜 로그인 · 콜백 (이슈 #85 · 소셜콜백-세부명세.md D5).
+
+    **오류 문구를 여기에 만들지 않는다.** 여덟 개 오류 코드 전부 서버 `resultMessage`
+    가 이미 행동을 안내한다 (AUTH_008 은 어느 소셜로 가입됐는지까지 말해 준다).
+    여기 있는 것은 우리가 쓰는 라벨과, 서버 문구가 없을 때의 최후 문구뿐이다.
+  */
+  socialLoginLabel: (provider: string) => `${provider}로 계속하기`,
+  socialRetryLabel: (provider: string) => `${provider} 다시 시도`,
+  oauthExchanging: '로그인하고 있어요',
+  oauthInvalidTitle: '잘못된 접근이에요',
+  oauthInvalidDescription: '로그인 화면에서 다시 시도해 주세요.',
+  oauthFailedTitle: '로그인하지 못했어요',
 } as const
