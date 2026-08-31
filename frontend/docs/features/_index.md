@@ -21,7 +21,7 @@
 | member  | `공통명세.md`, `마이페이지-세부명세.md`                                                                         | 명세 완료                                     | 구현                 | 계정 상태 3종(provider × hasPassword) · multipart 업로드 첫 등장 |
 | pet     | `공통명세.md`, `목록/등록/수정-세부명세.md`                                                                     | 구현 완료                                     | 구현                 | 등록 상한 5마리 / 사진 필드 없음 (S5-3)                          |
 | place   | `공통명세.md`, `장소상세-세부명세.md`                                                                           | 작성 중                                       | 구현                 | 목록 구현 완료 / 상세 구현 완료 / 지도 미착수                    |
-| plan    | `공통명세.md`, `일정상세-세부명세.md`, `일자편집-세부명세.md`                                                   | 작성 중                                       | 구현                 | 목록·생성 구현 완료 (#75) / 상세·편집 명세 완료·구현 미착수      |
+| plan    | `공통명세.md`, `일정상세-세부명세.md`, `일자편집-세부명세.md`                                                   | 작성 중                                       | 구현                 | 목록·생성(#75) · 상세(#80) 구현 완료 / 일자편집·담기 명세 완료   |
 | ai-plan | `공통명세.md`                                                                                                   | 명세 완료                                     | 구현 (Stub LLM 기본) | 폴링 2s. **SSE 는 BFF 버퍼링 때문에 별도 이슈**                  |
 
 상태 값: `미작성` / `작성 중` / `확정` / `구현 완료` / `보류`
@@ -31,18 +31,19 @@
 명세는 게이트웨이가 안 떠 있어 **Swagger 를 부르지 못한 상태**로 작성됐다. 구현하며 백엔드
 소스를 실측한 결과 아래가 달랐다. **실측이 정본이고, 명세 문서는 기록으로 남긴다.**
 
-| feature | 명세                                                 | 실제                                                                     |
-| ------- | ---------------------------------------------------- | ------------------------------------------------------------------------ |
-| home    | 실내 대안 `alternativePlaces`                        | **`indoorAlternatives`**                                                 |
-| home    | 적합도 등급 `HIGH/MEDIUM/LOW/UNKNOWN`                | **`HIGH/MEDIUM/LOW/INSUFFICIENT`**                                       |
-| home    | 산책 위험도도 같은 4단                               | **`SAFE/CAUTION/DANGER/UNKNOWN`** — 코드 체계가 다르다                   |
-| home    | 혼잡도도 같은 톤 매핑                                | **의미가 반대다** — `LOW` 가 "한산"(좋음), `HIGH` 가 "혼잡"              |
-| home    | 일정 날씨 `title` · `dailyBriefings[]`               | **`planTitle`** · **`days[]`**                                           |
-| home    | 인사이트 조회에 `petId`                              | **반려견 속성을 개별 쿼리 파라미터로** 보낸다 (공개 API 다)              |
-| place   | 목록 항목에 크기 정보 없음                           | **`allowedPetSize`(metadata) · `maxPetWeightKg`** 가 있다                |
-| place   | 목록 필터에 반려견 기준 축 없음                      | **`petSizeType` · `petWeightKg`** 파라미터가 있다                        |
-| plan    | 날씨 `skyState`·`precipitationType` 이 metadata 객체 | **`skyStateName`·`precipitationTypeName` 문자열**                        |
-| plan    | 날씨에 예보 출처·풍속·습도 없음                      | **`forecastSourceCode`/`Name` · `maxWindSpeed` · `maxHumidity`** 가 있다 |
+| feature | 명세                                                 | 실제                                                                                                                          |
+| ------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| home    | 실내 대안 `alternativePlaces`                        | **`indoorAlternatives`**                                                                                                      |
+| home    | 적합도 등급 `HIGH/MEDIUM/LOW/UNKNOWN`                | **`HIGH/MEDIUM/LOW/INSUFFICIENT`**                                                                                            |
+| home    | 산책 위험도도 같은 4단                               | **`SAFE/CAUTION/DANGER/UNKNOWN`** — 코드 체계가 다르다                                                                        |
+| home    | 혼잡도도 같은 톤 매핑                                | **의미가 반대다** — `LOW` 가 "한산"(좋음), `HIGH` 가 "혼잡"                                                                   |
+| home    | 일정 날씨 `title` · `dailyBriefings[]`               | **`planTitle`** · **`days[]`**                                                                                                |
+| home    | 인사이트 조회에 `petId`                              | **반려견 속성을 개별 쿼리 파라미터로** 보낸다 (공개 API 다)                                                                   |
+| place   | 목록 항목에 크기 정보 없음                           | **`allowedPetSize`(metadata) · `maxPetWeightKg`** 가 있다                                                                     |
+| place   | 목록 필터에 반려견 기준 축 없음                      | **`petSizeType` · `petWeightKg`** 파라미터가 있다                                                                             |
+| plan    | 날씨 `skyState`·`precipitationType` 이 metadata 객체 | **`skyStateName`·`precipitationTypeName` 문자열** (#80 에서 타입 수정)                                                        |
+| plan    | 날씨에 예보 출처·풍속·습도 없음                      | **`forecastSourceCode`/`Name` · `maxWindSpeed` · `maxHumidity`** 가 있다                                                      |
+| plan    | 항목 행에 주소 · **실내 여부**                       | 상세 응답(`PlaceDetail`)에 **`indoor` 가 없다** — 목록에만 있다 ([#16](https://github.com/8llow8llowMe/hondigagae/issues/16)) |
 
 **`petSizeType` 은 `allowedPetSize` 와 다른 축이다.** 저쪽은 *장소의 속성*을 직접 고르고,
 이쪽은 *내 반려견*을 기준으로 거른다. 그리고 **`UNKNOWN` 인 장소는 걸러내지 않는다** —

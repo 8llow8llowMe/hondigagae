@@ -54,15 +54,35 @@ export type PlanDayWeatherItem = {
   unavailableReason: string | null
 }
 
-/** 일자별 날씨 요약. 일정 브리핑 전용이라 인사이트의 `DailyWeatherItem` 과 다르다 */
+/**
+ * 일자별 날씨 요약. 일정 브리핑 전용이라 인사이트의 `DailyWeatherItem` 과 다르다.
+ *
+ * **하늘상태·강수형태는 metadata 객체가 아니라 문자열이다.** 명세는 `skyState`
+ * (`CodeNameMetadata`)로 적었지만 실제 DTO 는 `skyStateName: String` 이다 —
+ * 서버가 이미 표시용 이름으로 낮춰서 준다. `fc7d8af`(중기예보를 이어 붙여 예보 범위를
+ * 11일로 확장) 에서 출처·풍속·습도가 함께 들어왔다. 근거: `PlanDailyWeatherItem` 실측.
+ */
 export type PlanDailyWeatherItem = {
   date: string
+  /**
+   * `SHORT_TERM` / `MID_TERM`. **`MID_TERM` 이면 대략적인 값이다** (스키마 설명 명시) —
+   * 정밀도 차이를 감추지 않고 화면에 출처를 밝힌다.
+   */
+  forecastSourceCode: string | null
+  forecastSourceName: string | null
   minTemperature: number | null
   maxTemperature: number | null
   maxPrecipitationProbability: number | null
-  skyState: CodeNameMetadata | null
-  precipitationType: CodeNameMetadata | null
+  /** 그날 가장 나쁜 강수형태 — 이름 문자열 (예: `'비'`) */
+  precipitationTypeName: string | null
+  /** 대표 하늘상태 — 이름 문자열 (예: `'흐림'`) */
+  skyStateName: string | null
+  maxWindSpeed: number | null
+  maxHumidity: number | null
 }
+
+/** 중기예보 구간. 이 값이면 판정 옆에 출처를 밝힌다 */
+export const MID_TERM_FORECAST_CODE = 'MID_TERM'
 
 /** `GET /plans/{planId}/weather` */
 export type PlanWeatherResponse = {
@@ -126,6 +146,22 @@ export type PlanCreatePayload = {
   endDate: string
   /** 생략 가능. 0 이상 */
   budget?: number
+}
+
+/**
+ * `PUT /plans/{planId}` 요청 본문. **부분 수정이다** — 보내지 않은 필드는 기존 값을
+ * 유지한다 (`PlanCommandProcessor.updatePlan`).
+ *
+ * **예산을 비우는 방법이 없다.** `budget: null` 은 "지운다" 가 아니라 "유지" 로 읽힌다.
+ * 폼에서 예산을 지우면 `0` 을 보낸다 — `@PositiveOrZero` 라 0 은 유효하다 (D4).
+ *
+ * **기간(`startDate`/`endDate`)은 이 화면에서 보내지 않는다.** 서버가 기간을 줄여도
+ * 범위 밖 항목을 정리하지 않아 고아 항목이 생긴다 — 프론트가 그 경로를 열지 않는다 (D4).
+ */
+export type PlanUpdatePayload = {
+  title?: string
+  budget?: number
+  status?: PlanStatusCode
 }
 
 /** `POST /plans` · `GET /plans/{planId}` 응답. 목록보다 필드가 많다 */

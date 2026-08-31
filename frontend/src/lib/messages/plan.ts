@@ -92,4 +92,76 @@ export const planMessages = {
 
   errorTitle: '일정을 불러오지 못했어요',
   errorDescription: '잠시 후 다시 시도해 주세요.',
+
+  // ── 상세 (#80) ─────────────────────────────────────────────────────────
+  // 정본은 아트보드 01(모바일 · DRAFT) · 02(데스크톱 · CONFIRMED) · 06 ③.
+
+  detailNotFoundTitle: '찾을 수 없는 일정이에요',
+  detailNotFoundDescription: '삭제됐거나 주소가 잘못됐어요.',
+  detailErrorTitle: '일정을 불러오지 못했어요',
+  /**
+   * 숫자가 아닌 `planId` → 400 `PLAN_114`. **재시도를 주지 않는다** — 같은 주소를
+   * 다시 불러도 같은 400 이다 (일정상세-세부명세 D5).
+   */
+  detailBadRequestTitle: '잘못된 주소예요',
+  detailBadRequestDescription: '일정 주소를 다시 확인해 주세요.',
+  backToList: '일정 목록으로',
+
+  /** `{days}` 치환 */
+  totalDays: '총 {days}일',
+  budgetLabel: '예산',
+  /** `{amount}` 치환. 원 단위 */
+  budgetAmount: '{amount}원',
+  budgetEmpty: '예산 미정',
+
+  /** `{day}` 치환 */
+  dayLabel: '{day}일차',
+  dayEmpty: '이 날은 아직 담은 곳이 없어요.',
+
+  verdictTocTitle: '일자별 판정',
+  /** 목차에서 판정을 못 낸 날. 낮은 등급으로 칠하지 않고 점선 unknown 으로 둔다 */
+  verdictTocUnavailable: '판정 없음',
+  verdictErrorTitle: '이 날 판정을 불러오지 못했어요.',
+  /** 반려견 특성 조회에 실패해 일반 조건으로 판정한 경우 */
+  verdictPetConditionMissing: '반려견 특성을 반영하지 못해 일반 조건으로 판정했어요.',
+  /** `{source}` 치환 — 서버가 준 `forecastSourceName` */
+  verdictMidTermSource: '{source} 기준이라 대략적인 값이에요.',
+  /** 최고기온 */
+  verdictTemperatureLabel: '최고기온',
+  walkAction: '이 날 산책',
+
+  indoorAlternativesTitle: '비가 오면 갈 만한 실내',
+
+  outOfRangeTitle: '여행 기간 밖 항목',
+  outOfRangeDescription: '기간이 줄어들면서 남은 항목이에요.',
+  /** `{day}` 치환 */
+  outOfRangeDayLabel: '{day}일차에 있던 항목',
+
+  /**
+   * 거리는 **직선거리다.** 제주는 산간·해안도로가 많아 주행거리와 크게 다르다 —
+   * `4.1km` 만 쓰면 주행거리로 읽힌다. `{distance}` 치환.
+   */
+  distanceFromLodging: '숙소에서 직선 {distance}',
+  distanceFromPrevious: '직선 {distance} 이동',
+  /** 30km 이상 구간에 덧붙는다 */
+  longTripSuffix: ' — 하루 이동이 깁니다.',
+
+  statusConfirmAction: '일정 확정하기',
+  statusConfirmError: '확정하지 못했어요. 잠시 후 다시 시도해 주세요.',
+
+  manageLabel: '일정 관리',
+  editAction: '이름·예산 수정',
+  editTitle: '일정 수정',
+  editSubmit: '저장',
+  editCancel: '취소',
+  /** 예산을 비우는 방법이 서버에 없다 — 0 을 보낸다 (D4). 그 사실을 문구로 알린다 */
+  editBudgetHint: '예산을 지우면 0원으로 저장돼요.',
+  editError: '수정하지 못했어요. 잠시 후 다시 시도해 주세요.',
+
+  deleteAction: '일정 삭제',
+  dangerZoneTitle: '위험 영역',
+  /** `{title}` 치환 */
+  deleteConfirmTitle: '{title} 일정을 삭제할까요?',
+  deleteConfirmDescription: '담은 장소와 일자별 판정이 함께 사라져요. 되돌릴 수 없어요.',
+  deleteError: '삭제하지 못했어요. 잠시 후 다시 시도해 주세요.',
 } as const
