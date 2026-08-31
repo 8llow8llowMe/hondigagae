@@ -3,6 +3,7 @@ import { paths } from '@/lib/api/paths'
 import type { SliceResponse } from '@/types/api'
 import type {
   PlanCreatePayload,
+  PlanDayItemsReplacePayload,
   PlanDetail,
   PlanSummaryItem,
   PlanUpdatePayload,
@@ -89,4 +90,21 @@ export function updatePlan(planId: string, payload: PlanUpdatePayload): Promise<
  */
 export function deletePlan(planId: string): Promise<void> {
   return clientFetchVoid(planDetailPath(planId), { method: 'DELETE' })
+}
+
+/**
+ * 일자별 항목 **일괄 교체**. 부분 수정이 아니다 — 빈 목록을 보내면 그 일차가 비워진다.
+ *
+ * 응답은 `PlanDetailResponse` **통째로** 온다(그 일자만이 아니다). 호출부가
+ * `setQueryData` 로 갈아끼우고 판정만 invalidate 한다.
+ */
+export function replaceDayItems(
+  planId: string,
+  day: number,
+  payload: PlanDayItemsReplacePayload,
+): Promise<PlanDetail> {
+  return clientFetch<PlanDetail>(paths.plans.dayItems(planId, day), {
+    method: 'PUT',
+    body: payload,
+  })
 }

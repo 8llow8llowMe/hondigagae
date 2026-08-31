@@ -229,6 +229,40 @@ export type PlanItemDetail = {
 }
 
 /**
+ * `PUT /plans/{planId}/days/{day}/items` 요청 본문의 항목 하나.
+ *
+ * **`targetId` 가 문자열이다.** 서버는 `Long` 으로 읽지만 `placeId` 는 Snowflake 라
+ * `Number()` 를 거치면 정밀도를 잃는다(`212481712381923328` 은 `MAX_SAFE_INTEGER` 밖).
+ * 문자열 그대로 실어 보내면 Jackson 이 `Long` 으로 읽는다 — 생성 요청의 `petId` 와 같다.
+ *
+ * **`planItemId` 는 요청에 없다.** 서버가 그 일자를 삭제 후 재삽입하므로
+ * (`PlanCommandProcessor.replaceDayItems`) 저장하면 id 가 전부 새로 발급된다.
+ */
+export type PlanItemPayload = {
+  /** **1 이상이어야 한다.** 서버가 경로값으로 덮어쓰지만 `@Min(1)` 이 그보다 먼저 돈다 */
+  day: number
+  /** 0부터. 저장 직전에 다시 매긴다 */
+  sequence: number
+  itemType: string
+  /** 대상이 없으면 키 자체를 넣지 않는다 */
+  targetId?: string
+  /** NotBlank, 100자 이하 */
+  title: string
+  /** 500자 이하 */
+  memo?: string
+  /** `HH:mm:ss` */
+  startTime?: string
+}
+
+/**
+ * 일자별 항목 **일괄 교체** 요청 본문. 부분 수정이 아니다 —
+ * **빈 목록을 보내면 그 일차 항목이 모두 삭제된다.**
+ */
+export type PlanDayItemsReplacePayload = {
+  items: PlanItemPayload[]
+}
+
+/**
  * 만들기 폼 값. **요청 본문이 아니다** — `budget` 이 폼에서는 문자열(`''` 허용)이고
  * 전송 직전에 숫자 또는 생략으로 바뀐다 (`src/lib/plan/form.ts`).
  *

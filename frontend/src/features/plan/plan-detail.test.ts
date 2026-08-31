@@ -88,6 +88,9 @@ function renderDaySection(overrides = {}) {
       petConditionApplied: true,
       verdictFailed: false,
       onRetryVerdict: () => undefined,
+      editing: false,
+      onStartEdit: () => undefined,
+      editor: null,
       ...overrides,
     }),
   )

@@ -3,16 +3,20 @@
 import { useRef, useState } from 'react'
 
 import { Button } from '@/components/button'
+import { ConfirmModal } from '@/components/confirm-modal'
 import { EmptyState } from '@/components/empty-state'
 import { MoreIcon } from '@/components/icons'
 import { Menu, MenuAnchor } from '@/components/menu'
 import { Band } from '@/components/surface'
+import { PlanDayEditor } from '@/features/plan/plan-day-editor'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { PlanDeleteSection } from '@/features/plan/plan-delete-section'
 import { PlanEditModal } from '@/features/plan/plan-edit-modal'
 import { PlanItemRow } from '@/features/plan/plan-item-row'
 import { PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
 import { PlanStatusAction } from '@/features/plan/plan-status-action'
+import { usePlanDayEdit } from '@/features/plan/use-plan-day-edit'
+import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { toLatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
 import { addPlanDays } from '@/lib/plan/date'
@@ -40,6 +44,7 @@ export function PlanDetailSection({
   pet,
   petPending,
   places,
+  missingPlaces,
   weather,
   weatherFailed,
   onRetryWeather,
@@ -49,12 +54,57 @@ export function PlanDetailSection({
   pet: Pet | null
   petPending: boolean
   places: Map<string, PlaceDetail>
+  /** 장소 조회가 404 인 placeId. 편집모드가 `PLAN_004` 후보를 미리 짚는 데 쓴다 */
+  missingPlaces: Set<string>
   weather: PlanWeatherResponse | undefined
   weatherFailed: boolean
   onRetryWeather: () => void
   today: Date
 }) {
   const { days, outOfRange } = groupItemsByDay(plan.items, plan.totalDays)
+
+  /**
+   * **한 번에 한 일자만 편집한다** — 일괄 교체 단위가 일자다 (E0).
+   * `pendingDay` 는 편집 중에 다른 일자를 눌렀을 때 확인 모달이 들고 있는 대상이다.
+   */
+  const [editingDay, setEditingDay] = useState<number | null>(null)
+  const [pendingDay, setPendingDay] = useState<number | null>(null)
+  const [discarding, setDiscarding] = useState(false)
+
+  const edit = usePlanDayEdit({
+    planId: plan.planId,
+    onSaved: () => setEditingDay(null),
+  })
+
+  // 편집한 것을 브라우저 이탈로 잃지 않게 한다. 저장 중은 제외한다 (form-guide.md §7)
+  useUnsavedWarning(edit.dirty && !edit.saving)
+
+  function openEditor(day: number) {
+    const group = days[day - 1]
+    if (group === undefined) return
+    setEditingDay(day)
+    edit.start(group.items)
+  }
+
+  /** 편집 중이면 먼저 묻는다. 아니면 바로 연다 */
+  function requestEditor(day: number) {
+    if (editingDay !== null && edit.dirty) {
+      setPendingDay(day)
+      setDiscarding(true)
+      return
+    }
+    openEditor(day)
+  }
+
+  function requestCancel() {
+    if (edit.dirty) {
+      // 대상이 없으면 "닫기" 다
+      setPendingDay(null)
+      setDiscarding(true)
+      return
+    }
+    setEditingDay(null)
+  }
 
   const coordOf = (item: { targetId: string | null }) => {
     const place = item.targetId === null ? undefined : places.get(item.targetId)
@@ -88,6 +138,26 @@ export function PlanDetailSection({
               petConditionApplied={weather?.petConditionApplied ?? true}
               verdictFailed={weatherFailed}
               onRetryVerdict={onRetryWeather}
+              editing={editingDay === group.day}
+              onStartEdit={() => requestEditor(group.day)}
+              editor={
+                editingDay !== group.day ? null : (
+                  <PlanDayEditor
+                    items={edit.items}
+                    missing={missingPlaces}
+                    dirty={edit.dirty}
+                    saving={edit.saving}
+                    error={edit.error}
+                    announcement={edit.announcement}
+                    focusTarget={edit.focusTarget}
+                    onClearFocus={edit.clearFocus}
+                    onMove={edit.move}
+                    onToggleRemoved={edit.toggle}
+                    onSave={() => edit.save(group.day)}
+                    onCancel={requestCancel}
+                  />
+                )
+              }
             />
           </div>
         ))}
@@ -98,6 +168,29 @@ export function PlanDetailSection({
         <PlanStatusAction plan={plan} />
         <PlanDeleteSection planId={plan.planId} title={plan.title} />
       </div>
+
+      {/*
+        편집한 것을 말없이 버리지 않는다 (E4). 되돌릴 수 없는 확인이라 `ConfirmModal`
+        이고, 기본 포커스가 취소라 Enter 한 번에 편집이 사라지지 않는다.
+      */}
+      <ConfirmModal
+        open={discarding}
+        onClose={() => {
+          setDiscarding(false)
+          setPendingDay(null)
+        }}
+        onConfirm={() => {
+          setDiscarding(false)
+          if (pendingDay === null) setEditingDay(null)
+          else openEditor(pendingDay)
+          setPendingDay(null)
+        }}
+        title={messages.plan.editDiscardTitle}
+        description={messages.plan.editDiscardDescription}
+        confirmLabel={messages.plan.editDiscardConfirm}
+        cancelLabel={messages.plan.editCancel}
+        destructive
+      />
     </div>
   )
 }
