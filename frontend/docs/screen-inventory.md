@@ -148,7 +148,7 @@
 - **SSE 는 이번 범위가 아니다.** 백엔드에 `GET /ai-plans/jobs/{jobId}/stream` 이 있지만(`b7daa3a`) **BFF 가 응답을 통째로 버퍼링해 스트림을 통과시키지 못한다** — 지금 붙이면 폴링만도 못하다. 이슈 [#91](https://github.com/8llow8llowMe/hondigagae/issues/91) 로 뗐다 (명세 S3).
 - **LLM 어댑터가 두 개고 플래그로 갈린다** (`ai-llm.enabled`, 기본값 `false`).
   - `false`(기본) → `StubLlmAdapter` 고정 샘플. **결과가 매번 같은 것이 정상**이다.
-  - `true` → `AnthropicClaudeLlmAdapter` (`claude-opus-5`, 서킷브레이커·환각 방지 경로 포함).
+  - `true` → `OllamaLlmAdapter` (로컬 LLM). **`AnthropicClaudeLlmAdapter` 는 없다** — 이 줄이 오래 잘못 적혀 있었다 (실측: `adapter/out/llm/` 에 `OllamaLlmAdapter`·`StubLlmAdapter` 둘뿐).
   - **로컬에서 Stub 결과를 보고 "AI가 고장났다" 고 판단하지 않는다.** `AI_LLM_ENABLED` 를 먼저 확인한다.
 - XAI `reasons` 가 포함된다 → 서버 `description` 을 그대로 노출한다.
 - 저장·확정은 plan-service 몫이다. ai-service에 저장 API가 없다.

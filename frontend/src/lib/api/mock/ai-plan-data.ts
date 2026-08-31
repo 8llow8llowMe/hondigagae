@@ -102,8 +102,16 @@ function scenarioOf(requestNote: string | null): MockAiPlanJob['scenario'] {
   const note = requestNote ?? ''
   if (note.includes('실패')) return 'failed'
   if (note.includes('일부')) return 'partial'
+  if (note.includes('사라진')) return 'delisted'
   return 'normal'
 }
+
+/**
+ * 원천에서 사라진 장소의 id. **`MOCK_PLACES` 에 없는 값**이라
+ * `GET /places/{id}` 가 404 를 내고 담기가 `PLAN_004` 로 막힌다 — 이 저장소의
+ * "빼고 담기" 복구 경로를 로컬에서 열기 위한 장치다 (명세 S5 함정 3).
+ */
+const DELISTED_PLACE_ID = '999999999999999999'
 
 export function resolveAiPlanMock(
   path: string,
@@ -307,7 +315,7 @@ function draftFor(job: MockAiPlanJob): AiPlanDraft {
 
   const days: AiPlanDayItem[] = Array.from({ length: made }, (_, index) => ({
     day: index + 1,
-    items: itemsFor(index),
+    items: itemsFor(index, job.scenario === 'delisted' && index === 0),
   }))
 
   return {
@@ -332,7 +340,7 @@ function draftFor(job: MockAiPlanJob): AiPlanDraft {
   }
 }
 
-function itemsFor(dayIndex: number): AiPlanScheduleItem[] {
+function itemsFor(dayIndex: number, delisted: boolean): AiPlanScheduleItem[] {
   const pick = (offset: number) => MOCK_PLACES[(dayIndex * 3 + offset) % MOCK_PLACES.length]
 
   const first = pick(0)
@@ -342,7 +350,8 @@ function itemsFor(dayIndex: number): AiPlanScheduleItem[] {
   return [
     {
       itemType: 'PLACE',
-      placeId: first?.placeId ?? null,
+      // 사라진 장소 시나리오는 첫 항목만 실재하지 않는 id 로 바꾼다
+      placeId: delisted ? DELISTED_PLACE_ID : (first?.placeId ?? null),
       title: first?.title ?? '장소',
       note: '오전이라 노면이 덜 뜨거워요.',
     },
@@ -363,7 +372,12 @@ function itemsFor(dayIndex: number): AiPlanScheduleItem[] {
       itemType: 'MOVE',
       placeId: null,
       title: '숙소로 이동',
-      note: '',
+      /*
+        **`note` 를 null 로 둔다.** DTO 에 제약이 없고 presenter 도 방어하지 않으므로
+        실제로 올 수 있는 값이다 — 화면이 `.trim()` 을 바로 부르면 여기서 죽는다.
+        mock 이 항상 문자열을 채우면 그 구멍을 로컬에서 볼 수 없다.
+      */
+      note: null,
     },
   ]
 }

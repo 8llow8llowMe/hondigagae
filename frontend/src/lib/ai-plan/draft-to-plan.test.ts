@@ -1,38 +1,31 @@
 import { describe, expect, it } from 'vitest'
 
 import { draftItemCount, draftPlaceIds, draftToPlanPayload } from '@/lib/ai-plan/draft-to-plan'
-import type { AiPlanDraft, AiPlanRequestSnapshot, AiPlanScheduleItem } from '@/types/ai-plan'
-
-const snapshot: AiPlanRequestSnapshot = {
-  areaCode: '39',
-  startDate: '2026-09-12',
-  endDate: '2026-09-14',
-  petId: '123456789012000001',
-  petName: '몽실이',
-  budget: 300_000,
-  requestNote: '실내 위주로',
-}
+import {
+  aiPlanDraft,
+  aiPlanItem,
+  aiPlanItemWithNulls,
+  aiPlanSnapshot as snapshot,
+} from '@/test/fixtures/ai-plan'
+import type { AiPlanDraft, AiPlanScheduleItem } from '@/types/ai-plan'
 
 function item(overrides: Partial<AiPlanScheduleItem> = {}): AiPlanScheduleItem {
-  return {
-    itemType: 'PLACE',
-    placeId: '212481712381923328',
-    title: '협재해수욕장',
-    note: '오전이라 노면이 덜 뜨거워요.',
-    ...overrides,
-  }
+  return aiPlanItem({ title: '협재해수욕장', ...overrides })
 }
 
 function draft(days: AiPlanDraft['days']): AiPlanDraft {
-  return { days, reasons: [] }
+  return aiPlanDraft(days)
 }
 
-function payload(days: AiPlanDraft['days'], excludedPlaceIds?: Set<string>) {
+function payload(
+  days: AiPlanDraft['days'],
+  extra: { excludedPlaceIds?: Set<string>; totalDays?: number } = {},
+) {
   return draftToPlanPayload({
     draft: draft(days),
     snapshot,
     title: '몽실이와 제주 2박 3일',
-    ...(excludedPlaceIds === undefined ? {} : { excludedPlaceIds }),
+    ...extra,
   })
 }
 
@@ -183,7 +176,7 @@ describe('draftToPlanPayload — PLAN_004 재시도 (명세 S5 함정 3)', () =>
           ],
         },
       ],
-      new Set(['111']),
+      { excludedPlaceIds: new Set(['111']) },
     )
 
     expect(result.items?.map((i) => i.title)).toEqual(['살아있는 곳'])
@@ -193,7 +186,7 @@ describe('draftToPlanPayload — PLAN_004 재시도 (명세 S5 함정 3)', () =>
   it('제외 목록은 placeId 가 없는 항목에 영향을 주지 않는다', () => {
     const result = payload(
       [{ day: 1, items: [item({ itemType: 'MOVE', placeId: null, title: '이동' })] }],
-      new Set(['111']),
+      { excludedPlaceIds: new Set(['111']) },
     )
 
     expect(result.items?.map((i) => i.title)).toEqual(['이동'])
@@ -223,5 +216,48 @@ describe('draftItemCount', () => {
     )
 
     expect(count).toBe(3)
+  })
+})
+
+describe('draftToPlanPayload — title·note 가 null 로 올 수 있다', () => {
+  it('note 가 null 이면 던지지 않고 memo 키를 뺀다', () => {
+    const result = payload([{ day: 1, items: [aiPlanItemWithNulls({ title: '이름은 있다' })] }])
+
+    expect(result.items).toHaveLength(1)
+    expect('memo' in (result.items?.[0] ?? {})).toBe(false)
+  })
+
+  it('title 이 null 이면 그 항목을 뺀다 — @NotBlank 로 요청 전체가 400 이 된다', () => {
+    const result = payload([{ day: 1, items: [aiPlanItemWithNulls(), item({ title: '남는 곳' })] }])
+
+    expect(result.items?.map((i) => i.title)).toEqual(['남는 곳'])
+  })
+
+  it('둘 다 null 인 항목만 있으면 items 가 빈 배열이다', () => {
+    expect(payload([{ day: 1, items: [aiPlanItemWithNulls()] }]).items).toEqual([])
+  })
+})
+
+describe('draftToPlanPayload — 기간 밖 일차를 걸러낸다 (PLAN_002)', () => {
+  it('totalDays 를 넘는 일차를 뺀다 — 하나만 벗어나도 저장 전체가 400 이다', () => {
+    const result = payload(
+      [
+        { day: 1, items: [item({ title: '남음' })] },
+        { day: 4, items: [item({ title: '버려짐' })] },
+      ],
+      { totalDays: 3 },
+    )
+
+    expect(result.items?.map((i) => i.title)).toEqual(['남음'])
+  })
+
+  it('경계값(day === totalDays)은 남긴다', () => {
+    const result = payload([{ day: 3, items: [item({ title: '경계' })] }], { totalDays: 3 })
+    expect(result.items?.map((i) => i.title)).toEqual(['경계'])
+  })
+
+  it('totalDays 를 주지 않으면 거르지 않는다 — 일수를 모를 때 임의로 버리지 않는다', () => {
+    const result = payload([{ day: 4, items: [item({ title: '남음' })] }])
+    expect(result.items?.map((i) => i.title)).toEqual(['남음'])
   })
 })

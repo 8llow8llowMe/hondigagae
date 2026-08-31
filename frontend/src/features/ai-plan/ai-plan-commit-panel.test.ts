@@ -16,6 +16,7 @@ function render(overrides: Partial<AiPlanCommitPanelProps> = {}) {
     errors: NO_FORM_ERRORS,
     submitting: false,
     delistedBlocked: false,
+    hasDelisted: true,
     excludedCount: 0,
     onTitleChange: () => undefined,
     onSubmit: () => undefined,
@@ -98,5 +99,28 @@ describe('AiPlanCommitPanel — 빼기 표시', () => {
 
   it('뺀 것이 없으면 안내를 내지 않는다', () => {
     expect(render({ excludedCount: 0 })).not.toContain('빼고 담아요.')
+  })
+})
+
+describe('AiPlanCommitPanel — 뺄 항목을 짚지 못하면 CTA 를 주지 않는다', () => {
+  it('delisted 항목이 없으면 "빼고 담기" 를 숨긴다 — 눌러도 같은 400 이다', () => {
+    const html = render({ delistedBlocked: true, hasDelisted: false })
+
+    expect(html).not.toContain(messages.aiPlan.commitDelistedAction)
+    expect(html).toContain(messages.aiPlan.commitDelistedUnknown)
+  })
+
+  it('짚을 수 없을 때는 다른 갈래로 안내한다 — 없는 근거로 "빼면 된다" 고 말하지 않는다', () => {
+    const html = render({ delistedBlocked: true, hasDelisted: false })
+
+    expect(html).not.toContain(messages.aiPlan.commitDelistedDescription)
+    expect(html).toContain(messages.aiPlan.commitAgain)
+  })
+
+  it('짚을 수 있으면 CTA 를 준다', () => {
+    const html = render({ delistedBlocked: true, hasDelisted: true })
+
+    expect(html).toContain(messages.aiPlan.commitDelistedAction)
+    expect(html).toContain(messages.aiPlan.commitDelistedDescription)
   })
 })

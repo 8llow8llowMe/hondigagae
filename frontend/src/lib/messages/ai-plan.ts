@@ -131,9 +131,9 @@ export const aiPlanMessages = {
   /** `{day}` 치환 */
   dayLabel: '{day}일차',
 
-  /** 초안 항목의 장소 정보를 못 불러왔을 때. 항목 자체는 지우지 않는다 */
-  itemPlaceUnavailable: '장소 정보를 불러오지 못했어요',
   itemPlaceDelisted: '더 이상 조회되지 않는 장소예요',
+  /** `title` 이 비어 온 항목. **행을 지우지 않는다** — 담기에서 걸러질 뿐이다 */
+  itemTitleUnknown: '이름이 없는 항목',
 
   /**
    * **`days` 가 여행 일수보다 적어도 감추지 않는다** (명세 S6).
@@ -147,7 +147,6 @@ export const aiPlanMessages = {
 
   // ── 담기 (아트보드 03 하단 바) ─────────────────────────────────────────
 
-  commitTitle: '내 일정에 담기',
   commitFieldTitle: '일정 제목',
   commitSubmit: '내 일정에 담기',
   commitAgain: '전체 다시 만들기',
@@ -174,6 +173,9 @@ export const aiPlanMessages = {
   commitDelistedTitle: '일부 장소를 더 이상 담을 수 없어요.',
   commitDelistedDescription:
     '아래 표시한 곳이 원천에서 사라졌어요. 그 항목을 빼면 나머지는 담을 수 있어요.',
+  /** 어느 항목이 문제인지 짚을 수 없을 때 — 없는 근거로 "빼면 된다" 고 말하지 않는다 */
+  commitDelistedUnknown:
+    '어느 곳인지는 찾지 못했어요. 조건을 조금 바꿔 다시 만들거나 직접 만들어 주세요.',
   commitDelistedAction: '표시한 곳을 빼고 담기',
   /** `{count}` 치환 */
   commitExcludedNotice: '{count}개 항목을 빼고 담아요.',

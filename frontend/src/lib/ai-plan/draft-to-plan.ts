@@ -37,6 +37,15 @@ export type DraftToPlanOptions = {
   snapshot: AiPlanRequestSnapshot
   title: string
   /**
+   * 여행 총 일수. **기간 밖 일차를 걸러내는 데 쓴다** — 모르면(`null`) 거르지 않는다.
+   *
+   * `PlanCommandProcessor.createPlan` 이 `validateItemDays` → `Plan.containsDay()`
+   * (`1 <= day <= totalDays`)로 검사하고 하나만 벗어나도 **`PLAN_002` 400 으로 저장
+   * 전체가 막힌다.** LLM 이 기간을 넘는 일차를 낼 수 있고(`OllamaLlmAdapter.toDomain`
+   * 은 클램프하지 않는다) 화면은 기간을 이미 알고 있으므로 여기서 막는다.
+   */
+  totalDays?: number | null
+  /**
    * 담기에서 뺄 장소. `PLAN_004`(delisting 된 장소)로 저장이 막혔을 때 **초안을 버리지
    * 않고** 해당 항목만 빼고 다시 담기 위해 쓴다 (명세 S5 함정 3).
    */
@@ -65,6 +74,7 @@ export function draftToPlanPayload({
   draft,
   snapshot,
   title,
+  totalDays,
   excludedPlaceIds,
 }: DraftToPlanOptions): PlanCreatePayload {
   return {
@@ -74,30 +84,37 @@ export function draftToPlanPayload({
     startDate: snapshot.startDate,
     endDate: snapshot.endDate,
     ...(snapshot.budget === null ? {} : { budget: snapshot.budget }),
-    items: toItems(draft, excludedPlaceIds),
+    items: toItems(draft, totalDays ?? null, excludedPlaceIds),
   }
 }
 
-function toItems(draft: AiPlanDraft, excludedPlaceIds?: ReadonlySet<string>): PlanItemRequest[] {
+function toItems(
+  draft: AiPlanDraft,
+  totalDays: number | null,
+  excludedPlaceIds?: ReadonlySet<string>,
+): PlanItemRequest[] {
   const items: PlanItemRequest[] = []
 
   for (const dayItem of draft.days) {
     // `@Min(1)` — 0 이나 음수를 보내면 그 항목 때문에 요청 전체가 400 이다
     if (!Number.isInteger(dayItem.day) || dayItem.day < 1) continue
+    // `Plan.containsDay()` — 기간을 넘는 일차 하나가 `PLAN_002` 로 저장 전체를 막는다
+    if (totalDays !== null && dayItem.day > totalDays) continue
 
     // **sequence 는 걸러낸 뒤 다시 매긴다.** 원본 인덱스를 쓰면 제외된 항목 자리에
     // 구멍이 생겨 화면 순서와 저장 순서가 어긋난다
     let sequence = 0
 
     for (const item of dayItem.items) {
-      const itemTitle = item.title.trim()
+      // **`title`/`note` 는 nullable 이다** — `.trim()` 을 바로 부르면 던진다
+      const itemTitle = (item.title ?? '').trim()
       if (itemTitle === '') continue
       if (!isPlanItemType(item.itemType)) continue
 
       const placeId = item.placeId
       if (placeId !== null && excludedPlaceIds?.has(placeId) === true) continue
 
-      const memo = item.note.trim().slice(0, ITEM_MEMO_MAX)
+      const memo = (item.note ?? '').trim().slice(0, ITEM_MEMO_MAX)
       const targetId =
         placeId !== null && TARGET_ID_TYPES.includes(item.itemType) ? placeId : undefined
 

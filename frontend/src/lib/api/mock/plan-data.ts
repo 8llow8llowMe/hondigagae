@@ -71,6 +71,24 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 const ITEM_TITLE_MAX = 100
 const ITEM_MEMO_MAX = 500
 
+/**
+ * `verifyPlaceTargets` 의 대상. **`WALK` 은 빠진다** — 그 `targetId` 는 `walk_course.id`
+ * 라 tour-service 에 물어볼 값이 아니다 (`PlanCommandProcessor.PLACE_TARGET_TYPES`).
+ */
+const PLACE_TARGET_TYPES = new Set(['PLACE', 'MEAL', 'LODGING'])
+
+/** mock 이 아는 장소. 여기 없는 `targetId` 는 백엔드처럼 `PLAN_004` 로 막는다 */
+const KNOWN_PLACE_IDS = new Set(MOCK_PLACES.map((place) => place.placeId))
+
+/** 총 일수(양끝 포함). `Plan.containsDay()` 와 같은 셈이어야 한다 */
+function daysBetween(startDate: string, endDate: string): number {
+  const start = Date.parse(`${startDate}T00:00:00Z`)
+  const end = Date.parse(`${endDate}T00:00:00Z`)
+  if (Number.isNaN(start) || Number.isNaN(end)) return 1
+
+  return Math.max(1, Math.round((end - start) / 86_400_000) + 1)
+}
+
 function toSummary(plan: MockPlan): PlanSummaryItem {
   return {
     planId: plan.planId,
@@ -442,6 +460,29 @@ function create(memberId: string, body: string | null): MockResult {
   const itemErrors: { code: string; field: string; message: string }[] = []
   const items = toItems(parsed.items, store, itemErrors)
   if (itemErrors.length > 0) return failValidation(itemErrors)
+
+  /*
+    **일차 범위와 장소 존재를 함께 본다** — `PlanCommandProcessor.createPlan` 이
+    `validateItemDays` → `verifyPlaceTargets` 를 순서대로 부른다. 둘 다 도메인 예외라
+    Bean Validation 응답 형태가 아니다.
+
+    이 둘이 없으면 이 저장소의 `PLAN_004` 복구 UI("빼고 담기")가 로컬에서 한 번도
+    열리지 않는다.
+  */
+  const totalDays = daysBetween(startDate, endDate)
+  if (items.some((item) => item.day > totalDays)) {
+    return fail(400, 'PLAN_002', '여행 일차가 여행 기간을 벗어났습니다.')
+  }
+
+  const missing = items.find(
+    (item) =>
+      PLACE_TARGET_TYPES.has(item.itemType) &&
+      item.targetId !== null &&
+      !KNOWN_PLACE_IDS.has(item.targetId),
+  )
+  if (missing !== undefined) {
+    return fail(400, 'PLAN_004', '일정에 포함된 장소를 찾을 수 없습니다.')
+  }
 
   const pet = store.pets.find(
     (candidate) =>

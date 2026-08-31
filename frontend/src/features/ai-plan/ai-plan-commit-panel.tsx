@@ -1,5 +1,3 @@
-'use client'
-
 import { Button, ButtonLink } from '@/components/button'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
@@ -13,6 +11,11 @@ export type AiPlanCommitPanelProps = {
   submitting: boolean
   /** `PLAN_004` 로 막혔는가 — 빼고 담기를 제안한다 (명세 S5 함정 3) */
   delistedBlocked: boolean
+  /**
+   * 보강이 404 를 낸 항목이 있는가. **없으면 "빼고 담기" 를 주지 않는다** — 뺄 것이
+   * 없는데 누르면 같은 본문을 다시 보내 같은 400 이 된다.
+   */
+  hasDelisted: boolean
   /** 빼기로 표시한 항목 수. 0 이면 안내를 내지 않는다 */
   excludedCount: number
   onTitleChange: (title: string) => void
@@ -38,6 +41,7 @@ export function AiPlanCommitPanel({
   errors,
   submitting,
   delistedBlocked,
+  hasDelisted,
   excludedCount,
   onTitleChange,
   onSubmit,
@@ -71,10 +75,23 @@ export function AiPlanCommitPanel({
           <p className="text-body-2 text-danger-700 font-semibold">
             {messages.aiPlan.commitDelistedTitle}
           </p>
-          <p className="text-body-2 text-danger-700">{messages.aiPlan.commitDelistedDescription}</p>
-          <Button variant="secondary" size="sm" onClick={onExcludeDelisted}>
-            {messages.aiPlan.commitDelistedAction}
-          </Button>
+          <p className="text-body-2 text-danger-700">
+            {hasDelisted
+              ? messages.aiPlan.commitDelistedDescription
+              : messages.aiPlan.commitDelistedUnknown}
+          </p>
+          {/*
+            **뺄 항목을 짚지 못하면 CTA 를 주지 않는다.** `delistedPlaceIds` 는 항목
+            보강이 **404** 를 낸 곳만 모으는데, `PLAN_004` 는 plan-service 의
+            `verifyPlaceTargets` 가 걸러낸 경우에도 온다 — 그때는 tour-service 상세가
+            200 이라 짚을 수 없다. 빈 Set 으로 "빼고 담기" 를 누르면 배너만 사라지고
+            **같은 본문 재전송 → 같은 400** 이다. 위 주석과 정확히 반대가 된다.
+          */}
+          {hasDelisted && (
+            <Button variant="secondary" size="sm" onClick={onExcludeDelisted}>
+              {messages.aiPlan.commitDelistedAction}
+            </Button>
+          )}
         </div>
       )}
 

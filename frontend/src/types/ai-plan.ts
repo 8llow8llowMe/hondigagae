@@ -60,8 +60,14 @@ export type AiPlanScheduleItem = {
   itemType: string
   /** 이동 항목이거나 검증된 장소가 아니면 null */
   placeId: string | null
-  title: string
-  note: string
+  /**
+   * **nullable 이다.** DTO 에 제약이 없고 `AiPlanPresenter.toScheduleItems` 가 리스트만
+   * `List.of()` 로 방어한 뒤 `title`/`note` 는 그대로 통과시킨다. `ai-llm.enabled=true`
+   * 면 `OllamaLlmAdapter.toDomain` 이 모델 산출물을 그대로 싣는다 — **`.trim()` 을
+   * 바로 부르면 결과 화면 전체가 죽는다.**
+   */
+  title: string | null
+  note: string | null
 }
 
 export type AiPlanDayItem = {
