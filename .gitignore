@@ -31,6 +31,9 @@ frontend/out/
 backend/data/
 
 # 디자인 작업 파일 (Claude Design 아트보드 소스·브리프)
+# 화면 정본이라 명세가 절 번호로 참조하지만, 저장소에 넣지 않는다 —
+# standalone 한 벌만 6.5MB 고 폰트·업로드까지 14MB 다. Claude Design 이 원본이다.
 .design/
+frontend/docs/UI 모형 및 디자인 시스템/
 replay_pid*.log
 hs_err_pid*.log
