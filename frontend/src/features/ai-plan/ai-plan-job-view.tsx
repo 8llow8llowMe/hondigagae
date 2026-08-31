@@ -31,6 +31,7 @@ import { ApiError } from '@/lib/api/error'
 import { createPlan } from '@/lib/api/plan'
 import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { useForm } from '@/lib/form/use-form'
+import type { LatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
 import { formatPlanDateRange, totalDaysBetween } from '@/lib/plan/date'
 import type { AiPlanDraft, AiPlanRequestSnapshot } from '@/types/ai-plan'
@@ -71,7 +72,7 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
   const job = query.data ?? null
   const draft = job?.planDraft ?? null
 
-  const { addresses, delistedPlaceIds } = useDraftPlaces(draft)
+  const { addresses, coords, delistedPlaceIds } = useDraftPlaces(draft)
 
   const conditionSummary = useMemo(() => summarize(snapshot), [snapshot])
 
@@ -163,6 +164,7 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
         budget={null}
         totalDays={null}
         addresses={addresses}
+        coords={coords}
         delistedPlaceIds={delistedPlaceIds}
         excludedPlaceIds={EMPTY_SET}
         footer={
@@ -184,6 +186,7 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
       draft={draft}
       snapshot={snapshot}
       addresses={addresses}
+      coords={coords}
       delistedPlaceIds={delistedPlaceIds}
     />
   )
@@ -251,12 +254,14 @@ function AiPlanCommitContainer({
   draft,
   snapshot,
   addresses,
+  coords,
   delistedPlaceIds,
 }: {
   jobId: string
   draft: AiPlanDraft
   snapshot: AiPlanRequestSnapshot
   addresses: ReadonlyMap<string, string>
+  coords: ReadonlyMap<string, LatLng>
   delistedPlaceIds: ReadonlySet<string>
 }) {
   const router = useRouter()
@@ -325,6 +330,7 @@ function AiPlanCommitContainer({
       budget={snapshot.budget}
       totalDays={totalDays}
       addresses={addresses}
+      coords={coords}
       delistedPlaceIds={delistedPlaceIds}
       excludedPlaceIds={excludedPlaceIds}
       footer={

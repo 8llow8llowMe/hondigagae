@@ -5,10 +5,12 @@ import { EmptyState } from '@/components/empty-state'
 import { ReasonList } from '@/components/reason-list'
 import { AiPlanDraftItemRow } from '@/features/ai-plan/ai-plan-draft-item-row'
 import { formatBudget } from '@/lib/ai-plan/budget'
+import { draftItemDistances } from '@/lib/ai-plan/draft-distance'
 import { draftItemCount } from '@/lib/ai-plan/draft-to-plan'
+import type { LatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
 import { formatPlanDateRange } from '@/lib/plan/date'
-import type { AiPlanDraft } from '@/types/ai-plan'
+import type { AiPlanDraft, AiPlanScheduleItem } from '@/types/ai-plan'
 
 export type AiPlanDraftPreviewProps = {
   draft: AiPlanDraft
@@ -21,6 +23,11 @@ export type AiPlanDraftPreviewProps = {
   totalDays: number | null
   /** `placeId` → 주소. 보강 결과 (명세 S6) */
   addresses: ReadonlyMap<string, string>
+  /**
+   * `placeId` → 좌표. 같은 보강 결과에서 나온다 (#100). **없는 항목은 거리 줄이 없다** —
+   * 보강이 아직이거나 실패했거나 원천에 좌표가 없는 경우다.
+   */
+  coords: ReadonlyMap<string, LatLng>
   /** 보강이 404 를 낸 `placeId` — `PLAN_004` 원인 후보 */
   delistedPlaceIds: ReadonlySet<string>
   /** 담기에서 빼기로 표시한 `placeId` */
@@ -50,6 +57,7 @@ export function AiPlanDraftPreview({
   budget,
   totalDays,
   addresses,
+  coords,
   delistedPlaceIds,
   excludedPlaceIds,
   footer,
@@ -76,6 +84,13 @@ export function AiPlanDraftPreview({
    * 인데 일부 일자가 비는 경우다 — 그대로 말하고 나머지는 담은 뒤에 채우라고 안내한다.
    */
   const partial = totalDays !== null && madeDays < totalDays
+
+  /*
+    **`placeId` 가 없는 항목은 좌표도 없다.** `MOVE` 와 `WALK` 다 — `WALK` 는 보강 자체를
+    하지 않는다(그 `placeId` 는 `walk_course.id` 와 어긋나 있다, #89).
+  */
+  const coordOf = (item: AiPlanScheduleItem): LatLng | null =>
+    item.placeId === null ? null : (coords.get(item.placeId) ?? null)
 
   if (madeDays === 0) {
     return (
@@ -132,26 +147,37 @@ export function AiPlanDraftPreview({
         </section>
       )}
 
-      {draft.days.map((dayItem) => (
-        <section key={dayItem.day} className="pb-2">
-          <h3 className="text-body-1 text-fg px-4 pt-3 pb-2 font-semibold md:px-10">
-            {messages.aiPlan.dayLabel.replace('{day}', String(dayItem.day))}
-          </h3>
+      {draft.days.map((dayItem) => {
+        /*
+          **거리는 일자 안에서만 잰다.** 일자 경계를 넘겨 재면 전날 마지막 항목에서
+          다음 날 첫 항목까지가 "이동" 으로 읽히는데, 그 사이에는 숙박이 있다.
+          빼기로 표시한 항목도 순서에서 빼지 않는다 — 취소선으로 남아 있는 행이라
+          거리만 다시 이어 붙이면 화면과 어긋난다.
+        */
+        const distances = draftItemDistances(dayItem.items, coordOf)
 
-          <ul className="flex flex-col">
-            {dayItem.items.map((item, index) => (
-              <AiPlanDraftItemRow
-                key={`${dayItem.day}-${index}-${item.title}`}
-                item={item}
-                ordinal={index + 1}
-                address={item.placeId === null ? undefined : addresses.get(item.placeId)}
-                delisted={item.placeId !== null && delistedPlaceIds.has(item.placeId)}
-                excluded={item.placeId !== null && excludedPlaceIds.has(item.placeId)}
-              />
-            ))}
-          </ul>
-        </section>
-      ))}
+        return (
+          <section key={dayItem.day} className="pb-2">
+            <h3 className="text-body-1 text-fg px-4 pt-3 pb-2 font-semibold md:px-10">
+              {messages.aiPlan.dayLabel.replace('{day}', String(dayItem.day))}
+            </h3>
+
+            <ul className="flex flex-col">
+              {dayItem.items.map((item, index) => (
+                <AiPlanDraftItemRow
+                  key={`${dayItem.day}-${index}-${item.title}`}
+                  item={item}
+                  ordinal={index + 1}
+                  address={item.placeId === null ? undefined : addresses.get(item.placeId)}
+                  distanceMeters={distances[index] ?? null}
+                  delisted={item.placeId !== null && delistedPlaceIds.has(item.placeId)}
+                  excluded={item.placeId !== null && excludedPlaceIds.has(item.placeId)}
+                />
+              ))}
+            </ul>
+          </section>
+        )
+      })}
 
       {footer}
     </div>

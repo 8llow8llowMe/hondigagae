@@ -1,5 +1,7 @@
 import { Badge } from '@/components/badge'
 import { itemTypeLabel } from '@/lib/ai-plan/item-type'
+import { formatDistance } from '@/lib/format/distance'
+import { isLongTrip } from '@/lib/geo/distance'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
 import type { AiPlanScheduleItem } from '@/types/ai-plan'
@@ -20,15 +22,22 @@ export type AiPlanDraftItemRowProps = {
   delisted?: boolean
   /** 담기에서 빼기로 표시된 항목 */
   excluded?: boolean
+  /**
+   * 직전 항목으로부터의 **직선**거리(m). 기준이나 좌표가 없으면 `null` 이고 그때 줄이
+   * 사라진다 — 계산과 그 판정은 `lib/ai-plan/draft-distance.ts` 가 한다 (#100).
+   */
+  distanceMeters?: number | null
 }
 
 /**
  * 초안 항목 한 줄 — 아트보드 03.
  *
- * **거리(`4.1km`)와 실내 여부를 표시하지 않는다.**
- *  - 실내: `PlaceDetailResponse` 에 `indoor` 가 없다 (이슈 #16). 목록에만 있다
- *  - 거리: 직선거리 계산은 일정 상세(#80)의 `src/lib/geo/distance.ts` 소관이다.
- *    같은 함수를 두 브랜치가 각자 만들면 반드시 갈린다 — 그쪽이 머지되면 붙인다
+ * **실내 여부를 표시하지 않는다.** `PlaceDetailResponse` 에 `indoor` 가 없다 (이슈
+ * [#16](https://github.com/8llow8llowMe/hondigagae/issues/16)) — 목록(`PlaceSummary`)에만
+ * 있고, 목록 캐시에서 꺼내 쓰는 우회는 쓰지 않는다 (`PlanItemRow` 와 같은 결정).
+ *
+ * 거리는 붙인다 (#100). **문구·임계값을 일정 상세와 공유한다** — 두 화면이 같은 초안을
+ * 두 말로 말하지 않게 `messages.plan` 과 `lib/geo/distance.ts` 를 그대로 쓴다.
  *
  * 표시 전용이라 node 환경에서 렌더 테스트가 된다.
  */
@@ -38,6 +47,7 @@ export function AiPlanDraftItemRow({
   address,
   delisted = false,
   excluded = false,
+  distanceMeters = null,
 }: AiPlanDraftItemRowProps) {
   const typeLabel = itemTypeLabel(item.itemType)
   // **`title`/`note` 는 nullable 이다** — 서버 DTO 에 제약이 없다 (`types/ai-plan.ts`)
@@ -78,9 +88,41 @@ export function AiPlanDraftItemRow({
 
         {address !== undefined && <p className="text-caption text-fg-muted mt-0.5">{address}</p>}
 
+        <DraftItemDistance meters={distanceMeters} />
+
         {/* 항목별 이유 — 서버 문구를 그대로 쓴다 */}
         {note !== '' && <p className="text-body-2 text-fg-muted mt-1">{note}</p>}
       </div>
     </li>
+  )
+}
+
+/**
+ * 거리 한 줄 — `PlanItemDistance` 와 **같은 문구·같은 임계값**이다.
+ *
+ * **"직선" 을 반드시 붙인다.** 제주는 산간·해안도로가 많아 직선거리와 주행거리가 크게
+ * 다르다 — `4.1km` 만 쓰면 주행거리로 읽힌다 (일정상세-세부명세 D3).
+ *
+ * 30km 이상이면 **그 행만** 경고 톤이다. 색만으로 전달하지 않으려고 문장
+ * (`— 하루 이동이 깁니다.`)이 함께 간다.
+ *
+ * **기준 문구가 `숙소에서` 로 갈리지 않는다** — 초안은 직전 항목만 기준으로 삼는다
+ * (`draft-distance.ts` 주석).
+ */
+function DraftItemDistance({ meters }: { meters: number | null }) {
+  if (meters === null) return null
+
+  const long = isLongTrip(meters)
+
+  return (
+    <p
+      className={cn(
+        'text-caption mt-1 font-medium tabular-nums',
+        long ? 'text-metric-low-700' : 'text-fg-muted',
+      )}
+    >
+      {messages.plan.distanceFromPrevious.replace('{distance}', formatDistance(meters))}
+      {long && messages.plan.longTripSuffix}
+    </p>
   )
 }

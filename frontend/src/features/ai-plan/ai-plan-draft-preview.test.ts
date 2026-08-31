@@ -7,6 +7,7 @@ import {
   AiPlanDraftPreview,
   type AiPlanDraftPreviewProps,
 } from '@/features/ai-plan/ai-plan-draft-preview'
+import type { LatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
 import { aiPlanItem, aiPlanItemWithNulls } from '@/test/fixtures/ai-plan'
 import type { AiPlanDraft, AiPlanScheduleItem } from '@/types/ai-plan'
@@ -27,6 +28,13 @@ const DRAFT: AiPlanDraft = {
 
 const EMPTY_SET: ReadonlySet<string> = new Set()
 
+/** 협재해수욕장 · 그 근처 · 성산일출봉(동서 횡단이라 30km 초과) */
+const WEST: LatLng = { lat: 33.3938, lng: 126.2396 }
+const NEAR_WEST: LatLng = { lat: 33.3901, lng: 126.2402 }
+const EAST: LatLng = { lat: 33.4581, lng: 126.9425 }
+
+const EMPTY_COORDS: ReadonlyMap<string, LatLng> = new Map()
+
 function render(overrides: Partial<AiPlanDraftPreviewProps> = {}) {
   const props: AiPlanDraftPreviewProps = {
     draft: DRAFT,
@@ -36,6 +44,8 @@ function render(overrides: Partial<AiPlanDraftPreviewProps> = {}) {
     budget: 300_000,
     totalDays: 3,
     addresses: new Map([['212481712381923328', '제주시 한림읍']]),
+    // 좌표는 기본으로 비운다 — 거리 문구는 전용 describe 에서만 켠다
+    coords: EMPTY_COORDS,
     delistedPlaceIds: EMPTY_SET,
     excludedPlaceIds: EMPTY_SET,
     footer: null,
@@ -112,15 +122,75 @@ describe('AiPlanDraftPreview — 일자와 항목', () => {
     expect(render()).toContain('오전이라 노면이 덜 뜨거워요.')
   })
 
-  it('거리와 실내 여부를 만들지 않는다 — 계약에 없다 (#16) / #80 소관이다', () => {
+  it('실내 여부는 여전히 만들지 않는다 — 상세 응답에 indoor 가 없다 (#16)', () => {
     const html = render()
 
-    // 아트보드 03 의 행 서식은 `제주시 한림읍 · 야외 · 4.1km` 다. 주소만 남기고
-    // 나머지 두 조각을 붙이지 않았다는 것을 그 구분자로 확인한다 —
-    // "야외" 는 서버가 준 근거 문장에도 들어 있어 낱말만으로는 가릴 수 없다
-    expect(html).not.toContain('km')
+    // 아트보드 03 의 행 서식은 `제주시 한림읍 · 야외 · 4.1km` 다. 거리는 #100 에서
+    // 붙였고 실내 조각만 남아 있다 — "야외" 는 서버가 준 근거 문장에도 들어 있어
+    // 낱말만으로는 가릴 수 없어 구분자와 함께 본다
     expect(html).not.toContain('· 야외')
     expect(html).not.toContain('· 실내')
+  })
+})
+
+describe('AiPlanDraftPreview — 직선거리 (이슈 #100)', () => {
+  /** 1일차 두 항목의 좌표를 아는 상태 */
+  function withCoords(
+    entries: [string, LatLng][] = [
+      ['212481712381923328', WEST],
+      ['2', NEAR_WEST],
+    ],
+  ) {
+    return render({ coords: new Map(entries) })
+  }
+
+  it('직전 항목으로부터의 거리를 낸다', () => {
+    // 약 420m — 1km 미만이라 m 로 표기된다
+    expect(withCoords()).toMatch(/직선 \d+m 이동/)
+  })
+
+  it('"직선" 이라고 말한다 — 주행거리로 읽히면 안 된다 (일정 상세와 같은 문구)', () => {
+    const html = withCoords()
+
+    expect(html).toContain('직선')
+    expect(html).toContain('이동')
+    // 기준 문구가 갈리지 않는다 — 초안은 숙소 기준을 쓰지 않는다 (draft-distance.ts)
+    expect(html).not.toContain(messages.plan.distanceFromLodging.replace('{distance}', ''))
+  })
+
+  it('일자의 첫 항목에는 붙이지 않는다 — 기준이 없다', () => {
+    // 2일차는 항목이 하나뿐이라 거리 줄이 하나도 없어야 한다
+    const html = render({
+      draft: { ...DRAFT, days: [DRAFT.days[1] as AiPlanDraft['days'][number]] },
+      coords: new Map([['3', WEST]]),
+      totalDays: null,
+    })
+
+    expect(html).not.toContain('직선')
+  })
+
+  it('좌표를 모르면 거리 줄이 사라진다 — 보강 실패로 항목을 감추지는 않는다', () => {
+    const html = render({ coords: EMPTY_COORDS })
+
+    expect(html).not.toContain('직선')
+    expect(html).toContain('협재해수욕장')
+  })
+
+  it('30km 를 넘으면 경고 톤과 문장이 함께 간다 — 색만으로 전달하지 않는다', () => {
+    const html = withCoords([
+      ['212481712381923328', WEST],
+      ['2', EAST],
+    ])
+
+    expect(html).toContain(messages.plan.longTripSuffix.trim())
+    expect(html).toContain('text-metric-low-700')
+  })
+
+  it('30km 미만에는 경고를 붙이지 않는다', () => {
+    const html = withCoords()
+
+    expect(html).not.toContain(messages.plan.longTripSuffix.trim())
+    expect(html).not.toContain('text-metric-low-700')
   })
 })
 
