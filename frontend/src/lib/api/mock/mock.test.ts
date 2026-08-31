@@ -19,8 +19,14 @@ function body(search: string): SliceResponse<PlaceSummary> {
 
 describe('resolveMock — 처리 범위', () => {
   it('구현되지 않은 경로는 null 을 반환해 실제 게이트웨이로 넘긴다', () => {
-    // 프로필 이미지 업로드는 mock 이 아직 다루지 않는다 (이슈 #79)
-    expect(resolveMock('/members/me/profile-image', 'POST', '', '{}')).toBeNull()
+    /*
+      `/places/nearby` 는 **의도적인 통과 경로**다 — `resolveMock` 의 `SUB_RESOURCES` 가
+      상세(`/places/{id}`) 정규식에 걸리지 않게 먼저 빼낸다.
+
+      예시로 `/members/me/profile-image` 를 쓰지 않는다. 이제 mock 이 처리한다
+      (#79 업로드 · #83 삭제). **이 단언은 mock 이 정말 모르는 경로여야 의미가 있다.**
+    */
+    expect(resolveMock('/places/nearby', 'GET', '?lat=33.5&lng=126.5', null)).toBeNull()
   })
 
   it('AI 일정은 mock 이 처리한다 (이슈 #84)', () => {
@@ -338,7 +344,9 @@ describe('resolveMock — 인증', () => {
   })
 
   it('mock 이 모르는 POST 는 null 이라 게이트웨이로 넘어간다', () => {
-    expect(resolveMock('/members/me/profile-image', 'POST', '', '{}')).toBeNull()
+    // 비밀번호 재설정은 백엔드도 아직 없다 (#41). mock 이 처리하게 된 경로를 예시로
+    // 쓰면 이 단언이 조용히 무의미해진다 — 위 '구현되지 않은 경로' 와 같은 이유다
+    expect(resolveMock('/auth/password/reset', 'POST', '', '{}')).toBeNull()
   })
 
   it('send-code 공란 이메일은 400 AUTH_101 이다', () => {
