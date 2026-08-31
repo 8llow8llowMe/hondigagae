@@ -5,15 +5,23 @@ import { describe, expect, it } from 'vitest'
 
 import {
   PasswordResetCodeStep,
+  type PasswordResetCodeStepProps,
   PasswordResetDone,
   PasswordResetEmailStep,
+  type PasswordResetEmailStepProps,
 } from '@/features/auth/password-reset-steps'
 import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 
 const noop = () => undefined
 
-function emailStep(overrides: Record<string, unknown> = {}) {
+/*
+  **`overrides` 를 `Partial<Props>` 로 받고 `as never` 를 쓰지 않는다.** 캐스팅하면 prop 을
+  개명하거나 필수 prop 을 추가했을 때 `pnpm typecheck` 가 통과하고, 테스트는 `undefined` 를
+  넘긴 채 초록으로 남는다 — `signup-steps.test.ts` 가 매 케이스 완전 타입 props 를 적어
+  지키고 있는 방어다 (코드 리뷰 지적).
+*/
+function emailStep(overrides: Partial<PasswordResetEmailStepProps> = {}) {
   return renderToStaticMarkup(
     createElement(PasswordResetEmailStep, {
       values: { email: '' },
@@ -24,11 +32,11 @@ function emailStep(overrides: Record<string, unknown> = {}) {
       onSubmit: noop,
       onRetry: noop,
       ...overrides,
-    } as never),
+    }),
   )
 }
 
-function codeStep(overrides: Record<string, unknown> = {}) {
+function codeStep(overrides: Partial<PasswordResetCodeStepProps> = {}) {
   return renderToStaticMarkup(
     createElement(PasswordResetCodeStep, {
       email: 'demo@hondigagae.dev',
@@ -46,7 +54,7 @@ function codeStep(overrides: Record<string, unknown> = {}) {
       onChangeEmail: noop,
       onRetry: noop,
       ...overrides,
-    } as never),
+    }),
   )
 }
 

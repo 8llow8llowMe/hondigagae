@@ -244,15 +244,21 @@ function loginSuccess(memberId: string): MockResult {
 function oauthProfile(
   provider: string,
   code: string,
-): { email: string; nickname: string; emailVerified: boolean } {
+): { email: string; name: string; nickname: string; emailVerified: boolean } {
   const email = code.includes(OAUTH_CODE_SCENARIOS.linked)
     ? (OAUTH_PROFILE_EMAIL.get('KAKAO') as string)
     : (OAUTH_PROFILE_EMAIL.get(provider) ?? '')
 
+  // **`name` 을 함께 든다.** 백엔드 `validateRequiredProfile` 은 `nickname` 과 `name` 이
+  // **둘 다** 비었을 때만 `AUTH_011` 을 던진다 — `nickname` 만 보면 mock 이 백엔드보다
+  // 엄격해져서, 실제로는 통과할 프로필이 mock 에서만 400 이 된다 (코드 리뷰 지적).
+  const profileDenied = code.includes(OAUTH_CODE_SCENARIOS.profileDenied)
+
   return {
     // 미동의는 "값이 비어서 온다" 로 재현한다 — 백엔드 validateRequiredProfile 과 같은 신호다
     email: code.includes(OAUTH_CODE_SCENARIOS.emailDenied) ? '' : email,
-    nickname: code.includes(OAUTH_CODE_SCENARIOS.profileDenied) ? '' : '소셜이',
+    name: profileDenied ? '' : '박소셜',
+    nickname: profileDenied ? '' : '소셜이',
     emailVerified: !code.includes(OAUTH_CODE_SCENARIOS.unverified),
   }
 }
@@ -270,6 +276,16 @@ function oauthProfile(
 function oauthLogin(store: MockStore, rawProvider: string, search: string): MockResult {
   const provider = OAUTH_PROVIDERS.get(rawProvider.toLowerCase())
   if (provider === undefined) {
+    /*
+      **여기만 mock 이 백엔드보다 관대하다.** 실제로는 `@PathVariable OAuthProvider` 컨버터가
+      먼저 터져 `MethodArgumentTypeMismatchException` 이 되고, `AuthExceptionHandler` 가
+      그것을 처리하지 않아 `AUTH_007` 이 아닌 응답이 나간다 (`AUTH_105` 가 선언만 되어
+      있다 — 소셜콜백-세부명세.md D1 각주, BE 후속). mock 을 그 미정의 상태에 맞출 수는
+      없으므로 명세가 적은 코드를 낸다.
+
+      **화면은 이 응답에 기대지 않는다**: `use-oauth-exchange.ts` 가 `isOAuthProvider` 로
+      요청 자체를 막으므로 서버가 무엇을 주든 "잘못된 접근" 으로 간다.
+    */
     return fail(400, 'AUTH_007', `지원하지 않는 소셜 로그인 제공자입니다. (${rawProvider})`)
   }
 
@@ -309,7 +325,8 @@ function oauthLogin(store: MockStore, rawProvider: string, search: string): Mock
       '소셜 계정의 이메일이 인증되지 않았습니다. 제공자에서 이메일 인증 후 다시 시도해주세요.',
     )
   }
-  if (profile.nickname.length === 0) {
+  // 백엔드와 같은 조건: `!hasText(nickname) && !hasText(name)`
+  if (profile.nickname.length === 0 && profile.name.length === 0) {
     return fail(400, 'AUTH_011', '소셜 계정의 프로필(닉네임) 제공 동의가 필요합니다.')
   }
 
@@ -320,7 +337,8 @@ function oauthLogin(store: MockStore, rawProvider: string, search: string): Mock
       memberId: nextMemberId(store),
       email: profile.email,
       password: null,
-      name: profile.nickname,
+      // 백엔드 createOAuthMember: name 이 있으면 name, 없으면 nickname 으로 채운다
+      name: profile.name.length > 0 ? profile.name : profile.nickname,
       nickname: profile.nickname,
       profileImageUrl: null,
       provider,
