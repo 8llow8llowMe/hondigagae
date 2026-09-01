@@ -5,6 +5,7 @@ import com.hondigagae.domainlayer.planner.adapter.out.client.feign.dto.PetCondit
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import java.util.List;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
@@ -23,6 +24,11 @@ public interface PetConditionClient {
     @GetMapping("/internal/v1/pets/{petId}/condition")
     Response<PetConditionClientResponse> getPetCondition(
         @PathVariable long petId, @RequestParam("memberId") long memberId);
+
+    /** 여러 마리 특성 벌크 조회 — 마리 수만큼 왕복하지 않는다. 소유가 아닌 petId 는 응답에서 빠진다. */
+    @GetMapping("/internal/v1/pets/conditions")
+    Response<List<PetConditionClientResponse>> getPetConditions(
+        @RequestParam("memberId") long memberId, @RequestParam("petIds") List<Long> petIds);
 
     /** 대표 반려견 특성. 요청이 petId 를 지정하지 않았을 때의 기본값이다. 없으면 404. */
     @GetMapping("/internal/v1/pets/representative/condition")

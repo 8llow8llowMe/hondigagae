@@ -140,13 +140,13 @@ public class AiPlanWorker {
             }
             return List.of(representative);
         }
-        List<PetCondition> conditions = new ArrayList<>();
-        for (Long petId : petIds) {
-            petConditionQueryPort.findCondition(memberId, petId).ifPresentOrElse(
-                conditions::add,
-                () -> log.warn("AI plan generating without pet condition petId={} memberId={}", petId, memberId));
+        // 벌크 한 번으로 가져온다 — 마리 수만큼 HTTP 왕복하지 않는다 (§9-7).
+        List<PetCondition> conditions = petConditionQueryPort.findConditions(memberId, petIds);
+        if (conditions.size() < petIds.size()) {
+            log.warn("AI plan generating with partial pet conditions requested={} resolved={} memberId={}",
+                petIds.size(), conditions.size(), memberId);
         }
-        return List.copyOf(conditions);
+        return conditions;
     }
 
     /**

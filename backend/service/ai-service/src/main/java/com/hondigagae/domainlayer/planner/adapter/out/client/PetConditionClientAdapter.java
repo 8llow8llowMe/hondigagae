@@ -8,6 +8,7 @@ import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.port.out.PetConditionQueryPort;
 import com.hondigagae.shared.travel.pet.ActivityLevel;
 import com.hondigagae.shared.travel.pet.PetSizeType;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +48,26 @@ public class PetConditionClientAdapter implements PetConditionQueryPort {
             log.warn("Pet condition lookup failed petId={} errorCode={}",
                 petId, exception.getErrorCode().getCode());
             return Optional.empty();
+        }
+    }
+
+    @Override
+    public List<PetCondition> findConditions(long memberId, List<Long> petIds) {
+        if (petIds == null || petIds.isEmpty()) {
+            return List.of();
+        }
+        try {
+            List<PetConditionClientResponse> body = internalResponseSupport.requestAndUnwrapOrNull(
+                AUTH_SERVICE, () -> petConditionClient.getPetConditions(memberId, petIds));
+            if (body == null) {
+                log.info("Pet conditions not found memberId={} petIds={}", memberId, petIds);
+                return List.of();
+            }
+            return body.stream().map(this::toCondition).toList();
+        } catch (AiPlanException exception) {
+            log.warn("Pet conditions lookup failed memberId={} errorCode={}",
+                memberId, exception.getErrorCode().getCode());
+            return List.of();
         }
     }
 

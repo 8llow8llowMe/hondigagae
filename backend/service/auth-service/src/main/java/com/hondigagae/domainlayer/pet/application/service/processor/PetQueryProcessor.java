@@ -40,6 +40,19 @@ public class PetQueryProcessor {
     }
 
     /**
+     * 요청한 petId 중 본인 소유만 골라 준다(내부 벌크 조회용). 회원당 최대 5마리라
+     * 전체 목록 한 번 조회로 충분하다 — 소유 검증과 조회가 쿼리 하나로 끝난다.
+     * 남의 것/없는 것은 조용히 빠진다 — 내부 호출부가 누락으로 판단하고 관용 처리한다.
+     */
+    public List<PetInfo> getMyPetInfos(long memberId, List<Long> petIds) {
+        java.util.Set<Long> requested = new java.util.HashSet<>(petIds);
+        return petRepositoryPort.findAllByMemberId(memberId).stream()
+            .filter(pet -> requested.contains(pet.id()))
+            .map(PetInfo::from)
+            .toList();
+    }
+
+    /**
      * 본인 소유 반려견만 통과시킨다. 소유자가 다르면 존재 자체를 노출하지 않도록
      * 403이 아니라 404(NOT_FOUND_PET)로 응답한다.
      */
