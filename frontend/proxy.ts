@@ -15,7 +15,7 @@ import { SESSION_COOKIE_NAME } from '@/lib/auth/cookie-names'
  *
  * 장소 탐색(/places)은 공개다. tour-service 는 security 의존이 없는 공개 조회 서비스다.
  */
-export const PROTECTED_PATHS = ['/mypage', '/pets', '/plans', '/ai-plans'] as const
+export const PROTECTED_PATHS = ['/mypage', '/pets', '/plans', '/ai-plans', '/favorites'] as const
 
 const LOGIN_PATH = '/login'
 
@@ -40,5 +40,11 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/mypage/:path*', '/pets/:path*', '/plans/:path*', '/ai-plans/:path*'],
+  matcher: [
+    '/mypage/:path*',
+    '/pets/:path*',
+    '/plans/:path*',
+    '/ai-plans/:path*',
+    '/favorites/:path*',
+  ],
 }

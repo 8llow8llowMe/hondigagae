@@ -4,6 +4,7 @@ import { ErrorState } from '@/components/error-state'
 import { Skeleton } from '@/components/skeleton'
 import { Band, Section } from '@/components/surface'
 import { AccountSection } from '@/features/member/account-section'
+import { MyFavoritesRow } from '@/features/member/my-favorites-row'
 import { MyPetsRow } from '@/features/member/my-pets-row'
 import { MyProfileSection } from '@/features/member/my-profile-section'
 import { toAccountState } from '@/lib/member/account-state'
@@ -24,6 +25,12 @@ export type MyPageSectionsProps = {
   pets: Pet[] | null
   petsLoading: boolean
   petsTotalCount: number
+  /**
+   * 저장한 장소 개수 (#127). **`null` 은 조회 실패**이고, 그때는 개수 줄만 빠지고
+   * 진입점 자체는 남는다 — 목록이 안 열리는 것과 진입점이 사라지는 것은 다른 일이다.
+   */
+  favoritesTotalCount: number | null
+  favoritesLoading: boolean
   onRetry: () => void
   onLogout: () => void
   onEditProfile: () => void
@@ -34,7 +41,11 @@ export type MyPageSectionsProps = {
  * — `PetListSection` 과 같은 구조이고, 이 분리가 렌더 테스트를 가능하게 한다
  * (docs/testing-guide.md §1).
  *
- * 블록 순서: 내 정보 → **내 반려견** → 계정 → 위험한 액션 (아트보드 01).
+ * 블록 순서: 내 정보 → **내 반려견 · 저장한 장소** → 계정 → 위험한 액션 (아트보드 01).
+ *
+ * 저장한 장소는 반려견과 같은 밴드 안에 둔다 (#127) — 둘 다 "내가 쌓아 둔 것" 이고,
+ * 밴드를 하나 더 끼우면 "여기서 다른 이야기가 시작된다" 는 신호가 닳는다
+ * (`surface.tsx` 의 `Band` 주석).
  */
 export function MyPageSections({
   member,
@@ -43,6 +54,8 @@ export function MyPageSections({
   pets,
   petsLoading,
   petsTotalCount,
+  favoritesTotalCount,
+  favoritesLoading,
   onRetry,
   onLogout,
   onEditProfile,
@@ -97,6 +110,12 @@ export function MyPageSections({
       ) : (
         // 조회 실패면 이 행만 빠지고 나머지는 그대로 보인다 (D5)
         pets !== null && <MyPetsRow pets={pets} totalCount={petsTotalCount} />
+      )}
+
+      {favoritesLoading ? (
+        <Skeleton className="mx-4 my-3 h-14 md:mx-10" />
+      ) : (
+        <MyFavoritesRow totalCount={favoritesTotalCount} />
       )}
 
       <Band />
