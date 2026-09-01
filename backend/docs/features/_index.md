@@ -25,10 +25,12 @@
 | `draft-mid-term-forecast.md` | 미등록 | 구현 완료 | 중기예보 연동으로 예보 커버리지 3일 -> 11일 |
 | `draft-redis-sentinel-wiring.md` | 미등록 | 구현 완료 | Sentinel 접속 배선, 설정 누락 기동 실패 |
 | `draft-forecast-quota-defense.md` | 미등록 | 구현 완료 | 예보 캐시 쿼터 방어 3종 |
+| `draft-excluded-from-conventions-refactor.md` | 미등록 | 후보 | 컨벤션 리팩토링에서 의도적으로 뺀 4건 |
 
 ### 사후 초안에 대해
 
-위 셋은 **구현이 먼저 들어간 뒤에 쓴 초안**이다. `git-workflow.md` 의 "이슈 → 브랜치 → 작업"
+`draft-mid-term-forecast` / `draft-redis-sentinel-wiring` / `draft-forecast-quota-defense`
+는 **구현이 먼저 들어간 뒤에 쓴 초안**이다. `git-workflow.md` 의 "이슈 → 브랜치 → 작업"
 순서와 반대다. 한 브랜치에 세 기능을 담은 뒤 PR 의 `Issue Number` 를 채우려다 보니 이렇게 됐다.
 
 기록으로 남기는 이유는 이 순서가 반복되면 안 되기 때문이다. 이슈를 먼저 쪼갰으면 브랜치도
