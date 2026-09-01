@@ -7,6 +7,7 @@ import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -43,5 +44,13 @@ public class AiPlanExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Response<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
         return ValidationErrorSupport.toResponse(exception, AiPlanErrorCode.PARAMETER_TYPE_INVALID.getCode());
+    }
+    /** 필수 쿼리 파라미터 누락. 처리하지 않으면 Response 봉투 밖의 Spring 기본 에러 바디가 나간다. */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Response<Void>> handleMissingParameter(MissingServletRequestParameterException exception) {
+        AiPlanErrorCode errorCode = AiPlanErrorCode.PARAMETER_REQUIRED;
+        return ResponseEntity
+            .status(errorCode.getHttpStatus())
+            .body(Response.fail(errorCode.getCode(), errorCode.getMessage() + " (" + exception.getParameterName() + ")"));
     }
 }
