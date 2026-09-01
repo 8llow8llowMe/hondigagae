@@ -1,6 +1,6 @@
 package com.hondigagae.domainlayer.placeimport.adapter.out.persistence;
 
-import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceMergePort;
+import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceMergeCommandPort;
 import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceMergeCandidateQueryResult;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class JdbcPlaceMergeAdapter implements PlaceMergePort {
+public class JdbcPlaceMergeAdapter implements PlaceMergeCommandPort {
 
     private static final String SELECT_CANDIDATES_SQL = """
         SELECT id, source, title, lat, lng

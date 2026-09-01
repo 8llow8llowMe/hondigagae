@@ -1,6 +1,6 @@
 package com.hondigagae.domainlayer.placeimport.adapter.out.persistence;
 
-import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceDelistPort;
+import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceDelistCommandPort;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class JdbcPlaceDelistAdapter implements PlaceDelistPort {
+public class JdbcPlaceDelistAdapter implements PlaceDelistCommandPort {
 
     private static final String COUNT_ACTIVE_SQL = """
         SELECT COUNT(*) FROM place WHERE source = ? AND delisted_at IS NULL

@@ -1,6 +1,6 @@
 package com.hondigagae.domainlayer.placeimport.application.service.processor;
 
-import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceMergePort;
+import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceMergeCommandPort;
 import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceMergeCandidateQueryResult;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
 import com.hondigagae.domainlayer.placeimport.domain.model.PlaceNameMatcher;
@@ -34,10 +34,10 @@ public class PlaceMergeProcessor {
     /** 이름이 부분적으로만 같을 때 허용하는 거리. 좁게 잡아 오탐을 막는다. */
     private static final double PARTIAL_NAME_RADIUS_M = 300d;
 
-    private final PlaceMergePort placeMergePort;
+    private final PlaceMergeCommandPort placeMergeCommandPort;
 
     public int mergeDuplicates(String areaCode) {
-        List<PlaceMergeCandidateQueryResult> candidates = placeMergePort.findMergeCandidates(areaCode);
+        List<PlaceMergeCandidateQueryResult> candidates = placeMergeCommandPort.findMergeCandidates(areaCode);
 
         List<PlaceMergeCandidateQueryResult> survivors = candidates.stream()
             .filter(candidate -> PlaceSourceType.TOUR_API.name().equals(candidate.source()))
@@ -60,7 +60,7 @@ public class PlaceMergeProcessor {
             return 0;
         }
 
-        int merged = placeMergePort.markMerged(pairs);
+        int merged = placeMergeCommandPort.markMerged(pairs);
         log.info("place merge done areaCode={} merged={} survivors={} absorbables={}",
             areaCode, merged, survivors.size(), absorbables.size());
         return merged;

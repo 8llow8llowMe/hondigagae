@@ -78,12 +78,12 @@ mfds:
     base-url: ${MFDS_BASE_URL:https://www.foodsafetykorea.go.kr}
     download-path: ${MFDS_PET_RESTAURANT_PATH:/portal/petKorea/downloadExcel.do}
     file-path: ${MFDS_PET_RESTAURANT_FILE_PATH:}
-    connect-timeout-ms: ${MFDS_CONNECT_TIMEOUT_MS:3000}
+    # connect 타임아웃은 openApiWebClient 가 공통으로 잡는다 (WebClientConfig).
     read-timeout-ms: ${MFDS_READ_TIMEOUT_MS:30000}
 
 # VWorld 지오코더. 식약처 원천이 주소만 주므로 좌표를 여기서 채운다 (일 40,000건 무료).
 vworld:
   base-url: ${VWORLD_BASE_URL:https://api.vworld.kr}
   api-key: ${VWORLD_API_KEY:}
-  connect-timeout-ms: ${VWORLD_CONNECT_TIMEOUT_MS:3000}
+  # connect 타임아웃은 openApiWebClient 가 공통으로 잡는다 (WebClientConfig).
   read-timeout-ms: ${VWORLD_READ_TIMEOUT_MS:10000}

@@ -1,7 +1,7 @@
 package com.hondigagae.domainlayer.placeimport.application.service.processor;
 
-import com.hondigagae.domainlayer.placeimport.application.port.out.EmergencyFacilityDelistPort;
-import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceDelistPort;
+import com.hondigagae.domainlayer.placeimport.application.port.out.EmergencyFacilityDelistCommandPort;
+import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceDelistCommandPort;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
 import com.hondigagae.domainlayer.placeimport.domain.model.DelistGuard;
 import java.time.LocalDateTime;
@@ -25,17 +25,17 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class DelistProcessor {
 
-    private final PlaceDelistPort placeDelistPort;
-    private final EmergencyFacilityDelistPort emergencyFacilityDelistPort;
+    private final PlaceDelistCommandPort placeDelistCommandPort;
+    private final EmergencyFacilityDelistCommandPort emergencyFacilityDelistCommandPort;
 
     public int delistPlaces(PlaceSourceType source, LocalDateTime runStartedAt, long importedCount) {
-        long active = placeDelistPort.countActive(source.name());
+        long active = placeDelistCommandPort.countActive(source.name());
         if (!DelistGuard.allows(importedCount, active)) {
             log.warn("place delist skipped by guard. source={} imported={} active={}",
                 source, importedCount, active);
             return 0;
         }
-        int delisted = placeDelistPort.delistStale(source.name(), runStartedAt);
+        int delisted = placeDelistCommandPort.delistStale(source.name(), runStartedAt);
         if (delisted > 0) {
             log.info("place delisted. source={} delisted={} imported={} active={}",
                 source, delisted, importedCount, active);
@@ -44,13 +44,13 @@ public class DelistProcessor {
     }
 
     public int delistEmergencyFacilities(LocalDateTime runStartedAt, long importedCount) {
-        long active = emergencyFacilityDelistPort.countActive();
+        long active = emergencyFacilityDelistCommandPort.countActive();
         if (!DelistGuard.allows(importedCount, active)) {
             log.warn("emergency facility delist skipped by guard. imported={} active={}",
                 importedCount, active);
             return 0;
         }
-        int delisted = emergencyFacilityDelistPort.delistStale(runStartedAt);
+        int delisted = emergencyFacilityDelistCommandPort.delistStale(runStartedAt);
         if (delisted > 0) {
             log.info("emergency facility delisted. delisted={} imported={} active={}",
                 delisted, importedCount, active);

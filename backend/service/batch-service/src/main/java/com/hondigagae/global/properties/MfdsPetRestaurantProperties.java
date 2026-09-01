@@ -16,7 +16,7 @@ public record MfdsPetRestaurantProperties(
     String baseUrl,
     String downloadPath,
     String filePath,
-    int connectTimeoutMs,
+    // connect 타임아웃은 여기 두지 않는다 (VworldProperties 와 같은 이유).
     int readTimeoutMs
 ) {
 
@@ -26,9 +26,6 @@ public record MfdsPetRestaurantProperties(
         }
         if (downloadPath == null || downloadPath.isBlank()) {
             downloadPath = "/portal/petKorea/downloadExcel.do";
-        }
-        if (connectTimeoutMs <= 0) {
-            connectTimeoutMs = 3_000;
         }
         if (readTimeoutMs <= 0) {
             readTimeoutMs = 30_000;

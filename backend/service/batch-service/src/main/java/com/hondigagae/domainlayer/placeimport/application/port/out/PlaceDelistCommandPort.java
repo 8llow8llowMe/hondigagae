@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
  * 있어 지우면 남의 여행 계획이 깨지고, 원천의 일시적 오류로 대량 소실됐을 때 되돌릴 수
  * 있어야 하며, 다시 등록되는 경우 upsert 가 delisted_at 을 NULL 로 되살린다.
  */
-public interface PlaceDelistPort {
+public interface PlaceDelistCommandPort {
 
     /** 해당 원천의 활성(비 delisted) 행 수. 급감 가드의 분모다. */
     long countActive(String source);
