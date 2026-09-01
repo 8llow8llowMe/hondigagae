@@ -145,6 +145,11 @@ class JwtTokenProcessorTest {
         }
 
         @Override
+        public java.util.List<com.hondigagae.domainlayer.auth.application.port.out.query.RefreshSessionQueryResult> findSessions(long memberId) {
+            return java.util.List.of();
+        }
+
+        @Override
         public Optional<String> find(long memberId, String sessionId) {
             return Optional.ofNullable(tokens.get(memberId + ":" + sessionId));
         }
