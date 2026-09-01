@@ -18,4 +18,10 @@ public interface PetInternalUseCase {
 
     /** 대표 반려견의 특성. 호출부가 petId 를 받지 않았을 때의 기본값으로 쓴다. */
     PetConditionResponse getRepresentativePetCondition(long memberId);
+
+    /**
+     * 여러 마리의 특성을 한 번에 준다 — 마리 수만큼 HTTP 왕복이 생기는 원격 N+1 방지용(§9-7).
+     * 본인 소유가 아니거나 없는 petId 는 결과에서 조용히 빠진다 — 호출부가 누락으로 판단한다.
+     */
+    java.util.List<PetConditionResponse> getPetConditions(long memberId, java.util.List<Long> petIds);
 }
