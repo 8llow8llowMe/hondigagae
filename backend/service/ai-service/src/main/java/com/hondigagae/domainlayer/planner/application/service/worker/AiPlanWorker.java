@@ -275,6 +275,8 @@ public class AiPlanWorker {
             .contentTypeName(result.contentTypeName())
             .addr(result.addr())
             .petAllowanceName(result.petAllowanceName())
+            .allowedPetSizeName(result.allowedPetSizeName())
+            .maxPetWeightKg(result.maxPetWeightKg())
             .indoor(result.indoor())
             .sourceCategory(result.sourceCategory())
             .lat(result.lat())
