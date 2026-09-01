@@ -14,7 +14,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 /**
- * plan-service 의 기본(catch-all) advice. 서비스에 컨텍스트가 하나뿐이라 domainlayer 전체를 범위로 잡는다.
+ * plan-service 의 기본(catch-all) advice. favorite 컨텍스트는 전용 advice(@Order(1))가 먼저 받는다.
  */
 @RestControllerAdvice(basePackages = "com.hondigagae.domainlayer")
 public class PlanExceptionHandler {

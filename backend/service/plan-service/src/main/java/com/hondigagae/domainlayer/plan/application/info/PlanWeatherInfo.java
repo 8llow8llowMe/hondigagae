@@ -1,6 +1,5 @@
 package com.hondigagae.domainlayer.plan.application.info;
 
-import com.hondigagae.domainlayer.plan.application.port.out.query.PlaceSuitabilityQueryResult;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.Builder;
@@ -33,7 +32,7 @@ public record PlanWeatherInfo(
         LocalDate date,
         Long representativePlaceId,
         String representativePlaceTitle,
-        PlaceSuitabilityQueryResult suitability,
+        PlanDaySuitabilityInfo suitability,
         String unavailableReason
     ) {
 

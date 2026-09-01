@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.plan.application.port.out.PetConditionQueryPor
 import com.hondigagae.domainlayer.plan.application.port.out.PlaceSuitabilityQueryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PetConditionQueryResult;
+import com.hondigagae.domainlayer.plan.application.info.PlanDaySuitabilityInfo;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlaceSuitabilityQueryResult;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanItemType;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
@@ -94,7 +95,51 @@ public class PlanWeatherProcessor {
             .date(date)
             .representativePlaceId(item.targetId())
             .representativePlaceTitle(item.title())
-            .suitability(suitability.get())
+            .suitability(toSuitabilityInfo(suitability.get()))
+            .build();
+    }
+
+    /**
+     * out-port 계약(QueryResult)을 application 표현으로 접는다. Presenter 까지 QueryResult 가
+     * 번지면 tour-service 응답 스키마 변화가 화면 조립 코드를 직접 흔든다 (architecture-guide §4).
+     */
+    private PlanDaySuitabilityInfo toSuitabilityInfo(PlaceSuitabilityQueryResult result) {
+        return PlanDaySuitabilityInfo.builder()
+            .placeId(result.placeId())
+            .placeTitle(result.placeTitle())
+            .targetDate(result.targetDate())
+            .score(result.score())
+            .levelCode(result.levelCode())
+            .levelName(result.levelName())
+            .levelDescription(result.levelDescription())
+            .reasons(result.reasons() == null ? java.util.List.of() : result.reasons().stream()
+                .map(reason -> PlanDaySuitabilityInfo.ReasonInfo.builder()
+                    .code(reason.code()).name(reason.name())
+                    .description(reason.description()).scoreDelta(reason.scoreDelta())
+                    .build())
+                .toList())
+            .weather(result.weather() == null ? null : PlanDaySuitabilityInfo.DailyWeatherInfo.builder()
+                .date(result.weather().date())
+                .forecastSourceCode(result.weather().forecastSourceCode())
+                .forecastSourceName(result.weather().forecastSourceName())
+                .minTemperature(result.weather().minTemperature())
+                .maxTemperature(result.weather().maxTemperature())
+                .maxPrecipitationProbability(result.weather().maxPrecipitationProbability())
+                .precipitationTypeName(result.weather().precipitationTypeName())
+                .skyStateName(result.weather().skyStateName())
+                .maxWindSpeed(result.weather().maxWindSpeed())
+                .maxHumidity(result.weather().maxHumidity())
+                .build())
+            .indoorAlternatives(result.indoorAlternatives() == null ? java.util.List.of()
+                : result.indoorAlternatives().stream()
+                    .map(alternative -> PlanDaySuitabilityInfo.AlternativeInfo.builder()
+                        .placeId(alternative.placeId()).title(alternative.title())
+                        .lat(alternative.lat()).lng(alternative.lng())
+                        .distanceMeters(alternative.distanceMeters())
+                        .build())
+                    .toList())
+            .weatherApplied(result.weatherApplied())
+            .congestionApplied(result.congestionApplied())
             .build();
     }
 

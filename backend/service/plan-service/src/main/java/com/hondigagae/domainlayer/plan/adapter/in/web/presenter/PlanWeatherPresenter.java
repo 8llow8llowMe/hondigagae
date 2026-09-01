@@ -8,7 +8,7 @@ import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanWeatherReason
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanWeatherResponse;
 import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo.PlanDayWeatherInfo;
-import com.hondigagae.domainlayer.plan.application.port.out.query.PlaceSuitabilityQueryResult;
+import com.hondigagae.domainlayer.plan.application.info.PlanDaySuitabilityInfo;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -27,7 +27,7 @@ public class PlanWeatherPresenter {
     }
 
     private PlanDayWeatherItem toDayItem(PlanDayWeatherInfo day) {
-        PlaceSuitabilityQueryResult suitability = day.suitability();
+        PlanDaySuitabilityInfo suitability = day.suitability();
 
         return PlanDayWeatherItem.builder()
             .day(day.day())
@@ -45,7 +45,7 @@ public class PlanWeatherPresenter {
             .build();
     }
 
-    private ScoreMetricMetadata toLevelMetadata(PlaceSuitabilityQueryResult suitability) {
+    private ScoreMetricMetadata toLevelMetadata(PlanDaySuitabilityInfo suitability) {
         if (suitability == null || suitability.levelCode() == null) {
             return null;
         }
@@ -53,7 +53,7 @@ public class PlanWeatherPresenter {
             suitability.levelCode(), suitability.levelName(), suitability.levelDescription(), null);
     }
 
-    private List<PlanWeatherReasonItem> toReasonItems(PlaceSuitabilityQueryResult suitability) {
+    private List<PlanWeatherReasonItem> toReasonItems(PlanDaySuitabilityInfo suitability) {
         if (suitability == null || suitability.reasons() == null) {
             return List.of();
         }
@@ -67,11 +67,11 @@ public class PlanWeatherPresenter {
             .toList();
     }
 
-    private PlanDailyWeatherItem toWeatherItem(PlaceSuitabilityQueryResult suitability) {
+    private PlanDailyWeatherItem toWeatherItem(PlanDaySuitabilityInfo suitability) {
         if (suitability == null || suitability.weather() == null) {
             return null;
         }
-        PlaceSuitabilityQueryResult.DailyWeatherQueryResult weather = suitability.weather();
+        PlanDaySuitabilityInfo.DailyWeatherInfo weather = suitability.weather();
         return PlanDailyWeatherItem.builder()
             .date(weather.date())
             .forecastSourceCode(weather.forecastSourceCode())
@@ -86,7 +86,7 @@ public class PlanWeatherPresenter {
             .build();
     }
 
-    private List<PlanAlternativePlaceItem> toAlternativeItems(PlaceSuitabilityQueryResult suitability) {
+    private List<PlanAlternativePlaceItem> toAlternativeItems(PlanDaySuitabilityInfo suitability) {
         if (suitability == null || suitability.indoorAlternatives() == null) {
             return List.of();
         }

@@ -11,6 +11,7 @@ import com.hondigagae.domainlayer.plan.application.port.out.PlanPlaceLookupPort;
 import com.hondigagae.domainlayer.plan.application.port.out.query.EmergencyFacilityQueryResult;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlanPlaceSummaryQueryResult;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,8 +43,8 @@ public class PlanEmergencyProcessor {
     private final PlanPlaceLookupPort planPlaceLookupPort;
     private final EmergencyFacilityQueryPort emergencyFacilityQueryPort;
 
-    public PlanEmergencyInfo getEmergencyBriefing(long memberId, long planId) {
-        Plan plan = planQueryProcessor.getOwnedPlan(memberId, planId);
+    /** 소유권 확인은 다른 유스케이스와 같이 Facade 가 한다 — 이 Processor 는 브리핑 조립만 맡는다. */
+    public PlanEmergencyInfo getEmergencyBriefing(Plan plan) {
         PlanInfo planInfo = planQueryProcessor.getPlanInfo(plan);
 
         // 장소를 참조하는 항목만 브리핑 대상이다. 이동·좌표 없는 항목은 검색 중심점이 없다.
@@ -66,7 +67,7 @@ public class PlanEmergencyProcessor {
               없고, 남아 있어도 원천이 좌표를 주지 않은 장소가 있다. 브리핑에서만 건너뛴다.
             */
             if (point == null || !point.hasPoint()) {
-                log.info("Plan emergency briefing skips place without point planId={} placeId={}", planId, item.targetId());
+                log.info("Plan emergency briefing skips place without point planId={} placeId={}", plan.id(), item.targetId());
                 continue;
             }
             List<EmergencyFacilityQueryResult> facilities = facilitiesByPlace.computeIfAbsent(
@@ -74,7 +75,7 @@ public class PlanEmergencyProcessor {
                 placeId -> emergencyFacilityQueryPort.findNearby(
                     point.lat(), point.lng(), SEARCH_RADIUS_METERS, FACILITIES_PER_SPOT));
 
-            spotsByDay.computeIfAbsent(item.day(), day -> new java.util.ArrayList<>())
+            spotsByDay.computeIfAbsent(item.day(), day -> new ArrayList<>())
                 .add(SpotEmergencyInfo.builder()
                     .planItemId(item.planItemId())
                     .placeId(item.targetId())
@@ -91,7 +92,7 @@ public class PlanEmergencyProcessor {
             .toList();
 
         return PlanEmergencyInfo.builder()
-            .planId(planId)
+            .planId(plan.id())
             .radiusMeters(SEARCH_RADIUS_METERS)
             .days(days)
             .build();

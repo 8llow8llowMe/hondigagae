@@ -9,6 +9,4 @@ public interface PlanItemRepository extends JpaRepository<PlanItemEntity, Long> 
     List<PlanItemEntity> findByPlanIdOrderByDayAscSequenceAsc(Long planId);
 
     void deleteByPlanIdAndDay(Long planId, int day);
-
-    void deleteByPlanId(Long planId);
 }
