@@ -34,7 +34,10 @@ public enum AuthErrorCode {
     // 요청 검증(Bean Validation) 대역 — 1xx.
     // 필드별 코드(AUTH_101~104)는 AuthValidationMessage 가 단일 기준점이며, 여기서는 중복 정의하지 않는다.
     INVALID_REQUEST("AUTH_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
-    PARAMETER_TYPE_INVALID("AUTH_105", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
+    // AUTH_105 는 결번 — 과거 PARAMETER_TYPE_INVALID 자리였으나 필드별 코드(101~108) 중간에 끼어 있어
+    // §8-2 의 "프레임워크 공통 코드는 1xx 대역 끝" 규약에 맞게 뒤로 옮겼다. 재사용하지 않는다.
+    PARAMETER_TYPE_INVALID("AUTH_109", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
+    PARAMETER_REQUIRED("AUTH_110", "필수 요청 파라미터가 누락되었습니다.", HttpStatus.BAD_REQUEST);
 
     private final String code;
     private final String message;

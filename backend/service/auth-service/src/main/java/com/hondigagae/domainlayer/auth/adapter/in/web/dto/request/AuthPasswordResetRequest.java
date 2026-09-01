@@ -23,7 +23,7 @@ public record AuthPasswordResetRequest(
     @NotBlank(message = AuthValidationMessage.NEW_PASSWORD_REQUIRED)
     @Size(min = 8, max = 20, message = AuthValidationMessage.PASSWORD_LENGTH_INVALID)
     @Pattern(
-        regexp = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()\\-_=+\\[\\]{};:'\",.<>/?\\\\|])\\S+$",
+        regexp = AuthValidationMessage.PASSWORD_REGEXP,
         message = AuthValidationMessage.PASSWORD_PATTERN_INVALID
     )
     String newPassword

@@ -11,7 +11,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class RefreshCookieProvider {
 
-    private static final String REFRESH_TOKEN_COOKIE = "refreshToken";
+    /** 쿠키 이름의 단일 소유자. 컨트롤러의 @CookieValue 도 이 상수를 참조한다. */
+    public static final String REFRESH_TOKEN_COOKIE = "refreshToken";
     // reissue 와 logout 이 함께 쿠키를 읽는다 — 로그아웃이 "현재 기기 세션"을 특정하려면
     // 쿠키의 refresh 토큰(jti=sessionId)이 필요하므로 auth 경로 전체로 스코프를 넓혔다.
     // httpOnly + SameSite=Strict 는 유지되어 스크립트/타 사이트 접근은 여전히 불가하다.

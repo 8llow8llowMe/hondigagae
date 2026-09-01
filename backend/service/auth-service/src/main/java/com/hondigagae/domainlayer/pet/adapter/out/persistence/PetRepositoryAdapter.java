@@ -45,4 +45,10 @@ public class PetRepositoryAdapter implements PetRepositoryPort {
     public List<String> findAllProfileImageKeys() {
         return petRepository.findAllProfileImageKeys();
     }
+
+    @Override
+    public Optional<Pet> findRepresentativeByMemberId(long memberId) {
+        return petRepository.findFirstByMemberIdAndRepresentativeTrueAndDeletedFalseOrderByIdAsc(memberId)
+            .map(petMapper::toDomainFromEntity);
+    }
 }

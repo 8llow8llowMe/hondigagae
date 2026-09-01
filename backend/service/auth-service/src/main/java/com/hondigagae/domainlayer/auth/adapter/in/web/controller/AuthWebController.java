@@ -43,8 +43,6 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "인증/인가", description = "로그인, 로그아웃, 토큰 재발급 API를 제공합니다.")
 public class AuthWebController {
 
-    private static final String REFRESH_TOKEN_COOKIE = "refreshToken";
-
     private final AuthWebUseCase authWebUseCase;
     private final RefreshCookieProvider refreshCookieProvider;
     private final ClientIpResolver clientIpResolver;
@@ -71,7 +69,7 @@ public class AuthWebController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Response<Void>> logout(
         @AuthenticationPrincipal MemberLoginActive loginActive,
-        @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken
+        @CookieValue(name = RefreshCookieProvider.REFRESH_TOKEN_COOKIE, required = false) String refreshToken
     ) {
         authWebUseCase.logout(loginActive.memberId(), loginActive.tokenId(), refreshToken);
         return ResponseEntity.ok()
@@ -101,7 +99,9 @@ public class AuthWebController {
             .body(Response.success(result.response()));
     }
 
-    @Operation(summary = "이메일 인증코드 발송", description = "회원가입용 이메일 인증코드를 발송합니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 시간당 발송 상한(AUTH_016)이 적용되며, 가입 여부와 무관하게 항상 성공으로 응답합니다(기가입 이메일에는 안내 메일 발송).")
+    @Operation(summary = "이메일 인증코드 발송",
+        description = "회원가입용 이메일 인증코드를 발송합니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 시간당 발송 상한(AUTH_016)이 적용되며, "
+            + "가입 여부와 무관하게 항상 성공으로 응답합니다(기가입 이메일에는 안내 메일 발송).")
     @PostMapping("/email/send-code")
     public ResponseEntity<Response<Void>> sendEmailVerificationCode(
         @Valid @RequestBody AuthEmailCodeSendRequest request,
@@ -143,7 +143,7 @@ public class AuthWebController {
     @Operation(summary = "토큰 재발급", description = "리프레시 토큰으로 Access Token을 재발급합니다.")
     @PostMapping("/token/reissue")
     public ResponseEntity<Response<TokenReissueResponse>> reissueToken(
-        @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken) {
+        @CookieValue(name = RefreshCookieProvider.REFRESH_TOKEN_COOKIE, required = false) String refreshToken) {
         AuthCookieResult<TokenReissueResponse> result = authWebUseCase.reissueToken(TokenReissueCommand.from(refreshToken));
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, refreshCookieProvider.createRefreshCookie(result.refreshToken()).toString())

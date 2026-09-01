@@ -5,6 +5,7 @@ import com.hondigagae.domainlayer.member.adapter.out.persistence.repository.Memb
 import com.hondigagae.domainlayer.member.application.mapper.MemberMapper;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
 import com.hondigagae.domainlayer.member.domain.model.Member;
+import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -24,11 +25,6 @@ public class MemberRepositoryAdapter implements MemberRepositoryPort {
     }
 
     @Override
-    public boolean existsByEmail(String email) {
-        return memberRepository.existsByEmail(email);
-    }
-
-    @Override
     public Optional<Member> findByEmail(String email) {
         return memberRepository.findByEmail(email)
             .map(memberMapper::toDomainFromEntity);
@@ -41,7 +37,7 @@ public class MemberRepositoryAdapter implements MemberRepositoryPort {
     }
 
     @Override
-    public java.util.List<String> findAllProfileImageKeys() {
+    public List<String> findAllProfileImageKeys() {
         return memberRepository.findAllProfileImageKeys();
     }
 }

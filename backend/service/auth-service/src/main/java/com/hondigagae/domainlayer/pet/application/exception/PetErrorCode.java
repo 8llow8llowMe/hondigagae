@@ -14,7 +14,8 @@ public enum PetErrorCode {
 
     // 요청 검증(Bean Validation) 대역 — 1xx. 필드별 코드는 PetValidationMessage가 단일 기준점이다.
     INVALID_REQUEST("PET_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
-    PARAMETER_TYPE_INVALID("PET_113", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
+    PARAMETER_TYPE_INVALID("PET_113", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
+    PARAMETER_REQUIRED("PET_114", "필수 요청 파라미터가 누락되었습니다.", HttpStatus.BAD_REQUEST);
 
     private final String code;
     private final String message;

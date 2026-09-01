@@ -17,7 +17,7 @@ public record MemberPasswordChangeRequest(
     @NotBlank(message = MemberValidationMessage.NEW_PASSWORD_REQUIRED)
     @Size(min = 8, max = 20, message = MemberValidationMessage.PASSWORD_LENGTH_INVALID)
     @Pattern(
-        regexp = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()\\-_=+\\[\\]{};:'\",.<>/?\\\\|])\\S+$",
+        regexp = MemberValidationMessage.PASSWORD_REGEXP,
         message = MemberValidationMessage.PASSWORD_PATTERN_INVALID
     )
     String newPassword

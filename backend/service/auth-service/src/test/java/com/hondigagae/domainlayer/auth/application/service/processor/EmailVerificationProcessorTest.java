@@ -188,11 +188,6 @@ class EmailVerificationProcessorTest {
         }
 
         @Override
-        public boolean existsByEmail(String email) {
-            return false;
-        }
-
-        @Override
         public Optional<Member> findByEmail(String email) {
             return Optional.empty();
         }

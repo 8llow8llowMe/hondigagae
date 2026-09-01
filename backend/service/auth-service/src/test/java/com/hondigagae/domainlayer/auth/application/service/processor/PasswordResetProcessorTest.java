@@ -292,11 +292,6 @@ class PasswordResetProcessorTest {
         }
 
         @Override
-        public boolean existsByEmail(String email) {
-            return members.containsKey(email);
-        }
-
-        @Override
         public Optional<Member> findByEmail(String email) {
             return Optional.ofNullable(members.get(email));
         }

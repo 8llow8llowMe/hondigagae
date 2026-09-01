@@ -27,6 +27,9 @@ public final class MemberValidationMessage {
     public static final String CURRENT_PASSWORD_REQUIRED = "MEMBER_111:현재 비밀번호는 필수입니다.";
     public static final String NEW_PASSWORD_REQUIRED = "MEMBER_112:새 비밀번호는 필수입니다.";
 
+    /** 비밀번호 문자 구성 규칙. 길이는 @Size 가 담당하므로 여기서는 구성만 본다 (§8-2 중복 검사 금지). */
+    public static final String PASSWORD_REGEXP = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()\\-_=+\\[\\]{};:'\",.<>/?\\\\|])\\S+$";
+
     private MemberValidationMessage() {
     }
 }
