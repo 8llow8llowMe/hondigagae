@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.insight.adapter.in.web.controller;
 
 import com.hondigagae.common.dto.Response;
+import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.PlaceCongestionResponse;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.PlaceSuitabilityResponse;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.WalkSafetyResponse;
 import com.hondigagae.domainlayer.insight.application.exception.InsightValidationMessage;
@@ -12,6 +13,7 @@ import com.hondigagae.shared.travel.pet.PetSizeType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -131,6 +133,36 @@ public class PlaceInsightWebController {
             .build();
 
         return ResponseEntity.ok().body(Response.success(placeInsightWebUseCase.getWalkSafety(query)));
+    }
+
+    @Operation(summary = "장소 기간 혼잡도",
+        description = "\"이번 주 언제 덜 붐비나\"에 답합니다. 적합도가 하루를 판정하는 것과 달리 기간을 봅니다. "
+            + "혼잡도 예측은 30일 rolling 이라 예보(약 11일)보다 멀리까지 답할 수 있습니다 — "
+            + "적합도로는 근거가 없는 날짜도 여기서는 붐빔 정도를 알 수 있습니다. "
+            + "데이터가 없는 날짜도 UNKNOWN 으로 목록에 남습니다. 빠뜨리면 날짜 축에 구멍이 생겨 "
+            + "사용자가 그 날을 \"한산한 날\"로 읽기 때문입니다 — UNKNOWN 은 한산함이 아니라 모름입니다.")
+    @GetMapping("/{placeId}/congestions")
+    public ResponseEntity<Response<PlaceCongestionResponse>> getCongestions(
+        @Parameter(description = "장소 아이디", required = true, example = "212481712381923328")
+        @Min(value = 1, message = InsightValidationMessage.PLACE_ID_INVALID)
+        @PathVariable long placeId,
+
+        @Parameter(description = "조회 시작일. 생략하면 오늘", example = "2026-09-01")
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+        @RequestParam(required = false) LocalDate fromDate,
+
+        @Parameter(description = "조회 일수 (1~30). fromDate 부터 이 일수만큼 봅니다", example = "7")
+        @Min(value = 1, message = InsightValidationMessage.CONGESTION_DAYS_RANGE_INVALID)
+        @Max(value = 30, message = InsightValidationMessage.CONGESTION_DAYS_RANGE_INVALID)
+        @RequestParam(defaultValue = "7") int days
+    ) {
+        // 종료일이 아니라 일수를 받는다. 사용자가 묻는 것은 "이번 주"나 "다음 열흘"이지
+        // 특정 종료일이 아니고, 일수로 받으면 상한(30일)을 애노테이션으로 그대로 표현할 수 있다.
+        LocalDate from = fromDate == null ? LocalDate.now() : fromDate;
+        LocalDate to = from.plusDays(days - 1L);
+
+        return ResponseEntity.ok().body(
+            Response.success(placeInsightWebUseCase.getCongestions(placeId, from, to)));
     }
 
     private PetCondition toPetCondition(
