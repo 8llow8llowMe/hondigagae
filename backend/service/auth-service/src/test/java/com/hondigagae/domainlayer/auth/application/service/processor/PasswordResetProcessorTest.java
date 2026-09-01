@@ -234,6 +234,15 @@ class PasswordResetProcessorTest {
         }
 
         @Override
+        public long increaseVerifyFailureCount(String email, Duration ttl) {
+            return 0L;
+        }
+
+        @Override
+        public void clearVerifyFailures(String email) {
+        }
+
+        @Override
         public long increaseIpSendCount(String clientIp, Duration window) {
             return ipCounts.merge(clientIp, 1L, Long::sum);
         }

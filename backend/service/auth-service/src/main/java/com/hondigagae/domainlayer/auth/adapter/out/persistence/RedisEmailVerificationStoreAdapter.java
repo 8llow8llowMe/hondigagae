@@ -80,6 +80,25 @@ public class RedisEmailVerificationStoreAdapter implements EmailVerificationStor
         }
     }
 
+    @Override
+    public long increaseVerifyFailureCount(String email, Duration ttl) {
+        String key = buildFailKey(email);
+        Long count = redisTemplate.opsForValue().increment(key);
+        if (count != null && count == 1L) {
+            redisTemplate.expire(key, ttl);
+        }
+        return count == null ? 0L : count;
+    }
+
+    @Override
+    public void clearVerifyFailures(String email) {
+        redisTemplate.delete(buildFailKey(email));
+    }
+
+    private String buildFailKey(String email) {
+        return buildKey("emailVerificationFail", email);
+    }
+
     private String buildCodeKey(String email) {
         return buildKey("emailVerificationCode", email);
     }
