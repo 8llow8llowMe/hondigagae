@@ -641,15 +641,24 @@ function createStore(): MockStore {
     aiPlanJobs: [],
     nextAiPlanJobSeq: 1,
     /*
-      **demo 계정에 2건을 심는다.** 마이페이지의 저장 목록(아직 화면 없음)이 아니라
-      장소 상세의 저장 아이콘이 **이미 저장된 상태**로 뜨는 경로를 확인하기 위해서다 —
+      **demo 계정에 3건을 심는다.** 장소 상세의 저장 아이콘이 **이미 저장된 상태**로 뜨는
+      경로와, 저장한 장소 목록(`/favorites`, #127)이 채워진 상태를 함께 보기 위해서다 —
       빈 목록만 있으면 토글의 한쪽 방향밖에 볼 수 없다.
+
+      **셋째는 `MOCK_PLACES` 에 없는 placeId 다.** 그래야 목록의 "요약 없는 행"
+      (title 이 null 인 행을 감추지 않는다 — 명세 D5) 을 브라우저에서 실제로 볼 수 있다.
+      이 경로는 tour-service 조회 실패를 흉내 내는 것이라 다른 방법으로는 재현이 어렵다.
     */
     favorites: [
       { favoriteId: '345678901234000001', memberId: '900000000000000001', placeId: placeId(1) },
       { favoriteId: '345678901234000002', memberId: '900000000000000001', placeId: placeId(4) },
+      {
+        favoriteId: '345678901234000003',
+        memberId: '900000000000000001',
+        placeId: '212481712381923999',
+      },
     ],
-    nextFavoriteSeq: 3,
+    nextFavoriteSeq: 4,
   }
 }
 

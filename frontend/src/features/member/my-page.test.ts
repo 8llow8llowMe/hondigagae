@@ -53,6 +53,8 @@ function render(overrides: Partial<MyPageSectionsProps> = {}) {
       pets: [pet()],
       petsLoading: false,
       petsTotalCount: 1,
+      favoritesTotalCount: 3,
+      favoritesLoading: false,
       onRetry: () => undefined,
       onLogout: () => undefined,
       onEditProfile: () => undefined,

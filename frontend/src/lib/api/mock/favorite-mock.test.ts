@@ -10,7 +10,7 @@ import type { FavoritePlaceList } from '@/types/favorite'
 const TOKEN = 'mock-access-900000000000000001'
 const OTHER = 'mock-access-900000000000000777'
 
-/** fixture 가 저장해 둔 두 곳. `store.ts` 의 `favorites` 와 같아야 한다 */
+/** fixture 가 저장해 둔 곳 하나. `store.ts` 의 `favorites` 와 같아야 한다 */
 const SAVED = MOCK_PLACES[1]!.placeId
 /** 저장돼 있지 않은 장소 */
 const UNSAVED = MOCK_PLACES[2]!.placeId
@@ -31,6 +31,17 @@ function body(result: ReturnType<typeof list>): FavoritePlaceList {
   return (result?.payload as ApiResponse<FavoritePlaceList>).dataBody!
 }
 
+/**
+ * fixture 가 심어 둔 개수를 **읽어서 쓴다.**
+ *
+ * 숫자를 박아 두면 `store.ts` 의 seed 를 늘릴 때마다 이 파일의 무관한 테스트가 함께
+ * 깨진다 — 실제로 #127 이 "요약 없는 행" 을 브라우저에서 보려고 셋째를 심으면서
+ * 4개가 깨졌다. 여기서 확인하려는 것은 개수가 아니라 **멱등성과 소유권**이다.
+ */
+function seededCount(): number {
+  return body(list()).totalCount
+}
+
 beforeEach(resetMockStore)
 
 describe('즐겨찾기 mock — 인증과 소유권', () => {
@@ -42,7 +53,7 @@ describe('즐겨찾기 mock — 인증과 소유권', () => {
 
   it('남의 즐겨찾기는 섞이지 않는다', () => {
     expect(body(list(OTHER)).places).toEqual([])
-    expect(body(list()).totalCount).toBe(2)
+    expect(body(list()).totalCount).toBeGreaterThan(0)
   })
 
   it('다른 회원이 지워도 내 저장은 남는다 — 회원별로 갈린다', () => {
@@ -53,19 +64,25 @@ describe('즐겨찾기 mock — 인증과 소유권', () => {
 
 describe('즐겨찾기 mock — 저장과 해제는 멱등이다', () => {
   it('이미 저장된 장소를 다시 저장해도 성공하고 늘지 않는다', () => {
+    const before = seededCount()
+
     expect(add(SAVED)?.status).toBe(200)
-    expect(body(list()).totalCount).toBe(2)
+    expect(body(list()).totalCount).toBe(before)
   })
 
   it('저장돼 있지 않은 장소를 해제해도 성공한다', () => {
+    const before = seededCount()
+
     expect(remove(UNSAVED)?.status).toBe(200)
-    expect(body(list()).totalCount).toBe(2)
+    expect(body(list()).totalCount).toBe(before)
   })
 
   it('저장하면 목록 맨 앞에 온다 — 최근 저장순이다', () => {
+    const before = seededCount()
+
     add(UNSAVED)
     expect(body(list()).places[0]?.placeId).toBe(UNSAVED)
-    expect(body(list()).totalCount).toBe(3)
+    expect(body(list()).totalCount).toBe(before + 1)
   })
 
   it('해제하면 목록에서 빠진다', () => {

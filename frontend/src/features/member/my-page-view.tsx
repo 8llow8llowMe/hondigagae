@@ -3,6 +3,7 @@
 import { useState } from 'react'
 
 import { ConfirmModal } from '@/components/confirm-modal'
+import { useFavoriteList } from '@/features/favorite/use-favorite-list'
 import { MyPageSections } from '@/features/member/my-page-sections'
 import { MyProfileEditModal } from '@/features/member/my-profile-edit-modal'
 import { useMyInfo } from '@/features/member/use-my-info'
@@ -21,6 +22,7 @@ import { messages } from '@/lib/messages'
 export function MyPageView() {
   const query = useMyInfo()
   const petsQuery = usePetList()
+  const favoritesQuery = useFavoriteList()
   const exitSession = useSessionExit()
 
   const [logoutOpen, setLogoutOpen] = useState(false)
@@ -48,6 +50,11 @@ export function MyPageView() {
         pets={petsQuery.isError ? null : (petsQuery.data?.pets ?? null)}
         petsLoading={petsQuery.isPending}
         petsTotalCount={petsQuery.data?.totalCount ?? 0}
+        // null = 조회 실패. 진입점은 남기고 개수 줄만 뺀다 (#127)
+        favoritesTotalCount={
+          favoritesQuery.isError ? null : (favoritesQuery.data?.totalCount ?? null)
+        }
+        favoritesLoading={favoritesQuery.isPending}
         onRetry={() => void query.refetch()}
         onLogout={() => setLogoutOpen(true)}
         onEditProfile={() => setEditOpen(true)}
