@@ -13,6 +13,8 @@ package com.hondigagae.domainlayer.insight.application.exception;
 public final class InsightValidationMessage {
 
     public static final String PLACE_ID_INVALID = "INSIGHT_101:장소 아이디는 1 이상만 가능합니다.";
+    public static final String CONGESTION_DAYS_RANGE_INVALID =
+        "INSIGHT_102:조회 일수는 1일 이상 30일 이하만 가능합니다.";
 
     private InsightValidationMessage() {
     }

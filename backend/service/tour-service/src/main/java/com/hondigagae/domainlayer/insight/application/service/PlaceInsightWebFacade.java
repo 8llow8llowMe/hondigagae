@@ -1,17 +1,22 @@
 package com.hondigagae.domainlayer.insight.application.service;
 
+import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.PlaceCongestionResponse;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.PlaceSuitabilityResponse;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.WalkSafetyResponse;
+import com.hondigagae.domainlayer.insight.adapter.in.web.presenter.PlaceCongestionPresenter;
 import com.hondigagae.domainlayer.insight.adapter.in.web.presenter.PlaceSuitabilityPresenter;
 import com.hondigagae.domainlayer.insight.adapter.in.web.presenter.WalkSafetyPresenter;
 import com.hondigagae.domainlayer.insight.application.info.PlaceSuitabilityInfo;
 import com.hondigagae.domainlayer.insight.application.info.WalkSafetyInfo;
 import com.hondigagae.domainlayer.insight.application.model.PlaceInsightQuery;
 import com.hondigagae.domainlayer.insight.application.port.in.PlaceInsightWebUseCase;
+import com.hondigagae.domainlayer.insight.application.service.processor.PlaceCongestionProcessor;
 import com.hondigagae.domainlayer.insight.application.service.processor.PlaceSuitabilityProcessor;
 import com.hondigagae.domainlayer.insight.application.service.processor.WalkSafetyProcessor;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 장소 인사이트 오케스트레이터.
@@ -29,6 +34,8 @@ public class PlaceInsightWebFacade implements PlaceInsightWebUseCase {
     private final WalkSafetyProcessor walkSafetyProcessor;
     private final PlaceSuitabilityPresenter placeSuitabilityPresenter;
     private final WalkSafetyPresenter walkSafetyPresenter;
+    private final PlaceCongestionProcessor placeCongestionProcessor;
+    private final PlaceCongestionPresenter placeCongestionPresenter;
 
     @Override
     public PlaceSuitabilityResponse getSuitability(PlaceInsightQuery query) {
@@ -40,5 +47,18 @@ public class PlaceInsightWebFacade implements PlaceInsightWebUseCase {
     public WalkSafetyResponse getWalkSafety(PlaceInsightQuery query) {
         WalkSafetyInfo info = walkSafetyProcessor.assess(query);
         return walkSafetyPresenter.toResponse(info);
+    }
+
+    /**
+     * 기간 혼잡도.
+     *
+     * <p>여기는 DB 만 읽는다 - 기상청을 부르지 않으므로 위 둘과 달리 읽기 트랜잭션으로 묶어도
+     * 커넥션이 외부 응답에 묶이지 않는다.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PlaceCongestionResponse getCongestions(long placeId, LocalDate fromDate, LocalDate toDate) {
+        return placeCongestionPresenter.toResponse(
+            placeCongestionProcessor.getCongestions(placeId, fromDate, toDate));
     }
 }

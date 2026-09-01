@@ -1,8 +1,10 @@
 package com.hondigagae.domainlayer.insight.application.port.in;
 
+import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.PlaceCongestionResponse;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.PlaceSuitabilityResponse;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.WalkSafetyResponse;
 import com.hondigagae.domainlayer.insight.application.model.PlaceInsightQuery;
+import java.time.LocalDate;
 
 /**
  * 장소 단위 인사이트 유스케이스.
@@ -16,4 +18,10 @@ public interface PlaceInsightWebUseCase {
     PlaceSuitabilityResponse getSuitability(PlaceInsightQuery query);
 
     WalkSafetyResponse getWalkSafety(PlaceInsightQuery query);
+
+    /**
+     * 기간 혼잡도. 적합도·위험도와 입력이 달라({@code PlaceInsightQuery} 가 아니라 날짜 범위)
+     * 파라미터를 그대로 받는다.
+     */
+    PlaceCongestionResponse getCongestions(long placeId, LocalDate fromDate, LocalDate toDate);
 }
