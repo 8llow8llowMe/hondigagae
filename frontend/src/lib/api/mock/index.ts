@@ -9,6 +9,8 @@ import { resolvePetMock } from '@/lib/api/mock/pet-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import { mockPlaceDetail } from '@/lib/api/mock/place-detail-data'
 import { resolvePlanMock } from '@/lib/api/mock/plan-data'
+import { toLatLng } from '@/lib/geo/coord'
+import { haversineMeters } from '@/lib/geo/distance'
 import { allowsPetSize } from '@/lib/place/pet-size'
 import type { ApiResponse, SliceResponse } from '@/types/api'
 import type { PlaceSummary } from '@/types/place'
@@ -102,6 +104,9 @@ export function resolveMock(
 
   if (path === '/places') return placeList(params)
 
+  // 주변 장소 — 커서가 아니라 totalCount 를 준다 (NearbyPlaceResponse)
+  if (path === '/places/nearby') return nearbyPlaces(params)
+
   // 긴급 시설. `lat`/`lng` 는 mock 이 쓰지 않는다 — 거리는 fixture 가 이미 갖고 있다
   if (path === '/emergencies/facilities') {
     const radius = Number.parseInt(params.get('radius') ?? '10000', 10)
@@ -126,8 +131,7 @@ export function resolveMock(
   if (detail !== null) {
     const rawId = detail[1] ?? ''
 
-    // /places/nearby 는 상세가 아니라 별도 엔드포인트다. mock 이 처리하지 않으므로
-    // null 을 반환해 실제 게이트웨이로 넘긴다
+    // /places/nearby 는 위에서 이미 처리했다. 여기까지 오면 상세로 오해한 것이다
     if (SUB_RESOURCES.has(rawId)) return null
 
     // 컨트롤러가 @PathVariable long 이라, 숫자가 아닌 id 는 404 가 아니라 400 이다
@@ -160,6 +164,61 @@ function placeList(params: URLSearchParams): MockResult {
 
   const body: SliceResponse<PlaceSummary> = { contents, hasNext }
   return { status: 200, payload: ok(body) }
+}
+
+/**
+ * `GET /places/nearby` — `NearbyPlaceResponse`.
+ *
+ * **목록과 페이징 모델이 다르다.** 커서가 없고 `totalCount` 와 `radius` 를 돌려준다
+ * (screen-inventory §5-1). 백엔드 검증도 흉내 낸다: `lat`/`lng` 필수, `radius` 상한 50km.
+ *
+ * 거리는 fixture 좌표로 실제로 계산한다 — 상수로 박아 두면 지도를 옮겨도 거리가
+ * 그대로여서 "재검색이 도는가" 를 화면에서 확인할 수 없다.
+ */
+function nearbyPlaces(params: URLSearchParams): MockResult {
+  // **`Number(null)` 은 0 이다.** 그대로 Number 로 감싸면 좌표를 안 보낸 요청이
+  // 기니 만(0,0) 조회로 통과한다 — 백엔드는 @RequestParam 필수라 400 이다
+  const lat = readCoord(params.get('lat'))
+  const lng = readCoord(params.get('lng'))
+
+  if (lat === null || lng === null) {
+    return fail(400, 'PLACE_113', '위도와 경도는 필수입니다.')
+  }
+
+  const radius = Number(params.get('radius') ?? '5000')
+  if (!Number.isFinite(radius) || radius <= 0 || radius > 50_000) {
+    return fail(400, 'PLACE_113', '검색 반경은 50000 이하여야 합니다.')
+  }
+
+  const rawSize = params.get('size')
+  const size = rawSize === null ? 15 : Number(rawSize)
+  if (!Number.isInteger(size) || size < MIN_SIZE || size > MAX_SIZE) {
+    return fail(400, 'PLACE_113', '조회 개수는 1 이상 50 이하여야 합니다.')
+  }
+
+  const center = { lat, lng }
+  const within = MOCK_PLACES.filter((place) => matches(place, params))
+    .flatMap((place) => {
+      const distanceMeters = haversineMeters(center, toLatLng(place))
+      // 좌표가 없는 장소는 반경 판정을 할 수 없다 — 백엔드도 좌표 인덱스로 찾는다
+      return distanceMeters === null || distanceMeters > radius
+        ? []
+        : [{ place, distanceMeters: Math.round(distanceMeters) }]
+    })
+    .sort((left, right) => left.distanceMeters - right.distanceMeters)
+
+  return {
+    status: 200,
+    payload: ok({ places: within.slice(0, size), totalCount: within.length, radius }),
+  }
+}
+
+/** 빠졌거나 숫자가 아니면 `null`. `Number(null) === 0` 함정을 여기서 막는다 */
+function readCoord(raw: string | null): number | null {
+  if (raw === null || raw.trim() === '') return null
+
+  const value = Number(raw)
+  return Number.isFinite(value) ? value : null
 }
 
 function placeDetail(placeId: string): MockResult {

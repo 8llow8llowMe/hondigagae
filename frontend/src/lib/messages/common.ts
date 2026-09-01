@@ -2,6 +2,8 @@
 export const commonMessages = {
   retry: '다시 시도',
   loading: '불러오는 중',
+  /** 오버레이·선택 카드를 닫는 아이콘 버튼의 이름 */
+  close: '닫기',
 
   /** 5xx·무응답 */
   temporaryErrorTitle: '잠시 문제가 생겼어요',

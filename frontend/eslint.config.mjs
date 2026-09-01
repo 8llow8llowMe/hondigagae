@@ -47,7 +47,18 @@ const noDirectFetch = {
 }
 
 export default tseslint.config(
-  { ignores: ['.next/**', 'coverage/**', 'node_modules/**', 'next-env.d.ts'] },
+  {
+    ignores: [
+      '.next/**',
+      'coverage/**',
+      'node_modules/**',
+      'next-env.d.ts',
+      // 아트보드 산출물(.gitignore 대상)이다. 우리가 쓴 코드가 아니고 tsconfig include
+      // 밖이라 typed lint 가 파싱조차 못 한다 — 없으면 로컬 `pnpm verify` 가 항상 빨갛다.
+      // CI 는 이 디렉터리를 체크아웃하지 않아 지금까지 드러나지 않았다.
+      'docs/**/*.js',
+    ],
+  },
 
   // ── 1. 기본
   ...tseslint.configs.recommendedTypeChecked,
