@@ -11,7 +11,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -39,13 +38,11 @@ public class NearbyFacilityWebController {
     @GetMapping("/facilities")
     public ResponseEntity<Response<NearbyFacilityResponse>> searchNearbyFacilities(
         @Parameter(description = "중심 위도", required = true, example = "33.4996213")
-        @NotNull
         @Min(value = -90, message = EmergencyValidationMessage.LAT_RANGE_INVALID)
         @Max(value = 90, message = EmergencyValidationMessage.LAT_RANGE_INVALID)
         @RequestParam Double lat,
 
         @Parameter(description = "중심 경도", required = true, example = "126.5311884")
-        @NotNull
         @Min(value = -180, message = EmergencyValidationMessage.LNG_RANGE_INVALID)
         @Max(value = 180, message = EmergencyValidationMessage.LNG_RANGE_INVALID)
         @RequestParam Double lng,

@@ -40,7 +40,7 @@ import org.hibernate.annotations.Comment;
         // 반경 검색은 좌표 범위로 먼저 좁힌다
         @Index(name = "idx_emergency_facility_lat_lng", columnList = "lat,lng"),
         @Index(name = "idx_emergency_facility_open24", columnList = "open24"),
-        @Index(name = "idx_emergency_facility_type", columnList = "facilityType")
+        @Index(name = "idx_emergency_facility_facility_type", columnList = "facilityType")
     }
 )
 public class EmergencyFacilityEntity extends BaseEntity {

@@ -14,7 +14,9 @@ public enum InsightErrorCode {
     WEATHER_SERVICE_KEY_MISSING("INSIGHT_004", "날씨 서비스 설정이 완료되지 않았습니다.", HttpStatus.SERVICE_UNAVAILABLE),
 
     INVALID_REQUEST("INSIGHT_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
-    PARAMETER_TYPE_INVALID("INSIGHT_113", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
+    PARAMETER_TYPE_INVALID("INSIGHT_113", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
+    // 필수 쿼리 파라미터 누락. 값이 비어 온 경우(?lat=)도 스프링이 같은 예외로 처리한다.
+    PARAMETER_MISSING("INSIGHT_114", "필수 요청 파라미터가 없습니다.", HttpStatus.BAD_REQUEST);
 
     private final String code;
     private final String message;
