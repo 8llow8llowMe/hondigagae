@@ -1,10 +1,13 @@
 package com.hondigagae.domainlayer.placeimport.application.service;
 
+import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportErrorCode;
+import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportException;
 import com.hondigagae.domainlayer.placeimport.application.port.in.PetRestaurantImportUseCase;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.DelistProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PetRestaurantImportProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PlaceMergeProcessor;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
+import com.hondigagae.domainlayer.placeimport.domain.enums.RegionCodeMapping;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,21 +26,31 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class PetRestaurantImportFacade implements PetRestaurantImportUseCase {
 
-    /** 병합 판정 범위. 적재 대상과 같은 지역만 본다. */
-    private static final String JEJU_AREA_CODE = "39";
-
     private final PetRestaurantImportProcessor petRestaurantImportProcessor;
     private final PlaceMergeProcessor placeMergeProcessor;
     private final DelistProcessor delistProcessor;
 
     @Override
     public int importPetRestaurants(String region) {
+        // 병합 범위는 적재 범위와 같아야 한다 (CultureFacilityImportFacade 와 같은 이유).
+        // 식약처 원천은 "제주"처럼 줄여 주므로 시도 명칭으로 편 뒤 코드로 옮긴다.
+        String areaCode = resolveAreaCode(region);
+
         LocalDateTime runStartedAt = LocalDateTime.now();
         int imported = petRestaurantImportProcessor.importPetRestaurants(region);
         // 등록 철회가 실제로 일어나는 원천이다. 이번 파일에 없는 업소를 delist 해야
         // 폐업한 식당이 "동반 가능 확인됨"으로 남지 않는다.
         delistProcessor.delistPlaces(PlaceSourceType.MFDS, runStartedAt, imported);
-        placeMergeProcessor.mergeDuplicates(JEJU_AREA_CODE);
+        placeMergeProcessor.mergeDuplicates(areaCode);
         return imported;
+    }
+
+    /** 매핑에 없는 지역이면 적재를 시작하기 전에 실패시킨다. */
+    private String resolveAreaCode(String region) {
+        String areaCode = RegionCodeMapping.toAreaCode(RegionCodeMapping.toSidoName(region));
+        if (areaCode == null) {
+            throw new PlaceImportException(PlaceImportErrorCode.REGION_NOT_SUPPORTED, region);
+        }
+        return areaCode;
     }
 }

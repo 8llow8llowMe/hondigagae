@@ -53,7 +53,6 @@ public class MfdsPetRestaurantXlsxAdapter implements PetRestaurantCatalogPort {
         List.of(COL_NAME, COL_BUSINESS_TYPE, COL_REGION, COL_ADDRESS);
 
     /** 원천의 지역 표기("제주")를 관광 API areaCode 로 옮기기 위한 시도 명칭. */
-    private static final Map<String, String> REGION_TO_SIDO = Map.of("제주", "제주특별자치도");
 
     /** 서킷 인스턴스명. 식약처 파일 서버 전용이다. */
     public static final String CIRCUIT_NAME = "mfds";
@@ -109,7 +108,7 @@ public class MfdsPetRestaurantXlsxAdapter implements PetRestaurantCatalogPort {
             .name(name)
             .businessType(businessType)
             .address(address)
-            .areaCode(RegionCodeMapping.toAreaCode(REGION_TO_SIDO.get(region)))
+            .areaCode(RegionCodeMapping.toAreaCode(RegionCodeMapping.toSidoName(region)))
             // 원천이 시군구를 따로 주지 않아 주소 문자열에서 읽는다.
             .sigunguCode(RegionCodeMapping.toSigunguCodeFromAddress(address))
             .build();

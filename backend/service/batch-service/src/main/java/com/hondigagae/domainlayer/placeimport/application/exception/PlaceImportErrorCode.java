@@ -26,7 +26,8 @@ public enum PlaceImportErrorCode {
     // 수천 건을 계속 두드려 봐야 쿼터만 태우고 잡 시간만 늘어난다.
     TOUR_API_CIRCUIT_OPEN("PLACE_IMPORT_012", "TourAPI 서킷이 열려 있어 호출을 건너뜁니다."),
     GEOCODING_CIRCUIT_OPEN("PLACE_IMPORT_013", "VWorld 지오코더 서킷이 열려 있어 호출을 건너뜁니다."),
-    MFDS_CIRCUIT_OPEN("PLACE_IMPORT_014", "식약처 파일 서버 서킷이 열려 있어 내려받기를 건너뜁니다.");
+    MFDS_CIRCUIT_OPEN("PLACE_IMPORT_014", "식약처 파일 서버 서킷이 열려 있어 내려받기를 건너뜁니다."),
+    REGION_NOT_SUPPORTED("PLACE_IMPORT_015", "관광 지역코드로 옮길 수 없는 지역입니다. (%s)");
 
     private final String code;
     private final String message;
