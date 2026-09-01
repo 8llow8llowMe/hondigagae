@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.place.domain.enums;
 
+import com.hondigagae.common.dto.metadata.CodeNameDescribable;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -8,7 +9,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Getter
 @RequiredArgsConstructor
-public enum PlaceSource {
+public enum PlaceSource implements CodeNameDescribable {
 
     TOUR_API("관광정보 API", "한국관광공사 국문 관광정보·반려동물 동반여행 서비스"),
     CULTURE_PORTAL("문화정보원", "한국문화정보원 전국 반려동물 동반 가능 문화시설 위치 데이터"),

@@ -1,11 +1,9 @@
 package com.hondigagae.domainlayer.emergency.adapter.in.web.presenter;
 
-import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
 import com.hondigagae.domainlayer.emergency.adapter.in.web.dto.item.NearbyFacilityItem;
 import com.hondigagae.domainlayer.emergency.adapter.in.web.dto.response.NearbyFacilityResponse;
 import com.hondigagae.domainlayer.emergency.application.info.NearbyFacilityInfo;
 import com.hondigagae.domainlayer.emergency.application.model.NearbyFacilityQuery;
-import com.hondigagae.domainlayer.emergency.domain.enums.EmergencyFacilityType;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -33,7 +31,7 @@ public class NearbyFacilityPresenter {
         return NearbyFacilityItem.builder()
             // Snowflake 아이디는 문자열로 내린다. long 그대로 보내면 JS 가 조용히 절삭한다.
             .facilityId(String.valueOf(info.facilityId()))
-            .facilityType(toFacilityTypeMetadata(info.facilityType()))
+            .facilityType(info.facilityType().toMetadata())
             .name(info.name())
             .addr(info.addr())
             .lat(info.lat())
@@ -50,8 +48,4 @@ public class NearbyFacilityPresenter {
             .build();
     }
 
-    private CodeNameDescriptionMetadata toFacilityTypeMetadata(EmergencyFacilityType facilityType) {
-        return CodeNameDescriptionMetadata.of(
-            facilityType.name(), facilityType.getDisplayName(), facilityType.getDescription());
-    }
 }

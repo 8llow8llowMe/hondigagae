@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.emergency.domain.enums;
 
+import com.hondigagae.common.dto.metadata.CodeNameDescribable;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -11,7 +12,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Getter
 @RequiredArgsConstructor
-public enum EmergencyFacilityType {
+public enum EmergencyFacilityType implements CodeNameDescribable {
 
     ANIMAL_HOSPITAL("동물병원", "진료가 필요한 상황에서 찾는 곳입니다."),
     ANIMAL_PHARMACY("동물약국", "상비약이나 처방약이 필요할 때 찾는 곳입니다.");

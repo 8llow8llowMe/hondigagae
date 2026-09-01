@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.place.domain.enums;
 
+import com.hondigagae.common.dto.metadata.CodeNameDescribable;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -8,7 +9,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Getter
 @RequiredArgsConstructor
-public enum PetAllowanceScope {
+public enum PetAllowanceScope implements CodeNameDescribable {
 
     FULL_AREA("전구역 동반 가능", "실내외 전 구역에서 반려동물 동반이 가능합니다."),
     PARTIAL("일부 구역 동반 가능", "지정된 일부 구역에서만 반려동물 동반이 가능합니다."),
