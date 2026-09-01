@@ -24,6 +24,7 @@ public class PetCommandProcessor {
     private final SnowflakeIdGenerator snowflakeIdGenerator;
 
     public PetInfo register(long memberId, PetSaveCommand command) {
+        validateBirthYm(command.birthYm());
         long petCount = petRepositoryPort.countByMemberId(memberId);
         if (petCount >= MAX_PET_COUNT) {
             throw new PetException(PetErrorCode.PET_LIMIT_EXCEEDED);
@@ -52,6 +53,7 @@ public class PetCommandProcessor {
     }
 
     public PetInfo update(long memberId, long petId, PetSaveCommand command) {
+        validateBirthYm(command.birthYm());
         Pet pet = petQueryProcessor.getOwnedPet(memberId, petId);
         Pet updated = pet.update(
             command.name(), command.breed(), command.birthYm(), command.sizeType(), command.weightKg(),
@@ -89,6 +91,23 @@ public class PetCommandProcessor {
                 .filter(remaining -> remaining.id() != petId)
                 .findFirst()
                 .ifPresent(remaining -> petRepositoryPort.save(remaining.markRepresentative()));
+        }
+    }
+
+    /**
+     * 생년월 미래 금지. 형식(@Pattern)은 요청 검증이 보지만 "지금보다 뒤인가"는 시계가 필요해
+     * 여기서 본다 — 형식만 보면 9999-12 가 저장되고 나이 계산이 화면에서만 방어된다.
+     */
+    private void validateBirthYm(String birthYm) {
+        if (birthYm == null || birthYm.isBlank()) {
+            return;
+        }
+        try {
+            if (java.time.YearMonth.parse(birthYm).isAfter(java.time.YearMonth.now())) {
+                throw new PetException(PetErrorCode.BIRTH_YM_IN_FUTURE);
+            }
+        } catch (java.time.format.DateTimeParseException exception) {
+            // 형식은 요청 검증(@Pattern) 담당 — 여기까지 왔다면 방어적으로 통과시킨다.
         }
     }
 

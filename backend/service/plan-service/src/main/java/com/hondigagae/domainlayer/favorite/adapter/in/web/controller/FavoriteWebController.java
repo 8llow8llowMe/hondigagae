@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.favorite.adapter.in.web.controller;
 
 import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.favorite.adapter.in.web.dto.response.FavoritePlacesResponse;
+import com.hondigagae.domainlayer.favorite.adapter.in.web.dto.response.FavoriteStatusResponse;
 import com.hondigagae.domainlayer.favorite.application.port.in.FavoriteWebUseCase;
 import com.hondigagae.security.common.dto.MemberLoginActive;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,6 +38,19 @@ public class FavoriteWebController {
         @AuthenticationPrincipal MemberLoginActive loginActive
     ) {
         FavoritePlacesResponse response = favoriteWebUseCase.getMyFavorites(loginActive.memberId());
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(summary = "즐겨찾기 여부 확인",
+        description = "장소 한 곳의 즐겨찾기 저장 여부를 확인합니다. 상세 화면의 토글 초기 상태용입니다.",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @GetMapping("/{placeId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<FavoriteStatusResponse>> getFavoriteStatus(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "장소 아이디", required = true, example = "212481712381923328") @PathVariable long placeId
+    ) {
+        FavoriteStatusResponse response = favoriteWebUseCase.getFavoriteStatus(loginActive.memberId(), placeId);
         return ResponseEntity.ok().body(Response.success(response));
     }
 

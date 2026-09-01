@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.favorite.application.service;
 
 import com.hondigagae.domainlayer.favorite.adapter.in.web.dto.response.FavoritePlacesResponse;
+import com.hondigagae.domainlayer.favorite.adapter.in.web.dto.response.FavoriteStatusResponse;
 import com.hondigagae.domainlayer.favorite.adapter.in.web.presenter.FavoritePresenter;
 import com.hondigagae.domainlayer.favorite.application.port.in.FavoriteWebUseCase;
 import com.hondigagae.domainlayer.favorite.application.service.processor.FavoriteCommandProcessor;
@@ -25,6 +26,15 @@ public class FavoriteWebFacade implements FavoriteWebUseCase {
     @Override
     public FavoritePlacesResponse getMyFavorites(long memberId) {
         return favoritePresenter.toFavoritePlacesResponse(favoriteQueryProcessor.getMyFavorites(memberId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public FavoriteStatusResponse getFavoriteStatus(long memberId, long placeId) {
+        return FavoriteStatusResponse.builder()
+            .placeId(String.valueOf(placeId))
+            .favorited(favoriteQueryProcessor.isFavorited(memberId, placeId))
+            .build();
     }
 
     /** 저장도 같은 이유로 파사드 트랜잭션을 두지 않는다 — 존재 검증이 원격 조회다. */

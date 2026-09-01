@@ -177,7 +177,7 @@ throw new PlanException(PlanErrorCode.PLAN_DATE_RANGE_INVALID);
 | --- | --- | --- |
 | `{DOMAIN}_100` | ErrorCode enum (`INVALID_REQUEST`) | 접두어가 없는 메시지의 폴백 |
 | `{DOMAIN}_101~` | `*ValidationMessage` 상수 클래스 | 필드별 개별 코드 |
-| `{DOMAIN}_1xx` 마지막 | ErrorCode enum (`PARAMETER_TYPE_INVALID`) | 타입 불일치(`MethodArgumentTypeMismatchException`) |
+| `{DOMAIN}_1xx` 끝 | ErrorCode enum (`PARAMETER_TYPE_INVALID`, `PARAMETER_REQUIRED`) | 프레임워크 공통 2종 — 타입 불일치(`MethodArgumentTypeMismatchException`), 필수 파라미터 누락(`MissingServletRequestParameterException`). 이 순서로 대역 끝에 둔다 |
 
 필드별 코드는 ErrorCode enum에 **중복 정의하지 않습니다.** 상수 클래스가 단일 기준점입니다.
 
