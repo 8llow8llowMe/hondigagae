@@ -10,6 +10,8 @@ import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceContentType;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlace;
 import com.hondigagae.global.properties.TourApiProperties;
 import java.math.BigDecimal;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -42,9 +44,13 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
     private static final String OK_RESULT_CODE = "0000";
     private static final DateTimeFormatter SOURCE_DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
+    /** 서킷 인스턴스명. 제공처 단위로 분리한다 (coding-conventions §10). */
+    public static final String CIRCUIT_NAME = "tourapi";
+
     private final WebClient openApiWebClient;
     private final ObjectMapper objectMapper;
     private final TourApiProperties tourApiProperties;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @Override
     public PlaceCatalogQueryResult fetchAreaBasedPlaces(String areaCode, PlaceContentType contentType, int pageNo, int numOfRows) {
@@ -82,13 +88,23 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
         return URI.create(url);
     }
 
+    /**
+     * 원천 호출. 서킷은 <b>전송 호출만</b> 감싼다.
+     *
+     * <p>응답 해석 실패({@code parseAndValidate})는 이 밖에서 일어난다. 규격이 안 맞는 것은
+     * 원천이 죽은 것과 다른 문제라 서킷을 열 이유가 없다.
+     */
     private String requestRaw(URI uri) {
         try {
-            return openApiWebClient.get()
-                .uri(uri)
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
+            return circuitBreakerRegistry.circuitBreaker(CIRCUIT_NAME).executeSupplier(() ->
+                openApiWebClient.get()
+                    .uri(uri)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block()
+            );
+        } catch (CallNotPermittedException exception) {
+            throw new PlaceImportException(PlaceImportErrorCode.TOUR_API_CIRCUIT_OPEN, exception);
         } catch (WebClientResponseException exception) {
             throw new PlaceImportException(PlaceImportErrorCode.TOUR_API_CALL_FAILED, exception,
                 "HTTP %d".formatted(exception.getStatusCode().value()));

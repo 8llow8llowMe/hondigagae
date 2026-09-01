@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -53,8 +55,12 @@ public class MfdsPetRestaurantXlsxAdapter implements PetRestaurantCatalogPort {
     /** 원천의 지역 표기("제주")를 관광 API areaCode 로 옮기기 위한 시도 명칭. */
     private static final Map<String, String> REGION_TO_SIDO = Map.of("제주", "제주특별자치도");
 
+    /** 서킷 인스턴스명. 식약처 파일 서버 전용이다. */
+    public static final String CIRCUIT_NAME = "mfds";
+
     private final WebClient openApiWebClient;
     private final MfdsPetRestaurantProperties properties;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @Override
     public List<ImportedPetRestaurant> readPetRestaurants(String region) {
@@ -132,22 +138,33 @@ public class MfdsPetRestaurantXlsxAdapter implements PetRestaurantCatalogPort {
         return download();
     }
 
+    /**
+     * 원천에서 xlsx 를 내려받는다.
+     *
+     * <p>여기는 잡당 한 번만 부르는 경로라 서킷이 호출 수를 줄여 주지는 않는다. 그래도 거는
+     * 이유는 <b>실패를 빨리 드러내기 위해서다</b> - 원천이 죽어 있을 때 재시도로 시간을 끌기보다
+     * 잡을 즉시 실패시키는 편이 낫다. 파일이 없으면 어차피 적재할 것이 없다.
+     */
     private byte[] download() {
         String uri = properties.baseUrl() + properties.downloadPath();
         try {
-            byte[] body = openApiWebClient.post()
-                .uri(uri)
-                // 화면이 쓰는 경로라 Referer 를 붙여 둔다.
-                .header("Referer", properties.baseUrl() + "/portal/petKorea.do")
-                .retrieve()
-                .bodyToMono(byte[].class)
-                .block(Duration.ofMillis(properties.readTimeoutMs()));
+            byte[] body = circuitBreakerRegistry.circuitBreaker(CIRCUIT_NAME).executeSupplier(() ->
+                openApiWebClient.post()
+                    .uri(uri)
+                    // 화면이 쓰는 경로라 Referer 를 붙여 둔다.
+                    .header("Referer", properties.baseUrl() + "/portal/petKorea.do")
+                    .retrieve()
+                    .bodyToMono(byte[].class)
+                    .block(Duration.ofMillis(properties.readTimeoutMs()))
+            );
 
             if (body == null || body.length == 0) {
                 throw new PlaceImportException(PlaceImportErrorCode.MFDS_DOWNLOAD_FAILED, "빈 응답");
             }
             log.info("mfds pet restaurant downloaded bytes={}", body.length);
             return body;
+        } catch (CallNotPermittedException exception) {
+            throw new PlaceImportException(PlaceImportErrorCode.MFDS_CIRCUIT_OPEN, exception);
         } catch (PlaceImportException exception) {
             throw exception;
         } catch (RuntimeException exception) {

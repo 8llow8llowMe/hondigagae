@@ -11,6 +11,9 @@ dependencies {
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+    // 공공 API 호출에 서킷을 건다 (coding-conventions §10). 배치라 사용자 응답은 없지만,
+    // 원천이 죽었을 때 수천 건을 계속 두드리며 쿼터만 태우는 것을 막는다.
+    implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
 
     // 식약처 반려동물 동반출입 음식점 현황이 xlsx 로만 제공된다.
     implementation 'org.apache.poi:poi-ooxml:5.4.1'
