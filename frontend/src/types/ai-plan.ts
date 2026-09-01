@@ -9,10 +9,16 @@ import type { CodeNameMetadata } from '@/types/api'
  * (`origin/develop` `af86c98`, 2026-08-31). 계약 상세는 docs/features/ai-plan/공통명세.md.
  *
  * **명세 S1 표보다 최신이다.** 명세는 `8e44ddc` 기준이고 그 뒤 PR #78 이
- * `AiPlanCreateRequest` 에 `petIds` · `pinnedPlaceIds` · `planId` · `regenerateDay` 를
- * 추가하면서 `petId` 를 선택으로 내렸다. 이 화면은 **단일 `petId` 만 보낸다** — 새 필드는
- * 전부 선택이라 이 본문이 지금도 유효하고, 다중 반려견·필수 포함 장소는 아트보드 정본이
- * 없어 별도 이슈로 뗀다.
+ * `AiPlanCreateRequest` 에 `petIds` · `pinnedPlaceIds` · `preferFavorites` · `planId` ·
+ * `regenerateDay` 를 추가하면서 `petId` 를 선택으로 내렸다.
+ *
+ * #128 로 **`preferFavorites` 와 `pinnedPlaceIds` 를 붙였다** (아트보드 05 절).
+ * 나머지 둘은 아직 보내지 않는다:
+ *  - **`petIds`** — `plan-service` 의 `Plan` 은 `petId` **단일**이다. 두 마리로 만든 초안을
+ *    담으면 한 마리만 기록되어, 이후 날씨 브리핑·적합도 판정의 기준이 조용히 바뀐다.
+ *    `PlanCreateRequest` 가 `petIds` 를 받을 때까지 미룬다 (명세 S8)
+ *  - **`planId`·`regenerateDay`** — 아트보드 03 은 **저장 전 미리보기**에서 하루 재생성을
+ *    하는데 계약은 `planId`(이미 저장된 일정)를 요구한다. 계약과 정본이 어긋나 있다 (#90)
  */
 
 /**
@@ -37,6 +43,22 @@ export type AiPlanSubmitPayload = {
   budget?: number
   /** 500자 이하. 빈 값이면 생략한다 */
   requestNote?: string
+  /**
+   * 저장한 장소를 후보에 합치고 조건이 맞으면 먼저 배치한다 (#128, 아트보드 05).
+   *
+   * **`false` 는 보내지 않는다.** 서버 기본이 `false` 이고
+   * (`Boolean.TRUE.equals(preferFavorites)`), 끄기를 명시적으로 실어 보낼 이유가 없다.
+   */
+  preferFavorites?: boolean
+  /**
+   * 꼭 넣을 장소. **최대 10곳**이고 서버가 반드시 배치한다.
+   *
+   * **`preferFavorites` 와 다른 약속이다** — 저쪽은 우선순위(조건이 맞을 때만),
+   * 이쪽은 배치 보장이다. 아트보드 05 가 "먼저 / 꼭" 으로 문구를 갈라 쓰라고 못박았다.
+   *
+   * `placeId` 는 문자열 그대로 보낸다 — Snowflake 라 `Number()` 를 거치면 정밀도를 잃는다.
+   */
+  pinnedPlaceIds?: string[]
 }
 
 /** `POST /ai-plans` → **HTTP 202**. 같은 요청이 진행 중이면 기존 `jobId` 를 그대로 준다(멱등) */
@@ -118,6 +140,19 @@ export type AiPlanFormValues = {
   petId: string
   /** **만원 단위**다. 빈 값 = "상관없음" (아트보드 01 — 칩 + 직접 입력) */
   budgetManwon: string
+  /** 저장한 곳 먼저 넣기 (#128, 아트보드 05) */
+  preferFavorites: boolean
+  /**
+   * 꼭 넣을 장소. **`placeId` 만 두지 않고 이름을 함께 든다** — 칩에 이름을 그려야 하고,
+   * 시트를 닫은 뒤 이름을 다시 조회하면 폼이 네트워크에 의존하게 된다.
+   */
+  pinnedPlaces: PinnedPlace[]
+}
+
+/** 폼이 들고 있는 "꼭 넣을 장소" 한 곳. 계약으로 나갈 때는 `placeId` 만 실린다 */
+export type PinnedPlace = {
+  placeId: string
+  title: string
 }
 
 export const EMPTY_AI_PLAN_FORM_VALUES: AiPlanFormValues = {
@@ -126,6 +161,8 @@ export const EMPTY_AI_PLAN_FORM_VALUES: AiPlanFormValues = {
   endDate: '',
   petId: '',
   budgetManwon: '',
+  preferFavorites: false,
+  pinnedPlaces: [],
 }
 
 /**
@@ -143,4 +180,14 @@ export type AiPlanRequestSnapshot = {
   petName: string
   budget: number | null
   requestNote: string
+  /**
+   * #128 로 더한 두 조건. **담기에는 쓰이지 않는다** — `POST /plans` 에 해당 필드가 없다.
+   * 실패 화면의 `조건 바꾸기` 가 폼을 되살릴 때 이 둘도 살아나야 해서 함께 보관한다
+   * (아트보드 02 ②: "입력한 조건은 그대로 남아 있어요").
+   *
+   * **선택 필드로 둔다.** 앞 형식으로 저장된 값이 열어 둔 탭에 남아 있을 수 있고,
+   * 모양 검사가 없는 필드로 흘러들면 `readAiPlanRequest` 가 통째로 null 을 준다.
+   */
+  preferFavorites?: boolean
+  pinnedPlaces?: PinnedPlace[]
 }

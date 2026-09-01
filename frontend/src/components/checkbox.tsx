@@ -21,6 +21,13 @@ export type CheckboxProps = NativeProps & {
   id: string
   /** 체크박스는 라벨이 요소 옆에 붙는다. `Field` 를 쓰지 않고 자체 라벨을 갖는다 */
   label: string
+  /**
+   * 라벨 아래 한 줄. **`Field` 의 `hint` 가 아니라 라벨 블록 안이다** — 체크박스는
+   * 라벨이 옆에 오므로 힌트도 그 라벨과 같은 열에 붙어야 무엇에 대한 설명인지 읽힌다.
+   *
+   * `RadioGroup` 의 옵션 `description` 과 같은 자리다 (component-guide.md §7).
+   */
+  description?: string | undefined
   /** controlled 전용이다. uncontrolled 모드를 지원하지 않는다 — component-guide.md §5 */
   checked: boolean
   onCheckedChange: (checked: boolean) => void
@@ -43,6 +50,7 @@ export type CheckboxProps = NativeProps & {
 export function Checkbox({
   id,
   label,
+  description,
   checked,
   onCheckedChange,
   error,
@@ -58,7 +66,9 @@ export function Checkbox({
         htmlFor={id}
         className={cn(
           // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
-          'flex min-h-11 cursor-pointer items-center gap-3',
+          'flex min-h-11 cursor-pointer gap-3',
+          // 설명이 붙으면 두 줄이 되므로 위쪽 정렬이다 — 가운데 정렬은 체크박스가 떠 보인다
+          description === undefined ? 'items-center' : 'items-start',
           disabled === true && 'cursor-not-allowed opacity-50',
         )}
       >
@@ -72,12 +82,18 @@ export function Checkbox({
           aria-describedby={invalid ? fieldErrorId(id) : undefined}
           className={cn(
             'accent-brand-500 size-5 shrink-0 rounded',
+            description === undefined ? '' : 'mt-0.5',
             'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
             invalid && 'outline-danger-500 outline-1',
           )}
           {...rest}
         />
-        <span className="text-body-2 text-fg">{label}</span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-body-2 text-fg">{label}</span>
+          {description !== undefined && (
+            <span className="text-caption text-fg-muted tabular-nums">{description}</span>
+          )}
+        </span>
       </label>
 
       {invalid && (

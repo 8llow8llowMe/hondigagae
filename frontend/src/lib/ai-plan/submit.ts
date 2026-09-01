@@ -20,12 +20,20 @@ export const MANWON = 10_000
  *   (plan 공통명세 S1)
  * - `requestNote` 는 선택이다. 공백만 남은 값을 보내면 서버 프롬프트에 빈 요구사항이
  *   섞이므로 trim 후 빈 값이면 키를 뺀다
- * - **`petIds`·`pinnedPlaceIds`·`planId`·`regenerateDay` 를 보내지 않는다.** 계약에는
- *   있지만(PR #78) 전부 선택이고, 이 화면은 단일 반려견·최초 생성만 다룬다
+ * - **`preferFavorites` 는 켤 때만 보낸다.** 서버 기본이 `false` 라
+ *   (`Boolean.TRUE.equals(preferFavorites)`) 끄기를 실어 보낼 이유가 없다 (#128)
+ * - **`pinnedPlaceIds` 는 이름을 떼고 `placeId` 만 보낸다.** 비어 있으면 키를 뺀다 —
+ *   `[]` 를 보내도 서버는 같게 다루지만(`pinnedPlaceIds == null ? List.of()`), 생략이
+ *   "고르지 않았다" 를 그대로 말한다. **`Number()` 를 거치지 않는다** (Snowflake)
+ * - **`petIds`·`planId`·`regenerateDay` 는 아직 보내지 않는다.** 이유는
+ *   `types/ai-plan.ts` 주석 — 앞은 `POST /plans` 가 `petId` 단일이라, 뒤는 아트보드와
+ *   계약이 어긋나 있어서다
  */
 export function toAiPlanSubmitPayload(values: AiPlanFormValues): AiPlanSubmitPayload {
   const budget = toBudgetWon(values.budgetManwon)
   const requestNote = values.requestNote.trim()
+
+  const pinnedPlaceIds = values.pinnedPlaces.map((place) => place.placeId)
 
   return {
     areaCode: DEFAULT_AREA_CODE,
@@ -34,6 +42,8 @@ export function toAiPlanSubmitPayload(values: AiPlanFormValues): AiPlanSubmitPay
     petId: values.petId,
     ...(budget === null ? {} : { budget }),
     ...(requestNote === '' ? {} : { requestNote }),
+    ...(values.preferFavorites ? { preferFavorites: true } : {}),
+    ...(pinnedPlaceIds.length === 0 ? {} : { pinnedPlaceIds }),
   }
 }
 

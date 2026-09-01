@@ -10,6 +10,8 @@ function values(overrides: Partial<AiPlanFormValues> = {}): AiPlanFormValues {
     endDate: '2026-09-14',
     petId: '123456789012000001',
     budgetManwon: '',
+    preferFavorites: false,
+    pinnedPlaces: [],
     ...overrides,
   }
 }
@@ -70,5 +72,55 @@ describe('toAiPlanSubmitPayload — requestNote 는 선택이다', () => {
   it('값이 있으면 trim 해서 보낸다', () => {
     const payload = toAiPlanSubmitPayload(values({ requestNote: '  실내 위주로  ' }))
     expect(payload.requestNote).toBe('실내 위주로')
+  })
+})
+
+describe('toAiPlanSubmitPayload — 생성 옵션 확장 (#128, 아트보드 05)', () => {
+  it('preferFavorites 를 끄면 키를 보내지 않는다 — 서버 기본이 false 다', () => {
+    const payload = toAiPlanSubmitPayload(values({ preferFavorites: false }))
+
+    expect('preferFavorites' in payload).toBe(false)
+  })
+
+  it('preferFavorites 를 켜면 true 로 보낸다', () => {
+    expect(toAiPlanSubmitPayload(values({ preferFavorites: true })).preferFavorites).toBe(true)
+  })
+
+  it('고른 곳이 없으면 pinnedPlaceIds 키를 보내지 않는다 — 생략이 "고르지 않았다" 다', () => {
+    const payload = toAiPlanSubmitPayload(values({ pinnedPlaces: [] }))
+
+    expect('pinnedPlaceIds' in payload).toBe(false)
+  })
+
+  it('이름을 떼고 placeId 만 보낸다', () => {
+    const payload = toAiPlanSubmitPayload(
+      values({
+        pinnedPlaces: [
+          { placeId: '212481712381923328', title: '협재해수욕장' },
+          { placeId: '212481712381923329', title: '쇠소깍' },
+        ],
+      }),
+    )
+
+    expect(payload.pinnedPlaceIds).toEqual(['212481712381923328', '212481712381923329'])
+  })
+
+  it('**placeId 를 숫자로 바꾸지 않는다** — Snowflake 라 정밀도를 잃는다', () => {
+    const payload = toAiPlanSubmitPayload(
+      values({ pinnedPlaces: [{ placeId: '212481712381923328', title: '협재해수욕장' }] }),
+    )
+
+    expect(payload.pinnedPlaceIds?.[0]).toBe('212481712381923328')
+    expect(typeof payload.pinnedPlaceIds?.[0]).toBe('string')
+  })
+
+  it('아직 보내지 않는 필드가 새어 나가지 않는다 — petIds·planId·regenerateDay', () => {
+    const payload = toAiPlanSubmitPayload(
+      values({ preferFavorites: true, pinnedPlaces: [{ placeId: '1', title: '가' }] }),
+    )
+
+    expect('petIds' in payload).toBe(false)
+    expect('planId' in payload).toBe(false)
+    expect('regenerateDay' in payload).toBe(false)
   })
 })

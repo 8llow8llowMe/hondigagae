@@ -8,7 +8,9 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { Skeleton } from '@/components/skeleton'
 import { AiPlanCreateForm } from '@/features/ai-plan/ai-plan-create-form'
+import { AiPlanPlacePickerSheet } from '@/features/ai-plan/ai-plan-place-picker-sheet'
 import { aiPlanFormSchema } from '@/features/ai-plan/schemas'
+import { useFavoriteList } from '@/features/favorite/use-favorite-list'
 import { usePetList } from '@/features/pet/use-pet-list'
 import { readAiPlanRequest, saveAiPlanRequest } from '@/lib/ai-plan/request-store'
 import { MANWON, toAiPlanSubmitPayload } from '@/lib/ai-plan/submit'
@@ -16,7 +18,7 @@ import { submitAiPlan } from '@/lib/api/ai-plan'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
 import { totalDaysBetween } from '@/lib/plan/date'
-import type { AiPlanFormValues, AiPlanSubmitResult } from '@/types/ai-plan'
+import type { AiPlanFormValues, AiPlanSubmitResult, PinnedPlace } from '@/types/ai-plan'
 import { EMPTY_AI_PLAN_FORM_VALUES } from '@/types/ai-plan'
 import type { Pet } from '@/types/pet'
 
@@ -73,6 +75,19 @@ function AiPlanCreateFormContainer({ pets, fromJobId }: { pets: Pet[]; fromJobId
   const router = useRouter()
 
   /*
+    **저장한 장소 개수만 쓴다** (#128). 목록 자체는 피커 시트가 열릴 때 같은 캐시에서
+    읽는다 — 여기서 받아 두면 시트를 한 번도 열지 않는 대다수 경우에도 목록을 싣는다.
+    `favoriteKeys.list()` 를 공유하므로 시트가 열릴 때 이미 채워져 있다.
+
+    **조회 실패를 `0` 으로 접지 않는다.** `0` 은 토글을 비활성하는 값이라, 실패를 0 으로
+    다루면 저장한 곳이 있는데도 못 켜는 화면이 된다.
+  */
+  const favoritesQuery = useFavoriteList()
+  const favoriteCount = favoritesQuery.isError ? null : (favoritesQuery.data?.totalCount ?? null)
+
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  /*
     **실패 화면의 `조건 바꾸기` 를 위해 조건을 되살린다** (명세 S7 — "입력 조건은
     그대로 남기고"). `?from={jobId}` 로 오면 그 작업의 조건을 읽어 폼을 채운다.
 
@@ -104,6 +119,9 @@ function AiPlanCreateFormContainer({ pets, fromJobId }: { pets: Pet[]; fromJobId
         petName: pets.find((pet) => pet.petId === payload.petId)?.name ?? '',
         budget: payload.budget ?? null,
         requestNote: payload.requestNote ?? '',
+        // 담기에는 쓰이지 않는다 — `조건 바꾸기` 가 폼을 되살릴 때만 쓴다 (#128)
+        preferFavorites: values.preferFavorites,
+        pinnedPlaces: values.pinnedPlaces,
       })
 
       /*
@@ -115,18 +133,34 @@ function AiPlanCreateFormContainer({ pets, fromJobId }: { pets: Pet[]; fromJobId
     },
   })
 
+  function handleConfirmPicker(places: PinnedPlace[]) {
+    form.setValue('pinnedPlaces', places)
+    setPickerOpen(false)
+  }
+
   return (
-    <AiPlanCreateForm
-      values={form.values}
-      errors={form.errors}
-      pets={pets}
-      totalDays={totalDaysBetween(form.values.startDate, form.values.endDate)}
-      submitting={form.isSubmitting}
-      submitCount={form.submitCount}
-      firstErrorField={form.firstErrorField}
-      onValueChange={form.setValue}
-      onSubmit={() => void form.submit()}
-    />
+    <>
+      <AiPlanCreateForm
+        values={form.values}
+        errors={form.errors}
+        pets={pets}
+        totalDays={totalDaysBetween(form.values.startDate, form.values.endDate)}
+        submitting={form.isSubmitting}
+        submitCount={form.submitCount}
+        firstErrorField={form.firstErrorField}
+        favoriteCount={favoriteCount}
+        onValueChange={form.setValue}
+        onOpenPlacePicker={() => setPickerOpen(true)}
+        onSubmit={() => void form.submit()}
+      />
+
+      <AiPlanPlacePickerSheet
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        selected={form.values.pinnedPlaces}
+        onConfirm={handleConfirmPicker}
+      />
+    </>
   )
 }
 
@@ -169,5 +203,12 @@ function restoreValues(fromJobId: string | null, pets: Pet[]): AiPlanFormValues 
     endDate: snapshot.endDate,
     petId: known ? snapshot.petId : base.petId,
     budgetManwon: toBudgetManwon(snapshot.budget),
+    /*
+      **앞 형식으로 저장된 값에는 이 둘이 없다** (선택 필드로 둔 이유). 열어 둔 탭에
+      남은 조건을 되살릴 때 `undefined` 가 폼 값으로 흘러들면 체크박스가 uncontrolled
+      로 떨어지므로 기본값으로 접는다.
+    */
+    preferFavorites: snapshot.preferFavorites ?? false,
+    pinnedPlaces: snapshot.pinnedPlaces ?? [],
   }
 }

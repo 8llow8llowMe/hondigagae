@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { MAX_PINNED_PLACES } from '@/lib/ai-plan/pinned'
 import { messages } from '@/lib/messages'
 
 /**
@@ -45,6 +46,16 @@ export const aiPlanFormSchema = z
       if (trimmed === '') return true
       return /^\d+$/.test(trimmed) && Number(trimmed) > 0
     }, messages.aiPlan.errorBudgetPositive),
+    /** 체크박스가 값을 고정한다. 스키마에 두는 것은 폼 값 전체를 한 타입으로 검증하기 위해서다 */
+    preferFavorites: z.boolean(),
+    /**
+     * AIPLAN — `@Size(max = 10)` 복제본. **시트가 이미 상한을 막지만 2차 방어를 둔다.**
+     *
+     * 빈 배열을 허용한다 — 선택 입력이다.
+     */
+    pinnedPlaces: z
+      .array(z.object({ placeId: z.string().min(1), title: z.string().min(1) }))
+      .max(MAX_PINNED_PLACES, messages.aiPlan.errorPinnedTooMany),
   })
   /**
    * AIPLAN_001 을 화면이 먼저 본다. 서버도 400 으로 막지만 **왕복 없이 그 자리에서

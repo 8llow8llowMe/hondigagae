@@ -91,6 +91,9 @@ function asIdString(value: unknown): string | null {
   return null
 }
 
+/** `AiPlanCreateRequest.pinnedPlaceIds` 의 `@Size(max = 10)` 복제본 (#128) */
+const PINNED_MAX = 10
+
 /** `POST /ai-plans` 는 `@Positive` 라 0 을 거부한다 — 일정 생성(`@PositiveOrZero`)과 다르다 */
 const NOTE_MAX = 500
 
@@ -188,6 +191,38 @@ function submit(memberId: string, body: string | null): MockResult {
       field: 'requestNote',
       message: '요청 메모는 500자 이하만 가능합니다.',
     })
+  }
+
+  /*
+    **`pinnedPlaceIds` 는 `@Size(max = 10)` 이고 원소는 `@Positive` 다** (#128).
+    mock 이 상한을 지켜야 FE 의 "시트가 10곳에서 막는다" 판단이 검증된다 — 느슨하면
+    화면 버그가 로컬에서 통과한다.
+
+    `preferFavorites` 에는 제약이 없다(`Boolean`). 검증할 것이 없어 읽기만 한다 —
+    **키가 오는지 자체는 계약에 영향이 없다**: 서버가 `Boolean.TRUE.equals()` 로 받는다.
+  */
+  const pinnedPlaceIds: unknown[] | null = Array.isArray(parsed.pinnedPlaceIds)
+    ? (parsed.pinnedPlaceIds as unknown[])
+    : null
+  if (pinnedPlaceIds !== null) {
+    if (pinnedPlaceIds.length > PINNED_MAX) {
+      errors.push({
+        code: 'AIPLAN_109',
+        field: 'pinnedPlaceIds',
+        message: `꼭 넣을 장소는 ${PINNED_MAX}곳 이하만 가능합니다.`,
+      })
+    }
+    const badId = pinnedPlaceIds.find((raw) => {
+      const id = asIdString(raw)
+      return id === null || !/^[1-9]\d*$/.test(id)
+    })
+    if (badId !== undefined) {
+      errors.push({
+        code: 'AIPLAN_110',
+        field: 'pinnedPlaceIds',
+        message: '장소 식별자는 양수여야 합니다.',
+      })
+    }
   }
 
   if (errors.length > 0) return failValidation(errors)

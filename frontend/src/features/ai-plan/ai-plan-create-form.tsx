@@ -9,6 +9,7 @@ import { FormAlert } from '@/components/form-alert'
 import { Input } from '@/components/input'
 import { RadioGroup } from '@/components/radio-group'
 import { Textarea } from '@/components/textarea'
+import { AiPlanOptionsSection } from '@/features/ai-plan/ai-plan-options-section'
 import { BUDGET_PRESETS_MANWON } from '@/lib/ai-plan/budget'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
@@ -26,7 +27,13 @@ export type AiPlanCreateFormProps = {
   /** 제출이 실패로 끝난 횟수. 포커스 이동의 **유일한 안정적인 트리거**다 */
   submitCount: number
   firstErrorField: string | null
+  /**
+   * 저장한 장소 개수. `null` 은 "아직 모른다" 이고 `0` 과 다르다 (#128) —
+   * `AiPlanOptionsSection` 의 같은 이름 prop 주석 참고.
+   */
+  favoriteCount: number | null
   onValueChange: <K extends keyof AiPlanFormValues>(key: K, value: AiPlanFormValues[K]) => void
+  onOpenPlacePicker: () => void
   onSubmit: () => void
 }
 
@@ -47,7 +54,9 @@ export function AiPlanCreateForm({
   submitting,
   submitCount,
   firstErrorField,
+  favoriteCount,
   onValueChange,
+  onOpenPlacePicker,
   onSubmit,
 }: AiPlanCreateFormProps) {
   const formRef = useRef<HTMLFormElement>(null)
@@ -237,6 +246,29 @@ export function AiPlanCreateForm({
           </Field>
         </div>
       </div>
+
+      {/*
+        **생성 옵션은 필수 항목 뒤다** (아트보드 05 "입력 화면에 붙는 세 항목").
+        앞에 두면 선택 항목이 필수처럼 읽혀 "뭘 써야 하지" 에서 막히는 것과 같은 일이 된다.
+      */}
+      <AiPlanOptionsSection
+        preferFavorites={values.preferFavorites}
+        favoriteCount={favoriteCount}
+        pinnedPlaces={values.pinnedPlaces}
+        onPreferFavoritesChange={(preferFavorites) =>
+          onValueChange('preferFavorites', preferFavorites)
+        }
+        onRemovePinned={(placeId) =>
+          onValueChange(
+            'pinnedPlaces',
+            values.pinnedPlaces.filter((place) => place.placeId !== placeId),
+          )
+        }
+        onOpenPicker={onOpenPlacePicker}
+      />
+
+      {/* 상한 2차 방어가 걸렸을 때만 나온다 — 시트가 이미 막는다 */}
+      <FormAlert message={errors.fields.pinnedPlaces ?? null} />
 
       <div className="flex flex-col gap-2">
         <Button type="submit" size="lg" loading={submitting}>
