@@ -15,6 +15,7 @@ public enum PlanErrorCode {
     NOT_FOUND_PLAN_ITEM("PLAN_005", "존재하지 않는 일정 항목입니다.", HttpStatus.NOT_FOUND),
     ITEM_DAY_REQUIRED("PLAN_006", "일정 항목의 일차는 필수입니다.", HttpStatus.BAD_REQUEST),
     ITEM_SEQUENCE_DUPLICATED("PLAN_007", "같은 일차에 순서가 중복된 항목이 있습니다.", HttpStatus.BAD_REQUEST),
+    PLAN_PERIOD_TOO_LONG("PLAN_009", "여행 기간은 최대 30일까지 만들 수 있습니다.", HttpStatus.BAD_REQUEST),
     PLAN_PERIOD_SHRINK_CONFLICT("PLAN_008", "줄어든 여행 기간 밖에 일정 항목이 남아 있습니다. 해당 일차의 항목을 먼저 정리해 주세요.", HttpStatus.BAD_REQUEST),
     INVALID_REQUEST("PLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
     PARAMETER_TYPE_INVALID("PLAN_115", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),

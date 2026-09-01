@@ -55,6 +55,8 @@
 - `GET /api/v1/auth/{provider}/login?code=&state=` — 소셜 로그인
 - `POST /api/v1/auth/email/send-code`, `POST /api/v1/auth/email/verify-code`
 - `POST /api/v1/auth/password/reset/send-code`, `POST /api/v1/auth/password/reset` — 비밀번호 재설정
+- `GET /api/v1/auth/sessions` — 로그인 기기 목록 (최근 갱신순, current 는 refresh 쿠키로 판별)
+- `DELETE /api/v1/auth/sessions/{sessionId}` — 특정 기기 로그아웃 (멱등)
 - `POST /api/v1/auth/token/reissue`, `POST /api/v1/auth/logout` (현재 기기만)
 
 ### member
@@ -94,6 +96,7 @@
 
 `GET /internal/v1/pets/{petId}/condition` — 다른 서비스가 판정에 쓰는 반려견 특성을 준다.
 `GET /internal/v1/pets/representative/condition?memberId=` — 대표 반려견의 특성. 호출부가 petId 없이 요청했을 때의 기본값이다.
+`GET /internal/v1/pets/conditions?memberId=&petIds=` — 여러 마리 벌크 조회. 원격 N+1 방지용이며 소유가 아닌 petId 는 응답에서 빠진다.
 
 - **반려견 프로필의 원천은 이 서비스다.** 다른 서비스가 사본을 두는 대신 필요한 특성만
   가져가게 한다. 사본을 두면 사용자가 프로필을 고쳐도 옛 값으로 판정하는 일이 생긴다.

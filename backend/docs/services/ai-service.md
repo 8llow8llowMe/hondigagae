@@ -28,6 +28,7 @@ LLM 기반 AI 기능 전담. 선정된 AI 기능의 LLM 호출·프롬프트·�
   - `pinnedPlaceIds`(최대 10) — 필수 포함 장소. 검색 후보에 강제 합류, 없으면 AIPLAN_013 실패
   - `planId` + `regenerateDay` — 하루 재생성. 기존 일정을 plan-service 내부 API 로 받아
     지정한 날만 새로 짠다. 일차 범위는 제출 시점에 검증(AIPLAN_014/015)
+  - 검증: 시작일은 오늘 이후(AIPLAN_017), 기간은 최대 10일(AIPLAN_018) — 예보 커버리지(약 11일)와 프롬프트 규모에 맞춘 상한
   - `preferFavorites` — 즐겨찾기 우선 반영. 찜한 장소를 후보에 합치고 [선호] 표시로
     우선 배치를 지시한다. 필수가 아니라 조회 실패는 관용 처리(선호 표시만 빠짐)
 - `GET /api/v1/ai-plans/jobs/{jobId}` — 폴링

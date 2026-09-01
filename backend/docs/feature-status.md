@@ -28,6 +28,7 @@
 | POST | `/api/v1/auth/email/send-code` · `/verify-code` | 이메일 인증 |
 | POST | `/api/v1/auth/password/reset/send-code` · `/password/reset` | 재설정 (계정 열거 방지, 5회 오입력 무효화) |
 | POST | `/api/v1/auth/token/reissue` | 세션별 회전, 이전 refresh 즉시 무효 |
+| GET·DELETE | `/api/v1/auth/sessions[/{sessionId}]` | 로그인 기기 목록·특정 기기 로그아웃 |
 | POST | `/api/v1/members/signup` | |
 | GET·PATCH | `/api/v1/members/me` | |
 | POST·DELETE | `/api/v1/members/me/profile-image` | |
@@ -57,7 +58,7 @@
 | GET·PUT·DELETE | `/api/v1/plans/{planId}` | 항목마다 장소 요약(주소·실내·대표 이미지·좌표) 포함 |
 | PUT | `/api/v1/plans/{planId}/days/{day}/items` |
 | GET | `/api/v1/plans/{planId}/weather` | 일자별 날씨 브리핑 + 비 오는 날 실내 대안 |
-| GET·POST·DELETE | `/api/v1/favorites/places[/{placeId}]` | 장소 즐겨찾기 (멱등, 회원당 100곳) |
+| GET·POST·DELETE | `/api/v1/favorites/places[/{placeId}]` | 장소 즐겨찾기 (멱등, 회원당 100곳, GET {placeId} = 여부 확인) |
 | PUT | `/api/v1/plans/{planId}/items/{planItemId}/visited` | 항목 방문 체크 (다녀옴) |
 | GET | `/api/v1/plans/{planId}/emergency` | 일자별 방문 장소 주변 동물병원·약국 브리핑 |
 

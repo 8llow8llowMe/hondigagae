@@ -25,6 +25,9 @@ import org.springframework.util.CollectionUtils;
 @RequiredArgsConstructor
 public class PlanCommandProcessor {
 
+    /** 여행 기간 상한(일). 개인 여행 기준으로 충분하고, 일자 배열과 브리핑 루프의 상한이 된다. */
+    private static final int MAX_TRIP_DAYS = 30;
+
     private final PlanRepositoryPort planRepositoryPort;
     private final PlanItemRepositoryPort planItemRepositoryPort;
     private final PlaceVerifyQueryPort placeVerifyQueryPort;
@@ -116,6 +119,10 @@ public class PlanCommandProcessor {
     private void validateDateRange(LocalDate startDate, LocalDate endDate) {
         if (startDate.isAfter(endDate)) {
             throw new PlanException(PlanErrorCode.PLAN_DATE_RANGE_INVALID);
+        }
+        // 상한 없는 기간은 일자 배열·브리핑 루프를 무한정 키운다. 과거 날짜는 기록용으로 허용한다.
+        if (java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate) + 1 > MAX_TRIP_DAYS) {
+            throw new PlanException(PlanErrorCode.PLAN_PERIOD_TOO_LONG);
         }
     }
 

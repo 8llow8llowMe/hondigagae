@@ -40,6 +40,10 @@ public class FavoriteQueryProcessor {
             .toList();
     }
 
+    public boolean isFavorited(long memberId, long placeId) {
+        return favoriteRepositoryPort.findByMemberIdAndPlaceId(memberId, placeId).isPresent();
+    }
+
     public List<Long> getMyFavoritePlaceIds(long memberId) {
         return favoriteRepositoryPort.findAllByMemberId(memberId).stream()
             .map(Favorite::placeId)

@@ -38,6 +38,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AiPlanJobProcessor {
 
+    /** AI 생성 여행 일수 상한. 후보 풀·프롬프트 규모와 예보 커버리지(약 11일)에 맞춘 값이다. */
+    private static final int MAX_TRIP_DAYS = 10;
+
     private static final String JOB_TYPE = "AI_PLAN";
 
     private final AiPlanJobStorePort aiPlanJobStorePort;
@@ -48,6 +51,14 @@ public class AiPlanJobProcessor {
     public AiPlanSubmissionInfo submitPlan(long memberId, AiPlanCreateCommand command) {
         if (command.startDate().isAfter(command.endDate())) {
             throw new AiPlanException(AiPlanErrorCode.DATE_RANGE_INVALID);
+        }
+        // 과거 여행의 AI 생성은 의미가 없고, 날씨·혼잡도 근거도 없다. 기록용 과거 일정은 plan 직접 생성으로 한다.
+        if (command.startDate().isBefore(java.time.LocalDate.now())) {
+            throw new AiPlanException(AiPlanErrorCode.START_DATE_IN_PAST);
+        }
+        // 후보 50곳 규모에서 프롬프트가 감당할 수 있는 상한. 예보 커버리지(약 11일)와도 맞춘다.
+        if (ChronoUnit.DAYS.between(command.startDate(), command.endDate()) + 1 > MAX_TRIP_DAYS) {
+            throw new AiPlanException(AiPlanErrorCode.TRIP_DAYS_EXCEEDED);
         }
         validateRegenerateRequest(command);
 
