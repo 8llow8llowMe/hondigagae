@@ -3,3 +3,9 @@ node_modules
 coverage
 pnpm-lock.yaml
 public
+
+# 디자인 작업 파일 (Claude Design 아트보드 소스)
+# **prettier 가 건드리면 안 된다.** .gitignore 로 제외돼 있어 git 이 변경을 안 잡는데,
+# `pnpm format` 은 그것과 무관하게 13개 아트보드와 6.5MB standalone 을 매번 재작성한다.
+# HTML 재포맷은 inline 요소의 공백을 바꿔 렌더까지 흔들 수 있고, 원본은 Claude Design 이다.
+docs/UI 모형 및 디자인 시스템/

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { Wordmark } from '@/components/brand/wordmark'
 import { ButtonLink } from '@/components/button'
 import { EmergencyIcon } from '@/components/icons'
 import { AccountMenu } from '@/features/nav/account-menu'
@@ -15,6 +16,9 @@ import { PetSwitcherSlot } from '@/features/nav/pet-switcher-slot'
  * 좌우 패딩 16(모바일) / 40(데스크톱). `max-width` 를 두지 않는다 — 헤더는 화면 폭을 쓴다.
  * 로고와 nav 사이 gap 32, nav 항목 사이 gap 4.
  *
+ * **로고는 워드마크만이다** (아트보드 `혼디가개 브랜드 자산` 2절). 심볼(발바닥)을 붙이지
+ * 않는다 — 가이드 0절의 무채색 원칙이 헤더 로고까지 적용된다.
+ *
  * **`(auth)` 그룹에는 두지 않는다** — 이탈 경로가 되면 `returnTo` 흐름이 깨진다.
  *
  * 높이를 `<header>` 자신이 갖고 `box-border` 로 테두리를 그 안에 넣는다. 그래야 헤더가
@@ -27,11 +31,17 @@ export function GlobalHeader({ authed }: { authed: boolean }) {
     <header className="border-border bg-bg sticky top-0 z-30 box-border h-14 border-b md:h-16">
       <div className="flex h-full items-center justify-between gap-3 px-4 md:px-10">
         <div className="flex min-w-0 items-center gap-8">
+          {/*
+            **워드마크는 라이브 텍스트가 아니다** (아트보드 `브랜드 자산` 2절). 폰트
+            로딩이 실패하면 헤더만 시스템 폰트로 튀어 로고가 로고처럼 안 보인다.
+            `aria-label` 은 `Wordmark` 의 `<svg role="img">` 가 들고 있으므로 링크에
+            다시 붙이지 않는다 — 스크린리더가 이름을 두 번 읽는다.
+          */}
           <Link
             href="/"
-            className="text-fg focus-visible:ring-brand-500 text-emphasis inline-flex h-11 shrink-0 items-center rounded-md font-extrabold tracking-tight focus-visible:ring-2 focus-visible:outline-none"
+            className="text-fg focus-visible:ring-brand-500 inline-flex h-11 shrink-0 items-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
           >
-            혼디가개
+            <Wordmark />
           </Link>
           <NavLinks authed={authed} />
         </div>
