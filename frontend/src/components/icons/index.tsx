@@ -216,3 +216,65 @@ export function BookmarkIcon(props: IconProps) {
     </Svg>
   )
 }
+
+/**
+ * 지도 — 목록↔지도 세그먼트의 모바일(아이콘) 변형에 쓴다.
+ * 장소 탭의 돋보기와 구분된다: 저쪽은 "찾기", 이쪽은 "보기 방식" 이다.
+ */
+export function MapIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M9 4.5 3.5 6.8v12.7L9 17.2l6 2.3 5.5-2.3V4.5L15 6.8z" />
+      <path d="M9 4.5v12.7" />
+      <path d="M15 6.8v12.7" />
+    </Svg>
+  )
+}
+
+/** 목록 — 지도에서 목록으로 되돌리는 쪽 */
+export function ListIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M8 6.5h12" />
+      <path d="M8 12h12" />
+      <path d="M8 17.5h12" />
+      <path d="M4 6.5h.01" />
+      <path d="M4 12h.01" />
+      <path d="M4 17.5h.01" />
+    </Svg>
+  )
+}
+
+/** 위치 핀 — 지도 마커·현재 위치 버튼 */
+export function PinIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M12 21s6.5-5.6 6.5-10.5A6.5 6.5 0 0 0 5.5 10.5C5.5 15.4 12 21 12 21z" />
+      <circle cx="12" cy="10.5" r="2.5" />
+    </Svg>
+  )
+}
+
+/** 현재 위치로 — 조준 과녁 */
+export function CrosshairIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="7" />
+      <circle cx="12" cy="12" r="2.5" />
+      <path d="M12 2v3" />
+      <path d="M12 19v3" />
+      <path d="M2 12h3" />
+      <path d="M19 12h3" />
+    </Svg>
+  )
+}
+
+/** 닫기 — 지도 선택 카드 */
+export function CloseIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6 6l12 12" />
+      <path d="M18 6L6 18" />
+    </Svg>
+  )
+}

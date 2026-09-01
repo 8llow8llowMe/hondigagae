@@ -147,6 +147,13 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0)', () => {
       'src/features/home/profile-card.tsx',
       // 헤더 계정 팝오버
       'src/features/nav/account-menu.tsx',
+      // ── 지도 위에 뜨는 표면 (이슈 #14) ────────────────────────────────
+      // 아트보드 `혼디가개 장소 찾기` 05·06 은 **지도가 바탕이고 목록이 그 위에 얹히는**
+      // 구조다. 지도와 같은 평면에 두면 어디까지가 패널인지 읽히지 않는다.
+      'src/components/map-sheet.tsx',
+      'src/features/place/place-map-view.tsx',
+      // 마커를 고르면 지도 위에 뜨는 카드 (`혼디가개 긴급 시설` 02)
+      'src/features/emergency/facility-selected-card.tsx',
     ]
 
     const found = FILES.filter(({ path }) => !FLOATING.includes(path.replace(/\\/g, '/'))).flatMap(

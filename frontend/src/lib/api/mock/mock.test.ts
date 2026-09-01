@@ -20,13 +20,14 @@ function body(search: string): SliceResponse<PlaceSummary> {
 describe('resolveMock — 처리 범위', () => {
   it('구현되지 않은 경로는 null 을 반환해 실제 게이트웨이로 넘긴다', () => {
     /*
-      `/places/nearby` 는 **의도적인 통과 경로**다 — `resolveMock` 의 `SUB_RESOURCES` 가
-      상세(`/places/{id}`) 정규식에 걸리지 않게 먼저 빼낸다.
+      **이 단언은 mock 이 정말 모르는 경로여야 의미가 있다.**
 
-      예시로 `/members/me/profile-image` 를 쓰지 않는다. 이제 mock 이 처리한다
-      (#79 업로드 · #83 삭제). **이 단언은 mock 이 정말 모르는 경로여야 의미가 있다.**
+      `/members/me/profile-image` 를 쓰지 않는다 — mock 이 처리한다 (#79 · #83).
+      `/places/nearby` 도 쓸 수 없게 됐다 — 지도(#14)가 붙으며 mock 이 처리한다.
+      산책 코스(두루누비)는 **백엔드에 패키지 자체가 없다** — 화면도 mock 도 없는 것이
+      확실한 경로다 (screen-inventory §6).
     */
-    expect(resolveMock('/places/nearby', 'GET', '?lat=33.5&lng=126.5', null)).toBeNull()
+    expect(resolveMock('/walk-courses', 'GET', '', null)).toBeNull()
   })
 
   it('AI 일정은 mock 이 처리한다 (이슈 #84)', () => {
@@ -142,8 +143,28 @@ describe('resolveMock — 상세', () => {
     expect(result.payload.dataHeader.resultCode).toBe('PLACE_113')
   })
 
-  it('/places/nearby 는 상세가 아니다 — 실제 게이트웨이로 넘긴다', () => {
-    expect(resolveMock('/places/nearby', 'GET', 'lat=33.5&lng=126.5', null)).toBeNull()
+  it('/places/nearby 는 상세로 오해되지 않는다 — 전용 응답을 준다', () => {
+    const result = resolveMock('/places/nearby', 'GET', 'lat=33.5&lng=126.5', null)
+
+    expect(result?.status).toBe(200)
+    // 상세(PlaceDetailResponse)가 아니라 NearbyPlaceResponse 다 — 커서가 없고 totalCount 가 있다
+    expect(result?.payload.dataBody).toHaveProperty('totalCount')
+    expect(result?.payload.dataBody).not.toHaveProperty('hasNext')
+  })
+
+  it('/places/nearby 는 lat·lng 없이 부르면 400 이다 — 백엔드가 필수로 받는다', () => {
+    const result = resolveMock('/places/nearby', 'GET', 'radius=5000', null)
+
+    expect(result?.status).toBe(400)
+  })
+
+  it('/places/nearby 는 반경 밖 장소를 빼고 가까운 순으로 준다', () => {
+    const result = resolveMock('/places/nearby', 'GET', 'lat=33.5&lng=126.5&radius=50000', null)
+    const nearby = result?.payload.dataBody as { places: { distanceMeters: number }[] }
+
+    const distances = nearby.places.map((entry) => entry.distanceMeters)
+    expect(distances).toEqual([...distances].sort((left, right) => left - right))
+    expect(distances.every((meters) => meters <= 50_000)).toBe(true)
   })
 })
 

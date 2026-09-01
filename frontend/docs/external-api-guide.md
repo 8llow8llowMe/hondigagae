@@ -91,6 +91,26 @@ navigator.geolocation.getCurrentPosition(onOk, onFail, { timeout: 8000 })
 
 - **권한 거부·타임아웃 분기를 반드시 처리한다.** 실패 시 제주 중심 기본 좌표로 폴백하고, 그 사실을 화면에 알린다.
 - `navigator` 는 브라우저 전용이다. helper 안에서 `typeof navigator === 'undefined'` 가드.
+- **`timeout` 옵션만 믿지 않는다.** 권한이 막힌 일부 환경은 성공도 실패도 부르지 않고 그냥
+  조용하다(실측). 그러면 Promise 가 영영 pending 이고 화면이 스켈레톤에서 멈춘다 — 급할 때
+  여는 긴급 시설 화면에서 그것은 "느림" 이 아니라 "고장" 이다. `getCurrentPosition()` 은
+  우리 시계로도 한 번 끊는다.
+
+### 구현 메모 (#14)
+
+- **마커는 `Marker` 가 아니라 `CustomOverlay`** 다. 아트보드가 마커에 **이름 라벨**을
+  요구하고(`혼디가개 긴급 시설` 02 "마커에 이름을 쓴다"), 선택 강조를 **색이 아니라 크기와
+  라벨**로 하기 때문이다. 오버레이 내용은 React 트리 밖이라 스타일을 `app/globals.css` 의
+  `.map-pin` / `.map-cluster` 로 두고, 정리 책임은 전부 `features/map/map-canvas.tsx` 가 진다.
+- **SDK 의 `MarkerClusterer` 를 쓰지 않는다.** 그것은 기본 `Marker` 만 묶고 묶음 문구를
+  바꿀 수 없다. 격자 묶음은 `lib/map/cluster.ts` 순수 함수가 계산한다 → `libraries` 파라미터
+  없이 SDK 를 부른다.
+- **아트보드 `혼디가개 장소 찾기` 05 의 "네이버 지도 SDK" 는 오기다.** 같은 문서 다른 절과
+  `혼디가개 긴급 시설` 02·04 는 카카오맵으로 적고 있고, 이 저장소가 발급받은 키도 카카오다.
+- **길찾기는 SDK 경로 안내가 아니라 외부 지도 앱 딥링크**다 (`lib/geo/map-link.ts`).
+- 제주 기준 좌표가 **두 개**다. 이름을 갈라 뒀으니 섞지 않는다:
+  `JEJU_CENTER`(`lib/geo/coord.ts`, 섬의 기하 중심 — **지도를 놓는 자리**)와
+  `JEJU_QUERY_CENTER`(`lib/geo/current-position.ts`, 제주시 — **좌표를 모를 때 조회 기준점**).
 
 ### 검토
 

@@ -6,8 +6,16 @@
  * 이 브라우저에서는 아예 안 되는지가 다르다.
  */
 
-/** 제주 중심. 위치를 모를 때 조회의 기준점으로만 쓴다 */
-export const JEJU_CENTER = { lat: 33.4996213, lng: 126.5311884 } as const
+/**
+ * 위치를 모를 때 **조회의 기준점**. 제주시청 부근이다.
+ *
+ * **`lib/geo/coord.ts` 의 `JEJU_CENTER`(한라산 부근, 섬의 기하 중심)와 다른 값이다.**
+ * 두 상수가 같은 이름이면 반드시 섞인다 — 실제로 지도(#14)가 조회 기준점을 쓰려다
+ * 기하 중심을 집어 첫 화면이 비었다. 이름으로 쓰임을 갈라 둔다:
+ *  - `JEJU_QUERY_CENTER` — 좌표가 없을 때 **무엇을 조회할지**의 기준. 사람이 사는 쪽이다
+ *  - `JEJU_CENTER`(coord.ts) — **지도를 어디에 놓을지**의 기준. 섬 전체가 담기는 쪽이다
+ */
+export const JEJU_QUERY_CENTER = { lat: 33.4996213, lng: 126.5311884 } as const
 
 export type PositionFailure = 'denied' | 'timeout' | 'unsupported'
 
@@ -19,6 +27,12 @@ export type PositionResult =
 const TIMEOUT_MS = 10_000
 
 /**
+ * 우리 시계에 주는 여유. 브라우저가 제 시간에 응답하면 그쪽이 이기게 두고,
+ * 아무 말도 없을 때만 우리가 끊는다 — 정상 경로의 판정을 빼앗지 않는다.
+ */
+const GRACE_MS = 1_000
+
+/**
  * **거부·타임아웃·미지원 어느 쪽이어도 좌표를 돌려준다.**
  *
  * 조회 자체는 `lat`/`lng` 가 필수라 좌표가 없으면 화면이 통째로 비어 버린다. 대신
@@ -27,18 +41,42 @@ const TIMEOUT_MS = 10_000
  */
 export function getCurrentPosition(): Promise<PositionResult> {
   if (typeof navigator === 'undefined' || navigator.geolocation === undefined) {
-    return Promise.resolve({ ...JEJU_CENTER, kind: 'fallback', reason: 'unsupported' })
+    return Promise.resolve({ ...JEJU_QUERY_CENTER, kind: 'fallback', reason: 'unsupported' })
   }
 
   return new Promise((resolve) => {
+    /*
+      **플랫폼을 믿고 기다리기만 하지 않는다.**
+
+      `timeout` 옵션은 브라우저가 콜백을 부르기로 했을 때의 상한일 뿐이다. 권한이 막힌
+      일부 환경(내장 웹뷰·자동화 브라우저·기업 정책)에서는 **성공도 실패도 부르지 않고
+      그냥 조용하다** — 실측으로 확인했다. 그러면 이 Promise 가 영영 pending 이고,
+      호출부는 `position === null` 이라 **스켈레톤에서 멈춘다.**
+
+      급할 때 여는 화면에서 그것은 "느리다" 가 아니라 "고장" 이다. 그래서 우리 시계로도
+      한 번 끊고, 먼저 도착한 쪽을 쓴다.
+    */
+    let settled = false
+    const finish = (result: PositionResult) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      resolve(result)
+    }
+
+    const timer = setTimeout(
+      () => finish({ ...JEJU_QUERY_CENTER, kind: 'fallback', reason: 'timeout' }),
+      TIMEOUT_MS + GRACE_MS,
+    )
+
     navigator.geolocation.getCurrentPosition(
       (position) =>
-        resolve({
+        finish({
           kind: 'granted',
           lat: position.coords.latitude,
           lng: position.coords.longitude,
         }),
-      (error) => resolve({ ...JEJU_CENTER, kind: 'fallback', reason: toFailure(error) }),
+      (error) => finish({ ...JEJU_QUERY_CENTER, kind: 'fallback', reason: toFailure(error) }),
       { timeout: TIMEOUT_MS, maximumAge: 5 * 60_000 },
     )
   })

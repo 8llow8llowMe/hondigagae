@@ -34,6 +34,12 @@ export const paths = {
   places: {
     list: (query: string) => (query ? `/places?${query}` : '/places'),
     detail: (placeId: string) => `/places/${placeId}`,
+    /**
+     * 주변 장소 — 지도 뷰의 "지도 이동 시 재검색" 이 쓴다.
+     * **커서가 아니라 `totalCount`** 를 주므로 목록과 페이징 모델이 다르다
+     * (docs/screen-inventory.md §5-1). `lat`/`lng` 가 필수라 쿼리 없이 부르지 않는다
+     */
+    nearby: (query: string) => `/places/nearby?${query}`,
     /** 장소 인사이트 — tour-service insight 컨텍스트 */
     suitability: (placeId: string, query: string) =>
       query ? `/places/${placeId}/suitability?${query}` : `/places/${placeId}/suitability`,
