@@ -50,6 +50,7 @@ export const petMessages = {
     breed: '품종',
     birthYm: '생년월',
     sizeType: '크기',
+    weightKg: '체중',
     activityLevel: '활동량',
     sociality: '사회성',
     heatSensitive: '더위에 민감해요',
@@ -61,6 +62,11 @@ export const petMessages = {
   hints: {
     optional: '선택 입력',
     birthYm: '선택 입력 · 2017-05 형식',
+    /**
+     * **모르면 비워도 된다는 것을 먼저 말한다.** 크기가 이미 필수라 체중까지 필수처럼
+     * 보이면 모르는 사람이 대충 적고, 그 값이 장소 필터 판정에 그대로 쓰인다.
+     */
+    weightKg: '선택 입력 · 입장 체중 제한이 있는 곳을 걸러 줄 때 써요',
   },
 
   // 검증 — PetValidationMessage 복제본
@@ -74,10 +80,46 @@ export const petMessages = {
   birthYmFormat: '생년월은 yyyy-MM 형식이어야 합니다.',
   // PET_105
   sizeTypeRequired: '크기 구분은 필수입니다.',
+  /*
+    PET_108 · PET_109 를 하나로 합친다. 서버는 범위와 자릿수를 따로 말하지만, 입력이
+    한 칸이고 고칠 방법도 같아서 나누면 사용자가 두 규칙을 외워야 한다.
+  */
+  weightInvalid: '체중은 0.1 ~ 99.9kg 사이, 소수점 한 자리까지 입력할 수 있어요.',
   // PET_106
   activityLevelRequired: '활동량은 필수입니다.',
   // PET_107
   socialityRequired: '사회성은 필수입니다.',
+
+  // ── 체중 · 사진 · 대표견 (#126) ────────────────────────────────────────
+
+  weightLabel: '체중',
+  weightUnit: 'kg',
+  /**
+   * **모르면 비워도 된다는 것을 먼저 말한다.** 크기 구분(소형/중형/대형)이 이미 필수라
+   * 체중까지 필수처럼 보이면 모르는 사람이 대충 적는다 — 그 값이 장소 필터 판정에
+   * 그대로 쓰인다.
+   */
+  weightHelp: '모르면 비워 두세요. 입장 체중 제한이 있는 곳을 걸러 줄 때 써요.',
+
+  photoLabel: '프로필 사진',
+  photoUpload: '사진 등록',
+  photoChange: '사진 변경',
+  photoRemove: '사진 삭제',
+  /** `{name}` 치환 */
+  photoAlt: '{name} 프로필 사진',
+  photoUploading: '사진을 올리는 중',
+
+  representativeBadge: '대표',
+  representativeSet: '대표로 지정',
+  /** 이미 대표인 아이의 버튼 자리 — 해제 API 가 없다 (다른 아이를 지정하면 옮겨간다) */
+  representativeCurrent: '대표 반려견이에요',
+  /**
+   * **왜 대표가 필요한지 말한다.** "대표" 만 있으면 즐겨찾기 같은 장식으로 읽힌다.
+   */
+  representativeHelp: 'AI 일정에서 반려견을 고르지 않으면 대표 아이를 기준으로 짜요.',
+  /** `{name}` 치환 — 지정 직후 안내 */
+  representativeDone: '{name}를 대표로 지정했어요.',
+  representativeFailed: '대표로 지정하지 못했어요. 잠시 후 다시 시도해 주세요.',
 
   /** 근거: backend shared-travel PetSizeType / ActivityLevel / SocialityLevel */
   options: {

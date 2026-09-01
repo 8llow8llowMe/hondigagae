@@ -24,6 +24,10 @@ export const paths = {
     me: '/members/me',
     pets: '/members/me/pets',
     pet: (petId: string) => `/members/me/pets/${petId}`,
+    /** 반려견 사진 — 업로드(POST, multipart)와 삭제(DELETE)가 같은 경로다 */
+    petProfileImage: (petId: string) => `/members/me/pets/${petId}/profile-image`,
+    /** 대표 반려견 지정. **해제 API 는 없다** — 다른 아이를 지정하면 옮겨간다 */
+    petRepresentative: (petId: string) => `/members/me/pets/${petId}/representative`,
     profileImage: '/members/me/profile-image',
     /** 변경 — 현재 비밀번호 확인. DELETE 는 같은 경로로 소셜 전용 전환이다 */
     password: '/members/me/password',

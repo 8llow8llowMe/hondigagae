@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { messages } from '@/lib/messages'
+import { isValidWeightInput } from '@/lib/pet/weight'
 import { ACTIVITY_LEVEL_CODES, PET_SIZE_CODES, SOCIALITY_LEVEL_CODES } from '@/types/pet'
 
 /**
@@ -37,6 +38,14 @@ export const petFormSchema = z.object({
   birthYm: optionalBirthYm,
   // PET_105 — RadioGroup 이 값을 고정하므로 실질적으로는 2차 방어다
   sizeType: z.enum(PET_SIZE_CODES, { message: messages.pet.sizeTypeRequired }),
+  /*
+    PET_108(범위) · PET_109(소수 자릿수).
+
+    **빈 값을 허용한다.** 백엔드가 선택 필드로 받고, 모르는 것을 억지로 적게 하면
+    틀린 값이 들어온다 — 그 값이 장소 필터 판정에 그대로 쓰인다.
+    범위·자릿수 판정은 `lib/pet/weight.ts` 한 곳이 소유한다.
+  */
+  weightKg: z.string().refine(isValidWeightInput, { message: messages.pet.weightInvalid }),
   heatSensitive: z.boolean(),
   coldSensitive: z.boolean(),
   noiseSensitive: z.boolean(),

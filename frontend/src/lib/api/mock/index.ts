@@ -256,6 +256,19 @@ function matches(place: PlaceSummary, params: URLSearchParams): boolean {
   const petSizeType = params.get('petSizeType')
   if (petSizeType !== null && !allowsPetSize(place.allowedPetSize.code, petSizeType)) return false
 
+  /*
+    내 반려견 체중 — 백엔드는 `maxPetWeightKg IS NULL OR maxPetWeightKg >= petWeightKg` 다
+    (`PlaceCustomRepositoryImpl`). **상한을 모르는 곳(null)은 남긴다** — 크기 축과 같은
+    규칙이고, 정보 없음을 "불가" 로 단정하면 갈 수 있는 곳이 검색에서 사라진다.
+  */
+  const petWeightKg = params.get('petWeightKg')
+  if (petWeightKg !== null) {
+    const weight = Number(petWeightKg)
+    if (Number.isFinite(weight) && place.maxPetWeightKg !== null && place.maxPetWeightKg < weight) {
+      return false
+    }
+  }
+
   const sourceCategory = params.get('sourceCategory')
   if (sourceCategory !== null && place.sourceCategory !== sourceCategory) return false
 

@@ -15,6 +15,7 @@ const pet: Pet = {
   birthYm: '2017-05',
   age: 9,
   sizeType: { code: 'SMALL', name: '소형견', description: '체중 10kg 미만' },
+  weightKg: 3.5,
   heatSensitive: true,
   coldSensitive: false,
   noiseSensitive: false,
@@ -25,6 +26,8 @@ const pet: Pet = {
   },
   walkPreferred: true,
   sociality: { code: 'HIGH', name: '높음', description: '다른 개나 사람과 잘 어울립니다.' },
+  profileImageUrl: null,
+  representative: false,
 }
 
 describe('toPetSavePayload', () => {
@@ -83,7 +86,7 @@ describe('toPetSavePayload', () => {
     expect(payload.sociality).toBe('LOW')
   })
 
-  it('10개 필드를 모두 담는다 — PUT 은 부분 수정이 아니다', () => {
+  it('11개 필드를 모두 담는다 — PUT 은 부분 수정이 아니다', () => {
     const payload = toPetSavePayload({ ...EMPTY_PET_FORM_VALUES, name: '몽실이' })
 
     expect(Object.keys(payload).sort()).toEqual(
@@ -98,8 +101,19 @@ describe('toPetSavePayload', () => {
         'sizeType',
         'sociality',
         'walkPreferred',
+        'weightKg',
       ].sort(),
     )
+  })
+})
+
+describe('toPetSavePayload — 체중', () => {
+  it('빈 체중을 null 로 보낸다 — 0 을 보내면 PET_108 이다', () => {
+    expect(toPetSavePayload(EMPTY_PET_FORM_VALUES).weightKg).toBeNull()
+  })
+
+  it('입력한 체중을 숫자로 보낸다', () => {
+    expect(toPetSavePayload({ ...EMPTY_PET_FORM_VALUES, weightKg: '3.5' }).weightKg).toBe(3.5)
   })
 })
 
@@ -135,6 +149,7 @@ describe('toPetFormValues', () => {
       breed: '말티즈',
       birthYm: '2017-05',
       sizeType: 'SMALL',
+      weightKg: 3.5,
       heatSensitive: true,
       coldSensitive: false,
       noiseSensitive: false,
@@ -142,6 +157,12 @@ describe('toPetFormValues', () => {
       walkPreferred: true,
       sociality: 'HIGH',
     })
+  })
+
+  it('체중이 없는 아이는 왕복해도 없는 채로 남는다 — 0 이 되지 않는다', () => {
+    const payload = toPetSavePayload(toPetFormValues({ ...pet, weightKg: null }))
+
+    expect(payload.weightKg).toBeNull()
   })
 
   it('서버가 모르는 enum code 를 내려주면 기본값으로 떨어진다', () => {

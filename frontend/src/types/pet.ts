@@ -22,12 +22,24 @@ export type Pet = {
   birthYm: string | null
   age: number | null
   sizeType: EnumMetadata
+  /**
+   * 체중(kg). **`null` 은 "모름" 이지 0 이 아니다** — 백엔드가 선택 필드로 받는다.
+   * 장소의 입장 체중 제한 판정(`GET /places` 의 `petWeightKg`)에 쓰인다.
+   */
+  weightKg: number | null
   heatSensitive: boolean
   coldSensitive: boolean
   noiseSensitive: boolean
   activityLevel: EnumMetadata
   walkPreferred: boolean
   sociality: EnumMetadata
+  /** MinIO 에 저장된 프로필 사진. 없으면 `null` → 이름 첫 글자 아바타로 떨어진다 */
+  profileImageUrl: string | null
+  /**
+   * 대표 반려견. **회원당 하나만 유지된다** — 지정하면 기존 대표가 자동 해제된다.
+   * AI 일정 생성에서 반려견을 지정하지 않으면 이 아이가 쓰인다.
+   */
+  representative: boolean
 }
 
 /** `GET /members/me/pets` — SliceResponse 가 아니다. 최대 5마리라 항상 전량이 온다 */
@@ -66,6 +78,8 @@ export type PetSavePayload = {
   breed: string | null
   birthYm: string | null
   sizeType: PetSizeCode
+  /** `0.1~99.9`, 소수점 한 자리. **모르면 `null`** (PET_108 / PET_109) */
+  weightKg: number | null
   heatSensitive: boolean
   coldSensitive: boolean
   noiseSensitive: boolean
@@ -86,6 +100,11 @@ export type PetFormValues = {
   breed: string
   birthYm: string
   sizeType: PetSizeCode
+  /**
+   * `<input>` 이 들고 있는 문자열이다. `number` 로 두면 "3." 처럼 입력 도중의 값을
+   * 표현할 수 없고, 빈 값과 `0` 이 구분되지 않는다 — 여기서는 그 둘이 다른 뜻이다.
+   */
+  weightKg: string
   heatSensitive: boolean
   coldSensitive: boolean
   noiseSensitive: boolean

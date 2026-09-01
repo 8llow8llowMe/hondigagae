@@ -9,6 +9,7 @@ import { ErrorState } from '@/components/error-state'
 import { Skeleton } from '@/components/skeleton'
 import { PetDeleteSection } from '@/features/pet/pet-delete-section'
 import { PetForm } from '@/features/pet/pet-form'
+import { PetPhotoSection } from '@/features/pet/pet-photo-section'
 import { PET_INVALIDATE_KEY } from '@/features/pet/queries'
 import { usePetDetail } from '@/features/pet/use-pet-detail'
 import { classify, toErrorStatus } from '@/lib/api/error'
@@ -46,29 +47,37 @@ export function PetEditView({ petId }: { petId: string }) {
   const pet = query.data
 
   return (
-    <PetForm
-      // 응답의 metadata 객체에서 code 를 꺼낸다. 이 변환을 놓치면 수정 저장이
-      // 조용히 깨진다 (공통명세 S3-5)
-      initialValues={toPetFormValues(pet)}
-      submitLabel={messages.pet.save}
-      footer={
-        <>
-          <PetDeleteSection petId={pet.petId} petName={pet.name} />
-          <Link
-            href="/pets"
-            // 44px — 모바일 최소 터치 영역 (DESIGN.md §7). 텍스트 크기는 그대로 두고
-            // 히트 영역만 키운다
-            className="text-body-2 text-fg-muted inline-flex h-11 items-center justify-center self-center underline"
-          >
-            {messages.pet.backToList}
-          </Link>
-        </>
-      }
-      onSave={(payload) => updatePet(pet.petId, payload)}
-      onSaved={() => {
-        void queryClient.invalidateQueries({ queryKey: PET_INVALIDATE_KEY })
-        router.replace('/pets')
-      }}
-    />
+    <>
+      {/*
+        폼 위에 둔다. 사진·대표는 **저장 버튼과 무관하게 즉시 반영**되는 영역이라
+        폼 안에 섞으면 어디까지가 "저장해야 반영" 인지 알 수 없다
+      */}
+      <PetPhotoSection pet={pet} />
+
+      <PetForm
+        // 응답의 metadata 객체에서 code 를 꺼낸다. 이 변환을 놓치면 수정 저장이
+        // 조용히 깨진다 (공통명세 S3-5)
+        initialValues={toPetFormValues(pet)}
+        submitLabel={messages.pet.save}
+        footer={
+          <>
+            <PetDeleteSection petId={pet.petId} petName={pet.name} />
+            <Link
+              href="/pets"
+              // 44px — 모바일 최소 터치 영역 (DESIGN.md §7). 텍스트 크기는 그대로 두고
+              // 히트 영역만 키운다
+              className="text-body-2 text-fg-muted inline-flex h-11 items-center justify-center self-center underline"
+            >
+              {messages.pet.backToList}
+            </Link>
+          </>
+        }
+        onSave={(payload) => updatePet(pet.petId, payload)}
+        onSaved={() => {
+          void queryClient.invalidateQueries({ queryKey: PET_INVALIDATE_KEY })
+          router.replace('/pets')
+        }}
+      />
+    </>
   )
 }

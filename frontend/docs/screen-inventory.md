@@ -79,8 +79,15 @@
   `contentType`(enum name — `TOURIST_SPOT` `CULTURE` `FESTIVAL` `COURSE` `LEPORTS` `LODGING` `SHOPPING` `RESTAURANT`),
   `petAllowanceType`(`ALLOWED` `PARTIALLY_ALLOWED` `NOT_ALLOWED` `UNKNOWN`),
   `indoor`(true 면 실내만), `allowedPetSize`(`ALL`/`SMALL_ONLY`/`SMALL_MEDIUM`/`UNKNOWN`),
+  `petWeightKg`(내 반려견 체중, **`Integer`**),
   `sourceCategory`(원본 분류 자유 문자열, 예: 카페), `lastPlaceId`(커서), `size`(1~50, 기본 20).
   **모두 단일값이며 배열이 아니다.**
+- **`petWeightKg` 는 `petSizeType` 과 한 컨트롤이 함께 켠다** (#126). 아트보드의
+  "몽실이가 들어갈 수 있는 곳만" 체크 하나가 두 파라미터를 같이 보낸다 — 같은 축이라
+  따로 켜면 판정이 반쪽이 된다. 체중을 모르는 아이는 크기만 보낸다.
+- **체중은 올려서 보낸다.** 파라미터가 `Integer` 인데 조건이
+  `maxPetWeightKg >= petWeightKg` 라, 3.5kg 를 내림해 `3` 으로 보내면 **상한 3kg 인 곳이
+  통과한다.** 계산은 `lib/pet/weight.ts` 의 `toPlaceFilterWeight` 한 곳이다.
 - **`indoor` 주의**: 원천에 정보가 없는 장소(`indoor: null`)는 true/false **어느 쪽 필터에도 잡히지 않는다.**
 - `PlaceItem` 에 `indoor` / `sourceCategory` / `sourceName`(출처 표시명) 필드가 있다.
 - `contentType` / `petAllowanceType` 은 **응답에서 metadata 객체**(`{code, name, description}`)로 온다 → 서버 문구를 그대로 렌더한다.

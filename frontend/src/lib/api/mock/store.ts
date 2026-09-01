@@ -36,12 +36,18 @@ export type MockPet = {
   breed: string | null
   birthYm: string | null
   sizeType: string
+  /** 선택 입력. `null` 은 "모름" 이다 */
+  weightKg: number | null
   heatSensitive: boolean
   coldSensitive: boolean
   noiseSensitive: boolean
   activityLevel: string
   walkPreferred: boolean
   sociality: string
+  /** MinIO 오브젝트 키가 아니라 응답에 실리는 URL 이다 */
+  profileImageUrl: string | null
+  /** **회원당 하나만 참이다** — 지정하면 기존 대표가 자동 해제된다 */
+  representative: boolean
   /** 백엔드가 소프트 삭제다 — 삭제 후에도 행이 남는다 */
   deleted: boolean
 }
@@ -344,12 +350,16 @@ function createStore(): MockStore {
         breed: '말티즈',
         birthYm: '2017-05',
         sizeType: 'SMALL',
+        weightKg: 3.5,
         heatSensitive: true,
         coldSensitive: false,
         noiseSensitive: true,
         activityLevel: 'MEDIUM',
         walkPreferred: true,
         sociality: 'HIGH',
+        profileImageUrl: null,
+        // 대표는 회원당 하나다 — 이 회원은 몽실이가 대표다
+        representative: true,
         deleted: false,
       },
       {
@@ -360,12 +370,16 @@ function createStore(): MockStore {
         breed: null,
         birthYm: null,
         sizeType: 'LARGE',
+        // 체중을 모르는 아이 — 필터가 이 아이를 기준으로는 좁히지 않아야 한다
+        weightKg: null,
         heatSensitive: false,
         coldSensitive: true,
         noiseSensitive: false,
         activityLevel: 'HIGH',
         walkPreferred: true,
         sociality: 'LOW',
+        profileImageUrl: null,
+        representative: false,
         deleted: false,
       },
       {
@@ -376,12 +390,15 @@ function createStore(): MockStore {
         breed: null,
         birthYm: null,
         sizeType: 'MEDIUM',
+        weightKg: 14,
         heatSensitive: false,
         coldSensitive: false,
         noiseSensitive: false,
         activityLevel: 'LOW',
         walkPreferred: false,
         sociality: 'MEDIUM',
+        profileImageUrl: null,
+        representative: true,
         deleted: false,
       },
     ],

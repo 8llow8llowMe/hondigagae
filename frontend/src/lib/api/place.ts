@@ -60,6 +60,7 @@ export function nearbyPlacesPath(
   if (filters.indoor !== null) params.set('indoor', String(filters.indoor))
   if (filters.allowedPetSize !== null) params.set('allowedPetSize', filters.allowedPetSize)
   if (filters.petSizeType !== null) params.set('petSizeType', filters.petSizeType)
+  if (filters.petWeightKg !== null) params.set('petWeightKg', String(filters.petWeightKg))
   if (filters.sourceCategory !== null) params.set('sourceCategory', filters.sourceCategory)
   params.set('size', String(size))
 

@@ -93,6 +93,7 @@ function toPetResponse(pet: MockPet): Pet {
     birthYm: pet.birthYm,
     age: toAge(pet.birthYm),
     sizeType: { code: pet.sizeType, name: size.name, description: size.description },
+    weightKg: pet.weightKg,
     heatSensitive: pet.heatSensitive,
     coldSensitive: pet.coldSensitive,
     noiseSensitive: pet.noiseSensitive,
@@ -107,6 +108,8 @@ function toPetResponse(pet: MockPet): Pet {
       name: social?.name ?? pet.sociality,
       description: social?.sociality ?? '',
     },
+    profileImageUrl: pet.profileImageUrl,
+    representative: pet.representative,
   }
 }
 
@@ -146,6 +149,28 @@ function validate(raw: unknown): MockResult | null {
     errors.push({ code: 'PET_103', field: 'breed', message: '품종은 50자 이하만 가능합니다.' })
   }
 
+  /*
+    @DecimalMin("0.1") · @DecimalMax("99.9") · @Digits(integer = 2, fraction = 1).
+    **선택 필드다** — 없거나 null 이면 통과한다. mock 이 여기서 더 엄격하면 FE 가
+    통과시키는 입력이 mock 에서만 400 이 되어 자기 판정을 부정한다.
+  */
+  if (record.weightKg !== undefined && record.weightKg !== null) {
+    const weight = record.weightKg
+    if (typeof weight !== 'number' || !Number.isFinite(weight) || weight < 0.1 || weight > 99.9) {
+      errors.push({
+        code: 'PET_108',
+        field: 'weightKg',
+        message: '체중은 0.1 ~ 99.9kg 범위여야 합니다.',
+      })
+    } else if (Math.round(weight * 10) !== weight * 10) {
+      errors.push({
+        code: 'PET_109',
+        field: 'weightKg',
+        message: '체중은 소수점 한 자리까지만 입력할 수 있습니다.',
+      })
+    }
+  }
+
   // @Pattern 은 null 을 유효로 보지만 빈 문자열은 정규식에 걸린다 — 공통명세 S3-3.
   // **이 분기를 느슨하게 만들면 mock 이 함정을 숨겨 FE 가 잘못된 확신을 얻는다**
   if (typeof record.birthYm === 'string' && !BIRTH_YM_PATTERN.test(record.birthYm)) {
@@ -174,12 +199,22 @@ function toBoolean(value: unknown): boolean {
   return value === true
 }
 
-function toStored(raw: Record<string, unknown>): Omit<MockPet, 'petId' | 'memberId' | 'deleted'> {
+/**
+ * 요청 본문 → 저장 값.
+ *
+ * **사진과 대표견은 여기서 다루지 않는다.** `PetSaveRequest` 에 없는 필드이고 각자
+ * 전용 엔드포인트를 갖는다 — PUT 이 통째로 덮어쓴다고 해서 사진까지 날아가면 안 된다.
+ */
+function toStored(
+  raw: Record<string, unknown>,
+): Omit<MockPet, 'petId' | 'memberId' | 'deleted' | 'profileImageUrl' | 'representative'> {
   return {
     name: String(raw.name),
     breed: typeof raw.breed === 'string' ? raw.breed : null,
     birthYm: typeof raw.birthYm === 'string' ? raw.birthYm : null,
     sizeType: String(raw.sizeType),
+    // 선택 필드다. 숫자가 아니면 "모름" 으로 둔다 — 0 으로 채우지 않는다
+    weightKg: typeof raw.weightKg === 'number' ? raw.weightKg : null,
     heatSensitive: toBoolean(raw.heatSensitive),
     coldSensitive: toBoolean(raw.coldSensitive),
     noiseSensitive: toBoolean(raw.noiseSensitive),
@@ -220,12 +255,15 @@ export function resolvePetMock(
     return null
   }
 
-  const petId = path.slice('/members/me/pets/'.length)
+  const rest = path.slice('/members/me/pets/'.length)
+  const [petId = '', sub] = rest.split('/')
 
   // 컨트롤러가 @PathVariable long 이라, 숫자가 아닌 id 는 404 가 아니라 400 이다 — S4-3
   if (!/^\d+$/.test(petId)) {
     return fail(400, 'PET_113', '요청 파라미터 형식이 올바르지 않습니다.')
   }
+
+  if (sub !== undefined) return resolvePetSubResource(petId, sub, method, memberId)
 
   const owned = store.pets.find(
     (pet) => pet.petId === petId && pet.memberId === memberId && !pet.deleted,
@@ -236,6 +274,59 @@ export function resolvePetMock(
   if (method === 'GET') return { status: 200, payload: ok(toPetResponse(owned)) }
   if (method === 'PUT') return update(owned, parsed)
   if (method === 'DELETE') return remove(owned)
+
+  return null
+}
+
+/**
+ * 하위 경로 — 대표견 지정 · 프로필 사진.
+ *
+ * 본체(`/members/me/pets/{petId}`)와 나눠 둔 이유: 사진 업로드는 **multipart** 라
+ * `body` 가 JSON 이 아니고, 위 흐름은 전부 JSON 파싱을 전제로 한다.
+ */
+function resolvePetSubResource(
+  petId: string,
+  sub: string,
+  method: string,
+  memberId: string,
+): MockResult | null {
+  const store = mockStore()
+  const owned = store.pets.find(
+    (pet) => pet.petId === petId && pet.memberId === memberId && !pet.deleted,
+  )
+  if (owned === undefined) return NOT_FOUND()
+
+  if (sub === 'representative' && method === 'PUT') {
+    // **회원당 하나만 유지된다.** 기존 대표를 먼저 내린다 (백엔드와 같은 규칙)
+    for (const pet of store.pets) {
+      if (pet.memberId === memberId) pet.representative = false
+    }
+    owned.representative = true
+
+    return { status: 200, payload: ok(toPetResponse(owned)) }
+  }
+
+  if (sub === 'profile-image') {
+    if (method === 'POST') {
+      // 실제 파일을 저장하지 않는다. 화면이 확인할 것은 "URL 이 생겼는가" 다
+      owned.profileImageUrl = `https://mock.hondigagae.local/pets/${petId}.jpg`
+
+      // **업로드 응답은 회원 쪽과 같은 모양이다** — 전체가 아니라 키와 URL 뿐이다
+      return {
+        status: 200,
+        payload: ok({
+          profileImageKey: `pets/${petId}.jpg`,
+          profileImageUrl: owned.profileImageUrl,
+        }),
+      }
+    }
+
+    if (method === 'DELETE') {
+      // 삭제 응답은 반려견 전체다 — 업로드와 모양이 다르다
+      owned.profileImageUrl = null
+      return { status: 200, payload: ok(toPetResponse(owned)) }
+    }
+  }
 
   return null
 }
@@ -276,6 +367,9 @@ function create(memberId: string, raw: unknown): MockResult {
     petId: nextPetId(store),
     memberId,
     ...toStored(raw as Record<string, unknown>),
+    profileImageUrl: null,
+    // 첫 아이는 자동으로 대표가 된다 (백엔드 PetCommandProcessor.register)
+    representative: count === 0,
     deleted: false,
   }
   store.pets.push(stored)
