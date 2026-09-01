@@ -1,6 +1,5 @@
 package com.hondigagae.domainlayer.place.adapter.in.web.presenter;
 
-import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.NearbyPlaceItem;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlaceImageItem;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlaceIntroItem;
@@ -54,7 +53,7 @@ public class PlacePresenter {
         return PlaceDetailResponse.builder()
             .placeId(String.valueOf(place.id()))
             .contentId(toStringOrNull(place.contentId()))
-            .contentType(toContentTypeMetadata(ContentType.fromCode(place.contentTypeId())))
+            .contentType(ContentType.fromCode(place.contentTypeId()).toMetadata())
             .title(place.title())
             .addr1(place.addr1())
             .addr2(place.addr2())
@@ -69,7 +68,7 @@ public class PlacePresenter {
             .overview(place.overview())
             .petAvailable(place.petAvailable())
             .delisted(place.delistedAt() != null)
-            .petAllowanceType(toPetAllowanceMetadata(place.petAllowanceType()))
+            .petAllowanceType(place.petAllowanceType().toMetadata())
             .indoor(place.indoor())
             .sourceCategory(place.sourceCategory())
             .sourceName(place.source() == null ? null : place.source().getDisplayName())
@@ -82,7 +81,7 @@ public class PlacePresenter {
     private PlaceItem toItem(PlaceSummaryInfo info) {
         return PlaceItem.builder()
             .placeId(String.valueOf(info.placeId()))
-            .contentType(toContentTypeMetadata(info.contentType()))
+            .contentType(info.contentType().toMetadata())
             .title(info.title())
             .addr1(info.addr1())
             .sigunguCode(info.sigunguCode())
@@ -90,7 +89,7 @@ public class PlacePresenter {
             .lng(toDouble(info.lng()))
             .firstImage(info.firstImage())
             .firstImage2(info.firstImage2())
-            .petAllowanceType(toPetAllowanceMetadata(info.petAllowanceType()))
+            .petAllowanceType(info.petAllowanceType().toMetadata())
             .allowedPetSize(info.allowedPetSize() == null ? null : info.allowedPetSize().toMetadata())
             .maxPetWeightKg(info.maxPetWeightKg())
             .tel(info.tel())
@@ -129,10 +128,8 @@ public class PlacePresenter {
             .relaPosesFclty(petInfo.relaPosesFclty())
             .relaPurcPrdlst(petInfo.relaPurcPrdlst())
             .relaRntlPrdlst(petInfo.relaRntlPrdlst())
-            .allowanceScope(CodeNameDescriptionMetadata.of(
-                petInfo.allowanceScope().name(), petInfo.allowanceScope().getDisplayName(), petInfo.allowanceScope().getDescription()))
-            .allowedPetSize(CodeNameDescriptionMetadata.of(
-                petInfo.allowedPetSize().name(), petInfo.allowedPetSize().getDisplayName(), petInfo.allowedPetSize().getDescription()))
+            .allowanceScope(petInfo.allowanceScope().toMetadata())
+            .allowedPetSize(petInfo.allowedPetSize().toMetadata())
             .leashRequired(petInfo.leashRequired())
             .build();
     }
@@ -146,14 +143,6 @@ public class PlacePresenter {
                 .cpyrhtDivCd(image.cpyrhtDivCd())
                 .build())
             .toList();
-    }
-
-    private CodeNameDescriptionMetadata toContentTypeMetadata(ContentType contentType) {
-        return CodeNameDescriptionMetadata.of(contentType.name(), contentType.getDisplayName(), contentType.getDescription());
-    }
-
-    private CodeNameDescriptionMetadata toPetAllowanceMetadata(PetAllowanceType petAllowanceType) {
-        return CodeNameDescriptionMetadata.of(petAllowanceType.name(), petAllowanceType.getDisplayName(), petAllowanceType.getDescription());
     }
 
     private Double toDouble(BigDecimal value) {
