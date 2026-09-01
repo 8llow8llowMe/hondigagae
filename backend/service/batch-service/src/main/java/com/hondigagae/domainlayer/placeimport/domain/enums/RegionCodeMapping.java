@@ -18,6 +18,16 @@ public final class RegionCodeMapping {
         "제주특별자치도", "39"
     );
 
+    /**
+     * 원천이 쓰는 짧은 지역명 → 시도 명칭.
+     *
+     * <p>식약처 원천은 "제주"처럼 줄여 쓴다. 이 매핑이 어댑터 안에 사본으로 있으면 지역이
+     * 늘어날 때 한쪽만 고치게 되므로 지역 지식은 여기 한곳에 모은다.
+     */
+    private static final Map<String, String> SHORT_NAME_TO_SIDO = Map.of(
+        "제주", "제주특별자치도"
+    );
+
     /** 관광 API sigunguCode. 제주 기준 제주시=4, 서귀포시=3 */
     private static final Map<String, String> SIGUNGU_TO_CODE = Map.of(
         "제주시", "4",
@@ -25,6 +35,11 @@ public final class RegionCodeMapping {
     );
 
     private RegionCodeMapping() {
+    }
+
+    /** 짧은 지역명("제주")을 시도 명칭으로 편다. 모르는 이름이면 null 이다. */
+    public static String toSidoName(String shortRegionName) {
+        return shortRegionName == null ? null : SHORT_NAME_TO_SIDO.get(shortRegionName.trim());
     }
 
     public static String toAreaCode(String sidoName) {

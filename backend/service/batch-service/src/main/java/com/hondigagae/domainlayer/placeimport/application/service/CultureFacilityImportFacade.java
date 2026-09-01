@@ -5,7 +5,10 @@ import com.hondigagae.domainlayer.placeimport.application.service.processor.Deli
 import com.hondigagae.domainlayer.placeimport.application.service.processor.EmergencyFacilityImportProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.CultureFacilityImportProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PlaceMergeProcessor;
+import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportErrorCode;
+import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportException;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
+import com.hondigagae.domainlayer.placeimport.domain.enums.RegionCodeMapping;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,9 +27,6 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class CultureFacilityImportFacade implements CultureFacilityImportUseCase {
 
-    /** 병합 판정 범위. 적재 대상과 같은 지역만 본다. */
-    private static final String JEJU_AREA_CODE = "39";
-
     private final CultureFacilityImportProcessor cultureFacilityImportProcessor;
     private final EmergencyFacilityImportProcessor emergencyFacilityImportProcessor;
     private final PlaceMergeProcessor placeMergeProcessor;
@@ -34,13 +34,34 @@ public class CultureFacilityImportFacade implements CultureFacilityImportUseCase
 
     @Override
     public int importFacilities(String sido) {
+        // 병합 범위는 적재 범위와 반드시 같아야 한다. 예전에는 제주 코드를 상수로 박아 둬서,
+        // 다른 시도로 잡을 돌리면 그 지역을 적재해 놓고 제주만 병합하는 조용한 어긋남이 났다.
+        String areaCode = resolveAreaCode(sido);
+
         LocalDateTime runStartedAt = LocalDateTime.now();
         int imported = cultureFacilityImportProcessor.importFacilities(sido);
         delistProcessor.delistPlaces(PlaceSourceType.CULTURE_PORTAL, runStartedAt, imported);
-        placeMergeProcessor.mergeDuplicates(JEJU_AREA_CODE);
+        placeMergeProcessor.mergeDuplicates(areaCode);
         // 같은 파일에 동물병원·동물약국이 함께 들어 있어 한 번 읽는 김에 같이 적재한다.
         int facilities = emergencyFacilityImportProcessor.importFacilities(sido);
         delistProcessor.delistEmergencyFacilities(runStartedAt, facilities);
         return imported;
+    }
+
+    /**
+     * 시도 명칭을 관광 지역코드로 옮긴다. 원천은 명칭으로 주고 place 테이블은 코드 체계라
+     * 여기서 맞춰야 한다.
+     *
+     * <p>매핑에 없는 시도면 <b>적재를 시작하기 전에 실패시킨다.</b> 그대로 진행하면 병합
+     * 범위가 비어 중복이 남거나, 예전처럼 엉뚱한 지역을 병합하게 된다.
+     * 지금 채워진 것은 제주뿐이다 - 검증되지 않은 전국 매핑을 미리 넣지 않는다는 방침이다
+     * ({@link RegionCodeMapping}).
+     */
+    private String resolveAreaCode(String sido) {
+        String areaCode = RegionCodeMapping.toAreaCode(sido);
+        if (areaCode == null) {
+            throw new PlaceImportException(PlaceImportErrorCode.REGION_NOT_SUPPORTED, sido);
+        }
+        return areaCode;
     }
 }
