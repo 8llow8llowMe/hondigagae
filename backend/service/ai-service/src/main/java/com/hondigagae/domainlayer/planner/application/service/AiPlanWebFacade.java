@@ -6,11 +6,10 @@ import com.hondigagae.domainlayer.planner.adapter.in.web.presenter.AiPlanPresent
 import com.hondigagae.domainlayer.planner.application.command.AiPlanCreateCommand;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanJobInfo;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanSubmissionInfo;
-import com.hondigagae.domainlayer.planner.application.info.AiPlanJobInfo;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanJobSubscription;
 import com.hondigagae.domainlayer.planner.application.port.in.AiPlanWebUseCase;
-import java.util.function.Consumer;
 import com.hondigagae.domainlayer.planner.application.service.processor.AiPlanJobProcessor;
+import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

@@ -5,6 +5,7 @@ import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import java.time.LocalDate;
+import java.util.List;
 import java.time.temporal.ChronoUnit;
 import org.springframework.stereotype.Component;
 
@@ -110,7 +111,7 @@ public class AiPlanPromptFactory {
      * 특성 없이 "반려견 기준으로 짜라"고만 하면 모델은 일반적인 강아지를 상상한다.
      * 특성이 없으면(조회 실패/프로필 부재) 절 자체를 생략한다 — 없는 값을 지어 적지 않는다.
      */
-    private void appendPetSection(StringBuilder prompt, java.util.List<PetCondition> pets) {
+    private void appendPetSection(StringBuilder prompt, List<PetCondition> pets) {
         if (pets == null || pets.isEmpty()) {
             return;
         }

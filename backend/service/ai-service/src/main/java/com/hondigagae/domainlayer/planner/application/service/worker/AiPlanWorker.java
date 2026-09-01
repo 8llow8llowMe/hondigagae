@@ -2,7 +2,6 @@ package com.hondigagae.domainlayer.planner.application.service.worker;
 
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
-import com.hondigagae.domainlayer.planner.application.info.AiPlanDraftInfo;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
@@ -67,11 +66,11 @@ public class AiPlanWorker {
         }
 
         try {
-            // LLM 포트는 domain model을 준다. 저장·응답에 쓰는 Info 변환은 이 계층에서 수행한다.
+            // LLM 포트는 domain model을 주고, 잡에도 domain 그대로 저장한다. Info 변환은 응답 조립 시점(Processor)에 한다.
             AiPlanDraft draft = aiLlmPort.generatePlanDraft(toQuery(running.requestParams(), running.memberId()));
             log.info("AI plan draft generated jobId={} days={}", running.jobId(),
                 draft.days() == null ? 0 : draft.days().size());
-            aiPlanJobStorePort.save(running.completedWithDraft(AiPlanDraftInfo.from(draft), Instant.now()));
+            aiPlanJobStorePort.save(running.completedWithDraft(draft, Instant.now()));
         } catch (AiPlanException domainException) {
             log.error("AI plan job failed jobId={} memberId={} errorCode={} cause={}",
                 running.jobId(), running.memberId(),
@@ -211,6 +210,12 @@ public class AiPlanWorker {
         return favoritePlaceIdsQueryPort.findFavoritePlaceIds(memberId);
     }
 
+    /**
+     * 후보 장소를 가져온다. <b>필요하다고 선언한 구현일 때만</b> 부른다.
+     *
+     * <p>스텁은 후보를 쓰지 않으므로 부르지 않는다. 무조건 불러 두면 키 없이 띄운 로컬에서
+     * tour-service 까지 함께 떠 있어야 일정 생성이 도는 셈이 되어, 스텁을 남겨 둔 이유가 사라진다.
+     */
     private List<PlaceCandidate> loadCandidates(String areaCode, List<Long> pinnedPlaceIds, List<Long> favoritePlaceIds) {
         if (!aiLlmPort.requiresPlaceCandidates()) {
             return List.of();

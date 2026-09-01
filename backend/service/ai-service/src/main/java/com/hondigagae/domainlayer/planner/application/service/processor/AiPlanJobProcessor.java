@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.planner.application.service.processor;
 import com.hondigagae.domainlayer.planner.application.command.AiPlanCreateCommand;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
+import com.hondigagae.domainlayer.planner.application.info.AiPlanDraftInfo;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanJobInfo;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanSubmissionInfo;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanJobSubscription;
@@ -19,6 +20,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.function.Consumer;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.stream.Collectors;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -99,7 +104,8 @@ public class AiPlanJobProcessor {
         return AiPlanJobInfo.builder()
             .jobId(effectiveJob.jobId())
             .status(effectiveJob.status())
-            .planDraft(effectiveJob.status() == AiPlanJobStatus.COMPLETED ? effectiveJob.planDraft() : null)
+            .planDraft(effectiveJob.status() == AiPlanJobStatus.COMPLETED
+                ? AiPlanDraftInfo.from(effectiveJob.planDraft()) : null)
             .errorCode(effectiveJob.errorCode())
             .errorMessage(effectiveJob.errorMessage())
             .build();
@@ -136,7 +142,7 @@ public class AiPlanJobProcessor {
      * 잡 상태 변경 구독. 이벤트 수신 시마다 저장소에서 최신 상태를 다시 읽어 전달하므로
      * pub/sub 메시지 자체에는 상태를 싣지 않는다(발행-저장 순서 역전, 스키마 드리프트 방지).
      */
-    public AiPlanJobSubscription subscribeJobUpdates(String jobId, long memberId, java.util.function.Consumer<com.hondigagae.domainlayer.planner.application.info.AiPlanJobInfo> onUpdate) {
+    public AiPlanJobSubscription subscribeJobUpdates(String jobId, long memberId, Consumer<AiPlanJobInfo> onUpdate) {
         return aiPlanJobEventPort.subscribe(jobId, () -> {
             try {
                 onUpdate.accept(getJobInfo(jobId, memberId));
@@ -174,15 +180,15 @@ public class AiPlanJobProcessor {
         if (command.planId() == null || command.regenerateDay() == null) {
             throw new AiPlanException(AiPlanErrorCode.REGENERATE_REQUEST_INVALID);
         }
-        long dayCount = java.time.temporal.ChronoUnit.DAYS.between(command.startDate(), command.endDate()) + 1;
+        long dayCount = ChronoUnit.DAYS.between(command.startDate(), command.endDate()) + 1;
         if (command.regenerateDay() > dayCount) {
             throw new AiPlanException(AiPlanErrorCode.REGENERATE_DAY_OUT_OF_RANGE);
         }
     }
 
-    private String joinIds(java.util.List<Long> ids) {
+    private String joinIds(List<Long> ids) {
         return ids == null ? "" : ids.stream()
-            .map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+            .map(String::valueOf).collect(Collectors.joining(","));
     }
 
     private boolean isQueueFull(RuntimeException dispatchFailure) {

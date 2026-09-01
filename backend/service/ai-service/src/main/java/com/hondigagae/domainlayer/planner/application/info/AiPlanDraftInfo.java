@@ -7,8 +7,8 @@ import lombok.Builder;
 /**
  * AI가 생성한 여행 일정 초안의 application 표현.
  *
- * <p>{@link AiPlanDraft}(domain model)를 Presenter가 쓰기 좋은 모양으로 옮긴 것이며,
- * {@code AiPlanJob}의 필드로 Redis에 함께 저장된다.
+ * <p>{@link AiPlanDraft}(domain model)를 Presenter가 쓰기 좋은 모양으로 옮긴 것이다.
+ * 저장(Redis)은 domain 초안이 그대로 담기고, 이 표현은 응답 조립 시점에만 만든다.
  */
 @Builder
 public record AiPlanDraftInfo(

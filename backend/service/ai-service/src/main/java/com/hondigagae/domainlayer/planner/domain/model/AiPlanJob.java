@@ -1,6 +1,5 @@
 package com.hondigagae.domainlayer.planner.domain.model;
 
-import com.hondigagae.domainlayer.planner.application.info.AiPlanDraftInfo;
 import java.time.Instant;
 import java.util.Map;
 import lombok.Builder;
@@ -17,7 +16,8 @@ public record AiPlanJob(
     Instant createdAt,
     Instant startedAt,
     Instant completedAt,
-    AiPlanDraftInfo planDraft
+    // domain 초안을 그대로 담는다 — Info 를 여기 두면 out-port(Redis 저장)까지 application 표현이 샌다.
+    AiPlanDraft planDraft
 ) {
 
     public AiPlanJob withStatus(AiPlanJobStatus next, Instant now) {
@@ -28,7 +28,7 @@ public record AiPlanJob(
             .build();
     }
 
-    public AiPlanJob completedWithDraft(AiPlanDraftInfo draft, Instant now) {
+    public AiPlanJob completedWithDraft(AiPlanDraft draft, Instant now) {
         return toBuilder()
             .status(AiPlanJobStatus.COMPLETED)
             .errorCode(null)
