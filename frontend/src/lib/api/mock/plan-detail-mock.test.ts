@@ -360,3 +360,120 @@ describe('일자별 항목 일괄 교체 mock', () => {
     expect(call(`/plans/${PLAN}/days/1/items`, 'PUT', { items: [] }, null)?.status).toBe(401)
   })
 })
+
+/**
+ * 항목 방문 체크 — 이슈 #124.
+ *
+ * **계약의 핵심은 마지막 케이스다**: 일자 항목을 일괄 교체하면 그 날의 체크가 초기화된다.
+ * mock 이 체크를 이어받으면 화면이 경고 문구로 말하는 사실을 로컬에서 검증할 수 없다.
+ */
+describe('일정 상세 mock — 항목 방문 체크 (#124)', () => {
+  beforeEach(resetMockStore)
+
+  /** 1일차 첫 항목. 시드에서 `visited: true` 로 시작한다 */
+  const VISITED_ITEM = '323456789012000001'
+  /** 1일차 세 번째 항목(숙소). 시드에서 꺼진 상태다 */
+  const UNVISITED_ITEM = '323456789012000003'
+
+  function visit(planItemId: string, visited: boolean, planId = PLAN) {
+    return call(`/plans/${planId}/items/${planItemId}/visited`, 'PUT', { visited })
+  }
+
+  function itemOf(planId: string, planItemId: string) {
+    return detailOf(planId).items.find((item) => item.planItemId === planItemId)
+  }
+
+  it('상세 응답이 visited 를 함께 준다 — 시드가 켠 항목과 끈 항목을 둘 다 낸다', () => {
+    expect(itemOf(PLAN, VISITED_ITEM)?.visited).toBe(true)
+    expect(itemOf(PLAN, UNVISITED_ITEM)?.visited).toBe(false)
+  })
+
+  it('체크하면 상세에 반영된다', () => {
+    expect(visit(UNVISITED_ITEM, true)?.status).toBe(200)
+    expect(itemOf(PLAN, UNVISITED_ITEM)?.visited).toBe(true)
+  })
+
+  it('해제도 같은 API 다 — visited=false 를 보낸다', () => {
+    expect(visit(VISITED_ITEM, false)?.status).toBe(200)
+    expect(itemOf(PLAN, VISITED_ITEM)?.visited).toBe(false)
+  })
+
+  it('응답이 Response<Void> 다 — dataBody 가 null 이다', () => {
+    const result = visit(UNVISITED_ITEM, true)
+
+    expect(result?.payload.dataHeader.success).toBe(true)
+    expect(result?.payload.dataBody).toBeNull()
+  })
+
+  it('visited 가 빠지면 400 PLAN_100 이다 — @NotNull Boolean 이다', () => {
+    const result = call(`/plans/${PLAN}/items/${UNVISITED_ITEM}/visited`, 'PUT', {})
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_100')
+  })
+
+  it('없는 항목은 404 PLAN_005 다', () => {
+    const result = visit('323456789012999999', true)
+
+    expect(result?.status).toBe(404)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_005')
+  })
+
+  it('다른 일정의 항목을 내 planId 로 체크할 수 없다 — 404 PLAN_005 다', () => {
+    // 소유권은 일정 기준으로 보고, 항목이 그 일정의 것인지 다시 확인한다
+    const result = visit(VISITED_ITEM, true, ORPHAN_PLAN)
+
+    expect(result?.status).toBe(404)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_005')
+  })
+
+  it('숫자가 아닌 planItemId 는 404 가 아니라 400 PLAN_114 다', () => {
+    const result = visit('abc', true)
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_114')
+  })
+
+  it('남의 일정 항목은 404 PLAN_001 이다 — 일정 판정이 먼저다', () => {
+    const result = visit(VISITED_ITEM, true, OTHERS)
+
+    expect(result?.status).toBe(404)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_001')
+  })
+
+  it('토큰이 없으면 401 이다', () => {
+    const result = call(
+      `/plans/${PLAN}/items/${VISITED_ITEM}/visited`,
+      'PUT',
+      { visited: true },
+      null,
+    )
+
+    expect(result?.status).toBe(401)
+  })
+
+  it('일괄 교체하면 그 날의 체크가 초기화된다 — 항목이 새로 발급되기 때문이다', () => {
+    expect(itemOf(PLAN, VISITED_ITEM)?.visited).toBe(true)
+
+    // 1일차를 항목 하나로 교체한다. 새 planItemId 가 발급된다
+    const replaced = call(`/plans/${PLAN}/days/1/items`, 'PUT', {
+      items: [
+        { day: 1, sequence: 0, itemType: 'PLACE', targetId: '212481712381923328', title: '미술관' },
+      ],
+    })
+    expect(replaced?.status).toBe(200)
+
+    const dayOne = detailOf(PLAN).items.filter((item) => item.day === 1)
+
+    expect(dayOne).toHaveLength(1)
+    // 낡은 id 는 사라졌고, 새 항목은 꺼진 상태다
+    expect(itemOf(PLAN, VISITED_ITEM)).toBeUndefined()
+    expect(dayOne[0]?.visited).toBe(false)
+  })
+
+  it('교체 뒤 낡은 planItemId 로 체크하면 404 PLAN_005 다 — 재시도로 풀리지 않는 실패다', () => {
+    call(`/plans/${PLAN}/days/1/items`, 'PUT', { items: [] })
+
+    expect(visit(VISITED_ITEM, true)?.status).toBe(404)
+  })
+})

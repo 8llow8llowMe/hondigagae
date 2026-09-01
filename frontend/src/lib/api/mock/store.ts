@@ -75,6 +75,11 @@ export type MockPlanItem = {
   memo: string | null
   /** `HH:mm:ss` */
   startTime: string | null
+  /**
+   * 방문 체크 (#124). **일괄 교체로 만들어진 항목은 항상 `false` 다** — 백엔드가 새
+   * 항목을 발급하므로 그 날의 체크가 초기화된다 (`PlanItemEntity.visited` 기본값).
+   */
+  visited: boolean
 }
 
 /**
@@ -434,6 +439,8 @@ function createStore(): MockStore {
              장소다. 상세 응답의 `place` 가 null 로 오는 갈래(#86·#115)와, 그 일자를
              저장하면 PLAN_004 로 막히는 편집모드 안내(E1)를 로컬에서 볼 수 있다
            - 3일차: 항목 0개 (빈 일자 안내)
+           - **1일차 앞 두 항목은 `visited: true`** (#124) — 체크된 행의 모양과, 그 일자에
+             초기화 경고가 뜨는 조건(체크된 항목이 있을 때만)을 로컬에서 볼 수 있다
         */
         items: [
           {
@@ -445,6 +452,7 @@ function createStore(): MockStore {
             title: '제주특별자치도립김창열미술관',
             memo: '실내라 비가 와도 괜찮아요',
             startTime: '10:00:00',
+            visited: true,
           },
           {
             planItemId: '323456789012000002',
@@ -455,6 +463,7 @@ function createStore(): MockStore {
             title: '동문재래시장',
             memo: null,
             startTime: '12:30:00',
+            visited: true,
           },
           {
             planItemId: '323456789012000003',
@@ -465,6 +474,7 @@ function createStore(): MockStore {
             title: '애월 반려견 동반 독채 펜션 하나로',
             memo: null,
             startTime: '17:00:00',
+            visited: false,
           },
           {
             planItemId: '323456789012000004',
@@ -475,6 +485,7 @@ function createStore(): MockStore {
             title: '가세오름',
             memo: null,
             startTime: null,
+            visited: false,
           },
           {
             planItemId: '323456789012000005',
@@ -485,6 +496,7 @@ function createStore(): MockStore {
             title: '오설록 티뮤지엄 카페',
             memo: null,
             startTime: null,
+            visited: false,
           },
           {
             // WALK 는 walk_course.id 다. 장소를 가리키지 않아 place 가 null 이다
@@ -496,6 +508,7 @@ function createStore(): MockStore {
             title: '오설록 주변 산책',
             memo: null,
             startTime: null,
+            visited: false,
           },
           {
             /*
@@ -511,6 +524,7 @@ function createStore(): MockStore {
             title: '사라진 전시관',
             memo: null,
             startTime: null,
+            visited: false,
           },
         ],
       },
@@ -540,6 +554,7 @@ function createStore(): MockStore {
             title: '함덕 서우봉 해변',
             memo: null,
             startTime: null,
+            visited: false,
           },
           {
             planItemId: '323456789012000008',
@@ -550,6 +565,7 @@ function createStore(): MockStore {
             title: '동문재래시장',
             memo: null,
             startTime: null,
+            visited: false,
           },
           {
             planItemId: '323456789012000009',
@@ -560,6 +576,7 @@ function createStore(): MockStore {
             title: '제주현대미술관',
             memo: null,
             startTime: null,
+            visited: false,
           },
           {
             planItemId: '323456789012000010',
@@ -570,6 +587,7 @@ function createStore(): MockStore {
             title: '제주 곶자왈 반려견 산책 트레킹 코스',
             memo: null,
             startTime: null,
+            visited: false,
           },
         ],
       },

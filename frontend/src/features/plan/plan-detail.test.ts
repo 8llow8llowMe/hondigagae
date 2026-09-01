@@ -9,7 +9,14 @@ import { PlanItemRow } from '@/features/plan/plan-item-row'
 import { PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
 import { LONG_TRIP_THRESHOLD_M } from '@/lib/geo/distance'
 import { messages } from '@/lib/messages'
-import { pet, planDayAdd, planDetail, planItem, planVerdict } from '@/test/fixtures/plan'
+import {
+  pet,
+  planDayAdd,
+  planDayVisit,
+  planDetail,
+  planItem,
+  planVerdict,
+} from '@/test/fixtures/plan'
 import type { PlaceDetail } from '@/types/place'
 import type { PlanDayWeatherItem } from '@/types/plan'
 
@@ -92,6 +99,7 @@ function renderDaySection(overrides = {}) {
       onStartEdit: () => undefined,
       editor: null,
       add: planDayAdd,
+      visit: planDayVisit,
       ...overrides,
     }),
   )

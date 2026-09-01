@@ -28,6 +28,7 @@ function item(overrides: Partial<PlanItemDetail> & { day: number; sequence: numb
     title: '어딘가',
     memo: null,
     startTime: null,
+    visited: false,
     place: null,
     ...overrides,
     itemType: overrides.itemType ?? { code: type, name: type, description: '' },

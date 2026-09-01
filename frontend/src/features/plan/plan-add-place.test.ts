@@ -8,7 +8,13 @@ import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { PlanIndoorAlternatives } from '@/features/plan/plan-indoor-alts'
 import { messages } from '@/lib/messages'
 import { placeDetail, placeSummary } from '@/test/fixtures/place'
-import { planAlternative, planDayAdd, planDetail, planVerdict } from '@/test/fixtures/plan'
+import {
+  planAlternative,
+  planDayAdd,
+  planDayVisit,
+  planDetail,
+  planVerdict,
+} from '@/test/fixtures/plan'
 import type { PlaceDetail } from '@/types/place'
 
 /** 명세: docs/features/plan/일자편집-세부명세.md F절 (이슈 #82) */
@@ -176,6 +182,7 @@ describe('PlanDaySection — 장소 추가 진입', () => {
         onStartEdit: () => undefined,
         editor: null,
         add: planDayAdd,
+        visit: planDayVisit,
         ...overrides,
       }),
     )

@@ -6,7 +6,7 @@ import { Button, ButtonLink } from '@/components/button'
 import { RowList } from '@/components/surface'
 import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
 import { PlanIndoorAlternatives } from '@/features/plan/plan-indoor-alts'
-import { PlanItemRow } from '@/features/plan/plan-item-row'
+import { PlanItemRow, type PlanItemVisit } from '@/features/plan/plan-item-row'
 import { messages } from '@/lib/messages'
 import { weekdayOf } from '@/lib/plan/date'
 import type { PlanItemRowModel } from '@/lib/plan/detail'
@@ -37,6 +37,16 @@ export type PlanDayAdd = {
   onAdd: (alternative: PlanAlternativePlaceItem) => void
 }
 
+/**
+ * 이 일자의 방문 체크 한 묶음 — 이슈 #124.
+ *
+ * 훅은 화면 전체에 하나뿐이므로 **항목 단위로 좁혀서 행에 내려 준다** — 좁히지 않으면
+ * 한 항목에서 난 실패가 모든 행에 뜬다 (담기와 같은 판단).
+ */
+export type PlanDayVisit = {
+  visitOf: (planItemId: string) => PlanItemVisit
+}
+
 /** 좌측 목차의 앵커 대상. 목차와 제목이 같은 규칙으로 id 를 만들어야 링크가 맞는다 */
 export function planDayAnchorId(day: number): string {
   return `day${day}`
@@ -63,6 +73,7 @@ export function PlanDaySection({
   onStartEdit,
   editor,
   add,
+  visit,
 }: {
   day: number
   /** `YYYY-MM-DD`. 서버 판정의 날짜가 아니라 일정 기간에서 계산한 값이다 */
@@ -80,9 +91,17 @@ export function PlanDaySection({
   /** 편집 중일 때 항목 목록 자리에 들어간다 */
   editor: ReactNode
   add: PlanDayAdd
+  visit: PlanDayVisit
 }) {
   const anchorId = planDayAnchorId(day)
   const weekday = date === null ? null : weekdayOf(date)
+
+  /*
+    **체크된 항목이 있을 때만 초기화 경고를 낸다** (#124). 일괄 교체가 그 날의 체크를
+    지우는 것은 계약이지만(백엔드 스키마 설명 · screen-inventory §4), 잃을 것이 없는
+    날에도 띄우면 경고가 배경음이 되어 정작 잃을 날에 읽히지 않는다.
+  */
+  const hasVisited = rows.some((row) => row.item.visited)
 
   return (
     <section aria-labelledby={anchorId} className="px-4 md:px-10">
@@ -117,6 +136,17 @@ export function PlanDaySection({
         )}
       </div>
 
+      {/*
+        일괄 교체 모델과 부딪히는 지점을 화면이 먼저 말한다 (#124). 편집·담기 두 진입점이
+        모두 이 줄 위의 버튼에서 시작하므로 경고를 그 아래 한 번만 둔다.
+        **편집 중에는 감춘다** — 그때는 편집기 자체가 저장 지점을 들고 있다.
+      */}
+      {!editing && hasVisited && (
+        <p className="text-caption text-fg-muted mt-2 font-medium">
+          {messages.plan.visitResetNotice}
+        </p>
+      )}
+
       <PlanDayVerdict
         verdict={verdict}
         petConditionApplied={petConditionApplied}
@@ -134,7 +164,12 @@ export function PlanDaySection({
       ) : (
         <RowList className="border-border -mx-4 border-t md:-mx-10">
           {rows.map((row, index) => (
-            <PlanItemRow key={row.item.planItemId} model={row} last={index === rows.length - 1} />
+            <PlanItemRow
+              key={row.item.planItemId}
+              model={row}
+              last={index === rows.length - 1}
+              visit={visit.visitOf(row.item.planItemId)}
+            />
           ))}
         </RowList>
       )}
