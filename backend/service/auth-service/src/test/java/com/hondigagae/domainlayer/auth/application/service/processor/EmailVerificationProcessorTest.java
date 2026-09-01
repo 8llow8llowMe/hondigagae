@@ -97,6 +97,46 @@ class EmailVerificationProcessorTest {
             .isEqualTo(AuthErrorCode.EMAIL_CODE_COOLDOWN);
     }
 
+    @Test
+    void verifyCode_fifthMismatch_invalidatesCode() {
+        storePort.saveCode("user@example.com", "12345678", Duration.ofMinutes(5));
+
+        // 4번째까지는 오입력 응답, 5번째에 코드가 무효화된다 — 재설정과 같은 상한
+        for (int attempt = 0; attempt < 4; attempt++) {
+            assertThatThrownBy(() -> processor.verifyCode("user@example.com", "wrong"))
+                .isInstanceOf(AuthException.class)
+                .extracting(exception -> ((AuthException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.INVALID_EMAIL_CODE);
+        }
+        assertThatThrownBy(() -> processor.verifyCode("user@example.com", "wrong"))
+            .isInstanceOf(AuthException.class)
+            .extracting(exception -> ((AuthException) exception).getErrorCode())
+            .isEqualTo(AuthErrorCode.EMAIL_CODE_ATTEMPTS_EXCEEDED);
+
+        // 코드가 무효화됐으므로 정답을 넣어도 만료로 응답한다
+        assertThatThrownBy(() -> processor.verifyCode("user@example.com", "12345678"))
+            .isInstanceOf(AuthException.class)
+            .extracting(exception -> ((AuthException) exception).getErrorCode())
+            .isEqualTo(AuthErrorCode.EXPIRED_EMAIL_CODE);
+    }
+
+    @Test
+    void verifyCode_successAfterFailures_clearsCounter() {
+        storePort.saveCode("user@example.com", "12345678", Duration.ofMinutes(5));
+        assertThatThrownBy(() -> processor.verifyCode("user@example.com", "wrong"))
+            .isInstanceOf(AuthException.class);
+
+        // 상한 전에 성공하면 카운터가 초기화된다
+        processor.verifyCode("user@example.com", "12345678");
+        storePort.saveCode("user@example.com", "87654321", Duration.ofMinutes(5));
+        for (int attempt = 0; attempt < 4; attempt++) {
+            assertThatThrownBy(() -> processor.verifyCode("user@example.com", "wrong"))
+                .isInstanceOf(AuthException.class)
+                .extracting(exception -> ((AuthException) exception).getErrorCode())
+                .isEqualTo(AuthErrorCode.INVALID_EMAIL_CODE);
+        }
+    }
+
     private static class StubEmailVerificationStorePort implements EmailVerificationStorePort {
 
         private final Map<String, String> codes = new HashMap<>();
@@ -144,6 +184,18 @@ class EmailVerificationProcessorTest {
             }
             return ipCounts.merge(clientIp, 1L, Long::sum);
         }
+
+        @Override
+        public long increaseVerifyFailureCount(String email, Duration ttl) {
+            return failCounts.merge(email, 1L, Long::sum);
+        }
+
+        @Override
+        public void clearVerifyFailures(String email) {
+            failCounts.remove(email);
+        }
+
+        private final Map<String, Long> failCounts = new HashMap<>();
     }
 
     private static class StubMailSendPort implements MailSendPort {
