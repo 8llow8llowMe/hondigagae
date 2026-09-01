@@ -33,6 +33,7 @@ export const DEFAULT_PLACE_FILTERS: PlaceFilters = {
   indoor: null,
   allowedPetSize: null,
   petSizeType: null,
+  petWeightKg: null,
   sourceCategory: null,
 }
 
@@ -58,6 +59,17 @@ function readBoolean(value: string | null): boolean | null {
   return null
 }
 
+/**
+ * 체중 필터. **정수만 인정한다** — 백엔드 파라미터가 `Integer` 라 소수를 보내면 400 이다.
+ * URL 은 사용자가 손으로 고치므로 이상한 값은 예외 없이 미지정으로 떨어뜨린다.
+ */
+function readWeight(value: string | null): number | null {
+  if (value === null || !/^\d{1,3}$/.test(value.trim())) return null
+
+  const weight = Number(value.trim())
+  return weight >= 1 && weight <= 100 ? weight : null
+}
+
 function readText(value: string | null): string | null {
   return value !== null && value.trim() !== '' ? value.trim() : null
 }
@@ -74,6 +86,7 @@ export function parsePlaceFilters(params: RawParams): PlaceFilters {
     indoor: readBoolean(read(params, 'indoor')),
     allowedPetSize: pickFrom(ALLOWED_PET_SIZE_CODES, read(params, 'allowedPetSize')),
     petSizeType: pickFrom(PET_SIZE_CODES, read(params, 'petSizeType')),
+    petWeightKg: readWeight(read(params, 'petWeightKg')),
     sourceCategory: readText(read(params, 'sourceCategory')),
   }
 }
@@ -89,6 +102,7 @@ export function toPlaceFilterQuery(filters: PlaceFilters): string {
   if (filters.indoor !== null) params.set('indoor', String(filters.indoor))
   if (filters.allowedPetSize !== null) params.set('allowedPetSize', filters.allowedPetSize)
   if (filters.petSizeType !== null) params.set('petSizeType', filters.petSizeType)
+  if (filters.petWeightKg !== null) params.set('petWeightKg', String(filters.petWeightKg))
   if (filters.sourceCategory !== null) params.set('sourceCategory', filters.sourceCategory)
 
   return params.toString()
@@ -109,6 +123,7 @@ export function toPlaceApiQuery(
   if (filters.indoor !== null) params.set('indoor', String(filters.indoor))
   if (filters.allowedPetSize !== null) params.set('allowedPetSize', filters.allowedPetSize)
   if (filters.petSizeType !== null) params.set('petSizeType', filters.petSizeType)
+  if (filters.petWeightKg !== null) params.set('petWeightKg', String(filters.petWeightKg))
   if (filters.sourceCategory !== null) params.set('sourceCategory', filters.sourceCategory)
   if (cursor !== null) params.set('lastPlaceId', cursor)
   params.set('size', String(size))

@@ -500,3 +500,25 @@ describe('resolveMock — 인증', () => {
     expect(body.memberId).toBe(created?.memberId)
   })
 })
+
+describe('petWeightKg 필터', () => {
+  it('체중 상한이 낮은 곳을 뺀다', () => {
+    const heavy = body('areaCode=39&size=50&petWeightKg=30').contents
+    const light = body('areaCode=39&size=50&petWeightKg=1').contents
+
+    expect(heavy.length).toBeLessThanOrEqual(light.length)
+  })
+
+  it('상한을 모르는 곳(null)은 남긴다 — 정보 없음을 "불가" 로 단정하지 않는다', () => {
+    const filtered = body('areaCode=39&size=50&petWeightKg=99').contents
+
+    expect(filtered.some((place) => place.maxPetWeightKg === null)).toBe(true)
+  })
+
+  it('필터를 걸지 않으면 상한이 낮은 곳도 남는다', () => {
+    const all = body('areaCode=39&size=50').contents
+    const filtered = body('areaCode=39&size=50&petWeightKg=99').contents
+
+    expect(all.length).toBeGreaterThanOrEqual(filtered.length)
+  })
+})

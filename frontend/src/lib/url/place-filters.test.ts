@@ -149,3 +149,35 @@ describe('toPlaceApiQuery', () => {
     expect(toPlaceApiQuery(DEFAULT_PLACE_FILTERS)).not.toContain('lastPlaceId')
   })
 })
+
+describe('petWeightKg — 내 반려견 체중 필터', () => {
+  it('기본값은 미지정이다', () => {
+    expect(parsePlaceFilters({}).petWeightKg).toBeNull()
+  })
+
+  it('정수를 읽는다', () => {
+    expect(parsePlaceFilters({ petWeightKg: '12' }).petWeightKg).toBe(12)
+  })
+
+  it('소수는 미지정으로 떨어뜨린다 — 백엔드 파라미터가 Integer 라 400 이 된다', () => {
+    expect(parsePlaceFilters({ petWeightKg: '3.5' }).petWeightKg).toBeNull()
+  })
+
+  it('숫자가 아니면 미지정이다 — URL 은 사용자가 손으로 고친다', () => {
+    expect(parsePlaceFilters({ petWeightKg: '무거움' }).petWeightKg).toBeNull()
+    expect(parsePlaceFilters({ petWeightKg: '-5' }).petWeightKg).toBeNull()
+  })
+
+  it('화면 URL 과 API 쿼리 양쪽에 실린다', () => {
+    const filters = { ...DEFAULT_PLACE_FILTERS, petSizeType: 'SMALL' as const, petWeightKg: 4 }
+
+    expect(toPlaceFilterQuery(filters)).toContain('petWeightKg=4')
+    expect(toPlaceApiQuery(filters)).toContain('petWeightKg=4')
+  })
+
+  it('왕복해도 값이 유지된다', () => {
+    const filters = { ...DEFAULT_PLACE_FILTERS, petSizeType: 'MEDIUM' as const, petWeightKg: 12 }
+
+    expect(parsePlaceFilters(new URLSearchParams(toPlaceFilterQuery(filters)))).toEqual(filters)
+  })
+})

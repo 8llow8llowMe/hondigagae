@@ -45,6 +45,11 @@ export const placeMessages = {
   /** `{name}` · `{size}` 를 치환한다 — 화자를 반려견으로 유지한다 (아트보드 02) */
   filterPetSizeLabelFor: '{name}({size})가 들어갈 수 있는 곳만',
   filterPetSizeHint: '선택한 반려견 기준으로 걸러요. 반려견을 바꾸면 결과도 바뀝니다.',
+  /**
+   * 체중을 아는 아이면 그 기준까지 쓴다는 것을 밝힌다 — `{weight}` 치환.
+   * **판정 근거를 감추지 않는다.** 왜 어떤 곳이 사라졌는지 말할 수 있어야 한다.
+   */
+  filterPetSizeWeightHint: '크기와 체중({weight}kg)을 함께 봐요. 정보가 없는 곳은 남겨 둬요.',
 
   /** 행 메타 줄 — `제주시 한림읍 · 야외` */
   rowIndoor: '실내',

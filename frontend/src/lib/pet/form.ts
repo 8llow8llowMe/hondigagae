@@ -1,3 +1,4 @@
+import { toWeightInput, toWeightPayload } from '@/lib/pet/weight'
 import {
   ACTIVITY_LEVEL_CODES,
   type ActivityLevelCode,
@@ -29,6 +30,8 @@ export const EMPTY_PET_FORM_VALUES: PetFormValues = {
   breed: '',
   birthYm: '',
   sizeType: 'SMALL',
+  // 빈 값이 곧 "모름" 이다. 0 으로 채우면 서버가 400(PET_108) 을 낸다
+  weightKg: '',
   heatSensitive: false,
   coldSensitive: false,
   noiseSensitive: false,
@@ -64,7 +67,7 @@ function blankToNull(value: string): string | null {
 /**
  * 폼 값 → 요청 본문.
  *
- * 10개 필드를 **전부** 담는다. `PUT` 이 부분 수정이 아니라 통째로 덮어쓰기이므로
+ * 11개 필드를 **전부** 담는다. `PUT` 이 부분 수정이 아니라 통째로 덮어쓰기이므로
  * (S2) 빠진 필드는 값을 지우는 것과 같다.
  */
 export function toPetSavePayload(values: PetFormValues): PetSavePayload {
@@ -73,6 +76,7 @@ export function toPetSavePayload(values: PetFormValues): PetSavePayload {
     breed: blankToNull(values.breed),
     birthYm: blankToNull(values.birthYm),
     sizeType: values.sizeType,
+    weightKg: toWeightPayload(values.weightKg),
     heatSensitive: values.heatSensitive,
     coldSensitive: values.coldSensitive,
     noiseSensitive: values.noiseSensitive,
@@ -101,6 +105,7 @@ export function toPetFormValues(pet: Pet): PetFormValues {
     breed: pet.breed ?? '',
     birthYm: pet.birthYm ?? '',
     sizeType: isPetSizeCode(sizeType) ? sizeType : EMPTY_PET_FORM_VALUES.sizeType,
+    weightKg: toWeightInput(pet.weightKg),
     heatSensitive: pet.heatSensitive,
     coldSensitive: pet.coldSensitive,
     noiseSensitive: pet.noiseSensitive,

@@ -136,6 +136,14 @@ export type PlaceFilters = {
    * **내 반려견을 기준**으로 거르는 축이다. 화면에서는 이쪽만 쓴다 — 판정의 화자를 유지한다.
    */
   petSizeType: PetSizeCode | null
+  /**
+   * 내 반려견 체중(kg) 기준. **`petSizeType` 과 같은 축이고 함께 켜진다** —
+   * 아트보드의 "몽실이가 들어갈 수 있는 곳만" 체크 하나가 둘을 같이 보낸다.
+   *
+   * **정수다.** 백엔드 파라미터가 `Integer` 라 3.5kg 는 그대로 못 보낸다 —
+   * 올림해서 보낸다 (`lib/pet/weight.ts` 의 `toPlaceFilterWeight`).
+   */
+  petWeightKg: number | null
   /** 원본 분류 자유 문자열 (예: 카페) */
   sourceCategory: string | null
 }

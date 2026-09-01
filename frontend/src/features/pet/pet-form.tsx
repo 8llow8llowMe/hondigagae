@@ -138,6 +138,24 @@ export function PetFormFields({
       </section>
 
       <section>
+        <Field
+          id="weightKg"
+          label={labels.weightKg}
+          error={errors.fields.weightKg}
+          hint={messages.pet.hints.weightKg}
+        >
+          {/* `type="number"` 를 쓰지 않는다 — 휠·화살표로 값이 바뀌고 로케일에 따라
+              소수점이 콤마가 된다. 소수 한 자리 규칙은 스키마가 본다 */}
+          <Input
+            id="weightKg"
+            inputMode="decimal"
+            placeholder="3.5"
+            value={values.weightKg}
+            onValueChange={(value) => onValueChange('weightKg', value)}
+            invalid={errors.fields.weightKg !== undefined}
+          />
+        </Field>
+
         <RadioGroup
           id="sizeType"
           label={labels.sizeType}

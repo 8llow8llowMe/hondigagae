@@ -9,6 +9,7 @@ import {
 } from '@/features/place/filter-labels'
 import { messages } from '@/lib/messages'
 import { isPetSizeCode } from '@/lib/pet/form'
+import { toPlaceFilterWeight } from '@/lib/pet/weight'
 import type { Pet } from '@/types/pet'
 import type { ContentTypeCode, PlaceFilters } from '@/types/place'
 import { CONTENT_TYPE_CODES } from '@/types/place'
@@ -73,12 +74,31 @@ export function PetSizeField({
 
   const on = filters.petSizeType !== null
 
+  /*
+    **크기와 체중을 한 컨트롤이 함께 켠다.** 둘은 "내 반려견 기준으로 거른다" 는 같은
+    축이고, 아트보드도 체크 하나("몽실이가 들어갈 수 있는 곳만")로 그린다. 나누면
+    사용자가 두 번 켜야 하고, 하나만 켜면 판정이 반쪽이 된다.
+
+    체중을 모르는 아이(`weightKg === null`)면 크기만 보낸다 — 그것이 아는 전부다.
+  */
+  const weight = toPlaceFilterWeight(pet.weightKg)
+
   const control = (
     <FilterList label={messages.place.filterPetSizeLabel}>
       <FilterCheck
         selected={on}
-        onSelect={() => onChange({ ...filters, petSizeType: on ? null : size })}
-        description={messages.place.filterPetSizeHint}
+        onSelect={() =>
+          onChange({
+            ...filters,
+            petSizeType: on ? null : size,
+            petWeightKg: on ? null : weight,
+          })
+        }
+        description={
+          weight === null
+            ? messages.place.filterPetSizeHint
+            : messages.place.filterPetSizeWeightHint.replace('{weight}', String(pet.weightKg))
+        }
       >
         {messages.place.filterPetSizeLabelFor
           .replace('{name}', pet.name)
