@@ -47,6 +47,8 @@
 | GET | `/api/v1/places/nearby` | 좌표 반경 검색 (식당·카페 포함) |
 | GET | `/api/v1/places/{placeId}` | intro·petInfo·images 결합 상세. `indoor`·`sourceCategory`·`sourceName` 포함(목록과 같은 매핑), `contentId` 는 원천이 TourAPI 가 아니면 **null** |
 | GET | `/api/v1/emergencies/facilities` | 동물병원·동물약국 반경 검색, `openNowOnly` 지금 영업 중 필터 |
+| GET | `/api/v1/emergencies/facilities/{facilityId}` | 긴급 시설 상세. delisted 시설은 404 |
+| GET | `/api/v1/places/{placeId}/congestions` | 기간 혼잡도(기본 7일, 최대 30일). 데이터 없는 날짜도 UNKNOWN 으로 남긴다 |
 | GET | `/api/v1/places/{placeId}/suitability` | 날씨+동반조건+혼잡도 적합도. 단기+중기 합쳐 약 11일. `score` 가 null 이면 판단 근거 없음 |
 | GET | `/api/v1/places/{placeId}/walk-safety` | 추정 노면온도·열지수 기반 산책 위험도 + 안전 시간대 |
 

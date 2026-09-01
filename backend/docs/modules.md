@@ -32,7 +32,6 @@ backend/
 - `dto.DataHeader` — 응답 헤더
 - `dto.ValidationErrorBody` / `dto.ValidationErrorItem` — 검증 오류 응답 본문
 - `dto.metadata.*` — `CodeNameDescribable`, `CodeNameDescriptionMetadata`, 점수형 metadata
-- `enums.OrderType` — 정렬 방향 (ASC/DESC)
 - `exception.ValidationErrorSupport` — 공통 검증 예외 → 응답 변환 유틸
 - `geo.GeoDistance` — 하버사인 거리와 반경 검색용 사각 범위. 좌표 반경 검색을 쓰는 곳이
   셋(장소·긴급 시설·배치 병합 판정)이라 한곳에 모은다 — 흩어지면 "300m 안"의 뜻이 갈라진다

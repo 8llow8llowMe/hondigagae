@@ -9,7 +9,6 @@ import com.hondigagae.domainlayer.place.adapter.out.persistence.entity.PlaceEnti
 import com.hondigagae.global.properties.InsightProperties;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
@@ -34,7 +33,6 @@ public interface InsightMapper {
     PlaceCondition toPlaceConditionFromEntity(PlaceEntity entity);
 
     // 엔티티 리스트 -> 도메인 리스트
-    List<PlaceCondition> toPlaceConditionsFromEntities(List<PlaceEntity> entities);
 
     // 엔티티 -> 도메인
     @Mapping(target = "date", source = "baseYmd", qualifiedByName = "toForecastDate")

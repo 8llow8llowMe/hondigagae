@@ -26,6 +26,12 @@
 - `GET /api/v1/walk-courses` — 산책 코스 검색
 - `GET /api/v1/places/nearby?lat=&lng=&radius=&contentType=&petSizeType=&petWeightKg=` — 좌표 반경 장소 검색
 - `GET /api/v1/emergencies/facilities?lat=&lng=&radius=&type=&open24Only=&openNowOnly=` — 긴급 시설 반경 검색
+- `GET /api/v1/emergencies/facilities/{facilityId}` — 긴급 시설 상세.
+  내려간(delisted) 시설은 404 다 — 목록에 없는 곳을 상세로만 볼 수 있으면 폐업한 병원 주소를 들고 찾아가게 된다
+- `GET /api/v1/places/{placeId}/congestions?fromDate=&days=` — 기간 혼잡도.
+  "이번 주 언제 덜 붐비나"에 답한다. 혼잡도 예측은 30일 rolling 이라 예보(약 11일)보다 멀리 간다 —
+  적합도로는 근거가 없는 날짜도 붐빔 정도는 알 수 있다.
+  **데이터가 없는 날짜도 UNKNOWN 으로 목록에 남긴다** — 빠뜨리면 날짜 축에 구멍이 생겨 사용자가 그 날을 한산한 날로 읽는다
 - `GET /internal/v1/places/visible-ids?placeIds=` — (내부 전용) 일정 항목 검증용 벌크 존재 확인.
   게이트웨이가 라우팅하지 않으며, delisted 를 제외해 새 일정 항목이 사라진 장소를 참조하지 못하게 한다
 - `GET /internal/v1/places/candidates?placeIds=` — (내부 전용) 아이디로 후보 요약 조회.
@@ -58,6 +64,17 @@
   응답에 `delisted` 플래그). 새 참조는 내부 검증 API 가 막는다 — `data-refresh-guide.md` 2절.
 - 동적 검색은 `repository/custom`(QueryDSL) 이 담당한다. 병합·delisted 제외는
   `PlaceCustomRepositoryImpl.visible()` 한곳에 있다 — 새 검색을 추가하면 반드시 이것을 거친다.
+
+## 필수 파라미터 누락 응답 (필수)
+
+`@RequestParam` 필수 파라미터는 **Bean Validation 이 닿지 않는다.** 값이 아예 없을 때뿐
+아니라 `?lat=` 처럼 비어 온 경우도 스프링이 변환 후 `MissingServletRequestParameterException`
+을 던지므로, 파라미터에 `@NotNull` 을 붙여 둬도 실행되지 않는다.
+`NearbyFacilityParameterValidationTest` 가 이 동작을 고정한다.
+
+그래서 검증 애노테이션이 아니라 **advice 에서 받는다.** 핸들러가 없으면 스프링 기본 응답이
+나가 `dataHeader` 봉투 밖 형태가 되고, 모든 오류를 같은 봉투로 받는다고 전제하는 클라이언트의
+파싱이 깨진다. 코드는 각 도메인 1xx 대역 끝의 `{DOMAIN}_114` 다.
 
 ## 적합도/위험도 구현 주의점
 
