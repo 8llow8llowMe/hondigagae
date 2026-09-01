@@ -2,7 +2,7 @@
 
 > 화면별 담당 API, 상태, 착수 가능 여부. **백엔드 구현 상태와 동기화한다.**
 > 근거: `backend/docs/service-inventory.md` (백엔드 구현 현황), 루트 `README.md` (AI 기능 선정 상태)
-> 최종 확인: 2026-08-27 (백엔드 = origin/develop `a360b79` 기준, 컨트롤러 전수 실측)
+> 최종 확인: 2026-09-01 (백엔드 = origin/develop `9cd6711` 기준, 컨트롤러 전수 실측)
 > 갱신 방법: `find backend/service -name "*WebController.java"` 로 엔드포인트를 전수 확인한다.
 > **`backend/docs/service-inventory.md` 를 그대로 믿지 않는다** — 그 문서도 낡을 수 있다.
 
@@ -46,6 +46,14 @@
 | 반려견 등록      | `/pets/new`     | `POST /members/me/pets` | 구현 |
 | 반려견 수정·삭제 | `/pets/[petId]` | `GET                    | PUT  | DELETE /members/me/pets/{petId}` | 구현 (읽기 전용 상세는 두지 않는다 — 공통명세 S5-1) |
 
+**FE 미연동 (백엔드는 구현됨)** — [#126](https://github.com/8llow8llowMe/hondigagae/issues/126)
+
+| 기능        | API                                                    | 비고                                                                                 |
+| ----------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| 반려견 사진 | `POST`·`DELETE /members/me/pets/{petId}/profile-image` | multipart. 회원 프로필 사진(#79)과 같은 통과 경로                                    |
+| 체중        | `PetSaveRequest.weightKg`                              | `0.1~99.9`, 소수점 1자리. **`GET /places` 의 `petWeightKg` 필터가 이것에 딸려 있다** |
+| 대표견      | `PUT /members/me/pets/{petId}/representative`          | **AI 일정이 대표 반려견을 기본으로 쓴다** — 지정 UI 가 없다                          |
+
 주의: 등록 상한이 있다 (`PET_002 PET_LIMIT_EXCEEDED`, HTTP 400). 타인 반려견 조회는 **404** 다.
 
 ## 3. 장소 탐색 — 착수 가능
@@ -59,6 +67,9 @@
 
 주의:
 
+- **즐겨찾기 여부는 단건 API 로 확인할 수 있다** — `GET /favorites/places/{placeId}` → `{placeId, favorited}`.
+  화면은 아직 목록(`GET /favorites/places`) 전량을 받아 판정한다. 100곳 상한이라 당장 문제는
+  아니지만 단건 쪽이 의도에 맞다 ([#127](https://github.com/8llow8llowMe/hondigagae/issues/127) 에서 함께 정리).
 - **공개 API다.** tour-service는 security 의존이 없다 → 보호 경로 아님.
   **단, 하단 바의 즐겨찾기·담기는 보호 리소스다** — 미로그인에는 조회조차 보내지 않는다
   (401 이 전역 재발급을 헛돌린다).
@@ -144,6 +155,20 @@
 | 일정에 장소 담기            | `/plans/[planId]/days/[day]/add` + 실내 대안 | `PUT /plans/{planId}/days/{day}/items` (**같은 일괄 교체**) | **구현** (#82) — 새 API 없음                                         |
 | 일정 날씨 브리핑            | `/plans/[planId]` 내                         | `GET /plans/{planId}/weather`                               | **구현** (#80) — 일자 판정으로 통합                                  |
 
+**FE 미연동 (백엔드는 구현됨 — PR #105)**
+
+| 화면             | API                                              | 이슈                                                          |
+| ---------------- | ------------------------------------------------ | ------------------------------------------------------------- |
+| 항목 방문 체크   | `PUT /plans/{planId}/items/{planItemId}/visited` | [#124](https://github.com/8llow8llowMe/hondigagae/issues/124) |
+| 일정 응급 브리핑 | `GET /plans/{planId}/emergency`                  | [#125](https://github.com/8llow8llowMe/hondigagae/issues/125) |
+
+주의: **일차 항목을 교체하면 그 날의 방문 체크는 초기화된다** (백엔드 스키마 설명). 일괄 교체
+모델과 부딪히는 지점이라 화면 문구가 이 사실을 말해야 한다.
+
+| 저장한 장소 목록 | 경로   | API                     | 상태                                                                                                               |
+| ---------------- | ------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 저장한 장소      | (미정) | `GET /favorites/places` | **미착수** — 저장은 되는데 다시 찾아갈 화면이 없다 ([#127](https://github.com/8llow8llowMe/hondigagae/issues/127)) |
+
 주의:
 
 - **목록에 좁히기 파라미터가 없다.** `GET /plans` 는 `lastPlanId` · `size` 뿐이고 `status`·`petId` 도, `totalCount` 도 없다. 상태·반려견 좁히기는 화면에서 하고, `hasNext` 인 동안에는 개수를 말하지 않는다 (`docs/features/plan/공통명세.md` S3).
@@ -180,9 +205,12 @@
   (`lib/geo/distance.ts`)에서 가져온다 — 두 화면이 같은 초안을 두 말로 말하지 않게 하려는 것이
   요점이다. 기준은 직전 항목 하나뿐이고(초안 `itemType` 이 LLM raw string 이라 숙소를 못 믿는다)
   좌표를 모르는 항목은 거리 줄이 없다. **실내 여부도 붙였다** ([#112](https://github.com/8llow8llowMe/hondigagae/issues/112)).
-- **`AiPlanCreateRequest` 가 `petIds`·`pinnedPlaceIds`·`planId`+`regenerateDay` 를 받는다**
-  (PR #78). 전부 선택이고 **#84 는 단일 `petId` 만 보낸다** — 다중 반려견 UI 와 필수 포함
-  장소 플로우는 아트보드 정본이 없어 별도 FE 이슈다 (명세 S1).
+- **`AiPlanCreateRequest` 가 `petIds`·`pinnedPlaceIds`·`includeFavorites`·`planId`+`regenerateDay`
+  를 받는다** (PR #78). 전부 선택이고 **#84 는 단일 `petId` 만 보낸다** — 다중 반려견 UI ·
+  필수 포함 장소 · 즐겨찾기 우선 · 하루 재생성은 아트보드 정본이 없어 별도 이슈로 뗐다
+  ([#128](https://github.com/8llow8llowMe/hondigagae/issues/128), 명세 S1).
+- `petId` 와 `petIds` 가 함께 오면 **`petIds` 가 이기고 `petId` 는 무시된다.** 둘 다 없으면
+  **대표 반려견**을 쓴다 — 그런데 대표견 지정 UI 가 없다 (#126).
 
 ## 5-1. 주변 장소 검색 — 착수 가능
 
@@ -236,6 +264,7 @@
 
 확인 방법: `tour-service/domainlayer/` 에 `insight` · `emergency` 컨텍스트가 있고 각각 컨트롤러가 있다.
 `walkcourse` · `review` · `assistant` · `analysis` 는 **패키지 자체가 없다** — 그것이 미착수의 근거다.
+**2026-09-01 재확인**: `find backend/service -type d -name <pkg>` 로 네 패키지 모두 여전히 없다.
 
 ## 7. AI 기능 선정 게이트
 
