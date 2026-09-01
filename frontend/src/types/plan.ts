@@ -257,6 +257,17 @@ export type PlanItemDetail = {
   /** `HH:mm:ss` */
   startTime: string | null
   /**
+   * 방문 체크 — '다녀옴' (#124).
+   *
+   * **백엔드가 primitive `boolean` 이라 항상 온다** (`PlanItemDetailItem.visited`).
+   * nullable 이 아니므로 `?? false` 로 덮지 않는다 — 필드가 비어 오면 계약이 깨진 것이고
+   * 그것을 조용히 `false` 로 삼키면 드리프트를 놓친다.
+   *
+   * **일자 항목을 일괄 교체하면 초기화된다.** 교체는 새 `planItemId` 를 발급하므로
+   * 그 날의 체크가 전부 `false` 로 돌아간다 (컨트롤러 설명 · screen-inventory §4).
+   */
+  visited: boolean
+  /**
    * 항목이 가리키는 장소 요약 (#86). **객체 통째로 `null` 이 될 수 있다.**
    *
    * ① `WALK`·`MOVE` 처럼 장소를 가리키지 않는 항목, ② 원천에서 사라진(delisted) 장소,

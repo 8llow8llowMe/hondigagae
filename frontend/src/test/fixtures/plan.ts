@@ -1,4 +1,4 @@
-import type { PlanDayAdd } from '@/features/plan/plan-day-section'
+import type { PlanDayAdd, PlanDayVisit } from '@/features/plan/plan-day-section'
 import type { Pet } from '@/types/pet'
 import type {
   PlanAlternativePlaceItem,
@@ -49,6 +49,11 @@ export function planItem(
     title: '제주현대미술관',
     memo: null,
     startTime: null,
+    /**
+     * **기본값은 꺼진 상태다** (#124). 백엔드가 primitive `boolean` 이라 nullable 이
+     * 아니고, 체크된 행을 검증하려면 `planItem({ ..., visited: true })` 로 덮어쓴다.
+     */
+    visited: false,
     place: planItemPlace(),
     ...overrides,
   }
@@ -145,6 +150,16 @@ export const planDayAdd: PlanDayAdd = {
   busy: false,
   error: null,
   onAdd: () => undefined,
+}
+
+/**
+ * 방문 체크 배선 — 아무 항목도 진행·실패 상태가 아닌 기본값 (#124).
+ *
+ * 진행/실패 행을 보려면 `visitOf` 를 덮어쓴다:
+ * `{ visitOf: () => ({ pending: false, error: {...}, onToggle: () => undefined }) }`
+ */
+export const planDayVisit: PlanDayVisit = {
+  visitOf: () => ({ pending: false, error: null, onToggle: () => undefined }),
 }
 
 /**

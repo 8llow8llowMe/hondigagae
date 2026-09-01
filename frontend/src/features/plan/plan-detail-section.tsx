@@ -17,6 +17,7 @@ import { PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
 import { PlanStatusAction } from '@/features/plan/plan-status-action'
 import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
 import { usePlanDayEdit } from '@/features/plan/use-plan-day-edit'
+import { usePlanVisit } from '@/features/plan/use-plan-visit'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { messages } from '@/lib/messages'
 import { addPlanDays } from '@/lib/plan/date'
@@ -80,6 +81,13 @@ export function PlanDetailSection({
     후처리(캐시 갱신 · 판정 무효화 · 토스트)가 갈리면 안 된다 (F0).
   */
   const addPlace = usePlanAddPlace({ planId: plan.planId })
+
+  /*
+    방문 체크 (#124). **담기·편집과 달리 항목별로 동시에 진행할 수 있다** — 일괄 교체가
+    아니라 항목 한 행만 바꾸므로 두 요청이 겹쳐도 한쪽이 사라지지 않는다. 그래서 전역
+    잠금이 없고 진행·실패를 `planItemId` 로 든다.
+  */
+  const visit = usePlanVisit({ planId: plan.planId })
 
   // 편집한 것을 브라우저 이탈로 잃지 않게 한다. 저장 중은 제외한다 (form-guide.md §7)
   useUnsavedWarning(edit.dirty && !edit.saving)
@@ -159,6 +167,13 @@ export function PlanDetailSection({
                     dayItems: group.items,
                     place: alternative,
                   }),
+              }}
+              visit={{
+                visitOf: (planItemId) => ({
+                  pending: visit.pending.has(planItemId),
+                  error: visit.failures.get(planItemId) ?? null,
+                  onToggle: (next) => visit.toggle(planItemId, next),
+                }),
               }}
               editor={
                 editingDay !== group.day ? null : (

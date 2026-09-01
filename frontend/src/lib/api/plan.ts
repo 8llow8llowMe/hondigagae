@@ -108,3 +108,31 @@ export function replaceDayItems(
     body: payload,
   })
 }
+
+// ─── 항목 방문 체크 (#124) ────────────────────────────────────────────────────
+
+export function planItemVisitedPath(planId: string, planItemId: string): string {
+  return paths.plans.itemVisited(planId, planItemId)
+}
+
+/**
+ * 항목 방문 체크. **해제도 같은 API 다** — `visited: false` 를 보낸다
+ * (`PlanWebController.markItemVisited`).
+ *
+ * 응답이 `Response<Void>` 라 **`clientFetchVoid` 를 써야 한다.** `clientFetch` 로 부르면
+ * `unwrap()` 이 `dataBody === null` 을 실패로 보고 **서버는 저장했는데 화면만 실패라고
+ * 말한다** — `deletePlan` 에서 브라우저 실측으로 잡았던 것과 같은 함정이다.
+ *
+ * 갱신된 상세를 돌려주지 않으므로 호출부는 `setQueryData` 가 아니라
+ * `planKeys.detail(planId)` 무효화로 이어받는다.
+ */
+export function markItemVisited(
+  planId: string,
+  planItemId: string,
+  visited: boolean,
+): Promise<void> {
+  return clientFetchVoid(planItemVisitedPath(planId, planItemId), {
+    method: 'PUT',
+    body: { visited },
+  })
+}

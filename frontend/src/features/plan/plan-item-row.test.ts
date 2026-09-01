@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { PlanItemRow } from '@/features/plan/plan-item-row'
+import { PlanItemRow, type PlanItemVisit } from '@/features/plan/plan-item-row'
 import { messages } from '@/lib/messages'
 import type { PlanItemRowModel } from '@/lib/plan/detail'
 import { planDetail, planItemPlace } from '@/test/fixtures/plan'
@@ -61,5 +61,108 @@ describe('PlanItemRow — 메타 줄 (#112)', () => {
     const markup = render(planItemPlace({ indoor: null }))
 
     expect(markup).not.toContain(messages.place.rowIndoorUnknown)
+  })
+})
+
+/**
+ * 방문 체크 토글 — 이슈 #124.
+ *
+ * `visit` 를 넘기지 않으면 토글이 아예 없다는 것까지 본다. 기간 밖 고아 항목 섹션이
+ * 그 경로다 — 어느 일자에도 속하지 않는 항목에 '다녀옴' 을 두면 무엇을 다녀왔다는
+ * 것인지 말할 수 없다.
+ */
+function renderWithVisit({ visited = false, visit }: { visited?: boolean; visit?: PlanItemVisit }) {
+  const model: PlanItemRowModel = {
+    item: { ...planDetail.items[0]!, visited },
+    distanceMeters: null,
+    distanceKind: null,
+  }
+
+  return renderToStaticMarkup(
+    createElement(PlanItemRow, visit === undefined ? { model } : { model, visit }),
+  )
+}
+
+const idleVisit: PlanItemVisit = { pending: false, error: null, onToggle: () => undefined }
+
+describe('PlanItemRow — 방문 체크 토글 (#124)', () => {
+  it('visit 를 넘기지 않으면 토글이 없다 — 기간 밖 항목 섹션의 경로다', () => {
+    const markup = renderWithVisit({})
+
+    expect(markup).not.toContain(messages.plan.visitAction)
+    expect(markup).not.toContain('aria-pressed')
+  })
+
+  it('체크되지 않은 항목은 aria-pressed=false 이고 이름이 "표시" 다', () => {
+    const markup = renderWithVisit({ visited: false, visit: idleVisit })
+
+    expect(markup).toContain('aria-pressed="false"')
+    expect(markup).toContain(`aria-label="${messages.plan.visitAction}"`)
+  })
+
+  it('체크된 항목은 aria-pressed=true 이고 이름이 "해제" 다 — 누르면 일어날 일을 말한다', () => {
+    const markup = renderWithVisit({ visited: true, visit: idleVisit })
+
+    expect(markup).toContain('aria-pressed="true"')
+    expect(markup).toContain(`aria-label="${messages.plan.visitedAction}"`)
+  })
+
+  it('체크된 항목은 낱말로도 말한다 — 색·투명도만으로 전달하지 않는다', () => {
+    /*
+      **`aria-label` 에 걸리지 않게 배지 텍스트로 본다.** `다녀옴` 은 토글 이름
+      (`다녀옴으로 표시`)의 substring 이라 낱낱으로 찾으면 꺼진 행에서도 걸린다.
+    */
+    const badge = `>${messages.plan.visitedLabel}<`
+
+    expect(renderWithVisit({ visited: true, visit: idleVisit })).toContain(badge)
+    expect(renderWithVisit({ visited: false, visit: idleVisit })).not.toContain(badge)
+  })
+
+  it('저장 중이면 그 행의 토글만 잠기고 aria-busy 가 붙는다', () => {
+    const markup = renderWithVisit({ visit: { ...idleVisit, pending: true } })
+
+    expect(markup).toContain('aria-busy="true"')
+    expect(markup).toContain('disabled')
+  })
+
+  it('실패는 토스트가 아니라 이 행에 남는다 — role=alert 로 알린다', () => {
+    const markup = renderWithVisit({
+      visit: {
+        ...idleVisit,
+        error: { message: messages.plan.visitErrorDescription, retriable: true },
+      },
+    })
+
+    expect(markup).toContain('role="alert"')
+    expect(markup).toContain(messages.plan.visitErrorDescription)
+  })
+
+  /*
+    **문구로 세지 않는다.** 실패 문장 자체가 "다시 시도해 주세요" 를 품고 있어
+    `messages.common.retry` 를 substring 으로 찾으면 항상 걸린다. 버튼 개수로 본다 —
+    행에 있는 버튼은 토글 하나뿐이어야 한다.
+  */
+  function buttonCount(markup: string): number {
+    return markup.split('<button').length - 1
+  }
+
+  it('실패해도 재시도 버튼을 따로 두지 않는다 — 같은 토글을 다시 누르는 것이 재시도다', () => {
+    const markup = renderWithVisit({
+      visit: {
+        ...idleVisit,
+        error: { message: messages.plan.visitErrorDescription, retriable: true },
+      },
+    })
+
+    expect(buttonCount(markup)).toBe(1)
+  })
+
+  it('4xx 는 새로고침을 안내하고, 그때도 버튼이 늘지 않는다', () => {
+    const markup = renderWithVisit({
+      visit: { ...idleVisit, error: { message: messages.plan.visitStaleError, retriable: false } },
+    })
+
+    expect(markup).toContain(messages.plan.visitStaleError)
+    expect(buttonCount(markup)).toBe(1)
   })
 })

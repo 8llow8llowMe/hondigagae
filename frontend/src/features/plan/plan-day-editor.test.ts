@@ -7,7 +7,13 @@ import { PlanDayEditor } from '@/features/plan/plan-day-editor'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { messages } from '@/lib/messages'
 import { toEditItems, toggleRemoved } from '@/lib/plan/day-items'
-import { planAlternative, planDayAdd, planDetail, planVerdict } from '@/test/fixtures/plan'
+import {
+  planAlternative,
+  planDayAdd,
+  planDayVisit,
+  planDetail,
+  planVerdict,
+} from '@/test/fixtures/plan'
 import type { PlaceDetail } from '@/types/place'
 
 const ITEMS = toEditItems(planDetail.items)
@@ -167,6 +173,7 @@ describe('PlanDaySection — 편집 진입', () => {
         onStartEdit: () => undefined,
         editor: null,
         add: planDayAdd,
+        visit: planDayVisit,
         ...overrides,
       }),
     )

@@ -159,6 +159,7 @@ function toItem(item: MockPlanItem): PlanItemDetail {
     title: item.title,
     memo: item.memo,
     startTime: item.startTime,
+    visited: item.visited,
     place: toItemPlace(item),
   }
 }
@@ -265,6 +266,8 @@ function toItems(
       title: title.slice(0, ITEM_TITLE_MAX),
       memo: memo === null || memo.trim() === '' ? null : memo,
       startTime: typeof item.startTime === 'string' ? item.startTime : null,
+      // 새 항목은 방문 체크가 꺼진 상태로 태어난다 (`PlanItemEntity.visited` 기본값, #124)
+      visited: false,
     }
   })
 }
@@ -292,6 +295,18 @@ export function resolvePlanMock(
   if (dayItems !== null && method === 'PUT') {
     return withPlan(memberId, dayItems[1] ?? '', (plan) =>
       replaceDayItems(plan, dayItems[2] ?? '', body),
+    )
+  }
+
+  /*
+    항목 방문 체크 (#124). **`/days/{day}/items` 보다 뒤, 상세(`/plans/{id}`) 보다 앞이다** —
+    상세 정규식 `^/plans/([^/]+)$` 는 하위 경로를 잡지 않지만, 순서를 명시해 두면 그
+    규칙을 넓힐 때 실수하지 않는다 (index.ts 의 인사이트 주석과 같은 판단).
+  */
+  const itemVisited = /^\/plans\/([^/]+)\/items\/([^/]+)\/visited$/.exec(path)
+  if (itemVisited !== null && method === 'PUT') {
+    return withPlan(memberId, itemVisited[1] ?? '', (plan) =>
+      markVisited(plan, itemVisited[2] ?? '', body),
     )
   }
 
@@ -346,6 +361,48 @@ function withPlan(
   if (plan === undefined) return fail(404, 'PLAN_001', '존재하지 않는 여행 일정입니다.')
 
   return handle(plan)
+}
+
+/**
+ * 항목 방문 체크 — `PUT /plans/{planId}/items/{planItemId}/visited` (#124).
+ *
+ * 근거: `PlanWebController.markItemVisited` · `PlanItemVisitedRequest` ·
+ * `PlanCommandProcessor.markItemVisited` **소스 실측**.
+ *
+ * **소유권은 일정 기준으로 보고, 항목이 그 일정의 것인지 다시 확인한다** — 백엔드가
+ * `findById(planItemId).filter(found -> found.planId() == plan.id())` 로 그렇게 한다.
+ * `planItemId` 만 믿으면 남의 일정 항목을 내 `planId` 로 체크할 수 있다.
+ *
+ * **응답이 `Response<Void>` 다** — `dataBody` 가 `null` 이라, 호출부가 `clientFetch` 로
+ * 부르면 "서버는 저장했는데 화면만 실패" 가 된다. mock 도 같은 모양을 내야 그 함정이
+ * 로컬에서 드러난다.
+ */
+function markVisited(plan: MockPlan, rawItemId: string, body: string | null): MockResult {
+  // 컨트롤러가 `@PathVariable long` 이라 숫자가 아닌 id 는 404 가 아니라 400 이다
+  if (!/^\d+$/.test(rawItemId)) {
+    return fail(400, 'PLAN_114', '요청 파라미터 형식이 올바르지 않습니다.')
+  }
+
+  let parsed: Record<string, unknown>
+  try {
+    parsed = body === null ? {} : (JSON.parse(body) as Record<string, unknown>)
+  } catch {
+    return fail(400, 'PLAN_100', '요청 값이 올바르지 않습니다.')
+  }
+
+  // `@NotNull Boolean visited` — 빠지면 Bean Validation 이 잡는다
+  if (typeof parsed.visited !== 'boolean') {
+    return failValidation([
+      { code: 'PLAN_100', field: 'visited', message: '방문 여부는 필수입니다.' },
+    ])
+  }
+
+  const item = plan.items.find((candidate) => candidate.planItemId === rawItemId)
+  // 없는 항목, 또는 **다른 일정의** 항목이면 404 다 (`PLAN_005`)
+  if (item === undefined) return fail(404, 'PLAN_005', '존재하지 않는 일정 항목입니다.')
+
+  item.visited = parsed.visited
+  return { status: 200, payload: ok(null) }
 }
 
 /**
@@ -875,5 +932,11 @@ function toStoredItem(
     title: String(item.title),
     memo: typeof item.memo === 'string' ? item.memo : null,
     startTime: typeof item.startTime === 'string' ? item.startTime : null,
+    /*
+      **항상 `false` 다 — 이것이 계약의 핵심이다** (#124). 백엔드는 일괄 교체 때 항목을
+      삭제 후 재삽입하므로 그 날의 방문 체크가 통째로 초기화된다. mock 이 체크를
+      이어받으면 화면이 경고 문구로 말하는 사실을 로컬에서 검증할 수 없다.
+    */
+    visited: false,
   }
 }

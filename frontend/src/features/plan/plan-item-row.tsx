@@ -2,7 +2,9 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
-import { ImageIcon } from '@/components/icons'
+import { Button } from '@/components/button'
+import { FormAlert } from '@/components/form-alert'
+import { CheckIcon, ImageIcon } from '@/components/icons'
 import { Row } from '@/components/surface'
 import { formatDistance } from '@/lib/format/distance'
 import { isLongTrip } from '@/lib/geo/distance'
@@ -10,7 +12,24 @@ import { isAllowedImageHost } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { placeMetaLine } from '@/lib/place/meta'
 import { isPlaceTarget, type PlanItemRowModel } from '@/lib/plan/detail'
+import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import { cn } from '@/lib/utils/cn'
+
+/**
+ * 방문 체크에 필요한 것 한 묶음 — 이슈 #124.
+ *
+ * **optional 이다.** 넘기지 않으면 토글이 아예 렌더되지 않는다 — 기간 밖 고아 항목
+ * 섹션(`PlanOutOfRangeSection`)이 그 경로다. 어느 일자의 흐름에도 속하지 않는 항목에
+ * '다녀옴' 을 두면 무엇을 다녀왔다는 것인지 말할 수 없다.
+ */
+export type PlanItemVisit = {
+  /** 저장 중. **그 행만** 잠긴다 — 방문 체크는 항목 한 행만 바꿔 서로 충돌하지 않는다 */
+  pending: boolean
+  /** **이 항목에서** 난 실패만 온다. 좁히지 않으면 안 누른 행에도 오류가 남는다 */
+  error: PlanDaySaveError | null
+  /** 다음 상태를 넘긴다 — 해제도 같은 API 다 (`visited: false`) */
+  onToggle: (visited: boolean) => void
+}
 
 /**
  * 일정 항목 행 — 아트보드 `혼디가개 여행 일정.dc.html` 01·02.
@@ -31,8 +50,23 @@ import { cn } from '@/lib/utils/cn'
  *
  * **`startTime` 을 표시하지 않는다** — 아트보드 헤더 주석이 "시간 없음" 으로 못박았다
  * (일정상세-세부명세 D8-9).
+ *
+ * **방문 체크 토글은 링크의 형제다** (#124). 행 전체가 하나의 링크라 그 안에 버튼을 넣을
+ * 수 없다 — 중첩 상호작용은 시맨틱이 깨지고 키보드로 어느 쪽이 잡히는지 알 수 없다.
+ * 그래서 링크를 `flex-1` 로 두고 토글을 **후행 44px 열**로 뺀다. 아트보드 01 이 금지한
+ * 것은 순번 원 + 썸네일 + 텍스트의 **선행** 3열(390 에서 제목이 눌린다)이고, 후행
+ * 아이콘 열은 제목이 쓰는 폭을 그만큼만 줄인다.
  */
-export function PlanItemRow({ model, last = false }: { model: PlanItemRowModel; last?: boolean }) {
+export function PlanItemRow({
+  model,
+  last = false,
+  visit,
+}: {
+  model: PlanItemRowModel
+  last?: boolean
+  /** 없으면 토글이 렌더되지 않는다 — 기간 밖 항목 섹션이 그 경로다 */
+  visit?: PlanItemVisit
+}) {
   const { item } = model
   const { place } = item
   const hasImage = isAllowedImageHost(place?.firstImage ?? null)
@@ -46,7 +80,14 @@ export function PlanItemRow({ model, last = false }: { model: PlanItemRowModel; 
 
   const body = (
     <>
-      <div className="bg-band relative size-20 shrink-0 overflow-hidden rounded-md lg:size-24">
+      <div
+        className={cn(
+          'bg-band relative size-20 shrink-0 overflow-hidden rounded-md lg:size-24',
+          // 다녀온 곳은 남은 곳보다 뒤로 물러난다. **이것만으로 전달하지 않는다** —
+          // 배지(`다녀옴`)와 `aria-pressed` 가 같은 사실을 낱말로도 말한다 (DESIGN.md §7)
+          item.visited && 'opacity-60',
+        )}
+      >
         {hasImage ? (
           <Image
             src={place?.firstImage as string}
@@ -75,9 +116,22 @@ export function PlanItemRow({ model, last = false }: { model: PlanItemRowModel; 
         <div className="flex flex-wrap items-center gap-2">
           {/* 공백 없는 긴 한국어 이름(`제주특별자치도립김창열미술관`)이 넘치지 않게
               어절 안에서도 끊을 수 있게 한다 — PlaceRow 와 같은 규칙 */}
-          <h4 className="text-title-2 text-fg min-w-0 font-semibold break-words">{item.title}</h4>
+          <h4
+            className={cn(
+              'text-title-2 min-w-0 font-semibold break-words',
+              item.visited ? 'text-fg-muted' : 'text-fg',
+            )}
+          >
+            {item.title}
+          </h4>
           {/* `장소` 는 기본값이라 라벨이 잡음이다. 성격이 다른 유형만 알린다 */}
           {item.itemType.code !== 'PLACE' && <Badge size="sm">{item.itemType.name}</Badge>}
+          {/* 색·투명도만으로 전달하지 않기 위한 낱말 (#124) */}
+          {item.visited && (
+            <Badge tone="brand" size="sm">
+              {messages.plan.visitedLabel}
+            </Badge>
+          )}
         </div>
 
         {/* nullable 은 오류가 아니라 숨김이다. 둘 다 없으면 줄 자체가 사라진다 */}
@@ -92,18 +146,71 @@ export function PlanItemRow({ model, last = false }: { model: PlanItemRowModel; 
 
   return (
     <Row as="li" last={last}>
-      {href === null ? (
-        <div className="flex items-start gap-3 py-3 lg:gap-5 lg:py-4">{body}</div>
-      ) : (
-        // 링크 안에 링크를 넣지 않는다 — 행 전체가 하나의 링크다 (D6)
-        <Link
-          href={href}
-          className="focus-visible:ring-brand-500 flex items-start gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none lg:gap-5 lg:py-4"
-        >
-          {body}
-        </Link>
+      <div className="flex items-start">
+        {href === null ? (
+          <div className="flex min-w-0 flex-1 items-start gap-3 py-3 lg:gap-5 lg:py-4">{body}</div>
+        ) : (
+          // 링크 안에 링크를 넣지 않는다 — 행 전체가 하나의 링크다 (D6).
+          // 방문 토글은 이 링크의 **형제**라 중첩되지 않는다 (#124)
+          <Link
+            href={href}
+            className="focus-visible:ring-brand-500 flex min-w-0 flex-1 items-start gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none lg:gap-5 lg:py-4"
+          >
+            {body}
+          </Link>
+        )}
+
+        {visit !== undefined && <PlanItemVisitToggle item={item} visit={visit} />}
+      </div>
+
+      {/*
+        실패는 **토스트가 아니라 이 자리에 남는다** — 사라지는 UI 에 복구 수단을 두지
+        않는다 (`components/toast.tsx`). **별도 `다시 시도` 버튼을 두지 않는다**: 실패해도
+        서버 상태가 그대로라 토글이 아직 같은 방향을 가리키고, 그것을 다시 누르는 것이
+        재시도다 — 실내 대안 담기(`plan-indoor-alts.tsx`)와 같은 판단이다.
+      */}
+      {visit !== undefined && visit.error !== null && (
+        <FormAlert className="mb-3" message={visit.error.message} />
       )}
     </Row>
+  )
+}
+
+/**
+ * 방문 체크 토글 — 후행 44px 아이콘 열 (#124).
+ *
+ * **`aria-pressed` 토글이다.** `Checkbox` 는 라벨이 요소 옆에 붙는 폼 입력이라 행 후행
+ * 액션에 맞지 않고, 저장소는 이런 토글을 `aria-pressed` 로 쓴다 (`chip.tsx`).
+ *
+ * **이름은 상태가 아니라 누르면 일어날 일을 말한다.** `aria-pressed` 가 이미 현재
+ * 상태를 읽어 주므로 이름까지 상태를 말하면 스크린리더가 같은 사실을 두 번 듣는다.
+ */
+function PlanItemVisitToggle({
+  item,
+  visit,
+}: {
+  item: PlanItemRowModel['item']
+  visit: PlanItemVisit
+}) {
+  return (
+    // 썸네일 상단에 맞춘다 — 행이 길어져도 토글이 가운데로 흐르지 않는다
+    <div className="shrink-0 py-2 lg:py-3">
+      <Button
+        /*
+          **상태를 `variant` 로 말한다.** `className` 으로 색을 덮지 않는다 —
+          component-guide.md §3 이 금지한다. 표준 집합 안에서 `secondary`(테두리 + 진한
+          글자)와 `ghost`(맨 아이콘)의 차이가 눌린 상태를 그린다.
+        */
+        variant={item.visited ? 'secondary' : 'ghost'}
+        size="md"
+        iconOnly
+        aria-label={item.visited ? messages.plan.visitedAction : messages.plan.visitAction}
+        aria-pressed={item.visited}
+        loading={visit.pending}
+        leading={<CheckIcon size={20} />}
+        onClick={() => visit.onToggle(!item.visited)}
+      />
+    </div>
   )
 }
 
