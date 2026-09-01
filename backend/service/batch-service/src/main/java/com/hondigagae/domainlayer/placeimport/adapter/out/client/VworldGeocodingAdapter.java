@@ -8,6 +8,8 @@ import com.hondigagae.domainlayer.placeimport.application.port.out.GeocodingPort
 import com.hondigagae.domainlayer.placeimport.domain.model.Coordinate;
 import com.hondigagae.global.properties.VworldProperties;
 import java.math.BigDecimal;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -41,9 +43,13 @@ public class VworldGeocodingAdapter implements GeocodingPort {
     private static final String TYPE_ROAD = "road";
     private static final String TYPE_PARCEL = "parcel";
 
+    /** 서킷 인스턴스명. 지오코더 전용이다. */
+    public static final String CIRCUIT_NAME = "vworld";
+
     private final WebClient openApiWebClient;
     private final ObjectMapper objectMapper;
     private final VworldProperties vworldProperties;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @Override
     public Optional<Coordinate> geocode(String address) {
@@ -61,14 +67,29 @@ public class VworldGeocodingAdapter implements GeocodingPort {
         return request(address, TYPE_PARCEL);
     }
 
+    /**
+     * 한 표기(도로명/지번)로 좌표를 묻는다.
+     *
+     * <p><b>서킷이 열려도 예외로 올리지 않는다.</b> 이 어댑터는 원래 실패를 빈 좌표로 흘려
+     * 보내도록 만들어져 있다 - 좌표를 못 채운 장소는 좌표 없이 적재되고 다음 회차에 다시
+     * 시도한다. 지오코딩 실패로 음식점 적재 전체를 멈추는 것이 더 나쁘다.
+     *
+     * <p>서킷의 값어치는 여기서 "빨리 포기하는 것"에 있다. 원천이 죽었을 때 수천 건을
+     * 타임아웃까지 기다리며 두드리면 잡이 몇 시간씩 늘어진다.
+     */
     private Optional<Coordinate> request(String address, String type) {
         String rawBody;
         try {
-            rawBody = openApiWebClient.get()
-                .uri(buildUri(address, type))
-                .retrieve()
-                .bodyToMono(String.class)
-                .block(Duration.ofMillis(vworldProperties.readTimeoutMs()));
+            rawBody = circuitBreakerRegistry.circuitBreaker(CIRCUIT_NAME).executeSupplier(() ->
+                openApiWebClient.get()
+                    .uri(buildUri(address, type))
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block(Duration.ofMillis(vworldProperties.readTimeoutMs()))
+            );
+        } catch (CallNotPermittedException exception) {
+            log.warn("vworld geocode skipped, circuit open type={} address={}", type, address);
+            return Optional.empty();
         } catch (RuntimeException exception) {
             log.warn("vworld geocode call failed type={} address={} reason={}",
                 type, address, exception.getMessage());

@@ -9,6 +9,8 @@ import com.hondigagae.domainlayer.congestionimport.application.port.out.query.Co
 import com.hondigagae.domainlayer.congestionimport.domain.enums.JejuLegalRegion;
 import com.hondigagae.domainlayer.congestionimport.domain.model.ImportedCongestionForecast;
 import com.hondigagae.global.properties.TourApiProperties;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -41,9 +43,13 @@ public class TatsCongestionCatalogAdapter implements CongestionForecastCatalogPo
     private static final String OK_RESULT_CODE = "0000";
     private static final int RAW_BODY_LOG_LIMIT = 300;
 
+    /** 서킷 인스턴스명. 관광공사 집중률 예측(TATS) 전용이다. */
+    public static final String CIRCUIT_NAME = "tats";
+
     private final WebClient openApiWebClient;
     private final ObjectMapper objectMapper;
     private final TourApiProperties tourApiProperties;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
 
     @Override
     public CongestionCatalogQueryResult fetchConcentrationRates(JejuLegalRegion region, int pageNo, int numOfRows) {
@@ -79,9 +85,14 @@ public class TatsCongestionCatalogAdapter implements CongestionForecastCatalogPo
         return URI.create(url);
     }
 
+    /** 원천 호출. 서킷은 전송 호출만 감싼다 - 응답 해석 실패는 이 밖에서 일어난다. */
     private String requestRaw(URI uri) {
         try {
-            return openApiWebClient.get().uri(uri).retrieve().bodyToMono(String.class).block();
+            return circuitBreakerRegistry.circuitBreaker(CIRCUIT_NAME).executeSupplier(() ->
+                openApiWebClient.get().uri(uri).retrieve().bodyToMono(String.class).block()
+            );
+        } catch (CallNotPermittedException exception) {
+            throw new CongestionImportException(CongestionImportErrorCode.API_CIRCUIT_OPEN, exception);
         } catch (WebClientResponseException exception) {
             throw new CongestionImportException(CongestionImportErrorCode.API_CALL_FAILED, exception,
                 "HTTP %d".formatted(exception.getStatusCode().value()));
