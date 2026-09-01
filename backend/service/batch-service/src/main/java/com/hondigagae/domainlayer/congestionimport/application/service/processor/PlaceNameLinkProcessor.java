@@ -4,6 +4,8 @@ import com.hondigagae.domainlayer.congestionimport.application.port.out.PlaceNam
 import com.hondigagae.domainlayer.congestionimport.application.port.out.query.PlaceNameCandidateQueryResult;
 import com.hondigagae.domainlayer.congestionimport.domain.model.ImportedCongestionForecast;
 import com.hondigagae.domainlayer.congestionimport.domain.model.ResolvedPlaceNameLink;
+import com.hondigagae.shared.travel.insight.NameLinkSourceType;
+import com.hondigagae.shared.travel.insight.NameMatchType;
 import com.hondigagae.domainlayer.placeimport.domain.model.PlaceNameMatcher;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -32,10 +34,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class PlaceNameLinkProcessor {
 
-    private static final String SOURCE_TYPE_CONGESTION = "CONGESTION";
-    private static final String MATCH_EXACT = "EXACT";
-    private static final String MATCH_NORMALIZED = "NORMALIZED";
-    private static final String MATCH_UNMATCHED = "UNMATCHED";
 
     private final PlaceNameLinkBulkPort placeNameLinkBulkPort;
 
@@ -65,12 +63,12 @@ public class PlaceNameLinkProcessor {
                 matched++;
             }
             links.add(ResolvedPlaceNameLink.builder()
-                .sourceType(SOURCE_TYPE_CONGESTION)
+                .sourceType(NameLinkSourceType.CONGESTION.name())
                 .areaCd(key.areaCd())
                 .signguCd(key.signguCd())
                 .tatsNm(key.tatsNm())
                 .placeId(place.map(PlaceNameCandidateQueryResult::placeId).orElse(null))
-                .matchType(place.map(candidate -> matchTypeOf(key.tatsNm(), candidate)).orElse(MATCH_UNMATCHED))
+                .matchType(place.map(candidate -> matchTypeOf(key.tatsNm(), candidate)).orElse(NameMatchType.UNMATCHED.name()))
                 .build());
         }
 
@@ -78,7 +76,7 @@ public class PlaceNameLinkProcessor {
         int unmatched = links.size() - matched;
         // 커버리지를 로그로 남긴다. 매칭률이 조용히 떨어지는 것이 이 방식의 가장 큰 위험이다.
         log.info("Place name link done source={} total={} matched={} unmatched={} places={}",
-            SOURCE_TYPE_CONGESTION, links.size(), matched, unmatched, places.size());
+            NameLinkSourceType.CONGESTION, links.size(), matched, unmatched, places.size());
         return new LinkResult(matched, unmatched);
     }
 
@@ -110,8 +108,14 @@ public class PlaceNameLinkProcessor {
         return Optional.empty();
     }
 
+    /**
+     * 이 행이 어떤 방식으로 이어졌는지.
+     *
+     * <p>값은 tour-service 가 {@code NameMatchType} 으로 읽는 DB 계약이라 문자열을 직접 적지
+     * 않는다 (§8-3). 배치가 쓰고 tour 가 읽으므로 enum 자체는 shared-travel 에 있다.
+     */
     private String matchTypeOf(String tatsNm, PlaceNameCandidateQueryResult place) {
-        return PlaceNameMatcher.isExactMatch(tatsNm, place.title()) ? MATCH_EXACT : MATCH_NORMALIZED;
+        return PlaceNameMatcher.isExactMatch(tatsNm, place.title()) ? NameMatchType.EXACT.name() : NameMatchType.NORMALIZED.name();
     }
 
     private record NameKey(String areaCd, String signguCd, String tatsNm) {

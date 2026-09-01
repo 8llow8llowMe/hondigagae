@@ -1,7 +1,7 @@
 package com.hondigagae.domainlayer.insight.adapter.out.persistence.repository.custom;
 
 import com.hondigagae.domainlayer.insight.adapter.out.persistence.entity.CongestionForecastEntity;
-import com.hondigagae.domainlayer.insight.domain.enums.NameLinkSourceType;
+import com.hondigagae.shared.travel.insight.NameLinkSourceType;
 import java.util.List;
 
 /**

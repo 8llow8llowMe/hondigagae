@@ -26,8 +26,9 @@ class MfdsPetRestaurantXlsxAdapterTest {
 
     private MfdsPetRestaurantXlsxAdapter adapter() {
         MfdsPetRestaurantProperties properties = new MfdsPetRestaurantProperties(
-            null, null, FIXTURE.toString(), 0, 0);
-        return new MfdsPetRestaurantXlsxAdapter(null, properties);
+            null, null, FIXTURE.toString(), 0);
+        // 파일 분기만 타므로 WebClient 와 서킷은 쓰이지 않는다.
+        return new MfdsPetRestaurantXlsxAdapter(null, properties, null);
     }
 
     @Test

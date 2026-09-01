@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.domainlayer.insight.adapter.out.persistence.entity.CongestionForecastEntity;
 import com.hondigagae.domainlayer.insight.adapter.out.persistence.entity.PlaceNameLinkEntity;
-import com.hondigagae.domainlayer.insight.domain.enums.NameLinkSourceType;
-import com.hondigagae.domainlayer.insight.domain.enums.NameMatchType;
+import com.hondigagae.shared.travel.insight.NameLinkSourceType;
+import com.hondigagae.shared.travel.insight.NameMatchType;
 import com.hondigagae.persistence.config.QuerydslConfigurer;
 import java.time.LocalDateTime;
 import java.util.List;

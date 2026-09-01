@@ -3,8 +3,8 @@ package com.hondigagae.domainlayer.insight.adapter.out.persistence.repository.cu
 import com.hondigagae.domainlayer.insight.adapter.out.persistence.entity.CongestionForecastEntity;
 import com.hondigagae.domainlayer.insight.adapter.out.persistence.entity.QCongestionForecastEntity;
 import com.hondigagae.domainlayer.insight.adapter.out.persistence.entity.QPlaceNameLinkEntity;
-import com.hondigagae.domainlayer.insight.domain.enums.NameLinkSourceType;
-import com.hondigagae.domainlayer.insight.domain.enums.NameMatchType;
+import com.hondigagae.shared.travel.insight.NameLinkSourceType;
+import com.hondigagae.shared.travel.insight.NameMatchType;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

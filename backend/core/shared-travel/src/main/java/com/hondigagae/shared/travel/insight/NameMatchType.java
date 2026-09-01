@@ -1,4 +1,4 @@
-package com.hondigagae.domainlayer.insight.domain.enums;
+package com.hondigagae.shared.travel.insight;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
