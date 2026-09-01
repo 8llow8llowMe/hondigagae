@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * 원천이 다른 같은 장소를 하나로 묶는 계약.
  */
-public interface PlaceMergePort {
+public interface PlaceMergeCommandPort {
 
     /** 지역 안의 병합 판정 대상(아직 병합되지 않은 행)을 원천별로 읽는다. */
     List<PlaceMergeCandidateQueryResult> findMergeCandidates(String areaCode);

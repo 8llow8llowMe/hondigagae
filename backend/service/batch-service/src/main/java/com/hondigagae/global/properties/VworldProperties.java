@@ -12,16 +12,14 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record VworldProperties(
     String baseUrl,
     String apiKey,
-    int connectTimeoutMs,
+    // connect 타임아웃은 여기 두지 않는다. 커넥터 단위 설정이라 openApiWebClient 가 한 번만
+    // 정하고, 원천별로 달리 잡으려면 WebClient 를 따로 만들어야 한다 (WebClientConfig 참고).
     int readTimeoutMs
 ) {
 
     public VworldProperties {
         if (baseUrl == null || baseUrl.isBlank()) {
             baseUrl = "https://api.vworld.kr";
-        }
-        if (connectTimeoutMs <= 0) {
-            connectTimeoutMs = 3_000;
         }
         if (readTimeoutMs <= 0) {
             readTimeoutMs = 10_000;
