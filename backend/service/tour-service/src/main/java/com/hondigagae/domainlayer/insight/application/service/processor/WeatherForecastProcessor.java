@@ -139,16 +139,6 @@ public class WeatherForecastProcessor {
             .toList();
     }
 
-    /**
-     * 특정 날짜의 예보. 단기·중기 어느 쪽도 닿지 않으면 비어 있다.
-     *
-     * <p><b>비었다는 것은 "날씨가 좋다"가 아니라 "예보가 없다"는 뜻이다.</b> 호출부는 이 구분을
-     * 응답에 반드시 드러내야 한다 - 근거 없는 점수를 주면 안 된다.
-     */
-    public Optional<DailyWeather> dailyForecastAt(double lat, double lng, String sigunguCode, LocalDate date) {
-        return DailyWeather.findByDate(dailyForecastsAt(lat, lng, sigunguCode), date);
-    }
-
     /** 지금 시각에 가장 가까운 예보 한 건. 현재 상태를 보여줄 때 쓴다. */
     public Optional<WeatherForecast> nearestForecastAt(double lat, double lng, LocalDateTime target) {
         return forecastsAt(lat, lng).stream()

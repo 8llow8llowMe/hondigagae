@@ -17,6 +17,7 @@ import com.hondigagae.domainlayer.place.application.port.out.query.PlaceIntroQue
 import com.hondigagae.domainlayer.place.application.port.out.query.PlacePetInfoQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSliceQueryResult;
 import com.hondigagae.domainlayer.place.domain.model.Place;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +41,7 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
     }
 
     @Override
-    public List<Long> findVisibleIds(java.util.Collection<Long> placeIds) {
+    public List<Long> findVisibleIds(Collection<Long> placeIds) {
         if (placeIds.isEmpty()) {
             return List.of();
         }
@@ -48,7 +49,7 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
     }
 
     @Override
-    public List<Place> findVisiblePlaces(java.util.Collection<Long> placeIds) {
+    public List<Place> findVisiblePlaces(Collection<Long> placeIds) {
         if (placeIds.isEmpty()) {
             return List.of();
         }
