@@ -93,5 +93,4 @@ public class AiPlanWebController {
         return aiPlanJobSseStreamer.stream(jobId, loginActive.memberId());
     }
 
-    // TODO: SSE 스트림(GET /jobs/{jobId}/stream, text/event-stream) — 폴링 외 실시간 구독 제공 (api-design-guide §7)
 }
