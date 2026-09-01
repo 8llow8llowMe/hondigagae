@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.emergency.application.service;
 
+import com.hondigagae.domainlayer.emergency.adapter.in.web.dto.response.EmergencyFacilityDetailResponse;
 import com.hondigagae.domainlayer.emergency.adapter.in.web.dto.response.NearbyFacilityResponse;
 import com.hondigagae.domainlayer.emergency.adapter.in.web.presenter.NearbyFacilityPresenter;
 import com.hondigagae.domainlayer.emergency.application.info.NearbyFacilityInfo;
@@ -23,5 +24,12 @@ public class NearbyFacilityWebFacade implements NearbyFacilityWebUseCase {
     public NearbyFacilityResponse searchNearby(NearbyFacilityQuery query) {
         List<NearbyFacilityInfo> infos = nearbyFacilityQueryProcessor.searchNearby(query);
         return nearbyFacilityPresenter.toResponse(infos, query);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public EmergencyFacilityDetailResponse getFacilityDetail(long facilityId) {
+        return nearbyFacilityPresenter.toDetailResponse(
+            nearbyFacilityQueryProcessor.getDetail(facilityId));
     }
 }

@@ -4,8 +4,11 @@ import com.hondigagae.common.geo.GeoDistance;
 import com.hondigagae.domainlayer.emergency.application.info.NearbyFacilityInfo;
 import com.hondigagae.domainlayer.emergency.application.model.NearbyFacilityQuery;
 import com.hondigagae.domainlayer.emergency.application.port.out.EmergencyFacilityRepositoryPort;
+import com.hondigagae.domainlayer.emergency.application.exception.EmergencyErrorCode;
+import com.hondigagae.domainlayer.emergency.application.exception.EmergencyException;
+import com.hondigagae.domainlayer.emergency.application.info.EmergencyFacilityDetailInfo;
 import com.hondigagae.domainlayer.emergency.application.port.out.query.EmergencyFacilityQueryResult;
-import com.hondigagae.shared.travel.schedule.WeeklySchedule;
+import com.hondigagae.domainlayer.emergency.domain.model.FacilityOpenState;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -62,15 +65,36 @@ public class NearbyFacilityQueryProcessor {
     }
 
     /**
-     * 지금 영업 중인가. spec 이 있으면 그것으로 판정하고, 없어도 24시간 확인 시설은 연 것으로
-     * 본다(상호의 "24시"만으로 open24 가 켜진 곳은 spec 이 없다). 둘 다 아니면 모름(null)이다.
+     * 시설 상세.
+     *
+     * <p>목록과 <b>같은 판정 규칙</b>을 쓴다 ({@link FacilityOpenState}). 두 화면이 같은 시설을
+     * 다르게 말하면 사용자는 어느 쪽도 믿지 않는다.
+     *
+     * <p>내려간(delisted) 시설은 포트가 없는 것으로 돌려주므로 404 가 된다. 목록이 안 보여
+     * 주는 시설을 상세로는 볼 수 있으면, 폐업한 병원 주소를 들고 급하게 찾아가게 된다.
      */
+    public EmergencyFacilityDetailInfo getDetail(long facilityId) {
+        EmergencyFacilityQueryResult result = emergencyFacilityRepositoryPort.findById(facilityId)
+            .orElseThrow(() -> new EmergencyException(EmergencyErrorCode.NOT_FOUND_FACILITY));
+
+        return EmergencyFacilityDetailInfo.builder()
+            .facilityId(result.facilityId())
+            .facilityType(result.facilityType())
+            .name(result.name())
+            .addr(result.addr())
+            // 좌표가 없는 행은 적재되지 않으므로 여기서는 값이 있다고 본다.
+            .lat(toDouble(result.lat()))
+            .lng(toDouble(result.lng()))
+            .tel(result.tel())
+            .operatingHours(result.operatingHours())
+            .restDate(result.restDate())
+            .open24(result.open24())
+            .openNow(resolveOpenNow(result, LocalDateTime.now()))
+            .build();
+    }
+
     private Boolean resolveOpenNow(EmergencyFacilityQueryResult result, LocalDateTime now) {
-        WeeklySchedule schedule = WeeklySchedule.parseSpec(result.weeklyHoursSpec());
-        if (schedule != null) {
-            return schedule.isOpenAt(now);
-        }
-        return result.open24() ? Boolean.TRUE : null;
+        return FacilityOpenState.resolve(result.weeklyHoursSpec(), result.open24(), now);
     }
 
     private double toDouble(BigDecimal value) {

@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.emergency.adapter.in.web.controller;
 
 import com.hondigagae.common.dto.Response;
+import com.hondigagae.domainlayer.emergency.adapter.in.web.dto.response.EmergencyFacilityDetailResponse;
 import com.hondigagae.domainlayer.emergency.adapter.in.web.dto.response.NearbyFacilityResponse;
 import com.hondigagae.domainlayer.emergency.application.exception.EmergencyValidationMessage;
 import com.hondigagae.domainlayer.emergency.application.model.NearbyFacilityQuery;
@@ -15,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -78,6 +80,22 @@ public class NearbyFacilityWebController {
             .build();
 
         NearbyFacilityResponse response = nearbyFacilityWebUseCase.searchNearby(query);
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(summary = "긴급 시설 상세",
+        description = "목록에서 고른 시설 한 곳의 상세를 봅니다. "
+            + "목록이 내려주는 facilityId 를 그대로 씁니다. "
+            + "openNow / operatingHoursKnown 의 뜻은 목록과 같습니다 — 판정 규칙을 한곳에 두어 "
+            + "두 화면이 같은 시설을 다르게 말하지 않게 했습니다. "
+            + "원천에서 내려간(폐업 등) 시설은 404 입니다. 목록에 없는 곳을 상세로만 볼 수 있으면 "
+            + "폐업한 병원 주소를 들고 찾아가게 되기 때문입니다.")
+    @GetMapping("/facilities/{facilityId}")
+    public ResponseEntity<Response<EmergencyFacilityDetailResponse>> getFacilityDetail(
+        @Parameter(description = "긴급 시설 아이디", required = true, example = "4611686018427387904")
+        @PathVariable long facilityId
+    ) {
+        EmergencyFacilityDetailResponse response = nearbyFacilityWebUseCase.getFacilityDetail(facilityId);
         return ResponseEntity.ok().body(Response.success(response));
     }
 }
