@@ -36,6 +36,9 @@ resilience4j:
         automatic-transition-from-open-to-half-open-enabled: true
         ignore-exceptions:
           - com.hondigagae.domainlayer.plan.application.exception.PlanException
+          # 도메인 예외 변환은 서킷 밖(support)에서 일어나므로, 서킷을 실제로 통과하는 4xx 는
+          # FeignClientException 으로 제외해야 한다. 없으면 정상 404 가 실패로 집계돼 서킷을 연다.
+          - feign.FeignException$FeignClientException
     instances:
       tour-service:
         base-config: default

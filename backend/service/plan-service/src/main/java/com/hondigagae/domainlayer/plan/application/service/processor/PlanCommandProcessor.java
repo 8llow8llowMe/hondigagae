@@ -51,6 +51,7 @@ public class PlanCommandProcessor {
 
         if (!CollectionUtils.isEmpty(command.items())) {
             validateItemDays(saved, command.items());
+            validateSequenceUniqueness(command.items());
             verifyPlaceTargets(command.items());
             planItemRepositoryPort.saveAll(toItems(saved.id(), command.items()));
         }
@@ -69,6 +70,16 @@ public class PlanCommandProcessor {
             .budget(command.budget() != null ? command.budget() : plan.budget())
             .status(command.status() != null ? command.status() : plan.status())
             .build();
+
+        // 기간을 줄이면 범위 밖 일차의 항목이 고아가 된다 — 조용히 남기면 상세와 날씨 브리핑이 어긋나므로
+        // 사용자가 항목을 먼저 정리하도록 거부한다. 자동 삭제는 사용자의 기록을 말없이 지우는 일이라 하지 않는다.
+        if (updated.totalDays() < plan.totalDays()) {
+            boolean hasOrphanItems = planItemRepositoryPort.findByPlanId(plan.id()).stream()
+                .anyMatch(item -> item.day() > updated.totalDays());
+            if (hasOrphanItems) {
+                throw new PlanException(PlanErrorCode.PLAN_PERIOD_SHRINK_CONFLICT);
+            }
+        }
 
         return planRepositoryPort.save(updated);
     }
@@ -96,6 +107,7 @@ public class PlanCommandProcessor {
                 .build())
             .toList();
 
+        validateSequenceUniqueness(dayItems);
         verifyPlaceTargets(dayItems);
         planItemRepositoryPort.deleteByPlanIdAndDay(plan.id(), day);
         planItemRepositoryPort.saveAll(toItems(plan.id(), dayItems));
@@ -108,9 +120,27 @@ public class PlanCommandProcessor {
     }
 
     private void validateItemDays(Plan plan, List<PlanItemCommand> commands) {
+        // day 는 일자별 교체 경로에서 생략 가능하도록 Integer 다. 생성 경로에서는 여기서 필수를 강제한다.
+        if (commands.stream().anyMatch(command -> command.day() == null)) {
+            throw new PlanException(PlanErrorCode.ITEM_DAY_REQUIRED);
+        }
         boolean outOfRange = commands.stream().anyMatch(command -> !plan.containsDay(command.day()));
         if (outOfRange) {
             throw new PlanException(PlanErrorCode.PLAN_DAY_OUT_OF_RANGE);
+        }
+    }
+
+    /**
+     * (day, sequence) 중복을 저장 전에 거른다. DB 유니크 인덱스(uk_plan_item_plan_id_day_sequence)가
+     * 마지막 방어선이지만, 그대로 두면 위반이 500 으로 나간다 — 사용자 입력 문제는 400 으로 알려 준다.
+     */
+    private void validateSequenceUniqueness(List<PlanItemCommand> commands) {
+        long distinctCount = commands.stream()
+            .map(command -> command.day() + ":" + command.sequence())
+            .distinct()
+            .count();
+        if (distinctCount != commands.size()) {
+            throw new PlanException(PlanErrorCode.ITEM_SEQUENCE_DUPLICATED);
         }
     }
 
