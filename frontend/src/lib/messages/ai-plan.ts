@@ -46,6 +46,55 @@ export const aiPlanMessages = {
    */
   areaFixed: '제주 전체에서 찾아요.',
 
+  /*
+    ── 생성 옵션 확장 (#128) — 아트보드 `혼디가개 AI 일정 생성` 05 ──
+
+    **"먼저" 와 "꼭" 을 섞지 않는다.** `preferFavorites` 는 우선순위(조건이 맞을 때만)이고
+    `pinnedPlaceIds` 는 배치 보장이다. 아트보드가 두 문구를 갈라 쓰라고 못박았다 —
+    지키지 못할 약속을 하면 결과를 못 믿게 된다.
+  */
+
+  optionGroupLabel: '더 좋은 결과를 위해 (선택)',
+
+  /** 저장한 곳 먼저 — **"먼저" 쪽이다. "반드시" 라고 쓰지 않는다** */
+  preferFavoritesLabel: '저장한 곳 먼저 넣기',
+  /** `{count}` 는 저장한 장소 개수. 개수를 말해야 무엇이 후보에 들어가는지 안다 */
+  preferFavoritesHint: '저장한 {count}곳을 후보에 합치고, 조건이 맞으면 먼저 배치해요',
+  preferFavoritesLink: '저장한 장소 보기',
+  /**
+   * 저장 0곳. **숨기지 않고 비활성 + 이유 + 해결 방법이다** (아트보드 05).
+   * 숨기면 이 옵션의 존재를 알 방법이 없어진다.
+   */
+  preferFavoritesEmpty: '저장한 곳이 아직 없어요. 장소를 저장하면 여기서 먼저 넣을 수 있어요.',
+  preferFavoritesEmptyAction: '장소 찾아보기',
+
+  /** 꼭 넣을 장소 — **"꼭" 쪽이다. 배치 보장** */
+  pinnedLabel: '꼭 넣을 장소 (선택)',
+  pinnedCount: '{count} / {max}',
+  pinnedHint: '고른 곳은 반드시 일정에 들어가요. 날짜와 순서는 AI가 정해요.',
+  pinnedAdd: '+ 장소 고르기',
+  /** 칩의 제거 버튼 이름. 칩만으로는 어느 장소를 빼는지 스크린리더가 모른다 */
+  pinnedRemoveLabel: '{title} 빼기',
+
+  /** 피커 시트 — 같은 시트를 밀어 넣는 단계 전개다 (오버레이를 겹치지 않는다) */
+  pickerTitle: '꼭 넣을 장소',
+  pickerFavoritesTab: '저장한 장소',
+  /** `{count}` 곳 담기. **라벨에 결과를 쓴다** (`BottomSheet` footer 규약) */
+  pickerConfirm: '{count}곳 담기',
+  pickerConfirmEmpty: '고른 곳 없이 닫기',
+  /** 요약을 못 받은 행 — 이름·좌표가 없어 후보로 넘길 수 없다 */
+  pickerUnpinnable: '요약이 없어 후보로 넘길 수 없어요',
+  pickerEmptyTitle: '저장한 장소가 없어요',
+  pickerEmptyDescription: '장소 상세에서 저장해 두면 여기서 골라 넣을 수 있어요.',
+  pickerLoadFailedTitle: '저장한 장소를 불러오지 못했어요',
+  /**
+   * **검색 탭을 만들지 않았다.** 아트보드 05 는 `저장한 장소` / `검색` 두 탭을 그렸지만
+   * `GET /places` 에 이름 검색 파라미터가 없다 — 지역·타입·동반 조건 필터뿐이다.
+   * 아트보드도 "고르는 곳은 저장한 장소가 기본, 검색 탭은 두 번째" 라고 적었다.
+   * BE 에 검색 API 를 요청해 뒀다 (명세 S8).
+   */
+  pickerSearchUnavailable: '이름으로 찾기는 준비 중이에요. 지금은 저장한 장소에서 고를 수 있어요.',
+
   // ── 조건 입력 오류 ──────────────────────────────────────────────────────
 
   // AIPLAN_105
@@ -58,6 +107,8 @@ export const aiPlanMessages = {
   errorDateRange: '여행 시작일은 종료일보다 늦을 수 없습니다.',
   // AIPLAN_106
   errorBudgetPositive: '예산은 0보다 커야 합니다.',
+  /** 시트가 상한을 이미 막는다. 이 문구는 2차 방어가 걸렸을 때만 나온다 */
+  errorPinnedTooMany: '꼭 넣을 장소는 {max}곳까지예요.',
   // AIPLAN_107
   errorNoteTooLong: '요청 메모는 500자 이하만 가능합니다.',
 

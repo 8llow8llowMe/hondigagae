@@ -41,6 +41,8 @@ function render(overrides: Partial<AiPlanCreateFormProps> = {}) {
     submitting: false,
     submitCount: 0,
     firstErrorField: null,
+    favoriteCount: 0,
+    onOpenPlacePicker: () => undefined,
     onValueChange: () => undefined,
     onSubmit: () => undefined,
     ...overrides,
@@ -91,7 +93,21 @@ describe('AiPlanCreateForm — 반려견은 라디오 한 마리', () => {
   })
 
   it('여러 마리를 함께 고르는 컨트롤을 두지 않는다', () => {
-    expect(render()).not.toContain('type="checkbox"')
+    const html = render()
+
+    // 반려견은 라디오다 — 아트보드 01 "반려견은 라디오 — 한 마리"
+    expect(html).toContain('type="radio"')
+
+    /*
+      **`type="checkbox"` 부재로 검사하지 않는다.** #128 이 `저장한 곳 먼저` 체크박스를
+      더해서 그 검사는 이제 그 옵션에 걸린다. 확인하려는 것은 **반려견 다중 선택의 부재**라,
+      폼 안의 유일한 체크박스가 그 옵션임을 본다.
+
+      다중 반려견(`petIds`)은 아트보드 05 에 설계돼 있으나 `plan-service` 의 `Plan` 이
+      `petId` 단일이라 미뤘다 (명세 S8).
+    */
+    expect(html.match(/type="checkbox"/g) ?? []).toHaveLength(1)
+    expect(html).toContain('id="preferFavorites"')
   })
 
   it('선택 근거를 안내한다', () => {
