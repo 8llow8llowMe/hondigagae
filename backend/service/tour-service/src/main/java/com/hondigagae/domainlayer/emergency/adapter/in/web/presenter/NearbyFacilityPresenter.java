@@ -1,7 +1,9 @@
 package com.hondigagae.domainlayer.emergency.adapter.in.web.presenter;
 
 import com.hondigagae.domainlayer.emergency.adapter.in.web.dto.item.NearbyFacilityItem;
+import com.hondigagae.domainlayer.emergency.adapter.in.web.dto.response.EmergencyFacilityDetailResponse;
 import com.hondigagae.domainlayer.emergency.adapter.in.web.dto.response.NearbyFacilityResponse;
+import com.hondigagae.domainlayer.emergency.application.info.EmergencyFacilityDetailInfo;
 import com.hondigagae.domainlayer.emergency.application.info.NearbyFacilityInfo;
 import com.hondigagae.domainlayer.emergency.application.model.NearbyFacilityQuery;
 import java.util.List;
@@ -48,4 +50,28 @@ public class NearbyFacilityPresenter {
             .build();
     }
 
+    /**
+     * 상세 응답.
+     *
+     * <p>목록 항목과 같은 필드를 쓰지만 거리는 없다 - 상세는 검색 중심점 없이 부르는 화면이라
+     * 거리를 낼 기준이 없다. 0 을 채우면 "바로 여기"라는 뜻이 되어 명백히 틀린 값이 나간다.
+     */
+    public EmergencyFacilityDetailResponse toDetailResponse(EmergencyFacilityDetailInfo info) {
+        String hours = info.operatingHours();
+        return EmergencyFacilityDetailResponse.builder()
+            // Snowflake 아이디는 문자열로 내린다. long 그대로 보내면 JS 가 조용히 절삭한다.
+            .facilityId(String.valueOf(info.facilityId()))
+            .facilityType(info.facilityType().toMetadata())
+            .name(info.name())
+            .addr(info.addr())
+            .lat(info.lat())
+            .lng(info.lng())
+            .tel(info.tel())
+            .operatingHours(hours)
+            .restDate(info.restDate())
+            .open24(info.open24())
+            .openNow(info.openNow())
+            .operatingHoursKnown(hours != null && !hours.isBlank())
+            .build();
+    }
 }

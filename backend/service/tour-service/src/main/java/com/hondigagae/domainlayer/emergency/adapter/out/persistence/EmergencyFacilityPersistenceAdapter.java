@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.emergency.application.model.NearbyFacilityQuer
 import com.hondigagae.domainlayer.emergency.application.port.out.EmergencyFacilityRepositoryPort;
 import com.hondigagae.domainlayer.emergency.application.port.out.query.EmergencyFacilityQueryResult;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -20,6 +21,12 @@ public class EmergencyFacilityPersistenceAdapter implements EmergencyFacilityRep
         return emergencyFacilityRepository.searchWithinBox(query).stream()
             .map(this::toQueryResult)
             .toList();
+    }
+
+    @Override
+    public Optional<EmergencyFacilityQueryResult> findById(long facilityId) {
+        return emergencyFacilityRepository.findByIdAndDelistedAtIsNull(facilityId)
+            .map(this::toQueryResult);
     }
 
     private EmergencyFacilityQueryResult toQueryResult(EmergencyFacilityEntity entity) {
