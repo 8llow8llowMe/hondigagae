@@ -41,9 +41,4 @@ public class PlanItemRepositoryAdapter implements PlanItemRepositoryPort {
     public void deleteByPlanIdAndDay(long planId, int day) {
         planItemRepository.deleteByPlanIdAndDay(planId, day);
     }
-
-    @Override
-    public void deleteByPlanId(long planId) {
-        planItemRepository.deleteByPlanId(planId);
-    }
 }

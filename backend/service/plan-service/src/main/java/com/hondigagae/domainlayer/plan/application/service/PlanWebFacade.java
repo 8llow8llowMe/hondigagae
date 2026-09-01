@@ -64,7 +64,8 @@ public class PlanWebFacade implements PlanWebUseCase {
      */
     @Override
     public PlanEmergencyResponse getPlanEmergencyBriefing(long memberId, long planId) {
-        PlanEmergencyInfo info = planEmergencyProcessor.getEmergencyBriefing(memberId, planId);
+        Plan plan = planQueryProcessor.getOwnedPlan(memberId, planId);
+        PlanEmergencyInfo info = planEmergencyProcessor.getEmergencyBriefing(plan);
         return planPresenter.toEmergencyResponse(info);
     }
 

@@ -256,11 +256,6 @@ class PlanQueryProcessorTest {
         public void deleteByPlanIdAndDay(long planId, int day) {
             throw new UnsupportedOperationException();
         }
-
-        @Override
-        public void deleteByPlanId(long planId) {
-            throw new UnsupportedOperationException();
-        }
     }
 
     /**

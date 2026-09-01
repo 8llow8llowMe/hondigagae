@@ -8,9 +8,9 @@ import com.hondigagae.domainlayer.favorite.domain.model.Favorite;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
-@Service
+@Component
 @RequiredArgsConstructor
 public class FavoriteCommandProcessor {
 

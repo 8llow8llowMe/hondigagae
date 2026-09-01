@@ -15,6 +15,4 @@ public interface PlanItemRepositoryPort {
     PlanItem save(PlanItem item);
 
     void deleteByPlanIdAndDay(long planId, int day);
-
-    void deleteByPlanId(long planId);
 }

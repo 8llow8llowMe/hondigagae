@@ -13,6 +13,7 @@ import com.hondigagae.domainlayer.plan.application.port.out.query.PlanPlaceSumma
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import java.util.List;
+import java.util.Objects;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -77,7 +78,7 @@ public class PlanQueryProcessor {
     private Map<Long, PlanPlaceSummaryQueryResult> findPlaceSummaries(List<PlanItem> items) {
         List<Long> placeIds = items.stream()
             .map(PlanQueryProcessor::placeTargetIdOf)
-            .filter(java.util.Objects::nonNull)
+            .filter(Objects::nonNull)
             .distinct()
             .toList();
 
