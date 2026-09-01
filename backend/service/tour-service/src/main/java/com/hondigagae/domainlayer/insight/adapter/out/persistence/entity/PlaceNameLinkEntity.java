@@ -1,7 +1,7 @@
 package com.hondigagae.domainlayer.insight.adapter.out.persistence.entity;
 
-import com.hondigagae.domainlayer.insight.domain.enums.NameLinkSourceType;
-import com.hondigagae.domainlayer.insight.domain.enums.NameMatchType;
+import com.hondigagae.shared.travel.insight.NameLinkSourceType;
+import com.hondigagae.shared.travel.insight.NameMatchType;
 import com.hondigagae.persistence.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

@@ -3,7 +3,7 @@ package com.hondigagae.domainlayer.insight.adapter.out.persistence;
 import com.hondigagae.domainlayer.insight.adapter.out.persistence.repository.CongestionForecastRepository;
 import com.hondigagae.domainlayer.insight.application.mapper.InsightMapper;
 import com.hondigagae.domainlayer.insight.application.port.out.CongestionForecastPort;
-import com.hondigagae.domainlayer.insight.domain.enums.NameLinkSourceType;
+import com.hondigagae.shared.travel.insight.NameLinkSourceType;
 import com.hondigagae.domainlayer.insight.domain.model.CongestionSnapshot;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
