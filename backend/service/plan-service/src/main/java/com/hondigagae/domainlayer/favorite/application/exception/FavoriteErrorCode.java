@@ -13,6 +13,7 @@ public enum FavoriteErrorCode {
 
     INVALID_REQUEST("FAVORITE_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
     PARAMETER_TYPE_INVALID("FAVORITE_113", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
+    PARAMETER_REQUIRED("FAVORITE_114", "필수 요청 파라미터가 누락되었습니다.", HttpStatus.BAD_REQUEST),
 
     INTERNAL_SERVICE_UNAVAILABLE("FAVORITE_900", "내부 서비스 연동에 실패했습니다. 잠시 후 다시 시도해주세요.", HttpStatus.SERVICE_UNAVAILABLE);
 

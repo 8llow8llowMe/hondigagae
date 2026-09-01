@@ -45,7 +45,7 @@ public class PlanItemEntity extends BaseEntity {
     private int day;
 
     @Column(nullable = false)
-    @Comment("일차 내 순서 (1부터 시작)")
+    @Comment("일차 내 순서 (0부터 시작)")
     private int sequence;
 
     @Enumerated(EnumType.STRING)

@@ -13,9 +13,9 @@ import java.time.LocalTime;
 @Schema(description = "여행 일정 항목 요청 DTO")
 public record PlanItemRequest(
 
-    @Schema(description = "일차 (1부터)", example = "1")
+    @Schema(description = "일차 (1부터). 일자별 일괄 교체 요청에서는 경로의 day 로 덮어쓰므로 생략 가능", example = "1")
     @Min(value = 1, message = PlanValidationMessage.ITEM_DAY_MIN_INVALID)
-    int day,
+    Integer day,
 
     @Schema(description = "같은 일차 내 표시 순서 (0부터)", example = "0")
     int sequence,

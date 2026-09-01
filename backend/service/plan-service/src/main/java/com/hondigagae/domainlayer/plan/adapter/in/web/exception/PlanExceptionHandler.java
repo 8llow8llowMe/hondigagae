@@ -7,6 +7,7 @@ import com.hondigagae.domainlayer.plan.application.exception.PlanException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -43,5 +44,13 @@ public class PlanExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Response<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
         return ValidationErrorSupport.toResponse(exception, PlanErrorCode.PARAMETER_TYPE_INVALID.getCode());
+    }
+    /** 필수 쿼리 파라미터 누락. 처리하지 않으면 Response 봉투 밖의 Spring 기본 에러 바디가 나간다. */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Response<Void>> handleMissingParameter(MissingServletRequestParameterException exception) {
+        PlanErrorCode errorCode = PlanErrorCode.PARAMETER_REQUIRED;
+        return ResponseEntity
+            .status(errorCode.getHttpStatus())
+            .body(Response.fail(errorCode.getCode(), errorCode.getMessage() + " (" + exception.getParameterName() + ")"));
     }
 }
