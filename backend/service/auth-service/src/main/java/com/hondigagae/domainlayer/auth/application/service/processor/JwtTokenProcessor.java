@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.auth.application.service.processor;
 
+import com.hondigagae.domainlayer.auth.application.info.AuthSessionInfo;
 import com.hondigagae.domainlayer.auth.application.exception.AuthErrorCode;
 import com.hondigagae.domainlayer.auth.application.exception.AuthException;
 import com.hondigagae.domainlayer.auth.application.info.JwtTokenIssueInfo;
@@ -14,6 +15,7 @@ import com.hondigagae.security.auth.jwt.JwtAuthProvider;
 import com.hondigagae.security.auth.jwt.JwtAuthProvider.RefreshTokenClaims;
 import com.hondigagae.security.common.enums.SecurityRole;
 import com.hondigagae.security.common.exception.SecurityJwtException;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -107,6 +109,29 @@ public class JwtTokenProcessor {
         jwtTokenStorePort.save(member.id(), newSessionId, newRefreshToken);
 
         return JwtTokenReissueInfo.of(newAccessToken, newRefreshToken);
+    }
+
+    /**
+     * 로그인 기기 목록. current 는 요청 쿠키의 refresh 토큰과 같은 세션인지다 —
+     * access 토큰에는 세션 식별자가 없어 쿠키로만 판별하고, 쿠키가 없거나 해석 불가면 전부 false.
+     */
+    public List<AuthSessionInfo> listSessions(long memberId, String refreshToken) {
+        String currentSessionId = resolveSessionId(memberId, refreshToken).orElse(null);
+        return jwtTokenStorePort.findSessions(memberId).stream()
+            .map(session -> AuthSessionInfo.builder()
+                .sessionId(session.sessionId())
+                .lastRefreshedAt(session.lastRefreshedAt())
+                .current(session.sessionId().equals(currentSessionId))
+                .build())
+            .toList();
+    }
+
+    /**
+     * 특정 기기 세션 무효화(원격 로그아웃). 멱등이다 — 이미 만료/삭제된 세션이어도 성공으로 본다.
+     * 그 기기가 이미 발급받은 access 토큰은 만료 시까지 유효할 수 있다(비밀번호 변경과 같은 한계).
+     */
+    public void revokeSession(long memberId, String sessionId) {
+        jwtTokenStorePort.deleteSession(memberId, sessionId);
     }
 
     /** 쿠키의 refresh 토큰에서 세션 아이디를 추출한다. 위조/타인 토큰이면 세션을 건드리지 않는다. */

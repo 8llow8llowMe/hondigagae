@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.auth.application.port.in;
 
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthSessionsResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthGeneralLoginResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthOAuthAuthorizeResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueResponse;
@@ -14,6 +15,12 @@ public interface AuthWebUseCase {
 
     /** 현재 기기 세션만 로그아웃한다. refreshToken 은 요청 쿠키 값으로, 없으면 access 무효화만 수행한다. */
     void logout(long memberId, String tokenId, String refreshToken);
+
+    /** 로그인 기기 목록. refreshToken(쿠키)은 현재 기기 표시용이며 없어도 된다. */
+    AuthSessionsResponse getMySessions(long memberId, String refreshToken);
+
+    /** 특정 기기 세션 무효화(원격 로그아웃). 멱등. */
+    void revokeSession(long memberId, String sessionId);
 
     AuthCookieResult<TokenReissueResponse> reissueToken(TokenReissueCommand command);
 

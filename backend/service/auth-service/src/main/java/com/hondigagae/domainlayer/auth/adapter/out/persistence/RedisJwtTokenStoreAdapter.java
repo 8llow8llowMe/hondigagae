@@ -1,11 +1,15 @@
 package com.hondigagae.domainlayer.auth.adapter.out.persistence;
 
 import com.hondigagae.domainlayer.auth.application.port.out.JwtTokenStorePort;
+import com.hondigagae.domainlayer.auth.application.port.out.query.RefreshSessionQueryResult;
 import com.hondigagae.global.properties.AuthSessionProperties;
 import com.hondigagae.redis.properties.RedisProperties;
 import com.hondigagae.security.auth.blacklist.AccessTokenBlacklistVerifier;
 import com.hondigagae.security.auth.jwt.JwtAuthProperties;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import com.hondigagae.security.common.exception.SecurityErrorCode;
@@ -16,6 +20,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
 
 /**
@@ -80,6 +85,34 @@ public class RedisJwtTokenStoreAdapter implements JwtTokenStorePort, AccessToken
      * 세션 무효화의 핵심 연산이므로 Redis 실패를 삼키지 않고 전파한다.
      * 관용 처리가 필요한 호출부(로그아웃)는 상위에서 예외를 처리한다.
      */
+    @Override
+    public List<RefreshSessionQueryResult> findSessions(long memberId) {
+        String sessionsKey = buildSessionsKey(memberId);
+        Set<ZSetOperations.TypedTuple<String>> tuples =
+            redisTemplate.opsForZSet().reverseRangeWithScores(sessionsKey, 0, -1);
+        if (tuples == null || tuples.isEmpty()) {
+            return List.of();
+        }
+        List<RefreshSessionQueryResult> sessions = new ArrayList<>();
+        for (ZSetOperations.TypedTuple<String> tuple : tuples) {
+            String sessionId = tuple.getValue();
+            if (sessionId == null) {
+                continue;
+            }
+            // refresh 키는 TTL 로 만료되지만 ZSET 항목은 남을 수 있다. 목록 조회 시 자가 치유한다.
+            if (!Boolean.TRUE.equals(redisTemplate.hasKey(buildRefreshKey(memberId, sessionId)))) {
+                redisTemplate.opsForZSet().remove(sessionsKey, sessionId);
+                continue;
+            }
+            long epochMillis = tuple.getScore() == null ? 0L : tuple.getScore().longValue();
+            sessions.add(RefreshSessionQueryResult.builder()
+                .sessionId(sessionId)
+                .lastRefreshedAt(Instant.ofEpochMilli(epochMillis))
+                .build());
+        }
+        return List.copyOf(sessions);
+    }
+
     @Override
     public void deleteSession(long memberId, String sessionId) {
         redisTemplate.delete(buildRefreshKey(memberId, sessionId));

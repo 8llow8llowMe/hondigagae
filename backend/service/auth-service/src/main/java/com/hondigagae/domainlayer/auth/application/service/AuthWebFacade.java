@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.auth.application.service;
 
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthSessionsResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthGeneralLoginResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthOAuthAuthorizeResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueResponse;
@@ -46,6 +47,16 @@ public class AuthWebFacade implements AuthWebUseCase {
         AuthGeneralLoginResponse response = authPresenter.toGeneralLoginResponse(jwtTokenIssueInfo);
 
         return AuthCookieResult.of(response, jwtTokenIssueInfo.refreshToken());
+    }
+
+    @Override
+    public AuthSessionsResponse getMySessions(long memberId, String refreshToken) {
+        return authPresenter.toSessionsResponse(jwtTokenProcessor.listSessions(memberId, refreshToken));
+    }
+
+    @Override
+    public void revokeSession(long memberId, String sessionId) {
+        jwtTokenProcessor.revokeSession(memberId, sessionId);
     }
 
     @Override

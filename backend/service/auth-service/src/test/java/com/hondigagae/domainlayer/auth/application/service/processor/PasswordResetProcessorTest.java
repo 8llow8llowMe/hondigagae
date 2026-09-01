@@ -317,6 +317,11 @@ class PasswordResetProcessorTest {
     }
 
     private static class StubJwtTokenStorePort implements JwtTokenStorePort {
+        @Override
+        public java.util.List<com.hondigagae.domainlayer.auth.application.port.out.query.RefreshSessionQueryResult> findSessions(long memberId) {
+            return java.util.List.of();
+        }
+
 
         private final List<Long> allSessionsDeletedMemberIds = new ArrayList<>();
 

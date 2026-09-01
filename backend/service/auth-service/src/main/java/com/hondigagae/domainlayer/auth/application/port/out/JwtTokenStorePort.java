@@ -1,6 +1,8 @@
 package com.hondigagae.domainlayer.auth.application.port.out;
 
+import com.hondigagae.domainlayer.auth.application.port.out.query.RefreshSessionQueryResult;
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 
 public interface JwtTokenStorePort {
@@ -13,6 +15,12 @@ public interface JwtTokenStorePort {
     void save(long memberId, String sessionId, String refreshToken);
 
     Optional<String> find(long memberId, String sessionId);
+
+    /**
+     * 활성 세션(로그인 기기) 목록 — 최근 갱신순. refresh 키가 이미 만료돼 인덱스에만 남은
+     * 세션은 결과에서 빠진다.
+     */
+    List<RefreshSessionQueryResult> findSessions(long memberId);
 
     /** 특정 기기 세션만 무효화한다 (로그아웃). */
     void deleteSession(long memberId, String sessionId);

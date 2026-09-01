@@ -1,5 +1,7 @@
 package com.hondigagae.domainlayer.auth.adapter.in.web.controller;
 
+import org.springframework.web.bind.annotation.DeleteMapping;
+import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthSessionsResponse;
 import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.request.AuthEmailCodeSendRequest;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.request.AuthEmailCodeVerifyRequest;
@@ -75,6 +77,35 @@ public class AuthWebController {
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, refreshCookieProvider.clearRefreshCookie().toString())
             .body(Response.success());
+    }
+
+    @Operation(summary = "로그인 기기 목록",
+        description = "현재 로그인된 기기(활성 refresh 세션) 목록을 최근 갱신순으로 조회합니다. "
+            + "current 는 refresh 쿠키로 판별하므로 쿠키가 없는 요청에서는 모두 false 입니다. 기기당 별칭은 저장하지 않습니다.",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @GetMapping("/sessions")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<AuthSessionsResponse>> getMySessions(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @CookieValue(name = RefreshCookieProvider.REFRESH_TOKEN_COOKIE, required = false) String refreshToken
+    ) {
+        AuthSessionsResponse response = authWebUseCase.getMySessions(loginActive.memberId(), refreshToken);
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(summary = "특정 기기 로그아웃",
+        description = "지정한 세션(기기)의 refresh 토큰을 무효화합니다. 이미 만료된 세션이어도 성공합니다(멱등). "
+            + "해당 기기가 이미 발급받은 access 토큰은 만료 시까지 유효할 수 있습니다.",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @DeleteMapping("/sessions/{sessionId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<Void>> revokeSession(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "세션 아이디 (기기 목록 조회로 얻는다)", required = true,
+            example = "3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61") @PathVariable String sessionId
+    ) {
+        authWebUseCase.revokeSession(loginActive.memberId(), sessionId);
+        return ResponseEntity.ok().body(Response.success());
     }
 
     @Operation(summary = "소셜 로그인 인가 URL 생성", description = "provider(kakao/naver) 인가 페이지 URL을 생성합니다. CSRF 방어용 state가 포함되며 10분간 유효합니다. 프론트는 이 URL로 리다이렉트합니다.")
