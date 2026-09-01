@@ -10,6 +10,7 @@ import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
@@ -89,5 +90,13 @@ public class MemberExceptionHandler {
     private boolean isEmailUniqueViolation(DataIntegrityViolationException exception) {
         String message = exception.getMostSpecificCause().getMessage();
         return message != null && message.contains(EMAIL_UNIQUE_CONSTRAINT);
+    }
+    /** 필수 쿼리 파라미터 누락. 처리하지 않으면 Response 봉투 밖의 Spring 기본 에러 바디가 나간다. */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Response<Void>> handleMissingParameter(MissingServletRequestParameterException exception) {
+        MemberErrorCode errorCode = MemberErrorCode.PARAMETER_REQUIRED;
+        return ResponseEntity
+            .status(errorCode.getHttpStatus())
+            .body(Response.fail(errorCode.getCode(), errorCode.getMessage() + " (" + exception.getParameterName() + ")"));
     }
 }

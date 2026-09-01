@@ -8,8 +8,6 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface MemberRepository extends JpaRepository<MemberEntity, Long> {
 
-    boolean existsByEmail(String email);
-
     Optional<MemberEntity> findByEmail(String email);
 
     /** 고아 이미지 청소용 — 행이 남아 있는 키는 전부 참조로 본다 (탈퇴·상태 무관). */

@@ -187,6 +187,11 @@ class PetCommandProcessorTest {
         public long countByMemberId(long memberId) {
             return findAllByMemberId(memberId).size();
         }
+
+        @Override
+        public Optional<Pet> findRepresentativeByMemberId(long memberId) {
+            return findAllByMemberId(memberId).stream().filter(Pet::representative).findFirst();
+        }
     
         @Override
         public List<String> findAllProfileImageKeys() {

@@ -109,11 +109,6 @@ class MemberCommandProcessorTest {
         }
 
         @Override
-        public boolean existsByEmail(String email) {
-            return members.values().stream().anyMatch(member -> member.email().equals(email));
-        }
-
-        @Override
         public Optional<Member> findByEmail(String email) {
             return members.values().stream().filter(member -> member.email().equals(email)).findFirst();
         }

@@ -9,6 +9,7 @@ import com.hondigagae.domainlayer.member.domain.model.Member;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +38,8 @@ public class MemberCommandProcessor {
     /**
      * 업로드된 오브젝트 키를 회원에 반영한다. 실제 업로드는 트랜잭션 밖에서 이미 끝난 상태다.
      */
+    // 파사드가 스토리지 I/O 를 트랜잭션 밖에 두므로(업로드 → DB 반영 → 회수) DB 구간은 여기서 경계를 연다.
+    @Transactional
     public MemberProfileImageChangeResult updateProfileImage(long memberId, String objectKey) {
         Member member = memberQueryProcessor.getActiveMember(memberId);
         String previousObjectKey = member.profileImageKey();
@@ -44,6 +47,7 @@ public class MemberCommandProcessor {
         return new MemberProfileImageChangeResult(MemberMyInfo.from(updated), previousObjectKey);
     }
 
+    @Transactional
     public MemberProfileImageChangeResult removeProfileImage(long memberId) {
         Member member = memberQueryProcessor.getActiveMember(memberId);
         String previousObjectKey = member.profileImageKey();

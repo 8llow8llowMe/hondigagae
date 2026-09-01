@@ -30,10 +30,13 @@ public class PetQueryProcessor {
      * 반려견이 한 마리라도 있으면 반드시 존재한다. 없으면 404.
      */
     public Pet getRepresentativePet(long memberId) {
-        return petRepositoryPort.findAllByMemberId(memberId).stream()
-            .filter(Pet::representative)
-            .findFirst()
+        return petRepositoryPort.findRepresentativeByMemberId(memberId)
             .orElseThrow(() -> new PetException(PetErrorCode.NOT_FOUND_PET));
+    }
+
+    /** 내부 API 파사드용 — 다른 조회와 같이 Processor 가 Info 변환까지 책임져 대칭을 유지한다. */
+    public PetInfo getRepresentativePetInfo(long memberId) {
+        return PetInfo.from(getRepresentativePet(memberId));
     }
 
     /**

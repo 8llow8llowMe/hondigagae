@@ -10,6 +10,7 @@ import com.hondigagae.domainlayer.pet.domain.model.Pet;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -60,6 +61,8 @@ public class PetCommandProcessor {
         return PetInfo.from(petRepositoryPort.save(updated));
     }
 
+    // 파사드가 스토리지 I/O 를 트랜잭션 밖에 두므로(업로드 → DB 반영 → 회수) DB 구간은 여기서 경계를 연다.
+    @Transactional
     public PetProfileImageChangeResult updateProfileImage(long memberId, long petId, String objectKey) {
         Pet pet = petQueryProcessor.getOwnedPet(memberId, petId);
         String previousObjectKey = pet.profileImageKey();
@@ -67,6 +70,7 @@ public class PetCommandProcessor {
         return new PetProfileImageChangeResult(PetInfo.from(updated), previousObjectKey);
     }
 
+    @Transactional
     public PetProfileImageChangeResult removeProfileImage(long memberId, long petId) {
         Pet pet = petQueryProcessor.getOwnedPet(memberId, petId);
         String previousObjectKey = pet.profileImageKey();

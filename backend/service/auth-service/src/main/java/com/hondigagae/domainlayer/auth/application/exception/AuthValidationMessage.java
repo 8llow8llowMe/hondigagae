@@ -20,6 +20,9 @@ public final class AuthValidationMessage {
     public static final String PASSWORD_LENGTH_INVALID = "AUTH_107:비밀번호는 8자 이상 20자 이하여야 합니다.";
     public static final String PASSWORD_PATTERN_INVALID = "AUTH_108:비밀번호는 공백 없이 영문자, 숫자, 특수문자를 각각 1자 이상 포함해야 합니다.";
 
+    /** 비밀번호 문자 구성 규칙. member 컨텍스트와 동일 정책이며, 컨텍스트 경계상 상수만 각자 둔다. */
+    public static final String PASSWORD_REGEXP = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()\\-_=+\\[\\]{};:'\",.<>/?\\\\|])\\S+$";
+
     private AuthValidationMessage() {
     }
 }

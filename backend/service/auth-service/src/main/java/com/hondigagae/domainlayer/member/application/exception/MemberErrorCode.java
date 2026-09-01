@@ -22,7 +22,8 @@ public enum MemberErrorCode {
     // 요청 검증(Bean Validation) 대역 — 1xx.
     // 필드별 코드(MEMBER_101~112)는 MemberValidationMessage 가 단일 기준점이며, 여기서는 중복 정의하지 않는다.
     INVALID_REQUEST("MEMBER_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
-    PARAMETER_TYPE_INVALID("MEMBER_113", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST);
+    PARAMETER_TYPE_INVALID("MEMBER_113", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
+    PARAMETER_REQUIRED("MEMBER_114", "필수 요청 파라미터가 누락되었습니다.", HttpStatus.BAD_REQUEST);
 
     private final String code;
     private final String message;

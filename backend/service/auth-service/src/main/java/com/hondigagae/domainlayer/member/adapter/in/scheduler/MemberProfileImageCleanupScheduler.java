@@ -39,11 +39,11 @@ public class MemberProfileImageCleanupScheduler {
             return;
         }
         var referencedKeys = new HashSet<>(memberRepositoryPort.findAllProfileImageKeys());
-        long deleted = candidates.stream()
+        var orphanKeys = candidates.stream()
             .filter(objectKey -> !referencedKeys.contains(objectKey))
-            .peek(objectStorageClient::deleteQuietly)
-            .count();
+            .toList();
+        orphanKeys.forEach(objectStorageClient::deleteQuietly);
         log.info("회원 프로필 고아 이미지 청소 완료. candidates={} referenced={} deleted={}",
-            candidates.size(), referencedKeys.size(), deleted);
+            candidates.size(), referencedKeys.size(), orphanKeys.size());
     }
 }
