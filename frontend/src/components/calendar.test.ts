@@ -45,7 +45,9 @@ describe('Calendar', () => {
     const markup = render()
 
     expect(markup.match(/aria-current="date"/g)).toHaveLength(1)
-    expect(markup).toContain('aria-label="2026년 9월 2일 (수)" aria-pressed="false" aria-current="date"')
+    expect(markup).toContain(
+      'aria-label="2026년 9월 2일 (수)" aria-pressed="false" aria-current="date"',
+    )
   })
 
   it('선택된 칸만 aria-pressed 다', () => {

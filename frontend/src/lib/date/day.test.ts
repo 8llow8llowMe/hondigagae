@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { isDayBefore, isDayWithin, parseDay, todayDay, toDayString, weekdayOf } from '@/lib/date/day'
+import {
+  isDayBefore,
+  isDayWithin,
+  parseDay,
+  todayDay,
+  toDayString,
+  weekdayOf,
+} from '@/lib/date/day'
 
 describe('parseDay', () => {
   it('UTC 자정으로 읽는다 — 타임존에 따라 요일이 밀리지 않는다', () => {
