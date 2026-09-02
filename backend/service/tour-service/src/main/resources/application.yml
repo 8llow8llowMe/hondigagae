@@ -72,10 +72,10 @@ kma-api:
   # 원천 왕복보다 길고, 락 주인이 죽었을 때 남들이 오래 막히지 않을 만큼 짧아야 한다.
   refresh-lock-seconds: ${KMA_REFRESH_LOCK_SECONDS:10}
   # --- 기상특보 (WthrWrnInfoService) ---
-  # 예보와 별개로 활용신청해야 하는 서비스다. 승인 전에는 warning-enabled=false 로 꺼 둔다 -
-  # 켜 두면 10분마다 SERVICE_KEY_IS_NOT_REGISTERED 로그만 쌓인다.
+  # 예보와 별개로 활용신청해야 하는 서비스다(2026-09-01 신청·승인 확인).
+  # 신청이 안 된 환경에서는 false 로 꺼 둔다 - 켜 두면 10분마다 실패 로그만 쌓인다.
   warning-base-url: ${KMA_WARNING_BASE_URL:https://apis.data.go.kr/1360000/WthrWrnInfoService}
-  warning-enabled: ${KMA_WARNING_ENABLED:false}
+  warning-enabled: ${KMA_WARNING_ENABLED:true}
   warning-num-of-rows: ${KMA_WARNING_NUM_OF_ROWS:20}
   # 특보는 발효/해제가 예고 없이 일어나 발표 주기에 맞출 수 없다. 짧은 고정 TTL 을 쓴다.
   # 키가 지역 하나(제주=184)라 10분 TTL 이어도 하루 144건이다.

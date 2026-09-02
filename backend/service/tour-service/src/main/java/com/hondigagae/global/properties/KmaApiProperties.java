@@ -55,12 +55,13 @@ public record KmaApiProperties(
     Integer refreshLockSeconds,
     // 기상특보 (WthrWrnInfoService). 예보와 별개로 활용신청해야 하는 서비스다.
     String warningBaseUrl,
-    // 특보 조회를 켤지. 활용신청 승인 전에는 꺼 두면 호출 자체를 하지 않는다.
+    // 특보 조회를 켤지. 활용신청이 풀리지 않은 환경에서는 꺼 두면 무의미한 호출을 하지 않는다.
     Boolean warningEnabled,
     Integer warningNumOfRows,
     // 특보 캐시 수명(초). 예보와 달리 짧게 잡는다 - 발효/해제가 예고 없이 일어난다.
     Integer warningCacheSeconds,
-    // 특보를 조회할 지점번호. 제주는 184 다.
+    // 특보 조회 지점번호. 필수 파라미터라 보내지만 응답을 필터하지 않는다 -
+    // 실호출에서 제주(184)와 서울(108)에 같은 전국 문구가 왔다. 지역은 문구에서 가른다.
     String warningStationId
 ) {
 
@@ -128,9 +129,10 @@ public record KmaApiProperties(
     /**
      * 특보를 조회할 수 있는 상태인지.
      *
-     * <p>키가 없으면 부르지 않는다. 그리고 <b>키가 있어도 활용신청이 승인되지 않으면 실패한다</b> -
-     * 기상특보 조회서비스는 단기·중기예보와 별개로 신청해야 한다. 승인 전에는
-     * {@code warning-enabled: false} 로 꺼 두면 무의미한 호출과 로그를 만들지 않는다.
+     * <p>키가 없으면 부르지 않는다. 그리고 <b>키가 있어도 활용신청이 따로 필요하다</b> -
+     * 기상특보 조회서비스는 단기·중기예보와 별개로 신청해야 한다(2026-09-01 확인).
+     * 신청이 안 된 환경에서는 {@code warning-enabled: false} 로 꺼 두면 10분마다
+     * 실패 로그가 쌓이는 것을 막을 수 있다.
      */
     public boolean hasWarningSupport() {
         return Boolean.TRUE.equals(warningEnabled) && serviceKey != null && !serviceKey.isBlank();

@@ -3,16 +3,14 @@ package com.hondigagae.domainlayer.insight.adapter.out.client.kma;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hondigagae.domainlayer.insight.application.port.out.WeatherWarningPort;
-import com.hondigagae.domainlayer.insight.domain.enums.WeatherWarningLevel;
-import com.hondigagae.domainlayer.insight.domain.enums.WeatherWarningType;
 import com.hondigagae.domainlayer.insight.domain.model.WeatherWarning;
+import com.hondigagae.domainlayer.insight.domain.model.WeatherWarningStatusText;
 import com.hondigagae.global.properties.KmaApiProperties;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -27,25 +25,39 @@ import org.springframework.web.reactive.function.client.WebClient;
  *
  * <h2>서킷을 kma 와 분리한 이유</h2>
  *
- * 같은 기상청이지만 <b>활용신청이 별개다.</b> 2026-09-01 실호출에서 단기예보는 정상인데
- * 특보만 {@code SERVICE_KEY_IS_NOT_REGISTERED} 가 왔다 - 아직 신청하지 않았다는 뜻이다.
- * 서킷을 {@code kma} 와 공유하면 <b>승인되지 않은 이 API 의 연속 실패가 예보 서킷을 열어</b>
- * 이미 잘 돌고 있는 적합도·산책 위험도까지 끌어내린다. 그래서 {@code kma-warning} 으로 나눈다.
+ * 같은 기상청이지만 <b>활용신청이 별개다.</b> 2026-09-01 확인 과정에서 그것이 드러났다 -
+ * 같은 키로 단기예보는 정상인데 특보만 {@code SERVICE_KEY_IS_NOT_REGISTERED} 였고,
+ * 별도 신청 후에야 열렸다.
  *
- * <h2>응답 규격이 확인되지 않았다</h2>
+ * <p>신청이 갈리면 <b>승인 상태도 쿼터도 따로 움직인다.</b> 서킷을 {@code kma} 와 공유하면
+ * 한쪽의 연속 실패가 다른 쪽 서킷을 열어, 멀쩡한 예보 기능까지 끌어내린다.
+ * 그래서 {@code kma-warning} 으로 나눈다.
  *
- * 활용신청 승인 전이라 <b>실제 응답을 보지 못했다.</b> 그래서 필드명에 기대지 않는 방향으로
- * 짰다 - 특보 내용은 여러 후보 필드 중 있는 것을 이어 붙여 <b>문구에서</b> 종류와 단계를 뽑는다.
- * 필드명은 바뀔 수 있어도 "호우주의보" 같은 문구는 사람이 읽는 표기라 잘 바뀌지 않는다.
+ * <h2>getWthrWrnList 가 아니라 getPwnStatus 다</h2>
  *
- * <p><b>승인 후 반드시 다시 확인할 것</b> — 실제 응답으로 아래를 검증하고 이 주석을 갱신한다.
- * <ul>
- *   <li>발효 중 특보만 오는지, 해제분까지 섞여 오는지 (해제 여부 필드 유무)</li>
- *   <li>{@code stnId} 184(제주)로 제주 전역이 덮이는지</li>
- *   <li>발효 시각 필드명과 형식 ({@code tmFc} 가 발표시각인지 발효시각인지)</li>
- * </ul>
+ * 2026-09-01 실호출로 확인했다. 이름만 보면 "특보 목록"이 맞아 보이지만
+ * {@code getWthrWrnList} 는 <b>통보문 이력</b>이라 해제분까지 한 행으로 온다.
  *
- * <p>그때까지 이 어댑터는 <b>항상 빈 목록</b>을 준다. 실패가 기능을 멎게 하지 않는다.
+ * <pre>
+ * [특보] 제08-108호 : 2026.08.28.10:00 / 호우주의보 해제 (*)
+ * </pre>
+ *
+ * 이것을 발효 중으로 읽으면 <b>이미 풀린 경보로 사용자의 일정을 취소시킨다.</b>
+ * {@code getPwnStatus}(특보 현황)의 {@code t6} 에 지금 살아 있는 것만 남는다.
+ *
+ * <h2>stnId 는 응답을 필터하지 않는다</h2>
+ *
+ * 제주(184)와 서울(108)에 <b>같은 전국 문구</b>가 왔다. 그래서 지역 필터는 파라미터가 아니라
+ * 문구 해석에서 한다 ({@link WeatherWarningStatusText}). 빠뜨리면 전라남도 폭염주의보를
+ * 제주 특보로 읽는다.
+ *
+ * <p>그래도 {@code stnId} 를 보내는 이유는 필수 파라미터이기 때문이다.
+ *
+ * <h2>확인된 응답 필드</h2>
+ *
+ * {@code t6}(발효 중 특보), {@code t7}·{@code other}(실측 당시 모두 {@code "o 없음"}),
+ * {@code tmEf}(발효시각), {@code tmFc}(발표시각), {@code tmSeq}.
+ * <b>발효시각은 {@code tmEf} 다</b> - {@code tmFc} 는 발표시각이라 둘이 다를 수 있다.
  */
 @Slf4j
 @Component
@@ -59,13 +71,12 @@ public class KmaWeatherWarningAdapter implements WeatherWarningPort {
     private static final String OK_RESULT_CODE_TOUR_STYLE = "0000";
     private static final String NO_DATA_RESULT_CODE = "03";
 
-    private static final DateTimeFormatter DATE_PARAM_FORMAT = DateTimeFormatter.BASIC_ISO_DATE;
     private static final DateTimeFormatter EFFECTIVE_AT_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmm");
-    /** 특보 문구가 담길 만한 필드들. 규격 확인 전이라 있는 것을 모아 쓴다. */
-    private static final List<String> TEXT_FIELDS = List.of("title", "t6", "other", "warnVar", "cmd");
+    /** 발효 중 특보가 담기는 필드. */
+    private static final String ACTIVE_WARNING_FIELD = "t6";
+    /** 발효시각. 발표시각({@code tmFc})과 다를 수 있어 이쪽을 쓴다. */
+    private static final String EFFECTIVE_AT_FIELD = "tmEf";
     private static final int RAW_BODY_LOG_LIMIT = 300;
-    /** 조회 구간. 발효 중인 특보를 놓치지 않으려면 어제부터 본다. */
-    private static final int LOOKBACK_DAYS = 1;
 
     private final WebClient openApiWebClient;
     private final ObjectMapper objectMapper;
@@ -89,16 +100,20 @@ public class KmaWeatherWarningAdapter implements WeatherWarningPort {
         }
     }
 
+    /**
+     * 현황 조회 URI.
+     *
+     * <p>날짜 파라미터를 넣지 않는다. 현황은 <b>지금 상태의 스냅샷</b>이라 구간을 물을 필요가
+     * 없고, 실호출에서도 날짜 없이 최신 한 건이 왔다. (구간을 주면 6일 제한에 걸려
+     * {@code resultCode=99} 가 온다.)
+     */
     private URI buildUri(String stationId) {
-        LocalDate today = LocalDate.now();
-        String url = "%s/getWthrWrnList?serviceKey=%s&dataType=JSON&numOfRows=%d&pageNo=1&stnId=%s&fromTmFc=%s&toTmFc=%s"
+        String url = "%s/getPwnStatus?serviceKey=%s&dataType=JSON&numOfRows=%d&pageNo=1&stnId=%s"
             .formatted(
                 kmaApiProperties.warningBaseUrl(),
                 URLEncoder.encode(kmaApiProperties.serviceKey(), StandardCharsets.UTF_8),
                 kmaApiProperties.warningNumOfRows(),
-                stationId,
-                today.minusDays(LOOKBACK_DAYS).format(DATE_PARAM_FORMAT),
-                today.format(DATE_PARAM_FORMAT)
+                stationId
             );
         return URI.create(url);
     }
@@ -118,8 +133,12 @@ public class KmaWeatherWarningAdapter implements WeatherWarningPort {
     /**
      * 정상 래퍼와 오류 응답을 분기한다.
      *
-     * <p>활용신청 전에는 {@code response} 가 아니라 {@code OpenAPI_ServiceResponse} 로 오므로
-     * 헤더가 없어 여기서 걸린다.
+     * <p>활용신청이 풀리지 않은 키로 부르면 {@code response} 가 아니라
+     * {@code OpenAPI_ServiceResponse} 로 오므로 헤더가 없어 여기서 걸린다.
+     *
+     * <p>조회 구간을 잘못 주면 {@code resultCode=99}("최대 조회 기간은 오늘 기준으로 6일
+     * 전까지입니다")가 온다. 현황 조회는 날짜를 안 보내므로 해당되지 않지만, 오류 코드를
+     * 그대로 로그에 남겨 원인을 바로 알 수 있게 한다.
      */
     private JsonNode parseAndValidate(String rawBody) {
         if (rawBody == null || rawBody.isBlank()) {
@@ -173,41 +192,22 @@ public class KmaWeatherWarningAdapter implements WeatherWarningPort {
     }
 
     /**
-     * 특보 문구에서 종류와 단계를 뽑는다.
+     * 현황 문구를 제주 특보로 옮긴다.
      *
-     * <p>필드명이 아니라 문구를 근거로 삼는 것이 요점이다 - 규격을 확인하지 못한 상태에서
-     * 필드명을 찍으면 이름 하나 다를 때 조용히 0건이 된다.
+     * <p>해석 자체는 {@link WeatherWarningStatusText} 가 한다 - 지역 필터가 기상청 프로토콜이
+     * 아니라 <b>이 서비스가 제주만 다룬다는 도메인 사실</b>이라서다. 여기는 어느 필드를 읽을지만 안다.
      */
     private List<WeatherWarning> toWarnings(List<JsonNode> items) {
         List<WeatherWarning> warnings = new ArrayList<>();
         for (JsonNode item : items) {
-            String text = joinTextFields(item);
-            if (text.isBlank()) {
-                continue;
-            }
-            warnings.add(WeatherWarning.builder()
-                .type(WeatherWarningType.from(text))
-                .level(WeatherWarningLevel.from(text))
-                .effectiveAt(parseEffectiveAt(item))
-                .sourceText(truncate(text))
-                .build());
+            warnings.addAll(WeatherWarningStatusText.parseJejuWarnings(
+                item.path(ACTIVE_WARNING_FIELD).asText(""), parseEffectiveAt(item)));
         }
         return warnings;
     }
 
-    private String joinTextFields(JsonNode item) {
-        StringBuilder joined = new StringBuilder();
-        for (String field : TEXT_FIELDS) {
-            String value = item.path(field).asText("");
-            if (!value.isBlank()) {
-                joined.append(value).append(' ');
-            }
-        }
-        return joined.toString().trim();
-    }
-
     private LocalDateTime parseEffectiveAt(JsonNode item) {
-        String value = item.path("tmFc").asText("");
+        String value = item.path(EFFECTIVE_AT_FIELD).asText("");
         if (value.length() < 12) {
             return null;
         }
