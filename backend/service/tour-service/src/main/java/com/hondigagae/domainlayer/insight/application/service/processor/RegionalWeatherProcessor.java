@@ -12,6 +12,7 @@ import com.hondigagae.domainlayer.insight.domain.model.RegionalWeatherComparison
 import com.hondigagae.domainlayer.insight.domain.model.SuitabilityEvaluator;
 import com.hondigagae.domainlayer.insight.domain.model.SuitabilityReason;
 import com.hondigagae.domainlayer.insight.domain.model.SuitabilityThresholds;
+import com.hondigagae.domainlayer.insight.domain.model.WeatherWarning;
 import com.hondigagae.global.properties.InsightProperties;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -50,6 +51,7 @@ public class RegionalWeatherProcessor {
     private final WeatherForecastProcessor weatherForecastProcessor;
     private final InsightMapper insightMapper;
     private final InsightProperties insightProperties;
+    private final WeatherWarningProcessor weatherWarningProcessor;
 
     /**
      * 권역별 하루 날씨와 추천.
@@ -69,7 +71,13 @@ public class RegionalWeatherProcessor {
             // 다섯 권역 어디도 예보를 못 받았다. 빈 비교표를 주면 "전부 비슷하다"로 읽힌다.
             throw new InsightException(InsightErrorCode.WEATHER_UNAVAILABLE);
         }
-        return RegionalWeatherComparison.of(date, regions);
+
+        // 특보는 지금 발효 중인 것이라 오늘에만 붙인다. 적합도·산책 위험도와 같은 규칙이다 -
+        // 한 서비스가 화면마다 다른 말을 하면 안 된다.
+        WeatherWarning warning = date.equals(LocalDate.now())
+            ? weatherWarningProcessor.heaviestWarning().orElse(null)
+            : null;
+        return RegionalWeatherComparison.of(date, regions, warning);
     }
 
     private RegionWeather toRegionWeather(

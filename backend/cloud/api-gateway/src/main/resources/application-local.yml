@@ -28,6 +28,12 @@ spring:
           uri: lb://tour-service
           predicates:
             - Path=/api/v1/emergencies/**
+        # 장소에 매이지 않은 인사이트(권역 날씨 비교, 산책 골든타임).
+        # /api/v1/places/** 와 달리 장소 아이디로 시작하지 않아 경로가 따로다.
+        - id: tour-service-insights
+          uri: lb://tour-service
+          predicates:
+            - Path=/api/v1/insights/**
         - id: plan-service-plans
           uri: lb://plan-service
           predicates:

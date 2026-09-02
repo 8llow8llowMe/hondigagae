@@ -24,6 +24,7 @@ public class RegionalWeatherPresenter {
             .regions(comparison.regions().stream().map(this::toItem).toList())
             .recommendedRegion(recommended == null ? null : recommended.region().toMetadata())
             .recommendationReasons(toRecommendationReasons(recommended))
+            .weatherWarning(insightPresenter.toWarningItem(comparison.weatherWarning()))
             .build();
     }
 
