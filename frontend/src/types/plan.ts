@@ -24,10 +24,24 @@ export type PlanSummaryItem = {
   status: CodeNameMetadata
 }
 
+/**
+ * 일자 판정 근거 (`PlanWeatherReasonItem`).
+ *
+ * **장소 적합도의 `SuitabilityReasonItem` 과 필드가 같다** — `scoreDelta` 까지 포함해서다.
+ * `WalkSafetyReasonItem` 만 `scoreDelta` 가 없다 (`types/insight.ts`).
+ */
 export type PlanWeatherReasonItem = {
   code: string
   name: string
   description: string
+  /**
+   * 점수 영향. **음수면 감점, `0` 이면 정보성이다** (백엔드 `@Schema`).
+   *
+   * 화면은 **숫자를 노출하지 않고** 정보성만 한 단계 흐리게 내린다 — 적합도 패널과 같은
+   * 처리다. 예전에는 이 필드를 타입에서 잘라, 같은 `ReasonList` 를 쓰는 두 화면 중
+   * 일정 일자 판정만 그 구분을 못 했다 (#148).
+   */
+  scoreDelta: number
 }
 
 export type PlanAlternativePlaceItem = {

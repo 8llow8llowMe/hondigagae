@@ -78,7 +78,18 @@ export function PlanDayVerdict({
             )}
           </div>
 
-          <ReasonList reasons={verdict.reasons} />
+          {/*
+            서버 순서를 유지한다 — `reasons` 는 점수 영향이 큰 순서로 온다.
+            정보성(`scoreDelta === 0`)만 한 단계 흐리게 내린다. **장소 적합도 패널과 같은
+            처리다** (`place-suitability-panel.tsx`) — 같은 모양의 근거를 두 화면이 다르게
+            보여 주고 있었다 (#148).
+          */}
+          <ReasonList
+            reasons={verdict.reasons.map((reason) => ({
+              description: reason.description,
+              informational: reason.scoreDelta === 0,
+            }))}
+          />
 
           <PlanVerdictNotes verdict={verdict} petConditionApplied={petConditionApplied} />
         </>

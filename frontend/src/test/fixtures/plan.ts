@@ -101,6 +101,7 @@ export const planVerdict: PlanDayWeatherItem = {
       code: 'PET_ALLOWED',
       name: '반려견 동반 가능',
       description: '반려견과 함께 입장할 수 있는 장소입니다.',
+      scoreDelta: 0,
     },
   ],
   weather: {
