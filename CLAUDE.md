@@ -89,6 +89,8 @@
 | 멀티 에이전트 | `/backend-multi-agent` | `/fe-multi-agent` | |
 | 협업 문서 | | | `/issue`, `/pr`, `/mr` |
 
+작업 상태 동기화(`/sync` · `/sync out`)는 이 저장소 스킬이 아니라 **전역 스킬**이다 (`seonghoho/dev-dotfiles` → `~/.claude/skills/sync`). 이 저장소의 규칙은 `docs/git-workflow.md` 를 정본으로 읽어 적용한다.
+
 `.claude/agents/fe-*.md` — FE 전용 서브에이전트 7종 (`fe-spec-writer`, `fe-implementer`, `fe-reviewer`, `fe-api-contract`, `fe-design-reviewer`, `fe-test-author`, `fe-map-reviewer`). 세부는 `frontend/docs/team-playbook.md`.
 
 > **주의**: 사용자 전역(`~/.claude/agents/`)에 같은 이름의 다른 프로젝트용 에이전트가 있을 수 있다. 이 저장소의 프로젝트 스코프 정의가 우선하며, **BossPickSeoul 경로·Swagger URL이 등장하면 잘못된 에이전트를 읽고 있는 것이다.**
