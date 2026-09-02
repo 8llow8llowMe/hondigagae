@@ -30,6 +30,16 @@ describe('isValidWeightInput', () => {
     expect(isValidWeightInput('3.55')).toBe(false)
   })
 
+  it('플레이스홀더를 따라 친 단위를 걷어낸다 — 우리가 보여준 예시가 함정이 되면 안 된다', () => {
+    expect(isValidWeightInput('3.5kg')).toBe(true)
+    expect(isValidWeightInput('3.5 kg')).toBe(true)
+    expect(isValidWeightInput('12KG')).toBe(true)
+    expect(toWeightPayload('3.5kg')).toBe(3.5)
+    // 단위를 걷어도 값의 성질은 그대로 본다
+    expect(isValidWeightInput('100kg')).toBe(false)
+    expect(isValidWeightInput('3.55kg')).toBe(false)
+  })
+
   it('숫자가 아니면 거부한다', () => {
     expect(isValidWeightInput('삼점오')).toBe(false)
     expect(isValidWeightInput('3,5')).toBe(false)

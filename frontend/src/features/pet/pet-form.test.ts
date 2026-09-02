@@ -68,10 +68,22 @@ describe('PetFormFields — 구성', () => {
     expect(checkboxSection).not.toContain('checked=""')
   })
 
-  it('선택 입력에 안내 문구를 붙인다', () => {
+  it('입력 방법을 말하는 hint 만 남긴다', () => {
     const markup = render()
 
     expect(markup).toContain(messages.pet.hints.birthYm)
+    expect(markup).toContain(messages.pet.hints.weightKg)
+  })
+
+  it("'선택 입력' 이라고 적지 않는다 — 필수 표시(*)가 없는 것이 곧 선택이다", () => {
+    expect(render()).not.toContain('선택 입력')
+  })
+
+  it('체중 라벨과 플레이스홀더가 단위를 보여준다', () => {
+    const markup = render()
+
+    expect(markup).toContain('체중 (kg)')
+    expect(markup).toContain('placeholder="3.5kg"')
   })
 })
 

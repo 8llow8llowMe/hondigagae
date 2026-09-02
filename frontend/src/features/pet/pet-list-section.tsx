@@ -31,9 +31,11 @@ export function PetListSection({
   errorStatus,
   onRetry,
 }: PetListSectionProps) {
+  // 페이지가 전폭이라 좌우 인셋(16 / 40)을 상태 분기가 직접 갖는다. 이 값이
+  // `Row` 의 구분선 인셋과 같아서 선과 글자가 한 축에서 시작한다 (DESIGN.md §4)
   if (loading) {
     return (
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 px-4 py-6 md:px-10">
         <Skeleton className="h-32 w-full rounded-lg" />
         <Skeleton className="h-32 w-full rounded-lg" />
       </div>
@@ -69,9 +71,13 @@ export function PetListSection({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-body-2 text-fg-muted">
+    <div>
+      {/*
+        등록 수 · 등록 버튼 줄. **아래에 선을 그어 목록의 시작을 표시한다** — 여백만
+        두면 이 줄이 첫 번째 행처럼 읽힌다.
+      */}
+      <div className="border-border flex flex-wrap items-center justify-between gap-2 border-b px-4 py-4 md:px-10">
+        <p className="text-body-2 text-fg-muted tabular-nums">
           {totalCount} / {MAX_PET_COUNT}
         </p>
 

@@ -19,25 +19,36 @@ export const MAX_PET_WEIGHT_KG = 99.9
 const WEIGHT_PATTERN = /^\d{1,2}(\.\d)?$/
 
 /**
+ * 입력에서 단위를 걷는다.
+ *
+ * **라벨과 플레이스홀더가 `kg` 를 보여주기 때문이다.** `3.5kg` 라고 적힌 자리를 보고
+ * 그대로 따라 치는 것은 자연스러운 반응인데, 그것을 형식 오류로 되돌려 주면 우리가
+ * 보여준 예시가 곧 함정이 된다. 값의 성질(0.1~99.9 · 소수 한 자리)은 그대로 본다.
+ */
+function stripUnit(raw: string): string {
+  return raw.trim().replace(/\s*(kg|KG|Kg|kG|킬로|킬로그램)$/, '')
+}
+
+/**
  * 폼 문자열이 저장 가능한 값인가.
  *
  * **빈 값은 유효하다** — "모름" 이 정당한 답이기 때문이다. 백엔드도 선택 필드로 받는다.
  */
 export function isValidWeightInput(raw: string): boolean {
-  const trimmed = raw.trim()
-  if (trimmed === '') return true
-  if (!WEIGHT_PATTERN.test(trimmed)) return false
+  const normalized = stripUnit(raw)
+  if (normalized === '') return true
+  if (!WEIGHT_PATTERN.test(normalized)) return false
 
-  const value = Number(trimmed)
+  const value = Number(normalized)
   return value >= MIN_PET_WEIGHT_KG && value <= MAX_PET_WEIGHT_KG
 }
 
 /** 폼 문자열 → 요청 값. 빈 값이거나 읽을 수 없으면 `null`(= 보내지 않음) */
 export function toWeightPayload(raw: string): number | null {
-  const trimmed = raw.trim()
-  if (trimmed === '' || !WEIGHT_PATTERN.test(trimmed)) return null
+  const normalized = stripUnit(raw)
+  if (normalized === '' || !WEIGHT_PATTERN.test(normalized)) return null
 
-  const value = Number(trimmed)
+  const value = Number(normalized)
   return Number.isFinite(value) ? value : null
 }
 

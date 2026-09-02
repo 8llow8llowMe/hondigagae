@@ -12,7 +12,7 @@
 export const petMessages = {
   // 화면
   listTitle: '내 반려견',
-  listDescription: '등록한 반려견의 성향을 여행 설계에 반영해요.',
+  listDescription: '내 반려견을 등록해 여행 계획을 완성해 보세요.',
   newTitle: '반려견 등록',
   editTitle: '반려견 정보 수정',
 
@@ -50,7 +50,7 @@ export const petMessages = {
     breed: '품종',
     birthYm: '생년월',
     sizeType: '크기',
-    weightKg: '체중',
+    weightKg: '체중 (kg)',
     activityLevel: '활동량',
     sociality: '사회성',
     heatSensitive: '더위에 민감해요',
@@ -59,14 +59,15 @@ export const petMessages = {
     walkPreferred: '산책을 좋아해요',
   },
 
+  /**
+   * **'선택 입력' 이라고 적지 않는다.** 필수 필드에만 `*` 를 붙이고 있으므로 표시가
+   * 없는 것이 곧 선택이다 — 같은 말을 두 번 하면 폼이 안내문으로 뒤덮인다.
+   * hint 는 **입력 방법이나 쓰임새를 말할 때만** 남긴다.
+   */
   hints: {
-    optional: '선택 입력',
-    birthYm: '선택 입력 · 2017-05 형식',
-    /**
-     * **모르면 비워도 된다는 것을 먼저 말한다.** 크기가 이미 필수라 체중까지 필수처럼
-     * 보이면 모르는 사람이 대충 적고, 그 값이 장소 필터 판정에 그대로 쓰인다.
-     */
-    weightKg: '선택 입력 · 입장 체중 제한이 있는 곳을 걸러 줄 때 써요',
+    birthYm: '숫자만 입력해도 2017-05 형식으로 맞춰져요',
+    /** 값이 어디에 쓰이는지 말한다 — 그래야 모르면 비워도 되는 것이 전달된다 */
+    weightKg: '입장 체중 제한이 있는 곳을 걸러 줄 때 써요',
   },
 
   // 검증 — PetValidationMessage 복제본

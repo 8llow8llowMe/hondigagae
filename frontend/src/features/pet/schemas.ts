@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { messages } from '@/lib/messages'
+import { isValidBirthYmInput } from '@/lib/pet/birth-ym'
 import { isValidWeightInput } from '@/lib/pet/weight'
 import { ACTIVITY_LEVEL_CODES, PET_SIZE_CODES, SOCIALITY_LEVEL_CODES } from '@/types/pet'
 
@@ -12,9 +13,6 @@ import { ACTIVITY_LEVEL_CODES, PET_SIZE_CODES, SOCIALITY_LEVEL_CODES } from '@/t
  * `breed`/`birthYm` 이 폼에서는 `''`(빈 값)이고 전송 직전에 `null` 이 된다.
  */
 
-/** PetValidationMessage.BIRTH_YM_PATTERN 실측 — 백엔드와 문자 하나까지 같아야 한다 */
-const BIRTH_YM_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/
-
 /**
  * 선택 입력의 빈 값을 허용한다.
  *
@@ -22,12 +20,13 @@ const BIRTH_YM_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/
  * 폼은 빈 값을 `''` 로 들고 있다. 여기서 `''` 를 막으면 **선택 입력이 사실상 필수가 된다.**
  * `''` 는 통과시키고, 전송 직전 `toPetSavePayload()` 가 `null` 로 바꾼다
  * (공통명세 S3-3).
+ *
+ * 패턴 판정은 `lib/pet/birth-ym.ts` 한 곳이 소유한다 — 입력 마스크와 같은 규칙을 봐야
+ * 마스크가 만들어 준 값이 스키마에서 떨어지는 일이 없다.
  */
-const optionalBirthYm = z
-  .string()
-  .refine((value) => value.trim() === '' || BIRTH_YM_PATTERN.test(value.trim()), {
-    message: messages.pet.birthYmFormat,
-  })
+const optionalBirthYm = z.string().refine(isValidBirthYmInput, {
+  message: messages.pet.birthYmFormat,
+})
 
 export const petFormSchema = z.object({
   // PET_101 (필수) / PET_102 (길이)
