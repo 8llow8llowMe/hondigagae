@@ -24,13 +24,14 @@ function payload(
   return draftToPlanPayload({
     draft: draft(days),
     snapshot,
+    basisPetId: '123456789012000001',
     title: '몽실이와 제주 2박 3일',
     ...extra,
   })
 }
 
 describe('draftToPlanPayload — 일정 본문은 입력 조건에서 온다', () => {
-  it('초안에 없는 조건(petId·기간·예산·areaCode)을 스냅샷에서 채운다', () => {
+  it('초안에 없는 조건(기간·예산·areaCode)을 스냅샷에서 채운다', () => {
     const result = payload([{ day: 1, items: [item()] }])
 
     expect(result.petId).toBe('123456789012000001')
@@ -45,6 +46,7 @@ describe('draftToPlanPayload — 일정 본문은 입력 조건에서 온다', (
     const result = draftToPlanPayload({
       draft: draft([{ day: 1, items: [item()] }]),
       snapshot: { ...snapshot, budget: null },
+      basisPetId: '123456789012000001',
       title: '제주 2박 3일',
     })
 
@@ -259,5 +261,39 @@ describe('draftToPlanPayload — 기간 밖 일차를 걸러낸다 (PLAN_002)', 
   it('totalDays 를 주지 않으면 거르지 않는다 — 일수를 모를 때 임의로 버리지 않는다', () => {
     const result = payload([{ day: 4, items: [item({ title: '남음' })] }])
     expect(result.items?.map((i) => i.title)).toEqual(['남음'])
+  })
+})
+
+describe('draftToPlanPayload — 판정 기준 반려견 (#128 · 명세 D4)', () => {
+  const twoPets = {
+    ...snapshot,
+    pets: [
+      { petId: '111', name: '몽실이' },
+      { petId: '222', name: '초코' },
+    ],
+  }
+
+  it('기준으로 고른 반려견이 페이로드에 실린다', () => {
+    const result = draftToPlanPayload({
+      draft: draft([{ day: 1, items: [item()] }]),
+      snapshot: twoPets,
+      basisPetId: '222',
+      title: '제주 2박 3일',
+      totalDays: 3,
+    })
+
+    expect(result.petId).toBe('222')
+  })
+
+  it('스냅샷의 다른 아이가 실리지 않는다 — 첫 번째를 기본으로 삼지 않는다', () => {
+    const result = draftToPlanPayload({
+      draft: draft([{ day: 1, items: [item()] }]),
+      snapshot: twoPets,
+      basisPetId: '222',
+      title: '제주 2박 3일',
+      totalDays: 3,
+    })
+
+    expect(result.petId).not.toBe('111')
   })
 })

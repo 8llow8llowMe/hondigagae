@@ -35,8 +35,7 @@ export const aiPlanSnapshot: AiPlanRequestSnapshot = {
   areaCode: '39',
   startDate: '2026-09-12',
   endDate: '2026-09-14',
-  petId: '123456789012000001',
-  petName: '몽실이',
+  pets: [{ petId: '123456789012000001', name: '몽실이' }],
   budget: 300_000,
   requestNote: '실내 위주로',
 }

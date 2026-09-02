@@ -35,6 +35,12 @@ function isPlanItemType(value: string): value is PlanItemTypeCode {
 export type DraftToPlanOptions = {
   draft: AiPlanDraft
   snapshot: AiPlanRequestSnapshot
+  /**
+   * 이 일정의 판정 기준이 될 반려견. **스냅샷에서 꺼내지 않고 받는다** —
+   * `PlanCreateRequest.petId` 가 단일이라 여러 마리 중 하나를 사람이 고르고
+   * (다견선택-세부명세 D4), 그 선택이 여기까지 그대로 와야 한다.
+   */
+  basisPetId: string
   title: string
   /**
    * 여행 총 일수. **기간 밖 일차를 걸러내는 데 쓴다** — 모르면(`null`) 거르지 않는다.
@@ -73,12 +79,13 @@ export type DraftToPlanOptions = {
 export function draftToPlanPayload({
   draft,
   snapshot,
+  basisPetId,
   title,
   totalDays,
   excludedPlaceIds,
 }: DraftToPlanOptions): PlanCreatePayload {
   return {
-    petId: snapshot.petId,
+    petId: basisPetId,
     areaCode: snapshot.areaCode,
     title,
     startDate: snapshot.startDate,
