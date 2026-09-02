@@ -140,12 +140,24 @@ public final class SuitabilityEvaluator {
     }
 
     private static int applyWeather(SuitabilityInput input, List<SuitabilityReason> reasons) {
-        DailyWeather weather = input.weather();
         PlaceCondition place = input.place();
-        PetCondition pet = input.pet();
-        SuitabilityThresholds thresholds = input.thresholds();
+        return applyWeatherRules(input.weather(), input.pet(), input.thresholds(),
+            place.hasIndoorShelter(), place.isWeatherExposed(), reasons);
+    }
 
-        boolean sheltered = place.hasIndoorShelter();
+    /**
+     * 날씨만으로 감점과 근거를 만든다. <b>장소를 모르는 호출부도 같은 규칙을 쓰게 하려고 꺼냈다.</b>
+     *
+     * <p>권역 비교(어느 권역이 나가기 좋은가)에는 장소가 없다. 그렇다고 규칙을 복사하면
+     * 임계값이 바뀔 때 한쪽만 고쳐져 같은 날씨를 화면마다 다르게 판정하게 된다.
+     *
+     * @param sheltered      실내 공간이 있어 날씨 영향을 덜 받는가. 장소가 없으면 false 다
+     * @param weatherExposed 바람을 그대로 맞는 곳인가. 장소가 없으면 야외로 본다(true)
+     */
+    public static int applyWeatherRules(
+        DailyWeather weather, PetCondition pet, SuitabilityThresholds thresholds,
+        boolean sheltered, boolean weatherExposed, List<SuitabilityReason> reasons
+    ) {
         int penalty = 0;
         boolean anyWeatherPenalty = false;
 
@@ -212,7 +224,7 @@ public final class SuitabilityEvaluator {
         }
 
         Double wind = weather.maxWindSpeed();
-        if (wind != null && wind >= thresholds.strongWindSpeed() && place.isWeatherExposed()) {
+        if (wind != null && wind >= thresholds.strongWindSpeed() && weatherExposed) {
             penalty += PENALTY_STRONG_WIND;
             anyWeatherPenalty = true;
             reasons.add(SuitabilityReason.of(SuitabilityReasonCode.WIND_STRONG,
