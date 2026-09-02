@@ -154,6 +154,11 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0)', () => {
       'src/features/place/place-map-view.tsx',
       // 마커를 고르면 지도 위에 뜨는 카드 (`혼디가개 긴급 시설` 02)
       'src/features/emergency/facility-selected-card.tsx',
+      // ── 드래그 중인 항목 (DESIGN.md §6 이 --shadow-md 용도에 명시한다) ─────
+      // 끌고 있는 행은 손끝에 들려 목록 위에 떠 있다. 평면 카드를 띄우려고 이 목록에
+      // 넣는 것이 규칙을 무너뜨리는 경로이므로, 여기 추가하기 전에 그것이 **실제로
+      // 페이지 위에 뜨는지** 먼저 확인한다.
+      'src/features/plan/plan-editable-item-row.tsx',
     ]
 
     const found = FILES.filter(({ path }) => !FLOATING.includes(path.replace(/\\/g, '/'))).flatMap(
