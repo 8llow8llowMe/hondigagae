@@ -29,6 +29,7 @@ public class PlanPresenter {
         return PlanDetailResponse.builder()
             .planId(String.valueOf(info.planId()))
             .petId(String.valueOf(info.petId()))
+            .petIds(toIdStrings(info.petIds()))
             .areaCode(info.areaCode())
             .sigunguCode(info.sigunguCode())
             .title(info.title())
@@ -49,6 +50,7 @@ public class PlanPresenter {
         return PlanSummaryItem.builder()
             .planId(String.valueOf(info.planId()))
             .petId(String.valueOf(info.petId()))
+            .petIds(toIdStrings(info.petIds()))
             .areaCode(info.areaCode())
             .title(info.title())
             .startDate(info.startDate())
@@ -122,5 +124,10 @@ public class PlanPresenter {
 
     private CodeNameDescriptionMetadata toStatusMetadata(PlanStatus status) {
         return CodeNameDescriptionMetadata.of(status.name(), status.getDisplayName(), status.getDescription());
+    }
+
+    /** Snowflake 아이디 목록은 문자열로 내린다 (coding-conventions §7-1). */
+    private List<String> toIdStrings(List<Long> ids) {
+        return ids == null ? List.of() : ids.stream().map(String::valueOf).toList();
     }
 }

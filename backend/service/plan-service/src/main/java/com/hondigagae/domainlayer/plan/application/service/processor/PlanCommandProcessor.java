@@ -5,13 +5,16 @@ import com.hondigagae.domainlayer.plan.application.command.PlanItemCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanUpdateCommand;
 import com.hondigagae.domainlayer.plan.application.exception.PlanErrorCode;
 import com.hondigagae.domainlayer.plan.application.exception.PlanException;
+import com.hondigagae.domainlayer.plan.application.port.out.PetConditionQueryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlaceVerifyQueryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlanPetRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanRepositoryPort;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanItemType;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
+import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import java.time.LocalDate;
 import java.util.List;
@@ -30,16 +33,20 @@ public class PlanCommandProcessor {
 
     private final PlanRepositoryPort planRepositoryPort;
     private final PlanItemRepositoryPort planItemRepositoryPort;
+    private final PlanPetRepositoryPort planPetRepositoryPort;
     private final PlaceVerifyQueryPort placeVerifyQueryPort;
+    private final PetConditionQueryPort petConditionQueryPort;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
 
     public Plan createPlan(long memberId, PlanCreateCommand command) {
         validateDateRange(command.startDate(), command.endDate());
+        List<Long> petIds = resolvePetIds(memberId, command.petIds());
 
         Plan plan = Plan.builder()
             .id(snowflakeIdGenerator.generateId())
             .memberId(memberId)
-            .petId(command.petId())
+            // 대표 반려견 = 첫 번째. 목록 전체는 plan_pet 에 따로 둔다.
+            .petId(petIds.get(0))
             .areaCode(command.areaCode())
             .sigunguCode(command.sigunguCode())
             .title(command.title())
@@ -51,6 +58,7 @@ public class PlanCommandProcessor {
             .build();
 
         Plan saved = planRepositoryPort.save(plan);
+        planPetRepositoryPort.saveAll(toPets(saved.id(), petIds));
 
         if (!CollectionUtils.isEmpty(command.items())) {
             validateItemDays(saved, command.items());
@@ -59,6 +67,20 @@ public class PlanCommandProcessor {
             planItemRepositoryPort.saveAll(toItems(saved.id(), command.items()));
         }
         return saved;
+    }
+
+    /**
+     * 요청이 반려견을 지정하지 않았으면 <b>대표 반려견</b>으로 대신한다 — ai-service 의 생성과 같은
+     * 규칙이다. 한 마리만 키우는 사용자가 담기마다 petId 를 고르게 하지 않기 위한 기본값이고,
+     * 그것도 없으면 일정을 만들 수 없다 — petId 는 NOT NULL 이고 날씨 판정의 기준이기 때문이다.
+     */
+    private List<Long> resolvePetIds(long memberId, List<Long> requested) {
+        if (!CollectionUtils.isEmpty(requested)) {
+            return requested;
+        }
+        return petConditionQueryPort.findRepresentativePetId(memberId)
+            .map(List::of)
+            .orElseThrow(() -> new PlanException(PlanErrorCode.PET_REQUIRED));
     }
 
     public Plan updatePlan(Plan plan, PlanUpdateCommand command) {
@@ -182,6 +204,16 @@ public class PlanCommandProcessor {
             .filter(found -> found.planId() == plan.id())
             .orElseThrow(() -> new PlanException(PlanErrorCode.NOT_FOUND_PLAN_ITEM));
         return planItemRepositoryPort.save(item.withVisited(visited));
+    }
+
+    private List<PlanPet> toPets(long planId, List<Long> petIds) {
+        return petIds.stream()
+            .map(petId -> PlanPet.builder()
+                .id(snowflakeIdGenerator.generateId())
+                .planId(planId)
+                .petId(petId)
+                .build())
+            .toList();
     }
 
     private List<PlanItem> toItems(long planId, List<PlanItemCommand> commands) {

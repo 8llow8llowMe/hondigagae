@@ -110,7 +110,7 @@ public class PlanWebFacade implements PlanWebUseCase {
     @Override
     public PlanWeatherResponse getPlanWeather(long memberId, long planId) {
         Plan plan = planQueryProcessor.getOwnedPlan(memberId, planId);
-        PlanWeatherInfo info = planWeatherProcessor.brief(memberId, plan);
+        PlanWeatherInfo info = planWeatherProcessor.brief(memberId, plan, planQueryProcessor.getPetIds(plan));
         return planWeatherPresenter.toResponse(info);
     }
 }

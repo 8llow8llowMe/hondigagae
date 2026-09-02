@@ -45,7 +45,9 @@ public class PlanWebController {
     private final PlanWebUseCase planWebUseCase;
 
     @Operation(summary = "여행 일정 생성",
-        description = "여행 일정을 생성합니다. 일정 항목을 함께 보내면 같이 저장하며, 장소 항목은 tour-service에서 존재를 검증합니다.",
+        description = "여행 일정을 생성합니다. 일정 항목을 함께 보내면 같이 저장하며, 장소 항목은 tour-service에서 존재를 검증합니다. "
+            + "동행 반려견은 petIds(최대 5마리)로 보내고 첫 번째가 대표 반려견이 됩니다. petIds 가 없으면 petId 를, "
+            + "둘 다 없으면 대표 반려견을 씁니다 — AI 일정 생성(POST /ai-plans)과 같은 규칙입니다.",
         security = {@SecurityRequirement(name = "bearerAuth")})
     @PostMapping
     @PreAuthorize("isAuthenticated()")
@@ -63,7 +65,8 @@ public class PlanWebController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Response<SliceResponse<PlanSummaryItem>>> getMyPlans(
         @AuthenticationPrincipal MemberLoginActive loginActive,
-        @Parameter(description = "반려견 아이디 — 지정하면 그 반려견과 함께한 일정만 조회합니다 (반려견별 여행 히스토리)",
+        @Parameter(description = "반려견 아이디 — 지정하면 그 반려견이 동행한 일정만 조회합니다 (반려견별 여행 히스토리). "
+            + "여러 마리 일정은 그중 한 마리로 들어 있어도 조회됩니다",
             example = "1234567890123456789") @RequestParam(required = false) Long petId,
         @Parameter(description = "마지막으로 받은 일정 아이디 (첫 페이지는 생략)", example = "1234567890123456789") @RequestParam(required = false) Long lastPlanId,
         @Parameter(description = "조회 개수", example = "10")
@@ -130,6 +133,8 @@ public class PlanWebController {
     @Operation(summary = "일정 날씨 브리핑",
         description = "일정의 날짜별로 날씨와 반려견 여행 적합도를 같이 보여 줍니다. "
             + "그날 첫 장소 항목을 기준으로 판정하며, 반려견 특성은 등록된 프로필을 자동으로 반영합니다. "
+            + "여러 마리 일정은 아이별로 따로 판정하고 점수가 가장 낮은 아이를 그날의 기준(basisPetId)으로 삼습니다 — "
+            + "아이별 점수는 petSuitabilities 에 함께 내려갑니다. "
             + "예보는 단기·중기를 합쳐 약 11일까지 제공되므로 그보다 먼 날짜는 score 가 null 이고 "
             + "unavailableReason 에 그 이유가 담깁니다 — 점수가 낮은 것이 아니라 판단 근거가 없는 것입니다. "
             + "비 예보가 있고 그날 장소가 실내가 아니면 indoorAlternatives 에 실내 대안을 함께 내려 줍니다. "

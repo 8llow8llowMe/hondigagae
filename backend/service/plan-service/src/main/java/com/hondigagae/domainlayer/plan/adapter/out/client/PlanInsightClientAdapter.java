@@ -12,7 +12,9 @@ import com.hondigagae.domainlayer.plan.application.port.out.PlaceSuitabilityQuer
 import com.hondigagae.domainlayer.plan.application.port.out.query.PetConditionQueryResult;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlaceSuitabilityQueryResult;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,27 +42,69 @@ public class PlanInsightClientAdapter implements PetConditionQueryPort, PlaceSui
     private final InternalResponseSupport internalResponseSupport;
 
     @Override
-    public PetConditionQueryResult findCondition(long memberId, long petId) {
+    public Map<Long, PetConditionQueryResult> findConditions(long memberId, List<Long> petIds) {
+        if (petIds == null || petIds.isEmpty()) {
+            return Map.of();
+        }
         try {
-            PetConditionClientResponse body = internalResponseSupport.requestAndUnwrapOrNull(
-                AUTH_SERVICE, () -> petConditionClient.getPetCondition(petId, memberId));
+            List<PetConditionClientResponse> body = internalResponseSupport.requestAndUnwrapOrNull(
+                AUTH_SERVICE, () -> petConditionClient.getPetConditions(memberId, petIds));
             if (body == null) {
-                log.info("Pet condition not found petId={} memberId={}", petId, memberId);
-                return PetConditionQueryResult.unknown();
+                log.info("Pet conditions not found memberId={} petIds={}", memberId, petIds);
+                return Map.of();
             }
-            return PetConditionQueryResult.builder()
-                .breed(body.breed())
-                .sizeType(body.sizeType())
-                .heatSensitive(body.heatSensitive())
-                .coldSensitive(body.coldSensitive())
-                .noiseSensitive(body.noiseSensitive())
-                .activityLevel(body.activityLevel())
-                .build();
+            // 응답 순서를 지킨다 — 요청 순서(첫 번째 = 대표 반려견)와 같게 온다.
+            Map<Long, PetConditionQueryResult> conditions = new LinkedHashMap<>();
+            for (PetConditionClientResponse item : body) {
+                Long petId = toPetId(item.petId());
+                if (petId != null) {
+                    conditions.put(petId, toQueryResult(item));
+                }
+            }
+            return conditions;
         } catch (PlanException exception) {
             // 반려견 특성이 없으면 일반 조건으로 판정된다. 브리핑 자체를 막지는 않는다.
-            log.warn("Pet condition lookup failed petId={} errorCode={}",
-                petId, exception.getErrorCode().getCode());
-            return PetConditionQueryResult.unknown();
+            log.warn("Pet conditions lookup failed memberId={} errorCode={}",
+                memberId, exception.getErrorCode().getCode());
+            return Map.of();
+        }
+    }
+
+    @Override
+    public Optional<Long> findRepresentativePetId(long memberId) {
+        try {
+            PetConditionClientResponse body = internalResponseSupport.requestAndUnwrapOrNull(
+                AUTH_SERVICE, () -> petConditionClient.getRepresentativePetCondition(memberId));
+            if (body == null) {
+                log.info("Representative pet not found memberId={}", memberId);
+                return Optional.empty();
+            }
+            return Optional.ofNullable(toPetId(body.petId()));
+        } catch (PlanException exception) {
+            log.warn("Representative pet lookup failed memberId={} errorCode={}",
+                memberId, exception.getErrorCode().getCode());
+            return Optional.empty();
+        }
+    }
+
+    private PetConditionQueryResult toQueryResult(PetConditionClientResponse body) {
+        return PetConditionQueryResult.builder()
+            .breed(body.breed())
+            .sizeType(body.sizeType())
+            .heatSensitive(body.heatSensitive())
+            .coldSensitive(body.coldSensitive())
+            .noiseSensitive(body.noiseSensitive())
+            .activityLevel(body.activityLevel())
+            .build();
+    }
+
+    /** 반려견 아이디는 정밀도 때문에 문자열로 오간다. 못 읽으면 그 행을 버린다 — 0번 반려견을 만들지 않는다. */
+    private Long toPetId(String petId) {
+        try {
+            return Long.parseLong(petId);
+        } catch (RuntimeException exception) {
+            log.warn("Pet condition response carried an unusable petId={}", petId);
+            return null;
         }
     }
 

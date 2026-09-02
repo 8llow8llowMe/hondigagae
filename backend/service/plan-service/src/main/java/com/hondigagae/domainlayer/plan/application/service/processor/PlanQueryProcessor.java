@@ -7,11 +7,13 @@ import com.hondigagae.domainlayer.plan.application.info.PlanItemInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemPlaceInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanSummaryInfo;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlanPetRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanPlaceLookupPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlanPlaceSummaryQueryResult;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
+import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Map;
@@ -29,6 +31,7 @@ public class PlanQueryProcessor {
 
     private final PlanRepositoryPort planRepositoryPort;
     private final PlanItemRepositoryPort planItemRepositoryPort;
+    private final PlanPetRepositoryPort planPetRepositoryPort;
     private final PlanPlaceLookupPort planPlaceLookupPort;
 
     /**
@@ -39,6 +42,14 @@ public class PlanQueryProcessor {
         return planRepositoryPort.findActiveById(planId)
             .filter(plan -> plan.isOwnedBy(memberId))
             .orElseThrow(() -> new PlanException(PlanErrorCode.NOT_FOUND_PLAN));
+    }
+
+    /**
+     * 일정의 동행 반려견 목록. 조인 테이블이 비어 있는 옛 일정은 {@code Plan.resolvePetIds} 가
+     * 대표 한 마리로 읽는다 — 날씨 브리핑처럼 상세 조회를 거치지 않는 경로도 이 메서드를 쓴다.
+     */
+    public List<Long> getPetIds(Plan plan) {
+        return plan.resolvePetIds(planPetRepositoryPort.findByPlanId(plan.id()));
     }
 
     /**
@@ -131,6 +142,7 @@ public class PlanQueryProcessor {
         return PlanInfo.builder()
             .planId(plan.id())
             .petId(plan.petId())
+            .petIds(getPetIds(plan))
             .areaCode(plan.areaCode())
             .sigunguCode(plan.sigunguCode())
             .title(plan.title())
@@ -143,10 +155,19 @@ public class PlanQueryProcessor {
             .build();
     }
 
+    /**
+     * 목록의 동행 반려견은 <b>한 번의 in 절 조회</b>로 붙인다 — 일정마다 조인 테이블을 따로 읽으면
+     * 페이지 크기(최대 50)만큼 쿼리가 늘어난다 (coding-conventions §9-7).
+     */
     public Slice<PlanSummaryInfo> getMyPlans(long memberId, Long petId, Long lastPlanId, int size) {
         long cursor = lastPlanId == null ? Long.MAX_VALUE : lastPlanId;
-        return planRepositoryPort.findMyPlans(memberId, petId, cursor, size)
-            .map(this::toSummaryInfo);
+        Slice<Plan> plans = planRepositoryPort.findMyPlans(memberId, petId, cursor, size);
+
+        Map<Long, List<PlanPet>> petsByPlanId = planPetRepositoryPort
+            .findByPlanIds(plans.getContent().stream().map(Plan::id).toList()).stream()
+            .collect(Collectors.groupingBy(PlanPet::planId));
+
+        return plans.map(plan -> toSummaryInfo(plan, plan.resolvePetIds(petsByPlanId.get(plan.id()))));
     }
 
     private PlanItemInfo toItemInfo(PlanItem item, PlanPlaceSummaryQueryResult summary) {
@@ -181,10 +202,11 @@ public class PlanQueryProcessor {
             .build();
     }
 
-    private PlanSummaryInfo toSummaryInfo(Plan plan) {
+    private PlanSummaryInfo toSummaryInfo(Plan plan, List<Long> petIds) {
         return PlanSummaryInfo.builder()
             .planId(plan.id())
             .petId(plan.petId())
+            .petIds(petIds)
             .areaCode(plan.areaCode())
             .title(plan.title())
             .startDate(plan.startDate())

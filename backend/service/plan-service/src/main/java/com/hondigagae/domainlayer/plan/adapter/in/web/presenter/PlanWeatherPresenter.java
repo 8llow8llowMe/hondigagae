@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.plan.adapter.in.web.presenter;
 import com.hondigagae.common.dto.metadata.ScoreMetricMetadata;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanAlternativePlaceItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanDailyWeatherItem;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanDayPetSuitabilityItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanDayWeatherItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanWeatherReasonItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanWeatherResponse;
@@ -21,6 +22,7 @@ public class PlanWeatherPresenter {
             .planTitle(info.planTitle())
             .startDate(info.startDate())
             .endDate(info.endDate())
+            .petIds(info.petIds() == null ? List.of() : info.petIds().stream().map(String::valueOf).toList())
             .petConditionApplied(info.petConditionApplied())
             .days(info.days().stream().map(this::toDayItem).toList())
             .build();
@@ -35,22 +37,37 @@ public class PlanWeatherPresenter {
             .representativePlaceId(day.representativePlaceId() == null
                 ? null : String.valueOf(day.representativePlaceId()))
             .representativePlaceTitle(day.representativePlaceTitle())
+            .basisPetId(day.basisPetId() == null ? null : String.valueOf(day.basisPetId()))
             // 점수를 못 낸 날은 null 을 그대로 내린다. 0 으로 바꾸면 "최악"으로 읽힌다.
             .score(suitability == null ? null : suitability.score())
-            .suitabilityLevel(toLevelMetadata(suitability))
+            .suitabilityLevel(suitability == null ? null
+                : toLevelMetadata(suitability.levelCode(), suitability.levelName(), suitability.levelDescription()))
             .reasons(toReasonItems(suitability))
             .weather(toWeatherItem(suitability))
             .indoorAlternatives(toAlternativeItems(suitability))
+            .petSuitabilities(toPetSuitabilityItems(day))
             .unavailableReason(day.unavailableReason())
             .build();
     }
 
-    private ScoreMetricMetadata toLevelMetadata(PlanDaySuitabilityInfo suitability) {
-        if (suitability == null || suitability.levelCode() == null) {
+    private List<PlanDayPetSuitabilityItem> toPetSuitabilityItems(PlanDayWeatherInfo day) {
+        if (day.petSuitabilities() == null) {
+            return List.of();
+        }
+        return day.petSuitabilities().stream()
+            .map(pet -> PlanDayPetSuitabilityItem.builder()
+                .petId(String.valueOf(pet.petId()))
+                .score(pet.score())
+                .suitabilityLevel(toLevelMetadata(pet.levelCode(), pet.levelName(), pet.levelDescription()))
+                .build())
+            .toList();
+    }
+
+    private ScoreMetricMetadata toLevelMetadata(String levelCode, String levelName, String levelDescription) {
+        if (levelCode == null) {
             return null;
         }
-        return ScoreMetricMetadata.of(
-            suitability.levelCode(), suitability.levelName(), suitability.levelDescription(), null);
+        return ScoreMetricMetadata.of(levelCode, levelName, levelDescription, null);
     }
 
     private List<PlanWeatherReasonItem> toReasonItems(PlanDaySuitabilityInfo suitability) {
