@@ -281,7 +281,7 @@ function AiPlanCommitContainer({
     `snapshot` 은 부모가 `useState` 로 한 번만 읽어 두므로 이 컴포넌트가 사는 동안
     바뀌지 않는다 — 초기값으로 충분하고 동기화 effect 가 필요 없다.
   */
-  const basisPetId = snapshot.pets[0]?.petId ?? ''
+  const [basisPetId, setBasisPetId] = useState(() => snapshot.pets[0]?.petId ?? '')
 
   const [excludedPlaceIds, setExcludedPlaceIds] = useState<ReadonlySet<string>>(EMPTY_SET)
   const [delistedBlocked, setDelistedBlocked] = useState(false)
@@ -357,6 +357,9 @@ function AiPlanCommitContainer({
             delistedBlocked={delistedBlocked}
             hasDelisted={delistedPlaceIds.size > 0}
             excludedCount={excludedPlaceIds.size}
+            basisOptions={snapshot.pets.map((pet) => ({ value: pet.petId, label: pet.name }))}
+            basisPetId={basisPetId}
+            onBasisPetIdChange={setBasisPetId}
             onTitleChange={(title) => form.setValue('title', title)}
             onSubmit={() => void form.submit()}
             onExcludeDelisted={() => {
