@@ -2,16 +2,17 @@ package com.hondigagae.domainlayer.plan.adapter.out.client.feign;
 
 import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.plan.adapter.out.client.feign.dto.PetConditionClientResponse;
+import java.util.List;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
 /**
  * auth-service 반려견 특성 조회.
  *
  * <p>게이트웨이를 거치지 않는 내부 경로({@code /internal/v1})를 부른다. 반려견 프로필의
- * 원천은 auth-service 이고, plan-service 는 사본을 두지 않는다.
+ * 원천은 auth-service 이고, plan-service 는 사본을 두지 않는다. auth 쪽이 memberId 로
+ * 소유권을 다시 확인하므로 남의 petId 를 넣어도 특성이 나오지 않는다.
  */
 @FeignClient(
     name = "${feign-client.target-services.auth-service:auth-service}",
@@ -19,7 +20,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 )
 public interface PetConditionClient {
 
-    @GetMapping("/internal/v1/pets/{petId}/condition")
-    Response<PetConditionClientResponse> getPetCondition(
-        @PathVariable long petId, @RequestParam("memberId") long memberId);
+    /** 여러 마리 특성 벌크 조회 — 마리 수만큼 왕복하지 않는다. 소유가 아닌 petId 는 응답에서 빠진다. */
+    @GetMapping("/internal/v1/pets/conditions")
+    Response<List<PetConditionClientResponse>> getPetConditions(
+        @RequestParam("memberId") long memberId, @RequestParam("petIds") List<Long> petIds);
+
+    /** 대표 반려견 특성. 요청이 반려견을 지정하지 않았을 때의 기본값이다. 없으면 404. */
+    @GetMapping("/internal/v1/pets/representative/condition")
+    Response<PetConditionClientResponse> getRepresentativePetCondition(
+        @RequestParam("memberId") long memberId);
 }

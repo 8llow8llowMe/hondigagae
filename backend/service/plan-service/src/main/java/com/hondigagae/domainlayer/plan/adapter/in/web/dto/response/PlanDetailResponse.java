@@ -14,8 +14,11 @@ public record PlanDetailResponse(
     @Schema(description = "일정 아이디", example = "1234567890123456789")
     String planId,
 
-    @Schema(description = "대상 반려견 아이디", example = "1234567890123456789")
+    @Schema(description = "대표 반려견 아이디 — petIds 의 첫 번째와 같다", example = "1234567890123456789")
     String petId,
+
+    @Schema(description = "동행 반려견 아이디 목록 (한 마리 일정이면 원소 하나)", example = "[\"1234567890123456789\"]")
+    List<String> petIds,
 
     @Schema(description = "지역 코드", example = "39")
     String areaCode,

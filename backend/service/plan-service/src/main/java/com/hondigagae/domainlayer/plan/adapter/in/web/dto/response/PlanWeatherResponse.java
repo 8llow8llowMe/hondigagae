@@ -29,8 +29,12 @@ public record PlanWeatherResponse(
     @Schema(description = "여행 종료일", example = "2026-09-14")
     LocalDate endDate,
 
+    @Schema(description = "판정에 들어간 동행 반려견 아이디 목록. 일자별 basisPetId 는 이 안의 하나다",
+        example = "[\"1234567890123456789\"]")
+    List<String> petIds,
+
     @Schema(
-        description = "반려견 특성이 판정에 반영됐는지. false 면 특성 조회에 실패해 일반 조건으로 판정한 결과다",
+        description = "반려견 특성이 한 마리라도 판정에 반영됐는지. false 면 특성 조회에 실패해 일반 조건으로 판정한 결과다",
         example = "true")
     boolean petConditionApplied,
 

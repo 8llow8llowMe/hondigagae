@@ -34,8 +34,7 @@ public class PlanRepositoryAdapter implements PlanRepositoryPort {
                     memberId, lastPlanId, PageRequest.of(0, size))
                 .map(planMapper::toDomainFromEntity);
         }
-        return planRepository.findByMemberIdAndPetIdAndDeletedFalseAndIdLessThanOrderByIdDesc(
-                memberId, petId, lastPlanId, PageRequest.of(0, size))
+        return planRepository.findMyPlansWithPet(memberId, petId, lastPlanId, PageRequest.of(0, size))
             .map(planMapper::toDomainFromEntity);
     }
 }

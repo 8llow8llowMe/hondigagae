@@ -6,7 +6,9 @@ import com.hondigagae.domainlayer.plan.application.exception.PlanErrorCode;
 import com.hondigagae.domainlayer.plan.application.exception.PlanException;
 import com.hondigagae.domainlayer.plan.application.info.PlanInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemInfo;
+import com.hondigagae.domainlayer.plan.application.info.PlanSummaryInfo;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlanPetRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanPlaceLookupPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlanPlaceSummaryQueryResult;
@@ -14,10 +16,13 @@ import com.hondigagae.domainlayer.plan.domain.enums.PlanItemType;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
+import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.SliceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,15 +47,19 @@ class PlanQueryProcessorTest {
     private static final long WALK_COURSE_ID = 777L;
 
     private StubPlanItemRepositoryPort planItemRepositoryPort;
+    private StubPlanPetRepositoryPort planPetRepositoryPort;
     private StubPlanPlaceLookupPort planPlaceLookupPort;
+    private StubPlanRepositoryPort planRepositoryPort;
     private PlanQueryProcessor processor;
 
     @BeforeEach
     void setUp() {
         planItemRepositoryPort = new StubPlanItemRepositoryPort();
+        planPetRepositoryPort = new StubPlanPetRepositoryPort();
         planPlaceLookupPort = new StubPlanPlaceLookupPort();
+        planRepositoryPort = new StubPlanRepositoryPort();
         processor = new PlanQueryProcessor(
-            new StubPlanRepositoryPort(), planItemRepositoryPort, planPlaceLookupPort);
+            planRepositoryPort, planItemRepositoryPort, planPetRepositoryPort, planPlaceLookupPort);
     }
 
     private static Plan plan() {
@@ -226,7 +235,72 @@ class PlanQueryProcessorTest {
         assertThat(itemAt(info, 0).place()).isNull();
     }
 
+    // ── 동행 반려견 (다견 담기) ──────────────────────────────────────────────
+
+    @Test
+    @DisplayName("조인 테이블에 행이 없는 옛 일정은 대표 반려견 한 마리가 곧 목록이다 — 옮기는 SQL 없이 배포한다")
+    void legacyPlanFallsBackToRepresentativePet() {
+        planPetRepositoryPort.pets = List.of();
+
+        PlanInfo info = processor.getPlanInfo(plan());
+
+        assertThat(info.petId()).isEqualTo(2L);
+        assertThat(info.petIds()).containsExactly(2L);
+    }
+
+    @Test
+    @DisplayName("조인 테이블이 있으면 저장 순서대로 전부 내리고, 첫 번째가 대표 반려견과 같다")
+    void detailCarriesAllPets() {
+        planPetRepositoryPort.pets = List.of(planPet(1L, PLAN_ID, 2L), planPet(2L, PLAN_ID, 5L));
+
+        PlanInfo info = processor.getPlanInfo(plan());
+
+        assertThat(info.petIds()).containsExactly(2L, 5L);
+        assertThat(info.petIds().get(0)).isEqualTo(info.petId());
+    }
+
+    @Test
+    @DisplayName("목록은 페이지의 반려견을 한 번에 묻고, 옛 일정과 새 일정이 섞여도 각자 맞게 읽힌다")
+    void listLoadsPetsInOneQuery() {
+        Plan legacy = plan().toBuilder().id(901L).petId(7L).build();
+        Plan multi = plan().toBuilder().id(902L).petId(2L).build();
+        planRepositoryPort.plans = List.of(multi, legacy);
+        planPetRepositoryPort.pets = List.of(planPet(1L, 902L, 2L), planPet(2L, 902L, 5L));
+
+        List<PlanSummaryInfo> summaries = processor.getMyPlans(1L, null, null, 10).getContent();
+
+        assertThat(planPetRepositoryPort.bulkCalls).isEqualTo(1);
+        assertThat(summaries.get(0).petIds()).containsExactly(2L, 5L);
+        assertThat(summaries.get(1).petIds()).containsExactly(7L);
+    }
+
+    private static PlanPet planPet(long id, long planId, long petId) {
+        return PlanPet.builder().id(id).planId(planId).petId(petId).build();
+    }
+
     // ── 스텁 ───────────────────────────────────────────────────────────────
+
+    private static class StubPlanPetRepositoryPort implements PlanPetRepositoryPort {
+
+        private List<PlanPet> pets = List.of();
+        private int bulkCalls;
+
+        @Override
+        public List<PlanPet> saveAll(List<PlanPet> pets) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<PlanPet> findByPlanId(long planId) {
+            return pets.stream().filter(pet -> pet.planId() == planId).toList();
+        }
+
+        @Override
+        public List<PlanPet> findByPlanIds(Collection<Long> planIds) {
+            bulkCalls += 1;
+            return pets.stream().filter(pet -> planIds.contains(pet.planId())).toList();
+        }
+    }
 
     private static class StubPlanItemRepositoryPort implements PlanItemRepositoryPort {
 
@@ -300,6 +374,8 @@ class PlanQueryProcessorTest {
 
     private static class StubPlanRepositoryPort implements PlanRepositoryPort {
 
+        private List<Plan> plans = List.of();
+
         @Override
         public Plan save(Plan plan) {
             throw new UnsupportedOperationException();
@@ -312,7 +388,7 @@ class PlanQueryProcessorTest {
 
         @Override
         public Slice<Plan> findMyPlans(long memberId, Long petId, long lastPlanId, int size) {
-            throw new UnsupportedOperationException();
+            return new SliceImpl<>(plans);
         }
     }
 }

@@ -2,7 +2,9 @@ package com.hondigagae.domainlayer.plan.application.exception;
 
 public final class PlanValidationMessage {
 
-    public static final String PET_ID_REQUIRED = "PLAN_101:반려견 아이디는 필수입니다.";
+    // PLAN_101 은 petId 가 필수였을 때의 코드다. 다견 담기에서 petId 가 선택이 되면서 같은 자리에
+    // 양수 제약을 두었다 — 필드는 같고 위반 종류만 바뀌었다.
+    public static final String PET_ID_POSITIVE = "PLAN_101:반려견 아이디는 양수여야 합니다.";
     public static final String AREA_CODE_REQUIRED = "PLAN_102:지역 코드는 필수입니다.";
     public static final String TITLE_REQUIRED = "PLAN_103:일정 제목은 필수입니다.";
     public static final String TITLE_LENGTH_INVALID = "PLAN_104:일정 제목은 60자 이하만 가능합니다.";
@@ -16,6 +18,7 @@ public final class PlanValidationMessage {
     public static final String MEMO_LENGTH_INVALID = "PLAN_112:메모는 500자 이하만 가능합니다.";
     public static final String SIZE_RANGE_INVALID = "PLAN_113:조회 개수는 1 이상 50 이하만 가능합니다.";
     public static final String VISITED_REQUIRED = "PLAN_114:방문 여부는 필수입니다.";
+    public static final String PET_IDS_SIZE_INVALID = "PLAN_115:동행 반려견은 최대 5마리까지 지정할 수 있습니다.";
 
     private PlanValidationMessage() {
     }

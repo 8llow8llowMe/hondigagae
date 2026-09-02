@@ -44,7 +44,7 @@ public class PlanEntity extends BaseEntity {
     private Long memberId;
 
     @Column(nullable = false)
-    @Comment("반려견 아이디 (FK: pet.id)")
+    @Comment("대표 반려견 아이디 (FK: pet.id) - 동행 전체 목록은 plan_pet, 이 값은 그 첫 번째와 같다")
     private Long petId;
 
     @Column(nullable = false, length = 4)

@@ -2,8 +2,10 @@ package com.hondigagae.domainlayer.plan.application.mapper;
 
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanEntity;
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanItemEntity;
+import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanPetEntity;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
+import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
 import java.util.List;
 import org.mapstruct.Mapper;
 
@@ -27,4 +29,16 @@ public interface PlanMapper {
 
     // 도메인 리스트 -> 엔티티 리스트
     List<PlanItemEntity> toItemEntityListFromDomainList(List<PlanItem> items);
+
+    // 엔티티 -> 도메인
+    PlanPet toDomainFromEntity(PlanPetEntity entity);
+
+    // 도메인 -> 엔티티
+    PlanPetEntity toEntityFromDomain(PlanPet planPet);
+
+    // 엔티티 리스트 -> 도메인 리스트
+    List<PlanPet> toPetDomainListFromEntityList(List<PlanPetEntity> entities);
+
+    // 도메인 리스트 -> 엔티티 리스트
+    List<PlanPetEntity> toPetEntityListFromDomainList(List<PlanPet> pets);
 }

@@ -17,9 +17,12 @@ public enum PlanErrorCode {
     ITEM_SEQUENCE_DUPLICATED("PLAN_007", "같은 일차에 순서가 중복된 항목이 있습니다.", HttpStatus.BAD_REQUEST),
     PLAN_PERIOD_TOO_LONG("PLAN_009", "여행 기간은 최대 30일까지 만들 수 있습니다.", HttpStatus.BAD_REQUEST),
     PLAN_PERIOD_SHRINK_CONFLICT("PLAN_008", "줄어든 여행 기간 밖에 일정 항목이 남아 있습니다. 해당 일차의 항목을 먼저 정리해 주세요.", HttpStatus.BAD_REQUEST),
+    PET_REQUIRED("PLAN_010", "동행할 반려견을 지정하거나 대표 반려견을 등록해 주세요.", HttpStatus.BAD_REQUEST),
     INVALID_REQUEST("PLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
-    PARAMETER_TYPE_INVALID("PLAN_115", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
-    PARAMETER_REQUIRED("PLAN_116", "필수 요청 파라미터가 누락되었습니다.", HttpStatus.BAD_REQUEST),
+    // 프레임워크 공통 2종은 검증 대역 끝에 둔다 (coding-conventions §8-2). PLAN_115 가 petIds 필드 코드로
+    // 쓰이면서 한 칸씩 밀렸다.
+    PARAMETER_TYPE_INVALID("PLAN_116", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
+    PARAMETER_REQUIRED("PLAN_117", "필수 요청 파라미터가 누락되었습니다.", HttpStatus.BAD_REQUEST),
     INTERNAL_SERVICE_UNAVAILABLE("PLAN_900", "내부 서비스 연동에 실패했습니다. 잠시 후 다시 시도해주세요.", HttpStatus.SERVICE_UNAVAILABLE);
 
     private final String code;
