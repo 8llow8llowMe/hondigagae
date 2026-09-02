@@ -11,6 +11,7 @@ import { MAX_PET_COUNT } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
 import { describePet } from '@/lib/pet/describe'
 import { useOverlay } from '@/lib/ui/overlay'
+import { cn } from '@/lib/utils/cn'
 import type { Pet } from '@/types/pet'
 
 /**
@@ -29,6 +30,20 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const nameRef = useRef<HTMLSpanElement>(null)
+
+  /**
+   * 메뉴의 왼쪽 위 꼭짓점. **이름 줄의 왼쪽 아래**에 맞춘다 — 트리거 전체(`top-full` +
+   * 컨테이너 인셋) 기준으로 두면 아바타 왼쪽에서 시작해 프로필 블록 밖에서 열리고,
+   * 무엇을 눌러 열린 목록인지가 멀어진다. 이름에서 흘러내리면 그 아래 설명을 덮으면서
+   * "이 이름을 바꾸는 목록" 으로 읽힌다.
+   *
+   * **잰다.** 텍스트 블록은 아바타와 세로 중앙 정렬이고 아바타 폭도 폭마다 달라,
+   * 이름 줄의 x·y 가 태그 줄 수와 폰트에 따라 움직인다 — 고정값을 적으면 한 경우에서만
+   * 맞는다.
+   */
+  const [menuAt, setMenuAt] = useState<{ top: number; left: number } | null>(null)
 
   const storedPetId = useSelectedPetStore((state) => state.selectedPetId)
   const select = useSelectedPetStore((state) => state.select)
@@ -40,6 +55,18 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
     triggerRef,
     lockScroll: false,
   })
+
+  useEffect(() => {
+    if (!open) return
+
+    const name = nameRef.current
+    const root = rootRef.current
+    if (name === null || root === null) return
+
+    const nameBox = name.getBoundingClientRect()
+    const rootBox = root.getBoundingClientRect()
+    setMenuAt({ top: nameBox.bottom - rootBox.top, left: nameBox.left - rootBox.left })
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -59,19 +86,24 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
   if (selected === null) return <RegisterPrompt />
 
   return (
-    <div className="relative">
+    <div ref={rootRef} className="relative">
+      {/*
+        `py-8` 은 폭을 가리지 않는다. 위아래가 각각 날짜 줄·판정 줄과 맞닿아 있어
+        `py-4` 로는 프로필이 자기 영역을 갖지 못하고 낀 것처럼 보인다 — 레일이 좁은
+        데스크톱에서도 마찬가지다.
+      */}
       <button
         ref={triggerRef}
         type="button"
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((prev) => !prev)}
-        className="focus-visible:ring-brand-500 flex w-full items-center gap-4 px-4 py-4 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:px-6"
+        className="focus-visible:ring-brand-500 flex w-full items-center gap-4 px-4 py-8 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:px-6"
       >
         <PetAvatar size="hero" name={selected.name} />
 
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1">
+          <span ref={nameRef} className="flex items-center gap-1">
             <span className="text-title-1 text-fg truncate font-bold">{selected.name}</span>
             <ChevronDownIcon size={18} className="text-fg-subtle shrink-0" />
           </span>
@@ -82,12 +114,17 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
         </span>
       </button>
 
+      {/* 재기 전 첫 프레임은 트리거 아래(`top-full`)로 둔다 — 위치 없이 그리지 않는다 */}
       {open && (
         <div
           ref={panelRef}
           role="menu"
           aria-label="반려견 전환"
-          className="bg-bg border-border absolute start-4 top-full z-40 min-w-56 rounded-lg border py-1 shadow-md outline-none md:start-6"
+          className={cn(
+            'bg-bg border-border absolute z-40 min-w-56 rounded-lg border py-1 shadow-md outline-none',
+            menuAt === null && 'start-4 top-full md:start-6',
+          )}
+          style={menuAt === null ? undefined : { top: menuAt.top, insetInlineStart: menuAt.left }}
         >
           {pets.map((pet) => (
             <button

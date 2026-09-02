@@ -137,7 +137,11 @@ export function HomeView({
             </>
           )}
 
-          <Band />
+          {/*
+            판정이 그려질 때는 **밴드를 `WalkVerdict` 가 접힘 영역 안에서 그린다** —
+            바깥에 두면 모바일에서 접었을 때 빨간 줄 아래 회색 줄만 덩그러니 남는다.
+          */}
+          {walkSafety.data === undefined && <Band />}
           {/* 상시 진입점. 오류·빈 화면에서도 제거하지 않는다 (Banner 주석) */}
           <Banner
             href="/emergency"
@@ -146,8 +150,13 @@ export function HomeView({
             leading={<EmergencyIcon size={24} />}
             inset="rail"
           />
-          {/* 모바일에서는 병원 행이 맨 아래라 아래 밴드가 필요 없다 */}
-          <Band className="md:hidden" />
+          {/*
+            **1024 미만은 한 컬럼이라 병원 행 다음에 우측 열이 이어진다** — 묶음이
+            바뀌므로 밴드로 끊는다 (DESIGN.md §0). 2단이 되는 1024부터는 레일의
+            마지막 블록이라 끊을 다음 묶음이 없고, 대신 1px 선으로 끝을 맺는다.
+          */}
+          <Band className="lg:hidden" />
+          <div aria-hidden className="border-border hidden border-t lg:block" />
         </div>
 
         {/* ── 우: 지금 할 일. 열 구분선은 여기 border-left 다 (globals.css `.rail-layout` 주석) */}
