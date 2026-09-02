@@ -23,6 +23,8 @@ public record AiPlanGenerationQuery(
     List<Long> pinnedPlaceIds,
     // 즐겨찾기 장소(선호). 필수가 아니라 조건이 맞을 때 우선 배치하라는 신호다.
     List<Long> favoritePlaceIds,
+    // 여행 기간의 일자별 날씨 전망. 비어 있으면 조회 실패/커버리지 밖 — 날씨 절이 빠진다.
+    List<DayWeatherOutlook> weatherOutlook,
     // 하루 재생성. regenerateDay 가 있으면 planOutline 도 반드시 있다 (워커가 보장).
     Integer regenerateDay,
     PlanOutline planOutline,
@@ -44,5 +46,9 @@ public record AiPlanGenerationQuery(
 
     public List<Long> safeFavoritePlaceIds() {
         return favoritePlaceIds == null ? List.of() : favoritePlaceIds;
+    }
+
+    public List<DayWeatherOutlook> safeWeatherOutlook() {
+        return weatherOutlook == null ? List.of() : weatherOutlook;
     }
 }

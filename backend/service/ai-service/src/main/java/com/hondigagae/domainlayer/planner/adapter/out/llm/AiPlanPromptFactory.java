@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.planner.adapter.out.llm;
 
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
+import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
@@ -72,6 +73,7 @@ public class AiPlanPromptFactory {
         }
 
         appendPetSection(prompt, query.safePetConditions());
+        appendWeatherSection(prompt, query);
         appendRegenerateSection(prompt, query);
 
         prompt.append("\n후보 장소 (이 목록 안에서만 고를 것)\n");
@@ -127,6 +129,59 @@ public class AiPlanPromptFactory {
         }
         // 여러 마리면 입장 제한은 가장 제약이 큰 아이가 기준이다 — 한 마리라도 못 들어가면 그 장소는 못 간다.
         prompt.append("- 입장 제한(크기·체중)은 가장 큰 크기와 가장 무거운 체중 기준으로 판정할 것\n");
+    }
+
+    /**
+     * 여행 기간 날씨 전망 절. 이 절이 있어야 "비 오는 날 실내 위주" 배치가 <b>그날 실제로
+     * 비가 오는지</b>를 근거로 이뤄진다 — 반려견의 더위 민감을 알아도 그날 더운지 모르면
+     * 규칙이 빈 구호다. 전망이 없으면(조회 실패·커버리지 밖) 절을 생략한다 — 지어내지 않는다.
+     */
+    private void appendWeatherSection(StringBuilder prompt, AiPlanGenerationQuery query) {
+        List<DayWeatherOutlook> outlooks = query.safeWeatherOutlook();
+        if (outlooks.isEmpty()) {
+            return;
+        }
+        LocalDate startDate = parseDateOrNull(query.startDate());
+        prompt.append("\n여행 기간 날씨 전망 (기상청 예보)\n");
+        for (DayWeatherOutlook outlook : outlooks) {
+            prompt.append("- ");
+            if (startDate != null) {
+                long dayIndex = ChronoUnit.DAYS.between(startDate, outlook.date()) + 1;
+                prompt.append('[').append(dayIndex).append("일차] ");
+            }
+            prompt.append(outlook.date());
+            if (outlook.skyStateName() != null) {
+                prompt.append(" | ").append(outlook.skyStateName());
+            }
+            if (outlook.precipitationTypeName() != null) {
+                prompt.append(" | 강수형태: ").append(outlook.precipitationTypeName());
+            }
+            if (outlook.maxPrecipitationProbability() != null) {
+                prompt.append(" | 강수확률 ").append(outlook.maxPrecipitationProbability()).append('%');
+            }
+            if (outlook.minTemperature() != null || outlook.maxTemperature() != null) {
+                prompt.append(" | 기온 ")
+                    .append(outlook.minTemperature() == null ? "?" : outlook.minTemperature())
+                    .append('~')
+                    .append(outlook.maxTemperature() == null ? "?" : outlook.maxTemperature())
+                    .append("℃");
+            }
+            if (outlook.maxWindSpeed() != null) {
+                prompt.append(" | 최대풍속 ").append(outlook.maxWindSpeed()).append("m/s");
+            }
+            prompt.append('\n');
+        }
+        prompt.append("- 강수확률이 60% 이상이거나 강수형태가 있는 날은 실내 후보 위주로 배치할 것\n");
+        prompt.append("- 최고기온 31℃ 이상인 날 야외 일정은 아침·저녁에 두고, 더위에 민감한 반려견이면 한낮 야외를 넣지 말 것\n");
+        prompt.append("- 전망이 없는 날짜의 날씨는 지어내지 말 것\n");
+    }
+
+    private LocalDate parseDateOrNull(String date) {
+        try {
+            return LocalDate.parse(date);
+        } catch (RuntimeException exception) {
+            return null;
+        }
     }
 
     /**
