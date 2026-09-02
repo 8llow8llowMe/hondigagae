@@ -12,11 +12,13 @@ import type { CodeNameMetadata } from '@/types/api'
  * `AiPlanCreateRequest` 에 `petIds` · `pinnedPlaceIds` · `preferFavorites` · `planId` ·
  * `regenerateDay` 를 추가하면서 `petId` 를 선택으로 내렸다.
  *
- * #128 로 **`preferFavorites` 와 `pinnedPlaceIds` 를 붙였다** (아트보드 05 절).
- * 나머지 둘은 아직 보내지 않는다:
- *  - **`petIds`** — `plan-service` 의 `Plan` 은 `petId` **단일**이다. 두 마리로 만든 초안을
- *    담으면 한 마리만 기록되어, 이후 날씨 브리핑·적합도 판정의 기준이 조용히 바뀐다.
- *    `PlanCreateRequest` 가 `petIds` 를 받을 때까지 미룬다 (명세 S8)
+ * #128 로 **`preferFavorites`·`pinnedPlaceIds`·`petIds`** 를 붙였다.
+ *
+ * **`petIds` 로 만든 초안도 담기는 한 마리에 붙는다.** `plan-service` 의 `Plan` 은
+ * `petId` **단일**이라 저장 직전에 판정 기준이 될 한 마리를 사람이 고른다
+ * (다견선택-세부명세 D4). `PlanCreateRequest` 의 다견화는 BE 선행이라 범위 밖이다.
+ *
+ * 아직 보내지 않는 것:
  *  - **`planId`·`regenerateDay`** — 아트보드 03 은 **저장 전 미리보기**에서 하루 재생성을
  *    하는데 계약은 `planId`(이미 저장된 일정)를 요구한다. 계약과 정본이 어긋나 있다 (#90)
  */
@@ -24,7 +26,7 @@ import type { CodeNameMetadata } from '@/types/api'
 /**
  * `POST /ai-plans` 요청 본문.
  *
- * - **`petId` 를 숫자로 바꾸지 않는다.** 서버는 `Long` 으로 읽지만 Snowflake 라
+ * - **`petIds` 를 숫자로 바꾸지 않는다.** 서버는 `Long` 으로 읽지만 Snowflake 라
  *   `Number()` 를 거치면 정밀도를 잃는다. 문자열 그대로 실어 보내면 Jackson 이 읽는다
  *   (plan 공통명세 S1)
  * - **`budget` 은 `@Positive` 다.** 일정 생성(`@PositiveOrZero`)과 다르다 — `0` 을 보내면
@@ -38,7 +40,13 @@ export type AiPlanSubmitPayload = {
   startDate: string
   /** `YYYY-MM-DD` */
   endDate: string
-  petId: string
+  /**
+   * 동반 반려견. **한 마리여도 배열이다** (#128 · 명세 D2-2).
+   *
+   * 서버가 `petIds` 를 `petId` 보다 우선하므로(`effectivePetIds()`) 결과가 같고,
+   * 두 경로를 남기면 제출·스냅샷·복원 세 곳에 각각 분기가 생긴다.
+   */
+  petIds: string[]
   /** 원 단위. 생략 가능하고 **0 은 보낼 수 없다** */
   budget?: number
   /** 500자 이하. 빈 값이면 생략한다 */
@@ -137,7 +145,7 @@ export type AiPlanFormValues = {
   requestNote: string
   startDate: string
   endDate: string
-  petId: string
+  petIds: string[]
   /** **만원 단위**다. 빈 값 = "상관없음" (아트보드 01 — 칩 + 직접 입력) */
   budgetManwon: string
   /** 저장한 곳 먼저 넣기 (#128, 아트보드 05) */
@@ -159,7 +167,7 @@ export const EMPTY_AI_PLAN_FORM_VALUES: AiPlanFormValues = {
   requestNote: '',
   startDate: '',
   endDate: '',
-  petId: '',
+  petIds: [],
   budgetManwon: '',
   preferFavorites: false,
   pinnedPlaces: [],
