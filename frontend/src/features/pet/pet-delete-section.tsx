@@ -50,7 +50,13 @@ export function PetDeleteConfirm({
 }: PetDeleteConfirmProps) {
   return (
     <div className="border-border mt-2 border-t pt-4">
-      <Button variant="danger" onClick={onStart}>
+      {/*
+        **채운 빨강이 아니다** (`dangerOutline`). 이 화면의 주 행동은 `저장하기` 인데
+        채운 삭제 버튼이 그 바로 아래에서 더 강하게 서 있었다 — 거의 누르지 않는 것이
+        화면에서 가장 눈에 띄는 요소였다. 확정의 무게는 확인 다이얼로그가 갖는다
+        (`ConfirmModal destructive` 가 거기서 채운 빨강을 쓴다).
+      */}
+      <Button variant="dangerOutline" onClick={onStart}>
         {messages.pet.delete}
       </Button>
 

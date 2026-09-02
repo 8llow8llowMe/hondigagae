@@ -4,7 +4,7 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 
 import { cn } from '@/lib/utils/cn'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
 type BaseProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 'children'> & {
@@ -35,6 +35,18 @@ const VARIANT: Record<ButtonVariant, string> = {
   ghost: 'text-fg-muted hover:bg-band',
   // 파괴 버튼 채움은 danger-700 이다 — 가이드 §5-2 ConfirmModal
   danger: 'bg-danger-700 text-fg-inverse hover:opacity-90',
+  /*
+    **되돌릴 수 없지만 그 화면의 주 행동은 아닌 파괴 액션.**
+
+    `danger`(채움)는 확인 다이얼로그의 확정 버튼처럼 **그 순간의 주 행동**일 때 쓴다.
+    화면 안에 그냥 놓여 있는 삭제 버튼까지 채우면 저장 버튼과 같은 무게로 붉게 서서
+    시선을 먼저 끌고, 실제로 누를 일은 거의 없는 것이 화면에서 가장 강한 요소가 된다.
+
+    글자는 `danger-900`(흰 배경 6.47:1) — DESIGN.md §2-6 이 "메뉴 안 파괴적 항목
+    텍스트" 로 정의한 그 톤이고, 여기도 같은 성격(낮은 강조의 파괴 액션)이다.
+    테두리 `danger-500` 은 비텍스트라 3:1 기준이고 4.53:1 로 통과한다.
+  */
+  dangerOutline: 'border border-danger-500 bg-bg text-danger-900 hover:bg-danger-100',
 }
 
 const SIZE: Record<ButtonSize, string> = {
