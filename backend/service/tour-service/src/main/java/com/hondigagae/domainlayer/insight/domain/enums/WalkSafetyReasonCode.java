@@ -24,6 +24,7 @@ public enum WalkSafetyReasonCode implements CodeNameDescribable {
     COLD_RISK("저온 주의", "기온이 낮아 장시간 산책에 주의가 필요합니다."),
     WET_SURFACE("젖은 노면", "비나 눈으로 노면이 젖어 있어 미끄러짐에 주의가 필요합니다."),
     WIND_STRONG("강풍 주의", "바람이 강해 소형견 산책에 주의가 필요합니다."),
+    WEATHER_WARNING_ACTIVE("기상특보 발효", "기상특보가 발효 중이라 야외 산책을 권하지 않습니다."),
     SAFE_WINDOW("안전 시간대", "같은 날 안에 더 안전한 산책 시간대가 있습니다."),
     FORECAST_OUT_OF_RANGE("시각별 예보 없음",
         "3일 이후는 오전/오후 단위 중기예보만 제공되어 시각별 노면 상태를 판단할 수 없습니다."),

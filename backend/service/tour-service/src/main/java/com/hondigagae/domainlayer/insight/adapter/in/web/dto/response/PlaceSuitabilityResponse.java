@@ -5,6 +5,7 @@ import com.hondigagae.domainlayer.insight.adapter.in.web.dto.item.AlternativePla
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.item.CongestionItem;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.item.DailyWeatherItem;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.item.SuitabilityReasonItem;
+import com.hondigagae.domainlayer.insight.adapter.in.web.dto.item.WeatherWarningItem;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
 import java.util.List;
@@ -60,6 +61,11 @@ public record PlaceSuitabilityResponse(
     boolean congestionApplied,
 
     @Schema(description = "날씨 정보 출처", example = "기상청 단기예보")
-    String weatherProviderName
+    String weatherProviderName,
+
+    @Schema(
+        description = "발효 중인 기상특보. 없으면 null 이다. 경보면 점수를 내지 않고(0점) 산책은 위험으로 판정한다",
+        nullable = true)
+    WeatherWarningItem weatherWarning
 ) {
 }

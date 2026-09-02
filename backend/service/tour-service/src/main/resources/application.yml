@@ -37,6 +37,11 @@ resilience4j:
         base-config: default
         # 사용자 요청 경로에서 부르는 호출이라 느린 응답을 빨리 실패로 본다.
         slow-call-duration-threshold: 2s
+      # 기상특보. 예보(kma)와 나눈다 - 활용신청이 별개라 승인 전에는 이쪽만 계속 실패한다.
+      # 서킷을 공유하면 아직 신청도 안 한 API 가 이미 잘 도는 예보 서킷을 열어 버린다.
+      kma-warning:
+        base-config: default
+        slow-call-duration-threshold: 2s
 
 # 기상청 예보. serviceKey 는 공공데이터포털 "디코딩(원문)" 키를 그대로 넣는다 -
 # 인코딩은 어댑터가 한다. 관광공사(B551011) 키와 같은 키를 쓸 수 있음이 실호출로 확인되어 있다.
@@ -66,6 +71,16 @@ kma-api:
   # 발표 직후 여러 인스턴스가 같은 격자를 동시에 부르는 것을 막는 락의 수명.
   # 원천 왕복보다 길고, 락 주인이 죽었을 때 남들이 오래 막히지 않을 만큼 짧아야 한다.
   refresh-lock-seconds: ${KMA_REFRESH_LOCK_SECONDS:10}
+  # --- 기상특보 (WthrWrnInfoService) ---
+  # 예보와 별개로 활용신청해야 하는 서비스다. 승인 전에는 warning-enabled=false 로 꺼 둔다 -
+  # 켜 두면 10분마다 SERVICE_KEY_IS_NOT_REGISTERED 로그만 쌓인다.
+  warning-base-url: ${KMA_WARNING_BASE_URL:https://apis.data.go.kr/1360000/WthrWrnInfoService}
+  warning-enabled: ${KMA_WARNING_ENABLED:false}
+  warning-num-of-rows: ${KMA_WARNING_NUM_OF_ROWS:20}
+  # 특보는 발효/해제가 예고 없이 일어나 발표 주기에 맞출 수 없다. 짧은 고정 TTL 을 쓴다.
+  # 키가 지역 하나(제주=184)라 10분 TTL 이어도 하루 144건이다.
+  warning-cache-seconds: ${KMA_WARNING_CACHE_SECONDS:600}
+  warning-station-id: ${KMA_WARNING_STATION_ID:184}
 
 # 여행 적합도 / 산책 위험도 임계값.
 # 확정된 수의학 기준이 아니라 현재의 판단이므로 배포 없이 조정할 수 있게 프로퍼티로 둔다.

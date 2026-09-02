@@ -42,6 +42,12 @@ public final class SuitabilityEvaluator {
     private static final int PENALTY_STRONG_WIND = 10;
 
     // 혼잡도 감점
+    /**
+     * 특보 주의보 감점. 다른 어떤 감점보다 크게 잡는다 - 기상청이 조건이 나빠지고 있다고
+     * 공식적으로 알린 상태라, 기온이나 혼잡도로 상쇄될 성질이 아니다.
+     */
+    private static final int PENALTY_WARNING_ADVISORY = 45;
+
     private static final int PENALTY_HIGH_CONGESTION = 15;
     private static final int PENALTY_NOISE_SENSITIVE_CROWD = 10;
 
@@ -69,9 +75,46 @@ public final class SuitabilityEvaluator {
         noteMidTermEvidence(input, reasons);
         boolean congestionApplied = input.congestion() != null && input.congestion().isKnown();
         penalty += applyCongestion(input, reasons, congestionApplied);
+        penalty += applyWeatherWarning(input, reasons);
 
         int score = Math.max(MIN_SCORE, BASE_SCORE - penalty);
         return SuitabilityScore.scored(score, reasons, true, congestionApplied);
+    }
+
+    /**
+     * 기상특보를 반영한다.
+     *
+     * <h2>경보는 점수를 0 으로 눌러 버린다</h2>
+     *
+     * 경보는 기상청이 "나가지 말라"고 말하는 단계다. 감점으로 다루면 다른 조건이 좋을 때
+     * <b>태풍경보에 "여행 적합 82점"</b> 이 나간다. 정도의 문제가 아니므로 정도로 표현하지 않는다.
+     *
+     * <p>등급을 INSUFFICIENT 로 두지 않은 것은 의도한 선택이다. 그것은 "판단 근거가 없다"는
+     * 뜻인데 지금은 근거가 <b>있고</b>, 그 근거가 나쁘다고 말하고 있다. 모르는 것과 나쁜 것을
+     * 구분하는 것이 이 서비스의 규칙이라 여기서도 지킨다 - 점수 0, 등급 LOW 다.
+     *
+     * <p>주의보는 큰 감점으로 둔다. 조건이 나빠지고 있지만 아직 판단의 여지가 있는 단계라,
+     * 실내 위주 일정이면 다르게 읽힐 수 있다.
+     */
+    private static int applyWeatherWarning(SuitabilityInput input, List<SuitabilityReason> reasons) {
+        WeatherWarning warning = input.weatherWarning();
+        if (warning == null) {
+            return 0;
+        }
+
+        String description = "%s %s 발효 중입니다. %s".formatted(
+            warning.type().getDisplayName(), warning.level().getDisplayName(),
+            warning.type().getDescription());
+
+        if (warning.level().isWarning()) {
+            // 남은 점수를 전부 깎는다. 어떤 조합이 와도 0 이 되게 하기 위해서다.
+            reasons.add(SuitabilityReason.of(
+                SuitabilityReasonCode.WEATHER_WARNING_ACTIVE, description, -BASE_SCORE));
+            return BASE_SCORE;
+        }
+        reasons.add(SuitabilityReason.of(
+            SuitabilityReasonCode.WEATHER_WARNING_ACTIVE, description, -PENALTY_WARNING_ADVISORY));
+        return PENALTY_WARNING_ADVISORY;
     }
 
     /**

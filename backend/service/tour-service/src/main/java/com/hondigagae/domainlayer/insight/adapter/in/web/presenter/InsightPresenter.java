@@ -6,10 +6,12 @@ import com.hondigagae.domainlayer.insight.adapter.in.web.dto.item.AlternativePla
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.item.CongestionItem;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.item.DailyWeatherItem;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.item.SuitabilityReasonItem;
+import com.hondigagae.domainlayer.insight.adapter.in.web.dto.item.WeatherWarningItem;
 import com.hondigagae.domainlayer.insight.application.info.AlternativePlaceInfo;
 import com.hondigagae.domainlayer.insight.domain.model.CongestionSnapshot;
 import com.hondigagae.domainlayer.insight.domain.model.DailyWeather;
 import com.hondigagae.domainlayer.insight.domain.model.SuitabilityReason;
+import com.hondigagae.domainlayer.insight.domain.model.WeatherWarning;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +26,18 @@ public class InsightPresenter {
 
     public static final String WEATHER_PROVIDER_NAME = "기상청 단기예보";
     public static final String CONGESTION_PROVIDER_NAME = "한국관광공사 관광지 집중률 방문자 추이 예측";
+
+    /** 특보가 없으면 null 이다. 빈 객체를 만들면 화면이 "특보 있음"으로 읽는다. */
+    public WeatherWarningItem toWarningItem(WeatherWarning warning) {
+        if (warning == null) {
+            return null;
+        }
+        return WeatherWarningItem.builder()
+            .type(warning.type().toMetadata())
+            .level(warning.level().toMetadata())
+            .effectiveAt(warning.effectiveAt())
+            .build();
+    }
 
     public List<SuitabilityReasonItem> toReasonItems(List<SuitabilityReason> reasons) {
         if (reasons == null) {

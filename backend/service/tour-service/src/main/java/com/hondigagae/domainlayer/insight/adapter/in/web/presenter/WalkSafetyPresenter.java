@@ -6,10 +6,14 @@ import com.hondigagae.domainlayer.insight.application.info.WalkSafetyInfo;
 import com.hondigagae.domainlayer.insight.domain.model.WalkSafetyAssessment;
 import com.hondigagae.domainlayer.insight.domain.model.WeatherForecast;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@RequiredArgsConstructor
 public class WalkSafetyPresenter {
+
+    private final InsightPresenter insightPresenter;
 
     public WalkSafetyResponse toResponse(WalkSafetyInfo info) {
         WalkSafetyAssessment assessment = info.assessment();
@@ -21,6 +25,7 @@ public class WalkSafetyPresenter {
             .targetDateTime(info.targetDateTime())
             .walkSafetyLevel(assessment.level().toScoreMetadata())
             .reasons(toReasonItems(assessment))
+            .weatherWarning(insightPresenter.toWarningItem(info.weatherWarning()))
             .estimatedPavementCelsius(assessment.estimatedPavementCelsius())
             .heatIndexCelsius(assessment.heatIndexCelsius())
             .saferWindowStart(assessment.saferWindowStart())

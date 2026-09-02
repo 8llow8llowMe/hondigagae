@@ -52,7 +52,16 @@ public record KmaApiProperties(
     // 캐시 키로 쓸 격자를 몇 칸씩 묶을지. 1 이면 묶지 않는다.
     Integer gridCoarsenFactor,
     // 원천 갱신 락 수명(초). 락을 잡은 요청이 죽어도 이 시간 뒤 자동으로 풀린다.
-    Integer refreshLockSeconds
+    Integer refreshLockSeconds,
+    // 기상특보 (WthrWrnInfoService). 예보와 별개로 활용신청해야 하는 서비스다.
+    String warningBaseUrl,
+    // 특보 조회를 켤지. 활용신청 승인 전에는 꺼 두면 호출 자체를 하지 않는다.
+    Boolean warningEnabled,
+    Integer warningNumOfRows,
+    // 특보 캐시 수명(초). 예보와 달리 짧게 잡는다 - 발효/해제가 예고 없이 일어난다.
+    Integer warningCacheSeconds,
+    // 특보를 조회할 지점번호. 제주는 184 다.
+    String warningStationId
 ) {
 
     /**
@@ -61,6 +70,9 @@ public record KmaApiProperties(
      */
     private static final String DEFAULT_BASE_URL = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0";
     private static final String DEFAULT_MID_TERM_BASE_URL = "https://apis.data.go.kr/1360000/MidFcstInfoService";
+    private static final String DEFAULT_WARNING_BASE_URL = "https://apis.data.go.kr/1360000/WthrWrnInfoService";
+    /** 기상청 지점번호. 제주=184 (기상특보 조회서비스 기준). */
+    private static final String DEFAULT_WARNING_STATION_ID = "184";
 
     public KmaApiProperties {
         if (baseUrl == null || baseUrl.isBlank()) {
@@ -96,5 +108,31 @@ public record KmaApiProperties(
         if (refreshLockSeconds == null || refreshLockSeconds <= 0) {
             refreshLockSeconds = 10;
         }
+        if (warningBaseUrl == null || warningBaseUrl.isBlank()) {
+            warningBaseUrl = DEFAULT_WARNING_BASE_URL;
+        }
+        if (warningEnabled == null) {
+            warningEnabled = Boolean.TRUE;
+        }
+        if (warningNumOfRows == null || warningNumOfRows <= 0) {
+            warningNumOfRows = 20;
+        }
+        if (warningCacheSeconds == null || warningCacheSeconds <= 0) {
+            warningCacheSeconds = 600;
+        }
+        if (warningStationId == null || warningStationId.isBlank()) {
+            warningStationId = DEFAULT_WARNING_STATION_ID;
+        }
+    }
+
+    /**
+     * 특보를 조회할 수 있는 상태인지.
+     *
+     * <p>키가 없으면 부르지 않는다. 그리고 <b>키가 있어도 활용신청이 승인되지 않으면 실패한다</b> -
+     * 기상특보 조회서비스는 단기·중기예보와 별개로 신청해야 한다. 승인 전에는
+     * {@code warning-enabled: false} 로 꺼 두면 무의미한 호출과 로그를 만들지 않는다.
+     */
+    public boolean hasWarningSupport() {
+        return Boolean.TRUE.equals(warningEnabled) && serviceKey != null && !serviceKey.isBlank();
     }
 }
