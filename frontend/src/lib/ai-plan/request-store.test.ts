@@ -11,8 +11,7 @@ const snapshot: AiPlanRequestSnapshot = {
   areaCode: '39',
   startDate: '2026-09-12',
   endDate: '2026-09-14',
-  petId: '123456789012000001',
-  petName: '몽실이',
+  pets: [{ petId: '123456789012000001', name: '몽실이' }],
   budget: 300_000,
   requestNote: '실내 위주로',
 }
@@ -120,14 +119,20 @@ describe('저장된 값의 모양이 어긋나면 버린다', () => {
     expect(readAiPlanRequest('job-1')).toBeNull()
   })
 
-  it('petId 가 빠졌으면 null 이다 — 담기에 반드시 필요한 값이다', () => {
-    const rest = { ...snapshot, petId: undefined }
+  it('반려견이 하나도 없으면 null 이다 — 담기에 쓸 수 없는 조건이다', () => {
     globalThis.sessionStorage.setItem(
-      'hondigagae.ai-plan.request.job-1',
-      JSON.stringify({ ...rest, petId: '' }),
+      'hondigagae.ai-plan.request.job-empty',
+      JSON.stringify({
+        areaCode: '39',
+        startDate: '2026-09-11',
+        endDate: '2026-09-13',
+        pets: [],
+        budget: null,
+        requestNote: '',
+      }),
     )
 
-    expect(readAiPlanRequest('job-1')).toBeNull()
+    expect(readAiPlanRequest('job-empty')).toBeNull()
   })
 
   it('budget 이 숫자도 null 도 아니면 null 이다', () => {
@@ -139,14 +144,14 @@ describe('저장된 값의 모양이 어긋나면 버린다', () => {
     expect(readAiPlanRequest('job-1')).toBeNull()
   })
 
-  it('petName·requestNote 는 없어도 빈 문자열로 채운다 — 담기를 막을 이유가 아니다', () => {
+  it('반려견 이름·requestNote 는 없어도 빈 문자열로 채운다 — 담기를 막을 이유가 아니다', () => {
     globalThis.sessionStorage.setItem(
       'hondigagae.ai-plan.request.job-1',
       JSON.stringify({
         areaCode: '39',
         startDate: '2026-09-12',
         endDate: '2026-09-14',
-        petId: '1',
+        pets: [{ petId: '1' }],
         budget: null,
       }),
     )
@@ -155,10 +160,82 @@ describe('저장된 값의 모양이 어긋나면 버린다', () => {
       areaCode: '39',
       startDate: '2026-09-12',
       endDate: '2026-09-14',
-      petId: '1',
-      petName: '',
+      pets: [{ petId: '1', name: '' }],
       budget: null,
       requestNote: '',
     })
+  })
+
+  it('모양이 어긋난 항목은 걸러 낸다 — 남은 아이로 담기를 이어 간다', () => {
+    globalThis.sessionStorage.setItem(
+      'hondigagae.ai-plan.request.job-1',
+      JSON.stringify({
+        areaCode: '39',
+        startDate: '2026-09-12',
+        endDate: '2026-09-14',
+        pets: [{ petId: '1', name: '몽실이' }, null, { name: '이름만' }],
+        budget: null,
+      }),
+    )
+
+    expect(readAiPlanRequest('job-1')?.pets).toEqual([{ petId: '1', name: '몽실이' }])
+  })
+})
+
+describe('옛 모양 승격 (#128 · 명세 D2-3)', () => {
+  it('새 모양을 저장하고 읽는다', () => {
+    saveAiPlanRequest('job-1', {
+      ...snapshot,
+      pets: [
+        { petId: '1', name: '몽실이' },
+        { petId: '2', name: '초코' },
+      ],
+    })
+
+    expect(readAiPlanRequest('job-1')?.pets).toEqual([
+      { petId: '1', name: '몽실이' },
+      { petId: '2', name: '초코' },
+    ])
+  })
+
+  /*
+    배포 직후 대기 화면에 있던 사용자를 막지 않기 위한 승격이다.
+    승격이 없으면 readAiPlanRequest 가 null 을 주고 담기가 막힌다.
+  */
+  it('옛 모양(petId·petName)을 한 마리 배열로 승격해 읽는다', () => {
+    globalThis.sessionStorage.setItem(
+      'hondigagae.ai-plan.request.job-old',
+      JSON.stringify({
+        areaCode: '39',
+        startDate: '2026-09-11',
+        endDate: '2026-09-13',
+        petId: '1234567890123456789',
+        petName: '몽실이',
+        budget: null,
+        requestNote: '',
+      }),
+    )
+
+    expect(readAiPlanRequest('job-old')?.pets).toEqual([
+      { petId: '1234567890123456789', name: '몽실이' },
+    ])
+  })
+
+  it('옛 모양에 이름이 없어도 승격한다 — 이름은 제목 기본값에만 쓰인다', () => {
+    globalThis.sessionStorage.setItem(
+      'hondigagae.ai-plan.request.job-noname',
+      JSON.stringify({
+        areaCode: '39',
+        startDate: '2026-09-11',
+        endDate: '2026-09-13',
+        petId: '1234567890123456789',
+        budget: null,
+        requestNote: '',
+      }),
+    )
+
+    expect(readAiPlanRequest('job-noname')?.pets).toEqual([
+      { petId: '1234567890123456789', name: '' },
+    ])
   })
 })

@@ -176,7 +176,7 @@ export const EMPTY_AI_PLAN_FORM_VALUES: AiPlanFormValues = {
 /**
  * 제출한 조건. **`jobId` 를 키로 `sessionStorage` 에 보관한다** (명세 S5 함정 1 · S8 미결 2).
  *
- * 초안에는 `petId`·`areaCode`·기간·예산이 없는데 담기(`POST /plans`)에는 필요하고,
+ * 초안에는 반려견·`areaCode`·기간·예산이 없는데 담기(`POST /plans`)에는 필요하고,
  * 작업 조회 응답에도 요청 조건이 없어 **`jobId` 로 되살릴 수 없다.** 없으면 담기를 막는다
  * — 다른 기기에서 같은 URL 을 열면 실제로 없다.
  */
@@ -184,8 +184,16 @@ export type AiPlanRequestSnapshot = {
   areaCode: string
   startDate: string
   endDate: string
-  petId: string
-  petName: string
+  /**
+   * 동반 반려견. **담기에는 이 중 한 마리만 실린다** — `PlanCreateRequest.petId` 가
+   * 단일이라 담기 패널에서 판정 기준을 고른다 (다견선택-세부명세 D4).
+   *
+   * `name` 은 일정 제목 기본값에만 쓰인다. 비어 있어도 흐름이 막히지 않는다.
+   */
+  pets: {
+    petId: string
+    name: string
+  }[]
   budget: number | null
   requestNote: string
   /**
