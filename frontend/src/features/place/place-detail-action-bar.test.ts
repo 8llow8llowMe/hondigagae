@@ -18,6 +18,7 @@ const BASE: PlaceDetailActions = {
   added: false,
   onAddToPlan: () => undefined,
   onLogin: () => undefined,
+  delisted: false,
 }
 
 function render(overrides: Partial<PlaceDetailActions> = {}) {
@@ -85,5 +86,36 @@ describe('미로그인 — 저장 아이콘 대신 로그인이다 (아트보드
 
   it('담기는 그대로 열려 있다 — 눌러야 로그인 안내가 뜬다', () => {
     expect(render({ authed: false })).toContain(messages.plan.addToPlanAction)
+  })
+})
+
+describe('원천에서 사라진 장소 — 잠그되 해제는 남긴다 (#146)', () => {
+  /** `renderToStaticMarkup` 은 `disabled` 를 `disabled=""` 로 낸다 — 개수로 어느 버튼인지 가른다 */
+  function disabledCount(markup: string): number {
+    return markup.split('disabled=""').length - 1
+  }
+
+  it('왜 잠겼는지 버튼 위에 적는다 — disabled 만으로는 이유를 알 수 없다', () => {
+    expect(render({ delisted: true })).toContain(messages.place.detailDelistedActionsBlocked)
+  })
+
+  it('평소에는 그 문구가 없다', () => {
+    expect(render()).not.toContain(messages.place.detailDelistedActionsBlocked)
+  })
+
+  it('미저장이면 담기와 저장을 둘 다 잠근다 — 서버가 PLAN_004 · FAVORITE_001 로 막는다', () => {
+    expect(disabledCount(render({ delisted: true, saved: false }))).toBe(2)
+  })
+
+  it('이미 저장했으면 해제는 살려 둔다 — DELETE 는 장소 가시성을 보지 않는다', () => {
+    const markup = render({ delisted: true, saved: true })
+
+    // 잠기는 것은 담기 하나뿐이다
+    expect(disabledCount(markup)).toBe(1)
+    expect(markup).toContain(`aria-label="${messages.favorite.unsave}"`)
+  })
+
+  it('평소에는 아무것도 잠기지 않는다', () => {
+    expect(disabledCount(render())).toBe(0)
   })
 })

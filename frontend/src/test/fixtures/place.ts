@@ -76,6 +76,7 @@ export const placeDetail: PlaceDetail = {
   homepage: '<a href="https://www.visitjeju.net/kr" target="_blank">비짓제주</a>',
   overview: '제주 자연을 그대로 살린 공간이다.<br>야외 동선에서 반려견과 함께 산책할 수 있다.',
   petAvailable: true,
+  delisted: false,
   petAllowanceType: {
     code: 'PARTIALLY_ALLOWED',
     name: '부분 동반 가능',
@@ -167,4 +168,17 @@ export const placeDetailFromTourApi: PlaceDetail = {
   indoor: false,
   sourceCategory: '여행지',
   sourceName: '관광정보 API',
+}
+
+/**
+ * 원천에서 사라진(delisted) 장소 — **상세는 200 으로 계속 온다** (#146).
+ *
+ * 404 fixture 를 대신 쓰면 안 된다. 404 는 *병합된* 장소이고, delisting 은 응답 본문의
+ * 플래그로만 드러난다 (`types/place.ts` 의 `delisted` 주석).
+ */
+export const placeDetailDelisted: PlaceDetail = {
+  ...placeDetail,
+  placeId: '212481712381923332',
+  title: '문 닫은 반려견 카페',
+  delisted: true,
 }

@@ -13,6 +13,7 @@ import { messages } from '@/lib/messages'
 import { suitability as suitabilityFixture } from '@/test/fixtures/insight'
 import {
   placeDetail,
+  placeDetailDelisted,
   placeDetailFromTourApi,
   placeDetailWithoutOptionalSections,
 } from '@/test/fixtures/place'
@@ -37,6 +38,7 @@ const actions: PlaceDetailActions = {
   added: false,
   onAddToPlan: () => undefined,
   onLogin: () => undefined,
+  delisted: false,
 }
 
 function render(overrides: Partial<PlaceDetailSectionProps> = {}) {
@@ -327,5 +329,32 @@ describe('PlaceDetailSection — 외부 원문 처리', () => {
     // 장수별 분기는 photo-gallery.test.ts 가 본다.
     expect(markup).not.toContain('aspect-video')
     expect(markup).toContain('--gallery-w-mobile')
+  })
+})
+
+describe('원천에서 사라진 장소 — 안내를 먼저 보여 준다 (#146)', () => {
+  it('delisted 면 제목·설명이 함께 나온다', () => {
+    const markup = render({ place: placeDetailDelisted })
+
+    expect(markup).toContain(messages.place.detailDelistedTitle)
+    expect(markup).toContain(messages.place.detailDelistedDescription)
+  })
+
+  it('delisted 여도 상세 정보는 그대로 남는다 — 200 응답이라 빈 화면이 아니다', () => {
+    const markup = render({ place: placeDetailDelisted })
+
+    expect(markup).toContain(placeDetailDelisted.title)
+    expect(markup).toContain(messages.place.detailSectionBasic)
+  })
+
+  it('평소에는 안내가 없다', () => {
+    expect(render()).not.toContain(messages.place.detailDelistedTitle)
+  })
+
+  it('404 는 이 경로가 아니다 — 없는 장소는 빈 화면으로 간다', () => {
+    const markup = render({ place: null, errorStatus: 404 })
+
+    expect(markup).not.toContain(messages.place.detailDelistedTitle)
+    expect(markup).toContain(messages.place.detailNotFoundDescription)
   })
 })

@@ -64,6 +64,19 @@ export type PlaceDetail = {
   /** **HTML 태그가 섞인 원문.** toPlainText() 로 평문화해 쓴다 */
   overview: string | null
   petAvailable: boolean
+  /**
+   * **원천에서 사라진 장소인가.** `true` 면 폐업·등록 철회 등으로 더 이상 확인되지 않는
+   * 곳이다 — 백엔드 `@Schema` 가 *"화면에서 그렇게 안내해야 한다"* 고 적었다.
+   *
+   * **`true` 여도 상세는 200 으로 온다.** 기존 일정(`plan_item`)이 참조하는 장소가 원천에서
+   * 빠졌다고 일정 화면까지 깨지면 안 되기 때문이다
+   * (`PlaceRepository.findByIdAndMergedIntoIdIsNull`). `GET /places/{placeId}` 가 **404** 를
+   * 내는 것은 *병합된*(`mergedIntoId != null`) 장소뿐이다 — 둘을 뒤바꿔 읽지 않는다 (#146).
+   *
+   * 새로 참조하는 쪽은 백엔드가 막는다: 일정 담기는 `PLAN_004`, 즐겨찾기 저장은
+   * `FAVORITE_001` 로 400 이다. **저장 해제(DELETE)는 가시성 검사를 타지 않아 그대로 된다.**
+   */
+  delisted: boolean
   petAllowanceType: EnumMetadata
   /**
    * 실내 여부. **`null` 은 "야외" 가 아니라 "원천에 정보 없음" 이다** — `false` 와 다르게 다룬다

@@ -141,6 +141,16 @@ export function PlaceDetailSection({
     <article>
       <Breadcrumb title={place.title} />
 
+      {/*
+        원천에서 사라진 장소 안내 (#146). **2열로 들어가기 전, 폭 전체에 둔다** — 좌측 레일에
+        넣으면 모바일에서 갤러리·제목 아래로 밀리고, 우측 본문에 넣으면 데스크톱에서 레일의
+        하단 바(잠긴 버튼)와 멀어진다.
+
+        **붉게 칠하지 않는다.** 오류가 아니라 이 장소가 놓인 상태다 — `Banner` 가 같은
+        이유로 배경을 danger 로 쓰지 않는다.
+      */}
+      {place.delisted && <DelistedNotice />}
+
       <div className="rail-layout rail-layout-detail">
         {/*
           우측 열이 **DOM 상 먼저**다 — 모바일에서 갤러리·제목이 판정보다 위에 와야 한다.
@@ -321,6 +331,28 @@ function Breadcrumb({ title }: { title: string }) {
       <ChevronRightIcon size={16} aria-hidden className="text-fg-subtle shrink-0" />
       <span className="text-body-2 text-fg-muted min-w-0 truncate font-medium">{title}</span>
     </nav>
+  )
+}
+
+/**
+ * 원천에서 사라진 장소 안내 (#146).
+ *
+ * **`role="alert"` 을 쓰지 않는다.** 방금 일어난 실패가 아니라 이 장소가 원래 놓인
+ * 상태라, 화면에 들어오자마자 낭독을 가로챌 일이 아니다. 제목을 `strong` 으로 두어
+ * 훑어 읽을 때 먼저 잡히게만 한다.
+ */
+function DelistedNotice() {
+  return (
+    <div className="px-4 py-3 md:px-10">
+      <div className="bg-band rounded-md px-3 py-2.5">
+        <strong className="text-body-2 text-fg block font-semibold">
+          {messages.place.detailDelistedTitle}
+        </strong>
+        <p className="text-body-2 text-fg-muted mt-0.5">
+          {messages.place.detailDelistedDescription}
+        </p>
+      </div>
+    </div>
   )
 }
 
