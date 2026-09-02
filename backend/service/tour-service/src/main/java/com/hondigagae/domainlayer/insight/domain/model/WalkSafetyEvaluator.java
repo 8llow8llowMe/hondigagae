@@ -212,6 +212,37 @@ public final class WalkSafetyEvaluator {
      *
      * <p>기준 시각 <b>이후</b>만 본다. 이미 지나간 아침 시간대를 제안하는 것은 조언이 아니다.
      */
+    /**
+     * 남은 시간대별 안전 등급 곡선.
+     *
+     * <p>{@code evaluate} 가 한 시각을 판정하는 것과 달리 <b>하루의 모양</b>을 준다.
+     * "지금 나가도 되나"와 "오늘 언제 나가야 하나"는 다른 질문이고, 뒤쪽에는 곡선이 필요하다.
+     *
+     * <p>안전 시간대 탐색과 <b>같은 간이 판정</b>({@code quickLevel})을 쓴다. 따로 계산하면
+     * 같은 시각을 walk-safety 는 주의로, 골든타임은 안전으로 말하는 일이 생긴다.
+     *
+     * @param from 이 시각 이후만 본다. 지나간 시간을 제안하면 조언이 아니다
+     */
+    public static List<HourlyWalkSafety> hourlyCurve(
+        List<WeatherForecast> hourly, PetCondition pet, SuitabilityThresholds thresholds, LocalDateTime from
+    ) {
+        if (hourly == null || hourly.isEmpty()) {
+            return List.of();
+        }
+        return hourly.stream()
+            .filter(forecast -> !forecast.forecastAt().isBefore(from))
+            .filter(forecast -> forecast.temperature() != null)
+            .sorted(Comparator.comparing(WeatherForecast::forecastAt))
+            .map(forecast -> new HourlyWalkSafety(
+                forecast.forecastAt(),
+                quickLevel(forecast, pet, thresholds),
+                forecast.temperature(),
+                PavementHeat.estimate(forecast.temperature(), forecast.skyState(), forecast.isWet(),
+                    forecast.forecastAt().getHour()).estimatedCelsius(),
+                forecast.precipitationProbability()))
+            .toList();
+    }
+
     private static Optional<SaferWindow> findSaferWindow(
         List<WeatherForecast> hourly, PetCondition pet, SuitabilityThresholds thresholds, LocalDateTime at
     ) {

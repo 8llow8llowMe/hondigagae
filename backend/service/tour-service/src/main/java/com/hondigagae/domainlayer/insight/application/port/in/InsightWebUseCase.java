@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.insight.application.port.in;
 
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.RegionalWeatherResponse;
+import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.WalkTimesResponse;
 import com.hondigagae.domainlayer.insight.domain.model.PetCondition;
 import java.time.LocalDate;
 
@@ -20,4 +21,12 @@ public interface InsightWebUseCase {
      * @param pet  반려견 조건. 더위/추위 민감이 점수에 반영된다
      */
     RegionalWeatherResponse getRegionalWeather(LocalDate date, PetCondition pet);
+
+    /**
+     * 오늘의 산책 골든타임.
+     *
+     * <p>장소가 아니라 좌표로 받는다 - 숙소에서 "오늘 산책 언제 갈까"를 묻는 상황이라
+     * 장소를 고르기 전이다.
+     */
+    WalkTimesResponse getWalkTimes(double lat, double lng, PetCondition pet);
 }

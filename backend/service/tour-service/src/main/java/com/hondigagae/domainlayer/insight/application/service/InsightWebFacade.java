@@ -1,9 +1,12 @@
 package com.hondigagae.domainlayer.insight.application.service;
 
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.RegionalWeatherResponse;
+import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.WalkTimesResponse;
 import com.hondigagae.domainlayer.insight.adapter.in.web.presenter.RegionalWeatherPresenter;
+import com.hondigagae.domainlayer.insight.adapter.in.web.presenter.WalkTimesPresenter;
 import com.hondigagae.domainlayer.insight.application.port.in.InsightWebUseCase;
 import com.hondigagae.domainlayer.insight.application.service.processor.RegionalWeatherProcessor;
+import com.hondigagae.domainlayer.insight.application.service.processor.WalkTimesProcessor;
 import com.hondigagae.domainlayer.insight.domain.model.PetCondition;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
@@ -23,10 +26,17 @@ public class InsightWebFacade implements InsightWebUseCase {
 
     private final RegionalWeatherProcessor regionalWeatherProcessor;
     private final RegionalWeatherPresenter regionalWeatherPresenter;
+    private final WalkTimesProcessor walkTimesProcessor;
+    private final WalkTimesPresenter walkTimesPresenter;
 
     @Override
     public RegionalWeatherResponse getRegionalWeather(LocalDate date, PetCondition pet) {
         return regionalWeatherPresenter.toResponse(
             regionalWeatherProcessor.compare(date == null ? LocalDate.now() : date, pet));
+    }
+
+    @Override
+    public WalkTimesResponse getWalkTimes(double lat, double lng, PetCondition pet) {
+        return walkTimesPresenter.toResponse(walkTimesProcessor.findWalkTimes(lat, lng, pet));
     }
 }
