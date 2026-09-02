@@ -122,7 +122,8 @@ export type MockAiPlanJob = {
    * **`delisted` 는 사라진 장소를 섞어 담기를 `PLAN_004` 로 막는다.**
    */
   scenario: 'normal' | 'failed' | 'partial' | 'delisted'
-  petId: string
+  /** 동반 반려견. **`petIds` 가 `petId` 를 이긴다** — 서버 `effectivePetIds()` (#128) */
+  petIds: string[]
   areaCode: string
   startDate: string
   endDate: string

@@ -131,6 +131,45 @@ describe('AI 일정 mock — 제출 검증 (백엔드와 같은 경계)', () => 
   })
 })
 
+describe('POST /ai-plans — petIds (#128)', () => {
+  const MULTI: Record<string, unknown> = {
+    areaCode: '39',
+    startDate: '2026-11-01',
+    endDate: '2026-11-03',
+    petIds: ['123456789012000001', '123456789012000002'],
+  }
+
+  it('petIds 로만 보내도 통과한다 — FE 는 한 마리여도 배열로 보낸다', () => {
+    expect(submit(MULTI)?.status).toBe(202)
+  })
+
+  it('원소가 양수가 아니면 AIPLAN_105 다', () => {
+    expect(submit({ ...MULTI, petIds: ['0'] })?.status).toBe(400)
+  })
+
+  it('5마리를 넘으면 400 이다 — @Size(max = 5)', () => {
+    expect(submit({ ...MULTI, petIds: ['1', '2', '3', '4', '5', '6'] })?.status).toBe(400)
+  })
+
+  /*
+    서버 `effectivePetIds()` 의 우선순위다. mock 이 이것을 지키지 않으면 FE 가
+    두 경로를 남겨도 로컬에서 통과해 버린다.
+  */
+  it('petIds 가 petId 를 이긴다 — 조건이 달라지면 다른 jobId 다', () => {
+    const one = submitted(submit({ ...MULTI, petId: '999999999999999999' }))
+    const two = submitted(submit({ ...MULTI, petIds: ['123456789012000001'] }))
+
+    expect(one.jobId).not.toBe(two.jobId)
+  })
+
+  it('같은 반려견 조합이 진행 중이면 같은 jobId 다 — 멱등하다', () => {
+    const first = submitted(submit(MULTI))
+    const second = submitted(submit(MULTI))
+
+    expect(second.jobId).toBe(first.jobId)
+  })
+})
+
 describe('AI 일정 mock — 상태 전이', () => {
   it('첫 조회는 PENDING 이고 초안이 없다', () => {
     const first = pollTimes(newJob(), 1)

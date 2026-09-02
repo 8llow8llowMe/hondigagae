@@ -94,6 +94,9 @@ function asIdString(value: unknown): string | null {
 /** `AiPlanCreateRequest.pinnedPlaceIds` 의 `@Size(max = 10)` 복제본 (#128) */
 const PINNED_MAX = 10
 
+/** `AiPlanCreateRequest.petIds` 의 `@Size(max = 5)` 복제본 (#128) */
+const PET_MAX = 5
+
 /** `POST /ai-plans` 는 `@Positive` 라 0 을 거부한다 — 일정 생성(`@PositiveOrZero`)과 다르다 */
 const NOTE_MAX = 500
 
@@ -165,14 +168,48 @@ function submit(memberId: string, body: string | null): MockResult {
   }
 
   /*
-    **petId 는 선택이다** — `@Positive` 만 걸려 있고 `@NotNull` 이 없다 (PR #78).
+    **반려견은 선택이다** — `@Positive` 만 걸려 있고 `@NotNull` 이 없다 (PR #78).
     값이 없으면 워커가 대표 반려견으로 대신한다. FE 는 정밀도 때문에 문자열로 실어
     보내므로 문자열·숫자 양쪽을 받는다.
+
+    **`petIds` 가 `petId` 를 이긴다** — 서버 `effectivePetIds()` 의 우선순위다 (#128).
+    mock 이 이 순서를 지켜야 FE 의 "한 마리여도 배열로 보낸다" 판단이 검증된다.
   */
   const petId = asIdString(parsed.petId)
   if (petId !== null && !/^[1-9]\d*$/.test(petId)) {
     errors.push({ code: 'AIPLAN_105', field: 'petId', message: '반려견 식별자는 양수여야 합니다.' })
   }
+
+  const rawPetIds: unknown[] | null = Array.isArray(parsed.petIds)
+    ? (parsed.petIds as unknown[])
+    : null
+  if (rawPetIds !== null) {
+    if (rawPetIds.length > PET_MAX) {
+      errors.push({
+        code: 'AIPLAN_105',
+        field: 'petIds',
+        message: `반려견은 ${PET_MAX}마리 이하만 가능합니다.`,
+      })
+    }
+    const badPetId = rawPetIds.find((raw) => {
+      const id = asIdString(raw)
+      return id === null || !/^[1-9]\d*$/.test(id)
+    })
+    if (badPetId !== undefined) {
+      errors.push({
+        code: 'AIPLAN_105',
+        field: 'petIds',
+        message: '반려견 식별자는 양수여야 합니다.',
+      })
+    }
+  }
+
+  const petIds =
+    rawPetIds !== null && rawPetIds.length > 0
+      ? rawPetIds.map((raw) => asIdString(raw) ?? '')
+      : petId === null
+        ? []
+        : [petId]
 
   /*
     **`@Positive` 다.** 0 을 보내면 400 이다 — 일정 생성(`@PositiveOrZero`)과 다르므로
@@ -244,7 +281,7 @@ function submit(memberId: string, body: string | null): MockResult {
   const existing = store.aiPlanJobs.find(
     (job) =>
       job.memberId === memberId &&
-      job.petId === (petId ?? '') &&
+      job.petIds.join(',') === petIds.join(',') &&
       job.startDate === startDate &&
       job.endDate === endDate &&
       job.budget === budget &&
@@ -259,7 +296,7 @@ function submit(memberId: string, body: string | null): MockResult {
     jobId: nextAiPlanJobId(store),
     memberId,
     scenario: scenarioOf(requestNote),
-    petId: petId ?? '',
+    petIds,
     areaCode,
     startDate,
     endDate,
