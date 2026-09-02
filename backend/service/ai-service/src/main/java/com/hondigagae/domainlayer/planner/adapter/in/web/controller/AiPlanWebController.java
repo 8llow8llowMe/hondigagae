@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.planner.adapter.in.web.controller;
 import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.request.AiPlanCreateRequest;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanJobStatusResponse;
+import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.PackingListResponse;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanSubmitResponse;
 import com.hondigagae.domainlayer.planner.adapter.in.web.sse.AiPlanJobSseStreamer;
 import com.hondigagae.domainlayer.planner.application.port.in.AiPlanWebUseCase;
@@ -49,6 +50,22 @@ public class AiPlanWebController {
     ) {
         AiPlanSubmitResponse response = aiPlanWebUseCase.submitPlan(loginActive.memberId(), request.toCommand());
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(Response.success(response));
+    }
+
+    @Operation(summary = "반려견 여행 준비물 목록 생성",
+        description = "저장된 일정을 근거로 반려견 여행 준비물 목록을 AI 로 생성합니다. 일정 항목·여행 기간의 기상청 예보·"
+            + "반려견 특성(체중·더위/추위 민감 등)이 근거로 쓰이며, 각 항목에 이 여행 데이터 기반의 이유가 붙습니다. "
+            + "동기 API 라 LLM 응답까지 수십 초가 걸릴 수 있습니다. 결과는 저장되지 않는 제안입니다. "
+            + "일정이 없거나 본인 소유가 아니면 AIPLAN_016 으로 응답합니다.",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @PostMapping("/packing-list/{planId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<PackingListResponse>> generatePackingList(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "일정 아이디", required = true, example = "1234567890123456789") @PathVariable long planId
+    ) {
+        PackingListResponse response = aiPlanWebUseCase.generatePackingList(loginActive.memberId(), planId);
+        return ResponseEntity.ok().body(Response.success(response));
     }
 
     @Operation(summary = "AI 여행 일정 생성 작업 조회",

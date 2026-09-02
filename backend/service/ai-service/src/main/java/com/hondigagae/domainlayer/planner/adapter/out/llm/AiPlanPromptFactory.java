@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.planner.adapter.out.llm;
 
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
 import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
+import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
@@ -47,6 +48,39 @@ public class AiPlanPromptFactory {
 
     public String systemPrompt() {
         return SYSTEM_PROMPT;
+    }
+
+    /** 준비물 생성용 시스템 프롬프트. 일정 생성과 같은 이유로 상수 고정(프롬프트 캐싱)이다. */
+    private static final String PACKING_SYSTEM_PROMPT = """
+        당신은 반려견 동반 여행의 준비물을 챙겨 주는 전문가입니다.
+
+        지켜야 할 규칙:
+        1. 제공된 일정·날씨 전망·반려견 특성에서 근거를 찾을 수 있는 준비물을 우선합니다.
+        2. 이유는 일반론이 아니라 제공된 데이터의 사실로 적습니다 - "2일차 강수확률 80%" 처럼.
+        3. 제공되지 않은 정보(숙소 시설, 차량 유무 등)는 가정하지 않습니다.
+        4. 여행과 무관한 물건은 넣지 않습니다.
+        """;
+
+    public String packingSystemPrompt() {
+        return PACKING_SYSTEM_PROMPT;
+    }
+
+    /** 준비물 생성용 사용자 프롬프트. 일정 생성과 같은 절(반려견·날씨)을 재사용해 두 프롬프트가 갈라지지 않게 한다. */
+    public String packingUserPrompt(PackingChecklistQuery query) {
+        StringBuilder prompt = new StringBuilder();
+        prompt.append("여행 정보\n");
+        prompt.append("- 기간: ").append(query.startDate()).append(" ~ ").append(query.endDate()).append('\n');
+
+        appendPetSection(prompt, query.safePetConditions());
+        appendWeatherLines(prompt, query.safeWeatherOutlook(), parseDateOrNull(query.startDate()));
+
+        if (query.planOutline() != null) {
+            prompt.append("\n여행 일정\n");
+            appendOutlineDays(prompt, query.planOutline());
+        }
+
+        prompt.append("\n위 여행에 필요한 반려견 준비물 목록을 만들어 주세요.");
+        return prompt.toString();
     }
 
     /**
@@ -141,7 +175,18 @@ public class AiPlanPromptFactory {
         if (outlooks.isEmpty()) {
             return;
         }
-        LocalDate startDate = parseDateOrNull(query.startDate());
+        appendWeatherLines(prompt, outlooks, parseDateOrNull(query.startDate()));
+        // 배치 지시는 일정 생성 전용이다 — 준비물 프롬프트는 전망 줄만 재사용한다.
+        prompt.append("- 강수확률이 60% 이상이거나 강수형태가 있는 날은 실내 후보 위주로 배치할 것\n");
+        prompt.append("- 최고기온 31℃ 이상인 날 야외 일정은 아침·저녁에 두고, 더위에 민감한 반려견이면 한낮 야외를 넣지 말 것\n");
+        prompt.append("- 전망이 없는 날짜의 날씨는 지어내지 말 것\n");
+    }
+
+    /** 일자별 전망 줄. 일정 생성·준비물 생성 프롬프트가 같은 표기를 쓰도록 한 곳에 둔다. */
+    private void appendWeatherLines(StringBuilder prompt, List<DayWeatherOutlook> outlooks, LocalDate startDate) {
+        if (outlooks.isEmpty()) {
+            return;
+        }
         prompt.append("\n여행 기간 날씨 전망 (기상청 예보)\n");
         for (DayWeatherOutlook outlook : outlooks) {
             prompt.append("- ");
@@ -171,9 +216,6 @@ public class AiPlanPromptFactory {
             }
             prompt.append('\n');
         }
-        prompt.append("- 강수확률이 60% 이상이거나 강수형태가 있는 날은 실내 후보 위주로 배치할 것\n");
-        prompt.append("- 최고기온 31℃ 이상인 날 야외 일정은 아침·저녁에 두고, 더위에 민감한 반려견이면 한낮 야외를 넣지 말 것\n");
-        prompt.append("- 전망이 없는 날짜의 날씨는 지어내지 말 것\n");
     }
 
     private LocalDate parseDateOrNull(String date) {
@@ -194,6 +236,13 @@ public class AiPlanPromptFactory {
             return;
         }
         prompt.append("\n기존 일정\n");
+        appendOutlineDays(prompt, outline);
+        prompt.append("- 위 일정에서 ").append(query.regenerateDay())
+            .append("일차만 새로 구성할 것. 나머지 날은 기존 항목을 순서까지 그대로 유지해 전체 일정을 출력할 것\n");
+    }
+
+    /** 일정 개요의 일자별 줄. 하루 재생성·준비물 생성 프롬프트가 같은 표기를 쓰도록 한 곳에 둔다. */
+    private void appendOutlineDays(StringBuilder prompt, PlanOutline outline) {
         for (PlanOutline.PlanOutlineDay day : outline.safeDays()) {
             prompt.append("[").append(day.day()).append("일차]");
             if (day.safeItems().isEmpty()) {
@@ -207,8 +256,6 @@ public class AiPlanPromptFactory {
             }
             prompt.append('\n');
         }
-        prompt.append("- 위 일정에서 ").append(query.regenerateDay())
-            .append("일차만 새로 구성할 것. 나머지 날은 기존 항목을 순서까지 그대로 유지해 전체 일정을 출력할 것\n");
     }
 
     private void appendPetTraits(StringBuilder prompt, PetCondition pet) {

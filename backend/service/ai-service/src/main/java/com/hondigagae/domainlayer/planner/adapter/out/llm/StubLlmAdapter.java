@@ -1,5 +1,7 @@
 package com.hondigagae.domainlayer.planner.adapter.out.llm;
 
+import com.hondigagae.domainlayer.planner.domain.model.PackingList;
+import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
@@ -39,6 +41,22 @@ public class StubLlmAdapter implements AiLlmPort {
     @Override
     public boolean requiresPlaceCandidates() {
         return false;
+    }
+
+    @Override
+    public PackingList generatePackingList(PackingChecklistQuery query) {
+        simulateLatency();
+        return PackingList.builder()
+            .items(java.util.List.of(
+                PackingList.PackingItem.builder().category("필수").name("목줄·인식표")
+                    .reason("제주 여행지 대부분이 목줄 착용을 요구합니다.").build(),
+                PackingList.PackingItem.builder().category("필수").name("배변봉투")
+                    .reason("산책·야외 일정이 포함된 여행의 기본 준비물입니다.").build(),
+                PackingList.PackingItem.builder().category("반려견 케어").name("휴대용 물그릇과 생수")
+                    .reason("야외 이동 중 수분 보충이 필요합니다.").build(),
+                PackingList.PackingItem.builder().category("이동").name("차량용 안전벨트 리드")
+                    .reason("공항·숙소 간 차량 이동이 있는 일정입니다.").build()))
+            .build();
     }
 
     @Override

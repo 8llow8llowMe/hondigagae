@@ -73,6 +73,7 @@
 | POST | `/api/v1/ai-plans` | 일정 생성 제출 (202 + jobId, 멱등). 다중 반려견·대표견 기본값·필수 포함 장소·하루 재생성(planId+regenerateDay) 지원 |
 | GET | `/api/v1/ai-plans/jobs/{jobId}` | 폴링 (SSE 폴백) |
 | GET | `/api/v1/ai-plans/jobs/{jobId}/stream` | SSE — 상태 변경 시에만 이벤트, 종결 시 서버가 닫음 |
+| POST | `/api/v1/ai-plans/packing-list/{planId}` | 반려견 여행 준비물 AI 생성 (동기, 예보·특성·일정 근거) |
 
 LLM 연동 완료(**Spring AI + Ollama**, 공유 인프라 로컬 LLM, 구조화 출력).
 모델 교체는 `AI_LLM_MODEL` 값 하나, provider 교체는 어댑터·모델 빈 추가로 끝난다.

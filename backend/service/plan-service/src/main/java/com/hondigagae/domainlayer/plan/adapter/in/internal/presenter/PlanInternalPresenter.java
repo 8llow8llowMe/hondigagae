@@ -32,6 +32,7 @@ public class PlanInternalPresenter {
 
         return PlanOutlineResponse.builder()
             .planId(info.planId())
+            .petId(info.petId())
             .startDate(info.startDate() == null ? null : info.startDate().toString())
             .endDate(info.endDate() == null ? null : info.endDate().toString())
             .areaCode(info.areaCode())

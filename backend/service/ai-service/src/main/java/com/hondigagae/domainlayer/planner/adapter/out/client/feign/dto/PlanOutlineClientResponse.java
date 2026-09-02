@@ -9,6 +9,7 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record PlanOutlineClientResponse(
     Long planId,
+    Long petId,
     String startDate,
     String endDate,
     String areaCode,
