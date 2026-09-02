@@ -700,11 +700,13 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
               code: 'RAIN_EXPECTED',
               name: '비 예보',
               description: '강수확률이 80%라 야외 활동이 어려울 수 있습니다.',
+              scoreDelta: -25,
             },
             {
               code: 'TEMPERATURE_OK',
               name: '기온 적정',
               description: '최고기온 24도로 반려견에게 무리가 없습니다.',
+              scoreDelta: 0,
             },
           ]
         : [
@@ -712,16 +714,20 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
               code: 'PET_ALLOWED',
               name: '반려견 동반 가능',
               description: '반려견과 함께 입장할 수 있는 장소입니다.',
+              scoreDelta: 0,
             },
             {
               code: 'TEMPERATURE_OK',
               name: '기온 적정',
               description: '최고기온 26도로 반려견에게 무리가 없습니다.',
+              scoreDelta: 0,
             },
             {
               code: 'CONGESTION_UNKNOWN',
               name: '혼잡도 정보 없음',
               description: '이 장소의 혼잡도 자료가 아직 없습니다.',
+              // 정보성 — 감점이 아니다. 화면이 한 단계 흐리게 내리는 분기를 로컬에서 볼 수 있게 둔다
+              scoreDelta: 0,
             },
           ],
       weather: {

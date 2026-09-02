@@ -247,14 +247,23 @@ function matches(place: PlaceSummary, params: URLSearchParams): boolean {
     if (place.indoor !== (indoor === 'true')) return false
   }
 
+  /*
+    크기 축 두 개는 **`allowedPetSize` 가 null 이면 어느 쪽으로도 잡히지 않는다** —
+    백엔드가 `eq` / `in` 을 쓰는데 SQL 에서 NULL 은 둘 다 만족하지 않기 때문이다
+    (`indoor` 와 같은 규칙). 엔티티가 `nullable = false` 라 실제로 null 이 오지는 않지만,
+    presenter 가 null 을 내보낼 수 있는 모양이라 타입을 따라 여기서도 갈라 둔다 (#148).
+  */
   const allowedPetSize = params.get('allowedPetSize')
-  if (allowedPetSize !== null && place.allowedPetSize.code !== allowedPetSize) return false
+  if (allowedPetSize !== null && place.allowedPetSize?.code !== allowedPetSize) return false
 
   // 내 반려견 크기 — **받아 주지 않는 것으로 확인된 곳만 뺀다.**
   // `UNKNOWN` 은 남긴다: 정보 없음을 "불가" 로 단정하면 실제로는 갈 수 있는 장소가
   // 검색에서 사라진다 (backend `AllowedPetSize#allows` 와 같은 규칙이다)
   const petSizeType = params.get('petSizeType')
-  if (petSizeType !== null && !allowsPetSize(place.allowedPetSize.code, petSizeType)) return false
+  if (petSizeType !== null) {
+    if (place.allowedPetSize === null) return false
+    if (!allowsPetSize(place.allowedPetSize.code, petSizeType)) return false
+  }
 
   /*
     내 반려견 체중 — 백엔드는 `maxPetWeightKg IS NULL OR maxPetWeightKg >= petWeightKg` 다

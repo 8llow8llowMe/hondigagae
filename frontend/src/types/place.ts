@@ -23,8 +23,18 @@ export type PlaceSummary = {
   firstImage: string | null
   firstImage2: string | null
   petAllowanceType: EnumMetadata
-  /** 입장 가능 반려견 크기. **상세 응답의 `petInfo.allowedPetSize` 와 같은 축이다** */
-  allowedPetSize: EnumMetadata
+  /**
+   * 입장 가능 반려견 크기. **상세 응답의 `petInfo.allowedPetSize` 와 같은 축이다.**
+   *
+   * **`null` 을 허용한다** — `PlacePresenter#toItem` 이
+   * `info.allowedPetSize() == null ? null : ...toMetadata()` 로 내려보내기 때문이다 (#148).
+   *
+   * 다만 `PlaceEntity.allowedPetSize` 는 `@Column(nullable = false)` 라 **실제로 null 이
+   * 오지는 않는다.** presenter 의 방어 코드다. 그래도 계약의 경계는 presenter 라 타입은
+   * 그쪽을 따른다 — 상세의 `petInfo.allowedPetSize`(가드 없음)와 **다르게 생겼다는 사실
+   * 자체가 신호**이고, 논널로 적어 두면 그 차이가 지워진다.
+   */
+  allowedPetSize: EnumMetadata | null
   /** 입장 가능 체중 상한(kg). **원문에 숫자가 있을 때만 온다** — null 은 "제한 없음" 이 아니라 "모름" 이다 */
   maxPetWeightKg: number | null
   tel: string | null

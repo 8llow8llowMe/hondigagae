@@ -2,7 +2,7 @@
 
 > 화면별 담당 API, 상태, 착수 가능 여부. **백엔드 구현 상태와 동기화한다.**
 > 근거: `backend/docs/service-inventory.md` (백엔드 구현 현황), 루트 `README.md` (AI 기능 선정 상태)
-> 최종 확인: 2026-09-01 (백엔드 = origin/develop `9cd6711` 기준, 컨트롤러 전수 실측)
+> 최종 확인: 2026-09-02 (백엔드 = origin/develop `26f1b07` 기준, 컨트롤러 13개 · web DTO 68개 전수 실측)
 > 갱신 방법: `find backend/service -name "*WebController.java"` 로 엔드포인트를 전수 확인한다.
 > **`backend/docs/service-inventory.md` 를 그대로 믿지 않는다** — 그 문서도 낡을 수 있다.
 
@@ -127,6 +127,16 @@
 근거: tour-service `insight` 컨텍스트 / `PlaceInsightWebController` **실측**.
 이 서비스의 차별점이 담긴 응답이라 계약을 자세히 적어 둔다.
 
+**FE 미연동 (백엔드는 구현됨 — PR #138)**
+
+| API                                 | 응답                                                                                     | 비고                                                                                       |
+| ----------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `GET /places/{placeId}/congestions` | `PlaceCongestionResponse` — `dailyCongestions[]`(`date` · `level` · `concentrationRate`) | 기간 혼잡도(`fromDate`, `days` 기본 7 · 최대 30). 데이터 없는 날짜도 `UNKNOWN` 으로 남긴다 |
+
+**당장 붙일 곳이 없다.** 적합도 응답의 `congestion`(그 날 하나)으로 화면이 이미 채워져
+있고, 기간 그래프를 둘 자리는 아직 아트보드에 없다. **연동보다 "있다는 사실" 을 먼저
+기록한다** ([#148](https://github.com/8llow8llowMe/hondigagae/issues/148)).
+
 **`GET /places/{placeId}/suitability` — `PlaceSuitabilityResponse`**
 
 | 필드                | 타입                       | 화면 지침                                                         |
@@ -204,7 +214,8 @@
 - **아트보드 03 의 선택 → AI 일정 넘기기는 구현하지 않았다.** `pinnedPlaceIds` 를 FE 가
   아직 보내지 않아 선택 상태가 쓰일 곳이 없다 → [#128](https://github.com/8llow8llowMe/hondigagae/issues/128).
 
-- **목록에 좁히기 파라미터가 없다.** `GET /plans` 는 `lastPlanId` · `size` 뿐이고 `status`·`petId` 도, `totalCount` 도 없다. 상태·반려견 좁히기는 화면에서 하고, `hasNext` 인 동안에는 개수를 말하지 않는다 (`docs/features/plan/공통명세.md` S3).
+- **목록 좁히기는 화면에서 한다.** `GET /plans` 는 `petId` · `lastPlanId` · `size` 를 받고 `status` 와 `totalCount` 는 없다. `hasNext` 인 동안에는 개수를 말하지 않는다 (`docs/features/plan/공통명세.md` S3).
+  - **`petId` 는 있다** (`8a63485`, "반려견별 여행 히스토리"). 앞서 "없다" 고 적었던 것은 틀렸다 ([#148](https://github.com/8llow8llowMe/hondigagae/issues/148) 에서 정정). 그래도 **쓰지 않는다** — 화면 필터가 다중 선택이라 단일 `petId` 로 표현할 수 없고, 한 마리일 때만 서버로 보내면 같은 필터가 선택 개수에 따라 다른 경로로 동작한다.
 - **`COMPLETED` 로 가는 경로가 없다.** enum 에는 있으나 서버에 자동 전이가 없어, 여행이 끝나도 상태가 바뀌지 않는다. 다가오는/지난은 **날짜**로 나눈다 (S4).
 - **목록 정렬은 `id DESC`(만든 역순)** 이고 날짜순이 아니다 (`findByMemberIdAndDeletedFalseAndIdLessThanOrderByIdDesc`).
 - 일자 항목은 **부분 수정이 아니라 일괄 교체**다. 화면도 그 모델로 설계한다.
@@ -268,6 +279,15 @@
 | -------------- | ------------ | ----------------------------- | ------------------------------------ |
 | 주변 긴급 시설 | `/emergency` | `GET /emergencies/facilities` | **구현** (#13) · **지도 구현** (#14) |
 
+**FE 미연동 (백엔드는 구현됨 — PR #138)**
+
+| API                                        | 응답                              | 비고                                                                        |
+| ------------------------------------------ | --------------------------------- | --------------------------------------------------------------------------- |
+| `GET /emergencies/facilities/{facilityId}` | `EmergencyFacilityDetailResponse` | 목록 항목에서 `distanceMeters` 만 빠진 같은 필드다. **delisted 시설은 404** |
+
+**당장 붙일 곳이 없다.** 목록 응답이 이미 상세와 같은 필드를 주고 화면은 시트로 펼친다 —
+별도 상세 라우트가 생길 때 쓴다 ([#148](https://github.com/8llow8llowMe/hondigagae/issues/148)).
+
 파라미터: `lat` `lng`(필수), `radius`(기본 10000, 최대 50000), `type`(`ANIMAL_HOSPITAL`/`ANIMAL_PHARMACY`, 비우면 둘 다), `open24Only`(기본 false), `size`(1~50, 기본 10)
 
 **화면 설계에 직결되는 백엔드 지침** (스키마 설명에 명시돼 있다)
@@ -276,9 +296,9 @@
 - `open24Only=true` → **제주 동물병원 중 24시간은 3곳뿐**이라 결과가 매우 적다. 필터 UI에 이 사실을 알려야 한다
 - 응답에 `totalCount` 와 `providerName`(출처)이 있다
 
-> **BE 후속 요청** ([#8](https://github.com/8llow8llowMe/hondigagae/issues/8)): `facilityId` 가 `long` 이고 예시값 `4611686018427387904` 는
-> `Number.MAX_SAFE_INTEGER` 를 초과한다. `placeId` 처럼 **String 직렬화가 필요**하다.
-> 그 전까지 이 값을 키·경로에 쓰지 않는다.
+> [#8](https://github.com/8llow8llowMe/hondigagae/issues/8)(`facilityId` 정밀도)은 **해결·종료됐다.**
+> 백엔드가 `String` 으로 내린다 — _"Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로
+> 문자열로 내린다"_. FE 타입도 `string` 이고 **`number` 로 타이핑하면 정밀도가 손상된다.**
 
 ## 6. 대기 — 백엔드 미착수
 

@@ -34,6 +34,49 @@ function renderVerdict(overrides: Partial<PlanDayWeatherItem> | null = {}, extra
   )
 }
 
+describe('PlanDayVerdict — 근거의 정보성/감점을 구분한다 (#148)', () => {
+  /*
+    `ReasonList` 는 정보성 항목만 `text-fg-muted` 로 한 단계 내리고, 감점은 `text-fg` 다.
+    적합도 패널과 **같은 처리**여야 한다 — 예전에는 타입이 `scoreDelta` 를 잘라 이쪽만
+    구분을 못 했다.
+  */
+  const PENALTY = { code: 'RAIN', name: '비', description: '비가 옵니다.', scoreDelta: -25 }
+  const INFO = {
+    code: 'NO_DATA',
+    name: '자료 없음',
+    description: '자료가 없습니다.',
+    scoreDelta: 0,
+  }
+
+  it('감점 근거와 정보성 근거를 다른 톤으로 낸다', () => {
+    const markup = renderVerdict({ reasons: [PENALTY, INFO] })
+
+    expect(markup).toContain(`>${PENALTY.description}<`)
+    expect(markup).toContain(`>${INFO.description}<`)
+    // 정보성 하나만 흐리게 내려간다
+    expect(markup.split('text-fg-muted').length - 1).toBeGreaterThan(0)
+  })
+
+  it('정보성만 있으면 흐린 항목이 되고, 감점만 있으면 그렇지 않다', () => {
+    const info = renderVerdict({ reasons: [INFO] })
+    const penalty = renderVerdict({ reasons: [PENALTY] })
+
+    expect(info).toContain(`class="text-body-2 text-fg-muted"`)
+    expect(penalty).not.toContain(`class="text-body-2 text-fg-muted"`)
+    expect(penalty).toContain(`class="text-body-2 text-fg"`)
+  })
+
+  it('서버가 준 순서를 바꾸지 않는다 — 영향이 큰 순서로 온다', () => {
+    const markup = renderVerdict({ reasons: [PENALTY, INFO] })
+
+    expect(markup.indexOf(PENALTY.description)).toBeLessThan(markup.indexOf(INFO.description))
+  })
+
+  it('점수 숫자를 노출하지 않는다 — 등급은 상단 요약이 말한다', () => {
+    expect(renderVerdict({ reasons: [PENALTY] })).not.toContain('-25')
+  })
+})
+
 describe('PlanDayVerdict — 판정을 못 낸 것과 낮은 것을 구분한다', () => {
   it('score 가 null 이면 등급 배지 대신 서버 문장을 그대로 쓴다', () => {
     const markup = renderVerdict({
