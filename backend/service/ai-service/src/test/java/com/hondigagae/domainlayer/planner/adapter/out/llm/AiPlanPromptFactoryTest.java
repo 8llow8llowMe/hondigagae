@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.planner.adapter.out.llm;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
+import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
@@ -105,6 +106,41 @@ class AiPlanPromptFactoryTest {
         assertThat(prompt).contains("[선호] placeId=2");
         assertThat(prompt).doesNotContain("[선호] placeId=1");
         assertThat(prompt).contains("우선 배치할 것. 필수는 아님");
+    }
+
+    @Test
+    @DisplayName("날씨 전망이 있으면 일차별 예보와 배치 지시가 실리고, 없으면 절을 생략한다")
+    void weatherSectionCarriesOutlookAndInstruction() {
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .areaCode("39")
+            .startDate("2026-09-01")
+            .endDate("2026-09-02")
+            .weatherOutlook(List.of(
+                DayWeatherOutlook.builder()
+                    .date(java.time.LocalDate.parse("2026-09-01"))
+                    .skyStateName("맑음").maxPrecipitationProbability(10)
+                    .minTemperature(24.0).maxTemperature(31.0)
+                    .build(),
+                DayWeatherOutlook.builder()
+                    .date(java.time.LocalDate.parse("2026-09-02"))
+                    .skyStateName("흐림").precipitationTypeName("비").maxPrecipitationProbability(80)
+                    .build()))
+            .placeCandidates(List.of(
+                PlaceCandidate.builder().placeId(1L).title("장소").lat(33.5).lng(126.5).build()))
+            .build();
+
+        String prompt = factory.userPrompt(query);
+
+        assertThat(prompt).contains("여행 기간 날씨 전망");
+        assertThat(prompt).contains("[1일차] 2026-09-01 | 맑음");
+        assertThat(prompt).contains("[2일차] 2026-09-02 | 흐림 | 강수형태: 비 | 강수확률 80%");
+        assertThat(prompt).contains("기온 24.0~31.0℃");
+        assertThat(prompt).contains("실내 후보 위주로 배치할 것");
+        assertThat(prompt).contains("지어내지 말 것");
+
+        // 전망이 없으면 절 자체를 생략한다
+        String withoutWeather = factory.userPrompt(query(List.of()));
+        assertThat(withoutWeather).doesNotContain("여행 기간 날씨 전망");
     }
 
     @Test

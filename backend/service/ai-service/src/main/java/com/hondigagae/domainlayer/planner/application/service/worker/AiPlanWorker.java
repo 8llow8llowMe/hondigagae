@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.planner.application.service.worker;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
+import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
@@ -13,6 +14,7 @@ import com.hondigagae.domainlayer.planner.application.port.out.FavoritePlaceIdsQ
 import com.hondigagae.domainlayer.planner.application.port.out.PetConditionQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.PlaceCandidateQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.PlanOutlineQueryPort;
+import com.hondigagae.domainlayer.planner.application.port.out.WeatherOutlookQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.query.PlaceCandidateQueryResult;
 import com.hondigagae.global.properties.AiLlmProperties;
 import java.util.ArrayList;
@@ -42,6 +44,7 @@ public class AiPlanWorker {
     private final PetConditionQueryPort petConditionQueryPort;
     private final PlanOutlineQueryPort planOutlineQueryPort;
     private final FavoritePlaceIdsQueryPort favoritePlaceIdsQueryPort;
+    private final WeatherOutlookQueryPort weatherOutlookQueryPort;
     private final AiLlmProperties aiLlmProperties;
 
     @Async("aiPlanTaskExecutor")
@@ -113,6 +116,7 @@ public class AiPlanWorker {
             .petConditions(loadPetConditions(params.get("petIds"), memberId))
             .pinnedPlaceIds(pinnedPlaceIds)
             .favoritePlaceIds(favoritePlaceIds)
+            .weatherOutlook(loadWeatherOutlook(areaCode, params.get("startDate"), params.get("endDate")))
             .regenerateDay(regenerateDay)
             .planOutline(loadPlanOutline(params.get("planId"), regenerateDay, memberId))
             .placeCandidates(loadCandidates(areaCode, pinnedPlaceIds, favoritePlaceIds))
@@ -202,6 +206,29 @@ public class AiPlanWorker {
      * <p>스텁은 후보를 쓰지 않으므로 부르지 않는다. 무조건 불러 두면 키 없이 띄운 로컬에서
      * tour-service 까지 함께 떠 있어야 일정 생성이 도는 셈이 되어, 스텁을 남겨 둔 이유가 사라진다.
      */
+    /**
+     * 여행 기간에 걸치는 일자별 날씨 전망. 스텁 경로(requiresPlaceCandidates=false)에서는
+     * 부르지 않는다 — 스텁을 tour-service 에 묶지 않기 위해서다. 조회 실패·커버리지 밖은
+     * 빈 목록으로 관용 처리되어 프롬프트에서 날씨 절이 빠진다.
+     */
+    private List<DayWeatherOutlook> loadWeatherOutlook(String areaCode, String startDateParam, String endDateParam) {
+        if (!aiLlmPort.requiresPlaceCandidates()) {
+            return List.of();
+        }
+        java.time.LocalDate startDate;
+        java.time.LocalDate endDate;
+        try {
+            startDate = java.time.LocalDate.parse(startDateParam);
+            endDate = java.time.LocalDate.parse(endDateParam);
+        } catch (RuntimeException exception) {
+            log.warn("AI plan job carried unusable dates start={} end={}", startDateParam, endDateParam);
+            return List.of();
+        }
+        return weatherOutlookQueryPort.findDailyOutlook(areaCode).stream()
+            .filter(outlook -> !outlook.date().isBefore(startDate) && !outlook.date().isAfter(endDate))
+            .toList();
+    }
+
     /** 즐겨찾기는 선호일 뿐이라 조회 실패를 삼킨다(어댑터가 빈 목록으로 바꾼다). */
     private List<Long> loadFavoritePlaceIds(String preferFavoritesParam, Long memberId) {
         if (memberId == null || !Boolean.parseBoolean(preferFavoritesParam)) {
