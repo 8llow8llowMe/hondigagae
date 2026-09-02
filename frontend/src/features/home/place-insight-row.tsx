@@ -21,8 +21,8 @@ import type { PlaceSummary } from '@/types/place'
  * 썸네일 80(모바일) / 96(데스크톱) radius 8. `firstImage` 가 null 이어도 **같은 크기의
  * "이미지 없음" 타일**을 남긴다 — 행 높이가 흔들리면 목록을 훑을 수 없다.
  *
- * **배지 문구가 폭마다 다르다** — 모바일은 짧게("높음"), 데스크톱은 "적합도 높음".
- * 모바일은 섹션 제목이 이미 적합도를 말하고 있어 반복할 필요가 없다.
+ * **배지 자리가 폭마다 다르다** — 모바일은 제목 오른쪽, 데스크톱은 **행의 오른쪽 위**
+ * (점수 열 옆 판정 열). 문구는 양쪽 다 서버 `name` 그대로다.
  *
  * **점수는 제목 아래로 내린다** — 썸네일이 왼쪽 기둥을 잡으므로 오른쪽에 또 기둥을
  * 세우면 제목이 눌린다. 데스크톱은 폭이 있어 우측 열로 뺀다.
@@ -57,18 +57,15 @@ export function PlaceInsightRow({
           가 되고, 무효 HTML 이라 하이드레이션 경고가 난다.
         */}
         <div className="min-w-0 flex-1">
-          {/* 모바일: 제목과 배지를 양끝으로. 데스크톱: 붙여서 왼쪽 정렬 */}
-          <div className="flex items-start justify-between gap-2 md:items-center">
+          {/*
+            모바일은 제목과 배지를 양끝으로 벌린다. **데스크톱은 배지를 여기 두지 않는다** —
+            오른쪽 판정 열로 옮겼다(아래 주석).
+          */}
+          <div className="flex items-start justify-between gap-2">
             <span className="text-title-2 text-fg min-w-0 flex-1 font-semibold break-words">
               {data.placeTitle}
             </span>
-            {/*
-              **서버 `name` 을 그대로 쓴다.** 아트보드는 모바일에서 "높음" 으로 줄였지만,
-              그건 아트보드가 가정한 name 이 "적합도 높음" 이었기 때문이다. 실제 서버 값은
-              "여행 적합" 이라 이미 짧고, 잘라내면 "적합" 이 되어 뜻이 달라진다.
-              FE 가 서버 문구를 다시 쓰지 않는다 (api-integration-guide.md §6).
-            */}
-            <MetricBadge tone={tone} className="shrink-0">
+            <MetricBadge tone={tone} className="shrink-0 md:hidden">
               {data.suitabilityLevel.name}
             </MetricBadge>
           </div>
@@ -98,9 +95,9 @@ export function PlaceInsightRow({
           <Score score={data.score} tone={tone} size="row" className="mt-1 md:hidden" />
         </div>
 
-        {/* 데스크톱 태그 열 — 동반 가능 여부를 첫 태그로, 최대 3개 */}
+        {/* 데스크톱 속성 태그 열 — 동반 가능 여부를 첫 태그로 */}
         {place !== undefined && (
-          <div className="hidden w-36 shrink-0 flex-wrap justify-end gap-1.5 md:flex">
+          <div className="hidden w-36 shrink-0 flex-wrap justify-end gap-1.5 self-start md:flex">
             <Badge tone="neutral">{place.petAllowanceType.name}</Badge>
             {place.indoor !== null && (
               <Badge tone="neutral">
@@ -110,13 +107,29 @@ export function PlaceInsightRow({
           </div>
         )}
 
-        {/* 데스크톱 점수 열 */}
-        <Score
-          score={data.score}
-          tone={tone}
-          size="hero"
-          className="hidden w-20 shrink-0 items-end md:flex"
-        />
+        {/*
+          데스크톱 판정 열 — **배지가 점수 바로 위**, 행의 오른쪽 끝.
+
+          배지를 제목 옆에 두면 제목 길이에 따라 x 가 흔들리고 근거 문장과 같은 폭에서
+          경쟁한다. 점수 위로 모으면 둘이 한 덩어리로 읽힌다 — 등급어와 수치는 같은
+          판정을 두 해상도로 말하는 것이라 붙어 있어야 한다.
+
+          **`self-start` 다.** 행은 썸네일 높이로 세로 중앙 정렬이라, 이것이 없으면 덩어리가
+          가운데로 내려와 "오른쪽 위" 가 되지 않는다.
+
+          **폭은 `w-28`.** 가장 긴 배지("판단 근거 부족")가 한 줄에 들어가는 값이다.
+          점수(`82 /100`)보다 배지가 넓어 열 폭은 배지가 정한다.
+        */}
+        <div className="hidden w-28 shrink-0 flex-col items-end gap-1.5 self-start md:flex">
+          {/*
+            **서버 `name` 을 그대로 쓴다.** 아트보드는 모바일에서 "높음" 으로 줄였지만,
+            그건 아트보드가 가정한 name 이 "적합도 높음" 이었기 때문이다. 실제 서버 값은
+            "여행 적합" 이라 이미 짧고, 잘라내면 "적합" 이 되어 뜻이 달라진다.
+            FE 가 서버 문구를 다시 쓰지 않는다 (api-integration-guide.md §6).
+          */}
+          <MetricBadge tone={tone}>{data.suitabilityLevel.name}</MetricBadge>
+          <Score score={data.score} tone={tone} size="hero" />
+        </div>
       </Link>
     </li>
   )
@@ -134,12 +147,12 @@ function Score({
   size: 'row' | 'hero'
   className?: string
 }) {
-  // null 은 0점이 아니라 "점수를 내지 않았다" 는 뜻이다. 자리를 0 으로 채우지 않는다
-  if (score === null) {
-    return (
-      <p className={cn('text-body-2 text-fg-muted', className)}>{messages.home.scoreUnavailable}</p>
-    )
-  }
+  /*
+    null 은 0점이 아니라 "점수를 내지 않았다" 는 뜻이다. 자리를 0 으로 채우지 않고,
+    **대체 문구도 두지 않는다** — 바로 위 배지가 이미 서버 등급어("판단 근거 부족")로
+    같은 말을 한다. 둘 다 그리면 한 행에서 같은 문장이 두 번 보인다.
+  */
+  if (score === null) return null
 
   return <MetricValue value={score} unit="/100" tone={tone} size={size} className={className} />
 }

@@ -81,9 +81,17 @@ export function WalkVerdict({
         />
       </button>
 
-      {/* 데스크톱 — 펼친 패널이 기본. 모바일은 접힘 상태에 따른다 */}
+      {/*
+        데스크톱 — 펼친 패널이 기본. 모바일은 접힘 상태에 따른다.
+
+        **모바일 `pt-4` 를 준다.** 없으면 위 버튼(위험이면 tint 면)에 첫 문장이 붙어
+        같은 덩어리로 읽힌다. 데스크톱은 `md:py-5` 가 위아래를 함께 잡는다.
+      */}
       <div
-        className={cn('flex-col gap-3 px-4 pb-4 md:flex md:px-6 md:py-5', open ? 'flex' : 'hidden')}
+        className={cn(
+          'flex-col gap-3 px-4 pt-4 pb-4 md:flex md:px-6 md:py-5',
+          open ? 'flex' : 'hidden',
+        )}
       >
         {/* 데스크톱에만 보이는 등급 줄 — 모바일은 위 버튼이 이미 말했다 */}
         <div className="hidden items-end justify-between gap-3 md:flex">
@@ -111,6 +119,13 @@ export function WalkVerdict({
           </p>
         )}
       </div>
+
+      {/*
+        **아래 묶음과의 경계선을 이 섹션이 그린다** (DESIGN.md §0 의 8px 밴드).
+        호출부에 두면 접었을 때 tint 줄 아래에 회색 줄만 남아, 접힌 판정이 아니라
+        빈 밴드가 하나 떠 있는 것처럼 보인다. 접힘과 함께 사라져야 하는 경계다.
+      */}
+      <div aria-hidden className={cn('bg-band h-2 w-full md:block', open ? 'block' : 'hidden')} />
     </section>
   )
 }
