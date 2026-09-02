@@ -12,7 +12,7 @@ import {
   type YearMonth,
   yearMonthOf,
 } from '@/lib/date/calendar'
-import { isDayWithin, weekdayOf,WEEKDAYS } from '@/lib/date/day'
+import { isDayWithin, weekdayOf, WEEKDAYS } from '@/lib/date/day'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -186,7 +186,7 @@ export function Calendar({
                 selected
                   ? 'bg-brand-600 text-fg-inverse rounded-md font-bold'
                   : cell.inMonth
-                    ? 'text-fg font-medium hover:bg-band'
+                    ? 'text-fg hover:bg-band font-medium'
                     : 'text-fg-subtle hover:bg-band',
               )}
             >

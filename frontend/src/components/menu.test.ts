@@ -69,7 +69,7 @@ describe('Menu — 항목 계약 (가이드 §5-2)', () => {
     expect(markup).not.toContain('justify-center')
   })
 
-  it("align=\"center\" 를 준 곳만 가운데다 — 트리거가 축을 못 잡아 주는 자리다", () => {
+  it('align="center" 를 준 곳만 가운데다 — 트리거가 축을 못 잡아 주는 자리다', () => {
     const markup = render([{ label: '내 반려견', href: '/pets' }], true, 'center')
 
     expect(markup).toContain('justify-center')

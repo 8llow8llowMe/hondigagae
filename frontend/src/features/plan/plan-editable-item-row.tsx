@@ -118,11 +118,7 @@ export function PlanEditableItemRow({
             'bg-band text-fg-muted text-caption flex w-6 shrink-0 items-center justify-center self-stretch rounded-sm font-bold tabular-nums',
             // 터치에서 드래그가 스크롤로 먹히지 않게 한다
             'touch-none',
-            onHandlePointerDown === undefined
-              ? ''
-              : dragging
-                ? 'cursor-grabbing'
-                : 'cursor-grab',
+            onHandlePointerDown === undefined ? '' : dragging ? 'cursor-grabbing' : 'cursor-grab',
           )}
         >
           {index + 1}
