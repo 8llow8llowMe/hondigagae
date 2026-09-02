@@ -31,7 +31,10 @@ export type AiPlanDraftPreviewProps = {
    * 보강이 아직이거나 실패했거나 원천에 좌표가 없는 경우다.
    */
   coords: ReadonlyMap<string, LatLng>
-  /** 보강이 404 를 낸 `placeId` — `PLAN_004` 원인 후보 */
+  /**
+   * 담을 수 없는 `placeId` — `PLAN_004` 원인 후보. 상세 응답의 `delisted: true`(200)와
+   * 병합(404)이 함께 들어 있다 (#146)
+   */
   delistedPlaceIds: ReadonlySet<string>
   /** 담기에서 빼기로 표시한 `placeId` */
   excludedPlaceIds: ReadonlySet<string>

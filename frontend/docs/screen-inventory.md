@@ -100,6 +100,11 @@
   `false`(야외)와 다르게 다룬다 — 메타 줄에서 낱말을 빼고, 실내 필터를 가진 화면(목록 행·장소 상세)만
   "실내 여부 미확인" 배지로 드러낸다. 조립은 `lib/place/meta.ts` 한 곳이다.
 - **`sigunguCode` 는 여전히 상세 응답에 없다.** 목록 항목에만 있다 — #16 범위가 아니었다.
+- **`delisted` 를 404 로 대신 읽지 않는다** ([#146](https://github.com/8llow8llowMe/hondigagae/issues/146)).
+  원천에서 사라진 장소의 상세는 **200 + `delisted: true`** 로 온다 — 기존 일정(`plan_item`)이
+  참조하는 장소라 백엔드가 일부러 계속 응답한다. `GET /places/{placeId}` 가 **404** 를 내는 것은
+  _병합된_(`mergedIntoId`) 장소뿐이다. 판정은 `lib/place/availability.ts` 하나가 갖고,
+  장소 상세와 AI 초안 미리보기가 함께 쓴다.
 - 상세의 `contentId` 는 원천이 TourAPI 가 아니면 **`null`** 이다
   ([#17](https://github.com/8llow8llowMe/hondigagae/issues/17) 반영 — 그전에는 문자열 `"null"` 이었다).
   타입은 `string | null` 이 맞다.

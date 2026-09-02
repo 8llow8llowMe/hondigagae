@@ -86,6 +86,11 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
           added,
           onAddToPlan: () => (authed ? setAddOpen(true) : setLoginIntent('add')),
           onLogin: () => setLoginIntent('add'),
+          /*
+            아직 못 받았으면 `false` 다 — 잠긴 바를 먼저 보여 주고 푸는 것보다 낫다.
+            조회 중에는 스켈레톤이라 이 값이 화면에 닿지도 않는다 (#146).
+          */
+          delisted: query.data?.delisted ?? false,
         }}
       />
 

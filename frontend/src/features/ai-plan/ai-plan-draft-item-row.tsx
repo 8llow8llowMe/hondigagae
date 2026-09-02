@@ -17,8 +17,10 @@ export type AiPlanDraftItemRowProps = {
    */
   meta?: string | undefined
   /**
-   * 보강이 **404** 로 실패했는가. `PLAN_004`(delisting) 로 담기가 막힐 때의 원인 후보다
-   * (명세 S5 함정 3 · 일자편집 명세 E1).
+   * 담을 수 없는 장소인가 — 상세 응답의 `delisted: true`(원천에서 사라짐) 또는 **404**
+   * (병합). `PLAN_004` 로 담기가 막힐 때의 원인 후보다 (명세 S5 함정 3 · 일자편집 명세 E1).
+   *
+   * **404 만으로 판정하지 않는다** — delisted 장소의 상세는 200 으로 온다 (#146).
    */
   delisted?: boolean
   /** 담기에서 빼기로 표시된 항목 */

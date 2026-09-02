@@ -216,6 +216,17 @@ const VARIANTS: DetailVariant[] = [
   },
 ]
 
+/**
+ * delisted 로 내려보낼 순번. **한 곳은 반드시 있어야 한다.**
+ *
+ * 원천에서 사라진 장소는 **응답 본문의 플래그로만** 드러난다 — 404 가 아니라 200 이다
+ * (`types/place.ts` 의 `delisted` 주석). fixture 에 없으면 안내 배너도, 담기·저장이 400 으로
+ * 막히는 이유도 로컬에서 재현되지 않는다 (#146).
+ *
+ * 펜션을 고른 것은 폐업이 가장 그럴듯한 업종이어서다.
+ */
+const DELISTED_ORDINAL = 3
+
 export function mockPlaceDetail(placeId: string): PlaceDetail | null {
   const index = MOCK_PLACES.findIndex((place) => place.placeId === placeId)
   if (index === -1) return null
@@ -244,6 +255,7 @@ export function mockPlaceDetail(placeId: string): PlaceDetail | null {
     homepage: variant.homepage,
     overview: variant.overview,
     petAvailable: summary.petAllowanceType.code !== 'NOT_ALLOWED',
+    delisted: index === DELISTED_ORDINAL,
     petAllowanceType: summary.petAllowanceType,
     /*
       **목록과 같은 값을 넘긴다** (#16). 백엔드도 같은 `Place` 도메인 모델을 보고

@@ -17,6 +17,15 @@ export type PlaceDetailActions = {
   onAddToPlan: () => void
   /** 미로그인의 `로그인` 버튼. 로그인 안내 시트를 연다 */
   onLogin: () => void
+  /**
+   * 원천에서 사라진 장소인가 (#146). **두 동작이 서버에서 확정적으로 400 이다** —
+   * 담기는 `PLAN_004`, 저장은 `FAVORITE_001`.
+   *
+   * 즐겨찾기 100곳 상한은 서버 오류에 맡겼는데 여기는 미리 막는다. 갈림길은 **화면이 이미
+   * 그 사실을 갖고 있는가** 다 — 상한은 목록 전량을 받아야 알지만, `delisted` 는 지금 그리고
+   * 있는 상세 응답에 실려 왔다. 알면서 400 을 맞게 두지 않는다.
+   */
+  delisted: boolean
 }
 
 /**
@@ -32,6 +41,10 @@ export type PlaceDetailActions = {
  * **미로그인은 저장 아이콘 대신 `로그인` 버튼이다** (아트보드 04 ③ — 동폭 두 버튼).
  * 저장 여부를 알 수 없는데 빈 북마크를 두면 "저장 안 됨" 으로 읽힌다.
  *
+ * **`delisted` 면 담기와 저장을 잠근다** (#146). 다만 **`저장 해제`는 잠그지 않는다** —
+ * `DELETE /favorites/places/{placeId}` 는 장소 가시성을 보지 않아 정상 동작한다. 예전에
+ * 저장해 둔 곳을 지울 길이 막히면 그게 더 나쁘다.
+ *
  * 표시 전용이라 node 환경에서 렌더 테스트가 된다 (`testing-guide.md` §1).
  */
 export function PlaceDetailActionBar({
@@ -43,14 +56,28 @@ export function PlaceDetailActionBar({
   added,
   onAddToPlan,
   onLogin,
+  delisted,
   className,
 }: PlaceDetailActions & { className?: string }) {
+  // 해제는 살려 둔다 — 잠기는 것은 **새로 저장하는 방향**뿐이다
+  const saveBlocked = delisted && !saved
+
   return (
     <div className={cn('border-border bg-bg border-t', className)}>
       {saveError !== null && (
         <div className="px-4 pt-3 lg:px-6">
           <FormAlert message={saveError} />
         </div>
+      )}
+
+      {/*
+        왜 잠겼는지 **버튼 위에** 남긴다. `disabled` 만 걸면 스크린리더도 마우스도 이유를
+        얻지 못하고, 토스트로 흘리면 눌러 본 사람만 본다.
+      */}
+      {delisted && (
+        <p className="text-body-2 text-fg-muted px-4 pt-3 lg:px-6">
+          {messages.place.detailDelistedActionsBlocked}
+        </p>
       )}
 
       <div className="flex gap-2 px-4 py-3 lg:px-6">
@@ -63,7 +90,7 @@ export function PlaceDetailActionBar({
           <button
             type="button"
             onClick={onToggleSave}
-            disabled={savePending}
+            disabled={savePending || saveBlocked}
             aria-pressed={saved}
             aria-label={saved ? messages.favorite.unsave : messages.favorite.save}
             className={cn(
@@ -82,7 +109,12 @@ export function PlaceDetailActionBar({
         <button
           type="button"
           onClick={onAddToPlan}
-          className={cn(SHARED, added ? SECONDARY : PRIMARY, 'flex-1')}
+          disabled={delisted}
+          className={cn(
+            SHARED,
+            added ? SECONDARY : PRIMARY,
+            'flex-1 disabled:cursor-not-allowed disabled:opacity-60',
+          )}
         >
           {added ? messages.plan.addToPlanAgainAction : messages.plan.addToPlanAction}
         </button>
