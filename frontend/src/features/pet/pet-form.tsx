@@ -18,6 +18,7 @@ import type { FormErrors } from '@/lib/form/field-errors'
 import { useForm } from '@/lib/form/use-form'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { messages } from '@/lib/messages'
+import { BIRTH_YM_LENGTH, formatBirthYmInput } from '@/lib/pet/birth-ym'
 import { toPetSavePayload } from '@/lib/pet/form'
 import type { Pet, PetFormValues } from '@/types/pet'
 
@@ -106,12 +107,8 @@ export function PetFormFields({
           />
         </Field>
 
-        <Field
-          id="breed"
-          label={labels.breed}
-          error={errors.fields.breed}
-          hint={messages.pet.hints.optional}
-        >
+        {/* hint 를 달지 않는다 — 필수 표시(`*`)가 없는 것으로 선택 입력임이 이미 전달된다 */}
+        <Field id="breed" label={labels.breed} error={errors.fields.breed}>
           <Input
             id="breed"
             value={values.breed}
@@ -126,18 +123,26 @@ export function PetFormFields({
           error={errors.fields.birthYm}
           hint={messages.pet.hints.birthYm}
         >
+          {/* 하이픈을 사람이 치게 하지 않는다. 규칙은 `lib/pet/birth-ym.ts` 가 소유한다 */}
           <Input
             id="birthYm"
             inputMode="numeric"
             placeholder="2017-05"
+            maxLength={BIRTH_YM_LENGTH}
             value={values.birthYm}
-            onValueChange={(value) => onValueChange('birthYm', value)}
+            onValueChange={(value) => onValueChange('birthYm', formatBirthYmInput(value))}
             invalid={errors.fields.birthYm !== undefined}
           />
         </Field>
       </section>
 
-      <section>
+      {/*
+        제목 없는 섹션이지만 **간격은 형제 섹션과 같아야 한다.** `gap` 이 없어 체중의
+        hint 와 아래 `크기` 라디오 라벨이 붙어, 그 hint 가 체중이 아니라 크기의 안내처럼
+        읽혔다. 제목(`h2`)은 두지 않는다 — 라디오 그룹이 이미 `크기` 라벨을 갖고 있어
+        같은 말이 두 번 나온다.
+      */}
+      <section className="flex flex-col gap-4">
         <Field
           id="weightKg"
           label={labels.weightKg}
@@ -149,7 +154,7 @@ export function PetFormFields({
           <Input
             id="weightKg"
             inputMode="decimal"
-            placeholder="3.5"
+            placeholder="3.5kg"
             value={values.weightKg}
             onValueChange={(value) => onValueChange('weightKg', value)}
             invalid={errors.fields.weightKg !== undefined}
