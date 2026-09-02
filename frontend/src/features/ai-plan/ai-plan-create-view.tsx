@@ -25,7 +25,7 @@ import type { Pet } from '@/types/pet'
 /**
  * 조건 입력 — 명세 S0 · 아트보드 01.
  *
- * **반려견 목록이 먼저다.** 화면이 `petId` 를 필수로 두므로 반려견이 없으면 폼을 채울
+ * **반려견 목록이 먼저다.** 화면이 반려견을 필수로 두므로 하나도 없으면 폼을 채울
  * 수 없다. 0마리면 폼 대신 등록으로 안내한다 (`PlanCreateView` 와 같은 구조).
  */
 export function AiPlanCreateView({ fromJobId }: { fromJobId: string | null }) {
@@ -103,7 +103,7 @@ function AiPlanCreateFormContainer({ pets, fromJobId }: { pets: Pet[]; fromJobId
     onSubmit: (values) => submitAiPlan(toAiPlanSubmitPayload(values)),
     onSuccess: (result, values) => {
       /*
-        **조건을 `jobId` 로 보관한다** (명세 S5 함정 1). 초안에는 `petId`·기간·예산이
+        **조건을 `jobId` 로 보관한다** (명세 S5 함정 1). 초안에는 반려견·기간·예산이
         없는데 담기(`POST /plans`)에는 필요하고, 작업 조회 응답에도 요청 조건이 없어
         `jobId` 로 되살릴 수 없다.
 
@@ -115,8 +115,10 @@ function AiPlanCreateFormContainer({ pets, fromJobId }: { pets: Pet[]; fromJobId
         areaCode: payload.areaCode,
         startDate: payload.startDate,
         endDate: payload.endDate,
-        petId: payload.petId,
-        petName: pets.find((pet) => pet.petId === payload.petId)?.name ?? '',
+        pets: payload.petIds.map((petId) => ({
+          petId,
+          name: pets.find((pet) => pet.petId === petId)?.name ?? '',
+        })),
         budget: payload.budget ?? null,
         requestNote: payload.requestNote ?? '',
         // 담기에는 쓰이지 않는다 — `조건 바꾸기` 가 폼을 되살릴 때만 쓴다 (#128)
@@ -165,12 +167,6 @@ function AiPlanCreateFormContainer({ pets, fromJobId }: { pets: Pet[]; fromJobId
 }
 
 /**
- * `?from={jobId}` 의 조건을 폼 값으로. 없으면 기본값이다.
- *
- * **저장된 `petId` 가 지금 목록에 없으면 비운다** — 그 사이 반려견을 삭제했을 수 있고,
- * 라디오에 없는 값을 넣으면 아무것도 선택되지 않은 채로 값이 채워져 있다고 보인다.
- */
-/**
  * 원 단위 예산 → 만원 단위 폼 값.
  *
  * **만원 배수가 아니면 비운다.** `205_000 / 10_000` 은 `"20.5"` 인데 스키마가 `/^\d+$/`
@@ -183,11 +179,18 @@ function toBudgetManwon(budget: number | null): string {
   return String(budget / MANWON)
 }
 
+/**
+ * `?from={jobId}` 의 조건을 폼 값으로. 없으면 기본값이다.
+ *
+ * **저장된 반려견이 지금 목록에 없으면 걸러 낸다** — 그 사이 삭제했을 수 있고,
+ * 없는 아이가 선택된 채로 남으면 제출이 서버에서 막힌다. 전부 사라졌으면 기본값으로
+ * 떨어진다.
+ */
 function restoreValues(fromJobId: string | null, pets: Pet[]): AiPlanFormValues {
   const base: AiPlanFormValues = {
     ...EMPTY_AI_PLAN_FORM_VALUES,
-    // 한 마리뿐이면 미리 고른다 — 고를 것이 없는 라디오를 비워 두지 않는다
-    petId: pets.length === 1 ? (pets[0]?.petId ?? '') : '',
+    // 한 마리뿐이면 미리 고른다 — 고를 것이 없는 그룹을 비워 두지 않는다
+    petIds: pets.length === 1 ? [pets[0]?.petId ?? ''].filter((petId) => petId !== '') : [],
   }
 
   if (fromJobId === null) return base
@@ -195,13 +198,15 @@ function restoreValues(fromJobId: string | null, pets: Pet[]): AiPlanFormValues 
   const snapshot = readAiPlanRequest(fromJobId)
   if (snapshot === null) return base
 
-  const known = pets.some((pet) => pet.petId === snapshot.petId)
+  const knownPetIds = snapshot.pets
+    .map((pet) => pet.petId)
+    .filter((petId) => pets.some((pet) => pet.petId === petId))
 
   return {
     requestNote: snapshot.requestNote,
     startDate: snapshot.startDate,
     endDate: snapshot.endDate,
-    petId: known ? snapshot.petId : base.petId,
+    petIds: knownPetIds.length > 0 ? knownPetIds : base.petIds,
     budgetManwon: toBudgetManwon(snapshot.budget),
     /*
       **앞 형식으로 저장된 값에는 이 둘이 없다** (선택 필드로 둔 이유). 열어 둔 탭에

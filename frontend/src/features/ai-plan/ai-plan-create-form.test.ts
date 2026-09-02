@@ -84,7 +84,7 @@ describe('AiPlanCreateForm — 지역 컨트롤이 없다 (명세 S2)', () => {
   })
 })
 
-describe('AiPlanCreateForm — 반려견은 라디오 한 마리', () => {
+describe('AiPlanCreateForm — 반려견은 체크박스 여러 마리 (#128)', () => {
   it('반려견마다 이름과 설명을 낸다', () => {
     const html = render()
 
@@ -92,22 +92,21 @@ describe('AiPlanCreateForm — 반려견은 라디오 한 마리', () => {
     expect(html).toContain('초코')
   })
 
-  it('여러 마리를 함께 고르는 컨트롤을 두지 않는다', () => {
+  /*
+    아트보드 01 은 "반려견은 라디오 — 한 마리" 였다. 담기 직전에 판정 기준을 명시적으로
+    고르게 해서 그 이탈 근거인 "판정 기준이 모호해진다" 를 없앴다 (다견선택-세부명세 D1).
+  */
+  it('반려견을 체크박스로 고른다 — 라디오가 아니다', () => {
     const html = render()
 
-    // 반려견은 라디오다 — 아트보드 01 "반려견은 라디오 — 한 마리"
-    expect(html).toContain('type="radio"')
+    expect(html).toContain('type="checkbox"')
+    expect(html).not.toContain('type="radio"')
+  })
 
-    /*
-      **`type="checkbox"` 부재로 검사하지 않는다.** #128 이 `저장한 곳 먼저` 체크박스를
-      더해서 그 검사는 이제 그 옵션에 걸린다. 확인하려는 것은 **반려견 다중 선택의 부재**라,
-      폼 안의 유일한 체크박스가 그 옵션임을 본다.
+  it('여러 마리가 동시에 선택된 상태로 렌더된다', () => {
+    const html = render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, petIds: ['1', '2'] } })
 
-      다중 반려견(`petIds`)은 아트보드 05 에 설계돼 있으나 `plan-service` 의 `Plan` 이
-      `petId` 단일이라 미뤘다 (명세 S8).
-    */
-    expect(html.match(/type="checkbox"/g) ?? []).toHaveLength(1)
-    expect(html).toContain('id="preferFavorites"')
+    expect(html.split('checked=""').length - 1).toBeGreaterThanOrEqual(2)
   })
 
   it('선택 근거를 안내한다', () => {

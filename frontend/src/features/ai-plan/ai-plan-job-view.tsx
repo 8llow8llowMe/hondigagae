@@ -21,6 +21,7 @@ import { formatBudget } from '@/lib/ai-plan/budget'
 import { defaultPlanTitle } from '@/lib/ai-plan/draft-title'
 import { draftToPlanPayload } from '@/lib/ai-plan/draft-to-plan'
 import { isJobFailed } from '@/lib/ai-plan/job'
+import { petNamesLabel } from '@/lib/ai-plan/pet-names'
 import {
   clearAiPlanRequest,
   readAiPlanRequest,
@@ -222,7 +223,7 @@ function AiPlanFailedContainer({
         areaCode: snapshot.areaCode,
         startDate: snapshot.startDate,
         endDate: snapshot.endDate,
-        petId: snapshot.petId,
+        petIds: snapshot.pets.map((pet) => pet.petId),
         ...(snapshot.budget === null ? {} : { budget: snapshot.budget }),
         ...(snapshot.requestNote === '' ? {} : { requestNote: snapshot.requestNote }),
       })
@@ -269,6 +270,19 @@ function AiPlanCommitContainer({
 
   const totalDays = totalDaysBetween(snapshot.startDate, snapshot.endDate)
 
+  /*
+    판정 기준 반려견 (#128 · 다견선택-세부명세 D4). `PlanCreateRequest.petId` 가 단일이라
+    여러 마리로 만든 초안도 저장은 한 마리에 붙는다.
+
+    기본값은 **먼저 고른 아이**다 — `pets` 순서가 체크한 순서다. `usePetList()` 를 붙여
+    대표견을 찾지 않는다: 이 화면은 반려견 목록을 갖고 있지 않고, 기본값 하나를 위해
+    데이터 의존을 늘리면 조회가 늦거나 실패할 때 기본값이 흔들린다.
+
+    `snapshot` 은 부모가 `useState` 로 한 번만 읽어 두므로 이 컴포넌트가 사는 동안
+    바뀌지 않는다 — 초기값으로 충분하고 동기화 effect 가 필요 없다.
+  */
+  const basisPetId = snapshot.pets[0]?.petId ?? ''
+
   const [excludedPlaceIds, setExcludedPlaceIds] = useState<ReadonlySet<string>>(EMPTY_SET)
   const [delistedBlocked, setDelistedBlocked] = useState(false)
   const [discarding, setDiscarding] = useState(false)
@@ -277,7 +291,7 @@ function AiPlanCommitContainer({
     schema: aiPlanCommitSchema,
     initialValues: {
       // 기본값을 넣어 두고 담기 직전에 고칠 수 있게 한다 (명세 S8 미결 1)
-      title: defaultPlanTitle(snapshot.petName, totalDays ?? draft.days.length),
+      title: defaultPlanTitle(petNamesLabel(snapshot.pets), totalDays ?? draft.days.length),
     },
     /*
       **`PLAN_004` 를 여기서 잡는다.** `useForm` 은 오류를 `errors` 로만 남기고 원본
@@ -292,6 +306,7 @@ function AiPlanCommitContainer({
           draftToPlanPayload({
             draft,
             snapshot,
+            basisPetId,
             title: values.title.trim(),
             totalDays,
             excludedPlaceIds,
@@ -382,7 +397,9 @@ function summarize(snapshot: AiPlanRequestSnapshot | null): string | null {
   if (snapshot === null) return null
 
   const parts = [formatPlanDateRange(snapshot.startDate, snapshot.endDate)]
-  if (snapshot.petName !== '') parts.push(snapshot.petName)
+
+  const names = petNamesLabel(snapshot.pets)
+  if (names !== '') parts.push(names)
 
   const budget = formatBudget(snapshot.budget)
   if (budget !== null) parts.push(budget)
