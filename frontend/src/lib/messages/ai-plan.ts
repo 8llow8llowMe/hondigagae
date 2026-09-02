@@ -200,6 +200,10 @@ export const aiPlanMessages = {
 
   // ── 담기 (아트보드 03 하단 바) ─────────────────────────────────────────
 
+  /** 담기 패널의 판정 기준 선택 (#128). **2마리 이상일 때만 보인다** */
+  commitBasisLabel: '판정 기준 반려견',
+  /** 무엇이 걸린 선택인지 말한다 — 저장 후 판정이 이 아이 기준이 된다 */
+  commitBasisHint: '저장한 뒤 날씨·산책 판정은 고른 아이 기준으로 나와요.',
   commitFieldTitle: '일정 제목',
   commitSubmit: '내 일정에 담기',
   commitAgain: '전체 다시 만들기',
