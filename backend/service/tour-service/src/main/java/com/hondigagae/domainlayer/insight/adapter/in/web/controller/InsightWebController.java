@@ -2,6 +2,8 @@ package com.hondigagae.domainlayer.insight.adapter.in.web.controller;
 
 import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.RegionalWeatherResponse;
+import com.hondigagae.domainlayer.insight.adapter.in.web.dto.response.WalkTimesResponse;
+import com.hondigagae.domainlayer.insight.application.exception.InsightValidationMessage;
 import com.hondigagae.domainlayer.insight.application.port.in.InsightWebUseCase;
 import com.hondigagae.domainlayer.insight.domain.model.PetCondition;
 import com.hondigagae.shared.travel.pet.ActivityLevel;
@@ -9,6 +11,8 @@ import com.hondigagae.shared.travel.pet.PetSizeType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -75,5 +79,52 @@ public class InsightWebController {
 
         return ResponseEntity.ok().body(
             Response.success(insightWebUseCase.getRegionalWeather(date, pet)));
+    }
+
+    @Operation(summary = "오늘의 산책 골든타임",
+        description = "좌표 기준으로 오늘 남은 시간의 산책 안전 등급 곡선과 가장 좋은 연속 구간을 줍니다. "
+            + "장소 산책 위험도가 \"지금 나가도 되나\"를 답한다면 이쪽은 \"오늘 언제 나가야 하나\"를 답합니다 — "
+            + "여름 제주에서는 낮에 어차피 못 나가고 문제는 아침이 나은지 저녁이 나은지입니다. "
+            + "판정은 산책 위험도와 **같은 규칙**을 씁니다. "
+            + "`goldenStart` 가 null 이면 남은 시간이 전부 위험 등급이거나 특보 경보가 발효 중이라는 뜻입니다 — "
+            + "아무 구간이나 골라 주면 사용자가 그것을 허락으로 읽기 때문에 주지 않습니다. "
+            + "추정 노면온도는 기온에 일사와 시간대를 더해 계산한 값이며 실측이 아닙니다.")
+    @GetMapping("/walk-times")
+    public ResponseEntity<Response<WalkTimesResponse>> getWalkTimes(
+        @Parameter(description = "위도", required = true, example = "33.4996213")
+        @Min(value = -90, message = InsightValidationMessage.LAT_RANGE_INVALID)
+        @Max(value = 90, message = InsightValidationMessage.LAT_RANGE_INVALID)
+        @RequestParam double lat,
+
+        @Parameter(description = "경도", required = true, example = "126.5311884")
+        @Min(value = -180, message = InsightValidationMessage.LNG_RANGE_INVALID)
+        @Max(value = 180, message = InsightValidationMessage.LNG_RANGE_INVALID)
+        @RequestParam double lng,
+
+        @Parameter(description = "반려견 크기", example = "SMALL")
+        @RequestParam(required = false) PetSizeType petSizeType,
+
+        @Parameter(description = "더위에 민감한지", example = "true")
+        @RequestParam(defaultValue = "false") boolean heatSensitive,
+
+        @Parameter(description = "추위에 민감한지", example = "false")
+        @RequestParam(defaultValue = "false") boolean coldSensitive,
+
+        @Parameter(description = "활동량", example = "LOW")
+        @RequestParam(required = false) ActivityLevel activityLevel,
+
+        @Parameter(description = "견종. 단두종(불독/퍼그/시츄 등)이면 고온 위험을 높게 잡습니다", example = "퍼그")
+        @RequestParam(required = false) String breed
+    ) {
+        PetCondition pet = PetCondition.builder()
+            .sizeType(petSizeType)
+            .heatSensitive(heatSensitive)
+            .coldSensitive(coldSensitive)
+            .activityLevel(activityLevel)
+            .breed(breed)
+            .build();
+
+        return ResponseEntity.ok().body(
+            Response.success(insightWebUseCase.getWalkTimes(lat, lng, pet)));
     }
 }
