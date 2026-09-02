@@ -8,7 +8,7 @@ function values(overrides: Partial<AiPlanFormValues> = {}): AiPlanFormValues {
     requestNote: '',
     startDate: '2026-09-12',
     endDate: '2026-09-14',
-    petId: '123456789012000001',
+    petIds: ['123456789012000001'],
     budgetManwon: '',
     preferFavorites: false,
     pinnedPlaces: [],
@@ -27,12 +27,27 @@ describe('toAiPlanSubmitPayload — 필수 필드', () => {
     expect(payload.endDate).toBe('2026-09-14')
   })
 
-  it('petId 를 문자열로 유지한다 — Snowflake 라 Number() 를 거치면 정밀도를 잃는다', () => {
-    const petId = '212481712381923328'
-    const payload = toAiPlanSubmitPayload(values({ petId }))
+  it('petIds 를 배열로 보낸다', () => {
+    const payload = toAiPlanSubmitPayload(
+      values({ petIds: ['1234567890123456789', '9876543210987654321'] }),
+    )
 
-    expect(payload.petId).toBe(petId)
-    expect(typeof payload.petId).toBe('string')
+    expect(payload.petIds).toEqual(['1234567890123456789', '9876543210987654321'])
+  })
+
+  it('한 마리여도 배열이다 — 분기를 만들지 않는다 (명세 D2-2)', () => {
+    const payload = toAiPlanSubmitPayload(values({ petIds: ['1234567890123456789'] }))
+
+    expect(payload.petIds).toEqual(['1234567890123456789'])
+    expect('petId' in payload).toBe(false)
+  })
+
+  it('Snowflake 를 숫자로 바꾸지 않는다', () => {
+    const petId = '212481712381923328'
+    const payload = toAiPlanSubmitPayload(values({ petIds: [petId] }))
+
+    expect(payload.petIds[0]).toBe(petId)
+    expect(typeof payload.petIds[0]).toBe('string')
     // Number 로 바꾸면 값이 달라진다는 것을 이 테스트가 증명한다
     expect(String(Number(petId))).not.toBe(petId)
   })
@@ -114,12 +129,11 @@ describe('toAiPlanSubmitPayload — 생성 옵션 확장 (#128, 아트보드 05)
     expect(typeof payload.pinnedPlaceIds?.[0]).toBe('string')
   })
 
-  it('아직 보내지 않는 필드가 새어 나가지 않는다 — petIds·planId·regenerateDay', () => {
+  it('planId·regenerateDay 는 여전히 새지 않는다 — 아직 미완성이다 (#90)', () => {
     const payload = toAiPlanSubmitPayload(
       values({ preferFavorites: true, pinnedPlaces: [{ placeId: '1', title: '가' }] }),
     )
 
-    expect('petIds' in payload).toBe(false)
     expect('planId' in payload).toBe(false)
     expect('regenerateDay' in payload).toBe(false)
   })

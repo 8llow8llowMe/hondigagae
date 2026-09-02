@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { MAX_PINNED_PLACES } from '@/lib/ai-plan/pinned'
+import { MAX_PET_COUNT } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
 
 /**
@@ -29,12 +30,18 @@ export const aiPlanFormSchema = z
     // AIPLAN_103
     endDate: z.string().regex(DATE_PATTERN, messages.aiPlan.errorEndDateRequired),
     /**
-     * AIPLAN_105. 라디오가 값을 고정하므로 실질적으로는 2차 방어다.
+     * AIPLAN_105. 체크박스가 값을 고정하므로 실질적으로는 2차 방어다.
      *
-     * **서버는 `petId` 를 선택으로 받는다**(없으면 대표 반려견)지만 화면은 필수로 둔다 —
+     * **서버는 반려견을 선택으로 받는다**(없으면 대표 반려견)지만 화면은 필수로 둔다 —
      * 어느 아이 기준으로 짠 일정인지 사용자가 알아야 결과를 판단할 수 있다.
+     *
+     * 상한은 백엔드 `@Size(max = 5)` 와 회원당 반려견 상한이 같은 값이라 후자를 쓴다 —
+     * 숫자를 새로 적지 않는다 (#128).
      */
-    petId: z.string().min(1, messages.aiPlan.errorPetRequired),
+    petIds: z
+      .array(z.string().min(1))
+      .min(1, messages.aiPlan.errorPetRequired)
+      .max(MAX_PET_COUNT, messages.aiPlan.errorPetTooMany),
     /**
      * AIPLAN_106. 선택 입력이라 빈 값을 허용한다.
      *

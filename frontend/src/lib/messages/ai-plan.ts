@@ -109,6 +109,8 @@ export const aiPlanMessages = {
   errorBudgetPositive: '예산은 0보다 커야 합니다.',
   /** 시트가 상한을 이미 막는다. 이 문구는 2차 방어가 걸렸을 때만 나온다 */
   errorPinnedTooMany: '꼭 넣을 장소는 {max}곳까지예요.',
+  /** 반려견 상한(5) 2차 방어. 화면이 만들 수 없는 상태라 실제로는 닿지 않는다 */
+  errorPetTooMany: '반려견은 최대 5마리까지 고를 수 있어요.',
   // AIPLAN_107
   errorNoteTooLong: '요청 메모는 500자 이하만 가능합니다.',
 
