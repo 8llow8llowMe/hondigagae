@@ -21,6 +21,7 @@ export function PlanOverviewPanel({
   petPending,
   today,
   verdicts,
+  menu = null,
 }: {
   plan: PlanDetail
   /** 조회 실패·삭제된 반려견이면 `null` — **카드만 빠지고 화면은 그대로다** (D5) */
@@ -29,6 +30,12 @@ export function PlanOverviewPanel({
   today: Date
   /** 판정. 아직 없거나 실패했으면 빈 배열 — 목차 자체를 렌더하지 않는다 */
   verdicts: PlanDayWeatherItem[]
+  /**
+   * 일정 관리 진입점(`PlanManageMenu`). **주입으로 받는다** — 이 패널은 'use client' 가
+   * 없는 표시 전용이고, 메뉴는 상태·라우팅·삭제 요청을 갖는 클라이언트 컴포넌트다.
+   * 여기서 직접 import 하면 패널 전체가 클라이언트로 넘어가고 렌더 테스트도 무거워진다.
+   */
+  menu?: React.ReactNode
 }) {
   const dday = daysUntil(plan.startDate, today)
 
@@ -37,8 +44,10 @@ export function PlanOverviewPanel({
       <div className="flex flex-col gap-2">
         <div className="flex items-start gap-2">
           {/* 제목은 서버 상한 60자다. 좌측 400 에서 2~3줄이 되므로 keep-all 로 어절을 지킨다 */}
-          <h1 className="text-title-1 text-fg min-w-0 font-bold break-keep">{plan.title}</h1>
+          <h1 className="text-title-1 text-fg min-w-0 flex-1 font-bold break-keep">{plan.title}</h1>
           <PlanStatusBadge status={plan.status} className="mt-1" />
+          {/* 제목 줄 우측 상단 — 아이콘 버튼의 히트 영역이 제목 첫 줄과 맞도록 `-mt-1` */}
+          {menu !== null && <div className="-mt-1">{menu}</div>}
         </div>
 
         <p className="text-body-2 text-fg-muted font-medium tabular-nums">

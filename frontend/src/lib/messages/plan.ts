@@ -59,6 +59,8 @@ export const planMessages = {
   fieldPet: '누구와 가나요',
   fieldTitle: '일정 이름',
   fieldTitlePlaceholder: '예: 몽실이와 제주 2박 3일',
+  /** 달력을 눌러 고르는 자리라 서식이 아니라 **행동**을 적는다 */
+  datePlaceholder: '날짜 선택',
   fieldStartDate: '시작일',
   fieldEndDate: '종료일',
   fieldBudget: '예산 (선택)',
@@ -174,7 +176,6 @@ export const planMessages = {
   editError: '수정하지 못했어요. 잠시 후 다시 시도해 주세요.',
 
   deleteAction: '일정 삭제',
-  dangerZoneTitle: '위험 영역',
   /** `{title}` 치환 */
   deleteConfirmTitle: '{title} 일정을 삭제할까요?',
   deleteConfirmDescription: '담은 장소와 일자별 판정이 함께 사라져요. 되돌릴 수 없어요.',
@@ -185,10 +186,12 @@ export const planMessages = {
 
   editDayAction: '순서 편집',
   /** 편집 중 상단 안내. 낙관적 업데이트를 하지 않는다는 것을 화면이 말한다 */
-  editHint: '저장하기 전까지는 아무것도 바뀌지 않아요.',
+  editHint: '번호를 끌어 순서를 바꿀 수 있어요. 저장하기 전까지는 아무것도 바뀌지 않아요.',
   /** 거리 자리를 대신한다 — 순서를 옮길 때마다 숫자가 흔들리면 신뢰가 깨진다 */
   editDistanceNote: '이동 거리는 저장 후 다시 계산돼요',
 
+  /** 손잡이 `title` — 마우스·터치에서 끌 수 있다는 것을 알린다 */
+  editDragHandle: '끌어서 순서 바꾸기',
   editMoveUp: '위로 이동',
   editMoveDown: '아래로 이동',
   editRemove: '삭제',
