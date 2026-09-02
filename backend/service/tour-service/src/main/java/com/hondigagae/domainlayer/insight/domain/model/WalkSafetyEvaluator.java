@@ -33,8 +33,20 @@ public final class WalkSafetyEvaluator {
      */
     public static WalkSafetyAssessment evaluate(
         WeatherForecast forecast, List<WeatherForecast> hourly, PetCondition pet,
-        SuitabilityThresholds thresholds, LocalDateTime at, boolean forecastOutOfRange
+        SuitabilityThresholds thresholds, LocalDateTime at, boolean forecastOutOfRange,
+        WeatherWarning warning
     ) {
+        // 특보 경보는 예보보다 먼저 본다. 시각별 예보가 없어도 태풍경보에 "판단 근거 부족"을
+        // 돌려주면 안 된다 - 근거는 있고, 그 근거가 나가지 말라고 말하고 있다.
+        if (warning != null && warning.level().isWarning()) {
+            return WalkSafetyAssessment.builder()
+                .level(WalkSafetyLevel.DANGER)
+                .reasons(List.of(WalkSafetyReason.of(WalkSafetyReasonCode.WEATHER_WARNING_ACTIVE,
+                    "%s %s 발효 중입니다. %s".formatted(warning.type().getDisplayName(),
+                        warning.level().getDisplayName(), warning.type().getDescription()))))
+                .build();
+        }
+
         if (forecast == null || forecast.temperature() == null) {
             return WalkSafetyAssessment.unknown(List.of(WalkSafetyReason.of(
                 forecastOutOfRange ? WalkSafetyReasonCode.FORECAST_OUT_OF_RANGE
@@ -52,6 +64,7 @@ public final class WalkSafetyEvaluator {
         HeatIndex heatIndex = HeatIndex.of(airTemperature, forecast.humidity());
 
         WalkSafetyLevel level = WalkSafetyLevel.SAFE;
+        level = level.worseOf(assessWeatherWarning(warning, reasons));
         level = level.worseOf(assessPavement(pavement, thresholds, reasons));
         level = level.worseOf(assessHeatIndex(heatIndex, airTemperature, thresholds, reasons));
         level = level.worseOf(assessPetSensitivity(pet, airTemperature, heatIndex, thresholds, reasons));
@@ -79,6 +92,22 @@ public final class WalkSafetyEvaluator {
             .saferWindowStart(saferWindow.map(SaferWindow::start).orElse(null))
             .saferWindowEnd(saferWindow.map(SaferWindow::end).orElse(null))
             .build();
+    }
+
+    /**
+     * 주의보를 반영한다. 경보는 이 메서드에 오지 않는다 - 위에서 이미 DANGER 로 끊었다.
+     *
+     * <p>주의보는 최소 CAUTION 이다. 노면과 열지수가 아무리 좋아도 "안전"이라고 말하지 않는다 -
+     * 기상청이 조건이 나빠지고 있다고 알린 상태에서 안전을 단언하면 안 된다.
+     */
+    private static WalkSafetyLevel assessWeatherWarning(WeatherWarning warning, List<WalkSafetyReason> reasons) {
+        if (warning == null) {
+            return WalkSafetyLevel.SAFE;
+        }
+        reasons.add(WalkSafetyReason.of(WalkSafetyReasonCode.WEATHER_WARNING_ACTIVE,
+            "%s %s 발효 중입니다. %s".formatted(warning.type().getDisplayName(),
+                warning.level().getDisplayName(), warning.type().getDescription())));
+        return WalkSafetyLevel.CAUTION;
     }
 
     private static WalkSafetyLevel assessPavement(

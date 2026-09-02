@@ -39,6 +39,9 @@ public enum SuitabilityReasonCode implements CodeNameDescribable {
     HIGH_CONGESTION("혼잡도 높음", "관광객 집중도가 높아 붐빌 것으로 예상됩니다."),
     NOISE_SENSITIVE_CROWD("소음 민감 주의", "붐비는 환경이 소음에 민감한 반려견에게 부담이 됩니다."),
 
+    // 기상특보
+    WEATHER_WARNING_ACTIVE("기상특보 발효", "기상특보가 발효 중이라 야외 일정에 큰 영향이 있습니다."),
+
     // 근거 부족
     FORECAST_OUT_OF_RANGE("예보 범위 밖", "예보가 닿지 않는 날짜라 날씨를 근거로 쓰지 못했습니다."),
     MID_TERM_FORECAST("중기예보 기준", "3일 이후 예보라 단기예보보다 대략적입니다. 여행이 가까워지면 다시 확인해 주세요."),

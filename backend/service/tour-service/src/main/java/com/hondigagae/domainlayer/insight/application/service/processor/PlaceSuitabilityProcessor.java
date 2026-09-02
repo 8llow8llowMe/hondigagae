@@ -10,6 +10,7 @@ import com.hondigagae.domainlayer.insight.application.model.AlternativePlaceCrit
 import com.hondigagae.domainlayer.insight.application.model.PlaceInsightQuery;
 import com.hondigagae.domainlayer.insight.application.port.out.CongestionForecastPort;
 import com.hondigagae.domainlayer.insight.application.port.out.PlaceProfileQueryPort;
+import com.hondigagae.domainlayer.insight.domain.model.WeatherWarning;
 import com.hondigagae.domainlayer.insight.domain.model.CongestionSnapshot;
 import com.hondigagae.domainlayer.insight.domain.model.DailyWeather;
 import com.hondigagae.domainlayer.insight.domain.model.PlaceCondition;
@@ -45,6 +46,7 @@ public class PlaceSuitabilityProcessor {
     private final WeatherForecastProcessor weatherForecastProcessor;
     private final InsightMapper insightMapper;
     private final InsightProperties insightProperties;
+    private final WeatherWarningProcessor weatherWarningProcessor;
 
     public PlaceSuitabilityInfo evaluate(PlaceInsightQuery query) {
         PlaceCondition place = placeProfileQueryPort.findProfile(query.placeId())
@@ -57,6 +59,11 @@ public class PlaceSuitabilityProcessor {
         LocalDate targetDate = query.resolvedDate();
         WeatherLookup weather = lookupWeather(place, targetDate);
         CongestionSnapshot congestion = congestionForecastPort.findByPlaceAndDate(query.placeId(), targetDate);
+        // 특보는 지금 발효 중인 것이라 오늘에만 붙인다. 미래 날짜에 붙이면 그 날도 태풍이라고
+        // 말하는 셈이 된다. 판정과 응답이 같은 값을 쓰도록 한 번만 구한다.
+        WeatherWarning warning = targetDate.equals(LocalDate.now())
+            ? weatherWarningProcessor.heaviestWarning().orElse(null)
+            : null;
 
         SuitabilityScore score = SuitabilityEvaluator.evaluate(SuitabilityInput.builder()
             .place(place)
@@ -64,6 +71,7 @@ public class PlaceSuitabilityProcessor {
             .weather(weather.daily())
             .forecastOutOfRange(weather.outOfRange())
             .congestion(congestion)
+            .weatherWarning(warning)
             .thresholds(insightMapper.toThresholds(insightProperties))
             .build());
 
@@ -74,6 +82,7 @@ public class PlaceSuitabilityProcessor {
             .score(score)
             .weather(weather.daily())
             .congestion(congestion)
+            .weatherWarning(warning)
             .indoorAlternatives(findIndoorAlternativesIfRainy(place, weather.daily()))
             .petConditionApplied(query.petCondition().isSpecified())
             .build();

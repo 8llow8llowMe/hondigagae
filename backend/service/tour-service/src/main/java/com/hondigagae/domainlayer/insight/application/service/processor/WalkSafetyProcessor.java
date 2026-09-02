@@ -6,12 +6,14 @@ import com.hondigagae.domainlayer.insight.application.info.WalkSafetyInfo;
 import com.hondigagae.domainlayer.insight.application.mapper.InsightMapper;
 import com.hondigagae.domainlayer.insight.application.model.PlaceInsightQuery;
 import com.hondigagae.domainlayer.insight.application.port.out.PlaceProfileQueryPort;
+import com.hondigagae.domainlayer.insight.domain.model.WeatherWarning;
 import com.hondigagae.domainlayer.insight.domain.model.PlaceCondition;
 import com.hondigagae.domainlayer.insight.domain.model.WalkSafetyAssessment;
 import com.hondigagae.domainlayer.insight.domain.model.WalkSafetyEvaluator;
 import com.hondigagae.domainlayer.insight.domain.model.WeatherForecast;
 import com.hondigagae.global.properties.InsightProperties;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -40,6 +42,7 @@ public class WalkSafetyProcessor {
     private final WeatherForecastProcessor weatherForecastProcessor;
     private final InsightMapper insightMapper;
     private final InsightProperties insightProperties;
+    private final WeatherWarningProcessor weatherWarningProcessor;
 
     public WalkSafetyInfo assess(PlaceInsightQuery query) {
         PlaceCondition place = placeProfileQueryPort.findProfile(query.placeId())
@@ -54,11 +57,13 @@ public class WalkSafetyProcessor {
             .filter(forecast -> forecast.forecastAt().toLocalDate().equals(target.toLocalDate()))
             .toList();
         WeatherForecast nearest = nearest(sameDay, target).orElse(null);
+        // 판정과 응답이 같은 값을 쓰도록 한 번만 구한다.
+        WeatherWarning warning = isToday(target) ? weatherWarningProcessor.heaviestWarning().orElse(null) : null;
 
         WalkSafetyAssessment assessment = WalkSafetyEvaluator.evaluate(
             nearest, sameDay, query.petCondition(), insightMapper.toThresholds(insightProperties), target,
             // 예보는 받았는데 그 시각이 없으면 범위 밖(정상), 목록 자체가 없으면 장애다.
-            !forecasts.isEmpty() && sameDay.isEmpty());
+            !forecasts.isEmpty() && sameDay.isEmpty(), warning);
 
         return WalkSafetyInfo.builder()
             .placeId(place.placeId())
@@ -66,6 +71,7 @@ public class WalkSafetyProcessor {
             .targetDateTime(target)
             .assessment(assessment)
             .forecast(nearest)
+            .weatherWarning(warning)
             .petConditionApplied(query.petCondition().isSpecified())
             .build();
     }
@@ -95,5 +101,10 @@ public class WalkSafetyProcessor {
 
     private long gapMinutes(WeatherForecast forecast, LocalDateTime target) {
         return Math.abs(Duration.between(target, forecast.forecastAt()).toMinutes());
+    }
+
+    /** 특보는 지금 발효 중인 것이라 오늘에만 붙인다. */
+    private boolean isToday(LocalDateTime target) {
+        return target.toLocalDate().equals(LocalDate.now());
     }
 }

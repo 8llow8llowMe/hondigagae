@@ -112,7 +112,7 @@ class WalkSafetyEvaluatorTest {
             List<WeatherForecast> hourly = sunnyDayCoolingDown();
             WalkSafetyAssessment assessment = WalkSafetyEvaluator.evaluate(
                 hourly.stream().filter(forecast -> forecast.forecastAt().getHour() == 14).findFirst().orElseThrow(),
-                hourly, PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0), false);
+                hourly, PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0), false, null);
 
             assertThat(assessment.level()).isEqualTo(WalkSafetyLevel.DANGER);
             assertThat(assessment.hasSaferWindow()).isTrue();
@@ -135,7 +135,7 @@ class WalkSafetyEvaluatorTest {
     @DisplayName("예보가 없으면 UNKNOWN 이고, 안전하다고 말하지 않는다")
     void unknownWhenNoForecast() {
         WalkSafetyAssessment assessment = WalkSafetyEvaluator.evaluate(
-            null, List.of(), PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0), true);
+            null, List.of(), PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0), true, null);
 
         assertThat(assessment.level()).isEqualTo(WalkSafetyLevel.UNKNOWN);
         assertThat(codesOf(assessment)).contains(WalkSafetyReasonCode.FORECAST_OUT_OF_RANGE);
@@ -153,7 +153,7 @@ class WalkSafetyEvaluatorTest {
 
     private static WalkSafetyAssessment evaluate(WeatherForecast forecast, PetCondition pet, int hour) {
         return WalkSafetyEvaluator.evaluate(
-            forecast, List.of(forecast), pet, thresholds(), DATE.atTime(hour, 0), false);
+            forecast, List.of(forecast), pet, thresholds(), DATE.atTime(hour, 0), false, null);
     }
 
     private static WeatherForecast forecast(double temperature, Integer humidity, SkyState sky, int hour) {

@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.insight.adapter.in.web.dto.response;
 import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
 import com.hondigagae.common.dto.metadata.ScoreMetricMetadata;
 import com.hondigagae.domainlayer.insight.adapter.in.web.dto.item.WalkSafetyReasonItem;
+import com.hondigagae.domainlayer.insight.adapter.in.web.dto.item.WeatherWarningItem;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -68,6 +69,11 @@ public record WalkSafetyResponse(
     boolean petConditionApplied,
 
     @Schema(description = "날씨 정보 출처", example = "기상청 단기예보")
-    String weatherProviderName
+    String weatherProviderName,
+
+    @Schema(
+        description = "발효 중인 기상특보. 없으면 null 이다. 경보면 점수를 내지 않고(0점) 산책은 위험으로 판정한다",
+        nullable = true)
+    WeatherWarningItem weatherWarning
 ) {
 }

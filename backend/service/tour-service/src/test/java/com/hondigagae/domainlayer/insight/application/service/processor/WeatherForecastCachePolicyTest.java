@@ -163,8 +163,10 @@ class WeatherForecastCachePolicyTest {
 
     /** @param gridCoarsenFactor 1 이면 격자를 묶지 않는다 */
     private KmaApiProperties properties(int gridCoarsenFactor) {
+        // 특보 설정은 이 테스트의 관심사가 아니라 비워 둔다(생성자가 기본값을 채운다).
         return new KmaApiProperties(
-            null, null, "test-key", 10, 20, 1000, 21_600, 129_600, 30, 60, gridCoarsenFactor, 10);
+            null, null, "test-key", 10, 20, 1000, 21_600, 129_600, 30, 60, gridCoarsenFactor, 10,
+            null, false, null, null, null);
     }
 
     private CachedWeatherQueryResult cached(boolean stale) {

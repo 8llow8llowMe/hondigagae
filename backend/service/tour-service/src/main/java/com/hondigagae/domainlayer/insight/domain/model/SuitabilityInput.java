@@ -18,6 +18,8 @@ public record SuitabilityInput(
     boolean forecastOutOfRange,
     // null 또는 UNKNOWN 이면 혼잡도를 근거에서 뺀다
     CongestionSnapshot congestion,
+    // 발효 중인 가장 무거운 특보. null 이면 특보가 없거나 조회하지 못한 것이다.
+    WeatherWarning weatherWarning,
     SuitabilityThresholds thresholds
 ) {
 

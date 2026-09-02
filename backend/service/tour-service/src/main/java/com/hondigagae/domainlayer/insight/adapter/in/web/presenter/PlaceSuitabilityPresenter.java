@@ -23,6 +23,7 @@ public class PlaceSuitabilityPresenter {
             .score(score.score())
             .suitabilityLevel(score.level().toScoreMetadata())
             .reasons(insightPresenter.toReasonItems(score.reasons()))
+            .weatherWarning(insightPresenter.toWarningItem(info.weatherWarning()))
             .weather(insightPresenter.toWeatherItem(info.weather()))
             .congestion(insightPresenter.toCongestionItem(info.congestion()))
             .indoorAlternatives(insightPresenter.toAlternativeItems(info.indoorAlternatives()))
