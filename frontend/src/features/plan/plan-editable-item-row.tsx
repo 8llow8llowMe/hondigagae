@@ -1,6 +1,6 @@
 'use client'
 
-import type { KeyboardEvent } from 'react'
+import type { KeyboardEvent, PointerEvent as ReactPointerEvent, Ref } from 'react'
 
 import { Badge } from '@/components/badge'
 import { Button } from '@/components/button'
@@ -23,6 +23,14 @@ import { cn } from '@/lib/utils/cn'
  * **행 자체를 포커스 대상으로 만들지 않는다.** 조작하는 것은 이동·삭제 버튼이고, 그것들이
  * 이미 네이티브 `button` 이다. 행에 `tabIndex` + `onKeyDown` 을 얹으면 역할 없는 요소가
  * 상호작용을 갖게 되어 스크린리더가 무엇을 눌러야 하는지 말하지 못한다.
+ *
+ * **순번 배지가 드래그 손잡이다** (`useDragReorder`). 손잡이를 따로 두면 좁은 화면에서
+ * 제목이 들어갈 폭이 사라진다 — 순번은 이미 "몇 번째인가" 를 말하는 자리라, 그것을
+ * 잡아 위치를 바꾸는 것이 뜻으로도 맞다.
+ *
+ * 손잡이는 **마우스·터치 전용 보조 경로**라 `aria-hidden` 이다. 순서 정보는 `<ol>` 이,
+ * 키보드 경로는 이동 버튼과 `Alt+↑/↓` 가 이미 갖고 있다 — 포커스 가능한 컨트롤을 하나 더
+ * 늘리면 같은 일을 하는 탭 정지가 행마다 셋이 된다.
  */
 export function PlanEditableItemRow({
   entry,
@@ -34,6 +42,11 @@ export function PlanEditableItemRow({
   onMove,
   onToggleRemoved,
   last = false,
+  rowRef,
+  dragging = false,
+  onHandlePointerDown,
+  onHandlePointerMove,
+  onHandlePointerEnd,
 }: {
   entry: PlanDayEditItem
   index: number
@@ -49,6 +62,20 @@ export function PlanEditableItemRow({
   onMove: (index: number, direction: MoveDirection) => void
   onToggleRemoved: (index: number) => void
   last?: boolean
+  /**
+   * 이웃 행의 중간선을 재려면 실제 노드가 필요하다 — `useDragReorder` 가 붙인다.
+   *
+   * **`Row` 가 아니라 그 안의 줄에 붙는다.** 공용 `Row` 에 `ref` 를 뚫으면 `div`/`li`
+   * 두 태그를 오가는 컴포넌트에 한 가지 엘리먼트 타입을 강요하게 된다. 중간선 계산에
+   * 필요한 것은 "이 행이 화면에서 차지하는 세로 구간" 이고, 세로 padding 을 들고 있는
+   * 이 줄의 사각형이 곧 그 값이다.
+   */
+  rowRef?: Ref<HTMLDivElement>
+  /** 지금 끌고 있는 행인가. 손 아래에 있는 것이 무엇인지 보이게 한다 */
+  dragging?: boolean
+  onHandlePointerDown?: (index: number, event: ReactPointerEvent<HTMLElement>) => void
+  onHandlePointerMove?: (event: ReactPointerEvent<HTMLElement>) => void
+  onHandlePointerEnd?: (event: ReactPointerEvent<HTMLElement>) => void
 }) {
   const first = index === 0
   const bottom = index === total - 1
@@ -68,11 +95,35 @@ export function PlanEditableItemRow({
   }
 
   return (
-    <Row as="li" last={last}>
-      <div className="flex items-center gap-3 py-2">
+    <Row
+      as="li"
+      last={last}
+      /*
+        끌고 있는 행을 띄운다. **`--shadow-md` 는 "실제로 떠 있는 것" 에만 허용되는데
+        DESIGN.md §6 이 그 목록에 `드래그 중인 항목` 을 명시한다.**
+        `relative z-10` 이 없으면 그림자가 아래 행에 가린다.
+      */
+      className={cn(dragging && 'bg-bg relative z-10 shadow-md')}
+    >
+      {/* 끄는 동안 글자가 선택되면 드래그가 텍스트 선택으로 바뀐다 */}
+      <div ref={rowRef} className={cn('flex items-center gap-3 py-2', dragging && 'select-none')}>
         <span
           aria-hidden
-          className="bg-band text-fg-muted text-caption inline-flex size-6 shrink-0 items-center justify-center rounded-sm font-bold tabular-nums"
+          title={messages.plan.editDragHandle}
+          onPointerDown={(event) => onHandlePointerDown?.(index, event)}
+          onPointerMove={onHandlePointerMove}
+          onPointerUp={onHandlePointerEnd}
+          onPointerCancel={onHandlePointerEnd}
+          className={cn(
+            'bg-band text-fg-muted text-caption flex w-6 shrink-0 items-center justify-center self-stretch rounded-sm font-bold tabular-nums',
+            // 터치에서 드래그가 스크롤로 먹히지 않게 한다
+            'touch-none',
+            onHandlePointerDown === undefined
+              ? ''
+              : dragging
+                ? 'cursor-grabbing'
+                : 'cursor-grab',
+          )}
         >
           {index + 1}
         </span>

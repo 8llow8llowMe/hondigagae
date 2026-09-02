@@ -64,14 +64,22 @@ export function usePlanDayEdit({
     setFocusTarget(null)
   }, [])
 
-  const move = useCallback((index: number, direction: MoveDirection) => {
+  /**
+   * 한 칸 이동.
+   *
+   * `moveFocus` 는 **드래그 때문에 생긴 인자다.** 버튼·키보드로 옮길 때는 포커스가
+   * 옮겨진 항목을 따라가야 연속 이동이 되지만(E6), 끌어서 옮기는 중에 `.focus()` 를
+   * 부르면 브라우저가 그 요소를 화면 안으로 스크롤해 손가락 아래의 목록이 튄다.
+   * **알림(`aria-live`)은 양쪽 다 낸다** — 무엇이 몇 번째로 갔는지는 어느 쪽이든 알아야 한다.
+   */
+  const move = useCallback((index: number, direction: MoveDirection, moveFocus = true) => {
     setItems((current) => {
       const next = moveEditItem(current, index, direction)
       // 경계에서는 같은 배열이 온다 — 알림도 포커스 이동도 하지 않는다
       if (next === current) return current
 
       const moved = direction === 'up' ? index - 1 : index + 1
-      setFocusTarget({ index: moved, direction })
+      if (moveFocus) setFocusTarget({ index: moved, direction })
       setAnnouncement(messages.plan.editAnnounceMoved.replace('{position}', String(moved + 1)))
       return next
     })
