@@ -1,18 +1,14 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 
-import { Button } from '@/components/button'
 import { ConfirmModal } from '@/components/confirm-modal'
 import { EmptyState } from '@/components/empty-state'
-import { MoreIcon } from '@/components/icons'
-import { Menu, MenuAnchor } from '@/components/menu'
 import { Band } from '@/components/surface'
 import { PlanDayEditor } from '@/features/plan/plan-day-editor'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
-import { PlanDeleteSection } from '@/features/plan/plan-delete-section'
-import { PlanEditModal } from '@/features/plan/plan-edit-modal'
 import { PlanItemRow } from '@/features/plan/plan-item-row'
+import { PlanManageMenu } from '@/features/plan/plan-manage-menu'
 import { PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
 import { PlanStatusAction } from '@/features/plan/plan-status-action'
 import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
@@ -128,15 +124,20 @@ export function PlanDetailSection({
           petPending={petPending}
           today={today}
           verdicts={weather?.days ?? []}
+          /* 관리 진입점은 일정의 신원 옆에 둔다 — `PlanManageMenu` 주석 참고 */
+          menu={<PlanManageMenu plan={plan} />}
         />
       </aside>
 
       <div className="border-border lg:border-l">
-        <PlanDetailMenuBar plan={plan} />
-
-        {days.map((group) => (
+        {days.map((group, index) => (
           <div key={group.day}>
-            <Band />
+            {/*
+              **첫 일자 위에는 밴드를 두지 않는다.** 밴드는 "여기서 다른 이야기가
+              시작된다" 는 신호인데(`surface.tsx`), 열 맨 위에서는 앞에 끊을 것이
+              없어 신호가 아니라 두꺼운 회색 띠 하나로만 보였다.
+            */}
+            {index > 0 && <Band />}
             <PlanDaySection
               day={group.day}
               date={addPlanDays(plan.startDate, group.day - 1)}
@@ -200,7 +201,6 @@ export function PlanDetailSection({
 
         <Band />
         <PlanStatusAction plan={plan} />
-        <PlanDeleteSection planId={plan.planId} title={plan.title} />
       </div>
 
       {/*
@@ -225,54 +225,6 @@ export function PlanDetailSection({
         cancelLabel={messages.plan.editCancel}
         destructive
       />
-    </div>
-  )
-}
-
-/**
- * 더보기 메뉴 — 이름·예산 수정 · 일정 삭제.
- *
- * icon-only 라 `aria-label` 이 접근 가능한 이름이다 (D6). 키보드 순회는 `Menu` 가
- * 이미 보장한다.
- */
-function PlanDetailMenuBar({ plan }: { plan: PlanDetail }) {
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
-
-  return (
-    <div className="flex justify-end px-4 pt-4 md:px-10">
-      <MenuAnchor>
-        <Button
-          ref={triggerRef}
-          variant="ghost"
-          size="sm"
-          iconOnly
-          aria-label={messages.plan.manageLabel}
-          aria-expanded={menuOpen}
-          aria-haspopup="menu"
-          leading={<MoreIcon size={20} />}
-          onClick={() => setMenuOpen((open) => !open)}
-        />
-        <Menu
-          open={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          triggerRef={triggerRef}
-          label={messages.plan.manageLabel}
-          className="top-full right-0 mt-1"
-          items={[
-            {
-              label: messages.plan.editAction,
-              onSelect: () => {
-                setMenuOpen(false)
-                setEditOpen(true)
-              },
-            },
-          ]}
-        />
-      </MenuAnchor>
-
-      <PlanEditModal plan={plan} open={editOpen} onClose={() => setEditOpen(false)} />
     </div>
   )
 }
