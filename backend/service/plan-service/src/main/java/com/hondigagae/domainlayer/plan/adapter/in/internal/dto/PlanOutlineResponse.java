@@ -13,6 +13,8 @@ import lombok.Builder;
 @Builder
 public record PlanOutlineResponse(
     long planId,
+    // 일정에 연결된 반려견. 소비 측(ai)이 특성 조회의 키로 쓴다.
+    long petId,
     String startDate,
     String endDate,
     String areaCode,

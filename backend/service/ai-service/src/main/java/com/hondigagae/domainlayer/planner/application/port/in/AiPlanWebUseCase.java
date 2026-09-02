@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.planner.application.port.in;
 
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanJobStatusResponse;
+import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.PackingListResponse;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanJobInfo;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanJobSubscription;
 import java.util.function.Consumer;
@@ -12,6 +13,12 @@ public interface AiPlanWebUseCase {
     AiPlanSubmitResponse submitPlan(long memberId, AiPlanCreateCommand command);
 
     AiPlanJobStatusResponse getJobStatus(String jobId, long memberId);
+
+    /**
+     * 반려견 여행 준비물 목록 생성. 일정 생성과 달리 동기다 — 출력이 짧아 잡·SSE 인프라를
+     * 얹는 비용이 이득보다 크다. LLM 응답이 수십 초일 수 있다.
+     */
+    PackingListResponse generatePackingList(long memberId, long planId);
 
     /** SSE 스트리머용 상태 스냅샷. 소유권 검증과 멈춘 잡 만료 처리는 getJobStatus 와 같은 경로를 탄다. */
     AiPlanJobInfo getJobInfo(String jobId, long memberId);

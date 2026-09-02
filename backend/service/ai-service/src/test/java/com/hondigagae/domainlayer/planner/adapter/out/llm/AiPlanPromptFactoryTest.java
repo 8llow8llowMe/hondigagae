@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
 import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
+import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
@@ -176,6 +177,38 @@ class AiPlanPromptFactoryTest {
 
         assertThat(prompt).contains("입장크기: 소형견");
         assertThat(prompt).contains("체중제한: 10kg");
+    }
+
+    @Test
+    @DisplayName("준비물 프롬프트에 기간·반려견·날씨·일정 근거가 함께 실린다")
+    void packingPromptCarriesAllEvidence() {
+        PackingChecklistQuery query = PackingChecklistQuery.builder()
+            .startDate("2026-09-01")
+            .endDate("2026-09-02")
+            .petConditions(List.of(PetCondition.builder()
+                .sizeName("소형견").weightText("3.5").heatSensitive(true).build()))
+            .weatherOutlook(List.of(DayWeatherOutlook.builder()
+                .date(java.time.LocalDate.parse("2026-09-02"))
+                .precipitationTypeName("비").maxPrecipitationProbability(80)
+                .build()))
+            .planOutline(PlanOutline.builder()
+                .planId(7L)
+                .days(List.of(PlanOutline.PlanOutlineDay.builder().day(1).items(List.of(
+                    PlanOutline.PlanOutlineItem.builder().title("해안 산책로").placeId(11L).build())).build()))
+                .build())
+            .build();
+
+        String prompt = factory.packingUserPrompt(query);
+
+        assertThat(prompt).contains("기간: 2026-09-01 ~ 2026-09-02");
+        assertThat(prompt).contains("함께 여행하는 반려견");
+        assertThat(prompt).contains("체중: 3.5kg");
+        assertThat(prompt).contains("[2일차] 2026-09-02 | 강수형태: 비 | 강수확률 80%");
+        assertThat(prompt).contains("여행 일정");
+        assertThat(prompt).contains("해안 산책로(placeId=11)");
+        assertThat(prompt).contains("준비물 목록을 만들어 주세요");
+        // 배치 지시는 일정 생성 전용 — 준비물 프롬프트에는 실리지 않는다
+        assertThat(prompt).doesNotContain("실내 후보 위주로 배치할 것");
     }
 
     private AiPlanGenerationQuery query(List<PetCondition> petConditions) {

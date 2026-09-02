@@ -36,6 +36,8 @@
   게이트웨이가 라우팅하지 않으며, delisted 를 제외해 새 일정 항목이 사라진 장소를 참조하지 못하게 한다
 - `GET /internal/v1/places/candidates?placeIds=` — (내부 전용) 아이디로 후보 요약 조회.
   ai-service 의 필수 포함 장소를 프롬프트 후보에 합칠 때 쓴다. enum 은 표시명으로 변환해 준다
+- `GET /internal/v1/weather/daily?areaCode=` — (내부 전용) 제주 대표 지점의 일자별 예보(단기+중기, 약 11일).
+  ai-service 가 일정 생성·준비물 프롬프트에 싣는다. 기존 격자 캐시를 타 KMA 호출이 늘지 않고, 제주(39) 외 코드는 빈 목록
 
 ## 데이터 흐름
 

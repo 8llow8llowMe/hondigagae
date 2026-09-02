@@ -10,6 +10,9 @@ import lombok.Builder;
 @Builder
 public record PlanOutline(
     long planId,
+    // 일정에 연결된 반려견. 준비물 생성의 특성 조회 키다. 옛 응답에는 없을 수 있어 nullable.
+    Long petId,
+    String areaCode,
     String startDate,
     String endDate,
     List<PlanOutlineDay> days

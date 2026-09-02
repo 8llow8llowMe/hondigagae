@@ -5,9 +5,11 @@ import com.hondigagae.domainlayer.planner.adapter.in.web.dto.item.AiPlanDayItem;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.item.AiPlanReasonItem;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.item.AiPlanScheduleItem;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanDraftResponse;
+import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.PackingListResponse;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanJobStatusResponse;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanSubmitResponse;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanDraftInfo;
+import com.hondigagae.domainlayer.planner.application.info.PackingListInfo;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanJobInfo;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanSubmissionInfo;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStatus;
@@ -87,5 +89,19 @@ public class AiPlanPresenter {
                 .description(reason.description())
                 .build())
             .toList();
+    }
+    public PackingListResponse toPackingListResponse(long planId, PackingListInfo info) {
+        java.util.List<PackingListResponse.PackingListItem> items = info.items().stream()
+            .map(item -> PackingListResponse.PackingListItem.builder()
+                .category(item.category())
+                .name(item.name())
+                .reason(item.reason())
+                .build())
+            .toList();
+        return PackingListResponse.builder()
+            .planId(String.valueOf(planId))
+            .items(items)
+            .totalCount(items.size())
+            .build();
     }
 }

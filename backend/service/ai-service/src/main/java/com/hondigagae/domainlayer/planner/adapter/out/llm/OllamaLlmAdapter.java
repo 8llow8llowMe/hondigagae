@@ -1,12 +1,15 @@
 package com.hondigagae.domainlayer.planner.adapter.out.llm;
 
+import com.hondigagae.domainlayer.planner.adapter.out.llm.dto.LlmPackingListResponse;
 import com.hondigagae.domainlayer.planner.adapter.out.llm.dto.LlmPlanDraftResponse;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
+import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft;
+import com.hondigagae.domainlayer.planner.domain.model.PackingList;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft.AiPlanDraftDay;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft.AiPlanDraftItem;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft.AiPlanDraftReason;
@@ -69,6 +72,8 @@ public class OllamaLlmAdapter implements AiLlmPort {
 
     private final BeanOutputConverter<LlmPlanDraftResponse> outputConverter =
         new BeanOutputConverter<>(LlmPlanDraftResponse.class);
+    private final BeanOutputConverter<LlmPackingListResponse> packingConverter =
+        new BeanOutputConverter<>(LlmPackingListResponse.class);
 
     // 누적 사용량. 로컬 LLM 은 과금이 없지만 GPU 점유·모델 교체 판단의 근거로 남긴다.
     private final AtomicLong totalInputTokens = new AtomicLong();
@@ -87,6 +92,35 @@ public class OllamaLlmAdapter implements AiLlmPort {
         return toDomain(draft, candidates);
     }
 
+    @Override
+    public PackingList generatePackingList(PackingChecklistQuery query) {
+        String userPrompt = aiPlanPromptFactory.packingUserPrompt(query)
+            + "\n\n" + packingConverter.getFormat();
+        ChatResponse response = call(new Prompt(
+            List.of(new SystemMessage(aiPlanPromptFactory.packingSystemPrompt()), new UserMessage(userPrompt)),
+            buildRequestOptions()));
+
+        String text = extractText(response);
+        LlmPackingListResponse packing;
+        try {
+            packing = packingConverter.convert(text);
+        } catch (RuntimeException exception) {
+            log.error("LLM 준비물 응답을 스키마로 해석할 수 없습니다. model={} reason={}",
+                aiLlmProperties.model(), exception.getMessage());
+            throw new AiPlanException(AiPlanErrorCode.LLM_RESPONSE_INVALID, exception);
+        }
+        List<PackingList.PackingItem> items = packing.items() == null ? List.of()
+            : packing.items().stream()
+                .filter(item -> item.name() != null && !item.name().isBlank())
+                .map(item -> PackingList.PackingItem.builder()
+                    .category(item.category())
+                    .name(item.name())
+                    .reason(item.reason())
+                    .build())
+                .toList();
+        return PackingList.builder().items(items).build();
+    }
+
     private ChatResponse request(AiPlanGenerationQuery query) {
         // 스키마 지시를 사용자 프롬프트 끝에 싣는다. Anthropic SDK 의 outputConfig 가 하던
         // 스키마 강제를 provider 중립으로 옮긴 자리다 — format=json 이 "JSON 만" 을 강제하고,
@@ -94,10 +128,13 @@ public class OllamaLlmAdapter implements AiLlmPort {
         String userPrompt = aiPlanPromptFactory.userPrompt(query)
             + "\n\n" + outputConverter.getFormat();
 
-        Prompt prompt = new Prompt(
+        return call(new Prompt(
             List.of(new SystemMessage(aiPlanPromptFactory.systemPrompt()), new UserMessage(userPrompt)),
-            buildRequestOptions());
+            buildRequestOptions()));
+    }
 
+    /** 서킷 적용과 전송 예외 변환을 한 곳에 모은다 — 일정 생성·준비물 생성이 같은 경로를 탄다. */
+    private ChatResponse call(Prompt prompt) {
         try {
             return circuitBreakerRegistry.circuitBreaker(CIRCUIT_NAME)
                 .executeSupplier(() -> ollamaChatModel.call(prompt));
@@ -134,6 +171,21 @@ public class OllamaLlmAdapter implements AiLlmPort {
      * <p>본문이 비는 지점(응답 자체/결과/텍스트)을 구분해 남긴다 — 원인 추적이 갈라지는 자리다.
      */
     private LlmPlanDraftResponse extractDraft(ChatResponse response) {
+        String text = extractText(response);
+        try {
+            return outputConverter.convert(text);
+        } catch (RuntimeException exception) {
+            log.error("LLM 응답을 스키마로 해석할 수 없습니다. model={} reason={}",
+                aiLlmProperties.model(), exception.getMessage());
+            throw new AiPlanException(AiPlanErrorCode.LLM_RESPONSE_INVALID, exception);
+        }
+    }
+
+    /**
+     * 응답 본문을 꺼내고 사용량을 기록한다. 본문이 비는 지점(응답 자체/결과/텍스트)을 구분해
+     * 남긴다 — 원인 추적이 갈라지는 자리다.
+     */
+    private String extractText(ChatResponse response) {
         recordUsage(response);
 
         if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
@@ -149,14 +201,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
                 response.getResult().getMetadata() == null ? "unknown" : response.getResult().getMetadata().getFinishReason());
             throw new AiPlanException(AiPlanErrorCode.LLM_RESPONSE_INVALID);
         }
-
-        try {
-            return outputConverter.convert(text);
-        } catch (RuntimeException exception) {
-            log.error("LLM 응답을 스키마로 해석할 수 없습니다. model={} reason={}",
-                aiLlmProperties.model(), exception.getMessage());
-            throw new AiPlanException(AiPlanErrorCode.LLM_RESPONSE_INVALID, exception);
-        }
+        return text;
     }
 
     private void recordUsage(ChatResponse response) {
