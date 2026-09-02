@@ -7,7 +7,7 @@ import { Menu, type MenuItem } from '@/components/menu'
 
 const triggerRef = { current: null } as RefObject<HTMLElement | null>
 
-function render(items: MenuItem[], open = true) {
+function render(items: MenuItem[], open = true, align?: 'start' | 'center') {
   return renderToStaticMarkup(
     createElement(Menu, {
       open,
@@ -15,6 +15,7 @@ function render(items: MenuItem[], open = true) {
       triggerRef,
       items,
       label: '내 정보',
+      ...(align === undefined ? {} : { align }),
     }),
   )
 }
@@ -59,6 +60,20 @@ describe('Menu — 이동 항목 (이슈 #70)', () => {
 describe('Menu — 항목 계약 (가이드 §5-2)', () => {
   it('각 항목이 44px 다', () => {
     expect(render([{ label: '내 반려견', href: '/pets' }])).toContain('h-11')
+  })
+
+  it('기본 정렬은 왼쪽이다 — 목록은 왼쪽 축으로 훑는다', () => {
+    const markup = render([{ label: '이름·예산 수정', onSelect: () => undefined }])
+
+    expect(markup).toContain('text-left')
+    expect(markup).not.toContain('justify-center')
+  })
+
+  it("align=\"center\" 를 준 곳만 가운데다 — 트리거가 축을 못 잡아 주는 자리다", () => {
+    const markup = render([{ label: '내 반려견', href: '/pets' }], true, 'center')
+
+    expect(markup).toContain('justify-center')
+    expect(markup).toContain('text-center')
   })
 
   it('파괴적 항목은 danger-900 이고 위에 선을 긋는다', () => {
