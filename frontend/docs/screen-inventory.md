@@ -241,7 +241,8 @@
 - **생성 옵션 두 개가 붙었다** ([#128](https://github.com/8llow8llowMe/hondigagae/issues/128), 아트보드 05): `preferFavorites`(저장한 곳 먼저 — 우선순위)와 `pinnedPlaceIds`(꼭 넣을 장소 — **배치 보장**, 최대 10). **두 문구를 섞지 않는다** — "먼저" 와 "꼭" 은 다른 약속이다.
   - **필드명은 `preferFavorites` 다.** #128 이슈 본문의 `includeFavorites` 는 틀린 이름이고, 그대로 보내면 옵션이 조용히 무시된다.
   - 꼭 넣을 장소는 **저장한 장소에서 고른다** (`/favorites` 와 같은 캐시). 아트보드의 `검색` 탭은 **`GET /places` 에 이름 검색 파라미터가 없어** 만들지 못했다 (명세 S8-9).
-- **다중 반려견(`petIds`)은 아직 못 붙인다.** 계약과 아트보드 05 모두 준비돼 있지만 **`PlanCreateRequest` 가 `petId` 단일**이라, 두 마리로 만든 초안을 담으면 한 마리만 기록되어 이후 판정 기준이 조용히 바뀐다. 막고 있는 것은 디자인이 아니라 **담기 계약**이다 (명세 S8-8).
+- **다중 반려견(`petIds`)은 생성에만 붙였다** ([#128](https://github.com/8llow8llowMe/hondigagae/issues/128) · [다견선택-세부명세.md](features/ai-plan/다견선택-세부명세.md)). 조건 입력이 체크박스 그룹이고 한 마리여도 `petIds` 배열로 보낸다. **저장은 여전히 한 마리다** — `PlanCreateRequest` 가 `petId` 단일이라 담기 직전에 판정 기준이 될 한 마리를 사람이 고른다. 자동으로 고르지 않는다: 프롬프트의 "가장 제약이 큰 아이" 는 입장 제한(크기·체중) 축이고 저장 후 날씨 판정은 민감도(더위·추위) 축이라 서로 다르다. **저장·판정의 다견화는 `PlanCreateRequest.petIds` BE 선행이 필요하고 추적 이슈가 아직 없다** (명세 S8-8).
+- **아트보드 01 을 이탈했다.** 아트보드는 "반려견은 라디오 — 한 마리 / 두 마리를 함께 고르면 판정 기준이 모호해진다" 로 반대 결정을 해 뒀다. 담기 직전의 명시 선택이 그 모호한 구간을 없애므로 이탈했고, 근거의 정본은 세부명세 D1 이다. **아트보드 갱신은 후속.**
 - **아트보드 06 절이 02 절의 진행 5단계를 정정했다.** "진행률 바를 그리지 않는다 … 점 3개(대기·짜는 중·완성)만 쓴다 — 02 아트보드의 5단계는 이 규칙으로 대체한다." 현재 화면은 서버 `description` 만 쓰고 있어 방향은 맞지만, **SSE 배선([#91](https://github.com/8llow8llowMe/hondigagae/issues/91))에서 이 절을 정본으로 봐야 한다.**
 - **SSE 는 이번 범위가 아니다.** 백엔드에 `GET /ai-plans/jobs/{jobId}/stream` 이 있지만(`b7daa3a`) **BFF 가 응답을 통째로 버퍼링해 스트림을 통과시키지 못한다** — 지금 붙이면 폴링만도 못하다. 이슈 [#91](https://github.com/8llow8llowMe/hondigagae/issues/91) 로 뗐다 (명세 S3).
 - **LLM 어댑터가 두 개고 플래그로 갈린다** (`ai-llm.enabled`, 기본값 `false`).
@@ -255,9 +256,10 @@
   요점이다. 기준은 직전 항목 하나뿐이고(초안 `itemType` 이 LLM raw string 이라 숙소를 못 믿는다)
   좌표를 모르는 항목은 거리 줄이 없다. **실내 여부도 붙였다** ([#112](https://github.com/8llow8llowMe/hondigagae/issues/112)).
 - **`AiPlanCreateRequest` 가 `petIds`·`pinnedPlaceIds`·`includeFavorites`·`planId`+`regenerateDay`
-  를 받는다** (PR #78). 전부 선택이고 **#84 는 단일 `petId` 만 보낸다** — 다중 반려견 UI ·
-  필수 포함 장소 · 즐겨찾기 우선 · 하루 재생성은 아트보드 정본이 없어 별도 이슈로 뗐다
-  ([#128](https://github.com/8llow8llowMe/hondigagae/issues/128), 명세 S1).
+  를 받는다** (PR #78). 전부 선택이다. `petIds` · `pinnedPlaceIds` · `preferFavorites` 는
+  [#128](https://github.com/8llow8llowMe/hondigagae/issues/128) 로 붙였고(필드명은
+  `includeFavorites` 가 아니라 `preferFavorites` 다), **`planId`+`regenerateDay`(하루 재생성)는
+  아직 보내지 않는다** — 아트보드와 계약이 어긋나 있다 (명세 S1 · #90).
 - `petId` 와 `petIds` 가 함께 오면 **`petIds` 가 이기고 `petId` 는 무시된다.** 둘 다 없으면
   **대표 반려견**을 쓴다 — 그런데 대표견 지정 UI 가 없다 (#126).
 
