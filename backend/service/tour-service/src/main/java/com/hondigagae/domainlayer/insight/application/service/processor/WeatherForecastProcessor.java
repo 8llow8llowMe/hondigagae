@@ -139,6 +139,21 @@ public class WeatherForecastProcessor {
             .toList();
     }
 
+    /**
+     * 특정 날짜의 예보. 단기·중기 어느 쪽도 닿지 않으면 비어 있다.
+     *
+     * <p><b>비었다는 것은 "날씨가 좋다"가 아니라 "예보가 없다"는 뜻이다.</b> 호출부는 이 구분을
+     * 응답에 반드시 드러내야 한다 - 근거 없는 점수를 주면 안 된다.
+     *
+     * <p>지금은 이 서비스 안에서 부르는 곳이 없다. 그래도 두는 이유는 <b>일자별 예보 내부 API</b>
+     * (AI 일정 생성의 날씨 주입)가 이 형태를 그대로 쓰기 때문이다. 날짜 하나를 묻는 것은
+     * {@code dailyForecastsAt} 전체를 받아 호출부가 고르는 것과 다르다 - 고르는 규칙이
+     * 호출부마다 흩어지면 같은 날짜를 서비스마다 다르게 답하게 된다.
+     */
+    public Optional<DailyWeather> dailyForecastAt(double lat, double lng, String sigunguCode, LocalDate date) {
+        return DailyWeather.findByDate(dailyForecastsAt(lat, lng, sigunguCode), date);
+    }
+
     /** 지금 시각에 가장 가까운 예보 한 건. 현재 상태를 보여줄 때 쓴다. */
     public Optional<WeatherForecast> nearestForecastAt(double lat, double lng, LocalDateTime target) {
         return forecastsAt(lat, lng).stream()
