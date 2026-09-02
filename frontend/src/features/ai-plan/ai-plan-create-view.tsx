@@ -28,7 +28,14 @@ import type { Pet } from '@/types/pet'
  * **반려견 목록이 먼저다.** 화면이 반려견을 필수로 두므로 하나도 없으면 폼을 채울
  * 수 없다. 0마리면 폼 대신 등록으로 안내한다 (`PlanCreateView` 와 같은 구조).
  */
-export function AiPlanCreateView({ fromJobId }: { fromJobId: string | null }) {
+export function AiPlanCreateView({
+  fromJobId,
+  /** `'YYYY-MM-DD'`. 서버가 만들어 내려보낸 오늘 — 달력의 오늘 표시에 쓴다 */
+  today,
+}: {
+  fromJobId: string | null
+  today: string
+}) {
   const petsQuery = usePetList()
 
   if (petsQuery.isPending) {
@@ -63,7 +70,7 @@ export function AiPlanCreateView({ fromJobId }: { fromJobId: string | null }) {
     )
   }
 
-  return <AiPlanCreateFormContainer pets={pets} fromJobId={fromJobId} />
+  return <AiPlanCreateFormContainer pets={pets} fromJobId={fromJobId} today={today} />
 }
 
 /**
@@ -71,7 +78,15 @@ export function AiPlanCreateView({ fromJobId }: { fromJobId: string | null }) {
  * `initialValues` 만 취하므로, 조회 중에 만들면 한 마리뿐일 때의 미리 고르기가 영영
  * 반영되지 않는다 (`PlanCreateFormContainer` 와 같은 이유).
  */
-function AiPlanCreateFormContainer({ pets, fromJobId }: { pets: Pet[]; fromJobId: string | null }) {
+function AiPlanCreateFormContainer({
+  pets,
+  fromJobId,
+  today,
+}: {
+  pets: Pet[]
+  fromJobId: string | null
+  today: string
+}) {
   const router = useRouter()
 
   /*
@@ -151,6 +166,7 @@ function AiPlanCreateFormContainer({ pets, fromJobId }: { pets: Pet[]; fromJobId
         submitCount={form.submitCount}
         firstErrorField={form.firstErrorField}
         favoriteCount={favoriteCount}
+        today={today}
         onValueChange={form.setValue}
         onOpenPlacePicker={() => setPickerOpen(true)}
         onSubmit={() => void form.submit()}

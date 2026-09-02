@@ -24,6 +24,7 @@ import { usePlanDetail } from '@/features/plan/use-plan-detail'
 import { usePlanList } from '@/features/plan/use-plan-list'
 import { createPlan, replaceDayItems } from '@/lib/api/plan'
 import { mergeSlices } from '@/lib/api/slice'
+import { useToday } from '@/lib/date/use-today'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
 import { addPlanDays } from '@/lib/plan/date'
@@ -255,6 +256,11 @@ function CreatePlanForm({
   onClose: () => void
 }) {
   const add = useAddPlaceToPlan({ place, onAdded, onClose })
+  /*
+    **여기서 오늘을 읽는다.** 이 본문은 시트가 열린 뒤에만 렌더돼 서버가 그린 적이 없다 —
+    하이드레이션이 어긋날 서버 출력 자체가 없다. 근거는 `use-today.ts` 주석.
+  */
+  const today = useToday()
 
   const form = useForm<PlanFormValues, PlanDetail>({
     schema: planFormSchema,
@@ -296,6 +302,7 @@ function CreatePlanForm({
         submitting={form.isSubmitting || add.pending}
         submitCount={form.submitCount}
         firstErrorField={form.firstErrorField}
+        today={today}
         onValueChange={form.setValue}
         onSubmit={() => void form.submit()}
         submitLabel={messages.plan.addToPlanCreateSubmit}

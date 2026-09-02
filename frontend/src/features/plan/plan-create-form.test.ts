@@ -40,6 +40,7 @@ function render(overrides: Partial<PlanCreateFormProps> = {}) {
     submitting: false,
     submitCount: 0,
     firstErrorField: null,
+    today: '2026-09-02',
     onValueChange: () => undefined,
     onSubmit: () => undefined,
     ...overrides,
@@ -69,8 +70,29 @@ describe('만들기 폼 — 화면', () => {
     expect(render()).toContain('radio')
   })
 
-  it('종료일 입력이 시작일보다 이른 날짜를 브라우저에서 먼저 막는다', () => {
-    expect(render({ values: values() })).toContain('min="2026-09-12"')
+  /*
+    **`<input type="date">` 의 `min` 을 확인하던 자리다.** 날짜 입력이 `DateField` 로
+    바뀌면서 그 제약은 마크업 속성이 아니라 **달력에서 그 칸을 잠그는 것**으로 옮겨갔고,
+    달력은 열려야 렌더되므로 정적 렌더 테스트에서는 보이지 않는다.
+    잠금 자체는 `components/calendar.test.ts` 의 "min 보다 이른 칸을 잠근다" 가 지킨다.
+    여기서는 **네이티브 날짜 입력으로 되돌아가지 않았는지**를 지킨다.
+  */
+  it('날짜는 네이티브 date 입력이 아니다 — 달력을 우리가 그린다', () => {
+    const html = render({ values: values() })
+
+    expect(html).not.toContain('type="date"')
+    expect(html).toContain('id="startDate"')
+    expect(html).toContain('id="endDate"')
+    expect(html).toContain('aria-haspopup="dialog"')
+    // 타이핑을 막는다 — 손으로 치면 `2026/9/1` 이 들어오고 전부 형식 오류가 된다
+    expect(html.match(/readOnly=""/g)).toHaveLength(2)
+  })
+
+  it('고른 날짜를 요일까지 보여준다 — 여행 계획에서 요일은 날짜만큼 중요하다', () => {
+    const html = render({ values: values() })
+
+    expect(html).toContain('2026년 9월 12일 (토)')
+    expect(html).toContain('2026년 9월 14일 (월)')
   })
 
   it('예산은 number 가 아니다 — 휠 스크롤로 값이 바뀌면 안 된다', () => {

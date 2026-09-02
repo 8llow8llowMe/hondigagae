@@ -25,7 +25,12 @@ import { EMPTY_PLAN_FORM_VALUES, type PlanDetail, type PlanFormValues } from '@/
  * **반려견 목록이 먼저다.** `POST /plans` 에 `petId` 가 필수라 반려견이 없으면 폼을
  * 채울 수 없다. 0마리면 폼 대신 등록으로 안내한다.
  */
-export function PlanCreateView() {
+export function PlanCreateView({
+  /** `'YYYY-MM-DD'`. 서버가 만들어 내려보낸 오늘 — 달력의 오늘 표시에 쓴다 */
+  today,
+}: {
+  today: string
+}) {
   const petsQuery = usePetList()
 
   if (petsQuery.isPending) return <PlanListSkeleton rows={2} />
@@ -52,7 +57,7 @@ export function PlanCreateView() {
     )
   }
 
-  return <PlanCreateFormContainer pets={pets} />
+  return <PlanCreateFormContainer pets={pets} today={today} />
 }
 
 /**
@@ -60,7 +65,7 @@ export function PlanCreateView() {
  * `initialValues` 만 취하므로, 조회 중에 만들면 한 마리뿐일 때의 미리 고르기가 영영
  * 반영되지 않는다.
  */
-function PlanCreateFormContainer({ pets }: { pets: Pet[] }) {
+function PlanCreateFormContainer({ pets, today }: { pets: Pet[]; today: string }) {
   const router = useRouter()
   const queryClient = useQueryClient()
 
@@ -93,6 +98,7 @@ function PlanCreateFormContainer({ pets }: { pets: Pet[] }) {
       submitting={form.isSubmitting}
       submitCount={form.submitCount}
       firstErrorField={form.firstErrorField}
+      today={today}
       onValueChange={form.setValue}
       onSubmit={() => void form.submit()}
     />

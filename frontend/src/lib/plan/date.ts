@@ -1,43 +1,17 @@
+import { parseDay, todayUtc, weekdayOf } from '@/lib/date/day'
+
 /**
  * 일정 날짜 표기.
  *
  * **`today` 를 주입받는다** — 모듈 안에서 `new Date()` 를 부르면 테스트가 실행 시각에
  * 따라 흔들린다. 서버·클라이언트가 같은 값을 그려야 하이드레이션도 맞는다.
- */
-
-const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const
-
-/**
- * `'YYYY-MM-DD'` 를 UTC 자정으로 읽는다.
  *
- * **로컬 타임존으로 읽지 않는다.** `new Date('2026-09-12')` 는 UTC 로 읽히고
- * `new Date('2026-09-12T00:00:00')` 는 로컬로 읽혀, 둘을 섞으면 KST 에서 요일이
- * 하루 밀린다. 여행 날짜는 시각이 아니라 달력의 칸이라 UTC 로 통일한다.
+ * 날짜 문자열을 읽는 규칙 자체는 `lib/date/day.ts` 가 소유한다 — 달력 UI 가 같은 규칙을
+ * 쓰게 되면서 밖으로 꺼냈다. **여기는 "일정 화면의 표기" 만 갖는다.**
  */
-function parseDay(date: string): number | null {
-  const matched = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date)
-  if (matched === null) return null
 
-  const [, year, month, day] = matched as unknown as [string, string, string, string]
-  const time = Date.UTC(Number(year), Number(month) - 1, Number(day))
-
-  // Date.UTC 는 2026-02-31 같은 값을 3월로 넘겨 버린다. 되돌려 비교해 걸러낸다
-  const back = new Date(time)
-  if (back.getUTCMonth() !== Number(month) - 1 || back.getUTCDate() !== Number(day)) return null
-
-  return time
-}
-
-/** 같은 기준(UTC 자정)으로 오늘을 읽는다 */
-function todayUtc(today: Date): number {
-  return Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
-}
-
-export function weekdayOf(date: string): string | null {
-  const time = parseDay(date)
-  if (time === null) return null
-  return WEEKDAYS[new Date(time).getUTCDay()] ?? null
-}
+// 기존 호출부(`plan-item-row` 등)가 이 경로로 가져다 쓰고 있어 다시 내보낸다
+export { weekdayOf }
 
 /**
  * 아트보드 04·05 의 날짜 줄 — `2026-09-12 (토) – 09-14 (월)`.

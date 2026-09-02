@@ -23,6 +23,8 @@ export const aiPlanMessages = {
   requiredGroupLabel: '필수 항목',
 
   fieldStartDate: '여행 시작일',
+  /** 달력을 눌러 고르는 자리라 서식(`YYYY-MM-DD`)이 아니라 **행동**을 적는다 */
+  datePlaceholder: '날짜 선택',
   fieldEndDate: '여행 종료일',
   /** `{days}` 치환. 기간을 다 고른 뒤에만 붙는다 */
   periodSummary: '{days}일 일정이에요.',

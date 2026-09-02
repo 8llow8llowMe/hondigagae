@@ -30,12 +30,19 @@ export default async function AiPlanNewPage({
   */
   const { from } = await searchParams
 
+  /*
+    **`today` 를 서버에서 만들어 내려보낸다.** 달력이 "오늘" 을 표시하는데, 클라이언트가
+    따로 `new Date()` 를 부르면 자정 근처에서 서버 렌더와 하이드레이션이 하루 갈린다
+    (일정 상세와 같은 결정).
+  */
+  const today = new Date().toISOString().slice(0, 10)
+
   return (
     <div className="mx-auto w-full max-w-screen-md px-4 py-6 md:px-10 md:py-8">
       <h1 className="text-title-1 text-fg lg:text-display mb-6 font-bold lg:font-extrabold">
         {messages.aiPlan.createTitle}
       </h1>
-      <AiPlanCreateView fromJobId={from ?? null} />
+      <AiPlanCreateView fromJobId={from ?? null} today={today} />
     </div>
   )
 }

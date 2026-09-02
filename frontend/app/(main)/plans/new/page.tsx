@@ -17,6 +17,13 @@ export const metadata = {
  * **AI 갈래는 만들지 않았다.** 그 화면이 아직 없다 (공통명세 S2).
  */
 export default function PlanCreatePage() {
+  /*
+    **`today` 를 서버에서 만들어 내려보낸다.** 달력이 오늘을 표시하는데, 클라이언트가
+    따로 `new Date()` 를 부르면 자정 근처에서 서버 렌더와 하이드레이션이 하루 갈린다
+    (일정 상세 · `/ai-plans/new` 와 같은 결정).
+  */
+  const today = new Date().toISOString().slice(0, 10)
+
   return (
     <main
       id="main-content"
@@ -27,7 +34,7 @@ export default function PlanCreatePage() {
         <p className="text-body-2 text-fg-muted mt-2">{messages.plan.createDescription}</p>
       </header>
 
-      <PlanCreateView />
+      <PlanCreateView today={today} />
 
       <Link
         href="/plans"
