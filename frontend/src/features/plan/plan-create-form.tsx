@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 
 import { Button } from '@/components/button'
+import { DateField } from '@/components/date-field'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
 import { Input } from '@/components/input'
@@ -21,6 +22,8 @@ export type PlanCreateFormProps = {
   /** 제출이 실패로 끝난 횟수. 포커스 이동의 **유일한 안정적인 트리거**다 */
   submitCount: number
   firstErrorField: string | null
+  /** `'YYYY-MM-DD'`. 달력의 오늘 표시에 쓴다 — 어디서 오는지는 사용처 주석 참고 */
+  today: string
   onValueChange: <K extends keyof PlanFormValues>(key: K, value: PlanFormValues[K]) => void
   onSubmit: () => void
   /**
@@ -46,6 +49,7 @@ export function PlanCreateForm({
   submitting,
   submitCount,
   firstErrorField,
+  today,
   onValueChange,
   onSubmit,
   submitLabel = messages.plan.createSubmit,
@@ -105,8 +109,17 @@ export function PlanCreateForm({
         />
       </Field>
 
-      {/* 두 날짜는 한 줄에 나란히 — 기간은 하나의 값이라 세로로 떨어뜨리면 관계가 흐려진다 */}
-      <div className="flex flex-col gap-5 sm:flex-row sm:gap-4">
+      {/*
+        두 날짜는 한 줄에 나란히 — 기간은 하나의 값이라 세로로 떨어뜨리면 관계가 흐려진다.
+
+        **`<input type="date">` 가 아니라 `DateField` 다** (`date-field.tsx` 주석).
+        `rangeStart`/`rangeEnd` 를 두 달력에 똑같이 넘겨, 한쪽을 고르는 중에도 이미 고른
+        반대쪽이 띠로 보이게 한다 — 며칠 일정인지 그 자리에서 읽힌다.
+
+        `items-start` 다: 달력이 펼쳐지면 그 칸만 높아지는데, 늘어난 높이에 맞춰 옆 칸의
+        입력이 가운데로 내려가면 두 입력의 윗줄이 어긋난다.
+      */}
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-4">
         <Field
           id="startDate"
           label={messages.plan.fieldStartDate}
@@ -114,12 +127,16 @@ export function PlanCreateForm({
           error={errors.fields.startDate}
           className="flex-1"
         >
-          <Input
+          <DateField
             id="startDate"
-            type="date"
+            label={messages.plan.fieldStartDate}
+            placeholder={messages.plan.datePlaceholder}
+            today={today}
             value={values.startDate}
             onValueChange={(startDate) => onValueChange('startDate', startDate)}
             invalid={errors.fields.startDate !== undefined}
+            rangeStart={values.startDate}
+            rangeEnd={values.endDate}
           />
         </Field>
 
@@ -130,15 +147,19 @@ export function PlanCreateForm({
           error={errors.fields.endDate}
           className="flex-1"
         >
-          <Input
+          <DateField
             id="endDate"
-            type="date"
+            label={messages.plan.fieldEndDate}
+            placeholder={messages.plan.datePlaceholder}
+            today={today}
             value={values.endDate}
             onValueChange={(endDate) => onValueChange('endDate', endDate)}
             invalid={errors.fields.endDate !== undefined}
-            // 시작일보다 이른 날짜를 브라우저가 먼저 막는다. 스키마의 refine 은
-            // 직접 타이핑하는 경로를 위한 2차 방어다
-            min={values.startDate === '' ? undefined : values.startDate}
+            // 시작일보다 이른 날짜는 달력에서 아예 고를 수 없다. 스키마의 refine 은
+            // 남는 경로를 위한 2차 방어다
+            min={values.startDate === '' ? null : values.startDate}
+            rangeStart={values.startDate}
+            rangeEnd={values.endDate}
           />
         </Field>
       </div>

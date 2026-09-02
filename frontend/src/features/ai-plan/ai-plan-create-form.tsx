@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 
 import { Button } from '@/components/button'
 import { Chip, ChipGroup } from '@/components/chip'
+import { DateField } from '@/components/date-field'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
 import { Input } from '@/components/input'
@@ -32,6 +33,8 @@ export type AiPlanCreateFormProps = {
    * `AiPlanOptionsSection` 의 같은 이름 prop 주석 참고.
    */
   favoriteCount: number | null
+  /** `'YYYY-MM-DD'`. 서버가 내려보낸 오늘 — 달력의 오늘 표시에 쓴다 */
+  today: string
   onValueChange: <K extends keyof AiPlanFormValues>(key: K, value: AiPlanFormValues[K]) => void
   onOpenPlacePicker: () => void
   onSubmit: () => void
@@ -55,6 +58,7 @@ export function AiPlanCreateForm({
   submitCount,
   firstErrorField,
   favoriteCount,
+  today,
   onValueChange,
   onOpenPlacePicker,
   onSubmit,
@@ -123,7 +127,14 @@ export function AiPlanCreateForm({
           <p className="text-caption text-fg-muted">{messages.aiPlan.areaFixed}</p>
         </div>
 
-        {/* 두 날짜는 한 줄에 나란히 — 기간은 하나의 값이다 (`PlanCreateForm` 과 동일) */}
+        {/*
+          두 날짜는 한 줄에 나란히 — 기간은 하나의 값이다.
+
+          **`<input type="date">` 가 아니라 `DateField` 다.** 네이티브 날짜 입력을
+          쓰지 않는 이유는 `date-field.tsx` 주석에 있다. 여기서 중요한 것은
+          `rangeStart`/`rangeEnd` 를 **두 달력에 똑같이** 넘기는 것이다 — 시작일을
+          고르는 중에도 이미 고른 종료일이 띠로 보여야 며칠 일정인지 그 자리에서 읽힌다.
+        */}
         <div className="flex flex-col gap-5 sm:flex-row sm:gap-4">
           <Field
             id="startDate"
@@ -132,12 +143,16 @@ export function AiPlanCreateForm({
             error={errors.fields.startDate}
             className="flex-1"
           >
-            <Input
+            <DateField
               id="startDate"
-              type="date"
+              label={messages.aiPlan.fieldStartDate}
+              placeholder={messages.aiPlan.datePlaceholder}
+              today={today}
               value={values.startDate}
               onValueChange={(startDate) => onValueChange('startDate', startDate)}
               invalid={errors.fields.startDate !== undefined}
+              rangeStart={values.startDate}
+              rangeEnd={values.endDate}
             />
           </Field>
 
@@ -148,15 +163,19 @@ export function AiPlanCreateForm({
             error={errors.fields.endDate}
             className="flex-1"
           >
-            <Input
+            <DateField
               id="endDate"
-              type="date"
+              label={messages.aiPlan.fieldEndDate}
+              placeholder={messages.aiPlan.datePlaceholder}
+              today={today}
               value={values.endDate}
               onValueChange={(endDate) => onValueChange('endDate', endDate)}
               invalid={errors.fields.endDate !== undefined}
-              // 시작일보다 이른 날짜를 브라우저가 먼저 막는다. 스키마의 refine 은
-              // 직접 타이핑하는 경로를 위한 2차 방어다
-              min={values.startDate === '' ? undefined : values.startDate}
+              // 시작일보다 이른 날짜는 달력에서 아예 고를 수 없다. 스키마의 refine 은
+              // 조건을 되살리는 경로(`?from={jobId}`)를 위한 2차 방어로 남는다
+              min={values.startDate === '' ? null : values.startDate}
+              rangeStart={values.startDate}
+              rangeEnd={values.endDate}
             />
           </Field>
         </div>

@@ -42,6 +42,7 @@ function render(overrides: Partial<AiPlanCreateFormProps> = {}) {
     submitCount: 0,
     firstErrorField: null,
     favoriteCount: 0,
+    today: '2026-09-02',
     onOpenPlacePicker: () => undefined,
     onValueChange: () => undefined,
     onSubmit: () => undefined,
