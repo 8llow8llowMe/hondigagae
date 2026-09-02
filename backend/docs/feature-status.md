@@ -58,10 +58,10 @@
 
 | 메서드 | 경로 |
 | --- | --- |
-| POST·GET | `/api/v1/plans` (`petId` 필터 = 반려견별 히스토리) |
-| GET·PUT·DELETE | `/api/v1/plans/{planId}` | 항목마다 장소 요약(주소·실내·대표 이미지·좌표) 포함 |
+| POST·GET | `/api/v1/plans` | 생성은 `petIds`(최대 5, 첫 번째 = 대표) — ai-plans 와 같은 우선순위. `petId` 필터 = 반려견별 히스토리(한 마리라도 동행이면 히트) |
+| GET·PUT·DELETE | `/api/v1/plans/{planId}` | 항목마다 장소 요약(주소·실내·대표 이미지·좌표) 포함. `petIds` 동행 목록 |
 | PUT | `/api/v1/plans/{planId}/days/{day}/items` |
-| GET | `/api/v1/plans/{planId}/weather` | 일자별 날씨 브리핑 + 비 오는 날 실내 대안 |
+| GET | `/api/v1/plans/{planId}/weather` | 일자별 날씨 브리핑 + 비 오는 날 실내 대안. 여러 마리는 아이별 판정 → 가장 낮은 아이 기준(`basisPetId`·`petSuitabilities`) |
 | GET·POST·DELETE | `/api/v1/favorites/places[/{placeId}]` | 장소 즐겨찾기 (멱등, 회원당 100곳, GET {placeId} = 여부 확인) |
 | PUT | `/api/v1/plans/{planId}/items/{planItemId}/visited` | 항목 방문 체크 (다녀옴) |
 | GET | `/api/v1/plans/{planId}/emergency` | 일자별 방문 장소 주변 동물병원·약국 브리핑 |
