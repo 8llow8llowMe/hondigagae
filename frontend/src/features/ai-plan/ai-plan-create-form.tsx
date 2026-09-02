@@ -7,9 +7,9 @@ import { Chip, ChipGroup } from '@/components/chip'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
 import { Input } from '@/components/input'
-import { RadioGroup } from '@/components/radio-group'
 import { Textarea } from '@/components/textarea'
 import { AiPlanOptionsSection } from '@/features/ai-plan/ai-plan-options-section'
+import { PetCheckboxGroup } from '@/features/ai-plan/pet-checkbox-group'
 import { BUDGET_PRESETS_MANWON } from '@/lib/ai-plan/budget'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
@@ -167,8 +167,8 @@ export function AiPlanCreateForm({
           </p>
         )}
 
-        <RadioGroup
-          id="petId"
+        <PetCheckboxGroup
+          id="petIds"
           label={messages.aiPlan.fieldPet}
           required
           options={pets.map((pet) => ({
@@ -176,9 +176,9 @@ export function AiPlanCreateForm({
             label: pet.name,
             description: describePet(pet),
           }))}
-          value={values.petId}
-          onValueChange={(petId) => onValueChange('petId', petId)}
-          error={errors.fields.petId}
+          values={values.petIds}
+          onValuesChange={(petIds) => onValueChange('petIds', petIds)}
+          error={errors.fields.petIds}
         />
         <p className="text-caption text-fg-muted -mt-3">{messages.aiPlan.fieldPetHint}</p>
 
