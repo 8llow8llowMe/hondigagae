@@ -95,7 +95,19 @@ export function PetSwitcher({ pets, totalCount }: { pets: Pet[]; totalCount: num
           id={menuId}
           role="menu"
           aria-label="반려견 전환"
-          className="bg-bg border-border absolute end-0 z-40 mt-1 min-w-44 rounded-lg border py-1 shadow-md outline-none"
+          /*
+            **가운데 정렬이다.** 항목이 전부 반려견 이름(짧고 길이가 저마다)이라 왼쪽
+            정렬에서는 짧은 이름 뒤로 빈 폭이 길게 남아 글자가 한쪽에 밀린 것처럼 읽혔다.
+            트리거 라벨 자체가 폭 좁은 이름 하나라 패널도 그 축에 맞춰 세운다.
+
+            **계정 메뉴(`Menu`)는 왼쪽 정렬로 남긴다** — 그쪽은 길이가 비슷한 이동
+            항목 넷이라 왼쪽 축으로 훑는 편이 빠르다. 두 팝오버의 성격이 다르다:
+            이쪽은 값을 고르는 스위처고, 그쪽은 메뉴다.
+
+            폭은 트리거의 `max-w-40` 과 같은 값을 최소폭으로 둔다 — 떨어져 나온 패널이
+            트리거보다 좁지 않다는 것만 보장한다.
+          */
+          className="bg-bg border-border absolute end-0 z-40 mt-1 min-w-40 rounded-lg border py-1 shadow-md outline-none"
         >
           {pets.map((pet) => (
             <button
@@ -108,7 +120,7 @@ export function PetSwitcher({ pets, totalCount }: { pets: Pet[]; totalCount: num
                 setOpen(false)
               }}
               className={cn(
-                'text-body-2 hover:bg-band focus-visible:bg-band flex h-11 w-full items-center px-4 text-left focus-visible:outline-none',
+                'text-body-2 hover:bg-band focus-visible:bg-band flex h-11 w-full items-center justify-center px-5 text-center focus-visible:outline-none',
                 pet.petId === selected.petId
                   ? 'text-fg font-semibold'
                   : 'text-fg-muted font-medium',
@@ -121,7 +133,7 @@ export function PetSwitcher({ pets, totalCount }: { pets: Pet[]; totalCount: num
           <div className="border-border mt-1 border-t pt-1">
             {limitReached ? (
               // 상한은 버튼을 숨기지 않고 비활성 + 이유를 보여준다 (공통명세)
-              <div className="px-4 py-2">
+              <div className="px-5 py-2 text-center">
                 <span className="text-body-2 text-fg-subtle block">
                   {messages.home.registerPet}
                 </span>
@@ -134,7 +146,7 @@ export function PetSwitcher({ pets, totalCount }: { pets: Pet[]; totalCount: num
                 href="/pets/new"
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className="text-body-2 text-link hover:bg-band flex h-11 items-center px-4 font-semibold"
+                className="text-body-2 text-link hover:bg-band flex h-11 items-center justify-center px-5 font-semibold"
               >
                 {messages.home.registerPet}
               </Link>
