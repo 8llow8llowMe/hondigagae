@@ -3,7 +3,7 @@ import type { AiPlanRequestSnapshot } from '@/types/ai-plan'
 /**
  * 제출 조건 보관소 — 명세 S5 함정 1 · S8 미결 2.
  *
- * **초안에는 `petId`·`areaCode`·기간·예산이 없는데 담기(`POST /plans`)에는 필요하다.**
+ * **초안에는 반려견·`areaCode`·기간·예산이 없는데 담기(`POST /plans`)에는 필요하다.**
  * 작업 조회 응답에도 요청 조건이 없어 **`jobId` 로는 되살릴 수 없다.** 그래서 제출할 때
  * `sessionStorage` 에 `jobId` 를 키로 저장하고 대기 화면이 읽는다.
  *
@@ -73,9 +73,9 @@ function toSnapshot(value: unknown): AiPlanRequestSnapshot | null {
   const areaCode = asNonEmptyString(record.areaCode)
   const startDate = asNonEmptyString(record.startDate)
   const endDate = asNonEmptyString(record.endDate)
-  const petId = asNonEmptyString(record.petId)
+  const pets = toPets(record)
 
-  if (areaCode === null || startDate === null || endDate === null || petId === null) return null
+  if (areaCode === null || startDate === null || endDate === null || pets.length === 0) return null
 
   const budget = record.budget
   if (budget !== null && typeof budget !== 'number') return null
@@ -84,11 +84,36 @@ function toSnapshot(value: unknown): AiPlanRequestSnapshot | null {
     areaCode,
     startDate,
     endDate,
-    petId,
-    petName: typeof record.petName === 'string' ? record.petName : '',
+    pets,
     budget,
     requestNote: typeof record.requestNote === 'string' ? record.requestNote : '',
   }
+}
+
+/**
+ * 반려견 목록. **옛 모양(`petId`·`petName`)을 한 마리 배열로 승격한다** (명세 D2-3).
+ *
+ * 승격이 없으면 배포 직후 대기 화면에 있던 사용자의 `readAiPlanRequest` 가 null 을 주고
+ * **담기가 막힌다.** 승격은 읽기에서만 한다 — 쓰기는 항상 새 모양이라 양방향 호환을
+ * 만들지 않는다(그러면 지울 시점이 사라진다).
+ */
+function toPets(record: Record<string, unknown>): { petId: string; name: string }[] {
+  if (Array.isArray(record.pets)) {
+    return record.pets.flatMap((entry) => {
+      if (entry === null || typeof entry !== 'object') return []
+
+      const item = entry as Record<string, unknown>
+      const petId = asNonEmptyString(item.petId)
+      if (petId === null) return []
+
+      return [{ petId, name: typeof item.name === 'string' ? item.name : '' }]
+    })
+  }
+
+  const legacyId = asNonEmptyString(record.petId)
+  if (legacyId === null) return []
+
+  return [{ petId: legacyId, name: typeof record.petName === 'string' ? record.petName : '' }]
 }
 
 function asNonEmptyString(value: unknown): string | null {
