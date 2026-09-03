@@ -2,8 +2,15 @@ import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
 
 import { GATEWAY_UNREACHABLE_STATUS, gatewayUnreachablePayload } from '@/lib/api/bff-error'
+import {
+  EVENT_STREAM_MIME,
+  eventStreamHeaders,
+  isEventStream,
+  wantsEventStream,
+} from '@/lib/api/event-stream'
 import { type ForwardedBody, readForwardedBody, toMockBody } from '@/lib/api/forwarded-body'
-import { isMockEnabled, resolveMock } from '@/lib/api/mock'
+import { isMockEnabled, resolveMock, resolveMockStream } from '@/lib/api/mock'
+import { toEventStream } from '@/lib/api/mock/stream'
 import { gatewayUrl } from '@/lib/api/server'
 import { extractRefreshToken, toCookieHeader } from '@/lib/auth/refresh-cookie'
 import { canRetryReissue, isAuthEntryPath, isReissuePath } from '@/lib/auth/reissue'
@@ -22,6 +29,7 @@ import { clearSession, readSession, type Session, writeSession } from '@/lib/aut
  *  4. 401 이면 reissue 를 1회만 시도하고 원 요청을 재시도한다
  *  5. 본문을 형태 그대로 통과시킨다 — JSON 도, `multipart/form-data`(파일 업로드)도
  *     (`@/lib/api/forwarded-body`)
+ *  6. SSE 는 **버퍼링하지 않고 그대로 흘려보낸다** (#91 — `handleEventStream`)
  *
  * docs/architecture-guide.md §5, docs/auth-guide.md
  */
@@ -129,6 +137,145 @@ function stripTokens(payload: unknown): {
   return { body: { ...wrapper, dataBody: cleaned }, accessToken, memberId }
 }
 
+/**
+ * SSE 스트림 호출. **응답을 읽지 않고 그대로 돌려준다** — `callGateway` 와 갈라지는 지점이다.
+ *
+ * `signal` 을 반드시 넘긴다. 브라우저가 `EventSource` 를 닫으면 이 요청도 끊겨야 게이트웨이의
+ * `SseEmitter` 가 정리된다 — 안 넘기면 사용자가 화면을 떠난 뒤에도 연결이 남는다.
+ */
+async function fetchGatewayStream(
+  path: string,
+  search: string,
+  accessToken: string | null,
+  signal: AbortSignal,
+): Promise<{ response: Response } | { cause: unknown }> {
+  // 게이트웨이가 `produces = text/event-stream` 이라 `Accept` 를 맞춰야 한다.
+  // `callGateway` 처럼 `application/json` 을 박으면 **406** 이다
+  const headers: Record<string, string> = { Accept: EVENT_STREAM_MIME }
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`
+
+  try {
+    const response = await globalThis.fetch(`${gatewayUrl(path)}${search}`, {
+      method: 'GET',
+      headers,
+      cache: 'no-store',
+      redirect: 'manual',
+      signal,
+    })
+    return { response }
+  } catch (cause) {
+    console.error('[bff] 게이트웨이 스트림 호출 실패', { path })
+    return { cause }
+  }
+}
+
+/**
+ * SSE 통과 (#91).
+ *
+ * **토큰 스트립을 건너뛴다.** 근거: 이벤트 `data` 는 작업 상태 조회 응답의 `dataBody` 와
+ * 동일한 JSON 이고(`AiPlanWebController.streamJobStatus` 설명), 그 본문은
+ * `AiPlanJobStatusResponse` — `jobId`·`status`·`planDraft`·`errorCode`·`errorMessage` 뿐이라
+ * **토큰이 들어올 자리가 없다.** 스트립하려면 프레임마다 파싱해야 하고, 그 순간 통과가
+ * 아니라 변환이 된다.
+ *
+ * 스트림이 아닌 응답(스트림 시작 전 오류)은 기존 경로로 되돌려 공통 에러 봉투를 유지한다.
+ */
+async function handleEventStream(
+  request: NextRequest,
+  path: string,
+  search: string,
+  session: Session | null,
+): Promise<Response> {
+  if (isMockEnabled()) {
+    const mock = resolveMockStream(path, 'GET', session?.accessToken ?? null)
+    if (mock !== null) {
+      if (mock.kind === 'error') {
+        return NextResponse.json(mock.result.payload, { status: mock.result.status })
+      }
+      return new Response(toEventStream(mock.frames, request.signal), {
+        status: 200,
+        headers: eventStreamHeaders(),
+      })
+    }
+  }
+
+  let called = await fetchGatewayStream(path, search, session?.accessToken ?? null, request.signal)
+
+  /*
+    **401 재시도는 스트림이 시작되기 전에만 한다.**
+
+    소유권 검증 실패·인증 실패는 SSE 가 아니라 일반 JSON 오류로 온다(`AiPlanJobSseStreamer`)
+    — 즉 401 을 본 시점에는 아직 스트림이 열리지 않았고, 재발급 후 다시 구독하면 된다.
+
+    **중간 끊김은 여기서 다루지 않는다.** 이미 흐르는 스트림에 새 토큰을 주입할 방법이 없다.
+    그 경우는 클라이언트가 폴링으로 내려앉고(`use-ai-plan-job.ts`), 폴링은 이 파일의 기존
+    경로를 타므로 재발급이 거기서 돈다.
+
+    인증 진입 경로(`isAuthEntryPath`) 검사는 하지 않는다 — SSE 엔드포인트는 로그인이 아니다.
+  */
+  if (
+    'response' in called &&
+    called.response.status === 401 &&
+    session !== null &&
+    canRetryReissue(0)
+  ) {
+    // 열어 둔 응답 본문을 버린다 — 재시도 전에 소켓을 돌려준다
+    await called.response.body?.cancel().catch(() => undefined)
+
+    const reissued = await callGateway(
+      '/auth/token/reissue',
+      '',
+      'POST',
+      null,
+      null,
+      session.refreshToken,
+    )
+    const reissuedTokens = stripTokens(reissued.payload)
+
+    if (reissued.status === 200 && reissuedTokens.accessToken !== null) {
+      const next: Session = {
+        accessToken: reissuedTokens.accessToken,
+        refreshToken: reissued.refreshToken ?? session.refreshToken,
+        memberId: reissuedTokens.memberId ?? session.memberId,
+      }
+      await writeSession(next)
+      called = await fetchGatewayStream(path, search, next.accessToken, request.signal)
+    } else {
+      await clearSession()
+    }
+  }
+
+  if (!('response' in called)) {
+    return NextResponse.json(gatewayUnreachablePayload(called.cause), {
+      status: GATEWAY_UNREACHABLE_STATUS,
+    })
+  }
+
+  const { response } = called
+
+  /*
+    스트림이 아니면 통과시키지 않는다. 여기로 오는 것은 스트림 시작 전 오류
+    (`AIPLAN_002` 404 · 재발급 후에도 401)라 **공통 래퍼 JSON** 이다 — 그대로 흘려보내면
+    클라이언트의 `EventSource` 가 형식 오류로만 끊기고 화면은 이유를 알 수 없다.
+
+    토큰 스트립을 여기서는 태운다 — 통과 대상이 아닌 JSON 이라 기존 규칙(책임 2)을 지킨다.
+  */
+  if (!isEventStream(response.headers.get('content-type')) || response.body === null) {
+    const text = await response.text()
+    let payload: unknown = null
+    if (text) {
+      try {
+        payload = JSON.parse(text)
+      } catch {
+        payload = null
+      }
+    }
+    return NextResponse.json(stripTokens(payload).body, { status: response.status })
+  }
+
+  return new Response(response.body, { status: response.status, headers: eventStreamHeaders() })
+}
+
 async function handle(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const method = request.method as ForwardedMethod
   if (!FORWARDED_METHODS.includes(method)) {
@@ -138,10 +285,22 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
   const { path: segments } = await context.params
   const path = `/${segments.join('/')}`
   const search = request.nextUrl.search
-  // 재시도가 같은 본문을 다시 보내야 하므로 스트림이 아니라 버퍼로 들고 있는다
-  const body = await readForwardedBody(request)
 
   const session = await readSession()
+
+  /*
+    **SSE 는 여기서 갈라진다.** 아래 경로는 응답을 통째로 버퍼링하므로(`await response.text()`)
+    스트림을 태우면 작업이 끝난 뒤에야 이벤트가 한꺼번에 도착해 폴링만도 못하다 (#91).
+
+    **요청의 `Accept` 로 판정한다** — 응답 Content-Type 을 보고 갈라지려면 이미 부른 뒤인데,
+    게이트웨이는 `Accept: application/json` 에 406 을 낸다.
+  */
+  if (method === 'GET' && wantsEventStream(request.headers.get('accept'))) {
+    return handleEventStream(request, path, search, session)
+  }
+
+  // 재시도가 같은 본문을 다시 보내야 하므로 스트림이 아니라 버퍼로 들고 있는다
+  const body = await readForwardedBody(request)
 
   let result = await callGateway(
     path,

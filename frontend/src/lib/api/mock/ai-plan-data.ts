@@ -1,6 +1,8 @@
+import { JOB_STREAM_EVENT } from '@/lib/ai-plan/job-stream'
 import type { MockResult } from '@/lib/api/mock/auth-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import { memberIdOf, type MockAiPlanJob, mockStore, nextAiPlanJobId } from '@/lib/api/mock/store'
+import type { MockStreamFrame } from '@/lib/api/mock/stream'
 import type {
   AiPlanDayItem,
   AiPlanDraft,
@@ -52,6 +54,8 @@ function failValidation(errors: { code: string; field: string; message: string }
 // `SecurityErrorCode.UNAUTHORIZED`. **`AUTH_011` 이 아니다**: 그것은
 // `OAUTH_PROFILE_REQUIRED` 이고 400 이라, 401 과 짝지으면 서버가 내지 않는 조합이 된다 (#83)
 const UNAUTHORIZED = () => fail(401, 'SECURITY_001', '인증이 필요합니다.')
+
+type JobStatusCode = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED'
 
 /** 백엔드 `AiPlanJobStatus` 의 displayName/description 복제본 */
 const STATUS: Record<string, CodeNameMetadata> = {
@@ -144,6 +148,90 @@ export function resolveAiPlanMock(
   if (isPacking) return packingList(memberId, packingMatch?.[1] ?? '')
 
   return jobStatus(memberId, jobMatch?.[1] ?? '')
+}
+
+/**
+ * SSE 프레임 간격.
+ *
+ * **실제 소요 시간을 흉내 내지 않는다** — 로컬 LLM 기준 수십 초다. 여기서 재현하려는
+ * 것은 길이가 아니라 **전이가 따로따로 도착한다는 사실**이다. 통째로 버퍼링되면
+ * 한꺼번에 오므로, 간격이 있어야 통과 여부를 눈으로 가를 수 있다.
+ */
+const STREAM_SNAPSHOT_MS = 0
+const STREAM_RUNNING_MS = 1200
+const STREAM_TERMINAL_MS = 2500
+
+/**
+ * mock 스트림 해석 결과.
+ *
+ * `error` 는 **스트림이 시작되기 전** 실패다 — 백엔드도 소유권 검증 실패(`AIPLAN_002`)를
+ * SSE 가 아니라 일반 JSON 오류로 응답한다(`AiPlanJobSseStreamer.stream` 주석).
+ * 그래서 BFF 가 이 경우를 기존 버퍼링 경로로 되돌릴 수 있어야 한다.
+ */
+export type MockStreamResult =
+  { kind: 'error'; result: MockResult } | { kind: 'stream'; frames: MockStreamFrame[] }
+
+/**
+ * `GET /ai-plans/jobs/{jobId}/stream` mock (#91).
+ *
+ * **진행을 조회 횟수가 아니라 시간이 끌고 간다.** 폴링 mock 은 워커가 없어 조회할 때마다
+ * 상태를 한 칸 옮기지만, 스트림에서는 시간 경과 자체가 워커 역할을 한다.
+ *
+ * 그래서 스트림을 열 때 `pollCount` 를 종결까지 밀어 둔다 — 사용자가 RUNNING 에서 화면을
+ * 떠났다가 새로고침하면 완료를 보게 된다. **그게 맞다**: 실제 작업은 보는 사람이 없어도
+ * 백그라운드에서 끝난다.
+ */
+export function resolveAiPlanStreamMock(
+  path: string,
+  method: string,
+  accessToken: string | null,
+): MockStreamResult | null {
+  const match = /^\/ai-plans\/jobs\/([^/]+)\/stream$/.exec(path)
+  if (match === null || method !== 'GET') return null
+
+  // `@PreAuthorize("isAuthenticated()")` — 스트림도 인증이 필요하다
+  const memberId = memberIdOf(accessToken)
+  if (memberId === null) return { kind: 'error', result: UNAUTHORIZED() }
+
+  const jobId = match[1] ?? ''
+  const job = mockStore().aiPlanJobs.find((candidate) => candidate.jobId === jobId)
+
+  // **타인의 jobId 도 404 다** — 폴링과 같은 규칙이고, 스트림 시작 전이라 JSON 으로 온다
+  if (job === undefined || job.memberId !== memberId) {
+    return {
+      kind: 'error',
+      result: fail(404, 'AIPLAN_002', '요청하신 AI 일정 생성 작업을 찾을 수 없습니다.'),
+    }
+  }
+
+  const terminal: JobStatusCode = job.scenario === 'failed' ? 'FAILED' : 'COMPLETED'
+
+  /*
+    이미 종결된 작업이면 스냅샷 하나만 보내고 닫는다 — 백엔드도 `initial.status().isTerminal()`
+    이면 한 번 보내고 `complete()` 한다. 새로고침으로 다시 구독하는 경우가 이 경로다.
+  */
+  if (statusOf(job) === terminal) {
+    return {
+      kind: 'stream',
+      frames: [
+        { delayMs: STREAM_SNAPSHOT_MS, event: JOB_STREAM_EVENT, data: jobBody(job, terminal) },
+      ],
+    }
+  }
+
+  const snapshot = statusOf(job)
+  job.pollCount = 2
+
+  return {
+    kind: 'stream',
+    frames: [
+      { delayMs: STREAM_SNAPSHOT_MS, event: JOB_STREAM_EVENT, data: jobBody(job, snapshot) },
+      ...(snapshot === 'PENDING'
+        ? [{ delayMs: STREAM_RUNNING_MS, event: JOB_STREAM_EVENT, data: jobBody(job, 'RUNNING') }]
+        : []),
+      { delayMs: STREAM_TERMINAL_MS, event: JOB_STREAM_EVENT, data: jobBody(job, terminal) },
+    ],
+  }
 }
 
 /**
@@ -399,34 +487,45 @@ function jobStatus(memberId: string, jobId: string): MockResult {
   const status = statusOf(job)
   job.pollCount += 1
 
+  return ok<AiPlanJob>(jobBody(job, status))
+}
+
+/**
+ * 상태 하나에 해당하는 작업 조회 본문.
+ *
+ * **폴링과 SSE 가 같은 본문을 쓴다.** 백엔드도 같은 `AiPlanPresenter.toJobStatusResponse`
+ * 를 두 경로에 쓰고, SSE 이벤트 `data` 는 조회 응답의 `dataBody` 와 동일한 JSON 이다
+ * (컨트롤러 설명). mock 이 두 경로를 다르게 만들면 그 사실이 깨진다.
+ */
+function jobBody(job: MockAiPlanJob, status: JobStatusCode): AiPlanJob {
   if (status === 'FAILED') {
-    return ok<AiPlanJob>({
+    return {
       jobId: job.jobId,
       status: STATUS.FAILED as CodeNameMetadata,
       planDraft: null,
       // AIPLAN_012 — 실패 이유가 조건 문제일 수 있다는 것을 화면이 다뤄야 한다
       errorCode: 'AIPLAN_012',
       errorMessage: '여행 일정에 넣을 반려견 동반 가능 장소를 찾지 못했습니다.',
-    })
+    }
   }
 
   if (status !== 'COMPLETED') {
-    return ok<AiPlanJob>({
+    return {
       jobId: job.jobId,
       status: STATUS[status] as CodeNameMetadata,
       planDraft: null,
       errorCode: null,
       errorMessage: null,
-    })
+    }
   }
 
-  return ok<AiPlanJob>({
+  return {
     jobId: job.jobId,
     status: STATUS.COMPLETED as CodeNameMetadata,
     planDraft: draftFor(job),
     errorCode: null,
     errorMessage: null,
-  })
+  }
 }
 
 /**
@@ -436,7 +535,7 @@ function jobStatus(memberId: string, jobId: string): MockResult {
  * **완료·실패에 닿으면 그 상태에 머문다** — 화면이 폴링을 멈춘 뒤 새로고침해도 같은
  * 결과를 봐야 한다.
  */
-function statusOf(job: MockAiPlanJob): 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' {
+function statusOf(job: MockAiPlanJob): JobStatusCode {
   if (job.pollCount === 0) return 'PENDING'
   if (job.pollCount === 1) return 'RUNNING'
   return job.scenario === 'failed' ? 'FAILED' : 'COMPLETED'
