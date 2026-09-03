@@ -93,10 +93,31 @@ describe('PackingListPanel — 결과', () => {
   })
 
   /*
-    `AiPackingProcessor` 가 아직 `PlanOutlineResponse.petIds` 를 읽지 않는다 (#152 후속).
-    화면이 "모든 아이 기준" 이라고 말하면 거짓이 된다.
+    #179 로 `AiPackingProcessor` 가 동행 반려견 전체를 근거로 삼게 되면서 "대표 반려견
+    기준이에요" 안내가 거짓이 됐다. 지우고 끝낼 수도 있었지만, 지운 문구는 다음 사람이
+    "빠졌나" 하고 되돌리기 쉬운 자리라 없어야 하는 것을 테스트로 고정한다.
+
+    "모든 아이 기준" 으로 바꾸지 않은 이유는 `messages/plan.ts` 주석에 있다 — 특성 조회가
+    일부만 성공한 것을 응답이 알려 주지 않는다.
   */
-  it('대표 반려견 기준임을 밝힌다', () => {
-    expect(render({ items: ITEMS })).toContain(messages.plan.packingSinglePetNote)
+  it('대표 반려견 기준이라고 말하지 않는다', () => {
+    const markup = render({ items: ITEMS })
+
+    expect(markup).toContain(messages.plan.packingNotSaved)
+    expect(markup).not.toContain('대표 반려견')
+  })
+
+  /*
+    특정 아이 때문에 필요한 물건은 서버가 이유에 `[반려견 2]` 꼴로 밝힌다 (`AiPlanPromptFactory`
+    의 `PACKING_MULTI_PET_RULE`). 합집합이라 근거가 흐려지는 것을 이 접두가 막는데, 화면이
+    이유를 손대면 그 단서가 사라진다 — 대괄호가 escape 돼 사라지지 않는 것까지 본다.
+  */
+  it('이유의 [반려견 N] 접두를 손대지 않는다', () => {
+    const reason = '[반려견 2] 더위에 약해 한낮 야외 일정에 쿨매트가 필요합니다.'
+    const markup = render({
+      items: [{ category: '반려견 케어', name: '쿨매트', reason }],
+    })
+
+    expect(markup).toContain(reason)
   })
 })

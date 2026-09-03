@@ -111,9 +111,12 @@ function Result({ items, onRetry }: { items: PackingListItem[]; onRetry: () => v
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-caption text-fg-muted font-medium">
-        {messages.plan.packingNotSaved} · {messages.plan.packingSinglePetNote}
-      </p>
+      {/*
+        저장되지 않는다는 사실만 밝힌다. **"대표 반려견 기준" 안내가 여기 있었고 #179 로
+        걷었다** — 백엔드가 동행 반려견 전체를 근거로 삼게 됐다. 몇 마리가 실제로 근거에
+        들어갔는지는 응답이 말해 주지 않아 개수를 대신 적지도 않는다 (`messages/plan.ts` 주석).
+      */}
+      <p className="text-caption text-fg-muted font-medium">{messages.plan.packingNotSaved}</p>
 
       {groups.map(([category, group]) => (
         <div key={category} className="flex flex-col gap-1.5">
