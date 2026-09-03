@@ -10,6 +10,17 @@ import type { ApiResponse } from '@/types/api'
  */
 const BFF_BASE_URL = '/api/bff'
 
+/**
+ * BFF 절대 경로.
+ *
+ * `fetch` 가 아닌 전송 수단이 필요한 곳을 위해 열어 둔다 — SSE 는 `EventSource` 가 URL 을
+ * 직접 받으므로 `clientFetch` 를 거칠 수 없다 (#91). **base 를 호출부에서 다시 적지 않게**
+ * 하려는 것이다.
+ */
+export function bffUrl(path: string): string {
+  return `${BFF_BASE_URL}${path}`
+}
+
 export type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: unknown

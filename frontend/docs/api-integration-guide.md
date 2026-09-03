@@ -116,10 +116,14 @@ GET  /api/v1/ai-plans/jobs/{id}  → 폴링
   `dataHeader.success === true` 만 보고 성공 처리하면 실패를 놓친다.
 - 결과 페이로드는 status별 **nullable** 이다.
 - 동일 사용자·동일 요청이 in-flight면 백엔드가 **기존 jobId를 재사용**한다(멱등). 그래도 UI에서 중복 제출을 막는다.
-- **SSE(`/stream`) 는 백엔드에 있다** (`AiPlanWebController`). 미구현인 쪽은 **BFF** 로,
-  응답을 통째로 버퍼링해 스트림을 통과시키지 못한다 — 그래서 현재는 폴링만 쓴다
-  ([#91](https://github.com/8llow8llowMe/hondigagae/issues/91)). 이 줄은 오래 "백엔드 미구현" 으로
-  잘못 적혀 있었다.
+- **SSE(`/stream`) 를 쓴다** ([#91](https://github.com/8llow8llowMe/hondigagae/issues/91)).
+  BFF 가 요청 `Accept: text/event-stream` 을 보고 스트림 분기로 빠져 `response.body` 를 그대로
+  흘려보낸다(`handleEventStream`) — 그 전에는 응답을 통째로 버퍼링해 통과시키지 못했다.
+  **이벤트 이름은 `job-update` 이고 `data` 에 공통 래퍼가 없다**(조회 응답의 `dataBody` 와 동일).
+  종결 상태에서 클라이언트가 `close()` 하지 않으면 `EventSource` 가 자동 재연결해 무한 재구독이
+  된다. 계약 함정 전체는 ai-plan 공통명세 S3.
+- **스트림을 새로 붙일 때는 토큰 스트립을 건너뛰어도 되는지 먼저 따진다.** 통과 경로는 프레임을
+  파싱하지 않으므로 응답 본문에 토큰이 실릴 수 있는 엔드포인트는 통과시켜서는 안 된다.
 - 폴링은 **완료·실패 시 반드시 멈춘다.** `refetchInterval` 이 계속 도는 것이 대표 사고다.
 
 ```ts
