@@ -115,7 +115,7 @@ const MapView = dynamic(() => import('@/features/place/map-view'), { ssr: false 
 - 프록시가 서버 세션의 access token을 `Authorization` 헤더로 주입한다. 클라이언트 코드는 토큰을 모른다.
 - 게이트웨이가 내려주는 `Set-Cookie`(refresh)는 프록시가 흡수하고, 브라우저에는 같은 오리진 세션 쿠키만 남는다.
 - **FE 코드의 `/places/...` 는 실제로는 `/api/v1/places/...` 다.** 계약 대조 시 이 매핑을 적용한다.
-- 본문은 **형태 그대로** 통과한다 — JSON 도, `multipart/form-data`(파일 업로드)도. 아래 참고.
+- 본문은 **형태 그대로** 통과한다 — JSON 도, `multipart/form-data`(파일 업로드)도, SSE 도. 아래 참고.
 
 **왜 BFF인가**
 
@@ -135,6 +135,31 @@ const MapView = dynamic(() => import('@/features/place/map-view'), { ssr: false 
   경고하는 사례가 정확히 이것이다. **헤더 화이트리스트 방식을 유지한다.**
 - 게이트웨이 CORS 허용 목록은 **브라우저가 게이트웨이를 직접 부를 때만** 의미가 있다
   (WebSocket 핸드셰이크, Swagger UI). 그런 경로를 새로 만들 때는 BE에 오리진 등록을 요청한다.
+
+### SSE(`text/event-stream`) — **토큰 스트립을 건너뛰는 유일한 경로**
+
+기본 경로는 응답을 통째로 버퍼링한다(`await response.text()` → `stripTokens`). 스트림을 그
+경로에 태우면 **작업이 끝난 뒤에야 이벤트가 한꺼번에 도착한다** — 폴링만도 못하다. 그래서
+`handleEventStream` 이 따로 있다 ([#91](https://github.com/8llow8llowMe/hondigagae/issues/91)).
+
+- **분기 판정은 요청의 `Accept` 로 한다.** 응답 `Content-Type` 을 보고 갈라지려면 이미 부른
+  뒤인데, 스트림 엔드포인트가 `produces = text/event-stream` 이라 BFF 가 고정으로 박는
+  `Accept: application/json` 을 그대로 보내면 **406** 이다. 판정은 **완전 일치**여야 한다 —
+  `*/*` 를 SSE 로 읽으면 일반 요청이 이 경로로 샌다.
+- **통과 경로는 토큰을 스트립하지 않는다.** 프레임마다 파싱해야 하고 그 순간 통과가 아니라
+  변환이 된다. **그래서 스트림을 새로 붙일 때마다 응답 본문에 토큰이 실릴 수 있는지 먼저
+  따진다** — 실릴 수 있으면 통과시켜서는 안 된다. 현재 통과 대상(작업 상태)은
+  `AiPlanJobStatusResponse` 라 토큰이 들어올 자리가 없다.
+- **응답이 실제로 SSE 가 아니면 기본 경로로 되돌린다.** 스트림 시작 전 오류(404·401)는 일반
+  JSON 으로 오므로, 그대로 흘려보내면 `EventSource` 가 형식 오류로만 끊기고 화면이 이유를
+  잃는다. 되돌린 응답은 `stripTokens` 를 태워 규칙을 지킨다.
+- **401 재시도는 스트림 시작 전만 한다.** 흐르는 스트림에 새 토큰을 주입할 방법이 없어 중간
+  끊김은 클라이언트 폴백(폴링)에 넘긴다. 재발급 성공 시의 세션 갱신(`Set-Cookie`)은
+  스트리밍 응답과 함께 정상적으로 나간다 — #91 에서 스텁 게이트웨이로 실측했다.
+- **`request.signal` 을 스트림 fetch 에 넘긴다.** 안 넘기면 브라우저가 구독을 닫은 뒤에도
+  게이트웨이의 `SseEmitter` 가 남는다.
+- 버퍼링 방지 헤더는 `src/lib/api/event-stream.ts` 의 `eventStreamHeaders()` 가 한곳에서
+  만든다. `X-Accel-Buffering: no` 가 빠지면 nginx 가 응답을 모아 두어 통과 작업 전체가 무효다.
 
 ### 파일 업로드(`multipart/form-data`)
 

@@ -1,4 +1,4 @@
-import { clientFetch } from '@/lib/api/client'
+import { bffUrl, clientFetch } from '@/lib/api/client'
 import { paths } from '@/lib/api/paths'
 import type {
   AiPlanJob,
@@ -37,6 +37,22 @@ export function submitAiPlan(payload: AiPlanSubmitPayload): Promise<AiPlanSubmit
  */
 export function fetchAiPlanJob(jobId: string): Promise<AiPlanJob> {
   return clientFetch<AiPlanJob>(paths.aiPlans.job(jobId))
+}
+
+/**
+ * 작업 상태 SSE 구독을 연다 (#91).
+ *
+ * **전송만 여기서 만든다.** 구독 수명·이벤트 해석·폴백 판단은 호출부(`use-ai-plan-job-stream.ts`)가
+ * 한다 — 경로와 전송을 이 계층에 두는 규칙은 `architecture-guide.md` §8 이다.
+ *
+ * **`EventSource` 로 충분하다.** 백엔드 스키마는 `Authorization` 헤더 때문에 fetch 기반 SSE
+ * 클라이언트를 권하지만, 이 저장소는 BFF 가 토큰을 붙이므로 브라우저는 같은 오리진에 세션
+ * 쿠키만 실어 보낸다.
+ *
+ * `clientFetch` 를 쓸 수 없어 `bffUrl` 로 base 를 맞춘다 — **호출부가 base 를 다시 적으면 안 된다.**
+ */
+export function openAiPlanJobStream(jobId: string): EventSource {
+  return new globalThis.EventSource(bffUrl(paths.aiPlans.jobStream(jobId)))
 }
 
 /**

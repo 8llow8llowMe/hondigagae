@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest'
 import {
   isJobCompleted,
   isJobFailed,
+  JOB_POLL_INTERVAL_MS,
   JOB_POLL_LIMIT_MS,
   JOB_POLL_SLOW_MS,
+  JOB_STREAM_SAFETY_POLL_MS,
   jobPollInterval,
   jobPollPhase,
   shouldKeepPolling,
@@ -94,5 +96,21 @@ describe('jobPollInterval — 상한', () => {
 
   it('경과 시간을 주지 않으면 상한을 보지 않는다', () => {
     expect(jobPollInterval({ status: 'RUNNING' })).toBe(2000)
+  })
+})
+
+describe('JOB_STREAM_SAFETY_POLL_MS', () => {
+  /*
+    구독 중에도 남기는 확인 주기다. 하트비트가 코멘트 프레임이라 JS 가 구독의 생존을
+    관측할 수 없어(반열림 연결) 폴링을 완전히 끄면 상한까지 화면이 멈춘다.
+  */
+  it('2초 폴링보다 느리고 상한보다 짧다', () => {
+    expect(JOB_STREAM_SAFETY_POLL_MS).toBeGreaterThan(JOB_POLL_INTERVAL_MS)
+    expect(JOB_STREAM_SAFETY_POLL_MS).toBeLessThan(JOB_POLL_LIMIT_MS)
+  })
+
+  /** 백엔드 하트비트(25초)보다 길어야 정상 구독을 불필요하게 두드리지 않는다 */
+  it('백엔드 하트비트 주기보다 길다', () => {
+    expect(JOB_STREAM_SAFETY_POLL_MS).toBeGreaterThanOrEqual(25_000)
   })
 })

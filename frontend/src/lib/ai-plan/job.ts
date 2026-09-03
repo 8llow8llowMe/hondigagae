@@ -52,6 +52,19 @@ export function shouldKeepPolling(job: JobLike | null | undefined): boolean {
 export const JOB_POLL_INTERVAL_MS = 2000
 
 /**
+ * 구독 중에도 남겨 두는 확인 주기(ms).
+ *
+ * **구독의 생존을 클라이언트가 관측할 수 없다.** 백엔드의 25초 하트비트는 SSE 코멘트
+ * 프레임이라 `addEventListener` 로 오지 않고, 데이터 이벤트는 상태가 바뀔 때만 와서
+ * "조용한 것" 과 "끊긴 것" 이 구분되지 않는다. 중간 프록시가 조용히 끊으면
+ * `EventSource` 가 반열림으로 남아 `onerror` 가 늦게 오거나 오지 않는다.
+ *
+ * 그때 폴링을 완전히 끊어 두면 **상한 90초까지 화면이 멈춘다.** 이 주기가 그 구멍을
+ * 30초로 좁힌다 — 구독이 정상이면 잡이 보통 수십 초에 끝나므로 요청 한두 번이다.
+ */
+export const JOB_STREAM_SAFETY_POLL_MS = 30_000
+
+/**
  * 안내를 덧붙이는 시점(ms). 이 전에는 아무 말도 하지 않는다 — 정상 소요 시간이다
  * (제출 화면이 "20초쯤 걸려요" 로 이미 기대를 맞춰 뒀다).
  */
