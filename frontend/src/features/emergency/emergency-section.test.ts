@@ -251,3 +251,68 @@ describe('EmergencySection — 칩 개수', () => {
     expect(markup).toContain(messages.emergency.open24Note)
   })
 })
+
+/*
+  **#205.** 유형 칩 라벨을 응답 목록에서 역추적하고 있었다 —
+  `facilities.find((f) => f.facilityType.code === code)?.facilityType.name ?? code`.
+
+  이 화면은 유형을 **서버로 보내지 않고 클라이언트에서 좁힌다** (칩마다 개수를 보여주려고,
+  `lib/api/emergency.ts`). 그래서 **개수 0 인 칩도 반드시 그리는데**, 그 칩은 목록에 표본이
+  없어 `?? code` 로 떨어졌다 — dev `/emergency` 에 `ANIMAL_HOSPITAL 0 · ANIMAL_PHARMACY 0`
+  이 그대로 나갔다. 데이터가 차더라도 "반경 안에 병원만 있는" 흔한 경우에 재현된다.
+*/
+describe('EmergencySection — 유형 칩 라벨 (#205)', () => {
+  const EMPTY: EmergencySectionProps['result'] = {
+    facilities: [],
+    totalCount: 0,
+    radius: 10_000,
+    open24Only: false,
+    providerName: '출처',
+  }
+
+  it('결과가 0건이어도 enum 코드를 노출하지 않는다', () => {
+    const markup = render({ result: EMPTY })
+
+    expect(markup).not.toContain('ANIMAL_')
+  })
+
+  /*
+    개수까지 붙여서 본다. 라벨만 검사하면 페이지 제목("병원 · 약국")에 같은 낱말이 있어
+    칩이 코드로 떨어져도 테스트가 통과한다.
+  */
+  it('결과가 0건이어도 두 유형을 한국어로 그린다', () => {
+    const markup = render({ result: EMPTY })
+
+    expect(markup).toContain(`${messages.emergency.typeByCode.ANIMAL_HOSPITAL} 0`)
+    expect(markup).toContain(`${messages.emergency.typeByCode.ANIMAL_PHARMACY} 0`)
+  })
+
+  /* 실제로 가장 자주 밟는 경로다 — 반경 안에 병원만 있는 경우 */
+  it('병원만 있는 목록에서도 약국 칩이 한국어다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain('ANIMAL_')
+    expect(markup).toContain(`${messages.emergency.typeByCode.ANIMAL_PHARMACY} 0`)
+  })
+
+  /*
+    **목록 행은 그대로 서버 metadata 를 쓴다.** 거기는 데이터가 있는 자리라
+    `frontend/CLAUDE.md` 의 "서버 enum metadata 를 그대로 렌더한다" 가 적용된다 —
+    이 PR 이 그 규칙을 화면 전체로 뒤집은 것이 아님을 고정한다.
+  */
+  it('목록 행의 유형 표기는 서버 name 을 계속 쓴다', () => {
+    const markup = render({
+      result: {
+        ...EMPTY,
+        facilities: [
+          facility({
+            facilityType: { code: 'ANIMAL_PHARMACY', name: '동물약국', description: null },
+          }),
+        ],
+        totalCount: 1,
+      },
+    })
+
+    expect(markup).toContain('동물약국')
+  })
+})

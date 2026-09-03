@@ -1,3 +1,5 @@
+import type { FacilityTypeCode } from '@/types/emergency'
+
 /**
  * 긴급 시설(동물병원 · 동물약국) 화면 문구.
  *
@@ -12,6 +14,26 @@ export const emergencyMessages = {
 
   typeGroupLabel: '시설 유형',
   typeAll: '전체',
+  /**
+   * 시설 유형 칩 라벨 (#205).
+   *
+   * **이 자리만 서버 enum metadata 를 쓰지 않는다.** 원래는 응답 목록에서
+   * `facilityType.name` 을 역추적했는데, 이 화면은 유형을 **서버로 보내지 않고
+   * 클라이언트에서 좁힌다** (`lib/api/emergency.ts` — 칩마다 개수를 보여주려고). 그래서
+   * **개수가 0 인 칩도 반드시 그려야 하고**, 그 칩은 목록에 표본이 없어 라벨을 만들 수
+   * 없다 — `?? code` 로 떨어져 화면에 `ANIMAL_HOSPITAL` 이 나갔다. dev 실측이다.
+   *
+   * `frontend/CLAUDE.md` 의 "한국어 매핑 테이블 금지" 는 **서버가 준 값을 FE 가 다시
+   * 번역하지 말라**는 뜻이다. 여기는 서버가 값을 주지 않는 자리 — 데이터가 없는 필터
+   * 컨트롤의 고정 라벨이라 층이 다르다. **목록 행·선택 카드는 그대로 서버 `name` 을
+   * 쓴다** (거기는 데이터가 있는 자리다).
+   *
+   * `FACILITY_TYPE_CODES` 가 늘면 `satisfies` 가 컴파일 단계에서 잡는다.
+   */
+  typeByCode: {
+    ANIMAL_HOSPITAL: '병원',
+    ANIMAL_PHARMACY: '약국',
+  } satisfies Record<FacilityTypeCode, string>,
   narrowGroupLabel: '영업 조건',
   open24: '24시간',
   openNow: '지금 진료중',

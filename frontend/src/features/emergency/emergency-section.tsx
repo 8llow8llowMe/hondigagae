@@ -18,7 +18,6 @@ import { messages } from '@/lib/messages'
 import {
   FACILITY_TYPE_CODES,
   type FacilityFilters,
-  type FacilityTypeCode,
   type NearbyFacilityResult,
 } from '@/types/emergency'
 
@@ -106,7 +105,7 @@ export function EmergencySection({
               selected={filters.type === code}
               onSelect={() => onFiltersChange({ ...filters, type: code })}
             >
-              {withCount(typeLabel(all, code), counts.byType[code], showCounts)}
+              {withCount(messages.emergency.typeByCode[code], counts.byType[code], showCounts)}
             </Chip>
           ))}
         </ChipGroup>
@@ -257,11 +256,6 @@ function PositionNotice({ reason, onRetry }: { reason: PositionFailure; onRetry:
       )}
     </div>
   )
-}
-
-/** 서버 `name` 을 그대로 쓴다. 목록에 그 유형이 없으면 code 로 떨어진다 */
-function typeLabel(facilities: NearbyFacilityResult['facilities'], code: FacilityTypeCode): string {
-  return facilities.find((f) => f.facilityType.code === code)?.facilityType.name ?? code
 }
 
 /** 개수를 붙일 수 있을 때만 붙인다 */
