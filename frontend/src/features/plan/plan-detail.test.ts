@@ -16,6 +16,7 @@ import {
   planDetail,
   planItem,
   planVerdict,
+  secondPet,
 } from '@/test/fixtures/plan'
 import type { PlaceDetail } from '@/types/place'
 import type { PlanDayWeatherItem } from '@/types/plan'
@@ -265,7 +266,7 @@ function renderOverview(overrides = {}) {
   return renderToStaticMarkup(
     createElement(PlanOverviewPanel, {
       plan: planDetail,
-      pet,
+      companions: [pet],
       petPending: false,
       today: TODAY,
       verdicts: [planVerdict],
@@ -276,7 +277,7 @@ function renderOverview(overrides = {}) {
 
 describe('PlanOverviewPanel', () => {
   it('반려견 조회가 실패하면 카드만 빠지고 나머지는 그대로다', () => {
-    const markup = renderOverview({ pet: null })
+    const markup = renderOverview({ companions: [] })
 
     // 일정 제목에도 '몽실이' 가 들어 있다 — 카드 고유 정보(품종)로 판정한다
     expect(markup).not.toContain('푸들')
@@ -289,6 +290,20 @@ describe('PlanOverviewPanel', () => {
 
     expect(markup).toContain('푸들')
     expect(markup).toContain('소형견')
+  })
+
+  /*
+    #218. 대표 한 마리만 세우면 일자 판정이 `verdictBasisPet` 으로 부르는 이름이 화면
+    어디에도 없게 된다 — 같은 화면이 두 사실을 동시에 말한다.
+  */
+  it('동행이 두 마리면 둘 다 세운다 — 기준 아이 이름이 카드 안에 있어야 한다', () => {
+    const markup = renderOverview({ companions: [pet, secondPet] })
+
+    expect(markup).toContain('몽실이')
+    expect(markup).toContain('초코')
+    // 카드 고유 정보(품종)로 판정한다 — 이름은 일정 제목에도 들어 있다
+    expect(markup).toContain('푸들')
+    expect(markup).toContain('리트리버')
   })
 
   it('상태 배지는 서버 name 을 그대로 쓴다', () => {

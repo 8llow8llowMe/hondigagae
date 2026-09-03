@@ -43,7 +43,7 @@ import type { PlanDetail, PlanWeatherResponse } from '@/types/plan'
  */
 export function PlanDetailSection({
   plan,
-  pet,
+  companions,
   pets,
   petPending,
   places,
@@ -54,7 +54,8 @@ export function PlanDetailSection({
 }: {
   plan: PlanDetail
   /** 개요 카드가 쓰는 대표 반려견. 조회 실패·삭제면 null 이고 카드만 빠진다 */
-  pet: Pet | null
+  /** 이 일정의 동행 반려견, `petIds` 순서 (#218). 못 찾은 아이는 빠진다 */
+  companions: readonly Pet[]
   /**
    * 회원의 반려견 전체 (#176). **일자 판정의 기준 아이 이름을 찾는 데만 쓴다** —
    * 이 일정에 없는 아이가 섞여 있어도 `basisPetId` 로만 조회하므로 문제가 없다.
@@ -137,7 +138,7 @@ export function PlanDetailSection({
       <aside>
         <PlanOverviewPanel
           plan={plan}
-          pet={pet}
+          companions={companions}
           petPending={petPending}
           today={today}
           verdicts={weather?.days ?? []}

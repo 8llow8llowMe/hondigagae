@@ -9,6 +9,7 @@ import { useAnchorScroll } from '@/features/plan/use-anchor-scroll'
 import { usePlaceEnrichment, usePlanDetail, usePlanWeather } from '@/features/plan/use-plan-detail'
 import { ApiError } from '@/lib/api/error'
 import { messages } from '@/lib/messages'
+import { companionPetsOf } from '@/lib/plan/companion-pets'
 import { alternativePlaceIds } from '@/lib/plan/detail'
 
 /**
@@ -83,13 +84,19 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
 
   if (detail.data === undefined) return null
 
-  // 이 일정의 반려견만 찾는다. 조회 실패·삭제된 반려견이면 null 이고 카드만 빠진다
-  const pet = pets.data?.pets.find((candidate) => candidate.petId === detail.data.petId) ?? null
+  /*
+    이 일정의 **동행 반려견 전체**를 `petIds` 순서로 찾는다 (#218). 대표 한 마리만 읽으면
+    두 마리 일정이 한 마리로 보이는데, 같은 화면의 일자 판정은 `basisPetNameOf` 로
+    "함께 가는 아이 중" 을 말한다 — 그때 부르는 이름이 화면 어디에도 없게 된다.
+
+    조회 실패·삭제된 반려견이면 그만큼 빠지고, 전부 빠지면 카드만 사라진다 (D5).
+  */
+  const companions = companionPetsOf(detail.data.petIds, pets.data?.pets ?? [])
 
   return (
     <PlanDetailSection
       plan={detail.data}
-      pet={pet}
+      companions={companions}
       pets={pets.data?.pets ?? []}
       petPending={pets.isPending}
       places={places}
