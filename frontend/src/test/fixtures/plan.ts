@@ -153,6 +153,17 @@ export const pet: Pet = {
   sociality: { code: 'MEDIUM', name: '보통', description: null },
 }
 
+/** 동행 두 마리 갈래(#218)용 두 번째 아이. 대표가 아니고 특성도 몽실이와 갈린다 */
+export const secondPet: Pet = {
+  ...pet,
+  petId: '123456789012000002',
+  name: '초코',
+  breed: '리트리버',
+  sizeType: { code: 'LARGE', name: '대형견', description: '체중 25kg 이상' },
+  heatSensitive: false,
+  coldSensitive: true,
+}
+
 /**
  * `PlanDaySection` 의 담기 묶음 기본값 (#82).
  *

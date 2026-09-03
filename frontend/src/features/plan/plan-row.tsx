@@ -5,6 +5,7 @@ import { PetAvatar } from '@/components/pet-avatar'
 import { Row } from '@/components/surface'
 import { PlanStatusBadge } from '@/features/plan/plan-status-badge'
 import { messages } from '@/lib/messages'
+import { companionLabel } from '@/lib/plan/companion-pets'
 import { daysUntil, formatPlanDateRange } from '@/lib/plan/date'
 import type { PlanSummaryItem } from '@/types/plan'
 
@@ -22,17 +23,23 @@ import type { PlanSummaryItem } from '@/types/plan'
  */
 export function PlanRow({
   plan,
-  petName,
+  petNames,
   today,
   last = false,
 }: {
   plan: PlanSummaryItem
-  /** 반려견 조회가 실패했거나 삭제된 반려견이면 null. **행을 숨기지 않는다** (공통명세 S8) */
-  petName: string | null
+  /**
+   * 동행 반려견 이름, `petIds` 순서 (#218). **대표 한 마리가 아니다** — 두 마리 일정이
+   * 한 마리로 보이면 일자 판정의 "함께 가는 아이 중" 과 어긋난다.
+   *
+   * 조회가 실패했거나 전부 삭제됐으면 빈 배열이다. **행을 숨기지 않는다** (공통명세 S8).
+   */
+  petNames: readonly string[]
   today: Date
   last?: boolean
 }) {
   const dday = daysUntil(plan.startDate, today)
+  const companion = companionLabel(petNames)
 
   return (
     <Row as="li" last={last}>
@@ -57,10 +64,11 @@ export function PlanRow({
           <PlanStatusBadge status={plan.status} className="lg:hidden" />
         </span>
 
-        {petName !== null && (
+        {companion !== null && (
           <span className="hidden shrink-0 items-center gap-2 lg:flex">
-            <PetAvatar name={petName} size="lg" />
-            <span className="text-body-2 text-fg-muted font-medium">{petName}</span>
+            {/* 아바타는 대표 하나다 — 5마리까지 늘어나면 행의 폭이 터진다. 수는 글자가 말한다 */}
+            <PetAvatar name={petNames[0] ?? ''} size="lg" />
+            <span className="text-body-2 text-fg-muted font-medium">{companion}</span>
           </span>
         )}
 

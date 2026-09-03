@@ -17,7 +17,7 @@ import type { PlanDayWeatherItem, PlanDetail } from '@/types/plan'
  */
 export function PlanOverviewPanel({
   plan,
-  pet,
+  companions,
   petPending,
   today,
   verdicts,
@@ -25,7 +25,8 @@ export function PlanOverviewPanel({
 }: {
   plan: PlanDetail
   /** 조회 실패·삭제된 반려견이면 `null` — **카드만 빠지고 화면은 그대로다** (D5) */
-  pet: Pet | null
+  /** 동행 반려견, `petIds` 순서 (#218). 못 찾은 아이는 빠진다 */
+  companions: readonly Pet[]
   petPending: boolean
   today: Date
   /** 판정. 아직 없거나 실패했으면 빈 배열 — 목차 자체를 렌더하지 않는다 */
@@ -78,24 +79,40 @@ export function PlanOverviewPanel({
         </p>
       </div>
 
-      <PlanPetCard pet={pet} pending={petPending} />
+      <PlanPetCard companions={companions} pending={petPending} />
 
       <PlanVerdictToc verdicts={verdicts} />
     </div>
   )
 }
 
-/** 반려견 카드. **조회 실패는 숨김이다** — 카드만 빠지고 오류를 말하지 않는다 (D5) */
-function PlanPetCard({ pet, pending }: { pet: Pet | null; pending: boolean }) {
+/**
+ * 동행 반려견 카드. **조회 실패는 숨김이다** — 카드만 빠지고 오류를 말하지 않는다 (D5).
+ *
+ * **전원을 한 줄씩 세운다** (#218). 목록 행은 `{대표} 외 N마리` 로 줄이지만 여기는 줄이지
+ * 않는다 — 일자 판정이 `verdictBasisPet` 으로 부르는 이름이 **반드시 이 카드 안에 있어야**
+ * 사용자가 "그 아이가 누구인지" 를 알 수 있다. 최대 5마리라 길어지지 않는다.
+ */
+function PlanPetCard({ companions, pending }: { companions: readonly Pet[]; pending: boolean }) {
   if (pending) return <Skeleton className="h-14 w-full" />
-  if (pet === null) return null
+  if (companions.length === 0) return null
 
+  return (
+    <div className="border-border flex flex-col gap-3 border-t pt-4">
+      {companions.map((pet) => (
+        <PlanPetRow key={pet.petId} pet={pet} />
+      ))}
+    </div>
+  )
+}
+
+function PlanPetRow({ pet }: { pet: Pet }) {
   const traits = [pet.breed, pet.sizeType.name].filter(
     (part): part is string => part !== null && part.length > 0,
   )
 
   return (
-    <div className="border-border flex items-center gap-3 border-t pt-4">
+    <div className="flex items-center gap-3">
       <PetAvatar name={pet.name} size="lg" />
       <div className="min-w-0">
         <p className="text-body-1 text-fg font-semibold break-keep">{pet.name}</p>

@@ -5,6 +5,7 @@ import { Band, RowList } from '@/components/surface'
 import { PlanListSkeleton } from '@/features/plan/plan-list-skeleton'
 import { PlanRow } from '@/features/plan/plan-row'
 import { messages } from '@/lib/messages'
+import { companionNamesOf } from '@/lib/plan/companion-pets'
 import { groupPlans } from '@/lib/plan/list'
 import type { PlanSummaryItem } from '@/types/plan'
 
@@ -127,7 +128,8 @@ function PlanGroup({
           <PlanRow
             key={plan.planId}
             plan={plan}
-            petName={petNames.get(plan.petId) ?? null}
+            /* 대표(`plan.petId`)가 아니라 동행 전체다 (#218) */
+            petNames={companionNamesOf(plan.petIds, petNames)}
             today={today}
             last={index === plans.length - 1}
           />

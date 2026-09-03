@@ -154,6 +154,41 @@ describe('일정 행', () => {
     expect(html).toContain('몽실이와 제주 2박 3일')
   })
 
+  /*
+    #218. 대표(`plan.petId`)만 읽으면 두 마리 일정이 한 마리 일정과 구분되지 않는다.
+    목록은 이름을 나열하지 않는다 — 최대 5마리라 행의 폭이 터진다. 수로 말한다.
+  */
+  it('동행이 두 마리면 수를 드러낸다', () => {
+    const html = render({
+      plans: [plan({ petIds: ['123456789012000001', '123456789012000002'] })],
+      petNames: new Map([
+        ['123456789012000001', '몽실이'],
+        ['123456789012000002', '초코'],
+      ]),
+    })
+    expect(html).toContain('몽실이 외 1마리')
+  })
+
+  it('한 마리 일정은 이름만 그대로 쓴다 — 지금까지의 모양이 바뀌지 않는다', () => {
+    const html = render()
+    expect(html).toContain('몽실이')
+    expect(html).not.toContain('외 0마리')
+    expect(html).not.toMatch(/외\s*\d+마리/)
+  })
+
+  /*
+    그 아이만 조회에 실패하면 `petNames` 에서 빠진다 (`types/plan.ts:122`). 남은 이름으로
+    말하고, id 나 "알 수 없음" 을 세우지 않는다.
+  */
+  it('두 마리 중 하나를 못 찾으면 남은 한 마리로 말한다', () => {
+    const html = render({
+      plans: [plan({ petIds: ['123456789012000001', '123456789012000002'] })],
+      petNames: new Map([['123456789012000001', '몽실이']]),
+    })
+    expect(html).not.toMatch(/외\s*\d+마리/)
+    expect(html).toContain('몽실이')
+  })
+
   it('D-day 는 오늘 기준으로 센다', () => {
     expect(render()).toContain('D-16')
   })
