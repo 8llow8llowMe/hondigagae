@@ -89,6 +89,7 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
     <PlanDetailSection
       plan={detail.data}
       pet={pet}
+      pets={pets.data?.pets ?? []}
       petPending={pets.isPending}
       places={places}
       weather={weather.data}

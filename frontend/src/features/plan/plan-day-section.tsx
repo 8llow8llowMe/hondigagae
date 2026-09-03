@@ -67,6 +67,7 @@ export function PlanDaySection({
   places,
   verdict,
   petConditionApplied,
+  basisPetName,
   verdictFailed,
   onRetryVerdict,
   editing,
@@ -83,6 +84,8 @@ export function PlanDaySection({
   places: Map<string, PlaceDetail>
   verdict: PlanDayWeatherItem | undefined
   petConditionApplied: boolean
+  /** 이 일자 판정의 기준 반려견 이름 (#176). 한 마리 일정이면 null */
+  basisPetName: string | null
   verdictFailed: boolean
   onRetryVerdict: () => void
   /** 이 일자가 편집 중이다. **한 번에 한 일자만 연다** — 일괄 교체 단위가 일자다 (E0) */
@@ -150,6 +153,7 @@ export function PlanDaySection({
       <PlanDayVerdict
         verdict={verdict}
         petConditionApplied={petConditionApplied}
+        basisPetName={basisPetName}
         failed={verdictFailed}
         onRetry={onRetryVerdict}
       />

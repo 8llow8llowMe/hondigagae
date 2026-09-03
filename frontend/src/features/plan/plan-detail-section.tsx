@@ -17,6 +17,7 @@ import { usePlanDayEdit } from '@/features/plan/use-plan-day-edit'
 import { usePlanVisit } from '@/features/plan/use-plan-visit'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { messages } from '@/lib/messages'
+import { basisPetNameOf } from '@/lib/plan/basis-pet'
 import { addPlanDays } from '@/lib/plan/date'
 import { placeIdsOf } from '@/lib/plan/day-items'
 import {
@@ -41,6 +42,7 @@ import type { PlanDetail, PlanWeatherResponse } from '@/types/plan'
 export function PlanDetailSection({
   plan,
   pet,
+  pets,
   petPending,
   places,
   weather,
@@ -49,7 +51,13 @@ export function PlanDetailSection({
   today,
 }: {
   plan: PlanDetail
+  /** 개요 카드가 쓰는 대표 반려견. 조회 실패·삭제면 null 이고 카드만 빠진다 */
   pet: Pet | null
+  /**
+   * 회원의 반려견 전체 (#176). **일자 판정의 기준 아이 이름을 찾는 데만 쓴다** —
+   * 이 일정에 없는 아이가 섞여 있어도 `basisPetId` 로만 조회하므로 문제가 없다.
+   */
+  pets: readonly Pet[]
   petPending: boolean
   /** placeId → 보강 결과. **실내 대안 전용이다** — 항목은 자기 `place` 를 들고 온다 */
   places: Map<string, PlaceDetail>
@@ -116,6 +124,12 @@ export function PlanDetailSection({
     setEditingDay(null)
   }
 
+  /*
+    petId → 이름. **일자마다 다시 만들지 않는다** — 기준 아이는 날마다 다를 수 있어
+    조회가 일수만큼 일어난다.
+  */
+  const petNames = new Map(pets.map((candidate) => [candidate.petId, candidate.name]))
+
   return (
     <div className="rail-layout">
       <aside>
@@ -152,6 +166,11 @@ export function PlanDetailSection({
               places={places}
               verdict={weather?.days.find((entry) => entry.day === group.day)}
               petConditionApplied={weather?.petConditionApplied ?? true}
+              basisPetName={basisPetNameOf(
+                weather?.days.find((entry) => entry.day === group.day)?.basisPetId ?? null,
+                plan.petIds,
+                petNames,
+              )}
               verdictFailed={weatherFailed}
               onRetryVerdict={onRetryWeather}
               editing={editingDay === group.day}

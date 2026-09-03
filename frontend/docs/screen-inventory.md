@@ -283,7 +283,7 @@
   - **필드명은 `preferFavorites` 다.** #128 이슈 본문의 `includeFavorites` 는 틀린 이름이고, 그대로 보내면 옵션이 조용히 무시된다.
   - 꼭 넣을 장소는 **저장한 장소에서 고른다** (`/favorites` 와 같은 캐시). 아트보드의 `검색` 탭은 **`GET /places` 에 이름 검색 파라미터가 없어** 만들지 못했다 (명세 S8-9).
 - **다중 반려견(`petIds`)은 생성과 저장 양쪽에 붙었다** ([#128](https://github.com/8llow8llowMe/hondigagae/issues/128) · [#174](https://github.com/8llow8llowMe/hondigagae/issues/174) · [다견선택-세부명세.md](features/ai-plan/다견선택-세부명세.md)). 조건 입력이 체크박스 그룹이고 한 마리여도 `petIds` 배열로 보낸다. 담기도 동반한 아이를 전부 실으며 **첫 번째가 대표 반려견**이 된다. 한때는 `PlanCreateRequest.petId` 가 단일이라 담기 직전에 사람이 한 마리를 골랐지만, [#152](https://github.com/8llow8llowMe/hondigagae/issues/152) 가 `develop` 에 들어오면서 그 컨트롤을 걷었다 (명세 S8-8).
-- **남은 것: 일정 상세가 어느 아이 기준인지 말하지 않는다.** 이제 두 마리 일정이 실제로 생기는데, 일자 판정은 서버가 준 `basisPetId`(점수가 **가장 낮은** 아이) 기준이면서 화면이 그 이름을 붙이지 않는다. `petSuitabilities[]` 도 쓰지 않는다.
+- **일자 판정이 어느 아이 기준인지 말한다** ([#176](https://github.com/8llow8llowMe/hondigagae/issues/176)). 서버가 준 `basisPetId` 는 그날 점수가 **가장 낮은** 아이라 대표와 다를 수 있고 **날마다 달라진다** — 그래서 일정 단위가 아니라 일자마다 말한다. **두 마리 이상일 때만** 나오고, 이름을 못 찾으면(삭제된 반려견·조회 실패) 생략한다. `petSuitabilities[]` 로 아이별 점수를 나열하는 것은 하지 않았다 — 아트보드에 그 화면이 없다.
 - **아트보드 01 을 이탈했다.** 아트보드는 "반려견은 라디오 — 한 마리 / 두 마리를 함께 고르면 판정 기준이 모호해진다" 로 반대 결정을 해 뒀다. 담기 직전의 명시 선택이 그 모호한 구간을 없애므로 이탈했고, 근거의 정본은 세부명세 D1 이다. **아트보드 갱신은 후속.**
 - **아트보드 06 절이 02 절의 진행 5단계를 정정했다.** "진행률 바를 그리지 않는다 … 점 3개(대기·짜는 중·완성)만 쓴다 — 02 아트보드의 5단계는 이 규칙으로 대체한다." 현재 화면은 서버 `description` 만 쓰고 있어 방향은 맞지만, **SSE 배선([#91](https://github.com/8llow8llowMe/hondigagae/issues/91))에서 이 절을 정본으로 봐야 한다.**
 - **SSE 는 이번 범위가 아니다.** 백엔드에 `GET /ai-plans/jobs/{jobId}/stream` 이 있지만(`b7daa3a`) **BFF 가 응답을 통째로 버퍼링해 스트림을 통과시키지 못한다** — 지금 붙이면 폴링만도 못하다. 이슈 [#91](https://github.com/8llow8llowMe/hondigagae/issues/91) 로 뗐다 (명세 S3).

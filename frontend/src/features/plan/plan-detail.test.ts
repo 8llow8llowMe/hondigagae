@@ -27,6 +27,7 @@ function renderVerdict(overrides: Partial<PlanDayWeatherItem> | null = {}, extra
     createElement(PlanDayVerdict, {
       verdict: overrides === null ? undefined : { ...planVerdict, ...overrides },
       petConditionApplied: true,
+      basisPetName: null,
       failed: false,
       onRetry: () => undefined,
       ...extra,
@@ -136,6 +137,7 @@ function renderDaySection(overrides = {}) {
       places: new Map<string, PlaceDetail>(),
       verdict: planVerdict,
       petConditionApplied: true,
+      basisPetName: null,
       verdictFailed: false,
       onRetryVerdict: () => undefined,
       editing: false,
@@ -326,5 +328,37 @@ describe('PlanOverviewPanel', () => {
       messages.plan.budgetEmpty,
     )
     expect(renderOverview()).toContain('400,000')
+  })
+})
+
+describe('PlanDayVerdict — 기준 반려견 (#176)', () => {
+  it('한 마리 일정이면 줄이 없다', () => {
+    expect(renderVerdict()).not.toContain('기준이에요')
+  })
+
+  /*
+    기준은 그날 점수가 가장 낮은 아이라 날마다 다를 수 있다. 이유를 함께 말하지 않으면
+    사용자는 "왜 이 아이지" 를 알 수 없다.
+  */
+  it('기준 아이 이름과 그 이유를 함께 말한다', () => {
+    const markup = renderVerdict({}, { basisPetName: '초코' })
+
+    expect(markup).toContain('초코 기준이에요')
+    expect(markup).toContain('가장 힘든 아이')
+  })
+
+  /*
+    아래 두 줄(중기예보 출처 · 특성 미반영)은 판정을 어떻게 읽어야 하는지의 단서인데,
+    이 줄은 **누구의 판정인지**라 먼저 와야 나머지가 그 아이 이야기로 읽힌다.
+  */
+  it('같은 묶음의 다른 안내보다 먼저 온다', () => {
+    const markup = renderVerdict(
+      { weather: { ...planVerdict.weather!, forecastSourceCode: 'MID_TERM' } },
+      { basisPetName: '초코', petConditionApplied: false },
+    )
+
+    expect(markup.indexOf('초코 기준이에요')).toBeLessThan(
+      markup.indexOf(messages.plan.verdictPetConditionMissing),
+    )
   })
 })

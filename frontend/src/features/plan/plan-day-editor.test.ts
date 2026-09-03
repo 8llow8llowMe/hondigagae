@@ -167,6 +167,7 @@ describe('PlanDaySection — 편집 진입', () => {
           indoorAlternatives: [planAlternative({ placeId: '212481712381923330', title: '오설록' })],
         },
         petConditionApplied: true,
+        basisPetName: null,
         verdictFailed: false,
         onRetryVerdict: () => undefined,
         editing: false,
