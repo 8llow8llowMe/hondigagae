@@ -73,7 +73,7 @@ infra:
     host: localhost
     port: 6379
     password:
-    key-prefix: ${REDIS_KEY_PREFIX:hondigagae-local}
+    key-prefix: ${REDIS_KEY_PREFIX:hondigagae:local}
   storage:
     endpoint: http://localhost:9000
     public-url: http://localhost:9000
