@@ -4,6 +4,7 @@ import { Badge } from '@/components/badge'
 import { MetricValue, MetricWord } from '@/components/metric'
 import { ReasonList } from '@/components/reason-list'
 import { Skeleton } from '@/components/skeleton'
+import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { formatDistance } from '@/lib/format/distance'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
@@ -78,11 +79,17 @@ export function PlaceSuitabilityPanel({
   return (
     <div className={cn('flex flex-col gap-3 py-4', INSET)}>
       <div className="flex items-end justify-between gap-3">
-        <p className="text-body-1 font-semibold">
+        {/*
+          특보 배지가 등급 줄에 함께 선다. **등급을 대신하지 않는다** — 경보면 등급이 이미
+          "주의 필요" 로 내려와 있고, 배지는 그렇게 된 이유가 기상특보라는 것을 말한다.
+          `flex-wrap` 은 긴 종류명("열대야 주의보")이 좁은 화면에서 등급 단어를 밀지 않게 한다.
+        */}
+        <p className="text-body-1 flex flex-wrap items-center gap-x-1 gap-y-2 font-semibold">
           <span className="text-fg-muted">
             {messages.place.detailSuitabilitySpeaker.replace('{name}', petName)}
-          </span>{' '}
+          </span>
           <MetricWord tone={tone}>{data.suitabilityLevel.name}</MetricWord>
+          <WeatherWarningBadge warning={data.weatherWarning} />
         </p>
 
         {/* null 은 0점이 아니라 "점수를 내지 않았다" 는 뜻이다. 자리를 0 으로 채우지 않는다 */}

@@ -53,6 +53,8 @@ export const walkSafety: WalkSafetyResponse = {
   precipitationType: { code: 'NONE', name: '없음', description: '강수가 없습니다.' },
   petConditionApplied: true,
   weatherProviderName: '기상청 단기예보',
+  // 기본은 특보 없음이다 — 흔한 경우를 기본값으로 둔다. 배지 테스트는 개별로 얹는다
+  weatherWarning: null,
 }
 
 export const suitability: PlaceSuitabilityResponse = {
@@ -109,6 +111,7 @@ export const suitability: PlaceSuitabilityResponse = {
   weatherApplied: true,
   congestionApplied: false,
   weatherProviderName: '기상청 단기예보',
+  weatherWarning: null,
 }
 
 /** 점수를 내지 못한 경우 — **0점이 아니라 "모름" 이다** */
