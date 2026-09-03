@@ -91,6 +91,14 @@ export const paths = {
     submit: '/ai-plans',
     job: (jobId: string) => `/ai-plans/jobs/${jobId}`,
     /**
+     * 작업 상태 SSE 구독 (#91).
+     *
+     * **`clientFetch` 로 부르지 않는다** — `EventSource` 가 직접 연다. 브라우저가
+     * 게이트웨이를 직접 부르지 않고 BFF 가 토큰을 붙이므로, 스키마가 안내하는
+     * fetch 기반 SSE 클라이언트(`Authorization` 헤더용)가 이 저장소에는 필요 없다.
+     */
+    jobStream: (jobId: string) => `/ai-plans/jobs/${jobId}/stream`,
+    /**
      * 반려견 여행 준비물 생성 (#155). **POST 인데 조회에 가깝다** — 서버가 결과를
      * 저장하지 않는 제안이라 재호출하면 다른 목록이 온다.
      */

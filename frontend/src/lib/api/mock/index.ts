@@ -1,4 +1,5 @@
-import { resolveAiPlanMock } from '@/lib/api/mock/ai-plan-data'
+import type { MockStreamResult } from '@/lib/api/mock/ai-plan-data'
+import { resolveAiPlanMock, resolveAiPlanStreamMock } from '@/lib/api/mock/ai-plan-data'
 import type { MockResult } from '@/lib/api/mock/auth-data'
 import { resolveAuthMock } from '@/lib/api/mock/auth-data'
 import { mockNearbyFacilities } from '@/lib/api/mock/emergency-data'
@@ -32,7 +33,7 @@ import type { PlaceSummary } from '@/types/place'
  * 클라이언트 코드는 mock 존재를 모른다 — 전송 계층·래퍼 판별·에러 분기가 실제 경로 그대로다.
  */
 
-export type { MockResult }
+export type { MockResult, MockStreamResult }
 
 /**
  * mock 활성 여부.
@@ -61,6 +62,22 @@ const SUB_RESOURCES = new Set(['nearby'])
 /** 백엔드 `size` 허용 범위 (1~50). 벗어나면 400 이다 */
 const MIN_SIZE = 1
 const MAX_SIZE = 50
+
+/**
+ * SSE 스트림 요청을 mock 으로 해석한다 (#91). 대상이 아니면 null 이다.
+ *
+ * **`resolveMock` 과 나눈 이유**: 스트림은 `MockResult`(status + JSON payload)에 담기지
+ * 않는다. 프레임 목록을 시간 간격대로 흘려보내야 하고, 그 조립은 BFF 쪽에서 한다.
+ *
+ * 스트림 mock 은 이 하나뿐이다 — SSE 엔드포인트가 계약에 하나뿐이다.
+ */
+export function resolveMockStream(
+  path: string,
+  method: string,
+  accessToken: string | null = null,
+): MockStreamResult | null {
+  return resolveAiPlanStreamMock(path, method, accessToken)
+}
 
 /**
  * 경로+메서드+본문을 mock 응답으로 해석한다. 처리 대상이 아니면 null 을 반환해
