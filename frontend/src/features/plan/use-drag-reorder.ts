@@ -1,7 +1,14 @@
 'use client'
 
-import { type PointerEvent as ReactPointerEvent, useCallback, useRef, useState } from 'react'
+import {
+  type PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 
+import { autoScrollStep } from '@/lib/plan/auto-scroll'
 import type { MoveDirection } from '@/lib/plan/day-items'
 
 /**
@@ -23,6 +30,10 @@ import type { MoveDirection } from '@/lib/plan/day-items'
  * 좌표 기준은 **끄는 손가락의 위치와 이웃 행의 중간선**이다. 행 높이가 서로 달라
  * (삭제 표시·경고 문구가 붙은 행이 더 높다) 고정 높이로 계산할 수 없으므로 매번
  * `getBoundingClientRect()` 로 읽는다.
+ *
+ * **가장자리에서 화면이 따라 스크롤한다** (#161). 목록이 화면보다 길면 1번을 8번 자리로
+ * 옮기려다 손이 화면 밖으로 나가 버렸다 — 놓고, 스크롤하고, 다시 잡아야 했다.
+ * 판정 규칙은 `lib/plan/auto-scroll.ts` 에 순수 함수로 빼 두었다.
  */
 export function useDragReorder({
   onMove,
@@ -34,6 +45,15 @@ export function useDragReorder({
   const [dragging, setDragging] = useState<number | null>(null)
   const rowsRef = useRef<(HTMLElement | null)[]>([])
   const activeRef = useRef<{ pointerId: number; index: number } | null>(null)
+
+  /**
+   * 마지막 포인터 세로 좌표 (#161).
+   *
+   * **자동 스크롤 프레임이 이 값을 다시 읽는다.** 손가락이 멈춰 있어도 화면이 흐르면
+   * 행의 중간선이 움직이므로 판정이 계속 돌아야 한다 — `pointermove` 만 보면 손을
+   * 가장자리에 대고 가만히 있을 때 스크롤만 되고 순서는 안 바뀐다.
+   */
+  const pointerYRef = useRef(0)
 
   /** 행 엘리먼트를 위치별로 기억한다 — 중간선을 재려면 실제 노드가 필요하다 */
   const registerRow = useCallback(
@@ -60,15 +80,22 @@ export function useDragReorder({
       // 캡처 없이 진행한다
     }
     activeRef.current = { pointerId: event.pointerId, index }
+    // 첫 프레임이 낡은 좌표로 스크롤하지 않도록 시작점을 먼저 채운다
+    pointerYRef.current = event.clientY
     setDragging(index)
   }, [])
 
-  const onPointerMove = useCallback(
-    (event: ReactPointerEvent<HTMLElement>) => {
+  /**
+   * 포인터 세로 좌표 하나로 목표 위치를 정하고 그만큼 한 칸 이동을 반복한다.
+   *
+   * **`pointermove` 와 자동 스크롤 프레임이 함께 부른다** — 둘이 같은 판정을 써야
+   * 손을 움직일 때와 화면이 흐를 때의 결과가 갈리지 않는다.
+   */
+  const applyMove = useCallback(
+    (y: number) => {
       const active = activeRef.current
-      if (active === null || event.pointerId !== active.pointerId) return
+      if (active === null) return
 
-      const y = event.clientY
       const here = active.index
 
       /*
@@ -108,6 +135,49 @@ export function useDragReorder({
     },
     [onMove],
   )
+
+  /** 프레임 루프가 최신 판정을 보게 한다 — deps 에 넣으면 재배열마다 루프가 끊긴다 */
+  const applyMoveRef = useRef(applyMove)
+  applyMoveRef.current = applyMove
+
+  const onPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      const active = activeRef.current
+      if (active === null || event.pointerId !== active.pointerId) return
+
+      pointerYRef.current = event.clientY
+      applyMove(event.clientY)
+    },
+    [applyMove],
+  )
+
+  /*
+    자동 스크롤 루프 (#161).
+
+    **`dragging` 이 아니라 끄는 중인지 여부에만 반응한다.** `dragging` 은 한 칸 옮길
+    때마다 바뀌어서, 그것을 deps 에 넣으면 스왑이 일어날 때마다 루프가 끊겼다 다시 선다.
+
+    **cleanup 이 프레임을 반드시 취소한다** (`done-checklist.md` §3). 손을 떼든,
+    드래그가 취소되든, 화면을 벗어나든 같은 자리로 모인다 — `onPointerEnd` 에만 걸면
+    편집이 언마운트될 때 루프가 남는다.
+  */
+  const isDragging = dragging !== null
+
+  useEffect(() => {
+    if (!isDragging) return
+
+    let frame = requestAnimationFrame(function tick() {
+      const step = autoScrollStep(pointerYRef.current, window.innerHeight)
+      if (step !== 0) {
+        window.scrollBy(0, step)
+        // 화면이 움직였으니 중간선도 움직였다 — 손이 멈춰 있어도 다시 판정한다
+        applyMoveRef.current(pointerYRef.current)
+      }
+      frame = requestAnimationFrame(tick)
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [isDragging])
 
   const onPointerEnd = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     const active = activeRef.current
