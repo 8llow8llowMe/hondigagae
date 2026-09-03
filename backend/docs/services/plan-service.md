@@ -81,6 +81,19 @@ AI 일정 생성(`POST /ai-plans`)은 `petIds` 로 여러 마리를 받는데 �
 - 목록은 페이지의 `planId` 를 모아 **`in` 절 한 번**으로 `plan_pet` 을 읽는다 (§9-7).
 - `PUT /plans/{planId}` 로 동행 반려견을 바꾸는 경로는 아직 없다 — 기존에도 `petId` 수정이 없었다. 필요해지면 별도 이슈다.
 
+### 반려견 지정 규칙은 ai-service 와 함께 고친다 (필수)
+
+`PlanCreateRequest.petIds` 와 `AiPlanCreateRequest.petIds` 는 **같은 규칙을 쓴다** — 최대 5마리,
+첫 번째가 대표, `petId` 는 `petIds` 가 있으면 무시, 둘 다 없으면 대표 반려견 폴백.
+`effectivePetIds()` 구현이 두 파일에 같은 모양으로 들어 있다.
+
+**한쪽만 고치면 프론트가 생성과 담기에서 반려견을 서로 다른 모양으로 실어야 한다.**
+실제로 그런 일이 있었다 — 원소 `@NotNull` 이 빠져 `[null]` 이 통과했고, plan-service 는
+저장에서 500, ai-service 는 조용히 폴백으로 갈렸다. 어느 쪽도 문서화된 정책이 아니었다.
+
+지정 규칙을 손댈 때는 **두 DTO 와 두 검증 테스트**
+(`PlanCreateRequestValidationTest`, `AiPlanCreateRequestValidationTest`)를 함께 본다.
+
 **마이그레이션**
 
 - local/dev(`ddl-auto: update`) — 기동 시 `plan_pet` 이 만들어진다. 옛 행은 그대로 두면 된다.

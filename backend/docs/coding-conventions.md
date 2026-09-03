@@ -241,7 +241,30 @@ public ResponseEntity<Response<Void>> handleValidation(MethodArgumentNotValidExc
 @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[특수문자])\\S+$", ...)
 ```
 
-**5) advice 범위** — `@RestControllerAdvice(basePackages = "...domainlayer")` 를 명시합니다. 한 서비스에 advice 가 둘 이상이면 좁은 범위 advice 에 `@Order` 를 부여해 우선순위를 확정합니다 (예: auth-service 의 `AuthExceptionHandler` 가 `MemberExceptionHandler` 보다 앞).
+**5) 컬렉션 원소는 `@NotNull` 과 값 제약을 쌍으로 겁니다 (필수)** — `List<@Positive Long>` 처럼
+값 제약만 걸면 **null 원소가 검증을 통과합니다.** Bean Validation 스펙상 `@Positive`·`@Size`·
+`@Email` 같은 값 제약은 null 을 유효로 보기 때문입니다.
+
+```java
+// 지양 — [null] 이 통과한다. 통과한 뒤의 결과는 서비스마다 다르다
+List<@Positive(message = PlanValidationMessage.PET_ID_POSITIVE) Long> petIds
+
+// 권장 — 존재와 값을 나눠 건다
+List<@NotNull(message = PlanValidationMessage.PET_ID_POSITIVE)
+     @Positive(message = PlanValidationMessage.PET_ID_POSITIVE) Long> petIds
+```
+
+위 **2) 제약 우선순위**가 `필수 → 길이 → 범위 → 형식` 인 것이 이미 이 쌍을 전제한 정렬입니다.
+"같은 의미를 두 제약으로 중복 검사하지 않는다"에도 걸리지 않습니다 — **존재와 값은 다른
+의미**라, 비밀번호를 `@Size`(길이) + `@Pattern`(구성)으로 나누라는 아래 권장과 같은 모양입니다.
+
+**`.filter(Objects::nonNull)` 로 접지 않습니다.** 코드는 짧아지지만 "안 보낸 것"과 "잘못 보낸
+것"이 같은 결과가 됩니다. 이 저장소는 그 둘을 구분하는 쪽으로 계속 결정해 왔습니다 —
+`score: null` 을 0 으로 접지 않고, 예보 없음과 좋은 날씨를 구분하고, 특성 조회 실패를
+`petConditionApplied: false` 로 드러냅니다. 조용히 무시하면 **클라이언트가 자기 버그를 영영
+못 봅니다.**
+
+**6) advice 범위** — `@RestControllerAdvice(basePackages = "...domainlayer")` 를 명시합니다. 한 서비스에 advice 가 둘 이상이면 좁은 범위 advice 에 `@Order` 를 부여해 우선순위를 확정합니다 (예: auth-service 의 `AuthExceptionHandler` 가 `MemberExceptionHandler` 보다 앞).
 
 ### 8-3. 하드코딩된 문자열 금지
 

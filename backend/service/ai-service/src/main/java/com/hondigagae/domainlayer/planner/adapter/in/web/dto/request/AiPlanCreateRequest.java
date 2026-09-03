@@ -38,11 +38,17 @@ public record AiPlanCreateRequest(
 
     @Schema(description = "동반 반려견 식별자 목록 (선택, 최대 5마리) — 여러 마리와 함께 여행할 때 씁니다.")
     @Size(max = 5, message = AiPlanValidationMessage.PET_IDS_SIZE_INVALID)
-    List<@Positive(message = AiPlanValidationMessage.PET_ID_POSITIVE) Long> petIds,
+    // 원소 제약은 @NotNull 과 값 제약을 쌍으로 건다 (coding-conventions §8-2).
+    // @Positive 만 걸면 null 원소가 통과해 조용히 사라지고 대표 반려견으로 폴백된다.
+    List<@NotNull(message = AiPlanValidationMessage.PET_ID_POSITIVE)
+         @Positive(message = AiPlanValidationMessage.PET_ID_POSITIVE) Long> petIds,
 
     @Schema(description = "꼭 넣고 싶은 장소 식별자 목록 (선택, 최대 10곳) — 일정에 반드시 배치됩니다.")
     @Size(max = 10, message = AiPlanValidationMessage.PINNED_PLACE_IDS_SIZE_INVALID)
-    List<@Positive(message = AiPlanValidationMessage.PINNED_PLACE_ID_POSITIVE) Long> pinnedPlaceIds,
+    // 여기서 null 을 흘리면 "꼭 넣고 싶은 장소"가 말없이 하나 사라진다 -
+    // 반드시 배치된다고 약속받은 값이라 조용히 버리면 안 되는 자리다.
+    List<@NotNull(message = AiPlanValidationMessage.PINNED_PLACE_ID_POSITIVE)
+         @Positive(message = AiPlanValidationMessage.PINNED_PLACE_ID_POSITIVE) Long> pinnedPlaceIds,
 
     @Schema(description = "요청 메모 (선택) — 자연어 요구사항", example = "산책 위주로, 더위에 약한 아이라 실내 위주로 부탁해요")
     @Size(max = 500, message = AiPlanValidationMessage.REQUEST_NOTE_LENGTH_INVALID)
