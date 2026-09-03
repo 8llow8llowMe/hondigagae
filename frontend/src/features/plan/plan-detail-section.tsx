@@ -2,8 +2,10 @@
 
 import { useState } from 'react'
 
+import { Banner } from '@/components/banner'
 import { ConfirmModal } from '@/components/confirm-modal'
 import { EmptyState } from '@/components/empty-state'
+import { EmergencyIcon } from '@/components/icons'
 import { Band } from '@/components/surface'
 import { PlanDayEditor } from '@/features/plan/plan-day-editor'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
@@ -148,6 +150,22 @@ export function PlanDetailSection({
           것이라 특정 일자 옆에 두면 그 날 것으로 읽힌다.
         */}
         <PlanPackingList planId={plan.planId} />
+
+        {/*
+          응급 브리핑 진입점 (#125). **배너 하나만 둔다** — 응답이 일자 × 방문 장소 ×
+          최대 3곳이라 여기 펼치면 개요·준비물이 그만큼 밀린다. 홈이 `/emergency` 를
+          배너로 여는 것과 같은 형태다.
+
+          **상시로 둔다.** 담긴 장소가 없으면 브리핑이 비지만, 그 사실도 들어가서 봐야
+          알 수 있다 — 진입점을 감추면 기능이 있는 줄도 모른다.
+        */}
+        <Banner
+          href={`/plans/${plan.planId}/emergency`}
+          title={messages.plan.emergencyHeading}
+          description={messages.plan.emergencyBannerDescription}
+          leading={<EmergencyIcon size={24} />}
+          inset="rail"
+        />
       </aside>
 
       <div className="border-border lg:border-l">

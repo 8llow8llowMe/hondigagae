@@ -84,3 +84,60 @@ export const DEFAULT_FACILITY_FILTERS: FacilityFilters = {
   open24Only: false,
   openNowOnly: false,
 }
+
+// ─── 일정 응급 브리핑 (#125) ──────────────────────────────────────────────────
+
+/**
+ * 일정 브리핑의 시설 한 곳.
+ *
+ * **`/emergencies/facilities` 의 `NearbyFacilityItem` 과 다른 타입이다.** 훨씬 얇다 —
+ * `facilityId` · `lat` · `lng` · `operatingHours` · `openNow` 가 **없다.** 같은 것으로
+ * 착각해 `FacilityRow` 를 재사용하면 없는 필드를 읽게 된다.
+ *
+ * 그 차이가 화면을 하나 못 만들게 한다: **좌표가 없어 길찾기 링크를 만들 수 없다**
+ * (`directionsUrl` 이 좌표 없이는 null 이고, 눌러도 못 가는 버튼은 달지 않는다).
+ */
+export type PlanEmergencyFacility = {
+  name: string
+  /** **metadata 가 아니라 표시명 문자열이다** — `'동물병원'` · `'동물약국'` */
+  typeName: string
+  addr: string
+  tel: string
+  distanceMeters: number
+  open24: boolean
+  /**
+   * **`false` 는 휴무가 아니라 "확인 필요" 다** (백엔드 스키마 명시). 닫혔다고 쓰면
+   * 실제로 여는 병원을 사용자가 건너뛴다 — 응급 상황에서 가장 나쁜 실패다.
+   */
+  operatingHoursKnown: boolean
+}
+
+/** 한 방문 장소와 그 주변 시설 */
+export type PlanEmergencySpot = {
+  planItemId: string
+  placeId: string
+  /** 일정 항목 이름 (장소명) */
+  title: string
+  /** 가까운 순 최대 3곳 */
+  facilities: PlanEmergencyFacility[]
+}
+
+export type PlanEmergencyDay = {
+  /** 1부터 */
+  day: number
+  spots: PlanEmergencySpot[]
+}
+
+/**
+ * `GET /plans/{planId}/emergency` — 일정 응급 브리핑 (#125).
+ *
+ * **출발 전 확인 용도다** (컨트롤러 설명). 급할 때 검색을 시작하면 늦다는 것이 이 기능의
+ * 취지라, 화면도 "지금 찾기" 가 아니라 "미리 훑기" 로 만든다.
+ *
+ * 반경과 개수는 **서버 고정**이다 — 10km · 가까운 순 최대 3곳. 화면이 조절하지 않는다.
+ */
+export type PlanEmergencyResponse = {
+  planId: string
+  radiusMeters: number
+  days: PlanEmergencyDay[]
+}

@@ -14,6 +14,11 @@ export const planKeys = {
    * 그대로 남아야 하고(D5), 그 섹션만 따로 재조회할 수 있어야 한다.
    */
   weather: (planId: string) => [...planKeys.all, 'weather', planId] as const,
+  /**
+   * 응급 브리핑 (#125). **상세·판정과 key 를 또 나눈다** — 별도 화면이고 한쪽이 실패해도
+   * 다른 쪽은 살아 있어야 한다.
+   */
+  emergency: (planId: string) => [...planKeys.all, 'emergency', planId] as const,
 }
 
 /** api-integration-guide.md §7 표준값 — 일정 목록·상세는 30초 / 10분 (mutation 빈번) */
