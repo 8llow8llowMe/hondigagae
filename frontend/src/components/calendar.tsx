@@ -105,21 +105,44 @@ export function Calendar({
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
-      <div className="flex items-center justify-between">
-        <MonthNavButton
-          label="이전 달"
-          onClick={() => setVisible(shiftMonth(visible, -1))}
-          direction="prev"
-        />
+      {/*
+        **연 단위 이동을 함께 둔다** (#162). 달 버튼만 있으면 내년 여행을 잡는 데 12번을
+        눌러야 한다. 연도 선택 드롭다운을 두지 않은 이유는 이 달력이 여행 날짜를 고르는
+        자리이기 때문이다 — 실제 범위가 몇 달 앞이라 목록을 여는 조작이 더 비싸다.
+      */}
+      <div className="flex items-center justify-between gap-1">
+        <div className="flex items-center">
+          <MonthNavButton
+            label="이전 해"
+            onClick={() => setVisible(shiftMonth(visible, -MONTHS_IN_YEAR))}
+            direction="prev"
+            double
+          />
+          <MonthNavButton
+            label="이전 달"
+            onClick={() => setVisible(shiftMonth(visible, -1))}
+            direction="prev"
+          />
+        </div>
+
         {/* 달을 넘길 때 이 문구가 바뀌는 것을 스크린리더가 알아야 한다 */}
         <p aria-live="polite" className="text-body-1 text-fg font-semibold tabular-nums">
           {monthLabel(visible)}
         </p>
-        <MonthNavButton
-          label="다음 달"
-          onClick={() => setVisible(shiftMonth(visible, 1))}
-          direction="next"
-        />
+
+        <div className="flex items-center">
+          <MonthNavButton
+            label="다음 달"
+            onClick={() => setVisible(shiftMonth(visible, 1))}
+            direction="next"
+          />
+          <MonthNavButton
+            label="다음 해"
+            onClick={() => setVisible(shiftMonth(visible, MONTHS_IN_YEAR))}
+            direction="next"
+            double
+          />
+        </div>
       </div>
 
       <div aria-hidden className="grid grid-cols-7">
@@ -216,23 +239,49 @@ const ARROW_KEYS: Record<string, CalendarDirection | undefined> = {
   ArrowDown: 'down',
 }
 
+/** 한 해 = 12달. `shiftMonth` 가 delta 를 그대로 받으므로 연 이동도 같은 함수 하나다 */
+const MONTHS_IN_YEAR = 12
+
+/**
+ * 달·해 이동 버튼.
+ *
+ * **연 이동은 화살표 두 개로 그린다.** 별도 아이콘을 들이지 않는다 — 겹친 화살표는
+ * "한 번에 더 멀리" 라는 관습이 오래됐고, 접근 가능한 이름(`이전 해`)이 실제 의미를
+ * 말하므로 아이콘이 혼자 뜻을 지지 않아도 된다.
+ *
+ * 44px 를 지킨다 (DESIGN.md §7). 넷이 나란히 서지만 가로 폭은 `size-9` 로 좁히고
+ * 세로만 44를 채운다 — 좁은 화면에서 달 이름을 밀어내지 않기 위해서다.
+ */
 function MonthNavButton({
   label,
   onClick,
   direction,
+  double = false,
 }: {
   label: string
   onClick: () => void
   direction: 'prev' | 'next'
+  /** 연 단위 이동 */
+  double?: boolean
 }) {
   return (
     <button
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="text-fg-muted hover:bg-band focus-visible:ring-brand-500 inline-flex size-11 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
+      className={cn(
+        'text-fg-muted hover:bg-band focus-visible:ring-brand-500 inline-flex h-11 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none',
+        double ? 'w-9' : 'w-11',
+      )}
     >
-      <ChevronRightIcon size={20} className={direction === 'prev' ? 'rotate-180' : undefined} />
+      <span
+        aria-hidden
+        className={cn('inline-flex', direction === 'prev' ? 'rotate-180' : undefined)}
+      >
+        <ChevronRightIcon size={20} />
+        {/* 두 번째 화살표를 겹쳐 "한 번에 더 멀리" 를 만든다 */}
+        {double && <ChevronRightIcon size={20} className="-ms-3.5" />}
+      </span>
     </button>
   )
 }

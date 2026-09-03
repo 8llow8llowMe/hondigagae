@@ -94,3 +94,36 @@ describe('Calendar', () => {
     expect(markup).not.toContain('bg-band text-fg font-medium')
   })
 })
+
+describe('Calendar — 달·해 이동 (#162)', () => {
+  /*
+    달 버튼만 있으면 내년 여행을 잡는 데 12번을 눌러야 한다. 연 이동은 `shiftMonth` 에
+    12를 넘기는 것이라 날짜 계산 코드가 늘지 않는다.
+  */
+  it('연 단위 이동 버튼이 함께 있다', () => {
+    const markup = render()
+
+    expect(markup).toContain('이전 해')
+    expect(markup).toContain('다음 해')
+  })
+
+  it('달 이동은 그대로 있다 — 연 이동이 대체가 아니다', () => {
+    const markup = render()
+
+    expect(markup).toContain('이전 달')
+    expect(markup).toContain('다음 달')
+  })
+
+  /*
+    아이콘 자체는 뜻을 지지 않는다 — 겹친 화살표가 "한 번에 더 멀리" 로 읽히려면 접근
+    가능한 이름이 실제 의미를 말해야 한다. 이름이 없으면 화살표 넷이 구분되지 않는다.
+  */
+  it('네 버튼이 모두 이름을 갖는다', () => {
+    const labels = ['이전 해', '이전 달', '다음 달', '다음 해']
+    const markup = render()
+
+    for (const label of labels) {
+      expect(markup).toContain(`aria-label="${label}"`)
+    }
+  })
+})
