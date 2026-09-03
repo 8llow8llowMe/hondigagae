@@ -8,6 +8,17 @@ import type { PlanFilters, PlanStatusFilter, PlanSummaryItem } from '@/types/pla
  * 좁히기는 전부 여기서 한다 (공통명세 S3).
  */
 
+/**
+ * 한 일정의 동행 반려견 (#152).
+ *
+ * **`petIds` 가 없으면 `[petId]` 로 접는다.** 서버가 `plan_pet` 행 없는 옛 일정을
+ * `Plan.resolvePetIds()` 로 읽는 규칙과 같고, [#152](../../types/plan.ts) 가 `develop` 에
+ * 들어가기 전에는 응답에 이 필드가 아예 없다 — 둘 다 같은 폴백으로 덮인다.
+ */
+export function planPetIds(plan: PlanSummaryItem): readonly string[] {
+  return plan.petIds ?? [plan.petId]
+}
+
 export function filterPlans(
   plans: readonly PlanSummaryItem[],
   filters: PlanFilters,
@@ -15,7 +26,13 @@ export function filterPlans(
   return plans.filter(
     (plan) =>
       (filters.status === 'ALL' || plan.status.code === filters.status) &&
-      (filters.petIds.length === 0 || filters.petIds.includes(plan.petId)),
+      /*
+        **한 마리라도 동행이면 히트다** (#152). 대표(`petId`) 하나만 보면 두 마리로 만든
+        일정이 둘째 반려견으로 거를 때 사라진다 — 백엔드도 `GET /plans?petId=` 를
+        대표 컬럼과 조인 테이블을 **둘 다** 보도록 바꿨다 (설계 판단 3).
+      */
+      (filters.petIds.length === 0 ||
+        planPetIds(plan).some((petId) => filters.petIds.includes(petId))),
   )
 }
 
@@ -80,9 +97,17 @@ export function countByStatus(plans: readonly PlanSummaryItem[]): Record<PlanSta
   return counts
 }
 
-/** 반려견별 개수. 상태 필터를 적용한 뒤 값이다 — 두 축이 서로를 기준으로 센다 */
+/**
+ * 반려견별 개수. 상태 필터를 적용한 뒤 값이다 — 두 축이 서로를 기준으로 센다.
+ *
+ * **동행 일정은 아이마다 한 번씩 센다** (#152). 그래서 합이 `plans.length` 를 넘을 수
+ * 있는데, 그게 맞다 — `filterPlans` 가 "한 마리라도 동행이면 히트" 이므로 대표만 세면
+ * "초코 0건" 이라고 적어 놓고 골랐을 때 일정이 나오는 모순이 생긴다.
+ */
 export function countByPet(plans: readonly PlanSummaryItem[]): Map<string, number> {
   const counts = new Map<string, number>()
-  for (const plan of plans) counts.set(plan.petId, (counts.get(plan.petId) ?? 0) + 1)
+  for (const plan of plans) {
+    for (const petId of planPetIds(plan)) counts.set(petId, (counts.get(petId) ?? 0) + 1)
+  }
   return counts
 }
