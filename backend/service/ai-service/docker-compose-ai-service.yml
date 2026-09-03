@@ -50,6 +50,19 @@ x-ai-service-environment: &ai_service_environment
   AI_PLAN_JOB_TTL_SECONDS: ${AI_PLAN_JOB_TTL_SECONDS:-86400}
   AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS: ${AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS:-30}
   AI_PLAN_JOB_RUNNING_TIMEOUT_SECONDS: ${AI_PLAN_JOB_RUNNING_TIMEOUT_SECONDS:-300}
+  # LLM (Spring AI / Ollama). 기본값은 yml 과 같은 enabled=false 라 넘기지 않으면 Vault 에
+  # AI_LLM_ENABLED=true 를 넣어도 컨테이너는 Stub 으로 뜬다. 그래서 전부 전달한다.
+  # 공유 인프라의 Ollama 는 다른 호스트(ollama-01)라 컨테이너명이 아니라 사설 IP 로 접속한다.
+  AI_LLM_ENABLED: ${AI_LLM_ENABLED:-false}
+  AI_LLM_PROVIDER: ${AI_LLM_PROVIDER:-OLLAMA}
+  AI_LLM_BASE_URL: ${AI_LLM_BASE_URL:-http://localhost:11434}
+  AI_LLM_API_KEY: ${AI_LLM_API_KEY:-}
+  AI_LLM_MODEL: ${AI_LLM_MODEL:-qwen2.5:7b-instruct}
+  AI_LLM_TIMEOUT_MS: ${AI_LLM_TIMEOUT_MS:-120000}
+  AI_LLM_MAX_TOKENS: ${AI_LLM_MAX_TOKENS:-4000}
+  AI_LLM_TEMPERATURE: ${AI_LLM_TEMPERATURE:-0.2}
+  AI_LLM_REASONING_EFFORT: ${AI_LLM_REASONING_EFFORT:-low}
+  AI_LLM_PLACE_CANDIDATE_SIZE: ${AI_LLM_PLACE_CANDIDATE_SIZE:-50}
 
 x-logging: &default-logging
   driver: "json-file"
