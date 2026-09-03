@@ -8,17 +8,6 @@ import type { PlanFilters, PlanStatusFilter, PlanSummaryItem } from '@/types/pla
  * 좁히기는 전부 여기서 한다 (공통명세 S3).
  */
 
-/**
- * 한 일정의 동행 반려견 (#152).
- *
- * **`petIds` 가 없으면 `[petId]` 로 접는다.** 서버가 `plan_pet` 행 없는 옛 일정을
- * `Plan.resolvePetIds()` 로 읽는 규칙과 같고, [#152](../../types/plan.ts) 가 `develop` 에
- * 들어가기 전에는 응답에 이 필드가 아예 없다 — 둘 다 같은 폴백으로 덮인다.
- */
-export function planPetIds(plan: PlanSummaryItem): readonly string[] {
-  return plan.petIds ?? [plan.petId]
-}
-
 export function filterPlans(
   plans: readonly PlanSummaryItem[],
   filters: PlanFilters,
@@ -31,8 +20,7 @@ export function filterPlans(
         일정이 둘째 반려견으로 거를 때 사라진다 — 백엔드도 `GET /plans?petId=` 를
         대표 컬럼과 조인 테이블을 **둘 다** 보도록 바꿨다 (설계 판단 3).
       */
-      (filters.petIds.length === 0 ||
-        planPetIds(plan).some((petId) => filters.petIds.includes(petId))),
+      (filters.petIds.length === 0 || plan.petIds.some((petId) => filters.petIds.includes(petId))),
   )
 }
 
@@ -107,7 +95,7 @@ export function countByStatus(plans: readonly PlanSummaryItem[]): Record<PlanSta
 export function countByPet(plans: readonly PlanSummaryItem[]): Map<string, number> {
   const counts = new Map<string, number>()
   for (const plan of plans) {
-    for (const petId of planPetIds(plan)) counts.set(petId, (counts.get(petId) ?? 0) + 1)
+    for (const petId of plan.petIds) counts.set(petId, (counts.get(petId) ?? 0) + 1)
   }
   return counts
 }

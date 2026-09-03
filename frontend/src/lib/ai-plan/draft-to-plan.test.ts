@@ -24,7 +24,6 @@ function payload(
   return draftToPlanPayload({
     draft: draft(days),
     snapshot,
-    basisPetId: '123456789012000001',
     title: '몽실이와 제주 2박 3일',
     ...extra,
   })
@@ -34,7 +33,7 @@ describe('draftToPlanPayload — 일정 본문은 입력 조건에서 온다', (
   it('초안에 없는 조건(기간·예산·areaCode)을 스냅샷에서 채운다', () => {
     const result = payload([{ day: 1, items: [item()] }])
 
-    expect(result.petId).toBe('123456789012000001')
+    expect(result.petIds).toEqual(['123456789012000001'])
     expect(result.areaCode).toBe('39')
     expect(result.startDate).toBe('2026-09-12')
     expect(result.endDate).toBe('2026-09-14')
@@ -46,7 +45,6 @@ describe('draftToPlanPayload — 일정 본문은 입력 조건에서 온다', (
     const result = draftToPlanPayload({
       draft: draft([{ day: 1, items: [item()] }]),
       snapshot: { ...snapshot, budget: null },
-      basisPetId: '123456789012000001',
       title: '제주 2박 3일',
     })
 
@@ -273,27 +271,34 @@ describe('draftToPlanPayload — 판정 기준 반려견 (#128 · 명세 D4)', (
     ],
   }
 
-  it('기준으로 고른 반려견이 페이로드에 실린다', () => {
+  /*
+    #152 가 develop 에 들어오기 전에는 담기 직전에 사람이 한 마리를 골랐다. 이제 서버가
+    `petIds` 를 받으므로 동반한 아이를 전부 싣고, **순서를 지킨다** — 서버가 첫 번째를
+    대표 반려견으로 삼는다 (`PlanCommandProcessor.createPlan`).
+  */
+  it('동반한 아이를 전부 싣고 순서를 지킨다', () => {
     const result = draftToPlanPayload({
       draft: draft([{ day: 1, items: [item()] }]),
       snapshot: twoPets,
-      basisPetId: '222',
       title: '제주 2박 3일',
       totalDays: 3,
     })
 
-    expect(result.petId).toBe('222')
+    expect(result.petIds).toEqual(['111', '222'])
   })
 
-  it('스냅샷의 다른 아이가 실리지 않는다 — 첫 번째를 기본으로 삼지 않는다', () => {
+  /*
+    서버 `effectivePetIds()` 가 petIds 를 이기게 두므로 petId 는 무시될 값이다. 두 필드를
+    함께 실으면 어느 쪽이 진짜인지 호출부마다 다시 묻게 된다.
+  */
+  it('무시될 petId 를 함께 보내지 않는다', () => {
     const result = draftToPlanPayload({
       draft: draft([{ day: 1, items: [item()] }]),
       snapshot: twoPets,
-      basisPetId: '222',
       title: '제주 2박 3일',
       totalDays: 3,
     })
 
-    expect(result.petId).not.toBe('111')
+    expect('petId' in result).toBe(false)
   })
 })

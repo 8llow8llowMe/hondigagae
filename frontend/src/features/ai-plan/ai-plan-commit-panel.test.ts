@@ -18,9 +18,6 @@ function render(overrides: Partial<AiPlanCommitPanelProps> = {}) {
     delistedBlocked: false,
     hasDelisted: true,
     excludedCount: 0,
-    basisOptions: [{ value: '1', label: '몽실이' }],
-    basisPetId: '1',
-    onBasisPetIdChange: () => undefined,
     onTitleChange: () => undefined,
     onSubmit: () => undefined,
     onExcludeDelisted: () => undefined,
@@ -128,36 +125,13 @@ describe('AiPlanCommitPanel — 뺄 항목을 짚지 못하면 CTA 를 주지 �
   })
 })
 
-describe('판정 기준 선택 — 두 마리 이상일 때만 (#128)', () => {
-  const TWO = [
-    { value: '1', label: '몽실이' },
-    { value: '2', label: '초코' },
-  ]
-
-  it('한 마리면 렌더하지 않는다 — 지금 화면과 같다', () => {
-    const html = render()
-
-    expect(html).not.toContain(messages.aiPlan.commitBasisLabel)
-    expect(html).not.toContain('type="radio"')
-  })
-
-  it('두 마리 이상이면 라디오로 고른다', () => {
-    const html = render({ basisOptions: TWO, basisPetId: '1' })
-
-    expect(html).toContain(messages.aiPlan.commitBasisLabel)
-    expect(html.split('type="radio"').length - 1).toBe(2)
-  })
-
-  it('무엇이 걸린 선택인지 말한다', () => {
-    expect(render({ basisOptions: TWO, basisPetId: '1' })).toContain(
-      messages.aiPlan.commitBasisHint,
-    )
-  })
-
-  it('고른 아이가 선택된 채로 렌더된다', () => {
-    const html = render({ basisOptions: TWO, basisPetId: '2' })
-
-    expect(html.split('checked=""').length - 1).toBe(1)
-    expect(html).toContain('초코')
+/*
+  **판정 기준 선택 라디오 테스트가 여기 있었다** (#128 · 명세 D4). #152 가 `petIds` 를
+  받으면서 컨트롤을 걷었고(#174), 담기가 동반한 아이를 전부 싣는지는
+  `draft-to-plan.test.ts` 가 검증한다 — 이 패널은 더 이상 반려견을 다루지 않는다.
+*/
+describe('담기 패널 — 반려견 선택이 없다 (#174)', () => {
+  it('반려견 라디오를 렌더하지 않는다', () => {
+    expect(render()).not.toContain('type="radio"')
   })
 })

@@ -35,12 +35,6 @@ function isPlanItemType(value: string): value is PlanItemTypeCode {
 export type DraftToPlanOptions = {
   draft: AiPlanDraft
   snapshot: AiPlanRequestSnapshot
-  /**
-   * 이 일정의 판정 기준이 될 반려견. **스냅샷에서 꺼내지 않고 받는다** —
-   * `PlanCreateRequest.petId` 가 단일이라 여러 마리 중 하나를 사람이 고르고
-   * (다견선택-세부명세 D4), 그 선택이 여기까지 그대로 와야 한다.
-   */
-  basisPetId: string
   title: string
   /**
    * 여행 총 일수. **기간 밖 일차를 걸러내는 데 쓴다** — 모르면(`null`) 거르지 않는다.
@@ -79,13 +73,20 @@ export type DraftToPlanOptions = {
 export function draftToPlanPayload({
   draft,
   snapshot,
-  basisPetId,
   title,
   totalDays,
   excludedPlaceIds,
 }: DraftToPlanOptions): PlanCreatePayload {
   return {
-    petId: basisPetId,
+    /*
+      **동반한 아이를 전부 싣는다** (#152 · #174). 예전에는 `PlanCreateRequest.petId` 가
+      단일이라 담기 직전에 사람이 한 마리를 골랐지만, 이제 서버가 `petIds` 를 받고
+      **첫 번째를 대표로 삼는다** — 생성에서 고른 순서가 그대로 저장된다.
+
+      `petId` 를 함께 보내지 않는다. 서버 `effectivePetIds()` 가 `petIds` 를 이기게 두므로
+      무시될 값이고, 두 필드를 실으면 어느 쪽이 진짜인지 호출부마다 다시 묻게 된다.
+    */
+    petIds: snapshot.pets.map((pet) => pet.petId),
     areaCode: snapshot.areaCode,
     title,
     startDate: snapshot.startDate,

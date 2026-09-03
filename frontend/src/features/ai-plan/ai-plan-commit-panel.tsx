@@ -2,7 +2,6 @@ import { Button, ButtonLink } from '@/components/button'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
 import { Input } from '@/components/input'
-import { RadioGroup } from '@/components/radio-group'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 
@@ -19,16 +18,6 @@ export type AiPlanCommitPanelProps = {
   hasDelisted: boolean
   /** 빼기로 표시한 항목 수. 0 이면 안내를 내지 않는다 */
   excludedCount: number
-  /**
-   * 판정 기준 후보. **두 마리 이상일 때만 컨트롤이 나타난다** (#128 · 명세 D4).
-   *
-   * `PlanCreateRequest.petId` 가 단일이라 여러 마리로 만든 초안도 저장은 한 마리에
-   * 붙는다. 자동으로 고르지 않는 이유는 명세 D0 — 프롬프트의 "가장 제약이 큰 아이" 는
-   * 입장 제한 축이고 날씨 판정은 민감도 축이라 서로 다르다.
-   */
-  basisOptions: readonly { value: string; label: string }[]
-  basisPetId: string
-  onBasisPetIdChange: (petId: string) => void
   onTitleChange: (title: string) => void
   onSubmit: () => void
   onExcludeDelisted: () => void
@@ -54,9 +43,6 @@ export function AiPlanCommitPanel({
   delistedBlocked,
   hasDelisted,
   excludedCount,
-  basisOptions,
-  basisPetId,
-  onBasisPetIdChange,
   onTitleChange,
   onSubmit,
   onExcludeDelisted,
@@ -136,21 +122,11 @@ export function AiPlanCommitPanel({
       </Field>
 
       {/*
-        **한 마리면 렌더하지 않는다.** 선택지가 하나인 컨트롤은 고를 것이 없고,
-        기존 화면과 같아야 대다수 회원의 흐름이 늘어나지 않는다.
+        **판정 기준 반려견 라디오가 여기 있었다** (#128 · 명세 D4). `PlanCreateRequest.petId`
+        가 단일이던 시절, 여러 마리로 만든 초안이 저장되는 순간 한 마리가 되는 것을 사람이
+        알고 고르게 하려던 컨트롤이다. #152 가 `petIds` 를 받으면서 걷었다 (#174) —
+        이제 동반한 아이가 전부 저장되고 조건 입력에서 체크한 순서가 그대로 간다.
       */}
-      {basisOptions.length >= 2 && (
-        <div className="flex flex-col gap-1">
-          <RadioGroup
-            id="basisPetId"
-            label={messages.aiPlan.commitBasisLabel}
-            options={basisOptions}
-            value={basisPetId}
-            onValueChange={onBasisPetIdChange}
-          />
-          <p className="text-caption text-fg-muted">{messages.aiPlan.commitBasisHint}</p>
-        </div>
-      )}
 
       <div className="flex flex-col gap-2">
         <Button type="submit" size="lg" loading={submitting}>

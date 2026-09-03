@@ -18,9 +18,10 @@ const STATUS_NAMES: Record<PlanStatusCode, string> = {
 
 function plan(overrides: Partial<PlanSummaryItem> = {}): PlanSummaryItem {
   const code = (overrides.status?.code ?? 'DRAFT') as PlanStatusCode
-  const merged: PlanSummaryItem = {
+  const merged = {
     planId: '1234567890123456789',
     petId: '9876543210987654321',
+    petIds: ['9876543210987654321'],
     areaCode: '39',
     title: '몽실이와 제주 2박 3일',
     startDate: '2026-09-12',
@@ -34,7 +35,7 @@ function plan(overrides: Partial<PlanSummaryItem> = {}): PlanSummaryItem {
     `plan({ petId: 'p1' })` 이 대표만 바뀌고 동행은 옛 아이디로 남아, 반려견 축 테스트가
     조용히 엉뚱한 것을 검증한다.
   */
-  return { ...merged, petIds: overrides.petIds ?? [merged.petId] }
+  return { ...merged, petIds: overrides.petIds ?? [merged.petId] } satisfies PlanSummaryItem
 }
 
 /** 아트보드가 쓴 날짜다. 2026-08-27 기준으로 D-16 이 나온다 */
@@ -167,14 +168,6 @@ describe('좁히기', () => {
     const together = plan({ planId: 'c', petId: 'p1', petIds: ['p1', 'p3'] })
 
     expect(filterPlans([together], { status: 'ALL', petIds: ['p3'] })).toEqual([together])
-  })
-
-  it('petIds 가 없는 응답은 대표 한 마리로 읽는다 — #152 머지 전 서버', () => {
-    // `exactOptionalPropertyTypes` 라 `petIds: undefined` 는 타입이 거부한다 — 키를 지운다
-    const legacy = plan({ planId: 'd', petId: 'p4' })
-    delete legacy.petIds
-
-    expect(filterPlans([legacy], { status: 'ALL', petIds: ['p4'] })).toEqual([legacy])
   })
 })
 
