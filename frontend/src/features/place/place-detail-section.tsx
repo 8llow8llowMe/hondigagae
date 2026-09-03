@@ -19,6 +19,10 @@ import {
   PlaceSuitabilityPanel,
   type PlaceSuitabilityPanelProps,
 } from '@/features/place/place-suitability-panel'
+import {
+  PlaceWalkSafetyPanel,
+  type PlaceWalkSafetyPanelProps,
+} from '@/features/place/place-walk-safety-panel'
 import { classify } from '@/lib/api/error'
 import { toMessage } from '@/lib/api/response'
 import { suitabilityTone } from '@/lib/insight/tone'
@@ -41,6 +45,13 @@ export type PlaceDetailSectionProps = {
   onRetry: () => void
   /** 적합도 패널이 쓰는 것 전부. **장소 조회와 판정 조회는 따로 실패한다** */
   suitability: PlaceSuitabilityPanelProps
+  /**
+   * 산책 위험도 패널이 쓰는 것 전부 (#197).
+   *
+   * **적합도와 별개 prop 이다.** 엔드포인트가 다르고 한쪽만 실패할 수 있어, 하나로 묶으면
+   * 적합도가 죽을 때 노면 온도까지 함께 사라진다.
+   */
+  walkSafety: PlaceWalkSafetyPanelProps
   /** 선택된 반려견 — 동반 정보에 대입한다 */
   petName: string | null
   petSizeCode: string | null
@@ -86,6 +97,7 @@ export function PlaceDetailSection({
   errorMessage,
   onRetry,
   suitability,
+  walkSafety,
   petName,
   petSizeCode,
   petSizeName,
@@ -227,6 +239,17 @@ export function PlaceDetailSection({
           {/* 데스크톱에서는 열 자체가 경계라 밴드를 겹쳐 쌓지 않는다 */}
           <Band className="lg:hidden" />
           <PlaceSuitabilityPanel {...suitability} />
+
+          {/*
+            산책 위험도 (#197). **적합도 바로 아래, 하단 바 위**에 둔다 — 둘 다 판정이라
+            한 묶음으로 읽혀야 하고, 하단 바(담기·저장)가 사이에 끼면 판정이 두 군데로
+            갈린다. 아트보드 03 의 `판정 → 하단 바 → 기본 정보` 순서는 그대로다.
+
+            **1px 선으로만 나눈다.** 밴드로 끊으면 두 판정이 서로 다른 블록이 되고,
+            "오늘은 적합 / 지금은 위험" 이 같은 장소의 두 축이라는 것이 사라진다.
+          */}
+          <div className="border-border border-t" />
+          <PlaceWalkSafetyPanel {...walkSafety} />
 
           {/* 데스크톱 하단 바 — 판정 바로 아래, 기본 정보 위 (아트보드 03) */}
           <PlaceDetailActionBar {...actions} className="hidden lg:block" />

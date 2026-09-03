@@ -9,8 +9,12 @@ import {
   type PlaceDetailSectionProps,
 } from '@/features/place/place-detail-section'
 import type { PlaceSuitabilityPanelProps } from '@/features/place/place-suitability-panel'
+import type { PlaceWalkSafetyPanelProps } from '@/features/place/place-walk-safety-panel'
 import { messages } from '@/lib/messages'
-import { suitability as suitabilityFixture } from '@/test/fixtures/insight'
+import {
+  suitability as suitabilityFixture,
+  walkSafety as walkSafetyFixture,
+} from '@/test/fixtures/insight'
 import {
   placeDetail,
   placeDetailDelisted,
@@ -26,6 +30,15 @@ const suitability: PlaceSuitabilityPanelProps = {
   onRetry: () => undefined,
   petName: '몽실이',
   authed: true,
+}
+
+/** 산책 위험도도 도착한 상태. 분기 자체는 `place-walk-safety-panel.test.ts` 가 본다 */
+const walkSafety: PlaceWalkSafetyPanelProps = {
+  data: walkSafetyFixture,
+  loading: false,
+  failed: false,
+  onRetry: () => undefined,
+  petName: '몽실이',
 }
 
 /** 하단 바의 기본 상태 — 로그인 · 미저장 · 아직 담지 않음 */
@@ -48,6 +61,7 @@ function render(overrides: Partial<PlaceDetailSectionProps> = {}) {
     errorStatus: null,
     onRetry: () => undefined,
     suitability,
+    walkSafety,
     petName: '몽실이',
     petSizeCode: 'SMALL',
     petSizeName: '소형견',

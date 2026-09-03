@@ -9,6 +9,7 @@ import { PlaceDetailSection } from '@/features/place/place-detail-section'
 import { PlaceLoginPromptSheet } from '@/features/place/place-login-prompt-sheet'
 import { usePlaceDetail } from '@/features/place/use-place-detail'
 import { usePlaceSuitability } from '@/features/place/use-place-suitability'
+import { usePlaceWalkSafety } from '@/features/place/use-place-walk-safety'
 import { PlaceAddToPlanSheet } from '@/features/plan/place-add-to-plan-sheet'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { toPetCondition } from '@/lib/api/insight'
@@ -34,7 +35,15 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
    * 날씨만 게스트 블록이 쓰고 **점수·근거는 쓰지 않는다** — 기준이 되는 반려견이 없다.
    */
   const { pet } = useSelectedPet()
-  const suitability = usePlaceSuitability(placeId, toPetCondition(pet))
+  const condition = toPetCondition(pet)
+  const suitability = usePlaceSuitability(placeId, condition)
+
+  /*
+    산책 위험도 (#197). **적합도와 같은 조건을 쓰되 별도 query 다** — 엔드포인트가 다르고
+    한쪽만 실패할 수 있다. 조건을 한 번만 만들어 둘에 넘기는 이유는 두 key 가 같은
+    `conditionKey` 로 갈려야 반려견 전환이 두 판정에 동시에 반영되기 때문이다.
+  */
+  const walkSafety = usePlaceWalkSafety(placeId, condition)
 
   const favorite = usePlaceFavorite({ placeId, authed })
 
@@ -73,6 +82,18 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
           onRetry: () => void suitability.refetch(),
           petName: pet?.name ?? null,
           authed,
+        }}
+        /*
+          산책 위험도는 **게스트에게도 그린다** — 적합도가 `GuestBlock` 으로 갈리는 것과
+          다르다. 노면 온도·열지수는 장소와 시각의 속성이라 반려견이 없어도 값이 참이고,
+          홈의 `WalkVerdict` 도 같게 군다 (`place-walk-safety-panel.tsx`).
+        */
+        walkSafety={{
+          data: walkSafety.data ?? null,
+          loading: walkSafety.isPending,
+          failed: walkSafety.isError,
+          onRetry: () => void walkSafety.refetch(),
+          petName: pet?.name ?? null,
         }}
         petName={pet?.name ?? null}
         petSizeCode={pet?.sizeType.code ?? null}
