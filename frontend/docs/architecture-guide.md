@@ -242,6 +242,30 @@ GET /places?... → 404                           →  EmptyState
 
 - **AI 일정 생성 대기는 `loading.tsx` 가 아니다.** 폴링 중 상태이므로 화면 안에서 진행 표시를 렌더한다 (`api-integration-guide.md` §5).
 
+### `generateMetadata` 의 실패 문구는 본문과 같은 판정을 쓴다 ([#206](https://github.com/8llow8llowMe/hondigagae/issues/206))
+
+`generateMetadata` 는 본문과 **다른 try/catch** 를 갖는다. 그래서 catch 를 뭉개면 같은 요청의
+`<title>` 과 `h1` 이 서로 다른 말을 한다 — dev `/places/abc` 에서 관측했다:
+
+```text
+h1     요청 조건이 올바르지 않아요      (본문이 400 을 구분했다)
+title  장소를 찾을 수 없어요            (catch 가 404 문구로 뭉갰다)
+```
+
+`@PathVariable long` 이라 숫자가 아닌 id 는 404 가 아니라 **400** 이다.
+
+**규칙**
+
+- **`catch {}` 로 버리지 않고 `catch (error)` 로 받아 `classify()` 를 태운다.** 본문이 종류를
+  구분한다면 제목도 구분해야 한다.
+- **5xx·무응답에는 아무것도 단정하지 않는다.** 일시 장애라 클라이언트 재조회가 성공할 수
+  있고, 그러면 실제 리소스가 그려진 화면의 탭에 "찾을 수 없어요" 가 남는다. 본문의 5xx
+  문구도 쓰지 않는다 — 그쪽은 그 순간 실패한 영역을 가리키지만 **탭 제목은 페이지가 살아난
+  뒤에도 남는다.** 판정하지 않는 목록 제목으로 떨어뜨린다.
+- **판정을 순수 함수로 뽑는다.** async server component 는 `renderToStaticMarkup` 으로
+  렌더되지 않아 라우트 안에 두면 테스트할 수 없다 (`testing-guide.md` §1).
+  선례: `src/lib/place/detail-title.ts`.
+
 ## 8. 데이터 페칭 계층
 
 ```text

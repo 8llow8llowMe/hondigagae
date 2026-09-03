@@ -87,3 +87,34 @@ describe('RegionalWeatherSection — 상태', () => {
     expect(render(GOOD_DAY)).not.toContain('경보')
   })
 })
+
+/*
+  **#206.** 표가 온도를 숫자만 그려서 `27.0℃` 가 최고기온인지 최저인지 알 수 없었다.
+  바로 위 추천 문장은 서버가 준 완성형이라 "최고기온 26도, 강수확률 20% 로 …" 라고
+  정확히 말하는데, 같은 카드 안에서 표에만 라벨이 없었다.
+
+  dev 는 `minTemperature === maxTemperature` 인 날이 많아 드러나지 않았다 —
+  값이 갈리는 순간 사용자가 무슨 온도인지 알 수 없다 (DESIGN.md §2-3).
+*/
+describe('RegionalWeatherSection — 온도 라벨 (#206)', () => {
+  it('온도가 최고기온임을 밝힌다', () => {
+    const markup = render(GOOD_DAY)
+    const max = GOOD_DAY.regions.find((r) => r.maxTemperature !== null)?.maxTemperature as number
+
+    expect(markup).toContain(`${messages.home.regionTempPrefix} ${max.toFixed(1)}℃`)
+  })
+
+  /* 예보를 못 받은 권역에는 라벨만 남지 않아야 한다 — 값이 없으면 자리 자체가 없다 */
+  it('온도가 없는 권역에 라벨만 남기지 않는다', () => {
+    const markup = render({
+      ...GOOD_DAY,
+      regions: GOOD_DAY.regions.map((region) => ({
+        ...region,
+        minTemperature: null,
+        maxTemperature: null,
+      })),
+    })
+
+    expect(markup).not.toContain(messages.home.regionTempPrefix)
+  })
+})
