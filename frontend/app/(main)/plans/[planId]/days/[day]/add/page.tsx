@@ -92,7 +92,7 @@ export default async function PlanAddPlacePage({
     <main id="main-content" className="rail-layout rail-layout-filter">
       {/* 목록 화면과 같은 2단이다. 태블릿은 한 컬럼 — 280 레일을 더하면 768 을 넘는다 */}
       <div className="rail-sticky hidden lg:block">
-        <PlaceFilterRail filters={filters} />
+        <PlaceFilterRail filters={filters} authed />
       </div>
 
       <div className="lg:border-border lg:border-l">

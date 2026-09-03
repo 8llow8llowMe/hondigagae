@@ -14,7 +14,8 @@ import { usePetList } from '@/features/pet/use-pet-list'
  * nav 가 에러 화면이 되면 어디로도 갈 수 없다. 그 실패는 홈의 판정 섹션이 대신 알린다.
  */
 export function PetSwitcherSlot() {
-  const { data, isPending, isError } = usePetList()
+  const { data, isPending, isError } = usePetList(true)
+  // `GlobalHeader` 가 `{authed && <PetSwitcherSlot />}` 로 이미 막는다 (#200)
 
   if (isPending) return <Skeleton className="h-11 w-24 rounded-md" />
 

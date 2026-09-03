@@ -9,6 +9,7 @@ import { PlaceMapView } from '@/features/place/place-map-view'
 import { placeKeys } from '@/features/place/queries'
 import { placeListPath, type PlaceSlice } from '@/lib/api/place'
 import { serverFetch } from '@/lib/api/server'
+import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import { parsePlaceFilters, toPlaceFilterQuery } from '@/lib/url/place-filters'
@@ -24,6 +25,13 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>
 export default async function PlacesPage({ searchParams }: { searchParams: SearchParams }) {
   const resolved = await searchParams
   const filters = parsePlaceFilters(resolved)
+  /*
+    **공개 화면인데 로그인 여부가 필요하다** (#200). 필터의 반려견 크기 축이 내 반려견을
+    기준으로 걸러서, 필터 컴포넌트가 보호 리소스(`GET /members/me/pets`)를 조회한다.
+    미로그인에는 그 요청을 내지 않아야 하므로 여기서 판정해 내려보낸다 —
+    `(main)/layout.tsx` 가 프리페치를 `session !== null` 로 막는 것과 같은 규칙이다.
+  */
+  const authed = (await readSession()) !== null
   const view = parseViewMode(resolved)
   const filterQuery = toPlaceFilterQuery(filters)
   const listHref = viewModeHref('/places', filterQuery, 'list')
@@ -77,7 +85,7 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
       {/* `rail-sticky`(globals.css) — 레일이 뷰포트보다 길어도 바닥에 닿을 수 있게
           자기 스크롤을 준다. 실측: 1280×900 에서 레일 1067px 이라 실내·야외 축이 잘렸다 */}
       <div className="rail-sticky hidden lg:block">
-        <PlaceFilterRail filters={filters} />
+        <PlaceFilterRail filters={filters} authed={authed} />
       </div>
 
       <div className="lg:border-border lg:border-l">
@@ -98,7 +106,7 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
         </header>
 
         <div className="lg:hidden">
-          <PlaceFilterChips filters={filters} />
+          <PlaceFilterChips filters={filters} authed={authed} />
         </div>
 
         <HydrationBoundary state={dehydrate(queryClient)}>

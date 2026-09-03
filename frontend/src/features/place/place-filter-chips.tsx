@@ -35,9 +35,16 @@ type OpenSheet = 'contentType' | 'region' | 'more'
  * 고르는 자리라 한 칸 누를 때마다 결과가 뒤에서 바뀌면 무엇을 고르는 중인지 알 수 없다.
  * 취소하면 원래 값으로 돌아간다.
  */
-export function PlaceFilterChips({ filters }: { filters: PlaceFilters }) {
+export function PlaceFilterChips({
+  filters,
+  /** 미로그인이면 반려견 목록을 조회하지 않는다 — 크기 축 컨트롤이 빠진다 (#200) */
+  authed,
+}: {
+  filters: PlaceFilters
+  authed: boolean
+}) {
   const { apply, reset } = usePlaceFilterNav()
-  const { pet } = useSelectedPet()
+  const { pet } = useSelectedPet(authed)
 
   const [open, setOpen] = useState<OpenSheet | null>(null)
   // 시트 초안. 열 때 현재 값을 복사하고 적용 전까지 URL 을 건드리지 않는다

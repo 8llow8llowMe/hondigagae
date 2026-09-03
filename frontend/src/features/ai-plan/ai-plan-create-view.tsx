@@ -36,7 +36,8 @@ export function AiPlanCreateView({
   fromJobId: string | null
   today: string
 }) {
-  const petsQuery = usePetList()
+  const petsQuery = usePetList(true)
+  // `/ai-plans` 는 proxy.ts `PROTECTED_PATHS` 라 미로그인이 여기 닿지 않는다 (#200)
 
   if (petsQuery.isPending) {
     return (

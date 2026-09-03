@@ -69,8 +69,13 @@ export function HomeView({
     setRecentPlaceId(readRecentPlaceId())
   }, [restore])
 
-  const petList = usePetList()
-  const pets = authed ? (petList.data?.pets ?? []) : []
+  const petList = usePetList(authed)
+  /*
+    **`authed ?` 삼항을 걷었다** (#200). 예전에는 조회를 막지 못해 게스트도 응답(403)을
+    받았고 그 결과를 여기서 버렸다. 이제 `usePetList` 가 미로그인에 조회하지 않으므로
+    `data` 가 `undefined` 이고, 삼항은 같은 답을 두 번 말하는 줄이 된다.
+  */
+  const pets = petList.data?.pets ?? []
   const selectedPet = resolveSelectedPet(pets, storedPetId ?? null)
   const condition = toPetCondition(selectedPet)
 

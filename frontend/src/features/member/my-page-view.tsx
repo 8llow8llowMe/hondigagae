@@ -21,7 +21,8 @@ import { messages } from '@/lib/messages'
  */
 export function MyPageView() {
   const query = useMyInfo()
-  const petsQuery = usePetList()
+  const petsQuery = usePetList(true)
+  // `/mypage` 는 proxy.ts `PROTECTED_PATHS` 라 미로그인이 여기 닿지 않는다 (#200)
   const favoritesQuery = useFavoriteList()
   const exitSession = useSessionExit()
 

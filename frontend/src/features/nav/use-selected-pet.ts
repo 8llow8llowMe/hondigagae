@@ -15,8 +15,13 @@ import type { Pet } from '@/types/pet'
  *
  * **조회 실패는 `null` 이다.** 반려견을 기준으로 하는 기능(장소 필터의 크기 제한 등)은
  * 그때 컨트롤 자체를 감춘다 — 헤더 스위처가 실패했을 때 숨기는 것과 같은 판단이다.
+ *
+ * **`authed` 를 그대로 흘린다** (#200). 미로그인이면 목록을 조회하지 않으므로 `pet` 은
+ * `null` 이고, 위의 "조회 실패는 null" 과 같은 경로로 처리된다 — 호출부가 게스트를 위한
+ * 분기를 새로 만들 필요가 없다. 이 훅을 쓰는 세 화면(`/places` 목록·칩·장소 상세)이
+ * **전부 공개 페이지**라 게스트 요청이 실제로 나가고 있었다.
  */
-export function useSelectedPet(): { pet: Pet | null; loading: boolean } {
+export function useSelectedPet(authed: boolean): { pet: Pet | null; loading: boolean } {
   const storedPetId = useSelectedPetStore((state) => state.selectedPetId)
   const restore = useSelectedPetStore((state) => state.restore)
 
@@ -25,7 +30,7 @@ export function useSelectedPet(): { pet: Pet | null; loading: boolean } {
     restore()
   }, [restore])
 
-  const { data, isPending } = usePetList()
+  const { data, isPending } = usePetList(authed)
   const pets = data?.pets ?? []
 
   return { pet: resolveSelectedPet(pets, storedPetId ?? null), loading: isPending }
