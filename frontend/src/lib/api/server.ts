@@ -23,7 +23,7 @@ export type ServerRequestOptions = {
 }
 
 export function gatewayUrl(path: string): string {
-  return `${serverEnv.BACKEND_BASE_URL}${API_PREFIX}${path}`
+  return `${serverEnv.BACKEND_API_URL}${API_PREFIX}${path}`
 }
 
 export async function serverFetch<T>(path: string, options: ServerRequestOptions = {}): Promise<T> {

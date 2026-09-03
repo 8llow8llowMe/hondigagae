@@ -260,8 +260,8 @@ import 'server-only'
 import { z } from 'zod'
 
 const schema = z.object({
-  BACKEND_BASE_URL: z.string().url(),
-  SESSION_SECRET: z.string().min(32, 'SESSION_SECRET 은 32자 이상이어야 한다'),
+  BACKEND_API_URL: z.string().url(),
+  AUTH_SESSION_SECRET: z.string().min(32, 'AUTH_SESSION_SECRET 은 32자 이상이어야 한다'),
 })
 
 export const serverEnv = schema.parse(process.env)
@@ -271,22 +271,22 @@ export const serverEnv = schema.parse(process.env)
 // src/lib/env.client.ts
 import { z } from 'zod'
 
-const schema = z.object({ NEXT_PUBLIC_KAKAO_MAP_KEY: z.string().min(1) })
+const schema = z.object({ NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY: z.string().min(1) })
 
 // Next는 리터럴 참조만 인라인한다. process.env 를 통째로 넘기면 값이 비어 온다
 export const clientEnv = schema.parse({
-  NEXT_PUBLIC_KAKAO_MAP_KEY: process.env.NEXT_PUBLIC_KAKAO_MAP_KEY,
+  NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY: process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY,
 })
 ```
 
 ```bash
 # .env.example  (커밋한다. .env.local 은 커밋하지 않는다)
-BACKEND_BASE_URL=http://localhost:8000
-SESSION_SECRET=change-me-to-a-random-string-at-least-32-chars
-NEXT_PUBLIC_KAKAO_MAP_KEY=
+BACKEND_API_URL=http://localhost:8000
+AUTH_SESSION_SECRET=change-me-to-a-random-string-at-least-32-chars
+NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY=
 ```
 
-- **`NEXT_PUBLIC_` 은 클라이언트 번들에 박힌다.** `BACKEND_BASE_URL`, `SESSION_SECRET` 에 절대 붙이지 않는다.
+- **`NEXT_PUBLIC_` 은 클라이언트 번들에 박힌다.** `BACKEND_API_URL`, `AUTH_SESSION_SECRET` 에 절대 붙이지 않는다.
 - `env.server.ts` 는 `import 'server-only'` 로 잠근다.
 
 ## 8. next.config — 외부 이미지 (필수)

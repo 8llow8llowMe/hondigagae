@@ -79,16 +79,16 @@ docker compose -f docker-compose-local.yml up -d       # MySQL / Redis / MinIO
 
 ```bash
 # 백엔드 게이트웨이 (BFF가 서버에서만 사용 — NEXT_PUBLIC_ 아님)
-BACKEND_BASE_URL=http://localhost:8000
+BACKEND_API_URL=http://localhost:8000
 
 # 서버 세션 암호화 키
-SESSION_SECRET=<32자 이상 임의 문자열>
+AUTH_SESSION_SECRET=<32자 이상 임의 문자열>
 
 # 카카오 지도 JavaScript 앱 키 (클라이언트 노출)
-NEXT_PUBLIC_KAKAO_MAP_KEY=<JS 앱 키>
+NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY=<JS 앱 키>
 ```
 
-**`NEXT_PUBLIC_` 접두사는 클라이언트 번들에 박힌다.** `BACKEND_BASE_URL`, `SESSION_SECRET` 에는 절대 붙이지 않는다.
+**`NEXT_PUBLIC_` 접두사는 클라이언트 번들에 박힌다.** `BACKEND_API_URL`, `AUTH_SESSION_SECRET` 에는 절대 붙이지 않는다.
 
 ### 백엔드 없이 화면 보기 — `MOCK_API=true`
 
@@ -149,7 +149,7 @@ curl -s --max-time 10 http://localhost:8082/v3/api-docs   # tour-service
   BFF 경유라 FE 포트는 게이트웨이 CORS 와 무관하다. 게이트웨이를 직접 부르는 경우에만 `5174` 여야 한다 — 허용된 로컬 출처가 그것뿐이다.
 - **조회는 되는데 등록만 빈 403** — 브라우저가 게이트웨이를 **직접** 부르고 있고, 그 오리진이 CORS 허용 목록에 없다. 브라우저는 POST에 `Origin` 을 붙이고 GET에는 붙이지 않아 "조회만 되는" 형태로 나타난다. BFF를 우회하는 호출부가 있는지 먼저 확인하고, 정말 직접 호출이 필요하면 `ApiGatewayCorsConfig` 에 오리진 추가를 BE에 요청한다.
 - **로그인 직후 401** — refresh 쿠키의 `SameSite`/도메인 문제. BFF 경유가 아니라 게이트웨이를 직접 부르고 있는지 확인한다.
-- **지도가 빈 회색 박스** — ① `NEXT_PUBLIC_KAKAO_MAP_KEY` 누락 ② 카카오 콘솔에 `http://localhost:3000` 미등록 ③ `ssr:false` 누락. 브라우저 콘솔을 먼저 본다.
+- **지도가 빈 회색 박스** — ① `NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY` 누락 ② 카카오 콘솔에 `http://localhost:3000` 미등록 ③ `ssr:false` 누락. 브라우저 콘솔을 먼저 본다.
 - **지도가 바다 한가운데** — `LatLng(위도, 경도)` 순서. `lat` 이 먼저다. `src/lib/geo/coord.ts` 의 `toLatLng()` 을 쓴다 (`external-api-guide.md`).
 - **장소 목록이 항상 비어 있음** — 백엔드는 떴지만 batch로 데이터를 적재하지 않았다.
 - **AI 일정이 항상 같은 결과** — 정상이다. 현재 `StubLlmAdapter` 고정 샘플이다 (`backend/docs/service-inventory.md`).

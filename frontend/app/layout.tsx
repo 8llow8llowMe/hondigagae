@@ -14,11 +14,13 @@ import './globals.css'
  * 배포 도메인. `metadataBase` 가 없으면 Next 가 `og:image` 를 상대 경로로 내보내고
  * 카카오톡·트위터 크롤러는 그것을 못 읽는다.
  *
- * **아직 도메인이 확정되지 않았다.** 확정되면 이 값을 환경변수로 넣는다 —
- * `NEXT_PUBLIC_` 을 붙이지 않는다. 메타데이터는 서버에서만 만들어지므로 브라우저에
- * 인라인할 이유가 없다 (auth-guide.md 의 접두사 규칙).
+ * 값은 `NEXT_PUBLIC_SITE_URL` 로 주입한다. 메타데이터는 서버에서만 만들어지지만 비밀이
+ * 아니고, BossPickSeoul Vault(kv/bosspickseoul/frontend)와 **키 이름을 같게** 두기 위해
+ * `NEXT_PUBLIC_` 접두사를 쓴다. 빌드 시점에 인라인되므로 dev/prod 를 각각 빌드하고,
+ * `process.env` 는 반드시 리터럴로 접근한다 (동적 인덱싱은 치환되지 않는다).
+ *   dev = https://dev.hondigagae.com / prod = https://www.hondigagae.com
  */
-const SITE_URL = process.env.SITE_BASE_URL ?? 'http://localhost:3000'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
 /**
  * 브랜드 에셋 배선 — 아트보드 `혼디가개 브랜드 자산` 5절.
