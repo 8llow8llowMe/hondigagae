@@ -24,6 +24,7 @@ import { WalkVerdict } from '@/features/home/walk-verdict'
 import { useSelectedPetStore } from '@/features/nav/selected-pet-store'
 import { usePetList } from '@/features/pet/use-pet-list'
 import { toPetCondition } from '@/lib/api/insight'
+import { getCurrentPosition, type PositionResult } from '@/lib/geo/current-position'
 import { pickTopPlaces, resolveBasisPlaceId } from '@/lib/insight/reasons'
 import { readRecentPlaceId } from '@/lib/insight/recent-place'
 import { messages } from '@/lib/messages'
@@ -33,19 +34,6 @@ import type { PlanSummaryItem } from '@/types/plan'
 
 /** 홈은 요약 화면이다. 3장이 적당하다 — 공통명세 S5-2 (N=3) */
 const TOP_PLACE_COUNT = 3
-
-/**
- * 골든타임 조회 좌표 — 제주시청 (#158).
- *
- * **현재 위치가 아니다.** FE 에 아직 위치 권한 축이 없어 제주 대표 좌표로 고정하고
- * 화면이 "제주시 기준" 이라고 밝힌다. 홈이 이미 `todayLabel` 에 `· 제주시` 를 쓰고 있어
- * 어긋나지 않는다. 현재 위치·기준 장소 좌표로 넓히는 것은 별도 이슈다 — 권한 거부와
- * 실패 경로가 이 섹션보다 넓은 작업이다.
- *
- * 제주 안에서 좌표가 조금 달라도 예보 격자가 같아 곡선은 거의 바뀌지 않는다.
- */
-const JEJU_CITY_LAT = 33.4996213
-const JEJU_CITY_LNG = 126.5311884
 
 /**
  * 홈 — 아트보드 `01 홈`(모바일 390) / `02 홈`(데스크톱 1440).
@@ -89,10 +77,23 @@ export function HomeView({
   const basisPlaceId = resolveBasisPlaceId(recentPlaceId, null)
   const walkSafety = useWalkSafety(basisPlaceId, condition)
   /*
+    골든타임 좌표 (#180). **`/emergency` 와 같은 `getCurrentPosition()` 을 쓴다** — 거부·
+    타임아웃·미지원을 그 함수가 이미 구분해 처리하고, 어느 경우에도 제주 중심 좌표를
+    돌려준다. 여기서 위치 로직을 새로 짜면 두 화면이 다르게 굴게 된다.
+
+    예전에는 제주시청 좌표를 상수로 박아 뒀는데, **그 값이 `JEJU_QUERY_CENTER` 의 폴백과
+    같은 값이었다** — 같은 뜻의 상수가 둘이면 반드시 갈라진다.
+
     **기준 장소가 없어도 조회한다.** 산책 위험도는 장소가 있어야 성립하지만 골든타임은
     좌표만 있으면 되고, 첫 방문자에게도 "오늘 언제 나가면 좋은지" 는 답할 수 있다.
   */
-  const walkTimes = useWalkTimes(JEJU_CITY_LAT, JEJU_CITY_LNG, condition)
+  const [position, setPosition] = useState<PositionResult | null>(null)
+
+  useEffect(() => {
+    void getCurrentPosition().then(setPosition)
+  }, [])
+
+  const walkTimes = useWalkTimes(position, condition)
   const regionalWeather = useRegionalWeather(condition)
 
   const topPlaces = pickTopPlaces(places, TOP_PLACE_COUNT)
@@ -179,7 +180,11 @@ export function HomeView({
             **조회 실패는 섹션을 숨긴다.** 홈의 최소 골격에 이 섹션은 없고, 여기에
             `ErrorState` 를 하나 더 쌓으면 좌측 열이 오류 두 개로 채워진다.
           */}
-          <WalkTimesSection data={walkTimes.data ?? null} loading={walkTimes.isPending} />
+          <WalkTimesSection
+            data={walkTimes.data ?? null}
+            loading={position === null || walkTimes.isPending}
+            positionFallback={position !== null && position.kind === 'fallback'}
+          />
 
           {/*
             권역 비교. **골든타임 바로 아래다** — 골든타임이 "오늘 언제" 를 답하고 이쪽이

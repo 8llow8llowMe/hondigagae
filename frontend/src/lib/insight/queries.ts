@@ -20,8 +20,11 @@ export const insightKeys = {
   /**
    * 골든타임 (#158). **좌표가 key 에 들어간다** — 장소 축이 아니라 좌표 축이라
    * placeId 로 캐시하면 다른 지점의 곡선을 재사용하게 된다.
+   *
+   * 좌표가 아직 없으면(위치 확인 중) `null` 이다 — 그때는 조회 자체를 하지 않으므로
+   * key 는 자리만 채운다 (#180).
    */
-  walkTimes: (lat: number, lng: number, conditionKey: string) =>
+  walkTimes: (lat: number | null, lng: number | null, conditionKey: string) =>
     [...insightKeys.all, 'walk-times', lat, lng, conditionKey] as const,
   /** 권역 비교 (#158). 좌표 축이 없고 반려견 조건만 판정을 바꾼다 */
   regionalWeather: (conditionKey: string) =>
