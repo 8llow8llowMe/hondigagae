@@ -1,7 +1,9 @@
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
+import type { CodeNameMetadata } from '@/types/api'
 import type {
   CongestionItem,
   PlaceSuitabilityResponse,
+  RegionalWeatherResponse,
   ScoreMetricMetadata,
   WalkSafetyResponse,
   WalkTimesResponse,
@@ -400,5 +402,125 @@ export function mockWalkTimes(heatSensitive: boolean): WalkTimesResponse {
     goldenLevel: WALK_LEVELS.SAFE as ScoreMetricMetadata,
     weatherWarning: null,
     petConditionApplied: true,
+  }
+}
+
+/** 제주 다섯 권역. 문구는 `JejuRegion` 의 `displayName` / `description` 을 그대로 쓴다 */
+const JEJU_REGIONS: CodeNameMetadata[] = [
+  {
+    code: 'NORTH',
+    name: '제주시권',
+    description:
+      '제주공항과 시내를 포함한 북부입니다. 한라산 북쪽이라 겨울 북서풍의 영향을 먼저 받습니다.',
+  },
+  {
+    code: 'SOUTH',
+    name: '서귀포권',
+    description:
+      '서귀포 시내와 중문을 포함한 남부입니다. 한라산이 북풍을 막아 겨울에도 북부보다 따뜻합니다.',
+  },
+  {
+    code: 'EAST',
+    name: '동부권',
+    description: '성산과 우도 방면입니다. 탁 트인 해안이라 바람이 강하게 부는 날이 많습니다.',
+  },
+  {
+    code: 'WEST',
+    name: '서부권',
+    description: '한림과 협재 방면입니다. 해안 산책로가 많아 노면 온도와 바람을 함께 봐야 합니다.',
+  },
+  {
+    code: 'HALLA',
+    name: '한라산권',
+    description: '1100고지 등 산간입니다. 해발이 높아 해안보다 기온이 낮고 날씨가 빨리 바뀝니다.',
+  },
+]
+
+/**
+ * 제주 권역 날씨 비교 (#158).
+ *
+ * **한라산권을 일부러 "예보 없음" 으로 둔다.** 산간은 실제로 격자 결측이 잦고, 점수 없는 권역이
+ * 목록에 남는지(0점으로 접히지 않는지)가 이 화면의 핵심 분기다 — mock 이 그 경우를 못 내면
+ * 화면이 조용히 네 권역만 비교하게 돼도 아무도 모른다.
+ *
+ * `heatSensitive` 로 추천이 있는 날과 **특보 경보로 추천이 없는 날**을 가른다. 경보면 서버가
+ * `recommendedRegion` 을 null 로 주는데, 적합도 0점·산책 위험이라고 말하는 같은 서비스가
+ * 여기서만 "여기 가세요" 라고 하면 안 되기 때문이다.
+ */
+export function mockRegionalWeather(heatSensitive: boolean): RegionalWeatherResponse {
+  const regions = JEJU_REGIONS.map((region, order) => {
+    // 한라산권(마지막)은 예보를 못 받은 권역이다
+    if (region.code === 'HALLA') {
+      return {
+        region,
+        weatherScore: null,
+        skyState: null,
+        precipitationType: null,
+        maxPrecipitationProbability: null,
+        minTemperature: null,
+        maxTemperature: null,
+        maxWindSpeed: null,
+        reasons: [
+          {
+            code: 'FORECAST_UNAVAILABLE',
+            name: '예보 없음',
+            description: '이 권역의 예보를 가져오지 못해 점수를 내지 않았습니다.',
+            scoreDelta: 0,
+          },
+        ],
+      }
+    }
+
+    /*
+      남부가 가장 좋고 북쪽으로 갈수록 나빠지는 모양이다 — 한라산이 북풍을 막는다는
+      `JejuRegion` 의 설명과 어긋나지 않게 둔다. 값이 설명과 반대면 화면이 거짓말을 한다.
+    */
+    const score = [72, 86, 64, 78][order] as number
+    const rainy = score < 70
+
+    return {
+      region,
+      weatherScore: heatSensitive ? Math.max(0, score - 30) : score,
+      skyState: rainy
+        ? { code: 'CLOUDY', name: '흐림', description: '구름이 많습니다.' }
+        : { code: 'CLEAR', name: '맑음', description: '구름이 거의 없습니다.' },
+      precipitationType: rainy
+        ? { code: 'RAIN', name: '비', description: '비가 예보되었습니다.' }
+        : { code: 'NONE', name: '없음', description: '강수가 없습니다.' },
+      maxPrecipitationProbability: rainy ? 70 : 10,
+      minTemperature: 24.0,
+      maxTemperature: rainy ? 29.0 : 31.0,
+      maxWindSpeed: region.code === 'EAST' ? 8.4 : 4.2,
+      reasons: [
+        {
+          code: rainy ? 'RAIN_EXPECTED' : 'PRECIPITATION_LOW',
+          name: rainy ? '강수 예보' : '강수 적음',
+          description: rainy
+            ? '강수확률 70% 로, 야외 동선은 젖을 수 있습니다.'
+            : '강수확률 10%로 야외 일정에 무리가 없습니다.',
+          scoreDelta: rainy ? -20 : 0,
+        },
+      ],
+    }
+  })
+
+  if (heatSensitive) {
+    return {
+      date: '2026-08-29',
+      regions,
+      // 경보면 추천을 내지 않는다. 비교표는 그대로 준다 — 여전히 정보다
+      recommendedRegion: null,
+      recommendationReasons: [],
+      weatherWarning: HEAT_WAVE_WARNING,
+    }
+  }
+
+  return {
+    date: '2026-08-29',
+    regions,
+    // 위 점수 배열에서 가장 높은 권역과 같아야 한다 — 어긋나면 화면이 표와 다른 말을 한다
+    recommendedRegion: JEJU_REGIONS[1] as CodeNameMetadata,
+    recommendationReasons: ['강수확률 10%로 야외 일정에 무리가 없습니다.'],
+    weatherWarning: null,
   }
 }

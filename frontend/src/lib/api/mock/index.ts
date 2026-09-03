@@ -3,7 +3,12 @@ import type { MockResult } from '@/lib/api/mock/auth-data'
 import { resolveAuthMock } from '@/lib/api/mock/auth-data'
 import { mockNearbyFacilities } from '@/lib/api/mock/emergency-data'
 import { resolveFavoriteMock } from '@/lib/api/mock/favorite-data'
-import { mockSuitability, mockWalkSafety, mockWalkTimes } from '@/lib/api/mock/insight-data'
+import {
+  mockRegionalWeather,
+  mockSuitability,
+  mockWalkSafety,
+  mockWalkTimes,
+} from '@/lib/api/mock/insight-data'
 import { resolveMemberMock } from '@/lib/api/mock/member-data'
 import { resolvePetMock } from '@/lib/api/mock/pet-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
@@ -116,6 +121,17 @@ export function resolveMock(
     return {
       status: 200,
       payload: ok(mockWalkTimes(params.get('heatSensitive') === 'true')),
+    }
+  }
+
+  /*
+    권역 비교 (#158). `date` 는 mock 이 쓰지 않는다 — fixture 가 한 날짜로 고정돼 있고,
+    날짜마다 값을 지어내면 없는 예보 이력을 흉내 내게 된다.
+  */
+  if (path === '/insights/regional-weather') {
+    return {
+      status: 200,
+      payload: ok(mockRegionalWeather(params.get('heatSensitive') === 'true')),
     }
   }
 

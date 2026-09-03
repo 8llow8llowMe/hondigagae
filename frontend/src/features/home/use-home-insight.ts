@@ -3,11 +3,17 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
 
 import { clientFetch } from '@/lib/api/client'
-import { suitabilityPath, walkSafetyPath, walkTimesPath } from '@/lib/api/insight'
+import {
+  regionalWeatherPath,
+  suitabilityPath,
+  walkSafetyPath,
+  walkTimesPath,
+} from '@/lib/api/insight'
 import { conditionKey, INSIGHT_QUERY_OPTIONS, insightKeys } from '@/lib/insight/queries'
 import type {
   PetCondition,
   PlaceSuitabilityResponse,
+  RegionalWeatherResponse,
   WalkSafetyResponse,
   WalkTimesResponse,
 } from '@/types/insight'
@@ -46,6 +52,21 @@ export function useWalkTimes(lat: number, lng: number, condition: PetCondition |
   return useQuery({
     queryKey: insightKeys.walkTimes(lat, lng, conditionKey(condition)),
     queryFn: () => clientFetch<WalkTimesResponse>(walkTimesPath(lat, lng, condition)),
+    placeholderData: (previous) => previous,
+    ...INSIGHT_QUERY_OPTIONS,
+  })
+}
+
+/**
+ * 제주 권역 날씨 비교 (#158).
+ *
+ * 골든타임과 같은 성격이라 같은 규칙을 쓴다 — 조건 없이도 조회하고, 반려견을 바꾸면
+ * 재조회하되 이전 표를 유지한다.
+ */
+export function useRegionalWeather(condition: PetCondition | null) {
+  return useQuery({
+    queryKey: insightKeys.regionalWeather(conditionKey(condition)),
+    queryFn: () => clientFetch<RegionalWeatherResponse>(regionalWeatherPath(condition)),
     placeholderData: (previous) => previous,
     ...INSIGHT_QUERY_OPTIONS,
   })

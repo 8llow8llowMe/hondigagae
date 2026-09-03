@@ -224,6 +224,56 @@ export type WalkTimesResponse = {
 }
 
 /**
+ * 한 권역의 날씨와 점수 (#158).
+ *
+ * **예보를 못 받은 권역도 목록에 남는다.** 그때 `weatherScore` 가 null 이고 `reasons` 에
+ * 그 사실이 담긴다 — 목록에서 지우면 사용자는 그 권역이 조회되지 않았다는 것조차 모른 채
+ * "비교 대상이 넷" 이라고 읽는다. **0 점이 아니라 판단 근거가 없는 것이다.**
+ */
+export type RegionWeatherItem = {
+  /** `NORTH`(제주시권) · `SOUTH`(서귀포권) · `EAST`(동부권) · `WEST`(서부권) · `HALLA`(한라산권) */
+  region: CodeNameMetadata
+  /**
+   * 날씨만으로 매긴 점수(0~100). null 이면 예보를 못 받아 판정하지 않았다.
+   *
+   * **장소 적합도 점수가 아니다.** 같은 날씨 규칙을 쓰지만 장소·혼잡도 항목이 없어
+   * "이 권역이 나가기 좋은가" 이지 "이 장소가 갈 만한가" 가 아니다.
+   */
+  weatherScore: number | null
+  /** 예보가 없으면 null */
+  skyState: CodeNameMetadata | null
+  precipitationType: CodeNameMetadata | null
+  maxPrecipitationProbability: number | null
+  minTemperature: number | null
+  maxTemperature: number | null
+  /** 중기예보 기반 날짜는 null */
+  maxWindSpeed: number | null
+  /** 판정 근거. 데이터 사실만 담는다 */
+  reasons: SuitabilityReasonItem[]
+}
+
+/**
+ * `GET /insights/regional-weather` — 제주 권역 날씨 비교 (#158).
+ *
+ * **한라산이 섬을 기후로 갈라 놓는다는 것이 이 기능의 전제다.** 같은 시각에 북부는 비가 오고
+ * 남부는 개어 있는 일이 흔해, "제주 날씨" 를 한 값으로 말하면 그 차이가 통째로 사라진다.
+ *
+ * **`recommendedRegion` 이 null 인 경우가 둘이다.** ① 어느 권역도 예보를 못 받았다
+ * ② **특보 경보가 발효 중이다** — 적합도는 0점, 산책은 위험이라고 말하는 같은 서비스가
+ * 여기서만 "여기 가세요" 라고 하면 안 된다. 그때도 **비교표는 그대로 보여 준다**(여전히 정보다).
+ */
+export type RegionalWeatherResponse = {
+  date: string
+  /** 다섯 권역. 예보를 못 받은 권역도 점수 없이 남는다 */
+  regions: RegionWeatherItem[]
+  /** 판정할 수 있는 권역이 없으면 null */
+  recommendedRegion: CodeNameMetadata | null
+  /** 추천 이유. 그 권역의 판정 근거를 그대로 옮긴 **문장 배열**이다 (객체가 아니다) */
+  recommendationReasons: string[]
+  weatherWarning: WeatherWarningItem | null
+}
+
+/**
  * 판정에 반영할 반려견 조건.
  *
  * **`petId` 를 보내는 것이 아니다.** 백엔드가 속성을 개별 쿼리 파라미터로 받는다

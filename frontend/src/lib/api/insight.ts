@@ -75,6 +75,16 @@ export function walkTimesPath(lat: number, lng: number, condition: PetCondition 
   return paths.insights.walkTimes(toInsightQuery(condition, { lat: String(lat), lng: String(lng) }))
 }
 
+/**
+ * 제주 권역 날씨 비교 (#158).
+ *
+ * **`date` 를 보내지 않는다.** 생략하면 서버가 오늘로 잡고, FE 가 날짜를 만들면 서버 시각과
+ * 어긋날 수 있다 — 브라우저 타임존이 KST 가 아닌 사용자에게 어제 비교표가 나간다.
+ */
+export function regionalWeatherPath(condition: PetCondition | null): string {
+  return paths.insights.regionalWeather(toInsightQuery(condition))
+}
+
 export function planWeatherPath(planId: string): string {
   return paths.plans.weather(planId)
 }
