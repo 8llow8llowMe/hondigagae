@@ -2,17 +2,23 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { AI_PLAN_JOB_QUERY_OPTIONS, aiPlanKeys } from '@/features/ai-plan/queries'
+import { useAiPlanJobStream } from '@/features/ai-plan/use-ai-plan-job-stream'
 import { jobPollInterval, jobPollPhase, shouldKeepPolling } from '@/lib/ai-plan/job'
+import { mergeJobUpdate } from '@/lib/ai-plan/job-stream'
 import { fetchAiPlanJob } from '@/lib/api/ai-plan'
+import type { AiPlanJob } from '@/types/ai-plan'
 
 /** 경과 시간을 갱신하는 주기. 국면(30초·90초) 판정만 하므로 초 단위로 충분하다 */
 const TICK_MS = 1000
 
 /**
- * 작업 폴링 — 명세 S4.
+ * 작업 구독 — 명세 S3(SSE) · S4(폴링).
+ *
+ * **SSE 가 앞에 서고 폴링이 받친다** (#91). 구독이 살아 있는 동안 폴링은 멈추고, 끊기면
+ * 2초 폴링이 재개된다 — 둘이 같은 query 캐시를 쓰므로 화면은 출처를 구분하지 않는다.
  *
  * **경과 시간을 화면이 세야 한다.** 서버가 남은 시간을 주지 않으므로(명세 S2) 30초·90초
  * 국면은 **구독을 시작한 시점**을 기준으로 잰다. `jobId` 가 바뀌면 다시 0부터 센다.
@@ -22,6 +28,8 @@ const TICK_MS = 1000
  * 여지를 주는 것이 낫다.
  */
 export function useAiPlanJob(jobId: string) {
+  const queryClient = useQueryClient()
+  const streaming = useAiPlanJobStream(jobId)
   const [elapsedMs, setElapsedMs] = useState(0)
   const startedAt = useRef<number | null>(null)
   const watchedJobId = useRef(jobId)
@@ -38,7 +46,17 @@ export function useAiPlanJob(jobId: string) {
 
   const query = useQuery({
     queryKey: aiPlanKeys.job(jobId),
-    queryFn: () => fetchAiPlanJob(jobId),
+    /*
+      **첫 조회는 구독 여부와 무관하게 한 번 돈다.** 구독이 열리기까지의 공백을 메우고,
+      스트림이 아예 열리지 않는 환경(프록시가 SSE 를 막는 경우)에서도 화면이 데이터를 받는다.
+
+      늦게 도착한 응답이 구독이 받은 종결 상태를 되돌리지 않게 `mergeJobUpdate` 로 거른다.
+    */
+    queryFn: async (): Promise<AiPlanJob> => {
+      const fetched = await fetchAiPlanJob(jobId)
+      const cached = queryClient.getQueryData<AiPlanJob>(aiPlanKeys.job(jobId))
+      return mergeJobUpdate(cached, fetched)
+    },
     staleTime: AI_PLAN_JOB_QUERY_OPTIONS.staleTime,
     gcTime: AI_PLAN_JOB_QUERY_OPTIONS.gcTime,
     retry: AI_PLAN_JOB_QUERY_OPTIONS.retry,
@@ -46,7 +64,9 @@ export function useAiPlanJob(jobId: string) {
       **완료·실패·상한에서 멈춘다.** 멈추지 않는 폴링이 대표 사고다.
       탭이 비활성이면 React Query 기본대로 멈추고 돌아오면 재개된다 (명세 S4).
     */
-    refetchInterval: (polled): number | false => jobPollInterval(polled.state.data, elapsedMs),
+    refetchInterval: (polled): number | false =>
+      // **구독이 살아 있으면 폴링하지 않는다.** 끊기면 이 값이 다시 2초가 된다
+      streaming ? false : jobPollInterval(polled.state.data, elapsedMs),
   })
 
   const polling = query.data === undefined || shouldKeepPolling(query.data)
