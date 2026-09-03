@@ -25,7 +25,8 @@ import { alternativePlaceIds } from '@/lib/plan/detail'
 export function PlanDetailView({ planId, today }: { planId: string; today: string }) {
   const detail = usePlanDetail(planId)
   const weather = usePlanWeather(planId)
-  const pets = usePetList()
+  const pets = usePetList(true)
+  // `/plans` 는 proxy.ts `PROTECTED_PATHS` 라 미로그인이 여기 닿지 않는다 (#200)
 
   /*
     **보강은 실내 대안만 남았다** (#115). 항목은 상세 응답이 `place` 요약을 함께 주지만

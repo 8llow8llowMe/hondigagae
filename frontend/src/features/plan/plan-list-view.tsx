@@ -34,7 +34,8 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
   const [creating, setCreating] = useState(false)
 
   const plansQuery = usePlanList()
-  const petsQuery = usePetList()
+  const petsQuery = usePetList(true)
+  // `/plans` 는 proxy.ts `PROTECTED_PATHS` 라 미로그인이 여기 닿지 않는다 (#200)
 
   const pages = plansQuery.data?.pages
   const allPlans = useMemo(() => (pages === undefined ? [] : mergeSlices(pages)), [pages])

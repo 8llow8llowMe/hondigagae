@@ -31,10 +31,14 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
    * 판정은 **선택된 반려견 기준**이다. 헤더 스위처에서 바꾸면 조건이 바뀌고 key 가 달라져
    * 재조회된다 — 목록 필터의 크기 축과 같은 스토어를 쓴다.
    *
-   * 미로그인이면 `pet` 이 null 이고, 그때도 조회는 한다 (공개 API). 조건 없는 응답의
-   * 날씨만 게스트 블록이 쓰고 **점수·근거는 쓰지 않는다** — 기준이 되는 반려견이 없다.
+   * **미로그인이면 두 조회가 갈린다** (#200).
+   *  - 반려견 목록: **조회하지 않는다.** 보호 리소스라 403 이 된다 → `pet` 은 null 이다
+   *  - 적합도: **조회한다.** 인사이트는 공개 API 라 조건 없이 부르면 일반 판정이 온다
+   *
+   * 그 응답의 날씨만 게스트 블록이 쓰고 **점수·근거는 쓰지 않는다** — 기준이 되는
+   * 반려견이 없다.
    */
-  const { pet } = useSelectedPet()
+  const { pet } = useSelectedPet(authed)
   const condition = toPetCondition(pet)
   const suitability = usePlaceSuitability(placeId, condition)
 

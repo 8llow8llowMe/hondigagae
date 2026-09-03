@@ -142,7 +142,8 @@ export function PlanAddPlaceView({
     <PlanAddPlaceShell day={day} backHref={backHref} planTitle={detail.data.title}>
       {/* 데스크톱은 좌측 레일이 같은 일을 한다 (페이지가 렌더) */}
       <div className="lg:hidden">
-        <PlaceFilterChips filters={filters} />
+        {/* `/plans` 는 proxy.ts `PROTECTED_PATHS` 라 미로그인이 여기 닿지 않는다 (#200) */}
+        <PlaceFilterChips filters={filters} authed />
       </div>
 
       <PlaceListSection

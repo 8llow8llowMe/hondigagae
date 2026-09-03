@@ -23,9 +23,16 @@ import type { PlaceFilters } from '@/types/place'
  * 축 사이는 1px 구분선으로 잇는다 — 같은 묶음(필터) 안이라 8px 밴드를 쓰지 않는다
  * (디자인 가이드 §4).
  */
-export function PlaceFilterRail({ filters }: { filters: PlaceFilters }) {
+export function PlaceFilterRail({
+  filters,
+  /** 미로그인이면 반려견 목록을 조회하지 않는다 — 크기 축 컨트롤이 빠진다 (#200) */
+  authed,
+}: {
+  filters: PlaceFilters
+  authed: boolean
+}) {
   const { apply, reset } = usePlaceFilterNav()
-  const { pet } = useSelectedPet()
+  const { pet } = useSelectedPet(authed)
 
   const dirty = toPlaceFilterQuery(filters) !== toPlaceFilterQuery(DEFAULT_PLACE_FILTERS)
 

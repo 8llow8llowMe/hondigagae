@@ -219,7 +219,8 @@ function CreatePlanStep({
   onAdded: () => void
   onClose: () => void
 }) {
-  const petsQuery = usePetList()
+  const petsQuery = usePetList(true)
+  // 담기 시트는 authed 일 때만 열린다 (`place-detail-view` 의 `onAddToPlan`) (#200)
 
   if (petsQuery.isPending) return <PlanListSkeleton rows={2} />
 
