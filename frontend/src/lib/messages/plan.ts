@@ -17,6 +17,34 @@ export const planMessages = {
    */
   verdictBasisPet: '{name} 기준이에요. 함께 가는 아이 중 이 날이 가장 힘든 아이예요.',
 
+  // ── 일정 응급 브리핑 (#125) ────────────────────────────────────────────────
+  emergencyHeading: '가는 곳 주변 병원·약국',
+  emergencyPageTitle: '일정 주변 병원·약국',
+  /** 배너 설명 — 이 기능의 취지를 그대로 적는다 */
+  emergencyBannerDescription: '급할 때 찾으면 늦어요. 출발 전에 훑어보세요',
+  emergencyBack: '일정으로 돌아가기',
+  /** `{km}` 을 반경(km)으로 치환한다. **화면이 조절할 수 없는 값이라 사실로만 적는다** */
+  emergencyRadiusNote: '방문 장소에서 {km}km 안, 가까운 순 3곳이에요',
+  /** `{day}` 를 일차로 치환한다 */
+  emergencyDayLabel: '{day}일차',
+  /**
+   * 운영시간 정보가 없는 시설. **"휴무" 가 아니라 "확인 필요" 다** — 백엔드 스키마가
+   * 명시한 규칙이고, 닫혔다고 쓰면 실제로 여는 병원을 사용자가 건너뛴다.
+   */
+  emergencyHoursUnknown: '진료시간이 등록돼 있지 않아요 — 전화로 확인해 주세요',
+  emergencyOpen24: '24시간',
+  /** `{name}` 을 시설명으로 치환한다 */
+  emergencyCallLabel: '{name} 전화하기',
+  emergencyCallShort: '전화',
+  /**
+   * 길찾기를 못 다는 이유를 화면이 말하지 않는다 — 대신 주소를 준다. 계약에 좌표가 없어
+   * 링크를 만들 수 없고(`directionsUrl` 이 null), 눌러도 못 가는 버튼은 달지 않는다.
+   */
+  emergencyEmptyTitle: '주변 시설을 찾지 못했어요',
+  emergencyEmptyDescription: '이 일정에 장소가 담기면 그 주변을 다시 찾아봐요.',
+  emergencySpotEmpty: '반경 안에 등록된 시설이 없어요',
+  emergencyErrorTitle: '주변 시설을 불러오지 못했어요',
+
   packingHeading: '여행 준비물',
   packingCta: '준비물 목록 만들기',
   packingRetryCta: '다시 만들기',

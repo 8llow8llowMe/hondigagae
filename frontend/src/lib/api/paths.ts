@@ -81,6 +81,8 @@ export const paths = {
     detail: (planId: string) => `/plans/${planId}`,
     dayItems: (planId: string, day: number) => `/plans/${planId}/days/${day}/items`,
     weather: (planId: string) => `/plans/${planId}/weather`,
+    /** 일정 응급 브리핑 (#125). 반경·개수는 서버 고정이라 쿼리가 없다 */
+    emergency: (planId: string) => `/plans/${planId}/emergency`,
     /** 항목 방문 체크 (#124). 해제도 같은 경로다 — 본문의 `visited` 가 방향을 정한다 */
     itemVisited: (planId: string, planItemId: string) =>
       `/plans/${planId}/items/${planItemId}/visited`,

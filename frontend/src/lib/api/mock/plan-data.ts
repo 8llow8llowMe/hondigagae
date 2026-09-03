@@ -1,4 +1,5 @@
 import type { MockResult } from '@/lib/api/mock/auth-data'
+import { mockPlanEmergency } from '@/lib/api/mock/emergency-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import {
   memberIdOf,
@@ -357,6 +358,18 @@ export function resolvePlanMock(
     return withPlan(memberId, weather[1] ?? '', (plan) => ({
       status: 200,
       payload: ok(toWeather(plan)),
+    }))
+  }
+
+  /*
+    응급 브리핑 (#125). **`withPlan` 을 거친다** — 남의 일정·없는 일정은 404 여야 하고,
+    그 판정을 여기서 다시 쓰면 상세와 어긋날 수 있다.
+  */
+  const emergency = /^\/plans\/([^/]+)\/emergency$/.exec(path)
+  if (emergency !== null && method === 'GET') {
+    return withPlan(memberId, emergency[1] ?? '', (plan) => ({
+      status: 200,
+      payload: ok(mockPlanEmergency(plan.planId)),
     }))
   }
 

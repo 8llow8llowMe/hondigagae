@@ -1,6 +1,7 @@
 import { clientFetch, clientFetchVoid } from '@/lib/api/client'
 import { paths } from '@/lib/api/paths'
 import type { SliceResponse } from '@/types/api'
+import type { PlanEmergencyResponse } from '@/types/emergency'
 import type {
   PlanCreatePayload,
   PlanDayItemsReplacePayload,
@@ -68,6 +69,16 @@ export function planDetailPath(planId: string): string {
   return paths.plans.detail(planId)
 }
 
+/**
+ * 일정 응급 브리핑 (#125).
+ *
+ * **반경·개수 파라미터가 없다** — 10km · 최대 3곳이 서버 고정이다. 화면이 조절할 수 있는
+ * 것처럼 보이는 인자를 만들지 않는다.
+ */
+export function planEmergencyPath(planId: string): string {
+  return paths.plans.emergency(planId)
+}
+
 export function planWeatherPath(planId: string): string {
   return paths.plans.weather(planId)
 }
@@ -78,6 +89,10 @@ export function fetchPlanDetail(planId: string): Promise<PlanDetail> {
 
 export function fetchPlanWeather(planId: string): Promise<PlanWeatherResponse> {
   return clientFetch<PlanWeatherResponse>(planWeatherPath(planId))
+}
+
+export function fetchPlanEmergency(planId: string): Promise<PlanEmergencyResponse> {
+  return clientFetch<PlanEmergencyResponse>(planEmergencyPath(planId))
 }
 
 /**
