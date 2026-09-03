@@ -20,6 +20,18 @@ import type { HourlyWalkSafetyItem, WalkTimesResponse } from '@/types/insight'
  * 중이면 서버가 구간을 주지 않는다 — "그나마 이때가 낫다" 고 말하면 사용자가 그것을
  * 허락으로 읽는다 (`GoldenWalkWindow`). 그때도 **곡선은 그대로 보여 준다**: 근거를
  * 감추면 왜 안 되는지 확인할 방법이 없다.
+ *
+ * **판정 자리의 상태는 셋이다** (#204).
+ *
+ * | 응답 | 화면 | 뜻 |
+ * |------|------|-----|
+ * | `goldenStart` 있음 | `GoldenWindow` | 이때 나가면 된다 |
+ * | `hourly` 있고 `goldenStart` 없음 | `NoGoldenWindow` | **판정**: 남은 시간이 전부 위험이다 |
+ * | `hourly` 비었음 | `NoForecast` | **근거 없음**: 판정할 예보가 없다 |
+ *
+ * 앞의 두 줄만 있으면 늦은 밤(남은 시간대 0칸)에 화면이 "남은 시간이 모두 위험 등급"
+ * 이라고 단정한다 — dev 23:17 KST 에 `hourly: []` 로 실제로 관측했다. 모르는 것을
+ * 나쁜 것으로 말하지 않는다는 규칙(루트 `CLAUDE.md`)에 어긋난다.
  */
 export function WalkTimesSection({
   data,
@@ -38,6 +50,7 @@ export function WalkTimesSection({
   if (data === null) return loading ? <WalkTimesSkeleton /> : null
 
   const hasGolden = data.goldenStart !== null && data.goldenEnd !== null
+  const hasForecast = data.hourly.length > 0
 
   return (
     <section aria-label={messages.home.goldenHeading} className="border-border border-t">
@@ -47,7 +60,18 @@ export function WalkTimesSection({
           <WeatherWarningBadge warning={data.weatherWarning} />
         </div>
 
-        {hasGolden ? <GoldenWindow data={data} /> : <NoGoldenWindow />}
+        {/*
+          **`hasGolden` 을 먼저 본다.** `hourly` 가 비었는지로 먼저 갈라 버리면 서버가
+          구간을 주는데 곡선만 못 받은 경우에 실제 추천을 감춘다. 예보 없음이 밀어내야
+          하는 것은 **위험 단정(`NoGoldenWindow`) 하나뿐**이다.
+        */}
+        {hasGolden ? (
+          <GoldenWindow data={data} />
+        ) : hasForecast ? (
+          <NoGoldenWindow />
+        ) : (
+          <NoForecast />
+        )}
 
         <HourlyCurve hourly={data.hourly} />
 
@@ -108,6 +132,22 @@ function NoGoldenWindow() {
 }
 
 /**
+ * 판정할 예보가 없는 날 (#204).
+ *
+ * **위험 톤(`metric-critical`)을 쓰지 않는다.** 색은 등급을 말하는데 이 자리에는 등급이
+ * 없다 — 미지는 미지의 모양이어야 한다 (DESIGN.md §2-3). 그래서 `NoGoldenWindow` 와
+ * 나란히 두면서도 강조색을 뺀다.
+ */
+function NoForecast() {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-body-1 text-fg-muted font-semibold">{messages.home.goldenNoForecast}</p>
+      <p className="text-body-2 text-fg-muted">{messages.home.goldenNoForecastDesc}</p>
+    </div>
+  )
+}
+
+/**
  * 시간대 곡선.
  *
  * **가로 스크롤 한 줄이다.** 세로 목록으로 두면 8시간이 화면을 다 먹고, 곡선의 요점인
@@ -117,9 +157,8 @@ function NoGoldenWindow() {
  * 노면온도가 이 판정의 실제 근거라 그것을 숫자로 보여야 사용자가 판단을 검증할 수 있다.
  */
 function HourlyCurve({ hourly }: { hourly: HourlyWalkSafetyItem[] }) {
-  if (hourly.length === 0) {
-    return <p className="text-body-2 text-fg-muted">{messages.home.goldenCurveEmpty}</p>
-  }
+  // 판정 자리의 `NoForecast` 가 이미 말했다 — 같은 문장을 두 번 두지 않는다 (#204)
+  if (hourly.length === 0) return null
 
   return (
     <ul className="-mx-4 flex gap-1.5 overflow-x-auto px-4 md:-mx-6 md:px-6">
