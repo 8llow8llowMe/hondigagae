@@ -104,10 +104,79 @@ describe('WalkTimesSection — 곡선', () => {
     expect(markup).toContain(GOOD_DAY.hourly[0]?.walkSafetyLevel.name as string)
   })
 
-  it('남은 예보가 없으면 빈 곡선 대신 문장을 낸다', () => {
+  it('남은 예보가 없으면 빈 곡선을 그리지 않는다 — 판정 자리가 대신 말한다', () => {
     const markup = render({ ...GOOD_DAY, hourly: [] })
 
-    expect(markup).toContain(messages.home.goldenCurveEmpty)
+    expect(markup).not.toContain('overflow-x-auto')
+  })
+})
+
+/*
+  **#204.** dev 23:17 KST 에 서버가 `hourly: []` · `goldenStart: null` 을 줬다 — 오늘 남은
+  시간대가 0칸이라는 뜻이다. 그런데 판정 자리가 `goldenStart` 만 보고 갈라져서 화면이
+  `남은 시간이 모두 위험 등급이에요` 를 단정했고, 바로 아래 곡선 자리에서는
+  `오늘 남은 예보가 없어요` 가 나왔다 — 한 카드 안에 모순된 두 문장이 같이 나갔다.
+
+  모르는 것과 나쁜 것을 구분하는 것이 이 서비스의 규칙이다 (루트 `CLAUDE.md`).
+*/
+describe('WalkTimesSection — 예보가 없는 날 (#204)', () => {
+  /*
+    dev 실측 모양이다 — `hourly: []` · 구간 셋 다 null · `weatherWarning: null`.
+    특보가 있는 `BAD_DAY` 를 베이스로 쓰지 않는 이유는 특보 배지 자체가 위험 톤을 쓰기
+    때문이다: 그러면 아래 톤 검사가 판정 자리를 보는지 배지를 보는지 알 수 없어진다.
+  */
+  const NO_FORECAST: WalkTimesResponse = {
+    ...GOOD_DAY,
+    hourly: [],
+    goldenStart: null,
+    goldenEnd: null,
+    goldenLevel: null,
+  }
+
+  it('예보가 0건이면 위험 등급을 단정하지 않는다', () => {
+    const markup = render(NO_FORECAST)
+
+    expect(markup).not.toContain(messages.home.goldenNone)
+    expect(markup).not.toContain(messages.home.goldenNoneDesc)
+  })
+
+  it('판정할 근거가 없다고 말한다', () => {
+    const markup = render(NO_FORECAST)
+
+    expect(markup).toContain(messages.home.goldenNoForecast)
+    expect(markup).toContain(messages.home.goldenNoForecastDesc)
+  })
+
+  /* 색은 등급을 말하는데 이 자리에는 등급이 없다 — 미지는 미지의 모양이어야 한다 */
+  it('위험 톤을 쓰지 않는다 (DESIGN.md §2-3)', () => {
+    expect(render(NO_FORECAST)).not.toContain('text-metric-critical-700')
+    expect(render(BAD_DAY)).toContain('text-metric-critical-700')
+  })
+
+  it('같은 문장을 판정 자리와 곡선 자리에 두 번 두지 않는다', () => {
+    const markup = render(NO_FORECAST)
+    const occurrences = markup.split(messages.home.goldenNoForecast).length - 1
+
+    expect(occurrences).toBe(1)
+  })
+
+  /*
+    **예보 없음이 밀어내는 것은 위험 단정 하나뿐이다.** 서버가 구간을 주는데 곡선만 못
+    받았다면 그것은 추천이 있는 날이고, 화면이 그 추천을 감추면 안 된다.
+  */
+  it('구간이 있는데 곡선만 비었으면 추천을 감추지 않는다', () => {
+    const markup = render({ ...GOOD_DAY, hourly: [] })
+
+    expect(markup).toContain('18:00')
+    expect(markup).not.toContain(messages.home.goldenNoForecast)
+  })
+
+  /* 예보가 있고 구간만 없는 기존 케이스는 그대로 위험 단정이다 — 회귀 방지 */
+  it('예보가 있고 구간만 없으면 위험 단정을 유지한다', () => {
+    const markup = render(BAD_DAY)
+
+    expect(markup).toContain(messages.home.goldenNone)
+    expect(markup).not.toContain(messages.home.goldenNoForecast)
   })
 })
 
