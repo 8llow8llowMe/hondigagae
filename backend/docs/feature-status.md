@@ -1,7 +1,7 @@
 # 혼디가개 백엔드 기능 현황
 
 > 무엇이 되고 무엇이 안 되는지의 단일 기준. 기능을 추가·제거하면 여기부터 고친다.
-> 기준일: 2026-08-27 / 브랜치 `develop`
+> 기준일: 2026-09-02 / 브랜치 `develop` (+ #152). 이슈 단위 대응은 맨 아래 "이슈 대응 현황".
 
 ## 한눈에
 
@@ -128,12 +128,16 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | 기능 | 상태 | 막는 것 |
 | --- | --- | --- |
 | `walkcourse` (두루누비 산책 코스) | 미착수 | 데이터 확인 필요 |
-| 기상특보 연동 | 미착수 | 제주는 태풍 경로. 카카오 메시지 연계와 맞물린다 |
+| 기상특보 연동 | **구현 (조회)** | #156 — 적합도·권역 날씨·산책 안전 응답에 `weatherWarnings`. 카카오 메시지 알림 연계는 후속 |
 | 항목 단위 산책 위험도 | 미착수 | 일정 브리핑은 일자별 대표 장소 한 곳만 조회한다 |
+| 일정 브리핑 체감온도 | 미착수 | #88. tour-service `HeatIndex` 가 있어 재료는 있다 |
+| AI 초안 WALK 항목 `placeId` 불일치 | 미착수 | #89. FE 는 WALK 의 `targetId` 를 보내지 않는 것으로 우회 |
+| AI 작업 세부 단계·취소·`sigunguCode` | 미착수 | #90. 일자 재생성은 #77 로 됨 |
+| 다견 일정의 준비물 생성 | 미착수 | `PlanOutlineResponse.petIds` 를 `AiPackingProcessor` 가 아직 읽지 않는다 (#152 후속) |
 | 반려견 프로필 매칭 | **구현** | `petSizeType`/`petWeightKg` 필터. 프로필 체중 입력은 FE 몫 |
 | 영업시간 구조화 | **구현 (긴급 시설)** | `openNowOnly` + 항목별 `openNow`. 여행 장소(place_intro.use_time)는 후속 |
 | 데이터 delisting | **구현** | `delisted_at` 표시 + 급감 가드. `data-refresh-guide.md` 2절 |
-| 배포 파이프라인 | 미착수 | Dockerfile·Jenkinsfile 없음 |
+| 배포 파이프라인 | **구현** | #21 — 서비스별 `docker-compose-*.yml` + Jenkins. `deploy-guide.md`·`jenkins-cicd-dev-deploy-guide.md` |
 | 배치 메트릭 | 미착수 | 로그만 있고 Micrometer 미노출 |
 
 ### 데이터가 없어 못 하는 것
@@ -154,3 +158,66 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | 동물병원 운영시간 | 51% 만 제공. `operatingHoursKnown=false` 로 구분해 내려보낸다 |
 | 좌표 반경 검색 | 사각 범위 + 애플리케이션 정렬. 수백 곳 규모 전제. 전국 확대 시 공간 인덱스 필요 |
 | 중복 병합 | 각 적재 파사드가 개별 호출. 잡이 늘면 독립 잡으로 분리해야 한다 |
+
+## 이슈 대응 현황 (백엔드)
+
+> GitHub 이슈는 클론한 저장소에서 보이지 않는다. 백엔드 라벨이 붙은 이슈 46개가 코드에 어떻게 대응됐는지 여기 남긴다.
+> 갱신 기준: 2026-09-02. 이슈를 닫거나 새로 열면 이 표도 같이 고친다 (`docs/git-workflow.md` §7).
+> "완료" 는 코드가 `develop` 에 있고 이슈가 닫혔다는 뜻이다. 닫혔는데 체크박스가 비어 있던 14개(#4 #5 #25 #28 #34 #35 #40 #41 #57 #77 #86 #104 #106 #108)는
+> 코드로 대조해 전부 구현을 확인했다 — #40 의 "Swagger 400 응답 추가" 만 근거가 없다.
+
+**열린 것 (5)**
+
+| 이슈 | 영역 | 제목 | 상태 |
+| --- | --- | --- | --- |
+| #87 | plan | 여행 기간을 줄여도 범위 밖 일정 항목이 정리되지 않는다 | 해결됨 — `PLAN_008` 거부(99c6a41f). 이슈 닫기 대상 |
+| #88 | plan | 일정 날씨 브리핑에 체감온도 추가 | 미착수 |
+| #89 | ai | AI 초안의 WALK 항목 placeId 가 walk_course.id 와 어긋난다 | 미착수 |
+| #90 | ai | AI 일정 작업 세부 단계·일자 재생성·취소·sigunguCode | 재생성만 완료(#77), 나머지 3건 미착수 |
+| #152 | plan | 일정 저장·판정의 다중 반려견 지원 (PlanCreateRequest.petIds) | 구현 완료, PR 대기 (`features/152-plan-multi-pet.md`) |
+
+**완료 (41)**
+
+| 이슈 | 영역 | 제목 | 비고 |
+| --- | --- | --- | --- |
+| #1 | docs | 프로젝트 기반 문서 및 개발 컨벤션 세팅 | |
+| #3 | service-discovery·api-gateway | 백엔드 MSA 기반 구축 (Gradle 멀티모듈 + core + 게이트웨이) | |
+| #4 | auth·core·plan·tour | 도메인 서비스 5종 스캐폴딩 (auth/tour/plan/ai/batch) | |
+| #5 | auth | 멀티 소셜 로그인 회원 도메인 적용 및 원본 구조 정합화 | |
+| #8 | tour | 긴급 시설 facilityId 가 JS 안전 정수 범위를 초과해 정밀도가 손상됨 | |
+| #16 | tour | 장소 상세 응답에 indoor·sourceName·sourceCategory 추가 | |
+| #17 | tour | 장소 상세 응답의 contentId 가 문자열 "null" 로 직렬화됨 | |
+| #21 | 전 서비스 | dev/prod 배포 파이프라인 구축 (컨테이너 정의·Jenkins) | |
+| #22 | docs | 프로젝트 소개와 시스템 아키텍처 다이어그램 작성 | |
+| #25 | core | 여행 도메인 enum 을 shared-travel 공유 모듈로 이관 | |
+| #26 | core·tour | 기상청 단기예보 조회 기반 구축 | |
+| #27 | plan·tour | 장소 여행 적합도 조회 | |
+| #28 | plan·tour | 장소 산책 위험도 조회 | |
+| #29 | plan·tour | 관광지 집중률 예측 적재 배치 | |
+| #30 | ai·tour | AI 여행 플래너 Claude 어댑터 연동 | 이후 #57 로 Ollama 전환 |
+| #31 | auth·plan·tour | 일정 날씨 브리핑 | |
+| #32 | auth·api-gateway | CORS 허용 목록 정리와 FE 로컬 포트 5174 | |
+| #34 | tour | 원천에서 사라진 장소를 조회에서 내리는 delisting | |
+| #35 | plan·tour | 반려견 크기·체중으로 입장 가능한 장소 매칭 | |
+| #37 | docs·tour | 영업시간 구조화와 긴급 시설 "지금 영업 중" 판정 | |
+| #38 | ai·auth·plan·tour | 동적 검색 QueryDSL 전환과 @Param·예외 캐논 정리 | |
+| #39 | plan·tour | 일정 항목 검증의 원격 N+1 제거 | |
+| #40 | auth | POST /auth/login 에 @Valid 가 없어 서버 검증이 무효 | Swagger 400 명시는 미반영 |
+| #41 | auth | 비밀번호 재설정(찾기) API 추가 | |
+| #42 | auth | 인증코드 TTL·재전송 쿨다운을 응답과 Swagger 에 노출 | |
+| #52 | 전 서비스 | Redis Sentinel 접속 배선과 설정 누락 기동 실패 | |
+| #53 | core·tour | 예보 캐시 쿼터 방어 — 발표 유예·격자 묶기·갱신 락 | |
+| #55 | auth | 인증/회원 보안 보완 — 다중 기기 세션, 비밀번호 재설정, 계정 연결/전환 | |
+| #57 | ai | AI 플래너 로컬 LLM 전환과 SSE 상태 스트리밍 | |
+| #77 | ai·docs·plan·tour | AI 일정 생성 제어 — 다중 반려견·필수 포함 장소·하루 재생성 | 저장 측 다견화는 #152 |
+| #86 | plan | 일정 상세 항목에 장소 요약(주소·실내·이미지·좌표) 포함 | |
+| #104 | plan | 여행 동행 기능 — 방문 체크·응급 브리핑·반려견별 히스토리 | |
+| #106 | auth·docs | 반려견 프로필 보강 — 사진(MinIO)·체중·대표견·고아 이미지 청소 | |
+| #108 | tour | numOfRows 가 단기예보를 잘라 최고기온(TMX)이 유실되던 문제 | |
+| #121 | ai·auth·plan | 전 서비스 감사 반영 — 경계 위반·예외 응답 누수 수정과 보완 기능 5종 | |
+| #134 | batch·tour | batch-service 공공 API 방어와 포트 명명을 컨벤션에 맞춘다 | |
+| #135 | tour | tour-service 응답 봉투·인덱스·metadata 컨벤션 위반을 고친다 | |
+| #136 | tour | 명칭 매칭 구분값을 shared enum 으로 올린다 | |
+| #137 | plan·tour | 긴급 시설 상세와 기간 혼잡도 조회 API 를 추가한다 | |
+| #155 | ai·tour | AI 일정 생성 날씨 접목과 반려견 준비물 목록 생성 | |
+| #156 | docs·api-gateway·tour | 제주 특색 × 기상청 API 날씨 인사이트 3종 | |
