@@ -30,6 +30,7 @@
 | POST | `/api/v1/auth/token/reissue` | 세션별 회전, 이전 refresh 즉시 무효 |
 | GET·DELETE | `/api/v1/auth/sessions[/{sessionId}]` | 로그인 기기 목록·특정 기기 로그아웃 |
 | POST | `/api/v1/members/signup` | |
+| POST | `/api/v1/members/signup/dev` | **개발 전용** — 이메일 인증 생략. 운영 프로필에서는 404 |
 | GET·PATCH | `/api/v1/members/me` | |
 | POST·DELETE | `/api/v1/members/me/profile-image` | |
 | POST | `/api/v1/members/me/password` · `/password/setup` · DELETE `/password` · `/me/withdraw` | 변경/최초 설정/소셜 전용 전환/탈퇴 |
