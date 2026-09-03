@@ -207,3 +207,35 @@ export type AiPlanRequestSnapshot = {
   preferFavorites?: boolean
   pinnedPlaces?: PinnedPlace[]
 }
+
+// ─── 반려견 여행 준비물 (#155) ────────────────────────────────────────────────
+
+/**
+ * 준비물 한 항목.
+ *
+ * **`reason` 이 이 기능의 핵심이다** (XAI). 서버가 이 여행의 예보·반려견 특성·일정에
+ * 근거한 완성 문장을 준다 — "2일차 강수확률 80% 예보라 야외 일정 중 비를 만날 수
+ * 있습니다." FE 가 문장을 조립하지 않는다 (styling-guide.md §7).
+ */
+export type PackingListItem = {
+  /** 분류. **enum 이 아니라 문자열이다** — 서버가 "필수"·"날씨 대비"·"반려견 케어"·"이동" 을
+   * 그대로 주고, 모르는 분류가 와도 화면이 버리지 않는다 */
+  category: string
+  name: string
+  reason: string
+}
+
+/**
+ * `POST /ai-plans/packing-list/{planId}` 응답.
+ *
+ * **저장되지 않는 제안이다.** 서버가 결과를 보관하지 않으므로 새로고침하면 사라진다 —
+ * 화면이 그 사실을 밝혀야 저장된 것으로 오해하고 나중에 다시 열어 보려다 잃지 않는다.
+ *
+ * **동기 API 이고 수십 초가 걸릴 수 있다.** AI 일정 생성(202 + 폴링)과 다르다 — 출력이
+ * 짧아(8~15개) 잡을 두지 않았다.
+ */
+export type PackingListResult = {
+  planId: string
+  items: PackingListItem[]
+  totalCount: number
+}
