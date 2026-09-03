@@ -7,6 +7,24 @@
  * 서버 검증의 말투가 갈린다.
  */
 export const planMessages = {
+  // ── 반려견 여행 준비물 (#155) ──────────────────────────────────────────────
+  packingHeading: '여행 준비물',
+  packingCta: '준비물 목록 만들기',
+  packingRetryCta: '다시 만들기',
+  /**
+   * **대기 문구가 시간을 먼저 말한다.** 동기 API 라 수십 초가 걸릴 수 있고(컨트롤러 설명),
+   * 아무 안내 없이 기다리게 하면 사용자는 고장으로 읽는다.
+   */
+  packingPending: '준비물을 고르는 중이에요',
+  packingPendingNote: '수십 초 걸릴 수 있어요. 화면을 닫지 마세요.',
+  /** 결과를 서버가 보관하지 않는다 — 저장된 것으로 오해하면 나중에 다시 열어 보려다 잃는다 */
+  packingNotSaved: '저장되지 않는 제안이에요. 화면을 벗어나면 사라져요.',
+  /** 근거가 대표 반려견 하나다 (`AiPackingProcessor` 가 아직 petIds 를 읽지 않는다 · #152 후속) */
+  packingSinglePetNote: '대표 반려견 기준이에요',
+  packingIntro: '일정과 여행 기간 예보, 반려견 특성을 근거로 만들어요.',
+  /** 실패 코드가 AIPLAN_016 하나다 — 없는 일정과 남의 일정을 구분해 말하지 않는다 */
+  packingErrorTitle: '준비물을 만들지 못했어요',
+
   pageTitle: '여행 일정',
   pageDescription: '반려견과 함께한 여행과 앞으로의 여행을 한곳에서 봐요.',
 

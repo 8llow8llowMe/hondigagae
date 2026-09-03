@@ -1,6 +1,11 @@
 import { clientFetch } from '@/lib/api/client'
 import { paths } from '@/lib/api/paths'
-import type { AiPlanJob, AiPlanSubmitPayload, AiPlanSubmitResult } from '@/types/ai-plan'
+import type {
+  AiPlanJob,
+  AiPlanSubmitPayload,
+  AiPlanSubmitResult,
+  PackingListResult,
+} from '@/types/ai-plan'
 
 /**
  * AI 일정 생성 API — 경로와 브라우저 호출부.
@@ -32,4 +37,20 @@ export function submitAiPlan(payload: AiPlanSubmitPayload): Promise<AiPlanSubmit
  */
 export function fetchAiPlanJob(jobId: string): Promise<AiPlanJob> {
   return clientFetch<AiPlanJob>(paths.aiPlans.job(jobId))
+}
+
+/**
+ * 반려견 여행 준비물 생성 (#155).
+ *
+ * **동기 호출이고 수십 초가 걸릴 수 있다** (컨트롤러 설명). AI 일정 생성과 달리 잡·폴링이
+ * 없으므로 호출부가 대기 상태를 스스로 그려야 한다.
+ *
+ * **본문이 없다.** 근거는 서버가 `planId` 로 모은다 — 일정 개요, 여행 기간의 예보,
+ * 반려견 특성이다.
+ *
+ * 실패는 **`AIPLAN_016` 하나다** — 일정이 없거나 본인 소유가 아니면 같은 코드로 온다.
+ * 남의 일정을 가리켜도 "없다" 고 답하는 쪽이라 화면이 두 경우를 구분해 말하면 안 된다.
+ */
+export function generatePackingList(planId: string): Promise<PackingListResult> {
+  return clientFetch<PackingListResult>(paths.aiPlans.packingList(planId), { method: 'POST' })
 }

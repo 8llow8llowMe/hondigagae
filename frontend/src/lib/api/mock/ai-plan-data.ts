@@ -130,16 +130,94 @@ export function resolveAiPlanMock(
 ): MockResult | null {
   const isSubmit = path === '/ai-plans' && method === 'POST'
   const jobMatch = /^\/ai-plans\/jobs\/([^/]+)$/.exec(path)
+  const packingMatch = /^\/ai-plans\/packing-list\/([^/]+)$/.exec(path)
+  const isPacking = packingMatch !== null && method === 'POST'
 
-  if (!isSubmit && (jobMatch === null || method !== 'GET')) return null
+  if (!isSubmit && !isPacking && (jobMatch === null || method !== 'GET')) return null
 
-  // 두 엔드포인트 모두 @PreAuthorize("isAuthenticated()") 다
+  // 세 엔드포인트 모두 @PreAuthorize("isAuthenticated()") 다
   const memberId = memberIdOf(accessToken)
   if (memberId === null) return UNAUTHORIZED()
 
   if (isSubmit) return submit(memberId, body)
 
+  if (isPacking) return packingList(memberId, packingMatch?.[1] ?? '')
+
   return jobStatus(memberId, jobMatch?.[1] ?? '')
+}
+
+/**
+ * 반려견 여행 준비물 (#155).
+ *
+ * **실패 코드가 하나다.** 일정이 없거나 본인 소유가 아니면 둘 다 `AIPLAN_016` 이다 —
+ * 남의 일정을 가리켜도 "없다" 고 답하는 쪽이라 mock 도 두 경우를 구분하지 않는다.
+ *
+ * **수십 초 지연은 흉내 내지 않는다.** mock 에 인위적 지연을 넣으면 로컬에서 모든 작업이
+ * 느려지고, 대기 화면은 `isPending` 으로 이미 확인할 수 있다. 그 사실을 여기 적어 둔다 —
+ * 로컬이 빠르다고 실제도 빠르다고 오해하면 안 된다.
+ */
+function packingList(memberId: string, rawPlanId: string): MockResult {
+  const store = mockStore()
+  const plan = store.plans.find(
+    (candidate) =>
+      candidate.planId === rawPlanId && candidate.memberId === memberId && !candidate.deleted,
+  )
+  if (plan === undefined) {
+    return fail(400, 'AIPLAN_016', '일정 개요를 가져오지 못해 준비물을 만들 수 없습니다.')
+  }
+
+  /*
+    분류는 enum 이 아니라 서버가 주는 문자열이다. 문구는 백엔드 `PackingListResponse` 의
+    example 과 프롬프트 분류를 따른다 — 창작하지 않는다.
+
+    **이유(reason)가 이 기능의 핵심이다.** 일반적인 준비물 목록이 아니라 이 여행의 예보·
+    일정·반려견에 근거해야 하므로, mock 도 일정 제목과 날짜를 문장에 넣어 그 성격을 지킨다.
+  */
+  const items = [
+    {
+      category: '필수',
+      name: '반려동물 등록증',
+      reason: '동반 입장 시 확인을 요구하는 시설이 있어 챙기는 편이 안전합니다.',
+    },
+    {
+      category: '필수',
+      name: '리드줄과 배변봉투',
+      reason: `${plan.title} 일정에 야외 장소가 포함돼 이동 중 계속 필요합니다.`,
+    },
+    {
+      category: '날씨 대비',
+      name: '휴대용 우비',
+      reason: '2일차 강수확률 80% 예보라 야외 일정 중 비를 만날 수 있습니다.',
+    },
+    {
+      category: '날씨 대비',
+      name: '아이스팩과 쿨매트',
+      reason: '여행 기간 최고기온이 31도까지 올라 이동 중 체온 관리가 필요합니다.',
+    },
+    {
+      category: '반려견 케어',
+      name: '평소 먹던 사료',
+      reason: '여행 중 사료를 바꾸면 배탈이 나기 쉬워 쓰던 것을 그대로 챙깁니다.',
+    },
+    {
+      category: '반려견 케어',
+      name: '발 세정용 물티슈',
+      reason: '해안 산책로가 일정에 있어 모래와 염분을 닦아 낼 것이 필요합니다.',
+    },
+    {
+      category: '이동',
+      name: '이동장 또는 카시트',
+      reason: `${plan.startDate} 출발부터 장소 간 이동이 이어져 차 안에서 고정이 필요합니다.`,
+    },
+    {
+      category: '이동',
+      name: '접이식 물그릇',
+      reason: '이동 사이 급수 지점이 일정한 간격으로 없어 직접 챙기는 편이 낫습니다.',
+    },
+  ]
+
+  // 이 파일의 `ok()` 는 MockResult 를 통째로 만든다 — plan-data.ts 의 것과 시그니처가 다르다
+  return ok({ planId: plan.planId, items, totalCount: items.length })
 }
 
 function submit(memberId: string, body: string | null): MockResult {

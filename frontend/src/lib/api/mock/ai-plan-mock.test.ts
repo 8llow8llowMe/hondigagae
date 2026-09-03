@@ -280,3 +280,34 @@ describe('AI 일정 mock — 초안의 nullable 필드', () => {
     expect(notes).toContain(null)
   })
 })
+
+describe('준비물 mock — POST /ai-plans/packing-list/{planId} (#155)', () => {
+  function packing(planId: string, token: string | null = TOKEN) {
+    return resolveMock(`/ai-plans/packing-list/${planId}`, 'POST', '', null, token)
+  }
+
+  it('토큰이 없으면 401 이다', () => {
+    expect(packing('223456789012000001', null)?.status).toBe(401)
+  })
+
+  it('분류와 이유를 갖춘 목록을 준다', () => {
+    const body = packing('223456789012000001')?.payload.dataBody as {
+      items: { category: string; name: string; reason: string }[]
+      totalCount: number
+    }
+
+    expect(body.totalCount).toBe(body.items.length)
+    expect(body.items.every((item) => item.reason !== '')).toBe(true)
+    expect(body.items.map((item) => item.category)).toContain('날씨 대비')
+  })
+
+  /*
+    일정이 없을 때와 남의 일정일 때가 **같은 코드**다. 남의 일정을 가리켜도 "없다" 고
+    답하는 쪽이라 mock 도 두 경우를 구분하지 않는다.
+  */
+  it('없는 일정과 남의 일정이 모두 AIPLAN_016 이다', () => {
+    expect(JSON.stringify(packing('999999999999999999')?.payload)).toContain('AIPLAN_016')
+    // 223456789012000099 는 다른 회원의 일정이다 (store.ts fixture)
+    expect(JSON.stringify(packing('223456789012000099')?.payload)).toContain('AIPLAN_016')
+  })
+})

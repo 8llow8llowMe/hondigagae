@@ -88,5 +88,10 @@ export const paths = {
   aiPlans: {
     submit: '/ai-plans',
     job: (jobId: string) => `/ai-plans/jobs/${jobId}`,
+    /**
+     * 반려견 여행 준비물 생성 (#155). **POST 인데 조회에 가깝다** — 서버가 결과를
+     * 저장하지 않는 제안이라 재호출하면 다른 목록이 온다.
+     */
+    packingList: (planId: string) => `/ai-plans/packing-list/${planId}`,
   },
 } as const

@@ -10,6 +10,7 @@ import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { PlanItemRow } from '@/features/plan/plan-item-row'
 import { PlanManageMenu } from '@/features/plan/plan-manage-menu'
 import { PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
+import { PlanPackingList } from '@/features/plan/plan-packing-list'
 import { PlanStatusAction } from '@/features/plan/plan-status-action'
 import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
 import { usePlanDayEdit } from '@/features/plan/use-plan-day-edit'
@@ -127,6 +128,12 @@ export function PlanDetailSection({
           /* 관리 진입점은 일정의 신원 옆에 둔다 — `PlanManageMenu` 주석 참고 */
           menu={<PlanManageMenu plan={plan} />}
         />
+
+        {/*
+          준비물 (#155). **개요 바로 아래, 좌측 레일이다** — 일정 전체를 근거로 만드는
+          것이라 특정 일자 옆에 두면 그 날 것으로 읽힌다.
+        */}
+        <PlanPackingList planId={plan.planId} />
       </aside>
 
       <div className="border-border lg:border-l">
