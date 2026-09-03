@@ -816,14 +816,29 @@ for required_key in \${required_runtime_keys}; do
   fi
 done
 
-docker compose --env-file .env.runtime -f ${config.composeFile} config >/dev/null
-docker compose --env-file .env.runtime -f ${config.composeFile} up -d --build --remove-orphans ${config.composeServiceName}-${ctx.deployEnv}
+# compose 프로젝트명을 디렉터리 basename(api-gateway, web ...)에 맡기지 않는다.
+# BossPickSeoul 과 혼디가개가 같은 호스트에서 같은 basename 을 쓰면 하나의 프로젝트로 묶여,
+# `up --remove-orphans` 가 상대 프로젝트의 같은 서비스 컨테이너를 orphan 으로 지워 버린다.
+# (실제로 hondigagae auth 배포가 bosspickseoul-auth-service-dev 를 내렸다.)
+COMPOSE_PROJECT="${config.containerNamePrefix}"
+CONTAINER_NAME="${config.containerNamePrefix}-${ctx.deployEnv}"
+
+# 1회 이전: 같은 이름의 컨테이너가 옛 프로젝트(디렉터리명)에 묶여 있으면 먼저 지운다.
+# 그대로 두면 compose 가 "container name already in use" 로 실패한다.
+existing_project="\$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "\${CONTAINER_NAME}" 2>/dev/null || true)"
+if [ -n "\${existing_project}" ] && [ "\${existing_project}" != "\${COMPOSE_PROJECT}" ]; then
+  echo "기존 컨테이너 \${CONTAINER_NAME} 가 다른 compose 프로젝트(\${existing_project})에 속해 있어 정리합니다."
+  docker rm -f "\${CONTAINER_NAME}" >/dev/null
+fi
+
+docker compose -p "\${COMPOSE_PROJECT}" --env-file .env.runtime -f ${config.composeFile} config >/dev/null
+docker compose -p "\${COMPOSE_PROJECT}" --env-file .env.runtime -f ${config.composeFile} up -d --build --remove-orphans ${config.composeServiceName}-${ctx.deployEnv}
 
 for attempt in \$(seq 1 30); do
   state="\$(docker inspect -f '{{.State.Status}}' ${config.containerNamePrefix}-${ctx.deployEnv} 2>/dev/null || true)"
 
   if [ "\${state}" = "running" ]; then
-    docker compose --env-file .env.runtime -f ${config.composeFile} ps ${config.composeServiceName}-${ctx.deployEnv}
+    docker compose -p "\${COMPOSE_PROJECT}" --env-file .env.runtime -f ${config.composeFile} ps ${config.composeServiceName}-${ctx.deployEnv}
     exit 0
   fi
 
