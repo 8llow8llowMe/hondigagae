@@ -137,6 +137,14 @@ BossPickSeoul 규칙 `{project}_{service}_{env}` 그대로다.
 dev 는 `ddl-auto: update` 라 테이블은 첫 기동 때 애플리케이션이 만든다. 사람이 미리 만드는 것은
 스키마와 계정뿐이다. prod 는 `ddl-auto: none` 이므로 별도 마이그레이션 런북이 필요하다.
 
+**스키마명은 Vault 의 `*_DB_URL` 과 한 글자도 다르면 안 된다.** 없으면 서비스가 기동 시
+`Unknown database 'hondigagae_tour'` 로 죽는다 — JPA 는 테이블은 만들지만 데이터베이스는 만들지 않는다.
+아래 SQL 은 `backend/scripts/mysql/init-dev-schemas.sql` 에 실행 가능한 형태로 있다.
+
+```bash
+docker exec -i mysql mysql -uroot -p < backend/scripts/mysql/init-dev-schemas.sql
+```
+
 ```sql
 -- main-server MySQL 에 root 로 접속해 1회 실행. 비밀번호는 Vault 의 DB_PASSWORD 와 같은 값.
 CREATE DATABASE IF NOT EXISTS hondigagae_auth_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -202,6 +210,7 @@ curl -s "http://{host}:7000/api/v1/emergencies/facilities?lat=33.4996&lng=126.53
 | 게이트웨이가 엉뚱한 서비스로 보냄 | `*_APP_NAME` 이 등록명과 불일치 | Eureka UI 의 등록명과 대조 |
 | 배포 단계에서 `.env.runtime` key missing | Vault secret 에 키 누락 | `.env.example` 과 대조 |
 | batch 컨테이너가 안 뜸 | `BATCH_DATA_DIR` 미설정 | 배포 호스트에 디렉터리를 만들고 Vault 에 경로 기입 |
+| 기동 직후 `Unknown database 'hondigagae_…'` | Vault `*_DB_URL` 의 스키마가 MySQL 에 없음 (JPA 는 DB 를 만들지 않는다) | `backend/scripts/mysql/init-dev-schemas.sql` 실행. 스키마명과 URL 을 한 글자까지 맞춘다 |
 | 장소 조회 0건 | 배치 미실행 | `data-refresh-guide.md` 4절 |
 | Gradle 데몬 죽음 (`EXCEPTION_ACCESS_VIOLATION`) | 데몬 힙 부족 | `gradle.properties` 의 `-Xmx2g` 유지, `./gradlew --stop` 후 재시도 |
 | 배포하면 BossPickSeoul 컨테이너가 사라짐 (또는 반대) | compose 프로젝트명이 디렉터리 basename(`api-gateway` 등)으로 두 프로젝트가 같아져 `--remove-orphans` 가 상대를 지움 | 파이프라인이 `-p {containerNamePrefix}` 를 명시한다. **두 레포 모두** 반영돼야 하고, 처음 한 번은 옛 프로젝트 컨테이너를 자동으로 정리한다 |
