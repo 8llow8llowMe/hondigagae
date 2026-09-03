@@ -12,7 +12,8 @@ import { Skeleton } from '@/components/skeleton'
 import { PlaceInsightRow } from '@/features/home/place-insight-row'
 import { ProfileCard } from '@/features/home/profile-card'
 import { UpcomingPlanRow } from '@/features/home/upcoming-plan-row'
-import { useSuitabilities, useWalkSafety } from '@/features/home/use-home-insight'
+import { useSuitabilities, useWalkSafety, useWalkTimes } from '@/features/home/use-home-insight'
+import { WalkTimesSection } from '@/features/home/walk-times-section'
 import { WalkVerdict } from '@/features/home/walk-verdict'
 import { useSelectedPetStore } from '@/features/nav/selected-pet-store'
 import { usePetList } from '@/features/pet/use-pet-list'
@@ -26,6 +27,19 @@ import type { PlanSummaryItem } from '@/types/plan'
 
 /** 홈은 요약 화면이다. 3장이 적당하다 — 공통명세 S5-2 (N=3) */
 const TOP_PLACE_COUNT = 3
+
+/**
+ * 골든타임 조회 좌표 — 제주시청 (#158).
+ *
+ * **현재 위치가 아니다.** FE 에 아직 위치 권한 축이 없어 제주 대표 좌표로 고정하고
+ * 화면이 "제주시 기준" 이라고 밝힌다. 홈이 이미 `todayLabel` 에 `· 제주시` 를 쓰고 있어
+ * 어긋나지 않는다. 현재 위치·기준 장소 좌표로 넓히는 것은 별도 이슈다 — 권한 거부와
+ * 실패 경로가 이 섹션보다 넓은 작업이다.
+ *
+ * 제주 안에서 좌표가 조금 달라도 예보 격자가 같아 곡선은 거의 바뀌지 않는다.
+ */
+const JEJU_CITY_LAT = 33.4996213
+const JEJU_CITY_LNG = 126.5311884
 
 /**
  * 홈 — 아트보드 `01 홈`(모바일 390) / `02 홈`(데스크톱 1440).
@@ -68,6 +82,11 @@ export function HomeView({
 
   const basisPlaceId = resolveBasisPlaceId(recentPlaceId, null)
   const walkSafety = useWalkSafety(basisPlaceId, condition)
+  /*
+    **기준 장소가 없어도 조회한다.** 산책 위험도는 장소가 있어야 성립하지만 골든타임은
+    좌표만 있으면 되고, 첫 방문자에게도 "오늘 언제 나가면 좋은지" 는 답할 수 있다.
+  */
+  const walkTimes = useWalkTimes(JEJU_CITY_LAT, JEJU_CITY_LNG, condition)
 
   const topPlaces = pickTopPlaces(places, TOP_PLACE_COUNT)
   const suitabilities = useSuitabilities(
@@ -142,6 +161,19 @@ export function HomeView({
             바깥에 두면 모바일에서 접었을 때 빨간 줄 아래 회색 줄만 덩그러니 남는다.
           */}
           {walkSafety.data === undefined && <Band />}
+
+          {/*
+            골든타임. **산책 위험도 바로 아래다** — "지금 나가도 되나" 다음에 오는 질문이
+            "그럼 언제 나가나" 이고, 둘이 떨어지면 같은 판정 규칙을 쓴다는 것이 안 읽힌다.
+
+            **위 `Band` 뒤에 둔다.** 이 섹션이 스스로 아래 밴드를 그리므로 앞에 두면
+            판정이 없는 날 밴드가 연달아 두 줄로 겹친다.
+
+            **조회 실패는 섹션을 숨긴다.** 홈의 최소 골격에 이 섹션은 없고, 여기에
+            `ErrorState` 를 하나 더 쌓으면 좌측 열이 오류 두 개로 채워진다.
+          */}
+          <WalkTimesSection data={walkTimes.data ?? null} loading={walkTimes.isPending} />
+
           {/* 상시 진입점. 오류·빈 화면에서도 제거하지 않는다 (Banner 주석) */}
           <Banner
             href="/emergency"

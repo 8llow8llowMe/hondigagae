@@ -3,9 +3,14 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
 
 import { clientFetch } from '@/lib/api/client'
-import { suitabilityPath, walkSafetyPath } from '@/lib/api/insight'
+import { suitabilityPath, walkSafetyPath, walkTimesPath } from '@/lib/api/insight'
 import { conditionKey, INSIGHT_QUERY_OPTIONS, insightKeys } from '@/lib/insight/queries'
-import type { PetCondition, PlaceSuitabilityResponse, WalkSafetyResponse } from '@/types/insight'
+import type {
+  PetCondition,
+  PlaceSuitabilityResponse,
+  WalkSafetyResponse,
+  WalkTimesResponse,
+} from '@/types/insight'
 
 /**
  * 기준 장소의 산책 판정.
@@ -22,6 +27,25 @@ export function useWalkSafety(placeId: string | null, condition: PetCondition | 
     queryKey: insightKeys.walkSafety(placeId ?? '', conditionKey(condition)),
     queryFn: () => clientFetch<WalkSafetyResponse>(walkSafetyPath(placeId as string, condition)),
     enabled: placeId !== null,
+    placeholderData: (previous) => previous,
+    ...INSIGHT_QUERY_OPTIONS,
+  })
+}
+
+/**
+ * 오늘의 산책 골든타임 (#158).
+ *
+ * **`useWalkSafety` 와 달리 항상 조회한다.** 저쪽은 기준 장소가 있어야 성립하지만 이쪽은
+ * 좌표만 있으면 되고, 좌표는 호출부가 제주 기준으로 늘 갖고 있다 — 첫 방문자에게도
+ * "오늘 언제 나가면 좋은지" 는 답할 수 있다.
+ *
+ * 반려견을 바꾸면 조건 key 가 갈려 재조회되고, `placeholderData` 로 이전 곡선을 유지한다 —
+ * 깜빡이면 바꾼 것이 반영됐는지 알 수 없다 (홈-세부명세 D4-2).
+ */
+export function useWalkTimes(lat: number, lng: number, condition: PetCondition | null) {
+  return useQuery({
+    queryKey: insightKeys.walkTimes(lat, lng, conditionKey(condition)),
+    queryFn: () => clientFetch<WalkTimesResponse>(walkTimesPath(lat, lng, condition)),
     placeholderData: (previous) => previous,
     ...INSIGHT_QUERY_OPTIONS,
   })

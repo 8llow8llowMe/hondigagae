@@ -12,6 +12,20 @@ export const homeMessages = {
   saferWindowLabel: '더 안전한 시간대',
   basisSuffix: '기준',
   reasonsLink: '판정 근거 보기',
+
+  // ── 오늘의 산책 골든타임 (#158) ────────────────────────────────────────────
+  goldenHeading: '오늘 산책하기 좋은 시간',
+  /** 좌표 축이라 기준을 밝힌다 — 현재 위치가 아니다 */
+  goldenBasis: '제주시 기준',
+  /**
+   * 추천 구간이 없는 날. **"그나마 이때가 낫다" 를 쓰지 않는다** — 서버가 일부러 구간을
+   * 주지 않는 날이고, 대안을 지어내면 사용자가 그것을 허락으로 읽는다 (`GoldenWalkWindow`).
+   */
+  goldenNone: '오늘은 나가지 않는 편이 좋아요',
+  goldenNoneDesc: '남은 시간이 모두 위험 등급이에요. 실내에서 보내는 편이 안전해요.',
+  goldenPavementNote: '노면 온도는 추정치예요',
+  /** 시간대 곡선을 못 받은 경우 (늦은 밤이면 남은 예보가 없다) */
+  goldenCurveEmpty: '오늘 남은 예보가 없어요',
   /** `{name}` 을 반려견 이름으로 치환한다 */
   suitabilityHeading: '오늘 {name}에게 맞는 곳',
   suitabilityFallback: '오늘 갈 만한 곳',
