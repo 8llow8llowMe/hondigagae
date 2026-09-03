@@ -30,6 +30,7 @@ deploy agent 가 Vault KV secret 전체를 읽어 `.env.runtime` 으로 변환�
 | Vault 경로 | `kv/hondigagae/backend/{env}/env` | `kv/hondigagae/backend/dev/env` |
 | 배포 경로 | `$HOME/deploy/hondigagae/backend/{group}/{service}` | `.../service/tour-service` |
 | PR 라벨 | `backend-{service}` | `backend-tour-service` |
+| compose 프로젝트 | 컨테이너명 prefix 와 동일 `hondigagae-{service}` (파이프라인이 `-p` 로 명시) | `hondigagae-tour-service` |
 
 Vault 경로가 서비스별로 나뉘지 않는 점에 유의한다. **환경당 secret 하나**에 전 서비스의
 env 키를 모아 두고, 각 compose 가 필요한 것만 골라 쓴다. 서비스마다 secret 을 쪼개면
@@ -203,3 +204,4 @@ curl -s "http://{host}:7000/api/v1/emergencies/facilities?lat=33.4996&lng=126.53
 | batch 컨테이너가 안 뜸 | `BATCH_DATA_DIR` 미설정 | 배포 호스트에 디렉터리를 만들고 Vault 에 경로 기입 |
 | 장소 조회 0건 | 배치 미실행 | `data-refresh-guide.md` 4절 |
 | Gradle 데몬 죽음 (`EXCEPTION_ACCESS_VIOLATION`) | 데몬 힙 부족 | `gradle.properties` 의 `-Xmx2g` 유지, `./gradlew --stop` 후 재시도 |
+| 배포하면 BossPickSeoul 컨테이너가 사라짐 (또는 반대) | compose 프로젝트명이 디렉터리 basename(`api-gateway` 등)으로 두 프로젝트가 같아져 `--remove-orphans` 가 상대를 지움 | 파이프라인이 `-p {containerNamePrefix}` 를 명시한다. **두 레포 모두** 반영돼야 하고, 처음 한 번은 옛 프로젝트 컨테이너를 자동으로 정리한다 |
