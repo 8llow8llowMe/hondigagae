@@ -11,6 +11,7 @@ import { placeDetailPath } from '@/lib/api/place'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
+import { placeDetailFallbackTitle } from '@/lib/place/detail-title'
 import { toPlainText } from '@/lib/place/text'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import type { PlaceDetail } from '@/types/place'
@@ -48,9 +49,9 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
       title: `${place.title} · 혼디가개`,
       description: summarize(place),
     }
-  } catch {
+  } catch (error) {
     // 조회 실패를 메타데이터 단계에서 화면 실패로 만들지 않는다. 판정은 페이지가 한다
-    return { title: `${messages.place.detailNotFoundTitle} · 혼디가개` }
+    return { title: `${placeDetailFallbackTitle(error)} · 혼디가개` }
   }
 }
 

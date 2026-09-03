@@ -99,7 +99,16 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
       <span className="text-body-2 min-w-0 font-semibold">{item.region.name}</span>
 
       <span className="text-caption text-fg-muted flex shrink-0 items-center gap-2 font-medium tabular-nums">
-        {maxTemperature !== null && <span>{maxTemperature}℃</span>}
+        {/*
+          **온도에 라벨을 붙인다** (#206). `maxTemperature` 인데 숫자만 두면 무슨 온도인지
+          알 수 없다 — 바로 위 추천 문장(서버 완성형)은 "최고기온 26도" 라고 말한다.
+          `minTemperature` 와 값이 같은 날이 많아 드러나지 않았을 뿐이다 (DESIGN.md §2-3).
+        */}
+        {maxTemperature !== null && (
+          <span>
+            {messages.home.regionTempPrefix} {maxTemperature}℃
+          </span>
+        )}
         {item.maxPrecipitationProbability !== null && (
           <span>강수 {item.maxPrecipitationProbability}%</span>
         )}

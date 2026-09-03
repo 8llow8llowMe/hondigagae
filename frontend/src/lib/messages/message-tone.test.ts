@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
+import { homeMessages } from '@/lib/messages/home'
+
 /**
  * **FE 가 쓴 문구의 어미를 해요체로 고정한다** — DESIGN.md §1 (이슈 #15).
  *
@@ -56,5 +58,20 @@ describe('문구 어미 — 해요체로 통일한다 (DESIGN.md §1)', () => {
 
     // 이 개수가 0 이 되면 복제본을 잘못 고친 것이다
     expect(copies.length).toBeGreaterThan(0)
+  })
+})
+
+/*
+  **#206.** 홈 응급 배너가 `제주 24시간 병원은 3곳뿐이에요` 로 개수를 단정하고 있었다.
+  백엔드가 이 수를 주지 않아 하드코딩이었고, 배너를 눌러 들어간 화면은 실제 값을 쓰므로
+  데이터가 어긋나는 순간 **홈은 "3곳" 이라고 말하고 목록은 "반경 안에 없어요" 라고 말한다** —
+  dev 에서 실제로 그랬다 (`/emergencies/facilities` 가 0건).
+
+  주석으로 "숫자를 단정하지 마세요" 라고 적어 두면 반드시 어긋난다. 그래서 테스트로 잡는다
+  (이 파일의 어미 규칙과 같은 판단).
+*/
+describe('개수를 단정하는 문구 — 서버가 세는 값을 FE 가 적어 두지 않는다', () => {
+  it('홈 응급 배너 문구에 개수가 박혀 있지 않다', () => {
+    expect(homeMessages.emergencyDesc).not.toMatch(/\d+\s*곳/)
   })
 })
