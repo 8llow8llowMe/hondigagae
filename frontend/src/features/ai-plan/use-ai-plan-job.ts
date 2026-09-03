@@ -6,7 +6,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { AI_PLAN_JOB_QUERY_OPTIONS, aiPlanKeys } from '@/features/ai-plan/queries'
 import { useAiPlanJobStream } from '@/features/ai-plan/use-ai-plan-job-stream'
-import { jobPollInterval, jobPollPhase, shouldKeepPolling } from '@/lib/ai-plan/job'
+import {
+  JOB_STREAM_SAFETY_POLL_MS,
+  jobPollInterval,
+  jobPollPhase,
+  shouldKeepPolling,
+} from '@/lib/ai-plan/job'
 import { mergeJobUpdate } from '@/lib/ai-plan/job-stream'
 import { fetchAiPlanJob } from '@/lib/api/ai-plan'
 import type { AiPlanJob } from '@/types/ai-plan'
@@ -64,9 +69,19 @@ export function useAiPlanJob(jobId: string) {
       **완료·실패·상한에서 멈춘다.** 멈추지 않는 폴링이 대표 사고다.
       탭이 비활성이면 React Query 기본대로 멈추고 돌아오면 재개된다 (명세 S4).
     */
-    refetchInterval: (polled): number | false =>
-      // **구독이 살아 있으면 폴링하지 않는다.** 끊기면 이 값이 다시 2초가 된다
-      streaming ? false : jobPollInterval(polled.state.data, elapsedMs),
+    refetchInterval: (polled): number | false => {
+      const interval = jobPollInterval(polled.state.data, elapsedMs)
+
+      // 종결·상한에서는 구독 여부와 무관하게 멈춘다 — 멈추지 않는 폴링이 대표 사고다
+      if (interval === false) return false
+
+      /*
+        **구독 중에는 2초 폴링을 끊지만 완전히 끄지는 않는다.** 하트비트가 코멘트 프레임이라
+        JS 가 구독의 생존을 볼 수 없어(`JOB_STREAM_SAFETY_POLL_MS`), 반열림 연결에서
+        `onerror` 가 오지 않으면 상한까지 화면이 멈춘다. 끊기면 이 값이 다시 2초가 된다.
+      */
+      return streaming ? JOB_STREAM_SAFETY_POLL_MS : interval
+    },
   })
 
   const polling = query.data === undefined || shouldKeepPolling(query.data)

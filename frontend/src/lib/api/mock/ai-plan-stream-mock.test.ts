@@ -221,6 +221,24 @@ describe('toEventStream', () => {
     expect(text).toBe('')
   })
 
+  /*
+    `request.signal` 이 발화하지 않는 배포에서는 리더의 `cancel()` 이 정리 경로다.
+    타이머를 지우지 않으면 응답이 끝난 뒤에도 pump 체인이 남는다.
+  */
+  it('리더가 cancel 하면 남은 프레임을 보내지 않는다', async () => {
+    const stream = toEventStream([
+      { delayMs: 0, event: 'job-update', data: { step: 1 } },
+      { delayMs: 50, event: 'job-update', data: { step: 2 } },
+    ])
+
+    const reader = stream.getReader()
+    const first = await reader.read()
+    await reader.cancel()
+
+    expect(new TextDecoder().decode(first.value)).toContain('"step":1')
+    expect((await reader.read()).done).toBe(true)
+  })
+
   it('중간에 끊기면 남은 프레임을 보내지 않는다', async () => {
     const controller = new AbortController()
     const stream = toEventStream(

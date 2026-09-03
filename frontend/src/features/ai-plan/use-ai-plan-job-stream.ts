@@ -11,8 +11,7 @@ import {
   mergeJobUpdate,
   parseJobEvent,
 } from '@/lib/ai-plan/job-stream'
-import { bffUrl } from '@/lib/api/client'
-import { paths } from '@/lib/api/paths'
+import { openAiPlanJobStream } from '@/lib/api/ai-plan'
 import type { AiPlanJob } from '@/types/ai-plan'
 
 /**
@@ -32,14 +31,14 @@ export function useAiPlanJobStream(jobId: string): boolean {
   const [streaming, setStreaming] = useState(false)
 
   useEffect(() => {
-    // SSR·구형 브라우저 — 폴링으로 간다
+    // SSR·구형 브라우저 — 폴링으로 간다 (`openAiPlanJobStream` 이 던지기 전에 막는다)
     if (typeof globalThis.EventSource !== 'function') {
       setStreaming(false)
       return
     }
 
     const key = aiPlanKeys.job(jobId)
-    const source = new globalThis.EventSource(bffUrl(paths.aiPlans.jobStream(jobId)))
+    const source = openAiPlanJobStream(jobId)
     let live = true
 
     /** 구독을 접고 폴링에 넘긴다. 재연결은 `EventSource` 에 맡기지 않는다 */
