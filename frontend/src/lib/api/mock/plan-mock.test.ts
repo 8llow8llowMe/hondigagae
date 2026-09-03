@@ -42,13 +42,71 @@ describe('일정 mock — 인증과 소유권', () => {
     expect(titles).not.toContain('남의 일정')
   })
 
-  it('남의 반려견으로는 만들 수 없다', () => {
-    expect(create({ ...VALID, petId: '123456789012000099' })?.status).toBe(400)
+  /*
+    **plan-service 는 petId 소유권을 검사하지 않는다.** `createPlan` 이 값을 그대로 저장하고,
+    auth-service 는 나중에 날씨 판정의 특성 조회에서만 소유권을 본다 — 남의 아이디를 넣으면
+    특성이 빠질 뿐 일정은 만들어진다. 예전 mock 은 여기서 400 을 냈는데, 프로덕션에 없는
+    오류 분기를 FE 가 만들게 하는 거짓이었다 (#152 계약 대조).
+  */
+  it('남의 반려견이어도 서버가 막지 않는다 — 소유권 검사가 없다', () => {
+    expect(create({ ...VALID, petId: '123456789012000099' })?.status).toBe(200)
   })
 
   it('다른 회원은 자기 일정만 본다', () => {
     const contents = slice(list('', OTHER)).contents
     expect(contents.map((plan) => plan.title)).toEqual(['남의 일정'])
+  })
+})
+
+describe('일정 mock — 동행 반려견 (#152)', () => {
+  function detailOf(result: ReturnType<typeof create>): PlanDetail {
+    return (result?.payload as ApiResponse<PlanDetail>).dataBody!
+  }
+
+  it('petIds 가 petId 를 이기고, 첫 번째가 대표가 된다', () => {
+    const detail = detailOf(
+      create({
+        ...VALID,
+        petId: '123456789012000001',
+        petIds: ['123456789012000002', '123456789012000001'],
+      }),
+    )
+
+    expect(detail.petIds).toEqual(['123456789012000002', '123456789012000001'])
+    expect(detail.petId).toBe('123456789012000002')
+  })
+
+  it('중복은 순서를 지켜 한 마리로 접는다', () => {
+    const detail = detailOf(
+      create({ ...VALID, petIds: ['123456789012000002', '123456789012000002'] }),
+    )
+
+    expect(detail.petIds).toEqual(['123456789012000002'])
+  })
+
+  it('한 마리 일정도 petIds 가 원소 하나로 온다 — 빈 배열이 아니다', () => {
+    expect(detailOf(create(VALID)).petIds).toEqual(['123456789012000001'])
+  })
+
+  it('반려견을 지정하지 않으면 대표 반려견으로 대신한다', () => {
+    const detail = detailOf(create({ ...VALID, petId: undefined }))
+
+    // 데모 계정의 대표는 몽실이(...001) 다 — `store.ts` fixture
+    expect(detail.petIds).toEqual(['123456789012000001'])
+  })
+
+  it('여섯 마리는 PLAN_115 다', () => {
+    const result = create({ ...VALID, petIds: ['1', '2', '3', '4', '5', '6'] })
+
+    expect(result?.status).toBe(400)
+    expect(JSON.stringify(result?.payload)).toContain('PLAN_115')
+  })
+
+  it('양수가 아닌 아이디는 PLAN_101 이다 — 필수가 아니라 양수 제약이다', () => {
+    const result = create({ ...VALID, petId: '0' })
+
+    expect(result?.status).toBe(400)
+    expect(JSON.stringify(result?.payload)).toContain('PLAN_101')
   })
 })
 

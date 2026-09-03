@@ -15,7 +15,14 @@ import type { ScoreMetricMetadata } from '@/types/insight'
 /** `GET /plans` — `SliceResponse<PlanSummaryItem>` 로 온다 */
 export type PlanSummaryItem = {
   planId: string
+  /** 대표 반려견. **`petIds[0]` 과 같다** (#152) */
   petId: string
+  /**
+   * 동행 반려견 (#152). **한 마리 일정이어도 원소 하나로 온다** — 빈 배열이 아니다.
+   * `plan_pet` 조인 행이 없는 옛 일정도 서버가 `Plan.resolvePetIds()` 로 `[petId]` 를
+   * 채워 준다. 그래서 화면은 `petId` 대신 이 배열을 기준으로 읽으면 된다.
+   */
+  petIds: string[]
   areaCode: string
   title: string
   startDate: string
@@ -60,6 +67,20 @@ export type PlanAlternativePlaceItem = {
 }
 
 /**
+ * 한 마리의 그날 적합도 (#152).
+ *
+ * **점수·등급만 있다.** 판정 근거(`reasons`)·날씨·실내 대안은 기준 반려견 것만 일자에 한 번
+ * 붙는다 — 날씨는 아이마다 같고, 근거 목록을 마리 수만큼 반복하면 응답이 읽기 어려워진다
+ * (`PlanDayPetSuitabilityItem` javadoc).
+ */
+export type PlanDayPetSuitabilityItem = {
+  petId: string
+  /** 판단 근거가 없으면 null */
+  score: number | null
+  suitabilityLevel: ScoreMetricMetadata | null
+}
+
+/**
  * 일자별 브리핑. **일정 일수만큼 항상 채워진다** — 배열 길이로 성공/실패를 판단하지 않는다.
  * 그날 브리핑을 못 낸 이유는 `unavailableReason` 에 문장으로 온다.
  */
@@ -69,11 +90,29 @@ export type PlanDayWeatherItem = {
   date: string
   representativePlaceId: string | null
   representativePlaceTitle: string | null
+  /**
+   * 그날 판정의 기준이 된 반려견 (#152). **아이별 판정 중 점수가 가장 낮은 아이다** —
+   * 한 마리라도 힘든 날이면 그날은 힘든 날이라는 규칙이다 (`PlanWeatherProcessor.pickBasisPet`).
+   *
+   * **대표 반려견(`petIds[0]`)과 다를 수 있다.** 아래 `score`·`suitabilityLevel`·`reasons`·
+   * `indoorAlternatives` 는 전부 **이 아이 기준**이므로, 화면이 대표 이름을 붙이면 거짓말이
+   * 된다. 판정을 못 낸 날은 null 이다.
+   */
+  basisPetId: string | null
+  /** `basisPetId` 기준. 판단 근거가 없으면 null */
   score: number | null
+  /** `basisPetId` 기준 */
   suitabilityLevel: ScoreMetricMetadata | null
+  /** `basisPetId` 기준 */
   reasons: PlanWeatherReasonItem[]
   weather: PlanDailyWeatherItem | null
+  /** `basisPetId` 기준 */
   indoorAlternatives: PlanAlternativePlaceItem[]
+  /**
+   * 아이별 점수·등급 (#152). **한 마리 일정이면 원소 하나고, 판정을 못 낸 날은 빈 배열이다** —
+   * `petIds` 와 길이가 다를 수 있다(그 아이만 조회에 실패하면 빠진다). 순서는 `petIds` 순이다.
+   */
+  petSuitabilities: PlanDayPetSuitabilityItem[]
   /** null 이면 정상. 값이 있으면 **화면에 그대로 안내한다** */
   unavailableReason: string | null
 }
@@ -114,7 +153,12 @@ export type PlanWeatherResponse = {
   planTitle: string
   startDate: string
   endDate: string
-  /** false 면 특성 조회에 실패해 일반 조건으로 판정한 결과다 */
+  /** 판정에 들어간 동행 반려견 (#152). 일자별 `basisPetId` 는 이 안의 하나다 */
+  petIds: string[]
+  /**
+   * false 면 특성 조회에 실패해 일반 조건으로 판정한 결과다.
+   * **여러 마리면 "한 마리라도 반영됐는가" 다** — 마리별 플래그가 아니다 (#152).
+   */
   petConditionApplied: boolean
   days: PlanDayWeatherItem[]
 }
@@ -163,7 +207,19 @@ export const DEFAULT_PLAN_FILTERS: PlanFilters = { status: 'ALL', petIds: [] }
  * `items` 는 보내지 않는다 — 빈 일정을 만들고 장소는 일자 편집 화면에서 담는다.
  */
 export type PlanCreatePayload = {
-  petId: string
+  /**
+   * **선택이다** (#152). 예전에는 `@NotNull` 이었지만 `petIds` 가 생기면서 `@Positive` 만
+   * 남았다. `petIds` 가 함께 오면 **무시된다.**
+   */
+  petId?: string
+  /**
+   * 동행 반려견 (#152). **최대 5마리**(`@Size(max = 5)`, 넘으면 `PLAN_115`)이고
+   * **첫 번째가 대표 반려견**이 된다. 중복은 서버가 순서를 지켜 한 마리로 접는다.
+   *
+   * 우선순위가 `AiPlanCreateRequest` 와 **똑같다** — `petIds` 승 → `petId` → 대표 반려견,
+   * 셋 다 없으면 `PLAN_010`. 그래서 생성과 담기에서 반려견을 다른 모양으로 실을 이유가 없다.
+   */
+  petIds?: string[]
   areaCode: string
   title: string
   startDate: string
@@ -226,7 +282,10 @@ export type PlanUpdatePayload = {
 /** `POST /plans` · `GET /plans/{planId}` 응답. 목록보다 필드가 많다 */
 export type PlanDetail = {
   planId: string
+  /** 대표 반려견. **`petIds[0]` 과 같다** (#152) */
   petId: string
+  /** 동행 반려견 (#152). 한 마리 일정이어도 원소 하나로 온다 */
+  petIds: string[]
   areaCode: string
   sigunguCode: string | null
   title: string

@@ -14,6 +14,7 @@ function plan(planId: string, title: string): PlanSummaryItem {
   return {
     planId,
     petId: 'pet-1',
+    petIds: ['pet-1'],
     areaCode: '39',
     title,
     startDate: '2026-09-12',

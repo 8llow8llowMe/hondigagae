@@ -70,6 +70,36 @@ const DEFAULT_SIZE = 10
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
+/** `@Size(max = 5)` — 넘으면 `PLAN_115` (#152) */
+const MAX_PLAN_PETS = 5
+
+/** `@Positive` — 0 과 음수를 거른다. 앞자리 0 도 Snowflake 가 아니다 */
+const POSITIVE_ID_PATTERN = /^[1-9]\d*$/
+
+/**
+ * 반려견 아이디는 서버가 `Long` 으로 읽는다. FE 는 정밀도 때문에 문자열로 실어 보내므로
+ * **둘 다 받는다** — 숫자로 와도 문자열로 접어 두면 이후 비교가 한 갈래다.
+ */
+function toPetIdString(raw: unknown): string {
+  if (typeof raw === 'string') return raw
+  if (typeof raw === 'number') return String(raw)
+  return ''
+}
+
+/**
+ * 대표 반려견. 요청이 반려견을 지정하지 않았을 때의 기본값이다
+ * (`PetConditionQueryPort.findRepresentativePetId`).
+ *
+ * **없으면 빈 배열이다** — 부른 쪽이 `PLAN_010` 으로 접는다. auth-service 는 회원당 대표를
+ * 하나만 유지하므로 여기서도 첫 하나만 본다.
+ */
+function representativePetIdsOf(store: ReturnType<typeof mockStore>, memberId: string): string[] {
+  const representative = store.pets.find(
+    (pet) => pet.memberId === memberId && pet.representative && !pet.deleted,
+  )
+  return representative === undefined ? [] : [representative.petId]
+}
+
 const ITEM_TITLE_MAX = 100
 const ITEM_MEMO_MAX = 500
 
@@ -94,10 +124,22 @@ function daysBetween(startDate: string, endDate: string): number {
   return Math.max(1, Math.round((end - start) / 86_400_000) + 1)
 }
 
+/**
+ * 동행 반려견 (#152).
+ *
+ * **`plan_pet` 행이 없는 옛 일정을 `[petId]` 로 읽는 서버 규칙을 그대로 둔다**
+ * (`Plan.resolvePetIds()`). fixture 에 `petIds` 를 심어 뒀지만 이 폴백이 없으면
+ * 계약이 "가끔 빈 배열" 로 읽히고, 화면이 `petIds[0]` 을 못 믿게 된다.
+ */
+function petIdsOf(plan: MockPlan): string[] {
+  return plan.petIds.length > 0 ? plan.petIds : [plan.petId]
+}
+
 function toSummary(plan: MockPlan): PlanSummaryItem {
   return {
     planId: plan.planId,
     petId: plan.petId,
+    petIds: petIdsOf(plan),
     areaCode: plan.areaCode,
     title: plan.title,
     startDate: plan.startDate,
@@ -491,15 +533,34 @@ function create(memberId: string, body: string | null): MockResult {
 
   const errors: { code: string; field: string; message: string }[] = []
 
-  // petId 는 서버가 Long 으로 읽는다. FE 는 정밀도 때문에 문자열로 실어 보내므로 둘 다 받는다
-  const petId =
-    typeof parsed.petId === 'string'
-      ? parsed.petId
-      : typeof parsed.petId === 'number'
-        ? String(parsed.petId)
-        : ''
-  if (!/^\d+$/.test(petId)) {
-    errors.push({ code: 'PLAN_101', field: 'petId', message: '반려견 아이디는 필수입니다.' })
+  /*
+    **`petId` 는 더 이상 필수가 아니다** (#152). `@NotNull` 이 빠지고 `@Positive` 만 남아
+    `PLAN_101` 의 뜻이 "필수" 에서 "양수여야 한다" 로 바뀌었다 — 필드는 같고 위반 종류만
+    바뀐 자리다 (`PlanValidationMessage.PET_ID_POSITIVE`).
+  */
+  const petId = toPetIdString(parsed.petId)
+  if (parsed.petId !== undefined && parsed.petId !== null && !POSITIVE_ID_PATTERN.test(petId)) {
+    errors.push({ code: 'PLAN_101', field: 'petId', message: '반려견 아이디는 양수여야 합니다.' })
+  }
+
+  /*
+    동행 반려견 (#152). 배열이 아니면 Jackson 역직렬화가 먼저 깨지므로 필드 오류가 아니라
+    `PLAN_100` 이다 — 본문 파싱 실패와 같은 자리다.
+  */
+  if (parsed.petIds !== undefined && parsed.petIds !== null && !Array.isArray(parsed.petIds)) {
+    return fail(400, 'PLAN_100', '요청 값이 올바르지 않습니다.')
+  }
+  const petIds = Array.isArray(parsed.petIds) ? parsed.petIds.map(toPetIdString) : []
+  if (petIds.length > MAX_PLAN_PETS) {
+    errors.push({
+      code: 'PLAN_115',
+      field: 'petIds',
+      message: '동행 반려견은 최대 5마리까지 지정할 수 있습니다.',
+    })
+  }
+  // 원소마다 `@Positive` 가 걸려 있다 — 필드 코드는 petId 와 같은 PLAN_101 이다
+  if (petIds.some((candidate) => !POSITIVE_ID_PATTERN.test(candidate))) {
+    errors.push({ code: 'PLAN_101', field: 'petIds', message: '반려견 아이디는 양수여야 합니다.' })
   }
 
   const areaCode = typeof parsed.areaCode === 'string' ? parsed.areaCode.trim() : ''
@@ -548,9 +609,29 @@ function create(memberId: string, body: string | null): MockResult {
   const store = mockStore()
 
   /*
-    **항목 검증을 반려견 소유권보다 먼저 한다.** 백엔드는 Bean Validation 이 도메인
-    검증보다 먼저 돌기 때문이다 — 순서가 뒤바뀌면 FE 가 실제로는 못 보는 오류를 본다.
+    **반려견 확정이 항목 검증보다 먼저다** (#152). 서버는 저장 *전에* `resolvePetIds` 를
+    부르고 항목 검증(`PLAN_002`·`PLAN_004`)은 저장 *뒤에* 돈다
+    (`PlanCommandProcessor.createPlan`). 순서를 뒤집으면 FE 가 실제로는 못 보는 오류를 본다.
+
+    **`petIds` 가 `petId` 를 이긴다.** 중복은 순서를 지켜 한 마리로 접는다 —
+    첫 번째가 대표 반려견이 된다 (`PlanCreateRequest.effectivePetIds`).
   */
+  const requestedPetIds = petIds.length > 0 ? [...new Set(petIds)] : petId === '' ? [] : [petId]
+
+  /*
+    지정이 없으면 **대표 반려견**으로 대신한다 — 한 마리만 키우는 사용자가 담기마다
+    반려견을 고르게 하지 않기 위한 기본값이다. 대표도 없으면 일정을 만들 수 없다
+    (`PLAN_010`) — `plan.pet_id` 가 NOT NULL 이고 날씨 판정의 기준이기 때문이다.
+
+    **필드 오류가 아니라 도메인 예외다** — Bean Validation 응답 형태로 흉내 내면
+    FE 의 폼 오류 매핑이 실제로는 안 걸리는 경로를 통과시킨다.
+  */
+  const effectivePetIds =
+    requestedPetIds.length > 0 ? requestedPetIds : representativePetIdsOf(store, memberId)
+  if (effectivePetIds.length === 0) {
+    return fail(400, 'PLAN_010', '동행할 반려견을 지정하거나 대표 반려견을 등록해 주세요.')
+  }
+
   const itemErrors: { code: string; field: string; message: string }[] = []
   const items = toItems(parsed.items, store, itemErrors)
   if (itemErrors.length > 0) return failValidation(itemErrors)
@@ -578,21 +659,18 @@ function create(memberId: string, body: string | null): MockResult {
     return fail(400, 'PLAN_004', '일정에 포함된 장소를 찾을 수 없습니다.')
   }
 
-  const pet = store.pets.find(
-    (candidate) =>
-      candidate.petId === petId && candidate.memberId === memberId && !candidate.deleted,
-  )
-  // 백엔드는 반려견 소유권을 auth-service 로 검증한다. 남의 반려견이면 400 이다
-  if (pet === undefined) {
-    return failValidation([
-      { code: 'PLAN_101', field: 'petId', message: '반려견 아이디는 필수입니다.' },
-    ])
-  }
-
+  /*
+    **남의 반려견을 거절하지 않는다.** 예전 mock 은 여기서 `PLAN_101` 400 을 냈지만
+    plan-service 는 `petId` 소유권을 검사하지 않는다 — `createPlan` 이 값을 그대로 저장하고,
+    auth-service 는 **나중에 날씨 판정의 특성 조회에서만** 소유권을 본다(소유가 아니면 특성이
+    빠질 뿐 일정은 만들어진다). mock 이 더 엄격하면 FE 가 프로덕션에 없는 오류 분기를 만든다.
+  */
   const plan: MockPlan = {
     planId: nextPlanId(store),
     memberId,
-    petId,
+    // 대표 = 첫 번째. 목록 전체는 petIds 에 둔다 (#152 설계 판단 1)
+    petId: effectivePetIds[0] as string,
+    petIds: effectivePetIds,
     areaCode,
     sigunguCode: typeof parsed.sigunguCode === 'string' ? parsed.sigunguCode : null,
     title,
@@ -630,7 +708,34 @@ const SUITABILITY: Record<string, ScoreMetricMetadata> = {
     description: '일부 조건을 확인하고 가면 무난합니다.',
     scoreDescription: '점수가 중간이면 주의할 조건이 한둘 있다는 뜻입니다.',
   },
+  LOW: {
+    code: 'LOW',
+    name: '주의 필요',
+    description: '반려견과 방문하기에 불리한 조건이 있습니다.',
+    scoreDescription: '점수가 낮을수록 피하거나 시간대를 옮기는 편이 좋습니다.',
+  },
 }
+
+/**
+ * 점수 → 등급. 백엔드 `SuitabilityLevel.from` 의 경계와 같아야 한다 — **80 / 60** 이다.
+ * `null` 은 `INSUFFICIENT` 지만 이 mock 은 점수를 못 낸 날에 등급도 `null` 로 두므로
+ * (`PlanDayWeatherItem.suitabilityLevel` 이 nullable 이다) 여기서는 다루지 않는다.
+ */
+function levelOf(score: number): ScoreMetricMetadata {
+  if (score >= 80) return SUITABILITY.HIGH as ScoreMetricMetadata
+  if (score >= 60) return SUITABILITY.MEDIUM as ScoreMetricMetadata
+  return SUITABILITY.LOW as ScoreMetricMetadata
+}
+
+/**
+ * 두 번째 이후 반려견의 점수 낙폭 (#152).
+ *
+ * mock 에는 아이별 특성 차이가 없어 그대로 두면 모든 아이가 같은 점수를 받고,
+ * **기준 반려견(`basisPetId`)이 언제나 대표와 같아진다** — 화면이 "대표 이름을 붙이면
+ * 거짓말이 되는" 경로를 로컬에서 한 번도 못 본다. 11 은 84 → 73(보통), 62 → 51(주의 필요)로
+ * **등급까지 갈리게** 고른 값이다.
+ */
+const PET_SCORE_STEP = 11
 
 /**
  * 예보가 닿는 일수. 백엔드가 단기+중기를 이어 붙여 **약 11일**까지 준다
@@ -652,6 +757,7 @@ function addDays(date: string, days: number): string {
  */
 function toWeather(plan: MockPlan): PlanWeatherResponse {
   const totalDays = totalDaysOf(plan)
+  const petIds = petIdsOf(plan)
 
   const days: PlanDayWeatherItem[] = Array.from({ length: totalDays }, (_, index) => {
     const day = index + 1
@@ -672,11 +778,14 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
         date,
         representativePlaceId,
         representativePlaceTitle,
+        // 판정을 못 냈으면 기준 반려견도 없고 아이별 목록도 빈 배열이다 (`briefDay`)
+        basisPetId: null,
         score: null,
         suitabilityLevel: null,
         reasons: [],
         weather: null,
         indoorAlternatives: [],
+        petSuitabilities: [],
         unavailableReason:
           representativePlaceId === null
             ? '이 날은 담은 장소가 없어 판정할 기준이 없습니다.'
@@ -687,13 +796,36 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
     // 2일차는 비 예보 + 중기예보 구간이다 — 실내 대안과 출처 문구를 함께 드러낸다
     const rainy = day === 2
 
+    /*
+      **아이별로 따로 판정한다** (#152). 서버는 아이마다 조건이 달라 tour-service 를 따로
+      부르지만, mock 에는 그 차이가 없으므로 순서대로 낙폭을 준다 — 값이 아니라 **모양**이
+      계약이다. 순서는 `petIds` 순서를 지킨다 (서버가 `LinkedHashMap` 으로 보존한다).
+    */
+    const petSuitabilities = petIds.map((petId, order) => {
+      const petScore = (rainy ? 62 : 84) - order * PET_SCORE_STEP
+      return { petId, score: petScore, suitabilityLevel: levelOf(petScore) }
+    })
+
+    /*
+      **그날의 기준은 점수가 가장 낮은 아이다** — 한 마리라도 힘든 날이면 그날은 힘든
+      날이라는 규칙이다 (`PlanWeatherProcessor.pickBasisPet`). 동점이면 순서상 앞선 아이가
+      이기므로 `reduce` 의 비교를 `<` 로 둔다 (`Comparator.min` 과 같은 결과다).
+
+      아래 `score`·`suitabilityLevel`·`reasons`·`indoorAlternatives` 가 전부 이 아이 기준이라,
+      **여러 마리면 대표(petIds[0]) 점수와 다르다.**
+    */
+    const basisPet = petSuitabilities.reduce((lowest, candidate) =>
+      candidate.score < lowest.score ? candidate : lowest,
+    )
+
     return {
       day,
       date,
       representativePlaceId,
       representativePlaceTitle,
-      score: rainy ? 62 : 84,
-      suitabilityLevel: (rainy ? SUITABILITY.MEDIUM : SUITABILITY.HIGH) as ScoreMetricMetadata,
+      basisPetId: basisPet.petId,
+      score: basisPet.score,
+      suitabilityLevel: basisPet.suitabilityLevel,
       reasons: rainy
         ? [
             {
@@ -745,6 +877,7 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
       },
       // 비 예보가 있고 그날 장소가 실내가 아닐 때만 채워진다 (컨트롤러 설명)
       indoorAlternatives: rainy ? indoorAlternatives(representativePlaceId) : [],
+      petSuitabilities,
       unavailableReason: null,
     }
   })
@@ -754,6 +887,8 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
     planTitle: plan.title,
     startDate: plan.startDate,
     endDate: plan.endDate,
+    petIds,
+    // 여러 마리면 "한 마리라도 특성이 반영됐는가" 다 — 마리별 플래그가 아니다 (#152)
     petConditionApplied: true,
     days,
   }

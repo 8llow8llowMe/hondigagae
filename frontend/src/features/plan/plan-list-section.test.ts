@@ -18,6 +18,7 @@ function plan(overrides: Partial<PlanSummaryItem> = {}): PlanSummaryItem {
   return {
     planId: '223456789012000001',
     petId: '123456789012000001',
+    petIds: ['123456789012000001'],
     areaCode: '39',
     title: '몽실이와 제주 2박 3일',
     startDate: '2026-09-12',
