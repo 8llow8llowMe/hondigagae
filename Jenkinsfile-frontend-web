@@ -59,6 +59,7 @@ frontendPipeline.run([
         'TIME_ZONE',
         'SESSION_SECRET',
         'BACKEND_BASE_URL',
+        'SITE_BASE_URL',
         'FRONTEND_WEB_PORT',
         'FRONTEND_WEB_MEM_LIMIT'
     ]
