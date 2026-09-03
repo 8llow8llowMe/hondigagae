@@ -155,3 +155,26 @@ describe('PlaceSuitabilityPanel — 반려견이 없으면 판정을 말하지 �
     expect(markup).toContain(messages.place.detailGuestCta)
   })
 })
+
+describe('PlaceSuitabilityPanel — 기상특보', () => {
+  it('특보가 없으면 배지가 없다', () => {
+    expect(render()).not.toContain('주의보')
+  })
+
+  it('등급 줄에 특보 배지가 함께 선다 — 등급을 대신하지 않는다', () => {
+    const markup = render({
+      data: {
+        ...suitability,
+        weatherWarning: {
+          type: { code: 'HEAT_WAVE', name: '폭염', description: '더위가 심합니다.' },
+          level: { code: 'ADVISORY', name: '주의보', description: null },
+          effectiveAt: '2026-08-29T06:00:00',
+        },
+      },
+    })
+
+    expect(markup).toContain('주의보')
+    // 등급 단어가 배지에 밀려 사라지지 않는다
+    expect(markup).toContain(suitability.suitabilityLevel.name)
+  })
+})

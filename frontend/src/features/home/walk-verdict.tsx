@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import { ChevronDownIcon, ClockIcon } from '@/components/icons'
 import { MetricValue, MetricWord } from '@/components/metric'
+import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { formatCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
@@ -67,9 +68,15 @@ export function WalkVerdict({
         )}
       >
         <span className="min-w-0 flex-1">
-          <span className="text-body-1 block font-semibold">
-            <span className="text-fg-muted">{messages.home.walkTodayLabel}</span>{' '}
+          {/*
+            **모바일에도 배지를 둔다.** 아래 데스크톱 등급 줄은 `md:flex` 라 모바일에서 아예
+            렌더되지 않아, 여기 없으면 접힌 상태의 모바일 사용자는 특보를 못 본다 —
+            이 서비스에서 가장 흔한 화면이다.
+          */}
+          <span className="text-body-1 flex flex-wrap items-center gap-x-1 gap-y-1 font-semibold">
+            <span className="text-fg-muted">{messages.home.walkTodayLabel}</span>
             <MetricWord tone={tone}>{data.walkSafetyLevel.name}</MetricWord>
+            <WeatherWarningBadge warning={data.weatherWarning} />
           </span>
           <span className="text-caption text-fg-muted block font-medium tabular-nums">
             {summary}
@@ -95,9 +102,14 @@ export function WalkVerdict({
       >
         {/* 데스크톱에만 보이는 등급 줄 — 모바일은 위 버튼이 이미 말했다 */}
         <div className="hidden items-end justify-between gap-3 md:flex">
-          <span className="text-body-1 font-semibold">
-            <span className="text-fg-muted">{messages.home.walkTodayLabel}</span>{' '}
+          {/*
+            특보 배지는 등급 줄에 함께 선다. 경보면 서버가 이미 `DANGER` 로 끊어 이 섹션이
+            자동 펼침 + tint 인 상태이고, 배지는 그 이유를 말한다 — 등급을 대신하지 않는다.
+          */}
+          <span className="text-body-1 flex flex-wrap items-center gap-x-1 gap-y-2 font-semibold">
+            <span className="text-fg-muted">{messages.home.walkTodayLabel}</span>
             <MetricWord tone={tone}>{data.walkSafetyLevel.name}</MetricWord>
+            <WeatherWarningBadge warning={data.weatherWarning} />
           </span>
           {heatIndex !== null && (
             <MetricValue value={heatIndex} unit="℃" tone={tone} size="hero" className="shrink-0" />

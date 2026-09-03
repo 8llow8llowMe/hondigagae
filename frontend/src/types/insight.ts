@@ -101,6 +101,35 @@ export type AlternativePlaceItem = {
   allowedPetSize: CodeNameMetadata
 }
 
+/**
+ * 발효 중인 기상특보 (#158).
+ *
+ * **없으면 `null` 이다.** 여러 특보가 동시에 떠 있으면 서버가 **가장 무거운 것 하나만** 담는다 —
+ * 판정이 그것으로 이뤄지고, 목록을 통째로 내리면 화면이 무엇을 강조할지 알 수 없다.
+ *
+ * **지역 단위다.** 같은 시각이면 제주의 모든 장소에 같은 특보가 뜬다. 장소별로 다를 것이라고
+ * 가정하는 화면을 만들면 안 된다.
+ */
+export type WeatherWarningItem = {
+  /**
+   * 특보 종류. `TYPHOON`·`HEAVY_RAIN`·`STRONG_WIND`·`HEAT_WAVE`·`COLD_WAVE`·`HEAVY_SNOW`·
+   * `TROPICAL_NIGHT`·`WIND_WAVE`·`DRY`, 그리고 못 알아본 문구는 `OTHER`("기타 특보") 다.
+   *
+   * **`OTHER` 를 감추지 않는다.** 원천이 코드가 아니라 문구로 주기 때문에 표기가 조금만
+   * 바뀌어도 `OTHER` 가 된다 — 그때 배지를 숨기면 태풍이 떠 있는데 없다고 말하게 된다.
+   */
+  type: CodeNameMetadata
+  /**
+   * `ADVISORY`(주의보) · `WARNING`(경보) 둘뿐이다.
+   *
+   * **경보는 감점이 아니라 점수 0 이다** — 기상청이 위험을 경고한 단계라, 다른 조건이
+   * 아무리 좋아도 점수가 남지 않는다 (`SuitabilityEvaluator`). 산책은 `DANGER` 로 끊긴다.
+   */
+  level: CodeNameMetadata
+  /** 발효 시각. 원천이 주지 않으면 null */
+  effectiveAt: string | null
+}
+
 /** `GET /places/{placeId}/suitability` */
 export type PlaceSuitabilityResponse = {
   placeId: string
@@ -121,6 +150,8 @@ export type PlaceSuitabilityResponse = {
   /** false 면 그 장소에 연결된 혼잡도 예측 데이터가 없다 */
   congestionApplied: boolean
   weatherProviderName: string | null
+  /** 발효 중인 기상특보 (#158). 없으면 null */
+  weatherWarning: WeatherWarningItem | null
 }
 
 /** `GET /places/{placeId}/walk-safety` */
@@ -143,6 +174,8 @@ export type WalkSafetyResponse = {
   precipitationType: CodeNameMetadata | null
   petConditionApplied: boolean
   weatherProviderName: string | null
+  /** 발효 중인 기상특보 (#158). 없으면 null */
+  weatherWarning: WeatherWarningItem | null
 }
 
 /**

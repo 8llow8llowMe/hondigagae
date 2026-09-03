@@ -4,6 +4,7 @@ import type {
   PlaceSuitabilityResponse,
   ScoreMetricMetadata,
   WalkSafetyResponse,
+  WeatherWarningItem,
 } from '@/types/insight'
 
 /**
@@ -89,6 +90,38 @@ const CONGESTION_HIGH: CongestionItem = {
 }
 
 /** placeId 끝자리로 결과를 고정한다 — 새로고침마다 판정이 바뀌면 사용자가 못 믿는다 */
+/**
+ * 기상특보 (#158). 문구는 `WeatherWarningType` · `WeatherWarningLevel` 의
+ * `displayName` / `description` 을 **그대로** 쓴다.
+ *
+ * **실제로는 지역 단위다** — 같은 시각이면 제주의 모든 장소에 같은 특보가 뜬다. mock 이
+ * 갈래마다 다르게 주는 것은 주의보·경보·없음 세 경우를 함께 보기 위한 것이고,
+ * **화면은 이 차이에 기대면 안 된다.**
+ */
+const HEAT_WAVE_ADVISORY: WeatherWarningItem = {
+  type: {
+    code: 'HEAT_WAVE',
+    name: '폭염',
+    description: '더위가 심합니다. 노면이 뜨거워 발바닥 화상 위험이 큽니다.',
+  },
+  level: {
+    code: 'ADVISORY',
+    name: '주의보',
+    description: '기상 조건이 나빠지고 있습니다. 일정을 조정하는 편이 좋습니다.',
+  },
+  effectiveAt: '2026-08-29T06:00:00',
+}
+
+const HEAT_WAVE_WARNING: WeatherWarningItem = {
+  type: HEAT_WAVE_ADVISORY.type,
+  level: {
+    code: 'WARNING',
+    name: '경보',
+    description: '기상청이 위험을 경고한 단계입니다. 야외 일정은 취소하는 것이 좋습니다.',
+  },
+  effectiveAt: '2026-08-29T11:00:00',
+}
+
 function bucketOf(placeId: string): number {
   const last = placeId.at(-1) ?? '0'
   return Number.parseInt(last, 10) % 3
@@ -127,6 +160,7 @@ export function mockSuitability(placeId: string): PlaceSuitabilityResponse {
       indoorAlternatives: [],
       weatherApplied: false,
       congestionApplied: false,
+      weatherWarning: null,
     }
   }
 
@@ -154,6 +188,18 @@ export function mockSuitability(placeId: string): PlaceSuitabilityResponse {
           },
         ]
       : [
+          /*
+            **특보 근거가 맨 앞이다.** 서버는 `reasons` 를 점수 영향이 큰 순서로 보내고
+            주의보 감점이 다른 항목보다 크다 (`SuitabilityEvaluator.PENALTY_WARNING_ADVISORY`).
+            문장 형식도 서버와 같다 — "{종류} {단계} 발효 중입니다. {종류 설명}".
+          */
+          {
+            code: 'WEATHER_WARNING_ACTIVE',
+            name: '기상특보 발효',
+            description:
+              '폭염 주의보 발효 중입니다. 더위가 심합니다. 노면이 뜨거워 발바닥 화상 위험이 큽니다.',
+            scoreDelta: -30,
+          },
           {
             code: 'HEAT_RISK',
             name: '고온 주의',
@@ -192,6 +238,8 @@ export function mockSuitability(placeId: string): PlaceSuitabilityResponse {
       totalPrecipitationMm: high ? 0 : 12.5,
     },
     congestion: high ? CONGESTION_HIGH : CONGESTION_UNKNOWN,
+    // 특보가 없는 갈래(high)와 있는 갈래를 함께 둔다 — 배지 유무를 로컬에서 둘 다 본다
+    weatherWarning: high ? null : HEAT_WAVE_ADVISORY,
     // 비 예보일 때만 채워진다
     indoorAlternatives: high
       ? []
@@ -229,6 +277,20 @@ export function mockWalkSafety(placeId: string, heatSensitive: boolean): WalkSaf
     targetDateTime: '2026-08-29T14:00:00',
     walkSafetyLevel: WALK_LEVELS[level] as ScoreMetricMetadata,
     reasons: [
+      /*
+        **경보 갈래에서만 특보 근거가 맨 앞에 온다.** `WalkSafetyEvaluator` 는 경보를 만나면
+        다른 판정을 보기 전에 DANGER 로 끊고, 그 사실을 근거 첫 줄로 남긴다.
+      */
+      ...(heatSensitive
+        ? [
+            {
+              code: 'WEATHER_WARNING_ACTIVE',
+              name: '기상특보 발효',
+              description:
+                '폭염 경보 발효 중입니다. 더위가 심합니다. 노면이 뜨거워 발바닥 화상 위험이 큽니다.',
+            },
+          ]
+        : []),
       {
         code: 'PAVEMENT_HEAT',
         name: '노면 고온',
@@ -265,5 +327,10 @@ export function mockWalkSafety(placeId: string, heatSensitive: boolean): WalkSaf
     precipitationType: { code: 'NONE', name: '없음', description: '강수가 없습니다.' },
     petConditionApplied: true,
     weatherProviderName: '기상청 단기예보',
+    /*
+      경보는 산책을 DANGER 로 끊는다 — mock 의 `heatSensitive` 갈래가 이미 DANGER 라
+      여기에 얹으면 두 사실이 어긋나지 않는다. 반대 갈래는 특보 없음이다.
+    */
+    weatherWarning: heatSensitive ? HEAT_WAVE_WARNING : null,
   }
 }
