@@ -13,13 +13,12 @@ import type { ScoreMetricMetadata } from '@/types/insight'
  */
 
 /**
- * **#152 가 더한 필드는 전부 선택(`?`)이다** — 계약상으로는 항상 오지만, BE 브랜치
- * `feature/be/152-plan-multi-pet` 이 아직 `develop` 에 없어 **지금 서버는 보내지 않는다.**
- * 필수로 적으면 타입은 통과하고 런타임에서 `undefined` 를 만난다.
+ * **#152 가 더한 필드는 이제 전부 필수다** (`84ea259` 로 develop 에 들어왔다).
  *
- * **머지 뒤에 `?` 를 떼는 것이 이 전환의 마지막 단계다.** 그때까지 읽는 쪽은
- * `petIds ?? [petId]` 로 접는다 — 서버가 옛 일정을 `Plan.resolvePetIds()` 로 읽는 규칙과
- * 같은 폴백이라 화면이 두 시기를 구분할 필요가 없다.
+ * 전환 기간에는 선택(`?`)이었다 — 서버가 보내지 않는데 필수로 적으면 타입은 통과하고
+ * 런타임에서 `undefined` 를 만나기 때문이다. 서버가 `Plan.resolvePetIds()` 로 `plan_pet`
+ * 행이 없는 옛 일정까지 `[petId]` 로 채워 주므로, **빈 배열이나 누락이 오지 않는다** —
+ * 읽는 쪽이 폴백을 둘 이유가 없다.
  */
 
 /** `GET /plans` — `SliceResponse<PlanSummaryItem>` 로 온다 */
@@ -31,10 +30,8 @@ export type PlanSummaryItem = {
    * 동행 반려견 (#152). **한 마리 일정이어도 원소 하나로 온다** — 빈 배열이 아니다.
    * `plan_pet` 조인 행이 없는 옛 일정도 서버가 `Plan.resolvePetIds()` 로 `[petId]` 를
    * 채워 준다. 그래서 화면은 `petId` 대신 이 배열을 기준으로 읽으면 된다.
-   *
-   * **`?` 인 이유는 위 절 참조** — 머지 전까지 오지 않는다.
    */
-  petIds?: string[]
+  petIds: string[]
   areaCode: string
   title: string
   startDate: string
@@ -110,7 +107,7 @@ export type PlanDayWeatherItem = {
    * `indoorAlternatives` 는 전부 **이 아이 기준**이므로, 화면이 대표 이름을 붙이면 거짓말이
    * 된다. 판정을 못 낸 날은 null 이다.
    */
-  basisPetId?: string | null
+  basisPetId: string | null
   /** `basisPetId` 기준. 판단 근거가 없으면 null */
   score: number | null
   /** `basisPetId` 기준 */
@@ -124,7 +121,7 @@ export type PlanDayWeatherItem = {
    * 아이별 점수·등급 (#152). **한 마리 일정이면 원소 하나고, 판정을 못 낸 날은 빈 배열이다** —
    * `petIds` 와 길이가 다를 수 있다(그 아이만 조회에 실패하면 빠진다). 순서는 `petIds` 순이다.
    */
-  petSuitabilities?: PlanDayPetSuitabilityItem[]
+  petSuitabilities: PlanDayPetSuitabilityItem[]
   /** null 이면 정상. 값이 있으면 **화면에 그대로 안내한다** */
   unavailableReason: string | null
 }
@@ -165,8 +162,8 @@ export type PlanWeatherResponse = {
   planTitle: string
   startDate: string
   endDate: string
-  /** 판정에 들어간 동행 반려견 (#152). 일자별 `basisPetId` 는 이 안의 하나다. `?` 는 위 절 참조 */
-  petIds?: string[]
+  /** 판정에 들어간 동행 반려견 (#152). 일자별 `basisPetId` 는 이 안의 하나다 */
+  petIds: string[]
   /**
    * false 면 특성 조회에 실패해 일반 조건으로 판정한 결과다.
    * **여러 마리면 "한 마리라도 반영됐는가" 다** — 마리별 플래그가 아니다 (#152).
@@ -296,8 +293,8 @@ export type PlanDetail = {
   planId: string
   /** 대표 반려견. **`petIds[0]` 과 같다** (#152) */
   petId: string
-  /** 동행 반려견 (#152). 한 마리 일정이어도 원소 하나로 온다. `?` 는 위 절 참조 */
-  petIds?: string[]
+  /** 동행 반려견 (#152). 한 마리 일정이어도 원소 하나로 온다 */
+  petIds: string[]
   areaCode: string
   sigunguCode: string | null
   title: string

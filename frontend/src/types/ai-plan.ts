@@ -185,8 +185,10 @@ export type AiPlanRequestSnapshot = {
   startDate: string
   endDate: string
   /**
-   * 동반 반려견. **담기에는 이 중 한 마리만 실린다** — `PlanCreateRequest.petId` 가
-   * 단일이라 담기 패널에서 판정 기준을 고른다 (다견선택-세부명세 D4).
+   * 동반 반려견. **담기에 이 순서 그대로 전부 실린다** (#152 · #174) —
+   * `PlanCreateRequest.petIds` 가 받고 **첫 번째가 대표 반려견**이 된다.
+   *
+   * 예전에는 저장이 한 마리라 담기 패널에서 기준을 골랐다 (다견선택-세부명세 D4).
    *
    * `name` 은 일정 제목 기본값에만 쓰인다. 비어 있어도 흐름이 막히지 않는다.
    */

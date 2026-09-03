@@ -271,18 +271,13 @@ function AiPlanCommitContainer({
   const totalDays = totalDaysBetween(snapshot.startDate, snapshot.endDate)
 
   /*
-    판정 기준 반려견 (#128 · 다견선택-세부명세 D4). `PlanCreateRequest.petId` 가 단일이라
-    여러 마리로 만든 초안도 저장은 한 마리에 붙는다.
+    **판정 기준 반려견 선택이 여기 있었다** (#128 · 다견선택-세부명세 D4). `PlanCreateRequest.petId`
+    가 단일이라 여러 마리로 만든 초안이 저장되는 순간 한 마리가 되던 것을 숨기지 않으려는
+    장치였는데, #152 가 `petIds` 를 받으면서 그 제약이 사라져 걷었다 (#174).
 
-    기본값은 **먼저 고른 아이**다 — `pets` 순서가 체크한 순서다. `usePetList()` 를 붙여
-    대표견을 찾지 않는다: 이 화면은 반려견 목록을 갖고 있지 않고, 기본값 하나를 위해
-    데이터 의존을 늘리면 조회가 늦거나 실패할 때 기본값이 흔들린다.
-
-    `snapshot` 은 부모가 `useState` 로 한 번만 읽어 두므로 이 컴포넌트가 사는 동안
-    바뀌지 않는다 — 초기값으로 충분하고 동기화 effect 가 필요 없다.
+    이제 `draftToPlanPayload` 가 `snapshot.pets` 를 그대로 싣고 **첫 번째가 대표**가 된다 —
+    조건 입력에서 체크한 순서가 저장까지 그대로 간다.
   */
-  const [basisPetId, setBasisPetId] = useState(() => snapshot.pets[0]?.petId ?? '')
-
   const [excludedPlaceIds, setExcludedPlaceIds] = useState<ReadonlySet<string>>(EMPTY_SET)
   const [delistedBlocked, setDelistedBlocked] = useState(false)
   const [discarding, setDiscarding] = useState(false)
@@ -306,7 +301,6 @@ function AiPlanCommitContainer({
           draftToPlanPayload({
             draft,
             snapshot,
-            basisPetId,
             title: values.title.trim(),
             totalDays,
             excludedPlaceIds,
@@ -357,9 +351,6 @@ function AiPlanCommitContainer({
             delistedBlocked={delistedBlocked}
             hasDelisted={delistedPlaceIds.size > 0}
             excludedCount={excludedPlaceIds.size}
-            basisOptions={snapshot.pets.map((pet) => ({ value: pet.petId, label: pet.name }))}
-            basisPetId={basisPetId}
-            onBasisPetIdChange={setBasisPetId}
             onTitleChange={(title) => form.setValue('title', title)}
             onSubmit={() => void form.submit()}
             onExcludeDelisted={() => {
