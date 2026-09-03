@@ -15,7 +15,12 @@ import { messages } from '@/lib/messages'
  * 검증 대상은 **폼 값**(`AiPlanFormValues`)이고 요청 본문이 아니다.
  */
 
-/** `<input type="date">` 가 주는 서식. 사용자가 직접 칠 수도 있어 형식을 다시 본다 */
+/**
+ * `YYYY-MM-DD`. **`DateField` 가 이 서식으로만 값을 준다**(`readOnly` 라 타이핑이 없다).
+ *
+ * 그래도 확인하는 이유는 값이 필드 밖에서도 들어오기 때문이다 — 복원된 스냅샷·주소창.
+ * 서식이 어긋난 값을 그대로 보내면 서버가 400 으로 되돌려 준다.
+ */
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 export const aiPlanFormSchema = z

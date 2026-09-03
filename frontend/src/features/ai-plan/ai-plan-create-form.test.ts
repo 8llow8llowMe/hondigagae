@@ -175,3 +175,15 @@ describe('AiPlanCreateForm — 오류 표시', () => {
     expect(html).toContain('aria-invalid="true"')
   })
 })
+
+/*
+  **네이티브 날짜 입력으로 되돌아가는 것을 막는 회귀 감시** (#162). `DateField` 는
+  브라우저마다 다른 조작과 "여행 기간처럼 두 날짜의 관계를 보여줄 자리가 없다" 는 문제
+  때문에 도입했다 (`date-field.tsx`). 새 날짜 입력이 `<input type="date">` 로 들어오면
+  그 판단이 조용히 깨진다 — 같은 감시가 `plan-create-form.test.ts` 에도 있다.
+*/
+describe('AiPlanCreateForm — 날짜 입력이 네이티브로 돌아가지 않는다', () => {
+  it('type="date" 를 쓰지 않는다', () => {
+    expect(render()).not.toContain('type="date"')
+  })
+})
