@@ -134,7 +134,7 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | 일정 브리핑 체감온도 | 미착수 | #88. tour-service `HeatIndex` 가 있어 재료는 있다 |
 | AI 초안 WALK 항목 `placeId` 불일치 | 미착수 | #89. FE 는 WALK 의 `targetId` 를 보내지 않는 것으로 우회 |
 | AI 작업 세부 단계·취소·`sigunguCode` | 미착수 | #90. 일자 재생성은 #77 로 됨 |
-| 다견 일정의 준비물 생성 | 미착수 | `PlanOutlineResponse.petIds` 를 `AiPackingProcessor` 가 아직 읽지 않는다 (#152 후속) |
+| 다견 일정의 준비물 생성 | 구현 | 동행 반려견 전체 특성을 벌크 조회해 근거로 삼는다. 프롬프트는 합집합 규칙 |
 | 반려견 프로필 매칭 | **구현** | `petSizeType`/`petWeightKg` 필터. 프로필 체중 입력은 FE 몫 |
 | 영업시간 구조화 | **구현 (긴급 시설)** | `openNowOnly` + 항목별 `openNow`. 여행 장소(place_intro.use_time)는 후속 |
 | 데이터 delisting | **구현** | `delisted_at` 표시 + 급감 가드. `data-refresh-guide.md` 2절 |

@@ -9,7 +9,10 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record PlanOutlineClientResponse(
     Long planId,
+    // 대표 반려견 (petIds 의 첫 번째). 옛 응답 호환으로 남긴다.
     Long petId,
+    // 동행 반려견 전체. 준비물 생성이 아이별 특성을 모두 근거로 삼는 데 쓴다.
+    List<Long> petIds,
     String startDate,
     String endDate,
     String areaCode,

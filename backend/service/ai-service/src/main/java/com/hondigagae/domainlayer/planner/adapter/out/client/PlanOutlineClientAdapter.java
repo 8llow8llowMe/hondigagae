@@ -41,6 +41,7 @@ public class PlanOutlineClientAdapter implements PlanOutlineQueryPort {
         return Optional.of(PlanOutline.builder()
             .planId(body.planId() == null ? planId : body.planId())
             .petId(body.petId())
+            .petIds(body.petIds())
             .areaCode(body.areaCode())
             .startDate(body.startDate())
             .endDate(body.endDate())
