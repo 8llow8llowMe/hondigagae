@@ -28,7 +28,10 @@ public record PlanCreateRequest(
 
     @Schema(description = "동행 반려견 아이디 목록 (선택, 최대 5마리) — 첫 번째가 대표 반려견이 됩니다.")
     @Size(max = 5, message = PlanValidationMessage.PET_IDS_SIZE_INVALID)
-    List<@Positive(message = PlanValidationMessage.PET_ID_POSITIVE) Long> petIds,
+    // 원소 제약은 @NotNull 과 값 제약을 쌍으로 건다 (coding-conventions §8-2).
+    // @Positive 만 걸면 null 원소가 통과해 저장에서 500 이 난다 - 스펙상 @Positive 는 null 을 유효로 본다.
+    List<@NotNull(message = PlanValidationMessage.PET_ID_POSITIVE)
+         @Positive(message = PlanValidationMessage.PET_ID_POSITIVE) Long> petIds,
 
     @Schema(description = "지역 코드 (제주=39)", example = "39")
     @NotBlank(message = PlanValidationMessage.AREA_CODE_REQUIRED)
