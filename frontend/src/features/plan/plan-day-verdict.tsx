@@ -21,6 +21,7 @@ import { MID_TERM_FORECAST_CODE, type PlanDayWeatherItem } from '@/types/plan'
 export function PlanDayVerdict({
   verdict,
   petConditionApplied,
+  basisPetName,
   failed,
   onRetry,
 }: {
@@ -28,6 +29,11 @@ export function PlanDayVerdict({
   verdict: PlanDayWeatherItem | undefined
   /** `false` 면 반려견 특성 없이 일반 조건으로 판정한 결과다 */
   petConditionApplied: boolean
+  /**
+   * 이 일자 판정의 기준 반려견 이름 (#176). **한 마리 일정이면 `null`** 이고 그때는
+   * 줄을 내지 않는다 — `basisPetNameOf()` 가 그 판정을 갖는다.
+   */
+  basisPetName: string | null
   /** 판정 조회가 5xx 로 실패했다 */
   failed: boolean
   onRetry: () => void
@@ -91,7 +97,11 @@ export function PlanDayVerdict({
             }))}
           />
 
-          <PlanVerdictNotes verdict={verdict} petConditionApplied={petConditionApplied} />
+          <PlanVerdictNotes
+            verdict={verdict}
+            petConditionApplied={petConditionApplied}
+            basisPetName={basisPetName}
+          />
         </>
       )}
     </div>
@@ -107,18 +117,27 @@ export function PlanDayVerdict({
 function PlanVerdictNotes({
   verdict,
   petConditionApplied,
+  basisPetName,
 }: {
   verdict: PlanDayWeatherItem
   petConditionApplied: boolean
+  basisPetName: string | null
 }) {
   const midTerm =
     verdict.weather?.forecastSourceCode === MID_TERM_FORECAST_CODE &&
     verdict.weather.forecastSourceName !== null
 
-  if (!midTerm && petConditionApplied) return null
+  if (!midTerm && petConditionApplied && basisPetName === null) return null
 
   return (
     <div className="text-caption text-fg-muted flex flex-col gap-1">
+      {/*
+        **기준 반려견을 맨 위에 둔다.** 아래 두 줄은 판정을 어떻게 읽어야 하는지의 단서인데,
+        이 줄은 **누구의 판정인지**라 먼저 와야 나머지가 그 아이 이야기로 읽힌다.
+      */}
+      {basisPetName !== null && (
+        <p>{messages.plan.verdictBasisPet.replace('{name}', basisPetName)}</p>
+      )}
       {midTerm && (
         <p>
           {messages.plan.verdictMidTermSource.replace(

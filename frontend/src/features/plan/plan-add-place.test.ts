@@ -176,6 +176,7 @@ describe('PlanDaySection — 장소 추가 진입', () => {
         places: new Map<string, PlaceDetail>(),
         verdict: planVerdict,
         petConditionApplied: true,
+        basisPetName: null,
         verdictFailed: false,
         onRetryVerdict: () => undefined,
         editing: false,
