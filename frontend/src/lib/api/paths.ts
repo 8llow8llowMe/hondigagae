@@ -58,6 +58,12 @@ export const paths = {
      * 이쪽은 좌표 기준 "오늘 언제" 다.
      */
     walkTimes: (query: string) => `/insights/walk-times?${query}`,
+    /**
+     * 제주 권역 날씨 비교 (#158). **좌표가 필요 없다** — 서버가 권역 대표 좌표를 갖고 있다.
+     * `date` 는 생략하면 오늘이다.
+     */
+    regionalWeather: (query: string) =>
+      query ? `/insights/regional-weather?${query}` : '/insights/regional-weather',
   },
   emergencies: {
     /** 주변 긴급 시설. `lat`/`lng` 가 필수라 쿼리 없이 부르지 않는다 */

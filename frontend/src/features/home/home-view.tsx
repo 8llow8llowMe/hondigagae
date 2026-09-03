@@ -11,8 +11,14 @@ import { EmergencyIcon } from '@/components/icons'
 import { Skeleton } from '@/components/skeleton'
 import { PlaceInsightRow } from '@/features/home/place-insight-row'
 import { ProfileCard } from '@/features/home/profile-card'
+import { RegionalWeatherSection } from '@/features/home/regional-weather-section'
 import { UpcomingPlanRow } from '@/features/home/upcoming-plan-row'
-import { useSuitabilities, useWalkSafety, useWalkTimes } from '@/features/home/use-home-insight'
+import {
+  useRegionalWeather,
+  useSuitabilities,
+  useWalkSafety,
+  useWalkTimes,
+} from '@/features/home/use-home-insight'
 import { WalkTimesSection } from '@/features/home/walk-times-section'
 import { WalkVerdict } from '@/features/home/walk-verdict'
 import { useSelectedPetStore } from '@/features/nav/selected-pet-store'
@@ -87,6 +93,7 @@ export function HomeView({
     좌표만 있으면 되고, 첫 방문자에게도 "오늘 언제 나가면 좋은지" 는 답할 수 있다.
   */
   const walkTimes = useWalkTimes(JEJU_CITY_LAT, JEJU_CITY_LNG, condition)
+  const regionalWeather = useRegionalWeather(condition)
 
   const topPlaces = pickTopPlaces(places, TOP_PLACE_COUNT)
   const suitabilities = useSuitabilities(
@@ -173,6 +180,15 @@ export function HomeView({
             `ErrorState` 를 하나 더 쌓으면 좌측 열이 오류 두 개로 채워진다.
           */}
           <WalkTimesSection data={walkTimes.data ?? null} loading={walkTimes.isPending} />
+
+          {/*
+            권역 비교. **골든타임 바로 아래다** — 골든타임이 "오늘 언제" 를 답하고 이쪽이
+            "오늘 어디로" 를 답한다. 둘 다 오늘의 날씨 판단이라 떨어뜨리면 짝이 안 읽힌다.
+          */}
+          <RegionalWeatherSection
+            data={regionalWeather.data ?? null}
+            loading={regionalWeather.isPending}
+          />
 
           {/* 상시 진입점. 오류·빈 화면에서도 제거하지 않는다 (Banner 주석) */}
           <Banner

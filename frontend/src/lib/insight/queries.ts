@@ -23,6 +23,9 @@ export const insightKeys = {
    */
   walkTimes: (lat: number, lng: number, conditionKey: string) =>
     [...insightKeys.all, 'walk-times', lat, lng, conditionKey] as const,
+  /** 권역 비교 (#158). 좌표 축이 없고 반려견 조건만 판정을 바꾼다 */
+  regionalWeather: (conditionKey: string) =>
+    [...insightKeys.all, 'regional-weather', conditionKey] as const,
   planWeather: (planId: string) => [...insightKeys.all, 'plan-weather', planId] as const,
 }
 
