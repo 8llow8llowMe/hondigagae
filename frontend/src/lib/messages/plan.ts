@@ -56,8 +56,16 @@ export const planMessages = {
   packingPendingNote: '수십 초 걸릴 수 있어요. 화면을 닫지 마세요.',
   /** 결과를 서버가 보관하지 않는다 — 저장된 것으로 오해하면 나중에 다시 열어 보려다 잃는다 */
   packingNotSaved: '저장되지 않는 제안이에요. 화면을 벗어나면 사라져요.',
-  /** 근거가 대표 반려견 하나다 (`AiPackingProcessor` 가 아직 petIds 를 읽지 않는다 · #152 후속) */
-  packingSinglePetNote: '대표 반려견 기준이에요',
+  /*
+    `packingSinglePetNote`('대표 반려견 기준이에요')를 여기 뒀었다. #179 로 `AiPackingProcessor`
+    가 동행 반려견 전체를 벌크 조회하게 되면서 거짓이 됐다.
+
+    **"모든 아이 기준이에요" 로 바꾸지 않았다.** 특성 조회가 일부만 성공하면 백엔드는 그
+    아이를 빼고 WARN 만 남기는데, `PackingListResponse` 에는 그 사실을 알려 주는 필드가
+    없다 — 화면은 몇 마리가 근거에 들어갔는지 모른다. 이 저장소는 근거를 모를 때 아는
+    척하지 않는 쪽으로 결정해 왔다(`weatherApplied`·`score: null`·`basisPetId`). 대신
+    어느 아이 때문에 필요한 물건인지는 서버가 이유 문장에 `[반려견 2]` 꼴로 밝힌다.
+  */
   packingIntro: '일정과 여행 기간 예보, 반려견 특성을 근거로 만들어요.',
   /** 실패 코드가 AIPLAN_016 하나다 — 없는 일정과 남의 일정을 구분해 말하지 않는다 */
   packingErrorTitle: '준비물을 만들지 못했어요',
