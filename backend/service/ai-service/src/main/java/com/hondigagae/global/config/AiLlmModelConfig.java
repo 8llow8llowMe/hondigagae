@@ -18,12 +18,10 @@ import org.springframework.web.reactive.function.client.WebClient;
 /**
  * Spring AI 모델 빈.
  *
- * <p>{@code ai-llm.enabled=true} 일 때만 만든다. LLM 이 없는 로컬/CI 에서 기동이 깨지지
- * 않게 하기 위해서다 — 그 경우 {@code StubLlmAdapter} 가 포트를 채워 비동기 파이프라인은
- * 그대로 돈다.
+ * <p>항상 만든다. 빈 생성 시점에는 Ollama 에 연결하지 않으므로(Spring AI 는 첫 호출 때 붙는다)
+ * LLM 이 없는 로컬/CI 에서도 기동은 깨지지 않는다. provider 별 빈은 {@code ai-llm.provider} 로 고른다.
  */
 @Configuration
-@ConditionalOnProperty(prefix = "ai-llm", name = "enabled", havingValue = "true")
 public class AiLlmModelConfig {
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);

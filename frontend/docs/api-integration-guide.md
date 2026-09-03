@@ -268,7 +268,7 @@ mutation 후 무효화 대상을 **명세와 코드 양쪽에 명시한다.**
 - 산책 코스(두루누비), 여행 적합도·날씨·혼잡도, 긴급 동물병원
 - 여행 후기, 일정 공유
 - AI 상담사·비서(`/assistant`), 반려견 성향 분석
-- AI 일정 생성의 **실제 LLM** (현재 `StubLlmAdapter` 고정 샘플), SSE 스트림
+- AI 일정 생성 SSE 스트림 (LLM 자체는 Ollama 로 연동 완료, 스텁 없음)
 
 착수 가능 범위는 `screen-inventory.md`.
 

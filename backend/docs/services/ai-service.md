@@ -54,9 +54,10 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
 
 ## 구현 주의점
 
-- LLM 호출은 `AiLlmPort` 뒤에 캡슐화한다. 현재 구현은 `OllamaLlmAdapter`(**Spring AI**,
-  공유 인프라의 로컬 LLM)이고, `ai-llm.enabled=false`(기본)이면 `StubLlmAdapter` 가 대신 뜬다.
-  스텁을 남겨 둔 이유는 프론트 개발과 CI 가 로컬 LLM 기동 여부에 묶이면 안 되기 때문이다.
+- LLM 호출은 `AiLlmPort` 뒤에 캡슐화한다. 구현은 `OllamaLlmAdapter`(**Spring AI**,
+  공유 인프라의 로컬 LLM) 하나다. on/off 스위치나 스텁 어댑터는 두지 않는다 — BossPickSeoul 과
+  같은 구조이고, 프론트 개발자가 백엔드를 로컬에 띄우지 않고 dev 서버에 붙기로 해서 LLM 없는
+  환경을 위한 분기가 필요 없다. Spring AI 는 첫 호출 때 연결하므로 Ollama 가 없어도 기동은 된다.
 - **모델 교체는 `AI_LLM_MODEL` 값 하나로 끝난다** (gpt-oss:20b / qwen2.5:7b-instruct / llama3.1:8b 등,
   Infra/ollama 참고). provider 교체(예: ANTHROPIC)는 spring-ai-{provider} 의존 + 모델 빈 +
   어댑터를 더하는 것으로 끝난다 — application 계층은 손대지 않는다 (BossPickSeoul 동일 구조).

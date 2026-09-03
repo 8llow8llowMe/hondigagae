@@ -59,11 +59,9 @@
 - 구현 API
   - `POST /api/v1/ai-plans` (202 + jobId)
   - `GET /api/v1/ai-plans/jobs/{jobId}` (폴링)
-- LLM 은 `AiLlmPort` 뒤에 숨어 있고 구현이 둘이다.
-  - `AnthropicClaudeLlmAdapter` — Anthropic 공식 Java SDK, 구조화 출력로 응답 형태를 강제한다.
-    `ai-llm.enabled=true` 일 때만 뜼다
-  - `StubLlmAdapter` — 기본값. 키 없이도 제출→폴링→완료 흐름이 돌아가야 프론트 개발과 CI 가
-    토큰 비용에 묶이지 않는다
+- LLM 은 `AiLlmPort` 뒤에 숨어 있고 구현은 `OllamaLlmAdapter` 하나다 (Spring AI, 공유 인프라의
+  로컬 LLM, 구조화 출력). on/off 스위치와 스텁은 없다 — 프론트 개발자는 백엔드를 로컬에 띄우지 않고
+  dev 서버에 붙는다. 로컬에서 ai-service 를 띄우려면 Ollama 가 닿아야 한다.
 - **환각 방지는 후보를 먼저 주는 방식이다.** tour-service 에서 동반 가능으로 확인된 장소 목록을
   받아 프롬프트에 싫고, 돌아온 `placeId` 를 다시 후보 집합과 대조한다. 사후 검증보다 나은 이유는
   검증은 틀린 답을 걸러낼 뿐이지만 후보를 주는 방식은 애초에 틀릴 자리를 없애기 때문이다.

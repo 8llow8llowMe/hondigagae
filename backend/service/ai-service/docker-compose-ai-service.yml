@@ -50,10 +50,9 @@ x-ai-service-environment: &ai_service_environment
   AI_PLAN_JOB_TTL_SECONDS: ${AI_PLAN_JOB_TTL_SECONDS:-86400}
   AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS: ${AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS:-30}
   AI_PLAN_JOB_RUNNING_TIMEOUT_SECONDS: ${AI_PLAN_JOB_RUNNING_TIMEOUT_SECONDS:-300}
-  # LLM (Spring AI / Ollama). 기본값은 yml 과 같은 enabled=false 라 넘기지 않으면 Vault 에
-  # AI_LLM_ENABLED=true 를 넣어도 컨테이너는 Stub 으로 뜬다. 그래서 전부 전달한다.
+  # LLM (Spring AI / Ollama). 어댑터는 항상 뜨므로 BASE_URL 이 실제 Ollama 를 가리켜야 일정 생성이 된다.
+  # 기본값은 yml 과 같은 값이다 — compose 가 넘기지 않으면 Vault 를 바꿔도 컨테이너에는 도달하지 않는다.
   # 공유 인프라의 Ollama 는 다른 호스트(ollama-01)라 컨테이너명이 아니라 사설 IP 로 접속한다.
-  AI_LLM_ENABLED: ${AI_LLM_ENABLED:-false}
   AI_LLM_PROVIDER: ${AI_LLM_PROVIDER:-OLLAMA}
   AI_LLM_BASE_URL: ${AI_LLM_BASE_URL:-http://localhost:11434}
   AI_LLM_API_KEY: ${AI_LLM_API_KEY:-}

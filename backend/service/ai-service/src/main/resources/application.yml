@@ -26,12 +26,10 @@ ai:
       pending-timeout-seconds: ${AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS:30}
       running-timeout-seconds: ${AI_PLAN_JOB_RUNNING_TIMEOUT_SECONDS:300}
 
-# LLM provider 설정 (Spring AI).
-# enabled=false 가 기본이다 - 로컬 LLM 없이도 기동되고 StubLlmAdapter 가 포트를 채운다.
-# 프론트 개발과 CI 가 LLM 기동 여부에 묶이면 안 되기 때문이다.
+# LLM provider 설정 (Spring AI). on/off 스위치는 없다 - BossPickSeoul 과 같게 어댑터가 항상 뜬다.
+# Ollama 가 없으면 기동은 되고 첫 생성 요청이 timeout-ms 뒤 실패한다 (연결은 첫 호출 때 일어난다).
 # provider 는 Spring AI 모듈 스위치, 모델 교체는 model 값 하나로 끝난다.
 ai-llm:
-  enabled: ${AI_LLM_ENABLED:false}
   provider: ${AI_LLM_PROVIDER:OLLAMA}
   base-url: ${AI_LLM_BASE_URL:http://localhost:11434}
   api-key: ${AI_LLM_API_KEY:}

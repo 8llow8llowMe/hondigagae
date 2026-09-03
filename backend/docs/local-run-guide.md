@@ -107,19 +107,19 @@ Redis 가 떠 있어야 캐시가 동작한다. 없어도 기능은 돌지만 �
 
 ### ai-service — LLM
 
+LLM 어댑터(`OllamaLlmAdapter`, Spring AI)는 **항상 뜬다.** on/off 스위치와 스텁은 없다.
+Ollama 가 없어도 기동은 되지만(연결은 첫 호출 때) 일정 생성 요청은 `AI_LLM_TIMEOUT_MS` 뒤 실패한다.
+
 | 환경변수 | 기본값 | 설명 |
 | --- | --- | --- |
-| `AI_LLM_ENABLED` | `false` | `true` 여야 Claude 어댑터가 뜬다. 기본은 스텁 |
-| `ANTHROPIC_API_KEY` | (비어 있음) | `AI_LLM_ENABLED=true` 인데 비어 있으면 **기동에 실패한다** |
-| `AI_LLM_MODEL` | `claude-opus-5` | |
+| `AI_LLM_BASE_URL` | `http://localhost:11434` | 로컬 Ollama. 공유 인프라 ollama-01 을 쓰려면 그 사설 IP |
+| `AI_LLM_MODEL` | `qwen2.5:7b-instruct` | 8GB 안에 들어가는 로컬 기본. dev 는 `gpt-oss:20b` |
+| `AI_LLM_TIMEOUT_MS` | `120000` | 모델 호출 read timeout |
 | `AI_LLM_PLACE_CANDIDATE_SIZE` | `50` | 프롬프트에 싣는 후보 장소 수 |
-| `AI_LLM_TIMEOUT_SECONDS` | `180` | SDK 기본값 10분은 워커 스레드를 너무 오래 잡는다 |
 
-키가 비었는데 `enabled=true` 면 **기동 시점에 실패시킨다.** 그대로 띄우면 사용자가 일정
-생성을 눌렀을 때에야 401 로 드러나고, 원인이 설정 누락이라는 것이 보이지 않는다.
-
-`AI_LLM_ENABLED=true` 로 쓰려면 tour-service 도 함께 떠 있어야 한다 — 후보 장소를
-tour-service 에서 받아 오기 때문이다.
+일정 생성을 실제로 돌리려면 tour-service 도 함께 떠 있어야 한다 — 후보 장소를
+tour-service 에서 받아 오기 때문이다. 프론트 개발자는 이 조합을 로컬에 띄우지 않고
+dev 서버(`BACKEND_API_URL=https://api-dev.hondigagae.com`)에 직접 붙는다.
 
 ### 실행 순서 (배치)
 

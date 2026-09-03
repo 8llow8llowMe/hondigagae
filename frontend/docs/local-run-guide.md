@@ -152,5 +152,5 @@ curl -s --max-time 10 http://localhost:8082/v3/api-docs   # tour-service
 - **지도가 빈 회색 박스** — ① `NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY` 누락 ② 카카오 콘솔에 `http://localhost:3000` 미등록 ③ `ssr:false` 누락. 브라우저 콘솔을 먼저 본다.
 - **지도가 바다 한가운데** — `LatLng(위도, 경도)` 순서. `lat` 이 먼저다. `src/lib/geo/coord.ts` 의 `toLatLng()` 을 쓴다 (`external-api-guide.md`).
 - **장소 목록이 항상 비어 있음** — 백엔드는 떴지만 batch로 데이터를 적재하지 않았다.
-- **AI 일정이 항상 같은 결과** — 정상이다. 현재 `StubLlmAdapter` 고정 샘플이다 (`backend/docs/service-inventory.md`).
+- **AI 일정 생성이 타임아웃으로 실패** — 로컬 백엔드에 Ollama 가 없어서다. 스텁 어댑터는 없으므로(2026-09-03 제거) `BACKEND_API_URL` 을 dev 서버로 돌려 확인한다.
 - **`jwtDecoder` NPE로 백엔드 기동 실패** — FE 문제가 아니다. `backend/docs/local-run-guide.md` §7.

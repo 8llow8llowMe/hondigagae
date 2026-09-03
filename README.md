@@ -33,7 +33,7 @@
 | 여행 적합도 | 날씨·동반조건·혼잡도 점수 + 이유, 산책 위험도(추정 노면온도·열지수)와 안전 시간대 |
 | 긴급 시설 | 현재 위치 기준 동물병원·동물약국 반경 검색 (제주 214곳) |
 | 여행 일정 | 일정 CRUD, 일자별 항목 일괄 교체, 일자별 날씨 브리핑 + 비 오는 날 실내 대안. **소유권은 plan-service**. AI는 제안만 |
-| AI 플래너 | 조건 제출 → 202 + `jobId` → 폴링. 기본은 Stub, `ai-llm.enabled` 시 Anthropic Claude. 후보 장소 목록으로 환각 차단 |
+| AI 플래너 | 조건 제출 → 202 + `jobId` → 폴링. LLM 은 Spring AI + Ollama(공유 인프라 로컬 LLM), 스텁 없음. 후보 장소 목록으로 환각 차단 |
 | 공공데이터 적재 | TourAPI 장소, 문화정보원 시설·긴급, 식약처 음식점 + VWorld 지오코딩, 관광지 집중률 예측 |
 
 > 제주 장소 마스터는 관광 29 + 문화정보원 228 + 식약처 102 − 중복 ≈ **315곳**, 긴급 시설 **214곳** 규모로 설계되어 있습니다. 두루누비 산책 코스는 아직 미착수입니다.
@@ -116,7 +116,7 @@ Controller → WebUseCase → WebFacade → Processor → Port → Adapter
 | Frontend | Next.js 16 (App Router), React 19, TypeScript, TanStack Query, Zustand, Tailwind CSS, 카카오 지도 SDK, Vitest, pnpm |
 | Backend | Java 21, Spring Boot 3.4.5, Spring Cloud 2024.0.0 (Gateway · Eureka · OpenFeign), Spring Security / OAuth2 Resource Server, Spring Data JPA, QueryDSL, MapStruct, Spring Batch |
 | Data | MySQL, Redis (Sentinel), MinIO |
-| AI | Anthropic Claude (`AiLlmPort`, 기본 Stub) · 비동기 job + 폴링 |
+| AI | Spring AI + Ollama (`AiLlmPort` 뒤 `OllamaLlmAdapter` 단일 구현) · 비동기 job + 폴링 |
 | Infra | Docker Compose, Nginx, Certbot, HashiCorp Vault, Jenkins, Prometheus, Grafana |
 | 기타 | Resilience4j, Jasypt, Snowflake ID, SpringDoc OpenAPI |
 
