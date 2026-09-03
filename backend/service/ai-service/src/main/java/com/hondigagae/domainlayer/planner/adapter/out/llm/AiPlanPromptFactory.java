@@ -61,6 +61,31 @@ public class AiPlanPromptFactory {
         4. 여행과 무관한 물건은 넣지 않습니다.
         """;
 
+    /**
+     * 일정 생성의 다견 규칙 — <b>가장 제약이 큰 아이</b>가 기준이다.
+     * 한 마리라도 못 들어가면 그 장소는 갈 수 없기 때문이다.
+     */
+    private static final String PLAN_MULTI_PET_RULE = """
+        - 입장 제한(크기·체중)은 가장 큰 크기와 가장 무거운 체중 기준으로 판정할 것
+        """;
+
+    /**
+     * 준비물의 다견 규칙 — <b>합집합</b>이다.
+     *
+     * <p>일정 생성과 반대인 것이 요점이다. 준비물은 점수를 매기는 일이 아니라 목록을 만드는
+     * 일이라, "가장 제약이 큰 아이 하나"로 접으면 다른 아이에게 필요한 물건이 빠진다.
+     * 더위에 약한 아이의 쿨매트와 추위에 약한 아이의 옷은 둘 다 필요하다.
+     *
+     * <p>대신 <b>어느 아이 때문인지 이유에 밝히게</b> 한다. 합집합으로 만들면 "왜 이게
+     * 필요한가"가 흐려지는데, 준비물은 항목마다 근거를 붙이는 것이 핵심인 기능이라
+     * 그 문장이 흐려지면 목록 자체가 신뢰를 잃는다.
+     */
+    private static final String PACKING_MULTI_PET_RULE = """
+        - 아이마다 필요한 물건을 모두 넣을 것. 한 아이에게만 필요한 물건도 빠뜨리지 말 것
+        - 특정 아이 때문에 필요한 물건은 이유에 어느 아이인지 밝힐 것 - "[반려견 2] 더위에 약함" 처럼
+        - 아이들이 함께 쓸 수 있는 물건은 하나로 적되 마리 수가 필요하면 수량을 밝힐 것
+        """;
+
     public String packingSystemPrompt() {
         return PACKING_SYSTEM_PROMPT;
     }
@@ -71,7 +96,7 @@ public class AiPlanPromptFactory {
         prompt.append("여행 정보\n");
         prompt.append("- 기간: ").append(query.startDate()).append(" ~ ").append(query.endDate()).append('\n');
 
-        appendPetSection(prompt, query.safePetConditions());
+        appendPetSection(prompt, query.safePetConditions(), PACKING_MULTI_PET_RULE);
         appendWeatherLines(prompt, query.safeWeatherOutlook(), parseDateOrNull(query.startDate()));
 
         if (query.planOutline() != null) {
@@ -106,7 +131,7 @@ public class AiPlanPromptFactory {
             prompt.append("- 선호 장소: [선호] 표시가 붙은 장소는 조건(입장 제한·동선·날씨)이 맞으면 우선 배치할 것. 필수는 아님\n");
         }
 
-        appendPetSection(prompt, query.safePetConditions());
+        appendPetSection(prompt, query.safePetConditions(), PLAN_MULTI_PET_RULE);
         appendWeatherSection(prompt, query);
         appendRegenerateSection(prompt, query);
 
@@ -147,7 +172,21 @@ public class AiPlanPromptFactory {
      * 특성 없이 "반려견 기준으로 짜라"고만 하면 모델은 일반적인 강아지를 상상한다.
      * 특성이 없으면(조회 실패/프로필 부재) 절 자체를 생략한다 — 없는 값을 지어 적지 않는다.
      */
-    private void appendPetSection(StringBuilder prompt, List<PetCondition> pets) {
+    /**
+     * 반려견 절.
+     *
+     * <p><b>여러 마리일 때의 규칙은 쓰임마다 반대라서</b> 호출부가 정한다.
+     *
+     * <ul>
+     *   <li>일정 생성 — <b>가장 제약이 큰 아이</b>가 기준이다. 한 마리라도 못 들어가면
+     *       그 장소는 못 간다</li>
+     *   <li>준비물 — <b>합집합</b>이다. 더위에 약한 아이의 쿨매트와 추위에 약한 아이의 옷이
+     *       둘 다 필요하다. 여기서 "가장 제약이 큰 아이"로 접으면 다른 아이 물건이 빠진다</li>
+     * </ul>
+     *
+     * @param multiPetRule 여러 마리일 때 덧붙일 판정 규칙. 한 마리면 쓰이지 않는다
+     */
+    private void appendPetSection(StringBuilder prompt, List<PetCondition> pets, String multiPetRule) {
         if (pets == null || pets.isEmpty()) {
             return;
         }
@@ -161,8 +200,7 @@ public class AiPlanPromptFactory {
             prompt.append("[반려견 ").append(index + 1).append("]\n");
             appendPetTraits(prompt, pets.get(index));
         }
-        // 여러 마리면 입장 제한은 가장 제약이 큰 아이가 기준이다 — 한 마리라도 못 들어가면 그 장소는 못 간다.
-        prompt.append("- 입장 제한(크기·체중)은 가장 큰 크기와 가장 무거운 체중 기준으로 판정할 것\n");
+        prompt.append(multiPetRule);
     }
 
     /**

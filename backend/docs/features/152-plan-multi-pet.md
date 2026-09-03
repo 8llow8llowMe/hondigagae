@@ -49,7 +49,8 @@
 - [x] `PlanSummaryInfo` · 상세 · 내부 outline 에 `petIds`
 - [x] `GET /plans?petId=` — 한 마리라도 포함되면 히트 (JPQL + H2 슬라이스 테스트)
 - [ ] FE: 담기 패널의 판정 기준 선택을 뗄 수 있다 — `draftToPlanPayload` 가 `petIds: snapshot.pets[].petId` 를 보내면 된다. #128 후속으로 남긴다
-- [ ] ai-service: `PlanOutlineResponse.petIds` 를 준비물 생성이 읽도록 (`AiPackingProcessor` 는 아직 `petId` 만 본다) — 별도 이슈
+- [x] ai-service: `PlanOutlineResponse.petIds` 를 준비물 생성이 읽도록 — 완료.
+      다견 규칙이 일정 생성과 **반대**라는 것이 이 작업의 판단이었다(합집합 vs 가장 제약이 큰 아이).
 
 ## 범위 주의
 
