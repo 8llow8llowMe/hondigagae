@@ -5,9 +5,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * LLM provider 접속/생성 설정.
  *
- * <p>{@code enabled} 가 false 면 {@code StubLlmAdapter} 가 뜬다. LLM 없이도 비동기 파이프라인
- * (제출-폴링-완료)을 끝까지 돌려 볼 수 있어야 하기 때문이다 — 프론트 개발과 CI 가 로컬 LLM
- * 기동 여부에 묶이면 안 된다.
+ * <p>on/off 스위치는 없다. BossPickSeoul 과 같게 LLM 어댑터가 항상 뜨고, Ollama 에 닿지 않으면
+ * 기동은 되되 첫 생성 요청이 타임아웃으로 실패한다(Spring AI 는 첫 호출 때 연결한다).
+ * 예전에 있던 {@code enabled=false} + 스텁 어댑터는 프론트 개발자가 백엔드를 로컬에 띄우지 않고
+ * dev 서버에 직접 붙기로 하면서 제거했다 — 분기 하나가 사라진 만큼 dev 와 로컬이 같은 경로를 탄다.
  *
  * <p>provider 는 Spring AI 모듈 스위치다({@link AiLlmProvider}). 기본은 공유 인프라의
  * Ollama(로컬 LLM)이고, 모델 교체는 {@code model} 값만 바꾸면 된다 — 어댑터는
@@ -15,7 +16,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "ai-llm")
 public record AiLlmProperties(
-    boolean enabled,
     AiLlmProvider provider,
     String baseUrl,
     // Ollama 는 키가 없다. 키가 필요한 provider 를 붙일 때를 위해 자리만 둔다.
