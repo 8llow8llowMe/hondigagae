@@ -26,6 +26,48 @@ describe('WalkTimesSection — 추천 구간', () => {
   })
 
   /*
+    **#200 회귀.** dev 22:12 KST 에 서버가 `goldenStart == goldenEnd == 23:00` 을 줬다 —
+    그날 남은 시간대가 한 칸뿐이면 시작과 끝이 같다. `hasGolden` 이 null 검사만 해서
+    화면이 `23:00 – 23:00` 을 찍었고, 0분짜리 구간은 고장으로 읽힌다.
+  */
+  it('시작과 끝이 같으면 0분 구간이 아니라 한 시각으로 말한다', () => {
+    const markup = render({
+      ...GOOD_DAY,
+      goldenStart: '2026-09-03T23:00:00',
+      goldenEnd: '2026-09-03T23:00:00',
+    })
+
+    expect(markup).toContain('23:00')
+    expect(markup).not.toContain('23:00 – 23:00')
+    expect(markup).toContain(messages.home.goldenSingleHour.replace('{time}', '23:00'))
+  })
+
+  /*
+    **구간으로 늘리지 않는다.** 예보 단위가 1시간이라 `23:00 – 24:00` 이 그럴듯해 보이지만
+    서버가 주지 않은 끝시각을 화면이 만드는 것이다 — 이 섹션은 구간을 지어내지 않기로 한
+    자리다 (바로 아래 테스트와 같은 규칙).
+  */
+  it('한 시각을 한 시간짜리 구간으로 늘리지 않는다', () => {
+    const markup = render({
+      ...GOOD_DAY,
+      goldenStart: '2026-09-03T23:00:00',
+      goldenEnd: '2026-09-03T23:00:00',
+    })
+
+    expect(markup).not.toContain('24:00')
+    expect(markup).not.toContain('00:00')
+  })
+
+  /** 서로 다르면 그대로 구간이다 — 위 분기가 정상 경로를 잡아먹지 않아야 한다 */
+  it('시작과 끝이 다르면 구간으로 적는다', () => {
+    const markup = render(GOOD_DAY)
+
+    expect(markup).toContain('18:00')
+    expect(markup).toContain('21:00')
+    expect(markup).not.toContain(messages.home.goldenSingleHour.replace('{time}', '18:00'))
+  })
+
+  /*
     이 테스트가 이 화면의 핵심이다. 서버는 남은 시간이 전부 위험이면 일부러 구간을 주지
     않는다 — "그나마 이때가 낫다" 고 말하면 사용자가 그것을 허락으로 읽기 때문이다
     (`GoldenWalkWindow`). 화면이 대체 구간을 지어내면 그 설계가 무너진다.

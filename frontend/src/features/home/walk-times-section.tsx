@@ -69,10 +69,27 @@ export function WalkTimesSection({
 function GoldenWindow({ data }: { data: WalkTimesResponse }) {
   const tone = walkSafetyTone(data.goldenLevel?.code)
 
+  /*
+    **시작과 끝이 같으면 구간이 아니라 한 시각이다** (#200). 그날 남은 시간대가 한 칸뿐이면
+    서버가 둘을 같은 값으로 준다 — dev 22:12 KST 에 `23:00 – 23:00` 으로 관측했다. 대시로
+    이으면 0분짜리 구간이 되어 고장으로 읽힌다.
+
+    **구간으로 늘리지 않는다.** 예보 단위가 1시간이라 `23:00 – 24:00` 이 그럴듯해 보이지만,
+    서버가 주지 않은 끝시각을 화면이 만드는 것이다 — 이 섹션은 "그나마 이때가 낫다" 를
+    지어내지 않기로 한 자리다 (`goldenNone` 주석).
+  */
+  const single = data.goldenStart === data.goldenEnd
+
   return (
     <p className="text-body-1 flex flex-wrap items-baseline gap-x-2 gap-y-1 font-semibold tabular-nums">
       <span className="text-metric-high-700 text-title-3">
-        {hourMinute(data.goldenStart)} – {hourMinute(data.goldenEnd)}
+        {single ? (
+          messages.home.goldenSingleHour.replace('{time}', hourMinute(data.goldenStart))
+        ) : (
+          <>
+            {hourMinute(data.goldenStart)} – {hourMinute(data.goldenEnd)}
+          </>
+        )}
       </span>
       {data.goldenLevel !== null && <MetricWord tone={tone}>{data.goldenLevel.name}</MetricWord>}
     </p>
