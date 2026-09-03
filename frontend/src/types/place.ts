@@ -172,9 +172,19 @@ export type PlaceFilters = {
 }
 
 /**
- * 백엔드 ContentType enum 의 name().
- * TODO(BE 확인): Spring 기본 바인딩은 name() 기준이므로 `?contentType=TOURIST_SPOT` 을 전제한다.
- * 코드값("12") 바인딩용 컨버터가 있는지 Swagger 로 확인한다.
+ * 백엔드 `ContentType` enum 의 `name()`.
+ *
+ * **코드값 바인딩용 컨버터는 없다** — dev Swagger 로 확정했다 (#207):
+ *
+ * ```yaml
+ * # GET /api/v1/places · contentType
+ * type: string
+ * enum: [TOURIST_SPOT, CULTURE, FESTIVAL, COURSE, LEPORTS, LODGING, SHOPPING, RESTAURANT]
+ * ```
+ *
+ * TourAPI 원본 코드값을 보내면 **400 `PLACE_113`** 이다 (`?contentType=12` 실측:
+ * "contentType 파라미터 형식이 올바르지 않습니다."). 그래서 URL 필터도 이 이름을 그대로
+ * 쓴다 — `lib/url/place-filters.ts` 가 매핑 레이어를 두지 않는 근거다.
  */
 export const CONTENT_TYPE_CODES = [
   'TOURIST_SPOT',

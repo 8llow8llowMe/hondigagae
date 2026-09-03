@@ -2,8 +2,19 @@
 
 > 화면별 담당 API, 상태, 착수 가능 여부. **백엔드 구현 상태와 동기화한다.**
 > 근거: `backend/docs/service-inventory.md` (백엔드 구현 현황), 루트 `README.md` (AI 기능 선정 상태)
-> 최종 확인: 2026-09-03 (백엔드 = origin/develop `48214dd` 기준, 컨트롤러 13개 · 엔드포인트 **56개** 전수 실측)
-> 갱신 방법: `find backend/service -name "*WebController.java"` 로 엔드포인트를 전수 확인한다.
+> 최종 확인: 2026-09-03 (백엔드 = origin/develop `48214dd` 기준, **`*WebController` 11개 · 엔드포인트 56개** 전수 실측)
+> 갱신 방법:
+>
+> ```bash
+> for f in $(find backend/service -name "*WebController.java" -not -path "*/build/*"); do echo "$(grep -cE '@(Get|Post|Put|Patch|Delete)Mapping' "$f")  $(basename "$f")"; done
+> ```
+>
+> **`build/` 를 빼야 한다** — 빌드 산출물의 복사본이 함께 잡히면 수가 두 배로 보인다.
+> **세는 대상은 `*WebController` 뿐이다.** 같은 서비스에 `*InternalController` 5개
+> (`/internal/v1/**`)와 `*ExceptionHandler` 9개가 함께 있어 `@RestController` 를 세면 25개가
+> 된다. `/internal/v1/**` 은 **게이트웨이가 라우팅하지 않아 FE 가 부를 수 없다**
+> (실측: `GET /internal/v1/places` → nginx 404). 이 문서가 한동안 "컨트롤러 13개" 라고
+> 적어 둔 것은 어느 기준으로도 맞지 않는 수였다 ([#207](https://github.com/8llow8llowMe/hondigagae/issues/207)).
 > **dev 게이트웨이가 올라왔다** — `https://api-dev.hondigagae.com/swagger-ui/index.html` 의
 > `/{서비스}-service/v3/api-docs` 를 받아 대조하는 편이 더 정확하다 (`/fe-api-check` 의 전제였다).
 > **단 plan-service 는 503 이다** (2026-09-03 확인) — 일정·즐겨찾기 13개는 아직 로컬 소스로만 대조된다.
@@ -40,6 +51,22 @@
 주의: `state` 는 서버가 조회와 동시에 지운다 (Redis `GETDEL`). **콜백에서 교환을 두 번
 부르면 두 번째는 무조건 `AUTH_010`** 이므로 `use-oauth-exchange.ts` 의 ref 가드를 지운 채
 리팩터링하면 개발 모드(StrictMode)에서 성공 직후 오류 화면이 덮인다.
+
+**FE 미연동 (백엔드는 구현됨)** — dev Swagger 대조에서 드러났다 ([#207](https://github.com/8llow8llowMe/hondigagae/issues/207)).
+이 문서에 아예 없던 항목이라 여기 남긴다.
+
+| API                                 | 응답                                                                                              | 비고                                                                                                                |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `GET /auth/sessions`                | `AuthSessionsResponse` — `sessions[]`(`sessionId` · `lastRefreshedAt` · `current`) · `totalCount` | **로그인 기기 목록.** `refreshToken` 을 **쿠키로** 읽는다                                                           |
+| `DELETE /auth/sessions/{sessionId}` | `Response<Void>`                                                                                  | 개별 세션 강제 종료 (다른 기기 로그아웃)                                                                            |
+| `POST /members/signup/dev`          | `MemberDevSignupResponse` — `memberId` · `email`                                                  | **개발 서버 전용** 즉시 가입([#185](https://github.com/8llow8llowMe/hondigagae/issues/185)). 이메일 인증을 생략한다 |
+
+- **"기기 관리" 화면이 아직 없다.** 아트보드에도 없어 붙일 자리가 없다. 화면을 만들 때
+  `refreshToken` 이 **쿠키 파라미터**라는 점이 걸린다 — 이 저장소는 refresh 를 Next 서버
+  세션에 봉인하므로(`auth-guide.md`) BFF 가 쿠키로 되돌려 실어야 한다. `reissue`·`logout` 이
+  이미 그 경로를 쓰므로(`toCookieHeader`) 새로 만들 것은 없다.
+- **`POST /members/signup/dev` 는 FE 가 부르지 않는다.** 화면에서 쓰면 프로덕션에 남는다 —
+  개발용 계정은 curl 로 만든다.
 
 ## 2. 반려견 프로필 — 착수 가능
 
