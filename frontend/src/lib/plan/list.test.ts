@@ -18,10 +18,9 @@ const STATUS_NAMES: Record<PlanStatusCode, string> = {
 
 function plan(overrides: Partial<PlanSummaryItem> = {}): PlanSummaryItem {
   const code = (overrides.status?.code ?? 'DRAFT') as PlanStatusCode
-  return {
+  const merged: PlanSummaryItem = {
     planId: '1234567890123456789',
     petId: '9876543210987654321',
-    petIds: ['9876543210987654321'],
     areaCode: '39',
     title: '몽실이와 제주 2박 3일',
     startDate: '2026-09-12',
@@ -29,6 +28,13 @@ function plan(overrides: Partial<PlanSummaryItem> = {}): PlanSummaryItem {
     status: { code, name: STATUS_NAMES[code] ?? code, description: null },
     ...overrides,
   }
+
+  /*
+    **`petIds` 는 `petId` 를 따라간다** — 지정하지 않으면 한 마리 일정이다. 고정값으로 두면
+    `plan({ petId: 'p1' })` 이 대표만 바뀌고 동행은 옛 아이디로 남아, 반려견 축 테스트가
+    조용히 엉뚱한 것을 검증한다.
+  */
+  return { ...merged, petIds: overrides.petIds ?? [merged.petId] }
 }
 
 /** 아트보드가 쓴 날짜다. 2026-08-27 기준으로 D-16 이 나온다 */
@@ -152,6 +158,24 @@ describe('좁히기', () => {
   it('두 축은 함께 걸린다', () => {
     expect(filterPlans(ALL, { status: 'DRAFT', petIds: ['p2'] })).toEqual([])
   })
+
+  /*
+    #152 — 백엔드도 `GET /plans?petId=` 를 대표 컬럼과 조인 테이블을 **둘 다** 보도록
+    바꿨다. 대표만 보면 둘째 반려견으로 거를 때 일정이 사라진다.
+  */
+  it('동행 반려견으로 걸러도 잡힌다 — 대표만 보지 않는다', () => {
+    const together = plan({ planId: 'c', petId: 'p1', petIds: ['p1', 'p3'] })
+
+    expect(filterPlans([together], { status: 'ALL', petIds: ['p3'] })).toEqual([together])
+  })
+
+  it('petIds 가 없는 응답은 대표 한 마리로 읽는다 — #152 머지 전 서버', () => {
+    // `exactOptionalPropertyTypes` 라 `petIds: undefined` 는 타입이 거부한다 — 키를 지운다
+    const legacy = plan({ planId: 'd', petId: 'p4' })
+    delete legacy.petIds
+
+    expect(filterPlans([legacy], { status: 'ALL', petIds: ['p4'] })).toEqual([legacy])
+  })
 })
 
 describe('개수 — 0 을 감추지 않는다', () => {
@@ -171,6 +195,17 @@ describe('개수 — 0 을 감추지 않는다', () => {
   it('반려견별로 센다', () => {
     const counts = countByPet([plan({ petId: 'p1' }), plan({ petId: 'p1' }), plan({ petId: 'p2' })])
     expect(counts.get('p1')).toBe(2)
+    expect(counts.get('p2')).toBe(1)
+  })
+
+  /*
+    합이 일정 수를 넘는 게 맞다 — 좁히기가 "한 마리라도 동행이면 히트" 이므로 대표만 세면
+    "초코 0건" 이라고 적어 놓고 골랐을 때 일정이 나오는 모순이 생긴다 (#152).
+  */
+  it('동행 일정은 아이마다 한 번씩 센다', () => {
+    const counts = countByPet([plan({ petId: 'p1', petIds: ['p1', 'p2'] })])
+
+    expect(counts.get('p1')).toBe(1)
     expect(counts.get('p2')).toBe(1)
   })
 })

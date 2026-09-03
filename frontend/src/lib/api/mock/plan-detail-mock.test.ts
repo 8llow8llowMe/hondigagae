@@ -213,7 +213,7 @@ describe('일정 판정 mock — /weather', () => {
   it('아이별 점수가 petIds 순서로 온다', () => {
     const first = weatherOf(PLAN).days[0]
 
-    expect(first?.petSuitabilities.map((pet) => pet.petId)).toEqual([
+    expect(first?.petSuitabilities?.map((pet) => pet.petId)).toEqual([
       '123456789012000001',
       '123456789012000002',
     ])
@@ -231,7 +231,7 @@ describe('일정 판정 mock — /weather', () => {
     )[0]
 
     expect(first?.basisPetId).toBe(lowest?.petId)
-    expect(first?.basisPetId).not.toBe(weatherOf(PLAN).petIds[0])
+    expect(first?.basisPetId).not.toBe(weatherOf(PLAN).petIds?.[0])
     expect(first?.score).toBe(lowest?.score)
   })
 
@@ -250,7 +250,7 @@ describe('일정 판정 mock — /weather', () => {
   })
 
   it('등급 경계가 백엔드와 같다 — 80 이상 HIGH, 60 이상 MEDIUM', () => {
-    const levels = weatherOf(PLAN).days[0]?.petSuitabilities.map((pet) => [
+    const levels = weatherOf(PLAN).days[0]?.petSuitabilities?.map((pet) => [
       pet.score,
       pet.suitabilityLevel?.code,
     ])
