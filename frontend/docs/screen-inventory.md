@@ -2,8 +2,11 @@
 
 > 화면별 담당 API, 상태, 착수 가능 여부. **백엔드 구현 상태와 동기화한다.**
 > 근거: `backend/docs/service-inventory.md` (백엔드 구현 현황), 루트 `README.md` (AI 기능 선정 상태)
-> 최종 확인: 2026-09-03 (백엔드 = origin/develop `48214dd` 기준, 컨트롤러 13개 · 엔드포인트 45개 전수 실측)
+> 최종 확인: 2026-09-03 (백엔드 = origin/develop `48214dd` 기준, 컨트롤러 13개 · 엔드포인트 **56개** 전수 실측)
 > 갱신 방법: `find backend/service -name "*WebController.java"` 로 엔드포인트를 전수 확인한다.
+> **dev 게이트웨이가 올라왔다** — `https://api-dev.hondigagae.com/swagger-ui/index.html` 의
+> `/{서비스}-service/v3/api-docs` 를 받아 대조하는 편이 더 정확하다 (`/fe-api-check` 의 전제였다).
+> **단 plan-service 는 503 이다** (2026-09-03 확인) — 일정·즐겨찾기 13개는 아직 로컬 소스로만 대조된다.
 > **`backend/docs/service-inventory.md` 를 그대로 믿지 않는다** — 그 문서도 낡을 수 있다.
 
 ## 착수 가능 여부 요약
