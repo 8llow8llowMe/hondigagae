@@ -31,12 +31,12 @@ export async function readSession(): Promise<Session | null> {
   const raw = store.get(SESSION_COOKIE_NAME)?.value
   if (!raw) return null
 
-  return unseal<Session>(raw, serverEnv.SESSION_SECRET)
+  return unseal<Session>(raw, serverEnv.AUTH_SESSION_SECRET)
 }
 
 export async function writeSession(session: Session): Promise<void> {
   const store = await cookies()
-  store.set(SESSION_COOKIE_NAME, seal(session, serverEnv.SESSION_SECRET), COOKIE_OPTIONS)
+  store.set(SESSION_COOKIE_NAME, seal(session, serverEnv.AUTH_SESSION_SECRET), COOKIE_OPTIONS)
 }
 
 export async function clearSession(): Promise<void> {

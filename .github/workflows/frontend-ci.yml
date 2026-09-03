@@ -38,6 +38,6 @@ jobs:
       # (docs/architecture-guide.md §4)
       - run: pnpm build
         env:
-          BACKEND_BASE_URL: http://localhost:8000
-          SESSION_SECRET: ci-placeholder-secret-at-least-32-characters
-          NEXT_PUBLIC_KAKAO_MAP_KEY: ci-placeholder
+          BACKEND_API_URL: http://localhost:8000
+          AUTH_SESSION_SECRET: ci-placeholder-secret-at-least-32-characters
+          NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY: ci-placeholder

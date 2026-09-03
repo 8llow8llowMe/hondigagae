@@ -10,6 +10,10 @@
 #    Next.js 는 NEXT_PUBLIC_* 를 **빌드 시점에 코드로 인라인**하므로 런타임 주입은 무시된다.
 #    이 값들은 Jenkins 빌드 단계에서 Vault 로부터 주입된다. (Jenkinsfile.frontend-common.groovy)
 #    여기 있는 것은 서버에서만 읽는 값(BFF 세션 키, 백엔드 주소)뿐이다.
+#    og:image 기준 도메인(NEXT_PUBLIC_SITE_URL)도 빌드 시점 값이라 여기 없다.
+#
+# 키 이름은 BossPickSeoul 의 같은 파일과 동일하다 (AUTH_SESSION_SECRET, BACKEND_API_URL, ...).
+# 두 프로젝트의 Vault 를 나란히 관리하므로 이름을 갈라 두지 않는다.
 #
 # MOCK_API 는 두지 않는다. src/lib/api/mock 이 NODE_ENV=production 이면 값과 무관하게
 # 항상 비활성이므로, 운영 compose 에 남겨두면 켜질 수 있다는 오해만 만든다.
@@ -19,19 +23,13 @@ x-frontend-web-environment: &frontend_web_environment
   NEXT_TELEMETRY_DISABLED: '1'
   # BFF 세션 암호화 키. 32자 이상이어야 한다 (src/lib/env.server.ts 가 zod 로 검증).
   # 환경당 한 번만 만들어 고정한다 — 바뀌면 기존 세션 쿠키를 복호화할 수 없어 전원 로그아웃된다.
-  SESSION_SECRET: ${SESSION_SECRET}
+  AUTH_SESSION_SECRET: ${AUTH_SESSION_SECRET}
   # 서버 컴포넌트/Route Handler(BFF)가 호출할 백엔드 주소.
   # 사설 IP 가 아니라 공개 도메인을 쓴다. auth API(/api/v1/auth, /api/v1/members)는
   # 게이트웨이를 거치지 않고 auth-service 로 직결되며 그 분기를 nginx 가 하기 때문이다.
   #   dev  = https://api-dev.hondigagae.com
   #   prod = https://api.hondigagae.com
-  BACKEND_BASE_URL: ${BACKEND_BASE_URL}
-  # og:image 절대 URL 과 canonical 의 기준 도메인 (app/layout.tsx 의 metadataBase).
-  # 서버에서만 읽으므로 NEXT_PUBLIC_ 이 아니고 런타임 주입으로 충분하다.
-  # 비면 http://localhost:3000 으로 떨어져 카카오톡·트위터 공유 카드가 깨진다.
-  #   dev  = https://dev.hondigagae.com
-  #   prod = https://www.hondigagae.com
-  SITE_BASE_URL: ${SITE_BASE_URL}
+  BACKEND_API_URL: ${BACKEND_API_URL}
 
 x-logging: &default-logging
   driver: 'json-file'

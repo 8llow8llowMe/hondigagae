@@ -31,24 +31,31 @@ frontendPipeline.run([
         dev : 'deploy-frontend-dev',
         prod: 'deploy-frontend-prod'
     ],
-    // 빌드 단계에서 반드시 있어야 하는 값입니다. 셋 다 `pnpm build` 를 직접 깨뜨립니다.
+    // 키 이름은 BossPickSeoul 의 Jenkinsfile-frontend-web 과 같습니다. 두 프로젝트의 Vault
+    // (kv/{project}/frontend/{env}/env) 를 나란히 관리하므로 이름을 갈라 두지 않습니다.
+    // 다른 점은 NEXT_PUBLIC_WS_URL 하나뿐입니다 — WebSocket 을 아직 쓰지 않아 요구하지 않습니다.
+    // (Vault 에 들어 있어도 무해합니다. 실시간 기능이 붙으면 여기에 추가합니다)
     //
-    //   NEXT_PUBLIC_KAKAO_MAP_KEY  빌드 시점에 번들로 인라인됩니다. 비면 지도가 뜨지 않는
-    //                              번들이 그대로 배포됩니다. src/lib/env.client.ts 가 zod
-    //                              min(1) 로 잡아 빌드를 실패시킵니다.
-    //   BACKEND_BASE_URL           NEXT_PUBLIC_ 이 아닌데도 빌드에 필요합니다.
-    //   SESSION_SECRET             src/lib/env.server.ts 가 모듈 로드 시점에 zod 로
-    //                              fail-fast 하기 때문입니다(url / min(32)).
-    //                              .github/workflows/frontend-ci.yml 이 placeholder 를
-    //                              넘기는 것도 같은 이유입니다.
+    // 빌드 단계에서 반드시 있어야 하는 값입니다.
+    //
+    //   NEXT_PUBLIC_SITE_URL              빌드 시점에 인라인. og:image 절대 URL 과 canonical 의
+    //                                     기준 도메인(app/layout.tsx metadataBase). 비면 localhost 로
+    //                                     떨어진 번들이 그대로 배포돼 공유 카드가 깨집니다.
+    //   NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY  빌드 시점에 인라인. 비면 지도가 뜨지 않는 번들이
+    //                                     그대로 배포됩니다. src/lib/env.client.ts 가 zod min(1)
+    //                                     로 잡아 빌드를 실패시킵니다.
+    //   BACKEND_API_URL                   NEXT_PUBLIC_ 이 아닌데도 빌드에 필요합니다.
+    //   AUTH_SESSION_SECRET               src/lib/env.server.ts 가 모듈 로드 시점에 zod 로
+    //                                     fail-fast 하기 때문입니다(url / min(32)).
+    //                                     .github/workflows/frontend-ci.yml 이 placeholder 를
+    //                                     넘기는 것도 같은 이유입니다.
     //
     // 카카오는 지도 SDK 와 로그인 SDK 가 같은 JavaScript 키 하나를 씁니다. 키를 나누지 마세요.
-    // (WebSocket 은 아직 쓰지 않아 NEXT_PUBLIC_WS_URL 이 없습니다.
-    //  실시간 기능이 붙으면 여기와 Vault 에 같이 추가합니다)
     requiredBuildEnvKeys : [
-        'NEXT_PUBLIC_KAKAO_MAP_KEY',
-        'BACKEND_BASE_URL',
-        'SESSION_SECRET'
+        'NEXT_PUBLIC_SITE_URL',
+        'NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY',
+        'BACKEND_API_URL',
+        'AUTH_SESSION_SECRET'
     ],
     // 컨테이너 기동에 필요한 런타임 값입니다. compose 가 참조하는 보간 변수 전체와 일치해야 합니다.
     // compose 에 기본값(`:-`)을 두지 않으므로, 하나라도 비면 배포 전에 여기서 막힙니다.
@@ -57,9 +64,8 @@ frontendPipeline.run([
     // ('{ENV}' 를 쓰면 DEV/PROD 로 치환됩니다. 지금 쓰는 키는 없지만 규칙은 남겨둡니다)
     requiredRuntimeEnvKeys: [
         'TIME_ZONE',
-        'SESSION_SECRET',
-        'BACKEND_BASE_URL',
-        'SITE_BASE_URL',
+        'AUTH_SESSION_SECRET',
+        'BACKEND_API_URL',
         'FRONTEND_WEB_PORT',
         'FRONTEND_WEB_MEM_LIMIT'
     ]

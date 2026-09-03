@@ -45,12 +45,12 @@ grep -rn "accessToken\|refreshToken\|Authorization" frontend/src frontend/app
 ### 3. BFF 우회
 
 ```bash
-grep -rn "localhost:8000\|api/v1\|BACKEND_BASE_URL" frontend/src frontend/app
+grep -rn "localhost:8000\|api/v1\|BACKEND_API_URL" frontend/src frontend/app
 ```
 
 - 클라이언트 코드가 게이트웨이를 직접 부르는가 → **위반**
 - `src/lib/api/client.ts` 의 baseURL이 `/api/bff` 인가
-- `BACKEND_BASE_URL` 이 `NEXT_PUBLIC_` 접두사를 갖는가 → **위반**
+- `BACKEND_API_URL` 이 `NEXT_PUBLIC_` 접두사를 갖는가 → **위반**
 
 ### 4. 응답 래퍼 판별
 

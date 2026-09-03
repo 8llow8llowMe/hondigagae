@@ -196,21 +196,31 @@ pnpm build                                        → .next/standalone/server.js
 안에서 `pnpm install` / `next build` 를 돌리지 않는다 — 배포 대상이 라즈베리파이(aarch64)라
 이미지 빌드에 몇 분씩 쓸 수 없기 때문이다.
 
-### 빌드 시점에 필요한 값이 셋이다
+### 프론트 키 이름은 BossPickSeoul 과 같다
+
+`kv/hondigagae/frontend/{env}/env` 의 키는 `kv/bosspickseoul/frontend/{env}/env` 와 이름이 같다
+(`AUTH_SESSION_SECRET`, `BACKEND_API_URL`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY`,
+`TIME_ZONE`, `FRONTEND_WEB_PORT`, `FRONTEND_WEB_MEM_LIMIT`). 두 프로젝트의 Vault 를 나란히 관리하므로
+이름을 갈라 두지 않는다. 차이는 `NEXT_PUBLIC_WS_URL` 을 요구하지 않는 것 하나다 (WebSocket 미사용).
+백엔드 키도 공통 인프라 항목(`DB_*`, `REDIS_*`, `JWT_*`, `MINIO_*`, `MAIL_*`, `AI_LLM_*`)은 이름이 같고,
+서비스 고유 키(`TOUR_*`, `KMA_*`, `PLAN_*`)만 다르다.
+
+### 빌드 시점에 필요한 값이 넷이다
 
 `NEXT_PUBLIC_*` 는 빌드 시점에 코드로 인라인되므로 dev 와 prod 는 같은 커밋이라도 각각 빌드한다.
 그런데 `NEXT_PUBLIC_` 이 아닌 값 둘도 빌드에 필요하다.
 
 | key | 빌드에 필요한 이유 |
 | --- | --- |
-| `NEXT_PUBLIC_KAKAO_MAP_KEY` | 번들에 인라인. `src/lib/env.client.ts` 가 zod `min(1)` 로 검증 |
-| `BACKEND_BASE_URL` | `src/lib/env.server.ts` 가 모듈 로드 시점에 zod `url()` 로 fail-fast |
-| `SESSION_SECRET` | 〃 `min(32)` |
+| `NEXT_PUBLIC_SITE_URL` | 번들에 인라인. og:image 절대 URL 의 기준. 비면 localhost 번들이 배포된다 |
+| `NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY` | 번들에 인라인. `src/lib/env.client.ts` 가 zod `min(1)` 로 검증 |
+| `BACKEND_API_URL` | `src/lib/env.server.ts` 가 모듈 로드 시점에 zod `url()` 로 fail-fast |
+| `AUTH_SESSION_SECRET` | 〃 `min(32)` |
 
 `.github/workflows/frontend-ci.yml` 이 `pnpm build` 에 placeholder 를 넘기는 것도 같은 이유다.
 파이프라인은 Vault secret 전체를 빌드 단계에 주입하므로 따로 신경 쓸 것은 없다.
 
-### `SESSION_SECRET` 은 환경당 한 번만 만든다
+### `AUTH_SESSION_SECRET` 은 환경당 한 번만 만든다
 
 세션 쿠키의 암호화 키다. 배포마다 새로 만들면 기존 쿠키를 복호화할 수 없어
 **로그인한 사용자가 전원 로그아웃**된다. 유출됐을 때만 의도적으로 교체하고,

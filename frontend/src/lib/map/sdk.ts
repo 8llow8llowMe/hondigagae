@@ -51,7 +51,7 @@ export function kakaoSdkUrl(appKey: string): string {
  * 인덱싱하면 치환되지 않는다. 반드시 리터럴 접근이어야 한다 (.env.example 주석).
  */
 export function readMapKey(): string | null {
-  const key = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY
+  const key = process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY
   return key !== undefined && key.trim() !== '' ? key.trim() : null
 }
 
