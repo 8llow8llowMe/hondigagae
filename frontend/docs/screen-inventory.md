@@ -46,13 +46,13 @@
 | 반려견 등록      | `/pets/new`     | `POST /members/me/pets` | 구현 |
 | 반려견 수정·삭제 | `/pets/[petId]` | `GET                    | PUT  | DELETE /members/me/pets/{petId}` | 구현 (읽기 전용 상세는 두지 않는다 — 공통명세 S5-1) |
 
-**FE 미연동 (백엔드는 구현됨)** — [#126](https://github.com/8llow8llowMe/hondigagae/issues/126)
+**사진 · 체중 · 대표견도 붙어 있다** ([#126](https://github.com/8llow8llowMe/hondigagae/issues/126))
 
-| 기능        | API                                                    | 비고                                                                                 |
-| ----------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| 반려견 사진 | `POST`·`DELETE /members/me/pets/{petId}/profile-image` | multipart. 회원 프로필 사진(#79)과 같은 통과 경로                                    |
-| 체중        | `PetSaveRequest.weightKg`                              | `0.1~99.9`, 소수점 1자리. **`GET /places` 의 `petWeightKg` 필터가 이것에 딸려 있다** |
-| 대표견      | `PUT /members/me/pets/{petId}/representative`          | **AI 일정이 대표 반려견을 기본으로 쓴다** — 지정 UI 가 없다                          |
+| 기능        | API                                                    | 어디                                                                                               |
+| ----------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| 반려견 사진 | `POST`·`DELETE /members/me/pets/{petId}/profile-image` | `pet-photo-section.tsx`. multipart — 회원 프로필 사진(#79)과 같은 통과 경로                        |
+| 체중        | `PetSaveRequest.weightKg`                              | `pet-form.tsx`. `0.1~99.9` 소수점 1자리이고 **`GET /places` 의 `petWeightKg` 필터가 이 값을 쓴다** |
+| 대표견      | `PUT /members/me/pets/{petId}/representative`          | `pet-photo-section.tsx`. **AI 일정과 담기가 지정이 없을 때 이 값을 기본으로 쓴다**                 |
 
 주의: 등록 상한이 있다 (`PET_002 PET_LIMIT_EXCEEDED`, HTTP 400). 타인 반려견 조회는 **404** 다.
 
