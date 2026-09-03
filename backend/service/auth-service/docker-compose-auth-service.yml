@@ -32,6 +32,11 @@ x-auth-service-environment: &auth_service_environment
   REDIS_HOST: ${REDIS_HOST}
   REDIS_PORT: ${REDIS_PORT}
   REDIS_PASSWORD: ${REDIS_PASSWORD}
+  # sentinel 모드에서만 쓴다. standalone 이면 비워 둔다.
+  # 노드는 host:port 콤마 구분. sentinel 인데 비어 있으면 RedisConfigurer 가 기동 시점에
+  # 어떤 env 를 넣어야 하는지 적어 실패시킨다 — compose 가 넘기지 않으면 그 메시지가 나온다.
+  REDIS_MASTER_NAME: ${REDIS_MASTER_NAME:-}
+  REDIS_SENTINEL_NODES: ${REDIS_SENTINEL_NODES:-}
   # BossPickSeoul 과 같은 Redis 를 공유하므로 prefix 로 키 공간을 가른다.
   REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX}
   # HS512 라 64바이트 이상이어야 한다. 게이트웨이/리소스 서버와 같은 값을 쓴다.

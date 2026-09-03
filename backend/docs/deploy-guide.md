@@ -98,12 +98,51 @@ docker exec -i vault vault kv put -mount="kv" hondigagae/backend/dev/env env_fil
 | `JWT_ACCESS_KEY` / `JWT_REFRESH_KEY` | 기동 실패 | 자체 생성 (HS512, 64바이트 이상) |
 | `JASYPT_ENCRYPTOR_KEY` | 파이프라인 빌드 단계에서 중단 | 자체 생성 |
 | `OAUTH_KAKAO_*` | 카카오 로그인 불가 | 카카오 개발자센터 |
-| `BATCH_DATA_DIR` | compose 해석 실패로 배포 중단 | 배포 호스트 경로 |
-| `MYSQL_*`, `REDIS_*` | 기동 실패 | 인프라 |
+| `BATCH_DATA_DIR` | compose 해석 실패로 배포 중단 | 배포 **호스트** 경로 (agent 컨테이너 안 경로가 아니다) |
+| `DB_*`, `*_DB_URL`, `REDIS_*` | 기동 실패 | 인프라 — 아래 "DB 스키마 준비" 절 |
+| `MINIO_*` | 프로필 이미지 업로드 실패 | storage(192.168.0.12) MinIO 에 `hondigagae` 버킷 생성 |
 
 **주의**: Resource Server 계열(tour/plan/ai)은 `app.security.jwt.resource.access-key` 로 바인딩한다.
 `jwt.access-key` 로 넣으면 컴파일도 기동도 되다가 **첫 인증 요청에서 jwtDecoder NPE** 로 죽는다.
 실제로 겪은 함정이라 여기 적어 둔다.
+
+Redis 는 dev 에서 BossPickSeoul dev 와 같은 `redis-node1`(192.168.0.11:6379) 에 **standalone** 으로
+붙는다. `REDIS_MODE=sentinel` 은 compose 가 `REDIS_MASTER_NAME` / `REDIS_SENTINEL_NODES` 를
+넘겨야 살고, 둘 중 하나가 비면 기동 시점에 어떤 env 를 넣어야 하는지 적힌 예외로 죽는다.
+
+## DB 스키마 준비
+
+MySQL 은 BossPickSeoul 과 같은 인스턴스(main-server `192.168.0.11:3306`)를 쓰고, 스키마와 계정만
+혼디가개 것을 따로 만든다. **서비스마다 스키마 하나**, 스키마를 가로지르는 FK 는 두지 않는다 — 다른
+서비스의 행은 ID 값으로만 참조하고 정합성은 애플리케이션이 책임진다(약한 결합). 스키마명은
+BossPickSeoul 규칙 `{project}_{service}_{env}` 그대로다.
+
+| 서비스 | 스키마 | env 키 | 비고 |
+| --- | --- | --- | --- |
+| auth-service | `hondigagae_auth_dev` | `AUTH_DB_URL` | 회원·반려견·토큰 |
+| tour-service | `hondigagae_tour_dev` | `TOUR_DB_URL` | 장소·시설·날씨 캐시 |
+| plan-service | `hondigagae_plan_dev` | `PLAN_DB_URL` | 일정·동행 반려견(plan_pet) |
+| batch-service | `hondigagae_tour_dev` | `BATCH_DB_URL` | tour 와 같은 스키마. 적재 대상이 place 이고 BATCH_* 메타 테이블도 여기 생긴다 |
+| ai-service · api-gateway · service-discovery | — | — | DB 없음 (Redis 만) |
+
+dev 는 `ddl-auto: update` 라 테이블은 첫 기동 때 애플리케이션이 만든다. 사람이 미리 만드는 것은
+스키마와 계정뿐이다. prod 는 `ddl-auto: none` 이므로 별도 마이그레이션 런북이 필요하다.
+
+```sql
+-- main-server MySQL 에 root 로 접속해 1회 실행. 비밀번호는 Vault 의 DB_PASSWORD 와 같은 값.
+CREATE DATABASE IF NOT EXISTS hondigagae_auth_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS hondigagae_tour_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS hondigagae_plan_dev CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE USER IF NOT EXISTS 'hondigagae'@'%' IDENTIFIED BY '<DB_PASSWORD>';
+GRANT ALL PRIVILEGES ON hondigagae_auth_dev.* TO 'hondigagae'@'%';
+GRANT ALL PRIVILEGES ON hondigagae_tour_dev.* TO 'hondigagae'@'%';
+GRANT ALL PRIVILEGES ON hondigagae_plan_dev.* TO 'hondigagae'@'%';
+FLUSH PRIVILEGES;
+```
+
+계정을 `hondigagae_%.*` 와일드카드로 한 번에 주지 않는 이유는, prod 를 같은 인스턴스에 올리게
+될 경우 dev 계정이 prod 스키마까지 보게 되기 때문이다. 스키마가 늘면 GRANT 도 한 줄 늘린다.
 
 ## 배포 순서
 

@@ -80,19 +80,26 @@ BossPickSeoul 과 **같은 agent** 를 쓴다. 새로 띄울 것은 없다.
 agent 에 필요한 도구: `java 21`, `docker`, `docker compose`, `rsync`, `curl`.
 (Vault CLI 는 필요 없다. 파이프라인이 HTTP API 를 직접 부른다)
 
-**⚠️ 6개 중 1개만 기동 중이다.** `Infra/jenkins/README.md` 기준 현황:
+**dev 는 준비됐고 prod 는 아니다.** main-server `docker ps` (2026-09-03) 기준 현황:
 
 | agent | 상태 |
 | --- | --- |
-| `ai-host-builder` | 기동 중. 다만 **`builder-frontend` 라벨을 추가해야 한다** |
-| `backend-dev-agent` | 기동 중 |
-| `frontend-dev-agent` | **미기동** — main-server 에 컨테이너 추가 필요 |
-| `backend-prod-agent` | **미기동** — backend-1 에 컨테이너 추가 필요 |
+| `ai-host-builder` | 기동 중. `builder-frontend` 라벨이 붙어 있는지 Jenkins 노드 화면에서 확인 |
+| `backend-dev-agent` | 기동 중 (main-server, `deploy-backend-dev`) |
+| `frontend-dev-agent` | 기동 중 (main-server, `deploy-frontend-dev`) |
+| `backend-prod-agent` | **미기동** — backend-1(운영 미니 PC) 에 컨테이너 추가 필요 |
 | `frontend-prod-agent` | **미기동** — backend-1 에 컨테이너 추가 필요 |
 
 agent 가 없으면 해당 잡은 실행 자체를 못 하고 노드를 기다리며 멈춘다(빌드 실패가 아니라 대기다).
 `Infra/jenkins/docker-compose-jenkins-deploy-agent.yml` 로 띄우고 위 라벨을 붙인다.
-즉, **dev 백엔드 배포만 지금 바로 가능하고** 나머지 셋은 agent 를 먼저 띄워야 한다.
+즉, **dev 는 백엔드·프론트 모두 지금 배포 가능하고** prod 둘은 agent 를 먼저 띄워야 한다.
+
+BossPickSeoul 잡과 agent 를 공유하므로 `hondigagae-*` 잡을 새로 만들 때 노드 라벨은 그대로 두고
+credential(`hondigagae-vault-role-id` / `-secret-id`)만 프로젝트 것으로 바꾼다.
+
+deploy agent 의 `$HOME` 은 컨테이너 안의 `/home/jenkins` 다. 배포 디렉터리
+`$HOME/deploy/hondigagae/...` 는 그 안에 생기지만, compose 의 **바인드 마운트**(`BATCH_DATA_DIR`)는
+`/var/run/docker.sock` 을 통해 호스트 데몬이 해석하므로 **호스트 경로**를 적어야 한다.
 
 > **아키텍처 주의** — 빌더가 도는 ollama-01 은 x86_64 이고 배포 대상은 모두 aarch64 다.
 > 백엔드는 JAR 이라 무관하지만 프론트는 빌더에서 만든 `.next/standalone` 을 arm64 에서 실행한다.

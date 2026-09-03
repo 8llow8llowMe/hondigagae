@@ -26,6 +26,12 @@ x-frontend-web-environment: &frontend_web_environment
   #   dev  = https://api-dev.hondigagae.com
   #   prod = https://api.hondigagae.com
   BACKEND_BASE_URL: ${BACKEND_BASE_URL}
+  # og:image 절대 URL 과 canonical 의 기준 도메인 (app/layout.tsx 의 metadataBase).
+  # 서버에서만 읽으므로 NEXT_PUBLIC_ 이 아니고 런타임 주입으로 충분하다.
+  # 비면 http://localhost:3000 으로 떨어져 카카오톡·트위터 공유 카드가 깨진다.
+  #   dev  = https://dev.hondigagae.com
+  #   prod = https://www.hondigagae.com
+  SITE_BASE_URL: ${SITE_BASE_URL}
 
 x-logging: &default-logging
   driver: 'json-file'
