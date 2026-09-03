@@ -84,9 +84,17 @@ BossPickSeoul prod 9종이 함께 올라간다. 혼디가개 7종을 더하면 �
 
 `.env.example` 이 전체 목록의 단일 기준이다. Vault 에 넣을 때도 같은 key 이름을 쓴다.
 
+키별로 넣는다. 파이프라인이 secret 의 `data.data` 를 키별 평면 맵으로 읽고 줄바꿈이 든 값은 거부하므로,
+파일 전체를 `env_file` 한 키에 넣는 방식은 저장은 되지만 **배포 단계에서 실패한다.** Vault Web UI 의
+JSON 토글에 `{"KEY": "value", ...}` 를 붙여 넣는 것이 가장 쉽고, CLI 는 `.env` 를 인자로 풀어 넘긴다.
+
 ```bash
-docker exec -i vault vault kv put -mount="kv" hondigagae/backend/dev/env env_file=@backend/.env
+# .env.example 을 .env 로 복사해 <...> 를 채운 뒤 (주석·빈 줄 제외)
+docker exec -i vault vault kv put -mount="kv" hondigagae/backend/dev/env \
+  $(grep -Ev '^\s*(#|$)' backend/.env | xargs)
 ```
+
+키 목록과 환경별 값은 Infra 레포 `vault/README.md` 의 혼디가개 절에 표로 정리돼 있다.
 
 배포 전 반드시 채워야 하는 것:
 
