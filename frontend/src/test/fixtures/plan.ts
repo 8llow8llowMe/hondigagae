@@ -62,6 +62,7 @@ export function planItem(
 export const planDetail: PlanDetail = {
   planId: '223456789012000001',
   petId: '123456789012000001',
+  petIds: ['123456789012000001'],
   areaCode: '39',
   sigunguCode: '4',
   title: '몽실이와 제주 2박 3일',
@@ -89,6 +90,8 @@ export const planVerdict: PlanDayWeatherItem = {
   date: '2026-09-12',
   representativePlaceId: '212481712381923328',
   representativePlaceTitle: '김창열미술관',
+  // 한 마리 일정이라 기준 반려견이 대표와 같다. 갈리는 경우는 mock fixture 가 덮는다 (#152)
+  basisPetId: '123456789012000001',
   score: 84,
   suitabilityLevel: {
     code: 'HIGH',
@@ -96,6 +99,18 @@ export const planVerdict: PlanDayWeatherItem = {
     description: '반려견과 방문하기 좋은 조건입니다.',
     scoreDescription: null,
   },
+  petSuitabilities: [
+    {
+      petId: '123456789012000001',
+      score: 84,
+      suitabilityLevel: {
+        code: 'HIGH',
+        name: '여행 적합',
+        description: '반려견과 방문하기 좋은 조건입니다.',
+        scoreDescription: null,
+      },
+    },
+  ],
   reasons: [
     {
       code: 'PET_ALLOWED',

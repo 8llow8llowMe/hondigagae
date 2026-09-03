@@ -89,7 +89,15 @@ export type MockPlanItem = {
 export type MockPlan = {
   planId: string
   memberId: string
+  /** 대표 반려견 = `petIds[0]`. **저장 형태에도 둘 다 있다** — 백엔드가 `plan.pet_id` 컬럼을
+   * 남기고 목록만 `plan_pet` 조인 테이블에 뒀기 때문이다 (#152 설계 판단 1) */
   petId: string
+  /**
+   * 동행 반려견 (#152). **비어 있지 않다** — 서버는 `plan_pet` 행이 없는 옛 일정을
+   * `Plan.resolvePetIds()` 로 `[petId]` 로 읽는다. mock 은 저장 시점에 채워 그 규칙을
+   * 재현할 필요가 없게 한다.
+   */
+  petIds: string[]
   areaCode: string
   sigunguCode: string | null
   title: string
@@ -422,6 +430,14 @@ function createStore(): MockStore {
         planId: '223456789012000001',
         memberId: '900000000000000001',
         petId: '123456789012000001',
+        /*
+          **이 하나만 동행 2마리다** (#152). 나머지를 한 마리로 두는 이유는 두 모양이
+          같이 있어야 화면이 `petIds.length === 1` 분기를 로컬에서 둘 다 볼 수 있어서다.
+
+          초코(...002)가 몽실이보다 낮게 판정되도록 mock 을 짜 뒀다 — 그래야
+          **기준 반려견(basisPetId)이 대표(petIds[0])와 다른 날**이 실제로 생긴다.
+        */
+        petIds: ['123456789012000001', '123456789012000002'],
         areaCode: '39',
         sigunguCode: '4',
         title: '몽실이와 제주 2박 3일',
@@ -533,6 +549,7 @@ function createStore(): MockStore {
         planId: '223456789012000002',
         memberId: '900000000000000001',
         petId: '123456789012000002',
+        petIds: ['123456789012000002'],
         areaCode: '39',
         sigunguCode: '3',
         title: '초코와 가을 서귀포',
@@ -596,6 +613,7 @@ function createStore(): MockStore {
         planId: '223456789012000003',
         memberId: '900000000000000001',
         petId: '123456789012000001',
+        petIds: ['123456789012000001'],
         areaCode: '39',
         sigunguCode: '4',
         title: '몽실이 첫 제주',
@@ -610,6 +628,7 @@ function createStore(): MockStore {
         planId: '223456789012000004',
         memberId: '900000000000000001',
         petId: '123456789012000001',
+        petIds: ['123456789012000001'],
         areaCode: '39',
         sigunguCode: '4',
         title: '애월 하루',
@@ -625,6 +644,7 @@ function createStore(): MockStore {
         planId: '223456789012000099',
         memberId: '900000000000000777',
         petId: '123456789012000099',
+        petIds: ['123456789012000099'],
         areaCode: '39',
         sigunguCode: null,
         title: '남의 일정',

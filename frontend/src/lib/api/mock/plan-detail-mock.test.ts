@@ -202,6 +202,64 @@ describe('일정 판정 mock — /weather', () => {
   it('남의 일정 판정도 404 다', () => {
     expect(call(`/plans/${OTHERS}/weather`, 'GET')?.status).toBe(404)
   })
+
+  // ── 동행 반려견 (#152) ────────────────────────────────────────────────────
+
+  it('응답이 판정에 들어간 반려견 목록을 함께 준다', () => {
+    expect(weatherOf(PLAN).petIds).toEqual(['123456789012000001', '123456789012000002'])
+    expect(weatherOf(ORPHAN_PLAN).petIds).toEqual(['123456789012000002'])
+  })
+
+  it('아이별 점수가 petIds 순서로 온다', () => {
+    const first = weatherOf(PLAN).days[0]
+
+    expect(first?.petSuitabilities.map((pet) => pet.petId)).toEqual([
+      '123456789012000001',
+      '123456789012000002',
+    ])
+  })
+
+  /*
+    **이 테스트가 #152 의 핵심이다.** 기준 반려견은 점수가 가장 낮은 아이라서 대표와 다를 수
+    있고, 일자의 score·suitabilityLevel·reasons 는 전부 그 아이 기준이다. 화면이 대표 이름을
+    붙이면 거짓말이 된다.
+  */
+  it('기준 반려견은 점수가 가장 낮은 아이다 — 대표와 다를 수 있다', () => {
+    const first = weatherOf(PLAN).days[0]
+    const lowest = [...(first?.petSuitabilities ?? [])].sort(
+      (a, b) => (a.score ?? 0) - (b.score ?? 0),
+    )[0]
+
+    expect(first?.basisPetId).toBe(lowest?.petId)
+    expect(first?.basisPetId).not.toBe(weatherOf(PLAN).petIds[0])
+    expect(first?.score).toBe(lowest?.score)
+  })
+
+  it('한 마리 일정은 원소 하나고 기준이 대표와 같다', () => {
+    const first = weatherOf(ORPHAN_PLAN).days[0]
+
+    expect(first?.petSuitabilities).toHaveLength(1)
+    expect(first?.basisPetId).toBe('123456789012000002')
+  })
+
+  it('판정을 못 낸 일자는 기준 반려견이 없고 아이별 목록이 빈 배열이다', () => {
+    const third = weatherOf(PLAN).days[2]
+
+    expect(third?.basisPetId).toBeNull()
+    expect(third?.petSuitabilities).toEqual([])
+  })
+
+  it('등급 경계가 백엔드와 같다 — 80 이상 HIGH, 60 이상 MEDIUM', () => {
+    const levels = weatherOf(PLAN).days[0]?.petSuitabilities.map((pet) => [
+      pet.score,
+      pet.suitabilityLevel?.code,
+    ])
+
+    expect(levels).toEqual([
+      [84, 'HIGH'],
+      [73, 'MEDIUM'],
+    ])
+  })
 })
 
 function errorsOf(result: ReturnType<typeof call>): { code: string; field: string }[] {

@@ -17,6 +17,7 @@ function plan(petId: string, status: string): PlanSummaryItem {
   return {
     planId: `p-${petId}-${status}`,
     petId,
+    petIds: [petId],
     areaCode: '39',
     title: '일정',
     startDate: '2026-09-12',
