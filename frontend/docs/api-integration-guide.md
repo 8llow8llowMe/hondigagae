@@ -35,10 +35,43 @@ export type ApiResponse<T> = {
 
 - `dataBody` 를 바로 쓰지 않는다. 반드시 `src/lib/api/response.ts` 를 경유해 `dataHeader.success` 를 판별한다.
 - `resultMessage` 는 문자열이 아닐 수 있다. Bean Validation 실패 시 필드별 구조가 들어온다. **`unknown` 으로 받고 렌더 직전 정규화한다.**
+- **래퍼가 온다고 가정하지 않는다.** 아래 §2-1 을 먼저 읽는다.
+
+### 2-1. 래퍼가 없는 응답 — 게이트웨이가 대신 답할 때
+
+**공통 래퍼는 서비스가 응답을 만들었을 때만 온다.** 요청이 서비스에 닿지 못하면 게이트웨이의
+Spring 기본 오류 본문이 온다:
+
+```json
+{ "timestamp": "...", "path": "/api/v1/plans", "status": 503, "error": "Service Unavailable" }
+```
+
+| 상황                 | 상태 | 래퍼 | 실측 예                              |
+| -------------------- | ---- | ---- | ------------------------------------ |
+| 라우트 미등록        | 404  | ❌   | `/api/v1/favorites/**` (#202)        |
+| 서비스 미기동        | 503  | ❌   | plan-service 다운                    |
+| 게이트웨이 인증 거절 | 403  | ❌   | 토큰 없이 `/members/me`              |
+| 서비스가 만든 실패   | 4xx  | ✅   | 401 `SECURITY_004` · 404 `PLACE_002` |
+
+`response.json()` 이 성공하므로 전송 계층의 `payload === null` 방어를 통과한다. **`dataHeader`
+없이 구조분해하면 `TypeError` 가 나고, 그것은 `ApiError` 가 아니라서 `classify()` 를 거치지
+못한다** — `toErrorStatus()` 가 무응답(0)으로 떨어뜨려 화면이 서비스 장애를 "네트워크 연결
+확인" 으로 안내한다 (#203).
+
+그래서 `unwrap()` / `unwrapVoid()` 가 **먼저 래퍼 모양을 검사하고**, 래퍼가 아니면
+`ApiError(status, null, null)` 로 떨어뜨린다. 상태코드만 살리는 이유는 게이트웨이의 `error` 가
+`"Service Unavailable"` 같은 영문이어서다 — 실으면 `toMessage()` 가 문자열로 인정해 화면에
+영어가 나간다. 문구는 `messages` 가 담당한다.
+
+**이 판정을 전송 계층(`client.ts` · `server.ts`)에 복제하지 않는다.** 두 곳에 두면 한쪽만
+고쳐지고, 그 차이는 게이트웨이가 실제로 죽어야 드러난다.
 
 ```ts
 // src/lib/api/response.ts (개념)
 export function unwrap<T>(res: ApiResponse<T>, status: number): T {
+  // 래퍼가 아니면 상태코드만 살려 던진다 — §2-1
+  if (!hasEnvelope(res)) throw new ApiError(status, null, null)
+
   if (!res.dataHeader.success || res.dataBody === null) {
     throw new ApiError(status, res.dataHeader.resultCode, res.dataHeader.resultMessage)
   }
@@ -64,6 +97,7 @@ export function toMessage(raw: unknown, fallback: string): string {
 **핵심**
 
 - 백엔드는 **타인 리소스 접근도 404** 로 응답한다 (존재 자체 노출 차단). 403을 기대하면 안 된다.
+  - 다만 **게이트웨이는 토큰이 없으면 403** 을 준다 (`forbidden`). 이쪽은 래퍼가 없다 — §2-1.
 - `resultCode` 는 `{도메인}_{번호}` 문자열이다. 예: `PET_001`(없는 반려견), `PET_100`(요청 검증), `PET_113`(파라미터 형식). **번호 1xx 대역 = 요청 검증.**
 - **404와 5xx의 시각 언어를 다르게 한다.** 데이터 없음에 에러 톤·재시도 버튼을 쓰지 않는다.
 
