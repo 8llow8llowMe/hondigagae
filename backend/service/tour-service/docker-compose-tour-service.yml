@@ -49,6 +49,23 @@ x-tour-service-environment: &tour_service_environment
   KMA_API_BASE_URL: ${KMA_API_BASE_URL:-https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0}
   KMA_PUBLISH_DELAY_MINUTES: ${KMA_PUBLISH_DELAY_MINUTES:-10}
   KMA_STALE_CACHE_SECONDS: ${KMA_STALE_CACHE_SECONDS:-21600}
+  # 아래 튠값은 재빌드 없이 Vault 값만 고쳐 조정하려고 env 로 뺀 것이다. yml 기본값과 같은 값을
+  # 기본값으로 두었다 — compose 가 넘기지 않으면 Vault 를 바꿔도 컨테이너에는 도달하지 않는다.
+  KMA_NUM_OF_ROWS: ${KMA_NUM_OF_ROWS:-1500}
+  KMA_CACHE_GRACE_MINUTES: ${KMA_CACHE_GRACE_MINUTES:-30}
+  KMA_GRID_COARSEN_FACTOR: ${KMA_GRID_COARSEN_FACTOR:-1}
+  KMA_REFRESH_LOCK_SECONDS: ${KMA_REFRESH_LOCK_SECONDS:-10}
+  # 중기예보 (D+5 ~ D+10). 같은 키를 쓴다.
+  KMA_MID_TERM_BASE_URL: ${KMA_MID_TERM_BASE_URL:-https://apis.data.go.kr/1360000/MidFcstInfoService}
+  KMA_MID_TERM_PUBLISH_DELAY_MINUTES: ${KMA_MID_TERM_PUBLISH_DELAY_MINUTES:-20}
+  KMA_MID_TERM_STALE_CACHE_SECONDS: ${KMA_MID_TERM_STALE_CACHE_SECONDS:-129600}
+  KMA_MID_TERM_CACHE_GRACE_MINUTES: ${KMA_MID_TERM_CACHE_GRACE_MINUTES:-60}
+  # 기상특보. 활용신청이 안 된 키면 false 로 꺼 둔다 (켜 두면 10분마다 실패 로그만 쌓인다).
+  KMA_WARNING_ENABLED: ${KMA_WARNING_ENABLED:-true}
+  KMA_WARNING_BASE_URL: ${KMA_WARNING_BASE_URL:-https://apis.data.go.kr/1360000/WthrWrnInfoService}
+  KMA_WARNING_NUM_OF_ROWS: ${KMA_WARNING_NUM_OF_ROWS:-20}
+  KMA_WARNING_CACHE_SECONDS: ${KMA_WARNING_CACHE_SECONDS:-600}
+  KMA_WARNING_STATION_ID: ${KMA_WARNING_STATION_ID:-184}
   # 여행 적합도 / 산책 위험도 임계값.
   # 확정된 수의학 기준이 아니라 현재의 판단이므로, 재빌드 없이 Vault 값만 고쳐
   # 조정할 수 있도록 전부 환경변수로 뺀다. 기본값은 application.yml 과 같다.
