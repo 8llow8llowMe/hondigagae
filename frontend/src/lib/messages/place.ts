@@ -143,6 +143,36 @@ export const placeMessages = {
   /** 비 예보일 때만 채워진다. 빈 배열이면 섹션을 숨긴다 */
   detailIndoorAlternatives: '비 예보 · 가까운 실내 장소',
 
+  // ── 장소 상세 · 산책 위험도 (#197) ───────────────────────────────────────
+
+  /**
+   * **적합도와 답하는 질문이 다르다.** 적합도는 "오늘 여기 갈 만한가"(일자), 이쪽은
+   * "지금 나가도 되나"(시각)다. 라벨이 그 차이를 먼저 말해야 두 판정이 나란히 서도
+   * 사용자가 기준을 섞지 않는다.
+   *
+   * 홈의 `walkTodayLabel`('오늘 산책')과 다른 문구인 이유가 같다 — 홈은 대표 장소 하나의
+   * 오늘을 말하고, 여기는 **보고 있는 이 장소의 지금**이다.
+   */
+  detailWalkSafetyLabel: '지금 산책',
+
+  /** 등급 문구는 없다 — 서버 `walkSafetyLevel.name` 을 그대로 넣는다 */
+  detailWalkSafetyErrorTitle: '산책 위험도를 불러오지 못했어요',
+
+  detailHeatIndex: '체감 열지수',
+  /** **추정치다.** 실측 노면 온도가 아니라는 것을 라벨이 말한다 */
+  detailPavement: '추정 노면 온도',
+
+  /**
+   * `{time}` 치환. **적합도의 `detailSuitabilityBasis` 와 문구가 다르다** — 저쪽은
+   * `{date} 예보 기준`, 이쪽은 시각이다. 같은 화면에 두 줄이 나란히 서므로 둘이 같은
+   * 문구면 기준이 다른 것이 지워진다.
+   */
+  detailWalkSafetyBasis: '{time} 기준',
+  detailWalkSafetyBasisWithPet: '{time} 기준 · {name} 기준',
+
+  /** `{start}` · `{end}` 치환. **없으면 줄 자체를 렌더하지 않는다** — 지어내지 않는다 */
+  detailSaferWindow: '더 안전한 시간대는 {start} – {end}',
+
   // ── 장소 상세 · 반려견 동반 정보 ─────────────────────────────────────────
 
   /** 아트보드 04-① — `petInfo` 가 비어도 섹션을 숨기지 않는다 */
