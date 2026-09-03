@@ -61,6 +61,20 @@ export function walkSafetyPath(placeId: string, condition: PetCondition | null):
   return paths.places.walkSafety(placeId, toInsightQuery(condition))
 }
 
+/**
+ * 오늘의 산책 골든타임 (#158).
+ *
+ * **좌표가 필수다.** FE 에 아직 현재 위치 축이 없어 호출부가 제주 대표 좌표를 넘긴다 —
+ * 그 사실을 화면이 "제주시 기준" 으로 밝힌다. 이 함수는 좌표의 출처를 판단하지 않는다.
+ *
+ * 반려견 조건 파라미터는 적합도·산책 위험도와 같은 조립을 쓴다. 서버가 받지 않는
+ * `noiseSensitive` 가 섞여 가지만 Spring 이 모르는 쿼리 파라미터를 무시하므로 안전하고,
+ * 축마다 다른 조립을 두면 조건이 갈릴 때 어느 쪽이 맞는지 알 수 없어진다.
+ */
+export function walkTimesPath(lat: number, lng: number, condition: PetCondition | null): string {
+  return paths.insights.walkTimes(toInsightQuery(condition, { lat: String(lat), lng: String(lng) }))
+}
+
 export function planWeatherPath(planId: string): string {
   return paths.plans.weather(planId)
 }

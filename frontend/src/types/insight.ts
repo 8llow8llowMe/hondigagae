@@ -179,6 +179,51 @@ export type WalkSafetyResponse = {
 }
 
 /**
+ * 한 시각의 산책 안전 등급 (#158).
+ *
+ * **등급만으로 색 막대를 그리면 "왜 그 색인지" 를 말하지 못한다.** 서버가 기온과 추정
+ * 노면온도를 함께 주는 이유가 그것이고, 화면도 색 옆에 숫자를 둔다 (DESIGN.md §2-3 —
+ * 색만으로 정보를 전달하지 않는다).
+ */
+export type HourlyWalkSafetyItem = {
+  /** 예보 시각. `2026-09-02T15:00:00` */
+  at: string
+  walkSafetyLevel: ScoreMetricMetadata
+  temperature: number
+  /**
+   * **추정치다.** 기온에 일사와 시간대를 더해 계산한 값이고 실측이 아니다 —
+   * 단정하는 문구를 붙이지 않는다 (장소 상세의 `estimatedPavementCelsius` 와 같은 규칙).
+   */
+  estimatedPavementCelsius: number
+  /** 원천에 없는 시각은 null */
+  precipitationProbability: number | null
+}
+
+/**
+ * `GET /insights/walk-times` — 오늘의 산책 골든타임 (#158).
+ *
+ * **장소 산책 위험도와 답하는 질문이 다르다.** 저쪽은 "지금 나가도 되나"(`targetDateTime`
+ * 한 시점)이고 이쪽은 "오늘 언제 나가야 하나"다. 판정 규칙은 같다.
+ *
+ * **`goldenStart` 가 null 인 날이 정상 응답이다.** 남은 시간이 전부 위험 등급이거나 특보
+ * 경보가 발효 중이면 서버가 추천을 내지 않는다 — 아무 구간이나 골라 주면 사용자가 그것을
+ * **허락으로 읽기** 때문이다. 화면도 같은 태도를 지켜 대체 구간을 지어내지 않는다.
+ */
+export type WalkTimesResponse = {
+  /** 기준 시각. 이 시각 이후만 담긴다 */
+  from: string
+  /** 오늘 남은 예보 시각만. **비어 있을 수 있다** (늦은 밤) */
+  hourly: HourlyWalkSafetyItem[]
+  /** 추천할 구간이 없으면 null. `goldenEnd`·`goldenLevel` 과 항상 함께 움직인다 */
+  goldenStart: string | null
+  goldenEnd: string | null
+  goldenLevel: ScoreMetricMetadata | null
+  /** 경보면 골든타임을 주지 않는다 */
+  weatherWarning: WeatherWarningItem | null
+  petConditionApplied: boolean
+}
+
+/**
  * 판정에 반영할 반려견 조건.
  *
  * **`petId` 를 보내는 것이 아니다.** 백엔드가 속성을 개별 쿼리 파라미터로 받는다

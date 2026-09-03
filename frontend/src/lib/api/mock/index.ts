@@ -3,7 +3,7 @@ import type { MockResult } from '@/lib/api/mock/auth-data'
 import { resolveAuthMock } from '@/lib/api/mock/auth-data'
 import { mockNearbyFacilities } from '@/lib/api/mock/emergency-data'
 import { resolveFavoriteMock } from '@/lib/api/mock/favorite-data'
-import { mockSuitability, mockWalkSafety } from '@/lib/api/mock/insight-data'
+import { mockSuitability, mockWalkSafety, mockWalkTimes } from '@/lib/api/mock/insight-data'
 import { resolveMemberMock } from '@/lib/api/mock/member-data'
 import { resolvePetMock } from '@/lib/api/mock/pet-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
@@ -106,6 +106,18 @@ export function resolveMock(
 
   // 주변 장소 — 커서가 아니라 totalCount 를 준다 (NearbyPlaceResponse)
   if (path === '/places/nearby') return nearbyPlaces(params)
+
+  /*
+    오늘의 산책 골든타임 (#158). `lat`/`lng` 는 mock 이 쓰지 않는다 — 제주 안에서 좌표를
+    바꿔도 예보 격자가 같아 결과가 거의 같고, 좌표로 값을 가르면 없는 정밀도를 흉내 내게 된다.
+    갈래는 반려견 조건(`heatSensitive`)으로만 낸다 — 그것이 실제로 판정을 바꾸는 축이다.
+  */
+  if (path === '/insights/walk-times') {
+    return {
+      status: 200,
+      payload: ok(mockWalkTimes(params.get('heatSensitive') === 'true')),
+    }
+  }
 
   // 긴급 시설. `lat`/`lng` 는 mock 이 쓰지 않는다 — 거리는 fixture 가 이미 갖고 있다
   if (path === '/emergencies/facilities') {

@@ -17,6 +17,12 @@ export const insightKeys = {
     [...insightKeys.all, 'walk-safety', placeId, conditionKey] as const,
   suitability: (placeId: string, conditionKey: string) =>
     [...insightKeys.all, 'suitability', placeId, conditionKey] as const,
+  /**
+   * 골든타임 (#158). **좌표가 key 에 들어간다** — 장소 축이 아니라 좌표 축이라
+   * placeId 로 캐시하면 다른 지점의 곡선을 재사용하게 된다.
+   */
+  walkTimes: (lat: number, lng: number, conditionKey: string) =>
+    [...insightKeys.all, 'walk-times', lat, lng, conditionKey] as const,
   planWeather: (planId: string) => [...insightKeys.all, 'plan-weather', planId] as const,
 }
 

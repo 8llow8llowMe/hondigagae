@@ -50,6 +50,15 @@ export const paths = {
     walkSafety: (placeId: string, query: string) =>
       query ? `/places/${placeId}/walk-safety?${query}` : `/places/${placeId}/walk-safety`,
   },
+  insights: {
+    /**
+     * 오늘의 산책 골든타임 (#158). `lat`/`lng` 가 필수라 쿼리 없이 부르지 않는다.
+     *
+     * **`/places/{id}/walk-safety` 와 다른 컨트롤러다** — 저쪽은 장소 하나의 "지금",
+     * 이쪽은 좌표 기준 "오늘 언제" 다.
+     */
+    walkTimes: (query: string) => `/insights/walk-times?${query}`,
+  },
   emergencies: {
     /** 주변 긴급 시설. `lat`/`lng` 가 필수라 쿼리 없이 부르지 않는다 */
     facilities: (query: string) => `/emergencies/facilities?${query}`,

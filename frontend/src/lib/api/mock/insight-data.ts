@@ -4,6 +4,7 @@ import type {
   PlaceSuitabilityResponse,
   ScoreMetricMetadata,
   WalkSafetyResponse,
+  WalkTimesResponse,
   WeatherWarningItem,
 } from '@/types/insight'
 
@@ -332,5 +333,72 @@ export function mockWalkSafety(placeId: string, heatSensitive: boolean): WalkSaf
       여기에 얹으면 두 사실이 어긋나지 않는다. 반대 갈래는 특보 없음이다.
     */
     weatherWarning: heatSensitive ? HEAT_WAVE_WARNING : null,
+  }
+}
+
+/**
+ * 오늘의 산책 골든타임 (#158).
+ *
+ * **`heatSensitive` 로 두 날을 가른다.** 더위에 민감한 아이는 특보 경보까지 겹쳐 남은 시간이
+ * 전부 위험이고, 그때 서버는 **골든타임을 주지 않는다**(`goldenStart: null`). 추천이 없는 날을
+ * mock 이 못 내면 화면의 "오늘은 나가지 않는 편이 좋습니다" 분기를 로컬에서 한 번도 못 본다.
+ *
+ * 시각은 `mockWalkSafety` 와 같은 2026-08-29 오후다. 두 섹션이 같은 홈에 나란히 서므로
+ * 날짜가 갈리면 "지금" 과 "오늘 언제" 가 다른 날 이야기가 된다.
+ */
+export function mockWalkTimes(heatSensitive: boolean): WalkTimesResponse {
+  /*
+    기온 곡선은 실제 여름 제주의 모양을 따른다 — 오후에 정점이고 해가 지며 떨어진다.
+    노면온도는 기온보다 크게 높고 **해가 진 뒤 격차가 줄어든다**(일사가 빠지므로).
+    숫자를 아무렇게나 두면 화면이 "왜 이 시간이 좋은지" 를 설명하지 못한다.
+  */
+  const curve: [string, number, number, number | null][] = [
+    ['14:00:00', 31.0, 58.0, 20],
+    ['15:00:00', 31.5, 59.0, 20],
+    ['16:00:00', 30.0, 54.0, 10],
+    ['17:00:00', 28.5, 45.0, 10],
+    ['18:00:00', 27.0, 33.0, 0],
+    ['19:00:00', 26.0, 29.0, 0],
+    ['20:00:00', 25.0, 27.0, null],
+    ['21:00:00', 24.5, 26.0, null],
+  ]
+
+  const hourly = curve.map(([time, temperature, pavement, precipitation]) => ({
+    at: `2026-08-29T${time}`,
+    // 경보가 있는 날은 전부 위험이다 — 서버가 특보를 만나면 다른 판정보다 먼저 끊는다
+    walkSafetyLevel: (heatSensitive
+      ? WALK_LEVELS.DANGER
+      : pavement >= 50
+        ? WALK_LEVELS.DANGER
+        : pavement >= 40
+          ? WALK_LEVELS.CAUTION
+          : WALK_LEVELS.SAFE) as ScoreMetricMetadata,
+    temperature,
+    estimatedPavementCelsius: pavement,
+    precipitationProbability: precipitation,
+  }))
+
+  if (heatSensitive) {
+    return {
+      from: '2026-08-29T13:20:00',
+      hourly,
+      // 남은 시간이 전부 위험이면 추천을 내지 않는다. 곡선은 그대로 준다 — 근거는 감추지 않는다
+      goldenStart: null,
+      goldenEnd: null,
+      goldenLevel: null,
+      weatherWarning: HEAT_WAVE_WARNING,
+      petConditionApplied: true,
+    }
+  }
+
+  return {
+    from: '2026-08-29T13:20:00',
+    hourly,
+    // 18:00~21:00 이 SAFE 연속 구간이다 (노면 40도 미만) — 위 곡선과 어긋나면 안 된다
+    goldenStart: '2026-08-29T18:00:00',
+    goldenEnd: '2026-08-29T21:00:00',
+    goldenLevel: WALK_LEVELS.SAFE as ScoreMetricMetadata,
+    weatherWarning: null,
+    petConditionApplied: true,
   }
 }
