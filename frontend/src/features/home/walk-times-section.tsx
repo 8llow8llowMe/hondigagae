@@ -24,9 +24,15 @@ import type { HourlyWalkSafetyItem, WalkTimesResponse } from '@/types/insight'
 export function WalkTimesSection({
   data,
   loading = false,
+  positionFallback = false,
 }: {
   data: WalkTimesResponse | null
   loading?: boolean
+  /**
+   * 위치를 못 얻어 제주 중심으로 조회했는지 (#180). **그 사실을 감추지 않는다** —
+   * 곡선은 좌표에 딸린 값이라 어디 기준인지 모르면 읽을 수 없다.
+   */
+  positionFallback?: boolean
 }) {
   // 조회 실패는 섹션을 통째로 숨긴다 — 홈의 최소 골격에 이 섹션은 없다 (공통명세 S4-1)
   if (data === null) return loading ? <WalkTimesSkeleton /> : null
@@ -46,7 +52,8 @@ export function WalkTimesSection({
         <HourlyCurve hourly={data.hourly} />
 
         <p className="text-caption text-fg-muted font-medium">
-          {messages.home.goldenBasis} · {messages.home.goldenPavementNote}
+          {positionFallback ? messages.home.goldenBasis : messages.home.goldenBasisCurrent} ·{' '}
+          {messages.home.goldenPavementNote}
         </p>
       </div>
 

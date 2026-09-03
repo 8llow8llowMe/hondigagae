@@ -8,8 +8,8 @@ import { mockWalkTimes } from '@/lib/api/mock/insight-data'
 import { messages } from '@/lib/messages'
 import type { WalkTimesResponse } from '@/types/insight'
 
-function render(data: WalkTimesResponse | null, loading = false) {
-  return renderToStaticMarkup(createElement(WalkTimesSection, { data, loading }))
+function render(data: WalkTimesResponse | null, loading = false, positionFallback = false) {
+  return renderToStaticMarkup(createElement(WalkTimesSection, { data, loading, positionFallback }))
 }
 
 /** 골든타임이 있는 날 (mock 의 `heatSensitive: false` 갈래) */
@@ -86,7 +86,21 @@ describe('WalkTimesSection — 상태', () => {
     expect(render(GOOD_DAY)).not.toContain('경보')
   })
 
-  it('좌표 축이라 기준을 밝힌다 — 현재 위치가 아니다', () => {
-    expect(render(GOOD_DAY)).toContain(messages.home.goldenBasis)
+  /*
+    곡선은 좌표에 딸린 값이라 **어디 기준인지 모르면 읽을 수 없다.** 위치를 얻었는지에
+    따라 기준이 달라지므로 둘을 구분해 적는다 (#180).
+  */
+  it('현재 위치로 조회했으면 그렇게 적는다', () => {
+    const markup = render(GOOD_DAY)
+
+    expect(markup).toContain(messages.home.goldenBasisCurrent)
+    expect(markup).not.toContain(messages.home.goldenBasis)
+  })
+
+  it('위치를 못 얻었으면 제주시 기준임을 감추지 않는다', () => {
+    const markup = render(GOOD_DAY, false, true)
+
+    expect(markup).toContain(messages.home.goldenBasis)
+    expect(markup).not.toContain(messages.home.goldenBasisCurrent)
   })
 })
