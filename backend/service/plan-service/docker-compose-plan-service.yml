@@ -35,8 +35,13 @@ x-plan-service-environment: &plan_service_environment
   SNOWFLAKE_DATACENTER_ID: ${SNOWFLAKE_DATACENTER_ID}
   # 서비스마다 다른 값을 준다. 겹치면 같은 ID 가 두 번 나온다.
   SNOWFLAKE_WORKER_ID: ${SNOWFLAKE_WORKER_ID}
-  # 내부 호출 대상(lb://).
+  # 내부 호출 대상(lb://). Eureka 등록명에 -dev/-prod 접미사가 붙어 Feign name 을 env 로 받는다.
+  #   tour-service: 장소 검증·조회·응급시설·적합도
+  #   auth-service: 동행 반려견 특성(/internal/v1/pets/conditions) — 브리핑·판정 근거
+  # 빠지면 Feign 이 리터럴 "${AUTH_SERVICE_APP_NAME}" 을 호스트명으로 삼아
+  # "Service id not legal hostname" 으로 기동에 실패한다 (dev 배포에서 실제 발생).
   TOUR_SERVICE_APP_NAME: ${TOUR_SERVICE_APP_NAME}
+  AUTH_SERVICE_APP_NAME: ${AUTH_SERVICE_APP_NAME}
   INTERNAL_CLIENT_CONNECT_TIMEOUT_MS: ${INTERNAL_CLIENT_CONNECT_TIMEOUT_MS:-2000}
   INTERNAL_CLIENT_READ_TIMEOUT_MS: ${INTERNAL_CLIENT_READ_TIMEOUT_MS:-5000}
 

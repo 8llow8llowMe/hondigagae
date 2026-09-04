@@ -59,3 +59,5 @@ snowflake:
 feign-client:
   target-services:
     tour-service: ${TOUR_SERVICE_APP_NAME}
+    # dev 와 같다. 없으면 @FeignClient 기본값 "auth-service" 로 떨어져 prod 에서 auth-service-prod 를 못 찾는다.
+    auth-service: ${AUTH_SERVICE_APP_NAME}
