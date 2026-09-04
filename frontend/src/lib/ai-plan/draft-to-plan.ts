@@ -92,11 +92,15 @@ export function draftToPlanPayload({
     startDate: snapshot.startDate,
     endDate: snapshot.endDate,
     ...(snapshot.budget === null ? {} : { budget: snapshot.budget }),
-    items: toItems(draft, totalDays ?? null, excludedPlaceIds),
+    items: toDraftItems(draft, totalDays ?? null, excludedPlaceIds),
   }
 }
 
-function toItems(
+/**
+ * 초안 → 항목 목록. **담기(`POST /plans`)와 하루 재생성(`PUT .../days/{day}/items`)이
+ * 나눠 쓴다** (하루재생성-세부명세 R4-3) — 규칙이 두 벌이 되면 반드시 갈라진다.
+ */
+export function toDraftItems(
   draft: AiPlanDraft,
   totalDays: number | null,
   excludedPlaceIds?: ReadonlySet<string>,
