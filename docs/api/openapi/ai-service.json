@@ -1,0 +1,532 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "혼디가개 AI 서비스 API 명세서",
+    "description": "AI Service 전용 — AI 여행 플래너/비서/분석",
+    "version": "v1"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "AI Service (단독 호출)"
+    }
+  ],
+  "tags": [
+    {
+      "name": "AI 여행 플래너",
+      "description": "반려견 특성과 여행 조건으로 AI 여행 일정을 생성하고 작업 상태를 조회하는 API를 제공합니다."
+    }
+  ],
+  "paths": {
+    "/api/v1/ai-plans": {
+      "post": {
+        "tags": [
+          "AI 여행 플래너"
+        ],
+        "summary": "AI 여행 일정 생성 제출",
+        "description": "여행 조건과 반려견 정보를 받아 일정 생성 작업을 큐에 올리고 202와 함께 jobId를 반환합니다. 동일 사용자의 동일 요청이 진행 중이면 기존 jobId를 그대로 반환합니다(멱등). 생성된 일정은 제안(draft)이며, 확정 저장은 plan-service API로 수행합니다.",
+        "operationId": "submitPlan",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiPlanCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseAiPlanSubmitResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/ai-plans/packing-list/{planId}": {
+      "post": {
+        "tags": [
+          "AI 여행 플래너"
+        ],
+        "summary": "반려견 여행 준비물 목록 생성",
+        "description": "저장된 일정을 근거로 반려견 여행 준비물 목록을 AI 로 생성합니다. 일정 항목·여행 기간의 기상청 예보·반려견 특성(체중·더위/추위 민감 등)이 근거로 쓰이며, 각 항목에 이 여행 데이터 기반의 이유가 붙습니다. 동기 API 라 LLM 응답까지 수십 초가 걸릴 수 있습니다. 결과는 저장되지 않는 제안입니다. 일정이 없거나 본인 소유가 아니면 AIPLAN_016 으로 응답합니다.",
+        "operationId": "generatePackingList",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "description": "일정 아이디",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456789
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePackingListResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/ai-plans/jobs/{jobId}": {
+      "get": {
+        "tags": [
+          "AI 여행 플래너"
+        ],
+        "summary": "AI 여행 일정 생성 작업 조회",
+        "description": "작업 상태와 결과를 조회합니다. 본인 작업만 조회할 수 있으며 타인의 jobId는 404로 응답합니다. 작업 실패는 200 OK + status=FAILED + errorCode/errorMessage 로 표현합니다.",
+        "operationId": "getJobStatus",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "description": "작업 식별자",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseAiPlanJobStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/ai-plans/jobs/{jobId}/stream": {
+      "get": {
+        "tags": [
+          "AI 여행 플래너"
+        ],
+        "summary": "일정 생성 작업 상태 스트리밍 (SSE)",
+        "description": "비동기 일정 생성 작업의 상태 변경을 Server-Sent Events 로 스트리밍합니다.\n이벤트 data 는 작업 상태 조회 응답의 dataBody 와 동일한 JSON 입니다. 본인이 제출한 작업만 구독할 수 있습니다.\n\n수신 주기: 이벤트는 주기적으로 오지 않고 상태가 바뀔 때만 전송됩니다.\n일반적으로 구독 즉시 현재 상태 스냅샷 1회 -> RUNNING 전이 1회 -> COMPLETED/FAILED 1회, 총 2~3회 수신 후\n서버가 연결을 종료합니다 (일정 생성은 로컬 LLM 기준 수십 초 소요).\n25초 간격 하트비트는 SSE 코멘트 프레임이라 onmessage 로 수신되지 않으며 클라이언트 처리가 필요 없습니다.\n\n브라우저 기본 EventSource 는 Authorization 헤더를 지원하지 않으므로\nfetch 기반 SSE 클라이언트(예: @microsoft/fetch-event-source)를 사용하세요.\n연결이 끊기면 GET /jobs/{jobId} 폴링으로 폴백하면 됩니다.",
+        "operationId": "streamJobStatus",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "description": "작업 식별자",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseEmitter"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AiPlanCreateRequest": {
+        "type": "object",
+        "description": "AI 여행 일정 생성 요청 DTO",
+        "properties": {
+          "areaCode": {
+            "type": "string",
+            "description": "여행 지역 코드 (관광 areaCode, 제주=39)",
+            "example": 39,
+            "minLength": 1
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "description": "여행 시작일",
+            "example": "2026-09-11"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "description": "여행 종료일",
+            "example": "2026-09-13"
+          },
+          "budget": {
+            "type": "integer",
+            "format": "int64",
+            "description": "예산 (원 단위, 선택)",
+            "example": 400000
+          },
+          "petId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "동반 반려견 식별자 (선택) — petIds 가 있으면 무시됩니다. 둘 다 없으면 대표 반려견이 쓰입니다.",
+            "example": 1234567890123456789
+          },
+          "petIds": {
+            "type": "array",
+            "description": "동반 반려견 식별자 목록 (선택, 최대 5마리) — 여러 마리와 함께 여행할 때 씁니다.",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "maxItems": 5,
+            "minItems": 0
+          },
+          "pinnedPlaceIds": {
+            "type": "array",
+            "description": "꼭 넣고 싶은 장소 식별자 목록 (선택, 최대 10곳) — 일정에 반드시 배치됩니다.",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "maxItems": 10,
+            "minItems": 0
+          },
+          "requestNote": {
+            "type": "string",
+            "description": "요청 메모 (선택) — 자연어 요구사항",
+            "example": "산책 위주로, 더위에 약한 아이라 실내 위주로 부탁해요",
+            "maxLength": 500,
+            "minLength": 0
+          },
+          "preferFavorites": {
+            "type": "boolean",
+            "description": "즐겨찾기 우선 반영 (선택, 기본 false) — 찜한 장소를 후보에 합치고 조건이 맞으면 우선 배치합니다.",
+            "example": true
+          },
+          "planId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "하루 재생성 대상 일정 식별자 (선택) — regenerateDay 와 함께 지정합니다.",
+            "example": 1234567890123456789
+          },
+          "regenerateDay": {
+            "type": "integer",
+            "format": "int32",
+            "description": "다시 구성할 일차 (선택, 1부터) — 지정한 날만 새로 짜고 나머지 날은 기존 일정을 유지합니다.",
+            "example": 2
+          }
+        },
+        "required": [
+          "endDate",
+          "startDate"
+        ]
+      },
+      "AiPlanSubmitResponse": {
+        "type": "object",
+        "description": "AI 여행 일정 생성 제출 응답 DTO. 작업 접수 시 202와 함께 jobId를 반환한다.",
+        "properties": {
+          "submissionStatus": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "제출 상태 메타데이터",
+            "example": {
+              "code": "ACCEPTED",
+              "name": "작업 접수됨",
+              "description": "일정 생성 작업이 접수되었습니다. 작업 상태 조회 API로 완료 여부를 확인해 주세요."
+            }
+          },
+          "jobId": {
+            "type": "string",
+            "description": "작업 식별자",
+            "example": "8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00"
+          }
+        }
+      },
+      "CodeNameDescriptionMetadata": {
+        "type": "object",
+        "description": "코드명 메타데이터 DTO",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "내부 코드 값",
+            "example": "EXAMPLE_CODE"
+          },
+          "name": {
+            "type": "string",
+            "description": "화면 표시 이름",
+            "example": "예시 이름"
+          },
+          "description": {
+            "type": "string",
+            "description": "코드 의미 설명",
+            "example": "코드 의미를 설명하는 문장입니다."
+          }
+        }
+      },
+      "DataHeader": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "resultCode": {
+            "type": "string"
+          },
+          "resultMessage": {
+            "type": "object"
+          }
+        }
+      },
+      "ResponseAiPlanSubmitResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/AiPlanSubmitResponse"
+          }
+        }
+      },
+      "PackingListItem": {
+        "type": "object",
+        "description": "준비물 항목 DTO",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "분류 (필수/날씨 대비/반려견 케어/이동)",
+            "example": "날씨 대비"
+          },
+          "name": {
+            "type": "string",
+            "description": "준비물 이름",
+            "example": "휴대용 우비"
+          },
+          "reason": {
+            "type": "string",
+            "description": "필요한 이유 — 이 여행의 예보·반려견 특성·일정에 근거한다",
+            "example": "2일차 강수확률 80% 예보라 야외 일정 중 비를 만날 수 있습니다."
+          }
+        }
+      },
+      "PackingListResponse": {
+        "type": "object",
+        "description": "반려견 여행 준비물 목록 응답 DTO",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "description": "기준 일정 아이디",
+            "example": 1234567890123456789
+          },
+          "items": {
+            "type": "array",
+            "description": "준비물 목록 (분류별)",
+            "items": {
+              "$ref": "#/components/schemas/PackingListItem"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "준비물 수",
+            "example": 11
+          }
+        }
+      },
+      "ResponsePackingListResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/PackingListResponse"
+          }
+        }
+      },
+      "AiPlanDayItem": {
+        "type": "object",
+        "description": "AI 일정 초안의 일자 단위 항목 DTO",
+        "properties": {
+          "day": {
+            "type": "integer",
+            "format": "int32",
+            "description": "여행 일차 (1부터 시작)",
+            "example": 1
+          },
+          "items": {
+            "type": "array",
+            "description": "해당 일차의 일정 항목 목록",
+            "items": {
+              "$ref": "#/components/schemas/AiPlanScheduleItem"
+            }
+          }
+        }
+      },
+      "AiPlanDraftResponse": {
+        "type": "object",
+        "description": "AI가 생성한 여행 일정 초안 응답 DTO. 확정 저장은 plan-service API로 수행한다.",
+        "properties": {
+          "days": {
+            "type": "array",
+            "description": "일자별 일정 목록",
+            "items": {
+              "$ref": "#/components/schemas/AiPlanDayItem"
+            }
+          },
+          "reasons": {
+            "type": "array",
+            "description": "추천 이유 목록 (XAI)",
+            "items": {
+              "$ref": "#/components/schemas/AiPlanReasonItem"
+            }
+          }
+        }
+      },
+      "AiPlanJobStatusResponse": {
+        "type": "object",
+        "description": "AI 여행 일정 생성 작업 상태 응답 DTO",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "description": "작업 식별자",
+            "example": "8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "작업 상태 메타데이터",
+            "example": {
+              "code": "COMPLETED",
+              "name": "완료",
+              "description": "여행 일정 생성이 완료되었습니다."
+            }
+          },
+          "planDraft": {
+            "$ref": "#/components/schemas/AiPlanDraftResponse",
+            "description": "생성된 일정 초안 (status=COMPLETED 일 때만 채워짐)"
+          },
+          "errorCode": {
+            "type": "string",
+            "description": "실패 사유 코드 (status=FAILED 일 때만 채워짐)",
+            "example": "AIPLAN_005"
+          },
+          "errorMessage": {
+            "type": "string",
+            "description": "실패 사유 메시지 (status=FAILED 일 때만 채워짐)"
+          }
+        }
+      },
+      "AiPlanReasonItem": {
+        "type": "object",
+        "description": "AI 추천 이유 항목 DTO (XAI — api-design-guide §9)",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "이유 코드",
+            "example": "PET_ALLOWED"
+          },
+          "name": {
+            "type": "string",
+            "description": "이유 이름",
+            "example": "반려견 동반 가능"
+          },
+          "description": {
+            "type": "string",
+            "description": "데이터 근거 설명",
+            "example": "추천 장소는 모두 반려견 출입이 가능한 시설로만 구성했습니다."
+          }
+        }
+      },
+      "AiPlanScheduleItem": {
+        "type": "object",
+        "description": "AI 일정 초안의 개별 일정 항목 DTO",
+        "properties": {
+          "itemType": {
+            "type": "string",
+            "description": "일정 항목 종류 코드 (PLACE/MEAL/LODGING/WALK/MOVE)",
+            "example": "WALK"
+          },
+          "placeId": {
+            "type": "string",
+            "description": "장소 아이디. plan-service 에 저장할 때 targetId 로 쓴다. 이동 항목이거나 검증된 장소가 아니면 null 이다",
+            "example": 212481712381923328
+          },
+          "title": {
+            "type": "string",
+            "description": "항목 이름",
+            "example": "해안 산책로 산책"
+          },
+          "note": {
+            "type": "string",
+            "description": "참고 메모",
+            "example": "목줄 착용 필수"
+          }
+        }
+      },
+      "ResponseAiPlanJobStatusResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/AiPlanJobStatusResponse"
+          }
+        }
+      },
+      "SseEmitter": {
+        "type": "object",
+        "properties": {
+          "timeout": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

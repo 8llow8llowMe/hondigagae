@@ -1,0 +1,2392 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "혼디가개 관광 데이터 서비스 API 명세서",
+    "description": "Tour Service 전용 — 장소 검색/상세, 산책 코스, 여행 적합도, 긴급 시설",
+    "version": "v1"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Tour Service"
+    }
+  ],
+  "tags": [
+    {
+      "name": "여행 인사이트",
+      "description": "날씨와 반려견 조건을 결합한 장소 적합도/산책 위험도 분석 API를 제공합니다."
+    },
+    {
+      "name": "여행 인사이트 (권역)",
+      "description": "장소가 아니라 제주 전체나 좌표를 기준으로 답하는 분석 API 입니다."
+    },
+    {
+      "name": "긴급 시설",
+      "description": "여행 중 반려견에게 문제가 생겼을 때 필요한 시설을 찾습니다."
+    },
+    {
+      "name": "장소",
+      "description": "반려동물 동반 조건 기반 장소 검색과 상세 조회 API를 제공합니다."
+    }
+  ],
+  "paths": {
+    "/api/v1/places": {
+      "get": {
+        "tags": [
+          "장소"
+        ],
+        "summary": "장소 목록 조회",
+        "description": "지역·타입·반려동물 동반 조건으로 장소를 검색합니다. lastPlaceId 커서 기반 무한 스크롤 응답입니다. 비 오는 날 대안을 찾을 때는 indoor=true 로, 소형견만 받는 곳을 피할 때는 allowedPetSize 로 거릅니다.",
+        "operationId": "getPlaces",
+        "parameters": [
+          {
+            "name": "areaCode",
+            "in": "query",
+            "description": "관광 지역코드 (제주=39)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": 39
+          },
+          {
+            "name": "sigunguCode",
+            "in": "query",
+            "description": "관광 시군구코드",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": 3
+          },
+          {
+            "name": "contentType",
+            "in": "query",
+            "description": "콘텐츠 타입",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TOURIST_SPOT",
+                "CULTURE",
+                "FESTIVAL",
+                "COURSE",
+                "LEPORTS",
+                "LODGING",
+                "SHOPPING",
+                "RESTAURANT"
+              ]
+            }
+          },
+          {
+            "name": "petAllowanceType",
+            "in": "query",
+            "description": "반려동물 동반 구분",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALLOWED",
+                "PARTIALLY_ALLOWED",
+                "NOT_ALLOWED",
+                "UNKNOWN"
+              ]
+            }
+          },
+          {
+            "name": "indoor",
+            "in": "query",
+            "description": "실내 여부 — true 면 실내만. 원천에 정보가 없는 장소는 어느 쪽으로도 잡히지 않는다",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "example": true
+          },
+          {
+            "name": "allowedPetSize",
+            "in": "query",
+            "description": "입장 가능 반려동물 크기",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "SMALL_ONLY",
+                "SMALL_MEDIUM",
+                "UNKNOWN"
+              ]
+            }
+          },
+          {
+            "name": "petSizeType",
+            "in": "query",
+            "description": "내 반려견 크기. 받아 주지 않는 것으로 확인된 곳만 뺀다 — 정보 없음인 곳은 남는다",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SMALL",
+                "MEDIUM",
+                "LARGE"
+              ]
+            },
+            "example": "MEDIUM"
+          },
+          {
+            "name": "petWeightKg",
+            "in": "query",
+            "description": "내 반려견 체중(kg). 체중 상한이 명시된 곳(12kg 미만 등)을 정확히 거른다",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1
+            },
+            "example": 15
+          },
+          {
+            "name": "sourceCategory",
+            "in": "query",
+            "description": "원본 분류 (펜션·카페·박물관·여행지 등). 콘텐츠 타입으로는 갈리지 않는 구분에 쓴다",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "카페"
+          },
+          {
+            "name": "lastPlaceId",
+            "in": "query",
+            "description": "커서 — 직전 응답 마지막 placeId",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 212481712381923328
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "조회 개수 (1~50)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20,
+              "maximum": 50
+            },
+            "example": 20
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseSliceResponsePlaceItem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/places/{placeId}": {
+      "get": {
+        "tags": [
+          "장소"
+        ],
+        "summary": "장소 상세 조회",
+        "description": "장소 기본 정보에 소개(운영시간/주차), 반려동물 동반 정보, 추가 이미지를 결합해 반환합니다.",
+        "operationId": "getPlaceDetail",
+        "parameters": [
+          {
+            "name": "placeId",
+            "in": "path",
+            "description": "장소 아이디",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 212481712381923328
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePlaceDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/places/{placeId}/walk-safety": {
+      "get": {
+        "tags": [
+          "여행 인사이트"
+        ],
+        "summary": "장소 산책 위험도",
+        "description": "그 시각에 반려견과 걸어도 되는지를 판정합니다. 사람 기준 기온이 아니라 추정 아스팔트 노면온도와 열지수를 봅니다 — 기온 25도 맑은 한낮의 아스팔트는 50도를 넘어 발바닥 화상 위험 구간에 들어갑니다. estimatedPavementCelsius 는 실측이 아니라 기온/하늘상태/시간대로 계산한 추정치이므로 안내 용도로만 쓰고 단정하지 말아야 합니다. 위험/주의로 판정되면 같은 날 더 나은 시간대를 saferWindow 로 함께 제안합니다.",
+        "operationId": "getWalkSafety",
+        "parameters": [
+          {
+            "name": "placeId",
+            "in": "path",
+            "description": "장소 아이디",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "example": 212481712381923328
+          },
+          {
+            "name": "targetDateTime",
+            "in": "query",
+            "description": "판정 기준 시각. 생략하면 오늘은 지금, 다른 날은 14시 기준",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "example": "2026-08-27T14:00:00"
+          },
+          {
+            "name": "targetDate",
+            "in": "query",
+            "description": "판정 기준 일자. targetDateTime 을 주면 무시된다",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2026-08-27"
+          },
+          {
+            "name": "petSizeType",
+            "in": "query",
+            "description": "반려견 크기",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SMALL",
+                "MEDIUM",
+                "LARGE"
+              ]
+            },
+            "example": "SMALL"
+          },
+          {
+            "name": "heatSensitive",
+            "in": "query",
+            "description": "더위에 민감한지",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": true
+          },
+          {
+            "name": "coldSensitive",
+            "in": "query",
+            "description": "추위에 민감한지",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": false
+          },
+          {
+            "name": "noiseSensitive",
+            "in": "query",
+            "description": "소음에 민감한지",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": false
+          },
+          {
+            "name": "activityLevel",
+            "in": "query",
+            "description": "활동량",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOW",
+                "MEDIUM",
+                "HIGH"
+              ]
+            },
+            "example": "LOW"
+          },
+          {
+            "name": "breed",
+            "in": "query",
+            "description": "견종. 단두종(불독/퍼그/시츄 등)이면 고온 위험을 높게 잡는다",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "퍼그"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWalkSafetyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/places/{placeId}/suitability": {
+      "get": {
+        "tags": [
+          "여행 인사이트"
+        ],
+        "summary": "장소 여행 적합도",
+        "description": "날씨(기상청 단기예보) + 반려견 동반 조건 + 혼잡도를 결합해 0~100 점수와 판정 근거를 제공합니다. score 는 null 일 수 있으며, 이는 0점이 아니라 판단 근거가 없다는 뜻입니다 (단기·중기예보를 합쳐 약 11일까지 답하며, 그보다 먼 날짜는 근거가 없습니다). 이때 suitabilityLevel 은 INSUFFICIENT 이고 reasons 에 그 이유가 담깁니다. 비 예보가 있고 이 장소에 실내 공간이 없으면 indoorAlternatives 에 실내 대안을 함께 내려 줍니다.",
+        "operationId": "getSuitability",
+        "parameters": [
+          {
+            "name": "placeId",
+            "in": "path",
+            "description": "장소 아이디",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "example": 212481712381923328
+          },
+          {
+            "name": "targetDate",
+            "in": "query",
+            "description": "판정 기준 일자. 생략하면 오늘",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2026-08-27"
+          },
+          {
+            "name": "petSizeType",
+            "in": "query",
+            "description": "반려견 크기. 장소의 입장 조건과 대조한다",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SMALL",
+                "MEDIUM",
+                "LARGE"
+              ]
+            },
+            "example": "SMALL"
+          },
+          {
+            "name": "heatSensitive",
+            "in": "query",
+            "description": "더위에 민감한지",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": false
+          },
+          {
+            "name": "coldSensitive",
+            "in": "query",
+            "description": "추위에 민감한지",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": false
+          },
+          {
+            "name": "noiseSensitive",
+            "in": "query",
+            "description": "소음에 민감한지. 혼잡도 판정에 반영된다",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": false
+          },
+          {
+            "name": "activityLevel",
+            "in": "query",
+            "description": "활동량",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOW",
+                "MEDIUM",
+                "HIGH"
+              ]
+            },
+            "example": "MEDIUM"
+          },
+          {
+            "name": "breed",
+            "in": "query",
+            "description": "견종. 단두종 여부 판정에 쓴다",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "퍼그"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePlaceSuitabilityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/places/{placeId}/congestions": {
+      "get": {
+        "tags": [
+          "여행 인사이트"
+        ],
+        "summary": "장소 기간 혼잡도",
+        "description": "\"이번 주 언제 덜 붐비나\"에 답합니다. 적합도가 하루를 판정하는 것과 달리 기간을 봅니다. 혼잡도 예측은 30일 rolling 이라 예보(약 11일)보다 멀리까지 답할 수 있습니다 — 적합도로는 근거가 없는 날짜도 여기서는 붐빔 정도를 알 수 있습니다. 데이터가 없는 날짜도 UNKNOWN 으로 목록에 남습니다. 빠뜨리면 날짜 축에 구멍이 생겨 사용자가 그 날을 \"한산한 날\"로 읽기 때문입니다 — UNKNOWN 은 한산함이 아니라 모름입니다.",
+        "operationId": "getCongestions",
+        "parameters": [
+          {
+            "name": "placeId",
+            "in": "path",
+            "description": "장소 아이디",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "example": 212481712381923328
+          },
+          {
+            "name": "fromDate",
+            "in": "query",
+            "description": "조회 시작일. 생략하면 오늘",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2026-09-01"
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "description": "조회 일수 (1~30). fromDate 부터 이 일수만큼 봅니다",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 7,
+              "maximum": 30,
+              "minimum": 1
+            },
+            "example": 7
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePlaceCongestionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/places/nearby": {
+      "get": {
+        "tags": [
+          "장소"
+        ],
+        "summary": "주변 장소 검색",
+        "description": "좌표 기준 반경 안의 장소를 가까운 순으로 찾습니다. 여행 중 다음 일정을 고를 때 쓰는 조회라 커서가 아니라 상위 N 개를 돌려줍니다. 식사할 곳을 찾을 때는 contentType=RESTAURANT 로, 카페만 볼 때는 sourceCategory=카페 를 함께 씁니다. 여기 담긴 음식점은 지자체에 반려동물 동반출입 업소로 등록된 곳이라 동반 가능 여부가 확인된 정보입니다.",
+        "operationId": "getNearbyPlaces",
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "description": "중심 위도",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double",
+              "maximum": 90,
+              "minimum": -90
+            },
+            "example": 33.4996213
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "description": "중심 경도",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double",
+              "maximum": 180,
+              "minimum": -180
+            },
+            "example": 126.5311884
+          },
+          {
+            "name": "radius",
+            "in": "query",
+            "description": "검색 반경(m). 최대 50000",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 5000,
+              "maximum": 50000,
+              "minimum": 1
+            },
+            "example": 5000
+          },
+          {
+            "name": "contentType",
+            "in": "query",
+            "description": "콘텐츠 타입",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TOURIST_SPOT",
+                "CULTURE",
+                "FESTIVAL",
+                "COURSE",
+                "LEPORTS",
+                "LODGING",
+                "SHOPPING",
+                "RESTAURANT"
+              ]
+            }
+          },
+          {
+            "name": "petAllowanceType",
+            "in": "query",
+            "description": "반려동물 동반 구분",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALLOWED",
+                "PARTIALLY_ALLOWED",
+                "NOT_ALLOWED",
+                "UNKNOWN"
+              ]
+            }
+          },
+          {
+            "name": "indoor",
+            "in": "query",
+            "description": "실내 여부 — true 면 실내만",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "allowedPetSize",
+            "in": "query",
+            "description": "입장 가능 반려동물 크기",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "SMALL_ONLY",
+                "SMALL_MEDIUM",
+                "UNKNOWN"
+              ]
+            }
+          },
+          {
+            "name": "petSizeType",
+            "in": "query",
+            "description": "내 반려견 크기",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SMALL",
+                "MEDIUM",
+                "LARGE"
+              ]
+            },
+            "example": "MEDIUM"
+          },
+          {
+            "name": "petWeightKg",
+            "in": "query",
+            "description": "내 반려견 체중(kg)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "maximum": 100,
+              "minimum": 1
+            },
+            "example": 15
+          },
+          {
+            "name": "sourceCategory",
+            "in": "query",
+            "description": "원본 분류 (카페·펜션·일반음식점 등)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "카페"
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "조회 개수 (1~50)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 15,
+              "maximum": 50
+            },
+            "example": 15
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseNearbyPlaceResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/insights/walk-times": {
+      "get": {
+        "tags": [
+          "여행 인사이트 (권역)"
+        ],
+        "summary": "오늘의 산책 골든타임",
+        "description": "좌표 기준으로 오늘 남은 시간의 산책 안전 등급 곡선과 가장 좋은 연속 구간을 줍니다. 장소 산책 위험도가 \"지금 나가도 되나\"를 답한다면 이쪽은 \"오늘 언제 나가야 하나\"를 답합니다 — 여름 제주에서는 낮에 어차피 못 나가고 문제는 아침이 나은지 저녁이 나은지입니다. 판정은 산책 위험도와 **같은 규칙**을 씁니다. `goldenStart` 가 null 이면 남은 시간이 전부 위험 등급이거나 특보 경보가 발효 중이라는 뜻입니다 — 아무 구간이나 골라 주면 사용자가 그것을 허락으로 읽기 때문에 주지 않습니다. 추정 노면온도는 기온에 일사와 시간대를 더해 계산한 값이며 실측이 아닙니다.",
+        "operationId": "getWalkTimes",
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "description": "위도",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double",
+              "maximum": 90,
+              "minimum": -90
+            },
+            "example": 33.4996213
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "description": "경도",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double",
+              "maximum": 180,
+              "minimum": -180
+            },
+            "example": 126.5311884
+          },
+          {
+            "name": "petSizeType",
+            "in": "query",
+            "description": "반려견 크기",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SMALL",
+                "MEDIUM",
+                "LARGE"
+              ]
+            },
+            "example": "SMALL"
+          },
+          {
+            "name": "heatSensitive",
+            "in": "query",
+            "description": "더위에 민감한지",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": true
+          },
+          {
+            "name": "coldSensitive",
+            "in": "query",
+            "description": "추위에 민감한지",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": false
+          },
+          {
+            "name": "activityLevel",
+            "in": "query",
+            "description": "활동량",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOW",
+                "MEDIUM",
+                "HIGH"
+              ]
+            },
+            "example": "LOW"
+          },
+          {
+            "name": "breed",
+            "in": "query",
+            "description": "견종. 단두종(불독/퍼그/시츄 등)이면 고온 위험을 높게 잡습니다",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "퍼그"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWalkTimesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/insights/regional-weather": {
+      "get": {
+        "tags": [
+          "여행 인사이트 (권역)"
+        ],
+        "summary": "제주 권역 날씨 비교",
+        "description": "제주를 다섯 권역(제주시·서귀포·동부·서부·한라산)으로 나눠 날씨를 나란히 보여 주고, 지금 반려견과 나가기 가장 좋은 권역을 추천합니다. 한라산이 섬을 기후로 갈라 놓기 때문에 성립하는 비교입니다 — 같은 시각에 북부는 비가 오고 남부는 개어 있는 일이 흔합니다. 판정은 장소 적합도와 **같은 날씨 규칙**을 쓰되 장소·혼잡도 항목이 없어, 이 점수는 \"이 권역이 나가기 좋은가\"이지 \"이 장소가 갈 만한가\"가 아닙니다. 예보를 못 받은 권역도 `weatherScore = null` 로 목록에 남습니다 — 지우면 사용자가 그 권역이 조회되지 않았다는 것조차 모릅니다. `recommendedRegion` 이 null 이면 판정할 수 있는 권역이 하나도 없었다는 뜻입니다.",
+        "operationId": "getRegionalWeather",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "description": "비교 기준 일자. 생략하면 오늘. 오늘~내일을 전제로 합니다",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2026-09-02"
+          },
+          {
+            "name": "petSizeType",
+            "in": "query",
+            "description": "반려견 크기",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "SMALL",
+                "MEDIUM",
+                "LARGE"
+              ]
+            },
+            "example": "SMALL"
+          },
+          {
+            "name": "heatSensitive",
+            "in": "query",
+            "description": "더위에 민감한지",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": true
+          },
+          {
+            "name": "coldSensitive",
+            "in": "query",
+            "description": "추위에 민감한지",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": false
+          },
+          {
+            "name": "activityLevel",
+            "in": "query",
+            "description": "활동량",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOW",
+                "MEDIUM",
+                "HIGH"
+              ]
+            },
+            "example": "LOW"
+          },
+          {
+            "name": "breed",
+            "in": "query",
+            "description": "견종. 단두종(불독/퍼그/시츄 등)이면 고온 위험을 높게 잡습니다",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "퍼그"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseRegionalWeatherResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/emergencies/facilities": {
+      "get": {
+        "tags": [
+          "긴급 시설"
+        ],
+        "summary": "주변 긴급 시설 검색",
+        "description": "좌표 기준 반경 안의 동물병원·동물약국을 가까운 순으로 찾습니다. type 을 비우면 둘이 섞여 나옵니다 — 급할 때 필요한 것은 가장 가까운 도움이지 가장 가까운 병원이 아니기 때문입니다. operatingHoursKnown 이 false 인 항목은 \"휴무\"가 아니라 \"영업 정보 없음\"이므로 전화 확인을 안내해야 합니다(동물병원은 약 절반이 운영시간을 주지 않습니다). 24시간 운영이 확인된 곳은 제주 동물병원 중 3곳뿐이라 open24Only=true 는 결과가 매우 적습니다.",
+        "operationId": "searchNearbyFacilities",
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "description": "중심 위도",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double",
+              "maximum": 90,
+              "minimum": -90
+            },
+            "example": 33.4996213
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "description": "중심 경도",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "format": "double",
+              "maximum": 180,
+              "minimum": -180
+            },
+            "example": 126.5311884
+          },
+          {
+            "name": "radius",
+            "in": "query",
+            "description": "검색 반경(m). 최대 50000",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10000,
+              "maximum": 50000,
+              "minimum": 1
+            },
+            "example": 10000
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "시설 종류. 비우면 동물병원과 동물약국을 함께 본다",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ANIMAL_HOSPITAL",
+                "ANIMAL_PHARMACY"
+              ]
+            },
+            "example": "ANIMAL_HOSPITAL"
+          },
+          {
+            "name": "open24Only",
+            "in": "query",
+            "description": "24시간 운영으로 확인된 곳만 볼지",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": false
+          },
+          {
+            "name": "openNowOnly",
+            "in": "query",
+            "description": "지금 영업 중으로 확인된 곳만 볼지. 영업시간을 모르는 곳도 빠지므로 결과가 줄어든다",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": false
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "조회 개수 (1~50)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10,
+              "maximum": 50,
+              "minimum": 1
+            },
+            "example": 10
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseNearbyFacilityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/emergencies/facilities/{facilityId}": {
+      "get": {
+        "tags": [
+          "긴급 시설"
+        ],
+        "summary": "긴급 시설 상세",
+        "description": "목록에서 고른 시설 한 곳의 상세를 봅니다. 목록이 내려주는 facilityId 를 그대로 씁니다. openNow / operatingHoursKnown 의 뜻은 목록과 같습니다 — 판정 규칙을 한곳에 두어 두 화면이 같은 시설을 다르게 말하지 않게 했습니다. 원천에서 내려간(폐업 등) 시설은 404 입니다. 목록에 없는 곳을 상세로만 볼 수 있으면 폐업한 병원 주소를 들고 찾아가게 되기 때문입니다.",
+        "operationId": "getFacilityDetail",
+        "parameters": [
+          {
+            "name": "facilityId",
+            "in": "path",
+            "description": "긴급 시설 아이디",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 4611686018427387904
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseEmergencyFacilityDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CodeNameDescriptionMetadata": {
+        "type": "object",
+        "description": "코드명 메타데이터 DTO",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "내부 코드 값",
+            "example": "EXAMPLE_CODE"
+          },
+          "name": {
+            "type": "string",
+            "description": "화면 표시 이름",
+            "example": "예시 이름"
+          },
+          "description": {
+            "type": "string",
+            "description": "코드 의미 설명",
+            "example": "코드 의미를 설명하는 문장입니다."
+          }
+        }
+      },
+      "DataHeader": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "resultCode": {
+            "type": "string"
+          },
+          "resultMessage": {
+            "type": "object"
+          }
+        }
+      },
+      "PlaceItem": {
+        "type": "object",
+        "description": "장소 목록 항목",
+        "properties": {
+          "placeId": {
+            "type": "string",
+            "description": "장소 아이디",
+            "example": 212481712381923328
+          },
+          "contentType": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "콘텐츠 타입 metadata"
+          },
+          "title": {
+            "type": "string",
+            "description": "장소명",
+            "example": "가세오름"
+          },
+          "addr1": {
+            "type": "string",
+            "description": "주소",
+            "example": "제주특별자치도 서귀포시 표선면 가시리"
+          },
+          "sigunguCode": {
+            "type": "string",
+            "description": "관광 시군구코드",
+            "example": 3
+          },
+          "lat": {
+            "type": "number",
+            "format": "double",
+            "description": "위도",
+            "example": 33.3608276172
+          },
+          "lng": {
+            "type": "number",
+            "format": "double",
+            "description": "경도",
+            "example": 126.7818122232
+          },
+          "firstImage": {
+            "type": "string",
+            "description": "대표 이미지 원본 URL"
+          },
+          "firstImage2": {
+            "type": "string",
+            "description": "대표 이미지 썸네일 URL"
+          },
+          "petAllowanceType": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "반려동물 동반 구분 metadata"
+          },
+          "allowedPetSize": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "입장 가능 반려동물 크기 metadata"
+          },
+          "maxPetWeightKg": {
+            "type": "integer",
+            "format": "int32",
+            "description": "입장 가능 체중 상한(kg). 원문에 숫자가 있을 때만 온다",
+            "example": 12
+          },
+          "tel": {
+            "type": "string",
+            "description": "전화번호",
+            "example": "064-760-6331"
+          },
+          "indoor": {
+            "type": "boolean",
+            "description": "실내 여부. null 이면 원천에 정보가 없다",
+            "example": true
+          },
+          "sourceCategory": {
+            "type": "string",
+            "description": "원본 분류 (원천이 준 값 그대로)",
+            "example": "카페"
+          },
+          "sourceName": {
+            "type": "string",
+            "description": "정보 출처",
+            "example": "문화정보원"
+          }
+        }
+      },
+      "ResponseSliceResponsePlaceItem": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/SliceResponsePlaceItem"
+          }
+        }
+      },
+      "SliceResponsePlaceItem": {
+        "type": "object",
+        "properties": {
+          "contents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaceItem"
+            }
+          },
+          "hasNext": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PlaceDetailResponse": {
+        "type": "object",
+        "description": "장소 상세 응답",
+        "properties": {
+          "placeId": {
+            "type": "string",
+            "description": "장소 아이디",
+            "example": 212481712381923328
+          },
+          "contentId": {
+            "type": "string",
+            "description": "TourAPI 콘텐츠 아이디. 원천이 TourAPI 가 아니면(문화정보원·식약처) null 이다",
+            "example": 126439
+          },
+          "contentType": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "콘텐츠 타입 metadata"
+          },
+          "title": {
+            "type": "string",
+            "description": "장소명",
+            "example": "천지연폭포"
+          },
+          "addr1": {
+            "type": "string",
+            "description": "주소",
+            "example": "제주특별자치도 서귀포시 천지동 667-7"
+          },
+          "addr2": {
+            "type": "string",
+            "description": "상세주소",
+            "example": "(중문동)"
+          },
+          "zipcode": {
+            "type": "string",
+            "description": "우편번호",
+            "example": 63546
+          },
+          "lat": {
+            "type": "number",
+            "format": "double",
+            "description": "위도",
+            "example": 33.2526559999
+          },
+          "lng": {
+            "type": "number",
+            "format": "double",
+            "description": "경도",
+            "example": 126.4184294967
+          },
+          "firstImage": {
+            "type": "string",
+            "description": "대표 이미지 원본 URL"
+          },
+          "firstImage2": {
+            "type": "string",
+            "description": "대표 이미지 썸네일 URL"
+          },
+          "cpyrhtDivCd": {
+            "type": "string",
+            "description": "저작권 유형 (Type1/Type3 — 출처표기 의무)",
+            "example": "Type1"
+          },
+          "tel": {
+            "type": "string",
+            "description": "전화번호"
+          },
+          "homepage": {
+            "type": "string",
+            "description": "홈페이지 (HTML anchor 포함 원문)"
+          },
+          "overview": {
+            "type": "string",
+            "description": "개요"
+          },
+          "petAvailable": {
+            "type": "boolean",
+            "description": "반려동물 동반 콘텐츠 여부",
+            "example": true
+          },
+          "delisted": {
+            "type": "boolean",
+            "description": "원천에서 사라진 장소인지. true 면 폐업·등록 철회 등으로 더 이상 확인되지 않는 곳이라 화면에서 그렇게 안내해야 한다. 기존 일정이 참조할 수 있어 상세는 계속 응답한다",
+            "example": false
+          },
+          "petAllowanceType": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "반려동물 동반 구분 metadata"
+          },
+          "indoor": {
+            "type": "boolean",
+            "description": "실내 여부. null 이면 원천에 정보가 없다",
+            "example": true
+          },
+          "sourceCategory": {
+            "type": "string",
+            "description": "원본 분류 (원천이 준 값 그대로)",
+            "example": "카페"
+          },
+          "sourceName": {
+            "type": "string",
+            "description": "정보 출처",
+            "example": "문화정보원"
+          },
+          "intro": {
+            "$ref": "#/components/schemas/PlaceIntroItem",
+            "description": "소개 정보 (없으면 null)"
+          },
+          "petInfo": {
+            "$ref": "#/components/schemas/PlacePetInfoItem",
+            "description": "반려동물 동반 정보 (없으면 null)"
+          },
+          "images": {
+            "type": "array",
+            "description": "추가 이미지 목록",
+            "items": {
+              "$ref": "#/components/schemas/PlaceImageItem"
+            }
+          }
+        }
+      },
+      "PlaceImageItem": {
+        "type": "object",
+        "description": "장소 추가 이미지",
+        "properties": {
+          "originImgUrl": {
+            "type": "string",
+            "description": "원본 이미지 URL"
+          },
+          "smallImageUrl": {
+            "type": "string",
+            "description": "썸네일 이미지 URL"
+          },
+          "imgName": {
+            "type": "string",
+            "description": "이미지명",
+            "example": "제주_천지연폭포 (8)"
+          },
+          "cpyrhtDivCd": {
+            "type": "string",
+            "description": "저작권 유형 (Type1/Type3 — 출처표기 의무)",
+            "example": "Type1"
+          }
+        }
+      },
+      "PlaceIntroItem": {
+        "type": "object",
+        "description": "장소 소개 정보",
+        "properties": {
+          "infoCenter": {
+            "type": "string",
+            "description": "문의처",
+            "example": "064-760-6331"
+          },
+          "useTime": {
+            "type": "string",
+            "description": "운영시간",
+            "example": "09:00~17:50 (입장 마감 17:10)"
+          },
+          "restDate": {
+            "type": "string",
+            "description": "휴무일",
+            "example": "연중무휴"
+          },
+          "parking": {
+            "type": "string",
+            "description": "주차",
+            "example": "가능"
+          },
+          "chkPet": {
+            "type": "string",
+            "description": "애완동물 동반 가능 원문 (빈 값 가능 — 판단은 petInfo 우선)"
+          },
+          "chkBabyCarriage": {
+            "type": "string",
+            "description": "유모차 대여"
+          },
+          "chkCreditCard": {
+            "type": "string",
+            "description": "신용카드 가능"
+          }
+        }
+      },
+      "PlacePetInfoItem": {
+        "type": "object",
+        "description": "반려동물 동반 정보",
+        "properties": {
+          "acmpyTypeCd": {
+            "type": "string",
+            "description": "동반 유형 원문",
+            "example": "전구역 동반가능"
+          },
+          "acmpyPsblCpam": {
+            "type": "string",
+            "description": "동반 가능 동물 원문",
+            "example": "전 견종 동반 가능"
+          },
+          "acmpyNeedMtr": {
+            "type": "string",
+            "description": "동반 시 필요사항 원문",
+            "example": "목줄 착용"
+          },
+          "etcAcmpyInfo": {
+            "type": "string",
+            "description": "기타 동반 정보 원문"
+          },
+          "relaAcdntRiskMtr": {
+            "type": "string",
+            "description": "사고 대비사항 원문"
+          },
+          "relaFrnshPrdlst": {
+            "type": "string",
+            "description": "비치 품목 원문"
+          },
+          "relaPosesFclty": {
+            "type": "string",
+            "description": "부대시설 원문 (반려견 운동장 등)"
+          },
+          "relaPurcPrdlst": {
+            "type": "string",
+            "description": "구매 가능 품목 원문"
+          },
+          "relaRntlPrdlst": {
+            "type": "string",
+            "description": "대여 가능 품목 원문"
+          },
+          "allowanceScope": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "동반 가능 구역 metadata (가공값)"
+          },
+          "allowedPetSize": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "동반 가능 크기 metadata (가공값)"
+          },
+          "leashRequired": {
+            "type": "boolean",
+            "description": "목줄 필요 여부 (가공값)",
+            "example": true
+          }
+        }
+      },
+      "ResponsePlaceDetailResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/PlaceDetailResponse"
+          }
+        }
+      },
+      "ResponseWalkSafetyResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/WalkSafetyResponse"
+          }
+        }
+      },
+      "ScoreMetricMetadata": {
+        "type": "object",
+        "description": "점수 지표 메타데이터 DTO",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "내부 코드 값",
+            "example": "OPPORTUNITY_SCORE"
+          },
+          "name": {
+            "type": "string",
+            "description": "화면 표시 이름",
+            "example": "기회도"
+          },
+          "description": {
+            "type": "string",
+            "description": "지표 설명"
+          },
+          "scoreDescription": {
+            "type": "string",
+            "description": "점수 해석 설명"
+          }
+        }
+      },
+      "WalkSafetyReasonItem": {
+        "type": "object",
+        "description": "산책 위험도 판정 근거 DTO",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "근거 코드",
+            "example": "PAVEMENT_HEAT"
+          },
+          "name": {
+            "type": "string",
+            "description": "근거 이름",
+            "example": "노면 고온"
+          },
+          "description": {
+            "type": "string",
+            "description": "추정 수치를 담은 설명 문장",
+            "example": "기온 31도에 일사가 더해져 아스팔트 표면은 약 58도로 추정됩니다. 발바닥 화상 위험 구간입니다."
+          }
+        }
+      },
+      "WalkSafetyResponse": {
+        "type": "object",
+        "description": "장소 산책 위험도 응답 DTO",
+        "properties": {
+          "placeId": {
+            "type": "string",
+            "description": "장소 아이디",
+            "example": 212481712381923328
+          },
+          "placeTitle": {
+            "type": "string",
+            "description": "장소명",
+            "example": "협재해수욕장"
+          },
+          "targetDateTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "판정 기준 시각",
+            "example": "2026-08-27T14:00:00"
+          },
+          "walkSafetyLevel": {
+            "$ref": "#/components/schemas/ScoreMetricMetadata",
+            "description": "산책 위험도 등급 metadata"
+          },
+          "reasons": {
+            "type": "array",
+            "description": "판정 근거",
+            "items": {
+              "$ref": "#/components/schemas/WalkSafetyReasonItem"
+            }
+          },
+          "estimatedPavementCelsius": {
+            "type": "number",
+            "format": "double",
+            "description": "추정 아스팔트 표면온도(섭씨). 실측이 아니라 기온/하늘상태/시간대로 계산한 추정치다",
+            "example": 58.0
+          },
+          "heatIndexCelsius": {
+            "type": "number",
+            "format": "double",
+            "description": "기온과 습도를 합친 체감 열지수(섭씨)",
+            "example": 35.0
+          },
+          "saferWindowStart": {
+            "type": "string",
+            "description": "같은 날 더 안전한 시간대 시작. 없으면 null",
+            "example": "18:00:00"
+          },
+          "saferWindowEnd": {
+            "type": "string",
+            "description": "같은 날 더 안전한 시간대 종료. 없으면 null",
+            "example": "21:00:00"
+          },
+          "temperature": {
+            "type": "number",
+            "format": "double",
+            "description": "판정에 쓴 기온(섭씨)",
+            "example": 31.0
+          },
+          "humidity": {
+            "type": "integer",
+            "format": "int32",
+            "description": "판정에 쓴 습도(%)",
+            "example": 78
+          },
+          "skyState": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "판정에 쓴 하늘상태 metadata"
+          },
+          "precipitationType": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "판정에 쓴 강수형태 metadata"
+          },
+          "petConditionApplied": {
+            "type": "boolean",
+            "description": "요청에 반려견 조건이 포함되어 판정에 반영됐는지",
+            "example": true
+          },
+          "weatherProviderName": {
+            "type": "string",
+            "description": "날씨 정보 출처",
+            "example": "기상청 단기예보"
+          },
+          "weatherWarning": {
+            "$ref": "#/components/schemas/WeatherWarningItem",
+            "description": "발효 중인 기상특보. 없으면 null 이다. 경보면 점수를 내지 않고(0점) 산책은 위험으로 판정한다"
+          }
+        }
+      },
+      "WeatherWarningItem": {
+        "type": "object",
+        "description": "기상특보 DTO",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "특보 종류 metadata"
+          },
+          "level": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "특보 단계 metadata. 경보면 점수를 내지 않고 산책은 위험으로 판정한다"
+          },
+          "effectiveAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "발효 시각. 원천이 주지 않으면 null",
+            "example": "2026-09-02T06:00:00"
+          }
+        }
+      },
+      "AlternativePlaceItem": {
+        "type": "object",
+        "description": "실내 대안 장소 DTO",
+        "properties": {
+          "placeId": {
+            "type": "string",
+            "description": "장소 아이디",
+            "example": 212481712381923328
+          },
+          "title": {
+            "type": "string",
+            "description": "장소명",
+            "example": "제주현대미술관"
+          },
+          "lat": {
+            "type": "number",
+            "format": "double",
+            "description": "위도",
+            "example": 33.3608276172
+          },
+          "lng": {
+            "type": "number",
+            "format": "double",
+            "description": "경도",
+            "example": 126.7818122232
+          },
+          "distanceMeters": {
+            "type": "integer",
+            "format": "int32",
+            "description": "기준 장소로부터의 거리(m)",
+            "example": 2340
+          },
+          "petAllowanceType": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "반려동물 동반 구분 metadata"
+          },
+          "allowedPetSize": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "동반 가능 크기 metadata"
+          }
+        }
+      },
+      "CongestionItem": {
+        "type": "object",
+        "description": "혼잡도 예측 DTO",
+        "properties": {
+          "level": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "혼잡도 등급 metadata. 연결된 데이터가 없으면 UNKNOWN 이다"
+          },
+          "concentrationRate": {
+            "type": "number",
+            "format": "double",
+            "description": "관광지 집중률(0~100). 등급이 UNKNOWN 이면 null 이며, 이는 한산하다는 뜻이 아니라 데이터가 없다는 뜻이다",
+            "example": 37.2
+          }
+        }
+      },
+      "DailyWeatherItem": {
+        "type": "object",
+        "description": "일자별 날씨 요약 DTO",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "예보 대상 일자",
+            "example": "2026-08-27"
+          },
+          "forecastSource": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "이 값이 나온 예보의 출처. MID_TERM 이면 오전/오후 단위라 대략적이고 습도·바람이 없다",
+            "example": {
+              "code": "SHORT_TERM",
+              "name": "단기예보",
+              "description": "오늘부터 약 5일까지의 시간 단위 예보입니다. 가장 정확합니다."
+            }
+          },
+          "minTemperature": {
+            "type": "number",
+            "format": "double",
+            "description": "최저기온(섭씨)",
+            "example": 24.0
+          },
+          "maxTemperature": {
+            "type": "number",
+            "format": "double",
+            "description": "최고기온(섭씨)",
+            "example": 31.0
+          },
+          "maxPrecipitationProbability": {
+            "type": "integer",
+            "format": "int32",
+            "description": "최대 강수확률(%)",
+            "example": 80
+          },
+          "precipitationType": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "그날 가장 나쁜 강수형태 metadata"
+          },
+          "skyState": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "대표 하늘상태 metadata"
+          },
+          "maxWindSpeed": {
+            "type": "number",
+            "format": "double",
+            "description": "최대 풍속(m/s). 중기예보에는 없어 null 이다",
+            "example": 4.2
+          },
+          "maxHumidity": {
+            "type": "integer",
+            "format": "int32",
+            "description": "최고 습도(%). 중기예보에는 없어 null 이다",
+            "example": 85
+          },
+          "totalPrecipitationMm": {
+            "type": "number",
+            "format": "double",
+            "description": "예보 강수량 합계(mm). 범위 표기는 하한을 더한 값이다",
+            "example": 12.5
+          }
+        }
+      },
+      "PlaceSuitabilityResponse": {
+        "type": "object",
+        "description": "장소 여행 적합도 응답 DTO",
+        "properties": {
+          "placeId": {
+            "type": "string",
+            "description": "장소 아이디",
+            "example": 212481712381923328
+          },
+          "placeTitle": {
+            "type": "string",
+            "description": "장소명",
+            "example": "천지연폭포"
+          },
+          "targetDate": {
+            "type": "string",
+            "format": "date",
+            "description": "판정 기준 일자",
+            "example": "2026-08-27"
+          },
+          "score": {
+            "type": "integer",
+            "format": "int32",
+            "description": "적합도 점수(0~100). 판단 근거가 없으면 null 이며, 이는 0점이 아니라 점수를 내지 않았다는 뜻이다",
+            "example": 82
+          },
+          "suitabilityLevel": {
+            "$ref": "#/components/schemas/ScoreMetricMetadata",
+            "description": "적합도 등급 metadata"
+          },
+          "reasons": {
+            "type": "array",
+            "description": "판정 근거. 점수 영향이 큰 순서다",
+            "items": {
+              "$ref": "#/components/schemas/SuitabilityReasonItem"
+            }
+          },
+          "weather": {
+            "$ref": "#/components/schemas/DailyWeatherItem",
+            "description": "근거로 쓴 그날의 날씨. 예보 범위 밖이면 null"
+          },
+          "congestion": {
+            "$ref": "#/components/schemas/CongestionItem",
+            "description": "근거로 쓴 혼잡도 예측"
+          },
+          "indoorAlternatives": {
+            "type": "array",
+            "description": "비 예보일 때만 채워지는 실내 대안 장소. 비가 안 오면 빈 배열",
+            "items": {
+              "$ref": "#/components/schemas/AlternativePlaceItem"
+            }
+          },
+          "petConditionApplied": {
+            "type": "boolean",
+            "description": "요청에 반려견 조건이 포함되어 판정에 반영됐는지",
+            "example": true
+          },
+          "weatherApplied": {
+            "type": "boolean",
+            "description": "날씨를 근거로 썼는지",
+            "example": true
+          },
+          "congestionApplied": {
+            "type": "boolean",
+            "description": "혼잡도를 근거로 썼는지. false 면 그 장소에 연결된 예측 데이터가 없다",
+            "example": false
+          },
+          "weatherProviderName": {
+            "type": "string",
+            "description": "날씨 정보 출처",
+            "example": "기상청 단기예보"
+          },
+          "weatherWarning": {
+            "$ref": "#/components/schemas/WeatherWarningItem",
+            "description": "발효 중인 기상특보. 없으면 null 이다. 경보면 점수를 내지 않고(0점) 산책은 위험으로 판정한다"
+          }
+        }
+      },
+      "ResponsePlaceSuitabilityResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/PlaceSuitabilityResponse"
+          }
+        }
+      },
+      "SuitabilityReasonItem": {
+        "type": "object",
+        "description": "적합도 판정 근거 DTO",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "근거 코드",
+            "example": "HEAT_RISK"
+          },
+          "name": {
+            "type": "string",
+            "description": "근거 이름",
+            "example": "고온 주의"
+          },
+          "description": {
+            "type": "string",
+            "description": "데이터 근거를 담은 설명 문장",
+            "example": "최고기온 31도 로, 더위에 약한 아이에게는 부담이 큽니다."
+          },
+          "scoreDelta": {
+            "type": "integer",
+            "format": "int32",
+            "description": "이 근거가 점수에 미친 영향. 감점이면 음수, 정보성이면 0",
+            "example": -27
+          }
+        }
+      },
+      "DailyCongestionItem": {
+        "type": "object",
+        "description": "일자별 혼잡도 예측 DTO",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "예측 일자",
+            "example": "2026-09-05"
+          },
+          "level": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "혼잡도 등급 metadata. 연결된 데이터가 없으면 UNKNOWN 이다"
+          },
+          "concentrationRate": {
+            "type": "number",
+            "format": "double",
+            "description": "관광지 집중률(0~100). 등급이 UNKNOWN 이면 null 이며, 이는 한산하다는 뜻이 아니라 데이터가 없다는 뜻이다",
+            "example": 37.2
+          }
+        }
+      },
+      "PlaceCongestionResponse": {
+        "type": "object",
+        "description": "장소 기간별 혼잡도 응답 DTO",
+        "properties": {
+          "placeId": {
+            "type": "string",
+            "description": "장소 아이디. Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로 문자열로 내린다",
+            "example": 212481712381923328
+          },
+          "fromDate": {
+            "type": "string",
+            "format": "date",
+            "description": "조회 시작일",
+            "example": "2026-09-01"
+          },
+          "toDate": {
+            "type": "string",
+            "format": "date",
+            "description": "조회 종료일",
+            "example": "2026-09-07"
+          },
+          "dailyCongestions": {
+            "type": "array",
+            "description": "일자별 혼잡도. 데이터가 없는 날짜도 UNKNOWN 으로 자리를 지킨다",
+            "items": {
+              "$ref": "#/components/schemas/DailyCongestionItem"
+            }
+          }
+        }
+      },
+      "ResponsePlaceCongestionResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/PlaceCongestionResponse"
+          }
+        }
+      },
+      "NearbyPlaceItem": {
+        "type": "object",
+        "description": "주변 장소 항목",
+        "properties": {
+          "place": {
+            "$ref": "#/components/schemas/PlaceItem",
+            "description": "장소 정보"
+          },
+          "distanceMeters": {
+            "type": "integer",
+            "format": "int32",
+            "description": "검색 중심점으로부터의 거리(m)",
+            "example": 820
+          }
+        }
+      },
+      "NearbyPlaceResponse": {
+        "type": "object",
+        "description": "주변 장소 검색 응답 DTO",
+        "properties": {
+          "places": {
+            "type": "array",
+            "description": "검색 결과 (가까운 순)",
+            "items": {
+              "$ref": "#/components/schemas/NearbyPlaceItem"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "결과 수",
+            "example": 8
+          },
+          "radius": {
+            "type": "integer",
+            "format": "int32",
+            "description": "검색 반경(m)",
+            "example": 5000
+          }
+        }
+      },
+      "ResponseNearbyPlaceResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/NearbyPlaceResponse"
+          }
+        }
+      },
+      "HourlyWalkSafetyItem": {
+        "type": "object",
+        "description": "시간대별 산책 안전 DTO",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "예보 시각",
+            "example": "2026-09-02T15:00:00"
+          },
+          "walkSafetyLevel": {
+            "$ref": "#/components/schemas/ScoreMetricMetadata",
+            "description": "산책 안전 등급 metadata"
+          },
+          "temperature": {
+            "type": "number",
+            "format": "double",
+            "description": "기온(℃)",
+            "example": 29.0
+          },
+          "estimatedPavementCelsius": {
+            "type": "number",
+            "format": "double",
+            "description": "추정 노면온도(℃). 기온에 일사와 시간대를 더해 계산한 값이며 실측이 아니다",
+            "example": 44.0
+          },
+          "precipitationProbability": {
+            "type": "integer",
+            "format": "int32",
+            "description": "강수확률(%). 원천에 없는 시각은 null",
+            "example": 20
+          }
+        }
+      },
+      "ResponseWalkTimesResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/WalkTimesResponse"
+          }
+        }
+      },
+      "WalkTimesResponse": {
+        "type": "object",
+        "description": "오늘의 산책 골든타임 응답 DTO",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time",
+            "description": "기준 시각. 이 시각 이후만 본다",
+            "example": "2026-09-02T13:20:00"
+          },
+          "hourly": {
+            "type": "array",
+            "description": "시간대별 안전 등급 곡선. 오늘 남은 예보 시각만 담긴다",
+            "items": {
+              "$ref": "#/components/schemas/HourlyWalkSafetyItem"
+            }
+          },
+          "goldenStart": {
+            "type": "string",
+            "format": "date-time",
+            "description": "골든타임 시작. 추천할 구간이 없으면 null",
+            "example": "2026-09-02T18:00:00"
+          },
+          "goldenEnd": {
+            "type": "string",
+            "format": "date-time",
+            "description": "골든타임 종료. 추천할 구간이 없으면 null",
+            "example": "2026-09-02T21:00:00"
+          },
+          "goldenLevel": {
+            "$ref": "#/components/schemas/ScoreMetricMetadata",
+            "description": "골든타임의 안전 등급 metadata. 추천할 구간이 없으면 null"
+          },
+          "weatherWarning": {
+            "$ref": "#/components/schemas/WeatherWarningItem",
+            "description": "발효 중인 기상특보. 경보면 골든타임을 주지 않는다"
+          },
+          "petConditionApplied": {
+            "type": "boolean",
+            "description": "요청에 반려견 조건이 포함되어 판정에 반영됐는지",
+            "example": true
+          }
+        }
+      },
+      "RegionWeatherItem": {
+        "type": "object",
+        "description": "권역별 날씨 비교 항목 DTO",
+        "properties": {
+          "region": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "권역 metadata"
+          },
+          "weatherScore": {
+            "type": "integer",
+            "format": "int32",
+            "description": "날씨만으로 매긴 점수(0~100). null 이면 예보를 못 받아 판정하지 않았다",
+            "example": 82
+          },
+          "skyState": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "하늘상태 metadata. 예보가 없으면 null"
+          },
+          "precipitationType": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "강수형태 metadata. 예보가 없으면 null"
+          },
+          "maxPrecipitationProbability": {
+            "type": "integer",
+            "format": "int32",
+            "description": "최고 강수확률(%)",
+            "example": 20
+          },
+          "minTemperature": {
+            "type": "number",
+            "format": "double",
+            "description": "최저기온(℃)",
+            "example": 18.0
+          },
+          "maxTemperature": {
+            "type": "number",
+            "format": "double",
+            "description": "최고기온(℃)",
+            "example": 26.0
+          },
+          "maxWindSpeed": {
+            "type": "number",
+            "format": "double",
+            "description": "최대 풍속(m/s). 중기예보 기반 날짜는 null",
+            "example": 5.2
+          },
+          "reasons": {
+            "type": "array",
+            "description": "판정 근거. 데이터 사실만 담는다 (api-design-guide §9)",
+            "items": {
+              "$ref": "#/components/schemas/SuitabilityReasonItem"
+            }
+          }
+        }
+      },
+      "RegionalWeatherResponse": {
+        "type": "object",
+        "description": "제주 권역 날씨 비교 응답 DTO",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "비교 기준 일자",
+            "example": "2026-09-02"
+          },
+          "regions": {
+            "type": "array",
+            "description": "권역별 날씨. 예보를 못 받은 권역도 점수 없이 남는다",
+            "items": {
+              "$ref": "#/components/schemas/RegionWeatherItem"
+            }
+          },
+          "recommendedRegion": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "가장 나가기 좋은 권역 metadata. 판정할 수 있는 권역이 없으면 null"
+          },
+          "recommendationReasons": {
+            "type": "array",
+            "description": "추천 이유. 그 권역의 판정 근거를 그대로 옮긴다 — 데이터 사실만 담는다",
+            "example": [
+              "강수확률 10%로 야외 일정에 무리가 없습니다."
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "weatherWarning": {
+            "$ref": "#/components/schemas/WeatherWarningItem",
+            "description": "제주에 발효 중인 기상특보. 없으면 null 이다. **경보면 recommendedRegion 이 null 이다** — 적합도는 0점, 산책은 위험이라고 하는 같은 서비스가 여기서만 나가라고 하면 안 된다"
+          }
+        }
+      },
+      "ResponseRegionalWeatherResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/RegionalWeatherResponse"
+          }
+        }
+      },
+      "NearbyFacilityItem": {
+        "type": "object",
+        "description": "주변 긴급 시설 항목 DTO",
+        "properties": {
+          "facilityId": {
+            "type": "string",
+            "description": "긴급 시설 아이디. Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로 문자열로 내린다",
+            "example": 4611686018427387904
+          },
+          "facilityType": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "시설 종류 metadata"
+          },
+          "name": {
+            "type": "string",
+            "description": "시설명",
+            "example": "제주동물병원"
+          },
+          "addr": {
+            "type": "string",
+            "description": "주소",
+            "example": "제주특별자치도 제주시 ..."
+          },
+          "lat": {
+            "type": "number",
+            "format": "double",
+            "description": "위도",
+            "example": 33.4996213
+          },
+          "lng": {
+            "type": "number",
+            "format": "double",
+            "description": "경도",
+            "example": 126.5311884
+          },
+          "tel": {
+            "type": "string",
+            "description": "전화번호",
+            "example": "064-000-0000"
+          },
+          "operatingHours": {
+            "type": "string",
+            "description": "운영시간. 원천에 정보가 없으면 null 이며, 이는 \"휴무\"가 아니라 \"확인 필요\"를 뜻한다",
+            "example": "09:00~19:00"
+          },
+          "restDate": {
+            "type": "string",
+            "description": "휴무일",
+            "example": "일요일"
+          },
+          "open24": {
+            "type": "boolean",
+            "description": "24시간 운영 여부",
+            "example": false
+          },
+          "openNow": {
+            "type": "boolean",
+            "description": "지금 영업 중인지. null 이면 영업시간 정보가 없어 판정할 수 없는 곳이다 — \"닫힘\"으로 표시하지 말고 전화 확인을 안내해야 한다",
+            "example": true
+          },
+          "operatingHoursKnown": {
+            "type": "boolean",
+            "description": "운영시간 정보 보유 여부. false 면 화면에서 \"영업시간 정보 없음\"으로 안내해야 한다",
+            "example": true
+          },
+          "distanceMeters": {
+            "type": "integer",
+            "format": "int32",
+            "description": "검색 중심점으로부터의 거리(m)",
+            "example": 1250
+          }
+        }
+      },
+      "NearbyFacilityResponse": {
+        "type": "object",
+        "description": "주변 긴급 시설 검색 응답 DTO",
+        "properties": {
+          "facilities": {
+            "type": "array",
+            "description": "검색 결과 (가까운 순). 종류를 지정하지 않으면 동물병원과 동물약국이 섞여 나온다",
+            "items": {
+              "$ref": "#/components/schemas/NearbyFacilityItem"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "결과 수",
+            "example": 5
+          },
+          "radius": {
+            "type": "integer",
+            "format": "int32",
+            "description": "검색 반경(m)",
+            "example": 10000
+          },
+          "open24Only": {
+            "type": "boolean",
+            "description": "24시간 운영으로 확인된 곳만 걸렀는지. 제주 동물병원 중 3곳뿐이라 true 로 조회하면 결과가 매우 적다",
+            "example": false
+          },
+          "providerName": {
+            "type": "string",
+            "description": "정보 출처",
+            "example": "한국문화정보원 반려동물 동반 가능 문화시설 위치 데이터"
+          }
+        }
+      },
+      "ResponseNearbyFacilityResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/NearbyFacilityResponse"
+          }
+        }
+      },
+      "EmergencyFacilityDetailResponse": {
+        "type": "object",
+        "description": "긴급 시설 상세 응답 DTO",
+        "properties": {
+          "facilityId": {
+            "type": "string",
+            "description": "긴급 시설 아이디. Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로 문자열로 내린다",
+            "example": 4611686018427387904
+          },
+          "facilityType": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "시설 종류 metadata"
+          },
+          "name": {
+            "type": "string",
+            "description": "시설명",
+            "example": "제주동물병원"
+          },
+          "addr": {
+            "type": "string",
+            "description": "주소",
+            "example": "제주특별자치도 제주시 ..."
+          },
+          "lat": {
+            "type": "number",
+            "format": "double",
+            "description": "위도",
+            "example": 33.4996213
+          },
+          "lng": {
+            "type": "number",
+            "format": "double",
+            "description": "경도",
+            "example": 126.5311884
+          },
+          "tel": {
+            "type": "string",
+            "description": "전화번호",
+            "example": "064-000-0000"
+          },
+          "operatingHours": {
+            "type": "string",
+            "description": "운영시간. 원천에 정보가 없으면 null 이며, 이는 \"휴무\"가 아니라 \"확인 필요\"를 뜻한다",
+            "example": "09:00~19:00"
+          },
+          "restDate": {
+            "type": "string",
+            "description": "휴무일",
+            "example": "일요일"
+          },
+          "open24": {
+            "type": "boolean",
+            "description": "24시간 운영 여부",
+            "example": false
+          },
+          "openNow": {
+            "type": "boolean",
+            "description": "지금 영업 중인지. null 이면 영업시간 정보가 없어 판정할 수 없는 곳이다 — \"닫힘\"으로 표시하지 말고 전화 확인을 안내해야 한다",
+            "example": true
+          },
+          "operatingHoursKnown": {
+            "type": "boolean",
+            "description": "운영시간 정보 보유 여부. false 면 화면에서 \"영업시간 정보 없음\"으로 안내해야 한다",
+            "example": true
+          }
+        }
+      },
+      "ResponseEmergencyFacilityDetailResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/EmergencyFacilityDetailResponse"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}
