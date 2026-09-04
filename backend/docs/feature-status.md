@@ -167,7 +167,7 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 > "완료" 는 코드가 `develop` 에 있고 이슈가 닫혔다는 뜻이다. 닫혔는데 체크박스가 비어 있던 14개(#4 #5 #25 #28 #34 #35 #40 #41 #57 #77 #86 #104 #106 #108)는
 > 코드로 대조해 전부 구현을 확인했다 — #40 의 "Swagger 400 응답 추가" 만 근거가 없다.
 
-**열린 것 (5)**
+**열린 것 (7)**
 
 | 이슈 | 영역 | 제목 | 상태 |
 | --- | --- | --- | --- |
@@ -175,8 +175,9 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | #88 | plan | 일정 날씨 브리핑에 체감온도 추가 | 미착수 |
 | #89 | ai | AI 초안의 WALK 항목 placeId 가 walk_course.id 와 어긋난다 | 미착수 |
 | #90 | ai | AI 일정 작업 세부 단계·일자 재생성·취소·sigunguCode | 재생성만 완료(#77), 나머지 3건 미착수 |
-| #152 | plan | 일정 저장·판정의 다중 반려견 지원 (PlanCreateRequest.petIds) | 구현 완료, PR 대기 (`features/152-plan-multi-pet.md`) |
-| #214 | auth·core | 디코딩 불가 서명 JWT 가 401 이 아니라 500 을 준다 (래퍼 없는 본문) | 구현 완료, PR 대기 — 토큰 없음 403→401 `SECURITY_001`, `HttpMessageNotReadableException` 핸들러 4 서비스 |
+| #152 | plan | 일정 저장·판정의 다중 반려견 지원 (PlanCreateRequest.petIds) | 머지됨 — 이슈 닫기 대상 (`features/152-plan-multi-pet.md`) |
+| #202 | api-gateway·plan | 게이트웨이가 /api/v1/favorites 를 라우팅하지 않는다 | 구현 완료, PR 대기 — 세 프로파일 라우트 + `GatewayRouteCoverageTest`. FE 실기기 확인은 plan-service 배포 후 |
+| #214 | auth·core | 디코딩 불가 서명 JWT 가 401 이 아니라 500 을 준다 (래퍼 없는 본문) | 머지됨 — 이슈 닫기 대상. 토큰 없음 403→401 `SECURITY_001`, `HttpMessageNotReadableException` 핸들러 4 서비스 |
 
 **완료 (41)**
 

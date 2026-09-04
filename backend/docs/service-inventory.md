@@ -85,4 +85,7 @@
 ## Cloud
 
 - `service-discovery` — Eureka 서버
-- `api-gateway` — Spring Cloud Gateway. `/api/v1/{auth,members,places,walk-courses,emergencies,plans,ai-plans,assistant}/**` 라우팅 + JWT 1차 검증 + Swagger 집계
+- `api-gateway` — Spring Cloud Gateway. `/api/v1/{auth,members,places,walk-courses,emergencies,insights,plans,favorites,ai-plans,assistant}/**` 라우팅 + JWT 1차 검증 + Swagger 집계.
+  **새 컨트롤러가 `/api/v1/` 아래 새 접두어를 열면 세 프로파일 yml 에 라우트를 같이 추가한다** — 빠지면 서비스 안에서는 동작하고
+  Swagger 에도 뜨는데 프론트는 404 다 (`/insights` 3254d13, `/favorites` #202 두 번 겪었다). `GatewayRouteCoverageTest` 가
+  컨트롤러 접두어 ⊆ 라우트를 세 프로파일에 대해 검사하므로 빠뜨리면 게이트웨이 테스트가 깨진다
