@@ -166,19 +166,16 @@ export function PlaceMapView({
 
       {/* 지도 우상단 — 데스크톱은 글자, 모바일은 아이콘 (아트보드 05 마지막 단락) */}
       <div className="absolute top-3 right-3 z-30 lg:top-4 lg:right-4">
-        <ViewToggle
-          current="map"
-          listHref={listHref}
-          mapHref={mapHref}
-          variant="text"
-          className="hidden shadow-md lg:inline-flex"
-        />
+        {/*
+          **폭에 따라 두 벌을 두지 않는다** (#240). 아이콘형 하나로 통일했다 — 지도 위에
+          글자 버튼이 얹히면 지도를 가리고, 이름은 `title` 호버 툴팁과 `aria-label` 이 맡는다.
+        */}
         <ViewToggle
           current="map"
           listHref={listHref}
           mapHref={mapHref}
           variant="icon"
-          className="shadow-md lg:hidden"
+          className="shadow-md"
         />
       </div>
 

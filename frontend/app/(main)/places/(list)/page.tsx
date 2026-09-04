@@ -97,7 +97,7 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
               {messages.place.pageTitle}
             </h1>
             {/* 세 화면이 같은 세그먼트 컨트롤을 쓴다 — 아트보드 05 마지막 단락 */}
-            <ViewToggle current="list" listHref={listHref} mapHref={mapHref} />
+            <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
           </div>
           {/* 부제는 데스크톱에서만 — 모바일은 바로 아래 칩이 같은 것을 보여준다 */}
           <p className="text-caption text-fg-muted mt-1 hidden font-medium lg:block">

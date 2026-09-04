@@ -46,7 +46,7 @@ export function PlanAddPlaceRow({
 }) {
   return (
     <Row as="li" last={last}>
-      <div className="flex items-center gap-3 py-3 lg:gap-5 lg:py-4">
+      <div className="@container flex items-center gap-3 py-3 @lg:gap-5 @lg:py-4">
         <PlaceRowContent place={place} titleHref={`/places/${place.placeId}`} />
 
         {/* w-24 고정 — 버튼이든 문구든 앞 열의 폭이 변하지 않는다 */}
