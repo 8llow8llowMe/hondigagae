@@ -311,3 +311,36 @@ describe('준비물 mock — POST /ai-plans/packing-list/{planId} (#155)', () =>
     expect(JSON.stringify(packing('223456789012000099')?.payload)).toContain('AIPLAN_016')
   })
 })
+
+describe('하루 재생성 (#128)', () => {
+  const PLAN_ID = '223456789012000001'
+
+  function base() {
+    return {
+      areaCode: '39',
+      startDate: '2026-09-12',
+      endDate: '2026-09-14',
+      petIds: ['123456789012000001'],
+    }
+  }
+
+  /*
+    `AiPlanJobProcessor:191` — 둘 중 하나만 오면 막는다. mock 이 이 짝 규칙을 지켜야
+    FE 가 한쪽만 실어 보내는 회귀를 로컬에서 잡는다.
+  */
+  it('planId 만 오면 400 이다', () => {
+    expect(submit({ ...base(), planId: PLAN_ID })?.status).toBe(400)
+  })
+
+  it('regenerateDay 만 와도 400 이다', () => {
+    expect(submit({ ...base(), regenerateDay: 2 })?.status).toBe(400)
+  })
+
+  it('일차가 기간을 넘으면 400 이다', () => {
+    expect(submit({ ...base(), planId: PLAN_ID, regenerateDay: 99 })?.status).toBe(400)
+  })
+
+  it('짝으로 오면 접수한다', () => {
+    expect(submit({ ...base(), planId: PLAN_ID, regenerateDay: 2 })?.status).toBe(202)
+  })
+})

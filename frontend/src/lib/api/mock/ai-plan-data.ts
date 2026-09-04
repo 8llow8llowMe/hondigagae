@@ -428,6 +428,36 @@ function submit(memberId: string, body: string | null): MockResult {
     }
   }
 
+  /*
+    하루 재생성 (#128). **둘은 짝이다** — `AiPlanJobProcessor:188-195` 가 하나만 오면
+    막고, 일차가 일정 기간을 넘어도 막는다.
+  */
+  const regeneratePlanId = asIdString(parsed.planId)
+  const regenerateDay = typeof parsed.regenerateDay === 'number' ? parsed.regenerateDay : null
+
+  if ((regeneratePlanId === null) !== (regenerateDay === null)) {
+    errors.push({
+      code: 'AIPLAN_016',
+      field: 'regenerateDay',
+      message: 'planId 와 regenerateDay 는 함께 지정해야 합니다.',
+    })
+  }
+
+  if (regeneratePlanId !== null && regenerateDay !== null) {
+    const target = mockStore().plans.find(
+      (candidate) => candidate.planId === regeneratePlanId && !candidate.deleted,
+    )
+    const dayCount = target === undefined ? 0 : dayCountOf(target)
+
+    if (regenerateDay < 1 || regenerateDay > dayCount) {
+      errors.push({
+        code: 'AIPLAN_015',
+        field: 'regenerateDay',
+        message: '다시 구성할 일차가 여행 기간을 벗어났습니다.',
+      })
+    }
+  }
+
   if (errors.length > 0) return failValidation(errors)
 
   /*
@@ -469,6 +499,7 @@ function submit(memberId: string, body: string | null): MockResult {
     budget,
     requestNote,
     pollCount: 0,
+    regenerateDay,
   }
   store.aiPlanJobs.push(job)
 
@@ -550,6 +581,14 @@ function totalDaysOf(job: MockAiPlanJob): number {
   return Math.max(1, Math.round((end - start) / 86_400_000) + 1)
 }
 
+/** 시작·종료일로 총 일수를 센다. 백엔드 `Plan.totalDays()` 와 같은 셈이다 (양끝 포함) */
+function dayCountOf(plan: { startDate: string; endDate: string }): number {
+  const start = Date.parse(`${plan.startDate}T00:00:00Z`)
+  const end = Date.parse(`${plan.endDate}T00:00:00Z`)
+  if (Number.isNaN(start) || Number.isNaN(end)) return 0
+  return Math.floor((end - start) / 86_400_000) + 1
+}
+
 /**
  * 초안. **실제 `MOCK_PLACES` 의 placeId 를 쓴다** — 항목 보강(`GET /places/{placeId}`)이
  * 실제 경로 그대로 돌아야 화면을 확인할 수 있다.
@@ -565,10 +604,14 @@ function draftFor(job: MockAiPlanJob): AiPlanDraft {
   // `partial` 시나리오는 마지막 하루를 비운다 — status 는 COMPLETED 다 (명세 S6)
   const made = job.scenario === 'partial' ? Math.max(1, total - 1) : total
 
-  const days: AiPlanDayItem[] = Array.from({ length: made }, (_, index) => ({
-    day: index + 1,
-    items: itemsFor(index, job.scenario === 'delisted' && index === 0),
-  }))
+  const days: AiPlanDayItem[] = Array.from({ length: made }, (_, index) => {
+    const day = index + 1
+    const items = itemsFor(index, job.scenario === 'delisted' && index === 0)
+    return {
+      day,
+      items: job.regenerateDay === day ? regeneratedDayItems() : items,
+    }
+  })
 
   return {
     days,
@@ -590,6 +633,28 @@ function draftFor(job: MockAiPlanJob): AiPlanDraft {
       },
     ],
   }
+}
+
+/**
+ * 재생성 대상 일자의 항목. **다른 날과 눈에 띄게 달라야 한다** — 비교 화면
+ * (하루재생성-세부명세 R5)이 "무엇이 바뀌는지" 를 보여 주는 것이 요점이라, mock 이
+ * 같은 항목을 주면 그 화면을 로컬에서 확인할 수 없다.
+ */
+function regeneratedDayItems(): AiPlanScheduleItem[] {
+  return [
+    {
+      itemType: 'PLACE',
+      placeId: MOCK_PLACES[2]?.placeId ?? null,
+      title: '오설록 티뮤지엄 카페',
+      note: '실내라 비가 와도 괜찮아요',
+    },
+    {
+      itemType: 'WALK',
+      placeId: MOCK_PLACES[1]?.placeId ?? null,
+      title: '사려니숲길 산책',
+      note: '그늘이 많아요',
+    },
+  ]
 }
 
 function itemsFor(dayIndex: number, delisted: boolean): AiPlanScheduleItem[] {
