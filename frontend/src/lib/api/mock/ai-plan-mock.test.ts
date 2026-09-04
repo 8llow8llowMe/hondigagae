@@ -9,10 +9,26 @@ import type { ApiResponse } from '@/types/api'
 const TOKEN = 'mock-access-900000000000000001'
 const OTHER = 'mock-access-900000000000000777'
 
+/**
+ * 오늘부터 `offset` 일 뒤 (`YYYY-MM-DD`).
+ *
+ * **고정 날짜를 쓸 수 없다.** mock 이 `START_DATE_IN_PAST`(`AIPLAN_017`)를 판정하면서
+ * 시계를 보게 되었으므로(#128), 박아 둔 날짜는 그 날이 지나는 순간 이 파일의 제출
+ * 대부분을 400 으로 만든다. mock 이 로컬 날짜로 읽으므로 같은 기준으로 만든다.
+ */
+function fromToday(offset: number): string {
+  const now = new Date()
+  const target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
+  const month = String(target.getMonth() + 1).padStart(2, '0')
+  const day = String(target.getDate()).padStart(2, '0')
+
+  return `${target.getFullYear()}-${month}-${day}`
+}
+
 const VALID = {
   areaCode: '39',
-  startDate: '2026-11-01',
-  endDate: '2026-11-03',
+  startDate: fromToday(30),
+  endDate: fromToday(32),
   petId: '123456789012000001',
 }
 
@@ -79,7 +95,7 @@ describe('AI 일정 mock — 제출은 202 다', () => {
 
   it('조건이 다르면 다른 작업이다', () => {
     const first = newJob()
-    const second = newJob({ ...VALID, endDate: '2026-11-04' })
+    const second = newJob({ ...VALID, endDate: fromToday(33) })
 
     expect(second).not.toBe(first)
   })
@@ -97,7 +113,7 @@ describe('AI 일정 mock — 제출 검증 (백엔드와 같은 경계)', () => 
   })
 
   it('날짜 역전은 필드 오류가 아니라 AIPLAN_001 이다', () => {
-    const result = submit({ ...VALID, startDate: '2026-11-05' })
+    const result = submit({ ...VALID, startDate: fromToday(40) })
 
     expect(result?.status).toBe(400)
     expect((result?.payload as ApiResponse<null>).dataHeader.resultCode).toBe('AIPLAN_001')
@@ -318,8 +334,8 @@ describe('하루 재생성 (#128)', () => {
   function base() {
     return {
       areaCode: '39',
-      startDate: '2026-09-12',
-      endDate: '2026-09-14',
+      startDate: fromToday(8),
+      endDate: fromToday(10),
       petIds: ['123456789012000001'],
     }
   }
@@ -365,6 +381,83 @@ describe('하루 재생성 (#128)', () => {
     expect(submit({ ...base(), planId: PLAN_ID, regenerateDay: 2 })?.status).toBe(202)
   })
 
+  it('일차 범위 문구를 백엔드 그대로 쓴다 — 화면이 서버 문자열을 그린다', () => {
+    const result = submit({ ...base(), planId: PLAN_ID, regenerateDay: 99 })
+
+    expect(JSON.stringify(result?.payload)).toContain('재생성할 일차가 여행 기간을 벗어났습니다.')
+  })
+
+  /*
+    **재생성이 조용히 물려받는 두 전제다.** `AiPlanJobProcessor:55-62` 가
+    `validateRegenerateRequest` **앞에서** 본다 — 재생성 제출도 예외가 아니고, 제출 본문은
+    저장된 일정의 기간을 그대로 싣는다. 그래서 **이미 시작한 여행과 11일 이상 일정은
+    재생성이 영원히 막힌다** (`dayRegenerateBlock` 이 화면 쪽 짝이다).
+
+    **날짜를 박아 두지 않는다** — 이 판정이 시계를 보므로 고정 날짜는 그 날이 지나면서
+    뜻을 잃는다 (과거 판정만 예외다: 2020년은 앞으로도 과거다).
+  */
+  it('이미 시작한 여행은 400 이고 AIPLAN_017 이다', () => {
+    const result = submit({ ...base(), startDate: '2020-01-01', endDate: '2020-01-03' })
+
+    expect(result?.status).toBe(400)
+    expect((result?.payload as ApiResponse<null>).dataHeader.resultCode).toBe('AIPLAN_017')
+  })
+
+  it('짝이 멀쩡한 재생성도 시작일이 과거면 AIPLAN_017 이다 — 재생성 검증보다 앞이다', () => {
+    const result = submit({
+      ...base(),
+      startDate: '2020-01-01',
+      endDate: '2020-01-03',
+      planId: PLAN_ID,
+      regenerateDay: 2,
+    })
+
+    expect(result?.status).toBe(400)
+    expect((result?.payload as ApiResponse<null>).dataHeader.resultCode).toBe('AIPLAN_017')
+  })
+
+  it('10일은 통과하고 11일은 AIPLAN_018 이다 — plan-service 상한(30일)과 다르다', () => {
+    const tenDays = {
+      ...base(),
+      startDate: fromToday(1),
+      endDate: fromToday(10),
+      planId: PLAN_ID,
+      regenerateDay: 2,
+    }
+    expect(submit(tenDays)?.status).toBe(202)
+
+    const elevenDays = submit({ ...tenDays, endDate: fromToday(11) })
+    expect(elevenDays?.status).toBe(400)
+    expect((elevenDays?.payload as ApiResponse<null>).dataHeader.resultCode).toBe('AIPLAN_018')
+  })
+
+  /*
+    **멱등 술어가 재생성 대상을 봐야 한다.** 실제 멱등 키는 `toParams` 해시이고 그 map 에
+    `planId`·`regenerateDay` 가 들어 있다 (`AiPlanJobProcessor:167-179`). 빠뜨리면 1일차
+    재생성이 진행 중일 때 2일차 제출이 **그 작업의 jobId** 를 받아, 비교 화면이 2일차가
+    그대로인 초안을 보여 준다 — 화면 결함으로 오진하기 쉬운 함정이다.
+  */
+  it('같은 날을 다시 제출하면 진행 중인 작업을 그대로 준다', () => {
+    const first = newJob({ ...base(), planId: PLAN_ID, regenerateDay: 2 })
+    const second = newJob({ ...base(), planId: PLAN_ID, regenerateDay: 2 })
+
+    expect(second).toBe(first)
+  })
+
+  it('다른 일차 제출은 다른 작업이다 — 1일차가 진행 중이어도 그렇다', () => {
+    const firstDay = newJob({ ...base(), planId: PLAN_ID, regenerateDay: 1 })
+    const secondDay = newJob({ ...base(), planId: PLAN_ID, regenerateDay: 2 })
+
+    expect(secondDay).not.toBe(firstDay)
+  })
+
+  it('같은 기간의 새 일정 생성이 진행 중이어도 재생성은 다른 작업이다', () => {
+    const plain = newJob(base())
+    const regenerated = newJob({ ...base(), planId: PLAN_ID, regenerateDay: 2 })
+
+    expect(regenerated).not.toBe(plain)
+  })
+
   /*
     이 작업이 존재하는 이유인 속성이다 (Interfaces 절, Task 7 브라우저 실렌더가 여기
     기댄다) — 코드 검사만으로는 증명되지 않으므로 실제로 완료까지 폴링해 초안을
@@ -372,8 +465,7 @@ describe('하루 재생성 (#128)', () => {
     나머지 일자는 같은 조건의 일반 제출과 **완전히 같아야** 한다.
   */
   it('완료된 초안에서 목표 일자만 다르고 나머지는 그대로다 (R4)', () => {
-    // 재생성 작업을 먼저 완료까지 밀어 둬야 한다 — 진행 중인 작업이 있으면 멱등성
-    // 규칙(petIds/startDate/endDate/budget 동일)이 그것을 그대로 돌려주기 때문이다.
+    // 두 제출은 `planId`·`regenerateDay` 가 달라 멱등 술어가 섞지 않는다 (위 테스트).
     const regenerated = pollTimes(newJob({ ...base(), planId: PLAN_ID, regenerateDay: 2 }), 3)
     const plain = pollTimes(newJob(base()), 3)
 

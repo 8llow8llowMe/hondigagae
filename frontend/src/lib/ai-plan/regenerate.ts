@@ -1,4 +1,5 @@
 import { toDraftItems } from '@/lib/ai-plan/draft-to-plan'
+import { isDayBefore, todayDay } from '@/lib/date/day'
 import type { AiPlanDraft, AiPlanSubmitPayload } from '@/types/ai-plan'
 import type { PlanDetail, PlanItemRequest } from '@/types/plan'
 
@@ -70,4 +71,48 @@ export function toRegeneratedDayItems(
   if (target === undefined) return null
 
   return toDraftItems({ days: [target], reasons: [] }, totalDays, excludedPlaceIds)
+}
+
+/**
+ * AI 생성이 감당하는 여행 일수 상한.
+ *
+ * `AiPlanJobProcessor.MAX_TRIP_DAYS` = 10 (후보 풀 규모 · 예보 커버리지 약 11일).
+ * **plan-service 는 30일까지 받는다** (`PlanCommandProcessor:32`) — 두 상한이 다르므로
+ * 11~30일 일정은 저장은 되지만 AI 로 다시 만들 수 없다.
+ */
+export const AI_PLAN_MAX_TRIP_DAYS = 10
+
+/** 재생성을 막는 이유. 서버 코드와 짝이다 — `AIPLAN_017` · `AIPLAN_018` */
+export type DayRegenerateBlock = 'START_DATE_IN_PAST' | 'TRIP_DAYS_EXCEEDED'
+
+/**
+ * 하루 재생성을 아예 할 수 없는 일정인가 (R6).
+ *
+ * **제출이 두 전제를 조용히 물려받는다.** `POST /ai-plans` 는 `validateRegenerateRequest`
+ * **앞에서** 시작일과 일수를 보고(`AiPlanJobProcessor:55-62`), 재생성 payload 는 저장된
+ * 일정의 `startDate`/`endDate` 를 그대로 싣는다(`toDayRegeneratePayload`). 그래서
+ * **이미 시작한 여행과 11일 이상 일정은 이 기능을 영원히 쓸 수 없다.**
+ *
+ * 이 판정이 없으면 화면은 누를 수는 있지만 늘 400 인 버튼을 내고, 사용자는 *하루만 다시
+ * 만드는* 화면에서 `여행 시작일은 오늘 이후여야 합니다` 를 읽는다. **진입점과 뷰가 같은
+ * 함수를 쓴다** — 한쪽만 고치면 주소를 손으로 넣어 들어온 사용자가 그 400 을 본다.
+ *
+ * **`today` 를 주입받는다** — 모듈 안에서 `new Date()` 를 부르면 서버 렌더와
+ * 하이드레이션이 자정 근처에서 갈린다 (`lib/plan/date.ts` 와 같은 분담).
+ *
+ * 일수는 `totalDays` 로 센다. 서버가 같은 `startDate`~`endDate` 로 계산해 주는 값이라
+ * (`PlanDetailResponse.totalDays`) payload 가 실어 보낼 기간과 같은 셈이다.
+ *
+ * @returns 막을 이유가 없으면 `null`. 날짜를 못 읽으면 막지 않는다 —
+ *   판정할 근거가 없을 때 기능을 잠그는 편이 더 위험하다 (`isPastPlan` 과 같은 판단)
+ */
+export function dayRegenerateBlock(
+  plan: Pick<PlanDetail, 'startDate' | 'totalDays'>,
+  today: Date,
+): DayRegenerateBlock | null {
+  // 서버가 보는 순서를 따른다 — 둘 다 걸리면 시작일이 이긴다
+  if (isDayBefore(plan.startDate, todayDay(today))) return 'START_DATE_IN_PAST'
+  if (plan.totalDays > AI_PLAN_MAX_TRIP_DAYS) return 'TRIP_DAYS_EXCEEDED'
+
+  return null
 }

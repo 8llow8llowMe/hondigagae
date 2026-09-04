@@ -17,6 +17,7 @@ import { PlanStatusAction } from '@/features/plan/plan-status-action'
 import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
 import { usePlanDayEdit } from '@/features/plan/use-plan-day-edit'
 import { usePlanVisit } from '@/features/plan/use-plan-visit'
+import { dayRegenerateBlock } from '@/lib/ai-plan/regenerate'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { messages } from '@/lib/messages'
 import { basisPetNameOf } from '@/lib/plan/basis-pet'
@@ -133,6 +134,14 @@ export function PlanDetailSection({
   */
   const petNames = new Map(pets.map((candidate) => [candidate.petId, candidate.name]))
 
+  /*
+    **하루 재생성 진입점을 낼 수 있는 일정인가** (#128). 제출은 이 일정의 기간을 그대로
+    싣는데 `POST /ai-plans` 가 재생성 검증 앞에서 시작일(`AIPLAN_017`)과 일수
+    (`AIPLAN_018`)를 본다 — 이미 시작한 여행과 11일 이상 일정은 눌러도 늘 400 이다.
+    **일자마다 다시 판정하지 않는다** — 일정 하나에 대한 답이 하루마다 다를 수 없다.
+  */
+  const regenerateBlocked = dayRegenerateBlock(plan, today) !== null
+
   return (
     <div className="rail-layout">
       <aside>
@@ -194,7 +203,9 @@ export function PlanDetailSection({
               onRetryVerdict={onRetryWeather}
               editing={editingDay === group.day}
               onStartEdit={() => requestEditor(group.day)}
-              regenerateHref={`/plans/${plan.planId}/days/${group.day}/regenerate`}
+              regenerateHref={
+                regenerateBlocked ? null : `/plans/${plan.planId}/days/${group.day}/regenerate`
+              }
               add={{
                 href: `/plans/${plan.planId}/days/${group.day}/add`,
                 addedPlaceIds: placeIdsOf(group.items),

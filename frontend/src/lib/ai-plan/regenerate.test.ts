@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { toDayRegeneratePayload, toRegeneratedDayItems } from '@/lib/ai-plan/regenerate'
+import {
+  dayRegenerateBlock,
+  toDayRegeneratePayload,
+  toRegeneratedDayItems,
+} from '@/lib/ai-plan/regenerate'
 import type { AiPlanDraft } from '@/types/ai-plan'
 import type { PlanDetail } from '@/types/plan'
 
@@ -173,5 +177,50 @@ describe('toRegeneratedDayItems', () => {
 
   it('기간 밖 일차는 애초에 뽑히지 않는다', () => {
     expect(toRegeneratedDayItems(draft(), 2, 1)).toEqual([])
+  })
+})
+
+/*
+  **제출이 두 전제를 조용히 물려받는다** — `POST /ai-plans` 는 `validateRegenerateRequest`
+  **앞에서** 시작일과 일수를 본다 (`AiPlanJobProcessor:55-62`). 재생성 payload 가 저장된
+  일정의 기간을 그대로 싣기 때문에, 이 판정이 없으면 이미 시작한 여행과 11일 이상 일정이
+  누를 수는 있지만 늘 400 인 버튼을 갖는다.
+*/
+describe('dayRegenerateBlock', () => {
+  const TODAY = new Date('2026-09-04T10:00:00+09:00')
+
+  it('오늘 시작하는 3일 일정은 막지 않는다', () => {
+    expect(dayRegenerateBlock({ startDate: '2026-09-04', totalDays: 3 }, TODAY)).toBeNull()
+  })
+
+  it('앞으로의 일정은 막지 않는다', () => {
+    expect(dayRegenerateBlock({ startDate: '2026-09-12', totalDays: 3 }, TODAY)).toBeNull()
+  })
+
+  /* `AIPLAN_017` — 여행 시작일은 오늘 이후여야 합니다 */
+  it('이미 시작한 여행은 막는다 — 하루가 남았어도 그렇다', () => {
+    expect(dayRegenerateBlock({ startDate: '2026-09-01', totalDays: 5 }, TODAY)).toBe(
+      'START_DATE_IN_PAST',
+    )
+  })
+
+  /* `AIPLAN_018` — AI 일정 생성은 최대 10일까지 지원합니다 (plan-service 는 30일까지 받는다) */
+  it('10일은 통과하고 11일은 막는다 — 경계가 상한 포함이다', () => {
+    expect(dayRegenerateBlock({ startDate: '2026-09-12', totalDays: 10 }, TODAY)).toBeNull()
+    expect(dayRegenerateBlock({ startDate: '2026-09-12', totalDays: 11 }, TODAY)).toBe(
+      'TRIP_DAYS_EXCEEDED',
+    )
+  })
+
+  /* 서버가 먼저 보는 순서를 따른다 — 둘 다 걸리면 시작일이 이긴다 */
+  it('둘 다 걸리면 시작일을 말한다', () => {
+    expect(dayRegenerateBlock({ startDate: '2026-08-01', totalDays: 30 }, TODAY)).toBe(
+      'START_DATE_IN_PAST',
+    )
+  })
+
+  /* 날짜를 못 읽으면 막지 않는다 — `isPastPlan` 과 같은 판단이다 */
+  it('날짜 형식이 아니면 막지 않는다', () => {
+    expect(dayRegenerateBlock({ startDate: '2026/09/12', totalDays: 3 }, TODAY)).toBeNull()
   })
 })
