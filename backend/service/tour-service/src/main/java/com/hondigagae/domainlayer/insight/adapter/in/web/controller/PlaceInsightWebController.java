@@ -65,7 +65,7 @@ public class PlaceInsightWebController {
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
         @RequestParam(required = false) LocalDate targetDate,
 
-        @Parameter(description = "[선택] 반려견 크기. SMALL 10kg 미만 · MEDIUM 10~25kg · LARGE 25kg 이상. 생략하면 크기 조건을 판정에 넣지 않습니다 장소의 입장 조건과 대조합니다", example = "SMALL")
+        @Parameter(description = "[선택] 반려견 크기. SMALL 10kg 미만 · MEDIUM 10~25kg · LARGE 25kg 이상. 생략하면 크기 조건을 판정에 넣지 않습니다. 장소의 입장 조건과 대조합니다", example = "SMALL")
         @RequestParam(required = false) PetSizeType petSizeType,
 
         @Parameter(description = "[선택, 기본 false] 더위에 민감한지. true 면 고온 감점을 키웁니다", example = "false")
@@ -77,7 +77,7 @@ public class PlaceInsightWebController {
         @Parameter(description = "[선택, 기본 false] 소음에 민감한지. true 면 혼잡도 감점을 키웁니다", example = "false")
         @RequestParam(defaultValue = "false") boolean noiseSensitive,
 
-        @Parameter(description = "[선택] 활동량. LOW 짧은 산책 선호 · MEDIUM 보통 · HIGH 긴 산책 선호. 생략하면 MEDIUM 으로 봅니다", example = "MEDIUM")
+        @Parameter(description = "[선택] 활동량. LOW 짧은 산책 선호 · MEDIUM 보통 · HIGH 긴 산책 선호. 생략하면 활동량 조건을 판정에 넣지 않습니다", example = "MEDIUM")
         @RequestParam(required = false) ActivityLevel activityLevel,
 
         @Parameter(description = "[선택] 견종 이름(한글). 단두종(불독·퍼그·시츄 등)이면 고온 위험을 높게 잡습니다. 생략하면 견종 보정 없음", example = "퍼그")
@@ -128,7 +128,7 @@ public class PlaceInsightWebController {
         @Parameter(description = "[선택, 기본 false] 소음에 민감한지", example = "false")
         @RequestParam(defaultValue = "false") boolean noiseSensitive,
 
-        @Parameter(description = "[선택] 활동량. LOW 짧은 산책 선호 · MEDIUM 보통 · HIGH 긴 산책 선호. 생략하면 MEDIUM 으로 봅니다", example = "LOW")
+        @Parameter(description = "[선택] 활동량. LOW 짧은 산책 선호 · MEDIUM 보통 · HIGH 긴 산책 선호. 생략하면 활동량 조건을 판정에 넣지 않습니다", example = "LOW")
         @RequestParam(required = false) ActivityLevel activityLevel,
 
         @Parameter(description = "[선택] 견종 이름(한글). 단두종(불독·퍼그·시츄 등)이면 고온 위험을 높게 잡습니다. 생략하면 견종 보정 없음", example = "퍼그")

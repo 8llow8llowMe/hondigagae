@@ -67,7 +67,7 @@ public class InsightWebController {
         @Parameter(description = "[선택, 기본 false] 추위에 민감한지", example = "false")
         @RequestParam(defaultValue = "false") boolean coldSensitive,
 
-        @Parameter(description = "[선택] 활동량. LOW 짧은 산책 선호 · MEDIUM 보통 · HIGH 긴 산책 선호. 생략하면 MEDIUM 으로 봅니다", example = "LOW")
+        @Parameter(description = "[선택] 활동량. LOW 짧은 산책 선호 · MEDIUM 보통 · HIGH 긴 산책 선호. 생략하면 활동량 조건을 판정에 넣지 않습니다", example = "LOW")
         @RequestParam(required = false) ActivityLevel activityLevel,
 
         @Parameter(description = "[선택] 견종 이름(한글). 단두종(불독·퍼그·시츄 등)이면 고온 위험을 높게 잡습니다. 생략하면 견종 보정 없음", example = "퍼그")
@@ -120,7 +120,7 @@ public class InsightWebController {
         @Parameter(description = "[선택, 기본 false] 추위에 민감한지", example = "false")
         @RequestParam(defaultValue = "false") boolean coldSensitive,
 
-        @Parameter(description = "[선택] 활동량. LOW 짧은 산책 선호 · MEDIUM 보통 · HIGH 긴 산책 선호. 생략하면 MEDIUM 으로 봅니다", example = "LOW")
+        @Parameter(description = "[선택] 활동량. LOW 짧은 산책 선호 · MEDIUM 보통 · HIGH 긴 산책 선호. 생략하면 활동량 조건을 판정에 넣지 않습니다", example = "LOW")
         @RequestParam(required = false) ActivityLevel activityLevel,
 
         @Parameter(description = "[선택] 견종 이름(한글). 단두종(불독·퍼그·시츄 등)이면 고온 위험을 높게 잡습니다. 생략하면 견종 보정 없음", example = "퍼그")

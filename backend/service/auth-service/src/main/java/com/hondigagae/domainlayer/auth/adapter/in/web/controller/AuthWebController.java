@@ -95,7 +95,7 @@ public class AuthWebController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Response<AuthSessionsResponse>> getMySessions(
         @AuthenticationPrincipal MemberLoginActive loginActive,
-        @Parameter(description = "[선택] refresh 토큰 쿠키. 로그인 응답의 Set-Cookie 로 심어지고 브라우저가 자동으로 보내므로 직접 넣지 않습니다 있으면 그 기기가 current=true 로 표시됩니다")
+        @Parameter(description = "[선택] refresh 토큰 쿠키. 로그인 응답의 Set-Cookie 로 심어지고 브라우저가 자동으로 보내므로 직접 넣지 않습니다. 있으면 그 기기가 current=true 로 표시됩니다")
         @CookieValue(name = RefreshCookieProvider.REFRESH_TOKEN_COOKIE, required = false) String refreshToken
     ) {
         AuthSessionsResponse response = authWebUseCase.getMySessions(loginActive.memberId(), refreshToken);
@@ -209,7 +209,7 @@ public class AuthWebController {
             + "호출 예: `POST /api/v1/auth/token/reissue` (바디 없음, 쿠키 자동 전송)")
     @PostMapping("/token/reissue")
     public ResponseEntity<Response<TokenReissueResponse>> reissueToken(
-        @Parameter(description = "[필수] refresh 토큰 쿠키. 로그인 응답의 Set-Cookie 로 심어지고 브라우저가 자동으로 보냅니다. 없으면 401")
+        @Parameter(description = "[필수] refresh 토큰 쿠키. 로그인 응답의 Set-Cookie 로 심어지고 브라우저가 자동으로 보냅니다. 없으면 401", required = true)
         @CookieValue(name = RefreshCookieProvider.REFRESH_TOKEN_COOKIE, required = false) String refreshToken) {
         AuthCookieResult<TokenReissueResponse> result = authWebUseCase.reissueToken(TokenReissueCommand.from(refreshToken));
         return ResponseEntity.ok()
