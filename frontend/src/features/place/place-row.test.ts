@@ -74,11 +74,29 @@ describe('PlaceRow — 메타 줄 (아트보드 01·03)', () => {
 })
 
 describe('PlaceRow — nullable 처리', () => {
-  it('firstImage 가 null 이면 같은 크기의 "이미지 없음" 타일을 남긴다', () => {
+  /*
+    **사진 없는 장소가 대부분이다** — dev 실측(제주 400건) 281건(70%). 그래서 그 자리를
+    카테고리 일러스트가 채운다 (`lib/place/illustration.ts`). 어느 갈래든 **타일 크기는
+    그대로**여서 행 높이가 흔들리지 않는다.
+  */
+  it('firstImage 가 null 이면 카테고리 일러스트로 같은 크기의 타일을 채운다', () => {
     const markup = render({ ...placeSummary, firstImage: null })
 
+    expect(markup).toContain('/illustrations/place-tourist_spot.svg')
+    // 장식이므로 이름을 읽히지 않는다 — 카테고리는 배지가 낱말로 말한다
+    expect(markup).toContain('alt=""')
+    expect(markup).toContain('size-20')
+  })
+
+  it('자산이 없는 카테고리는 "이미지 없음" 타일로 떨어진다 — 카테고리를 지어내지 않는다', () => {
+    const markup = render({
+      ...placeSummary,
+      firstImage: null,
+      contentType: { code: 'FESTIVAL', name: '축제·공연', description: null },
+    })
+
     expect(markup).toContain(messages.place.noImage)
-    // 행 높이가 흔들리지 않도록 타일 크기는 그대로다
+    expect(markup).not.toContain('/illustrations/')
     expect(markup).toContain('size-20')
   })
 

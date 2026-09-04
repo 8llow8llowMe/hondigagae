@@ -9,6 +9,7 @@ import { splitReasons } from '@/lib/insight/reasons'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { shortAddress } from '@/lib/place/address'
+import { placeIllustration } from '@/lib/place/illustration'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceSuitabilityResponse } from '@/types/insight'
 import type { PlaceSummary } from '@/types/place'
@@ -159,6 +160,7 @@ function Score({
 
 function Thumbnail({ place }: { place: PlaceSummary | undefined }) {
   const url = imageSrc(place?.firstImage ?? null)
+  const illustration = placeIllustration(place?.contentType.code ?? null)
 
   return (
     <span className="bg-band relative flex size-20 shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-md md:size-24">
@@ -170,6 +172,10 @@ function Thumbnail({ place }: { place: PlaceSummary | undefined }) {
           sizes="(min-width: 768px) 96px, 80px"
           className="object-cover"
         />
+      ) : illustration !== null ? (
+        /* 사진이 없으면 카테고리 일러스트 — 장식이므로 alt="" (`lib/place/illustration.ts`) */
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={illustration} alt="" className="absolute inset-0 size-full object-cover" />
       ) : (
         <>
           <ImageIcon size={20} className="text-fg-subtle" />
