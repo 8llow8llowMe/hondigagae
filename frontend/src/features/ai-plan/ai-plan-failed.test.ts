@@ -41,6 +41,14 @@ describe('AiPlanFailed — 5xx 화면과 다르게 다룬다 (명세 S7)', () =>
     expect(html).toContain(messages.aiPlan.failedManual)
   })
 
+  /*
+    **기본 목적지를 잠근다** (#128). `manualHref` 가 선택 prop 이 되면서 기본값이
+    바뀌거나 사라지면 생성 대기 화면의 세 번째 갈래가 조용히 다른 곳으로 간다.
+  */
+  it('직접 만들기는 기본으로 새 일정 만들기로 간다', () => {
+    expect(render()).toContain('href="/plans/new"')
+  })
+
   it('조건 바꾸기는 그 작업의 조건을 되살리는 주소로 간다', () => {
     expect(render()).toContain('/ai-plans/new?from=job-1')
   })
@@ -67,5 +75,20 @@ describe('AiPlanFailed — 조건을 잃은 경우', () => {
   it('조건이 없으면 "그대로 남아 있어요" 를 말하지 않는다', () => {
     const html = render({ onRetry: null, conditionSummary: null })
     expect(html).not.toContain('그대로 남아 있어요')
+  })
+})
+
+/*
+  하루 재생성(#128)이 쓰는 모양이다. **일정이 이미 있고 하루만 실패했으므로** 새 일정
+  만들기는 잘못된 목적지다 — 그 갈래를 뺄 수 있어야 한다.
+*/
+describe('AiPlanFailed — 직접 만들기 목적지가 없는 경우', () => {
+  it('manualHref 가 null 이면 직접 만들기를 주지 않는다', () => {
+    const html = render({ manualHref: null })
+
+    expect(html).not.toContain(messages.aiPlan.failedManual)
+    expect(html).not.toContain('/plans/new')
+    // 남은 갈래는 그대로다
+    expect(html).toContain(messages.aiPlan.failedChange)
   })
 })

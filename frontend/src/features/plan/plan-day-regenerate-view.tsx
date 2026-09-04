@@ -352,6 +352,10 @@ function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jo
       **`ai-plan-failed` 를 그대로 쓴다** (R6). 재시도를 주지 않는 이유는 조건을 잃어서가
       아니라 **메모를 잃어서다** — 스냅샷을 쓰지 않으므로(R2-2) 입력한 요청사항이 남아
       있지 않다. 제출 상태로 돌려보내면 메모를 다시 쓸 수 있다.
+
+      **`직접 만들기` 는 빼고 `조건 바꾸기` 하나만 남긴다.** 그 갈래는 `/plans/new`
+      (새 일정)로 가는데, 여기서는 **일정이 이미 있고 하루만 실패했다** — 새 일정을
+      만드는 것은 사용자가 하려던 일이 아니다.
     */
     return (
       <AiPlanFailed
@@ -360,6 +364,7 @@ function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jo
         onRetry={null}
         retrying={false}
         changeHref={submitHref}
+        manualHref={null}
       />
     )
   }
@@ -379,11 +384,17 @@ function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jo
 
   // ── 4. 완료 ────────────────────────────────────────────────────────────
 
-  if (nextItems === null) {
+  if (nextItems === null || nextItems.length === 0) {
     /*
       **빈 배열로 되붙이지 않는다** (R4-2). 초안에 그 날이 없으면(LLM 이 빼먹었거나
       `COMPLETED` 인데 초안이 아예 없으면) 재생성 실패로 다루고 다시 제출하게 한다 —
       다시 조회해도 같은 초안이라 `ErrorState` 의 재시도는 답이 아니다.
+
+      **빈 배열도 여기서 막는다.** `null`(그 날이 초안에 없다)과 뜻이 다르지만
+      **되붙이면 결과가 같다** — `PlanDayItemsReplacePayload` 는 빈 목록을 "그 일자 전부
+      삭제" 로 읽는다. 위 `PLAN_004` 제외(R6)가 그 날의 마지막 항목을 걸러내면 실제로
+      여기 닿는다: 사용자는 안내대로 `이 날 바꾸기` 를 다시 누를 뿐인데 그 날이 비워진다.
+      **버튼을 잠그는 것으로 대신하지 않는다** — 새는 지점이 하나뿐이어야 한다.
     */
     return (
       <EmptyState
