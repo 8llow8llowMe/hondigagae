@@ -172,13 +172,16 @@ export function PlaceDetailSection({
         <div className="rail-detail-main lg:border-border lg:border-l">
           <div className="pt-4 md:pt-6">
             {/*
-              0장이면 섹션 자체를 렌더하지 않는다 — 제목부터 시작한다 (DESIGN.md §7-3).
               **`images` 가 비면 `firstImage` 를 쓴다** — dev 실데이터는 `images` 가 전부
               빈 배열이고 사진이 `firstImage` 로만 온다 (`lib/place/gallery.ts`).
+
+              사진이 하나도 없으면 **카테고리 일러스트**가 그 자리를 채운다 (DESIGN.md §7-3).
+              그래서 `contentType.code` 를 넘긴다 — 한국어 `name` 으로 고르지 않는다.
             */}
             <PhotoGallery
               images={galleryImages(place.images, place.firstImage, place.cpyrhtDivCd)}
               title={place.title}
+              contentTypeCode={place.contentType.code}
             />
           </div>
 
@@ -336,13 +339,18 @@ export function PlaceDetailSection({
       {/*
         모바일 하단 바 — 아트보드 01 의 `position:sticky; bottom:0`.
 
-        **`bottom-16` 이다.** 고정 탭바(h-16)가 `(main)` 레이아웃에 있어 `bottom-0` 이면
-        그 아래로 깔려 가려진다.
+        **오프셋 breakpoint 와 표시 breakpoint 가 다르다.** 바 자신은 `lg` 미만에서 보이지만
+        (데스크톱은 좌측 레일이 대신한다), 바닥을 비켜야 할 이유인 **고정 탭바는 `md:hidden`
+        이라 768 에서 이미 사라진다.** 둘을 같은 값으로 묶어 `bottom-16` 만 두었더니
+        768~1023 에서 바가 바닥에서 64px 떠 그 아래로 본문이 비쳤다(실측: 900×800 에서
+        탭바 `display:none`, `#main` 의 `pb-16` 도 해제, 바는 뷰포트 바닥에서 정확히 64px).
+
+        그래서 **탭바가 있는 폭에서만 그만큼 올린다** — `md` 부터는 바닥에 붙는다.
 
         **sticky 라 자리를 스스로 차지한다** — 본문 끝에 바 높이만큼 여백을 따로 두지
         않아도 마지막 줄이 가려지지 않는다 (fixed 였다면 필요했다).
       */}
-      <PlaceDetailActionBar {...actions} className="sticky bottom-16 z-30 lg:hidden" />
+      <PlaceDetailActionBar {...actions} className="sticky bottom-16 z-30 md:bottom-0 lg:hidden" />
     </article>
   )
 }
