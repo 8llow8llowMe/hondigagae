@@ -326,28 +326,72 @@ describe('하루 재생성 (#128)', () => {
 
   /*
     `AiPlanJobProcessor:187-197` — 둘 중 하나만 오면 `REGENERATE_REQUEST_INVALID`
-    (`AIPLAN_014`)로 막는다. mock 이 이 짝 규칙과 코드를 지켜야 FE 가 한쪽만 실어
-    보내는 회귀를 로컬에서 잡는다.
+    (`AIPLAN_014`)로 막는다. **평평한 바디다** — `AiPlanExceptionHandler` 가 도메인
+    예외를 `Response.fail(errorCode.getCode(), message)` 로 응답하는 것이지 Bean
+    Validation 배치(`AIPLAN_100`/`errors[]`)가 아니다. 날짜 역전(`AIPLAN_001`)과 같은
+    형태이므로 `dataHeader.resultCode` 를 직접 확인한다.
   */
-  it('planId 만 오면 400 이고 AIPLAN_014 다', () => {
+  it('planId 만 오면 400 이고 평평한 AIPLAN_014 다', () => {
     const result = submit({ ...base(), planId: PLAN_ID })
     expect(result?.status).toBe(400)
-    expect(JSON.stringify(result?.payload)).toContain('AIPLAN_014')
+    expect((result?.payload as ApiResponse<null>).dataHeader.resultCode).toBe('AIPLAN_014')
   })
 
-  it('regenerateDay 만 와도 400 이고 AIPLAN_014 다', () => {
+  it('regenerateDay 만 와도 400 이고 평평한 AIPLAN_014 다', () => {
     const result = submit({ ...base(), regenerateDay: 2 })
     expect(result?.status).toBe(400)
-    expect(JSON.stringify(result?.payload)).toContain('AIPLAN_014')
+    expect((result?.payload as ApiResponse<null>).dataHeader.resultCode).toBe('AIPLAN_014')
   })
 
-  it('일차가 기간을 넘으면 400 이고 AIPLAN_015 다', () => {
+  /*
+    `AiPlanCreateRequest.regenerateDay:65-67` 의 `@Positive` — 실제 상수는
+    `AiPlanValidationMessage.REGENERATE_DAY_POSITIVE` = `AIPLAN_112`. 이건 Bean
+    Validation 필드 오류라 `AIPLAN_015`(범위 초과)와 다른 코드이고, `errors[]` 배치를
+    거친다.
+  */
+  it('regenerateDay 가 0 이면 400 이고 AIPLAN_112 다 (@Positive)', () => {
+    const result = submit({ ...base(), planId: PLAN_ID, regenerateDay: 0 })
+    expect(result?.status).toBe(400)
+    expect(JSON.stringify(result?.payload)).toContain('AIPLAN_112')
+  })
+
+  it('일차가 기간을 넘으면 400 이고 평평한 AIPLAN_015 다', () => {
     const result = submit({ ...base(), planId: PLAN_ID, regenerateDay: 99 })
     expect(result?.status).toBe(400)
-    expect(JSON.stringify(result?.payload)).toContain('AIPLAN_015')
+    expect((result?.payload as ApiResponse<null>).dataHeader.resultCode).toBe('AIPLAN_015')
   })
 
   it('짝으로 오면 접수한다', () => {
     expect(submit({ ...base(), planId: PLAN_ID, regenerateDay: 2 })?.status).toBe(202)
+  })
+
+  /*
+    이 작업이 존재하는 이유인 속성이다 (Interfaces 절, Task 7 브라우저 실렌더가 여기
+    기댄다) — 코드 검사만으로는 증명되지 않으므로 실제로 완료까지 폴링해 초안을
+    비교한다. 목표 일자(2일차)는 `regeneratedDayItems()` 의 고정 항목으로 바뀌고,
+    나머지 일자는 같은 조건의 일반 제출과 **완전히 같아야** 한다.
+  */
+  it('완료된 초안에서 목표 일자만 다르고 나머지는 그대로다 (R4)', () => {
+    // 재생성 작업을 먼저 완료까지 밀어 둬야 한다 — 진행 중인 작업이 있으면 멱등성
+    // 규칙(petIds/startDate/endDate/budget 동일)이 그것을 그대로 돌려주기 때문이다.
+    const regenerated = pollTimes(newJob({ ...base(), planId: PLAN_ID, regenerateDay: 2 }), 3)
+    const plain = pollTimes(newJob(base()), 3)
+
+    const regeneratedDays = regenerated.planDraft?.days ?? []
+    const plainDays = plain.planDraft?.days ?? []
+
+    expect(regeneratedDays.length).toBe(3)
+    expect(plainDays.length).toBe(3)
+
+    const targetItems = regeneratedDays.find((day) => day.day === 2)?.items ?? []
+    expect(targetItems).toHaveLength(2)
+    expect(targetItems[0]).toMatchObject({ itemType: 'PLACE', title: '오설록 티뮤지엄 카페' })
+    expect(targetItems[1]).toMatchObject({ itemType: 'WALK', title: '사려니숲길 산책' })
+
+    for (const plainDay of plainDays) {
+      if (plainDay.day === 2) continue
+      const regeneratedDay = regeneratedDays.find((day) => day.day === plainDay.day)
+      expect(regeneratedDay?.items).toEqual(plainDay.items)
+    }
   })
 })
