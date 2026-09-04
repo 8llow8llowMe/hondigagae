@@ -52,8 +52,8 @@ public class JdbcPlaceImageBulkAdapter implements PlaceImageBulkPort {
     private static final String INSERT_SQL = """
         INSERT INTO place_image (
             id, place_id, origin_img_url, small_image_url, img_name, serial_num, cpyrht_div_cd,
-            created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            synced_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW())
         """;
 
     private final JdbcTemplate jdbcTemplate;
@@ -87,10 +87,21 @@ public class JdbcPlaceImageBulkAdapter implements PlaceImageBulkPort {
             ps.setString(3, image.originImgUrl());
             ps.setString(4, image.smallImageUrl());
             ps.setString(5, image.imgName());
-            ps.setString(6, image.serialNum());
+            ps.setString(6, effectiveSerialNum(image));
             ps.setString(7, image.cpyrhtDivCd());
         });
         return images.size();
+    }
+
+    /**
+     * serialNum 이 빈 원천 행 대비 — uk_place_image_place_id_serial_num 유니크 인덱스가
+     * 빈 값 두 개를 충돌시키므로, URL 해시 앞 16자를 결정적 대체값으로 쓴다.
+     */
+    private String effectiveSerialNum(ImportedPlaceImage image) {
+        if (image.serialNum() != null && !image.serialNum().isBlank()) {
+            return image.serialNum();
+        }
+        return Long.toHexString(imageId(0L, null, image.originImgUrl()));
     }
 
     /**
