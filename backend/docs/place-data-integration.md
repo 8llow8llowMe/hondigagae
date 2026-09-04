@@ -61,7 +61,7 @@
 | 반려동물 제한사항 | `petRestriction`(신규) | 원문 보존. "야외만 반려동물 동반 가능" 15건은 부분 동반 판정에 쓴다 |
 | 장소(실내)/(실외) 여부 | `indoor` / `outdoor`(신규) | **비 오는 날 대안 추천의 근거** |
 | 반려동물 전용 정보 | `petOnly`(신규) | "반려동물 전용" 55건 |
-| 애견 동반 추가 요금 | `petExtraFee`(신규) | |
+| 애견 동반 추가 요금 | `petExtraFee`(신규) | 원문 보존. 요금 없음이 "없음" 이라는 낱말로 온다 — 뜻 해석은 tour-service `PetExtraFee` 가 판정 단계에서 한다 (#231) |
 | 휴무일 / 운영시간 | `place_intro.restDate` / `useTime` | 기존 테이블 재사용 |
 | 최종작성일 | `sourceModifiedAt` | |
 
