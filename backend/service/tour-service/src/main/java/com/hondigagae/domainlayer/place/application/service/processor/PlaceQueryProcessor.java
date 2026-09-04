@@ -115,6 +115,21 @@ public class PlaceQueryProcessor {
                 .build())
             .toList();
 
+        /*
+          place_image 는 TourAPI 추가 이미지 배치가 채우는 테이블이라 비어 있을 수 있고,
+          문화정보원·식약처 원천 장소는 추가 이미지 API 자체가 없다. 대표 이미지가 있으면
+          한 장짜리 갤러리로 폴백한다 — 프론트가 firstImage 를 따로 조립하지 않아도
+          상세 갤러리가 성립하고, 배치가 채우면 자연히 원본 목록으로 대체된다.
+        */
+        if (images.isEmpty() && place.firstImage() != null && !place.firstImage().isBlank()) {
+            images = List.of(PlaceImageInfo.builder()
+                .originImgUrl(place.firstImage())
+                .smallImageUrl(place.firstImage2())
+                .imgName(place.title())
+                .cpyrhtDivCd(place.cpyrhtDivCd())
+                .build());
+        }
+
         return PlaceDetailInfo.builder()
             .place(place)
             .intro(intro)
