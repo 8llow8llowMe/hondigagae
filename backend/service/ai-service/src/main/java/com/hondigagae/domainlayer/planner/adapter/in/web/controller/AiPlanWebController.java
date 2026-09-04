@@ -44,11 +44,15 @@ public class AiPlanWebController {
             + "**필수: areaCode, startDate, endDate (JSON 바디).** 나머지는 전부 생략 가능합니다. "
             + "반려견을 지정하지 않으면 회원의 대표 반려견 기준으로 짜고, 예산·메모를 비우면 그 조건 없이 짭니다. "
             + "시작일은 오늘 또는 그 이후여야 하고 여행 기간은 최대 10일입니다. "
+            + "sigunguCode 를 주면 그 시군구(제주시=4 · 서귀포시=3) 안에서만 후보를 고릅니다 — "
+            + "후보가 없으면 지역 전체로 넓히지 않고 AIPLAN_012 로 실패합니다. "
             + "planId 와 regenerateDay 를 함께 주면 그 일차만 다시 짜는 하루 재생성이 됩니다(하나만 주면 AIPLAN_014).\n\n"
             + "흐름\n"
             + "1. `POST /api/v1/ai-plans` → 202 + jobId (상태 PENDING)\n"
-            + "2. `GET /api/v1/ai-plans/jobs/{jobId}` 를 폴링하거나 `GET /api/v1/ai-plans/jobs/{jobId}/stream` 을 구독합니다 (PENDING → RUNNING → COMPLETED/FAILED)\n"
-            + "3. status=COMPLETED 면 planDraft 를 화면에 보여 주고, 확정하려면 plan-service 저장 API 로 넘깁니다\n\n"
+            + "2. `GET /api/v1/ai-plans/jobs/{jobId}` 를 폴링하거나 `GET /api/v1/ai-plans/jobs/{jobId}/stream` 을 구독합니다 "
+            + "(PENDING → RUNNING → COMPLETED/FAILED). RUNNING 중에는 step 으로 세부 진행을 그릴 수 있습니다\n"
+            + "3. status=COMPLETED 면 planDraft 를 화면에 보여 주고, 확정하려면 plan-service 저장 API 로 넘깁니다\n"
+            + "- 대기 중 그만두려면 `POST /api/v1/ai-plans/jobs/{jobId}/cancel`\n\n"
             + "호출 예: `POST /api/v1/ai-plans` 바디 `{\"areaCode\":\"39\",\"startDate\":\"2026-09-11\",\"endDate\":\"2026-09-13\"}`",
         security = {@SecurityRequirement(name = "bearerAuth")})
     @PostMapping
@@ -84,8 +88,10 @@ public class AiPlanWebController {
         description = "작업 상태와 결과를 조회합니다. 본인 작업만 조회할 수 있으며 타인의 jobId는 404로 응답합니다. "
             + "작업 실패는 200 OK + status=FAILED + errorCode/errorMessage 로 표현합니다.\n\n"
             + "**필수: jobId(경로).** 쿼리 파라미터는 없습니다. "
-            + "status.code 는 PENDING 대기 중 · RUNNING 생성 중 · COMPLETED 완료 · FAILED 실패 이며, "
+            + "status.code 는 PENDING 대기 중 · RUNNING 생성 중 · COMPLETED 완료 · FAILED 실패 · CANCELED 취소됨 이며, "
             + "COMPLETED 일 때만 planDraft 가, FAILED 일 때만 errorCode/errorMessage 가 채워집니다. "
+            + "RUNNING 이면 `step`·`stepOrder`·`totalSteps` 로 세부 진행을 그릴 수 있습니다 — "
+            + "**PENDING 이면 step 이 null 이니 0/1 단계로 그리지 마세요.** "
             + "대기·실행 제한 시간(기본 30초·300초)을 넘긴 작업은 조회 시점에 FAILED(AIPLAN_006)로 바뀌고, "
             + "작업 기록은 보관 기간(기본 24시간)이 지나면 사라져 404 가 됩니다.\n\n"
             + "호출 예: `GET /api/v1/ai-plans/jobs/8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00`",
@@ -97,6 +103,27 @@ public class AiPlanWebController {
         @Parameter(description = "[필수] 작업 식별자(UUID). 제출 응답의 jobId 를 그대로 복사합니다. 예시는 형식 안내용이며 실제 값은 제출 응답에서 복사합니다", required = true, example = "8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00") @PathVariable String jobId
     ) {
         AiPlanJobStatusResponse response = aiPlanWebUseCase.getJobStatus(jobId, loginActive.memberId());
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(summary = "AI 여행 일정 생성 작업 취소",
+        description = "대기·생성 중인 작업을 취소합니다. 본인 작업만 취소할 수 있으며 타인의 jobId 는 404 입니다.\n\n"
+            + "**실행 중인 AI 호출을 즉시 끊지는 못합니다.** 상태를 CANCELED 로 못 박고, 워커가 단계 경계마다 "
+            + "그것을 확인해 멈춥니다. 그래서 취소의 실익은 **가장 오래 걸리는 일정 구성(DRAFTING) 에 들어가기 전에 "
+            + "서는 것**이고, 이미 들어간 뒤라면 돌아온 결과를 버립니다 — 어느 쪽이든 planDraft 는 내려가지 않습니다.\n\n"
+            + "취소하면 중복 방지 키도 함께 풀립니다. 같은 조건으로 바로 다시 제출할 수 있습니다.\n\n"
+            + "이미 취소된 작업을 또 취소하면 200 으로 같은 상태를 돌려줍니다(멱등). "
+            + "이미 완료·실패한 작업은 **409 AIPLAN_019** 입니다 — 취소할 것이 없다는 뜻이니 화면은 결과를 보여 주면 됩니다.\n\n"
+            + "**필수: jobId(경로).** 바디와 쿼리 파라미터는 없습니다.\n\n"
+            + "호출 예: `POST /api/v1/ai-plans/jobs/8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00/cancel`",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @PostMapping("/jobs/{jobId}/cancel")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<AiPlanJobStatusResponse>> cancelJob(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "[필수] 작업 식별자(UUID). 제출 응답의 jobId 를 그대로 복사합니다", required = true, example = "8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00") @PathVariable String jobId
+    ) {
+        AiPlanJobStatusResponse response = aiPlanWebUseCase.cancelJob(jobId, loginActive.memberId());
         return ResponseEntity.ok().body(Response.success(response));
     }
 
@@ -116,7 +143,8 @@ public class AiPlanWebController {
             연결이 끊기면 GET /jobs/{jobId} 폴링으로 폴백하면 됩니다.
 
             이벤트 이름은 `job-update` 하나입니다(클라이언트는 이 이름으로 리스너를 등록합니다).
-            종료 조건: status.code 가 COMPLETED 또는 FAILED 인 이벤트를 보낸 직후 서버가 연결을 닫습니다.
+            종료 조건: status.code 가 COMPLETED / FAILED / CANCELED 인 이벤트를 보낸 직후 서버가 연결을 닫습니다.
+            취소는 별도 이벤트가 아니라 CANCELED 상태 이벤트로 옵니다 — 취소 버튼을 눌렀으면 이 이벤트로 화면을 정리하면 됩니다.
             구독 시점에 이미 종결 상태면 그 스냅샷 1회를 보내고 바로 닫습니다.
             jobId 가 없거나 타인의 것이면 스트림이 열리기 전에 일반 JSON 오류(404, AIPLAN_002)로 응답합니다.
 

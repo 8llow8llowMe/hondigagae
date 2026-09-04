@@ -13,6 +13,7 @@ public final class AiPlanValidationMessage {
     public static final String PINNED_PLACE_ID_POSITIVE = "AIPLAN_110:필수 포함 장소 식별자는 양수여야 합니다.";
     public static final String PLAN_ID_POSITIVE = "AIPLAN_111:일정 식별자는 양수여야 합니다.";
     public static final String REGENERATE_DAY_POSITIVE = "AIPLAN_112:재생성할 일차는 양수여야 합니다.";
+    public static final String SIGUNGU_CODE_LENGTH_INVALID = "AIPLAN_115:시군구 코드는 10자 이하만 가능합니다.";
 
     private AiPlanValidationMessage() {
     }

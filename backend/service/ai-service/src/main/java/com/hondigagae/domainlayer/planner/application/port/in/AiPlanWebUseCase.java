@@ -15,6 +15,12 @@ public interface AiPlanWebUseCase {
     AiPlanJobStatusResponse getJobStatus(String jobId, long memberId);
 
     /**
+     * 작업 취소. 실행 중인 LLM 호출을 끊지는 못하고, 단계 경계에서 워커가 협조적으로 선다.
+     * 이미 끝난 작업은 AIPLAN_019 (409) 다.
+     */
+    AiPlanJobStatusResponse cancelJob(String jobId, long memberId);
+
+    /**
      * 반려견 여행 준비물 목록 생성. 일정 생성과 달리 동기다 — 출력이 짧아 잡·SSE 인프라를
      * 얹는 비용이 이득보다 크다. LLM 응답이 수십 초일 수 있다.
      */

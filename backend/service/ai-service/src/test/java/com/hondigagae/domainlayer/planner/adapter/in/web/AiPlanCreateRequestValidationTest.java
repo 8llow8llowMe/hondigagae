@@ -104,7 +104,7 @@ class AiPlanCreateRequestValidationTest {
 
     private AiPlanCreateRequest request(List<Long> petIds, List<Long> pinnedPlaceIds) {
         return new AiPlanCreateRequest(
-            "39", LocalDate.of(2026, 9, 12), LocalDate.of(2026, 9, 13), null,
+            "39", null, LocalDate.of(2026, 9, 12), LocalDate.of(2026, 9, 13), null,
             null, petIds, pinnedPlaceIds, null, null, null, null);
     }
 }

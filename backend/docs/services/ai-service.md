@@ -26,6 +26,9 @@ LLM 기반 AI 기능 전담. 선정된 AI 기능의 LLM 호출·프롬프트·�
 - `POST /api/v1/ai-plans` — 일정 생성 제출 (`202` + jobId, 멱등)
   - `petIds`(최대 5) / `petId` 선택 — 둘 다 없으면 **대표 반려견**이 기본값
   - `pinnedPlaceIds`(최대 10) — 필수 포함 장소. 검색 후보에 강제 합류, 없으면 AIPLAN_013 실패
+  - `sigunguCode` 선택 — 후보를 그 시군구(제주시=4 · 서귀포시=3)로 좁힌다. 생략하면 지역 전체다.
+    **좁혀서 후보가 없으면 지역 전체로 넓히지 않고 AIPLAN_012 로 실패한다** — "제주시만" 이라는
+    요청에 서귀포 장소를 섞으면 조건을 무시한 일정이 되고 그 사실이 응답에 드러나지도 않는다
   - `planId` + `regenerateDay` — 하루 재생성. 기존 일정을 plan-service 내부 API 로 받아
     지정한 날만 새로 짠다. 일차 범위는 제출 시점에 검증(AIPLAN_014/015)
   - 검증: 시작일은 오늘 이후(AIPLAN_017), 기간은 최대 10일(AIPLAN_018) — 예보 커버리지(약 11일)와 프롬프트 규모에 맞춘 상한
@@ -37,6 +40,8 @@ LLM 기반 AI 기능 전담. 선정된 AI 기능의 LLM 호출·프롬프트·�
   일정 개요(필수)·반려견 특성·날씨 전망(관용)을 근거로 항목마다 이 여행 데이터 기반의 이유를 붙인다. 저장하지 않는 제안이다
 - `GET /api/v1/ai-plans/jobs/{jobId}` — 폴링
 - `GET /api/v1/ai-plans/jobs/{jobId}/stream` — SSE
+- `POST /api/v1/ai-plans/jobs/{jobId}/cancel` — 작업 취소. 이미 취소된 잡은 200(멱등),
+  완료·실패한 잡은 409(AIPLAN_019)
 - `POST /api/v1/ai-plans/{planId}/revisions` — 자연어 일정 수정 ("카페 말고 다른 곳")
 - `POST /api/v1/assistant/conversations` / `POST .../conversations/{id}/messages` — 상담사·비서 채팅
 - `POST /api/v1/reviews/drafts` — 후기 자동 작성
@@ -96,8 +101,8 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
 
 ## 작업 상태 전달 — SSE + 폴링 폴백
 
-- `GET /jobs/{jobId}/stream` (text/event-stream) — 구독 즉시 현재 상태 스냅샷, 이후 **상태가
-  바뀔 때만** 이벤트(PENDING→RUNNING→COMPLETED/FAILED), 종결 시 서버가 연결을 닫는다.
+- `GET /jobs/{jobId}/stream` (text/event-stream) — 구독 즉시 현재 상태 스냅샷, 이후 **상태나
+  세부 단계가 바뀔 때만** 이벤트(PENDING→RUNNING→COMPLETED/FAILED/CANCELED), 종결 시 서버가 연결을 닫는다.
   이벤트 data 는 폴링 응답의 dataBody 와 동일한 JSON 이라 FE 는 처리 코드를 공유한다.
 - 전파는 Redis pub/sub(`AiPlanJobEventPort`) — SSE 연결을 잡은 인스턴스와 워커 인스턴스가
   다를 수 있어 저장소 밖 브로드캐스트가 필요하다. 메시지에 상태를 싣지 않고 수신 시 저장소를
@@ -106,6 +111,38 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
   종결을 보장한다. 하트비트의 재확인은 멈춘 잡의 타임아웃 처리(expireIfStuck)도 겸한다.
 - 브라우저 기본 EventSource 는 Authorization 헤더를 못 실으므로 fetch 기반 SSE 클라이언트를
   쓴다. 연결이 끊기면 `GET /jobs/{jobId}` 폴링으로 폴백한다. (BossPickSeoul 동일 구조)
+
+### 세부 진행 단계 (필수)
+
+대기 화면이 진행을 그릴 수 있도록 `step` · `stepOrder` · `totalSteps` 를 함께 내린다.
+`AiPlanJobStep` 이 정본이고 값은 넷이다 — `CONDITIONS` 조건 확인 → `CANDIDATES` 후보 장소 수집
+→ `WEATHER` 날씨 전망 반영 → `DRAFTING` 일정 구성.
+
+- **선언 순서가 곧 워커의 실행 순서다.** 둘이 갈라지면 화면은 정확해 보이는 채로 거짓
+  진행률을 그리고, 그것이 이 기능을 미루던 이유다. `AiPlanWorker.toQuery` 의 줄 순서가
+  계약이고 테스트가 그 둘을 묶어 둔다 — 단계를 더하거나 순서를 바꿀 때 함께 고친다.
+- `order` 와 `total` 은 `ordinal` 과 값의 개수에서 파생한다. 손으로 적으면 값을 추가할 때
+  한쪽만 고쳐져 "5 / 4 단계" 가 나간다.
+- **PENDING 이면 `step` 이 null 이다.** 0 이나 1 로 채우면 화면이 시작한 것으로 그린다.
+- 종결 상태에서는 마지막으로 밟은 단계가 남는다 — 실패 지점을 아는 것이 진단이다.
+- 그럴듯한 이름을 늘리지 않는다. 여기 있는 단계는 워커가 실제로 밟는 단계여야 한다.
+
+### 취소는 협조적이다 (필수)
+
+`POST /jobs/{jobId}/cancel` 은 **실행 중인 스레드를 멈추지 못한다.** LLM 호출은 블로킹이고
+중간에 끊을 수단이 없다. 하는 일은 상태를 `CANCELED` 로 못 박는 것이고, 워커가 단계 경계마다
+저장소를 다시 읽어 스스로 선다.
+
+- 그래서 실익은 **가장 비싼 `DRAFTING` 에 들어가기 전에 서는 것**이다. 이미 들어간 뒤라면
+  돌아온 초안을 버리는 것까지가 전부다 — 그것마저 안 하면 사용자가 취소한 일정이 완료로 뜬다.
+- 취소는 실패가 아니다. `errorCode` 를 채우지 않는다 — 채우면 화면이 "실패했습니다" 를 띄우고
+  지표에서도 장애와 섞인다.
+- **멱등 키를 함께 풀어 준다.** 취소하고 같은 조건으로 다시 넣는 것이 취소의 주된 쓰임인데,
+  키가 남아 있으면 취소된 잡을 그대로 돌려받는다.
+- 이미 취소된 잡은 200(멱등), 완료·실패한 잡은 409(`AIPLAN_019`). 후자는 취소할 것이 없다는
+  뜻이니 화면은 결과를 보여 주면 된다.
+- `CANCELED` 는 종결 상태다 — 빠지면 대기 화면이 취소를 눌러 놓고도 하트비트 타임아웃까지
+  스트림을 열어 둔다.
 
 ## 반려견 특성 주입
 

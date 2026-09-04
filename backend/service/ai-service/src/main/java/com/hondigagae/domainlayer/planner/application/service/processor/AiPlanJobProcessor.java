@@ -110,16 +110,54 @@ public class AiPlanJobProcessor {
             throw new AiPlanException(AiPlanErrorCode.JOB_NOT_FOUND);
         }
 
-        AiPlanJob effectiveJob = expireIfStuck(job);
+        return toInfo(expireIfStuck(job));
+    }
 
+    /** 잡 하나를 응답용 Info 로. 조회와 취소가 같은 모양을 돌려주도록 한곳에 둔다. */
+    private AiPlanJobInfo toInfo(AiPlanJob job) {
         return AiPlanJobInfo.builder()
-            .jobId(effectiveJob.jobId())
-            .status(effectiveJob.status())
-            .planDraft(effectiveJob.status() == AiPlanJobStatus.COMPLETED
-                ? AiPlanDraftInfo.from(effectiveJob.planDraft()) : null)
-            .errorCode(effectiveJob.errorCode())
-            .errorMessage(effectiveJob.errorMessage())
+            .jobId(job.jobId())
+            .status(job.status())
+            .step(job.step())
+            .planDraft(job.status() == AiPlanJobStatus.COMPLETED ? AiPlanDraftInfo.from(job.planDraft()) : null)
+            .errorCode(job.errorCode())
+            .errorMessage(job.errorMessage())
             .build();
+    }
+
+    /**
+     * 사용자 취소.
+     *
+     * <p><b>실행 중인 스레드를 멈추지는 못한다.</b> LLM 호출은 블로킹이라 중간에 끊을 수단이
+     * 없다. 여기서 하는 일은 상태를 CANCELED 로 못 박는 것이고, 워커가 단계 경계마다 그것을
+     * 읽어 협조적으로 선다. 그래서 실익은 <b>가장 비싼 LLM 호출에 들어가기 전에 서는 것</b>이고,
+     * 이미 들어간 뒤라면 돌아온 결과를 버리는 것까지가 전부다.
+     *
+     * <p>멱등 키를 함께 풀어 준다 — 취소하고 같은 조건으로 다시 넣는 것이 취소의 주된 쓰임인데,
+     * 키가 남아 있으면 취소된 잡을 그대로 돌려받는다.
+     *
+     * <p>이미 취소된 잡을 또 취소하면 그대로 돌려준다(멱등). 완료·실패한 잡은 409 다 —
+     * 취소할 것이 없다는 사실을 화면이 알아야 결과를 보여 줄 수 있다.
+     */
+    public AiPlanJobInfo cancelJob(String jobId, long memberId) {
+        AiPlanJob job = aiPlanJobStorePort.findById(jobId)
+            .orElseThrow(() -> new AiPlanException(AiPlanErrorCode.JOB_NOT_FOUND));
+        if (job.memberId() == null || !job.memberId().equals(memberId)) {
+            throw new AiPlanException(AiPlanErrorCode.JOB_NOT_FOUND);
+        }
+        if (job.status() == AiPlanJobStatus.CANCELED) {
+            return toInfo(job);
+        }
+        if (!job.status().isCancelable()) {
+            throw new AiPlanException(AiPlanErrorCode.JOB_NOT_CANCELABLE);
+        }
+
+        AiPlanJob canceled = aiPlanJobStorePort.save(job.canceled(Instant.now()));
+        aiPlanJobStorePort.releaseIdempotencyKey(job.memberId(), job.requestHash());
+        aiPlanJobEventPort.publishJobUpdated(jobId);
+        log.info("AI plan job canceled by member jobId={} memberId={} statusBefore={} step={}",
+            jobId, memberId, job.status(), job.step());
+        return toInfo(canceled);
     }
 
     private AiPlanJob expireIfStuck(AiPlanJob job) {
@@ -167,6 +205,7 @@ public class AiPlanJobProcessor {
     private Map<String, String> toParams(AiPlanCreateCommand command) {
         Map<String, String> params = new LinkedHashMap<>();
         params.put("areaCode", command.areaCode());
+        params.put("sigunguCode", command.sigunguCode() == null ? "" : command.sigunguCode());
         params.put("startDate", command.startDate().toString());
         params.put("endDate", command.endDate().toString());
         params.put("budget", command.budget() == null ? "" : String.valueOf(command.budget()));

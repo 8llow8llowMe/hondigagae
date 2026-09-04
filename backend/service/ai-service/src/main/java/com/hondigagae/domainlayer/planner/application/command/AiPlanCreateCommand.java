@@ -7,6 +7,8 @@ import lombok.Builder;
 @Builder
 public record AiPlanCreateCommand(
     String areaCode,
+    // 관광 시군구코드. null 이면 지역 전체에서 후보를 고른다.
+    String sigunguCode,
     LocalDate startDate,
     LocalDate endDate,
     Long budget,
