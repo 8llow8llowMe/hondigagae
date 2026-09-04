@@ -134,9 +134,13 @@ export function PlanDayRegenerateView({
     넣거나 북마크로 들어올 수 있어 여기서도 본다. **없는 일자처럼 되돌려 보내지 않는다**:
     그쪽은 주소가 틀린 경우라 말없이 보내도 되지만, 여기는 주소가 맞고 그 날도 있으므로
     말없이 튕기면 버튼이 고장 난 것처럼 보인다 — **이유를 말한다.**
+
+    이 전제는 제출(`POST /ai-plans`)의 것이고 적용 경로(`PUT /plans/{id}/days/{day}/items`)에는
+    없다 — 이미 받아 둔 초안을 자정이 지났다는 이유로 버리지 않는다. 그래서 `jobId === null`
+    (제출 화면)일 때만 본다 — 대기·비교·적용 단계는 이 판을 거치지 않는다.
   */
   const block = dayRegenerateBlock(plan, new Date(today))
-  if (block !== null) {
+  if (jobId === null && block !== null) {
     return (
       <RegenerateShell day={day} backHref={backHref} planTitle={plan.title}>
         <EmptyState
