@@ -91,7 +91,7 @@ on/off 스위치와 스텁 어댑터는 두지 않는다(2026-09-03 제거). 프
 
 | 잡 | 대상 | 상태 |
 | --- | --- | --- |
-| `placeImportJob` | TourAPI 관광 장소 | 구현 |
+| `placeImportJob` | TourAPI 관광 장소 + 추가 이미지(detailImage2, place_image) | 구현 |
 | `cultureFacilityImportJob` | 문화정보원 문화시설 + 긴급 시설 | 구현 |
 | `petRestaurantImportJob` | 식약처 음식점 + VWorld 지오코딩 | 구현 |
 | `congestionImportJob` | 관광지 집중률 예측 + 명칭 매칭 | 구현 |

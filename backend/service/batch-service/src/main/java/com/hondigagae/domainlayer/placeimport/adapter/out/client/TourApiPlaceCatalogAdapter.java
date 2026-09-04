@@ -8,6 +8,7 @@ import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceCatalogP
 import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceCatalogQueryResult;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceContentType;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlace;
+import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlaceImage;
 import com.hondigagae.global.properties.TourApiProperties;
 import java.math.BigDecimal;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
@@ -62,6 +63,46 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
             places.add(toImportedPlace(item));
         }
         return new PlaceCatalogQueryResult(places, pageNo, numOfRows, body.path("totalCount").asInt(0));
+    }
+
+    @Override
+    public List<ImportedPlaceImage> fetchDetailImages(long contentId) {
+        String rawBody = requestRaw(buildDetailImageUri(contentId));
+        JsonNode body = parseAndValidate(rawBody);
+
+        List<ImportedPlaceImage> images = new ArrayList<>();
+        for (JsonNode item : extractItems(body)) {
+            String originImgUrl = text(item, "originimgurl");
+            // URL 없는 행은 갤러리에 그릴 수 없다 — 적재 단계에서 뺀다.
+            if (originImgUrl == null || originImgUrl.isBlank()) {
+                continue;
+            }
+            images.add(ImportedPlaceImage.builder()
+                .originImgUrl(originImgUrl)
+                .smallImageUrl(text(item, "smallimageurl"))
+                .imgName(text(item, "imgname"))
+                .serialNum(text(item, "serialnum"))
+                .cpyrhtDivCd(text(item, "cpyrhtDivCd"))
+                .build());
+        }
+        return images;
+    }
+
+    /** 추가 이미지 목록. 한 콘텐츠의 이미지는 수십 장을 넘지 않아 한 페이지(100)로 충분하다. */
+    private URI buildDetailImageUri(long contentId) {
+        String serviceKey = tourApiProperties.serviceKey();
+        if (serviceKey == null || serviceKey.isBlank()) {
+            throw new PlaceImportException(PlaceImportErrorCode.TOUR_API_SERVICE_KEY_MISSING);
+        }
+        String url = "%s/KorService2/detailImage2?serviceKey=%s&MobileOS=%s&MobileApp=%s&_type=json&contentId=%d&imageYN=Y&pageNo=1&numOfRows=100"
+            .formatted(
+                tourApiProperties.baseUrl(),
+                URLEncoder.encode(serviceKey, StandardCharsets.UTF_8),
+                tourApiProperties.mobileOs(),
+                tourApiProperties.mobileApp(),
+                contentId
+            );
+        return URI.create(url);
     }
 
     /**

@@ -13,4 +13,12 @@ public interface PlaceImportUseCase {
      * @return 적재(upsert)한 총 건수
      */
     int importPlaces(String areaCode, List<PlaceContentType> contentTypes);
+
+    /**
+     * TourAPI 원천 장소의 추가 이미지를 detailImage2 로 수집해 place_image 를 교체한다.
+     * 장소 적재 뒤에 돌아야 한다 — place 테이블의 TourAPI 행이 대상 목록이다.
+     *
+     * @return 적재한 이미지 총 장수
+     */
+    int importPlaceImages();
 }
