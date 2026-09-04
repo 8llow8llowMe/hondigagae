@@ -20,6 +20,7 @@ public class WalkTimesPresenter {
         return WalkTimesResponse.builder()
             .from(info.from())
             .hourly(info.curve().stream().map(this::toItem).toList())
+            .forecastCoverage(info.forecastCoverage().toMetadata())
             .goldenStart(golden == null ? null : golden.start())
             .goldenEnd(golden == null ? null : golden.end())
             .goldenLevel(golden == null ? null : golden.level().toScoreMetadata())
