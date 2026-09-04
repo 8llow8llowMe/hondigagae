@@ -59,6 +59,10 @@ public class AiLlmModelConfig {
                     .model(properties.model())
                     .temperature(properties.temperature())
                     .numPredict(properties.maxTokens())
+                    // 명시하지 않으면 Ollama 가 2,048 로 잡는다. 모델이 128k 를 지원하든
+                    // 그 값이 상한이 되어 프롬프트가 조용히 잘리고, 잘린 자리에 출력 스키마
+                    // 지시가 있으면 스키마 밖 응답이 돌아온다 (#232 의 AIPLAN_010).
+                    .numCtx(properties.contextTokens())
                     .build()
             )
             .build();

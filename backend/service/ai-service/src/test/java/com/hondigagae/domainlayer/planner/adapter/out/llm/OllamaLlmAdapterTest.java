@@ -12,7 +12,12 @@ import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.hondigagae.global.properties.AiLlmProperties;
+import java.net.SocketTimeoutException;
+import org.slf4j.LoggerFactory;
 import com.hondigagae.shared.travel.plan.PlanItemType;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.util.List;
@@ -45,7 +50,7 @@ class OllamaLlmAdapterTest {
 
     @BeforeEach
     void setUp() {
-        AiLlmProperties properties = new AiLlmProperties(null, null, null, null, null, null, null, null, null);
+        AiLlmProperties properties = new AiLlmProperties(null, null, null, null, null, null, null, null, null, null);
         adapter = new OllamaLlmAdapter(
             ollamaChatModel, new AiPlanPromptFactory(), properties, CircuitBreakerRegistry.ofDefaults());
     }
@@ -221,6 +226,85 @@ class OllamaLlmAdapterTest {
             .isInstanceOf(AiPlanException.class)
             .extracting(e -> ((AiPlanException) e).getErrorCode())
             .isEqualTo(AiPlanErrorCode.LLM_UNAVAILABLE);
+    }
+
+    @Test
+    @DisplayName("파싱 실패 로그에 응답 원문 앞부분과 진단 값이 남는다")
+    void logsRawResponseOnParseFailure() {
+        // 전에는 예외 메시지만 남겨 모델이 무엇을 돌려줬는지 알 수 없었다. dev 에서
+        // AIPLAN_010 을 받고도 원인을 좁힐 수단이 없었던 것이 #232 의 첫 항목이다.
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        stubResponse("죄송합니다. 일정을 만들어 드리기 전에 몇 가지 여쭙고 싶습니다.");
+
+        assertThatThrownBy(() -> adapter.generatePlanDraft(query(candidate(100L, "장소"))))
+            .isInstanceOf(AiPlanException.class);
+
+        String logged = appender.list.stream()
+            .map(ILoggingEvent::getFormattedMessage)
+            .filter(message -> message.contains("스키마로 해석할 수 없습니다"))
+            .findFirst()
+            .orElseThrow();
+        // 원문이 없으면 "JSON 이 아닌 산문" 과 "잘린 JSON" 과 "스키마가 다른 JSON" 을 가를 수 없다.
+        assertThat(logged).contains("죄송합니다");
+        // 함께 남는 값들. 이것들이 고칠 곳을 가른다 - 출력 예산인지 입력 잘림인지.
+        assertThat(logged).contains("contextTokens=").contains("finishReason=").contains("promptTokens=");
+    }
+
+    @Test
+    @DisplayName("응답 원문은 앞부분만 남긴다 — 실패가 몰릴 때 로그가 폭발하면 안 된다")
+    void truncatesRawResponseInLog() {
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        stubResponse("가".repeat(5_000));
+
+        assertThatThrownBy(() -> adapter.generatePlanDraft(query(candidate(100L, "장소"))))
+            .isInstanceOf(AiPlanException.class);
+
+        String logged = appender.list.stream()
+            .map(ILoggingEvent::getFormattedMessage)
+            .filter(message -> message.contains("스키마로 해석할 수 없습니다"))
+            .findFirst()
+            .orElseThrow();
+        assertThat(logged).contains("...(truncated)");
+        // 원문 5,000자가 그대로 실리지 않는다. 원문과 파서 메시지를 각각 500자로 끊으므로
+        // 라벨을 더해도 한 줄이 2,000자를 넘지 않는다.
+        assertThat(logged.length()).isLessThan(2_000);
+        // 잘렸어도 얼마나 길었는지는 알 수 있어야 한다.
+        assertThat(logged).contains("textLength=5000");
+    }
+
+    @Test
+    @DisplayName("읽기 타임아웃은 AIPLAN_020 으로 가른다 — 연결 불가와 할 말이 다르다")
+    void readTimeoutIsItsOwnCode() {
+        // dev 에서 두 번 실패했는데 코드가 서로 달랐고(AIPLAN_007 / AIPLAN_010) 원인을 좁힐
+        // 수 없었다(#232). 타임아웃은 "잠시 후 다시" 가 아니라 "조건을 줄여 보세요" 다.
+        when(ollamaChatModel.call(any(Prompt.class)))
+            .thenThrow(new IllegalStateException("I/O error", new SocketTimeoutException("Read timed out")));
+
+        assertThatThrownBy(() -> adapter.generatePlanDraft(query(candidate(100L, "장소"))))
+            .isInstanceOf(AiPlanException.class)
+            .extracting(e -> ((AiPlanException) e).getErrorCode())
+            .isEqualTo(AiPlanErrorCode.LLM_TIMEOUT);
+    }
+
+    @Test
+    @DisplayName("타임아웃 판정은 원인 사슬을 훑는다 — 최상위 타입만 보면 놓친다")
+    void findsTimeoutDeepInTheCauseChain() {
+        // RestClient 가 ResourceAccessException 으로 감싸고 그 안에 SocketTimeoutException 이
+        // 들어 있다. 실제 사슬은 여기보다 한두 겹 더 깊다.
+        when(ollamaChatModel.call(any(Prompt.class))).thenThrow(new IllegalStateException("outer",
+            new IllegalStateException("middle", new SocketTimeoutException("Read timed out"))));
+
+        assertThatThrownBy(() -> adapter.generatePlanDraft(query(candidate(100L, "장소"))))
+            .extracting(e -> ((AiPlanException) e).getErrorCode())
+            .isEqualTo(AiPlanErrorCode.LLM_TIMEOUT);
+    }
+
+    /** 어댑터 로거에 붙여 남은 로그를 읽는다. 파싱 실패의 진단 값이 실제로 남는지 보려면 이 방법뿐이다. */
+    private ListAppender<ILoggingEvent> attachAppender() {
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        ((Logger) LoggerFactory.getLogger(OllamaLlmAdapter.class)).addAppender(appender);
+        return appender;
     }
 
     private void stubResponse(String text) {
