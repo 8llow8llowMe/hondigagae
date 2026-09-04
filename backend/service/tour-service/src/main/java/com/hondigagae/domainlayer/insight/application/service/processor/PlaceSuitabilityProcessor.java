@@ -10,6 +10,7 @@ import com.hondigagae.domainlayer.insight.application.model.AlternativePlaceCrit
 import com.hondigagae.domainlayer.insight.application.model.PlaceInsightQuery;
 import com.hondigagae.domainlayer.insight.application.port.out.CongestionForecastPort;
 import com.hondigagae.domainlayer.insight.application.port.out.PlaceProfileQueryPort;
+import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.model.WeatherWarning;
 import com.hondigagae.domainlayer.insight.domain.model.CongestionSnapshot;
 import com.hondigagae.domainlayer.insight.domain.model.DailyWeather;
@@ -20,7 +21,6 @@ import com.hondigagae.domainlayer.insight.domain.model.SuitabilityScore;
 import com.hondigagae.global.properties.InsightProperties;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -69,7 +69,7 @@ public class PlaceSuitabilityProcessor {
             .place(place)
             .pet(query.petCondition())
             .weather(weather.daily())
-            .forecastOutOfRange(weather.outOfRange())
+            .coverage(weather.coverage())
             .congestion(congestion)
             .weatherWarning(warning)
             .thresholds(insightMapper.toThresholds(insightProperties))
@@ -101,15 +101,16 @@ public class PlaceSuitabilityProcessor {
         try {
             List<DailyWeather> dailies = weatherForecastProcessor.dailyForecastsAt(
                 place.lat(), place.lng(), place.sigunguCode());
-            Optional<DailyWeather> matched = DailyWeather.findByDate(dailies, targetDate);
-            if (matched.isPresent()) {
-                return new WeatherLookup(matched.get(), false);
-            }
-            return new WeatherLookup(null, !dailies.isEmpty());
+            return new WeatherLookup(
+                DailyWeather.findByDate(dailies, targetDate).orElse(null),
+                DailyWeather.coverageOn(dailies, targetDate));
         } catch (InsightException exception) {
+            if (exception.getErrorCode() != InsightErrorCode.WEATHER_UNAVAILABLE) {
+                throw exception;
+            }
             log.info("Suitability falls back to no-weather placeId={} date={} errorCode={}",
                 place.placeId(), targetDate, exception.getErrorCode().getCode());
-            return new WeatherLookup(null, false);
+            return new WeatherLookup(null, ForecastCoverage.UNAVAILABLE);
         }
     }
 
@@ -158,9 +159,10 @@ public class PlaceSuitabilityProcessor {
     /**
      * 예보 조회 결과. 없을 때 그 이유를 함께 들고 다니기 위한 내부 값이다.
      *
-     * @param outOfRange 예보 자체는 받았는데 그 날짜가 범위 밖이면 true (장애가 아니라 정상)
+     * @param coverage 왜 없는지. 아직 안 온 날짜인지, 이미 지난 날짜인지, 못 받은 것인지가
+     *                 사용자에게 하는 말을 가른다 ({@link ForecastCoverage})
      */
-    private record WeatherLookup(DailyWeather daily, boolean outOfRange) {
+    private record WeatherLookup(DailyWeather daily, ForecastCoverage coverage) {
 
     }
 }

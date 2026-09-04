@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.insight.domain.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.enums.PrecipitationType;
 import com.hondigagae.domainlayer.insight.domain.enums.SkyState;
 import com.hondigagae.domainlayer.insight.domain.enums.WalkSafetyReasonCode;
@@ -112,7 +113,8 @@ class WalkSafetyEvaluatorTest {
             List<WeatherForecast> hourly = sunnyDayCoolingDown();
             WalkSafetyAssessment assessment = WalkSafetyEvaluator.evaluate(
                 hourly.stream().filter(forecast -> forecast.forecastAt().getHour() == 14).findFirst().orElseThrow(),
-                hourly, PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0), false, null);
+                hourly, PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0),
+                ForecastCoverage.AVAILABLE, null);
 
             assertThat(assessment.level()).isEqualTo(WalkSafetyLevel.DANGER);
             assertThat(assessment.hasSaferWindow()).isTrue();
@@ -135,10 +137,30 @@ class WalkSafetyEvaluatorTest {
     @DisplayName("예보가 없으면 UNKNOWN 이고, 안전하다고 말하지 않는다")
     void unknownWhenNoForecast() {
         WalkSafetyAssessment assessment = WalkSafetyEvaluator.evaluate(
-            null, List.of(), PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0), true, null);
+            null, List.of(), PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0),
+            ForecastCoverage.OUT_OF_RANGE, null);
 
         assertThat(assessment.level()).isEqualTo(WalkSafetyLevel.UNKNOWN);
         assertThat(codesOf(assessment)).contains(WalkSafetyReasonCode.FORECAST_OUT_OF_RANGE);
+    }
+
+    @Test
+    @DisplayName("예보 시각대가 지난 것과 예보를 못 받은 것을 다른 근거로 말한다")
+    void separatesDayEndedFromUnavailable() {
+        // 밤 11시에 오늘을 물으면 예보 시각이 없는 것이 정상이다. 그것을 "3일 이후라 판단하지
+        // 않았다"고 하면 사용자는 오늘 날짜를 미래로 착각하고, "가져오지 못했다"고 하면
+        // 풀리지 않을 것을 계속 다시 시도한다.
+        WalkSafetyAssessment dayEnded = WalkSafetyEvaluator.evaluate(
+            null, List.of(), PetCondition.unspecified(), thresholds(), DATE.atTime(23, 30),
+            ForecastCoverage.DAY_ENDED, null);
+        WalkSafetyAssessment unavailable = WalkSafetyEvaluator.evaluate(
+            null, List.of(), PetCondition.unspecified(), thresholds(), DATE.atTime(23, 30),
+            ForecastCoverage.UNAVAILABLE, null);
+
+        assertThat(codesOf(dayEnded)).containsExactly(WalkSafetyReasonCode.FORECAST_DAY_ENDED);
+        assertThat(codesOf(unavailable)).containsExactly(WalkSafetyReasonCode.FORECAST_UNAVAILABLE);
+        assertThat(dayEnded.level()).isEqualTo(WalkSafetyLevel.UNKNOWN);
+        assertThat(unavailable.level()).isEqualTo(WalkSafetyLevel.UNKNOWN);
     }
 
     // --- fixtures ---
@@ -153,7 +175,8 @@ class WalkSafetyEvaluatorTest {
 
     private static WalkSafetyAssessment evaluate(WeatherForecast forecast, PetCondition pet, int hour) {
         return WalkSafetyEvaluator.evaluate(
-            forecast, List.of(forecast), pet, thresholds(), DATE.atTime(hour, 0), false, null);
+            forecast, List.of(forecast), pet, thresholds(), DATE.atTime(hour, 0),
+            ForecastCoverage.AVAILABLE, null);
     }
 
     private static WeatherForecast forecast(double temperature, Integer humidity, SkyState sky, int hour) {

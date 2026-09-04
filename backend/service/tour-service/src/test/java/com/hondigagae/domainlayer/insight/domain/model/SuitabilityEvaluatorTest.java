@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.insight.domain.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.enums.PrecipitationType;
 import com.hondigagae.domainlayer.insight.domain.enums.SkyState;
 import com.hondigagae.domainlayer.insight.domain.enums.SuitabilityReasonCode;
@@ -233,7 +234,8 @@ class SuitabilityEvaluatorTest {
         DailyWeather weather, boolean outOfRange, PlaceCondition place, PetCondition pet
     ) {
         return SuitabilityInput.builder()
-            .place(place).pet(pet).weather(weather).forecastOutOfRange(outOfRange)
+            .place(place).pet(pet).weather(weather)
+            .coverage(outOfRange ? ForecastCoverage.OUT_OF_RANGE : ForecastCoverage.UNAVAILABLE)
             .congestion(CongestionSnapshot.unknown(DATE)).thresholds(thresholds()).build();
     }
 

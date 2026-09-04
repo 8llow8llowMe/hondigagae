@@ -7,6 +7,7 @@ import com.hondigagae.domainlayer.insight.application.exception.InsightErrorCode
 import com.hondigagae.domainlayer.insight.application.exception.InsightException;
 import com.hondigagae.domainlayer.insight.application.mapper.InsightMapper;
 import com.hondigagae.domainlayer.insight.application.mapper.InsightMapperImpl;
+import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.enums.JejuRegion;
 import com.hondigagae.domainlayer.insight.domain.enums.SkyState;
 import com.hondigagae.domainlayer.insight.domain.model.PetCondition;
@@ -110,6 +111,25 @@ class RegionalWeatherProcessorTest {
             .isInstanceOf(InsightException.class);
     }
 
+    @Test
+    @DisplayName("밤에 다섯 권역이 모두 비어도 실패시키지 않는다")
+    void doesNotFailWhenEveryRegionOnlyHasTomorrow() {
+        // 기상청 23시 회차는 자기 발표일 행을 주지 않는다. 오늘을 물으면 다섯 권역이 모두
+        // 비는데, 그것은 장애가 아니라 밤마다 일어나는 정상 상태다. 5xx 로 올리면 비교 API 가
+        // 매일 밤 죽는 것처럼 보인다.
+        RegionalWeatherProcessor processor = processor(region -> tomorrowOnlyForecasts());
+
+        RegionalWeatherComparison comparison = processor.compare(TODAY, PetCondition.unspecified());
+
+        assertThat(comparison.regions()).hasSize(JejuRegion.values().length);
+        assertThat(comparison.regions()).noneMatch(RegionWeather::isScored);
+        assertThat(comparison.regions()).noneMatch(RegionWeather::isFailure);
+        assertThat(comparison.regions()).extracting(RegionWeather::coverage)
+            .containsOnly(ForecastCoverage.DAY_ENDED);
+        // 추천은 없다 - 근거 없이 한 곳을 지목하지 않는다.
+        assertThat(comparison.recommended()).isNull();
+    }
+
     // --- fixtures ---
 
     /** 권역별 예보 조회를 대신하는 훅. */
@@ -169,6 +189,15 @@ class RegionalWeatherProcessorTest {
     /** 전부 null 로 넘기면 record 생성자가 기본 임계값을 채운다. */
     private InsightProperties properties() {
         return new InsightProperties(null, null, null, null, null, null, null, null, null, null, null, null);
+    }
+
+    /** 23시 회차를 받은 뒤의 모습. 오늘 행이 하나도 없다. */
+    private static List<WeatherForecast> tomorrowOnlyForecasts() {
+        return List.of(WeatherForecast.builder()
+            .forecastAt(TODAY.plusDays(1).atTime(9, 0))
+            .temperature(21.0d).humidity(50).skyState(SkyState.CLEAR)
+            .precipitationProbability(10)
+            .build());
     }
 
     private static List<WeatherForecast> sunnyForecasts() {

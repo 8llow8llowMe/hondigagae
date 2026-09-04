@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.insight.domain.model;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.enums.SkyState;
 import com.hondigagae.domainlayer.insight.domain.enums.SuitabilityReasonCode;
 import com.hondigagae.domainlayer.insight.domain.enums.WalkSafetyReasonCode;
@@ -101,7 +102,8 @@ class WeatherWarningRuleTest {
         void dangerEvenWithoutForecast() {
             // 태풍경보에 "판단 근거 부족"을 돌려주면 안 된다 - 근거는 있고, 나가지 말라고 말한다.
             WalkSafetyAssessment assessment = WalkSafetyEvaluator.evaluate(
-                null, List.of(), PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0), true,
+                null, List.of(), PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0),
+                ForecastCoverage.DAY_ENDED,
                 warning(WeatherWarningType.TYPHOON, WeatherWarningLevel.WARNING));
 
             assertThat(assessment.level()).isEqualTo(WalkSafetyLevel.DANGER);
@@ -129,7 +131,8 @@ class WeatherWarningRuleTest {
                 .temperature(18.0d).humidity(50).skyState(SkyState.OVERCAST)
                 .build();
             return WalkSafetyEvaluator.evaluate(
-                mild, List.of(mild), PetCondition.unspecified(), thresholds(), DATE.atTime(9, 0), false, warning);
+                mild, List.of(mild), PetCondition.unspecified(), thresholds(), DATE.atTime(9, 0),
+                ForecastCoverage.AVAILABLE, warning);
         }
     }
 

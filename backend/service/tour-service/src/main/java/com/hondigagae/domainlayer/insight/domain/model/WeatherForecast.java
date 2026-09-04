@@ -1,8 +1,13 @@
 package com.hondigagae.domainlayer.insight.domain.model;
 
+import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.enums.PrecipitationType;
 import com.hondigagae.domainlayer.insight.domain.enums.SkyState;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.Builder;
 
 /**
@@ -36,6 +41,21 @@ public record WeatherForecast(
     Double minTemperature,
     Double maxTemperature
 ) {
+
+    /**
+     * 시각별 예보 목록이 그 날짜를 덮는지. 판정 규칙은 {@link ForecastCoverage} 한 곳에 있다.
+     *
+     * <p>{@code foldByDate} 와 같은 성격의 목록 연산이라 여기 둔다.
+     */
+    public static ForecastCoverage coverageOn(List<WeatherForecast> forecasts, LocalDate date) {
+        if (forecasts == null) {
+            return ForecastCoverage.UNAVAILABLE;
+        }
+        Set<LocalDate> dates = forecasts.stream()
+            .map(forecast -> forecast.forecastAt().toLocalDate())
+            .collect(Collectors.toSet());
+        return ForecastCoverage.of(date, dates);
+    }
 
     /** 젖는 날씨인지. 강수형태와 강수량을 함께 본다 - PTY 가 없는 시각도 있다. */
     public boolean isWet() {

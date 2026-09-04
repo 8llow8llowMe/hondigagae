@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.insight.domain.model;
 
+import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.enums.PrecipitationType;
 import com.hondigagae.domainlayer.insight.domain.enums.SkyState;
 import com.hondigagae.shared.travel.insight.ForecastSource;
@@ -61,6 +62,18 @@ public record DailyWeather(
 
     public static Optional<DailyWeather> findByDate(List<DailyWeather> dailies, LocalDate date) {
         return dailies.stream().filter(daily -> daily.date().equals(date)).findFirst();
+    }
+
+    /**
+     * 일자별 예보 목록이 그 날짜를 덮는지. 판정 규칙은 {@link ForecastCoverage} 한 곳에 있다.
+     *
+     * <p>{@code findByDate} 가 비었을 때 <b>왜</b> 비었는지를 답한다.
+     */
+    public static ForecastCoverage coverageOn(List<DailyWeather> dailies, LocalDate date) {
+        if (dailies == null) {
+            return ForecastCoverage.UNAVAILABLE;
+        }
+        return ForecastCoverage.of(date, dailies.stream().map(DailyWeather::date).collect(Collectors.toSet()));
     }
 
     /** 시각 단위 판정이 가능한 예보인지. 산책 위험도가 이 값을 본다. */

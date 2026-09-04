@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.insight.domain.model;
 
+import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.enums.WalkSafetyReasonCode;
 import com.hondigagae.shared.travel.insight.WalkSafetyLevel;
 import java.time.LocalDateTime;
@@ -30,10 +31,11 @@ public final class WalkSafetyEvaluator {
      * @param at       판정 기준 시각
      * @param hourly   같은 날의 시각별 예보. 안전 시간대를 찾는 데 쓴다
      * @param forecast 기준 시각에 가장 가까운 예보. null 이면 판단하지 않는다
+     * @param coverage 예보를 못 쓸 때 <b>왜</b> 못 쓰는지. 근거 문장이 여기서 갈린다
      */
     public static WalkSafetyAssessment evaluate(
         WeatherForecast forecast, List<WeatherForecast> hourly, PetCondition pet,
-        SuitabilityThresholds thresholds, LocalDateTime at, boolean forecastOutOfRange,
+        SuitabilityThresholds thresholds, LocalDateTime at, ForecastCoverage coverage,
         WeatherWarning warning
     ) {
         // 특보 경보는 예보보다 먼저 본다. 시각별 예보가 없어도 태풍경보에 "판단 근거 부족"을
@@ -48,13 +50,7 @@ public final class WalkSafetyEvaluator {
         }
 
         if (forecast == null || forecast.temperature() == null) {
-            return WalkSafetyAssessment.unknown(List.of(WalkSafetyReason.of(
-                forecastOutOfRange ? WalkSafetyReasonCode.FORECAST_OUT_OF_RANGE
-                    : WalkSafetyReasonCode.FORECAST_UNAVAILABLE,
-                forecastOutOfRange
-                    ? "노면 온도는 시각별 기온과 일사로 계산합니다. 3일 이후는 오전/오후 단위 예보만 있어 "
-                        + "판단하지 않았습니다 — 여행이 가까워지면 다시 확인해 주세요."
-                    : "날씨 정보를 가져오지 못해 위험도를 판단하지 못했습니다.")));
+            return WalkSafetyAssessment.unknown(List.of(missingForecastReason(coverage)));
         }
 
         List<WalkSafetyReason> reasons = new ArrayList<>();
@@ -92,6 +88,26 @@ public final class WalkSafetyEvaluator {
             .saferWindowStart(saferWindow.map(SaferWindow::start).orElse(null))
             .saferWindowEnd(saferWindow.map(SaferWindow::end).orElse(null))
             .build();
+    }
+
+    /**
+     * 예보를 못 쓴 이유. <b>셋을 뭉뚱그리지 않는다.</b>
+     *
+     * <p>예보 시간대가 지난 것(밤마다 일어나는 정상 상태)에 "3일 이후라 판단하지 않았다"고
+     * 답하면 사용자는 오늘 날짜를 미래로 착각하고, 장애라고 답하면 풀리지 않을 것을 계속
+     * 다시 시도한다. 상태마다 할 말이 다르다.
+     */
+    private static WalkSafetyReason missingForecastReason(ForecastCoverage coverage) {
+        return switch (coverage == null ? ForecastCoverage.UNAVAILABLE : coverage) {
+            case OUT_OF_RANGE -> WalkSafetyReason.of(WalkSafetyReasonCode.FORECAST_OUT_OF_RANGE,
+                "노면 온도는 시각별 기온과 일사로 계산합니다. 3일 이후는 오전/오후 단위 예보만 있어 "
+                    + "판단하지 않았습니다 — 여행이 가까워지면 다시 확인해 주세요.");
+            case DAY_ENDED -> WalkSafetyReason.of(WalkSafetyReasonCode.FORECAST_DAY_ENDED,
+                "그 날짜의 예보 시간대가 이미 지났습니다. 기상청은 23시 발표부터 다음 날 예보만 주기 때문에 "
+                    + "늦은 밤에는 오늘의 시각별 판단을 하지 않습니다 — 내일 일정으로 확인해 주세요.");
+            default -> WalkSafetyReason.of(WalkSafetyReasonCode.FORECAST_UNAVAILABLE,
+                "날씨 정보를 가져오지 못해 위험도를 판단하지 못했습니다.");
+        };
     }
 
     /**
