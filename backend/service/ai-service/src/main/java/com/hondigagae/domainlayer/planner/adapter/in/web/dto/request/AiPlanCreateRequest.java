@@ -20,6 +20,13 @@ public record AiPlanCreateRequest(
     @NotBlank(message = AiPlanValidationMessage.AREA_CODE_REQUIRED)
     String areaCode,
 
+    @Schema(description = "관광 시군구코드 (TourAPI sigunguCode, 제주시=4 · 서귀포시=3). 생략 가능. "
+        + "생략하면 지역 전체에서 후보를 고릅니다. 지정하면 그 시군구 안에서만 고르고, "
+        + "**후보가 없으면 지역 전체로 넓히지 않고 AIPLAN_012 로 실패합니다** — 조건을 무시한 일정보다 낫습니다",
+        example = "4")
+    @Size(max = 10, message = AiPlanValidationMessage.SIGUNGU_CODE_LENGTH_INVALID)
+    String sigunguCode,
+
     @Schema(description = "여행 시작일 (yyyy-MM-dd). 오늘 또는 그 이후여야 합니다", example = "2026-09-11",
         requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = AiPlanValidationMessage.START_DATE_REQUIRED)
@@ -78,6 +85,7 @@ public record AiPlanCreateRequest(
     public AiPlanCreateCommand toCommand() {
         return AiPlanCreateCommand.builder()
             .areaCode(areaCode)
+            .sigunguCode(sigunguCode)
             .startDate(startDate)
             .endDate(endDate)
             .budget(budget)

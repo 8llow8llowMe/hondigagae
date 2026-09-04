@@ -11,6 +11,9 @@ public record AiPlanJob(
     String requestHash,
     Map<String, String> requestParams,
     AiPlanJobStatus status,
+    // 지금 밟고 있는 세부 단계. PENDING 이면 아직 없다(null).
+    // 종결 상태에서는 마지막으로 밟은 단계가 남는다 - 실패 지점을 아는 것이 진단이다.
+    AiPlanJobStep step,
     String errorCode,
     String errorMessage,
     Instant createdAt,
@@ -25,6 +28,24 @@ public record AiPlanJob(
             .status(next)
             .startedAt(next == AiPlanJobStatus.RUNNING ? now : startedAt)
             .completedAt(next.isTerminal() ? now : completedAt)
+            .build();
+    }
+
+    /** 세부 단계만 옮긴다. 상태는 그대로 RUNNING 이다. */
+    public AiPlanJob atStep(AiPlanJobStep next) {
+        return toBuilder().step(next).build();
+    }
+
+    /**
+     * 사용자 취소.
+     *
+     * <p>실패가 아니므로 {@code errorCode} 를 채우지 않는다. 취소를 오류로 기록하면 화면이
+     * "실패했습니다" 를 띄우고, 지표에서도 장애와 섞인다.
+     */
+    public AiPlanJob canceled(Instant now) {
+        return toBuilder()
+            .status(AiPlanJobStatus.CANCELED)
+            .completedAt(now)
             .build();
     }
 
@@ -56,6 +77,7 @@ public record AiPlanJob(
             .requestHash(requestHash)
             .requestParams(requestParams)
             .status(status)
+            .step(step)
             .errorCode(errorCode)
             .errorMessage(errorMessage)
             .createdAt(createdAt)

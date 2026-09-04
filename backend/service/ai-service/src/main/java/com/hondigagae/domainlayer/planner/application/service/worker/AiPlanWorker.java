@@ -22,10 +22,13 @@ import java.util.List;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJob;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStatus;
+import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStep;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -68,30 +71,82 @@ public class AiPlanWorker {
             return;
         }
 
+        // 단계를 옮길 때마다 최신 잡으로 갈아 끼운다. 종결 저장이 마지막 단계 위에서
+        // 이뤄져야 어느 단계에서 실패했는지가 응답에 남는다.
+        AtomicReference<AiPlanJob> current = new AtomicReference<>(running);
         try {
+            AiPlanGenerationQuery query = toQuery(running, step -> current.set(advanceTo(current.get(), step)));
+
+            current.set(advanceTo(current.get(), AiPlanJobStep.DRAFTING));
             // LLM 포트는 domain model을 주고, 잡에도 domain 그대로 저장한다. Info 변환은 응답 조립 시점(Processor)에 한다.
-            AiPlanDraft draft = aiLlmPort.generatePlanDraft(toQuery(running.requestParams(), running.memberId()));
+            AiPlanDraft draft = aiLlmPort.generatePlanDraft(query);
             log.info("AI plan draft generated jobId={} days={}", running.jobId(),
                 draft.days() == null ? 0 : draft.days().size());
-            aiPlanJobStorePort.save(running.completedWithDraft(draft, Instant.now()));
+
+            // 가장 오래 걸리는 구간을 지나는 동안 취소됐을 수 있다. 결과로 덮어쓰지 않는다.
+            if (isCanceled(running.jobId())) {
+                log.info("AI plan job canceled during generation, discarding draft jobId={}", running.jobId());
+                return;
+            }
+            aiPlanJobStorePort.save(current.get().completedWithDraft(draft, Instant.now()));
+        } catch (JobCanceledException canceled) {
+            log.info("AI plan job canceled before step={} jobId={}", canceled.stoppedBefore, running.jobId());
         } catch (AiPlanException domainException) {
-            log.error("AI plan job failed jobId={} memberId={} errorCode={} cause={}",
-                running.jobId(), running.memberId(),
+            log.error("AI plan job failed jobId={} memberId={} step={} errorCode={} cause={}",
+                running.jobId(), running.memberId(), current.get().step(),
                 domainException.getErrorCode().getCode(), domainException.getMessage(), domainException);
-            aiPlanJobStorePort.save(running.failed(
+            aiPlanJobStorePort.save(current.get().failed(
                 domainException.getErrorCode().getCode(), domainException.getErrorCode().getMessage(), Instant.now()
             ));
         } catch (Exception unexpected) {
-            log.error("AI plan job failed unexpectedly jobId={} memberId={} type={} cause={}",
-                running.jobId(), running.memberId(),
+            log.error("AI plan job failed unexpectedly jobId={} memberId={} step={} type={} cause={}",
+                running.jobId(), running.memberId(), current.get().step(),
                 unexpected.getClass().getSimpleName(), unexpected.getMessage(), unexpected);
-            aiPlanJobStorePort.save(running.failed(
+            aiPlanJobStorePort.save(current.get().failed(
                 AiPlanErrorCode.JOB_FAILED.getCode(), AiPlanErrorCode.JOB_FAILED.getMessage(), Instant.now()
             ));
         } finally {
             aiPlanJobStorePort.releaseIdempotencyKey(running.memberId(), running.requestHash());
-            // 종결(완료/실패) 저장은 위 모든 경로에서 finally 이전에 끝난다. 여기서 한 번만 알린다.
+            // 종결(완료/실패/취소) 저장은 위 모든 경로에서 finally 이전에 끝난다. 여기서 한 번만 알린다.
             aiPlanJobEventPort.publishJobUpdated(running.jobId());
+        }
+    }
+
+    /**
+     * 다음 단계로 옮기고 화면에 알린다. <b>취소를 확인하는 지점이기도 하다.</b>
+     *
+     * <p>취소는 실행 중인 스레드를 멈추지 못한다 — LLM 호출은 블로킹이고 중간에 끊을 수단이
+     * 없다. 대신 단계 경계마다 저장소를 다시 읽어 협조적으로 멈춘다. 그래서 취소의 실익은
+     * <b>가장 비싼 LLM 호출에 들어가기 전에 서는 것</b>이고, 이미 들어간 뒤라면 돌아온 결과를
+     * 버리는 것까지가 할 수 있는 전부다. 이 성질을 응답 문서에도 적어 둔다.
+     *
+     * <p>단계마다 Redis 를 한 번 더 읽지만 왕복 네 번은 LLM 한 번에 비하면 없는 값이다.
+     */
+    private AiPlanJob advanceTo(AiPlanJob job, AiPlanJobStep step) {
+        AiPlanJob latest = aiPlanJobStorePort.findById(job.jobId()).orElse(job);
+        if (latest.status() == AiPlanJobStatus.CANCELED) {
+            throw new JobCanceledException(step);
+        }
+        AiPlanJob advanced = aiPlanJobStorePort.save(latest.atStep(step));
+        aiPlanJobEventPort.publishJobUpdated(job.jobId());
+        return advanced;
+    }
+
+    private boolean isCanceled(String jobId) {
+        return aiPlanJobStorePort.findById(jobId)
+            .map(job -> job.status() == AiPlanJobStatus.CANCELED)
+            .orElse(false);
+    }
+
+    /** 취소로 인한 중단. 실패가 아니라서 오류 경로와 섞지 않으려고 따로 둔다. */
+    private static final class JobCanceledException extends RuntimeException {
+
+        private final transient AiPlanJobStep stoppedBefore;
+
+        private JobCanceledException(AiPlanJobStep stoppedBefore) {
+            // 흐름 제어용이라 스택트레이스를 만들지 않는다.
+            super(null, null, false, false);
+            this.stoppedBefore = stoppedBefore;
         }
     }
 
@@ -101,26 +156,52 @@ public class AiPlanWorker {
      * <p>후보 조회를 어댑터가 아니라 이 계층이 하는 이유는, 어떤 데이터를 근거로 쓸지가
      * provider 세부사항이 아니라 <b>유스케이스의 결정</b>이기 때문이다. provider 를 바꿔도
      * "실제 DB 에 있는 동반 가능 장소 안에서만 고른다"는 규칙은 그대로 남아야 한다.
+     *
+     * <p><b>여기의 순서가 {@link AiPlanJobStep} 의 선언 순서다.</b> 전에는 빌더 체인 안에서
+     * 조회가 일어나 순서가 코드 모양에 묻혀 있었는데, 화면에 단계를 알리려면 순서가 눈에
+     * 보여야 한다 — 보이지 않으면 다음 사람이 줄을 옮기는 순간 진행률이 거짓이 된다.
+     *
+     * @param onStep 단계에 들어갈 때마다 부른다. 취소됐으면 여기서 흐름이 끊긴다
      */
-    private AiPlanGenerationQuery toQuery(Map<String, String> params, Long memberId) {
+    private AiPlanGenerationQuery toQuery(AiPlanJob job, Consumer<AiPlanJobStep> onStep) {
+        Map<String, String> params = job.requestParams();
+        Long memberId = job.memberId();
+
+        onStep.accept(AiPlanJobStep.CONDITIONS);
+        List<PetCondition> petConditions = loadPetConditions(params.get("petIds"), memberId);
+        Integer regenerateDay = parseNullableInt(params.get("regenerateDay"));
+        PlanOutline planOutline = loadPlanOutline(params.get("planId"), regenerateDay, memberId);
+
+        onStep.accept(AiPlanJobStep.CANDIDATES);
         String areaCode = params.get("areaCode");
+        String sigunguCode = emptyToNull(params.get("sigunguCode"));
         List<Long> pinnedPlaceIds = parseIdList(params.get("pinnedPlaceIds"));
         List<Long> favoritePlaceIds = loadFavoritePlaceIds(params.get("preferFavorites"), memberId);
-        Integer regenerateDay = parseNullableInt(params.get("regenerateDay"));
+        List<PlaceCandidate> placeCandidates =
+            loadCandidates(areaCode, sigunguCode, pinnedPlaceIds, favoritePlaceIds);
+
+        onStep.accept(AiPlanJobStep.WEATHER);
+        List<DayWeatherOutlook> weatherOutlook =
+            loadWeatherOutlook(areaCode, params.get("startDate"), params.get("endDate"));
+
         return AiPlanGenerationQuery.builder()
             .areaCode(areaCode)
             .startDate(params.get("startDate"))
             .endDate(params.get("endDate"))
             .budget(params.get("budget"))
             .requestNote(params.get("requestNote"))
-            .petConditions(loadPetConditions(params.get("petIds"), memberId))
+            .petConditions(petConditions)
             .pinnedPlaceIds(pinnedPlaceIds)
             .favoritePlaceIds(favoritePlaceIds)
-            .weatherOutlook(loadWeatherOutlook(areaCode, params.get("startDate"), params.get("endDate")))
+            .weatherOutlook(weatherOutlook)
             .regenerateDay(regenerateDay)
-            .planOutline(loadPlanOutline(params.get("planId"), regenerateDay, memberId))
-            .placeCandidates(loadCandidates(areaCode, pinnedPlaceIds, favoritePlaceIds))
+            .planOutline(planOutline)
+            .placeCandidates(placeCandidates)
             .build();
+    }
+
+    private String emptyToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     /**
@@ -243,14 +324,21 @@ public class AiPlanWorker {
      * <p>스텁은 후보를 쓰지 않으므로 부르지 않는다. 무조건 불러 두면 키 없이 띄운 로컬에서
      * tour-service 까지 함께 떠 있어야 일정 생성이 도는 셈이 되어, 스텁을 남겨 둔 이유가 사라진다.
      */
-    private List<PlaceCandidate> loadCandidates(String areaCode, List<Long> pinnedPlaceIds, List<Long> favoritePlaceIds) {
+    private List<PlaceCandidate> loadCandidates(
+        String areaCode, String sigunguCode, List<Long> pinnedPlaceIds, List<Long> favoritePlaceIds
+    ) {
         if (!aiLlmPort.requiresPlaceCandidates()) {
             return List.of();
         }
         List<PlaceCandidate> searched = placeCandidateQueryPort
-            .findPetFriendlyCandidates(areaCode, aiLlmProperties.placeCandidateSize()).stream()
+            .findPetFriendlyCandidates(areaCode, sigunguCode, aiLlmProperties.placeCandidateSize()).stream()
             .map(this::toCandidate)
             .toList();
+        if (sigunguCode != null && searched.isEmpty()) {
+            // 지역 전체로 넓히지 않는다. 사용자가 "제주시만" 이라고 한 요청에 서귀포 장소를
+            // 섞으면 조건을 무시한 일정이 되고, 그 사실이 응답에 드러나지도 않는다.
+            log.warn("No candidates in the requested sigungu areaCode={} sigunguCode={}", areaCode, sigunguCode);
+        }
         if (pinnedPlaceIds.isEmpty()) {
             return mergeFavorites(searched, favoritePlaceIds);
         }

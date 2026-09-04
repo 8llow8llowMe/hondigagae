@@ -13,6 +13,7 @@ import com.hondigagae.domainlayer.planner.application.info.PackingListInfo;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanJobInfo;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanSubmissionInfo;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStatus;
+import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStep;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanSubmissionStatus;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -30,9 +31,14 @@ public class AiPlanPresenter {
 
     public AiPlanJobStatusResponse toJobStatusResponse(AiPlanJobInfo info) {
         AiPlanJobStatus status = info.status();
+        AiPlanJobStep step = info.step();
         return AiPlanJobStatusResponse.builder()
             .jobId(info.jobId())
             .status(CodeNameDescriptionMetadata.of(status.name(), status.getDisplayName(), status.getDescription()))
+            // 아직 시작하지 않았으면(PENDING) 단계가 없다. 0 이나 1 로 채우면 화면이 시작한 것으로 그린다.
+            .step(step == null ? null : step.toMetadata())
+            .stepOrder(step == null ? null : step.order())
+            .totalSteps(AiPlanJobStep.total())
             .planDraft(toDraftResponse(info.planDraft()))
             .errorCode(info.errorCode())
             .errorMessage(info.errorMessage())

@@ -31,6 +31,11 @@ public class AiPlanWebFacade implements AiPlanWebUseCase {
     }
 
     @Override
+    public AiPlanJobStatusResponse cancelJob(String jobId, long memberId) {
+        return aiPlanPresenter.toJobStatusResponse(aiPlanJobProcessor.cancelJob(jobId, memberId));
+    }
+
+    @Override
     public AiPlanJobStatusResponse getJobStatus(String jobId, long memberId) {
         AiPlanJobInfo jobInfo = aiPlanJobProcessor.getJobInfo(jobId, memberId);
         return aiPlanPresenter.toJobStatusResponse(jobInfo);

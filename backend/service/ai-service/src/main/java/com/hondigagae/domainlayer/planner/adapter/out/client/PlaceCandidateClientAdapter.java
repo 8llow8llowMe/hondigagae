@@ -27,13 +27,13 @@ public class PlaceCandidateClientAdapter implements PlaceCandidateQueryPort {
     private final InternalResponseSupport internalResponseSupport;
 
     @Override
-    public List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, int size) {
+    public List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, String sigunguCode, int size) {
         PlaceSliceClientResponse body = internalResponseSupport.requestAndUnwrapOrNull(
             InternalResponseSupport.TOUR_SERVICE,
-            () -> placeCandidateClient.searchPlaces(areaCode, PET_ALLOWED, size));
+            () -> placeCandidateClient.searchPlaces(areaCode, sigunguCode, PET_ALLOWED, size));
 
         if (body == null || body.contents() == null) {
-            log.warn("Place candidates empty areaCode={} size={}", areaCode, size);
+            log.warn("Place candidates empty areaCode={} sigunguCode={} size={}", areaCode, sigunguCode, size);
             return List.of();
         }
         return body.contents().stream()

@@ -16,10 +16,12 @@ import java.util.List;
 public interface PlaceCandidateQueryPort {
 
     /**
-     * @param areaCode 관광 지역코드 (제주=39)
-     * @param size     후보 개수. 프롬프트 토큰과 선택지 다양성의 절충이다
+     * @param areaCode    관광 지역코드 (제주=39)
+     * @param sigunguCode 관광 시군구코드. null 이면 지역 전체다. 좁히면 후보 풀도 좁아지므로
+     *                    <b>넓히는 폴백을 두지 않는다</b> — 조건을 무시한 일정이 되기 때문이다
+     * @param size        후보 개수. 프롬프트 토큰과 선택지 다양성의 절충이다
      */
-    List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, int size);
+    List<PlaceCandidateQueryResult> findPetFriendlyCandidates(String areaCode, String sigunguCode, int size);
 
     /**
      * 아이디로 후보를 직접 가져온다 — 사용자가 필수 포함으로 지정한 장소는 검색 상위 N 에

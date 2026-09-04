@@ -19,9 +19,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 )
 public interface PlaceCandidateClient {
 
+    /**
+     * @param sigunguCode null 이면 Feign 이 쿼리에서 아예 뺀다 — tour-service 쪽 선택 파라미터라
+     *                    빈 문자열을 보내면 "빈 시군구" 로 걸러질 위험이 있다
+     */
     @GetMapping("/api/v1/places")
     Response<PlaceSliceClientResponse> searchPlaces(
         @RequestParam("areaCode") String areaCode,
+        @RequestParam(value = "sigunguCode", required = false) String sigunguCode,
         @RequestParam("petAllowanceType") String petAllowanceType,
         @RequestParam("size") int size
     );

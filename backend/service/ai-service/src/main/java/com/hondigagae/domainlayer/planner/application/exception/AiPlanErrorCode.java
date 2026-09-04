@@ -26,6 +26,8 @@ public enum AiPlanErrorCode {
     PLAN_OUTLINE_UNAVAILABLE("AIPLAN_016", "재생성할 일정을 찾을 수 없습니다. 삭제되었거나 잘못된 일정입니다.", HttpStatus.UNPROCESSABLE_ENTITY),
     START_DATE_IN_PAST("AIPLAN_017", "여행 시작일은 오늘 이후여야 합니다.", HttpStatus.BAD_REQUEST),
     TRIP_DAYS_EXCEEDED("AIPLAN_018", "AI 일정 생성은 최대 10일까지 지원합니다.", HttpStatus.BAD_REQUEST),
+    // 이미 끝난 작업의 취소. 400 이 아니라 409 다 - 요청이 잘못된 것이 아니라 대상의 상태가 지나간 것이다.
+    JOB_NOT_CANCELABLE("AIPLAN_019", "이미 끝난 작업은 취소할 수 없습니다.", HttpStatus.CONFLICT),
 
     // 요청 검증(Bean Validation) 전용 코드 — 1xx 대역.
     INVALID_REQUEST("AIPLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
