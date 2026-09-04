@@ -24,7 +24,11 @@ import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { planKeys } from '@/features/plan/queries'
 import { usePlanDetail } from '@/features/plan/use-plan-detail'
 import { isJobFailed } from '@/lib/ai-plan/job'
-import { toDayRegeneratePayload, toRegeneratedDayItems } from '@/lib/ai-plan/regenerate'
+import {
+  dayRegenerateBlock,
+  toDayRegeneratePayload,
+  toRegeneratedDayItems,
+} from '@/lib/ai-plan/regenerate'
 import { submitAiPlan } from '@/lib/api/ai-plan'
 import { ApiError } from '@/lib/api/error'
 import { replaceDayItems } from '@/lib/api/plan'
@@ -51,7 +55,19 @@ import type { PlanDetail, PlanItemDetail, PlanItemRequest } from '@/types/plan'
  * `planId` 가 그 역할을 한다 — 조건이 전부 일정에서 다시 나오고 되붙이기에는 항목만
  * 있으면 된다. 보관할 것이 없으므로 보관하지 않는다.
  */
-export function PlanDayRegenerateView({ planId, day }: { planId: string; day: number }) {
+export function PlanDayRegenerateView({
+  planId,
+  day,
+  today,
+}: {
+  planId: string
+  day: number
+  /**
+   * 서버가 만든 ISO 시각 (#128). **클라이언트가 따로 `new Date()` 를 부르지 않는다** —
+   * 자정 근처에서 서버 렌더와 하이드레이션의 판정이 하루 갈린다 (일정 상세와 같은 결정).
+   */
+  today: string
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const detail = usePlanDetail(planId)
@@ -108,6 +124,36 @@ export function PlanDayRegenerateView({ planId, day }: { planId: string; day: nu
 
   // 없는 일자다 — 위 effect 가 일정으로 보내는 중이라 화면을 세우지 않는다 (R2)
   if (outOfRange) return null
+
+  /*
+    **제출의 두 전제를 화면이 먼저 말한다** (R6). `POST /ai-plans` 는 재생성 검증 앞에서
+    시작일(`AIPLAN_017`)과 일수(`AIPLAN_018`)를 보고, 제출 본문은 이 일정의 기간을 그대로
+    싣는다 — 막힌 일정에서는 무엇을 눌러도 400 이다.
+
+    **진입점을 감추는 것만으로 끝나지 않는다** (`plan-detail-section.tsx`) — 주소를 손으로
+    넣거나 북마크로 들어올 수 있어 여기서도 본다. **없는 일자처럼 되돌려 보내지 않는다**:
+    그쪽은 주소가 틀린 경우라 말없이 보내도 되지만, 여기는 주소가 맞고 그 날도 있으므로
+    말없이 튕기면 버튼이 고장 난 것처럼 보인다 — **이유를 말한다.**
+  */
+  const block = dayRegenerateBlock(plan, new Date(today))
+  if (block !== null) {
+    return (
+      <RegenerateShell day={day} backHref={backHref} planTitle={plan.title}>
+        <EmptyState
+          title={
+            block === 'START_DATE_IN_PAST'
+              ? messages.plan.regenerateDayPastPlan
+              : messages.plan.regenerateDayTooLong
+          }
+          action={
+            <ButtonLink href={backHref} variant="secondary">
+              {messages.plan.addPlaceBack}
+            </ButtonLink>
+          }
+        />
+      </RegenerateShell>
+    )
+  }
 
   return (
     <RegenerateShell day={day} backHref={backHref} planTitle={plan.title}>
@@ -262,7 +308,7 @@ function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jo
         : { days: draft.days.filter((entry) => entry.day === day), reasons: [] },
     [draft, day],
   )
-  const { delistedPlaceIds } = useDraftPlaces(dayDraft)
+  const { delistedPlaceIds, loading: placesLoading } = useDraftPlaces(dayDraft)
 
   /*
     **`null` 과 빈 배열의 뜻이 다르다** (R4-2). `null` 은 초안에 그 날이 없다는 뜻이고,
@@ -303,24 +349,37 @@ function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jo
       // 끝난 작업을 히스토리에 남기지 않는다 (R8). 바꾼 일자로 앵커 스크롤한다
       router.replace(`/plans/${plan.planId}#${planDayAnchorId(day)}`)
     } catch (cause) {
-      setSaveError(
-        toPlanDaySaveError(cause, {
-          retriable: messages.plan.errorDescription,
-          /*
-            **편집모드 문구를 쓴다** — 그쪽처럼 여기도 뺄 목록(`이렇게 바뀌어요`)이
-            화면에 있고, 아래에서 그 항목을 실제로 빼 준다.
-          */
-          missingPlace: messages.plan.editMissingPlaceError,
-        }),
-      )
-
       /*
         **`PLAN_004` 여도 초안을 버리지 않는다** (R6). 서버는 어느 장소인지 말해 주지
         않으므로 담기 화면과 같은 방식으로 짚는다 — 조회되지 않는 장소를 빼고 다시
         만든 항목으로 같은 버튼을 한 번 더 누르면 저장된다.
       */
-      if (cause instanceof ApiError && cause.resultCode === 'PLAN_004') {
-        setExcludedPlaceIds(new Set(delistedPlaceIds))
+      const excluded =
+        cause instanceof ApiError && cause.resultCode === 'PLAN_004' ? delistedPlaceIds : EMPTY_SET
+
+      if (excluded.size > 0) {
+        setExcludedPlaceIds(new Set(excluded))
+        /*
+          **뺀 다음에는 다른 말을 한다.** 같은 `catch` 가 목록을 고치면서 편집모드 문구
+          (*"목록에서 빼면 저장할 수 있어요"*)를 남기면, 이미 조치한 오류가 고쳐진 목록
+          옆에 남아 방금 고친 것이 아직 문제인 것처럼 보인다 (담기 경로가 같은 함정에
+          빠졌다 — `ai-plan-job-view.tsx:357`). 게다가 **여기서 빼는 것은 코드다** —
+          `이렇게 바뀌어요` 열은 읽기 전용이라 사용자가 뺄 수 있는 것이 없다.
+        */
+        setSaveError({ message: messages.plan.regenerateDayExcludedPlace, retriable: false })
+      } else {
+        setSaveError(
+          toPlanDaySaveError(cause, {
+            retriable: messages.plan.errorDescription,
+            /*
+              **뺄 것을 못 찾은 `PLAN_004` 가 여기로 온다.** 화면이 지목할 항목이 없어
+              고쳐 줄 수 없으니 사실을 그대로 말하는 편집모드 문구를 쓴다. *조회가 아직
+              진행 중이라* 못 찾은 경우는 아래 확정 버튼이 그동안 잠겨 있어 여기 닿지
+              않는다 — 여기 닿는 것은 조회가 끝났는데도 delisted 가 없는 경우다.
+            */
+            missingPlace: messages.plan.editMissingPlaceError,
+          }),
+        )
       }
 
       applyingRef.current = false
@@ -336,6 +395,29 @@ function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jo
     **한 번도 못 받았을 때만** 전체 오류로 간다 (`ai-plan-job-view.tsx` 와 같은 판단).
   */
   if (query.error !== null && job === null) {
+    /*
+      **404 에 재시도 버튼을 주지 않는다** (CLAUDE.md 절대 규칙 · api-integration-guide §3).
+      `?jobId=` 가 주소에 있으므로 공유·북마크된 주소가 정리된 작업이나 남의 작업
+      (`AIPLAN_002`)을 가리킬 수 있다 — 다시 불러도 없다.
+
+      **`ai-plan-job-view` 와 목적지가 다르다.** 그쪽은 `/ai-plans/new` 로 보내지만
+      여기서는 **일정이 그대로 있다** — 이 화면의 제출 상태로 돌려보내면 그 자리에서
+      다시 만들 수 있다.
+    */
+    if (query.error instanceof ApiError && query.error.status === 404) {
+      return (
+        <EmptyState
+          title={messages.aiPlan.jobNotFoundTitle}
+          description={messages.aiPlan.jobNotFoundDescription}
+          action={
+            <ButtonLink href={submitHref} variant="secondary">
+              {messages.plan.regenerateDaySubmit}
+            </ButtonLink>
+          }
+        />
+      )
+    }
+
     return (
       <ErrorState
         title={messages.aiPlan.jobErrorTitle}
@@ -359,6 +441,12 @@ function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jo
     */
     return (
       <AiPlanFailed
+        /*
+          **`일정을 만들지 못했어요` 가 아니다.** 하루가 실패했을 뿐 일정은 그대로 있다 —
+          없어지지 않은 것을 없어졌다고 말하면 확정 전에 사실을 말하는 이 화면의 원칙(R5)이
+          실패 경로에서 뒤집힌다.
+        */
+        title={messages.plan.regenerateDayFailedTitle}
         errorMessage={job?.errorMessage ?? null}
         conditionSummary={null}
         onRetry={null}
@@ -420,7 +508,12 @@ function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jo
       */}
       <PlanDayRegenerateConfirm
         onApply={() => void apply(nextItems)}
-        applying={applying}
+        /*
+          **장소 조회가 끝날 때까지 함께 잠근다** (R6). `PLAN_004` 복구는
+          `delistedPlaceIds` 를 근거로 하는데 그 조회가 아직 진행 중이면 집합이 비어
+          있어, 눌러도 아무것도 빠지지 않고 같은 400 만 다시 받는다 — 화면은 그대로다.
+        */
+        applying={applying || placesLoading}
         error={saveError}
       />
     </div>

@@ -105,6 +105,36 @@ const PET_MAX = 5
 const NOTE_MAX = 500
 
 /**
+ * `AiPlanJobProcessor.MAX_TRIP_DAYS` 의 **독립 사본이다** (#128).
+ *
+ * 화면 쪽 상수(`lib/ai-plan/regenerate.ts` 의 `AI_PLAN_MAX_TRIP_DAYS`)를 가져다 쓰지
+ * 않는다 — mock 은 가짜 서버이고, 같은 상수를 공유하면 화면이 상한을 잘못 고쳐도 mock 이
+ * 함께 틀려 로컬에서 통과한다. plan-service 상한(30일)과 다른 값이라는 점이 요점이다.
+ */
+const MAX_TRIP_DAYS = 10
+
+/** 양끝 포함 여행 일수. 형식은 앞의 Bean Validation 이 이미 걸러서 못 읽으면 0 이다 */
+function tripDays(startDate: string, endDate: string): number {
+  const start = Date.parse(`${startDate}T00:00:00Z`)
+  const end = Date.parse(`${endDate}T00:00:00Z`)
+  return Number.isNaN(start) || Number.isNaN(end) ? 0 : Math.floor((end - start) / 86_400_000) + 1
+}
+
+/**
+ * 서버의 `command.startDate().isBefore(LocalDate.now())`.
+ *
+ * `YYYY-MM-DD` 는 사전순 = 시간순이라 문자열 비교로 충분하다. **`lib/date/day.ts` 를
+ * 가져다 쓰지 않는다** — 위 상수와 같은 이유로 판정을 화면과 공유하지 않는다.
+ */
+function isStartDateInPast(startDate: string): boolean {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+
+  return startDate < `${now.getFullYear()}-${month}-${day}`
+}
+
+/**
  * 시나리오 트리거.
  *
  * mock 이 무작위로 갈리면 화면 분기를 확인할 수 없다. **요청 메모에 이 낱말이 있으면
@@ -457,6 +487,32 @@ function submit(memberId: string, body: string | null): MockResult {
   }
 
   /*
+    **재생성이 조용히 물려받는 두 전제다** (#128). `AiPlanJobProcessor:55-62` 가
+    `validateRegenerateRequest` **앞에서** 본다 — 재생성 요청도 예외가 아니고, 제출 본문이
+    저장된 일정의 기간을 그대로 싣기 때문에 **이미 시작한 여행과 11일 이상 일정은 재생성이
+    영원히 막힌다.** mock 이 이 둘을 모르면 화면이 진입점을 감추지 않는 회귀가 로컬에서
+    통과한다 (`dayRegenerateBlock` 이 화면 쪽 짝이다).
+
+    `LocalDate.now()` 를 흉내 낸다 — mock 에 시계를 두는 유일한 지점이고, 서버가 제출에서
+    시계를 보는 지점도 여기 하나다.
+  */
+  if (isStartDateInPast(startDate)) {
+    return fail(400, 'AIPLAN_017', '여행 시작일은 오늘 이후여야 합니다.')
+  }
+
+  /*
+    **일수는 이 요청 자체의 기간으로 센다** — 서버가 제출 시점에 plan 을 조회하지 않고
+    `ChronoUnit.DAYS.between(startDate, endDate) + 1` 로 계산한다. `AIPLAN_015` 도 같은
+    값을 쓴다. **plan-service 상한은 30일이라**(`PlanCommandProcessor:32`) 11~30일 일정은
+    저장은 되지만 AI 로 다시 만들 수 없다.
+  */
+  const dayCount = tripDays(startDate, endDate)
+
+  if (dayCount > MAX_TRIP_DAYS) {
+    return fail(400, 'AIPLAN_018', 'AI 일정 생성은 최대 10일까지 지원합니다.')
+  }
+
+  /*
     **둘은 짝이다.** 실제 서비스는 `AiPlanException` 을 던지고
     `AiPlanExceptionHandler.handleAiPlanException` 이 평평한 바디
     (`resultCode: 'AIPLAN_014'`, 문자열 message)로 응답한다 — Bean Validation 배치
@@ -467,22 +523,16 @@ function submit(memberId: string, body: string | null): MockResult {
   }
 
   /*
-    **일수는 이 요청 자체의 startDate/endDate 로 센다** — 서버가 제출 시점에는 plan 을
-    조회하지 않고 `ChronoUnit.DAYS.between(command.startDate(), command.endDate()) + 1`
-    로 계산해 `REGENERATE_DAY_OUT_OF_RANGE`(`AIPLAN_015`, `AiPlanJobProcessor:193-196`)를
-    판단한다. 존재하지 않거나 남의 plan 인 경우(`PLAN_OUTLINE_UNAVAILABLE` = `AIPLAN_016`)는
-    `AiPlanWorker` 가 비동기로 던지는 예외라 이 계약에서는 HTTP 200 + `status=FAILED` 로
-    오고, 화면은 항상 본인 plan 으로만 접근하므로 여기서 모델링하지 않는다.
-  */
-  if (regeneratePlanId !== null && regenerateDay !== null) {
-    const start = Date.parse(`${startDate}T00:00:00Z`)
-    const end = Date.parse(`${endDate}T00:00:00Z`)
-    const dayCount =
-      Number.isNaN(start) || Number.isNaN(end) ? 0 : Math.floor((end - start) / 86_400_000) + 1
+    `REGENERATE_DAY_OUT_OF_RANGE`(`AIPLAN_015`, `AiPlanJobProcessor:193-196`). 존재하지
+    않거나 남의 plan 인 경우(`PLAN_OUTLINE_UNAVAILABLE` = `AIPLAN_016`)는 `AiPlanWorker` 가
+    비동기로 던지는 예외라 이 계약에서는 HTTP 200 + `status=FAILED` 로 오고, 화면은 항상
+    본인 plan 으로만 접근하므로 여기서 모델링하지 않는다.
 
-    if (regenerateDay > dayCount) {
-      return fail(400, 'AIPLAN_015', '다시 구성할 일차가 여행 기간을 벗어났습니다.')
-    }
+    **문구는 백엔드를 그대로 인용한다** — 화면이 서버 문자열을 그대로 그리므로
+    (`RegenerateSubmit`) mock 이 다른 말을 하면 로컬에서 본 문장이 배포에서 달라진다.
+  */
+  if (regeneratePlanId !== null && regenerateDay !== null && regenerateDay > dayCount) {
+    return fail(400, 'AIPLAN_015', '재생성할 일차가 여행 기간을 벗어났습니다.')
   }
 
   const store = mockStore()
@@ -490,6 +540,11 @@ function submit(memberId: string, body: string | null): MockResult {
   /*
     **멱등하다.** 같은 회원의 같은 조건이 진행 중이면 기존 jobId 를 그대로 준다
     (컨트롤러 설명). 완료된 작업은 대상이 아니다 — 다시 만들기가 막히면 안 된다.
+
+    **`planId`·`regenerateDay` 도 조건이다** (#128). 실제 멱등 키는 `toParams` 를 해시한
+    것이고 그 map 에 두 값이 들어 있다 (`AiPlanJobProcessor:167-179`). 빠뜨리면 1일차
+    재생성(또는 같은 기간의 새 일정 생성)이 진행 중일 때 2일차 제출이 **그 작업의 jobId**
+    를 받아, 비교 화면이 2일차가 그대로인 초안을 보여 준다.
   */
   const existing = store.aiPlanJobs.find(
     (job) =>
@@ -498,6 +553,8 @@ function submit(memberId: string, body: string | null): MockResult {
       job.startDate === startDate &&
       job.endDate === endDate &&
       job.budget === budget &&
+      job.regeneratePlanId === regeneratePlanId &&
+      job.regenerateDay === regenerateDay &&
       statusOf(job) !== 'COMPLETED' &&
       statusOf(job) !== 'FAILED',
   )
@@ -516,6 +573,7 @@ function submit(memberId: string, body: string | null): MockResult {
     budget,
     requestNote,
     pollCount: 0,
+    regeneratePlanId,
     regenerateDay,
   }
   store.aiPlanJobs.push(job)

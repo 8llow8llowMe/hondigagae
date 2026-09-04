@@ -139,6 +139,14 @@ export type MockAiPlanJob = {
   requestNote: string | null
   pollCount: number
   /**
+   * 하루 재생성 대상 일정 (#128). 새 일정 생성이면 `null` 이다.
+   *
+   * **멱등 술어가 이것을 본다.** 실제 멱등 키는 `toParams` 해시이고 그 map 에 `planId`
+   * 가 들어 있다 (`AiPlanJobProcessor:167-179`) — 들지 않으면 같은 기간의 새 일정 생성이
+   * 진행 중일 때 재생성 제출이 그 작업을 되받는다.
+   */
+  regeneratePlanId: string | null
+  /**
    * 하루 재생성 대상 일차 (#128). 새 일정 생성이면 `null` 이다.
    *
    * **초안은 재생성이어도 전체 일정을 담는다** — 서버 프롬프트가 그렇게 지시한다

@@ -10,10 +10,26 @@ import type { ApiResponse } from '@/types/api'
 const TOKEN = 'mock-access-900000000000000001'
 const OTHER = 'mock-access-900000000000000777'
 
+/**
+ * 오늘부터 `offset` 일 뒤 (`YYYY-MM-DD`).
+ *
+ * **고정 날짜를 쓸 수 없다.** mock 이 `START_DATE_IN_PAST`(`AIPLAN_017`)를 판정하면서
+ * 시계를 보게 되었으므로(#128), 박아 둔 날짜는 그 날이 지나는 순간 이 파일의 제출
+ * 대부분을 400 으로 만든다. mock 이 로컬 날짜로 읽으므로 같은 기준으로 만든다.
+ */
+function fromToday(offset: number): string {
+  const now = new Date()
+  const target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
+  const month = String(target.getMonth() + 1).padStart(2, '0')
+  const day = String(target.getDate()).padStart(2, '0')
+
+  return `${target.getFullYear()}-${month}-${day}`
+}
+
 const VALID = {
   areaCode: '39',
-  startDate: '2026-11-01',
-  endDate: '2026-11-03',
+  startDate: fromToday(30),
+  endDate: fromToday(32),
   petId: '123456789012000001',
 }
 

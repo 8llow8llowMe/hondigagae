@@ -65,7 +65,12 @@ export default async function PlanDayRegeneratePage({ params }: { params: Params
   return (
     <main id="main-content">
       <HydrationBoundary state={dehydrate(queryClient)}>
-        <PlanDayRegenerateView planId={planId} day={day} />
+        {/*
+          **`today` 를 서버에서 만들어 내려보낸다.** 클라이언트가 따로 `new Date()` 를
+          부르면 자정 근처에서 서버 렌더와 하이드레이션의 판정이 갈린다 (일정 상세와 같은
+          결정). 뷰는 이 값으로 재생성이 막힌 일정인지 본다 (`dayRegenerateBlock`).
+        */}
+        <PlanDayRegenerateView planId={planId} day={day} today={new Date().toISOString()} />
       </HydrationBoundary>
     </main>
   )

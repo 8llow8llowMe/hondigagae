@@ -203,6 +203,22 @@ describe('PlanDaySection', () => {
     expect(markup).toContain(messages.plan.regenerateDayAction)
     expect(markup).not.toContain(messages.plan.editDayAction)
   })
+
+  /*
+    **제출이 늘 400 인 일정에서는 진입점을 내지 않는다** (#128). `POST /ai-plans` 가 재생성
+    검증 앞에서 시작일(`AIPLAN_017`)과 일수(`AIPLAN_018`)를 보므로, 이미 시작한 여행과
+    11일 이상 일정은 눌러도 서버 문구만 받는다 — `AiPlanFailed.manualHref` 와 같은 판단으로
+    갈래에서 뺀다. 어느 일정이 그런지는 `dayRegenerateBlock` 이 판정한다.
+  */
+  it('regenerateHref 가 null 이면 다시 만들기를 내지 않는다', () => {
+    const markup = renderDaySection({ regenerateHref: null })
+
+    expect(markup).not.toContain(messages.plan.regenerateDayAction)
+    expect(markup).not.toContain('/regenerate')
+    // 나머지 진입점은 그대로다 — 막힌 것은 재생성뿐이다
+    expect(markup).toContain(messages.plan.addPlaceAction)
+    expect(markup).toContain(messages.plan.editDayAction)
+  })
 })
 
 function renderItemRow(overrides = {}) {

@@ -96,8 +96,15 @@ export function PlanDaySection({
   editor: ReactNode
   add: PlanDayAdd
   visit: PlanDayVisit
-  /** `다시 만들기` 가 가는 곳 (#128). `장소 추가` 와 같이 모달이 아니라 라우트다 */
-  regenerateHref: string
+  /**
+   * `다시 만들기` 가 가는 곳 (#128). `장소 추가` 와 같이 모달이 아니라 라우트다.
+   *
+   * **`null` 이면 진입점을 내지 않는다.** 제출(`POST /ai-plans`)이 재생성 검증 앞에서
+   * 시작일과 일수를 보므로(`dayRegenerateBlock`) 이미 시작한 여행과 11일 이상 일정은
+   * 눌러도 늘 400 이다 — 누를 수 없는 버튼을 보여 주는 대신 뺀다 (`AiPlanFailed.manualHref`
+   * 와 같은 판단). **어느 일정이 그런지는 호출부가 안다** — 여기는 `startDate` 를 모른다.
+   */
+  regenerateHref: string | null
 }) {
   const anchorId = planDayAnchorId(day)
   const weekday = date === null ? null : weekdayOf(date)
@@ -135,10 +142,14 @@ export function PlanDaySection({
             {/*
               **빈 일자에도 남는다** — 빈 날을 채우는 것이 이 기능이 가장 쓸모 있는
               순간이다 (하루재생성-세부명세 R3-2). `순서 편집` 과 달리 항목 수를 보지 않는다.
+
+              **일정 자체가 재생성 대상이 아니면 빠진다** — 항목 수가 아니라 기간 때문이다.
             */}
-            <ButtonLink href={regenerateHref} variant="secondary" size="sm">
-              {messages.plan.regenerateDayAction}
-            </ButtonLink>
+            {regenerateHref !== null && (
+              <ButtonLink href={regenerateHref} variant="secondary" size="sm">
+                {messages.plan.regenerateDayAction}
+              </ButtonLink>
+            )}
 
             {/* 항목이 없으면 바꿀 순서도 없다 */}
             {rows.length > 0 && (
