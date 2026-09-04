@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.insight.domain.model;
 
 import com.hondigagae.domainlayer.insight.domain.enums.CongestionLevel;
+import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.enums.SuitabilityReasonCode;
 import com.hondigagae.shared.travel.place.PetAllowanceType;
 import java.util.ArrayList;
@@ -61,13 +62,7 @@ public final class SuitabilityEvaluator {
         boolean weatherApplied = input.weather() != null;
         if (!weatherApplied) {
             // 날씨를 못 쓴 이유를 근거로 남긴다. 조용히 빠지면 사용자는 날씨를 본 줄 안다.
-            reasons.add(SuitabilityReason.informational(
-                input.forecastOutOfRange()
-                    ? SuitabilityReasonCode.FORECAST_OUT_OF_RANGE
-                    : SuitabilityReasonCode.FORECAST_UNAVAILABLE,
-                input.forecastOutOfRange()
-                    ? "예보는 약 11일까지만 제공되어 이 날짜의 날씨는 근거로 쓰지 못했습니다."
-                    : "날씨 정보를 가져오지 못해 날씨를 근거로 쓰지 못했습니다."));
+            reasons.add(missingWeatherReason(input.coverage()));
             return SuitabilityScore.insufficient(reasons);
         }
 
@@ -79,6 +74,23 @@ public final class SuitabilityEvaluator {
 
         int score = Math.max(MIN_SCORE, BASE_SCORE - penalty);
         return SuitabilityScore.scored(score, reasons, true, congestionApplied);
+    }
+
+    /**
+     * 날씨를 못 쓴 이유. 상태마다 할 말이 다르다.
+     *
+     * <p>산책 위험도와 <b>같은 구분</b>을 쓴다({@link ForecastCoverage}). 한 서비스가 같은 시각에
+     * 한 화면에서는 "예보 범위 밖", 다른 화면에서는 "장애"라고 말하면 안 된다.
+     */
+    private static SuitabilityReason missingWeatherReason(ForecastCoverage coverage) {
+        return switch (coverage == null ? ForecastCoverage.UNAVAILABLE : coverage) {
+            case OUT_OF_RANGE -> SuitabilityReason.informational(SuitabilityReasonCode.FORECAST_OUT_OF_RANGE,
+                "예보는 약 11일까지만 제공되어 이 날짜의 날씨는 근거로 쓰지 못했습니다.");
+            case DAY_ENDED -> SuitabilityReason.informational(SuitabilityReasonCode.FORECAST_DAY_ENDED,
+                "이 날짜의 예보 시간대가 이미 지나 날씨를 근거로 쓰지 못했습니다.");
+            default -> SuitabilityReason.informational(SuitabilityReasonCode.FORECAST_UNAVAILABLE,
+                "날씨 정보를 가져오지 못해 날씨를 근거로 쓰지 못했습니다.");
+        };
     }
 
     /**

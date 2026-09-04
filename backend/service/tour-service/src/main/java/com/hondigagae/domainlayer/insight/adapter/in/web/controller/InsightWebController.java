@@ -47,7 +47,9 @@ public class InsightWebController {
             + "이 점수는 \"이 권역이 나가기 좋은가\"이지 \"이 장소가 갈 만한가\"가 아닙니다. "
             + "예보를 못 받은 권역도 `weatherScore = null` 로 목록에 남습니다 — 지우면 사용자가 "
             + "그 권역이 조회되지 않았다는 것조차 모릅니다. "
-            + "`recommendedRegion` 이 null 이면 판정할 수 있는 권역이 하나도 없었다는 뜻입니다.")
+            + "`recommendedRegion` 이 null 이면 판정할 수 있는 권역이 하나도 없었다는 뜻입니다. "
+            + "늦은 밤에 오늘을 조회하면 다섯 권역이 모두 점수 없이 올 수 있습니다 — 기상청 23시 발표부터는 "
+            + "오늘의 시각별 예보가 없기 때문이며, 그때도 200 이고 각 권역의 `reasons` 에 이유가 담깁니다.")
     @GetMapping("/regional-weather")
     public ResponseEntity<Response<RegionalWeatherResponse>> getRegionalWeather(
         @Parameter(description = "비교 기준 일자. 생략하면 오늘. 오늘~내일을 전제로 합니다", example = "2026-09-02")
@@ -88,6 +90,10 @@ public class InsightWebController {
             + "판정은 산책 위험도와 **같은 규칙**을 씁니다. "
             + "`goldenStart` 가 null 이면 남은 시간이 전부 위험 등급이거나 특보 경보가 발효 중이라는 뜻입니다 — "
             + "아무 구간이나 골라 주면 사용자가 그것을 허락으로 읽기 때문에 주지 않습니다. "
+            + "**`hourly` 가 빈 배열이어도 200 입니다.** 늦은 밤에는 오늘 남은 예보가 없는 것이 정상입니다 — "
+            + "기상청은 23시 발표부터 다음 날 예보만 주므로 그 시간대에는 오늘의 시각별 예보가 원천에 없고, "
+            + "재시도해도 자정 전에는 풀리지 않습니다. 빈 이유는 `forecastCoverage` 로 구분하세요 — "
+            + "`DAY_ENDED` 는 정상이고 `UNAVAILABLE` 만 다시 시도할 일입니다. "
             + "추정 노면온도는 기온에 일사와 시간대를 더해 계산한 값이며 실측이 아닙니다.")
     @GetMapping("/walk-times")
     public ResponseEntity<Response<WalkTimesResponse>> getWalkTimes(

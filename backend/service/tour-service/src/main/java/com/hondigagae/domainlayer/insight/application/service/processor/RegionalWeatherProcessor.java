@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.insight.application.service.processor;
 import com.hondigagae.domainlayer.insight.application.exception.InsightErrorCode;
 import com.hondigagae.domainlayer.insight.application.exception.InsightException;
 import com.hondigagae.domainlayer.insight.application.mapper.InsightMapper;
+import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.enums.JejuRegion;
 import com.hondigagae.domainlayer.insight.domain.enums.SuitabilityReasonCode;
 import com.hondigagae.domainlayer.insight.domain.model.DailyWeather;
@@ -12,6 +13,7 @@ import com.hondigagae.domainlayer.insight.domain.model.RegionalWeatherComparison
 import com.hondigagae.domainlayer.insight.domain.model.SuitabilityEvaluator;
 import com.hondigagae.domainlayer.insight.domain.model.SuitabilityReason;
 import com.hondigagae.domainlayer.insight.domain.model.SuitabilityThresholds;
+import com.hondigagae.domainlayer.insight.domain.model.WeatherForecast;
 import com.hondigagae.domainlayer.insight.domain.model.WeatherWarning;
 import com.hondigagae.global.properties.InsightProperties;
 import java.time.LocalDate;
@@ -56,6 +58,13 @@ import org.springframework.stereotype.Component;
  * 다섯 곳 중 하나의 격자 조회가 실패했다고 비교 자체를 못 하는 것은 아니다. 실패한 권역은
  * 점수 없이 목록에 남고 추천 후보에서만 빠진다 - 목록에서 통째로 지우면 사용자는 그 권역이
  * 조회되지 않았다는 사실조차 모른다.
+ *
+ * <h2>밤에 다섯 곳이 다 비는 것은 장애가 아니다</h2>
+ *
+ * 기상청 단기예보 23시 회차는 자기 발표일 행을 하나도 주지 않는다. 그래서 오늘을 물으면
+ * 23시 회차 이후 자정까지는 <b>다섯 권역이 모두</b> 예보 없음이 되는데, 그것을 5xx 로 올리면
+ * 비교 API 가 밤마다 죽는 것처럼 보인다. 못 판정한 이유가 {@link ForecastCoverage} 로
+ * 구분되므로, <b>다섯이 전부 진짜 장애일 때만</b> 실패로 올린다.
  */
 @Slf4j
 @Component
@@ -90,8 +99,11 @@ public class RegionalWeatherProcessor {
 
         List<RegionWeather> regions = compareInParallel(date, pet, thresholds);
 
-        if (regions.stream().noneMatch(RegionWeather::isScored)) {
-            // 다섯 권역 어디도 예보를 못 받았다. 빈 비교표를 주면 "전부 비슷하다"로 읽힌다.
+        if (regions.stream().noneMatch(RegionWeather::isScored)
+            && regions.stream().allMatch(RegionWeather::isFailure)) {
+            // 다섯 권역 어디도 예보를 못 받았고 그것이 전부 장애다. 빈 비교표를 주면
+            // "전부 비슷하다"로 읽힌다. 반대로 예보 시간대가 지난 것뿐이면 정상 상태이므로
+            // 이유를 담은 비교표를 그대로 준다.
             throw new InsightException(InsightErrorCode.WEATHER_UNAVAILABLE);
         }
 
@@ -130,7 +142,7 @@ public class RegionalWeatherProcessor {
             } catch (CompletionException | CancellationException exception) {
                 log.warn("Regional weather task failed region={} reason={}",
                     region.name(), exception.getMessage());
-                regions.add(unavailable(region, date));
+                regions.add(unavailable(region, date, ForecastCoverage.UNAVAILABLE));
             }
         }
         return regions;
@@ -139,9 +151,13 @@ public class RegionalWeatherProcessor {
     private RegionWeather toRegionWeather(
         JejuRegion region, LocalDate date, PetCondition pet, SuitabilityThresholds thresholds
     ) {
-        Optional<DailyWeather> daily = dailyOf(region, date);
+        List<WeatherForecast> forecasts = forecastsOf(region);
+        ForecastCoverage coverage = WeatherForecast.coverageOn(forecasts, date);
+        Optional<DailyWeather> daily = coverage.isUsable()
+            ? DailyWeather.findByDate(DailyWeather.foldByDate(forecasts), date)
+            : Optional.empty();
         if (daily.isEmpty()) {
-            return unavailable(region, date);
+            return unavailable(region, date, coverage);
         }
 
         // 권역 비교는 "밖에 나가기"를 전제한다. 실내 대피처는 없고(sheltered=false),
@@ -155,37 +171,53 @@ public class RegionalWeatherProcessor {
             .date(date)
             .weather(daily.get())
             .weatherScore(Math.max(0, 100 - penalty))
+            .coverage(coverage)
             .reasons(reasons)
             .build();
     }
 
-    /** 점수를 못 낸 권역. 목록에서 지우지 않고 그 사실을 근거로 남긴다. */
-    private RegionWeather unavailable(JejuRegion region, LocalDate date) {
+    /**
+     * 점수를 못 낸 권역. 목록에서 지우지 않고 <b>왜</b> 못 냈는지를 근거로 남긴다.
+     *
+     * <p>"가져오지 못했다"와 "예보 시간대가 지났다"는 사용자가 할 일이 다르다 - 앞은 다시
+     * 시도할 일이고 뒤는 내일을 보라는 뜻이다. 한 문장으로 뭉개면 둘 다 틀린 안내가 된다.
+     */
+    private RegionWeather unavailable(JejuRegion region, LocalDate date, ForecastCoverage coverage) {
         return RegionWeather.builder()
             .region(region)
             .date(date)
-            .reasons(List.of(SuitabilityReason.informational(
-                SuitabilityReasonCode.FORECAST_UNAVAILABLE,
-                "이 권역의 예보를 가져오지 못해 비교에서 제외했습니다.")))
+            .coverage(coverage)
+            .reasons(List.of(unavailableReason(coverage)))
             .build();
     }
 
+    private SuitabilityReason unavailableReason(ForecastCoverage coverage) {
+        return switch (coverage) {
+            case DAY_ENDED -> SuitabilityReason.informational(SuitabilityReasonCode.FORECAST_DAY_ENDED,
+                "이 날짜의 예보 시간대가 이미 지나 비교에서 제외했습니다.");
+            case OUT_OF_RANGE -> SuitabilityReason.informational(SuitabilityReasonCode.FORECAST_OUT_OF_RANGE,
+                "이 권역의 예보가 아직 닿지 않는 날짜라 비교에서 제외했습니다.");
+            default -> SuitabilityReason.informational(SuitabilityReasonCode.FORECAST_UNAVAILABLE,
+                "이 권역의 예보를 가져오지 못해 비교에서 제외했습니다.");
+        };
+    }
+
     /**
-     * 권역 대표 격자의 그 날짜 예보.
+     * 권역 대표 격자의 시각별 예보.
      *
-     * <p>실패를 예외로 올리지 않는다 - 한 권역의 장애가 비교 전체를 막으면 안 된다.
+     * <p>실패를 예외로 올리지 않는다 - 한 권역의 장애가 비교 전체를 막으면 안 된다. 빈 목록은
+     * 곧 {@code ForecastCoverage.UNAVAILABLE} 로 읽힌다.
+     *
+     * <p>오늘/내일이라 단기예보만으로 충분하다. {@code dailyForecastsAt} 을 쓰면 중기예보
+     * 경로까지 타는데, 이 기능이 다루는 날짜에는 쓸 일이 없는 왕복이다.
      */
-    private Optional<DailyWeather> dailyOf(JejuRegion region, LocalDate date) {
+    private List<WeatherForecast> forecastsOf(JejuRegion region) {
         try {
-            // 오늘/내일이라 단기예보만으로 충분하다. dailyForecastsAt 을 쓰면 중기예보 경로까지
-            // 타는데, 이 기능이 다루는 날짜에는 쓸 일이 없는 왕복이다.
-            List<DailyWeather> dailies = DailyWeather.foldByDate(
-                weatherForecastProcessor.forecastsAt(region.getLat(), region.getLng()));
-            return DailyWeather.findByDate(dailies, date);
+            return weatherForecastProcessor.forecastsAt(region.getLat(), region.getLng());
         } catch (InsightException exception) {
             log.info("Regional weather unavailable region={} errorCode={}",
                 region.name(), exception.getErrorCode().getCode());
-            return Optional.empty();
+            return List.of();
         }
     }
 }

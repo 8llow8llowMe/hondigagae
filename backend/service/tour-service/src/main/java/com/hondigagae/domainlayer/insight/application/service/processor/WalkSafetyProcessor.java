@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.insight.application.info.WalkSafetyInfo;
 import com.hondigagae.domainlayer.insight.application.mapper.InsightMapper;
 import com.hondigagae.domainlayer.insight.application.model.PlaceInsightQuery;
 import com.hondigagae.domainlayer.insight.application.port.out.PlaceProfileQueryPort;
+import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.model.WeatherWarning;
 import com.hondigagae.domainlayer.insight.domain.model.PlaceCondition;
 import com.hondigagae.domainlayer.insight.domain.model.WalkSafetyAssessment;
@@ -62,8 +63,8 @@ public class WalkSafetyProcessor {
 
         WalkSafetyAssessment assessment = WalkSafetyEvaluator.evaluate(
             nearest, sameDay, query.petCondition(), insightMapper.toThresholds(insightProperties), target,
-            // 예보는 받았는데 그 시각이 없으면 범위 밖(정상), 목록 자체가 없으면 장애다.
-            !forecasts.isEmpty() && sameDay.isEmpty(), warning);
+            // 그 날짜가 없을 때 아직 안 온 것인지 이미 지난 것인지까지 가른다.
+            WeatherForecast.coverageOn(forecasts, target.toLocalDate()), warning);
 
         return WalkSafetyInfo.builder()
             .placeId(place.placeId())
@@ -76,10 +77,14 @@ public class WalkSafetyProcessor {
             .build();
     }
 
+    /** 설정 오류(INSIGHT_004)는 200 뒤에 숨기지 않는다 - 배포가 잘못된 것이라 드러나야 한다. */
     private List<WeatherForecast> loadForecasts(PlaceCondition place, LocalDateTime target) {
         try {
             return weatherForecastProcessor.forecastsAt(place.lat(), place.lng());
         } catch (InsightException exception) {
+            if (exception.getErrorCode() != InsightErrorCode.WEATHER_UNAVAILABLE) {
+                throw exception;
+            }
             log.info("Walk safety falls back to no-weather placeId={} at={} errorCode={}",
                 place.placeId(), target, exception.getErrorCode().getCode());
             return List.of();

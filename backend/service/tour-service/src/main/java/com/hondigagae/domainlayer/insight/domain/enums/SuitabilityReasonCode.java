@@ -44,6 +44,7 @@ public enum SuitabilityReasonCode implements CodeNameDescribable {
 
     // 근거 부족
     FORECAST_OUT_OF_RANGE("예보 범위 밖", "예보가 닿지 않는 날짜라 날씨를 근거로 쓰지 못했습니다."),
+    FORECAST_DAY_ENDED("남은 예보 없음", "그 날짜의 예보 시간대가 이미 지나 날씨를 근거로 쓰지 못했습니다."),
     MID_TERM_FORECAST("중기예보 기준", "3일 이후 예보라 단기예보보다 대략적입니다. 여행이 가까워지면 다시 확인해 주세요."),
     FORECAST_UNAVAILABLE("날씨 정보 없음", "날씨 정보를 가져오지 못해 날씨를 근거로 쓰지 못했습니다."),
     CONGESTION_UNAVAILABLE("혼잡도 정보 없음", "혼잡도 예측 데이터가 없어 근거로 쓰지 못했습니다.");
