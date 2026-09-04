@@ -138,6 +138,15 @@ export type MockAiPlanJob = {
   budget: number | null
   requestNote: string | null
   pollCount: number
+  /**
+   * 하루 재생성 대상 일차 (#128). 새 일정 생성이면 `null` 이다.
+   *
+   * **초안은 재생성이어도 전체 일정을 담는다** — 서버 프롬프트가 그렇게 지시한다
+   * (`AiPlanPromptFactory#appendRegenerateSection`). 이 값은 *어느 날을 다르게 낼지*
+   * 를 가리킬 뿐 초안의 범위를 좁히지 않는다. mock 이 전체를 주어야 FE 의
+   * "목표 일자만 뽑는다" 판단(하루재생성-세부명세 R4)이 로컬에서 검증된다.
+   */
+  regenerateDay: number | null
 }
 
 /**
