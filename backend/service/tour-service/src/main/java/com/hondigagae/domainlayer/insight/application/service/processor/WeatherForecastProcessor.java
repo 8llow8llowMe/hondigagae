@@ -209,6 +209,7 @@ public class WeatherForecastProcessor {
             }
             log.warn("KMA returned no forecast rows grid={}", grid.cacheKey());
         } catch (InsightException exception) {
+            rethrowIfConfigurationFault(exception);
             log.warn("KMA fetch failed, falling back to cache grid={} errorCode={}",
                 grid.cacheKey(), exception.getErrorCode().getCode());
         }
@@ -229,10 +230,25 @@ public class WeatherForecastProcessor {
             }
             log.warn("KMA returned no mid-term rows region={}", region.getDisplayName());
         } catch (InsightException exception) {
+            rethrowIfConfigurationFault(exception);
             log.warn("Mid-term fetch failed, falling back to cache region={} errorCode={}",
                 region.getDisplayName(), exception.getErrorCode().getCode());
         }
         return List.of();
+    }
+
+    /**
+     * 설정 오류는 폴백으로 삼키지 않는다.
+     *
+     * <p>serviceKey 가 비어 있는 것은 <b>배포가 잘못된 것</b>이지 원천이 흔들린 것이 아니다.
+     * 여기서 빈 목록으로 낮추면 INSIGHT_004 가 INSIGHT_003 으로 바뀌고, 호출부가 그 코드를
+     * "일시적 장애"로 다루면서 화면에는 "오늘은 예보가 없네"만 남는다. 그 상태로 며칠이
+     * 지나간다 - 키를 안 넣은 환경은 언제 넣어도 저절로 낫지 않는다.
+     */
+    private void rethrowIfConfigurationFault(InsightException exception) {
+        if (exception.getErrorCode() == InsightErrorCode.WEATHER_SERVICE_KEY_MISSING) {
+            throw exception;
+        }
     }
 
     /**
