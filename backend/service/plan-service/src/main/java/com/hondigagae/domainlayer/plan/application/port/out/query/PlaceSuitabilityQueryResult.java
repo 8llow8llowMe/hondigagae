@@ -43,7 +43,9 @@ public record PlaceSuitabilityQueryResult(
         String precipitationTypeName,
         String skyStateName,
         Double maxWindSpeed,
-        Integer maxHumidity
+        Integer maxHumidity,
+        // 하루 최고 체감온도(열지수). 중기예보는 null. 계산은 tour-service 가 한다 — 여기서 다시 내지 않는다.
+        Double maxFeelsLikeTemperature
     ) {
 
     }

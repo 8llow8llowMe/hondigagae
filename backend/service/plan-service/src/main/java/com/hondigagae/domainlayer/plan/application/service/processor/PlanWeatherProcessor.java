@@ -210,6 +210,7 @@ public class PlanWeatherProcessor {
                 .skyStateName(result.weather().skyStateName())
                 .maxWindSpeed(result.weather().maxWindSpeed())
                 .maxHumidity(result.weather().maxHumidity())
+                .maxFeelsLikeTemperature(result.weather().maxFeelsLikeTemperature())
                 .build())
             .indoorAlternatives(result.indoorAlternatives() == null ? java.util.List.of()
                 : result.indoorAlternatives().stream()

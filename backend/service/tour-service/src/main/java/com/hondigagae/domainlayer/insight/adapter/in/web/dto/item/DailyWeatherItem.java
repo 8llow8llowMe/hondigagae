@@ -44,6 +44,13 @@ public record DailyWeatherItem(
     @Schema(description = "최고 습도(%). 중기예보에는 없어 null 이다", example = "85")
     Integer maxHumidity,
 
+    @Schema(
+        description = "하루 최고 체감온도(섭씨). 시각별 기온과 상대습도로 계산한 열지수(Rothfusz 회귀식 섭씨판)의 "
+            + "하루 최대값이다. 기온 26도 미만이거나 습도가 없는 시각은 기온을 그대로 쓴다. "
+            + "중기예보는 시각별 데이터가 없어 null 이다 — 최고기온으로 대신하지 않는다",
+        example = "33.4", nullable = true)
+    Double maxFeelsLikeTemperature,
+
     @Schema(description = "예보 강수량 합계(mm). 범위 표기는 하한을 더한 값이다", example = "12.5")
     double totalPrecipitationMm
 ) {
