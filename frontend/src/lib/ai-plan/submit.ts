@@ -26,7 +26,9 @@ export const MANWON = 10_000
  * - **`pinnedPlaceIds` 는 이름을 떼고 `placeId` 만 보낸다.** 비어 있으면 키를 뺀다 —
  *   `[]` 를 보내도 서버는 같게 다루지만(`pinnedPlaceIds == null ? List.of()`), 생략이
  *   "고르지 않았다" 를 그대로 말한다. **`Number()` 를 거치지 않는다** (Snowflake)
- * - **`planId`·`regenerateDay` 는 아직 보내지 않는다.** 아트보드와 계약이 어긋나 있다 (#90)
+ * - **`planId`·`regenerateDay` 는 이 함수가 보내지 않는다.** 여기는 새 일정을 만드는
+ *   경로다. 하루 재생성은 `lib/ai-plan/regenerate.ts` 가 따로 만든다
+ *   (하루재생성-세부명세 R3)
  */
 export function toAiPlanSubmitPayload(values: AiPlanFormValues): AiPlanSubmitPayload {
   const budget = toBudgetWon(values.budgetManwon)

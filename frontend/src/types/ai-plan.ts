@@ -67,6 +67,18 @@ export type AiPlanSubmitPayload = {
    * `placeId` 는 문자열 그대로 보낸다 — Snowflake 라 `Number()` 를 거치면 정밀도를 잃는다.
    */
   pinnedPlaceIds?: string[]
+  /**
+   * 하루 재생성 대상 일정 (#128 · 하루재생성-세부명세 R3).
+   *
+   * **`regenerateDay` 와 반드시 짝이다** — 하나만 오면 서버가 막는다
+   * (`AiPlanJobProcessor:191`). 새 일정을 만드는 경로(`/ai-plans/new`)는 둘 다
+   * 보내지 않는다.
+   *
+   * Snowflake 라 **문자열 그대로 보낸다** — `Number()` 를 거치면 정밀도를 잃는다.
+   */
+  planId?: string
+  /** 다시 구성할 일차, **1부터**. `planId` 와 반드시 짝이다 (`@Positive`) */
+  regenerateDay?: number
 }
 
 /** `POST /ai-plans` → **HTTP 202**. 같은 요청이 진행 중이면 기존 `jobId` 를 그대로 준다(멱등) */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { MANWON, toAiPlanSubmitPayload } from '@/lib/ai-plan/submit'
-import type { AiPlanFormValues } from '@/types/ai-plan'
+import type { AiPlanFormValues, AiPlanSubmitPayload } from '@/types/ai-plan'
 
 function values(overrides: Partial<AiPlanFormValues> = {}): AiPlanFormValues {
   return {
@@ -129,12 +129,22 @@ describe('toAiPlanSubmitPayload — 생성 옵션 확장 (#128, 아트보드 05)
     expect(typeof payload.pinnedPlaceIds?.[0]).toBe('string')
   })
 
-  it('planId·regenerateDay 는 여전히 새지 않는다 — 아직 미완성이다 (#90)', () => {
+  /*
+    #128 로 두 필드가 타입에 열렸다. **생성 경로에서는 여전히 안 실린다** — 이 함수는
+    새 일정을 만드는 폼의 것이고, 하루 재생성은 `lib/ai-plan/regenerate.ts` 가 따로
+    만든다 (하루재생성-세부명세 R3). 이 잠금을 없애면 생성 요청에 두 필드가 새어 드는
+    회귀를 아무도 막지 않게 된다.
+  */
+  it('생성 경로에는 planId·regenerateDay 가 실리지 않는다 (#128)', () => {
     const payload = toAiPlanSubmitPayload(
       values({ preferFavorites: true, pinnedPlaces: [{ placeId: '1', title: '가' }] }),
     )
 
     expect('planId' in payload).toBe(false)
     expect('regenerateDay' in payload).toBe(false)
+
+    // 타입에는 열려 있다 — 재생성 경로가 쓴다
+    const withRegenerate: AiPlanSubmitPayload = { ...payload, planId: '1', regenerateDay: 2 }
+    expect(withRegenerate.regenerateDay).toBe(2)
   })
 })
