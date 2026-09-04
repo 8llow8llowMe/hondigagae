@@ -95,6 +95,15 @@ export function ChevronRightIcon(props: IconProps) {
   )
 }
 
+/** 사진 뷰어의 이전 사진. `ChevronRightIcon` 을 회전시키지 않는다 — 회전은 애니메이션의 몫이다 */
+export function ChevronLeftIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M15 6l-6 6 6 6" />
+    </Svg>
+  )
+}
+
 /** 더 안전한 시간대 */
 export function ClockIcon(props: IconProps) {
   return (

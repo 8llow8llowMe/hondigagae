@@ -324,14 +324,15 @@ describe('PlaceDetailSection — 외부 원문 처리', () => {
     expect(markup).not.toContain(messages.place.detailLeashRequired)
   })
 
-  it('사진이 없으면 갤러리 섹션 자체를 렌더하지 않는다 (가이드 §5 PhotoGallery)', () => {
-    const markup = render({ place: { ...placeDetail, images: [] } })
+  it('사진이 없으면 카테고리 일러스트로 자리를 채운다 (DESIGN.md §7-3)', () => {
+    // fixture 의 contentType 은 CULTURE — 일러스트 자산이 있는 코드다
+    const markup = render({ place: { ...placeDetail, images: [], firstImage: null } })
 
-    // 상세는 목록과 반대다 — 회색 "이미지 없음" 면이 첫 화면을 덮지 않게 제목부터 시작한다.
-    // (목록 행은 행 높이를 지켜야 하므로 같은 크기의 타일을 남긴다 — PlaceRow)
+    expect(markup).toContain('/illustrations/place-culture.svg')
+    // 없애려던 것은 자리가 아니라 **회색 벽**이었다. 그것은 여전히 그리지 않는다
     expect(markup).not.toContain(messages.place.noImage)
+    // 일러스트는 한국관광공사가 준 사진이 아니다 — 사진 출처를 달지 않는다
     expect(markup).not.toContain(messages.place.photoSource)
-    // 사진이 없어도 본문은 그대로 보인다
     expect(markup).toContain(placeDetail.title)
   })
 
@@ -348,6 +349,20 @@ describe('PlaceDetailSection — 외부 원문 처리', () => {
     // 장수별 분기는 photo-gallery.test.ts 가 본다.
     expect(markup).not.toContain('aspect-video')
     expect(markup).toContain('--gallery-w-mobile')
+  })
+})
+
+describe('PlaceDetailSection — 모바일 하단 바의 바닥 오프셋', () => {
+  /**
+   * 바는 `lg` 미만에서 보이지만 그것이 비켜야 할 **고정 탭바는 `md:hidden`** 이다.
+   * 두 breakpoint 를 같은 값으로 묶어 `bottom-16` 만 두었더니 768~1023 에서 바가
+   * 바닥에서 64px 떠 그 아래로 본문이 비쳤다(실측: 900×800).
+   */
+  it('탭바가 사라지는 md 부터는 바닥에 붙는다', () => {
+    const markup = render()
+
+    expect(markup).toContain('bottom-16')
+    expect(markup).toContain('md:bottom-0')
   })
 })
 
