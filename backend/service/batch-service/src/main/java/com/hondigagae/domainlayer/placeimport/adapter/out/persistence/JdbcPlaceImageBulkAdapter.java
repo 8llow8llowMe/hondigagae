@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.placeimport.adapter.out.persistence;
 
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceImageBulkPort;
+import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceImageBackfillTargetQueryResult;
 import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceImageTargetQueryResult;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlaceImage;
 import java.nio.charset.StandardCharsets;
@@ -30,6 +31,22 @@ public class JdbcPlaceImageBulkAdapter implements PlaceImageBulkPort {
           AND delisted_at IS NULL
         """;
 
+    private static final String SELECT_BACKFILL_TARGETS_SQL = """
+        SELECT id, title, lat, lng
+        FROM place
+        WHERE source <> 'TOUR_API'
+          AND (first_image IS NULL OR first_image = '')
+          AND lat IS NOT NULL AND lng IS NOT NULL
+          AND merged_into_id IS NULL
+          AND delisted_at IS NULL
+        """;
+
+    private static final String UPDATE_FIRST_IMAGE_SQL = """
+        UPDATE place
+           SET first_image = ?, first_image2 = ?, updated_at = NOW()
+         WHERE id = ?
+        """;
+
     private static final String DELETE_SQL = "DELETE FROM place_image WHERE place_id = ?";
 
     private static final String INSERT_SQL = """
@@ -45,6 +62,17 @@ public class JdbcPlaceImageBulkAdapter implements PlaceImageBulkPort {
     public List<PlaceImageTargetQueryResult> findTourApiTargets() {
         return jdbcTemplate.query(SELECT_TARGETS_SQL,
             (rs, rowNum) -> new PlaceImageTargetQueryResult(rs.getLong("id"), rs.getLong("content_id")));
+    }
+
+    @Override
+    public List<PlaceImageBackfillTargetQueryResult> findImageBackfillTargets() {
+        return jdbcTemplate.query(SELECT_BACKFILL_TARGETS_SQL, (rs, rowNum) -> new PlaceImageBackfillTargetQueryResult(
+            rs.getLong("id"), rs.getString("title"), rs.getDouble("lat"), rs.getDouble("lng")));
+    }
+
+    @Override
+    public void updateFirstImage(long placeId, String firstImage, String firstImage2) {
+        jdbcTemplate.update(UPDATE_FIRST_IMAGE_SQL, firstImage, firstImage2, placeId);
     }
 
     @Override
