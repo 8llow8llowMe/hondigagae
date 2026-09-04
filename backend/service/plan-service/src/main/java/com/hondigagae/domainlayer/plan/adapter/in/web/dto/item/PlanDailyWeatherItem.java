@@ -36,6 +36,14 @@ public record PlanDailyWeatherItem(
     Double maxWindSpeed,
 
     @Schema(description = "최고 습도(%)", example = "88")
-    Integer maxHumidity
+    Integer maxHumidity,
+
+    @Schema(
+        description = "하루 최고 체감온도(섭씨). 시각별 기온과 상대습도로 계산한 열지수(Rothfusz 회귀식 섭씨판)의 "
+            + "하루 최대값이라 maxTemperature 와 다른 시각에서 나올 수 있다. 기온 26도 미만이거나 습도가 없는 "
+            + "시각은 기온 그대로다. 중기예보(forecastSourceCode=MID_TERM)는 시각별 데이터가 없어 null 이며, "
+            + "그때는 maxTemperature 를 대신 표시하고 값을 지어내지 않는다",
+        example = "33.4", nullable = true)
+    Double maxFeelsLikeTemperature
 ) {
 }

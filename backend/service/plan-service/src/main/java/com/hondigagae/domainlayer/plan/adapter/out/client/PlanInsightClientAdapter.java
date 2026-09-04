@@ -181,7 +181,8 @@ public class PlanInsightClientAdapter implements PetConditionQueryPort, PlaceSui
             weather.precipitationType() == null ? null : weather.precipitationType().name(),
             weather.skyState() == null ? null : weather.skyState().name(),
             weather.maxWindSpeed(),
-            weather.maxHumidity());
+            weather.maxHumidity(),
+            weather.maxFeelsLikeTemperature());
     }
 
     private List<PlaceSuitabilityQueryResult.AlternativeQueryResult> toAlternatives(

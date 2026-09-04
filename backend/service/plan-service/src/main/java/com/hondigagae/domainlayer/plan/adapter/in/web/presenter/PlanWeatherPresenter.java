@@ -100,6 +100,7 @@ public class PlanWeatherPresenter {
             .skyStateName(weather.skyStateName())
             .maxWindSpeed(weather.maxWindSpeed())
             .maxHumidity(weather.maxHumidity())
+            .maxFeelsLikeTemperature(weather.maxFeelsLikeTemperature())
             .build();
     }
 

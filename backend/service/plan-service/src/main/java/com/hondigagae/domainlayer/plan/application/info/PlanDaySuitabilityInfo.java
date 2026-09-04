@@ -45,7 +45,8 @@ public record PlanDaySuitabilityInfo(
         String precipitationTypeName,
         String skyStateName,
         Double maxWindSpeed,
-        Integer maxHumidity
+        Integer maxHumidity,
+        Double maxFeelsLikeTemperature
     ) {
 
     }

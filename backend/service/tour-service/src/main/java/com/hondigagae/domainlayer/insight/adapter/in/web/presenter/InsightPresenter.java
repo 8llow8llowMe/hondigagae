@@ -71,6 +71,7 @@ public class InsightPresenter {
                 ? null : weather.representativeSkyState().toMetadata())
             .maxWindSpeed(weather.maxWindSpeed())
             .maxHumidity(weather.maxHumidity())
+            .maxFeelsLikeTemperature(weather.maxFeelsLikeTemperature())
             .totalPrecipitationMm(weather.totalPrecipitationMm())
             .build();
     }

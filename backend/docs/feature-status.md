@@ -131,7 +131,7 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | `walkcourse` (두루누비 산책 코스) | 미착수 | 데이터 확인 필요 |
 | 기상특보 연동 | **구현 (조회)** | #156 — 적합도·권역 날씨·산책 안전 응답에 `weatherWarnings`. 카카오 메시지 알림 연계는 후속 |
 | 항목 단위 산책 위험도 | 미착수 | 일정 브리핑은 일자별 대표 장소 한 곳만 조회한다 |
-| 일정 브리핑 체감온도 | 미착수 | #88. tour-service `HeatIndex` 가 있어 재료는 있다 |
+| 일정 브리핑 체감온도 | **구현** | #88. `weather.maxFeelsLikeTemperature` — tour `DailyWeather` 가 시각별 열지수의 하루 최대를 내고 plan 이 그대로 전달. 중기예보는 null |
 | AI 초안 WALK 항목 `placeId` 불일치 | 미착수 | #89. FE 는 WALK 의 `targetId` 를 보내지 않는 것으로 우회 |
 | AI 작업 세부 단계·취소·`sigunguCode` | 미착수 | #90. 일자 재생성은 #77 로 됨 |
 | 다견 일정의 준비물 생성 | 구현 | 동행 반려견 전체 특성을 벌크 조회해 근거로 삼는다. 프롬프트는 합집합 규칙 |
@@ -172,7 +172,7 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | 이슈 | 영역 | 제목 | 상태 |
 | --- | --- | --- | --- |
 | #87 | plan | 여행 기간을 줄여도 범위 밖 일정 항목이 정리되지 않는다 | 해결됨 — `PLAN_008` 거부(99c6a41f). 이슈 닫기 대상 |
-| #88 | plan | 일정 날씨 브리핑에 체감온도 추가 | 미착수 |
+| #88 | plan | 일정 날씨 브리핑에 체감온도 추가 | 구현 — `PlanDailyWeatherItem.maxFeelsLikeTemperature` (tour 적합도 응답 `weather` 에도 같은 필드) |
 | #89 | ai | AI 초안의 WALK 항목 placeId 가 walk_course.id 와 어긋난다 | 미착수 |
 | #90 | ai | AI 일정 작업 세부 단계·일자 재생성·취소·sigunguCode | 재생성만 완료(#77), 나머지 3건 미착수 |
 | #152 | plan | 일정 저장·판정의 다중 반려견 지원 (PlanCreateRequest.petIds) | 머지됨 — 이슈 닫기 대상 (`features/152-plan-multi-pet.md`) |

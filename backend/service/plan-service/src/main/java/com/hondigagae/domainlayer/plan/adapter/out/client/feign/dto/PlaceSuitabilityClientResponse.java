@@ -44,7 +44,8 @@ public record PlaceSuitabilityClientResponse(
         MetadataClientResponse precipitationType,
         MetadataClientResponse skyState,
         Double maxWindSpeed,
-        Integer maxHumidity
+        Integer maxHumidity,
+        Double maxFeelsLikeTemperature
     ) {
 
     }
