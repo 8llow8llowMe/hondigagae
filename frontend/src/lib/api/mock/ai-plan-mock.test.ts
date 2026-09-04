@@ -325,19 +325,26 @@ describe('하루 재생성 (#128)', () => {
   }
 
   /*
-    `AiPlanJobProcessor:191` — 둘 중 하나만 오면 막는다. mock 이 이 짝 규칙을 지켜야
-    FE 가 한쪽만 실어 보내는 회귀를 로컬에서 잡는다.
+    `AiPlanJobProcessor:187-197` — 둘 중 하나만 오면 `REGENERATE_REQUEST_INVALID`
+    (`AIPLAN_014`)로 막는다. mock 이 이 짝 규칙과 코드를 지켜야 FE 가 한쪽만 실어
+    보내는 회귀를 로컬에서 잡는다.
   */
-  it('planId 만 오면 400 이다', () => {
-    expect(submit({ ...base(), planId: PLAN_ID })?.status).toBe(400)
+  it('planId 만 오면 400 이고 AIPLAN_014 다', () => {
+    const result = submit({ ...base(), planId: PLAN_ID })
+    expect(result?.status).toBe(400)
+    expect(JSON.stringify(result?.payload)).toContain('AIPLAN_014')
   })
 
-  it('regenerateDay 만 와도 400 이다', () => {
-    expect(submit({ ...base(), regenerateDay: 2 })?.status).toBe(400)
+  it('regenerateDay 만 와도 400 이고 AIPLAN_014 다', () => {
+    const result = submit({ ...base(), regenerateDay: 2 })
+    expect(result?.status).toBe(400)
+    expect(JSON.stringify(result?.payload)).toContain('AIPLAN_014')
   })
 
-  it('일차가 기간을 넘으면 400 이다', () => {
-    expect(submit({ ...base(), planId: PLAN_ID, regenerateDay: 99 })?.status).toBe(400)
+  it('일차가 기간을 넘으면 400 이고 AIPLAN_015 다', () => {
+    const result = submit({ ...base(), planId: PLAN_ID, regenerateDay: 99 })
+    expect(result?.status).toBe(400)
+    expect(JSON.stringify(result?.payload)).toContain('AIPLAN_015')
   })
 
   it('짝으로 오면 접수한다', () => {

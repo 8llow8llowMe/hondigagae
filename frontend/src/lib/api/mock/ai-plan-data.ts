@@ -429,26 +429,37 @@ function submit(memberId: string, body: string | null): MockResult {
   }
 
   /*
-    하루 재생성 (#128). **둘은 짝이다** — `AiPlanJobProcessor:188-195` 가 하나만 오면
-    막고, 일차가 일정 기간을 넘어도 막는다.
+    하루 재생성 (#128). **둘은 짝이다** — `AiPlanJobProcessor:187-197` 가 하나만 오면
+    `REGENERATE_REQUEST_INVALID`(`AIPLAN_014`)로 막는다. **일수는 이 요청 자체의
+    startDate/endDate 로 센다** — 서버가 제출 시점에는 plan 을 조회하지 않고
+    `ChronoUnit.DAYS.between(command.startDate(), command.endDate()) + 1` 로 계산해
+    `REGENERATE_DAY_OUT_OF_RANGE`(`AIPLAN_015`)를 판단한다. 존재하지 않거나 남의
+    plan 인 경우(`PLAN_OUTLINE_UNAVAILABLE` = `AIPLAN_016`)는 `AiPlanWorker` 가 비동기로
+    던지는 예외라 이 계약에서는 HTTP 200 + `status=FAILED` 로 오고, 화면은 항상 본인
+    plan 으로만 접근하므로 여기서 모델링하지 않는다.
   */
   const regeneratePlanId = asIdString(parsed.planId)
   const regenerateDay = typeof parsed.regenerateDay === 'number' ? parsed.regenerateDay : null
 
   if ((regeneratePlanId === null) !== (regenerateDay === null)) {
     errors.push({
-      code: 'AIPLAN_016',
+      code: 'AIPLAN_014',
       field: 'regenerateDay',
-      message: 'planId 와 regenerateDay 는 함께 지정해야 합니다.',
+      message: '하루 재생성에는 일정 식별자와 재생성할 일차가 함께 필요합니다.',
     })
   }
 
   if (regeneratePlanId !== null && regenerateDay !== null) {
-    const target = mockStore().plans.find(
-      (candidate) => candidate.planId === regeneratePlanId && !candidate.deleted,
-    )
-    const dayCount = target === undefined ? 0 : dayCountOf(target)
+    const start = Date.parse(`${startDate}T00:00:00Z`)
+    const end = Date.parse(`${endDate}T00:00:00Z`)
+    const dayCount =
+      Number.isNaN(start) || Number.isNaN(end) ? 0 : Math.floor((end - start) / 86_400_000) + 1
 
+    /*
+      `regenerateDay < 1` 은 실제로는 서버 `@Positive` Bean Validation 이 먼저 막지만,
+      mock 은 그것만을 위한 별도 필드 오류 형태를 만들지 않고 범위 오류(AIPLAN_015)에
+      접어 넣는다 — 결과적으로 항상 400 이라는 사실은 같다.
+    */
     if (regenerateDay < 1 || regenerateDay > dayCount) {
       errors.push({
         code: 'AIPLAN_015',
@@ -579,14 +590,6 @@ function totalDaysOf(job: MockAiPlanJob): number {
   if (Number.isNaN(start) || Number.isNaN(end)) return 1
 
   return Math.max(1, Math.round((end - start) / 86_400_000) + 1)
-}
-
-/** 시작·종료일로 총 일수를 센다. 백엔드 `Plan.totalDays()` 와 같은 셈이다 (양끝 포함) */
-function dayCountOf(plan: { startDate: string; endDate: string }): number {
-  const start = Date.parse(`${plan.startDate}T00:00:00Z`)
-  const end = Date.parse(`${plan.endDate}T00:00:00Z`)
-  if (Number.isNaN(start) || Number.isNaN(end)) return 0
-  return Math.floor((end - start) / 86_400_000) + 1
 }
 
 /**
