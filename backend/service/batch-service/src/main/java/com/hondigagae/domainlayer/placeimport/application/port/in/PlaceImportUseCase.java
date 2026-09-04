@@ -21,4 +21,12 @@ public interface PlaceImportUseCase {
      * @return 적재한 이미지 총 장수
      */
     int importPlaceImages();
+
+    /**
+     * 문화정보원·식약처 원천 장소의 대표 이미지를 TourAPI 키워드 검색으로 백필한다.
+     * 두 원천의 적재 잡 이후에 돌아야 한다. 정규화 제목 일치 + 좌표 근접 검증을 통과한 곳만 채운다.
+     *
+     * @return 채운 장소 수
+     */
+    int backfillPlaceImages(String areaCode);
 }

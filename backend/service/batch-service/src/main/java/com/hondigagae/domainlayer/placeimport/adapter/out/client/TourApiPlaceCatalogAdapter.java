@@ -88,6 +88,36 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
         return images;
     }
 
+    @Override
+    public List<ImportedPlace> searchPlacesByKeyword(String keyword, String areaCode) {
+        String rawBody = requestRaw(buildSearchKeywordUri(keyword, areaCode));
+        JsonNode body = parseAndValidate(rawBody);
+
+        List<ImportedPlace> places = new ArrayList<>();
+        for (JsonNode item : extractItems(body)) {
+            places.add(toImportedPlace(item));
+        }
+        return places;
+    }
+
+    /** 키워드 검색. 백필 매칭은 상위 소수만 보면 되므로 한 페이지(10)로 자른다. */
+    private URI buildSearchKeywordUri(String keyword, String areaCode) {
+        String serviceKey = tourApiProperties.serviceKey();
+        if (serviceKey == null || serviceKey.isBlank()) {
+            throw new PlaceImportException(PlaceImportErrorCode.TOUR_API_SERVICE_KEY_MISSING);
+        }
+        String url = "%s/KorService2/searchKeyword2?serviceKey=%s&MobileOS=%s&MobileApp=%s&_type=json&keyword=%s&areaCode=%s&pageNo=1&numOfRows=10&arrange=Q"
+            .formatted(
+                tourApiProperties.baseUrl(),
+                URLEncoder.encode(serviceKey, StandardCharsets.UTF_8),
+                tourApiProperties.mobileOs(),
+                tourApiProperties.mobileApp(),
+                URLEncoder.encode(keyword, StandardCharsets.UTF_8),
+                areaCode
+            );
+        return URI.create(url);
+    }
+
     /** 추가 이미지 목록. 한 콘텐츠의 이미지는 수십 장을 넘지 않아 한 페이지(100)로 충분하다. */
     private URI buildDetailImageUri(long contentId) {
         String serviceKey = tourApiProperties.serviceKey();
