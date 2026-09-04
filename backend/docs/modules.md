@@ -124,7 +124,8 @@ yml 목록(`infra.redis.sentinels`)도 계속 받지만 로컬용 탈출구다 �
 **역할**: Spring Cloud Gateway — 외부 요청 라우팅 + JWT 검증
 
 **처리:**
-- `/api/v1/**` 경로를 각 서비스로 라우팅
+- `/api/v1/**` 경로를 각 서비스로 라우팅 — 라우트는 프로파일 yml 3개(local/dev/prod)에 **접두어 단위**로 나열한다.
+  컨트롤러가 새 접두어를 열면 셋 다 고쳐야 하며, `GatewayRouteCoverageTest` 가 컨트롤러 `@RequestMapping` 접두어 ⊆ 라우트를 검사한다
 - JWT 유효성 1차 검증 (서비스 내부 인가는 각 서비스)
 - CORS 공통 처리
 
