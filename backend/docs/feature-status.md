@@ -179,6 +179,7 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | #152 | plan | 일정 저장·판정의 다중 반려견 지원 (PlanCreateRequest.petIds) | 머지됨 — 이슈 닫기 대상 (`features/152-plan-multi-pet.md`) |
 | #202 | api-gateway·plan | 게이트웨이가 /api/v1/favorites 를 라우팅하지 않는다 | 구현 완료, PR 대기 — 세 프로파일 라우트 + `GatewayRouteCoverageTest`. FE 실기기 확인은 plan-service 배포 후 |
 | #214 | auth·core | 디코딩 불가 서명 JWT 가 401 이 아니라 500 을 준다 (래퍼 없는 본문) | 머지됨 — 이슈 닫기 대상. 토큰 없음 403→401 `SECURITY_001`, `HttpMessageNotReadableException` 핸들러 4 서비스 |
+| #231 | tour | 추가 요금 원문 "없음" 이 요금 있음으로 판정돼 적합도가 3점 깎인다 | 구현 완료, PR 대기 — `PetExtraFee` 가 원문 뜻(CHARGED/NONE/UNKNOWN)을 읽고 CHARGED 만 감점 |
 
 **완료 (41)**
 
