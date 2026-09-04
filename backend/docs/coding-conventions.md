@@ -418,6 +418,10 @@ private Long targetId;
     `resilience4j.circuitbreaker.configs.default` + `instances.<논리 서비스명>`으로 관리합니다.
   - 서킷 인스턴스명은 대상 서비스의 논리명(`tour-service` 등)으로 하고, 상수는
     각 서비스의 `adapter/out/client/support/InternalResponseSupport`에 둡니다.
+    한 서비스에 컨텍스트가 둘 이상이면 클래스 이름에 컨텍스트 접두사를 붙입니다
+    (예: `FavoriteInternalResponseSupport`). 같은 단순 이름의 `@Component` 가 두 패키지에 있으면
+    기본 빈 이름이 충돌해 `ConflictingBeanDefinitionException` 으로 기동에 실패하고, 단위 테스트는
+    이를 잡지 못합니다 — 각 서비스의 `*ApplicationTests`(컨텍스트 로딩)가 이 게이트입니다.
   - 서킷 적용과 예외 변환은 `InternalResponseSupport.requestAndUnwrap(대상, Supplier)`에서 수행합니다.
     서킷은 Feign 호출만 감싸 전송 실패(5xx·타임아웃)만 집계하고, 4xx(`FeignClientException`)는
     호출한 쪽의 요청 문제이므로 `ignore-exceptions`로 제외합니다.
