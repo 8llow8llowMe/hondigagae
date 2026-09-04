@@ -60,6 +60,26 @@ describe('AiPlanFailed — 5xx 화면과 다르게 다룬다 (명세 S7)', () =>
   it('서버가 사유를 주지 않으면 대체 문구를 쓴다', () => {
     expect(render({ errorMessage: null })).toContain(messages.aiPlan.failedFallback)
   })
+
+  /* `title` 이 선택 prop 이 되면서 생성 화면의 제목이 조용히 바뀌지 않게 잠근다 (#128) */
+  it('제목은 기본으로 생성 실패를 말한다', () => {
+    expect(render()).toContain(messages.aiPlan.failedTitle)
+  })
+})
+
+/*
+  하루 재생성(#128)이 쓰는 모양이다. **하루가 실패했을 뿐 일정은 그대로 있다** —
+  `일정을 만들지 못했어요` 는 없어지지 않은 것을 없어졌다고 말한다.
+*/
+describe('AiPlanFailed — 제목을 바꾸는 경우', () => {
+  it('넘긴 제목을 쓰고 기본 제목을 쓰지 않는다', () => {
+    const html = render({ title: messages.plan.regenerateDayFailedTitle })
+
+    expect(html).toContain(messages.plan.regenerateDayFailedTitle)
+    expect(html).not.toContain(messages.aiPlan.failedTitle)
+    // 서버 문구는 그대로 남는다 — 제목만 바꾼다
+    expect(html).toContain(SERVER_MESSAGE)
+  })
 })
 
 describe('AiPlanFailed — 조건을 잃은 경우', () => {

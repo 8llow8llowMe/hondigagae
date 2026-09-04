@@ -35,7 +35,11 @@ export function PlanDayDiff({
 function DiffColumn({ title, rows }: { title: string; rows: readonly PlanDayDiffRow[] }) {
   return (
     <section className="border-border rounded-md border p-4">
-      <h3 className="text-caption text-fg-muted font-semibold">{title}</h3>
+      {/*
+        **`h2` 다.** 껍데기의 `h1` 바로 아래이고 사이에 `h2` 가 없어 `h3` 는 단계를
+        건너뛴다 — 이 화면의 다른 상태(대기·실패·빈 결과)는 모두 `h2` 를 쓴다.
+      */}
+      <h2 className="text-caption text-fg-muted font-semibold">{title}</h2>
 
       {rows.length === 0 ? (
         <p className="text-body-2 text-fg-muted mt-3">{messages.plan.regenerateDayEmpty}</p>
@@ -43,7 +47,15 @@ function DiffColumn({ title, rows }: { title: string; rows: readonly PlanDayDiff
         <ol className="mt-3 flex flex-col gap-3">
           {rows.map((row, index) => (
             <li key={`${index}-${row.title}`} className="flex items-start gap-3">
-              <span className="bg-band text-fg-muted text-caption flex w-6 shrink-0 items-center justify-center rounded-sm font-bold tabular-nums">
+              {/*
+                **`aria-hidden` 이다.** `<ol>` 안이라 스크린리더가 이미 순번을 읽어 주므로
+                숫자를 남기면 "1, 1 오설록…" 으로 두 번 들린다 (`plan-item-row.tsx:108` ·
+                `plan-editable-item-row.tsx:110` 과 같은 판단).
+              */}
+              <span
+                aria-hidden
+                className="bg-band text-fg-muted text-caption flex w-6 shrink-0 items-center justify-center rounded-sm font-bold tabular-nums"
+              >
                 {index + 1}
               </span>
               <div className="min-w-0">

@@ -58,4 +58,23 @@ describe('PlanDayDiff', () => {
     expect(markup).toContain('>1<')
     expect(markup).toContain('>2<')
   })
+
+  /*
+    껍데기의 `h1` 바로 아래다. `h3` 는 단계를 건너뛰고, 이 화면의 다른 상태(대기·실패·빈
+    결과)는 모두 `h2` 를 쓴다.
+  */
+  it('열 제목이 h2 다 — h1 다음 단계를 건너뛰지 않는다', () => {
+    const markup = render()
+
+    expect(markup).toContain('<h2')
+    expect(markup).not.toContain('<h3')
+  })
+
+  /*
+    `<ol>` 안이라 스크린리더가 이미 순번을 읽어 준다 — 숫자를 남기면 두 번 들린다
+    (`plan-item-row` · `plan-editable-item-row` 와 같은 판단).
+  */
+  it('순번 배지를 스크린리더에서 감춘다', () => {
+    expect(render()).toContain('<span aria-hidden="true"')
+  })
 })
