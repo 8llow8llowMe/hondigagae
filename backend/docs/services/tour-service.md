@@ -35,7 +35,10 @@
   예보를 못 받은 권역도 `weatherScore = null` 로 목록에 남는다
 - `GET /api/v1/insights/walk-times?lat=&lng=` — 오늘 남은 시간의 산책 안전 곡선 + 골든타임.
   `goldenStart` 가 null 이면 남은 시간이 전부 위험이거나 특보 경보 중이다 —
-  아무 구간이나 주면 사용자가 허락으로 읽는다
+  아무 구간이나 주면 사용자가 허락으로 읽는다.
+  **`hourly` 가 빈 배열이어도 200 이다** — 기상청 23시 회차부터 자정까지는 오늘의 시각별 예보가
+  원천에 없다(정상). 빈 이유는 `forecastCoverage` 로 가른다
+  (`weather-insight-integration.md` §5-2)
 - `GET /api/v1/places/{placeId}/congestions?fromDate=&days=` — 기간 혼잡도.
   "이번 주 언제 덜 붐비나"에 답한다. 혼잡도 예측은 30일 rolling 이라 예보(약 11일)보다 멀리 간다 —
   적합도로는 근거가 없는 날짜도 붐빔 정도는 알 수 있다.
