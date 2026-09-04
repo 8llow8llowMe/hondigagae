@@ -171,7 +171,7 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 
 | 이슈 | 영역 | 제목 | 상태 |
 | --- | --- | --- | --- |
-| #87 | plan | 여행 기간을 줄여도 범위 밖 일정 항목이 정리되지 않는다 | 해결됨 — `PLAN_008` 거부(99c6a41f). 이슈 닫기 대상 |
+| #87 | plan | 여행 기간을 줄여도 범위 밖 일정 항목이 정리되지 않는다 | 해결됨 — `PLAN_008` 거부(99c6a41f) + 회귀 테스트·규칙 문서화. 이슈 닫기 대상 |
 | #88 | plan | 일정 날씨 브리핑에 체감온도 추가 | 구현 — `PlanDailyWeatherItem.maxFeelsLikeTemperature` (tour 적합도 응답 `weather` 에도 같은 필드) |
 | #89 | ai | AI 초안의 WALK 항목 placeId 가 walk_course.id 와 어긋난다 | 미착수 |
 | #90 | ai | AI 일정 작업 세부 단계·일자 재생성·취소·sigunguCode | 재생성만 완료(#77), 나머지 3건 미착수 |
