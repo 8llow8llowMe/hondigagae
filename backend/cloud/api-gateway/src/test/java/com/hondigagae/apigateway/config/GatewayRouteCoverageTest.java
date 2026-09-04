@@ -56,44 +56,79 @@ class GatewayRouteCoverageTest {
             .containsAll(controllerPrefixes);
     }
 
-    /** {@code backend/service/*}/src/main/java 의 *Controller.java 에서 {@code @RequestMapping("/api/v1/...")} 의 첫 마디. */
+    /**
+     * {@code backend/service/*}/src/main/java 의 *Controller.java 에서 {@code @RequestMapping("/api/v1/...")} 의 첫 마디.
+     *
+     * <p>서비스마다 {@code src/main/java} 만 걷는다 — 서비스 루트째 걸으면 {@code build/}(클래스·리포트·캐시)까지
+     * 순회해 프로파일 3회 × 서비스 수만큼 느려진다.
+     */
     private static Set<String> controllerPrefixes() throws IOException {
         Set<String> prefixes = new TreeSet<>();
-        try (Stream<Path> files = Files.walk(SERVICE_ROOT)) {
-            List<Path> controllers = files
-                .filter(path -> path.toString().replace('\\', '/').contains("/src/main/java/"))
-                .filter(path -> path.getFileName().toString().endsWith("Controller.java"))
-                .toList();
-            for (Path controller : controllers) {
-                Matcher matcher = REQUEST_MAPPING.matcher(Files.readString(controller, StandardCharsets.UTF_8));
-                while (matcher.find()) {
-                    prefixes.add(matcher.group(1));
-                }
-            }
-        }
-        return prefixes;
-    }
-
-    /** 프로파일 yml 의 {@code spring.cloud.gateway.routes[].predicates} 중 {@code Path=/api/v1/xxx/**} 의 접두어. */
-    @SuppressWarnings("unchecked")
-    private static Set<String> routedPrefixes(String profile) throws IOException {
-        Set<String> prefixes = new TreeSet<>();
-        try (InputStream yml = GatewayRouteCoverageTest.class.getResourceAsStream("/application-" + profile + ".yml")) {
-            assertThat(yml).as("application-%s.yml 이 클래스패스에 있어야 한다", profile).isNotNull();
-            Map<String, Object> root = new Yaml().load(yml);
-            Map<String, Object> spring = (Map<String, Object>) root.get("spring");
-            Map<String, Object> cloud = (Map<String, Object>) spring.get("cloud");
-            Map<String, Object> gateway = (Map<String, Object>) cloud.get("gateway");
-            List<Map<String, Object>> routes = (List<Map<String, Object>>) gateway.get("routes");
-            for (Map<String, Object> route : routes) {
-                for (Object predicate : (List<Object>) route.getOrDefault("predicates", List.of())) {
-                    Matcher matcher = ROUTE_PATH.matcher(predicate.toString());
-                    if (matcher.matches()) {
+        for (Path sourceRoot : mainSourceRoots()) {
+            try (Stream<Path> files = Files.walk(sourceRoot)) {
+                List<Path> controllers = files
+                    .filter(path -> path.getFileName().toString().endsWith("Controller.java"))
+                    .toList();
+                for (Path controller : controllers) {
+                    Matcher matcher = REQUEST_MAPPING.matcher(Files.readString(controller, StandardCharsets.UTF_8));
+                    while (matcher.find()) {
                         prefixes.add(matcher.group(1));
                     }
                 }
             }
         }
         return prefixes;
+    }
+
+    private static List<Path> mainSourceRoots() throws IOException {
+        try (Stream<Path> services = Files.list(SERVICE_ROOT)) {
+            return services
+                .map(service -> service.resolve("src").resolve("main").resolve("java"))
+                .filter(Files::isDirectory)
+                .toList();
+        }
+    }
+
+    /**
+     * 프로파일 yml 의 {@code spring.cloud.gateway.routes[].predicates} 중 {@code Path=/api/v1/xxx/**} 의 접두어.
+     *
+     * <p>구조를 한 단계씩 확인하며 내려간다 — yml 이 깨졌을 때 NPE 대신 "어느 키가 없는지" 가 실패 메시지에 남아야 한다.
+     */
+    private static Set<String> routedPrefixes(String profile) throws IOException {
+        try (InputStream yml = GatewayRouteCoverageTest.class.getResourceAsStream("/application-" + profile + ".yml")) {
+            assertThat(yml).as("application-%s.yml 이 클래스패스에 있어야 한다", profile).isNotNull();
+            Map<String, Object> root = new Yaml().load(yml);
+            List<?> routes = asList(section(section(section(root, "spring", profile), "cloud", profile), "gateway", profile)
+                .get("routes"), "spring.cloud.gateway.routes", profile);
+
+            Set<String> prefixes = new TreeSet<>();
+            for (Object route : routes) {
+                Object predicates = asMap(route, "routes[]", profile).get("predicates");
+                if (predicates == null) {
+                    continue;
+                }
+                for (Object predicate : asList(predicates, "routes[].predicates", profile)) {
+                    Matcher matcher = ROUTE_PATH.matcher(String.valueOf(predicate));
+                    if (matcher.matches()) {
+                        prefixes.add(matcher.group(1));
+                    }
+                }
+            }
+            return prefixes;
+        }
+    }
+
+    private static Map<?, ?> section(Map<?, ?> parent, String key, String profile) {
+        return asMap(parent.get(key), key, profile);
+    }
+
+    private static Map<?, ?> asMap(Object value, String name, String profile) {
+        assertThat(value).as("application-%s.yml 의 %s 는 매핑이어야 한다", profile, name).isInstanceOf(Map.class);
+        return (Map<?, ?>) value;
+    }
+
+    private static List<?> asList(Object value, String name, String profile) {
+        assertThat(value).as("application-%s.yml 의 %s 는 목록이어야 한다", profile, name).isInstanceOf(List.class);
+        return (List<?>) value;
     }
 }
