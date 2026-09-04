@@ -9,6 +9,7 @@ import com.hondigagae.storage.exception.StorageException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -69,6 +70,15 @@ public class MemberExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Response<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
         return ValidationErrorSupport.toResponse(exception, MemberErrorCode.PARAMETER_TYPE_INVALID.getCode());
+    }
+
+    /**
+     * 본문을 읽지 못한 요청(깨진 JSON, enum 에 없는 값). 역직렬화 단계라 도메인별 advice 보다 앞서 이 catch-all 이
+     * 받는다 — 처리하지 않으면 Response 봉투 밖의 Spring 기본 400 이 나간다 (#214, pet 공통명세 S6-3).
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Response<Void>> handleUnreadableBody(HttpMessageNotReadableException exception) {
+        return ValidationErrorSupport.toResponse(exception, MemberErrorCode.INVALID_REQUEST.getCode());
     }
 
     /**

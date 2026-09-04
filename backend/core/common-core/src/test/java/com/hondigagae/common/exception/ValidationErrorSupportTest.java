@@ -2,6 +2,8 @@ package com.hondigagae.common.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hondigagae.common.dto.Response;
 import com.hondigagae.common.dto.ValidationErrorBody;
 import com.hondigagae.common.dto.ValidationErrorItem;
@@ -11,6 +13,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
@@ -22,6 +26,66 @@ class ValidationErrorSupportTest {
     private static final String OBJECT_NAME = "signupRequest";
 
     private record SignupRequest(String email, String password, String nickname) {
+    }
+
+    private enum SizeType { SMALL, MEDIUM, LARGE }
+
+    private record PetRequest(String name, SizeType sizeType, List<PetRequest> friends) {
+    }
+
+    // ── 요청 본문을 읽지 못한 경우 (HttpMessageNotReadableException) ─────────────
+
+    @Test
+    @DisplayName("enum 에 없는 값은 필드명과 허용 값을 함께 알려 준다 — 어디를 고칠지 알 수 있어야 한다")
+    void unreadableBodyWithUnknownEnumValue() throws Exception {
+        HttpMessageNotReadableException exception = unreadable("{\"name\":\"몽실이\",\"sizeType\":\"HUGE\"}");
+
+        ValidationErrorBody body = bodyOf(exception);
+
+        assertThat(body.errors()).hasSize(1);
+        assertThat(body.errors().getFirst().code()).isEqualTo(DEFAULT_CODE);
+        assertThat(body.errors().getFirst().field()).isEqualTo("sizeType");
+        assertThat(body.message()).contains("sizeType").contains("SMALL, MEDIUM, LARGE");
+    }
+
+    @Test
+    @DisplayName("중첩 배열 안의 필드는 items[0].field 꼴 경로로 가리킨다")
+    void unreadableBodyPointsNestedPath() throws Exception {
+        HttpMessageNotReadableException exception =
+            unreadable("{\"name\":\"몽실이\",\"friends\":[{\"name\":\"보리\",\"sizeType\":\"HUGE\"}]}");
+
+        assertThat(bodyOf(exception).errors().getFirst().field()).isEqualTo("friends[0].sizeType");
+    }
+
+    @Test
+    @DisplayName("깨진 JSON 은 필드를 특정할 수 없어 request 로 두고 형식을 확인하라고 안내한다")
+    void unreadableBodyWithBrokenJson() throws Exception {
+        HttpMessageNotReadableException exception = unreadable("{\"name\": ");
+
+        ValidationErrorBody body = bodyOf(exception);
+
+        assertThat(body.errors().getFirst().field()).isEqualTo("request");
+        assertThat(body.message()).contains("JSON");
+    }
+
+    /** 실제 Jackson 이 던지는 원인 예외를 그대로 감싼다 — Spring 의 메시지 컨버터가 하는 일과 같다. */
+    private static HttpMessageNotReadableException unreadable(String json) {
+        try {
+            new ObjectMapper().readValue(json, PetRequest.class);
+            throw new IllegalStateException("역직렬화가 실패해야 하는 입력이다: " + json);
+        } catch (JsonParseException | com.fasterxml.jackson.databind.JsonMappingException cause) {
+            return new HttpMessageNotReadableException("JSON parse error", cause, new MockHttpInputMessage(json.getBytes()));
+        } catch (java.io.IOException cause) {
+            throw new IllegalStateException(cause);
+        }
+    }
+
+    private static ValidationErrorBody bodyOf(HttpMessageNotReadableException exception) {
+        ResponseEntity<Response<Void>> response = ValidationErrorSupport.toResponse(exception, DEFAULT_CODE);
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        Response<Void> payload = response.getBody();
+        assertThat(payload).isNotNull();
+        return (ValidationErrorBody) payload.dataHeader().resultMessage();
     }
 
     @SuppressWarnings("unused")
