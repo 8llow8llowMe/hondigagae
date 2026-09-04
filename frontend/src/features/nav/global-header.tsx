@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { BrandSymbol } from '@/components/brand/symbol'
 import { Wordmark } from '@/components/brand/wordmark'
 import { ButtonLink } from '@/components/button'
 import { EmergencyIcon } from '@/components/icons'
@@ -39,8 +40,20 @@ export function GlobalHeader({ authed }: { authed: boolean }) {
           */}
           <Link
             href="/"
-            className="text-fg focus-visible:ring-brand-500 inline-flex h-11 shrink-0 items-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
+            className="text-fg focus-visible:ring-brand-500 inline-flex h-11 shrink-0 items-center gap-2 rounded-md focus-visible:ring-2 focus-visible:outline-none"
           >
+            {/*
+              **심볼 + 워드마크 락업이다** (#240). `DESIGN.md` §1 이 채도를 데이터에만
+              남기라고 정했고 이전에는 헤더에 워드마크만 두었는데, 그 결정을 뒤집었다 —
+              근거와 조건은 §1 과 `BrandSymbol` 주석에 적었다. 조건은 크기(24px)와
+              색(브랜드 하나)이고, 심볼은 로고 자리 밖으로 흘리지 않는다.
+
+              **375 에서도 둘 다 둔다.** 24 + gap 8 + 74 = 106px 이고 그 폭에서 헤더의
+              다른 것은 아이콘 두 개뿐이라 자리가 남는다 (375 실측: nav 를 밀지 않는다).
+              폭을 조건으로 심볼을 숨기지 않는다 — 임의 breakpoint 는 이 저장소가 린트로
+              막고, 스케일에 없는 폭을 새로 만들 이유도 없다.
+            */}
+            <BrandSymbol />
             <Wordmark />
           </Link>
           <NavLinks authed={authed} />
