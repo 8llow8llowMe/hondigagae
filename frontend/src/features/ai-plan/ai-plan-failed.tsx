@@ -11,6 +11,14 @@ export type AiPlanFailedProps = {
   retrying: boolean
   /** 조건을 되살려 폼으로 */
   changeHref: string
+  /**
+   * `직접 만들기` 가 가는 곳. **`null` 이면 그 갈래를 주지 않는다.**
+   *
+   * 기본값은 새 일정 만들기다 — 생성 실패의 대안이 "AI 없이 직접 만든다" 이기 때문이다.
+   * 하루 재생성(#128)에서는 **일정이 이미 있고 하루만 실패했으므로** 새 일정으로 보내는
+   * 것이 잘못된 목적지다. 그 화면은 `null` 을 넘기고 `조건 바꾸기` 하나로 되돌아간다.
+   */
+  manualHref?: string | null
 }
 
 /**
@@ -28,6 +36,7 @@ export function AiPlanFailed({
   onRetry,
   retrying,
   changeHref,
+  manualHref = '/plans/new',
 }: AiPlanFailedProps) {
   return (
     <div className="flex flex-col items-start gap-3 px-4 py-12 md:px-10">
@@ -49,9 +58,12 @@ export function AiPlanFailed({
         <ButtonLink href={changeHref} variant="secondary">
           {messages.aiPlan.failedChange}
         </ButtonLink>
-        <ButtonLink href="/plans/new" variant="ghost">
-          {messages.aiPlan.failedManual}
-        </ButtonLink>
+        {/* **목적지가 없으면 갈래에서 뺀다** — 재시도와 같은 판단이다 */}
+        {manualHref !== null && (
+          <ButtonLink href={manualHref} variant="ghost">
+            {messages.aiPlan.failedManual}
+          </ButtonLink>
+        )}
       </div>
 
       {conditionSummary !== null && (
