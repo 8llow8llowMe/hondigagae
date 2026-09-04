@@ -175,6 +175,7 @@ describe('PlanDaySection — 편집 진입', () => {
         editor: null,
         add: planDayAdd,
         visit: planDayVisit,
+        regenerateHref: '/plans/1/days/1/regenerate',
         ...overrides,
       }),
     )

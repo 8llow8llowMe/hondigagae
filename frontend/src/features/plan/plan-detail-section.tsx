@@ -194,6 +194,7 @@ export function PlanDetailSection({
               onRetryVerdict={onRetryWeather}
               editing={editingDay === group.day}
               onStartEdit={() => requestEditor(group.day)}
+              regenerateHref={`/plans/${plan.planId}/days/${group.day}/regenerate`}
               add={{
                 href: `/plans/${plan.planId}/days/${group.day}/add`,
                 addedPlaceIds: placeIdsOf(group.items),
