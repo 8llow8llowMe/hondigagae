@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Badge } from '@/components/badge'
 import { ImageIcon } from '@/components/icons'
 import { MetricBadge, type MetricTone, MetricValue } from '@/components/metric'
-import { isAllowedImageHost } from '@/lib/image/remote-host'
+import { imageSrc } from '@/lib/image/remote-host'
 import { splitReasons } from '@/lib/insight/reasons'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
@@ -158,12 +158,11 @@ function Score({
 }
 
 function Thumbnail({ place }: { place: PlaceSummary | undefined }) {
-  const url = place?.firstImage ?? null
-  const usable = isAllowedImageHost(url) && url !== null
+  const url = imageSrc(place?.firstImage ?? null)
 
   return (
     <span className="bg-band relative flex size-20 shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-md md:size-24">
-      {usable ? (
+      {url !== null ? (
         <Image
           src={url}
           alt=""

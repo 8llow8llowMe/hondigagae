@@ -4,6 +4,7 @@ import { messages } from '@/lib/messages'
 import { petSizeVerdict } from '@/lib/place/pet-size'
 import { toPlainText } from '@/lib/place/text'
 import { cn } from '@/lib/utils/cn'
+import type { EnumMetadata } from '@/types/api'
 import type { PlacePetInfo } from '@/types/place'
 
 /**
@@ -21,6 +22,7 @@ import type { PlacePetInfo } from '@/types/place'
  */
 export function PlacePetInfoSection({
   petInfo,
+  allowance,
   sourceText,
   tel,
   petName,
@@ -29,6 +31,11 @@ export function PlacePetInfoSection({
 }: {
   /** **null 이어도 섹션을 숨기지 않는다** (아트보드 04-①) */
   petInfo: PlacePetInfo | null
+  /**
+   * 장소의 `petAllowanceType`. **`petInfo` 가 없을 때 무슨 말을 할지 이것이 정한다** —
+   * 서버가 동반 여부를 등록해 둔 것과 아무것도 모르는 것은 다른 상태다.
+   */
+  allowance: EnumMetadata | null
   /** intro.chkPet — DTO 주석이 "판단은 petInfo 우선" 이라 참고 값으로만 둔다 */
   sourceText: string | null
   /** 정보가 없을 때 안내할 전화번호 */
@@ -40,7 +47,7 @@ export function PlacePetInfoSection({
   /** 문장에 넣을 서버 `name`. FE 가 크기 한국어를 만들지 않는다 */
   petSizeName: string | null
 }) {
-  if (petInfo === null) return <EmptyPetInfo tel={tel} />
+  if (petInfo === null) return <EmptyPetInfo allowance={allowance} tel={tel} />
 
   const lines = petInfoLines(petInfo, sourceText)
   const verdict = sizeVerdictLine(petInfo, petName, petSizeCode, petSizeName)
@@ -90,13 +97,33 @@ function PetInfoLine({
 }
 
 /** 아트보드 04-① — `petInfo` 가 비어도 섹션을 숨기지 않는다. 대신 다음 행동을 준다 */
-function EmptyPetInfo({ tel }: { tel: string | null }) {
+/**
+ * `petInfo` 가 없는 상태. **두 갈래다.**
+ *
+ * 서버가 동반 여부를 등록해 둔 곳(`ALLOWED`/`NOT_ALLOWED`/`PARTIALLY_ALLOWED`)에서
+ * "동반 가능 여부가 등록되지 않았어요" 라고 말하면 제목 옆 배지와 **한 화면이 두 말을
+ * 한다.** 명세는 모름을 확신처럼 말하지 말라고 했는데, 확신을 모름처럼 말하는 것도
+ * 같은 크기의 거짓이다. 그래서 그 갈래에서는 **서버 문장을 그대로** 쓰고 없는 것이
+ * 세부 조건임을 밝힌다 (FE 가 code 별 한국어를 만들지 않는다).
+ */
+function EmptyPetInfo({ allowance, tel }: { allowance: EnumMetadata | null; tel: string | null }) {
+  const registered = allowance !== null && allowance.code !== 'UNKNOWN'
+
   return (
     <div className="flex flex-col items-start gap-2.5">
       {/* 점선 배지로 "모름" 을 드러낸다 — tint 를 주지 않는다 (DESIGN.md §2-3 UNKNOWN) */}
-      <MetricBadge tone="unknown">{messages.place.detailPetInfoEmptyBadge}</MetricBadge>
+      {!registered && (
+        <MetricBadge tone="unknown">{messages.place.detailPetInfoEmptyBadge}</MetricBadge>
+      )}
+
+      {registered && allowance.description !== null && allowance.description !== undefined && (
+        <p className="text-body-2 text-fg break-keep">{allowance.description}</p>
+      )}
+
       <p className="text-body-2 text-fg-muted break-keep">
-        {messages.place.detailPetInfoEmptyText}
+        {registered
+          ? messages.place.detailPetInfoDetailsMissingText
+          : messages.place.detailPetInfoEmptyText}
       </p>
       {tel !== null && (
         <a

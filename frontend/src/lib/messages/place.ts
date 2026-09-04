@@ -178,6 +178,13 @@ export const placeMessages = {
   /** 아트보드 04-① — `petInfo` 가 비어도 섹션을 숨기지 않는다 */
   detailPetInfoEmptyBadge: '정보 없음',
   detailPetInfoEmptyText: '동반 가능 여부가 등록되지 않았어요. 방문 전 전화로 확인해 주세요.',
+  /**
+   * 동반 여부는 **등록돼 있고** 세부 조건만 없을 때. 이 갈래를 위 문구로 덮으면
+   * 제목 옆 배지(`동반 불가` 등)와 다른 말을 하게 된다 — 실데이터에서 흔한 조합이다
+   * (dev 실측: `petAllowanceType=NOT_ALLOWED` + `petInfo=null`).
+   */
+  detailPetInfoDetailsMissingText:
+    '세부 동반 조건은 등록되지 않았어요. 방문 전 전화로 확인해 주세요.',
   /** `{tel}` 치환 */
   detailPetInfoEmptyTel: '{tel} 전화',
 

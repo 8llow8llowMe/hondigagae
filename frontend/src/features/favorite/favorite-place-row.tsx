@@ -8,7 +8,7 @@ import { FormAlert } from '@/components/form-alert'
 import { BookmarkIcon, ImageIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
 import { Row } from '@/components/surface'
-import { isAllowedImageHost } from '@/lib/image/remote-host'
+import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { placeMetaLine } from '@/lib/place/meta'
 import { cn } from '@/lib/utils/cn'
@@ -57,7 +57,7 @@ export function FavoritePlaceRow({
   index: number
   onToggle: (item: FavoritePlaceItem, index: number) => void
 }) {
-  const hasImage = isAllowedImageHost(item.firstImage) && item.firstImage !== null
+  const thumbnail = imageSrc(item.firstImage)
   const meta = placeMetaLine(item.addr, item.indoor)
   const href = `/places/${item.placeId}`
 
@@ -75,9 +75,9 @@ export function FavoritePlaceRow({
       <div className="flex items-center gap-3 py-3 lg:gap-5 lg:py-4">
         <div className="bg-band relative size-20 shrink-0 overflow-hidden rounded-md lg:size-24">
           {/* 미등록 호스트를 next/image 에 넘기면 런타임에 던진다 — 플레이스홀더로 떨어뜨린다 */}
-          {hasImage ? (
+          {thumbnail !== null ? (
             <Image
-              src={item.firstImage as string}
+              src={thumbnail}
               alt=""
               fill
               sizes="(min-width: 1024px) 96px, 80px"

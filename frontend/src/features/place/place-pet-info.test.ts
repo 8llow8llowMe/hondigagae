@@ -1,6 +1,9 @@
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+
 import { describe, expect, it } from 'vitest'
 
-import { petInfoLines, sizeVerdictLine } from '@/features/place/place-pet-info'
+import { petInfoLines, PlacePetInfoSection, sizeVerdictLine } from '@/features/place/place-pet-info'
 import { messages } from '@/lib/messages'
 import { placeDetail } from '@/test/fixtures/place'
 
@@ -94,5 +97,71 @@ describe('sizeVerdictLine — 규정을 옮기는 것과 판단을 돕는 것은
     )
 
     expect(line).toBe(messages.place.detailPetSizeUnknown.replace('{name}', '몽실이'))
+  })
+})
+
+function renderEmpty(allowance: { code: string; name: string; description: string | null } | null) {
+  return renderToStaticMarkup(
+    createElement(PlacePetInfoSection, {
+      petInfo: null,
+      allowance,
+      sourceText: null,
+      tel: '064-799-4820',
+      petName: null,
+      petSizeCode: null,
+      petSizeName: null,
+    }),
+  )
+}
+
+describe('petInfo 가 없을 때 — 동반 여부가 등록됐는지와 세부 조건이 있는지를 구분한다', () => {
+  /*
+    **실데이터가 이 분기를 만들게 했다.** dev 의 테지움사파리는 `petAllowanceType` 이
+    `NOT_ALLOWED`(서버가 불가로 등록)인데 `petInfo` 가 null 이다. 그때 제목 옆 배지는
+    "동반 불가" 인데 이 섹션은 "동반 가능 여부가 등록되지 않았어요" 라고 말해
+    **한 화면이 두 말을 했다.** 명세가 세운 원칙(모름을 확신처럼 말하지 않는다)의
+    반대 방향 — 확신을 모름처럼 말하는 것도 거짓이다.
+  */
+  it('동반 여부가 확정값이면 서버 문장을 쓰고 "등록되지 않았어요" 라고 말하지 않는다', () => {
+    const html = renderEmpty({
+      code: 'NOT_ALLOWED',
+      name: '동반 불가',
+      description: '반려동물 동반이 불가능한 장소입니다.',
+    })
+
+    expect(html).toContain('반려동물 동반이 불가능한 장소입니다.')
+    expect(html).toContain(messages.place.detailPetInfoDetailsMissingText)
+    expect(html).not.toContain(messages.place.detailPetInfoEmptyText)
+  })
+
+  it('동반 가능으로 등록된 곳도 같은 길을 탄다 — 세부 조건만 없다', () => {
+    const html = renderEmpty({
+      code: 'ALLOWED',
+      name: '동반 가능',
+      description: '반려동물 동반이 가능한 장소입니다.',
+    })
+
+    expect(html).toContain('반려동물 동반이 가능한 장소입니다.')
+    expect(html).not.toContain(messages.place.detailPetInfoEmptyText)
+  })
+
+  /** `UNKNOWN` 은 실제로 모르는 것이라 기존 문구가 맞다 */
+  it('UNKNOWN 이면 "등록되지 않았어요" 를 그대로 쓴다', () => {
+    const html = renderEmpty({ code: 'UNKNOWN', name: '정보 없음', description: null })
+
+    expect(html).toContain(messages.place.detailPetInfoEmptyText)
+    expect(html).toContain(messages.place.detailPetInfoEmptyBadge)
+  })
+
+  it('동반 구분 자체가 없으면 모름으로 다룬다', () => {
+    expect(renderEmpty(null)).toContain(messages.place.detailPetInfoEmptyText)
+  })
+
+  /** 어느 갈래든 다음 행동(전화)은 남는다 — 숨기는 대신 행동을 준다 (명세 D5) */
+  it('두 갈래 모두 전화 링크를 남긴다', () => {
+    expect(renderEmpty(null)).toContain('tel:0647994820')
+    expect(
+      renderEmpty({ code: 'NOT_ALLOWED', name: '동반 불가', description: '불가합니다.' }),
+    ).toContain('tel:0647994820')
   })
 })
