@@ -88,7 +88,7 @@ class ValidationErrorSupportTest {
         return (ValidationErrorBody) payload.dataHeader().resultMessage();
     }
 
-    @SuppressWarnings("unused")
+    /** 직접 호출하지 않는다 — {@code MethodArgumentNotValidException} 이 요구하는 {@code MethodParameter} 를 리플렉션으로 얻는 자리다. */
     private void handler(SignupRequest request) {
     }
 
