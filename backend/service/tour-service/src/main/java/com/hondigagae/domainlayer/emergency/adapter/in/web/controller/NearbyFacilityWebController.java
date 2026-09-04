@@ -36,35 +36,39 @@ public class NearbyFacilityWebController {
             + "가장 가까운 병원이 아니기 때문입니다. "
             + "operatingHoursKnown 이 false 인 항목은 \"휴무\"가 아니라 \"영업 정보 없음\"이므로 "
             + "전화 확인을 안내해야 합니다(동물병원은 약 절반이 운영시간을 주지 않습니다). "
-            + "24시간 운영이 확인된 곳은 제주 동물병원 중 3곳뿐이라 open24Only=true 는 결과가 매우 적습니다.")
+            + "24시간 운영이 확인된 곳은 제주 동물병원 중 3곳뿐이라 open24Only=true 는 결과가 매우 적습니다.\n\n"
+            + "**필수: lat, lng.** 나머지는 생략 가능하고 radius 기본 10000m, size 기본 10 입니다.\n\n"
+            + "호출 예\n"
+            + "- 가장 가까운 도움 10곳: `GET /api/v1/emergencies/facilities?lat=33.4996&lng=126.5312`\n"
+            + "- 지금 영업 중인 동물병원만: `GET /api/v1/emergencies/facilities?lat=33.4996&lng=126.5312&type=ANIMAL_HOSPITAL&openNowOnly=true`")
     @GetMapping("/facilities")
     public ResponseEntity<Response<NearbyFacilityResponse>> searchNearbyFacilities(
-        @Parameter(description = "중심 위도", required = true, example = "33.4996213")
+        @Parameter(description = "[필수] 중심 위도 (WGS84, -90~90)", required = true, example = "33.4996213")
         @Min(value = -90, message = EmergencyValidationMessage.LAT_RANGE_INVALID)
         @Max(value = 90, message = EmergencyValidationMessage.LAT_RANGE_INVALID)
         @RequestParam Double lat,
 
-        @Parameter(description = "중심 경도", required = true, example = "126.5311884")
+        @Parameter(description = "[필수] 중심 경도 (WGS84, -180~180)", required = true, example = "126.5311884")
         @Min(value = -180, message = EmergencyValidationMessage.LNG_RANGE_INVALID)
         @Max(value = 180, message = EmergencyValidationMessage.LNG_RANGE_INVALID)
         @RequestParam Double lng,
 
-        @Parameter(description = "검색 반경(m). 최대 50000", example = "10000")
+        @Parameter(description = "[선택, 기본 10000] 검색 반경(m). 1~50000", example = "10000")
         @Min(value = 1, message = EmergencyValidationMessage.RADIUS_RANGE_INVALID)
         @Max(value = 50_000, message = EmergencyValidationMessage.RADIUS_RANGE_INVALID)
         @RequestParam(defaultValue = "10000") int radius,
 
-        @Parameter(description = "시설 종류. 비우면 동물병원과 동물약국을 함께 본다", example = "ANIMAL_HOSPITAL")
+        @Parameter(description = "[선택] 시설 종류. ANIMAL_HOSPITAL 동물병원(진료) · ANIMAL_PHARMACY 동물약국(상비약·처방약). 생략하면 둘을 함께 봅니다", example = "ANIMAL_HOSPITAL")
         @RequestParam(required = false) EmergencyFacilityType type,
 
-        @Parameter(description = "24시간 운영으로 확인된 곳만 볼지", example = "false")
+        @Parameter(description = "[선택, 기본 false] 24시간 운영으로 확인된 곳만 볼지. 제주 동물병원 중 3곳뿐이라 결과가 매우 적습니다", example = "false")
         @RequestParam(defaultValue = "false") boolean open24Only,
 
-        @Parameter(description = "지금 영업 중으로 확인된 곳만 볼지. 영업시간을 모르는 곳도 빠지므로 "
-            + "결과가 줄어든다", example = "false")
+        @Parameter(description = "[선택, 기본 false] 지금 영업 중으로 확인된 곳만 볼지. 영업시간을 모르는 곳(operatingHoursKnown=false)도 "
+            + "함께 빠지므로 결과가 줄어듭니다", example = "false")
         @RequestParam(defaultValue = "false") boolean openNowOnly,
 
-        @Parameter(description = "조회 개수 (1~50)", example = "10")
+        @Parameter(description = "[선택, 기본 10] 조회 개수 (1~50)", example = "10")
         @Min(value = 1, message = EmergencyValidationMessage.SIZE_RANGE_INVALID)
         @Max(value = 50, message = EmergencyValidationMessage.SIZE_RANGE_INVALID)
         @RequestParam(defaultValue = "10") int size
@@ -92,7 +96,7 @@ public class NearbyFacilityWebController {
             + "폐업한 병원 주소를 들고 찾아가게 되기 때문입니다.")
     @GetMapping("/facilities/{facilityId}")
     public ResponseEntity<Response<EmergencyFacilityDetailResponse>> getFacilityDetail(
-        @Parameter(description = "긴급 시설 아이디", required = true, example = "4611686018427387904")
+        @Parameter(description = "[필수] 긴급 시설 아이디. 주변 검색 응답의 facilityId 를 그대로 씁니다. 예시 값은 형식 안내용", required = true, example = "4611686018427387904")
         @PathVariable long facilityId
     ) {
         EmergencyFacilityDetailResponse response = nearbyFacilityWebUseCase.getFacilityDetail(facilityId);
