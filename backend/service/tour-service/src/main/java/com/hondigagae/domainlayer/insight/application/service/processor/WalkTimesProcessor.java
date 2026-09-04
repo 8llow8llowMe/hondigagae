@@ -4,6 +4,7 @@ import com.hondigagae.domainlayer.insight.application.exception.InsightErrorCode
 import com.hondigagae.domainlayer.insight.application.exception.InsightException;
 import com.hondigagae.domainlayer.insight.application.info.WalkTimesInfo;
 import com.hondigagae.domainlayer.insight.application.mapper.InsightMapper;
+import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.model.GoldenWalkWindow;
 import com.hondigagae.domainlayer.insight.domain.model.HourlyWalkSafety;
 import com.hondigagae.domainlayer.insight.domain.model.PetCondition;
@@ -28,6 +29,17 @@ import org.springframework.stereotype.Component;
  * <p>장소가 아니라 좌표로 받는다. 숙소에서 "오늘 산책 언제 갈까"를 묻는 상황이라 장소를
  * 고르기 전이다.
  *
+ * <h2>오늘 남은 시간이 없는 것은 오류가 아니다</h2>
+ *
+ * <b>밤마다 반드시 이 상태가 된다.</b> 기상청 단기예보 23시 회차는 자기 발표일 행을 하나도
+ * 주지 않으므로(실측: {@code base_time=2300} 의 최초 예보가 익일 0000), 23시 회차가 올라온
+ * 뒤부터 자정까지 "오늘"의 시각별 예보는 원천에 존재하지 않는다. 그 전에도 마지막 예보 시각을
+ * 지나면 곡선은 비어 있다.
+ *
+ * <p>그래서 빈 곡선을 5xx 로 올리지 않는다 - 재시도해도 자정 전에는 풀리지 않는 것을
+ * "잠시 후 다시 시도해 주세요"라고 말하는 셈이고, 화면은 이유 없이 사라진다. 대신
+ * {@link ForecastCoverage} 로 <b>왜 비었는지</b>를 응답에 실어 화면이 말할 수 있게 한다.
+ *
  * <h2>판정을 복제하지 않는다</h2>
  *
  * {@code WalkSafetyEvaluator.hourlyCurve} 가 안전 시간대 탐색과 <b>같은 간이 판정</b>을 쓴다.
@@ -47,16 +59,14 @@ public class WalkTimesProcessor {
         LocalDateTime now = LocalDateTime.now();
         LocalDate today = now.toLocalDate();
 
-        List<WeatherForecast> sameDay = weatherForecastProcessor.forecastsAt(lat, lng).stream()
+        List<WeatherForecast> forecasts = loadForecasts(lat, lng);
+        List<WeatherForecast> sameDay = forecasts.stream()
             .filter(forecast -> forecast.forecastAt().toLocalDate().equals(today))
             .toList();
-        if (sameDay.isEmpty()) {
-            // 오늘 남은 예보가 없다. 곡선을 못 그리므로 빈 답 대신 명시적으로 실패시킨다.
-            throw new InsightException(InsightErrorCode.WEATHER_UNAVAILABLE);
-        }
 
         List<HourlyWalkSafety> curve = WalkSafetyEvaluator.hourlyCurve(
             sameDay, pet, insightMapper.toThresholds(insightProperties), now);
+        ForecastCoverage coverage = coverageOf(forecasts, curve);
 
         WeatherWarning warning = weatherWarningProcessor.heaviestWarning().orElse(null);
 
@@ -65,12 +75,50 @@ public class WalkTimesProcessor {
             .lng(lng)
             .from(now)
             .curve(curve)
+            .forecastCoverage(coverage)
             // 경보 중에는 골든타임을 주지 않는다. 시간대 곡선이 아무리 좋아도 기상청이
             // 나가지 말라고 한 날에 "이때가 좋다"고 말하면 안 된다.
             .goldenWindow(isWarningActive(warning) ? null : GoldenWalkWindow.from(curve).orElse(null))
             .weatherWarning(warning)
             .petConditionApplied(pet.isSpecified())
             .build();
+    }
+
+    /**
+     * 예보를 가져온다. <b>일시적 장애는 빈 목록으로 낮춘다.</b>
+     *
+     * <p>장소 산책 위험도가 이미 같은 선택을 해 두었다 - 날씨를 못 받았다는 것도 화면이 말할 수
+     * 있는 정보라, 그 사실을 근거로 남기고 200 으로 답한다. 두 화면이 같은 원인에 다른 상태
+     * 코드를 내면 프론트는 같은 상황을 두 벌로 처리하게 된다.
+     *
+     * <p><b>설정 오류(INSIGHT_004)는 그대로 올린다.</b> 그것은 배포가 잘못된 것이고, 200 뒤에
+     * 숨기면 "오늘은 예보가 없네" 로 읽혀 며칠이고 발견되지 않는다.
+     */
+    private List<WeatherForecast> loadForecasts(double lat, double lng) {
+        try {
+            return weatherForecastProcessor.forecastsAt(lat, lng);
+        } catch (InsightException exception) {
+            if (exception.getErrorCode() != InsightErrorCode.WEATHER_UNAVAILABLE) {
+                throw exception;
+            }
+            log.info("Walk times falls back to no-weather lat={} lng={} errorCode={}",
+                lat, lng, exception.getErrorCode().getCode());
+            return List.of();
+        }
+    }
+
+    /**
+     * 곡선이 비었을 때 <b>왜</b> 비었는지.
+     *
+     * <p>이 화면이 묻는 날짜는 언제나 오늘이라 "예보 범위 밖"은 나올 수 없다. 남는 것은 둘 -
+     * 예보를 못 받았거나(장애), 오늘 예보 시간대가 지났거나(정상)다. 오늘 행이 있어도 남은
+     * 시각이 없으면 곡선은 비므로, 판단 기준은 오늘 행의 유무가 아니라 <b>곡선</b>이다.
+     */
+    private ForecastCoverage coverageOf(List<WeatherForecast> forecasts, List<HourlyWalkSafety> curve) {
+        if (forecasts.isEmpty()) {
+            return ForecastCoverage.UNAVAILABLE;
+        }
+        return curve.isEmpty() ? ForecastCoverage.DAY_ENDED : ForecastCoverage.AVAILABLE;
     }
 
     private boolean isWarningActive(WeatherWarning warning) {
