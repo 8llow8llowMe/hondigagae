@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.placeimport.adapter.in.batch.job;
 
+import com.hondigagae.domainlayer.placeimport.adapter.in.batch.tasklet.PlaceImageImportTasklet;
 import com.hondigagae.domainlayer.placeimport.adapter.in.batch.tasklet.PlaceImportTasklet;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -29,11 +30,14 @@ public class PlaceImportJobConfig {
 
     public static final String JOB_NAME = "placeImportJob";
     private static final String STEP_NAME = "placeImportStep";
+    private static final String IMAGE_STEP_NAME = "placeImageImportStep";
 
     @Bean
-    public Job placeImportJob(JobRepository jobRepository, Step placeImportStep) {
+    public Job placeImportJob(JobRepository jobRepository, Step placeImportStep, Step placeImageImportStep) {
         return new JobBuilder(JOB_NAME, jobRepository)
             .start(placeImportStep)
+            // 이미지 적재는 장소 적재 뒤에 돈다 — place 테이블의 TourAPI 행이 대상 목록이다.
+            .next(placeImageImportStep)
             .build();
     }
 
@@ -45,6 +49,17 @@ public class PlaceImportJobConfig {
     ) {
         return new StepBuilder(STEP_NAME, jobRepository)
             .tasklet(placeImportTasklet, transactionManager)
+            .build();
+    }
+
+    @Bean
+    public Step placeImageImportStep(
+        JobRepository jobRepository,
+        PlatformTransactionManager transactionManager,
+        PlaceImageImportTasklet placeImageImportTasklet
+    ) {
+        return new StepBuilder(IMAGE_STEP_NAME, jobRepository)
+            .tasklet(placeImageImportTasklet, transactionManager)
             .build();
     }
 }

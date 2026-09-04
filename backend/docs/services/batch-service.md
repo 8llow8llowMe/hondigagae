@@ -41,6 +41,11 @@
 ./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=congestionImportJob"
 ```
 
+`placeImportJob` 은 장소 적재 뒤 **추가 이미지 단계(placeImageImportStep)** 를 이어 돈다 —
+TourAPI 원천 행만 대상으로 detailImage2 를 장소당 1회 불러 place_image 를 교체(멱등)한다.
+문화정보원·식약처 원천은 추가 이미지 API 가 없어 대상에서 빠지며, 그 장소들의 상세 갤러리는
+tour-service 의 대표 이미지 폴백이 담당한다.
+
 - **`placeImportJob` 이후에 돌려야 한다.** 장소가 비어 있으면 전부 UNMATCHED 로 적재되고
   적합도 응답에서 혼잡도가 계속 빠진다.
 - 30일 rolling 원천이라 **일 1회 주기 실행**이 전제다. 같은 날짜가 다시 오면 예측이 갱신된

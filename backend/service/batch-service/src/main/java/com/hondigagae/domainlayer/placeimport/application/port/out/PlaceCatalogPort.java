@@ -2,6 +2,8 @@ package com.hondigagae.domainlayer.placeimport.application.port.out;
 
 import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceCatalogQueryResult;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceContentType;
+import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlaceImage;
+import java.util.List;
 
 /**
  * 외부 장소 카탈로그(TourAPI) 조회 계약.
@@ -10,4 +12,7 @@ import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceContentType;
 public interface PlaceCatalogPort {
 
     PlaceCatalogQueryResult fetchAreaBasedPlaces(String areaCode, PlaceContentType contentType, int pageNo, int numOfRows);
+
+    /** 콘텐츠 하나의 추가 이미지 전부(detailImage2). 이미지가 없으면 빈 목록이다. */
+    List<ImportedPlaceImage> fetchDetailImages(long contentId);
 }
