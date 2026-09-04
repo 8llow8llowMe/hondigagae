@@ -293,16 +293,17 @@
 
 ## 4. 여행 일정 — 착수 가능
 
-| 화면                        | 경로                                         | API                                                         | 상태                                                                 |
-| --------------------------- | -------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------- |
-| 일정 목록                   | `/plans`                                     | `GET /plans` (커서)                                         | **구현** (#75)                                                       |
-| 일정 생성                   | `/plans/new`                                 | `POST /plans`                                               | **구현** (#75)                                                       |
-| 일정 상세 (타임라인 + 판정) | `/plans/[planId]`                            | `GET /plans/{planId}` + `GET /plans/{planId}/weather`       | **구현** (#80)                                                       |
-| 일정 수정·삭제              | `/plans/[planId]` 내                         | `PUT` · `DELETE /plans/{planId}`                            | **구현** (#80) — 이름·예산·상태만. **기간 수정은 열지 않는다**(아래) |
-| 일자 항목 편집              | `/plans/[planId]` 내 모드                    | `PUT /plans/{planId}/days/{day}/items` (**일괄 교체**)      | **구현** (#81)                                                       |
-| 일정에 장소 담기            | `/plans/[planId]/days/[day]/add` + 실내 대안 | `PUT /plans/{planId}/days/{day}/items` (**같은 일괄 교체**) | **구현** (#82) — 새 API 없음                                         |
-| 일정 날씨 브리핑            | `/plans/[planId]` 내                         | `GET /plans/{planId}/weather`                               | **구현** (#80) — 일자 판정으로 통합                                  |
-| 항목 방문 체크              | `/plans/[planId]` 내 항목 행                 | `PUT /plans/{planId}/items/{planItemId}/visited`            | **구현** (#124) — 해제도 같은 API                                    |
+| 화면                        | 경로                                         | API                                                                                  | 상태                                                                               |
+| --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| 일정 목록                   | `/plans`                                     | `GET /plans` (커서)                                                                  | **구현** (#75)                                                                     |
+| 일정 생성                   | `/plans/new`                                 | `POST /plans`                                                                        | **구현** (#75)                                                                     |
+| 일정 상세 (타임라인 + 판정) | `/plans/[planId]`                            | `GET /plans/{planId}` + `GET /plans/{planId}/weather`                                | **구현** (#80)                                                                     |
+| 일정 수정·삭제              | `/plans/[planId]` 내                         | `PUT` · `DELETE /plans/{planId}`                                                     | **구현** (#80) — 이름·예산·상태만. **기간 수정은 열지 않는다**(아래)               |
+| 일자 항목 편집              | `/plans/[planId]` 내 모드                    | `PUT /plans/{planId}/days/{day}/items` (**일괄 교체**)                               | **구현** (#81)                                                                     |
+| 일정에 장소 담기            | `/plans/[planId]/days/[day]/add` + 실내 대안 | `PUT /plans/{planId}/days/{day}/items` (**같은 일괄 교체**)                          | **구현** (#82) — 새 API 없음                                                       |
+| 하루 재생성                 | `/plans/[planId]/days/[day]/regenerate`      | `POST /ai-plans` (`planId`+`regenerateDay`) → `PUT /plans/{planId}/days/{day}/items` | **구현** (#128) — 새 API 없음. 정본 `docs/features/ai-plan/하루재생성-세부명세.md` |
+| 일정 날씨 브리핑            | `/plans/[planId]` 내                         | `GET /plans/{planId}/weather`                                                        | **구현** (#80) — 일자 판정으로 통합                                                |
+| 항목 방문 체크              | `/plans/[planId]` 내 항목 행                 | `PUT /plans/{planId}/items/{planItemId}/visited`                                     | **구현** (#124) — 해제도 같은 API                                                  |
 
 **일정 응급 브리핑** — [#125](https://github.com/8llow8llowMe/hondigagae/issues/125) · BE PR #105
 
@@ -403,8 +404,9 @@
 - **`AiPlanCreateRequest` 가 `petIds`·`pinnedPlaceIds`·`includeFavorites`·`planId`+`regenerateDay`
   를 받는다** (PR #78). 전부 선택이다. `petIds` · `pinnedPlaceIds` · `preferFavorites` 는
   [#128](https://github.com/8llow8llowMe/hondigagae/issues/128) 로 붙였고(필드명은
-  `includeFavorites` 가 아니라 `preferFavorites` 다), **`planId`+`regenerateDay`(하루 재생성)는
-  아직 보내지 않는다** — 아트보드와 계약이 어긋나 있다 (명세 S1 · #90).
+  `includeFavorites` 가 아니라 `preferFavorites` 다). **`planId`+`regenerateDay`(하루 재생성)도
+  #128 로 붙였다** — 다만 **이 화면이 아니라 일정 상세의 하루 재생성**(위 4절)에서만 실린다.
+  `planId` 가 저장된 일정에만 있어 담기 전 초안에서는 보낼 수 없다 (`하루재생성-세부명세.md` R1).
 - `petId` 와 `petIds` 가 함께 오면 **`petIds` 가 이기고 `petId` 는 무시된다.** 둘 다 없으면
   **대표 반려견**을 쓴다 — 그런데 대표견 지정 UI 가 없다 (#126).
 
