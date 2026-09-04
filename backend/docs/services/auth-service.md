@@ -83,6 +83,12 @@
 ## 구현 주의점
 
 - `security-core`의 `auth/*` 패키지는 이 서비스만 사용한다 (토큰 발급 전용).
+- **인증 실패는 전부 `Response` 봉투 안의 401 이다** (#214). `JwtAuthProvider` 가 jjwt 예외를 종류와 무관하게
+  `SecurityJwtException` 으로 바꾸고(만료 `SECURITY_002` · 서명 불일치 `SECURITY_004` · 나머지 형식·디코딩·클레임 오류
+  `SECURITY_003`), 토큰 없이 인증 API 를 부르면 `JwtAuthenticationEntryPoint` 가 `SECURITY_001` 을 쓴다. 이전에는 서명부
+  길이가 base64url 에 맞지 않는 토큰이 500 으로, 토큰 없는 요청이 Spring 기본 403 으로 봉투 밖에 나갔다.
+  jjwt 의 `SecurityException` 은 `java.lang.SecurityException` 과 이름이 같아 import 없이 catch 하면 엉뚱한 것을 잡는다 —
+  `JwtException` 부모로 받는다.
 - OAuth state, refresh token, 로그아웃 블랙리스트, 이메일 인증코드, 로그인 실패 카운터는 Redis에 저장한다.
 - provider 호출은 서킷 인스턴스(`kakao`, `naver`)로 감싸고, 인가코드 만료 같은 사용자 4xx는
   `OAuthApiCallSupport`가 `AuthException`으로 변환한 뒤 `ignore-exceptions`로 서킷에서 제외한다.

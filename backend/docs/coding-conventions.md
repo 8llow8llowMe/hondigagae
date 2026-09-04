@@ -171,6 +171,8 @@ throw new PlanException(PlanErrorCode.PLAN_DATE_RANGE_INVALID);
 
 공통 검증 예외 (`MethodArgumentNotValidException`, `MethodArgumentTypeMismatchException`, `ConstraintViolationException`, `HandlerMethodValidationException`) 는 **`{DOMAIN}_400` 같은 뭉뚱그린 코드를 쓰지 않습니다.** 필드별로 개별 에러코드를 부여해 클라이언트가 코드 단위로 분기할 수 있게 합니다.
 
+역직렬화 실패(`HttpMessageNotReadableException` — 깨진 JSON, enum 에 없는 값)는 Bean Validation 보다 앞선 단계라 필드별 코드가 없습니다. **catch-all advice 가 `INVALID_REQUEST`(`{DOMAIN}_100`) 로 받되 `ValidationErrorSupport` 가 어느 필드인지와 enum 허용 값을 메시지에 담습니다.** 핸들러가 없으면 Spring 기본 400 이 `Response` 봉투 없이 나가 클라이언트 파서가 깨집니다 (#214).
+
 **1) 코드 대역** — 검증 전용 코드는 `1xx` 대역을 사용합니다. 비즈니스 코드(`001~`)와 번호가 섞이지 않아 확장이 쉽습니다. 대역 안에서 역할을 나눕니다.
 
 | 코드 | 정의 위치 | 용도 |

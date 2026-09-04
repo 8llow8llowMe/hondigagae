@@ -176,6 +176,7 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | #89 | ai | AI 초안의 WALK 항목 placeId 가 walk_course.id 와 어긋난다 | 미착수 |
 | #90 | ai | AI 일정 작업 세부 단계·일자 재생성·취소·sigunguCode | 재생성만 완료(#77), 나머지 3건 미착수 |
 | #152 | plan | 일정 저장·판정의 다중 반려견 지원 (PlanCreateRequest.petIds) | 구현 완료, PR 대기 (`features/152-plan-multi-pet.md`) |
+| #214 | auth·core | 디코딩 불가 서명 JWT 가 401 이 아니라 500 을 준다 (래퍼 없는 본문) | 구현 완료, PR 대기 — 토큰 없음 403→401 `SECURITY_001`, `HttpMessageNotReadableException` 핸들러 4 서비스 |
 
 **완료 (41)**
 
