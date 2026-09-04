@@ -429,44 +429,21 @@ function submit(memberId: string, body: string | null): MockResult {
   }
 
   /*
-    하루 재생성 (#128). **둘은 짝이다** — `AiPlanJobProcessor:187-197` 가 하나만 오면
-    `REGENERATE_REQUEST_INVALID`(`AIPLAN_014`)로 막는다. **일수는 이 요청 자체의
-    startDate/endDate 로 센다** — 서버가 제출 시점에는 plan 을 조회하지 않고
-    `ChronoUnit.DAYS.between(command.startDate(), command.endDate()) + 1` 로 계산해
-    `REGENERATE_DAY_OUT_OF_RANGE`(`AIPLAN_015`)를 판단한다. 존재하지 않거나 남의
-    plan 인 경우(`PLAN_OUTLINE_UNAVAILABLE` = `AIPLAN_016`)는 `AiPlanWorker` 가 비동기로
-    던지는 예외라 이 계약에서는 HTTP 200 + `status=FAILED` 로 오고, 화면은 항상 본인
-    plan 으로만 접근하므로 여기서 모델링하지 않는다.
+    하루 재생성 (#128). `regenerateDay` 자체의 `@Positive` 는 다른 필드들과 같은 Bean
+    Validation 배치다 — `AiPlanValidationMessage.REGENERATE_DAY_POSITIVE` =
+    `AIPLAN_112:재생성할 일차는 양수여야 합니다.` (`AiPlanCreateRequest.regenerateDay:65-67`).
+    **짝 규칙과 범위 검사는 다르다** — `AiPlanJobProcessor:187-197` 가 이 배치를 통과한
+    요청에만 수행하는 서비스 계층 교차 검증이라, 아래 `errors.length` 판정 뒤에 따로 둔다.
   */
   const regeneratePlanId = asIdString(parsed.planId)
   const regenerateDay = typeof parsed.regenerateDay === 'number' ? parsed.regenerateDay : null
 
-  if ((regeneratePlanId === null) !== (regenerateDay === null)) {
+  if (regenerateDay !== null && regenerateDay < 1) {
     errors.push({
-      code: 'AIPLAN_014',
+      code: 'AIPLAN_112',
       field: 'regenerateDay',
-      message: '하루 재생성에는 일정 식별자와 재생성할 일차가 함께 필요합니다.',
+      message: '재생성할 일차는 양수여야 합니다.',
     })
-  }
-
-  if (regeneratePlanId !== null && regenerateDay !== null) {
-    const start = Date.parse(`${startDate}T00:00:00Z`)
-    const end = Date.parse(`${endDate}T00:00:00Z`)
-    const dayCount =
-      Number.isNaN(start) || Number.isNaN(end) ? 0 : Math.floor((end - start) / 86_400_000) + 1
-
-    /*
-      `regenerateDay < 1` 은 실제로는 서버 `@Positive` Bean Validation 이 먼저 막지만,
-      mock 은 그것만을 위한 별도 필드 오류 형태를 만들지 않고 범위 오류(AIPLAN_015)에
-      접어 넣는다 — 결과적으로 항상 400 이라는 사실은 같다.
-    */
-    if (regenerateDay < 1 || regenerateDay > dayCount) {
-      errors.push({
-        code: 'AIPLAN_015',
-        field: 'regenerateDay',
-        message: '다시 구성할 일차가 여행 기간을 벗어났습니다.',
-      })
-    }
   }
 
   if (errors.length > 0) return failValidation(errors)
@@ -477,6 +454,35 @@ function submit(memberId: string, body: string | null): MockResult {
   */
   if (startDate > endDate) {
     return fail(400, 'AIPLAN_001', '여행 시작일은 종료일보다 늦을 수 없습니다.')
+  }
+
+  /*
+    **둘은 짝이다.** 실제 서비스는 `AiPlanException` 을 던지고
+    `AiPlanExceptionHandler.handleAiPlanException` 이 평평한 바디
+    (`resultCode: 'AIPLAN_014'`, 문자열 message)로 응답한다 — Bean Validation 배치
+    (`AIPLAN_100`/`errors[]`)가 아니다. 날짜 역전(`AIPLAN_001`)과 같은 형태를 쓴다.
+  */
+  if ((regeneratePlanId === null) !== (regenerateDay === null)) {
+    return fail(400, 'AIPLAN_014', '하루 재생성에는 일정 식별자와 재생성할 일차가 함께 필요합니다.')
+  }
+
+  /*
+    **일수는 이 요청 자체의 startDate/endDate 로 센다** — 서버가 제출 시점에는 plan 을
+    조회하지 않고 `ChronoUnit.DAYS.between(command.startDate(), command.endDate()) + 1`
+    로 계산해 `REGENERATE_DAY_OUT_OF_RANGE`(`AIPLAN_015`, `AiPlanJobProcessor:193-196`)를
+    판단한다. 존재하지 않거나 남의 plan 인 경우(`PLAN_OUTLINE_UNAVAILABLE` = `AIPLAN_016`)는
+    `AiPlanWorker` 가 비동기로 던지는 예외라 이 계약에서는 HTTP 200 + `status=FAILED` 로
+    오고, 화면은 항상 본인 plan 으로만 접근하므로 여기서 모델링하지 않는다.
+  */
+  if (regeneratePlanId !== null && regenerateDay !== null) {
+    const start = Date.parse(`${startDate}T00:00:00Z`)
+    const end = Date.parse(`${endDate}T00:00:00Z`)
+    const dayCount =
+      Number.isNaN(start) || Number.isNaN(end) ? 0 : Math.floor((end - start) / 86_400_000) + 1
+
+    if (regenerateDay > dayCount) {
+      return fail(400, 'AIPLAN_015', '다시 구성할 일차가 여행 기간을 벗어났습니다.')
+    }
   }
 
   const store = mockStore()
