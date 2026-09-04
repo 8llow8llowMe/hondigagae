@@ -13,6 +13,7 @@ import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuer
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft;
 import com.hondigagae.global.properties.AiLlmProperties;
+import com.hondigagae.shared.travel.plan.PlanItemType;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,9 @@ import org.springframework.ai.ollama.OllamaChatModel;
 /**
  * Spring AI 어댑터 검증. 핵심은 provider 를 바꿔도 지켜져야 하는 두 가지다 —
  * 스키마 밖 응답을 파싱 실패로 처리하는 것, 후보 밖 장소(환각)의 링크를 끊는 것.
+ *
+ * <p>항목 종류를 다시 보는 것도 여기 있다 (#89). 모델이 고른 종류와 실린 장소가 어긋나면
+ * plan-service 에서 두 아이디 공간이 섞이는데, 그것을 막을 수 있는 마지막 지점이 이 어댑터다.
  */
 @ExtendWith(MockitoExtension.class)
 class OllamaLlmAdapterTest {
@@ -78,6 +82,90 @@ class OllamaLlmAdapterTest {
         assertThat(draft.days().get(0).items()).hasSize(1);
         assertThat(draft.days().get(0).items().get(0).placeId()).isNull();
         assertThat(draft.days().get(0).items().get(0).title()).isEqualTo("존재하지 않는 장소");
+    }
+
+    @Test
+    @DisplayName("장소가 실린 WALK 는 PLACE 로 바로잡는다 — 두 아이디 공간이 섞이면 안 된다")
+    void correctsWalkItemThatCarriesAPlace() {
+        // plan-service 에서 WALK 의 targetId 는 walk_course.id 이고, 그 유형은 장소 존재 검증에서
+        // 빠진다. 이대로 저장되면 place.id 가 walk_course.id 자리에 들어가고 아무도 막지 않는다.
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"WALK","placeId":100,"title":"해안 산책로","note":"목줄 착용"}]}],
+             "reasons":[]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "해안 산책로")));
+
+        AiPlanDraft.AiPlanDraftItem item = draft.days().get(0).items().get(0);
+        assertThat(item.itemType()).isEqualTo(PlanItemType.PLACE);
+        // 아이디는 후보 집합과 대조해 확인한 값이라 남긴다. 틀린 쪽은 종류였다 -
+        // 아이디를 끊으면 지도 표시와 장소 요약이 함께 사라진다.
+        assertThat(item.placeId()).isEqualTo(100L);
+        assertThat(item.title()).isEqualTo("해안 산책로");
+    }
+
+    @Test
+    @DisplayName("장소가 없는 WALK 는 그대로 둔다 — 섞일 아이디가 없다")
+    void keepsWalkItemWithoutAPlace() {
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"WALK","placeId":null,"title":"숙소 주변 산책","note":"저녁에"}]}],
+             "reasons":[]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "실제 장소")));
+
+        assertThat(draft.days().get(0).items().get(0).itemType()).isEqualTo(PlanItemType.WALK);
+        assertThat(draft.days().get(0).items().get(0).placeId()).isNull();
+    }
+
+    @Test
+    @DisplayName("후보 밖 장소를 실은 WALK 는 링크가 끊긴 뒤라 종류를 바꾸지 않는다")
+    void keepsWalkWhenItsPlaceWasHallucinated() {
+        // 링크를 끊고 나면 섞일 아이디가 없다. 그때까지 종류를 바꾸면 근거 없이 바꾸는 것이다.
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"WALK","placeId":999,"title":"지어낸 산책로","note":""}]}],
+             "reasons":[]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "실제 장소")));
+
+        assertThat(draft.days().get(0).items().get(0).itemType()).isEqualTo(PlanItemType.WALK);
+        assertThat(draft.days().get(0).items().get(0).placeId()).isNull();
+    }
+
+    @Test
+    @DisplayName("모르는 종류 코드는 PLACE 로 접는다 — 담는 순간 400 나는 초안을 내려 주지 않는다")
+    void foldsUnknownItemTypeToPlace() {
+        // plan-service 의 itemType 은 enum 이라 "CAFE" 를 그대로 실어 보내면 사용자가 담기를
+        // 누르는 순간 400 이 난다. 초안을 만든 쪽이 저장 가능한 값만 내려 주는 편이 맞다.
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"CAFE","placeId":100,"title":"오설록","note":"실내"}]}],
+             "reasons":[]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "오설록")));
+
+        assertThat(draft.days().get(0).items().get(0).itemType()).isEqualTo(PlanItemType.PLACE);
+    }
+
+    @Test
+    @DisplayName("MEAL·LODGING 은 장소가 실려도 그대로다 — 둘 다 targetId 가 place.id 다")
+    void keepsOtherPlaceTargetTypes() {
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"MEAL","placeId":100,"title":"점심","note":""},
+              {"itemType":"LODGING","placeId":100,"title":"숙소","note":""}]}],
+             "reasons":[]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "오설록")));
+
+        assertThat(draft.days().get(0).items()).extracting(AiPlanDraft.AiPlanDraftItem::itemType)
+            .containsExactly(PlanItemType.MEAL, PlanItemType.LODGING);
     }
 
     @Test
