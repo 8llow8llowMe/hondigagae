@@ -7,6 +7,7 @@ import { MetricBadge } from '@/components/metric'
 import { Row } from '@/components/surface'
 import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
+import { placeIllustration } from '@/lib/place/illustration'
 import { placeMetaLine } from '@/lib/place/meta'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceSummary } from '@/types/place'
@@ -58,6 +59,7 @@ export function PlaceRowContent({
   titleHref?: string
 }) {
   const thumbnail = imageSrc(place.firstImage)
+  const illustration = placeIllustration(place.contentType.code)
   const meta = placeMetaLine(place.addr1, place.indoor)
 
   return (
@@ -72,6 +74,15 @@ export function PlaceRowContent({
             sizes="(min-width: 1024px) 96px, 80px"
             className="object-cover"
           />
+        ) : illustration !== null ? (
+          /*
+            사진이 없으면 카테고리 일러스트로 채운다 (`lib/place/illustration.ts`).
+            **`next/image` 가 아니라 `<img>` 다** — 저장소 안의 정적 SVG 라 최적화할
+            것이 없고(`unoptimized: true`), 원격 호스트 허용 목록과도 무관하다.
+            **장식이므로 `alt=""` 다** — 카테고리는 아래 배지가 이미 낱말로 말한다.
+          */
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={illustration} alt="" className="absolute inset-0 size-full object-cover" />
         ) : (
           <span className="text-fg-subtle absolute inset-0 flex flex-col items-center justify-center gap-1">
             <ImageIcon size={20} />

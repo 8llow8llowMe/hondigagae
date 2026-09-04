@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-hidden="true">
+  <defs>
+    <filter id="g-t"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.18"/></feComponentTransfer>
+      <feComposite in2="SourceGraphic" operator="in"/></filter>
+  </defs>
+  <rect width="100" height="100" fill="#cfe6f2"/>
+  <circle cx="26" cy="26" r="10" fill="#f6efd8"/>
+  <path d="M0 58l30-26 22 19 14-11 34 26v34H0z" fill="#3f8f6a"/>
+  <path d="M0 78l26-14 24 10 20-8 30 12v22H0z" fill="#2b6b4d"/>
+  <path d="M52 51l14-11 12 9-13 8z" fill="#f7f7f2"/>
+  <rect width="100" height="100" filter="url(#g-t)" opacity="0.7"/>
+</svg>
