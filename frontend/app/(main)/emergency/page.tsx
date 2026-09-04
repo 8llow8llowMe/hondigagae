@@ -39,6 +39,7 @@ export default async function EmergencyPage({ searchParams }: { searchParams: Se
           current={view}
           listHref={viewModeHref('/emergency', '', 'list')}
           mapHref={viewModeHref('/emergency', '', 'map')}
+          variant="icon"
           className="lg:hidden"
         />
       </header>

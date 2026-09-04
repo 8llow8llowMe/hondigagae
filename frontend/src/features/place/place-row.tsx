@@ -31,7 +31,7 @@ export function PlaceRow({ place, last = false }: { place: PlaceSummary; last?: 
     <Row as="li" last={last}>
       <Link
         href={`/places/${place.placeId}`}
-        className="focus-visible:ring-brand-500 flex items-center gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none lg:gap-5 lg:py-4"
+        className="focus-visible:ring-brand-500 @container flex items-center gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none @lg:gap-5 @lg:py-4"
       >
         <PlaceRowContent place={place} />
         <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
@@ -42,6 +42,15 @@ export function PlaceRow({ place, last = false }: { place: PlaceSummary; last?: 
 
 /**
  * 행의 **내용**만 — 썸네일 · 제목 · 메타 · 태그.
+ *
+ * ### breakpoint 가 아니라 컨테이너 쿼리인 이유
+ *
+ * 태그를 우측 고정 열(`w-56` = 224px)로 빼는 규칙을 `lg:`(뷰포트)로 두었더니 **지도
+ * 좌측 패널에서 제목이 한 글자로 잘렸다.** 그 패널은 데스크톱이지만 폭이 400px 이라,
+ * 96px 썸네일 + gap + 224px 배지 열을 빼면 제목에 40~50px 만 남는다 (실측: `테…`).
+ * 뷰포트는 컨테이너 폭을 모른다 — 그래서 `@lg:`(컨테이너)로 바꿨다. 소비처가 부모에
+ * `@container` 를 주면 목록은 우측 열, 400px 패널은 수직 배치가 **같은 마크업**으로
+ * 나온다. 아트보드 05 의 "행 마크업은 목록과 지도가 동일하다" 를 지키는 유일한 방법이다.
  *
  * 링크 래퍼에서 떼어낸 이유: 일정에 담는 화면(#82)은 행에 `담기` 버튼을 두어야 하는데
  * **`<a>` 안에 `<button>` 을 넣을 수 없다.** 그쪽은 내용을 링크로 감싸지 않고
@@ -64,7 +73,7 @@ export function PlaceRowContent({
 
   return (
     <>
-      <div className="bg-band relative size-20 shrink-0 overflow-hidden rounded-md lg:size-24">
+      <div className="bg-band relative size-20 shrink-0 overflow-hidden rounded-md @lg:size-24">
         {/* 미등록 호스트를 next/image 에 넘기면 런타임에 던진다 — 플레이스홀더로 떨어뜨린다 */}
         {thumbnail !== null ? (
           <Image
@@ -91,7 +100,7 @@ export function PlaceRowContent({
         )}
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-col">
         {/* 한국어 실데이터는 길다. body 의 word-break: keep-all 은 어절 단위로만
               끊으므로 `제주특별자치도립김창열미술관` 처럼 공백 없는 긴 이름이 넘친다.
               break-words 로 "다른 방법이 없을 때만" 어절 안에서 끊게 한다. */}
@@ -115,11 +124,17 @@ export function PlaceRowContent({
           </p>
         )}
 
-        <PlaceBadges place={place} className="mt-1.5 lg:hidden" />
+        {/*
+          좁은 컨테이너에서는 배지를 **제목 위**로 올린다 (`order-first`). 지도 패널에서
+          행을 누르는 것은 "이름 찾기" 가 아니라 "이 핀 고르기" 라, 동반 가능 여부가
+          먼저 읽히는 편이 낫다. **DOM 순서는 제목 → 메타 → 배지 그대로다** — 스크린리더는
+          이름을 먼저 읽는다. 시각 순서만 바꾼다.
+        */}
+        <PlaceBadges place={place} className="order-first mb-1.5 @lg:hidden" />
       </div>
 
-      {/* 데스크톱은 태그를 우측 열로 뺀다 — 아트보드 03 절 (폭 220 우측 정렬) */}
-      <PlaceBadges place={place} className="hidden w-56 shrink-0 justify-end lg:flex" />
+      {/* 넓은 컨테이너는 태그를 우측 열로 뺀다 — 아트보드 03 절 (폭 220 우측 정렬) */}
+      <PlaceBadges place={place} className="hidden w-56 shrink-0 justify-end @lg:flex" />
     </>
   )
 }

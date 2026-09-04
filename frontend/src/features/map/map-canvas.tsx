@@ -192,18 +192,31 @@ export function MapCanvas({
     overlaysRef.current = created
   }, [pins, selectedId, status, level])
 
-  // ── 선택 핀으로 부드럽게 이동 ────────────────────────────────────────────
+  /*
+    ── 선택 핀으로 부드럽게 이동 ────────────────────────────────────────────
+
+    **`pins` 를 의존성에 넣으면 지도가 되돌아온다** (#240). `pins` 는 조회 결과라
+    지도를 옮길 때마다 새 배열이 되는데, 그것이 이 effect 를 다시 돌려 **선택된 핀으로
+    `panTo`** 하고, 그 이동이 또 `idle` → 재조회 → 새 `pins` 를 만들어 사용자가 지도를
+    옮길 수 없게 된다 (실측: '지도 이동 시 재검색' 을 켜면 같은 자리로 계속 돌아왔다).
+
+    그래서 **`selectedId` 가 바뀔 때만** 움직인다. 좌표는 ref 로 최신 `pins` 에서 읽는다 —
+    선택은 사용자 행동이고 조회 결과 갱신은 아니다.
+  */
+  const pinsRef = useRef(pins)
+  pinsRef.current = pins
+
   useEffect(() => {
     const map = mapRef.current
     const maps = mapsRef.current
     if (map === null || maps === null || selectedId === null) return
 
-    const pin = pins.find((candidate) => candidate.id === selectedId)
+    const pin = pinsRef.current.find((candidate) => candidate.id === selectedId)
     const coord = pin === undefined ? null : toLatLng(pin)
     if (coord === null) return
 
     map.panTo(new maps.LatLng(coord.lat, coord.lng))
-  }, [selectedId, pins])
+  }, [selectedId])
 
   // ── 밖에서 중심을 옮길 때 (현재 위치 버튼) ───────────────────────────────
   useEffect(() => {

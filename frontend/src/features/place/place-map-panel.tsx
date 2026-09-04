@@ -38,7 +38,7 @@ export function PlaceMapPanel({
               onClick={() => onSelect(place.placeId)}
               aria-pressed={selected}
               className={cn(
-                'focus-visible:ring-brand-500 flex w-full items-center gap-3 px-4 py-3 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
+                'focus-visible:ring-brand-500 @container flex w-full items-center gap-3 px-4 py-3 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
                 // 선택 배경은 --row-selected 다. 판정 색(metric-*)을 쓰지 않는다 —
                 // 지도 마커의 검정 채움과 짝을 이뤄 "같은 것" 을 가리킨다 (아트보드 05)
                 selected ? 'bg-row-selected' : 'hover:bg-bg-sunken',
