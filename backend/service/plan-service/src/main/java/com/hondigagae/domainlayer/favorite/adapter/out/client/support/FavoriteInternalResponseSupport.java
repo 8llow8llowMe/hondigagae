@@ -15,10 +15,15 @@ import org.springframework.stereotype.Component;
  *
  * <p>plan 컨텍스트의 support 와 같은 패턴이지만 도메인 예외 타입이 달라 컨텍스트별로 둔다 —
  * 서킷 인스턴스명은 논리 서비스명으로 같아, 같은 원격 서비스의 장애는 하나의 서킷으로 집계된다.
+ *
+ * <p>클래스 이름에 컨텍스트 접두사를 붙인 이유: 같은 모듈에 {@code InternalResponseSupport} 가
+ * 두 패키지에 있으면 컴포넌트 스캔이 둘 다 기본 빈 이름 {@code internalResponseSupport} 로 등록하려다
+ * {@code ConflictingBeanDefinitionException} 으로 기동에 실패한다 (dev 배포에서 실제로 발생, 2026-09-03).
+ * 단위 테스트는 컨텍스트를 띄우지 않아 잡지 못하므로 {@code PlanServiceApplicationTests} 가 이를 지킨다.
  */
 @Component
 @RequiredArgsConstructor
-public class InternalResponseSupport {
+public class FavoriteInternalResponseSupport {
 
     // 서킷브레이커 인스턴스명(application.yml resilience4j.circuitbreaker.instances 키와 일치).
     public static final String TOUR_SERVICE = "tour-service";
