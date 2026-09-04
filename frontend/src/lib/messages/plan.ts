@@ -256,6 +256,34 @@ export const planMessages = {
   // 정본은 아트보드 `여행 일정` 03 A(모바일) · B(데스크톱) · C(저장 실패).
 
   editDayAction: '순서 편집',
+
+  // ── 하루 재생성 (#128 · 하루재생성-세부명세 R7) ─────────────────────────────
+  /** 일자 헤더 버튼. `장소 추가`·`순서 편집` 과 같은 줄이라 짧게 둔다 */
+  regenerateDayAction: '다시 만들기',
+  /** `{day}` 치환. 재생성 화면의 제목 */
+  regenerateDayPageTitle: '{day}일차 다시 만들기',
+  regenerateDayNoteLabel: '이 날에 바라는 것 (선택)',
+  regenerateDayNotePlaceholder: '실내 위주로 부탁해요',
+  regenerateDaySubmit: '이 날 다시 만들기',
+  regenerateDayCurrent: '지금',
+  regenerateDayNext: '이렇게 바뀌어요',
+  regenerateDayEmpty: '아직 담은 곳이 없어요',
+  regenerateDayApply: '이 날 바꾸기',
+  /**
+   * 되돌리기를 만들 수 없다 — 계약에 일자 이력이 없다. **확정 전에 사실을 말하는 것**이
+   * 유일한 방어다 (R5).
+   */
+  regenerateDayIrreversible: '지금 이 날의 항목은 사라지고 되돌릴 수 없어요.',
+  /** 초안에 목표 일자가 없을 때 (R4-2). 빈 항목으로 저장하지 않는다 */
+  regenerateDayMissing: '이 날을 다시 만들지 못했어요. 다시 시도해 주세요.',
+  /**
+   * '다녀옴' 초기화 (R5). **`visitResetNotice` 를 재사용하지 않는다** — 그 문구는
+   * *"순서를 바꾸거나 장소를 담으면"* 이라고 계기 둘을 못박아 두었고 재생성은 거기
+   * 없다. 그대로 쓰면 화면이 사실과 다른 말을 한다. 초기화되는 **이유는 같다**:
+   * 일괄 교체가 새 `planItemId` 를 발급한다.
+   */
+  regenerateDayVisitReset: '이 날 항목이 바뀌면 ‘다녀옴’ 표시가 초기화돼요.',
+
   /** 편집 중 상단 안내. 낙관적 업데이트를 하지 않는다는 것을 화면이 말한다 */
   editHint: '번호를 끌어 순서를 바꿀 수 있어요. 저장하기 전까지는 아무것도 바뀌지 않아요.',
   /** 거리 자리를 대신한다 — 순서를 옮길 때마다 숫자가 흔들리면 신뢰가 깨진다 */

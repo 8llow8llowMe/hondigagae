@@ -146,6 +146,7 @@ function renderDaySection(overrides = {}) {
       editor: null,
       add: planDayAdd,
       visit: planDayVisit,
+      regenerateHref: '/plans/1/days/1/regenerate',
       ...overrides,
     }),
   )
@@ -183,6 +184,24 @@ describe('PlanDaySection', () => {
     })
     expect(rainy).toContain(messages.plan.indoorAlternativesTitle)
     expect(rainy).toContain('오설록 티뮤지엄 카페')
+  })
+
+  it('일자 헤더에 다시 만들기가 있고 재생성 라우트를 가리킨다 (#128)', () => {
+    const markup = renderDaySection({ regenerateHref: '/plans/1/days/2/regenerate' })
+
+    expect(markup).toContain(messages.plan.regenerateDayAction)
+    expect(markup).toContain('href="/plans/1/days/2/regenerate"')
+  })
+
+  /*
+    R3-2. 빈 날을 채우는 것이 이 기능이 가장 쓸모 있는 순간이다 — `순서 편집` 과 달리
+    항목 수를 보지 않는다 (`장소 추가` 와 같은 판단).
+  */
+  it('항목이 0개인 날에도 남는다', () => {
+    const markup = renderDaySection({ rows: [], regenerateHref: '/plans/1/days/3/regenerate' })
+
+    expect(markup).toContain(messages.plan.regenerateDayAction)
+    expect(markup).not.toContain(messages.plan.editDayAction)
   })
 })
 

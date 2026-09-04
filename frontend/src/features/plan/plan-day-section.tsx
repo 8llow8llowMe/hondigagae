@@ -75,6 +75,7 @@ export function PlanDaySection({
   editor,
   add,
   visit,
+  regenerateHref,
 }: {
   day: number
   /** `YYYY-MM-DD`. 서버 판정의 날짜가 아니라 일정 기간에서 계산한 값이다 */
@@ -95,6 +96,8 @@ export function PlanDaySection({
   editor: ReactNode
   add: PlanDayAdd
   visit: PlanDayVisit
+  /** `다시 만들기` 가 가는 곳 (#128). `장소 추가` 와 같이 모달이 아니라 라우트다 */
+  regenerateHref: string
 }) {
   const anchorId = planDayAnchorId(day)
   const weekday = date === null ? null : weekdayOf(date)
@@ -127,6 +130,14 @@ export function PlanDaySection({
             */}
             <ButtonLink href={add.href} variant="secondary" size="sm">
               {messages.plan.addPlaceAction}
+            </ButtonLink>
+
+            {/*
+              **빈 일자에도 남는다** — 빈 날을 채우는 것이 이 기능이 가장 쓸모 있는
+              순간이다 (하루재생성-세부명세 R3-2). `순서 편집` 과 달리 항목 수를 보지 않는다.
+            */}
+            <ButtonLink href={regenerateHref} variant="secondary" size="sm">
+              {messages.plan.regenerateDayAction}
             </ButtonLink>
 
             {/* 항목이 없으면 바꿀 순서도 없다 */}
