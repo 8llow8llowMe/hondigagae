@@ -54,6 +54,9 @@
     시작일 편집을 여는 순간 다시 고아가 생긴다.
   - 고아가 생기면 지울 수단이 없다는 것이 이 규칙의 근거다 — 일자별 교체(`PUT .../days/{day}/items`)는
     범위 밖 일차를 `PLAN_002` 로 막는다.
+- **`PlanItemType` 은 이 서비스가 아니라 `core/shared-travel` 에 있다 (필수).** ai-service 초안의
+  `itemType` 이 여기 저장 규칙을 그대로 따라야 하기 때문이다 — 문자열과 주석으로만 맞추던 때
+  실제로 어긋났다 (#89).
 - **`targetId` 가 `place.id` 인지의 판정은 `PlanItemType.isPlaceTarget()` 이 갖는다.** 저장 시
   존재 검증과 상세 요약 조회가 같은 집합을 써야 해서 도메인으로 올렸다 — `WALK` 의 `targetId`
   는 `walk_course.id` 라 장소로 조회하면 남의 아이디로 없는 장소를 찾는다.

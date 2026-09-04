@@ -254,6 +254,9 @@ yml 목록(`infra.redis.sentinels`)도 계속 받지만 로컬용 탈출구다 �
 - `travel.insight` — `SuitabilityLevel`, `WalkSafetyLevel` (tour ↔ ai ↔ plan)
 - `travel.schedule` — `WeeklySchedule` (batch ↔ tour). 요일별 영업시간과 spec 직렬화.
   배치가 쓰고(문자열 컬럼) 조회가 읽는 계약이라 테이블 스키마와 같은 결로 여기 둔다
+- `travel.plan` — `PlanItemType` (plan ↔ ai). **`targetId` 가 어느 아이디 공간을 가리키는지**를
+  함께 정한다(`isPlaceTarget()`). AI 초안 항목은 사용자가 그대로 담으므로 ai-service 의
+  `itemType` 은 plan-service 의 저장 규칙을 그대로 따라야 한다
 
 **존재 이유**: 위 기준 1번에 해당한다. 적합도를 붙이면서 tour-service 가 반려견 크기를
 장소의 입장 조건과 대조해야 했고, 그 둘은 서로 다른 서비스에 있었다. 복사해 두면

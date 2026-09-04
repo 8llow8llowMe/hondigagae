@@ -10,7 +10,7 @@ import com.hondigagae.domainlayer.plan.application.port.out.PlaceVerifyQueryPort
 import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanPetRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanRepositoryPort;
-import com.hondigagae.domainlayer.plan.domain.enums.PlanItemType;
+import com.hondigagae.shared.travel.plan.PlanItemType;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;

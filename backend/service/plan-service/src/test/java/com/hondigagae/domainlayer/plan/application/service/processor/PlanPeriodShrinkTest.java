@@ -13,12 +13,12 @@ import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPo
 import com.hondigagae.domainlayer.plan.application.port.out.PlanPetRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PetConditionQueryResult;
-import com.hondigagae.domainlayer.plan.domain.enums.PlanItemType;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
+import com.hondigagae.shared.travel.plan.PlanItemType;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
