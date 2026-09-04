@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { toDayRegeneratePayload } from '@/lib/ai-plan/regenerate'
+import { toDayRegeneratePayload, toRegeneratedDayItems } from '@/lib/ai-plan/regenerate'
+import type { AiPlanDraft } from '@/types/ai-plan'
 import type { PlanDetail } from '@/types/plan'
 
 function plan(overrides: Partial<PlanDetail> = {}): PlanDetail {
@@ -81,5 +82,96 @@ describe('toDayRegeneratePayload', () => {
     const payload = toDayRegeneratePayload(plan({ petIds: ['123456789012000001'] }), 1, '')
 
     expect(payload.petIds).toEqual(['123456789012000001'])
+  })
+})
+
+function draft(): AiPlanDraft {
+  return {
+    days: [
+      {
+        day: 1,
+        items: [{ itemType: 'PLACE', placeId: '111', title: '1일차 그대로', note: null }],
+      },
+      {
+        day: 2,
+        items: [
+          { itemType: 'PLACE', placeId: '222', title: '오설록 티뮤지엄', note: '실내예요' },
+          { itemType: 'WALK', placeId: '333', title: '사려니숲길 산책', note: null },
+        ],
+      },
+    ],
+    reasons: [],
+  }
+}
+
+describe('toRegeneratedDayItems', () => {
+  /*
+    R4. 프롬프트가 "나머지 날은 그대로 유지해 전체 일정을 출력할 것" 이라고 **부탁**할
+    뿐 강제하지 않는다. 사용자는 하루만 바꾸겠다고 했다.
+  */
+  it('목표 일자만 뽑는다 — 다른 날은 무시한다', () => {
+    const items = toRegeneratedDayItems(draft(), 2, 3)
+
+    expect(items).not.toBeNull()
+    expect(items?.every((item) => item.day === 2)).toBe(true)
+    expect(items?.map((item) => item.title)).toEqual(['오설록 티뮤지엄', '사려니숲길 산책'])
+  })
+
+  it('sequence 를 0부터 다시 매긴다', () => {
+    expect(toRegeneratedDayItems(draft(), 2, 3)?.map((item) => item.sequence)).toEqual([0, 1])
+  })
+
+  /*
+    R4-3 · #89. `AiPlanScheduleItem.placeId` 는 장소 id 인데 `WALK` 의 `targetId` 는
+    `walk_course.id` 다. 보내면 틀린 id 가 조용히 저장된다.
+  */
+  it('WALK 에는 targetId 를 붙이지 않는다', () => {
+    const items = toRegeneratedDayItems(draft(), 2, 3)
+    const walk = items?.find((item) => item.itemType === 'WALK')
+
+    expect(walk).toBeDefined()
+    expect('targetId' in (walk ?? {})).toBe(false)
+  })
+
+  it('PLACE 에는 targetId 를 붙인다', () => {
+    const place = toRegeneratedDayItems(draft(), 2, 3)?.find((item) => item.itemType === 'PLACE')
+
+    expect(place?.targetId).toBe('222')
+  })
+
+  /*
+    R4-2. 빈 배열로 PUT 하면 `PlanDayItemsReplacePayload` 가 "그 일자 전부 삭제" 로
+    읽는다 — 재생성 실패가 조용한 삭제가 된다.
+  */
+  it('목표 일자가 없으면 null 이다 — 빈 배열이 아니다', () => {
+    expect(toRegeneratedDayItems(draft(), 3, 3)).toBeNull()
+  })
+
+  it('목표 일자의 항목이 전부 걸러지면 빈 배열이다 — null 과 다르다', () => {
+    const empty: AiPlanDraft = {
+      days: [{ day: 2, items: [{ itemType: 'PLACE', placeId: null, title: '  ', note: null }] }],
+      reasons: [],
+    }
+
+    expect(toRegeneratedDayItems(empty, 2, 3)).toEqual([])
+  })
+
+  it('title 이 null 인 항목을 만나도 죽지 않는다', () => {
+    const nullTitle: AiPlanDraft = {
+      days: [{ day: 2, items: [{ itemType: 'PLACE', placeId: '1', title: null, note: null }] }],
+      reasons: [],
+    }
+
+    expect(toRegeneratedDayItems(nullTitle, 2, 3)).toEqual([])
+  })
+
+  it('제외한 장소는 빠진다 — PLAN_004 재시도가 쓴다', () => {
+    const items = toRegeneratedDayItems(draft(), 2, 3, new Set(['222']))
+
+    expect(items?.map((item) => item.title)).toEqual(['사려니숲길 산책'])
+  })
+
+  it('기간 밖 일차는 애초에 뽑히지 않는다', () => {
+    expect(toRegeneratedDayItems(draft(), 2, 1)).toEqual([])
   })
 })

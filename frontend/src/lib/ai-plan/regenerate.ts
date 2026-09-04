@@ -1,5 +1,6 @@
-import type { AiPlanSubmitPayload } from '@/types/ai-plan'
-import type { PlanDetail } from '@/types/plan'
+import { toDraftItems } from '@/lib/ai-plan/draft-to-plan'
+import type { AiPlanDraft, AiPlanSubmitPayload } from '@/types/ai-plan'
+import type { PlanDetail, PlanItemRequest } from '@/types/plan'
 
 /**
  * 하루 재생성 (#128 · 하루재생성-세부명세).
@@ -42,4 +43,31 @@ export function toDayRegeneratePayload(
     planId: plan.planId,
     regenerateDay: day,
   }
+}
+
+/**
+ * 재생성 초안에서 **그 일자 하나만** 뽑는다 (R4).
+ *
+ * **초안은 모든 날을 담아 온다.** 프롬프트가 _"나머지 날은 기존 항목을 순서까지 그대로
+ * 유지해 전체 일정을 출력할 것"_ 이라고 지시하기 때문이다. 그 지시는 **부탁이지 강제가
+ * 아니다** — 이 저장소는 이미 LLM 산출물을 못 믿는 전제로 짜여 있다
+ * (`draft-to-plan.ts` 가 기간 밖 일차를 걸러내는 것과 같은 판단).
+ *
+ * 다른 날을 반영하지 않는 이유는 둘이다. **사용자가 하루만 바꾸겠다고 말했고**,
+ * 일자별 PUT 은 원자적이지 않아 여러 날을 쓰다 중간에 실패하면 반쯤 바뀐 일정이 남는다.
+ *
+ * @returns 목표 일자가 초안에 없으면 `null`. **빈 배열과 뜻이 다르다** —
+ *   `PlanDayItemsReplacePayload` 는 빈 목록을 "그 일자 전부 삭제" 로 읽으므로
+ *   재생성 실패를 조용한 삭제로 바꾸면 안 된다 (R4-2)
+ */
+export function toRegeneratedDayItems(
+  draft: AiPlanDraft,
+  day: number,
+  totalDays: number,
+  excludedPlaceIds?: ReadonlySet<string>,
+): PlanItemRequest[] | null {
+  const target = draft.days.find((entry) => entry.day === day)
+  if (target === undefined) return null
+
+  return toDraftItems({ days: [target], reasons: [] }, totalDays, excludedPlaceIds)
 }
