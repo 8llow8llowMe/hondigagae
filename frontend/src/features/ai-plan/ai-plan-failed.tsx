@@ -2,6 +2,13 @@ import { Button, ButtonLink } from '@/components/button'
 import { messages } from '@/lib/messages'
 
 export type AiPlanFailedProps = {
+  /**
+   * 화면 제목. **기본값은 생성 실패다** (`일정을 만들지 못했어요`).
+   *
+   * 하루 재생성(#128)은 다른 말을 한다 — **하루가 실패했을 뿐 일정은 그대로 있다.**
+   * 기본값을 그대로 쓰면 없어지지 않은 것을 없어졌다고 말한다.
+   */
+  title?: string
   /** 서버 `errorMessage`. 없으면 대체 문구를 쓴다 */
   errorMessage: string | null
   /** 입력 조건 요약. 조건을 잃었으면 null */
@@ -31,6 +38,7 @@ export type AiPlanFailedProps = {
  * 표시 전용이라 node 환경에서 렌더 테스트가 된다.
  */
 export function AiPlanFailed({
+  title = messages.aiPlan.failedTitle,
   errorMessage,
   conditionSummary,
   onRetry,
@@ -40,7 +48,7 @@ export function AiPlanFailed({
 }: AiPlanFailedProps) {
   return (
     <div className="flex flex-col items-start gap-3 px-4 py-12 md:px-10">
-      <h2 className="text-title-2 text-fg font-semibold">{messages.aiPlan.failedTitle}</h2>
+      <h2 className="text-title-2 text-fg font-semibold">{title}</h2>
 
       {/* 서버 문구를 그대로 쓴다 — 실패 이유를 우리가 다시 쓰면 조건 문제가 장애로 읽힌다 */}
       <p className="text-body-2 text-fg-muted">{errorMessage ?? messages.aiPlan.failedFallback}</p>
