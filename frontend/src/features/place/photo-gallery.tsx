@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 
-import { isAllowedImageHost } from '@/lib/image/remote-host'
+import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import type { PlaceImage } from '@/types/place'
 
@@ -28,10 +28,14 @@ import type { PlaceImage } from '@/types/place'
  * 모바일은 `scroll-snap` + 옆 사진 물림으로 넘길 수 있음을 알리고, 점 인디케이터 대신
  * **`1/8` 카운터**를 쓴다 — 장수가 8장까지 가면 점은 읽히지 않는다.
  */
+/** `next/image` 에 넘길 src 가 확정된 사진. 판정은 `PhotoGallery` 가 한 번만 한다 */
+type GalleryImage = PlaceImage & { src: string }
+
 export function PhotoGallery({ images, title }: { images: PlaceImage[]; title: string }) {
-  const usable = images.filter(
-    (image) => isAllowedImageHost(image.originImgUrl) && image.originImgUrl !== null,
-  )
+  // `next/image` 에 넘길 수 있는 것만 남긴다 (허용 호스트 + https 승격)
+  const usable = images
+    .map((image) => ({ ...image, src: imageSrc(image.originImgUrl) }))
+    .filter((image): image is GalleryImage => image.src !== null)
 
   // 0장이면 섹션 자체를 렌더하지 않는다
   if (usable.length === 0) return null
@@ -47,7 +51,7 @@ export function PhotoGallery({ images, title }: { images: PlaceImage[]; title: s
   )
 }
 
-function MobileCarousel({ images, title }: { images: PlaceImage[]; title: string }) {
+function MobileCarousel({ images, title }: { images: GalleryImage[]; title: string }) {
   const trackRef = useRef<HTMLUListElement>(null)
   const [index, setIndex] = useState(0)
 
@@ -84,7 +88,7 @@ function MobileCarousel({ images, title }: { images: PlaceImage[]; title: string
             style={{ width: 'var(--gallery-w-mobile)', height: 'var(--gallery-h-mobile)' }}
           >
             <Image
-              src={image.originImgUrl as string}
+              src={image.src}
               // 대표 이미지는 장식이 아니라 콘텐츠다 — 장소명을 alt 로 준다
               alt={position === 0 ? title : (image.imgName ?? '')}
               fill
@@ -113,7 +117,7 @@ function MobileCarousel({ images, title }: { images: PlaceImage[]; title: string
  * 좁아지지 않는 비율이다. 고정 px(590/362)로 두지 않는 이유는 **우측 열이 가변**이기
  * 때문이다 — 데스크톱 2단에서 우측 폭은 뷰포트에 따라 달라진다.
  */
-function DesktopStrip({ images, title }: { images: PlaceImage[]; title: string }) {
+function DesktopStrip({ images, title }: { images: GalleryImage[]; title: string }) {
   const [lead, ...rest] = images
   if (lead === undefined) return null
 
@@ -138,21 +142,14 @@ function DesktopStrip({ images, title }: { images: PlaceImage[]; title: string }
         }}
       >
         <div className="bg-band relative overflow-hidden rounded-md">
-          <Image
-            src={lead.originImgUrl as string}
-            alt={title}
-            fill
-            sizes="590px"
-            priority
-            className="object-cover"
-          />
+          <Image src={lead.src} alt={title} fill sizes="590px" priority className="object-cover" />
         </div>
 
         {/* 2장이면 썸네일 열을 만들지 않는다 — 같은 크기로 나란히 둔다 */}
         {images.length === 2 && rest[0] !== undefined && (
           <div className="bg-band relative overflow-hidden rounded-md">
             <Image
-              src={rest[0].originImgUrl as string}
+              src={rest[0].src}
               alt={rest[0].imgName ?? ''}
               fill
               sizes="590px"
@@ -169,7 +166,7 @@ function DesktopStrip({ images, title }: { images: PlaceImage[]; title: string }
                 className="bg-band relative overflow-hidden rounded-md"
               >
                 <Image
-                  src={image.originImgUrl as string}
+                  src={image.src}
                   alt={image.imgName ?? ''}
                   fill
                   sizes="362px"

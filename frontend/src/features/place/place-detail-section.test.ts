@@ -147,10 +147,15 @@ describe('PlaceDetailSection — nullable 섹션은 숨긴다', () => {
     const markup = render({ place: placeDetailWithoutOptionalSections })
 
     // 동반 여부는 이 서비스의 핵심 질문이다. 섹션이 사라지면 "확인해 봤는데 없더라" 와
-    // "확인조차 안 했다" 를 구분할 수 없다 — 대신 정보 없음을 드러내고 전화로 안내한다
+    // "확인조차 안 했다" 를 구분할 수 없다 — 대신 없는 것이 무엇인지 드러내고 전화로 안내한다.
+    //
+    // **이 픽스처는 `petAllowanceType` 이 `PARTIALLY_ALLOWED` 다.** 즉 동반 여부는
+    // 등록돼 있고 세부 조건만 없는 상태라, "동반 가능 여부가 등록되지 않았어요" 라고
+    // 말하면 제목 옆 배지와 다른 말을 한다. `UNKNOWN` 갈래는 place-pet-info.test.ts 가 잠근다.
     expect(markup).toContain(messages.place.detailSectionPet)
-    expect(markup).toContain(messages.place.detailPetInfoEmptyBadge)
-    expect(markup).toContain(messages.place.detailPetInfoEmptyText)
+    expect(markup).toContain(placeDetailWithoutOptionalSections.petAllowanceType.description)
+    expect(markup).toContain(messages.place.detailPetInfoDetailsMissingText)
+    expect(markup).not.toContain(messages.place.detailPetInfoEmptyText)
   })
 
   it('결합 데이터가 없어도 에러가 아니라 장소명이 그대로 보인다', () => {

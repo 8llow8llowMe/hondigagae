@@ -8,7 +8,7 @@ import { CheckIcon, ImageIcon } from '@/components/icons'
 import { Row } from '@/components/surface'
 import { formatDistance } from '@/lib/format/distance'
 import { isLongTrip } from '@/lib/geo/distance'
-import { isAllowedImageHost } from '@/lib/image/remote-host'
+import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { placeMetaLine } from '@/lib/place/meta'
 import { isPlaceTarget, type PlanItemRowModel } from '@/lib/plan/detail'
@@ -69,7 +69,7 @@ export function PlanItemRow({
 }) {
   const { item } = model
   const { place } = item
-  const hasImage = isAllowedImageHost(place?.firstImage ?? null)
+  const thumbnail = imageSrc(place?.firstImage ?? null)
   const meta = placeMetaLine(place?.addr1 ?? null, place?.indoor ?? null)
 
   /*
@@ -88,9 +88,9 @@ export function PlanItemRow({
           item.visited && 'opacity-60',
         )}
       >
-        {hasImage ? (
+        {thumbnail !== null ? (
           <Image
-            src={place?.firstImage as string}
+            src={thumbnail}
             alt=""
             fill
             sizes="(min-width: 1024px) 96px, 80px"

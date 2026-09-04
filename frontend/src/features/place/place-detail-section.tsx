@@ -29,6 +29,7 @@ import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { shortAddress } from '@/lib/place/address'
 import { copyrightLabel } from '@/lib/place/copyright'
+import { galleryImages } from '@/lib/place/gallery'
 import { parseHomepage } from '@/lib/place/homepage'
 import { indoorLabel } from '@/lib/place/indoor'
 import { toPlainText } from '@/lib/place/text'
@@ -170,8 +171,15 @@ export function PlaceDetailSection({
         */}
         <div className="rail-detail-main lg:border-border lg:border-l">
           <div className="pt-4 md:pt-6">
-            {/* 0장이면 섹션 자체를 렌더하지 않는다 — 제목부터 시작한다 (DESIGN.md §7-3) */}
-            <PhotoGallery images={place.images} title={place.title} />
+            {/*
+              0장이면 섹션 자체를 렌더하지 않는다 — 제목부터 시작한다 (DESIGN.md §7-3).
+              **`images` 가 비면 `firstImage` 를 쓴다** — dev 실데이터는 `images` 가 전부
+              빈 배열이고 사진이 `firstImage` 로만 온다 (`lib/place/gallery.ts`).
+            */}
+            <PhotoGallery
+              images={galleryImages(place.images, place.firstImage, place.cpyrhtDivCd)}
+              title={place.title}
+            />
           </div>
 
           <header className="flex flex-col gap-2.5 px-4 pt-5 pb-6 md:px-10">
@@ -278,6 +286,7 @@ export function PlaceDetailSection({
           <DetailSection title={messages.place.detailSectionPet}>
             <PlacePetInfoSection
               petInfo={place.petInfo}
+              allowance={place.petAllowanceType}
               sourceText={place.intro?.chkPet ?? null}
               tel={place.tel}
               petName={petName}

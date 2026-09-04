@@ -5,7 +5,7 @@ import { Badge } from '@/components/badge'
 import { ChevronRightIcon, ImageIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
 import { Row } from '@/components/surface'
-import { isAllowedImageHost } from '@/lib/image/remote-host'
+import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { placeMetaLine } from '@/lib/place/meta'
 import { cn } from '@/lib/utils/cn'
@@ -57,16 +57,16 @@ export function PlaceRowContent({
    */
   titleHref?: string
 }) {
-  const hasImage = isAllowedImageHost(place.firstImage) && place.firstImage !== null
+  const thumbnail = imageSrc(place.firstImage)
   const meta = placeMetaLine(place.addr1, place.indoor)
 
   return (
     <>
       <div className="bg-band relative size-20 shrink-0 overflow-hidden rounded-md lg:size-24">
         {/* 미등록 호스트를 next/image 에 넘기면 런타임에 던진다 — 플레이스홀더로 떨어뜨린다 */}
-        {hasImage ? (
+        {thumbnail !== null ? (
           <Image
-            src={place.firstImage as string}
+            src={thumbnail}
             alt=""
             fill
             sizes="(min-width: 1024px) 96px, 80px"
