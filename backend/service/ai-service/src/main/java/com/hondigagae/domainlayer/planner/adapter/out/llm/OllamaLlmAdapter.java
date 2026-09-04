@@ -17,12 +17,15 @@ import com.hondigagae.global.properties.AiLlmProperties;
 import com.hondigagae.shared.travel.plan.PlanItemType;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import java.net.SocketTimeoutException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -74,6 +77,12 @@ public class OllamaLlmAdapter implements AiLlmPort {
      */
     private static final PlanItemType DEFAULT_ITEM_TYPE = PlanItemType.PLACE;
 
+    /** 파싱 실패 때 로그에 남길 응답 원문 길이. 원인을 가르는 데는 앞부분으로 충분하다. */
+    private static final int RAW_RESPONSE_LOG_LIMIT = 500;
+
+    /** 프롬프트가 컨텍스트 창의 이 비율을 넘으면 경고한다. 넘어서면 입력이 잘릴 위험 구간이다. */
+    private static final double CONTEXT_WARN_RATIO = 0.7d;
+
     private final OllamaChatModel ollamaChatModel;
     private final AiPlanPromptFactory aiPlanPromptFactory;
     private final AiLlmProperties aiLlmProperties;
@@ -114,8 +123,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
         try {
             packing = packingConverter.convert(text);
         } catch (RuntimeException exception) {
-            log.error("LLM 준비물 응답을 스키마로 해석할 수 없습니다. model={} reason={}",
-                aiLlmProperties.model(), exception.getMessage());
+            logParseFailure("준비물", response, text, exception);
             throw new AiPlanException(AiPlanErrorCode.LLM_RESPONSE_INVALID, exception);
         }
         List<PackingList.PackingItem> items = packing.items() == null ? List.of()
@@ -142,8 +150,15 @@ public class OllamaLlmAdapter implements AiLlmPort {
             buildRequestOptions()));
     }
 
-    /** 서킷 적용과 전송 예외 변환을 한 곳에 모은다 — 일정 생성·준비물 생성이 같은 경로를 탄다. */
+    /**
+     * 서킷 적용과 전송 예외 변환을 한 곳에 모은다 — 일정 생성·준비물 생성이 같은 경로를 탄다.
+     *
+     * <p><b>타임아웃을 연결 불가와 가른다.</b> 전에는 둘 다 AIPLAN_007 이라, dev 에서 실패를
+     * 보고도 "LLM 이 안 떠 있나"와 "너무 오래 걸리나" 중 무엇인지 알 수 없었다 (#232).
+     * 사용자에게 할 말도 다르다 — 앞은 잠시 후 다시, 뒤는 조건을 줄이라는 안내다.
+     */
     private ChatResponse call(Prompt prompt) {
+        long startedAt = System.nanoTime();
         try {
             return circuitBreakerRegistry.circuitBreaker(CIRCUIT_NAME)
                 .executeSupplier(() -> ollamaChatModel.call(prompt));
@@ -153,9 +168,30 @@ public class OllamaLlmAdapter implements AiLlmPort {
         } catch (AiPlanException exception) {
             throw exception;
         } catch (RuntimeException exception) {
-            log.error("LLM call failed model={} reason={}", aiLlmProperties.model(), exception.getMessage(), exception);
-            throw new AiPlanException(AiPlanErrorCode.LLM_UNAVAILABLE, exception);
+            long elapsedMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
+            boolean timedOut = isTimeout(exception);
+            log.error("LLM call failed model={} timedOut={} elapsedMs={} timeoutMs={} type={} reason={}",
+                aiLlmProperties.model(), timedOut, elapsedMs, aiLlmProperties.timeoutMs(),
+                exception.getClass().getSimpleName(), exception.getMessage(), exception);
+            throw new AiPlanException(
+                timedOut ? AiPlanErrorCode.LLM_TIMEOUT : AiPlanErrorCode.LLM_UNAVAILABLE, exception);
         }
+    }
+
+    /**
+     * 읽기 타임아웃인지. <b>원인 사슬을 훑는다</b> — RestClient 가
+     * {@code ResourceAccessException} 으로 감싸고 그 안에 {@code SocketTimeoutException} 이
+     * 들어 있어, 최상위 타입만 보면 타임아웃을 놓친다.
+     */
+    private boolean isTimeout(Throwable exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            if (cause instanceof SocketTimeoutException || cause instanceof TimeoutException) {
+                return true;
+            }
+            cause = cause.getCause() == cause ? null : cause.getCause();
+        }
+        return false;
     }
 
     private OllamaChatOptions buildRequestOptions() {
@@ -184,10 +220,65 @@ public class OllamaLlmAdapter implements AiLlmPort {
         try {
             return outputConverter.convert(text);
         } catch (RuntimeException exception) {
-            log.error("LLM 응답을 스키마로 해석할 수 없습니다. model={} reason={}",
-                aiLlmProperties.model(), exception.getMessage());
+            logParseFailure("일정", response, text, exception);
             throw new AiPlanException(AiPlanErrorCode.LLM_RESPONSE_INVALID, exception);
         }
+    }
+
+    /**
+     * 파싱 실패의 원인을 좁힐 수 있게 남긴다.
+     *
+     * <p>전에는 예외 메시지만 남겨서 <b>모델이 실제로 무엇을 돌려줬는지 알 수 없었다</b> —
+     * dev 에서 AIPLAN_010 을 받고도 원인을 좁힐 수단이 없었던 것이 #232 의 첫 항목이다.
+     * 다음 셋이 원인을 갈라 준다.
+     *
+     * <ul>
+     *   <li><b>finishReason</b> — {@code length} 면 출력이 {@code num_predict} 에서 잘린 것이다.
+     *       프롬프트가 이상한 것이 아니라 출력 예산이 모자란 것이라 고칠 곳이 다르다</li>
+     *   <li><b>프롬프트 토큰 수와 컨텍스트 창</b> — 프롬프트가 창에 가까우면 입력이 잘렸다는
+     *       뜻이고, 그때는 모델이 스키마 지시를 못 본 채로 답한다</li>
+     *   <li><b>응답 원문 앞부분</b> — JSON 이 아닌 산문인지, 잘린 JSON 인지, 스키마가 다른
+     *       JSON 인지가 여기서 갈린다</li>
+     * </ul>
+     *
+     * <p>원문은 앞부분만 남긴다. 전체를 남기면 실패가 몰릴 때 로그가 폭발하고, 원인을 가르는
+     * 데는 앞부분으로 충분하다. 프롬프트에는 개인정보를 싣지 않으므로(회원 식별 정보 제외)
+     * 응답 원문에도 그것이 돌아올 여지가 없다.
+     */
+    private void logParseFailure(String what, ChatResponse response, String text, RuntimeException exception) {
+        log.error("LLM {} 응답을 스키마로 해석할 수 없습니다. model={} finishReason={} promptTokens={} "
+                + "contextTokens={} maxTokens={} textLength={} reason={} rawHead={}",
+            what, aiLlmProperties.model(), finishReasonOf(response), promptTokensOf(response),
+            aiLlmProperties.contextTokens(), aiLlmProperties.maxTokens(),
+            // 파서 예외 메시지도 잘라 낸다 - Jackson 은 실패 지점 주변 원문을 메시지에 함께
+            // 담아서, 원문만 자르고 여기를 두면 로그 한 줄이 여전히 수백 자씩 불어난다.
+            text == null ? 0 : text.length(), head(exception.getMessage()), head(text));
+    }
+
+    private String finishReasonOf(ChatResponse response) {
+        if (response == null || response.getResult() == null || response.getResult().getMetadata() == null) {
+            return "unknown";
+        }
+        return response.getResult().getMetadata().getFinishReason();
+    }
+
+    private long promptTokensOf(ChatResponse response) {
+        if (response == null || response.getMetadata() == null || response.getMetadata().getUsage() == null) {
+            return -1;
+        }
+        Integer promptTokens = response.getMetadata().getUsage().getPromptTokens();
+        return promptTokens == null ? -1 : promptTokens;
+    }
+
+    /** 로그에 실을 앞부분. 줄바꿈은 로그 한 줄이 깨지지 않게 접는다. */
+    private String head(String text) {
+        if (text == null || text.isBlank()) {
+            return "";
+        }
+        String folded = text.strip().replaceAll("\\s+", " ");
+        return folded.length() <= RAW_RESPONSE_LOG_LIMIT
+            ? folded
+            : folded.substring(0, RAW_RESPONSE_LOG_LIMIT) + "...(truncated)";
     }
 
     /**
@@ -220,9 +311,18 @@ public class OllamaLlmAdapter implements AiLlmPort {
         Usage usage = response.getMetadata().getUsage();
         long input = usage.getPromptTokens() == null ? 0 : usage.getPromptTokens();
         long output = usage.getCompletionTokens() == null ? 0 : usage.getCompletionTokens();
-        log.info("LLM usage model={} inputTokens={} outputTokens={} cumulativeInput={} cumulativeOutput={}",
-            aiLlmProperties.model(), input, output,
+        int contextTokens = aiLlmProperties.contextTokens();
+        log.info("LLM usage model={} inputTokens={} outputTokens={} contextTokens={} cumulativeInput={} cumulativeOutput={}",
+            aiLlmProperties.model(), input, output, contextTokens,
             totalInputTokens.addAndGet(input), totalOutputTokens.addAndGet(output));
+
+        // 프롬프트가 창에 가까워지면 다음에 잘린다. 잘림은 오류가 아니라 조용한 품질 저하라
+        // 미리 드러내야 한다 - place-candidate-size 를 줄이거나 context-tokens 를 올릴 신호다.
+        if (input > contextTokens * CONTEXT_WARN_RATIO) {
+            log.warn("LLM prompt is close to the context window promptTokens={} contextTokens={} model={}"
+                    + " - lower ai-llm.place-candidate-size or raise ai-llm.context-tokens",
+                input, contextTokens, aiLlmProperties.model());
+        }
     }
 
     /**

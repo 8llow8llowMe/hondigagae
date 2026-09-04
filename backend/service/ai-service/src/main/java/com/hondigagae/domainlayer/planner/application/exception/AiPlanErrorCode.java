@@ -28,6 +28,10 @@ public enum AiPlanErrorCode {
     TRIP_DAYS_EXCEEDED("AIPLAN_018", "AI 일정 생성은 최대 10일까지 지원합니다.", HttpStatus.BAD_REQUEST),
     // 이미 끝난 작업의 취소. 400 이 아니라 409 다 - 요청이 잘못된 것이 아니라 대상의 상태가 지나간 것이다.
     JOB_NOT_CANCELABLE("AIPLAN_019", "이미 끝난 작업은 취소할 수 없습니다.", HttpStatus.CONFLICT),
+    // 모델 호출 자체가 제한 시간을 넘긴 경우. LLM_UNAVAILABLE(연결 불가·서킷 열림)과 가른다 -
+    // 사용자가 할 일이 다르고("조건을 줄여 보세요" vs "잠시 후"), 운영이 볼 곳도 다르다.
+    LLM_TIMEOUT("AIPLAN_020", "AI 일정 생성이 제한 시간을 넘겼습니다. 여행 기간이나 조건을 줄여 다시 시도해 주세요.",
+        HttpStatus.GATEWAY_TIMEOUT),
 
     // 요청 검증(Bean Validation) 전용 코드 — 1xx 대역.
     INVALID_REQUEST("AIPLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),

@@ -176,6 +176,7 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | #88 | plan | 일정 날씨 브리핑에 체감온도 추가 | 구현 — `PlanDailyWeatherItem.maxFeelsLikeTemperature` (tour 적합도 응답 `weather` 에도 같은 필드) |
 | #89 | ai | AI 초안의 WALK 항목 placeId 가 walk_course.id 와 어긋난다 | 해결됨 — `PlanItemType` 공유 + 어댑터 교정. FE 후속: WALK `targetId` 우회 해제 |
 | #90 | ai | AI 일정 작업 세부 단계·일자 재생성·취소·sigunguCode | 해결됨 — 4건 모두 완료(재생성 #77, 나머지 3건). 이슈 닫기 대상 |
+| #232 | ai | dev 에서 AI 일정 생성이 실패한다 (AIPLAN_007 · AIPLAN_010) | 해결됨 — `num_ctx` 미지정으로 프롬프트가 잘리고 있었다(실측 11,160자 vs 기본 2,048). `context-tokens` 명시 + 파싱 실패 진단 로그 + `LLM_TIMEOUT` 분리 |
 | #152 | plan | 일정 저장·판정의 다중 반려견 지원 (PlanCreateRequest.petIds) | 머지됨 — 이슈 닫기 대상 (`features/152-plan-multi-pet.md`) |
 | #202 | api-gateway·plan | 게이트웨이가 /api/v1/favorites 를 라우팅하지 않는다 | 구현 완료, PR 대기 — 세 프로파일 라우트 + `GatewayRouteCoverageTest`. FE 실기기 확인은 plan-service 배포 후 |
 | #214 | auth·core | 디코딩 불가 서명 JWT 가 401 이 아니라 500 을 준다 (래퍼 없는 본문) | 머지됨 — 이슈 닫기 대상. 토큰 없음 403→401 `SECURITY_001`, `HttpMessageNotReadableException` 핸들러 4 서비스 |

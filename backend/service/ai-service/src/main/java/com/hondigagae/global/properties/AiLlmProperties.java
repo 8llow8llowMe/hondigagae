@@ -24,11 +24,15 @@ public record AiLlmProperties(
     // 모델 호출 read timeout(ms). 외부 호출은 타임아웃을 반드시 명시한다 (coding-conventions §10).
     Long timeoutMs,
     Integer maxTokens,
+    // 컨텍스트 창(num_ctx). 프롬프트와 출력이 함께 들어가는 창이다.
+    // 명시하지 않으면 Ollama 가 2,048 로 잡고 프롬프트를 조용히 자른다 (#232).
+    Integer contextTokens,
     Double temperature,
     // gpt-oss 계열 추론 강도(low/medium/high). 기본 medium 은 추론에 생성 토큰 대부분을
     // 소모하므로 low 를 기본값으로 쓴다. 미지원 모델은 이 값을 무시한다.
     String reasoningEffort,
     // 후보 장소를 몇 개까지 프롬프트에 실을지. 토큰 비용과 선택지 다양성의 절충이다.
+    // 프롬프트 크기를 좌우하는 값이라 contextTokens 와 함께 봐야 한다.
     Integer placeCandidateSize
 ) {
 
@@ -50,6 +54,13 @@ public record AiLlmProperties(
         }
         if (maxTokens == null || maxTokens <= 0) {
             maxTokens = 4_000;
+        }
+        if (contextTokens == null || contextTokens <= 0) {
+            // 실측(#232): 후보 50곳 기준 일정 프롬프트가 11,160자(시스템 478 + 사용자 7,800 +
+            // 출력 스키마 2,882)다. 한글이 3,400자 넘게 섞여 있어 토큰으로는 6,000~8,000 이고,
+            // 여기에 maxTokens(출력)까지 같은 창에 들어가므로 16,384 를 기본으로 둔다.
+            // 줄이려면 placeCandidateSize 를 함께 줄여야 한다 - 프롬프트의 대부분이 후보 목록이다.
+            contextTokens = 16_384;
         }
         if (temperature == null) {
             temperature = 0.2;

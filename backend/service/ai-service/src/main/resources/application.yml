@@ -36,6 +36,10 @@ ai-llm:
   model: ${AI_LLM_MODEL:qwen2.5:7b-instruct}
   timeout-ms: ${AI_LLM_TIMEOUT_MS:120000}
   max-tokens: ${AI_LLM_MAX_TOKENS:4000}
+  # 컨텍스트 창(num_ctx). 프롬프트 + 출력이 함께 들어간다.
+  # 명시하지 않으면 Ollama 가 2,048 로 잡아 일정 프롬프트(실측 11,160자)가 조용히 잘린다.
+  # 줄이려면 place-candidate-size 를 함께 줄인다 - 프롬프트의 대부분이 후보 목록이다.
+  context-tokens: ${AI_LLM_CONTEXT_TOKENS:16384}
   temperature: ${AI_LLM_TEMPERATURE:0.2}
   reasoning-effort: ${AI_LLM_REASONING_EFFORT:low}
   place-candidate-size: ${AI_LLM_PLACE_CANDIDATE_SIZE:50}
