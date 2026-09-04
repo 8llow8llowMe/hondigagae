@@ -1,0 +1,157 @@
+# 백엔드 API 계약 스냅샷
+
+이 폴더는 **게이트웨이가 실제로 서빙하는 OpenAPI 문서를 파일로 고정해 둔 것**이다.
+백엔드가 로컬에 뜨지 않아도 계약을 읽을 수 있고, 계약이 언제 어떻게 바뀌었는지 diff 로 보인다.
+
+| 파일                                                     | 서비스                                  | operations | schemas |
+| -------------------------------------------------------- | --------------------------------------- | ---------- | ------- |
+| [`openapi/auth-service.json`](openapi/auth-service.json) | 회원 · 인증/인가                        | 22         | 35      |
+| [`openapi/tour-service.json`](openapi/tour-service.json) | 관광 데이터 · 여행 인사이트 · 긴급 시설 | 10         | 38      |
+| [`openapi/plan-service.json`](openapi/plan-service.json) | 여행 일정 · 즐겨찾기                    | 8          | 33      |
+| [`openapi/ai-service.json`](openapi/ai-service.json)     | AI 여행 플래너                          | 4          | 15      |
+
+**정본 순서**: 기동 중인 게이트웨이 Swagger > 이 스냅샷 > 서술 문서(`backend/docs/*.md`).
+스냅샷이 낡을 수 있으므로, 계약이 의심되면 아래 명령으로 다시 받아 diff 를 본다.
+
+## 갱신 방법
+
+```bash
+for s in ai tour plan auth; do
+  curl -s "https://api-dev.hondigagae.com/$s-service/v3/api-docs" \
+    | python3 -m json.tool --no-ensure-ascii --indent 2 \
+    > "docs/api/openapi/$s-service.json"
+done
+git diff --stat docs/api/openapi/
+```
+
+로컬 백엔드로 받을 때는 호스트만 바꾼다 (`http://localhost:8000`).
+
+**게이트웨이 루트 `/v3/api-docs` 는 비어 있다** (`OpenAPI definition v0`, paths 0). 서비스별
+그룹 경로(`/{svc}-service/v3/api-docs`)를 써야 한다 — 목록은 `/v3/api-docs/swagger-config` 가 준다.
+
+## 환경
+
+| 환경  | 게이트웨이                       | Swagger UI                                       |
+| ----- | -------------------------------- | ------------------------------------------------ |
+| local | `http://localhost:8000`          | `http://localhost:8000/swagger-ui.html`          |
+| dev   | `https://api-dev.hondigagae.com` | `https://api-dev.hondigagae.com/swagger-ui.html` |
+| prod  | `https://api.hondigagae.com`     | —                                                |
+
+FE 는 이 값을 `BACKEND_API_URL` 로 받는다. 브라우저는 게이트웨이를 직접 부르지 않고
+`/api/bff/**` 를 거친다 (`frontend/docs/api-integration-guide.md` §1).
+
+**auth API 는 게이트웨이를 거치지 않는다.** `/api/v1/auth`·`/api/v1/members` 는 nginx 가
+auth-service 로 직결시킨다 — 배포에서 사설 IP 대신 공개 도메인을 쓰는 이유다
+(`frontend/.env.example` 주석).
+
+## 계약을 읽을 때 걸리는 것들
+
+- **모든 응답이 `{ dataHeader, dataBody }` 로 감싸여 온다.** 게이트웨이가 대신 답하는
+  경우(인증 실패 등)에는 래퍼가 없을 수 있다 — 판별 규약은 api-integration-guide §2-1.
+- **비동기 AI 작업 실패는 HTTP 200 + `status.code === 'FAILED'`** 다. `dataHeader.success`
+  만 보면 놓친다.
+- **ID 는 응답에서 문자열로 내려온다** (Snowflake — JS 안전 정수 범위 초과). 스키마의
+  `type: integer, format: int64` 는 **요청** 바디 기준이고, 응답 DTO 는 `type: string` 이다.
+  FE 는 요청에서도 문자열을 그대로 보낸다.
+- **enum 은 `{code, name, description}` metadata 로 온다.** 한국어 매핑 테이블을 FE 에
+  만들지 않고 서버가 준 `name`/`description` 을 그대로 렌더한다.
+- **`null` 은 "없음"이 아니라 "모름"인 필드가 많다** — `indoor`, `score`,
+  `openNow`, `concentrationRate`, `goldenStart` 등. 스키마 description 이 그 뜻을 적어 두었으니
+  0·false 로 접지 않는다.
+- **`POST /ai-plans` 는 재생성 검증보다 앞서 두 전제를 본다** — 시작일이 오늘 이후
+  (`AIPLAN_017`), 기간 10일 이하(`AIPLAN_018`). 스키마에는 안 보이고 서비스 코드에만 있다
+  (`AiPlanJobProcessor.submitPlan`). plan-service 는 30일까지 허용하므로 11~30일 일정은
+  AI 생성·재생성을 할 수 없다.
+
+## 엔드포인트 인벤토리
+
+`FE 경로` 는 `frontend/src/lib/api/paths.ts` 에 그 경로가 등록돼 있는지다 (화면 연동 여부는
+`frontend/docs/screen-inventory.md`). **56 operations 중 51개가 등록돼 있고 5개가 비어 있다.**
+
+### `auth-service` — 회원 및 인증/인가 서비스
+
+| Method   | 경로 (`/api/v1` 하위)                     | 인증 | FE 경로  | 요약                                      |
+| -------- | ----------------------------------------- | ---- | -------- | ----------------------------------------- |
+| `POST`   | `/auth/email/send-code`                   | 공개 | ✅       | 이메일 인증코드 발송                      |
+| `POST`   | `/auth/email/verify-code`                 | 공개 | ✅       | 이메일 인증코드 검증                      |
+| `POST`   | `/auth/login`                             | 공개 | ✅       | 일반 로그인                               |
+| `POST`   | `/auth/logout`                            | 🔒   | ✅       | 로그아웃                                  |
+| `POST`   | `/auth/password/reset`                    | 공개 | ✅       | 비밀번호 재설정                           |
+| `POST`   | `/auth/password/reset/send-code`          | 공개 | ✅       | 비밀번호 재설정 코드 발송                 |
+| `GET`    | `/auth/sessions`                          | 🔒   | **없음** | 로그인 기기 목록                          |
+| `DELETE` | `/auth/sessions/{sessionId}`              | 🔒   | **없음** | 특정 기기 로그아웃                        |
+| `POST`   | `/auth/token/reissue`                     | 공개 | ✅       | 토큰 재발급                               |
+| `GET`    | `/auth/{provider}/authorize`              | 공개 | ✅       | 소셜 로그인 인가 URL 생성                 |
+| `GET`    | `/auth/{provider}/login`                  | 공개 | ✅       | 소셜 로그인                               |
+| `GET`    | `/members/me`                             | 🔒   | ✅       | 내 회원 정보 조회                         |
+| `PATCH`  | `/members/me`                             | 🔒   | ✅       | 내 회원 정보 수정                         |
+| `POST`   | `/members/me/password`                    | 🔒   | ✅       | 비밀번호 변경                             |
+| `DELETE` | `/members/me/password`                    | 🔒   | ✅       | 소셜 전용 계정 전환 (비밀번호 제거)       |
+| `POST`   | `/members/me/password/setup`              | 🔒   | ✅       | 비밀번호 최초 설정                        |
+| `GET`    | `/members/me/pets`                        | 🔒   | ✅       | 내 반려견 목록 조회                       |
+| `POST`   | `/members/me/pets`                        | 🔒   | ✅       | 반려견 등록                               |
+| `GET`    | `/members/me/pets/{petId}`                | 🔒   | ✅       | 반려견 상세 조회                          |
+| `PUT`    | `/members/me/pets/{petId}`                | 🔒   | ✅       | 반려견 정보 수정                          |
+| `DELETE` | `/members/me/pets/{petId}`                | 🔒   | ✅       | 반려견 삭제                               |
+| `POST`   | `/members/me/pets/{petId}/profile-image`  | 🔒   | ✅       | 반려견 프로필 이미지 업로드               |
+| `DELETE` | `/members/me/pets/{petId}/profile-image`  | 🔒   | ✅       | 반려견 프로필 이미지 삭제                 |
+| `PUT`    | `/members/me/pets/{petId}/representative` | 🔒   | ✅       | 대표 반려견 지정                          |
+| `POST`   | `/members/me/profile-image`               | 🔒   | ✅       | 프로필 이미지 업로드                      |
+| `DELETE` | `/members/me/profile-image`               | 🔒   | ✅       | 프로필 이미지 삭제                        |
+| `POST`   | `/members/me/withdraw`                    | 🔒   | ✅       | 회원 탈퇴                                 |
+| `POST`   | `/members/signup`                         | 공개 | ✅       | 일반 회원가입                             |
+| `POST`   | `/members/signup/dev`                     | 공개 | **없음** | [개발용] 즉시 회원가입 (이메일 인증 생략) |
+
+### `tour-service` — 관광 데이터 서비스
+
+| Method | 경로 (`/api/v1` 하위)                  | 인증 | FE 경로  | 요약                 |
+| ------ | -------------------------------------- | ---- | -------- | -------------------- |
+| `GET`  | `/emergencies/facilities`              | 공개 | ✅       | 주변 긴급 시설 검색  |
+| `GET`  | `/emergencies/facilities/{facilityId}` | 공개 | **없음** | 긴급 시설 상세       |
+| `GET`  | `/insights/regional-weather`           | 공개 | ✅       | 제주 권역 날씨 비교  |
+| `GET`  | `/insights/walk-times`                 | 공개 | ✅       | 오늘의 산책 골든타임 |
+| `GET`  | `/places`                              | 공개 | ✅       | 장소 목록 조회       |
+| `GET`  | `/places/nearby`                       | 공개 | ✅       | 주변 장소 검색       |
+| `GET`  | `/places/{placeId}`                    | 공개 | ✅       | 장소 상세 조회       |
+| `GET`  | `/places/{placeId}/congestions`        | 공개 | **없음** | 장소 기간 혼잡도     |
+| `GET`  | `/places/{placeId}/suitability`        | 공개 | ✅       | 장소 여행 적합도     |
+| `GET`  | `/places/{placeId}/walk-safety`        | 공개 | ✅       | 장소 산책 위험도     |
+
+### `plan-service` — 여행 일정 서비스
+
+| Method   | 경로 (`/api/v1` 하위)                        | 인증 | FE 경로 | 요약                       |
+| -------- | -------------------------------------------- | ---- | ------- | -------------------------- |
+| `GET`    | `/favorites/places`                          | 🔒   | ✅      | 내 즐겨찾기 목록           |
+| `GET`    | `/favorites/places/{placeId}`                | 🔒   | ✅      | 즐겨찾기 여부 확인         |
+| `POST`   | `/favorites/places/{placeId}`                | 🔒   | ✅      | 즐겨찾기 저장              |
+| `DELETE` | `/favorites/places/{placeId}`                | 🔒   | ✅      | 즐겨찾기 해제              |
+| `GET`    | `/plans`                                     | 🔒   | ✅      | 내 여행 일정 목록 조회     |
+| `POST`   | `/plans`                                     | 🔒   | ✅      | 여행 일정 생성             |
+| `GET`    | `/plans/{planId}`                            | 🔒   | ✅      | 여행 일정 상세 조회        |
+| `PUT`    | `/plans/{planId}`                            | 🔒   | ✅      | 여행 일정 수정             |
+| `DELETE` | `/plans/{planId}`                            | 🔒   | ✅      | 여행 일정 삭제             |
+| `PUT`    | `/plans/{planId}/days/{day}/items`           | 🔒   | ✅      | 일자별 일정 항목 일괄 교체 |
+| `GET`    | `/plans/{planId}/emergency`                  | 🔒   | ✅      | 일정 응급 브리핑           |
+| `PUT`    | `/plans/{planId}/items/{planItemId}/visited` | 🔒   | ✅      | 일정 항목 방문 체크        |
+| `GET`    | `/plans/{planId}/weather`                    | 🔒   | ✅      | 일정 날씨 브리핑           |
+
+### `ai-service` — AI 서비스
+
+| Method | 경로 (`/api/v1` 하위)             | 인증 | FE 경로 | 요약                               |
+| ------ | --------------------------------- | ---- | ------- | ---------------------------------- |
+| `POST` | `/ai-plans`                       | 🔒   | ✅      | AI 여행 일정 생성 제출             |
+| `GET`  | `/ai-plans/jobs/{jobId}`          | 🔒   | ✅      | AI 여행 일정 생성 작업 조회        |
+| `GET`  | `/ai-plans/jobs/{jobId}/stream`   | 🔒   | ✅      | 일정 생성 작업 상태 스트리밍 (SSE) |
+| `POST` | `/ai-plans/packing-list/{planId}` | 🔒   | ✅      | 반려견 여행 준비물 목록 생성       |
+
+### FE 경로가 없는 5개
+
+미착수 기능이라 호출부를 만들지 않은 것이다 (없는 API 를 상상해 mock 으로 채우지 않는다는
+규칙과 같은 판단 — api-integration-guide §9).
+
+| 경로                                                       | 무엇                              | 비고                                                          |
+| ---------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------- |
+| `GET /auth/sessions` · `DELETE /auth/sessions/{sessionId}` | 로그인 기기 목록 · 개별 로그아웃  | 마이페이지에 기기 관리 화면이 없다                            |
+| `POST /members/signup/dev`                                 | 이메일 인증 없이 테스트 계정 생성 | **운영 프로필에는 없다.** dev 연동 테스트 계정을 만들 때 쓴다 |
+| `GET /emergencies/facilities/{facilityId}`                 | 긴급 시설 상세                    | 목록만 쓰고 상세 화면이 없다                                  |
+| `GET /places/{placeId}/congestions`                        | 장소 기간 혼잡도 (30일)           | 적합도(약 11일)보다 멀리 답할 수 있는 유일한 지표             |

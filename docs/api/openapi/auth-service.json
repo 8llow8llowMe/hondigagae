@@ -1,0 +1,1887 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "혼디가개 회원 및 인증/인가 서비스 API 명세서",
+    "description": "Auth Service 전용",
+    "version": "v1"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Auth Service (단독 호출)"
+    }
+  ],
+  "tags": [
+    {
+      "name": "회원",
+      "description": "회원 가입, 내 정보 조회/수정, 비밀번호 변경, 탈퇴 API를 제공합니다."
+    },
+    {
+      "name": "개발용 (운영 미노출)",
+      "description": "개발·테스트 편의 API 입니다. 운영 프로필에서는 존재하지 않습니다."
+    },
+    {
+      "name": "인증/인가",
+      "description": "로그인, 로그아웃, 토큰 재발급 API를 제공합니다."
+    },
+    {
+      "name": "반려견",
+      "description": "반려견 프로필 등록/조회/수정/삭제 API를 제공합니다. AI 여행 설계의 핵심 입력입니다."
+    }
+  ],
+  "paths": {
+    "/api/v1/members/me/pets/{petId}": {
+      "get": {
+        "tags": [
+          "반려견"
+        ],
+        "summary": "반려견 상세 조회",
+        "description": "반려견 프로필 상세를 조회합니다. 본인 소유가 아니면 404로 응답합니다.",
+        "operationId": "getMyPet",
+        "parameters": [
+          {
+            "name": "petId",
+            "in": "path",
+            "description": "반려견 아이디",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456789
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePetResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "반려견"
+        ],
+        "summary": "반려견 정보 수정",
+        "description": "반려견 프로필을 수정합니다. 본인 소유가 아니면 404로 응답합니다.",
+        "operationId": "updatePet",
+        "parameters": [
+          {
+            "name": "petId",
+            "in": "path",
+            "description": "반려견 아이디",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456789
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PetSaveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePetResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "반려견"
+        ],
+        "summary": "반려견 삭제",
+        "description": "반려견 프로필을 삭제합니다. 기존 여행 일정이 참조하고 있어 소프트 삭제로 처리됩니다.",
+        "operationId": "deletePet",
+        "parameters": [
+          {
+            "name": "petId",
+            "in": "path",
+            "description": "반려견 아이디",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456789
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseVoid"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/members/me/pets/{petId}/representative": {
+      "put": {
+        "tags": [
+          "반려견"
+        ],
+        "summary": "대표 반려견 지정",
+        "description": "대표 반려견을 지정합니다. 기존 대표는 자동 해제되어 회원당 하나만 유지됩니다. AI 일정 생성에서 반려견을 지정하지 않으면 대표 반려견이 사용됩니다. 본인 소유가 아니면 404로 응답합니다.",
+        "operationId": "markRepresentative",
+        "parameters": [
+          {
+            "name": "petId",
+            "in": "path",
+            "description": "반려견 아이디",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456789
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePetResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/members/signup": {
+      "post": {
+        "tags": [
+          "회원"
+        ],
+        "summary": "일반 회원가입",
+        "description": "일반 회원으로 가입합니다.",
+        "operationId": "generalSignup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberGeneralSignupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/members/signup/dev": {
+      "post": {
+        "tags": [
+          "개발용 (운영 미노출)"
+        ],
+        "summary": "[개발용] 즉시 회원가입 (이메일 인증 생략)",
+        "description": "이메일 인증코드 없이 테스트 계정을 바로 만듭니다.\n\n**이메일 인증 게이트만 건너뜁니다.** 비밀번호 규칙과 이메일 중복(409 `MEMBER_001`)은\n일반 가입과 똑같이 검사합니다 — 검증까지 느슨하게 하면 개발에서만 통과하는 값이 생겨,\n정작 운영에서 막히는 입력을 개발에서 못 잡습니다.\n\n응답의 `email` 과 요청에 쓴 비밀번호로 바로 `POST /api/v1/auth/login` 을 부를 수 있습니다.\n\n운영 프로필에서는 이 API 가 등록되지 않아 404 입니다.",
+        "operationId": "devSignup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberGeneralSignupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseMemberDevSignupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/members/me/withdraw": {
+      "post": {
+        "tags": [
+          "회원"
+        ],
+        "summary": "회원 탈퇴",
+        "description": "회원을 탈퇴 처리합니다. 개인정보가 마스킹되고 모든 기기의 토큰 재발급이 차단됩니다. 동일 이메일로 재가입할 수 없습니다. (다른 기기의 기존 access token은 만료 시까지 유효할 수 있으나, 회원 상태 검사로 회원 API 접근은 차단됩니다)",
+        "operationId": "withdraw",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseVoid"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/members/me/profile-image": {
+      "post": {
+        "tags": [
+          "회원"
+        ],
+        "summary": "프로필 이미지 업로드",
+        "description": "프로필 이미지를 업로드해 즉시 반영합니다. jpg/png/gif/webp 만 허용하며 파일 내용(매직 바이트)으로 형식을 판정합니다. 기존 이미지가 있으면 교체 후 이전 파일은 삭제됩니다.",
+        "operationId": "uploadProfileImage",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "imageFile": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "업로드할 이미지 파일"
+                  }
+                },
+                "required": [
+                  "imageFile"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseMemberProfileImageUploadResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "회원"
+        ],
+        "summary": "프로필 이미지 삭제",
+        "description": "프로필 이미지를 제거합니다. 저장된 파일도 함께 삭제됩니다.",
+        "operationId": "removeProfileImage",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseMemberMyInfoResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/members/me/pets": {
+      "get": {
+        "tags": [
+          "반려견"
+        ],
+        "summary": "내 반려견 목록 조회",
+        "description": "로그인한 회원이 등록한 반려견 목록을 조회합니다.",
+        "operationId": "getMyPets",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePetsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "반려견"
+        ],
+        "summary": "반려견 등록",
+        "description": "반려견 프로필을 등록합니다. 품종·크기·환경 민감도·활동 성향이 AI 여행 설계에 반영됩니다. 회원당 최대 5마리까지 등록할 수 있습니다.",
+        "operationId": "registerPet",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PetSaveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePetResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/members/me/pets/{petId}/profile-image": {
+      "post": {
+        "tags": [
+          "반려견"
+        ],
+        "summary": "반려견 프로필 이미지 업로드",
+        "description": "반려견 프로필 이미지를 업로드해 즉시 반영합니다. jpg/png/gif/webp 만 허용하며 파일 내용(매직 바이트)으로 형식을 판정합니다. 기존 이미지가 있으면 교체 후 이전 파일은 삭제됩니다. 본인 소유가 아니면 404로 응답합니다.",
+        "operationId": "uploadProfileImage_1",
+        "parameters": [
+          {
+            "name": "petId",
+            "in": "path",
+            "description": "반려견 아이디",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456789
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "imageFile": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "업로드할 이미지 파일"
+                  }
+                },
+                "required": [
+                  "imageFile"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePetProfileImageUploadResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "반려견"
+        ],
+        "summary": "반려견 프로필 이미지 삭제",
+        "description": "반려견 프로필 이미지를 제거합니다. 저장된 파일도 함께 삭제됩니다. 본인 소유가 아니면 404로 응답합니다.",
+        "operationId": "removeProfileImage_1",
+        "parameters": [
+          {
+            "name": "petId",
+            "in": "path",
+            "description": "반려견 아이디",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456789
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePetResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/members/me/password": {
+      "post": {
+        "tags": [
+          "회원"
+        ],
+        "summary": "비밀번호 변경",
+        "description": "현재 비밀번호 확인 후 새 비밀번호로 변경합니다. 변경 후 재로그인이 필요하며, 모든 기기의 토큰 재발급이 차단됩니다. (다른 기기의 기존 access token은 만료 시까지 유효할 수 있습니다)",
+        "operationId": "changePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberPasswordChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseVoid"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "회원"
+        ],
+        "summary": "소셜 전용 계정 전환 (비밀번호 제거)",
+        "description": "소셜 로그인이 연결된 계정의 비밀번호를 제거해 소셜 전용 계정으로 전환합니다. 전환 후 이메일 로그인은 불가하며, 모든 기기에서 로그아웃됩니다. 소셜이 연결되지 않은 일반 계정은 400(MEMBER_009), 이미 소셜 전용이면 400(MEMBER_007)으로 응답합니다.",
+        "operationId": "removePassword",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseVoid"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/members/me/password/setup": {
+      "post": {
+        "tags": [
+          "회원"
+        ],
+        "summary": "비밀번호 최초 설정",
+        "description": "소셜 로그인으로 가입해 비밀번호가 없는 계정에 비밀번호를 설정합니다. 설정 후에는 이메일 로그인과 소셜 로그인 모두 사용할 수 있습니다. 이미 비밀번호가 있는 계정은 400(MEMBER_008)으로 응답합니다.",
+        "operationId": "setupPassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberPasswordSetupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseVoid"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/token/reissue": {
+      "post": {
+        "tags": [
+          "인증/인가"
+        ],
+        "summary": "토큰 재발급",
+        "description": "리프레시 토큰으로 Access Token을 재발급합니다.",
+        "operationId": "reissueToken",
+        "parameters": [
+          {
+            "name": "refreshToken",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseTokenReissueResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password/reset": {
+      "post": {
+        "tags": [
+          "인증/인가"
+        ],
+        "summary": "비밀번호 재설정",
+        "description": "메일로 받은 인증코드로 비밀번호를 재설정합니다. 성공 시 전 기기 세션이 무효화되어 재로그인이 필요합니다.\n코드 불일치는 AUTH_004, 만료/미발급은 AUTH_005, 5회 실패 시 코드가 무효화되고 AUTH_017 로 응답합니다.",
+        "operationId": "resetPassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthPasswordResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password/reset/send-code": {
+      "post": {
+        "tags": [
+          "인증/인가"
+        ],
+        "summary": "비밀번호 재설정 코드 발송",
+        "description": "비밀번호 재설정 인증코드를 메일로 발송합니다. 일반(이메일+비밀번호) 계정 전용입니다.\n계정 존재 여부와 무관하게 항상 성공으로 응답하며, 미가입 이메일과 소셜 전용 계정에는\n각각 안내 메일이 발송됩니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 발송 상한(AUTH_016)이 적용됩니다.",
+        "operationId": "sendPasswordResetCode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthPasswordResetCodeSendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "인증/인가"
+        ],
+        "summary": "로그아웃",
+        "description": "현재 기기의 세션만 로그아웃합니다 (리프레시 토큰 무효화 + Access 토큰 블랙리스트). 다른 기기의 로그인은 유지됩니다.",
+        "operationId": "logout",
+        "parameters": [
+          {
+            "name": "refreshToken",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseVoid"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "인증/인가"
+        ],
+        "summary": "일반 로그인",
+        "description": "이메일과 비밀번호로 로그인합니다. 형식 오류는 400(필드별 검증 코드), 자격증명 불일치는 401(AUTH_006)로 구분됩니다. 실패가 누적되면 해당 이메일이 일정 시간 잠깁니다(AUTH_015, 429).",
+        "operationId": "loginWithCredentials",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthGeneralLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseAuthGeneralLoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/email/verify-code": {
+      "post": {
+        "tags": [
+          "인증/인가"
+        ],
+        "summary": "이메일 인증코드 검증",
+        "description": "메일로 받은 인증코드를 검증합니다. 성공하면 30분 동안 해당 이메일로 회원가입할 수 있습니다.",
+        "operationId": "verifyEmailVerificationCode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthEmailCodeVerifyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/email/send-code": {
+      "post": {
+        "tags": [
+          "인증/인가"
+        ],
+        "summary": "이메일 인증코드 발송",
+        "description": "회원가입용 이메일 인증코드를 발송합니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 시간당 발송 상한(AUTH_016)이 적용되며, 가입 여부와 무관하게 항상 성공으로 응답합니다(기가입 이메일에는 안내 메일 발송).",
+        "operationId": "sendEmailVerificationCode",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthEmailCodeSendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseVoid"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/members/me": {
+      "get": {
+        "tags": [
+          "회원"
+        ],
+        "summary": "내 회원 정보 조회",
+        "description": "로그인한 회원의 내 정보를 조회합니다.",
+        "operationId": "getMyInfo",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseMemberMyInfoResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "회원"
+        ],
+        "summary": "내 회원 정보 수정",
+        "description": "닉네임을 수정합니다. 프로필 이미지는 이 API가 아니라 전용 업로드/삭제 API로 관리합니다.",
+        "operationId": "updateMyInfo",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberMyInfoUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseMemberMyInfoResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/{provider}/login": {
+      "get": {
+        "tags": [
+          "인증/인가"
+        ],
+        "summary": "소셜 로그인",
+        "description": "provider 콜백의 인가코드와 state로 로그인합니다. 미가입 이메일이면 자동 회원가입 후 로그인합니다. 응답은 일반 로그인과 동일합니다(accessToken + refresh 쿠키).",
+        "operationId": "loginWithOAuthCode",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "description": "소셜 로그인 제공자",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "KAKAO",
+                "NAVER"
+              ]
+            },
+            "example": "kakao"
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "description": "provider가 콜백으로 전달한 인가코드",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "인가 URL 생성 시 발급된 state",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseAuthGeneralLoginResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/{provider}/authorize": {
+      "get": {
+        "tags": [
+          "인증/인가"
+        ],
+        "summary": "소셜 로그인 인가 URL 생성",
+        "description": "provider(kakao/naver) 인가 페이지 URL을 생성합니다. CSRF 방어용 state가 포함되며 10분간 유효합니다. 프론트는 이 URL로 리다이렉트합니다.",
+        "operationId": "generateOAuthAuthorizationUrl",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "description": "소셜 로그인 제공자",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "KAKAO",
+                "NAVER"
+              ]
+            },
+            "example": "kakao"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseAuthOAuthAuthorizeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions": {
+      "get": {
+        "tags": [
+          "인증/인가"
+        ],
+        "summary": "로그인 기기 목록",
+        "description": "현재 로그인된 기기(활성 refresh 세션) 목록을 최근 갱신순으로 조회합니다. current 는 refresh 쿠키로 판별하므로 쿠키가 없는 요청에서는 모두 false 입니다. 기기당 별칭은 저장하지 않습니다.",
+        "operationId": "getMySessions",
+        "parameters": [
+          {
+            "name": "refreshToken",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseAuthSessionsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/sessions/{sessionId}": {
+      "delete": {
+        "tags": [
+          "인증/인가"
+        ],
+        "summary": "특정 기기 로그아웃",
+        "description": "지정한 세션(기기)의 refresh 토큰을 무효화합니다. 이미 만료된 세션이어도 성공합니다(멱등). 해당 기기가 이미 발급받은 access 토큰은 만료 시까지 유효할 수 있습니다.",
+        "operationId": "revokeSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "description": "세션 아이디 (기기 목록 조회로 얻는다)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseVoid"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PetSaveRequest": {
+        "type": "object",
+        "description": "반려견 등록/수정 요청 DTO",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "반려견 이름",
+            "example": "몽실이",
+            "maxLength": 20,
+            "minLength": 0
+          },
+          "breed": {
+            "type": "string",
+            "description": "품종",
+            "example": "말티즈",
+            "maxLength": 50,
+            "minLength": 0
+          },
+          "birthYm": {
+            "type": "string",
+            "description": "생년월 (yyyy-MM)",
+            "example": "2017-05",
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+          },
+          "sizeType": {
+            "type": "string",
+            "description": "크기 구분",
+            "enum": [
+              "SMALL",
+              "MEDIUM",
+              "LARGE"
+            ],
+            "example": "SMALL"
+          },
+          "weightKg": {
+            "type": "number",
+            "description": "체중 (kg). 장소의 입장 체중 제한 판정에 쓰입니다. 모르면 생략",
+            "example": 3.5,
+            "maximum": 99.9,
+            "minimum": 0.1
+          },
+          "heatSensitive": {
+            "type": "boolean",
+            "description": "더위 민감 여부",
+            "example": true
+          },
+          "coldSensitive": {
+            "type": "boolean",
+            "description": "추위 민감 여부",
+            "example": false
+          },
+          "noiseSensitive": {
+            "type": "boolean",
+            "description": "소음 민감 여부",
+            "example": false
+          },
+          "activityLevel": {
+            "type": "string",
+            "description": "활동량",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ],
+            "example": "MEDIUM"
+          },
+          "walkPreferred": {
+            "type": "boolean",
+            "description": "산책 선호 여부",
+            "example": true
+          },
+          "sociality": {
+            "type": "string",
+            "description": "사회성",
+            "enum": [
+              "LOW",
+              "MEDIUM",
+              "HIGH"
+            ],
+            "example": "MEDIUM"
+          }
+        },
+        "required": [
+          "activityLevel",
+          "sizeType",
+          "sociality"
+        ]
+      },
+      "CodeNameDescriptionMetadata": {
+        "type": "object",
+        "description": "코드명 메타데이터 DTO",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "내부 코드 값",
+            "example": "EXAMPLE_CODE"
+          },
+          "name": {
+            "type": "string",
+            "description": "화면 표시 이름",
+            "example": "예시 이름"
+          },
+          "description": {
+            "type": "string",
+            "description": "코드 의미 설명",
+            "example": "코드 의미를 설명하는 문장입니다."
+          }
+        }
+      },
+      "DataHeader": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "resultCode": {
+            "type": "string"
+          },
+          "resultMessage": {
+            "type": "object"
+          }
+        }
+      },
+      "PetResponse": {
+        "type": "object",
+        "description": "반려견 프로필 응답 DTO",
+        "properties": {
+          "petId": {
+            "type": "string",
+            "description": "반려견 아이디",
+            "example": 1234567890123456789
+          },
+          "name": {
+            "type": "string",
+            "description": "반려견 이름",
+            "example": "몽실이"
+          },
+          "breed": {
+            "type": "string",
+            "description": "품종",
+            "example": "말티즈"
+          },
+          "birthYm": {
+            "type": "string",
+            "description": "생년월 (yyyy-MM)",
+            "example": "2017-05"
+          },
+          "age": {
+            "type": "integer",
+            "format": "int32",
+            "description": "나이 (생년월 기준 만 나이, 생년월 미입력 시 null)",
+            "example": 9
+          },
+          "sizeType": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "크기 구분",
+            "example": {
+              "code": "SMALL",
+              "name": "소형견",
+              "description": "체중 10kg 미만"
+            }
+          },
+          "weightKg": {
+            "type": "number",
+            "description": "체중 (kg, 미입력 시 null)",
+            "example": 3.5
+          },
+          "heatSensitive": {
+            "type": "boolean",
+            "description": "더위 민감 여부",
+            "example": true
+          },
+          "coldSensitive": {
+            "type": "boolean",
+            "description": "추위 민감 여부",
+            "example": false
+          },
+          "noiseSensitive": {
+            "type": "boolean",
+            "description": "소음 민감 여부",
+            "example": false
+          },
+          "activityLevel": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "활동량",
+            "example": {
+              "code": "MEDIUM",
+              "name": "보통",
+              "description": "일반적인 산책과 관광 일정을 소화합니다."
+            }
+          },
+          "walkPreferred": {
+            "type": "boolean",
+            "description": "산책 선호 여부",
+            "example": true
+          },
+          "sociality": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "사회성",
+            "example": {
+              "code": "MEDIUM",
+              "name": "보통",
+              "description": "상황에 따라 적응합니다."
+            }
+          },
+          "profileImageUrl": {
+            "type": "string",
+            "description": "프로필 이미지 공개 URL (미등록 시 null)",
+            "example": "https://minio.hondigagae.com/hondigagae/pets/profiles/202507110001/2026/08/3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61.png"
+          },
+          "representative": {
+            "type": "boolean",
+            "description": "대표 반려견 여부 (AI 일정 생성 기본값)",
+            "example": true
+          }
+        }
+      },
+      "ResponsePetResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/PetResponse"
+          }
+        }
+      },
+      "MemberGeneralSignupRequest": {
+        "type": "object",
+        "description": "일반 회원가입 요청 DTO",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "이메일 주소",
+            "example": "user@example.com",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "description": "비밀번호 (영문자, 숫자, 특수문자 포함 8~20자)",
+            "example": "password123!",
+            "maxLength": 20,
+            "minLength": 8,
+            "pattern": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()\\-_=+\\[\\]{};:'\",.<>/?\\\\|])\\S+$"
+          },
+          "name": {
+            "type": "string",
+            "description": "회원 이름",
+            "example": "홍길동",
+            "maxLength": 10,
+            "minLength": 0
+          },
+          "nickname": {
+            "type": "string",
+            "description": "회원 닉네임",
+            "example": "길동짱",
+            "maxLength": 10,
+            "minLength": 0
+          }
+        }
+      },
+      "ResponseVoid": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "type": "object"
+          }
+        }
+      },
+      "MemberDevSignupResponse": {
+        "type": "object",
+        "description": "개발용 즉시 가입 응답 DTO",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "description": "생성된 회원 아이디. Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로 문자열로 내린다",
+            "example": 212481712381923328
+          },
+          "email": {
+            "type": "string",
+            "description": "가입된 이메일. 앞뒤 공백을 지우고 소문자로 정규화한 값이다",
+            "example": "tester@example.com"
+          }
+        }
+      },
+      "ResponseMemberDevSignupResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/MemberDevSignupResponse"
+          }
+        }
+      },
+      "MemberProfileImageUploadResponse": {
+        "type": "object",
+        "description": "프로필 이미지 업로드 응답 DTO",
+        "properties": {
+          "profileImageKey": {
+            "type": "string",
+            "description": "저장된 오브젝트 키 (서버 내부 식별자)",
+            "example": "members/profiles/202507110001/2026/08/3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61.png"
+          },
+          "profileImageUrl": {
+            "type": "string",
+            "description": "프로필 이미지 공개 URL",
+            "example": "https://minio.hondigagae.com/hondigagae/members/profiles/202507110001/2026/08/3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61.png"
+          }
+        }
+      },
+      "ResponseMemberProfileImageUploadResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/MemberProfileImageUploadResponse"
+          }
+        }
+      },
+      "PetProfileImageUploadResponse": {
+        "type": "object",
+        "description": "반려견 프로필 이미지 업로드 응답 DTO",
+        "properties": {
+          "profileImageKey": {
+            "type": "string",
+            "description": "저장된 오브젝트 키 (서버 내부 식별자)",
+            "example": "pets/profiles/202507110001/2026/08/3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61.png"
+          },
+          "profileImageUrl": {
+            "type": "string",
+            "description": "반려견 프로필 이미지 공개 URL",
+            "example": "https://minio.hondigagae.com/hondigagae/pets/profiles/202507110001/2026/08/3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61.png"
+          }
+        }
+      },
+      "ResponsePetProfileImageUploadResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/PetProfileImageUploadResponse"
+          }
+        }
+      },
+      "MemberPasswordChangeRequest": {
+        "type": "object",
+        "description": "비밀번호 변경 요청 DTO",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "현재 비밀번호",
+            "example": "password123!",
+            "minLength": 1
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "새 비밀번호 (영문자, 숫자, 특수문자 포함 8~20자)",
+            "example": "newPassword456!",
+            "maxLength": 20,
+            "minLength": 8,
+            "pattern": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()\\-_=+\\[\\]{};:'\",.<>/?\\\\|])\\S+$"
+          }
+        }
+      },
+      "MemberPasswordSetupRequest": {
+        "type": "object",
+        "description": "비밀번호 최초 설정 요청 DTO (소셜 전용 계정에 이메일 로그인 수단 추가)",
+        "properties": {
+          "newPassword": {
+            "type": "string",
+            "description": "새 비밀번호 (영문자, 숫자, 특수문자 포함 8~20자)",
+            "example": "newPassword456!",
+            "maxLength": 20,
+            "minLength": 8,
+            "pattern": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()\\-_=+\\[\\]{};:'\",.<>/?\\\\|])\\S+$"
+          }
+        }
+      },
+      "ResponseTokenReissueResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/TokenReissueResponse"
+          }
+        }
+      },
+      "TokenReissueResponse": {
+        "type": "object",
+        "description": "토큰 재발급 응답 DTO",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT 액세스 토큰",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          }
+        }
+      },
+      "AuthPasswordResetRequest": {
+        "type": "object",
+        "description": "비밀번호 재설정 요청 DTO",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "가입한 이메일",
+            "example": "user@example.com",
+            "minLength": 1
+          },
+          "code": {
+            "type": "string",
+            "description": "메일로 받은 재설정 인증코드",
+            "example": "A2B3C4D5",
+            "minLength": 1
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "새 비밀번호 (영문자, 숫자, 특수문자 포함 8~20자)",
+            "example": "newPassword456!",
+            "maxLength": 20,
+            "minLength": 8,
+            "pattern": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()\\-_=+\\[\\]{};:'\",.<>/?\\\\|])\\S+$"
+          }
+        }
+      },
+      "AuthPasswordResetCodeSendRequest": {
+        "type": "object",
+        "description": "비밀번호 재설정 코드 발송 요청 DTO",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "가입한 이메일",
+            "example": "user@example.com",
+            "minLength": 1
+          }
+        }
+      },
+      "AuthGeneralLoginRequest": {
+        "type": "object",
+        "description": "일반 로그인 요청 DTO",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "이메일 주소",
+            "example": "user@example.com",
+            "minLength": 1
+          },
+          "password": {
+            "type": "string",
+            "description": "비밀번호",
+            "example": "password123!",
+            "minLength": 1
+          }
+        }
+      },
+      "AuthGeneralLoginResponse": {
+        "type": "object",
+        "description": "일반 로그인 성공 응답 DTO",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "JWT 액세스 토큰",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "memberId": {
+            "type": "string",
+            "description": "회원 아이디",
+            "example": 1
+          }
+        }
+      },
+      "ResponseAuthGeneralLoginResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/AuthGeneralLoginResponse"
+          }
+        }
+      },
+      "AuthEmailCodeVerifyRequest": {
+        "type": "object",
+        "description": "이메일 인증코드 검증 요청 DTO",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "인증코드를 받은 이메일 주소",
+            "example": "user@example.com",
+            "minLength": 1
+          },
+          "code": {
+            "type": "string",
+            "description": "메일로 받은 인증코드",
+            "example": "A3K7MP2X",
+            "minLength": 1
+          }
+        }
+      },
+      "AuthEmailCodeSendRequest": {
+        "type": "object",
+        "description": "이메일 인증코드 발송 요청 DTO",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "인증코드를 받을 이메일 주소",
+            "example": "user@example.com",
+            "minLength": 1
+          }
+        }
+      },
+      "MemberMyInfoUpdateRequest": {
+        "type": "object",
+        "description": "내 회원 정보 수정 요청 DTO",
+        "properties": {
+          "nickname": {
+            "type": "string",
+            "description": "변경할 닉네임",
+            "example": "길동짱",
+            "maxLength": 10,
+            "minLength": 0
+          }
+        }
+      },
+      "MemberMyInfoResponse": {
+        "type": "object",
+        "description": "회원 내 정보 조회 응답 DTO",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "description": "회원 아이디",
+            "example": 202507110001
+          },
+          "email": {
+            "type": "string",
+            "description": "이메일 주소",
+            "example": "user@example.com"
+          },
+          "name": {
+            "type": "string",
+            "description": "회원 이름",
+            "example": "홍길동"
+          },
+          "nickname": {
+            "type": "string",
+            "description": "회원 닉네임",
+            "example": "길동이"
+          },
+          "profileImageUrl": {
+            "type": "string",
+            "description": "프로필 이미지 URL",
+            "example": "https://cdn.tripmarble.com/profile.jpg"
+          },
+          "role": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "회원 권한 메타데이터",
+            "example": {
+              "code": "USER",
+              "name": "일반 회원",
+              "description": "일반 회원 권한입니다."
+            }
+          },
+          "provider": {
+            "type": "string",
+            "description": "소셜 로그인 제공자 (일반 계정이면 null)",
+            "example": "KAKAO"
+          },
+          "hasPassword": {
+            "type": "boolean",
+            "description": "비밀번호 설정 여부 — provider 와 조합해 계정 상태를 구분한다 (true+null=일반, false+KAKAO=소셜 전용, true+KAKAO=연결됨)",
+            "example": true
+          }
+        }
+      },
+      "ResponseMemberMyInfoResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/MemberMyInfoResponse"
+          }
+        }
+      },
+      "PetItem": {
+        "type": "object",
+        "description": "반려견 목록 항목 DTO",
+        "properties": {
+          "petId": {
+            "type": "string",
+            "description": "반려견 아이디",
+            "example": 1234567890123456789
+          },
+          "name": {
+            "type": "string",
+            "description": "반려견 이름",
+            "example": "몽실이"
+          },
+          "breed": {
+            "type": "string",
+            "description": "품종",
+            "example": "말티즈"
+          },
+          "birthYm": {
+            "type": "string",
+            "description": "생년월 (yyyy-MM)",
+            "example": "2017-05"
+          },
+          "age": {
+            "type": "integer",
+            "format": "int32",
+            "description": "나이 (생년월 기준 만 나이, 생년월 미입력 시 null)",
+            "example": 9
+          },
+          "sizeType": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "크기 구분",
+            "example": {
+              "code": "SMALL",
+              "name": "소형견",
+              "description": "체중 10kg 미만"
+            }
+          },
+          "weightKg": {
+            "type": "number",
+            "description": "체중 (kg, 미입력 시 null)",
+            "example": 3.5
+          },
+          "heatSensitive": {
+            "type": "boolean",
+            "description": "더위 민감 여부",
+            "example": true
+          },
+          "coldSensitive": {
+            "type": "boolean",
+            "description": "추위 민감 여부",
+            "example": false
+          },
+          "noiseSensitive": {
+            "type": "boolean",
+            "description": "소음 민감 여부",
+            "example": false
+          },
+          "activityLevel": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "활동량",
+            "example": {
+              "code": "MEDIUM",
+              "name": "보통",
+              "description": "일반적인 산책과 관광 일정을 소화합니다."
+            }
+          },
+          "walkPreferred": {
+            "type": "boolean",
+            "description": "산책 선호 여부",
+            "example": true
+          },
+          "sociality": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "사회성",
+            "example": {
+              "code": "MEDIUM",
+              "name": "보통",
+              "description": "상황에 따라 적응합니다."
+            }
+          },
+          "profileImageUrl": {
+            "type": "string",
+            "description": "프로필 이미지 공개 URL (미등록 시 null)",
+            "example": "https://minio.hondigagae.com/hondigagae/pets/profiles/202507110001/2026/08/3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61.png"
+          },
+          "representative": {
+            "type": "boolean",
+            "description": "대표 반려견 여부 (AI 일정 생성 기본값)",
+            "example": true
+          }
+        }
+      },
+      "PetsResponse": {
+        "type": "object",
+        "description": "내 반려견 목록 응답 DTO",
+        "properties": {
+          "pets": {
+            "type": "array",
+            "description": "반려견 목록 (등록순)",
+            "items": {
+              "$ref": "#/components/schemas/PetItem"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "등록된 반려견 수",
+            "example": 2
+          }
+        }
+      },
+      "ResponsePetsResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/PetsResponse"
+          }
+        }
+      },
+      "AuthOAuthAuthorizeResponse": {
+        "type": "object",
+        "description": "소셜 로그인 인가 URL 응답 DTO",
+        "properties": {
+          "authorizationUrl": {
+            "type": "string",
+            "description": "provider 인가 페이지로 리다이렉트할 URL (CSRF 방어용 state 포함)",
+            "example": "https://kauth.kakao.com/oauth/authorize?response_type=code&client_id=...&state=..."
+          }
+        }
+      },
+      "ResponseAuthOAuthAuthorizeResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/AuthOAuthAuthorizeResponse"
+          }
+        }
+      },
+      "AuthSessionItem": {
+        "type": "object",
+        "description": "로그인 기기(세션) 항목 DTO",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "세션 아이디 (개별 로그아웃에 사용)",
+            "example": "3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61"
+          },
+          "lastRefreshedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "마지막 토큰 갱신 시각",
+            "example": "2026-09-01T09:30:00Z"
+          },
+          "current": {
+            "type": "boolean",
+            "description": "지금 요청을 보낸 기기인지. refresh 쿠키가 없으면 판별할 수 없어 false",
+            "example": true
+          }
+        }
+      },
+      "AuthSessionsResponse": {
+        "type": "object",
+        "description": "로그인 기기(세션) 목록 응답 DTO",
+        "properties": {
+          "sessions": {
+            "type": "array",
+            "description": "활성 세션 목록 (최근 갱신순)",
+            "items": {
+              "$ref": "#/components/schemas/AuthSessionItem"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "활성 세션 수",
+            "example": 2
+          }
+        }
+      },
+      "ResponseAuthSessionsResponse": {
+        "type": "object",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/AuthSessionsResponse"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

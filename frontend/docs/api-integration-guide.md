@@ -1,19 +1,30 @@
 # Frontend API Integration Guide
 
-> **계약 정본은 로컬 기동 중 Swagger다.** `http://localhost:8000/swagger-ui.html`
+> **계약 정본 순서: 기동 중인 게이트웨이 Swagger > `docs/api/openapi/*.json` 스냅샷 > 서술 문서.**
+> 스냅샷과 엔드포인트 인벤토리(56 operations)는 [`docs/api/README.md`](../../docs/api/README.md) 에 있다 —
+> 백엔드가 로컬에 없어도 계약을 읽을 수 있고, 갱신 명령이 같은 문서에 있다.
 > 서술 문서는 `backend/docs/api-design-guide.md`, 서비스별 책임은 `backend/docs/service-inventory.md`.
 > 이 문서의 내용은 백엔드 코드 실측 기준이며, 충돌하면 Swagger가 이긴다.
 
 ## 1. 진입점
 
-| 항목          | 값                                                                                   |
-| ------------- | ------------------------------------------------------------------------------------ |
-| 게이트웨이    | `http://localhost:8000` (dev `6000`, prod `9000`)                                    |
-| FE dev 서버   | `http://localhost:3000`                                                              |
-| 라우팅 prefix | `/api/v1/{auth,members,places,walk-courses,emergencies,plans,ai-plans,assistant}/**` |
-| BFF 매핑      | `/api/bff/{path}` → `{GATEWAY}/api/v1/{path}`                                        |
+| 항목          | 값                                                                                                       |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| 게이트웨이    | local `http://localhost:8000` / dev `https://api-dev.hondigagae.com` / prod `https://api.hondigagae.com` |
+| FE dev 서버   | `http://localhost:3000` (`pnpm dev:alt` = 5174)                                                          |
+| 라우팅 prefix | `/api/v1/{auth,members,places,insights,emergencies,favorites,plans,ai-plans}/**`                         |
+| BFF 매핑      | `/api/bff/{path}` → `{GATEWAY}/api/v1/{path}`                                                            |
 
-서비스 개별 Swagger: auth `8081` / tour `8082` / plan `8083` / ai `8085`
+`BACKEND_API_URL` 이 이 값을 정한다. **`MOCK_API=true` 면 게이트웨이를 아예 부르지 않는다** —
+실 데이터로 확인할 때는 `false` 로 두고 `BACKEND_API_URL` 을 살아 있는 게이트웨이로 돌린다.
+
+서비스 개별 Swagger: auth `8081` / tour `8082` / plan `8083` / ai `8085`.
+게이트웨이에서는 **루트 `/v3/api-docs` 가 비어 있고**(paths 0) 서비스 그룹 경로를 써야 한다:
+`/{auth,tour,plan,ai}-service/v3/api-docs`.
+
+**auth API 는 게이트웨이를 거치지 않는다** — `/api/v1/auth`·`/api/v1/members` 는 nginx 가
+auth-service 로 직결시킨다. FE 입장에서는 같은 `BACKEND_API_URL` 이라 차이가 없지만,
+게이트웨이만 죽었을 때 로그인은 되고 나머지가 안 되는 그림이 나올 수 있다.
 
 ## 2. 공통 응답 래퍼
 
@@ -46,11 +57,11 @@ Spring 기본 오류 본문이 온다:
 { "timestamp": "...", "path": "/api/v1/plans", "status": 503, "error": "Service Unavailable" }
 ```
 
-| 상황                 | 상태 | 래퍼 | 실측 예                              |
-| -------------------- | ---- | ---- | ------------------------------------ |
-| 라우트 미등록        | 404  | ❌   | `/api/v1/favorites/**` (#202)        |
-| 서비스 미기동        | 503  | ❌   | plan-service 다운                    |
-| 서비스가 만든 실패   | 4xx  | ✅   | 401 `SECURITY_004` · 404 `PLACE_002` |
+| 상황               | 상태 | 래퍼 | 실측 예                              |
+| ------------------ | ---- | ---- | ------------------------------------ |
+| 라우트 미등록      | 404  | ❌   | `/api/v1/favorites/**` (#202)        |
+| 서비스 미기동      | 503  | ❌   | plan-service 다운                    |
+| 서비스가 만든 실패 | 4xx  | ✅   | 401 `SECURITY_004` · 404 `PLACE_002` |
 
 토큰 없이 `/members/me` 를 부르면 예전에는 래퍼 없는 403 이었다. **#214 이후 auth-service 가 401 `SECURITY_001`
 을 봉투 안에 준다** — 다른 토큰 오류와 같은 길(재발급 1회 → 로그인 유도)을 탄다. 서명부가 디코딩 불가한
@@ -327,12 +338,21 @@ mutation 후 무효화 대상을 **명세와 코드 양쪽에 명시한다.**
 
 ## 9. 없는 API를 부르지 않는다
 
-`backend/docs/service-inventory.md` 기준으로 **미착수**인 기능은 호출부를 만들지 않는다.
+**미착수**인 기능은 호출부를 만들지 않는다. 판단 기준은 저장된 계약 스냅샷이다 —
+[`docs/api/README.md`](../../docs/api/README.md) 의 인벤토리에 없으면 그 API 는 존재하지 않는다.
 
-- 산책 코스(두루누비), 여행 적합도·날씨·혼잡도, 긴급 동물병원
+지금 계약에 **없는** 것:
+
+- 산책 코스(두루누비, `/walk-courses`)
 - 여행 후기, 일정 공유
 - AI 상담사·비서(`/assistant`), 반려견 성향 분석
-- AI 일정 생성 SSE 스트림 (LLM 자체는 Ollama 로 연동 완료, 스텁 없음)
+
+**계약에 있으나 FE 호출부가 없는 것 5개** — 만들어도 되는 것들이다:
+`GET /auth/sessions` · `DELETE /auth/sessions/{sessionId}` · `POST /members/signup/dev` ·
+`GET /emergencies/facilities/{facilityId}` · `GET /places/{placeId}/congestions`.
+
+여행 적합도·날씨·혼잡도, 긴급 시설, 권역 날씨·골든타임, AI 일정 SSE 는 **이미 계약에 있고
+FE 도 연동돼 있다** — 이 목록에 미착수로 적혀 있던 것을 2026-09-04 스냅샷 기준으로 정정했다.
 
 착수 가능 범위는 `screen-inventory.md`.
 
