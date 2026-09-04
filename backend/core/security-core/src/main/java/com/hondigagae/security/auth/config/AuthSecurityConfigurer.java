@@ -2,6 +2,7 @@ package com.hondigagae.security.auth.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hondigagae.security.auth.blacklist.AccessTokenBlacklistVerifier;
+import com.hondigagae.security.auth.handler.JwtAuthenticationEntryPoint;
 import com.hondigagae.security.auth.handler.JwtAuthenticationFailureHandler;
 import com.hondigagae.security.auth.jwt.JwtAuthFilter;
 import com.hondigagae.security.auth.jwt.JwtAuthProperties;
@@ -34,7 +35,8 @@ public class AuthSecurityConfigurer {
 
     @Bean
     public SecurityFilterChain securityFilterChain(
-        HttpSecurity http, JwtAuthFilter jwtAuthFilter, CustomAccessDeniedHandler customAccessDeniedHandler) throws Exception {
+        HttpSecurity http, JwtAuthFilter jwtAuthFilter, CustomAccessDeniedHandler customAccessDeniedHandler,
+        JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint) throws Exception {
 
         http
             // 1. CORS(Cross-Origin Resource Sharing) 설정 적용
@@ -56,11 +58,13 @@ public class AuthSecurityConfigurer {
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
             // 4. JWT 인증 필터 등록
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-            // 5. 예외 처리 (권한 실패만 처리, 인증 실패는 Filter에서 처리)
+            // 5. 예외 처리
             .exceptionHandling(ex -> ex
-                // Auth‐Service 에서도 권한 체크(@PreAuthorize) 시 403 을 JSON으로 내려줌
-                // AuthenticationEntryPoint 등록 안 함
-                // 인증 실패는 JwtAuthFilter 안에서 처리 -> 커스텀 응답
+                // 토큰이 있는데 틀린 경우는 JwtAuthFilter 가 파싱 단계에서 401 을 쓴다.
+                // 토큰이 없는 경우는 @PreAuthorize 가 익명 주체를 거부한 뒤 이 진입점으로 온다 — 등록하지 않으면
+                // Spring 기본 403 이 Response 봉투 없이 나간다 (#214).
+                .authenticationEntryPoint(jwtAuthenticationEntryPoint)
+                // 인증은 됐지만 권한이 없는 경우(@PreAuthorize 역할 검사) 403 을 JSON 으로 내려준다.
                 .accessDeniedHandler(customAccessDeniedHandler)
             );
 
@@ -111,6 +115,11 @@ public class AuthSecurityConfigurer {
     @Bean
     public AuthenticationFailureHandler jwtAuthenticationFailureHandler(SecurityErrorResponseWriter errorResponseWriter) {
         return new JwtAuthenticationFailureHandler(errorResponseWriter);
+    }
+
+    @Bean
+    public JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint(SecurityErrorResponseWriter errorResponseWriter) {
+        return new JwtAuthenticationEntryPoint(errorResponseWriter);
     }
 
     @Bean

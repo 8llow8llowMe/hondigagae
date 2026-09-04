@@ -6,9 +6,9 @@ import com.hondigagae.security.common.exception.SecurityErrorCode;
 import com.hondigagae.security.common.exception.SecurityJwtException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.Jwts.SIG;
-import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.security.Keys;
 import io.jsonwebtoken.security.SignatureException;
 import java.time.Duration;
@@ -16,6 +16,13 @@ import java.util.Date;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 
+/**
+ * 토큰 발급·파싱.
+ *
+ * <p><b>파싱 실패는 어떤 종류든 {@link SecurityJwtException} 으로 나간다.</b> {@code JwtAuthFilter} 는 이
+ * 예외만 잡아 401 을 쓰고, 여기서 새는 예외는 Spring 기본 500 이 래퍼 없이 나간다 — FE 는 그것을
+ * "일시 장애 · 재시도" 로 안내하는데 재시도해도 절대 풀리지 않는 인증 오류다 (#214).
+ */
 @RequiredArgsConstructor
 public class JwtAuthProvider {
 
@@ -51,7 +58,7 @@ public class JwtAuthProvider {
 
     public RefreshTokenClaims parseRefreshToken(String refreshToken) {
         Claims payload = parseToken(refreshToken, jwtAuthProperties.refreshKey());
-        return new RefreshTokenClaims(Long.parseLong(payload.getSubject()), payload.getId());
+        return new RefreshTokenClaims(requireMemberId(payload), payload.getId());
     }
 
     /** refresh 토큰의 핵심 클레임. tokenId(jti)는 기기별 세션 식별자로 쓴다. */
@@ -62,8 +69,8 @@ public class JwtAuthProvider {
         Claims payload = parseToken(accessToken, jwtAuthProperties.accessKey());
 
         return MemberLoginActive.builder()
-            .memberId(Long.parseLong(payload.getSubject()))
-            .role(SecurityRole.from(payload.get(CLAIM_ROLE, String.class)))
+            .memberId(requireMemberId(payload))
+            .role(requireRole(payload))
             .tokenId(payload.getId())
             .build();
     }
@@ -79,23 +86,50 @@ public class JwtAuthProvider {
             .compact();
     }
 
+    /**
+     * 만료와 서명 불일치만 코드를 나누고 나머지는 전부 {@code TOKEN_INVALID} 다 — 형식 오류(MalformedJwt),
+     * 서명부를 디코딩할 수 없는 길이(jjwt 0.13 은 UnsupportedJwt 로 던진다), 지원하지 않는 alg, 빈 문자열
+     * (IllegalArgument) 등. 화면이 갈라 다룰 이유가 없고, 어느 검사에 걸렸는지는 cause 로 로그에 남는다.
+     * {@code JwtException} 이 jjwt 예외 전체의 부모라 새 예외 종류가 생겨도 여기서 막힌다.
+     */
     private Claims parseToken(String token, String secretKey) {
-        Claims payload;
-
         try {
-            payload = Jwts.parser()
+            return Jwts.parser()
                 .verifyWith(Keys.hmacShaKeyFor(secretKey.getBytes()))
                 .build()
-                .parseSignedClaims(token).getPayload();
+                .parseSignedClaims(token)
+                .getPayload();
         } catch (ExpiredJwtException e) {
-            throw new SecurityJwtException(SecurityErrorCode.TOKEN_EXPIRED);
-        } catch (MalformedJwtException | SecurityException | IllegalArgumentException e) {
-            throw new SecurityJwtException(SecurityErrorCode.TOKEN_INVALID);
+            throw new SecurityJwtException(SecurityErrorCode.TOKEN_EXPIRED, e);
         } catch (SignatureException e) {
-            throw new SecurityJwtException(SecurityErrorCode.TOKEN_SIGNATURE_INVALID);
+            throw new SecurityJwtException(SecurityErrorCode.TOKEN_SIGNATURE_INVALID, e);
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new SecurityJwtException(SecurityErrorCode.TOKEN_INVALID, e);
         }
+    }
 
-        return payload;
+    /**
+     * 서명이 맞아도 클레임이 발급 규약과 다르면 서버 오류가 아니라 잘못된 토큰이다. 키가 새지 않으면 만들 수 없는
+     * 토큰이지만, 만들 수 있게 됐을 때 500 으로 보이게 두면 그 사실이 서버 장애로 위장된다.
+     */
+    private long requireMemberId(Claims payload) {
+        try {
+            return Long.parseLong(payload.getSubject());
+        } catch (NumberFormatException e) {
+            throw new SecurityJwtException(SecurityErrorCode.TOKEN_INVALID, e);
+        }
+    }
+
+    private SecurityRole requireRole(Claims payload) {
+        try {
+            String role = payload.get(CLAIM_ROLE, String.class);
+            if (role == null) {
+                throw new SecurityJwtException(SecurityErrorCode.TOKEN_INVALID);
+            }
+            return SecurityRole.from(role);
+        } catch (JwtException | IllegalArgumentException e) {
+            // role 이 문자열이 아니면 jjwt 가 RequiredTypeException 을, 모르는 값이면 valueOf 가 IllegalArgument 를 던진다.
+            throw new SecurityJwtException(SecurityErrorCode.TOKEN_INVALID, e);
+        }
     }
 }
-
