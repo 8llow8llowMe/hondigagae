@@ -48,7 +48,11 @@ public record PlaceCondition(
         return Boolean.TRUE.equals(outdoor) || !hasIndoorShelter();
     }
 
+    /**
+     * 추가 요금이 <b>있다고 확실히 읽히는지</b>. 값의 존재가 아니라 뜻을 본다 — 원천은 요금 없음을 "없음" 이라는
+     * 낱말로 보내므로 {@code !isBlank()} 로 판정하면 요금 없는 장소 대부분이 깎인다 (#231, {@link PetExtraFee}).
+     */
     public boolean hasExtraFee() {
-        return petExtraFee != null && !petExtraFee.isBlank();
+        return PetExtraFee.of(petExtraFee).isCharged();
     }
 }

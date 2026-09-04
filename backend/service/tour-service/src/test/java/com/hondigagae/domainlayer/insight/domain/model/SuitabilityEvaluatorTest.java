@@ -145,6 +145,35 @@ class SuitabilityEvaluatorTest {
 
             assertThat(withSize.score()).isEqualTo(noRestriction.score());
         }
+
+        @Test
+        @DisplayName("추가 요금 원문이 \"없음\" 이면 깎지 않고 근거도 만들지 않는다 — 요금이 있습니다 (없음) 이 나가던 자리 (#231)")
+        void noFeeWordingIsNotAFee() {
+            SuitabilityScore noFee = SuitabilityEvaluator.evaluate(
+                input(mildWeather(), false, placeWithExtraFee("없음"), pet()));
+            SuitabilityScore blank = SuitabilityEvaluator.evaluate(
+                input(mildWeather(), false, allowedPlace(), pet()));
+
+            assertThat(noFee.score()).isEqualTo(blank.score());
+            assertThat(codesOf(noFee)).doesNotContain(SuitabilityReasonCode.PET_EXTRA_FEE);
+        }
+
+        @Test
+        @DisplayName("실제 금액이 적혀 있으면 3점 깎고 원문을 근거에 그대로 싣는다")
+        void actualFeeIsPenalizedWithRawText() {
+            SuitabilityScore charged = SuitabilityEvaluator.evaluate(
+                input(mildWeather(), false, placeWithExtraFee("20,000원"), pet()));
+            SuitabilityScore blank = SuitabilityEvaluator.evaluate(
+                input(mildWeather(), false, allowedPlace(), pet()));
+
+            assertThat(charged.score()).isEqualTo(blank.score() - 3);
+            SuitabilityReason fee = charged.reasons().stream()
+                .filter(reason -> reason.code() == SuitabilityReasonCode.PET_EXTRA_FEE)
+                .findFirst()
+                .orElseThrow();
+            assertThat(fee.description()).contains("20,000원").doesNotContain("없음");
+            assertThat(fee.scoreDelta()).isEqualTo(-3);
+        }
     }
 
     @Nested
@@ -284,6 +313,15 @@ class SuitabilityEvaluatorTest {
         return PlaceCondition.builder()
             .placeId(4L).title("소형견 전용 카페").lat(33.3).lng(126.5)
             .petAllowanceType(PetAllowanceType.ALLOWED).allowedPetSize(AllowedPetSize.SMALL_ONLY)
+            .build();
+    }
+
+    /** {@code allowedPlace()} 와 추가 요금 원문만 다르다 — 점수 차이가 요금 판정에서만 나오게 한다. */
+    private static PlaceCondition placeWithExtraFee(String petExtraFee) {
+        return PlaceCondition.builder()
+            .placeId(1L).title("천지연폭포").lat(33.24).lng(126.55)
+            .petAllowanceType(PetAllowanceType.ALLOWED).allowedPetSize(AllowedPetSize.ALL)
+            .petExtraFee(petExtraFee)
             .build();
     }
 
