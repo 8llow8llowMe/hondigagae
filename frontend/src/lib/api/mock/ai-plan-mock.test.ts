@@ -150,8 +150,8 @@ describe('AI 일정 mock — 제출 검증 (백엔드와 같은 경계)', () => 
 describe('POST /ai-plans — petIds (#128)', () => {
   const MULTI: Record<string, unknown> = {
     areaCode: '39',
-    startDate: '2026-11-01',
-    endDate: '2026-11-03',
+    startDate: fromToday(30),
+    endDate: fromToday(32),
     petIds: ['123456789012000001', '123456789012000002'],
   }
 
@@ -237,7 +237,7 @@ describe('AI 일정 mock — 일수가 부족한 완료 (명세 S6)', () => {
     const partial = pollTimes(newJob({ ...VALID, requestNote: '일부만' }), 3)
 
     expect(partial.status.code).toBe('COMPLETED')
-    // 2026-11-01 ~ 11-03 = 3일인데 2일만 만든다
+    // VALID = fromToday(30) ~ fromToday(32) = 3일인데 2일만 만든다
     expect(partial.planDraft?.days.length).toBe(2)
   })
 })
