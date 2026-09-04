@@ -11,7 +11,7 @@ public record AiPlanDayItem(
     @Schema(description = "여행 일차 (1부터 시작)", example = "1")
     int day,
 
-    @Schema(description = "해당 일차의 일정 항목 목록")
+    @Schema(description = "해당 일차의 일정 항목 목록 (시간 순서). 없으면 빈 배열")
     List<AiPlanScheduleItem> items
 ) {
 

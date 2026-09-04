@@ -12,7 +12,7 @@ import java.util.List;
 @Schema(description = "일자별 일정 항목 일괄 교체 요청 DTO")
 public record PlanDayItemsReplaceRequest(
 
-    @Schema(description = "해당 일차의 항목 목록")
+    @Schema(description = "생략 가능. 해당 일차의 항목 목록. 생략하거나 빈 목록이면 해당 일차 항목이 모두 삭제됩니다.")
     @Valid
     List<PlanItemRequest> items
 ) {

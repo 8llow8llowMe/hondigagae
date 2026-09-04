@@ -12,7 +12,7 @@ import jakarta.validation.constraints.Size;
 @Schema(description = "내 회원 정보 수정 요청 DTO")
 public record MemberMyInfoUpdateRequest(
 
-    @Schema(description = "변경할 닉네임", example = "길동짱")
+    @Schema(description = "변경할 닉네임", example = "길동짱", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = MemberValidationMessage.NICKNAME_REQUIRED)
     @Size(max = 10, message = MemberValidationMessage.NICKNAME_LENGTH_INVALID)
     String nickname

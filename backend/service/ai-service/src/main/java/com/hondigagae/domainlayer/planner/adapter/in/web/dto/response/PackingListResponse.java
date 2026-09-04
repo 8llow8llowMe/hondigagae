@@ -8,13 +8,13 @@ import lombok.Builder;
 @Schema(description = "반려견 여행 준비물 목록 응답 DTO")
 public record PackingListResponse(
 
-    @Schema(description = "기준 일정 아이디", example = "1234567890123456789")
+    @Schema(description = "기준 일정 아이디. 요청 경로의 planId 를 문자열로 돌려준다", example = "1234567890123456789")
     String planId,
 
-    @Schema(description = "준비물 목록 (분류별)")
+    @Schema(description = "준비물 목록 (분류별). 항목마다 이 여행 데이터 기반의 이유가 붙는다")
     List<PackingListItem> items,
 
-    @Schema(description = "준비물 수", example = "11")
+    @Schema(description = "준비물 수 (items 길이)", example = "11")
     int totalCount
 ) {
 

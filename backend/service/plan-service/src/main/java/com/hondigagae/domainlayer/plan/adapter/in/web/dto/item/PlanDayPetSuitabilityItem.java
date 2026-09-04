@@ -18,7 +18,7 @@ public record PlanDayPetSuitabilityItem(
     @Schema(description = "이 반려견 기준 적합도 점수(0~100). 판단 근거가 없으면 null", example = "48", nullable = true)
     Integer score,
 
-    @Schema(description = "이 반려견 기준 적합도 등급 metadata", nullable = true)
+    @Schema(description = "이 반려견 기준 적합도 등급 metadata. 판단 근거가 없으면 null", nullable = true)
     ScoreMetricMetadata suitabilityLevel
 ) {
 }

@@ -10,16 +10,16 @@ import jakarta.validation.constraints.Size;
 @Schema(description = "비밀번호 재설정 요청 DTO")
 public record AuthPasswordResetRequest(
 
-    @Schema(description = "가입한 이메일", example = "user@example.com")
+    @Schema(description = "가입한 이메일", example = "user@example.com", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = AuthValidationMessage.EMAIL_REQUIRED)
     @Email(message = AuthValidationMessage.EMAIL_FORMAT_INVALID)
     String email,
 
-    @Schema(description = "메일로 받은 재설정 인증코드", example = "A2B3C4D5")
+    @Schema(description = "메일로 받은 재설정 인증코드", example = "A2B3C4D5", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = AuthValidationMessage.EMAIL_CODE_REQUIRED)
     String code,
 
-    @Schema(description = "새 비밀번호 (영문자, 숫자, 특수문자 포함 8~20자)", example = "newPassword456!")
+    @Schema(description = "새 비밀번호 (영문자, 숫자, 특수문자 포함 8~20자)", example = "newPassword456!", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = AuthValidationMessage.NEW_PASSWORD_REQUIRED)
     @Size(min = 8, max = 20, message = AuthValidationMessage.PASSWORD_LENGTH_INVALID)
     @Pattern(
