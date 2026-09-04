@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.plan.application.exception.PlanErrorCode;
 import com.hondigagae.domainlayer.plan.application.exception.PlanException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -44,6 +45,12 @@ public class PlanExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Response<Void>> handleTypeMismatch(MethodArgumentTypeMismatchException exception) {
         return ValidationErrorSupport.toResponse(exception, PlanErrorCode.PARAMETER_TYPE_INVALID.getCode());
+    }
+
+    /** 본문을 읽지 못한 요청(깨진 JSON, enum 에 없는 itemType 등). 처리하지 않으면 Response 봉투 밖의 Spring 기본 400 이 나간다 (#214). */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Response<Void>> handleUnreadableBody(HttpMessageNotReadableException exception) {
+        return ValidationErrorSupport.toResponse(exception, PlanErrorCode.INVALID_REQUEST.getCode());
     }
     /** 필수 쿼리 파라미터 누락. 처리하지 않으면 Response 봉투 밖의 Spring 기본 에러 바디가 나간다. */
     @ExceptionHandler(MissingServletRequestParameterException.class)

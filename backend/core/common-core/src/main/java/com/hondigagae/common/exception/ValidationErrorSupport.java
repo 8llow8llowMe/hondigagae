@@ -1,5 +1,8 @@
 package com.hondigagae.common.exception;
 
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.hondigagae.common.dto.Response;
 import com.hondigagae.common.dto.ValidationErrorBody;
 import com.hondigagae.common.dto.ValidationErrorItem;
@@ -7,13 +10,16 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -101,6 +107,55 @@ public final class ValidationErrorSupport {
     public static ResponseEntity<Response<Void>> toResponse(MethodArgumentTypeMismatchException exception, String defaultCode) {
         String message = "%s 파라미터 형식이 올바르지 않습니다.".formatted(exception.getName());
         return respond(List.of(new ValidationErrorItem(defaultCode, exception.getName(), message)));
+    }
+
+    /**
+     * 요청 본문을 읽지 못한 경우 — 깨진 JSON, enum 에 없는 값({@code sizeType: "HUGE"}), 타입 불일치.
+     *
+     * <p>Bean Validation 보다 앞선 역직렬화 단계라 필드별 코드가 없다. 도메인 기본 코드({@code {DOMAIN}_100})로
+     * 응답하되 <b>어느 필드인지는 밝힌다</b> — 필드가 열 개인 요청에서 "본문을 읽을 수 없다" 만 받으면 무엇을
+     * 고쳐야 할지 알 수 없다. enum 이면 허용 값도 함께 준다. 핸들러가 없으면 Spring 기본 400 이 {@code Response}
+     * 봉투 없이 나가 클라이언트 파서가 깨진다.
+     */
+    public static ResponseEntity<Response<Void>> toResponse(HttpMessageNotReadableException exception, String defaultCode) {
+        Throwable cause = exception.getCause();
+        // InvalidFormat 이 MismatchedInput 의 하위라 먼저 본다.
+        if (cause instanceof InvalidFormatException invalidFormat) {
+            String field = fieldPathOf(invalidFormat);
+            return respond(List.of(new ValidationErrorItem(defaultCode, field, describeInvalidFormat(invalidFormat, field))));
+        }
+        if (cause instanceof MismatchedInputException mismatched) {
+            String field = fieldPathOf(mismatched);
+            return respond(List.of(new ValidationErrorItem(defaultCode, field, "%s 값의 형식이 올바르지 않습니다.".formatted(field))));
+        }
+        return respond(List.of(new ValidationErrorItem(defaultCode, UNKNOWN_FIELD, "요청 본문을 읽을 수 없습니다. JSON 형식을 확인해 주세요.")));
+    }
+
+    /** Jackson 경로({@code items[0].itemType})를 필드명으로. 경로가 없으면 본문 전체를 가리키는 {@code request} 다. */
+    private static String fieldPathOf(JsonMappingException exception) {
+        StringBuilder path = new StringBuilder();
+        for (JsonMappingException.Reference reference : exception.getPath()) {
+            if (reference.getFieldName() != null) {
+                if (!path.isEmpty()) {
+                    path.append('.');
+                }
+                path.append(reference.getFieldName());
+            } else if (reference.getIndex() >= 0) {
+                path.append('[').append(reference.getIndex()).append(']');
+            }
+        }
+        return path.isEmpty() ? UNKNOWN_FIELD : path.toString();
+    }
+
+    private static String describeInvalidFormat(InvalidFormatException exception, String field) {
+        Class<?> targetType = exception.getTargetType();
+        if (targetType != null && targetType.isEnum()) {
+            String allowed = Arrays.stream(targetType.getEnumConstants())
+                .map(constant -> ((Enum<?>) constant).name())
+                .collect(Collectors.joining(", "));
+            return "%s 값이 올바르지 않습니다. 허용 값: %s".formatted(field, allowed);
+        }
+        return "%s 값의 형식이 올바르지 않습니다.".formatted(field);
     }
 
     /**

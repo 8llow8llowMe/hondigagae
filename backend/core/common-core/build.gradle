@@ -2,6 +2,8 @@ dependencies {
     implementation 'com.github.ulisesbocchio:jasypt-spring-boot-starter:3.0.5'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    // ValidationErrorSupport 가 역직렬화 실패(HttpMessageNotReadableException)의 Jackson 원인을 읽는다.
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
 }
 
 jar { enabled = true }
