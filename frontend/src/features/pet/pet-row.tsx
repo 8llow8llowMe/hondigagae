@@ -6,6 +6,7 @@ import { Row } from '@/components/surface'
 import { PetPhoto } from '@/features/pet/pet-photo'
 import { PetTraitBadges } from '@/features/pet/pet-trait-badges'
 import { messages } from '@/lib/messages'
+import { petAgeText } from '@/lib/pet/describe'
 import type { Pet } from '@/types/pet'
 
 /**
@@ -59,7 +60,7 @@ export function PetRow({ pet, last = false }: { pet: Pet; last?: boolean }) {
 
           {pet.age !== null && (
             <p className="text-caption text-fg-muted tabular-nums">
-              {messages.pet.labels.birthYm} {pet.birthYm} · {pet.age}세
+              {messages.pet.labels.birthYm} {pet.birthYm} · {petAgeText(pet.age)}
             </p>
           )}
 
