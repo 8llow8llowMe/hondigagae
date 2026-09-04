@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.planner.application.info;
 
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft;
 import java.util.List;
+import com.hondigagae.shared.travel.plan.PlanItemType;
 import lombok.Builder;
 
 /**
@@ -46,8 +47,8 @@ public record AiPlanDraftInfo(
 
     @Builder
     public record AiPlanItemInfo(
-        // 일정 항목 종류 코드 (PLACE/MEAL/LODGING/WALK/MOVE) — plan-service의 PlanItemType과 코드 문자열을 맞춘다.
-        String itemType,
+        // 항목 종류. plan-service 와 같은 enum 을 쓴다.
+        PlanItemType itemType,
         // 장소 식별자. 후보 목록에서 확인된 장소만 채운다.
         Long placeId,
         String title,

@@ -14,12 +14,14 @@ import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft.AiPlanDraftDa
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft.AiPlanDraftItem;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft.AiPlanDraftReason;
 import com.hondigagae.global.properties.AiLlmProperties;
+import com.hondigagae.shared.travel.plan.PlanItemType;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
@@ -62,6 +64,15 @@ public class OllamaLlmAdapter implements AiLlmPort {
 
     /** 서킷 인스턴스명. provider 와 무관한 단일 인스턴스다 (coding-conventions §10). */
     public static final String CIRCUIT_NAME = "llm";
+
+    /**
+     * 항목 종류를 정하지 못했을 때의 값.
+     *
+     * <p>후보 목록이 전부 장소이고 초안 항목의 대부분이 장소 방문이라 {@code PLACE} 가 가장 덜
+     * 틀린다. 무엇보다 {@code targetId} 를 {@code place.id} 로 읽게 하는 유형이라, 확인된
+     * 아이디의 뜻과 어긋나지 않는다.
+     */
+    private static final PlanItemType DEFAULT_ITEM_TYPE = PlanItemType.PLACE;
 
     private final OllamaChatModel ollamaChatModel;
     private final AiPlanPromptFactory aiPlanPromptFactory;
@@ -223,6 +234,11 @@ public class OllamaLlmAdapter implements AiLlmPort {
      *
      * <p>걸러낸 항목은 <b>버리지 않고 장소 연결만 끊는다.</b> "카페에서 휴식" 같은 항목 자체는
      * 일정의 흐름으로 쓸모가 있고, 사용자가 직접 장소를 고르면 된다.
+     *
+     * <p><b>항목 종류도 같은 이유로 다시 본다.</b> 모델이 {@code WALK} 를 골라 놓고 후보 목록의
+     * {@code place.id} 를 실어 보내면 두 아이디 공간이 섞인다 — plan-service 에서 {@code WALK} 의
+     * {@code targetId} 는 {@code walk_course.id} 이고, 그 유형은 장소 존재 검증에서 빠지므로
+     * <b>틀린 아이디가 조용히 저장된다.</b> {@link #resolveItemType} 이 그것을 맞춘다.
      */
     private AiPlanDraft toDomain(LlmPlanDraftResponse draft, List<PlaceCandidate> candidates) {
         Map<Long, PlaceCandidate> candidateById = candidates.stream()
@@ -244,7 +260,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
                 }
                 PlaceCandidate matched = unknownPlace || placeId == null ? null : candidateById.get(placeId);
                 items.add(AiPlanDraftItem.builder()
-                    .itemType(item.itemType())
+                    .itemType(resolveItemType(item.itemType(), matched))
                     // 후보 밖 장소는 연결만 끊는다. 항목 자체는 일정의 흐름으로 쓸모가 있다.
                     .placeId(matched == null ? null : matched.placeId())
                     // 후보에 있으면 우리 데이터의 이름을 쓴다. 모델이 이름을 조금씩 바꿔 적는 일이 있다.
@@ -269,6 +285,41 @@ public class OllamaLlmAdapter implements AiLlmPort {
                     .build())
                 .toList())
             .build();
+    }
+
+    /**
+     * 항목 종류를 정한다. <b>장소가 실린 항목은 반드시 장소 유형이어야 한다.</b>
+     *
+     * <p>ai-service 는 산책 코스를 본 적이 없다 — 후보 목록은 tour-service 의 장소뿐이라
+     * {@code walk_course.id} 를 알 방법이 없다. 그러므로 <b>장소가 확인된 {@code WALK} 항목은
+     * 있을 수 없고</b>, 그것은 유형이 틀린 것이지 아이디가 틀린 것이 아니다 — 아이디는 후보
+     * 집합과 대조해 확인했고, 유형은 모델이 자유롭게 적은 값이다.
+     *
+     * <p>그래서 확인된 쪽을 남기고 유형을 {@code PLACE} 로 바로잡는다. 반대로 아이디를 끊으면
+     * 지도 표시와 장소 요약이 함께 사라지는데, "해안 산책로에서 산책"이 실제로 우리 데이터에
+     * 있는 장소를 가리키고 있었다면 잃을 이유가 없다. 산책이라는 성격은 {@code title} 과
+     * {@code note} 에 그대로 남는다.
+     *
+     * <p>모르는 코드도 같은 자리에서 접는다. plan-service 의 {@code itemType} 은 enum 이라
+     * 모델이 {@code "CAFE"} 처럼 적으면 사용자가 담는 순간 400 이 난다 — 초안을 만든 쪽이
+     * 저장 가능한 값만 내려 주는 편이 맞다.
+     *
+     * @param matched 후보 집합에서 확인된 장소. null 이면 이 항목에 장소가 없다
+     */
+    private PlanItemType resolveItemType(String code, PlaceCandidate matched) {
+        Optional<PlanItemType> parsed = PlanItemType.from(code);
+        if (parsed.isEmpty()) {
+            log.warn("LLM returned an unknown item type itemType={} falling back to {}", code, DEFAULT_ITEM_TYPE);
+            return DEFAULT_ITEM_TYPE;
+        }
+
+        PlanItemType itemType = parsed.get();
+        if (matched != null && !itemType.isPlaceTarget()) {
+            log.warn("LLM put a place on a non-place item type itemType={} placeId={} correcting to {}",
+                itemType, matched.placeId(), DEFAULT_ITEM_TYPE);
+            return DEFAULT_ITEM_TYPE;
+        }
+        return itemType;
     }
 
     private <T> List<T> safeList(List<T> values) {

@@ -39,7 +39,8 @@ public record LlmPlanDraftResponse(
     public record LlmPlanItem(
 
         @JsonPropertyDescription(
-            "항목 종류. PLACE(장소), MEAL(식사), LODGING(숙박), WALK(산책), MOVE(이동) 중 하나만 쓴다.")
+            "항목 종류. PLACE(장소), MEAL(식사), LODGING(숙박), MOVE(이동) 중 하나만 쓴다. "
+            + "산책은 종류가 아니라 그 장소에서 하는 일이므로 PLACE 로 적고 title 과 note 에 적는다.")
         String itemType,
 
         @JsonPropertyDescription(

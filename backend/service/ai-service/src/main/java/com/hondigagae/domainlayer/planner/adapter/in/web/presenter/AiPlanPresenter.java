@@ -70,7 +70,7 @@ public class AiPlanPresenter {
         }
         return items.stream()
             .map(item -> AiPlanScheduleItem.builder()
-                .itemType(item.itemType())
+                .itemType(item.itemType().name())
                 .placeId(item.placeId() == null ? null : String.valueOf(item.placeId()))
                 .title(item.title())
                 .note(item.note())

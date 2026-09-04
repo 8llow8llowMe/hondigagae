@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.planner.domain.model;
 
 import java.util.List;
+import com.hondigagae.shared.travel.plan.PlanItemType;
 import lombok.Builder;
 
 /**
@@ -26,10 +27,18 @@ public record AiPlanDraft(
 
     }
 
+    /**
+     * 초안의 일정 항목.
+     *
+     * <p><b>{@code itemType} 과 {@code placeId} 는 따로 볼 수 없다.</b> {@code placeId} 는
+     * plan-service 에서 {@code targetId} 가 되는데, 그 값이 {@code place.id} 인지
+     * {@code walk_course.id} 인지를 {@code itemType} 이 정하기 때문이다
+     * ({@link PlanItemType} 의 아이디 공간 참고). 어댑터가 둘을 맞춰 놓고 여기로 넘긴다.
+     */
     @Builder
     public record AiPlanDraftItem(
-        // 일정 항목 종류 코드 (PLACE/MEAL/LODGING/WALK/MOVE) — plan-service의 PlanItemType과 코드 문자열을 맞춘다.
-        String itemType,
+        // 항목 종류. plan-service 와 같은 enum 을 쓴다 - 문자열로 두면 코드가 조용히 어긋난다.
+        PlanItemType itemType,
         // 장소 식별자. plan-service 저장 시 targetId 가 된다.
         // 이동(MOVE)처럼 특정 장소가 없거나, 후보 밖 장소라 연결을 끊은 경우 null 이다.
         Long placeId,
