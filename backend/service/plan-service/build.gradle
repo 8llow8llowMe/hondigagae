@@ -2,6 +2,8 @@ dependencies {
     implementation project(':core:common-core')
     implementation project(':core:persistence-core')
     implementation project(':core:security-core')
+    // PlanItemType — ai-service 초안이 같은 코드와 targetId 규칙을 써야 한다.
+    implementation project(':core:shared-travel')
 
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-web'

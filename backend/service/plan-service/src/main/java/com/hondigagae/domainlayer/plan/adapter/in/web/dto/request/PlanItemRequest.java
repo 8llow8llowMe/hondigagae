@@ -2,7 +2,7 @@ package com.hondigagae.domainlayer.plan.adapter.in.web.dto.request;
 
 import com.hondigagae.domainlayer.plan.application.command.PlanItemCommand;
 import com.hondigagae.domainlayer.plan.application.exception.PlanValidationMessage;
-import com.hondigagae.domainlayer.plan.domain.enums.PlanItemType;
+import com.hondigagae.shared.travel.plan.PlanItemType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;

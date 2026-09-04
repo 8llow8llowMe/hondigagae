@@ -11,7 +11,7 @@ import com.hondigagae.domainlayer.plan.application.info.PlanInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemPlaceInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanSummaryInfo;
-import com.hondigagae.domainlayer.plan.domain.enums.PlanItemType;
+import com.hondigagae.shared.travel.plan.PlanItemType;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.persistence.dto.SliceResponse;
 import java.util.List;

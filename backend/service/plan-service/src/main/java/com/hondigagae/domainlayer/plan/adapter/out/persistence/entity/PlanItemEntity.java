@@ -1,6 +1,6 @@
 package com.hondigagae.domainlayer.plan.adapter.out.persistence.entity;
 
-import com.hondigagae.domainlayer.plan.domain.enums.PlanItemType;
+import com.hondigagae.shared.travel.plan.PlanItemType;
 import com.hondigagae.persistence.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

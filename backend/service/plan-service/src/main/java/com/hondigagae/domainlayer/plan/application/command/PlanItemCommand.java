@@ -1,6 +1,6 @@
 package com.hondigagae.domainlayer.plan.application.command;
 
-import com.hondigagae.domainlayer.plan.domain.enums.PlanItemType;
+import com.hondigagae.shared.travel.plan.PlanItemType;
 import java.time.LocalTime;
 import lombok.Builder;
 
