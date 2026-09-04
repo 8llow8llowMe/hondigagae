@@ -140,6 +140,7 @@ public class RegionalWeatherProcessor {
             try {
                 regions.add(futures.get(index).join());
             } catch (CompletionException | CancellationException exception) {
+                rethrowIfConfigurationFault(exception);
                 log.warn("Regional weather task failed region={} reason={}",
                     region.name(), exception.getMessage());
                 regions.add(unavailable(region, date, ForecastCoverage.UNAVAILABLE));
@@ -205,8 +206,12 @@ public class RegionalWeatherProcessor {
     /**
      * 권역 대표 격자의 시각별 예보.
      *
-     * <p>실패를 예외로 올리지 않는다 - 한 권역의 장애가 비교 전체를 막으면 안 된다. 빈 목록은
-     * 곧 {@code ForecastCoverage.UNAVAILABLE} 로 읽힌다.
+     * <p>일시적 장애를 예외로 올리지 않는다 - 한 권역이 흔들렸다고 비교 전체를 막으면 안 된다.
+     * 빈 목록은 곧 {@code ForecastCoverage.UNAVAILABLE} 로 읽힌다.
+     *
+     * <p><b>설정 오류는 예외다.</b> 다른 세 화면과 같은 규칙을 쓴다 - 그것만 여기서 삼키면
+     * 권역 비교는 계속 INSIGHT_003 을 내고, 키를 안 넣은 배포가 "다섯 권역 다 예보를 못
+     * 받았네"로 읽힌다.
      *
      * <p>오늘/내일이라 단기예보만으로 충분하다. {@code dailyForecastsAt} 을 쓰면 중기예보
      * 경로까지 타는데, 이 기능이 다루는 날짜에는 쓸 일이 없는 왕복이다.
@@ -215,9 +220,30 @@ public class RegionalWeatherProcessor {
         try {
             return weatherForecastProcessor.forecastsAt(region.getLat(), region.getLng());
         } catch (InsightException exception) {
+            if (exception.getErrorCode() != InsightErrorCode.WEATHER_UNAVAILABLE) {
+                throw exception;
+            }
             log.info("Regional weather unavailable region={} errorCode={}",
                 region.name(), exception.getErrorCode().getCode());
             return List.of();
+        }
+    }
+
+    /**
+     * 설정 오류는 <b>권역 하나의 실패로 흡수하지 않는다.</b>
+     *
+     * <p>병렬 실행이라 원인이 {@code CompletionException} 안에 싸여 오는데, 그것까지 점수 없는
+     * 권역으로 접으면 다섯이 모두 그렇게 접히고 결국 INSIGHT_003 이 나간다. 다섯이 동시에
+     * 같은 이유로 실패하는 것은 격자의 문제가 아니라 <b>배포의 문제</b>이고, 그 구분이
+     * 사라지면 키 누락이 "오늘은 예보가 없네"로 읽혀 며칠이고 발견되지 않는다.
+     *
+     * <p>먼저 끝난 권역에서 잡아 그대로 올린다. 남은 태스크는 어차피 같은 이유로 실패하므로
+     * 기다릴 이유가 없다.
+     */
+    private void rethrowIfConfigurationFault(RuntimeException exception) {
+        if (exception.getCause() instanceof InsightException cause
+            && cause.getErrorCode() == InsightErrorCode.WEATHER_SERVICE_KEY_MISSING) {
+            throw cause;
         }
     }
 }

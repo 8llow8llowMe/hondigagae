@@ -130,6 +130,20 @@ class RegionalWeatherProcessorTest {
         assertThat(comparison.recommended()).isNull();
     }
 
+    @Test
+    @DisplayName("설정 오류는 권역 하나의 실패로 흡수하지 않는다")
+    void propagatesConfigurationFault() {
+        // 다섯이 동시에 같은 이유로 실패하는 것은 격자의 문제가 아니라 배포의 문제다.
+        // INSIGHT_003 으로 뭉개면 키 누락이 "다섯 권역 다 예보를 못 받았네"로 읽힌다.
+        RegionalWeatherProcessor processor = processor(region -> {
+            throw new InsightException(InsightErrorCode.WEATHER_SERVICE_KEY_MISSING);
+        });
+
+        assertThatThrownBy(() -> processor.compare(TODAY, PetCondition.unspecified()))
+            .isInstanceOf(InsightException.class)
+            .hasFieldOrPropertyWithValue("errorCode", InsightErrorCode.WEATHER_SERVICE_KEY_MISSING);
+    }
+
     // --- fixtures ---
 
     /** 권역별 예보 조회를 대신하는 훅. */
