@@ -22,7 +22,7 @@ public record PlanItemPlaceItem(
         example = "true", nullable = true)
     Boolean indoor,
 
-    @Schema(description = "대표 이미지 URL", nullable = true)
+    @Schema(description = "대표 이미지 URL. 없으면 null", example = "http://tong.visitkorea.or.kr/cms/resource/1.jpg", nullable = true)
     String firstImage,
 
     @Schema(description = "위도. 항목 간 이동 거리 계산에 쓴다", example = "33.3608276172", nullable = true)

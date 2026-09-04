@@ -37,6 +37,8 @@ public class MemberDevSignupWebController {
     @Operation(
         summary = "[개발용] 즉시 회원가입 (이메일 인증 생략)",
         description = """
+            **dev 전용** — 운영 프로필(prod)에서는 이 API 가 존재하지 않습니다(404).
+
             이메일 인증코드 없이 테스트 계정을 바로 만듭니다.
 
             **이메일 인증 게이트만 건너뜁니다.** 비밀번호 규칙과 이메일 중복(409 `MEMBER_001`)은
@@ -45,7 +47,11 @@ public class MemberDevSignupWebController {
 
             응답의 `email` 과 요청에 쓴 비밀번호로 바로 `POST /api/v1/auth/login` 을 부를 수 있습니다.
 
-            운영 프로필에서는 이 API 가 등록되지 않아 404 입니다."""
+            운영 프로필에서는 이 API 가 등록되지 않아 404 입니다.
+
+            인증 불필요. **필수: 요청 바디의 email, password(영문자·숫자·특수문자 포함 8~20자), name, nickname** — 일반 가입과 같은 바디입니다.
+
+            호출 예: `POST /api/v1/members/signup/dev` `{"email":"dev1@example.com","password":"P@ssw0rd!","name":"홍길동","nickname":"길동짱"}`"""
     )
     @PostMapping("/signup/dev")
     public ResponseEntity<Response<MemberDevSignupResponse>> devSignup(

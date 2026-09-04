@@ -30,16 +30,16 @@ public record PlanDayWeatherItem(
     @Schema(description = "적합도 점수(0~100). 기준 반려견(basisPetId) 기준. 판단 근거가 없으면 null", example = "62", nullable = true)
     Integer score,
 
-    @Schema(description = "적합도 등급 metadata", nullable = true)
+    @Schema(description = "적합도 등급 metadata. 기준 반려견(basisPetId) 기준. 판단 근거가 없으면 null", nullable = true)
     ScoreMetricMetadata suitabilityLevel,
 
-    @Schema(description = "판정 근거")
+    @Schema(description = "판정 근거 목록. 기준 반려견 기준이며 판정을 못 낸 날은 빈 배열")
     List<PlanWeatherReasonItem> reasons,
 
-    @Schema(description = "그날의 날씨 요약", nullable = true)
+    @Schema(description = "그날의 날씨 요약. 예보가 닿지 않는 날은 null", nullable = true)
     PlanDailyWeatherItem weather,
 
-    @Schema(description = "비 예보일 때 제안하는 실내 대안 장소")
+    @Schema(description = "비 예보일 때 제안하는 실내 대안 장소 목록. 해당 없으면 빈 배열")
     List<PlanAlternativePlaceItem> indoorAlternatives,
 
     @Schema(description = "아이별 점수·등급. 한 마리 일정이면 원소 하나고, 판정을 못 낸 날은 빈 배열이다")

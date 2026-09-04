@@ -18,7 +18,7 @@ import java.math.BigDecimal;
 @Schema(description = "반려견 등록/수정 요청 DTO")
 public record PetSaveRequest(
 
-    @Schema(description = "반려견 이름", example = "몽실이")
+    @Schema(description = "반려견 이름", example = "몽실이", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = PetValidationMessage.NAME_REQUIRED)
     @Size(max = 20, message = PetValidationMessage.NAME_LENGTH_INVALID)
     String name,
@@ -31,7 +31,7 @@ public record PetSaveRequest(
     @Pattern(regexp = PetValidationMessage.BIRTH_YM_PATTERN, message = PetValidationMessage.BIRTH_YM_FORMAT_INVALID)
     String birthYm,
 
-    @Schema(description = "크기 구분", example = "SMALL")
+    @Schema(description = "크기 구분", example = "SMALL", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = PetValidationMessage.SIZE_TYPE_REQUIRED)
     PetSizeType sizeType,
 
@@ -50,14 +50,14 @@ public record PetSaveRequest(
     @Schema(description = "소음 민감 여부", example = "false")
     boolean noiseSensitive,
 
-    @Schema(description = "활동량", example = "MEDIUM")
+    @Schema(description = "활동량", example = "MEDIUM", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = PetValidationMessage.ACTIVITY_LEVEL_REQUIRED)
     ActivityLevel activityLevel,
 
     @Schema(description = "산책 선호 여부", example = "true")
     boolean walkPreferred,
 
-    @Schema(description = "사회성", example = "MEDIUM")
+    @Schema(description = "사회성", example = "MEDIUM", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = PetValidationMessage.SOCIALITY_REQUIRED)
     SocialityLevel sociality
 ) {

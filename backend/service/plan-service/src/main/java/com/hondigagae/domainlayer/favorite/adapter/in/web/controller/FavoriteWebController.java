@@ -30,7 +30,10 @@ public class FavoriteWebController {
 
     @Operation(summary = "내 즐겨찾기 목록",
         description = "저장한 장소를 최근 저장순으로 조회합니다. 장소 요약은 tour-service 에서 붙이며, "
-            + "조회에 실패해도 placeId 목록은 내려갑니다.",
+            + "조회에 실패해도 placeId 목록은 내려갑니다.\n\n"
+            + "**필수 파라미터는 없습니다.** 페이징 없이 저장한 장소 전체(회원당 최대 100곳)가 한 번에 옵니다.\n\n"
+            + "호출 예\n"
+            + "- `GET /api/v1/favorites/places`",
         security = {@SecurityRequirement(name = "bearerAuth")})
     @GetMapping
     @PreAuthorize("isAuthenticated()")
@@ -42,39 +45,48 @@ public class FavoriteWebController {
     }
 
     @Operation(summary = "즐겨찾기 여부 확인",
-        description = "장소 한 곳의 즐겨찾기 저장 여부를 확인합니다. 상세 화면의 토글 초기 상태용입니다.",
+        description = "장소 한 곳의 즐겨찾기 저장 여부를 확인합니다. 상세 화면의 토글 초기 상태용입니다.\n\n"
+            + "**필수: placeId (경로).**\n\n"
+            + "호출 예\n"
+            + "- `GET /api/v1/favorites/places/212481712381923328`",
         security = {@SecurityRequirement(name = "bearerAuth")})
     @GetMapping("/{placeId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Response<FavoriteStatusResponse>> getFavoriteStatus(
         @AuthenticationPrincipal MemberLoginActive loginActive,
-        @Parameter(description = "장소 아이디", required = true, example = "212481712381923328") @PathVariable long placeId
+        @Parameter(description = "[필수] 장소 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 tour-service 장소 목록·주변 조회 응답의 placeId 를 그대로 씁니다", required = true, example = "212481712381923328") @PathVariable long placeId
     ) {
         FavoriteStatusResponse response = favoriteWebUseCase.getFavoriteStatus(loginActive.memberId(), placeId);
         return ResponseEntity.ok().body(Response.success(response));
     }
 
     @Operation(summary = "즐겨찾기 저장",
-        description = "장소를 즐겨찾기에 저장합니다. 이미 저장된 장소면 그대로 성공합니다(멱등). 회원당 최대 100곳까지 저장할 수 있습니다.",
+        description = "장소를 즐겨찾기에 저장합니다. 이미 저장된 장소면 그대로 성공합니다(멱등). 회원당 최대 100곳까지 저장할 수 있습니다.\n\n"
+            + "**필수: placeId (경로).** 요청 바디는 없습니다.\n\n"
+            + "호출 예\n"
+            + "- `POST /api/v1/favorites/places/212481712381923328`",
         security = {@SecurityRequirement(name = "bearerAuth")})
     @PostMapping("/{placeId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Response<Void>> addFavorite(
         @AuthenticationPrincipal MemberLoginActive loginActive,
-        @Parameter(description = "장소 아이디", required = true, example = "212481712381923328") @PathVariable long placeId
+        @Parameter(description = "[필수] 장소 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 tour-service 장소 목록·주변 조회 응답의 placeId 를 그대로 씁니다", required = true, example = "212481712381923328") @PathVariable long placeId
     ) {
         favoriteWebUseCase.addFavorite(loginActive.memberId(), placeId);
         return ResponseEntity.ok().body(Response.success());
     }
 
     @Operation(summary = "즐겨찾기 해제",
-        description = "장소를 즐겨찾기에서 제거합니다. 저장되어 있지 않아도 성공합니다(멱등).",
+        description = "장소를 즐겨찾기에서 제거합니다. 저장되어 있지 않아도 성공합니다(멱등).\n\n"
+            + "**필수: placeId (경로).**\n\n"
+            + "호출 예\n"
+            + "- `DELETE /api/v1/favorites/places/212481712381923328`",
         security = {@SecurityRequirement(name = "bearerAuth")})
     @DeleteMapping("/{placeId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Response<Void>> removeFavorite(
         @AuthenticationPrincipal MemberLoginActive loginActive,
-        @Parameter(description = "장소 아이디", required = true, example = "212481712381923328") @PathVariable long placeId
+        @Parameter(description = "[필수] 장소 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 tour-service 장소 목록·주변 조회 응답의 placeId 를 그대로 씁니다", required = true, example = "212481712381923328") @PathVariable long placeId
     ) {
         favoriteWebUseCase.removeFavorite(loginActive.memberId(), placeId);
         return ResponseEntity.ok().body(Response.success());

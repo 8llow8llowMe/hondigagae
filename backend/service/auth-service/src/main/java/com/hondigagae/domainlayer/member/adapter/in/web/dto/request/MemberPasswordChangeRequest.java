@@ -9,11 +9,11 @@ import jakarta.validation.constraints.Size;
 @Schema(description = "비밀번호 변경 요청 DTO")
 public record MemberPasswordChangeRequest(
 
-    @Schema(description = "현재 비밀번호", example = "password123!")
+    @Schema(description = "현재 비밀번호", example = "password123!", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = MemberValidationMessage.CURRENT_PASSWORD_REQUIRED)
     String currentPassword,
 
-    @Schema(description = "새 비밀번호 (영문자, 숫자, 특수문자 포함 8~20자)", example = "newPassword456!")
+    @Schema(description = "새 비밀번호 (영문자, 숫자, 특수문자 포함 8~20자)", example = "newPassword456!", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = MemberValidationMessage.NEW_PASSWORD_REQUIRED)
     @Size(min = 8, max = 20, message = MemberValidationMessage.PASSWORD_LENGTH_INVALID)
     @Pattern(

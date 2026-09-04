@@ -52,7 +52,10 @@ public class AuthWebController {
     @Operation(
         summary = "일반 로그인",
         description = "이메일과 비밀번호로 로그인합니다. 형식 오류는 400(필드별 검증 코드), 자격증명 불일치는 401(AUTH_006)로 "
-            + "구분됩니다. 실패가 누적되면 해당 이메일이 일정 시간 잠깁니다(AUTH_015, 429)."
+            + "구분됩니다. 실패가 누적되면 해당 이메일이 일정 시간 잠깁니다(AUTH_015, 429).\n\n"
+            + "인증 불필요. **필수: 요청 바디의 email, password.** "
+            + "응답 바디의 accessToken 을 이후 요청의 `Authorization: Bearer` 헤더에 넣고, refresh 토큰은 HttpOnly 쿠키로 자동 저장됩니다.\n\n"
+            + "호출 예: `POST /api/v1/auth/login` `{\"email\":\"user@example.com\",\"password\":\"P@ssw0rd!\"}`"
     )
     @PostMapping("/login")
     public ResponseEntity<Response<AuthGeneralLoginResponse>> loginWithCredentials(@Valid @RequestBody AuthGeneralLoginRequest request) {
@@ -64,13 +67,16 @@ public class AuthWebController {
 
     @Operation(
         summary = "로그아웃",
-        description = "현재 기기의 세션만 로그아웃합니다 (리프레시 토큰 무효화 + Access 토큰 블랙리스트). 다른 기기의 로그인은 유지됩니다.",
+        description = "현재 기기의 세션만 로그아웃합니다 (리프레시 토큰 무효화 + Access 토큰 블랙리스트). 다른 기기의 로그인은 유지됩니다.\n\n"
+            + "**필수: Authorization 헤더.** refresh 쿠키는 브라우저가 자동 전송하며 없어도 동작합니다.\n\n"
+            + "호출 예: `POST /api/v1/auth/logout` (바디 없음)",
         security = {@SecurityRequirement(name = "bearerAuth")}
     )
     @PostMapping("/logout")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Response<Void>> logout(
         @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "[선택] refresh 토큰 쿠키. 로그인 응답의 Set-Cookie 로 심어지고 브라우저가 자동으로 보내므로 직접 넣지 않습니다")
         @CookieValue(name = RefreshCookieProvider.REFRESH_TOKEN_COOKIE, required = false) String refreshToken
     ) {
         authWebUseCase.logout(loginActive.memberId(), loginActive.tokenId(), refreshToken);
@@ -81,12 +87,15 @@ public class AuthWebController {
 
     @Operation(summary = "로그인 기기 목록",
         description = "현재 로그인된 기기(활성 refresh 세션) 목록을 최근 갱신순으로 조회합니다. "
-            + "current 는 refresh 쿠키로 판별하므로 쿠키가 없는 요청에서는 모두 false 입니다. 기기당 별칭은 저장하지 않습니다.",
+            + "current 는 refresh 쿠키로 판별하므로 쿠키가 없는 요청에서는 모두 false 입니다. 기기당 별칭은 저장하지 않습니다.\n\n"
+            + "**필수: Authorization 헤더.** 쿼리 파라미터는 없습니다.\n\n"
+            + "호출 예: `GET /api/v1/auth/sessions`",
         security = {@SecurityRequirement(name = "bearerAuth")})
     @GetMapping("/sessions")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Response<AuthSessionsResponse>> getMySessions(
         @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "[선택] refresh 토큰 쿠키. 로그인 응답의 Set-Cookie 로 심어지고 브라우저가 자동으로 보내므로 직접 넣지 않습니다 있으면 그 기기가 current=true 로 표시됩니다")
         @CookieValue(name = RefreshCookieProvider.REFRESH_TOKEN_COOKIE, required = false) String refreshToken
     ) {
         AuthSessionsResponse response = authWebUseCase.getMySessions(loginActive.memberId(), refreshToken);
@@ -95,34 +104,43 @@ public class AuthWebController {
 
     @Operation(summary = "특정 기기 로그아웃",
         description = "지정한 세션(기기)의 refresh 토큰을 무효화합니다. 이미 만료된 세션이어도 성공합니다(멱등). "
-            + "해당 기기가 이미 발급받은 access 토큰은 만료 시까지 유효할 수 있습니다.",
+            + "해당 기기가 이미 발급받은 access 토큰은 만료 시까지 유효할 수 있습니다.\n\n"
+            + "**필수: Authorization 헤더, sessionId(경로).**\n\n"
+            + "호출 예: `DELETE /api/v1/auth/sessions/3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61`",
         security = {@SecurityRequirement(name = "bearerAuth")})
     @DeleteMapping("/sessions/{sessionId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Response<Void>> revokeSession(
         @AuthenticationPrincipal MemberLoginActive loginActive,
-        @Parameter(description = "세션 아이디 (기기 목록 조회로 얻는다)", required = true,
+        @Parameter(description = "[필수] 세션 아이디(UUID). 기기 목록 조회 응답의 sessionId 를 그대로 씁니다", required = true,
             example = "3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61") @PathVariable String sessionId
     ) {
         authWebUseCase.revokeSession(loginActive.memberId(), sessionId);
         return ResponseEntity.ok().body(Response.success());
     }
 
-    @Operation(summary = "소셜 로그인 인가 URL 생성", description = "provider(kakao/naver) 인가 페이지 URL을 생성합니다. CSRF 방어용 state가 포함되며 10분간 유효합니다. 프론트는 이 URL로 리다이렉트합니다.")
+    @Operation(summary = "소셜 로그인 인가 URL 생성",
+        description = "provider(kakao/naver) 인가 페이지 URL을 생성합니다. CSRF 방어용 state가 포함되며 10분간 유효합니다. 프론트는 이 URL로 리다이렉트합니다.\n\n"
+            + "인증 불필요. **필수: provider(경로).**\n\n"
+            + "호출 예: `GET /api/v1/auth/kakao/authorize` → 응답의 authorizeUrl 로 브라우저를 이동시킵니다")
     @GetMapping("/{provider}/authorize")
     public ResponseEntity<Response<AuthOAuthAuthorizeResponse>> generateOAuthAuthorizationUrl(
-        @Parameter(description = "소셜 로그인 제공자", required = true, example = "kakao") @PathVariable OAuthProvider provider
+        @Parameter(description = "[필수] 소셜 로그인 제공자. kakao 카카오 · naver 네이버 (소문자)", required = true, example = "kakao") @PathVariable OAuthProvider provider
     ) {
         AuthOAuthAuthorizeResponse response = authWebUseCase.generateOAuthAuthorizationUrl(provider);
         return ResponseEntity.ok().body(Response.success(response));
     }
 
-    @Operation(summary = "소셜 로그인", description = "provider 콜백의 인가코드와 state로 로그인합니다. 미가입 이메일이면 자동 회원가입 후 로그인합니다. 응답은 일반 로그인과 동일합니다(accessToken + refresh 쿠키).")
+    @Operation(summary = "소셜 로그인",
+        description = "provider 콜백의 인가코드와 state로 로그인합니다. 미가입 이메일이면 자동 회원가입 후 로그인합니다. 응답은 일반 로그인과 동일합니다(accessToken + refresh 쿠키).\n\n"
+            + "인증 불필요. **필수: provider(경로), code, state.** 둘 다 provider 가 콜백 URL 의 쿼리로 넘겨준 값을 그대로 전달합니다. "
+            + "state 가 인가 URL 생성 때 발급한 값과 다르거나 10분이 지났으면 실패합니다.\n\n"
+            + "호출 예: `GET /api/v1/auth/kakao/login?code=<콜백 code>&state=<콜백 state>`")
     @GetMapping("/{provider}/login")
     public ResponseEntity<Response<AuthGeneralLoginResponse>> loginWithOAuthCode(
-        @Parameter(description = "소셜 로그인 제공자", required = true, example = "kakao") @PathVariable OAuthProvider provider,
-        @Parameter(description = "provider가 콜백으로 전달한 인가코드", required = true) @RequestParam("code") String code,
-        @Parameter(description = "인가 URL 생성 시 발급된 state", required = true) @RequestParam("state") String state
+        @Parameter(description = "[필수] 소셜 로그인 제공자. kakao 카카오 · naver 네이버 (소문자)", required = true, example = "kakao") @PathVariable OAuthProvider provider,
+        @Parameter(description = "[필수] provider 가 콜백 URL 로 전달한 인가코드(1회용)", required = true, example = "q1w2e3r4t5y6u7i8o9p0") @RequestParam("code") String code,
+        @Parameter(description = "[필수] 인가 URL 생성 응답에 들어 있던 state. 콜백 URL 의 state 를 그대로 넘깁니다", required = true, example = "3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61") @RequestParam("state") String state
     ) {
         AuthCookieResult<AuthGeneralLoginResponse> result = authWebUseCase.oauthLogin(provider, code, state);
         return ResponseEntity.ok()
@@ -132,7 +150,9 @@ public class AuthWebController {
 
     @Operation(summary = "이메일 인증코드 발송",
         description = "회원가입용 이메일 인증코드를 발송합니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 시간당 발송 상한(AUTH_016)이 적용되며, "
-            + "가입 여부와 무관하게 항상 성공으로 응답합니다(기가입 이메일에는 안내 메일 발송).")
+            + "가입 여부와 무관하게 항상 성공으로 응답합니다(기가입 이메일에는 안내 메일 발송).\n\n"
+            + "인증 불필요. **필수: 요청 바디의 email.**\n\n"
+            + "호출 예: `POST /api/v1/auth/email/send-code` `{\"email\":\"user@example.com\"}`")
     @PostMapping("/email/send-code")
     public ResponseEntity<Response<Void>> sendEmailVerificationCode(
         @Valid @RequestBody AuthEmailCodeSendRequest request,
@@ -142,7 +162,10 @@ public class AuthWebController {
         return ResponseEntity.ok().body(Response.success());
     }
 
-    @Operation(summary = "이메일 인증코드 검증", description = "메일로 받은 인증코드를 검증합니다. 성공하면 30분 동안 해당 이메일로 회원가입할 수 있습니다.")
+    @Operation(summary = "이메일 인증코드 검증",
+        description = "메일로 받은 인증코드를 검증합니다. 성공하면 30분 동안 해당 이메일로 회원가입할 수 있습니다.\n\n"
+            + "인증 불필요. **필수: 요청 바디의 email, code.**\n\n"
+            + "호출 예: `POST /api/v1/auth/email/verify-code` `{\"email\":\"user@example.com\",\"code\":\"A3K7MP2X\"}`")
     @PostMapping("/email/verify-code")
     public ResponseEntity<Response<Void>> verifyEmailVerificationCode(@Valid @RequestBody AuthEmailCodeVerifyRequest request) {
         authWebUseCase.verifyEmailVerificationCode(request.email(), request.code());
@@ -152,7 +175,11 @@ public class AuthWebController {
     @Operation(summary = "비밀번호 재설정 코드 발송", description = """
         비밀번호 재설정 인증코드를 메일로 발송합니다. 일반(이메일+비밀번호) 계정 전용입니다.
         계정 존재 여부와 무관하게 항상 성공으로 응답하며, 미가입 이메일과 소셜 전용 계정에는
-        각각 안내 메일이 발송됩니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 발송 상한(AUTH_016)이 적용됩니다.""")
+        각각 안내 메일이 발송됩니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 발송 상한(AUTH_016)이 적용됩니다.
+
+        인증 불필요. **필수: 요청 바디의 email.**
+
+        호출 예: `POST /api/v1/auth/password/reset/send-code` `{"email":"user@example.com"}`""")
     @PostMapping("/password/reset/send-code")
     public ResponseEntity<Response<Void>> sendPasswordResetCode(
         @Valid @RequestBody AuthPasswordResetCodeSendRequest request,
@@ -164,16 +191,25 @@ public class AuthWebController {
 
     @Operation(summary = "비밀번호 재설정", description = """
         메일로 받은 인증코드로 비밀번호를 재설정합니다. 성공 시 전 기기 세션이 무효화되어 재로그인이 필요합니다.
-        코드 불일치는 AUTH_004, 만료/미발급은 AUTH_005, 5회 실패 시 코드가 무효화되고 AUTH_017 로 응답합니다.""")
+        코드 불일치는 AUTH_004, 만료/미발급은 AUTH_005, 5회 실패 시 코드가 무효화되고 AUTH_017 로 응답합니다.
+
+        인증 불필요. **필수: 요청 바디의 email, code, newPassword** (영문자·숫자·특수문자 포함 8~20자).
+
+        호출 예: `POST /api/v1/auth/password/reset` `{"email":"user@example.com","code":"A2B3C4D5","newPassword":"NewP@ss123!"}`""")
     @PostMapping("/password/reset")
     public ResponseEntity<Response<Void>> resetPassword(@Valid @RequestBody AuthPasswordResetRequest request) {
         authWebUseCase.resetPassword(request.email(), request.code(), request.newPassword());
         return ResponseEntity.ok().body(Response.success());
     }
 
-    @Operation(summary = "토큰 재발급", description = "리프레시 토큰으로 Access Token을 재발급합니다.")
+    @Operation(summary = "토큰 재발급",
+        description = "리프레시 토큰으로 Access Token을 재발급합니다. 응답의 accessToken 으로 교체하고, refresh 쿠키도 새 값으로 갱신됩니다.\n\n"
+            + "**필수: refresh 토큰 쿠키.** Authorization 헤더와 바디는 필요 없습니다. "
+            + "쿠키가 없거나 만료·무효화(로그아웃, 비밀번호 변경, 탈퇴)됐으면 401 이며 다시 로그인해야 합니다.\n\n"
+            + "호출 예: `POST /api/v1/auth/token/reissue` (바디 없음, 쿠키 자동 전송)")
     @PostMapping("/token/reissue")
     public ResponseEntity<Response<TokenReissueResponse>> reissueToken(
+        @Parameter(description = "[필수] refresh 토큰 쿠키. 로그인 응답의 Set-Cookie 로 심어지고 브라우저가 자동으로 보냅니다. 없으면 401")
         @CookieValue(name = RefreshCookieProvider.REFRESH_TOKEN_COOKIE, required = false) String refreshToken) {
         AuthCookieResult<TokenReissueResponse> result = authWebUseCase.reissueToken(TokenReissueCommand.from(refreshToken));
         return ResponseEntity.ok()
