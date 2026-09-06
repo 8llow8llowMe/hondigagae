@@ -224,6 +224,32 @@ describe('mock 데이터 품질', () => {
     거절 경로가 단위 테스트에만 잠겨 있었다. 거절이 무너지면 `next/image` 가 런타임에
     던져 화면 전체가 죽으므로, 로컬에서 늘 눈에 보이는 자리를 하나 둔다.
   */
+  /*
+    #247 C. **예전에는 전부 null 이라 썸네일 경로가 로컬에서 한 번도 돌지 않았다** —
+    화면은 늘 카테고리 일러스트만 보여 줬고, `imageSrc()` → `next/image` 로 이어지는 길이
+    mock 에서 끊겨 있었다.
+
+    **전부 채우지도 않는다.** dev 실측(2026-09-07)에서 제주 400곳 중 사진 보유는 123곳(31%)
+    이다 — 다 채우면 "사진 없는 장소가 대부분" 이라는 이 서비스의 조건이 로컬에서 사라지고,
+    일러스트·"이미지 없음" 갈래를 볼 수 없게 된다.
+  */
+  it('실제로 뜨는 사진과 사진 없음이 함께 있다', () => {
+    const usable = MOCK_PLACES.filter((p) => isAllowedImageHost(p.firstImage))
+    const empty = MOCK_PLACES.filter((p) => p.firstImage === null)
+
+    expect(usable.length).toBeGreaterThan(0)
+    expect(empty.length).toBeGreaterThan(0)
+    // 사진 없는 쪽이 더 많아야 실제 분포에 가깝다 (실측 31%)
+    expect(empty.length).toBeGreaterThan(usable.length)
+  })
+
+  /* 화면이 쓰지 않는 값이지만 계약에는 늘 함께 온다 — 비워 두면 그 규칙이 시험되지 않는다 */
+  it('사진이 있으면 firstImage2 도 함께 온다', () => {
+    for (const p of MOCK_PLACES.filter((x) => isAllowedImageHost(x.firstImage))) {
+      expect(p.firstImage2).not.toBeNull()
+    }
+  })
+
   it('허용 목록 밖 호스트의 firstImage 를 가진 장소를 포함한다', () => {
     const rejected = MOCK_PLACES.filter(
       (p) => p.firstImage !== null && !isAllowedImageHost(p.firstImage),

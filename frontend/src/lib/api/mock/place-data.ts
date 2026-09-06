@@ -12,6 +12,8 @@ import type { PlaceSummary } from '@/types/place'
  * 데이터를 만들 때 지킨 것:
  *  - 긴 한국어 이름을 섞는다 (오버플로가 기본 경로에서 드러나야 한다)
  *  - nullable 필드를 실제로 비운다 (`firstImage` / `tel` / `addr1` / `indoor`)
+ *  - **사진은 여덟 중 셋만 갖는다** (#247) — dev 실측 31% 에 맞췄다. 전부 채우면 화면이
+ *    실제보다 풍성해 보이고, 사진 없는 장소가 대부분이라는 조건이 로컬에서 사라진다
  *  - **허용 목록 밖 호스트의 `firstImage` 를 한 곳에 싣는다** (#67 B) — "사진이 없다" 와
  *    "사진이 있는데 못 쓴다" 는 다른 갈래이고, 뒤쪽은 실데이터로 만들 수 없다
  *  - `indoor: null` 인 장소를 포함한다 — 원천에 정보가 없으면 어느 필터에도 안 잡힌다
@@ -36,6 +38,43 @@ import type { PlaceSummary } from '@/types/place'
  * 서버를 부르게 되고, 허용 목록에 그 호스트가 추가되는 순간 이 갈래가 조용히 사라진다.
  */
 const UNREGISTERED_HOST_IMAGE = 'http://cdn.not-allowed.invalid/photo/pension-1.jpg'
+
+/**
+ * 목록·홈 썸네일에 쓰는 **실제 TourAPI 사진** ([#247](https://github.com/8llow8llowMe/hondigagae/issues/247) C).
+ *
+ * **예전에는 모든 장소가 `firstImage: null` 이었다.** 그래서 목록 행의 썸네일 경로가 로컬에서
+ * 한 번도 돌지 않았고 화면은 늘 카테고리 일러스트만 보여 줬다 — `imageSrc()` → `next/image`
+ * 로 이어지는 길이 mock 에서 끊겨 있었던 셈이다.
+ *
+ * **여덟 seed 중 셋에만 넣는다.** dev 실측(2026-09-07)에서 제주 400곳 중 사진 보유는
+ * **123곳(31%)** 이다 — 전부 채우면 화면이 실제보다 풍성해 보이고, **사진 없는 장소가
+ * 대부분**이라는 이 서비스의 조건이 로컬에서 사라진다. 남은 다섯은 일러스트 · "이미지 없음" ·
+ * 미등록 호스트 갈래를 계속 지킨다.
+ *
+ * **카테고리에 맞는 실제 장소의 사진을 골랐다.** 미술관 자리에 유채밭 사진을 두면 화면을 볼
+ * 때마다 데이터를 의심하게 된다.
+ *
+ * `firstImage2`(다른 크기 원본)도 함께 넣는다. **화면은 이 값을 쓰지 않지만**
+ * (`galleryImages` 가 같은 사진의 다른 크기를 두 장으로 세지 않는다) 계약에는 늘 함께 오므로,
+ * 비워 두면 "쓰지 않는다" 는 규칙이 로컬에서 한 번도 시험되지 않는다.
+ */
+const PHOTO = {
+  /** 제주웰컴센터 940×627 — 이 seed 의 상세 갤러리와 **같은 장소**의 사진이다 */
+  CULTURE: {
+    first: 'http://tong.visitkorea.or.kr/cms/resource/08/3066908_image2_1.jpg',
+    small: 'http://tong.visitkorea.or.kr/cms/resource/08/3066908_image3_1.jpg',
+  },
+  /** 코리코카페 제주점 940×626 */
+  CAFE: {
+    first: 'http://tong.visitkorea.or.kr/cms/resource/64/3443264_image2_1.jpg',
+    small: 'http://tong.visitkorea.or.kr/cms/resource/64/3443264_image3_1.jpg',
+  },
+  /** 금능포구 700×467 — **940 이 아닌 크기도 섞는다** (실측 최소 700 · 최대 1080) */
+  SHORE: {
+    first: 'http://tong.visitkorea.or.kr/cms/resource/86/2947286_image2_1.jpg',
+    small: 'http://tong.visitkorea.or.kr/cms/resource/86/2947286_image3_1.jpg',
+  },
+} as const
 
 const CONTENT = {
   TOURIST_SPOT: { code: 'TOURIST_SPOT', name: '관광지', description: '자연·문화 관광지' },
@@ -98,8 +137,8 @@ const SEEDS: Seed[] = [
     sigunguCode: '4',
     lat: 33.3608276172,
     lng: 126.4106264,
-    firstImage: null,
-    firstImage2: null,
+    firstImage: PHOTO.CULTURE.first,
+    firstImage2: PHOTO.CULTURE.small,
     petAllowanceType: PET.PARTIALLY_ALLOWED,
     allowedPetSize: SIZE.SMALL_ONLY,
     maxPetWeightKg: 10,
@@ -132,8 +171,8 @@ const SEEDS: Seed[] = [
     sigunguCode: '2',
     lat: 33.3057,
     lng: 126.2895,
-    firstImage: null,
-    firstImage2: null,
+    firstImage: PHOTO.CAFE.first,
+    firstImage2: PHOTO.CAFE.small,
     petAllowanceType: PET.PARTIALLY_ALLOWED,
     allowedPetSize: SIZE.SMALL_MEDIUM,
     maxPetWeightKg: 15,
@@ -167,8 +206,8 @@ const SEEDS: Seed[] = [
     sigunguCode: '4',
     lat: 33.5432,
     lng: 126.6695,
-    firstImage: null,
-    firstImage2: null,
+    firstImage: PHOTO.SHORE.first,
+    firstImage2: PHOTO.SHORE.small,
     petAllowanceType: PET.ALLOWED,
     allowedPetSize: SIZE.UNKNOWN,
     maxPetWeightKg: null,
