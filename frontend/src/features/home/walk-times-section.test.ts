@@ -109,12 +109,49 @@ describe('WalkTimesSection — 추천 구간', () => {
 })
 
 describe('WalkTimesSection — 곡선', () => {
-  it('시각과 노면온도를 함께 둔다 — 색만으로 정보를 전달하지 않는다 (DESIGN.md §2-3)', () => {
+  /*
+    #269. **예전에는 숫자가 하나뿐이라 노면온도를 기온으로 읽었다** — 기온 29℃ 인 날
+    `56.0℃` 만 보고 "온도가 잘못된 것 같다" 는 제보가 왔다. `temperature` 는 응답에 이미
+    있었는데 화면이 버리고 있었다.
+  */
+  it('시각·기온·노면온도를 함께 둔다 — 색만으로 정보를 전달하지 않는다 (DESIGN.md §2-3)', () => {
     const markup = render(GOOD_DAY)
+    const first = GOOD_DAY.hourly[0]
 
     expect(markup).toContain('14시')
     // `formatCelsius` 는 소수점 1자리를 유지한다 — 목록에서 자릿수가 흔들리지 않게
-    expect(markup).toContain('58.0℃')
+    expect(markup).toContain(`${first?.temperature.toFixed(1)}℃`)
+    expect(markup).toContain(`${first?.estimatedPavementCelsius.toFixed(1)}℃`)
+    // 두 값이 실제로 다른 fixture 여야 이 단언이 뜻을 갖는다
+    expect(first?.temperature).not.toBe(first?.estimatedPavementCelsius)
+  })
+
+  /*
+    3rem 폭에 `기온 29℃` 는 들어가지 않아 **눈으로는 위치가** 둘을 가른다. 그 위치가
+    무엇인지는 낱말이 말해야 한다 — 보조기기에는 셀 안의 라벨이, 눈에는 곡선 바로 아래
+    범례가 간다. 자리와 색만으로 전달하지 않는다.
+  */
+  it('두 온도가 무엇인지 낱말로도 말한다', () => {
+    const markup = render(GOOD_DAY)
+
+    expect(markup).toContain(messages.home.temperatureLabel)
+    expect(markup).toContain(messages.home.pavementLabel)
+    expect(markup).toContain(messages.home.goldenCurveLegend)
+  })
+
+  /* "노면" 만으로는 흙길·잔디를 떠올린다. 이 추정식은 아스팔트 기준이다 */
+  it('노면이 아스팔트임을 밝힌다', () => {
+    for (const text of [messages.home.pavementLabel, messages.home.goldenPavementNote]) {
+      expect(text).toContain('아스팔트')
+    }
+  })
+
+  /*
+    범례는 **곡선을 설명하는 줄**이다. 곡선이 없는 날에 남으면 없는 숫자의 위치를 말하게 된다 —
+    `HourlyCurve` 안에 두어 곡선과 함께 사라지게 했다.
+  */
+  it('곡선이 없으면 범례도 렌더하지 않는다', () => {
+    expect(render(DAY_ENDED)).not.toContain(messages.home.goldenCurveLegend)
   })
 
   it('막대의 등급 이름을 보조기기에 남긴다', () => {
