@@ -7,6 +7,7 @@ import { formatCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
+import type { CodeNameMetadata } from '@/types/api'
 import type { HourlyWalkSafetyItem, WalkTimesResponse } from '@/types/insight'
 
 /**
@@ -21,22 +22,29 @@ import type { HourlyWalkSafetyItem, WalkTimesResponse } from '@/types/insight'
  * 허락으로 읽는다 (`GoldenWalkWindow`). 그때도 **곡선은 그대로 보여 준다**: 근거를
  * 감추면 왜 안 되는지 확인할 방법이 없다.
  *
- * **판정 자리의 상태는 셋이다** (#204).
+ * **판정 자리의 상태는 넷이다** (#204 · [#262](https://github.com/8llow8llowMe/hondigagae/issues/262)).
  *
  * | 응답 | 화면 | 뜻 |
  * |------|------|-----|
  * | `goldenStart` 있음 | `GoldenWindow` | 이때 나가면 된다 |
  * | `hourly` 있고 `goldenStart` 없음 | `NoGoldenWindow` | **판정**: 남은 시간이 전부 위험이다 |
- * | `hourly` 비었음 | `NoForecast` | **근거 없음**: 판정할 예보가 없다 |
+ * | `hourly` 비었고 `forecastCoverage.code === 'UNAVAILABLE'` | `NoForecast` + **재시도** | **장애**: 날씨를 못 받았다 |
+ * | `hourly` 비었고 그 밖 | `NoForecast` | **근거 없음**: 판정할 예보가 없다 |
  *
  * 앞의 두 줄만 있으면 늦은 밤(남은 시간대 0칸)에 화면이 "남은 시간이 모두 위험 등급"
  * 이라고 단정한다 — dev 23:17 KST 에 `hourly: []` 로 실제로 관측했다. 모르는 것을
  * 나쁜 것으로 말하지 않는다는 규칙(루트 `CLAUDE.md`)에 어긋난다.
+ *
+ * **넷째 줄이 #262 다.** 곡선이 비는 이유는 하나가 아닌데 셋째 줄 하나로 접혀 있었다 —
+ * `UNAVAILABLE`(다시 시도하면 되는 일시 장애)을 `DAY_ENDED`(정상, 자정 이후 채워짐)와
+ * 같은 문장으로 말하고 있었다. **고칠 수 있는 상태를 고칠 수 없는 것처럼 말하지 않는다** —
+ * `404` 에 재시도를 달지 않는 규칙(`frontend/CLAUDE.md`)과 같은 축이다.
  */
 export function WalkTimesSection({
   data,
   loading = false,
   positionFallback = false,
+  onRetry,
 }: {
   data: WalkTimesResponse | null
   loading?: boolean
@@ -45,6 +53,11 @@ export function WalkTimesSection({
    * 곡선은 좌표에 딸린 값이라 어디 기준인지 모르면 읽을 수 없다.
    */
   positionFallback?: boolean
+  /**
+   * 날씨를 못 받았을 때만 쓰는 재조회 (#262). **없으면 버튼을 렌더하지 않는다** —
+   * 누를 수는 있는데 아무 일도 없는 버튼을 두지 않는다.
+   */
+  onRetry?: () => void
 }) {
   // 조회 실패는 섹션을 통째로 숨긴다 — 홈의 최소 골격에 이 섹션은 없다 (공통명세 S4-1)
   if (data === null) return loading ? <WalkTimesSkeleton /> : null
@@ -70,7 +83,7 @@ export function WalkTimesSection({
         ) : hasForecast ? (
           <NoGoldenWindow />
         ) : (
-          <NoForecast />
+          <NoForecast coverage={data.forecastCoverage} onRetry={onRetry} />
         )}
 
         <HourlyCurve hourly={data.hourly} />
@@ -131,18 +144,59 @@ function NoGoldenWindow() {
   )
 }
 
+/** 다시 시도할 일인 것은 이 코드 하나뿐이다 — 서버 `ForecastCoverage` 주석 */
+const COVERAGE_UNAVAILABLE = 'UNAVAILABLE'
+
 /**
- * 판정할 예보가 없는 날 (#204).
+ * 판정할 예보가 없는 날 (#204 · #262).
  *
  * **위험 톤(`metric-critical`)을 쓰지 않는다.** 색은 등급을 말하는데 이 자리에는 등급이
  * 없다 — 미지는 미지의 모양이어야 한다 (DESIGN.md §2-3). 그래서 `NoGoldenWindow` 와
  * 나란히 두면서도 강조색을 뺀다.
+ *
+ * **문구를 서버가 준다** (#262). `forecastCoverage` 는 `{code, name, description}` metadata 라
+ * 한국어 매핑 테이블을 FE 에 만들지 않는다 (`frontend/CLAUDE.md`) — 서버가 코드를 하나 더
+ * 내도 화면은 그것을 그대로 말한다. `reasons[].description` 을 그대로 렌더하는 것과 같다.
+ *
+ * **`AVAILABLE` 인데 곡선이 비면 서버 문구를 쓰지 않는다.** 그 조합은 오지 않아야 하지만,
+ * 오면 `예보 있음` 이라는 제목 아래 아무것도 없는 자리가 된다 — 그때는 우리 문구로
+ * "모른다" 고 말하는 편이 맞다. 같은 이유로 **`forecastCoverage` 가 없어도**(옛 서버)
+ * 예전 문구로 떨어진다.
  */
-function NoForecast() {
+function NoForecast({
+  coverage,
+  onRetry,
+}: {
+  coverage: CodeNameMetadata | null
+  onRetry?: (() => void) | undefined
+}) {
+  const server = coverage !== null && coverage.code !== 'AVAILABLE' ? coverage : null
+  const retryable = server?.code === COVERAGE_UNAVAILABLE && onRetry !== undefined
+
   return (
-    <div className="flex flex-col gap-1">
-      <p className="text-body-1 text-fg-muted font-semibold">{messages.home.goldenNoForecast}</p>
-      <p className="text-body-2 text-fg-muted">{messages.home.goldenNoForecastDesc}</p>
+    <div className="flex flex-col items-start gap-1">
+      <p className="text-body-1 text-fg-muted font-semibold">
+        {server?.name ?? messages.home.goldenNoForecast}
+      </p>
+      <p className="text-body-2 text-fg-muted">
+        {server?.description ?? messages.home.goldenNoForecastDesc}
+      </p>
+
+      {/*
+        **`UNAVAILABLE` 에만 단다.** `DAY_ENDED` 는 정상이고 자정 전에는 몇 번을 눌러도
+        같은 응답이다 — 고칠 수 없는 것에 버튼을 달면 사용자가 계속 누른다.
+
+        44px — 모바일 최소 터치 영역 (DESIGN.md §7). 장소 상세 판정 실패 자리와 같은 모양이다.
+      */}
+      {retryable && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
+        >
+          {messages.common.retry}
+        </button>
+      )}
     </div>
   )
 }

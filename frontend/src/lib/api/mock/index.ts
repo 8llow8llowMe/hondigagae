@@ -132,12 +132,20 @@ export function resolveMock(
   /*
     오늘의 산책 골든타임 (#158). `lat`/`lng` 는 mock 이 쓰지 않는다 — 제주 안에서 좌표를
     바꿔도 예보 격자가 같아 결과가 거의 같고, 좌표로 값을 가르면 없는 정밀도를 흉내 내게 된다.
-    갈래는 반려견 조건(`heatSensitive`)으로만 낸다 — 그것이 실제로 판정을 바꾸는 축이다.
+    갈래는 반려견 조건으로만 낸다 — 그것이 실제로 판정을 바꾸는 축이다. **`coldSensitive`
+    까지 읽는다** (#262): 판정 자리의 상태가 넷이라 `heatSensitive` 하나로는 두 갈래가
+    한계인데, 빈 곡선의 두 이유(`DAY_ENDED`·`UNAVAILABLE`)는 실데이터로 만들 수 없다.
+    조합표는 `mockWalkTimes` 머리주석에 있다.
   */
   if (path === '/insights/walk-times') {
     return {
       status: 200,
-      payload: ok(mockWalkTimes(params.get('heatSensitive') === 'true')),
+      payload: ok(
+        mockWalkTimes(
+          params.get('heatSensitive') === 'true',
+          params.get('coldSensitive') === 'true',
+        ),
+      ),
     }
   }
 
