@@ -24,6 +24,7 @@ public class WalkTimesPresenter {
             .goldenStart(golden == null ? null : golden.start())
             .goldenEnd(golden == null ? null : golden.end())
             .goldenLevel(golden == null ? null : golden.level().toScoreMetadata())
+            .goldenWindowStatus(info.goldenWindowStatus().toMetadata())
             .weatherWarning(insightPresenter.toWarningItem(info.weatherWarning()))
             .petConditionApplied(info.petConditionApplied())
             .build();

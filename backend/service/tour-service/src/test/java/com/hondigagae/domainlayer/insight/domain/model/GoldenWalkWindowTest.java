@@ -25,6 +25,8 @@ import org.junit.jupiter.api.Test;
 class GoldenWalkWindowTest {
 
     private static final LocalDate DATE = LocalDate.of(2026, 9, 2);
+    /** 제주시 시내. 노면온도 추정이 태양 고도를 쓰므로 위도가 필요하다. */
+    private static final double JEJU_LATITUDE = 33.4996d;
 
     @Nested
     @DisplayName("구간 고르기")
@@ -126,7 +128,7 @@ class GoldenWalkWindowTest {
                 forecast(9, 24.0d), forecast(15, 30.0d), forecast(18, 26.0d));
 
             List<HourlyWalkSafety> curve = WalkSafetyEvaluator.hourlyCurve(
-                hourly, PetCondition.unspecified(), thresholds(), DATE.atTime(13, 0));
+                hourly, PetCondition.unspecified(), thresholds(), DATE.atTime(13, 0), JEJU_LATITUDE);
 
             assertThat(curve).extracting(point -> point.at().getHour()).containsExactly(15, 18);
         }
@@ -136,7 +138,8 @@ class GoldenWalkWindowTest {
         void carriesEvidence() {
             // 등급만 주면 화면이 색깔은 그려도 왜 그 색인지 말하지 못한다.
             List<HourlyWalkSafety> curve = WalkSafetyEvaluator.hourlyCurve(
-                List.of(forecast(15, 30.0d)), PetCondition.unspecified(), thresholds(), DATE.atTime(13, 0));
+                List.of(forecast(15, 30.0d)), PetCondition.unspecified(), thresholds(), DATE.atTime(13, 0),
+                JEJU_LATITUDE);
 
             assertThat(curve).singleElement().satisfies(point -> {
                 assertThat(point.temperature()).isEqualTo(30.0d);
