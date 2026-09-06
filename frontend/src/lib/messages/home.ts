@@ -7,7 +7,13 @@
  */
 export const homeMessages = {
   walkTodayLabel: '오늘 산책',
-  heatIndexLabel: '체감 열지수',
+  /**
+   * 판정 요약줄의 열지수 ([#259](https://github.com/8llow8llowMe/hondigagae/issues/259)).
+   * **장소 상세와 같은 `heatIndexCelsius`(시각 기준)라 같은 이름으로 부른다** — 예전에는
+   * 여기만 `체감 열지수` 였다. 같은 물리량을 화면마다 다르게 부르면 사용자는 서로 다른
+   * 값으로 읽는다. 하루 최대 쪽은 `최고 체감온도` 로 갈린다.
+   */
+  heatIndexLabel: '체감온도',
   pavementLabel: '추정 노면 온도',
   saferWindowLabel: '더 안전한 시간대',
   basisSuffix: '기준',

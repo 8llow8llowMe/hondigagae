@@ -70,6 +70,39 @@ describe('PlaceWalkSafetyPanel — 등급과 수치', () => {
   })
 
   /*
+    #259. 예전에는 hero 에 라벨이 없었다 — 적합도의 점수 hero(`82 /100`)를 따라 뺐던 것인데,
+    점수는 단위가 스스로 말하고 온도는 그렇지 않다. 게스트 경로에서는 바로 위 적합도가
+    **하루 최대** 체감온도를 같은 ℃ 로 내므로, 라벨이 없으면 기준이 다른 두 숫자가 이름
+    없이 붙어 선다.
+  */
+  it('열지수 hero 에 라벨을 붙인다', () => {
+    expect(render()).toContain(messages.place.detailHeatIndex)
+  })
+
+  /*
+    **하루 최대 라벨을 쓰지 않는다** (#259). 이 값은 `targetDateTime` 그 시각의 열지수라
+    `최고` 를 붙이면 하루 최고를 말하게 된다.
+
+    `not.toContain` 이 성립하는 방향을 골랐다 — `detailHeatIndex`(`체감온도`)는
+    `detailFeelsLikeTemperature`(`최고 체감온도`)의 **부분 문자열**이라 반대 방향으로
+    쓰면 라벨이 뒤바뀌어도 통과한다.
+  */
+  it('하루 최대 라벨을 쓰지 않는다 — 시각 기준 값이다', () => {
+    expect(messages.place.detailFeelsLikeTemperature).not.toBe(messages.place.detailHeatIndex)
+    expect(render()).not.toContain(messages.place.detailFeelsLikeTemperature)
+  })
+
+  /*
+    `null` 이면 hero 자체가 없으므로 **라벨도 함께 사라져야 한다** — 라벨만 남으면 값이
+    빠진 것이 아니라 0 인 것처럼 읽힌다.
+  */
+  it('열지수가 없으면 라벨도 렌더하지 않는다', () => {
+    const markup = render({ data: { ...walkSafety, heatIndexCelsius: null } })
+
+    expect(markup).not.toContain(messages.place.detailHeatIndex)
+  })
+
+  /*
     **소수점 1자리를 유지한다.** `35` 와 `35.0` 이 섞이면 자릿수가 흔들려 값을 비교할 수
     없다 (`formatCelsius`).
   */

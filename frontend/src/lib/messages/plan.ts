@@ -215,10 +215,16 @@ export const planMessages = {
    */
   verdictTemperatureLabel: '최고기온',
   /**
-   * 판정 옆 큰 숫자의 기본 라벨 (#253). **기온과 습도를 합친 열지수다** — 반려견은
-   * 헐떡임으로 체온을 내려 습도에 사람보다 민감해서 이 값이 판정의 핵심 지표다.
+   * 판정 옆 큰 숫자의 기본 라벨 (#253 · [#259](https://github.com/8llow8llowMe/hondigagae/issues/259)).
+   * **기온과 습도를 합친 열지수다** — 반려견은 헐떡임으로 체온을 내려 습도에 사람보다
+   * 민감해서 이 값이 판정의 핵심 지표다.
+   *
+   * **`최고` 가 붙는 이유는 이 값이 하루 최대이기 때문이다** (`maxFeelsLikeTemperature`).
+   * 산책 위험도가 같은 열지수를 시각 기준으로 내므로(`place.detailHeatIndex`), 저장소
+   * 전체에서 **이름은 `체감온도` 하나이고 기준은 `최고` 유무가 가른다.** 이 화면에는 시각
+   * 기준 값이 나란히 서지 않지만, 화면마다 이름이 갈리면 그 구분 자체가 무너진다.
    */
-  verdictFeelsLikeLabel: '체감온도',
+  verdictFeelsLikeLabel: '최고 체감온도',
   walkAction: '이 날 산책',
 
   indoorAlternativesTitle: '비가 오면 갈 만한 실내',

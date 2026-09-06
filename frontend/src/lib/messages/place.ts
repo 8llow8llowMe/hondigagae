@@ -137,11 +137,17 @@ export const placeMessages = {
 
   detailMaxTemperature: '최고기온',
   /**
-   * 체감온도 (#253). **기온과 습도를 합친 열지수다** — 반려견은 헐떡임으로 체온을 내려
-   * 습도에 사람보다 민감해서 이 값이 판정의 핵심 지표다. 아트보드가 이 자리에 그린
-   * 큰 숫자도 최고기온이 아니라 이것이다.
+   * **하루 최대** 체감온도 (#253 · [#259](https://github.com/8llow8llowMe/hondigagae/issues/259)).
+   * **기온과 습도를 합친 열지수다** — 반려견은 헐떡임으로 체온을 내려 습도에 사람보다
+   * 민감해서 이 값이 판정의 핵심 지표다. 아트보드가 이 자리에 그린 큰 숫자도 최고기온이
+   * 아니라 이것이다.
+   *
+   * **`최고` 가 기준을 말한다.** 같은 레일의 산책 위험도가 같은 열지수를 **시각 기준**으로
+   * 내는데(`detailHeatIndex`), 둘 다 `체감온도` 이면 어느 쪽이 하루치인지 알 수 없다.
+   * **이름을 나누지 않고 기준을 나눈 이유**는 두 값이 같은 물리량이기 때문이다 — 이름이
+   * 갈리면 사용자는 서로 다른 값으로 읽는다. 폴백인 `최고기온` 과도 짝이 맞는다.
    */
-  detailFeelsLikeTemperature: '체감온도',
+  detailFeelsLikeTemperature: '최고 체감온도',
   detailTemperatureUnit: '℃',
   detailPrecipitationProbability: '강수확률',
   detailPercentUnit: '%',
@@ -164,7 +170,16 @@ export const placeMessages = {
   /** 등급 문구는 없다 — 서버 `walkSafetyLevel.name` 을 그대로 넣는다 */
   detailWalkSafetyErrorTitle: '산책 위험도를 불러오지 못했어요',
 
-  detailHeatIndex: '체감 열지수',
+  /**
+   * 산책 위험도 hero 의 라벨 ([#259](https://github.com/8llow8llowMe/hondigagae/issues/259)).
+   * **`heatIndexCelsius` 는 `targetDateTime` 그 시각의 값이다** — 하루 최대인
+   * `detailFeelsLikeTemperature`(`최고 체감온도`)와 같은 물리량이고 기준만 다르다.
+   *
+   * **예전에는 hero 에 라벨이 없었다.** 적합도의 점수 hero(`82 /100`)를 따라 뺐던 것인데,
+   * 점수는 단위가 스스로 말하고 온도는 그렇지 않다 — 맨 `35.0℃` 는 기온으로 읽힌다.
+   * '지금' 은 위의 `지금 산책` 제목과 아래 `{time} 기준` 각주가 이미 말한다.
+   */
+  detailHeatIndex: '체감온도',
   /** **추정치다.** 실측 노면 온도가 아니라는 것을 라벨이 말한다 */
   detailPavement: '추정 노면 온도',
 

@@ -93,9 +93,19 @@ export function PlaceWalkSafetyPanel({
         {/*
           열지수를 hero 로 세운다 — 적합도의 점수 자리와 같다. **`null` 이면 자리를 비운다**
           (0.0℃ 로 채우면 영하 판정으로 읽힌다).
+
+          **라벨을 붙인다** (#259). 예전에는 적합도의 점수 hero(`82 /100`)를 따라 뺐는데,
+          점수는 단위가 스스로 말하고 온도는 그렇지 않다 — 맨 `35.0℃` 는 기온으로 읽힌다.
+          게스트 경로에서는 바로 위 적합도가 **하루 최대** 체감온도를 같은 ℃ 로 내므로,
+          라벨이 없으면 기준이 다른 두 숫자가 이름 없이 붙어 선다.
+
+          **`지금 체감온도` 가 아니라 `체감온도` 다.** 시각 기준이라는 것은 위의
+          `지금 산책` 제목과 아래 `{time} 기준` 각주가 이미 두 번 말한다 — 라벨까지
+          '지금' 을 얹으면 같은 말이 세 번이다. 가르는 일은 하루쪽의 `최고` 가 한다.
         */}
         {heatIndex !== null && (
           <MetricValue
+            label={messages.place.detailHeatIndex}
             value={heatIndex}
             unit={messages.place.detailTemperatureUnit}
             tone={tone}

@@ -111,8 +111,20 @@ export function WalkVerdict({
             <MetricWord tone={tone}>{data.walkSafetyLevel.name}</MetricWord>
             <WeatherWarningBadge warning={data.weatherWarning} />
           </span>
+          {/*
+            **라벨을 붙인다** (#259). 모바일 접힌 줄은 `heatIndexLabel` 을 이미 달고 있는데
+            데스크톱 hero 만 맨 숫자였다 — 같은 화면의 같은 값이 폭에 따라 이름을 잃었다.
+            아래 기준 줄(`{장소} 기준`)은 어디의 값인지만 말하고 무엇인지는 말하지 않는다.
+          */}
           {heatIndex !== null && (
-            <MetricValue value={heatIndex} unit="℃" tone={tone} size="hero" className="shrink-0" />
+            <MetricValue
+              label={messages.home.heatIndexLabel}
+              value={heatIndex}
+              unit="℃"
+              tone={tone}
+              size="hero"
+              className="shrink-0"
+            />
           )}
         </div>
         <p className="text-caption text-fg-muted hidden font-medium md:block">
