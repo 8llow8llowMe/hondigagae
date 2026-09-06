@@ -88,6 +88,26 @@ describe('PlaceRow — nullable 처리', () => {
     expect(markup).toContain('size-20')
   })
 
+  /*
+    #67 B. **"사진이 없다" 와 "사진이 있는데 못 쓴다" 는 다른 갈래다.** 계약은 사진이 있다고
+    말하는데 `next.config.ts` 의 `remotePatterns` 에 없는 호스트라 `next/image` 에 넘길 수 없다.
+
+    **넘겨 버리면 런타임에 던져 화면 전체가 죽는다** (`lib/image/remote-host.ts` 머리주석).
+    `imageSrc` 의 거절만 단위 테스트로 잠가 두면 부족하다 — 호출부가 그 `null` 을 받아
+    자리를 채우는 것까지가 이 갈래다. mock 이 이 케이스를 한 곳에 싣고 있다
+    (`api/mock/place-data.ts` 의 `UNREGISTERED_HOST_IMAGE`).
+  */
+  it('허용 목록 밖 호스트면 URL 을 내보내지 않고 사진 없음과 같은 자리를 채운다', () => {
+    const markup = render({
+      ...placeSummary,
+      firstImage: 'http://cdn.not-allowed.invalid/photo/a.jpg',
+    })
+
+    expect(markup).not.toContain('not-allowed.invalid')
+    expect(markup).toContain('/illustrations/place-tourist_spot.svg')
+    expect(markup).toContain('size-20')
+  })
+
   it('자산이 없는 카테고리는 "이미지 없음" 타일로 떨어진다 — 카테고리를 지어내지 않는다', () => {
     const markup = render({
       ...placeSummary,
