@@ -21,7 +21,7 @@ import type { AiPlanScheduleItem } from '@/types/ai-plan'
  *
  * `null` 인 자리는 거리를 렌더하지 않는다. 세 경우다:
  *  - **첫 항목** — 기준이 없다
- *  - **직전 항목의 좌표를 모른다** — `placeId` 가 null 인 `MOVE`·`WALK` 이거나 보강 실패다
+ *  - **직전 항목의 좌표를 모른다** — `placeId` 가 null 인 `MOVE` 이거나 보강 실패다
  *  - **이 항목의 좌표를 모른다**
  *
  * `0` 을 쓰지 않는다 — `haversineMeters` 와 같은 이유로 0m 는 "같은 자리" 라는 뜻이다.

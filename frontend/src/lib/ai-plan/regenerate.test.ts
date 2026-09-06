@@ -126,15 +126,16 @@ describe('toRegeneratedDayItems', () => {
   })
 
   /*
-    R4-3 · #89. `AiPlanScheduleItem.placeId` 는 장소 id 인데 `WALK` 의 `targetId` 는
-    `walk_course.id` 다. 보내면 틀린 id 가 조용히 저장된다.
+    R4-3 · #89 · #252. 재생성도 담기와 **같은 `toDraftItems`** 를 쓴다 — 규칙이 두 벌이 되면
+    반드시 갈라진다. 담기 쪽에서 유형 필터를 걷었으니 이 경로에도 남아 있으면 안 된다.
+    입력의 `WALK` 는 그 필터가 없음을 증명하기 위한 것이고, 실제 초안에는 오지 않는다.
   */
-  it('WALK 에는 targetId 를 붙이지 않는다', () => {
+  it('유형으로 targetId 를 가리지 않는다 — 담기와 같은 규칙이다', () => {
     const items = toRegeneratedDayItems(draft(), 2, 3)
     const walk = items?.find((item) => item.itemType === 'WALK')
 
     expect(walk).toBeDefined()
-    expect('targetId' in (walk ?? {})).toBe(false)
+    expect(walk?.targetId).toBe('333')
   })
 
   it('PLACE 에는 targetId 를 붙인다', () => {

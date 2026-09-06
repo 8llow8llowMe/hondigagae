@@ -92,8 +92,8 @@ export function AiPlanDraftPreview({
   const partial = totalDays !== null && madeDays < totalDays
 
   /*
-    **`placeId` 가 없는 항목은 좌표도 없다.** `MOVE` 와 `WALK` 다 — `WALK` 는 보강 자체를
-    하지 않는다(그 `placeId` 는 `walk_course.id` 와 어긋나 있다, #89).
+    **`placeId` 가 없는 항목은 좌표도 없다.** `MOVE` 다 — 초안에 `WALK` 는 오지 않고(#89),
+    나머지 유형은 후보 밖 장소라 연결이 끊긴 경우에만 `placeId` 가 비어 있다.
   */
   const coordOf = (item: AiPlanScheduleItem): LatLng | null =>
     item.placeId === null ? null : (coords.get(item.placeId) ?? null)

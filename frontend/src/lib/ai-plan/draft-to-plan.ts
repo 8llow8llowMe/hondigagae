@@ -19,15 +19,6 @@ import {
 const ITEM_TITLE_MAX = 100
 const ITEM_MEMO_MAX = 500
 
-/**
- * **`WALK` 은 `targetId` 를 보내지 않는다** (명세 S5 함정 2 · S8 미결 4).
- *
- * `AiPlanScheduleItem.placeId` 는 "장소 아이디" 인데 `PlanItemRequest.targetId` 는 `WALK`
- * 일 때 **`walk_course.id`** 다. 백엔드 검증(`PLACE_TARGET_TYPES`)이 `WALK` 를 빼기 때문에
- * **틀린 id 가 조용히 저장된다.** 보내지 않는 편이 낫다 — 이슈 #89 가 BE 쪽 문제다.
- */
-const TARGET_ID_TYPES: readonly PlanItemTypeCode[] = ['PLACE', 'MEAL', 'LODGING']
-
 function isPlanItemType(value: string): value is PlanItemTypeCode {
   return (PLAN_ITEM_TYPES as readonly string[]).includes(value)
 }
@@ -135,14 +126,21 @@ export function toDraftItems(
       if (placeId !== null && excludedPlaceIds?.has(placeId) === true) continue
 
       const memo = (item.note ?? '').trim().slice(0, ITEM_MEMO_MAX)
-      const targetId =
-        placeId !== null && TARGET_ID_TYPES.includes(item.itemType) ? placeId : undefined
 
       items.push({
         day: dayItem.day,
         sequence,
         itemType: item.itemType,
-        ...(targetId === undefined ? {} : { targetId }),
+        /*
+          **`placeId` 를 유형으로 가리지 않는다** (#252). 예전에는 `WALK` 만 `targetId` 를
+          빼고 보냈다 — 초안의 `placeId` 는 `place.id` 인데 `PlanItemRequest.targetId` 는
+          `WALK` 일 때 `walk_course.id` 라 아이디 공간이 어긋났기 때문이다(#89).
+
+          BE 가 그 원인을 없앴다. 초안 스키마에서 `WALK` 를 빼고, 그럼에도 모델이 `WALK` 에
+          장소를 실으면 `OllamaLlmAdapter.resolveItemType` 이 `PLACE` 로 바로잡는다 —
+          **초안의 모든 `itemType` 은 `place.id` 를 `targetId` 로 받는 유형이다.**
+        */
+        ...(placeId === null ? {} : { targetId: placeId }),
         title: itemTitle.slice(0, ITEM_TITLE_MAX),
         ...(memo === '' ? {} : { memo }),
       })
@@ -163,9 +161,7 @@ export function draftPlaceIds(draft: AiPlanDraft): string[] {
 
   for (const dayItem of draft.days) {
     for (const item of dayItem.items) {
-      if (item.placeId !== null && TARGET_ID_TYPES.includes(item.itemType as PlanItemTypeCode)) {
-        ids.add(item.placeId)
-      }
+      if (item.placeId !== null) ids.add(item.placeId)
     }
   }
 

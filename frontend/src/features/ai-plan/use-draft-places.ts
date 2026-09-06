@@ -22,9 +22,9 @@ import type { PlaceDetail } from '@/types/place'
  * 상세와 같다 (`features/plan/일정상세-세부명세.md` D3) — **`placeKeys.detail()` 을
  * 재사용**해야 장소 상세를 이미 본 항목이 요청 없이 채워진다.
  *
- * **`placeId` 가 null 인 항목은 부르지 않는다.** 이동 항목과 검증되지 않은 장소다.
- * `WALK` 도 부르지 않는다 — 그 `placeId` 는 `walk_course.id` 와 어긋나 있어(#89)
- * 보강 결과를 신뢰할 수 없다 (`draftPlaceIds` 가 걸러낸다).
+ * **`placeId` 가 null 인 항목은 부르지 않는다.** 이동 항목과 검증되지 않은 장소다
+ * (`draftPlaceIds` 가 걸러낸다). **유형으로는 거르지 않는다** — 초안의 모든 `itemType` 은
+ * `place.id` 를 가리킨다 (#89 · #252).
  *
  * **담을 수 없는 장소를 따로 모은다** — 담기가 `PLAN_004` 로 막힐 때 그 항목을 지목하기
  * 위해서다 (명세 S5 함정 3). 백엔드가 `findVisiblePlaceIds` 로 거르는 것이 둘인데
