@@ -4,6 +4,7 @@ import { resolveMock } from '@/lib/api/mock'
 import { MOCK_EMAIL_CODE } from '@/lib/api/mock/auth-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import { mockStore, resetMockStore } from '@/lib/api/mock/store'
+import { isAllowedImageHost } from '@/lib/image/remote-host'
 import type { SliceResponse } from '@/types/api'
 import type { PlaceDetail, PlaceSummary } from '@/types/place'
 
@@ -214,7 +215,25 @@ describe('mock 데이터 품질', () => {
     expect(MOCK_PLACES.some((p) => p.addr1 === null)).toBe(true)
     expect(MOCK_PLACES.some((p) => p.tel === null)).toBe(true)
     expect(MOCK_PLACES.some((p) => p.indoor === null)).toBe(true)
-    expect(MOCK_PLACES.every((p) => p.firstImage === null)).toBe(true)
+    expect(MOCK_PLACES.some((p) => p.firstImage === null)).toBe(true)
+  })
+
+  /*
+    #67 B. **"사진이 없다" 와 "사진이 있는데 못 쓴다" 는 다른 갈래다.** 뒤쪽은 실데이터로
+    만들 수 없다 — dev 실측에서 이미지 호스트는 `tong.visitkorea.or.kr` 하나뿐이라
+    거절 경로가 단위 테스트에만 잠겨 있었다. 거절이 무너지면 `next/image` 가 런타임에
+    던져 화면 전체가 죽으므로, 로컬에서 늘 눈에 보이는 자리를 하나 둔다.
+  */
+  it('허용 목록 밖 호스트의 firstImage 를 가진 장소를 포함한다', () => {
+    const rejected = MOCK_PLACES.filter(
+      (p) => p.firstImage !== null && !isAllowedImageHost(p.firstImage),
+    )
+
+    expect(rejected.length).toBeGreaterThan(0)
+    // 실재하는 주소를 부르지 않는다 — 예약된 `.invalid` 다 (RFC 2606)
+    for (const place of rejected) {
+      expect(new URL(place.firstImage as string).hostname.endsWith('.invalid')).toBe(true)
+    }
   })
 
   it('좌표가 제주 범위 안에 있다', () => {

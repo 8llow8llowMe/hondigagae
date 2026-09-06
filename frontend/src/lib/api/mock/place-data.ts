@@ -12,10 +12,30 @@ import type { PlaceSummary } from '@/types/place'
  * 데이터를 만들 때 지킨 것:
  *  - 긴 한국어 이름을 섞는다 (오버플로가 기본 경로에서 드러나야 한다)
  *  - nullable 필드를 실제로 비운다 (`firstImage` / `tel` / `addr1` / `indoor`)
+ *  - **허용 목록 밖 호스트의 `firstImage` 를 한 곳에 싣는다** (#67 B) — "사진이 없다" 와
+ *    "사진이 있는데 못 쓴다" 는 다른 갈래이고, 뒤쪽은 실데이터로 만들 수 없다
  *  - `indoor: null` 인 장소를 포함한다 — 원천에 정보가 없으면 어느 필터에도 안 잡힌다
  *  - metadata 는 백엔드 enum 의 실제 name/description 을 그대로 쓴다
  *  - 좌표는 제주 범위(위도 33.1~33.6 / 경도 126.1~126.9)
  */
+
+/**
+ * **허용 목록에 없는 호스트의 이미지 URL** (#67 B).
+ *
+ * 계약은 이 장소에 사진이 있다고 말하는데 `next.config.ts` 의 `remotePatterns` 에 없는
+ * 호스트라 `next/image` 에 넘길 수 없다 — `imageSrc()` 가 `null` 로 떨어뜨리고 화면은
+ * 플레이스홀더를 세운다. **"사진이 아예 없다" 와 다른 갈래다.**
+ *
+ * **fixture 없이는 이 갈래를 로컬에서 볼 수 없었다.** dev 실측(2026-09-04, 제주 400건)에서
+ * 이미지 호스트는 `tong.visitkorea.or.kr` 하나뿐이라 실데이터로는 만들 수 없고, 그래서
+ * `isAllowedImageHost` 의 거절 경로가 단위 테스트에만 잠겨 있었다. **거절이 무너지면
+ * `next/image` 가 런타임에 던져 화면 전체가 죽는다** (`lib/image/remote-host.ts` 머리주석) —
+ * 단위 테스트가 통과해도 호출부가 `null` 을 안 받아 주면 그렇게 된다.
+ *
+ * **예약된 도메인을 쓴다** (RFC 2606 `.invalid`). 실재하는 주소를 적으면 mock 이 남의
+ * 서버를 부르게 되고, 허용 목록에 그 호스트가 추가되는 순간 이 갈래가 조용히 사라진다.
+ */
+const UNREGISTERED_HOST_IMAGE = 'http://cdn.not-allowed.invalid/photo/pension-1.jpg'
 
 const CONTENT = {
   TOURIST_SPOT: { code: 'TOURIST_SPOT', name: '관광지', description: '자연·문화 관광지' },
@@ -129,8 +149,9 @@ const SEEDS: Seed[] = [
     sigunguCode: '4',
     lat: 33.4636,
     lng: 126.3092,
-    firstImage: null,
-    firstImage2: null,
+    // 허용 목록 밖 호스트 — 계약에는 사진이 있고 화면은 못 쓴다 (#67 B, 위 상수)
+    firstImage: UNREGISTERED_HOST_IMAGE,
+    firstImage2: UNREGISTERED_HOST_IMAGE,
     petAllowanceType: PET.ALLOWED,
     allowedPetSize: SIZE.ALL,
     maxPetWeightKg: null,
