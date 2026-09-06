@@ -99,6 +99,12 @@ export const paths = {
      */
     jobStream: (jobId: string) => `/ai-plans/jobs/${jobId}/stream`,
     /**
+     * 작업 취소 (#250). **`POST` 인데 본문이 없다** — 대상은 경로의 `jobId` 뿐이다.
+     *
+     * 응답은 취소된 작업(`AiPlanJobStatusResponse`)이라 조회와 같은 모양이다.
+     */
+    jobCancel: (jobId: string) => `/ai-plans/jobs/${jobId}/cancel`,
+    /**
      * 반려견 여행 준비물 생성 (#155). **POST 인데 조회에 가깝다** — 서버가 결과를
      * 저장하지 않는 제안이라 재호출하면 다른 목록이 온다.
      */

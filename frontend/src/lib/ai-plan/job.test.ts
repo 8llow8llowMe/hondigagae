@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  isJobCanceled,
   isJobCompleted,
   isJobFailed,
   JOB_POLL_INTERVAL_MS,
@@ -9,6 +10,7 @@ import {
   JOB_STREAM_SAFETY_POLL_MS,
   jobPollInterval,
   jobPollPhase,
+  jobStepProgress,
   shouldKeepPolling,
 } from '@/lib/ai-plan/job'
 
@@ -53,8 +55,66 @@ describe('shouldKeepPolling', () => {
     expect(shouldKeepPolling({ status: 'FAILED' })).toBe(false)
   })
 
+  /*
+    **취소도 종결이다** (#250). 빠뜨리면 취소한 작업을 상한(90초)까지 2초마다 두드리고,
+    화면은 그동안 진행 중으로 남는다 — 서버는 이미 상태를 못 박고 SSE 도 닫은 뒤다.
+  */
+  it('취소되면 폴링을 멈춘다', () => {
+    expect(shouldKeepPolling({ status: 'CANCELED' })).toBe(false)
+  })
+
   it('아직 응답이 없으면 폴링을 계속한다', () => {
     expect(shouldKeepPolling(null)).toBe(true)
+  })
+})
+
+describe('isJobCanceled (#250)', () => {
+  it('status 가 CANCELED 면 취소로 판정한다', () => {
+    expect(isJobCanceled({ status: 'CANCELED' })).toBe(true)
+    expect(isJobCanceled({ status: { code: 'CANCELED', name: '취소됨' } })).toBe(true)
+  })
+
+  /*
+    **실패와 갈라야 한다.** 취소는 `errorCode` 를 비운 채로 오므로 실패 화면에 태우면
+    사유 없는 "일정을 만들지 못했어요" 가 뜬다 — 사용자가 스스로 그만둔 일이다.
+  */
+  it('실패·완료는 취소가 아니다', () => {
+    expect(isJobCanceled({ status: 'FAILED' })).toBe(false)
+    expect(isJobCanceled({ status: 'COMPLETED' })).toBe(false)
+    expect(isJobFailed({ status: 'CANCELED' })).toBe(false)
+  })
+})
+
+describe('jobStepProgress (#250)', () => {
+  it('서버가 준 n / m 을 그대로 돌려준다', () => {
+    expect(jobStepProgress({ stepOrder: 2, totalSteps: 4 })).toEqual({ order: 2, total: 4 })
+  })
+
+  /*
+    **`PENDING` 은 `stepOrder` 가 null 이다.** 0 이나 1 로 채우면 아직 시작하지 않은
+    작업을 시작한 것으로 그린다.
+  */
+  it('대기 중이면 그릴 것이 없다', () => {
+    expect(jobStepProgress({ stepOrder: null, totalSteps: 4 })).toBeNull()
+  })
+
+  /*
+    **필드를 모르는 서버가 붙어 있을 수 있다.** SSE 프레임은 `parseJobEvent` 가 모양을
+    검사하지 않고 통과시키므로 타입만 믿으면 `NaN / undefined 단계` 가 화면에 나간다.
+  */
+  it('값이 아예 없으면 그리지 않는다', () => {
+    expect(jobStepProgress({})).toBeNull()
+    expect(jobStepProgress(null)).toBeNull()
+  })
+
+  /** `5 / 4 단계` 는 진행률이 아니라 버그의 표시다 */
+  it('순서가 전체보다 크면 그리지 않는다', () => {
+    expect(jobStepProgress({ stepOrder: 5, totalSteps: 4 })).toBeNull()
+  })
+
+  it('0 이하나 정수가 아닌 값은 그리지 않는다', () => {
+    expect(jobStepProgress({ stepOrder: 0, totalSteps: 4 })).toBeNull()
+    expect(jobStepProgress({ stepOrder: 1.5, totalSteps: 4 })).toBeNull()
   })
 })
 

@@ -13,8 +13,12 @@ import {
   shouldKeepPolling,
 } from '@/lib/ai-plan/job'
 import { mergeJobUpdate } from '@/lib/ai-plan/job-stream'
-import { fetchAiPlanJob } from '@/lib/api/ai-plan'
+import { cancelAiPlanJob, fetchAiPlanJob } from '@/lib/api/ai-plan'
+import { ApiError } from '@/lib/api/error'
 import type { AiPlanJob } from '@/types/ai-plan'
+
+/** 이미 완료·실패해 취소할 것이 없다 — 요청 오류가 아니라 대상의 상태가 지나간 것이다 */
+const NOT_CANCELABLE = 'AIPLAN_019'
 
 /** 경과 시간을 갱신하는 주기. 국면(30초·90초) 판정만 하므로 초 단위로 충분하다 */
 const TICK_MS = 1000
@@ -36,6 +40,8 @@ export function useAiPlanJob(jobId: string) {
   const queryClient = useQueryClient()
   const streaming = useAiPlanJobStream(jobId)
   const [elapsedMs, setElapsedMs] = useState(0)
+  const [canceling, setCanceling] = useState(false)
+  const [cancelFailed, setCancelFailed] = useState(false)
   const startedAt = useRef<number | null>(null)
   const watchedJobId = useRef(jobId)
 
@@ -47,6 +53,8 @@ export function useAiPlanJob(jobId: string) {
     watchedJobId.current = jobId
     startedAt.current = null
     setElapsedMs(0)
+    // 앞 작업의 취소 실패 문구가 새 작업의 진행 화면에 남지 않게 한다
+    setCancelFailed(false)
   }
 
   const query = useQuery({
@@ -113,6 +121,38 @@ export function useAiPlanJob(jobId: string) {
     */
   }, [jobId, polling, phase])
 
+  /**
+   * 그만두기 (#250).
+   *
+   * **응답을 캐시에 바로 쓴다.** 취소 응답이 취소된 작업 그 자체라 다음 폴링을 기다릴
+   * 이유가 없고, SSE 는 `CANCELED` 를 보낸 직후 닫히므로 기다리면 오히려 늦다.
+   * `mergeJobUpdate` 를 거치는 이유는 구독이 먼저 종결 상태를 써 뒀을 수 있어서다.
+   */
+  async function cancel(): Promise<void> {
+    setCanceling(true)
+    setCancelFailed(false)
+
+    try {
+      const canceled = await cancelAiPlanJob(jobId)
+      queryClient.setQueryData<AiPlanJob>(aiPlanKeys.job(jobId), (cached) =>
+        mergeJobUpdate(cached, canceled),
+      )
+    } catch (error) {
+      /*
+        **409 는 오류로 띄우지 않는다.** 취소하려는 사이에 작업이 끝난 것이라 사용자가
+        볼 것은 오류가 아니라 **결과**다 — 다시 조회해 완료·실패 화면으로 넘긴다.
+      */
+      if (error instanceof ApiError && error.resultCode === NOT_CANCELABLE) {
+        await query.refetch()
+      } else {
+        // 그 외에는 작업이 계속 돌고 있다. 진행 화면을 유지한 채 다시 누를 수 있게 한다
+        setCancelFailed(true)
+      }
+    } finally {
+      setCanceling(false)
+    }
+  }
+
   return {
     query,
     /** 폴링 국면 — `normal` / `slow` / `exceeded` */
@@ -125,5 +165,10 @@ export function useAiPlanJob(jobId: string) {
       setElapsedMs(0)
       void query.refetch()
     },
+    /** 그만두기 — 협조적 취소라 즉시 멈추지 않는다 (#250) */
+    cancel: (): void => void cancel(),
+    canceling,
+    /** 취소 요청 자체가 실패했는가. 작업은 계속 돌고 있다 */
+    cancelFailed,
   }
 }

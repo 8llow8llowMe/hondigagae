@@ -139,6 +139,19 @@ export type MockAiPlanJob = {
   requestNote: string | null
   pollCount: number
   /**
+   * 그만두기로 종결됐는가 (#250). **`pollCount` 와 독립이다** — 취소는 진행 상태를 덮는다.
+   *
+   * 멱등 술어도 이것을 본다: 취소는 **멱등 키를 함께 풀어 주므로**(백엔드 판단) 취소된
+   * 작업이 진행 중으로 남으면 "같은 조건으로 다시 만들기" 가 취소한 잡을 되받는다.
+   */
+  canceled: boolean
+  /**
+   * 취소 시점에 밟고 있던 단계 코드. 대기 중(`PENDING`)에 취소했으면 null 이다.
+   *
+   * **종결 상태에서도 마지막 단계가 남는다**는 계약을 mock 이 지키는 자리다.
+   */
+  canceledAtStep: string | null
+  /**
    * 하루 재생성 대상 일정 (#128). 새 일정 생성이면 `null` 이다.
    *
    * **멱등 술어가 이것을 본다.** 실제 멱등 키는 `toParams` 해시이고 그 map 에 `planId`

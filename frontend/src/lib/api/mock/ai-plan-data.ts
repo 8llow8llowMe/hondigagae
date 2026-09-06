@@ -55,26 +55,85 @@ function failValidation(errors: { code: string; field: string; message: string }
 // `OAUTH_PROFILE_REQUIRED` 이고 400 이라, 401 과 짝지으면 서버가 내지 않는 조합이 된다 (#83)
 const UNAUTHORIZED = () => fail(401, 'SECURITY_001', '인증이 필요합니다.')
 
-type JobStatusCode = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED'
+type JobStatusCode = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELED'
 
-/** 백엔드 `AiPlanJobStatus` 의 displayName/description 복제본 */
+/**
+ * 백엔드 `AiPlanJobStatus` 의 displayName/description **복제본**.
+ *
+ * **문구가 어긋나면 안 된다.** 화면이 `status.description` 을 그대로 그리므로(명세 S7)
+ * mock 이 다른 말을 하면 로컬에서 본 문장이 배포에서 달라진다 — `CANCELED` 를 더하면서
+ * 넷 다 실측으로 다시 맞췄다 (#250).
+ */
 const STATUS: Record<string, CodeNameMetadata> = {
   PENDING: {
     code: 'PENDING',
     name: '대기 중',
-    description: '일정 생성 작업이 대기열에 있습니다.',
+    description: '작업이 큐에서 실행을 기다리고 있습니다.',
   },
   RUNNING: {
     code: 'RUNNING',
     name: '생성 중',
-    description: '반려견 조건에 맞는 장소를 모아 일자별로 배치하고 있습니다.',
+    description: 'AI가 반려견 맞춤 여행 일정을 생성하고 있습니다.',
   },
   COMPLETED: {
     code: 'COMPLETED',
     name: '완료',
     description: '여행 일정 생성이 완료되었습니다.',
   },
-  FAILED: { code: 'FAILED', name: '실패', description: 'AI 일정 생성 작업이 실패했습니다.' },
+  FAILED: {
+    code: 'FAILED',
+    name: '실패',
+    description: '여행 일정 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+  },
+  CANCELED: { code: 'CANCELED', name: '취소됨', description: '사용자가 작업을 취소했습니다.' },
+}
+
+/**
+ * 백엔드 `AiPlanJobStep` 의 displayName/description 복제본 (#250).
+ *
+ * **선언 순서가 곧 단계 순서다** — 백엔드도 `ordinal` 에서 `order` 를 뽑는다.
+ */
+const STEPS: CodeNameMetadata[] = [
+  {
+    code: 'CONDITIONS',
+    name: '조건 확인',
+    description: '반려견 특성과, 하루 재생성이면 기존 일정을 확인합니다.',
+  },
+  {
+    code: 'CANDIDATES',
+    name: '후보 장소 수집',
+    description: '여행 지역에서 반려견 동반이 확인된 장소를 모읍니다.',
+  },
+  {
+    code: 'WEATHER',
+    name: '날씨 전망 반영',
+    description: '여행 기간의 일자별 날씨 전망을 붙입니다.',
+  },
+  { code: 'DRAFTING', name: '일정 구성', description: 'AI 가 후보 장소로 일자별 일정을 짭니다.' },
+]
+
+/**
+ * **값의 개수에서 뽑는다. 손으로 적지 않는다** — 백엔드가 `values().length` 로 내리는
+ * 것과 같은 이유다. 적어 두면 단계를 더할 때 한쪽만 고쳐져 `5 / 4 단계` 가 나간다.
+ */
+const TOTAL_STEPS = STEPS.length
+
+/** 단계 코드 → metadata. 모르는 코드면 null (계약상 오지 않지만 mock 이 죽지 않게) */
+function stepOf(code: string | null): CodeNameMetadata | null {
+  return STEPS.find((step) => step.code === code) ?? null
+}
+
+/**
+ * 상태에 해당하는 단계 코드.
+ *
+ * **`PENDING` 은 null 이다** — 아직 시작하지 않았다. 종결 상태에는 마지막으로 밟은 단계가
+ * 남는다(`DRAFTING`). 취소는 선 지점이 그대로 남으므로 저장해 둔 값을 쓴다.
+ */
+function stepCodeOf(job: MockAiPlanJob, status: JobStatusCode): string | null {
+  if (status === 'PENDING') return null
+  if (status === 'RUNNING') return 'CONDITIONS'
+  if (status === 'CANCELED') return job.canceledAtStep
+  return 'DRAFTING'
 }
 
 const SUBMITTED: CodeNameMetadata = {
@@ -164,12 +223,14 @@ export function resolveAiPlanMock(
 ): MockResult | null {
   const isSubmit = path === '/ai-plans' && method === 'POST'
   const jobMatch = /^\/ai-plans\/jobs\/([^/]+)$/.exec(path)
+  const cancelMatch = /^\/ai-plans\/jobs\/([^/]+)\/cancel$/.exec(path)
+  const isCancel = cancelMatch !== null && method === 'POST'
   const packingMatch = /^\/ai-plans\/packing-list\/([^/]+)$/.exec(path)
   const isPacking = packingMatch !== null && method === 'POST'
 
-  if (!isSubmit && !isPacking && (jobMatch === null || method !== 'GET')) return null
+  if (!isSubmit && !isPacking && !isCancel && (jobMatch === null || method !== 'GET')) return null
 
-  // 세 엔드포인트 모두 @PreAuthorize("isAuthenticated()") 다
+  // 네 엔드포인트 모두 @PreAuthorize("isAuthenticated()") 다
   const memberId = memberIdOf(accessToken)
   if (memberId === null) return UNAUTHORIZED()
 
@@ -177,7 +238,43 @@ export function resolveAiPlanMock(
 
   if (isPacking) return packingList(memberId, packingMatch?.[1] ?? '')
 
+  if (isCancel) return cancelJob(memberId, cancelMatch?.[1] ?? '')
+
   return jobStatus(memberId, jobMatch?.[1] ?? '')
+}
+
+/**
+ * `POST /ai-plans/jobs/{jobId}/cancel` mock (#250).
+ *
+ * **워커가 없어 "협조적" 이라는 성질은 흉내 낼 수 없다.** 실제 서버는 상태만 못 박고 워커가
+ * 단계 경계에서 스스로 서지만, mock 에는 돌고 있는 것이 없어 즉시 종결된다. 화면이 확인할
+ * 수 있는 것은 **상태 전이와 갈래**이고 그것은 같다.
+ *
+ * 계약에서 지켜야 하는 세 가지:
+ *  - 이미 취소된 작업은 **200 멱등** — 두 번 눌러도 오류가 아니다
+ *  - 완료·실패한 작업은 **409 `AIPLAN_019`** (400 이 아니다 — 요청이 아니라 대상의 문제다)
+ *  - 취소는 실패가 아니므로 **`errorCode` 를 채우지 않는다**
+ */
+function cancelJob(memberId: string, jobId: string): MockResult {
+  const job = mockStore().aiPlanJobs.find((candidate) => candidate.jobId === jobId)
+
+  // **타인의 jobId 도 404 다** — 조회와 같은 규칙이다
+  if (job === undefined || job.memberId !== memberId) {
+    return fail(404, 'AIPLAN_002', '요청하신 AI 일정 생성 작업을 찾을 수 없습니다.')
+  }
+
+  const status = statusOf(job)
+
+  if (status === 'CANCELED') return ok<AiPlanJob>(jobBody(job, 'CANCELED'))
+
+  if (status === 'COMPLETED' || status === 'FAILED') {
+    return fail(409, 'AIPLAN_019', '이미 끝난 작업은 취소할 수 없습니다.')
+  }
+
+  job.canceledAtStep = stepCodeOf(job, status)
+  job.canceled = true
+
+  return ok<AiPlanJob>(jobBody(job, 'CANCELED'))
 }
 
 /**
@@ -188,8 +285,14 @@ export function resolveAiPlanMock(
  * 한꺼번에 오므로, 간격이 있어야 통과 여부를 눈으로 가를 수 있다.
  */
 const STREAM_SNAPSHOT_MS = 0
-const STREAM_RUNNING_MS = 1200
-const STREAM_TERMINAL_MS = 2500
+/**
+ * 단계 하나가 지나는 간격 (#250).
+ *
+ * **잡당 이벤트가 2회에서 6회로 늘었다** — 백엔드가 단계마다 하나씩 내보낸다. mock 도 그
+ * 모양이어야 `n / m 단계` 가 실제로 움직이는 것을 로컬에서 볼 수 있다.
+ */
+const STREAM_STEP_MS = 600
+const STREAM_TERMINAL_MS = STREAM_STEP_MS * (TOTAL_STEPS + 1)
 
 /**
  * mock 스트림 해석 결과.
@@ -234,7 +337,12 @@ export function resolveAiPlanStreamMock(
     }
   }
 
-  const terminal: JobStatusCode = job.scenario === 'failed' ? 'FAILED' : 'COMPLETED'
+  /** **취소가 시나리오를 이긴다** — 종결은 되돌아가지 않는다 (#250) */
+  const terminal: JobStatusCode = job.canceled
+    ? 'CANCELED'
+    : job.scenario === 'failed'
+      ? 'FAILED'
+      : 'COMPLETED'
 
   /*
     이미 종결된 작업이면 스냅샷 하나만 보내고 닫는다 — 백엔드도 `initial.status().isTerminal()`
@@ -252,13 +360,25 @@ export function resolveAiPlanStreamMock(
   const snapshot = statusOf(job)
   job.pollCount = 2
 
+  /*
+    **단계마다 프레임을 하나씩 낸다** (#250). 백엔드가 단계 경계에서 pub/sub 이벤트를
+    올리므로 잡당 2회였던 것이 6회가 됐다 — 여기서 그 모양을 재현하지 않으면 `n / m 단계`
+    표시가 로컬에서 한 번도 움직이지 않아 확인할 수가 없다.
+
+    **스냅샷이 이미 `RUNNING` 이면 첫 단계를 다시 보내지 않는다** — 구독 전에 지나간
+    단계다.
+  */
+  const stepFrames = STEPS.map((step, index) => ({
+    delayMs: STREAM_STEP_MS * (index + 1),
+    event: JOB_STREAM_EVENT,
+    data: jobBody(job, 'RUNNING', step.code),
+  })).slice(snapshot === 'PENDING' ? 0 : 1)
+
   return {
     kind: 'stream',
     frames: [
       { delayMs: STREAM_SNAPSHOT_MS, event: JOB_STREAM_EVENT, data: jobBody(job, snapshot) },
-      ...(snapshot === 'PENDING'
-        ? [{ delayMs: STREAM_RUNNING_MS, event: JOB_STREAM_EVENT, data: jobBody(job, 'RUNNING') }]
-        : []),
+      ...stepFrames,
       { delayMs: STREAM_TERMINAL_MS, event: JOB_STREAM_EVENT, data: jobBody(job, terminal) },
     ],
   }
@@ -555,8 +675,12 @@ function submit(memberId: string, body: string | null): MockResult {
       job.budget === budget &&
       job.regeneratePlanId === regeneratePlanId &&
       job.regenerateDay === regenerateDay &&
-      statusOf(job) !== 'COMPLETED' &&
-      statusOf(job) !== 'FAILED',
+      /*
+        **돌고 있는 작업만 되돌려준다.** 완료·실패는 물론이고 **취소도 대상이 아니다**
+        (#250) — 백엔드가 취소하면서 멱등 키를 함께 풀어 주기 때문이고, 그러지 않으면
+        "같은 조건으로 다시 만들기" 가 방금 취소한 잡을 그대로 되받는다.
+      */
+      isInFlight(statusOf(job)),
   )
   if (existing !== undefined) {
     return ok<AiPlanSubmitResult>({ submissionStatus: SUBMITTED, jobId: existing.jobId }, 202)
@@ -573,6 +697,8 @@ function submit(memberId: string, body: string | null): MockResult {
     budget,
     requestNote,
     pollCount: 0,
+    canceled: false,
+    canceledAtStep: null,
     regeneratePlanId,
     regenerateDay,
   }
@@ -603,11 +729,30 @@ function jobStatus(memberId: string, jobId: string): MockResult {
  * 를 두 경로에 쓰고, SSE 이벤트 `data` 는 조회 응답의 `dataBody` 와 동일한 JSON 이다
  * (컨트롤러 설명). mock 이 두 경로를 다르게 만들면 그 사실이 깨진다.
  */
-function jobBody(job: MockAiPlanJob, status: JobStatusCode): AiPlanJob {
+function jobBody(
+  job: MockAiPlanJob,
+  status: JobStatusCode,
+  /** 단계를 직접 지정한다 — 스트림이 `RUNNING` 안에서 단계를 옮길 때 쓴다 (#250) */
+  stepCode: string | null = stepCodeOf(job, status),
+): AiPlanJob {
+  /*
+    **단계는 상태와 함께 움직인다** (#250). `PENDING` 이면 `step`·`stepOrder` 가 **null** 이고,
+    종결 상태에는 마지막으로 밟은 단계가 남는다. `totalSteps` 는 언제나 실린다 —
+    `int` 라 nullable 이 아니다.
+  */
+  const step = stepOf(stepCode)
+  const stepIndex = step === null ? -1 : STEPS.indexOf(step)
+  const steps = {
+    step,
+    stepOrder: stepIndex < 0 ? null : stepIndex + 1,
+    totalSteps: TOTAL_STEPS,
+  }
+
   if (status === 'FAILED') {
     return {
       jobId: job.jobId,
       status: STATUS.FAILED as CodeNameMetadata,
+      ...steps,
       planDraft: null,
       // AIPLAN_012 — 실패 이유가 조건 문제일 수 있다는 것을 화면이 다뤄야 한다
       errorCode: 'AIPLAN_012',
@@ -619,7 +764,12 @@ function jobBody(job: MockAiPlanJob, status: JobStatusCode): AiPlanJob {
     return {
       jobId: job.jobId,
       status: STATUS[status] as CodeNameMetadata,
+      ...steps,
       planDraft: null,
+      /*
+        **취소도 여기로 온다 — `errorCode` 를 채우지 않는다.** 채우면 화면이
+        "실패했습니다" 를 띄우고, 실패와 취소를 가른 이 계약의 요점이 무너진다.
+      */
       errorCode: null,
       errorMessage: null,
     }
@@ -628,6 +778,7 @@ function jobBody(job: MockAiPlanJob, status: JobStatusCode): AiPlanJob {
   return {
     jobId: job.jobId,
     status: STATUS.COMPLETED as CodeNameMetadata,
+    ...steps,
     planDraft: draftFor(job),
     errorCode: null,
     errorMessage: null,
@@ -640,11 +791,20 @@ function jobBody(job: MockAiPlanJob, status: JobStatusCode): AiPlanJob {
  * 0회: `PENDING` / 1회: `RUNNING` / 2회 이상: 시나리오에 따라 `COMPLETED` 또는 `FAILED`.
  * **완료·실패에 닿으면 그 상태에 머문다** — 화면이 폴링을 멈춘 뒤 새로고침해도 같은
  * 결과를 봐야 한다.
+ *
+ * **취소가 조회 횟수를 이긴다** (#250). 취소는 종결이고 종결은 되돌아가지 않는다 —
+ * `pollCount` 를 보고 판정하면 취소한 작업이 다음 조회에서 완료로 살아난다.
  */
 function statusOf(job: MockAiPlanJob): JobStatusCode {
+  if (job.canceled) return 'CANCELED'
   if (job.pollCount === 0) return 'PENDING'
   if (job.pollCount === 1) return 'RUNNING'
   return job.scenario === 'failed' ? 'FAILED' : 'COMPLETED'
+}
+
+/** 아직 돌고 있는가 — 백엔드 `AiPlanJobStatus.isInFlight()` 복제본. 멱등 술어가 쓴다 */
+function isInFlight(status: JobStatusCode): boolean {
+  return status === 'PENDING' || status === 'RUNNING'
 }
 
 /** 총 일수. 기간에서 센다 — 초안에는 `totalDays` 가 없다 */

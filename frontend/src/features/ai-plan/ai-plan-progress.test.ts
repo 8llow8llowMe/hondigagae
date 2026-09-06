@@ -11,9 +11,14 @@ const SERVER_DESCRIPTION = '반려견 조건에 맞는 장소를 모아 일자�
 function render(overrides: Partial<AiPlanProgressProps> = {}) {
   const props: AiPlanProgressProps = {
     status: { code: 'RUNNING', name: '생성 중', description: SERVER_DESCRIPTION },
+    step: null,
+    stepProgress: null,
     phase: 'normal',
     onRecheck: () => undefined,
     rechecking: false,
+    onCancel: null,
+    canceling: false,
+    cancelFailed: false,
     ...overrides,
   }
 
@@ -25,12 +30,15 @@ describe('AiPlanProgress — 서버 문구만 쓴다 (명세 S2 · S7)', () => {
     expect(render()).toContain(SERVER_DESCRIPTION)
   })
 
-  it('진행 단계 목록이나 남은 시간을 만들지 않는다 — 계약에 없다', () => {
+  /*
+    **단계를 서버가 주기 전에는 그리지 않는다** (#250). 계약에 값이 생겼어도 화면이
+    지어내지 않는다는 규칙은 그대로다 — `PENDING` 이면 `stepProgress` 가 null 이다.
+  */
+  it('단계 값이 없으면 단계 표시를 만들지 않는다', () => {
     const html = render()
 
     expect(html).not.toContain('단계')
     expect(html).not.toContain('남음')
-    expect(html).not.toContain('취소')
   })
 
   it('서버가 설명을 주지 않으면 대체 문구를 쓴다', () => {
@@ -73,5 +81,79 @@ describe('AiPlanProgress — 폴링 국면 (명세 S4)', () => {
 
     expect(html).not.toContain(messages.aiPlan.failedTitle)
     expect(html).not.toContain(messages.common.temporaryErrorDescription)
+  })
+})
+
+describe('AiPlanProgress — 세부 단계 (#250)', () => {
+  const STEP = {
+    code: 'CANDIDATES',
+    name: '후보 장소 수집',
+    description: '여행 지역에서 반려견 동반이 확인된 장소를 모읍니다.',
+  }
+
+  it('서버가 준 n / m 과 단계 이름을 그린다', () => {
+    const html = render({ step: STEP, stepProgress: { order: 2, total: 4 } })
+
+    expect(html).toContain('2 / 4단계')
+    expect(html).toContain(STEP.name)
+  })
+
+  /*
+    **단계 설명이 상태 설명보다 정확하다.** `status.description` 은 "생성 중" 전체를,
+    `step.description` 은 지금 하는 일을 말한다. 둘 다 서버 문구다.
+  */
+  it('단계 설명이 있으면 그것을 본문으로 쓴다', () => {
+    const html = render({ step: STEP, stepProgress: { order: 2, total: 4 } })
+
+    expect(html).toContain(STEP.description)
+    expect(html).not.toContain(SERVER_DESCRIPTION)
+  })
+
+  /*
+    **총 단계 수를 화면이 적지 않는다.** 백엔드가 단계를 늘리면 이 숫자도 함께 늘어야
+    한다 — 상수로 박아 두면 `5 / 4 단계` 가 나간다.
+  */
+  it('총 단계 수는 서버 값을 따른다', () => {
+    expect(render({ stepProgress: { order: 5, total: 6 } })).toContain('5 / 6단계')
+  })
+
+  it('단계 표시도 aria-live 영역 안에 있다 — 진행을 낭독해야 한다', () => {
+    const html = render({ step: STEP, stepProgress: { order: 2, total: 4 } })
+    const liveRegion = html.slice(html.indexOf('aria-live'))
+
+    expect(liveRegion).toContain('2 / 4단계')
+  })
+})
+
+describe('AiPlanProgress — 그만두기 (#250)', () => {
+  it('onCancel 이 없으면 버튼을 그리지 않는다', () => {
+    expect(render()).not.toContain(messages.aiPlan.jobCancel)
+  })
+
+  it('onCancel 이 있으면 버튼과 한계 안내를 함께 그린다', () => {
+    const html = render({ onCancel: () => undefined })
+
+    expect(html).toContain(messages.aiPlan.jobCancel)
+    // 협조적 취소라 즉시 멈추지 않는다는 것을 누르기 전에 말한다
+    expect(html).toContain(messages.aiPlan.jobCancelHint)
+  })
+
+  /*
+    **상한을 넘긴 화면에서야말로 그만둘 이유가 크다.** 이 화면을 벗어나는 것으로는
+    작업이 멈추지 않는다.
+  */
+  it('상한 초과 화면에도 그만두기가 있다', () => {
+    const html = render({ phase: 'exceeded', onCancel: () => undefined })
+
+    expect(html).toContain(messages.aiPlan.jobCancel)
+    expect(html).toContain(messages.aiPlan.jobExceededAction)
+  })
+
+  it('취소 요청이 실패하면 진행 표시를 유지한 채 이유를 말한다', () => {
+    const html = render({ onCancel: () => undefined, cancelFailed: true })
+
+    expect(html).toContain(messages.aiPlan.jobCancelFailed)
+    // 작업은 계속 돌고 있다 — 진행 표시를 걷지 않는다
+    expect(html).toContain(SERVER_DESCRIPTION)
   })
 })
