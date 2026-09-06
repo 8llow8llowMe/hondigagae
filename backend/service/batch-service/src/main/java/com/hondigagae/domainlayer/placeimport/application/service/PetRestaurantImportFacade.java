@@ -3,11 +3,14 @@ package com.hondigagae.domainlayer.placeimport.application.service;
 import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportErrorCode;
 import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportException;
 import com.hondigagae.domainlayer.placeimport.application.port.in.PetRestaurantImportUseCase;
+import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceImportMetricsPort;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.DelistProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PetRestaurantImportProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PlaceMergeProcessor;
+import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceImportResultType;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
 import com.hondigagae.domainlayer.placeimport.domain.enums.RegionCodeMapping;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,6 +32,7 @@ public class PetRestaurantImportFacade implements PetRestaurantImportUseCase {
     private final PetRestaurantImportProcessor petRestaurantImportProcessor;
     private final PlaceMergeProcessor placeMergeProcessor;
     private final DelistProcessor delistProcessor;
+    private final PlaceImportMetricsPort placeImportMetricsPort;
 
     @Override
     public int importPetRestaurants(String region) {
@@ -40,8 +44,16 @@ public class PetRestaurantImportFacade implements PetRestaurantImportUseCase {
         int imported = petRestaurantImportProcessor.importPetRestaurants(region);
         // 등록 철회가 실제로 일어나는 원천이다. 이번 파일에 없는 업소를 delist 해야
         // 폐업한 식당이 "동반 가능 확인됨"으로 남지 않는다.
-        delistProcessor.delistPlaces(PlaceSourceType.MFDS, runStartedAt, imported);
+        int delisted = delistProcessor.delistPlaces(PlaceSourceType.MFDS, runStartedAt, imported);
         placeMergeProcessor.mergeDuplicates(areaCode);
+
+        // geocode_failed 는 건수가 태어나는 PetRestaurantImportProcessor 가 기록한다
+        placeImportMetricsPort.recordRows(PlaceSourceType.MFDS, PlaceImportResultType.UPSERTED, imported);
+        placeImportMetricsPort.recordRows(PlaceSourceType.MFDS, PlaceImportResultType.DELISTED, delisted);
+        if (imported > 0) {
+            // 신선도는 실제로 데이터가 들어온 실행만 갱신한다 (PlaceImportFacade 와 같은 이유)
+            placeImportMetricsPort.recordLastSuccess(PlaceSourceType.MFDS, Instant.now());
+        }
         return imported;
     }
 

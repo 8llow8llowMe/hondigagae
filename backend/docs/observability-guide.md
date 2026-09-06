@@ -81,12 +81,16 @@ target 파일의 라벨 계약도 동일하게 맞춘다. 대시보드를 프로
 일반 웹 지표만으로는 "데이터가 낡았다"를 잡지 못한다. 배치가 조용히 멈추면 에러율도
 지연도 정상인 채로 데이터만 몇 주씩 묵는다.
 
-노출할 지표 둘.
+노출하는 지표 둘.
 
 ```
-place_import_rows{source, result}            # inserted / updated / delisted / geocode_failed
-place_import_last_success_timestamp{source}  # 소스별 마지막 성공 시각(epoch)
+place_import_rows{source, result}            # upserted / delisted / geocode_failed
+place_import_last_success_timestamp{source}  # 소스별 마지막 성공 시각(epoch seconds)
 ```
+
+`source` 는 `PlaceSourceType` 이름(`TOUR_API` / `CULTURE_PORTAL` / `MFDS`)이다.
+`inserted/updated` 를 나누지 않는 이유: 적재가 JdbcTemplate upsert 라 구분해 세지 않고,
+경보도 그 구분을 쓰지 않는다.
 
 경보 기준.
 
@@ -99,8 +103,20 @@ place_import_last_success_timestamp{source}  # 소스별 마지막 성공 시각
 마지막 항목이 중요하다. delisting 은 잘못 돌면 데이터를 통째로 날리므로,
 급감 가드(`data-refresh-guide.md` 2절)와 이 경보가 이중 방어선이다.
 
-**아직 구현되지 않았다.** 지금은 배치가 `log.info` 로만 건수를 남긴다.
-Micrometer `Counter`/`Gauge` 로 올리는 작업이 필요하다.
+**구현 방식** (batch-service `placeimport` 도메인, `PlaceImportMetricsPort` +
+`MicrometerPlaceImportMetricsAdapter`):
+
+- `place_import_rows` 는 Counter 가 아니라 **마지막 실행 값을 담는 Gauge** 다.
+  위 경보 기준이 실행 단위 값을 전제하기 때문이다. Counter 누적값은 `increase()` 없이
+  실행 단위를 읽을 수 없다.
+- `last_success` 는 **단조 증가**로만 갱신하고, **실제로 데이터가 들어온 실행(imported > 0)**
+  만 성공으로 친다. 원천이 빈 응답을 준 실행을 성공으로 남기면 경보가 침묵한다.
+- 게이지는 프로세스 메모리에만 있으므로, 기동 시 `PlaceImportMetricsSeeder` 가
+  Spring Batch 메타데이터에서 잡별 마지막 COMPLETED 실행 종료 시각을 **씨딩**한다.
+  배포 직후에도 신선도 패널이 비지 않는다. `place_import_rows` 는 씨딩하지 않아
+  재기동 후 첫 실행 전까지는 값이 없다 — 없는 것이 0 으로 보이는 것보다 낫다.
+- 긴급 시설·이미지 잡·혼잡도 잡은 이 지표에 넣지 않는다. `place_import_rows` 는
+  장소 마스터 기준이고, 긴급 시설은 급감 가드 + 경고 로그가 별도로 지킨다.
 
 ## 외부 API 지표
 
