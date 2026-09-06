@@ -88,6 +88,14 @@ export function draftToPlanPayload({
     */
     petIds: snapshot.pets.map((pet) => pet.petId),
     areaCode: snapshot.areaCode,
+    /*
+      **고른 지역을 저장까지 옮긴다** (#251). 옮기지 않으면 "제주시만" 으로 만든 일정이
+      담기는 순간 "지역 미지정" 이 되고, 사용자가 고른 조건이 화면에서 사라진다.
+      계약에는 처음부터 있던 필드다 (`PlanCreateRequest.sigunguCode`).
+    */
+    ...(snapshot.sigunguCode === null || snapshot.sigunguCode === undefined
+      ? {}
+      : { sigunguCode: snapshot.sigunguCode }),
     title,
     startDate: snapshot.startDate,
     endDate: snapshot.endDate,

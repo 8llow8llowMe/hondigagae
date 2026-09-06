@@ -243,6 +243,15 @@ export type PlanCreatePayload = {
    */
   petIds?: string[]
   areaCode: string
+  /**
+   * 좁힌 시군구 (#251). 생략하면 서버가 비워 둔다.
+   *
+   * **AI 초안 담기만 채운다.** 조건 입력에서 고른 지역을 저장까지 옮기지 않으면 사용자가
+   * 고른 조건이 담는 순간 사라진다 — 계약(`PlanCreateRequest.sigunguCode`)에는 처음부터
+   * 있었는데 화면이 싣지 않고 있었다. 직접 만들기(`/plans/new`)에는 지역 컨트롤이 없어
+   * 보낼 값이 없다.
+   */
+  sigunguCode?: string
   title: string
   startDate: string
   endDate: string

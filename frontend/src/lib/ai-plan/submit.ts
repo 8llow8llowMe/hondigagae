@@ -12,7 +12,10 @@ import type { AiPlanFormValues, AiPlanSubmitPayload } from '@/types/ai-plan'
 export const MANWON = 10_000
 
 /**
- * - `areaCode` 는 폼에 없다 — 계약에 `sigunguCode` 가 없어 제주 전체 고정 (명세 S2)
+ * - `areaCode` 는 폼에 없다 — 제주(`'39'`) 고정이라 선택지가 하나다
+ * - **`sigunguCode` 는 고른 값만 보낸다** (#251). `null`("제주 전체")이면 키를 뺀다 —
+ *   빈 문자열을 보내도 서버가 null 로 접지만, 생략이 "좁히지 않았다" 를 그대로 말한다.
+ *   **좁혀서 후보가 없으면 서버가 전체로 넓히지 않고 `AIPLAN_012` 로 실패시킨다**
  * - **`budget` 은 `@Positive` 다.** 일정 생성(`@PositiveOrZero`)과 다르다 — `0` 을 보내면
  *   `AIPLAN_106` 400 이다. 그래서 "상관없음" 과 `0` 을 **똑같이 키 생략**으로 처리한다.
  *   `null` 을 보내지 않는 이유는 일정 생성과 같다: 생략이 "안 정했다" 다
@@ -38,6 +41,7 @@ export function toAiPlanSubmitPayload(values: AiPlanFormValues): AiPlanSubmitPay
 
   return {
     areaCode: DEFAULT_AREA_CODE,
+    ...(values.sigunguCode === null ? {} : { sigunguCode: values.sigunguCode }),
     startDate: values.startDate,
     endDate: values.endDate,
     petIds: values.petIds,

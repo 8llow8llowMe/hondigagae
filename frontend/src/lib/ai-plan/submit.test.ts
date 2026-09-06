@@ -8,6 +8,7 @@ function values(overrides: Partial<AiPlanFormValues> = {}): AiPlanFormValues {
     requestNote: '',
     startDate: '2026-09-12',
     endDate: '2026-09-14',
+    sigunguCode: null,
     petIds: ['123456789012000001'],
     budgetManwon: '',
     preferFavorites: false,
@@ -17,7 +18,7 @@ function values(overrides: Partial<AiPlanFormValues> = {}): AiPlanFormValues {
 }
 
 describe('toAiPlanSubmitPayload — 필수 필드', () => {
-  it('areaCode 를 제주(39)로 고정한다 — 계약에 sigunguCode 가 없어 폼에 지역이 없다', () => {
+  it('areaCode 를 제주(39)로 고정한다 — 선택지가 하나라 폼에 두지 않는다', () => {
     expect(toAiPlanSubmitPayload(values()).areaCode).toBe('39')
   })
 
@@ -146,5 +147,21 @@ describe('toAiPlanSubmitPayload — 생성 옵션 확장 (#128, 아트보드 05)
     // 타입에는 열려 있다 — 재생성 경로가 쓴다
     const withRegenerate: AiPlanSubmitPayload = { ...payload, planId: '1', regenerateDay: 2 }
     expect(withRegenerate.regenerateDay).toBe(2)
+  })
+})
+
+describe('toAiPlanSubmitPayload — sigunguCode (#251)', () => {
+  it('고른 시군구를 그대로 실어 보낸다', () => {
+    expect(toAiPlanSubmitPayload(values({ sigunguCode: '4' })).sigunguCode).toBe('4')
+  })
+
+  /*
+    **"제주 전체" 는 키를 뺀다.** 빈 문자열을 보내도 서버가 null 로 접어 주지만, 생략이
+    "좁히지 않았다" 를 그대로 말한다 — `budget`·`requestNote` 와 같은 규칙이다.
+  */
+  it('제주 전체(null)면 키를 뺀다', () => {
+    const payload = toAiPlanSubmitPayload(values({ sigunguCode: null }))
+
+    expect('sigunguCode' in payload).toBe(false)
   })
 })

@@ -221,6 +221,60 @@ describe('AI 일정 mock — 상태 전이', () => {
   })
 })
 
+describe('AI 일정 mock — sigunguCode (#251)', () => {
+  it('시군구를 실어 보내면 접수된다', () => {
+    expect(submit({ ...VALID, sigunguCode: '4' })?.status).toBe(202)
+  })
+
+  it('10자를 넘으면 400 이다 — @Size(max = 10) · AIPLAN_115', () => {
+    const result = submit({ ...VALID, sigunguCode: '12345678901' })
+
+    expect(result?.status).toBe(400)
+    expect((result?.payload as ApiResponse<null>).dataHeader.resultCode).toBe('AIPLAN_100')
+  })
+
+  /** 백엔드가 빈 문자열을 null 로 접는다 — 그러지 않으면 "빈 시군구" 로 걸러져 후보가 0건이다 */
+  it('빈 문자열은 제주 전체와 같다', () => {
+    expect(newJob({ ...VALID, sigunguCode: '' })).toBe(newJob(VALID))
+  })
+
+  /*
+    **멱등 키에 들어 있다.** 빼면 "제주 전체" 로 만들던 작업이 진행 중일 때 "제주시만"
+    제출이 그 작업을 그대로 되받아, 좁힌 조건이 무시된 초안을 보게 된다.
+  */
+  it('좁힌 지역이 다르면 다른 작업이다', () => {
+    expect(newJob({ ...VALID, sigunguCode: '4' })).not.toBe(newJob({ ...VALID, sigunguCode: '3' }))
+    expect(newJob({ ...VALID, sigunguCode: '4' })).not.toBe(newJob(VALID))
+  })
+
+  it('좁히면 그 시군구 장소만 초안에 온다', () => {
+    const done = pollTimes(newJob({ ...VALID, sigunguCode: '3' }), 3)
+    const titles = (done.planDraft?.days ?? []).flatMap((day) =>
+      day.items.map((item) => item.title ?? ''),
+    )
+
+    // 서귀포시 seed 는 `가세오름` 하나다 — 장소 항목은 전부 그것에서 나온다
+    expect(titles.some((title) => title.includes('가세오름'))).toBe(true)
+    expect(titles.some((title) => title.includes('동문재래시장'))).toBe(false)
+  })
+
+  /*
+    **좁혀서 후보가 없으면 지역 전체로 넓히지 않는다.** 조건을 무시한 일정보다 실패가 낫다는
+    백엔드 판단이고, **제출 400 이 아니라 작업 실패(HTTP 200 + FAILED)** 다 — 후보 수집은
+    워커가 하기 때문이다.
+  */
+  it('좁혀서 후보가 없으면 AIPLAN_012 로 실패한다 — 전체로 넓히지 않는다', () => {
+    const result = submit({ ...VALID, sigunguCode: '9' })
+    expect(result?.status).toBe(202)
+
+    const failed = pollTimes(submitted(result).jobId, 3)
+
+    expect(failed.status.code).toBe('FAILED')
+    expect(failed.errorCode).toBe('AIPLAN_012')
+    expect(failed.planDraft).toBeNull()
+  })
+})
+
 describe('AI 일정 mock — 세부 단계 (#250)', () => {
   it('PENDING 이면 step 이 null 이다 — 아직 시작하지 않았다', () => {
     const first = pollTimes(newJob(), 1)

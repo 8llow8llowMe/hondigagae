@@ -160,6 +160,9 @@ const PINNED_MAX = 10
 /** `AiPlanCreateRequest.petIds` 의 `@Size(max = 5)` 복제본 (#128) */
 const PET_MAX = 5
 
+/** `AiPlanCreateRequest.sigunguCode` 의 `@Size(max = 10)` 복제본 (#251) */
+const SIGUNGU_CODE_MAX = 10
+
 /** `POST /ai-plans` 는 `@Positive` 라 0 을 거부한다 — 일정 생성(`@PositiveOrZero`)과 다르다 */
 const NOTE_MAX = 500
 
@@ -200,12 +203,33 @@ function isStartDateInPast(startDate: string): boolean {
  * 그 시나리오로 간다** — 개발 중에 실패 화면과 일수 부족 화면을 의도적으로 열기 위한
  * 장치다. `local-run-guide.md` 에 적어 둔다.
  */
-function scenarioOf(requestNote: string | null): MockAiPlanJob['scenario'] {
+function scenarioOf(requestNote: string | null, candidateCount: number): MockAiPlanJob['scenario'] {
+  /*
+    **좁혀서 후보가 없으면 실패다** (#251). 백엔드는 지역 전체로 넓히지 않고 `AIPLAN_012`
+    로 워커를 실패시킨다 — "제주시만" 이라는 요청에 서귀포 장소를 섞으면 조건을 무시한
+    일정이 되고 그 사실이 응답에 드러나지도 않기 때문이다.
+
+    **제출 400 이 아니라 작업 실패다.** 후보 수집은 워커가 하므로 HTTP 200 + `status=FAILED`
+    로 온다 — mock 이 400 으로 막으면 화면이 그 경로를 잘못 배운다.
+  */
+  if (candidateCount === 0) return 'failed'
+
   const note = requestNote ?? ''
   if (note.includes('실패')) return 'failed'
   if (note.includes('일부')) return 'partial'
   if (note.includes('사라진')) return 'delisted'
   return 'normal'
+}
+
+/**
+ * 좁힌 시군구의 후보 장소 (#251). `null` 이면 전체다.
+ *
+ * **mock 의 서귀포시 장소가 한 곳뿐이라 좁히면 같은 곳이 반복된다.** 그것을 감추지
+ * 않는다 — 후보가 줄었다는 사실이 화면에 그대로 보이는 편이 낫다.
+ */
+function candidatesIn(sigunguCode: string | null) {
+  if (sigunguCode === null) return MOCK_PLACES
+  return MOCK_PLACES.filter((place) => place.sigunguCode === sigunguCode)
 }
 
 /**
@@ -537,6 +561,23 @@ function submit(memberId: string, body: string | null): MockResult {
     errors.push({ code: 'AIPLAN_106', field: 'budget', message: '예산은 0보다 커야 합니다.' })
   }
 
+  /*
+    `@Size(max = 10)` — `AIPLAN_115` (#251). **코드 목록으로 좁히지 않는다**: 백엔드도
+    길이만 본다. 원천에 폐지된 시군구 코드가 남아 있어 서버가 목록을 갖고 있지 않다.
+
+    **빈 문자열은 null 로 접는다.** 백엔드가 그렇게 하고(Feign 이 쿼리에서 빼도록),
+    그러지 않으면 "빈 시군구" 로 걸러져 후보가 0건이 된다.
+  */
+  const rawSigungu = typeof parsed.sigunguCode === 'string' ? parsed.sigunguCode.trim() : null
+  const sigunguCode = rawSigungu === null || rawSigungu === '' ? null : rawSigungu
+  if (sigunguCode !== null && sigunguCode.length > SIGUNGU_CODE_MAX) {
+    errors.push({
+      code: 'AIPLAN_115',
+      field: 'sigunguCode',
+      message: `시군구 코드는 ${SIGUNGU_CODE_MAX}자 이하만 가능합니다.`,
+    })
+  }
+
   const requestNote = typeof parsed.requestNote === 'string' ? parsed.requestNote : null
   if (requestNote !== null && requestNote.length > NOTE_MAX) {
     errors.push({
@@ -673,6 +714,8 @@ function submit(memberId: string, body: string | null): MockResult {
       job.startDate === startDate &&
       job.endDate === endDate &&
       job.budget === budget &&
+      // 좁힌 지역이 다르면 다른 조건이다 (#251) — 실제 멱등 키의 map 에도 들어 있다
+      job.sigunguCode === sigunguCode &&
       job.regeneratePlanId === regeneratePlanId &&
       job.regenerateDay === regenerateDay &&
       /*
@@ -689,9 +732,10 @@ function submit(memberId: string, body: string | null): MockResult {
   const job: MockAiPlanJob = {
     jobId: nextAiPlanJobId(store),
     memberId,
-    scenario: scenarioOf(requestNote),
+    scenario: scenarioOf(requestNote, candidatesIn(sigunguCode).length),
     petIds,
     areaCode,
+    sigunguCode,
     startDate,
     endDate,
     budget,
@@ -831,9 +875,15 @@ function draftFor(job: MockAiPlanJob): AiPlanDraft {
   // `partial` 시나리오는 마지막 하루를 비운다 — status 는 COMPLETED 다 (명세 S6)
   const made = job.scenario === 'partial' ? Math.max(1, total - 1) : total
 
+  /*
+    **좁힌 시군구 안에서만 고른다** (#251). 후보가 0건이면 이 함수에 닿지 않는다 —
+    그 잡은 제출 시점에 `failed` 시나리오가 되어 `AIPLAN_012` 로 실패한다.
+  */
+  const candidates = candidatesIn(job.sigunguCode)
+
   const days: AiPlanDayItem[] = Array.from({ length: made }, (_, index) => {
     const day = index + 1
-    const items = itemsFor(index, job.scenario === 'delisted' && index === 0)
+    const items = itemsFor(index, job.scenario === 'delisted' && index === 0, candidates)
     return {
       day,
       items: job.regenerateDay === day ? regeneratedDayItems() : items,
@@ -884,8 +934,13 @@ function regeneratedDayItems(): AiPlanScheduleItem[] {
   ]
 }
 
-function itemsFor(dayIndex: number, delisted: boolean): AiPlanScheduleItem[] {
-  const pick = (offset: number) => MOCK_PLACES[(dayIndex * 3 + offset) % MOCK_PLACES.length]
+function itemsFor(
+  dayIndex: number,
+  delisted: boolean,
+  /** 좁힌 시군구의 후보 (#251). 좁히지 않았으면 `MOCK_PLACES` 전체다 */
+  candidates: typeof MOCK_PLACES,
+): AiPlanScheduleItem[] {
+  const pick = (offset: number) => candidates[(dayIndex * 3 + offset) % candidates.length]
 
   const first = pick(0)
   const second = pick(1)

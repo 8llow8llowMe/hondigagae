@@ -14,9 +14,13 @@ import type { AiPlanRequestSnapshot } from '@/types/ai-plan'
  * 중인 작업일 때만 그렇고, 실패·취소된 작업은 진행 중이 아니므로 **새 `jobId` 가 나온다.**
  * 취소는 멱등 키를 함께 풀어 주므로(#250) 같은 조건이라도 취소된 잡을 되받지 않는다.
  *
- * **`preferFavorites`·`pinnedPlaceIds` 는 싣지 않는다.** 실패 화면이 원래 그랬고 이 훅은
- * 그 동작을 옮겨 온 것이다 — 바꾸려면 두 화면의 "같은 조건" 이 무엇을 뜻하는지 함께
- * 정하는 편이 낫다.
+ * **보관한 조건을 전부 싣는다** (#251). 실패 화면에서 옮겨 왔을 때는 `preferFavorites`·
+ * `pinnedPlaceIds` 를 빠뜨리고 있었는데, 그러면 버튼이 말하는 "같은 조건" 이 사실이
+ * 아니게 된다 — 꼭 넣으라고 고른 장소가 조용히 빠진 초안이 나온다. `sigunguCode` 를
+ * 더하면서 셋을 함께 맞췄다.
+ *
+ * 그 셋이 새고 있었던 이유는 `readAiPlanRequest` 가 저장된 값에서 옮기지 않아서였다
+ * (`request-store.ts` 의 `toSnapshot`). 거기가 원인이고 여기는 그 값을 쓰는 자리다.
  *
  * @returns `resubmit` 은 조건이 없으면 아무 일도 하지 않는다 — 호출부가 버튼을 감춘다
  */
@@ -29,13 +33,21 @@ export function useAiPlanResubmit(snapshot: AiPlanRequestSnapshot | null) {
 
     setRetrying(true)
     try {
+      const pinnedPlaceIds = (snapshot.pinnedPlaces ?? []).map((place) => place.placeId)
+
       const result = await submitAiPlan({
         areaCode: snapshot.areaCode,
         startDate: snapshot.startDate,
         endDate: snapshot.endDate,
         petIds: snapshot.pets.map((pet) => pet.petId),
+        // 생략 규칙은 `toAiPlanSubmitPayload` 와 같아야 한다 — 두 경로가 다른 본문을 내면 안 된다
+        ...(snapshot.sigunguCode === null || snapshot.sigunguCode === undefined
+          ? {}
+          : { sigunguCode: snapshot.sigunguCode }),
         ...(snapshot.budget === null ? {} : { budget: snapshot.budget }),
         ...(snapshot.requestNote === '' ? {} : { requestNote: snapshot.requestNote }),
+        ...(snapshot.preferFavorites === true ? { preferFavorites: true } : {}),
+        ...(pinnedPlaceIds.length === 0 ? {} : { pinnedPlaceIds }),
       })
 
       // 새 작업에도 같은 조건을 붙여 둔다 — 담기가 다시 필요하다

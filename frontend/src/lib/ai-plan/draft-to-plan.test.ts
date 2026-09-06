@@ -19,13 +19,15 @@ function draft(days: AiPlanDraft['days']): AiPlanDraft {
 
 function payload(
   days: AiPlanDraft['days'],
-  extra: { excludedPlaceIds?: Set<string>; totalDays?: number } = {},
+  extra: { excludedPlaceIds?: Set<string>; totalDays?: number; sigunguCode?: string } = {},
 ) {
+  const { sigunguCode, ...options } = extra
+
   return draftToPlanPayload({
     draft: draft(days),
-    snapshot,
+    snapshot: sigunguCode === undefined ? snapshot : { ...snapshot, sigunguCode },
     title: '몽실이와 제주 2박 3일',
-    ...extra,
+    ...options,
   })
 }
 
@@ -300,5 +302,23 @@ describe('draftToPlanPayload — 판정 기준 반려견 (#128 · 명세 D4)', (
     })
 
     expect('petId' in result).toBe(false)
+  })
+})
+
+describe('draftToPlanPayload — 고른 지역을 저장까지 옮긴다 (#251)', () => {
+  /*
+    옮기지 않으면 "제주시만" 으로 만든 일정이 담기는 순간 "지역 미지정" 이 된다.
+    계약(`PlanCreateRequest.sigunguCode`)에는 처음부터 있던 필드인데 화면이 싣지 않고 있었다.
+  */
+  it('스냅샷의 sigunguCode 를 실어 보낸다', () => {
+    const result = payload([{ day: 1, items: [item()] }], { sigunguCode: '4' })
+
+    expect(result.sigunguCode).toBe('4')
+  })
+
+  it('제주 전체였으면 키를 뺀다', () => {
+    const result = payload([{ day: 1, items: [item()] }])
+
+    expect('sigunguCode' in result).toBe(false)
   })
 })
