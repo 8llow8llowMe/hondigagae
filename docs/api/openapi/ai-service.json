@@ -24,7 +24,7 @@
           "AI 여행 플래너"
         ],
         "summary": "AI 여행 일정 생성 제출",
-        "description": "여행 조건과 반려견 정보를 받아 일정 생성 작업을 큐에 올리고 202와 함께 jobId를 반환합니다. 동일 사용자의 동일 요청이 진행 중이면 기존 jobId를 그대로 반환합니다(멱등). 생성된 일정은 제안(draft)이며, 확정 저장은 plan-service API로 수행합니다.",
+        "description": "여행 조건과 반려견 정보를 받아 일정 생성 작업을 큐에 올리고 202와 함께 jobId를 반환합니다. 동일 사용자의 동일 요청이 진행 중이면 기존 jobId를 그대로 반환합니다(멱등). 생성된 일정은 제안(draft)이며, 확정 저장은 plan-service API로 수행합니다.\n\n**필수: areaCode, startDate, endDate (JSON 바디).** 나머지는 전부 생략 가능합니다. 반려견을 지정하지 않으면 회원의 대표 반려견 기준으로 짜고, 예산·메모를 비우면 그 조건 없이 짭니다. 시작일은 오늘 또는 그 이후여야 하고 여행 기간은 최대 10일입니다. sigunguCode 를 주면 그 시군구(제주시=4 · 서귀포시=3) 안에서만 후보를 고릅니다 — 후보가 없으면 지역 전체로 넓히지 않고 AIPLAN_012 로 실패합니다. planId 와 regenerateDay 를 함께 주면 그 일차만 다시 짜는 하루 재생성이 됩니다(하나만 주면 AIPLAN_014).\n\n흐름\n1. `POST /api/v1/ai-plans` → 202 + jobId (상태 PENDING)\n2. `GET /api/v1/ai-plans/jobs/{jobId}` 를 폴링하거나 `GET /api/v1/ai-plans/jobs/{jobId}/stream` 을 구독합니다 (PENDING → RUNNING → COMPLETED/FAILED). RUNNING 중에는 step 으로 세부 진행을 그릴 수 있습니다\n3. status=COMPLETED 면 planDraft 를 화면에 보여 주고, 확정하려면 plan-service 저장 API 로 넘깁니다\n- 대기 중 그만두려면 `POST /api/v1/ai-plans/jobs/{jobId}/cancel`\n\n호출 예: `POST /api/v1/ai-plans` 바디 `{\"areaCode\":\"39\",\"startDate\":\"2026-09-11\",\"endDate\":\"2026-09-13\"}`",
         "operationId": "submitPlan",
         "requestBody": {
           "content": {
@@ -61,13 +61,13 @@
           "AI 여행 플래너"
         ],
         "summary": "반려견 여행 준비물 목록 생성",
-        "description": "저장된 일정을 근거로 반려견 여행 준비물 목록을 AI 로 생성합니다. 일정 항목·여행 기간의 기상청 예보·반려견 특성(체중·더위/추위 민감 등)이 근거로 쓰이며, 각 항목에 이 여행 데이터 기반의 이유가 붙습니다. 동기 API 라 LLM 응답까지 수십 초가 걸릴 수 있습니다. 결과는 저장되지 않는 제안입니다. 일정이 없거나 본인 소유가 아니면 AIPLAN_016 으로 응답합니다.",
+        "description": "저장된 일정을 근거로 반려견 여행 준비물 목록을 AI 로 생성합니다. 일정 항목·여행 기간의 기상청 예보·반려견 특성(체중·더위/추위 민감 등)이 근거로 쓰이며, 각 항목에 이 여행 데이터 기반의 이유가 붙습니다. 동기 API 라 LLM 응답까지 수십 초가 걸릴 수 있습니다. 결과는 저장되지 않는 제안입니다. 일정이 없거나 본인 소유가 아니면 AIPLAN_016 으로 응답합니다.\n\n**필수: planId(경로).** 요청 바디와 쿼리 파라미터는 없습니다. 반려견 특성(일정에 등록된 동행 반려견 전체)과 여행 기간 예보는 서버가 알아서 붙이며, 가져오지 못하면 그만큼 일반적인 목록이 됩니다.\n\n호출 예: `POST /api/v1/ai-plans/packing-list/{planId}` (바디 없음)",
         "operationId": "generatePackingList",
         "parameters": [
           {
             "name": "planId",
             "in": "path",
-            "description": "일정 아이디",
+            "description": "[필수] plan-service 에 저장된 일정 아이디. 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 plan-service 일정 목록·생성 응답의 planId 를 그대로 씁니다",
             "required": true,
             "schema": {
               "type": "integer",
@@ -95,19 +95,58 @@
         ]
       }
     },
+    "/api/v1/ai-plans/jobs/{jobId}/cancel": {
+      "post": {
+        "tags": [
+          "AI 여행 플래너"
+        ],
+        "summary": "AI 여행 일정 생성 작업 취소",
+        "description": "대기·생성 중인 작업을 취소합니다. 본인 작업만 취소할 수 있으며 타인의 jobId 는 404 입니다.\n\n**실행 중인 AI 호출을 즉시 끊지는 못합니다.** 상태를 CANCELED 로 못 박고, 워커가 단계 경계마다 그것을 확인해 멈춥니다. 그래서 취소의 실익은 **가장 오래 걸리는 일정 구성(DRAFTING) 에 들어가기 전에 서는 것**이고, 이미 들어간 뒤라면 돌아온 결과를 버립니다 — 어느 쪽이든 planDraft 는 내려가지 않습니다.\n\n취소하면 중복 방지 키도 함께 풀립니다. 같은 조건으로 바로 다시 제출할 수 있습니다.\n\n이미 취소된 작업을 또 취소하면 200 으로 같은 상태를 돌려줍니다(멱등). 이미 완료·실패한 작업은 **409 AIPLAN_019** 입니다 — 취소할 것이 없다는 뜻이니 화면은 결과를 보여 주면 됩니다.\n\n**필수: jobId(경로).** 바디와 쿼리 파라미터는 없습니다.\n\n호출 예: `POST /api/v1/ai-plans/jobs/8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00/cancel`",
+        "operationId": "cancelJob",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "description": "[필수] 작업 식별자(UUID). 제출 응답의 jobId 를 그대로 복사합니다",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseAiPlanJobStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/v1/ai-plans/jobs/{jobId}": {
       "get": {
         "tags": [
           "AI 여행 플래너"
         ],
         "summary": "AI 여행 일정 생성 작업 조회",
-        "description": "작업 상태와 결과를 조회합니다. 본인 작업만 조회할 수 있으며 타인의 jobId는 404로 응답합니다. 작업 실패는 200 OK + status=FAILED + errorCode/errorMessage 로 표현합니다.",
+        "description": "작업 상태와 결과를 조회합니다. 본인 작업만 조회할 수 있으며 타인의 jobId는 404로 응답합니다. 작업 실패는 200 OK + status=FAILED + errorCode/errorMessage 로 표현합니다.\n\n**필수: jobId(경로).** 쿼리 파라미터는 없습니다. status.code 는 PENDING 대기 중 · RUNNING 생성 중 · COMPLETED 완료 · FAILED 실패 · CANCELED 취소됨 이며, COMPLETED 일 때만 planDraft 가, FAILED 일 때만 errorCode/errorMessage 가 채워집니다. RUNNING 이면 `step`·`stepOrder`·`totalSteps` 로 세부 진행을 그릴 수 있습니다 — **PENDING 이면 step 이 null 이니 0/1 단계로 그리지 마세요.** 대기·실행 제한 시간(기본 30초·300초)을 넘긴 작업은 조회 시점에 FAILED(AIPLAN_006)로 바뀌고, 작업 기록은 보관 기간(기본 24시간)이 지나면 사라져 404 가 됩니다.\n\n호출 예: `GET /api/v1/ai-plans/jobs/8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00`",
         "operationId": "getJobStatus",
         "parameters": [
           {
             "name": "jobId",
             "in": "path",
-            "description": "작업 식별자",
+            "description": "[필수] 작업 식별자(UUID). 제출 응답의 jobId 를 그대로 복사합니다. 예시는 형식 안내용이며 실제 값은 제출 응답에서 복사합니다",
             "required": true,
             "schema": {
               "type": "string"
@@ -140,17 +179,18 @@
           "AI 여행 플래너"
         ],
         "summary": "일정 생성 작업 상태 스트리밍 (SSE)",
-        "description": "비동기 일정 생성 작업의 상태 변경을 Server-Sent Events 로 스트리밍합니다.\n이벤트 data 는 작업 상태 조회 응답의 dataBody 와 동일한 JSON 입니다. 본인이 제출한 작업만 구독할 수 있습니다.\n\n수신 주기: 이벤트는 주기적으로 오지 않고 상태가 바뀔 때만 전송됩니다.\n일반적으로 구독 즉시 현재 상태 스냅샷 1회 -> RUNNING 전이 1회 -> COMPLETED/FAILED 1회, 총 2~3회 수신 후\n서버가 연결을 종료합니다 (일정 생성은 로컬 LLM 기준 수십 초 소요).\n25초 간격 하트비트는 SSE 코멘트 프레임이라 onmessage 로 수신되지 않으며 클라이언트 처리가 필요 없습니다.\n\n브라우저 기본 EventSource 는 Authorization 헤더를 지원하지 않으므로\nfetch 기반 SSE 클라이언트(예: @microsoft/fetch-event-source)를 사용하세요.\n연결이 끊기면 GET /jobs/{jobId} 폴링으로 폴백하면 됩니다.",
+        "description": "비동기 일정 생성 작업의 상태 변경을 Server-Sent Events 로 스트리밍합니다.\n이벤트 data 는 작업 상태 조회 응답의 dataBody 와 동일한 JSON 입니다. 본인이 제출한 작업만 구독할 수 있습니다.\n\n수신 주기: 이벤트는 주기적으로 오지 않고 상태가 바뀔 때만 전송됩니다.\n일반적으로 구독 즉시 현재 상태 스냅샷 1회 -> RUNNING 전이 1회 -> COMPLETED/FAILED 1회, 총 2~3회 수신 후\n서버가 연결을 종료합니다 (일정 생성은 로컬 LLM 기준 수십 초 소요).\n25초 간격 하트비트는 SSE 코멘트 프레임이라 onmessage 로 수신되지 않으며 클라이언트 처리가 필요 없습니다.\n\n브라우저 기본 EventSource 는 Authorization 헤더를 지원하지 않으므로\nfetch 기반 SSE 클라이언트(예: @microsoft/fetch-event-source)를 사용하세요.\n연결이 끊기면 GET /jobs/{jobId} 폴링으로 폴백하면 됩니다.\n\n이벤트 이름은 `job-update` 하나입니다(클라이언트는 이 이름으로 리스너를 등록합니다).\n종료 조건: status.code 가 COMPLETED / FAILED / CANCELED 인 이벤트를 보낸 직후 서버가 연결을 닫습니다.\n취소는 별도 이벤트가 아니라 CANCELED 상태 이벤트로 옵니다 — 취소 버튼을 눌렀으면 이 이벤트로 화면을 정리하면 됩니다.\n구독 시점에 이미 종결 상태면 그 스냅샷 1회를 보내고 바로 닫습니다.\njobId 가 없거나 타인의 것이면 스트림이 열리기 전에 일반 JSON 오류(404, AIPLAN_002)로 응답합니다.\n\n**필수: jobId(경로).** 쿼리 파라미터는 없습니다.\n\n호출 예: `GET /api/v1/ai-plans/jobs/8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00/stream` (Accept: text/event-stream, Authorization: Bearer 토큰)",
         "operationId": "streamJobStatus",
         "parameters": [
           {
             "name": "jobId",
             "in": "path",
-            "description": "작업 식별자",
+            "description": "[필수] 작업 식별자(UUID). 제출 응답의 jobId 를 그대로 복사합니다. 예시는 형식 안내용이며 실제 값은 제출 응답에서 복사합니다",
             "required": true,
             "schema": {
               "type": "string"
-            }
+            },
+            "example": "8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00"
           }
         ],
         "responses": {
@@ -185,33 +225,44 @@
             "example": 39,
             "minLength": 1
           },
+          "sigunguCode": {
+            "type": "string",
+            "description": "관광 시군구코드 (TourAPI sigunguCode, 제주시=4 · 서귀포시=3). 생략 가능. 생략하면 지역 전체에서 후보를 고릅니다. 지정하면 그 시군구 안에서만 고르고, **후보가 없으면 지역 전체로 넓히지 않고 AIPLAN_012 로 실패합니다** — 조건을 무시한 일정보다 낫습니다",
+            "example": 4,
+            "maxLength": 10,
+            "minLength": 0
+          },
           "startDate": {
             "type": "string",
             "format": "date",
-            "description": "여행 시작일",
+            "description": "여행 시작일 (yyyy-MM-dd). 오늘 또는 그 이후여야 합니다",
             "example": "2026-09-11"
           },
           "endDate": {
             "type": "string",
             "format": "date",
-            "description": "여행 종료일",
+            "description": "여행 종료일 (yyyy-MM-dd). 시작일과 같거나 이후여야 하고, 기간은 최대 10일입니다",
             "example": "2026-09-13"
           },
           "budget": {
             "type": "integer",
             "format": "int64",
-            "description": "예산 (원 단위, 선택)",
+            "description": "예산 (원 단위, 0보다 큰 값). 생략 가능. 생략하면 예산 조건 없이 짭니다",
             "example": 400000
           },
           "petId": {
             "type": "integer",
             "format": "int64",
-            "description": "동반 반려견 식별자 (선택) — petIds 가 있으면 무시됩니다. 둘 다 없으면 대표 반려견이 쓰입니다.",
+            "description": "동반 반려견 식별자 한 마리. 생략 가능. petIds 가 있으면 무시되고, 둘 다 없으면 회원의 대표 반려견으로 짭니다",
             "example": 1234567890123456789
           },
           "petIds": {
             "type": "array",
-            "description": "동반 반려견 식별자 목록 (선택, 최대 5마리) — 여러 마리와 함께 여행할 때 씁니다.",
+            "description": "동반 반려견 식별자 목록 (최대 5마리). 생략 가능. 생략하면 petId 를, 그것도 없으면 대표 반려견을 씁니다. 중복은 한 마리로 접힙니다",
+            "example": [
+              1,
+              2
+            ],
             "items": {
               "type": "integer",
               "format": "int64"
@@ -221,7 +272,11 @@
           },
           "pinnedPlaceIds": {
             "type": "array",
-            "description": "꼭 넣고 싶은 장소 식별자 목록 (선택, 최대 10곳) — 일정에 반드시 배치됩니다.",
+            "description": "꼭 넣고 싶은 장소 식별자 목록 (최대 10곳). 생략 가능. 지정하면 일정에 반드시 배치되고, 없는 장소가 섞이면 작업이 AIPLAN_013 으로 실패합니다. 생략하면 후보 검색 결과만으로 짭니다",
+            "example": [
+              212481712381923328,
+              212481712381923329
+            ],
             "items": {
               "type": "integer",
               "format": "int64"
@@ -231,30 +286,31 @@
           },
           "requestNote": {
             "type": "string",
-            "description": "요청 메모 (선택) — 자연어 요구사항",
+            "description": "요청 메모 — 자연어 요구사항 (500자 이하). 생략 가능. 생략하면 메모 없이 짭니다",
             "example": "산책 위주로, 더위에 약한 아이라 실내 위주로 부탁해요",
             "maxLength": 500,
             "minLength": 0
           },
           "preferFavorites": {
             "type": "boolean",
-            "description": "즐겨찾기 우선 반영 (선택, 기본 false) — 찜한 장소를 후보에 합치고 조건이 맞으면 우선 배치합니다.",
+            "description": "즐겨찾기 우선 반영. 생략 가능. 생략하면 false 로 보고 찜한 장소를 따로 반영하지 않습니다. true 면 찜한 장소를 후보에 합치고 조건이 맞으면 우선 배치합니다",
             "example": true
           },
           "planId": {
             "type": "integer",
             "format": "int64",
-            "description": "하루 재생성 대상 일정 식별자 (선택) — regenerateDay 와 함께 지정합니다.",
+            "description": "하루 재생성 대상 일정 식별자. 생략 가능. regenerateDay 와 함께 줘야 하며(하나만 주면 AIPLAN_014), 둘 다 생략하면 새 일정 전체를 짭니다",
             "example": 1234567890123456789
           },
           "regenerateDay": {
             "type": "integer",
             "format": "int32",
-            "description": "다시 구성할 일차 (선택, 1부터) — 지정한 날만 새로 짜고 나머지 날은 기존 일정을 유지합니다.",
+            "description": "다시 구성할 일차 (1부터). 생략 가능. planId 와 함께 줘야 하며, 지정한 날만 새로 짜고 나머지 날은 기존 일정을 유지합니다. 여행 기간을 벗어나면 AIPLAN_015",
             "example": 2
           }
         },
         "required": [
+          "areaCode",
           "endDate",
           "startDate"
         ]
@@ -265,7 +321,7 @@
         "properties": {
           "submissionStatus": {
             "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
-            "description": "제출 상태 메타데이터",
+            "description": "제출 상태 메타데이터. code 는 ACCEPTED 작업 접수됨 하나다",
             "example": {
               "code": "ACCEPTED",
               "name": "작업 접수됨",
@@ -274,7 +330,7 @@
           },
           "jobId": {
             "type": "string",
-            "description": "작업 식별자",
+            "description": "작업 식별자 (UUID). 작업 상태 조회·SSE 스트림의 경로 변수 jobId 로 그대로 쓴다",
             "example": "8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00"
           }
         }
@@ -352,12 +408,12 @@
         "properties": {
           "planId": {
             "type": "string",
-            "description": "기준 일정 아이디",
+            "description": "기준 일정 아이디. 요청 경로의 planId 를 문자열로 돌려준다",
             "example": 1234567890123456789
           },
           "items": {
             "type": "array",
-            "description": "준비물 목록 (분류별)",
+            "description": "준비물 목록 (분류별). 항목마다 이 여행 데이터 기반의 이유가 붙는다",
             "items": {
               "$ref": "#/components/schemas/PackingListItem"
             }
@@ -365,7 +421,7 @@
           "totalCount": {
             "type": "integer",
             "format": "int32",
-            "description": "준비물 수",
+            "description": "준비물 수 (items 길이)",
             "example": 11
           }
         }
@@ -393,7 +449,7 @@
           },
           "items": {
             "type": "array",
-            "description": "해당 일차의 일정 항목 목록",
+            "description": "해당 일차의 일정 항목 목록 (시간 순서). 없으면 빈 배열",
             "items": {
               "$ref": "#/components/schemas/AiPlanScheduleItem"
             }
@@ -406,14 +462,14 @@
         "properties": {
           "days": {
             "type": "array",
-            "description": "일자별 일정 목록",
+            "description": "일자별 일정 목록. day 는 1부터 시작하며 여행 일수만큼 담긴다",
             "items": {
               "$ref": "#/components/schemas/AiPlanDayItem"
             }
           },
           "reasons": {
             "type": "array",
-            "description": "추천 이유 목록 (XAI)",
+            "description": "추천 이유 목록 (XAI). 일정 전체를 이렇게 짠 데이터 근거로, 없으면 빈 배열",
             "items": {
               "$ref": "#/components/schemas/AiPlanReasonItem"
             }
@@ -426,30 +482,47 @@
         "properties": {
           "jobId": {
             "type": "string",
-            "description": "작업 식별자",
+            "description": "작업 식별자 (UUID). 제출 응답의 jobId 와 같다",
             "example": "8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00"
           },
           "status": {
             "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
-            "description": "작업 상태 메타데이터",
+            "description": "작업 상태 메타데이터. code 는 PENDING 대기 중 · RUNNING 생성 중 · COMPLETED 완료 · FAILED 실패 · CANCELED 취소됨",
             "example": {
               "code": "COMPLETED",
               "name": "완료",
               "description": "여행 일정 생성이 완료되었습니다."
             }
           },
+          "step": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "지금 밟고 있는 세부 단계 metadata. code 는 CONDITIONS 조건 확인 · CANDIDATES 후보 장소 수집 · WEATHER 날씨 전망 반영 · DRAFTING 일정 구성. **PENDING 이면 null 이다** — 아직 시작하지 않았다는 뜻이라 0 이나 1 로 그리면 안 된다. 종결 상태에서는 마지막으로 밟은 단계가 남는다(실패 지점)"
+          },
+          "stepOrder": {
+            "type": "integer",
+            "format": "int32",
+            "description": "몇 번째 단계인지 (1부터). PENDING 이면 null",
+            "example": 3
+          },
+          "totalSteps": {
+            "type": "integer",
+            "format": "int32",
+            "description": "전체 단계 수. 화면의 \"n / m 단계\" 에서 m 이다. 단계가 늘면 이 값도 함께 늘어난다",
+            "example": 4
+          },
           "planDraft": {
             "$ref": "#/components/schemas/AiPlanDraftResponse",
-            "description": "생성된 일정 초안 (status=COMPLETED 일 때만 채워짐)"
+            "description": "생성된 일정 초안. status=COMPLETED 일 때만 채워지고 그 외에는 null"
           },
           "errorCode": {
             "type": "string",
-            "description": "실패 사유 코드 (status=FAILED 일 때만 채워짐)",
+            "description": "실패 사유 코드. status=FAILED 일 때만 채워지고 그 외에는 null",
             "example": "AIPLAN_005"
           },
           "errorMessage": {
             "type": "string",
-            "description": "실패 사유 메시지 (status=FAILED 일 때만 채워짐)"
+            "description": "실패 사유 메시지. status=FAILED 일 때만 채워지고 그 외에는 null",
+            "example": "AI 일정 생성 작업이 실패했습니다."
           }
         }
       },
@@ -459,17 +532,17 @@
         "properties": {
           "code": {
             "type": "string",
-            "description": "이유 코드",
+            "description": "이유 코드. PET_ALLOWED 반려견 동반 가능 · WEATHER_OK 날씨 양호 · LOW_CONGESTION 한산 · INDOOR_ALTERNATIVE 실내 대안 · SHORT_DISTANCE 짧은 이동 · REST_SLOT 휴식 시간 확보",
             "example": "PET_ALLOWED"
           },
           "name": {
             "type": "string",
-            "description": "이유 이름",
+            "description": "이유 이름 (화면 표시용 짧은 문구)",
             "example": "반려견 동반 가능"
           },
           "description": {
             "type": "string",
-            "description": "데이터 근거 설명",
+            "description": "데이터 근거 설명. 일반론이 아니라 이 여행의 데이터에 근거한 한두 문장",
             "example": "추천 장소는 모두 반려견 출입이 가능한 시설로만 구성했습니다."
           }
         }
@@ -480,12 +553,12 @@
         "properties": {
           "itemType": {
             "type": "string",
-            "description": "일정 항목 종류 코드 (PLACE/MEAL/LODGING/WALK/MOVE)",
-            "example": "WALK"
+            "description": "일정 항목 종류 코드 (plan-service PlanItemType 과 같은 코드). **초안에는 PLACE 장소 · MEAL 식사 · LODGING 숙박 · MOVE 이동 넷만 나옵니다** — `WALK` 는 targetId 가 walk_course.id 인데 AI 는 산책 코스 후보를 보지 않으므로 그 아이디를 알 수 없습니다. 산책 일정은 장소 항목으로 나오고 그 성격은 title·note 에 담깁니다",
+            "example": "PLACE"
           },
           "placeId": {
             "type": "string",
-            "description": "장소 아이디. plan-service 에 저장할 때 targetId 로 쓴다. 이동 항목이거나 검증된 장소가 아니면 null 이다",
+            "description": "장소 아이디 (숫자 문자열). plan-service 에 저장할 때 **targetId 로 그대로 쓰면 됩니다** — 초안의 itemType 은 모두 place.id 를 targetId 로 받는 유형이라 아이디 공간이 어긋나지 않습니다. 이동 항목이거나 검증된 장소가 아니면 null 이다",
             "example": 212481712381923328
           },
           "title": {
@@ -495,7 +568,7 @@
           },
           "note": {
             "type": "string",
-            "description": "참고 메모",
+            "description": "참고 메모. 이 항목을 넣은 이유나 주의점을 반려견 관점에서 한 문장으로 담는다",
             "example": "목줄 착용 필수"
           }
         }
