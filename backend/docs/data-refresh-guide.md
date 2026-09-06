@@ -112,7 +112,7 @@
 **로그·메트릭** (`observability-guide.md` 연계)
 
 ```
-place_import_rows{source="MFDS", result="inserted|updated|delisted|geocode_failed"}
+place_import_rows{source="MFDS", result="upserted|delisted|geocode_failed"}
 place_import_last_success_timestamp{source="MFDS"}
 ```
 
@@ -133,6 +133,7 @@ place_import_last_success_timestamp{source="MFDS"}
 3. 지오코딩 재사용 (`source_key`로 기존 좌표 조회)
 4. 병합을 독립 잡으로 분리
 5. 스케줄 등록 (cron 또는 scheduler 어댑터)
-6. 배치 메트릭 노출 + `last_success` 경보
+6. ~~배치 메트릭 노출~~ — 완료 (`observability-guide.md` 배치 지표 절).
+   `last_success` 경보 등록은 Prometheus rule 작업으로 남아 있다
 
 1~2 가 없으면 데이터가 한 방향으로만 늘어난다. 나머지보다 먼저 해야 한다.

@@ -3,6 +3,9 @@ package com.hondigagae.domainlayer.placeimport.application.service.processor;
 import com.hondigagae.domainlayer.placeimport.application.port.out.GeocodingPort;
 import com.hondigagae.domainlayer.placeimport.application.port.out.PetRestaurantCatalogPort;
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceBulkPort;
+import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceImportMetricsPort;
+import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceImportResultType;
+import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
 import com.hondigagae.domainlayer.placeimport.domain.model.Coordinate;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPetRestaurant;
 import java.util.ArrayList;
@@ -31,6 +34,7 @@ public class PetRestaurantImportProcessor {
     private final PetRestaurantCatalogPort petRestaurantCatalogPort;
     private final GeocodingPort geocodingPort;
     private final PlaceBulkPort placeBulkPort;
+    private final PlaceImportMetricsPort placeImportMetricsPort;
 
     public int importPetRestaurants(String region) {
         List<ImportedPetRestaurant> restaurants = petRestaurantCatalogPort.readPetRestaurants(region);
@@ -56,6 +60,8 @@ public class PetRestaurantImportProcessor {
             // 조용히 버리지 않는다. 몇 곳이 왜 빠졌는지 로그로 남겨야 원천 문제를 알아챈다.
             log.warn("mfds pet restaurant geocoding failed count={} names={}", unresolved.size(), unresolved);
         }
+        // 0 도 기록한다 — 마지막 실행 기준 게이지라, 지난 실행의 실패 건수가 남아 있으면 경보가 늦게 꺼진다
+        placeImportMetricsPort.recordRows(PlaceSourceType.MFDS, PlaceImportResultType.GEOCODE_FAILED, unresolved.size());
         if (located.isEmpty()) {
             return 0;
         }

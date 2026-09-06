@@ -27,6 +27,7 @@
 | `draft-forecast-quota-defense.md` | 미등록 | 구현 완료 | 예보 캐시 쿼터 방어 3종 |
 | `draft-excluded-from-conventions-refactor.md` | 미등록 | 후보 | 컨벤션 리팩토링에서 의도적으로 뺀 4건 |
 | `152-plan-multi-pet.md` | #152 | 구현 완료 | 담기 `petIds` + `plan_pet` + 아이별 날씨 판정 — 저장 구조·판정 축 판단 기록 |
+| `draft-batch-import-metrics.md` | 미등록 | 구현 완료 | 배치 적재 메트릭 — `place_import_rows` 게이지 + `last_success` 씨딩 |
 
 ### 사후 초안에 대해
 
