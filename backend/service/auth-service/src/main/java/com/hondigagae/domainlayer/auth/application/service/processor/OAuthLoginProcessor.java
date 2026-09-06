@@ -86,8 +86,10 @@ public class OAuthLoginProcessor {
             throw new AuthException(AuthErrorCode.OAUTH_EMAIL_REQUIRED);
         }
 
-        // 회원 식별의 기준이 이메일이므로, provider가 소유를 검증하지 않은 이메일은 신뢰하지 않는다.
-        if (!oAuthMember.emailVerified()) {
+        // provider 가 "미검증"이라고 명시한 이메일은 신뢰하지 않는다 (카카오의 is_email_verified=false).
+        // null(검증 여부 미상 — 네이버)은 로그인 자체는 허용하되, 기존 계정 자동 연결만
+        // resolveExistingMember 에서 차단한다 — 미상 이메일 연결은 계정 탈취 경로다.
+        if (Boolean.FALSE.equals(oAuthMember.emailVerified())) {
             throw new AuthException(AuthErrorCode.OAUTH_EMAIL_UNVERIFIED);
         }
 
@@ -119,9 +121,13 @@ public class OAuthLoginProcessor {
             } // 정상
         }
 
-        // 일반 계정이면 소셜 계정으로 연결한다.
-        // 검증된 이메일만 여기 도달하므로(validateRequiredProfile) 계정 탈취 경로가 아니다.
+        // 일반 계정이면 소셜 계정으로 연결한다 — 단, provider 가 이메일 소유를 검증한 경우에만.
+        // 검증 여부 미상(네이버)인 이메일로 연결하면 피해자 이메일을 연락처로 등록한 공격자가
+        // 비밀번호 없이 기존 계정을 가로챌 수 있다. 이때는 기존 방식 로그인으로 유도한다.
         if (existing.provider() == null) {
+            if (!Boolean.TRUE.equals(oAuthMember.emailVerified())) {
+                throw new AuthException(AuthErrorCode.OAUTH_LINK_REQUIRES_VERIFIED_EMAIL);
+            }
             log.info("[OAuthLoginProcessor] 일반 계정을 소셜 계정으로 연결: memberId={}, provider={}", existing.id(), provider);
             Member linked = memberRepositoryPort.save(existing.withProvider(provider));
             // 연결 사실을 메일로 통보한다 — 본인이 한 게 아니면 즉시 알아챌 수 있는 탈취 감지 수단.

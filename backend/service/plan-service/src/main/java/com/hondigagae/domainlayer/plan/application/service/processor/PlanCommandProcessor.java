@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 @Component
@@ -38,9 +39,15 @@ public class PlanCommandProcessor {
     private final PetConditionQueryPort petConditionQueryPort;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
 
-    public Plan createPlan(long memberId, PlanCreateCommand command) {
+    /**
+     * DB 쓰기 구간만 트랜잭션으로 묶는다. 반려견 확인({@link #resolvePetIds})과 장소 검증
+     * ({@link #verifyPlaceTargets})은 원격 호출이라 Facade 가 <b>이 메서드에 들어오기 전에</b>
+     * 수행한다 — 트랜잭션 안에서 원격 응답을 기다리면 DB 커넥션을 잡은 채 대기하게 된다
+     * (architecture-guide §3 의 문서화된 예외).
+     */
+    @Transactional
+    public Plan createPlan(long memberId, PlanCreateCommand command, List<Long> petIds) {
         validateDateRange(command.startDate(), command.endDate());
-        List<Long> petIds = resolvePetIds(memberId, command.petIds());
 
         Plan plan = Plan.builder()
             .id(snowflakeIdGenerator.generateId())
@@ -63,7 +70,6 @@ public class PlanCommandProcessor {
         if (!CollectionUtils.isEmpty(command.items())) {
             validateItemDays(saved, command.items());
             validateSequenceUniqueness(command.items());
-            verifyPlaceTargets(command.items());
             planItemRepositoryPort.saveAll(toItems(saved.id(), command.items()));
         }
         return saved;
@@ -73,9 +79,17 @@ public class PlanCommandProcessor {
      * 요청이 반려견을 지정하지 않았으면 <b>대표 반려견</b>으로 대신한다 — ai-service 의 생성과 같은
      * 규칙이다. 한 마리만 키우는 사용자가 담기마다 petId 를 고르게 하지 않기 위한 기본값이고,
      * 그것도 없으면 일정을 만들 수 없다 — petId 는 NOT NULL 이고 날씨 판정의 기준이기 때문이다.
+     *
+     * <p>지정된 petIds 는 <b>소유·존재를 auth-service 로 검증한다.</b> 검증 없이 저장하면 남의
+     * petId·없는 petId 가 그대로 plan.pet_id / plan_pet 에 남고, 이후 날씨 브리핑이 특성을 못 받아
+     * 그 일정만 영구히 일반 조건으로 조용히 강등된다. 원격 호출이므로 트랜잭션 밖(Facade)에서 부른다.
      */
-    private List<Long> resolvePetIds(long memberId, List<Long> requested) {
+    public List<Long> resolvePetIds(long memberId, List<Long> requested) {
         if (!CollectionUtils.isEmpty(requested)) {
+            Set<Long> ownedPetIds = petConditionQueryPort.findOwnedPetIds(memberId, requested);
+            if (!ownedPetIds.containsAll(requested)) {
+                throw new PlanException(PlanErrorCode.NOT_FOUND_PET);
+            }
             return requested;
         }
         return petConditionQueryPort.findRepresentativePetId(memberId)
@@ -83,6 +97,7 @@ public class PlanCommandProcessor {
             .orElseThrow(() -> new PlanException(PlanErrorCode.PET_REQUIRED));
     }
 
+    @Transactional
     public Plan updatePlan(Plan plan, PlanUpdateCommand command) {
         LocalDate startDate = command.startDate() != null ? command.startDate() : plan.startDate();
         LocalDate endDate = command.endDate() != null ? command.endDate() : plan.endDate();
@@ -115,7 +130,10 @@ public class PlanCommandProcessor {
 
     /**
      * 특정 일차의 항목을 일괄 교체한다. (삭제 후 재삽입)
+     *
+     * <p>장소 검증({@link #verifyPlaceTargets})은 원격 호출이라 Facade 가 트랜잭션 밖에서 먼저 한다.
      */
+    @Transactional
     public void replaceDayItems(Plan plan, int day, List<PlanItemCommand> commands) {
         if (!plan.containsDay(day)) {
             throw new PlanException(PlanErrorCode.PLAN_DAY_OUT_OF_RANGE);
@@ -133,7 +151,6 @@ public class PlanCommandProcessor {
             .toList();
 
         validateSequenceUniqueness(dayItems);
-        verifyPlaceTargets(dayItems);
         planItemRepositoryPort.deleteByPlanIdAndDay(plan.id(), day);
         planItemRepositoryPort.saveAll(toItems(plan.id(), dayItems));
     }
@@ -178,9 +195,12 @@ public class PlanCommandProcessor {
      *
      * <p>항목마다 따로 부르면 일정 하루(항목 8개 안팎) 저장에 HTTP 왕복이 8번 생긴다.
      * delisted 장소는 tour-service 가 목록에서 빼고 돌려주므로, 원천에서 사라진 장소를
-     * 새 항목이 참조하는 것도 여기서 함께 막힌다.
+     * 새 항목이 참조하는 것도 여기서 함께 막힌다. 원격 호출이므로 트랜잭션 밖(Facade)에서 부른다.
      */
-    private void verifyPlaceTargets(List<PlanItemCommand> commands) {
+    public void verifyPlaceTargets(List<PlanItemCommand> commands) {
+        if (CollectionUtils.isEmpty(commands)) {
+            return;
+        }
         Set<Long> targetIds = commands.stream()
             .filter(command -> command.itemType().isPlaceTarget() && command.targetId() != null)
             .map(PlanItemCommand::targetId)

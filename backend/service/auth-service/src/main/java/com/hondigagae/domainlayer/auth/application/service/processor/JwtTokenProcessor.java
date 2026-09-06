@@ -99,13 +99,19 @@ public class JwtTokenProcessor {
             .orElseThrow(() -> new MemberException(MemberErrorCode.NOT_FOUND_MEMBER));
         validateReissuableStatus(member);
 
-        // 4. Issue and rotate tokens — 새 sessionId 로 교체 회전한다. 같은 jti 를 유지하면
-        //    iat 가 초 단위라 같은 초 안에서 동일 토큰이 재생성되어 회전이 무력화되기 때문이다.
-        //    이전 세션 키는 즉시 삭제되어 회전 전 토큰의 재사용(탈취 재생)이 차단된다.
+        // 4. Rotate — 옛 세션 삭제는 "저장값 == 제시 토큰"일 때만 성공하는 원자 연산이다.
+        //    동시 재발급 두 건이 위의 비교(2)를 함께 통과해도 여기서는 한 건만 이기므로
+        //    세션이 증식하지 않고, 탈취 토큰의 동시 재생도 한 건만 성공한다.
+        //    진 쪽은 이미 회전된 토큰의 재사용과 같은 상태라 같은 코드로 거부한다.
+        if (!jwtTokenStorePort.deleteSessionIfTokenMatches(member.id(), claims.tokenId(), refreshToken)) {
+            throw new AuthException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        }
+
+        // 5. Issue — 새 sessionId 로 교체 회전한다. 같은 jti 를 유지하면 iat 가 초 단위라
+        //    같은 초 안에서 동일 토큰이 재생성되어 회전이 무력화되기 때문이다.
         String newSessionId = UUID.randomUUID().toString();
         String newAccessToken = jwtAuthProvider.issueAccessToken(member.id(), member.role());
         String newRefreshToken = jwtAuthProvider.issueRefreshToken(member.id(), newSessionId);
-        jwtTokenStorePort.deleteSession(member.id(), claims.tokenId());
         jwtTokenStorePort.save(member.id(), newSessionId, newRefreshToken);
 
         return JwtTokenReissueInfo.of(newAccessToken, newRefreshToken);

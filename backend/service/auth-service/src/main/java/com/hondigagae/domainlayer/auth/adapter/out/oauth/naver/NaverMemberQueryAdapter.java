@@ -47,8 +47,10 @@ public class NaverMemberQueryAdapter implements OAuthMemberQueryPort {
 
         return OAuthMemberQueryResult.builder()
             .email(account.email())
-            // 네이버는 검증 여부 플래그를 제공하지 않지만, 계정에 등록된 연락처 이메일이라 신뢰한다.
-            .emailVerified(StringUtils.hasText(account.email()))
+            // 네이버는 검증 여부 플래그를 제공하지 않는다 — 연락처 이메일은 소유 검증 없이 등록될 수
+            // 있으므로 "검증됨"으로 단정하면 안 된다(피해자 이메일을 등록한 뒤 소셜 로그인으로 기존
+            // 일반 계정을 탈취하는 경로가 열린다). null = 검증 여부 미상으로 넘긴다.
+            .emailVerified(null)
             .name(account.name())
             .nickname(account.nickname())
             .profileImageUrl(account.profileImage())

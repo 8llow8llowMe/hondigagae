@@ -11,7 +11,8 @@ public enum CongestionImportErrorCode {
     API_CALL_FAILED("CONGESTION_IMPORT_002", "집중률 예측 API 호출에 실패했습니다. (%s)"),
     RESPONSE_INVALID("CONGESTION_IMPORT_003", "집중률 예측 API 응답을 해석할 수 없습니다. (%s)"),
     // 서킷 오픈. 원천이 이미 죽어 있다는 뜻이므로 잡을 즉시 실패시킨다.
-    API_CIRCUIT_OPEN("CONGESTION_IMPORT_004", "집중률 예측 API 서킷이 열려 있어 호출을 건너뜁니다.");
+    API_CIRCUIT_OPEN("CONGESTION_IMPORT_004", "집중률 예측 API 서킷이 열려 있어 호출을 건너뜁니다."),
+    ALL_REGIONS_FAILED("CONGESTION_IMPORT_005", "모든 지역의 집중률 적재가 실패했습니다.");
 
     private final String code;
     private final String message;

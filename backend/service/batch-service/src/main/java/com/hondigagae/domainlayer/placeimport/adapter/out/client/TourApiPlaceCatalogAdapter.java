@@ -60,6 +60,9 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
 
         List<ImportedPlace> places = new ArrayList<>();
         for (JsonNode item : extractItems(body)) {
+            if (lacksContentId(item)) {
+                continue;
+            }
             places.add(toImportedPlace(item));
         }
         return new PlaceCatalogQueryResult(places, pageNo, numOfRows, body.path("totalCount").asInt(0));
@@ -95,9 +98,24 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
 
         List<ImportedPlace> places = new ArrayList<>();
         for (JsonNode item : extractItems(body)) {
+            if (lacksContentId(item)) {
+                continue;
+            }
             places.add(toImportedPlace(item));
         }
         return places;
+    }
+
+    /**
+     * contentid 없는 행은 적재하지 않는다 — asLong() 기본값 0 으로 흘리면 그런 행들이 전부
+     * id=0 / source_key="0" 한 행으로 수렴해 서로 덮어쓴다.
+     */
+    private boolean lacksContentId(JsonNode item) {
+        if (item.path("contentid").asLong(0) > 0) {
+            return false;
+        }
+        log.warn("tour api item skipped: contentid missing title={}", item.path("title").asText(""));
+        return true;
     }
 
     /** 키워드 검색. 백필 매칭은 상위 소수만 보면 되므로 한 페이지(10)로 자른다. */

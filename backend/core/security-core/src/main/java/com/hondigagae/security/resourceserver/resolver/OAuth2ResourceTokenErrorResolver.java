@@ -2,6 +2,7 @@ package com.hondigagae.security.resourceserver.resolver;
 
 import com.hondigagae.security.common.exception.SecurityErrorCode;
 import com.hondigagae.security.common.resolver.JwtTokenErrorResolver;
+import java.util.Locale;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 
 public class OAuth2ResourceTokenErrorResolver implements JwtTokenErrorResolver {
@@ -10,7 +11,9 @@ public class OAuth2ResourceTokenErrorResolver implements JwtTokenErrorResolver {
     public SecurityErrorCode resolve(Throwable ex) {
 
         if (ex instanceof OAuth2AuthenticationException oauth2Ex) {
-            String msg = oauth2Ex.getError().getDescription().toLowerCase();
+            // OAuth2Error.description 은 null 허용 필드다 — NPE 로 인증 오류가 500 이 되지 않게 비운다.
+            String description = oauth2Ex.getError().getDescription();
+            String msg = description == null ? "" : description.toLowerCase(Locale.ROOT);
 
             if (msg.contains("expired")) {
                 return SecurityErrorCode.TOKEN_EXPIRED;

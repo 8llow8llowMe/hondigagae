@@ -70,10 +70,16 @@ class PlanCommandProcessorTest {
             .build();
     }
 
+    /** Facade 와 같은 순서 — 반려견 확인(원격)은 트랜잭션 밖, 저장은 트랜잭션 안. */
+    private Plan createPlan(List<Long> petIds) {
+        PlanCreateCommand command = command(petIds);
+        return processor.createPlan(MEMBER_ID, command, processor.resolvePetIds(MEMBER_ID, command.petIds()));
+    }
+
     @Test
     @DisplayName("여러 마리를 지정하면 첫 번째가 대표 반려견이 되고, 전체는 조인 테이블에 순서대로 저장된다")
     void firstPetBecomesRepresentative() {
-        Plan saved = processor.createPlan(MEMBER_ID, command(List.of(2L, 5L, 9L)));
+        Plan saved = createPlan(List.of(2L, 5L, 9L));
 
         assertThat(saved.petId()).isEqualTo(2L);
         assertThat(planPetRepositoryPort.saved).extracting(PlanPet::petId).containsExactly(2L, 5L, 9L);
@@ -85,7 +91,7 @@ class PlanCommandProcessorTest {
     @Test
     @DisplayName("한 마리 지정도 조인 테이블에 남긴다 — 한 마리 일정과 여러 마리 일정을 같은 경로로 읽는다")
     void singlePetIsAlsoStoredInJoinTable() {
-        Plan saved = processor.createPlan(MEMBER_ID, command(List.of(2L)));
+        Plan saved = createPlan(List.of(2L));
 
         assertThat(saved.petId()).isEqualTo(2L);
         assertThat(planPetRepositoryPort.saved).extracting(PlanPet::petId).containsExactly(2L);
@@ -96,7 +102,7 @@ class PlanCommandProcessorTest {
     void fallsBackToRepresentativePet() {
         petConditionQueryPort.representativePetId = REPRESENTATIVE_PET_ID;
 
-        Plan saved = processor.createPlan(MEMBER_ID, command(List.of()));
+        Plan saved = createPlan(List.of());
 
         assertThat(saved.petId()).isEqualTo(REPRESENTATIVE_PET_ID);
         assertThat(planPetRepositoryPort.saved).extracting(PlanPet::petId).containsExactly(REPRESENTATIVE_PET_ID);
@@ -107,7 +113,7 @@ class PlanCommandProcessorTest {
     void rejectsWhenNoPetAtAll() {
         petConditionQueryPort.representativePetId = null;
 
-        assertThatThrownBy(() -> processor.createPlan(MEMBER_ID, command(List.of())))
+        assertThatThrownBy(() -> createPlan(List.of()))
             .isInstanceOf(PlanException.class)
             .extracting(exception -> ((PlanException) exception).getErrorCode())
             .isEqualTo(PlanErrorCode.PET_REQUIRED);
@@ -115,11 +121,24 @@ class PlanCommandProcessorTest {
     }
 
     @Test
-    @DisplayName("반려견을 지정했으면 대표 반려견을 묻지 않는다 — 담기마다 auth-service 를 왕복하지 않는다")
+    @DisplayName("반려견을 지정했으면 대표 반려견을 묻지 않는다 — 담기마다 대표 조회를 왕복하지 않는다")
     void doesNotAskRepresentativeWhenSpecified() {
-        processor.createPlan(MEMBER_ID, command(List.of(2L)));
+        createPlan(List.of(2L));
 
         assertThat(petConditionQueryPort.representativeCalls).isZero();
+    }
+
+    @Test
+    @DisplayName("본인 소유가 아닌 petId 가 섞이면 400 NOT_FOUND_PET — 남의 반려견이 plan_pet 에 남지 않는다")
+    void rejectsPetIdsNotOwnedByMember() {
+        petConditionQueryPort.ownedPetIds = Set.of(2L);
+
+        assertThatThrownBy(() -> createPlan(List.of(2L, 999L)))
+            .isInstanceOf(PlanException.class)
+            .extracting(exception -> ((PlanException) exception).getErrorCode())
+            .isEqualTo(PlanErrorCode.NOT_FOUND_PET);
+        assertThat(planRepositoryPort.saved).isNull();
+        assertThat(planPetRepositoryPort.saved).isEmpty();
     }
 
     // ── 스텁 ───────────────────────────────────────────────────────────────
@@ -170,6 +189,8 @@ class PlanCommandProcessorTest {
 
         private Long representativePetId;
         private int representativeCalls;
+        /** null 이면 요청 전부를 소유로 본다. */
+        private Set<Long> ownedPetIds;
 
         @Override
         public Map<Long, PetConditionQueryResult> findConditions(long memberId, List<Long> petIds) {
@@ -180,6 +201,11 @@ class PlanCommandProcessorTest {
         public Optional<Long> findRepresentativePetId(long memberId) {
             representativeCalls += 1;
             return Optional.ofNullable(representativePetId);
+        }
+
+        @Override
+        public Set<Long> findOwnedPetIds(long memberId, List<Long> petIds) {
+            return ownedPetIds != null ? ownedPetIds : new HashSet<>(petIds);
         }
     }
 

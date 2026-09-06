@@ -67,10 +67,8 @@ public class RedisEmailVerificationStoreAdapter implements EmailVerificationStor
         try {
             String key = buildKey("emailSendIp", clientIp);
             Long count = redisTemplate.opsForValue().increment(key);
-            if (count != null && count == 1L) {
-                // 첫 발송에서만 TTL 을 걸어 고정 윈도우를 만든다 (로그인 실패 카운터와 동일한 방식).
-                redisTemplate.expire(key, window);
-            }
+            // 첫 발송에서만 TTL 을 걸어 고정 윈도우를 만든다 (로그인 실패 카운터와 동일한 방식).
+            ensureCounterTtl(key, count, window);
             return count == null ? 0L : count;
         } catch (DataAccessException exception) {
             // fail-open: 발송 상한은 보조 방어라 저장소 장애로 발송 자체를 막지 않는다.
@@ -84,10 +82,24 @@ public class RedisEmailVerificationStoreAdapter implements EmailVerificationStor
     public long increaseVerifyFailureCount(String email, Duration ttl) {
         String key = buildFailKey(email);
         Long count = redisTemplate.opsForValue().increment(key);
+        ensureCounterTtl(key, count, ttl);
+        return count == null ? 0L : count;
+    }
+
+    /**
+     * INCR 와 EXPIRE 는 원자적이지 않다 — 첫 증가 직후 장애가 나면 TTL 없는 카운터가 영구히 남아
+     * 해당 키(IP 뒤의 모든 사용자 포함)가 수동 복구 전까지 차단된다. count==1 이 아니어도 TTL 이
+     * 없으면(과거 유실의 흔적) 다시 걸어 자가 치유한다.
+     */
+    private void ensureCounterTtl(String key, Long count, Duration ttl) {
         if (count != null && count == 1L) {
             redisTemplate.expire(key, ttl);
+            return;
         }
-        return count == null ? 0L : count;
+        Long remaining = redisTemplate.getExpire(key);
+        if (remaining != null && remaining < 0) {
+            redisTemplate.expire(key, ttl);
+        }
     }
 
     @Override

@@ -44,7 +44,7 @@ public class PetRestaurantImportFacade implements PetRestaurantImportUseCase {
         int imported = petRestaurantImportProcessor.importPetRestaurants(region);
         // 등록 철회가 실제로 일어나는 원천이다. 이번 파일에 없는 업소를 delist 해야
         // 폐업한 식당이 "동반 가능 확인됨"으로 남지 않는다.
-        int delisted = delistProcessor.delistPlaces(PlaceSourceType.MFDS, runStartedAt, imported);
+        int delisted = delistProcessor.delistPlaces(PlaceSourceType.MFDS, areaCode, runStartedAt, imported);
         placeMergeProcessor.mergeDuplicates(areaCode);
 
         // geocode_failed 는 건수가 태어나는 PetRestaurantImportProcessor 가 기록한다

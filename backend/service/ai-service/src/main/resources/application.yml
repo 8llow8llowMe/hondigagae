@@ -23,7 +23,8 @@ ai:
   plan:
     job:
       ttl-seconds: ${AI_PLAN_JOB_TTL_SECONDS:86400}
-      pending-timeout-seconds: ${AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS:30}
+      # 동시 실행 2 + 대기열 4(AsyncConfig) 기준 최악 대기 240초를 덮는 값. 세 값은 한 세트다.
+      pending-timeout-seconds: ${AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS:300}
       running-timeout-seconds: ${AI_PLAN_JOB_RUNNING_TIMEOUT_SECONDS:300}
 
 # LLM provider 설정 (Spring AI). on/off 스위치는 없다 - BossPickSeoul 과 같게 어댑터가 항상 뜬다.

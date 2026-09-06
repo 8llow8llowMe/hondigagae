@@ -95,7 +95,7 @@ public class AiPlanJobProcessor {
             log.error("AI plan worker dispatch failed jobId={} memberId={} errorCode={} reason={}",
                 newJobId, memberId, errorCode.getCode(), dispatchFailure.getMessage());
             aiPlanJobStorePort.save(pendingJob.failed(errorCode.getCode(), errorCode.getMessage(), Instant.now()));
-            aiPlanJobStorePort.releaseIdempotencyKey(memberId, requestHash);
+            aiPlanJobStorePort.releaseIdempotencyKey(memberId, requestHash, newJobId);
             aiPlanJobEventPort.publishJobUpdated(newJobId);
         }
 
@@ -153,7 +153,12 @@ public class AiPlanJobProcessor {
         }
 
         AiPlanJob canceled = aiPlanJobStorePort.save(job.canceled(Instant.now()));
-        aiPlanJobStorePort.releaseIdempotencyKey(job.memberId(), job.requestHash());
+        if (canceled.status() != AiPlanJobStatus.CANCELED) {
+            // 위 isCancelable 확인과 save 사이에 워커가 종결(완료/실패)했다 — 저장소가 종결을
+            // 덮지 않고 그 잡을 돌려준다. 순차 요청과 같은 계약(409)으로 알린다.
+            throw new AiPlanException(AiPlanErrorCode.JOB_NOT_CANCELABLE);
+        }
+        aiPlanJobStorePort.releaseIdempotencyKey(job.memberId(), job.requestHash(), job.jobId());
         aiPlanJobEventPort.publishJobUpdated(jobId);
         log.info("AI plan job canceled by member jobId={} memberId={} statusBefore={} step={}",
             jobId, memberId, job.status(), job.step());
@@ -178,11 +183,14 @@ public class AiPlanJobProcessor {
 
         log.warn("AI plan job timed out jobId={} status={} createdAt={} startedAt={}",
             job.jobId(), job.status(), job.createdAt(), job.startedAt());
-        AiPlanJob expired = job.failed(
+        AiPlanJob expired = aiPlanJobStorePort.save(job.failed(
             AiPlanErrorCode.JOB_TIMEOUT.getCode(), AiPlanErrorCode.JOB_TIMEOUT.getMessage(), now
-        );
-        aiPlanJobStorePort.save(expired);
-        aiPlanJobStorePort.releaseIdempotencyKey(job.memberId(), job.requestHash());
+        ));
+        if (expired.status() != AiPlanJobStatus.FAILED) {
+            // 판정과 save 사이에 워커가 종결(완료/취소)했다 — 그 결과가 정답이다.
+            return expired;
+        }
+        aiPlanJobStorePort.releaseIdempotencyKey(job.memberId(), job.requestHash(), job.jobId());
         aiPlanJobEventPort.publishJobUpdated(job.jobId());
         return expired;
     }

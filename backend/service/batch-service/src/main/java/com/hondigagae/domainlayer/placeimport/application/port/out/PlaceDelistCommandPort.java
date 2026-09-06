@@ -11,15 +11,17 @@ import java.time.LocalDateTime;
  */
 public interface PlaceDelistCommandPort {
 
-    /** 해당 원천의 활성(비 delisted) 행 수. 급감 가드의 분모다. */
-    long countActive(String source);
+    /** 해당 원천·지역의 활성(비 delisted) 행 수. 급감 가드의 분모다. */
+    long countActive(String source, String areaCode);
 
     /**
-     * 이번 실행이 건드리지 않은 행을 delist 한다.
+     * 이번 실행이 건드리지 않은 행을 delist 한다. <b>범위는 적재 범위와 같아야 한다</b> —
+     * 적재는 지역 단위인데 delist 가 source 전체면, 다른 지역 실행이 기존 지역을 통째로 내린다.
      *
      * @param source       원천 (TOUR_API / CULTURE_PORTAL / MFDS)
+     * @param areaCode     이번 실행이 적재한 관광 지역코드
      * @param runStartedAt 이번 실행 시작 시각. synced_at 이 이보다 앞서면 이번 원천에 없던 행이다
      * @return delist 된 행 수
      */
-    int delistStale(String source, LocalDateTime runStartedAt);
+    int delistStale(String source, String areaCode, LocalDateTime runStartedAt);
 }

@@ -21,6 +21,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 /**
@@ -42,6 +43,21 @@ public class RedisJwtTokenStoreAdapter implements JwtTokenStorePort, AccessToken
 
     private static final String BLACKLIST_VALUE = "logout";
 
+    /**
+     * 회전 전용 compare-and-delete. GET/비교/DEL 을 클라이언트에서 나눠 하면 그 사이에 다른
+     * 재발급이 끼어들 수 있어 Lua 로 원자화한다. KEYS[1]=refresh 키, KEYS[2]=세션 인덱스,
+     * ARGV[1]=기대 토큰, ARGV[2]=sessionId.
+     */
+    private static final DefaultRedisScript<Long> DELETE_IF_TOKEN_MATCHES = new DefaultRedisScript<>(
+        """
+        if redis.call('GET', KEYS[1]) == ARGV[1] then
+          redis.call('DEL', KEYS[1])
+          redis.call('ZREM', KEYS[2], ARGV[2])
+          return 1
+        end
+        return 0
+        """, Long.class);
+
     private final RedisTemplate<String, String> redisTemplate;
     private final JwtAuthProperties jwtAuthProperties;
     private final RedisProperties redisProperties;
@@ -51,22 +67,22 @@ public class RedisJwtTokenStoreAdapter implements JwtTokenStorePort, AccessToken
     @Value("${jwt.blacklist-fail-open:false}")
     private boolean blacklistFailOpen;
 
+    /**
+     * 저장 실패를 삼키지 않는다 — 삼키면 로그인은 200 인데 세션이 Redis 에 없어, 첫 재발급에서
+     * 원인 불명의 강제 재로그인이 된다. 실패가 로그인 실패(5xx)로 드러나야 사용자와 운영자가
+     * 원인을 볼 수 있다 (이메일 인증코드 어댑터와 같은 정책).
+     */
     @Override
     public void save(long memberId, String sessionId, String refreshToken) {
-        try {
-            Duration ttl = jwtAuthProperties.refreshExpiration();
-            redisTemplate.opsForValue().set(buildRefreshKey(memberId, sessionId), refreshToken, ttl);
+        Duration ttl = jwtAuthProperties.refreshExpiration();
+        redisTemplate.opsForValue().set(buildRefreshKey(memberId, sessionId), refreshToken, ttl);
 
-            // 세션 인덱스 갱신 — score 를 현재 시각으로 올려 "가장 오래 갱신되지 않은" 순서를 유지한다.
-            String sessionsKey = buildSessionsKey(memberId);
-            redisTemplate.opsForZSet().add(sessionsKey, sessionId, System.currentTimeMillis());
-            redisTemplate.expire(sessionsKey, ttl);
+        // 세션 인덱스 갱신 — score 를 현재 시각으로 올려 "가장 오래 갱신되지 않은" 순서를 유지한다.
+        String sessionsKey = buildSessionsKey(memberId);
+        redisTemplate.opsForZSet().add(sessionsKey, sessionId, System.currentTimeMillis());
+        redisTemplate.expire(sessionsKey, ttl);
 
-            evictOldestSessionsOverLimit(memberId, sessionsKey);
-        } catch (RedisConnectionFailureException e) {
-            log.error("[RedisJwtTokenStoreAdapter] RefreshToken 저장 실패: memberId={}, error={}",
-                memberId, e.getMessage());
-        }
+        evictOldestSessionsOverLimit(memberId, sessionsKey);
     }
 
     @Override
@@ -117,6 +133,15 @@ public class RedisJwtTokenStoreAdapter implements JwtTokenStorePort, AccessToken
     public void deleteSession(long memberId, String sessionId) {
         redisTemplate.delete(buildRefreshKey(memberId, sessionId));
         redisTemplate.opsForZSet().remove(buildSessionsKey(memberId), sessionId);
+    }
+
+    @Override
+    public boolean deleteSessionIfTokenMatches(long memberId, String sessionId, String expectedToken) {
+        Long deleted = redisTemplate.execute(
+            DELETE_IF_TOKEN_MATCHES,
+            List.of(buildRefreshKey(memberId, sessionId), buildSessionsKey(memberId)),
+            expectedToken, sessionId);
+        return deleted != null && deleted == 1L;
     }
 
     @Override

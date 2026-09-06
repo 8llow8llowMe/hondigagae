@@ -27,7 +27,8 @@ public enum PlaceImportErrorCode {
     TOUR_API_CIRCUIT_OPEN("PLACE_IMPORT_012", "TourAPI 서킷이 열려 있어 호출을 건너뜁니다."),
     GEOCODING_CIRCUIT_OPEN("PLACE_IMPORT_013", "VWorld 지오코더 서킷이 열려 있어 호출을 건너뜁니다."),
     MFDS_CIRCUIT_OPEN("PLACE_IMPORT_014", "식약처 파일 서버 서킷이 열려 있어 내려받기를 건너뜁니다."),
-    REGION_NOT_SUPPORTED("PLACE_IMPORT_015", "관광 지역코드로 옮길 수 없는 지역입니다. (%s)");
+    REGION_NOT_SUPPORTED("PLACE_IMPORT_015", "관광 지역코드로 옮길 수 없는 지역입니다. (%s)"),
+    INTRO_JSON_SERIALIZE_FAILED("PLACE_IMPORT_016", "place_intro raw_json 직렬화에 실패했습니다. (sourceKey=%s)");
 
     private final String code;
     private final String message;

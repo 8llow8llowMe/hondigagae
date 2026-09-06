@@ -44,7 +44,7 @@ public class CultureFacilityImportFacade implements CultureFacilityImportUseCase
 
         LocalDateTime runStartedAt = LocalDateTime.now();
         int imported = cultureFacilityImportProcessor.importFacilities(sido);
-        int delisted = delistProcessor.delistPlaces(PlaceSourceType.CULTURE_PORTAL, runStartedAt, imported);
+        int delisted = delistProcessor.delistPlaces(PlaceSourceType.CULTURE_PORTAL, areaCode, runStartedAt, imported);
         placeMergeProcessor.mergeDuplicates(areaCode);
         // 같은 파일에 동물병원·동물약국이 함께 들어 있어 한 번 읽는 김에 같이 적재한다.
         int facilities = emergencyFacilityImportProcessor.importFacilities(sido);

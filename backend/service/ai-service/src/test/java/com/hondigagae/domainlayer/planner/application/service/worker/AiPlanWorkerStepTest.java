@@ -114,6 +114,21 @@ class AiPlanWorkerStepTest {
     }
 
     @Test
+    @DisplayName("생성 도중 타임아웃 판정(FAILED)된 잡을 완료로 되살리지 않는다")
+    void doesNotResurrectTimedOutJobWithDraft() {
+        // 폴링 쪽 expireIfStuck 이 RUNNING 타임아웃으로 FAILED 를 박고 멱등 키를 풀었을 수 있다.
+        // 그 위에 COMPLETED 를 덮으면 사용자가 이미 재제출한 동일 요청과 결과가 둘이 된다.
+        FakeJobStore store = new FakeJobStore(pendingJob(null));
+        RecordingLlm llm = new RecordingLlm();
+        llm.onCall = () -> store.forceStatus(AiPlanJobStatus.FAILED);
+
+        worker(store, new FakeJobEvents(), llm).runJob(JOB_ID);
+
+        assertThat(store.current().status()).isEqualTo(AiPlanJobStatus.FAILED);
+        assertThat(store.current().planDraft()).isNull();
+    }
+
+    @Test
     @DisplayName("시군구를 지정하면 후보 조회에 그대로 넘긴다")
     void passesSigunguCodeToCandidateLookup() {
         FakeJobStore store = new FakeJobStore(pendingJob("4"));
@@ -191,7 +206,11 @@ class AiPlanWorkerStepTest {
         }
 
         private void forceStatus(AiPlanJobStatus status) {
-            job = status == AiPlanJobStatus.CANCELED ? job.canceled(Instant.now()) : job;
+            if (status == AiPlanJobStatus.CANCELED) {
+                job = job.canceled(Instant.now());
+            } else if (status == AiPlanJobStatus.FAILED) {
+                job = job.failed("AIPLAN_006", "timeout", Instant.now());
+            }
         }
 
         @Override
@@ -212,6 +231,11 @@ class AiPlanWorkerStepTest {
 
         @Override
         public AiPlanJob save(AiPlanJob saving) {
+            // 포트 계약과 같게, 종결로 저장된 잡은 덮지 않고 저장소의 잡을 돌려준다 —
+            // "취소·타임아웃된 잡을 결과로 되살리지 않는다" 가 이 계약 위에 서 있다.
+            if (job.status().isTerminal()) {
+                return job;
+            }
             if (saving.step() != null && !Objects.equals(saving.step(), job.step())) {
                 observedSteps.add(saving.step());
             }
@@ -225,7 +249,7 @@ class AiPlanWorkerStepTest {
         }
 
         @Override
-        public void releaseIdempotencyKey(Long memberId, String requestHash) {
+        public void releaseIdempotencyKey(Long memberId, String requestHash, String jobId) {
             // 워커가 finally 에서 항상 부른다. 이 테스트의 관심사는 아니다.
         }
 

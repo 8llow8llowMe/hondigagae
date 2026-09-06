@@ -44,11 +44,11 @@ public class PetRestaurantImportProcessor {
         }
 
         List<ImportedPetRestaurant> located = new ArrayList<>(restaurants.size());
-        List<String> unresolved = new ArrayList<>();
+        List<ImportedPetRestaurant> unresolved = new ArrayList<>();
         for (ImportedPetRestaurant restaurant : restaurants) {
             Optional<Coordinate> coordinate = geocodingPort.geocode(restaurant.address());
             if (coordinate.isEmpty()) {
-                unresolved.add(restaurant.name());
+                unresolved.add(restaurant);
                 continue;
             }
             located.add(restaurant
@@ -58,7 +58,12 @@ public class PetRestaurantImportProcessor {
 
         if (!unresolved.isEmpty()) {
             // 조용히 버리지 않는다. 몇 곳이 왜 빠졌는지 로그로 남겨야 원천 문제를 알아챈다.
-            log.warn("mfds pet restaurant geocoding failed count={} names={}", unresolved.size(), unresolved);
+            log.warn("mfds pet restaurant geocoding failed count={} names={}",
+                unresolved.size(), unresolved.stream().map(ImportedPetRestaurant::name).toList());
+            // 실패 업소도 이번 원천 파일에는 존재한다. synced_at 을 만져 두지 않으면 delistStale 이
+            // 좌표 실패(서킷 오픈 포함)를 폐업으로 판정해 멀쩡한 업소를 내린다.
+            placeBulkPort.touchPetRestaurantsSyncedAt(
+                unresolved.stream().map(ImportedPetRestaurant::sourceKey).toList());
         }
         // 0 도 기록한다 — 마지막 실행 기준 게이지라, 지난 실행의 실패 건수가 남아 있으면 경보가 늦게 꺼진다
         placeImportMetricsPort.recordRows(PlaceSourceType.MFDS, PlaceImportResultType.GEOCODE_FAILED, unresolved.size());

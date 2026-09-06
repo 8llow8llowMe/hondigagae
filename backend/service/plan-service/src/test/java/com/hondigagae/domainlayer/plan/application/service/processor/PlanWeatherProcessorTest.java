@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -179,6 +180,11 @@ class PlanWeatherProcessorTest {
 
         @Override
         public Optional<Long> findRepresentativePetId(long memberId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Set<Long> findOwnedPetIds(long memberId, List<Long> petIds) {
             throw new UnsupportedOperationException();
         }
     }

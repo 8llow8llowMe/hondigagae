@@ -251,6 +251,11 @@ class PlanPeriodShrinkTest {
         public Optional<Long> findRepresentativePetId(long memberId) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public Set<Long> findOwnedPetIds(long memberId, List<Long> petIds) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static class StubPlaceVerifyQueryPort implements PlaceVerifyQueryPort {

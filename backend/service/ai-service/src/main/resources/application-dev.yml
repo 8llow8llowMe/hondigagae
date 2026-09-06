@@ -42,3 +42,6 @@ feign-client:
   target-services:
     tour-service: ${TOUR_SERVICE_APP_NAME}
     plan-service: ${PLAN_SERVICE_APP_NAME}
+    # 없으면 PetConditionClient 가 리터럴 "auth-service" 로 폴백해 dev/prod 등록명
+    # (접미사 포함)을 못 찾고, 어댑터가 실패를 관용 처리해 반려견 특성이 조용히 통째로 빠진다.
+    auth-service: ${AUTH_SERVICE_APP_NAME}

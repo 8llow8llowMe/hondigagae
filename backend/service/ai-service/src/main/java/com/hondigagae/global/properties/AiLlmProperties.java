@@ -71,5 +71,10 @@ public record AiLlmProperties(
         if (placeCandidateSize == null || placeCandidateSize <= 0) {
             placeCandidateSize = 50;
         }
+        // tour-service 후보 조회 계약의 상한(PlaceWebController size @Max(50)). 넘겨 설정하면
+        // 후보 조회가 400 으로 거절돼 모든 일정 생성 잡이 실패하므로 여기서 접는다.
+        if (placeCandidateSize > 50) {
+            placeCandidateSize = 50;
+        }
     }
 }

@@ -50,3 +50,6 @@ feign-client:
   target-services:
     tour-service: ${TOUR_SERVICE_APP_NAME}
     plan-service: ${PLAN_SERVICE_APP_NAME}
+    # dev 와 같다. 없으면 PetConditionClient 가 리터럴 "auth-service" 로 폴백해
+    # auth-service-prod 를 못 찾고, 반려견 특성이 조용히 통째로 빠진다.
+    auth-service: ${AUTH_SERVICE_APP_NAME}
