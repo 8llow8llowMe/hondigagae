@@ -207,19 +207,29 @@ function NoForecast({
  * **가로 스크롤 한 줄이다.** 세로 목록으로 두면 8시간이 화면을 다 먹고, 곡선의 요점인
  * "언제부터 괜찮아지는가" 가 한눈에 안 들어온다.
  *
- * 셀마다 **시각 · 막대 · 노면온도** 셋을 함께 둔다. 막대만 두면 색이 유일한 정보가 되고,
- * 노면온도가 이 판정의 실제 근거라 그것을 숫자로 보여야 사용자가 판단을 검증할 수 있다.
+ * 셀마다 **시각 · 기온 · 막대 · 노면온도** 넷을 함께 둔다 (#269). 막대만 두면 색이 유일한
+ * 정보가 되고, 두 온도가 이 판정의 실제 근거라 숫자로 보여야 사용자가 판단을 검증할 수 있다.
+ *
+ * **범례를 곡선 바로 아래 둔다.** 셀 안에는 라벨을 적을 자리가 없어 위치가 둘을 가르는데,
+ * 그 위치가 무엇인지는 낱말이 말해야 한다. 섹션 맨 아래 캡션(`goldenPavementNote`)으로는
+ * 부족했다 — 곡선과 캡션 사이에 다른 줄이 끼어 숫자와 이어 읽히지 않는다.
  */
 function HourlyCurve({ hourly }: { hourly: HourlyWalkSafetyItem[] }) {
   // 판정 자리의 `NoForecast` 가 이미 말했다 — 같은 문장을 두 번 두지 않는다 (#204)
   if (hourly.length === 0) return null
 
   return (
-    <ul className="-mx-4 flex gap-1.5 overflow-x-auto px-4 md:-mx-6 md:px-6">
-      {hourly.map((hour) => (
-        <HourCell key={hour.at} hour={hour} />
-      ))}
-    </ul>
+    <div className="flex flex-col gap-1">
+      <ul className="-mx-4 flex gap-1.5 overflow-x-auto px-4 md:-mx-6 md:px-6">
+        {hourly.map((hour) => (
+          <HourCell key={hour.at} hour={hour} />
+        ))}
+      </ul>
+      {/* 셀의 sr-only 라벨과 같은 사실을 눈으로도 말한다 — 자리만으로 전달하지 않는다 */}
+      <p aria-hidden className="text-caption text-fg-muted font-medium">
+        {messages.home.goldenCurveLegend}
+      </p>
+    </div>
   )
 }
 
@@ -235,8 +245,26 @@ const BAR_TONE: Record<string, string> = {
   unknown: 'bg-metric-unknown-500',
 }
 
+/**
+ * 한 시각 — **시각 · 기온 · 막대 · 노면온도** ([#269](https://github.com/8llow8llowMe/hondigagae/issues/269)).
+ *
+ * **예전에는 숫자가 하나뿐이었다.** 노면온도만 찍혀 있어 사용자가 그것을 기온으로 읽었다 —
+ * 기온 29℃ 인 날 `56.0℃` 를 보고 "온도가 잘못된 것 같다" 는 제보가 실제로 왔다. 값도
+ * 계산도 정상이었고, **그 값이 무엇인지가 전달되지 않은 것**이다. `temperature` 는 응답에
+ * 이미 있었는데 화면이 버리고 있었다.
+ *
+ * 둘을 나란히 두면 **"기온은 괜찮은데 지면이 뜨겁다"** 는 이 서비스의 요점이 그대로 간다.
+ *
+ * **막대가 둘을 가른다.** 3rem 폭에 `기온 29℃` 는 들어가지 않고 줄을 나누면 여섯 줄짜리
+ * 셀이 되어 가로 한 줄이라는 이 곡선의 성격이 사라진다. 그래서
+ *  - **눈으로는** 위치(막대 위=기온, 아래=노면) + 진하기, 그리고 곡선 바로 아래 범례
+ *  - **보조기기에는** 낱말(`기온` · `추정 노면(아스팔트) 온도`)
+ *
+ * 자리와 색만으로 전달하지 않는다 (DESIGN.md §2-3) — 두 채널이 같은 사실을 말한다.
+ */
 function HourCell({ hour }: { hour: HourlyWalkSafetyItem }) {
   const tone = walkSafetyTone(hour.walkSafetyLevel.code)
+  const temperature = formatCelsius(hour.temperature)
   const pavement = formatCelsius(hour.estimatedPavementCelsius)
 
   return (
@@ -244,6 +272,17 @@ function HourCell({ hour }: { hour: HourlyWalkSafetyItem }) {
       <span className="text-caption text-fg-muted font-medium tabular-nums">
         {hourOnly(hour.at)}
       </span>
+
+      {/*
+        **기온이 노면보다 진하다.** 사람이 외출을 정할 때 실제로 보는 값이 이쪽이고,
+        노면은 그 판단을 뒤집는 근거다 — 등급 색은 막대가 이미 말하므로 여기에 톤을 주지
+        않는다 (판정을 말하는 자리가 둘이 되면 무엇이 판정인지 흐려진다).
+      */}
+      <span className="text-caption text-fg font-medium tabular-nums">
+        <span className="sr-only">{messages.home.temperatureLabel} </span>
+        {temperature === null ? '—' : `${temperature}℃`}
+      </span>
+
       {/*
         등급 이름을 화면에서 지우지 않는다 — 막대는 색뿐이라 스크린리더에 아무 말도 하지
         못한다. 시각적으로는 숫자가 대신하므로 이름은 보조기기 전용으로 둔다.
@@ -251,7 +290,9 @@ function HourCell({ hour }: { hour: HourlyWalkSafetyItem }) {
       <span className={cn('h-8 w-2 rounded-full', BAR_TONE[tone])}>
         <span className="sr-only">{hour.walkSafetyLevel.name}</span>
       </span>
+
       <span className="text-caption text-fg-muted font-medium tabular-nums">
+        <span className="sr-only">{messages.home.pavementLabel} </span>
         {pavement === null ? '—' : `${pavement}℃`}
       </span>
     </li>

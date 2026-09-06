@@ -180,8 +180,14 @@ export const placeMessages = {
    * '지금' 은 위의 `지금 산책` 제목과 아래 `{time} 기준` 각주가 이미 말한다.
    */
   detailHeatIndex: '체감온도',
-  /** **추정치다.** 실측 노면 온도가 아니라는 것을 라벨이 말한다 */
-  detailPavement: '추정 노면 온도',
+  /**
+   * **추정치다.** 실측 노면 온도가 아니라는 것을 라벨이 말한다.
+   *
+   * **`(아스팔트)` 를 넣는다** ([#269](https://github.com/8llow8llowMe/hondigagae/issues/269)).
+   * "노면" 만으로는 흙길·잔디도 떠올리게 되는데 추정식은 아스팔트 기준이다. 홈 곡선과
+   * 같은 값이므로 두 화면이 같은 낱말로 부른다 (`home.pavementLabel`).
+   */
+  detailPavement: '추정 노면(아스팔트) 온도',
 
   /**
    * `{time}` 치환. **적합도의 `detailSuitabilityBasis` 와 문구가 다르다** — 저쪽은
