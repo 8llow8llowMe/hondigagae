@@ -360,28 +360,82 @@ const COVERAGE = {
   },
 } as const
 
+/** 서버 `GoldenWindowStatus` 의 metadata 를 그대로 옮긴다 (#270) */
+const GOLDEN_STATUS = {
+  AVAILABLE: {
+    code: 'AVAILABLE',
+    name: '추천 구간 있음',
+    description: '오늘 남은 시간 중 산책하기 좋은 구간이 있습니다.',
+  },
+  SUPPRESSED_BY_WARNING: {
+    code: 'SUPPRESSED_BY_WARNING',
+    name: '특보로 추천 보류',
+    description:
+      '기상특보 경보가 발효 중이라 시간대가 좋아도 추천하지 않습니다. 시간대 곡선은 근거로 그대로 제공됩니다.',
+  },
+  ALL_HOURS_RISKY: {
+    code: 'ALL_HOURS_RISKY',
+    name: '남은 시간 모두 위험',
+    description: '오늘 남은 시각이 전부 위험 등급이라 추천할 구간이 없습니다.',
+  },
+  NO_FORECAST: {
+    code: 'NO_FORECAST',
+    name: '판정할 예보 없음',
+    description: '오늘 남은 시각의 예보가 없어 추천 여부를 판정하지 않았습니다.',
+  },
+} as const
+
 /**
  * 오늘의 산책 골든타임 (#158 · [#262](https://github.com/8llow8llowMe/hondigagae/issues/262)).
  *
- * **반려견 조건 둘로 네 날을 가른다.** 이 mock 에는 자유 입력이 없어(AI 일정의 요청 메모 같은
- * 것) 시나리오를 고를 축이 반려견 조건뿐이다. `heatSensitive` 하나로는 두 갈래가 한계인데
- * 판정 자리의 상태는 넷이라(`walk-times-section.tsx` 머리주석), `coldSensitive` 를 함께 읽는다.
+ * **반려견 조건 셋으로 다섯 날을 가른다** (#262 · [#270](https://github.com/8llow8llowMe/hondigagae/issues/270)).
+ * 이 mock 에는 자유 입력이 없어(AI 일정의 요청 메모 같은 것) 시나리오를 고를 축이 반려견
+ * 조건뿐이다. 판정 자리의 상태가 넷이고 그중 `NO_FORECAST` 는 이유가 둘이라
+ * (`forecastCoverage`), 불린 하나로는 어림도 없다.
  *
- * | `heatSensitive` | `coldSensitive` | 화면 | 로컬에서 여는 법 |
- * | --- | --- | --- | --- |
- * | `true` | `false` | 전부 위험 → 골든타임 없음 | **몽실이** (기본) |
- * | `false` | `true` | 골든타임 있음 | **초코** (기본) |
- * | `false` | `false` | **`DAY_ENDED`** — 빈 곡선, 정상 | 초코의 `추위 민감` 해제 |
- * | `true` | `true` | **`UNAVAILABLE`** — 빈 곡선 + 재시도 | 몽실이에 `추위 민감` 추가 |
+ * | 더위 | 추위 | 소리 | 화면 | 로컬에서 여는 법 |
+ * | --- | --- | --- | --- | --- |
+ * | — | — | — | `AVAILABLE` — 골든타임 있음 | **반려견 없음**(게스트·미등록) |
+ * | `true` | `false` | `true` | **`SUPPRESSED_BY_WARNING`** — 경보라 보류, 곡선은 남는다 | **몽실이** (기본) |
+ * | `true` | `false` | `false` | **`ALL_HOURS_RISKY`** — 경보 없이 전부 위험 | 몽실이의 `소리 민감` 해제 |
+ * | `false` | `true` | — | `AVAILABLE` — 골든타임 있음 | **초코** (기본) |
+ * | `false` | `false` | — | `NO_FORECAST` + **`DAY_ENDED`** (정상) | 초코의 `추위 민감` 해제 |
+ * | `true` | `true` | — | `NO_FORECAST` + **`UNAVAILABLE`** (+ 재시도) | 몽실이에 `추위 민감` 추가 |
  *
- * **아래 둘은 실데이터로 만들 수 없다.** `DAY_ENDED` 는 밤 늦게만 나오고(#204 가 dev 23:17
- * KST 에 관측했다) `UNAVAILABLE` 은 날씨 원천이 죽어야 나온다 — mock 이 유일한 확인 경로다.
- * 조합 자체는 임의지만, **둘 다 반려견 편집 화면에서 체크 한 번으로 열린다.**
+ * **넷 다 실데이터로 만들기 어렵다.** `DAY_ENDED` 는 밤 늦게만, `UNAVAILABLE` 은 날씨
+ * 원천이 죽어야, `SUPPRESSED_BY_WARNING` 은 경보가 떠야, `ALL_HOURS_RISKY` 는 경보 없이
+ * 하루가 전부 위험이어야 나온다 — mock 이 유일한 확인 경로다. 조합 자체는 임의지만
+ * **전부 반려견 편집 화면에서 체크 한 번으로 열린다.**
+ *
+ * **`heatSensitive` 가 경보까지 겹쳐 오던 것을 갈랐다.** 예전에는 그 한 값이 "전부 위험"
+ * 과 "경보" 를 함께 켜서, 서버 규칙상 실제로는 `SUPPRESSED_BY_WARNING` 인 날을 화면이
+ * `ALL_HOURS_RISKY` 로 보고 있었다 — 이 이슈가 고친 바로 그 어긋남이다.
  *
  * 시각은 `mockWalkSafety` 와 같은 2026-08-29 오후다. 두 섹션이 같은 홈에 나란히 서므로
  * 날짜가 갈리면 "지금" 과 "오늘 언제" 가 다른 날 이야기가 된다.
  */
-export function mockWalkTimes(heatSensitive: boolean, coldSensitive = false): WalkTimesResponse {
+/**
+ * 조회에 실린 반려견 조건. **`null` 은 조건이 아예 없다는 뜻이다** — 게스트이거나 반려견을
+ * 등록하지 않은 사용자다 (`toInsightQuery` 가 그때 파라미터를 싣지 않는다).
+ */
+export type MockWalkCondition = {
+  heatSensitive: boolean
+  coldSensitive: boolean
+  noiseSensitive: boolean
+}
+
+export function mockWalkTimes(condition: MockWalkCondition | null): WalkTimesResponse {
+  /*
+    **조건이 없으면 기본 갈래(골든타임 있음)다.** 게스트 홈에서 판정 자리가 "예보 없음" 이
+    되면 이 섹션이 무엇을 하는 화면인지 로컬에서 볼 수 없다 — 아래 조합은 시나리오를 고르는
+    장치이지 "조건이 없다" 를 뜻하지 않는다.
+  */
+  const { heatSensitive, coldSensitive, noiseSensitive } = condition ?? {
+    heatSensitive: false,
+    coldSensitive: true,
+    noiseSensitive: false,
+  }
+
   /*
     **곡선이 비는 두 날.** `hourly` 를 비우면서 이유를 함께 준다 — 화면은 그 이유로 문구와
     재시도 유무를 가른다. 비운 곡선에 골든타임을 남기면 근거 없는 추천이 된다.
@@ -394,6 +448,7 @@ export function mockWalkTimes(heatSensitive: boolean, coldSensitive = false): Wa
       goldenStart: null,
       goldenEnd: null,
       goldenLevel: null,
+      goldenWindowStatus: GOLDEN_STATUS.NO_FORECAST,
       weatherWarning: null,
       petConditionApplied: true,
     }
@@ -417,7 +472,7 @@ export function mockWalkTimes(heatSensitive: boolean, coldSensitive = false): Wa
 
   const hourly = curve.map(([time, temperature, pavement, precipitation]) => ({
     at: `2026-08-29T${time}`,
-    // 경보가 있는 날은 전부 위험이다 — 서버가 특보를 만나면 다른 판정보다 먼저 끊는다
+    // 더위에 민감한 아이는 남은 시각이 전부 위험이다 (경보 유무와 별개다 — #270)
     walkSafetyLevel: (heatSensitive
       ? WALK_LEVELS.DANGER
       : pavement >= 50
@@ -430,16 +485,28 @@ export function mockWalkTimes(heatSensitive: boolean, coldSensitive = false): Wa
     precipitationProbability: precipitation,
   }))
 
+  /*
+    추천이 없는 두 날 (#270). **곡선은 그대로 준다** — 근거는 감추지 않는다.
+
+    **경보 유무로 갈린다.** 서버 `GoldenWindowStatus.of` 가 예보 → **경보** → 구간 순으로
+    보므로, 경보가 떠 있으면 곡선이 전부 위험이든 아니든 `SUPPRESSED_BY_WARNING` 이다.
+    예전 mock 은 이 둘을 한 갈래로 묶어 두어 화면이 어긋난 것을 로컬에서 볼 수 없었다.
+  */
   if (heatSensitive) {
     return {
       from: '2026-08-29T13:20:00',
       hourly,
       forecastCoverage: COVERAGE.AVAILABLE,
-      // 남은 시간이 전부 위험이면 추천을 내지 않는다. 곡선은 그대로 준다 — 근거는 감추지 않는다
       goldenStart: null,
       goldenEnd: null,
       goldenLevel: null,
-      weatherWarning: HEAT_WAVE_WARNING,
+      goldenWindowStatus: noiseSensitive
+        ? GOLDEN_STATUS.SUPPRESSED_BY_WARNING
+        : GOLDEN_STATUS.ALL_HOURS_RISKY,
+      ...(noiseSensitive
+        ? { weatherWarning: HEAT_WAVE_WARNING }
+        : // 경보가 없으니 배지도 없다 — 배지만 남으면 보류인지 판정인지 화면이 흐려진다
+          { weatherWarning: null }),
       petConditionApplied: true,
     }
   }
@@ -448,6 +515,7 @@ export function mockWalkTimes(heatSensitive: boolean, coldSensitive = false): Wa
     from: '2026-08-29T13:20:00',
     hourly,
     forecastCoverage: COVERAGE.AVAILABLE,
+    goldenWindowStatus: GOLDEN_STATUS.AVAILABLE,
     // 18:00~21:00 이 SAFE 연속 구간이다 (노면 40도 미만) — 위 곡선과 어긋나면 안 된다
     goldenStart: '2026-08-29T18:00:00',
     goldenEnd: '2026-08-29T21:00:00',

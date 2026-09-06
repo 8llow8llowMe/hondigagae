@@ -242,6 +242,24 @@ export type WalkTimesResponse = {
   goldenStart: string | null
   goldenEnd: string | null
   goldenLevel: ScoreMetricMetadata | null
+  /**
+   * 구간을 줬는지, 안 줬다면 **왜** ([#270](https://github.com/8llow8llowMe/hondigagae/issues/270)).
+   *
+   * **`goldenStart: null` 에 성질이 다른 셋이 섞여 있었다.** 그것 하나로는 이유를 고를 수
+   * 없어 화면이 셋 중 하나의 문구를 나머지에도 썼다 — 풍랑경보 날 곡선에는 저녁 안전
+   * 구간이 초록으로 그려져 있는데 "남은 시간이 모두 위험 등급이에요" 가 나갔다.
+   *
+   * `AVAILABLE` · `SUPPRESSED_BY_WARNING`(경보라 보류 — **곡선이 좋아도 이 값**) ·
+   * `ALL_HOURS_RISKY`(전부 위험 — **이때만 그 문구가 참이다**) · `NO_FORECAST`(예보 없음,
+   * 왜 없는지는 `forecastCoverage` 가 답한다).
+   *
+   * **판정 순서를 화면이 다시 짜지 않는다.** 서버 `GoldenWindowStatus.of` 가
+   * 예보 → 경보 → 구간 순으로 정하고, 호출부마다 `if` 를 세우면 한쪽만 고쳐져 같은
+   * 상태에 다른 문구가 나간다.
+   *
+   * **`null` 을 허용한다** — 나중에 생긴 필드다. 그때는 예전 세 갈래로 떨어진다.
+   */
+  goldenWindowStatus: CodeNameMetadata | null
   /** 경보면 골든타임을 주지 않는다 */
   weatherWarning: WeatherWarningItem | null
   petConditionApplied: boolean

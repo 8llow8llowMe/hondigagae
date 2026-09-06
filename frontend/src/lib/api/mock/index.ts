@@ -132,18 +132,24 @@ export function resolveMock(
   /*
     오늘의 산책 골든타임 (#158). `lat`/`lng` 는 mock 이 쓰지 않는다 — 제주 안에서 좌표를
     바꿔도 예보 격자가 같아 결과가 거의 같고, 좌표로 값을 가르면 없는 정밀도를 흉내 내게 된다.
-    갈래는 반려견 조건으로만 낸다 — 그것이 실제로 판정을 바꾸는 축이다. **`coldSensitive`
-    까지 읽는다** (#262): 판정 자리의 상태가 넷이라 `heatSensitive` 하나로는 두 갈래가
-    한계인데, 빈 곡선의 두 이유(`DAY_ENDED`·`UNAVAILABLE`)는 실데이터로 만들 수 없다.
-    조합표는 `mockWalkTimes` 머리주석에 있다.
+    갈래는 반려견 조건으로만 낸다 — 그것이 실제로 판정을 바꾸는 축이다. **셋을 다 읽는다**
+    (#262 · #270): 판정 자리가 넷이고 그중 `NO_FORECAST` 는 이유가 둘이라, 로컬에서 봐야 할
+    화면이 다섯이다. 그 넷은 실데이터로 만들기 어렵다 — 밤 늦게만, 원천이 죽어야, 경보가
+    떠야, 경보 없이 하루가 전부 위험이어야 나온다. 조합표는 `mockWalkTimes` 머리주석에 있다.
   */
   if (path === '/insights/walk-times') {
     return {
       status: 200,
       payload: ok(
         mockWalkTimes(
-          params.get('heatSensitive') === 'true',
-          params.get('coldSensitive') === 'true',
+          // **파라미터가 없으면 조건이 없는 것이다** — 게스트·반려견 미등록 (#270)
+          params.has('heatSensitive')
+            ? {
+                heatSensitive: params.get('heatSensitive') === 'true',
+                coldSensitive: params.get('coldSensitive') === 'true',
+                noiseSensitive: params.get('noiseSensitive') === 'true',
+              }
+            : null,
         ),
       ),
     }
