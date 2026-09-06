@@ -122,7 +122,11 @@ export type AiPlanJobStatusCode = (typeof AI_PLAN_JOB_STATUSES)[number]
  * 다른 도메인의 enum 과 달리 `name`/`description` 이 없어 화면이 표시명을 만들어야 한다.
  */
 export type AiPlanScheduleItem = {
-  /** `PLACE` | `MEAL` | `LODGING` | `WALK` | `MOVE` */
+  /**
+   * `PLACE` | `MEAL` | `LODGING` | `MOVE` — **초안에 `WALK` 는 오지 않는다** (#89).
+   * ai-service 는 산책 코스 후보를 보지 않아 `walk_course.id` 를 알 수 없다.
+   * 산책 일정은 `PLACE` 로 오고 그 성격은 `title`·`note` 에 담긴다.
+   */
   itemType: string
   /** 이동 항목이거나 검증된 장소가 아니면 null */
   placeId: string | null

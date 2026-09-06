@@ -110,11 +110,19 @@ describe('draftToPlanPayload — targetId (명세 S5 함정 2)', () => {
     expect(result.items?.map((i) => i.targetId)).toEqual(['1', '2', '3'])
   })
 
-  it('WALK 은 placeId 가 실려 와도 targetId 를 보내지 않는다 — walk_course.id 와 어긋난다', () => {
+  /*
+    #252. 예전에는 `WALK` 만 `targetId` 를 빼고 보냈다 — 초안의 `placeId` 는 `place.id` 인데
+    `PlanItemRequest.targetId` 는 `WALK` 일 때 `walk_course.id` 였기 때문이다(#89).
+    BE 가 초안 스키마에서 `WALK` 를 빼고 어댑터가 `PLACE` 로 바로잡으면서 원인이 사라졌다.
+
+    **회귀 방지다** — 유형별 필터를 다시 세우면 `placeId` 가 조용히 버려진다.
+    입력에 `WALK` 를 두는 것은 그 필터가 없음을 증명하기 위해서고, 실제 초안에는 오지 않는다.
+  */
+  it('유형으로 targetId 를 가리지 않는다 — placeId 가 있으면 그대로 보낸다', () => {
     const result = payload([{ day: 1, items: [item({ itemType: 'WALK', placeId: '999' })] }])
 
     expect(result.items).toHaveLength(1)
-    expect('targetId' in (result.items?.[0] ?? {})).toBe(false)
+    expect(result.items?.[0]?.targetId).toBe('999')
   })
 
   it('MOVE 는 placeId 가 null 이라 targetId 가 없다', () => {
@@ -200,7 +208,7 @@ describe('draftPlaceIds', () => {
     const ids = draftPlaceIds(
       draft([
         { day: 1, items: [item({ placeId: '1' }), item({ placeId: '1' })] },
-        { day: 2, items: [item({ placeId: '2' }), item({ itemType: 'WALK', placeId: '3' })] },
+        { day: 2, items: [item({ placeId: '2' }), item({ itemType: 'MOVE', placeId: null })] },
       ]),
     )
 

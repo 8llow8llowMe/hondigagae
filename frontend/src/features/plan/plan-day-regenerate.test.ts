@@ -20,7 +20,7 @@ const saved = [
 
 const next: PlanItemRequest[] = [
   { day: 1, sequence: 0, itemType: 'PLACE', targetId: '222', title: '오설록 티뮤지엄 카페' },
-  { day: 1, sequence: 1, itemType: 'WALK', title: '사려니숲길 산책', memo: '그늘이 많아요' },
+  { day: 1, sequence: 1, itemType: 'PLACE', title: '사려니숲길 산책', memo: '그늘이 많아요' },
 ]
 
 describe('toDiffRows — 저장된 항목', () => {

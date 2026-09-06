@@ -864,10 +864,11 @@ function totalDaysOf(job: MockAiPlanJob): number {
  * 초안. **실제 `MOCK_PLACES` 의 placeId 를 쓴다** — 항목 보강(`GET /places/{placeId}`)이
  * 실제 경로 그대로 돌아야 화면을 확인할 수 있다.
  *
- * 한 일자에 네 종류를 섞는다:
- *  - `PLACE` — 보강 대상
+ * 한 일자에 세 종류를 섞는다:
+ *  - `PLACE` — 보강 대상. **산책 항목도 `PLACE` 다** (#89) — ai-service 는 산책 코스 후보를
+ *    보지 않아 `walk_course.id` 를 알 수 없고, 산책이라는 성격은 `title`·`note` 에 담긴다.
+ *    **`WALK` 를 내리면 안 된다** — BE 가 안 내리는 것을 mock 이 내리면 화면이 로컬에서만 다르게 돈다
  *  - `MEAL` — 보강 대상
- *  - `WALK` — **`placeId` 가 실려 있다.** FE 가 `targetId` 를 빼는지 확인해야 한다 (S5 함정 2)
  *  - `MOVE` — `placeId` 가 null 이라 보강하지 않는다
  */
 function draftFor(job: MockAiPlanJob): AiPlanDraft {
@@ -926,7 +927,8 @@ function regeneratedDayItems(): AiPlanScheduleItem[] {
       note: '실내라 비가 와도 괜찮아요',
     },
     {
-      itemType: 'WALK',
+      // 산책 항목도 `PLACE` 다 (#89). 성격은 title·note 에 담긴다
+      itemType: 'PLACE',
       placeId: MOCK_PLACES[1]?.placeId ?? null,
       title: '사려니숲길 산책',
       note: '그늘이 많아요',
@@ -961,8 +963,8 @@ function itemsFor(
       note: '테라스에 반려견 자리가 있어요.',
     },
     {
-      // **placeId 가 실려 있다.** targetId 로 그대로 보내면 walk_course.id 와 어긋난다
-      itemType: 'WALK',
+      // 산책 항목도 `PLACE` 다 (#89) — placeId 를 targetId 로 그대로 보낸다
+      itemType: 'PLACE',
       placeId: third?.placeId ?? null,
       title: '해안 산책로 산책',
       note: '목줄 착용 필수예요.',

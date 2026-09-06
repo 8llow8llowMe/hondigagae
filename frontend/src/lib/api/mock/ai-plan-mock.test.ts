@@ -421,11 +421,20 @@ describe('AI 일정 mock — 일수가 부족한 완료 (명세 S6)', () => {
 })
 
 describe('AI 일정 mock — 초안 항목', () => {
-  it('WALK 항목에도 placeId 가 실려 온다 — FE 가 targetId 를 빼는지 확인해야 한다', () => {
+  /*
+    #89 · #252. ai-service 는 산책 코스 후보를 보지 않아 `walk_course.id` 를 알 수 없고,
+    그래서 초안 스키마에서 `WALK` 를 뺐다. **BE 가 안 내리는 것을 mock 이 내리면** FE 가
+    우회를 걷은 뒤 화면이 로컬에서만 다르게 돈다 — 산책은 `PLACE` 로 오고 성격은 title 에 담긴다.
+  */
+  it('초안에 WALK 는 오지 않는다 — 산책 항목도 placeId 를 실은 PLACE 다', () => {
     const done = pollTimes(newJob(), 3)
-    const walk = done.planDraft?.days[0]?.items.find((item) => item.itemType === 'WALK')
+    const items = done.planDraft?.days.flatMap((day) => day.items) ?? []
 
-    expect(walk?.placeId).not.toBeNull()
+    expect(items.some((item) => item.itemType === 'WALK')).toBe(false)
+
+    const walkish = items.find((item) => (item.title ?? '').includes('산책'))
+    expect(walkish?.itemType).toBe('PLACE')
+    expect(walkish?.placeId).not.toBeNull()
   })
 
   it('MOVE 항목은 placeId 가 null 이다', () => {
@@ -656,7 +665,7 @@ describe('하루 재생성 (#128)', () => {
     const targetItems = regeneratedDays.find((day) => day.day === 2)?.items ?? []
     expect(targetItems).toHaveLength(2)
     expect(targetItems[0]).toMatchObject({ itemType: 'PLACE', title: '오설록 티뮤지엄 카페' })
-    expect(targetItems[1]).toMatchObject({ itemType: 'WALK', title: '사려니숲길 산책' })
+    expect(targetItems[1]).toMatchObject({ itemType: 'PLACE', title: '사려니숲길 산책' })
 
     for (const plainDay of plainDays) {
       if (plainDay.day === 2) continue
