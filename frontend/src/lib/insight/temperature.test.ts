@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { displayTemperature } from '@/lib/insight/temperature'
+import { messages } from '@/lib/messages'
 import { planVerdict } from '@/test/fixtures/plan'
 import type { PlanDailyWeatherItem } from '@/types/plan'
 
@@ -55,5 +56,44 @@ describe('displayTemperature — 체감온도가 먼저다 (#253)', () => {
       kind: 'feelsLike',
       value: 0,
     })
+  })
+})
+
+/*
+  #259. 열지수는 두 기준으로 온다 — 적합도·일정 판정은 **하루 최대**
+  (`maxFeelsLikeTemperature`), 산책 위험도와 홈은 **그 시각**(`heatIndexCelsius`)이다.
+  장소 상세 좌측 레일에서는 둘이 나란히 선다.
+
+  **이름을 나누지 않고 기준을 나눈다.** 같은 물리량이라 이름이 갈리면 사용자는 서로 다른
+  값으로 읽는다 — 예전에 홈만 `체감 열지수` 였던 것이 그 상태다. 가르는 일은 `최고` 가 한다.
+
+  `displayTemperature` 옆에 두는 이유: 이 규칙이 깨지는 방식은 **화면 하나만 고치는 것**인데,
+  그것을 잡으려면 네 문구를 한자리에서 봐야 한다.
+*/
+describe('체감온도 라벨 — 이름은 하나, 기준은 `최고` 가 가른다 (#259)', () => {
+  const timeBased = [messages.place.detailHeatIndex, messages.home.heatIndexLabel]
+  const dayMax = [messages.place.detailFeelsLikeTemperature, messages.plan.verdictFeelsLikeLabel]
+
+  it('시각 기준은 화면이 달라도 같은 이름이다', () => {
+    expect(new Set(timeBased).size).toBe(1)
+  })
+
+  it('하루 최대도 화면이 달라도 같은 이름이다', () => {
+    expect(new Set(dayMax).size).toBe(1)
+  })
+
+  it('하루 최대는 시각 기준 이름에 `최고` 를 얹은 것이다', () => {
+    for (const label of dayMax) {
+      expect(label).toBe(`최고 ${timeBased[0]}`)
+    }
+  })
+
+  /*
+    중기예보 구간의 폴백. **최고기온을 체감온도라고 부르지 않는다** — 판정의 근거를 잘못
+    알려 주는 것이다 (#253). 두 라벨이 같아지면 그 구분이 사라진다.
+  */
+  it('최고기온 폴백은 체감온도와 다른 이름을 유지한다', () => {
+    expect(messages.place.detailMaxTemperature).not.toBe(messages.place.detailFeelsLikeTemperature)
+    expect(messages.plan.verdictTemperatureLabel).not.toBe(messages.plan.verdictFeelsLikeLabel)
   })
 })

@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { WalkVerdict } from '@/features/home/walk-verdict'
+import { messages } from '@/lib/messages'
 import { walkSafety } from '@/test/fixtures/insight'
 import type { WalkSafetyResponse, WeatherWarningItem } from '@/types/insight'
 
@@ -51,5 +52,35 @@ describe('WalkVerdict — 기상특보', () => {
     })
 
     expect(markup).toContain('폭염 경보 발효 중입니다.')
+  })
+})
+
+/*
+  #259. 모바일 접힌 줄은 `heatIndexLabel` 을 달고 있었는데 **데스크톱 hero 만 맨 숫자**였다 —
+  같은 화면의 같은 값이 폭에 따라 이름을 잃었다. 아래 기준 줄(`{장소} 기준`)은 어디의
+  값인지만 말하고 무엇인지는 말하지 않는다.
+
+  `renderToStaticMarkup` 은 두 분기를 **함께** 그린다(`md:` 는 CSS 다). 그래서 라벨이
+  마크업에 **두 번** 나와야 양쪽에 다 붙은 것이다 — 한 번이면 한쪽이 빠진 것이다.
+*/
+describe('WalkVerdict — 열지수 라벨 (#259)', () => {
+  const occurrences = (markup: string, needle: string) => markup.split(needle).length - 1
+
+  it('모바일 접힌 줄과 데스크톱 hero 양쪽에 라벨이 붙는다', () => {
+    expect(occurrences(render(walkSafety), messages.home.heatIndexLabel)).toBe(2)
+  })
+
+  /*
+    **장소 상세 산책 위험도와 같은 이름이다** — 같은 `heatIndexCelsius` 다. 하루 최대
+    (`최고 체감온도`)와는 `최고` 가 가른다.
+  */
+  it('장소 상세 산책 위험도와 같은 이름을 쓴다', () => {
+    expect(messages.home.heatIndexLabel).toBe(messages.place.detailHeatIndex)
+  })
+
+  it('열지수가 없으면 라벨도 렌더하지 않는다', () => {
+    const markup = render({ ...walkSafety, heatIndexCelsius: null })
+
+    expect(markup).not.toContain(messages.home.heatIndexLabel)
   })
 })

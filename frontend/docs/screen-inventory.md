@@ -194,13 +194,13 @@
 
 **`GET /places/{placeId}/walk-safety` — `WalkSafetyResponse`**
 
-| 필드                       | 타입                     | 화면 지침                                      |
-| -------------------------- | ------------------------ | ---------------------------------------------- |
-| `walkSafetyLevel`          | `ScoreMetricMetadata`    | 등급 metadata                                  |
-| `reasons[]`                | `WalkSafetyReasonItem[]` | `scoreDelta` 가 **없다** (적합도와 다르다)     |
-| `estimatedPavementCelsius` | `Double`                 | **단위 ℃ 를 표기한다** (노면 온도)             |
-| `heatIndexCelsius`         | `Double`                 | **단위 ℃ 를 표기한다** (체감 열지수)           |
-| `saferWindowStart/End`     | `LocalTime \| null`      | **없으면 null** → "더 안전한 시간대" 를 숨긴다 |
+| 필드                       | 타입                     | 화면 지침                                              |
+| -------------------------- | ------------------------ | ------------------------------------------------------ |
+| `walkSafetyLevel`          | `ScoreMetricMetadata`    | 등급 metadata                                          |
+| `reasons[]`                | `WalkSafetyReasonItem[]` | `scoreDelta` 가 **없다** (적합도와 다르다)             |
+| `estimatedPavementCelsius` | `Double`                 | **단위 ℃ 를 표기한다** (노면 온도)                     |
+| `heatIndexCelsius`         | `Double`                 | **`체감온도` 라벨 + 단위 ℃** (#259). **시각 기준**이다 |
+| `saferWindowStart/End`     | `LocalTime \| null`      | **없으면 null** → "더 안전한 시간대" 를 숨긴다         |
 
 - 적합도는 **일자 기준**(`targetDate`), 산책 위험도는 **시각 기준**(`targetDateTime`)이다. 같은 화면에 두 값을 나란히 두면 기준이 다른 것을 명시해야 한다.
 - `saferWindowStart/End` 는 **같은 날 안에서만** 제안된다.
@@ -221,11 +221,26 @@
 - **`data.temperature` 를 쓰지 않는다.** 그 시각의 기온인데 장소 상세의 기온 라벨은 둘 다
   **하루 단위**라(`detailFeelsLikeTemperature`·`detailMaxTemperature`), 붙이면 시각 기온을
   일 최고로 말하게 된다.
-- **`heatIndexCelsius` 에 라벨이 없다** — 위 두 라벨이 하루 단위라 붙일 것이 없었기 때문인데,
+- **`heatIndexCelsius` hero 에 `체감온도` 라벨이 붙는다** ([#259](https://github.com/8llow8llowMe/hondigagae/issues/259) — 해소됨).
+  예전에는 라벨이 없었다. 적합도의 점수 hero(`82 /100`)를 따라 뺐던 것인데 **점수는 단위가
+  스스로 말하고 온도는 그렇지 않다** — 맨 `35.0℃` 는 기온으로 읽힌다. 게다가
   [#253](https://github.com/8llow8llowMe/hondigagae/issues/253) 이 적합도 쪽을 `체감온도`(하루 최대)로
-  바꾸면서 **같은 레일에 기준이 다른 열지수 두 개**가 서게 됐다(하루 최대 33.4 · 14:00 시각 32.4).
-  지금은 `오늘 이 지역` / `지금 산책` 두 제목과 `{time} 기준` 각주가 갈라 주고 있지만,
-  **시각 단위 라벨을 따로 두는 것이 낫다** — 별도 이슈로 다룬다.
+  바꾸면서 **같은 레일에 기준이 다른 열지수 두 개**가 섰다(하루 최대 33.4 · 14:00 시각 32.4).
+
+  **이름은 `체감온도` 하나이고 기준은 `최고` 유무가 가른다.**
+
+  | 라벨            | 값                        | 기준                        | 쓰는 곳                                            |
+  | --------------- | ------------------------- | --------------------------- | -------------------------------------------------- |
+  | `체감온도`      | `heatIndexCelsius`        | **시각** (`targetDateTime`) | 장소 상세 산책 위험도 · 홈 `WalkVerdict`           |
+  | `최고 체감온도` | `maxFeelsLikeTemperature` | **하루 최대**               | 장소 상세 적합도 게스트 블록 · 일정 상세 일자 판정 |
+  | `최고기온`      | `maxTemperature`          | 하루 최대 (**폴백**)        | 위 둘의 중기예보 구간                              |
+
+  **이름을 나누지 않은 이유**는 앞의 둘이 같은 물리량이기 때문이다 — 이름이 갈리면 사용자는
+  서로 다른 값으로 읽는다(예전에 홈만 `체감 열지수` 였던 것이 그 상태다). 규칙은
+  `lib/insight/temperature.test.ts` 가 네 문구를 한자리에서 고정한다.
+
+  라벨에 '지금' 을 얹지 않는다 — `지금 산책` 제목과 `{time} 기준` 각주가 이미 두 번 말한다.
+
 - 인셋은 적합도 패널과 **같은 `px-4 md:px-10 lg:px-6`** 다. 375·768·1280 실렌더로 확인했다.
 
 **`GET /insights/walk-times` — `WalkTimesResponse`** (#158 · FE #167)
