@@ -8,14 +8,34 @@ import { mockWalkTimes } from '@/lib/api/mock/insight-data'
 import { messages } from '@/lib/messages'
 import type { WalkTimesResponse } from '@/types/insight'
 
-function render(data: WalkTimesResponse | null, loading = false, positionFallback = false) {
-  return renderToStaticMarkup(createElement(WalkTimesSection, { data, loading, positionFallback }))
+function render(
+  data: WalkTimesResponse | null,
+  loading = false,
+  positionFallback = false,
+  onRetry?: () => void,
+) {
+  return renderToStaticMarkup(
+    createElement(WalkTimesSection, {
+      data,
+      loading,
+      positionFallback,
+      ...(onRetry === undefined ? {} : { onRetry }),
+    }),
+  )
 }
 
-/** 골든타임이 있는 날 (mock 의 `heatSensitive: false` 갈래) */
-const GOOD_DAY = mockWalkTimes(false)
-/** 특보 경보로 추천이 없는 날 */
-const BAD_DAY = mockWalkTimes(true)
+/*
+  mock 은 반려견 조건 **둘**로 네 날을 가른다 (#262) — 판정 자리의 상태가 넷인데
+  `heatSensitive` 하나로는 두 갈래가 한계다. 조합표는 `mockWalkTimes` 머리주석에 있다.
+*/
+/** 골든타임이 있는 날 — 초코 조합 */
+const GOOD_DAY = mockWalkTimes(false, true)
+/** 특보 경보로 추천이 없는 날 — 몽실이 조합 */
+const BAD_DAY = mockWalkTimes(true, false)
+/** 곡선이 비었고 **정상**인 날 (그 날짜 예보 시간대가 지났다) */
+const DAY_ENDED = mockWalkTimes(false, false)
+/** 곡선이 비었고 **장애**인 날 (날씨를 못 받았다) */
+const UNAVAILABLE = mockWalkTimes(true, true)
 
 describe('WalkTimesSection — 추천 구간', () => {
   it('골든타임을 시각 문장으로 적는다 — 곡선 색에만 기대지 않는다', () => {
@@ -131,6 +151,8 @@ describe('WalkTimesSection — 예보가 없는 날 (#204)', () => {
     goldenStart: null,
     goldenEnd: null,
     goldenLevel: null,
+    // 옛 서버 모양 — 이 필드가 없던 시절이다 (#262). 그때는 우리 문구로 떨어진다
+    forecastCoverage: null,
   }
 
   it('예보가 0건이면 위험 등급을 단정하지 않는다', () => {
@@ -213,5 +235,81 @@ describe('WalkTimesSection — 상태', () => {
 
     expect(markup).toContain(messages.home.goldenBasis)
     expect(markup).not.toContain(messages.home.goldenBasisCurrent)
+  })
+})
+
+/*
+  #262. **곡선이 비는 이유는 하나가 아니다.** 서버 `forecastCoverage` 가 갈라 준다 —
+  `DAY_ENDED` 는 정상(자정 이후 다시 채워진다)이고 `UNAVAILABLE` 만 다시 시도할 일이다.
+  전에는 둘을 같은 문장으로 말했다: **고칠 수 있는 상태를 고칠 수 없는 것처럼** 말한 것이다.
+*/
+describe('WalkTimesSection — 곡선이 빈 이유 (#262)', () => {
+  it('서버 문구를 그대로 쓴다 — FE 에 한국어 매핑 테이블을 두지 않는다', () => {
+    const markup = render(DAY_ENDED)
+    const coverage = DAY_ENDED.forecastCoverage
+
+    expect(coverage?.code).toBe('DAY_ENDED')
+    expect(markup).toContain(coverage?.name)
+    expect(markup).toContain(coverage?.description)
+    // 우리 문구로 덮어쓰지 않는다
+    expect(markup).not.toContain(messages.home.goldenNoForecast)
+  })
+
+  it('장애와 정상이 다른 문구를 받는다', () => {
+    const ended = render(DAY_ENDED)
+    const failed = render(UNAVAILABLE)
+
+    expect(UNAVAILABLE.forecastCoverage?.code).toBe('UNAVAILABLE')
+    expect(ended).not.toContain(UNAVAILABLE.forecastCoverage?.name)
+    expect(failed).not.toContain(DAY_ENDED.forecastCoverage?.name)
+  })
+
+  /*
+    `DAY_ENDED` 는 자정 전에는 몇 번을 눌러도 같은 응답이다 — 고칠 수 없는 것에 버튼을
+    달면 사용자가 계속 누른다. `404` 에 재시도를 달지 않는 규칙과 같은 축이다.
+  */
+  it('UNAVAILABLE 에만 재시도를 준다', () => {
+    expect(render(UNAVAILABLE, false, false, () => undefined)).toContain(messages.common.retry)
+    expect(render(DAY_ENDED, false, false, () => undefined)).not.toContain(messages.common.retry)
+  })
+
+  it('onRetry 가 없으면 UNAVAILABLE 이어도 버튼을 렌더하지 않는다', () => {
+    expect(render(UNAVAILABLE)).not.toContain(messages.common.retry)
+  })
+
+  /*
+    옛 서버(필드가 없던 시절)와 `AVAILABLE` 인데 곡선이 빈 경우. 뒤쪽은 오지 않아야 하지만
+    오면 `예보 있음` 이라는 제목 아래 아무것도 없는 자리가 된다 — 그때는 우리 문구로
+    "모른다" 고 말한다.
+  */
+  it('forecastCoverage 가 없으면 예전 문구로 떨어진다', () => {
+    const markup = render({ ...DAY_ENDED, forecastCoverage: null })
+
+    expect(markup).toContain(messages.home.goldenNoForecast)
+    expect(markup).toContain(messages.home.goldenNoForecastDesc)
+  })
+
+  it('AVAILABLE 인데 곡선이 비면 "예보 있음" 이라고 말하지 않는다', () => {
+    const markup = render({
+      ...DAY_ENDED,
+      forecastCoverage: { code: 'AVAILABLE', name: '예보 있음', description: '있습니다.' },
+    })
+
+    expect(markup).not.toContain('예보 있음')
+    expect(markup).toContain(messages.home.goldenNoForecast)
+  })
+
+  /*
+    **곡선이 있으면 이 자리를 쓰지 않는다.** `forecastCoverage` 를 먼저 보게 바꾸면
+    `AVAILABLE` 이 아닌 코드가 왔을 때 실제로 있는 곡선과 추천을 감춘다.
+  */
+  it('곡선이 있으면 coverage 문구가 나오지 않는다', () => {
+    const markup = render({
+      ...GOOD_DAY,
+      forecastCoverage: UNAVAILABLE.forecastCoverage,
+    })
+
+    expect(markup).not.toContain(UNAVAILABLE.forecastCoverage?.name)
+    expect(markup).toContain('18:00')
   })
 })

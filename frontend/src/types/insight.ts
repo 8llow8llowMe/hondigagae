@@ -213,6 +213,8 @@ export type HourlyWalkSafetyItem = {
  * **장소 산책 위험도와 답하는 질문이 다르다.** 저쪽은 "지금 나가도 되나"(`targetDateTime`
  * 한 시점)이고 이쪽은 "오늘 언제 나가야 하나"다. 판정 규칙은 같다.
  *
+ * **곡선이 비는 이유가 하나가 아니다** — `forecastCoverage` 참고 (#262).
+ *
  * **`goldenStart` 가 null 인 날이 정상 응답이다.** 남은 시간이 전부 위험 등급이거나 특보
  * 경보가 발효 중이면 서버가 추천을 내지 않는다 — 아무 구간이나 골라 주면 사용자가 그것을
  * **허락으로 읽기** 때문이다. 화면도 같은 태도를 지켜 대체 구간을 지어내지 않는다.
@@ -222,6 +224,20 @@ export type WalkTimesResponse = {
   from: string
   /** 오늘 남은 예보 시각만. **비어 있을 수 있다** (늦은 밤) */
   hourly: HourlyWalkSafetyItem[]
+  /**
+   * 곡선이 빈 이유 ([#262](https://github.com/8llow8llowMe/hondigagae/issues/262)).
+   *
+   * **"예보가 없다" 에 성질이 다른 것들이 섞여 있다.** 서버 `ForecastCoverage` 는 넷을
+   * 가른다 — `AVAILABLE`(곡선 있음) · `DAY_ENDED`(그 날짜 예보 시간대가 지남, **정상**이고
+   * 자정 이후 다시 채워진다) · `OUT_OF_RANGE`(아직 안 온 날짜) · `UNAVAILABLE`(**목록 자체를
+   * 못 받았다 — 이것만 장애다**).
+   *
+   * 이 화면은 늘 오늘을 묻지만 **코드를 좁혀 타이핑하지 않는다.** 서버가 하나를 더 내면
+   * 화면이 그 값을 모른 채 렌더해야 하고, 그게 이 저장소가 metadata 를 그대로 그리는 이유다.
+   *
+   * **`null` 을 허용한다** — 스키마에 `required` 가 없고, 이 필드는 나중에 생겼다.
+   */
+  forecastCoverage: CodeNameMetadata | null
   /** 추천할 구간이 없으면 null. `goldenEnd`·`goldenLevel` 과 항상 함께 움직인다 */
   goldenStart: string | null
   goldenEnd: string | null
