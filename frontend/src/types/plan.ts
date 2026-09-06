@@ -144,6 +144,19 @@ export type PlanDailyWeatherItem = {
   forecastSourceName: string | null
   minTemperature: number | null
   maxTemperature: number | null
+  /**
+   * 하루 최고 체감온도(℃) — #253 · [PR #235](https://github.com/8llow8llowMe/hondigagae/pull/235).
+   *
+   * **`maxTemperature` 와 다른 시각에서 나온다.** 시각별 기온·습도로 낸 열지수(Rothfusz
+   * 회귀식 섭씨판)의 하루 **최대**라, 기온이 내려가는 저녁에 습도가 올라 체감이 더 높은
+   * 시각이 따로 있다. **화면이 기온·습도로 다시 계산하지 않는다** — 계산은 tour-service
+   * 한 곳이다.
+   *
+   * **중기예보(`MID_TERM`)는 시각별 데이터가 없어 언제나 null 이다.** 그때 서버는
+   * `maxTemperature` 를 대신 채우지 않으므로 **화면도 이 자리에 최고기온을 넣지 않는다**
+   * — 최고기온을 보여 주더라도 `최고기온` 이라고 말한다 (`lib/plan/verdict-temperature.ts`).
+   */
+  maxFeelsLikeTemperature: number | null
   maxPrecipitationProbability: number | null
   /** 그날 가장 나쁜 강수형태 — 이름 문자열 (예: `'비'`) */
   precipitationTypeName: string | null

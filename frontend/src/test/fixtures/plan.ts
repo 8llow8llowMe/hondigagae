@@ -125,6 +125,7 @@ export const planVerdict: PlanDayWeatherItem = {
     forecastSourceName: '단기예보',
     minTemperature: 21,
     maxTemperature: 26,
+    maxFeelsLikeTemperature: 27.5,
     maxPrecipitationProbability: 10,
     precipitationTypeName: '없음',
     skyStateName: '맑음',

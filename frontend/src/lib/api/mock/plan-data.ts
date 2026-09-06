@@ -882,6 +882,15 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
         forecastSourceName: rainy ? '중기예보' : '단기예보',
         minTemperature: rainy ? 19.0 : 21.0,
         maxTemperature: rainy ? 24.0 : 26.0,
+        /*
+          **중기예보(`rainy`)는 언제나 null 이다** (#253) — 시각별 데이터가 없어 열지수를
+          낼 수 없고, 서버가 최고기온으로 대신 채우지도 않는다. 두 갈래를 다 내야 화면의
+          `최고기온` 폴백 경로를 로컬에서 볼 수 있다.
+
+          단기예보 쪽 값이 최고기온(26.0)보다 높은 것은 습도가 60% 라서다 — 두 값이 같으면
+          체감온도를 쓰는 이유가 화면에서 드러나지 않는다.
+        */
+        maxFeelsLikeTemperature: rainy ? null : 27.5,
         maxPrecipitationProbability: rainy ? 80 : 10,
         precipitationTypeName: rainy ? '비' : '없음',
         skyStateName: rainy ? '흐림' : '맑음',

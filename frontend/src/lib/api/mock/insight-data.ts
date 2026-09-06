@@ -231,6 +231,8 @@ export function mockSuitability(placeId: string): PlaceSuitabilityResponse {
       },
       minTemperature: 24.0,
       maxTemperature: 31.0,
+      // 열지수는 최고기온과 다른 시각에서 나온다 — 습도 85% 라 체감이 더 높다 (#253)
+      maxFeelsLikeTemperature: 33.4,
       maxPrecipitationProbability: high ? 10 : 80,
       precipitationType: high
         ? { code: 'NONE', name: '없음', description: '강수가 없습니다.' }

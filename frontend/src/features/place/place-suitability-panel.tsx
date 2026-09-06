@@ -6,10 +6,11 @@ import { ReasonList } from '@/components/reason-list'
 import { Skeleton } from '@/components/skeleton'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { formatDistance } from '@/lib/format/distance'
+import { displayTemperature } from '@/lib/insight/temperature'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
-import type { PlaceSuitabilityResponse } from '@/types/insight'
+import type { DailyWeatherItem, PlaceSuitabilityResponse } from '@/types/insight'
 
 /**
  * 좌우 인셋.
@@ -135,8 +136,10 @@ export function PlaceSuitabilityPanel({
  * **점수·근거·"{이름}에게" 를 쓰지 않는다.** 기준이 되는 반려견이 없는데 판정을 말하면
  * 그 판정이 누구 것인지 알 수 없다. 지역 날씨만 보여주고 등록으로 보낸다.
  *
- * 아트보드는 여기에 체감 열지수를 적었지만 **적합도 응답에는 열지수가 없다**
- * (산책 위험도 응답의 `heatIndexCelsius` 다). 있는 값인 최고기온·강수확률만 쓴다.
+ * 아트보드가 여기에 적은 **체감 열지수는 이제 적합도 응답에 있다** — [PR #235](https://github.com/8llow8llowMe/hondigagae/pull/235)
+ * 가 `weather.maxFeelsLikeTemperature` 를 더했다 (#253). 그전에는 없어서 최고기온으로
+ * 대신하고 있었고, 지금은 **체감온도가 서고 못 받은 날에만 최고기온이 선다.**
+ * 산책 위험도 응답의 `heatIndexCelsius` 와는 여전히 다른 값이다.
  */
 function GuestBlock({ data, authed }: { data: PlaceSuitabilityResponse; authed: boolean }) {
   const weather = data.weather
@@ -149,13 +152,7 @@ function GuestBlock({ data, authed }: { data: PlaceSuitabilityResponse; authed: 
         <p className="text-body-2 text-fg-muted">{messages.place.detailGuestNoWeather}</p>
       ) : (
         <div className="flex flex-wrap items-end gap-6">
-          {weather.maxTemperature !== null && (
-            <MetricValue
-              label={messages.place.detailMaxTemperature}
-              value={weather.maxTemperature.toFixed(1)}
-              unit={messages.place.detailTemperatureUnit}
-            />
-          )}
+          <TemperatureValue weather={weather} />
           {weather.maxPrecipitationProbability !== null && (
             <MetricValue
               label={messages.place.detailPrecipitationProbability}
@@ -177,6 +174,29 @@ function GuestBlock({ data, authed }: { data: PlaceSuitabilityResponse; authed: 
         </Link>
       </div>
     </div>
+  )
+}
+
+/**
+ * 미로그인 블록의 온도 — 체감온도, 없으면 최고기온 (#253).
+ *
+ * **일정 상세와 같은 규칙을 쓴다** (`lib/insight/temperature.ts`). 같은 값을 두 화면이
+ * 다르게 고르면 사용자는 어느 쪽을 믿어야 할지 알 수 없다.
+ */
+function TemperatureValue({ weather }: { weather: DailyWeatherItem }) {
+  const temperature = displayTemperature(weather)
+  if (temperature === null) return null
+
+  return (
+    <MetricValue
+      label={
+        temperature.kind === 'feelsLike'
+          ? messages.place.detailFeelsLikeTemperature
+          : messages.place.detailMaxTemperature
+      }
+      value={temperature.value.toFixed(1)}
+      unit={messages.place.detailTemperatureUnit}
+    />
   )
 }
 

@@ -4,6 +4,7 @@ import { ButtonLink } from '@/components/button'
 import { ErrorState } from '@/components/error-state'
 import { MetricBadge, MetricValue } from '@/components/metric'
 import { ReasonList } from '@/components/reason-list'
+import { displayTemperature } from '@/lib/insight/temperature'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { MID_TERM_FORECAST_CODE, type PlanDayWeatherItem } from '@/types/plan'
@@ -62,14 +63,12 @@ export function PlanDayVerdict({
               {verdict.suitabilityLevel.name}
             </MetricBadge>
 
-            {verdict.weather?.maxTemperature !== null &&
-              verdict.weather?.maxTemperature !== undefined && (
-                <MetricValue
-                  label={messages.plan.verdictTemperatureLabel}
-                  value={verdict.weather.maxTemperature.toFixed(1)}
-                  unit="℃"
-                />
-              )}
+            {/*
+              **체감온도가 이 자리의 기본값이다** (#253 · 아트보드 01). 못 받은 날
+              (중기예보 구간)에만 최고기온이 서고, 그때는 라벨이 함께 바뀐다 —
+              고르는 규칙은 `lib/insight/temperature.ts` 하나이고 장소 상세와 공유한다.
+            */}
+            <VerdictTemperatureValue weather={verdict.weather} />
 
             {verdict.representativePlaceId !== null && (
               // 산책 위험도는 장소 상세가 소유한다. 기준 장소가 없으면 부를 대상이 없다
@@ -105,6 +104,29 @@ export function PlanDayVerdict({
         </>
       )}
     </div>
+  )
+}
+
+/**
+ * 판정 옆 큰 숫자 — 체감온도, 없으면 최고기온 (#253).
+ *
+ * **라벨이 값과 함께 바뀐다.** 둘 다 ℃ 라 라벨이 고정이면 중기예보 구간에서 최고기온을
+ * `체감온도` 라고 부르게 되고, 그것은 판정의 근거를 잘못 알려 주는 것이다.
+ */
+function VerdictTemperatureValue({ weather }: { weather: PlanDayWeatherItem['weather'] }) {
+  const temperature = displayTemperature(weather)
+  if (temperature === null) return null
+
+  return (
+    <MetricValue
+      label={
+        temperature.kind === 'feelsLike'
+          ? messages.plan.verdictFeelsLikeLabel
+          : messages.plan.verdictTemperatureLabel
+      }
+      value={temperature.value.toFixed(1)}
+      unit="℃"
+    />
   )
 }
 
