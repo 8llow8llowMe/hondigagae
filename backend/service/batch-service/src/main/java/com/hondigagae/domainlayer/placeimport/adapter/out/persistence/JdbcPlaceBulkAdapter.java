@@ -178,15 +178,19 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             id,
             place_id,
             use_time,
+            weekly_hours_spec,
+            open24,
             rest_date,
             parking,
             raw_json,
             synced_at,
             created_at,
             updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         ON DUPLICATE KEY UPDATE
             use_time = VALUES(use_time),
+            weekly_hours_spec = VALUES(weekly_hours_spec),
+            open24 = VALUES(open24),
             rest_date = VALUES(rest_date),
             parking = VALUES(parking),
             raw_json = VALUES(raw_json),
@@ -389,6 +393,8 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
                 ps.setLong(index++, facility.placeId());
                 ps.setLong(index++, facility.placeId());
                 ps.setString(index++, facility.useTime());
+                ps.setString(index++, facility.weeklyHoursSpec());
+                ps.setBoolean(index++, facility.open24());
                 ps.setString(index++, facility.restDate());
                 ps.setString(index++, facility.parking());
                 ps.setString(index++, toRawJson(facility));

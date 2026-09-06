@@ -89,6 +89,8 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
         return PlaceIntroQueryResult.builder()
             .infoCenter(entity.getInfoCenter())
             .useTime(entity.getUseTime())
+            .weeklyHoursSpec(entity.getWeeklyHoursSpec())
+            .open24(entity.isOpen24())
             .restDate(entity.getRestDate())
             .parking(entity.getParking())
             .chkPet(entity.getChkPet())

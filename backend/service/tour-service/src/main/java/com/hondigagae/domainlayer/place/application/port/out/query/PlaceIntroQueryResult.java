@@ -6,6 +6,8 @@ import lombok.Builder;
 public record PlaceIntroQueryResult(
     String infoCenter,
     String useTime,
+    String weeklyHoursSpec,
+    boolean open24,
     String restDate,
     String parking,
     String chkPet,

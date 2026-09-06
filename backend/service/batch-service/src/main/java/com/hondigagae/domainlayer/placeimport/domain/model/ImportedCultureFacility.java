@@ -40,6 +40,9 @@ public record ImportedCultureFacility(
     String petRestriction,
     String petExtraFee,
     String useTime,
+    // 구조화된 주간 영업시간(WeeklySchedule spec). 원문(useTime)을 풀 수 없으면 null — "모름"
+    String weeklyHoursSpec,
+    boolean open24,
     String restDate,
     String parking,
     String admissionFee,
