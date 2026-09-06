@@ -13,6 +13,12 @@ public record PlaceIntroItem(
     @Schema(description = "운영시간", example = "09:00~17:50 (입장 마감 17:10)")
     String useTime,
 
+    @Schema(description = "지금 영업 중 여부. null 은 판정 근거 없음(운영시간을 구조화하지 못한 곳) — 닫힘과 다르다", example = "true")
+    Boolean openNow,
+
+    @Schema(description = "24시간 운영 여부", example = "false")
+    boolean open24,
+
     @Schema(description = "휴무일", example = "연중무휴")
     String restDate,
 

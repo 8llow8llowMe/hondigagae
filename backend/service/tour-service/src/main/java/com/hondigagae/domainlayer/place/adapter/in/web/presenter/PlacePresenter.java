@@ -106,6 +106,8 @@ public class PlacePresenter {
         return PlaceIntroItem.builder()
             .infoCenter(intro.infoCenter())
             .useTime(intro.useTime())
+            .openNow(intro.openNow())
+            .open24(intro.open24())
             .restDate(intro.restDate())
             .parking(intro.parking())
             .chkPet(intro.chkPet())

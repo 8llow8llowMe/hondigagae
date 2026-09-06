@@ -16,6 +16,8 @@ import com.hondigagae.domainlayer.place.application.port.out.PlaceRepositoryPort
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSliceQueryResult;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
 import com.hondigagae.domainlayer.place.domain.model.Place;
+import com.hondigagae.domainlayer.place.domain.model.PlaceOpenState;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -81,6 +83,8 @@ public class PlaceQueryProcessor {
             .map(result -> PlaceIntroInfo.builder()
                 .infoCenter(result.infoCenter())
                 .useTime(result.useTime())
+                .openNow(PlaceOpenState.resolve(result.weeklyHoursSpec(), result.open24(), LocalDateTime.now()))
+                .open24(result.open24())
                 .restDate(result.restDate())
                 .parking(result.parking())
                 .chkPet(result.chkPet())

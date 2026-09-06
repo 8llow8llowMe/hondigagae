@@ -273,6 +273,9 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
         String roadAddress = value(values, header, COL_ROAD_ADDR);
         String lotAddress = value(values, header, COL_LOT_ADDR);
         String address = isBlank(roadAddress) ? lotAddress : roadAddress;
+        // 긴급 시설(toEmergencyFacility)과 같은 구조화 규칙 — 실측 기준 여행 장소 원문의 93% 가 풀린다
+        String hours = OperatingHoursParser.normalizeHours(value(values, header, COL_USE_TIME));
+        WeeklySchedule weekly = OperatingHoursParser.parseWeekly(hours);
 
         boolean petAvailable = PetFieldParser.parseYn(value(values, header, COL_PET_AVAILABLE));
         String petSizeRaw = value(values, header, COL_PET_SIZE);
@@ -303,6 +306,8 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
             .petRestriction(value(values, header, COL_PET_RESTRICTION))
             .petExtraFee(value(values, header, COL_PET_FEE))
             .useTime(value(values, header, COL_USE_TIME))
+            .weeklyHoursSpec(weekly == null ? null : weekly.toSpec())
+            .open24(OperatingHoursParser.isOpen24(name, hours))
             .restDate(value(values, header, COL_REST_DATE))
             .parking(value(values, header, COL_PARKING))
             .admissionFee(value(values, header, COL_ADMISSION_FEE))

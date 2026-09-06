@@ -137,7 +137,7 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | AI 작업 세부 단계·취소·`sigunguCode` | **구현** | #90. 4단계(`step`/`stepOrder`/`totalSteps`) · `POST /jobs/{jobId}/cancel`(협조적) · `sigunguCode` 후보 좁히기. 일자 재생성은 #77 로 됨 |
 | 다견 일정의 준비물 생성 | 구현 | 동행 반려견 전체 특성을 벌크 조회해 근거로 삼는다. 프롬프트는 합집합 규칙 |
 | 반려견 프로필 매칭 | **구현** | `petSizeType`/`petWeightKg` 필터. 프로필 체중 입력은 FE 몫 |
-| 영업시간 구조화 | **구현 (긴급 시설)** | `openNowOnly` + 항목별 `openNow`. 여행 장소(place_intro.use_time)는 후속 |
+| 영업시간 구조화 | **구현 (긴급 시설 + 여행 장소)** | 긴급 시설은 `openNowOnly` + 항목별 `openNow`. 여행 장소는 상세 `intro.openNow`·`open24` (문화정보원 출처만, TourAPI `detailIntro2` 수집과 목록 필터는 후속) |
 | 데이터 delisting | **구현** | `delisted_at` 표시 + 급감 가드. `data-refresh-guide.md` 2절 |
 | 배포 파이프라인 | **구현** | #21 — 서비스별 `docker-compose-*.yml` + Jenkins. `deploy-guide.md`·`jenkins-cicd-dev-deploy-guide.md` |
 | 배치 메트릭 | **구현** | `place_import_rows` 게이지 + `place_import_last_success_timestamp` (기동 씨딩 포함). Prometheus 경보 rule 등록은 인프라 후속 |
