@@ -91,6 +91,7 @@ export const suitability: PlaceSuitabilityResponse = {
     },
     minTemperature: 24.0,
     maxTemperature: 31.0,
+    maxFeelsLikeTemperature: 33.4,
     maxPrecipitationProbability: 80,
     precipitationType: { code: 'RAIN', name: '비', description: '비가 예보되었습니다.' },
     skyState: { code: 'CLOUDY', name: '흐림', description: '구름이 많습니다.' },

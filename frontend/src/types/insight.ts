@@ -71,6 +71,14 @@ export type DailyWeatherItem = {
   forecastSource: CodeNameMetadata
   minTemperature: number | null
   maxTemperature: number | null
+  /**
+   * 하루 최고 체감온도(℃) — #253 · [PR #235](https://github.com/8llow8llowMe/hondigagae/pull/235).
+   *
+   * 시각별 기온·습도로 낸 열지수의 하루 **최대**라 `maxTemperature` 와 다른 시각에서
+   * 나온다. **중기예보에는 시각별 데이터가 없어 null 이고, 서버가 최고기온으로 대신
+   * 채우지 않는다.**
+   */
+  maxFeelsLikeTemperature: number | null
   maxPrecipitationProbability: number | null
   precipitationType: CodeNameMetadata | null
   skyState: CodeNameMetadata | null

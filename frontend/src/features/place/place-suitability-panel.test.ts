@@ -135,12 +135,38 @@ describe('PlaceSuitabilityPanel — 반려견이 없으면 판정을 말하지 �
     expect(markup).not.toContain(suitability.reasons[0]?.description ?? '')
   })
 
-  it('대신 지역 날씨와 등록 유도를 보여준다', () => {
+  /*
+    **최고기온이 아니라 체감온도다** (#253). 아트보드가 이 자리에 그린 큰 숫자는 열지수인데
+    계약에 없어 최고기온으로 대신하고 있었고, PR #235 가 `maxFeelsLikeTemperature` 를
+    더하면서 아트보드대로 돌아왔다.
+  */
+  it('대신 지역 날씨와 등록 유도를 보여준다 — 온도는 체감온도다', () => {
     const markup = render({ petName: null })
 
     expect(markup).toContain(messages.place.detailGuestHeading)
     expect(markup).toContain(messages.place.detailGuestCta)
+    expect(markup).toContain(messages.place.detailFeelsLikeTemperature)
+    expect(markup).toContain('33.4')
+    // 같은 ℃ 라 둘을 나란히 세우지 않는다 — 라벨을 읽어야 구분되는 숫자 두 개가 된다
+    expect(markup).not.toContain('31.0')
+  })
+
+  /*
+    중기예보 구간은 체감온도가 **언제나 null** 이다. 그때 최고기온을 세우되 **이름을 바꿔
+    말하지 않는다** — 최고기온을 체감온도라고 부르면 판정의 근거를 잘못 알려 주는 것이다.
+  */
+  it('체감온도를 못 받으면 최고기온으로 바꿔 세우고 라벨도 바꾼다', () => {
+    const weather = suitability.weather
+    if (weather === null) throw new Error('fixture 에 예보가 있어야 한다')
+
+    const markup = render({
+      petName: null,
+      data: { ...suitability, weather: { ...weather, maxFeelsLikeTemperature: null } },
+    })
+
+    expect(markup).toContain(messages.place.detailMaxTemperature)
     expect(markup).toContain('31.0')
+    expect(markup).not.toContain(messages.place.detailFeelsLikeTemperature)
   })
 
   it('미로그인이면 로그인으로, 로그인했으면 반려견 등록으로 보낸다', () => {

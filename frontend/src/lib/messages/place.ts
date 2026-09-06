@@ -136,6 +136,12 @@ export const placeMessages = {
   detailGuestNoWeather: '오늘 이 지역의 예보를 가져오지 못했어요.',
 
   detailMaxTemperature: '최고기온',
+  /**
+   * 체감온도 (#253). **기온과 습도를 합친 열지수다** — 반려견은 헐떡임으로 체온을 내려
+   * 습도에 사람보다 민감해서 이 값이 판정의 핵심 지표다. 아트보드가 이 자리에 그린
+   * 큰 숫자도 최고기온이 아니라 이것이다.
+   */
+  detailFeelsLikeTemperature: '체감온도',
   detailTemperatureUnit: '℃',
   detailPrecipitationProbability: '강수확률',
   detailPercentUnit: '%',
