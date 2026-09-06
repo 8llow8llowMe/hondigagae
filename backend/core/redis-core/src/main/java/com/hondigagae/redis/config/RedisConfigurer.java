@@ -34,6 +34,10 @@ public class RedisConfigurer {
         // 주의: 기본 ObjectMapper 라 java.time 타입을 직렬화하지 못한다.
         // 객체 저장이 필요하면 StringRedisTemplate + 서비스 ObjectMapper 로 JSON 문자열을 직접 다룬다.
         redisTemplate.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+        // hash 직렬화기를 지정하지 않으면 JDK 직렬화로 폴백한다 — opsForHash 를 쓰는 순간
+        // redis-cli 로 읽을 수 없는 바이너리가 저장되므로 key/value 와 같은 정책으로 맞춘다.
+        redisTemplate.setHashKeySerializer(new StringRedisSerializer());
+        redisTemplate.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
         return redisTemplate;
     }
 

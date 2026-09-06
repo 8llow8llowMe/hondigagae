@@ -15,7 +15,10 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -85,6 +88,23 @@ public class PlanInsightClientAdapter implements PetConditionQueryPort, PlaceSui
                 memberId, exception.getErrorCode().getCode());
             return Optional.empty();
         }
+    }
+
+    /**
+     * 소유 검증용이라 이 어댑터의 다른 메서드와 달리 <b>실패를 삼키지 않는다</b> — support 가
+     * 던지는 503(INTERNAL_SERVICE_UNAVAILABLE)을 그대로 올린다. 포트 계약 참고.
+     */
+    @Override
+    public Set<Long> findOwnedPetIds(long memberId, List<Long> petIds) {
+        List<PetConditionClientResponse> body = internalResponseSupport.requestAndUnwrapOrNull(
+            AUTH_SERVICE, () -> petConditionClient.getPetConditions(memberId, petIds));
+        if (body == null) {
+            return Set.of();
+        }
+        return body.stream()
+            .map(item -> toPetId(item.petId()))
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
     }
 
     private PetConditionQueryResult toQueryResult(PetConditionClientResponse body) {

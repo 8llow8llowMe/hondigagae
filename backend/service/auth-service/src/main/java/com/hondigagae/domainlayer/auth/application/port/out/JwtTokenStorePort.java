@@ -25,6 +25,15 @@ public interface JwtTokenStorePort {
     /** 특정 기기 세션만 무효화한다 (로그아웃). */
     void deleteSession(long memberId, String sessionId);
 
+    /**
+     * 저장된 refresh 토큰이 기대값과 같을 때만 세션을 <b>원자적으로</b> 지운다 — 재발급 회전 전용.
+     * "조회 → 비교 → 삭제"를 나눠 하면 동시 재발급 두 건이 모두 비교를 통과해 세션이 증식하고,
+     * 탈취 토큰의 동시 재생도 둘 다 성공할 수 있다.
+     *
+     * @return 지웠으면 true. false 는 다른 요청이 먼저 회전시켰거나 이미 만료된 경우다
+     */
+    boolean deleteSessionIfTokenMatches(long memberId, String sessionId, String expectedToken);
+
     /** 회원의 전 기기 세션을 무효화한다 (탈퇴/비밀번호 변경/상태 이상). */
     void deleteAllSessions(long memberId);
 

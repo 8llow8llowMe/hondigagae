@@ -95,7 +95,12 @@ public class AiPlanJobSseStreamer {
         Runnable cleanup = closeOnce::getAsBoolean;
         Runnable closeStream = () -> {
             if (closeOnce.getAsBoolean()) {
-                emitter.complete();
+                try {
+                    emitter.complete();
+                } catch (RuntimeException exception) {
+                    // 이미 끊긴 연결의 complete 는 실패할 수 있다. 자원 정리는 위에서 끝났다.
+                    log.debug("AI 일정 SSE 종료 처리에 실패했습니다. reason={}", exception.getMessage());
+                }
             }
         };
         emitter.onCompletion(cleanup);
@@ -151,8 +156,11 @@ public class AiPlanJobSseStreamer {
                 forward(emitter, current, cleanup, closeStream);
             }
         } catch (IOException | RuntimeException exception) {
+            // 상태 재확인 실패(Redis 순단 등)도 여기로 온다. 구독만 정리하고 emitter 를 열어 두면
+            // 어떤 이벤트도 오지 않는 좀비 연결이 emitter 타임아웃까지 남는다 — 닫아서 클라이언트가
+            // 즉시 재연결(폴백 폴링)하게 한다.
             log.debug("AI 일정 SSE 하트비트 중 연결을 정리합니다. jobId={} reason={}", jobId, exception.getMessage());
-            cleanup.run();
+            closeStream.run();
         }
     }
 

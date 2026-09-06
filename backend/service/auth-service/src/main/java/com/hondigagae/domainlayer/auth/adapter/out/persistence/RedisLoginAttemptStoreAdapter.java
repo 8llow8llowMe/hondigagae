@@ -53,11 +53,9 @@ public class RedisLoginAttemptStoreAdapter implements LoginAttemptStorePort {
         try {
             String key = buildFailKey(email);
             Long count = redisTemplate.opsForValue().increment(key);
-            if (count != null && count == 1L) {
-                // 첫 실패에서만 TTL 을 건다. 매 실패마다 갱신하면 공격자가 카운터를 무한히 살려둘 수 있고,
-                // 반대로 정상 사용자는 오래된 실패가 만료돼 카운터가 자연 초기화되어야 한다.
-                redisTemplate.expire(key, ttl);
-            }
+            // 첫 실패에서만 TTL 을 건다. 매 실패마다 갱신하면 공격자가 카운터를 무한히 살려둘 수 있고,
+            // 반대로 정상 사용자는 오래된 실패가 만료돼 카운터가 자연 초기화되어야 한다.
+            ensureCounterTtl(key, count, ttl);
             return count == null ? 0L : count;
         } catch (DataAccessException exception) {
             log.error("[RedisLoginAttemptStoreAdapter] 로그인 실패 카운터 증가 실패(fail-open 처리): error={}",
@@ -84,6 +82,21 @@ public class RedisLoginAttemptStoreAdapter implements LoginAttemptStorePort {
             redisTemplate.delete(buildLockKey(email));
         } catch (DataAccessException exception) {
             log.error("[RedisLoginAttemptStoreAdapter] 로그인 실패 카운터 초기화 실패: error={}", exception.getMessage());
+        }
+    }
+
+    /**
+     * INCR 와 EXPIRE 는 원자적이지 않다 — 첫 증가 직후 장애가 나면 TTL 없는 카운터가 영구히 남는다.
+     * count==1 이 아니어도 TTL 이 없으면(과거 유실의 흔적) 다시 걸어 자가 치유한다.
+     */
+    private void ensureCounterTtl(String key, Long count, Duration ttl) {
+        if (count != null && count == 1L) {
+            redisTemplate.expire(key, ttl);
+            return;
+        }
+        Long remaining = redisTemplate.getExpire(key);
+        if (remaining != null && remaining < 0) {
+            redisTemplate.expire(key, ttl);
         }
     }
 

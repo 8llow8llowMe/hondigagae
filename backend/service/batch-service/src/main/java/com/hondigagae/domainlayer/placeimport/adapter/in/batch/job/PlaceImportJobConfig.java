@@ -7,6 +7,7 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -41,25 +42,27 @@ public class PlaceImportJobConfig {
             .build();
     }
 
+    // 스텝에는 무자원 매니저를 쓴다 — HTTP 페이징을 품은 tasklet 전체가 한 DB 트랜잭션으로
+    // 묶이면 실행 내내 row lock 을 쥔다 (BatchServiceBeansConfig.taskletTransactionManager 참고).
     @Bean
     public Step placeImportStep(
         JobRepository jobRepository,
-        PlatformTransactionManager transactionManager,
+        @Qualifier("taskletTransactionManager") PlatformTransactionManager taskletTransactionManager,
         PlaceImportTasklet placeImportTasklet
     ) {
         return new StepBuilder(STEP_NAME, jobRepository)
-            .tasklet(placeImportTasklet, transactionManager)
+            .tasklet(placeImportTasklet, taskletTransactionManager)
             .build();
     }
 
     @Bean
     public Step placeImageImportStep(
         JobRepository jobRepository,
-        PlatformTransactionManager transactionManager,
+        @Qualifier("taskletTransactionManager") PlatformTransactionManager taskletTransactionManager,
         PlaceImageImportTasklet placeImageImportTasklet
     ) {
         return new StepBuilder(IMAGE_STEP_NAME, jobRepository)
-            .tasklet(placeImageImportTasklet, transactionManager)
+            .tasklet(placeImageImportTasklet, taskletTransactionManager)
             .build();
     }
 }

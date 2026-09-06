@@ -78,6 +78,20 @@ class JwtTokenProcessorTest {
     }
 
     @Test
+    void reissueTokens_losingConcurrentRotation_rejectsWithoutNewSession() {
+        JwtTokenIssueInfo issued = processor.issueTokens(MEMBER_ID, SecurityRole.USER);
+        tokenStorePort.forceRotationLost = true;
+
+        // 조회·비교는 통과했지만 원자 삭제에서 진 쪽 — 이미 회전된 토큰의 재사용과 같은 취급이다
+        assertThatThrownBy(() -> processor.reissueTokens(issued.refreshToken()))
+            .isInstanceOf(AuthException.class)
+            .extracting(exception -> ((AuthException) exception).getErrorCode())
+            .isEqualTo(AuthErrorCode.INVALID_REFRESH_TOKEN);
+        // 진 쪽이 새 세션을 저장하면 세션이 증식한다 — 발급 시점의 1개 그대로여야 한다
+        assertThat(tokenStorePort.sessionCount(MEMBER_ID)).isEqualTo(1);
+    }
+
+    @Test
     void reissueTokens_withEvictedSession_rejectsAsExpired() {
         JwtTokenIssueInfo issued = processor.issueTokens(MEMBER_ID, SecurityRole.USER);
         tokenStorePort.deleteAllSessions(MEMBER_ID);
@@ -138,6 +152,8 @@ class JwtTokenProcessorTest {
 
         private final Map<String, String> tokens = new HashMap<>();
         private final Set<String> blacklistedTokenIds = new HashSet<>();
+        /** 동시 재발급에서 원자 삭제에 진 상황을 흉내낸다 — 다른 요청이 먼저 회전시킨 경우. */
+        private boolean forceRotationLost;
 
         @Override
         public void save(long memberId, String sessionId, String refreshToken) {
@@ -157,6 +173,14 @@ class JwtTokenProcessorTest {
         @Override
         public void deleteSession(long memberId, String sessionId) {
             tokens.remove(memberId + ":" + sessionId);
+        }
+
+        @Override
+        public boolean deleteSessionIfTokenMatches(long memberId, String sessionId, String expectedToken) {
+            if (forceRotationLost) {
+                return false;
+            }
+            return tokens.remove(memberId + ":" + sessionId, expectedToken);
         }
 
         @Override

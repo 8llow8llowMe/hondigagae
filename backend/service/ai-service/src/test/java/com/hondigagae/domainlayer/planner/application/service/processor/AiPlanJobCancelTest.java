@@ -170,12 +170,16 @@ class AiPlanJobCancelTest {
 
         @Override
         public AiPlanJob save(AiPlanJob job) {
+            // 포트 계약과 같게, 종결로 저장된 잡은 덮지 않고 저장소의 잡을 돌려준다.
+            if (stored != null && stored.status().isTerminal()) {
+                return stored;
+            }
             saved = job;
             return job;
         }
 
         @Override
-        public void releaseIdempotencyKey(Long memberId, String requestHash) {
+        public void releaseIdempotencyKey(Long memberId, String requestHash, String jobId) {
             releasedHash = requestHash;
         }
 

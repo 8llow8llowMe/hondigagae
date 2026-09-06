@@ -65,6 +65,12 @@ public class AiPlanWorker {
                 return;
             }
             running = aiPlanJobStorePort.save(job.withStatus(AiPlanJobStatus.RUNNING, Instant.now()));
+            // 위 status 확인과 save 사이에 취소·타임아웃이 끼어들 수 있다. 저장소가 종결을
+            // 덮지 않고 저장된 잡을 돌려주므로, 반영되지 않았으면 시작하지 않는다.
+            if (running.status() != AiPlanJobStatus.RUNNING) {
+                log.info("AI plan job already terminal before worker start jobId={} status={}", jobId, running.status());
+                return;
+            }
             aiPlanJobEventPort.publishJobUpdated(jobId);
         } catch (RuntimeException pickupFailure) {
             log.error("AI plan job pickup failed jobId={} reason={}", jobId, pickupFailure.getMessage(), pickupFailure);
@@ -83,14 +89,16 @@ public class AiPlanWorker {
             log.info("AI plan draft generated jobId={} days={}", running.jobId(),
                 draft.days() == null ? 0 : draft.days().size());
 
-            // 가장 오래 걸리는 구간을 지나는 동안 취소됐을 수 있다. 결과로 덮어쓰지 않는다.
-            if (isCanceled(running.jobId())) {
-                log.info("AI plan job canceled during generation, discarding draft jobId={}", running.jobId());
-                return;
+            // 가장 오래 걸리는 구간을 지나는 동안 취소되거나 타임아웃 판정(FAILED)됐을 수 있다.
+            // 저장소가 종결을 덮지 않으므로, 반영되지 않았으면 초안을 버린다.
+            AiPlanJob completed = aiPlanJobStorePort.save(current.get().completedWithDraft(draft, Instant.now()));
+            if (completed.status() != AiPlanJobStatus.COMPLETED) {
+                log.info("AI plan job already terminal, discarding draft jobId={} status={}",
+                    running.jobId(), completed.status());
             }
-            aiPlanJobStorePort.save(current.get().completedWithDraft(draft, Instant.now()));
         } catch (JobCanceledException canceled) {
-            log.info("AI plan job canceled before step={} jobId={}", canceled.stoppedBefore, running.jobId());
+            log.info("AI plan job already terminal, stopping before step={} jobId={}",
+                canceled.stoppedBefore, running.jobId());
         } catch (AiPlanException domainException) {
             log.error("AI plan job failed jobId={} memberId={} step={} errorCode={} cause={}",
                 running.jobId(), running.memberId(), current.get().step(),
@@ -106,39 +114,40 @@ public class AiPlanWorker {
                 AiPlanErrorCode.JOB_FAILED.getCode(), AiPlanErrorCode.JOB_FAILED.getMessage(), Instant.now()
             ));
         } finally {
-            aiPlanJobStorePort.releaseIdempotencyKey(running.memberId(), running.requestHash());
+            aiPlanJobStorePort.releaseIdempotencyKey(running.memberId(), running.requestHash(), running.jobId());
             // 종결(완료/실패/취소) 저장은 위 모든 경로에서 finally 이전에 끝난다. 여기서 한 번만 알린다.
             aiPlanJobEventPort.publishJobUpdated(running.jobId());
         }
     }
 
     /**
-     * 다음 단계로 옮기고 화면에 알린다. <b>취소를 확인하는 지점이기도 하다.</b>
+     * 다음 단계로 옮기고 화면에 알린다. <b>취소·타임아웃을 확인하는 지점이기도 하다.</b>
      *
      * <p>취소는 실행 중인 스레드를 멈추지 못한다 — LLM 호출은 블로킹이고 중간에 끊을 수단이
      * 없다. 대신 단계 경계마다 저장소를 다시 읽어 협조적으로 멈춘다. 그래서 취소의 실익은
      * <b>가장 비싼 LLM 호출에 들어가기 전에 서는 것</b>이고, 이미 들어간 뒤라면 돌아온 결과를
      * 버리는 것까지가 할 수 있는 전부다. 이 성질을 응답 문서에도 적어 둔다.
      *
+     * <p>CANCELED 만이 아니라 <b>모든 종결</b>에서 선다 — 폴링이 RUNNING 타임아웃으로 FAILED
+     * 를 박아 둔 잡을 계속 진행하면, 사용자가 이미 재제출한 동일 요청과 나란히 돈다.
+     *
      * <p>단계마다 Redis 를 한 번 더 읽지만 왕복 네 번은 LLM 한 번에 비하면 없는 값이다.
+     * 읽기와 저장 사이의 남은 창은 저장소의 종결 보호 저장이 막는다.
      */
     private AiPlanJob advanceTo(AiPlanJob job, AiPlanJobStep step) {
         AiPlanJob latest = aiPlanJobStorePort.findById(job.jobId()).orElse(job);
-        if (latest.status() == AiPlanJobStatus.CANCELED) {
+        if (latest.status().isTerminal()) {
             throw new JobCanceledException(step);
         }
         AiPlanJob advanced = aiPlanJobStorePort.save(latest.atStep(step));
+        if (advanced.status().isTerminal()) {
+            throw new JobCanceledException(step);
+        }
         aiPlanJobEventPort.publishJobUpdated(job.jobId());
         return advanced;
     }
 
-    private boolean isCanceled(String jobId) {
-        return aiPlanJobStorePort.findById(jobId)
-            .map(job -> job.status() == AiPlanJobStatus.CANCELED)
-            .orElse(false);
-    }
-
-    /** 취소로 인한 중단. 실패가 아니라서 오류 경로와 섞지 않으려고 따로 둔다. */
+    /** 취소·타임아웃 등 종결로 인한 중단. 실패가 아니라서 오류 경로와 섞지 않으려고 따로 둔다. */
     private static final class JobCanceledException extends RuntimeException {
 
         private final transient AiPlanJobStep stoppedBefore;

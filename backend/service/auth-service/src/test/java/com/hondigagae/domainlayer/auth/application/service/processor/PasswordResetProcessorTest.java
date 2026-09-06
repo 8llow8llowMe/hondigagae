@@ -339,6 +339,11 @@ class PasswordResetProcessorTest {
         }
 
         @Override
+        public boolean deleteSessionIfTokenMatches(long memberId, String sessionId, String expectedToken) {
+            return false;
+        }
+
+        @Override
         public void deleteAllSessions(long memberId) {
             allSessionsDeletedMemberIds.add(memberId);
         }

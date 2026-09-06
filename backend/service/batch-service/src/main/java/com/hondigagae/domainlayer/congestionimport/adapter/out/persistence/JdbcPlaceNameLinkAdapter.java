@@ -25,11 +25,15 @@ public class JdbcPlaceNameLinkAdapter implements PlaceNameLinkBulkPort {
 
     private static final int BATCH_SIZE = 500;
 
-    /** 병합으로 사라진 행은 매칭 대상이 아니다. 조회에서 빠진 장소에 링크를 걸면 안 된다. */
+    /**
+     * 병합으로 사라진 행과 delist 된 행은 매칭 대상이 아니다. delist 행이 완전일치를 선점하면
+     * 살아있는 장소가 부분일치 기회를 뺏겨 UNMATCHED 가 된다.
+     */
     private static final String SELECT_PLACES_SQL = """
         SELECT id, title
         FROM place
         WHERE merged_into_id IS NULL
+          AND delisted_at IS NULL
           AND (? IS NULL OR area_code = ?)
         """;
 

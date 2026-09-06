@@ -8,6 +8,7 @@ import com.hondigagae.domainlayer.favorite.domain.model.Favorite;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -39,11 +40,19 @@ public class FavoriteCommandProcessor {
         if (favoritePlaceLookupPort.findSummaries(List.of(placeId)).isEmpty()) {
             throw new FavoriteException(FavoriteErrorCode.NOT_FOUND_PLACE);
         }
-        return favoriteRepositoryPort.save(Favorite.builder()
-            .id(snowflakeIdGenerator.generateId())
-            .memberId(memberId)
-            .placeId(placeId)
-            .build());
+        try {
+            return favoriteRepositoryPort.save(Favorite.builder()
+                .id(snowflakeIdGenerator.generateId())
+                .memberId(memberId)
+                .placeId(placeId)
+                .build());
+        } catch (DataIntegrityViolationException exception) {
+            // 동시 요청 둘이 모두 "없음" 을 보고 INSERT 한 경우다. 유니크 인덱스
+            // (uk_favorite_member_id_place_id)에서 진 쪽도 멱등 계약대로 성공으로 흡수한다 —
+            // 그대로 두면 토글 연타가 500 을 받는다.
+            return favoriteRepositoryPort.findByMemberIdAndPlaceId(memberId, placeId)
+                .orElseThrow(() -> exception);
+        }
     }
 
     /** 즐겨찾기 해제. 저장과 마찬가지로 멱등이다 — 없는 것을 지워도 성공으로 본다. */

@@ -6,6 +6,7 @@ import org.springframework.batch.core.Step;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -40,14 +41,15 @@ public class PetRestaurantImportJobConfig {
             .build();
     }
 
+    // 무자원 매니저 사용 이유는 BatchServiceBeansConfig.taskletTransactionManager 참고.
     @Bean
     public Step petRestaurantImportStep(
         JobRepository jobRepository,
-        PlatformTransactionManager transactionManager,
+        @Qualifier("taskletTransactionManager") PlatformTransactionManager taskletTransactionManager,
         PetRestaurantImportTasklet petRestaurantImportTasklet
     ) {
         return new StepBuilder(STEP_NAME, jobRepository)
-            .tasklet(petRestaurantImportTasklet, transactionManager)
+            .tasklet(petRestaurantImportTasklet, taskletTransactionManager)
             .build();
     }
 }

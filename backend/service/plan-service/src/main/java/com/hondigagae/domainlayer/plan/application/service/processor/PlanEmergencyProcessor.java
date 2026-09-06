@@ -47,9 +47,11 @@ public class PlanEmergencyProcessor {
     public PlanEmergencyInfo getEmergencyBriefing(Plan plan) {
         PlanInfo planInfo = planQueryProcessor.getPlanInfo(plan);
 
-        // 장소를 참조하는 항목만 브리핑 대상이다. 이동·좌표 없는 항목은 검색 중심점이 없다.
+        // 장소를 참조하는 항목만 브리핑 대상이다. 이동·좌표 없는 항목은 검색 중심점이 없고,
+        // WALK 의 targetId 는 walk_course.id 라 장소 아이디 공간으로 조회하면 안 된다
+        // (PlanItemType.isPlaceTarget 판정 — PlanQueryProcessor.placeTargetIdOf 와 같은 기준).
         List<PlanItemInfo> placeItems = planInfo.items().stream()
-            .filter(item -> item.targetId() != null)
+            .filter(item -> item.itemType().isPlaceTarget() && item.targetId() != null)
             .toList();
 
         List<Long> placeIds = placeItems.stream().map(PlanItemInfo::targetId).distinct().toList();

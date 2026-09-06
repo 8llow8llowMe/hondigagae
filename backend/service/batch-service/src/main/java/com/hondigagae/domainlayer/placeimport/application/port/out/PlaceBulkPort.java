@@ -24,4 +24,12 @@ public interface PlaceBulkPort {
      * 원천에 없으므로 <b>추정하지 않고 NULL 로 둔다</b> — "실외"와 "정보 없음"은 다르다.
      */
     void upsertPetRestaurants(List<ImportedPetRestaurant> restaurants);
+
+    /**
+     * 지오코딩 실패로 upsert 에서 빠진 식약처 업소의 synced_at 만 갱신한다.
+     *
+     * <p>delist 판정이 synced_at 기준이라, 원천 파일에 멀쩡히 있는 업소가 좌표 조회 일시 실패
+     * (VWorld 서킷 오픈 포함)만으로 폐업 취급되어 내려가면 안 된다.
+     */
+    void touchPetRestaurantsSyncedAt(List<String> sourceKeys);
 }

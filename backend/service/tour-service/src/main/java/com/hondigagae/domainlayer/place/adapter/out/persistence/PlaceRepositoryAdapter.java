@@ -18,6 +18,7 @@ import com.hondigagae.domainlayer.place.application.port.out.query.PlacePetInfoQ
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSliceQueryResult;
 import com.hondigagae.domainlayer.place.domain.model.Place;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -71,11 +72,27 @@ public class PlaceRepositoryAdapter implements PlaceRepositoryPort {
         return placePetInfoRepository.findByPlaceId(placeId).map(this::toPetInfoQueryResult);
     }
 
+    /**
+     * 원천(TourAPI) serialnum 은 자릿수가 다른 숫자 문자열이고, 원천에 일련번호가 없으면 적재가
+     * URL 해시(16진)로 대체한다. 컬럼 사전순은 "10" 을 "2" 앞에 두므로 여기서 숫자 값을 우선
+     * (짧은 것 먼저 → 사전순 = 숫자 크기순) 세우고, 순서 의미가 없는 해시는 그 뒤에 사전순으로
+     * 고정만 한다 — 어느 쪽이든 호출마다 같은 순서를 준다.
+     */
+    static final Comparator<PlaceImageEntity> GALLERY_ORDER =
+        Comparator.comparing((PlaceImageEntity image) -> !isDigits(image.getSerialNum()))
+            .thenComparingInt(image -> image.getSerialNum().length())
+            .thenComparing(PlaceImageEntity::getSerialNum);
+
     @Override
     public List<PlaceImageQueryResult> findImagesByPlaceId(long placeId) {
-        return placeImageRepository.findAllByPlaceIdOrderBySerialNumAsc(placeId).stream()
+        return placeImageRepository.findAllByPlaceId(placeId).stream()
+            .sorted(GALLERY_ORDER)
             .map(this::toImageQueryResult)
             .toList();
+    }
+
+    private static boolean isDigits(String value) {
+        return !value.isEmpty() && value.chars().allMatch(Character::isDigit);
     }
 
     @Override

@@ -28,17 +28,18 @@ public class DelistProcessor {
     private final PlaceDelistCommandPort placeDelistCommandPort;
     private final EmergencyFacilityDelistCommandPort emergencyFacilityDelistCommandPort;
 
-    public int delistPlaces(PlaceSourceType source, LocalDateTime runStartedAt, long importedCount) {
-        long active = placeDelistCommandPort.countActive(source.name());
+    /** 범위는 (source, areaCode) — 적재 범위와 같아야 다른 지역 실행이 기존 지역을 내리지 않는다. */
+    public int delistPlaces(PlaceSourceType source, String areaCode, LocalDateTime runStartedAt, long importedCount) {
+        long active = placeDelistCommandPort.countActive(source.name(), areaCode);
         if (!DelistGuard.allows(importedCount, active)) {
-            log.warn("place delist skipped by guard. source={} imported={} active={}",
-                source, importedCount, active);
+            log.warn("place delist skipped by guard. source={} areaCode={} imported={} active={}",
+                source, areaCode, importedCount, active);
             return 0;
         }
-        int delisted = placeDelistCommandPort.delistStale(source.name(), runStartedAt);
+        int delisted = placeDelistCommandPort.delistStale(source.name(), areaCode, runStartedAt);
         if (delisted > 0) {
-            log.info("place delisted. source={} delisted={} imported={} active={}",
-                source, delisted, importedCount, active);
+            log.info("place delisted. source={} areaCode={} delisted={} imported={} active={}",
+                source, areaCode, delisted, importedCount, active);
         }
         return delisted;
     }

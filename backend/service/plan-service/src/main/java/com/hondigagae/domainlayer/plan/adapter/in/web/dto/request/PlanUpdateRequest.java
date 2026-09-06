@@ -4,6 +4,7 @@ import com.hondigagae.domainlayer.plan.application.command.PlanUpdateCommand;
 import com.hondigagae.domainlayer.plan.application.exception.PlanValidationMessage;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
@@ -14,7 +15,10 @@ import java.time.LocalDate;
 @Schema(description = "여행 일정 수정 요청 DTO")
 public record PlanUpdateRequest(
 
-    @Schema(description = "생략 가능. 일정 제목(60자 이하). 생략하면 기존 값 유지", example = "몽실이와 제주 2박 3일")
+    @Schema(description = "생략 가능. 일정 제목(60자 이하, 공백만으로는 불가). 생략하면 기존 값 유지", example = "몽실이와 제주 2박 3일")
+    // null 은 "유지" 라 @NotBlank 를 못 쓴다. 보냈다면 내용이 있어야 한다 — 빈 문자열이 통과하면
+    // 제목 없는 일정이 목록에 남는다. (@Pattern 은 null 을 검사하지 않는다)
+    @Pattern(regexp = ".*\\S.*", message = PlanValidationMessage.TITLE_REQUIRED)
     @Size(max = 60, message = PlanValidationMessage.TITLE_LENGTH_INVALID)
     String title,
 

@@ -32,6 +32,9 @@ public enum AuthErrorCode {
     PASSWORD_RESET_ATTEMPTS_EXCEEDED("AUTH_017", "인증코드 시도 횟수를 초과했습니다. 인증코드를 다시 요청해주세요.", HttpStatus.BAD_REQUEST),
     // 가입용 이메일 인증코드도 재설정(AUTH_017)과 같은 브루트포스 표면이다 — 같은 상한을 적용한다.
     EMAIL_CODE_ATTEMPTS_EXCEEDED("AUTH_018", "인증코드 시도 횟수를 초과했습니다. 인증코드를 다시 요청해주세요.", HttpStatus.BAD_REQUEST),
+    // 제공자가 이메일 소유를 검증하지 않은 소셜 로그인(네이버)이 기존 일반 계정과 같은 이메일로
+    // 들어온 경우 — 자동 연결하면 계정 탈취 경로가 되므로 기존 방식 로그인으로 유도한다.
+    OAUTH_LINK_REQUIRES_VERIFIED_EMAIL("AUTH_019", "이미 가입된 이메일입니다. 기존에 사용하던 로그인 방식으로 로그인해주세요.", HttpStatus.CONFLICT),
 
     // 요청 검증(Bean Validation) 대역 — 1xx.
     // 필드별 코드(AUTH_101~104)는 AuthValidationMessage 가 단일 기준점이며, 여기서는 중복 정의하지 않는다.

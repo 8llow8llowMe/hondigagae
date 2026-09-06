@@ -40,15 +40,19 @@ x-ai-service-environment: &ai_service_environment
   # 이름이 auth-service 발급 쪽(jwt.access-key)과 다르지만 값은 같아야 한다.
   # 다르면 컴파일도 기동도 되다가 첫 인증 요청에서 jwtDecoder NPE 로 죽는다.
   JWT_ACCESS_KEY: ${JWT_ACCESS_KEY}
-  # 내부 호출 대상(lb://).
+  # 내부 호출 대상(lb://). 빠지면 Feign 이 리터럴 "${...}" 을 호스트명으로 삼아
+  # "Service id not legal hostname" 으로 기동에 실패한다 (plan-service dev 배포에서 실제 발생).
   TOUR_SERVICE_APP_NAME: ${TOUR_SERVICE_APP_NAME}
   # ai-service 는 일정을 소유하지 않는다. 생성 결과는 plan-service 에 넘긴다.
   PLAN_SERVICE_APP_NAME: ${PLAN_SERVICE_APP_NAME}
+  # 반려견 특성 조회(PetConditionClient) 대상.
+  AUTH_SERVICE_APP_NAME: ${AUTH_SERVICE_APP_NAME}
   INTERNAL_CLIENT_CONNECT_TIMEOUT_MS: ${INTERNAL_CLIENT_CONNECT_TIMEOUT_MS:-2000}
   INTERNAL_CLIENT_READ_TIMEOUT_MS: ${INTERNAL_CLIENT_READ_TIMEOUT_MS:-5000}
   # 작업 상태 Redis 보관 기간.
   AI_PLAN_JOB_TTL_SECONDS: ${AI_PLAN_JOB_TTL_SECONDS:-86400}
-  AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS: ${AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS:-30}
+  # 동시 실행 2 + 대기열 4(AsyncConfig) 기준 최악 대기 240초를 덮는 값. 세 값은 한 세트다.
+  AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS: ${AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS:-300}
   AI_PLAN_JOB_RUNNING_TIMEOUT_SECONDS: ${AI_PLAN_JOB_RUNNING_TIMEOUT_SECONDS:-300}
   # LLM (Spring AI / Ollama). 어댑터는 항상 뜨므로 BASE_URL 이 실제 Ollama 를 가리켜야 일정 생성이 된다.
   # 기본값은 yml 과 같은 값이다 — compose 가 넘기지 않으면 Vault 를 바꿔도 컨테이너에는 도달하지 않는다.

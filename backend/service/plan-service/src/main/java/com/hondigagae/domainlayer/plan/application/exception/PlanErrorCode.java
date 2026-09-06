@@ -18,6 +18,7 @@ public enum PlanErrorCode {
     PLAN_PERIOD_TOO_LONG("PLAN_009", "여행 기간은 최대 30일까지 만들 수 있습니다.", HttpStatus.BAD_REQUEST),
     PLAN_PERIOD_SHRINK_CONFLICT("PLAN_008", "줄어든 여행 기간 밖에 일정 항목이 남아 있습니다. 해당 일차의 항목을 먼저 정리해 주세요.", HttpStatus.BAD_REQUEST),
     PET_REQUIRED("PLAN_010", "동행할 반려견을 지정하거나 대표 반려견을 등록해 주세요.", HttpStatus.BAD_REQUEST),
+    NOT_FOUND_PET("PLAN_011", "존재하지 않거나 본인 소유가 아닌 반려견이 있습니다.", HttpStatus.BAD_REQUEST),
     INVALID_REQUEST("PLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
     // 프레임워크 공통 2종은 검증 대역 끝에 둔다 (coding-conventions §8-2). PLAN_115 가 petIds 필드 코드로
     // 쓰이면서 한 칸씩 밀렸다.

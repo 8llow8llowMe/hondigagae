@@ -1,5 +1,9 @@
 package com.hondigagae.domainlayer.placeimport.adapter.out.persistence;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportErrorCode;
+import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportException;
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceBulkPort;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedCultureFacility;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPetRestaurant;
@@ -10,6 +14,7 @@ import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -246,6 +251,7 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
         """;
 
     private final JdbcTemplate jdbcTemplate;
+    private final ObjectMapper objectMapper;
 
     @Override
     public void upsertAll(List<ImportedPlace> places) {
@@ -383,6 +389,39 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
         }
     }
 
+    /** 지오코딩 실패 업소는 upsert 를 못 타므로 synced_at 만 따로 만진다. 행이 아직 없으면 무시된다. */
+    private static final String MFDS_TOUCH_SYNCED_SQL = """
+        UPDATE place
+           SET synced_at = ?,
+               updated_at = NOW()
+         WHERE source = 'MFDS'
+           AND source_key = ?
+        """;
+
+    @Override
+    public void touchPetRestaurantsSyncedAt(List<String> sourceKeys) {
+        if (sourceKeys.isEmpty()) {
+            return;
+        }
+        LocalDateTime syncedAt = LocalDateTime.now();
+
+        for (int start = 0; start < sourceKeys.size(); start += BATCH_SIZE) {
+            List<String> chunk = sourceKeys.subList(start, Math.min(start + BATCH_SIZE, sourceKeys.size()));
+            jdbcTemplate.batchUpdate(MFDS_TOUCH_SYNCED_SQL, new BatchPreparedStatementSetter() {
+                @Override
+                public void setValues(PreparedStatement ps, int i) throws SQLException {
+                    ps.setTimestamp(1, Timestamp.valueOf(syncedAt));
+                    ps.setString(2, chunk.get(i));
+                }
+
+                @Override
+                public int getBatchSize() {
+                    return chunk.size();
+                }
+            });
+        }
+    }
+
     /** 입장료는 place_intro 의 정규 컬럼이 없어 raw_json 에 넣는다. */
     private void upsertCultureIntros(List<ImportedCultureFacility> chunk, LocalDateTime syncedAt) {
         jdbcTemplate.batchUpdate(CULTURE_INTRO_UPSERT_SQL, new BatchPreparedStatementSetter() {
@@ -408,11 +447,20 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
         });
     }
 
+    /**
+     * raw_json 은 MySQL JSON 컬럼이라 invalid JSON 은 INSERT 자체가 거부된다. 수제 이스케이프는
+     * 원문에 역슬래시·개행이 오면 깨지므로 반드시 ObjectMapper 로 직렬화한다.
+     */
     private String toRawJson(ImportedCultureFacility facility) {
         if (facility.admissionFee() == null) {
             return null;
         }
-        return "{\"admissionFee\":\"" + facility.admissionFee().replace("\"", "'") + "\"}";
+        try {
+            return objectMapper.writeValueAsString(Map.of("admissionFee", facility.admissionFee()));
+        } catch (JsonProcessingException exception) {
+            throw new PlaceImportException(PlaceImportErrorCode.INTRO_JSON_SERIALIZE_FAILED,
+                exception, facility.sourceKey());
+        }
     }
 
     private void setNullableInt(PreparedStatement ps, int index, Integer value) throws SQLException {

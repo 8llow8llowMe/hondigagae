@@ -107,6 +107,18 @@ public class AuthSecurityConfigurer {
         return new JwtAuthFilter(jwtAuthProvider, jwtAuthenticationFailureHandler, blacklistVerifierProvider.getIfAvailable());
     }
 
+    /**
+     * Filter 타입 빈은 Spring Boot 가 시큐리티 체인과 <b>별개로</b> 서블릿 컨테이너 필터로도 자동
+     * 등록한다. JwtAuthFilter 는 체인 안(addFilterBefore)에서만 돌아야 하므로 자동 등록을 끈다 —
+     * 켜져 있으면 실행 시점이 등록 순서에 따라 달라지는 이중 실행 경로가 잠복한다.
+     */
+    @Bean
+    public FilterRegistrationBean<JwtAuthFilter> jwtAuthFilterRegistration(JwtAuthFilter jwtAuthFilter) {
+        FilterRegistrationBean<JwtAuthFilter> registration = new FilterRegistrationBean<>(jwtAuthFilter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
     @Bean
     public CustomAccessDeniedHandler customAccessDeniedHandler(SecurityErrorResponseWriter errorResponseWriter) {
         return new CustomAccessDeniedHandler(errorResponseWriter);

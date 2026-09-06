@@ -44,7 +44,7 @@ public class PlaceImportFacade implements PlaceImportUseCase {
             || contentTypes.containsAll(PlaceContentType.DEFAULT_IMPORT_TARGETS);
         int delisted = 0;
         if (fullRun) {
-            delisted = delistProcessor.delistPlaces(PlaceSourceType.TOUR_API, runStartedAt, imported);
+            delisted = delistProcessor.delistPlaces(PlaceSourceType.TOUR_API, areaCode, runStartedAt, imported);
         }
 
         placeImportMetricsPort.recordRows(PlaceSourceType.TOUR_API, PlaceImportResultType.UPSERTED, imported);

@@ -47,7 +47,10 @@ public class PlaceQueryProcessor {
         return placeRepositoryPort.findNearby(criteria).stream()
             .map(place -> toNearbyInfo(place, criteria))
             .filter(info -> info.distanceMeters() <= criteria.radius())
-            .sorted(Comparator.comparingInt(NearbyPlaceInfo::distanceMeters))
+            // 거리(m 반올림)는 동률이 흔하다 — 아이디로 순서를 고정하지 않으면 같은 요청이
+            // 호출마다 다른 순서를 주고, limit 경계에서는 포함되는 장소 자체가 바뀐다.
+            .sorted(Comparator.comparingInt(NearbyPlaceInfo::distanceMeters)
+                .thenComparingLong(info -> info.place().placeId()))
             .limit(criteria.size())
             .toList();
     }

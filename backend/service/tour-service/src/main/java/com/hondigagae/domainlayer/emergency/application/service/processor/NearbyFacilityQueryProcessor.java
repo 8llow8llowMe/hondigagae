@@ -37,7 +37,10 @@ public class NearbyFacilityQueryProcessor {
             // 근거 없이 열려 있다고 말하는 편이 더 나쁘다. 다만 24시간 확인 시설은 spec 없이도 연다.
             .filter(info -> !query.openNowOnly() || Boolean.TRUE.equals(info.openNow()))
             .filter(info -> info.distanceMeters() <= query.radius())
-            .sorted(Comparator.comparingInt(NearbyFacilityInfo::distanceMeters))
+            // 거리(m 반올림)는 같은 건물의 병원·약국처럼 동률이 흔하다 — 아이디로 순서를
+            // 고정하지 않으면 호출마다 목록이 흔들리고 limit 경계의 포함 여부도 바뀐다.
+            .sorted(Comparator.comparingInt(NearbyFacilityInfo::distanceMeters)
+                .thenComparingLong(NearbyFacilityInfo::facilityId))
             .limit(query.size())
             .toList();
     }

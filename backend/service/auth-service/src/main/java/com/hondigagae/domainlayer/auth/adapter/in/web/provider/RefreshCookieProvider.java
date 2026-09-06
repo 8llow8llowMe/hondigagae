@@ -42,6 +42,9 @@ public class RefreshCookieProvider {
     }
 
     private boolean isSecure() {
-        return environment.acceptsProfiles(Profiles.of("prod"));
+        // "https 로 서비스되는가"가 기준이다. dev 도 https(dev.hondigagae.com)로 서비스되므로
+        // prod 만 보면 dev 의 refresh 토큰이 평문 http 요청에 실려 나갈 수 있다.
+        // http 는 로컬 개발(localhost)뿐이라 local 프로필만 제외한다.
+        return !environment.acceptsProfiles(Profiles.of("local"));
     }
 }
