@@ -6,7 +6,7 @@
  * **DOM 이 필요한 부분과 판정을 나눈다.** `EventSource` 조립은 훅이 하고, 이 파일은
  * "이 이벤트를 어떻게 읽고 언제 끊는가" 만 다뤄 node 환경 테스트로 덮는다.
  */
-import { isJobCompleted, isJobFailed } from '@/lib/ai-plan/job'
+import { isJobCanceled, isJobCompleted, isJobFailed } from '@/lib/ai-plan/job'
 import type { AiPlanJob } from '@/types/ai-plan'
 
 /**
@@ -50,9 +50,12 @@ export function parseJobEvent(data: string): AiPlanJob | null {
  * **닫지 않으면 무한 재구독이 된다.** 백엔드는 종결 상태를 보낸 뒤 `emitter.complete()`
  * 로 연결을 닫는데, 네이티브 `EventSource` 는 서버가 닫은 연결을 **자동 재연결 대상**으로
  * 본다. 그러면 재구독 → 종결 스냅샷 → 닫힘이 끝없이 돈다.
+ *
+ * **`CANCELED` 도 종결이다** (#250). 취소는 별도 이벤트가 아니라 `CANCELED` 상태 이벤트로
+ * 오고 서버가 그 직후 닫는다 — 빠뜨리면 취소한 작업에서 정확히 그 무한 재구독이 돈다.
  */
 export function isTerminalJob(job: AiPlanJob | null): boolean {
-  return isJobCompleted(job) || isJobFailed(job)
+  return isJobCompleted(job) || isJobFailed(job) || isJobCanceled(job)
 }
 
 /**

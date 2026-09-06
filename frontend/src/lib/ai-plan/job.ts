@@ -1,9 +1,10 @@
 /**
  * AI 일정 생성 작업 상태 판정 — 명세 S4(폴링) · S7(상태 화면).
  *
- * 근거: backend ai-service `AiPlanJobStatus` · `AiPlanJobStatusResponse` **소스 실측**
- * (`origin/develop` `af86c98`). 상태는 `PENDING`·`RUNNING`·`COMPLETED`·`FAILED` **넷뿐이고
- * 세부 단계가 계약에 없다** — 화면이 단계 목록을 지어내면 거짓 진행률이 된다 (명세 S2).
+ * 근거: backend ai-service `AiPlanJobStatus` · `AiPlanJobStep` · `AiPlanJobStatusResponse`
+ * **소스 실측**. 상태는 `PENDING`·`RUNNING`·`COMPLETED`·`FAILED`·**`CANCELED`** 다섯이고,
+ * 세부 단계는 **서버가 내려 준다**(#250 · PR #246) — 넷 중 지금 밟는 것과 `n / m` 이 온다.
+ * **화면이 단계를 지어내지 않는다는 규칙은 그대로다**: 서버가 준 값만 그린다 (명세 S2).
  *
  * 작업 타입 정본은 `src/types/ai-plan.ts` 다. 여기서는 판정만 한다.
  */
@@ -40,12 +41,56 @@ export function isJobCompleted(job: JobLike | null | undefined): boolean {
 }
 
 /**
+ * 작업이 취소됐는가 (#250).
+ *
+ * **실패와 갈라서 판정한다.** 취소는 `errorCode` 를 비운 채로 오므로 실패 화면에 태우면
+ * 사유 없는 "일정을 만들지 못했어요" 가 뜬다 — 사용자가 스스로 그만둔 것이지 장애가
+ * 아니다.
+ */
+export function isJobCanceled(job: JobLike | null | undefined): boolean {
+  return statusCodeOf(job?.status) === 'CANCELED'
+}
+
+/**
  * 폴링을 계속해야 하는가.
- * 완료·실패에서 반드시 멈춘다. 멈추지 않는 폴링이 대표 사고다.
+ * 완료·실패·**취소**에서 반드시 멈춘다. 멈추지 않는 폴링이 대표 사고다.
+ *
+ * **`CANCELED` 를 빠뜨리면 취소한 작업을 상한(90초)까지 두드린다** — 서버는 이미 종결
+ * 상태로 못 박고 SSE 도 닫았는데 화면만 진행 중으로 남는다 (#250).
  */
 export function shouldKeepPolling(job: JobLike | null | undefined): boolean {
   if (job === null || job === undefined) return true
-  return !isJobCompleted(job) && !isJobFailed(job)
+  return !isJobCompleted(job) && !isJobFailed(job) && !isJobCanceled(job)
+}
+
+/** 대기 화면이 그릴 세부 단계 — `n / m` 과 단계 metadata */
+export type JobStepProgress = {
+  order: number
+  total: number
+}
+
+/**
+ * `n / m 단계` 로 그릴 수 있는가 (#250).
+ *
+ * **없으면 null 이고, 화면은 그 자리를 비운다.** 세 가지가 다 null 을 낳는다:
+ *  - `PENDING` — `stepOrder` 가 **null 이다.** 0 이나 1 로 채우면 시작한 것으로 그린다
+ *  - 계약보다 앞선 배포 — 필드를 모르는 서버가 붙어 있으면 `undefined` 로 온다.
+ *    SSE 프레임은 `parseJobEvent` 가 모양을 검사하지 않고 통과시키므로 **타입만 믿으면
+ *    `NaN / undefined 단계` 가 화면에 나간다**
+ *  - 값이 어긋남 — 순서가 전체보다 크면 그리지 않는다. `5 / 4 단계` 는 진행률이 아니라
+ *    버그의 표시다
+ */
+export function jobStepProgress(
+  job: { stepOrder?: number | null; totalSteps?: number | null } | null | undefined,
+): JobStepProgress | null {
+  const order = job?.stepOrder
+  const total = job?.totalSteps
+
+  if (typeof order !== 'number' || typeof total !== 'number') return null
+  if (!Number.isInteger(order) || !Number.isInteger(total)) return null
+  if (order < 1 || total < 1 || order > total) return null
+
+  return { order, total }
 }
 
 /** 폴링 간격(ms) — 아트보드 02 */

@@ -40,6 +40,28 @@ export function fetchAiPlanJob(jobId: string): Promise<AiPlanJob> {
 }
 
 /**
+ * 작업 취소 (#250).
+ *
+ * **협조적 취소다.** 실행 중인 LLM 호출을 끊지 못하고, 서버가 상태를 `CANCELED` 로 못
+ * 박으면 워커가 **단계 경계마다** 그것을 읽어 스스로 선다 — 실익은 가장 비싼 `DRAFTING`
+ * 에 들어가기 전에 서는 것이고, 이미 들어갔다면 돌아온 초안을 버리는 것까지가 전부다.
+ * **즉시 중단을 전제로 화면을 짜면 안 된다.**
+ *
+ * 응답은 취소된 작업이라 **호출부가 그대로 작업 캐시에 쓴다** — 다음 폴링을 기다릴 필요가
+ * 없다.
+ *
+ * 던지는 경우:
+ *  - **409 `AIPLAN_019`** — 이미 완료·실패한 작업. 요청이 잘못된 것이 아니라 대상의 상태가
+ *    지나간 것이므로 **오류로 띄우지 않고 결과 화면으로 넘긴다**
+ *  - 404 `AIPLAN_002` — 타인·없는 `jobId`
+ *
+ * **이미 취소된 작업은 던지지 않는다** — 200 멱등이다.
+ */
+export function cancelAiPlanJob(jobId: string): Promise<AiPlanJob> {
+  return clientFetch<AiPlanJob>(paths.aiPlans.jobCancel(jobId), { method: 'POST' })
+}
+
+/**
  * 작업 상태 SSE 구독을 연다 (#91).
  *
  * **전송만 여기서 만든다.** 구독 수명·이벤트 해석·폴백 판단은 호출부(`use-ai-plan-job-stream.ts`)가

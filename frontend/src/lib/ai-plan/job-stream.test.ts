@@ -12,6 +12,9 @@ function job(code: string): AiPlanJob {
   return {
     jobId: 'job-1',
     status: { code, name: code, description: null },
+    step: null,
+    stepOrder: null,
+    totalSteps: 4,
     planDraft: null,
     errorCode: null,
     errorMessage: null,
@@ -70,6 +73,15 @@ describe('isTerminalJob', () => {
   it('완료·실패에서 닫는다', () => {
     expect(isTerminalJob(job('COMPLETED'))).toBe(true)
     expect(isTerminalJob(job('FAILED'))).toBe(true)
+  })
+
+  /*
+    **취소도 종결이다** (#250). 백엔드 `AiPlanJobStatus.isTerminal()` 이 `CANCELED` 를
+    포함하고 그 순간 `complete()` 로 닫는다 — 여기서 빠지면 취소한 작업에서 정확히
+    무한 재구독이 돈다.
+  */
+  it('취소에서도 닫는다', () => {
+    expect(isTerminalJob(job('CANCELED'))).toBe(true)
   })
 
   it('진행 중에는 열어 둔다', () => {

@@ -106,8 +106,42 @@ describe('resolveMockStream — 스트림 시작 전 오류', () => {
 })
 
 describe('resolveMockStream — 프레임 순서', () => {
-  it('스냅샷 → RUNNING → COMPLETED 로 전이한다', () => {
-    expect(codes(stream(newJob()))).toEqual(['PENDING', 'RUNNING', 'COMPLETED'])
+  /*
+    **단계마다 프레임이 하나씩 온다** (#250 · PR #246). 잡당 2회였던 이벤트가 6회가 됐다 —
+    백엔드가 단계 경계에서 pub/sub 이벤트를 올린다. mock 이 이 모양이어야 `n / m 단계` 가
+    움직이는 것을 로컬에서 볼 수 있다.
+  */
+  it('스냅샷 → 단계 4개 → COMPLETED 로 전이한다', () => {
+    expect(codes(stream(newJob()))).toEqual([
+      'PENDING',
+      'RUNNING',
+      'RUNNING',
+      'RUNNING',
+      'RUNNING',
+      'COMPLETED',
+    ])
+  })
+
+  it('RUNNING 프레임이 단계를 1부터 차례로 올린다', () => {
+    const result = stream(newJob())
+
+    if (result?.kind !== 'stream') throw new Error('스트림이 아니다')
+    const orders = result.frames.map((frame) => (frame.data as AiPlanJob).stepOrder)
+
+    // 스냅샷(PENDING)은 null 이고, 종결 프레임에는 마지막 단계가 남는다
+    expect(orders).toEqual([null, 1, 2, 3, 4, 4])
+  })
+
+  it('PENDING 스냅샷에는 단계가 없다 — 아직 시작하지 않았다', () => {
+    const result = stream(newJob())
+
+    if (result?.kind !== 'stream') throw new Error('스트림이 아니다')
+    const first = result.frames[0]?.data as AiPlanJob
+
+    expect(first.step).toBeNull()
+    expect(first.stepOrder).toBeNull()
+    // totalSteps 는 int 라 언제나 실린다
+    expect(first.totalSteps).toBeGreaterThan(0)
   })
 
   it('첫 프레임은 지연 없이 나간다 — 구독 즉시 스냅샷', () => {
@@ -128,7 +162,7 @@ describe('resolveMockStream — 프레임 순서', () => {
 
   /** 시나리오 트리거는 폴링 mock 과 같은 낱말을 쓴다 (`local-run-guide.md`) */
   it('요청 메모에 "실패" 가 있으면 FAILED 로 끝난다', () => {
-    expect(codes(stream(newJob('실패 시나리오')))).toEqual(['PENDING', 'RUNNING', 'FAILED'])
+    expect(codes(stream(newJob('실패 시나리오'))).at(-1)).toBe('FAILED')
   })
 
   it('FAILED 프레임에 errorCode 가 실린다 — 화면이 이유를 말해야 한다', () => {
@@ -146,6 +180,18 @@ describe('resolveMockStream — 프레임 순서', () => {
     if (result?.kind !== 'stream') throw new Error('스트림이 아니다')
     const last = result.frames.at(-1)?.data as AiPlanJob
     expect(last.planDraft?.days.length).toBeGreaterThan(0)
+  })
+
+  /*
+    **취소도 종결이라 스냅샷 하나로 닫는다** (#250). 백엔드는 `CANCELED` 를 별도 이벤트가
+    아니라 상태 이벤트로 보내고 그 직후 연결을 닫는다 — 취소한 뒤 새로고침한 경우가 이
+    경로다.
+  */
+  it('취소된 작업을 구독하면 CANCELED 스냅샷 하나로 닫는다', () => {
+    const jobId = newJob()
+    resolveMock(`/ai-plans/jobs/${jobId}/cancel`, 'POST', '', null, TOKEN)
+
+    expect(codes(stream(jobId))).toEqual(['CANCELED'])
   })
 
   /*

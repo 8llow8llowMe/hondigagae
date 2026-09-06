@@ -23,7 +23,7 @@ import { PlanDayRegenerateConfirm } from '@/features/plan/plan-day-regenerate-co
 import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { planKeys } from '@/features/plan/queries'
 import { usePlanDetail } from '@/features/plan/use-plan-detail'
-import { isJobFailed } from '@/lib/ai-plan/job'
+import { isJobFailed, jobStepProgress } from '@/lib/ai-plan/job'
 import {
   dayRegenerateBlock,
   toDayRegeneratePayload,
@@ -467,9 +467,26 @@ function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jo
     return (
       <AiPlanProgress
         status={job?.status ?? null}
+        /*
+          **세부 단계는 여기서도 그린다** (#250). 재생성도 같은 `ai-plans` 작업이라 계약이
+          같고, 수십 초 기다리는 것도 같다.
+        */
+        step={job?.step ?? null}
+        stepProgress={jobStepProgress(job)}
         phase={phase}
         onRecheck={recheck}
         rechecking={query.isFetching}
+        /*
+          **그만두기는 이 화면에 두지 않는다** (#250 범위 밖).
+
+          취소 자체는 같은 API 로 되지만 **끝난 뒤 갈 곳이 다르다** — 새 일정 만들기는
+          "같은 조건으로 다시" 가 답인 반면, 여기서는 일정과 그 날이 그대로 남아 있어
+          제출 화면으로 되돌리는 것이 맞다. 그 갈래를 설계하지 않은 채 버튼만 달면
+          취소한 사용자가 재생성 실패 화면을 보게 된다.
+        */
+        onCancel={null}
+        canceling={false}
+        cancelFailed={false}
       />
     )
   }

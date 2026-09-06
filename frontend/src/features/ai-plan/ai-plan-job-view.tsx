@@ -9,25 +9,22 @@ import { ButtonLink } from '@/components/button'
 import { ConfirmModal } from '@/components/confirm-modal'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
+import { AiPlanCanceled } from '@/features/ai-plan/ai-plan-canceled'
 import { AiPlanCommitPanel } from '@/features/ai-plan/ai-plan-commit-panel'
 import { AiPlanDraftPreview } from '@/features/ai-plan/ai-plan-draft-preview'
 import { AiPlanFailed } from '@/features/ai-plan/ai-plan-failed'
 import { AiPlanProgress } from '@/features/ai-plan/ai-plan-progress'
 import { aiPlanCommitSchema } from '@/features/ai-plan/schemas'
 import { useAiPlanJob } from '@/features/ai-plan/use-ai-plan-job'
+import { useAiPlanResubmit } from '@/features/ai-plan/use-ai-plan-resubmit'
 import { useDraftPlaces } from '@/features/ai-plan/use-draft-places'
 import { planKeys } from '@/features/plan/queries'
 import { formatBudget } from '@/lib/ai-plan/budget'
 import { defaultPlanTitle } from '@/lib/ai-plan/draft-title'
 import { draftToPlanPayload } from '@/lib/ai-plan/draft-to-plan'
-import { isJobFailed } from '@/lib/ai-plan/job'
+import { isJobCanceled, isJobFailed, jobStepProgress } from '@/lib/ai-plan/job'
 import { petNamesLabel } from '@/lib/ai-plan/pet-names'
-import {
-  clearAiPlanRequest,
-  readAiPlanRequest,
-  saveAiPlanRequest,
-} from '@/lib/ai-plan/request-store'
-import { submitAiPlan } from '@/lib/api/ai-plan'
+import { clearAiPlanRequest, readAiPlanRequest } from '@/lib/ai-plan/request-store'
 import { ApiError } from '@/lib/api/error'
 import { createPlan } from '@/lib/api/plan'
 import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
@@ -46,15 +43,16 @@ function isDelistedFailure(error: unknown): boolean {
 /**
  * 생성 대기 · 결과 — 명세 S0 · S4 · S6 · S7.
  *
- * 상태 다섯을 여기서 가른다:
+ * 상태 여섯을 여기서 가른다:
  *  1. 조회 실패 404(`AIPLAN_002`) → `not-found` 성격, **재시도를 주지 않는다**
  *  2. 조회 실패 그 외 → `ErrorState` + 재시도
- *  3. `PENDING`/`RUNNING`(+ 상한) → 진행 표시
+ *  3. `PENDING`/`RUNNING`(+ 상한) → 진행 표시 + 그만두기
  *  4. `FAILED` (**HTTP 200**) → `AiPlanFailed`
- *  5. `COMPLETED` → 미리보기 + 담기
+ *  5. `CANCELED` (#250) → `AiPlanCanceled` — **실패와 갈라 놓는다**
+ *  6. `COMPLETED` → 미리보기 + 담기
  */
 export function AiPlanJobView({ jobId }: { jobId: string }) {
-  const { query, phase, polling, recheck } = useAiPlanJob(jobId)
+  const { query, phase, polling, recheck, cancel, canceling, cancelFailed } = useAiPlanJob(jobId)
 
   /*
     **조건은 `sessionStorage` 에서 읽는다** (명세 S5 함정 1). 지연 초기화로 한 번만 읽어
@@ -125,20 +123,46 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
     )
   }
 
+  // ── 5. 취소 — 실패가 아니다 (#250) ─────────────────────────────────────
+
+  /*
+    **`FAILED` 판정 뒤, 진행 판정 앞이다.** `CANCELED` 는 종결이라 `polling` 이 false 이고,
+    이 분기가 없으면 완료 분기로 흘러 초안 없음(`emptyDraft`) 화면이 뜬다 — 사용자가
+    그만둔 것을 "만들어진 일정이 없어요" 라고 말하게 된다.
+  */
+  if (isJobCanceled(job)) {
+    return (
+      <AiPlanCanceledContainer
+        jobId={jobId}
+        snapshot={snapshot}
+        conditionSummary={conditionSummary}
+      />
+    )
+  }
+
   // ── 3. 진행 중 ─────────────────────────────────────────────────────────
 
   if (job === null || polling) {
     return (
       <AiPlanProgress
         status={job?.status ?? null}
+        step={job?.step ?? null}
+        stepProgress={jobStepProgress(job)}
         phase={phase}
         onRecheck={recheck}
         rechecking={query.isFetching}
+        /*
+          **첫 응답 전에는 그만둘 수 없다.** 아직 서버가 이 `jobId` 를 아는지조차 확인되지
+          않았고, 취소는 404 로 떨어질 뿐이다 — 누를 수 없는 버튼을 그리는 대신 뺀다.
+        */
+        onCancel={job === null ? null : cancel}
+        canceling={canceling}
+        cancelFailed={cancelFailed}
       />
     )
   }
 
-  // ── 5. 완료 ────────────────────────────────────────────────────────────
+  // ── 6. 완료 ────────────────────────────────────────────────────────────
 
   if (draft === null) {
     // `COMPLETED` 인데 초안이 없다 — 계약상 오지 않아야 하지만 화면이 비어 죽지 않게 한다
@@ -207,42 +231,40 @@ function AiPlanFailedContainer({
   conditionSummary: string | null
   errorMessage: string | null
 }) {
-  const router = useRouter()
-  const [retrying, setRetrying] = useState(false)
-
-  /*
-    **같은 조건으로 다시 제출한다.** 재생성 API 가 아니라 `POST /ai-plans` 새 제출이다.
-    서버가 멱등하지만 실패한 작업은 진행 중이 아니므로 **새 `jobId` 가 나온다.**
-  */
-  async function retry(): Promise<void> {
-    if (snapshot === null) return
-
-    setRetrying(true)
-    try {
-      const result = await submitAiPlan({
-        areaCode: snapshot.areaCode,
-        startDate: snapshot.startDate,
-        endDate: snapshot.endDate,
-        petIds: snapshot.pets.map((pet) => pet.petId),
-        ...(snapshot.budget === null ? {} : { budget: snapshot.budget }),
-        ...(snapshot.requestNote === '' ? {} : { requestNote: snapshot.requestNote }),
-      })
-
-      // 새 작업에도 같은 조건을 붙여 둔다 — 담기가 다시 필요하다
-      saveAiPlanRequest(result.jobId, snapshot)
-
-      router.replace(`/ai-plans/jobs/${result.jobId}`)
-    } catch {
-      // 제출 실패는 폼이 없어 필드에 붙일 수 없다. 버튼을 되살려 다시 누를 수 있게 한다
-      setRetrying(false)
-    }
-  }
+  const { resubmit, retrying } = useAiPlanResubmit(snapshot)
 
   return (
     <AiPlanFailed
       errorMessage={errorMessage}
       conditionSummary={conditionSummary}
-      onRetry={snapshot === null ? null : () => void retry()}
+      onRetry={resubmit}
+      retrying={retrying}
+      changeHref={`/ai-plans/new?from=${encodeURIComponent(jobId)}`}
+    />
+  )
+}
+
+/**
+ * 취소 화면 (#250) — 실패와 **같은 재제출**을 쓴다.
+ *
+ * 두 화면이 하는 일이 같기 때문이다: 보관한 조건으로 새 작업을 낸다. 다른 것은 **무엇을
+ * 말하는가**뿐이라 문구와 갈래만 갈라 놓는다.
+ */
+function AiPlanCanceledContainer({
+  jobId,
+  snapshot,
+  conditionSummary,
+}: {
+  jobId: string
+  snapshot: AiPlanRequestSnapshot | null
+  conditionSummary: string | null
+}) {
+  const { resubmit, retrying } = useAiPlanResubmit(snapshot)
+
+  return (
+    <AiPlanCanceled
+      conditionSummary={conditionSummary}
+      onRetry={resubmit}
       retrying={retrying}
       changeHref={`/ai-plans/new?from=${encodeURIComponent(jobId)}`}
     />

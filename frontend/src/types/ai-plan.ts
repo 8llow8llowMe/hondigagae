@@ -131,17 +131,45 @@ export type AiPlanDraft = {
 }
 
 /**
- * `GET /ai-plans/jobs/{jobId}`.
+ * `GET /ai-plans/jobs/{jobId}` · `POST /ai-plans/jobs/{jobId}/cancel`.
  *
  * **작업 실패는 HTTP 5xx 가 아니라 200 + `status.code === 'FAILED'`** 다
  * (api-integration-guide.md §5). `dataHeader.success` 만 보면 실패를 놓친다.
+ *
+ * **취소 응답도 같은 모양이다** — 컨트롤러가 `AiPlanJobStatusResponse` 를 그대로 돌려주므로
+ * 화면은 그것을 작업 캐시에 바로 쓴다.
  */
 export type AiPlanJob = {
   jobId: string
+  /** `PENDING` | `RUNNING` | `COMPLETED` | `FAILED` | **`CANCELED`** (#250) */
   status: CodeNameMetadata
+  /**
+   * 지금 밟고 있는 세부 단계 (#250 · 백엔드 `AiPlanJobStep`).
+   * `CONDITIONS` 조건 확인 · `CANDIDATES` 후보 장소 수집 · `WEATHER` 날씨 전망 반영 ·
+   * `DRAFTING` 일정 구성.
+   *
+   * **`PENDING` 이면 null 이다** — 아직 시작하지 않았다는 뜻이라 0 이나 1 로 그리면
+   * 화면이 시작한 것으로 거짓말을 한다. 종결 상태에서는 **마지막으로 밟은 단계**가
+   * 남는다 (실패 지점이 곧 진단이다).
+   */
+  step: CodeNameMetadata | null
+  /** 몇 번째 단계인지, **1부터**. `PENDING` 이면 null */
+  stepOrder: number | null
+  /**
+   * 전체 단계 수. 화면의 `n / m 단계` 에서 m 이다.
+   *
+   * **화면이 상수로 적지 않는다.** 백엔드가 값의 개수에서 파생시키므로 단계가 늘면 이
+   * 값도 함께 는다 — 복제해 두면 `5 / 4 단계` 가 나간다.
+   */
+  totalSteps: number
   /** `COMPLETED` 일 때만 채워진다 */
   planDraft: AiPlanDraft | null
-  /** `FAILED` 일 때만 채워진다 */
+  /**
+   * `FAILED` 일 때만 채워진다.
+   *
+   * **취소는 실패가 아니라 비어 있다** — 채우면 화면이 "실패했습니다" 를 띄우고 지표에서도
+   * 장애와 섞인다(백엔드 판단). `CANCELED` 를 실패로 다루면 안 되는 이유다.
+   */
   errorCode: string | null
   errorMessage: string | null
 }

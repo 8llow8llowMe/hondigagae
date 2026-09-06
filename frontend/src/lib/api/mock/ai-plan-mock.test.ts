@@ -221,6 +221,130 @@ describe('AI 일정 mock — 상태 전이', () => {
   })
 })
 
+describe('AI 일정 mock — 세부 단계 (#250)', () => {
+  it('PENDING 이면 step 이 null 이다 — 아직 시작하지 않았다', () => {
+    const first = pollTimes(newJob(), 1)
+
+    expect(first.step).toBeNull()
+    expect(first.stepOrder).toBeNull()
+  })
+
+  it('RUNNING 이면 step metadata 와 1부터의 순서가 온다', () => {
+    const running = pollTimes(newJob(), 2)
+
+    expect(running.step?.code).toBe('CONDITIONS')
+    expect(running.stepOrder).toBe(1)
+  })
+
+  /** 종결 상태에는 마지막으로 밟은 단계가 남는다 — 실패 지점을 아는 것이 진단이다 */
+  it('완료돼도 마지막 단계가 남는다', () => {
+    const done = pollTimes(newJob(), 3)
+
+    expect(done.step?.code).toBe('DRAFTING')
+    expect(done.stepOrder).toBe(done.totalSteps)
+  })
+
+  /*
+    **총 단계 수는 값의 개수에서 나온다.** 손으로 적으면 단계를 더할 때 한쪽만 고쳐져
+    `5 / 4 단계` 가 나간다 — 백엔드도 `values().length` 로 내린다.
+  */
+  it('totalSteps 는 언제나 실리고 stepOrder 를 넘지 않는다', () => {
+    const running = pollTimes(newJob(), 2)
+
+    expect(running.totalSteps).toBeGreaterThan(0)
+    expect(running.stepOrder).toBeLessThanOrEqual(running.totalSteps)
+  })
+})
+
+describe('AI 일정 mock — 작업 취소 (#250)', () => {
+  function cancel(jobId: string, token: string | null = TOKEN) {
+    return resolveMock(`/ai-plans/jobs/${jobId}/cancel`, 'POST', '', null, token)
+  }
+
+  it('진행 중인 작업을 취소하면 200 + status=CANCELED 다', () => {
+    const jobId = newJob()
+
+    const result = cancel(jobId)
+
+    expect(result?.status).toBe(200)
+    expect(status(result).status.code).toBe('CANCELED')
+  })
+
+  /*
+    **취소는 실패가 아니다.** `errorCode` 를 채우면 화면이 "실패했습니다" 를 띄우고
+    지표에서도 장애와 섞인다 — 백엔드가 일부러 비운 자리다.
+  */
+  it('취소 응답에는 errorCode 가 없다', () => {
+    const canceled = status(cancel(newJob()))
+
+    expect(canceled.errorCode).toBeNull()
+    expect(canceled.errorMessage).toBeNull()
+  })
+
+  it('취소는 종결이다 — 다시 조회해도 CANCELED 에 머문다', () => {
+    const jobId = newJob()
+    cancel(jobId)
+
+    expect(status(job(jobId)).status.code).toBe('CANCELED')
+    // 조회 횟수가 늘어도 완료로 살아나지 않는다
+    expect(pollTimes(jobId, 3).status.code).toBe('CANCELED')
+  })
+
+  it('이미 취소된 작업은 멱등 200 이다 — 두 번 눌러도 오류가 아니다', () => {
+    const jobId = newJob()
+    cancel(jobId)
+
+    expect(cancel(jobId)?.status).toBe(200)
+  })
+
+  /*
+    **완료·실패는 409 `AIPLAN_019` 다. 400 이 아니다** — 요청이 잘못된 것이 아니라 대상의
+    상태가 지나간 것이고, 화면은 그때 결과를 보여 주면 된다.
+  */
+  it('완료된 작업 취소는 409 AIPLAN_019 다', () => {
+    const jobId = newJob()
+    pollTimes(jobId, 3)
+
+    const result = cancel(jobId)
+
+    expect(result?.status).toBe(409)
+    expect((result?.payload as ApiResponse<null>).dataHeader.resultCode).toBe('AIPLAN_019')
+  })
+
+  it('실패한 작업 취소도 409 다', () => {
+    const jobId = newJob({ ...VALID, requestNote: '실패 시나리오' })
+    pollTimes(jobId, 3)
+
+    expect(cancel(jobId)?.status).toBe(409)
+  })
+
+  it('타인의 작업은 404 다 — 존재를 노출하지 않는다', () => {
+    expect(cancel(newJob(), OTHER)?.status).toBe(404)
+  })
+
+  it('토큰이 없으면 401 이다', () => {
+    expect(cancel(newJob(), null)?.status).toBe(401)
+  })
+
+  /*
+    **멱등 키를 함께 풀어 준다.** 취소 후 같은 조건 재제출이 취소의 주된 쓰임인데, 키가
+    남아 있으면 취소된 잡을 그대로 돌려받아 화면이 "취소됨" 에서 벗어나지 못한다.
+  */
+  it('취소한 뒤 같은 조건으로 제출하면 새 작업이 나온다', () => {
+    const first = newJob()
+    cancel(first)
+
+    expect(newJob()).not.toBe(first)
+  })
+
+  it('취소 시점의 단계가 남는다 — 대기 중 취소면 단계가 없다', () => {
+    const canceled = status(cancel(newJob()))
+
+    expect(canceled.step).toBeNull()
+    expect(canceled.stepOrder).toBeNull()
+  })
+})
+
 describe('AI 일정 mock — 실패는 HTTP 200 이다', () => {
   it('실패 시나리오는 200 + status=FAILED + errorCode 다', () => {
     const failed = pollTimes(newJob({ ...VALID, requestNote: '실패 시나리오' }), 3)
