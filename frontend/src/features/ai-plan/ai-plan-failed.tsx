@@ -11,6 +11,13 @@ export type AiPlanFailedProps = {
   title?: string
   /** 서버 `errorMessage`. 없으면 대체 문구를 쓴다 */
   errorMessage: string | null
+  /**
+   * 서버 문구 **아래에 덧붙이는** 한 줄 (#251). 없으면 렌더하지 않는다.
+   *
+   * **서버 문구를 대신하지 않는다.** 서버가 아는 것("장소를 찾지 못했다")과 화면만 아는
+   * 것(좁힌 지역이 원인일 수 있다)이 다르고, 둘 다 필요하다.
+   */
+  hint?: string | null
   /** 입력 조건 요약. 조건을 잃었으면 null */
   conditionSummary: string | null
   /** 같은 조건으로 다시 제출. 조건이 없으면 줄 수 없다 */
@@ -45,6 +52,7 @@ export function AiPlanFailed({
   retrying,
   changeHref,
   manualHref = '/plans/new',
+  hint = null,
 }: AiPlanFailedProps) {
   return (
     <div className="flex flex-col items-start gap-3 px-4 py-12 md:px-10">
@@ -52,6 +60,9 @@ export function AiPlanFailed({
 
       {/* 서버 문구를 그대로 쓴다 — 실패 이유를 우리가 다시 쓰면 조건 문제가 장애로 읽힌다 */}
       <p className="text-body-2 text-fg-muted">{errorMessage ?? messages.aiPlan.failedFallback}</p>
+
+      {/* 화면만 아는 단서를 아래에 덧붙인다 (#251) — 서버 문구를 덮지 않는다 */}
+      {hint !== null && <p className="text-body-2 text-fg -mt-1 font-medium">{hint}</p>}
 
       <div className="mt-1 flex flex-wrap gap-2">
         {/*

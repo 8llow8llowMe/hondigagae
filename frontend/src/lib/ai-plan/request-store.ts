@@ -1,4 +1,4 @@
-import type { AiPlanRequestSnapshot } from '@/types/ai-plan'
+import type { AiPlanRequestSnapshot, PinnedPlace } from '@/types/ai-plan'
 
 /**
  * 제출 조건 보관소 — 명세 S5 함정 1 · S8 미결 2.
@@ -80,6 +80,18 @@ function toSnapshot(value: unknown): AiPlanRequestSnapshot | null {
   const budget = record.budget
   if (budget !== null && typeof budget !== 'number') return null
 
+  /*
+    **선택 필드는 있을 때만 싣는다** (`exactOptionalPropertyTypes`). 셋 다 앞 형식으로
+    저장된 값에는 없을 수 있고, 없는 것과 `undefined` 를 명시적으로 넣는 것은 다르다.
+
+    **이 셋을 빠뜨리면 조용히 사라진다.** `restoreValues` 가 세 필드를 읽어 폼을 되살리는데
+    여기서 옮기지 않으면 `조건 바꾸기` 가 "꼭 넣을 장소" 와 "저장한 곳 먼저" 를 잃는다
+    — #251 이 `sigunguCode` 를 더하다가 앞 둘이 이미 그렇게 새고 있는 것을 발견했다.
+    `sigunguCode` 는 **제출 본문으로 다시 나가는 값**이라 새면 조건이 말없이 넓어진다.
+  */
+  const pinnedPlaces = toPinnedPlaces(record.pinnedPlaces)
+  const sigunguCode = asNonEmptyString(record.sigunguCode)
+
   return {
     areaCode,
     startDate,
@@ -87,7 +99,32 @@ function toSnapshot(value: unknown): AiPlanRequestSnapshot | null {
     pets,
     budget,
     requestNote: typeof record.requestNote === 'string' ? record.requestNote : '',
+    ...(typeof record.preferFavorites === 'boolean'
+      ? { preferFavorites: record.preferFavorites }
+      : {}),
+    ...(pinnedPlaces === null ? {} : { pinnedPlaces }),
+    ...(sigunguCode === null ? {} : { sigunguCode }),
   }
+}
+
+/**
+ * 꼭 넣을 장소. **배열이 아니면 null 이고, 모양이 어긋난 원소만 버린다** (`toPets` 와 같은 규칙).
+ *
+ * 통째로 null 을 주지 않는 이유: 칩 하나가 깨졌다고 기간·반려견까지 잃으면 사용자가
+ * 처음부터 다시 입력해야 한다.
+ */
+function toPinnedPlaces(value: unknown): PinnedPlace[] | null {
+  if (!Array.isArray(value)) return null
+
+  return value.flatMap((entry) => {
+    if (entry === null || typeof entry !== 'object') return []
+
+    const item = entry as Record<string, unknown>
+    const placeId = asNonEmptyString(item.placeId)
+    if (placeId === null) return []
+
+    return [{ placeId, title: typeof item.title === 'string' ? item.title : '' }]
+  })
 }
 
 /**

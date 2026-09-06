@@ -11,6 +11,7 @@ import { Input } from '@/components/input'
 import { Textarea } from '@/components/textarea'
 import { AiPlanOptionsSection } from '@/features/ai-plan/ai-plan-options-section'
 import { PetCheckboxGroup } from '@/features/ai-plan/pet-checkbox-group'
+import { SIGUNGU_CODES, SIGUNGU_LABEL } from '@/features/place/filter-labels'
 import { BUDGET_PRESETS_MANWON } from '@/lib/ai-plan/budget'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
@@ -120,12 +121,7 @@ export function AiPlanCreateForm({
       </Field>
 
       <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-1">
-          <h3 className="text-body-1 text-fg font-semibold">
-            {messages.aiPlan.requiredGroupLabel}
-          </h3>
-          <p className="text-caption text-fg-muted">{messages.aiPlan.areaFixed}</p>
-        </div>
+        <h3 className="text-body-1 text-fg font-semibold">{messages.aiPlan.requiredGroupLabel}</h3>
 
         {/*
           두 날짜는 한 줄에 나란히 — 기간은 하나의 값이다.
@@ -185,6 +181,54 @@ export function AiPlanCreateForm({
             {messages.aiPlan.periodSummary.replace('{days}', String(totalDays))}
           </p>
         )}
+
+        {/*
+          지역 좁히기 (#251 · 아트보드 01). 계약에 `sigunguCode` 가 없던 동안에는
+          "제주 전체에서 찾아요." 한 줄이 이 자리에 있었다.
+
+          **`제주 전체` 를 첫 칩으로 둔다.** 기본값이고, 빼면 "안 고른 상태" 를 되돌릴
+          방법이 없어진다 — 한 번 좁히면 전체로 못 돌아온다.
+
+          **예산 칩과 같은 `gap-2.5`** 다. 필터 칩(6px)이 아니라 폼 컨트롤이라
+          아트보드가 다른 값을 준다 (아래 예산 블록 주석과 같은 이유).
+        */}
+        <fieldset className="flex flex-col gap-1">
+          {/*
+            **라벨이 눈에 보여야 한다.** 예산 칩은 바로 아래 `Field`(예산 (선택))가 라벨을
+            들고 있어 `ChipGroup` 의 `aria-label` 만으로 충분했지만, 이 축은 칩이 컨트롤의
+            전부다 — 라벨이 없으면 날짜 줄에 딸린 무언가로 읽힌다.
+            `PetCheckboxGroup` 의 `legend` 와 같은 값이다.
+          */}
+          <legend className="text-body-2 text-fg mb-1 font-medium">
+            {messages.aiPlan.fieldRegion}
+          </legend>
+
+          <ChipGroup
+            label={messages.aiPlan.fieldRegion}
+            exclusive
+            className="flex flex-wrap gap-2.5"
+          >
+            <Chip
+              exclusive
+              selected={values.sigunguCode === null}
+              onSelect={() => onValueChange('sigunguCode', null)}
+            >
+              {messages.aiPlan.fieldRegionAll}
+            </Chip>
+            {SIGUNGU_CODES.map((code) => (
+              <Chip
+                key={code}
+                exclusive
+                selected={values.sigunguCode === code}
+                onSelect={() => onValueChange('sigunguCode', code)}
+              >
+                {SIGUNGU_LABEL[code]}
+              </Chip>
+            ))}
+          </ChipGroup>
+
+          <p className="text-caption text-fg-muted mt-1">{messages.aiPlan.fieldRegionHint}</p>
+        </fieldset>
 
         <PetCheckboxGroup
           id="petIds"

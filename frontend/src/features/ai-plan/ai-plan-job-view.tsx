@@ -18,10 +18,12 @@ import { aiPlanCommitSchema } from '@/features/ai-plan/schemas'
 import { useAiPlanJob } from '@/features/ai-plan/use-ai-plan-job'
 import { useAiPlanResubmit } from '@/features/ai-plan/use-ai-plan-resubmit'
 import { useDraftPlaces } from '@/features/ai-plan/use-draft-places'
+import { SIGUNGU_LABEL } from '@/features/place/filter-labels'
 import { planKeys } from '@/features/plan/queries'
 import { formatBudget } from '@/lib/ai-plan/budget'
 import { defaultPlanTitle } from '@/lib/ai-plan/draft-title'
 import { draftToPlanPayload } from '@/lib/ai-plan/draft-to-plan'
+import { isNarrowedRegionFailure } from '@/lib/ai-plan/failure-hint'
 import { isJobCanceled, isJobFailed, jobStepProgress } from '@/lib/ai-plan/job'
 import { petNamesLabel } from '@/lib/ai-plan/pet-names'
 import { clearAiPlanRequest, readAiPlanRequest } from '@/lib/ai-plan/request-store'
@@ -119,6 +121,7 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
         snapshot={snapshot}
         conditionSummary={conditionSummary}
         errorMessage={job?.errorMessage ?? null}
+        errorCode={job?.errorCode ?? null}
       />
     )
   }
@@ -219,23 +222,46 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
 
 const EMPTY_SET: ReadonlySet<string> = new Set()
 
+/**
+ * 좁힌 지역이 원인일 수 있다는 단서 (#251). 붙일 이유가 없으면 null 이다.
+ *
+ * **라벨은 장소 찾기와 같은 표에서 가져온다** — 같은 코드에 두 이름이 생기면 조건 입력에서
+ * 고른 이름과 실패 화면이 말하는 이름이 달라진다. 표에 없는 코드(원천에 남은 폐지 시군구)면
+ * 이름을 지어내지 않고 단서를 생략한다.
+ */
+function narrowedRegionHint(
+  errorCode: string | null,
+  snapshot: AiPlanRequestSnapshot | null,
+): string | null {
+  const sigunguCode = snapshot?.sigunguCode ?? null
+  if (!isNarrowedRegionFailure(errorCode, sigunguCode)) return null
+
+  const region = SIGUNGU_LABEL[sigunguCode ?? '']
+  if (region === undefined) return null
+
+  return messages.aiPlan.failedNarrowedRegion.replace('{region}', region)
+}
+
 /** 실패 화면 — 같은 조건으로 재제출을 담당한다 */
 function AiPlanFailedContainer({
   jobId,
   snapshot,
   conditionSummary,
   errorMessage,
+  errorCode,
 }: {
   jobId: string
   snapshot: AiPlanRequestSnapshot | null
   conditionSummary: string | null
   errorMessage: string | null
+  errorCode: string | null
 }) {
   const { resubmit, retrying } = useAiPlanResubmit(snapshot)
 
   return (
     <AiPlanFailed
       errorMessage={errorMessage}
+      hint={narrowedRegionHint(errorCode, snapshot)}
       conditionSummary={conditionSummary}
       onRetry={resubmit}
       retrying={retrying}

@@ -112,3 +112,25 @@ describe('AiPlanFailed — 직접 만들기 목적지가 없는 경우', () => {
     expect(html).toContain(messages.aiPlan.failedChange)
   })
 })
+
+describe('AiPlanFailed — 화면만 아는 단서 (#251)', () => {
+  const HINT = messages.aiPlan.failedNarrowedRegion.replace('{region}', '제주시')
+
+  /*
+    **서버 문구를 대신하지 않고 아래에 덧붙인다.** 서버가 아는 것("장소를 찾지 못했다")과
+    화면만 아는 것(좁힌 지역이 원인일 수 있다)이 다르고, 둘 다 필요하다.
+  */
+  it('서버 문구와 단서를 함께 보여 준다', () => {
+    const html = render({ hint: HINT })
+
+    expect(html).toContain(SERVER_MESSAGE)
+    expect(html).toContain(HINT)
+  })
+
+  it('단서가 없으면 줄을 만들지 않는다', () => {
+    const html = render()
+
+    expect(html).toContain(SERVER_MESSAGE)
+    expect(html).not.toContain('지역을 넓혀')
+  })
+})

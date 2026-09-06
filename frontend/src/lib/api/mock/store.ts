@@ -133,6 +133,14 @@ export type MockAiPlanJob = {
   /** 동반 반려견. **`petIds` 가 `petId` 를 이긴다** — 서버 `effectivePetIds()` (#128) */
   petIds: string[]
   areaCode: string
+  /**
+   * 좁힌 시군구 (#251). `null` 이면 지역 전체다.
+   *
+   * **멱등 술어가 이것을 본다** — 실제 멱등 키는 `toParams` 해시이고 그 map 에
+   * `sigunguCode` 가 들어 있다. 빼면 "제주 전체" 로 만들던 작업이 진행 중일 때
+   * "제주시만" 제출이 그 작업을 그대로 되받는다.
+   */
+  sigunguCode: string | null
   startDate: string
   endDate: string
   budget: number | null

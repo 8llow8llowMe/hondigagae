@@ -129,6 +129,8 @@ function AiPlanCreateFormContainer({
       const payload = toAiPlanSubmitPayload(values)
       saveAiPlanRequest(result.jobId, {
         areaCode: payload.areaCode,
+        // 재제출이 이 값을 다시 실어 보낸다 — 빠뜨리면 조건이 말없이 제주 전체로 넓어진다 (#251)
+        sigunguCode: values.sigunguCode,
         startDate: payload.startDate,
         endDate: payload.endDate,
         pets: payload.petIds.map((petId) => ({
@@ -223,6 +225,8 @@ function restoreValues(fromJobId: string | null, pets: Pet[]): AiPlanFormValues 
     requestNote: snapshot.requestNote,
     startDate: snapshot.startDate,
     endDate: snapshot.endDate,
+    // 앞 형식에는 없다 — 없으면 "제주 전체" 다 (#251)
+    sigunguCode: snapshot.sigunguCode ?? null,
     petIds: knownPetIds.length > 0 ? knownPetIds : base.petIds,
     budgetManwon: toBudgetManwon(snapshot.budget),
     /*

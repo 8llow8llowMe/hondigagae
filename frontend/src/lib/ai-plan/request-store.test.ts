@@ -239,3 +239,48 @@ describe('옛 모양 승격 (#128 · 명세 D2-3)', () => {
     ])
   })
 })
+
+describe('선택 조건을 왕복시킨다 (#251)', () => {
+  /*
+    **이 셋이 새고 있었다.** `restoreValues` 는 세 필드를 읽어 폼을 되살리는데 `toSnapshot`
+    이 저장된 값에서 옮기지 않아, `조건 바꾸기` 가 "꼭 넣을 장소" 와 "저장한 곳 먼저" 를
+    조용히 잃었다. #251 이 `sigunguCode` 를 더하다가 발견해 함께 고쳤다.
+  */
+  it('sigunguCode · preferFavorites · pinnedPlaces 를 그대로 돌려준다', () => {
+    const full: AiPlanRequestSnapshot = {
+      ...snapshot,
+      sigunguCode: '4',
+      preferFavorites: true,
+      pinnedPlaces: [{ placeId: '212481712381923328', title: '가세오름' }],
+    }
+    saveAiPlanRequest('job-1', full)
+
+    expect(readAiPlanRequest('job-1')).toEqual(full)
+  })
+
+  /** 앞 형식으로 저장된 값에는 셋 다 없다. 없는 것과 잘못된 것은 다르다 — 버리지 않는다 */
+  it('없으면 키 없이 돌려준다 — 통째로 버리지 않는다', () => {
+    saveAiPlanRequest('job-1', snapshot)
+
+    const restored = readAiPlanRequest('job-1')
+
+    expect(restored).not.toBeNull()
+    expect(restored?.sigunguCode).toBeUndefined()
+    expect(restored?.pinnedPlaces).toBeUndefined()
+  })
+
+  /** 칩 하나가 깨졌다고 기간·반려견까지 잃으면 처음부터 다시 입력해야 한다 */
+  it('꼭 넣을 장소의 원소가 깨져 있으면 그 원소만 버린다', () => {
+    saveAiPlanRequest('job-1', {
+      ...snapshot,
+      pinnedPlaces: [
+        { placeId: '', title: '깨진 값' },
+        { placeId: '212481712381923328', title: '가세오름' },
+      ],
+    })
+
+    expect(readAiPlanRequest('job-1')?.pinnedPlaces).toEqual([
+      { placeId: '212481712381923328', title: '가세오름' },
+    ])
+  })
+})

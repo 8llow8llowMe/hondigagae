@@ -35,6 +35,14 @@ export const aiPlanFormSchema = z
     // AIPLAN_103
     endDate: z.string().regex(DATE_PATTERN, messages.aiPlan.errorEndDateRequired),
     /**
+     * AIPLAN_115 (`@Size(max = 10)`). **`null` 이 "제주 전체" 다** (#251).
+     *
+     * 코드 목록으로 좁히지 않는다 — 칩이 값을 고정하므로 실질적인 2차 방어이고,
+     * 원천에 폐지된 시군구 코드가 남아 있어 화면이 목록을 늘리게 될 수 있다.
+     * 여기서 지켜야 하는 것은 **길이 상한**뿐이다.
+     */
+    sigunguCode: z.string().min(1).max(10).nullable(),
+    /**
      * AIPLAN_105. 체크박스가 값을 고정하므로 실질적으로는 2차 방어다.
      *
      * **서버는 반려견을 선택으로 받는다**(없으면 대표 반려견)지만 화면은 필수로 둔다 —

@@ -31,11 +31,23 @@ import type { CodeNameMetadata } from '@/types/api'
  *   (plan 공통명세 S1)
  * - **`budget` 은 `@Positive` 다.** 일정 생성(`@PositiveOrZero`)과 다르다 — `0` 을 보내면
  *   `AIPLAN_106` 400 이다. "상관없음" 은 `0` 이 아니라 **키 생략**으로 표현한다
- * - **`sigunguCode` 가 없다.** 지역을 제주시/서귀포시로 좁힐 수 없어 화면에 지역 컨트롤을
- *   두지 않는다 (명세 S2)
  */
 export type AiPlanSubmitPayload = {
   areaCode: string
+  /**
+   * 관광 시군구코드 — 제주시 `'4'` · 서귀포시 `'3'` (#251 · [PR #246](https://github.com/8llow8llowMe/hondigagae/pull/246)).
+   *
+   * **"제주 전체" 는 키를 뺀다.** 빈 문자열을 보내면 서버가 null 로 접어 주긴 하지만
+   * (`Feign` 이 쿼리에서 빼도록), 생략이 "좁히지 않았다" 를 그대로 말한다.
+   *
+   * **좁혀서 후보가 없으면 서버가 지역 전체로 넓히지 않는다** — `AIPLAN_012` 로 작업이
+   * 실패한다(HTTP 200 + `status=FAILED`). "제주시만" 이라는 요청에 서귀포 장소를 섞으면
+   * 조건을 무시한 일정이 되기 때문이고, 화면은 그 실패에 **지역을 넓혀 보라는 다음
+   * 행동**을 준다.
+   *
+   * `@Size(max = 10)` — 넘으면 `AIPLAN_115` 다. 화면이 코드를 고르게 하므로 닿지 않는다.
+   */
+  sigunguCode?: string
   /** `YYYY-MM-DD` */
   startDate: string
   /** `YYYY-MM-DD` */
@@ -87,8 +99,20 @@ export type AiPlanSubmitResult = {
   jobId: string
 }
 
-/** 백엔드 `AiPlanJobStatus` — 넷뿐이다. **세부 단계가 계약에 없다** (명세 S2) */
-export const AI_PLAN_JOB_STATUSES = ['PENDING', 'RUNNING', 'COMPLETED', 'FAILED'] as const
+/**
+ * 백엔드 `AiPlanJobStatus` — **다섯이다.** `CANCELED` 가 #250 으로 들어왔고
+ * `COMPLETED`·`FAILED` 와 함께 종결 상태다.
+ *
+ * 판정은 `lib/ai-plan/job.ts` 가 코드 문자열로 하므로 이 목록을 쓰지 않는다. 계약이
+ * 무엇인지 한 줄로 읽히도록 남겨 둔다.
+ */
+export const AI_PLAN_JOB_STATUSES = [
+  'PENDING',
+  'RUNNING',
+  'COMPLETED',
+  'FAILED',
+  'CANCELED',
+] as const
 export type AiPlanJobStatusCode = (typeof AI_PLAN_JOB_STATUSES)[number]
 
 /**
@@ -178,13 +202,21 @@ export type AiPlanJob = {
  * 조건 입력 폼 값. **요청 본문이 아니다** — `budget` 이 폼에서는 **만원 단위 문자열**이고
  * 전송 직전에 원 단위 숫자 또는 생략으로 바뀐다 (`src/lib/ai-plan/submit.ts`).
  *
- * **`areaCode` 필드가 없다.** 계약에 `sigunguCode` 가 없어 제주 전체 고정이고, 선택지가
- * 하나인 컨트롤을 폼에 두지 않는다 (plan 공통명세 S9 과 같은 규칙).
+ * **`areaCode` 필드는 없다.** 제주(`'39'`) 고정이고 선택지가 하나인 컨트롤을 폼에 두지
+ * 않는다 (plan 공통명세 S9 과 같은 규칙). **`sigunguCode` 는 다르다** — 계약에 들어오면서
+ * 선택지가 셋이 됐다 (#251).
  */
 export type AiPlanFormValues = {
   requestNote: string
   startDate: string
   endDate: string
+  /**
+   * 좁힐 시군구. **`null` 이 "제주 전체" 다** (#251).
+   *
+   * 빈 문자열을 쓰지 않는다 — `''` 는 "고르지 않았다" 와 "전체를 골랐다" 를 구분하지
+   * 못하고, 제출 직전에 키를 뺄지 판단하는 자리에서 그 차이가 필요하다.
+   */
+  sigunguCode: string | null
   petIds: string[]
   /** **만원 단위**다. 빈 값 = "상관없음" (아트보드 01 — 칩 + 직접 입력) */
   budgetManwon: string
@@ -207,6 +239,8 @@ export const EMPTY_AI_PLAN_FORM_VALUES: AiPlanFormValues = {
   requestNote: '',
   startDate: '',
   endDate: '',
+  // 기본은 제주 전체 — 좁히는 것은 사용자가 고르는 일이다
+  sigunguCode: null,
   petIds: [],
   budgetManwon: '',
   preferFavorites: false,
@@ -248,6 +282,14 @@ export type AiPlanRequestSnapshot = {
    */
   preferFavorites?: boolean
   pinnedPlaces?: PinnedPlace[]
+  /**
+   * 좁힌 시군구 (#251). `null`·생략이 "제주 전체" 다.
+   *
+   * **재제출과 `조건 바꾸기` 가 함께 쓴다.** 위 두 필드와 달리 이것은 **제출 본문으로
+   * 다시 나가는 값**이라, 빠뜨리면 "같은 조건으로 다시 만들기" 가 조용히 제주 전체로
+   * 넓어진다 — 사용자가 고른 조건을 화면이 말없이 바꾸는 셈이다.
+   */
+  sigunguCode?: string | null
 }
 
 // ─── 반려견 여행 준비물 (#155) ────────────────────────────────────────────────

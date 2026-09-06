@@ -7,6 +7,7 @@ import {
   AiPlanCreateForm,
   type AiPlanCreateFormProps,
 } from '@/features/ai-plan/ai-plan-create-form'
+import { SIGUNGU_LABEL } from '@/features/place/filter-labels'
 import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 import { EMPTY_AI_PLAN_FORM_VALUES } from '@/types/ai-plan'
@@ -69,19 +70,39 @@ describe('AiPlanCreateForm — 자유 입력은 선택이다 (아트보드 01)',
   })
 })
 
-describe('AiPlanCreateForm — 지역 컨트롤이 없다 (명세 S2)', () => {
-  it('지역 선택 컨트롤을 만들지 않는다 — 계약에 sigunguCode 가 없다', () => {
+describe('AiPlanCreateForm — 지역 좁히기 (#251)', () => {
+  /*
+    계약에 `sigunguCode` 가 없던 동안에는 이 칩들을 빼고 "제주 전체에서 찾아요." 한 줄로
+    대신하고 있었다. [PR #246](https://github.com/8llow8llowMe/hondigagae/pull/246) 이
+    필드를 열면서 아트보드 01 대로 돌아왔다.
+  */
+  it('아트보드 01 의 세 갈래를 낸다', () => {
     const html = render()
 
-    // 아트보드 01 의 지역 칩 세 개(제주시 / 서귀포시 / 제주 전체)를 뺐다.
-    // 그룹 라벨이 없다는 것으로 확인한다 — "제주 전체" 는 아래 고정 안내 문구에도
-    // 들어 있어 낱말만으로는 가릴 수 없다
-    expect(html).not.toContain('지역')
-    expect(html).not.toContain('서귀포시')
+    expect(html).toContain(messages.aiPlan.fieldRegion)
+    expect(html).toContain(messages.aiPlan.fieldRegionAll)
+    expect(html).toContain('제주시')
+    expect(html).toContain('서귀포시')
   })
 
-  it('대신 제주 전체에서 찾는다고 한 줄로 밝힌다 — 누락으로 보이지 않게', () => {
-    expect(render()).toContain(messages.aiPlan.areaFixed)
+  /** 장소 찾기와 같은 표를 쓴다 — 같은 코드에 두 이름이 생기면 화면마다 다른 말을 한다 */
+  it('선택지 이름을 장소 찾기와 같은 표에서 가져온다', () => {
+    const html = render()
+
+    expect(html).toContain(SIGUNGU_LABEL['4'] ?? '')
+    expect(html).toContain(SIGUNGU_LABEL['3'] ?? '')
+  })
+
+  it('기본은 제주 전체가 골라져 있다 — 좁히는 것은 사용자가 고르는 일이다', () => {
+    const html = render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, sigunguCode: null } })
+
+    // 배타 칩은 `aria-checked` 로 선택을 말한다
+    expect(html).toContain('aria-checked="true"')
+  })
+
+  /** 좁히면 못 만들 수 있다는 것을 **고르기 전에** 말한다 — 서버가 전체로 넓혀 주지 않는다 */
+  it('좁히기의 결과를 한 줄로 밝힌다', () => {
+    expect(render()).toContain(messages.aiPlan.fieldRegionHint)
   })
 })
 
