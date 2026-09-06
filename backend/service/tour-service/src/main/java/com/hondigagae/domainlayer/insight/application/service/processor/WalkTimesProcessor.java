@@ -5,6 +5,7 @@ import com.hondigagae.domainlayer.insight.application.exception.InsightException
 import com.hondigagae.domainlayer.insight.application.info.WalkTimesInfo;
 import com.hondigagae.domainlayer.insight.application.mapper.InsightMapper;
 import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
+import com.hondigagae.domainlayer.insight.domain.enums.GoldenWindowStatus;
 import com.hondigagae.domainlayer.insight.domain.model.GoldenWalkWindow;
 import com.hondigagae.domainlayer.insight.domain.model.HourlyWalkSafety;
 import com.hondigagae.domainlayer.insight.domain.model.PetCondition;
@@ -44,6 +45,13 @@ import org.springframework.stereotype.Component;
  *
  * {@code WalkSafetyEvaluator.hourlyCurve} 가 안전 시간대 탐색과 <b>같은 간이 판정</b>을 쓴다.
  * 여기서 따로 계산하면 같은 시각을 walk-safety 는 주의로, 골든타임은 안전으로 말하는 일이 생긴다.
+ *
+ * <h2>추천이 없는 이유를 함께 준다</h2>
+ *
+ * 추천 구간이 없는 데에는 <b>성질이 다른 셋</b>이 있고({@link GoldenWindowStatus}), 화면이
+ * 할 말이 각각 다르다. 예전에는 셋을 {@code goldenStart: null} 하나로 뭉개서 내보냈고,
+ * 화면은 그중 "남은 시간이 전부 위험"이라는 문구만 갖고 있었다. 그래서 경보로 추천을 보류한
+ * 날에도 <b>저녁 안전 구간이 초록으로 그려진 채</b> "남은 시간이 모두 위험 등급"이라고 말했다.
  */
 @Slf4j
 @Component
@@ -65,10 +73,11 @@ public class WalkTimesProcessor {
             .toList();
 
         List<HourlyWalkSafety> curve = WalkSafetyEvaluator.hourlyCurve(
-            sameDay, pet, insightMapper.toThresholds(insightProperties), now);
+            sameDay, pet, insightMapper.toThresholds(insightProperties), now, lat);
         ForecastCoverage coverage = coverageOf(forecasts, curve);
 
         WeatherWarning warning = weatherWarningProcessor.heaviestWarning().orElse(null);
+        GoldenWalkWindow golden = goldenWindowOf(curve, warning);
 
         return WalkTimesInfo.builder()
             .lat(lat)
@@ -76,12 +85,31 @@ public class WalkTimesProcessor {
             .from(now)
             .curve(curve)
             .forecastCoverage(coverage)
-            // 경보 중에는 골든타임을 주지 않는다. 시간대 곡선이 아무리 좋아도 기상청이
-            // 나가지 말라고 한 날에 "이때가 좋다"고 말하면 안 된다.
-            .goldenWindow(isWarningActive(warning) ? null : GoldenWalkWindow.from(curve).orElse(null))
+            .goldenWindow(golden)
+            .goldenWindowStatus(goldenWindowStatusOf(curve, warning, golden))
             .weatherWarning(warning)
             .petConditionApplied(pet.isSpecified())
             .build();
+    }
+
+    /**
+     * 추천 구간. <b>경보 중에는 곡선을 보지도 않는다.</b>
+     *
+     * <p>시간대 곡선이 아무리 좋아도 기상청이 나가지 말라고 한 날에 "이때가 좋다"고 말하면
+     * 안 된다.
+     */
+    private GoldenWalkWindow goldenWindowOf(List<HourlyWalkSafety> curve, WeatherWarning warning) {
+        if (isWarningActive(warning)) {
+            return null;
+        }
+        return GoldenWalkWindow.from(curve).orElse(null);
+    }
+
+    /** 추천이 없다면 <b>왜</b> 없는지. 가르는 순서는 {@link GoldenWindowStatus#of} 에 있다. */
+    private GoldenWindowStatus goldenWindowStatusOf(
+        List<HourlyWalkSafety> curve, WeatherWarning warning, GoldenWalkWindow golden
+    ) {
+        return GoldenWindowStatus.of(!curve.isEmpty(), isWarningActive(warning), golden != null);
     }
 
     /**

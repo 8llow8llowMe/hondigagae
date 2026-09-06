@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
  * 장소 산책 위험도 산출.
  *
  * <p>적합도가 <b>하루</b>를 보는 것과 달리 위험도는 <b>시각</b>을 본다. 같은 날 안에서도
- * 14시와 19시의 노면온도는 완전히 다르고, 그 차이가 이 기능의 전부이기 때문이다.
+ * 14시와 19시의 노면(아스팔트) 온도는 완전히 다르고, 그 차이가 이 기능의 전부이기 때문이다.
  *
  * <p>적합도와 같은 이유로 트랜잭션을 걸지 않는다 (architecture-guide §3 의 문서화된 예외).
  */
@@ -64,7 +64,9 @@ public class WalkSafetyProcessor {
         WalkSafetyAssessment assessment = WalkSafetyEvaluator.evaluate(
             nearest, sameDay, query.petCondition(), insightMapper.toThresholds(insightProperties), target,
             // 그 날짜가 없을 때 아직 안 온 것인지 이미 지난 것인지까지 가른다.
-            WeatherForecast.coverageOn(forecasts, target.toLocalDate()), warning);
+            WeatherForecast.coverageOn(forecasts, target.toLocalDate()), warning,
+            // 노면온도 추정이 태양 고도를 쓴다. 같은 시각도 위도에 따라 일사가 다르다.
+            place.lat());
 
         return WalkSafetyInfo.builder()
             .placeId(place.placeId())
@@ -97,6 +99,9 @@ public class WalkSafetyProcessor {
      * <p>단기예보는 시간 단위라 보통 한 시간 안쪽에서 찾힌다. 세 시간을 넘는다면 그 시각의
      * 예보가 사실상 없는 것이고, 그것을 "가장 가까운 값"이라며 쓰면 새벽 기온으로 한낮 노면을
      * 판정하는 일이 생긴다.
+     *
+     * <p>고른 행의 <b>기온과 시각을 함께</b> 노면 추정에 넘긴다({@code WalkSafetyEvaluator}).
+     * 기온만 이 행에서 가져오고 시각은 기준 시각을 쓰면 최대 세 시간 어긋난 일사로 계산하게 된다.
      */
     private Optional<WeatherForecast> nearest(List<WeatherForecast> forecasts, LocalDateTime target) {
         return forecasts.stream()

@@ -31,9 +31,9 @@ public enum ForecastSource implements CodeNameDescribable {
     /**
      * 시각 단위 판정이 가능한 출처인지.
      *
-     * <p>산책 위험도는 노면온도를 {@code 기온 + 하늘상태 x 시간대} 로 추정하므로 시각별 데이터가
-     * 필요하다. 중기예보는 오전/오후뿐이라 "14시 아스팔트"를 판정할 수 없다 - 억지로 값을 내면
-     * 없는 근거를 지어내는 것이 된다.
+     * <p>산책 위험도는 노면(아스팔트) 온도를 {@code 기온 + 일사(날짜·시각·위도) x 하늘상태 x 바람}
+     * 으로 추정하므로 시각별 데이터가 필요하다. 중기예보는 오전/오후뿐이라 "14시 아스팔트"를
+     * 판정할 수 없다 - 억지로 값을 내면 없는 근거를 지어내는 것이 된다.
      */
     public boolean supportsHourlyJudgement() {
         return this == SHORT_TERM;

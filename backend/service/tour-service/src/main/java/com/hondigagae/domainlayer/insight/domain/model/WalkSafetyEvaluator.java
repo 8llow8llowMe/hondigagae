@@ -16,8 +16,11 @@ import java.util.Optional;
  * <p>적합도와 달리 점수를 내지 않고 등급만 낸다. "산책해도 되는가"는 정도의 문제가 아니라
  * 임계를 넘었는지의 문제이고, 73점 같은 값은 판단에 도움이 되지 않기 때문이다.
  *
- * <p>판정에 쓰는 것 셋: 추정 노면온도({@link PavementHeat}), 열지수({@link HeatIndex}),
- * 반려견 개별 조건(민감도/견종). 모두 근거 수치를 문장에 넣어 돌려준다.
+ * <p>판정에 쓰는 것 셋: 추정 노면(아스팔트) 온도({@link PavementHeat}), 열지수
+ * ({@link HeatIndex}), 반려견 개별 조건(민감도/견종). 모두 근거 수치를 문장에 넣어 돌려준다.
+ *
+ * <p><b>좌표를 함께 받는다.</b> 노면온도 추정이 태양 고도를 쓰는데, 그것은 시각만으로는
+ * 정해지지 않고 <b>날짜와 위도</b>가 있어야 나온다 ({@link PavementHeat}).
  */
 public final class WalkSafetyEvaluator {
 
@@ -32,11 +35,12 @@ public final class WalkSafetyEvaluator {
      * @param hourly   같은 날의 시각별 예보. 안전 시간대를 찾는 데 쓴다
      * @param forecast 기준 시각에 가장 가까운 예보. null 이면 판단하지 않는다
      * @param coverage 예보를 못 쓸 때 <b>왜</b> 못 쓰는지. 근거 문장이 여기서 갈린다
+     * @param latitude 판정 지점의 위도. 노면온도 추정의 태양 고도 계산에 쓴다
      */
     public static WalkSafetyAssessment evaluate(
         WeatherForecast forecast, List<WeatherForecast> hourly, PetCondition pet,
         SuitabilityThresholds thresholds, LocalDateTime at, ForecastCoverage coverage,
-        WeatherWarning warning
+        WeatherWarning warning, double latitude
     ) {
         // 특보 경보는 예보보다 먼저 본다. 시각별 예보가 없어도 태풍경보에 "판단 근거 부족"을
         // 돌려주면 안 된다 - 근거는 있고, 그 근거가 나가지 말라고 말하고 있다.
@@ -55,8 +59,10 @@ public final class WalkSafetyEvaluator {
 
         List<WalkSafetyReason> reasons = new ArrayList<>();
         double airTemperature = forecast.temperature();
-        PavementHeat pavement = PavementHeat.estimate(
-            airTemperature, forecast.skyState(), forecast.isWet(), at.getHour());
+        // 시각도 기온과 같은 예보 행에서 가져온다. 기준 시각(at)의 시(hour)를 쓰면 기온은
+        // 15시 값인데 일사는 16시로 계산하는 어긋남이 생긴다 - nearest 가 최대 3시간까지
+        // 떨어진 행을 고를 수 있기 때문이다.
+        PavementHeat pavement = pavementOf(forecast, latitude);
         HeatIndex heatIndex = HeatIndex.of(airTemperature, forecast.humidity());
 
         WalkSafetyLevel level = WalkSafetyLevel.SAFE;
@@ -69,13 +75,13 @@ public final class WalkSafetyEvaluator {
 
         if (reasons.isEmpty()) {
             reasons.add(WalkSafetyReason.of(WalkSafetyReasonCode.PAVEMENT_OK,
-                "기온 %.0f도, 추정 노면온도 %.0f도로 산책에 무리가 없는 조건입니다."
+                "기온 %.0f도, 추정 노면(아스팔트) 온도 %.0f도로 산책에 무리가 없는 조건입니다."
                     .formatted(airTemperature, pavement.estimatedCelsius())));
         }
 
         Optional<SaferWindow> saferWindow = level == WalkSafetyLevel.SAFE
             ? Optional.empty()
-            : findSaferWindow(hourly, pet, thresholds, at);
+            : findSaferWindow(hourly, pet, thresholds, at, latitude);
         saferWindow.ifPresent(window -> reasons.add(WalkSafetyReason.of(WalkSafetyReasonCode.SAFE_WINDOW,
             "같은 날 %s~%s 는 조건이 나아 산책하기 낫습니다."
                 .formatted(window.start().toString(), window.end().toString()))));
@@ -100,7 +106,7 @@ public final class WalkSafetyEvaluator {
     private static WalkSafetyReason missingForecastReason(ForecastCoverage coverage) {
         return switch (coverage == null ? ForecastCoverage.UNAVAILABLE : coverage) {
             case OUT_OF_RANGE -> WalkSafetyReason.of(WalkSafetyReasonCode.FORECAST_OUT_OF_RANGE,
-                "노면 온도는 시각별 기온과 일사로 계산합니다. 3일 이후는 오전/오후 단위 예보만 있어 "
+                "노면(아스팔트) 온도는 시각별 기온과 일사로 계산합니다. 3일 이후는 오전/오후 단위 예보만 있어 "
                     + "판단하지 않았습니다 — 여행이 가까워지면 다시 확인해 주세요.");
             case DAY_ENDED -> WalkSafetyReason.of(WalkSafetyReasonCode.FORECAST_DAY_ENDED,
                 "그 날짜의 예보 시간대가 이미 지났습니다. 기상청은 23시 발표부터 다음 날 예보만 주기 때문에 "
@@ -113,7 +119,7 @@ public final class WalkSafetyEvaluator {
     /**
      * 주의보를 반영한다. 경보는 이 메서드에 오지 않는다 - 위에서 이미 DANGER 로 끊었다.
      *
-     * <p>주의보는 최소 CAUTION 이다. 노면과 열지수가 아무리 좋아도 "안전"이라고 말하지 않는다 -
+     * <p>주의보는 최소 CAUTION 이다. 노면(아스팔트) 온도와 열지수가 아무리 좋아도 "안전"이라고 말하지 않는다 -
      * 기상청이 조건이 나빠지고 있다고 알린 상태에서 안전을 단언하면 안 된다.
      */
     private static WalkSafetyLevel assessWeatherWarning(WeatherWarning warning, List<WalkSafetyReason> reasons) {
@@ -132,14 +138,14 @@ public final class WalkSafetyEvaluator {
         double surface = pavement.estimatedCelsius();
         if (surface >= thresholds.pavementDangerCelsius()) {
             reasons.add(WalkSafetyReason.of(WalkSafetyReasonCode.PAVEMENT_HEAT,
-                "기온 %.0f도에 일사가 더해져 아스팔트 표면은 약 %.0f도로 추정됩니다. 발바닥 화상 위험 구간입니다."
+                "기온 %.0f도에 일사가 더해져 노면(아스팔트) 온도는 약 %.0f도로 추정됩니다. 발바닥 화상 위험 구간입니다."
                     .formatted(pavement.airTemperature(), surface)));
             return WalkSafetyLevel.DANGER;
         }
         if (surface >= thresholds.pavementCautionCelsius()) {
             reasons.add(WalkSafetyReason.of(WalkSafetyReasonCode.PAVEMENT_HEAT,
-                "아스팔트 표면이 약 %.0f도로 추정됩니다. 그늘길로 걷고 손등으로 지면을 확인해 주세요."
-                    .formatted(surface)));
+                "기온 %.0f도지만 노면(아스팔트) 온도는 약 %.0f도로 추정됩니다. 그늘길로 걷고 손등으로 지면을 확인해 주세요."
+                    .formatted(pavement.airTemperature(), surface)));
             return WalkSafetyLevel.CAUTION;
         }
         return WalkSafetyLevel.SAFE;
@@ -237,10 +243,12 @@ public final class WalkSafetyEvaluator {
      * <p>안전 시간대 탐색과 <b>같은 간이 판정</b>({@code quickLevel})을 쓴다. 따로 계산하면
      * 같은 시각을 walk-safety 는 주의로, 골든타임은 안전으로 말하는 일이 생긴다.
      *
-     * @param from 이 시각 이후만 본다. 지나간 시간을 제안하면 조언이 아니다
+     * @param from     이 시각 이후만 본다. 지나간 시간을 제안하면 조언이 아니다
+     * @param latitude 판정 지점의 위도. 노면온도 추정의 태양 고도 계산에 쓴다
      */
     public static List<HourlyWalkSafety> hourlyCurve(
-        List<WeatherForecast> hourly, PetCondition pet, SuitabilityThresholds thresholds, LocalDateTime from
+        List<WeatherForecast> hourly, PetCondition pet, SuitabilityThresholds thresholds,
+        LocalDateTime from, double latitude
     ) {
         if (hourly == null || hourly.isEmpty()) {
             return List.of();
@@ -251,16 +259,28 @@ public final class WalkSafetyEvaluator {
             .sorted(Comparator.comparing(WeatherForecast::forecastAt))
             .map(forecast -> new HourlyWalkSafety(
                 forecast.forecastAt(),
-                quickLevel(forecast, pet, thresholds),
+                quickLevel(forecast, pet, thresholds, latitude),
                 forecast.temperature(),
-                PavementHeat.estimate(forecast.temperature(), forecast.skyState(), forecast.isWet(),
-                    forecast.forecastAt().getHour()).estimatedCelsius(),
+                pavementOf(forecast, latitude).estimatedCelsius(),
                 forecast.precipitationProbability()))
             .toList();
     }
 
+    /**
+     * 그 예보 행 하나로 노면온도를 추정한다.
+     *
+     * <p>추정 입력(기온·하늘상태·젖음·풍속·시각)을 <b>전부 같은 행에서</b> 뽑는 자리를 한 곳으로
+     * 모은다. 흩어 두면 한쪽만 고쳐져 화면마다 다른 노면온도가 나온다.
+     */
+    private static PavementHeat pavementOf(WeatherForecast forecast, double latitude) {
+        return PavementHeat.estimate(
+            forecast.temperature(), forecast.skyState(), forecast.isWet(),
+            forecast.windSpeed(), forecast.forecastAt(), latitude);
+    }
+
     private static Optional<SaferWindow> findSaferWindow(
-        List<WeatherForecast> hourly, PetCondition pet, SuitabilityThresholds thresholds, LocalDateTime at
+        List<WeatherForecast> hourly, PetCondition pet, SuitabilityThresholds thresholds,
+        LocalDateTime at, double latitude
     ) {
         if (hourly == null || hourly.isEmpty()) {
             return Optional.empty();
@@ -275,7 +295,7 @@ public final class WalkSafetyEvaluator {
         LocalTime start = null;
         LocalTime end = null;
         for (WeatherForecast forecast : upcoming) {
-            WalkSafetyLevel level = quickLevel(forecast, pet, thresholds);
+            WalkSafetyLevel level = quickLevel(forecast, pet, thresholds, latitude);
             boolean acceptable = level.getSeverity() <= SAFER_WINDOW_MAX_LEVEL.getSeverity()
                 && level != WalkSafetyLevel.UNKNOWN;
             if (acceptable) {
@@ -298,11 +318,10 @@ public final class WalkSafetyEvaluator {
      * <p>전체 판정을 시각마다 돌리면 근거 리스트를 스물네 번 만들게 된다.
      */
     private static WalkSafetyLevel quickLevel(
-        WeatherForecast forecast, PetCondition pet, SuitabilityThresholds thresholds
+        WeatherForecast forecast, PetCondition pet, SuitabilityThresholds thresholds, double latitude
     ) {
         double airTemperature = forecast.temperature();
-        PavementHeat pavement = PavementHeat.estimate(
-            airTemperature, forecast.skyState(), forecast.isWet(), forecast.forecastAt().getHour());
+        PavementHeat pavement = pavementOf(forecast, latitude);
         HeatIndex heatIndex = HeatIndex.of(airTemperature, forecast.humidity());
 
         WalkSafetyLevel level = WalkSafetyLevel.SAFE;

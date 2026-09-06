@@ -31,6 +31,8 @@ import org.junit.jupiter.api.Test;
 class WeatherWarningRuleTest {
 
     private static final LocalDate DATE = LocalDate.of(2026, 9, 2);
+    /** 제주시 시내. 노면온도 추정이 태양 고도를 쓰므로 위도가 필요하다. */
+    private static final double JEJU_LATITUDE = 33.4996d;
 
     @Nested
     @DisplayName("적합도")
@@ -104,7 +106,7 @@ class WeatherWarningRuleTest {
             WalkSafetyAssessment assessment = WalkSafetyEvaluator.evaluate(
                 null, List.of(), PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0),
                 ForecastCoverage.DAY_ENDED,
-                warning(WeatherWarningType.TYPHOON, WeatherWarningLevel.WARNING));
+                warning(WeatherWarningType.TYPHOON, WeatherWarningLevel.WARNING), JEJU_LATITUDE);
 
             assertThat(assessment.level()).isEqualTo(WalkSafetyLevel.DANGER);
         }
@@ -132,7 +134,7 @@ class WeatherWarningRuleTest {
                 .build();
             return WalkSafetyEvaluator.evaluate(
                 mild, List.of(mild), PetCondition.unspecified(), thresholds(), DATE.atTime(9, 0),
-                ForecastCoverage.AVAILABLE, warning);
+                ForecastCoverage.AVAILABLE, warning, JEJU_LATITUDE);
         }
     }
 

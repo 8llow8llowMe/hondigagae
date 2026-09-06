@@ -18,20 +18,52 @@ import org.junit.jupiter.api.Test;
 class WalkSafetyEvaluatorTest {
 
     private static final LocalDate DATE = LocalDate.of(2026, 8, 27);
+    /** 한여름 기준 조건이 필요한 테스트용. 노면 상승분은 계절을 탄다 ({@code PavementHeatTest}). */
+    private static final LocalDate MIDSUMMER = LocalDate.of(2026, 6, 21);
+    /** 제주시 시내. 노면온도 추정이 태양 고도를 쓰므로 위도가 필요하다. */
+    private static final double JEJU_LATITUDE = 33.4996d;
 
     @Nested
-    @DisplayName("노면 온도")
+    @DisplayName("노면(아스팔트) 온도")
     class PavementRules {
 
         @Test
         @DisplayName("사람 기준으로 좋은 25도 맑은 한낮도 반려견에게는 위험이다")
         void warnsOnMildLookingSunnyAfternoon() {
             // 사람 기준 기온만 보면 아무 문제 없는 날이다. 이 격차가 이 기능의 존재 이유다.
-            WalkSafetyAssessment assessment = evaluate(forecast(25.0d, 50, SkyState.CLEAR, 14), 14);
+            WalkSafetyAssessment assessment = evaluate(
+                forecast(MIDSUMMER, 25.0d, 50, SkyState.CLEAR, 13, null), 13);
 
             assertThat(assessment.estimatedPavementCelsius()).isGreaterThanOrEqualTo(50.0d);
             assertThat(assessment.level()).isEqualTo(WalkSafetyLevel.DANGER);
             assertThat(codesOf(assessment)).contains(WalkSafetyReasonCode.PAVEMENT_HEAT);
+        }
+
+        @Test
+        @DisplayName("근거 문장에 기온과 노면온도를 함께 적는다 - 노면만 주면 기온으로 읽힌다")
+        void namesBothTemperaturesInTheReason() {
+            WalkSafetyAssessment assessment = evaluate(
+                forecast(MIDSUMMER, 25.0d, 50, SkyState.CLEAR, 13, null), 13);
+
+            assertThat(assessment.reasons())
+                .filteredOn(reason -> reason.code() == WalkSafetyReasonCode.PAVEMENT_HEAT)
+                .singleElement()
+                .satisfies(reason -> assertThat(reason.description())
+                    .contains("기온 25도")
+                    .contains("노면(아스팔트)"));
+        }
+
+        @Test
+        @DisplayName("같은 기온 같은 시각도 계절이 다르면 노면이 다르다")
+        void seasonChangesTheJudgement() {
+            // 시각만 보던 옛 계산은 9월 오후에도 한여름 정오와 같은 상승분을 얹었다.
+            WalkSafetyAssessment midsummer = evaluate(
+                forecast(MIDSUMMER, 25.0d, 50, SkyState.CLEAR, 13, null), 13);
+            WalkSafetyAssessment lateSummer = evaluate(
+                forecast(DATE, 25.0d, 50, SkyState.CLEAR, 13, null), 13);
+
+            assertThat(lateSummer.estimatedPavementCelsius())
+                .isLessThan(midsummer.estimatedPavementCelsius());
         }
 
         @Test
@@ -51,6 +83,15 @@ class WalkSafetyEvaluatorTest {
             WalkSafetyAssessment overcast = evaluate(forecast(25.0d, 50, SkyState.OVERCAST, 14), 14);
 
             assertThat(overcast.estimatedPavementCelsius()).isLessThan(clear.estimatedPavementCelsius());
+        }
+
+        @Test
+        @DisplayName("바람이 세면 대류로 식어 노면이 덜 뜨겁다")
+        void windCoolsThePavement() {
+            WalkSafetyAssessment calm = evaluate(forecast(DATE, 30.0d, 55, SkyState.CLEAR, 14, 0.0d), 14);
+            WalkSafetyAssessment windy = evaluate(forecast(DATE, 30.0d, 55, SkyState.CLEAR, 14, 10.0d), 14);
+
+            assertThat(windy.estimatedPavementCelsius()).isLessThan(calm.estimatedPavementCelsius());
         }
     }
 
@@ -114,7 +155,7 @@ class WalkSafetyEvaluatorTest {
             WalkSafetyAssessment assessment = WalkSafetyEvaluator.evaluate(
                 hourly.stream().filter(forecast -> forecast.forecastAt().getHour() == 14).findFirst().orElseThrow(),
                 hourly, PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0),
-                ForecastCoverage.AVAILABLE, null);
+                ForecastCoverage.AVAILABLE, null, JEJU_LATITUDE);
 
             assertThat(assessment.level()).isEqualTo(WalkSafetyLevel.DANGER);
             assertThat(assessment.hasSaferWindow()).isTrue();
@@ -138,7 +179,7 @@ class WalkSafetyEvaluatorTest {
     void unknownWhenNoForecast() {
         WalkSafetyAssessment assessment = WalkSafetyEvaluator.evaluate(
             null, List.of(), PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0),
-            ForecastCoverage.OUT_OF_RANGE, null);
+            ForecastCoverage.OUT_OF_RANGE, null, JEJU_LATITUDE);
 
         assertThat(assessment.level()).isEqualTo(WalkSafetyLevel.UNKNOWN);
         assertThat(codesOf(assessment)).contains(WalkSafetyReasonCode.FORECAST_OUT_OF_RANGE);
@@ -152,10 +193,10 @@ class WalkSafetyEvaluatorTest {
         // 풀리지 않을 것을 계속 다시 시도한다.
         WalkSafetyAssessment dayEnded = WalkSafetyEvaluator.evaluate(
             null, List.of(), PetCondition.unspecified(), thresholds(), DATE.atTime(23, 30),
-            ForecastCoverage.DAY_ENDED, null);
+            ForecastCoverage.DAY_ENDED, null, JEJU_LATITUDE);
         WalkSafetyAssessment unavailable = WalkSafetyEvaluator.evaluate(
             null, List.of(), PetCondition.unspecified(), thresholds(), DATE.atTime(23, 30),
-            ForecastCoverage.UNAVAILABLE, null);
+            ForecastCoverage.UNAVAILABLE, null, JEJU_LATITUDE);
 
         assertThat(codesOf(dayEnded)).containsExactly(WalkSafetyReasonCode.FORECAST_DAY_ENDED);
         assertThat(codesOf(unavailable)).containsExactly(WalkSafetyReasonCode.FORECAST_UNAVAILABLE);
@@ -174,23 +215,32 @@ class WalkSafetyEvaluatorTest {
     }
 
     private static WalkSafetyAssessment evaluate(WeatherForecast forecast, PetCondition pet, int hour) {
+        // 기준 시각의 날짜는 예보 행에서 가져온다 - 노면 상승분이 날짜를 타므로 둘이 어긋나면
+        // 테스트가 조용히 다른 계절을 판정한다.
         return WalkSafetyEvaluator.evaluate(
-            forecast, List.of(forecast), pet, thresholds(), DATE.atTime(hour, 0),
-            ForecastCoverage.AVAILABLE, null);
+            forecast, List.of(forecast), pet, thresholds(),
+            forecast.forecastAt().toLocalDate().atTime(hour, 0),
+            ForecastCoverage.AVAILABLE, null, JEJU_LATITUDE);
     }
 
     private static WeatherForecast forecast(double temperature, Integer humidity, SkyState sky, int hour) {
+        return forecast(DATE, temperature, humidity, sky, hour, 2.0d);
+    }
+
+    private static WeatherForecast forecast(
+        LocalDate date, double temperature, Integer humidity, SkyState sky, int hour, Double windSpeed
+    ) {
         return WeatherForecast.builder()
             .nx(53).ny(38)
-            .forecastAt(DATE.atTime(hour, 0))
-            .baseAt(DATE.atTime(2, 0))
+            .forecastAt(date.atTime(hour, 0))
+            .baseAt(date.atTime(2, 0))
             .temperature(temperature)
             .humidity(humidity)
             .skyState(sky)
             .precipitationType(PrecipitationType.NONE)
             .precipitation(PrecipitationAmount.none())
             .precipitationProbability(10)
-            .windSpeed(2.0d)
+            .windSpeed(windSpeed)
             .build();
     }
 
