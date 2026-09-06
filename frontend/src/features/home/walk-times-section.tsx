@@ -22,23 +22,34 @@ import type { HourlyWalkSafetyItem, WalkTimesResponse } from '@/types/insight'
  * 허락으로 읽는다 (`GoldenWalkWindow`). 그때도 **곡선은 그대로 보여 준다**: 근거를
  * 감추면 왜 안 되는지 확인할 방법이 없다.
  *
- * **판정 자리의 상태는 넷이다** (#204 · [#262](https://github.com/8llow8llowMe/hondigagae/issues/262)).
+ * **판정 자리는 서버 `goldenWindowStatus` 가 고른다** (#204 · #262 ·
+ * [#270](https://github.com/8llow8llowMe/hondigagae/issues/270)).
  *
- * | 응답 | 화면 | 뜻 |
+ * | `goldenWindowStatus` | 화면 | 뜻 |
  * |------|------|-----|
- * | `goldenStart` 있음 | `GoldenWindow` | 이때 나가면 된다 |
- * | `hourly` 있고 `goldenStart` 없음 | `NoGoldenWindow` | **판정**: 남은 시간이 전부 위험이다 |
- * | `hourly` 비었고 `forecastCoverage.code === 'UNAVAILABLE'` | `NoForecast` + **재시도** | **장애**: 날씨를 못 받았다 |
- * | `hourly` 비었고 그 밖 | `NoForecast` | **근거 없음**: 판정할 예보가 없다 |
+ * | `AVAILABLE` | `GoldenWindow` | 이때 나가면 된다 |
+ * | `SUPPRESSED_BY_WARNING` | `SuppressedByWarning` | **보류**: 경보라 곡선이 좋아도 추천하지 않는다 |
+ * | `ALL_HOURS_RISKY` | `NoGoldenWindow` | **판정**: 남은 시간이 전부 위험이다 |
+ * | `NO_FORECAST` | `NoForecast` (+ `UNAVAILABLE` 이면 **재시도**) | **근거 없음**: 판정할 예보가 없다 |
  *
- * 앞의 두 줄만 있으면 늦은 밤(남은 시간대 0칸)에 화면이 "남은 시간이 모두 위험 등급"
- * 이라고 단정한다 — dev 23:17 KST 에 `hourly: []` 로 실제로 관측했다. 모르는 것을
- * 나쁜 것으로 말하지 않는다는 규칙(루트 `CLAUDE.md`)에 어긋난다.
+ * **불린 두 개(`hasGolden`·`hasForecast`)로는 표현되지 않는다.** 그렇게 갈랐을 때
+ * 두 번 틀렸다:
  *
- * **넷째 줄이 #262 다.** 곡선이 비는 이유는 하나가 아닌데 셋째 줄 하나로 접혀 있었다 —
- * `UNAVAILABLE`(다시 시도하면 되는 일시 장애)을 `DAY_ENDED`(정상, 자정 이후 채워짐)와
- * 같은 문장으로 말하고 있었다. **고칠 수 있는 상태를 고칠 수 없는 것처럼 말하지 않는다** —
- * `404` 에 재시도를 달지 않는 규칙(`frontend/CLAUDE.md`)과 같은 축이다.
+ *  - 늦은 밤 `hourly: []` 를 "남은 시간이 모두 위험" 이라고 단정했다 (#204, dev 23:17 KST).
+ *  - **풍랑경보 날 곡선에는 저녁 안전 구간이 초록으로 그려져 있는데 같은 문장이 나갔다**
+ *    (#270). 곡선과 문장이 서로 다른 말을 하면 사용자는 둘 다 믿지 않는다.
+ *
+ * 둘 다 **모르는 것·보류를 나쁜 것으로 말한** 경우다 (루트 `CLAUDE.md`).
+ *
+ * **판정 순서를 여기서 다시 짜지 않는다.** 서버 `GoldenWindowStatus.of` 가 예보 → 경보 →
+ * 구간 순으로 정한다 — 화면이 `if` 를 다시 세우면 한쪽만 고쳐져 같은 상태에 다른 문구가
+ * 나간다. `weatherWarning` 을 보고 보류를 직접 판정하지 않는 이유도 그것이다
+ * (경보/주의보 구분도 서버 몫이다).
+ *
+ * **`NO_FORECAST` 안에서 한 번 더 갈린다** (#262). 곡선이 비는 이유는 하나가 아니라
+ * `forecastCoverage` 가 답한다 — `UNAVAILABLE`(다시 시도하면 되는 일시 장애)을
+ * `DAY_ENDED`(정상, 자정 이후 채워짐)와 같은 문장으로 말하지 않는다. **고칠 수 있는
+ * 상태를 고칠 수 없는 것처럼 말하지 않는다** — `404` 에 재시도를 달지 않는 규칙과 같은 축이다.
  */
 export function WalkTimesSection({
   data,
@@ -62,8 +73,7 @@ export function WalkTimesSection({
   // 조회 실패는 섹션을 통째로 숨긴다 — 홈의 최소 골격에 이 섹션은 없다 (공통명세 S4-1)
   if (data === null) return loading ? <WalkTimesSkeleton /> : null
 
-  const hasGolden = data.goldenStart !== null && data.goldenEnd !== null
-  const hasForecast = data.hourly.length > 0
+  const status = goldenWindowStatusOf(data)
 
   return (
     <section aria-label={messages.home.goldenHeading} className="border-border border-t">
@@ -74,13 +84,14 @@ export function WalkTimesSection({
         </div>
 
         {/*
-          **`hasGolden` 을 먼저 본다.** `hourly` 가 비었는지로 먼저 갈라 버리면 서버가
-          구간을 주는데 곡선만 못 받은 경우에 실제 추천을 감춘다. 예보 없음이 밀어내야
-          하는 것은 **위험 단정(`NoGoldenWindow`) 하나뿐**이다.
+          **서버가 고른 상태를 그대로 따른다** (#270). 예전에는 `hasGolden` → `hasForecast`
+          순으로 화면이 갈랐는데, 그 두 불린에는 "경보라 보류" 가 들어갈 자리가 없었다.
         */}
-        {hasGolden ? (
+        {status === 'AVAILABLE' ? (
           <GoldenWindow data={data} />
-        ) : hasForecast ? (
+        ) : status === 'SUPPRESSED_BY_WARNING' ? (
+          <SuppressedByWarning />
+        ) : status === 'ALL_HOURS_RISKY' ? (
           <NoGoldenWindow />
         ) : (
           <NoForecast coverage={data.forecastCoverage} onRetry={onRetry} />
@@ -130,6 +141,65 @@ function GoldenWindow({ data }: { data: WalkTimesResponse }) {
       </span>
       {data.goldenLevel !== null && <MetricWord tone={tone}>{data.goldenLevel.name}</MetricWord>}
     </p>
+  )
+}
+
+/** 서버 `GoldenWindowStatus`. 모르는 값이 오면 옛 갈래로 떨어진다 — `goldenWindowStatusOf` */
+type GoldenWindowStatusCode =
+  'AVAILABLE' | 'SUPPRESSED_BY_WARNING' | 'ALL_HOURS_RISKY' | 'NO_FORECAST'
+
+const GOLDEN_WINDOW_STATUSES: readonly string[] = [
+  'AVAILABLE',
+  'SUPPRESSED_BY_WARNING',
+  'ALL_HOURS_RISKY',
+  'NO_FORECAST',
+]
+
+/**
+ * 판정 자리에 무엇을 세울지 (#270).
+ *
+ * **서버 값이 먼저다.** 판정 순서(예보 → 경보 → 구간)는 `GoldenWindowStatus.of` 가 갖고
+ * 있고 화면은 그것을 다시 짜지 않는다.
+ *
+ * 서버 값을 쓰지 않는 두 경우가 있다.
+ *
+ *  - **모르는 코드** — 서버가 하나를 더 내면 `NO_FORECAST` 로 떨어져 "예보 없음" 을 말하게
+ *    된다. 있지도 않은 사실이므로 옛 갈래로 내려가 아는 만큼만 말한다.
+ *  - **`AVAILABLE` 인데 구간이 없다** — 그릴 것이 없다. 오지 않아야 할 조합이지만 오면
+ *    빈 자리가 된다.
+ *
+ * **폴백은 예전 세 갈래 그대로다.** `weatherWarning` 을 보고 보류를 만들어 내지 않는다 —
+ * 경보와 주의보를 가르는 규칙까지 화면이 복제하게 되고, 그러면 서버가 그 규칙을 고쳐도
+ * 화면은 옛 규칙으로 답한다.
+ */
+function goldenWindowStatusOf(data: WalkTimesResponse): GoldenWindowStatusCode {
+  const code = data.goldenWindowStatus?.code
+  const hasGolden = data.goldenStart !== null && data.goldenEnd !== null
+
+  if (code !== undefined && GOLDEN_WINDOW_STATUSES.includes(code)) {
+    if (code !== 'AVAILABLE' || hasGolden) return code as GoldenWindowStatusCode
+  }
+
+  if (hasGolden) return 'AVAILABLE'
+  return data.hourly.length > 0 ? 'ALL_HOURS_RISKY' : 'NO_FORECAST'
+}
+
+/**
+ * 경보로 추천을 보류한 날 (#270).
+ *
+ * **위험 톤을 쓰지 않는다.** 이것은 판정이 아니라 보류다 — 곡선에 안전 구간이 남아 있고
+ * 그것을 근거로 그대로 보여 준다. `NoGoldenWindow`(전부 위험)와 같은 색을 주면 두 상태가
+ * 다시 한 덩어리로 읽힌다.
+ *
+ * **곡선이 초록인데 왜 추천이 없는지**를 말하는 것이 이 자리의 일이다. 그 어긋남이 이
+ * 이슈의 제보였다.
+ */
+function SuppressedByWarning() {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-body-1 text-fg-muted font-semibold">{messages.home.goldenSuppressed}</p>
+      <p className="text-body-2 text-fg-muted">{messages.home.goldenSuppressedDesc}</p>
+    </div>
   )
 }
 

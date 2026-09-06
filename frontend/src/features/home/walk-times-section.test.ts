@@ -29,13 +29,37 @@ function render(
   `heatSensitive` 하나로는 두 갈래가 한계다. 조합표는 `mockWalkTimes` 머리주석에 있다.
 */
 /** 골든타임이 있는 날 — 초코 조합 */
-const GOOD_DAY = mockWalkTimes(false, true)
-/** 특보 경보로 추천이 없는 날 — 몽실이 조합 */
-const BAD_DAY = mockWalkTimes(true, false)
+const GOOD_DAY = mockWalkTimes({ heatSensitive: false, coldSensitive: true, noiseSensitive: false })
+/**
+ * 특보 **경보**로 추천이 **보류**된 날 — 몽실이 조합 (#270).
+ *
+ * **`ALL_RISKY_DAY` 와 다른 상태다.** 서버는 예보 → 경보 → 구간 순으로 보므로 경보가
+ * 떠 있으면 곡선이 어떻든 `SUPPRESSED_BY_WARNING` 이다. 예전 fixture 는 이 둘을 하나로
+ * 묶어 두어, 화면이 보류를 위험 단정으로 말하는 것을 테스트가 오히려 고정하고 있었다.
+ */
+const SUPPRESSED_DAY = mockWalkTimes({
+  heatSensitive: true,
+  coldSensitive: false,
+  noiseSensitive: true,
+})
+/** 경보 없이 남은 시각이 전부 위험한 날 — `goldenNone` 이 참인 유일한 상태 */
+const ALL_RISKY_DAY = mockWalkTimes({
+  heatSensitive: true,
+  coldSensitive: false,
+  noiseSensitive: false,
+})
 /** 곡선이 비었고 **정상**인 날 (그 날짜 예보 시간대가 지났다) */
-const DAY_ENDED = mockWalkTimes(false, false)
+const DAY_ENDED = mockWalkTimes({
+  heatSensitive: false,
+  coldSensitive: false,
+  noiseSensitive: false,
+})
 /** 곡선이 비었고 **장애**인 날 (날씨를 못 받았다) */
-const UNAVAILABLE = mockWalkTimes(true, true)
+const UNAVAILABLE = mockWalkTimes({
+  heatSensitive: true,
+  coldSensitive: true,
+  noiseSensitive: false,
+})
 
 describe('WalkTimesSection — 추천 구간', () => {
   it('골든타임을 시각 문장으로 적는다 — 곡선 색에만 기대지 않는다', () => {
@@ -93,7 +117,7 @@ describe('WalkTimesSection — 추천 구간', () => {
     (`GoldenWalkWindow`). 화면이 대체 구간을 지어내면 그 설계가 무너진다.
   */
   it('추천이 없는 날에 시간대를 지어내지 않는다', () => {
-    const markup = render(BAD_DAY)
+    const markup = render(ALL_RISKY_DAY)
 
     expect(markup).toContain(messages.home.goldenNone)
     expect(markup).not.toContain('18:00')
@@ -101,10 +125,10 @@ describe('WalkTimesSection — 추천 구간', () => {
   })
 
   it('추천이 없어도 곡선은 그대로 보여 준다 — 근거를 감추지 않는다', () => {
-    const markup = render(BAD_DAY)
-
-    expect(markup).toContain('14시')
-    expect(markup).toContain('21시')
+    for (const markup of [render(ALL_RISKY_DAY), render(SUPPRESSED_DAY)]) {
+      expect(markup).toContain('14시')
+      expect(markup).toContain('21시')
+    }
   })
 })
 
@@ -179,7 +203,7 @@ describe('WalkTimesSection — 곡선', () => {
 describe('WalkTimesSection — 예보가 없는 날 (#204)', () => {
   /*
     dev 실측 모양이다 — `hourly: []` · 구간 셋 다 null · `weatherWarning: null`.
-    특보가 있는 `BAD_DAY` 를 베이스로 쓰지 않는 이유는 특보 배지 자체가 위험 톤을 쓰기
+    특보가 있는 `SUPPRESSED_DAY` 를 베이스로 쓰지 않는 이유는 특보 배지 자체가 위험 톤을 쓰기
     때문이다: 그러면 아래 톤 검사가 판정 자리를 보는지 배지를 보는지 알 수 없어진다.
   */
   const NO_FORECAST: WalkTimesResponse = {
@@ -209,7 +233,7 @@ describe('WalkTimesSection — 예보가 없는 날 (#204)', () => {
   /* 색은 등급을 말하는데 이 자리에는 등급이 없다 — 미지는 미지의 모양이어야 한다 */
   it('위험 톤을 쓰지 않는다 (DESIGN.md §2-3)', () => {
     expect(render(NO_FORECAST)).not.toContain('text-metric-critical-700')
-    expect(render(BAD_DAY)).toContain('text-metric-critical-700')
+    expect(render(ALL_RISKY_DAY)).toContain('text-metric-critical-700')
   })
 
   it('같은 문장을 판정 자리와 곡선 자리에 두 번 두지 않는다', () => {
@@ -230,9 +254,9 @@ describe('WalkTimesSection — 예보가 없는 날 (#204)', () => {
     expect(markup).not.toContain(messages.home.goldenNoForecast)
   })
 
-  /* 예보가 있고 구간만 없는 기존 케이스는 그대로 위험 단정이다 — 회귀 방지 */
+  /* 경보 없이 구간만 없는 경우는 그대로 위험 단정이다 — 회귀 방지 */
   it('예보가 있고 구간만 없으면 위험 단정을 유지한다', () => {
-    const markup = render(BAD_DAY)
+    const markup = render(ALL_RISKY_DAY)
 
     expect(markup).toContain(messages.home.goldenNone)
     expect(markup).not.toContain(messages.home.goldenNoForecast)
@@ -252,7 +276,7 @@ describe('WalkTimesSection — 상태', () => {
   })
 
   it('특보 배지를 함께 그린다', () => {
-    expect(render(BAD_DAY)).toContain('경보')
+    expect(render(SUPPRESSED_DAY)).toContain('경보')
     expect(render(GOOD_DAY)).not.toContain('경보')
   })
 
@@ -348,5 +372,117 @@ describe('WalkTimesSection — 곡선이 빈 이유 (#262)', () => {
 
     expect(markup).not.toContain(UNAVAILABLE.forecastCoverage?.name)
     expect(markup).toContain('18:00')
+  })
+})
+
+/*
+  #270. **`goldenStart: null` 에 성질이 다른 셋이 섞여 있었다.** 화면이 불린 둘로 갈라
+  그중 하나의 문구를 나머지에도 썼고, 풍랑경보 날 곡선에는 저녁 안전 구간이 초록으로
+  그려져 있는데 "남은 시간이 모두 위험 등급이에요" 가 나갔다.
+*/
+describe('WalkTimesSection — 골든타임이 없는 이유 (#270)', () => {
+  it('경보 보류와 위험 단정이 다른 문구를 받는다', () => {
+    const suppressed = render(SUPPRESSED_DAY)
+    const risky = render(ALL_RISKY_DAY)
+
+    expect(suppressed).toContain(messages.home.goldenSuppressed)
+    expect(risky).toContain(messages.home.goldenNone)
+    // 서로의 문구를 쓰지 않는다 — 이 이슈의 제보가 정확히 그것이었다
+    expect(suppressed).not.toContain(messages.home.goldenNone)
+    expect(risky).not.toContain(messages.home.goldenSuppressed)
+  })
+
+  /*
+    **보류는 판정이 아니다.** 곡선에 안전 구간이 남아 있고 그것을 근거로 그대로 보여 주므로,
+    전부 위험과 같은 색을 주면 두 상태가 다시 한 덩어리로 읽힌다.
+  */
+  it('보류에는 위험 톤을 쓰지 않는다 (DESIGN.md §2-3)', () => {
+    const suppressed = render(SUPPRESSED_DAY)
+
+    // 특보 배지가 위험 톤을 쓰므로 판정 문구 자체에 톤이 없는지를 본다
+    expect(suppressed).not.toContain(
+      `text-metric-critical-700 font-semibold">${messages.home.goldenSuppressed}`,
+    )
+    expect(render(ALL_RISKY_DAY)).toContain('text-metric-critical-700')
+  })
+
+  it('보류에도 곡선은 그대로 남는다 — 근거를 감추지 않는다', () => {
+    const markup = render(SUPPRESSED_DAY)
+
+    expect(markup).toContain('14시')
+    expect(markup).toContain(messages.home.goldenCurveLegend)
+  })
+
+  /*
+    **판정 순서를 화면이 다시 짜지 않는다.** 서버 `GoldenWindowStatus.of` 가 예보 → 경보 →
+    구간 순으로 정한다. 서버가 `SUPPRESSED_BY_WARNING` 이라고 하면 곡선에 구간이 보여도
+    보류다 — 화면이 곡선을 다시 읽어 뒤집으면 두 규칙이 갈린다.
+  */
+  it('서버 상태가 곡선보다 우선한다', () => {
+    const markup = render({
+      ...GOOD_DAY,
+      goldenWindowStatus: SUPPRESSED_DAY.goldenWindowStatus,
+      goldenStart: null,
+      goldenEnd: null,
+      goldenLevel: null,
+    })
+
+    expect(markup).toContain(messages.home.goldenSuppressed)
+    expect(markup).toContain('14시')
+  })
+
+  /*
+    **모르는 코드에서 화면이 비지 않는다.** 서버가 하나를 더 내면 `NO_FORECAST` 로 떨어져
+    "예보 없음" 을 말하게 되는데, 곡선이 있는 날에 그것은 거짓이다 — 옛 갈래로 내려가
+    아는 만큼만 말한다.
+  */
+  it('모르는 코드는 옛 갈래로 떨어진다', () => {
+    const markup = render({
+      ...ALL_RISKY_DAY,
+      goldenWindowStatus: { code: 'FUTURE_CODE', name: '미래', description: '모르는 값' },
+    })
+
+    expect(markup).toContain(messages.home.goldenNone)
+    expect(markup).not.toContain(messages.home.goldenNoForecast)
+  })
+
+  /*
+    **옛 서버(필드 없음)에서 예전 세 갈래 그대로다.** `weatherWarning` 을 보고 보류를
+    만들어 내지 않는다 — 경보와 주의보를 가르는 규칙까지 화면이 복제하게 된다.
+  */
+  it('goldenWindowStatus 가 없으면 예전 세 갈래로 떨어진다', () => {
+    expect(render({ ...GOOD_DAY, goldenWindowStatus: null })).toContain('18:00')
+    expect(render({ ...ALL_RISKY_DAY, goldenWindowStatus: null })).toContain(
+      messages.home.goldenNone,
+    )
+    expect(render({ ...DAY_ENDED, goldenWindowStatus: null })).toContain(
+      DAY_ENDED.forecastCoverage?.name as string,
+    )
+  })
+
+  /* `AVAILABLE` 인데 구간이 없으면 그릴 것이 없다 — 빈 자리를 만들지 않는다 */
+  it('AVAILABLE 인데 구간이 없으면 옛 갈래로 떨어진다', () => {
+    const markup = render({
+      ...ALL_RISKY_DAY,
+      goldenWindowStatus: GOOD_DAY.goldenWindowStatus,
+    })
+
+    expect(markup).toContain(messages.home.goldenNone)
+  })
+})
+
+/*
+  **조건이 없는 조회**(게스트·반려견 미등록)는 기본 갈래다. #262 가 조합 규칙을 넣으면서
+  `heatSensitive` 파라미터가 아예 없는 경우가 `false/false` 로 접혀 게스트 홈이 늘
+  "예보 없음" 을 보게 됐다 — 브라우저 실측에서 잡았다. 조합은 **시나리오를 고르는 장치**이지
+  "조건이 없다" 를 뜻하지 않는다.
+*/
+describe('mockWalkTimes — 조건이 없는 조회 (#270)', () => {
+  it('반려견 조건이 없으면 골든타임이 있는 기본 날이다', () => {
+    const guest = mockWalkTimes(null)
+
+    expect(guest.goldenWindowStatus?.code).toBe('AVAILABLE')
+    expect(guest.hourly.length).toBeGreaterThan(0)
+    expect(render(guest)).toContain('18:00')
   })
 })
