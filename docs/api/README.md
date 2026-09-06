@@ -3,12 +3,17 @@
 이 폴더는 **게이트웨이가 실제로 서빙하는 OpenAPI 문서를 파일로 고정해 둔 것**이다.
 백엔드가 로컬에 뜨지 않아도 계약을 읽을 수 있고, 계약이 언제 어떻게 바뀌었는지 diff 로 보인다.
 
+수집 시각: **2026-09-06** (dev 게이트웨이).
+
 | 파일                                                     | 서비스                                  | operations | schemas |
 | -------------------------------------------------------- | --------------------------------------- | ---------- | ------- |
-| [`openapi/auth-service.json`](openapi/auth-service.json) | 회원 · 인증/인가                        | 22         | 35      |
+| [`openapi/auth-service.json`](openapi/auth-service.json) | 회원 · 인증/인가                        | 29         | 35      |
 | [`openapi/tour-service.json`](openapi/tour-service.json) | 관광 데이터 · 여행 인사이트 · 긴급 시설 | 10         | 38      |
-| [`openapi/plan-service.json`](openapi/plan-service.json) | 여행 일정 · 즐겨찾기                    | 8          | 33      |
-| [`openapi/ai-service.json`](openapi/ai-service.json)     | AI 여행 플래너                          | 4          | 15      |
+| [`openapi/plan-service.json`](openapi/plan-service.json) | 여행 일정 · 즐겨찾기                    | 13         | 33      |
+| [`openapi/ai-service.json`](openapi/ai-service.json)     | AI 여행 플래너                          | 5          | 15      |
+
+> **표의 숫자는 스냅샷에서 센다.** 예전 `22` · `8` · `4` 는 아래 인벤토리와도 어긋나 있었다 —
+> 표는 손으로 적고 인벤토리는 따로 늘려 온 탓이다. 재수집할 때 이 줄도 함께 고친다.
 
 **정본 순서**: 기동 중인 게이트웨이 Swagger > 이 스냅샷 > 서술 문서(`backend/docs/*.md`).
 스냅샷이 낡을 수 있으므로, 계약이 의심되면 아래 명령으로 다시 받아 diff 를 본다.
@@ -22,6 +27,34 @@ for s in ai tour plan auth; do
     > "docs/api/openapi/$s-service.json"
 done
 git diff --stat docs/api/openapi/
+```
+
+**`git diff` 만 보면 어디가 바뀌었는지 안 보인다** — 키 순서와 description 이 함께 흔들려
+수백 줄이 잡힌다. 구조로 좁혀서 본다 (operation·schema·필드·타입만):
+
+```bash
+python3 - <<'EOF'
+import json, subprocess
+for svc in ['ai','tour','plan','auth']:
+    p = f'docs/api/openapi/{svc}-service.json'
+    o = json.loads(subprocess.run(['git','show',f'HEAD:{p}'],capture_output=True,text=True).stdout)
+    n = json.load(open(p, encoding='utf-8'))
+    ops = lambda d: {f'{m.upper()} {k}' for k, v in d['paths'].items() for m in v
+                     if m in ('get','post','put','delete','patch')}
+    so, sn = o['components']['schemas'], n['components']['schemas']
+    print(f'--- {svc}')
+    for label, diff in [('+op', ops(n)-ops(o)), ('-op', ops(o)-ops(n)),
+                        ('+schema', set(sn)-set(so)), ('-schema', set(so)-set(sn))]:
+        if diff: print(' ', label, sorted(diff))
+    for name in sorted(set(so) & set(sn)):
+        po, pn = so[name].get('properties',{}) or {}, sn[name].get('properties',{}) or {}
+        if set(pn)-set(po): print(f'  ~ {name} + {sorted(set(pn)-set(po))}')
+        if set(po)-set(pn): print(f'  ~ {name} - {sorted(set(po)-set(pn))}')
+        for f in set(po) & set(pn):
+            a = po[f].get('type') or po[f].get('$ref')
+            b = pn[f].get('type') or pn[f].get('$ref')
+            if a != b: print(f'  ! {name}.{f}: {a} -> {b}')
+EOF
 ```
 
 로컬 백엔드로 받을 때는 호스트만 바꾼다 (`http://localhost:8000`).
@@ -66,7 +99,7 @@ auth-service 로 직결시킨다 — 배포에서 사설 IP 대신 공개 도메
 ## 엔드포인트 인벤토리
 
 `FE 경로` 는 `frontend/src/lib/api/paths.ts` 에 그 경로가 등록돼 있는지다 (화면 연동 여부는
-`frontend/docs/screen-inventory.md`). **56 operations 중 51개가 등록돼 있고 5개가 비어 있다.**
+`frontend/docs/screen-inventory.md`). **57 operations 중 52개가 등록돼 있고 5개가 비어 있다.**
 
 ### `auth-service` — 회원 및 인증/인가 서비스
 
@@ -142,6 +175,7 @@ auth-service 로 직결시킨다 — 배포에서 사설 IP 대신 공개 도메
 | `POST` | `/ai-plans`                       | 🔒   | ✅      | AI 여행 일정 생성 제출             |
 | `GET`  | `/ai-plans/jobs/{jobId}`          | 🔒   | ✅      | AI 여행 일정 생성 작업 조회        |
 | `GET`  | `/ai-plans/jobs/{jobId}/stream`   | 🔒   | ✅      | 일정 생성 작업 상태 스트리밍 (SSE) |
+| `POST` | `/ai-plans/jobs/{jobId}/cancel`   | 🔒   | ✅      | 일정 생성 작업 취소 (협조적)       |
 | `POST` | `/ai-plans/packing-list/{planId}` | 🔒   | ✅      | 반려견 여행 준비물 목록 생성       |
 
 ### FE 경로가 없는 5개
