@@ -44,6 +44,17 @@
 
 타입은 `feat` / `fix` / `chore` / `refactor` / `style` / `docs` / `test` (`.github/PULL_REQUEST_TEMPLATE.md` 기준).
 
+### AI 공동 작성자 표기 (필수)
+
+- Codex가 실질적으로 작성한 변경을 Codex가 커밋하거나 커밋을 수정할 때는 커밋 메시지 마지막에 아래 트레일러를 추가한다.
+
+  ```text
+  Co-authored-by: Codex <codex@openai.com>
+  ```
+
+- 기존 Git 작성자·커미터 이름과 이메일은 변경하지 않는다. Codex 참여 사실만 공동 작성자 트레일러로 남긴다.
+- 사용자가 직접 작성한 변경만 포함된 커밋에는 이 트레일러를 임의로 추가하지 않는다.
+
 ### Git 협업 워크플로 (필수)
 
 **정본: [docs/git-workflow.md](docs/git-workflow.md)**
@@ -75,20 +86,23 @@
 - 엔트리 문서는 얇게 유지하고, 세부 규칙은 각 워크스페이스 `docs/`에 모은다.
 - 구현 중 새 규칙이 생기면 엔트리 문서보다 해당 `docs/*.md`를 먼저 갱신한다.
 - 코드 변경과 문서 변경은 같이 움직인다.
-- 새 반복 패턴이 생기면 `.claude/skills/` 스킬화를 검토한다.
+- 새 반복 패턴이 생기면 `.agents/skills/` 공용 스킬화를 검토한다.
 
 ## 스킬 / 에이전트
 
-`.claude/skills/*` — `/스킬명` 으로 호출한다.
+스킬 정본은 `.agents/skills/*`이고 Claude Code 호환 미러는 `.claude/skills/*`다. 관리 규칙은 [docs/agent-skills.md](docs/agent-skills.md)를 따른다.
+
+- Codex: `$스킬명`
+- Claude Code / Cursor: `/스킬명`
 
 | 구분 | 백엔드 | 프론트엔드 | 공통 |
 |------|--------|------------|------|
-| 착수 | `/backend-feature-bootstrap` | `/fe-feature-bootstrap` | |
-| 계약 점검 | `/backend-api-check` | `/fe-api-check` | |
-| 경계 점검 | `/hexagonal-guard` | `/fe-boundary-guard` | |
-| 멀티 에이전트 | `/backend-multi-agent` | `/fe-multi-agent` | |
-| 협업 문서 | | | `/issue`, `/pr`, `/mr` |
+| 착수 | `backend-feature-bootstrap` | `fe-feature-bootstrap` | |
+| 계약 점검 | `backend-api-check` | `fe-api-check` | |
+| 경계 점검 | `hexagonal-guard` | `fe-boundary-guard` | |
+| 멀티 에이전트 | `backend-multi-agent` | `fe-multi-agent` | |
+| 협업 문서 | | | `issue`, `pr`, `mr` |
 
-`.claude/agents/fe-*.md` — FE 전용 서브에이전트 7종 (`fe-spec-writer`, `fe-implementer`, `fe-reviewer`, `fe-api-contract`, `fe-design-reviewer`, `fe-test-author`, `fe-map-reviewer`). 세부는 `frontend/docs/team-playbook.md`.
+`.claude/agents/fe-*.md` — FE 전용 역할 정의 7종 (`fe-spec-writer`, `fe-implementer`, `fe-reviewer`, `fe-api-contract`, `fe-design-reviewer`, `fe-test-author`, `fe-map-reviewer`). Claude Code에서는 subagent로, Codex/Cursor에서는 각 호스트의 agent 기능 또는 순차 역할 프롬프트로 사용한다. 세부는 `frontend/docs/team-playbook.md`.
 
 > **주의**: 사용자 전역(`~/.claude/agents/`)에 같은 이름의 다른 프로젝트용 에이전트가 있을 수 있다. 이 저장소의 프로젝트 스코프 정의가 우선하며, **BossPickSeoul 경로·Swagger URL이 등장하면 잘못된 에이전트를 읽고 있는 것이다.**
