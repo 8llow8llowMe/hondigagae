@@ -52,14 +52,14 @@ export type NearbyFacilityResult = {
   /** 가까운 순. 병원과 약국이 **섞여** 온다 */
   facilities: NearbyFacilityItem[]
   /**
-   * **총계가 아니다 — `facilities.length` 와 같은 값이다.**
+   * **반경 안 총계. `size` 로 자르기 전 값이다** (BE #285 / PR #296).
    *
-   * 이름이 총계처럼 보여 예전에는 잘림 판정에 썼는데, dev 실측에서 `size` 를 3 / 10 / 50
-   * 으로 바꿔 부르면 `totalCount` 도 3 / 10 / 50 으로 따라온다(제주시청 · radius 10km).
-   * 즉 이 값으로는 "더 있는지" 를 알 수 없다.
+   * dev 실측 2026-09-08: 제주시청 · `radius=10000` 에서 `size` 를 3 / 50 / 250 으로
+   * 바꿔 불러도 `totalCount` 는 **136 고정**이고 `facilities.length` 만 따라 늘어난다.
    *
-   * 잘림은 **상한에 닿았는지**로 판단한다 (`countsAreComplete`).
-   * 백엔드 계약을 손대야 할 사안이라 별도 이슈로 올린다.
+   * 잘림은 `facilities.length < totalCount` 로 안다 (`countsAreComplete`).
+   * 한때는 이 값이 `size` 를 그대로 따라와 잘림을 알 수 없었고, 그동안은 상한 도달로
+   * 대신 판정했다 (#281 → #297 에서 되돌렸다).
    */
   totalCount: number
   radius: number

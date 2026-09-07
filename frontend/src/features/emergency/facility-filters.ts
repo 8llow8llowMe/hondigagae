@@ -1,4 +1,3 @@
-import { MAX_SIZE } from '@/lib/api/emergency'
 import type {
   FacilityFilters,
   FacilityTypeCode,
@@ -55,20 +54,21 @@ export function facilityCounts(facilities: readonly NearbyFacilityItem[]): {
 /**
  * 개수를 화면에 써도 되는가.
  *
- * 칩 개수는 **받아 온 목록에서 센 것**이다. `size` 상한(50)에 걸려 잘렸다면 그 수는
- * 전체가 아니다 — **틀린 개수는 없는 개수보다 나쁘다.** 잘렸으면 칩에서 숫자를 뺀다.
+ * 칩 개수는 **받아 온 목록에서 센 것**이다. 반경 안에 더 있는데 `size` 로 잘렸다면 그
+ * 수는 전체가 아니다 — **틀린 개수는 없는 개수보다 나쁘다.** 잘렸으면 칩에서 숫자를 뺀다.
  *
- * **`totalCount` 로는 잘림을 알 수 없다.** 이름이 총계처럼 보이지만 dev 실측에서
- * `totalCount` 가 **돌려준 개수와 늘 같다** — `size` 를 3 / 10 / 50 으로 바꿔 부르면
- * `totalCount` 도 3 / 10 / 50 으로 따라온다(제주시청 · radius 10km). 그래서 예전
- * 조건(`length >= totalCount`)은 **항상 참**이었고, 50개로 잘린 결과에도 개수가 그대로
- * 나갔다. 같은 조회에서 병원 19 + 약국 31 = 정확히 50 이 왔으므로 상한에 닿아 있다.
+ * **`totalCount` 가 자르기 전 총계다** (#297 · BE #285 / PR #296). dev 실측
+ * 2026-09-08: 제주시청 · `radius=10000` 에서 `size` 를 3 / 50 / 250 으로 바꿔 불러도
+ * `totalCount` 는 **136 으로 고정**이고 `facilities.length` 만 3 / 50 / 136 으로 따라온다.
+ * 그래서 받은 개수와 총계를 비교하면 잘림을 정직하게 알 수 있다.
  *
- * 대신 **상한에 닿았는지**로 판단한다. 이쪽은 응답의 해석에 기대지 않는다 — 우리가 보낸
- * `size` 와 받은 개수만 본다.
+ * **상한 도달(`length >= MAX_SIZE`) 우회는 걷었다.** `totalCount` 가 `size` 를 그대로
+ * 따라오던 시절의 대체 판정이었는데(#281 / PR #283), 그 전제가 사라졌다. 우회는 "잘렸다"
+ * 만 알려주고 "얼마나 더 있는지" 는 말하지 못했고, 상한만큼 정확히 온 정상 응답을
+ * 잘린 것으로 오판했다.
  */
 export function countsAreComplete(result: NearbyFacilityResult): boolean {
-  return result.facilities.length < MAX_SIZE
+  return result.facilities.length >= result.totalCount
 }
 
 /**
