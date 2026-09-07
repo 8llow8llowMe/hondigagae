@@ -22,7 +22,9 @@
 - `GET /api/v1/places/{placeId}` — 상세 (출입 조건: 실내/실외, 크기 제한, 목줄/케이지 조건)
 - `GET /api/v1/places/{placeId}/related` — 연관 관광지
 - `GET /api/v1/places/{placeId}/suitability` — 여행 적합도 (`score` + `reasons`, `api-design-guide.md` §9)
-- `GET /api/v1/places/{placeId}/walk-safety` — 산책 위험도 (추정 노면온도 + 열지수 + 안전 시간대)
+- `GET /api/v1/places/{placeId}/walk-safety` — 산책 위험도 (추정 노면온도 + 기상청 여름철 체감온도 + 안전 시간대).
+  체감온도는 기상청 산식으로 계산하며 폭염특보 기준(33/35℃)이 판정 임계다. NOAA 열지수는 참고로 병기하고,
+  두 값 모두 계산 근거 문구(feelsLikeBasis/heatIndexBasis)를 함께 내린다
 - `GET /api/v1/walk-courses` — 산책 코스 검색
 - `GET /api/v1/places/nearby?lat=&lng=&radius=&contentType=&petSizeType=&petWeightKg=` — 좌표 반경 장소 검색
 - `GET /api/v1/emergencies/facilities?lat=&lng=&radius=&type=&open24Only=&openNowOnly=` — 긴급 시설 반경 검색

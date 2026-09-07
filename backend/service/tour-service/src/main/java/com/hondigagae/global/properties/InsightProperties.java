@@ -27,9 +27,9 @@ public record InsightProperties(
     // 노면(아스팔트) 표면온도 추정치 기준. 사람 체감이 아니라 발바닥 기준이다.
     Double pavementCautionCelsius,
     Double pavementDangerCelsius,
-    // 기온 + 습도로 산출한 열지수 기준.
-    Double heatIndexCautionCelsius,
-    Double heatIndexDangerCelsius,
+    // 기상청 여름철 체감온도 기준. 폭염특보(주의보 33℃·경보 35℃)와 같은 척도를 쓴다.
+    Double feelsLikeCautionCelsius,
+    Double feelsLikeDangerCelsius,
     // 비 오는 날 실내 대안 검색 기본 반경(m) / 개수
     Integer alternativeRadiusMeters,
     Integer alternativeSize
@@ -60,11 +60,13 @@ public record InsightProperties(
         if (pavementDangerCelsius == null) {
             pavementDangerCelsius = 52.0d;
         }
-        if (heatIndexCautionCelsius == null) {
-            heatIndexCautionCelsius = 27.0d;
+        if (feelsLikeCautionCelsius == null) {
+            // 폭염주의보 발표 기준(체감온도 33℃)과 맞춘다 — 임계의 출처가 우리 감이 아니라 기상청 특보다.
+            feelsLikeCautionCelsius = 33.0d;
         }
-        if (heatIndexDangerCelsius == null) {
-            heatIndexDangerCelsius = 32.0d;
+        if (feelsLikeDangerCelsius == null) {
+            // 폭염경보 발표 기준(체감온도 35℃).
+            feelsLikeDangerCelsius = 35.0d;
         }
         if (alternativeRadiusMeters == null || alternativeRadiusMeters <= 0) {
             alternativeRadiusMeters = 5000;

@@ -77,13 +77,14 @@ public record DailyWeather(
     }
 
     /**
-     * 하루 최고 체감온도(섭씨). 시각별 기온·상대습도로 낸 열지수({@link HeatIndex})의 하루 최대값이다.
+     * 하루 최고 체감온도(섭씨). 시각별 기온·상대습도로 낸 기상청 여름철 체감온도
+     * ({@link FeelsLikeTemperature})의 하루 최대값이다 — 폭염특보와 같은 척도라 사용자가 아는 값과 맞는다.
      *
      * <p>반려견은 헐떡임으로 체온을 내리므로 습도가 높으면 같은 기온도 더 위험하다. 일정 브리핑이
      * "최고기온 31도" 옆에 큰 숫자로 보여 줄 값이 이것이다 (#88).
      *
      * <p>중기예보는 시각별 데이터가 없어 {@code null} 이다 — 최고기온·평균 습도로 지어내지 않는다.
-     * 습도가 없는 시각은 {@link HeatIndex#of} 규칙대로 기온을 그대로 쓴다. 소수 첫째 자리로 반올림한다.
+     * 습도가 없는 시각은 {@link FeelsLikeTemperature#of} 규칙대로 기온을 그대로 쓴다. 소수 첫째 자리로 반올림한다.
      */
     public Double maxFeelsLikeTemperature() {
         if (hourly == null || hourly.isEmpty()) {
@@ -91,7 +92,7 @@ public record DailyWeather(
         }
         return hourly.stream()
             .filter(forecast -> forecast.temperature() != null)
-            .mapToDouble(forecast -> HeatIndex.of(forecast.temperature(), forecast.humidity()).celsius())
+            .mapToDouble(forecast -> FeelsLikeTemperature.of(forecast.temperature(), forecast.humidity()).celsius())
             .max()
             .stream()
             .map(value -> Math.round(value * 10.0d) / 10.0d)
