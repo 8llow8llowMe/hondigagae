@@ -27,7 +27,10 @@
   두 값 모두 계산 근거 문구(feelsLikeBasis/heatIndexBasis)를 함께 내린다
 - `GET /api/v1/walk-courses` — 산책 코스 검색
 - `GET /api/v1/places/nearby?lat=&lng=&radius=&contentType=&petSizeType=&petWeightKg=` — 좌표 반경 장소 검색
-- `GET /api/v1/emergencies/facilities?lat=&lng=&radius=&type=&open24Only=&openNowOnly=` — 긴급 시설 반경 검색
+- `GET /api/v1/emergencies/facilities?lat=&lng=&radius=&type=&open24Only=&openNowOnly=&size=` — 긴급 시설 반경 검색.
+  `size` 상한은 **250** 이다 — 제주 전역 시설이 214곳이라 반경을 최대로 넓혀도 잘리지 않는다.
+  화면이 유형·24시간을 클라이언트에서 좁히며 칩마다 개수를 보여주므로 한 번에 전량을 받아야 한다.
+  두 조회 모두 **`totalCount` 는 `size` 로 자르기 전 총계**다 (`api-design-guide.md` §5-1, 이슈 #285)
 - `GET /api/v1/emergencies/facilities/{facilityId}` — 긴급 시설 상세.
   내려간(delisted) 시설은 404 다 — 목록에 없는 곳을 상세로만 볼 수 있으면 폐업한 병원 주소를 들고 찾아가게 된다
 - `GET /api/v1/insights/regional-weather?date=` — 제주 권역(5곳) 날씨 비교 + "나가기 좋은 권역" 추천.

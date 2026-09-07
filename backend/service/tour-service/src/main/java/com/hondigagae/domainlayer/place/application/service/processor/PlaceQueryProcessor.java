@@ -4,6 +4,7 @@ import com.hondigagae.domainlayer.place.application.exception.PlaceErrorCode;
 import com.hondigagae.domainlayer.place.application.exception.PlaceException;
 import com.hondigagae.common.geo.GeoDistance;
 import com.hondigagae.domainlayer.place.application.info.NearbyPlaceInfo;
+import com.hondigagae.domainlayer.place.application.info.NearbyPlacesInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceDetailInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceImageInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceIntroInfo;
@@ -42,17 +43,23 @@ public class PlaceQueryProcessor {
      *
      * <p>제주 장소가 수백 곳 규모라 메모리 정렬 비용이 문제 되지 않는다. 전국으로 넓히면
      * 공간 인덱스로 옮겨야 하는 지점이 여기다.
+     *
+     * <p><b>총계는 자르기 전에 센다</b>(이슈 #285). 자른 뒤에 세면 {@code size} 와 늘 같은
+     * 값이 나와, 반경 안에 몇 곳이 더 있는지 응답만으로는 알 수 없게 된다.
      */
-    public List<NearbyPlaceInfo> getNearbyPlaces(NearbyPlaceCriteria criteria) {
-        return placeRepositoryPort.findNearby(criteria).stream()
+    public NearbyPlacesInfo getNearbyPlaces(NearbyPlaceCriteria criteria) {
+        List<NearbyPlaceInfo> matched = placeRepositoryPort.findNearby(criteria).stream()
             .map(place -> toNearbyInfo(place, criteria))
             .filter(info -> info.distanceMeters() <= criteria.radius())
             // 거리(m 반올림)는 동률이 흔하다 — 아이디로 순서를 고정하지 않으면 같은 요청이
             // 호출마다 다른 순서를 주고, limit 경계에서는 포함되는 장소 자체가 바뀐다.
             .sorted(Comparator.comparingInt(NearbyPlaceInfo::distanceMeters)
                 .thenComparingLong(info -> info.place().placeId()))
-            .limit(criteria.size())
             .toList();
+
+        return new NearbyPlacesInfo(
+            matched.stream().limit(criteria.size()).toList(),
+            matched.size());
     }
 
     private NearbyPlaceInfo toNearbyInfo(Place place, NearbyPlaceCriteria criteria) {

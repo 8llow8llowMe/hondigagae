@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.emergency.application.service.processor;
 
 import com.hondigagae.common.geo.GeoDistance;
+import com.hondigagae.domainlayer.emergency.application.info.NearbyFacilitiesInfo;
 import com.hondigagae.domainlayer.emergency.application.info.NearbyFacilityInfo;
 import com.hondigagae.domainlayer.emergency.application.model.NearbyFacilityQuery;
 import com.hondigagae.domainlayer.emergency.application.port.out.EmergencyFacilityRepositoryPort;
@@ -27,10 +28,13 @@ public class NearbyFacilityQueryProcessor {
      *
      * <p>제주 전체가 214곳뿐이라 메모리 정렬 비용이 문제 되지 않는다. 규모가 커지면
      * 공간 인덱스로 옮겨야 하는 지점이 여기다.
+     *
+     * <p><b>총계는 자르기 전에 센다</b>(이슈 #285). 자른 뒤에 세면 {@code size} 와 늘 같은
+     * 값이 나와, 그 수를 받은 쪽은 반경 안에 몇 곳이 더 있는지 영영 알 수 없다.
      */
-    public List<NearbyFacilityInfo> searchNearby(NearbyFacilityQuery query) {
+    public NearbyFacilitiesInfo searchNearby(NearbyFacilityQuery query) {
         LocalDateTime now = LocalDateTime.now();
-        return emergencyFacilityRepositoryPort.findWithinBox(query).stream()
+        List<NearbyFacilityInfo> matched = emergencyFacilityRepositoryPort.findWithinBox(query).stream()
             .filter(result -> result.lat() != null && result.lng() != null)
             .map(result -> toInfo(result, query, now))
             // openNowOnly 는 "지금 확실히 열린 곳"이다. 모름(null)도 뺀다 — 급할 때
@@ -41,8 +45,11 @@ public class NearbyFacilityQueryProcessor {
             // 고정하지 않으면 호출마다 목록이 흔들리고 limit 경계의 포함 여부도 바뀐다.
             .sorted(Comparator.comparingInt(NearbyFacilityInfo::distanceMeters)
                 .thenComparingLong(NearbyFacilityInfo::facilityId))
-            .limit(query.size())
             .toList();
+
+        return new NearbyFacilitiesInfo(
+            matched.stream().limit(query.size()).toList(),
+            matched.size());
     }
 
     private NearbyFacilityInfo toInfo(EmergencyFacilityQueryResult result, NearbyFacilityQuery query,

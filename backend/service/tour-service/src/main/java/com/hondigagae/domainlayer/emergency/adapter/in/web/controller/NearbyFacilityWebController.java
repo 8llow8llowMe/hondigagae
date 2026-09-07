@@ -38,6 +38,8 @@ public class NearbyFacilityWebController {
             + "전화 확인을 안내해야 합니다(동물병원은 약 절반이 운영시간을 주지 않습니다). "
             + "24시간 운영이 확인된 곳은 제주 동물병원 중 3곳뿐이라 open24Only=true 는 결과가 매우 적습니다.\n\n"
             + "**필수: lat, lng.** 나머지는 생략 가능하고 radius 기본 10000m, size 기본 10 입니다.\n\n"
+            + "**totalCount 는 size 로 자르기 전 총계입니다.** 돌려준 개수보다 클 수 있고, "
+            + "그때는 `facilities.length < totalCount` 가 참이 되어 잘렸음을 알 수 있습니다.\n\n"
             + "호출 예\n"
             + "- 가장 가까운 도움 10곳: `GET /api/v1/emergencies/facilities?lat=33.4996&lng=126.5312`\n"
             + "- 지금 영업 중인 동물병원만: `GET /api/v1/emergencies/facilities?lat=33.4996&lng=126.5312&type=ANIMAL_HOSPITAL&openNowOnly=true`")
@@ -68,9 +70,11 @@ public class NearbyFacilityWebController {
             + "함께 빠지므로 결과가 줄어듭니다", example = "false")
         @RequestParam(defaultValue = "false") boolean openNowOnly,
 
-        @Parameter(description = "[선택, 기본 10] 조회 개수 (1~50)", example = "10")
+        @Parameter(description = "[선택, 기본 10] 조회 개수 (1~250). 제주 전역 시설이 214곳이라 "
+            + "250 이면 반경을 최대(50km)로 넓혀도 잘리지 않습니다 — 화면에서 유형·24시간을 좁히며 "
+            + "개수를 함께 보여주려면 한 번에 전량을 받아야 하기 때문입니다", example = "10")
         @Min(value = 1, message = EmergencyValidationMessage.SIZE_RANGE_INVALID)
-        @Max(value = 50, message = EmergencyValidationMessage.SIZE_RANGE_INVALID)
+        @Max(value = 250, message = EmergencyValidationMessage.SIZE_RANGE_INVALID)
         @RequestParam(defaultValue = "10") int size
     ) {
         NearbyFacilityQuery query = NearbyFacilityQuery.builder()
