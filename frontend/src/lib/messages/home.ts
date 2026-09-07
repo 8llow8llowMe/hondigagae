@@ -8,12 +8,16 @@
 export const homeMessages = {
   walkTodayLabel: '오늘 산책',
   /**
-   * 판정 요약줄의 열지수 ([#259](https://github.com/8llow8llowMe/hondigagae/issues/259)).
-   * **장소 상세와 같은 `heatIndexCelsius`(시각 기준)라 같은 이름으로 부른다** — 예전에는
+   * 판정 요약줄의 체감온도 ([#259](https://github.com/8llow8llowMe/hondigagae/issues/259)).
+   * **장소 상세와 같은 `feelsLikeCelsius`(시각 기준)라 같은 이름으로 부른다** — 예전에는
    * 여기만 `체감 열지수` 였다. 같은 물리량을 화면마다 다르게 부르면 사용자는 서로 다른
    * 값으로 읽는다. 하루 최대 쪽은 `최고 체감온도` 로 갈린다.
+   *
+   * **근거 필드가 `heatIndexCelsius` → `feelsLikeCelsius` 로 바뀌었다** (#292). 라벨 문구는
+   * 그대로 맞다 — 판정 기준이 NOAA 열지수에서 기상청 체감온도로 교체됐고, 화면은 처음부터
+   * 그 자리를 `체감온도` 라고 불러 왔다. **바뀐 것은 이름이 아니라 그 이름이 가리키던 값**이다.
    */
-  heatIndexLabel: '체감온도',
+  feelsLikeLabel: '체감온도',
   /**
    * 노면온도의 라벨 ([#269](https://github.com/8llow8llowMe/hondigagae/issues/269)).
    *

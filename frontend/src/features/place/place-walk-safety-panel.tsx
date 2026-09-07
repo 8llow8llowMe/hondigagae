@@ -1,3 +1,15 @@
+'use client'
+
+/*
+  **hook 이 들어와 `'use client'` 가 필수가 됐다** (architecture-guide.md §4 — hook 하나라도
+  쓰면 파일 최상단). 계산 근거 펼침이 `useState`/`useId` 를 쓴다. 이 파일은 예전에도
+  `onClick`(재시도) 을 달고 있었으나 client 부모만 임포트해 우연히 굴러갔다 — 규칙대로 밝힌다.
+
+  **지시문이 첫 줄이어야 한다.** 주석을 위에 두면 번들러에 따라 directive 로 인식되지 않는다.
+*/
+
+import { useId, useState } from 'react'
+
 import { ClockIcon } from '@/components/icons'
 import { MetricValue, MetricWord } from '@/components/metric'
 import { ReasonList } from '@/components/reason-list'
@@ -43,7 +55,7 @@ export type PlaceWalkSafetyPanelProps = {
  * - **점수가 없다.** 이 응답에는 `score` 가 아예 없어 등급어가 유일한 요약이다
  *
  * **게스트에게도 렌더한다** — 적합도 패널이 `GuestBlock` 으로 갈리는 것과 다르다.
- * 적합도의 점수는 반려견이 기준이라 화자가 없으면 말할 수 없지만, 노면 온도와 열지수는
+ * 적합도의 점수는 반려견이 기준이라 화자가 없으면 말할 수 없지만, 노면 온도와 체감온도는
  * **장소와 시각의 속성**이라 반려견이 없어도 값 자체가 참이다. 홈의 `WalkVerdict` 도
  * 같게 굴어(미로그인에 그대로 그린다) 두 화면이 갈리지 않는다.
  */
@@ -74,7 +86,11 @@ export function PlaceWalkSafetyPanel({
   }
 
   const tone = walkSafetyTone(data.walkSafetyLevel.code)
-  const heatIndex = formatCelsius(data.heatIndexCelsius)
+  /*
+    **`heatIndexCelsius` 가 아니라 `feelsLikeCelsius` 다** (#292 · BE `46f35e4`). 열지수는
+    판정에서 내려와 참고값이 됐다 — 아래 `FeelsLikeBasis` 안에서만 산다.
+  */
+  const feelsLike = formatCelsius(data.feelsLikeCelsius)
   const pavement = formatCelsius(data.estimatedPavementCelsius)
 
   return (
@@ -91,7 +107,7 @@ export function PlaceWalkSafetyPanel({
         </p>
 
         {/*
-          열지수를 hero 로 세운다 — 적합도의 점수 자리와 같다. **`null` 이면 자리를 비운다**
+          체감온도를 hero 로 세운다 — 적합도의 점수 자리와 같다. **`null` 이면 자리를 비운다**
           (0.0℃ 로 채우면 영하 판정으로 읽힌다).
 
           **라벨을 붙인다** (#259). 예전에는 적합도의 점수 hero(`82 /100`)를 따라 뺐는데,
@@ -103,10 +119,10 @@ export function PlaceWalkSafetyPanel({
           `지금 산책` 제목과 아래 `{time} 기준` 각주가 이미 두 번 말한다 — 라벨까지
           '지금' 을 얹으면 같은 말이 세 번이다. 가르는 일은 하루쪽의 `최고` 가 한다.
         */}
-        {heatIndex !== null && (
+        {feelsLike !== null && (
           <MetricValue
-            label={messages.place.detailHeatIndex}
-            value={heatIndex}
+            label={messages.place.detailFeelsLike}
+            value={feelsLike}
             unit={messages.place.detailTemperatureUnit}
             tone={tone}
             size="hero"
@@ -116,7 +132,7 @@ export function PlaceWalkSafetyPanel({
       </div>
 
       {/*
-        노면 온도. **중립 톤이다** — 등급을 말하는 값은 위 등급어와 hero 열지수뿐이고,
+        노면 온도. **중립 톤이다** — 등급을 말하는 값은 위 등급어와 hero 체감온도뿐이고,
         여기에도 색을 주면 무엇이 판정인지 흐려진다 (DESIGN.md §2-3).
 
         **`data.temperature` 를 곁들이지 않는다** (#269 에서 다시 판단했다).
@@ -154,6 +170,80 @@ export function PlaceWalkSafetyPanel({
       <BasisLine data={data} petName={petName} />
 
       <SaferWindow data={data} />
+
+      {/*
+        **맨 아래다.** 접혀 있어도 44px 한 줄을 차지하므로 위에 두면 `SaferWindow` 의
+        조언(실제로 행동을 바꾸는 유일한 줄)이 그만큼 밀린다. 계산 근거는 이 패널에서
+        가장 깊은 층이고, 접힌 각주는 아래에 산다.
+      */}
+      <FeelsLikeBasis data={data} />
+    </div>
+  )
+}
+
+/**
+ * 체감온도 계산 근거 + 참고 열지수 (#292).
+ *
+ * **이 자리가 생긴 이유.** BE `46f35e4` 가 판정 기준을 NOAA 열지수에서 기상청 여름철
+ * 체감온도로 바꾸고 열지수를 참고값으로 내렸다. 노면온도는 라벨이 스스로 `추정` 이라고
+ * 밝히는데 **hero 체감온도만 자기 출처를 말하지 않았고**, 열지수는 판정에서 내려온 뒤에도
+ * 서버가 계속 내려온다 — 두 사실을 한자리에서 처리한다.
+ *
+ * 지키는 것:
+ * - **접어 둔다.** `feelsLikeBasis` 는 산식·입력·임계 출처를 다 담은 130자 문장이다.
+ *   펼쳐 두면 판정과 근거 목록 사이에 회색 벽이 서고, 그러면 아무도 읽지 않는다
+ * - **참고 열지수를 평면에 세우지 않는다.** hero(판정) · 노면(근거) 로 정리된 자리에
+ *   세 번째 온도를 더하면 판정값과 참고값이 같은 위계로 읽힌다 — 그것이 이 변경이
+ *   고치려는 오독 그 자체다. 값과 `heatIndexBasis`("판정에는 쓰지 않으며…")를 **붙여
+ *   두어** 숫자만 떼어 읽히지 않게 한다
+ * - **서버 문장을 다시 쓰지 않는다.** 둘 다 완성형이다 (styling-guide.md §7)
+ * - **`feelsLikeBasis` 가 없으면 서랍 자체가 없다.** 펼침 라벨이 `체감온도 계산 근거` 라고
+ *   말하므로 체감온도 근거가 없는데 열지수만 담아 열면 라벨이 거짓이 된다. BE 도 두 값이
+ *   같은 `temperature` 에서 나와 **함께 있거나 함께 없다** (`WalkSafetyPresenter`)
+ */
+function FeelsLikeBasis({ data }: { data: WalkSafetyResponse }) {
+  const [open, setOpen] = useState(false)
+  const bodyId = useId()
+
+  if (data.feelsLikeBasis === null) return null
+
+  const heatIndex = formatCelsius(data.heatIndexCelsius)
+  const hasHeatIndex = heatIndex !== null && data.heatIndexBasis !== null
+
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={bodyId}
+        onClick={() => setOpen((prev) => !prev)}
+        // 44px — 모바일 최소 터치 영역 (DESIGN.md §7). `ReasonList` 의 펼침과 같은 모양이다
+        className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center self-start font-semibold focus-visible:ring-2 focus-visible:outline-none"
+      >
+        {open ? messages.place.detailFeelsLikeBasisClose : messages.place.detailFeelsLikeBasisOpen}
+      </button>
+
+      {/*
+        **`open && (...)` 이 아니라 `hidden` 이다.** 접힘을 조건부 렌더로 만들면 위 버튼의
+        `aria-controls` 가 없는 id 를 가리키고, 그 순간 보조기기에게 이 버튼은 무엇을
+        여는지 알 수 없는 버튼이 된다. `ReasonList` 는 `<ul>` 자체가 늘 있어 같은 문제가
+        없지만 여기는 몸통 전체가 접힘 대상이다. `hidden` 은 a11y 트리에서도 빠진다.
+      */}
+      <div id={bodyId} hidden={!open} className="flex flex-col gap-3">
+        <p className="text-body-2 text-fg-muted">{data.feelsLikeBasis}</p>
+
+        {hasHeatIndex && (
+          <div className="flex flex-col gap-1">
+            {/* 중립 톤이다 — 판정에 쓰이지 않는 값에 등급 색을 주면 두 번째 판정으로 읽힌다 */}
+            <MetricValue
+              label={messages.place.detailHeatIndexReference}
+              value={heatIndex}
+              unit={messages.place.detailTemperatureUnit}
+            />
+            <p className="text-body-2 text-fg-muted">{data.heatIndexBasis}</p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -71,7 +71,7 @@ describe('displayTemperature — 체감온도가 먼저다 (#253)', () => {
   그것을 잡으려면 네 문구를 한자리에서 봐야 한다.
 */
 describe('체감온도 라벨 — 이름은 하나, 기준은 `최고` 가 가른다 (#259)', () => {
-  const timeBased = [messages.place.detailHeatIndex, messages.home.heatIndexLabel]
+  const timeBased = [messages.place.detailFeelsLike, messages.home.feelsLikeLabel]
   const dayMax = [messages.place.detailFeelsLikeTemperature, messages.plan.verdictFeelsLikeLabel]
 
   it('시각 기준은 화면이 달라도 같은 이름이다', () => {

@@ -303,9 +303,10 @@ export function mockWalkSafety(placeId: string, heatSensitive: boolean): WalkSaf
           '기온 31도에 일사가 더해져 아스팔트 표면은 약 58도로 추정됩니다. 발바닥 화상 위험 구간입니다.',
       },
       {
-        code: 'HEAT_INDEX_HIGH',
-        name: '열지수 높음',
-        description: '기온과 습도를 함께 보면 체감 부담이 큽니다.',
+        // #292 — BE `WalkSafetyReasonCode` 가 `HEAT_INDEX_HIGH` 를 이 코드로 교체했다
+        code: 'FEELS_LIKE_HIGH',
+        name: '체감온도 높음',
+        description: '기상청 여름철 체감온도 기준으로 더위 부담이 큰 조건입니다.',
       },
       ...(heatSensitive
         ? [
@@ -323,7 +324,24 @@ export function mockWalkSafety(placeId: string, heatSensitive: boolean): WalkSaf
       },
     ],
     estimatedPavementCelsius: 58.0,
-    heatIndexCelsius: heatSensitive ? 35.0 : 32.4,
+    /*
+      **기온 31℃ · 습도 78% 를 두 산식에 실제로 넣은 값이다** (#292). 판정값은 기상청
+      체감온도 `33.0`, 참고 열지수는 NOAA `40.2` 다 — **열지수가 7℃ 높다.**
+
+      이 갈래를 일부러 고온다습으로 둔다. 그 차이가 이 변경의 이유이고, 두 값이 붙어 있는
+      mock 이 없으면 "참고값이 판정값보다 크게 나오는" 화면(위계가 뒤집혀 보이는 유일한
+      경우)을 로컬에서 볼 수 없다. 서늘한 날은 반대로 체감온도가 더 높다 (21℃/85% → 23.2 vs 21.0).
+
+      **`heatSensitive` 로 갈리지 않는다.** 두 갈래가 같은 기온·습도를 쓰므로 온도값이
+      갈리면 거짓이다 — 갈리는 것은 등급이고, 그것이 반려견 특성이 반영된다는 증거다.
+      (예전 mock 은 열지수만 갈래별로 달라 같은 조건에서 다른 숫자를 냈다.)
+    */
+    feelsLikeCelsius: 33.0,
+    feelsLikeBasis:
+      '기상청 여름철 체감온도 산식으로 계산했습니다. 판정 시각의 기온과 상대습도로 습구온도(Stull, 2011 근사식)를 구해 산출하며, 폭염특보 기준(주의보 33℃·경보 35℃)과 같은 척도입니다. 습도가 없는 시각은 기온을 그대로 씁니다.',
+    heatIndexCelsius: 40.2,
+    heatIndexBasis:
+      '미국 NOAA 열지수(Rothfusz 회귀식 섭씨판)로 계산한 참고값입니다. 판정에는 쓰지 않으며, 고온다습에서 기상청 체감온도보다 높게 나오는 별도 지표입니다.',
     saferWindowStart: '18:00:00',
     saferWindowEnd: '21:00:00',
     temperature: 31.0,

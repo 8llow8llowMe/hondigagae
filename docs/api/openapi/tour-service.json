@@ -239,7 +239,7 @@
           "여행 인사이트"
         ],
         "summary": "장소 산책 위험도",
-        "description": "그 시각에 반려견과 걸어도 되는지를 판정합니다. 사람 기준 기온이 아니라 추정 아스팔트 노면온도와 열지수를 봅니다 — 기온 25도 맑은 한낮의 아스팔트는 50도를 넘어 발바닥 화상 위험 구간에 들어갑니다. estimatedPavementCelsius 는 실측이 아니라 기온/하늘상태/시간대로 계산한 추정치이므로 안내 용도로만 쓰고 단정하지 말아야 합니다. 위험/주의로 판정되면 같은 날 더 나은 시간대를 saferWindow 로 함께 제안합니다.\n\n**필수: placeId(경로).** 시각·반려견 조건은 전부 생략 가능합니다. targetDateTime 과 targetDate 를 둘 다 주면 targetDateTime 이 이깁니다.\n\n호출 예\n- 지금 기준: `GET /api/v1/places/{placeId}/walk-safety`\n- 내일 오후 2시, 더위에 약한 아이: `GET /api/v1/places/{placeId}/walk-safety?targetDateTime=2026-09-05T14:00:00&heatSensitive=true`",
+        "description": "그 시각에 반려견과 걸어도 되는지를 판정합니다. 사람 기준 기온이 아니라 추정 노면(아스팔트) 온도와 기상청 여름철 체감온도를 봅니다 — 한여름 기온 25도 맑은 한낮의 아스팔트는 50도를 넘어 발바닥 화상 위험 구간에 들어갑니다. estimatedPavementCelsius 는 실측이 아니라 기온에 일사(날짜·시각·위도로 낸 태양 고도)·하늘상태·바람을 반영해 계산한 추정치이므로 안내 용도로만 쓰고 단정하지 말아야 합니다. **화면에는 temperature(기온)와 나란히 두고 '노면(아스팔트)' 임을 밝혀 주세요** — 노면온도만 표시하면 사용자가 그것을 기온으로 읽습니다. 위험/주의로 판정되면 같은 날 더 나은 시간대를 saferWindow 로 함께 제안합니다.\n\n**필수: placeId(경로).** 시각·반려견 조건은 전부 생략 가능합니다. targetDateTime 과 targetDate 를 둘 다 주면 targetDateTime 이 이깁니다.\n\n호출 예\n- 지금 기준: `GET /api/v1/places/{placeId}/walk-safety`\n- 내일 오후 2시, 더위에 약한 아이: `GET /api/v1/places/{placeId}/walk-safety?targetDateTime=2026-09-05T14:00:00&heatSensitive=true`",
         "operationId": "getWalkSafety",
         "parameters": [
           {
@@ -728,7 +728,7 @@
           "여행 인사이트 (권역)"
         ],
         "summary": "오늘의 산책 골든타임",
-        "description": "좌표 기준으로 오늘 남은 시간의 산책 안전 등급 곡선과 가장 좋은 연속 구간을 줍니다. 장소 산책 위험도가 \"지금 나가도 되나\"를 답한다면 이쪽은 \"오늘 언제 나가야 하나\"를 답합니다 — 여름 제주에서는 낮에 어차피 못 나가고 문제는 아침이 나은지 저녁이 나은지입니다. 판정은 산책 위험도와 **같은 규칙**을 씁니다. `goldenStart` 가 null 이면 남은 시간이 전부 위험 등급이거나 특보 경보가 발효 중이라는 뜻입니다 — 아무 구간이나 골라 주면 사용자가 그것을 허락으로 읽기 때문에 주지 않습니다. **`hourly` 가 빈 배열이어도 200 입니다.** 늦은 밤에는 오늘 남은 예보가 없는 것이 정상입니다 — 기상청은 23시 발표부터 다음 날 예보만 주므로 그 시간대에는 오늘의 시각별 예보가 원천에 없고, 재시도해도 자정 전에는 풀리지 않습니다. 빈 이유는 `forecastCoverage` 로 구분하세요 — `DAY_ENDED` 는 정상이고 `UNAVAILABLE` 만 다시 시도할 일입니다. 추정 노면온도는 기온에 일사와 시간대를 더해 계산한 값이며 실측이 아닙니다.\n\n**필수: lat, lng.** 반려견 조건은 전부 생략 가능합니다.\n\n호출 예: `GET /api/v1/insights/walk-times?lat=33.4996&lng=126.5312&petSizeType=SMALL&heatSensitive=true`",
+        "description": "좌표 기준으로 오늘 남은 시간의 산책 안전 등급 곡선과 가장 좋은 연속 구간을 줍니다. 장소 산책 위험도가 \"지금 나가도 되나\"를 답한다면 이쪽은 \"오늘 언제 나가야 하나\"를 답합니다 — 여름 제주에서는 낮에 어차피 못 나가고 문제는 아침이 나은지 저녁이 나은지입니다. 판정은 산책 위험도와 **같은 규칙**을 씁니다. `goldenStart` 가 null 이면 추천할 구간이 없다는 뜻이고, **그 이유는 `goldenWindowStatus` 로 갈라 줍니다** — `ALL_HOURS_RISKY`(남은 시각이 전부 위험) / `SUPPRESSED_BY_WARNING`(특보 경보라 보류) / `NO_FORECAST`(판정할 예보 없음). 경보로 보류한 날에도 곡선에는 안전 시각이 남아 있으므로 null 하나만 보고 \"남은 시간이 모두 위험\"이라고 쓰면 화면이 곡선과 다른 말을 하게 됩니다. 아무 구간이나 골라 주면 사용자가 그것을 허락으로 읽기 때문에 주지 않습니다. **`hourly` 가 빈 배열이어도 200 입니다.** 늦은 밤에는 오늘 남은 예보가 없는 것이 정상입니다 — 기상청은 23시 발표부터 다음 날 예보만 주므로 그 시간대에는 오늘의 시각별 예보가 원천에 없고, 재시도해도 자정 전에는 풀리지 않습니다. 빈 이유는 `forecastCoverage` 로 구분하세요 — `DAY_ENDED` 는 정상이고 `UNAVAILABLE` 만 다시 시도할 일입니다. 추정 노면(아스팔트) 온도는 기온에 일사(날짜·시각·위도로 낸 태양 고도)·하늘상태·바람을 반영해 계산한 값이며 실측이 아닙니다. **`temperature`(기온)와 나란히 보여 주세요** — 노면온도만 표시하면 사용자가 그것을 기온으로 읽습니다.\n\n**필수: lat, lng.** 반려견 조건은 전부 생략 가능합니다.\n\n호출 예: `GET /api/v1/insights/walk-times?lat=33.4996&lng=126.5312&petSizeType=SMALL&heatSensitive=true`",
         "operationId": "getWalkTimes",
         "parameters": [
           {
@@ -1386,6 +1386,16 @@
             "description": "운영시간",
             "example": "09:00~17:50 (입장 마감 17:10)"
           },
+          "openNow": {
+            "type": "boolean",
+            "description": "지금 영업 중 여부. null 은 판정 근거 없음(운영시간을 구조화하지 못한 곳) — 닫힘과 다르다",
+            "example": true
+          },
+          "open24": {
+            "type": "boolean",
+            "description": "24시간 운영 여부",
+            "example": false
+          },
           "restDate": {
             "type": "string",
             "description": "휴무일",
@@ -1569,14 +1579,30 @@
           "estimatedPavementCelsius": {
             "type": "number",
             "format": "double",
-            "description": "추정 아스팔트 표면온도(섭씨). 실측이 아니라 기온/하늘상태/시간대로 계산한 추정치다",
+            "description": "추정 노면(아스팔트) 표면온도(섭씨). 실측이 아니라 기온에 일사(날짜·시각·위도로 낸 태양 고도)·하늘상태·바람을 반영해 계산한 추정치다. **화면 문구에 '노면(아스팔트)' 를 밝히고 `temperature`(기온)와 나란히 보여 주세요**",
             "example": 58.0
+          },
+          "feelsLikeCelsius": {
+            "type": "number",
+            "format": "double",
+            "description": "기상청 여름철 체감온도(섭씨). 위험 등급 판정의 기준값이며 폭염특보(주의보 33℃·경보 35℃)와 같은 척도다",
+            "example": 33.5
+          },
+          "feelsLikeBasis": {
+            "type": "string",
+            "description": "체감온도를 어떻게 계산했는지 — 산식과 입력, 임계의 출처",
+            "example": "기상청 여름철 체감온도 산식으로 계산..."
           },
           "heatIndexCelsius": {
             "type": "number",
             "format": "double",
-            "description": "기온과 습도를 합친 체감 열지수(섭씨)",
-            "example": 35.0
+            "description": "참고용 NOAA 열지수(섭씨). 판정에는 쓰지 않는다 — 기상청 체감온도보다 고온다습에서 높게 나오는 별도 지표다",
+            "example": 39.1
+          },
+          "heatIndexBasis": {
+            "type": "string",
+            "description": "열지수를 어떻게 계산했는지",
+            "example": "미국 NOAA 열지수(Rothfusz 회귀식)..."
           },
           "saferWindowStart": {
             "type": "string",
@@ -1762,7 +1788,7 @@
           "maxFeelsLikeTemperature": {
             "type": "number",
             "format": "double",
-            "description": "하루 최고 체감온도(섭씨). 시각별 기온과 상대습도로 계산한 열지수(Rothfusz 회귀식 섭씨판)의 하루 최대값이다. 기온 26도 미만이거나 습도가 없는 시각은 기온을 그대로 쓴다. 중기예보는 시각별 데이터가 없어 null 이다 — 최고기온으로 대신하지 않는다",
+            "description": "하루 최고 체감온도(섭씨). 시각별 기온과 상대습도로 계산한 기상청 여름철 체감온도(습구온도 Stull 근사식 기반)의 하루 최대값이다. 기온 26도 미만이거나 습도가 없는 시각은 기온을 그대로 쓴다. 중기예보는 시각별 데이터가 없어 null 이다 — 최고기온으로 대신하지 않는다",
             "example": 33.4
           },
           "totalPrecipitationMm": {
@@ -2021,13 +2047,13 @@
           "temperature": {
             "type": "number",
             "format": "double",
-            "description": "기온(℃)",
+            "description": "기온(℃). 사람이 보는 그 기온이다. **노면온도와 나란히 보여 주세요** — 노면온도만 두면 사용자가 그것을 기온으로 읽는다",
             "example": 29.0
           },
           "estimatedPavementCelsius": {
             "type": "number",
             "format": "double",
-            "description": "추정 노면온도(℃). 기온에 일사와 시간대를 더해 계산한 값이며 실측이 아니다",
+            "description": "추정 노면(아스팔트) 온도(℃). 기온에 일사(날짜·시각·위도로 낸 태양 고도), 하늘상태, 바람을 반영해 계산한 값이며 실측이 아니다. **화면 문구에 '노면(아스팔트)' 를 밝혀 주세요**",
             "example": 44.0
           },
           "precipitationProbability": {
@@ -2085,6 +2111,10 @@
           "goldenLevel": {
             "$ref": "#/components/schemas/ScoreMetricMetadata",
             "description": "골든타임의 안전 등급 metadata. 추천할 구간이 없으면 null"
+          },
+          "goldenWindowStatus": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "골든타임을 준 이유/안 준 이유 metadata. `AVAILABLE`(구간 있음) / `SUPPRESSED_BY_WARNING`(특보 경보로 보류 — **곡선에 안전 시각이 남아 있어도 이 값이다**) / `ALL_HOURS_RISKY`(남은 시각이 전부 위험) / `NO_FORECAST`(판정할 예보 없음). **`goldenStart` 가 null 이라는 이유만으로 '남은 시간이 모두 위험'이라고 쓰지 마세요** — 그 문구는 `ALL_HOURS_RISKY` 일 때만 참입니다"
           },
           "weatherWarning": {
             "$ref": "#/components/schemas/WeatherWarningItem",

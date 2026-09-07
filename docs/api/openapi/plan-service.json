@@ -602,10 +602,11 @@
         "properties": {
           "title": {
             "type": "string",
-            "description": "생략 가능. 일정 제목(60자 이하). 생략하면 기존 값 유지",
+            "description": "생략 가능. 일정 제목(60자 이하, 공백만으로는 불가). 생략하면 기존 값 유지",
             "example": "몽실이와 제주 2박 3일",
             "maxLength": 60,
-            "minLength": 0
+            "minLength": 0,
+            "pattern": ".*\\S.*"
           },
           "startDate": {
             "type": "string",

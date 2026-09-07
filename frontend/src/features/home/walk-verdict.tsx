@@ -38,9 +38,18 @@ export function WalkVerdict({
   // 위험은 접지 않는다 — 자동 펼침 (아트보드 04-①)
   const [open, setOpen] = useState(tone === 'critical')
 
-  const heatIndex = formatCelsius(data.heatIndexCelsius)
+  /*
+    **`heatIndexCelsius` 가 아니라 `feelsLikeCelsius` 다** (#292). 판정 기준이 NOAA 열지수에서
+    기상청 체감온도로 바뀌었고(BE `46f35e4`), 열지수는 판정에 쓰이지 않는 참고값으로 내려갔다.
+    이 줄이 옛 필드를 읽는 동안 화면은 `체감온도` 라벨로 **판정에 쓰이지 않는 숫자**를 말했다 —
+    서늘한 날은 차이가 작지만 33℃/85% 에서 48 vs 35.5 로 갈린다.
+
+    **참고 열지수를 여기 곁들이지 않는다.** 홈은 요약면이고 이 줄은 접힌 상태에서 한 줄이다.
+    참고값과 그것을 참고값이라 말하는 문장은 장소 상세의 펼침 근거가 함께 맡는다.
+  */
+  const feelsLike = formatCelsius(data.feelsLikeCelsius)
   const summary = [
-    heatIndex === null ? null : `${messages.home.heatIndexLabel} ${heatIndex}℃`,
+    feelsLike === null ? null : `${messages.home.feelsLikeLabel} ${feelsLike}℃`,
     `${data.placeTitle} ${messages.home.basisSuffix}`,
   ]
     .filter((part): part is string => part !== null)
@@ -112,14 +121,14 @@ export function WalkVerdict({
             <WeatherWarningBadge warning={data.weatherWarning} />
           </span>
           {/*
-            **라벨을 붙인다** (#259). 모바일 접힌 줄은 `heatIndexLabel` 을 이미 달고 있는데
+            **라벨을 붙인다** (#259). 모바일 접힌 줄은 `feelsLikeLabel` 을 이미 달고 있는데
             데스크톱 hero 만 맨 숫자였다 — 같은 화면의 같은 값이 폭에 따라 이름을 잃었다.
             아래 기준 줄(`{장소} 기준`)은 어디의 값인지만 말하고 무엇인지는 말하지 않는다.
           */}
-          {heatIndex !== null && (
+          {feelsLike !== null && (
             <MetricValue
-              label={messages.home.heatIndexLabel}
-              value={heatIndex}
+              label={messages.home.feelsLikeLabel}
+              value={feelsLike}
               unit="℃"
               tone={tone}
               size="hero"
