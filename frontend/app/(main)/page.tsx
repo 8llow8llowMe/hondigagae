@@ -5,6 +5,7 @@ import { paths } from '@/lib/api/paths'
 import { placeListPath } from '@/lib/api/place'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
+import { todayDay, weekdayOf } from '@/lib/date/day'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import { DEFAULT_PLACE_FILTERS } from '@/lib/url/place-filters'
 import type { SliceResponse } from '@/types/api'
@@ -12,13 +13,8 @@ import type { PlaceSummary } from '@/types/place'
 import type { PlanSummaryItem } from '@/types/plan'
 
 /** `2026-08-29 (금) · 제주시` — 지역은 이 서비스가 제주 전용이라 고정이다 */
-function formatTodayLabel(today: Date): string {
-  const days = ['일', '월', '화', '수', '목', '금', '토']
-  const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
-    today.getDate(),
-  ).padStart(2, '0')}`
-
-  return `${iso} (${days[today.getDay()]}) · 제주시`
+function formatTodayLabel(todayIso: string): string {
+  return `${todayIso} (${weekdayOf(todayIso) ?? ''}) · 제주시`
 }
 
 export const metadata = {
@@ -59,8 +55,12 @@ export default async function HomePage() {
 
   const [places, plans] = await Promise.all([placesPromise, plansPromise])
 
-  // 기준 줄은 서버에서 만든다 — 클라이언트에서 new Date() 를 부르면 하이드레이션이 어긋난다
-  const todayLabel = formatTodayLabel(new Date())
+  /*
+    **오늘은 서버가 정한다.** 클라이언트에서 `new Date()` 를 부르면 하이드레이션이
+    어긋난다 — 기준 줄의 날짜뿐 아니라 "다가오는 일정" 이 고르는 일정까지 갈린다
+    (`lib/date/day.ts` `dayToLocalNoon`).
+  */
+  const todayIso = todayDay(new Date())
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
@@ -68,7 +68,8 @@ export default async function HomePage() {
         authed={authed}
         places={places?.contents ?? []}
         plans={plans?.contents ?? []}
-        todayLabel={todayLabel}
+        todayIso={todayIso}
+        todayLabel={formatTodayLabel(todayIso)}
       />
     </HydrationBoundary>
   )
