@@ -7,7 +7,7 @@ import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlaceItem;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.item.PlacePetInfoItem;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.NearbyPlaceResponse;
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.PlaceDetailResponse;
-import com.hondigagae.domainlayer.place.application.info.NearbyPlaceInfo;
+import com.hondigagae.domainlayer.place.application.info.NearbyPlacesInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceDetailInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceImageInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceIntroInfo;
@@ -33,17 +33,24 @@ public class PlacePresenter {
         return new SliceResponse<>(items, summariesInfo.hasNext());
     }
 
-    public NearbyPlaceResponse toNearbyResponse(List<NearbyPlaceInfo> infos, NearbyPlaceCriteria criteria) {
-        List<NearbyPlaceItem> items = infos.stream()
-            .map(info -> NearbyPlaceItem.builder()
-                .place(toItem(info.place()))
-                .distanceMeters(info.distanceMeters())
+    /**
+     * 주변 장소 응답.
+     *
+     * <p><b>{@code totalCount} 를 {@code items.size()} 로 채우지 않는다</b>(이슈 #285).
+     * 목록은 {@code size} 로 잘려 있어 여기서 다시 세면 두 값이 언제나 같아지고, 그러면
+     * 이름만 총계인 값이 나간다.
+     */
+    public NearbyPlaceResponse toNearbyResponse(NearbyPlacesInfo info, NearbyPlaceCriteria criteria) {
+        List<NearbyPlaceItem> items = info.places().stream()
+            .map(nearby -> NearbyPlaceItem.builder()
+                .place(toItem(nearby.place()))
+                .distanceMeters(nearby.distanceMeters())
                 .build())
             .toList();
 
         return NearbyPlaceResponse.builder()
             .places(items)
-            .totalCount(items.size())
+            .totalCount(info.totalCount())
             .radius(criteria.radius())
             .build();
     }

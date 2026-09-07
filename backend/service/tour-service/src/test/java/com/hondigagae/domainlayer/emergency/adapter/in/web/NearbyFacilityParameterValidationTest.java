@@ -70,4 +70,27 @@ class NearbyFacilityParameterValidationTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.dataHeader.resultCode").value("EMERGENCY_101"));
     }
+
+    /**
+     * {@code size} 상한은 50 에서 <b>250</b> 으로 올라갔다(이슈 #285). 제주 전역 시설이 214곳이라
+     * 반경을 최대로 넓혀도 잘리지 않게 하려는 값이다 - 화면이 유형·24시간을 클라이언트에서 좁히며
+     * 칩마다 개수를 보여주므로 한 번에 전량을 받아야 한다.
+     *
+     * <p>상한은 어노테이션 값과 사용자 메시지 문구 <b>두 곳</b>에 적혀 있어 한쪽만 고치면 어긋난다.
+     * 그래서 경계를 여기서 고정한다.
+     */
+    @Test
+    @DisplayName("size 는 250 까지 받고 251 부터 EMERGENCY_104 다")
+    void acceptsSizeUpToNewUpperBound() throws Exception {
+        mockMvc.perform(get(PATH).param("lat", "33.4996").param("lng", "126.5312").param("size", "250"))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(get(PATH).param("lat", "33.4996").param("lng", "126.5312").param("size", "251"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.dataHeader.resultCode").value("EMERGENCY_104"))
+            // 필드 검증 실패는 resultMessage 가 문자열이 아니라 {message, errors} 객체다
+            // (위의 파라미터 누락 경로와 형태가 다르다).
+            .andExpect(jsonPath("$.dataHeader.resultMessage.message")
+                .value(org.hamcrest.Matchers.containsString("250")));
+    }
 }

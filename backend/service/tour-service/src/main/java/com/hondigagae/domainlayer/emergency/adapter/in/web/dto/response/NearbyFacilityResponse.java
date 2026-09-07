@@ -12,7 +12,11 @@ public record NearbyFacilityResponse(
     @Schema(description = "검색 결과 (가까운 순). 종류를 지정하지 않으면 동물병원과 동물약국이 섞여 나온다")
     List<NearbyFacilityItem> facilities,
 
-    @Schema(description = "결과 수", example = "5")
+    @Schema(
+        description = "반경 안에서 조건에 맞는 시설의 **총** 개수. size 로 자르기 **전** 값이라 "
+            + "facilities 개수보다 클 수 있고, 그 차이가 \"더 있다\"는 뜻이다 — "
+            + "`facilities.length < totalCount` 로 잘림을 판정하면 된다",
+        example = "137")
     int totalCount,
 
     @Schema(description = "검색 반경(m)", example = "10000")

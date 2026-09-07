@@ -39,6 +39,23 @@ return ResponseEntity.ok().body(Response.success(response));
   - 예: `sortType`, `orderType`
 - enum을 쓰면 Swagger에서 허용값을 명확하게 보여줄 수 있다.
 
+### 5-1. `totalCount` 는 총계여야 한다 (이슈 [#285](https://github.com/8llow8llowMe/hondigagae/issues/285))
+
+커서 대신 **상위 N 개**를 돌려주는 조회(`/emergencies/facilities`, `/places/nearby`)에서
+Presenter 가 `totalCount(items.size())` 로 채우면 **이름만 총계인 값**이 나간다. 목록은 이미
+`size` 로 잘려 있어 두 값이 언제나 같아지고, 클라이언트가 `items.length < totalCount` 로
+잘림을 판정하면 그 조건이 **늘 거짓**이 된다 — 잘린 목록에서 센 개수가 전체인 양 화면에 나간다.
+
+**규칙**
+
+- `totalCount` 는 **자르기 전** 개수다. Presenter 는 항목을 세지 말고 Processor 가 센 값을 받는다.
+- 그래서 Processor 는 목록과 총계를 **함께 든 Info** 를 돌려준다 (`NearbyFacilitiesInfo`,
+  `NearbyPlacesInfo`). `List<XxxInfo>` 만 넘기면 총계를 담을 자리가 없어 Presenter 가 다시 센다.
+- 자를 일이 없는 목록(즐겨찾기, 반려견 목록처럼 전량을 주는 조회)은 `items.size()` 가 곧 총계라
+  그대로 둔다. **`size` 파라미터가 있으면 이 규칙의 대상이다.**
+- 총계를 셀 수 있는 근거는 포트에 있다 — 위 두 조회는 사각 범위 전량을 가져와 메모리에서
+  거른다. DB `LIMIT` 으로 옮기는 순간 총계는 별도 count 질의가 필요하다.
+
 ## 6. 보안 API 설계
 
 - 인증 사용자 전용 API는 `@PreAuthorize`를 명시한다.

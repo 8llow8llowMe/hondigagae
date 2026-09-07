@@ -12,7 +12,10 @@ public record NearbyPlaceResponse(
     @Schema(description = "검색 결과 (가까운 순)")
     List<NearbyPlaceItem> places,
 
-    @Schema(description = "결과 수", example = "8")
+    @Schema(
+        description = "반경 안에서 조건에 맞는 장소의 **총** 개수. size 로 자르기 **전** 값이라 "
+            + "places 개수보다 클 수 있고, 그 차이가 \"더 있다\"는 뜻이다",
+        example = "34")
     int totalCount,
 
     @Schema(description = "검색 반경(m)", example = "5000")

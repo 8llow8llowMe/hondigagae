@@ -91,6 +91,7 @@ public class PlaceWebController {
             + "식사할 곳을 찾을 때는 contentType=RESTAURANT 로, 카페만 볼 때는 sourceCategory=카페 를 함께 씁니다. "
             + "여기 담긴 음식점은 지자체에 반려동물 동반출입 업소로 등록된 곳이라 동반 가능 여부가 확인된 정보입니다.\n\n"
             + "**필수: lat, lng.** 나머지는 생략 가능하고 radius 기본 5000m, size 기본 15 입니다.\n\n"
+            + "**totalCount 는 size 로 자르기 전 총계입니다.** 돌려준 개수보다 크면 반경 안에 더 있다는 뜻입니다.\n\n"
             + "호출 예\n"
             + "- 제주시청 반경 3km 카페: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&radius=3000&sourceCategory=카페`\n"
             + "- 소형견 동반 가능한 5km 안 장소: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&petAllowanceType=ALLOWED&petSizeType=SMALL`")

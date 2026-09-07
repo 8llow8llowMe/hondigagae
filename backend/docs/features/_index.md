@@ -29,6 +29,7 @@
 | `152-plan-multi-pet.md` | #152 | 구현 완료 | 담기 `petIds` + `plan_pet` + 아이별 날씨 판정 — 저장 구조·판정 축 판단 기록 |
 | `draft-batch-import-metrics.md` | #266 | 구현 완료 | 배치 적재 메트릭 — `place_import_rows` 게이지 + `last_success` 씨딩 |
 | `267-place-open-hours.md` | #267 | 구현 완료 | 여행 장소 영업시간 구조화 — 상세 `intro.openNow` (문화정보원 출처) |
+| `285-nearby-total-count.md` | #285 | 구현 완료 | 반경 검색 `totalCount` 를 진짜 총계로 — 계약 두 안 중 1번을 고른 근거 · `size` 상한 250 |
 
 ### 사후 초안에 대해
 
