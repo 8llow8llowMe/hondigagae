@@ -92,6 +92,24 @@
 
 작업 상태 동기화(`/sync` · `/sync out`)는 이 저장소 스킬이 아니라 **전역 스킬**이다 (`seonghoho/dev-dotfiles` → `~/.claude/skills/sync`). 이 저장소의 규칙은 `docs/git-workflow.md` 를 정본으로 읽어 적용한다.
 
-`.claude/agents/fe-*.md` — FE 전용 역할 정의 7종 (`fe-spec-writer`, `fe-implementer`, `fe-reviewer`, `fe-api-contract`, `fe-design-reviewer`, `fe-test-author`, `fe-map-reviewer`). Claude Code에서는 subagent로, 다른 호스트에서는 해당 agent 기능 또는 순차 역할 프롬프트로 사용한다. 세부는 `frontend/docs/team-playbook.md`.
+### 역할별 subagent
+
+정의는 `.claude/agents/*.md`이고 역할·모델·권한의 정본은 [docs/claude-agents.md](docs/claude-agents.md)다. Codex 쪽 대응본은 [docs/codex-agents.md](docs/codex-agents.md).
+
+| 구분 | 역할 |
+|------|------|
+| 공용 | `explorer`, `crud-implementer`, `implementer`, `bug-investigator`, `reviewer`, `refactorer`, `architect` |
+| 백엔드 | `be-executor`, `be-hexagonal-reviewer`, `be-db-reviewer`, `be-security-reviewer` |
+| 프론트엔드 | `fe-spec-writer`, `fe-implementer`, `fe-reviewer`, `fe-api-contract`, `fe-design-reviewer`, `fe-test-author`, `fe-map-reviewer` |
+
+- 모델 배정: 설계·아키텍처는 **Fable**, 어려운 구현·버그 분석·리팩토링·최종 검토는 **Opus**, 탐색·DTO·매핑 같은 저비용 반복은 **Sonnet**. (FE 역할 7종은 모델 미배정 — 세션 기본 모델을 쓴다)
+- 검토 역할은 `tools` 로 읽기 전용을 강제한다. Write/Edit를 부여하지 않는다.
+- **모든 작업을 병렬화하지 않는다.** 서로 독립적인 읽기 전용 조사·검토만 한 메시지 안에서 병렬 호출하고, 같은 파일을 고치는 쓰기 역할은 한 번에 하나만 실행한다.
+- 작업 분류와 라우팅은 `dev-orchestrator` 스킬을 쓴다.
+- 정의를 바꾸면 `sh scripts/check-claude-agents.sh` 로 검사한다.
+
+세부 역할 조합은 `backend/docs/team-playbook.md`, `frontend/docs/team-playbook.md`.
 
 > **주의**: 사용자 전역(`~/.claude/agents/`)에 같은 이름의 다른 프로젝트용 에이전트가 있을 수 있다. 이 저장소의 프로젝트 스코프 정의가 우선하며, **BossPickSeoul 경로·Swagger URL이 등장하면 잘못된 에이전트를 읽고 있는 것이다.**
+>
+> 공용 역할 이름(`explorer`, `implementer`, `reviewer` 등)은 일반적이라 전역 정의와 겹치기 쉽다. 역할이 이 저장소 규칙(Hexagonal 계층, `/api/bff`, `pnpm verify`)을 모르는 것처럼 굴면 전역 정의를 읽고 있는지 의심한다.

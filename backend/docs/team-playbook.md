@@ -21,6 +21,18 @@
 
 ## 역할 정의
 
+역할 프롬프트 파일은 `.claude/agents/be-*.md` 다. Claude Code 에서는 subagent 로 호출하고, 다른 호스트에서는 같은 파일을 역할 프롬프트로 읽어 순차 수행한다. 모델·권한 배정의 정본은 [docs/claude-agents.md](../../docs/claude-agents.md).
+
+| 역할 | 파일 | 권한 |
+|------|------|------|
+| Backend Leader | 없음 — 메인 실행자가 맡는다 | — |
+| Backend Executor | `.claude/agents/be-executor.md` | 쓰기 |
+| Hexagonal Reviewer | `.claude/agents/be-hexagonal-reviewer.md` | 읽기 전용 |
+| DB Reviewer | `.claude/agents/be-db-reviewer.md` | 읽기 전용 |
+| Security Reviewer | `.claude/agents/be-security-reviewer.md` | 읽기 전용 |
+
+Reviewer 는 `tools` 로 읽기 전용이 강제돼 있어 구현을 대신할 수 없다. 독립적인 Reviewer 들은 한 메시지 안에서 병렬로 호출할 수 있다.
+
 ### Backend Leader
 
 - 작업 범위와 산출물을 먼저 고정한다.

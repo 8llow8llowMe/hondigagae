@@ -104,13 +104,14 @@
 | 개발 오케스트레이션 | | | `dev-orchestrator` |
 | 협업 문서 | | | `issue`, `pr`, `mr` |
 
-### Codex 역할별 개발 흐름
+### 역할별 개발 흐름
 
 - 비단순 개발 작업에는 `dev-orchestrator`를 적용해 작업 유형에 맞는 역할과 모델을 선택한다.
-- 단순 CRUD·탐색은 Terra, 일반 구현은 Sol Medium, 버그 분석·리뷰·리팩토링은 Sol High, 아키텍처 판단은 Astra High를 기본으로 한다.
+- 역할 분류와 라우팅 판단은 호스트가 같고 **실행 수단과 모델 이름만 다르다.**
+  - Codex — `.codex/agents/*.toml`. 정본 [docs/codex-agents.md](docs/codex-agents.md). 단순 CRUD·탐색은 Terra, 일반 구현은 Sol Medium, 버그 분석·리뷰·리팩토링은 Sol High, 아키텍처는 Astra High
+  - Claude Code — `.claude/agents/*.md`. 정본 [docs/claude-agents.md](docs/claude-agents.md). 탐색·단순 구현은 Sonnet, 일반 구현·버그 분석·리뷰·리팩토링은 Opus, 아키텍처는 Fable
+- 공용 역할 7종(`explorer`, `crud_implementer`/`crud-implementer`, `implementer`, `bug_investigator`/`bug-investigator`, `reviewer`, `refactorer`, `architect`)은 양쪽에 대응 파일이 있다.
+- 워크스페이스 전용 역할은 Claude Code에만 파일이 있다. BE 4종(`be-executor`, `be-hexagonal-reviewer`, `be-db-reviewer`, `be-security-reviewer`), FE 7종(`fe-spec-writer`, `fe-implementer`, `fe-reviewer`, `fe-api-contract`, `fe-design-reviewer`, `fe-test-author`, `fe-map-reviewer`). 다른 호스트에서는 해당 역할 프롬프트를 순차로 적용한다. 세부는 `backend/docs/team-playbook.md`, `frontend/docs/team-playbook.md`.
 - 모든 작업을 무조건 병렬화하지 않는다. 서로 독립적인 읽기 전용 조사만 병렬화하고, 겹치는 파일의 쓰기는 한 실행자가 순차 수행한다.
-- 역할 설정과 세부 선택 기준의 정본은 [docs/codex-agents.md](docs/codex-agents.md)다.
-
-`.claude/agents/fe-*.md` — FE 전용 역할 정의 7종 (`fe-spec-writer`, `fe-implementer`, `fe-reviewer`, `fe-api-contract`, `fe-design-reviewer`, `fe-test-author`, `fe-map-reviewer`). Claude Code에서는 subagent로, Codex/Cursor에서는 각 호스트의 agent 기능 또는 순차 역할 프롬프트로 사용한다. 세부는 `frontend/docs/team-playbook.md`.
 
 > **주의**: 사용자 전역(`~/.claude/agents/`)에 같은 이름의 다른 프로젝트용 에이전트가 있을 수 있다. 이 저장소의 프로젝트 스코프 정의가 우선하며, **BossPickSeoul 경로·Swagger URL이 등장하면 잘못된 에이전트를 읽고 있는 것이다.**
