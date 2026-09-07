@@ -93,7 +93,8 @@ insight:
   strong-wind-speed: ${INSIGHT_STRONG_WIND_SPEED:9.0}
   pavement-caution-celsius: ${INSIGHT_PAVEMENT_CAUTION_CELSIUS:42.0}
   pavement-danger-celsius: ${INSIGHT_PAVEMENT_DANGER_CELSIUS:52.0}
-  heat-index-caution-celsius: ${INSIGHT_HEAT_INDEX_CAUTION_CELSIUS:27.0}
-  heat-index-danger-celsius: ${INSIGHT_HEAT_INDEX_DANGER_CELSIUS:32.0}
+  # 기상청 여름철 체감온도 기준 — 폭염주의보(33℃)·폭염경보(35℃)와 같은 척도
+  feels-like-caution-celsius: ${INSIGHT_FEELS_LIKE_CAUTION_CELSIUS:33.0}
+  feels-like-danger-celsius: ${INSIGHT_FEELS_LIKE_DANGER_CELSIUS:35.0}
   alternative-radius-meters: ${INSIGHT_ALTERNATIVE_RADIUS_METERS:5000}
   alternative-size: ${INSIGHT_ALTERNATIVE_SIZE:5}

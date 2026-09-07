@@ -18,8 +18,9 @@ public record SuitabilityThresholds(
     double strongWindSpeed,
     double pavementCautionCelsius,
     double pavementDangerCelsius,
-    double heatIndexCautionCelsius,
-    double heatIndexDangerCelsius
+    // 기상청 여름철 체감온도 기준 — 폭염특보 척도(주의보 33℃·경보 35℃)와 같은 값 체계다.
+    double feelsLikeCautionCelsius,
+    double feelsLikeDangerCelsius
 ) {
 
 }

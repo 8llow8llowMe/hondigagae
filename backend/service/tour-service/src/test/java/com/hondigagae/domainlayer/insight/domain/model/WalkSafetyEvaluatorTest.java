@@ -96,17 +96,20 @@ class WalkSafetyEvaluatorTest {
     }
 
     @Nested
-    @DisplayName("열지수")
-    class HeatIndexRules {
+    @DisplayName("체감온도 (기상청 여름철 산식)")
+    class FeelsLikeRules {
 
         @Test
-        @DisplayName("같은 기온이라도 습하면 체감이 올라간다 - 반려견은 헐떡임으로 열을 내보낸다")
+        @DisplayName("같은 기온이라도 습하면 체감온도가 올라간다 - 반려견은 헐떡임으로 열을 내보낸다")
         void humidityRaisesPerceivedHeat() {
-            WalkSafetyAssessment dry = evaluate(forecast(30.0d, 40, SkyState.OVERCAST, 20), 20);
-            WalkSafetyAssessment humid = evaluate(forecast(30.0d, 90, SkyState.OVERCAST, 20), 20);
+            WalkSafetyAssessment dry = evaluate(forecast(33.0d, 30, SkyState.OVERCAST, 20), 20);
+            WalkSafetyAssessment humid = evaluate(forecast(33.0d, 85, SkyState.OVERCAST, 20), 20);
 
-            assertThat(humid.heatIndexCelsius()).isGreaterThan(dry.heatIndexCelsius());
-            assertThat(codesOf(humid)).contains(WalkSafetyReasonCode.HEAT_INDEX_HIGH);
+            assertThat(humid.feelsLikeCelsius()).isGreaterThan(dry.feelsLikeCelsius());
+            // 폭염주의보 기준(33℃)을 넘긴 습한 조건에서만 근거가 실린다
+            assertThat(codesOf(humid)).contains(WalkSafetyReasonCode.FEELS_LIKE_HIGH);
+            // 참고 병기하는 NOAA 열지수는 고온다습에서 기상청 체감온도보다 높다
+            assertThat(humid.heatIndexCelsius()).isGreaterThan(humid.feelsLikeCelsius());
         }
 
         @Test
@@ -114,6 +117,7 @@ class WalkSafetyEvaluatorTest {
         void doesNotInventHumidity() {
             WalkSafetyAssessment assessment = evaluate(forecast(30.0d, null, SkyState.OVERCAST, 20), 20);
 
+            assertThat(assessment.feelsLikeCelsius()).isEqualTo(30.0d);
             assertThat(assessment.heatIndexCelsius()).isEqualTo(30.0d);
         }
     }
@@ -261,7 +265,7 @@ class WalkSafetyEvaluatorTest {
             .coldTemperature(5.0d).veryColdTemperature(0.0d)
             .strongWindSpeed(9.0d)
             .pavementCautionCelsius(42.0d).pavementDangerCelsius(52.0d)
-            .heatIndexCautionCelsius(27.0d).heatIndexDangerCelsius(32.0d)
+            .feelsLikeCautionCelsius(33.0d).feelsLikeDangerCelsius(35.0d)
             .build();
     }
 }

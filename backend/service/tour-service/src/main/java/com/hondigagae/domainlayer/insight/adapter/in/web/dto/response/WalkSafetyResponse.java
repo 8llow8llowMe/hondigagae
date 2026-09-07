@@ -47,8 +47,19 @@ public record WalkSafetyResponse(
         example = "58.0")
     Double estimatedPavementCelsius,
 
-    @Schema(description = "기온과 습도를 합친 체감 열지수(섭씨)", example = "35.0")
+    @Schema(description = "기상청 여름철 체감온도(섭씨). 위험 등급 판정의 기준값이며 폭염특보(주의보 33℃·경보 35℃)와 같은 척도다",
+        example = "33.5")
+    Double feelsLikeCelsius,
+
+    @Schema(description = "체감온도를 어떻게 계산했는지 — 산식과 입력, 임계의 출처", example = "기상청 여름철 체감온도 산식으로 계산...")
+    String feelsLikeBasis,
+
+    @Schema(description = "참고용 NOAA 열지수(섭씨). 판정에는 쓰지 않는다 — 기상청 체감온도보다 고온다습에서 높게 나오는 별도 지표다",
+        example = "39.1")
     Double heatIndexCelsius,
+
+    @Schema(description = "열지수를 어떻게 계산했는지", example = "미국 NOAA 열지수(Rothfusz 회귀식)...")
+    String heatIndexBasis,
 
     @Schema(description = "같은 날 더 안전한 시간대 시작. 없으면 null", example = "18:00:00")
     LocalTime saferWindowStart,

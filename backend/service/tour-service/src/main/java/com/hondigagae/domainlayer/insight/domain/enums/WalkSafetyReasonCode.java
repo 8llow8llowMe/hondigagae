@@ -17,7 +17,7 @@ public enum WalkSafetyReasonCode implements CodeNameDescribable {
 
     PAVEMENT_HEAT("노면(아스팔트) 고온", "아스팔트 표면 온도가 높아 발바닥 화상 위험이 있습니다."),
     PAVEMENT_OK("노면(아스팔트) 적정", "지면 온도가 산책에 무리 없는 수준입니다."),
-    HEAT_INDEX_HIGH("열지수 높음", "기온과 습도를 함께 보면 체감 부담이 큽니다."),
+    FEELS_LIKE_HIGH("체감온도 높음", "기상청 여름철 체감온도 기준으로 더위 부담이 큰 조건입니다."),
     BRACHYCEPHALIC("단두종 주의", "코가 짧은 견종은 고온에서 체온 조절이 어렵습니다."),
     HEAT_SENSITIVE("더위 민감", "더위에 약한 아이라 같은 기온에도 부담이 큽니다."),
     COLD_SENSITIVE("추위 민감", "추위에 약한 아이라 같은 기온에도 부담이 큽니다."),

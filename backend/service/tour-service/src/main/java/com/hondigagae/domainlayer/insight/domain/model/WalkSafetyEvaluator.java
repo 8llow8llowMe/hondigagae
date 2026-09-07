@@ -16,8 +16,9 @@ import java.util.Optional;
  * <p>적합도와 달리 점수를 내지 않고 등급만 낸다. "산책해도 되는가"는 정도의 문제가 아니라
  * 임계를 넘었는지의 문제이고, 73점 같은 값은 판단에 도움이 되지 않기 때문이다.
  *
- * <p>판정에 쓰는 것 셋: 추정 노면(아스팔트) 온도({@link PavementHeat}), 열지수
- * ({@link HeatIndex}), 반려견 개별 조건(민감도/견종). 모두 근거 수치를 문장에 넣어 돌려준다.
+ * <p>판정에 쓰는 것 셋: 추정 노면(아스팔트) 온도({@link PavementHeat}), 기상청 여름철
+ * 체감온도({@link FeelsLikeTemperature}), 반려견 개별 조건(민감도/견종). 모두 근거 수치를
+ * 문장에 넣어 돌려준다. NOAA 열지수({@link HeatIndex})는 판정에 쓰지 않고 참고로 병기한다.
  *
  * <p><b>좌표를 함께 받는다.</b> 노면온도 추정이 태양 고도를 쓰는데, 그것은 시각만으로는
  * 정해지지 않고 <b>날짜와 위도</b>가 있어야 나온다 ({@link PavementHeat}).
@@ -63,13 +64,15 @@ public final class WalkSafetyEvaluator {
         // 15시 값인데 일사는 16시로 계산하는 어긋남이 생긴다 - nearest 가 최대 3시간까지
         // 떨어진 행을 고를 수 있기 때문이다.
         PavementHeat pavement = pavementOf(forecast, latitude);
+        FeelsLikeTemperature feelsLike = FeelsLikeTemperature.of(airTemperature, forecast.humidity());
+        // 열지수는 판정에 쓰지 않는다 — 기상청 척도와 값이 달라 참고로만 병기한다.
         HeatIndex heatIndex = HeatIndex.of(airTemperature, forecast.humidity());
 
         WalkSafetyLevel level = WalkSafetyLevel.SAFE;
         level = level.worseOf(assessWeatherWarning(warning, reasons));
         level = level.worseOf(assessPavement(pavement, thresholds, reasons));
-        level = level.worseOf(assessHeatIndex(heatIndex, airTemperature, thresholds, reasons));
-        level = level.worseOf(assessPetSensitivity(pet, airTemperature, heatIndex, thresholds, reasons));
+        level = level.worseOf(assessFeelsLike(feelsLike, airTemperature, thresholds, reasons));
+        level = level.worseOf(assessPetSensitivity(pet, airTemperature, feelsLike, thresholds, reasons));
         level = level.worseOf(assessCold(airTemperature, pet, thresholds, reasons));
         level = level.worseOf(assessSurfaceAndWind(forecast, thresholds, reasons));
 
@@ -90,6 +93,7 @@ public final class WalkSafetyEvaluator {
             .level(level)
             .reasons(reasons)
             .estimatedPavementCelsius(pavement.estimatedCelsius())
+            .feelsLikeCelsius(feelsLike.celsius())
             .heatIndexCelsius(heatIndex.celsius())
             .saferWindowStart(saferWindow.map(SaferWindow::start).orElse(null))
             .saferWindowEnd(saferWindow.map(SaferWindow::end).orElse(null))
@@ -119,7 +123,7 @@ public final class WalkSafetyEvaluator {
     /**
      * 주의보를 반영한다. 경보는 이 메서드에 오지 않는다 - 위에서 이미 DANGER 로 끊었다.
      *
-     * <p>주의보는 최소 CAUTION 이다. 노면(아스팔트) 온도와 열지수가 아무리 좋아도 "안전"이라고 말하지 않는다 -
+     * <p>주의보는 최소 CAUTION 이다. 노면(아스팔트) 온도와 체감온도가 아무리 좋아도 "안전"이라고 말하지 않는다 -
      * 기상청이 조건이 나빠지고 있다고 알린 상태에서 안전을 단언하면 안 된다.
      */
     private static WalkSafetyLevel assessWeatherWarning(WeatherWarning warning, List<WalkSafetyReason> reasons) {
@@ -151,28 +155,29 @@ public final class WalkSafetyEvaluator {
         return WalkSafetyLevel.SAFE;
     }
 
-    private static WalkSafetyLevel assessHeatIndex(
-        HeatIndex heatIndex, double airTemperature, SuitabilityThresholds thresholds, List<WalkSafetyReason> reasons
+    /** 임계는 기상청 폭염특보 기준(주의보 33℃·경보 35℃)이다 — 체감온도와 같은 척도의 공식 기준이 있다. */
+    private static WalkSafetyLevel assessFeelsLike(
+        FeelsLikeTemperature feelsLike, double airTemperature, SuitabilityThresholds thresholds, List<WalkSafetyReason> reasons
     ) {
-        double value = heatIndex.celsius();
-        if (value < thresholds.heatIndexCautionCelsius()) {
+        double value = feelsLike.celsius();
+        if (value < thresholds.feelsLikeCautionCelsius()) {
             return WalkSafetyLevel.SAFE;
         }
-        boolean adjusted = heatIndex.isAdjusted(airTemperature);
+        boolean adjusted = feelsLike.isAdjusted(airTemperature);
         String humidityNote = adjusted
-            ? "기온 %.0f도지만 습도가 높아 체감 %.0f도 수준입니다. 반려견은 헐떡임으로 열을 내보내는데 습할수록 그 효율이 떨어집니다."
+            ? "기온 %.0f도지만 습도가 높아 체감온도 %.1f도(기상청 여름철 산식)입니다. 반려견은 헐떡임으로 열을 내보내는데 습할수록 그 효율이 떨어집니다."
                 .formatted(airTemperature, value)
-            : "체감 %.0f도로 더위 부담이 있는 조건입니다.".formatted(value);
+            : "체감온도 %.1f도로 더위 부담이 있는 조건입니다.".formatted(value);
 
-        reasons.add(WalkSafetyReason.of(WalkSafetyReasonCode.HEAT_INDEX_HIGH, humidityNote));
-        return value >= thresholds.heatIndexDangerCelsius() ? WalkSafetyLevel.DANGER : WalkSafetyLevel.CAUTION;
+        reasons.add(WalkSafetyReason.of(WalkSafetyReasonCode.FEELS_LIKE_HIGH, humidityNote));
+        return value >= thresholds.feelsLikeDangerCelsius() ? WalkSafetyLevel.DANGER : WalkSafetyLevel.CAUTION;
     }
 
     private static WalkSafetyLevel assessPetSensitivity(
-        PetCondition pet, double airTemperature, HeatIndex heatIndex,
+        PetCondition pet, double airTemperature, FeelsLikeTemperature feelsLike,
         SuitabilityThresholds thresholds, List<WalkSafetyReason> reasons
     ) {
-        if (heatIndex.celsius() < thresholds.heatIndexCautionCelsius()
+        if (feelsLike.celsius() < thresholds.feelsLikeCautionCelsius()
             && airTemperature < thresholds.hotTemperature()) {
             return WalkSafetyLevel.SAFE;
         }
@@ -322,7 +327,7 @@ public final class WalkSafetyEvaluator {
     ) {
         double airTemperature = forecast.temperature();
         PavementHeat pavement = pavementOf(forecast, latitude);
-        HeatIndex heatIndex = HeatIndex.of(airTemperature, forecast.humidity());
+        FeelsLikeTemperature feelsLike = FeelsLikeTemperature.of(airTemperature, forecast.humidity());
 
         WalkSafetyLevel level = WalkSafetyLevel.SAFE;
         if (pavement.estimatedCelsius() >= thresholds.pavementDangerCelsius()) {
@@ -330,12 +335,12 @@ public final class WalkSafetyEvaluator {
         } else if (pavement.estimatedCelsius() >= thresholds.pavementCautionCelsius()) {
             level = level.worseOf(WalkSafetyLevel.CAUTION);
         }
-        if (heatIndex.celsius() >= thresholds.heatIndexDangerCelsius()) {
+        if (feelsLike.celsius() >= thresholds.feelsLikeDangerCelsius()) {
             level = level.worseOf(WalkSafetyLevel.DANGER);
-        } else if (heatIndex.celsius() >= thresholds.heatIndexCautionCelsius()) {
+        } else if (feelsLike.celsius() >= thresholds.feelsLikeCautionCelsius()) {
             level = level.worseOf(WalkSafetyLevel.CAUTION);
         }
-        if (BreedHeatRisk.isBrachycephalic(pet.breed()) && heatIndex.celsius() >= thresholds.heatIndexCautionCelsius()) {
+        if (BreedHeatRisk.isBrachycephalic(pet.breed()) && feelsLike.celsius() >= thresholds.feelsLikeCautionCelsius()) {
             level = level.worseOf(WalkSafetyLevel.DANGER);
         }
         if (forecast.isWet()) {

@@ -232,7 +232,7 @@ class WeatherWarningRuleTest {
             .coldTemperature(5.0d).veryColdTemperature(0.0d)
             .strongWindSpeed(9.0d)
             .pavementCautionCelsius(42.0d).pavementDangerCelsius(52.0d)
-            .heatIndexCautionCelsius(27.0d).heatIndexDangerCelsius(32.0d)
+            .feelsLikeCautionCelsius(33.0d).feelsLikeDangerCelsius(35.0d)
             .build();
     }
 }

@@ -21,10 +21,10 @@ class DailyWeatherFeelsLikeTest {
     private static final LocalDate DATE = LocalDate.of(2026, 8, 27);
 
     @Test
-    @DisplayName("습한 시각의 열지수가 최고기온보다 높으면 그 값이 체감온도다")
-    void picksMaxHeatIndexAcrossHours() {
+    @DisplayName("습한 시각의 체감온도가 최고기온 시각보다 높으면 그 값이 하루 체감온도다")
+    void picksMaxFeelsLikeAcrossHours() {
         DailyWeather day = shortTermDay(List.of(
-            reading(12, 30.0d, 60),   // 열지수 약 32.x
+            reading(12, 30.0d, 60),
             reading(15, 31.0d, 40),   // 최고기온이지만 건조 - 보정이 작다
             reading(18, 29.0d, 85)    // 기온은 낮지만 습해서 체감이 높다
         ));
@@ -32,22 +32,21 @@ class DailyWeatherFeelsLikeTest {
         Double feelsLike = day.maxFeelsLikeTemperature();
 
         assertThat(feelsLike).isNotNull();
-        assertThat(feelsLike).isGreaterThan(31.0d);
-        // 시각별 계산과 같은 규칙으로 낸 값 중 최대여야 한다.
+        // 시각별 계산과 같은 규칙(기상청 여름철 체감온도)으로 낸 값 중 최대여야 한다.
         double expected = List.of(
-                HeatIndex.of(30.0d, 60).celsius(),
-                HeatIndex.of(31.0d, 40).celsius(),
-                HeatIndex.of(29.0d, 85).celsius())
+                FeelsLikeTemperature.of(30.0d, 60).celsius(),
+                FeelsLikeTemperature.of(31.0d, 40).celsius(),
+                FeelsLikeTemperature.of(29.0d, 85).celsius())
             .stream().mapToDouble(Double::doubleValue).max().orElseThrow();
         assertThat(feelsLike).isEqualTo(Math.round(expected * 10.0d) / 10.0d);
     }
 
     @Test
-    @DisplayName("26도 미만이거나 습도가 없으면 기온 그대로다 - 없는 근거로 보정하지 않는다")
-    void fallsBackToTemperatureWhenNotApplicable() {
-        DailyWeather mild = shortTermDay(List.of(reading(12, 22.0d, 90), reading(15, 24.5d, null)));
+    @DisplayName("습도가 없는 시각은 기온 그대로다 - 없는 근거로 보정하지 않는다")
+    void fallsBackToTemperatureWhenHumidityMissing() {
+        DailyWeather humidityless = shortTermDay(List.of(reading(15, 24.5d, null)));
 
-        assertThat(mild.maxFeelsLikeTemperature()).isEqualTo(24.5d);
+        assertThat(humidityless.maxFeelsLikeTemperature()).isEqualTo(24.5d);
     }
 
     @Test

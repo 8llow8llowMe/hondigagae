@@ -17,6 +17,9 @@ public record WalkSafetyAssessment(
     List<WalkSafetyReason> reasons,
     // 추정 노면온도. 판단의 핵심 근거라 값 자체를 함께 내린다.
     Double estimatedPavementCelsius,
+    // 기상청 여름철 체감온도 — 판정에 쓴 값이다.
+    Double feelsLikeCelsius,
+    // NOAA 열지수 — 판정에 쓰지 않는 참고 병기 값이다.
     Double heatIndexCelsius,
     // 같은 날 안에서 더 안전한 시간대. 없으면 둘 다 null 이다.
     LocalTime saferWindowStart,
