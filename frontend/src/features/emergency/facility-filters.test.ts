@@ -120,23 +120,36 @@ describe('countsAreComplete — 잘린 목록에서 센 개수는 전체가 아�
   })
 
   /*
-    상한(50)만큼 왔으면 더 있는지 알 수 없다 — dev 실측에서 제주시청 반경 10km 가
-    정확히 50건(병원 19 · 약국 31)으로 채워졌다.
+    **#297.** `totalCount` 가 자르기 전 총계가 됐으므로(BE #285 / PR #296) 잘림을
+    정직하게 판정한다 — 받은 개수가 총계보다 적으면 반경 안에 더 있다.
   */
-  it('size 상한에 걸렸으면 개수를 쓰지 않는다 — 틀린 개수는 없는 개수보다 나쁘다', () => {
+  it('총계보다 적게 받았으면 개수를 쓰지 않는다 — 틀린 개수는 없는 개수보다 나쁘다', () => {
+    expect(countsAreComplete({ ...result, totalCount: 136 })).toBe(false)
+  })
+
+  /*
+    **상한 도달 우회(#281)를 걷은 것이 여기서 드러난다.** 반경 안 총계가 정확히 상한과
+    같으면 다 받은 것이고 개수는 옳다. 우회는 이 응답을 잘린 것으로 오판해 숫자를 뺐다.
+  */
+  it('상한만큼 왔는데 총계도 그만큼이면 개수를 쓴다', () => {
     const full = Array.from({ length: MAX_SIZE }, (_, index) =>
       facility({ facilityId: String(index) }),
     )
 
-    expect(countsAreComplete({ ...result, facilities: full, totalCount: MAX_SIZE })).toBe(false)
+    expect(countsAreComplete({ ...result, facilities: full, totalCount: MAX_SIZE })).toBe(true)
   })
 
   /*
-    **`totalCount` 를 잘림 신호로 쓰지 않는다.** 이름은 총계처럼 보이지만 dev 는 이 값을
-    `size` 만큼만 돌려준다 — 여기에 기대면 예전처럼 조건이 늘 참이 되어 아무것도 막지 못한다.
+    반대 방향 — 상한까지 받았는데도 총계가 더 크면 진짜로 잘렸다. 제주 전역이 214곳이라
+    (dev 실측) 250 상한에서는 실제로 일어나지 않지만, 반경 안 시설이 250을 넘으면 이
+    갈래가 화면을 지킨다.
   */
-  it('totalCount 가 커도 상한 아래면 개수를 쓴다', () => {
-    expect(countsAreComplete({ ...result, totalCount: 120 })).toBe(true)
+  it('상한까지 받았어도 총계가 더 크면 개수를 쓰지 않는다', () => {
+    const full = Array.from({ length: MAX_SIZE }, (_, index) =>
+      facility({ facilityId: String(index) }),
+    )
+
+    expect(countsAreComplete({ ...result, facilities: full, totalCount: MAX_SIZE + 1 })).toBe(false)
   })
 })
 

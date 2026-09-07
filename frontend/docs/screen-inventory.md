@@ -547,13 +547,13 @@
 **당장 붙일 곳이 없다.** 목록 응답이 이미 상세와 같은 필드를 주고 화면은 시트로 펼친다 —
 별도 상세 라우트가 생길 때 쓴다 ([#148](https://github.com/8llow8llowMe/hondigagae/issues/148)).
 
-파라미터: `lat` `lng`(필수), `radius`(기본 10000, 최대 50000), `type`(`ANIMAL_HOSPITAL`/`ANIMAL_PHARMACY`, 비우면 둘 다), `open24Only`(기본 false), `size`(1~50, 기본 10)
+파라미터: `lat` `lng`(필수), `radius`(기본 10000, 최대 50000), `type`(`ANIMAL_HOSPITAL`/`ANIMAL_PHARMACY`, 비우면 둘 다), `open24Only`(기본 false), `size`(**1~250**, 기본 10 — BE #285 로 50 에서 올랐다)
 
 **화면 설계에 직결되는 백엔드 지침** (스키마 설명에 명시돼 있다)
 
 - `operatingHoursKnown: false` → **"영업시간 정보 없음"으로 안내한다.** `operatingHours: null` 은 "휴무"가 아니라 "확인 필요"다
 - `open24Only=true` → **제주 동물병원 중 24시간은 3곳뿐**이라 결과가 매우 적다. 필터 UI에 이 사실을 알려야 한다
-- 응답에 `totalCount` 와 `providerName`(출처)이 있다
+- 응답에 `totalCount` 와 `providerName`(출처)이 있다. **`totalCount` 는 `size` 로 자르기 전 총계다** (BE #285 / PR #296) — 잘림 판정을 이 값으로 되돌렸다 ([#297](https://github.com/8llow8llowMe/hondigagae/issues/297))
 
 > [#8](https://github.com/8llow8llowMe/hondigagae/issues/8)(`facilityId` 정밀도)은 **해결·종료됐다.**
 > 백엔드가 `String` 으로 내린다 — _"Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로

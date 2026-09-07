@@ -11,14 +11,20 @@ export const MAX_RADIUS_METERS = 50_000
 /** 백엔드 `@RequestParam(defaultValue = "10000")` */
 export const DEFAULT_RADIUS_METERS = 10_000
 /**
- * 백엔드 `@Max(50)`. **상한을 그대로 쓴다.**
+ * 백엔드 `@Max(250)`. **상한을 그대로 쓴다.**
  *
  * 화면이 유형·24시간·지금진료중을 **클라이언트에서** 좁히므로(아래 참고) 한 번에 다
- * 받아 와야 칩 개수가 맞는다. 제주 전역 시설 수가 50 을 넘지 않는 규모라 실질적으로
- * 전량이 온다 — 넘으면 `facilities.length < totalCount` 로 드러나고, 그때 화면이
- * 개수를 감춘다 (`facility-filters.ts`).
+ * 받아 와야 칩 개수가 맞는다. 제주 전역이 214곳이라(dev 실측 2026-09-08 ·
+ * `radius=50000` → `totalCount=214`) 250 이면 실질적으로 전량이 온다.
+ *
+ * **50 이던 시절에는 이 상한이 화면을 스스로 멈추게 했다** (#297). 제주시청 반경 10km 만
+ * 해도 136곳인데 50에서 잘려, 반경을 넓혀도 칩 개수가 계속 감춰졌다. `size` 상한이
+ * 250 으로 오른 뒤(BE #285 / PR #296) 여기를 따라 올렸다.
+ *
+ * 250 으로도 넘치면 `facilities.length < totalCount` 로 드러나고, 그때 화면이 개수를
+ * 감춘다 (`facility-filters.ts`).
  */
-export const MAX_SIZE = 50
+export const MAX_SIZE = 250
 
 /**
  * **`type` · `open24Only` · `openNowOnly` 를 서버로 보내지 않는다.**

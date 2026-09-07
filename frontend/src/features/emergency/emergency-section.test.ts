@@ -253,8 +253,30 @@ describe('EmergencySection — 칩 개수', () => {
     expect(render()).toContain(`${messages.emergency.typeAll} 1`)
   })
 
-  /* 상한(50)만큼 왔으면 더 있는지 알 수 없다 — dev 실측에서 10km 가 정확히 50건이었다 */
-  it('size 상한에 걸렸으면 숫자를 빼고 라벨만 쓴다', () => {
+  /*
+    **#297.** 반경 안 총계보다 적게 받았으면 잘렸다 — `totalCount` 가 자르기 전 총계가
+    되면서(BE #285 / PR #296) 이 판정이 상한 도달 우회를 대신한다.
+  */
+  it('총계보다 적게 받았으면 숫자를 빼고 라벨만 쓴다', () => {
+    const markup = render({
+      result: {
+        facilities: [facility()],
+        totalCount: 136,
+        radius: 10_000,
+        open24Only: false,
+        providerName: '출처',
+      },
+    })
+
+    expect(markup).toContain(messages.emergency.typeAll)
+    expect(markup).not.toContain(`${messages.emergency.typeAll} 1`)
+  })
+
+  /*
+    상한 도달 우회(#281)를 걷은 결과 — 상한만큼 왔는데 총계도 그만큼이면 다 받은 것이라
+    개수를 붙인다. 우회는 이 응답에서 숫자를 뺐다.
+  */
+  it('상한만큼 왔는데 총계도 그만큼이면 개수를 붙인다', () => {
     const markup = render({
       result: {
         facilities: Array.from({ length: MAX_SIZE }, (_, index) =>
@@ -267,8 +289,7 @@ describe('EmergencySection — 칩 개수', () => {
       },
     })
 
-    expect(markup).toContain(messages.emergency.typeAll)
-    expect(markup).not.toContain(`${messages.emergency.typeAll} 1`)
+    expect(markup).toContain(`${messages.emergency.typeAll} ${MAX_SIZE}`)
   })
 
   it('24시간을 켜면 결과가 적다는 사실을 알린다 (백엔드 스키마 지침)', () => {
