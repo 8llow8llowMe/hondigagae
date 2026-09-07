@@ -70,6 +70,9 @@ git pull --ff-only origin develop
 git checkout -b feature/fe/12-place-detail
 ```
 
+> **클론 직후 한 번은 훅을 켠다** — `git config core.hooksPath .githooks` (§8-3).
+> 저장소마다 한 번이면 되고, 켜 두면 프론트 검사를 빠뜨린 push 가 걸린다.
+
 ## 4. 커밋
 
 - 형식: `[영역] type: 요약` — 루트 `CLAUDE.md` 기준
@@ -139,8 +142,25 @@ gh pr create --base develop \
 > 루트 `docs/`, `.github/`, `.claude/`, CI 설정처럼 어느 워크스페이스도 가리키지 않는 변경에는
 > 해당하는 라벨이 없다. **라벨을 새로 만들지 않고 생략한다.** assignee 는 그대로 지정한다.
 
-**이유**: 이 저장소는 브랜치 보호를 쓸 수 없어(§8) 자동화로 강제할 수단이 없다. assignee 가 비어
-있으면 "누가 들고 있는 작업인지" 를 PR 목록에서 알 수 없고, 라벨이 없으면 영역별 필터가 무너진다.
+**이유**: 라벨은 **배포 대상을 정하는 값**이다. Jenkins 가 PR 라벨로 배포 스코프를 정하고
+라벨이 없으면 배포하지 않는다(fail-closed). 라벨을 빠뜨린 PR 은 머지돼도 배포가 나가지
+않는다 — [#217](https://github.com/8llow8llowMe/hondigagae/pull/217) ·
+[#219](https://github.com/8llow8llowMe/hondigagae/pull/219) ·
+[#223](https://github.com/8llow8llowMe/hondigagae/pull/223) 이 그랬다.
+assignee 가 비어 있으면 "누가 들고 있는 작업인지" 를 PR 목록에서 알 수 없다.
+
+#### 라벨은 자동으로도 붙는다 — 그래도 확인은 한다
+
+`.github/workflows/label.yml` 이 **경로를 보고 라벨을 붙인다** (매핑은
+`.github/labeler.yml`). 위 표를 그대로 자동화한 것이라, 보통은 손으로 붙일 필요가 없다.
+
+**더하기만 한다** (`sync-labels: false`) — 사람이 넓혀 둔 스코프를 지우지 않는다.
+
+**자동으로 다 되지 않는 경우가 하나 있다.** `backend/core/**` 는 공용 모듈이라 바뀌면 그것을
+쓰는 서비스 전부의 런타임이 바뀌는데, Jenkins 배포 스코프는 `backend-{service}` 단위다.
+그래서 `backend-core` 만 붙은 PR 은 **아무 서비스도 배포되지 않는다.** 자동으로 5개 서비스를
+다 붙이지도 않는다 — "의도한 대상만 배포한다" 가 fail-closed 설계의 요점이라, 자동으로 전체
+배포를 열면 그 설계가 무너진다. **core 를 건드렸다면 배포할 서비스 라벨을 직접 더한다.**
 
 이미 만든 PR 에 붙이려면:
 
@@ -175,8 +195,9 @@ gh pr edit <번호> --add-assignee @me --add-label frontend-web
 gh pr merge <번호> --rebase --delete-branch
 ```
 
-- `Create a merge commit` / `Squash and merge` 를 쓰지 않는다.
-- `--delete-branch` 로 원격 브랜치를 정리한다. 저장소 설정의 자동 삭제가 꺼져 있다.
+- `Create a merge commit` / `Squash and merge` 는 **저장소 설정에서 껐다** — UI 에 뜨지 않는다 (§8-1).
+- `--delete-branch` 는 그대로 쓴다. 저장소 자동 삭제를 켜 뒀지만(§8-1) 명령에 남겨 두면
+  **로컬에서 바로 결과를 확인할 수 있고**, 설정이 되돌려져도 브랜치가 남지 않는다.
 - 로컬 정리:
 
 ```bash
@@ -214,16 +235,57 @@ gh issue close <번호> --comment "PR #<번호> 로 머지됐습니다."
   Swagger 대조 불가 — 로컬 기동 후 `/fe-api-check`").
 - 구현 도중 발견한 **다른 영역의 문제는 별도 이슈로 뗀다.** 원래 이슈에 매달아 두면 닫히지 않는다.
 
-## 8. 브랜치 보호에 대해
+## 8. 강제되는 것과 규칙으로만 지키는 것
 
 이 저장소는 **비공개 무료 플랜이라 GitHub 브랜치 보호 규칙을 쓸 수 없다.**
-develop 직접 푸시를 기술적으로 막을 방법이 없으므로 **규칙으로만 지킨다.**
 
-공개 전환하거나 플랜을 올리면 아래를 설정한다.
+```text
+GET /repos/8llow8llowMe/hondigagae/branches/develop/protection
+→ 403 "Upgrade to GitHub Pro or make this repository public to enable this feature."
+```
 
-- `develop` 직접 푸시 금지
-- PR 머지 전 `frontend-ci` 통과 필수
-- 머지 후 브랜치 자동 삭제
+**그래도 무료로 강제할 수 있는 것이 있고, 그것부터 걸어 뒀다** ([#286](https://github.com/8llow8llowMe/hondigagae/issues/286)).
+
+### 8-1. 이미 강제된다
+
+| 규약                    | 강제 수단                                            |
+| ----------------------- | ---------------------------------------------------- |
+| Rebase and merge 만 쓴다 | 저장소 설정에서 **Squash · Merge commit 을 껐다**     |
+| 머지 후 브랜치 삭제      | 저장소 설정 **Automatically delete head branches** 켬 |
+| PR 라벨 (배포 대상)      | `.github/workflows/label.yml` — **경로 기반 자동 부여** |
+| CI 빨간불을 develop 에 올리지 않기 | `.githooks/pre-push` (§8-3) — push 단계에서 끊는다 |
+
+머지 방식은 이제 GitHub UI 에도 `Rebase and merge` 하나만 뜬다. **머지 커밋이 섞여 선형
+히스토리가 깨지는 일이 설정으로 막혀 있다.**
+
+### 8-2. 아직 규칙으로만 지킨다
+
+브랜치 보호가 필요한 것들이다. **공개 전환 또는 플랜 업그레이드가 정해지면** 건다.
+
+- `develop` **직접 푸시 금지** (§1 이 금지하지만 기술적으로는 열려 있다)
+- PR 머지 전 **`verify` 통과 필수** (required status check)
+- Jenkins `pr-merge` 도 필수 — Jenkins 는 통과했는데 Actions 만 빨간 경우가 있었다
+
+> **이게 왜 급한지** — [#282](https://github.com/8llow8llowMe/hondigagae/pull/282) 가
+> `verify` **실패 상태로 머지**돼 develop 이 빨간불이 됐다. GitHub Actions 는 PR 을
+> **현재 develop 에 머지한 트리**로 빌드하므로, 그동안 **뒤따르는 모든 PR 이 그 실패를
+> 물려받는다** — [#283](https://github.com/8llow8llowMe/hondigagae/pull/283) 이 건드리지도
+> 않은 파일 때문에 빨간불이 됐고 원인 추적에 시간이 들었다.
+
+### 8-3. pre-push 훅 — **한 번 켜 두면 된다**
+
+```bash
+git config core.hooksPath .githooks
+```
+
+**`frontend/` 가 한 줄이라도 바뀐 push 에서 `format:check` + `verify` 를 돌린다.**
+작업 영역과 무관하다 — #282 는 백엔드 PR 이었고 프론트 문서 하나를 함께 고쳤다.
+"나는 백엔드 작업이니 프론트 검사는 필요 없다" 는 판단이 정확히 그 사고를 만들었다.
+
+백엔드는 돌리지 않는다 — `./gradlew check` 가 분 단위라 push 훅에 맞지 않다.
+
+일회성으로 건너뛰려면 `SKIP_HOOKS=1 git push`. **머지를 막는 장치가 아니라 실수를 줄이는
+장치다** — 진짜 강제는 8-2 가 열려야 한다.
 
 ## 9. 요약 체크리스트
 
@@ -232,6 +294,7 @@ develop 직접 푸시를 기술적으로 막을 방법이 없으므로 **규칙�
 - [ ] 이슈가 있다 (화면/기능 단위)
 - [ ] `develop` 최신 상태에서 브랜치를 팠다
 - [ ] 브랜치명이 `<type>/<영역>/<이슈번호>-<요약>` 이다
+- [ ] **훅을 켰다** — `git config core.hooksPath .githooks` (클론당 한 번, §8-3)
 
 PR 올리기 전:
 
@@ -240,11 +303,12 @@ PR 올리기 전:
 - [ ] 완료 체크리스트를 통과했다
 - [ ] 30파일을 넘으면 이유를 본문에 적었다
 - [ ] **assignee 를 본인으로 지정했다**
-- [ ] **라벨을 변경 범위에 맞게 붙였다** (이슈와 같은 라벨)
+- [ ] **라벨을 확인했다** — 자동 부여되지만 `backend/core/**` 는 배포할 서비스 라벨을 직접 더한다 (§6)
 
 머지할 때:
 
-- [ ] CI 통과
+- [ ] CI 통과 — **`verify` 와 Jenkins 둘 다.** 빨간불로 머지하면 develop 이 오염되고
+      뒤따르는 모든 PR 이 그 실패를 물려받는다 (§8-2)
 - [ ] `Issue Number` 가 채워져 있다
 - [ ] **Rebase and merge** 로 머지하고 브랜치를 삭제했다
 
