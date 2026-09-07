@@ -50,8 +50,10 @@ class AiPlanPromptFactoryTest {
             PetCondition.builder().sizeName("대형견").weightText("28").heatSensitive(true).build())));
 
         assertThat(prompt).contains("함께 여행하는 반려견 2마리");
-        assertThat(prompt).contains("[반려견 1]");
-        assertThat(prompt).contains("[반려견 2]");
+        // 이유 문장이 가리킬 이름이라 대괄호 없이 쓴다 — 표기가 그대로 화면에 새기 때문 (#233)
+        assertThat(prompt).contains("\n반려견 1\n");
+        assertThat(prompt).contains("\n반려견 2\n");
+        assertThat(prompt).doesNotContain("[반려견");
         assertThat(prompt).contains("소음에 민감함");
         assertThat(prompt).contains("더위에 민감함");
         assertThat(prompt).contains("가장 큰 크기와 가장 무거운 체중 기준으로 판정할 것");
@@ -133,8 +135,8 @@ class AiPlanPromptFactoryTest {
         String prompt = factory.userPrompt(query);
 
         assertThat(prompt).contains("여행 기간 날씨 전망");
-        assertThat(prompt).contains("[1일차] 2026-09-01 | 맑음");
-        assertThat(prompt).contains("[2일차] 2026-09-02 | 흐림 | 강수형태: 비 | 강수확률 80%");
+        assertThat(prompt).contains("- 1일차 2026-09-01 | 맑음");
+        assertThat(prompt).contains("- 2일차 2026-09-02 | 흐림 | 강수형태: 비 | 강수확률 80%");
         assertThat(prompt).contains("기온 24.0~31.0℃");
         assertThat(prompt).contains("실내 후보 위주로 배치할 것");
         assertThat(prompt).contains("지어내지 말 것");
@@ -203,7 +205,8 @@ class AiPlanPromptFactoryTest {
         assertThat(prompt).contains("기간: 2026-09-01 ~ 2026-09-02");
         assertThat(prompt).contains("함께 여행하는 반려견");
         assertThat(prompt).contains("체중: 3.5kg");
-        assertThat(prompt).contains("[2일차] 2026-09-02 | 강수형태: 비 | 강수확률 80%");
+        assertThat(prompt).contains("- 2일차 2026-09-02 | 강수형태: 비 | 강수확률 80%");
+        assertThat(prompt).contains("\n1일차 · 해안 산책로(placeId=11)");
         assertThat(prompt).contains("여행 일정");
         assertThat(prompt).contains("해안 산책로(placeId=11)");
         assertThat(prompt).contains("준비물 목록을 만들어 주세요");
