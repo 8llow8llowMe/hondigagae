@@ -58,6 +58,7 @@ description: 혼디가개 백엔드의 큰 작업(신규 서비스, DB/Redis/API
 
 현재 호스트(Claude Code, Codex, Cursor)가 제공하는 subagent/agent 위임 기능이 있으면 역할별로 호출한다.
 
+- 각 역할에는 `.claude/agents/be-*.md`의 프로젝트 정의를 역할 프롬프트로 제공한다 (`be-executor`, `be-hexagonal-reviewer`, `be-db-reviewer`, `be-security-reviewer`). Leader는 파일이 없고 메인 실행자가 맡는다
 - 각 subagent에는 역할, 읽을 문서, 허용된 변경 범위, 기대 출력만 전달한다
 - 독립적인 읽기 전용 Reviewer는 병렬로 실행할 수 있다
 - 구현은 메인 실행자 또는 단일 Executor만 맡아 편집 충돌을 막는다
