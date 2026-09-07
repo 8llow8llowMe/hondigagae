@@ -87,6 +87,7 @@
 | 계약 점검 | `backend-api-check` | `fe-api-check` | |
 | 경계 점검 | `hexagonal-guard` | `fe-boundary-guard` | |
 | 멀티 에이전트 | `backend-multi-agent` | `fe-multi-agent` | |
+| 개발 오케스트레이션 | | | `dev-orchestrator` |
 | 협업 문서 | | | `issue`, `pr`, `mr` |
 
 작업 상태 동기화(`/sync` · `/sync out`)는 이 저장소 스킬이 아니라 **전역 스킬**이다 (`seonghoho/dev-dotfiles` → `~/.claude/skills/sync`). 이 저장소의 규칙은 `docs/git-workflow.md` 를 정본으로 읽어 적용한다.

@@ -101,7 +101,15 @@
 | 계약 점검 | `backend-api-check` | `fe-api-check` | |
 | 경계 점검 | `hexagonal-guard` | `fe-boundary-guard` | |
 | 멀티 에이전트 | `backend-multi-agent` | `fe-multi-agent` | |
+| 개발 오케스트레이션 | | | `dev-orchestrator` |
 | 협업 문서 | | | `issue`, `pr`, `mr` |
+
+### Codex 역할별 개발 흐름
+
+- 비단순 개발 작업에는 `dev-orchestrator`를 적용해 작업 유형에 맞는 역할과 모델을 선택한다.
+- 단순 CRUD·탐색은 Terra, 일반 구현은 Sol Medium, 버그 분석·리뷰·리팩토링은 Sol High, 아키텍처 판단은 Astra High를 기본으로 한다.
+- 모든 작업을 무조건 병렬화하지 않는다. 서로 독립적인 읽기 전용 조사만 병렬화하고, 겹치는 파일의 쓰기는 한 실행자가 순차 수행한다.
+- 역할 설정과 세부 선택 기준의 정본은 [docs/codex-agents.md](docs/codex-agents.md)다.
 
 `.claude/agents/fe-*.md` — FE 전용 역할 정의 7종 (`fe-spec-writer`, `fe-implementer`, `fe-reviewer`, `fe-api-contract`, `fe-design-reviewer`, `fe-test-author`, `fe-map-reviewer`). Claude Code에서는 subagent로, Codex/Cursor에서는 각 호스트의 agent 기능 또는 순차 역할 프롬프트로 사용한다. 세부는 `frontend/docs/team-playbook.md`.
 
