@@ -140,6 +140,13 @@ export const homeMessages = {
   upcomingHeading: '다가오는 일정',
   noPlanTitle: '아직 일정이 없어요',
   noPlanDesc: '반려견에게 맞는 일정을 만들어보세요.',
+  /**
+   * 일정은 있는데 **전부 지나간** 경우. `noPlanTitle` 과 갈라 둔다 —
+   * 넷 다 지난 계정에 "아직 일정이 없어요" 라고 말하면 사용자는 자기 일정이 사라졌다고
+   * 읽는다. 다음 행동도 다르다: 저쪽은 만들기 유도, 이쪽은 목록으로 보내는 안내다.
+   */
+  noUpcomingPlanTitle: '다가오는 일정이 없어요',
+  noUpcomingPlanDesc: '지난 일정은 일정 목록에서 볼 수 있어요.',
   emergencyTitle: '주변 동물병원 찾기',
   /**
    * **개수를 단정하지 않는다** (#206).
@@ -153,6 +160,43 @@ export const homeMessages = {
    * 않고도 말할 수 있다. 정확한 수는 다음 화면이 센다.
    */
   emergencyDesc: '24시간 진료가 확인된 곳은 많지 않아요',
+  /**
+   * 실제 시설을 찾았을 때의 배너 설명. `{name}` · `{distance}` 치환.
+   *
+   * **위 `emergencyDesc` 의 규칙을 어기는 것이 아니다.** #206 이 금지한 것은 FE 가
+   * **수를 적어 두는 것**이었다 — 홈이 "3곳" 이라고 박아 두고 목록은 `/emergencies/facilities`
+   * 를 부르니 둘이 어긋났다. 이 문구들은 **그 목록과 같은 API 의 응답**을 그대로 말하므로
+   * 어긋날 자리가 없다. 개수도 세지 않는다 (`pickNearestHospital` 머리주석).
+   *
+   * 좌표를 못 얻었거나 조회 전·실패면 `emergencyDesc` 로 남는다 — 배너는 어떤 상태에서도
+   * 사라지지 않는다 (`components/banner.tsx`).
+   */
+  emergencyNearest24h: '24시간 · {name} {distance}',
+  /** 24시간은 없고 지금 문이 열린 곳은 있을 때 */
+  emergencyNearestOpen: '지금 진료중 · {name} {distance}',
+  /**
+   * 열림 여부를 말하지 않는 갈래. **`openNow === null` 이 여기로 온다** — null 은 "닫힘"
+   * 이 아니라 "영업시간 정보가 없어 판정할 수 없음" 이라, 배너가 열림/닫힘을 단정하지 않고
+   * 위치만 말한다 (`types/emergency.ts` `openNow`).
+   */
+  emergencyNearest: '가장 가까운 곳 · {name} {distance}',
+  /**
+   * 실내 대안의 거리 (`AlternativePlaceItem.distanceMeters`). `{distance}` 치환.
+   *
+   * **`직선` 을 반드시 붙인다.** 서버가 하버사인으로 재므로 직선거리이고, 제주는 산간·
+   * 해안도로가 많아 주행거리와 크게 다르다 — 일정 상세의 `plan.distanceStraight` 와 같은
+   * 이유이고 같은 표기다.
+   */
+  indoorDistance: '직선 {distance}',
+  /**
+   * 실내 대안 섹션의 기준을 밝힌다.
+   *
+   * **거리의 기준점을 말하지 않으면 안 된다.** 이 값은 "적합도를 조회한 장소로부터" 의
+   * 거리인데, 홈은 여러 장소의 대안을 하나로 접으므로(`collectIndoorAlternatives`) 숫자만
+   * 두면 무엇으로부터의 거리인지 알 수 없다. 장소 행이 거리를 안 그리는 이유와 같은
+   * 판단이다 (`place-insight-row.tsx` `metaLine`).
+   */
+  indoorNote: '위 목록의 장소에서 가까운 실내예요',
   congestionUnknown: '혼잡도 정보 없음',
   /** 점수를 내지 못한 경우. **0점이 아니다** */
   scoreUnavailable: '판단 근거 부족',

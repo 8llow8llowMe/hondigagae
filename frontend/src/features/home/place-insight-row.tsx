@@ -6,12 +6,12 @@ import { ImageIcon } from '@/components/icons'
 import { MetricBadge, type MetricTone, MetricValue } from '@/components/metric'
 import { imageSrc } from '@/lib/image/remote-host'
 import { splitReasons } from '@/lib/insight/reasons'
-import { suitabilityTone } from '@/lib/insight/tone'
+import { congestionTone, suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { shortAddress } from '@/lib/place/address'
 import { placeIllustration } from '@/lib/place/illustration'
 import { cn } from '@/lib/utils/cn'
-import type { PlaceSuitabilityResponse } from '@/types/insight'
+import type { CongestionItem, PlaceSuitabilityResponse } from '@/types/insight'
 import type { PlaceSummary } from '@/types/place'
 
 /**
@@ -92,21 +92,43 @@ export function PlaceInsightRow({
             </div>
           )}
 
-          {/* 모바일 점수 — 제목 아래 */}
-          <Score score={data.score} tone={tone} size="row" className="mt-1 md:hidden" />
+          {/*
+            모바일 점수 — 제목 아래. **혼잡도를 같은 줄에 둔다** — 아래로 한 줄을 더 쓰면
+            80px 썸네일 행에 네 줄이 되어 행 높이가 늘어난다.
+          */}
+          {/* 둘 다 없으면 줄을 만들지 않는다 — 빈 `div` 의 `mt-1` 만 남는다 */}
+          {(data.score !== null || data.congestion !== null) && (
+            <div className="mt-1 flex items-center gap-2 md:hidden">
+              <Score score={data.score} tone={tone} size="row" />
+              <CongestionBadge congestion={data.congestion} />
+            </div>
+          )}
         </div>
 
-        {/* 데스크톱 속성 태그 열 — 동반 가능 여부를 첫 태그로 */}
-        {place !== undefined && (
-          <div className="hidden w-36 shrink-0 flex-wrap justify-end gap-1.5 self-start md:flex">
-            <Badge tone="neutral">{place.petAllowanceType.name}</Badge>
-            {place.indoor !== null && (
-              <Badge tone="neutral">
-                {place.indoor ? messages.home.indoor : messages.home.outdoor}
-              </Badge>
-            )}
-          </div>
-        )}
+        {/*
+          데스크톱 속성 태그 열 — 동반 가능 여부를 첫 태그로, 혼잡도는 마지막.
+
+          **속성 배지와 등급 배지가 한 줄에 섞인다.** `components/metric.tsx` 가 두 배지의
+          크기를 같은 값으로 못박아 둔 이유가 이 자리다 — 높이가 갈리면 줄이 어긋난다.
+          속성(동반 가능 · 실내)은 안 바뀌는 값이고 혼잡도는 오늘의 판정이라, 순서로
+          그 둘을 가른다.
+
+          **`place` 가 없어도 이 열은 남는다.** 혼잡도는 `place` 가 아니라 적합도 응답에서
+          오므로, 목록 응답이 비어도 혼잡도는 말할 수 있다.
+        */}
+        <div className="hidden w-36 shrink-0 flex-wrap justify-end gap-1.5 self-start md:flex">
+          {place !== undefined && (
+            <>
+              <Badge tone="neutral">{place.petAllowanceType.name}</Badge>
+              {place.indoor !== null && (
+                <Badge tone="neutral">
+                  {place.indoor ? messages.home.indoor : messages.home.outdoor}
+                </Badge>
+              )}
+            </>
+          )}
+          <CongestionBadge congestion={data.congestion} />
+        </div>
 
         {/*
           데스크톱 판정 열 — **배지가 점수 바로 위**, 행의 오른쪽 끝.
@@ -133,6 +155,36 @@ export function PlaceInsightRow({
         </div>
       </Link>
     </li>
+  )
+}
+
+/**
+ * 혼잡도 배지 — 공통명세 S3-3 · 홈-세부명세 D5-1 §12.
+ *
+ * **섹션 부제가 "오늘 날씨와 혼잡도 반영" 이라고 말하는데 화면에는 없었다.** 값은
+ * 적합도 응답의 `congestion` 으로 이미 와 있고(추가 호출 없음), `reasons` 에는 섞여
+ * 오지 않는다 — dev 실측에서 `혼잡`(집중률 72.4%)인 장소의 `reasons` 가
+ * `PET_ALLOWED` · `HEAT_RISK` 뿐이었다. 즉 근거 문장에 기대면 혼잡도는 영영 안 보인다.
+ *
+ * **톤은 적합도와 뒤집혀 있다.** `LOW`(한산)가 좋은 쪽이라 `congestionTone` 을 쓴다 —
+ * 공용 매퍼를 쓰면 "혼잡" 이 초록으로 나간다 (`lib/insight/tone.ts`).
+ *
+ * `UNKNOWN` 은 **낱말을 FE 가 보탠다.** 서버 `name` 이 "정보 없음" 인데 배지 하나로 서면
+ * 무엇의 정보가 없는지 알 수 없다 — 명세가 "혼잡도 정보 없음" 을 정해 둔 이유다. 색은
+ * 주지 않고 점선 테두리로만 남는다 (DESIGN.md §2-3 — 혼잡도가 실제로 이 상태로 온다).
+ *
+ * **`null` 이면 그리지 않는다.** 계약이 `congestion` 자체를 null 로 줄 수 있고, 그때는
+ * 등급이 `UNKNOWN` 인 것과도 다르다 — 서버가 이 축을 아예 판정하지 않은 것이다.
+ */
+function CongestionBadge({ congestion }: { congestion: CongestionItem | null }) {
+  if (congestion === null) return null
+
+  const unknown = congestion.level.code === 'UNKNOWN'
+
+  return (
+    <MetricBadge tone={congestionTone(congestion.level.code)}>
+      {unknown ? messages.home.congestionUnknown : congestion.level.name}
+    </MetricBadge>
   )
 }
 

@@ -43,6 +43,25 @@ export function todayDay(today: Date): string {
   return toDayString(todayUtc(today))
 }
 
+/**
+ * 달력의 칸 → 그 날의 **로컬 정오** `Date`. 못 읽으면 `null`.
+ *
+ * `todayUtc()` 를 받는 함수들(`daysUntil` · `isPastPlan`)에 **서버가 정한 오늘**을 넘기기
+ * 위한 것이다. 클라이언트 컴포넌트가 스스로 `new Date()` 를 부르면 SSR 과 하이드레이션이
+ * 자정을 걸쳐 갈릴 수 있고, 그러면 같은 화면이 서버에서는 A 일정을, 브라우저에서는 B
+ * 일정을 고른다 (`app/(main)/page.tsx` 의 `todayLabel` 이 서버에서 만들어지는 것과 같은 이유).
+ *
+ * **자정이 아니라 정오다.** `todayUtc()` 는 로컬 getter 로 날짜를 읽으므로, UTC 자정으로
+ * 만든 Date 를 넘기면 UTC 보다 뒤진 타임존에서 하루 밀린다. 정오면 ±12시간 안에서 날짜가
+ * 바뀌지 않는다.
+ */
+export function dayToLocalNoon(date: string): Date | null {
+  if (parseDay(date) === null) return null
+
+  const [year, month, day] = date.split('-') as [string, string, string]
+  return new Date(Number(year), Number(month) - 1, Number(day), 12)
+}
+
 /** 요일 이름. 못 읽으면 `null` */
 export function weekdayOf(date: string): string | null {
   const time = parseDay(date)
