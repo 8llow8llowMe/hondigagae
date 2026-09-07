@@ -13,6 +13,8 @@
 *.mjs working-tree-encoding=UTF-8
 *.cjs working-tree-encoding=UTF-8
 *.json working-tree-encoding=UTF-8
+*.toml working-tree-encoding=UTF-8
+*.py working-tree-encoding=UTF-8
 *.css working-tree-encoding=UTF-8
 *.scss working-tree-encoding=UTF-8
 *.html working-tree-encoding=UTF-8
