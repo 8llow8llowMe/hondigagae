@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { getCurrentPosition, toFailure } from '@/lib/geo/current-position'
+import { getCurrentPosition, JEJU_QUERY_CENTER, toFailure } from '@/lib/geo/current-position'
 
 type GeoSuccess = (position: { coords: { latitude: number; longitude: number } }) => void
 type GeoError = (error: { code: number }) => void
@@ -31,6 +31,35 @@ describe('getCurrentPosition', () => {
       lat: 33.51,
       lng: 126.52,
     })
+  })
+
+  /*
+    **좌표를 정확히 받았는데도 폴백이다.** 브라우저가 실패한 것이 아니라 우리 데이터가
+    제주뿐이라, 서울 좌표로 조회하면 오류가 아니라 조용한 0건이 온다 (dev 실측:
+    `/emergencies/facilities` 가 200 + `facilities: []`). 그러면 화면이 고장으로 보인다.
+  */
+  it('제주 밖 좌표는 제주 중심으로 내리고 outside 로 표시한다', async () => {
+    stubGeolocation((ok) => ok({ coords: { latitude: 37.5665, longitude: 126.978 } }))
+
+    const result = await getCurrentPosition()
+
+    expect(result).toEqual({ ...JEJU_QUERY_CENTER, kind: 'fallback', reason: 'outside' })
+  })
+
+  /* 서울 좌표를 그대로 들고 있으면 어느 화면이 "granted 니까 내 위치 기준" 으로 읽는다 */
+  it('제주 밖 좌표를 결과에 남기지 않는다', async () => {
+    stubGeolocation((ok) => ok({ coords: { latitude: 37.5665, longitude: 126.978 } }))
+
+    const result = await getCurrentPosition()
+
+    expect(result.lat).not.toBe(37.5665)
+    expect(result.lng).not.toBe(126.978)
+  })
+
+  it('추자도는 제주 안이다 — 행정상 제주시다', async () => {
+    stubGeolocation((ok) => ok({ coords: { latitude: 34.0577, longitude: 126.3241 } }))
+
+    await expect(getCurrentPosition()).resolves.toMatchObject({ kind: 'granted' })
   })
 
   it('거부되면 제주 중심으로 떨어지고 이유를 남긴다', async () => {

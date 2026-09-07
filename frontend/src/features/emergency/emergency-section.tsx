@@ -238,18 +238,22 @@ function PositionNotice({ reason, onRetry }: { reason: PositionFailure; onRetry:
       ? messages.emergency.positionDenied
       : reason === 'unsupported'
         ? messages.emergency.positionUnsupported
-        : messages.emergency.positionTimeout
+        : reason === 'outside'
+          ? messages.emergency.positionOutside
+          : messages.emergency.positionTimeout
 
   return (
     <div className="border-border flex flex-col items-start gap-2 border-b px-4 py-3.5 md:px-10">
       <p className="text-body-2 text-fg break-keep">{text}</p>
       {/*
-        미지원 브라우저에는 다시 시도할 것이 없다.
+        **다시 시도할 것이 없는 두 갈래에는 버튼을 두지 않는다.** 미지원 브라우저는
+        눌러도 같은 답이고, 제주 밖(`outside`)은 좌표를 이미 정확히 받은 상태라
+        다시 물어도 같은 좌표가 온다 — 위치를 옮겨야 바뀐다.
 
         44px 를 지킨다 — 아트보드도 `min-height:44px` 다. 급할 때 누르는 버튼이라
         작게 두면 안 된다 (DESIGN.md §7).
       */}
-      {reason !== 'unsupported' && (
+      {reason !== 'unsupported' && reason !== 'outside' && (
         <Button variant="secondary" onClick={onRetry}>
           {messages.emergency.retryPosition}
         </Button>

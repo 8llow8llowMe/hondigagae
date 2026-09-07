@@ -144,7 +144,22 @@ export function PlanDetailSection({
 
   return (
     <div className="rail-layout">
-      <aside>
+      {/*
+        **레일 전체를 고정한다 — 첫 블록만 고정하면 겹친다.**
+
+        예전에는 `PlanOverviewPanel` 안쪽 div 에만 `lg:sticky` 가 걸려 있었다. 그러면
+        개요만 제자리에 못 박히고 준비물·병원 배너가 그 위로 올라와 글자가 겹쳤다
+        (실측 scrollY=700: 개요 top 64~519 고정, 준비물 top -181, 배너 top -18).
+
+        **`lg:self-start` 가 없으면 고정이 아무 일도 하지 않는다.** grid 항목은 기본이
+        stretch 라 `aside` 높이가 행 높이(실측 1948px)까지 늘어나고, 자기 컨테이너를
+        꽉 채운 요소는 붙을 자리가 없다.
+
+        레일 콘텐츠는 개요 455 + 준비물 163 + 배너 74 = 692px 로 가용 높이(1000 − 64 =
+        936px) 안에 들어온다. 넘기 시작하면 `rail-sticky`(자기 스크롤)로 바꿔야 한다 —
+        고정 레일이 뷰포트보다 길면 아래쪽에 손이 닿지 않는다 (`globals.css`).
+      */}
+      <aside className="lg:sticky lg:top-16 lg:self-start">
         <PlanOverviewPanel
           plan={plan}
           companions={companions}

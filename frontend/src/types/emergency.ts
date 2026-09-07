@@ -46,12 +46,21 @@ export type NearbyFacilityItem = {
 /**
  * `GET /emergencies/facilities`
  *
- * **`SliceResponse` 가 아니다.** `totalCount` 가 있어 건수 표기가 가능하다 —
- * 장소 목록과 다른 점이다.
+ * **`SliceResponse` 가 아니다** — 커서가 없다.
  */
 export type NearbyFacilityResult = {
   /** 가까운 순. 병원과 약국이 **섞여** 온다 */
   facilities: NearbyFacilityItem[]
+  /**
+   * **총계가 아니다 — `facilities.length` 와 같은 값이다.**
+   *
+   * 이름이 총계처럼 보여 예전에는 잘림 판정에 썼는데, dev 실측에서 `size` 를 3 / 10 / 50
+   * 으로 바꿔 부르면 `totalCount` 도 3 / 10 / 50 으로 따라온다(제주시청 · radius 10km).
+   * 즉 이 값으로는 "더 있는지" 를 알 수 없다.
+   *
+   * 잘림은 **상한에 닿았는지**로 판단한다 (`countsAreComplete`).
+   * 백엔드 계약을 손대야 할 사안이라 별도 이슈로 올린다.
+   */
   totalCount: number
   radius: number
   /** 24시간 확인된 곳만 걸렀는지. 제주 동물병원 중 3곳뿐이라 true 면 결과가 매우 적다 */

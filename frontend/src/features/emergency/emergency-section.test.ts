@@ -7,6 +7,7 @@ import {
   EmergencySection,
   type EmergencySectionProps,
 } from '@/features/emergency/emergency-section'
+import { MAX_SIZE } from '@/lib/api/emergency'
 import { messages } from '@/lib/messages'
 import { DEFAULT_FACILITY_FILTERS, type NearbyFacilityItem } from '@/types/emergency'
 
@@ -166,19 +167,41 @@ describe('EmergencySection — 위치 폴백', () => {
     expect(markup).toContain('href="tel:')
   })
 
-  it('거부·타임아웃·미지원의 안내가 서로 다르다', () => {
+  it('네 갈래의 안내가 서로 다르다', () => {
     expect(render({ positionFallback: 'denied' })).toContain(messages.emergency.positionDenied)
     expect(render({ positionFallback: 'timeout' })).toContain(messages.emergency.positionTimeout)
     expect(render({ positionFallback: 'unsupported' })).toContain(
       messages.emergency.positionUnsupported,
     )
+    expect(render({ positionFallback: 'outside' })).toContain(messages.emergency.positionOutside)
   })
 
-  it('미지원 브라우저에는 다시 시도 버튼을 주지 않는다', () => {
+  /*
+    제주 밖은 **권한 문제가 아니다.** 좌표는 정확히 받았고 우리 데이터가 제주뿐이다 —
+    권한 문구를 내면 사용자가 브라우저 설정을 뒤진다.
+  */
+  it('제주 밖 안내를 권한 문제로 말하지 않는다', () => {
+    const markup = render({ positionFallback: 'outside' })
+
+    expect(markup).not.toContain(messages.emergency.positionDenied)
+    expect(markup).not.toContain(messages.emergency.positionTimeout)
+  })
+
+  it('다시 시도해도 답이 같은 갈래에는 버튼을 주지 않는다', () => {
     expect(render({ positionFallback: 'unsupported' })).not.toContain(
       messages.emergency.retryPosition,
     )
+    // 서울에서 다시 눌러도 서울이다 — 위치를 옮겨야 바뀐다
+    expect(render({ positionFallback: 'outside' })).not.toContain(messages.emergency.retryPosition)
     expect(render({ positionFallback: 'denied' })).toContain(messages.emergency.retryPosition)
+  })
+
+  it('제주 밖이어도 목록과 거리 기준 표기는 폴백 규칙을 따른다', () => {
+    const markup = render({ positionFallback: 'outside' })
+
+    expect(markup).not.toContain('480m')
+    expect(markup).toContain(messages.emergency.basisJeju)
+    expect(markup).toContain('제주24시동물병원')
   })
 })
 
@@ -230,11 +253,14 @@ describe('EmergencySection — 칩 개수', () => {
     expect(render()).toContain(`${messages.emergency.typeAll} 1`)
   })
 
-  it('잘렸으면 숫자를 빼고 라벨만 쓴다', () => {
+  /* 상한(50)만큼 왔으면 더 있는지 알 수 없다 — dev 실측에서 10km 가 정확히 50건이었다 */
+  it('size 상한에 걸렸으면 숫자를 빼고 라벨만 쓴다', () => {
     const markup = render({
       result: {
-        facilities: [facility()],
-        totalCount: 120,
+        facilities: Array.from({ length: MAX_SIZE }, (_, index) =>
+          facility({ facilityId: String(index) }),
+        ),
+        totalCount: MAX_SIZE,
         radius: 10_000,
         open24Only: false,
         providerName: '출처',

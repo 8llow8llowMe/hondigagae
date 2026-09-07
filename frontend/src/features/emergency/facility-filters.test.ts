@@ -6,6 +6,7 @@ import {
   facilityCounts,
   reliefs,
 } from '@/features/emergency/facility-filters'
+import { MAX_SIZE } from '@/lib/api/emergency'
 import { DEFAULT_FACILITY_FILTERS, type NearbyFacilityItem } from '@/types/emergency'
 
 function facility(overrides: Partial<NearbyFacilityItem> = {}): NearbyFacilityItem {
@@ -115,11 +116,27 @@ describe('countsAreComplete — 잘린 목록에서 센 개수는 전체가 아�
   }
 
   it('다 받았으면 개수를 쓴다', () => {
-    expect(countsAreComplete({ ...result, totalCount: 4 })).toBe(true)
+    expect(countsAreComplete({ ...result, totalCount: ALL.length })).toBe(true)
   })
 
-  it('size 상한에 걸려 잘렸으면 쓰지 않는다 — 틀린 개수는 없는 개수보다 나쁘다', () => {
-    expect(countsAreComplete({ ...result, totalCount: 120 })).toBe(false)
+  /*
+    상한(50)만큼 왔으면 더 있는지 알 수 없다 — dev 실측에서 제주시청 반경 10km 가
+    정확히 50건(병원 19 · 약국 31)으로 채워졌다.
+  */
+  it('size 상한에 걸렸으면 개수를 쓰지 않는다 — 틀린 개수는 없는 개수보다 나쁘다', () => {
+    const full = Array.from({ length: MAX_SIZE }, (_, index) =>
+      facility({ facilityId: String(index) }),
+    )
+
+    expect(countsAreComplete({ ...result, facilities: full, totalCount: MAX_SIZE })).toBe(false)
+  })
+
+  /*
+    **`totalCount` 를 잘림 신호로 쓰지 않는다.** 이름은 총계처럼 보이지만 dev 는 이 값을
+    `size` 만큼만 돌려준다 — 여기에 기대면 예전처럼 조건이 늘 참이 되어 아무것도 막지 못한다.
+  */
+  it('totalCount 가 커도 상한 아래면 개수를 쓴다', () => {
+    expect(countsAreComplete({ ...result, totalCount: 120 })).toBe(true)
   })
 })
 

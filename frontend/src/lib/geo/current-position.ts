@@ -1,3 +1,5 @@
+import { isInJeju } from '@/lib/geo/jeju-bounds'
+
 /**
  * 현재 위치.
  *
@@ -17,7 +19,14 @@
  */
 export const JEJU_QUERY_CENTER = { lat: 33.4996213, lng: 126.5311884 } as const
 
-export type PositionFailure = 'denied' | 'timeout' | 'unsupported'
+/**
+ * `outside` — 좌표는 받았는데 **제주 밖**인 경우.
+ *
+ * 다른 셋과 성격이 다르다: 브라우저가 실패한 것이 아니라 **우리 데이터가 제주뿐**이다.
+ * 제주 밖 좌표로 조회하면 오류가 아니라 조용한 0건이 와서(`lib/geo/jeju-bounds.ts`)
+ * 화면이 고장처럼 보인다. 그래서 폴백으로 내려 제주 기준으로 조회한다.
+ */
+export type PositionFailure = 'denied' | 'timeout' | 'unsupported' | 'outside'
 
 export type PositionResult =
   | { kind: 'granted'; lat: number; lng: number }
@@ -38,6 +47,11 @@ const GRACE_MS = 1_000
  * 조회 자체는 `lat`/`lng` 가 필수라 좌표가 없으면 화면이 통째로 비어 버린다. 대신
  * 제주 중심으로 조회하고 **그 사실을 화면이 말한다** — `kind: 'fallback'` 이면
  * 거리를 표시하지 않는다. 제주 중심에서 480m 인 것을 "480m" 라고 쓰면 거짓말이다.
+ *
+ * **좌표를 받아도 제주 밖이면 폴백이다** (`reason: 'outside'`). 이 서비스의 데이터가
+ * 제주뿐이라 제주 밖 좌표는 오류가 아니라 **조용한 0건**을 부른다 — 서울에서 열면
+ * 병원·약국이 "반경 안에 없어요" 로만 보였다(dev 실측). 여기서 한 번 거르므로
+ * 화면들은 "제주 안일 때만 내 위치 기준" 이라는 규칙을 따로 알 필요가 없다.
  */
 export function getCurrentPosition(): Promise<PositionResult> {
   if (typeof navigator === 'undefined' || navigator.geolocation === undefined) {
@@ -71,15 +85,26 @@ export function getCurrentPosition(): Promise<PositionResult> {
 
     navigator.geolocation.getCurrentPosition(
       (position) =>
-        finish({
-          kind: 'granted',
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        }),
+        finish(toResult({ lat: position.coords.latitude, lng: position.coords.longitude })),
       (error) => finish({ ...JEJU_QUERY_CENTER, kind: 'fallback', reason: toFailure(error) }),
       { timeout: TIMEOUT_MS, maximumAge: 5 * 60_000 },
     )
   })
+}
+
+/**
+ * 브라우저가 준 좌표를 결과로 옮긴다. **제주 밖이면 폴백으로 내린다.**
+ *
+ * 좌표 자체는 버린다 — 남겨 두면 어느 화면이 "granted 니까 내 위치 기준" 이라고
+ * 읽고 서울 좌표로 제주 데이터를 조회한다. 폴백 좌표 하나만 남기는 것이
+ * "제주 밖에서는 제주 기준으로 본다" 를 구조로 못박는 방법이다.
+ */
+function toResult(point: { lat: number; lng: number }): PositionResult {
+  if (!isInJeju(point)) {
+    return { ...JEJU_QUERY_CENTER, kind: 'fallback', reason: 'outside' }
+  }
+
+  return { kind: 'granted', lat: point.lat, lng: point.lng }
 }
 
 /**

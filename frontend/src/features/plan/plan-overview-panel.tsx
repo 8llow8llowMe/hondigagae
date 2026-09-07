@@ -41,7 +41,16 @@ export function PlanOverviewPanel({
   const dday = daysUntil(plan.startDate, today)
 
   return (
-    <div className="flex flex-col gap-5 px-4 py-6 md:px-10 lg:sticky lg:top-16 lg:px-8">
+    /*
+      **여기에 `lg:sticky` 를 걸지 않는다.** 이 패널은 좌측 레일의 **첫 블록**일 뿐이고
+      아래에 준비물·병원 배너가 이어진다. 이것만 고정하면 레일이 스크롤될 때 이 패널은
+      제자리에 붙어 있고 **뒤 형제들이 그 위로 올라와 글자가 겹친다** — 실측으로
+      scrollY=700 에서 패널이 top 64~519 에 못 박힌 채 준비물이 -181 까지 올라갔다.
+
+      고정은 레일 전체(`aside`)가 맡는다 (`plan-detail-section.tsx`). 홈이 좌측 레일을
+      한 겹으로 감싸 고정하는 것과 같은 형태다.
+    */
+    <div className="flex flex-col gap-5 px-4 py-6 md:px-10 lg:px-8">
       <div className="flex flex-col gap-2">
         <div className="flex items-start gap-2">
           {/* 제목은 서버 상한 60자다. 좌측 400 에서 2~3줄이 되므로 keep-all 로 어절을 지킨다 */}
