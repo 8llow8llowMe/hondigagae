@@ -1,3 +1,4 @@
+import { MAX_SIZE } from '@/lib/api/emergency'
 import type {
   FacilityFilters,
   FacilityTypeCode,
@@ -56,9 +57,18 @@ export function facilityCounts(facilities: readonly NearbyFacilityItem[]): {
  *
  * 칩 개수는 **받아 온 목록에서 센 것**이다. `size` 상한(50)에 걸려 잘렸다면 그 수는
  * 전체가 아니다 — **틀린 개수는 없는 개수보다 나쁘다.** 잘렸으면 칩에서 숫자를 뺀다.
+ *
+ * **`totalCount` 로는 잘림을 알 수 없다.** 이름이 총계처럼 보이지만 dev 실측에서
+ * `totalCount` 가 **돌려준 개수와 늘 같다** — `size` 를 3 / 10 / 50 으로 바꿔 부르면
+ * `totalCount` 도 3 / 10 / 50 으로 따라온다(제주시청 · radius 10km). 그래서 예전
+ * 조건(`length >= totalCount`)은 **항상 참**이었고, 50개로 잘린 결과에도 개수가 그대로
+ * 나갔다. 같은 조회에서 병원 19 + 약국 31 = 정확히 50 이 왔으므로 상한에 닿아 있다.
+ *
+ * 대신 **상한에 닿았는지**로 판단한다. 이쪽은 응답의 해석에 기대지 않는다 — 우리가 보낸
+ * `size` 와 받은 개수만 본다.
  */
 export function countsAreComplete(result: NearbyFacilityResult): boolean {
-  return result.facilities.length >= result.totalCount
+  return result.facilities.length < MAX_SIZE
 }
 
 /**
