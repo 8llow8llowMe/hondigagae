@@ -1,0 +1,71 @@
+#!/usr/bin/env sh
+#
+# push 전에 프론트엔드 검사를 돌린다.
+#
+# **왜 필요한가** — CI 가 빨간불인 PR 도 머지된다. private + free 플랜에서는
+# required status check 를 걸 수 없어(#286 B) 막아 주는 것이 없고, 실제로 #282 가
+# `verify` 실패 상태로 머지돼 develop 이 빨간불이 됐다. 그러면 GitHub Actions 가 PR 을
+# **현재 develop 에 머지한 트리**로 빌드하므로 **뒤따르는 모든 PR 이 그 실패를
+# 물려받는다** — #283 이 건드리지도 않은 파일 때문에 빨간불이 됐다.
+#
+# 이 훅은 머지를 막지는 못한다. 대신 **빨간불이 develop 에 닿기 전에 push 단계에서**
+# 잡는다.
+#
+# **`frontend/**` 가 한 줄이라도 바뀌면 돈다 — 작업 영역과 무관하게.** #282 는 백엔드
+# PR 이었고 프론트 문서 하나를 함께 고쳤다. "나는 백엔드 작업이니 프론트 검사는 필요
+# 없다" 는 판단이 정확히 그 사고를 만들었다.
+#
+# 백엔드는 여기서 돌리지 않는다 — `./gradlew check` 가 분 단위라 push 훅에 맞지 않다.
+#
+# 켜기 (한 번만):
+#   git config core.hooksPath .githooks
+#
+# 건너뛰기 (일회성):
+#   SKIP_HOOKS=1 git push
+
+set -e
+
+if [ "${SKIP_HOOKS:-}" = "1" ]; then
+  echo "pre-push: SKIP_HOOKS=1 — 검사를 건너뛴다"
+  exit 0
+fi
+
+ZERO="0000000000000000000000000000000000000000"
+repo_root=$(git rev-parse --show-toplevel)
+changed=""
+
+# stdin 으로 `<local ref> <local sha> <remote ref> <remote sha>` 가 줄마다 온다
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  # 브랜치 삭제 push 는 검사할 것이 없다
+  [ "$local_sha" = "$ZERO" ] && continue
+
+  if [ "$remote_sha" = "$ZERO" ]; then
+    # 새 브랜치다 — 원격에 비교 대상이 없으니 develop 과의 분기점부터 본다
+    base=$(git merge-base origin/develop "$local_sha" 2>/dev/null || true)
+  else
+    base="$remote_sha"
+  fi
+
+  if [ -z "$base" ]; then
+    # 분기점을 못 찾으면(develop 미fetch 등) 판단을 포기하고 검사하는 쪽으로 넘어간다.
+    # **모르는 것을 "바뀐 게 없다" 로 읽지 않는다** — 그 침묵이 사고를 통과시킨다
+    changed="frontend/"
+    break
+  fi
+
+  changed="$changed$(git diff --name-only "$base" "$local_sha" -- 'frontend/' || true)
+"
+done
+
+if [ -z "$(printf '%s' "$changed" | tr -d '[:space:]')" ]; then
+  exit 0
+fi
+
+echo "pre-push: frontend/ 변경이 있어 검사를 돌린다 (건너뛰려면 SKIP_HOOKS=1)"
+
+cd "$repo_root/frontend"
+
+# CI(`.github/workflows/frontend-ci.yml`)와 **같은 순서**다. format 을 먼저 두는 이유는
+# 가장 빠르고, #282 가 걸린 자리가 정확히 여기이기 때문이다
+pnpm format:check
+pnpm verify
