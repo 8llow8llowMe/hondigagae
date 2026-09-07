@@ -34,7 +34,7 @@ class PackingPromptMultiPetTest {
         String prompt = promptFactory.packingUserPrompt(packingQuery(List.of(hotSensitive(), coldSensitive())));
 
         assertThat(prompt).contains("함께 여행하는 반려견 2마리");
-        assertThat(prompt).contains("[반려견 1]").contains("[반려견 2]");
+        assertThat(prompt).contains("\n반려견 1\n").contains("\n반려견 2\n");
         // 두 아이의 특성이 모두 실려야 한다 - 절반이 빠지면 근거 문장이 신뢰를 잃는다.
         assertThat(prompt).contains("말티즈").contains("리트리버");
     }

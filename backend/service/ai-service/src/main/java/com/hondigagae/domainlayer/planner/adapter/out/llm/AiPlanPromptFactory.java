@@ -20,6 +20,12 @@ import org.springframework.stereotype.Component;
  *
  * <p>출력 형식을 여기 적지 않는 것도 의도다. 형식은 구조화 출력 스키마
  * ({@code LlmPlanDraftResponse}) 가 강제하므로, 프롬프트에 또 적으면 두 곳이 갈라진다.
+ *
+ * <p><b>근거 문장에서 가리키게 될 것(일차·반려견)에는 대괄호를 쓰지 않는다.</b> 모델은 입력의
+ * 표기를 그대로 흉내 내서, {@code [1일차]} 라고 주면 {@code "[1일차]~[3일차] 구름많음"} 처럼
+ * 사용자 화면에 그 표기가 그대로 나간다 (#233). 대괄호는 후보 줄의 태그
+ * ({@code [필수 포함]} · {@code [선호]})처럼 <b>지시문이 이름으로 부르는 표시</b>에만 남긴다 —
+ * 이것은 문장 안에서 인용될 일이 없다. 그래도 새는 것은 {@link LlmTextCleaner} 가 응답에서 걷어낸다.
  */
 @Component
 public class AiPlanPromptFactory {
@@ -44,6 +50,8 @@ public class AiPlanPromptFactory {
            아니라 실내 여부, 동반 조건, 분류처럼 목록에서 확인되는 내용을 적습니다.
         5. 확신할 수 없는 것은 적지 않습니다. 운영시간, 요금, 예약 가능 여부는 후보 목록에
            없으므로 언급하지 않습니다.
+        6. 근거와 항목 메모는 사용자에게 그대로 보이는 문장입니다. 대괄호([ ]) 같은 기호 표기를
+           쓰지 말고, 일자는 "2일차", 여러 날은 "1~3일차" 처럼 자연스러운 문장으로 적습니다.
         """;
 
     public String systemPrompt() {
@@ -59,6 +67,8 @@ public class AiPlanPromptFactory {
         2. 이유는 일반론이 아니라 제공된 데이터의 사실로 적습니다 - "2일차 강수확률 80%" 처럼.
         3. 제공되지 않은 정보(숙소 시설, 차량 유무 등)는 가정하지 않습니다.
         4. 여행과 무관한 물건은 넣지 않습니다.
+        5. 이유는 사용자에게 그대로 보이는 문장입니다. 대괄호([ ]) 같은 기호 표기를 쓰지 말고,
+           일자는 "2일차", 여러 날은 "1~3일차" 처럼 자연스러운 문장으로 적습니다.
         """;
 
     /**
@@ -82,7 +92,7 @@ public class AiPlanPromptFactory {
      */
     private static final String PACKING_MULTI_PET_RULE = """
         - 아이마다 필요한 물건을 모두 넣을 것. 한 아이에게만 필요한 물건도 빠뜨리지 말 것
-        - 특정 아이 때문에 필요한 물건은 이유에 어느 아이인지 밝힐 것 - "[반려견 2] 더위에 약함" 처럼
+        - 특정 아이 때문에 필요한 물건은 이유에 어느 아이인지 밝힐 것 - "반려견 2가 더위에 약해" 처럼
         - 아이들이 함께 쓸 수 있는 물건은 하나로 적되 마리 수가 필요하면 수량을 밝힐 것
         """;
 
@@ -197,7 +207,8 @@ public class AiPlanPromptFactory {
         }
         prompt.append("\n함께 여행하는 반려견 ").append(pets.size()).append("마리\n");
         for (int index = 0; index < pets.size(); index++) {
-            prompt.append("[반려견 ").append(index + 1).append("]\n");
+            // 이유 문장이 "반려견 2가 …" 로 가리킬 이름이다. 대괄호를 두면 그 표기까지 따라 나온다.
+            prompt.append("반려견 ").append(index + 1).append('\n');
             appendPetTraits(prompt, pets.get(index));
         }
         prompt.append(multiPetRule);
@@ -230,7 +241,7 @@ public class AiPlanPromptFactory {
             prompt.append("- ");
             if (startDate != null) {
                 long dayIndex = ChronoUnit.DAYS.between(startDate, outlook.date()) + 1;
-                prompt.append('[').append(dayIndex).append("일차] ");
+                prompt.append(dayLabel(dayIndex)).append(' ');
             }
             prompt.append(outlook.date());
             if (outlook.skyStateName() != null) {
@@ -254,6 +265,16 @@ public class AiPlanPromptFactory {
             }
             prompt.append('\n');
         }
+    }
+
+    /**
+     * 일차 표기. 날씨 전망·일정 개요·재생성 지시가 모두 이 한 가지 표기를 쓴다.
+     *
+     * <p>모델이 이유 문장에서 그날을 가리킬 때 그대로 옮겨 쓰는 이름이므로 <b>사용자에게 보여도
+     * 되는 꼴</b>이어야 한다. {@code [1일차]} 는 아니고 {@code 1일차} 는 그렇다.
+     */
+    private static String dayLabel(long day) {
+        return day + "일차";
     }
 
     private LocalDate parseDateOrNull(String date) {
@@ -282,7 +303,7 @@ public class AiPlanPromptFactory {
     /** 일정 개요의 일자별 줄. 하루 재생성·준비물 생성 프롬프트가 같은 표기를 쓰도록 한 곳에 둔다. */
     private void appendOutlineDays(StringBuilder prompt, PlanOutline outline) {
         for (PlanOutline.PlanOutlineDay day : outline.safeDays()) {
-            prompt.append("[").append(day.day()).append("일차]");
+            prompt.append(dayLabel(day.day()));
             if (day.safeItems().isEmpty()) {
                 prompt.append(" (항목 없음)");
             }

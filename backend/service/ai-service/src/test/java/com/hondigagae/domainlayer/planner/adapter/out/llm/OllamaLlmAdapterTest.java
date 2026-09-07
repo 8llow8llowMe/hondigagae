@@ -10,8 +10,10 @@ import static org.mockito.Mockito.when;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
+import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft;
+import com.hondigagae.domainlayer.planner.domain.model.PackingList;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
@@ -297,6 +299,39 @@ class OllamaLlmAdapterTest {
         assertThatThrownBy(() -> adapter.generatePlanDraft(query(candidate(100L, "장소"))))
             .extracting(e -> ((AiPlanException) e).getErrorCode())
             .isEqualTo(AiPlanErrorCode.LLM_TIMEOUT);
+    }
+
+    @Test
+    @DisplayName("준비물 이유에 새어 든 프롬프트 표기 [N일차] 를 걷어낸다 — 그 문장이 화면의 본문이다 (#233)")
+    void cleansPromptMarkersLeakedIntoPackingReasons() {
+        stubResponse("""
+            {"items":[
+              {"category":"날씨 대비","name":"가벼운 방수 재킷","reason":"[4일차] 2026-09-12 흐림, 강수확률 40%로 비가 올 가능성이 있으므로 가볍게 대비"},
+              {"category":"반려견 케어","name":"햇빛 차단 선글라스","reason":"[1일차]~[3일차] 구름많음으로 햇빛이 강할 수 있어 반려견 눈 보호 필요"}]}
+            """);
+
+        PackingList packing = adapter.generatePackingList(PackingChecklistQuery.builder()
+            .startDate("2026-09-09").endDate("2026-09-12").build());
+
+        assertThat(packing.items()).extracting(PackingList.PackingItem::reason).containsExactly(
+            "4일차 2026-09-12 흐림, 강수확률 40%로 비가 올 가능성이 있으므로 가볍게 대비",
+            "1~3일차 구름많음으로 햇빛이 강할 수 있어 반려견 눈 보호 필요");
+    }
+
+    @Test
+    @DisplayName("일정 근거와 항목 메모도 같은 정리를 거친다 — 같은 프롬프트 팩토리를 쓰므로 같은 표기가 샌다")
+    void cleansPromptMarkersLeakedIntoDraftReasonsAndNotes() {
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"PLACE","placeId":100,"title":"오설록","note":"[1일차] 비 예보라 실내"}]}],
+             "reasons":[{"code":"WEATHER_OK","name":"[날씨]","description":"[2일차]~[3일차] 강수확률 80%라 실내 위주"}]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "오설록")));
+
+        assertThat(draft.days().get(0).items().get(0).note()).isEqualTo("1일차 비 예보라 실내");
+        assertThat(draft.reasons().get(0).name()).isEqualTo("날씨");
+        assertThat(draft.reasons().get(0).description()).isEqualTo("2~3일차 강수확률 80%라 실내 위주");
     }
 
     /** 어댑터 로거에 붙여 남은 로그를 읽는다. 파싱 실패의 진단 값이 실제로 남는지 보려면 이 방법뿐이다. */

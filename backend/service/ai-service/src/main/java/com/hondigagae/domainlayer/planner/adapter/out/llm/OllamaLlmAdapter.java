@@ -132,7 +132,8 @@ public class OllamaLlmAdapter implements AiLlmPort {
                 .map(item -> PackingList.PackingItem.builder()
                     .category(item.category())
                     .name(item.name())
-                    .reason(item.reason())
+                    // 이유는 화면의 본문이다. 프롬프트 표기([N일차])가 새면 여기서 걷어낸다 (#233).
+                    .reason(LlmTextCleaner.clean(item.reason()))
                     .build())
                 .toList();
         return PackingList.builder().items(items).build();
@@ -365,7 +366,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
                     .placeId(matched == null ? null : matched.placeId())
                     // 후보에 있으면 우리 데이터의 이름을 쓴다. 모델이 이름을 조금씩 바꿔 적는 일이 있다.
                     .title(matched != null ? matched.title() : item.title())
-                    .note(item.note())
+                    .note(LlmTextCleaner.clean(item.note()))
                     .build());
             }
             days.add(AiPlanDraftDay.builder().day(day.day()).items(items).build());
@@ -377,11 +378,12 @@ public class OllamaLlmAdapter implements AiLlmPort {
 
         return AiPlanDraft.builder()
             .days(days)
+            // 근거 이름·설명과 항목 메모는 사용자에게 그대로 보이는 문장이다 — 준비물 이유와 같은 정리를 거친다.
             .reasons(safeList(draft.reasons()).stream()
                 .map(reason -> AiPlanDraftReason.builder()
                     .code(reason.code())
-                    .name(reason.name())
-                    .description(reason.description())
+                    .name(LlmTextCleaner.clean(reason.name()))
+                    .description(LlmTextCleaner.clean(reason.description()))
                     .build())
                 .toList())
             .build();
