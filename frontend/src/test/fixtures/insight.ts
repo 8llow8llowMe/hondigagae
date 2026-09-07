@@ -28,9 +28,10 @@ export const walkSafety: WalkSafetyResponse = {
         '기온 31도에 일사가 더해져 아스팔트 표면은 약 58도로 추정됩니다. 발바닥 화상 위험 구간입니다.',
     },
     {
-      code: 'HEAT_INDEX_HIGH',
-      name: '열지수 높음',
-      description: '기온과 습도를 함께 보면 체감 부담이 큽니다.',
+      // #292 — BE `WalkSafetyReasonCode` 가 `HEAT_INDEX_HIGH` 를 이 코드로 교체했다
+      code: 'FEELS_LIKE_HIGH',
+      name: '체감온도 높음',
+      description: '기상청 여름철 체감온도 기준으로 더위 부담이 큰 조건입니다.',
     },
     {
       code: 'HEAT_SENSITIVE',
@@ -44,7 +45,20 @@ export const walkSafety: WalkSafetyResponse = {
     },
   ],
   estimatedPavementCelsius: 58.0,
-  heatIndexCelsius: 35.0,
+  /*
+    **기온 31℃ · 습도 78% 를 두 산식에 실제로 넣은 값이다** (#292 · BE `46f35e4`).
+    판정값은 기상청 체감온도 `33.0`, 참고 열지수는 NOAA `40.2` — **열지수가 7℃ 높다.**
+    두 숫자가 다르지 않으면 "화면이 어느 필드를 읽는지" 를 테스트가 가릴 수 없다.
+
+    근거 문장 둘은 서버 상수(`WalkSafetyPresenter.FEELS_LIKE_BASIS`/`HEAT_INDEX_BASIS`)를
+    그대로 옮겼다 — 문장을 창작하지 않는다 (홈-세부명세 D7).
+  */
+  feelsLikeCelsius: 33.0,
+  feelsLikeBasis:
+    '기상청 여름철 체감온도 산식으로 계산했습니다. 판정 시각의 기온과 상대습도로 습구온도(Stull, 2011 근사식)를 구해 산출하며, 폭염특보 기준(주의보 33℃·경보 35℃)과 같은 척도입니다. 습도가 없는 시각은 기온을 그대로 씁니다.',
+  heatIndexCelsius: 40.2,
+  heatIndexBasis:
+    '미국 NOAA 열지수(Rothfusz 회귀식 섭씨판)로 계산한 참고값입니다. 판정에는 쓰지 않으며, 고온다습에서 기상청 체감온도보다 높게 나오는 별도 지표입니다.',
   saferWindowStart: '18:00:00',
   saferWindowEnd: '21:00:00',
   temperature: 31.0,

@@ -59,11 +59,11 @@ describe('PlaceWalkSafetyPanel — 등급과 수치', () => {
     ℃ 를 빼면 58 이 무슨 단위인지 알 수 없다. 노면 온도는 **추정치**라 라벨이 그렇게 말한다 —
     실측으로 읽으면 사용자가 "58도면 못 나간다" 를 확정된 사실로 받는다.
   */
-  it('노면 온도와 열지수에 ℃ 를 붙이고, 노면은 추정임을 밝힌다', () => {
+  it('노면 온도와 체감온도에 ℃ 를 붙이고, 노면은 추정임을 밝힌다', () => {
     const markup = render()
 
     expect(markup).toContain('58.0')
-    expect(markup).toContain('35.0')
+    expect(markup).toContain('33.0')
     expect(markup).toContain(messages.place.detailTemperatureUnit)
     expect(markup).toContain(messages.place.detailPavement)
     expect(markup).toContain('추정')
@@ -84,20 +84,20 @@ describe('PlaceWalkSafetyPanel — 등급과 수치', () => {
     **하루 최대** 체감온도를 같은 ℃ 로 내므로, 라벨이 없으면 기준이 다른 두 숫자가 이름
     없이 붙어 선다.
   */
-  it('열지수 hero 에 라벨을 붙인다', () => {
-    expect(render()).toContain(messages.place.detailHeatIndex)
+  it('체감온도 hero 에 라벨을 붙인다', () => {
+    expect(render()).toContain(messages.place.detailFeelsLike)
   })
 
   /*
-    **하루 최대 라벨을 쓰지 않는다** (#259). 이 값은 `targetDateTime` 그 시각의 열지수라
+    **하루 최대 라벨을 쓰지 않는다** (#259). 이 값은 `targetDateTime` 그 시각의 체감온도라
     `최고` 를 붙이면 하루 최고를 말하게 된다.
 
-    `not.toContain` 이 성립하는 방향을 골랐다 — `detailHeatIndex`(`체감온도`)는
+    `not.toContain` 이 성립하는 방향을 골랐다 — `detailFeelsLike`(`체감온도`)는
     `detailFeelsLikeTemperature`(`최고 체감온도`)의 **부분 문자열**이라 반대 방향으로
     쓰면 라벨이 뒤바뀌어도 통과한다.
   */
   it('하루 최대 라벨을 쓰지 않는다 — 시각 기준 값이다', () => {
-    expect(messages.place.detailFeelsLikeTemperature).not.toBe(messages.place.detailHeatIndex)
+    expect(messages.place.detailFeelsLikeTemperature).not.toBe(messages.place.detailFeelsLike)
     expect(render()).not.toContain(messages.place.detailFeelsLikeTemperature)
   })
 
@@ -105,10 +105,24 @@ describe('PlaceWalkSafetyPanel — 등급과 수치', () => {
     `null` 이면 hero 자체가 없으므로 **라벨도 함께 사라져야 한다** — 라벨만 남으면 값이
     빠진 것이 아니라 0 인 것처럼 읽힌다.
   */
-  it('열지수가 없으면 라벨도 렌더하지 않는다', () => {
-    const markup = render({ data: { ...walkSafety, heatIndexCelsius: null } })
+  /*
+    **`feelsLikeBasis` 도 같이 비운다.** BE 는 두 값을 같은 `temperature` 에서 내므로 값이
+    없으면 근거 문장도 없다 (`WalkSafetyPresenter`). 근거만 남겨 두면 펼침 라벨
+    (`체감온도 계산 근거 보기`)이 `체감온도` 를 품고 있어 이 단정이 값 때문인지 라벨
+    때문인지 가릴 수 없다.
+  */
+  it('체감온도가 없으면 라벨도 렌더하지 않는다', () => {
+    const markup = render({
+      data: { ...walkSafety, feelsLikeCelsius: null, feelsLikeBasis: null },
+    })
 
-    expect(markup).not.toContain(messages.place.detailHeatIndex)
+    /*
+      **낱말이 아니라 라벨 자리를 본다** (#292). 서버 근거 문장이 `FEELS_LIKE_HIGH`
+      ("기상청 여름철 체감온도 기준으로…")로 바뀌어 `체감온도` 가 근거 목록에도 있다 —
+      낱말로 단정하면 화면이 맞아도 실패한다. `MetricValue` 라벨은 자기 span 이다.
+    */
+    expect(markup).not.toContain(`>${messages.place.detailFeelsLike}</span>`)
+    expect(markup).not.toContain('33.0')
   })
 
   /*
@@ -117,7 +131,7 @@ describe('PlaceWalkSafetyPanel — 등급과 수치', () => {
   */
   it('정수 값도 소수점 1자리로 그린다', () => {
     const markup = render({
-      data: { ...walkSafety, heatIndexCelsius: 31, estimatedPavementCelsius: 50 },
+      data: { ...walkSafety, feelsLikeCelsius: 31, estimatedPavementCelsius: 50 },
     })
 
     expect(markup).toContain('31.0')
@@ -130,7 +144,14 @@ describe('PlaceWalkSafetyPanel — 등급과 수치', () => {
   */
   it('수치가 null 이면 자리를 0 으로 채우지 않는다', () => {
     const markup = render({
-      data: { ...walkSafety, heatIndexCelsius: null, estimatedPavementCelsius: null },
+      data: {
+        ...walkSafety,
+        feelsLikeCelsius: null,
+        feelsLikeBasis: null,
+        heatIndexCelsius: null,
+        heatIndexBasis: null,
+        estimatedPavementCelsius: null,
+      },
     })
 
     expect(markup).not.toContain('0.0')
@@ -145,6 +166,82 @@ describe('PlaceWalkSafetyPanel — 등급과 수치', () => {
   */
   it('적합도의 점수 단위를 쓰지 않는다', () => {
     expect(render()).not.toContain(messages.place.detailScoreUnit)
+  })
+})
+
+/*
+  #292. BE `46f35e4` 가 판정 기준을 NOAA 열지수 → 기상청 체감온도로 바꿨는데 이 패널은
+  한동안 `heatIndexCelsius` 를 계속 읽었다. **라벨은 줄곧 `체감온도` 였다** — 라벨만 보는
+  테스트로는 잡히지 않는 종류의 버그다. fixture 가 두 필드를 다른 숫자(33.0 vs 40.2)로
+  두는 이유가 이것이다.
+*/
+describe('PlaceWalkSafetyPanel — 판정값과 참고값의 위계 (#292)', () => {
+  it('hero 는 `feelsLikeCelsius` 다', () => {
+    const markup = render()
+
+    expect(markup).toContain('33.0')
+    // hero 라벨 바로 뒤에 판정값이 온다 — 참고값이 그 자리를 차지하지 않는다
+    expect(markup.indexOf('33.0')).toBeLessThan(markup.indexOf('40.2'))
+  })
+
+  /*
+    **참고 열지수는 접힌 서랍 안에만 있다.** 평면에 세 번째 온도로 세우면 판정값과 참고값이
+    같은 위계로 읽히고, 그것이 이 변경이 고치려는 오독 그 자체다.
+  */
+  it('참고 열지수는 판정 라벨이 아니라 `참고` 라벨을 단다', () => {
+    const markup = render()
+
+    expect(markup).toContain(messages.place.detailHeatIndexReference)
+    expect(markup).toContain('40.2')
+  })
+
+  /*
+    **접혀서 시작한다.** `feelsLikeBasis` 는 130자 문장이라 펼쳐 두면 판정과 근거 목록
+    사이에 회색 벽이 선다. `hidden` 이므로 마크업에는 있고 화면에는 없다.
+  */
+  it('계산 근거는 접힌 상태로 시작한다', () => {
+    const markup = render()
+
+    expect(markup).toContain(messages.place.detailFeelsLikeBasisOpen)
+    expect(markup).not.toContain(messages.place.detailFeelsLikeBasisClose)
+    expect(markup).toContain('aria-expanded="false"')
+    expect(markup).toContain('hidden=""')
+  })
+
+  /*
+    서버 문장을 그대로 렌더한다 (styling-guide.md §7). **열지수 쪽 문장이 "판정에는 쓰지
+    않으며" 를 말한다** — 숫자만 떼어 읽히지 않게 하는 것이 이 문장의 역할이다.
+  */
+  it('두 근거 문장을 서버 문구 그대로 담는다', () => {
+    const markup = render()
+
+    expect(markup).toContain('기상청 여름철 체감온도 산식으로 계산했습니다')
+    expect(markup).toContain('판정에는 쓰지 않으며')
+  })
+
+  /*
+    **`feelsLikeBasis` 가 없으면 서랍 자체가 없다.** 펼침 라벨이 체감온도 근거라고 말하므로
+    체감온도 근거 없이 열지수만 담아 열면 라벨이 거짓이 된다.
+  */
+  it('체감온도 근거가 없으면 서랍을 만들지 않는다', () => {
+    const markup = render({ data: { ...walkSafety, feelsLikeBasis: null } })
+
+    expect(markup).not.toContain(messages.place.detailFeelsLikeBasisOpen)
+    expect(markup).not.toContain(messages.place.detailHeatIndexReference)
+  })
+
+  /*
+    반대 방향. 열지수만 비어도 체감온도 근거는 남아야 한다 — 참고값이 없다는 것이 판정
+    근거를 감출 이유가 되지 않는다.
+  */
+  it('열지수가 없어도 체감온도 근거는 남는다', () => {
+    const markup = render({
+      data: { ...walkSafety, heatIndexCelsius: null, heatIndexBasis: null },
+    })
+
+    expect(markup).toContain(messages.place.detailFeelsLikeBasisOpen)
+    expect(markup).toContain('기상청 여름철 체감온도 산식으로 계산했습니다')
+    expect(markup).not.toContain(messages.place.detailHeatIndexReference)
   })
 })
 
@@ -282,11 +379,17 @@ describe('PlaceWalkSafetyPanel — 기상특보', () => {
       },
     })
 
-    expect(markup).toContain('폭염')
+    expect(markup).toContain('폭염 경보')
     expect(markup).toContain(walkSafety.walkSafetyLevel.name)
   })
 
+  /*
+    **`폭염` 이 아니라 `폭염 경보` 로 본다** (#292). 서버 `feelsLikeBasis` 가 척도를 설명하며
+    "폭염특보 기준(주의보 33℃·경보 35℃)과 같은 척도입니다" 라고 말한다 — 발효 중인 특보가
+    아니라 **임계의 출처**다. 낱말로 단정하면 그 문장 때문에 실패한다. 배지가 실제로 그리는
+    문자열(`{type.name} {level.name}`)을 그대로 확인한다.
+  */
   it('특보가 없으면 배지 자리를 비운다', () => {
-    expect(render()).not.toContain('폭염')
+    expect(render()).not.toContain('폭염 경보')
   })
 })

@@ -172,7 +172,21 @@ export type WalkSafetyResponse = {
   reasons: WalkSafetyReasonItem[]
   /** 실측이 아니라 추정치다. 단정하는 문구를 붙이지 않는다 */
   estimatedPavementCelsius: number | null
+  /**
+   * **기상청 여름철 체감온도 — 등급 판정의 기준값이다** (BE `46f35e4`).
+   * 폭염특보(주의보 33℃·경보 35℃)와 같은 척도라 화면의 큰 숫자 자리는 이 값이 갖는다.
+   */
+  feelsLikeCelsius: number | null
+  /** 산식·입력·임계의 출처를 담은 **완성형 문장**이다. FE 가 다시 쓰지 않는다 */
+  feelsLikeBasis: string | null
+  /**
+   * **참고용 NOAA 열지수 — 판정에는 쓰이지 않는다.** 예전에는 이 값이 판정 기준이었고
+   * 화면도 이것을 `체감온도` 로 불렀다. 고온다습에서 기상청 체감온도보다 높게 나오는
+   * 별도 지표이므로(33℃/85% 에서 48 vs 35.5) **`feelsLikeCelsius` 자리에 세우지 않는다.**
+   */
   heatIndexCelsius: number | null
+  /** 위 `feelsLikeBasis` 와 같이 완성형 문장이다. **판정에 쓰지 않는다는 것을 여기서 말한다** */
+  heatIndexBasis: string | null
   /** 같은 날 안에 안전 구간이 없으면 null → 줄을 숨긴다 */
   saferWindowStart: string | null
   saferWindowEnd: string | null

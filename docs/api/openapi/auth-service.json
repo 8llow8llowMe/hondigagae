@@ -36,13 +36,13 @@
           "반려견"
         ],
         "summary": "반려견 상세 조회",
-        "description": "반려견 프로필 상세를 조회합니다. 본인 소유가 아니면 404로 응답합니다.",
+        "description": "반려견 프로필 상세를 조회합니다. 본인 소유가 아니면 404로 응답합니다.\n\n**필수: Authorization 헤더, petId(경로).**\n\n호출 예: `GET /api/v1/members/me/pets/1234567890123456789`",
         "operationId": "getMyPet",
         "parameters": [
           {
             "name": "petId",
             "in": "path",
-            "description": "반려견 아이디",
+            "description": "[필수] 반려견 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 목록 응답의 아이디를 그대로 씁니다",
             "required": true,
             "schema": {
               "type": "integer",
@@ -74,13 +74,13 @@
           "반려견"
         ],
         "summary": "반려견 정보 수정",
-        "description": "반려견 프로필을 수정합니다. 본인 소유가 아니면 404로 응답합니다.",
+        "description": "반려견 프로필을 수정합니다. 본인 소유가 아니면 404로 응답합니다. PUT 이라 바디는 등록과 같은 전체 형태이며, 생략한 선택 필드는 비워집니다(부분 수정이 아닙니다).\n\n**필수: Authorization 헤더, petId(경로), 요청 바디의 name, sizeType, activityLevel, sociality.**\n\n호출 예: `PUT /api/v1/members/me/pets/1234567890123456789` (바디는 등록과 동일)",
         "operationId": "updatePet",
         "parameters": [
           {
             "name": "petId",
             "in": "path",
-            "description": "반려견 아이디",
+            "description": "[필수] 반려견 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 목록 응답의 아이디를 그대로 씁니다",
             "required": true,
             "schema": {
               "type": "integer",
@@ -122,13 +122,13 @@
           "반려견"
         ],
         "summary": "반려견 삭제",
-        "description": "반려견 프로필을 삭제합니다. 기존 여행 일정이 참조하고 있어 소프트 삭제로 처리됩니다.",
+        "description": "반려견 프로필을 삭제합니다. 기존 여행 일정이 참조하고 있어 소프트 삭제로 처리됩니다.\n\n**필수: Authorization 헤더, petId(경로).**\n\n호출 예: `DELETE /api/v1/members/me/pets/1234567890123456789`",
         "operationId": "deletePet",
         "parameters": [
           {
             "name": "petId",
             "in": "path",
-            "description": "반려견 아이디",
+            "description": "[필수] 반려견 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 목록 응답의 아이디를 그대로 씁니다",
             "required": true,
             "schema": {
               "type": "integer",
@@ -162,13 +162,13 @@
           "반려견"
         ],
         "summary": "대표 반려견 지정",
-        "description": "대표 반려견을 지정합니다. 기존 대표는 자동 해제되어 회원당 하나만 유지됩니다. AI 일정 생성에서 반려견을 지정하지 않으면 대표 반려견이 사용됩니다. 본인 소유가 아니면 404로 응답합니다.",
+        "description": "대표 반려견을 지정합니다. 기존 대표는 자동 해제되어 회원당 하나만 유지됩니다. AI 일정 생성에서 반려견을 지정하지 않으면 대표 반려견이 사용됩니다. 본인 소유가 아니면 404로 응답합니다.\n\n**필수: Authorization 헤더, petId(경로).** 바디 없음.\n\n호출 예: `PUT /api/v1/members/me/pets/1234567890123456789/representative`",
         "operationId": "markRepresentative",
         "parameters": [
           {
             "name": "petId",
             "in": "path",
-            "description": "반려견 아이디",
+            "description": "[필수] 반려견 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 목록 응답의 아이디를 그대로 씁니다",
             "required": true,
             "schema": {
               "type": "integer",
@@ -202,7 +202,7 @@
           "회원"
         ],
         "summary": "일반 회원가입",
-        "description": "일반 회원으로 가입합니다.",
+        "description": "일반 회원으로 가입합니다. 먼저 이메일 인증코드 발송·검증(`/api/v1/auth/email/*`)을 마쳐야 하고, 검증 후 30분 안에 가입해야 합니다.\n\n인증 불필요. **필수: 요청 바디의 email, password(영문자·숫자·특수문자 포함 8~20자), name(10자 이내), nickname(10자 이내).**\n\n호출 예: `POST /api/v1/members/signup` `{\"email\":\"user@example.com\",\"password\":\"P@ssw0rd!\",\"name\":\"홍길동\",\"nickname\":\"길동짱\"}`",
         "operationId": "generalSignup",
         "requestBody": {
           "content": {
@@ -234,7 +234,7 @@
           "개발용 (운영 미노출)"
         ],
         "summary": "[개발용] 즉시 회원가입 (이메일 인증 생략)",
-        "description": "이메일 인증코드 없이 테스트 계정을 바로 만듭니다.\n\n**이메일 인증 게이트만 건너뜁니다.** 비밀번호 규칙과 이메일 중복(409 `MEMBER_001`)은\n일반 가입과 똑같이 검사합니다 — 검증까지 느슨하게 하면 개발에서만 통과하는 값이 생겨,\n정작 운영에서 막히는 입력을 개발에서 못 잡습니다.\n\n응답의 `email` 과 요청에 쓴 비밀번호로 바로 `POST /api/v1/auth/login` 을 부를 수 있습니다.\n\n운영 프로필에서는 이 API 가 등록되지 않아 404 입니다.",
+        "description": "**dev 전용** — 운영 프로필(prod)에서는 이 API 가 존재하지 않습니다(404).\n\n이메일 인증코드 없이 테스트 계정을 바로 만듭니다.\n\n**이메일 인증 게이트만 건너뜁니다.** 비밀번호 규칙과 이메일 중복(409 `MEMBER_001`)은\n일반 가입과 똑같이 검사합니다 — 검증까지 느슨하게 하면 개발에서만 통과하는 값이 생겨,\n정작 운영에서 막히는 입력을 개발에서 못 잡습니다.\n\n응답의 `email` 과 요청에 쓴 비밀번호로 바로 `POST /api/v1/auth/login` 을 부를 수 있습니다.\n\n운영 프로필에서는 이 API 가 등록되지 않아 404 입니다.\n\n인증 불필요. **필수: 요청 바디의 email, password(영문자·숫자·특수문자 포함 8~20자), name, nickname** — 일반 가입과 같은 바디입니다.\n\n호출 예: `POST /api/v1/members/signup/dev` `{\"email\":\"dev1@example.com\",\"password\":\"P@ssw0rd!\",\"name\":\"홍길동\",\"nickname\":\"길동짱\"}`",
         "operationId": "devSignup",
         "requestBody": {
           "content": {
@@ -266,7 +266,7 @@
           "회원"
         ],
         "summary": "회원 탈퇴",
-        "description": "회원을 탈퇴 처리합니다. 개인정보가 마스킹되고 모든 기기의 토큰 재발급이 차단됩니다. 동일 이메일로 재가입할 수 없습니다. (다른 기기의 기존 access token은 만료 시까지 유효할 수 있으나, 회원 상태 검사로 회원 API 접근은 차단됩니다)",
+        "description": "회원을 탈퇴 처리합니다. 개인정보가 마스킹되고 모든 기기의 토큰 재발급이 차단됩니다. 동일 이메일로 재가입할 수 없습니다. (다른 기기의 기존 access token은 만료 시까지 유효할 수 있으나, 회원 상태 검사로 회원 API 접근은 차단됩니다)\n\n**필수: Authorization 헤더.** 바디 없음. 되돌릴 수 없습니다.\n\n호출 예: `POST /api/v1/members/me/withdraw`",
         "operationId": "withdraw",
         "responses": {
           "200": {
@@ -293,7 +293,7 @@
           "회원"
         ],
         "summary": "프로필 이미지 업로드",
-        "description": "프로필 이미지를 업로드해 즉시 반영합니다. jpg/png/gif/webp 만 허용하며 파일 내용(매직 바이트)으로 형식을 판정합니다. 기존 이미지가 있으면 교체 후 이전 파일은 삭제됩니다.",
+        "description": "프로필 이미지를 업로드해 즉시 반영합니다. jpg/png/gif/webp 만 허용하며 파일 내용(매직 바이트)으로 형식을 판정합니다. 기존 이미지가 있으면 교체 후 이전 파일은 삭제됩니다.\n\n**필수: Authorization 헤더, multipart 필드 imageFile** (jpg/png/gif/webp, 5MB 이하).\n\n호출 예: `POST /api/v1/members/me/profile-image` (multipart/form-data, `imageFile=@photo.jpg`)",
         "operationId": "uploadProfileImage",
         "requestBody": {
           "content": {
@@ -304,7 +304,7 @@
                   "imageFile": {
                     "type": "string",
                     "format": "binary",
-                    "description": "업로드할 이미지 파일"
+                    "description": "[필수] 업로드할 이미지 파일. jpg/png/gif/webp, 5MB 이하. 확장자가 아니라 파일 내용으로 형식을 판정합니다"
                   }
                 },
                 "required": [
@@ -337,7 +337,7 @@
           "회원"
         ],
         "summary": "프로필 이미지 삭제",
-        "description": "프로필 이미지를 제거합니다. 저장된 파일도 함께 삭제됩니다.",
+        "description": "프로필 이미지를 제거합니다. 저장된 파일도 함께 삭제됩니다.\n\n**필수: Authorization 헤더.**\n\n호출 예: `DELETE /api/v1/members/me/profile-image`",
         "operationId": "removeProfileImage",
         "responses": {
           "200": {
@@ -364,7 +364,7 @@
           "반려견"
         ],
         "summary": "내 반려견 목록 조회",
-        "description": "로그인한 회원이 등록한 반려견 목록을 조회합니다.",
+        "description": "로그인한 회원이 등록한 반려견 목록을 조회합니다. 대표 반려견은 representative=true 로 표시됩니다.\n\n**필수: Authorization 헤더.** 파라미터는 없습니다.\n\n호출 예: `GET /api/v1/members/me/pets`",
         "operationId": "getMyPets",
         "responses": {
           "200": {
@@ -389,7 +389,7 @@
           "반려견"
         ],
         "summary": "반려견 등록",
-        "description": "반려견 프로필을 등록합니다. 품종·크기·환경 민감도·활동 성향이 AI 여행 설계에 반영됩니다. 회원당 최대 5마리까지 등록할 수 있습니다.",
+        "description": "반려견 프로필을 등록합니다. 품종·크기·환경 민감도·활동 성향이 AI 여행 설계에 반영됩니다. 회원당 최대 5마리까지 등록할 수 있습니다.\n\n**필수: Authorization 헤더, 요청 바디의 name(20자 이내), sizeType(SMALL/MEDIUM/LARGE), activityLevel(LOW/MEDIUM/HIGH), sociality(LOW/MEDIUM/HIGH).** breed·birthYm(yyyy-MM)·weightKg 은 생략 가능, 민감도·산책선호 boolean 은 생략하면 false 입니다. 첫 등록이면 자동으로 대표 반려견이 됩니다.\n\n호출 예: `POST /api/v1/members/me/pets` `{\"name\":\"몽실이\",\"breed\":\"말티즈\",\"sizeType\":\"SMALL\",\"weightKg\":3.5,\"heatSensitive\":true,\"activityLevel\":\"MEDIUM\",\"sociality\":\"MEDIUM\"}`",
         "operationId": "registerPet",
         "requestBody": {
           "content": {
@@ -426,13 +426,13 @@
           "반려견"
         ],
         "summary": "반려견 프로필 이미지 업로드",
-        "description": "반려견 프로필 이미지를 업로드해 즉시 반영합니다. jpg/png/gif/webp 만 허용하며 파일 내용(매직 바이트)으로 형식을 판정합니다. 기존 이미지가 있으면 교체 후 이전 파일은 삭제됩니다. 본인 소유가 아니면 404로 응답합니다.",
+        "description": "반려견 프로필 이미지를 업로드해 즉시 반영합니다. jpg/png/gif/webp 만 허용하며 파일 내용(매직 바이트)으로 형식을 판정합니다. 기존 이미지가 있으면 교체 후 이전 파일은 삭제됩니다. 본인 소유가 아니면 404로 응답합니다.\n\n**필수: Authorization 헤더, petId(경로), multipart 필드 imageFile** (jpg/png/gif/webp, 5MB 이하).\n\n호출 예: `POST /api/v1/members/me/pets/1234567890123456789/profile-image` (multipart/form-data, `imageFile=@photo.jpg`)",
         "operationId": "uploadProfileImage_1",
         "parameters": [
           {
             "name": "petId",
             "in": "path",
-            "description": "반려견 아이디",
+            "description": "[필수] 반려견 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 목록 응답의 아이디를 그대로 씁니다",
             "required": true,
             "schema": {
               "type": "integer",
@@ -450,7 +450,7 @@
                   "imageFile": {
                     "type": "string",
                     "format": "binary",
-                    "description": "업로드할 이미지 파일"
+                    "description": "[필수] 업로드할 이미지 파일. jpg/png/gif/webp, 5MB 이하. 확장자가 아니라 파일 내용으로 형식을 판정합니다"
                   }
                 },
                 "required": [
@@ -483,13 +483,13 @@
           "반려견"
         ],
         "summary": "반려견 프로필 이미지 삭제",
-        "description": "반려견 프로필 이미지를 제거합니다. 저장된 파일도 함께 삭제됩니다. 본인 소유가 아니면 404로 응답합니다.",
+        "description": "반려견 프로필 이미지를 제거합니다. 저장된 파일도 함께 삭제됩니다. 본인 소유가 아니면 404로 응답합니다.\n\n**필수: Authorization 헤더, petId(경로).**\n\n호출 예: `DELETE /api/v1/members/me/pets/1234567890123456789/profile-image`",
         "operationId": "removeProfileImage_1",
         "parameters": [
           {
             "name": "petId",
             "in": "path",
-            "description": "반려견 아이디",
+            "description": "[필수] 반려견 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 목록 응답의 아이디를 그대로 씁니다",
             "required": true,
             "schema": {
               "type": "integer",
@@ -523,7 +523,7 @@
           "회원"
         ],
         "summary": "비밀번호 변경",
-        "description": "현재 비밀번호 확인 후 새 비밀번호로 변경합니다. 변경 후 재로그인이 필요하며, 모든 기기의 토큰 재발급이 차단됩니다. (다른 기기의 기존 access token은 만료 시까지 유효할 수 있습니다)",
+        "description": "현재 비밀번호 확인 후 새 비밀번호로 변경합니다. 변경 후 재로그인이 필요하며, 모든 기기의 토큰 재발급이 차단됩니다. (다른 기기의 기존 access token은 만료 시까지 유효할 수 있습니다)\n\n**필수: Authorization 헤더, 요청 바디의 currentPassword, newPassword(영문자·숫자·특수문자 포함 8~20자).**\n\n호출 예: `POST /api/v1/members/me/password` `{\"currentPassword\":\"P@ssw0rd!\",\"newPassword\":\"NewP@ss123!\"}`",
         "operationId": "changePassword",
         "requestBody": {
           "content": {
@@ -558,7 +558,7 @@
           "회원"
         ],
         "summary": "소셜 전용 계정 전환 (비밀번호 제거)",
-        "description": "소셜 로그인이 연결된 계정의 비밀번호를 제거해 소셜 전용 계정으로 전환합니다. 전환 후 이메일 로그인은 불가하며, 모든 기기에서 로그아웃됩니다. 소셜이 연결되지 않은 일반 계정은 400(MEMBER_009), 이미 소셜 전용이면 400(MEMBER_007)으로 응답합니다.",
+        "description": "소셜 로그인이 연결된 계정의 비밀번호를 제거해 소셜 전용 계정으로 전환합니다. 전환 후 이메일 로그인은 불가하며, 모든 기기에서 로그아웃됩니다. 소셜이 연결되지 않은 일반 계정은 400(MEMBER_009), 이미 소셜 전용이면 400(MEMBER_007)으로 응답합니다.\n\n**필수: Authorization 헤더.** 바디 없음.\n\n호출 예: `DELETE /api/v1/members/me/password`",
         "operationId": "removePassword",
         "responses": {
           "200": {
@@ -585,7 +585,7 @@
           "회원"
         ],
         "summary": "비밀번호 최초 설정",
-        "description": "소셜 로그인으로 가입해 비밀번호가 없는 계정에 비밀번호를 설정합니다. 설정 후에는 이메일 로그인과 소셜 로그인 모두 사용할 수 있습니다. 이미 비밀번호가 있는 계정은 400(MEMBER_008)으로 응답합니다.",
+        "description": "소셜 로그인으로 가입해 비밀번호가 없는 계정에 비밀번호를 설정합니다. 설정 후에는 이메일 로그인과 소셜 로그인 모두 사용할 수 있습니다. 이미 비밀번호가 있는 계정은 400(MEMBER_008)으로 응답합니다.\n\n**필수: Authorization 헤더, 요청 바디의 newPassword(영문자·숫자·특수문자 포함 8~20자).**\n\n호출 예: `POST /api/v1/members/me/password/setup` `{\"newPassword\":\"NewP@ss123!\"}`",
         "operationId": "setupPassword",
         "requestBody": {
           "content": {
@@ -622,13 +622,14 @@
           "인증/인가"
         ],
         "summary": "토큰 재발급",
-        "description": "리프레시 토큰으로 Access Token을 재발급합니다.",
+        "description": "리프레시 토큰으로 Access Token을 재발급합니다. 응답의 accessToken 으로 교체하고, refresh 쿠키도 새 값으로 갱신됩니다.\n\n**필수: refresh 토큰 쿠키.** Authorization 헤더와 바디는 필요 없습니다. 쿠키가 없거나 만료·무효화(로그아웃, 비밀번호 변경, 탈퇴)됐으면 401 이며 다시 로그인해야 합니다.\n\n호출 예: `POST /api/v1/auth/token/reissue` (바디 없음, 쿠키 자동 전송)",
         "operationId": "reissueToken",
         "parameters": [
           {
             "name": "refreshToken",
             "in": "cookie",
-            "required": false,
+            "description": "[필수] refresh 토큰 쿠키. 로그인 응답의 Set-Cookie 로 심어지고 브라우저가 자동으로 보냅니다. 없으면 401",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -654,7 +655,7 @@
           "인증/인가"
         ],
         "summary": "비밀번호 재설정",
-        "description": "메일로 받은 인증코드로 비밀번호를 재설정합니다. 성공 시 전 기기 세션이 무효화되어 재로그인이 필요합니다.\n코드 불일치는 AUTH_004, 만료/미발급은 AUTH_005, 5회 실패 시 코드가 무효화되고 AUTH_017 로 응답합니다.",
+        "description": "메일로 받은 인증코드로 비밀번호를 재설정합니다. 성공 시 전 기기 세션이 무효화되어 재로그인이 필요합니다.\n코드 불일치는 AUTH_004, 만료/미발급은 AUTH_005, 5회 실패 시 코드가 무효화되고 AUTH_017 로 응답합니다.\n\n인증 불필요. **필수: 요청 바디의 email, code, newPassword** (영문자·숫자·특수문자 포함 8~20자).\n\n호출 예: `POST /api/v1/auth/password/reset` `{\"email\":\"user@example.com\",\"code\":\"A2B3C4D5\",\"newPassword\":\"NewP@ss123!\"}`",
         "operationId": "resetPassword",
         "requestBody": {
           "content": {
@@ -686,7 +687,7 @@
           "인증/인가"
         ],
         "summary": "비밀번호 재설정 코드 발송",
-        "description": "비밀번호 재설정 인증코드를 메일로 발송합니다. 일반(이메일+비밀번호) 계정 전용입니다.\n계정 존재 여부와 무관하게 항상 성공으로 응답하며, 미가입 이메일과 소셜 전용 계정에는\n각각 안내 메일이 발송됩니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 발송 상한(AUTH_016)이 적용됩니다.",
+        "description": "비밀번호 재설정 인증코드를 메일로 발송합니다. 일반(이메일+비밀번호) 계정 전용입니다.\n계정 존재 여부와 무관하게 항상 성공으로 응답하며, 미가입 이메일과 소셜 전용 계정에는\n각각 안내 메일이 발송됩니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 발송 상한(AUTH_016)이 적용됩니다.\n\n인증 불필요. **필수: 요청 바디의 email.**\n\n호출 예: `POST /api/v1/auth/password/reset/send-code` `{\"email\":\"user@example.com\"}`",
         "operationId": "sendPasswordResetCode",
         "requestBody": {
           "content": {
@@ -718,12 +719,13 @@
           "인증/인가"
         ],
         "summary": "로그아웃",
-        "description": "현재 기기의 세션만 로그아웃합니다 (리프레시 토큰 무효화 + Access 토큰 블랙리스트). 다른 기기의 로그인은 유지됩니다.",
+        "description": "현재 기기의 세션만 로그아웃합니다 (리프레시 토큰 무효화 + Access 토큰 블랙리스트). 다른 기기의 로그인은 유지됩니다.\n\n**필수: Authorization 헤더.** refresh 쿠키는 브라우저가 자동 전송하며 없어도 동작합니다.\n\n호출 예: `POST /api/v1/auth/logout` (바디 없음)",
         "operationId": "logout",
         "parameters": [
           {
             "name": "refreshToken",
             "in": "cookie",
+            "description": "[선택] refresh 토큰 쿠키. 로그인 응답의 Set-Cookie 로 심어지고 브라우저가 자동으로 보내므로 직접 넣지 않습니다",
             "required": false,
             "schema": {
               "type": "string"
@@ -755,7 +757,7 @@
           "인증/인가"
         ],
         "summary": "일반 로그인",
-        "description": "이메일과 비밀번호로 로그인합니다. 형식 오류는 400(필드별 검증 코드), 자격증명 불일치는 401(AUTH_006)로 구분됩니다. 실패가 누적되면 해당 이메일이 일정 시간 잠깁니다(AUTH_015, 429).",
+        "description": "이메일과 비밀번호로 로그인합니다. 형식 오류는 400(필드별 검증 코드), 자격증명 불일치는 401(AUTH_006)로 구분됩니다. 실패가 누적되면 해당 이메일이 일정 시간 잠깁니다(AUTH_015, 429).\n\n인증 불필요. **필수: 요청 바디의 email, password.** 응답 바디의 accessToken 을 이후 요청의 `Authorization: Bearer` 헤더에 넣고, refresh 토큰은 HttpOnly 쿠키로 자동 저장됩니다.\n\n호출 예: `POST /api/v1/auth/login` `{\"email\":\"user@example.com\",\"password\":\"P@ssw0rd!\"}`",
         "operationId": "loginWithCredentials",
         "requestBody": {
           "content": {
@@ -787,7 +789,7 @@
           "인증/인가"
         ],
         "summary": "이메일 인증코드 검증",
-        "description": "메일로 받은 인증코드를 검증합니다. 성공하면 30분 동안 해당 이메일로 회원가입할 수 있습니다.",
+        "description": "메일로 받은 인증코드를 검증합니다. 성공하면 30분 동안 해당 이메일로 회원가입할 수 있습니다.\n\n인증 불필요. **필수: 요청 바디의 email, code.**\n\n호출 예: `POST /api/v1/auth/email/verify-code` `{\"email\":\"user@example.com\",\"code\":\"A3K7MP2X\"}`",
         "operationId": "verifyEmailVerificationCode",
         "requestBody": {
           "content": {
@@ -819,7 +821,7 @@
           "인증/인가"
         ],
         "summary": "이메일 인증코드 발송",
-        "description": "회원가입용 이메일 인증코드를 발송합니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 시간당 발송 상한(AUTH_016)이 적용되며, 가입 여부와 무관하게 항상 성공으로 응답합니다(기가입 이메일에는 안내 메일 발송).",
+        "description": "회원가입용 이메일 인증코드를 발송합니다. 이메일당 60초 쿨다운(AUTH_003)과 IP당 시간당 발송 상한(AUTH_016)이 적용되며, 가입 여부와 무관하게 항상 성공으로 응답합니다(기가입 이메일에는 안내 메일 발송).\n\n인증 불필요. **필수: 요청 바디의 email.**\n\n호출 예: `POST /api/v1/auth/email/send-code` `{\"email\":\"user@example.com\"}`",
         "operationId": "sendEmailVerificationCode",
         "requestBody": {
           "content": {
@@ -851,7 +853,7 @@
           "회원"
         ],
         "summary": "내 회원 정보 조회",
-        "description": "로그인한 회원의 내 정보를 조회합니다.",
+        "description": "로그인한 회원의 내 정보를 조회합니다.\n\n**필수: Authorization 헤더.** 파라미터는 없습니다.\n\n호출 예: `GET /api/v1/members/me`",
         "operationId": "getMyInfo",
         "responses": {
           "200": {
@@ -876,7 +878,7 @@
           "회원"
         ],
         "summary": "내 회원 정보 수정",
-        "description": "닉네임을 수정합니다. 프로필 이미지는 이 API가 아니라 전용 업로드/삭제 API로 관리합니다.",
+        "description": "닉네임을 수정합니다. 프로필 이미지는 이 API가 아니라 전용 업로드/삭제 API로 관리합니다.\n\n**필수: Authorization 헤더, 요청 바디의 nickname(10자 이내).**\n\n호출 예: `PATCH /api/v1/members/me` `{\"nickname\":\"길동짱\"}`",
         "operationId": "updateMyInfo",
         "requestBody": {
           "content": {
@@ -913,13 +915,13 @@
           "인증/인가"
         ],
         "summary": "소셜 로그인",
-        "description": "provider 콜백의 인가코드와 state로 로그인합니다. 미가입 이메일이면 자동 회원가입 후 로그인합니다. 응답은 일반 로그인과 동일합니다(accessToken + refresh 쿠키).",
+        "description": "provider 콜백의 인가코드와 state로 로그인합니다. 미가입 이메일이면 자동 회원가입 후 로그인합니다. 응답은 일반 로그인과 동일합니다(accessToken + refresh 쿠키).\n\n인증 불필요. **필수: provider(경로), code, state.** 둘 다 provider 가 콜백 URL 의 쿼리로 넘겨준 값을 그대로 전달합니다. state 가 인가 URL 생성 때 발급한 값과 다르거나 10분이 지났으면 실패합니다.\n\n호출 예: `GET /api/v1/auth/kakao/login?code=<콜백 code>&state=<콜백 state>`",
         "operationId": "loginWithOAuthCode",
         "parameters": [
           {
             "name": "provider",
             "in": "path",
-            "description": "소셜 로그인 제공자",
+            "description": "[필수] 소셜 로그인 제공자. kakao 카카오 · naver 네이버 (소문자)",
             "required": true,
             "schema": {
               "type": "string",
@@ -933,20 +935,22 @@
           {
             "name": "code",
             "in": "query",
-            "description": "provider가 콜백으로 전달한 인가코드",
+            "description": "[필수] provider 가 콜백 URL 로 전달한 인가코드(1회용)",
             "required": true,
             "schema": {
               "type": "string"
-            }
+            },
+            "example": "q1w2e3r4t5y6u7i8o9p0"
           },
           {
             "name": "state",
             "in": "query",
-            "description": "인가 URL 생성 시 발급된 state",
+            "description": "[필수] 인가 URL 생성 응답에 들어 있던 state. 콜백 URL 의 state 를 그대로 넘깁니다",
             "required": true,
             "schema": {
               "type": "string"
-            }
+            },
+            "example": "3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61"
           }
         ],
         "responses": {
@@ -969,13 +973,13 @@
           "인증/인가"
         ],
         "summary": "소셜 로그인 인가 URL 생성",
-        "description": "provider(kakao/naver) 인가 페이지 URL을 생성합니다. CSRF 방어용 state가 포함되며 10분간 유효합니다. 프론트는 이 URL로 리다이렉트합니다.",
+        "description": "provider(kakao/naver) 인가 페이지 URL을 생성합니다. CSRF 방어용 state가 포함되며 10분간 유효합니다. 프론트는 이 URL로 리다이렉트합니다.\n\n인증 불필요. **필수: provider(경로).**\n\n호출 예: `GET /api/v1/auth/kakao/authorize` → 응답의 authorizeUrl 로 브라우저를 이동시킵니다",
         "operationId": "generateOAuthAuthorizationUrl",
         "parameters": [
           {
             "name": "provider",
             "in": "path",
-            "description": "소셜 로그인 제공자",
+            "description": "[필수] 소셜 로그인 제공자. kakao 카카오 · naver 네이버 (소문자)",
             "required": true,
             "schema": {
               "type": "string",
@@ -1007,12 +1011,13 @@
           "인증/인가"
         ],
         "summary": "로그인 기기 목록",
-        "description": "현재 로그인된 기기(활성 refresh 세션) 목록을 최근 갱신순으로 조회합니다. current 는 refresh 쿠키로 판별하므로 쿠키가 없는 요청에서는 모두 false 입니다. 기기당 별칭은 저장하지 않습니다.",
+        "description": "현재 로그인된 기기(활성 refresh 세션) 목록을 최근 갱신순으로 조회합니다. current 는 refresh 쿠키로 판별하므로 쿠키가 없는 요청에서는 모두 false 입니다. 기기당 별칭은 저장하지 않습니다.\n\n**필수: Authorization 헤더.** 쿼리 파라미터는 없습니다.\n\n호출 예: `GET /api/v1/auth/sessions`",
         "operationId": "getMySessions",
         "parameters": [
           {
             "name": "refreshToken",
             "in": "cookie",
+            "description": "[선택] refresh 토큰 쿠키. 로그인 응답의 Set-Cookie 로 심어지고 브라우저가 자동으로 보내므로 직접 넣지 않습니다. 있으면 그 기기가 current=true 로 표시됩니다",
             "required": false,
             "schema": {
               "type": "string"
@@ -1044,13 +1049,13 @@
           "인증/인가"
         ],
         "summary": "특정 기기 로그아웃",
-        "description": "지정한 세션(기기)의 refresh 토큰을 무효화합니다. 이미 만료된 세션이어도 성공합니다(멱등). 해당 기기가 이미 발급받은 access 토큰은 만료 시까지 유효할 수 있습니다.",
+        "description": "지정한 세션(기기)의 refresh 토큰을 무효화합니다. 이미 만료된 세션이어도 성공합니다(멱등). 해당 기기가 이미 발급받은 access 토큰은 만료 시까지 유효할 수 있습니다.\n\n**필수: Authorization 헤더, sessionId(경로).**\n\n호출 예: `DELETE /api/v1/auth/sessions/3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61`",
         "operationId": "revokeSession",
         "parameters": [
           {
             "name": "sessionId",
             "in": "path",
-            "description": "세션 아이디 (기기 목록 조회로 얻는다)",
+            "description": "[필수] 세션 아이디(UUID). 기기 목록 조회 응답의 sessionId 를 그대로 씁니다",
             "required": true,
             "schema": {
               "type": "string"
@@ -1164,6 +1169,7 @@
         },
         "required": [
           "activityLevel",
+          "name",
           "sizeType",
           "sociality"
         ]
@@ -1340,7 +1346,13 @@
             "maxLength": 10,
             "minLength": 0
           }
-        }
+        },
+        "required": [
+          "email",
+          "name",
+          "nickname",
+          "password"
+        ]
       },
       "ResponseVoid": {
         "type": "object",
@@ -1452,7 +1464,11 @@
             "minLength": 8,
             "pattern": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()\\-_=+\\[\\]{};:'\",.<>/?\\\\|])\\S+$"
           }
-        }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ]
       },
       "MemberPasswordSetupRequest": {
         "type": "object",
@@ -1466,7 +1482,10 @@
             "minLength": 8,
             "pattern": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()\\-_=+\\[\\]{};:'\",.<>/?\\\\|])\\S+$"
           }
-        }
+        },
+        "required": [
+          "newPassword"
+        ]
       },
       "ResponseTokenReissueResponse": {
         "type": "object",
@@ -1514,7 +1533,12 @@
             "minLength": 8,
             "pattern": "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()\\-_=+\\[\\]{};:'\",.<>/?\\\\|])\\S+$"
           }
-        }
+        },
+        "required": [
+          "code",
+          "email",
+          "newPassword"
+        ]
       },
       "AuthPasswordResetCodeSendRequest": {
         "type": "object",
@@ -1526,7 +1550,10 @@
             "example": "user@example.com",
             "minLength": 1
           }
-        }
+        },
+        "required": [
+          "email"
+        ]
       },
       "AuthGeneralLoginRequest": {
         "type": "object",
@@ -1544,7 +1571,11 @@
             "example": "password123!",
             "minLength": 1
           }
-        }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
       },
       "AuthGeneralLoginResponse": {
         "type": "object",
@@ -1589,7 +1620,11 @@
             "example": "A3K7MP2X",
             "minLength": 1
           }
-        }
+        },
+        "required": [
+          "code",
+          "email"
+        ]
       },
       "AuthEmailCodeSendRequest": {
         "type": "object",
@@ -1601,7 +1636,10 @@
             "example": "user@example.com",
             "minLength": 1
           }
-        }
+        },
+        "required": [
+          "email"
+        ]
       },
       "MemberMyInfoUpdateRequest": {
         "type": "object",
@@ -1614,7 +1652,10 @@
             "maxLength": 10,
             "minLength": 0
           }
-        }
+        },
+        "required": [
+          "nickname"
+        ]
       },
       "MemberMyInfoResponse": {
         "type": "object",
