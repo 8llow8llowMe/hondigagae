@@ -2,6 +2,7 @@
 
 import { FilterCheck, FilterList, FilterListHeading, FilterRadio } from '@/components/filter-list'
 import {
+  CONTENT_TYPE_FILTER_ORDER,
   CONTENT_TYPE_LABEL,
   INDOOR_LABEL,
   SIGUNGU_CODES,
@@ -12,7 +13,6 @@ import { isPetSizeCode } from '@/lib/pet/form'
 import { toPlaceFilterWeight } from '@/lib/pet/weight'
 import type { Pet } from '@/types/pet'
 import type { ContentTypeCode, PlaceFilters } from '@/types/place'
-import { CONTENT_TYPE_CODES } from '@/types/place'
 
 /**
  * 필터 축 하나하나 — 데스크톱 레일과 모바일 시트가 **같은 필드를 공유한다.**
@@ -156,7 +156,7 @@ export function ContentTypeField({ filters, onChange }: FieldProps) {
       >
         {messages.place.filterAll}
       </FilterRadio>
-      {CONTENT_TYPE_CODES.map((code: ContentTypeCode) => (
+      {CONTENT_TYPE_FILTER_ORDER.map((code: ContentTypeCode) => (
         <FilterRadio
           key={code}
           selected={filters.contentType === code}

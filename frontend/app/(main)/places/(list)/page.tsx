@@ -13,7 +13,7 @@ import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import { parsePlaceFilters, toPlaceFilterQuery } from '@/lib/url/place-filters'
-import { parseViewMode, viewModeHref } from '@/lib/url/view-mode'
+import { parseViewMode, PLACES_DEFAULT_VIEW, viewModeHref } from '@/lib/url/view-mode'
 
 export const metadata = {
   title: `${messages.place.pageTitle} · 혼디가개`,
@@ -32,10 +32,15 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
     `(main)/layout.tsx` 가 프리페치를 `session !== null` 로 막는 것과 같은 규칙이다.
   */
   const authed = (await readSession()) !== null
-  const view = parseViewMode(resolved)
+  /*
+    **이 화면의 기본 보기는 지도다** (`PLACES_DEFAULT_VIEW`). 그래서 `/places` 가 지도이고
+    목록이 `?view=list` 로 붙는다 — 링크를 만드는 쪽과 파싱하는 쪽에 **같은 기본값**을
+    넘겨야 한다. 어긋나면 토글이 가리키는 보기와 페이지가 그리는 보기가 달라진다.
+  */
+  const view = parseViewMode(resolved, PLACES_DEFAULT_VIEW)
   const filterQuery = toPlaceFilterQuery(filters)
-  const listHref = viewModeHref('/places', filterQuery, 'list')
-  const mapHref = viewModeHref('/places', filterQuery, 'map')
+  const listHref = viewModeHref('/places', filterQuery, 'list', PLACES_DEFAULT_VIEW)
+  const mapHref = viewModeHref('/places', filterQuery, 'map', PLACES_DEFAULT_VIEW)
 
   // 요청마다 새 인스턴스 — 모듈 스코프 공유는 요청 간 데이터 유출이다
   const queryClient = getServerQueryClient()
@@ -74,7 +79,7 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
       <main id="main-content">
         <h1 className="sr-only">{messages.place.pageTitle}</h1>
         <HydrationBoundary state={dehydrate(queryClient)}>
-          <PlaceMapView filters={filters} filterQuery={filterQuery} />
+          <PlaceMapView filters={filters} filterQuery={filterQuery} authed={authed} />
         </HydrationBoundary>
       </main>
     )
