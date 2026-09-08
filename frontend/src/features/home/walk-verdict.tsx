@@ -80,7 +80,7 @@ export function WalkVerdict({
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
-          'focus-visible:ring-brand-500 flex w-full items-center gap-2.5 px-4 py-3.5 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:hidden',
+          'focus-visible:ring-brand-500 flex w-full items-center gap-2 px-4 py-3.5 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:hidden',
           /*
             위험만 그 줄을 tint 로 강조한다. **다섯 톤 표를 만들지 않는다** — 이 조건이
             `critical` 로 좁혀 실제로 쓰이는 값은 하나뿐이고, 표로 두면 나머지 넷도

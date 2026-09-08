@@ -20,7 +20,7 @@ export function PlaceDetailSkeleton() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-2.5 px-4 pt-5 pb-6 md:px-10">
+      <div className="flex flex-col gap-3 px-4 pt-5 pb-6 md:px-10">
         <div className="flex items-center justify-between gap-2">
           <Skeleton variant="text" className="h-8 w-3/5" />
           <Skeleton variant="text" className="h-6 w-20" />

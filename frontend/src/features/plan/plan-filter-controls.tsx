@@ -206,7 +206,7 @@ function CountLine({
   leading?: ReactNode
 }) {
   return (
-    <span className="flex items-center gap-2.5">
+    <span className="flex items-center gap-2">
       {leading}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {count !== null && <span className="text-fg-muted shrink-0 tabular-nums">{count}</span>}

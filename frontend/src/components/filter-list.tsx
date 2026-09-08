@@ -137,7 +137,7 @@ function OptionButton({
       onClick={onSelect}
       className={cn(
         // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
-        'flex min-h-11 items-center gap-2.5 rounded-md px-3 py-2 text-left transition-colors',
+        'flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-left transition-colors',
         'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
         selected ? 'bg-band' : 'hover:bg-band',
         className,
