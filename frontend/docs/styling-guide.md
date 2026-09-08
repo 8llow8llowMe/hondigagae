@@ -159,6 +159,21 @@
 | 선택 항목   | 마운트·변경 시 컨테이너 안으로 센터링                      | 375 에서 선택 칩이 화면 밖에 있으면 **필터가 걸린 사실 자체를 알 수 없다.** `centerScrollLeft()` 를 쓴다                         |
 | md 이상     | `flex-wrap` 으로 접어 스크롤 자체를 없앤다                 | 768 에서는 몇 px 만 넘치는 경우가 많다                                                                                           |
 
+> **세로 스크롤바는 숨기지 않고 얇게만 쓴다.** `globals.css` 가 전역으로 6px + 둥근 thumb
+> (`--border-strong`, hover `--fg-subtle`)를 준다. 사용처에서 따로 지정하지 않는다.
+>
+> 표준 속성(`scrollbar-width`/`scrollbar-color`)과 `::-webkit-scrollbar` 를 **같은 요소에
+> 함께 걸지 않는다** — Chromium 은 표준 속성이 있으면 의사요소를 통째로 무시해서 6px 대신
+> `thin` 기본값(11px)이 나온다. 두 계열은 `@supports not selector(::-webkit-scrollbar)` 로
+> 갈라 둔다. 검증은 macOS 기본 오버레이 스크롤바가 아니라 "스크롤 막대 항상 표시" 상태로 한다.
+>
+> **모바일에서는 하단 탭바 위에 스크롤바를 그리지 않는다.** 뷰포트 스크롤바는 화면 전체
+> 높이에 그려져 `fixed` 탭바를 가로지른다. 768 미만에서
+> `body:has(nav[aria-label='하단'])::-webkit-scrollbar-track` 에 `margin-block-end` 를 줘서
+> 탭바 높이만큼 위에서 끝낸다. **선택자는 `body::` 여야 한다** — `html::`·`:root::` 는
+> 뷰포트 스크롤바에 매칭되지 않고, 한정자를 빼면 안쪽 스크롤 컨테이너까지 물린다.
+> Firefox 는 트랙 인셋에 해당하는 표준 속성이 없어 대응하지 않는다.
+
 > `scrollIntoView({ inline: 'center' })` 를 쓰지 않는다. 조상 스크롤 컨테이너(페이지)까지
 > 함께 움직이고, 하이드레이션 직후 동작하지 않는 경우가 관측됐다. 계산은 순수 함수로 뽑아 테스트한다.
 
