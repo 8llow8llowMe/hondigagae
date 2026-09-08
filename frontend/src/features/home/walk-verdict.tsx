@@ -25,6 +25,16 @@ import type { WalkSafetyResponse } from '@/types/insight'
  * **`위험`(DANGER)은 유일하게 접지 않는다** — 자동 펼침이고, 그 줄만 tint 로 강조한다.
  *
  * 등급어는 세로 바 없이 **라벨 16/600 `--fg-muted` + 등급어 20/800 등급 색**으로 구분한다.
+ *
+ * **아래에 밴드를 그리지 않는다** (#305). 예전에는 이 섹션이 끝에서 8px 밴드를 그렸고,
+ * 접었을 때 tint 줄 아래 회색 줄만 남는 문제 때문에 그것을 `open` 에 묶어 두어야 했다.
+ *
+ * 밴드는 "여기서 **다른 이야기**가 시작된다" 는 유일한 신호인데(DESIGN.md §0), 바로 아래
+ * 골든타임은 다른 이야기가 아니다 — "지금 나가도 되나" 다음 질문이 "그럼 언제 나가나" 이고
+ * 둘은 같은 판정 규칙을 쓴다. 같은 이야기 안은 1px 선으로 잇고, 그 선은
+ * `WalkTimesSection` 의 `border-t` 가 이미 그린다. 여기서 또 그리면 선이 두 겹이 된다.
+ *
+ * 접힘에 따라 경계의 굵기가 바뀌던 것도 함께 사라진다.
  */
 export function WalkVerdict({
   data,
@@ -170,13 +180,6 @@ export function WalkVerdict({
           </p>
         )}
       </div>
-
-      {/*
-        **아래 묶음과의 경계선을 이 섹션이 그린다** (DESIGN.md §0 의 8px 밴드).
-        호출부에 두면 접었을 때 tint 줄 아래에 회색 줄만 남아, 접힌 판정이 아니라
-        빈 밴드가 하나 떠 있는 것처럼 보인다. 접힘과 함께 사라져야 하는 경계다.
-      */}
-      <div aria-hidden className={cn('bg-band h-2 w-full md:block', open ? 'block' : 'hidden')} />
     </section>
   )
 }
