@@ -12,8 +12,6 @@ import java.util.Optional;
  */
 public interface PetConditionQueryPort {
 
-    Optional<PetCondition> findCondition(long memberId, long petId);
-
     /**
      * 여러 마리 특성을 한 번에 조회한다(원격 N+1 방지, §9-7). 소유가 아니거나 없는 petId 는
      * 결과에서 빠지며, 조회 실패는 빈 목록으로 관용 처리된다.

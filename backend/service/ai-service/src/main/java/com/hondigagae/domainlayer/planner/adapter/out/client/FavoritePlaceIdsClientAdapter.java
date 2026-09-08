@@ -18,8 +18,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class FavoritePlaceIdsClientAdapter implements FavoritePlaceIdsQueryPort {
 
-    private static final String PLAN_SERVICE = "plan-service";
-
     private final FavoritePlaceIdsClient favoritePlaceIdsClient;
     private final InternalResponseSupport internalResponseSupport;
 
@@ -27,7 +25,7 @@ public class FavoritePlaceIdsClientAdapter implements FavoritePlaceIdsQueryPort 
     public List<Long> findFavoritePlaceIds(long memberId) {
         try {
             List<Long> body = internalResponseSupport.requestAndUnwrapOrNull(
-                PLAN_SERVICE, () -> favoritePlaceIdsClient.getFavoritePlaceIds(memberId));
+                InternalResponseSupport.PLAN_SERVICE, () -> favoritePlaceIdsClient.getFavoritePlaceIds(memberId));
             return body == null ? List.of() : body;
         } catch (AiPlanException exception) {
             log.warn("Favorite place ids lookup failed memberId={} errorCode={}",

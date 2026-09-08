@@ -4,7 +4,6 @@ import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.planner.adapter.out.client.feign.dto.PetConditionClientResponse;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import java.util.List;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -20,10 +19,6 @@ import org.springframework.web.bind.annotation.RequestParam;
     contextId = "petConditionClient"
 )
 public interface PetConditionClient {
-
-    @GetMapping("/internal/v1/pets/{petId}/condition")
-    Response<PetConditionClientResponse> getPetCondition(
-        @PathVariable long petId, @RequestParam("memberId") long memberId);
 
     /** 여러 마리 특성 벌크 조회 — 마리 수만큼 왕복하지 않는다. 소유가 아닌 petId 는 응답에서 빠진다. */
     @GetMapping("/internal/v1/pets/conditions")

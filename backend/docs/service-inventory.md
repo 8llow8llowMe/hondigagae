@@ -48,7 +48,7 @@
   - `GET /api/v1/plans/{planId}/weather` (일자별 날씨 브리핑 + 비 오는 날 실내 대안)
 - 날씨 브리핑은 적합도를 **다시 계산하지 않고** tour-service 결과를 그대로 옮긴다. 같은 규칙을
   두 곳에서 구현하면 일정 화면과 장소 화면이 같은 날 같은 곳을 다르게 말하게 된다.
-  반려견 특성은 auth-service 내부 API(`/internal/v1/pets/{petId}/condition`)에서 받는다.
+  반려견 특성은 auth-service 내부 API(`/internal/v1/pets/conditions`, 벌크)에서 받는다.
 - 상태: 구현 (plan 컨텍스트). **미착수**: `review`(여행 후기), 일정 공유
 
 ## AI Service

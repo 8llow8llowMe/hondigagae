@@ -25,15 +25,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class PlanOutlineClientAdapter implements PlanOutlineQueryPort {
 
-    private static final String PLAN_SERVICE = "plan-service";
-
     private final PlanOutlineClient planOutlineClient;
     private final InternalResponseSupport internalResponseSupport;
 
     @Override
     public Optional<PlanOutline> findOutline(long memberId, long planId) {
         PlanOutlineClientResponse body = internalResponseSupport.requestAndUnwrapOrNull(
-            PLAN_SERVICE, () -> planOutlineClient.getPlanOutline(planId, memberId));
+            InternalResponseSupport.PLAN_SERVICE, () -> planOutlineClient.getPlanOutline(planId, memberId));
         if (body == null) {
             log.info("Plan outline not found planId={} memberId={}", planId, memberId);
             return Optional.empty();

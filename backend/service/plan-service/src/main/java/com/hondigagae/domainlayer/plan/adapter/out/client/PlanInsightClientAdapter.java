@@ -38,8 +38,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class PlanInsightClientAdapter implements PetConditionQueryPort, PlaceSuitabilityQueryPort {
 
-    private static final String AUTH_SERVICE = "auth-service";
-
     private final PetConditionClient petConditionClient;
     private final PlaceSuitabilityClient placeSuitabilityClient;
     private final InternalResponseSupport internalResponseSupport;
@@ -51,7 +49,7 @@ public class PlanInsightClientAdapter implements PetConditionQueryPort, PlaceSui
         }
         try {
             List<PetConditionClientResponse> body = internalResponseSupport.requestAndUnwrapOrNull(
-                AUTH_SERVICE, () -> petConditionClient.getPetConditions(memberId, petIds));
+                InternalResponseSupport.AUTH_SERVICE, () -> petConditionClient.getPetConditions(memberId, petIds));
             if (body == null) {
                 log.info("Pet conditions not found memberId={} petIds={}", memberId, petIds);
                 return Map.of();
@@ -77,7 +75,7 @@ public class PlanInsightClientAdapter implements PetConditionQueryPort, PlaceSui
     public Optional<Long> findRepresentativePetId(long memberId) {
         try {
             PetConditionClientResponse body = internalResponseSupport.requestAndUnwrapOrNull(
-                AUTH_SERVICE, () -> petConditionClient.getRepresentativePetCondition(memberId));
+                InternalResponseSupport.AUTH_SERVICE, () -> petConditionClient.getRepresentativePetCondition(memberId));
             if (body == null) {
                 log.info("Representative pet not found memberId={}", memberId);
                 return Optional.empty();
@@ -97,7 +95,7 @@ public class PlanInsightClientAdapter implements PetConditionQueryPort, PlaceSui
     @Override
     public Set<Long> findOwnedPetIds(long memberId, List<Long> petIds) {
         List<PetConditionClientResponse> body = internalResponseSupport.requestAndUnwrapOrNull(
-            AUTH_SERVICE, () -> petConditionClient.getPetConditions(memberId, petIds));
+            InternalResponseSupport.AUTH_SERVICE, () -> petConditionClient.getPetConditions(memberId, petIds));
         if (body == null) {
             return Set.of();
         }
@@ -174,8 +172,11 @@ public class PlanInsightClientAdapter implements PetConditionQueryPort, PlaceSui
     }
 
     /**
-     * 장소 아이디는 정밀도 때문에 문자열로 오간다. 비어 있거나 숫자가 아니면 0 이 아니라 예외다 -
-     * 조용히 0번 장소를 가리키게 두면 화면이 엉뚱한 곳으로 이동한다.
+     * 장소 아이디는 정밀도 때문에 문자열로 오간다. 비어 있거나 숫자가 아니면 0 으로 접지 않고 예외를
+     * 던진다 - 조용히 0번 장소를 가리키게 두면 화면이 엉뚱한 곳으로 이동한다.
+     *
+     * <p>이 예외는 {@link #findSuitability} 의 catch 에 잡혀 <b>그날 판정이 비는 것</b>으로 끝난다.
+     * 틀린 장소를 가리키는 판정보다 없는 판정이 낫다는 같은 이유다. 경고 로그가 남는다.
      */
     private long toPlaceId(String placeId) {
         try {

@@ -102,7 +102,6 @@
 
 ## 서비스 간 내부 API
 
-`GET /internal/v1/pets/{petId}/condition` — 다른 서비스가 판정에 쓰는 반려견 특성을 준다.
 `GET /internal/v1/pets/representative/condition?memberId=` — 대표 반려견의 특성. 호출부가 petId 없이 요청했을 때의 기본값이다.
 `GET /internal/v1/pets/conditions?memberId=&petIds=` — 여러 마리 벌크 조회. 원격 N+1 방지용이며 소유가 아닌 petId 는 응답에서 빠진다.
 

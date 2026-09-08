@@ -90,6 +90,11 @@ class FavoriteCommandProcessorTest {
         }
 
         @Override
+        public boolean existsByMemberIdAndPlaceId(long memberId, long placeId) {
+            return findByMemberIdAndPlaceId(memberId, placeId).isPresent();
+        }
+
+        @Override
         public List<Favorite> findAllByMemberId(long memberId) {
             return store.values().stream()
                 .filter(favorite -> favorite.memberId() == memberId)

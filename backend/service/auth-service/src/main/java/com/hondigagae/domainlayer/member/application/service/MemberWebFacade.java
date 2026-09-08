@@ -20,6 +20,8 @@ import com.hondigagae.storage.model.StoredObject;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @RequiredArgsConstructor
@@ -114,8 +116,16 @@ public class MemberWebFacade implements MemberWebUseCase {
         //    전 기기를 무효화하고, 실패 시 전파되어 제거도 함께 롤백된다.
         memberSessionRevokePort.revokeAllSessions(memberId, tokenId);
 
-        // 3. 전환 사실 통보 (비동기 발송 — 실패해도 전환은 유효)
-        memberMailNotifyPort.notifyPasswordRemoved(converted.email(), converted.provider().getDescription());
+        // 3. 전환 사실 통보. 발송은 비동기(@Async)라 여기서 바로 부르면 커밋 전에 다른 스레드로
+        //    나간다 — 2번이 실패해 롤백되면 "전환됐다"는 메일만 남는다. 커밋 뒤로 미룬다.
+        String email = converted.email();
+        String provider = converted.provider().getDescription();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                memberMailNotifyPort.notifyPasswordRemoved(email, provider);
+            }
+        });
     }
 
     @Override

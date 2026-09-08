@@ -14,8 +14,6 @@ import com.hondigagae.domainlayer.pet.adapter.in.internal.dto.PetConditionRespon
  */
 public interface PetInternalUseCase {
 
-    PetConditionResponse getPetCondition(long memberId, long petId);
-
     /** 대표 반려견의 특성. 호출부가 petId 를 받지 않았을 때의 기본값으로 쓴다. */
     PetConditionResponse getRepresentativePetCondition(long memberId);
 

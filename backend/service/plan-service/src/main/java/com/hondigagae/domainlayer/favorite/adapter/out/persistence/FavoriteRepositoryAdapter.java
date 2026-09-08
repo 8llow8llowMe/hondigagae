@@ -29,6 +29,11 @@ public class FavoriteRepositoryAdapter implements FavoriteRepositoryPort {
     }
 
     @Override
+    public boolean existsByMemberIdAndPlaceId(long memberId, long placeId) {
+        return favoriteRepository.existsByMemberIdAndPlaceId(memberId, placeId);
+    }
+
+    @Override
     public List<Favorite> findAllByMemberId(long memberId) {
         return favoriteMapper.toDomainListFromEntityList(
             favoriteRepository.findAllByMemberIdOrderByIdDesc(memberId));

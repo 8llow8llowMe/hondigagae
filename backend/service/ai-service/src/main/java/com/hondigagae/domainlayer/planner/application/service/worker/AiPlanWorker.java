@@ -291,20 +291,10 @@ public class AiPlanWorker {
     }
 
     /**
-     * 후보 장소를 가져온다. <b>필요하다고 선언한 구현일 때만</b> 부른다.
-     *
-     * <p>스텁은 후보를 쓰지 않으므로 부르지 않는다. 무조건 불러 두면 키 없이 띄운 로컬에서
-     * tour-service 까지 함께 떠 있어야 일정 생성이 도는 셈이 되어, 스텁을 남겨 둔 이유가 사라진다.
-     */
-    /**
-     * 여행 기간에 걸치는 일자별 날씨 전망. 스텁 경로(requiresPlaceCandidates=false)에서는
-     * 부르지 않는다 — 스텁을 tour-service 에 묶지 않기 위해서다. 조회 실패·커버리지 밖은
-     * 빈 목록으로 관용 처리되어 프롬프트에서 날씨 절이 빠진다.
+     * 여행 기간에 걸치는 일자별 날씨 전망. 조회 실패·커버리지 밖은 빈 목록으로 관용 처리되어
+     * 프롬프트에서 날씨 절이 빠진다 — 없는 날씨를 지어 적지 않는다.
      */
     private List<DayWeatherOutlook> loadWeatherOutlook(String areaCode, String startDateParam, String endDateParam) {
-        if (!aiLlmPort.requiresPlaceCandidates()) {
-            return List.of();
-        }
         java.time.LocalDate startDate;
         java.time.LocalDate endDate;
         try {
@@ -328,17 +318,12 @@ public class AiPlanWorker {
     }
 
     /**
-     * 후보 장소를 가져온다. <b>필요하다고 선언한 구현일 때만</b> 부른다.
-     *
-     * <p>스텁은 후보를 쓰지 않으므로 부르지 않는다. 무조건 불러 두면 키 없이 띄운 로컬에서
-     * tour-service 까지 함께 떠 있어야 일정 생성이 도는 셈이 되어, 스텁을 남겨 둔 이유가 사라진다.
+     * 후보 장소를 가져온다. 후보 없이 생성하면 모델이 존재하지 않는 장소를 지어내므로
+     * 항상 부른다 — 후보가 비면 어댑터가 {@code NO_PLACE_CANDIDATES} 로 실패시킨다.
      */
     private List<PlaceCandidate> loadCandidates(
         String areaCode, String sigunguCode, List<Long> pinnedPlaceIds, List<Long> favoritePlaceIds
     ) {
-        if (!aiLlmPort.requiresPlaceCandidates()) {
-            return List.of();
-        }
         List<PlaceCandidate> searched = placeCandidateQueryPort
             .findPetFriendlyCandidates(areaCode, sigunguCode, aiLlmProperties.placeCandidateSize()).stream()
             .map(this::toCandidate)
