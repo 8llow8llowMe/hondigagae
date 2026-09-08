@@ -70,6 +70,31 @@ describe('WalkTimesSection — 추천 구간', () => {
   })
 
   /*
+    **시각과 등급어는 같은 색이어야 한다.** 예전에는 시각 쪽이 `text-metric-high-700`
+    (초록) 하드코딩이라, 추천 구간의 등급이 `CAUTION` 인 날 초록 시각 옆에 황갈색 "주의"
+    가 섰다 — 한 줄 안에서 색 두 개가 서로 다른 말을 했다.
+
+    `CAUTION` 으로 고정해 검사한다. 톤이 갈리는 것을 보려면 **초록이 아닌 등급**이어야
+    한다 — `SAFE` 로 두면 옛 하드코딩도 우연히 통과한다.
+  */
+  const CAUTION_GOLDEN: WalkTimesResponse = {
+    ...GOOD_DAY,
+    goldenLevel: { code: 'CAUTION', name: '주의', description: null, scoreDescription: null },
+  }
+
+  it('추천 시각과 등급어가 같은 등급 색을 쓴다', () => {
+    const markup = render(CAUTION_GOLDEN)
+
+    expect(markup).toContain('text-metric-mid-700')
+    expect(markup).not.toContain('text-metric-high-700')
+  })
+
+  /* `-500` 은 22px + weight 900 전용이다. 이 시각은 700 이라 글자 층(`-700`)을 쓴다 */
+  it('추천 시각에 -500 층을 쓰지 않는다', () => {
+    expect(render(CAUTION_GOLDEN)).not.toContain('text-metric-mid-500')
+  })
+
+  /*
     **#200 회귀.** dev 22:12 KST 에 서버가 `goldenStart == goldenEnd == 23:00` 을 줬다 —
     그날 남은 시간대가 한 칸뿐이면 시작과 끝이 같다. `hasGolden` 이 null 검사만 해서
     화면이 `23:00 – 23:00` 을 찍었고, 0분짜리 구간은 고장으로 읽힌다.
@@ -152,15 +177,24 @@ describe('WalkTimesSection — 곡선', () => {
 
   /*
     3rem 폭에 `기온 29℃` 는 들어가지 않아 **눈으로는 위치가** 둘을 가른다. 그 위치가
-    무엇인지는 낱말이 말해야 한다 — 보조기기에는 셀 안의 라벨이, 눈에는 곡선 바로 아래
-    범례가 간다. 자리와 색만으로 전달하지 않는다.
+    무엇인지는 낱말이 말해야 한다 — 보조기기에는 셀 안의 라벨이, 눈에는 곡선 **왼쪽의
+    행 라벨 열**이 간다. 자리와 색만으로 전달하지 않는다.
+
+    예전에는 눈에 가는 쪽이 곡선 아래 범례 한 줄이었다. 읽고 다시 위로 올라와 대응시켜야
+    했고, `노면(아스팔트)` 의 괄호가 항목 둘로 읽혔다.
   */
   it('두 온도가 무엇인지 낱말로도 말한다', () => {
     const markup = render(GOOD_DAY)
 
     expect(markup).toContain(messages.home.temperatureLabel)
     expect(markup).toContain(messages.home.pavementLabel)
-    expect(markup).toContain(messages.home.goldenCurveLegend)
+    expect(markup).toContain(messages.home.goldenCurveRowTemperature)
+    expect(markup).toContain(messages.home.goldenCurveRowPavement)
+  })
+
+  /* 라벨은 낱말만 남긴다 — 괄호가 붙으면 노면과 아스팔트가 두 가지로 읽힌다 */
+  it('행 라벨에는 괄호를 달지 않는다', () => {
+    expect(messages.home.goldenCurveRowPavement).not.toContain('(')
   })
 
   /* "노면" 만으로는 흙길·잔디를 떠올린다. 이 추정식은 아스팔트 기준이다 */
@@ -171,11 +205,21 @@ describe('WalkTimesSection — 곡선', () => {
   })
 
   /*
-    범례는 **곡선을 설명하는 줄**이다. 곡선이 없는 날에 남으면 없는 숫자의 위치를 말하게 된다 —
-    `HourlyCurve` 안에 두어 곡선과 함께 사라지게 했다.
+    행 라벨은 **곡선을 설명하는 낱말**이다. 곡선이 없는 날에 남으면 없는 숫자의 자리를
+    말하게 된다 — `HourlyCurve` 안에 두어 곡선과 함께 사라지게 했다.
+
+    **낱말로 확인하지 않는다.** `기온`·`노면` 은 셀의 `sr-only` 라벨과 하단 캡션
+    (`goldenPavementNote` — "노면(아스팔트) 온도는 추정치예요")에도 들어 있어, 곡선이
+    없어도 문자열은 남는다. 실제로 이 테스트를 낱말로 썼다가 그 캡션에 걸렸다.
+
+    그래서 **곡선 자체가 없는지**를 본다. `scroll-rail` 은 이 곡선에만 붙는 클래스라
+    라벨 열·셀·화살표가 한꺼번에 사라졌음을 한 줄로 말한다.
   */
-  it('곡선이 없으면 범례도 렌더하지 않는다', () => {
-    expect(render(DAY_ENDED)).not.toContain(messages.home.goldenCurveLegend)
+  it('곡선이 없으면 행 라벨도 렌더하지 않는다', () => {
+    const markup = render(DAY_ENDED)
+
+    expect(markup).not.toContain('scroll-rail')
+    expect(markup).toContain(messages.home.goldenPavementNote)
   })
 
   it('막대의 등급 이름을 보조기기에 남긴다', () => {
@@ -410,7 +454,7 @@ describe('WalkTimesSection — 골든타임이 없는 이유 (#270)', () => {
     const markup = render(SUPPRESSED_DAY)
 
     expect(markup).toContain('14시')
-    expect(markup).toContain(messages.home.goldenCurveLegend)
+    expect(markup).toContain(messages.home.goldenCurveRowPavement)
   })
 
   /*

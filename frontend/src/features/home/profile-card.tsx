@@ -10,6 +10,7 @@ import { useSelectedPetStore } from '@/features/nav/selected-pet-store'
 import { MAX_PET_COUNT } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
 import { describePet } from '@/lib/pet/describe'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { useOverlay } from '@/lib/ui/overlay'
 import { cn } from '@/lib/utils/cn'
 import type { Pet } from '@/types/pet'
@@ -98,7 +99,10 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((prev) => !prev)}
-        className="focus-visible:ring-brand-500 flex w-full items-center gap-4 px-4 py-8 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:px-6"
+        className={cn(
+          'focus-visible:ring-brand-500 flex w-full items-center gap-4 py-8 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
+          INSET_CLASS.rail,
+        )}
       >
         <PetAvatar size="hero" name={selected.name} />
 
@@ -202,7 +206,10 @@ function RegisterPrompt() {
   return (
     <Link
       href="/pets/new"
-      className="focus-visible:ring-brand-500 flex items-center gap-3 px-4 py-4 focus-visible:ring-2 focus-visible:outline-none md:px-6"
+      className={cn(
+        'focus-visible:ring-brand-500 flex items-center gap-3 py-4 focus-visible:ring-2 focus-visible:outline-none',
+        INSET_CLASS.rail,
+      )}
     >
       <span className="min-w-0 flex-1">
         <span className="text-body-1 text-fg block font-semibold">

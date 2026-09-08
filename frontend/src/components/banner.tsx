@@ -3,6 +3,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 
 import { ChevronRightIcon } from '@/components/icons'
+import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -36,7 +37,7 @@ export function Banner({
   href: string
   /** 아이콘. 여기에만 danger 색을 쓴다 */
   leading?: ReactNode
-  inset?: 'main' | 'rail'
+  inset?: Inset
   className?: string
 }) {
   return (
@@ -44,7 +45,7 @@ export function Banner({
       href={href}
       className={cn(
         'bg-bg focus-visible:ring-brand-500 flex items-center gap-3 py-4 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
-        inset === 'rail' ? 'px-4 md:px-10 lg:px-6' : 'px-4 md:px-10',
+        INSET_CLASS[inset],
         className,
       )}
     >

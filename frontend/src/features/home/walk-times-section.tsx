@@ -1,11 +1,13 @@
 'use client'
 
-import { MetricWord } from '@/components/metric'
+import { METRIC_WORD_TONE, MetricWord } from '@/components/metric'
+import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { Skeleton } from '@/components/skeleton'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { formatCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
+import { INSET_BLEED_END_CLASS, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { CodeNameMetadata } from '@/types/api'
 import type { HourlyWalkSafetyItem, WalkTimesResponse } from '@/types/insight'
@@ -77,7 +79,7 @@ export function WalkTimesSection({
 
   return (
     <section aria-label={messages.home.goldenHeading} className="border-border border-t">
-      <div className="flex flex-col gap-3 px-4 py-4 md:px-6 md:py-5">
+      <div className={cn('flex flex-col gap-3 py-4 md:py-5', INSET_CLASS.rail)}>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
           <h2 className="text-body-1 font-semibold">{messages.home.goldenHeading}</h2>
           <WeatherWarningBadge warning={data.weatherWarning} />
@@ -128,9 +130,18 @@ function GoldenWindow({ data }: { data: WalkTimesResponse }) {
   */
   const single = data.goldenStart === data.goldenEnd
 
+  /*
+    **시각도 등급 색을 따른다.** 예전에는 `text-metric-high-700`(초록)이 하드코딩돼 있어,
+    추천 구간의 등급이 `CAUTION` 인 날 **초록 시각 옆에 황갈색 "주의"** 가 섰다 — 한 줄
+    안에서 색 두 개가 다른 말을 했다. 16px 일 때는 덜 보였는데 22px 로 키우면서 드러났다.
+
+    **`-700` 층이다** (`METRIC_WORD_TONE`). `-500` 은 22px 이상 **+ weight 900** 에만
+    허용되는데 이 시각은 700 이고, MID 의 `-500` 은 흰 배경에서 3.85:1 이라 글자로 쓰면
+    대비가 무너진다.
+  */
   return (
     <p className="text-body-1 flex flex-wrap items-baseline gap-x-2 gap-y-1 font-semibold tabular-nums">
-      <span className="text-metric-high-700 text-title-3">
+      <span className={cn('text-title-1 font-bold', METRIC_WORD_TONE[tone])}>
         {single ? (
           messages.home.goldenSingleHour.replace('{time}', hourMinute(data.goldenStart))
         ) : (
@@ -285,20 +296,88 @@ function NoForecast({
  * 부족했다 — 곡선과 캡션 사이에 다른 줄이 끼어 숫자와 이어 읽히지 않는다.
  */
 function HourlyCurve({ hourly }: { hourly: HourlyWalkSafetyItem[] }) {
+  // 훅은 early return 보다 위다 — 곡선이 비는 날과 아닌 날의 훅 순서가 달라지면 안 된다
+  const rail = useScrollRail<HTMLUListElement>()
+
   // 판정 자리의 `NoForecast` 가 이미 말했다 — 같은 문장을 두 번 두지 않는다 (#204)
   if (hourly.length === 0) return null
 
   return (
-    <div className="flex flex-col gap-1">
-      <ul className="-mx-4 flex gap-1.5 overflow-x-auto px-4 md:-mx-6 md:px-6">
-        {hourly.map((hour) => (
-          <HourCell key={hour.at} hour={hour} />
-        ))}
-      </ul>
-      {/* 셀의 sr-only 라벨과 같은 사실을 눈으로도 말한다 — 자리만으로 전달하지 않는다 */}
-      <p aria-hidden className="text-caption text-fg-muted font-medium">
-        {messages.home.goldenCurveLegend}
-      </p>
+    /*
+      **행 라벨 열 + 스크롤러.** 라벨을 스크롤러 *바깥* 형제로 둔다 — 안에 `sticky` 로
+      넣으면 마스크가 왼쪽 24px 를 투명하게 지우면서 라벨까지 흐린다. 그것을 피하려면
+      왼쪽 그라데이션과 "이전" 화살표를 포기해야 해서, 바깥에 두는 쪽을 골랐다.
+
+      대신 두 열이 각자 행 높이를 갖는다. **`RowLabels` 는 `HourCell` 의 구조를 그대로
+      미러링해야 한다** — 같은 `gap-1.5`, 같은 `text-caption` 줄, 같은 `h-8` 막대 자리.
+      한쪽만 고치면 라벨이 숫자와 어긋난 줄에 선다. 둘을 붙여 둔 이유다.
+    */
+    <div className="flex items-start gap-2">
+      <RowLabels />
+
+      {/*
+        **`scroll-rail` 은 화살표의 기준면이다** (`app/globals.css`). 화살표를 `<ul>` 안에
+        넣으면 마스크가 화살표까지 흐리고 내용과 같이 스크롤돼 제자리에 남지 않는다
+        (`ScrollRailArrows` 주석).
+
+        **`relative` 만 주면 안 된다** — 안쪽 스크롤러의 내용 폭이 조상의 `scrollWidth` 로
+        새어 `main` 이 390 → 630 이 된다. 그 클래스가 `contain: layout` 을 함께 건다.
+
+        **넘침은 오른쪽뿐이다** (`INSET_BLEED_END_CLASS`). 왼쪽에는 라벨 열이 서 있어
+        파고들 자리가 없다.
+      */}
+      <div className="scroll-rail min-w-0 flex-1">
+        <ul
+          ref={rail.ref}
+          onScroll={rail.onScroll}
+          className={cn(
+            'flex gap-1.5 overflow-x-auto',
+            INSET_BLEED_END_CLASS.rail,
+            // 스크롤바 자리는 fade 와 화살표가 대신한다 (`app/globals.css`)
+            'scrollbar-none',
+            rail.fadeClassName,
+          )}
+        >
+          {hourly.map((hour) => (
+            <HourCell key={hour.at} hour={hour} />
+          ))}
+        </ul>
+
+        <ScrollRailArrows
+          rail={rail}
+          prevLabel={messages.home.goldenCurvePrev}
+          nextLabel={messages.home.goldenCurveNext}
+        />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 곡선 왼쪽의 고정 행 라벨 — **범례를 대신한다.**
+ *
+ * 예전에는 곡선 아래 한 줄(`위는 기온 · 아래는 노면(아스팔트)`)로 위치를 설명했다.
+ * 그 줄을 읽고 다시 위로 올라와 대응시켜야 했고, 셀 안에서 두 숫자를 가르는 채널은
+ * 색 하나뿐이었다 (DESIGN.md §2-3 — 색이 유일한 채널이면 안 된다).
+ *
+ * **`aria-hidden` 이다.** 같은 낱말이 셀마다 `sr-only` 로 이미 붙어 있다 — 스크린리더는
+ * 셀을 선형으로 읽으므로 바깥 라벨과 묶이지 않고, 그대로 두면 낱말이 두 번 들린다.
+ *
+ * **`HourCell` 과 같은 리듬으로 쌓는다.** 시각 자리(빈 줄) → 기온 → 막대 자리(`h-8`)
+ * → 노면. 한쪽 구조가 바뀌면 다른 쪽도 같이 바꾼다.
+ */
+function RowLabels() {
+  return (
+    <div
+      aria-hidden
+      className="text-caption text-fg-muted flex shrink-0 flex-col gap-1.5 pt-0 font-medium"
+    >
+      {/* 시각 줄 자리. 라벨이 없지만 높이는 차지해야 아래 두 낱말이 숫자와 같은 줄에 선다 */}
+      <span aria-hidden>&nbsp;</span>
+      <span>{messages.home.goldenCurveRowTemperature}</span>
+      {/* 막대 줄 자리 — `HourCell` 의 `h-8` 과 같아야 한다 */}
+      <span aria-hidden className="h-8" />
+      <span>{messages.home.goldenCurveRowPavement}</span>
     </div>
   )
 }
@@ -372,7 +451,7 @@ function HourCell({ hour }: { hour: HourlyWalkSafetyItem }) {
 function WalkTimesSkeleton() {
   return (
     <section aria-hidden className="border-border border-t">
-      <div className="flex flex-col gap-3 px-4 py-4 md:px-6 md:py-5">
+      <div className={cn('flex flex-col gap-3 py-4 md:py-5', INSET_CLASS.rail)}>
         <Skeleton className="h-5 w-40" />
         <Skeleton className="h-7 w-48" />
         <Skeleton className="h-14 w-full" />

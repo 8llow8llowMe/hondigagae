@@ -31,11 +31,13 @@ import { dayToLocalNoon } from '@/lib/date/day'
 import { hospitalBannerDescription, pickNearestHospital } from '@/lib/emergency/nearest'
 import { getCurrentPosition, type PositionResult } from '@/lib/geo/current-position'
 import { collectIndoorAlternatives } from '@/lib/insight/indoor'
-import { pickTopPlaces, resolveBasisPlaceId } from '@/lib/insight/reasons'
+import { appliedFactorsOf, pickTopPlaces, resolveBasisPlaceId } from '@/lib/insight/reasons'
 import { readRecentPlaceId } from '@/lib/insight/recent-place'
 import { messages } from '@/lib/messages'
 import { resolveSelectedPet } from '@/lib/nav/selected-pet'
 import { pickUpcomingPlans } from '@/lib/plan/upcoming'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { PlaceSummary } from '@/types/place'
 import type { PlanSummaryItem } from '@/types/plan'
 
@@ -150,6 +152,15 @@ export function HomeView({
       ? messages.home.suitabilityFallback
       : messages.home.suitabilityHeading.replace('{name}', selectedPet.name)
 
+  /*
+    캡션이 말할 축을 응답에서 읽는다 (`appliedFactorsOf`). **고정 문구가 아니다** — 예전에는
+    "오늘 날씨와 혼잡도 반영" 이 늘 나가서, 장소 세 장이 전부 `혼잡도 정보 없음` 인 화면에서
+    캡션과 배지가 서로를 부정했다.
+  */
+  const applied = appliedFactorsOf(loaded)
+  const sortNote = messages.home.sortNote[applied]
+  const sortNoteShort = messages.home.sortNoteShort[applied]
+
   const placeById = new Map(places.map((place) => [place.placeId, place]))
   const remaining = Math.max(0, places.length - loaded.length)
 
@@ -182,7 +193,12 @@ export function HomeView({
       <div className="rail-layout">
         {/* ── 좌: 변하지 않는 맥락 */}
         <div className="lg:sticky lg:top-16 lg:self-start">
-          <p className="text-caption text-fg-muted px-4 pt-3 font-medium tabular-nums md:px-6 md:pt-6">
+          <p
+            className={cn(
+              'text-caption text-fg-muted pt-3 font-medium tabular-nums md:pt-5',
+              INSET_CLASS.rail,
+            )}
+          >
             {todayLabel}
           </p>
 
@@ -196,7 +212,7 @@ export function HomeView({
           {basisPlaceId !== null && (
             <>
               {walkSafety.isPending && (
-                <div className="border-border border-t px-4 py-4 md:px-6">
+                <div className={cn('border-border border-t py-4', INSET_CLASS.rail)}>
                   <Skeleton className="h-7 w-40" />
                   <Skeleton className="mt-2 h-5 w-56" />
                 </div>
@@ -205,6 +221,7 @@ export function HomeView({
                 <div className="border-border border-t">
                   <ErrorState
                     title={messages.home.verdictErrorTitle}
+                    inset="rail"
                     onRetry={() => void walkSafety.refetch()}
                   />
                 </div>
@@ -294,13 +311,21 @@ export function HomeView({
                 >
                   {heading}
                 </h2>
+                {/*
+                  **개수는 반영 축이 없어도 남는다.** 둘은 다른 사실이다 — 무엇을 반영했는지는
+                  모를 수 있어도 목록이 몇 곳인지는 언제나 안다.
+                */}
                 <p className="text-caption text-fg-muted mt-1 hidden font-medium tabular-nums md:block">
-                  {messages.home.sortNote} · {places.length}곳
+                  {sortNote === null ? '' : `${sortNote} · `}
+                  {places.length}곳
                 </p>
               </div>
-              <p className="text-caption text-fg-muted shrink-0 font-medium md:hidden">
-                {messages.home.sortNoteShort}
-              </p>
+              {/* 모바일은 자리가 없어 개수를 빼고 반영 축만 적는다 — 없으면 줄 자체를 그리지 않는다 */}
+              {sortNoteShort !== null && (
+                <p className="text-caption text-fg-muted shrink-0 font-medium md:hidden">
+                  {sortNoteShort}
+                </p>
+              )}
               <ButtonLink href="/places" className="hidden shrink-0 md:inline-flex">
                 {messages.home.findPlaces}
               </ButtonLink>

@@ -78,13 +78,17 @@ export function MetricBadge({
 }
 
 /**
- * 흰 배경 위 등급 단어에 쓰는 색. **`-700` 층이다** (DESIGN.md §2-3 — 흰 배경 대비
+ * 흰 배경 위 등급 **글자**에 쓰는 색. **`-700` 층이다** (DESIGN.md §2-3 — 흰 배경 대비
  * HIGH 8.64:1 · LOW 7.56:1 · CRITICAL 6.47:1 · MID 5.64:1).
  *
  * `-500` 을 쓰지 않는다 — 그 층은 마크와 22px+/900 큰 숫자 전용이고, MID 는 흰 배경에서
  * 3.85:1 이라 단어에 쓰면 대비가 무너진다.
+ *
+ * **내보내는 이유는 `MetricWord` 가 크기까지 못박기 때문이다** (20/800 고정). 등급 색은
+ * 필요한데 그 크기는 아닌 자리가 있다 — 홈 골든타임의 추천 시각(22/700)이 그렇다.
+ * 그런 자리는 이 표를 직접 쓰되 **`-700` 층 밖으로 나가지 않는다.**
  */
-const WORD_TONE: Record<MetricTone, string> = {
+export const METRIC_WORD_TONE: Record<MetricTone, string> = {
   critical: 'text-metric-critical-700',
   high: 'text-metric-high-700',
   mid: 'text-metric-mid-700',
@@ -116,7 +120,7 @@ export function MetricWord({
   className?: string
 }) {
   return (
-    <span className={cn('text-emphasis font-extrabold', WORD_TONE[tone], className)}>
+    <span className={cn('text-emphasis font-extrabold', METRIC_WORD_TONE[tone], className)}>
       {children}
     </span>
   )
