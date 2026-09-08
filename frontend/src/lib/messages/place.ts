@@ -30,6 +30,9 @@ export const placeMessages = {
   filterCancel: '취소',
 
   filterContentTypeLabel: '유형',
+  /** 지도 필터의 유형 줄을 좌우로 미는 화살표 (`ScrollRailArrows`) */
+  filterTypePrev: '이전 유형 보기',
+  filterTypeNext: '다음 유형 보기',
   filterPetAllowanceLabel: '반려견 동반',
   filterAllowedOnly: '반려견 동반 가능만',
 
