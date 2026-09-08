@@ -36,6 +36,7 @@ export function PlaceInsightRow({
   data,
   place,
   first = false,
+  collapsed = false,
   reasons = data.reasons,
 }: {
   data: PlaceSuitabilityResponse
@@ -43,6 +44,19 @@ export function PlaceInsightRow({
   place: PlaceSummary | undefined
   /** 첫 행은 위 구분선을 그리지 않는다 — 섹션 제목과 붙는다 */
   first?: boolean
+  /**
+   * 2·3등을 접는다 — #307. `DESIGN.md` §1 의 *"낮은 우선순위는 접는다"*.
+   *
+   * **데스크톱에서만 접힌다.** 접는 것(근거 · 속성 태그)이 애초에 `md:` 전용이라
+   * 모바일에는 접을 것이 없고, 390px 에서 썸네일까지 줄이면 목록을 알아보는 유일한
+   * 단서를 가장 좁은 화면에서 뺏는 것이 된다. 그래서 이 prop 이 바꾸는 클래스는
+   * **전부 `md:` 접두를 가진다** — 모바일 출력은 접기 전과 같다.
+   *
+   * **펼치는 장치를 두지 않는다.** 행 전체가 `<Link>` 라 그 안의 `<button>` 은 무효
+   * HTML 이고, 근거 전문은 이미 상세 화면이 갖고 있다 (`place-suitability-panel`).
+   * 펼침 상태를 URL 에 두지 않는다는 판단도 함께 사라진다 — 상태 자체가 없다.
+   */
+  collapsed?: boolean
   /**
    * 이 행에 적을 근거 (#304). **기본값은 응답 그대로**라, 목록 밖에서 이 행 하나만 쓰는
    * 곳은 지금까지와 같다.
@@ -65,9 +79,12 @@ export function PlaceInsightRow({
     <li className={cn('bg-bg', !first && 'border-border border-t')}>
       <Link
         href={`/places/${data.placeId}`}
-        className="focus-visible:ring-brand-500 flex items-center gap-3 px-4 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:gap-5 md:px-10 md:py-5"
+        className={cn(
+          'focus-visible:ring-brand-500 flex items-center gap-3 px-4 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:gap-5 md:px-10',
+          collapsed ? 'md:py-3' : 'md:py-5',
+        )}
       >
-        <Thumbnail place={place} />
+        <Thumbnail place={place} collapsed={collapsed} />
 
         {/*
           `<a>` 는 flow content 를 담을 수 있으므로 행 내부 래퍼는 `div` 다.
@@ -92,8 +109,8 @@ export function PlaceInsightRow({
             {metaLine(place)}
           </p>
 
-          {/* 근거는 데스크톱에만. 모바일은 상세에서 읽는다 */}
-          {lines.length > 0 && (
+          {/* 근거는 데스크톱에만. 모바일은 상세에서 읽는다 — 접힌 행은 근거를 접는다 */}
+          {!collapsed && lines.length > 0 && (
             <div className="mt-1.5 hidden md:block">
               {lines.map((reason, index) => (
                 <p
@@ -133,7 +150,13 @@ export function PlaceInsightRow({
           **`place` 가 없어도 이 열은 남는다.** 혼잡도는 `place` 가 아니라 적합도 응답에서
           오므로, 목록 응답이 비어도 혼잡도는 말할 수 있다.
         */}
-        <div className="hidden w-36 shrink-0 flex-wrap justify-end gap-1.5 self-start md:flex">
+        <div
+          className={cn(
+            'w-36 shrink-0 flex-wrap justify-end gap-1.5 self-start',
+            // 속성 태그는 1등에서만. 접힌 행에 남기면 접기 전후 폭이 같아 위계가 안 읽힌다
+            collapsed ? 'hidden' : 'hidden md:flex',
+          )}
+        >
           {place !== undefined && (
             <>
               <Badge tone="neutral">{place.petAllowanceType.name}</Badge>
@@ -160,7 +183,13 @@ export function PlaceInsightRow({
           **폭은 `w-28`.** 가장 긴 배지("판단 근거 부족")가 한 줄에 들어가는 값이다.
           점수(`82 /100`)보다 배지가 넓어 열 폭은 배지가 정한다.
         */}
-        <div className="hidden w-28 shrink-0 flex-col items-end gap-1.5 self-start md:flex">
+        <div
+          className={cn(
+            'hidden w-28 shrink-0 flex-col items-end gap-1.5 self-start md:flex',
+            // 접힌 행은 세로 가운데 — 근거가 없어 덩어리 하나뿐이라 위로 붙일 이유가 없다
+            collapsed && 'self-center',
+          )}
+        >
           {/*
             **서버 `name` 을 그대로 쓴다.** 아트보드는 모바일에서 "높음" 으로 줄였지만,
             그건 아트보드가 가정한 name 이 "적합도 높음" 이었기 때문이다. 실제 서버 값은
@@ -168,7 +197,12 @@ export function PlaceInsightRow({
             FE 가 서버 문구를 다시 쓰지 않는다 (api-integration-guide.md §6).
           */}
           <MetricBadge tone={tone}>{data.suitabilityLevel.name}</MetricBadge>
-          <Score score={data.score} tone={tone} size="hero" />
+          {/*
+            **접힌 행은 `row`(22/900), 1등은 `hero`(28/900).** `DESIGN.md` §1 —
+            위계는 크기와 순서로 만든다. 색으로 만들지 않으므로 등급 색은 둘 다 그대로다.
+            그 사이 크기는 없다 (§3-3).
+          */}
+          <Score score={data.score} tone={tone} size={collapsed ? 'row' : 'hero'} />
         </div>
       </Link>
     </li>
@@ -227,18 +261,34 @@ function Score({
   return <MetricValue value={score} unit="/100" tone={tone} size={size} className={className} />
 }
 
-function Thumbnail({ place }: { place: PlaceSummary | undefined }) {
+function Thumbnail({
+  place,
+  collapsed = false,
+}: {
+  place: PlaceSummary | undefined
+  collapsed?: boolean
+}) {
   const url = imageSrc(place?.firstImage ?? null)
   const illustration = placeIllustration(place?.contentType.code ?? null)
 
+  /*
+    접힌 행의 썸네일은 96 → 48 이다. **이것이 없으면 접기가 높이를 못 줄인다** — 행 높이를
+    96px 썸네일이 잡고 있어, 근거 두 줄을 걷어도 실측 136px 그대로였다 (#304 계측).
+    모바일은 `size-20` 그대로다.
+  */
   return (
-    <span className="bg-band relative flex size-20 shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-md md:size-24">
+    <span
+      className={cn(
+        'bg-band relative flex size-20 shrink-0 flex-col items-center justify-center gap-1 overflow-hidden rounded-md',
+        collapsed ? 'md:size-12' : 'md:size-24',
+      )}
+    >
       {url !== null ? (
         <Image
           src={url}
           alt=""
           fill
-          sizes="(min-width: 768px) 96px, 80px"
+          sizes={collapsed ? '(min-width: 768px) 48px, 80px' : '(min-width: 768px) 96px, 80px'}
           className="object-cover"
         />
       ) : illustration !== null ? (
@@ -248,7 +298,10 @@ function Thumbnail({ place }: { place: PlaceSummary | undefined }) {
       ) : (
         <>
           <ImageIcon size={20} className="text-fg-subtle" />
-          <span className="text-caption text-fg-muted font-medium">{messages.place.noImage}</span>
+          {/* 48px 타일에는 낱말이 들어가지 않는다 — 데스크톱 접힘에서만 뗀다 */}
+          <span className={cn('text-caption text-fg-muted font-medium', collapsed && 'md:hidden')}>
+            {messages.place.noImage}
+          </span>
         </>
       )}
     </span>

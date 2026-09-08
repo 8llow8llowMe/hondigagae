@@ -414,6 +414,12 @@ export function HomeView({
                       data={data}
                       place={placeById.get(data.placeId)}
                       first={index === 0}
+                      /*
+                        1등만 펼치고 나머지는 접는다 (#307). 홈은 요약 화면인데 세 장이
+                        전부 펼쳐져 있어 "요약" 이 아니라 "짧은 목록" 이었다 —
+                        `DESIGN.md` §1 "낮은 우선순위는 접는다".
+                      */
+                      collapsed={index > 0}
                       reasons={placeReasons[index] ?? data.reasons}
                     />
                   ))}
