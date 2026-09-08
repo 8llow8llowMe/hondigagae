@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest'
 import {
   boundsCenter,
   boundsRadiusMeters,
+  framedCenterLat,
   isSameViewport,
   isWithinBounds,
   type MapBounds,
+  metersPerPixel,
 } from '@/lib/map/viewport'
 
 /** 협재 일대. 제주는 위도 33 / 경도 126 이다 */
@@ -106,5 +108,55 @@ describe('isSameViewport', () => {
     }
 
     expect(isSameViewport(HANLIM, zoomed)).toBe(false)
+  })
+})
+
+/**
+ * **SDK 없이 확대 단계를 미터로 환산한다.** 지도를 만들기 전에 첫 중심을 정해야 해서
+ * `map.getBounds()` 를 쓸 수 없고(만든 뒤에 옮기면 `idle` 이 한 번 더 불려 사용자의
+ * 이동으로 세어진다), 환산식이 `lib/map/viewport.ts` 에 고정돼 있다.
+ * 그 식이 실측 두 건을 재현하는지 여기서 잡는다.
+ */
+describe('metersPerPixel', () => {
+  it('단계가 1 오르면 두 배가 된다 — 카카오는 작을수록 확대다', () => {
+    expect(metersPerPixel(9)).toBe(metersPerPixel(8) * 2)
+    expect(metersPerPixel(10)).toBe(metersPerPixel(9) * 2)
+  })
+
+  it('level 10 은 128 m/px 이다 — 실측 129.5 와 1% 안에서 맞는다', () => {
+    expect(metersPerPixel(10)).toBe(128)
+  })
+
+  it('level 7 · 1280×656 의 경계 반경이 11km 대다 — coord.ts 에 적힌 실측을 재현한다', () => {
+    const corner = Math.hypot(640, 328) * metersPerPixel(7)
+
+    expect(Math.round(corner / 1000)).toBe(12)
+  })
+})
+
+describe('framedCenterLat', () => {
+  const ANCHOR = 33.52
+
+  it('바다 비율 0.5 면 기준 위도가 그대로 중심이다', () => {
+    expect(framedCenterLat(ANCHOR, 656, 9, 0.5)).toBeCloseTo(ANCHOR, 10)
+  })
+
+  it('바다를 위쪽 35% 로 줄이면 중심이 기준선보다 남쪽으로 내려간다', () => {
+    expect(framedCenterLat(ANCHOR, 656, 9, 0.35)).toBeLessThan(ANCHOR)
+  })
+
+  it('기준 위도가 화면 위쪽 35% 지점에 온다 — 뷰포트 높이가 달라도 같은 구도다', () => {
+    for (const heightPx of [600, 656, 830, 1200]) {
+      const centerLat = framedCenterLat(ANCHOR, heightPx, 9, 0.35)
+      const latSpan = (metersPerPixel(9) * heightPx) / 111_320
+      // 화면 위 끝은 중심보다 위도 half 만큼 높다. 기준선까지의 거리 / 전체 높이 = 0.35
+      const fromTop = (centerLat + latSpan / 2 - ANCHOR) / latSpan
+
+      expect(fromTop).toBeCloseTo(0.35, 10)
+    }
+  })
+
+  it('높이가 0 이면 대체값으로 계산한다 — 중심이 기준선(바다)으로 올라가지 않는다', () => {
+    expect(framedCenterLat(ANCHOR, 0, 9, 0.35)).toBeLessThan(ANCHOR)
   })
 })
