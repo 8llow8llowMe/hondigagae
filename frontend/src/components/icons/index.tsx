@@ -287,3 +287,20 @@ export function CloseIcon(props: IconProps) {
     </Svg>
   )
 }
+
+/**
+ * 물음표 원 — `InfoTip` 트리거 (#313).
+ *
+ * **원을 아이콘 안에 그린다.** 버튼 쪽 `rounded-full` 배경으로 대신하면 44px 터치 영역과
+ * 원의 크기가 같아져(§7) 화면에서 22px 짜리 회색 동그라미가 된다 — 원은 16px 로 두고
+ * 터치 영역은 그 바깥 여백이 맡는다.
+ */
+export function HelpIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M9.6 9.4a2.5 2.5 0 1 1 2.9 2.5v1.4" />
+      <path d="M12.5 16.4h.01" />
+    </Svg>
+  )
+}

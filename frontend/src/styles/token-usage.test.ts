@@ -147,6 +147,8 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0)', () => {
       'src/features/home/profile-card.tsx',
       // 헤더 계정 팝오버
       'src/features/nav/account-menu.tsx',
+      // 물음표를 눌러 여는 근거 말풍선 (#313) — Menu 와 같은 팝오버다
+      'src/components/info-tip.tsx',
       // ── 지도 위에 뜨는 표면 (이슈 #14) ────────────────────────────────
       // 아트보드 `혼디가개 장소 찾기` 05·06 은 **지도가 바탕이고 목록이 그 위에 얹히는**
       // 구조다. 지도와 같은 평면에 두면 어디까지가 패널인지 읽히지 않는다.
