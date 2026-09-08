@@ -132,7 +132,7 @@ export function AiPlanDraftPreview({
               .replace('{total}', String(totalDays))
               .replace('{made}', String(madeDays))}
           </p>
-          <p className="text-caption text-fg-muted mt-0.5">
+          <p className="text-caption text-fg-muted mt-1">
             {messages.aiPlan.partialDaysDescription}
           </p>
         </div>

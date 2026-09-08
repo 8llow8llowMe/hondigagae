@@ -72,7 +72,7 @@ export function PlaceAddToPlanPicker({
                     </span>
                     <PlanStatusBadge status={plan.status} />
                   </span>
-                  <span className="text-caption text-fg-muted mt-0.5 block font-medium tabular-nums">
+                  <span className="text-caption text-fg-muted mt-1 block font-medium tabular-nums">
                     {formatPlanDateRange(plan.startDate, plan.endDate)}
                   </span>
                 </span>

@@ -85,8 +85,14 @@ function PetInfoLine({
 }) {
   return (
     <li className="flex items-start gap-2.5">
-      {/* 장식 아이콘이다 — 뜻은 옆 문장이 말한다 (DESIGN.md §9) */}
-      <CheckIcon size={20} aria-hidden className="text-metric-high-500 mt-0.5 shrink-0" />
+      {/*
+        장식 아이콘이다 — 뜻은 옆 문장이 말한다 (DESIGN.md §9).
+
+        **첫 글자 줄에 맞추는 보정을 두지 않는다** (#334). 20px 아이콘을 22px 줄(`body-2`)에
+        맞추는 이상값은 1px 인데 그 값은 스페이싱 스케일에 없다 (§4) — 스케일 안 값 중
+        0 이 1px, 4 가 3px 어긋나 가까운 쪽을 고른다.
+      */}
+      <CheckIcon size={20} aria-hidden className="text-metric-high-500 shrink-0" />
       <span className={cn('text-body-2 flex-1 break-keep', muted ? 'text-fg-muted' : 'text-fg')}>
         {label !== undefined && <span className="text-fg-muted">{label} </span>}
         {/* 개행이 있는 원문(etcAcmpyInfo)이 한 줄로 뭉치지 않게 한다 */}

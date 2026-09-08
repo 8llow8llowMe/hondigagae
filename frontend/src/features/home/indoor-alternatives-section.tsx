@@ -67,7 +67,7 @@ function IndoorAlternativeRow({ alternative }: { alternative: AlternativePlaceIt
           <span className="text-body-1 text-fg md:text-title-2 font-semibold break-words">
             {alternative.title}
           </span>
-          <span className="text-caption text-fg-muted mt-0.5 font-medium tabular-nums">
+          <span className="text-caption text-fg-muted mt-1 font-medium tabular-nums">
             {messages.home.indoorDistance.replace(
               '{distance}',
               formatDistance(alternative.distanceMeters),

@@ -81,8 +81,13 @@ export function Checkbox({
           aria-invalid={invalid ? true : undefined}
           aria-describedby={invalid ? fieldErrorId(id) : undefined}
           className={cn(
+            /*
+              **첫 글자 줄에 맞추는 보정을 두지 않는다** (#334). 20px 상자를 22px 줄
+              (`body-2`)에 맞추는 이상값은 `(22 − 20) / 2 = 1px` 인데 그 값은 스페이싱
+              스케일에 없다 (DESIGN.md §4). 스케일 안 값 중 **0 이 1px 어긋나고 4 는 3px
+              어긋난다** — 가까운 쪽을 고른다. 설명이 없을 때는 위 `items-center` 가 맡는다.
+            */
             'accent-brand-500 size-5 shrink-0 rounded',
-            description === undefined ? '' : 'mt-0.5',
             'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
             invalid && 'outline-danger-500 outline-1',
           )}

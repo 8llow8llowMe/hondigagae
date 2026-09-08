@@ -61,7 +61,7 @@ function DiffColumn({ title, rows }: { title: string; rows: readonly PlanDayDiff
               <div className="min-w-0">
                 <p className="text-body-2 text-fg font-semibold break-keep">{row.title}</p>
                 {row.caption !== null && (
-                  <p className="text-caption text-fg-muted mt-0.5 line-clamp-1 font-medium">
+                  <p className="text-caption text-fg-muted mt-1 line-clamp-1 font-medium">
                     {row.caption}
                   </p>
                 )}

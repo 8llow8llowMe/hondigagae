@@ -151,7 +151,7 @@ function OptionButton({
           {children}
         </span>
         {description !== undefined && (
-          <span className="text-caption text-fg-muted mt-0.5 block">{description}</span>
+          <span className="text-caption text-fg-muted mt-1 block">{description}</span>
         )}
       </span>
     </button>

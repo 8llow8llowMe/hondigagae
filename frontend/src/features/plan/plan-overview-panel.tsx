@@ -126,7 +126,7 @@ function PlanPetRow({ pet }: { pet: Pet }) {
       <div className="min-w-0">
         <p className="text-body-1 text-fg font-semibold break-keep">{pet.name}</p>
         {traits.length > 0 && (
-          <p className="text-caption text-fg-muted mt-0.5 line-clamp-1 font-medium">
+          <p className="text-caption text-fg-muted mt-1 line-clamp-1 font-medium">
             {traits.join(' · ')}
           </p>
         )}

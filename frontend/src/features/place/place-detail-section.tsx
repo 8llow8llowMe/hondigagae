@@ -401,9 +401,7 @@ function DelistedNotice() {
         <strong className="text-body-2 text-fg block font-semibold">
           {messages.place.detailDelistedTitle}
         </strong>
-        <p className="text-body-2 text-fg-muted mt-0.5">
-          {messages.place.detailDelistedDescription}
-        </p>
+        <p className="text-body-2 text-fg-muted mt-1">{messages.place.detailDelistedDescription}</p>
       </div>
     </div>
   )

@@ -56,7 +56,7 @@ export function PlanRow({
               {/* 데스크톱은 제목 옆, 모바일은 행 우측 상단 — 위치만 다르고 같은 배지다 */}
               <PlanStatusBadge status={plan.status} className="hidden lg:inline-flex" />
             </span>
-            <span className="text-caption text-fg-muted mt-0.5 block font-medium tabular-nums">
+            <span className="text-caption text-fg-muted mt-1 block font-medium tabular-nums">
               {formatPlanDateRange(plan.startDate, plan.endDate)}
             </span>
           </span>
