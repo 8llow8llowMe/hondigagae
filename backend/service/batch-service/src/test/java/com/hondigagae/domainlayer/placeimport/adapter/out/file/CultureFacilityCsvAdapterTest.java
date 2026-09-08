@@ -71,4 +71,18 @@ class CultureFacilityCsvAdapterTest {
         assertThat(facility.weeklyHoursSpec()).isNull();
         assertThat(facility.open24()).isFalse();
     }
+
+    @Test
+    @DisplayName("00:00~24:00 은 spec 0000-2400 과 open24 가 함께 켜진다")
+    void marksAllDayHoursAsOpen24() throws IOException {
+        // dev 에서 이 원문이 open24=false 로 내려온 것이 #301 의 가장 분명한 신호였다 —
+        // 파서가 돌았다면 반드시 true 여야 하는 값이라, 여기서 고정해 둔다.
+        List<ImportedCultureFacility> facilities = readFixture(
+            "군산오름,여행지,제주특별자치도,33.2,126.3,Y,서귀포시 어딘가 4,매일 00:00~24:00");
+
+        ImportedCultureFacility facility = facilities.get(0);
+        assertThat(facility.useTime()).isEqualTo("매일 00:00~24:00");
+        assertThat(facility.weeklyHoursSpec()).isEqualTo("1234567:0000-2400");
+        assertThat(facility.open24()).isTrue();
+    }
 }
