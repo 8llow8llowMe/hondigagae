@@ -279,8 +279,12 @@ function MonthNavButton({
         className={cn('inline-flex', direction === 'prev' ? 'rotate-180' : undefined)}
       >
         <ChevronRightIcon size={20} />
-        {/* 두 번째 화살표를 겹쳐 "한 번에 더 멀리" 를 만든다 */}
-        {double && <ChevronRightIcon size={20} className="-ms-3.5" />}
+        {/*
+          두 번째 화살표를 겹쳐 "한 번에 더 멀리" 를 만든다. 겹침은 `-ms-3`(12) —
+          예전 `-ms-3.5`(14) 는 스케일 밖 값이었고(§4), 두 글리프 사이가 6 → 8px 로
+          2px 벌어질 뿐이라 `w-9`(36) 버튼 안에 그대로 들어간다.
+        */}
+        {double && <ChevronRightIcon size={20} className="-ms-3" />}
       </span>
     </button>
   )
