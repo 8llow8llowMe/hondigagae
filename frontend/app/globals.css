@@ -109,6 +109,75 @@ body {
 }
 
 /*
+  전역 스크롤바 — 기본 두께(15~17px)는 열 폭을 밀고 시각적으로 무겁다. 6px 로 줄인다.
+
+  **표준 속성과 `::-webkit-scrollbar` 를 같은 요소에 함께 걸면 안 된다.** Chromium 은
+  `scrollbar-width`/`scrollbar-color` 가 지정되면 의사요소 쪽을 통째로 무시한다.
+  실제로 `* { scrollbar-width: thin }` 을 함께 뒀을 때 6px 이 먹지 않고 thin 기본값인
+  11px 이 나왔다(Chrome 152 실측). 그래서 두 계열을 @supports 로 갈라 놓는다.
+
+  - 의사요소를 아는 엔진(Chromium·WebKit) → 아래 `::-webkit-scrollbar` 로 정확히 6px
+  - 모르는 엔진(Firefox) → `@supports not` 안의 표준 속성으로 thin
+
+  가로 칩 레일의 `.scrollbar-none` 은 그대로 이긴다 — 의사요소 쪽은 클래스가 붙어
+  구체성이 높고(0,1,0 > 0,0,0), 표준 속성 쪽도 `*` 보다 구체적이면서 뒤에 온다.
+
+  macOS 기본값(오버레이 스크롤바)에서는 폭을 차지하지 않아 차이가 거의 보이지 않는다.
+  효과는 Windows 와 "스크롤 막대 항상 표시" 설정에서 드러나므로 검증도 그 상태로 한다.
+*/
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--border-strong);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--fg-subtle);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}
+
+/*
+  모바일 하단 탭바 위에는 스크롤바를 그리지 않는다.
+
+  뷰포트 스크롤바는 화면 높이 **전체**에 걸쳐 그려지므로 `fixed` 인 탭바 위를 그대로
+  가로지른다. 탭바는 페이지 위에 떠 있는 별개 표면인데 스크롤바가 그 위를 지나가면
+  탭바가 페이지의 일부처럼 보이고, 마지막 칸("내 정보") 아이콘과도 겹친다.
+
+  트랙에 아래 여백을 줘서 스크롤바가 탭바 높이만큼 위에서 끝나게 한다.
+
+  **선택자는 `body::` 여야 한다.** 뷰포트 스크롤바를 잡는 건 `body` 뿐이다 —
+  `html::` 과 `:root::` 는 매칭되지 않고(Chrome 152 실측), 한정자를 아예 빼면 목록
+  패널·필터 레일 같은 안쪽 스크롤 컨테이너까지 바닥에 죽은 영역이 생긴다.
+
+  `:has()` 로 탭바가 실제로 있는 문서에만 건다 — `(auth)` 그룹에는 nav 가 없어서
+  (전역nav-세부명세 D0) 무조건 걸면 로그인 화면 스크롤바만 이유 없이 짧아진다.
+
+  768 미만에서만 건다. 탭바가 `md:hidden` 이라 그 위로는 렌더되지 않는다.
+
+  **Firefox 는 대응 수단이 없다** — 표준 속성에는 트랙 인셋에 해당하는 게 없다.
+  좁은 폭 데스크톱 Firefox 에서는 스크롤바가 탭바를 가로지른 채로 남는다.
+*/
+@media (width < 48rem) {
+  body:has(nav[aria-label='하단'])::-webkit-scrollbar-track {
+    margin-block-end: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  }
+}
+
+/*
   2단 레일 레이아웃 — DESIGN.md §7-1 · §7-2.
 
   **열 구분선은 우측 열의 `border-left` 로 그린다** (사용처에서 `lg:border-l`).
