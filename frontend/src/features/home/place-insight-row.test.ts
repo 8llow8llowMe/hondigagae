@@ -157,3 +157,57 @@ describe('PlaceInsightRow — 근거 출처', () => {
     expect(markup).not.toContain('최고기온 31도')
   })
 })
+
+/*
+  #307 — 홈 첫 화면에 값이 너무 많이 서 있어 "요약" 이 아니라 "짧은 목록" 이 됐다.
+  `DESIGN.md` §1 — 위계는 크기와 순서로 만들고, **낮은 우선순위는 접는다.**
+*/
+describe('PlaceInsightRow — 접힘', () => {
+  const data = { ...suitability, reasons: REASONS_WITHOUT_CONGESTION }
+
+  function collapsed() {
+    return renderToStaticMarkup(
+      createElement(PlaceInsightRow, { data, place: placeSummary, first: false, collapsed: true }),
+    )
+  }
+
+  it('접히면 근거를 그리지 않는다', () => {
+    expect(collapsed()).not.toContain('최고기온 31도')
+    expect(render(data)).toContain('최고기온 31도')
+  })
+
+  it('접혀도 이름 · 등급 배지 · 점수는 남는다', () => {
+    const markup = collapsed()
+
+    expect(markup).toContain(suitability.placeTitle)
+    expect(markup).toContain(suitability.suitabilityLevel.name)
+    expect(markup).toContain(String(suitability.score))
+  })
+
+  /*
+    **점수 크기가 위계다.** 색으로 만들지 않으므로(§1) 등급 색은 접힌 행에도 그대로 있고,
+    갈리는 것은 `text-display`(28/900) 대 `text-title-1`(22/900) 뿐이다 (§3-3 — 그 사이 크기는 없다).
+  */
+  it('접힌 행의 점수는 한 단계 작다', () => {
+    expect(collapsed()).toContain('text-title-1')
+    expect(render(data)).toContain('text-display')
+  })
+
+  /*
+    **행 높이를 96px 썸네일이 잡고 있다** — #304 계측에서 근거 두 줄을 걷어도 136px 그대로였다.
+    썸네일을 함께 줄이지 않으면 접기가 높이를 못 줄인다.
+  */
+  it('접힌 행은 데스크톱 썸네일이 48px 이다', () => {
+    expect(collapsed()).toContain('md:size-12')
+    expect(render(data)).toContain('md:size-24')
+  })
+
+  /*
+    **모바일 출력은 접기 전과 같아야 한다.** 접는 것(근거 · 속성 태그)이 애초에 `md:`
+    전용이라 모바일에는 접을 것이 없고, 390px 에서 썸네일까지 줄이면 목록을 알아보는
+    유일한 단서를 가장 좁은 화면에서 뺏게 된다.
+  */
+  it('모바일 썸네일 크기는 건드리지 않는다', () => {
+    expect(collapsed()).toContain('size-20')
+  })
+})
