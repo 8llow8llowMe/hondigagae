@@ -11,7 +11,11 @@ import { messages } from '@/lib/messages'
 import { shortAddress } from '@/lib/place/address'
 import { placeIllustration } from '@/lib/place/illustration'
 import { cn } from '@/lib/utils/cn'
-import type { CongestionItem, PlaceSuitabilityResponse } from '@/types/insight'
+import type {
+  CongestionItem,
+  PlaceSuitabilityResponse,
+  SuitabilityReasonItem,
+} from '@/types/insight'
 import type { PlaceSummary } from '@/types/place'
 
 /**
@@ -32,15 +36,28 @@ export function PlaceInsightRow({
   data,
   place,
   first = false,
+  reasons = data.reasons,
 }: {
   data: PlaceSuitabilityResponse
   /** 목록 응답의 장소. 썸네일·주소·실내 여부는 인사이트 응답에 없다 */
   place: PlaceSummary | undefined
   /** 첫 행은 위 구분선을 그리지 않는다 — 섹션 제목과 붙는다 */
   first?: boolean
+  /**
+   * 이 행에 적을 근거 (#304). **기본값은 응답 그대로**라, 목록 밖에서 이 행 하나만 쓰는
+   * 곳은 지금까지와 같다.
+   *
+   * 홈 목록은 `splitSharedReasons` 로 **전 카드 공통 문장을 뺀 것**을 넘긴다. 날씨는
+   * 장소별 근거가 아니라 화면의 전제라, 카드마다 같은 문장을 반복하면 세 장소의 실제
+   * 차이가 그 문장 아래 묻힌다. 뺀 문장은 목록 위에 한 번 선다.
+   *
+   * **행이 스스로 걸러내지 않는다.** 무엇이 공통인지는 다른 카드를 봐야 알 수 있고,
+   * 그것은 목록을 가진 쪽만 안다.
+   */
+  reasons?: SuitabilityReasonItem[]
 }) {
   const tone = suitabilityTone(data.suitabilityLevel.code)
-  const { penalties, informational } = splitReasons(data.reasons)
+  const { penalties, informational } = splitReasons(reasons)
   // 데스크톱에만 근거 문장을 둔다. 모바일은 세로 공간이 없다
   const lines = [...penalties, ...informational].slice(0, 2)
 

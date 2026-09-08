@@ -87,3 +87,60 @@ export function appliedFactorsOf(loaded: PlaceSuitabilityResponse[]): AppliedFac
   if (congestion) return 'congestion'
   return 'none'
 }
+
+/**
+ * 로드된 카드 **전부**에 있는 근거 문장을 화면의 전제로 떼어낸다 — #304.
+ *
+ * 날씨는 장소별 근거가 아니다. 같은 날 같은 시군구면 세 장소에 똑같은 문장이 붙는데,
+ * 장소별 근거인 척 반복되면서 세 장소의 실제 차이(동반 가능 여부 · 실내/야외)가 같은
+ * 문장 아래 묻힌다. 실측(1265×900)에서 `풍랑 주의보 발효 중입니다…` 한 문장이 좌측
+ * 판정 1번 + 카드 3장 = **4번** 서 있었다.
+ *
+ * **근거 코드를 나열하지 않는다.** `WEATHER_WARNING_ACTIVE` 같은 코드로 걸러 두면 서버가
+ * 코드를 하나 더 낼 때 조용히 새어 나온다 (`frontend/CLAUDE.md` — 한국어 매핑 테이블 금지와
+ * 같은 이유다). 판단 기준은 **화면에 실제로 보이는 것**, 즉 `description` 이 겹치는가다.
+ *
+ * **`code` 가 아니라 `description` 으로 견준다.** 같은 코드라도 장소 이름이 섞이면 문장이
+ * 갈리고, 그때는 장소별 근거가 맞다. 반대로 코드가 달라도 문장이 같으면 사용자에게는
+ * 같은 말이 두 번 보이는 것이다.
+ *
+ * **한 장뿐이면 전제가 없다.** "전부에 있다" 가 "그 한 장에 있다" 와 같아져, 유일한 카드의
+ * 근거를 통째로 걷어내게 된다.
+ *
+ * 순서는 첫 카드의 순서를 따른다 — `reasons` 는 영향이 큰 순서로 오고 그 순서가 곧 중요도다.
+ */
+export function splitSharedReasons(reasonsByPlace: readonly SuitabilityReasonItem[][]): {
+  /** 전 카드 공통 문장. 호출부가 목록 위에 **한 번만** 적는다 */
+  shared: SuitabilityReasonItem[]
+  /** 공통 문장을 뺀 카드별 근거. 입력과 같은 순서·같은 길이다 */
+  perPlace: SuitabilityReasonItem[][]
+} {
+  const first = reasonsByPlace[0]
+
+  if (reasonsByPlace.length < 2 || first === undefined) {
+    return { shared: [], perPlace: reasonsByPlace.map((reasons) => [...reasons]) }
+  }
+
+  const others = reasonsByPlace
+    .slice(1)
+    .map((reasons) => new Set(reasons.map((r) => r.description)))
+
+  const sharedDescriptions = new Set<string>()
+  const shared: SuitabilityReasonItem[] = []
+
+  for (const reason of first) {
+    // 한 카드 안에 같은 문장이 두 번 와도 전제는 한 줄이다
+    if (sharedDescriptions.has(reason.description)) continue
+    if (!others.every((set) => set.has(reason.description))) continue
+
+    sharedDescriptions.add(reason.description)
+    shared.push(reason)
+  }
+
+  return {
+    shared,
+    perPlace: reasonsByPlace.map((reasons) =>
+      reasons.filter((reason) => !sharedDescriptions.has(reason.description)),
+    ),
+  }
+}
