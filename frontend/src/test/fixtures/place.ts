@@ -88,6 +88,9 @@ export const placeDetail: PlaceDetail = {
   intro: {
     infoCenter: '064-710-4150',
     useTime: '09:00~18:00 (입장 마감 17:30)',
+    open24: false,
+    // 영업 중 갈래. 다른 갈래는 각 테스트가 덮어쓴다 (#294)
+    openNow: true,
     restDate: '매주 월요일',
     parking: '가능',
     chkPet: '반려동물 동반 가능 (일부 구역)',

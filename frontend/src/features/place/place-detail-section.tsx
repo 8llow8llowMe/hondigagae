@@ -275,7 +275,20 @@ export function PlaceDetailSection({
               <InfoRow label={messages.place.detailTel} value={place.tel}>
                 {place.tel !== null && <TelLink tel={place.tel} />}
               </InfoRow>
-              <InfoRow label={messages.place.detailUseTime} value={place.intro?.useTime ?? null} />
+              {/*
+                영업 상태는 **운영시간 원문 위**에 선다 (#294 · 세부명세 D5). 별도 행으로
+                떼면 판정값과 원문이 같은 크기로 서서 어느 쪽이 답인지 흐려진다.
+
+                `useTime` 이 없으면 행 자체가 사라지는 동작을 그대로 둔다 — 근거 없이
+                판정만 오는 갈래는 계약상 없다 (`types/place.ts` 의 `openNow` 주석).
+              */}
+              <InfoRow label={messages.place.detailUseTime} value={place.intro?.useTime ?? null}>
+                <PlaceOpenStatus
+                  open24={place.intro?.open24 ?? null}
+                  openNow={place.intro?.openNow ?? null}
+                  useTime={place.intro?.useTime ?? null}
+                />
+              </InfoRow>
               <InfoRow label={messages.place.detailHomepage} value={homepage?.label ?? null}>
                 {homepage !== null && <HomepageLink href={homepage.href} label={homepage.label} />}
               </InfoRow>
@@ -447,6 +460,56 @@ function InfoRow({
         {children ?? text}
       </dd>
     </div>
+  )
+}
+
+/**
+ * 영업 상태 — `운영시간` 원문 위의 판정값 (#294).
+ *
+ * **등급 색을 쓰지 않는다.** 초록·주황은 산책 위험도 전용이고(DESIGN.md) 영업 여부는
+ * 판정 축이 아니다. 긴급 시설 `OpenStatus`(`features/emergency/facility-row.tsx`)와 같은
+ * 규칙으로 **색이 아니라 무게로 가른다.**
+ *
+ * **그 선례와 갈리는 곳이 하나 있다 — `null` 을 드러내지 않는다.** 긴급 시설은 원문조차
+ * 없는 곳이 있어 "영업 여부 확인 필요" 가 정보였지만, 여기는 바로 아래 `useTime` 원문이
+ * 항상 있어(계약상) 정보가 아니라 노이즈다. dev 실측 2026-09-08 로는 장소 200곳의
+ * `openNow` 가 **전부 `null`** 이라, 드러냈다면 131곳 전부가 그 배지 하나만 달고 있었다.
+ *
+ * 문구가 다르고(`진료중` vs `영업 중`) 이 갈래가 갈리므로 두 컴포넌트를 합치지 않는다 —
+ * 프롭으로 분기를 실으면 양쪽 다 읽기 어려워진다.
+ */
+function PlaceOpenStatus({
+  open24,
+  openNow,
+  useTime,
+}: {
+  open24: boolean | null
+  openNow: boolean | null
+  useTime: string | null
+}) {
+  const text = toPlainText(useTime)
+
+  return (
+    <>
+      {/*
+        **`open24` 면 `openNow` 를 말하지 않는다.** 24시간인 곳에 "지금 영업 중" 은
+        동어반복이고 "영업 종료" 는 모순이다 — 그 모순이 실제로 온다 (긴급 시설 dev 응답의
+        청사약국이 `10:00~24:00` 인데 `open24: true`/`openNow: false` 다). 모순을 나란히
+        두면 사용자가 판단할 수 없고, 원문이 바로 아래 있으니 확인할 수 있다.
+      */}
+      {open24 === true ? (
+        <Badge tone="neutral">{messages.place.detailOpen24}</Badge>
+      ) : (
+        openNow !== null && (
+          // 영업 중은 무게를 주고, 영업 종료는 그대로 둔다
+          <Badge tone="neutral" className={openNow ? 'text-fg font-semibold' : ''}>
+            {openNow ? messages.place.detailOpenNow : messages.place.detailOpenClosed}
+          </Badge>
+        )
+      )}
+      {/* 판정값이 있으면 줄을 바꿔 원문을 아래에 둔다 — 위계가 이 순서로 드러난다 */}
+      {text !== null && <span className="block">{text}</span>}
+    </>
   )
 }
 

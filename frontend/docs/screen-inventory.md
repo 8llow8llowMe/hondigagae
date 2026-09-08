@@ -91,7 +91,7 @@
 | 화면              | 경로                   | API                                                                                                     | 상태                                                                                      |
 | ----------------- | ---------------------- | ------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | 장소 목록         | `/places`              | `GET /places` (지역·타입·반려견 동반 필터, `SliceResponse` 커서)                                        | 구현                                                                                      |
-| 장소 상세         | `/places/[placeId]`    | `GET /places/{placeId}` + `GET /places/{placeId}/suitability` (intro/petInfo/images 결합, **nullable**) | 구현                                                                                      |
+| 장소 상세         | `/places/[placeId]`    | `GET /places/{placeId}` + `GET /places/{placeId}/suitability` (intro/petInfo/images 결합, **nullable**) | 구현 — 영업 상태 포함 (#294)                                                              |
 | 장소 상세 하단 바 | `/places/[placeId]` 내 | `GET`·`POST`·`DELETE /favorites/places` + `POST /plans` + `PUT /plans/{planId}/days/{day}/items`        | 구현 — 저장 + 일정에 담기 ([#118](https://github.com/8llow8llowMe/hondigagae/issues/118)) |
 | 지도 뷰           | `/places?view=map`     | 목록 캐시 재사용 + `GET /places/nearby`(지도 이동 시) + 카카오 지도 SDK                                 | **구현** ([#14](https://github.com/8llow8llowMe/hondigagae/issues/14))                    |
 
@@ -136,6 +136,14 @@
   `false`(야외)와 다르게 다룬다 — 메타 줄에서 낱말을 빼고, 실내 필터를 가진 화면(목록 행·장소 상세)만
   "실내 여부 미확인" 배지로 드러낸다. 조립은 `lib/place/meta.ts` 한 곳이다.
 - **`sigunguCode` 는 여전히 상세 응답에 없다.** 목록 항목에만 있다 — #16 범위가 아니었다.
+- **영업 상태(`intro.open24` / `intro.openNow`)는 화면에 붙었지만 dev 데이터가 비어 있다**
+  ([#294](https://github.com/8llow8llowMe/hondigagae/issues/294)). 장소 200곳 전수 조회
+  (2026-09-08)에서 `openNow` 가 **전부 `null`**, `open24` 가 **전부 `false`** 였다 —
+  `useTime` 은 131곳 전부 채워져 있고 `매일 00:00~24:00` 인 곳조차 `open24: false` 다.
+  BE `152ef4e`(#267)가 `weekly_hours_spec` 컬럼과 문화정보원 CSV 구조화를 넣었는데 그
+  원천의 장소가 전부 비어 오므로 **재적재/백필 누락으로 보인다.** FE 는 `openNow: null` 을
+  **완전 숨김**으로 다루므로 지금 화면은 종전과 같고, 백필되면 자동으로 배지가 뜬다.
+  **확인은 mock 6갈래로만 된다** (`features/place/장소상세-세부명세.md` D5-5).
 - **`delisted` 를 404 로 대신 읽지 않는다** ([#146](https://github.com/8llow8llowMe/hondigagae/issues/146)).
   원천에서 사라진 장소의 상세는 **200 + `delisted: true`** 로 온다 — 기존 일정(`plan_item`)이
   참조하는 장소라 백엔드가 일부러 계속 응답한다. `GET /places/{placeId}` 가 **404** 를 내는 것은

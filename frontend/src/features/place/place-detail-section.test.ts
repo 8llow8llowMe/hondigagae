@@ -21,6 +21,7 @@ import {
   placeDetailFromTourApi,
   placeDetailWithoutOptionalSections,
 } from '@/test/fixtures/place'
+import type { PlaceDetail } from '@/types/place'
 
 /** 판정이 이미 도착한 상태. 판정 분기 자체는 `place-suitability-panel.test.ts` 가 본다 */
 const suitability: PlaceSuitabilityPanelProps = {
@@ -172,6 +173,8 @@ describe('PlaceDetailSection — nullable 섹션은 숨긴다', () => {
         intro: {
           infoCenter: null,
           useTime: null,
+          open24: null,
+          openNow: null,
           restDate: null,
           parking: null,
           chkPet: null,
@@ -390,5 +393,91 @@ describe('원천에서 사라진 장소 — 안내를 먼저 보여 준다 (#146
 
     expect(markup).not.toContain(messages.place.detailDelistedTitle)
     expect(markup).toContain(messages.place.detailNotFoundDescription)
+  })
+})
+
+/*
+  **#294.** 영업 상태는 `운영시간` 원문 **위**에 서는 판정값이다.
+
+  **`openNow: null` 을 드러내지 않는 것이 이 묶음의 요점이다.** 긴급 시설은 같은 `null` 을
+  점선 배지("영업 여부 확인 필요")로 드러내지만, 그 화면에는 원문조차 없는 곳이 있어 "모름"
+  이 정보였다. 장소는 원문이 항상 함께 있어 정보가 아니다 — dev 실측 2026-09-08 로 장소
+  200곳의 `openNow` 가 전부 `null` 이라, 드러냈다면 131곳 전부가 그 배지 하나만 달았다.
+*/
+describe('PlaceDetailSection — 영업 상태 (#294)', () => {
+  function withIntro(overrides: Partial<NonNullable<PlaceDetail['intro']>>) {
+    return render({
+      place: {
+        ...placeDetail,
+        intro: { ...placeDetail.intro!, ...overrides },
+      },
+    })
+  }
+
+  it('openNow 가 true 면 영업 중을 쓴다', () => {
+    const markup = withIntro({ open24: false, openNow: true })
+
+    expect(markup).toContain(messages.place.detailOpenNow)
+    expect(markup).not.toContain(messages.place.detailOpenClosed)
+  })
+
+  it('openNow 가 false 면 영업 종료를 쓴다', () => {
+    const markup = withIntro({ open24: false, openNow: false })
+
+    expect(markup).toContain(messages.place.detailOpenClosed)
+    expect(markup).not.toContain(messages.place.detailOpenNow)
+  })
+
+  /*
+    24시간인 곳에 "지금 영업 중" 은 동어반복이고 "영업 종료" 는 모순이다. 그 모순이 실제로
+    오므로(긴급 시설 dev 응답의 청사약국 — `10:00~24:00` 인데 `open24: true`/`openNow: false`)
+    화면은 `24시간` 하나만 말한다.
+  */
+  it('open24 면 openNow 가 어긋나도 24시간만 쓴다', () => {
+    const markup = withIntro({ open24: true, openNow: false })
+
+    expect(markup).toContain(messages.place.detailOpen24)
+    expect(markup).not.toContain(messages.place.detailOpenClosed)
+    expect(markup).not.toContain(messages.place.detailOpenNow)
+  })
+
+  it('open24 이고 openNow 가 null 이어도 24시간을 쓴다', () => {
+    expect(withIntro({ open24: true, openNow: null })).toContain(messages.place.detailOpen24)
+  })
+
+  /* 이 갈래가 회귀하면 dev 의 모든 장소에 쓸모없는 배지가 붙는다 */
+  it('openNow 가 null 이면 배지를 아예 그리지 않는다', () => {
+    const markup = withIntro({ open24: false, openNow: null })
+
+    expect(markup).not.toContain(messages.place.detailOpenNow)
+    expect(markup).not.toContain(messages.place.detailOpenClosed)
+    expect(markup).not.toContain(messages.place.detailOpen24)
+  })
+
+  it('open24 가 null 이어도 같다 — false 와 구분해 다루지 않는다', () => {
+    const markup = withIntro({ open24: null, openNow: null })
+
+    expect(markup).not.toContain(messages.place.detailOpen24)
+  })
+
+  /* 판정값은 원문을 대체하지 않는다 — 위계를 가르는 것이지 감추는 것이 아니다 */
+  it('어느 갈래에서도 운영시간 원문이 남는다', () => {
+    const useTime = placeDetail.intro!.useTime!
+
+    expect(withIntro({ open24: false, openNow: true })).toContain(useTime)
+    expect(withIntro({ open24: false, openNow: false })).toContain(useTime)
+    expect(withIntro({ open24: true, openNow: false })).toContain(useTime)
+    expect(withIntro({ open24: false, openNow: null })).toContain(useTime)
+  })
+
+  /*
+    `useTime` 이 없으면 `운영시간` 행 자체가 사라지는 기존 동작을 그대로 둔다.
+    근거 없이 판정만 오는 갈래는 계약상 없다 (`types/place.ts` 의 `openNow` 주석).
+  */
+  it('운영시간 원문이 없으면 행이 사라져 판정값도 함께 사라진다', () => {
+    const markup = withIntro({ useTime: null, open24: false, openNow: true })
+
+    expect(markup).not.toContain(messages.place.detailUseTime)
+    expect(markup).not.toContain(messages.place.detailOpenNow)
   })
 })
