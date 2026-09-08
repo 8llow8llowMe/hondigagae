@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
+import { InfiniteScrollSentinel } from '@/components/infinite-scroll-sentinel'
 import { RowList } from '@/components/surface'
 import { PlaceRow } from '@/features/place/place-row'
 import { PlaceRowSkeleton } from '@/features/place/place-row-skeleton'
@@ -12,6 +13,14 @@ import { messages } from '@/lib/messages'
 import type { PlaceSummary } from '@/types/place'
 
 const SKELETON_COUNT = 6
+
+/**
+ * 다음 페이지를 받는 동안 목록 끝에 세우는 행 수.
+ *
+ * 첫 로딩(6개)보다 적게 둔다 — 이미 읽을 것이 위에 있는 상태라, 스켈레톤이 화면을
+ * 채우면 방금 보던 목록이 밀려 올라가 어디를 읽고 있었는지 잃는다.
+ */
+const LOAD_MORE_SKELETON_COUNT = 2
 
 export type PlaceListSectionProps = {
   places: readonly PlaceSummary[]
@@ -122,18 +131,31 @@ export function PlaceListSection({
       </RowList>
 
       {hasNext ? (
-        // 아트보드 01·03 절: 모바일은 전폭, 데스크톱은 내용 폭. 좌우 여백은 행 인셋과 같다
-        <div className="border-border border-t px-4 py-4 md:px-10 lg:py-5">
-          <Button
-            variant="secondary"
-            size="md"
-            className="w-full md:w-auto"
-            loading={loadingMore}
-            onClick={onLoadMore}
-          >
-            {messages.common.loadMore}
-          </Button>
-        </div>
+        /*
+          **커서 페이지네이션을 버튼으로 드러내지 않는다.** "더 보기" 는 사용자가 목록을
+          계속 보고 싶다는 뜻을 이미 스크롤로 말한 뒤에 한 번 더 누르게 하는 단계였다.
+          표식이 화면에 들어오면 다음 페이지를 받는다.
+
+          받아오는 동안 **스켈레톤 행을 세운다.** 아무것도 두지 않으면 목록이 끝난 것처럼
+          보이고, 스피너 하나만 두면 이어서 무엇이 올지 예고하지 못한다.
+        */
+        <>
+          <InfiniteScrollSentinel onIntersect={onLoadMore} disabled={loadingMore} />
+
+          {loadingMore && (
+            <>
+              <RowList>
+                {Array.from({ length: LOAD_MORE_SKELETON_COUNT }, (_, index) => (
+                  <PlaceRowSkeleton key={index} last={index === LOAD_MORE_SKELETON_COUNT - 1} />
+                ))}
+              </RowList>
+              {/* 스켈레톤은 보조기기에 아무 말도 하지 않는다. 진행 상황은 이 줄이 알린다 */}
+              <p role="status" className="sr-only">
+                {messages.common.loading}
+              </p>
+            </>
+          )}
+        </>
       ) : (
         <p className="text-caption text-fg-muted py-4 text-center font-medium">
           {messages.common.listEnd}
