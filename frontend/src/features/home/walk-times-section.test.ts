@@ -82,16 +82,67 @@ describe('WalkTimesSection — 추천 구간', () => {
     goldenLevel: { code: 'CAUTION', name: '주의', description: null, scoreDescription: null },
   }
 
-  it('추천 시각과 등급어가 같은 등급 색을 쓴다', () => {
-    const markup = render(CAUTION_GOLDEN)
+  /*
+    **추천 문장 한 줄만 떼어 본다** (#312). 예전에는 마크업 전체에 `not.toContain` 을 걸어
+    두었는데, 곡선 셀의 노면 숫자가 등급 색을 갖게 되면서 그 단정이 무너졌다 — 그 색은
+    이 문장과 무관한 다른 자리의 사실이다. 검사 대상은 처음부터 이 한 줄이었다.
+  */
+  function recommendationLine(markup: string): string {
+    return /<p class="text-body-1[^>]*>.*?<\/p>/.exec(markup)?.[0] ?? ''
+  }
 
-    expect(markup).toContain('text-metric-mid-700')
-    expect(markup).not.toContain('text-metric-high-700')
+  it('추천 시각과 등급어가 같은 등급 색을 쓴다', () => {
+    const line = recommendationLine(render(CAUTION_GOLDEN))
+
+    expect(line).toContain('18:00')
+    expect(line).toContain('text-metric-mid-700')
+    expect(line).not.toContain('text-metric-high-700')
   })
 
   /* `-500` 은 22px + weight 900 전용이다. 이 시각은 700 이라 글자 층(`-700`)을 쓴다 */
   it('추천 시각에 -500 층을 쓰지 않는다', () => {
     expect(render(CAUTION_GOLDEN)).not.toContain('text-metric-mid-500')
+  })
+
+  /*
+    #312 — 곡선의 세로 막대는 `h-8 w-2` 고정이라 **길이가 변하지 않으면서 막대의 형태**를
+    하고 있었다. DESIGN.md §10 이 이미 금지한 것이고(장식성 세로 바는 `ReasonList` 3px 바에만),
+    그 색은 문장이 가리키는 추천 구간으로 옮겼다.
+  */
+  it('장식성 세로 막대를 그리지 않는다', () => {
+    const markup = render(GOOD_DAY)
+
+    expect(markup).not.toContain('h-8 w-2')
+    expect(markup).not.toContain('bg-metric-high-500')
+  })
+
+  it('추천 구간에 드는 셀에만 tint 면을 준다', () => {
+    // GOOD_DAY 는 18:00 – 21:00 추천이고 곡선은 14시부터다
+    const cells = render(GOOD_DAY).split('<li ').slice(1)
+
+    expect(cells).toHaveLength(8)
+    expect(cells.map((cell) => cell.includes('bg-metric-'))).toEqual([
+      false, // 14시
+      false, // 15시
+      false, // 16시
+      false, // 17시
+      true, //  18시 — 구간 시작
+      true, //  19시
+      true, //  20시
+      true, //  21시 — 구간 끝
+    ])
+  })
+
+  /* 면과 숫자가 다 색이라 스크린리더에는 아무 말도 못 한다 — 낱말을 남긴다 */
+  it('등급 이름을 sr-only 로 남긴다', () => {
+    expect(render(GOOD_DAY)).toContain('<span class="sr-only">안전</span>')
+  })
+
+  /* 추천이 없는 날에 화면이 구간을 만들어 내지 않는다 */
+  it('추천 구간이 없으면 어느 셀에도 면을 주지 않는다', () => {
+    const markup = render({ ...GOOD_DAY, goldenStart: null, goldenEnd: null, goldenLevel: null })
+
+    expect(markup).not.toContain('bg-metric-')
   })
 
   /*

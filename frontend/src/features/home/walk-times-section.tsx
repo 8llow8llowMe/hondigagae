@@ -5,6 +5,7 @@ import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { Skeleton } from '@/components/skeleton'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { formatCelsius } from '@/lib/format/celsius'
+import { markGoldenWindow } from '@/lib/insight/golden-window'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { INSET_BLEED_END_CLASS, INSET_CLASS } from '@/lib/ui/inset'
@@ -99,7 +100,7 @@ export function WalkTimesSection({
           <NoForecast coverage={data.forecastCoverage} onRetry={onRetry} />
         )}
 
-        <HourlyCurve hourly={data.hourly} />
+        <HourlyCurve data={data} />
 
         <p className="text-caption text-fg-muted font-medium">
           {positionFallback ? messages.home.goldenBasis : messages.home.goldenBasisCurrent} ·{' '}
@@ -295,9 +296,22 @@ function NoForecast({
  * 그 위치가 무엇인지는 낱말이 말해야 한다. 섹션 맨 아래 캡션(`goldenPavementNote`)으로는
  * 부족했다 — 곡선과 캡션 사이에 다른 줄이 끼어 숫자와 이어 읽히지 않는다.
  */
-function HourlyCurve({ hourly }: { hourly: HourlyWalkSafetyItem[] }) {
+function HourlyCurve({ data }: { data: WalkTimesResponse }) {
   // 훅은 early return 보다 위다 — 곡선이 비는 날과 아닌 날의 훅 순서가 달라지면 안 된다
   const rail = useScrollRail<HTMLUListElement>()
+
+  const hourly = data.hourly
+
+  /*
+    추천 구간 표시 (#312). **문장이 가리키는 시각을 곡선에서도 짚는다** — 위에서
+    `17:00 – 23:00` 을 추천해 놓고 아래 셀 중 어느 것이 그 구간인지 표시가 없어,
+    시각을 하나씩 대조해야 문장과 그림이 이어졌다.
+
+    **면의 색은 구간의 등급(`goldenLevel`)이다.** 칸마다의 등급이 아니다 — 이 면이
+    말하는 것은 "서버가 추천한 구간" 하나이고, 칸마다 색이 갈리면 면이 아니라 줄무늬가 된다.
+  */
+  const marks = markGoldenWindow(hourly, data.goldenStart, data.goldenEnd)
+  const windowTone = walkSafetyTone(data.goldenLevel?.code)
 
   // 판정 자리의 `NoForecast` 가 이미 말했다 — 같은 문장을 두 번 두지 않는다 (#204)
   if (hourly.length === 0) return null
@@ -331,15 +345,27 @@ function HourlyCurve({ hourly }: { hourly: HourlyWalkSafetyItem[] }) {
           ref={rail.ref}
           onScroll={rail.onScroll}
           className={cn(
-            'flex gap-1.5 overflow-x-auto',
+            /*
+              **칸 사이 간격을 `gap` 이 아니라 셀 안쪽 padding 으로 준다** (#312).
+              `gap` 이면 추천 구간의 tint 면이 칸마다 끊겨 면이 아니라 줄무늬로 읽힌다.
+              padding 은 배경이 함께 칠해지므로 이웃한 칸의 면이 정확히 맞닿는다.
+              간격은 6 → 8 이 된다. 3px 씩 나눠 6 을 유지하려면 스케일 밖 값이 되고
+              (DESIGN.md §4 — arbitrary value 금지), 8 은 스케일 안 값이다.
+            */
+            'flex overflow-x-auto',
             INSET_BLEED_END_CLASS.rail,
             // 스크롤바 자리는 fade 와 화살표가 대신한다 (`app/globals.css`)
             'scrollbar-none',
             rail.fadeClassName,
           )}
         >
-          {hourly.map((hour) => (
-            <HourCell key={hour.at} hour={hour} />
+          {hourly.map((hour, index) => (
+            <HourCell
+              key={hour.at}
+              hour={hour}
+              inGoldenWindow={marks[index]?.inWindow ?? false}
+              windowTone={windowTone}
+            />
           ))}
         </ul>
 
@@ -363,8 +389,8 @@ function HourlyCurve({ hourly }: { hourly: HourlyWalkSafetyItem[] }) {
  * **`aria-hidden` 이다.** 같은 낱말이 셀마다 `sr-only` 로 이미 붙어 있다 — 스크린리더는
  * 셀을 선형으로 읽으므로 바깥 라벨과 묶이지 않고, 그대로 두면 낱말이 두 번 들린다.
  *
- * **`HourCell` 과 같은 리듬으로 쌓는다.** 시각 자리(빈 줄) → 기온 → 막대 자리(`h-8`)
- * → 노면. 한쪽 구조가 바뀌면 다른 쪽도 같이 바꾼다.
+ * **`HourCell` 과 같은 리듬으로 쌓는다.** 시각 자리(빈 줄) → 기온 → 노면. 한쪽 구조가
+ * 바뀌면 다른 쪽도 같이 바꾼다 — 예전에 있던 `h-8` 막대 자리는 막대와 함께 걷었다 (#312).
  */
 function RowLabels() {
   return (
@@ -375,23 +401,28 @@ function RowLabels() {
       {/* 시각 줄 자리. 라벨이 없지만 높이는 차지해야 아래 두 낱말이 숫자와 같은 줄에 선다 */}
       <span aria-hidden>&nbsp;</span>
       <span>{messages.home.goldenCurveRowTemperature}</span>
-      {/* 막대 줄 자리 — `HourCell` 의 `h-8` 과 같아야 한다 */}
-      <span aria-hidden className="h-8" />
       <span>{messages.home.goldenCurveRowPavement}</span>
     </div>
   )
 }
 
 /**
- * 막대 색은 등급 톤의 **-500 층**이다. 3px 지표 바와 같은 자리라 12px 텍스트 대비 규칙이
- * 걸리지 않는다 (DESIGN.md §2-3 — `-500` 은 지표 바와 stroke 아이콘 전용).
+ * 추천 구간 tint 면 — **`-100` 층**이다 (#312).
+ *
+ * 예전에는 이 색이 `-500` 층 세로 막대에 있었다. 그 막대는 `h-8 w-2` 고정이라 **길이가
+ * 변하지 않으면서 막대의 형태를 하고 있었다** — 사람은 막대를 보면 길이를 읽으려 하는데
+ * 읽을 것이 없었다. `DESIGN.md` §10 이 이미 금지한 것이기도 하다 (장식성 세로 바는
+ * `ReasonList` 근거 부호의 3px 바에만).
+ *
+ * 그 색을 **문장이 가리키는 구간**으로 옮겼다. 면은 12px 숫자의 배경이 되므로 텍스트 대비
+ * 규칙에 걸린다 — `-500` 이 아니라 tint 층인 `-100` 을 쓴다.
  */
-const BAR_TONE: Record<string, string> = {
-  critical: 'bg-metric-critical-500',
-  high: 'bg-metric-high-500',
-  mid: 'bg-metric-mid-500',
-  low: 'bg-metric-low-500',
-  unknown: 'bg-metric-unknown-500',
+const WINDOW_TINT: Record<string, string> = {
+  critical: 'bg-metric-critical-100',
+  high: 'bg-metric-high-100',
+  mid: 'bg-metric-mid-100',
+  low: 'bg-metric-low-100',
+  unknown: 'bg-band',
 }
 
 /**
@@ -404,28 +435,49 @@ const BAR_TONE: Record<string, string> = {
  *
  * 둘을 나란히 두면 **"기온은 괜찮은데 지면이 뜨겁다"** 는 이 서비스의 요점이 그대로 간다.
  *
- * **막대가 둘을 가른다.** 3rem 폭에 `기온 29℃` 는 들어가지 않고 줄을 나누면 여섯 줄짜리
+ * **위치가 둘을 가른다.** 3rem 폭에 `기온 29℃` 는 들어가지 않고 줄을 나누면 여러 줄짜리
  * 셀이 되어 가로 한 줄이라는 이 곡선의 성격이 사라진다. 그래서
- *  - **눈으로는** 위치(막대 위=기온, 아래=노면) + 진하기, 그리고 곡선 바로 아래 범례
- *  - **보조기기에는** 낱말(`기온` · `추정 노면(아스팔트) 온도`)
+ *  - **눈으로는** 위치(위=기온, 아래=노면)와 왼쪽 고정 행 라벨(`RowLabels`)
+ *  - **보조기기에는** 낱말(`기온` · `추정 노면(아스팔트) 온도` · 등급 이름)
  *
  * 자리와 색만으로 전달하지 않는다 (DESIGN.md §2-3) — 두 채널이 같은 사실을 말한다.
+ *
+ * **세로 막대를 걷었다** (#312). `h-8 w-2` 고정이라 길이가 변하지 않으면서 막대의 형태를
+ * 하고 있었고, 그 색은 추천 구간 표시로 옮겼다 (`WINDOW_TINT`).
  */
-function HourCell({ hour }: { hour: HourlyWalkSafetyItem }) {
+function HourCell({
+  hour,
+  inGoldenWindow,
+  windowTone,
+}: {
+  hour: HourlyWalkSafetyItem
+  /** 이 칸이 서버가 추천한 구간에 드는가 (`markGoldenWindow`) */
+  inGoldenWindow: boolean
+  /** 구간 전체의 등급 톤. 칸마다의 등급이 아니다 */
+  windowTone: string
+}) {
   const tone = walkSafetyTone(hour.walkSafetyLevel.code)
   const temperature = formatCelsius(hour.temperature)
   const pavement = formatCelsius(hour.estimatedPavementCelsius)
 
   return (
-    <li className="flex shrink-0 flex-col items-center gap-1.5" style={{ minWidth: '3rem' }}>
+    <li
+      className={cn(
+        // 두 칸이 맞닿아 8px 이 된다 — 스케일 안 값이다 (DESIGN.md §4: 4 · 6 · 8 …)
+        'flex shrink-0 flex-col items-center gap-1.5 px-1 py-1',
+        // 라운드를 주지 않는다 — 목록·섹션에 라운드가 없다 (DESIGN.md §0)
+        inGoldenWindow && WINDOW_TINT[windowTone],
+      )}
+      // 3rem(칸) + 8px(안쪽 여백). 예전 피치(48 + gap 6)보다 칸당 2px 넓다
+      style={{ minWidth: '3.5rem' }}
+    >
       <span className="text-caption text-fg-muted font-medium tabular-nums">
         {hourOnly(hour.at)}
       </span>
 
       {/*
-        **기온이 노면보다 진하다.** 사람이 외출을 정할 때 실제로 보는 값이 이쪽이고,
-        노면은 그 판단을 뒤집는 근거다 — 등급 색은 막대가 이미 말하므로 여기에 톤을 주지
-        않는다 (판정을 말하는 자리가 둘이 되면 무엇이 판정인지 흐려진다).
+        **기온에는 톤을 주지 않는다.** 사람이 외출을 정할 때 먼저 보는 값이지만 등급을
+        가르는 것은 아래 노면온도이고, 두 숫자가 다 색을 가지면 무엇이 판정인지 흐려진다.
       */}
       <span className="text-caption text-fg font-medium tabular-nums">
         <span className="sr-only">{messages.home.temperatureLabel} </span>
@@ -433,17 +485,22 @@ function HourCell({ hour }: { hour: HourlyWalkSafetyItem }) {
       </span>
 
       {/*
-        등급 이름을 화면에서 지우지 않는다 — 막대는 색뿐이라 스크린리더에 아무 말도 하지
-        못한다. 시각적으로는 숫자가 대신하므로 이름은 보조기기 전용으로 둔다.
-      */}
-      <span className={cn('h-8 w-2 rounded-full', BAR_TONE[tone])}>
-        <span className="sr-only">{hour.walkSafetyLevel.name}</span>
-      </span>
+        **등급 색이 노면 숫자로 내려왔다** (#312). 걷어낸 막대가 갖고 있던 정보다 —
+        `-700` 층이라 12px 글자에 써도 대비가 선다 (`METRIC_WORD_TONE`, DESIGN.md §2-3).
 
-      <span className="text-caption text-fg-muted font-medium tabular-nums">
+        **색이 유일한 채널이 아니다.** 무엇의 온도인지는 왼쪽 행 라벨이 낱말로 말하고,
+        등급 이름은 아래 `sr-only` 가 보조기기에 그대로 전한다.
+      */}
+      <span className={cn('text-caption font-medium tabular-nums', METRIC_WORD_TONE[tone])}>
         <span className="sr-only">{messages.home.pavementLabel} </span>
         {pavement === null ? '—' : `${pavement}℃`}
       </span>
+
+      {/*
+        막대와 함께 사라질 뻔한 낱말이다. 화면에서는 tint 면과 숫자가 말하지만 둘 다
+        스크린리더에는 아무 말도 하지 못한다.
+      */}
+      <span className="sr-only">{hour.walkSafetyLevel.name}</span>
     </li>
   )
 }
