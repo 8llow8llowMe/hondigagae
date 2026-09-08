@@ -125,8 +125,22 @@ dev 서버(`BACKEND_API_URL=https://api-dev.hondigagae.com`)에 직접 붙는다
 ### 실행 순서 (배치)
 
 ```
-placeImportJob → cultureFacilityImportJob → petRestaurantImportJob → congestionImportJob
+placeImportJob → cultureFacilityImportJob → petRestaurantImportJob → placeImageBackfillJob → congestionImportJob
 ```
 
 `congestionImportJob` 은 장소 마스터가 채워진 뒤에 돌려야 명칭 매칭이 붙는다.
 비어 있으면 전부 UNMATCHED 로 적재되고 적합도 응답에서 혼잡도가 계속 빠진다.
+
+`placeImageBackfillJob` 은 **문화정보원·식약처 적재 뒤**에 돌린다 — 그 두 원천에는 이미지
+필드가 없어서 같은 장소가 TourAPI 에 있으면 대표 이미지를 빌려 채운다. 순서를 앞당기면
+채울 대상이 아직 없어 0건으로 끝난다. 재실행은 멱등이다(이미 채워진 행은 대상에서 빠진다).
+
+```bash
+./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=placeImageBackfillJob areaCode=39 runAt=$(date +%s)"
+```
+
+이 잡을 돌려도 **모든 장소에 사진이 생기지는 않는다.** 정규화 제목 일치 + 좌표 500m 를 둘 다
+통과해야 채우기 때문이다(틀린 사진이 없는 사진보다 나쁘다). dev 실측(2026-09-08)에서
+문화정보원 228곳 중 이름이 같은 TourAPI 행이 있는 곳은 2곳뿐이었고 둘 다 좌표가 1km 넘게
+떨어져 있었다 — 나머지는 원천에 그 장소가 없다. 못 채운 자리는 프론트의 카테고리 일러스트가
+담당한다.
