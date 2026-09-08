@@ -114,3 +114,46 @@ describe('PlaceInsightRow — 혼잡도', () => {
     expect(markup).not.toContain('mt-1 flex items-center gap-2 md:hidden')
   })
 })
+
+/*
+  #304 — 카드 전부에 같은 날씨 문장이 붙어 목록이 그 한 문장으로 채워졌다. 걸러내는 일은
+  목록을 가진 쪽(`home-view`)이 하고(`splitSharedReasons`), 이 행은 **받은 것만 그린다.**
+*/
+describe('PlaceInsightRow — 근거 출처', () => {
+  it('`reasons` 를 주면 응답 대신 그것을 그린다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(PlaceInsightRow, {
+        data: { ...suitability, reasons: REASONS_WITHOUT_CONGESTION },
+        place: placeSummary,
+        first: true,
+        // 공통 문장(`PET_ALLOWED`)이 빠진 나머지 — home-view 가 넘기는 모양이다
+        reasons: [REASONS_WITHOUT_CONGESTION[1]!],
+      }),
+    )
+
+    expect(markup).toContain('최고기온 31도')
+    expect(markup).not.toContain('반려견과 함께 입장할 수 있는 장소입니다')
+  })
+
+  /* 목록 밖에서 이 행 하나만 쓰는 곳은 지금까지와 같아야 한다 */
+  it('안 주면 응답의 `reasons` 를 그대로 그린다', () => {
+    const markup = render({ ...suitability, reasons: REASONS_WITHOUT_CONGESTION })
+
+    expect(markup).toContain('반려견과 함께 입장할 수 있는 장소입니다')
+  })
+
+  /* 공통 문장을 다 걷어 빈 배열이 와도 근거 블록만 사라지고 행은 남는다 */
+  it('빈 배열이면 근거 없이 행만 그린다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(PlaceInsightRow, {
+        data: { ...suitability, reasons: REASONS_WITHOUT_CONGESTION },
+        place: placeSummary,
+        first: true,
+        reasons: [],
+      }),
+    )
+
+    expect(markup).toContain(suitability.placeTitle)
+    expect(markup).not.toContain('최고기온 31도')
+  })
+})

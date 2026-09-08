@@ -31,7 +31,12 @@ import { dayToLocalNoon } from '@/lib/date/day'
 import { hospitalBannerDescription, pickNearestHospital } from '@/lib/emergency/nearest'
 import { getCurrentPosition, type PositionResult } from '@/lib/geo/current-position'
 import { collectIndoorAlternatives } from '@/lib/insight/indoor'
-import { appliedFactorsOf, pickTopPlaces, resolveBasisPlaceId } from '@/lib/insight/reasons'
+import {
+  appliedFactorsOf,
+  pickTopPlaces,
+  resolveBasisPlaceId,
+  splitSharedReasons,
+} from '@/lib/insight/reasons'
 import { readRecentPlaceId } from '@/lib/insight/recent-place'
 import { messages } from '@/lib/messages'
 import { resolveSelectedPet } from '@/lib/nav/selected-pet'
@@ -163,6 +168,14 @@ export function HomeView({
 
   const placeById = new Map(places.map((place) => [place.placeId, place]))
   const remaining = Math.max(0, places.length - loaded.length)
+
+  /*
+    카드 전부에 똑같이 붙는 문장은 장소별 근거가 아니라 **이 화면의 전제**다 (#304).
+    카드에서 걷어 목록 위에 한 번만 적는다 — 남는 문장이 곧 장소 간 차이가 된다.
+  */
+  const { shared: sharedReasons, perPlace: placeReasons } = splitSharedReasons(
+    loaded.map((data) => data.reasons),
+  )
 
   /*
     비 예보일 때의 실내 대안. **추가 호출이 없다** — 위 적합도 응답에 이미 들어 있다.
@@ -331,6 +344,36 @@ export function HomeView({
               </ButtonLink>
             </div>
 
+            {/*
+              카드에서 걷어 온 공통 근거 (#304) — 목록의 **전제**로 한 번만 선다.
+
+              **문구는 서버 `description` 그대로다.** 여기서 "오늘은" 같은 말을 앞에 붙이면
+              FE 가 서버 문장을 다시 쓰는 것이 된다 (docs/styling-guide.md §7).
+
+              **데스크톱 전용이다.** 카드 근거 자체가 `hidden md:block` 이라, 모바일에서는
+              걷어낼 것도 옮겨 올 것도 없다 — 여기에 상시 노출로 두면 없던 줄이 새로 생긴다.
+              모바일의 특보는 위 권역 섹션의 `WeatherWarningBadge` 가 이미 말한다.
+
+              **기준 장소가 없는 첫 방문자에게도 보인다.** 좌측 판정 섹션은 그때 렌더되지
+              않으므로(`resolveBasisPlaceId`), 카드에서만 걷고 끝냈으면 그 사용자는 특보를
+              어디서도 못 봤다. 이 자리는 우측 열이라 로그인 여부와 무관하게 남는다.
+            */}
+            {sharedReasons.length > 0 && (
+              <div className="hidden px-4 pb-3 md:block md:px-10">
+                {sharedReasons.map((reason, index) => (
+                  <p
+                    key={`${index}-${reason.code}`}
+                    className={cn(
+                      'text-body-2 break-keep',
+                      reason.scoreDelta === 0 ? 'text-fg-muted' : 'text-fg',
+                    )}
+                  >
+                    {reason.description}
+                  </p>
+                ))}
+              </div>
+            )}
+
             {pending && loaded.length === 0 ? (
               <ul>
                 {Array.from({ length: 2 }, (_, index) => (
@@ -371,6 +414,7 @@ export function HomeView({
                       data={data}
                       place={placeById.get(data.placeId)}
                       first={index === 0}
+                      reasons={placeReasons[index] ?? data.reasons}
                     />
                   ))}
                 </ul>
