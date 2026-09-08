@@ -61,7 +61,7 @@ export function PlaceAddToPlanPicker({
                 onClick={() => onSelectPlan(plan.planId)}
                 aria-pressed={selected}
                 className={cn(
-                  'focus-visible:ring-brand-500 flex w-full items-center gap-3 px-4 py-3.5 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
+                  'focus-visible:ring-brand-500 flex w-full items-center gap-3 px-4 py-3 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
                   selected && 'bg-band',
                 )}
               >

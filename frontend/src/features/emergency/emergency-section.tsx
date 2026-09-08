@@ -243,7 +243,7 @@ function PositionNotice({ reason, onRetry }: { reason: PositionFailure; onRetry:
           : messages.emergency.positionTimeout
 
   return (
-    <div className="border-border flex flex-col items-start gap-2 border-b px-4 py-3.5 md:px-10">
+    <div className="border-border flex flex-col items-start gap-2 border-b px-4 py-3 md:px-10">
       <p className="text-body-2 text-fg break-keep">{text}</p>
       {/*
         **다시 시도할 것이 없는 두 갈래에는 버튼을 두지 않는다.** 미지원 브라우저는
