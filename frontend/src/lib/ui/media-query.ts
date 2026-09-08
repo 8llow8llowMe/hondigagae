@@ -39,3 +39,12 @@ function getSnapshot(query: string): boolean {
 
 /** Tailwind `lg` (64rem). 값을 화면마다 적지 않는다 — 브레이크포인트가 갈리면 레이아웃이 갈린다 */
 export const LG_QUERY = '(min-width: 64rem)'
+
+/**
+ * Tailwind `md` (48rem). 팝오버냐 시트냐를 가르는 선이다 (`InfoTip`).
+ *
+ * **여기서는 CSS 로 감출 수 없다.** `md:hidden` 으로 시트를 감춰도 시트는 mount 된 채
+ * `useOverlay` 를 걸어 Esc·포커스 이동·바탕 스크롤 잠금을 실행한다 — 보이지 않는 오버레이가
+ * 키보드를 가로챈다. 둘 중 하나만 mount 해야 한다.
+ */
+export const MD_QUERY = '(min-width: 48rem)'

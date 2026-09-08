@@ -3,6 +3,7 @@
 import { useState } from 'react'
 
 import { ChevronDownIcon, ClockIcon } from '@/components/icons'
+import { InfoTip } from '@/components/info-tip'
 import { MetricValue, MetricWord } from '@/components/metric'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { formatCelsius } from '@/lib/format/celsius'
@@ -139,7 +140,25 @@ export function WalkVerdict({
           */}
           {feelsLike !== null && (
             <MetricValue
-              label={messages.home.feelsLikeLabel}
+              label={
+                <span className="inline-flex items-center gap-1">
+                  {messages.home.feelsLikeLabel}
+                  {/*
+                    **`33.0℃` 가 무슨 척도인지 말하는 자리가 홈에 없었다** (#313).
+                    `feelsLikeBasis` 는 응답에 이미 있고 장소 상세는 접힘 서랍으로 내보내는데,
+                    홈은 숫자만 있었다. 상시 노출로 세우지 않고 원할 때 여는 채널로 둔다 —
+                    홈 첫 화면의 밀도를 키우면서 행동은 하나도 바꾸지 않는 문장이다.
+
+                    **`null` 이면 아이콘 자체를 렌더하지 않는다.** 눌러도 빈 말풍선이 뜨는
+                    물음표를 두지 않는다.
+                  */}
+                  {data.feelsLikeBasis !== null && (
+                    <InfoTip label={messages.home.feelsLikeBasisLabel}>
+                      {data.feelsLikeBasis}
+                    </InfoTip>
+                  )}
+                </span>
+              }
               value={feelsLike}
               unit="℃"
               tone={tone}

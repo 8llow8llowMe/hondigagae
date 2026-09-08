@@ -72,10 +72,30 @@ describe('WalkVerdict — 체감온도 라벨 (#259)', () => {
   it('모바일 접힌 줄과 데스크톱 hero 양쪽에 라벨이 붙는다', () => {
     const markup = render(walkSafety)
 
-    // 데스크톱 hero — `MetricValue` 의 라벨은 자기 span 이다
-    expect(markup).toContain(`>${messages.home.feelsLikeLabel}</span>`)
+    /*
+      데스크톱 hero — `MetricValue` 의 라벨은 자기 span 이다. **낱말 뒤가 `</span>` 이 아니다**
+      (#313): 라벨 옆에 `InfoTip` 물음표가 서면서 낱말과 버튼을 한 줄로 묶는 span 이 하나
+      더 생겼다. 확인할 것은 낱말이 자기 요소의 **텍스트 시작**에 선다는 것이다.
+    */
+    expect(markup).toContain(`>${messages.home.feelsLikeLabel}`)
     // 모바일 접힌 줄 — 라벨과 값이 한 문장으로 붙는다
     expect(markup).toContain(`>${messages.home.feelsLikeLabel} 33.0℃`)
+  })
+
+  /*
+    #313 — 체감온도 근거를 여는 물음표. **`feelsLikeBasis` 가 있을 때만 선다** —
+    눌러도 빈 말풍선이 뜨는 물음표를 두지 않는다.
+  */
+  it('체감온도 근거가 있으면 물음표를 세운다', () => {
+    expect(render(walkSafety)).toContain(`aria-label="${messages.home.feelsLikeBasisLabel}"`)
+  })
+
+  it('체감온도 근거가 없으면 물음표를 그리지 않는다', () => {
+    const markup = render({ ...walkSafety, feelsLikeBasis: null })
+
+    expect(markup).not.toContain(`aria-label="${messages.home.feelsLikeBasisLabel}"`)
+    // 값은 그대로 남는다 — 사라지는 것은 근거를 여는 버튼뿐이다
+    expect(markup).toContain('33.0')
   })
 
   /*

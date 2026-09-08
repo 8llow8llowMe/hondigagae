@@ -190,6 +190,7 @@ type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
 | `Checkbox`                  | 자체 `<label htmlFor>`. `error` 시 `aria-invalid` + `aria-describedby`                                                                      |
 | `Skeleton`                  | `aria-hidden` (스크린리더에 의미 없는 반복 읽기 방지)                                                                                       |
 | `EmptyState` / `ErrorState` | 제목이 heading 요소여야 한다                                                                                                                |
+| `InfoTip`                   | hover · focus · click **셋 다** 열고 `Esc`·바깥 클릭이 닫는다. `title` 속성을 쓰지 않는다. `md` 미만은 `BottomSheet` 로 떨어뜨린다          |
 
 ### 선택 계열은 `Field` 로 감싸지 않는다
 
@@ -219,6 +220,24 @@ export type ButtonProps = (IconOnly | WithLabel) & BaseButtonProps
 ```
 
 `iconOnly` 를 주고 `aria-label` 을 빼면 **컴파일이 실패한다.** 이런 식으로 리뷰 항목을 타입으로 내리는 것을 우선한다.
+
+### `InfoTip` — 보조 설명은 hover 만으로 열지 않는다
+
+응답에 근거 문장은 있는데 화면에 자리가 없는 필드를 여는 채널이다 (#313). 상시 노출로
+세우면 밀도만 키우고 행동은 바꾸지 않는 문장들이다.
+
+| 규칙                                  | 이유                                                                    |
+| ------------------------------------- | ----------------------------------------------------------------------- |
+| hover + focus + click **셋 다**       | hover 만이면 터치에서 안 열리고 키보드로도 못 연다                      |
+| `Esc` · 바깥 클릭으로 닫는다          | 덮개가 없는 팝오버라 문서에서 직접 듣는다 (`Menu` 와 같은 방식)         |
+| **`title` 을 쓰지 않는다**            | 모바일에서 안 뜨고 스크린리더 지원이 제각각이며 지연을 우리가 못 정한다 |
+| `md` 미만은 `BottomSheet`             | 근거 문장이 100자를 넘어 390px 말풍선에 안 들어간다                     |
+| **하나만 mount 한다**                 | `md:hidden` 으로 감춘 시트도 `useOverlay` 로 Esc·포커스를 가로챈다      |
+| **포커스를 옮기지 않는다**            | 팝오버는 읽는 것이다. 옮기면 focus 로 연 것이 blur 로 곧바로 닫힌다     |
+| `aria-describedby` + `role="tooltip"` | 트리거에 머문 채 내용이 읽힌다                                          |
+| 44px 터치 영역 (§7)                   | 아이콘 16 + `p-3`. `-m-3` 로 레이아웃 폭은 20 으로 되돌린다             |
+
+**클릭으로 연 것은 고정된다** — hover 가 끝나도 닫히지 않는다. 읽는 도중에 사라지면 읽을 수 없다.
 
 ## 8. 파일 내부 순서
 
