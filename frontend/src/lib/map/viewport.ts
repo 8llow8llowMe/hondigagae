@@ -80,3 +80,53 @@ export function isSameViewport(
 
   return ratio < 0.1
 }
+
+/**
+ * 카카오 확대 단계 → **픽셀당 미터.**
+ *
+ * 실측으로 확인했다 (2026-09-08, dev · 컨테이너 1280×656 · level 10): 마커 두 개의 화면
+ * 좌표차와 좌표값차로 재면 129.5 m/px 이고, 이 식이 주는 128 과 1% 안에서 맞는다.
+ * 같은 식이 `coord.ts` 에 적혀 있던 다른 실측("7 이면 반경 11km")도 재현한다 —
+ * √(640² + 328²) × 16 = 11.5km.
+ *
+ * **SDK 에 이 값을 물어볼 방법이 없다.** `map.getBounds()` 는 지도를 만든 뒤에야
+ * 답하는데, 첫 중심을 정하는 일은 지도를 만들기 **전**에 끝나야 한다 (만든 뒤에 옮기면
+ * 그 이동이 `idle` 을 한 번 더 부르고, 그것이 사용자의 이동으로 세어져 첫 화면부터
+ * 주변 검색으로 갈아탄다). 그래서 환산식을 여기 고정해 둔다.
+ */
+export function metersPerPixel(level: number): number {
+  return 0.25 * 2 ** (level - 1)
+}
+
+/** 위도 1도의 남북 거리(m). 제주만 다루므로 상수로 충분하다 */
+const METERS_PER_LAT_DEGREE = 111_320
+
+/**
+ * 컨테이너 높이를 아직 모를 때 쓰는 대체값.
+ *
+ * 시트나 탭 뒤에서 지도가 만들어지면 `clientHeight` 가 0 이고, 그대로 계산하면 위도
+ * 폭이 0 이 되어 **중심이 해안선 위(바다)로 올라간다.** 데스크톱 실측값을 대신 쓴다.
+ */
+const FALLBACK_HEIGHT_PX = 640
+
+/**
+ * 기준 위도가 화면 위쪽 `seaRatio` 지점에 오는 **지도 중심의 위도.**
+ *
+ * 첫 화면을 "위쪽은 바다 · 아래쪽은 육지" 로 열기 위한 계산이다. 중심을 상수로 박으면
+ * 뷰포트 높이에 따라 바다 비율이 흔들린다 — 같은 좌표가 데스크톱에서 35%, 모바일에서
+ * 21% 가 된다. 높이를 받아 그때그때 역산하면 어느 화면에서도 같은 구도가 된다.
+ *
+ * 화면 위에서 아래로 갈수록 위도는 **작아진다.** 중심은 화면 정중앙(0.5)이므로,
+ * 기준 위도는 중심보다 `(0.5 - seaRatio)` 만큼 위에 있다.
+ */
+export function framedCenterLat(
+  anchorLat: number,
+  heightPx: number,
+  level: number,
+  seaRatio: number,
+): number {
+  const height = heightPx > 0 ? heightPx : FALLBACK_HEIGHT_PX
+  const latSpan = (metersPerPixel(level) * height) / METERS_PER_LAT_DEGREE
+
+  return anchorLat - (0.5 - seaRatio) * latSpan
+}

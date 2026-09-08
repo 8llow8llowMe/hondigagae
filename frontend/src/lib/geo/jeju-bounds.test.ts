@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { JEJU_CENTER } from '@/lib/geo/coord'
+import { JEJU_MAP_ANCHOR } from '@/lib/geo/coord'
 import { JEJU_QUERY_CENTER } from '@/lib/geo/current-position'
 import { isInJeju, JEJU_BOUNDS } from '@/lib/geo/jeju-bounds'
 
 describe('isInJeju — 제주 안', () => {
   /* 두 기준 좌표가 상자 밖이면 폴백이 스스로를 "제주 밖" 이라고 부르게 된다 */
   it('두 제주 기준 좌표는 안이다', () => {
-    expect(isInJeju(JEJU_CENTER)).toBe(true)
+    expect(isInJeju(JEJU_MAP_ANCHOR)).toBe(true)
     expect(isInJeju(JEJU_QUERY_CENTER)).toBe(true)
   })
 

@@ -55,7 +55,7 @@ new kakao.maps.LatLng(coord.lat, coord.lng)
 
 - **순서를 뒤집으면 지도가 기니 만 앞바다로 튄다.** 제주는 위도 33 / 경도 126 이므로 뒤집으면 위도가 126이 되어 범위를 벗어난다.
 - 좌표가 `null` 이거나 `0` 인 장소는 **마커를 그리지 않는다.**
-- 변환·검증은 `src/lib/geo/coord.ts` 의 `toLatLng()` 을 쓴다. 유효하지 않으면 `null` 을 반환하므로 호출부가 마커를 건너뛴다. 폴백 중심은 `JEJU_CENTER` 다.
+- 변환·검증은 `src/lib/geo/coord.ts` 의 `toLatLng()` 을 쓴다. 유효하지 않으면 `null` 을 반환하므로 호출부가 마커를 건너뛴다.
 - 이 함수에는 테스트가 있다 (`src/lib/geo/coord.test.ts`). 새 좌표 규칙을 추가하면 테스트도 추가한다.
 
 ### 생명주기 (메모리 누수)
@@ -109,8 +109,17 @@ navigator.geolocation.getCurrentPosition(onOk, onFail, { timeout: 8000 })
   `혼디가개 긴급 시설` 02·04 는 카카오맵으로 적고 있고, 이 저장소가 발급받은 키도 카카오다.
 - **길찾기는 SDK 경로 안내가 아니라 외부 지도 앱 딥링크**다 (`lib/geo/map-link.ts`).
 - 제주 기준 좌표가 **두 개**다. 이름을 갈라 뒀으니 섞지 않는다:
-  `JEJU_CENTER`(`lib/geo/coord.ts`, 섬의 기하 중심 — **지도를 놓는 자리**)와
-  `JEJU_QUERY_CENTER`(`lib/geo/current-position.ts`, 제주시 — **좌표를 모를 때 조회 기준점**).
+  `JEJU_MAP_ANCHOR`(`lib/geo/coord.ts`, 제주시 북쪽 해안선 — **지도 첫 화면의 기준선**)와
+  `JEJU_QUERY_CENTER`(`lib/geo/current-position.ts`, 제주시청 — **좌표를 모를 때 조회 기준점**).
+- **첫 중심은 상수가 아니라 계산값이다.** `JEJU_MAP_ANCHOR.lat` 이 화면 위쪽
+  `JEJU_MAP_SEA_RATIO`(35%) 지점에 오도록 `framedCenterLat`(`lib/map/viewport.ts`)이
+  역산한다 → 어느 뷰포트에서도 **위쪽은 바다, 아래쪽은 육지**로 열린다. 중심을 상수로
+  박으면 같은 좌표가 데스크톱에서 35%, 모바일에서 21% 가 된다.
+- **계산은 지도를 만들기 전에 끝낸다.** 만든 뒤 `setCenter` 로 옮기면 그 이동이 `idle` 을
+  한 번 더 부르고, `MapCanvas` 의 `settledRef` 판정에서 그것이 **사용자의 이동**으로 세어져
+  첫 화면부터 `GET /places/nearby` 로 갈아탄다. 그래서 확대 단계 → 픽셀당 미터 환산식
+  (`metersPerPixel`)을 FE 가 갖는다 — SDK 는 지도를 만든 뒤에야 `getBounds()` 로 답한다.
+  실측으로 고정한 값이라 임의로 바꾸지 않는다 (`viewport.ts` 머리주석).
 
 ### 검토
 

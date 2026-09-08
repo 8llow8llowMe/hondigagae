@@ -51,10 +51,18 @@ export type KakaoMapOptions = {
   level?: number
 }
 
+/** `setLevel` 의 두 번째 인자 */
+export type KakaoZoomOptions = {
+  /** `true` 면 SDK 기본 지속시간, 객체면 밀리초를 지정한다 */
+  animate?: boolean | { duration: number }
+  /** 확대 중심으로 고정할 좌표. 주지 않으면 지도 중심이 기준이다 */
+  anchor?: KakaoLatLng
+}
+
 export type KakaoMap = {
   setCenter: (latlng: KakaoLatLng) => void
   getCenter: () => KakaoLatLng
-  setLevel: (level: number) => void
+  setLevel: (level: number, options?: KakaoZoomOptions) => void
   getLevel: () => number
   getBounds: () => KakaoLatLngBounds
   setBounds: (bounds: KakaoLatLngBounds) => void
