@@ -90,25 +90,42 @@ describe('PlaceListSection — 빈 결과', () => {
   })
 })
 
+/**
+ * 커서 페이지네이션을 **버튼으로 드러내지 않는다.** "더 보기" 는 사용자가 스크롤로 이미
+ * 말한 뜻을 한 번 더 누르게 하는 단계였다 — 감지 표식이 그 자리를 대신한다.
+ */
 describe('PlaceListSection — 무한 스크롤', () => {
-  it('다음 페이지가 있으면 더 보기를 노출한다', () => {
+  it('다음 페이지가 있으면 감지 표식을 두고 버튼은 두지 않는다', () => {
     const markup = render({ places: [placeSummary], hasNext: true })
 
-    expect(markup).toContain(messages.common.loadMore)
+    expect(markup).toContain('class="h-px w-full"')
+    // 문구 상수가 아니라 **글자**로 잡는다 — 어느 상수를 쓰든 버튼이 돌아오면 걸린다
+    expect(markup).not.toContain('더 보기')
     expect(markup).not.toContain(messages.common.listEnd)
   })
 
-  it('마지막 페이지에서는 종료 문구를 노출한다', () => {
+  it('마지막 페이지에서는 감지 표식 없이 종료 문구만 노출한다', () => {
     const markup = render({ places: [placeSummary], hasNext: false })
 
     expect(markup).toContain(messages.common.listEnd)
-    expect(markup).not.toContain(messages.common.loadMore)
+    expect(markup).not.toContain('class="h-px w-full"')
   })
 
-  it('추가 로딩 중에는 더 보기 버튼을 비활성화한다', () => {
+  it('추가 로딩 중에는 스켈레톤 행과 진행 안내를 함께 둔다', () => {
     const markup = render({ places: [placeSummary], hasNext: true, loadingMore: true })
 
-    expect(markup).toContain('aria-busy="true"')
-    expect(markup).toContain('disabled')
+    // 목록 끝이 비어 보이지 않아야 한다 — 다음에 무엇이 올지 형태로 예고한다
+    expect(markup).toContain('animate-pulse')
+    // 스켈레톤은 보조기기에 아무 말도 하지 않는다
+    expect(markup).toContain('role="status"')
+    expect(markup).toContain(messages.common.loading)
+    // 첫 행은 그대로 남는다 — 추가 로딩이 목록을 대체하지 않는다
+    expect(markup).toContain(placeSummary.title)
+  })
+
+  it('로딩이 끝나면 스켈레톤을 걷는다', () => {
+    const markup = render({ places: [placeSummary], hasNext: true, loadingMore: false })
+
+    expect(markup).not.toContain('animate-pulse')
   })
 })

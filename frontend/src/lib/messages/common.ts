@@ -24,5 +24,4 @@ export const commonMessages = {
    * 목록 끝에 붙는 이 줄이 말할 수 있는 것은 목록의 상태뿐이다 (디자인 리뷰 #15).
    */
   listEnd: '마지막 장소예요',
-  loadMore: '더 보기',
 } as const
