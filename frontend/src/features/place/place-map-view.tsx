@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 
-import { Checkbox } from '@/components/checkbox'
 import { EmptyState } from '@/components/empty-state'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { MapSheet, type SheetStop } from '@/components/map-sheet'
@@ -69,7 +68,6 @@ export function PlaceMapView({
   const [bounds, setBounds] = useState<MapBounds | null>(null)
   /** 지도를 옮겼는지. 처음 `idle` 한 번은 이동이 아니다 */
   const [movedBounds, setMovedBounds] = useState<MapBounds | null>(null)
-  const [searchOnMove, setSearchOnMove] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sheetStop, setSheetStop] = useState<SheetStop>('mid')
   const [panelOpen, setPanelOpen] = useState(true)
@@ -115,9 +113,15 @@ export function PlaceMapView({
 
   const searchCenter = movedBounds === null ? null : boundsCenter(movedBounds)
   const searchRadius = movedBounds === null ? 0 : boundsRadiusMeters(movedBounds)
-  const nearbyQuery = useNearbyPlaces(searchCenter, searchRadius, filters, searchOnMove)
+  /*
+    **지도를 옮기면 항상 그 지역을 다시 찾는다.** 예전에는 이것을 체크박스로 열어 뒀는데
+    (#240), 켜고 끄는 것이 바꾸는 것은 **데이터 출처**여서 화면만 보고는 무엇이 달라지는지
+    알 수 없었다. 끈 상태에서도 영역 필터는 계속 돌아 화면 밖 장소가 빠지니, 사용자에게는
+    "아무 일도 안 하는 체크박스" 로 보였다. 지도를 옮기는 것이 곧 "여기를 보여 줘" 다.
+  */
+  const nearbyQuery = useNearbyPlaces(searchCenter, searchRadius, filters, true)
 
-  const usingNearby = searchOnMove && nearbyQuery.data !== undefined
+  const usingNearby = nearbyQuery.data !== undefined
   const places: PlaceSummary[] = useMemo(
     () => (usingNearby ? (nearbyQuery.data?.places.map((entry) => entry.place) ?? []) : listPlaces),
     [usingNearby, nearbyQuery.data, listPlaces],
@@ -237,66 +241,72 @@ export function PlaceMapView({
         className={cn(
           // 상단은 보기 전환 토글과 **같은 높이**다 (lg 헤더의 `pt-6`) — 8px 어긋나면
           // 지도 위에 뜬 두 표면이 서로 삐뚤어져 보인다
-          'absolute top-6 bottom-4 left-4 z-30 hidden lg:flex',
+          //
+          // 하단은 32 다. **카카오 축척·로고 막대가 지도 왼쪽 아래 20px 를 쓴다** —
+          // 16 이었을 때는 패널이 그 위에 바로 얹혀 축척이 눌려 보였다 (실측: 막대가
+          // 바닥에서 0~19px, 왼쪽 6px 부터 129px 폭). 32 면 13px 이 남는다.
+          'absolute top-6 bottom-8 left-4 z-30 hidden lg:block',
           panelOpen ? 'map-panel-width' : 'w-auto',
         )}
       >
         {panelOpen ? (
-          <div className="bg-bg border-border flex w-full flex-col overflow-hidden rounded-xl border shadow-lg">
+          // 접기 탭이 패널 **밖으로** 튀어나오므로 여기서 자르지 않는다
+          <div className="relative h-full">
             {/*
-              **패널 머리에는 필터가 온다.** 예전에는 "지도에 보이는 곳 20" 이 제목으로
-              앉아 있었는데, 제목이 할 일이 없는 자리다 — 이 패널이 무엇인지는 안에 든
-              목록이 이미 말한다. 개수는 아래 캡션으로 내렸다.
+              **오른쪽 위만 각지다** (`rounded-tr-none`). 둥근 모서리에 탭을 붙이면 그
+              곡선만큼 지도가 초승달로 비쳐 탭이 떠 있는 것처럼 보인다. 그 자리는 탭이
+              덮는 자리이므로 각지게 두는 것이 맞다.
             */}
-            <div className="border-border border-b px-3 py-2">
-              <PlaceMapFilterBar filters={filters} authed={authed} />
-            </div>
-
-            {/*
-              개수와 접기를 한 줄에 둔다 — **필터 줄에 끼우지 않는다.** 400 폭에서 접기
-              버튼(44)까지 같은 줄에 두면 유형 칩이 두 개만 보였다.
-            */}
-            <div className="border-border bg-bg-sunken flex items-center gap-2 border-b pr-1 pl-4">
-              <p className="text-caption text-fg-muted min-w-0 flex-1 font-medium">{countLine}</p>
+            <div className="bg-bg border-border flex h-full w-full flex-col overflow-hidden rounded-xl rounded-tr-none border shadow-lg">
               {/*
-                **글자 `‹` 가 아니라 아이콘이다.** 글자 화살표는 폰트가 정하는 크기로 나와
-                44 버튼 안에서 점처럼 작았고, 펼치기 쪽은 이미 `ChevronRightIcon` 이라
-                같은 컨트롤의 두 방향이 다른 물성으로 보였다.
+                **패널 머리에는 필터가 온다.** 예전에는 "지도에 보이는 곳 20" 이 제목으로
+                앉아 있었는데, 제목이 할 일이 없는 자리다 — 이 패널이 무엇인지는 안에 든
+                목록이 이미 말한다. 개수는 아래 캡션으로 내렸다.
               */}
-              <button
-                type="button"
-                onClick={() => setPanelOpen(false)}
-                aria-expanded
-                aria-label={messages.map.collapsePanel}
-                title={messages.map.collapsePanel}
-                className="text-fg-muted hover:text-fg focus-visible:ring-brand-500 flex size-11 shrink-0 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
-              >
-                <ChevronLeftIcon size={20} />
-              </button>
-            </div>
+              <div className="border-border border-b px-3 py-2">
+                <PlaceMapFilterBar filters={filters} authed={authed} />
+              </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              {visible.length === 0 ? (
-                <EmptyState
-                  title={messages.map.emptyInView}
-                  description={messages.map.emptyInViewDescription}
-                />
-              ) : (
-                <PlaceMapPanel places={visible} selectedId={selectedId} onSelect={setSelectedId} />
-              )}
-            </div>
-
-            <div className="border-border border-t px-4 py-3">
-              <Checkbox
-                id="place-map-search-on-move"
-                label={messages.map.searchOnMove}
-                checked={searchOnMove}
-                onCheckedChange={setSearchOnMove}
-              />
-              <p className="text-caption text-fg-subtle mt-2 font-medium">
-                {searchOnMove ? messages.map.panelHint : messages.map.panelHintFixed}
+              <p className="text-caption text-fg-muted border-border bg-bg-sunken border-b px-4 py-2 font-medium">
+                {countLine}
               </p>
+
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {visible.length === 0 ? (
+                  <EmptyState
+                    title={messages.map.emptyInView}
+                    description={messages.map.emptyInViewDescription}
+                  />
+                ) : (
+                  <PlaceMapPanel
+                    places={visible}
+                    selectedId={selectedId}
+                    onSelect={setSelectedId}
+                  />
+                )}
+              </div>
             </div>
+
+            {/*
+              ── 접기 탭 ──────────────────────────────────────────────────────
+
+              **패널 안이 아니라 밖에 붙는다.** 안쪽 머리에 두면 목록의 컨트롤처럼 읽혀서
+              "이 패널을 접는다" 로 보이지 않았고, 개수 줄과 자리를 다퉜다. 책갈피처럼
+              오른쪽 모서리에 물려 두면 손잡이로 읽힌다.
+
+              높이는 **닫혔을 때 펼치기 버튼이 서는 자리**와 같다(`top-0` · 44) — 접고
+              펴는 동작에서 손잡이가 제자리에 남아 있어야 같은 것으로 보인다.
+            */}
+            <button
+              type="button"
+              onClick={() => setPanelOpen(false)}
+              aria-expanded
+              aria-label={messages.map.collapsePanel}
+              title={messages.map.collapsePanel}
+              className="bg-bg border-border text-fg-muted hover:text-fg focus-visible:ring-brand-500 absolute top-0 -right-6 flex h-11 w-6 items-center justify-center rounded-r-lg border border-l-0 shadow-md focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
+            >
+              <ChevronLeftIcon size={16} />
+            </button>
           </div>
         ) : (
           <button
@@ -329,12 +339,7 @@ export function PlaceMapView({
             description={messages.map.emptyInViewDescription}
           />
         ) : (
-          <>
-            <PlaceMapPanel places={visible} selectedId={selectedId} onSelect={setSelectedId} />
-            <p className="text-caption text-fg-subtle px-4 py-3 font-medium">
-              {searchOnMove ? messages.map.panelHint : messages.map.panelHintFixed}
-            </p>
-          </>
+          <PlaceMapPanel places={visible} selectedId={selectedId} onSelect={setSelectedId} />
         )}
       </MapSheet>
     </div>
