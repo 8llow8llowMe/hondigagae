@@ -97,17 +97,27 @@ export function ChipGroup({
   children,
   className,
   ref,
+  onScroll,
 }: {
   label: string
   exclusive?: boolean
   children: ReactNode
   className?: string
-  /** 가로 스크롤 컨테이너를 사용처가 제어할 때 쓴다 (선택 칩 센터링) */
+  /**
+   * 가로 스크롤 컨테이너를 사용처가 제어할 때 쓴다 (선택 칩 센터링 · `useScrollRail`).
+   *
+   * **묶음 자신이 스크롤러여야 한다.** 바깥 div 를 스크롤러로 삼고 안에 이 묶음을 넣으면
+   * 넘치는 방향의 `padding-right` 가 무시돼 마지막 칩이 여백 없이 잘린다 —
+   * flex 컨테이너가 직접 스크롤할 때만 끝 여백이 남는다 (`components/scroll-rail.tsx`).
+   */
   ref?: Ref<HTMLDivElement>
+  /** 스크롤 위치를 사용처가 재야 할 때 (`useScrollRail` 의 `onScroll`) */
+  onScroll?: () => void
 }) {
   return (
     <div
       ref={ref}
+      onScroll={onScroll}
       role={exclusive ? 'radiogroup' : 'group'}
       aria-label={label}
       className={className}

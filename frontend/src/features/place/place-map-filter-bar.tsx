@@ -7,6 +7,7 @@ import { Button } from '@/components/button'
 import { Chip, ChipGroup } from '@/components/chip'
 import { FilterListHeading } from '@/components/filter-list'
 import { ChevronDownIcon, SlidersIcon } from '@/components/icons'
+import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { useSelectedPet } from '@/features/nav/use-selected-pet'
 import {
   CONTENT_TYPE_FILTER_ORDER,
@@ -42,6 +43,13 @@ type OpenSheet = 'region' | 'more'
  * **유형만 펼친다.** 8종 + "전체" 라 가로로 나열되는 것이 자연스럽고, 지도에서 가장
  * 자주 바꾸는 축이다. 지역(3갈래)·동반·실내·크기는 값을 고르기보다 조합해서 확정하는
  * 축이라 시트로 남긴다 — 가로줄에 다 펼치면 스크롤이 길어져 유형이 묻힌다.
+ *
+ * **두 줄이다.** 한 줄에 유형·지역·더보기를 다 두면 400 폭에서 유형이 세 개만 보이고,
+ * 뒤쪽 유형(쇼핑·여행코스)에 **닿을 방법이 없었다** — 트랙패드 가로 스크롤을 아는
+ * 사용자에게만 열린 기능이었다. 1행은 유형 전용 스크롤러 + 원형 화살표, 2행은 지역·더보기다.
+ *
+ * "더 있다" 신호(fade 마스크 + 원형 화살표)는 **홈의 가로 줄과 같은 `ScrollRail` 을 쓴다.**
+ * 같은 사실을 말하는 컨트롤이 화면마다 다르게 생기면 사용자가 두 번 배운다.
  *
  * **유형은 라디오다.** 백엔드 `contentType` 이 단일 `@RequestParam` 이라 여러 개를 보낼
  * 수 없고, "전체" 칩이 해제 역할을 맡는다 (`ContentTypeField` 와 같은 판단).
@@ -88,66 +96,80 @@ export function PlaceMapFilterBar({
 
   const dirty = toPlaceFilterQuery(filters) !== toPlaceFilterQuery(DEFAULT_PLACE_FILTERS)
 
+  const rail = useScrollRail<HTMLDivElement>()
+
   return (
-    <div className={cn('flex min-w-0 items-center gap-1.5', className)}>
+    <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
       {/*
-        유형만 가로 스크롤한다 — 지역·더보기는 항상 보여야 한다. 둘을 한 스크롤러에 넣으면
-        조건을 조합하려는 사용자가 매번 끝까지 밀어야 한다.
-        스크롤바는 감춘다(`scrollbar-none`) — 지도 위에 얹히는 줄이라 두 줄로 보인다
+        ── 1행: 유형 ───────────────────────────────────────────────────────
+
+        `.scroll-rail`(globals.css)이 화살표를 앉히는 기준면이고, **묶음 자신이
+        스크롤러**다. 바깥 div 를 스크롤러로 삼으면 넘치는 방향의 끝 여백이 사라져
+        마지막 칩이 잘린다 (`components/scroll-rail.tsx` 머리주석).
       */}
-      <ChipGroup
-        label={messages.place.filterContentTypeLabel}
-        exclusive
-        className="flex min-w-0 flex-1 scrollbar-none gap-1.5 overflow-x-auto"
-      >
-        <Chip
+      <div className="scroll-rail">
+        <ChipGroup
+          ref={rail.ref}
+          onScroll={rail.onScroll}
+          label={messages.place.filterContentTypeLabel}
           exclusive
-          selected={filters.contentType === null}
-          onSelect={() => apply({ ...filters, contentType: null })}
+          className={cn('flex scrollbar-none gap-1.5 overflow-x-auto', rail.fadeClassName)}
         >
-          {messages.place.filterAll}
-        </Chip>
-        {CONTENT_TYPE_FILTER_ORDER.map((code: ContentTypeCode) => (
           <Chip
-            key={code}
             exclusive
-            selected={filters.contentType === code}
-            onSelect={() => apply({ ...filters, contentType: code })}
+            selected={filters.contentType === null}
+            onSelect={() => apply({ ...filters, contentType: null })}
           >
-            {CONTENT_TYPE_LABEL[code]}
+            {messages.place.filterAll}
           </Chip>
-        ))}
-      </ChipGroup>
+          {CONTENT_TYPE_FILTER_ORDER.map((code: ContentTypeCode) => (
+            <Chip
+              key={code}
+              exclusive
+              selected={filters.contentType === code}
+              onSelect={() => apply({ ...filters, contentType: code })}
+            >
+              {CONTENT_TYPE_LABEL[code]}
+            </Chip>
+          ))}
+        </ChipGroup>
 
-      {/* 구분선 — 왼쪽은 값을 고르는 축, 오른쪽은 시트를 여는 트리거다 */}
-      <span aria-hidden className="bg-border h-6 w-px shrink-0" />
+        <ScrollRailArrows
+          rail={rail}
+          prevLabel={messages.place.filterTypePrev}
+          nextLabel={messages.place.filterTypeNext}
+        />
+      </div>
 
-      <Chip
-        selected={filters.sigunguCode !== null}
-        expanded={open === 'region'}
-        onSelect={() => openSheet('region')}
-        className="shrink-0"
-      >
-        {regionLabel}
-        <ChevronDownIcon size={16} />
-      </Chip>
-
-      {/* 아이콘만 둔다 — 지도 위 줄이라 폭이 없고, 이름은 `aria-label` · `title` 이 맡는다 */}
-      <Chip
-        selected={moreActive}
-        expanded={open === 'more'}
-        onSelect={() => openSheet('more')}
-        className="w-11 shrink-0 justify-center px-0"
-        label={messages.place.filterMore}
-      >
-        <SlidersIcon size={16} />
-      </Chip>
-
-      {dirty && (
-        <Chip selected={false} onSelect={reset} className="shrink-0">
-          {messages.place.resetFilters}
+      {/* ── 2행: 지역 · 더보기 ────────────────────────────────────────────── */}
+      <div className="flex min-w-0 items-center gap-1.5">
+        <Chip
+          selected={filters.sigunguCode !== null}
+          expanded={open === 'region'}
+          onSelect={() => openSheet('region')}
+          className="shrink-0"
+        >
+          {regionLabel}
+          <ChevronDownIcon size={16} />
         </Chip>
-      )}
+
+        {/* 자기 줄을 가졌으니 글자를 되살린다 — 한 줄이던 때는 폭이 없어 아이콘만 뒀다 */}
+        <Chip
+          selected={moreActive}
+          expanded={open === 'more'}
+          onSelect={() => openSheet('more')}
+          className="shrink-0"
+        >
+          <SlidersIcon size={16} />
+          {messages.place.filterMore}
+        </Chip>
+
+        {dirty && (
+          <Chip selected={false} onSelect={reset} className="shrink-0">
+            {messages.place.resetFilters}
+          </Chip>
+        )}
+      </div>
 
       <BottomSheet
         open={open === 'region'}
