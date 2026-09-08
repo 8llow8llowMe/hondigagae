@@ -59,7 +59,14 @@ export function BottomSheet({
         aria-label={title}
         tabIndex={-1}
         className={cn(
-          'bg-bg relative flex max-h-[85dvh] w-full flex-col rounded-t-xl shadow-lg outline-none md:max-w-md md:rounded-xl',
+          /*
+            **`overflow-hidden` 이 없으면 `md:rounded-xl` 이 헛돈다.** 하단 footer 가
+            자기 배경(`bg-bg`)을 사각으로 칠해서 부모의 둥근 아래 모서리를 덮는다 —
+            데스크톱 중앙 패널에서 위만 둥글고 아래는 각진 상태로 보였다.
+            모바일은 시트가 화면 바닥에 붙으므로 아래가 각진 것이 맞고, `rounded-t-xl`
+            이라 잘릴 것이 없다.
+          */
+          'bg-bg relative flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-t-xl shadow-lg outline-none md:max-w-md md:rounded-xl',
           className,
         )}
       >
