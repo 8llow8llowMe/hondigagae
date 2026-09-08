@@ -127,3 +127,45 @@ describe('WalkVerdict — 판정값은 체감온도다 (#292)', () => {
     expect(markup).toContain(messages.home.feelsLikeLabel)
   })
 })
+
+describe('WalkVerdict — 등급이 권하는 행동', () => {
+  /*
+    `walkSafetyLevel.description` 은 완성형 행동 지침이다 ("짧게 걷고 물과 그늘을 챙기는
+    편이 좋습니다"). 예전에는 등급어 두 글자만 쓰고 이 문장을 버렸다 — 판정만 하고 판단을
+    돕지 않던 자리다.
+  */
+  it('등급 설명 문장을 렌더한다', () => {
+    const markup = render({
+      ...walkSafety,
+      walkSafetyLevel: {
+        ...walkSafety.walkSafetyLevel,
+        description: '짧게 걷고 물과 그늘을 챙기는 편이 좋습니다.',
+      },
+    })
+
+    expect(markup).toContain('짧게 걷고 물과 그늘을 챙기는 편이 좋습니다.')
+  })
+
+  /* 서버가 안 주면 빈 문단을 만들지 않는다 */
+  it('설명이 없으면 줄을 만들지 않는다', () => {
+    const markup = render({
+      ...walkSafety,
+      walkSafetyLevel: { ...walkSafety.walkSafetyLevel, description: null },
+    })
+
+    expect(markup).not.toContain('<p class="text-body-2 text-fg"></p>')
+  })
+
+  /* `reasons` 가 같은 요인을 낱낱이 세므로 같은 말을 두 번 하지 않는다 */
+  it('scoreDescription 은 쓰지 않는다', () => {
+    const markup = render({
+      ...walkSafety,
+      walkSafetyLevel: {
+        ...walkSafety.walkSafetyLevel,
+        scoreDescription: '위험 요인이 하나 이상 확인되었습니다.',
+      },
+    })
+
+    expect(markup).not.toContain('위험 요인이 하나 이상 확인되었습니다.')
+  })
+})
