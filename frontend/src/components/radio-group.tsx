@@ -92,7 +92,7 @@ export function RadioGroup<T extends string>({
                 onChange={() => onValueChange(option.value)}
                 className="accent-brand-500 mt-1 size-4 shrink-0"
               />
-              <span className="flex flex-col gap-0.5">
+              <span className="flex flex-col gap-1">
                 <span className="text-body-2 text-fg font-medium">{option.label}</span>
                 {option.description !== undefined && option.description !== null && (
                   <span className="text-caption text-fg-muted">{option.description}</span>

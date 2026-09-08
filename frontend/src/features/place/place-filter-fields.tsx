@@ -200,7 +200,7 @@ export function IndoorField({ filters, onChange }: FieldProps) {
         </FilterRadio>
       </FilterList>
 
-      <p className="text-caption text-fg-muted bg-band mx-4 mt-2 mb-4 rounded-md px-3 py-2.5">
+      <p className="text-caption text-fg-muted bg-band mx-4 mt-2 mb-4 rounded-md px-3 py-2">
         {messages.place.filterIndoorUnknownNote}
       </p>
     </>

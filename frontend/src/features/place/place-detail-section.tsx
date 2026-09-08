@@ -397,7 +397,7 @@ function Breadcrumb({ title }: { title: string }) {
 function DelistedNotice() {
   return (
     <div className="px-4 py-3 md:px-10">
-      <div className="bg-band rounded-md px-3 py-2.5">
+      <div className="bg-band rounded-md px-3 py-2">
         <strong className="text-body-2 text-fg block font-semibold">
           {messages.place.detailDelistedTitle}
         </strong>

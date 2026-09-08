@@ -58,9 +58,14 @@ function DesktopLink({
       )}
     >
       {item.label}
-      {/* accent 는 "AI 가 생성·판단한 것" 표시 전용이다 (DESIGN.md §2-5) */}
+      {/*
+        accent 는 "AI 가 생성·판단한 것" 표시 전용이다 (DESIGN.md §2-5).
+
+        **높이를 padding 이 아니라 `h-5` 로 말한다** — `Badge size="sm"` 과 같은 20px 이다.
+        예전 `py-0.5`(2) 는 스케일 밖 값이었고(§4) 22px 이라 다른 배지들과 2px 어긋났다.
+      */}
       {item.ai === true && (
-        <span className="text-caption bg-accent-100 text-accent-700 rounded-sm px-1.5 py-0.5 font-semibold">
+        <span className="text-caption bg-accent-100 text-accent-700 inline-flex h-5 items-center rounded-sm px-1.5 font-semibold">
           AI
         </span>
       )}

@@ -151,8 +151,14 @@ export function DateField({
             setOpen(true)
           }}
           className={cn(
-            // 44px — 모바일 최소 터치 영역 (DESIGN.md §7). 우측 아이콘 자리를 비운다
-            'text-body-1 h-11 w-full cursor-pointer rounded-md border pr-11 pl-3 text-left',
+            /*
+              44px — 모바일 최소 터치 영역 (DESIGN.md §7).
+
+              **우측은 아이콘 자리를 비운다.** 아이콘은 `end-3`(12) 에 20px 이라 오른쪽
+              32px 을 먹는다. `pr-10`(40) 이면 글자와 아이콘 사이가 8px 남는다 — 예전
+              `pr-11`(44) 은 스케일 밖 값이었고(§4) 필요보다 4px 넓었다.
+            */
+            'text-body-1 h-11 w-full cursor-pointer rounded-md border pr-10 pl-3 text-left',
             'placeholder:text-fg-subtle',
             'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
             invalid ? 'border-danger-500' : 'border-border-strong',

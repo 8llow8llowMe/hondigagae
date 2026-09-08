@@ -145,7 +145,7 @@ function DayButton({
       onClick={onSelect}
       aria-pressed={selected}
       className={cn(
-        'focus-visible:ring-brand-500 flex min-w-24 flex-col items-start gap-0.5 rounded-md border px-3 py-2 focus-visible:ring-2 focus-visible:outline-none',
+        'focus-visible:ring-brand-500 flex min-w-24 flex-col items-start gap-1 rounded-md border px-3 py-2 focus-visible:ring-2 focus-visible:outline-none',
         selected ? 'border-brand-700 bg-band' : 'border-border',
       )}
     >

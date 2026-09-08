@@ -93,7 +93,7 @@ export function Checkbox({
           )}
           {...rest}
         />
-        <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="flex min-w-0 flex-col gap-1">
           <span className="text-body-2 text-fg">{label}</span>
           {description !== undefined && (
             <span className="text-caption text-fg-muted tabular-nums">{description}</span>
