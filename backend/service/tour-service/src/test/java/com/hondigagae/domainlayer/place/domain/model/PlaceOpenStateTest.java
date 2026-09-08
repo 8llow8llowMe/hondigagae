@@ -47,4 +47,15 @@ class PlaceOpenStateTest {
     void prefersSpecOverOpen24Flag() {
         assertThat(PlaceOpenState.resolve("3:0900-1800", true, WEDNESDAY_11PM)).isFalse();
     }
+
+    @Test
+    @DisplayName("0000-2400 spec 은 하루 어느 시각이든 열림이다")
+    void treatsAllDaySpecAsAlwaysOpen() {
+        // 배치가 "매일 00:00~24:00" 원문에서 만드는 spec 이다. 종료 2400 이 1440분으로 접혀
+        // 23:59 까지 열림으로 판정돼야 한다.
+        String spec = "1234567:0000-2400";
+
+        assertThat(PlaceOpenState.resolve(spec, true, WEDNESDAY_10AM)).isTrue();
+        assertThat(PlaceOpenState.resolve(spec, true, WEDNESDAY_11PM)).isTrue();
+    }
 }

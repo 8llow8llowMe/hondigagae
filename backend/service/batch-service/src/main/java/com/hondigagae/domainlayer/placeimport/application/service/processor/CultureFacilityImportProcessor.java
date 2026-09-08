@@ -30,7 +30,15 @@ public class CultureFacilityImportProcessor {
         }
 
         placeBulkPort.upsertCultureFacilities(facilities);
-        log.info("culture facility import done sido={} upserted={}", sido, facilities.size());
+
+        // 영업시간 구조화 커버리지를 남긴다 (긴급 시설 적재와 같은 결). withWeeklyHoursSpec 이 0 이면
+        // 컬럼만 있고 값이 없는 상태라 장소 상세의 openNow 가 전부 "모름"으로 내려간다 — #301 이 그랬다.
+        // 재적재 로그에서 바로 드러나야 API 를 전수 조회해 보기 전에 잡을 수 있다.
+        long withUseTime = facilities.stream().filter(facility -> facility.useTime() != null).count();
+        long withWeeklyHoursSpec = facilities.stream().filter(facility -> facility.weeklyHoursSpec() != null).count();
+        long open24 = facilities.stream().filter(ImportedCultureFacility::open24).count();
+        log.info("culture facility import done sido={} upserted={} withUseTime={} withWeeklyHoursSpec={} open24={}",
+            sido, facilities.size(), withUseTime, withWeeklyHoursSpec, open24);
         return facilities.size();
     }
 }

@@ -280,6 +280,7 @@ docker exec hondigagae-batch-service-dev \
 | 포트 바인딩 실패 | BossPickSeoul 6xxx/9xxx 와 충돌. 7xxx/5xxx 확인 |
 | Gradle 데몬 죽음 | `gradle.properties` 의 `-Xmx2g` 가 agent 에 반영됐는지 확인 |
 | 배치만 실패 | `VWORLD_API_KEY` / `TOUR_API_SERVICE_KEY` / `BATCH_DATA_DIR` 누락 |
+| API 는 새 필드를 내려주는데 값이 전부 기본값(null/false) | 배치가 채우는 컬럼이다. 배포 뒤 해당 적재 잡을 다시 돌리지 않았다 (§8, #301) |
 
 ## 11. 보안 체크리스트
 

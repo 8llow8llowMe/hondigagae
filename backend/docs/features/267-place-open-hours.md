@@ -28,6 +28,9 @@
 - [x] tour: `PlaceOpenState` 판정 + 상세 응답 `intro.openNow`/`open24` (QueryResult → Info → Presenter → Item 관통)
 - [x] 테스트 — `PlaceOpenStateTest`(모름 유지 4분기), `CultureFacilityCsvAdapterTest`(구조화 3분기)
 - [x] `place-data-integration.md` / `feature-status.md` 갱신
+- [ ] dev 재적재 — 배포 뒤 `cultureFacilityImportJob` 을 다시 돌려 기존 `place_intro` 행을 채운다 (#301).
+      컬럼과 코드는 있었고 데이터만 비어 있었다. 재실행 로그 `withWeeklyHoursSpec` 과
+      `매일 00:00~24:00` 장소의 `open24: true` 로 확인한다
 - [ ] (후속) TourAPI `detailIntro2` 운영시간 수집 → TOUR_API 출처 장소도 spec 커버
 - [ ] (후속) 장소 목록 `openNowOnly` 필터 (place_intro 조인)
 

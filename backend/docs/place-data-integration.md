@@ -125,6 +125,10 @@ CULTURE_FACILITY_CSV_PATH=/path/to/pet_culture.csv ./gradlew :service:batch-serv
 - CSV 원본은 30MB라 저장소에 커밋하지 않는다 (`.gitignore` 의 `backend/data/`). 재다운로드 주소는 §2
 - `sido` 파라미터로 제주만 필터 (전국 70,650행 중 1,191행)
 - upsert 키는 `(source, source_key)`. 재실행해도 같은 행을 갱신한다
+- **적재가 채우는 컬럼을 추가·변경했으면 배포 뒤 잡을 1회 재실행한다.** 컬럼은 tour-service 의
+  `ddl-auto` 가 만들지만 값은 이 잡만 채운다. 재실행을 빠뜨리면 API 는 필드를 정상적으로 내려주면서
+  값만 기본값(`weekly_hours_spec` null · `open24` false)으로 남는다 — #301 이 그랬다.
+  적재 로그의 `withWeeklyHoursSpec` 이 0 이거나 없으면 이 상태다
 - 적재 후 별도 스텝에서 §4 규칙으로 중복 판정 → `merged_into_id` 갱신
 - CSV는 UTF-8 BOM. `utf-8-sig` 로 읽어야 첫 컬럼명이 깨지지 않는다
 
@@ -343,3 +347,6 @@ enum(`allowed_pet_size`)은 10kg 경계로 뭉개므로 "12kg 미만"인 곳이 
 적재가 채우고, 장소 상세 응답(`intro.openNow`)이 이를 판정한다. 원문(`use_time`)은 그대로
 보존한다. 단, TourAPI 는 `detailIntro2` 를 아직 수집하지 않아 spec 이 채워지는 것은 문화정보원
 출처 장소(약 230곳)뿐이다. TourAPI 운영시간 수집과 목록 `openNowOnly` 필터는 후속 과제다.
+
+두 컬럼의 값은 `cultureFacilityImportJob` 재실행으로만 채워진다 — 컬럼이 생긴 시점의 기존 행은
+비어 있다(§5 재실행 규칙, #301).
