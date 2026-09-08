@@ -10,6 +10,7 @@
 
 import { useId, useState } from 'react'
 
+import { BasisFootnote } from '@/components/basis-footnote'
 import { ClockIcon } from '@/components/icons'
 import { MetricValue, MetricWord } from '@/components/metric'
 import { ReasonList } from '@/components/reason-list'
@@ -230,7 +231,17 @@ function FeelsLikeBasis({ data }: { data: WalkSafetyResponse }) {
         없지만 여기는 몸통 전체가 접힘 대상이다. `hidden` 은 a11y 트리에서도 빠진다.
       */}
       <div id={bodyId} hidden={!open} className="flex flex-col gap-3">
-        <p className="text-body-2 text-fg-muted">{data.feelsLikeBasis}</p>
+        <div className="flex flex-col gap-1">
+          <p className="text-body-2 text-fg-muted">{data.feelsLikeBasis}</p>
+          {/*
+            출처와 계산 입력 (#317). **홈과 같은 조각을 쓴다** — 같은 두 값을 두 화면이
+            다르게 적으면 사용자는 서로 다른 사실로 읽는다.
+
+            **위 문장에 붙여 둔다** (`gap-1`). 습도는 그 문장이 말하는 입력의 실제
+            수치라, 떨어뜨리면 무엇의 습도인지 알 수 없는 단독 값이 된다.
+          */}
+          <BasisFootnote humidity={data.humidity} providerName={data.weatherProviderName} />
+        </div>
 
         {hasHeatIndex && (
           <div className="flex flex-col gap-1">

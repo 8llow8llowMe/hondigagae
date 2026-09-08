@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 
+import { BasisFootnote } from '@/components/basis-footnote'
 import { ChevronDownIcon, ClockIcon } from '@/components/icons'
 import { InfoTip } from '@/components/info-tip'
 import { MetricValue, MetricWord } from '@/components/metric'
@@ -155,6 +156,16 @@ export function WalkVerdict({
                   {data.feelsLikeBasis !== null && (
                     <InfoTip label={messages.home.feelsLikeBasisLabel}>
                       {data.feelsLikeBasis}
+                      {/*
+                        출처와 계산 입력 (#317). **상시 노출 줄을 새로 만들지 않는다** —
+                        홈 첫 화면의 밀도를 키우면서 행동은 하나도 바꾸지 않는 값이라,
+                        근거를 여는 이 자리 안에서만 산다.
+                      */}
+                      <BasisFootnote
+                        humidity={data.humidity}
+                        providerName={data.weatherProviderName}
+                        className="mt-2"
+                      />
                     </InfoTip>
                   )}
                 </span>
