@@ -40,11 +40,78 @@ function sourceFiles(): { path: string; text: string }[] {
 
 const FILES = sourceFiles()
 
+/**
+ * 문자열 리터럴을 뽑되 **주석 안은 보지 않는다** (#306).
+ *
+ * 정규식으로 따옴표만 훑으면 주석 안의 백틱도 코드로 집힌다. 실제로
+ * `plan-day-regenerate-confirm.tsx` 의 *"`text-danger` 는 이 저장소의 토큰이 아니다"* 라는
+ * **경고 주석**이 위반으로 잡혔다 — 같은 실수를 막으려고 적어 둔 문장이 그 실수로 세어졌다.
+ *
+ * 그래서 상태 기계로 훑는다. 줄 주석과 블록 주석을 건너뛰고 문자열만 모은다.
+ * `'https://...'` 처럼 **문자열 안의 `//` 는 주석이 아니다** — 상태를 들고 있어야 갈린다.
+ */
+function stringLiterals(text: string): string[] {
+  const found: string[] = []
+  let index = 0
+
+  while (index < text.length) {
+    const char = text[index]
+    const next = text[index + 1]
+
+    if (char === '/' && next === '/') {
+      index = text.indexOf('\n', index)
+      if (index === -1) break
+      continue
+    }
+
+    if (char === '/' && next === '*') {
+      const end = text.indexOf('*/', index + 2)
+      index = end === -1 ? text.length : end + 2
+      continue
+    }
+
+    if (char === "'" || char === '"' || char === '`') {
+      const quote = char
+      let cursor = index + 1
+      let value = ''
+
+      while (cursor < text.length) {
+        const inner = text[cursor]
+        // 이스케이프는 다음 글자와 함께 삼킨다 — `\'` 가 문자열을 끝내면 안 된다
+        if (inner === '\\') {
+          value += text.slice(cursor, cursor + 2)
+          cursor += 2
+          continue
+        }
+        if (inner === quote) break
+        // 줄바꿈이 있는 '·" 리터럴은 없다. 여기서 끊어야 따옴표 짝이 어긋난 채 파일을 삼키지 않는다
+        if (inner === '\n' && quote !== '`') break
+        value += inner
+        cursor += 1
+      }
+
+      found.push(value)
+      index = cursor + 1
+      continue
+    }
+
+    index += 1
+  }
+
+  return found
+}
+
 /** className 문자열 리터럴만 본다. 한 리터럴 안에 함께 있으면 같은 요소에 적용된 것이다 */
 function classLiterals(text: string): string[] {
-  return [...text.matchAll(/'([^'\n]*)'|"([^"\n]*)"|`([^`\n]*)`/g)]
-    .map((match) => match[1] ?? match[2] ?? match[3] ?? '')
-    .filter((literal) => /\b(bg|text|border)-/.test(literal))
+  return stringLiterals(text).filter((literal) => /\b(bg|text|border)-/.test(literal))
+}
+
+/**
+ * 변형 접두어(`md:` · `hover:` · `focus-visible:` …)를 떼고 유틸리티 이름만 남긴다.
+ * 접두어가 붙었다고 스케일이 달라지지 않는다.
+ */
+function bareUtility(token: string): string {
+  return token.replace(/^(?:[a-z0-9@[\]().<>_-]+:)+/, '')
 }
 
 function violations(predicate: (literal: string) => boolean): string[] {
@@ -237,5 +304,195 @@ describe('토큰 사용 — --brand-500 위에 글자를 얹지 않는다 (이�
     )
 
     expect(found).toEqual([])
+  })
+})
+
+/**
+ * 스페이싱 스케일 — `DESIGN.md` §4 (#306).
+ *
+ * `4 · 6 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 · 64`. 문서는 *"스케일 밖 값을 쓰지 않는다"*
+ * 고 적어 두었는데 **어긋나도 아무것도 실패하지 않았다.** lint 는 못 잡는다 — `py-3.5` 는
+ * arbitrary value(`p-[14px]`)가 아니라 문법상 멀쩡한 Tailwind 클래스다.
+ *
+ * `0` 은 스케일 밖이 아니라 **간격 없음**이라 함께 허용한다.
+ */
+const SPACING_SCALE_PX = [0, 4, 6, 8, 12, 16, 20, 24, 32, 40, 48, 64]
+
+/**
+ * 간격 유틸리티만 본다 — margin · padding · gap · space.
+ *
+ * **크기(`w-2` · `h-8` · `size-11`)는 대상이 아니다.** §4 는 간격의 스케일이고, 크기는
+ * 아이콘·터치 영역·썸네일처럼 각자 근거가 다른 값이다.
+ *
+ * 논리 방향(`ms` · `me`)과 음수(`-mx-1`)를 함께 잡는다 — 부호가 바뀐다고 스케일이 달라지지 않는다.
+ */
+const SPACING_UTILITY = /^-?(?:[mp][trblxyse]?|gap(?:-[xy])?|space-[xy])-([0-9]+(?:\.[0-9]+)?)$/
+
+/**
+ * **현재 남아 있는 위반 (2026-09-08 실측 44곳).**
+ *
+ * 새로 들어오는 것만 막고 기존 것은 통과시킨다 — 44곳을 한 PR 에 담으면 30파일을 넘고,
+ * 일부는 주석에 의도가 적혀 있어 개별 판단이 필요하다 (#306).
+ *
+ * **이 표는 줄어드는 방향으로만 고친다.** 값이 정확히 일치해야 하므로, 하나를 고치면 숫자를
+ * 함께 낮춰야 테스트가 통과한다 — 목록이 조용히 늘지도, 고친 것이 조용히 되돌아오지도 않는다.
+ *
+ * 정리는 화면 묶음별 후속 이슈로 나눈다.
+ */
+const SPACING_BASELINE: Record<string, number> = {
+  'mt-0.5': 20,
+  'gap-2.5': 10,
+  'py-3.5': 5,
+  'gap-0.5': 4,
+  'py-2.5': 2,
+  '-ms-3.5': 1,
+  // 44px — 필드 안에 겹쳐 놓은 44px 버튼 자리다 (`date-field.tsx`). 스케일에는 없는 값이다
+  'pr-11': 1,
+  'py-0.5': 1,
+}
+
+function spacingUsage(): { counts: Record<string, number>; places: string[] } {
+  const counts: Record<string, number> = {}
+  const places: string[] = []
+
+  for (const { path, text } of FILES) {
+    for (const literal of stringLiterals(text)) {
+      for (const token of literal.split(/\s+/)) {
+        const utility = bareUtility(token)
+        const match = SPACING_UTILITY.exec(utility)
+        if (match === null) continue
+
+        // Tailwind 기본 스케일은 1 = 0.25rem = 4px 다
+        const px = Number(match[1]) * 4
+        if (SPACING_SCALE_PX.includes(px)) continue
+
+        counts[utility] = (counts[utility] ?? 0) + 1
+        places.push(`${path} :: ${utility}`)
+      }
+    }
+  }
+
+  return { counts, places }
+}
+
+describe('토큰 사용 — 스페이싱 스케일 (DESIGN.md §4)', () => {
+  /*
+    **`gap-1.5` 를 잡으면 안 된다.** `1.5 × 4 = 6` 이고 6 은 스케일 안 값이다 (§4 가
+    "태그 사이" 용도로 신설했다). `.5` 가 붙었다고 스케일 밖이 아니다 — 이 오탐이 나면
+    저장소 전역에서 정상 값이 위반으로 뜬다.
+  */
+  it('스케일 안의 .5 값(6px)을 오탐하지 않는다', () => {
+    const { counts } = spacingUsage()
+
+    expect(Object.keys(counts).filter((key) => /-1\.5$/.test(key))).toEqual([])
+  })
+
+  /* 0 은 간격 없음이다. 스케일 밖으로 세면 `p-0` 이 전부 위반이 된다 */
+  it('0 을 위반으로 세지 않는다', () => {
+    const { counts } = spacingUsage()
+
+    expect(Object.keys(counts).filter((key) => /-0$/.test(key))).toEqual([])
+  })
+
+  /*
+    **새 위반이 들어오면 여기서 걸린다.** 기존 44곳은 baseline 이 통과시킨다.
+    실패하면 `places` 가 어느 파일인지 말한다.
+  */
+  it('스케일 밖 값이 baseline 보다 늘지 않는다', () => {
+    const { counts, places } = spacingUsage()
+    const grown = Object.keys(counts).filter(
+      (utility) => (counts[utility] ?? 0) > (SPACING_BASELINE[utility] ?? 0),
+    )
+
+    // 실패했을 때 **어느 파일인지** 보이게 함께 싣는다 — 클래스 이름만으로는 찾을 수 없다
+    expect(
+      places.filter((place) => grown.some((utility) => place.endsWith(` :: ${utility}`))),
+    ).toEqual([])
+  })
+
+  /*
+    **줄었으면 baseline 도 낮춘다.** 고친 것이 조용히 되돌아오는 것을 막는 쪽이 이 표의
+    값어치다 — 숫자를 낮추지 않으면 같은 자리에 다시 들어와도 통과한다.
+  */
+  it('baseline 이 실측과 정확히 같다 — 고쳤으면 숫자를 낮춘다', () => {
+    const { counts } = spacingUsage()
+
+    expect(counts).toEqual(SPACING_BASELINE)
+  })
+})
+
+/**
+ * 타이포·색 토큰 — `DESIGN.md` §3-1 · §2 (#306).
+ *
+ * **`--text-*` 에 없는 이름을 쓰면 클래스가 아무 일도 하지 않고 상속 크기로 조용히 렌더된다.**
+ * 실제로 `text-title-3` 이 4곳에 있었다 — 홈 골든타임의 추천 시각이 22px 의도였는데 16px 로
+ * 나갔고, 그 결과 섹션 제목과 픽셀 단위로 같고 등급어(20px)보다 작았다 (#310 에서 걷었다).
+ *
+ * 지금은 **0곳**이라, 0 을 지키는 데 허용 목록이 필요 없다.
+ *
+ * **`text-` 접두어에 세 가지가 섞여 있다.**
+ *
+ * | 갈래 | 예 | 출처 |
+ * |------|----|------|
+ * | 크기 | `text-title-1` | `app/globals.css` 의 `--text-*` |
+ * | 색   | `text-fg-muted` | 같은 파일의 `--color-*` |
+ * | 레이아웃 빌트인 | `text-center` · `text-balance` | Tailwind |
+ *
+ * **토큰 목록을 여기 옮겨 적지 않는다.** CSS 에서 읽으므로 토큰이 늘어도 이 파일은 그대로다 —
+ * 베껴 적으면 두 곳이 갈린다.
+ *
+ * **Tailwind 기본 크기·색(`text-xs` · `text-white`)은 허용하지 않는다.** 죽은 클래스는
+ * 아니지만 §3-1 의 7단과 §2 의 색 토큰을 우회한다 — 지금 0곳이라 여기서 함께 잠근다.
+ */
+const TEXT_LAYOUT_UTILITIES = [
+  'left',
+  'center',
+  'right',
+  'justify',
+  'start',
+  'end',
+  'wrap',
+  'nowrap',
+  'balance',
+  'pretty',
+  'ellipsis',
+  'clip',
+]
+
+function definedTextNames(): Set<string> {
+  const css = readFileSync(join(ROOT, 'app/globals.css'), 'utf8')
+  const names = new Set(TEXT_LAYOUT_UTILITIES)
+
+  // `--text-title-1: 22px` · `--text-title-1--line-height: 30px` 둘 다 담긴다. 후자는 쓰이지 않을 뿐이다
+  for (const match of css.matchAll(/--text-([a-z0-9-]+):/g)) names.add(match[1] ?? '')
+  for (const match of css.matchAll(/--color-([a-z0-9-]+):/g)) names.add(match[1] ?? '')
+
+  return names
+}
+
+describe('토큰 사용 — text-* 는 토큰이거나 빌트인이어야 한다 (DESIGN.md §3-1 · §2)', () => {
+  const defined = definedTextNames()
+
+  it('토큰에 없는 이름을 쓰지 않는다 — 죽은 클래스는 조용히 상속 크기로 렌더된다', () => {
+    const found = FILES.flatMap(({ path, text }) =>
+      stringLiterals(text)
+        .flatMap((literal) => literal.split(/\s+/))
+        .map(bareUtility)
+        .filter((utility) => {
+          const match = /^text-([a-z0-9-]+)$/.exec(utility)
+          return match !== null && !defined.has(match[1] ?? '')
+        })
+        .map((utility) => `${path} :: ${utility}`),
+    )
+
+    expect(found).toEqual([])
+  })
+
+  /* 하네스가 실제로 토큰을 읽고 있는지 — 빈 집합이면 위 테스트가 언제나 통과한다 */
+  it('토큰 목록을 globals.css 에서 읽는다', () => {
+    expect(defined.has('title-1')).toBe(true)
+    expect(defined.has('fg-muted')).toBe(true)
+    expect(defined.has('title-3')).toBe(false)
+    expect(defined.has('danger')).toBe(false)
   })
 })
