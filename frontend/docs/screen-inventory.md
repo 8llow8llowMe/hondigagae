@@ -110,6 +110,10 @@
   **`usePetList(authed)` 는 인자가 필수다** — 기본값을 주면 안 넘긴 호출부가 조용히
   예전 동작(미로그인 403)으로 돌아간다. 이것이 #200 의 결함 모양이었다.
 - 무한 스크롤(`hasNext`) 기본.
+- **목록 정렬은 `placeId` 오름차순이고 최신순이 아니다** (BE #321). 아이디 대역이 원천별로
+  갈려 있어 사진·개요가 있는 관광정보(TourAPI) 장소가 먼저 오고, 이미지가 없는
+  문화정보원·식약처 장소가 뒤에 온다. **클라이언트가 재정렬하지 않는다** — 커서(`lastPlaceId`)가
+  서버 정렬에 묶여 있어 순서를 바꾸면 페이지 경계가 깨진다.
 - 데이터가 비어 있으면 batch 적재가 안 된 것이다 (`local-run-guide.md` §4).
 - **목록 필터 파라미터 (백엔드 `PlaceWebController` 실측)**: `areaCode`(제주=39), `sigunguCode`,
   `contentType`(enum name — `TOURIST_SPOT` `CULTURE` `FESTIVAL` `COURSE` `LEPORTS` `LODGING` `SHOPPING` `RESTAURANT`),

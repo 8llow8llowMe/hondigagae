@@ -42,6 +42,8 @@ public class PlaceWebController {
             + "비 오는 날 대안을 찾을 때는 indoor=true 로, 소형견만 받는 곳을 피할 때는 allowedPetSize 로 거릅니다.\n\n"
             + "**필수 파라미터는 없습니다.** 전부 생략하면 전체 장소의 첫 페이지(20개)가 옵니다. "
             + "선택 파라미터는 채운 것만 AND 조건으로 걸립니다.\n\n"
+            + "**정렬은 `placeId` 오름차순이며 최신순이 아닙니다.** 아이디 대역이 원천별로 갈려 있어 "
+            + "사진·개요가 있는 관광정보(TourAPI) 장소가 먼저 오고, 이미지가 없는 문화정보원·식약처 장소가 뒤에 옵니다.\n\n"
             + "호출 예\n"
             + "- 제주 음식점·카페 20개: `GET /api/v1/places?areaCode=39&contentType=RESTAURANT`\n"
             + "- 중형견 동반 가능한 실내 장소: `GET /api/v1/places?petAllowanceType=ALLOWED&indoor=true&petSizeType=MEDIUM`\n"
@@ -63,7 +65,7 @@ public class PlaceWebController {
         @RequestParam(required = false) Integer petWeightKg,
         @Parameter(description = "[선택] 원천 분류명 그대로 (펜션·카페·박물관·여행지 등). 콘텐츠 타입으로는 갈리지 않는 구분에 씁니다. 생략하면 필터 없음", example = "카페")
         @RequestParam(required = false) String sourceCategory,
-        @Parameter(description = "[선택] 커서. 첫 페이지는 생략하고, 다음 페이지는 직전 응답 마지막 항목의 placeId 를 넣습니다. 예시 값은 형식 안내용", example = "212481712381923328") @RequestParam(required = false) Long lastPlaceId,
+        @Parameter(description = "[선택] 커서. 첫 페이지는 생략하고, 다음 페이지는 직전 응답 마지막 항목의 placeId 를 넣습니다(그 아이디 **뒤**부터 옵니다). 예시 값은 형식 안내용", example = "126434") @RequestParam(required = false) Long lastPlaceId,
         @Parameter(description = "[선택, 기본 20] 조회 개수 (1~50)", example = "20")
         @Positive(message = PlaceValidationMessage.SIZE_POSITIVE) @Max(value = 50, message = PlaceValidationMessage.SIZE_MAX_INVALID)
         @RequestParam(defaultValue = "20") int size

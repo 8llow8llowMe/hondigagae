@@ -27,6 +27,21 @@ public class PlaceCustomRepositoryImpl implements PlaceCustomRepository {
 
     private final JPAQueryFactory queryFactory;
 
+    /**
+     * 커서 목록. <b>id 오름차순이고, 그것이 곧 원천 우선순위다.</b>
+     *
+     * <p>{@code PlaceIdFactory}(batch-service)가 TourAPI 행에는 {@code contentId}(제주 실측
+     * 12만~344만)를, 문화정보원·식약처 행에는 {@code SHA-256} 해시를 2<sup>62</sup> 이상으로
+     * 접어 준다. 두 대역이 겹치지 않으므로 <b>오름차순 = TourAPI 먼저</b>다.
+     *
+     * <p>내림차순이던 것을 뒤집은 이유는 첫 페이지의 내용이다 (#321). 사진·개요·동반 조건을
+     * 가진 쪽은 TourAPI 행인데(dev 실측 985건 중 917건에 사진), 내림차순은 이미지가 아예 없는
+     * 문화정보원·식약처 행부터 내려보내 관광지·문화시설·숙박·음식점의 첫 화면이 전부 회색
+     * 일러스트였다. 정렬을 뒤집는 것만으로 사라지는 문제라 화면에 폴백을 더 얹지 않는다.
+     *
+     * <p>같은 원천 안에서는 적재 순서(TourAPI 는 contentId 순)이며 시간순이 아니다 — 이 목록에
+     * "최신순" 의 뜻은 없다. 최신순이 필요해지면 커서를 정렬 키와 함께 다시 설계해야 한다.
+     */
     @Override
     public Slice<PlaceEntity> searchByCriteria(PlaceSearchCriteria criteria) {
         BooleanBuilder where = visible()
@@ -40,14 +55,15 @@ public class PlaceCustomRepositoryImpl implements PlaceCustomRepository {
             where.and(place.sigunguCode.eq(criteria.sigunguCode()));
         }
         if (criteria.lastPlaceId() != null) {
-            where.and(place.id.lt(criteria.lastPlaceId()));
+            // 오름차순이라 커서는 "그 뒤" 다. 정렬과 방향이 어긋나면 같은 페이지를 무한히 돌려준다.
+            where.and(place.id.gt(criteria.lastPlaceId()));
         }
 
         // hasNext 판정을 위해 한 건 더 가져온다. 커서 방식이라 total count 가 필요 없다.
         List<PlaceEntity> rows = queryFactory
             .selectFrom(place)
             .where(where)
-            .orderBy(place.id.desc())
+            .orderBy(place.id.asc())
             .limit(criteria.size() + 1L)
             .fetch();
 
