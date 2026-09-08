@@ -29,27 +29,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class PetConditionClientAdapter implements PetConditionQueryPort {
 
-    private static final String AUTH_SERVICE = "auth-service";
-
     private final PetConditionClient petConditionClient;
     private final InternalResponseSupport internalResponseSupport;
-
-    @Override
-    public Optional<PetCondition> findCondition(long memberId, long petId) {
-        try {
-            PetConditionClientResponse body = internalResponseSupport.requestAndUnwrapOrNull(
-                AUTH_SERVICE, () -> petConditionClient.getPetCondition(petId, memberId));
-            if (body == null) {
-                log.info("Pet condition not found petId={} memberId={}", petId, memberId);
-                return Optional.empty();
-            }
-            return Optional.of(toCondition(body));
-        } catch (AiPlanException exception) {
-            log.warn("Pet condition lookup failed petId={} errorCode={}",
-                petId, exception.getErrorCode().getCode());
-            return Optional.empty();
-        }
-    }
 
     @Override
     public List<PetCondition> findConditions(long memberId, List<Long> petIds) {
@@ -58,7 +39,7 @@ public class PetConditionClientAdapter implements PetConditionQueryPort {
         }
         try {
             List<PetConditionClientResponse> body = internalResponseSupport.requestAndUnwrapOrNull(
-                AUTH_SERVICE, () -> petConditionClient.getPetConditions(memberId, petIds));
+                InternalResponseSupport.AUTH_SERVICE, () -> petConditionClient.getPetConditions(memberId, petIds));
             if (body == null) {
                 log.info("Pet conditions not found memberId={} petIds={}", memberId, petIds);
                 return List.of();
@@ -75,7 +56,7 @@ public class PetConditionClientAdapter implements PetConditionQueryPort {
     public Optional<PetCondition> findRepresentativeCondition(long memberId) {
         try {
             PetConditionClientResponse body = internalResponseSupport.requestAndUnwrapOrNull(
-                AUTH_SERVICE, () -> petConditionClient.getRepresentativePetCondition(memberId));
+                InternalResponseSupport.AUTH_SERVICE, () -> petConditionClient.getRepresentativePetCondition(memberId));
             if (body == null) {
                 log.info("Representative pet condition not found memberId={}", memberId);
                 return Optional.empty();

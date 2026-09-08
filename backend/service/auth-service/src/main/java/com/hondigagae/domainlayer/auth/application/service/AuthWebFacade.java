@@ -34,8 +34,12 @@ public class AuthWebFacade implements AuthWebUseCase {
     private final PasswordResetProcessor passwordResetProcessor;
     private final AuthPresenter authPresenter;
 
+    /**
+     * 트랜잭션을 걸지 않는다 — 이 흐름에 DB 쓰기가 없다. 회원 조회 한 번 뒤는 bcrypt 대조와
+     * Redis 왕복(실패 횟수·세션 저장)이라, 트랜잭션을 열면 가장 붐비는 경로가 커넥션을 잡은 채
+     * 원격 I/O 를 기다린다 (architecture-guide §3).
+     */
     @Override
-    @Transactional
     public AuthCookieResult<AuthGeneralLoginResponse> generalLogin(AuthGeneralLoginCommand command) {
         // 1. 일반 로그인 자격 검증
         GeneralLoginInfo generalLoginInfo = generalLoginProcessor.generalLogin(command);
@@ -65,8 +69,8 @@ public class AuthWebFacade implements AuthWebUseCase {
         jwtTokenProcessor.revokeCurrentSession(memberId, tokenId, refreshToken);
     }
 
+    /** 재발급도 같은 이유로 트랜잭션을 두지 않는다 — 회원 조회 뒤는 전부 Redis 다. */
     @Override
-    @Transactional
     public AuthCookieResult<TokenReissueResponse> reissueToken(TokenReissueCommand command) {
         // 1. 토큰 재발급 수행
         JwtTokenReissueInfo jwtTokenReissueInfo = jwtTokenProcessor.reissueTokens(command.refreshToken());

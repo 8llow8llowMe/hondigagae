@@ -9,6 +9,7 @@ import com.hondigagae.domainlayer.planner.adapter.out.client.feign.dto.PlaceSlic
 import com.hondigagae.domainlayer.planner.adapter.out.client.support.InternalResponseSupport;
 import com.hondigagae.domainlayer.planner.application.port.out.PlaceCandidateQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.query.PlaceCandidateQueryResult;
+import com.hondigagae.shared.travel.place.PetAllowanceType;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +21,7 @@ import org.springframework.stereotype.Component;
 public class PlaceCandidateClientAdapter implements PlaceCandidateQueryPort {
 
     /** 동반 가능이 확인된 곳만 후보로 준다. UNKNOWN 을 섞으면 LLM 이 그것을 가능으로 읽는다. */
-    private static final String PET_ALLOWED = "ALLOWED";
+    private static final String PET_ALLOWED = PetAllowanceType.ALLOWED.name();
 
     private final PlaceCandidateClient placeCandidateClient;
     private final PinnedPlaceCandidateClient pinnedPlaceCandidateClient;

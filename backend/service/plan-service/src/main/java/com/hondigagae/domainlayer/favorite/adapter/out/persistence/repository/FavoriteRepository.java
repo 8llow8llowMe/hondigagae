@@ -12,5 +12,7 @@ public interface FavoriteRepository extends JpaRepository<FavoriteEntity, Long> 
 
     Optional<FavoriteEntity> findByMemberIdAndPlaceId(long memberId, long placeId);
 
+    boolean existsByMemberIdAndPlaceId(long memberId, long placeId);
+
     long countByMemberId(long memberId);
 }

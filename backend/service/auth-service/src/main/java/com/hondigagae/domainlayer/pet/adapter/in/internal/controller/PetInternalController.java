@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import java.util.List;
@@ -32,14 +31,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class PetInternalController {
 
     private final PetInternalUseCase petInternalUseCase;
-
-    @GetMapping("/{petId}/condition")
-    public ResponseEntity<Response<PetConditionResponse>> getPetCondition(
-        @PathVariable long petId,
-        @RequestParam long memberId
-    ) {
-        return ResponseEntity.ok().body(Response.success(petInternalUseCase.getPetCondition(memberId, petId)));
-    }
 
     /**
      * 여러 마리 특성 벌크 조회 — ai-service 가 마리 수만큼 왕복하지 않게 한다 (§9-7).

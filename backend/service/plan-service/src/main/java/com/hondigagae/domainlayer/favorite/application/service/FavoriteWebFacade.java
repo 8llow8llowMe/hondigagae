@@ -31,10 +31,7 @@ public class FavoriteWebFacade implements FavoriteWebUseCase {
     @Override
     @Transactional(readOnly = true)
     public FavoriteStatusResponse getFavoriteStatus(long memberId, long placeId) {
-        return FavoriteStatusResponse.builder()
-            .placeId(String.valueOf(placeId))
-            .favorited(favoriteQueryProcessor.isFavorited(memberId, placeId))
-            .build();
+        return favoritePresenter.toStatusResponse(placeId, favoriteQueryProcessor.isFavorited(memberId, placeId));
     }
 
     /** 저장도 같은 이유로 파사드 트랜잭션을 두지 않는다 — 존재 검증이 원격 조회다. */

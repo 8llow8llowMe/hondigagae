@@ -230,11 +230,15 @@ public class PlanWeatherProcessor {
      *
      * <p>가장 이른 순서의 장소성 항목을 쓴다. 하루의 첫 목적지가 그날 동선의 기준점이고,
      * 사용자도 보통 그곳을 떠올린다.
+     *
+     * <p>"장소성" 의 판정은 {@link PlanItemType#isPlaceTarget()} 이 갖는다. {@code MOVE} 만 빼면
+     * {@code WALK} 가 통과하는데, 그 {@code targetId} 는 {@code walk_course.id} 라 장소 적합도를
+     * 조회하면 남의 아이디로 없는 장소를 찾는다 (#89). 상세·긴급 시설 조회와 같은 집합을 써야 한다.
      */
     private Optional<PlanItem> pickRepresentative(List<PlanItem> items) {
         return items.stream()
             .filter(item -> item.targetId() != null)
-            .filter(item -> item.itemType() != PlanItemType.MOVE)
+            .filter(item -> item.itemType().isPlaceTarget())
             .min(Comparator.comparingInt(PlanItem::sequence));
     }
 }

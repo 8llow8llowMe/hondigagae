@@ -48,15 +48,17 @@ class PlanWeatherProcessorTest {
     private static final PetConditionQueryResult ROBUST = PetConditionQueryResult.builder()
         .sizeType("LARGE").build();
 
+    private StubPlanItemRepositoryPort planItemRepositoryPort;
     private StubPetConditionQueryPort petConditionQueryPort;
     private StubPlaceSuitabilityQueryPort placeSuitabilityQueryPort;
     private PlanWeatherProcessor processor;
 
     @BeforeEach
     void setUp() {
+        planItemRepositoryPort = new StubPlanItemRepositoryPort();
         petConditionQueryPort = new StubPetConditionQueryPort();
         placeSuitabilityQueryPort = new StubPlaceSuitabilityQueryPort();
-        processor = new PlanWeatherProcessor(new StubPlanItemRepositoryPort(), petConditionQueryPort, placeSuitabilityQueryPort);
+        processor = new PlanWeatherProcessor(planItemRepositoryPort, petConditionQueryPort, placeSuitabilityQueryPort);
     }
 
     private static Plan plan() {
@@ -161,6 +163,21 @@ class PlanWeatherProcessorTest {
         assertThat(firstDay(info).petSuitabilities()).isEmpty();
     }
 
+    @Test
+    @DisplayName("WALK 항목은 대표 장소가 되지 않는다 — targetId 가 walk_course.id 라 장소 적합도를 물을 수 없다 (#89)")
+    void walkItemIsNotTheRepresentativePlace() {
+        planItemRepositoryPort.items = List.of(
+            PlanItem.builder().id(1L).planId(PLAN_ID).day(1).sequence(0)
+                .itemType(PlanItemType.WALK).targetId(777L).title("올레 7코스").build(),
+            PlanItem.builder().id(2L).planId(PLAN_ID).day(1).sequence(1)
+                .itemType(PlanItemType.PLACE).targetId(PLACE_ID).title("협재해수욕장").build());
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+
+        processor.brief(1L, plan(), List.of(MONGSIL));
+
+        assertThat(placeSuitabilityQueryPort.lastPlaceId).isEqualTo(PLACE_ID);
+    }
+
     // ── 스텁 ───────────────────────────────────────────────────────────────
 
     private static class StubPetConditionQueryPort implements PetConditionQueryPort {
@@ -192,12 +209,14 @@ class PlanWeatherProcessorTest {
     private static class StubPlaceSuitabilityQueryPort implements PlaceSuitabilityQueryPort {
 
         private int calls;
+        private Long lastPlaceId;
         private boolean unavailable;
         private Function<PetConditionQueryResult, Integer> scoreOf = condition -> 60;
 
         @Override
         public Optional<PlaceSuitabilityQueryResult> findSuitability(long placeId, LocalDate targetDate, PetConditionQueryResult pet) {
             calls += 1;
+            lastPlaceId = placeId;
             if (unavailable) {
                 return Optional.empty();
             }
@@ -215,12 +234,14 @@ class PlanWeatherProcessorTest {
 
     private static class StubPlanItemRepositoryPort implements PlanItemRepositoryPort {
 
+        private List<PlanItem> items = List.of(PlanItem.builder()
+            .id(1000L).planId(PLAN_ID).day(1).sequence(0)
+            .itemType(PlanItemType.PLACE).targetId(PLACE_ID).title("협재해수욕장")
+            .build());
+
         @Override
         public List<PlanItem> findByPlanId(long planId) {
-            return List.of(PlanItem.builder()
-                .id(1000L).planId(planId).day(1).sequence(0)
-                .itemType(PlanItemType.PLACE).targetId(PLACE_ID).title("협재해수욕장")
-                .build());
+            return items;
         }
 
         @Override

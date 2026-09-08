@@ -21,6 +21,8 @@ public class InternalResponseSupport {
 
     // 서킷 인스턴스명. Eureka 등록명(-dev/-prod 접미사)과 무관한 논리 서비스명을 쓴다.
     public static final String TOUR_SERVICE = "tour-service";
+    public static final String AUTH_SERVICE = "auth-service";
+    public static final String PLAN_SERVICE = "plan-service";
 
     private final CircuitBreakerRegistry circuitBreakerRegistry;
 

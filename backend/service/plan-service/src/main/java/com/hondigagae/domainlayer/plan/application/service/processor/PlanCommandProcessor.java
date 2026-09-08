@@ -124,6 +124,7 @@ public class PlanCommandProcessor {
         return planRepositoryPort.save(updated);
     }
 
+    @Transactional
     public void softDeletePlan(Plan plan) {
         planRepositoryPort.save(plan.markDeleted());
     }
@@ -219,6 +220,7 @@ public class PlanCommandProcessor {
      * 방문 체크. 소유권은 일정 기준으로 보고, 항목이 그 일정의 것인지 다시 확인한다 —
      * planItemId 만 믿으면 남의 일정 항목을 내 planId 로 체크할 수 있다.
      */
+    @Transactional
     public PlanItem markItemVisited(Plan plan, long planItemId, boolean visited) {
         PlanItem item = planItemRepositoryPort.findById(planItemId)
             .filter(found -> found.planId() == plan.id())

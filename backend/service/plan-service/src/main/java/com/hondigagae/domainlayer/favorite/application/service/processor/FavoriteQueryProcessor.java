@@ -41,7 +41,7 @@ public class FavoriteQueryProcessor {
     }
 
     public boolean isFavorited(long memberId, long placeId) {
-        return favoriteRepositoryPort.findByMemberIdAndPlaceId(memberId, placeId).isPresent();
+        return favoriteRepositoryPort.existsByMemberIdAndPlaceId(memberId, placeId);
     }
 
     public List<Long> getMyFavoritePlaceIds(long memberId) {

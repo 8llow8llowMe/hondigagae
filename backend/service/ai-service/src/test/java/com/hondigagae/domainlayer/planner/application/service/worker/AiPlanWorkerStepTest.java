@@ -329,11 +329,6 @@ class AiPlanWorkerStepTest {
         public Optional<PetCondition> findRepresentativeCondition(long memberId) {
             return Optional.of(PetCondition.builder().sizeName("소형견").build());
         }
-
-        @Override
-        public Optional<PetCondition> findCondition(long memberId, long petId) {
-            throw new UnsupportedOperationException();
-        }
     }
 
     private static final class StubPlanOutlines implements PlanOutlineQueryPort {
