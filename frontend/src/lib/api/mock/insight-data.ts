@@ -237,7 +237,7 @@ export function mockSuitability(placeId: string): PlaceSuitabilityResponse {
       precipitationType: high
         ? { code: 'NONE', name: '없음', description: '강수가 없습니다.' }
         : { code: 'RAIN', name: '비', description: '비가 예보되었습니다.' },
-      skyState: { code: 'CLOUDY', name: '흐림', description: '구름이 많습니다.' },
+      skyState: { code: 'OVERCAST', name: '흐림', description: '하늘이 구름으로 덮인 상태입니다.' },
       maxWindSpeed: 4.2,
       maxHumidity: 85,
       totalPrecipitationMm: high ? 0 : 12.5,
@@ -620,7 +620,7 @@ export function mockRegionalWeather(heatSensitive: boolean): RegionalWeatherResp
       region,
       weatherScore: heatSensitive ? Math.max(0, score - 30) : score,
       skyState: rainy
-        ? { code: 'CLOUDY', name: '흐림', description: '구름이 많습니다.' }
+        ? { code: 'OVERCAST', name: '흐림', description: '하늘이 구름으로 덮인 상태입니다.' }
         : { code: 'CLEAR', name: '맑음', description: '구름이 거의 없습니다.' },
       precipitationType: rainy
         ? { code: 'RAIN', name: '비', description: '비가 예보되었습니다.' }

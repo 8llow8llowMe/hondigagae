@@ -304,3 +304,45 @@ export function HelpIcon(props: IconProps) {
     </Svg>
   )
 }
+
+/**
+ * 구름많음 — 해가 구름 뒤에 있다. 서버 `SkyState.MOSTLY_CLOUDY` (#314).
+ *
+ * **`OVERCAST`(흐림)와 갈라 둔다.** 서버가 둘을 다른 낱말로 부르는데 같은 그림을 주면
+ * 아이콘이 낱말보다 정보를 덜 담게 된다 — 그러면 낱말을 대체할 자격이 없다 (DESIGN.md §9-1).
+ */
+export function PartlyCloudyIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M9 2.6v1.4M4.4 8H3M12.2 4.1l1-1M4.8 4.1l-1-1" />
+      <path d="M8.5 19a3.8 3.8 0 0 1 .4-7.6 5.2 5.2 0 0 1 9.8 1.5A3.4 3.4 0 0 1 18 19z" />
+    </Svg>
+  )
+}
+
+/** 눈 — 서버 `SNOW` · `SNOW_FLURRY` (#314) */
+export function SnowIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6.5 15a4 4 0 0 1 .4-8 5.5 5.5 0 0 1 10.5 1.6A3.6 3.6 0 0 1 17 15z" />
+      <path d="M8.5 19h.01M12 20.5h.01M15.5 19h.01" />
+    </Svg>
+  )
+}
+
+/**
+ * 비와 눈이 섞임 — 서버 `RAIN_SNOW` · `DRIZZLE_SNOW` (#314).
+ *
+ * **비나 눈 하나로 뭉개지 않는다.** 서버가 `비/눈` 이라고 부르는 것을 눈으로만 그리면
+ * 그림이 서버보다 덜 말한다.
+ */
+export function SleetIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M6.5 15a4 4 0 0 1 .4-8 5.5 5.5 0 0 1 10.5 1.6A3.6 3.6 0 0 1 17 15z" />
+      <path d="M9 18.5l-1 2" />
+      <path d="M12.5 20h.01M15.5 18.5h.01" />
+    </Svg>
+  )
+}

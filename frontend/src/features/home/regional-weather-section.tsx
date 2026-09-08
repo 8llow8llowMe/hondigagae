@@ -1,11 +1,20 @@
 'use client'
 
+import {
+  CloudIcon,
+  PartlyCloudyIcon,
+  RainIcon,
+  SleetIcon,
+  SnowIcon,
+  SunIcon,
+} from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
 import { Skeleton } from '@/components/skeleton'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { formatCelsius } from '@/lib/format/celsius'
 import { sortRegionsByScore } from '@/lib/insight/region-order'
 import { suitabilityTone } from '@/lib/insight/tone'
+import { resolveWeatherGlyph, type WeatherIconKind } from '@/lib/insight/weather-icon'
 import { messages } from '@/lib/messages'
 import type { RegionalWeatherResponse, RegionWeatherItem } from '@/types/insight'
 
@@ -112,6 +121,50 @@ function Recommendation({ data }: { data: RegionalWeatherResponse }) {
   )
 }
 
+/** 그림 종류 → 컴포넌트. 이 표에 없는 종류는 `resolveWeatherGlyph` 가 만들지 않는다 */
+const WEATHER_ICONS: Record<WeatherIconKind, typeof SunIcon> = {
+  sun: SunIcon,
+  'partly-cloudy': PartlyCloudyIcon,
+  cloud: CloudIcon,
+  rain: RainIcon,
+  snow: SnowIcon,
+  sleet: SleetIcon,
+}
+
+/**
+ * 권역 행의 날씨 그림 — `DESIGN.md` §9-1 (2026-09-08 결정) (#314).
+ *
+ * **선 아이콘이다.** §9-1 이 이모지도 허용하지만 *"한 화면에서 이모지와 선 아이콘을 섞지
+ * 않는다"* 고 못박았고, 홈에는 이미 선 아이콘만 서 있다 (병원 배너 · 시계 · 셰브론).
+ * 이 자리에만 이모지를 두면 그 규칙을 이 화면이 어긴다.
+ *
+ * **등급 색을 쓰지 않는다.** 부모의 `text-fg-muted` 를 그대로 물려받는다 — 날씨는 판정이
+ * 아니고, 같은 줄 오른쪽에 `--metric-*` 점수 배지가 서 있어 색이 겹치면 둘이 같은 축으로
+ * 읽힌다.
+ *
+ * **`sr-only` 로 서버 `name` 을 남긴다.** 아이콘은 스크린리더에 아무 말도 못 한다.
+ *
+ * **숫자를 대체하지 않는다.** 아이콘이 대신하는 것은 낱말(`맑음`)이지 `최고 28.0℃` ·
+ * `강수 0%` 같은 측정값이 아니다 (§9-1).
+ */
+function WeatherGlyph({ item }: { item: RegionWeatherItem }) {
+  const glyph = resolveWeatherGlyph(item.skyState, item.precipitationType)
+
+  if (glyph === null) return null
+
+  // 그림이 없는 코드는 서버 낱말을 그대로 적는다 — 빈 자리로 두지도, 틀린 그림을 그리지도 않는다
+  if (glyph.kind === null) return <span>{glyph.name}</span>
+
+  const Icon = WEATHER_ICONS[glyph.kind]
+
+  return (
+    <span className="inline-flex shrink-0 items-center">
+      <Icon size={16} />
+      <span className="sr-only">{glyph.name}</span>
+    </span>
+  )
+}
+
 /**
  * 한 권역 행.
  *
@@ -131,11 +184,21 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
       <span className="text-body-2 min-w-0 font-semibold">{item.region.name}</span>
 
       {/*
-        **값 줄은 어느 폭에서도 한 줄이다.** 2단 칸은 237px 이고 이 줄은 실측 160px
-        (`예보 없음` 배지가 붙는 최악에도 188px)라 들어간다 — 세로로 쌓으면 칸이 132px 로
-        불어나 권역을 가로로 편 이유가 사라진다.
+        **값 줄은 가로로 흐른다.** 세로로 쌓으면 칸이 불어나 권역을 가로로 편 이유가 사라진다.
+
+        **한 컬럼(~1023)에서는 한 줄이다** — 실측 186px. 2단(1024+)의 칸은 실측 143~156px 라
+        `최고 31.0℃ · 강수 10% · 배지` 가 두 줄로 접힌다. **이것은 #314 이전부터 그랬다**
+        (아이콘을 붙이기 전후 값 줄이 143 × 36 으로 같다). 예전 주석은 "어느 폭에서도 한 줄,
+        칸 237px" 이라고 적어 두었는데, 권역이 우측 열로 옮겨 오면서 칸이 좁아진 뒤로
+        맞지 않는 값이었다.
       */}
       <span className="text-caption text-fg-muted flex shrink-0 items-center gap-2 font-medium tabular-nums">
+        {/*
+          **다섯 줄을 훑을 때 낱말보다 픽토그램이 빠르다** (#314). `skyState` · `precipitationType`
+          이 이미 응답에 오는데 화면이 둘 다 버리고 있었다 — BE 작업 없이 붙일 수 있었다.
+        */}
+        <WeatherGlyph item={item} />
+
         {/*
           **온도에 라벨을 붙인다** (#206). `maxTemperature` 인데 숫자만 두면 무슨 온도인지
           알 수 없다 — 바로 위 추천 문장(서버 완성형)은 "최고기온 26도" 라고 말한다.
