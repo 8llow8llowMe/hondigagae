@@ -136,7 +136,7 @@ export function PlanItemRow({
 
         {/* nullable 은 오류가 아니라 숨김이다. 둘 다 없으면 줄 자체가 사라진다 */}
         {meta !== null && (
-          <p className="text-caption text-fg-muted mt-0.5 line-clamp-1 font-medium">{meta}</p>
+          <p className="text-caption text-fg-muted mt-1 line-clamp-1 font-medium">{meta}</p>
         )}
 
         <PlanItemDistance model={model} />

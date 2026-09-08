@@ -65,9 +65,13 @@ export function AiPlanDraftItemRow({
         excluded && 'opacity-60',
       )}
     >
+      {/*
+        **보정이 필요 없다** (#334). 24px 배지와 옆 제목 줄(`body-1` 16/24)의 높이가 같아
+        이상값이 0 이다 — 예전 `mt-0.5` 는 배지를 2px 내려 놓고 있었다.
+      */}
       <span
         aria-hidden
-        className="bg-band text-caption text-fg-muted mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-semibold tabular-nums"
+        className="bg-band text-caption text-fg-muted flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-semibold tabular-nums"
       >
         {ordinal}
       </span>
@@ -89,7 +93,7 @@ export function AiPlanDraftItemRow({
           )}
         </div>
 
-        {meta !== undefined && <p className="text-caption text-fg-muted mt-0.5">{meta}</p>}
+        {meta !== undefined && <p className="text-caption text-fg-muted mt-1">{meta}</p>}
 
         <DraftItemDistance meters={distanceMeters} />
 

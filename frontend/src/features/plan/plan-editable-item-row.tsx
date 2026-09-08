@@ -141,7 +141,7 @@ export function PlanEditableItemRow({
           </div>
 
           {entry.removed && (
-            <p className="text-caption text-fg-muted mt-0.5 font-medium">
+            <p className="text-caption text-fg-muted mt-1 font-medium">
               {messages.plan.editRemoveMark}
             </p>
           )}
@@ -149,7 +149,7 @@ export function PlanEditableItemRow({
           {/* 저장이 PLAN_004 로 막히는 원인 후보다. 서버가 어느 항목인지 알려주지
               않으므로 상세에서 이미 알고 있는 404 로 미리 짚는다 (E1) */}
           {missing && !entry.removed && (
-            <p className="text-caption text-metric-low-700 mt-0.5 font-medium">
+            <p className="text-caption text-metric-low-700 mt-1 font-medium">
               {messages.plan.editMissingPlaceMark}
             </p>
           )}

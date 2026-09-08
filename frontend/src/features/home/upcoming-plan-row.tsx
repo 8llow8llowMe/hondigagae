@@ -30,7 +30,7 @@ export function UpcomingPlanRow({ plan, today }: { plan: PlanSummaryItem; today:
         <span className="text-body-1 text-fg md:text-title-2 block font-semibold">
           {plan.title}
         </span>
-        <span className="text-caption text-fg-muted mt-0.5 block font-medium tabular-nums">
+        <span className="text-caption text-fg-muted mt-1 block font-medium tabular-nums">
           {plan.startDate} – {plan.endDate.slice(5)}
           <span className="md:hidden"> · {plan.status.name}</span>
           {dday !== null && <span className="hidden md:inline"> · D-{dday}</span>}

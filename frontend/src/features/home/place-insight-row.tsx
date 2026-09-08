@@ -105,7 +105,7 @@ export function PlaceInsightRow({
             </MetricBadge>
           </div>
 
-          <p className="text-caption text-fg-muted mt-0.5 font-medium tabular-nums">
+          <p className="text-caption text-fg-muted mt-1 font-medium tabular-nums">
             {metaLine(place)}
           </p>
 

@@ -111,7 +111,7 @@ export function FavoritePlaceRow({
 
               {/* nullable 은 에러가 아니라 숨김이다. 둘 다 없으면 줄 자체가 사라진다 */}
               {meta !== null && (
-                <p className="text-caption text-fg-muted mt-0.5 line-clamp-1 font-medium tabular-nums">
+                <p className="text-caption text-fg-muted mt-1 line-clamp-1 font-medium tabular-nums">
                   {meta}
                 </p>
               )}
@@ -176,7 +176,7 @@ function MissingSummary({ placeId, href }: { placeId: string; href: string }) {
   return (
     <>
       <h3 className="text-title-2 text-fg-muted font-semibold">{messages.favorite.missingTitle}</h3>
-      <p className="text-caption text-fg-muted mt-0.5 tabular-nums">
+      <p className="text-caption text-fg-muted mt-1 tabular-nums">
         {messages.favorite.missingTitlePlaceId.replace('{placeId}', placeId)}
       </p>
       <Link
