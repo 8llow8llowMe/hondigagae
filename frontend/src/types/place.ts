@@ -109,6 +109,26 @@ export type PlaceDetail = {
 export type PlaceIntro = {
   infoCenter: string | null
   useTime: string | null
+  /**
+   * 24시간 운영 여부. **속성이고 시각 판정이 아니다** — `openNow` 와 위계가 다르다.
+   *
+   * `true` 면 화면이 `openNow` 를 말하지 않는다 (세부명세 D5 조합 표). 24시간인 곳에
+   * "지금 영업 중" 은 동어반복이고 "영업 종료" 는 모순이다.
+   */
+  open24: boolean | null
+  /**
+   * 지금 영업 중인지. **`null` 은 "닫힘" 이 아니라 "판정 근거 없음"** 이다 —
+   * 운영시간을 구조화하지 못한 곳이다 (백엔드 스키마 명시).
+   *
+   * **`null` 이면 화면이 아무것도 그리지 않는다.** 긴급 시설(`NearbyFacilityItem.openNow`)은
+   * 같은 `null` 을 점선 배지로 드러내는데, 그 화면에는 원문조차 없는 곳이 있어 "모름" 이
+   * 정보였다. 장소는 `useTime` 원문이 바로 아래 항상 있어 정보가 아니다 (세부명세 D5).
+   *
+   * **근거 없이 판정만 오는 갈래는 계약상 없다** — 백엔드가 `useTime` 원문을 파싱해
+   * `weekly_hours_spec` 을 만들고 이 값은 그 spec 에서 나온다
+   * (`backend/docs/features/267-place-open-hours.md`).
+   */
+  openNow: boolean | null
   restDate: string | null
   parking: string | null
   /** 애완동물 동반 가능 원문. **판단은 petInfo 우선** (백엔드 DTO 주석) */

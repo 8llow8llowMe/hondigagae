@@ -89,6 +89,12 @@ export function FacilityRow({
  *
  * **등급 색을 쓰지 않는다** (아트보드 주석). 초록·주황은 산책 위험도 전용이고
  * 영업 여부는 판정이 아니다. `null` 은 점선으로 "모름" 을 드러낸다.
+ *
+ * **장소 상세의 `PlaceOpenStatus` 와 합치지 않았다** (#294). 규칙(등급색 금지 · 색이
+ * 아니라 무게)은 같지만 문구가 다르고(`진료중` vs `영업 중`) `null` 처리가 갈린다 —
+ * 이 화면은 `operatingHoursKnown: false` 처럼 **원문조차 없는 곳**이 있어 "모름" 이
+ * 정보지만, 장소는 운영시간 원문이 항상 함께 있어 정보가 아니다. 규칙을 바꿀 때는
+ * 양쪽을 같이 본다.
  */
 function OpenStatus({ openNow }: { openNow: boolean | null }) {
   if (openNow === null) {

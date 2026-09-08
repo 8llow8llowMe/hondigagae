@@ -50,9 +50,19 @@ const PET_SIZE = {
   },
 } as const
 
+/**
+ * 영업 상태 4갈래를 mock 이 전부 싣는다 (#294).
+ *
+ * **dev 는 이 화면을 보여주지 못한다.** 장소 200곳 전수 실측(2026-09-08)에서
+ * `openNow` 가 전부 `null`, `open24` 가 전부 `false` 였다 — 문화정보원 원천의
+ * `weekly_hours_spec` 이 비어 있다. 그래서 **mock 이 유일한 확인 경로다.**
+ */
 const FULL_INTRO: PlaceIntro = {
   infoCenter: '064-760-6331',
   useTime: '09:00~17:50 (입장 마감 17:10)',
+  open24: false,
+  // 영업 중 — 무게를 준 배지
+  openNow: true,
   restDate: '연중무휴',
   parking: '가능 (승용차 40대, 30분 무료 이후 30분당 500원)',
   chkPet: '반려동물 동반 가능 (전구역)',
@@ -60,15 +70,49 @@ const FULL_INTRO: PlaceIntro = {
   chkCreditCard: '가능',
 }
 
-/** 일부 값만 있는 intro — 없는 줄이 숨겨져야 한다 */
+/** 일부 값만 있는 intro — 없는 줄이 숨겨져야 한다. 영업 상태는 **영업 종료** 갈래다 */
 const PARTIAL_INTRO: PlaceIntro = {
   infoCenter: null,
   useTime: '10:00~18:00',
+  open24: false,
+  openNow: false,
   restDate: null,
   parking: '불가 (인근 공영주차장 이용)',
   chkPet: null,
   chkBabyCarriage: null,
   chkCreditCard: null,
+}
+
+/**
+ * **24시간** 갈래. `openNow` 를 함께 두어 화면이 그것을 말하지 않는 것까지 보이게 한다 —
+ * 긴급 시설 dev 응답에 실제로 있는 `open24: true` / `openNow: false` 조합이다.
+ */
+const OPEN24_INTRO: PlaceIntro = {
+  infoCenter: '064-728-3919',
+  useTime: '매일 00:00~24:00',
+  open24: true,
+  openNow: false,
+  restDate: '연중무휴',
+  parking: '가능 (무료)',
+  chkPet: '반려동물 동반 가능 (전구역)',
+  chkBabyCarriage: null,
+  chkCreditCard: null,
+}
+
+/**
+ * **판정 근거 없음** 갈래 — 배지가 아예 나오지 않고 원문만 남아야 한다.
+ * 지금 dev 의 모든 장소가 이 상태다.
+ */
+const HOURS_UNKNOWN_INTRO: PlaceIntro = {
+  infoCenter: null,
+  useTime: '화~일 09:00~18:00',
+  open24: false,
+  openNow: null,
+  restDate: '매주 월요일',
+  parking: '가능 (승용차 20대)',
+  chkPet: null,
+  chkBabyCarriage: null,
+  chkCreditCard: '가능',
 }
 
 const FULL_PET_INFO: PlacePetInfo = {
@@ -202,8 +246,11 @@ type DetailVariant = {
 }
 
 /**
- * 4가지 조합을 순환시켜 **nullable 경로가 항상 화면에 등장**하게 한다.
+ * 6가지 조합을 순환시켜 **nullable 경로가 항상 화면에 등장**하게 한다.
  * 하나라도 빠지면 "내 로컬에서는 잘 보이던" 상태로 숨김 처리 버그가 지나간다.
+ *
+ * 4가지였던 것을 6으로 늘렸다 (#294) — 영업 상태가 4갈래이고 그중 둘(24시간 ·
+ * 판정 근거 없음)이 기존 조합에 자리가 없었다.
  */
 const VARIANTS: DetailVariant[] = [
   {
@@ -240,6 +287,24 @@ const VARIANTS: DetailVariant[] = [
     overview: null,
     homepage: null,
     cpyrhtDivCd: null,
+  },
+  {
+    // 24시간 — `openNow` 가 어긋나도 화면은 `24시간` 만 말한다 (#294)
+    intro: OPEN24_INTRO,
+    petInfo: FULL_PET_INFO,
+    images: IMAGES.slice(0, 2),
+    overview: OVERVIEW,
+    homepage: HOMEPAGE_ANCHOR,
+    cpyrhtDivCd: null,
+  },
+  {
+    // 영업 상태 판정 근거 없음 — 배지 없이 원문만 (#294). 지금 dev 의 실상태다
+    intro: HOURS_UNKNOWN_INTRO,
+    petInfo: MEDIUM_PET_INFO,
+    images: IMAGES,
+    overview: null,
+    homepage: null,
+    cpyrhtDivCd: 'Type1',
   },
 ]
 

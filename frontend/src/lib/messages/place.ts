@@ -84,6 +84,16 @@ export const placeMessages = {
 
   detailInfoCenter: '문의처',
   detailUseTime: '운영시간',
+  /**
+   * 영업 상태 — `운영시간` 원문 **위**에 선다 (#294 · 세부명세 D5).
+   *
+   * **`openNow === null` 문구는 만들지 않는다.** 그 갈래는 아무것도 그리지 않으므로
+   * 문구가 필요 없다. 긴급 시설의 `statusUnknown`("영업 여부 확인 필요")에 해당하는
+   * 것이 여기 없는 이유다 — 이유는 `types/place.ts` 의 `openNow` 주석에 있다.
+   */
+  detailOpen24: '24시간',
+  detailOpenNow: '영업 중',
+  detailOpenClosed: '영업 종료',
   detailRestDate: '휴무일',
   detailParking: '주차',
   detailBabyCarriage: '유모차 대여',
