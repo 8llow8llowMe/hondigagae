@@ -32,6 +32,14 @@ export type ChipProps = {
    * 적용된 것처럼 들린다 — 여는 것과 고르는 것은 다른 일이다.
    */
   expanded?: boolean
+  /**
+   * 아이콘만 든 칩의 이름. 주면 `aria-label`(보조기기)과 `title`(마우스 호버 툴팁)
+   * 양쪽에 남긴다 — `ViewToggle` 의 아이콘형과 같은 규칙이다.
+   *
+   * 글자가 든 칩에는 주지 않는다. `aria-label` 이 보이는 글자를 덮어써서
+   * 스크린리더가 읽는 이름과 화면에 보이는 이름이 갈린다.
+   */
+  label?: string
   children: ReactNode
   className?: string
 }
@@ -41,6 +49,7 @@ export function Chip({
   onSelect,
   exclusive = false,
   expanded,
+  label,
   children,
   className,
 }: ChipProps) {
@@ -55,6 +64,8 @@ export function Chip({
     <button
       type="button"
       {...a11y}
+      aria-label={label}
+      title={label}
       onClick={onSelect}
       className={cn(
         // 모바일 최소 터치 영역 44px (DESIGN.md §7)

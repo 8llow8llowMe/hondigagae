@@ -20,6 +20,29 @@ export const CONTENT_TYPE_LABEL: Record<ContentTypeCode, string> = {
   RESTAURANT: '음식점',
 }
 
+/**
+ * 필터에 **보여 주는 순서.** `CONTENT_TYPE_CODES`(`types/place.ts`)는 백엔드 enum 의
+ * 선언 순서라 화면 순서로 쓰면 반려견 여행과 무관한 축이 앞에 온다.
+ *
+ * 순서의 근거: 이 서비스에서 먼저 찾는 것은 **갈 곳 → 먹을 곳 → 잘 곳**이다.
+ * 지도 필터 줄(`place-map-filter-bar.tsx`)은 폭이 400 이라 **앞 두세 개만 스크롤 없이
+ * 보인다** — 무엇을 앞에 두는지가 실제로 도달률을 바꾼다. 여행코스는 개별 장소가 아니라
+ * 장소 묶음이라 맨 뒤다.
+ *
+ * **레일·시트도 이 순서를 쓴다.** 같은 축의 두 컨트롤이 다른 순서로 보이면 사용자가
+ * 목록에서 익힌 위치가 지도에서 통하지 않는다.
+ */
+export const CONTENT_TYPE_FILTER_ORDER = [
+  'TOURIST_SPOT',
+  'RESTAURANT',
+  'LODGING',
+  'CULTURE',
+  'LEPORTS',
+  'FESTIVAL',
+  'SHOPPING',
+  'COURSE',
+] as const satisfies readonly ContentTypeCode[]
+
 export const PET_ALLOWANCE_LABEL: Record<PetAllowanceCode, string> = {
   ALLOWED: '동반 가능',
   PARTIALLY_ALLOWED: '부분 동반 가능',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseViewMode, viewModeHref } from '@/lib/url/view-mode'
+import { parseViewMode, PLACES_DEFAULT_VIEW, viewModeHref } from '@/lib/url/view-mode'
 
 describe('parseViewMode', () => {
   it('키가 없으면 목록이다 — 지도가 첫 화면이 아니다', () => {
@@ -46,5 +46,52 @@ describe('viewModeHref', () => {
     const backToList = viewModeHref('/places', new URL(toMap, 'http://x').search.slice(1), 'list')
 
     expect(backToList).toBe('/places?contentType=RESTAURANT')
+  })
+})
+
+/**
+ * **화면마다 기본 보기가 다르다.** 장소 찾기는 지도가 먼저고(`/places` = 지도), 긴급
+ * 시설은 목록이 먼저다. 기본값을 상수 하나로 통일하면 한쪽이 반드시 틀어진다.
+ *
+ * 파싱과 링크 생성에 **같은 기본값**이 들어가야 하는 것이 이 규약의 핵심이다 — 어긋나면
+ * 토글이 가리키는 보기와 페이지가 그리는 보기가 달라져 전환이 먹지 않는다.
+ */
+describe('화면별 기본 보기 — 장소 찾기는 지도가 먼저다', () => {
+  it('장소 찾기는 view 가 없으면 지도다', () => {
+    expect(parseViewMode({}, PLACES_DEFAULT_VIEW)).toBe('map')
+  })
+
+  it('잘못된 값도 그 화면의 기본값으로 떨어진다', () => {
+    expect(parseViewMode({ view: 'satellite' }, PLACES_DEFAULT_VIEW)).toBe('map')
+  })
+
+  it('명시된 목록은 그대로 목록이다', () => {
+    expect(parseViewMode({ view: 'list' }, PLACES_DEFAULT_VIEW)).toBe('list')
+  })
+
+  it('기본값(지도)은 URL 에서 생략되고 목록이 view=list 로 붙는다', () => {
+    expect(viewModeHref('/places', '', 'map', PLACES_DEFAULT_VIEW)).toBe('/places')
+    expect(viewModeHref('/places', '', 'list', PLACES_DEFAULT_VIEW)).toBe('/places?view=list')
+  })
+
+  it('필터를 유지한 채 전환한다', () => {
+    expect(viewModeHref('/places', 'indoor=true', 'list', PLACES_DEFAULT_VIEW)).toBe(
+      '/places?indoor=true&view=list',
+    )
+  })
+
+  it('왕복하면 처음 URL 로 돌아온다 — 링크와 파싱이 같은 기본값을 쓴다', () => {
+    const toList = viewModeHref('/places', 'contentType=RESTAURANT', 'list', PLACES_DEFAULT_VIEW)
+    const query = new URL(toList, 'http://x').search.slice(1)
+
+    expect(parseViewMode(new URLSearchParams(query), PLACES_DEFAULT_VIEW)).toBe('list')
+    expect(viewModeHref('/places', query, 'map', PLACES_DEFAULT_VIEW)).toBe(
+      '/places?contentType=RESTAURANT',
+    )
+  })
+
+  it('긴급 시설은 그대로 목록이 기본이다 — 기본값을 통일하지 않는다', () => {
+    expect(parseViewMode({})).toBe('list')
+    expect(viewModeHref('/emergency', '', 'list')).toBe('/emergency')
   })
 })

@@ -38,12 +38,18 @@ const DRAG_THRESHOLD_PX = 24
 export function MapSheet({
   stop,
   onStopChange,
+  toolbar,
   header,
   children,
   className,
 }: {
   stop: SheetStop
   onStopChange: (stop: SheetStop) => void
+  /**
+   * 전폭 컨트롤 줄 — 필터가 여기 온다. **`header` 와 한 줄에 두지 않는다.**
+   * 단계 이동 버튼과 나란히 두면 375 에서 폭이 300 도 안 남아 필터 칩이 두 개만 보였다.
+   */
+  toolbar?: ReactNode
   /** 항상 보이는 줄 — 개수와 정렬. 최소 단계에서도 남는다 */
   header: ReactNode
   children: ReactNode
@@ -102,6 +108,9 @@ export function MapSheet({
       >
         <span aria-hidden className="bg-border-strong h-1 w-9 rounded-full" />
       </div>
+
+      {/* 필터 같은 전폭 컨트롤. 최소 단계에서도 남으므로 지도를 보면서 조건을 바꿀 수 있다 */}
+      {toolbar !== undefined && <div className="px-3 pb-2">{toolbar}</div>}
 
       {/**
        * 드래그를 못 쓰는 입력(키보드·스위치)을 위한 단계 이동. 아이콘 없이 글자로 둔다 —
