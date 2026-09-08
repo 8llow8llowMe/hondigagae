@@ -4,6 +4,7 @@ import { MetricBadge } from '@/components/metric'
 import { Skeleton } from '@/components/skeleton'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { formatCelsius } from '@/lib/format/celsius'
+import { sortRegionsByScore } from '@/lib/insight/region-order'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import type { RegionalWeatherResponse, RegionWeatherItem } from '@/types/insight'
@@ -62,8 +63,13 @@ export function RegionalWeatherSection({
           정한다 — dev 실측은 5개(제주시 · 서귀포 · 동부 · 서부 · 한라산)인데 4칸 grid 로
           두면 다섯째가 두 번째 줄로 떨어져 칸 높이가 두 배가 됐다. 늘거나 줄어도 한 줄이다.
         */}
+        {/*
+          **점수 높은 순이다** (`sortRegionsByScore`). 서버는 지리 순서로 주는데, 그대로
+          두면 추천 권역이 어디 있을지 알 수 없다 — 실측에서 100점짜리가 맨 끝이었고
+          바로 위 문장은 그 권역을 가리키고 있었다. 동점은 서버 순서를 지킨다.
+        */}
         <ul className="flex flex-col lg:flex-row lg:gap-x-1">
-          {data.regions.map((region) => (
+          {sortRegionsByScore(data.regions).map((region) => (
             <RegionRow key={region.region.code} item={region} />
           ))}
         </ul>

@@ -143,6 +143,22 @@ export function WalkVerdict({
           {petName !== null && ` · ${petName} ${messages.home.basisSuffix}`}
         </p>
 
+        {/*
+          **등급이 권하는 행동.** `walkSafetyLevel.description` 은 "짧게 걷고 물과 그늘을
+          챙기는 편이 좋습니다" 같은 완성형 문장인데, 화면은 지금까지 등급어(`주의`) 두
+          글자만 쓰고 이 문장을 버리고 있었다. 이 서비스는 판정이 아니라 **판단을 돕는**
+          쪽이고, 그 일을 하는 문장이 응답에 이미 들어 있었다.
+
+          **`reasons` 위에 둔다.** 근거("왜 주의인가")보다 조치("그럼 어떻게 하나")가
+          먼저 읽혀야 한다 — 근거는 그 조치를 뒷받침하는 자리다.
+
+          **`scoreDescription` 은 쓰지 않는다.** "위험 요인이 하나 이상 확인되었습니다" 는
+          아래 `reasons` 가 그 요인을 낱낱이 세는 것과 같은 말이고, 행동을 바꾸지 않는다.
+        */}
+        {data.walkSafetyLevel.description !== null && (
+          <p className="text-body-2 text-fg">{data.walkSafetyLevel.description}</p>
+        )}
+
         <VerdictReasons reasons={data.reasons} />
 
         {/* 안전 시간대는 조언의 실체다. 없으면 줄 자체를 렌더하지 않는다 */}
