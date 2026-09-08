@@ -214,7 +214,7 @@ function EmptyResult({
   }
 
   return (
-    <div className="flex flex-col items-start gap-2.5 px-4 py-6 md:px-10">
+    <div className="flex flex-col items-start gap-2 px-4 py-6 md:px-10">
       <h3 className="text-title-2 text-fg font-semibold">{messages.emergency.narrowedTitle}</h3>
       <div className="mt-1 flex flex-wrap gap-2">
         {options.map((option) => (

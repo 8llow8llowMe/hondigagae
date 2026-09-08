@@ -185,7 +185,7 @@ export function PlaceDetailSection({
             />
           </div>
 
-          <header className="flex flex-col gap-2.5 px-4 pt-5 pb-6 md:px-10">
+          <header className="flex flex-col gap-3 px-4 pt-5 pb-6 md:px-10">
             <div className="flex items-start justify-between gap-2 md:items-center">
               {/*
                 공백 없는 긴 장소명이 가로로 넘치지 않게 한다 (styling-guide.md §4).

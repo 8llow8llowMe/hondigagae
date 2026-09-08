@@ -84,7 +84,7 @@ function PetInfoLine({
   muted?: boolean
 }) {
   return (
-    <li className="flex items-start gap-2.5">
+    <li className="flex items-start gap-2">
       {/*
         장식 아이콘이다 — 뜻은 옆 문장이 말한다 (DESIGN.md §9).
 
@@ -116,7 +116,7 @@ function EmptyPetInfo({ allowance, tel }: { allowance: EnumMetadata | null; tel:
   const registered = allowance !== null && allowance.code !== 'UNKNOWN'
 
   return (
-    <div className="flex flex-col items-start gap-2.5">
+    <div className="flex flex-col items-start gap-2">
       {/* 점선 배지로 "모름" 을 드러낸다 — tint 를 주지 않는다 (DESIGN.md §2-3 UNKNOWN) */}
       {!registered && (
         <MetricBadge tone="unknown">{messages.place.detailPetInfoEmptyBadge}</MetricBadge>
