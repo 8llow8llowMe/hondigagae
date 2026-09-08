@@ -96,7 +96,7 @@ export function PetFormFields({
       <FormAlert message={errors.form} />
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-title-3 text-fg font-semibold">기본 정보</h2>
+        <h2 className="text-title-2 text-fg font-semibold">기본 정보</h2>
 
         <Field id="name" label={labels.name} error={errors.fields.name} required>
           <Input
@@ -173,7 +173,7 @@ export function PetFormFields({
       </section>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-title-3 text-fg font-semibold">성향</h2>
+        <h2 className="text-title-2 text-fg font-semibold">성향</h2>
 
         <RadioGroup
           id="activityLevel"
@@ -204,7 +204,7 @@ export function PetFormFields({
       </section>
 
       <section className="flex flex-col gap-1">
-        <h2 className="text-title-3 text-fg font-semibold">민감도</h2>
+        <h2 className="text-title-2 text-fg font-semibold">민감도</h2>
 
         <Checkbox
           id="heatSensitive"

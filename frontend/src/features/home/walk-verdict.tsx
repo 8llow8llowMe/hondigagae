@@ -8,6 +8,7 @@ import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { formatCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { WalkSafetyResponse } from '@/types/insight'
 
@@ -105,7 +106,8 @@ export function WalkVerdict({
       */}
       <div
         className={cn(
-          'flex-col gap-3 px-4 pt-4 pb-4 md:flex md:px-6 md:py-5',
+          'flex-col gap-3 pt-4 pb-4 md:flex md:py-5',
+          INSET_CLASS.rail,
           open ? 'flex' : 'hidden',
         )}
       >
