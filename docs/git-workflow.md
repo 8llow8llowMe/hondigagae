@@ -79,6 +79,41 @@ git checkout -b feature/fe/12-place-detail
 - **의미 단위로 나눈다.** `Rebase and merge` 라서 **커밋이 그대로 develop 에 남는다.**
   "wip", "fix typo" 같은 커밋을 남기지 않는다. 필요하면 `git rebase -i` 로 정리한다.
 
+### 4-1. 작업 트리를 혼자 쓰지 않는다
+
+**같은 작업 트리에서 다른 세션·사람이 동시에 파일을 고치고 있을 수 있다.** 2026-09-08 에
+실제로 겪었다 — 세션 시작 때 `git status` 가 깨끗했는데, 작업 중 다른 쪽이 같은 트리에서
+홈 화면 16파일을 건드리기 시작했고 하마터면 한 커밋에 섞일 뻔했다.
+
+| 하지 않는다 | 대신 |
+|-------------|------|
+| `git add -A` · `git add .` | **경로를 하나씩 적는다.** 커밋 전에 `git diff --cached --name-only` 로 확인한다 |
+| `git stash` | 남의 진행 중 작업을 통째로 치운다. 중간 상태를 검증해야 하면 **워크트리**를 쓴다 (아래) |
+| `SKIP_HOOKS=1` 로 pre-push 훅 끄기 | 훅이 남의 미완성 파일에 걸린 것이다. **깨끗한 워크트리에서 push 한다** (아래) |
+| 남의 파일에 `prettier --write` | 같은 이유. 내 변경이 아닌 파일을 고치지 않는다 |
+
+**커밋 전에 항상 `git status --short` 로 내 것이 아닌 변경이 있는지 먼저 본다.**
+
+`.githooks/pre-push` 는 **작업 트리 기준**으로 `pnpm format:check && pnpm verify` 를 돈다.
+그래서 남의 미완성 파일 하나로 내 push 가 막힌다. 훅을 끄지 말고 푸시할 커밋만 담긴
+워크트리에서 민다.
+
+```bash
+git worktree add --detach <scratch>/wt HEAD
+ln -s "$(pwd)/frontend/node_modules" <scratch>/wt/frontend/node_modules
+cd <scratch>/wt && git push -u origin HEAD:refs/heads/<branch>
+```
+
+`tsc` · `vitest` · `eslint` · `prettier` 는 심볼릭 링크한 `node_modules` 로 충분하다
+(Turbopack 은 아니다 — `frontend/docs/local-run-guide.md`).
+
+**훅을 끄는 쪽이 더 나쁜 이유**: 이 저장소는 free 플랜이라 required status check 가 없다
+([#286](https://github.com/8llow8llowMe/hondigagae/issues/286)). 훅이 develop 빨간불을 막는
+마지막 문턱이다.
+
+> 리베이스 머지 뒤 `git branch -d` 가 거부하면 `git cherry -v develop <branch>` 로 전부
+> `-` 인지(= 이미 develop 에 있음) 확인하고 `-D` 한다.
+
 ## 5. develop 동기화는 rebase 로 한다
 
 작업 중 develop 이 앞서 나갔으면 **merge 가 아니라 rebase** 를 쓴다.
