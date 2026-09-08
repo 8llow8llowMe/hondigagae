@@ -34,7 +34,7 @@ export function FacilityRow({
 
   return (
     <Row as="li" last={last}>
-      <div className="flex items-center gap-3 py-3.5">
+      <div className="flex items-center gap-3 py-3">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex items-center gap-1.5">
             <span className="text-title-2 text-fg font-semibold break-keep">{facility.name}</span>

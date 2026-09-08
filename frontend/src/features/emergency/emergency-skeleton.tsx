@@ -30,7 +30,7 @@ export function EmergencySkeleton() {
       <ul>
         {Array.from({ length: ROW_COUNT }, (_, index) => (
           <li key={index} className="border-border border-b last:border-b-0">
-            <div className="flex items-center gap-3 px-4 py-3.5 md:px-10">
+            <div className="flex items-center gap-3 px-4 py-3 md:px-10">
               <div className="flex flex-1 flex-col gap-2">
                 <Skeleton variant="text" className="h-6 w-3/5" />
                 <Skeleton variant="text" className="h-4 w-2/5" />
