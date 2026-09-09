@@ -536,6 +536,22 @@ body {
   }
 }
 
+/*
+  탭바가 덮는 만큼 바닥을 비운다.
+  지도 폴백 목록이 고정 높이 껍데기를 넘쳐 흐르면 `main` 의 탭바 여백이 먹지 않아
+  마지막 행의 버튼이 탭바 뒤로 들어간다 (실측: 375×812 에서 담기 버튼 44px 중 21px 만
+  남았다). 탭바는 768 미만에만 있으므로 그 위에서는 0 이다.
+*/
+.pb-tabbar {
+  padding-block-end: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+}
+
+@media (width >= 48rem) {
+  .pb-tabbar {
+    padding-block-end: 0;
+  }
+}
+
 /* 지도 캔버스 높이 — 헤더·탭바를 뺀 나머지를 채운다.
    아트보드 05·06 은 지도가 바탕이고 그 위에 패널·시트가 얹히는 구조다. */
 .map-canvas-height {

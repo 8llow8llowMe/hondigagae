@@ -67,6 +67,18 @@ describe('MapSheet — maxTopInset 은 max 단계의 상한만 바꾼다', () =>
     expect(markup).not.toContain('85dvh')
   })
 
+  /**
+   * 회귀 고정 — 인셋 경로는 뷰포트에 선형이라 짧은 화면에서 max 가 mid 아래로 내려간다
+   * (812×375 에서 375 − 240 = 135px < 45dvh = 169px). 그러면 `목록 더 보기` 가 시트를
+   * 줄인다. `mid` 비율을 하한으로 걸어 두는 것으로 막는다.
+   */
+  it('inset 을 줘도 mid 비율 아래로는 안 내려간다 — max() 로 하한을 건다', () => {
+    const markup = render('max', { maxTopInset: 240 })
+
+    expect(markup).toContain('max(')
+    expect(markup).toContain('45dvh')
+  })
+
   it('mid 는 여전히 비율이다 — inset 은 max 에만 걸린다', () => {
     const markup = render('mid', { maxTopInset: 240 })
 
