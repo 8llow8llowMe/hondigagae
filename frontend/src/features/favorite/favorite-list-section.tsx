@@ -154,6 +154,24 @@ export function FavoriteListSection({
           />
         ))}
       </RowList>
+
+      {/*
+        **아트보드 01 하단의 AI 안내** (#408). AI 일정 조건 입력에는
+        `preferFavoritesLink: '저장한 장소 보기'` 로 이리 오는 길이 있는데, 되돌아가는
+        길이 없었다 — 저장을 쌓아도 그것이 어디에 쓰이는지 이 화면이 말하지 않았다.
+
+        **목록이 비어 있으면 내지 않는다.** `EmptyState` 갈래로 빠지므로 여기 오지
+        않는다 — 후보가 없는데 "먼저 넣기" 를 권하면 빈 토글을 켜러 가게 된다.
+      */}
+      <div className="flex flex-col items-start gap-1 px-4 md:px-10">
+        <p className="text-caption text-fg-muted">{messages.favorite.aiHint}</p>
+        <Link
+          href="/ai-plans/new"
+          className="text-caption text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex min-h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
+        >
+          {messages.favorite.aiHintAction}
+        </Link>
+      </div>
     </div>
   )
 }

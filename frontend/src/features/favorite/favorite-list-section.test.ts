@@ -246,3 +246,29 @@ describe('FavoriteListSection — 저장일 (명세 D9-1)', () => {
     expect(markup).not.toMatch(/\d{4}-\d{2}-\d{2} 저장/)
   })
 })
+
+describe('FavoriteListSection — AI 일정 안내 (명세 D8-1 · #408)', () => {
+  /*
+    아트보드 01 하단의 안내다. AI 일정 조건 입력에는 `preferFavoritesLink` 로 이리 오는
+    길이 있는데 되돌아가는 길이 없었다 — #127 때는 토글이 없어 비웠고, #128 이 토글을
+    만든 뒤에도 문구만 남아 있었다.
+  */
+  it('목록이 있으면 AI 일정 조건 입력으로 가는 길을 낸다', () => {
+    const markup = render({ places: [favoritePlaceItem()], totalCount: 1 })
+
+    expect(markup).toContain(messages.favorite.aiHint)
+    expect(markup).toContain('href="/ai-plans/new"')
+    expect(markup).toContain(messages.favorite.aiHintAction)
+  })
+
+  it('토글 이름을 그대로 인용한다 — 갈리면 사용자가 그 컨트롤을 못 찾는다', () => {
+    expect(messages.favorite.aiHint).toContain(messages.aiPlan.preferFavoritesLabel)
+  })
+
+  it('빈 목록에는 내지 않는다 — 후보가 없는데 먼저 넣기를 권하지 않는다', () => {
+    const markup = render({ places: [], totalCount: 0 })
+
+    expect(markup).not.toContain(messages.favorite.aiHint)
+    expect(markup).not.toContain('href="/ai-plans/new"')
+  })
+})
