@@ -166,6 +166,20 @@ export function PlaceMapView({
     })
   }, [places, bounds])
 
+  /*
+    **내용이 같으면 같은 Set 으로 취급한다.** `mutedPlaceIds` 는 참조 동등성으로만
+    메모 판정에 들어가는데, 호출부가 매 렌더 새 `Set` 을 만들면(담기 화면이 그렇다 —
+    `placeIdsOf` 를 조건부 return 뒤에서 부르므로 useMemo 로 감쌀 수 없다) `pins` 가
+    매 렌더 새 배열이 되고 `MapCanvas` 가 오버레이를 전부 지웠다 다시 그린다. 무관한
+    리렌더마다 지도 위 핀이 통째로 깜빡인다.
+
+    "안정된 참조로 넘겨라" 를 호출부 계약으로 두지 않는 이유는 그 계약이 호출부에서
+    보이지 않기 때문이다 — 다음 소비자가 또 밟는다. `placeId` 는 숫자 문자열이라
+    쉼표로 이어 붙여도 안전하다.
+  */
+  const mutedKey = mutedPlaceIds === undefined ? '' : [...mutedPlaceIds].sort().join(',')
+  const mutedIds = useMemo(() => new Set(mutedKey === '' ? [] : mutedKey.split(',')), [mutedKey])
+
   const pins: MapPin[] = useMemo(
     () =>
       visible.map((place) => ({
@@ -178,9 +192,9 @@ export function PlaceMapView({
             `caption` 은 선택됐을 때만 라벨에 붙고, `MapCanvas` 는 마커에 판정 색을 쓰지
             않는다는 규약이 있다. 긴급 시설의 약국이 쓰던 표현을 그대로 재사용한다.
           */
-        muted: mutedPlaceIds?.has(place.placeId) ?? false,
+        muted: mutedIds.has(place.placeId),
       })),
-    [visible, mutedPlaceIds],
+    [visible, mutedIds],
   )
 
   const handleBounds = useCallback((next: MapBounds, userMoved: boolean) => {
