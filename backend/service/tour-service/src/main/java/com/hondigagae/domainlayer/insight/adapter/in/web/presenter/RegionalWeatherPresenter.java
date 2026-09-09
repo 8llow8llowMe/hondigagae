@@ -54,6 +54,7 @@ public class RegionalWeatherPresenter {
             .maxPrecipitationProbability(weather == null ? null : weather.maxPrecipitationProbability())
             .minTemperature(weather == null ? null : weather.minTemperature())
             .maxTemperature(weather == null ? null : weather.maxTemperature())
+            .maxFeelsLikeTemperature(weather == null ? null : weather.maxFeelsLikeTemperature())
             .maxWindSpeed(weather == null ? null : weather.maxWindSpeed())
             .reasons(insightPresenter.toReasonItems(region.reasons()))
             .build();

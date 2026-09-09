@@ -37,6 +37,14 @@ public record RegionWeatherItem(
     @Schema(description = "최고기온(℃)", example = "26.0")
     Double maxTemperature,
 
+    @Schema(
+        description = "하루 최고 체감온도(섭씨). 시각별 기온·상대습도로 계산한 기상청 여름철 체감온도의 "
+            + "하루 최대값이며 폭염특보(주의보 33℃·경보 35℃)와 같은 척도다. 장소 상세의 "
+            + "`weather.maxFeelsLikeTemperature` 와 같은 규칙이라 두 화면의 숫자가 어긋나지 않는다. "
+            + "예보가 없으면 null 이다 — 최고기온으로 대신하지 않는다",
+        example = "33.4", nullable = true)
+    Double maxFeelsLikeTemperature,
+
     @Schema(description = "최대 풍속(m/s). 중기예보 기반 날짜는 null", example = "5.2")
     Double maxWindSpeed,
 
