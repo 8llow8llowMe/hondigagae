@@ -1604,9 +1604,25 @@ git commit -m "[FE] refactor: 시설 칩 개수 라벨 헬퍼를 한 곳으로 �
 **Interfaces:**
 - Consumes: `EmergencyMapPanel`(T5) · `EmergencyFilterBar`(T6) · `EmergencySection`(T7) · `MapCanvas` 의 `camera`(T2) · `SELECTED_FACILITY_MAP_LEVEL`(T3)
 - Produces:
-  - `useEmergencyBoard(): { position, fallback, radius, setRadius, widen, canWiden, filters, setFilters, query, locate, inJeju }`
+  - `useEmergencyBoard(): { position, camera, fallback, showDistance, inJeju, radius, setRadius, widenRadius, canWiden, filters, setFilters, query, locate }`
+  - `type EmergencyBoard = ReturnType<typeof useEmergencyBoard>`
   - `EmergencyMapView({ listHref, mapHref })`
-  - `EmergencyListView()` — **props 없음.** 필요한 상태를 스스로 `useEmergencyBoard()` 로 만든다
+  - `EmergencyBoardSection({ board })` — 보드를 **받아서** 목록을 그린다. 보드를 만들지 않는다
+  - `EmergencyListView()` — props 없음. 보드를 하나 만들어 `EmergencyBoardSection` 에 넘긴다
+
+> **컨트롤러 ruling (Task 8 착수 전 발견):** 원래 계획은 지도 갈래의 SDK 실패 분기에서
+> `<EmergencyListView />` 를 렌더했다. 그런데 `EmergencyMapView` 가 이미
+> `useEmergencyBoard()` 를 부르고 있어서, 그렇게 하면 **보드가 두 벌 마운트된다** —
+> `getCurrentPosition()` 이 두 번 나가고(`lib/geo/current-position.ts` 는 호출마다 브라우저에
+> 다시 묻고 11초 타이머를 건다), `radius`·`filters` 상태가 갈리고, 아무도 보지 않는 조회
+> 구독이 하나 남는다.
+>
+> **SDK 실패는 예외 경로가 아니다.** 카카오 키에 도메인이 등록돼 있지 않으면 항상 이쪽이다.
+>
+> 그래서 목록 렌더를 보드 생성과 갈랐다: `EmergencyBoardSection` 이 보드를 받고,
+> `EmergencyListView` 는 보드를 만들어 넘기고, 지도 갈래의 실패 분기는 **자기 보드를**
+> 넘긴다. 화면당 보드는 언제나 하나다. 라우트 페이지는 그대로 `EmergencyListView` 를
+> 쓴다 — 거기가 목록 갈래의 최상위이므로 보드를 만드는 것이 맞다.
 
 - [ ] **Step 1: 상태 훅을 만든다**
 
@@ -1626,6 +1642,13 @@ import { DEFAULT_FACILITY_FILTERS, type FacilityFilters } from '@/types/emergenc
 export function widen(radius: number): number {
   return Math.min(MAX_RADIUS_METERS, radius * 2)
 }
+
+/**
+ * 이 화면의 상태 묶음. **화면당 하나만 만든다** — 두 벌이 마운트되면
+ * `getCurrentPosition()` 이 두 번 나가고 반경·필터가 갈린다. 보드를 만들지 않고
+ * **받아서** 쓰는 컴포넌트는 이 타입을 prop 으로 받는다.
+ */
+export type EmergencyBoard = ReturnType<typeof useEmergencyBoard>
 
 /**
  * 긴급 시설 화면의 상태 — 위치 · 반경 · 필터 · 조회.
@@ -1709,7 +1732,7 @@ export function useEmergencyBoard() {
 'use client'
 
 import { EmergencySection } from '@/features/emergency/emergency-section'
-import { useEmergencyBoard } from '@/features/emergency/use-emergency-board'
+import { type EmergencyBoard, useEmergencyBoard } from '@/features/emergency/use-emergency-board'
 import { toErrorStatus } from '@/lib/api/error'
 
 /**
@@ -1722,8 +1745,17 @@ import { toErrorStatus } from '@/lib/api/error'
  * 지도 갈래는 `EmergencySection` 을 쓰지 않고 자기 패널 본문을 갖는다.
  */
 export function EmergencyListView() {
-  const board = useEmergencyBoard()
+  return <EmergencyBoardSection board={useEmergencyBoard()} />
+}
 
+/**
+ * 보드를 **받아서** 목록을 그린다. **보드를 만들지 않는다.**
+ *
+ * 지도 갈래의 SDK 실패 분기가 자기 보드를 그대로 넘기기 위해 갈라 뒀다. 거기서
+ * `EmergencyListView` 를 렌더하면 보드가 두 벌이 되어 위치를 두 번 묻고 반경·필터가
+ * 갈린다 — SDK 실패는 카카오 키 도메인이 안 맞을 때 **항상** 오는 경로라 예외가 아니다.
+ */
+export function EmergencyBoardSection({ board }: { board: EmergencyBoard }) {
   return (
     <EmergencySection
       result={board.query.data ?? null}
@@ -1768,7 +1800,7 @@ import {
   reliefs,
 } from '@/features/emergency/facility-filters'
 import { useEmergencyBoard } from '@/features/emergency/use-emergency-board'
-import { EmergencyListView } from '@/features/emergency/emergency-list-view'
+import { EmergencyBoardSection } from '@/features/emergency/emergency-list-view'
 import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
 import { formatDistance } from '@/lib/format/distance'
@@ -1880,7 +1912,8 @@ export function EmergencyMapView({
         >
           {failureMessage(failure)}
         </p>
-        <EmergencyListView />
+        {/* **자기 보드를 넘긴다.** `EmergencyListView` 를 렌더하면 보드가 두 벌이 된다 */}
+        <EmergencyBoardSection board={board} />
       </div>
     )
   }
