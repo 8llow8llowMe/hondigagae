@@ -307,20 +307,56 @@ body {
 /* 스크롤 여지가 있는 쪽에만 fade 를 준다.
    끝까지 스크롤한 뒤에도 fade 가 남으면 마지막 항목이 이유 없이 흐려진다.
    방향 판정은 src/lib/ui/scroll.ts 의 scrollFadeSide 가 한다. */
+
+/*
+  **fade 폭은 셀 하나(48px)다** (#346). 24px 였을 때는 셀 절반만 덮어 마지막 칸이
+  거의 불투명하게 끝났다 — 390 홈 곡선 실측에서 119px 가 화면 밖인데 19시 칸이 그대로
+  읽혔다. 절반만 흐린 것과 한 칸이 통째로 흐려지는 것은 읽히는 정도가 다르다.
+
+  **중간 정지점을 둔다.** 단일 선형은 알파가 고르게 떨어져 눈에는 완만해 보인다.
+  가장자리 20px 지점을 0.3 으로 먼저 떨어뜨리면 같은 폭에서 훨씬 분명하다.
+
+  **세 클래스가 한 값을 공유한다.** 숫자를 세 곳에 흩어 두면 다음에 하나만 고쳐진다.
+
+  이 두 값은 `tokens.css` 에 두지 않는다 — 디자인 토큰(색·간격·radius)이 아니라 이 세
+  규칙의 지역 상수이고, `DESIGN.md` 가 정본으로 삼는 어휘에 마스크 폭은 없다.
+
+  `DESIGN.md` §10 이 그라디언트를 금지하지만 **이것은 장식이 아니라 스크롤 어포던스**이고
+  `scroll-rail.tsx` 가 이미 정본으로 삼은 장치다. 색을 칠하지 않고 알파만 깎는다.
+*/
+:root {
+  --scroll-fade-w: 48px;
+  --scroll-fade-mid: 20px;
+}
+
 .scroll-fade-right {
-  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(
+    to right,
+    #000 0,
+    #000 calc(100% - var(--scroll-fade-w)),
+    rgb(0 0 0 / 30%) calc(100% - var(--scroll-fade-mid)),
+    transparent 100%
+  );
 }
 
 .scroll-fade-left {
-  mask-image: linear-gradient(to right, transparent 0, #000 24px, #000 100%);
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    rgb(0 0 0 / 30%) var(--scroll-fade-mid),
+    #000 var(--scroll-fade-w),
+    #000 100%
+  );
 }
 
 .scroll-fade-both {
   mask-image: linear-gradient(
     to right,
     transparent 0,
-    #000 24px,
-    #000 calc(100% - 24px),
+    rgb(0 0 0 / 30%) var(--scroll-fade-mid),
+    #000 var(--scroll-fade-w),
+    #000 calc(100% - var(--scroll-fade-w)),
+    rgb(0 0 0 / 30%) calc(100% - var(--scroll-fade-mid)),
     transparent 100%
   );
 }
