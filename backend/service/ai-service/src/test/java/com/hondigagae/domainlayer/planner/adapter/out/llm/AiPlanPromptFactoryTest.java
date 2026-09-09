@@ -27,6 +27,7 @@ class AiPlanPromptFactoryTest {
             .breed("골든 리트리버")
             .sizeName("대형견")
             .weightText("28.5")
+            .ageText("11년 2개월")
             .heatSensitive(true)
             .walkPreferred(true)
             .build())));
@@ -34,12 +35,24 @@ class AiPlanPromptFactoryTest {
         assertThat(prompt).contains("함께 여행하는 반려견");
         assertThat(prompt).contains("대형견");
         assertThat(prompt).contains("체중: 28.5kg");
+        // 나이가 있어야 노령견과 퍼피가 다른 일정을 받는다 (#367)
+        assertThat(prompt).contains("나이: 11년 2개월");
         assertThat(prompt).contains("더위에 민감함");
         assertThat(prompt).contains("산책을 좋아함");
         // 켜지 않은 특성은 지어 적지 않는다
         assertThat(prompt).doesNotContain("추위에 민감함");
         // 한 마리일 때는 다중 판정 규칙이 붙지 않는다
         assertThat(prompt).doesNotContain("가장 큰 크기와 가장 무거운 체중");
+    }
+
+    @Test
+    @DisplayName("나이를 모르면 나이 줄을 지어 적지 않는다")
+    void unknownAgeOmitsAgeLine() {
+        String prompt = factory.userPrompt(query(List.of(PetCondition.builder()
+            .sizeName("소형견")
+            .build())));
+
+        assertThat(prompt).doesNotContain("나이:");
     }
 
     @Test

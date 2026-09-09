@@ -16,6 +16,8 @@ public record PetCondition(
     String sizeName,
     // 사람이 읽는 kg 표기 ("3.5"). 없으면 null — 지어 적지 않는다.
     String weightText,
+    // 사람이 읽는 나이 표기 ("7년 4개월", "8개월"). 생년월을 모르면 null — 지어 적지 않는다.
+    String ageText,
     boolean heatSensitive,
     boolean coldSensitive,
     boolean noiseSensitive,
