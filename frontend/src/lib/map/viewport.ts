@@ -130,3 +130,65 @@ export function framedCenterLat(
 
   return anchorLat - (0.5 - seaRatio) * latSpan
 }
+
+/**
+ * 카카오 확대 단계의 범위. **작을수록 확대**다.
+ *
+ * SDK 가 상수로 노출하지 않아 여기 적어 둔다 — 범위를 벗어난 값을 `setLevel` 에 넣으면
+ * 조용히 무시되고, 그러면 첫 화면이 "왜 이 확대인지" 설명할 수 없는 상태가 된다.
+ */
+const MIN_MAP_LEVEL = 1
+const MAX_MAP_LEVEL = 14
+
+/**
+ * `meters` 가 `pixels` 안에 들어오는 **가장 작은(= 가장 확대된) 확대 단계.**
+ *
+ * 긴급 시설 화면이 "내 위치 반경 10km 를 조회했으니 그만큼을 보여준다" 를 지키기 위한
+ * 역산이다. 단계를 상수로 박으면 뷰포트마다 보이는 범위가 달라져, 375 에서는 반경
+ * 절반이 화면 밖이고 1280 에서는 빈 바다가 절반이 된다.
+ *
+ * **경계는 담기는 쪽으로 본다** (`>=`). 딱 맞는 폭을 한 단계 더 축소하면 조회 범위
+ * 바깥이 화면에 들어오고, 그 자리는 재조회하지 않는 이 화면에서 영구히 비어 보인다.
+ *
+ * `pixels` 가 0 이면 `framedCenterLat` 과 같은 대체 높이를 쓴다 — 시트나 탭 뒤에서
+ * 지도가 만들어지면 `clientHeight` 가 0 이고, 그대로 계산하면 최대 축소로 떨어진다.
+ */
+export function levelForSpanMeters(meters: number, pixels: number): number {
+  if (!Number.isFinite(meters) || meters <= 0) return MAX_MAP_LEVEL
+
+  const span = Number.isFinite(pixels) && pixels > 0 ? pixels : FALLBACK_HEIGHT_PX
+
+  for (let level = MIN_MAP_LEVEL; level <= MAX_MAP_LEVEL; level += 1) {
+    if (metersPerPixel(level) * span >= meters) return level
+  }
+
+  return MAX_MAP_LEVEL
+}
+
+/**
+ * 기준점과 담고 싶은 폭으로 **첫 카메라(중심 + 확대 단계)** 를 만든다.
+ *
+ * `framedCenterLat` 과 `levelForSpanMeters` 를 한 번에 묶는다 — 두 함수를 호출부가
+ * 따로 부르면 **level 을 두 번 정하게 되고**(하나는 확대용, 하나는 위도 폭 환산용)
+ * 둘이 어긋나면 구도가 조용히 틀어진다.
+ *
+ * **짧은 변으로 단계를 정한다.** 긴 변에 맞추면 짧은 변에서 잘려 조회 범위의 일부가
+ * 화면 밖에 남는다.
+ */
+export function framedCamera(input: {
+  anchor: LatLng
+  /** 화면에 담고 싶은 폭(m). 반경이면 **지름**을 넘긴다 */
+  spanMeters: number
+  width: number
+  height: number
+  /** 기준점이 화면 위쪽 몇 할 지점에 올지. 0.5 면 정중앙 */
+  seaRatio: number
+}): { lat: number; lng: number; level: number } {
+  const level = levelForSpanMeters(input.spanMeters, Math.min(input.width, input.height))
+
+  return {
+    lat: framedCenterLat(input.anchor.lat, input.height, level, input.seaRatio),
+    lng: input.anchor.lng,
+    level,
+  }
+}

@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest'
 import {
   boundsCenter,
   boundsRadiusMeters,
+  framedCamera,
   framedCenterLat,
   isSameViewport,
   isWithinBounds,
+  levelForSpanMeters,
   type MapBounds,
   metersPerPixel,
 } from '@/lib/map/viewport'
@@ -158,5 +160,108 @@ describe('framedCenterLat', () => {
 
   it('높이가 0 이면 대체값으로 계산한다 — 중심이 기준선(바다)으로 올라가지 않는다', () => {
     expect(framedCenterLat(ANCHOR, 0, 9, 0.35)).toBeLessThan(ANCHOR)
+  })
+})
+
+describe('levelForSpanMeters', () => {
+  /*
+    반경 10km = 지름 20km. 카카오는 level 이 작을수록 확대이고
+    픽셀당 미터가 `0.25 × 2^(level-1)` 이다.
+  */
+  it('반경 10km 를 375px 에 담으면 level 9 다 (64m/px × 375 = 24km)', () => {
+    expect(levelForSpanMeters(20_000, 375)).toBe(9)
+  })
+
+  it('같은 반경을 800px 에 담으면 한 단계 더 확대된다 (32m/px × 800 = 25.6km)', () => {
+    expect(levelForSpanMeters(20_000, 800)).toBe(8)
+  })
+
+  it('반경을 넓히면 단계가 따라 올라간다 — "보는 범위 = 조회한 범위"', () => {
+    expect(levelForSpanMeters(40_000, 375)).toBe(10)
+    expect(levelForSpanMeters(80_000, 375)).toBe(11)
+  })
+
+  it('딱 맞는 폭은 담기는 것으로 본다 (경계 포함)', () => {
+    // level 8 · 375px = 12,000m
+    expect(levelForSpanMeters(12_000, 375)).toBe(8)
+    expect(levelForSpanMeters(12_001, 375)).toBe(9)
+  })
+
+  it('픽셀을 모르면(0) 대체 높이로 계산한다 — 0 을 그대로 쓰면 최대 축소가 된다', () => {
+    // FALLBACK_HEIGHT_PX(640) 기준: level 9 = 64 × 640 = 40,960m
+    expect(levelForSpanMeters(20_000, 0)).toBe(levelForSpanMeters(20_000, 640))
+  })
+
+  it('아무리 넓어도 카카오 상한 14 를 넘기지 않는다', () => {
+    expect(levelForSpanMeters(40_000_000, 375)).toBe(14)
+  })
+
+  it('폭이 0 이하면 최대 축소로 떨어뜨린다 — 계산 불가를 예외로 던지지 않는다', () => {
+    expect(levelForSpanMeters(0, 375)).toBe(14)
+    expect(levelForSpanMeters(-1, 375)).toBe(14)
+  })
+})
+
+describe('framedCamera', () => {
+  const anchor = { lat: 33.4996213, lng: 126.5311884 }
+
+  it('짧은 변으로 단계를 정한다 — 긴 변으로 맞추면 짧은 변에서 잘린다', () => {
+    const wide = framedCamera({
+      anchor,
+      spanMeters: 20_000,
+      width: 1280,
+      height: 800,
+      seaRatio: 0.35,
+    })
+
+    expect(wide.level).toBe(levelForSpanMeters(20_000, 800))
+  })
+
+  it('경도는 anchor 그대로다 — 틀잡기는 위도만 옮긴다', () => {
+    const camera = framedCamera({
+      anchor,
+      spanMeters: 20_000,
+      width: 375,
+      height: 700,
+      seaRatio: 0.35,
+    })
+
+    expect(camera.lng).toBe(anchor.lng)
+  })
+
+  it('seaRatio 0.35 면 중심이 anchor 보다 남쪽이다 — anchor 가 화면 위쪽에 온다', () => {
+    const camera = framedCamera({
+      anchor,
+      spanMeters: 20_000,
+      width: 375,
+      height: 700,
+      seaRatio: 0.35,
+    })
+
+    expect(camera.lat).toBeLessThan(anchor.lat)
+  })
+
+  it('seaRatio 0.5 면 anchor 가 그대로 중심이다', () => {
+    const camera = framedCamera({
+      anchor,
+      spanMeters: 20_000,
+      width: 375,
+      height: 700,
+      seaRatio: 0.5,
+    })
+
+    expect(camera.lat).toBeCloseTo(anchor.lat, 10)
+  })
+
+  it('framedCenterLat 과 같은 값을 준다 — 두 경로가 갈리면 첫 화면 구도가 달라진다', () => {
+    const camera = framedCamera({
+      anchor,
+      spanMeters: 20_000,
+      width: 375,
+      height: 700,
+      seaRatio: 0.35,
+    })
+
+    expect(camera.lat).toBe(framedCenterLat(anchor.lat, 700, camera.level, 0.35))
   })
 })
