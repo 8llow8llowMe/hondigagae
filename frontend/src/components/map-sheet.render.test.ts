@@ -6,9 +6,12 @@ import { describe, expect, it } from 'vitest'
 import { MapSheet, type SheetStop } from '@/components/map-sheet'
 import { messages } from '@/lib/messages'
 
-function render(stop: SheetStop) {
+// 이 파일은 화면과 무관한 범용 동작(단계 전환·모달 아님)만 검증한다 —
+// 이름 자체는 호출부마다 다르므로(`src/components/map-sheet.test.ts`) 임의 값을 쓴다.
+function render(stop: SheetStop, label = '목록') {
   return renderToStaticMarkup(
     createElement(MapSheet, {
+      label,
       stop,
       onStopChange: () => undefined,
       header: createElement('p', null, '지도에 보이는 곳 8'),
@@ -50,8 +53,8 @@ describe('MapSheet — 모달이 아니다', () => {
     expect(render('mid')).not.toContain('aria-modal')
   })
 
-  it('시트에 이름을 준다', () => {
-    expect(render('mid')).toContain(`aria-label="${messages.map.sheetLabel}"`)
+  it('시트에 이름을 준다 — 호출부가 준 이름을 그대로 쓴다', () => {
+    expect(render('mid', '목록')).toContain('aria-label="목록"')
   })
 
   it('헤더와 목록을 모두 렌더한다 — 최소 단계에서도 개수는 남는다', () => {

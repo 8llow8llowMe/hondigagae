@@ -54,6 +54,20 @@ export const JEJU_MAP_LEVEL = 9
 export const SELECTED_PLACE_MAP_LEVEL = 5
 
 /**
+ * 긴급 시설에서 **한 곳을 고를 때** 맞추는 확대 단계.
+ *
+ * `SELECTED_PLACE_MAP_LEVEL`(5) 보다 **한 단계 깊다.** 장소 찾기가 5 에서 멈춘 이유는
+ * 위에 적힌 대로 "4로 내리면 목록이 한두 건으로 남아 다음 카드를 이어 누를 수가 없다"
+ * 인데, 이 화면은 밀도가 다르다 — 반경 10km 안에 136곳이다
+ * (`docs/features/emergency/공통명세.md` E2-1 · dev 실측 2026-09-08).
+ *
+ * 그리고 `cellSizeFor(4) === 0` 이라(`lib/map/cluster.ts`) **묶음이 전부 풀려 개별 핀이
+ * 된다.** 1280 폭에서 2.6km, 375 폭에서 750m — 도로와 골목이 읽히는 단계다. 아픈 개를
+ * 안고 "그래서 이게 어디냐" 를 묻는 화면이라 동네가 아니라 건물이 보여야 한다.
+ */
+export const SELECTED_FACILITY_MAP_LEVEL = 4
+
+/**
  * 응답 좌표를 지도에 쓸 수 있는 형태로 변환한다.
  *
  * 백엔드는 lat / lng 를 Double 로 내려주지만 null 이거나 0 인 장소가 있다.

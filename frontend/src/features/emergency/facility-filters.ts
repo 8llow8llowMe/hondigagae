@@ -111,3 +111,14 @@ export function reliefs(
       .filter((candidate) => candidate.count > 0)
   )
 }
+
+/**
+ * 칩 라벨에 개수를 붙인다. **붙일 수 있을 때만 붙인다** — 잘린 목록에서 센 수는
+ * 전체가 아니고, 틀린 개수는 없는 개수보다 나쁘다 (`countsAreComplete`).
+ *
+ * 목록 갈래(`EmergencySection`)와 지도 갈래(`EmergencyFilterBar`)가 함께 쓴다.
+ * 각자 갖고 있으면 한쪽만 고쳐져 같은 칩이 화면마다 다르게 보인다.
+ */
+export function labelWithCount(label: string, count: number, show: boolean): string {
+  return show ? `${label} ${String(count)}` : label
+}

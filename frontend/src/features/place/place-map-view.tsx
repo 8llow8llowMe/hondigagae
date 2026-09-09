@@ -323,6 +323,7 @@ export function PlaceMapView({
 
       {/* ── 모바일: 하단 시트 3단 ────────────────────────────────────────── */}
       <MapSheet
+        label="장소 목록"
         stop={sheetStop}
         onStopChange={setSheetStop}
         /*

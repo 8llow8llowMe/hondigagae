@@ -52,7 +52,6 @@ export const mapMessages = {
 
   collapsePanel: '목록 패널 접기',
   expandPanel: '목록 패널 펼치기',
-  sheetLabel: '장소 목록',
   expandSheet: '목록 더 보기',
   collapseSheet: '목록 접기',
   sheetHint: '시트를 올리면 전체 목록을 봐요.',

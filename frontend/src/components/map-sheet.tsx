@@ -36,6 +36,7 @@ const STOP_RATIO: Record<SheetStop, number> = { min: 0.2, mid: 0.45, max: 0.85 }
 const DRAG_THRESHOLD_PX = 24
 
 export function MapSheet({
+  label,
   stop,
   onStopChange,
   toolbar,
@@ -43,6 +44,12 @@ export function MapSheet({
   children,
   className,
 }: {
+  /**
+   * 시트의 접근성 이름. **화면마다 다르다** — 장소 찾기는 "장소 목록", 긴급 시설은
+   * "병원 · 약국 목록" 이다. 문구를 이 컴포넌트가 들고 있던 시절에는 병원 목록이
+   * "장소 목록" 으로 읽혔다.
+   */
+  label: string
   stop: SheetStop
   onStopChange: (stop: SheetStop) => void
   /**
@@ -87,7 +94,7 @@ export function MapSheet({
 
   return (
     <section
-      aria-label={messages.map.sheetLabel}
+      aria-label={label}
       style={{ height }}
       className={cn(
         'bg-bg border-border fixed inset-x-0 z-40 flex flex-col rounded-t-xl border-t shadow-lg lg:hidden',
