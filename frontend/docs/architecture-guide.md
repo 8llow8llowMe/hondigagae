@@ -436,11 +436,20 @@ export function toEmergencyBoardQuery(params: EmergencyBoardParams): string
 - **초기화 대상이 아닌 값은 `filters` 밖에 둔다.** 긴급 시설의 반경이 그렇다 — URL 에는 싣지만(`?radius=40000`) 필터가 아니라 조회 파라미터라 「초기화」가 되돌리지 않는다. `EmergencyBoardParams = { filters, radius }` 가 그 구분을 타입 모양으로 새긴다. 초기화는 `filters` 만 갈아 끼운다.
 - **선택지가 유한하면 범위 검사가 아니라 화이트리스트로 받는다.** 긴급 시설 반경은 `RADIUS_OPTIONS`(10/20/40/50km) 밖이면 기본값으로 떨어진다. 백엔드 상한(`@Max(50_000)`)만 보고 통과시키면 `?radius=33333` 이 살아남아 칩은 "33.3km" 인데 반경 시트에는 선택된 항목이 없는 화면이 된다.
 
-**`view` 와 조건을 합치는 것은 `viewModeHref` 한 곳이다.**
+**`view` 와 조건을 합치는 것은 `viewModeHref` 한 곳이다 — 지금 이 규칙을 지키는 것은 `/emergency` 뿐이다.**
 
-두 곳이 링크를 만든다 — 서버(`page.tsx` 의 보기 전환 토글)와 클라이언트(조건을 바꿀 때 도는 `router.replace`). **양쪽 다 `viewModeHref(pathname, toXQuery(params), view, 화면기본값)` 을 거친다.**
+두 곳이 링크를 만든다 — 서버(`page.tsx` 의 보기 전환 토글)와 클라이언트(조건을 바꿀 때 도는 `router.replace`). **양쪽 다 `viewModeHref(pathname, toXQuery(params), view, 화면기본값)` 을 거쳐야 한다.**
 
 - 토글이 조건을 안 실으면 목록↔지도 전환이 좁힌 조건을 통째로 버린다 (`/emergency` 가 실제로 그랬다 — `viewModeHref('/emergency', '', …)`).
 - 조건 변경이 `view` 를 안 실으면 칩을 누를 때마다 지도가 목록으로 튄다.
+
+`/emergency` 는 (#371) `use-emergency-nav.ts` 가 양쪽 다 `viewModeHref` 를 거치도록
+고쳐 이 규칙을 지킨다. **`/places` 는 아직 아니다** — `use-place-filter-nav.ts` 의
+`apply` 는 `pathname` 과 쿼리 문자열만으로 `router.replace` 를 직접 조립하고 `view` 를
+싣지 않는다. `PLACES_DEFAULT_VIEW` 가 `'map'` 이므로 `/places?view=list` 에서 필터
+칩을 하나만 눌러도 `view=list` 가 URL 에서 빠져 지도로 튄다 — 위 두 번째 항목이 바로
+이 화면에서 실제로 일어난다. 코드 수정은 별도 이슈로 분리한다 (이슈 번호 미배정 —
+"`/places` 가 `view=list` 를 잃는다"로 검색해 찾는다). 그때까지 이 문단의 "한 곳"은
+`/emergency` 에만 참이다.
 
 **프리페치가 없는 화면은 클라이언트 훅이 읽기까지 한다.** `/places` 는 서버 프리페치가 있어 `page.tsx` 가 읽고 `usePlaceFilterNav` 는 쓰기만 하지만, `/emergency` 는 좌표가 브라우저에만 있어 프리페치가 없다(§9). 읽기를 페이지에 두면 지도 → 패널 → 시트로 조건을 prop 으로 꿰야 하고 그 사슬이 끊기면 두 갈래가 다른 조건을 본다. `useEmergencyNav` 가 `useSearchParams()` 로 직접 읽는 이유다.
