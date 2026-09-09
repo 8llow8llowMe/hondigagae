@@ -121,3 +121,79 @@ describe('PackingListPanel — 결과', () => {
     expect(markup).toContain(reason)
   })
 })
+
+/*
+  **#397.** 이 절이 접었다 펴는 토글처럼 읽혀 **서비스의 AI 기능 하나가 부가 기능으로
+  보였다.** 응답의 `reason` 이 "이 여행의 날짜·장소·예보·반려견을 읽고 골랐다" 는 것을
+  증명하는데, 화면이 그 사실을 어디서도 말하지 않았다.
+
+  여기서 지키는 것은 **세 상태 전부가 AI 를 말하는가** 다 — 하나라도 빠지면 그 상태에
+  들어온 사용자에게는 여전히 체크리스트다.
+*/
+describe('PackingListPanel — AI 산출물임을 말한다 (#397)', () => {
+  it('제목 옆에 AI 배지가 선다 — 헤더 nav 와 같은 낱말이다', () => {
+    const markup = render()
+
+    expect(markup).toContain(messages.plan.packingAiBadge)
+    // accent 는 "AI 가 생성·판단한 것" 표시 전용이다 (DESIGN.md §2-5)
+    expect(markup).toContain('bg-accent-100')
+  })
+
+  it('만들기 전 안내가 AI 를 주어로 말한다', () => {
+    expect(messages.plan.packingIntro).toContain('AI')
+    expect(render()).toContain(messages.plan.packingIntro)
+  })
+
+  /*
+    이 문장이 CTA 를 누를지 정하는 유일한 근거다. caption 톤으로 흐려 두면
+    절이 토글처럼 읽힌다 — 그것이 이 이슈의 원인이었다.
+  */
+  it('만들기 전 안내를 흐리게 두지 않는다', () => {
+    const line = new RegExp(`<p class="([^"]*)">${messages.plan.packingIntro}`).exec(render())?.[1]
+
+    expect(line).toBeDefined()
+    expect(line).toContain('text-body-2')
+    expect(line).not.toContain('text-fg-muted')
+    expect(line).not.toContain('text-caption')
+  })
+
+  it('CTA 가 무엇이 만들어지는지 말한다', () => {
+    expect(messages.plan.packingCta).toContain('AI')
+    expect(render()).toContain(messages.plan.packingCta)
+  })
+
+  it('대기 문구도 AI 가 무엇을 하는 중인지 말한다', () => {
+    const markup = render({ pending: true })
+
+    expect(messages.plan.packingPending).toContain('AI')
+    expect(markup).toContain(messages.plan.packingPending)
+  })
+
+  it('결과 머리에서 무엇에 근거한 목록인지 다시 못박는다', () => {
+    const markup = render({ items: ITEMS })
+
+    expect(markup).toContain(messages.plan.packingResultBasis)
+    expect(messages.plan.packingResultBasis).toContain('AI')
+  })
+
+  /*
+    **이유는 이 기능이 다른 체크리스트와 다른 유일한 지점인데 가장 작은 글자였다.**
+    품목 이름보다 크게 두지는 않는다 — 챙기는 것은 품목이고 이유는 그 근거다.
+  */
+  it('이유를 caption 이 아니라 body-2 로 올린다 — 품목 이름을 넘지 않는다', () => {
+    const markup = render({ items: ITEMS })
+    const reason = ITEMS[0]?.reason as string
+    const cls = new RegExp(`<span class="([^"]*)">${reason}`).exec(markup)?.[1]
+
+    expect(cls).toBeDefined()
+    expect(cls).toContain('text-body-2')
+    expect(cls).not.toContain('text-caption')
+    // 품목 이름과 같은 크기이고, 톤으로만 갈린다
+    expect(markup).toContain(`<span class="text-body-2 font-semibold">${ITEMS[0]?.name}</span>`)
+  })
+
+  /* 저장되지 않는다는 사실은 그대로 남는다 — AI 어필이 그것을 덮으면 안 된다 */
+  it('AI 어필이 "저장되지 않는다" 를 밀어내지 않는다', () => {
+    expect(render({ items: ITEMS })).toContain(messages.plan.packingNotSaved)
+  })
+})
