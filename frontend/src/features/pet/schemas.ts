@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { messages } from '@/lib/messages'
 import { isValidBirthYmInput } from '@/lib/pet/birth-ym'
+import { sizeMatchesWeightInput } from '@/lib/pet/size'
 import { isValidWeightInput } from '@/lib/pet/weight'
 import { ACTIVITY_LEVEL_CODES, PET_SIZE_CODES, SOCIALITY_LEVEL_CODES } from '@/types/pet'
 
@@ -28,29 +29,46 @@ const optionalBirthYm = z.string().refine(isValidBirthYmInput, {
   message: messages.pet.birthYmFormat,
 })
 
-export const petFormSchema = z.object({
-  // PET_101 (필수) / PET_102 (길이)
-  name: z.string().trim().min(1, messages.pet.nameRequired).max(20, messages.pet.nameLength),
-  // PET_103 — 선택 입력이라 빈 값을 허용한다
-  breed: z.string().trim().max(50, messages.pet.breedLength),
-  // PET_104
-  birthYm: optionalBirthYm,
-  // PET_105 — RadioGroup 이 값을 고정하므로 실질적으로는 2차 방어다
-  sizeType: z.enum(PET_SIZE_CODES, { message: messages.pet.sizeTypeRequired }),
-  /*
+export const petFormSchema = z
+  .object({
+    // PET_101 (필수) / PET_102 (길이)
+    name: z.string().trim().min(1, messages.pet.nameRequired).max(20, messages.pet.nameLength),
+    // PET_103 — 선택 입력이라 빈 값을 허용한다
+    breed: z.string().trim().max(50, messages.pet.breedLength),
+    // PET_104
+    birthYm: optionalBirthYm,
+    // PET_105 — RadioGroup 이 값을 고정하므로 실질적으로는 2차 방어다
+    sizeType: z.enum(PET_SIZE_CODES, { message: messages.pet.sizeTypeRequired }),
+    /*
     PET_108(범위) · PET_109(소수 자릿수).
 
     **빈 값을 허용한다.** 백엔드가 선택 필드로 받고, 모르는 것을 억지로 적게 하면
     틀린 값이 들어온다 — 그 값이 장소 필터 판정에 그대로 쓰인다.
     범위·자릿수 판정은 `lib/pet/weight.ts` 한 곳이 소유한다.
   */
-  weightKg: z.string().refine(isValidWeightInput, { message: messages.pet.weightInvalid }),
-  heatSensitive: z.boolean(),
-  coldSensitive: z.boolean(),
-  noiseSensitive: z.boolean(),
-  // PET_106
-  activityLevel: z.enum(ACTIVITY_LEVEL_CODES, { message: messages.pet.activityLevelRequired }),
-  walkPreferred: z.boolean(),
-  // PET_107
-  sociality: z.enum(SOCIALITY_LEVEL_CODES, { message: messages.pet.socialityRequired }),
-})
+    weightKg: z.string().refine(isValidWeightInput, { message: messages.pet.weightInvalid }),
+    heatSensitive: z.boolean(),
+    coldSensitive: z.boolean(),
+    noiseSensitive: z.boolean(),
+    // PET_106
+    activityLevel: z.enum(ACTIVITY_LEVEL_CODES, { message: messages.pet.activityLevelRequired }),
+    walkPreferred: z.boolean(),
+    // PET_107
+    sociality: z.enum(SOCIALITY_LEVEL_CODES, { message: messages.pet.socialityRequired }),
+  })
+  /*
+    PET_004 — 체중과 크기 구분의 모순 조합 (#369 · BE #364).
+
+    **필드 하나로는 판정할 수 없어 객체 수준에서 본다.** 30kg 소형견이 저장되면 적합도
+    판정이 "소형견만 가능" 장소를 동반 가능으로 읽는다.
+
+    **체중을 고치면 크기가 저절로 따라오므로**(`PetForm` 이 `sizeFromWeightInput` 으로
+    맞춘다) 이 오류는 사용자가 **크기를 직접 어긋나게 골랐을 때만** 남는다. 그래서
+    오류를 `sizeType` 에 붙인다 — 고칠 자리가 그곳이다.
+
+    체중이 비었거나 읽을 수 없으면 어긋남을 판정하지 않는다(백엔드도 그렇다).
+  */
+  .refine((values) => sizeMatchesWeightInput(values.sizeType, values.weightKg), {
+    message: messages.pet.weightSizeMismatch,
+    path: ['sizeType'],
+  })

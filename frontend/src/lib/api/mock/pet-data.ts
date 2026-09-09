@@ -191,7 +191,31 @@ function validate(raw: unknown): MockResult | null {
     errors.push({ code: 'PET_107', field: 'sociality', message: '사회성은 필수입니다.' })
   }
 
-  return errors.length > 0 ? failValidation(errors) : null
+  if (errors.length > 0) return failValidation(errors)
+
+  /*
+    PET_004 — 체중과 크기 구분의 모순 조합 (#369 · BE #364 / PR #366).
+
+    **Bean Validation 이 아니라 도메인 예외라 형태가 다르다.** `resultMessage` 가
+    `{ message, errors }` 객체가 아니라 **문자열**이고, 그래서 화면에서 필드 오류가 아니라
+    폼 전체 오류(`FormAlert`)로 뜬다. mock 이 이 차이를 지우면 FE 가 필드 오류를 기대하게
+    되고 실서버에서만 자리가 어긋난다.
+
+    **필드 검증을 모두 통과한 뒤에 본다** — 백엔드도 `@Valid` 다음에 도메인 규칙을 본다.
+    문구는 `PetErrorCode.WEIGHT_SIZE_MISMATCH` 그대로다.
+  */
+  const weightKg = typeof record.weightKg === 'number' ? record.weightKg : null
+  const derived =
+    weightKg === null ? null : weightKg < 10 ? 'SMALL' : weightKg < 25 ? 'MEDIUM' : 'LARGE'
+  if (derived !== null && record.sizeType !== derived) {
+    return fail(
+      400,
+      'PET_004',
+      '체중과 크기 구분이 맞지 않습니다. 소형견 10kg 미만 · 중형견 10~25kg 미만 · 대형견 25kg 이상 기준으로 선택해 주세요.',
+    )
+  }
+
+  return null
 }
 
 /** primitive boolean 이라 누락 시 서버가 조용히 false 로 채운다 — 공통명세 S3-4 */
