@@ -6,7 +6,6 @@ import com.hondigagae.domainlayer.placeimport.application.port.in.PetRestaurantI
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceImportMetricsPort;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.DelistProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PetRestaurantImportProcessor;
-import com.hondigagae.domainlayer.placeimport.application.service.processor.PlaceMergeProcessor;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceImportResultType;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
 import com.hondigagae.domainlayer.placeimport.domain.enums.RegionCodeMapping;
@@ -18,8 +17,9 @@ import org.springframework.stereotype.Service;
 /**
  * 식약처 음식점 적재 오케스트레이터.
  *
- * <p>적재 뒤 중복 병합을 돌린다. 문화정보원 카페와 겹치는 업소가 실제로 있어서다
- * (제주 기준 이름 대조로 1곳 확인). 병합을 적재 뒤에 해야 새로 들어온 행까지 판정 대상이 된다.
+ * <p>적재 → delist 까지만 한다. 병합은 {@code placeMergeJob} 이 모든 적재 뒤에 한 번 한다(#363).
+ * 다만 <b>식약처(MFDS) 행은 현재 어떤 병합에도 걸리지 않는다</b> — {@code PlaceMergeProcessor} 는
+ * 문화정보원(CULTURE_PORTAL) 행을 관광 API(TOUR_API) 행으로 흡수시키는 판정만 하기 때문이다.
  *
  * <p>{@code @Transactional} 을 붙이지 않는 이유는 다른 적재 파사드와 같다 — 외부 호출과
  * 대량 upsert 를 한 트랜잭션으로 묶으면 커넥션을 오래 잡는다. 재실행이 멱등이라 중간에
@@ -30,13 +30,12 @@ import org.springframework.stereotype.Service;
 public class PetRestaurantImportFacade implements PetRestaurantImportUseCase {
 
     private final PetRestaurantImportProcessor petRestaurantImportProcessor;
-    private final PlaceMergeProcessor placeMergeProcessor;
     private final DelistProcessor delistProcessor;
     private final PlaceImportMetricsPort placeImportMetricsPort;
 
     @Override
     public int importPetRestaurants(String region) {
-        // 병합 범위는 적재 범위와 같아야 한다 (CultureFacilityImportFacade 와 같은 이유).
+        // delist 범위는 적재 범위와 같아야 한다 (CultureFacilityImportFacade 와 같은 이유).
         // 식약처 원천은 "제주"처럼 줄여 주므로 시도 명칭으로 편 뒤 코드로 옮긴다.
         String areaCode = resolveAreaCode(region);
 
@@ -45,7 +44,6 @@ public class PetRestaurantImportFacade implements PetRestaurantImportUseCase {
         // 등록 철회가 실제로 일어나는 원천이다. 이번 파일에 없는 업소를 delist 해야
         // 폐업한 식당이 "동반 가능 확인됨"으로 남지 않는다.
         int delisted = delistProcessor.delistPlaces(PlaceSourceType.MFDS, areaCode, runStartedAt, imported);
-        placeMergeProcessor.mergeDuplicates(areaCode);
 
         // geocode_failed 는 건수가 태어나는 PetRestaurantImportProcessor 가 기록한다
         placeImportMetricsPort.recordRows(PlaceSourceType.MFDS, PlaceImportResultType.UPSERTED, imported);

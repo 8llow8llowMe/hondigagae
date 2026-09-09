@@ -26,8 +26,7 @@ import org.springframework.transaction.PlatformTransactionManager;
  *   <li>{@code sido} — 시도 명칭 (기본 제주특별자치도)</li>
  * </ul>
  *
- * <p>적재 후 같은 스텝에서 중복 병합까지 수행한다 — 관광 API 로 이미 들어온 장소와 겹치는 행에
- * {@code merged_into_id} 를 채워 조회에서 빠지게 한다.
+ * <p>병합은 {@code placeMergeJob} 을 이어 돌린다 (#363).
  */
 @Configuration
 public class CultureFacilityImportJobConfig {

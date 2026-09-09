@@ -125,8 +125,11 @@ dev 서버(`BACKEND_API_URL=https://api-dev.hondigagae.com`)에 직접 붙는다
 ### 실행 순서 (배치)
 
 ```
-placeImportJob → cultureFacilityImportJob → petRestaurantImportJob → placeImageBackfillJob → congestionImportJob
+placeImportJob → cultureFacilityImportJob → petRestaurantImportJob → placeMergeJob → placeImageBackfillJob → congestionImportJob
 ```
+
+`placeMergeJob` 은 **적재가 모두 끝난 뒤 한 번** 돌린다 — 중복 판정에 세 원천이 다 들어와 있어야
+하기 때문이다(#363). 적재 잡을 하나만 돌렸을 때도 이 잡을 이어 돌려야 중복이 목록에서 빠진다.
 
 `congestionImportJob` 은 장소 마스터가 채워진 뒤에 돌려야 명칭 매칭이 붙는다.
 비어 있으면 전부 UNMATCHED 로 적재되고 적합도 응답에서 혼잡도가 계속 빠진다.

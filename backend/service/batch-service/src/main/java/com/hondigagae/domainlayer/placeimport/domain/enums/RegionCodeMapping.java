@@ -46,6 +46,14 @@ public final class RegionCodeMapping {
         return sidoName == null ? null : SIDO_TO_AREA_CODE.get(sidoName.trim());
     }
 
+    /**
+     * 관광 API areaCode 로 알고 있는 값인지. 잡 파라미터로 직접 들어온 지역코드를 적재 전에
+     * 거르는 데 쓴다 — 법정동 코드(제주=50)를 넣으면 조용히 0건으로 끝나기 때문이다.
+     */
+    public static boolean isKnownAreaCode(String areaCode) {
+        return areaCode != null && SIDO_TO_AREA_CODE.containsValue(areaCode.trim());
+    }
+
     public static String toSigunguCode(String sigunguName) {
         return sigunguName == null ? null : SIGUNGU_TO_CODE.get(sigunguName.trim());
     }
