@@ -73,7 +73,7 @@ export function FacilitySelectedCard({
           type="button"
           onClick={onClose}
           aria-label={messages.common.close}
-          className="text-fg-muted hover:text-fg focus-visible:ring-brand-500 -mt-1 -mr-1 flex size-11 shrink-0 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
+          className="text-fg-muted hover:text-fg focus-visible:ring-brand-500 -mt-1 -mr-1 flex size-11 shrink-0 items-center justify-center rounded-md focus-visible:ring-1 focus-visible:outline-none"
         >
           <CloseIcon size={20} />
         </button>
@@ -90,7 +90,7 @@ export function FacilitySelectedCard({
             aria-label={messages.emergency.callLabel.replace('{name}', facility.name)}
             className={cn(
               'bg-brand-600 text-fg-inverse flex h-12 flex-1 items-center justify-center gap-1.5 rounded-md font-semibold transition-colors',
-              'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:outline-none',
+              'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
             )}
           >
             <PhoneIcon size={20} />
@@ -105,7 +105,7 @@ export function FacilitySelectedCard({
             rel="noopener noreferrer"
             className={cn(
               'border-border-strong text-fg hover:bg-band flex h-12 flex-1 items-center justify-center rounded-md border font-semibold transition-colors',
-              'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:outline-none',
+              'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
             )}
           >
             {messages.map.directions}

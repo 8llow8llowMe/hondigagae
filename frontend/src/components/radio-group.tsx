@@ -82,7 +82,7 @@ export function RadioGroup<T extends string>({
                   선택 테두리와 겹쳐 테두리가 두 겹으로 보였다. 라디오는 클릭으로
                   `:focus-visible` 이 되지 않으므로 이 변형이 키보드 이동에서만 링을 낸다.
                 */
-                'has-[:focus-visible]:ring-brand-500 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-offset-0',
+                'has-[:focus-visible]:ring-brand-500 has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-offset-0',
                 disabled && 'cursor-not-allowed opacity-50',
                 value === option.value
                   ? 'border-brand-500 bg-row-selected'

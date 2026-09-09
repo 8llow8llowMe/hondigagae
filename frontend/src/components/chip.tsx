@@ -70,7 +70,7 @@ export function Chip({
       className={cn(
         // 모바일 최소 터치 영역 44px (DESIGN.md §7)
         'text-body-2 inline-flex h-11 items-center gap-1.5 rounded-md border px-3 whitespace-nowrap transition-colors',
-        'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:outline-none',
+        'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
         // **테두리는 선택 여부와 무관하게 항상 있다** — 없으면 칩이 그냥 글자로 보여
         // 누를 수 있다는 것을 알 수 없다 (아트보드 `01 목록 — 모바일`: 미선택도 1px 테두리).
         // 선택은 tint + 진한 테두리 + weight 셋으로 말한다. 색 하나에 기대지 않는다.

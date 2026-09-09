@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/button'
 import { DateField } from '@/components/date-field'
@@ -55,6 +55,12 @@ export function PlanCreateForm({
   submitLabel = messages.plan.createSubmit,
 }: PlanCreateFormProps) {
   const formRef = useRef<HTMLFormElement>(null)
+
+  /*
+    종료일 달력의 열림 상태. **시작일을 고른 순간 부모가 연다** (`DateField` 의 `open` 주석).
+    그 외에는 `DateField` 가 스스로 여닫는 것과 똑같이 동작한다.
+  */
+  const [endDateOpen, setEndDateOpen] = useState(false)
 
   /*
     제출 실패 시 첫 오류 필드로 포커스를 옮긴다. `errors` 를 의존성으로 쓰면 입력 중인
@@ -123,6 +129,14 @@ export function PlanCreateForm({
         않는다. 가운데로 내려가는 것은 `items-center` 일 때의 이야기다.
         `ai-plan-create-form.tsx` 의 같은 두 날짜 줄도 정렬 클래스 없이 성립한다.
       */}
+      {/*
+        **시작일을 고르면 종료일 달력이 이어서 열린다** — 기간은 두 번 고르는 하나의 값이라
+        중간에 한 번 더 누르게 할 이유가 없다. 두 필드를 하나의 기간 선택으로 합치지 않기로
+        한 결정(#162)은 그대로 두고, 합쳤을 때 얻는 흐름만 가져온다.
+
+        **종료일이 비어 있을 때만 연다.** 이미 잡은 일정의 시작일만 하루 미루는 것은 흔한
+        조작인데, 그때도 달력이 튀어나오면 참견이 된다.
+      */}
       <div className="flex flex-col gap-5 sm:flex-row sm:gap-4">
         <Field
           id="startDate"
@@ -137,7 +151,11 @@ export function PlanCreateForm({
             placeholder={messages.plan.datePlaceholder}
             today={today}
             value={values.startDate}
-            onValueChange={(startDate) => onValueChange('startDate', startDate)}
+            onValueChange={(startDate) => {
+              onValueChange('startDate', startDate)
+              // 종료일이 비어 있을 때만 이어서 연다 — 위 주석
+              if (values.endDate === '') setEndDateOpen(true)
+            }}
             invalid={errors.fields.startDate !== undefined}
             rangeStart={values.startDate}
             rangeEnd={values.endDate}
@@ -158,6 +176,8 @@ export function PlanCreateForm({
             today={today}
             value={values.endDate}
             onValueChange={(endDate) => onValueChange('endDate', endDate)}
+            open={endDateOpen}
+            onOpenChange={setEndDateOpen}
             invalid={errors.fields.endDate !== undefined}
             // 시작일보다 이른 날짜는 달력에서 아예 고를 수 없다. 스키마의 refine 은
             // 남는 경로를 위한 2차 방어다

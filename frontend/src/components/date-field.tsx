@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { Calendar, dayLabel } from '@/components/calendar'
@@ -74,6 +74,8 @@ export function DateField({
   rangeEnd = null,
   invalid = false,
   className,
+  open: openProp,
+  onOpenChange,
 }: {
   id: string
   value: string
@@ -87,8 +89,30 @@ export function DateField({
   rangeEnd?: string | null
   invalid?: boolean
   className?: string
+  /**
+   * 열림 상태를 부모가 쥔다. **생략하면 내부 상태를 쓴다** — 세 사용처 중 둘은 그대로다.
+   *
+   * 기간 입력이 이것을 쓴다: 시작일을 고른 순간 종료일 달력을 이어서 연다. 두 필드를
+   * 하나의 기간 선택으로 합치지 않기로 한 결정(#162)을 지키면서, 합쳤을 때 얻는 흐름만
+   * 가져오는 방법이다.
+   */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
-  const [open, setOpen] = useState(false)
+  /*
+    **controlled / uncontrolled 둘 다 받는다.** `open` 을 넘기지 않으면 지금까지처럼
+    자기 상태로 연다 — 기존 사용처를 건드리지 않기 위해서다.
+  */
+  const [selfOpen, setSelfOpen] = useState(false)
+  const open = openProp ?? selfOpen
+  const setOpen = useCallback(
+    (next: boolean) => {
+      // controlled 면 부모만 상태를 바꾼다. 둘 다 쓰면 한쪽이 뒤늦게 되돌린다
+      if (onOpenChange !== undefined) onOpenChange(next)
+      else setSelfOpen(next)
+    },
+    [onOpenChange],
+  )
   const inputRef = useRef<HTMLInputElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   /** 첫 초점을 날짜 격자로 보낸다 — `Calendar` 의 `focusRef` 주석 참고 */
@@ -221,7 +245,7 @@ export function DateField({
             */
             'text-body-1 h-11 w-full cursor-pointer rounded-md border pr-10 pl-3 text-left',
             'placeholder:text-fg-subtle',
-            'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:outline-none',
+            'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
             invalid ? 'border-danger-500' : 'border-border-strong',
           )}
         />
