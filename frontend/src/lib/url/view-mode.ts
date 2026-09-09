@@ -96,3 +96,4 @@ export function viewModeHref(
   const query = params.toString()
   return query === '' ? pathname : `${pathname}?${query}`
 }
+
