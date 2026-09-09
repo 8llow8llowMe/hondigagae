@@ -9,26 +9,8 @@ import {
 } from '@/features/emergency/emergency-section'
 import { MAX_SIZE } from '@/lib/api/emergency'
 import { messages } from '@/lib/messages'
-import { DEFAULT_FACILITY_FILTERS, type NearbyFacilityItem } from '@/types/emergency'
-
-function facility(overrides: Partial<NearbyFacilityItem> = {}): NearbyFacilityItem {
-  return {
-    facilityId: '4611686018427387904',
-    facilityType: { code: 'ANIMAL_HOSPITAL', name: '동물병원', description: null },
-    name: '제주24시동물병원',
-    addr: '제주특별자치도 제주시 연북로 100',
-    lat: 33.48,
-    lng: 126.49,
-    tel: '064-000-0000',
-    operatingHours: '월~금 09:00~19:00, 토 09:00~13:00',
-    restDate: '일요일',
-    open24: true,
-    openNow: true,
-    operatingHoursKnown: true,
-    distanceMeters: 480,
-    ...overrides,
-  }
-}
+import { facility } from '@/test/fixtures/emergency'
+import { DEFAULT_FACILITY_FILTERS } from '@/types/emergency'
 
 function render(overrides: Partial<EmergencySectionProps> = {}) {
   const props: EmergencySectionProps = {

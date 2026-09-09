@@ -9,6 +9,7 @@ import {
   countsAreComplete,
   facilityCounts,
   type FilterRelief,
+  labelWithCount,
   reliefs,
 } from '@/features/emergency/facility-filters'
 import { FacilityRow } from '@/features/emergency/facility-row'
@@ -96,7 +97,7 @@ export function EmergencySection({
             selected={filters.type === null}
             onSelect={() => onFiltersChange({ ...filters, type: null })}
           >
-            {withCount(messages.emergency.typeAll, counts.all, showCounts)}
+            {labelWithCount(messages.emergency.typeAll, counts.all, showCounts)}
           </Chip>
           {FACILITY_TYPE_CODES.map((code) => (
             <Chip
@@ -105,7 +106,7 @@ export function EmergencySection({
               selected={filters.type === code}
               onSelect={() => onFiltersChange({ ...filters, type: code })}
             >
-              {withCount(messages.emergency.typeByCode[code], counts.byType[code], showCounts)}
+              {labelWithCount(messages.emergency.typeByCode[code], counts.byType[code], showCounts)}
             </Chip>
           ))}
         </ChipGroup>
@@ -115,13 +116,13 @@ export function EmergencySection({
             selected={filters.open24Only}
             onSelect={() => onFiltersChange({ ...filters, open24Only: !filters.open24Only })}
           >
-            {withCount(messages.emergency.open24, counts.open24, showCounts)}
+            {labelWithCount(messages.emergency.open24, counts.open24, showCounts)}
           </Chip>
           <Chip
             selected={filters.openNowOnly}
             onSelect={() => onFiltersChange({ ...filters, openNowOnly: !filters.openNowOnly })}
           >
-            {withCount(messages.emergency.openNow, counts.openNow, showCounts)}
+            {labelWithCount(messages.emergency.openNow, counts.openNow, showCounts)}
           </Chip>
         </ChipGroup>
 
@@ -260,11 +261,6 @@ function PositionNotice({ reason, onRetry }: { reason: PositionFailure; onRetry:
       )}
     </div>
   )
-}
-
-/** 개수를 붙일 수 있을 때만 붙인다 */
-function withCount(label: string, count: number, show: boolean): string {
-  return show ? `${label} ${count}` : label
 }
 
 function reliefLabel(option: FilterRelief): string {
