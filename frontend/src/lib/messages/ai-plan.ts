@@ -12,15 +12,20 @@ export const aiPlanMessages = {
   // ── 조건 입력 (아트보드 01) ─────────────────────────────────────────────
 
   createTitle: 'AI 일정 만들기',
-  createHeading: '어떤 여행을 원하세요?',
-  createDescription: '자유롭게 적어도 되고, 아래 3가지만 채워도 만들 수 있어요.',
+  /**
+   * **`metadata.description` 전용이다** (`app/(main)/ai-plans/new/page.tsx`).
+   * 폼 안에는 같은 말을 하는 헤딩이 없다 — 페이지 제목 바로 아래에 헤딩을 또 두면
+   * 같은 문장이 두 번 나오고, 그만큼 실제로 답해야 할 것이 아래로 밀린다.
+   *
+   * 화면에 필수로 서 있는 것은 **기간·반려견 둘뿐**이다. 나머지는 기본값이 있어
+   * 접기 안에 있으므로 "3가지" 로 세지 않는다.
+   */
+  createDescription: '반려견과 기간만 정하면 AI 가 제주 여행 일정을 짜 드려요.',
 
   fieldNote: '하고 싶은 여행 (선택)',
   fieldNotePlaceholder: '사람 많은 곳은 피하고, 오전엔 바다 산책 하고 오후엔 실내로 쉬고 싶어요.',
   /** 아트보드 01 의 곱은 인용부호를 쓴다 — `"` 는 HTML 에서 이스케이프돼 읽기 나빠진다 */
   fieldNoteHint: '예) “차 없이 다닐 수 있게”, “숙소는 서귀포 근처”',
-
-  requiredGroupLabel: '필수 항목',
 
   fieldStartDate: '여행 시작일',
   /** 달력을 눌러 고르는 자리라 서식(`YYYY-MM-DD`)이 아니라 **행동**을 적는다 */
