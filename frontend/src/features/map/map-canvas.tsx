@@ -11,7 +11,7 @@ import {
 } from '@/lib/geo/coord'
 import { cellSizeFor, clusterByGrid } from '@/lib/map/cluster'
 import { loadKakaoMaps, MapSdkError, type MapSdkFailure } from '@/lib/map/sdk'
-import { framedCenterLat, type MapBounds } from '@/lib/map/viewport'
+import { framedCamera, framedCenterLat, type MapBounds } from '@/lib/map/viewport'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
 import type { KakaoCustomOverlay, KakaoLatLng, KakaoMap, KakaoMaps } from '@/types/kakao-maps'
@@ -65,6 +65,7 @@ export function MapCanvas({
   onSelect,
   onBoundsChange,
   center,
+  camera,
   selectedLevel,
   onFailure,
   className,
@@ -82,6 +83,18 @@ export function MapCanvas({
   onBoundsChange?: (bounds: MapBounds, userMoved: boolean) => void
   /** 지도 중심을 밖에서 옮길 때 (현재 위치 버튼). 같은 값을 다시 주면 움직이지 않는다 */
   center?: LatLng | null
+  /**
+   * **기준점 + 담고 싶은 폭으로 카메라를 확정한다.** `center` 와 달리 확대 단계까지 함께
+   * 옮긴다.
+   *
+   * 좌표를 비동기로 얻는 화면(`/emergency`)이 쓴다. 지도는 모듈 상수 기준으로 **먼저**
+   * 만들고, 좌표가 도착하면 이것으로 한 번 옮긴다 — `position` 을 기다렸다가 만들면
+   * 위치 타임아웃(10초)만큼 지도가 비어 있다.
+   *
+   * **호출부는 반드시 `useMemo` 로 만든다.** 렌더 중에 새 객체를 만들면 참조가 매번
+   * 바뀌어 필터를 누를 때마다 카메라가 되돌아간다.
+   */
+  camera?: { anchor: LatLng; spanMeters: number } | null
   /**
    * 핀을 고르면 이 단계까지 **확대**한다. 주지 않으면 이동만 한다.
    *
@@ -313,6 +326,37 @@ export function MapCanvas({
 
     map.setCenter(new maps.LatLng(center.lat, center.lng))
   }, [center])
+
+  /*
+    ── 밖에서 카메라를 확정할 때 (좌표가 늦게 도착하는 화면) ────────────────
+
+    **`center` effect 와 나란히 두고 합치지 않는다.** 둘이 하는 일이 다르다 —
+    `center` 는 확대를 건드리지 않고 옮기기만 하고(사용자가 맞춰 둔 확대를 지킨다),
+    이쪽은 확대까지 확정한다(조회 범위와 보이는 범위를 맞춘다). 한 effect 로 묶으면
+    어느 쪽 의도로 불렸는지 알 수 없다.
+
+    컨테이너 크기를 여기서 읽는다 — 이 컴포넌트가 그것을 아는 유일한 곳이다.
+  */
+  useEffect(() => {
+    const map = mapRef.current
+    const maps = mapsRef.current
+    const container = containerRef.current
+    if (map === null || maps === null || container === null) return
+    if (camera === null || camera === undefined) return
+
+    const next = framedCamera({
+      anchor: camera.anchor,
+      spanMeters: camera.spanMeters,
+      width: container.clientWidth,
+      height: container.clientHeight,
+      seaRatio: JEJU_MAP_SEA_RATIO,
+    })
+
+    // **단계를 먼저, 중심을 나중에.** 순서가 뒤집히면 옛 중심을 확대한 뒤 옮기게 되어
+    // 한 프레임 동안 엉뚱한 곳이 보인다 (선택 핀 확대에서 같은 판단을 했다)
+    map.setLevel(next.level)
+    map.setCenter(new maps.LatLng(next.lat, next.lng))
+  }, [camera, status])
 
   // 패널을 접거나 시트를 올리면 컨테이너 폭이 바뀐다 → 되잡지 않으면 지도가 잘린다
   const relayout = useCallback(() => mapRef.current?.relayout(), [])
