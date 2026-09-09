@@ -31,11 +31,12 @@ public record PetSaveRequest(
     @Pattern(regexp = PetValidationMessage.BIRTH_YM_PATTERN, message = PetValidationMessage.BIRTH_YM_FORMAT_INVALID)
     String birthYm,
 
-    @Schema(description = "크기 구분", example = "SMALL", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "크기 구분. 체중을 함께 보내면 경계(소형 <10kg · 중형 10~25kg 미만 · 대형 ≥25kg)와 "
+        + "어긋날 수 없습니다 — 어긋나면 PET_004 로 거부됩니다", example = "SMALL", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = PetValidationMessage.SIZE_TYPE_REQUIRED)
     PetSizeType sizeType,
 
-    @Schema(description = "체중 (kg). 장소의 입장 체중 제한 판정에 쓰입니다. 모르면 생략", example = "3.5")
+    @Schema(description = "체중 (kg, 숫자만 — 단위는 붙이지 않습니다). 장소의 동반 가능 크기 판정에 쓰입니다. 모르면 생략", example = "3.5")
     @DecimalMin(value = "0.1", message = PetValidationMessage.WEIGHT_RANGE_INVALID)
     @DecimalMax(value = "99.9", message = PetValidationMessage.WEIGHT_RANGE_INVALID)
     @Digits(integer = 2, fraction = 1, message = PetValidationMessage.WEIGHT_SCALE_INVALID)

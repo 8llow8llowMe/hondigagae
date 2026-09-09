@@ -8,6 +8,7 @@ import com.hondigagae.domainlayer.pet.application.info.PetProfileImageChangeResu
 import com.hondigagae.domainlayer.pet.application.port.out.PetRepositoryPort;
 import com.hondigagae.domainlayer.pet.domain.model.Pet;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
+import com.hondigagae.shared.travel.pet.PetSizeType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ public class PetCommandProcessor {
 
     public PetInfo register(long memberId, PetSaveCommand command) {
         validateBirthYm(command.birthYm());
+        validateWeightMatchesSize(command);
         long petCount = petRepositoryPort.countByMemberId(memberId);
         if (petCount >= MAX_PET_COUNT) {
             throw new PetException(PetErrorCode.PET_LIMIT_EXCEEDED);
@@ -54,6 +56,7 @@ public class PetCommandProcessor {
 
     public PetInfo update(long memberId, long petId, PetSaveCommand command) {
         validateBirthYm(command.birthYm());
+        validateWeightMatchesSize(command);
         Pet pet = petQueryProcessor.getOwnedPet(memberId, petId);
         Pet updated = pet.update(
             command.name(), command.breed(), command.birthYm(), command.sizeType(), command.weightKg(),
@@ -108,6 +111,19 @@ public class PetCommandProcessor {
             }
         } catch (java.time.format.DateTimeParseException exception) {
             // 형식은 요청 검증(@Pattern) 담당 — 여기까지 왔다면 방어적으로 통과시킨다.
+        }
+    }
+
+    /**
+     * 체중과 크기 구분의 모순 금지. 체중이 없으면 검증하지 않는다 — 선택 입력이다.
+     *
+     * <p>이 모순은 화면 표기 문제가 아니라 <b>판정 오염</b>이다. 적합도 판정이 장소의 동반 가능
+     * 크기와 반려견 sizeType 을 대조하므로, 30kg 개가 소형견으로 저장되면 "소형견만 가능"
+     * 장소를 동반 가능으로 판정한다. 경계의 단일 출처는 {@link PetSizeType#fromWeight} 다 (#364).
+     */
+    private void validateWeightMatchesSize(PetSaveCommand command) {
+        if (command.sizeType() != null && !command.sizeType().matchesWeight(command.weightKg())) {
+            throw new PetException(PetErrorCode.WEIGHT_SIZE_MISMATCH);
         }
     }
 
