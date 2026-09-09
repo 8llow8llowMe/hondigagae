@@ -37,6 +37,12 @@ import type { WalkSafetyResponse } from '@/types/insight'
  * `WalkTimesSection` 의 `border-t` 가 이미 그린다. 여기서 또 그리면 선이 두 겹이 된다.
  *
  * 접힘에 따라 경계의 굵기가 바뀌던 것도 함께 사라진다.
+ *
+ * **이 섹션만 시각 `h2` 가 없다** (#348). 형제 섹션들이 `title-2`→`md:title-1` 로 제목을 다는
+ * 동안 여기는 `오늘 산책` + 등급어 한 줄이 그 자리를 겸한다. 라벨을 heading 으로 올리지
+ * 않는 이유는 셋이다 — 그 줄은 제목이 아니라 **값**이고(등급어가 답이다), 모바일 쪽은
+ * `<button>` 안이라 heading 이 버튼에 들어가며, 모바일/데스크톱 두 벌이라 같은 `h2` 가
+ * DOM 에 둘 생긴다. 접근성 이름은 `<section aria-label>` 이 이미 준다.
  */
 export function WalkVerdict({
   data,

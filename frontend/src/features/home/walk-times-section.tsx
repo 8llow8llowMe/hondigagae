@@ -82,7 +82,9 @@ export function WalkTimesSection({
     <section aria-label={messages.home.goldenHeading} className="border-border border-t">
       <div className={cn('flex flex-col gap-3 py-4 md:py-5', INSET_CLASS.rail)}>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-          <h2 className="text-body-1 font-semibold">{messages.home.goldenHeading}</h2>
+          <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
+            {messages.home.goldenHeading}
+          </h2>
           <WeatherWarningBadge warning={data.weatherWarning} />
         </div>
 
