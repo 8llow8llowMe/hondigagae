@@ -2285,6 +2285,7 @@ git commit -m "[FE] feat: 긴급 시설 지도 보기를 전면 지도 + 패널�
 - Modify: `src/lib/url/view-mode.test.ts`
 - Modify: `app/(main)/emergency/page.tsx`
 - Modify: `app/globals.css`
+- Modify: `src/styles/token-usage.test.ts` — 지우는 파일의 `FLOATING` 예외 항목을 함께 걷는다
 - Delete: `src/features/emergency/emergency-view.tsx`
 - Delete: `src/features/emergency/emergency-map.tsx`
 - Delete: `src/features/emergency/facility-selected-card.tsx`
@@ -2396,10 +2397,23 @@ git rm src/features/emergency/emergency-view.tsx \
 
 **`.map-canvas-height` 와 `.map-panel-width` 는 남긴다** — 새 화면이 그 둘을 쓴다.
 
+- [ ] **Step 6-1: 죽은 그림자 예외 항목을 걷는다**
+
+`src/styles/token-usage.test.ts` 의 `FLOATING` 배열에서 아래 두 줄(주석 + 경로)을 지운다.
+
+```ts
+      // 마커를 고르면 지도 위에 뜨는 카드 (`혼디가개 긴급 시설` 02)
+      'src/features/emergency/facility-selected-card.tsx',
+```
+
+**테스트는 이것 없이도 통과한다** — 그 검사는 `FILES` 를 이 목록으로 걸러내기만 하므로 존재하지 않는 경로는 아무것과도 매칭되지 않는다. 그래서 남겨도 CI 는 조용하다. 그것이 바로 지워야 하는 이유다: 이 배열의 주석이 *"평면 카드를 띄우려고 여기에 넣는 것이 이 규칙을 무너뜨리는 경로다"* 라고 경고하는데, 존재하지 않는 컴포넌트를 설명하는 항목이 남아 있으면 다음 사람이 그 카드가 아직 떠 있는 줄 알고 목록을 신뢰하지 못한다.
+
+**`emergency-map-view.tsx` 항목은 남긴다** — Task 8 이 더한 것이고 그 파일은 실제로 지도 위에 뜬다 (`place-map-view.tsx` 와 같은 근거).
+
 - [ ] **Step 7: 남은 참조가 없는지 확인한다**
 
 ```bash
-grep -rn "emergency-map-height\|EmergencyView\|FacilitySelectedCard\|features/emergency/emergency-map'" src app
+grep -rn "emergency-map-height\|EmergencyView\|FacilitySelectedCard\|facility-selected-card\|features/emergency/emergency-map'" src app
 ```
 
 Expected: 결과 없음
@@ -2412,7 +2426,7 @@ Expected: PASS
 - [ ] **Step 9: 커밋**
 
 ```bash
-git add src/lib/url/view-mode.ts src/lib/url/view-mode.test.ts "app/(main)/emergency/page.tsx" app/globals.css
+git add src/lib/url/view-mode.ts src/lib/url/view-mode.test.ts "app/(main)/emergency/page.tsx" app/globals.css src/styles/token-usage.test.ts
 git commit -m "[FE] refactor: 긴급 시설의 기본 보기를 지도로 바꾸고 2단 시절 코드를 걷는다"
 ```
 
