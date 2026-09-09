@@ -38,6 +38,16 @@ export const aiPlanMessages = {
   budgetPresetLabel: '예산 고르기',
   budgetAny: '상관없음',
 
+  /**
+   * 「더 자세히 정할게요」 접기 섹션 (Task 3). `budgetAny` 는 예산 프리셋 칩 라벨이고,
+   * `detailsBudgetAny` 는 접힌 줄 요약에 쓰는 별도의 더 긴 문구다 — 섞지 않는다.
+   */
+  detailsToggle: '더 자세히 정할게요',
+  detailsBudgetAny: '예산 상관없음',
+  detailsPreferFavorites: '저장한 곳 우선',
+  /** `{count}` 치환 */
+  detailsPinned: '꼭 넣을 곳 {count}',
+
   createSubmit: '일정 만들기',
   /** 버튼 아래 — 소요 시간과 저장 시점을 미리 말한다 (아트보드 01 주석) */
   createSubmitHint: '만드는 데 20초쯤 걸려요. 결과는 초안으로 저장돼요.',
