@@ -45,6 +45,11 @@
   --color-accent-100: var(--accent-100);
   --color-accent-700: var(--accent-700);
 
+  /* ── 날씨 픽토그램 — DESIGN.md §9-1 */
+  --color-weather-sun: var(--weather-sun);
+  --color-weather-rain: var(--weather-rain);
+  --color-weather-snow: var(--weather-snow);
+
   /* ── 시스템 상태(5xx) — DESIGN.md §2-6 */
   --color-danger-100: var(--danger-100);
   --color-danger-500: var(--danger-500);
@@ -191,9 +196,21 @@ body {
   폭은 `--rail-context` 하나로 묶어 열과 선이 함께 움직인다 (1584+ 에서 480).
 */
 @media (width >= 64rem) {
+  /*
+    **`1fr` 이 아니라 `minmax(0, 1fr)` 이다** (#342). `1fr` 트랙의 `min-width` 는 `auto` 라
+    안쪽 내용의 min-content 가 트랙을 밀어낸다 — 우측 열이 가용 폭에 갇히지 않아
+    **안쪽 스크롤러의 `overflow-x-auto` 가 발동하지 못하고 페이지가 가로로 넘친다.**
+
+    1024×900 실측: 홈 권역 줄이 다섯 칸이라 `main.scrollWidth` 가 1111(뷰포트 1009)이었다.
+    칸이 112~125px 로 쪼그라든 채였고, 그래도 못 담아 넘긴 것이다. DESIGN.md §7 이 금지한
+    가로 스크롤이고, 칸에 최소폭을 주면 넘침이 그만큼 커진다.
+
+    `minmax(0, …)` 이 트랙 바닥을 0 으로 내려 우측 열을 가용 폭에 묶는다. 그러면 넘치는
+    쪽이 페이지가 아니라 안쪽 스크롤러가 되고, 레일이 제 화살표로 넘긴다.
+  */
   .rail-layout {
     display: grid;
-    grid-template-columns: var(--rail-context) 1fr;
+    grid-template-columns: var(--rail-context) minmax(0, 1fr);
 
     /*
       콘텐츠가 짧아도 열 구분선이 화면 끝까지 내려오게 한다.
@@ -215,7 +232,7 @@ body {
     필터 레일은 280 을 유지한다 — 라디오 한 줄에 그 이상이 필요하지 않다.
   */
   .rail-layout-filter {
-    grid-template-columns: var(--rail-filter) 1fr;
+    grid-template-columns: var(--rail-filter) minmax(0, 1fr);
   }
 
   /*

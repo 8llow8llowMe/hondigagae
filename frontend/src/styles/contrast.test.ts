@@ -151,3 +151,37 @@ describe('토큰 대비 — 텍스트로 쓰면 안 되는 값', () => {
     expect(contrastRatio(token('--metric-unknown-500'), WHITE)).toBeLessThan(3)
   })
 })
+
+/**
+ * 날씨 픽토그램 색 — DESIGN.md §9-1 (#342).
+ *
+ * **1.5px 선 아이콘이라 비텍스트 3:1 기준이다.** 값 자체는 여기가 지키고, "글자에 얹지
+ * 않는다" 는 쓰임은 `token-usage.test.ts` 가 지킨다 — `--brand-500` 과 같은 구조다.
+ */
+describe('토큰 대비 — 날씨 픽토그램 (비텍스트 3:1)', () => {
+  const cases: [string, string][] = [
+    ['--weather-sun', '맑음 · 구름조금'],
+    ['--weather-rain', '비 · 소나기 · 진눈깨비'],
+    ['--weather-snow', '눈 · 눈날림'],
+  ]
+
+  it.each(cases)('%s 이 흰 배경에서 3:1 이상이다 (%s)', (name) => {
+    expect(contrastRatio(token(name), WHITE)).toBeGreaterThanOrEqual(3)
+  })
+
+  /*
+    권역 행은 흰 배경이지만 섹션 밴드(--band)와 선택 행(--row-selected) 위에도 같은
+    아이콘이 설 수 있다. 흰 배경만 재고 넘어가면 tint 위에서 조용히 미달한다.
+  */
+  it.each(cases)('%s 이 band 위에서도 3:1 이상이다', (name) => {
+    expect(contrastRatio(token(name), token('--band'))).toBeGreaterThanOrEqual(3)
+  })
+
+  /*
+    **--weather-sun 은 본문 대비에 미달한다.** 태양의 관습색이 앰버 대역이라 피할 수
+    없이 밝다. 언젠가 4.5 를 넘게 바뀌면 이 구분이 필요 없어지므로 그때 알려준다.
+  */
+  it('--weather-sun 은 글자에 쓸 수 없다 — 본문 4.5:1 미달', () => {
+    expect(contrastRatio(token('--weather-sun'), WHITE)).toBeLessThan(4.5)
+  })
+})

@@ -65,8 +65,66 @@ describe('RegionalWeatherSection — 비교표', () => {
     expect(markup).toContain('한라산권')
   })
 
-  it('점수가 장소 적합도가 아님을 밝힌다', () => {
-    expect(render(GOOD_DAY)).toContain(messages.home.regionScoreNote)
+  /*
+    **#342 에서 하단 보조 문구를 걷었다.** 점수 배지가 날씨 값 바로 옆에 서 있어 무엇을
+    보고 매긴 점수인지 자리가 말한다. 되살아나면 이 테스트가 먼저 알려준다.
+  */
+  it('하단에 보조 문구 줄을 두지 않는다', () => {
+    expect(render(GOOD_DAY)).not.toContain('날씨만 본 점수')
+  })
+})
+
+/*
+  **#342.** 값 넷이 한 줄로 흐르던 것을 아이콘 / 숫자 두 줄 / 배지 세 자리로 갈랐고,
+  아이콘에 날씨 전용 색(`--weather-*`)을 줬다. 등급 색(`--metric-*`)과 다른 축이다.
+*/
+describe('RegionalWeatherSection — 날씨 아이콘 (#342)', () => {
+  it('맑은 권역의 아이콘에 해 색을 준다', () => {
+    expect(render(GOOD_DAY)).toContain('text-weather-sun')
+  })
+
+  it('비 오는 권역의 아이콘에 비 색을 준다', () => {
+    const markup = render(GOOD_DAY)
+
+    expect(markup).toContain('text-weather-rain')
+    expect(markup).toContain('비')
+  })
+
+  /*
+    등급 색을 날씨에 전용하지 않는다 — 두 축이 섞이면 점수와 날씨가 같은 것으로 읽힌다.
+
+    **마크업 전체에서 금지할 수는 없다** — 같은 행의 점수 배지는 등급 색을 쓰는 것이
+    맞다. 아이콘 래퍼(`inline-flex shrink-0 items-center …`)만 본다.
+  */
+  it('아이콘 래퍼에 등급 색을 쓰지 않는다', () => {
+    const markup = render(GOOD_DAY)
+    const wrappers = [...markup.matchAll(/class="inline-flex shrink-0 items-center([^"]*)"/g)].map(
+      (match) => match[1] ?? '',
+    )
+
+    expect(wrappers.length).toBeGreaterThan(0)
+    expect(wrappers.filter((classes) => classes.includes('metric'))).toEqual([])
+  })
+
+  /* §9 "24px 기본". 16px 인라인이던 것을 키웠다 */
+  it('아이콘이 24px 이다', () => {
+    expect(render(GOOD_DAY)).toContain('width="24"')
+  })
+
+  /* 아이콘은 장식이고 의미는 sr-only 낱말이 진다 — 색을 줘도 이 구조는 그대로다 */
+  it('색을 줘도 sr-only 낱말을 남긴다', () => {
+    const markup = render(GOOD_DAY)
+
+    expect(markup).toContain('sr-only')
+    expect(markup).toContain('맑음')
+  })
+
+  /*
+    값이 둘 다 없는 권역(`한라산권`)에 빈 flex 항목을 남기면 부모의 `gap-2` 가 그 자리에도
+    붙어 배지가 8px 밀린다. 두 줄로 쌓으면서 감싼 `<span>` 이 생겨 처음 생긴 갈래다.
+  */
+  it('값이 없는 권역에 빈 숫자 자리를 남기지 않는다', () => {
+    expect(render(GOOD_DAY)).not.toContain('<span class="flex flex-col items-start"></span>')
   })
 })
 
