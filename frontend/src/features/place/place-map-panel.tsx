@@ -79,10 +79,15 @@ export function PlaceMapPanel({
                 끝난다.
               */}
               <div className="flex w-24 shrink-0 flex-col items-end justify-center gap-1 py-3 pr-4">
+                {/*
+                  **`min-w-11` 이 없으면 44×44 를 못 지킨다** (#408). 낱말이 두 글자
+                  12px 라 실측 폭이 28.8px 였다 — 세로만 `h-11` 로 잡고 가로를 비워 둔
+                  탓이다. DESIGN.md §7 의 최소 터치 영역은 **44×44** 로 두 축 모두다.
+                */}
                 <Link
                   href={`/places/${place.placeId}`}
                   aria-label={messages.map.rowDetailLabel.replace('{title}', place.title)}
-                  className="text-caption text-link hover:text-link-hover focus-visible:ring-brand-500 flex h-11 items-center rounded-md px-1 font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                  className="text-caption text-link hover:text-link-hover focus-visible:ring-brand-500 flex h-11 min-w-11 items-center justify-center rounded-md px-1 font-semibold focus-visible:ring-2 focus-visible:outline-none"
                 >
                   {messages.map.rowDetail}
                 </Link>
