@@ -95,6 +95,7 @@ on/off 스위치와 스텁 어댑터는 두지 않는다(2026-09-03 제거). 프
 | `placeImageBackfillJob` | 문화정보원·식약처 장소의 대표 이미지 백필 (TourAPI 검색, 제목+좌표 검증) | 구현 |
 | `cultureFacilityImportJob` | 문화정보원 문화시설 + 긴급 시설 | 구현 |
 | `petRestaurantImportJob` | 식약처 음식점 + VWorld 지오코딩 | 구현 |
+| `placeMergeJob` | 원천이 다른 같은 장소 병합 (`merged_into_id`). 적재 잡들 뒤에 한 번 | 구현 |
 | `congestionImportJob` | 관광지 집중률 예측 + 명칭 매칭 | 구현 |
 
 `congestionImportJob` 은 **`placeImportJob` 이후에 돌려야 한다.** 장소가 비어 있으면
@@ -159,7 +160,7 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | 문화정보원 갱신 | 파일 수동 다운로드. 자동 수집 불가 |
 | 동물병원 운영시간 | 51% 만 제공. `operatingHoursKnown=false` 로 구분해 내려보낸다 |
 | 좌표 반경 검색 | 사각 범위 + 애플리케이션 정렬. 수백 곳 규모 전제. 전국 확대 시 공간 인덱스 필요 |
-| 중복 병합 | 각 적재 파사드가 개별 호출. 잡이 늘면 독립 잡으로 분리해야 한다 |
+| 중복 병합 | `placeMergeJob` 독립 잡. 적재 잡 단독 실행 시 병합되지 않으므로 이어 돌린다 |
 
 ## 이슈 대응 현황 (백엔드)
 

@@ -83,10 +83,13 @@
 | `petRestaurantImportJob` | 주 1회 | 월 04:00 | 등록이 계속 느는 원천 |
 | `placeImportJob` | 주 1회 | 월 04:30 | TourAPI 쿼터 여유, 변경 느림 |
 | `cultureFacilityImportJob` | 월 1회 | 1일 05:00 | 파일 갱신 확인 후 조건부 적재 |
+| `placeMergeJob` | 적재 잡 뒤 매번 | 위 세 잡 직후 | 모든 원천이 들어온 상태에서 한 번 판정 (#363) |
+| `placeImageBackfillJob` | 병합 뒤 매번 | `placeMergeJob` 직후 | 흡수된 행은 대상에서 빠지므로 병합 뒤가 맞다 |
 
-순서가 중요하다. **중복 병합은 모든 적재가 끝난 뒤 한 번만 돌아야 한다.** 지금은 각 파사드가
-자기 적재 뒤에 `mergeDuplicates`를 부르는데, 잡이 셋으로 늘면 병합이 세 번 돌면서 중간 상태를
-기준으로 판정한다. 병합을 독립 잡으로 떼어내는 편이 맞다.
+순서가 중요하다. **중복 병합은 모든 적재가 끝난 뒤 한 번만 돌아야 한다.** 병합은
+`placeMergeJob` 으로 독립됐다(#363) — 예전처럼 각 적재 파사드가 자기 적재 뒤에 부르면
+아직 다른 원천이 들어오지 않은 중간 상태를 기준으로 판정한다. **적재 잡을 단독으로 돌렸으면
+이 잡을 이어 돌린다.** 그러지 않으면 중복이 목록에 그대로 남는다.
 
 스케줄러는 아직 없다. batch-service 에 `adapter/in/scheduler`를 두거나, 배포 호스트의 cron 에서
 `--spring.batch.job.name=` 으로 부르는 두 가지 선택지가 있다. 후자가 단순하고 실패 시
@@ -131,7 +134,7 @@ place_import_last_success_timestamp{source="MFDS"}
 2. ~~적재 잡에 `runStartedAt` 기반 delisting 스텝 + 급감 가드~~ — 완료.
    TourAPI 는 부분 실행(contentType 지정) 시 delist 를 건너뛴다
 3. 지오코딩 재사용 (`source_key`로 기존 좌표 조회)
-4. 병합을 독립 잡으로 분리
+4. ~~병합을 독립 잡으로 분리~~ — 완료(#363). `placeMergeJob` 을 적재 잡들 뒤에 이어 돌린다
 5. 스케줄 등록 (cron 또는 scheduler 어댑터)
 6. ~~배치 메트릭 노출~~ — 완료 (`observability-guide.md` 배치 지표 절).
    `last_success` 경보 등록은 Prometheus rule 작업으로 남아 있다

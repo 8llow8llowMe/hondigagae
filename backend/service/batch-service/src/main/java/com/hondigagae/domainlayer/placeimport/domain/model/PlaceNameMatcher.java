@@ -8,6 +8,8 @@ import com.hondigagae.common.geo.GeoDistance;
  * <p>제주 실측에서 얻은 두 가지가 규칙의 근거다.
  * <ul>
  *   <li>이름이 좌표보다 믿을 만하다 — {@code 도치돌목장}과 {@code 도치돌 알파카목장}은 99m 떨어져 있지만 같은 곳이고,
+ *       (단, 지금의 부분일치는 "한쪽이 다른 쪽을 품는" 관계만 보므로 이 쌍은 아직 걸리지 않는다 —
+ *       {@code PlaceIdentityPolicyTest.documentsDochidolPairNotMatchingToday}. 토큰 기반 판정은 후속 이슈다)
  *       {@code 녹차미로공원}과 {@code 쉼한모금}은 93m 거리의 서로 다른 시설이다.</li>
  *   <li>원천마다 기준점이 다르다 — {@code 서우봉}(정상)과 {@code 서우봉둘레길}(입구)처럼 같은 이름도 좌표가 멀 수 있다.</li>
  * </ul>
