@@ -13,12 +13,20 @@
  * `md:px-6` 에서 멈춰 있던 것이 위 실측의 원인이다. 규칙이 한 군데 있으면 한 군데만 어긋난다.
  *
  * 세로 여백은 여기서 정하지 않는다 — 블록마다 다르고, 그 차이에는 각자 이유가 있다.
+ *
+ * **`panel` 은 고정 폭 컨테이너 전용이다.** 긴급 시설 지도 화면의 데스크톱 패널(400px)과
+ * 모바일 시트가 그렇다 — `md:`/`lg:` 는 항상 **뷰포트** 기준이라, `main`/`rail` 을 그
+ * 안에 쓰면 1024 이상에서 40px(`main`) 또는 24px(`rail`) 이 컨테이너 자신의 폭이 아니라
+ * 화면 폭을 보고 붙는다. 400px 패널 안 내용이 320px 로 줄어 실제 행(평평한 `px-4`,
+ * `emergency-map-panel.tsx`)과 다른 세로선에 선다. `panel` 은 그 트랩을 피하려고 끝까지
+ * 평평하다 — 컨테이너 자체가 이미 고정 폭이라 더 넓은 여백을 줄 뷰포트가 없다.
  */
-export type Inset = 'main' | 'rail'
+export type Inset = 'main' | 'rail' | 'panel'
 
 export const INSET_CLASS: Record<Inset, string> = {
   main: 'px-4 md:px-10',
   rail: 'px-4 md:px-10 lg:px-6',
+  panel: 'px-4',
 }
 
 /**
@@ -29,6 +37,7 @@ export const INSET_CLASS: Record<Inset, string> = {
 export const INSET_BLEED_CLASS: Record<Inset, string> = {
   main: '-mx-4 px-4 md:-mx-10 md:px-10',
   rail: '-mx-4 px-4 md:-mx-10 md:px-10 lg:-mx-6 lg:px-6',
+  panel: '-mx-4 px-4',
 }
 
 /**
@@ -40,4 +49,5 @@ export const INSET_BLEED_CLASS: Record<Inset, string> = {
 export const INSET_BLEED_END_CLASS: Record<Inset, string> = {
   main: '-mr-4 pr-4 md:-mr-10 md:pr-10',
   rail: '-mr-4 pr-4 md:-mr-10 md:pr-10 lg:-mr-6 lg:pr-6',
+  panel: '-mr-4 pr-4',
 }
