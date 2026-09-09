@@ -342,15 +342,19 @@ const SPACING_UTILITY = /^-?(?:[mp][trblxyse]?|gap(?:-[xy])?|space-[xy])-([0-9]+
  * **이 표가 비면 표째로 걷고 0 으로 잠근다.** 빈 표를 남겨 두면 다음 사람이 "여기 적으면
  * 통과하는구나" 로 읽는다.
  */
-const SPACING_BASELINE: Record<string, number> = {
-  /*
-    **아트보드 값이라 남긴다** (#335). 폼 컨트롤 칩 두 곳(`ai-plan-create-form.tsx`)이고,
-    그 자리 주석이 *"규약이 같다고 값까지 맞추지 않는다 — 맞추면 아트보드에서 멀어진다"* 라고
-    이미 한 번 판단해 두었다 (필터 칩 6px 과 갈라 둔 결정). **아트보드와 §4 스케일이
-    부딪히는 자리**라 FE 가 단독으로 정하지 않는다 — 디자인 결정이 나오면 그때 비운다.
-  */
-  'gap-2.5': 2,
-}
+/**
+ * **스케일 밖 스페이싱의 허용 목록 — 지금은 비어 있다** (#335).
+ *
+ * `DESIGN.md` §4 의 스케일(4 · 6 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 · 64) 밖 값을
+ * 예외로 남겨 둘 때만 항목이 생긴다. **비어 있는 것이 정상 상태다** — 항목을 더하려면
+ * 그것이 왜 스케일 밖에 있어야 하는지가 여기 적혀야 하고, 그 설명을 쓸 수 없으면
+ * 스케일 안 값으로 고치는 것이 답이다.
+ *
+ * 마지막 예외였던 `gap-2.5`(10px, AI 일정 생성 폼의 칩 줄 2곳)는 #335 에서 `gap-2` 로
+ * 내려 비웠다. 아트보드가 10px 을 줬지만 **정본은 §4** 라는 판단이다 —
+ * `ai-plan-create-form.tsx` 의 예산 블록 주석에 근거가 있다.
+ */
+const SPACING_BASELINE: Record<string, number> = {}
 
 function spacingUsage(): { counts: Record<string, number>; places: string[] } {
   const counts: Record<string, number> = {}
