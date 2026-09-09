@@ -34,8 +34,45 @@ describe('PlaceMapPanel', () => {
     expect(markup).toContain('aria-pressed="false"')
   })
 
-  it('제목은 링크로 남긴다 — 상세로 가는 길이 사라지면 안 된다', () => {
+  it('상세로 가는 길이 사라지지 않는다 — 제목 대신 액션 열 링크다', () => {
     expect(render()).toContain(`href="/places/${placeSummary.placeId}"`)
+  })
+
+  it('선택 버튼 안에 대화형 요소가 없다 — button 안의 a 는 명세 위반이다', () => {
+    const markup = render()
+    const selectButton = markup.slice(markup.indexOf('<button'), markup.indexOf('</button>'))
+
+    expect(selectButton).not.toContain('<a ')
+    expect(selectButton).not.toContain('href=')
+  })
+
+  it('상세 링크가 어느 장소인지 말한다', () => {
+    expect(render()).toContain(
+      `aria-label="${messages.map.rowDetailLabel.replace('{title}', placeSummary.title)}"`,
+    )
+  })
+
+  it('renderRowAction 을 액션 열에 그린다 — 담기 버튼이 여기 온다', () => {
+    const markup = render({
+      renderRowAction: () => createElement('button', { type: 'button' }, '담기'),
+    })
+
+    expect(markup).toContain('담기')
+    expect(markup).toContain('w-24')
+  })
+
+  it('액션이 없어도 열 자체는 있다 — /places 는 상세 링크만 든다', () => {
+    expect(render()).toContain('w-24')
+  })
+
+  it('renderRowNotice 는 행 아래 전폭이다 — 액션 열은 w-24 라 알림이 못 들어간다', () => {
+    const markup = render({
+      renderRowNotice: () => createElement('p', { role: 'alert' }, '담지 못했어요'),
+    })
+
+    expect(markup).toContain('role="alert"')
+    // 알림은 액션 열(w-24) 안이 아니라 그 뒤에 온다
+    expect(markup.indexOf('role="alert"')).toBeGreaterThan(markup.indexOf('w-24'))
   })
 
   it('선택된 행을 aria-pressed 와 배경으로 함께 알린다', () => {
