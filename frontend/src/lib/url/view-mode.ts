@@ -39,6 +39,18 @@ export const DEFAULT_VIEW_MODE: ViewMode = 'list'
 export const PLACES_DEFAULT_VIEW: ViewMode = 'map'
 export const EMERGENCY_DEFAULT_VIEW: ViewMode = 'map'
 
+/**
+ * 장소 담기(`/plans/[planId]/days/[day]/add`)의 기본 보기도 **지도**다 (#370).
+ *
+ * 장소를 고르는 행위가 `/places` 와 같은데 한쪽만 목록이면, 담기 화면에서만 위치 감각을
+ * 잃는다 — 그날 담은 다른 곳과 얼마나 떨어져 있는지가 하루 동선의 전부다.
+ *
+ * **`PLACES_DEFAULT_VIEW` 를 그대로 쓰지 않는다.** 값은 지금 같지만 이 파일의 규약이
+ * "화면이 자기 기본값을 갖는다" 이고, 긴급 시설이 목록으로 남은 것이 그 규약의 존재
+ * 이유다. 한 상수를 두 화면이 나눠 쓰면 한쪽 기본값을 바꿀 때 다른 쪽이 따라 움직인다.
+ */
+export const PLAN_ADD_DEFAULT_VIEW: ViewMode = 'map'
+
 const VIEW_KEY = 'view'
 
 type RawParams = URLSearchParams | Record<string, string | string[] | undefined>

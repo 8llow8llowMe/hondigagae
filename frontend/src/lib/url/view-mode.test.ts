@@ -4,6 +4,7 @@ import {
   EMERGENCY_DEFAULT_VIEW,
   parseViewMode,
   PLACES_DEFAULT_VIEW,
+  PLAN_ADD_DEFAULT_VIEW,
   viewModeHref,
 } from '@/lib/url/view-mode'
 
@@ -121,5 +122,33 @@ describe('EMERGENCY_DEFAULT_VIEW', () => {
 
   it('장소 찾기와 같은 값이다 — 두 지도 화면의 URL 모양이 같아야 한다', () => {
     expect(EMERGENCY_DEFAULT_VIEW).toBe(PLACES_DEFAULT_VIEW)
+  })
+})
+
+describe('PLAN_ADD_DEFAULT_VIEW — 담기 화면의 기본 보기', () => {
+  it('지도다 — /places 와 같은 이유로 "어디쯤인지" 에 먼저 답한다', () => {
+    expect(PLAN_ADD_DEFAULT_VIEW).toBe('map')
+  })
+
+  it('값이 없으면 지도로 떨어진다', () => {
+    expect(parseViewMode({}, PLAN_ADD_DEFAULT_VIEW)).toBe('map')
+  })
+
+  it('잘못된 값도 지도로 떨어진다 — 예외를 던지지 않는다', () => {
+    expect(parseViewMode({ view: 'grid' }, PLAN_ADD_DEFAULT_VIEW)).toBe('map')
+  })
+
+  it('기본값이 지도라 목록 링크에만 ?view=list 가 붙는다', () => {
+    const path = '/plans/1/days/2/add'
+
+    expect(viewModeHref(path, '', 'map', PLAN_ADD_DEFAULT_VIEW)).toBe(path)
+    expect(viewModeHref(path, '', 'list', PLAN_ADD_DEFAULT_VIEW)).toBe(`${path}?view=list`)
+  })
+
+  it('보기를 바꿔도 필터 쿼리가 남는다', () => {
+    const href = viewModeHref('/plans/1/days/2/add', 'indoor=true', 'list', PLAN_ADD_DEFAULT_VIEW)
+
+    expect(href).toContain('indoor=true')
+    expect(href).toContain('view=list')
   })
 })
