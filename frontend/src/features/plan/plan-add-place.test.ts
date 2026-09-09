@@ -1,6 +1,9 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { describe, expect, it } from 'vitest'
 
 import { PlanAddPlaceRow } from '@/features/plan/plan-add-place-row'
@@ -205,5 +208,27 @@ describe('PlanDaySection — 장소 추가 진입', () => {
     const markup = renderSection({ editing: true, editor: null })
 
     expect(markup).not.toContain(messages.plan.addPlaceAction)
+  })
+})
+
+describe('담기 성공 후 화면에 남는다 (#370)', () => {
+  /* vitest 의 cwd 에 기대지 않는다 — 테스트 파일 기준으로 잡는다 */
+  const source = readFileSync(
+    fileURLToPath(new URL('./plan-add-place-view.tsx', import.meta.url)),
+    'utf8',
+  )
+
+  /*
+    일자편집 명세 F5(396행)는 원래 "그 일자로 replace 이동" 이었다. #370 이 뒤집었다 —
+    지도에서 여러 곳을 연달아 담으려면 화면에 남아야 한다. 피드백은 토스트와
+    "이미 담았어요" 이고, 돌아가기는 헤더의 BackLink 다.
+  */
+  it('onAdded 콜백을 넘기지 않는다 — 담자마자 나가면 연달아 담을 수 없다', () => {
+    expect(source).toContain('usePlanAddPlace({ planId })')
+    expect(source).not.toContain('onAdded:')
+  })
+
+  it('담기 경로에서 일정 상세로 replace 하지 않는다', () => {
+    expect(source).not.toContain('router.replace(`/plans/${planId}#')
   })
 })

@@ -45,17 +45,16 @@ export function PlanAddPlaceView({
   const detail = usePlanDetail(planId)
   const list = usePlaceList(filters)
 
-  const addPlace = usePlanAddPlace({
-    planId,
-    /*
-      **성공하면 그 일자로 돌아간다** (F2). 저장을 먼저 하고 이동하므로 실패하면
-      목록에 남아 같은 버튼으로 다시 시도할 수 있다.
+  /*
+    **담기에 성공해도 화면에 남는다** (#370). 원래는 그 일자로 `replace` 이동했는데
+    (일자편집 명세 F5), 지도 보기에서 하루 동선을 짜려면 여러 곳을 연달아 담아야 해서
+    담자마자 나가면 지도로 바꾼 의미가 없다.
 
-      `replace` 다 — 끝난 단계를 히스토리에 남기면 뒤로가기가 "이미 담았어요" 로 잠긴
-      목록으로 되돌아간다.
-    */
-    onAdded: () => router.replace(`/plans/${planId}#${planDayAnchorId(day)}`),
-  })
+    **피드백이 사라지지는 않는다.** `usePlanAddPlace` 가 토스트를 띄우고, 응답이
+    `planKeys.detail` 을 갈아끼우므로 그 행이 곧바로 `이미 담았어요` 로 바뀐다.
+    돌아가기는 헤더의 `일정으로 돌아가기` 가 맡는다.
+  */
+  const addPlace = usePlanAddPlace({ planId })
 
   const backHref = `/plans/${planId}#${planDayAnchorId(day)}`
 
