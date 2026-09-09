@@ -180,3 +180,68 @@ describe('RegionalWeatherSection — 온도 라벨 (#206)', () => {
     expect(markup).not.toContain(messages.home.regionTempPrefix)
   })
 })
+
+/*
+  **#352.** 서버가 `minTemperature` 를 이미 주고 있었는데 화면이 버렸다. 최고만 있으면
+  31.0℃ 한 값으로 읽히는데, 아침 산책을 계획하는 사람에게는 그 값이 몇 시의 이야기인지가
+  판단을 가른다.
+
+  dev 는 `minTemperature === maxTemperature` 인 날이 많아 이 차이가 드러나지 않는다 —
+  그래서 mock 이 24.0 / 31.0 으로 갈라 둔 값으로 검사한다.
+*/
+describe('RegionalWeatherSection — 최저기온 (#352)', () => {
+  it('최고 아래에 최저기온을 라벨과 함께 낸다', () => {
+    const markup = render(GOOD_DAY)
+    const region = GOOD_DAY.regions.find((r) => r.minTemperature !== null)
+    const min = region?.minTemperature as number
+
+    expect(markup).toContain(`${messages.home.regionMinTempPrefix} ${min.toFixed(1)}℃`)
+  })
+
+  /* 최고 → 최저 → 강수 순서다. 접두 길이가 같아 두 줄의 숫자 왼쪽 끝이 맞는다 */
+  it('최고보다 뒤, 강수보다 앞에 선다', () => {
+    const markup = render(GOOD_DAY)
+
+    const max = markup.indexOf(messages.home.regionTempPrefix)
+    const min = markup.indexOf(messages.home.regionMinTempPrefix)
+    const rain = markup.indexOf('강수 ')
+
+    expect(max).toBeGreaterThanOrEqual(0)
+    expect(min).toBeGreaterThan(max)
+    expect(rain).toBeGreaterThan(min)
+  })
+
+  it('최고와 최저의 접두 길이가 같다 — 숫자 왼쪽 끝이 어긋나지 않는다', () => {
+    expect(messages.home.regionMinTempPrefix.length).toBe(messages.home.regionTempPrefix.length)
+  })
+
+  /* 최저만 없는 날에 라벨만 남기지 않는다. 최고·강수는 그대로 서야 한다 */
+  it('최저기온이 없으면 그 줄만 빠지고 최고·강수는 남는다', () => {
+    const markup = render({
+      ...GOOD_DAY,
+      regions: GOOD_DAY.regions.map((region) => ({ ...region, minTemperature: null })),
+    })
+
+    expect(markup).not.toContain(messages.home.regionMinTempPrefix)
+    expect(markup).toContain(messages.home.regionTempPrefix)
+    expect(markup).toContain('강수 ')
+  })
+
+  /*
+    셋 다 없으면 감싼 `<span>` 자체를 내지 않는다 — 빈 flex 항목을 남기면 부모의 `gap-2`
+    가 그 자리에도 붙어 배지가 8px 밀린다 (#342 가 두 값일 때 잡아 둔 갈래).
+  */
+  it('세 값이 다 없으면 감싼 자리도 내지 않는다', () => {
+    const markup = render({
+      ...GOOD_DAY,
+      regions: GOOD_DAY.regions.map((region) => ({
+        ...region,
+        minTemperature: null,
+        maxTemperature: null,
+        maxPrecipitationProbability: null,
+      })),
+    })
+
+    expect(markup).not.toContain('<span class="flex flex-col items-start">')
+  })
+})

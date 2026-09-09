@@ -162,6 +162,20 @@ export const placeMessages = {
    */
   detailFeelsLikeTemperature: '최고 체감온도',
   detailTemperatureUnit: '℃',
+  /**
+   * 큰 숫자를 받치는 최고·최저기온 줄 (#352).
+   *
+   * **큰 숫자가 `최고 체감온도` 이므로 이 줄의 `최고` 는 기온이라고 말해야 한다** — 같은
+   * 자리에 `최고` 가 두 번 서는데 하나는 체감온도, 하나는 기온이다. 그래서 여기서만
+   * 낱말을 줄이지 않고 `최고기온` · `최저기온` 을 그대로 쓴다 (권역 행은 옆에 체감온도가
+   * 없어 `최고`/`최저` 로 줄인다 — `home.regionTempPrefix`).
+   *
+   * `detailMaxTemperature` 를 재사용하지 않는다 — 그쪽은 체감온도를 못 받은 날 **큰 숫자
+   * 자리의 라벨**이고, 이 줄은 그때 최고기온을 빼므로 두 자리가 동시에 서지 않는다.
+   * 같은 문구를 공유하면 한쪽을 고칠 때 다른 자리가 조용히 따라 바뀐다.
+   */
+  detailSupportingMaxTemperature: '최고기온',
+  detailSupportingMinTemperature: '최저기온',
   detailPrecipitationProbability: '강수확률',
   detailPercentUnit: '%',
 

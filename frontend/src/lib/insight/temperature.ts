@@ -33,6 +33,8 @@ export type DisplayTemperature = {
 type TemperatureSource = {
   maxFeelsLikeTemperature?: number | null
   maxTemperature?: number | null
+  /** 큰 숫자에는 쓰이지 않고 `supportingTemperatures` 만 본다 (#352) */
+  minTemperature?: number | null
 }
 
 export function displayTemperature(
@@ -45,4 +47,43 @@ export function displayTemperature(
   if (typeof max === 'number') return { kind: 'max', value: max }
 
   return null
+}
+
+/** 큰 숫자를 받치는 보조 온도 한 값 */
+export type SupportingTemperature = {
+  kind: 'max' | 'min'
+  value: number
+}
+
+/**
+ * 큰 숫자(`displayTemperature`) 아래에 받치는 **최고·최저기온** — #352.
+ *
+ * **하루의 폭이 판단을 가른다.** 게스트 블록이 `최고 체감온도 33.4℃` 한 값만 보여 주고
+ * 있었는데, 응답에 이미 `maxTemperature` · `minTemperature` 가 실려 있었다. 33.4℃ 만으로는
+ * 아침에 나갈 수 있는 날인지 알 수 없다.
+ *
+ * **큰 숫자를 되풀이하지 않는다.** 체감온도를 못 받은 날(중기예보 구간)에는
+ * `displayTemperature` 가 최고기온을 큰 숫자로 세우므로(`kind: 'max'`), 그때 여기서
+ * 최고기온을 다시 말하면 같은 값이 한 자리에 두 번 선다. 그 경우 최저만 남긴다.
+ *
+ * **`displayTemperature` 와 짝이라 함께 읽어야 한다** — 저쪽이 무엇을 집었는지가 이쪽이
+ * 무엇을 빼는지를 정한다. 그래서 큰 숫자를 인자로 받는다(다시 계산하지 않는다).
+ * 계산이 갈리면 같은 값이 두 번 서거나 최고기온이 통째로 사라진다.
+ *
+ * **둘 다 없으면 빈 배열이다** — 호출부가 줄 자체를 내지 않는다. `0` 은 유효한 온도라
+ * falsy 검사로 걸러서는 안 되고, 여기서 `typeof` 로 가른다.
+ */
+export function supportingTemperatures(
+  weather: TemperatureSource | null | undefined,
+  displayed: DisplayTemperature | null,
+): SupportingTemperature[] {
+  const out: SupportingTemperature[] = []
+
+  const max = weather?.maxTemperature
+  if (typeof max === 'number' && displayed?.kind !== 'max') out.push({ kind: 'max', value: max })
+
+  const min = weather?.minTemperature
+  if (typeof min === 'number') out.push({ kind: 'min', value: min })
+
+  return out
 }
