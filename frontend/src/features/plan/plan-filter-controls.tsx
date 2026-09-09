@@ -74,7 +74,7 @@ export function PlanStatusTabs({
             className={cn(
               'text-body-2 focus-visible:ring-brand-500 flex h-12 items-center justify-center gap-1 border-b-2 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
               selected
-                ? 'border-fg text-fg font-semibold'
+                ? 'border-brand-500 text-fg font-semibold'
                 : 'text-fg-muted border-transparent font-medium',
             )}
           >
