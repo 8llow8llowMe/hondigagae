@@ -3,10 +3,9 @@
 import { useState } from 'react'
 
 import { BasisFootnote } from '@/components/basis-footnote'
-import { ChevronDownIcon, ClockIcon } from '@/components/icons'
+import { ChevronDownIcon } from '@/components/icons'
 import { InfoTip } from '@/components/info-tip'
 import { MetricValue, MetricWord } from '@/components/metric'
-import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { formatCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
@@ -97,14 +96,13 @@ export function WalkVerdict({
       >
         <span className="min-w-0 flex-1">
           {/*
-            **모바일에도 배지를 둔다.** 아래 데스크톱 등급 줄은 `md:flex` 라 모바일에서 아예
-            렌더되지 않아, 여기 없으면 접힌 상태의 모바일 사용자는 특보를 못 본다 —
-            이 서비스에서 가장 흔한 화면이다.
+            **특보 배지를 걷었다** (#349). 예전에는 이 줄이 모바일의 특보 표시를 겸했는데
+            (아래 데스크톱 등급 줄이 `md:flex` 라 모바일에서 렌더되지 않는다), 이제
+            페이지 최상단 `WeatherWarningStrip` 이 폭과 무관하게 항상 그 자리에 선다.
           */}
           <span className="text-body-1 flex flex-wrap items-center gap-x-1 gap-y-1 font-semibold">
             <span className="text-fg-muted">{messages.home.walkTodayLabel}</span>
             <MetricWord tone={tone}>{data.walkSafetyLevel.name}</MetricWord>
-            <WeatherWarningBadge warning={data.weatherWarning} />
           </span>
           <span className="text-caption text-fg-muted block font-medium tabular-nums">
             {summary}
@@ -132,13 +130,13 @@ export function WalkVerdict({
         {/* 데스크톱에만 보이는 등급 줄 — 모바일은 위 버튼이 이미 말했다 */}
         <div className="hidden items-end justify-between gap-3 md:flex">
           {/*
-            특보 배지는 등급 줄에 함께 선다. 경보면 서버가 이미 `DANGER` 로 끊어 이 섹션이
-            자동 펼침 + tint 인 상태이고, 배지는 그 이유를 말한다 — 등급을 대신하지 않는다.
+            **특보 배지가 여기 없다** (#349). 경보면 서버가 이미 `DANGER` 로 끊어 이 섹션이
+            자동 펼침 + tint 인 상태이고, **그 tint 가 곧 배지가 말하던 이유**다. 특보 자체는
+            페이지 최상단 스트립이 한 번 말한다.
           */}
           <span className="text-body-1 flex flex-wrap items-center gap-x-1 gap-y-2 font-semibold">
             <span className="text-fg-muted">{messages.home.walkTodayLabel}</span>
             <MetricWord tone={tone}>{data.walkSafetyLevel.name}</MetricWord>
-            <WeatherWarningBadge warning={data.weatherWarning} />
           </span>
           {/*
             **라벨을 붙인다** (#259). 모바일 접힌 줄은 `feelsLikeLabel` 을 이미 달고 있는데
@@ -207,14 +205,26 @@ export function WalkVerdict({
 
         <VerdictReasons reasons={data.reasons} />
 
-        {/* 안전 시간대는 조언의 실체다. 없으면 줄 자체를 렌더하지 않는다 */}
-        {data.saferWindowStart !== null && data.saferWindowEnd !== null && (
-          <p className="bg-metric-high-100 text-metric-high-700 text-body-2 flex items-center gap-2 rounded-md p-3 tabular-nums">
-            <ClockIcon size={20} className="shrink-0" />
-            {messages.home.saferWindowLabel}는 {data.saferWindowStart.slice(0, 5)} –{' '}
-            {data.saferWindowEnd.slice(0, 5)}
-          </p>
-        )}
+        {/*
+          **`saferWindow` 줄을 홈에서 걷었다** (#349). 이 섹션은 "지금 나가도 되나" 만
+          답하고, "오늘 언제 나가나" 는 바로 아래 `WalkTimesSection` 이 답한다. 두 섹션이
+          같은 질문에 각자 답하는 동안 **서로를 부정했다** — 폭염 경보 날 화면 세로 200px
+          안에서 이 초록 박스가 `더 안전한 시간대는 18:00 – 21:00` 이라고 말하고, 골든타임이
+          `경보가 발효 중이라 추천하지 않아요` 라고 말했다.
+
+          두 값의 출처가 다른 엔드포인트다. `WalkSafetyEvaluator` 는 `level == SAFE` 일 때만
+          `saferWindow` 를 비우고 **경보를 보지 않는데**, `GoldenWindowStatus.of` 는 경보면
+          `SUPPRESSED_BY_WARNING` 으로 억제한다.
+
+          **여기서 `weatherWarning` 을 보고 조건을 세우지 않는다.** 그러면 화면이 서버의
+          판정 순서를 다시 짜는 것이 되고, 한쪽만 고쳐져 같은 상태에 다른 문구가 나간다
+          (`WalkTimesSection` 머리주석 — 경보/주의보 구분도 서버 몫이다). 조건 대신 **자리**로
+          푼다: 시간축은 골든타임 하나가 맡는다 (DESIGN.md §7-1).
+
+          **`place-walk-safety-panel` 의 같은 줄은 남는다** — 장소 상세에는 골든타임 섹션이
+          없어 거기서는 이 줄이 그 질문의 유일한 답이다. 근본 수정(경보일 때 서버가
+          `saferWindow` 를 비우는 것)은 BE 몫으로 남겨 두었다.
+        */}
       </div>
     </section>
   )

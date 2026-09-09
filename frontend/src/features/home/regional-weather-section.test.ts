@@ -140,9 +140,13 @@ describe('RegionalWeatherSection — 상태', () => {
     expect(markup).not.toContain('서귀포권')
   })
 
-  it('특보 배지를 함께 그린다', () => {
-    expect(render(BAD_DAY)).toContain('경보')
-    expect(render(GOOD_DAY)).not.toContain('경보')
+  /*
+    **#349.** 예전에는 이 섹션이 제목 옆에 특보 배지를 그렸고, 그것이 모바일의 유일한 특보
+    표시를 겸했다. 페이지 최상단 `WeatherWarningStrip` 하나로 모으면서 여기서 걷었다 —
+    세 섹션의 `weatherWarning` 은 백엔드 단일 지점에서 온 같은 값이라 갈릴 수 없다.
+  */
+  it('특보가 있어도 배지를 그리지 않는다', () => {
+    expect(render(BAD_DAY)).not.toContain('경보')
   })
 })
 

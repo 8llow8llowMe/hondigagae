@@ -8,6 +8,14 @@
 export const homeMessages = {
   walkTodayLabel: '오늘 산책',
   /**
+   * 페이지 최상단 특보 줄의 접근성 이름 (#349).
+   *
+   * **화면에 글자로 그리지 않는다.** 그 줄이 말하는 것은 전부 서버 값(배지 `type.name` +
+   * `level.name`, 옆 문장 `type.description`)이고, 여기에 우리 제목을 하나 더 얹으면
+   * 같은 사실이 다시 두 번이 된다 — 이 이슈가 없앤 바로 그 모양이다.
+   */
+  warningStripLabel: '기상특보',
+  /**
    * 판정 요약줄의 체감온도 ([#259](https://github.com/8llow8llowMe/hondigagae/issues/259)).
    * **장소 상세와 같은 `feelsLikeCelsius`(시각 기준)라 같은 이름으로 부른다** — 예전에는
    * 여기만 `체감 열지수` 였다. 같은 물리량을 화면마다 다르게 부르면 사용자는 서로 다른
@@ -43,7 +51,11 @@ export const homeMessages = {
    * "기온은 괜찮은데 지면이 뜨겁다" 는 이 서비스의 요점이 그대로 전달된다.
    */
   temperatureLabel: '기온',
-  saferWindowLabel: '더 안전한 시간대',
+  /*
+    `saferWindowLabel` 을 걷었다 (#349). 홈 판정에서 `saferWindow` 줄을 뺐고 — "오늘 언제
+    나가나" 는 골든타임 섹션 하나가 답한다 — 이 문구를 쓰는 자리가 사라졌다. 장소 상세는
+    자기 문구(`messages.place.detailSaferWindow`)를 쓴다.
+  */
   basisSuffix: '기준',
   reasonsLink: '판정 근거 보기',
 

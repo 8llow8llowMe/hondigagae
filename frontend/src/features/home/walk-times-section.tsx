@@ -3,7 +3,6 @@
 import { METRIC_WORD_TONE, MetricWord } from '@/components/metric'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { Skeleton } from '@/components/skeleton'
-import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { formatCelsius } from '@/lib/format/celsius'
 import { markGoldenWindow } from '@/lib/insight/golden-window'
 import { walkSafetyTone } from '@/lib/insight/tone'
@@ -81,12 +80,13 @@ export function WalkTimesSection({
   return (
     <section aria-label={messages.home.goldenHeading} className="border-border border-t">
       <div className={cn('flex flex-col gap-3 py-4 md:py-5', INSET_CLASS.rail)}>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-          <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
-            {messages.home.goldenHeading}
-          </h2>
-          <WeatherWarningBadge warning={data.weatherWarning} />
-        </div>
+        {/*
+          **특보 배지가 여기 없다** (#349). 페이지 최상단 `WeatherWarningStrip` 하나가
+          말한다 — 그래야 감싸던 flex 줄도 함께 사라진다.
+        */}
+        <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
+          {messages.home.goldenHeading}
+        </h2>
 
         {/*
           **서버가 고른 상태를 그대로 따른다** (#270). 예전에는 `hasGolden` → `hasForecast`
