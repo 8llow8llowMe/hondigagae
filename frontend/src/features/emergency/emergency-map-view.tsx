@@ -12,7 +12,7 @@ import { ViewToggle } from '@/components/view-toggle'
 import { EmergencyFilterBar } from '@/features/emergency/emergency-filter-bar'
 import { EmergencyBoardSection } from '@/features/emergency/emergency-list-view'
 import { EmergencyMapPanel } from '@/features/emergency/emergency-map-panel'
-import { EmergencySkeleton } from '@/features/emergency/emergency-skeleton'
+import { EmergencyMapSkeleton } from '@/features/emergency/emergency-map-skeleton'
 import {
   applyFilters,
   countsAreComplete,
@@ -288,7 +288,7 @@ function PanelBody({
   onSelect: (id: string) => void
 }) {
   // 좌표를 기다리는 동안에도 로딩이다 — 조회는 아직 시작도 못 했다
-  if (board.position === null || board.query.isPending) return <EmergencySkeleton />
+  if (board.position === null || board.query.isPending) return <EmergencyMapSkeleton />
 
   if (board.query.error !== null || board.query.data === undefined) {
     return (
@@ -296,6 +296,7 @@ function PanelBody({
         title={messages.emergency.errorTitle}
         description={messages.common.temporaryErrorDescription}
         onRetry={() => void board.query.refetch()}
+        inset="panel"
       />
     )
   }
@@ -317,6 +318,7 @@ function PanelBody({
             </Button>
           ) : undefined
         }
+        inset="panel"
       />
     )
   }
