@@ -638,3 +638,31 @@ body {
     bottom: 32px;
   }
 }
+
+/*
+  전역 푸터 — 이슈 #399.
+
+  **지도가 뷰포트를 꽉 채우는 화면에는 두지 않는다.** `.map-canvas-height` 는
+  `calc(100dvh - 헤더 - 탭바)` 라 그 화면은 이미 뷰포트를 정확히 채운다 — 푸터가 붙으면
+  지도 화면에 페이지 스크롤이 생기고, 지도 밖 여백을 굴리면 화면이 밀린다.
+
+  **레이아웃이 화면마다 분기하지 않는다.** 푸터는 `(main)` 전체에 한 번 두고, 지도 쪽이
+  **자기 성질로 빠진다** — 전폭 지도를 `.rail-layout` 에 "가입하지 않는 것" 으로 표현한
+  #376 과 같은 축이다. `:has()` 는 이 파일이 탭바 스크롤바 규칙에서 이미 쓰는 장치다.
+
+  **탭바 자리를 비운다.** 탭바가 `fixed` 라 푸터 마지막 줄이 그 뒤로 들어간다. 탭바는
+  768 미만에만 있으므로 그 위에서는 0 이다 (`.pb-tabbar` 와 같은 계산).
+*/
+body:has(.map-canvas-height) .site-footer {
+  display: none;
+}
+
+.site-footer {
+  padding-block-end: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+}
+
+@media (width >= 48rem) {
+  .site-footer {
+    padding-block-end: 0;
+  }
+}

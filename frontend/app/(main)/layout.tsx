@@ -3,6 +3,7 @@ import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 import { ToastProvider } from '@/components/toast'
 import { GlobalHeader } from '@/features/nav/global-header'
 import { MobileTabBar } from '@/features/nav/mobile-tab-bar'
+import { SiteFooter } from '@/features/nav/site-footer'
 import { petKeys } from '@/features/pet/queries'
 import { petListPath } from '@/lib/api/pet'
 import { serverFetch } from '@/lib/api/server'
@@ -71,6 +72,13 @@ export default async function MainLayout({ children }: { children: React.ReactNo
           {children}
         </div>
       </ToastProvider>
+
+      {/*
+        푸터는 `ToastProvider` 밖이다 — 토스트가 필요한 것은 본문의 조작이고, 푸터는
+        상태 없는 표기다. **지도 화면에서는 스스로 빠진다** (`app/globals.css` 의
+        `body:has(.map-canvas-height) .site-footer`) — 자세한 이유는 `SiteFooter` 주석에 있다.
+      */}
+      <SiteFooter />
 
       <MobileTabBar authed={authed} />
     </HydrationBoundary>
