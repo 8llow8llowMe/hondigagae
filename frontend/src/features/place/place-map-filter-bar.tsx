@@ -6,7 +6,7 @@ import { BottomSheet } from '@/components/bottom-sheet'
 import { Button } from '@/components/button'
 import { Chip, ChipGroup } from '@/components/chip'
 import { FilterListHeading } from '@/components/filter-list'
-import { ChevronDownIcon, SlidersIcon } from '@/components/icons'
+import { CheckIcon, ChevronDownIcon, SlidersIcon } from '@/components/icons'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { useSelectedPet } from '@/features/nav/use-selected-pet'
 import {
@@ -14,12 +14,7 @@ import {
   CONTENT_TYPE_LABEL,
   SIGUNGU_LABEL,
 } from '@/features/place/filter-labels'
-import {
-  IndoorField,
-  PetAllowanceField,
-  PetSizeField,
-  RegionField,
-} from '@/features/place/place-filter-fields'
+import { IndoorField, PetSizeField, RegionField } from '@/features/place/place-filter-fields'
 import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { messages } from '@/lib/messages'
 import { DEFAULT_PLACE_FILTERS, toPlaceFilterQuery } from '@/lib/url/place-filters'
@@ -41,12 +36,18 @@ type OpenSheet = 'region' | 'more'
  * 내리고, 이 자리는 사용자가 실제로 만질 것에 준다.
  *
  * **유형만 펼친다.** 8종 + "전체" 라 가로로 나열되는 것이 자연스럽고, 지도에서 가장
- * 자주 바꾸는 축이다. 지역(3갈래)·동반·실내·크기는 값을 고르기보다 조합해서 확정하는
+ * 자주 바꾸는 축이다. 지역(3갈래)·실내·크기는 값을 고르기보다 조합해서 확정하는
  * 축이라 시트로 남긴다 — 가로줄에 다 펼치면 스크롤이 길어져 유형이 묻힌다.
  *
  * **두 줄이다.** 한 줄에 유형·지역·더보기를 다 두면 400 폭에서 유형이 세 개만 보이고,
  * 뒤쪽 유형(쇼핑·여행코스)에 **닿을 방법이 없었다** — 트랙패드 가로 스크롤을 아는
- * 사용자에게만 열린 기능이었다. 1행은 유형 전용 스크롤러 + 원형 화살표, 2행은 지역·더보기다.
+ * 사용자에게만 열린 기능이었다. 1행은 유형 전용 스크롤러 + 원형 화살표,
+ * 2행은 **동반 가능만 · 지역 · 더보기**다.
+ *
+ * **동반 축은 2행 맨 왼쪽 토글이다.** 시트 안에 있던 동안에는 이 서비스의 존재 이유인
+ * 조건이 두 단계 뒤에 접혀 있었다 — 반려견과 갈 수 있는 곳을 찾으러 온 화면이다.
+ * `ALLOWED` 한 갈래만 쓰는 축이라 시트를 열 이유가 없고, 목록 칩 줄이 이미 같은 자리에
+ * 같은 토글을 둔다 (`place-filter-chips.tsx`) — 두 보기에서 같게 생겨야 한 번만 배운다.
  *
  * "더 있다" 신호(fade 마스크 + 원형 화살표)는 **홈의 가로 줄과 같은 `ScrollRail` 을 쓴다.**
  * 같은 사실을 말하는 컨트롤이 화면마다 다르게 생기면 사용자가 두 번 배운다.
@@ -86,13 +87,14 @@ export function PlaceMapFilterBar({
       ? messages.place.filterRegionLabel
       : (SIGUNGU_LABEL[filters.sigunguCode] ?? messages.place.filterRegionLabel)
 
+  const allowedOnly = filters.petAllowanceType === 'ALLOWED'
+
   /*
-    시트 안의 세 축 중 하나라도 걸려 있으면 트리거가 켜져 있어야 한다 — 접힌 곳에 걸린
-    필터는 결과만 줄이고 이유는 보이지 않는다. **동반 축이 여기 포함된다**: 목록 칩 줄과
-    달리 이 줄에는 "동반 가능만" 상시 칩이 없다(유형에 자리를 줬다).
+    시트 안의 두 축 중 하나라도 걸려 있으면 트리거가 켜져 있어야 한다 — 접힌 곳에 걸린
+    필터는 결과만 줄이고 이유는 보이지 않는다. **동반 축은 이제 여기서 빠진다**:
+    2행 토글로 나왔으므로 시트에 함께 두면 같은 필터를 두 곳에서 만지게 된다.
   */
-  const moreActive =
-    filters.petAllowanceType !== null || filters.indoor !== null || filters.petSizeType !== null
+  const moreActive = filters.indoor !== null || filters.petSizeType !== null
 
   const dirty = toPlaceFilterQuery(filters) !== toPlaceFilterQuery(DEFAULT_PLACE_FILTERS)
 
@@ -141,8 +143,18 @@ export function PlaceMapFilterBar({
         />
       </div>
 
-      {/* ── 2행: 지역 · 더보기 ────────────────────────────────────────────── */}
+      {/* ── 2행: 동반 가능만 · 지역 · 더보기 ──────────────────────────────── */}
       <div className="flex min-w-0 items-center gap-1.5">
+        {/* 즉시 반영이다 — 시트가 아니라 토글이라 "적용" 이 없다 (아트보드 02 절의 규칙) */}
+        <Chip
+          selected={allowedOnly}
+          onSelect={() => apply({ ...filters, petAllowanceType: allowedOnly ? null : 'ALLOWED' })}
+          className="shrink-0"
+        >
+          {allowedOnly && <CheckIcon size={16} strokeWidth={2} />}
+          {messages.place.filterAllowedOnly}
+        </Chip>
+
         <Chip
           selected={filters.sigunguCode !== null}
           expanded={open === 'region'}
@@ -186,13 +198,9 @@ export function PlaceMapFilterBar({
         title={messages.place.filterMore}
         footer={<SheetFooter onCancel={() => setOpen(null)} onApply={applyDraft} />}
       >
-        <FilterListHeading>{messages.place.filterPetAllowanceLabel}</FilterListHeading>
-        <PetAllowanceField filters={draft} onChange={setDraft} />
-
-        <div className="border-border border-t">
-          <FilterListHeading>{messages.place.filterIndoorLabel}</FilterListHeading>
-          <IndoorField filters={draft} onChange={setDraft} />
-        </div>
+        {/* 동반 축은 2행 토글로 나갔다 — 시트의 첫 절이 실내다. 위에 구분선을 두지 않는다 */}
+        <FilterListHeading>{messages.place.filterIndoorLabel}</FilterListHeading>
+        <IndoorField filters={draft} onChange={setDraft} />
 
         {/* 제목은 `PetSizeField` 가 그린다 — 반려견이 없으면 절 전체가 사라져야 한다 */}
         <PetSizeField
