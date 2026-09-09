@@ -13,6 +13,7 @@ import {
   type PlaceDetailActions,
 } from '@/features/place/place-detail-action-bar'
 import { PlaceDetailSkeleton } from '@/features/place/place-detail-skeleton'
+import { PlaceMiniMap } from '@/features/place/place-mini-map'
 import { PlaceOverview } from '@/features/place/place-overview'
 import { PlacePetInfoSection } from '@/features/place/place-pet-info'
 import {
@@ -33,7 +34,6 @@ import { galleryImages } from '@/lib/place/gallery'
 import { parseHomepage } from '@/lib/place/homepage'
 import { indoorLabel } from '@/lib/place/indoor'
 import { toPlainText } from '@/lib/place/text'
-import { cn } from '@/lib/utils/cn'
 import type { PlaceDetail, PlaceIntro } from '@/types/place'
 
 export type PlaceDetailSectionProps = {
@@ -64,10 +64,14 @@ export type PlaceDetailSectionProps = {
 /**
  * 장소 상세 — 아트보드 `혼디가개 장소 상세` 01(모바일 390) · 03(데스크톱 1440) · 04(상태).
  *
- * **데스크톱은 2단이다.** 좌 `--rail-context`(400) sticky = 판정 + 기본 정보,
- * 우 1fr = 갤러리 + 제목 + 본문. 열 구분선은 **우측 열의 `border-left`** 다.
+ * **데스크톱은 2단이다.** 좌 `--rail-context`(400) sticky = 판정 두 개 + 하단 바,
+ * 우 1fr = 갤러리 + 제목 + 기본 정보 + 본문. 열 구분선은 **우측 열의 `border-left`** 다.
  *
- * DOM 순서는 **모바일 기준**이다 (갤러리 → 제목 → 판정 → 기본 정보 → 본문). 데스크톱 배치는
+ * **기본 정보는 레일이 아니라 제목 바로 아래다.** 레일에 있던 동안에는 주소·전화·운영시간이
+ * 판정 아래로 밀려, 상세에 들어온 사람이 제일 먼저 묻는 "여기 어디고 몇 시까지 하냐" 가
+ * 판정보다 뒤에 있었다. 레일에는 **판정만** 남는다 — 한 가지 성격의 것만 든다.
+ *
+ * DOM 순서는 **모바일 기준**이다 (갤러리 → 제목 → 기본 정보 → 판정 → 본문). 데스크톱 배치는
  * `.rail-layout-detail` 의 grid 배치가 바꾼다 — 트리를 폭마다 둘로 나누면 같은 내용이 두 번
  * 렌더돼 스크린리더가 중복해 읽는다. 자세한 이유는 `app/globals.css` 에 적어 뒀다.
  *
@@ -77,9 +81,11 @@ export type PlaceDetailSectionProps = {
  * **404 의 정상 경로는 여기가 아니다.** 서버 컴포넌트가 `notFound()` 로 보낸다.
  * 여기서 404 를 다루는 것은 클라이언트 재조회에서 리소스가 사라진 경우다.
  *
- * 아트보드에 있으나 **구현하지 않은 것**: "지도 보기"·"길찾기"
- * ([#14](https://github.com/8llow8llowMe/hondigagae/issues/14)) · 메타의 거리(상세는 기준점이
- * 없다) · 입장료. **없는 값을 지어내지 않는다.**
+ * "지도 보기"·"길찾기"는 기본 정보 절 끝의 `PlaceMiniMap` 이 맡는다
+ * ([#14](https://github.com/8llow8llowMe/hondigagae/issues/14) 로 미뤄 뒀던 자리다).
+ *
+ * 아트보드에 있으나 **여전히 구현하지 않은 것**: 메타의 거리(상세는 기준점이 없다) ·
+ * 입장료. **없는 값을 지어내지 않는다.**
  *
  * 하단 바(담기 + 저장)는 #118 로 붙었다 — 막고 있던 사유가 둘 다 소멸했다 (일정 화면은
  * #80·#82, 즐겨찾기 API 는 `/api/v1/favorites/places`).
@@ -240,34 +246,23 @@ export function PlaceDetailSection({
               )}
             </div>
           </header>
-        </div>
-
-        {/*
-          좌: 판정 + 기본 정보. 데스크톱에서만 sticky 다 — `rail-sticky` 가 레일이 뷰포트보다
-          길어도 바닥에 닿게 자기 스크롤을 준다 (장소 찾기 레일에서 잘렸던 전례가 있다).
-        */}
-        <div className="rail-detail-aside rail-sticky">
-          {/* 데스크톱에서는 열 자체가 경계라 밴드를 겹쳐 쌓지 않는다 */}
-          <Band className="lg:hidden" />
-          <PlaceSuitabilityPanel {...suitability} />
 
           {/*
-            산책 위험도 (#197). **적합도 바로 아래, 하단 바 위**에 둔다 — 둘 다 판정이라
-            한 묶음으로 읽혀야 하고, 하단 바(담기·저장)가 사이에 끼면 판정이 두 군데로
-            갈린다. 아트보드 03 의 `판정 → 하단 바 → 기본 정보` 순서는 그대로다.
+            ── 기본 정보 ─────────────────────────────────────────────────────
 
-            **1px 선으로만 나눈다.** 밴드로 끊으면 두 판정이 서로 다른 블록이 되고,
-            "오늘은 적합 / 지금은 위험" 이 같은 장소의 두 축이라는 것이 사라진다.
+            **좌측 레일이 아니라 제목 바로 아래다.** 레일에 있던 동안에는 주소·전화·운영시간이
+            판정(적합도·산책 위험도) 아래로 밀려 있었다 — 상세에 들어온 사람이 제일 먼저 묻는
+            "여기 어디고 몇 시까지 하냐" 가 판정보다 뒤에 있었던 것이다. 제목 다음 자리가
+            그 질문의 자리다.
+
+            **폭마다 나누지 않는다.** DOM 하나를 옮겨 모바일 순서도 같이 바뀐다 — 트리를
+            둘로 나누면 같은 내용이 두 번 렌더돼 스크린리더가 중복해 읽는다
+            (`app/globals.css` 의 `.rail-layout-detail` 주석과 같은 규칙).
+
+            인셋도 레일(24)이 아니라 본문(40)을 따른다 — 이제 본문 열의 한 절이다.
           */}
-          <div className="border-border border-t" />
-          <PlaceWalkSafetyPanel {...walkSafety} />
-
-          {/* 데스크톱 하단 바 — 판정 바로 아래, 기본 정보 위 (아트보드 03) */}
-          <PlaceDetailActionBar {...actions} className="hidden lg:block" />
-
-          <Band className="lg:hidden" />
-          <div className="border-border hidden border-t lg:block" />
-          <DetailSection title={messages.place.detailSectionBasic} padding="rail">
+          <Band />
+          <DetailSection title={messages.place.detailSectionBasic}>
             <dl className="flex flex-col gap-3">
               <InfoRow label={messages.place.detailAddress} value={fullAddress(place)} />
               {/* 원천이 준 분류. `contentType`(문화시설)로는 카페·펜션이 갈리지 않는다 (#112) */}
@@ -293,7 +288,49 @@ export function PlaceDetailSection({
                 {homepage !== null && <HomepageLink href={homepage.href} label={homepage.label} />}
               </InfoRow>
             </dl>
+
+            {/*
+              지도는 **`dl` 밖, 절의 끝**이다 (#14).
+
+              행 사이에 끼우지 않는다 — `InfoRow` 가 이미 `dl > div > dt+dd` 구조라 그 안에
+              지도 div 를 하나 더 끼우면 목록의 짝 구조가 깨지고, `dd` 안에 넣으면 라벨
+              80 + 간격 12 만큼 들여써져 375 에서 지도 폭이 251px 로 쪼그라든다.
+
+              절의 끝에 두면 전폭을 쓰고, 위의 주소가 글자로 말한 것을 그림으로 한 번 더
+              말하는 순서가 된다. 좌표가 없거나 SDK 가 실패하면 스스로 사라진다.
+            */}
+            <PlaceMiniMap
+              placeId={place.placeId}
+              title={place.title}
+              lat={place.lat}
+              lng={place.lng}
+            />
           </DetailSection>
+        </div>
+
+        {/*
+          좌: 판정 + 기본 정보. 데스크톱에서만 sticky 다 — `rail-sticky` 가 레일이 뷰포트보다
+          길어도 바닥에 닿게 자기 스크롤을 준다 (장소 찾기 레일에서 잘렸던 전례가 있다).
+        */}
+        <div className="rail-detail-aside rail-sticky">
+          {/* 데스크톱에서는 열 자체가 경계라 밴드를 겹쳐 쌓지 않는다 */}
+          <Band className="lg:hidden" />
+          <PlaceSuitabilityPanel {...suitability} />
+
+          {/*
+            산책 위험도 (#197). **적합도 바로 아래, 하단 바 위**에 둔다 — 둘 다 판정이라
+            한 묶음으로 읽혀야 하고, 하단 바(담기·저장)가 사이에 끼면 판정이 두 군데로
+            갈린다. 아트보드 03 의 `판정 → 하단 바` 순서는 그대로다 (기본 정보는 우측
+            본문으로 옮겼다).
+
+            **1px 선으로만 나눈다.** 밴드로 끊으면 두 판정이 서로 다른 블록이 되고,
+            "오늘은 적합 / 지금은 위험" 이 같은 장소의 두 축이라는 것이 사라진다.
+          */}
+          <div className="border-border border-t" />
+          <PlaceWalkSafetyPanel {...walkSafety} />
+
+          {/* 데스크톱 하단 바 — 판정 바로 아래, 레일의 끝 (아트보드 03) */}
+          <PlaceDetailActionBar {...actions} className="hidden lg:block" />
         </div>
 
         {/* 우측 열 아래쪽 — 본문. 위 블록과 같은 열이라 `border-left` 가 이어진다 */}
@@ -407,26 +444,15 @@ function DelistedNotice() {
   )
 }
 
-function DetailSection({
-  title,
-  padding = 'main',
-  children,
-}: {
-  title: string
-  /**
-   * 레일(24)과 본문(40)은 **1024 이상에서만** 인셋이 다르다 — 아트보드 03.
-   * 그 아래에서는 레일이 레일이 아니라 한 컬럼의 한 블록이라 본문 인셋을 따른다.
-   */
-  padding?: 'main' | 'rail'
-  children: ReactNode
-}) {
+/**
+ * 본문 열의 한 절. 좌우 인셋은 `Row`(px-4 md:px-10)와 같은 값이다.
+ *
+ * **레일 인셋(lg:px-6) 갈래가 없다.** 기본 정보가 레일에서 본문으로 옮겨 오면서
+ * 레일에 남은 것은 판정 패널뿐이고, 그것들은 자기 인셋을 스스로 갖는다.
+ */
+function DetailSection({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section
-      className={cn(
-        'flex flex-col gap-3 py-5',
-        padding === 'rail' ? 'px-4 md:px-10 lg:px-6' : 'px-4 md:px-10',
-      )}
-    >
+    <section className="flex flex-col gap-3 px-4 py-5 md:px-10">
       <h2 className="text-title-2 text-fg lg:text-title-1 font-semibold lg:font-bold">{title}</h2>
       {children}
     </section>
