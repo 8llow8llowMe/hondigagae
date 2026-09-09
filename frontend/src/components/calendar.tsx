@@ -62,16 +62,29 @@ export function Calendar({
   focusRef?: Ref<HTMLButtonElement>
   className?: string
 }) {
-  /** 보고 있는 달. 선택값이 없으면 오늘의 달에서 시작한다 */
+  /*
+    **값이 없을 때 어느 날에서 시작할지.** 예전에는 무조건 오늘이었는데, 종료일 달력은
+    열릴 때 값이 비어 있고 `min`(=시작일)만 갖는다 — 시작일이 몇 달 뒤면 오늘의 달이
+    열리고 **화면 전체가 비활성**이라 고를 것이 하나도 없었다. 첫 초점도 비활성 칸으로
+    가서 아무 데도 닿지 않았다.
+  */
+  const anchorDay = value !== '' ? value : min !== null && today < min ? min : today
+
+  /** 보고 있는 달 */
   const [visible, setVisible] = useState<YearMonth>(
-    () => yearMonthOf(value) ?? yearMonthOf(today) ?? { year: 2026, month: 1 },
+    () => yearMonthOf(anchorDay) ?? yearMonthOf(today) ?? { year: 2026, month: 1 },
   )
 
   /**
    * 격자 안에서 포커스를 갖는 칸. **선택값과 다른 축이다** — 방향키로 훑는 동안에는
    * 아직 고르지 않았다. 값이 밖에서 바뀌면(칩·다른 필드) 따라간다.
    */
-  const [focused, setFocused] = useState(() => (value === '' ? today : value))
+  const [focused, setFocused] = useState(() => anchorDay)
+  /**
+   * 커서가 얹힌 칸. **구간 미리보기 전용이다** — 값도 포커스도 아니다.
+   * 격자를 벗어나면 `null` 로 돌아간다.
+   */
+  const [hovered, setHovered] = useState<string | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
   /** 방향키 이동으로 옮긴 포커스만 DOM 에 반영한다 — 열릴 때 격자가 화면을 잡아채지 않게 */
   const movingRef = useRef(false)
@@ -102,6 +115,16 @@ export function Calendar({
   const cells = monthCells(visible)
   const rangeLow = rangeStart !== null && rangeStart !== '' ? rangeStart : null
   const rangeHigh = rangeEnd !== null && rangeEnd !== '' ? rangeEnd : null
+
+  /*
+    **끝이 아직 없으면 커서까지를 미리 칠한다.** 종료일 달력은 시작일만 들고 열리는데,
+    어디까지 고르는 중인지 보이지 않으면 며칠 일정이 되는지 손을 떼기 전까지 알 수 없다.
+
+    **마우스가 없어도 성립해야 한다.** 방향키로 훑는 사람에게도 같은 띠가 필요하므로
+    커서가 없을 때는 포커스 칸을 끝으로 본다. 시작일보다 앞이면 구간이 아니라 칠하지 않는다.
+  */
+  const previewEnd = hovered ?? focused
+  const high = rangeHigh ?? (rangeLow !== null && previewEnd >= rangeLow ? previewEnd : null)
 
   return (
     <div className={cn('flex flex-col gap-2', className)}>
@@ -162,15 +185,24 @@ export function Calendar({
         아무 안내도 못 하는 상태가 된다. 각 칸이 날짜 전체를 이름으로 가진 버튼이면
         `group` 만으로도 "무엇을 누르는지" 가 정확히 전달된다.
       */}
-      <div ref={gridRef} role="group" aria-label="날짜 선택" className="grid grid-cols-7">
+      <div
+        ref={gridRef}
+        role="group"
+        aria-label="날짜 선택"
+        // 격자를 벗어나면 미리보기를 접는다 — 칸마다 걸면 칸 사이 여백에서 깜빡인다
+        onMouseLeave={() => setHovered(null)}
+        className="grid grid-cols-7"
+      >
         {cells.map((cell) => {
           const selectable = isDayWithin(cell.date, min, max)
           const selected = cell.date === value
           const inRange =
-            rangeLow !== null &&
-            rangeHigh !== null &&
-            cell.date >= rangeLow &&
-            cell.date <= rangeHigh
+            rangeLow !== null && high !== null && cell.date >= rangeLow && cell.date <= high
+          /*
+            **다른 필드가 정한 구간의 시작점.** 이 달력의 값은 아니므로 브랜드색으로
+            칠하지 않는다 — 회색으로 "여기서부터" 만 말한다.
+          */
+          const isRangeStart = rangeLow !== null && cell.date === rangeLow && !selected
 
           return (
             <button
@@ -199,6 +231,7 @@ export function Calendar({
                 setFocused(cell.date)
                 onSelect(cell.date)
               }}
+              onMouseEnter={() => setHovered(cell.date)}
               className={cn(
                 'text-body-2 relative flex h-11 items-center justify-center tabular-nums',
                 'focus-visible:ring-brand-500 focus-visible:z-10 focus-visible:ring-2 focus-visible:outline-none',
@@ -211,6 +244,8 @@ export function Calendar({
                   : cell.inMonth
                     ? 'text-fg hover:bg-band font-medium'
                     : 'text-fg-subtle hover:bg-band',
+                // 선택 칸(brand)보다 뒤에 온다 — `cn` 이 tailwind-merge 라 뒤가 이긴다
+                isRangeStart && 'bg-border-strong text-fg rounded-md font-semibold',
               )}
             >
               {cell.dayOfMonth}
