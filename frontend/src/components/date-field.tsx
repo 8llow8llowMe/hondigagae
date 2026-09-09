@@ -234,8 +234,15 @@ export function DateField({
               top: position?.top ?? 0,
               left: position?.left ?? 0,
               minWidth: position?.minWidth ?? 0,
-              // 재는 동안에는 감춘다 — 좌상단에 한 프레임 스치는 것을 막는다
-              visibility: position === null ? 'hidden' : 'visible',
+              /*
+                `visibility: hidden` 이 아니라 `opacity` 로 감춘다. `useOverlay` 가 마운트
+                직후 이 패널에 `.focus()` 를 거는데, `visibility: hidden` 인 요소는 포커스를
+                받지 못한다 — 재는 동안 포커스가 날아가 버리는 것이다. `opacity: 0` 은 안
+                보이게 하면서도 포커스는 그대로 받아 준다. 대신 좌상단(0,0)에 한 프레임
+                떠 있는 동안 눌리면 안 되므로 `pointerEvents: 'none'` 으로 클릭만 막는다.
+              */
+              opacity: position === null ? 0 : 1,
+              pointerEvents: position === null ? 'none' : undefined,
             }}
             className="border-border bg-bg fixed z-[60] rounded-md border p-3 shadow-md outline-none"
           >
