@@ -4,13 +4,13 @@ import { useRouter } from 'next/navigation'
 
 import type { ReactNode } from 'react'
 
-import { BackLink } from '@/components/back-link'
 import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { PlaceFilterChips } from '@/features/place/place-filter-chips'
 import { PlaceListSection } from '@/features/place/place-list-section'
 import { usePlaceList } from '@/features/place/use-place-list'
+import { PlanAddPlaceHeader } from '@/features/plan/plan-add-place-header'
 import { PlanAddPlaceRow } from '@/features/plan/plan-add-place-row'
 import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
@@ -20,6 +20,7 @@ import { mergeSlices } from '@/lib/api/slice'
 import { messages } from '@/lib/messages'
 import { placeIdsOf } from '@/lib/plan/day-items'
 import { groupItemsByDay } from '@/lib/plan/detail'
+import type { ViewMode } from '@/lib/url/view-mode'
 import type { PlaceFilters } from '@/types/place'
 
 /**
@@ -36,10 +37,16 @@ export function PlanAddPlaceView({
   planId,
   day,
   filters,
+  view,
+  listHref,
+  mapHref,
 }: {
   planId: string
   day: number
   filters: PlaceFilters
+  view: ViewMode
+  listHref: string
+  mapHref: string
 }) {
   const router = useRouter()
   const detail = usePlanDetail(planId)
@@ -65,7 +72,13 @@ export function PlanAddPlaceView({
   */
   if (detail.isPending) {
     return (
-      <PlanAddPlaceShell day={day} backHref={backHref}>
+      <PlanAddPlaceShell
+        day={day}
+        backHref={backHref}
+        listHref={listHref}
+        mapHref={mapHref}
+        view={view}
+      >
         <PlaceListSection
           places={[]}
           loading
@@ -84,7 +97,13 @@ export function PlanAddPlaceView({
     // 400(숫자가 아닌 planId)은 재시도로 풀리지 않는다 — 상세 화면과 같은 판단 (D5)
     if (detail.error instanceof ApiError && detail.error.status === 400) {
       return (
-        <PlanAddPlaceShell day={day} backHref={backHref}>
+        <PlanAddPlaceShell
+          day={day}
+          backHref={backHref}
+          listHref={listHref}
+          mapHref={mapHref}
+          view={view}
+        >
           <EmptyState
             title={messages.plan.detailBadRequestTitle}
             description={messages.plan.detailBadRequestDescription}
@@ -94,7 +113,13 @@ export function PlanAddPlaceView({
     }
 
     return (
-      <PlanAddPlaceShell day={day} backHref={backHref}>
+      <PlanAddPlaceShell
+        day={day}
+        backHref={backHref}
+        listHref={listHref}
+        mapHref={mapHref}
+        view={view}
+      >
         <ErrorState
           title={messages.plan.detailErrorTitle}
           description={messages.plan.errorDescription}
@@ -116,7 +141,13 @@ export function PlanAddPlaceView({
   */
   if (group === undefined) {
     return (
-      <PlanAddPlaceShell day={day} backHref={`/plans/${planId}`}>
+      <PlanAddPlaceShell
+        day={day}
+        backHref={`/plans/${planId}`}
+        listHref={listHref}
+        mapHref={mapHref}
+        view={view}
+      >
         <EmptyState
           title={messages.plan.addPlaceDayMissingTitle.replace('{day}', String(day))}
           description={messages.plan.addPlaceDayMissingDescription.replace(
@@ -138,7 +169,14 @@ export function PlanAddPlaceView({
   const addedPlaceIds = placeIdsOf(group.items)
 
   return (
-    <PlanAddPlaceShell day={day} backHref={backHref} planTitle={detail.data.title}>
+    <PlanAddPlaceShell
+      day={day}
+      backHref={backHref}
+      planTitle={detail.data.title}
+      listHref={listHref}
+      mapHref={mapHref}
+      view={view}
+    >
       {/* 데스크톱은 좌측 레일이 같은 일을 한다 (페이지가 렌더) */}
       <div className="lg:hidden">
         {/* `/plans` 는 proxy.ts `PROTECTED_PATHS` 라 미로그인이 여기 닿지 않는다 (#200) */}
@@ -192,28 +230,30 @@ function PlanAddPlaceShell({
   day,
   backHref,
   planTitle,
+  listHref,
+  mapHref,
+  view,
   children,
 }: {
   day: number
   backHref: string
   /** 아직 못 받았으면 생략한다 — 제목은 `day` 만으로 쓸 수 있다 */
-  planTitle?: string
+  planTitle?: string | undefined
+  listHref: string
+  mapHref: string
+  view: ViewMode
   children: ReactNode
 }) {
-  const subtitle = messages.plan.addPlaceSubtitle.replace('{day}', String(day))
-
   return (
     <>
-      <header className="px-4 pt-5 pb-3 md:px-10 lg:pt-6">
-        <BackLink href={backHref} label={messages.plan.addPlaceBack} className="-ml-1" />
-        <h1 className="text-title-1 text-fg lg:text-display mt-1 font-bold lg:font-extrabold">
-          {messages.plan.addPlaceTitle.replace('{day}', String(day))}
-        </h1>
-        <p className="text-caption text-fg-muted mt-1 font-medium">
-          {planTitle === undefined ? subtitle : `${planTitle} · ${subtitle}`}
-        </p>
-      </header>
-
+      <PlanAddPlaceHeader
+        day={day}
+        backHref={backHref}
+        planTitle={planTitle}
+        listHref={listHref}
+        mapHref={mapHref}
+        view={view}
+      />
       {children}
     </>
   )

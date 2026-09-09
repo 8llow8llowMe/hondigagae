@@ -13,7 +13,8 @@ import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
-import { parsePlaceFilters } from '@/lib/url/place-filters'
+import { parsePlaceFilters, toPlaceFilterQuery } from '@/lib/url/place-filters'
+import { parseViewMode, PLAN_ADD_DEFAULT_VIEW, viewModeHref } from '@/lib/url/view-mode'
 import type { PlanDetail } from '@/types/plan'
 
 /**
@@ -58,7 +59,19 @@ export default async function PlanAddPlacePage({
   const day = Number(rawDay)
   if (day < 1) notFound()
 
-  const filters = parsePlaceFilters(await searchParams)
+  const resolved = await searchParams
+  const filters = parsePlaceFilters(resolved)
+
+  /*
+    **이 화면의 기본 보기도 지도다** (`PLAN_ADD_DEFAULT_VIEW`, #370). 링크를 만드는 쪽과
+    파싱하는 쪽에 **같은 기본값**을 넘겨야 한다 — 어긋나면 토글이 가리키는 보기와
+    페이지가 그리는 보기가 달라진다.
+  */
+  const view = parseViewMode(resolved, PLAN_ADD_DEFAULT_VIEW)
+  const basePath = `/plans/${planId}/days/${rawDay}/add`
+  const filterQuery = toPlaceFilterQuery(filters)
+  const listHref = viewModeHref(basePath, filterQuery, 'list', PLAN_ADD_DEFAULT_VIEW)
+  const mapHref = viewModeHref(basePath, filterQuery, 'map', PLAN_ADD_DEFAULT_VIEW)
 
   // 보호 경로다 — `proxy.ts` 의 PROTECTED_PATHS 에 '/plans' 가 이미 있다
   const session = await readSession()
@@ -98,7 +111,14 @@ export default async function PlanAddPlacePage({
       <div className="lg:border-border lg:border-l">
         {/* 모바일 필터 칩은 뷰가 제목과 목록 사이에 넣는다 — 목록 아래로 밀리면 못 쓴다 */}
         <HydrationBoundary state={dehydrate(queryClient)}>
-          <PlanAddPlaceView planId={planId} day={day} filters={filters} />
+          <PlanAddPlaceView
+            planId={planId}
+            day={day}
+            filters={filters}
+            view={view}
+            listHref={listHref}
+            mapHref={mapHref}
+          />
         </HydrationBoundary>
       </div>
     </main>
