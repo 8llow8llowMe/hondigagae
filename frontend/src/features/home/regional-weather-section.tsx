@@ -11,7 +11,6 @@ import {
 import { MetricBadge } from '@/components/metric'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { Skeleton } from '@/components/skeleton'
-import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { formatCelsius } from '@/lib/format/celsius'
 import { sortRegionsByScore } from '@/lib/insight/region-order'
 import { suitabilityTone } from '@/lib/insight/tone'
@@ -59,12 +58,14 @@ export function RegionalWeatherSection({
     */
     <section aria-label={messages.home.regionHeading}>
       <div className="flex flex-col gap-3 px-4 py-4 md:px-10 md:py-5">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
-          <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
-            {messages.home.regionHeading}
-          </h2>
-          <WeatherWarningBadge warning={data.weatherWarning} />
-        </div>
+        {/*
+          **특보 배지가 여기 없다** (#349). 페이지 최상단 `WeatherWarningStrip` 하나가
+          말한다. 예전에는 이 배지가 **모바일의 유일한 특보 표시**를 겸했는데, 스트립이
+          레이아웃 밖 최상단이라 그 역할까지 함께 가져갔다.
+        */}
+        <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
+          {messages.home.regionHeading}
+        </h2>
 
         <Recommendation data={data} />
 

@@ -23,6 +23,7 @@ import {
 } from '@/features/home/use-home-insight'
 import { WalkTimesSection } from '@/features/home/walk-times-section'
 import { WalkVerdict } from '@/features/home/walk-verdict'
+import { WeatherWarningStrip } from '@/features/home/weather-warning-strip'
 import { useSelectedPetStore } from '@/features/nav/selected-pet-store'
 import { usePetList } from '@/features/pet/use-pet-list'
 import { DEFAULT_RADIUS_METERS } from '@/lib/api/emergency'
@@ -38,6 +39,7 @@ import {
   splitSharedReasons,
 } from '@/lib/insight/reasons'
 import { readRecentPlaceId } from '@/lib/insight/recent-place'
+import { pickWeatherWarning } from '@/lib/insight/weather-warning'
 import { messages } from '@/lib/messages'
 import { resolveSelectedPet } from '@/lib/nav/selected-pet'
 import { pickUpcomingPlans } from '@/lib/plan/upcoming'
@@ -199,6 +201,22 @@ export function HomeView({
       <h1 className="sr-only">혼디가개 홈</h1>
 
       {/*
+        발효 중인 기상특보 — **홈 전체에서 여기 한 번뿐이다** (#349). 예전에는 판정 ·
+        골든타임 · 권역이 각자 배지를 그렸는데, 백엔드가 제주 전역 단일 지점에서 특보 하나를
+        골라 네 응답에 함께 싣기 때문에 **세 배지의 값이 갈릴 수 없었다.**
+
+        **`rail-layout` 밖, 두 열 위다.** 특보는 어느 한 열의 사실이 아니고, 이 자리가
+        로그인·기준 장소·폭과 무관하게 **항상 뜨는 유일한 자리**다.
+      */}
+      <WeatherWarningStrip
+        warning={pickWeatherWarning([
+          regionalWeather.data?.weatherWarning,
+          walkSafety.data?.weatherWarning,
+          walkTimes.data?.weatherWarning,
+        ])}
+      />
+
+      {/*
         `rail-layout`(`app/globals.css`)이 2단 grid 를 만들고, 열 구분선은 우측 열의
         `border-left` 가 그린다. 2단은 **데스크톱(1024+)부터**다. 태블릿(768~1023)은 한 컬럼을 유지한다 —
         400px 레일 + 우측 본문이 768 에 안 들어가 가로 스크롤이 난다 (실측으로 확인).
@@ -353,7 +371,8 @@ export function HomeView({
 
               **데스크톱 전용이다.** 카드 근거 자체가 `hidden md:block` 이라, 모바일에서는
               걷어낼 것도 옮겨 올 것도 없다 — 여기에 상시 노출로 두면 없던 줄이 새로 생긴다.
-              모바일의 특보는 위 권역 섹션의 `WeatherWarningBadge` 가 이미 말한다.
+              모바일의 특보는 페이지 최상단 `WeatherWarningStrip` 이 말한다 (#349 — 예전에는
+              이 자리에 "위 권역 섹션의 배지" 라고 적혀 있었고, 그 배지는 이제 없다).
 
               **기준 장소가 없는 첫 방문자에게도 보인다.** 좌측 판정 섹션은 그때 렌더되지
               않으므로(`resolveBasisPlaceId`), 카드에서만 걷고 끝냈으면 그 사용자는 특보를

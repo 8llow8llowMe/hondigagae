@@ -18,27 +18,23 @@ function render(data: WalkSafetyResponse) {
   return renderToStaticMarkup(createElement(WalkVerdict, { data, petName: '몽실이' }))
 }
 
-describe('WalkVerdict — 기상특보', () => {
-  it('특보가 없으면 배지가 없다', () => {
-    expect(render(walkSafety)).not.toContain('경보')
+/*
+  #349. 예전에는 이 섹션이 접힌 모바일 줄과 데스크톱 등급 줄 **양쪽에** 배지를 그렸다.
+  세 섹션이 각자 그리던 배지를 페이지 최상단 `WeatherWarningStrip` 하나로 모으면서 여기서
+  걷었다 — 백엔드가 제주 전역 단일 지점에서 특보 하나를 골라 네 응답에 함께 싣기 때문에
+  세 배지의 값은 갈릴 수 없었다.
+*/
+describe('WalkVerdict — 기상특보 (#349)', () => {
+  it('특보가 있어도 배지를 그리지 않는다', () => {
+    expect(render({ ...walkSafety, weatherWarning: HEAT_WAVE_WARNING })).not.toContain('폭염')
   })
 
   /*
-    데스크톱 등급 줄은 `md:flex` 라 모바일에서 아예 렌더되지 않는다. 접힌 모바일 한 줄에도
-    배지가 있어야 이 서비스에서 가장 흔한 화면이 특보를 말한다.
+    **배지가 사라져도 정보는 남는다.** 서버가 보내는 `WEATHER_WARNING_ACTIVE` 문장이
+    무엇을 조심해야 하는지 말한다 — 배지는 그 사실을 문단 밖으로 올리는 강조였을 뿐이고,
+    강조는 이제 최상단 스트립이 맡는다.
   */
-  it('모바일 접힌 줄과 데스크톱 등급 줄 양쪽에 배지가 온다', () => {
-    const markup = render({ ...walkSafety, weatherWarning: HEAT_WAVE_WARNING })
-    const occurrences = markup.split('폭염').length - 1
-
-    expect(occurrences).toBe(2)
-  })
-
-  /*
-    배지는 근거 문장을 대체하지 않는다 — 서버가 보내는 `WEATHER_WARNING_ACTIVE` 문장이
-    무엇을 조심해야 하는지 말하고, 배지는 그 사실을 문단 밖으로 올릴 뿐이다.
-  */
-  it('배지가 근거 목록을 대체하지 않는다', () => {
+  it('근거 목록의 특보 문장은 그대로 남는다', () => {
     const markup = render({
       ...walkSafety,
       weatherWarning: HEAT_WAVE_WARNING,
@@ -52,6 +48,41 @@ describe('WalkVerdict — 기상특보', () => {
     })
 
     expect(markup).toContain('폭염 경보 발효 중입니다.')
+  })
+})
+
+/*
+  #349. 판정은 "지금 나가도 되나" 만 답한다. "오늘 언제 나가나" 는 바로 아래
+  `WalkTimesSection` 이 답하는데, 두 섹션이 각자 답하는 동안 **서로를 부정했다** — 폭염
+  경보 날 이 초록 박스가 `18:00 – 21:00` 을 제시하고 골든타임이 `경보가 발효 중이라
+  추천하지 않아요` 라고 말했다. `WalkSafetyEvaluator` 가 `level == SAFE` 일 때만
+  `saferWindow` 를 비우고 경보를 보지 않기 때문이다.
+*/
+describe('WalkVerdict — saferWindow 는 홈에서 말하지 않는다 (#349)', () => {
+  it('안전 시간대가 와도 시각을 그리지 않는다', () => {
+    const markup = render({
+      ...walkSafety,
+      saferWindowStart: '18:00:00',
+      saferWindowEnd: '21:00:00',
+    })
+
+    expect(markup).not.toContain('18:00')
+    expect(markup).not.toContain('21:00')
+  })
+
+  /*
+    **조건문으로 끄지 않았다.** 경보 여부를 화면이 다시 판정하면 서버의 판정 순서를 복제하는
+    것이 된다 (`WalkTimesSection` 머리주석). 경보가 아닌 날에도 이 줄은 없다.
+  */
+  it('특보가 없는 날에도 마찬가지다', () => {
+    const markup = render({
+      ...walkSafety,
+      weatherWarning: null,
+      saferWindowStart: '06:00:00',
+      saferWindowEnd: '08:00:00',
+    })
+
+    expect(markup).not.toContain('06:00')
   })
 })
 

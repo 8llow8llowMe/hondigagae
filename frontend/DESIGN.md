@@ -71,7 +71,31 @@
 - **위계는 크기와 순서로 만든다.** P1 안전 → P2 오늘 행동 → P3 예정·상시.
   **우선순위를 색으로 만들지 않는다.** 낮은 우선순위는 접는다.
 - **색은 유일한 채널이 아니다.** 등급은 항상 문구로 먼저 전달한다("적합도 높음"). 색은 보조.
+- **같은 사실을 한 화면에서 두 번 말하지 않는다.** 반복은 강조가 아니라 소음이다.
 - 마케팅 톤 금지. "최고의", "완벽한" 같은 표현을 쓰지 않는다.
+
+### 기상특보는 화면당 1회 (#349)
+
+발효 중인 특보는 **한 화면에 배지 하나**다. 홈은 페이지 최상단 `WeatherWarningStrip`,
+장소 상세는 각 패널이 자기 것 하나를 그린다.
+
+예전 홈은 판정 · 골든타임 · 권역이 각자 배지를 그려 **셋이 동시에 떠 있었다.** 값이 갈릴
+여지도 없다 — 백엔드가 제주 전역 단일 지점에서 가장 무거운 특보 하나를 골라 네 응답에
+함께 싣는다. 늘어난 것은 정확성이 아니라 소음이었다.
+
+> GOV.UK Design System — Notification banner: _"Avoid showing more than one notification
+> banner on the same page… only show the highest priority notification banner."_ /
+> _"Use notification banners sparingly. There's evidence that people often miss them, and
+> using them too often is likely to make this problem worse."_
+
+**배지 옆 문장은 `level.description` 이다.** `type.description` 은 서버가 판정 근거
+(`WEATHER_WARNING_ACTIVE`)를 `"{type} {level} 발효 중입니다. {type.description}"` 로 조립할 때
+쓰므로, 배지 옆에 같은 값을 두면 한 화면에서 그 꼬리를 두 번 말하게 된다. 종류가 무엇인지는
+근거가, 그래서 어떻게 하라는지는(`야외 일정은 취소하는 것이 좋습니다`) 배지 줄이 맡는다.
+
+**같은 축의 규칙**: 한 질문에는 한 섹션만 답한다. 판정은 "지금 나가도 되나", 골든타임은
+"오늘 언제 나가나" 다 — 판정이 `saferWindow` 를 함께 말하던 동안 경보 날 두 섹션이 서로를
+부정했다 (§7-1 시간축).
 
 ### 어미 — 해요체로 통일 (이슈 #15)
 
