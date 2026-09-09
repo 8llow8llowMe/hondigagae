@@ -81,8 +81,13 @@ export function PetCheckboxGroup({
               className={cn(
                 // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
                 'flex min-h-11 cursor-pointer items-start gap-3 rounded-md border px-3 py-2',
-                'focus-within:ring-brand-500 focus-within:ring-2 focus-within:ring-offset-1',
-                checked ? 'border-fg bg-row-selected' : 'border-border-strong',
+                /*
+                  **`focus-within` 이 아니라 `has-[:focus-visible]` 이다** — `RadioGroup` 과
+                  같은 이유다. `focus-within` 은 마우스 클릭에도 걸려 선택 테두리 바깥에
+                  링이 한 겹 더 그려졌다.
+                */
+                'has-[:focus-visible]:ring-brand-500 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-offset-1',
+                checked ? 'border-brand-500 bg-row-selected' : 'border-border-strong',
                 invalid && 'border-danger-500',
               )}
             >
