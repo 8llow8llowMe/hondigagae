@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { describe, expect, it } from 'vitest'
 
 import { readDesignMd, readGlobalsCss, readTokensCss } from '@/test/tokens'
@@ -59,5 +62,34 @@ describe('콘텐츠 컨테이너 — 문서 동기 (#376)', () => {
   it('DESIGN.md 에 400 → 480 서술이 남아 있지 않다', () => {
     expect(design).not.toContain('480(1584~)')
     expect(design).not.toContain('좌측만 480까지')
+  })
+})
+
+/*
+  소스를 문자열로 읽어 본다 — `GlobalHeader` 는 client 자식(`NavLinks` · `AccountMenu` ·
+  `PetSwitcherSlot`)을 안고 있어 node 환경에서 통째로 렌더하려면 mock 이 여럿 필요하다.
+  여기서 지키려는 것은 렌더 결과가 아니라 **어느 요소가 캡을 갖는가** 하나다.
+  `token-usage.test.ts` 가 화면 코드를 문자열로 훑는 것과 같은 방식이다.
+*/
+function repoSource(relative: string): string {
+  return readFileSync(fileURLToPath(new URL(`../../${relative}`, import.meta.url)), 'utf8')
+}
+
+describe('콘텐츠 컨테이너 — 헤더 (#376)', () => {
+  const header = repoSource('src/features/nav/global-header.tsx')
+
+  it('바(<header>)는 캡하지 않는다 — 캡하면 border-b 가 화면 가운데서 끊긴다', () => {
+    const barClasses = header.match(/<header className="([^"]*)"/)?.[1]
+
+    expect(barClasses).toBeDefined()
+    expect(barClasses).not.toContain('content-container')
+  })
+
+  it('안쪽 div 가 content-container 를 쓴다', () => {
+    expect(header).toMatch(/<div className="content-container[^"]*"/)
+  })
+
+  it('Tailwind arbitrary 로 캡하지 않는다 — eslint noComplexArbitrary', () => {
+    expect(header).not.toContain('max-w-[var(')
   })
 })
