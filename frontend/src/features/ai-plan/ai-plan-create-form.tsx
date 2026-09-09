@@ -359,8 +359,8 @@ export function AiPlanCreateForm({
           **`제주 전체` 를 첫 칩으로 둔다.** 기본값이고, 빼면 "안 고른 상태" 를 되돌릴
           방법이 없어진다 — 한 번 좁히면 전체로 못 돌아온다.
 
-          **예산 칩과 같은 `gap-2.5`** 다. 필터 칩(6px)이 아니라 폼 컨트롤이라
-          아트보드가 다른 값을 준다 (아래 예산 블록 주석과 같은 이유).
+          **예산 칩과 같은 `gap-2`** 다. 필터 칩(6px)과는 여전히 갈라져 있다 —
+          근거는 아래 예산 블록 주석에 있다.
         */}
         <fieldset className="flex flex-col gap-1">
           {/*
@@ -373,11 +373,7 @@ export function AiPlanCreateForm({
             {messages.aiPlan.fieldRegion}
           </legend>
 
-          <ChipGroup
-            label={messages.aiPlan.fieldRegion}
-            exclusive
-            className="flex flex-wrap gap-2.5"
-          >
+          <ChipGroup label={messages.aiPlan.fieldRegion} exclusive className="flex flex-wrap gap-2">
             <Chip
               exclusive
               selected={values.sigunguCode === null}
@@ -409,17 +405,24 @@ export function AiPlanCreateForm({
             **레이아웃 클래스를 여기서 준다.** `ChipGroup` 은 role/aria 배선만 하고
             배치를 사용처에 맡긴다 (`place-filter-chips.tsx` 와 같은 규약).
 
-            **간격만 다르다 — `gap-2.5`(10px) 는 아트보드 값이다.** 필터 칩
-            (`place-filter-chips` · `emergency-section`)은 `gap-1.5`(6px)를 쓰는데,
-            그쪽은 여러 줄로 빽빽하게 깔리는 필터 줄이고 이쪽은 한 줄짜리 폼 컨트롤이라
-            정본이 애초에 다른 값을 준다. **규약이 같다고 값까지 맞추지 않는다** —
-            맞추면 아트보드에서 멀어진다 (#96 이 필터 쪽 3곳을 6px 로 통일한 것과
-            이 값은 별개다).
+            **간격은 `gap-2`(8px)다.** 필터 칩(`place-filter-chips` · `emergency-section`)은
+            `gap-1.5`(6px)를 쓰는데, 그쪽은 여러 줄로 빽빽하게 깔리는 필터 줄이고 이쪽은
+            폼 컨트롤이라 **여전히 갈라져 있다** — 규약이 같다고 값까지 맞추지 않는다
+            (#96 이 필터 쪽 3곳을 6px 로 통일한 것과 이 값은 별개다).
+
+            **아트보드는 이 자리에 10px 을 줬고, 그것을 §4 스케일의 8 로 내렸다** (#335).
+            아트보드가 `DESIGN.md` §4 의 출처지만 **정본은 §4 다** — "아트보드가 그랬다" 가
+            이기면 스케일은 어디에서도 권위를 갖지 못하고, `token-usage.test.ts` 가 그
+            권위를 지키려고 존재한다. 2px 은 이 자리에서 보이지 않지만, **한 폼의 칩 줄만
+            제품의 다른 모든 칩 줄과 다른 간격을 쓰는 것**은 화면을 옮겨 다닐 때 보인다.
+            6 으로 내리는 쪽은 #339 에서 시도했다가 되돌렸다(필터 칩과 같아진다) —
+            8 은 "폼 컨트롤이 필터 칩보다 조금 넉넉하다" 는 뜻을 지키면서 스케일 안에 있는
+            유일한 값이다.
           */}
           <ChipGroup
             label={messages.aiPlan.budgetPresetLabel}
             exclusive
-            className="flex flex-wrap gap-2.5"
+            className="flex flex-wrap gap-2"
           >
             {BUDGET_PRESETS_MANWON.map((preset) => (
               <Chip
