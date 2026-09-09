@@ -83,19 +83,33 @@ describe('PositionNotice', () => {
     expect(markup.slice(buttonOpen, buttonClose)).not.toContain('<a ')
   })
 
-  it('다시 시도 링크가 44px 터치 영역(h-11)을 유지한다 — 글자 크기로 때우지 않는다', () => {
+  it('다시 시도 링크는 문장 줄 안에서도 44px 히트 영역을 유지한다 — py-3 을 -my-3 로 상쇄해 줄 높이는 그대로 둔다', () => {
     const markup = renderNotice('denied')
     const buttonOpen = markup.indexOf('<button')
     const buttonClose = markup.indexOf('</button>')
     const button = markup.slice(buttonOpen, buttonClose)
 
-    expect(button).toContain('h-11')
+    // 히트 영역을 키우는 패딩과, 그 늘어난 만큼을 줄 높이에서 되돌리는 음수 마진이
+    // 함께 있어야 트릭이 성립한다 — 하나만 있으면 터치 영역이 줄거나 블록이 다시 커진다
+    expect(button).toContain('py-3')
+    expect(button).toContain('-my-3')
+    // 이전의 독립 블록형 44px(h-11)이 아니다 — 인라인 트릭으로 대체됐다
+    expect(button).not.toContain('h-11')
   })
 
-  it('한 줄 레이아웃이다 — 이전처럼 세로로 쌓인 블록(flex-col)이 아니라 한 행(items-center)이다', () => {
+  it('안내와 링크가 하나의 문단(<p>) 안에서 흐른다 — 이전처럼 감싸는 flex 블록으로 나뉘지 않는다', () => {
     const markup = renderNotice('denied')
+    const paragraphCount = markup.match(/<p /g)?.length ?? 0
+    const pOpen = markup.indexOf('<p ')
+    const pClose = markup.indexOf('</p>')
+    const buttonOpen = markup.indexOf('<button')
 
-    expect(markup).toContain('items-center')
-    expect(markup).not.toContain('flex-col')
+    // 문단이 하나뿐이고, 그 문단 안에 링크 버튼이 들어 있다 — 텍스트와 링크가
+    // 같은 줄바꿈 흐름을 공유한다는 뜻이다
+    expect(paragraphCount).toBe(1)
+    expect(buttonOpen).toBeGreaterThan(pOpen)
+    expect(buttonOpen).toBeLessThan(pClose)
+    // 이전 구현을 감쌌던 flex 래퍼가 없다 — 있었다면 링크가 별도 줄로 밀려난다
+    expect(markup).not.toContain('flex-wrap')
   })
 })

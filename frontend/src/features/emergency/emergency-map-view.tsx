@@ -449,20 +449,29 @@ function PanelBody({
 /**
  * 위치를 못 얻었을 때. **목록을 지우지 않고 그 위에 얹는다.**
  *
- * **한 줄이다 (B2).** 두 줄 문구 + 별도 44px 버튼 블록이던 이전 모양은 375px 시트
- * `mid` 단계에서 칩 두 줄 + 캡션 + 이 안내를 합치면 첫 행의 52px 전화 버튼이 화면
- * 아래로 밀려났다 — 이 화면이 지도를 기본으로 바꾼 근거("시트가 열리면 행과 전화
- * 버튼이 이미 보인다")가 폴백 상태에서는 거짓이 되는 결함이었다. 다시 시도는 문장
- * 끝에 붙는 **인라인 링크**로 줄여 안내 전체를 한 줄(짧으면) 또는 줄바꿈 없는 한
- * 문단으로 좁힌다.
+ * **이 블록의 높이는 모바일 시트에서 load-bearing 이다.** 375px 시트 `mid` 단계는
+ * 스크롤 영역이 204px 뿐이고, 첫 시설 행(183px, 52px 전화 버튼이 117px 지점에서
+ * 끝난다)이 첫 화면에 보이려면 이 블록이 109px 을 넘으면 안 된다. **한 줄로 줄여도
+ * (B2) 부족했다** — 문구 한 줄(~22px) 아래에 다시 시도 링크가 `h-11` 블록으로 자기
+ * 줄을 새로 차지해 안내문 전체가 70px(문구 22 + 링크 44 + 사이 여백)이 됐고, 바깥
+ * `py-3` 테두리(24+1)를 더하면 95px — 부족분 8px 이 바로 저 전화 버튼을 시트
+ * 스크롤 영역 밖으로 8px 밀어낸다. **그래서 지금은 링크를 별도 줄이 아니라 문장
+ * 안의 인라인 단어로 넣는다** — `<p>` 하나에 안내문과 링크를 같은 텍스트 흐름으로
+ * 넣어 두 줄(문구가 길면)로만 접히게 한다(줄당 `text-body-2` 라인하이트 22px, 총
+ * ~44px). **다음에 이 블록에 줄을 하나라도 더 얹으면(문구를 늘리거나 링크를 다시
+ * 별도 줄로 뺴면) 저 전화 버튼이 다시 화면 밖으로 밀려난다** — 이 doc-comment 를
+ * 먼저 갱신할 것.
  *
  * **네 갈래를 여전히 가른다.** `unsupported` · `outside` 는 다시 시도해도 답이 같아
  * 링크 자체를 두지 않는다 — 버튼을 눈에 덜 띄게 줄인 것이 아니라 아예 없다.
  *
- * **링크의 터치 영역은 44px 를 유지한다** (`DESIGN.md` §7). 글자 크기를 줄이거나
- * 버튼 높이를 낮춰 맞추지 않는다 — `h-11` 그대로 두고, 짧은 안내문 옆에 나란히 서도록
- * **줄(행)이 items-center 로 정렬해 세로 여백을 흡수**한다. 그래서 다시 시도가 없는
- * 두 갈래는 이 만큼의 세로 공간도 필요 없어 한층 더 얕아진다.
+ * **링크의 터치 영역은 문장 줄 안에서도 44px 를 유지한다** (`DESIGN.md` §7).
+ * 글자 크기를 줄이거나 링크를 별도 블록으로 빼서 맞추지 않는다 — `py-3`(상하 각
+ * 12px)로 히트 영역을 키우고, 그만큼을 `-my-3` 음수 마진으로 되돌려 문단의 줄
+ * 높이(레이아웃)에는 반영되지 않게 한다. `text-body-2` 라인하이트가 22px이므로
+ * 히트 박스는 22 + 24 = **46px** — 링크가 문장 한가운데 있어도 44px 최소 기준을
+ * 넘는다. 패딩(히트 영역)과 마진(줄 높이 상쇄)은 서로 다른 역할이라 하나가 없으면
+ * 이 트릭이 성립하지 않는다.
  */
 export function PositionNotice({
   reason,
@@ -485,25 +494,29 @@ export function PositionNotice({
   const canRetry = reason !== 'unsupported' && reason !== 'outside'
 
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      <p className="text-body-2 text-fg break-keep">{text}</p>
+    <p className="text-body-2 text-fg break-keep">
+      {text}
       {canRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className={cn(
-            // `text-link` 는 DESIGN.md 가 "링크 · 인라인 액션" 으로 정의한 토큰이다 —
-            // 이 자리(문장 끝의 인라인 다시 시도)가 정확히 그 용도다
-            'text-link hover:text-link-hover shrink-0 rounded-md font-semibold',
-            'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:outline-none',
-            // 44px 터치 영역 — 글자는 본문 크기 그대로, 상하 여백으로만 높이를 채운다
-            'flex h-11 items-center px-1',
-          )}
-        >
-          {messages.emergency.retryPosition}
-        </button>
+        <>
+          {' '}
+          <button
+            type="button"
+            onClick={onRetry}
+            className={cn(
+              // `text-link` 는 DESIGN.md 가 "링크 · 인라인 액션" 으로 정의한 토큰이다 —
+              // 이 자리(문장 안의 인라인 다시 시도)가 정확히 그 용도다
+              'text-link hover:text-link-hover rounded-md font-semibold',
+              'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:outline-none',
+              // 44px 터치 영역을 만들되(py-3 = 상하 12px) 줄 높이에는 남기지 않는다
+              // (-my-3 로 그만큼 되돌린다) — 위 doc-comment 의 46px 계산 참고
+              '-my-3 px-1 py-3',
+            )}
+          >
+            {messages.emergency.retryPosition}
+          </button>
+        </>
       )}
-    </div>
+    </p>
   )
 }
 
