@@ -12,7 +12,9 @@
 ## 컨텍스트
 
 - `place` — 장소 마스터, 반려견 동반 조건, 연관 관광지
-- `walkcourse` — 두루누비 코스
+- `walkcourse` — 제주올레 코스 (조회 구현). **두루누비를 쓰지 않는다** — 걷기 코스 142개가
+  코리아둘레길 축이라 제주가 0개다(실호출 검증). 원천은 공공데이터포털 올레코스현황 CSV(공식
+  거리·소요시간·시종점) + TourAPI 레포츠(28) 올레 항목(시작점 좌표·대표이미지) 결합이다 (#382)
 - `insight` — 여행 적합도, 산책 위험도, 혼잡도, 날씨 (구현 완료, `weather-insight-integration.md`)
 - `emergency` — 동물병원·동물약국 등 긴급 시설
 
@@ -25,7 +27,12 @@
 - `GET /api/v1/places/{placeId}/walk-safety` — 산책 위험도 (추정 노면온도 + 기상청 여름철 체감온도 + 안전 시간대).
   체감온도는 기상청 산식으로 계산하며 폭염특보 기준(33/35℃)이 판정 임계다. NOAA 열지수는 참고로 병기하고,
   두 값 모두 계산 근거 문구(feelsLikeBasis/heatIndexBasis)를 함께 내린다
-- `GET /api/v1/walk-courses` — 산책 코스 검색
+- `GET /api/v1/walk-courses` — 산책 코스 목록. `petActivityLevel` 로 반려견 활동량 필터
+  (LOW 4시간·MEDIUM 6시간 이하 — `WalkCourseActivityFit` 이 상한의 단일 출처), 거리 필터·정렬.
+  **좌표가 있는 코스는 `/api/v1/insights/walk-times?lat=&lng=` 로 이어진다** — 골든타임을 코스
+  시작점에서 그대로 재사용하므로 "오늘 이 코스 언제 걷기 좋은가"에 신규 API 없이 답한다.
+  좌표가 null 인 코스(20·18-2)는 그 동선을 만들지 않는다
+- `GET /api/v1/walk-courses/{walkCourseId}` — 산책 코스 상세
 - `GET /api/v1/places/nearby?lat=&lng=&radius=&contentType=&petSizeType=&petWeightKg=` — 좌표 반경 장소 검색
 - `GET /api/v1/emergencies/facilities?lat=&lng=&radius=&type=&open24Only=&openNowOnly=&size=` — 긴급 시설 반경 검색.
   `size` 상한은 **250** 이다 — 제주 전역 시설이 214곳이라 반경을 최대로 넓혀도 잘리지 않는다.
