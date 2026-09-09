@@ -97,7 +97,15 @@ export function MapSheet({
       aria-label={label}
       style={{ height }}
       className={cn(
-        'bg-bg border-border fixed inset-x-0 z-40 flex flex-col rounded-t-xl border-t shadow-lg lg:hidden',
+        // `develop` 의 DESIGN.md z-index 스케일: 모바일 탭바는 "흐름 내 컨트롤에 붙은
+        // 팝오버" 층(z-40)이고, `BottomSheet`/`Modal`/`Toast` 는 그 위 "오버레이" 층(z-50)이다.
+        // 이 시트도 z-40 을 썼던 시절에는 탭바와 같은 층이라 DOM 순서가 승패를 갈랐고,
+        // 탭바가 나중에 그려져 시트의 하단 64px 을 덮었다(min 이 아닌 단계에서 시트가
+        // `bottom-0` 을 쓰기 때문). z-50 으로 올려 이 컴포넌트 헤더 주석의 "그 위 단계에서는
+        // 시트가 탭바 자리를 쓴다" 는 문장을 실제로 성립시킨다. `BottomSheet` 와 같은 층을
+        // 쓰지만 이 시트는 배경 덮개·`aria-modal`·포커스 트랩이 전혀 없다 — 오직 쌓임 순서만
+        // 그쪽과 같아졌을 뿐, 모달이 되지는 않는다.
+        'bg-bg border-border fixed inset-x-0 z-50 flex flex-col rounded-t-xl border-t shadow-lg lg:hidden',
         // 최소 단계에서만 탭바가 보인다. 그 위에서는 시트가 탭바 자리를 쓴다
         stop === 'min' ? 'map-sheet-above-tabbar' : 'bottom-0',
         // 끄는 동안에는 전환을 끈다 — 손가락을 따라오지 못하고 끈적여 보인다
