@@ -3,9 +3,14 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { PositionNotice, visibleCountLabel } from '@/features/emergency/emergency-map-view'
-import type { PositionFailure } from '@/lib/geo/current-position'
+import {
+  isSelectionStillValid,
+  PositionNotice,
+  visibleCountLabel,
+} from '@/features/emergency/emergency-map-view'
+import type { PositionFailure, PositionResult } from '@/lib/geo/current-position'
 import { messages } from '@/lib/messages'
+import { facility } from '@/test/fixtures/emergency'
 
 describe('visibleCountLabel', () => {
   it('선택되지 않았을 때는 messages.map.visibleCount 를 쓴다 — "지도에 보이는" 이 참인 상태다', () => {
@@ -35,6 +40,60 @@ describe('visibleCountLabel', () => {
 
     expect(deselectedButStale).toBe(messages.emergency.selectedCount.replace('{n}', '136'))
     expect(deselectedButStale).not.toBe(messages.map.visibleCount.replace('{n}', '136'))
+  })
+})
+
+describe('isSelectionStillValid', () => {
+  const granted: PositionResult = { kind: 'granted', lat: 33.48, lng: 126.49 }
+  const relocated: PositionResult = { kind: 'granted', lat: 33.25, lng: 126.4 }
+  const selected = facility()
+
+  function base() {
+    return {
+      anchorRadius: 10_000,
+      anchorPosition: granted,
+      currentRadius: 10_000,
+      currentPosition: granted,
+      selectedId: selected.facilityId,
+      visible: [selected],
+    }
+  }
+
+  it('anchor 와 지금 값이 모두 같고 목록에 남아 있으면 유효하다', () => {
+    expect(isSelectionStillValid(base())).toBe(true)
+  })
+
+  it('Finding 1 — 필터·재조회로 고른 시설이 visible 에서 빠지면 무효다', () => {
+    expect(isSelectionStillValid({ ...base(), visible: [] })).toBe(false)
+  })
+
+  it('Finding 2 — 반경이 anchor 와 달라지면(넓히기) 무효다', () => {
+    expect(isSelectionStillValid({ ...base(), currentRadius: 40_000 })).toBe(false)
+  })
+
+  it('Finding 2 — 위치가 anchor 와 다른 참조면(내 위치 재클릭) 무효다', () => {
+    expect(isSelectionStillValid({ ...base(), currentPosition: relocated })).toBe(false)
+  })
+
+  it('좌표값이 같아도 참조가 다른 새 PositionResult 면 무효다 — locate() 는 매번 새 객체를 만든다', () => {
+    const sameCoordsNewObject: PositionResult = { kind: 'granted', lat: 33.48, lng: 126.49 }
+    expect(isSelectionStillValid({ ...base(), currentPosition: sameCoordsNewObject })).toBe(false)
+  })
+
+  it('anchorPosition 이 null 이어도(제주 밖 폴백) 참조 비교만으로 판단한다', () => {
+    const fallback: PositionResult = {
+      kind: 'fallback',
+      lat: 33.4996213,
+      lng: 126.5311884,
+      reason: 'outside',
+    }
+    expect(
+      isSelectionStillValid({
+        ...base(),
+        anchorPosition: fallback,
+        currentPosition: fallback,
+      }),
+    ).toBe(true)
   })
 })
 

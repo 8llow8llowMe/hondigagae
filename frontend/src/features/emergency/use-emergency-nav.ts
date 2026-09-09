@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 import {
@@ -37,7 +38,16 @@ export function useEmergencyNav(): EmergencyBoardParams & {
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const { filters, radius } = parseEmergencyBoardParams(searchParams)
+  /*
+    **`searchParams` 로 메모한다 (review #353 Minor).** 메모 없이 매 렌더
+    `parseEmergencyBoardParams` 를 새로 부르면 `filters` 가 매번 새 객체 참조가
+    된다 — `EmergencyMapView` 의 `useMemo(..., [inBounds, board.filters])` 가
+    그 참조를 의존성으로 쓰므로 절대 캐시에 걸리지 않고, 그 아래 `pins` 도 매번
+    새 배열이 되어 `MapCanvas` 가 시트 드래그·패널 접기 같은 무관한 렌더마다
+    최대 136개 오버레이를 다시 만든다. `searchParams` 는 URL 이 실제로 바뀔
+    때만 새 참조이므로 그것을 키로 쓰면 충분하다.
+  */
+  const { filters, radius } = useMemo(() => parseEmergencyBoardParams(searchParams), [searchParams])
   const view = parseViewMode(searchParams, EMERGENCY_DEFAULT_VIEW)
 
   function apply(next: EmergencyBoardParams) {
