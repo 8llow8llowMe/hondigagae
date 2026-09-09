@@ -31,7 +31,9 @@
   - `GET /internal/v1/places/visible-ids` (내부 전용 — plan 의 일정 항목 벌크 검증)
   - `GET /api/v1/places/{placeId}/suitability` (날씨+동반조건+혼잡도, score + XAI reasons)
   - `GET /api/v1/places/{placeId}/walk-safety` (추정 노면온도·열지수 기반 산책 위험도)
-- 상태: 구현 (`place`, `emergency`, `insight`). **미착수**: `walkcourse`(두루누비)
+- 상태: 구현 (`place`, `emergency`, `insight`, `walkcourse` 조회). 적재 배치(#383) 미착수.
+  `walkcourse` 원천은 두루누비가 아니라 **제주올레**다 — 두루누비 걷기 코스에 제주가 0개다
+  - `GET /api/v1/walk-courses[/{walkCourseId}]` (제주올레 목록·상세, 반려견 활동량 필터)
 - `insight` 는 기상청 단기예보를 격자별 Redis 캐시로 쓰고, 집중률은 배치 적재분을 DB 에서 읽는다.
   반려견 조건은 사본을 두지 않고 요청 파라미터로 받는다 — 이 서비스는 인증이 없는 공개 조회
   서비스고, 프로필의 원천은 auth-service 다. 세부는 `weather-insight-integration.md` 참고.

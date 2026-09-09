@@ -9,7 +9,7 @@
 | --- | --- | --- |
 | auth-service | `auth`, `member`, `pet` | 구현 |
 | tour-service | `place`, `emergency`, `insight` | 구현 |
-| tour-service | `walkcourse` | **미착수** |
+| tour-service | `walkcourse` | 구현 (조회 API. 적재 배치는 #383) |
 | plan-service | `plan` | 구현 (날씨 브리핑 포함) |
 | ai-service | `planner` | 구현 (Spring AI + 로컬 LLM(Ollama), 기본값은 스텁) |
 | batch-service | `placeimport`, `congestionimport` | 구현 |
@@ -129,7 +129,7 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 
 | 기능 | 상태 | 막는 것 |
 | --- | --- | --- |
-| `walkcourse` (두루누비 산책 코스) | 미착수 | 데이터 확인 필요 |
+| `walkcourse` 적재 배치 | 미착수 | #383. 조회 API 는 #382 로 구현. **원천을 두루누비 → 제주올레로 교체** — 두루누비 걷기 142개는 코리아둘레길 축이라 제주 0개(실호출 검증), TourAPI 여행코스(25)도 제주 0건 |
 | 기상특보 연동 | **구현 (조회)** | #156 — 적합도·권역 날씨·산책 안전 응답에 `weatherWarnings`. 카카오 메시지 알림 연계는 후속 |
 | 항목 단위 산책 위험도 | 미착수 | 일정 브리핑은 일자별 대표 장소 한 곳만 조회한다 |
 | 일정 브리핑 체감온도 | **구현** | #88. `weather.maxFeelsLikeTemperature` — tour `DailyWeather` 가 시각별 열지수의 하루 최대를 내고 plan 이 그대로 전달. 중기예보는 null |
