@@ -49,7 +49,7 @@ export function Input({
         // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
         'text-body-1 h-11 w-full rounded-md border px-3',
         'placeholder:text-fg-subtle',
-        'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:outline-none',
+        'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
         'disabled:cursor-not-allowed disabled:opacity-50',
         invalid ? 'border-danger-500' : 'border-border-strong',
         className,

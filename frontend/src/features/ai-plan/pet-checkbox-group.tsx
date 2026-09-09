@@ -86,7 +86,7 @@ export function PetCheckboxGroup({
                   같은 이유다. `focus-within` 은 마우스 클릭에도 걸려 선택 테두리 바깥에
                   링이 한 겹 더 그려졌다.
                 */
-                'has-[:focus-visible]:ring-brand-500 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-offset-0',
+                'has-[:focus-visible]:ring-brand-500 has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-offset-0',
                 checked ? 'border-brand-500 bg-row-selected' : 'border-border-strong',
                 invalid && 'border-danger-500',
               )}
