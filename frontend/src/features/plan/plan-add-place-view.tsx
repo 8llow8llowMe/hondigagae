@@ -26,6 +26,22 @@ import { PLAN_ADD_DEFAULT_VIEW, type ViewMode, viewModeHref } from '@/lib/url/vi
 import type { PlaceFilters, PlaceSummary } from '@/types/place'
 
 /**
+ * 모바일 시트를 끝까지 올렸을 때 **비워 둘 상단 높이**(px).
+ *
+ * 이 화면은 헤더가 정상 흐름이라 시트 기본 상한(`85dvh`)이 제목·보기 전환·부제를 덮는다
+ * — 375×812 실측으로 시트 상단이 y=122 인데 헤더가 y=56~189 를 쓴다. 남는 것은
+ * `일정으로 돌아가기` 뿐이고 그마저 2px 차이다.
+ *
+ * **비율이 아니라 px 이다.** 비율은 기기가 작을수록 더 덮는다(667px 기기면 상단이
+ * y=100 으로 내려간다). 헤더 높이는 기기 높이와 무관하게 거의 일정하다.
+ *
+ * 240 은 헤더(실측 189)에 약 50px 을 더한 값이다 — 지도가 한 줄이라도 남아야 시트가
+ * "페이지" 가 아니라 "지도 위에 얹힌 것" 으로 읽힌다. 일정 제목이 길어 부제가 두 줄이
+ * 되면 부제 끝만 잘리고 제목과 토글은 남는다.
+ */
+const SHEET_MAX_TOP_INSET = 240
+
+/**
  * 장소를 골라 일자에 담는 화면 — 세부명세 F2.
  *
  * **모달·시트가 아니라 라우트다** (F5-1). 장소 목록이 필터 + 무한 스크롤이라 모달에
@@ -209,6 +225,7 @@ export function PlanAddPlaceView({
             authed
             fill
             /* 헤더가 토글을 가지므로 `listHref`/`mapHref` 를 주지 않는다 */
+            sheetMaxTopInset={SHEET_MAX_TOP_INSET}
             mutedPlaceIds={addedPlaceIds}
             renderRowAction={(place) =>
               planAddPlaceAction(place, {

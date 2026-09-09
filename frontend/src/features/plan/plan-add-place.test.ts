@@ -106,7 +106,9 @@ describe('PlanIndoorAlternatives — 실내 대안 담기', () => {
   })
 
   it('다른 담기가 진행 중이면 버튼이 잠긴다 — 일괄 교체는 동시에 두 개를 보낼 수 없다', () => {
-    expect(renderAlternatives({ disabled: true })).toContain('disabled')
+    // `disabled=""` 로 본다. `disabled` 만 보면 Button 의 `disabled:opacity-50` 클래스에
+    // 걸려 **항상 통과한다**
+    expect(renderAlternatives({ disabled: true })).toContain('disabled=""')
   })
 })
 

@@ -65,6 +65,7 @@ export function PlaceMapView({
   renderRowNotice,
   mutedPlaceIds,
   renderListRow,
+  sheetMaxTopInset,
 }: {
   filters: PlaceFilters
   /** 미로그인이면 반려견 목록을 조회하지 않는다 — 필터의 크기 축이 빠진다 (#200) */
@@ -73,7 +74,7 @@ export function PlaceMapView({
    * `true` 면 **부모가 높이를 정한다.** 위에 헤더가 붙는 화면(담기, #370)이 쓴다.
    * `false`(기본)면 스스로 `map-canvas-height` 로 뷰포트를 채운다.
    */
-  fill?: boolean
+  fill?: boolean | undefined
   /**
    * 지도 우상단에 떠 있는 보기 전환의 목적지. **둘 다 있어야 토글을 그린다.**
    * 헤더가 토글을 갖는 화면은 주지 않는다 — 같은 컨트롤이 두 개 뜨면 안 된다.
@@ -81,8 +82,8 @@ export function PlaceMapView({
    * 예전에는 이 컴포넌트가 `'/places'` 를 하드코딩해 링크를 만들었다. 그래서 다른
    * 화면이 이 지도를 쓰면 토글이 남의 화면으로 보냈다 (#370).
    */
-  listHref?: string
-  mapHref?: string
+  listHref?: string | undefined
+  mapHref?: string | undefined
   /** 패널·시트 행의 액션 열. 담기 버튼이 여기 온다 */
   renderRowAction?: ((place: PlaceSummary) => ReactNode) | undefined
   /** 행 아래 전폭 줄. 담기 실패 알림이 여기 온다 */
@@ -91,6 +92,14 @@ export function PlaceMapView({
   mutedPlaceIds?: ReadonlySet<string> | undefined
   /** SDK 실패 폴백의 행. 주지 않으면 상세로 가는 기본 행이다 */
   renderListRow?: PlaceListSectionProps['renderRow'] | undefined
+  /**
+   * 모바일 시트를 끝까지 올렸을 때 비워 둘 상단 높이(px). 주지 않으면 기본 상한이다.
+   *
+   * **헤더가 정상 흐름인 화면(담기, #370)이 자기 헤더 높이를 알려 준다.** 이 컴포넌트는
+   * 위에 무엇이 얹히는지 모르고, 시트 기본 상한(`85dvh`)은 상단 컨트롤이 `absolute` 로
+   * 떠 있는 `/places` 기준이라 그런 화면에서는 헤더를 통째로 덮는다.
+   */
+  sheetMaxTopInset?: number | undefined
 }) {
   const [bounds, setBounds] = useState<MapBounds | null>(null)
   /** 지도를 옮겼는지. 처음 `idle` 한 번은 이동이 아니다 */
@@ -390,6 +399,7 @@ export function PlaceMapView({
         */
         toolbar={<PlaceMapFilterBar filters={filters} authed={authed} />}
         header={<p className="text-caption text-fg-muted truncate font-medium">{countLine}</p>}
+        maxTopInset={sheetMaxTopInset}
       >
         {visible.length === 0 ? (
           <EmptyState

@@ -5,15 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { PlaceMapPanel } from '@/features/place/place-map-panel'
 import { messages } from '@/lib/messages'
-import { placeSummary } from '@/test/fixtures/place'
-
-const withoutCoord = {
-  ...placeSummary,
-  placeId: '999',
-  title: '좌표 없는 곳',
-  lat: null,
-  lng: null,
-}
+import { placeSummary, placeWithoutCoordinate } from '@/test/fixtures/place'
 
 function render(overrides: Partial<Parameters<typeof PlaceMapPanel>[0]> = {}) {
   return renderToStaticMarkup(
@@ -85,9 +77,9 @@ describe('PlaceMapPanel', () => {
   })
 
   it('좌표가 없는 곳도 목록에는 남기고 이유를 말한다 — 목록으로도 도달 가능해야 한다', () => {
-    const markup = render({ places: [withoutCoord] })
+    const markup = render({ places: [placeWithoutCoordinate] })
 
-    expect(markup).toContain(withoutCoord.title)
+    expect(markup).toContain(placeWithoutCoordinate.title)
     expect(markup).toContain(messages.map.noCoordinate)
   })
 
