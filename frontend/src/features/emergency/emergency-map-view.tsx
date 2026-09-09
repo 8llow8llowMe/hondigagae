@@ -74,6 +74,22 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
     `frozenBounds` 도 함께 비운다.
   */
   const [frozenBounds, setFrozenBounds] = useState<MapBounds | null>(null)
+  /*
+    `bounds` 가 지금 실제 지도 프레임과 맞는지 (B1 후속).
+
+    선택 시 `MapCanvas` 가 `setLevel(animate) + panTo` 로 레벨 4 까지 확대하는데,
+    카카오 SDK 는 이 애니메이션 이동에서 `idle` 을 내지 않는다(위 `frozenBounds`
+    설명과 같은 관찰) — 그래서 `bounds` 자체가 그 확대된 프레임을 반영하도록
+    갱신되지 않는다. `frozenBounds` 는 선택이 풀리면 비워지지만, 그렇다고 `bounds`
+    가 갑자기 최신이 되는 것은 아니다: 지도는 여전히 확대된 채로 남아 있고
+    (`MapCanvas` 는 `selectedId` 가 `null` 이 돼도 되돌아가지 않는다 — 그 효과는
+    `selectedId === null` 이면 그냥 return 한다), 실제 팬/줌이 일어나 `onIdle` 이
+    다시 올 때까지 `bounds` 는 선택 이전 값 그대로다. 그 상태에서 캡션이 "지도에
+    보이는 136곳" 이라고 말하면 거짓이다 — 화면은 도로 단계인데 숫자는 반경
+    10km 기준이기 때문이다. 그래서 **`selectedId` 와 별개로** 이 플래그를 둔다:
+    선택하는 순간 켜고(`handleSelect`), 진짜 `idle` 이 올 때만 끈다(`handleBounds`).
+  */
+  const [boundsStale, setBoundsStale] = useState(false)
   const [sheetStop, setSheetStop] = useState<SheetStop>('mid')
   const [panelOpen, setPanelOpen] = useState(true)
   const [failure, setFailure] = useState<MapSdkFailure | null>(null)
@@ -126,6 +142,8 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
     // **`userMoved` 를 쓰지 않는다.** 재조회가 없으니 첫 `idle` 과 사용자 이동을
     // 가를 이유가 없다 — 어느 쪽이든 "지금 보이는 영역" 이 답이다
     setBounds(next)
+    // 진짜 `idle` 이 왔다 — 지금부터 `bounds` 는 현재 지도 프레임을 신뢰할 수 있다
+    setBoundsStale(false)
   }, [])
 
   /*
@@ -156,17 +174,26 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
     `bounds` 가 바뀌어도(또는 안 바뀌어도) 목록은 지금 이 영역 기준으로 남는다.
     다른 행을 이어 고르면 그 시점의 `bounds` 로 다시 얼린다 — 그사이 수동 드래그가
     있었다면 그 갱신된 영역을 반영해야 하기 때문이다.
+
+    **`boundsStale` 도 이 순간 켠다(새 선택에 한해).** 지금부터 `MapCanvas` 가
+    보고 없이 지도를 확대한다는 것을 아는 유일한 지점이 여기다 — 해제 분기에서는
+    켜지 않는다: 해제는 지도를 전혀 움직이지 않으므로(위 설명) 새로 켤 이유가
+    없고, 그렇다고 여기서 끄지도 않는다 — 지도는 해제된 뒤에도 여전히 확대된
+    채이므로 `bounds` 는 그대로 stale 이다. 끄는 것은 오직 `handleBounds` 뿐이다.
   */
   const handleSelect = useCallback(
     (id: string) => {
       if (selectedId === id) {
         // 해제 — `frozenBounds` 정리는 위 `selectedId === null` effect 가 맡는다.
+        // `boundsStale` 은 여기서 건드리지 않는다 — 지도가 실제로는 안 움직였으니
+        // (바로 위 설명) `bounds` 가 그 사이 최신이 됐을 리 없다.
         setSelectedId(null)
         return
       }
 
       setSelectedId(id)
       setFrozenBounds(bounds)
+      setBoundsStale(true)
       setSheetStop((stop) => (stop === 'min' ? 'mid' : stop))
     },
     [selectedId, bounds],
@@ -189,7 +216,14 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
     )
   }
 
-  const countLine = `${visibleCountLabel(visible.length, selectedId !== null)} · ${messages.emergency.radiusLabel.replace('{radius}', formatDistance(board.radius))}`
+  /*
+    "지도에 보이는" 이라는 주장을 감출 두 상태를 하나로 합친다 — 선택 중이거나,
+    선택은 풀렸어도 `bounds` 가 아직 그 선택-확대를 반영하지 못한 상태(`boundsStale`).
+    후자를 빼면 해제 직후 캡션이 이미 확대된 지도 앞에서 "지도에 보이는 136곳" 으로
+    돌아가 버린다 — `boundsStale` 위 doc-comment 가 설명하는 바로 그 결함이다.
+  */
+  const hideViewportClaim = selectedId !== null || boundsStale
+  const countLine = `${visibleCountLabel(visible.length, hideViewportClaim)} · ${messages.emergency.radiusLabel.replace('{radius}', formatDistance(board.radius))}`
   const basisLine = board.showDistance
     ? messages.emergency.basisCurrent
     : messages.emergency.basisJeju
@@ -474,16 +508,21 @@ export function PositionNotice({
 }
 
 /**
- * 캡션의 개수 라벨 (B1). `selected` 가 `true` 면 `messages.map.visibleCount`("지도에
- * 보이는 {n}곳") 대신 `messages.emergency.selectedCount`("목록 {n}곳") 를 쓴다.
+ * 캡션의 개수 라벨 (B1 + 후속 stale 수정). `hideViewportClaim` 이 `true` 면
+ * `messages.map.visibleCount`("지도에 보이는 {n}곳") 대신
+ * `messages.emergency.selectedCount`("목록 {n}곳") 를 쓴다.
  *
- * **선택 중에는 "지도에 보이는" 이라고 말하지 않는다.** 선택하면 지도가 확대되어
- * 실제 프레임과 `frozenBounds` 가 어긋나므로, 그 주장은 그 순간 거짓이 된다. 개수
- * 자체(목록 길이)는 얼려도 참이라 숫자는 그대로 두고 문구만 바꾼다 — 순수 함수라
- * `emergency-map-view.test.ts` 가 문자열로 고정한다.
+ * **"지도에 보이는" 이라고 말하면 안 되는 상태가 둘이다** — 선택 중(지도가 확대돼
+ * 실제 프레임과 `frozenBounds` 가 어긋난다), 그리고 선택이 풀렸어도 `bounds` 가
+ * 아직 그 확대를 못 따라잡은 stale 상태(해제는 지도를 움직이지 않으므로 stale 이
+ * 저절로 풀리지 않는다 — `emergency-map-view.tsx` 의 `boundsStale` 설명 참고).
+ * 두 상태 모두 "목록 {n}곳" 을 새로 만들지 않고 재사용한다 — 이 문구 자체가 이미
+ * "지도 프레임에 대한 주장이 없는 중립적 표현" 이라 두 상태 모두에 그대로 맞는다.
+ * 개수 자체(목록 길이)는 두 상태 모두에서 참이라 숫자는 그대로 두고 문구만
+ * 바꾼다 — 순수 함수라 `emergency-map-view.test.ts` 가 문자열로 고정한다.
  */
-export function visibleCountLabel(count: number, selected: boolean): string {
-  const template = selected ? messages.emergency.selectedCount : messages.map.visibleCount
+export function visibleCountLabel(count: number, hideViewportClaim: boolean): string {
+  const template = hideViewportClaim ? messages.emergency.selectedCount : messages.map.visibleCount
   return template.replace('{n}', String(count))
 }
 
