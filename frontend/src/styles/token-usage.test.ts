@@ -224,6 +224,9 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0)', () => {
       // 구조다. 지도와 같은 평면에 두면 어디까지가 패널인지 읽히지 않는다.
       'src/components/map-sheet.tsx',
       'src/features/place/place-map-view.tsx',
+      // 긴급 시설 지도 보기 — `place-map-view.tsx` 와 같은 구조다(#353) - 지도가
+      // 바탕이고 좌측 패널·접기 탭이 그 위에 뜬다
+      'src/features/emergency/emergency-map-view.tsx',
       // 지도 우상단에 얹히는 현재 위치 버튼 — 보기 전환 토글과 같은 스택에 뜬다
       'src/features/map/map-locate-button.tsx',
       // 마커를 고르면 지도 위에 뜨는 카드 (`혼디가개 긴급 시설` 02)
