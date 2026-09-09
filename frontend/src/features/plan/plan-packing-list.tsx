@@ -2,6 +2,7 @@
 
 import { useMutation } from '@tanstack/react-query'
 
+import { Badge } from '@/components/badge'
 import { Button } from '@/components/button'
 import { ErrorState } from '@/components/error-state'
 import { generatePackingList } from '@/lib/api/ai-plan'
@@ -56,9 +57,22 @@ export function PackingListPanel({ items, pending, failed, onGenerate }: Packing
           22)과 같은 값이 된다. `lg` 은 레일이 레일이 되는 지점이고 `h1` 이 28 로
           올라가는 지점이기도 하다 — `place-detail-section` 의 섹션 제목과 같은 변형이다.
         */}
-        <h2 className="text-title-2 text-fg lg:text-title-1 font-semibold lg:font-bold">
-          {messages.plan.packingHeading}
-        </h2>
+        {/*
+          **제목 옆에 AI 배지를 둔다** (#397). accent 는 "AI 가 생성·판단한 것" 표시
+          전용이고(DESIGN.md §2-5), 헤더 nav 의 `AI 일정 생성` 배지와 **같은 낱말·같은
+          톤**이어야 한다 — 같은 성질의 것을 화면마다 다르게 부르면 다른 기능으로 읽힌다.
+
+          제목과 배지의 baseline 을 맞추지 않고 `items-center` 로 세운다 — 제목이 lg 에서
+          22 로 커지는데 baseline 정렬은 그때 배지를 아래로 떨어뜨린다.
+        */}
+        <div className="flex items-center gap-2">
+          <h2 className="text-title-2 text-fg lg:text-title-1 font-semibold lg:font-bold">
+            {messages.plan.packingHeading}
+          </h2>
+          <Badge tone="accent" size="sm" className="font-semibold">
+            {messages.plan.packingAiBadge}
+          </Badge>
+        </div>
 
         {pending ? (
           <Pending />
@@ -80,8 +94,12 @@ function Intro({ failed, onGenerate }: { failed: boolean; onGenerate: () => void
       {/*
         **실패해도 안내 문장을 남긴다.** `ErrorState` 만 남기면 다시 눌렀을 때 무엇이
         만들어지는지 화면에 아무 설명이 없다.
+
+        **`text-fg-muted` 를 걷었다** (#397). 이 문장이 CTA 를 누를지 정하는 유일한 근거인데
+        caption 톤으로 흐려 두면 절이 접었다 펴는 토글처럼 읽힌다 — AI 기능 하나가 부가
+        기능으로 보이던 원인이다.
       */}
-      <p className="text-body-2 text-fg-muted">{messages.plan.packingIntro}</p>
+      <p className="text-body-2 text-fg">{messages.plan.packingIntro}</p>
 
       {/*
         실패 코드가 `AIPLAN_016` 하나다 — 일정이 없거나 본인 소유가 아니면 같은 코드로 온다.
@@ -121,11 +139,20 @@ function Result({ items, onRetry }: { items: PackingListItem[]; onRetry: () => v
   return (
     <div className="flex flex-col gap-3">
       {/*
-        저장되지 않는다는 사실만 밝힌다. **"대표 반려견 기준" 안내가 여기 있었고 #179 로
-        걷었다** — 백엔드가 동행 반려견 전체를 근거로 삼게 됐다. 몇 마리가 실제로 근거에
-        들어갔는지는 응답이 말해 주지 않아 개수를 대신 적지도 않는다 (`messages/plan.ts` 주석).
+        **무엇에 근거한 목록인지 결과 머리에서 다시 못박는다** (#397). 목록만 남으면
+        어디서든 구할 수 있는 체크리스트와 구분되지 않는다 — 아래 각 항목의 `reason` 이
+        그 차이를 증명하지만, 그것을 읽기 전에 기준이 서 있어야 한다.
+
+        저장되지 않는다는 사실도 함께 밝힌다. **"대표 반려견 기준" 안내가 여기 있었고
+        #179 로 걷었다** — 백엔드가 동행 반려견 전체를 근거로 삼게 됐다. 몇 마리가 실제로
+        근거에 들어갔는지는 응답이 말해 주지 않아 개수를 대신 적지도 않는다.
       */}
-      <p className="text-caption text-fg-muted font-medium">{messages.plan.packingNotSaved}</p>
+      <div className="flex flex-col gap-1">
+        <p className="text-body-2 text-accent-700 font-semibold">
+          {messages.plan.packingResultBasis}
+        </p>
+        <p className="text-caption text-fg-muted font-medium">{messages.plan.packingNotSaved}</p>
+      </div>
 
       {groups.map(([category, group]) => (
         <div key={category} className="flex flex-col gap-1.5">
@@ -138,8 +165,12 @@ function Result({ items, onRetry }: { items: PackingListItem[]; onRetry: () => v
                   **이유가 이 기능의 핵심이다.** 일반적인 준비물 목록이 아니라 이 여행의
                   예보·일정·반려견에 근거한 문장이고, 서버가 완성형으로 준다 — 접거나
                   줄이지 않는다 (styling-guide.md §7).
+
+                  **caption 에서 body-2 로 올렸다** (#397). 이 기능이 다른 체크리스트와
+                  다른 유일한 지점인데 가장 작은 글자로 서 있었다. 품목 이름보다 크게
+                  두지는 않는다 — 챙기는 것은 품목이고 이유는 그 근거다.
                 */}
-                <span className="text-caption text-fg-muted">{item.reason}</span>
+                <span className="text-body-2 text-fg-muted">{item.reason}</span>
               </li>
             ))}
           </ul>
