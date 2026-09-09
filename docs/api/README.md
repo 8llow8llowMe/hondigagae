@@ -3,14 +3,25 @@
 이 폴더는 **게이트웨이가 실제로 서빙하는 OpenAPI 문서를 파일로 고정해 둔 것**이다.
 백엔드가 로컬에 뜨지 않아도 계약을 읽을 수 있고, 계약이 언제 어떻게 바뀌었는지 diff 로 보인다.
 
-수집 시각: **2026-09-07** (dev 게이트웨이).
+수집 시각: **2026-09-10** (dev 게이트웨이).
 
-> 이 재수집에서 구조가 바뀐 곳은 tour-service 셋뿐이다 (#292) —
+> 이 재수집(#409)에서 구조가 바뀐 곳은 **하나뿐이다** —
+> `RegionWeatherItem +maxFeelsLikeTemperature` (tour-service). 권역 비교 행이 체감온도를
+> 낼 수 있게 됐다는 뜻이고, [#407](https://github.com/8llow8llowMe/hondigagae/issues/407)
+> 이 기다리는 값이기도 하다. **FE 타입에는 아직 없다** — 표시 여부가 #407 의 답에 걸려
+> 있어 일부러 안 붙였다 (`features/_index.md` 드리프트 표).
+> auth-service 의 4줄 diff 는 `PetSaveRequest.sizeType`·`weightKg` 의 description 보강이고
+> operation·schema·필드는 그대로다. 새로 명시된 `PET_004` 경계 규칙은 FE 가 이미 지킨다
+> (`lib/pet/size.ts`, #369).
+>
+> **plan-service 가 살아났다.** 2026-09-03 에는 503 이라 일정·즐겨찾기 13개를 로컬 소스로만
+> 대조할 수 있었는데, 이번에는 네 서비스 모두 200 이다.
+>
+> 앞선 재수집(2026-09-07)의 기록: 구조가 바뀐 곳은 tour-service 셋이었다 (#292) —
 > `WalkSafetyResponse +feelsLikeCelsius/+feelsLikeBasis/+heatIndexBasis`,
 > `PlaceIntroItem +open24/+openNow`, `WalkTimesResponse +goldenWindowStatus`.
-> **`goldenWindowStatus` 는 FE 가 이미 쓰던 필드다** — 스냅샷만 낡아 있었다. 스냅샷을
-> 정본으로 믿고 "없는 필드" 로 판단하면 틀리는 경우가 실제로 있다는 뜻이라 적어 둔다.
-> auth-service 의 149줄 diff 는 전부 description 보강이고 operation·schema·필드는 그대로다.
+> **`goldenWindowStatus` 는 FE 가 이미 쓰던 필드였다** — 스냅샷만 낡아 있었다. 스냅샷을
+> 정본으로 믿고 "없는 필드" 로 판단하면 틀리는 경우가 실제로 있다는 뜻이라 남겨 둔다.
 
 | 파일                                                     | 서비스                                  | operations | schemas |
 | -------------------------------------------------------- | --------------------------------------- | ---------- | ------- |
