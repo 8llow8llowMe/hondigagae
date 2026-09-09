@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useEmergencyNav } from '@/features/emergency/use-emergency-nav'
 import { useNearbyFacilities } from '@/features/emergency/use-nearby-facilities'
 import { MAX_RADIUS_METERS } from '@/lib/api/emergency'
+import type { LatLng } from '@/lib/geo/coord'
 import {
   getCurrentPosition,
   type PositionFailure,
@@ -40,6 +41,17 @@ export type EmergencyBoard = ReturnType<typeof useEmergencyBoard>
  */
 export function useEmergencyBoard() {
   const [position, setPosition] = useState<PositionResult | null>(null)
+  /*
+    **"이 지역에서 재검색" 으로 옮겨 간 기준점** (#396). `null` 이면 내 위치를 쓴다.
+
+    URL 에 싣지 않는다 — `radius`·`filters` 와 달리 이것은 **지금 지도를 어디로
+    밀어 뒀는지**에 딸린 값이라, 링크로 건네면 받는 사람에게는 아무 뜻도 없는 좌표다.
+    (좌표를 URL 에 두지 않는 이유는 이 훅 머리주석의 `position` 설명과 같다.)
+
+    **반경은 그대로 쓴다.** 버튼의 뜻은 "같은 반경으로 여기를 보여줘" 다 — 보이는
+    영역에서 반경을 역산해 넣으면 `radius` 칩이 말하는 값과 실제 조회 반경이 갈린다.
+  */
+  const [searchCenter, setSearchCenter] = useState<LatLng | null>(null)
   const { filters, radius, setFilters, setRadius, widenRadius } = useEmergencyNav()
 
   /*
@@ -50,17 +62,42 @@ export function useEmergencyBoard() {
     거리를 표시하고 정렬 근거로 쓰므로 기준점이 바뀌면 목록도 바뀌어야 한다.
   */
   const locate = useCallback(() => {
+    // "내 위치" 는 옮겨 둔 기준점을 되돌리는 조작이기도 하다 (#396)
+    setSearchCenter(null)
     void getCurrentPosition().then(setPosition)
   }, [])
+
+  /** 지도 중심으로 기준점을 옮긴다 — 반경은 그대로다 (#396) */
+  const researchAt = useCallback((center: LatLng) => setSearchCenter(center), [])
 
   useEffect(() => {
     locate()
   }, [locate])
 
-  const query = useNearbyFacilities(position, radius)
+  /*
+    조회 기준점. 재검색으로 옮겼으면 그 자리, 아니면 내 위치다.
+
+    **`query` 도 `camera` 도 이 하나를 본다** — 둘이 다른 점을 보면 "여기를 조회했다"
+    는 주장과 화면이 보여주는 자리가 어긋난다.
+  */
+  const anchor: LatLng | null =
+    searchCenter ?? (position === null ? null : { lat: position.lat, lng: position.lng })
+
+  const query = useNearbyFacilities(anchor, radius)
 
   const fallback: PositionFailure | null =
     position !== null && position.kind === 'fallback' ? position.reason : null
+
+  /*
+    거리·정렬이 **무엇을 기준으로 한 값인지.** 화면이 이 셋을 서로 다른 문구로 말한다.
+
+    - `current` — 내 위치. 거리를 그대로 보여준다
+    - `map` — 재검색으로 옮긴 지도 중심. 거리는 **진짜 거리지만 내 위치에서가 아니다**
+    - `jeju` — 좌표를 못 받아 제주 중심으로 폴백. 거리를 감춘다 (제주 중심에서 480m 인
+      것을 "480m" 로 쓸 수 없다)
+  */
+  const basis: 'current' | 'map' | 'jeju' =
+    searchCenter !== null ? 'map' : fallback === null ? 'current' : 'jeju'
 
   /*
     지도 카메라. **`useMemo` 가 필수다** — 렌더 중에 새 객체를 만들면 `MapCanvas` 의
@@ -70,11 +107,8 @@ export function useEmergencyBoard() {
     `spanMeters` 가 지름이다 — 반경 10km 를 담으려면 20km 폭이 필요하다.
   */
   const camera = useMemo(
-    () =>
-      position === null
-        ? null
-        : { anchor: { lat: position.lat, lng: position.lng }, spanMeters: radius * 2 },
-    [position, radius],
+    () => (anchor === null ? null : { anchor, spanMeters: radius * 2 }),
+    [anchor?.lat, anchor?.lng, radius],
   )
 
   return {
@@ -82,8 +116,15 @@ export function useEmergencyBoard() {
     camera,
     /** null 이면 내 위치를 쓰고 있다. 값이 있으면 제주 중심 폴백이다 */
     fallback,
+    /** 조회 기준점. 재검색으로 옮겼으면 지도 중심이다 */
+    anchor,
+    /** 거리·정렬의 기준 — `current` · `map` · `jeju` */
+    basis,
     /** 폴백이면 거리를 감춘다 — 제주 중심에서 480m 인 것을 "480m" 로 쓸 수 없다 */
-    showDistance: fallback === null,
+    showDistance: basis !== 'jeju',
+    /** 재검색으로 기준점을 옮긴 상태인가 */
+    researched: searchCenter !== null,
+    researchAt,
     /** 제주 안에서만 "내 위치" 버튼을 그린다 — 밖에서는 눌러도 갈 곳이 없다 */
     inJeju: position !== null && position.kind === 'granted',
     radius,

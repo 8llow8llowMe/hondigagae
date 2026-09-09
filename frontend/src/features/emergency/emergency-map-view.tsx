@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
-import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
+import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from '@/components/icons'
 import { MapSheet, type SheetStop } from '@/components/map-sheet'
 import { ViewToggle } from '@/components/view-toggle'
 import { EmergencyFilterBar } from '@/features/emergency/emergency-filter-bar'
@@ -19,6 +19,7 @@ import {
   reliefLabel,
   reliefs,
 } from '@/features/emergency/facility-filters'
+import { shouldOfferResearch } from '@/features/emergency/research-offer'
 import { useEmergencyBoard } from '@/features/emergency/use-emergency-board'
 import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
@@ -26,7 +27,7 @@ import { formatDistance } from '@/lib/format/distance'
 import { SELECTED_FACILITY_MAP_LEVEL, toLatLng } from '@/lib/geo/coord'
 import type { PositionResult } from '@/lib/geo/current-position'
 import type { MapSdkFailure } from '@/lib/map/sdk'
-import { isWithinBounds, type MapBounds } from '@/lib/map/viewport'
+import { boundsCenter, isWithinBounds, type MapBounds } from '@/lib/map/viewport'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
 import type { NearbyFacilityItem } from '@/types/emergency'
@@ -307,9 +308,28 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
   */
   const hideViewportClaim = selectedId !== null || boundsStale
   const countLine = `${visibleCountLabel(visible.length, hideViewportClaim)} · ${messages.emergency.radiusLabel.replace('{radius}', formatDistance(board.radius))}`
-  const basisLine = board.showDistance
-    ? messages.emergency.basisCurrent
-    : messages.emergency.basisJeju
+  /*
+    거리·정렬의 기준을 말한다 — 세 갈래다 (#396). 재검색으로 기준점을 옮기면
+    거리는 여전히 진짜 거리지만 **내 위치에서가 아니다.** 감추지 않고 기준을 바꿔 말한다:
+    사용자가 직접 밀어 놓고 누른 자리라 그 자리에서 480m 인 것은 알고 싶은 사실이다.
+  */
+  const basisLine =
+    board.basis === 'map'
+      ? messages.emergency.basisMap
+      : board.basis === 'current'
+        ? messages.emergency.basisCurrent
+        : messages.emergency.basisJeju
+
+  /*
+    조회한 자리에서 충분히 벗어났을 때만 재검색을 권한다 (#396). 판정은
+    `shouldOfferResearch` 순수 함수가 갖는다 — 임계값이 반경에 비례한다.
+  */
+  const offerResearch = shouldOfferResearch({
+    bounds,
+    anchor: board.anchor,
+    radius: board.radius,
+    selected: selectedId !== null,
+  })
 
   const body = (
     <PanelBody
@@ -353,6 +373,32 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         onFailure={setFailure}
         className="map-canvas-height w-full"
       />
+
+      {/*
+        **"이 지역에서 재검색" — 지도 하단 중앙** (#396). 네이버·구글 지도가 쓰는 자리이고
+        형태다. `/places` 처럼 자동으로 재조회하지 않는 이유는 PR #373 에 있다 — 거리 기준이
+        모르는 사이에 바뀌면 안 된다. 재조회 시점을 사용자가 쥐면 그 우려가 "모르는 사이에"
+        에서 "누른 뒤에" 로 내려온다.
+
+        **`rounded-full` 은 `ScrollRailArrows` 가 이미 낸 예외를 따른다** — DESIGN.md §5 의
+        원형은 사진·아바타 몫이지만, 이것은 **면 위에 떠 있는 오버레이**라 아래 지도의
+        사각 격자와 같은 모양이면 지도의 일부로 읽힌다.
+
+        세로 자리는 `.map-research-offset`(globals.css)이 갖는다 — 모바일 시트 최소 단계를
+        피해야 해서 그 계산이 CSS 에 있다.
+      */}
+      {offerResearch && bounds !== null && (
+        <div className="map-research-offset absolute inset-x-0 z-30 flex justify-center px-4">
+          <button
+            type="button"
+            onClick={() => board.researchAt(boundsCenter(bounds))}
+            className="text-body-2 bg-bg text-fg border-border hover:bg-band focus-visible:ring-brand-500 inline-flex h-11 max-w-full items-center gap-2 rounded-full border px-5 font-semibold whitespace-nowrap shadow-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <SearchIcon size={16} />
+            {messages.emergency.researchHere}
+          </button>
+        </div>
+      )}
 
       {/* 여백이 `/places` 지도 보기와 정확히 같다 — 같은 컨트롤이면 같은 자리에 있어야 한다 */}
       <div className="absolute top-5 right-4 z-30 flex flex-col items-end gap-2 md:right-10 lg:top-6">

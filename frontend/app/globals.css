@@ -606,3 +606,35 @@ body {
 .filter-rail .filter-option {
   padding-inline: 16px;
 }
+
+/*
+  지도 위 "이 지역에서 재검색" 알약의 세로 자리 — 이슈 #396.
+
+  **모바일은 하단 시트 최소 단계 위에 앉는다.** 시트 높이는 `map-sheet.tsx` 의
+  `STOP_RATIO.min`(0.2 = 20dvh)이고 최소 단계에서만 탭바 위에 뜬다(`.map-sheet-above-tabbar`).
+  그 둘을 더한 자리에서 8px 띄운다.
+
+  **시트를 올리면 알약은 시트 뒤로 들어간다** (시트 `z-50` · 알약 `z-30`). 의도한 동작이다 —
+  목록을 펼쳐 읽는 중이라면 지도를 옮기는 중이 아니다.
+
+  `lg` 는 시트가 없다(`lg:hidden`). 좌측 패널이 `bottom-8` 로 카카오 축척·로고 막대를
+  피하고 있으므로 같은 자리에 맞춘다.
+
+  **`20dvh` 는 `STOP_RATIO.min` 의 복제본이다.** `map-research-offset.test.ts` 가 두 값이
+  갈라지는 것을 잡는다 — 갈라지면 알약이 시트에 반쯤 잠긴다.
+*/
+.map-research-offset {
+  bottom: calc(var(--tabbar-h) + 20dvh + 8px);
+}
+
+@media (width >= 48rem) {
+  .map-research-offset {
+    bottom: calc(20dvh + 8px);
+  }
+}
+
+@media (width >= 64rem) {
+  .map-research-offset {
+    bottom: 32px;
+  }
+}
