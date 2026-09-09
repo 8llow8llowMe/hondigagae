@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 
 import { Button } from '@/components/button'
@@ -24,6 +24,7 @@ import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
 import { formatDistance } from '@/lib/format/distance'
 import { SELECTED_FACILITY_MAP_LEVEL, toLatLng } from '@/lib/geo/coord'
+import type { PositionResult } from '@/lib/geo/current-position'
 import type { MapSdkFailure } from '@/lib/map/sdk'
 import { isWithinBounds, type MapBounds } from '@/lib/map/viewport'
 import { messages } from '@/lib/messages'
@@ -99,6 +100,17 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
     if (selectedId === null) setFrozenBounds(null)
   }, [selectedId])
 
+  /*
+    선택이 딛고 선 전제 — `handleSelect` 가 고를 때의 `radius`·`position` 를
+    담아 둔다 (review #353, Finding 1 + 2).
+
+    렌더에 쓰이지 않아 `useState` 가 아니라 `ref` 다 — 여기 값이 바뀐다고 다시
+    그릴 것이 없다. 아래 해제 effect 만 읽는다.
+  */
+  const selectionAnchorRef = useRef<{ radius: number; position: PositionResult | null } | null>(
+    null,
+  )
+
   const inRadius = board.query.data?.facilities ?? []
 
   /*
@@ -123,6 +135,72 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
   }, [inRadius, bounds, frozenBounds])
 
   const visible = useMemo(() => applyFilters(inBounds, board.filters), [inBounds, board.filters])
+
+  /*
+    **선택은 그것이 딛고 있던 전제가 깨지면 놓아준다** — 하나의 규칙으로 두 리뷰
+    발견(review #353 Finding 1 · 2)을 함께 고친다.
+
+    - **Finding 1**: 재조회(60초 `staleTime`)나 칩(필터)이 바뀌어 고른 시설이
+      `visible` 에서 사라지면, 패널·핀·`aria-pressed` 어디에도 그 행이 없어
+      다시 눌러 해제할 방법이 사라진다 — 세션이 끝날 때까지 `frozenBounds` 가
+      풀리지 않는 영구 고착이었다.
+    - **Finding 2**: `반경 넓히기`/반경 시트나 `내 위치` 는 "다른 영역을 보여줘"
+      라는 명시적 조작이다. `radius`·`position` 이 바뀌면 카메라도(§ `camera`
+      memo) 실제로 움직이는데, `frozenBounds` 가 옛 프레임을 붙들고 있으면
+      목록·칩 개수가 늘지 않는다 — "넓히기" 를 눌렀는데 아무것도 안 넓어진
+      것처럼 보인다.
+
+    두 갈래 모두 "선택을 고른 순간의 전제(anchor)가 지금도 참인가" 로 통합된다:
+    `handleSelect` 가 채우는 `selectionAnchorRef` 의 `radius`·`position` 이
+    지금 값과 같고, 고른 시설이 여전히 `visible` 안에 있어야 유효하다
+    (`isSelectionStillValid` — 순수 함수라 `emergency-map-view.test.ts` 가
+    표로 고정한다). 셋 중 하나라도 깨지면 `setSelectedId(null)` 만 부른다 —
+    그러면 위 `selectedId === null` effect 가 `frozenBounds` 를 마저 비운다.
+
+    **`idle` 을 트리거로 쓰지 않는다.** 선택-확대(`setLevel(animate) + panTo`)
+    가 카카오 SDK 에서 쓸 만한 `idle` 을 내지 않는다는 사실은 위 `frozenBounds`
+    doc-comment 가 설명하는 SDK 타이밍 사고다 — 그것이 바뀌어 `idle` 이 오기
+    시작해도 이 effect 는 여전히 `visible` 멤버십과 anchor 로만 판단하므로
+    영향받지 않는다. `idle` 로 풀도록 바꾸면 오히려 그 사고에 기대는 것이 되어
+    좁아진 레벨 4 프레임으로 목록이 즉시 몇 곳까지 줄어드는, `frozenBounds` 를
+    만든 이유 그 자체가 재발한다.
+
+    **클러스터 클릭 확대는 일부러 그대로 얼어 있다.** `map-canvas.tsx` 의 클러스터
+    오버레이는 두 단계 확대 + 팬으로 실제 `idle` 을 낸다(`bounds` 가 갱신된다).
+    하지만 그때도 `frozenBounds` 가 우선이라 목록은 그대로다 — 이 effect 가
+    고치는 두 발견과 달리 **고착이 아니다**: 고른 시설은 여전히 `visible` 안에
+    있으므로(그 행을 다시 누르면) 언제든 풀 수 있다. `radius`/`position` 처럼
+    "다른 영역을 보여줘" 로 볼 명시적 신호도 아니다. 그래서 anchor 에 클러스터
+    확대는 넣지 않는다 — 알려진 잔존 동작이지 결함이 아니다.
+
+    **무한 루프가 안 나는 이유.** 가드가 `selectedId !== null` 이다 — 한 번
+    `setSelectedId(null)` 을 부르면 다음 렌더에서 이 effect 는 그 즉시 return
+    하고, 그 뒤로 `visible`·`radius`·`position` 이 아무리 바뀌어도 다시
+    `setSelectedId` 를 부르지 않는다. 새로 고르면 `handleSelect` 가 anchor 를
+    다시 채우므로 같은 판정이 그 새 선택에 대해 처음부터 다시 시작된다.
+
+    **지도·시트를 움직이지 않는다.** 여기서 하는 일은 상태를 하나 지우는 것뿐이다
+    — `MapCanvas` 는 `selectedId` 가 `null` 이 되어도 카메라를 되돌리지 않고
+    (아래 `handleSelect` doc-comment 참고), 시트 단계도 이 effect 는 건드리지
+    않는다. 수동 재클릭 해제와 동일한 보장이다.
+  */
+  useEffect(() => {
+    if (selectedId === null) return // 해제된 선택은 다시 검사하지 않는다 — 루프 방지
+
+    const anchor = selectionAnchorRef.current
+    if (anchor === null) return
+
+    const stillValid = isSelectionStillValid({
+      anchorRadius: anchor.radius,
+      anchorPosition: anchor.position,
+      currentRadius: board.radius,
+      currentPosition: board.position,
+      selectedId,
+      visible,
+    })
+
+    if (!stillValid) setSelectedId(null)
+  }, [selectedId, board.radius, board.position, visible])
 
   const pins: MapPin[] = useMemo(
     () =>
@@ -180,6 +258,10 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
     켜지 않는다: 해제는 지도를 전혀 움직이지 않으므로(위 설명) 새로 켤 이유가
     없고, 그렇다고 여기서 끄지도 않는다 — 지도는 해제된 뒤에도 여전히 확대된
     채이므로 `bounds` 는 그대로 stale 이다. 끄는 것은 오직 `handleBounds` 뿐이다.
+
+    **`selectionAnchorRef` 도 이 순간 채운다(새 선택에 한해).** 위 `visible` 아래
+    해제 effect 가 "지금 `radius`·`position` 이 고를 때와 같은가" 를 판단할 때
+    쓰는 기준값이다 — `frozenBounds` 와 같은 순간에 같이 얼려 둔다.
   */
   const handleSelect = useCallback(
     (id: string) => {
@@ -194,9 +276,10 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
       setSelectedId(id)
       setFrozenBounds(bounds)
       setBoundsStale(true)
+      selectionAnchorRef.current = { radius: board.radius, position: board.position }
       setSheetStop((stop) => (stop === 'min' ? 'mid' : stop))
     },
-    [selectedId, bounds],
+    [selectedId, bounds, board.radius, board.position],
   )
 
   // ── SDK 실패 → 목록으로 되돌리고 안내 한 줄 ──────────────────────────────
@@ -537,6 +620,36 @@ export function PositionNotice({
 export function visibleCountLabel(count: number, hideViewportClaim: boolean): string {
   const template = hideViewportClaim ? messages.emergency.selectedCount : messages.map.visibleCount
   return template.replace('{n}', String(count))
+}
+
+/**
+ * 선택이 지금도 유효한가 (review #353 Finding 1 + 2) — `EmergencyMapView` 의
+ * 해제 effect 가 매 렌더 판단에 쓰는 순수 predicate. 세 조건을 모두 만족해야
+ * 유효하다:
+ *  1. 고를 때의 `radius`(anchor)가 지금 `radius` 와 같다 — 다르면 반경을
+ *     넓히거나 좁힌 것이다(Finding 2)
+ *  2. 고를 때의 `position`(anchor)이 지금 `position` 과 같은 참조다 — 다르면
+ *     `내 위치` 를 다시 눌러 새 좌표를 받은 것이다(Finding 2). 좌표값이 우연히
+ *     같아도 `locate()` 는 매번 새 `PositionResult` 객체를 만들므로 참조
+ *     비교로 충분하다 — "다시 눌렀다" 는 사실 자체가 신호다
+ *  3. 고른 시설이 지금 `visible` 안에 있다 — 없으면 필터·재조회로 목록에서
+ *     빠진 것이다(Finding 1)
+ *
+ * 지도·좌표·SDK 를 몰라도 되는 순수 로직이라 여기 분리해 표로 고정한다
+ * (`emergency-map-view.test.ts`) — effect 자체는 상태 전이라 브라우저로만
+ * 검증한다.
+ */
+export function isSelectionStillValid(params: {
+  anchorRadius: number
+  anchorPosition: PositionResult | null
+  currentRadius: number
+  currentPosition: PositionResult | null
+  selectedId: string
+  visible: NearbyFacilityItem[]
+}): boolean {
+  if (params.anchorRadius !== params.currentRadius) return false
+  if (params.anchorPosition !== params.currentPosition) return false
+  return params.visible.some((entry) => entry.facilityId === params.selectedId)
 }
 
 function reliefLabel(option: FilterRelief): string {
