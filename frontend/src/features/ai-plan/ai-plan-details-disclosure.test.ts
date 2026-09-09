@@ -44,4 +44,23 @@ describe('AiPlanDetailsDisclosure — 접힘/펼침', () => {
   it('여는 단추에 라벨이 있다', () => {
     expect(render(false)).toContain(messages.aiPlan.detailsToggle)
   })
+
+  /*
+    패널은 조건부 렌더라 접힌 동안 그 id 가 DOM 에 없다. `aria-controls` 를 무조건 달면
+    없는 것을 가리키는 단추가 된다 (`place-walk-safety-panel.tsx` 가 못박은 규칙).
+  */
+  it('접혀 있으면 aria-controls 를 달지 않는다', () => {
+    expect(render(false)).not.toContain('aria-controls')
+    expect(render(true)).toContain('aria-controls')
+  })
+
+  /*
+    폼의 `필수 항목` `<h3>` 를 지운 뒤로 이 머리글이 페이지 `<h1>` 다음 제목이다.
+    `<h2>` 가 빠지면 바로 아래 `AiPlanOptionsSection` 의 `<h3>` 로 단계가 건너뛴다.
+    클래스는 보지 않는다 — 여기서 지키려는 것은 레이아웃이 아니라 제목 단계다.
+  */
+  it('머리글이 h2 로 선다 — h1 → h2 → h3 을 잇는다', () => {
+    expect(render(false)).toMatch(/<h2[^>]*><button/)
+    expect(render(true)).toMatch(/<h2[^>]*><button/)
+  })
 })

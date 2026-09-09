@@ -43,14 +43,34 @@ export type AiPlanCreateFormProps = {
   onSubmit: () => void
 }
 
+/*
+  **「더 자세히 정할게요」 접기 안에 있는 필드 키 넷.** 접기 안팎을 옮길 때 고칠 곳을
+  한 군데로 묶어 둔다 — 아래 펼침 effect 가 이 목록을 그대로 읽는다.
+
+  **여기서 빠진 키는 제출을 조용히 실패시킨다.** 오류가 나도 섹션이 접힌 채라 메시지도
+  포커스 대상도 화면에 없다 (`docs/form-guide.md` §8). 실제로 `sigunguCode` 가 한동안
+  빠져 있었다.
+
+  `preferFavorites` 는 지금 검증 오류를 낼 수 없지만 목록에 남긴다 — 이 상수가 말하는
+  것은 "오류 키" 가 아니라 "접기 안에 있는 것" 이고, 그 답은 넷이다
+  (`docs/features/ai-plan/공통명세.md`).
+*/
+const COLLAPSED_FIELDS: ReadonlySet<string> = new Set([
+  'sigunguCode',
+  'budgetManwon',
+  'preferFavorites',
+  'pinnedPlaces',
+])
+
 /**
  * AI 일정 조건 입력 폼 — 아트보드 01 · 04 좌측 레일.
  *
  * 표시 전용이라 node 환경에서 렌더 테스트가 된다 (`testing-guide.md` §1).
  *
- * **정말 필수인 것은 기간·반려견 둘뿐이다.** 나머지 다섯(지역 · 예산 · 저장한 곳 우선 ·
- * 꼭 넣을 곳)은 기본값이 있어 「더 자세히 정할게요」 접기 안에 있다. 자유 요청만 접기
- * 밖에 남는데, 기본값이 없고 결과 품질에 가장 크게 기여하는 입력이기 때문이다.
+ * **정말 필수인 것은 기간·반려견 둘뿐이다.** 선택 항목은 다섯인데 그중 넷(지역 · 예산 ·
+ * 저장한 곳 우선 · 꼭 넣을 곳)은 기본값이 있어 「더 자세히 정할게요」 접기 안에 있다.
+ * 다섯째인 자유 요청만 접기 밖에 남는데, 기본값이 없고 결과 품질에 가장 크게 기여하는
+ * 입력이기 때문이다.
  */
 export function AiPlanCreateForm({
   values,
@@ -109,7 +129,7 @@ export function AiPlanCreateForm({
   */
   useEffect(() => {
     if (submitCount === 0 || firstErrorField === null) return
-    if (firstErrorField === 'budgetManwon' || firstErrorField === 'pinnedPlaces') {
+    if (COLLAPSED_FIELDS.has(firstErrorField)) {
       setDetailsOpen(true)
     }
   }, [submitCount, firstErrorField])
@@ -124,12 +144,18 @@ export function AiPlanCreateForm({
     를 기억해 두면 그 뒤의 토글은 전부 조용히 빠져나간다.
 
     **소비 시점이 핵심이다 — 대상을 찾았을 때만 소비한다.** 접힌 섹션 안의 필드
-    (`budgetManwon` · `pinnedPlaces`)에서 오류가 나면 첫 패스는 패널이 마운트되기 전이라
+    (`COLLAPSED_FIELDS`)에서 오류가 나면 첫 패스는 패널이 마운트되기 전이라
     `querySelector` 가 빈손으로 끝난다. 여기서 소비해 버리면 그걸로 끝이고, 위 펼침
     effect 의 `setDetailsOpen(true)` 가 만든 재렌더에서 `detailsOpen` 이 바뀌어 effect 가
     한 번 더 돌 때 가드에 막힌다. 못 찾았으면 소비하지 않고 두어 **두 번째 패스가
     성공하게** 만든다. 그 두 번째 패스가 소비를 끝내므로 이후의 수동 토글은 다시
     포커스를 옮기지 않는다.
+
+    **단 `pinnedPlaces` 와 `sigunguCode` 는 예외다** — 그 키를 `id`/`name` 으로 다는 요소가
+    아예 없다(담긴 곳은 목록이고 지역은 칩 그룹이다). 두 번째 패스도 빈손이라 ref 는 끝내
+    소비되지 않고, 이후 토글마다 `querySelector` 가 한 번씩 헛돌기만 한다 — 못 찾으면
+    그대로 빠져나가므로 포커스를 훔치지도, 옮기지도 않는다. **이 두 키에서 실제로 일하는
+    것은 위 펼침 effect 뿐이다**: 섹션을 열어 오류 메시지를 화면에 올리는 데서 끝난다.
 
     ⚠️ 이 ref 를 "불필요한 상태" 로 보고 지우면 접힌 필드의 포커스 이동
     (`docs/form-guide.md` §8)이 조용히 깨지거나 토글이 포커스를 훔친다. 이 저장소의
@@ -172,9 +198,10 @@ export function AiPlanCreateForm({
       <FormAlert message={errors.form} />
 
       {/*
-        **정말 답해야 하는 둘이 맨 위다** — 기간과 반려견. 나머지 다섯은 기본값이 있어
-        접기 안으로 들어갔고, 그래서 `필수 항목` `<h3>` 을 지웠다: "필수 vs 선택" 이
-        접기라는 구조로 이미 드러나므로 라벨이 같은 말을 한 번 더 하는 셈이 된다.
+        **정말 답해야 하는 둘이 맨 위다** — 기간과 반려견. 선택 다섯 중 넷은 기본값이
+        있어 접기 안으로 들어갔고(자유 요청만 밖에 남는다), 그래서 `필수 항목` `<h3>` 을
+        지웠다: "필수 vs 선택" 이 접기라는 구조로 이미 드러나므로 라벨이 같은 말을 한 번
+        더 하는 셈이 된다.
       */}
       <div className="flex flex-col gap-5">
         {/*
@@ -284,7 +311,8 @@ export function AiPlanCreateForm({
       </Field>
 
       {/*
-        **기본값이 있는 다섯을 여기로 모은다** — 지역 · 예산 · 저장한 곳 우선 · 꼭 넣을 곳.
+        **기본값이 있는 넷을 여기로 모은다** — 지역 · 예산 · 저장한 곳 우선 · 꼭 넣을 곳
+        (`COLLAPSED_FIELDS`).
         전부 안 건드려도 일정이 만들어지므로, 펼쳐 두면 "해야 할 일" 로 읽혀 실제로
         답해야 하는 둘을 가린다. 접힌 줄이 무엇으로 만들어지는지 대신 말해 준다.
       */}

@@ -116,10 +116,14 @@ export function PlanCreateForm({
         `rangeStart`/`rangeEnd` 를 두 달력에 똑같이 넘겨, 한쪽을 고르는 중에도 이미 고른
         반대쪽이 띠로 보이게 한다 — 며칠 일정인지 그 자리에서 읽힌다.
 
-        `items-start` 다: 달력이 펼쳐지면 그 칸만 높아지는데, 늘어난 높이에 맞춰 옆 칸의
-        입력이 가운데로 내려가면 두 입력의 윗줄이 어긋난다.
+        **정렬 클래스를 주지 않는다.** `sm:items-start` 가 있었는데 그 근거("달력이
+        펼쳐지면 그 칸만 높아진다")는 달력이 포털 팝오버가 되면서 사라졌다. 남은 높이 차는
+        한쪽에만 오류 문구가 붙을 때인데, 기본값인 `stretch` 는 짧은 칸의 **상자**만 늘릴
+        뿐 `Field`(`flex flex-col`)의 내용은 위에 그대로 있어 두 입력의 윗줄이 어긋나지
+        않는다. 가운데로 내려가는 것은 `items-center` 일 때의 이야기다.
+        `ai-plan-create-form.tsx` 의 같은 두 날짜 줄도 정렬 클래스 없이 성립한다.
       */}
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-4">
+      <div className="flex flex-col gap-5 sm:flex-row sm:gap-4">
         <Field
           id="startDate"
           label={messages.plan.fieldStartDate}
