@@ -34,31 +34,31 @@
 
 `src/lib/messages/map.ts` 의 `mapMessages` 에 두 개만 추가한다. 나머지는 **전부 기존 키를 쓴다.**
 
-| 키 | 값 |
-| --- | --- |
-| `rowDetail` | `'상세'` |
+| 키               | 값                    |
+| ---------------- | --------------------- |
+| `rowDetail`      | `'상세'`              |
 | `rowDetailLabel` | `'{title} 상세 보기'` |
 
 ---
 
 ## File Structure
 
-| 파일 | 책임 | 태스크 |
-| --- | --- | --- |
-| `src/lib/url/view-mode.ts` | 보기 모드 URL 직렬화. `PLAN_ADD_DEFAULT_VIEW` 추가 | 1 |
-| `src/lib/url/view-mode.test.ts` | 위 순수 로직 | 1 |
-| `src/features/plan/plan-add-place-view.tsx` | 담기 화면의 두 보기 분기 · 담기 액션 · 상태 분기 | 2, 6 |
-| `src/lib/messages/map.ts` | 지도 문구 | 3 |
-| `src/features/place/place-map-panel.tsx` | 지도 패널·시트의 행. 선택 버튼 / 액션 열 / 알림 줄 | 3 |
-| `src/features/place/place-map-panel.test.ts` | 위 렌더 분기 | 3 |
-| `src/features/place/place-map-view.tsx` | 지도 상태의 유일한 주인. `fill` + slot props | 4 |
-| `app/(main)/places/(list)/page.tsx` | `/places` 호출부 갱신 | 4 |
-| `src/features/plan/plan-add-place-header.tsx` | **신규.** 담기 화면 헤더 (뒤로 · h1 · 부제 · 토글) | 5 |
-| `app/(main)/plans/[planId]/days/[day]/add/page.tsx` | `view` 파싱 + 지도/목록 갈래 | 6 |
-| `src/features/plan/plan-add-place-map.test.ts` | **신규.** 담기 액션·알림·폴백 렌더 분기 | 6 |
-| `src/features/plan/plan-add-place.test.ts` | 담기 후 이동 안 함 회귀 고정 | 2 |
-| `docs/features/plan/일자편집-세부명세.md` | F5 표 396행 개정 | 8 |
-| `docs/features/_index.md`, `docs/screen-inventory.md` | 상태 갱신 | 8 |
+| 파일                                                  | 책임                                               | 태스크 |
+| ----------------------------------------------------- | -------------------------------------------------- | ------ |
+| `src/lib/url/view-mode.ts`                            | 보기 모드 URL 직렬화. `PLAN_ADD_DEFAULT_VIEW` 추가 | 1      |
+| `src/lib/url/view-mode.test.ts`                       | 위 순수 로직                                       | 1      |
+| `src/features/plan/plan-add-place-view.tsx`           | 담기 화면의 두 보기 분기 · 담기 액션 · 상태 분기   | 2, 6   |
+| `src/lib/messages/map.ts`                             | 지도 문구                                          | 3      |
+| `src/features/place/place-map-panel.tsx`              | 지도 패널·시트의 행. 선택 버튼 / 액션 열 / 알림 줄 | 3      |
+| `src/features/place/place-map-panel.test.ts`          | 위 렌더 분기                                       | 3      |
+| `src/features/place/place-map-view.tsx`               | 지도 상태의 유일한 주인. `fill` + slot props       | 4      |
+| `app/(main)/places/(list)/page.tsx`                   | `/places` 호출부 갱신                              | 4      |
+| `src/features/plan/plan-add-place-header.tsx`         | **신규.** 담기 화면 헤더 (뒤로 · h1 · 부제 · 토글) | 5      |
+| `app/(main)/plans/[planId]/days/[day]/add/page.tsx`   | `view` 파싱 + 지도/목록 갈래                       | 6      |
+| `src/features/plan/plan-add-place-map.test.ts`        | **신규.** 담기 액션·알림·폴백 렌더 분기            | 6      |
+| `src/features/plan/plan-add-place.test.ts`            | 담기 후 이동 안 함 회귀 고정                       | 2      |
+| `docs/features/plan/일자편집-세부명세.md`             | F5 표 396행 개정                                   | 8      |
+| `docs/features/_index.md`, `docs/screen-inventory.md` | 상태 갱신                                          | 8      |
 
 **의존 순서:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9. 1·2·3 은 서로 독립이라 순서를 바꿔도 되지만 4 는 3 을, 6 은 1·4·5 를 필요로 한다.
 
@@ -66,13 +66,15 @@
 
 ## Task 1: `PLAN_ADD_DEFAULT_VIEW` 상수
 
-담기 화면의 기본 보기를 지도로 정한다. **값은 `PLACES_DEFAULT_VIEW` 와 같지만 상수를 따로 둔다** — `view-mode.ts` 가 이미 *"화면이 자기 기본값을 갖는다"* 를 규약으로 적어 뒀고, 긴급 시설이 목록으로 남은 것이 그 규약의 존재 이유다.
+담기 화면의 기본 보기를 지도로 정한다. **값은 `PLACES_DEFAULT_VIEW` 와 같지만 상수를 따로 둔다** — `view-mode.ts` 가 이미 _"화면이 자기 기본값을 갖는다"_ 를 규약으로 적어 뒀고, 긴급 시설이 목록으로 남은 것이 그 규약의 존재 이유다.
 
 **Files:**
+
 - Modify: `src/lib/url/view-mode.ts` (`PLACES_DEFAULT_VIEW` 선언 바로 아래)
 - Test: `src/lib/url/view-mode.test.ts`
 
 **Interfaces:**
+
 - Consumes: 없음
 - Produces: `export const PLAN_ADD_DEFAULT_VIEW: ViewMode` — 태스크 6 의 `add/page.tsx` 가 `parseViewMode` · `viewModeHref` 양쪽에 넘긴다
 
@@ -160,10 +162,12 @@ git commit -m "[FE] feat: 담기 화면의 기본 보기를 지도로 정하는 
 **`usePlanAddPlace` 훅 내부는 손대지 않는다.** 토스트 · `planKeys.detail` 교체 · 판정 무효화가 이미 전부 있고, `onAdded` 는 optional 이라 넘기지 않으면 그만이다.
 
 **Files:**
+
 - Modify: `src/features/plan/plan-add-place-view.tsx` (`usePlanAddPlace` 호출부와 `useRouter` 사용처)
 - Test: `src/features/plan/plan-add-place.test.ts`
 
 **Interfaces:**
+
 - Consumes: `usePlanAddPlace({ planId, onAdded? })` — `onAdded` 를 넘기지 않는다
 - Produces: 없음 (동작 변경)
 
@@ -205,7 +209,7 @@ Expected: FAIL — 두 케이스 모두. 현재 소스에 `onAdded:` 와 `router
 `plan-add-place-view.tsx` 의 `usePlanAddPlace` 호출을 이렇게 바꾼다. 주석이 왜 바뀌었는지를 남긴다.
 
 ```tsx
-  /*
+/*
     **담기에 성공해도 화면에 남는다** (#370). 원래는 그 일자로 `replace` 이동했는데
     (일자편집 명세 F5), 지도 보기에서 하루 동선을 짜려면 여러 곳을 연달아 담아야 해서
     담자마자 나가면 지도로 바꾼 의미가 없다.
@@ -214,7 +218,7 @@ Expected: FAIL — 두 케이스 모두. 현재 소스에 `onAdded:` 와 `router
     `planKeys.detail` 을 갈아끼우므로 그 행이 곧바로 `이미 담았어요` 로 바뀐다.
     돌아가기는 헤더의 `일정으로 돌아가기` 가 맡는다.
   */
-  const addPlace = usePlanAddPlace({ planId })
+const addPlace = usePlanAddPlace({ planId })
 ```
 
 `router` 는 `onResetFilters` 가 계속 쓰므로 **`useRouter` 는 남긴다.**
@@ -244,11 +248,13 @@ git commit -m "[FE] fix: 장소를 담아도 담기 화면에 남아 연달아 �
 **`/places` 지도 패널도 함께 바뀐다.** 제목이 더 이상 링크가 아니고 액션 열에 `상세` 링크가 생긴다.
 
 **Files:**
+
 - Modify: `src/lib/messages/map.ts` (`rowDetail` · `rowDetailLabel` 추가)
 - Modify: `src/features/place/place-map-panel.tsx` (전면 재작성)
 - Test: `src/features/place/place-map-panel.test.ts`
 
 **Interfaces:**
+
 - Consumes: `PlaceRowContent({ place, titleHref? })` · `PlaceSummary`
 - Produces: `PlaceMapPanel` 이 두 prop 을 더 받는다 — 태스크 4 가 `PlaceMapView` 에서 그대로 통과시킨다
 
@@ -277,46 +283,46 @@ renderRowNotice?: ((place: PlaceSummary) => ReactNode) | undefined
 `src/features/place/place-map-panel.test.ts` — 기존 `render()` 헬퍼는 그대로 두고, **"제목은 링크로 남긴다" 케이스의 이름과 뜻을 고치고** 아래 케이스를 더한다.
 
 ```ts
-  it('상세로 가는 길이 사라지지 않는다 — 제목 대신 액션 열 링크다', () => {
-    expect(render()).toContain(`href="/places/${placeSummary.placeId}"`)
+it('상세로 가는 길이 사라지지 않는다 — 제목 대신 액션 열 링크다', () => {
+  expect(render()).toContain(`href="/places/${placeSummary.placeId}"`)
+})
+
+it('선택 버튼 안에 대화형 요소가 없다 — button 안의 a 는 명세 위반이다', () => {
+  const markup = render()
+  const selectButton = markup.slice(markup.indexOf('<button'), markup.indexOf('</button>'))
+
+  expect(selectButton).not.toContain('<a ')
+  expect(selectButton).not.toContain('href=')
+})
+
+it('상세 링크가 어느 장소인지 말한다', () => {
+  expect(render()).toContain(
+    `aria-label="${messages.map.rowDetailLabel.replace('{title}', placeSummary.title)}"`,
+  )
+})
+
+it('renderRowAction 을 액션 열에 그린다 — 담기 버튼이 여기 온다', () => {
+  const markup = render({
+    renderRowAction: () => createElement('button', { type: 'button' }, '담기'),
   })
 
-  it('선택 버튼 안에 대화형 요소가 없다 — button 안의 a 는 명세 위반이다', () => {
-    const markup = render()
-    const selectButton = markup.slice(markup.indexOf('<button'), markup.indexOf('</button>'))
+  expect(markup).toContain('담기')
+  expect(markup).toContain('w-24')
+})
 
-    expect(selectButton).not.toContain('<a ')
-    expect(selectButton).not.toContain('href=')
+it('액션이 없어도 열 자체는 있다 — /places 는 상세 링크만 든다', () => {
+  expect(render()).toContain('w-24')
+})
+
+it('renderRowNotice 는 행 아래 전폭이다 — 액션 열은 w-24 라 알림이 못 들어간다', () => {
+  const markup = render({
+    renderRowNotice: () => createElement('p', { role: 'alert' }, '담지 못했어요'),
   })
 
-  it('상세 링크가 어느 장소인지 말한다', () => {
-    expect(render()).toContain(
-      `aria-label="${messages.map.rowDetailLabel.replace('{title}', placeSummary.title)}"`,
-    )
-  })
-
-  it('renderRowAction 을 액션 열에 그린다 — 담기 버튼이 여기 온다', () => {
-    const markup = render({
-      renderRowAction: () => createElement('button', { type: 'button' }, '담기'),
-    })
-
-    expect(markup).toContain('담기')
-    expect(markup).toContain('w-24')
-  })
-
-  it('액션이 없어도 열 자체는 있다 — /places 는 상세 링크만 든다', () => {
-    expect(render()).toContain('w-24')
-  })
-
-  it('renderRowNotice 는 행 아래 전폭이다 — 액션 열은 w-24 라 알림이 못 들어간다', () => {
-    const markup = render({
-      renderRowNotice: () => createElement('p', { role: 'alert' }, '담지 못했어요'),
-    })
-
-    expect(markup).toContain('role="alert"')
-    // 알림은 액션 열(w-24) 안이 아니라 그 뒤에 온다
-    expect(markup.indexOf('role="alert"')).toBeGreaterThan(markup.indexOf('w-24'))
-  })
+  expect(markup).toContain('role="alert"')
+  // 알림은 액션 열(w-24) 안이 아니라 그 뒤에 온다
+  expect(markup.indexOf('role="alert"')).toBeGreaterThan(markup.indexOf('w-24'))
+})
 ```
 
 - [ ] **Step 3: 실패를 확인한다**
@@ -463,10 +469,12 @@ git commit -m "[FE] fix: 지도 패널 행의 button 안 링크 중첩을 풀고
 지도 상태의 유일한 주인은 그대로 두고, 두 화면이 다른 부분만 밖에서 받는다. **전부 place 어휘다** — plan 을 모른다.
 
 **Files:**
+
 - Modify: `src/features/place/place-map-view.tsx`
 - Modify: `app/(main)/places/(list)/page.tsx` (호출부)
 
 **Interfaces:**
+
 - Consumes: 태스크 3 의 `PlaceMapPanel({ renderRowAction?, renderRowNotice? })`
 - Produces: 태스크 6 이 쓰는 `PlaceMapView` 의 새 인터페이스
 
@@ -541,22 +549,22 @@ import { PlaceListSection, type PlaceListSectionProps } from '@/features/place/p
 `pins` 계산을 바꾼다.
 
 ```tsx
-  const pins: MapPin[] = useMemo(
-    () =>
-      visible.map((place) => ({
-        id: place.placeId,
-        title: place.title,
-        lat: place.lat,
-        lng: place.lng,
-        /*
+const pins: MapPin[] = useMemo(
+  () =>
+    visible.map((place) => ({
+      id: place.placeId,
+      title: place.title,
+      lat: place.lat,
+      lng: place.lng,
+      /*
           **이미 담은 곳은 톤을 낮춘다** (#370). 훑어볼 때 항상 보이는 채널이 이것뿐이다 —
           `caption` 은 선택됐을 때만 라벨에 붙고, `MapCanvas` 는 마커에 판정 색을 쓰지
           않는다는 규약이 있다. 긴급 시설의 약국이 쓰던 표현을 그대로 재사용한다.
         */
-        muted: mutedPlaceIds?.has(place.placeId) ?? false,
-      })),
-    [visible, mutedPlaceIds],
-  )
+      muted: mutedPlaceIds?.has(place.placeId) ?? false,
+    })),
+  [visible, mutedPlaceIds],
+)
 ```
 
 - [ ] **Step 3: SDK 실패 폴백에 행을 통과시킨다**
@@ -564,20 +572,18 @@ import { PlaceListSection, type PlaceListSectionProps } from '@/features/place/p
 `if (failure !== null)` 블록의 `PlaceListSection` 에 한 줄을 더한다.
 
 ```tsx
-        <PlaceListSection
-          places={listPlaces}
-          loading={listQuery.isPending}
-          errorStatus={toErrorStatus(listQuery.error)}
-          errorMessage={
-            listQuery.error instanceof ApiError ? listQuery.error.rawMessage : undefined
-          }
-          hasNext={listQuery.data?.pages.at(-1)?.hasNext ?? false}
-          loadingMore={listQuery.isFetchingNextPage}
-          onLoadMore={() => void listQuery.fetchNextPage()}
-          onRetry={() => void listQuery.refetch()}
-          onResetFilters={() => undefined}
-          {...(renderListRow === undefined ? {} : { renderRow: renderListRow })}
-        />
+<PlaceListSection
+  places={listPlaces}
+  loading={listQuery.isPending}
+  errorStatus={toErrorStatus(listQuery.error)}
+  errorMessage={listQuery.error instanceof ApiError ? listQuery.error.rawMessage : undefined}
+  hasNext={listQuery.data?.pages.at(-1)?.hasNext ?? false}
+  loadingMore={listQuery.isFetchingNextPage}
+  onLoadMore={() => void listQuery.fetchNextPage()}
+  onRetry={() => void listQuery.refetch()}
+  onResetFilters={() => undefined}
+  {...(renderListRow === undefined ? {} : { renderRow: renderListRow })}
+/>
 ```
 
 > 전개 형태인 이유는 `exactOptionalPropertyTypes` 다. `renderRow={renderListRow}` 로 쓰면 `undefined` 를 명시적으로 넘기는 것이 되어 기본값이 안 먹는다.
@@ -589,46 +595,46 @@ import { PlaceListSection, type PlaceListSectionProps } from '@/features/place/p
 성공 갈래의 `return` 을 바꾼다.
 
 ```tsx
-  const countLine = messages.map.visibleCount.replace('{n}', String(visible.length))
-  /** 둘 다 있을 때만 그린다 — 헤더가 토글을 갖는 화면은 주지 않는다 */
-  const showToggle = listHref !== undefined && mapHref !== undefined
+const countLine = messages.map.visibleCount.replace('{n}', String(visible.length))
+/** 둘 다 있을 때만 그린다 — 헤더가 토글을 갖는 화면은 주지 않는다 */
+const showToggle = listHref !== undefined && mapHref !== undefined
 
-  return (
-    /*
+return (
+  /*
       **높이를 여기서 잡는다.** `map-canvas-height` 는 뷰포트를 정확히 다 쓰므로
       (`calc(100dvh - --header-h - --tabbar-h)`), 캔버스에 걸어 둔 채 위에 헤더를 얹으면
       그 높이만큼 넘쳐 지도 화면에 세로 스크롤이 난다. `fill` 이면 부모가 정한 높이를
       채우고, 아니면 예전처럼 스스로 뷰포트를 채운다 — `/places` 는 픽셀이 같다.
     */
-    <div className={cn('relative', fill ? 'h-full' : 'map-canvas-height')}>
-      <MapCanvas
-        pins={pins}
-        selectedId={selectedId}
-        onSelect={setSelectedId}
-        onBoundsChange={handleBounds}
-        center={center}
-        selectedLevel={SELECTED_PLACE_MAP_LEVEL}
-        onFailure={setFailure}
-        className="h-full w-full"
-      />
+  <div className={cn('relative', fill ? 'h-full' : 'map-canvas-height')}>
+    <MapCanvas
+      pins={pins}
+      selectedId={selectedId}
+      onSelect={setSelectedId}
+      onBoundsChange={handleBounds}
+      center={center}
+      selectedLevel={SELECTED_PLACE_MAP_LEVEL}
+      onFailure={setFailure}
+      className="h-full w-full"
+    />
 
-      <div className="absolute top-5 right-4 z-30 flex flex-col items-end gap-2 md:right-10 lg:top-6">
-        {showToggle && (
-          <ViewToggle
-            current="map"
-            listHref={listHref}
-            mapHref={mapHref}
-            variant="icon"
-            className="shadow-md"
-          />
-        )}
+    <div className="absolute top-5 right-4 z-30 flex flex-col items-end gap-2 md:right-10 lg:top-6">
+      {showToggle && (
+        <ViewToggle
+          current="map"
+          listHref={listHref}
+          mapHref={mapHref}
+          variant="icon"
+          className="shadow-md"
+        />
+      )}
 
-        {inJeju && <MapLocateButton onLocate={locate} />}
-      </div>
-
-      {/* …좌측 패널 · MapSheet 는 그대로… */}
+      {inJeju && <MapLocateButton onLocate={locate} />}
     </div>
-  )
+
+    {/* …좌측 패널 · MapSheet 는 그대로… */}
+  </div>
+)
 ```
 
 > 우상단 스택은 토글이 없어도 남긴다 — `MapLocateButton` 이 같은 자리를 쓴다.
@@ -638,13 +644,13 @@ import { PlaceListSection, type PlaceListSectionProps } from '@/features/place/p
 데스크톱 패널과 `MapSheet` 안, **두 군데 모두** 같은 두 줄을 더한다.
 
 ```tsx
-                  <PlaceMapPanel
-                    places={visible}
-                    selectedId={selectedId}
-                    onSelect={setSelectedId}
-                    renderRowAction={renderRowAction}
-                    renderRowNotice={renderRowNotice}
-                  />
+<PlaceMapPanel
+  places={visible}
+  selectedId={selectedId}
+  onSelect={setSelectedId}
+  renderRowAction={renderRowAction}
+  renderRowNotice={renderRowNotice}
+/>
 ```
 
 - [ ] **Step 6: `/places` 호출부를 고친다**
@@ -652,22 +658,17 @@ import { PlaceListSection, type PlaceListSectionProps } from '@/features/place/p
 `app/(main)/places/(list)/page.tsx` 의 지도 갈래를 바꾼다. `listHref`·`mapHref` 는 **이미 위에서 계산돼 있다** — 목록 갈래의 `ViewToggle` 이 쓰던 것을 그대로 넘긴다.
 
 ```tsx
-  if (view === 'map') {
-    return (
-      <main id="main-content">
-        <h1 className="sr-only">{messages.place.pageTitle}</h1>
-        <HydrationBoundary state={dehydrate(queryClient)}>
-          {/* 보기 전환 링크를 페이지가 만든다 — 지도 컴포넌트가 '/places' 를 알 이유가 없다 */}
-          <PlaceMapView
-            filters={filters}
-            authed={authed}
-            listHref={listHref}
-            mapHref={mapHref}
-          />
-        </HydrationBoundary>
-      </main>
-    )
-  }
+if (view === 'map') {
+  return (
+    <main id="main-content">
+      <h1 className="sr-only">{messages.place.pageTitle}</h1>
+      <HydrationBoundary state={dehydrate(queryClient)}>
+        {/* 보기 전환 링크를 페이지가 만든다 — 지도 컴포넌트가 '/places' 를 알 이유가 없다 */}
+        <PlaceMapView filters={filters} authed={authed} listHref={listHref} mapHref={mapHref} />
+      </HydrationBoundary>
+    </main>
+  )
+}
 ```
 
 - [ ] **Step 7: 타입과 기존 테스트를 확인한다**
@@ -693,10 +694,12 @@ git commit -m "[FE] refactor: 지도 뷰가 높이·보기전환·행 액션을 
 동작을 바꾸지 않는 순수 추출이다. 두 보기가 같은 헤더를 써야 하는데 지금은 `PlanAddPlaceShell` 안에 박혀 있다.
 
 **Files:**
+
 - Create: `src/features/plan/plan-add-place-header.tsx`
 - Modify: `src/features/plan/plan-add-place-view.tsx` (`PlanAddPlaceShell` 이 새 컴포넌트를 쓰게)
 
 **Interfaces:**
+
 - Consumes: `BackLink({ href, label, className? })` · `ViewToggle({ current, listHref, mapHref, variant?, className? })`
 - Produces: 태스크 6 이 지도 갈래에서 직접 쓴다
 
@@ -832,11 +835,13 @@ git commit -m "[FE] refactor: 담기 화면 헤더를 뽑아 두 보기가 나�
 ## Task 6: 담기 화면에 지도 갈래를 붙인다
 
 **Files:**
+
 - Modify: `app/(main)/plans/[planId]/days/[day]/add/page.tsx`
 - Modify: `src/features/plan/plan-add-place-view.tsx`
 - Test: `src/features/plan/plan-add-place-map.test.ts` (신규)
 
 **Interfaces:**
+
 - Consumes: 태스크 1 의 `PLAN_ADD_DEFAULT_VIEW` · 태스크 4 의 `PlaceMapView` · 태스크 5 의 `PlanAddPlaceHeader`
 - Produces: 없음 (화면 완성)
 
@@ -1078,19 +1083,19 @@ Expected: PASS (8케이스).
 `app/(main)/plans/[planId]/days/[day]/add/page.tsx` — `filters` 계산 다음에 보기와 링크를 만들고, `return` 을 둘로 나눈다.
 
 ```tsx
-  const resolved = await searchParams
-  const filters = parsePlaceFilters(resolved)
+const resolved = await searchParams
+const filters = parsePlaceFilters(resolved)
 
-  /*
+/*
     **이 화면의 기본 보기도 지도다** (`PLAN_ADD_DEFAULT_VIEW`, #370). 링크를 만드는 쪽과
     파싱하는 쪽에 **같은 기본값**을 넘겨야 한다 — 어긋나면 토글이 가리키는 보기와
     페이지가 그리는 보기가 달라진다.
   */
-  const view = parseViewMode(resolved, PLAN_ADD_DEFAULT_VIEW)
-  const basePath = `/plans/${planId}/days/${rawDay}/add`
-  const filterQuery = toPlaceFilterQuery(filters)
-  const listHref = viewModeHref(basePath, filterQuery, 'list', PLAN_ADD_DEFAULT_VIEW)
-  const mapHref = viewModeHref(basePath, filterQuery, 'map', PLAN_ADD_DEFAULT_VIEW)
+const view = parseViewMode(resolved, PLAN_ADD_DEFAULT_VIEW)
+const basePath = `/plans/${planId}/days/${rawDay}/add`
+const filterQuery = toPlaceFilterQuery(filters)
+const listHref = viewModeHref(basePath, filterQuery, 'list', PLAN_ADD_DEFAULT_VIEW)
+const mapHref = viewModeHref(basePath, filterQuery, 'map', PLAN_ADD_DEFAULT_VIEW)
 ```
 
 import 를 더한다.
@@ -1105,49 +1110,49 @@ import { parseViewMode, PLAN_ADD_DEFAULT_VIEW, viewModeHref } from '@/lib/url/vi
 `return` 을 이렇게 나눈다.
 
 ```tsx
-  /*
+/*
     **지도 보기는 레일 2단을 쓰지 않는다.** 280 레일을 함께 두면 지도가 세 번 접힌다
     (`places/(list)/page.tsx` 와 같은 판단). 필터는 패널·시트 머리가 맡고 URL 에 남아
     있으므로 목록으로 돌아가면 레일에 다시 보인다.
   */
-  if (view === 'map') {
-    return (
-      <main id="main-content">
-        <HydrationBoundary state={dehydrate(queryClient)}>
-          <PlanAddPlaceView
-            planId={planId}
-            day={day}
-            filters={filters}
-            view="map"
-            listHref={listHref}
-            mapHref={mapHref}
-          />
-        </HydrationBoundary>
-      </main>
-    )
-  }
-
+if (view === 'map') {
   return (
-    <main id="main-content" className="rail-layout rail-layout-filter">
-      {/* 목록 화면과 같은 2단이다. 태블릿은 한 컬럼 — 280 레일을 더하면 768 을 넘는다 */}
-      <div className="rail-sticky hidden lg:block">
-        <PlaceFilterRail filters={filters} authed />
-      </div>
-
-      <div className="lg:border-border lg:border-l">
-        <HydrationBoundary state={dehydrate(queryClient)}>
-          <PlanAddPlaceView
-            planId={planId}
-            day={day}
-            filters={filters}
-            view="list"
-            listHref={listHref}
-            mapHref={mapHref}
-          />
-        </HydrationBoundary>
-      </div>
+    <main id="main-content">
+      <HydrationBoundary state={dehydrate(queryClient)}>
+        <PlanAddPlaceView
+          planId={planId}
+          day={day}
+          filters={filters}
+          view="map"
+          listHref={listHref}
+          mapHref={mapHref}
+        />
+      </HydrationBoundary>
     </main>
   )
+}
+
+return (
+  <main id="main-content" className="rail-layout rail-layout-filter">
+    {/* 목록 화면과 같은 2단이다. 태블릿은 한 컬럼 — 280 레일을 더하면 768 을 넘는다 */}
+    <div className="rail-sticky hidden lg:block">
+      <PlaceFilterRail filters={filters} authed />
+    </div>
+
+    <div className="lg:border-border lg:border-l">
+      <HydrationBoundary state={dehydrate(queryClient)}>
+        <PlanAddPlaceView
+          planId={planId}
+          day={day}
+          filters={filters}
+          view="list"
+          listHref={listHref}
+          mapHref={mapHref}
+        />
+      </HydrationBoundary>
+    </div>
+  </main>
+)
 ```
 
 - [ ] **Step 6: `PlanAddPlaceView` 에 지도 갈래를 붙인다**
@@ -1175,13 +1180,13 @@ export function PlanAddPlaceView({
 `onResetFilters` 를 고친다 — **지금 코드는 `?view=` 를 잃어 지도에서 목록으로 튄다.**
 
 ```tsx
-  /** 필터만 비운다. **보기는 유지한다** — 지도에서 조건을 풀었는데 목록으로 튀면 안 된다 */
-  const resetHref = viewModeHref(
-    `/plans/${planId}/days/${String(day)}/add`,
-    '',
-    view,
-    PLAN_ADD_DEFAULT_VIEW,
-  )
+/** 필터만 비운다. **보기는 유지한다** — 지도에서 조건을 풀었는데 목록으로 튀면 안 된다 */
+const resetHref = viewModeHref(
+  `/plans/${planId}/days/${String(day)}/add`,
+  '',
+  view,
+  PLAN_ADD_DEFAULT_VIEW,
+)
 ```
 
 `PlaceListSection` 의 `onResetFilters` 를 `() => router.replace(resetHref, { scroll: false })` 로 바꾼다.
@@ -1189,71 +1194,69 @@ export function PlanAddPlaceView({
 성공 갈래(`addedPlaceIds` 계산 뒤)에 지도 분기를 넣는다. **`detail` 이 준비된 뒤에만 온다** — 앞의 pending·error·기간 밖 갈래가 이미 목록 껍데기로 처리했다.
 
 ```tsx
-  const addedPlaceIds = placeIdsOf(group.items)
+const addedPlaceIds = placeIdsOf(group.items)
 
-  const onAdd = (selected: PlaceSummary) =>
-    addPlace.add({
-      day,
-      // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
-      dayItems: group.items,
-      place: { placeId: selected.placeId, title: selected.title },
-    })
+const onAdd = (selected: PlaceSummary) =>
+  addPlace.add({
+    day,
+    // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
+    dayItems: group.items,
+    place: { placeId: selected.placeId, title: selected.title },
+  })
 
-  if (view === 'map') {
-    return (
-      /*
+if (view === 'map') {
+  return (
+    /*
         **높이를 여기서 잡는다.** 헤더가 정상 흐름으로 서고 남는 높이를 지도가 채운다 —
         `PlaceMapView` 에 `map-canvas-height` 를 맡기면 헤더 높이만큼 넘쳐 지도 화면에
         세로 스크롤이 난다.
       */
-      <div className="map-canvas-height flex flex-col">
-        <PlanAddPlaceHeader
-          day={day}
-          backHref={backHref}
-          planTitle={detail.data.title}
-          listHref={listHref}
-          mapHref={mapHref}
-          view="map"
-        />
+    <div className="map-canvas-height flex flex-col">
+      <PlanAddPlaceHeader
+        day={day}
+        backHref={backHref}
+        planTitle={detail.data.title}
+        listHref={listHref}
+        mapHref={mapHref}
+        view="map"
+      />
 
-        <div className="min-h-0 flex-1">
-          <PlaceMapView
-            filters={filters}
-            authed
-            fill
-            /* 헤더가 토글을 가지므로 `listHref`/`mapHref` 를 주지 않는다 */
-            mutedPlaceIds={addedPlaceIds}
-            renderRowAction={(place) =>
-              planAddPlaceAction(place, {
-                addedPlaceIds,
-                pendingPlaceId: addPlace.pending?.placeId ?? null,
-                disabled: addPlace.adding,
-                onAdd,
-              })
-            }
-            renderRowNotice={(place) => planAddPlaceNotice(place, { failure: addPlace.failure })}
-            /* **SDK 가 실패해도 담을 수 있어야 한다.** 없으면 열람 전용 화면이 된다 */
-            renderListRow={(place, last) => (
-              <PlanAddPlaceRow
-                key={place.placeId}
-                place={place}
-                last={last}
-                added={addedPlaceIds.has(place.placeId)}
-                pending={addPlace.pending?.placeId === place.placeId}
-                disabled={addPlace.adding}
-                error={
-                  addPlace.failure?.target.placeId === place.placeId
-                    ? addPlace.failure.error
-                    : null
-                }
-                onAdd={onAdd}
-              />
-            )}
-          />
-        </div>
+      <div className="min-h-0 flex-1">
+        <PlaceMapView
+          filters={filters}
+          authed
+          fill
+          /* 헤더가 토글을 가지므로 `listHref`/`mapHref` 를 주지 않는다 */
+          mutedPlaceIds={addedPlaceIds}
+          renderRowAction={(place) =>
+            planAddPlaceAction(place, {
+              addedPlaceIds,
+              pendingPlaceId: addPlace.pending?.placeId ?? null,
+              disabled: addPlace.adding,
+              onAdd,
+            })
+          }
+          renderRowNotice={(place) => planAddPlaceNotice(place, { failure: addPlace.failure })}
+          /* **SDK 가 실패해도 담을 수 있어야 한다.** 없으면 열람 전용 화면이 된다 */
+          renderListRow={(place, last) => (
+            <PlanAddPlaceRow
+              key={place.placeId}
+              place={place}
+              last={last}
+              added={addedPlaceIds.has(place.placeId)}
+              pending={addPlace.pending?.placeId === place.placeId}
+              disabled={addPlace.adding}
+              error={
+                addPlace.failure?.target.placeId === place.placeId ? addPlace.failure.error : null
+              }
+              onAdd={onAdd}
+            />
+          )}
+        />
       </div>
-    )
-  }
+    </div>
+  )
+}
 ```
 
 기존 목록 갈래의 `renderRow` 는 `onAdd` 를 쓰도록 정리한다 (중복 제거).
@@ -1319,6 +1322,7 @@ git commit -m "[FE] style: 포맷을 맞춘다"
 **코드 변경과 문서 변경은 같이 움직인다** (`frontend/CLAUDE.md` 운영 원칙).
 
 **Files:**
+
 - Modify: `docs/features/plan/일자편집-세부명세.md`
 - Modify: `docs/features/_index.md`
 - Modify: `docs/screen-inventory.md`
@@ -1328,7 +1332,7 @@ git commit -m "[FE] style: 포맷을 맞춘다"
 `docs/features/plan/일자편집-세부명세.md` 의 `| 담기 성공 후 |` 행을 바꾼다.
 
 ```markdown
-| 담기 성공 후                   | **화면에 남는다** ([#370](https://github.com/8llow8llowMe/hondigagae/issues/370)). 원래는 그 일자로 `replace` 이동이었으나, 지도 보기에서 하루 동선을 짜려면 여러 곳을 연달아 담아야 해서 담자마자 나가면 지도로 바꾼 의미가 없다. 피드백은 **토스트 + 그 행이 `이미 담았어요` 로 바뀌는 것**이고, 돌아가기는 헤더의 `일정으로 돌아가기` 다 |
+| 담기 성공 후 | **화면에 남는다** ([#370](https://github.com/8llow8llowMe/hondigagae/issues/370)). 원래는 그 일자로 `replace` 이동이었으나, 지도 보기에서 하루 동선을 짜려면 여러 곳을 연달아 담아야 해서 담자마자 나가면 지도로 바꾼 의미가 없다. 피드백은 **토스트 + 그 행이 `이미 담았어요` 로 바뀌는 것**이고, 돌아가기는 헤더의 `일정으로 돌아가기` 다 |
 ```
 
 같은 파일 F2 절 끝에 한 줄을 더한다.
@@ -1372,6 +1376,7 @@ pnpm dev:alt
 `/plans/{실제 planId}/days/1/add` 를 390 · 768 · 1280 에서 연다.
 
 확인 항목:
+
 - 지도 화면에 **세로 스크롤이 없다** (헤더 + 지도가 뷰포트에 정확히 든다)
 - 데스크톱 좌측 패널이 헤더와 겹치지 않는다
 - 모바일 시트를 `min`/`mid`/`max` 로 옮겨도 헤더가 가려지지 않는다
@@ -1431,19 +1436,19 @@ git push -u origin feature/fe/370-plan-add-place-map
 
 **1. 명세 커버리지**
 
-| 명세 절 | 태스크 |
-| --- | --- |
-| D0 기본 보기 · 이탈 경로 | 1, 5, 6 |
-| D1 레이아웃 · 높이 | 4(Step 4), 6(Step 6) |
-| D2 컴포넌트 · 인터페이스 | 3, 4, 5, 6 |
-| D3 데이터 흐름 · 프리페치 유지 | 6(Step 5) |
-| D4 상호작용 · `onResetFilters` 보존 | 6(Step 6) |
-| D4 담기 후 화면 유지 | 2 |
-| D5 상태별 화면 · SDK 폴백 | 4(Step 3), 6(Step 6) |
-| D6 접근성 · 중첩 해소 | 3 |
-| D7 테스트 | 1, 2, 3, 6 |
-| D8 미결 1·2 | 9(Step 5) |
-| 앞선 결정 개정(F5 396행) | 2, 8 |
+| 명세 절                             | 태스크               |
+| ----------------------------------- | -------------------- |
+| D0 기본 보기 · 이탈 경로            | 1, 5, 6              |
+| D1 레이아웃 · 높이                  | 4(Step 4), 6(Step 6) |
+| D2 컴포넌트 · 인터페이스            | 3, 4, 5, 6           |
+| D3 데이터 흐름 · 프리페치 유지      | 6(Step 5)            |
+| D4 상호작용 · `onResetFilters` 보존 | 6(Step 6)            |
+| D4 담기 후 화면 유지                | 2                    |
+| D5 상태별 화면 · SDK 폴백           | 4(Step 3), 6(Step 6) |
+| D6 접근성 · 중첩 해소               | 3                    |
+| D7 테스트                           | 1, 2, 3, 6           |
+| D8 미결 1·2                         | 9(Step 5)            |
+| 앞선 결정 개정(F5 396행)            | 2, 8                 |
 
 빠진 절 없음.
 
