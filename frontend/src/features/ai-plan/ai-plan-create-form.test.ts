@@ -13,6 +13,22 @@ import { messages } from '@/lib/messages'
 import { EMPTY_AI_PLAN_FORM_VALUES } from '@/types/ai-plan'
 import type { Pet } from '@/types/pet'
 
+/*
+  `SIGUNGU_LABEL` 의 키는 시군구 코드 `'3'`(서귀포시) · `'4'`(제주시) 다 — 지역코드가
+  아니다. `noUncheckedIndexedAccess` 때문에 인덱스 접근이 `string | undefined` 라
+  여기서 한 번만 좁혀 쓴다.
+*/
+const JEJU_SI = SIGUNGU_LABEL['4'] ?? ''
+const SEOGWIPO_SI = SIGUNGU_LABEL['3'] ?? ''
+
+/*
+  「더 자세히 정할게요」 안의 컨트롤은 **펼쳐졌을 때만 마운트된다.** 열림은 마운트 시
+  1회 판정이라(`hasAnyDetail`) 검사하려는 축과 **다른 축**의 값으로 열어야 한다 —
+  지역 칩을 보려면 예산으로, 예산 칩을 보려면 지역으로 연다.
+*/
+const OPEN_BY_BUDGET = { budgetManwon: '30' } as const
+const OPEN_BY_REGION = { sigunguCode: '4' } as const
+
 function pet(petId: string, name: string): Pet {
   return {
     petId,
@@ -77,7 +93,7 @@ describe('AiPlanCreateForm — 지역 좁히기 (#251)', () => {
     필드를 열면서 아트보드 01 대로 돌아왔다.
   */
   it('아트보드 01 의 세 갈래를 낸다', () => {
-    const html = render()
+    const html = render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_BUDGET } })
 
     expect(html).toContain(messages.aiPlan.fieldRegion)
     expect(html).toContain(messages.aiPlan.fieldRegionAll)
@@ -87,14 +103,16 @@ describe('AiPlanCreateForm — 지역 좁히기 (#251)', () => {
 
   /** 장소 찾기와 같은 표를 쓴다 — 같은 코드에 두 이름이 생기면 화면마다 다른 말을 한다 */
   it('선택지 이름을 장소 찾기와 같은 표에서 가져온다', () => {
-    const html = render()
+    const html = render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_BUDGET } })
 
-    expect(html).toContain(SIGUNGU_LABEL['4'] ?? '')
-    expect(html).toContain(SIGUNGU_LABEL['3'] ?? '')
+    expect(html).toContain(JEJU_SI)
+    expect(html).toContain(SEOGWIPO_SI)
   })
 
   it('기본은 제주 전체가 골라져 있다 — 좁히는 것은 사용자가 고르는 일이다', () => {
-    const html = render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, sigunguCode: null } })
+    const html = render({
+      values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_BUDGET, sigunguCode: null },
+    })
 
     // 배타 칩은 `aria-checked` 로 선택을 말한다
     expect(html).toContain('aria-checked="true"')
@@ -102,7 +120,9 @@ describe('AiPlanCreateForm — 지역 좁히기 (#251)', () => {
 
   /** 좁히면 못 만들 수 있다는 것을 **고르기 전에** 말한다 — 서버가 전체로 넓혀 주지 않는다 */
   it('좁히기의 결과를 한 줄로 밝힌다', () => {
-    expect(render()).toContain(messages.aiPlan.fieldRegionHint)
+    expect(render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_BUDGET } })).toContain(
+      messages.aiPlan.fieldRegionHint,
+    )
   })
 })
 
@@ -138,7 +158,7 @@ describe('AiPlanCreateForm — 반려견은 체크박스 여러 마리 (#128)', 
 
 describe('AiPlanCreateForm — 예산은 칩 + 직접 입력', () => {
   it('어림값 칩 세 개와 상관없음을 준다', () => {
-    const html = render()
+    const html = render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_REGION } })
 
     expect(html).toContain('20만원')
     expect(html).toContain('30만원')
@@ -147,17 +167,23 @@ describe('AiPlanCreateForm — 예산은 칩 + 직접 입력', () => {
   })
 
   it('빈 값이면 상관없음이 골라져 있다 — 0 이 아니라 생략이 "안 정했다" 다', () => {
-    const html = render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, budgetManwon: '' } })
+    const html = render({
+      values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_REGION, budgetManwon: '' },
+    })
     // exclusive 칩은 role="radio" + aria-checked 다
     expect(html).toContain('aria-checked="true"')
   })
 
   it('만원 단위임을 라벨로 밝힌다', () => {
-    expect(render()).toContain(messages.aiPlan.fieldBudgetUnit)
+    expect(render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_REGION } })).toContain(
+      messages.aiPlan.fieldBudgetUnit,
+    )
   })
 
   it('예산 칸은 number 가 아니다 — 휠 스크롤로 값이 바뀌면 안 된다', () => {
-    expect(render()).toContain('inputMode="numeric"')
+    expect(render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_REGION } })).toContain(
+      'inputMode="numeric"',
+    )
   })
 })
 
@@ -187,8 +213,14 @@ describe('AiPlanCreateForm — 오류 표시', () => {
     expect(html).toContain('요청 값이 올바르지 않습니다.')
   })
 
+  /*
+    예산 칸은 접기 안에 있다. **오류를 낸 값을 함께 넘긴다** — 실제 화면에서도 오류는
+    값에서 나오므로 접기가 펼쳐진 채로 열린다. (제출 시점에 펼치는 effect 는
+    `renderToStaticMarkup` 이 effect 를 돌리지 않아 여기서 검사할 수 없다.)
+  */
   it('필드 오류를 그 필드에 붙인다', () => {
     const html = render({
+      values: { ...EMPTY_AI_PLAN_FORM_VALUES, budgetManwon: '3.5' },
       errors: { fields: { budgetManwon: messages.aiPlan.errorBudgetPositive }, form: null },
     })
 
@@ -206,5 +238,37 @@ describe('AiPlanCreateForm — 오류 표시', () => {
 describe('AiPlanCreateForm — 날짜 입력이 네이티브로 돌아가지 않는다', () => {
   it('type="date" 를 쓰지 않는다', () => {
     expect(render()).not.toContain('type="date"')
+  })
+})
+
+describe('AiPlanCreateForm — 선택 항목을 접는다', () => {
+  it('아무것도 안 정했으면 지역 칩을 접어 둔다', () => {
+    const html = render()
+
+    expect(html).toContain(messages.aiPlan.detailsToggle)
+    expect(html).not.toContain(JEJU_SI)
+  })
+
+  it('접힌 줄이 기본값을 읽어 준다', () => {
+    expect(render()).toContain('제주 전체 · 예산 상관없음')
+  })
+
+  it('예산이 이미 있으면 펼친 채로 연다 — 조건 바꾸기로 돌아온 경우다', () => {
+    const html = render({
+      values: { ...EMPTY_AI_PLAN_FORM_VALUES, budgetManwon: '30' },
+    })
+
+    expect(html).toContain(JEJU_SI)
+  })
+
+  it('필수 항목은 접지 않는다', () => {
+    const html = render()
+
+    expect(html).toContain(messages.aiPlan.fieldStartDate)
+    expect(html).toContain(messages.aiPlan.fieldPet)
+  })
+
+  it('자유 요청은 접기 밖에 남는다 — AI 품질에 가장 크게 기여하는 입력이다', () => {
+    expect(render()).toContain(messages.aiPlan.fieldNote)
   })
 })

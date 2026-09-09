@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/button'
 import { Chip, ChipGroup } from '@/components/chip'
@@ -9,10 +9,12 @@ import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
 import { Input } from '@/components/input'
 import { Textarea } from '@/components/textarea'
+import { AiPlanDetailsDisclosure } from '@/features/ai-plan/ai-plan-details-disclosure'
 import { AiPlanOptionsSection } from '@/features/ai-plan/ai-plan-options-section'
 import { PetCheckboxGroup } from '@/features/ai-plan/pet-checkbox-group'
 import { SIGUNGU_CODES, SIGUNGU_LABEL } from '@/features/place/filter-labels'
 import { BUDGET_PRESETS_MANWON } from '@/lib/ai-plan/budget'
+import { type DetailsInput, detailsSummary, hasAnyDetail } from '@/lib/ai-plan/details'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 import { describePet } from '@/lib/pet/describe'
@@ -46,9 +48,9 @@ export type AiPlanCreateFormProps = {
  *
  * 표시 전용이라 node 환경에서 렌더 테스트가 된다 (`testing-guide.md` §1).
  *
- * **지역 컨트롤이 없다.** 아트보드에는 제주시 / 서귀포시 / 제주 전체 칩이 있지만
- * `AiPlanCreateRequest` 에 `sigunguCode` 가 없어 좁힐 수 없다 (명세 S2). 선택지가 하나면
- * 컨트롤을 두지 않되, **없는 것이 누락으로 보이지 않게 한 줄로 밝힌다.**
+ * **정말 필수인 것은 기간·반려견 둘뿐이다.** 나머지 다섯(지역 · 예산 · 저장한 곳 우선 ·
+ * 꼭 넣을 곳)은 기본값이 있어 「더 자세히 정할게요」 접기 안에 있다. 자유 요청만 접기
+ * 밖에 남는데, 기본값이 없고 결과 품질에 가장 크게 기여하는 입력이기 때문이다.
  */
 export function AiPlanCreateForm({
   values,
@@ -65,6 +67,53 @@ export function AiPlanCreateForm({
   onSubmit,
 }: AiPlanCreateFormProps) {
   const formRef = useRef<HTMLFormElement>(null)
+
+  const details: DetailsInput = {
+    /*
+      **`?? fieldRegionAll` 을 뺄 수 없다.** `tsconfig` 가 `noUncheckedIndexedAccess: true`
+      이고 `SIGUNGU_LABEL` 이 `Record<string, string>` 이라, 인덱스 접근의 타입은
+      `string | undefined` 다. 빼면 typecheck 가 깨진다.
+    */
+    regionLabel:
+      values.sigunguCode === null
+        ? messages.aiPlan.fieldRegionAll
+        : (SIGUNGU_LABEL[values.sigunguCode] ?? messages.aiPlan.fieldRegionAll),
+    regionNarrowed: values.sigunguCode !== null,
+    budgetManwon: values.budgetManwon,
+    preferFavorites: values.preferFavorites,
+    pinnedCount: values.pinnedPlaces.length,
+  }
+
+  /*
+    **마운트 시 1회만 판정한다.** 지연 초기화로 첫 값을 정하고 그 뒤로는 사용자의 토글만
+    듣는다. `hasAnyDetail(details)` 를 매 렌더 읽으면 **마지막 값을 지우는 순간 입력 중인
+    섹션이 접힌다** — `restoreValues` 가 `sessionStorage` 를 지연 초기화로 읽는 것과 같은
+    이유다 (`ai-plan-create-view.tsx`).
+
+    `?from={jobId}` 로 돌아온 사람에게 자기가 넣었던 예산이 접혀 있으면 사라진 것처럼 보인다.
+  */
+  const [detailsOpen, setDetailsOpen] = useState(() => hasAnyDetail(details))
+
+  /*
+    **접힌 섹션 안의 필드에서 오류가 나면 먼저 펼친다.** 안 그러면 제출이 조용히 실패한다 —
+    포커스를 옮길 요소가 마운트돼 있지 않고, 오류 메시지도 화면에 없다.
+
+    `submitCount` 를 트리거로 쓴다 (`errors` 를 쓰면 입력 중에 다시 돈다 —
+    `use-form.ts` 의 `submitCount` JSDoc).
+
+    **아래 포커스 effect 보다 먼저 선언한다.** 다만 순서만으로 포커스까지 살아나지는
+    않는다 — 두 effect 는 같은 커밋에서 연달아 돌고, 여기서 부른 `setDetailsOpen` 이
+    만든 재렌더는 그 뒤에 온다. 즉 아래 effect 가 `querySelector` 할 때 패널은 아직
+    마운트 전이다. **이 effect 가 지키는 것은 "오류가 화면에 보인다" 까지다** —
+    포커스가 접힌 필드에 닿게 하려면 `detailsOpen` 을 아래 effect 의 의존성에
+    더해야 하는데, 그러면 사용자가 접기를 여닫을 때마다 포커스를 훔친다.
+  */
+  useEffect(() => {
+    if (submitCount === 0 || firstErrorField === null) return
+    if (firstErrorField === 'budgetManwon' || firstErrorField === 'pinnedPlaces') {
+      setDetailsOpen(true)
+    }
+  }, [submitCount, firstErrorField])
 
   /*
     제출 실패 시 첫 오류 필드로 포커스를 옮긴다. `errors` 를 의존성으로 쓰면 입력 중인
@@ -94,35 +143,12 @@ export function AiPlanCreateForm({
     >
       <FormAlert message={errors.form} />
 
-      <div className="flex flex-col gap-1">
-        <h2 className="text-title-2 text-fg font-semibold">{messages.aiPlan.createHeading}</h2>
-        <p className="text-body-2 text-fg-muted">{messages.aiPlan.createDescription}</p>
-      </div>
-
       {/*
-        자유 입력이 **맨 위이고 선택**이다. 필수로 두면 "뭘 써야 하지" 에서 막힌다
-        (아트보드 01 주석). 비워도 만들 수 있게 하고 예시를 아래에 둔다.
+        **정말 답해야 하는 둘이 맨 위다** — 기간과 반려견. 나머지 다섯은 기본값이 있어
+        접기 안으로 들어갔고, 그래서 `필수 항목` `<h3>` 을 지웠다: "필수 vs 선택" 이
+        접기라는 구조로 이미 드러나므로 라벨이 같은 말을 한 번 더 하는 셈이 된다.
       */}
-      <Field
-        id="requestNote"
-        label={messages.aiPlan.fieldNote}
-        hint={messages.aiPlan.fieldNoteHint}
-        error={errors.fields.requestNote}
-      >
-        <Textarea
-          id="requestNote"
-          rows={3}
-          value={values.requestNote}
-          onValueChange={(requestNote) => onValueChange('requestNote', requestNote)}
-          invalid={errors.fields.requestNote !== undefined}
-          placeholder={messages.aiPlan.fieldNotePlaceholder}
-          maxLength={500}
-        />
-      </Field>
-
       <div className="flex flex-col gap-5">
-        <h3 className="text-body-1 text-fg font-semibold">{messages.aiPlan.requiredGroupLabel}</h3>
-
         {/*
           두 날짜는 한 줄에 나란히 — 기간은 하나의 값이다.
 
@@ -181,7 +207,64 @@ export function AiPlanCreateForm({
             {messages.aiPlan.periodSummary.replace('{days}', String(totalDays))}
           </p>
         )}
+      </div>
 
+      {/*
+        안내는 그룹 바로 아래 8px 이다. 앞서 `-mt-3` 으로 위 여백을 되돌려 붙이고
+        있었는데, 그 값은 부모의 `gap-5` 를 상쇄하려던 것이라 부모가 바뀌면 어긋난다 —
+        그룹과 안내를 한 상자에 넣어 간격을 직접 준다.
+      */}
+      <div className="flex flex-col gap-2">
+        <PetCheckboxGroup
+          id="petIds"
+          label={messages.aiPlan.fieldPet}
+          required
+          options={pets.map((pet) => ({
+            value: pet.petId,
+            label: pet.name,
+            description: describePet(pet),
+          }))}
+          values={values.petIds}
+          onValuesChange={(petIds) => onValueChange('petIds', petIds)}
+          error={errors.fields.petIds}
+        />
+        <p className="text-caption text-fg-muted">{messages.aiPlan.fieldPetHint}</p>
+      </div>
+
+      {/*
+        자유 입력은 **접기 밖에 남는다.** 기본값이 없고 결과 품질에 가장 크게 기여하는
+        입력이라, 접으면 아무도 쓰지 않는다.
+
+        다만 **필수 둘보다는 뒤다.** 맨 위에 두면 빈 칸이 화면을 열어 "뭘 써야 하지" 에서
+        막힌다 (아트보드 01 주석) — 기간·반려견을 먼저 답하고 나면 쓸 말이 생긴다.
+      */}
+      <Field
+        id="requestNote"
+        label={messages.aiPlan.fieldNote}
+        hint={messages.aiPlan.fieldNoteHint}
+        error={errors.fields.requestNote}
+      >
+        <Textarea
+          id="requestNote"
+          rows={3}
+          value={values.requestNote}
+          onValueChange={(requestNote) => onValueChange('requestNote', requestNote)}
+          invalid={errors.fields.requestNote !== undefined}
+          placeholder={messages.aiPlan.fieldNotePlaceholder}
+          maxLength={500}
+        />
+      </Field>
+
+      {/*
+        **기본값이 있는 다섯을 여기로 모은다** — 지역 · 예산 · 저장한 곳 우선 · 꼭 넣을 곳.
+        전부 안 건드려도 일정이 만들어지므로, 펼쳐 두면 "해야 할 일" 로 읽혀 실제로
+        답해야 하는 둘을 가린다. 접힌 줄이 무엇으로 만들어지는지 대신 말해 준다.
+      */}
+      <AiPlanDetailsDisclosure
+        open={detailsOpen}
+        summary={detailsSummary(details)}
+        onToggle={() => setDetailsOpen((open) => !open)}
+      >
         {/*
           지역 좁히기 (#251 · 아트보드 01). 계약에 `sigunguCode` 가 없던 동안에는
           "제주 전체에서 찾아요." 한 줄이 이 자리에 있었다.
@@ -196,7 +279,7 @@ export function AiPlanCreateForm({
           {/*
             **라벨이 눈에 보여야 한다.** 예산 칩은 바로 아래 `Field`(예산 (선택))가 라벨을
             들고 있어 `ChipGroup` 의 `aria-label` 만으로 충분했지만, 이 축은 칩이 컨트롤의
-            전부다 — 라벨이 없으면 날짜 줄에 딸린 무언가로 읽힌다.
+            전부다 — 라벨이 없으면 접기를 펼쳤을 때 무엇을 고르는 칩인지 알 수 없다.
             `PetCheckboxGroup` 의 `legend` 와 같은 값이다.
           */}
           <legend className="text-body-2 text-fg mb-1 font-medium">
@@ -229,21 +312,6 @@ export function AiPlanCreateForm({
 
           <p className="text-caption text-fg-muted mt-1">{messages.aiPlan.fieldRegionHint}</p>
         </fieldset>
-
-        <PetCheckboxGroup
-          id="petIds"
-          label={messages.aiPlan.fieldPet}
-          required
-          options={pets.map((pet) => ({
-            value: pet.petId,
-            label: pet.name,
-            description: describePet(pet),
-          }))}
-          values={values.petIds}
-          onValuesChange={(petIds) => onValueChange('petIds', petIds)}
-          error={errors.fields.petIds}
-        />
-        <p className="text-caption text-fg-muted -mt-3">{messages.aiPlan.fieldPetHint}</p>
 
         {/*
           예산은 **칩 + 직접 입력**이다 (아트보드 01 주석: 대부분 어림값을 고른다).
@@ -308,27 +376,27 @@ export function AiPlanCreateForm({
             </div>
           </Field>
         </div>
-      </div>
 
-      {/*
-        **생성 옵션은 필수 항목 뒤다** (아트보드 05 "입력 화면에 붙는 세 항목").
-        앞에 두면 선택 항목이 필수처럼 읽혀 "뭘 써야 하지" 에서 막히는 것과 같은 일이 된다.
-      */}
-      <AiPlanOptionsSection
-        preferFavorites={values.preferFavorites}
-        favoriteCount={favoriteCount}
-        pinnedPlaces={values.pinnedPlaces}
-        onPreferFavoritesChange={(preferFavorites) =>
-          onValueChange('preferFavorites', preferFavorites)
-        }
-        onRemovePinned={(placeId) =>
-          onValueChange(
-            'pinnedPlaces',
-            values.pinnedPlaces.filter((place) => place.placeId !== placeId),
-          )
-        }
-        onOpenPicker={onOpenPlacePicker}
-      />
+        {/*
+          **생성 옵션은 접기의 맨 아래다** (아트보드 05 "입력 화면에 붙는 세 항목").
+          자체 `<h3>`(`optionGroupLabel`)을 갖고 있으므로 여기서 제목을 덧붙이지 않는다.
+        */}
+        <AiPlanOptionsSection
+          preferFavorites={values.preferFavorites}
+          favoriteCount={favoriteCount}
+          pinnedPlaces={values.pinnedPlaces}
+          onPreferFavoritesChange={(preferFavorites) =>
+            onValueChange('preferFavorites', preferFavorites)
+          }
+          onRemovePinned={(placeId) =>
+            onValueChange(
+              'pinnedPlaces',
+              values.pinnedPlaces.filter((place) => place.placeId !== placeId),
+            )
+          }
+          onOpenPicker={onOpenPlacePicker}
+        />
+      </AiPlanDetailsDisclosure>
 
       {/* 상한 2차 방어가 걸렸을 때만 나온다 — 시트가 이미 막는다 */}
       <FormAlert message={errors.fields.pinnedPlaces ?? null} />
