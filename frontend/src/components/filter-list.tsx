@@ -19,6 +19,12 @@ import { cn } from '@/lib/utils/cn'
  * **같은 세로 목록을 `aria-pressed` 토글로 두지 않는다** — 배타 축도 다중 선택으로 읽힌다.
  * 가이드가 명시적으로 금지한 형태다.
  *
+ * **`filter-list` · `filter-list-heading` · `filter-option` 클래스는 스타일이 아니라 자리다**
+ * (#389). 데스크톱 필터 레일(`.filter-rail`)이 이 셋의 좌우 여백만 바꿔 페이지의 왼쪽
+ * 기준선(40)에 세운다 — 같은 컴포넌트를 모바일 시트도 쓰는데 거기서는 40 이 틀린 값이라,
+ * 값을 컴포넌트가 아니라 **담는 곳**이 정해야 했다. 규칙은 `app/globals.css` 에 있다.
+ * 클래스 이름을 바꾸면 그 규칙이 조용히 안 걸린다.
+ *
  * `RadioGroup`/`Checkbox`(`src/components/`)와 다른 컴포넌트다. 저쪽은 **폼 입력**이라
  * 테두리 박스 + 에러 슬롯 + `name` 배선을 갖는다. 필터는 폼이 아니라 조회 조건이고,
  * 제출도 검증도 없다 — 형태를 공유하면 둘 중 하나가 반드시 어색해진다
@@ -41,7 +47,7 @@ export function FilterList({
     <div
       role={exclusive ? 'radiogroup' : 'group'}
       aria-label={label}
-      className={cn('flex flex-col px-2', className)}
+      className={cn('filter-list flex flex-col px-2', className)}
     >
       {children}
     </div>
@@ -50,7 +56,11 @@ export function FilterList({
 
 /** 축 제목. 12px `--fg-muted` — 옵션(16px)보다 작아 목록이 제목을 이긴다 */
 export function FilterListHeading({ children }: { children: ReactNode }) {
-  return <h3 className="text-caption text-fg-muted px-4 pt-4 pb-2 font-semibold">{children}</h3>
+  return (
+    <h3 className="filter-list-heading text-caption text-fg-muted px-4 pt-4 pb-2 font-semibold">
+      {children}
+    </h3>
+  )
 }
 
 type OptionProps = {
@@ -137,7 +147,7 @@ function OptionButton({
       onClick={onSelect}
       className={cn(
         // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
-        'flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-left transition-colors',
+        'filter-option flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-left transition-colors',
         'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
         selected ? 'bg-band' : 'hover:bg-band',
         className,

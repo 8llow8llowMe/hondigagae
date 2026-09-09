@@ -37,8 +37,8 @@ export function PlaceFilterRail({
   const dirty = toPlaceFilterQuery(filters) !== toPlaceFilterQuery(DEFAULT_PLACE_FILTERS)
 
   return (
-    <div className="pb-6">
-      <div className="flex items-baseline justify-between gap-2 px-5 pt-5 pb-3">
+    <div className="filter-rail pb-6">
+      <div className="filter-rail-title flex items-baseline justify-between gap-2 px-5 pt-5 pb-3">
         <h2 className="text-body-1 text-fg font-semibold">{messages.place.filterTitle}</h2>
         {/* 걸린 필터가 없으면 초기화할 것이 없다 — 누를 수 없는 버튼을 남기지 않는다 */}
         {dirty && (
