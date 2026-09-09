@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { displayTemperature } from '@/lib/insight/temperature'
+import { displayTemperature, supportingTemperatures } from '@/lib/insight/temperature'
 import { messages } from '@/lib/messages'
 import { planVerdict } from '@/test/fixtures/plan'
 import type { PlanDailyWeatherItem } from '@/types/plan'
@@ -95,5 +95,64 @@ describe('체감온도 라벨 — 이름은 하나, 기준은 `최고` 가 가�
   it('최고기온 폴백은 체감온도와 다른 이름을 유지한다', () => {
     expect(messages.place.detailMaxTemperature).not.toBe(messages.place.detailFeelsLikeTemperature)
     expect(messages.plan.verdictTemperatureLabel).not.toBe(messages.plan.verdictFeelsLikeLabel)
+  })
+})
+
+/*
+  **#352.** 큰 숫자 하나만으로는 하루의 폭을 알 수 없다 — `최고 체감온도 33.4℃` 가
+  아침에 나갈 수 있는 날인지 말해 주지 않는다. 받치는 줄이 그 폭을 말한다.
+
+  이 함수의 값어치는 **큰 숫자를 되풀이하지 않는 것**이다. 중기예보 구간은 체감온도가
+  없어 큰 숫자가 최고기온이므로, 그때 최고기온을 다시 세우면 같은 값이 두 번 선다.
+*/
+describe('supportingTemperatures — 큰 숫자를 받치는 줄 (#352)', () => {
+  it('체감온도가 큰 숫자면 최고·최저기온을 그 순서로 받친다', () => {
+    const weather = { maxFeelsLikeTemperature: 33.4, maxTemperature: 31, minTemperature: 24 }
+
+    expect(supportingTemperatures(weather, displayTemperature(weather))).toEqual([
+      { kind: 'max', value: 31 },
+      { kind: 'min', value: 24 },
+    ])
+  })
+
+  /* 중기예보 구간 — 큰 숫자가 이미 최고기온이라 그것을 빼고 최저만 남긴다 */
+  it('큰 숫자가 최고기온이면 최고를 되풀이하지 않는다', () => {
+    const weather = { maxFeelsLikeTemperature: null, maxTemperature: 31, minTemperature: 24 }
+    const displayed = displayTemperature(weather)
+
+    expect(displayed).toEqual({ kind: 'max', value: 31 })
+    expect(supportingTemperatures(weather, displayed)).toEqual([{ kind: 'min', value: 24 }])
+  })
+
+  it('최저기온만 있으면 그 한 줄만 낸다', () => {
+    const weather = { maxFeelsLikeTemperature: null, maxTemperature: null, minTemperature: 24 }
+
+    expect(supportingTemperatures(weather, displayTemperature(weather))).toEqual([
+      { kind: 'min', value: 24 },
+    ])
+  })
+
+  it('둘 다 없으면 빈 배열이다 — 호출부가 줄 자체를 내지 않는다', () => {
+    const weather = { maxFeelsLikeTemperature: 33.4, maxTemperature: null, minTemperature: null }
+
+    expect(supportingTemperatures(weather, displayTemperature(weather))).toEqual([])
+  })
+
+  it('weather 가 null 이거나 undefined 면 빈 배열이다', () => {
+    expect(supportingTemperatures(null, null)).toEqual([])
+    expect(supportingTemperatures(undefined, null)).toEqual([])
+  })
+
+  /*
+    **0℃ 는 유효한 온도다.** falsy 검사로 걸러 두면 제주 한겨울 최저기온이 통째로
+    사라진다 — 한라산권은 실제로 영하로 내려간다.
+  */
+  it('0℃ 와 영하를 값으로 남긴다 — falsy 로 걸러내지 않는다', () => {
+    const weather = { maxFeelsLikeTemperature: 3.2, maxTemperature: 0, minTemperature: -4.5 }
+
+    expect(supportingTemperatures(weather, displayTemperature(weather))).toEqual([
+      { kind: 'max', value: 0 },
+      { kind: 'min', value: -4.5 },
+    ])
   })
 })

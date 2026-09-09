@@ -28,6 +28,18 @@ function render(overrides: Partial<PlaceSuitabilityPanelProps> = {}) {
   return renderToStaticMarkup(createElement(PlaceSuitabilityPanel, props))
 }
 
+/**
+ * `MetricValue` 의 **큰 숫자** span 만 걷는다 (`font-black` + `text-display`/`text-title-1`).
+ *
+ * caption 으로 받치는 줄과 큰 숫자를 가르기 위한 것이다 — 마크업 전체를 문자열로 보면
+ * 두 자리의 같은 숫자를 구분할 수 없다 (#352).
+ */
+function bigNumbers(markup: string): string[] {
+  return [...markup.matchAll(/<span class="font-black[^"]*">([^<]*)<\/span>/g)].map(
+    (match) => match[1] as string,
+  )
+}
+
 describe('PlaceSuitabilityPanel — 상태 배타성', () => {
   it('로딩 중에는 skeleton 만 보이고 점수가 함께 나오지 않는다', () => {
     const markup = render({ loading: true, data: null })
@@ -147,8 +159,17 @@ describe('PlaceSuitabilityPanel — 반려견이 없으면 판정을 말하지 �
     expect(markup).toContain(messages.place.detailGuestCta)
     expect(markup).toContain(messages.place.detailFeelsLikeTemperature)
     expect(markup).toContain('33.4')
-    // 같은 ℃ 라 둘을 나란히 세우지 않는다 — 라벨을 읽어야 구분되는 숫자 두 개가 된다
-    expect(markup).not.toContain('31.0')
+
+    /*
+      **같은 ℃ 라 큰 숫자를 둘 세우지 않는다** — 라벨을 읽어야 구분되는 숫자 두 개가 되고,
+      그 순간 "큰 숫자 하나" 라는 이 자리의 성격이 사라진다.
+
+      **검사를 큰 숫자 자리로 좁혔다** (#352). 예전에는 마크업 전체에 `31.0` 이 없는지 봤는데,
+      #352 가 최고기온을 **caption 으로 받치는 줄**에 넣으면서 그 검사가 함께 걸렸다.
+      지키려던 규칙은 "최고기온이 화면에 없다" 가 아니라 **"최고기온이 큰 숫자로 서지 않는다"**
+      이므로, `MetricValue` 의 큰 숫자 span 만 본다.
+    */
+    expect(bigNumbers(markup)).toEqual(['33.4', '80'])
   })
 
   /*
@@ -202,5 +223,77 @@ describe('PlaceSuitabilityPanel — 기상특보', () => {
     expect(markup).toContain('주의보')
     // 등급 단어가 배지에 밀려 사라지지 않는다
     expect(markup).toContain(suitability.suitabilityLevel.name)
+  })
+})
+
+/*
+  **#352.** 게스트 블록이 `최고 체감온도 33.4℃` 한 값만 보여 줬다. 응답에는
+  `maxTemperature` · `minTemperature` 가 이미 실려 있었고, 33.4℃ 만으로는 아침에
+  나갈 수 있는 날인지 알 수 없다.
+
+  **큰 숫자를 하나 더 세우지 않는다** — `lib/insight/temperature.ts` 가 *"둘을 나란히
+  세우지 않는다"* 고 정해 둔 자리라, 받치는 줄은 caption 이다.
+*/
+describe('PlaceSuitabilityPanel — 게스트 블록의 최고·최저기온 (#352)', () => {
+  const guest = () => render({ petName: null })
+
+  it('최고 체감온도 아래에 최고기온과 최저기온을 받친다', () => {
+    const markup = guest()
+    const weather = suitability.weather as NonNullable<typeof suitability.weather>
+
+    expect(markup).toContain(messages.place.detailFeelsLikeTemperature)
+    expect(markup).toContain(
+      `${messages.place.detailSupportingMaxTemperature} ${(weather.maxTemperature as number).toFixed(1)}℃`,
+    )
+    expect(markup).toContain(
+      `${messages.place.detailSupportingMinTemperature} ${(weather.minTemperature as number).toFixed(1)}℃`,
+    )
+  })
+
+  /* 큰 숫자와 경쟁하지 않는다 — 받치는 줄은 caption 이고 MetricValue 를 쓰지 않는다 */
+  it('받치는 줄은 caption 이다 — 큰 숫자를 하나 더 세우지 않는다', () => {
+    const markup = guest()
+    const line = /<p class="([^"]*)"><span>최고기온/.exec(markup)?.[1]
+
+    expect(line).toBeDefined()
+    expect(line).toContain('text-caption')
+    expect(line).not.toContain('text-display')
+    expect(line).not.toContain('text-title-1')
+  })
+
+  /*
+    중기예보 구간은 체감온도가 없어 큰 숫자가 **최고기온**이 된다. 그때 받치는 줄에서
+    최고기온을 다시 말하면 같은 값이 한 자리에 두 번 선다.
+  */
+  it('체감온도를 못 받은 날은 최고기온을 되풀이하지 않고 최저만 받친다', () => {
+    const weather = suitability.weather as NonNullable<typeof suitability.weather>
+    const markup = render({
+      petName: null,
+      data: { ...suitability, weather: { ...weather, maxFeelsLikeTemperature: null } },
+    })
+
+    // 큰 숫자 자리가 `최고기온` 이라고 말한다 (#253)
+    expect(markup).toContain(messages.place.detailMaxTemperature)
+    expect(markup).not.toContain(messages.place.detailSupportingMaxTemperature + ' ')
+    expect(markup).toContain(messages.place.detailSupportingMinTemperature)
+  })
+
+  it('최고·최저가 둘 다 없으면 받치는 줄 자체를 내지 않는다', () => {
+    const weather = suitability.weather as NonNullable<typeof suitability.weather>
+    const markup = render({
+      petName: null,
+      data: {
+        ...suitability,
+        weather: { ...weather, maxTemperature: null, minTemperature: null },
+      },
+    })
+
+    expect(markup).not.toContain(messages.place.detailSupportingMinTemperature)
+    expect(markup).toContain(messages.place.detailFeelsLikeTemperature)
+  })
+
+  /* 반려견 기준 판정에는 이 블록이 없다 — 게스트 경로에서만 보인다 */
+  it('반려견 기준 판정에는 받치는 줄이 없다', () => {
+    expect(render()).not.toContain(messages.place.detailSupportingMinTemperature)
   })
 })

@@ -235,6 +235,9 @@ function WeatherGlyph({ item }: { item: RegionWeatherItem }) {
 function RegionRow({ item }: { item: RegionWeatherItem }) {
   const known = item.weatherScore !== null
   const maxTemperature = formatCelsius(item.maxTemperature)
+  const minTemperature = formatCelsius(item.minTemperature)
+  const hasNumbers =
+    maxTemperature !== null || minTemperature !== null || item.maxPrecipitationProbability !== null
 
   return (
     /*
@@ -254,6 +257,11 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
 
         한 컬럼(~1023)에서는 행 높이가 39 → 약 48px 로 늘지만, 섹션 하단의 보조 문구 줄이
         함께 빠져(#342) 섹션 전체로는 거의 같다.
+
+        **숫자 줄이 둘에서 셋으로 늘었다** (#352, 최저기온). #342 가 "숫자 줄이 늘면 칸
+        폭·높이를 다시 재라" 고 남겨 둔 자리라 1024 에서 실측했다 — **폭은 그대로다.**
+        가장 넓은 줄이 `최고 31.0℃`(63px)이고 `최저 24.0℃` 도 같은 63px 이라 늘어난 것은
+        높이뿐이다 (칸의 숫자 자리는 `152 − 아이콘 24 − 배지 33 − gap 16 = 79px`).
       */}
       <span className="text-caption text-fg-muted flex shrink-0 items-center gap-2 font-medium tabular-nums lg:w-full lg:shrink lg:justify-between">
         {/*
@@ -263,15 +271,15 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
         <WeatherGlyph item={item} />
 
         {/*
-          **숫자 두 값은 좌측 정렬로 쌓는다.** `최고` · `강수` 라벨이 줄머리에 서므로
-          왼쪽이 읽는 기준선이다 — 우측 정렬로 두면 라벨이 들쭉날쭉해진다. 값의 자릿수는
-          `tabular-nums`(부모가 준다)가 이미 맞춰 준다.
+          **숫자 세 값은 좌측 정렬로 쌓는다.** `최고` · `최저` · `강수` 라벨이 줄머리에
+          서므로 왼쪽이 읽는 기준선이다 — 우측 정렬로 두면 라벨이 들쭉날쭉해진다. 값의
+          자릿수는 `tabular-nums`(부모가 준다)가 이미 맞춰 준다.
 
           **온도에 라벨을 붙인다** (#206). `maxTemperature` 인데 숫자만 두면 무슨 온도인지
           알 수 없다 — 바로 위 추천 문장(서버 완성형)은 "최고기온 26도" 라고 말한다.
           `minTemperature` 와 값이 같은 날이 많아 드러나지 않았을 뿐이다 (DESIGN.md §2-3).
 
-          값이 없으면 자리 자체가 없다 — 라벨만 남기지 않고, **둘 다 없으면 감싼 자리도
+          값이 없으면 자리 자체가 없다 — 라벨만 남기지 않고, **셋 다 없으면 감싼 자리도
           내지 않는다.** 빈 flex 항목을 남기면 부모의 `gap-2` 가 그 자리에도 붙어
           예보를 못 받은 권역(`한라산권`)의 배지가 8px 밀린다.
 
@@ -279,11 +287,23 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
           자식이 배지 하나뿐인 칸(`한라산권`)에서 `justify-between` 은 그것을 **왼쪽**에
           두고, 다섯 칸의 배지가 열을 이루지 못한다 (1280 실측: 넷은 우측 끝, 하나는 85px 앞).
         */}
-        {(maxTemperature !== null || item.maxPrecipitationProbability !== null) && (
+        {hasNumbers && (
           <span className="flex flex-col items-start">
             {maxTemperature !== null && (
               <span>
                 {messages.home.regionTempPrefix} {maxTemperature}℃
+              </span>
+            )}
+            {/*
+              **최저기온은 최고 바로 아래다** (#352). 서버가 이미 주고 있던 값인데 화면이
+              버리고 있었다 — 하루 폭을 모르면 최고 31.0℃ 가 몇 시의 이야기인지 알 수 없다.
+
+              **접두가 `최고`/`최저` 로 길이가 같아** 두 줄의 숫자 왼쪽 끝이 맞는다.
+              값이 없으면 이 줄만 빠지고 최고·강수는 그대로 선다.
+            */}
+            {minTemperature !== null && (
+              <span>
+                {messages.home.regionMinTempPrefix} {minTemperature}℃
               </span>
             )}
             {item.maxPrecipitationProbability !== null && (

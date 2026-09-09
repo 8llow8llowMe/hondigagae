@@ -6,7 +6,7 @@ import { ReasonList } from '@/components/reason-list'
 import { Skeleton } from '@/components/skeleton'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { formatDistance } from '@/lib/format/distance'
-import { displayTemperature } from '@/lib/insight/temperature'
+import { displayTemperature, supportingTemperatures } from '@/lib/insight/temperature'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -152,15 +152,26 @@ function GuestBlock({ data, authed }: { data: PlaceSuitabilityResponse; authed: 
       {weather === null ? (
         <p className="text-body-2 text-fg-muted">{messages.place.detailGuestNoWeather}</p>
       ) : (
-        <div className="flex flex-wrap items-end gap-6">
-          <TemperatureValue weather={weather} />
-          {weather.maxPrecipitationProbability !== null && (
-            <MetricValue
-              label={messages.place.detailPrecipitationProbability}
-              value={weather.maxPrecipitationProbability}
-              unit={messages.place.detailPercentUnit}
-            />
-          )}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-end gap-6">
+            <TemperatureValue weather={weather} />
+            {weather.maxPrecipitationProbability !== null && (
+              <MetricValue
+                label={messages.place.detailPrecipitationProbability}
+                value={weather.maxPrecipitationProbability}
+                unit={messages.place.detailPercentUnit}
+              />
+            )}
+          </div>
+
+          {/*
+            **큰 숫자 아래 한 줄로 받친다** (#352). `MetricValue` 를 하나 더 세우지 않는다 —
+            `lib/insight/temperature.ts` 가 *"둘을 나란히 세우지 않는다"* 고 정해 둔 자리다.
+            같은 ℃ 짜리 큰 숫자가 둘이면 어느 쪽이 판정의 근거인지 라벨을 읽어야 알 수 있고,
+            그 순간 이 자리의 성격("큰 숫자 하나")이 사라진다. 받치는 줄은 caption 이라
+            큰 숫자와 경쟁하지 않는다.
+          */}
+          <TemperatureRange weather={weather} />
         </div>
       )}
 
@@ -203,6 +214,38 @@ function TemperatureValue({ weather }: { weather: DailyWeatherItem }) {
       value={temperature.value.toFixed(1)}
       unit={messages.place.detailTemperatureUnit}
     />
+  )
+}
+
+/**
+ * 큰 숫자를 받치는 최고·최저기온 한 줄 — #352.
+ *
+ * **응답에 이미 있던 값이다.** `weather.maxTemperature` · `weather.minTemperature` 가
+ * 실려 오는데 화면이 둘 다 버리고 `최고 체감온도` 하나만 보여 주고 있었다 — 33.4℃ 만으로는
+ * 아침에 나갈 수 있는 날인지 알 수 없다.
+ *
+ * **큰 숫자가 이미 최고기온이면 최고를 빼고 최저만 남긴다.** 중기예보 구간은 체감온도가
+ * 없어 `displayTemperature` 가 최고기온을 큰 숫자로 세우고, 그때 여기서 다시 말하면 같은
+ * 값이 한 자리에 두 번 선다. 판정은 `supportingTemperatures` 한 곳이 갖는다.
+ *
+ * **값이 없으면 줄 자체를 내지 않는다** — 라벨만 남은 줄을 두지 않는 이 화면의 규칙이다.
+ */
+function TemperatureRange({ weather }: { weather: DailyWeatherItem }) {
+  const supporting = supportingTemperatures(weather, displayTemperature(weather))
+  if (supporting.length === 0) return null
+
+  return (
+    <p className="text-caption text-fg-muted flex flex-wrap items-center gap-x-3 font-medium tabular-nums">
+      {supporting.map((temperature) => (
+        <span key={temperature.kind}>
+          {temperature.kind === 'max'
+            ? messages.place.detailSupportingMaxTemperature
+            : messages.place.detailSupportingMinTemperature}{' '}
+          {temperature.value.toFixed(1)}
+          {messages.place.detailTemperatureUnit}
+        </span>
+      ))}
+    </p>
   )
 }
 
