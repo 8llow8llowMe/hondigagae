@@ -9,7 +9,9 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { PlaceFilterChips } from '@/features/place/place-filter-chips'
 import { PlaceListSection } from '@/features/place/place-list-section'
+import { PlaceMapView } from '@/features/place/place-map-view'
 import { usePlaceList } from '@/features/place/use-place-list'
+import { planAddPlaceAction, planAddPlaceNotice } from '@/features/plan/plan-add-place-action'
 import { PlanAddPlaceHeader } from '@/features/plan/plan-add-place-header'
 import { PlanAddPlaceRow } from '@/features/plan/plan-add-place-row'
 import { planDayAnchorId } from '@/features/plan/plan-day-section'
@@ -20,8 +22,8 @@ import { mergeSlices } from '@/lib/api/slice'
 import { messages } from '@/lib/messages'
 import { placeIdsOf } from '@/lib/plan/day-items'
 import { groupItemsByDay } from '@/lib/plan/detail'
-import type { ViewMode } from '@/lib/url/view-mode'
-import type { PlaceFilters } from '@/types/place'
+import { PLAN_ADD_DEFAULT_VIEW, type ViewMode, viewModeHref } from '@/lib/url/view-mode'
+import type { PlaceFilters, PlaceSummary } from '@/types/place'
 
 /**
  * 장소를 골라 일자에 담는 화면 — 세부명세 F2.
@@ -64,6 +66,14 @@ export function PlanAddPlaceView({
   const addPlace = usePlanAddPlace({ planId })
 
   const backHref = `/plans/${planId}#${planDayAnchorId(day)}`
+
+  /** 필터만 비운다. **보기는 유지한다** — 지도에서 조건을 풀었는데 목록으로 튀면 안 된다 */
+  const resetHref = viewModeHref(
+    `/plans/${planId}/days/${String(day)}/add`,
+    '',
+    view,
+    PLAN_ADD_DEFAULT_VIEW,
+  )
 
   /*
     **`return null` 이 아니라 껍데기를 세운다.** 이 세그먼트에는 `loading.tsx` 를
@@ -168,6 +178,68 @@ export function PlanAddPlaceView({
   const lastPage = list.data?.pages.at(-1)
   const addedPlaceIds = placeIdsOf(group.items)
 
+  const onAdd = (selected: PlaceSummary) =>
+    addPlace.add({
+      day,
+      // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
+      dayItems: group.items,
+      place: { placeId: selected.placeId, title: selected.title },
+    })
+
+  if (view === 'map') {
+    return (
+      /*
+        **높이를 여기서 잡는다.** 헤더가 정상 흐름으로 서고 남는 높이를 지도가 채운다 —
+        `PlaceMapView` 에 `map-canvas-height` 를 맡기면 헤더 높이만큼 넘쳐 지도 화면에
+        세로 스크롤이 난다.
+      */
+      <div className="map-canvas-height flex flex-col">
+        <PlanAddPlaceHeader
+          day={day}
+          backHref={backHref}
+          planTitle={detail.data.title}
+          listHref={listHref}
+          mapHref={mapHref}
+          view="map"
+        />
+
+        <div className="min-h-0 flex-1">
+          <PlaceMapView
+            filters={filters}
+            authed
+            fill
+            /* 헤더가 토글을 가지므로 `listHref`/`mapHref` 를 주지 않는다 */
+            mutedPlaceIds={addedPlaceIds}
+            renderRowAction={(place) =>
+              planAddPlaceAction(place, {
+                addedPlaceIds,
+                pendingPlaceId: addPlace.pending?.placeId ?? null,
+                disabled: addPlace.adding,
+                onAdd,
+              })
+            }
+            renderRowNotice={(place) => planAddPlaceNotice(place, { failure: addPlace.failure })}
+            /* **SDK 가 실패해도 담을 수 있어야 한다.** 없으면 열람 전용 화면이 된다 */
+            renderListRow={(place, last) => (
+              <PlanAddPlaceRow
+                key={place.placeId}
+                place={place}
+                last={last}
+                added={addedPlaceIds.has(place.placeId)}
+                pending={addPlace.pending?.placeId === place.placeId}
+                disabled={addPlace.adding}
+                error={
+                  addPlace.failure?.target.placeId === place.placeId ? addPlace.failure.error : null
+                }
+                onAdd={onAdd}
+              />
+            )}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <PlanAddPlaceShell
       day={day}
@@ -192,7 +264,7 @@ export function PlanAddPlaceView({
         loadingMore={list.isFetchingNextPage}
         onLoadMore={() => void list.fetchNextPage()}
         onRetry={() => void list.refetch()}
-        onResetFilters={() => router.replace(`/plans/${planId}/days/${day}/add`, { scroll: false })}
+        onResetFilters={() => router.replace(resetHref, { scroll: false })}
         renderRow={(place, last) => (
           <PlanAddPlaceRow
             key={place.placeId}
@@ -205,14 +277,7 @@ export function PlanAddPlaceView({
             error={
               addPlace.failure?.target.placeId === place.placeId ? addPlace.failure.error : null
             }
-            onAdd={(selected) =>
-              addPlace.add({
-                day,
-                // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
-                dayItems: group.items,
-                place: { placeId: selected.placeId, title: selected.title },
-              })
-            }
+            onAdd={onAdd}
           />
         )}
       />

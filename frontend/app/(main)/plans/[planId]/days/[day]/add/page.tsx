@@ -101,6 +101,28 @@ export default async function PlanAddPlacePage({
     })
     .catch(() => undefined)
 
+  /*
+    **지도 보기는 레일 2단을 쓰지 않는다.** 280 레일을 함께 두면 지도가 세 번 접힌다
+    (`places/(list)/page.tsx` 와 같은 판단). 필터는 패널·시트 머리가 맡고 URL 에 남아
+    있으므로 목록으로 돌아가면 레일에 다시 보인다.
+  */
+  if (view === 'map') {
+    return (
+      <main id="main-content">
+        <HydrationBoundary state={dehydrate(queryClient)}>
+          <PlanAddPlaceView
+            planId={planId}
+            day={day}
+            filters={filters}
+            view="map"
+            listHref={listHref}
+            mapHref={mapHref}
+          />
+        </HydrationBoundary>
+      </main>
+    )
+  }
+
   return (
     <main id="main-content" className="rail-layout rail-layout-filter">
       {/* 목록 화면과 같은 2단이다. 태블릿은 한 컬럼 — 280 레일을 더하면 768 을 넘는다 */}
@@ -115,7 +137,7 @@ export default async function PlanAddPlacePage({
             planId={planId}
             day={day}
             filters={filters}
-            view={view}
+            view="list"
             listHref={listHref}
             mapHref={mapHref}
           />
