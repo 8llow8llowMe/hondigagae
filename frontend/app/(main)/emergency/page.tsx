@@ -2,7 +2,7 @@ import { ViewToggle } from '@/components/view-toggle'
 import { EmergencyListView } from '@/features/emergency/emergency-list-view'
 import { EmergencyMapView } from '@/features/emergency/emergency-map-view'
 import { messages } from '@/lib/messages'
-import { parseViewMode, viewModeHref } from '@/lib/url/view-mode'
+import { EMERGENCY_DEFAULT_VIEW, parseViewMode, viewModeHref } from '@/lib/url/view-mode'
 
 export const metadata = {
   title: `${messages.emergency.pageTitle} · 혼디가개`,
@@ -21,9 +21,9 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>
  * 제목이 들어갈 자리가 없다 — `/places` 지도 보기와 같은 구조다.
  */
 export default async function EmergencyPage({ searchParams }: { searchParams: SearchParams }) {
-  const view = parseViewMode(await searchParams)
-  const listHref = viewModeHref('/emergency', '', 'list')
-  const mapHref = viewModeHref('/emergency', '', 'map')
+  const view = parseViewMode(await searchParams, EMERGENCY_DEFAULT_VIEW)
+  const listHref = viewModeHref('/emergency', '', 'list', EMERGENCY_DEFAULT_VIEW)
+  const mapHref = viewModeHref('/emergency', '', 'map', EMERGENCY_DEFAULT_VIEW)
 
   if (view === 'map') {
     return (
