@@ -109,6 +109,7 @@
 `GET /internal/v1/pets/representative/condition?memberId=` — 대표 반려견의 특성. 호출부가 petId 없이 요청했을 때의 기본값이다.
 `GET /internal/v1/pets/conditions?memberId=&petIds=` — 여러 마리 벌크 조회. 원격 N+1 방지용이며 소유가 아닌 petId 는 응답에서 빠진다.
 
+- 사회성(`sociality`)도 내려간다 - 필수 입력인데 내부 계약에 빠져 AI 가 버리고 있었다 (#380).
 - 응답에는 이름·생년월 원문이 없다. 나이는 판정(노령견·퍼피 구분)에 실제로 필요해
   **파생값 `ageMonths`(개월 수)** 만 내보낸다 — 서비스 경계를 넘는 개인정보 최소화 방침을
   지키면서 필요한 정보만 넘기는 선이다 (#367).

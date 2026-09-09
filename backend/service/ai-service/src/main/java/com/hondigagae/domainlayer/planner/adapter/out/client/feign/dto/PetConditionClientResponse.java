@@ -19,6 +19,7 @@ public record PetConditionClientResponse(
     boolean coldSensitive,
     boolean noiseSensitive,
     String activityLevel,
-    boolean walkPreferred
+    boolean walkPreferred,
+    String sociality
 ) {
 }

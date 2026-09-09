@@ -22,6 +22,8 @@ public record PetCondition(
     boolean coldSensitive,
     boolean noiseSensitive,
     String activityName,
-    boolean walkPreferred
+    boolean walkPreferred,
+    // 사회성 낮음 - 다른 개나 낯선 사람을 불편해한다. 보통/높음은 제약이 아니라 플래그로 접는다.
+    boolean lowSociality
 ) {
 }

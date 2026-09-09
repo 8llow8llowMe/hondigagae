@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.pet.adapter.in.internal.dto;
 
 import com.hondigagae.shared.travel.pet.ActivityLevel;
 import com.hondigagae.shared.travel.pet.PetSizeType;
+import com.hondigagae.shared.travel.pet.SocialityLevel;
 import java.math.BigDecimal;
 import lombok.Builder;
 
@@ -27,6 +28,8 @@ public record PetConditionResponse(
     boolean coldSensitive,
     boolean noiseSensitive,
     ActivityLevel activityLevel,
-    boolean walkPreferred
+    boolean walkPreferred,
+    // 낮음이면 붐비는 장소·시간을 피해야 한다 - 소음 민감과 같은 결의 판정 입력이다 (#380).
+    SocialityLevel sociality
 ) {
 }
