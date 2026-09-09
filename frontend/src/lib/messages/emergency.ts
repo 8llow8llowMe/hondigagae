@@ -78,6 +78,18 @@ export const emergencyMessages = {
   sheetLabel: '병원 · 약국 목록',
 
   /**
+   * 행을 고른 동안의 개수 캡션. `{n}` 치환. `messages.map.visibleCount`
+   * ("지도에 보이는 {n}곳") 대신 선택 중에만 쓴다.
+   *
+   * **"지도에 보이는" 이라고 말하지 않는다.** 행을 고르면 지도가 도로 단위까지
+   * 확대된다(`SELECTED_FACILITY_MAP_LEVEL`). 그 순간 목록이 세는 영역은 선택 **직전**
+   * 에 얼려 둔 범위이지 지금 화면에 보이는 좁은 프레임이 아니다(`emergency-map-view.tsx`
+   * 의 `frozenBounds`) — "보이는" 이라고 하면 화면과 다른 걸 주장하는 거짓말이 된다.
+   * 개수 자체(목록 길이)는 얼려도 진실이므로 숫자는 그대로 두고 **주장만** 뺀다.
+   */
+  selectedCount: '목록 {n}곳',
+
+  /**
    * 지도를 반경 밖으로 옮겨 영역 안이 0건일 때.
    *
    * **"조건을 풀어 보세요" 로 끝내지 않는다** (`messages.map.emptyInViewDescription` 은
@@ -116,10 +128,16 @@ export const emergencyMessages = {
   /**
    * **거리를 감추는 이유를 말한다.** 제주 중심에서 480m 인 것을 "480m" 로 쓰면
    * 사용자는 자기 위치에서 480m 로 읽는다.
+   *
+   * **"제주 중심에서 찾은 곳들이에요" 를 덧붙이지 않는다.** 두 화면(목록의
+   * `sortNote`, 지도의 캡션 줄) 모두 이 안내 바로 옆에 `basisJeju`("제주 중심 기준")
+   * 를 이미 따로 그린다 — 같은 사실을 두 번 말하면 모바일에서 줄만 늘어난다
+   * (지도 보기 375px 시트에서는 그 한 줄이 전화 버튼을 화면 밖으로 미는 원인이었다).
+   * 네 갈래를 가르는 이유(권한 · 미지원 · 제주 밖 · 시간 초과)만 여기 남긴다.
    */
-  positionDenied: '위치 권한이 없어 거리를 계산할 수 없어요. 제주 중심에서 찾은 곳들이에요.',
-  positionTimeout: '위치를 확인하지 못했어요. 제주 중심에서 찾은 곳들이에요.',
-  positionUnsupported: '이 브라우저에서는 현재 위치를 쓸 수 없어요. 제주 중심에서 찾은 곳들이에요.',
+  positionDenied: '위치 권한이 없어 거리를 계산할 수 없어요.',
+  positionTimeout: '위치를 확인하지 못했어요.',
+  positionUnsupported: '이 브라우저에서는 현재 위치를 쓸 수 없어요.',
   /**
    * 좌표는 받았는데 **제주 밖**일 때 (`reason: 'outside'`).
    *
@@ -130,7 +148,7 @@ export const emergencyMessages = {
    * **다시 시도 버튼을 붙이지 않는다** — 서울에서 다시 눌러도 서울이다
    * (`positionUnsupported` 와 같은 판단).
    */
-  positionOutside: '지금 제주 밖에 있어요. 제주 중심에서 찾은 곳들이에요.',
+  positionOutside: '지금 제주 밖에 있어요.',
   retryPosition: '현재 위치로 다시 찾기',
 
   /** `{provider}` 치환 */

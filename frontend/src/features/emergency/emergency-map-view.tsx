@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 
 import { Button } from '@/components/button'
@@ -57,9 +57,31 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
 
   const [bounds, setBounds] = useState<MapBounds | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  /*
+    선택 순간의 `bounds` 를 얼려 둔다 (B1).
+
+    **선택하면 지도가 `SELECTED_FACILITY_MAP_LEVEL`(4)까지 확대된다** — 그런데 그
+    확대는 `setLevel(animate) + panTo` 로 이루어지고, 카카오 SDK 가 이 애니메이션
+    이동에서는 쓸 만한 `idle` 을 내지 않는다(브라우저 실측 — 10초를 기다려도 `onIdle`
+    이 다시 안 온다). 그래서 `bounds` 자체는 지금도 바뀌지 않고 목록이 살아남는다.
+
+    **그 "안 바뀜" 에 기대면 안 된다.** 그것은 SDK 타이밍의 사고이지 우리가 만든
+    규칙이 아니다 — 다음 SDK 버전이 그 애니메이션에서도 `idle` 을 내는 순간, 좁아진
+    레벨 4 영역으로 `bounds` 가 실제로 갱신되고 목록이 4곳 안팎으로 줄어 다음 행을
+    이어 누를 수 없게 된다(반경 10km 에 136곳 — `docs/.../emergency-map-unification-design.md`
+    §4). 그래서 **선택이 살아 있는 동안 쓸 `inBounds` 를 선택 시점의 값으로 명시적으로
+    고정한다.** 수동 드래그는 여전히 `bounds` 를 갱신하고(§5-2), 선택을 풀면
+    `frozenBounds` 도 함께 비운다.
+  */
+  const [frozenBounds, setFrozenBounds] = useState<MapBounds | null>(null)
   const [sheetStop, setSheetStop] = useState<SheetStop>('mid')
   const [panelOpen, setPanelOpen] = useState(true)
   const [failure, setFailure] = useState<MapSdkFailure | null>(null)
+
+  // 선택이 풀리면 얼린 영역도 같이 비운다 — 다음 수동 이동이 다시 `bounds` 를 갱신한다
+  useEffect(() => {
+    if (selectedId === null) setFrozenBounds(null)
+  }, [selectedId])
 
   const inRadius = board.query.data?.facilities ?? []
 
@@ -71,15 +93,18 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
 
     **좌표가 없는 시설은 영역 필터에서 살린다.** 지도가 판단할 수 없다는 이유로 병원을
     숨기면 안 된다 (`/places` 와 같은 규칙).
+
+    **선택 중에는 `frozenBounds` 를 우선한다** — 바로 위 설명대로다.
   */
   const inBounds = useMemo(() => {
-    if (bounds === null) return inRadius
+    const effectiveBounds = frozenBounds ?? bounds
+    if (effectiveBounds === null) return inRadius
 
     return inRadius.filter((entry) => {
       const coord = toLatLng(entry)
-      return coord === null || isWithinBounds(bounds, coord)
+      return coord === null || isWithinBounds(effectiveBounds, coord)
     })
-  }, [inRadius, bounds])
+  }, [inRadius, bounds, frozenBounds])
 
   const visible = useMemo(() => applyFilters(inBounds, board.filters), [inBounds, board.filters])
 
@@ -108,11 +133,20 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
 
     **시트가 최소 단계면 올린다.** 안 올리면 고른 행이 화면 밖이라 "눌렀는데 아무
     일도 안 일어난다" 로 보인다. 이미 중간·최대면 사용자가 맞춰 둔 것을 건드리지 않는다.
+
+    **`bounds` 를 이 순간 그대로 얼린다.** 이후 지도가 확대되며 `bounds` 가 바뀌어도
+    (또는 안 바뀌어도) 목록은 지금 이 영역 기준으로 남는다. 다른 행을 이어 고르면
+    그 시점의 `bounds` 로 다시 얼린다 — 그사이 수동 드래그가 있었다면 그 갱신된 영역을
+    반영해야 하기 때문이다.
   */
-  const handleSelect = useCallback((id: string) => {
-    setSelectedId(id)
-    setSheetStop((stop) => (stop === 'min' ? 'mid' : stop))
-  }, [])
+  const handleSelect = useCallback(
+    (id: string) => {
+      setSelectedId(id)
+      setFrozenBounds(bounds)
+      setSheetStop((stop) => (stop === 'min' ? 'mid' : stop))
+    },
+    [bounds],
+  )
 
   // ── SDK 실패 → 목록으로 되돌리고 안내 한 줄 ──────────────────────────────
   if (failure !== null) {
@@ -131,7 +165,7 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
     )
   }
 
-  const countLine = `${messages.map.visibleCount.replace('{n}', String(visible.length))} · ${messages.emergency.radiusLabel.replace('{radius}', formatDistance(board.radius))}`
+  const countLine = `${visibleCountLabel(visible.length, selectedId !== null)} · ${messages.emergency.radiusLabel.replace('{radius}', formatDistance(board.radius))}`
   const basisLine = board.showDistance
     ? messages.emergency.basisCurrent
     : messages.emergency.basisJeju
@@ -354,8 +388,25 @@ function PanelBody({
   )
 }
 
-/** 위치를 못 얻었을 때. **목록을 지우지 않고 그 위에 얹는다** */
-function PositionNotice({
+/**
+ * 위치를 못 얻었을 때. **목록을 지우지 않고 그 위에 얹는다.**
+ *
+ * **한 줄이다 (B2).** 두 줄 문구 + 별도 44px 버튼 블록이던 이전 모양은 375px 시트
+ * `mid` 단계에서 칩 두 줄 + 캡션 + 이 안내를 합치면 첫 행의 52px 전화 버튼이 화면
+ * 아래로 밀려났다 — 이 화면이 지도를 기본으로 바꾼 근거("시트가 열리면 행과 전화
+ * 버튼이 이미 보인다")가 폴백 상태에서는 거짓이 되는 결함이었다. 다시 시도는 문장
+ * 끝에 붙는 **인라인 링크**로 줄여 안내 전체를 한 줄(짧으면) 또는 줄바꿈 없는 한
+ * 문단으로 좁힌다.
+ *
+ * **네 갈래를 여전히 가른다.** `unsupported` · `outside` 는 다시 시도해도 답이 같아
+ * 링크 자체를 두지 않는다 — 버튼을 눈에 덜 띄게 줄인 것이 아니라 아예 없다.
+ *
+ * **링크의 터치 영역은 44px 를 유지한다** (`DESIGN.md` §7). 글자 크기를 줄이거나
+ * 버튼 높이를 낮춰 맞추지 않는다 — `h-11` 그대로 두고, 짧은 안내문 옆에 나란히 서도록
+ * **줄(행)이 items-center 로 정렬해 세로 여백을 흡수**한다. 그래서 다시 시도가 없는
+ * 두 갈래는 이 만큼의 세로 공간도 필요 없어 한층 더 얕아진다.
+ */
+export function PositionNotice({
   reason,
   onRetry,
 }: {
@@ -371,20 +422,45 @@ function PositionNotice({
           ? messages.emergency.positionOutside
           : messages.emergency.positionTimeout
 
+  // **다시 시도할 것이 없는 두 갈래에는 링크를 두지 않는다.** 미지원 브라우저는
+  // 눌러도 같은 답이고, 제주 밖은 좌표를 이미 정확히 받은 상태다.
+  const canRetry = reason !== 'unsupported' && reason !== 'outside'
+
   return (
-    <div className="flex flex-col items-start gap-2">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <p className="text-body-2 text-fg break-keep">{text}</p>
-      {/*
-        **다시 시도할 것이 없는 두 갈래에는 버튼을 두지 않는다.** 미지원 브라우저는
-        눌러도 같은 답이고, 제주 밖은 좌표를 이미 정확히 받은 상태다.
-      */}
-      {reason !== 'unsupported' && reason !== 'outside' && (
-        <Button variant="secondary" onClick={onRetry}>
+      {canRetry && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className={cn(
+            // `text-link` 는 DESIGN.md 가 "링크 · 인라인 액션" 으로 정의한 토큰이다 —
+            // 이 자리(문장 끝의 인라인 다시 시도)가 정확히 그 용도다
+            'text-link hover:text-link-hover shrink-0 rounded-md font-semibold',
+            'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:outline-none',
+            // 44px 터치 영역 — 글자는 본문 크기 그대로, 상하 여백으로만 높이를 채운다
+            'flex h-11 items-center px-1',
+          )}
+        >
           {messages.emergency.retryPosition}
-        </Button>
+        </button>
       )}
     </div>
   )
+}
+
+/**
+ * 캡션의 개수 라벨 (B1). `selected` 가 `true` 면 `messages.map.visibleCount`("지도에
+ * 보이는 {n}곳") 대신 `messages.emergency.selectedCount`("목록 {n}곳") 를 쓴다.
+ *
+ * **선택 중에는 "지도에 보이는" 이라고 말하지 않는다.** 선택하면 지도가 확대되어
+ * 실제 프레임과 `frozenBounds` 가 어긋나므로, 그 주장은 그 순간 거짓이 된다. 개수
+ * 자체(목록 길이)는 얼려도 참이라 숫자는 그대로 두고 문구만 바꾼다 — 순수 함수라
+ * `emergency-map-view.test.ts` 가 문자열로 고정한다.
+ */
+export function visibleCountLabel(count: number, selected: boolean): string {
+  const template = selected ? messages.emergency.selectedCount : messages.map.visibleCount
+  return template.replace('{n}', String(count))
 }
 
 function reliefLabel(option: FilterRelief): string {
