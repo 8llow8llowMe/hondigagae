@@ -16,7 +16,7 @@ import { EmergencyMapSkeleton } from '@/features/emergency/emergency-map-skeleto
 import {
   applyFilters,
   countsAreComplete,
-  type FilterRelief,
+  reliefLabel,
   reliefs,
 } from '@/features/emergency/facility-filters'
 import { useEmergencyBoard } from '@/features/emergency/use-emergency-board'
@@ -650,17 +650,6 @@ export function isSelectionStillValid(params: {
   if (params.anchorRadius !== params.currentRadius) return false
   if (params.anchorPosition !== params.currentPosition) return false
   return params.visible.some((entry) => entry.facilityId === params.selectedId)
-}
-
-function reliefLabel(option: FilterRelief): string {
-  const template =
-    option.kind === 'openNowOnly'
-      ? messages.emergency.reliefOpenNow
-      : option.kind === 'open24Only'
-        ? messages.emergency.reliefOpen24
-        : messages.emergency.reliefType
-
-  return template.replace('{n}', String(option.count))
 }
 
 function failureMessage(reason: MapSdkFailure): string {

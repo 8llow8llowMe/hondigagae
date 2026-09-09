@@ -67,8 +67,6 @@ export const emergencyMessages = {
 
   /** `{name}` 치환 — icon-only 버튼의 접근성 이름 */
   callLabel: '{name} 전화하기',
-  /** 지도 선택 카드의 전화 버튼 라벨 — 행의 아이콘 버튼과 달리 글자가 들어간다 */
-  callShort: '전화',
   /** `tel === null`. **버튼을 숨기지 않고 이유와 다음 방법을 준다** */
   telMissing: '등록된 전화번호가 없어요 — 주소로 위치를 확인해 주세요.',
 
