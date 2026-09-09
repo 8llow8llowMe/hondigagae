@@ -6,6 +6,8 @@ import com.hondigagae.domainlayer.insight.domain.enums.ForecastCoverage;
 import com.hondigagae.domainlayer.insight.domain.enums.PrecipitationType;
 import com.hondigagae.domainlayer.insight.domain.enums.SkyState;
 import com.hondigagae.domainlayer.insight.domain.enums.WalkSafetyReasonCode;
+import com.hondigagae.domainlayer.insight.domain.enums.WeatherWarningLevel;
+import com.hondigagae.domainlayer.insight.domain.enums.WeatherWarningType;
 import com.hondigagae.shared.travel.insight.WalkSafetyLevel;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -175,6 +177,55 @@ class WalkSafetyEvaluatorTest {
 
             assertThat(assessment.level()).isEqualTo(WalkSafetyLevel.SAFE);
             assertThat(assessment.hasSaferWindow()).isFalse();
+        }
+    }
+
+    @Nested
+    @DisplayName("기상특보")
+    class WeatherWarningRules {
+
+        /**
+         * 경보 + 곡선에 안전 구간이 있는 조합 (#357).
+         *
+         * <p>골든타임({@code GoldenWindowStatus.of})은 경보면 곡선이 좋아도 추천을 보류한다.
+         * saferWindow 가 같은 축을 지키지 않으면 같은 서비스가 "경보라 추천하지 않는다"고
+         * 말하면서 시간대를 제시하게 되고, 사용자는 그것을 허락으로 읽는다.
+         */
+        @Test
+        @DisplayName("경보 중에는 곡선에 안전 구간이 있어도 saferWindow 를 주지 않는다 - 골든타임과 같은 축이다")
+        void suppressesSaferWindowDuringWarning() {
+            List<WeatherForecast> hourly = sunnyDayCoolingDown();   // 저녁(16시~)에 안전 구간이 실재한다
+            WalkSafetyAssessment assessment = WalkSafetyEvaluator.evaluate(
+                hourly.stream().filter(forecast -> forecast.forecastAt().getHour() == 14).findFirst().orElseThrow(),
+                hourly, PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0),
+                ForecastCoverage.AVAILABLE, warning(WeatherWarningLevel.WARNING), JEJU_LATITUDE);
+
+            assertThat(assessment.level()).isEqualTo(WalkSafetyLevel.DANGER);
+            assertThat(assessment.hasSaferWindow()).isFalse();
+            // 구간이 없는데 문장만 남으면 같은 모순이 근거 목록으로 옮겨 갈 뿐이다.
+            assertThat(codesOf(assessment)).containsExactly(WalkSafetyReasonCode.WEATHER_WARNING_ACTIVE);
+        }
+
+        @Test
+        @DisplayName("주의보는 추천을 막지 않는다 - 골든타임도 주의보에는 보류를 내지 않는다")
+        void advisoryKeepsSaferWindow() {
+            List<WeatherForecast> hourly = sunnyDayCoolingDown();
+            WalkSafetyAssessment assessment = WalkSafetyEvaluator.evaluate(
+                hourly.stream().filter(forecast -> forecast.forecastAt().getHour() == 14).findFirst().orElseThrow(),
+                hourly, PetCondition.unspecified(), thresholds(), DATE.atTime(14, 0),
+                ForecastCoverage.AVAILABLE, warning(WeatherWarningLevel.ADVISORY), JEJU_LATITUDE);
+
+            // 주의보는 최소 CAUTION 근거로 실리되, 더 나은 시간대 제안은 그대로 남는다.
+            assertThat(codesOf(assessment)).contains(WalkSafetyReasonCode.WEATHER_WARNING_ACTIVE);
+            assertThat(assessment.hasSaferWindow()).isTrue();
+            assertThat(codesOf(assessment)).contains(WalkSafetyReasonCode.SAFE_WINDOW);
+        }
+
+        private WeatherWarning warning(WeatherWarningLevel level) {
+            return WeatherWarning.builder()
+                .type(WeatherWarningType.HEAT_WAVE)
+                .level(level)
+                .build();
         }
     }
 

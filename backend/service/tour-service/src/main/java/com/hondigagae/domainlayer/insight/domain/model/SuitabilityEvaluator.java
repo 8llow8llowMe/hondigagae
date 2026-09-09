@@ -118,7 +118,7 @@ public final class SuitabilityEvaluator {
             warning.type().getDisplayName(), warning.level().getDisplayName(),
             warning.type().getDescription());
 
-        if (warning.level().isWarning()) {
+        if (WeatherWarning.suppressesRecommendation(warning)) {
             // 남은 점수를 전부 깎는다. 어떤 조합이 와도 0 이 되게 하기 위해서다.
             reasons.add(SuitabilityReason.of(
                 SuitabilityReasonCode.WEATHER_WARNING_ACTIVE, description, -BASE_SCORE));
