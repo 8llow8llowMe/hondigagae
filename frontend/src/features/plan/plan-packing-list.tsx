@@ -49,7 +49,16 @@ export function PackingListPanel({ items, pending, failed, onGenerate }: Packing
   return (
     <section aria-label={messages.plan.packingHeading} className="border-border border-t">
       <div className="flex flex-col gap-3 px-4 py-4 md:px-6 md:py-5">
-        <h2 className="text-body-1 font-semibold">{messages.plan.packingHeading}</h2>
+        {/*
+          **`md:` 가 아니라 `lg:` 다** (#358). 홈의 섹션 제목은 `md:text-title-1` 인데
+          (DESIGN.md §3-1), 홈에는 화면 안에 보이는 `h1` 이 없다(sr-only). 여기는 같은
+          레일 위에 일정 제목 `h1` 이 서 있어서, md 에서 22 로 올리면 그 `h1`(md 까지
+          22)과 같은 값이 된다. `lg` 은 레일이 레일이 되는 지점이고 `h1` 이 28 로
+          올라가는 지점이기도 하다 — `place-detail-section` 의 섹션 제목과 같은 변형이다.
+        */}
+        <h2 className="text-title-2 text-fg lg:text-title-1 font-semibold lg:font-bold">
+          {messages.plan.packingHeading}
+        </h2>
 
         {pending ? (
           <Pending />

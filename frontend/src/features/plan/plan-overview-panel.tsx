@@ -53,8 +53,17 @@ export function PlanOverviewPanel({
     <div className="flex flex-col gap-5 px-4 py-6 md:px-10 lg:px-8">
       <div className="flex flex-col gap-2">
         <div className="flex items-start gap-2">
-          {/* 제목은 서버 상한 60자다. 좌측 400 에서 2~3줄이 되므로 keep-all 로 어절을 지킨다 */}
-          <h1 className="text-title-1 text-fg min-w-0 flex-1 font-bold break-keep">{plan.title}</h1>
+          {/*
+            제목은 서버 상한 60자다. 좌측 400 에서 2~3줄이 되므로 keep-all 로 어절을 지킨다.
+
+            **`lg:text-display` 는 저장소의 콘텐츠 화면 `h1` 관례다** (#358) — 일정 목록 ·
+            장소 추가 · 일차 재생성 · 장소 상세가 같은 값이다. 여기만 인증 폼 값
+            (`text-title-1 font-bold`)을 쓰고 있어서, 화면 제목이 우측 `N일차`(22/700)와
+            **모든 폭에서 완전히 같았다.** 그래서 좌측 레일의 준비물도 올릴 자리가 없었다.
+          */}
+          <h1 className="text-title-1 text-fg lg:text-display min-w-0 flex-1 font-bold break-keep lg:font-extrabold">
+            {plan.title}
+          </h1>
           <PlanStatusBadge status={plan.status} className="mt-1" />
           {/* 제목 줄 우측 상단 — 아이콘 버튼의 히트 영역이 제목 첫 줄과 맞도록 `-mt-1` */}
           {menu !== null && <div className="-mt-1">{menu}</div>}

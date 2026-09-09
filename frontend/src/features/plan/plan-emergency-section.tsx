@@ -66,7 +66,8 @@ function DaySection({ day }: { day: PlanEmergencyDay }) {
 
   return (
     <section aria-label={messages.plan.emergencyDayLabel.replace('{day}', String(day.day))}>
-      <h2 className="text-title-2 text-fg px-4 pt-5 pb-2 font-semibold md:px-10">
+      {/* 섹션 제목 등급은 일정 상세와 같은 갈래다 — `lg` 에서 갈린다 (#358) */}
+      <h2 className="text-title-2 text-fg lg:text-title-1 px-4 pt-5 pb-2 font-semibold md:px-10 lg:font-bold">
         {messages.plan.emergencyDayLabel.replace('{day}', String(day.day))}
       </h2>
 
