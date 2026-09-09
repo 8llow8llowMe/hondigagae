@@ -12,13 +12,17 @@ import type { PlaceSummary } from '@/types/place'
  * 안 된다. 행 마크업 자체는 `PlaceMapPanel` 이 갖고 있어 재사용할 수 없어서, 겹치는
  * 액션 조각을 여기에 **따로 두었다.**
  *
- * **같은 조각이 네 곳에 있다 — 고칠 때 같이 고쳐야 한다.** 문구·버튼 설정·`이미 담았어요`
- * 대체가 문자 단위로 겹치는 복제다:
+ * **같은 조각이 네 곳에 있다 — 고칠 때 같이 봐야 한다.** 다만 **겹침 정도가 다르다:**
  *
  *  1. 이 파일 (`plan-add-place-action.tsx`) — 지도 패널·시트 행의 액션 열
  *  2. `plan-add-place-row.tsx` — 담기 화면 목록 보기의 행
  *  3. `plan-indoor-alts.tsx` — 비 예보 일자의 실내 대안 행
  *  4. `place-add-to-plan-picker.tsx` — 장소 상세에서 여는 담기 시트의 일자 버튼
+ *
+ * **1·2·3 만 문자 단위로 겹친다** — `messages.plan.addPlaceAlready` 대체, 담기 버튼의
+ * `messages.plan.addPlaceShort`, `disabled={disabled && !pending}` 가 그대로 같다.
+ * **4 는 `messages.plan.addPlaceAlready` 하나만 공유한다** — 일자 버튼이라 담기 버튼도
+ * 그 disabled 규칙도 없다.
  *
  * 하나로 합치려면 네 곳의 행 구조를 전부 건드려야 하고 이 브랜치가 만든 중복도 아니라서
  * #370 범위를 넘겼다.

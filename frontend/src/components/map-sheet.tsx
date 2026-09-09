@@ -108,10 +108,18 @@ export function MapSheet({
     끄는 동안의 오프셋은 두 갈래 모두 같은 방식으로 빼진다 — 위로 끌면 음수라 커진다.
     `maxTopInset` 은 **`max` 에만** 걸린다. `min`·`mid` 는 헤더와 부딪히지 않으므로
     비율 그대로 두는 편이 화면 크기에 잘 따라간다.
+
+    **`mid` 비율이 하한이다.** 인셋은 px 이라 `100dvh - inset` 은 뷰포트 높이에 선형인데
+    `mid` 는 비율이라, 화면이 짧아지면 max 가 mid 아래로 내려간다 — 가로 모드 폰
+    (812×375)에서 max = 375 − 240 = **135px**, mid = 45dvh = **169px** 다. 시트는
+    `lg:hidden` 이라 폭 812 에서도 뜨므로 실제로 `목록 더 보기` 를 누르면 시트가 오히려
+    줄어드는 뒤집힘이 난다(그래버 + 필터 툴바 + 개수 줄이 대략 120px 이라 목록 영역이
+    사실상 0 이 된다). 비율끼리인 기존 경로는 `0.2 < 0.45 < 0.85` 로 단조성이 구조적으로
+    보장됐지만 이 갈래는 보장하지 않으므로 CSS `max()` 로 클램프한다.
   */
   const base =
     stop === 'max' && maxTopInset > 0
-      ? `100dvh - ${String(maxTopInset)}px`
+      ? `max(${String(STOP_RATIO.mid * 100)}dvh, 100dvh - ${String(maxTopInset)}px)`
       : `${String(STOP_RATIO[stop] * 100)}dvh`
   const height = `calc(${base} - ${String(Math.round(dragOffset))}px)`
 
