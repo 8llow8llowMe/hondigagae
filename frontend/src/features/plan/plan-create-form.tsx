@@ -90,30 +90,26 @@ export function PlanCreateForm({
     >
       <FormAlert message={errors.form} />
 
-      <RadioGroup
-        id="petId"
-        label={messages.plan.fieldPet}
-        required
-        options={pets.map((pet) => ({
-          value: pet.petId,
-          label: pet.name,
-          description: describePet(pet),
-        }))}
-        value={values.petId}
-        onValueChange={(petId) => onValueChange('petId', petId)}
-        error={errors.fields.petId}
-      />
+      {/*
+        ── 묻는 순서: 기간 → 반려견 → 제목 → 예산 ─────────────────────────────
 
-      <Field id="title" label={messages.plan.fieldTitle} required error={errors.fields.title}>
-        <Input
-          id="title"
-          value={values.title}
-          onValueChange={(title) => onValueChange('title', title)}
-          invalid={errors.fields.title !== undefined}
-          placeholder={messages.plan.fieldTitlePlaceholder}
-          maxLength={60}
-        />
-      </Field>
+        **`/ai-plans/new` 와 같은 순서다** (#400). 두 화면은 같은 일(여행 일정 만들기)을
+        하는 두 갈래인데 묻는 순서가 어긋나 있어, 한쪽을 써 본 사람이 다른 쪽에서 다시
+        헤맸다 — 예전에는 이 화면이 `반려견 → 제목 → 기간` 이고 저쪽이 `기간 → 반려견` 이라
+        **반려견과 기간이 서로 뒤집혀** 있었다.
+
+        **기간이 먼저인 쪽으로 맞췄다.** 근거가 둘이다.
+         1. 여행을 계획하는 순서가 "언제 가지" → "누구랑" 이다. 기간이 앵커고 나머지가
+            그 위에 얹힌다.
+         2. **시작일을 고르면 종료일 달력이 이어서 열린다.** 그 흐름은 기간이 화면 첫
+            블록일 때 가장 자연스럽다 — 중간에 있으면 위 필드를 지나쳐 온 뒤에 달력이
+            두 번 튀어나온다.
+
+        **`예산` 은 저쪽처럼 접기 안에 넣지 않는다.** 저쪽은 선택 입력이 넷(지역·예산·저장한
+        곳·꼭 넣을 곳)이라 접기가 값을 하지만(#354), 이 화면의 선택 입력은 `예산` 하나다 —
+        하나를 위해 접기를 두면 여는 동작이 그 하나보다 비싸다. 대신 **필수 뒤 맨 끝**이라는
+        자리로 같은 것을 말한다.
+      */}
 
       {/*
         두 날짜는 한 줄에 나란히 — 기간은 하나의 값이라 세로로 떨어뜨리면 관계가 흐려진다.
@@ -198,6 +194,31 @@ export function PlanCreateForm({
           />
         </Field>
       </div>
+
+      <RadioGroup
+        id="petId"
+        label={messages.plan.fieldPet}
+        required
+        options={pets.map((pet) => ({
+          value: pet.petId,
+          label: pet.name,
+          description: describePet(pet),
+        }))}
+        value={values.petId}
+        onValueChange={(petId) => onValueChange('petId', petId)}
+        error={errors.fields.petId}
+      />
+
+      <Field id="title" label={messages.plan.fieldTitle} required error={errors.fields.title}>
+        <Input
+          id="title"
+          value={values.title}
+          onValueChange={(title) => onValueChange('title', title)}
+          invalid={errors.fields.title !== undefined}
+          placeholder={messages.plan.fieldTitlePlaceholder}
+          maxLength={60}
+        />
+      </Field>
 
       <Field
         id="budget"
