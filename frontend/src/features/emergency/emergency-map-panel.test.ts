@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { EmergencyMapPanel } from '@/features/emergency/emergency-map-panel'
+import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
 import { facility, pharmacy } from '@/test/fixtures/emergency'
 
@@ -69,6 +70,12 @@ describe('EmergencyMapPanel', () => {
   })
 
   it('showDistance 가 false 면 거리를 감춘다', () => {
-    expect(render({ showDistance: false })).not.toContain('480m')
+    const distanceStr = formatDistance(facility().distanceMeters)
+    expect(render({ showDistance: false })).not.toContain(distanceStr)
+  })
+
+  it('showDistance 가 true 면 거리를 보인다', () => {
+    const distanceStr = formatDistance(facility().distanceMeters)
+    expect(render({ showDistance: true })).toContain(distanceStr)
   })
 })
