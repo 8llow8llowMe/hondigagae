@@ -321,6 +321,10 @@ public class AiPlanPromptFactory {
         if (pet.breed() != null && !pet.breed().isBlank()) {
             prompt.append("- 견종: ").append(pet.breed()).append('\n');
         }
+        if (pet.ageText() != null && !pet.ageText().isBlank()) {
+            prompt.append("- 나이: ").append(pet.ageText())
+                .append(" (나이에 맞는 활동 강도로 짤 것 - 노령견은 이동과 도보를 줄이고 휴식을 자주, 어린 반려견은 낯선 환경 연속 배치를 피할 것)").append('\n');
+        }
         if (pet.sizeName() != null) {
             prompt.append("- 크기: ").append(pet.sizeName())
                 .append(" (입장 조건이 맞는 후보만 고를 것)").append('\n');

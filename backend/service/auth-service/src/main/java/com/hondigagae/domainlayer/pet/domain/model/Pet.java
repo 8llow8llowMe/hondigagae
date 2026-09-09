@@ -71,4 +71,25 @@ public record Pet(
     public boolean isOwnedBy(long memberId) {
         return this.memberId == memberId;
     }
+
+    /**
+     * 생년월에서 파생한 나이(개월 수).
+     *
+     * <p>내부 계약이 생년월 <b>원문 대신</b> 이 파생값을 내보낸다 — 판정(노령견·퍼피 구분)에
+     * 필요한 것은 나이이지 생년월이 아니고, 서비스 경계를 넘는 개인정보는 최소로 유지한다 (#367).
+     *
+     * <p>생년월이 없거나 형식이 어긋나거나 미래면 null 이다 — 나이를 지어내지 않는다.
+     * 미래 생년월은 저장이 막혀 있지만({@code PetErrorCode.BIRTH_YM_IN_FUTURE}) 방어한다.
+     */
+    public static Integer ageMonths(String birthYm, java.time.YearMonth now) {
+        if (birthYm == null || birthYm.isBlank()) {
+            return null;
+        }
+        try {
+            long months = java.time.YearMonth.parse(birthYm).until(now, java.time.temporal.ChronoUnit.MONTHS);
+            return months < 0 ? null : (int) months;
+        } catch (java.time.format.DateTimeParseException exception) {
+            return null;
+        }
+    }
 }

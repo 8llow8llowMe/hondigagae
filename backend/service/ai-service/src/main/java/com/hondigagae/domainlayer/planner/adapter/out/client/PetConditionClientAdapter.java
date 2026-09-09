@@ -74,12 +74,26 @@ public class PetConditionClientAdapter implements PetConditionQueryPort {
             .breed(body.breed())
             .sizeName(sizeName(body.sizeType()))
             .weightText(weightText(body.weightKg()))
+            .ageText(ageText(body.ageMonths()))
             .heatSensitive(body.heatSensitive())
             .coldSensitive(body.coldSensitive())
             .noiseSensitive(body.noiseSensitive())
             .activityName(activityName(body.activityLevel()))
             .walkPreferred(body.walkPreferred())
             .build();
+    }
+
+    /** 개월 수를 "7년 4개월" 같은 사람이 읽는 표기로. 값이 없으면 null 유지. */
+    private String ageText(Integer ageMonths) {
+        if (ageMonths == null) {
+            return null;
+        }
+        int years = ageMonths / 12;
+        int months = ageMonths % 12;
+        if (years == 0) {
+            return months + "개월";
+        }
+        return months == 0 ? years + "년" : years + "년 " + months + "개월";
     }
 
     /** BigDecimal 을 "3.5" 같은 사람이 읽는 표기로. 값이 없으면 null 유지. */
