@@ -639,10 +639,11 @@ Run (Bash, background): `cd /Users/seonghoho/Documents/projects/hondigagae-376/f
 
 | URL | 기대 |
 | --- | --- |
-| `http://localhost:5174/places?view=map` | 지도가 뷰포트 전폭. 좌우 여백 0 |
-| `http://localhost:5174/plans/<실재 planId>/days/1/add?view=map` | 같음 |
+| `/places?view=map` | 지도가 뷰포트 전폭. 좌우 여백 0 |
 
-`planId` 는 `/plans` 에서 하나 열어 URL 에서 딴다. 로그인이 필요하면 먼저 로그인한다.
+**develop 에 지도 화면은 이 하나뿐이다.** 담기 지도는 #370 의 미머지 작업이라 이 브랜치에
+없다 — 계획 초안이 메인 워크트리(`feature/fe/370`)를 읽고 두 개로 적었던 것을 바로잡는다.
+#370 의 분기도 `.rail-layout` 없는 bare `<main>` 이라 머지되면 자동으로 전폭이 된다.
 
 - [ ] **Step 4: 1440 에서 변경 전과 같은지 확인한다**
 
@@ -689,7 +690,7 @@ git push -u origin refactor/fe/376-content-max-width
 - `Issue Number: #376`
 - 1440 을 고른 근거 (1440 노트북에서 오늘과 픽셀이 같다 / 1280 이면 960 → 800 으로 좁아진다)
 - 1920 · 1440 · 375 스크린샷
-- 지도 두 화면이 전폭임을 보이는 스크린샷
+- 지도 화면(`/places?view=map`)이 전폭임을 보이는 실측
 - `--rail-context: 480px` 삭제 사실 (`DESIGN.md` §7 결정을 뒤집은 것이므로 리뷰어가 알아야 한다)
 
 머지는 **Rebase and merge** 만 쓴다.

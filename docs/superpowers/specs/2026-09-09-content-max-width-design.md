@@ -8,7 +8,7 @@
 **Goal:** 넓은 화면에서 **화면마다 다른 폭 규칙**을 하나로 모은다. 레일 레이아웃과 헤더
 안쪽 내용을 `--content-max: 1440px` 로 캡하고 중앙 정렬한다.
 
-**Non-goal:** 512 / 672 / 768 캡 화면의 폭 변경. 지도 화면의 전폭 해제. 레일 폭(400/280)
+**Non-goal:** 512 / 672 / 768 캡 화면의 폭 변경. 지도 화면의 전폭 해제. #370 의 담기 지도 (머지되면 자동으로 전폭이다). 레일 폭(400/280)
 재설계. 헤더 높이·sticky·border 계약 변경. 새 컴포넌트.
 
 ---
@@ -23,7 +23,7 @@
 | `max-w-2xl` 672 | 일정 생성 |
 | `max-w-screen-md` 768 | 마이페이지(3) · 응급 · 즐겨찾기 · AI일정(2) · 반려견 목록 · 일정 응급 |
 | 무제한 (`.rail-layout`) | 홈 · 장소찾기 목록 · 장소상세 · 일정 목록 · 일정상세 · 담기 목록 |
-| 전폭 | 장소찾기 지도 · 담기 지도 |
+| 전폭 | 장소찾기 지도 |
 
 1920 에서 마이페이지는 정중앙 768 컬럼이고, 홈은 왼쪽 끝에 붙은 레일 + 1440px 우측 본문이다.
 **두 화면이 같은 제품으로 보이지 않는다.**
@@ -36,11 +36,14 @@
 
 ### 1-3. 전폭은 이미 "가입하지 않음"으로 구현돼 있다
 
-지도 두 화면은 `.rail-layout` 을 붙이지 않고 `<main id="main-content">` 만 낸다.
+지도 화면은 `.rail-layout` 을 붙이지 않고 `<main id="main-content">` 만 낸다.
 예외 처리가 아니라 **그 규칙에 가입하지 않는 방식**이다.
 
 - `app/(main)/places/(list)/page.tsx` — `view === 'map'` 분기
-- `app/(main)/plans/[planId]/days/[day]/add/page.tsx` — `view === 'map'` 분기
+
+**develop 기준으로 지도 화면은 이 하나다.** 담기 지도(`plans/[planId]/days/[day]/add`)는
+#370 에서 오는 미머지 작업이고, 그쪽 분기도 같은 모양(`.rail-layout` 없는 bare `<main>`)이라
+머지되면 **아무 작업 없이 전폭을 물려받는다.**
 
 이 구조가 캡을 어디에 걸지를 결정한다 (§3).
 
@@ -161,7 +164,7 @@ sticky · `border-b` · `--header-h`(56/64) 계약은 그대로다. 바를 캡�
 | lint · typecheck · test | `pnpm verify` — `noComplexArbitrary` 위반이 없어야 한다 (§4-2) |
 | 1440 에서 오늘과 동일 | 변경 전후 스크린샷 대조 |
 | 1920 중앙 정렬 | 홈 · 장소찾기 목록 · 일정 상세 |
-| 지도 두 화면 전폭 | `/places?view=map` · `/plans/:id/days/:d/add?view=map` |
+| 지도 화면 전폭 | `/places?view=map` (develop 의 유일한 지도 화면) |
 | 375 가로 스크롤 0 | `document.scrollingElement.scrollWidth === clientWidth` |
 | 브레이크포인트 | 1920 / 1440 / 1280 / 1024 / 768 / 375 |
 
