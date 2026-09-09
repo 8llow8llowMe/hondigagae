@@ -67,3 +67,23 @@ describe('WeatherWarningStrip (#349)', () => {
     expect(render(HEAT_WAVE)).not.toContain('role="alert"')
   })
 })
+
+describe('WeatherWarningStrip — 콘텐츠 컨테이너 (#376)', () => {
+  /*
+    스트립은 `rail-layout` 밖, 두 열 위에 있다. 레일만 캡하면 1920 에서 이 줄의 글자만
+    화면 끝(40px)에 남고 아래 본문은 264px 에서 시작해 **세로 기준선이 꺾인다.**
+
+    헤더와 같은 처리다 — 바는 전폭이라 `border-b` 가 헤더 구분선과 같은 길이로 이어지고,
+    안쪽만 캡해 글자가 본문과 같은 세로선에 선다.
+  */
+  it('바는 전폭이다 — border-b 가 헤더 구분선과 같은 길이로 이어진다', () => {
+    const markup = render(HEAT_WAVE)
+
+    expect(markup).toContain('border-b')
+    expect(markup).not.toMatch(/<section[^>]*class="[^"]*content-container/)
+  })
+
+  it('안쪽 줄이 content-container 로 캡된다', () => {
+    expect(render(HEAT_WAVE)).toMatch(/class="content-container/)
+  })
+})

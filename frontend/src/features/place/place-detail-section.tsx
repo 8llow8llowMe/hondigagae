@@ -433,7 +433,8 @@ function Breadcrumb({ title }: { title: string }) {
  */
 function DelistedNotice() {
   return (
-    <div className="px-4 py-3 md:px-10">
+    // `rail-layout` 밖, 두 열 위다. 캡하지 않으면 1920 에서 아래 본문과 세로선이 꺾인다 (#376)
+    <div className="content-container px-4 py-3 md:px-10">
       <div className="bg-band rounded-md px-3 py-2">
         <strong className="text-body-2 text-fg block font-semibold">
           {messages.place.detailDelistedTitle}

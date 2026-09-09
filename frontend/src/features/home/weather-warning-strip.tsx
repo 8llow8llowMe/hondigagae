@@ -42,14 +42,20 @@ export function WeatherWarningStrip({ warning }: { warning: WeatherWarningItem |
   if (warning === null) return null
 
   return (
-    <section
-      aria-label={messages.home.warningStripLabel}
-      className={`border-border flex flex-wrap items-center gap-x-2 gap-y-1 border-b py-3 ${INSET_CLASS.main}`}
-    >
-      <WeatherWarningBadge warning={warning} />
-      {warning.level.description !== null && (
-        <p className="text-body-2 text-fg break-keep">{warning.level.description}</p>
-      )}
+    /*
+      **바는 전폭, 안쪽만 캡이다** (#376) — `GlobalHeader` 와 같은 구조다.
+      `border-b` 는 페이지를 가로지르는 경계라 캡하면 헤더 구분선보다 짧아져 어긋난다.
+      안쪽 줄은 `.content-container` 로 본문(`.rail-layout`)과 같은 세로선에 선다.
+    */
+    <section aria-label={messages.home.warningStripLabel} className="border-border border-b">
+      <div
+        className={`content-container flex flex-wrap items-center gap-x-2 gap-y-1 py-3 ${INSET_CLASS.main}`}
+      >
+        <WeatherWarningBadge warning={warning} />
+        {warning.level.description !== null && (
+          <p className="text-body-2 text-fg break-keep">{warning.level.description}</p>
+        )}
+      </div>
     </section>
   )
 }
