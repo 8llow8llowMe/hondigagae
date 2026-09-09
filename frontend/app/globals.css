@@ -183,6 +183,29 @@ body {
 }
 
 /*
+  콘텐츠 컨테이너 — DESIGN.md §7 (#376). 넓은 화면에서 본문이 무한히 자라지 않게 한다.
+
+  **캡이 필요한 곳이 여럿이라 한 규칙에 모은다.** 값이 갈라지면 헤더 내용과 본문의
+  좌우 경계가 어긋난다 — 1920 에서 40px 대 264px 로 벌어진다.
+
+  **`@media` 밖이다.** 1440 미만에서는 `max-inline-size` 가 걸리지 않고, `margin-inline: auto`
+  도 폭이 `auto` 인 블록에서는 무효라 모바일·태블릿은 이 규칙이 있어도 무변화다.
+  `.rail-layout` 의 grid 선언만 `lg` 안에 남는다.
+
+  **지도 화면은 여기에 가입하지 않는다** — `.rail-layout` 을 붙이지 않으므로 전폭이다
+  (`places/(list)/page.tsx` · `plans/[planId]/days/[day]/add/page.tsx` 의 `view === 'map'` 분기).
+  전폭을 예외로 처리하지 않고 **규칙에 가입하지 않는 방식**으로 두는 것이 이 설계의 핵심이다.
+
+  Tailwind arbitrary(`max-w-[var(--content-max)]`)로 쓰지 않는다 — 대괄호 안 함수 호출은
+  eslint `noComplexArbitrary` 가 막고, Tailwind 가 조용히 클래스를 만들지 않을 수 있다.
+*/
+.content-container,
+.rail-layout {
+  max-inline-size: var(--content-max);
+  margin-inline: auto;
+}
+
+/*
   2단 레일 레이아웃 — DESIGN.md §7-1 · §7-2.
 
   **열 구분선은 우측 열의 `border-left` 로 그린다** (사용처에서 `lg:border-l`).
@@ -193,7 +216,7 @@ body {
   y=159..569 구간이 가려졌다(실측). 우측 열은 sticky 가 아니므로 border 가 끊기지 않고,
   border 는 자식의 배경보다 바깥에 그려져 덮이지도 않는다.
 
-  폭은 `--rail-context` 하나로 묶어 열과 선이 함께 움직인다 (1584+ 에서 480).
+  폭은 `--rail-context` 하나로 묶어 열과 선이 함께 움직인다 (400 고정).
 */
 @media (width >= 64rem) {
   /*
@@ -228,8 +251,7 @@ body {
   /*
     목록 화면용 변형 — 좌측이 **맥락 패널이 아니라 필터 레일**이라 폭이 다르다
     (`--rail-filter: 280px`, DESIGN.md §7-1). 역할이 다르므로 폭도 다르다는 것이
-    디자인 가이드 §4 의 규칙이고, 1584+ 에서 맥락 패널만 480 으로 넓어지는 것과 달리
-    필터 레일은 280 을 유지한다 — 라디오 한 줄에 그 이상이 필요하지 않다.
+    디자인 가이드 §4 의 규칙이다 — 라디오 한 줄에 280 이상이 필요하지 않다.
   */
   .rail-layout-filter {
     grid-template-columns: var(--rail-filter) minmax(0, 1fr);
