@@ -9,17 +9,18 @@ import { formatDistance } from '@/lib/format/distance'
 import { displayTemperature } from '@/lib/insight/temperature'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { DailyWeatherItem, PlaceSuitabilityResponse } from '@/types/insight'
 
 /**
- * 좌우 인셋.
+ * 좌우 인셋 — `INSET_CLASS.rail` 을 참조한다. 문자열을 이 파일에 다시 적지 않는다 (#386).
  *
- * **레일 폭(24)은 1024 이상에서만이다.** 그 아래에서는 이 패널이 레일이 아니라 한 컬럼
- * 본문의 한 블록이라, 24 를 쓰면 제목·행과 다른 축에서 시작한다 — 768 실렌더에서 제목이
- * 40, 이 패널이 24 로 어긋나 있었다.
+ * **오른쪽만 1024 이상에서 24 로 좁아진다.** 왼쪽은 끝까지 본문과 같은 40 이라, 그 아래
+ * 한 컬럼일 때(이 패널이 레일이 아니라 본문의 한 블록일 때)도 제목·행과 같은 축에서
+ * 시작한다 — 768 실렌더에서 제목이 40, 이 패널이 24 로 어긋나 있던 자리다.
  */
-const INSET = 'px-4 md:px-10 lg:px-6'
+const INSET = INSET_CLASS.rail
 
 export type PlaceSuitabilityPanelProps = {
   /** 조회 전이거나 실패면 null */

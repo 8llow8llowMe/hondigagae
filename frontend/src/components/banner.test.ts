@@ -55,8 +55,16 @@ describe('Banner — 상시 진입점 (아트보드 `홈·내비게이션`)', ()
     expect(render()).not.toContain('border-y')
   })
 
-  it('레일 인셋은 1024 이상에서만 좁다 — 그 아래는 본문을 따른다', () => {
-    expect(render({ inset: 'rail' })).toContain('lg:px-6')
-    expect(render()).not.toContain('lg:px-6')
+  /*
+    #386 — 좁아지는 것은 **오른쪽만**이다. 왼쪽이 함께 24 로 내려가면 헤더 로고(40)와
+    레일 첫 글자가 같은 컨테이너 경계에서 16px 갈라진다.
+  */
+  it('레일 인셋은 1024 이상에서 오른쪽만 좁다 — 왼쪽은 본문을 따른다', () => {
+    const rail = render({ inset: 'rail' })
+
+    expect(rail).toContain('lg:pr-6')
+    expect(rail).not.toContain('lg:px-6')
+    expect(rail).not.toContain('lg:pl-')
+    expect(render()).not.toContain('lg:pr-6')
   })
 })
