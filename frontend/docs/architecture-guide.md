@@ -444,7 +444,7 @@ export function toEmergencyBoardQuery(params: EmergencyBoardParams): string
 - 조건 변경이 `view` 를 안 실으면 칩을 누를 때마다 지도가 목록으로 튄다.
 
 `/emergency` 는 (#371) `use-emergency-nav.ts` 가 양쪽 다 `viewModeHref` 를 거치도록
-고쳐 이 규칙을 지킨다. **`/places` 는 아직 아니다** — `use-place-filter-nav.ts` 의
+고쳐 이 규칙을 지킨다. **`/places` 는 아직 아니다** ([#372](https://github.com/8llow8llowMe/hondigagae/issues/372)) — `use-place-filter-nav.ts` 의
 `apply` 는 `pathname` 과 쿼리 문자열만으로 `router.replace` 를 직접 조립하고 `view` 를
 싣지 않는다. `PLACES_DEFAULT_VIEW` 가 `'map'` 이므로 `/places?view=list` 에서 필터
 칩을 하나만 눌러도 `view=list` 가 URL 에서 빠져 지도로 튄다 — 위 두 번째 항목이 바로
