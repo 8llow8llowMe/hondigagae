@@ -93,3 +93,13 @@ describe('콘텐츠 컨테이너 — 헤더 (#376)', () => {
     expect(header).not.toContain('max-w-[var(')
   })
 })
+
+describe('콘텐츠 컨테이너 — 레일 밖 형제 (#376)', () => {
+  it('장소 상세의 폐업 안내가 컨테이너에 가입한다', () => {
+    const section = repoSource('src/features/place/place-detail-section.tsx')
+    const notice = section.match(/function DelistedNotice\(\)[\s\S]{0,200}/)?.[0]
+
+    expect(notice).toBeDefined()
+    expect(notice).toContain('content-container')
+  })
+})
