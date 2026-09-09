@@ -27,7 +27,7 @@
 - 커밋 제목은 `[FE] <type>: <요약>` (`feat`/`fix`/`chore`/`refactor`/`style`/`docs`/`test`). 문서만 바꾸는 커밋은 `[DOCS] docs:`
 - 검증 명령은 `pnpm verify` (= `lint && typecheck && test`) 와 `pnpm format:check`
 - dev 서버는 **`pnpm dev:alt` (포트 5174)** 로 띄운다. 3000 은 카카오 지도 키에 도메인이 등록돼 있지 않아 지도가 항상 폴백으로 떨어진다
-- **`/places` 의 화면 결과를 바꾸지 않는다.** 공유 코드를 꺼내 쓸 뿐이다. `src/features/place/**` 는 이 계획에서 한 줄도 고치지 않는다
+- **`/places` 의 화면 결과를 바꾸지 않는다.** 공유 코드를 꺼내 쓸 뿐이다. `src/features/place/**` 에서 고치는 것은 **단 한 줄** — `place-map-view.tsx` 의 `<MapSheet label="장소 목록">` 인자다 (Task 3). `MapSheet.label` 을 필수 prop 으로 만들면 그 호출부가 타입 에러가 되므로 피할 수 없고, 값이 이전 하드코딩과 같은 문자열이라 화면은 바뀌지 않는다. **그 외에는 한 줄도 고치지 않는다.**
 
 ---
 
@@ -60,8 +60,8 @@
 | `src/lib/messages/emergency.ts` | `sheetLabel` · 영역 0건 문구 · 반경 문구 추가 |
 | `src/features/emergency/facility-filters.ts` | `labelWithCount` 를 export (지금 두 곳에서 사복될 예정) |
 | `src/features/emergency/facility-row.tsx` | `FacilityRowContent` · `CallButton` export. 선택 버튼 + 길찾기 |
-| `src/features/emergency/emergency-section.tsx` | 개수·relief 가 셀 배열을 props 로 받는다 |
-| `src/features/emergency/emergency-section.test.ts` | 픽스처 import 로 교체 + props 변경 반영 |
+| `src/features/emergency/emergency-section.tsx` | `withCount` 로컬 함수를 공용 `labelWithCount` 로 갈아탄다 (ruling F2 로 `countBase` 는 넣지 않는다) |
+| `src/features/emergency/emergency-section.test.ts` | 로컬 `facility()` 를 공용 픽스처 import 로 교체 |
 | `src/lib/url/view-mode.ts` | `EMERGENCY_DEFAULT_VIEW` 추가, 기본값 주석 갱신 |
 | `src/lib/url/view-mode.test.ts` | 새 상수 테스트 추가 |
 | `app/(main)/emergency/page.tsx` | 두 갈래 분기 |
@@ -1500,118 +1500,93 @@ git commit -m "[FE] feat: 긴급 시설 지도 보기의 필터 줄과 반경 �
 
 ---
 
-## Task 7: `EmergencySection` — 셀 배열을 props 로
+## Task 7: `EmergencySection` — 개수 라벨 헬퍼 중복 제거
 
-목록 갈래는 반경 전량을, 지도 갈래는 영역 안 배열을 센다. 지금은 `result` 에서 스스로 꺼내 세므로 지도 갈래가 다른 범위를 넘길 수 없다.
+> **컨트롤러 ruling (pre-flight F2):** 이 태스크는 원래 `countBase?: NearbyFacilityItem[]`
+> prop 을 더해 "지도 갈래가 영역 안 배열을 센다" 를 지원하려 했다. **그 prop 을 뺐다.**
+>
+> 프로덕션에서 `EmergencySection` 을 렌더하는 곳은 `EmergencyListView` 하나이고, 그것은
+> 반경 전량을 센다 (설계 §5-3: *"목록 갈래의 개수는 지금처럼 반경 전량 기준이다 — 거기에는
+> 지도 영역이 없다"*). 지도 갈래는 `EmergencySection` 을 **쓰지 않는다** — Task 8 의
+> `PanelBody` 와 `EmergencyFilterBar` 가 `inBounds` 를 센다. 그래서 설계 §5-3 의 요구는
+> 그대로 충족되고, `countBase` 는 **호출자가 없는 죽은 prop** 이 된다.
+>
+> 설계 §7 이 `countBase` 를 적은 것은 지도 갈래가 `EmergencySection` 을 재사용할 것이라는
+> 전제였고, Task 8 이 그 전제를 버렸다 (지도 패널은 0건 분기가 다르고 여백이 `px-4` 다).
+>
+> 남는 일은 하나다: `withCount` 로컬 함수를 Task 3 의 `labelWithCount` 로 갈아탄다.
+> 같은 헬퍼가 두 파일에 사복되면 한쪽만 고쳐져 같은 칩이 화면마다 다르게 보인다.
 
 **Files:**
 - Modify: `src/features/emergency/emergency-section.tsx`
 - Modify: `src/features/emergency/emergency-section.test.ts`
 
 **Interfaces:**
-- Produces: `EmergencySectionProps` 에 `countBase?: NearbyFacilityItem[]` 추가 — 생략하면 `result.facilities` (지금 동작)
+- Consumes: `labelWithCount` (Task 3), `facility` · `facilityResult` (Task 1)
+- Produces: 없음. **`EmergencySectionProps` 는 바뀌지 않는다** — 이 태스크는 순수 내부 정리다
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- [ ] **Step 1: 픽스처를 공유로 바꾼다 (동작 불변 리팩토링)**
 
-`src/features/emergency/emergency-section.test.ts` 를 고친다.
-
-1. 파일 안의 `function facility(...)` 정의를 **지우고** import 로 바꾼다.
-
-```ts
-import { facility, facilityResult } from '@/test/fixtures/emergency'
-```
-
-2. 파일 끝에 붙인다.
+`src/features/emergency/emergency-section.test.ts` 에서 파일 안의 `function facility(...)`
+정의를 **지우고** import 로 바꾼다. 픽스처 기본값이 Task 1 의 것과 같은 값이라 기존
+assertion 은 전부 그대로 통과해야 한다 — **그것이 이 단계의 검증이다.**
 
 ```ts
-describe('EmergencySection · 개수 범위', () => {
-  const hospital = facility({ facilityId: '1', name: '가' })
-  const other = facility({ facilityId: '2', name: '나' })
-
-  function props(overrides: Partial<EmergencySectionProps> = {}): EmergencySectionProps {
-    return {
-      result: facilityResult({ facilities: [hospital, other] }),
-      loading: false,
-      errorStatus: null,
-      onRetry: () => undefined,
-      filters: DEFAULT_FACILITY_FILTERS,
-      onFiltersChange: () => undefined,
-      positionFallback: null,
-      onRetryPosition: () => undefined,
-      onWidenRadius: () => undefined,
-      canWiden: true,
-      ...overrides,
-    }
-  }
-
-  it('countBase 를 주지 않으면 응답 전량을 센다 — 목록 갈래의 지금 동작이다', () => {
-    const markup = renderToStaticMarkup(createElement(EmergencySection, props()))
-
-    expect(markup).toContain(`${messages.emergency.typeAll} 2`)
-  })
-
-  it('countBase 를 주면 그것을 센다 — 지도 갈래가 영역 안 배열을 넘긴다', () => {
-    const markup = renderToStaticMarkup(
-      createElement(EmergencySection, props({ countBase: [hospital] })),
-    )
-
-    expect(markup).toContain(`${messages.emergency.typeAll} 1`)
-  })
-})
+import { facility } from '@/test/fixtures/emergency'
 ```
 
-- [ ] **Step 2: 테스트가 실패하는 것을 확인한다**
+기존 테스트가 `facilityResult` 로 응답을 만들고 있지 않다면 그대로 둔다. 이 태스크는
+테스트 내용을 바꾸지 않는다.
+
+- [ ] **Step 2: 픽스처 교체만으로 테스트가 통과하는 것을 확인한다**
 
 Run: `pnpm vitest run src/features/emergency/emergency-section.test.ts`
-Expected: FAIL — `countBase` 가 `EmergencySectionProps` 에 없어 typecheck·런타임이 갈린다 (개수가 계속 2 로 나온다)
+Expected: PASS — 통과하지 않으면 Task 1 의 픽스처 기본값이 원래 것과 다르다는 뜻이다.
+그때는 **픽스처를 원래 값에 맞추고** (테스트를 고치지 않는다) 다시 돌린다.
 
-- [ ] **Step 3: props 를 더한다**
+- [ ] **Step 3: `withCount` 를 `labelWithCount` 로 갈아탄다**
 
 `src/features/emergency/emergency-section.tsx`:
 
-`EmergencySectionProps` 에 더한다.
+1. 파일 끝의 로컬 함수를 지운다.
 
 ```ts
-  /**
-   * 칩 개수와 relief 제안이 셀 배열.
-   *
-   * 생략하면 `result.facilities`(반경 전량)다 — 목록 갈래는 지도 영역이 없다.
-   * 지도 갈래는 **영역 안 · `applyFilters` 전** 배열을 넘긴다: 캡션이 "지도에 보이는
-   * 12곳" 인데 칩이 "병원 120" 이면 두 숫자가 서로를 부정한다.
-   */
-  countBase?: NearbyFacilityItem[]
+/** 개수를 붙일 수 있을 때만 붙인다 */
+function withCount(label: string, count: number, show: boolean): string {
+  return show ? `${label} ${count}` : label
+}
 ```
 
-`NearbyFacilityItem` 을 타입 import 에 더한다.
-
-구조분해에 `countBase,` 를 더하고, 본문의 세 줄을 바꾼다.
+2. import 에 더한다 (같은 파일이 이미 `facility-filters` 에서 여러 개를 가져온다).
 
 ```ts
-  const all = result.facilities
-  const visible = applyFilters(all, filters)
-  // 세는 범위와 보여주는 범위가 다를 수 있다 — 지도 갈래가 영역 안 배열을 넘긴다
-  const base = countBase ?? all
-  const counts = facilityCounts(base)
+import {
+  applyFilters,
+  countsAreComplete,
+  facilityCounts,
+  type FilterRelief,
+  labelWithCount,
+  reliefs,
+} from '@/features/emergency/facility-filters'
 ```
 
-그리고 `EmptyResult` 에 넘기는 `all={all}` 을 `all={base}` 로 바꾼다 — "24시간 끄면 N곳" 도 같은 범위여야 한다.
+3. 본문의 `withCount(` 호출 **5곳**을 `labelWithCount(` 로 바꾼다 (전체 · 병원 · 약국 ·
+24시간 · 지금 진료중). 인자는 그대로다.
 
-`withCount` 로컬 함수를 지우고 `labelWithCount` 를 import 해 호출부 5곳을 바꾼다.
+**주의:** 지운 로컬 함수는 `${count}` 를, `labelWithCount` 는 `${String(count)}` 를 쓴다.
+템플릿 문자열 결과는 같다 — `labelWithCount` 쪽이 `@typescript-eslint` 의
+`restrict-template-expressions` 를 만족하는 형태다.
 
-```ts
-import { ..., labelWithCount } from '@/features/emergency/facility-filters'
-```
+- [ ] **Step 4: 검증**
 
-- [ ] **Step 4: 테스트가 통과하는 것을 확인한다**
-
-Run: `pnpm vitest run src/features/emergency/ && pnpm typecheck`
-Expected: PASS
+Run: `pnpm vitest run src/features/emergency/ && pnpm typecheck && pnpm lint`
+Expected: PASS. 렌더 결과가 바뀌지 않았으므로 기존 assertion 이 전부 통과해야 한다
 
 - [ ] **Step 5: 커밋**
 
 ```bash
 git add src/features/emergency/emergency-section.tsx src/features/emergency/emergency-section.test.ts
-git commit -m "[FE] refactor: 시설 칩 개수가 셀 범위를 호출부가 정하게 한다"
+git commit -m "[FE] refactor: 시설 칩 개수 라벨 헬퍼를 한 곳으로 모은다"
 ```
 
 ---
@@ -1743,7 +1718,8 @@ import { toErrorStatus } from '@/lib/api/error'
  * 응급 화면에서 지도 없이 전화까지 도달하는 경로가 여기다. 지도가 기본 보기가 된 뒤에도
  * 이 갈래는 그대로 남는다.
  *
- * **`countBase` 를 넘기지 않는다** — 지도 영역이 없으므로 반경 전량이 세는 범위다.
+ * **개수는 반경 전량 기준이다** — 이 갈래에는 지도 영역이 없다 (설계 §5-3).
+ * 지도 갈래는 `EmergencySection` 을 쓰지 않고 자기 패널 본문을 갖는다.
  */
 export function EmergencyListView() {
   const board = useEmergencyBoard()
