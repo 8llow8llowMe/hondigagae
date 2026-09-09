@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import { Calendar, dayLabel } from '@/components/calendar'
 import { fieldErrorId } from '@/components/field'
 import { PlanIcon } from '@/components/icons'
+import { type AnchoredPosition, anchoredPosition } from '@/lib/ui/anchored-position'
 import { useOverlay } from '@/lib/ui/overlay'
 import { cn } from '@/lib/utils/cn'
 
@@ -24,18 +26,26 @@ import { cn } from '@/lib/utils/cn'
  * 타이핑은 막는다: 날짜를 손으로 치게 하면 `2026/9/1` · `9월 1일` 이 들어오고 그 전부를
  * 형식 오류로 되돌려 줘야 한다.
  *
- * **달력은 오버레이가 아니라 문서 흐름 안에서 펼쳐진다.**
+ * **달력은 `document.body` 로 포털된 `fixed` 팝오버다.**
  *
  * 처음에는 `BottomSheet`(모바일 시트 / 데스크톱 중앙 패널)로 만들었다. 그런데 이 필드를
  * 쓰는 `PlanCreateForm` 이 **장소 상세의 `담기` 시트 안에서도** 렌더된다 — 시트 위에 시트가
  * 겹치는 것이고, `bottom-sheet.tsx` 가 "오버레이 위에 오버레이를 쌓지 않는다" 로 못박은
- * 바로 그 경우다. 팝오버(absolute)도 답이 아니다: 그 시트 본문이 `overflow-y-auto` 라
- * 잘린다. 흐름 안에서 펼치면 세 사용처(`/plans/new` · 담기 시트 · `/ai-plans/new`)가
- * 같은 한 가지 코드로 성립한다.
+ * 바로 그 경우다. 그 다음에는 흐름 안에서 펼쳤다 — 세 사용처가 한 코드로 성립했지만
+ * **열 때마다 아래 내용이 300px 밀렸다.**
  *
- * 흐름 안에 있으므로 **덮개도 스크롤 잠금도 없다.** 다만 열린 것은 닫혀야 하므로
- * `Esc`·바깥 클릭·포커스 복귀는 `Menu` 와 같은 방식으로 배선한다 (이슈 #70 — 오버레이
- * 배선을 손으로 다시 만들지 않고 `useOverlay` 가 소유한다).
+ * **포털 + `fixed` 가 세 번째 답이다.** body 에 붙은 `fixed` 는 조상 `overflow` 가 없어
+ * 담기 시트의 `overflow-hidden`(패널) · `overflow-y-auto`(본문) 를 모두 빠져나간다.
+ * `absolute` 팝오버가 잘렸던 이유가 사라지고, 세 사용처가 여전히 한 코드다.
+ *
+ * 좌표는 `lib/ui/anchored-position.ts` 가 정한다 — 순수 함수라 뒤집기·clamp 가 node 에서
+ * 테스트된다. 스크롤하면 닫는다(재배치보다 단순하다). `z-[60]` 은 담기 시트(`z-50`) 위다.
+ *
+ * 이제 **진짜로 떠 있으므로 그림자가 있다** (DESIGN.md §6). 흐름 안이던 때 그림자가
+ * 없었던 것은 떠 있지 않았기 때문이다.
+ *
+ * `Esc`·바깥 클릭·포커스 복귀는 `useOverlay` 가 그대로 소유한다 — ref 기반이라 포털
+ * 노드에서도 성립한다 (이슈 #70).
  *
  * **시작일·종료일을 하나의 기간 선택으로 합치지 않는다** (#162 에서 검토하고 내린 결정).
  * 클릭은 줄지만 세 가지를 잃는다.
@@ -84,33 +94,39 @@ export function DateField({
   const dayRef = useRef<HTMLButtonElement>(null)
   const panelId = useId()
 
+  const [position, setPosition] = useState<AnchoredPosition | null>(null)
+
+  /*
+    **열린 뒤에 잰다.** 패널이 마운트돼야 크기를 알 수 있어 `useLayoutEffect` 로 그린 직후
+    측정한다 — `useEffect` 로 두면 좌상단(0,0)에 한 프레임 그려졌다가 제자리로 튄다.
+  */
+  useLayoutEffect(() => {
+    if (!open) {
+      setPosition(null)
+      return
+    }
+    const anchor = inputRef.current?.getBoundingClientRect()
+    const panel = panelRef.current?.getBoundingClientRect()
+    if (anchor === undefined || panel === undefined) return
+
+    setPosition(
+      anchoredPosition(
+        { top: anchor.top, bottom: anchor.bottom, left: anchor.left, width: anchor.width },
+        { width: panel.width, height: panel.height },
+        { width: window.innerWidth, height: window.innerHeight },
+      ),
+    )
+  }, [open])
+
   useOverlay({
     open,
     onClose: () => setOpen(false),
     containerRef: panelRef,
     triggerRef: inputRef,
     initialFocusRef: dayRef,
-    // 흐름 안에서 펼쳐진다 — 바탕은 살아 있고 스크롤도 잠그지 않는다
+    // 바탕을 막지 않는다 — 덮개가 없고, 스크롤은 잠그는 대신 닫는 것으로 처리한다
     lockScroll: false,
   })
-
-  /*
-    **열 때 패널이 보이는 자리까지 스크롤한다** (#162).
-
-    흐름 안 확장이라 잘리지는 않지만, 필드가 화면 아래쪽에 있으면 펼쳐진 달력이 접힌
-    화면 밖으로 나가 사용자가 직접 스크롤해야 했다.
-
-    `useOverlay` 가 첫 초점을 날짜 격자로 보내면서 그 칸까지는 브라우저가 스크롤하지만,
-    **격자 첫 칸이 보인다고 달력 아래쪽까지 보이는 것은 아니다** — 여기서 패널 전체를
-    기준으로 한 번 더 맞춘다. `block: 'nearest'` 라 이미 보이면 아무 일도 하지 않는다.
-
-    `useOverlay` 보다 **뒤에** 선언해 포커스 스크롤이 끝난 뒤에 돈다 — 순서가 바뀌면
-    우리가 맞춘 위치를 포커스가 다시 흔든다.
-  */
-  useEffect(() => {
-    if (!open) return
-    panelRef.current?.scrollIntoView({ block: 'nearest' })
-  }, [open])
 
   // 바깥을 누르면 닫는다. 덮개가 없으므로 문서에서 직접 듣는다 (`Menu` 와 같은 방식)
   useEffect(() => {
@@ -123,6 +139,36 @@ export function DateField({
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [open])
+
+  /*
+    **스크롤하면 닫는다.** `fixed` 라 페이지가 움직여도 패널은 제자리에 남아 입력에서
+    떨어진다. 재배치보다 닫는 쪽이 단순하고 날짜 피커에서 흔한 처리다.
+
+    **중첩 스크롤러를 잡으려면 `capture: true` 여야 한다** — 담기 시트 본문이
+    `overflow-y-auto` 라(`bottom-sheet.tsx:92`) 그 스크롤은 window 까지 버블링되지 않는다.
+
+    **다음 프레임에 붙인다.** `useOverlay` 가 패널로 초기 포커스를 옮기는데, 그 포커스가
+    스크롤을 유발하면 방금 건 리스너가 열리자마자 닫아 버린다.
+  */
+  useEffect(() => {
+    if (!open) return
+
+    let dispose = () => undefined as void
+    const raf = requestAnimationFrame(() => {
+      const close = () => setOpen(false)
+      window.addEventListener('scroll', close, true)
+      window.addEventListener('resize', close)
+      dispose = () => {
+        window.removeEventListener('scroll', close, true)
+        window.removeEventListener('resize', close)
+      }
+    })
+
+    return () => {
+      cancelAnimationFrame(raf)
+      dispose()
+    }
   }, [open])
 
   return (
@@ -171,40 +217,47 @@ export function DateField({
         />
       </div>
 
-      {open && (
+      {open &&
         /*
           `aria-modal` 을 붙이지 않는다 — 실제로 바탕을 막지 않으므로 막는다고 말하면
           거짓이 된다. `role="dialog"` 만으로 "빠져나올 수 있는 묶음" 이 전달되고,
           `Esc` 가 실제로 그 일을 한다.
-
-          **그림자가 없다.** 떠 있지 않고 흐름 안에 있으므로 테두리로만 묶는다 (DESIGN.md §6).
         */
-        <div
-          ref={panelRef}
-          id={panelId}
-          role="dialog"
-          aria-label={label}
-          tabIndex={-1}
-          className="border-border bg-bg mt-2 rounded-md border p-3 outline-none"
-        >
-          <Calendar
-            focusRef={dayRef}
-            value={value}
-            min={min}
-            max={max}
-            today={today}
-            rangeStart={rangeStart}
-            rangeEnd={rangeEnd}
-            onSelect={(date) => {
-              onValueChange(date)
-              // 고르면 닫고 포커스를 입력으로 되돌린다. "고르고 확인 누르기" 는
-              // 한 값을 두 번 확정하는 것이다
-              setOpen(false)
-              inputRef.current?.focus()
+        createPortal(
+          <div
+            ref={panelRef}
+            id={panelId}
+            role="dialog"
+            aria-label={label}
+            tabIndex={-1}
+            style={{
+              top: position?.top ?? 0,
+              left: position?.left ?? 0,
+              minWidth: position?.minWidth ?? 0,
+              // 재는 동안에는 감춘다 — 좌상단에 한 프레임 스치는 것을 막는다
+              visibility: position === null ? 'hidden' : 'visible',
             }}
-          />
-        </div>
-      )}
+            className="border-border bg-bg fixed z-[60] rounded-md border p-3 shadow-md outline-none"
+          >
+            <Calendar
+              focusRef={dayRef}
+              value={value}
+              min={min}
+              max={max}
+              today={today}
+              rangeStart={rangeStart}
+              rangeEnd={rangeEnd}
+              onSelect={(date) => {
+                onValueChange(date)
+                // 고르면 닫고 포커스를 입력으로 되돌린다. "고르고 확인 누르기" 는
+                // 한 값을 두 번 확정하는 것이다
+                setOpen(false)
+                inputRef.current?.focus()
+              }}
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }
