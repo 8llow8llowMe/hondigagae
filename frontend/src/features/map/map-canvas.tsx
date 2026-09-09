@@ -94,7 +94,18 @@ export function MapCanvas({
    * **호출부는 반드시 `useMemo` 로 만든다.** 렌더 중에 새 객체를 만들면 참조가 매번
    * 바뀌어 필터를 누를 때마다 카메라가 되돌아간다.
    */
-  camera?: { anchor: LatLng; spanMeters: number } | null
+  camera?: {
+    anchor: LatLng
+    spanMeters: number
+    /**
+     * 기준점이 화면 위쪽 몇 할 지점에 올지. 생략하면 `JEJU_MAP_SEA_RATIO`(0.35) —
+     * 제주 전체를 담는 화면에서 위쪽을 바다로 여는 값이다.
+     *
+     * **한 곳만 담는 지도는 `0.5` 를 넘긴다.** 그 화면에는 바다도 맥락도 없고 주인공이
+     * 하나라, 0.35 면 핀이 이유 없이 위로 치우쳐 보인다 (`PlaceMiniMap`).
+     */
+    anchorRatio?: number
+  } | null
   /**
    * 핀을 고르면 이 단계까지 **확대**한다. 주지 않으면 이동만 한다.
    *
@@ -349,7 +360,7 @@ export function MapCanvas({
       spanMeters: camera.spanMeters,
       width: container.clientWidth,
       height: container.clientHeight,
-      seaRatio: JEJU_MAP_SEA_RATIO,
+      seaRatio: camera.anchorRatio ?? JEJU_MAP_SEA_RATIO,
     })
 
     // **단계를 먼저, 중심을 나중에.** 순서가 뒤집히면 옛 중심을 확대한 뒤 옮기게 되어

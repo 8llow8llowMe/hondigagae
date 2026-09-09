@@ -397,6 +397,51 @@ describe('원천에서 사라진 장소 — 안내를 먼저 보여 준다 (#146
 })
 
 /*
+  기본 정보의 **자리**를 고정한다.
+
+  좌측 레일에 있던 동안에는 주소·전화·운영시간이 판정 아래로 밀려 있었다 — 상세에 들어온
+  사람이 제일 먼저 묻는 "여기 어디고 몇 시까지 하냐" 가 판정보다 뒤였던 것이다.
+
+  **DOM 순서 하나로 두 폭을 만든다.** 데스크톱은 grid 가 판정을 좌측 열로 보내지만
+  (`.rail-layout-detail`), 모바일은 이 순서 그대로 쌓인다. 그래서 여기서 순서가 뒤집히면
+  모바일이 곧바로 회귀한다 — 트리를 폭마다 나누면 스크린리더가 같은 내용을 두 번 읽는다.
+*/
+describe('PlaceDetailSection — 기본 정보의 자리', () => {
+  it('제목 다음, 판정보다 먼저 온다', () => {
+    const markup = render()
+
+    const title = markup.indexOf(placeDetail.title)
+    const basic = markup.indexOf(messages.place.detailSectionBasic)
+    // 판정 패널의 첫 줄 — `{name}에게 적합해요` (`place-suitability-panel.tsx`)
+    const verdict = markup.indexOf(
+      messages.place.detailSuitabilitySpeaker.replace('{name}', '몽실이'),
+    )
+
+    expect(title).toBeGreaterThanOrEqual(0)
+    expect(verdict).toBeGreaterThanOrEqual(0)
+    expect(basic).toBeGreaterThan(title)
+    expect(basic).toBeLessThan(verdict)
+  })
+
+  it('본문 절(반려견 동반 정보)보다는 앞이다 — 순서가 갤러리 → 제목 → 기본 정보 → 판정 → 본문이다', () => {
+    const markup = render()
+
+    expect(markup.indexOf(messages.place.detailSectionBasic)).toBeLessThan(
+      markup.indexOf(messages.place.detailSectionPet),
+    )
+  })
+
+  it('좌표가 있으면 기본 정보 안에 길찾기가 함께 선다 (#14)', () => {
+    const markup = render()
+
+    expect(markup).toContain(messages.map.directions)
+    expect(markup.indexOf(messages.place.detailSectionBasic)).toBeLessThan(
+      markup.indexOf(messages.map.directions),
+    )
+  })
+})
+
+/*
   **#294.** 영업 상태는 `운영시간` 원문 **위**에 서는 판정값이다.
 
   **`openNow: null` 을 드러내지 않는 것이 이 묶음의 요점이다.** 긴급 시설은 같은 `null` 을
