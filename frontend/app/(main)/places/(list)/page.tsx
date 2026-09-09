@@ -79,7 +79,8 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
       <main id="main-content">
         <h1 className="sr-only">{messages.place.pageTitle}</h1>
         <HydrationBoundary state={dehydrate(queryClient)}>
-          <PlaceMapView filters={filters} filterQuery={filterQuery} authed={authed} />
+          {/* 보기 전환 링크를 페이지가 만든다 — 지도 컴포넌트가 '/places' 를 알 이유가 없다 */}
+          <PlaceMapView filters={filters} authed={authed} listHref={listHref} mapHref={mapHref} />
         </HydrationBoundary>
       </main>
     )

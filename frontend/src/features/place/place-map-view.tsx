@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 
+import type { ReactNode } from 'react'
+
 import { EmptyState } from '@/components/empty-state'
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { MapSheet, type SheetStop } from '@/components/map-sheet'
 import { ViewToggle } from '@/components/view-toggle'
 import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
-import { PlaceListSection } from '@/features/place/place-list-section'
+import { PlaceListSection, type PlaceListSectionProps } from '@/features/place/place-list-section'
 import { PlaceMapFilterBar } from '@/features/place/place-map-filter-bar'
 import { PlaceMapPanel } from '@/features/place/place-map-panel'
 import { useNearbyPlaces } from '@/features/place/use-nearby-places'
@@ -27,7 +29,6 @@ import {
   type MapBounds,
 } from '@/lib/map/viewport'
 import { messages } from '@/lib/messages'
-import { PLACES_DEFAULT_VIEW, viewModeHref } from '@/lib/url/view-mode'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceFilters, PlaceSummary } from '@/types/place'
 
@@ -56,14 +57,40 @@ const MapCanvas = dynamic(
  */
 export function PlaceMapView({
   filters,
-  filterQuery,
   authed,
+  fill = false,
+  listHref,
+  mapHref,
+  renderRowAction,
+  renderRowNotice,
+  mutedPlaceIds,
+  renderListRow,
 }: {
   filters: PlaceFilters
-  /** 현재 URL 의 필터 쿼리. 보기 전환 링크가 이것을 유지한다 */
-  filterQuery: string
   /** 미로그인이면 반려견 목록을 조회하지 않는다 — 필터의 크기 축이 빠진다 (#200) */
   authed: boolean
+  /**
+   * `true` 면 **부모가 높이를 정한다.** 위에 헤더가 붙는 화면(담기, #370)이 쓴다.
+   * `false`(기본)면 스스로 `map-canvas-height` 로 뷰포트를 채운다.
+   */
+  fill?: boolean
+  /**
+   * 지도 우상단에 떠 있는 보기 전환의 목적지. **둘 다 있어야 토글을 그린다.**
+   * 헤더가 토글을 갖는 화면은 주지 않는다 — 같은 컨트롤이 두 개 뜨면 안 된다.
+   *
+   * 예전에는 이 컴포넌트가 `'/places'` 를 하드코딩해 링크를 만들었다. 그래서 다른
+   * 화면이 이 지도를 쓰면 토글이 남의 화면으로 보냈다 (#370).
+   */
+  listHref?: string
+  mapHref?: string
+  /** 패널·시트 행의 액션 열. 담기 버튼이 여기 온다 */
+  renderRowAction?: ((place: PlaceSummary) => ReactNode) | undefined
+  /** 행 아래 전폭 줄. 담기 실패 알림이 여기 온다 */
+  renderRowNotice?: ((place: PlaceSummary) => ReactNode) | undefined
+  /** 핀 톤을 낮출 장소들. 담기 화면은 "이미 담은 곳" 을 넘긴다 */
+  mutedPlaceIds?: ReadonlySet<string> | undefined
+  /** SDK 실패 폴백의 행. 주지 않으면 상세로 가는 기본 행이다 */
+  renderListRow?: PlaceListSectionProps['renderRow'] | undefined
 }) {
   const [bounds, setBounds] = useState<MapBounds | null>(null)
   /** 지도를 옮겼는지. 처음 `idle` 한 번은 이동이 아니다 */
@@ -146,8 +173,14 @@ export function PlaceMapView({
         title: place.title,
         lat: place.lat,
         lng: place.lng,
+        /*
+            **이미 담은 곳은 톤을 낮춘다** (#370). 훑어볼 때 항상 보이는 채널이 이것뿐이다 —
+            `caption` 은 선택됐을 때만 라벨에 붙고, `MapCanvas` 는 마커에 판정 색을 쓰지
+            않는다는 규약이 있다. 긴급 시설의 약국이 쓰던 표현을 그대로 재사용한다.
+          */
+        muted: mutedPlaceIds?.has(place.placeId) ?? false,
       })),
-    [visible],
+    [visible, mutedPlaceIds],
   )
 
   const handleBounds = useCallback((next: MapBounds, userMoved: boolean) => {
@@ -160,9 +193,6 @@ export function PlaceMapView({
     // 손가락이 스친 정도는 재조회하지 않는다 — 요청이 폭주하고 목록이 깜빡인다
     setMovedBounds((previous) => (isSameViewport(previous, next) ? previous : next))
   }, [])
-
-  const listHref = viewModeHref('/places', filterQuery, 'list', PLACES_DEFAULT_VIEW)
-  const mapHref = viewModeHref('/places', filterQuery, 'map', PLACES_DEFAULT_VIEW)
 
   // ── SDK 실패 → 목록으로 되돌리고 안내 한 줄 ──────────────────────────────
   if (failure !== null) {
@@ -187,15 +217,24 @@ export function PlaceMapView({
           onLoadMore={() => void listQuery.fetchNextPage()}
           onRetry={() => void listQuery.refetch()}
           onResetFilters={() => undefined}
+          {...(renderListRow === undefined ? {} : { renderRow: renderListRow })}
         />
       </div>
     )
   }
 
   const countLine = messages.map.visibleCount.replace('{n}', String(visible.length))
+  /** 둘 다 있을 때만 그린다 — 헤더가 토글을 갖는 화면은 주지 않는다 */
+  const showToggle = listHref !== undefined && mapHref !== undefined
 
   return (
-    <div className="relative">
+    /*
+        **높이를 여기서 잡는다.** `map-canvas-height` 는 뷰포트를 정확히 다 쓰므로
+        (`calc(100dvh - --header-h - --tabbar-h)`), 캔버스에 걸어 둔 채 위에 헤더를 얹으면
+        그 높이만큼 넘쳐 지도 화면에 세로 스크롤이 난다. `fill` 이면 부모가 정한 높이를
+        채우고, 아니면 예전처럼 스스로 뷰포트를 채운다 — `/places` 는 픽셀이 같다.
+      */
+    <div className={cn('relative', fill ? 'h-full' : 'map-canvas-height')}>
       {/* 지도가 바탕이다. 데스크톱은 좌측 패널이 그 위에 얹힌다 (아트보드 05) */}
       <MapCanvas
         pins={pins}
@@ -206,7 +245,7 @@ export function PlaceMapView({
         /* 카드를 누르면 그 핀으로 옮기고 동네가 보이는 단계까지 확대한다 */
         selectedLevel={SELECTED_PLACE_MAP_LEVEL}
         onFailure={setFailure}
-        className="map-canvas-height w-full"
+        className="h-full w-full"
       />
 
       {/*
@@ -224,13 +263,15 @@ export function PlaceMapView({
           **폭에 따라 두 벌을 두지 않는다** (#240). 아이콘형 하나로 통일했다 — 지도 위에
           글자 버튼이 얹히면 지도를 가리고, 이름은 `title` 호버 툴팁과 `aria-label` 이 맡는다.
         */}
-        <ViewToggle
-          current="map"
-          listHref={listHref}
-          mapHref={mapHref}
-          variant="icon"
-          className="shadow-md"
-        />
+        {showToggle && (
+          <ViewToggle
+            current="map"
+            listHref={listHref}
+            mapHref={mapHref}
+            variant="icon"
+            className="shadow-md"
+          />
+        )}
 
         {/* 제주 밖이면 렌더하지 않는다 — 눌러도 갈 곳이 없다 */}
         {inJeju && <MapLocateButton onLocate={locate} />}
@@ -282,6 +323,8 @@ export function PlaceMapView({
                     places={visible}
                     selectedId={selectedId}
                     onSelect={setSelectedId}
+                    renderRowAction={renderRowAction}
+                    renderRowNotice={renderRowNotice}
                   />
                 )}
               </div>
@@ -340,7 +383,13 @@ export function PlaceMapView({
             description={messages.map.emptyInViewDescription}
           />
         ) : (
-          <PlaceMapPanel places={visible} selectedId={selectedId} onSelect={setSelectedId} />
+          <PlaceMapPanel
+            places={visible}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            renderRowAction={renderRowAction}
+            renderRowNotice={renderRowNotice}
+          />
         )}
       </MapSheet>
     </div>
