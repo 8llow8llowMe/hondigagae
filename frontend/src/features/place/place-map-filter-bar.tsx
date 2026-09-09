@@ -6,7 +6,7 @@ import { BottomSheet } from '@/components/bottom-sheet'
 import { Button } from '@/components/button'
 import { Chip, ChipGroup } from '@/components/chip'
 import { FilterListHeading } from '@/components/filter-list'
-import { CheckIcon, ChevronDownIcon, SlidersIcon } from '@/components/icons'
+import { ChevronDownIcon, SlidersIcon } from '@/components/icons'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { useSelectedPet } from '@/features/nav/use-selected-pet'
 import {
@@ -145,13 +145,19 @@ export function PlaceMapFilterBar({
 
       {/* ── 2행: 동반 가능만 · 지역 · 더보기 ──────────────────────────────── */}
       <div className="flex min-w-0 items-center gap-1.5">
-        {/* 즉시 반영이다 — 시트가 아니라 토글이라 "적용" 이 없다 (아트보드 02 절의 규칙) */}
+        {/*
+          즉시 반영이다 — 시트가 아니라 토글이라 "적용" 이 없다 (아트보드 02 절의 규칙).
+
+          **선택 표시는 칩의 tint 하나다** (#393). 예전에는 여기에만 체크 아이콘을 덧댔는데,
+          바로 윗줄의 유형 칩들이 같은 `Chip` 으로 tint 만 바꾸고 있어 **한 필터 묶음 안에서
+          선택을 말하는 방법이 두 가지**가 됐다. 아이콘이 붙은 칩만 다른 종류의 컨트롤처럼
+          보인다. `Chip` 은 tint 와 함께 weight 도 올리므로 색 하나에만 기대지 않는다.
+        */}
         <Chip
           selected={allowedOnly}
           onSelect={() => apply({ ...filters, petAllowanceType: allowedOnly ? null : 'ALLOWED' })}
           className="shrink-0"
         >
-          {allowedOnly && <CheckIcon size={16} strokeWidth={2} />}
           {messages.place.filterAllowedOnly}
         </Chip>
 

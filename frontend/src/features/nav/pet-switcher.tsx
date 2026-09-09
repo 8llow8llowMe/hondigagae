@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import Link from 'next/link'
 
-import { ChevronDownIcon } from '@/components/icons'
+import { CheckIcon, ChevronDownIcon } from '@/components/icons'
 import { useSelectedPetStore } from '@/features/nav/selected-pet-store'
 import { MAX_PET_COUNT } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
@@ -120,13 +120,34 @@ export function PetSwitcher({ pets, totalCount }: { pets: Pet[]; totalCount: num
                 setOpen(false)
               }}
               className={cn(
-                'text-body-2 hover:bg-band focus-visible:bg-band flex h-11 w-full items-center justify-center px-5 text-center focus-visible:outline-none',
+                /*
+                  **좌우 여백이 선택 여부와 무관하게 같다** (#393) — 체크가 `absolute` 라
+                  자리를 차지하지 않으므로, 여백을 상태에 따라 바꾸면 스위처를 옮길 때마다
+                  이름이 좌우로 흔들린다. 여백은 체크(16) + 간격이 들어갈 만큼 §4 스케일 안에서 잡는다 (36 은 스케일 밖이라 40).
+                */
+                'text-body-2 hover:bg-band focus-visible:bg-band relative flex h-11 w-full items-center justify-center px-10 text-center focus-visible:outline-none',
                 pet.petId === selected.petId
                   ? 'text-fg font-semibold'
                   : 'text-fg-muted font-medium',
               )}
             >
               <span className="truncate">{pet.name}</span>
+              {/*
+                **지금 판정의 기준이 되는 반려견을 눈으로 찍어 준다** (#393). weight·색만으로
+                가르던 것을 체크로 보강했다 — 반려견이 둘뿐이면 굵기 차이가 미묘하고, 이름은
+                길이도 제각각이라 비교 기준이 되지 못한다.
+
+                `aria-checked`(`menuitemradio`)가 이미 보조기기에 같은 사실을 말하므로
+                아이콘은 `aria-hidden` 이다. 두 번 읽히면 "몽실이 선택됨 선택됨" 이 된다.
+              */}
+              {pet.petId === selected.petId && (
+                <CheckIcon
+                  size={16}
+                  strokeWidth={2}
+                  aria-hidden
+                  className="text-brand-600 absolute end-3 shrink-0"
+                />
+              )}
             </button>
           ))}
 

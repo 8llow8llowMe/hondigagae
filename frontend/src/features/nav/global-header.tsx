@@ -31,6 +31,13 @@ import { cn } from '@/lib/utils/cn'
  *
  * **`(auth)` 그룹에는 두지 않는다** — 이탈 경로가 되면 `returnTo` 흐름이 깨진다.
  *
+ * **`z-40` 이다 — 지도 위 플로팅 컨트롤(`z-30`)보다 위다** (#393). `sticky` + `z-index` 는
+ * **쌓임 맥락을 만든다.** 헤더가 `z-30` 이던 동안 안쪽 드롭다운(`Menu` · `PetSwitcher`)의
+ * `z-40` 은 그 맥락 **안에서만** 유효했고, 바깥에서 헤더 전체는 여전히 30 이었다. 지도
+ * 컨트롤도 30 이라 같은 층에서 DOM 순서가 승패를 갈랐고 — 지도가 뒤에 온다 — `/emergency`
+ * 에서 계정 드롭다운이 보기 전환 토글 **아래**로 깔렸다. 값을 올려야 하는 것은 드롭다운이
+ * 아니라 **헤더 자신**이다.
+ *
  * 높이를 `<header>` 자신이 갖고 `box-border` 로 테두리를 그 안에 넣는다. 그래야 헤더가
  * 실제로 차지하는 높이가 `--header-h`(56/64)와 정확히 같아진다 — 안쪽 div 가 높이를
  * 가지면 border 1px 이 더해져 65px 이 되고, 그 1px 때문에
@@ -38,7 +45,7 @@ import { cn } from '@/lib/utils/cn'
  */
 export function GlobalHeader({ authed }: { authed: boolean }) {
   return (
-    <header className="border-border bg-bg sticky top-0 z-30 box-border h-14 border-b md:h-16">
+    <header className="border-border bg-bg sticky top-0 z-40 box-border h-14 border-b md:h-16">
       <div
         className={cn(
           'content-container flex h-full items-center justify-between gap-3',
