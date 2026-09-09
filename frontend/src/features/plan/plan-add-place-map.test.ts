@@ -26,7 +26,6 @@ const BASE = {
   addedPlaceIds: new Set<string>(),
   pendingPlaceId: null,
   disabled: false,
-  failure: null,
   onAdd: () => undefined,
 }
 
@@ -126,7 +125,7 @@ describe('지도 패널의 담기 실패 알림', () => {
 })
 
 describe('PlanAddPlaceHeader — 두 보기가 나눠 쓰는 머리', () => {
-  function renderHeader(overrides: Record<string, unknown> = {}) {
+  function renderHeader(overrides: Partial<Parameters<typeof PlanAddPlaceHeader>[0]> = {}) {
     return renderToStaticMarkup(
       createElement(PlanAddPlaceHeader, {
         day: 2,
@@ -158,6 +157,24 @@ describe('PlanAddPlaceHeader — 두 보기가 나눠 쓰는 머리', () => {
   })
 
   it('보기 전환 토글이 현재 보기를 눌린 상태로 알린다', () => {
-    expect(renderHeader({ view: 'map' })).toContain('aria-current="true"')
+    const onMap = renderHeader({ view: 'map' })
+    const onList = renderHeader({ view: 'list' })
+
+    /*
+      실제 마크업은 `aria-current` 가 (있을 때만) `href` 보다 앞에 오고 그 사이에 활성
+      여부에 따라 값이 달라지는 `class` 가 낀다 — `aria-current="true" aria-label="..."
+      title="..." class="..." href="...">` 순서. `href` 를 직접 붙여 보는 대신, 활성
+      링크에만 붙는 `aria-current` 가 어느 `aria-label`(지도로 보기/목록으로 보기)에
+      붙는지로 "두 보기에서 눌린 쪽이 다르다" 를 검증한다.
+    */
+    // 지도 보기면 지도 링크가 눌려 있고 목록 링크는 아니다
+    expect(onMap).toContain('aria-current="true" aria-label="지도로 보기"')
+    expect(onMap).not.toContain('aria-current="true" aria-label="목록으로 보기"')
+    expect(onMap).toContain('href="/plans/1/days/2/add"')
+    expect(onMap).toContain('href="/plans/1/days/2/add?view=list"')
+
+    // 목록 보기면 반대다
+    expect(onList).toContain('aria-current="true" aria-label="목록으로 보기"')
+    expect(onList).not.toContain('aria-current="true" aria-label="지도로 보기"')
   })
 })
