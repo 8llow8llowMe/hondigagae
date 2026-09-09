@@ -234,8 +234,15 @@ describe('AiPlanCreateForm — 오류 표시', () => {
     그 셀렉터가 무엇을 찾는지는 마크업으로 검사할 수 있다** — 오류 키와 `id`/`name` 이
     어긋나면 제출 실패 시 포커스가 조용히 아무 데도 안 간다. 체크박스 그룹만 `name` 으로
     잡힌다 (`PetCheckboxGroup` 은 `id` 를 각 체크박스의 `name` 으로 쓴다).
+
+    **`sigunguCode` 와 `pinnedPlaces` 는 일부러 뺐다** — 가능한 오류 키 일곱 중 이 둘만
+    §8 이 성립하지 않는다. 지역은 칩 그룹이고 담긴 곳은 목록이라 그 키를 `id`/`name` 으로
+    다는 요소가 아예 없고, 그래서 포커스는 옮겨지지 않는다. 이 둘에서 오류가 났을 때 실제로
+    일하는 것은 접기를 펼치는 effect 다 (`ai-plan-create-form.tsx` 의 `COLLAPSED_FIELDS`).
+    **여기 넣으면 통과할 수 없으니, 넣기 전에 그 키를 실제로 다는 요소를 먼저 만들어야
+    한다.**
   */
-  it('오류 키마다 포커스 셀렉터가 찾을 대상이 있다', () => {
+  it('id/name 을 가진 오류 키 다섯을 포커스 셀렉터가 찾는다', () => {
     const html = render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_REGION } })
 
     expect(html).toContain('id="startDate"')
