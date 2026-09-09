@@ -99,7 +99,7 @@ public class WalkTimesProcessor {
      * 안 된다.
      */
     private GoldenWalkWindow goldenWindowOf(List<HourlyWalkSafety> curve, WeatherWarning warning) {
-        if (isWarningActive(warning)) {
+        if (WeatherWarning.suppressesRecommendation(warning)) {
             return null;
         }
         return GoldenWalkWindow.from(curve).orElse(null);
@@ -109,7 +109,7 @@ public class WalkTimesProcessor {
     private GoldenWindowStatus goldenWindowStatusOf(
         List<HourlyWalkSafety> curve, WeatherWarning warning, GoldenWalkWindow golden
     ) {
-        return GoldenWindowStatus.of(!curve.isEmpty(), isWarningActive(warning), golden != null);
+        return GoldenWindowStatus.of(!curve.isEmpty(), WeatherWarning.suppressesRecommendation(warning), golden != null);
     }
 
     /**
@@ -149,7 +149,4 @@ public class WalkTimesProcessor {
         return curve.isEmpty() ? ForecastCoverage.DAY_ENDED : ForecastCoverage.AVAILABLE;
     }
 
-    private boolean isWarningActive(WeatherWarning warning) {
-        return warning != null && warning.level().isWarning();
-    }
 }

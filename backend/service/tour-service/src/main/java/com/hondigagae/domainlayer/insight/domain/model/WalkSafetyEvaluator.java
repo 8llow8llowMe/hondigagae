@@ -45,7 +45,8 @@ public final class WalkSafetyEvaluator {
     ) {
         // 특보 경보는 예보보다 먼저 본다. 시각별 예보가 없어도 태풍경보에 "판단 근거 부족"을
         // 돌려주면 안 된다 - 근거는 있고, 그 근거가 나가지 말라고 말하고 있다.
-        if (warning != null && warning.level().isWarning()) {
+        // saferWindow 도 여기서 함께 막힌다 - 골든타임(GoldenWindowStatus)과 같은 축이다 (#357).
+        if (WeatherWarning.suppressesRecommendation(warning)) {
             return WalkSafetyAssessment.builder()
                 .level(WalkSafetyLevel.DANGER)
                 .reasons(List.of(WalkSafetyReason.of(WalkSafetyReasonCode.WEATHER_WARNING_ACTIVE,

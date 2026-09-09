@@ -25,6 +25,19 @@ public record WeatherWarning(
 ) {
 
     /**
+     * 이 특보가 추천을 막는 단계(경보)인지. 주의보는 해당하지 않는다.
+     *
+     * <p>경보 억제는 네 판정이 함께 쓰는 한 규칙이다 — 적합도(점수 0), 산책 위험도(DANGER,
+     * saferWindow 없음), 골든타임({@code GoldenWindowStatus.SUPPRESSED_BY_WARNING}), 권역
+     * 추천(보류). 호출부마다 {@code warning != null && warning.level().isWarning()} 을 따로
+     * 세우면 한쪽만 고쳐질 수 있고, 그러면 같은 특보에 "추천하지 않는다"와 시간대 제시가
+     * 한 화면에 함께 서는 모순이 생긴다 (#357).
+     */
+    public static boolean suppressesRecommendation(WeatherWarning warning) {
+        return warning != null && warning.level().isWarning();
+    }
+
+    /**
      * 가장 무거운 특보. 단계(경보 > 주의보)를 먼저 보고, 같으면 종류 선언 순서를 쓴다.
      *
      * <p>선언 순서가 곧 심각도다 - 태풍이 맨 앞이고 건조가 맨 뒤다.

@@ -36,7 +36,7 @@ public record RegionalWeatherComparison(
     public static RegionalWeatherComparison of(
         LocalDate date, List<RegionWeather> regions, WeatherWarning warning
     ) {
-        Optional<RegionWeather> best = warning != null && warning.level().isWarning()
+        Optional<RegionWeather> best = WeatherWarning.suppressesRecommendation(warning)
             ? Optional.empty()
             : regions.stream()
                 .filter(RegionWeather::isScored)
