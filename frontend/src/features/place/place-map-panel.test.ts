@@ -87,3 +87,18 @@ describe('PlaceMapPanel', () => {
     expect(render()).not.toContain(messages.map.noCoordinate)
   })
 })
+
+describe('PlaceMapPanel — 상세 링크 터치 영역 (#408)', () => {
+  /*
+    실측으로 잡았다. `h-11` 만 있을 때 낱말 두 글자 12px 라 **28.8 × 44** 였다 —
+    DESIGN.md §7 의 최소 터치 영역은 44×44 로 **두 축 모두**다. 세로만 지킨 클래스는
+    눈으로는 통과해 보여서, 가로 축을 클래스로 못박아 회귀를 막는다.
+  */
+  it('상세 링크가 두 축 모두 44px 를 잡는다', () => {
+    const markup = render()
+    const link = markup.match(/<a[^>]+href="\/places\/[^"]+"[^>]*>/)?.[0] ?? ''
+
+    expect(link).toContain('h-11')
+    expect(link).toContain('min-w-11')
+  })
+})
