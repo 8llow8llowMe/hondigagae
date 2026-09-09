@@ -227,6 +227,23 @@ describe('AiPlanCreateForm — 오류 표시', () => {
     expect(html).toContain(messages.aiPlan.errorBudgetPositive)
     expect(html).toContain('aria-invalid="true"')
   })
+
+  /*
+    포커스 이동 effect 는 `[id="${firstErrorField}"], [name="${firstErrorField}"]` 로
+    대상을 찾는다 (`docs/form-guide.md` §8). **effect 자체는 node 환경에서 돌지 않지만
+    그 셀렉터가 무엇을 찾는지는 마크업으로 검사할 수 있다** — 오류 키와 `id`/`name` 이
+    어긋나면 제출 실패 시 포커스가 조용히 아무 데도 안 간다. 체크박스 그룹만 `name` 으로
+    잡힌다 (`PetCheckboxGroup` 은 `id` 를 각 체크박스의 `name` 으로 쓴다).
+  */
+  it('오류 키마다 포커스 셀렉터가 찾을 대상이 있다', () => {
+    const html = render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_REGION } })
+
+    expect(html).toContain('id="startDate"')
+    expect(html).toContain('id="endDate"')
+    expect(html).toContain('id="requestNote"')
+    expect(html).toContain('id="budgetManwon"')
+    expect(html).toContain('name="petIds"')
+  })
 })
 
 /*
