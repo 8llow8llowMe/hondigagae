@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { fieldErrorId } from '@/components/field'
 import { PetFormFields, type PetFormFieldsProps } from '@/features/pet/pet-form'
 import { petFormSchema } from '@/features/pet/schemas'
-import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
+import { NO_FORM_ERRORS, toFormErrors } from '@/lib/form/field-errors'
 import { validate } from '@/lib/form/validate'
 import { messages } from '@/lib/messages'
 import { EMPTY_PET_FORM_VALUES, toPetFormValues } from '@/lib/pet/form'
@@ -79,11 +79,35 @@ describe('PetFormFields — 구성', () => {
     expect(render()).not.toContain('선택 입력')
   })
 
-  it('체중 라벨과 플레이스홀더가 단위를 보여준다', () => {
+  /*
+    **#369.** 단위가 라벨(`체중 (kg)`)과 플레이스홀더(`3.5kg`)에만 있었다. 플레이스홀더는
+    **값을 채우는 순간 사라져** 무슨 단위인지 다시 알 수 없었고, 라벨과 겹쳐 같은 말이 두
+    번 서 있었다. 단위를 입력란 안 상시 자리로 옮겼다.
+  */
+  it('체중 단위가 입력란 안에 상시로 선다 — 라벨·플레이스홀더에 겹쳐 두지 않는다', () => {
     const markup = render()
 
-    expect(markup).toContain('체중 (kg)')
-    expect(markup).toContain('placeholder="3.5kg"')
+    expect(markup).toContain('>체중</label>')
+    expect(markup).not.toContain('체중 (kg)')
+    expect(markup).toContain('placeholder="3.5"')
+    expect(markup).not.toContain('placeholder="3.5kg"')
+    expect(markup).toContain(`>${messages.pet.weightUnit}</span>`)
+  })
+
+  /* 단위는 값이 아니라 그 옆에 그려지는 라벨이다 — 보내는 것은 숫자뿐이다 */
+  it('단위가 입력값에 들어가지 않는다', () => {
+    const markup = render({ values: { ...EMPTY_PET_FORM_VALUES, weightKg: '3.5' } })
+
+    expect(markup).toContain('value="3.5"')
+    expect(markup).not.toContain('value="3.5kg"')
+  })
+
+  /* 라벨(`체중`)과 함께 `체중 kg` 로 읽히지 않게 한다. 단위는 hint 가 이미 말한다 */
+  it('단위는 스크린리더에서 감춘다', () => {
+    const markup = render()
+    const unit = /<span aria-hidden="true"[^>]*>kg<\/span>/.test(markup)
+
+    expect(unit).toBe(true)
   })
 })
 
@@ -204,6 +228,43 @@ describe('PetFormFields — 수정 초기값', () => {
   })
 })
 
+/*
+  **PET_004 는 도메인 예외라 형태가 다르다** (#369 · BE #364).
+
+  Bean Validation(`PET_100`)은 `{ message, errors: [{code, field, message}] }` 이지만
+  이쪽은 `resultMessage` 가 **문자열**이라 붙일 필드가 없다 — `toFormErrors` 가 폼 전체
+  오류로 돌리고 화면은 `FormAlert` 로 띄운다. 서버 문장이 경계를 그대로 설명한다.
+
+  **여기까지 오는 것은 백스톱이다.** 폼이 체중에 맞춰 크기를 옮기고(`sizeChangeForWeight`)
+  스키마가 어긋난 조합을 막으므로(`petFormSchema`), 사용자가 이 400 을 만날 길은
+  두 방어를 모두 지난 경우뿐이다.
+*/
+describe('PetFormFields — PET_004 서버 오류 (#369)', () => {
+  const SERVER_MESSAGE =
+    '체중과 크기 구분이 맞지 않습니다. 소형견 10kg 미만 · 중형견 10~25kg 미만 · 대형견 25kg 이상 기준으로 선택해 주세요.'
+
+  it('문자열 resultMessage 를 폼 전체 오류로 돌린다', () => {
+    const errors = toFormErrors(SERVER_MESSAGE, messages.form.submitFailed)
+
+    expect(errors.form).toBe(SERVER_MESSAGE)
+    expect(errors.fields).toEqual({})
+  })
+
+  it('폼 상단 경고로 띄운다 — 서버 문장을 고쳐 쓰지 않는다', () => {
+    const markup = render({ errors: { fields: {}, form: SERVER_MESSAGE } })
+
+    expect(markup).toContain(SERVER_MESSAGE)
+  })
+
+  /* 400 은 일시 장애가 아니다 — ErrorState 로 폼을 덮으면 고칠 수단이 사라진다 */
+  it('폼을 ErrorState 로 덮지 않는다 — 값을 고칠 수단이 남아야 한다', () => {
+    const markup = render({ errors: { fields: {}, form: SERVER_MESSAGE }, errorStatus: 400 })
+
+    expect(markup).toContain('id="weightKg"')
+    expect(markup).not.toContain(messages.common.temporaryErrorTitle)
+  })
+})
+
 describe('petFormSchema', () => {
   function check(overrides: Record<string, unknown>) {
     return validate(petFormSchema, { ...EMPTY_PET_FORM_VALUES, name: '몽실이', ...overrides })
@@ -247,5 +308,46 @@ describe('petFormSchema', () => {
 
     expect(result.ok).toBe(false)
     if (!result.ok) expect(result.errors.fields.breed).toBe(messages.pet.breedLength)
+  })
+
+  /*
+    **PET_004 의 FE 복제본** (#369 · BE #364). 백엔드가 모순 조합을 400 으로 거부하므로,
+    같은 경계를 스키마가 들고 제출 전에 막는다. 체중을 고치면 크기가 저절로 따라오니
+    이 오류는 **크기를 직접 어긋나게 골랐을 때만** 남고, 그래서 `sizeType` 에 붙는다.
+  */
+  it('30kg 소형견을 거부하고 오류를 크기에 붙인다 (PET_004)', () => {
+    const result = check({ weightKg: '30', sizeType: 'SMALL' })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.errors.fields.sizeType).toBe(messages.pet.weightSizeMismatch)
+      // 체중 자체는 유효한 값이다 — 어긋난 것은 둘의 조합이다
+      expect(result.errors.fields.weightKg).toBeUndefined()
+    }
+  })
+
+  it.each([
+    ['9.9', 'SMALL'],
+    ['10.0', 'MEDIUM'],
+    ['24.9', 'MEDIUM'],
+    ['25.0', 'LARGE'],
+  ])('경계 %s kg 에 맞는 크기(%s)는 통과한다', (weightKg, sizeType) => {
+    expect(check({ weightKg, sizeType }).ok).toBe(true)
+  })
+
+  it.each([
+    ['9.9', 'MEDIUM'],
+    ['10.0', 'SMALL'],
+    ['24.9', 'LARGE'],
+    ['25.0', 'MEDIUM'],
+  ])('경계 %s kg 에 어긋난 크기(%s)는 거부한다', (weightKg, sizeType) => {
+    expect(check({ weightKg, sizeType }).ok).toBe(false)
+  })
+
+  /* 체중이 비면 어긋남을 판정할 수 없다 — 크기만으로 저장할 수 있어야 한다 */
+  it('체중이 비었으면 어느 크기든 통과한다', () => {
+    for (const sizeType of ['SMALL', 'MEDIUM', 'LARGE'] as const) {
+      expect(check({ weightKg: '', sizeType }).ok).toBe(true)
+    }
   })
 })

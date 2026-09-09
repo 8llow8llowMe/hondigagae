@@ -20,6 +20,7 @@ import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { messages } from '@/lib/messages'
 import { BIRTH_YM_LENGTH, formatBirthYmInput } from '@/lib/pet/birth-ym'
 import { toPetSavePayload } from '@/lib/pet/form'
+import { sizeChangeForWeight } from '@/lib/pet/size'
 import type { Pet, PetFormValues } from '@/types/pet'
 
 const labels = messages.pet.labels
@@ -151,10 +152,19 @@ export function PetFormFields({
         >
           {/* `type="number"` 를 쓰지 않는다 — 휠·화살표로 값이 바뀌고 로케일에 따라
               소수점이 콤마가 된다. 소수 한 자리 규칙은 스키마가 본다 */}
+          {/*
+            **단위를 입력란 안에 세운다** (#369). `placeholder="3.5kg"` 로 알리던 자리는
+            **값을 채우는 순간 사라져** 무슨 단위인지 다시 알 수 없었다. `suffix` 는 값에
+            들어가지 않는다 — 보내는 것은 숫자뿐이다.
+
+            placeholder 에서도 `kg` 를 걷었다. 단위가 옆에 상시로 서므로 예시까지 단위를
+            달면 `3.5kg kg` 로 겹쳐 읽힌다.
+          */}
           <Input
             id="weightKg"
             inputMode="decimal"
-            placeholder="3.5kg"
+            placeholder="3.5"
+            suffix={messages.pet.weightUnit}
             value={values.weightKg}
             onValueChange={(value) => onValueChange('weightKg', value)}
             invalid={errors.fields.weightKg !== undefined}
@@ -295,6 +305,24 @@ export function PetForm({ initialValues, submitLabel, footer, onSave, onSaved }:
           // 5xx 를 받은 뒤 값을 고치면 ErrorState 를 걷는다 — 등록-세부명세 D4
           setErrorStatus(null)
           setValue(key, value)
+
+          /*
+            **체중을 적으면 크기를 맞춘다** (#369). 백엔드가 모순 조합을 `PET_004` 로
+            거부하므로(#364), 어긋난 조합은 애초에 만들어질 수 없는 값이다 — 사용자가
+            그 400 을 만나기 전에 여기서 닫는다.
+
+            **체중이 크기를 이긴다.** 둘 중 체중이 더 구체적인 사실이고 크기는 그것에서
+            파생되는 구분이다. 반대로 두면(크기가 이기면) 어느 쪽이 참인지 알 수 없다.
+            사용자가 크기를 직접 어긋나게 고르는 갈래는 덮지 않고 스키마가 오류로 말한다 —
+            방금 만진 필드를 화면이 되돌리면 폼과 씨름하는 느낌이 된다.
+
+            **읽을 수 없는 값은 `null` 이라 라디오가 타이핑 도중에 튀지 않는다**
+            (`1.` · `` · `abc`). 판정은 `lib/pet/size.ts` 한 곳이 갖는다.
+          */
+          if (key !== 'weightKg') return
+
+          const derived = sizeChangeForWeight(value as string, values.sizeType)
+          if (derived !== null) setValue('sizeType', derived)
         }}
         onSubmit={() => void submit()}
         onRetry={() => void submit()}
