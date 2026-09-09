@@ -153,8 +153,19 @@ export function PlanCreateForm({
             value={values.startDate}
             onValueChange={(startDate) => {
               onValueChange('startDate', startDate)
-              // 종료일이 비어 있을 때만 이어서 연다 — 위 주석
-              if (values.endDate === '') setEndDateOpen(true)
+              /*
+                **종료일보다 늦은 시작일을 고르면 종료일을 비우고 다시 받는다.**
+                시작일에는 `max` 를 걸지 않는다 — 걸면 기간을 통째로 뒤로 옮기려는 사람이
+                종료일부터 고쳐야 하고, 그 순서를 화면이 알려 줄 방법이 없다. 대신 어긋난
+                순간 종료일만 비워 다시 묻는다. 남겨 두면 스키마가 제출에서 막는 값이
+                화면에는 멀쩡해 보인다.
+              */
+              if (values.endDate !== '' && startDate > values.endDate) {
+                onValueChange('endDate', '')
+                setEndDateOpen(true)
+              } else if (values.endDate === '') {
+                setEndDateOpen(true)
+              }
             }}
             invalid={errors.fields.startDate !== undefined}
             rangeStart={values.startDate}

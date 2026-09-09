@@ -87,11 +87,49 @@ describe('Calendar', () => {
     expect(markup).toContain('2026년 9월 11일')
   })
 
-  it('기간이 한쪽만 있으면 띠를 그리지 않는다 — 열린 구간을 색으로 말할 수 없다', () => {
+  it('끝이 없고 커서도 시작일에 있으면 칠할 구간이 없다', () => {
     const markup = render({ value: '2026-09-10', rangeStart: '2026-09-10', rangeEnd: '' })
 
     // hover 클래스의 bg-band 는 남으므로 요일 머리글이 아닌 칸에 띠가 없는 것만 본다
     expect(markup).not.toContain('bg-band text-fg font-medium')
+  })
+})
+
+describe('Calendar — 끝을 고르는 중의 미리보기', () => {
+  /*
+    종료일 달력은 시작일만 들고 열린다. 어디까지 고르는 중인지 보이지 않으면 며칠 일정이
+    되는지 손을 떼기 전까지 알 수 없다. 커서가 없을 때는 **포커스 칸**이 끝을 대신하므로
+    방향키 사용자에게도 같은 띠가 보인다 — 그래서 이 동작이 마크업으로 검증된다.
+  */
+  it('끝이 비어 있으면 시작일부터 포커스 칸까지 칠한다', () => {
+    // 포커스는 오늘(9/2)이고 시작일이 8/30 이라 그 사이가 구간이다
+    const markup = render({ value: '', rangeStart: '2026-08-30', rangeEnd: '' })
+
+    expect(markup).toContain('bg-band')
+  })
+
+  it('포커스가 시작일보다 앞이면 칠하지 않는다 — 거꾸로 된 구간은 구간이 아니다', () => {
+    const markup = render({ value: '', rangeStart: '2026-09-20', rangeEnd: '' })
+
+    expect(markup).not.toContain('bg-band text-fg font-medium')
+  })
+
+  it('다른 필드가 정한 시작일은 회색으로 세운다 — 이 달력의 값이 아니다', () => {
+    const markup = render({ value: '', rangeStart: '2026-08-30', rangeEnd: '' })
+
+    expect(markup).toContain('bg-border-strong')
+    /*
+      브랜드 채움은 **이 달력에서 고른 값**에만 쓴다. `bg-brand-600` 만 보면 안 된다 —
+      오늘 표시 점도 같은 색이라 항상 걸린다. 선택 칸의 조합으로 좁힌다.
+    */
+    expect(markup).not.toContain('bg-brand-600 text-fg-inverse')
+  })
+
+  it('값이 없고 min 이 뒤에 있으면 그 달에서 연다 — 오늘의 달은 전부 잠겨 있다', () => {
+    const markup = render({ value: '', min: '2026-12-24' })
+
+    expect(markup).toContain('2026년 12월')
+    expect(markup).not.toContain('2026년 9월')
   })
 })
 
