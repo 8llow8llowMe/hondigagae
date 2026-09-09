@@ -166,7 +166,9 @@ export function CallButton({ name, tel }: { name: string; tel: string | null }) 
       className={cn(
         base,
         'border-border-strong text-fg hover:bg-band',
-        'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:outline-none',
+        // 테두리가 있으니 offset 0 · 1px — offset 을 주면 [테두리·흰틈·링] 세 겹이 된다
+        // (DESIGN.md 포커스 링 표). 지운 `facility-selected-card` 의 같은 버튼이 쓰던 값이다
+        'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
       )}
     >
       <PhoneIcon size={24} />
@@ -194,7 +196,8 @@ export function DirectionsLink({ facility }: { facility: NearbyFacilityItem }) {
       rel="noopener noreferrer"
       className={cn(
         'border-border-strong text-fg hover:bg-band flex h-11 items-center justify-center rounded-md border font-semibold transition-colors',
-        'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
+        // 위 `CallButton` 과 같은 이유로 offset 0 · 1px 이다 (DESIGN.md 포커스 링 표)
+        'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
       )}
     >
       {messages.map.directions}
