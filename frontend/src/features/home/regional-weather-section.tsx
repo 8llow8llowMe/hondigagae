@@ -86,17 +86,24 @@ export function RegionalWeatherSection({
           바로 위 문장은 그 권역을 가리키고 있었다. 동점은 서버 순서를 지킨다.
         */}
         {/*
-          **2단에서 칸을 쥐어짜지 않고 레일로 넘긴다** (#342). `lg:flex-1` 만 두면 칸이
-          `min-w-0` 까지 줄어 1024~1280 에서 다섯 칸이 쪼그라들었다 — 값 묶음이 136px 를
-          요구하는데 칸이 그보다 좁아지면 안에서 다시 접힌다.
+          **2단에서 칸을 쥐어짜지 않고 레일로 넘긴다** (#342). 칸이 `min-w-0` 까지 줄면
+          1024~1280 에서 다섯 칸이 쪼그라든다 — 값 묶음이 136px 를 요구하는데 칸이 그보다
+          좁아지면 안에서 다시 접힌다.
 
-          **`lg:min-w-38`(152px) 이 바닥이다.** 값 묶음 136px + 칸 인셋 12px = 148 에
-          4px 여유다. `flex-1` 은 남는 폭을 나눠 갖고, 폭이 모자라면 이 바닥에서 멈춰
-          `<ul>` 이 넘친다 → 가로 스크롤 + 화살표로 넘긴다.
+          **폭은 `lg:w-38`(152px) 고정이다** (#395). 예전에는 `lg:min-w-38 lg:flex-1` 이라
+          **폭에 따라 152~191 사이를 오갔고**, 1170 같은 중간 폭에서 바닥값으로 내려앉은 채
+          마지막 칸이 65px 만 보이며 잘렸다. 폭이 뷰포트마다 달라지면 같은 칸이 화면마다
+          다른 물건처럼 보이고, 잘린 칸은 "더 있다" 가 아니라 "깨졌다" 로 읽힌다.
+
+          **고정의 대가는 넓은 화면의 빈 자리다.** 1920 에서 우측 열이 남아도 칸은 152 에
+          머문다 — 받아들인 값이다 (#395). 대신 어느 폭에서든 칸 모양이 같다.
+
+          **152 는 #342 가 계산한 값 그대로다.** 값 묶음 136px + 칸 인셋 12px = 148 에 4px
+          여유이고, `152×5 + gap 16 = 776` 이라 1280(가용 799)은 넘김 없이 들어가고
+          1024(가용 543)만 넘긴다 → 가로 스크롤 + 스냅 + 화살표.
 
           **160 이 아니라 152 인 이유**: 1280 의 우측 열 가용폭이 799px 이라 160×5 + gap 16
           = 816 이 17px 모자랐다. 그 17px 때문에 1280 에서까지 화살표가 남는다.
-          152×5 + 16 = 776 이면 1280 은 넘김 없이 들어가고 1024(가용 543)는 그대로 넘긴다.
 
           한 컬럼(~1023)에서는 세로 목록이라 넘칠 폭이 없다 — `fade` 가 `none` 이고
           `ScrollRailArrows` 도 스스로 그리지 않는다.
@@ -109,6 +116,23 @@ export function RegionalWeatherSection({
               'flex flex-col lg:flex-row lg:gap-x-1 lg:overflow-x-auto',
               // 스크롤바 자리는 fade 와 화살표가 대신한다 (`app/globals.css`)
               'scrollbar-none',
+              /*
+                **칸이 중간에서 잘린 채 멈추지 않게 한다** (#395). 고정 폭이라 어느 위치에서
+                멈추든 칸 모양은 같지만, 멈추는 자리가 칸 경계가 아니면 마지막 칸이 반쯤
+                보인 채 남아 "더 있다" 가 아니라 "깨졌다" 로 읽힌다.
+
+                **마지막 칸만 `snap-end` 다.** 스냅 지점이 칸 시작(0 · 156 · 312 …)뿐이면
+                넘치는 폭이 칸 하나보다 작을 때(1170 실측 87px < 152) 0 말고는 닿을 자리가
+                없어 **마지막 칸을 끝까지 볼 수 없다.** 마지막 칸의 끝을 컨테이너 끝에
+                맞추면 그 자리가 곧 `maxScroll` 이라 한 번 넘기면 통째로 드러난다.
+
+                1170 실측: `scrollTo(87)` → 87 에 눕고 마지막 칸이 완전히 보인다.
+                중간(`40`)으로 밀면 0 으로 되돌아온다 — **칸 중간에서 멈추지 않는다**는 것이
+                이 규칙의 전부다.
+
+                `lg:` 로 한정한다 — 그 아래는 세로 목록이라 가로로 스냅할 축이 없다.
+              */
+              'lg:snap-x lg:snap-mandatory',
               rail.fadeClassName,
             )}
           >
@@ -244,7 +268,7 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
       한 컬럼은 가로 행(이름 ↔ 값), 2단은 세로 칸(이름 위, 값 아래)이다. 2단에서 아래
       테두리를 걷고 왼쪽 테두리로 갈아 끼운다 — 첫 칸에는 선을 두지 않는다.
     */
-    <li className="border-border/60 flex items-center justify-between gap-3 border-b py-2 last:border-b-0 lg:min-w-38 lg:flex-1 lg:flex-col lg:items-start lg:gap-1 lg:border-b-0 lg:border-l lg:py-0 lg:pl-3 lg:first:border-l-0 lg:first:pl-0">
+    <li className="border-border/60 flex items-center justify-between gap-3 border-b py-2 last:border-b-0 lg:w-38 lg:shrink-0 lg:snap-start lg:flex-col lg:items-start lg:gap-1 lg:border-b-0 lg:border-l lg:py-0 lg:pl-3 lg:first:border-l-0 lg:first:pl-0 lg:last:snap-end">
       <span className="text-body-2 min-w-0 font-semibold">{item.region.name}</span>
 
       {/*
@@ -315,14 +339,13 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
         {known ? (
           <MetricBadge
             tone={suitabilityTone(levelOf(item.weatherScore as number))}
-            size="sm"
             className="lg:ml-auto"
           >
             {item.weatherScore}
           </MetricBadge>
         ) : (
           /* `unknown` 톤은 점선 테두리를 쓴다 — 0 점과 다른 모양이어야 한다 (DESIGN.md §2-3) */
-          <MetricBadge tone="unknown" size="sm" className="lg:ml-auto">
+          <MetricBadge tone="unknown" className="lg:ml-auto">
             {messages.home.regionScoreUnavailable}
           </MetricBadge>
         )}
