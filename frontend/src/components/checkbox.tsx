@@ -88,7 +88,7 @@ export function Checkbox({
               어긋난다** — 가까운 쪽을 고른다. 설명이 없을 때는 위 `items-center` 가 맡는다.
             */
             'accent-brand-500 size-5 shrink-0 rounded',
-            'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
+            'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:outline-none',
             invalid && 'outline-danger-500 outline-1',
           )}
           {...rest}

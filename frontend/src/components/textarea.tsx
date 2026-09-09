@@ -50,7 +50,7 @@ export function Textarea({
       className={cn(
         'text-body-1 min-h-11 w-full rounded-md border px-3 py-2',
         'placeholder:text-fg-subtle',
-        'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
+        'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:outline-none',
         'disabled:cursor-not-allowed disabled:opacity-50',
         invalid ? 'border-danger-500' : 'border-border-strong',
         className,

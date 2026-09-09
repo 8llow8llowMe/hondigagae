@@ -221,7 +221,7 @@ export function DateField({
             */
             'text-body-1 h-11 w-full cursor-pointer rounded-md border pr-10 pl-3 text-left',
             'placeholder:text-fg-subtle',
-            'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
+            'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-0 focus-visible:outline-none',
             invalid ? 'border-danger-500' : 'border-border-strong',
           )}
         />
