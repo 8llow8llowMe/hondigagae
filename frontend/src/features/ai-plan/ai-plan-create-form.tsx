@@ -101,12 +101,11 @@ export function AiPlanCreateForm({
     `submitCount` 를 트리거로 쓴다 (`errors` 를 쓰면 입력 중에 다시 돈다 —
     `use-form.ts` 의 `submitCount` JSDoc).
 
-    **아래 포커스 effect 보다 먼저 선언한다.** 다만 순서만으로 포커스까지 살아나지는
+    **아래 포커스 effect 보다 먼저 선언한다.** 다만 순서만으로는 포커스까지 살아나지
     않는다 — 두 effect 는 같은 커밋에서 연달아 돌고, 여기서 부른 `setDetailsOpen` 이
-    만든 재렌더는 그 뒤에 온다. 즉 아래 effect 가 `querySelector` 할 때 패널은 아직
-    마운트 전이다. **이 effect 가 지키는 것은 "오류가 화면에 보인다" 까지다** —
-    포커스가 접힌 필드에 닿게 하려면 `detailsOpen` 을 아래 effect 의 의존성에
-    더해야 하는데, 그러면 사용자가 접기를 여닫을 때마다 포커스를 훔친다.
+    만든 재렌더는 그 **뒤에** 온다. 즉 아래 effect 의 첫 `querySelector` 시점에 패널은
+    아직 마운트 전이라 대상을 못 찾는다. 그 두 번째 기회는 아래 effect 가 직접 만든다
+    (`focusedSubmitCountRef` 주석).
   */
   useEffect(() => {
     if (submitCount === 0 || firstErrorField === null) return
@@ -116,18 +115,47 @@ export function AiPlanCreateForm({
   }, [submitCount, firstErrorField])
 
   /*
+    **이미 포커스를 옮겨 준 `submitCount`.** `0` 은 "아직 아무 제출도 처리하지 않았다".
+
+    이 ref 가 없으면 아래 effect 의 `detailsOpen` 의존성이 곧바로 버그가 된다 —
+    제출 실패 뒤 오류가 남아 있는 동안 사용자가 접기를 여닫을 때마다 effect 가 다시 돌아
+    **사용자가 보고 있던 곳에서 포커스를 훔친다** (`use-form.ts` 의 `submitCount` JSDoc 이
+    `errors` 를 의존성에서 뺀 것과 같은 문제의 변종이다). ref 로 "이 제출은 이미 처리했다"
+    를 기억해 두면 그 뒤의 토글은 전부 조용히 빠져나간다.
+
+    **소비 시점이 핵심이다 — 대상을 찾았을 때만 소비한다.** 접힌 섹션 안의 필드
+    (`budgetManwon` · `pinnedPlaces`)에서 오류가 나면 첫 패스는 패널이 마운트되기 전이라
+    `querySelector` 가 빈손으로 끝난다. 여기서 소비해 버리면 그걸로 끝이고, 위 펼침
+    effect 의 `setDetailsOpen(true)` 가 만든 재렌더에서 `detailsOpen` 이 바뀌어 effect 가
+    한 번 더 돌 때 가드에 막힌다. 못 찾았으면 소비하지 않고 두어 **두 번째 패스가
+    성공하게** 만든다. 그 두 번째 패스가 소비를 끝내므로 이후의 수동 토글은 다시
+    포커스를 옮기지 않는다.
+
+    ⚠️ 이 ref 를 "불필요한 상태" 로 보고 지우면 접힌 필드의 포커스 이동
+    (`docs/form-guide.md` §8)이 조용히 깨지거나 토글이 포커스를 훔친다. 이 저장소의
+    렌더 테스트는 effect 를 돌리지 않아 **둘 다 테스트가 잡아 주지 않는다.**
+  */
+  const focusedSubmitCountRef = useRef(0)
+
+  /*
     제출 실패 시 첫 오류 필드로 포커스를 옮긴다. `errors` 를 의존성으로 쓰면 입력 중인
     필드에서 포커스를 훔친다 (`use-form.ts` 의 `submitCount` JSDoc).
+
+    `detailsOpen` 이 의존성에 있는 것은 위 두 번째 패스 때문이다 — 재실행 자체는
+    `focusedSubmitCountRef` 가 걸러 준다.
 
     라디오 그룹은 `id` 로 찾을 수 없어 `[name]` 을 함께 본다 (`PlanCreateForm` 과 동일).
   */
   useEffect(() => {
     if (submitCount === 0 || firstErrorField === null) return
+    if (focusedSubmitCountRef.current === submitCount) return
     const target = formRef.current?.querySelector<HTMLElement>(
       `[id="${firstErrorField}"], [name="${firstErrorField}"]`,
     )
-    target?.focus()
-  }, [submitCount, firstErrorField])
+    if (target === null || target === undefined) return
+    focusedSubmitCountRef.current = submitCount
+    target.focus()
+  }, [submitCount, firstErrorField, detailsOpen])
 
   const budgetSelected = values.budgetManwon.trim()
 
