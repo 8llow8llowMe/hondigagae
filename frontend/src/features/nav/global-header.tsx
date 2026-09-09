@@ -14,7 +14,9 @@ import { PetSwitcherSlot } from '@/features/nav/pet-switcher-slot'
  * **서버 컴포넌트다.** 세션으로 분기하는 셸만 담당하고, 활성 판정(`usePathname`)과
  * 스위처 조회는 client 자식이 맡는다.
  *
- * 좌우 패딩 16(모바일) / 40(데스크톱). `max-width` 를 두지 않는다 — 헤더는 화면 폭을 쓴다.
+ * 좌우 패딩 16(모바일) / 40(데스크톱). **바(`<header>`)에는 `max-width` 를 두지 않는다** —
+ * 캡하면 `border-b` 가 화면 가운데서 끊긴다. 안쪽 div 만 `.content-container` 로 캡해
+ * 본문(`.rail-layout`)과 같은 세로 경계에 선다 (#376).
  * 로고와 nav 사이 gap 32, nav 항목 사이 gap 4.
  *
  * **로고는 워드마크만이다** (아트보드 `혼디가개 브랜드 자산` 2절). 심볼(발바닥)을 붙이지
@@ -30,7 +32,7 @@ import { PetSwitcherSlot } from '@/features/nav/pet-switcher-slot'
 export function GlobalHeader({ authed }: { authed: boolean }) {
   return (
     <header className="border-border bg-bg sticky top-0 z-30 box-border h-14 border-b md:h-16">
-      <div className="flex h-full items-center justify-between gap-3 px-4 md:px-10">
+      <div className="content-container flex h-full items-center justify-between gap-3 px-4 md:px-10">
         <div className="flex min-w-0 items-center gap-8">
           {/*
             **워드마크는 라이브 텍스트가 아니다** (아트보드 `브랜드 자산` 2절). 폰트
