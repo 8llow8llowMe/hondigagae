@@ -8,8 +8,8 @@ import {
   applyFilters,
   countsAreComplete,
   facilityCounts,
-  type FilterRelief,
   labelWithCount,
+  reliefLabel,
   reliefs,
 } from '@/features/emergency/facility-filters'
 import { FacilityRow } from '@/features/emergency/facility-row'
@@ -261,15 +261,4 @@ function PositionNotice({ reason, onRetry }: { reason: PositionFailure; onRetry:
       )}
     </div>
   )
-}
-
-function reliefLabel(option: FilterRelief): string {
-  const template =
-    option.kind === 'openNowOnly'
-      ? messages.emergency.reliefOpenNow
-      : option.kind === 'open24Only'
-        ? messages.emergency.reliefOpen24
-        : messages.emergency.reliefType
-
-  return template.replace('{n}', String(option.count))
 }

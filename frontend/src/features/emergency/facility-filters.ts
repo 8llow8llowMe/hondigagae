@@ -1,3 +1,4 @@
+import { messages } from '@/lib/messages'
 import type {
   FacilityFilters,
   FacilityTypeCode,
@@ -121,4 +122,22 @@ export function reliefs(
  */
 export function labelWithCount(label: string, count: number, show: boolean): string {
   return show ? `${label} ${String(count)}` : label
+}
+
+/**
+ * `reliefs()` 결과 한 항목을 화면 문구로 바꾼다.
+ *
+ * 목록 갈래(`EmergencySection`)와 지도 갈래(`EmergencyMapView`)가 함께 쓴다.
+ * `labelWithCount` 와 같은 이유로 여기 하나만 둔다 — 각자 갖고 있으면 한쪽만
+ * 고쳐져 같은 relief 버튼이 화면마다 다르게 보인다.
+ */
+export function reliefLabel(option: FilterRelief): string {
+  const template =
+    option.kind === 'openNowOnly'
+      ? messages.emergency.reliefOpenNow
+      : option.kind === 'open24Only'
+        ? messages.emergency.reliefOpen24
+        : messages.emergency.reliefType
+
+  return template.replace('{n}', String(option.count))
 }
