@@ -19,14 +19,15 @@ import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { formatCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { WalkSafetyResponse } from '@/types/insight'
 
 /**
- * 좌우 인셋 — `PlaceSuitabilityPanel` 과 **같은 값을 쓴다.** 두 판정이 같은 레일에 위아래로
- * 서므로 인셋이 갈리면 등급 줄이 서로 다른 축에서 시작한다.
+ * 좌우 인셋 — `PlaceSuitabilityPanel` 과 **같은 `INSET_CLASS.rail` 을 참조한다** (#386).
+ * 두 판정이 같은 레일에 위아래로 서므로 인셋이 갈리면 등급 줄이 서로 다른 축에서 시작한다.
  */
-const INSET = 'px-4 md:px-10 lg:px-6'
+const INSET = INSET_CLASS.rail
 
 export type PlaceWalkSafetyPanelProps = {
   /** 조회 전이거나 실패면 null */

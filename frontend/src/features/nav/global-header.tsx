@@ -7,6 +7,8 @@ import { EmergencyIcon } from '@/components/icons'
 import { AccountMenu } from '@/features/nav/account-menu'
 import { NavLinks } from '@/features/nav/nav-links'
 import { PetSwitcherSlot } from '@/features/nav/pet-switcher-slot'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 
 /**
  * 전역 헤더 — 아트보드 `01 홈`(모바일 56) / `02 홈`(데스크톱 64) / `03 전역 nav`.
@@ -14,9 +16,14 @@ import { PetSwitcherSlot } from '@/features/nav/pet-switcher-slot'
  * **서버 컴포넌트다.** 세션으로 분기하는 셸만 담당하고, 활성 판정(`usePathname`)과
  * 스위처 조회는 client 자식이 맡는다.
  *
- * 좌우 패딩 16(모바일) / 40(데스크톱). **바(`<header>`)에는 `max-width` 를 두지 않는다** —
- * 캡하면 `border-b` 가 화면 가운데서 끊긴다. 안쪽 div 만 `.content-container` 로 캡해
- * 본문(`.rail-layout`)과 같은 세로 경계에 선다 (#376).
+ * 좌우 패딩은 **`INSET_CLASS.main`(16/40)을 참조한다** — 문자열을 다시 적지 않는다 (#386).
+ * 헤더는 화면 하나가 아니라 제품 전체에 서는 바라 페이지 인셋을 따르고, 그 값이 곧
+ * 왼쪽 세로 기준선이다. 레일은 오른쪽만 24 로 좁히므로 왼쪽에서 헤더와 갈리지 않는다
+ * (근거는 `lib/ui/inset.ts`).
+ *
+ * **바(`<header>`)에는 `max-width` 를 두지 않는다** — 캡하면 `border-b` 가 화면 가운데서
+ * 끊긴다. 안쪽 div 만 `.content-container` 로 캡해 본문(`.rail-layout`)과 같은 세로
+ * 경계에 선다 (#376).
  * 로고와 nav 사이 gap 32, nav 항목 사이 gap 4.
  *
  * **로고는 워드마크만이다** (아트보드 `혼디가개 브랜드 자산` 2절). 심볼(발바닥)을 붙이지
@@ -32,7 +39,12 @@ import { PetSwitcherSlot } from '@/features/nav/pet-switcher-slot'
 export function GlobalHeader({ authed }: { authed: boolean }) {
   return (
     <header className="border-border bg-bg sticky top-0 z-30 box-border h-14 border-b md:h-16">
-      <div className="content-container flex h-full items-center justify-between gap-3 px-4 md:px-10">
+      <div
+        className={cn(
+          'content-container flex h-full items-center justify-between gap-3',
+          INSET_CLASS.main,
+        )}
+      >
         <div className="flex min-w-0 items-center gap-8">
           {/*
             **워드마크는 라이브 텍스트가 아니다** (아트보드 `브랜드 자산` 2절). 폰트

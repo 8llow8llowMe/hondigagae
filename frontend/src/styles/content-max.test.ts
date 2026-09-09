@@ -86,7 +86,16 @@ describe('콘텐츠 컨테이너 — 헤더 (#376)', () => {
   })
 
   it('안쪽 div 가 content-container 를 쓴다', () => {
-    expect(header).toMatch(/<div className="content-container[^"]*"/)
+    expect(header).toContain("'content-container")
+  })
+
+  /*
+    #386 — 헤더는 인셋 문자열을 다시 적지 않고 `INSET_CLASS.main` 을 참조한다.
+    다시 적어 두면 `inset.ts` 가 바뀌어도 헤더만 옛 값에 남아 왼쪽 기준선이 갈라진다.
+  */
+  it('인셋을 INSET_CLASS.main 으로 참조한다 — px-4 md:px-10 을 다시 적지 않는다', () => {
+    expect(header).toContain('INSET_CLASS.main')
+    expect(header).not.toMatch(/className="[^"]*px-4 md:px-10/)
   })
 
   it('Tailwind arbitrary 로 캡하지 않는다 — eslint noComplexArbitrary', () => {
