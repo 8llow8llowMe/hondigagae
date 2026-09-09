@@ -43,6 +43,7 @@ export function MapSheet({
   header,
   children,
   className,
+  maxTopInset = 0,
 }: {
   /**
    * 시트의 접근성 이름. **화면마다 다르다** — 장소 찾기는 "장소 목록", 긴급 시설은
@@ -61,6 +62,19 @@ export function MapSheet({
   header: ReactNode
   children: ReactNode
   className?: string
+  /**
+   * `max` 단계에서 **비워 둘 상단 높이**(px). 기본 `0` 이면 지금까지처럼 `85dvh` 다.
+   *
+   * **비율이 아니라 px 로 받는다.** `STOP_RATIO.max`(0.85dvh)는 상단 컨트롤이
+   * `absolute` 로 떠 있는 `/places` 기준으로 튜닝된 값이라, 헤더가 **정상 흐름**인
+   * 화면에서는 헤더를 덮는다 — 375×812 실측으로 시트 상단이 y=122 인데 담기 화면
+   * 헤더는 y=56~189 를 쓴다(제목·보기 전환·부제가 전부 가려지고 지도 가시 영역이 0).
+   *
+   * 그리고 비율은 **기기가 작을수록 더 덮는다**: 667px 기기라면 `85dvh` 의 상단이
+   * y=100 으로 내려가 지금보다 나빠진다. 헤더 높이는 기기 높이와 무관하게 거의
+   * 일정하므로 px 이 안정적이다.
+   */
+  maxTopInset?: number | undefined
 }) {
   const [dragOffset, setDragOffset] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -90,7 +104,16 @@ export function MapSheet({
     [stop, dragOffset, onStopChange],
   )
 
-  const height = `calc(${String(STOP_RATIO[stop] * 100)}dvh - ${String(Math.round(dragOffset))}px)`
+  /*
+    끄는 동안의 오프셋은 두 갈래 모두 같은 방식으로 빼진다 — 위로 끌면 음수라 커진다.
+    `maxTopInset` 은 **`max` 에만** 걸린다. `min`·`mid` 는 헤더와 부딪히지 않으므로
+    비율 그대로 두는 편이 화면 크기에 잘 따라간다.
+  */
+  const base =
+    stop === 'max' && maxTopInset > 0
+      ? `100dvh - ${String(maxTopInset)}px`
+      : `${String(STOP_RATIO[stop] * 100)}dvh`
+  const height = `calc(${base} - ${String(Math.round(dragOffset))}px)`
 
   return (
     <section

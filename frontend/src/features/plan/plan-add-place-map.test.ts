@@ -64,7 +64,9 @@ describe('지도 패널의 담기 액션', () => {
         planAddPlaceAction(place, { ...BASE, disabled: true, pendingPlaceId: 'other' }),
     })
 
-    expect(markup).toContain('disabled')
+    // `disabled=""` 로 본다. `disabled` 만 보면 Button 의 `disabled:opacity-50` 클래스에
+    // 걸려 **항상 통과한다** — 전역 잠금이 풀려도 CI 가 녹색이었다
+    expect(markup).toContain('disabled=""')
   })
 
   it('좌표가 없어도 담기 버튼은 붙는다 — 좌표는 담는 것과 무관하다', () => {
