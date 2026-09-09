@@ -103,6 +103,7 @@
   --shadow-lg: 0 12px 32px rgb(21 24 29 / 12%);
 
   /* ── 레이아웃 — DESIGN.md §7 */
+  --content-max: 1440px;
   --header-h: 56px;
   --header-h-search: 64px;
   --tabbar-h: 64px;
@@ -125,11 +126,5 @@
 @media (width >= 48rem) {
   :root {
     --header-h: 64px;
-  }
-}
-
-@media (width >= 99rem) {
-  :root {
-    --rail-context: 480px;
   }
 }
