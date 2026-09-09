@@ -483,6 +483,13 @@ Swagger 설명에 "나란히 보여 달라"를 못박아 뒀다. 문구도 "노�
 한쪽만 고쳐져 같은 날씨를 화면마다 다르게 판정하게 된다. 권역 비교는 "밖에 나가기"를
 전제하므로 실내 대피처 없음 / 바람 그대로 맞음으로 넣는다.
 
+권역 항목의 수치는 최저·최고기온에 더해 **하루 최고 체감온도**(`maxFeelsLikeTemperature`)를
+싣는다. 값은 장소 상세의 `weather.maxFeelsLikeTemperature` 와 같은 규칙 —
+`DailyWeather.maxFeelsLikeTemperature()`(기상청 여름철 체감온도의 시각별 최대) — 이다.
+홈 카드와 장소 상세가 같은 척도의 숫자를 말해야 사용자가 두 화면을 오가며 비교할 수 있다.
+예보를 못 받은 권역은 세 값 모두 null 이다 — 0 이나 최고기온으로 지어내지 않는다
+(`RegionalWeatherPresenterTest`).
+
 ## 8. 산책 골든타임 — saferWindow 와 무엇이 다른가
 
 둘 다 "언제가 나은가"를 다루지만 고르는 기준이 반대다.
