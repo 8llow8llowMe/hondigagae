@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { EmergencyFilterBar, RADIUS_OPTIONS } from '@/features/emergency/emergency-filter-bar'
+import { EmergencyFilterBar } from '@/features/emergency/emergency-filter-bar'
 import { MAX_RADIUS_METERS } from '@/lib/api/emergency'
 import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
@@ -76,9 +76,5 @@ describe('EmergencyFilterBar', () => {
     const markup = render({ radius: MAX_RADIUS_METERS })
 
     expect(markup).not.toContain(messages.place.resetFilters)
-  })
-
-  it('반경 선택지는 넓히기 사다리와 상한을 따른다', () => {
-    expect(RADIUS_OPTIONS).toEqual([10_000, 20_000, 40_000, MAX_RADIUS_METERS])
   })
 })

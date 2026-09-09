@@ -2,23 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { useEmergencyNav } from '@/features/emergency/use-emergency-nav'
 import { useNearbyFacilities } from '@/features/emergency/use-nearby-facilities'
-import { DEFAULT_RADIUS_METERS, MAX_RADIUS_METERS } from '@/lib/api/emergency'
+import { MAX_RADIUS_METERS } from '@/lib/api/emergency'
 import {
   getCurrentPosition,
   type PositionFailure,
   type PositionResult,
 } from '@/lib/geo/current-position'
-import { DEFAULT_FACILITY_FILTERS, type FacilityFilters } from '@/types/emergency'
-
-/** 넓히기 한 번에 두 배. 10km → 20km → 40km → 50km(상한) */
-export function widen(radius: number): number {
-  return Math.min(MAX_RADIUS_METERS, radius * 2)
-}
 
 /**
  * 이 화면의 상태 묶음. **화면당 하나만 만든다** — 두 벌이 마운트되면
- * `getCurrentPosition()` 이 두 번 나가고 반경·필터가 갈린다. 보드를 만들지 않고
+ * `getCurrentPosition()` 이 두 번 나가고 좌표가 갈린다. 보드를 만들지 않고
  * **받아서** 쓰는 컴포넌트는 이 타입을 prop 으로 받는다.
  */
 export type EmergencyBoard = ReturnType<typeof useEmergencyBoard>
@@ -29,6 +24,13 @@ export type EmergencyBoard = ReturnType<typeof useEmergencyBoard>
  * **두 갈래(목록 · 지도)가 같은 모델을 쓴다.** 각자 갖고 있으면 보기를 전환할 때
  * 조건이 풀리고, 위치 권한 프롬프트가 화면마다 다른 순간에 뜬다.
  *
+ * **반경과 필터는 URL 이 소유한다** (`useEmergencyNav` · architecture-guide.md §10).
+ * 이 화면은 급할 때 링크로 건네는 화면이라 "24시간 · 40km" 를 좁혀 놓고 보낸 링크가
+ * 받는 사람에게 기본 화면으로 열리면 안 된다. 새로고침·뒤로가기도 같은 이유다.
+ *
+ * **좌표는 URL 에 없다.** 공유 대상이 아니고(받는 사람의 기준점은 자기 위치다) URL 에
+ * 실을 값도 아니다.
+ *
  * **좌표를 먼저 구하고 그다음 조회한다.** `lat`/`lng` 가 필수라 순서가 뒤집히면 400 이다.
  * 좌표 요청은 **실패해도 좌표를 돌려준다**(제주 중심) — 이 화면은 급할 때 여는 화면이라
  * 위치 하나 때문에 비어 버리면 안 된다.
@@ -38,8 +40,7 @@ export type EmergencyBoard = ReturnType<typeof useEmergencyBoard>
  */
 export function useEmergencyBoard() {
   const [position, setPosition] = useState<PositionResult | null>(null)
-  const [radius, setRadius] = useState(DEFAULT_RADIUS_METERS)
-  const [filters, setFilters] = useState<FacilityFilters>(DEFAULT_FACILITY_FILTERS)
+  const { filters, radius, setFilters, setRadius, widenRadius } = useEmergencyNav()
 
   /*
     **누를 때마다 다시 묻는다.** 마운트 때 받은 좌표를 재사용하면 사용자가 이동한 뒤
@@ -87,7 +88,7 @@ export function useEmergencyBoard() {
     inJeju: position !== null && position.kind === 'granted',
     radius,
     setRadius,
-    widenRadius: () => setRadius(widen),
+    widenRadius,
     canWiden: radius < MAX_RADIUS_METERS,
     filters,
     setFilters,

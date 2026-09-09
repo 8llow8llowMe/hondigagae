@@ -8,9 +8,9 @@ import { Chip, ChipGroup } from '@/components/chip'
 import { ChevronDownIcon } from '@/components/icons'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { facilityCounts, labelWithCount } from '@/features/emergency/facility-filters'
-import { MAX_RADIUS_METERS } from '@/lib/api/emergency'
 import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
+import { RADIUS_OPTIONS } from '@/lib/url/emergency-filters'
 import { cn } from '@/lib/utils/cn'
 import {
   DEFAULT_FACILITY_FILTERS,
@@ -18,15 +18,6 @@ import {
   type FacilityFilters,
   type NearbyFacilityItem,
 } from '@/types/emergency'
-
-/**
- * 반경 선택지.
- *
- * **`widen()` 의 ×2 사다리와 상한을 그대로 따른다** (`emergency-view` 시절의 10 → 20 →
- * 40 → 50). 두 경로가 다른 값을 쓰면 0건 화면의 "반경 넓히기" 를 누른 뒤 칩이 목록에
- * 없는 값을 가리킨다.
- */
-export const RADIUS_OPTIONS = [10_000, 20_000, 40_000, MAX_RADIUS_METERS] as const
 
 /**
  * 지도 보기의 필터 줄 — 패널 머리와 시트 툴바가 같은 것을 쓴다.
@@ -72,6 +63,9 @@ export function EmergencyFilterBar({
   /*
     **반경은 `dirty` 에 넣지 않는다.** 필터가 아니라 조회 파라미터다 — "초기화" 가
     반경까지 되돌리면 넓혀 찾던 사용자가 조건 하나를 끄려다 결과를 통째로 잃는다.
+
+    반경도 URL 에 실리지만(`?radius=40000`) 그 구분은 그대로다 — `EmergencyBoardParams`
+    가 반경을 `filters` 밖에 두는 이유가 이것이다 (`lib/url/emergency-filters.ts`).
   */
   const dirty =
     filters.type !== DEFAULT_FACILITY_FILTERS.type ||
