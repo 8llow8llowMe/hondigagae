@@ -30,6 +30,7 @@ class AiPlanPromptFactoryTest {
             .ageText("11년 2개월")
             .heatSensitive(true)
             .walkPreferred(true)
+            .lowSociality(true)
             .build())));
 
         assertThat(prompt).contains("함께 여행하는 반려견");
@@ -39,6 +40,8 @@ class AiPlanPromptFactoryTest {
         assertThat(prompt).contains("나이: 11년 2개월");
         assertThat(prompt).contains("더위에 민감함");
         assertThat(prompt).contains("산책을 좋아함");
+        // 필수 입력인 사회성을 받아 놓고 버리면 안 된다 (#380). 낮음일 때만 제약으로 싣는다
+        assertThat(prompt).contains("사회성이 낮음");
         // 켜지 않은 특성은 지어 적지 않는다
         assertThat(prompt).doesNotContain("추위에 민감함");
         // 한 마리일 때는 다중 판정 규칙이 붙지 않는다
@@ -53,6 +56,8 @@ class AiPlanPromptFactoryTest {
             .build())));
 
         assertThat(prompt).doesNotContain("나이:");
+        // 사회성 보통/높음은 제약이 아니다 - 줄을 만들지 않는다
+        assertThat(prompt).doesNotContain("사회성이 낮음");
     }
 
     @Test

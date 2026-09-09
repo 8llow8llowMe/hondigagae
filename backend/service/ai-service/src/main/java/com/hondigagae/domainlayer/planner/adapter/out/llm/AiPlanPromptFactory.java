@@ -345,6 +345,9 @@ public class AiPlanPromptFactory {
         if (pet.noiseSensitive()) {
             prompt.append("- 소음에 민감함: 붐비는 장소를 연달아 배치하지 말 것\n");
         }
+        if (pet.lowSociality()) {
+            prompt.append("- 사회성이 낮음: 다른 반려견이나 사람이 몰리는 장소를 피하고 한적한 곳 위주로 짤 것\n");
+        }
         if (pet.walkPreferred()) {
             prompt.append("- 산책을 좋아함: 하루에 한 번은 걷는 일정을 넣을 것\n");
         }

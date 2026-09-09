@@ -8,6 +8,7 @@ import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.port.out.PetConditionQueryPort;
 import com.hondigagae.shared.travel.pet.ActivityLevel;
 import com.hondigagae.shared.travel.pet.PetSizeType;
+import com.hondigagae.shared.travel.pet.SocialityLevel;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -80,6 +81,7 @@ public class PetConditionClientAdapter implements PetConditionQueryPort {
             .noiseSensitive(body.noiseSensitive())
             .activityName(activityName(body.activityLevel()))
             .walkPreferred(body.walkPreferred())
+            .lowSociality(SocialityLevel.LOW.name().equals(body.sociality()))
             .build();
     }
 

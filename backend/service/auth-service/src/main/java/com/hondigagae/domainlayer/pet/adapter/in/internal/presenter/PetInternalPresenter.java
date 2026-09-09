@@ -25,6 +25,7 @@ public class PetInternalPresenter {
             .noiseSensitive(petInfo.noiseSensitive())
             .activityLevel(petInfo.activityLevel())
             .walkPreferred(petInfo.walkPreferred())
+            .sociality(petInfo.sociality())
             .build();
     }
 }
