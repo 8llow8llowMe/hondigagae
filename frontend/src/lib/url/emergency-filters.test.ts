@@ -1,0 +1,153 @@
+import { describe, expect, it } from 'vitest'
+
+import { DEFAULT_RADIUS_METERS, MAX_RADIUS_METERS } from '@/lib/api/emergency'
+import {
+  DEFAULT_EMERGENCY_BOARD_PARAMS,
+  type EmergencyBoardParams,
+  parseEmergencyBoardParams,
+  RADIUS_OPTIONS,
+  toEmergencyBoardQuery,
+  widen,
+} from '@/lib/url/emergency-filters'
+import { DEFAULT_FACILITY_FILTERS } from '@/types/emergency'
+
+describe('parseEmergencyBoardParams', () => {
+  it('빈 URL 에서 기본값을 만든다', () => {
+    expect(parseEmergencyBoardParams(new URLSearchParams())).toEqual(DEFAULT_EMERGENCY_BOARD_PARAMS)
+  })
+
+  it('허용된 시설 유형을 읽는다', () => {
+    const params = new URLSearchParams('type=ANIMAL_PHARMACY')
+
+    expect(parseEmergencyBoardParams(params).filters.type).toBe('ANIMAL_PHARMACY')
+  })
+
+  it('없는 시설 유형은 예외 없이 전체(null)로 떨어뜨린다 (URL 은 사용자가 고칠 수 있다)', () => {
+    expect(parseEmergencyBoardParams(new URLSearchParams('type=CLINIC')).filters.type).toBeNull()
+  })
+
+  it('boolean 은 `true` 만 인정한다 — `1` 은 켜지지 않는다', () => {
+    const params = new URLSearchParams('open24Only=true&openNowOnly=1')
+
+    expect(parseEmergencyBoardParams(params).filters).toMatchObject({
+      open24Only: true,
+      openNowOnly: false,
+    })
+  })
+
+  it('RADIUS_OPTIONS 에 있는 반경을 읽는다', () => {
+    expect(parseEmergencyBoardParams(new URLSearchParams('radius=40000')).radius).toBe(40_000)
+  })
+
+  /*
+    화이트리스트인 이유: 시트가 `draft === option` 으로 고르므로 목록에 없는 값이 들어오면
+    칩은 "33.3km" 인데 시트에는 선택된 항목이 없는 화면이 된다.
+  */
+  it('RADIUS_OPTIONS 에 없는 반경은 기본값으로 떨어뜨린다', () => {
+    expect(parseEmergencyBoardParams(new URLSearchParams('radius=33333')).radius).toBe(
+      DEFAULT_RADIUS_METERS,
+    )
+    expect(parseEmergencyBoardParams(new URLSearchParams('radius=abc')).radius).toBe(
+      DEFAULT_RADIUS_METERS,
+    )
+    expect(parseEmergencyBoardParams(new URLSearchParams('radius=')).radius).toBe(
+      DEFAULT_RADIUS_METERS,
+    )
+  })
+
+  it('server component 의 searchParams 객체 형태도 읽는다', () => {
+    expect(parseEmergencyBoardParams({ type: 'ANIMAL_HOSPITAL' }).filters.type).toBe(
+      'ANIMAL_HOSPITAL',
+    )
+  })
+
+  it('배열로 들어온 값은 첫 항목만 쓴다', () => {
+    expect(
+      parseEmergencyBoardParams({ type: ['ANIMAL_PHARMACY', 'ANIMAL_HOSPITAL'] }).filters.type,
+    ).toBe('ANIMAL_PHARMACY')
+  })
+
+  /** `view` 는 `lib/url/view-mode.ts` 소유다. 이 파서가 읽지도 내보내지도 않는다 */
+  it('섞여 있는 `view` 키를 무시한다', () => {
+    const params = new URLSearchParams('view=map&open24Only=true')
+
+    expect(parseEmergencyBoardParams(params)).toEqual({
+      filters: { ...DEFAULT_FACILITY_FILTERS, open24Only: true },
+      radius: DEFAULT_RADIUS_METERS,
+    })
+  })
+})
+
+describe('toEmergencyBoardQuery', () => {
+  it('기본값은 통째로 생략한다 — 빈 URL = 기본 상태', () => {
+    expect(toEmergencyBoardQuery(DEFAULT_EMERGENCY_BOARD_PARAMS)).toBe('')
+  })
+
+  it('boolean 은 켜졌을 때만 키를 넣는다', () => {
+    const query = toEmergencyBoardQuery({
+      filters: { type: null, open24Only: true, openNowOnly: false },
+      radius: DEFAULT_RADIUS_METERS,
+    })
+
+    expect(query).toBe('open24Only=true')
+  })
+
+  it('기본 반경은 생략하고 넓힌 반경만 싣는다', () => {
+    expect(
+      toEmergencyBoardQuery({ filters: DEFAULT_FACILITY_FILTERS, radius: DEFAULT_RADIUS_METERS }),
+    ).toBe('')
+    expect(toEmergencyBoardQuery({ filters: DEFAULT_FACILITY_FILTERS, radius: 40_000 })).toBe(
+      'radius=40000',
+    )
+  })
+
+  it('`view` 를 내보내지 않는다', () => {
+    expect(
+      toEmergencyBoardQuery({ filters: DEFAULT_FACILITY_FILTERS, radius: 20_000 }),
+    ).not.toContain('view')
+  })
+})
+
+/*
+  기본값 생략 규칙 때문에 이 테스트가 실제로 버그를 잡는다 (architecture-guide.md §10).
+*/
+describe('왕복', () => {
+  const cases: EmergencyBoardParams[] = [
+    DEFAULT_EMERGENCY_BOARD_PARAMS,
+    { filters: { type: 'ANIMAL_HOSPITAL', open24Only: false, openNowOnly: false }, radius: 10_000 },
+    { filters: { type: null, open24Only: true, openNowOnly: true }, radius: 40_000 },
+    {
+      filters: { type: 'ANIMAL_PHARMACY', open24Only: true, openNowOnly: false },
+      radius: MAX_RADIUS_METERS,
+    },
+  ]
+
+  it.each(cases)('parse(toQuery(p)) === p — %j', (params) => {
+    expect(parseEmergencyBoardParams(new URLSearchParams(toEmergencyBoardQuery(params)))).toEqual(
+      params,
+    )
+  })
+})
+
+describe('widen', () => {
+  it('한 번에 두 배로 넓힌다', () => {
+    expect(widen(10_000)).toBe(20_000)
+    expect(widen(20_000)).toBe(40_000)
+  })
+
+  it('상한에서 멈춘다 — 40km 다음은 80km 가 아니라 50km 다', () => {
+    expect(widen(40_000)).toBe(MAX_RADIUS_METERS)
+    expect(widen(MAX_RADIUS_METERS)).toBe(MAX_RADIUS_METERS)
+  })
+
+  it('선택지는 사다리와 상한을 따른다', () => {
+    expect(RADIUS_OPTIONS).toEqual([10_000, 20_000, 40_000, MAX_RADIUS_METERS])
+  })
+
+  /** 사다리가 시트 선택지 밖으로 나가면 칩이 목록에 없는 값을 가리킨다 */
+  it('사다리가 RADIUS_OPTIONS 안에서만 움직인다', () => {
+    for (const option of RADIUS_OPTIONS) {
+      expect(RADIUS_OPTIONS).toContain(widen(option))
+    }
+  })
+})
