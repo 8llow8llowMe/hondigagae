@@ -2,6 +2,7 @@ import { aiPlanMessages } from '@/lib/messages/ai-plan'
 import { commonMessages } from '@/lib/messages/common'
 import { emergencyMessages } from '@/lib/messages/emergency'
 import { favoriteMessages } from '@/lib/messages/favorite'
+import { footerMessages } from '@/lib/messages/footer'
 import { authMessages, formMessages } from '@/lib/messages/form'
 import { homeMessages } from '@/lib/messages/home'
 import { mapMessages } from '@/lib/messages/map'
@@ -39,6 +40,7 @@ export const messages = {
   aiPlan: aiPlanMessages,
   emergency: emergencyMessages,
   favorite: favoriteMessages,
+  footer: footerMessages,
   map: mapMessages,
   pet: petMessages,
   member: memberMessages,
