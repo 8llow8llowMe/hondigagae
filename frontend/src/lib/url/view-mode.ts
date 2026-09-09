@@ -22,16 +22,22 @@ export type ViewMode = (typeof VIEW_MODES)[number]
 export const DEFAULT_VIEW_MODE: ViewMode = 'list'
 
 /**
- * 장소 찾기(`/places`)의 기본 보기는 **지도**다.
+ * 장소 찾기(`/places`)와 긴급 시설(`/emergency`)의 기본 보기는 **지도**다.
  *
- * 이 화면에 오는 이유가 "제주 어디에 무엇이 있나" 이고, 그 질문에 먼저 답하는 것은
+ * 두 화면에 오는 이유가 "제주 어디에 무엇이 있나" 이고, 그 질문에 먼저 답하는 것은
  * 목록이 아니라 지도다. 목록으로 열면 사용자가 매번 전환을 한 번 더 눌러야 했다.
  *
- * **긴급 시설(`/emergency`)은 그대로 목록이 먼저다.** 급할 때 필요한 것은 위치가 아니라
- * 전화번호이고, 지도 SDK 가 뜨기를 기다릴 여유가 없다. 그래서 기본값을 상수 하나로
- * 통일하지 않고 화면별로 둔다.
+ * **긴급 시설도 지도가 됐다** (#353). 예전에는 *"급할 때 필요한 것은 위치가 아니라
+ * 전화번호이고, 지도 SDK 를 기다릴 여유가 없다"* 를 근거로 이 화면만 목록이었다.
+ * 그 근거는 두 장치로 지킨다:
+ *  - 모바일 시트가 **중간 단계로 열려** 첫 화면에 행과 52px 전화 버튼이 이미 보인다
+ *  - SDK 가 실패하면 **목록 갈래로 되돌린다** (`EmergencyMapView` 의 `failure` 분기)
+ *
+ * 두 상수를 하나로 합치지 않는다 — 화면이 자기 기본값을 갖는다는 규약이 남아 있어야
+ * 다음 지도 화면이 다른 값을 고를 수 있다.
  */
 export const PLACES_DEFAULT_VIEW: ViewMode = 'map'
+export const EMERGENCY_DEFAULT_VIEW: ViewMode = 'map'
 
 const VIEW_KEY = 'view'
 

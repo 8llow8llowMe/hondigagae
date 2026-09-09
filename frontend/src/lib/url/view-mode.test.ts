@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { parseViewMode, PLACES_DEFAULT_VIEW, viewModeHref } from '@/lib/url/view-mode'
+import {
+  EMERGENCY_DEFAULT_VIEW,
+  parseViewMode,
+  PLACES_DEFAULT_VIEW,
+  viewModeHref,
+} from '@/lib/url/view-mode'
 
 describe('parseViewMode', () => {
   it('키가 없으면 목록이다 — 지도가 첫 화면이 아니다', () => {
@@ -93,5 +98,26 @@ describe('화면별 기본 보기 — 장소 찾기는 지도가 먼저다', () 
   it('긴급 시설은 그대로 목록이 기본이다 — 기본값을 통일하지 않는다', () => {
     expect(parseViewMode({})).toBe('list')
     expect(viewModeHref('/emergency', '', 'list')).toBe('/emergency')
+  })
+})
+
+describe('EMERGENCY_DEFAULT_VIEW', () => {
+  it('긴급 시설의 기본 보기는 지도다', () => {
+    expect(EMERGENCY_DEFAULT_VIEW).toBe('map')
+  })
+
+  it('빈 쿼리는 지도로 떨어진다', () => {
+    expect(parseViewMode({}, EMERGENCY_DEFAULT_VIEW)).toBe('map')
+  })
+
+  it('기본값인 지도는 URL 에서 생략되고 목록이 붙는다', () => {
+    expect(viewModeHref('/emergency', '', 'map', EMERGENCY_DEFAULT_VIEW)).toBe('/emergency')
+    expect(viewModeHref('/emergency', '', 'list', EMERGENCY_DEFAULT_VIEW)).toBe(
+      '/emergency?view=list',
+    )
+  })
+
+  it('장소 찾기와 같은 값이다 — 두 지도 화면의 URL 모양이 같아야 한다', () => {
+    expect(EMERGENCY_DEFAULT_VIEW).toBe(PLACES_DEFAULT_VIEW)
   })
 })

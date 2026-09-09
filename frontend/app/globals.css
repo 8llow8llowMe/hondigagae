@@ -530,15 +530,3 @@ body {
 .map-panel-width {
   width: 400px;
 }
-
-/* 긴급 시설 지도 — 목록과 나란히 서는 높이.
-   모바일 토글에서는 화면을 채우고, 1024+ 2단에서는 목록 옆에서 고정 높이를 갖는다. */
-.emergency-map-height {
-  height: calc(100dvh - var(--header-h) - var(--tabbar-h));
-}
-
-@media (width >= 64rem) {
-  .emergency-map-height {
-    height: calc(100dvh - var(--header-h) - 3rem);
-  }
-}
