@@ -90,20 +90,27 @@ export function RegionalWeatherSection({
           1024~1280 에서 다섯 칸이 쪼그라든다 — 값 묶음이 136px 를 요구하는데 칸이 그보다
           좁아지면 안에서 다시 접힌다.
 
-          **폭은 `lg:w-38`(152px) 고정이다** (#395). 예전에는 `lg:min-w-38 lg:flex-1` 이라
+          **폭은 `lg:w-44`(176px) 고정이다.** 예전에는 `lg:min-w-38 lg:flex-1` 이라
           **폭에 따라 152~191 사이를 오갔고**, 1170 같은 중간 폭에서 바닥값으로 내려앉은 채
-          마지막 칸이 65px 만 보이며 잘렸다. 폭이 뷰포트마다 달라지면 같은 칸이 화면마다
-          다른 물건처럼 보이고, 잘린 칸은 "더 있다" 가 아니라 "깨졌다" 로 읽힌다.
+          마지막 칸이 65px 만 보이며 잘렸다 (#395). 폭이 뷰포트마다 달라지면 같은 칸이
+          화면마다 다른 물건처럼 보이고, 잘린 칸은 "더 있다" 가 아니라 "깨졌다" 로 읽힌다.
 
-          **고정의 대가는 넓은 화면의 빈 자리다.** 1920 에서 우측 열이 남아도 칸은 152 에
-          머문다 — 받아들인 값이다 (#395). 대신 어느 폭에서든 칸 모양이 같다.
+          **152 였던 값을 176 으로 올렸다** (#412). 152 의 산식이 틀려 있었다 — "값 묶음
+          136 + 칸 인셋 12 = 148 에 4px 여유" 라고 적었는데, **인셋은 첫 칸에만 없다.**
+          둘째 칸부터는 `lg:pl-3`(12) + `lg:border-l`(1) 이 매번 들어가 값 자리가
+          **78.6 → 65.6px** 로 줄었다. 가장 넓은 줄 `최고 31.0℃` 가 62.9px 이라 남는 것이
+          **2.7px** 이었고, 폰트 렌더링이 조금만 달라지면 `최고` 와 `27.0℃` 사이에서 줄이
+          접혀 칸 높이가 배로 뛰었다. 첫 칸만 멀쩡해 보여 더 늦게 드러났다.
 
-          **152 는 #342 가 계산한 값 그대로다.** 값 묶음 136px + 칸 인셋 12px = 148 에 4px
-          여유이고, `152×5 + gap 16 = 776` 이라 1280(가용 799)은 넘김 없이 들어가고
-          1024(가용 543)만 넘긴다 → 가로 스크롤 + 스냅 + 화살표.
+          **176 의 산식**: 인셋 13 + 아이콘 24 + gap 8 + 숫자 자리 88 + gap 8 + 배지 33.4
+          = 174.4. 숫자 자리를 `lg:w-22`(88px)로 **고정**해 62.9px 짜리 줄에 25px 여유를
+          둔다 — 이 여유가 폰트가 달라져도 접히지 않게 하는 몫이다.
 
-          **160 이 아니라 152 인 이유**: 1280 의 우측 열 가용폭이 799px 이라 160×5 + gap 16
-          = 816 이 17px 모자랐다. 그 17px 때문에 1280 에서까지 화살표가 남는다.
+          **대가는 1280 에서도 남는 화살표다.** `176×5 + gap 4×4 = 896` 이라 1280 의 우측
+          열 가용폭 793 을 넘긴다 — #395 는 이것을 피하려고 152 를 골랐지만, 그 선택이
+          지키려던 "한 줄" 자체가 깨지고 있었다. **접히는 칸보다 화살표가 낫다.**
+          1280 을 화살표 없이 채우려면 칸이 155px 이하여야 하는데(`(793−16)/5`), 그 폭으로는
+          접힘을 못 막는다 — 두 조건은 동시에 만족할 수 없다.
 
           한 컬럼(~1023)에서는 세로 목록이라 넘칠 폭이 없다 — `fade` 가 `none` 이고
           `ScrollRailArrows` 도 스스로 그리지 않는다.
@@ -268,7 +275,7 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
       한 컬럼은 가로 행(이름 ↔ 값), 2단은 세로 칸(이름 위, 값 아래)이다. 2단에서 아래
       테두리를 걷고 왼쪽 테두리로 갈아 끼운다 — 첫 칸에는 선을 두지 않는다.
     */
-    <li className="border-border/60 flex items-center justify-between gap-3 border-b py-2 last:border-b-0 lg:w-38 lg:shrink-0 lg:snap-start lg:flex-col lg:items-start lg:gap-1 lg:border-b-0 lg:border-l lg:py-0 lg:pl-3 lg:first:border-l-0 lg:first:pl-0 lg:last:snap-end">
+    <li className="border-border/60 flex items-center justify-between gap-3 border-b py-2 last:border-b-0 lg:w-44 lg:shrink-0 lg:snap-start lg:flex-col lg:items-start lg:gap-1 lg:border-b-0 lg:border-l lg:py-0 lg:pl-3 lg:first:border-l-0 lg:first:pl-0 lg:last:snap-end">
       <span className="text-body-2 min-w-0 font-semibold">{item.region.name}</span>
 
       {/*
@@ -282,12 +289,14 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
         한 컬럼(~1023)에서는 행 높이가 39 → 약 48px 로 늘지만, 섹션 하단의 보조 문구 줄이
         함께 빠져(#342) 섹션 전체로는 거의 같다.
 
-        **숫자 줄이 둘에서 셋으로 늘었다** (#352, 최저기온). #342 가 "숫자 줄이 늘면 칸
-        폭·높이를 다시 재라" 고 남겨 둔 자리라 1024 에서 실측했다 — **폭은 그대로다.**
-        가장 넓은 줄이 `최고 31.0℃`(63px)이고 `최저 24.0℃` 도 같은 63px 이라 늘어난 것은
-        높이뿐이다 (칸의 숫자 자리는 `152 − 아이콘 24 − 배지 33 − gap 16 = 79px`).
+        **숫자 줄이 둘에서 셋으로 늘었다** (#352, 최저기온). 가장 넓은 줄은
+        `최고 31.0℃`(62.9px)이고 `최저 24.0℃` 도 같은 폭이라 늘어난 것은 높이뿐이다.
+
+        **그때 잰 `79px` 는 첫 칸 값이었다** (#412). 나머지 네 칸은 인셋 13px 이 더 빠져
+        65.6px 이고, 62.9px 짜리 줄에 2.7px 만 남아 있었다. 지금은 숫자 자리를
+        `lg:w-22`(88px)로 고정해 어느 칸에서도 같은 폭이다.
       */}
-      <span className="text-caption text-fg-muted flex shrink-0 items-center gap-2 font-medium tabular-nums lg:w-full lg:shrink lg:justify-between">
+      <span className="text-caption text-fg-muted flex shrink-0 items-center gap-2 font-medium tabular-nums lg:w-full lg:shrink">
         {/*
           **다섯 줄을 훑을 때 낱말보다 픽토그램이 빠르다** (#314). `skyState` · `precipitationType`
           이 이미 응답에 오는데 화면이 둘 다 버리고 있었다 — BE 작업 없이 붙일 수 있었다.
@@ -310,9 +319,21 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
           그래서 배지는 `justify-between` 에 기대지 않고 `lg:ml-auto` 로 밀어 붙인다 —
           자식이 배지 하나뿐인 칸(`한라산권`)에서 `justify-between` 은 그것을 **왼쪽**에
           두고, 다섯 칸의 배지가 열을 이루지 못한다 (1280 실측: 넷은 우측 끝, 하나는 85px 앞).
+
+          **그래서 `lg:justify-between` 을 걷었다** (#412). `ml-auto` 가 남는 공간을 전부
+          먹어 버리므로 `justify-between` 은 애초에 발동할 자리가 없다 — 실측으로 확인했다
+          (빼도 다섯 칸의 배지 우측 끝이 617·797·977·1157·1337 로 한 픽셀도 안 움직인다).
+          같은 일을 두 규칙이 하면 나중에 어느 쪽을 고쳐야 하는지 알 수 없다.
+
+          **`ml-auto` 는 반대로 필수다.** 함께 걷으면 `한라산권` 배지가 1337 → 1236 으로
+          100px 어긋난다. 이 칸만 아이콘도 숫자도 없어 배지가 곧 첫 자식이기 때문이다.
+
+          **남는 공간을 줄이는 쪽으로 고쳤다.** 칸이 176 이 되면서 `ml-auto` 가 먹는 틈이
+          34.7px 까지 벌어져 배지가 숫자에서 떨어져 보였다 — 숫자 자리를 88px 로 고정해
+          9.6px 로 되돌렸다 (152 시절의 10.7px 과 같은 밀도다).
         */}
         {hasNumbers && (
-          <span className="flex flex-col items-start">
+          <span className="flex flex-col items-start lg:w-22">
             {maxTemperature !== null && (
               <span>
                 {messages.home.regionTempPrefix} {maxTemperature}℃
