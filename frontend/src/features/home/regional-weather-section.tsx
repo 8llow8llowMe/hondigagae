@@ -102,15 +102,24 @@ export function RegionalWeatherSection({
           **2.7px** 이었고, 폰트 렌더링이 조금만 달라지면 `최고` 와 `27.0℃` 사이에서 줄이
           접혀 칸 높이가 배로 뛰었다. 첫 칸만 멀쩡해 보여 더 늦게 드러났다.
 
-          **176 의 산식**: 인셋 13 + 아이콘 24 + gap 8 + 숫자 자리 88 + gap 8 + 배지 33.4
-          = 174.4. 숫자 자리를 `lg:w-22`(88px)로 **고정**해 62.9px 짜리 줄에 25px 여유를
+          **184 의 산식**: 인셋 13 + 아이콘 24 + gap 8 + 숫자 자리 88 + gap 8 + 배지 41.4
+          = 182.4. 숫자 자리를 `lg:w-22`(88px)로 **고정**해 62.9px 짜리 줄에 25px 여유를
           둔다 — 이 여유가 폰트가 달라져도 접히지 않게 하는 몫이다.
 
-          **대가는 1280 에서도 남는 화살표다.** `176×5 + gap 4×4 = 896` 이라 1280 의 우측
-          열 가용폭 793 을 넘긴다 — #395 는 이것을 피하려고 152 를 골랐지만, 그 선택이
-          지키려던 "한 줄" 자체가 깨지고 있었다. **접히는 칸보다 화살표가 낫다.**
-          1280 을 화살표 없이 채우려면 칸이 155px 이하여야 하는데(`(793−16)/5`), 그 폭으로는
-          접힘을 못 막는다 — 두 조건은 동시에 만족할 수 없다.
+          **배지가 41.4 인 것은 `size="score"`(px-3) 때문이다.** 숫자만 담는 배지라
+          낱말용 8px 에서는 조여 보였다 (`components/metric.tsx`). 배지를 더 키우면
+          **숫자 자리가 눌린다** — `lg:w-22` 는 하한이 아니라 상한이라, 남는 폭이 모자라면
+          조용히 줄어든다. 그래서 이 둘은 함께 움직여야 하고 테스트가 그 관계를 잡는다.
+
+          **상한은 187.4 다.** 1440 의 우측 열 가용폭이 953 이라 `(953−16)/5 = 187.4` 를
+          넘기면 **1440 에서도 화살표가 남는다.** 184 는 936 이라 들어간다 (실측).
+          배지를 `px-4`(49.4)로 키우면 필요 폭이 190.4 가 되어 이 상한을 넘는다.
+
+          **1280 에서는 화살표가 남는다.** `184×5 + gap 4×4 = 936` 이 1280 의 가용폭 793 을
+          넘긴다 — #395 는 이것을 피하려고 152 를 골랐지만, 그 선택이 지키려던 "한 줄"
+          자체가 깨지고 있었다. **접히는 칸보다 화살표가 낫다.** 1280 을 화살표 없이
+          채우려면 칸이 155px 이하여야 하는데(`(793−16)/5`), 그 폭으로는 접힘을 못 막는다 —
+          두 조건은 동시에 만족할 수 없다.
 
           한 컬럼(~1023)에서는 세로 목록이라 넘칠 폭이 없다 — `fade` 가 `none` 이고
           `ScrollRailArrows` 도 스스로 그리지 않는다.
@@ -275,7 +284,7 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
       한 컬럼은 가로 행(이름 ↔ 값), 2단은 세로 칸(이름 위, 값 아래)이다. 2단에서 아래
       테두리를 걷고 왼쪽 테두리로 갈아 끼운다 — 첫 칸에는 선을 두지 않는다.
     */
-    <li className="border-border/60 flex items-center justify-between gap-3 border-b py-2 last:border-b-0 lg:w-44 lg:shrink-0 lg:snap-start lg:flex-col lg:items-start lg:gap-1 lg:border-b-0 lg:border-l lg:py-0 lg:pl-3 lg:first:border-l-0 lg:first:pl-0 lg:last:snap-end">
+    <li className="border-border/60 flex items-center justify-between gap-3 border-b py-2 last:border-b-0 lg:w-46 lg:shrink-0 lg:snap-start lg:flex-col lg:items-start lg:gap-1 lg:border-b-0 lg:border-l lg:py-0 lg:pl-3 lg:first:border-l-0 lg:first:pl-0 lg:last:snap-end">
       <span className="text-body-2 min-w-0 font-semibold">{item.region.name}</span>
 
       {/*
@@ -359,6 +368,7 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
 
         {known ? (
           <MetricBadge
+            size="score"
             tone={suitabilityTone(levelOf(item.weatherScore as number))}
             className="lg:ml-auto"
           >
