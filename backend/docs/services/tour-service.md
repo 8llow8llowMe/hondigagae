@@ -63,6 +63,9 @@
   ai-service 의 필수 포함 장소를 프롬프트 후보에 합칠 때 쓴다. enum 은 표시명으로 변환해 준다
 - `GET /internal/v1/weather/daily?areaCode=` — (내부 전용) 제주 대표 지점의 일자별 예보(단기+중기, 약 11일).
   ai-service 가 일정 생성·준비물 프롬프트에 싣는다. 기존 격자 캐시를 타 KMA 호출이 늘지 않고, 제주(39) 외 코드는 빈 목록
+- `GET /internal/v1/weather/warnings` — (내부 전용) 제주에 발효 중인 특보 중 **가장 무거운 한 건**. 없으면 `dataBody` 가 null 인 200.
+  plan-service 여행 브리핑이 당일 일정에 붙인다. 고르는 규칙은 웹 응답 4곳과 같고(`WeatherWarning.heaviest`), 경보 판정
+  `recommendationSuppressed` 를 함께 내려 소비 측이 단계 문자열로 다시 판정하지 않게 한다 (#357)
 
 ## 데이터 흐름
 
