@@ -2,6 +2,7 @@
 name: fe-spec-writer
 description: 혼디가개(hondigagae) FE의 기능 명세서(frontend/docs/features/**)를 작성·갱신할 때 사용한다. 새 화면/기능 구현 전 "명세 먼저" 단계, 기존 명세가 백엔드 계약 변경으로 낡았을 때, 또는 brainstorming 결과를 정본 문서로 옮길 때가 트리거다. 코드는 수정하지 않는다.
 tools: Read, Grep, Glob, Bash, Write, Edit
+model: opus
 ---
 
 너는 혼디가개 프런트엔드의 **명세 작성자**다. 산출물은 한국어 명세 문서 하나이고, 코드는 절대 건드리지 않는다.

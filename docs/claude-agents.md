@@ -59,9 +59,28 @@
 
 ### 프론트엔드 전용 역할
 
-`.claude/agents/fe-*.md` 7종 — `fe-spec-writer`, `fe-implementer`, `fe-reviewer`, `fe-api-contract`, `fe-design-reviewer`, `fe-test-author`, `fe-map-reviewer`. 세부는 `frontend/docs/team-playbook.md`.
+`frontend/docs/team-playbook.md` 가 정의한 역할의 실행 파일이다. 등급 기준은 공용 역할과 같다 — 구현·검토·판정은 Opus, 대조·보강처럼 절차가 정해진 반복은 Sonnet.
 
-**FE 역할의 모델 배정은 아직 하지 않았다.** 모델을 명시하지 않은 에이전트는 세션 기본 모델을 쓴다. 프론트 담당이 별도 이슈로 정한다.
+| 역할 | 모델 | 권한 | 사용 시점 |
+|------|------|------|-----------|
+| `fe-spec-writer` | Opus | 문서만 쓰기 | 기능 명세(`frontend/docs/features/**`) 작성·갱신, Swagger 실측으로 계약 확정 |
+| `fe-implementer` | Opus | 쓰기 | 컴포넌트·API 클라이언트·타입·라우트 실구현, `pnpm verify` 통과까지 |
+| `fe-reviewer` | Opus | 읽기 전용 | 변경 diff 를 저장소 규약 기준으로 검토 |
+| `fe-design-reviewer` | Opus | 읽기 전용 (브라우저 사용) | 실제 화면을 띄워 `DESIGN.md` 기준 검토 |
+| `fe-map-reviewer` | Opus | 읽기 전용 | 카카오 지도 연동 전용 검토 (SSR·누수·키 노출) |
+| `fe-api-contract` | Sonnet | 읽기 전용 | FE 호출부·타입 ↔ Swagger 계약 대조 |
+| `fe-test-author` | Sonnet | 테스트만 쓰기 | vitest 테스트 추가·보강 |
+
+`fe-design-reviewer` 는 브라우저 프리뷰 도구가 필요해 `tools` 를 생략한다(전체 상속). 본문에서 편집 금지를 명시하고, `scripts/check-claude-agents.sh` 의 읽기 전용 목록에는 넣지 않는다.
+
+### 세션 모델과 하위 에이전트 모델
+
+메인 세션의 모델과 하위 에이전트의 모델은 **따로 정한다.** 역할 파일의 `model` 이 하위 에이전트의 모델이고, 세션 모델은 메인 실행자의 것이다.
+
+- **메인 세션이 Fable 이면** 작업 계획·설계·범위와 순서 결정·최종 완료 판단은 **메인 실행자가 직접** 한다. 이 판단을 하위 에이전트에 위임하지 않는다.
+- 하위 에이전트(구현·검토·탐색·테스트 보강)는 **역할 파일의 `model`(Opus / Sonnet)로 돈다.** `architect` 만 Fable 이다. 메인 세션의 Fable 을 하위 에이전트에 상속시키지 않는다 — 모든 역할 파일에 `model` 이 있는 이유다.
+- `Agent` 호출에서 `model` 을 덮어쓰는 것은 예외 처리다(예: 계정에 그 모델이 없을 때). 덮어썼으면 보고에 적는다.
+- 메인 세션이 Opus 이하여도 규칙은 같다 — 역할 파일의 모델이 우선한다. 세션 모델을 하위 에이전트에 물려주고 싶으면 역할 파일에 `model: inherit` 를 적는다(현재 그런 역할은 없다).
 
 ### 모델 가용성
 
