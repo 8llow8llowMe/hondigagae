@@ -28,7 +28,8 @@ public class PlanWeatherPresenter {
             .build();
     }
 
-    private PlanDayWeatherItem toDayItem(PlanDayWeatherInfo day) {
+    /** 하루치 항목. 여행 브리핑이 같은 DTO 를 내려 두 화면이 같은 컴포넌트를 쓰게 하기 위해 공개했다. */
+    public PlanDayWeatherItem toDayItem(PlanDayWeatherInfo day) {
         PlanDaySuitabilityInfo suitability = day.suitability();
 
         return PlanDayWeatherItem.builder()

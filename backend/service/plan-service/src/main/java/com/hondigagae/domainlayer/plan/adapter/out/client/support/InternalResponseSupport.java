@@ -36,4 +36,23 @@ public class InternalResponseSupport {
         }
         return response == null ? null : response.dataBody();
     }
+
+    /**
+     * {@link #requestAndUnwrapOrNull} 과 같되 <b>404 도 실패로 본다.</b>
+     *
+     * <p>"리소스 없음" 이 정상 응답인 호출(장소 조회 등)에는 쓰지 않는다. 대상이 <b>항상 200 으로
+     * 답하는 엔드포인트</b>(없으면 {@code dataBody} null)일 때만 쓴다 — 그런 곳의 404 는 리소스가
+     * 없다는 뜻이 아니라 <b>경로가 없다는 뜻</b>이다(상대 서비스가 아직 그 엔드포인트가 없는
+     * 옛 버전으로 떠 있을 때). 그것을 null 로 접으면 배포 순서가 어긋난 동안 "특보 없음" 같은
+     * 거짓 정상이 화면에 나간다.
+     */
+    public <T> T requestAndUnwrap(String targetService, Supplier<Response<T>> requester) {
+        Response<T> response;
+        try {
+            response = circuitBreakerRegistry.circuitBreaker(targetService).executeSupplier(requester::get);
+        } catch (CallNotPermittedException | FeignException exception) {
+            throw new PlanException(PlanErrorCode.INTERNAL_SERVICE_UNAVAILABLE, exception);
+        }
+        return response == null ? null : response.dataBody();
+    }
 }

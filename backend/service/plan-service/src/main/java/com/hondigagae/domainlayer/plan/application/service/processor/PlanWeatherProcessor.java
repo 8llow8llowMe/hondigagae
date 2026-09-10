@@ -85,8 +85,11 @@ public class PlanWeatherProcessor {
      * 요청한 모든 반려견에 조건을 붙인다. 벌크 조회에서 빠진 아이(소유 아님·조회 실패)는
      * {@link PetConditionQueryResult#unknown()} 이다 — 특성이 없어도 그 아이 몫의 판정은 나간다.
      * 순서를 지켜 첫 번째(대표)가 동점일 때 기준이 된다.
+     *
+     * <p><b>여행 브리핑이 하루치만 재사용한다 — 복사하지 않고 같은 판정 경로를 쓰기 위해
+     * 공개했다.</b> 사본을 두면 "특성을 못 받으면 일반 조건" 같은 규칙이 두 곳으로 갈라진다.
      */
-    private Map<Long, PetConditionQueryResult> loadConditions(long memberId, List<Long> petIds) {
+    public Map<Long, PetConditionQueryResult> loadConditions(long memberId, List<Long> petIds) {
         Map<Long, PetConditionQueryResult> found = petConditionQueryPort.findConditions(memberId, petIds);
         Map<Long, PetConditionQueryResult> conditions = new LinkedHashMap<>();
         for (Long petId : petIds) {
@@ -100,7 +103,16 @@ public class PlanWeatherProcessor {
             || pet.noiseSensitive() || pet.breed() != null;
     }
 
-    private PlanDayWeatherInfo briefDay(
+    /**
+     * 하루치 브리핑.
+     *
+     * <p><b>여행 브리핑이 하루치만 재사용한다 — 복사하지 않고 같은 판정 경로를 쓰기 위해
+     * 공개했다.</b> 대표 장소 선정·아이별 판정·기준 반려견 선택이 전부 이 안에 있어, 사본을
+     * 두면 일정 화면과 브리핑 화면이 같은 날을 다르게 말하게 된다.
+     *
+     * @param items 그날({@code day})의 항목만. 걸러내기는 호출부가 한다
+     */
+    public PlanDayWeatherInfo briefDay(
         Plan plan, int day, List<PlanItem> items, Map<Long, PetConditionQueryResult> conditions
     ) {
         LocalDate date = plan.startDate().plusDays(day - 1L);
@@ -234,8 +246,12 @@ public class PlanWeatherProcessor {
      * <p>"장소성" 의 판정은 {@link PlanItemType#isPlaceTarget()} 이 갖는다. {@code MOVE} 만 빼면
      * {@code WALK} 가 통과하는데, 그 {@code targetId} 는 {@code walk_course.id} 라 장소 적합도를
      * 조회하면 남의 아이디로 없는 장소를 찾는다 (#89). 상세·긴급 시설 조회와 같은 집합을 써야 한다.
+     *
+     * <p><b>여행 브리핑이 골든타임 좌표를 구할 때 재사용한다 — 복사하지 않고 같은 판정 경로를
+     * 쓰기 위해 공개했다.</b> 브리핑의 "대표 장소" 와 날씨의 "대표 장소" 가 다르면 한 화면에
+     * 서로 다른 장소가 기준으로 서게 된다. 상태를 쓰지 않으므로 static 이다.
      */
-    private Optional<PlanItem> pickRepresentative(List<PlanItem> items) {
+    public static Optional<PlanItem> pickRepresentative(List<PlanItem> items) {
         return items.stream()
             .filter(item -> item.targetId() != null)
             .filter(item -> item.itemType().isPlaceTarget())

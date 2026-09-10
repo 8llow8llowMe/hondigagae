@@ -1,25 +1,30 @@
 package com.hondigagae.domainlayer.plan.application.service;
 
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanSummaryItem;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanBriefingResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanDetailResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanEmergencyResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanWeatherResponse;
+import com.hondigagae.domainlayer.plan.adapter.in.web.presenter.PlanBriefingPresenter;
 import com.hondigagae.domainlayer.plan.adapter.in.web.presenter.PlanPresenter;
 import com.hondigagae.domainlayer.plan.adapter.in.web.presenter.PlanWeatherPresenter;
 import com.hondigagae.domainlayer.plan.application.command.PlanCreateCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanItemCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanUpdateCommand;
+import com.hondigagae.domainlayer.plan.application.info.PlanBriefingInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanEmergencyInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanSummaryInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo;
 import com.hondigagae.domainlayer.plan.application.port.in.PlanWebUseCase;
+import com.hondigagae.domainlayer.plan.application.service.processor.PlanBriefingProcessor;
 import com.hondigagae.domainlayer.plan.application.service.processor.PlanCommandProcessor;
 import com.hondigagae.domainlayer.plan.application.service.processor.PlanEmergencyProcessor;
 import com.hondigagae.domainlayer.plan.application.service.processor.PlanQueryProcessor;
 import com.hondigagae.domainlayer.plan.application.service.processor.PlanWeatherProcessor;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.persistence.dto.SliceResponse;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Slice;
@@ -34,8 +39,10 @@ public class PlanWebFacade implements PlanWebUseCase {
     private final PlanCommandProcessor planCommandProcessor;
     private final PlanWeatherProcessor planWeatherProcessor;
     private final PlanEmergencyProcessor planEmergencyProcessor;
+    private final PlanBriefingProcessor planBriefingProcessor;
     private final PlanPresenter planPresenter;
     private final PlanWeatherPresenter planWeatherPresenter;
+    private final PlanBriefingPresenter planBriefingPresenter;
 
     /**
      * 생성·수정·상세·일자 교체에 {@code @Transactional} 을 걸지 않는다 — 반려견 확인(auth-service),
@@ -118,5 +125,20 @@ public class PlanWebFacade implements PlanWebUseCase {
         Plan plan = planQueryProcessor.getOwnedPlan(memberId, planId);
         PlanWeatherInfo info = planWeatherProcessor.brief(memberId, plan, planQueryProcessor.getPetIds(plan));
         return planWeatherPresenter.toResponse(info);
+    }
+
+    /**
+     * 하루치 여행 브리핑.
+     *
+     * <p><b>트랜잭션을 걸지 않는다.</b> 날씨 브리핑과 같은 이유다 — tour-service · auth-service
+     * 원격 호출(특성·적합도·장소 요약·특보·골든타임)이 섞여 있어 DB 커넥션을 잡은 채 응답을
+     * 기다리게 된다 (architecture-guide §3 의 문서화된 예외). 소유권 확인과 항목 조회는 Processor
+     * 안의 짧은 조회로 끝난다.
+     */
+    @Override
+    public PlanBriefingResponse getPlanBriefing(long memberId, long planId, LocalDate date) {
+        Plan plan = planQueryProcessor.getOwnedPlan(memberId, planId);
+        PlanBriefingInfo info = planBriefingProcessor.brief(memberId, plan, planQueryProcessor.getPetIds(plan), date);
+        return planBriefingPresenter.toResponse(info);
     }
 }

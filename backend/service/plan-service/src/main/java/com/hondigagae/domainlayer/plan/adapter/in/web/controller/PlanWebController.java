@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanCreateRequ
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanDayItemsReplaceRequest;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanUpdateRequest;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanItemVisitedRequest;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanBriefingResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanDetailResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanEmergencyResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanWeatherResponse;
@@ -20,7 +21,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -223,6 +226,36 @@ public class PlanWebController {
         @Parameter(description = "[필수] 일정 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 일정 목록 응답의 planId 를 그대로 씁니다", required = true, example = "1234567890123456789") @PathVariable long planId
     ) {
         PlanEmergencyResponse response = planWebUseCase.getPlanEmergencyBriefing(loginActive.memberId(), planId);
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(summary = "여행 브리핑 (하루치)",
+        description = "출발 전날·당일에 그날 정보를 한 번에 보여 줍니다 — 그날 일정 요약(항목 수, 첫/마지막 항목, 대표 장소), "
+            + "날씨·반려견 적합도(일정 날씨 브리핑의 하루치와 같은 판정, 비 예보면 실내 대안 포함), 발효 중인 기상특보, "
+            + "산책 골든타임을 하나로 묶습니다. 전부 기존 판정을 그대로 중계하는 결정적 조합이고 LLM 을 부르지 않습니다. "
+            + "준비물은 이 응답에 없습니다 — ai-service 의 준비물 API 를 따로 부르세요.\n\n"
+            + "**기상특보와 골든타임은 요청 날짜가 오늘일 때만 채워집니다** (`today=true`). 골든타임은 '오늘 남은 시간' 기준 판정이라 "
+            + "내일 이후를 물을 수단이 없고, 특보는 발효 중인 것만 존재하기 때문입니다. `today=false` 면 두 필드는 null 이고 "
+            + "`weatherWarningUnavailableReason` · `walkTimesUnavailableReason` 에 이유가 담기니 그대로 안내하세요. "
+            + "특보는 **필드와 이유가 둘 다 null 일 때만 '특보 없음'** 입니다 — 확인하지 못한 날은 이유가 채워지며, "
+            + "그때 '특보 없음' 이라고 쓰면 태풍경보를 조용히 지우는 셈입니다. "
+            + "골든타임은 그날 대표 장소(가장 이른 순서의 장소 항목) 좌표로 판정하며, 시간대별 곡선은 싣지 않습니다 — "
+            + "곡선이 필요하면 응답의 좌표로 `GET /api/v1/insights/walk-times?lat=&lng=` 를 부르세요. "
+            + "날짜가 일정 기간을 벗어나면 PLAN_002 로 실패합니다.\n\n"
+            + "**필수: planId (경로), date (쿼리, yyyy-MM-dd).**\n\n"
+            + "호출 예\n"
+            + "- 내일(출발 전날 준비): `GET /api/v1/plans/1234567890123456789/briefing?date=2026-09-13`\n"
+            + "- 오늘(당일 아침): 같은 URL 에 오늘 날짜 — 특보·골든타임이 함께 옵니다",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @GetMapping("/{planId}/briefing")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<PlanBriefingResponse>> getPlanBriefing(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "[필수] 일정 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 일정 목록 응답의 planId 를 그대로 씁니다", required = true, example = "1234567890123456789") @PathVariable long planId,
+        @Parameter(description = "[필수] 브리핑할 날짜 (yyyy-MM-dd, 일정 기간 안). 오늘이면 특보·골든타임이 함께 옵니다", required = true, example = "2026-09-13")
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) @RequestParam LocalDate date
+    ) {
+        PlanBriefingResponse response = planWebUseCase.getPlanBriefing(loginActive.memberId(), planId, date);
         return ResponseEntity.ok().body(Response.success(response));
     }
 }
