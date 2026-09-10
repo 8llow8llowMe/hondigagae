@@ -2,11 +2,11 @@ import Link from 'next/link'
 
 import { ChevronRightIcon } from '@/components/icons'
 import { PetAvatar } from '@/components/pet-avatar'
-import { Row } from '@/components/surface'
 import { PlanStatusBadge } from '@/features/plan/plan-status-badge'
 import { messages } from '@/lib/messages'
 import { companionLabel } from '@/lib/plan/companion-pets'
 import { daysUntil, formatPlanDateRange } from '@/lib/plan/date'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import type { PlanSummaryItem } from '@/types/plan'
 
 /**
@@ -20,12 +20,14 @@ import type { PlanSummaryItem } from '@/types/plan'
  * (공통명세 S2).
  *
  * 지역명(`제주시`)도 쓰지 않는다 — 목록은 `areaCode`(`'39'`) 만 준다.
+ *
+ * **L1 카드 안의 L2 항목이다** (#445). 자기 테두리를 두르지 않는다 — 구분선은 `SurfaceList` 가
+ * 항목 사이에만 긋고, 그래서 `last` 가 없다(#439). 인셋은 카드 안 값(16/20)이다.
  */
 export function PlanRow({
   plan,
   petNames,
   today,
-  last = false,
 }: {
   plan: PlanSummaryItem
   /**
@@ -36,13 +38,12 @@ export function PlanRow({
    */
   petNames: readonly string[]
   today: Date
-  last?: boolean
 }) {
   const dday = daysUntil(plan.startDate, today)
   const companion = companionLabel(petNames)
 
   return (
-    <Row as="li" last={last}>
+    <li className={INSET_CLASS.card}>
       <Link
         href={`/plans/${plan.planId}`}
         className="focus-visible:ring-brand-500 flex flex-col gap-2 py-4 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none lg:flex-row lg:items-center lg:gap-5 lg:py-5"
@@ -82,6 +83,6 @@ export function PlanRow({
 
         <ChevronRightIcon size={20} className="text-fg-subtle hidden shrink-0 lg:block" />
       </Link>
-    </Row>
+    </li>
   )
 }

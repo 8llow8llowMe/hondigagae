@@ -1,5 +1,6 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 
+import { Canvas } from '@/components/surface'
 import { PlanListView } from '@/features/plan/plan-list-view'
 import { planKeys } from '@/features/plan/queries'
 import { planListPath, type PlanSlice } from '@/lib/api/plan'
@@ -51,12 +52,16 @@ export default async function PlansPage({ searchParams }: { searchParams: Search
 
     **`today` 를 서버에서 만들어 내려보낸다.** 클라이언트가 따로 `new Date()` 를 부르면
     자정 근처에서 서버 렌더와 하이드레이션의 D-day 가 하루 갈릴 수 있다.
+
+    **`main` 이 L0 바닥이다** (`DESIGN.md §0`, 이슈 #445). 장소 목록(#439)과 같은 3층 표면 —
+    바닥은 전폭이어야 하므로 `Canvas` 를 `main` 에 걸고, 카드를 쌓는 일은 `PlanListView` 의
+    `SurfaceStack` 이 맡는다.
   */
   return (
-    <main id="main-content" className="rail-layout rail-layout-filter">
+    <Canvas as="main" id="main-content" className="rail-layout rail-layout-filter">
       <HydrationBoundary state={dehydrate(queryClient)}>
         <PlanListView filters={filters} today={new Date()} />
       </HydrationBoundary>
-    </main>
+    </Canvas>
   )
 }
