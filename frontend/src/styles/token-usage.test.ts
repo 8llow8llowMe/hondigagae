@@ -198,7 +198,7 @@ describe('토큰 사용 — 폐기한 토큰이 되살아나지 않는다 (DESIG
   })
 })
 
-describe('토큰 사용 — 표면 규칙 (DESIGN.md §0)', () => {
+describe('토큰 사용 — 표면 규칙 (DESIGN.md §0 · 3a)', () => {
   it('평평한 행·섹션에 그림자를 쓰지 않는다 — shadow 는 떠 있는 것에만', () => {
     // 실제로 떠 있는 것만 그림자를 쓴다. 목록에 추가하려면 그것이 페이지 위에 뜨는지
     // 먼저 확인한다 — 평면 카드를 띄우려고 여기에 넣는 것이 이 규칙을 무너뜨리는 경로다.
@@ -240,6 +240,42 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0)', () => {
       ({ path, text }) =>
         classLiterals(text)
           .filter((literal) => /\bshadow-(md|lg)\b/.test(literal))
+          .map((literal) => `${path} :: ${literal}`),
+    )
+
+    expect(found).toEqual([])
+  })
+
+  it('--bg-sunken 은 바닥 전용이다 — 화면이 회색 면을 직접 칠하지 않는다', () => {
+    /*
+      3a 는 회색을 **바닥 하나**에만 둔다. 섹션은 흰색(`--bg`)이고 아이템 채움은
+      `--band` 다. 화면이 `bg-bg-sunken` 을 직접 칠하면 층이 하나 늘어나 어느 것이
+      바닥인지 읽히지 않는다 — 바닥은 `Canvas` 가 소유한다.
+
+      2a 에서는 이 토큰이 "모형 밖 자료 전용" 이라 화면 안 사용이 전부 위반이었는데
+      검사가 없어 네 파일이 새어 있었다. 3a 는 용도를 열면서 **소유자를 지정**한다.
+    */
+    const OWNER = 'src/components/surface.tsx'
+
+    /*
+      지도 화면은 `.rail-layout` 에 가입하지 않는 **전폭 예외**(§7)라 `Canvas` 밖에서
+      바탕을 스스로 칠한다 — 지도가 바탕이고 목록·패널이 그 위에 얹히는 구조다.
+      **이 목록은 늘리지 않는다.** 새 화면은 `Canvas` 를 쓴다.
+    */
+    const MAP_GROUND = [
+      // 지도 컨테이너 바탕 (타일이 오기 전 회색)
+      'src/features/map/map-canvas.tsx',
+      // 목록 위 캡션 줄 · 패널 행 hover — 지도 위 표면이라 흰색이 바탕이 아니다
+      'src/features/place/place-map-view.tsx',
+      'src/features/place/place-map-panel.tsx',
+      'src/features/emergency/emergency-map-view.tsx',
+    ]
+
+    const allowed = new Set([OWNER, ...MAP_GROUND])
+    const found = FILES.filter(({ path }) => !allowed.has(path.replace(/\\/g, '/'))).flatMap(
+      ({ path, text }) =>
+        classLiterals(text)
+          .filter((literal) => /\bbg-bg-sunken\b/.test(literal))
           .map((literal) => `${path} :: ${literal}`),
     )
 
