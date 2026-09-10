@@ -4,6 +4,7 @@ import com.hondigagae.common.geo.GeoDistance;
 import com.hondigagae.domainlayer.place.adapter.out.persistence.entity.PlaceEntity;
 import com.hondigagae.domainlayer.place.adapter.out.persistence.entity.QPlaceEntity;
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
+import com.hondigagae.domainlayer.place.application.model.PlaceKeyword;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
 import com.hondigagae.shared.travel.pet.PetSizeType;
@@ -47,7 +48,7 @@ public class PlaceCustomRepositoryImpl implements PlaceCustomRepository {
         BooleanBuilder where = visible()
             .and(commonFilters(criteria.contentType(), criteria.petAllowanceType(), criteria.indoor(),
                 criteria.allowedPetSize(), criteria.petSizeType(), criteria.petWeightKg(),
-                criteria.sourceCategory()));
+                criteria.sourceCategory(), criteria.keyword()));
         if (criteria.areaCode() != null) {
             where.and(place.areaCode.eq(criteria.areaCode()));
         }
@@ -80,7 +81,7 @@ public class PlaceCustomRepositoryImpl implements PlaceCustomRepository {
         BooleanBuilder where = visible()
             .and(commonFilters(criteria.contentType(), criteria.petAllowanceType(), criteria.indoor(),
                 criteria.allowedPetSize(), criteria.petSizeType(), criteria.petWeightKg(),
-                criteria.sourceCategory()))
+                criteria.sourceCategory(), criteria.keyword()))
             // 좌표가 없는 장소는 between 조건에서 자연히 빠진다 — 반경 검색의 대상이 아니다
             .and(place.lat.between(
                 BigDecimal.valueOf(criteria.lat() - latDelta), BigDecimal.valueOf(criteria.lat() + latDelta)))
@@ -100,7 +101,7 @@ public class PlaceCustomRepositoryImpl implements PlaceCustomRepository {
     /** 목록·주변 검색이 공유하는 필터. null 인 조건은 where 에 아예 들어가지 않는다. */
     private BooleanBuilder commonFilters(ContentType contentType, PetAllowanceType petAllowanceType,
         Boolean indoor, AllowedPetSize allowedPetSize, PetSizeType petSizeType, Integer petWeightKg,
-        String sourceCategory) {
+        String sourceCategory, String keyword) {
 
         BooleanBuilder where = new BooleanBuilder();
         if (contentType != null) {
@@ -127,6 +128,12 @@ public class PlaceCustomRepositoryImpl implements PlaceCustomRepository {
         if (sourceCategory != null) {
             where.and(place.sourceCategory.eq(sourceCategory));
         }
+        PlaceKeyword.normalize(keyword).ifPresent(normalized -> {
+            String escaped = PlaceKeyword.escapeLike(normalized);
+            where.and(new BooleanBuilder()
+                .or(place.title.likeIgnoreCase("%" + escaped + "%", '\\'))
+                .or(place.addr1.likeIgnoreCase("%" + escaped + "%", '\\')));
+        });
         return where;
     }
 }

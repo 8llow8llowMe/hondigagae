@@ -35,6 +35,7 @@ export const DEFAULT_PLACE_FILTERS: PlaceFilters = {
   petSizeType: null,
   petWeightKg: null,
   sourceCategory: null,
+  keyword: null,
 }
 
 type RawParams = URLSearchParams | Record<string, string | string[] | undefined>
@@ -74,6 +75,12 @@ function readText(value: string | null): string | null {
   return value !== null && value.trim() !== '' ? value.trim() : null
 }
 
+/** 백엔드 `keyword` 최대 50자. 넘어가면 400 이라 URL 은 미지정으로 떨어뜨린다. */
+function readKeyword(value: string | null): string | null {
+  const text = readText(value)
+  return text !== null && text.length <= 50 ? text : null
+}
+
 export function parsePlaceFilters(params: RawParams): PlaceFilters {
   const areaCode = read(params, 'areaCode')
   const sigunguCode = read(params, 'sigunguCode')
@@ -88,6 +95,7 @@ export function parsePlaceFilters(params: RawParams): PlaceFilters {
     petSizeType: pickFrom(PET_SIZE_CODES, read(params, 'petSizeType')),
     petWeightKg: readWeight(read(params, 'petWeightKg')),
     sourceCategory: readText(read(params, 'sourceCategory')),
+    keyword: readKeyword(read(params, 'keyword')),
   }
 }
 
@@ -104,6 +112,7 @@ export function toPlaceFilterQuery(filters: PlaceFilters): string {
   if (filters.petSizeType !== null) params.set('petSizeType', filters.petSizeType)
   if (filters.petWeightKg !== null) params.set('petWeightKg', String(filters.petWeightKg))
   if (filters.sourceCategory !== null) params.set('sourceCategory', filters.sourceCategory)
+  if (filters.keyword !== null) params.set('keyword', filters.keyword)
 
   return params.toString()
 }
@@ -125,6 +134,7 @@ export function toPlaceApiQuery(
   if (filters.petSizeType !== null) params.set('petSizeType', filters.petSizeType)
   if (filters.petWeightKg !== null) params.set('petWeightKg', String(filters.petWeightKg))
   if (filters.sourceCategory !== null) params.set('sourceCategory', filters.sourceCategory)
+  if (filters.keyword !== null) params.set('keyword', filters.keyword)
   if (cursor !== null) params.set('lastPlaceId', cursor)
   params.set('size', String(size))
 

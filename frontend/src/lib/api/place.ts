@@ -62,6 +62,7 @@ export function nearbyPlacesPath(
   if (filters.petSizeType !== null) params.set('petSizeType', filters.petSizeType)
   if (filters.petWeightKg !== null) params.set('petWeightKg', String(filters.petWeightKg))
   if (filters.sourceCategory !== null) params.set('sourceCategory', filters.sourceCategory)
+  if (filters.keyword !== null) params.set('keyword', filters.keyword)
   params.set('size', String(size))
 
   return paths.places.nearby(params.toString())

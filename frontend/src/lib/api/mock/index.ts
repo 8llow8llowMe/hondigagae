@@ -340,5 +340,11 @@ function matches(place: PlaceSummary, params: URLSearchParams): boolean {
   const sourceCategory = params.get('sourceCategory')
   if (sourceCategory !== null && place.sourceCategory !== sourceCategory) return false
 
+  const keyword = params.get('keyword')?.trim()
+  if (keyword !== null && keyword !== undefined && keyword !== '') {
+    const haystack = `${place.title} ${place.addr1 ?? ''}`.toLowerCase()
+    if (!haystack.includes(keyword.toLowerCase())) return false
+  }
+
   return true
 }

@@ -75,6 +75,16 @@ describe('parsePlaceFilters — 새 필터', () => {
   it('공백뿐인 sourceCategory 는 미지정으로 본다', () => {
     expect(parsePlaceFilters({ sourceCategory: '   ' }).sourceCategory).toBeNull()
   })
+
+  it('keyword 는 앞뒤 공백을 지운 문자열이다', () => {
+    expect(parsePlaceFilters(new URLSearchParams('keyword=성산')).keyword).toBe('성산')
+    expect(parsePlaceFilters({ keyword: '  성산  ' }).keyword).toBe('성산')
+  })
+
+  it('공백뿐인 keyword 와 51자는 미지정이다', () => {
+    expect(parsePlaceFilters({ keyword: '   ' }).keyword).toBeNull()
+    expect(parsePlaceFilters({ keyword: '가'.repeat(51) }).keyword).toBeNull()
+  })
 })
 
 describe('toPlaceFilterQuery', () => {
@@ -115,6 +125,7 @@ describe('round-trip', () => {
     { ...DEFAULT_PLACE_FILTERS, allowedPetSize: 'SMALL_ONLY' },
     { ...DEFAULT_PLACE_FILTERS, petSizeType: 'MEDIUM' },
     { ...DEFAULT_PLACE_FILTERS, sourceCategory: '카페' },
+    { ...DEFAULT_PLACE_FILTERS, keyword: '성산' },
     {
       ...DEFAULT_PLACE_FILTERS,
       indoor: true,

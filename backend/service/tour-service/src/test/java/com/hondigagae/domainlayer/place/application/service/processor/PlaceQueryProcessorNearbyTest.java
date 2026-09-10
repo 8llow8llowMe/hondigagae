@@ -3,9 +3,11 @@ package com.hondigagae.domainlayer.place.application.service.processor;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.domainlayer.place.application.info.NearbyPlacesInfo;
+import com.hondigagae.domainlayer.place.application.info.PlaceSummariesInfo;
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.out.PlaceRepositoryPort;
+import com.hondigagae.domainlayer.place.application.port.out.PlaceSearchCachePort;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceImageQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceIntroQueryResult;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlacePetInfoQueryResult;
@@ -135,6 +137,28 @@ class PlaceQueryProcessorNearbyTest {
             public List<PlaceImageQueryResult> findImagesByPlaceId(long placeId) {
                 return List.of();
             }
-        });
+        }, missCache());
+    }
+
+    private static PlaceSearchCachePort missCache() {
+        return new PlaceSearchCachePort() {
+            @Override
+            public Optional<PlaceSummariesInfo> findList(PlaceSearchCriteria criteria) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void putList(PlaceSearchCriteria criteria, PlaceSummariesInfo info) {
+            }
+
+            @Override
+            public Optional<NearbyPlacesInfo> findNearby(NearbyPlaceCriteria criteria) {
+                return Optional.empty();
+            }
+
+            @Override
+            public void putNearby(NearbyPlaceCriteria criteria, NearbyPlacesInfo info) {
+            }
+        };
     }
 }

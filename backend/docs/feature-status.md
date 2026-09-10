@@ -44,8 +44,8 @@
 
 | 메서드 | 경로 | 비고 |
 | --- | --- | --- |
-| GET | `/api/v1/places` | 지역·타입·동반조건·실내·크기·원본분류·반려견 크기/체중 필터, 커서 기반 |
-| GET | `/api/v1/places/nearby` | 좌표 반경 검색 (식당·카페 포함) |
+| GET | `/api/v1/places` | 지역·타입·동반조건·실내·크기·원본분류·반려견 크기/체중·**키워드(이름·주소)** 필터, 커서 기반 |
+| GET | `/api/v1/places/nearby` | 좌표 반경 검색 (식당·카페 포함). **keyword** 로 이름·주소 부분 일치 |
 | GET | `/api/v1/places/{placeId}` | intro·petInfo·images 결합 상세. `indoor`·`sourceCategory`·`sourceName` 포함(목록과 같은 매핑), `contentId` 는 원천이 TourAPI 가 아니면 **null** |
 | GET | `/api/v1/emergencies/facilities` | 동물병원·동물약국 반경 검색, `openNowOnly` 지금 영업 중 필터 |
 | GET | `/api/v1/emergencies/facilities/{facilityId}` | 긴급 시설 상세. delisted 시설은 404 |
@@ -232,3 +232,4 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | #137 | plan·tour | 긴급 시설 상세와 기간 혼잡도 조회 API 를 추가한다 | |
 | #155 | ai·tour | AI 일정 생성 날씨 접목과 반려견 준비물 목록 생성 | |
 | #156 | docs·api-gateway·tour | 제주 특색 × 기상청 API 날씨 인사이트 3종 | |
+| #421 | tour | 장소 목록·주변 조회에 키워드 검색 (DB LIKE + Redis 캐시) | ES 는 인프라 미구성. 검색 UI 는 FE 후속 |

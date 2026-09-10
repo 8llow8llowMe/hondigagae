@@ -101,6 +101,15 @@ describe('resolveMock — 필터', () => {
     expect(indoorFalse.every((p) => p.indoor === false)).toBe(true)
   })
 
+  it('keyword 는 이름 또는 주소 부분 일치다', () => {
+    const contents = body('keyword=오설록&size=50').contents
+
+    expect(contents.length).toBeGreaterThan(0)
+    expect(contents.every((place) => `${place.title} ${place.addr1 ?? ''}`.includes('오설록'))).toBe(
+      true,
+    )
+  })
+
   it('조건에 맞는 결과가 없으면 빈 목록을 준다 (404 가 아니다)', () => {
     const result = list('contentType=FESTIVAL&size=50')
 

@@ -112,10 +112,8 @@ export const aiPlanMessages = {
   pickerEmptyDescription: '장소 상세에서 저장해 두면 여기서 골라 넣을 수 있어요.',
   pickerLoadFailedTitle: '저장한 장소를 불러오지 못했어요',
   /**
-   * **검색 탭을 만들지 않았다.** 아트보드 05 는 `저장한 장소` / `검색` 두 탭을 그렸지만
-   * `GET /places` 에 이름 검색 파라미터가 없다 — 지역·타입·동반 조건 필터뿐이다.
+   * **검색 탭을 아직 만들지 않았다.** `GET /places` 의 `keyword` 는 #421 로 열렸다.
    * 아트보드도 "고르는 곳은 저장한 장소가 기본, 검색 탭은 두 번째" 라고 적었다.
-   * BE 에 검색 API 를 요청해 뒀다 (명세 S8).
    */
   pickerSearchUnavailable: '이름으로 찾기는 준비 중이에요. 지금은 저장한 장소에서 고를 수 있어요.',
 

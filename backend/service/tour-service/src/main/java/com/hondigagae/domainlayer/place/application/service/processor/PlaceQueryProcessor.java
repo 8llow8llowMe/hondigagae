@@ -12,8 +12,10 @@ import com.hondigagae.domainlayer.place.application.info.PlacePetDetailInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceSummariesInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceSummaryInfo;
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
+import com.hondigagae.domainlayer.place.application.model.PlaceKeyword;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.out.PlaceRepositoryPort;
+import com.hondigagae.domainlayer.place.application.port.out.PlaceSearchCachePort;
 import com.hondigagae.domainlayer.place.application.port.out.query.PlaceSliceQueryResult;
 import com.hondigagae.domainlayer.place.domain.enums.ContentType;
 import com.hondigagae.domainlayer.place.domain.model.Place;
@@ -29,13 +31,27 @@ import org.springframework.stereotype.Component;
 public class PlaceQueryProcessor {
 
     private final PlaceRepositoryPort placeRepositoryPort;
+    private final PlaceSearchCachePort placeSearchCachePort;
 
     public PlaceSummariesInfo getPlaces(PlaceSearchCriteria criteria) {
-        PlaceSliceQueryResult queryResult = placeRepositoryPort.findPlaces(criteria);
+        PlaceSearchCriteria query = criteria.toBuilder()
+            .keyword(PlaceKeyword.normalize(criteria.keyword()).orElse(null))
+            .build();
+        if (query.keyword() != null) {
+            var cached = placeSearchCachePort.findList(query);
+            if (cached.isPresent()) {
+                return cached.get();
+            }
+        }
+        PlaceSliceQueryResult queryResult = placeRepositoryPort.findPlaces(query);
         List<PlaceSummaryInfo> summaries = queryResult.places().stream()
             .map(this::toSummaryInfo)
             .toList();
-        return new PlaceSummariesInfo(summaries, queryResult.hasNext());
+        PlaceSummariesInfo info = new PlaceSummariesInfo(summaries, queryResult.hasNext());
+        if (query.keyword() != null) {
+            placeSearchCachePort.putList(query, info);
+        }
+        return info;
     }
 
     /**
@@ -48,18 +64,31 @@ public class PlaceQueryProcessor {
      * 값이 나와, 반경 안에 몇 곳이 더 있는지 응답만으로는 알 수 없게 된다.
      */
     public NearbyPlacesInfo getNearbyPlaces(NearbyPlaceCriteria criteria) {
-        List<NearbyPlaceInfo> matched = placeRepositoryPort.findNearby(criteria).stream()
-            .map(place -> toNearbyInfo(place, criteria))
-            .filter(info -> info.distanceMeters() <= criteria.radius())
+        NearbyPlaceCriteria query = criteria.toBuilder()
+            .keyword(PlaceKeyword.normalize(criteria.keyword()).orElse(null))
+            .build();
+        if (query.keyword() != null) {
+            var cached = placeSearchCachePort.findNearby(query);
+            if (cached.isPresent()) {
+                return cached.get();
+            }
+        }
+        List<NearbyPlaceInfo> matched = placeRepositoryPort.findNearby(query).stream()
+            .map(place -> toNearbyInfo(place, query))
+            .filter(info -> info.distanceMeters() <= query.radius())
             // 거리(m 반올림)는 동률이 흔하다 — 아이디로 순서를 고정하지 않으면 같은 요청이
             // 호출마다 다른 순서를 주고, limit 경계에서는 포함되는 장소 자체가 바뀐다.
             .sorted(Comparator.comparingInt(NearbyPlaceInfo::distanceMeters)
                 .thenComparingLong(info -> info.place().placeId()))
             .toList();
 
-        return new NearbyPlacesInfo(
-            matched.stream().limit(criteria.size()).toList(),
+        NearbyPlacesInfo info = new NearbyPlacesInfo(
+            matched.stream().limit(query.size()).toList(),
             matched.size());
+        if (query.keyword() != null) {
+            placeSearchCachePort.putNearby(query, info);
+        }
+        return info;
     }
 
     private NearbyPlaceInfo toNearbyInfo(Place place, NearbyPlaceCriteria criteria) {
