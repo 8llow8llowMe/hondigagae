@@ -132,8 +132,9 @@ public final class SuitabilityEvaluator {
     /**
      * 중기예보로 판정했으면 그 사실을 근거에 남긴다.
      *
-     * <p>같은 점수라도 신뢰도가 다르고, 중기예보에는 습도와 풍속이 없어 열지수 보정과 강풍
-     * 감점이 아예 빠진다. 점수만 주고 이 사실을 감추면 사용자가 근거를 과대평가한다.
+     * <p>같은 점수라도 신뢰도가 다르고, 중기예보에는 습도가 없어 체감온도 규칙이 기온 규칙으로
+     * 퇴화하고 풍속이 없어 강풍 감점이 빠진다. 점수만 주고 이 사실을 감추면 사용자가 근거를
+     * 과대평가한다.
      */
     private static void noteMidTermEvidence(SuitabilityInput input, List<SuitabilityReason> reasons) {
         DailyWeather weather = input.weather();
@@ -206,6 +207,9 @@ public final class SuitabilityEvaluator {
      * <p>권역 비교(어느 권역이 나가기 좋은가)에는 장소가 없다. 그렇다고 규칙을 복사하면
      * 임계값이 바뀔 때 한쪽만 고쳐져 같은 날씨를 화면마다 다르게 판정하게 된다.
      *
+     * <p>고온 판정은 {@link #applyHeatRule} 로 뺐다 - 체감온도와 기온 두 축을 함께 보느라
+     * 다른 규칙보다 길다.
+     *
      * @param sheltered      실내 공간이 있어 날씨 영향을 덜 받는가. 장소가 없으면 false 다
      * @param weatherExposed 바람을 그대로 맞는 곳인가. 장소가 없으면 야외로 본다(true)
      */
@@ -234,26 +238,10 @@ public final class SuitabilityEvaluator {
                 "%s 예보가 있습니다.".formatted(weather.worstPrecipitationType().getDisplayName()), -amount));
         }
 
-        Double highest = weather.maxTemperature();
-        if (highest != null) {
-            int amount = 0;
-            if (highest >= thresholds.veryHotTemperature()) {
-                amount = PENALTY_VERY_HOT;
-            } else if (highest >= thresholds.hotTemperature()) {
-                amount = PENALTY_HOT;
-            }
-            if (amount > 0) {
-                if (pet.heatSensitive()) {
-                    amount += PENALTY_SENSITIVE_EXTRA;
-                }
-                amount = shelterAdjusted(amount, sheltered);
-                penalty += amount;
-                anyWeatherPenalty = true;
-                reasons.add(SuitabilityReason.of(SuitabilityReasonCode.HEAT_RISK,
-                    "최고기온 %.0f도%s".formatted(highest,
-                        pet.heatSensitive() ? " 로, 더위에 약한 아이에게는 부담이 큽니다." : " 로 더위에 주의가 필요합니다."),
-                    -amount));
-            }
+        int heatPenalty = applyHeatRule(weather, pet, thresholds, sheltered, reasons);
+        if (heatPenalty > 0) {
+            penalty += heatPenalty;
+            anyWeatherPenalty = true;
         }
 
         Double lowest = weather.minTemperature();
@@ -294,6 +282,78 @@ public final class SuitabilityEvaluator {
                 "실내 공간이 있어 날씨 영향을 덜 받습니다."));
         }
         return penalty;
+    }
+
+    /**
+     * 고온 감점. <b>기온과 하루 최고 체감온도 중 큰 값에 반려견 기준 임계(28/31)를 건다.</b>
+     *
+     * <p>반려견은 헐떡임으로 체온을 내리므로 습도가 높으면 같은 기온도 더 위험하다. 기온만
+     * 보면 습한 날과 건조한 날의 점수가 같아진다 - 습도가 점수에 한 번도 반영되지 않던
+     * 자리였다 (#407, #417).
+     *
+     * <h2>체감온도에 33/35 를 걸지 않는 이유</h2>
+     *
+     * 기상청 여름철 체감온도는 습구온도 기반이라 <b>습도 100% 에서도 기온 대비 상승폭이 기온
+     * 30℃ 대에서 약 +3.6℃</b> 다(기온 30℃·습도 100% → 33.6℃. 기온이 높을수록 조금 커져 35℃ 에서
+     * +3.9℃). 체감에 33/35 를 걸면 체감이 33 을 넘는 시점의 기온은 이미 29.5 를 넘어 기온
+     * 감점이 늘 같고, 35 를 넘는 시점의 기온은 31 을 넘어 기온 감점이 이미 최대다 - 체감
+     * 규칙이 한 번도 이기지 못하는 <b>죽은 규칙</b>이 된다. 28/31 은 이 서비스가 반려견 기준으로 정한 더위
+     * 임계이고 체감온도는 반려견이 실제로 겪는 온도이므로, 그 임계를 체감온도에 적용하는 것이
+     * 일관된다.
+     *
+     * <p>산책 위험도({@link WalkSafetyEvaluator})가 33/35 를 쓰는 것과 어긋나는 것이 아니다.
+     * 그쪽은 <b>사용자가 아는 폭염특보 척도로 등급을 말하는 화면</b>이고 여기는 반려견 기준
+     * 척도로 점수를 매기는 곳이다 - 척도가 다르니 임계도 다르다.
+     *
+     * <p>둘을 더하지 않고 큰 값 하나만 쓰는 것은 같은 위험(더위)을 두 번 세지 않기 위해서다.
+     *
+     * <p>중기예보에는 시각별 습도가 없어 {@code maxFeelsLikeTemperature()} 가 null 이다.
+     * 그때는 기온 규칙으로 자연스럽게 퇴화한다 - 없는 습도를 지어내 체감을 만들지 않는다.
+     */
+    private static int applyHeatRule(
+        DailyWeather weather, PetCondition pet, SuitabilityThresholds thresholds,
+        boolean sheltered, List<SuitabilityReason> reasons
+    ) {
+        Double highest = weather.maxTemperature();
+        Double feelsLike = weather.maxFeelsLikeTemperature();
+
+        // 기온이 없으면 체감만으로, 체감이 없으면 기온만으로 본다. 둘 다 없으면 판정하지 않는다.
+        boolean useFeelsLike = feelsLike != null && (highest == null || feelsLike > highest);
+        Double effective = useFeelsLike ? feelsLike : highest;
+        if (effective == null) {
+            return 0;
+        }
+
+        int amount = 0;
+        if (effective >= thresholds.veryHotTemperature()) {
+            amount = PENALTY_VERY_HOT;
+        } else if (effective >= thresholds.hotTemperature()) {
+            amount = PENALTY_HOT;
+        }
+        if (amount == 0) {
+            return 0;
+        }
+
+        if (pet.heatSensitive()) {
+            amount += PENALTY_SENSITIVE_EXTRA;
+        }
+        amount = shelterAdjusted(amount, sheltered);
+        reasons.add(SuitabilityReason.of(SuitabilityReasonCode.HEAT_RISK,
+            describeHeat(useFeelsLike, feelsLike, highest, pet.heatSensitive()), -amount));
+        return amount;
+    }
+
+    /** 어느 수치로 깎았는지가 문장에 드러나야 한다. 체감으로 깎고 기온을 보여 주면 근거가 어긋난다. */
+    private static String describeHeat(
+        boolean useFeelsLike, Double feelsLike, Double airTemperature, boolean heatSensitive
+    ) {
+        String suffix = heatSensitive ? " 로, 더위에 약한 아이에게는 부담이 큽니다." : " 로 더위에 주의가 필요합니다.";
+        if (!useFeelsLike) {
+            return "최고기온 %.0f도%s".formatted(airTemperature, suffix);
+        }
+        return airTemperature == null
+            ? "최고 체감온도 %.0f도%s".formatted(feelsLike, suffix)
+            : "최고 체감온도 %.0f도(기온 %.0f도)%s".formatted(feelsLike, airTemperature, suffix);
     }
 
     private static int applyCongestion(SuitabilityInput input, List<SuitabilityReason> reasons, boolean applied) {
