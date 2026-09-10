@@ -7,8 +7,8 @@ import { PlaceRow } from '@/features/place/place-row'
 import { messages } from '@/lib/messages'
 import { placeSummary } from '@/test/fixtures/place'
 
-function render(place = placeSummary, last = false) {
-  return renderToStaticMarkup(createElement(PlaceRow, { place, last }))
+function render(place = placeSummary) {
+  return renderToStaticMarkup(createElement(PlaceRow, { place }))
 }
 
 describe('PlaceRow — 서버 metadata 렌더', () => {
@@ -36,20 +36,42 @@ describe('PlaceRow — 서버 metadata 렌더', () => {
   })
 })
 
-describe('PlaceRow — 표면 (DESIGN.md §0)', () => {
-  it('카드가 아니라 행이다 — 라운드·그림자를 쓰지 않는다', () => {
+describe('PlaceRow — L2 항목 (DESIGN.md §0 · 3a)', () => {
+  it('카드가 아니다 — 라운드·그림자를 쓰지 않는다', () => {
     const markup = render()
 
     expect(markup).not.toContain('rounded-lg')
     expect(markup).not.toContain('shadow')
   })
 
-  it('마지막 행이 아니면 구분선을 그린다', () => {
-    expect(render(placeSummary, false)).toContain('border-b')
+  /*
+    **구분선을 행이 그리지 않는다.** `SurfaceList` 가 `[&>li+li]` 로 항목 사이에만
+    긋는다 — 그래서 이 행에는 `last` prop 이 없다. 행이 선을 다시 그리면 목록의 첫
+    항목 위에도 선이 생기고(제목 아래 허공에 선) 마지막 항목 아래는 두 줄이 된다.
+  */
+  it('자기 테두리를 두르지 않는다 — 구분선은 SurfaceList 가 소유한다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain('border-b')
+    expect(markup).not.toContain('border-t')
   })
 
-  it('마지막 행에는 구분선을 그리지 않는다', () => {
-    expect(render(placeSummary, true)).not.toContain('border-b')
+  it('기본 인셋은 카드 안 값(16/20)이다 — 3a 가 정본이라 카드가 기본 자리다', () => {
+    const markup = render()
+
+    expect(markup).toContain('px-4')
+    expect(markup).toContain('md:px-5')
+    // 페이지 인셋 40 을 카드 안에서 쓰면 내용이 두 번 밀린다 (§0)
+    expect(markup).not.toContain('md:px-10')
+  })
+
+  it('카드 밖 사용처는 페이지 인셋을 스스로 밝힌다 — 지도 SDK 실패 폴백 목록', () => {
+    const markup = renderToStaticMarkup(
+      createElement(PlaceRow, { place: placeSummary, inset: 'main' }),
+    )
+
+    expect(markup).toContain('md:px-10')
+    expect(markup).not.toContain('md:px-5')
   })
 })
 

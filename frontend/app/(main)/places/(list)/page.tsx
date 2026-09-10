@@ -1,5 +1,6 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 
+import { Canvas, Surface, SurfaceStack } from '@/components/surface'
 import { ViewToggle } from '@/components/view-toggle'
 import { filterSummaryLine } from '@/features/place/filter-summary-line'
 import { PlaceFilterChips } from '@/features/place/place-filter-chips'
@@ -87,38 +88,67 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
   }
 
   return (
-    <main id="main-content" className="rail-layout rail-layout-filter">
+    /*
+      **3층 표면** (`DESIGN.md §0`, 이슈 #439). `main` 이 L0 바닥을 전폭으로 깔고,
+      목록이 L1 카드 하나가 된다.
+
+      **열 구분선을 걷었다.** 2a 에서는 우측 열의 `border-left` 가 두 열을 갈랐는데,
+      3a 는 **L0 바닥이 그 일을 한다** — 카드 사이·열 사이로 바닥이 비친다. 홈(#428)이
+      같은 이유로 걷었다. 선을 남기면 카드 테두리와 선이 나란히 두 줄로 읽힌다.
+    */
+    <Canvas as="main" id="main-content" className="rail-layout rail-layout-filter">
       {/* `rail-sticky`(globals.css) — 레일이 뷰포트보다 길어도 바닥에 닿을 수 있게
           자기 스크롤을 준다. 실측: 1280×900 에서 레일 1067px 이라 실내·야외 축이 잘렸다 */}
       <div className="rail-sticky hidden lg:block">
         <PlaceFilterRail filters={filters} authed={authed} />
       </div>
 
-      <div className="lg:border-border lg:border-l">
-        {/* 좌우 여백은 `Row`(px-4 md:px-10)와 같은 값이어야 한다 — 어긋나면 제목과
-            행 구분선이 다른 축에서 시작해 목록이 어긋나 보인다 (768 실렌더에서 확인) */}
-        <header className="px-4 pt-5 pb-3 md:px-10 lg:pt-6">
-          <div className="flex items-start justify-between gap-3">
-            <h1 className="text-title-1 text-fg lg:text-display font-bold lg:font-extrabold">
-              {messages.place.pageTitle}
-            </h1>
-            {/* 세 화면이 같은 세그먼트 컨트롤을 쓴다 — 아트보드 05 마지막 단락 */}
-            <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
-          </div>
-          {/* 부제는 데스크톱에서만 — 모바일은 바로 아래 칩이 같은 것을 보여준다 */}
-          <p className="text-caption text-fg-muted mt-1 hidden font-medium lg:block">
-            {filterSummaryLine(filters)}
-          </p>
-        </header>
-
+      <SurfaceStack>
+        {/*
+          **필터는 카드 밖이다.** 칩은 목록을 좁히는 **도구**이고 카드는 그 결과를 담는다 —
+          §0 의 카드 판정 3문에서 "혼자 떼어놔도 말이 되는가" 에 걸린다(필터만 있는 화면은
+          없다). 데스크톱 레일이 카드 밖에 서 있는 것과 같은 자리다.
+        */}
         <div className="lg:hidden">
           <PlaceFilterChips filters={filters} authed={authed} />
         </div>
 
-        <HydrationBoundary state={dehydrate(queryClient)}>
-          <PlaceListView filters={filters} />
-        </HydrationBoundary>
-      </div>
-    </main>
+        {/*
+          **페이지 제목이 카드 제목으로 들어왔다** (§0 "섹션 제목은 섹션 안에 있다").
+          이 화면의 카드는 하나뿐이고 그 카드의 이름이 곧 페이지의 이름이라, 밖에 두면
+          제목만 바닥 위에 떠 어느 묶음의 제목인지 모호해진다.
+
+          그래서 **보이는 제목은 카드의 `h2`** 이고, 페이지의 `h1` 은 `sr-only` 로 남긴다 —
+          **이 라우트의 지도 갈래(위)와 `emergency` 가 이미 쓰는 방식이다.** 두 갈래가 같은
+          `h1` 을 내야 보기 전환이 문서 구조를 바꾸지 않는다.
+
+          보조기기에서 "장소 찾기" 가 h1·h2 로 두 번 들린다. `Surface` 에 제목 레벨 prop 을
+          더하면 없앨 수 있지만 **그러면 한 규칙에 두 경로가 생긴다** — 홈은 `sr-only` h1
+          방식이고, 추측으로 만든 API 를 아무 화면도 검증하지 않는 것이 #422 에서
+          프리미티브 넷을 걷은 이유다. 필요해지는 화면이 나오면 그때 만든다.
+        */}
+        <h1 className="sr-only">{messages.place.pageTitle}</h1>
+
+        <Surface
+          lead
+          titleId="place-list-heading"
+          title={messages.place.pageTitle}
+          /* 부제는 데스크톱에서만 — 모바일은 위의 칩이 같은 것을 보여준다 */
+          description={
+            <p className="text-caption text-fg-muted hidden font-medium lg:block">
+              {filterSummaryLine(filters)}
+            </p>
+          }
+          /* 세 화면이 같은 세그먼트 컨트롤을 쓴다 — 아트보드 05 마지막 단락 */
+          trailing={
+            <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
+          }
+        >
+          <HydrationBoundary state={dehydrate(queryClient)}>
+            <PlaceListView filters={filters} />
+          </HydrationBoundary>
+        </Surface>
+      </SurfaceStack>
+    </Canvas>
   )
 }

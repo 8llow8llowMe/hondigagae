@@ -1,5 +1,5 @@
 import { Skeleton } from '@/components/skeleton'
-import { Row } from '@/components/surface'
+import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 
 /**
  * 실제 행과 **같은 골격**으로 그린다 — 썸네일 자리를 포함해 높이·리듬을 흉내 낸다
@@ -8,9 +8,9 @@ import { Row } from '@/components/surface'
  * 고정 높이(예: `h-28`)를 쓰면 실데이터 행과 어긋나 레이아웃 점프가 생긴다.
  * 같은 골격을 두면 자연히 비슷한 높이가 된다.
  */
-export function PlaceRowSkeleton({ last = false }: { last?: boolean }) {
+export function PlaceRowSkeleton({ inset = 'card' }: { inset?: Inset }) {
   return (
-    <Row as="li" last={last}>
+    <li className={INSET_CLASS[inset]}>
       <div className="flex gap-3 py-3 lg:gap-5 lg:py-4">
         <Skeleton variant="thumbnail" className="size-20 shrink-0 lg:size-24" />
 
@@ -24,6 +24,6 @@ export function PlaceRowSkeleton({ last = false }: { last?: boolean }) {
           </div>
         </div>
       </div>
-    </Row>
+    </li>
   )
 }

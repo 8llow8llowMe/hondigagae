@@ -236,6 +236,8 @@ export function PlaceMapView({
           {failureMessage(failure)}
         </p>
         <PlaceListSection
+          /* 폴백 목록은 카드가 아니라 페이지 위다 — 카드 인셋 20 을 쓰면 위 안내 줄(40)과 어긋난다 */
+          inset="main"
           places={listPlaces}
           loading={listQuery.isPending}
           errorStatus={toErrorStatus(listQuery.error)}
