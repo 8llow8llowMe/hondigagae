@@ -365,7 +365,7 @@ export function HomeView({
               title={messages.home.emergencyTitle}
               description={hospitalBannerDescription(nearestHospital)}
               leading={<EmergencyIcon size={24} />}
-              inset="panel"
+              inset="card"
             />
           </Surface>
           {/*

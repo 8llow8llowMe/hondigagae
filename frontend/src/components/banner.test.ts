@@ -42,10 +42,24 @@ describe('Banner — 상시 진입점 (아트보드 `홈·내비게이션`)', ()
     expect(markup).not.toContain('text-caption')
   })
 
+  it('자기 배경을 칠하지 않는다 — 각진 흰 면이 감싸는 카드의 모서리를 덮는다 (#428)', () => {
+    /*
+      3a 에서 실제로 났다. `Surface`(radius 12) 안의 배너가 `bg-bg` 로 각진 흰 면을
+      그려 카드가 사각으로 보였다. `overflow-hidden` 으로 풀 수 없다 — 같은 카드 안
+      `ProfileCard` 의 팝오버가 `absolute`(portal 아님)라 함께 잘린다.
+    */
+    const classes = render()
+      .split('class="')
+      .slice(1)
+      .flatMap((chunk) => chunk.split('"')[0]?.split(/\s+/) ?? [])
+
+    expect(classes.filter((name) => /^bg-/.test(name))).toEqual([])
+  })
+
   it('배경을 붉게 칠하지 않는다 — 상시 진입점이지 경보가 아니다', () => {
     const markup = render({ leading: createElement('svg') })
 
-    expect(markup).toContain('bg-bg')
+    // `bg-bg` 를 기대하던 줄을 걷었다 — 배너는 자기 면을 갖지 않는다 (#428, 위 테스트)
     expect(markup).not.toContain('bg-danger')
     // 아이콘에만 danger 색을 쓴다
     expect(markup).toContain('text-danger-500')
