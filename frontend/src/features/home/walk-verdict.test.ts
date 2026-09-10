@@ -14,9 +14,26 @@ const HEAT_WAVE_WARNING: WeatherWarningItem = {
   effectiveAt: '2026-08-29T11:00:00',
 }
 
+const TODAY_LABEL = '2026-08-29 (금) · 제주시'
+
 function render(data: WalkSafetyResponse) {
-  return renderToStaticMarkup(createElement(WalkVerdict, { data, petName: '몽실이' }))
+  return renderToStaticMarkup(
+    createElement(WalkVerdict, { data, petName: '몽실이', todayLabel: TODAY_LABEL }),
+  )
 }
+
+describe('날짜 줄 — 데스크톱은 이 카드가 겸한다 (#428)', () => {
+  it('체감온도 라벨과 같은 줄에 날짜가 선다', () => {
+    const markup = render(walkSafety)
+
+    expect(markup).toContain(TODAY_LABEL)
+    /*
+      **`items-baseline` 이어야 한다.** 양쪽이 caption + 값 두 줄이 되면서 값 줄 높이가
+      갈리는데(16 vs 28), `items-end` 로 두면 위 caption 두 개가 어긋난다.
+    */
+    expect(markup).toContain('items-baseline')
+  })
+})
 
 /*
   #349. 예전에는 이 섹션이 접힌 모바일 줄과 데스크톱 등급 줄 **양쪽에** 배지를 그렸다.

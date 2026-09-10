@@ -232,6 +232,12 @@ export function HomeView({
     **`GET /plans` 는 날짜순이 아니다** — 최근 생성순이다. 그대로 첫 건을 집으면 지나간
     일정이 "다가오는 일정" 으로 뜬다 (`pickUpcomingPlans`).
   */
+  /*
+    데스크톱 날짜 줄의 자리를 가른다 (#428). **판정 패널이 실제로 서는 날에만** 그쪽이
+    날짜를 맡는다 — 스켈레톤·오류 상태에는 `체감온도` 줄 자체가 없어 날짜가 사라진다.
+  */
+  const verdictShown = basisPlaceId !== null && walkSafety.data !== undefined
+
   const today = dayToLocalNoon(todayIso)
   const upcomingPlans = today === null ? [] : pickUpcomingPlans(plans, today, UPCOMING_PLAN_COUNT)
 
@@ -272,8 +278,23 @@ export function HomeView({
           {/*
             날짜 줄은 카드가 아니다 — **페이지 머리**다. 자기 제목이 없고 한 줄이라
             카드 판정 3문 중 둘을 못 넘는다. 바닥 위에 직접 놓는다.
+
+            **데스크톱에 판정이 서면 이 줄을 감춘다** (#428). 3a 로 바닥이 회색이 되면서
+            이 줄만 카드 밖에 떠 **어느 카드의 날짜인지 붙을 곳이 없어졌다.** 판정 카드가
+            `체감온도` 라벨과 같은 줄에 자리를 갖고 있어 그리로 들였다 (`WalkVerdict`).
+
+            **모바일은 여기 남는다.** 판정이 접힌 한 줄이 기본이라 그 패널이 닫혀 있을 수
+            있고, 그러면 날짜가 어디에도 없게 된다.
+
+            **판정이 없으면(기준 장소 없음 · 조회 실패 · 로딩) 데스크톱에서도 여기 남는다** —
+            첫 방문자가 날짜를 잃지 않는다.
           */}
-          <p className="text-caption text-fg-muted px-4 pt-3 font-medium tabular-nums md:px-1 md:pt-1">
+          <p
+            className={cn(
+              'text-caption text-fg-muted px-4 pt-3 font-medium tabular-nums md:px-1 md:pt-1',
+              verdictShown && 'md:hidden',
+            )}
+          >
             {todayLabel}
           </p>
 
@@ -316,6 +337,7 @@ export function HomeView({
                   <WalkVerdict
                     data={walkSafety.data}
                     petName={selectedPet?.name ?? null}
+                    todayLabel={todayLabel}
                     busy={walkSafety.isFetching && !walkSafety.isPending}
                   />
                 )}
