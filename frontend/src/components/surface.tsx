@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils/cn'
  * | 2a (DESIGN.md §0 현행) | `Band` · `Section` · `Row` · `RowList` | 유지. 전 화면이 아직 이것을 쓴다 |
  * | 3a (개정안) | `Canvas` · `Surface` · `SurfaceList` · `SurfaceRow` · `SurfaceTile` | **추가.** 아직 아무도 안 쓴다 |
  *
- * **2a 를 지우지 않는 것이 이 이슈의 핵심이다.** 홈 한 화면(#423 예정)만 3a 로 옮겨
+ * **2a 를 지우지 않는 것이 이 이슈의 핵심이다.** 홈 한 화면(#428)만 3a 로 옮겨
  * 검증하고, 통과해야 DESIGN.md §0 을 개정한다. 실패하면 3a 쪽만 지우면 되고 화면은
  * 하나도 건드리지 않은 상태다.
  *
