@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.insight.adapter.in.internal.controller;
 
 import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.insight.adapter.in.internal.dto.DailyWeatherInternalResponse;
+import com.hondigagae.domainlayer.insight.adapter.in.internal.dto.WeatherWarningInternalResponse;
 import com.hondigagae.domainlayer.insight.application.port.in.InsightInternalUseCase;
 import io.swagger.v3.oas.annotations.Hidden;
 import java.util.List;
@@ -35,5 +36,17 @@ public class WeatherInternalController {
         @RequestParam String areaCode
     ) {
         return ResponseEntity.ok().body(Response.success(insightInternalUseCase.getDailyWeather(areaCode)));
+    }
+
+    /**
+     * 발효 중인 기상특보 중 가장 무거운 한 건. plan-service 여행 브리핑이 당일 일정에 붙인다.
+     *
+     * <p><b>없으면 {@code dataBody} 가 null 인 200 이다.</b> 404 로 답하면 "특보 없음" 이
+     * 호출부의 오류 경로로 들어가는데, 특보가 없는 것이 압도적으로 흔한 정상 상태다.
+     */
+    @GetMapping("/warnings")
+    public ResponseEntity<Response<WeatherWarningInternalResponse>> getActiveWeatherWarning() {
+        return ResponseEntity.ok().body(
+            Response.success(insightInternalUseCase.getActiveWeatherWarning().orElse(null)));
     }
 }

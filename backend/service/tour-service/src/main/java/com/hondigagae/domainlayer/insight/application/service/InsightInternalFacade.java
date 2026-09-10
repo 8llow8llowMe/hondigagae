@@ -1,10 +1,13 @@
 package com.hondigagae.domainlayer.insight.application.service;
 
 import com.hondigagae.domainlayer.insight.adapter.in.internal.dto.DailyWeatherInternalResponse;
+import com.hondigagae.domainlayer.insight.adapter.in.internal.dto.WeatherWarningInternalResponse;
 import com.hondigagae.domainlayer.insight.adapter.in.internal.presenter.InsightInternalPresenter;
 import com.hondigagae.domainlayer.insight.application.port.in.InsightInternalUseCase;
 import com.hondigagae.domainlayer.insight.application.service.processor.WeatherForecastProcessor;
+import com.hondigagae.domainlayer.insight.application.service.processor.WeatherWarningProcessor;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +27,7 @@ public class InsightInternalFacade implements InsightInternalUseCase {
     private static final String JEJU_SIGUNGU_CODE = "4";
 
     private final WeatherForecastProcessor weatherForecastProcessor;
+    private final WeatherWarningProcessor weatherWarningProcessor;
     private final InsightInternalPresenter insightInternalPresenter;
 
     @Override
@@ -36,5 +40,18 @@ public class InsightInternalFacade implements InsightInternalUseCase {
         }
         return insightInternalPresenter.toDailyWeatherResponses(
             weatherForecastProcessor.dailyForecastsAt(JEJU_LAT, JEJU_LNG, JEJU_SIGUNGU_CODE));
+    }
+
+    /**
+     * 발효 중인 특보 중 가장 무거운 한 건. 고르는 판정은 {@link WeatherWarningProcessor} 가 갖고
+     * 이 Facade 는 표현으로 접기만 한다 — 웹 응답 4곳과 같은 값을 내보내야 한다.
+     *
+     * <p>지점이 제주 하나라 {@code areaCode} 파라미터를 두지 않았다. 특보 조회는 격자가 아니라
+     * 지점(184) 단위이고, 그 지점 하나가 제주 전역을 덮는다.
+     */
+    @Override
+    public Optional<WeatherWarningInternalResponse> getActiveWeatherWarning() {
+        return weatherWarningProcessor.heaviestWarning()
+            .map(insightInternalPresenter::toWeatherWarningResponse);
     }
 }
