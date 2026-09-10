@@ -5,7 +5,7 @@ import { FormAlert } from '@/components/form-alert'
 import { PlaceRowContent } from '@/features/place/place-row'
 import { messages } from '@/lib/messages'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
-import { INSET_CLASS } from '@/lib/ui/inset'
+import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import type { PlaceSummary } from '@/types/place'
 
 /**
@@ -27,6 +27,7 @@ export function PlanAddPlaceRow({
   disabled,
   error,
   onAdd,
+  inset = 'card',
 }: {
   place: PlaceSummary
   /** **그 일자에** 이미 담겼다. 서버가 중복을 막지 않아 화면이 막는다 (F5-4) */
@@ -41,14 +42,26 @@ export function PlanAddPlaceRow({
    */
   error: PlanDaySaveError | null
   onAdd: (place: PlaceSummary) => void
+  /**
+   * 좌우 여백 축. **이 행을 담는 곳이 정한다** (`PlaceRow` 와 같은 규칙).
+   *
+   * 기본은 카드 안(16/20)이다 — 목록 갈래에서 이 행은 L1 카드 안에 든다 (#451).
+   * **지도 갈래의 SDK 실패 폴백 목록은 카드가 아니라 페이지 위**라 `main`(16/40)을
+   * 넘긴다: 그 목록은 `PlaceListSection inset="main"` 이고 위 안내 줄도 `md:px-10`
+   * 이어서, 여기서 20 을 쓰면 768 이상에서 행만 20px 안쪽으로 들어간다
+   * (`place-map-view.tsx` 의 폴백 주석이 못박아 둔 규칙이다).
+   */
+  inset?: Inset
 }) {
   return (
     /*
-      **이 화면은 아직 3a 로 옮기지 않았다.** 목록이 카드 안이 아니라 페이지 위에 있어
-      인셋이 카드 값(16/20)이 아니라 페이지 값(16/40)이다 — 옮길 때 `INSET_CLASS.card`
-      로 바꾼다. 구분선은 `SurfaceList` 가 항목 사이에만 그으므로 `last` 는 없다.
+      **3a 로 옮겼다** (#451). 목록 갈래에서 이 행은 L1 카드 안에 들어가므로 기본 인셋이
+      페이지 값(16/40)이 아니라 카드 값(16/20)이다 — 카드가 이미 페이지에서 한 번 들어와
+      있어 안쪽까지 40 을 주면 내용이 두 번 밀린다 (`DESIGN.md §0`). **지도 폴백은 카드가
+      아니라 `main` 이라** 그쪽만 `inset` 을 넘겨 되돌린다. 구분선은 `SurfaceList` 가 항목
+      사이에만 그으므로 `last` 는 없다.
     */
-    <li className={INSET_CLASS.main}>
+    <li className={INSET_CLASS[inset]}>
       <div className="@container flex items-center gap-3 py-3 @lg:gap-5 @lg:py-4">
         <PlaceRowContent place={place} titleHref={`/places/${place.placeId}`} />
 

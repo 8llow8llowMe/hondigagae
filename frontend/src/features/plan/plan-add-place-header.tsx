@@ -1,7 +1,9 @@
 import { BackLink } from '@/components/back-link'
 import { ViewToggle } from '@/components/view-toggle'
 import { messages } from '@/lib/messages'
+import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import type { ViewMode } from '@/lib/url/view-mode'
+import { cn } from '@/lib/utils/cn'
 
 /**
  * 담기 화면의 머리 — 뒤로가기 · `h1` · 부제 · 보기 전환.
@@ -14,6 +16,10 @@ import type { ViewMode } from '@/lib/url/view-mode'
  *
  * **오류·빈 상태에도 `h1` 이 있어야 한다.** 없으면 문서의 최상위 제목이 필터의
  * `h2 "필터"` 가 되어 스크린리더 사용자가 무슨 화면인지 알 수 없다 (실측으로 잡았다).
+ *
+ * **목록 보기는 3층 표면의 L0 위 페이지 머리다** (`DESIGN.md §0`, #451) — 카드가 아니다.
+ * 카드 판정 3문에서 ①(자기 제목)·③(항목 여럿)에 걸리고, 장소 상세(#443)·일정 상세(#447)가
+ * 같은 자리를 같은 방식으로 두었다.
  */
 export function PlanAddPlaceHeader({
   day,
@@ -22,6 +28,7 @@ export function PlanAddPlaceHeader({
   listHref,
   mapHref,
   view,
+  inset = 'main',
 }: {
   day: number
   backHref: string
@@ -30,11 +37,26 @@ export function PlanAddPlaceHeader({
   listHref: string
   mapHref: string
   view: ViewMode
+  /**
+   * 좌우 여백 축. **기본은 `main`(16/40)이고 지도 보기가 그것을 쓴다** — 지도는 전폭
+   * 미디어라 카드 열이 없다.
+   *
+   * 목록 보기(`SurfaceStack` 안)는 `card` 를 넘긴다. L0 위에 놓이지만 인셋은 **카드 안
+   * 글줄과 같은 축**이어야 아래 카드의 첫 글자와 세로선이 맞는다 — 카드 테두리 1px 만큼
+   * (44 vs 45) 어긋나는 것은 #443 · #447 과 같은 의도다.
+   */
+  inset?: Inset
 }) {
   const subtitle = messages.plan.addPlaceSubtitle.replace('{day}', String(day))
 
   return (
-    <header className="px-4 pt-5 pb-3 md:px-10 lg:pt-6">
+    <header
+      className={cn(
+        INSET_CLASS[inset],
+        // 데스크톱 세로 여백은 `SurfaceStack` 의 `md:p-6` 이 준다 (#447 개요 패널과 같은 값)
+        inset === 'card' ? 'pt-4 pb-4 md:pt-0 md:pb-0' : 'pt-5 pb-3 lg:pt-6',
+      )}
+    >
       <BackLink href={backHref} label={messages.plan.addPlaceBack} className="-ml-1" />
 
       <div className="flex items-start justify-between gap-3">

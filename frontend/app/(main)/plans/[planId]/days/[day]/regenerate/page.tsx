@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 
+import { Canvas } from '@/components/surface'
 import { PlanDayRegenerateView } from '@/features/plan/plan-day-regenerate-view'
 import { planKeys } from '@/features/plan/queries'
 import { ApiError } from '@/lib/api/error'
@@ -62,8 +63,9 @@ export default async function PlanDayRegeneratePage({ params }: { params: Params
     if (error instanceof ApiError && error.kind === 'not-found') notFound()
   }
 
+  // `main` 이 L0 바닥이다 (`DESIGN.md §0`, #451) — 카드를 쌓는 일은 뷰의 `SurfaceStack` 이 맡는다
   return (
-    <main id="main-content">
+    <Canvas as="main" id="main-content">
       <HydrationBoundary state={dehydrate(queryClient)}>
         {/*
           **`today` 를 서버에서 만들어 내려보낸다.** 클라이언트가 따로 `new Date()` 를
@@ -72,6 +74,6 @@ export default async function PlanDayRegeneratePage({ params }: { params: Params
         */}
         <PlanDayRegenerateView planId={planId} day={day} today={new Date().toISOString()} />
       </HydrationBoundary>
-    </main>
+    </Canvas>
   )
 }

@@ -44,7 +44,8 @@ export type PlaceListSectionProps = {
    */
   renderRow?: (place: PlaceSummary) => ReactNode
   /**
-   * 기본 행·스켈레톤의 좌우 인셋. **이 목록을 담는 곳이 정한다** (`inset.ts`).
+   * 기본 행·스켈레톤과 **빈·오류 상태**의 좌우 인셋. **이 목록을 담는 곳이 정한다**
+   * (`inset.ts`). 네 상태가 서로 다른 축에 서면 목록이 바뀌는 순간 왼쪽 선이 뛴다 (#451).
    *
    * 기본은 카드 안(16/20)이다 — 3a 가 정본이라 카드가 기본 자리다. 지도 SDK 실패
    * 폴백 목록은 카드가 아니라 페이지 위에 놓이므로 `main`(16/40)을 넘긴다.
@@ -88,6 +89,8 @@ export function PlaceListSection({
     if (kind === 'not-found') {
       return (
         <EmptyState
+          /* 네 상태가 목록과 같은 축에 선다 — 기본 `main`(40)은 카드 안에서 두 번 밀린다 (§0) */
+          inset={inset}
           title={toMessage(errorMessage, messages.place.emptyTitle)}
           description={messages.place.emptyDescription}
           action={
@@ -102,6 +105,7 @@ export function PlaceListSection({
     if (kind === 'validation') {
       return (
         <ErrorState
+          inset={inset}
           title={messages.common.validationErrorTitle}
           description={toMessage(errorMessage, messages.place.emptyDescription)}
           retryLabel={messages.place.resetFilters}
@@ -113,6 +117,7 @@ export function PlaceListSection({
     // 5xx · 무응답 — 재시도를 제공한다
     return (
       <ErrorState
+        inset={inset}
         title={messages.place.errorTitle}
         description={messages.common.temporaryErrorDescription}
         onRetry={onRetry}
@@ -123,6 +128,7 @@ export function PlaceListSection({
   if (places.length === 0) {
     return (
       <EmptyState
+        inset={inset}
         title={messages.place.emptyTitle}
         description={messages.place.emptyDescription}
         action={

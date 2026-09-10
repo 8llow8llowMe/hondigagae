@@ -158,6 +158,25 @@ describe('PlanAddPlaceHeader — 두 보기가 나눠 쓰는 머리', () => {
     expect(renderHeader()).toContain(messages.plan.addPlaceSubtitle.replace('{day}', '2'))
   })
 
+  /*
+    #451 이 목록 갈래를 3층 표면으로 옮기면서 머리의 인셋이 갈렸다. 지도는 전폭 미디어라
+    페이지 인셋(16/40) 그대로고, 목록은 `SurfaceStack` 안이라 카드 안 글줄과 같은 축
+    (16/20)이어야 아래 카드의 첫 글자와 세로선이 맞는다.
+  */
+  it('목록 갈래는 카드 인셋에 선다 — inset="card" 면 20 이고 40 이 아니다', () => {
+    const markup = renderHeader({ view: 'list', inset: 'card' })
+
+    expect(markup).toContain('md:px-5')
+    expect(markup).not.toContain('md:px-10')
+  })
+
+  it('기본은 페이지 인셋이다 — 지도 갈래는 값을 넘기지 않는다', () => {
+    const markup = renderHeader()
+
+    expect(markup).toContain('md:px-10')
+    expect(markup).not.toContain('md:px-5')
+  })
+
   it('보기 전환 토글이 현재 보기를 눌린 상태로 알린다', () => {
     const onMap = renderHeader({ view: 'map' })
     const onList = renderHeader({ view: 'list' })

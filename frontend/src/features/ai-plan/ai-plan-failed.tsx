@@ -1,5 +1,7 @@
 import { Button, ButtonLink } from '@/components/button'
 import { messages } from '@/lib/messages'
+import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 
 export type AiPlanFailedProps = {
   /**
@@ -33,6 +35,14 @@ export type AiPlanFailedProps = {
    * 것이 잘못된 목적지다. 그 화면은 `null` 을 넘기고 `조건 바꾸기` 하나로 되돌아간다.
    */
   manualHref?: string | null
+  /**
+   * 좌우 여백 축 (`EmptyState` · `ErrorState` 와 같은 계약). 기본은 페이지 위 `main`
+   * (16/40)이고 `/ai-plans/jobs/[jobId]` 가 그것을 쓴다.
+   *
+   * 하루 재생성(#451)은 이 화면이 L1 카드 안에 들어가 `card`(16/20)를 넘긴다 — 카드가
+   * 이미 한 번 들어와 있어 안쪽까지 40 을 주면 내용이 두 번 밀린다 (`DESIGN.md §0`).
+   */
+  inset?: Inset
 }
 
 /**
@@ -53,9 +63,10 @@ export function AiPlanFailed({
   changeHref,
   manualHref = '/plans/new',
   hint = null,
+  inset = 'main',
 }: AiPlanFailedProps) {
   return (
-    <div className="flex flex-col items-start gap-3 px-4 py-12 md:px-10">
+    <div className={cn('flex flex-col items-start gap-3 py-12', INSET_CLASS[inset])}>
       <h2 className="text-title-2 text-fg font-semibold">{title}</h2>
 
       {/* 서버 문구를 그대로 쓴다 — 실패 이유를 우리가 다시 쓰면 조건 문제가 장애로 읽힌다 */}

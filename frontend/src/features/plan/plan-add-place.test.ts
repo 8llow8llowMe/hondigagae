@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
+import { PlaceListSection } from '@/features/place/place-list-section'
 import { PlanAddPlaceRow } from '@/features/plan/plan-add-place-row'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { PlanIndoorAlternatives } from '@/features/plan/plan-indoor-alts'
@@ -234,32 +235,128 @@ describe('담기 성공 후 화면에 남는다 (#370)', () => {
   })
 })
 
-describe('스켈레톤이 행과 같은 인셋에 선다 (#439)', () => {
+describe('행과 그 행을 담는 목록이 같은 인셋에 선다 (#451)', () => {
   const source = readFileSync(
     fileURLToPath(new URL('./plan-add-place-view.tsx', import.meta.url)),
     'utf8',
   )
 
   /*
-    이 화면은 아직 2a 라 행(`PlanAddPlaceRow`)이 페이지 인셋 `main`(16/40)에 선다.
-    `PlaceListSection` 의 기본 인셋은 3a 카드 안 값 `card`(16/20)이므로, 넘기지 않으면
-    **스켈레톤만 20 에 서고 실데이터 행은 40 에 서** 목록이 바뀌는 순간 왼쪽 선이 뛴다.
-    첫 로딩 껍데기와 본 목록 두 곳 모두 넘겨야 한다 — 하나만 넘기면 더 받는 중 스켈레톤이
-    다시 어긋난다. 3a 로 옮기면 행과 함께 `card` 로 바꾸고 이 테스트도 따라 바꾼다.
+    **불변식은 "카드 안이냐" 가 아니라 "행과 목록이 같은 축에 서느냐" 다.**
+
+    이 뷰는 `PlanAddPlaceRow` 를 두 자리에서 그린다.
+    - **목록 갈래** — L1 카드 안이라 행·스켈레톤·빈/오류가 전부 카드 값 `card`(16/20)다.
+      `PlaceListSection` 의 기본값이 그것이므로 **넘기지 않는 것**이 맞는 상태다 (#451).
+    - **지도 갈래의 SDK 실패 폴백** — 카드가 아니라 페이지 위라 `main`(16/40)이다. 그쪽
+      `PlaceListSection` 은 `inset="main"` 이고 위 안내 줄도 `md:px-10` 이어서
+      (`place-map-view.tsx`), 행이 기본값으로 서면 768 이상에서 행만 20 이 된다.
+
+    #439 가 "두 곳 다 `inset="main"`" 을 잠갔던 자리다 — 화면이 3a 로 옮겨지면서
+    목록 갈래만 뒤집혔고 폴백은 그대로다.
   */
-  it('PlaceListSection 두 곳 모두 inset="main" 을 넘긴다', () => {
-    const uses = source.match(/<PlaceListSection\b[\s\S]*?\/>/g) ?? []
-    expect(uses).toHaveLength(2)
-    for (const use of uses) {
-      expect(use).toContain('inset="main"')
-    }
+  /**
+   * **주석을 걷은 소스로 본다.** 이 파일의 결정 주석이 `inset="main"` 같은 값을 그대로
+   * 인용하므로, 걷지 않으면 **속성을 지워도 주석이 단언을 통과시킨다** (실제로 잡았다).
+   */
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '')
+
+  /** 첩첩 태그가 없어 non-greedy 로 한 태그를 정확히 끊는다 */
+  const ROW_TAG = /<PlanAddPlaceRow\b[\s\S]*?\/>/
+
+  it('목록 갈래는 목록도 행도 인셋을 넘기지 않는다 — 기본값 card 가 곧 그 자리다', () => {
+    const block = code.slice(
+      code.lastIndexOf('<PlaceListSection'),
+      code.lastIndexOf('</PlanAddPlaceShell>'),
+    )
+
+    // `PlaceListSection` 자신의 props (renderRow 앞까지)
+    expect(block.split('renderRow=')[0]).not.toContain('inset=')
+    // 그 안에서 그리는 행
+    expect(ROW_TAG.exec(block)?.[0]).not.toContain('inset=')
   })
 
-  it('행도 같은 값을 쓴다 — 스켈레톤과 행이 서로 다른 인셋 상수를 보지 않는다', () => {
-    const row = readFileSync(
-      fileURLToPath(new URL('./plan-add-place-row.tsx', import.meta.url)),
+  it('첫 로딩 껍데기의 목록도 인셋을 넘기지 않는다 — 하나만 어긋나도 왼쪽 선이 뛴다', () => {
+    const shell = /<PlaceListSection\b[\s\S]*?\/>/.exec(code)?.[0]
+
+    expect(shell).toBeDefined()
+    expect(shell).not.toContain('inset=')
+  })
+
+  it('지도 폴백의 행은 inset="main" 을 되돌려 받는다 — 그 목록은 카드가 아니다', () => {
+    const fallback = /renderListRow=\{\(place\) => \([\s\S]*?<PlanAddPlaceRow\b[\s\S]*?\/>/.exec(
+      code,
+    )?.[0]
+
+    expect(fallback).toBeDefined()
+    expect(fallback).toContain('inset="main"')
+  })
+
+  /*
+    소스 단언만으로는 두 값이 실제로 다른 클래스가 되는지 알 수 없다 — 렌더해서 본다.
+    `card` 는 16/20(`md:px-5`), `main` 은 16/40(`md:px-10`)이다.
+  */
+  it('기본 행은 카드 값 20 으로 렌더된다', () => {
+    const markup = renderRow()
+
+    expect(markup).toContain('md:px-5')
+    expect(markup).not.toContain('md:px-10')
+  })
+
+  it('inset="main" 을 받은 행은 페이지 값 40 으로 렌더된다', () => {
+    const markup = renderRow({ inset: 'main' })
+
+    expect(markup).toContain('md:px-10')
+    expect(markup).not.toContain('md:px-5')
+  })
+
+  /*
+    스켈레톤도 같은 값이어야 목록이 실데이터로 바뀌는 순간 왼쪽 선이 뛰지 않는다.
+    `PlaceListSection` 의 기본값에 기대는 대신 실제로 로딩 상태를 렌더해 확인한다.
+  */
+  it('목록 갈래 스켈레톤도 카드 값 20 이다 — 기본값을 렌더로 확인한다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(PlaceListSection, {
+        places: [],
+        loading: true,
+        errorStatus: null,
+        hasNext: false,
+        loadingMore: false,
+        onLoadMore: () => undefined,
+        onRetry: () => undefined,
+        onResetFilters: () => undefined,
+      }),
+    )
+
+    expect(markup).toContain('md:px-5')
+    expect(markup).not.toContain('md:px-10')
+  })
+})
+
+describe('담기 목록이 3층 표면 위에 선다 (#451)', () => {
+  const source = readFileSync(
+    fileURLToPath(new URL('./plan-add-place-view.tsx', import.meta.url)),
+    'utf8',
+  )
+
+  it('껍데기가 SurfaceStack 과 Surface 를 쓴다 — 2a 프리미티브를 쓰지 않는다', () => {
+    expect(source).toContain("import { Surface, SurfaceStack } from '@/components/surface'")
+    expect(source).toContain('<SurfaceStack>')
+    expect(source).toContain('<Surface aria-label=')
+  })
+
+  /*
+    2a 는 우측 열의 `border-left` 로 두 열을 갈랐다. 3a 는 L0 바닥이 그 일을 한다 —
+    선을 남기면 카드 테두리와 나란히 두 줄로 읽힌다 (`places/(list)/page.tsx` · 홈 #428).
+  */
+  it('페이지가 열 구분선을 그리지 않는다 — 바닥이 두 열을 가른다', () => {
+    const page = readFileSync(
+      fileURLToPath(
+        new URL('../../../app/(main)/plans/[planId]/days/[day]/add/page.tsx', import.meta.url),
+      ),
       'utf8',
     )
-    expect(row).toContain('INSET_CLASS.main')
+
+    expect(page).not.toContain('lg:border-l')
+    expect(page).toContain('<Canvas as="main"')
   })
 })

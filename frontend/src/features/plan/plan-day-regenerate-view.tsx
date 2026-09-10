@@ -13,6 +13,7 @@ import { ErrorState } from '@/components/error-state'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
 import { Skeleton } from '@/components/skeleton'
+import { Surface, SurfaceStack } from '@/components/surface'
 import { Textarea } from '@/components/textarea'
 import { AiPlanFailed } from '@/features/ai-plan/ai-plan-failed'
 import { AiPlanProgress } from '@/features/ai-plan/ai-plan-progress'
@@ -36,6 +37,8 @@ import { toMessage } from '@/lib/api/response'
 import { messages } from '@/lib/messages'
 import { groupItemsByDay } from '@/lib/plan/detail'
 import { type PlanDaySaveError, toPlanDaySaveError } from '@/lib/plan/save-error'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { AiPlanDraft } from '@/types/ai-plan'
 import type { PlanDetail, PlanItemDetail, PlanItemRequest } from '@/types/plan'
 
@@ -98,7 +101,7 @@ export function PlanDayRegenerateView({
   if (detail.isPending) {
     return (
       <RegenerateShell day={day} backHref={backHref}>
-        <div aria-hidden className="flex flex-col gap-3 px-4 py-6 md:px-10">
+        <div aria-hidden className={cn('flex flex-col gap-3 py-6', INSET_CLASS.card)}>
           <Skeleton className="h-6 w-24" />
           <Skeleton className="h-24 w-full" />
         </div>
@@ -114,6 +117,7 @@ export function PlanDayRegenerateView({
     return (
       <RegenerateShell day={day} backHref={backHref}>
         <ErrorState
+          inset="card"
           title={messages.plan.detailErrorTitle}
           description={messages.plan.errorDescription}
           onRetry={() => void detail.refetch()}
@@ -144,6 +148,7 @@ export function PlanDayRegenerateView({
     return (
       <RegenerateShell day={day} backHref={backHref} planTitle={plan.title}>
         <EmptyState
+          inset="card"
           title={
             block === 'START_DATE_IN_PAST'
               ? messages.plan.regenerateDayPastPlan
@@ -159,38 +164,64 @@ export function PlanDayRegenerateView({
     )
   }
 
-  return (
-    <RegenerateShell day={day} backHref={backHref} planTitle={plan.title}>
-      {jobId === null ? (
+  if (jobId === null) {
+    return (
+      <RegenerateShell day={day} backHref={backHref} planTitle={plan.title}>
         <RegenerateSubmit plan={plan} day={day} />
-      ) : (
-        <RegenerateJob plan={plan} day={day} jobId={jobId} />
-      )}
-    </RegenerateShell>
-  )
+      </RegenerateShell>
+    )
+  }
+
+  /*
+    **껍데기를 `RegenerateJob` 안으로 넘긴다** (#451). 대기·실패·오류는 카드 하나지만
+    **완료(비교)만 카드를 스스로 그린다** — 두 열이 각자 L1 카드이고 확정 블록은 액션이라
+    카드가 아니다. 그 갈래를 여기서 알 수 없으므로 껍데기를 씌우는 자리를 상태를 아는
+    쪽으로 옮겼다. `bare` 플래그 하나를 뷰까지 끌어올리는 것보다 짧다.
+  */
+  return <RegenerateJob plan={plan} day={day} jobId={jobId} backHref={backHref} />
 }
 
 /**
- * 모든 상태가 공유하는 껍데기 — 뒤로가기 · `h1`.
+ * 모든 상태가 공유하는 껍데기 — 뒤로가기 · `h1` + L1 카드 하나.
  *
  * **오류·대기에도 `h1` 이 있어야 한다.** 없으면 문서의 최상위 제목이 진행 표시의
  * `h2` 가 되어 스크린리더 사용자가 무슨 화면인지 알 수 없다 (담기 화면과 같은 판단).
+ *
+ * **3층 표면이다** (`DESIGN.md §0`, #451). 페이지가 `Canvas` 로 L0 바닥을 깔고 여기서
+ * `SurfaceStack` 이 그 위에 쌓는다. **머리는 카드가 아니다** — 페이지 머리(h1)는 카드
+ * 판정에서 빠진다 (장소 상세 #443 · 일정 상세 #447 과 같은 결정). 인셋만 카드 안 글줄과
+ * 같은 축으로 둬서 아래 카드의 첫 글자와 세로선이 맞는다 (테두리 1px 만큼 어긋나는 것도
+ * 두 화면과 같다).
+ *
+ * **본문은 카드 하나다.** 제출 폼 · 대기 · 작업 실패 · 조회 오류 · 빈 초안이 전부 같은
+ * 화자("이 날을 다시 만드는 일")가 이어 말하는 것이라 한 카드에 든다 (§0 "카드 경계는
+ * 이야기 단위"). 상태마다 카드를 따로 그리면 하나를 빠뜨렸을 때 카드가 생겼다 사라진다
+ * (#440 판단). 머리가 이름을 이미 그리므로 카드는 `aria-label` 만 갖는다.
  */
 function RegenerateShell({
   day,
   backHref,
   planTitle,
+  bare = false,
   children,
 }: {
   day: number
   backHref: string
   /** 아직 못 받았으면 생략한다 — 제목은 `day` 만으로 쓸 수 있다 */
   planTitle?: string
+  /**
+   * `children` 이 **이미 자기 카드를 그린다** — 껍데기가 다시 감싸지 않는다.
+   *
+   * 완료(비교) 상태 하나뿐이다: 두 비교 열이 각자 L1 카드이고 확정 블록은 액션이라
+   * 카드가 아니다. 카드 안에 카드를 넣으면 §0 의 "층마다 다른 채널" 이 깨진다.
+   */
+  bare?: boolean
   children: ReactNode
 }) {
   return (
-    <>
-      <header className="px-4 pt-5 pb-3 md:px-10 lg:pt-6">
+    <SurfaceStack>
+      {/* 데스크톱 세로 여백은 `SurfaceStack` 의 `md:p-6` 이 준다 (#447 개요 패널과 같은 값) */}
+      <header className={cn('pt-4 pb-4 md:pt-0 md:pb-0', INSET_CLASS.card)}>
         {/*
           **`addPlaceBack` 을 그대로 쓴다** — 문구가 `일정으로 돌아가기` 로 화면에
           매이지 않았고 목적지도 같다. 같은 말을 위한 키를 새로 만들지 않는다.
@@ -205,8 +236,14 @@ function RegenerateShell({
         )}
       </header>
 
-      {children}
-    </>
+      {bare ? (
+        children
+      ) : (
+        <Surface aria-label={messages.plan.regenerateDayPageTitle.replace('{day}', String(day))}>
+          {children}
+        </Surface>
+      )}
+    </SurfaceStack>
   )
 }
 
@@ -254,7 +291,8 @@ function RegenerateSubmit({ plan, day }: { plan: PlanDetail; day: number }) {
   }
 
   return (
-    <div className="flex flex-col items-start gap-4 px-4 py-2 md:px-10">
+    /* 카드 안이라 인셋이 `card`(16/20)다 — 페이지 값 40 을 쓰면 내용이 두 번 밀린다 (§0) */
+    <div className={cn('flex flex-col items-start gap-4 py-5', INSET_CLASS.card)}>
       <Field id="regenerateNote" label={messages.plan.regenerateDayNoteLabel} className="w-full">
         <Textarea
           id="regenerateNote"
@@ -287,7 +325,18 @@ function RegenerateSubmit({ plan, day }: { plan: PlanDetail; day: number }) {
  * `status.code === 'FAILED'` 로 오므로(api-integration-guide.md §5) 순서를 바꾸면
  * 실패가 영원히 "진행 중" 으로 보인다.
  */
-function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jobId: string }) {
+function RegenerateJob({
+  plan,
+  day,
+  jobId,
+  backHref,
+}: {
+  plan: PlanDetail
+  day: number
+  jobId: string
+  /** 껍데기를 여기서 그린다 — 완료 갈래만 카드를 스스로 그리기 때문이다 (#451) */
+  backHref: string
+}) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const { query, phase, polling, recheck } = useAiPlanJob(jobId)
@@ -410,24 +459,30 @@ function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jo
     */
     if (query.error instanceof ApiError && query.error.status === 404) {
       return (
-        <EmptyState
-          title={messages.aiPlan.jobNotFoundTitle}
-          description={messages.aiPlan.jobNotFoundDescription}
-          action={
-            <ButtonLink href={submitHref} variant="secondary">
-              {messages.plan.regenerateDaySubmit}
-            </ButtonLink>
-          }
-        />
+        <RegenerateShell day={day} backHref={backHref} planTitle={plan.title}>
+          <EmptyState
+            inset="card"
+            title={messages.aiPlan.jobNotFoundTitle}
+            description={messages.aiPlan.jobNotFoundDescription}
+            action={
+              <ButtonLink href={submitHref} variant="secondary">
+                {messages.plan.regenerateDaySubmit}
+              </ButtonLink>
+            }
+          />
+        </RegenerateShell>
       )
     }
 
     return (
-      <ErrorState
-        title={messages.aiPlan.jobErrorTitle}
-        description={messages.aiPlan.jobErrorDescription}
-        onRetry={() => void query.refetch()}
-      />
+      <RegenerateShell day={day} backHref={backHref} planTitle={plan.title}>
+        <ErrorState
+          inset="card"
+          title={messages.aiPlan.jobErrorTitle}
+          description={messages.aiPlan.jobErrorDescription}
+          onRetry={() => void query.refetch()}
+        />
+      </RegenerateShell>
     )
   }
 
@@ -444,20 +499,23 @@ function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jo
       만드는 것은 사용자가 하려던 일이 아니다.
     */
     return (
-      <AiPlanFailed
-        /*
-          **`일정을 만들지 못했어요` 가 아니다.** 하루가 실패했을 뿐 일정은 그대로 있다 —
-          없어지지 않은 것을 없어졌다고 말하면 확정 전에 사실을 말하는 이 화면의 원칙(R5)이
-          실패 경로에서 뒤집힌다.
-        */
-        title={messages.plan.regenerateDayFailedTitle}
-        errorMessage={job?.errorMessage ?? null}
-        conditionSummary={null}
-        onRetry={null}
-        retrying={false}
-        changeHref={submitHref}
-        manualHref={null}
-      />
+      <RegenerateShell day={day} backHref={backHref} planTitle={plan.title}>
+        <AiPlanFailed
+          inset="card"
+          /*
+            **`일정을 만들지 못했어요` 가 아니다.** 하루가 실패했을 뿐 일정은 그대로 있다 —
+            없어지지 않은 것을 없어졌다고 말하면 확정 전에 사실을 말하는 이 화면의 원칙(R5)이
+            실패 경로에서 뒤집힌다.
+          */
+          title={messages.plan.regenerateDayFailedTitle}
+          errorMessage={job?.errorMessage ?? null}
+          conditionSummary={null}
+          onRetry={null}
+          retrying={false}
+          changeHref={submitHref}
+          manualHref={null}
+        />
+      </RegenerateShell>
     )
   }
 
@@ -465,29 +523,32 @@ function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jo
 
   if (job === null || polling) {
     return (
-      <AiPlanProgress
-        status={job?.status ?? null}
-        /*
-          **세부 단계는 여기서도 그린다** (#250). 재생성도 같은 `ai-plans` 작업이라 계약이
-          같고, 수십 초 기다리는 것도 같다.
-        */
-        step={job?.step ?? null}
-        stepProgress={jobStepProgress(job)}
-        phase={phase}
-        onRecheck={recheck}
-        rechecking={query.isFetching}
-        /*
-          **그만두기는 이 화면에 두지 않는다** (#250 범위 밖).
+      <RegenerateShell day={day} backHref={backHref} planTitle={plan.title}>
+        <AiPlanProgress
+          inset="card"
+          status={job?.status ?? null}
+          /*
+            **세부 단계는 여기서도 그린다** (#250). 재생성도 같은 `ai-plans` 작업이라 계약이
+            같고, 수십 초 기다리는 것도 같다.
+          */
+          step={job?.step ?? null}
+          stepProgress={jobStepProgress(job)}
+          phase={phase}
+          onRecheck={recheck}
+          rechecking={query.isFetching}
+          /*
+            **그만두기는 이 화면에 두지 않는다** (#250 범위 밖).
 
-          취소 자체는 같은 API 로 되지만 **끝난 뒤 갈 곳이 다르다** — 새 일정 만들기는
-          "같은 조건으로 다시" 가 답인 반면, 여기서는 일정과 그 날이 그대로 남아 있어
-          제출 화면으로 되돌리는 것이 맞다. 그 갈래를 설계하지 않은 채 버튼만 달면
-          취소한 사용자가 재생성 실패 화면을 보게 된다.
-        */
-        onCancel={null}
-        canceling={false}
-        cancelFailed={false}
-      />
+            취소 자체는 같은 API 로 되지만 **끝난 뒤 갈 곳이 다르다** — 새 일정 만들기는
+            "같은 조건으로 다시" 가 답인 반면, 여기서는 일정과 그 날이 그대로 남아 있어
+            제출 화면으로 되돌리는 것이 맞다. 그 갈래를 설계하지 않은 채 버튼만 달면
+            취소한 사용자가 재생성 실패 화면을 보게 된다.
+          */
+          onCancel={null}
+          canceling={false}
+          cancelFailed={false}
+        />
+      </RegenerateShell>
     )
   }
 
@@ -506,21 +567,32 @@ function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jo
       **버튼을 잠그는 것으로 대신하지 않는다** — 새는 지점이 하나뿐이어야 한다.
     */
     return (
-      <EmptyState
-        title={messages.plan.regenerateDayMissing}
-        action={
-          <ButtonLink href={submitHref} variant="secondary">
-            {messages.plan.regenerateDaySubmit}
-          </ButtonLink>
-        }
-      />
+      <RegenerateShell day={day} backHref={backHref} planTitle={plan.title}>
+        <EmptyState
+          inset="card"
+          title={messages.plan.regenerateDayMissing}
+          action={
+            <ButtonLink href={submitHref} variant="secondary">
+              {messages.plan.regenerateDaySubmit}
+            </ButtonLink>
+          }
+        />
+      </RegenerateShell>
     )
   }
 
   const currentItems = groupItemsByDay(plan.items, plan.totalDays).days[day - 1]?.items ?? []
 
+  /*
+    **이 상태만 카드를 스스로 그린다** (#451). 비교 두 열이 각자 L1 카드이고 확정 블록은
+    액션이라 카드가 아니다 — 껍데기가 한 번 더 감싸면 카드 안에 카드가 된다.
+
+    **둘을 `SurfaceStack` 의 직접 자식으로 내보낸다.** 래퍼(`px-4 pb-8 md:px-10`)로 묶으면
+    카드 사이 간격을 스택이 주지 못하고 인셋도 카드 값과 갈린다 (#447 `PlanOverviewPanel` 이
+    fragment 를 돌려주는 것과 같은 이유).
+  */
   return (
-    <div className="px-4 pb-8 md:px-10">
+    <RegenerateShell day={day} backHref={backHref} planTitle={plan.title} bare>
       <PlanDayDiff current={toDiffRows(currentItems)} next={toNextDiffRows(nextItems)} />
 
       {/*
@@ -537,7 +609,7 @@ function RegenerateJob({ plan, day, jobId }: { plan: PlanDetail; day: number; jo
         applying={applying || placesLoading}
         error={saveError}
       />
-    </div>
+    </RegenerateShell>
   )
 }
 
