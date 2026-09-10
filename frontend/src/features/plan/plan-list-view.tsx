@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 
 import { Button } from '@/components/button'
 import { PlusIcon } from '@/components/icons'
+import { Surface, SurfaceStack } from '@/components/surface'
 import { usePetList } from '@/features/pet/use-pet-list'
 import { PlanCreateSheet } from '@/features/plan/plan-create-sheet'
 import { PlanFilterRail, PlanPetChips, PlanStatusTabs } from '@/features/plan/plan-filter-controls'
@@ -103,20 +104,41 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
         />
       </div>
 
-      <div className="lg:border-border lg:border-l">
-        <header className="flex items-start justify-between gap-4 px-4 pt-5 pb-3 md:px-10 lg:pt-6">
-          <div className="min-w-0">
-            <h1 className="text-title-1 text-fg lg:text-display font-bold lg:font-extrabold">
-              {messages.plan.pageTitle}
-            </h1>
-            {countable && (
-              <p className="text-caption text-fg-muted mt-1 font-medium tabular-nums">
+      {/*
+        **3층 표면** (`DESIGN.md §0`, 이슈 #445). 우측 열은 `SurfaceStack` 하나고 목록이 L1 카드
+        하나다 — 장소 목록(#439)과 같은 모양. **열 구분선을 걷었다** — L0 바닥이 열 사이로
+        비쳐 그 일을 한다.
+      */}
+      <SurfaceStack>
+        {/*
+          **필터는 카드 밖이다.** 상태 탭·반려견 칩은 목록을 좁히는 **도구**이고 카드는 그
+          결과를 담는다 — 데스크톱 레일이 카드 밖에 서 있는 것과 같은 자리다 (#439 와 같은 판단).
+        */}
+        <div className="lg:hidden">
+          <PlanStatusTabs filters={filters} onChange={apply} statusCounts={statusCounts} />
+          <PlanPetChips filters={filters} onChange={apply} pets={pets} />
+        </div>
+
+        {/*
+          **페이지 제목이 카드 제목으로 들어왔다** (§0 "섹션 제목은 섹션 안에 있다"). 카드가
+          하나뿐이고 그 이름이 곧 페이지의 이름이라, 밖에 두면 어느 묶음의 제목인지 모호해진다.
+          보이는 제목은 카드의 `h2`, 페이지의 `h1` 은 `sr-only` — 장소 목록(#439)과 같은 방식이다.
+        */}
+        <h1 className="sr-only">{messages.plan.pageTitle}</h1>
+
+        <Surface
+          lead
+          titleId="plan-list-heading"
+          title={messages.plan.pageTitle}
+          /* 개수는 전량을 받았을 때만 말한다 (공통명세 S3) — `countable` 이 그 조건이다 */
+          description={
+            countable && (
+              <p className="text-caption text-fg-muted font-medium tabular-nums">
                 {messages.plan.countSummary.replace('{total}', String(allPlans.length))}
               </p>
-            )}
-          </div>
-
-          {/*
+            )
+          }
+          /*
             반려견이 없으면 만들기로 보내지 않는다 — `POST /plans` 에 `petId` 가 필수라
             폼을 채울 수 없다. 빈 상태(`NoPlans`)가 등록으로 안내한다.
 
@@ -126,32 +148,29 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
 
             링크가 아니라 `Button` 인 이유: 이 버튼은 이동이 아니라 **시트를 여는
             조작**이다. 이동은 시트 안의 두 링크가 한다 (#70 과 같은 기준).
-          */}
-          {pets.length > 0 && (
-            <>
-              <Button className="hidden shrink-0 lg:inline-flex" onClick={() => setCreating(true)}>
-                {messages.plan.createAction}
-              </Button>
-              {/* 모바일은 44×44 아이콘 버튼 — 라벨이 보이지 않아 aria-label 로 준다 */}
-              <Button
-                variant="ghost"
-                iconOnly
-                aria-label={messages.plan.createActionLabel}
-                leading={<PlusIcon size={24} />}
-                className="shrink-0 lg:hidden"
-                onClick={() => setCreating(true)}
-              />
-            </>
-          )}
-        </header>
-
-        <div className="lg:hidden">
-          <PlanStatusTabs filters={filters} onChange={apply} statusCounts={statusCounts} />
-          <PlanPetChips filters={filters} onChange={apply} pets={pets} />
-        </div>
-
-        {section}
-      </div>
+          */
+          trailing={
+            pets.length > 0 ? (
+              <>
+                <Button className="hidden lg:inline-flex" onClick={() => setCreating(true)}>
+                  {messages.plan.createAction}
+                </Button>
+                {/* 모바일은 44×44 아이콘 버튼 — 라벨이 보이지 않아 aria-label 로 준다 */}
+                <Button
+                  variant="ghost"
+                  iconOnly
+                  aria-label={messages.plan.createActionLabel}
+                  leading={<PlusIcon size={24} />}
+                  className="lg:hidden"
+                  onClick={() => setCreating(true)}
+                />
+              </>
+            ) : undefined
+          }
+        >
+          {section}
+        </Surface>
+      </SurfaceStack>
 
       <PlanCreateSheet open={creating} onClose={() => setCreating(false)} />
     </>

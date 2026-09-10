@@ -204,3 +204,55 @@ describe('일정 행', () => {
     expect(render()).toContain('min-w-0')
   })
 })
+
+describe('3층 표면 (#445) — 카드 안의 L2', () => {
+  const past = plan({
+    planId: '223456789012000003',
+    startDate: '2026-05-02',
+    endDate: '2026-05-03',
+  })
+
+  it('밴드 · last 규약 · 페이지 인셋을 쓰지 않는다 — 카드가 경계고 구분선은 목록이 긋는다', () => {
+    const markup = render({ plans: [plan(), past] })
+
+    expect(markup).not.toContain('bg-band h-2')
+    // 행이 스스로 선을 긋지 않는다 — 2a `Row` 의 `border-b` 규약
+    expect(markup).not.toContain('border-border border-b')
+    expect(markup).not.toContain('md:px-10')
+    expect(markup).toContain('[&amp;&gt;li+li]:border-t')
+    expect(markup).toContain('md:px-5')
+  })
+
+  it('두 묶음은 한 카드 안이다 — 카드(section 표면)를 만들지 않고 뒤 묶음 위에 1px 선만 긋는다', () => {
+    const markup = render({ plans: [plan(), past] })
+
+    expect(markup).not.toContain('md:rounded-lg')
+    expect(markup.match(/<h3[^>]*>/g)).toHaveLength(2)
+    // 지난 일정 묶음에만 위 선이 있다 — 다가오는 일정 위는 카드 제목이다
+    const pastStart = markup.indexOf(messages.plan.sectionPast)
+    const pastSection = markup.slice(markup.lastIndexOf('<section', pastStart), pastStart)
+    expect(pastSection).toContain('border-t')
+    const upcomingStart = markup.indexOf(messages.plan.sectionUpcoming)
+    const upcomingSection = markup.slice(
+      markup.lastIndexOf('<section', upcomingStart),
+      upcomingStart,
+    )
+    expect(upcomingSection).not.toContain('border-t')
+  })
+
+  it('지난 일정만 있으면 위 선을 긋지 않는다 — 앞 묶음이 없다', () => {
+    const markup = render({ plans: [past] })
+    const pastStart = markup.indexOf(messages.plan.sectionPast)
+    const pastSection = markup.slice(markup.lastIndexOf('<section', pastStart), pastStart)
+
+    expect(pastSection).not.toContain('border-t')
+  })
+
+  it('로딩 스켈레톤도 같은 목록 규약이다', () => {
+    const markup = render({ loading: true })
+
+    expect(markup).toContain('[&amp;&gt;li+li]:border-t')
+    expect(markup).toContain('md:px-5')
+    expect(markup).not.toContain('md:px-10')
+  })
+})
