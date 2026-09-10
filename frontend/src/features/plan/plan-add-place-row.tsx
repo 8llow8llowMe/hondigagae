@@ -2,10 +2,10 @@
 
 import { Button } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
-import { Row } from '@/components/surface'
 import { PlaceRowContent } from '@/features/place/place-row'
 import { messages } from '@/lib/messages'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import type { PlaceSummary } from '@/types/place'
 
 /**
@@ -22,7 +22,6 @@ import type { PlaceSummary } from '@/types/place'
  */
 export function PlanAddPlaceRow({
   place,
-  last,
   added,
   pending,
   disabled,
@@ -30,7 +29,6 @@ export function PlanAddPlaceRow({
   onAdd,
 }: {
   place: PlaceSummary
-  last: boolean
   /** **그 일자에** 이미 담겼다. 서버가 중복을 막지 않아 화면이 막는다 (F5-4) */
   added: boolean
   pending: boolean
@@ -45,7 +43,12 @@ export function PlanAddPlaceRow({
   onAdd: (place: PlaceSummary) => void
 }) {
   return (
-    <Row as="li" last={last}>
+    /*
+      **이 화면은 아직 3a 로 옮기지 않았다.** 목록이 카드 안이 아니라 페이지 위에 있어
+      인셋이 카드 값(16/20)이 아니라 페이지 값(16/40)이다 — 옮길 때 `INSET_CLASS.card`
+      로 바꾼다. 구분선은 `SurfaceList` 가 항목 사이에만 그으므로 `last` 는 없다.
+    */
+    <li className={INSET_CLASS.main}>
       <div className="@container flex items-center gap-3 py-3 @lg:gap-5 @lg:py-4">
         <PlaceRowContent place={place} titleHref={`/places/${place.placeId}`} />
 
@@ -79,6 +82,6 @@ export function PlanAddPlaceRow({
           }
         />
       )}
-    </Row>
+    </li>
   )
 }
