@@ -31,6 +31,12 @@ public record PlaceCongestionResponse(
     LocalDate toDate,
 
     @Schema(description = "일자별 혼잡도. 데이터가 없는 날짜도 UNKNOWN 으로 자리를 지킨다")
-    List<DailyCongestionItem> dailyCongestions
+    List<DailyCongestionItem> dailyCongestions,
+
+    @Schema(
+        description = "기간 중 가장 덜 붐비는 날. 집중률을 아는 날짜 중 최저이고 동률이면 가장 이른 날짜다. "
+            + "아는 날이 하나도 없으면 null 이다 - 데이터 없음은 한산함이 아니다",
+        nullable = true)
+    DailyCongestionItem leastCrowded
 ) {
 }

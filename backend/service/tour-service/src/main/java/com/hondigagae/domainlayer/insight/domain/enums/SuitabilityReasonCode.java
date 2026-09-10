@@ -38,6 +38,7 @@ public enum SuitabilityReasonCode implements CodeNameDescribable {
     LOW_CONGESTION("혼잡도 낮음", "관광객 집중도가 낮아 여유로운 방문이 가능합니다."),
     HIGH_CONGESTION("혼잡도 높음", "관광객 집중도가 높아 붐빌 것으로 예상됩니다."),
     NOISE_SENSITIVE_CROWD("소음 민감 주의", "붐비는 환경이 소음에 민감한 반려견에게 부담이 됩니다."),
+    LOW_SOCIALITY_CROWD("사회성 낮음 주의", "붐비는 환경이 다른 개나 낯선 사람을 불편해하는 반려견에게 부담이 됩니다."),
 
     // 기상특보
     WEATHER_WARNING_ACTIVE("기상특보 발효", "기상특보가 발효 중이라 야외 일정에 큰 영향이 있습니다."),

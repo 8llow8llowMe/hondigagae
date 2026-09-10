@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.insight.domain.model;
 
 import com.hondigagae.shared.travel.pet.ActivityLevel;
 import com.hondigagae.shared.travel.pet.PetSizeType;
+import com.hondigagae.shared.travel.pet.SocialityLevel;
 import lombok.Builder;
 
 /**
@@ -21,7 +22,9 @@ public record PetCondition(
     boolean coldSensitive,
     boolean noiseSensitive,
     ActivityLevel activityLevel,
-    String breed
+    String breed,
+    // 사회성. 낮음만 판정에 쓴다 - 보통/높음은 제약이 아니다 (#425)
+    SocialityLevel sociality
 ) {
 
     public static PetCondition unspecified() {
@@ -31,7 +34,12 @@ public record PetCondition(
     /** 반려견 조건이 하나라도 주어졌는지. 응답에 "이 아이 기준" 인지 표시할 때 쓴다. */
     public boolean isSpecified() {
         return sizeType != null || heatSensitive || coldSensitive || noiseSensitive
-            || activityLevel != null || (breed != null && !breed.isBlank());
+            || activityLevel != null || (breed != null && !breed.isBlank()) || sociality != null;
+    }
+
+    /** 붐비는 환경을 피해야 하는 사회성인지. 다른 개·낯선 사람과의 대면이 부담이라 소음 민감과 이유가 다르다. */
+    public boolean hasLowSociality() {
+        return sociality == SocialityLevel.LOW;
     }
 
     /** 이름을 부를 수 없으므로 문장에서 주어로 쓸 표현. */

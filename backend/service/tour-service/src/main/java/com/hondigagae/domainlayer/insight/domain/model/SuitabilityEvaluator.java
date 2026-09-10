@@ -51,6 +51,8 @@ public final class SuitabilityEvaluator {
 
     private static final int PENALTY_HIGH_CONGESTION = 15;
     private static final int PENALTY_NOISE_SENSITIVE_CROWD = 10;
+    // 소음 민감과 크기가 같다 - 소리와 대면이라 이유가 다를 뿐 붐빔이 주는 부담의 성질은 같다.
+    private static final int PENALTY_LOW_SOCIALITY_CROWD = 10;
 
     private SuitabilityEvaluator() {
     }
@@ -374,6 +376,12 @@ public final class SuitabilityEvaluator {
                 penalty += PENALTY_NOISE_SENSITIVE_CROWD;
                 reasons.add(SuitabilityReason.of(SuitabilityReasonCode.NOISE_SENSITIVE_CROWD,
                     "소음에 민감한 아이라 붐비는 시간대는 피하는 편이 좋습니다.", -PENALTY_NOISE_SENSITIVE_CROWD));
+            }
+            // 소음 민감과 별개 감점이다 - 소리와 대면은 다른 부담이고, 둘 다면 위험이 실제로 더 크다 (#425).
+            if (input.pet().hasLowSociality()) {
+                penalty += PENALTY_LOW_SOCIALITY_CROWD;
+                reasons.add(SuitabilityReason.of(SuitabilityReasonCode.LOW_SOCIALITY_CROWD,
+                    "다른 개나 낯선 사람을 불편해하는 아이라 붐비는 날은 피하는 편이 좋습니다.", -PENALTY_LOW_SOCIALITY_CROWD));
             }
             return penalty;
         }

@@ -26,6 +26,7 @@
 - `GET /api/v1/places/{placeId}/suitability` — 여행 적합도 (`score` + `reasons`, `api-design-guide.md` §9).
   고온 규칙은 **최고기온과 하루 최고 체감온도 중 큰 값**에 반려견 기준 28/31℃ 를 건다 — 같은 기온이라도 습한 날이 더 깎인다
   (산책 위험도의 33/35℃ 는 사람 폭염특보 척도로 등급을 말하는 값이라 여기 쓰지 않는다)
+  `petSociality=LOW` 는 혼잡 감점을 키운다 — 소음 민감(소리)과 별개 감점(대면)이라 둘 다면 함께 깎인다 (#425)
 - `GET /api/v1/places/{placeId}/walk-safety` — 산책 위험도 (추정 노면온도 + 기상청 여름철 체감온도 + 안전 시간대).
   체감온도는 기상청 산식으로 계산하며 폭염특보 기준(33/35℃)이 판정 임계다. NOAA 열지수는 참고로 병기하고,
   두 값 모두 계산 근거 문구(feelsLikeBasis/heatIndexBasis)를 함께 내린다
@@ -59,7 +60,9 @@
 - `GET /api/v1/places/{placeId}/congestions?fromDate=&days=` — 기간 혼잡도.
   "이번 주 언제 덜 붐비나"에 답한다. 혼잡도 예측은 30일 rolling 이라 예보(약 11일)보다 멀리 간다 —
   적합도로는 근거가 없는 날짜도 붐빔 정도는 알 수 있다.
-  **데이터가 없는 날짜도 UNKNOWN 으로 목록에 남긴다** — 빠뜨리면 날짜 축에 구멍이 생겨 사용자가 그 날을 한산한 날로 읽는다
+  **데이터가 없는 날짜도 UNKNOWN 으로 목록에 남긴다** — 빠뜨리면 날짜 축에 구멍이 생겨 사용자가 그 날을 한산한 날로 읽는다.
+  `leastCrowded` 가 기간 중 가장 덜 붐비는 날이다(아는 날 중 최저 집중률, 동률이면 가장 이른 날짜,
+  전부 UNKNOWN 이면 null) — 고르는 규칙은 `CongestionSnapshot.leastCrowded` 한 곳이다 (#425)
 - `GET /internal/v1/places/visible-ids?placeIds=` — (내부 전용) 일정 항목 검증용 벌크 존재 확인.
   게이트웨이가 라우팅하지 않으며, delisted 를 제외해 새 일정 항목이 사라진 장소를 참조하지 못하게 한다
 - `GET /internal/v1/places/candidates?placeIds=` — (내부 전용) 아이디로 후보 요약 조회.

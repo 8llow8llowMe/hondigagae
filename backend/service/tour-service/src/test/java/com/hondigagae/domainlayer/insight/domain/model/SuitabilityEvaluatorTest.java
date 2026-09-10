@@ -310,6 +310,53 @@ class SuitabilityEvaluatorTest {
             assertThat(sensitiveScore.score()).isLessThan(normalScore.score());
             assertThat(codesOf(sensitiveScore)).contains(SuitabilityReasonCode.NOISE_SENSITIVE_CROWD);
         }
+
+        @Test
+        @DisplayName("사회성 낮은 아이도 혼잡한 날 추가로 깎인다 - 소리가 아니라 대면이 문제라 소음 민감과 별개 근거다")
+        void lowSocialityPetLosesMoreWhenCrowded() {
+            SuitabilityInput base = SuitabilityInput.builder()
+                .place(allowedPlace()).pet(pet()).weather(mildWeather())
+                .congestion(CongestionSnapshot.of(DATE, 85.0)).thresholds(thresholds()).build();
+            SuitabilityInput lowSociality = SuitabilityInput.builder()
+                .place(allowedPlace()).pet(lowSocialityPet()).weather(mildWeather())
+                .congestion(CongestionSnapshot.of(DATE, 85.0)).thresholds(thresholds()).build();
+
+            SuitabilityScore normalScore = SuitabilityEvaluator.evaluate(base);
+            SuitabilityScore lowScore = SuitabilityEvaluator.evaluate(lowSociality);
+
+            assertThat(lowScore.score()).isLessThan(normalScore.score());
+            assertThat(codesOf(lowScore)).contains(SuitabilityReasonCode.LOW_SOCIALITY_CROWD);
+        }
+
+        @Test
+        @DisplayName("소음 민감과 사회성 낮음이 겹치면 둘 다 깎인다 - 위험이 실제로 더 크다")
+        void noiseAndLowSocialityStack() {
+            SuitabilityInput both = SuitabilityInput.builder()
+                .place(allowedPlace())
+                .pet(PetCondition.builder().noiseSensitive(true)
+                    .sociality(com.hondigagae.shared.travel.pet.SocialityLevel.LOW).build())
+                .weather(mildWeather())
+                .congestion(CongestionSnapshot.of(DATE, 85.0)).thresholds(thresholds()).build();
+
+            SuitabilityScore score = SuitabilityEvaluator.evaluate(both);
+
+            assertThat(codesOf(score)).contains(
+                SuitabilityReasonCode.NOISE_SENSITIVE_CROWD, SuitabilityReasonCode.LOW_SOCIALITY_CROWD);
+        }
+
+        @Test
+        @DisplayName("사회성 보통/높음은 혼잡 감점에 영향이 없다 - 제약이 아니다")
+        void mediumSocialityDoesNotPenalize() {
+            SuitabilityInput medium = SuitabilityInput.builder()
+                .place(allowedPlace())
+                .pet(PetCondition.builder()
+                    .sociality(com.hondigagae.shared.travel.pet.SocialityLevel.MEDIUM).build())
+                .weather(mildWeather())
+                .congestion(CongestionSnapshot.of(DATE, 85.0)).thresholds(thresholds()).build();
+
+            assertThat(codesOf(SuitabilityEvaluator.evaluate(medium)))
+                .doesNotContain(SuitabilityReasonCode.LOW_SOCIALITY_CROWD);
+        }
     }
 
     @Nested
@@ -438,6 +485,10 @@ class SuitabilityEvaluatorTest {
 
     private static PetCondition noiseSensitivePet() {
         return PetCondition.builder().noiseSensitive(true).build();
+    }
+
+    private static PetCondition lowSocialityPet() {
+        return PetCondition.builder().sociality(com.hondigagae.shared.travel.pet.SocialityLevel.LOW).build();
     }
 
     private static PetCondition largePet() {

@@ -16,6 +16,7 @@ public class PlaceCongestionPresenter {
             .fromDate(info.fromDate())
             .toDate(info.toDate())
             .dailyCongestions(info.snapshots().stream().map(this::toItem).toList())
+            .leastCrowded(CongestionSnapshot.leastCrowded(info.snapshots()).map(this::toItem).orElse(null))
             .build();
     }
 
