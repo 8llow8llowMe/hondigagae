@@ -10,6 +10,7 @@ import com.hondigagae.domainlayer.insight.application.port.in.PlaceInsightWebUse
 import com.hondigagae.domainlayer.insight.domain.model.PetCondition;
 import com.hondigagae.shared.travel.pet.ActivityLevel;
 import com.hondigagae.shared.travel.pet.PetSizeType;
+import com.hondigagae.shared.travel.pet.SocialityLevel;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -81,12 +82,15 @@ public class PlaceInsightWebController {
         @RequestParam(required = false) ActivityLevel activityLevel,
 
         @Parameter(description = "[선택] 견종 이름(한글). 단두종(불독·퍼그·시츄 등)이면 고온 위험을 높게 잡습니다. 생략하면 견종 보정 없음", example = "퍼그")
-        @RequestParam(required = false) String breed
+        @RequestParam(required = false) String breed,
+
+        @Parameter(description = "[선택] 사회성. LOW 면 혼잡도 감점을 키웁니다 - 다른 개나 낯선 사람을 불편해하는 아이는 붐비는 날이 부담입니다. 보통/높음은 판정에 영향이 없습니다", example = "LOW")
+        @RequestParam(required = false) SocialityLevel petSociality
     ) {
         PlaceInsightQuery query = PlaceInsightQuery.builder()
             .placeId(placeId)
             .targetDate(targetDate)
-            .petCondition(toPetCondition(petSizeType, heatSensitive, coldSensitive, noiseSensitive, activityLevel, breed))
+            .petCondition(toPetCondition(petSizeType, heatSensitive, coldSensitive, noiseSensitive, activityLevel, breed, petSociality))
             .build();
 
         return ResponseEntity.ok().body(Response.success(placeInsightWebUseCase.getSuitability(query)));
@@ -140,7 +144,7 @@ public class PlaceInsightWebController {
             .placeId(placeId)
             .targetDate(targetDate)
             .targetDateTime(targetDateTime)
-            .petCondition(toPetCondition(petSizeType, heatSensitive, coldSensitive, noiseSensitive, activityLevel, breed))
+            .petCondition(toPetCondition(petSizeType, heatSensitive, coldSensitive, noiseSensitive, activityLevel, breed, null))
             .build();
 
         return ResponseEntity.ok().body(Response.success(placeInsightWebUseCase.getWalkSafety(query)));
@@ -178,9 +182,10 @@ public class PlaceInsightWebController {
             Response.success(placeInsightWebUseCase.getCongestions(placeId, from, to)));
     }
 
+    // 사회성은 적합도(혼잡 감점)에서만 쓴다 - 산책 위험도는 혼잡을 보지 않아 null 로 온다.
     private PetCondition toPetCondition(
         PetSizeType petSizeType, boolean heatSensitive, boolean coldSensitive, boolean noiseSensitive,
-        ActivityLevel activityLevel, String breed
+        ActivityLevel activityLevel, String breed, SocialityLevel sociality
     ) {
         return PetCondition.builder()
             .sizeType(petSizeType)
@@ -189,6 +194,7 @@ public class PlaceInsightWebController {
             .noiseSensitive(noiseSensitive)
             .activityLevel(activityLevel)
             .breed(breed)
+            .sociality(sociality)
             .build();
     }
 }
