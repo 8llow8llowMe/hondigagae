@@ -233,3 +233,33 @@ describe('담기 성공 후 화면에 남는다 (#370)', () => {
     expect(source).not.toContain('router.replace(`/plans/${planId}#')
   })
 })
+
+describe('스켈레톤이 행과 같은 인셋에 선다 (#439)', () => {
+  const source = readFileSync(
+    fileURLToPath(new URL('./plan-add-place-view.tsx', import.meta.url)),
+    'utf8',
+  )
+
+  /*
+    이 화면은 아직 2a 라 행(`PlanAddPlaceRow`)이 페이지 인셋 `main`(16/40)에 선다.
+    `PlaceListSection` 의 기본 인셋은 3a 카드 안 값 `card`(16/20)이므로, 넘기지 않으면
+    **스켈레톤만 20 에 서고 실데이터 행은 40 에 서** 목록이 바뀌는 순간 왼쪽 선이 뛴다.
+    첫 로딩 껍데기와 본 목록 두 곳 모두 넘겨야 한다 — 하나만 넘기면 더 받는 중 스켈레톤이
+    다시 어긋난다. 3a 로 옮기면 행과 함께 `card` 로 바꾸고 이 테스트도 따라 바꾼다.
+  */
+  it('PlaceListSection 두 곳 모두 inset="main" 을 넘긴다', () => {
+    const uses = source.match(/<PlaceListSection\b[\s\S]*?\/>/g) ?? []
+    expect(uses).toHaveLength(2)
+    for (const use of uses) {
+      expect(use).toContain('inset="main"')
+    }
+  })
+
+  it('행도 같은 값을 쓴다 — 스켈레톤과 행이 서로 다른 인셋 상수를 보지 않는다', () => {
+    const row = readFileSync(
+      fileURLToPath(new URL('./plan-add-place-row.tsx', import.meta.url)),
+      'utf8',
+    )
+    expect(row).toContain('INSET_CLASS.main')
+  })
+})

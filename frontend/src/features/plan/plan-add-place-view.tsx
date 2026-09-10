@@ -106,6 +106,8 @@ export function PlanAddPlaceView({
         view={view}
       >
         <PlaceListSection
+          /* 이 화면은 아직 2a 라 스켈레톤도 행과 같은 페이지 인셋(16/40)에 선다 — `PlanAddPlaceRow` 와 같은 값 */
+          inset="main"
           places={[]}
           loading
           errorStatus={null}
@@ -272,6 +274,13 @@ export function PlanAddPlaceView({
       </div>
 
       <PlaceListSection
+        /*
+          **스켈레톤 인셋을 행과 맞춘다.** 기본값 `card`(16/20)는 3a 카드 안 값이고, 이 화면은
+          아직 2a 라 행(`PlanAddPlaceRow`)이 페이지 인셋(16/40)에 선다. 넘기지 않으면 첫 로딩과
+          더 받는 중 스켈레톤만 20 에 서서 목록이 실데이터로 바뀌는 순간 왼쪽 선이 20px 뛴다.
+          3a 로 옮길 때 행과 함께 `card` 로 바꾼다.
+        */
+        inset="main"
         places={places}
         loading={list.isPending}
         errorStatus={toErrorStatus(list.error)}
