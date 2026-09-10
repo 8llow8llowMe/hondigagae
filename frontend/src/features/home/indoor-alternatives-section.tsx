@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
 import { ChevronRightIcon } from '@/components/icons'
-import { Surface } from '@/components/surface'
+import { Surface, SurfaceList } from '@/components/surface'
 import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
 import type { AlternativePlaceItem } from '@/types/insight'
@@ -36,17 +36,17 @@ export function IndoorAlternativesSection({
         <p className="text-caption text-fg-muted font-medium">{messages.home.indoorNote}</p>
       }
     >
-      <ul>
+      <SurfaceList>
         {alternatives.map((alternative) => (
           <IndoorAlternativeRow key={alternative.placeId} alternative={alternative} />
         ))}
-      </ul>
+      </SurfaceList>
     </Surface>
   )
 }
 
 /**
- * 대안 한 행. **카드가 아니라 전폭 행이다** (DESIGN.md §0).
+ * 대안 한 행. **L1 카드 안의 L2 항목이다** (DESIGN.md §0).
  *
  * 계약이 주는 것은 `placeId` · `title` · `lat` · `lng` · `distanceMeters` ·
  * `petAllowanceType` · `allowedPetSize` 뿐이다 — **썸네일과 주소가 없다.** 장소 상세를
@@ -55,10 +55,10 @@ export function IndoorAlternativesSection({
  */
 function IndoorAlternativeRow({ alternative }: { alternative: AlternativePlaceItem }) {
   return (
-    <li className="border-border border-t">
+    <li>
       <Link
         href={`/places/${alternative.placeId}`}
-        className="focus-visible:ring-brand-500 flex items-center gap-3 px-4 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:gap-5 md:px-10 md:py-4"
+        className="focus-visible:ring-brand-500 flex items-center gap-3 px-4 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:gap-5 md:px-5 md:py-4"
       >
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="text-body-1 text-fg md:text-title-2 font-semibold break-words">

@@ -10,9 +10,7 @@ import { placeSummary } from '@/test/fixtures/place'
 import type { CongestionItem, PlaceSuitabilityResponse } from '@/types/insight'
 
 function render(data: PlaceSuitabilityResponse) {
-  return renderToStaticMarkup(
-    createElement(PlaceInsightRow, { data, place: placeSummary, first: true }),
-  )
+  return renderToStaticMarkup(createElement(PlaceInsightRow, { data, place: placeSummary }))
 }
 
 const CROWDED: CongestionItem = {
@@ -125,7 +123,6 @@ describe('PlaceInsightRow — 근거 출처', () => {
       createElement(PlaceInsightRow, {
         data: { ...suitability, reasons: REASONS_WITHOUT_CONGESTION },
         place: placeSummary,
-        first: true,
         // 공통 문장(`PET_ALLOWED`)이 빠진 나머지 — home-view 가 넘기는 모양이다
         reasons: [REASONS_WITHOUT_CONGESTION[1]!],
       }),
@@ -148,7 +145,6 @@ describe('PlaceInsightRow — 근거 출처', () => {
       createElement(PlaceInsightRow, {
         data: { ...suitability, reasons: REASONS_WITHOUT_CONGESTION },
         place: placeSummary,
-        first: true,
         reasons: [],
       }),
     )
@@ -167,7 +163,7 @@ describe('PlaceInsightRow — 접힘', () => {
 
   function collapsed() {
     return renderToStaticMarkup(
-      createElement(PlaceInsightRow, { data, place: placeSummary, first: false, collapsed: true }),
+      createElement(PlaceInsightRow, { data, place: placeSummary, collapsed: true }),
     )
   }
 

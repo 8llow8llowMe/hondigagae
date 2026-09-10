@@ -35,7 +35,6 @@ import type { PlaceSummary } from '@/types/place'
 export function PlaceInsightRow({
   data,
   place,
-  first = false,
   collapsed = false,
   reasons = data.reasons,
 }: {
@@ -43,7 +42,6 @@ export function PlaceInsightRow({
   /** 목록 응답의 장소. 썸네일·주소·실내 여부는 인사이트 응답에 없다 */
   place: PlaceSummary | undefined
   /** 첫 행은 위 구분선을 그리지 않는다 — 섹션 제목과 붙는다 */
-  first?: boolean
   /**
    * 2·3등을 접는다 — #307. `DESIGN.md` §1 의 *"낮은 우선순위는 접는다"*.
    *
@@ -76,7 +74,7 @@ export function PlaceInsightRow({
   const lines = [...penalties, ...informational].slice(0, 2)
 
   return (
-    <li className={cn('bg-bg', !first && 'border-border border-t')}>
+    <li>
       <Link
         href={`/places/${data.placeId}`}
         className={cn(
