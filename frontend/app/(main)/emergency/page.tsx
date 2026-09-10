@@ -1,4 +1,3 @@
-import { ViewToggle } from '@/components/view-toggle'
 import { EmergencyListView } from '@/features/emergency/emergency-list-view'
 import { EmergencyMapView } from '@/features/emergency/emergency-map-view'
 import { messages } from '@/lib/messages'
@@ -42,18 +41,18 @@ export default async function EmergencyPage({ searchParams }: { searchParams: Se
     )
   }
 
+  /*
+    **폭도 헤더도 여기서 정하지 않는다** (#419). 목록 갈래가 `/places` 와 같은 2단
+    (좌 280 필터 레일 / 우 목록)이 되면서 grid 가 `EmergencyListView` 안으로 들어갔다 —
+    레일이 `useEmergencyBoard` 의 조건·반경·개수를 봐야 하는데 이 화면은 좌표가 브라우저에만
+    있어 서버가 그것을 알 수 없다. `h1`·`ViewToggle` 도 우측 열 안이라 같이 내려갔다.
+
+    예전에는 여기에 `max-w-screen-md`(768)가 있었고, 1920 에서 목록만 768 로 묶여
+    보기 토글이 목록↔지도 사이에서 339px 옮겨 다녔다.
+  */
   return (
-    <main id="main-content" className="mx-auto w-full max-w-screen-md">
-      <header className="flex items-start justify-between gap-3 px-4 pt-5 pb-1 md:px-10 lg:pt-6">
-        <h1 className="text-title-1 text-fg lg:text-display font-bold lg:font-extrabold">
-          {messages.emergency.pageTitle}
-        </h1>
-
-        {/* 세 화면이 같은 세그먼트 컨트롤을 쓴다 */}
-        <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
-      </header>
-
-      <EmergencyListView />
+    <main id="main-content">
+      <EmergencyListView listHref={listHref} mapHref={mapHref} />
     </main>
   )
 }

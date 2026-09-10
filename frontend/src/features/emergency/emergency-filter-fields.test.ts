@@ -6,7 +6,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { NarrowFields, RadiusField, TypeField } from '@/features/emergency/emergency-filter-fields'
 import { DEFAULT_FACILITY_FILTERS, type FacilityFilters } from '@/types/emergency'
 
-const COUNTS = { all: 12, byType: { ANIMAL_HOSPITAL: 7, ANIMAL_PHARMACY: 5 }, open24: 3, openNow: 8 }
+const COUNTS = {
+  all: 12,
+  byType: { ANIMAL_HOSPITAL: 7, ANIMAL_PHARMACY: 5 },
+  open24: 3,
+  openNow: 8,
+}
 
 function renderType(filters: FacilityFilters, showCounts = true) {
   return renderToStaticMarkup(
