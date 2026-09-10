@@ -17,6 +17,46 @@
 | `congestionImportJob` | 관광지 집중률 방문자 추이 예측 API | 일 1회 | 30일 rolling. **주기가 달라 파이프라인에 넣지 않는다** |
 | `olleCourseImportJob` | 제주올레 공공 CSV + TourAPI 좌표 | 수동 | 산책 코스 마스터 (#383). 장소 파이프라인과 별개다 |
 
+## 스케줄 (#378)
+
+주기 실행은 **batch-service 프로세스 안 Quartz** 가 맡는다
+(`domainlayer/schedule/adapter/in/scheduler`). 배포 호스트 cron 을 쓰지 않은 이유는 컨테이너가
+`restart: unless-stopped` 로 상시 떠 있어서다 — 스케줄이 저장소 밖 crontab 이 아니라 배포 단위와
+함께 움직인다.
+
+| 무엇 | 언제 |
+| --- | --- |
+| `placeDataPipelineJob` | 월 03:00 KST (`0 0 3 ? * MON`) |
+| `congestionImportJob` | 매일 06:00 KST (`0 0 6 * * ?`) |
+
+- **스위치**: `batch.schedule.enabled` (`BATCH_SCHEDULE_ENABLED`). dev 기본 true, local·CI·prod 기본 false.
+  조건은 `batch.schedule.enabled=true` **그리고** `spring.batch.job.enabled=false` 둘 다라,
+  `docker exec` 로 잡 하나만 돌리려 띄운 **수동 JVM 에서는 트리거가 등록되지 않고 스케줄러도
+  시작되지 않는다.** `auto-startup` 은 `application.yml` 에서 고정 false 이고, 조건을 통과한
+  컨텍스트의 `SchedulerFactoryBeanCustomizer` 만 그것을 true 로 되돌린다.
+- **조건은 SpEL 이 아니라 `@ConditionalOnProperty` 조합**(`ScheduleEnabledCondition`)이다.
+  `@ConditionalOnExpression` 은 치환된 값을 문자열로 파싱하므로 값이 불리언 리터럴이 아니면
+  (빈 문자열·`yes`·`1`) 컨텍스트 refresh 가 깨져 컨테이너가 crash-loop 에 빠진다. compose 의
+  `${VAR:-}` 는 변수를 부재가 아니라 **빈 문자열**로 만들기 때문에 실제로 밟을 수 있는 길이었다.
+  지금은 **`true` 가 아닌 값이 전부 꺼짐**으로 떨어진다.
+- **잡 스토어는 메모리**다. 인스턴스가 하나고 트리거가 코드에 있어 영속할 상태가 없다 —
+  tour 스키마에 `QRTZ_*` 테이블을 더하지 않는다. Quartz 스레드는 1개라 두 잡이 동시에 돌지 않는다
+  (JobKey 가 달라 `@DisallowConcurrentExecution` 만으로는 안 막힌다). 그리고 **데몬 스레드**다 —
+  `SchedulerFactoryBean` 은 auto-startup 과 무관하게 스레드를 만들므로, non-daemon 이면
+  `--spring.main.web-application-type=none` 수동 실행 JVM 이 잡을 끝내고도 죽지 않는다.
+- **실행 중 가드**: 겹치면 안 되는 잡이 돌고 있으면 이번 주기를 건너뛴다. 두 스케줄 모두 place 를
+  건드리는 잡 7개 전부(파이프라인·자식 다섯·혼잡도)를 본다 — 자식 잡 하나만 단독으로 수동 실행
+  중이어도 장소가 반쯤 들어온 상태라 혼잡도가 UNMATCHED 를 대량으로 남기기 때문이다. 판정 근거는
+  Quartz 가 아니라 **배치 메타데이터**다 — 수동 JVM 의 실행은 Quartz 가 모른다. 단 6시간을 넘긴
+  STARTED 는 죽은 JVM 의 잔재로 보고 무시한다. 방치된 행 하나에 스케줄이 영원히 막히는 쪽이 더 나쁘다.
+- **수동 실행과의 관계**: 겹쳐도 스케줄 쪽이 양보한다(`schedule fire skipped ...` WARN). 반대는
+  막지 않으므로 수동 실행은 스케줄 창을 피하는 편이 낫다. 수동 실행 명령은
+  `jenkins-cicd-dev-deploy-guide.md` §8.
+- `runAt` 은 발화 시각을 `Asia/Seoul` 초 단위로 자른 `2026-09-14T03:00:00` 꼴이다. 시간대를 트리거가
+  직접 못박는다 — `-Duser.timezone` 은 배포 환경변수(`TIME_ZONE`)라 그 값으로 03:00 이 흔들린다.
+- 발화는 `batch_schedule_fire_total{job,result}` / `batch_schedule_last_fire_timestamp{job}` 로
+  드러난다 (`observability-guide.md`).
+
 ### 계획 (미착수)
 
 | 잡 | 원천 API | 비고 |

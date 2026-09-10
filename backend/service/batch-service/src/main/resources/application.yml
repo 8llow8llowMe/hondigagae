@@ -10,6 +10,49 @@ spring:
       # 기동 시 잡 자동 실행 금지 — 잡 이름을 지정한 수동 실행만 허용한다.
       # 예) --spring.batch.job.enabled=true --spring.batch.job.name=placeImportJob areaCode=39
       enabled: false
+  # 프로세스 안 Quartz (#378). 주기 실행 트리거는 QuartzScheduleConfig 가 코드로 들고 있다.
+  quartz:
+    # 인스턴스가 하나고 트리거 정의가 코드에 있어 영속할 상태가 없다.
+    # JDBC 스토어를 쓰면 tour 스키마에 QRTZ_* 테이블만 늘어난다.
+    job-store-type: memory
+    # 여기서는 항상 끈다. 켜는 것은 QuartzScheduleConfig 의 SchedulerFactoryBeanCustomizer 로,
+    # 스케줄 조건이 참인 컨텍스트에서만 auto-startup 을 true 로 되돌린다.
+    # ${batch.schedule.enabled:false} 를 그대로 꽂으면 env 가 빈 문자열일 때 불리언 바인딩이 깨진다.
+    auto-startup: false
+    properties:
+      org.quartz.scheduler.instanceName: batch-service-scheduler
+      # 스레드 1개 = 파이프라인과 혼잡도가 절대 동시에 돌지 않는다.
+      # 둘은 JobKey 가 다르므로 @DisallowConcurrentExecution 만으로는 막히지 않는다.
+      org.quartz.threadPool.threadCount: "1"
+      # Quartz 스레드는 데몬이다. SchedulerFactoryBean 은 auto-startup 과 무관하게 스케줄러를
+      # 만들면서 스레드풀·스케줄러 스레드를 띄우므로, non-daemon 이면
+      # `--spring.main.web-application-type=none` 으로 띄운 수동 실행 JVM 이 잡을 끝내고도 죽지
+      # 않고 컨테이너 안에 좀비 JVM 으로 남는다.
+      # 메모리 잡 스토어 + 단일 인스턴스라 갑작스러운 종료로 잃을 상태가 없어 부작용도 없다.
+      org.quartz.threadPool.makeThreadsDaemons: "true"
+      org.quartz.scheduler.makeSchedulerThreadDaemon: "true"
+
+# 주기 실행 스케줄 (#378).
+#
+# enabled 는 로컬·CI 에서 꺼진 채로 둔다 — 개발자 노트북이 새벽 3시에 TourAPI 쿼터를 태우거나
+# 테스트 컨텍스트가 실제 적재를 시작하면 안 된다. dev 프로파일만 기본 true 다.
+#
+# 스위치는 조건이 둘이다. batch.schedule.enabled 가 true 이고 동시에
+# spring.batch.job.enabled 가 false 여야 트리거가 등록된다 — 후자가 true 인 JVM 은
+# `docker exec` 로 잡 하나만 돌리고 끝나는 수동 실행이라 스케줄을 얹으면 안 된다.
+# 판정은 SpEL 이 아니라 @ConditionalOnProperty 조합(ScheduleEnabledCondition)이다.
+# 정확히 "true" 가 아닌 값(빈 문자열·yes·1)은 전부 꺼짐으로 본다 — 기동을 막지 않는다.
+batch:
+  schedule:
+    enabled: ${BATCH_SCHEDULE_ENABLED:false}
+    # cron 이 뜻하는 시각은 배포 환경(-Duser.timezone)이 아니라 원천의 갱신 주기에서 나온다.
+    time-zone: ${BATCH_SCHEDULE_TIME_ZONE:Asia/Seoul}
+    # 월요일 03:00 KST. Quartz cron 은 6~7 필드다(초가 맨 앞).
+    place-pipeline-cron: ${BATCH_SCHEDULE_PLACE_PIPELINE_CRON:0 0 3 ? * MON}
+    # 매일 06:00 KST. 30일 rolling 원천이라 일 1회.
+    congestion-cron: ${BATCH_SCHEDULE_CONGESTION_CRON:0 0 6 * * ?}
+    # 이 시간을 넘긴 STARTED 실행은 죽은 JVM 의 잔재로 보고 무시한다.
+    stale-running-after: ${BATCH_SCHEDULE_STALE_RUNNING_AFTER:6h}
 
 tour-api:
   base-url: ${TOUR_API_BASE_URL:https://apis.data.go.kr/B551011}

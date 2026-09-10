@@ -1,6 +1,7 @@
 package com.hondigagae.global.config;
 
 import com.hondigagae.common.config.JasyptPropertiesConfig;
+import com.hondigagae.global.properties.BatchScheduleProperties;
 import com.hondigagae.global.properties.CultureFacilityProperties;
 import com.hondigagae.global.properties.MfdsPetRestaurantProperties;
 import com.hondigagae.global.properties.OlleCourseProperties;
@@ -19,7 +20,8 @@ import org.springframework.context.annotation.Import;
     CultureFacilityProperties.class,
     MfdsPetRestaurantProperties.class,
     OlleCourseProperties.class,
-    VworldProperties.class
+    VworldProperties.class,
+    BatchScheduleProperties.class
 })
 public class BatchServicePropertiesConfig {
 

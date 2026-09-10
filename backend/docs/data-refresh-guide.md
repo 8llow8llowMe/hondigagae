@@ -78,13 +78,22 @@
 
 ## 4. 갱신 주기와 실행
 
+**스케줄러가 직접 부르는 잡은 둘뿐이다.**
+
 | 잡 | 주기 | 실행 시각 | 근거 |
 | --- | --- | --- | --- |
-| `petRestaurantImportJob` | 주 1회 | 월 04:00 | 등록이 계속 느는 원천 |
-| `placeImportJob` | 주 1회 | 월 04:30 | TourAPI 쿼터 여유, 변경 느림 |
-| `cultureFacilityImportJob` | 월 1회 | 1일 05:00 | 파일 갱신 확인 후 조건부 적재 |
-| `placeMergeJob` | 적재 잡 뒤 매번 | 위 세 잡 직후 | 모든 원천이 들어온 상태에서 한 번 판정 (#363) |
-| `placeImageBackfillJob` | 병합 뒤 매번 | `placeMergeJob` 직후 | 흡수된 행은 대상에서 빠지므로 병합 뒤가 맞다 |
+| `placeDataPipelineJob` | 주 1회 | **월 03:00 KST** | 적재 3종 → 병합 → 이미지 백필을 순서대로 잇는다(#377). 새벽이라 공공 API 쿼터 경쟁이 적다 |
+| `congestionImportJob` | 일 1회 | **매일 06:00 KST** | 30일 rolling 원천. 주기가 달라 파이프라인 밖에 있다. 파이프라인이 길어져도 겹치지 않게 떨어뜨렸다 |
+
+파이프라인 안 자식 잡들의 주기는 부모를 따른다. 단독 실행할 때 참고할 성격만 적는다.
+
+| 자식 잡 | 성격 |
+| --- | --- |
+| `placeImportJob` | TourAPI. 변경이 느리고 쿼터 여유가 있다 |
+| `cultureFacilityImportJob` | 파일 갱신 확인 후 조건부 적재. 원천 파일 자체는 월 1회쯤 바뀐다 |
+| `petRestaurantImportJob` | 등록이 계속 느는 원천이라 가장 자주 갱신할 값어치가 있다 |
+| `placeMergeJob` | 모든 원천이 들어온 상태에서 한 번 판정 (#363) |
+| `placeImageBackfillJob` | 흡수된 행은 대상에서 빠지므로 병합 뒤가 맞다 |
 
 순서가 중요하다. **중복 병합은 모든 적재가 끝난 뒤 한 번만 돌아야 한다.** 병합은
 `placeMergeJob` 으로 독립됐다(#363) — 예전처럼 각 적재 파사드가 자기 적재 뒤에 부르면
@@ -95,9 +104,54 @@
 한 flow job 으로 이어 붙였으므로 사람이 다섯 줄을 차례로 치다 한 줄을 빠뜨릴 여지가 없다.
 주기가 다른 `congestionImportJob` 만 파이프라인 밖에 남아 따로 돈다.
 
-스케줄러는 아직 없다. batch-service 에 `adapter/in/scheduler`를 두거나, 배포 호스트의 cron 에서
-`--spring.batch.job.name=` 으로 부르는 두 가지 선택지가 있다. 후자가 단순하고 실패 시
-재실행이 쉽다.
+`olleCourseImportJob`(#383)은 이 표에 없다. 적재 대상이 `place` 가 아니라 `walk_course` 테이블이라
+장소 파이프라인·병합·delisting 어디에도 걸리지 않고, 아직 스케줄 없이 수동으로만 돈다.
+
+### 스케줄러 — batch-service 프로세스 안 Quartz (#378)
+
+주기 실행은 배포 호스트 cron 이 아니라 **batch-service 프로세스 안 Quartz** 가 맡는다
+(`domainlayer/schedule/adapter/in/scheduler`). 컨테이너가 `restart: unless-stopped` 로 상시 떠
+있으므로, 그 프로세스가 스스로 시각을 지키면 스케줄이 배포 단위와 함께 움직인다 — 어느 호스트의
+crontab 에 무엇이 걸려 있는지가 저장소 밖에 흩어지지 않고, 컨테이너를 옮겨도 따라간다.
+
+| 항목 | 값 |
+| --- | --- |
+| `placeDataPipelineJob` | `0 0 3 ? * MON` — 월 03:00 KST |
+| `congestionImportJob` | `0 0 6 * * ?` — 매일 06:00 KST |
+| 스위치 | `batch.schedule.enabled` (`BATCH_SCHEDULE_ENABLED`). **dev 기본 true, local·CI·prod 기본 false** |
+| 잡 스토어 | 메모리. 인스턴스가 하나고 트리거가 코드에 있어 영속할 상태가 없다 — tour 스키마에 `QRTZ_*` 를 더하지 않는다 |
+| 스레드 | 1개. 파이프라인과 혼잡도가 절대 동시에 돌지 않는다 (JobKey 가 달라 `@DisallowConcurrentExecution` 만으로는 안 막힌다). **전부 데몬**이다 — `SchedulerFactoryBean` 은 auto-startup 과 무관하게 스레드를 만들어서, non-daemon 이면 수동 실행 JVM 이 잡을 끝내고도 죽지 않는다 |
+| misfire | `FireAndProceed`. 재기동으로 발화를 놓쳤으면 늦게라도 한 번 돌고 다음 주기로 간다 — 주 1회 잡을 건너뛰면 데이터가 한 주 더 낡는다 |
+
+**수동 실행 JVM 에서는 트리거가 등록되지 않고 스케줄러도 시작되지 않는다.** 조건은
+`batch.schedule.enabled=true` **그리고** `spring.batch.job.enabled=false` 둘 다이고, `docker exec` 로
+잡 하나만 돌리려 띄운 두 번째 JVM 은 후자가 true 라 걸린다. 스케줄러 시작(`auto-startup`)도 같은
+조건에 묶여 있다 — `application.yml` 은 고정 false 이고, 조건을 통과한 컨텍스트에서만
+`SchedulerFactoryBeanCustomizer` 가 true 로 되돌린다.
+
+판정은 SpEL(`@ConditionalOnExpression`)이 아니라 `@ConditionalOnProperty` 조합
+(`ScheduleEnabledCondition`)이다. SpEL 조건식은 값을 치환한 **문자열을 파싱**하므로 값이 불리언
+리터럴이 아니면(빈 문자열·`yes`·`1`) 기동 자체가 죽는다. compose 의 `${VAR:-}` 는 변수를 부재가
+아니라 **빈 문자열**로 만들기 때문에 이것은 가상의 사고가 아니다. 그래서 compose 는 dev/prod
+서비스별로 `BATCH_SCHEDULE_ENABLED` 에 실제 값(`true`/`false`)을 준다. **`true` 가 아닌 값은 전부
+꺼짐**으로 본다 — 스위치 오타로 배치 컨테이너가 crash-loop 에 빠지는 것보다 낫다.
+
+**실행 중 가드.** 발화 시각에 겹치면 안 되는 잡이 돌고 있으면 이번 주기를 건너뛰고
+`schedule fire skipped ...` 를 WARN 으로 남긴다. 판정 근거는 Quartz 상태가 아니라 **배치 메타데이터**다
+— 수동으로 띄운 두 번째 JVM 의 실행은 Quartz 가 모르기 때문이다. 두 스케줄 모두 **place 를 건드리는
+잡 7개 전부**(파이프라인·자식 다섯·혼잡도)를 본다. 혼잡도까지 같은 목록인 이유는, 사람이 자식 잡
+하나만 단독으로 돌리는 중에도 장소가 반쯤 들어온 상태가 되어 혼잡도가 UNMATCHED 를 대량으로
+남기기 때문이다.
+단 **6시간을 넘긴 STARTED 실행은 무시한다.** OOM 으로 죽은 JVM 이 남긴 행 하나에 스케줄이 영원히
+막히는 쪽이 더 나쁘다 — 대신 `abandoned running execution ignored ...` 를 ERROR 로 남겨 사람이
+그 행을 정리하게 한다.
+
+**`runAt`.** 발화 시각을 `Asia/Seoul` 초 단위로 자른 `2026-09-14T03:00:00` 꼴을 잡의 증분
+JobParameter 로 넘긴다. 시간대를 트리거가 직접 못박는 이유는 `-Duser.timezone` 이 배포 환경변수
+(`TIME_ZONE`)라 그 값 하나로 03:00 이 다른 나라 새벽이 될 수 있기 때문이다.
+
+발화 자체는 `batch_schedule_fire_total{job,result}` 와
+`batch_schedule_last_fire_timestamp{job}` 로 드러난다 (`observability-guide.md`).
 
 ## 5. 실패했을 때
 
@@ -139,7 +193,8 @@ place_import_last_success_timestamp{source="MFDS"}
    TourAPI 는 부분 실행(contentType 지정) 시 delist 를 건너뛴다
 3. 지오코딩 재사용 (`source_key`로 기존 좌표 조회)
 4. ~~병합을 독립 잡으로 분리~~ — 완료(#363). `placeMergeJob` 을 적재 잡들 뒤에 이어 돌린다
-5. 스케줄 등록 (cron 또는 scheduler 어댑터)
+5. ~~스케줄 등록 (cron 또는 scheduler 어댑터)~~ — 완료(#378, 프로세스 안 Quartz).
+   dev 만 켜져 있다. prod 전환은 dev 관찰 뒤 결정
 6. ~~배치 메트릭 노출~~ — 완료 (`observability-guide.md` 배치 지표 절).
    `last_success` 경보 등록은 Prometheus rule 작업으로 남아 있다
 

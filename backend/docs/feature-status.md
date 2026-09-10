@@ -143,6 +143,7 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | 데이터 delisting | **구현** | `delisted_at` 표시 + 급감 가드. `data-refresh-guide.md` 2절 |
 | 배포 파이프라인 | **구현** | #21 — 서비스별 `docker-compose-*.yml` + Jenkins. `deploy-guide.md`·`jenkins-cicd-dev-deploy-guide.md` |
 | 배치 메트릭 | **구현** | `place_import_rows` 게이지 + `place_import_last_success_timestamp` (기동 씨딩 포함). Prometheus 경보 rule 등록은 인프라 후속 |
+| 배치 주기 실행 | **구현 (dev)** | #378 — batch-service 프로세스 안 Quartz. 장소 파이프라인 월 03:00 / 혼잡도 매일 06:00 KST, 실행 중 가드 + `batch_schedule_*` 지표. prod 전환은 dev 관찰 뒤 결정 |
 
 ### 데이터가 없어 못 하는 것
 

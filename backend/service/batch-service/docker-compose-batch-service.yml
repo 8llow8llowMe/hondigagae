@@ -23,13 +23,18 @@
 #
 # 배포와 적재는 분리한다
 #   이 서비스는 기동 시 잡을 자동 실행하지 않는다(spring.batch.job.enabled=false).
-#   적재는 몇 분씩 걸리고 외부 API 상태에 좌우되므로 파이프라인에 넣지 않는다.
+#   적재는 몇 분씩 걸리고 외부 API 상태에 좌우되므로 배포 파이프라인에 넣지 않는다.
+#   주기 실행은 프로세스 안 Quartz 가 맡는다(#378) — dev 기본 켬, 스위치는 BATCH_SCHEDULE_ENABLED.
 #   자세한 절차는 backend/docs/data-refresh-guide.md.
 #
+#   수동으로 한 잡만 돌릴 때. 같은 컨테이너 안에 두 번째 JVM 이 뜨므로 메모리 상한을 낮추고
+#   웹·Eureka 를 끈다(8080 재바인딩·중복 등록 방지):
 #     docker exec hondigagae-batch-service-dev \
-#       java -jar /app/batch-service.jar \
+#       java -XX:MaxRAMPercentage=25 -XX:InitialRAMPercentage=5 -jar /app/batch-service.jar \
+#         --spring.main.web-application-type=none \
+#         --eureka.client.enabled=false \
 #         --spring.batch.job.enabled=true \
-#         --spring.batch.job.name=petRestaurantImportJob region=제주
+#         --spring.batch.job.name=petRestaurantImportJob region=제주 runAt=2026-09-14T03:00:00
 
 x-batch-service-environment: &batch_service_environment
   TIME_ZONE: ${TIME_ZONE}
@@ -60,6 +65,9 @@ x-batch-service-environment: &batch_service_environment
   # 아래 volumes 로 붙인 경로다.
   # Dockerfile 에 WORKDIR 이 없어 상대 경로는 / 기준으로 풀리므로 절대 경로로 준다.
   CULTURE_FACILITY_CSV_PATH: ${CULTURE_FACILITY_CSV_PATH:-/app/data/pet_culture.csv}
+  # BATCH_SCHEDULE_ENABLED 는 이 공통 anchor 에 두지 않는다. dev/prod 기본값이 다르고,
+  # compose 의 `:-` 는 값을 부재가 아니라 빈 문자열로 만들어 Spring 기본값이 먹지 않기 때문이다.
+  # 각 서비스의 environment 에서 실제 값을 준다.
 
 x-logging: &default-logging
   driver: "json-file"
@@ -85,6 +93,10 @@ services:
       - "${BATCH_SERVICE_PORT_DEV}:${BATCH_SERVICE_PORT}" # host:container
     environment:
       <<: *batch_service_environment
+      # 프로세스 안 Quartz 스케줄 (#378). dev 는 기본 켬.
+      # compose 의 `:-` 는 값을 빈 문자열로 만들어 Spring 쪽 `${...:false}` 기본값이 먹지 않으므로
+      # 여기서 실제 값을 준다. "true" 가 아닌 값은 전부 꺼짐이다.
+      BATCH_SCHEDULE_ENABLED: ${BATCH_SCHEDULE_ENABLED:-true}
     volumes:
       # 공공데이터 원본 CSV. 읽기 전용으로만 붙인다.
       - ${BATCH_DATA_DIR}:/app/data:ro
@@ -116,6 +128,9 @@ services:
       - "${BATCH_SERVICE_PORT_PROD}:${BATCH_SERVICE_PORT}" # host:container
     environment:
       <<: *batch_service_environment
+      # prod 는 기본 끔 — dev 에서 몇 주기를 관찰한 뒤 켠다.
+      # dev 와 같은 이유로 여기서 실제 값을 준다(빈 문자열이면 Spring 기본값이 먹지 않는다).
+      BATCH_SCHEDULE_ENABLED: ${BATCH_SCHEDULE_ENABLED:-false}
     volumes:
       # 공공데이터 원본 CSV. 읽기 전용으로만 붙인다.
       - ${BATCH_DATA_DIR}:/app/data:ro

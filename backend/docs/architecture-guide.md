@@ -25,6 +25,8 @@ domainlayer/<context>
   |  |  \- presenter
   |  |- in/internal           (서비스 간 전용 — 게이트웨이가 라우팅하지 않는 /internal/v1)
   |  |  \- controller
+  |  |- in/batch              (배치 잡 진입점 — *JobConfig, tasklet, listener. batch-service)
+  |  |- in/scheduler          (시각이 부르는 진입점 — Quartz JobDetail/Trigger, @Scheduled)
   |  \- out
   |     |- persistence
   |     |  |- entity

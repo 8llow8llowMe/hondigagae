@@ -232,23 +232,42 @@ pnpm build                                        → .next/standalone/server.js
 Actions 는 모든 PR 의 빠른 게이트이고, 이 잡은 **배포까지 가는 경로**를 같은 검사로 한 번 더 확인한다.
 Jenkins 쪽만 Vault 실값으로 빌드하므로, 키가 빠져 깨지는 번들은 여기서만 걸린다.
 
-## 8. 배치 잡은 파이프라인에 넣지 않는다
+## 8. 배치 잡은 배포 파이프라인에 넣지 않는다
 
 batch-service 는 **배포와 적재를 분리**한다. 컨테이너를 띄우는 것과 잡을 도는 것은 다른 일이고,
 적재는 몇 분씩 걸리며 외부 API 상태에 좌우된다. 배포 파이프라인이 그것을 기다리면
 배포 성공/실패 신호가 흐려진다.
 
-적재는 배포 후 별도로 부른다.
+**주기 실행은 프로세스 안 Quartz 가 맡는다** (#378) — 장소 파이프라인 월 03:00 KST,
+혼잡도 매일 06:00 KST, dev 만 켜져 있다. 자세한 내용은 `data-refresh-guide.md` 4절.
+배포 파이프라인에 넣지 않는다는 원칙은 그대로다. 바뀐 것은 "사람이 언젠가 손으로 부른다"가
+"컨테이너가 정해진 시각에 스스로 부른다"가 된 것뿐이다.
+
+적재를 지금 당장 한 번 돌려야 하면(첫 배포 직후, 원천 복구 뒤 따라잡기) 아래처럼 부른다.
 
 ```bash
 docker exec hondigagae-batch-service-dev \
-  java -jar /app/batch-service.jar \
+  java -XX:MaxRAMPercentage=25 -XX:InitialRAMPercentage=5 -jar /app/batch-service.jar \
+    --spring.main.web-application-type=none \
+    --eureka.client.enabled=false \
     --spring.batch.job.enabled=true \
-    --spring.batch.job.name=petRestaurantImportJob \
-    region=제주
+    --spring.batch.job.name=placeDataPipelineJob \
+    areaCode=39 runAt=2026-09-14T03:00:00
 ```
 
-주기 실행 방법은 `data-refresh-guide.md` 4절에서 정한다.
+플래그가 늘어난 이유가 각각 있다. **이 명령은 이미 떠 있는 컨테이너 안에 두 번째 JVM 을 띄운다.**
+
+| 플래그 | 없으면 |
+| --- | --- |
+| `-XX:MaxRAMPercentage=25` | 두 JVM 이 같은 컨테이너 메모리 상한(dev 512m)을 각자 70% 로 잡아 OOM 으로 상시 컨테이너까지 죽는다 |
+| `--spring.main.web-application-type=none` | 두 번째 JVM 이 8080 에 다시 바인딩하려다 기동 실패한다 |
+| `--eureka.client.enabled=false` | 같은 서비스가 Eureka 에 두 번 등록돼 게이트웨이가 곧 사라질 인스턴스로 라우팅한다 |
+| `--spring.batch.job.enabled=true` | 잡이 돌지 않는다. 동시에 이 값이 **스케줄러를 끄는 조건**이라 수동 JVM 은 트리거를 등록하지 않고 스케줄러도 시작되지 않는다 (`auto-startup` 은 조건이 참일 때만 커스터마이저가 켠다) |
+| `runAt=<ISO 시각>` | 같은 JobInstance 로 판정돼 재시작 금지(`JobRestartException`) 로 거부된다. 앞선 실행이 COMPLETED 였다면 `JobInstanceAlreadyCompleteException` 이다 |
+
+스케줄 창(03:00·06:00)과 겹쳐도 데이터가 깨지지는 않는다 — **스케줄 쪽이 배치 메타데이터를 보고
+양보한다**(`schedule fire skipped ...` WARN). 반대 방향은 막히지 않으니, 수동 실행은 스케줄 창을
+피하는 편이 낫다.
 
 ## 9. 첫 배포 순서
 
