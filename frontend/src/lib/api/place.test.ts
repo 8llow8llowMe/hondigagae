@@ -14,9 +14,7 @@ describe('placeListPath', () => {
   })
 
   it('keyword 를 목록 경로에 싣는다', () => {
-    expect(placeListPath({ ...DEFAULT_PLACE_FILTERS, keyword: '성산' }, null)).toContain(
-      'keyword=',
-    )
+    expect(placeListPath({ ...DEFAULT_PLACE_FILTERS, keyword: '성산' }, null)).toContain('keyword=')
   })
 
   it('커서를 lastPlaceId 로 붙인다', () => {
