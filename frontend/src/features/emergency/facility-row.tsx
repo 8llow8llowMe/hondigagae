@@ -1,10 +1,10 @@
 import { Badge } from '@/components/badge'
 import { PhoneIcon } from '@/components/icons'
-import { Row } from '@/components/surface'
 import { formatDistance } from '@/lib/format/distance'
 import { directionsUrl } from '@/lib/geo/map-link'
 import { messages } from '@/lib/messages'
 import { shortAddress } from '@/lib/place/address'
+import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { NearbyFacilityItem } from '@/types/emergency'
 
@@ -22,19 +22,27 @@ import type { NearbyFacilityItem } from '@/types/emergency'
  * 지도 패널은 내용만 선택 버튼으로 감싸고 액션은 그 **형제**로 둔다 —
  * `<a>` 를 `<button>` 안에 넣을 수 없다. 내용을 복제하면 두 목록의 행이 갈리므로
  * 여기서 공유한다.
+ *
+ * **구분선을 스스로 긋지 않는다** (3층 표면, #460). 2a 의 `Row` 는 `border-bottom` 을
+ * 행에 걸고 마지막 행이 `last` 로 껐는데, 그러면 행 수를 아는 호출자만 목록을 그릴 수 있다.
+ * 선은 `SurfaceList` 가 항목 **사이에만** 긋는다 (#439 가 정한 L2 규약).
+ *
+ * **좌우 인셋은 담는 곳이 정한다** (`inset.ts`). 목록 갈래는 카드 안이라 `card`(16/20),
+ * 지도 SDK 폴백은 카드가 없어 `main`(16/40) — `PlaceRow` 와 같은 규칙이다. 자기 배경도
+ * 없다: 카드 안 자식은 자기 배경을 갖지 않는다 (§0).
  */
 export function FacilityRow({
   facility,
   /** 위치 폴백이면 거리를 숨긴다 — 제주 중심에서 480m 인 것을 "480m" 라고 쓸 수 없다 */
   showDistance,
-  last = false,
+  inset = 'card',
 }: {
   facility: NearbyFacilityItem
   showDistance: boolean
-  last?: boolean
+  inset?: Inset
 }) {
   return (
-    <Row as="li" last={last}>
+    <li className={INSET_CLASS[inset]}>
       <div className="flex items-center gap-3 py-3">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <FacilityRowContent facility={facility} showDistance={showDistance} />
@@ -42,7 +50,7 @@ export function FacilityRow({
 
         <CallButton name={facility.name} tel={facility.tel} />
       </div>
-    </Row>
+    </li>
   )
 }
 

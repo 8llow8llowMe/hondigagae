@@ -1,8 +1,11 @@
+import { BackLink } from '@/components/back-link'
 import { Badge } from '@/components/badge'
 import { EmptyState } from '@/components/empty-state'
 import { PhoneIcon } from '@/components/icons'
+import { Surface, SurfaceList } from '@/components/surface'
 import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type {
   PlanEmergencyDay,
@@ -12,11 +15,58 @@ import type {
 } from '@/types/emergency'
 
 /**
+ * 페이지 머리 — 돌아가기 · `h1` · 반경 안내. **카드가 아니다** (§0 의 페이지 머리 예외 —
+ * 장소 상세 #443 · 일정 상세 #447 · 담기 #451 이 정한 "L0 위 제목 줄").
+ *
+ * 인셋은 카드 안 글줄과 같은 `card` 다 — 아래 카드의 첫 글자와 세로선이 맞아야 한다.
+ * 카드 테두리 1px 만큼(44 vs 45) 어긋나는 것은 같은 PR 들이 의도한 값이다.
+ * 데스크톱 세로 여백은 `SurfaceStack` 의 `md:p-6` 이 준다 (`plan-add-place-header.tsx` 와 같다).
+ *
+ * **반경 안내는 응답이 와야 쓸 수 있다** — 그래서 `null` 이면 그 줄을 비운다. 반경과 개수는
+ * 서버 고정이라 조절 컨트롤을 두지 않고 사실만 적는다 — 조절할 수 있는 것처럼 보이면
+ * 사용자가 찾아 헤맨다.
+ */
+export function PlanEmergencyHeader({
+  planId,
+  radiusMeters,
+}: {
+  planId: string
+  radiusMeters: number | null
+}) {
+  return (
+    <header className={cn('flex flex-col pt-4 pb-4 md:pt-0 md:pb-0', INSET_CLASS.card)}>
+      <BackLink href={`/plans/${planId}`} label={messages.plan.emergencyBack} className="-ml-1" />
+      <h1 className="text-title-1 text-fg lg:text-display mt-1 font-bold break-keep lg:font-extrabold">
+        {messages.plan.emergencyHeading}
+      </h1>
+      {radiusMeters !== null && (
+        <p className="text-caption text-fg-muted mt-1 font-medium">
+          {messages.plan.emergencyRadiusNote.replace(
+            '{km}',
+            String(Math.round(radiusMeters / 1000)),
+          )}
+        </p>
+      )}
+    </header>
+  )
+}
+
+/**
  * 일정 응급 브리핑 — `GET /plans/{planId}/emergency` (#125).
  *
  * **출발 전 확인 용도다.** 급할 때 검색을 시작하면 늦다는 것이 이 기능의 취지라,
  * 화면도 "지금 가장 가까운 곳" 이 아니라 **일자별로 미리 훑는 목록**으로 만든다.
  * 그래서 `/emergency`(현재 위치 기준, 지도 토글)와 화면 모양이 다르다.
+ *
+ * **일자마다 카드 하나다** (3층 표면, #460 — 일정 상세 #447 과 같은 판정). 카드 판정 3문을
+ * 통과한다 — ① 자기 제목(`N일차`) ② 혼자 떼어놔도 말이 된다(그날 갈 곳 주변의 병원) ③ 담는
+ * 항목이 여럿(장소 × 시설). 장소 묶음은 카드 안 L2 다 — 같은 화자(그날의 동선)가 이어
+ * 말하는 것이라 카드를 더 쪼개지 않는다(§0 "카드 경계는 이야기 단위"). 묶음 사이와
+ * 시설 사이는 둘 다 1px 선이고, 묶음 제목이 `h3` 캡션으로 리듬을 끊는다 (#445 두 묶음과
+ * 같은 처리).
+ *
+ * **`SurfaceStack` 의 직접 자식으로 카드들을 돌려준다** — 부모가 카드 간격(8/24)을 주려면
+ * 래퍼가 없어야 한다 (`plan-overview-panel.tsx` 가 조각을 fragment 로 돌려주는 이유).
  *
  * **길찾기 버튼이 없다.** 이 응답의 `FacilityItem` 에는 좌표가 없어 `directionsUrl` 이
  * 링크를 만들 수 없고, 눌러도 아무 데도 못 가는 버튼은 없는 것만 못하다
@@ -28,79 +78,71 @@ import type {
 export function PlanEmergencySection({ data }: { data: PlanEmergencyResponse }) {
   /*
     **장소가 하나도 없으면 일차 목록을 그리지 않는다.** 빈 일차만 늘어선 화면은
-    "찾지 못했다" 를 어렵게 말하는 것이다.
+    "찾지 못했다" 를 어렵게 말하는 것이다. 빈 상태도 카드 안이다 — 로딩·오류와 같은
+    자리에 같은 표면이 서야 상태가 바뀌어도 카드가 생겼다 사라지지 않는다 (#440 판단).
   */
   const hasAnySpot = data.days.some((day) => day.spots.length > 0)
   if (!hasAnySpot) {
     return (
-      <EmptyState
-        title={messages.plan.emergencyEmptyTitle}
-        description={messages.plan.emergencyEmptyDescription}
-      />
+      <Surface aria-label={messages.plan.emergencyHeading}>
+        <EmptyState
+          title={messages.plan.emergencyEmptyTitle}
+          description={messages.plan.emergencyEmptyDescription}
+          inset="card"
+        />
+      </Surface>
     )
   }
 
   return (
-    <div className="flex flex-col">
-      {/*
-        반경과 개수는 **서버 고정**이라 조절 컨트롤을 두지 않는다. 화면은 사실만 적는다 —
-        조절할 수 있는 것처럼 보이면 사용자가 찾아 헤맨다.
-      */}
-      <p className="text-caption text-fg-muted px-4 py-3 font-medium md:px-10">
-        {messages.plan.emergencyRadiusNote.replace(
-          '{km}',
-          String(Math.round(data.radiusMeters / 1000)),
-        )}
-      </p>
-
+    <>
       {data.days.map((day) => (
-        <DaySection key={day.day} day={day} />
+        <DayCard key={day.day} day={day} />
       ))}
-    </div>
+    </>
   )
 }
 
-/** 장소가 없는 일차는 통째로 건너뛴다 — 이동만 있는 날에 빈 제목을 남기지 않는다 */
-function DaySection({ day }: { day: PlanEmergencyDay }) {
+/** 장소가 없는 일차는 통째로 건너뛴다 — 이동만 있는 날에 빈 카드를 남기지 않는다 */
+function DayCard({ day }: { day: PlanEmergencyDay }) {
   if (day.spots.length === 0) return null
 
   return (
-    <section aria-label={messages.plan.emergencyDayLabel.replace('{day}', String(day.day))}>
-      {/* 섹션 제목 등급은 일정 상세와 같은 갈래다 — `lg` 에서 갈린다 (#358) */}
-      <h2 className="text-title-2 text-fg lg:text-title-1 px-4 pt-5 pb-2 font-semibold md:px-10 lg:font-bold">
-        {messages.plan.emergencyDayLabel.replace('{day}', String(day.day))}
-      </h2>
-
-      {day.spots.map((spot) => (
-        <SpotBlock key={spot.planItemId} spot={spot} />
-      ))}
-    </section>
+    <Surface title={messages.plan.emergencyDayLabel.replace('{day}', String(day.day))}>
+      {/* 장소 묶음 사이 선은 이 목록이 긋는다 — 첫 묶음 위(카드 제목 아래)에는 없다 */}
+      <SurfaceList>
+        {day.spots.map((spot) => (
+          <SpotBlock key={spot.planItemId} spot={spot} />
+        ))}
+      </SurfaceList>
+    </Surface>
   )
 }
 
 function SpotBlock({ spot }: { spot: PlanEmergencySpot }) {
   return (
-    <div className="px-4 py-2 md:px-10">
-      <p className="text-body-2 text-fg-muted font-semibold">{spot.title}</p>
+    <li>
+      {/* 카드 제목이 `h2` 라 묶음 제목은 `h3` 캡션이다 (#445 두 묶음과 같은 등급) */}
+      <h3 className={cn('text-body-2 text-fg-muted pt-3 pb-1 font-semibold', INSET_CLASS.card)}>
+        {spot.title}
+      </h3>
 
       {/*
         **반경 안에 아무것도 없는 장소를 목록에서 지우지 않는다.** 지우면 사용자는 그
         장소 주변을 확인한 것으로 오해한다 — 실제로는 "없다" 는 정보가 있어야 한다.
       */}
       {spot.facilities.length === 0 ? (
-        <p className="text-caption text-fg-subtle py-2">{messages.plan.emergencySpotEmpty}</p>
+        <p className={cn('text-caption text-fg-subtle pb-3', INSET_CLASS.card)}>
+          {messages.plan.emergencySpotEmpty}
+        </p>
       ) : (
-        <ul className="flex flex-col">
-          {spot.facilities.map((facility, index) => (
-            <FacilityRow
-              key={`${facility.name}-${facility.addr}`}
-              facility={facility}
-              last={index === spot.facilities.length - 1}
-            />
+        <SurfaceList>
+          {spot.facilities.map((facility) => (
+            <FacilityRow key={`${facility.name}-${facility.addr}`} facility={facility} />
           ))}
-        </ul>
+        </SurfaceList>
       )}
-    </div>
+    </li>
   )
 }
 
@@ -110,10 +152,12 @@ function SpotBlock({ spot }: { spot: PlanEmergencySpot }) {
  * **`/emergency` 의 `FacilityRow` 를 재사용하지 않는다.** 저쪽은 `NearbyFacilityItem`
  * 을 받는데 이 응답에는 `facilityId`·좌표·`operatingHours`·`openNow` 가 없다. 같은
  * 것으로 다루면 없는 필드를 읽게 된다 (`types/emergency.ts` 주석).
+ *
+ * 구분선은 스스로 긋지 않는다 — `SurfaceList` 가 항목 사이에만 긋는다 (#439 L2 규약).
  */
-function FacilityRow({ facility, last }: { facility: PlanEmergencyFacility; last: boolean }) {
+function FacilityRow({ facility }: { facility: PlanEmergencyFacility }) {
   return (
-    <li className={cn('flex items-center gap-3 py-3', !last && 'border-border/60 border-b')}>
+    <li className={cn('flex items-center gap-3 py-3', INSET_CLASS.card)}>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-body-2 text-fg font-semibold break-keep">{facility.name}</span>

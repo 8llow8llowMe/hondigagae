@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { PlanEmergencySection } from '@/features/plan/plan-emergency-section'
+import { PlanEmergencyHeader, PlanEmergencySection } from '@/features/plan/plan-emergency-section'
 import { resolveMock } from '@/lib/api/mock'
 import { mockPlanEmergency } from '@/lib/api/mock/emergency-data'
 import { resetMockStore } from '@/lib/api/mock/store'
@@ -33,12 +33,27 @@ describe('PlanEmergencySection — 목록', () => {
     반경과 개수는 서버 고정이라 조절 컨트롤을 두지 않는다. 조절할 수 있는 것처럼 보이면
     사용자가 찾아 헤맨다 — 사실만 적는다.
   */
-  it('반경을 사실로만 알리고 조절 컨트롤을 두지 않는다', () => {
-    const markup = render()
+  it('반경을 사실로만 알리고 조절 컨트롤을 두지 않는다 — 안내는 페이지 머리에 있다 (#460)', () => {
+    const header = renderToStaticMarkup(
+      createElement(PlanEmergencyHeader, { planId: PLAN, radiusMeters: DATA.radiusMeters }),
+    )
 
-    expect(markup).toContain('10km')
-    expect(markup).not.toContain('<input')
-    expect(markup).not.toContain('<select')
+    expect(header).toContain('10km')
+    for (const markup of [header, render()]) {
+      expect(markup).not.toContain('<input')
+      expect(markup).not.toContain('<select')
+    }
+  })
+
+  /* 반경은 응답에서 온다 — 응답 전에는 그 줄만 비운다. 제목과 돌아가기는 그대로 선다 */
+  it('반경을 아직 모르면 안내 줄을 비우고 머리는 남긴다', () => {
+    const header = renderToStaticMarkup(
+      createElement(PlanEmergencyHeader, { planId: PLAN, radiusMeters: null }),
+    )
+
+    expect(header).not.toContain('km')
+    expect(header).toContain(messages.plan.emergencyHeading)
+    expect(header).toContain(`href="/plans/${PLAN}"`)
   })
 
   /*
@@ -75,6 +90,60 @@ describe('PlanEmergencySection — 빈 경우', () => {
 
     expect(markup).toContain(messages.plan.emergencyEmptyTitle)
     expect(markup).not.toContain('1일차')
+  })
+})
+
+/*
+  **3층 표면** (`DESIGN.md §0`, #460 — 로드맵 #455 의 7번). 일정 상세(#447)와 같은 판정 —
+  일자마다 카드 하나, 장소 묶음은 카드 안 L2, 머리는 L0 위.
+*/
+describe('PlanEmergencySection — 3층 표면 (#460)', () => {
+  const daysWithSpots = DATA.days.filter((day) => day.spots.length > 0).length
+
+  it('장소가 있는 일차마다 Surface 카드 하나다 — 제목이 카드 안에 있다', () => {
+    const markup = render()
+
+    expect(markup.match(/<section /g)?.length).toBe(daysWithSpots)
+    expect(markup).toMatch(
+      /<section [^>]*class="bg-bg border-border border-y md:rounded-lg md:border"[\s\S]*?<h2[^>]*>1일차<\/h2>/,
+    )
+  })
+
+  it('h1 은 카드 밖 — 섹션은 h1 을 그리지 않는다', () => {
+    expect(render()).not.toContain('<h1')
+  })
+
+  it('장소 묶음 제목은 h3 캡션이고 시설 행은 카드 인셋에 선다', () => {
+    const markup = render()
+
+    expect(markup).toMatch(/<h3 class="[^"]*px-4 md:px-5"[^>]*>협재해수욕장<\/h3>/)
+    expect(markup).not.toContain('md:px-10')
+  })
+
+  /* 구분선은 목록이 항목 사이에만 긋는다 — 행이 스스로 `border-border/60` 을 걸지 않는다 */
+  it('묶음 사이와 시설 사이 선은 SurfaceList 가 긋고 행은 border-b 를 갖지 않는다', () => {
+    const markup = render()
+
+    expect(markup).toContain('[&amp;&gt;li+li]:border-t')
+    expect(markup).not.toContain('border-border/60')
+    expect(markup).not.toMatch(/<li[^>]*border-b/)
+  })
+
+  it('빈 상태도 카드 안이다 — 상태에 따라 카드가 생겼다 사라지지 않는다', () => {
+    const markup = render({ ...DATA, days: [{ day: 1, spots: [] }] })
+
+    expect(markup).toMatch(/<section [^>]*aria-label="[^"]*"[^>]*class="bg-bg border-border/)
+    expect(markup).toContain('px-4 md:px-5')
+  })
+
+  it('페이지 머리는 카드 인셋에 서고 카드는 아니다', () => {
+    const header = renderToStaticMarkup(
+      createElement(PlanEmergencyHeader, { planId: PLAN, radiusMeters: DATA.radiusMeters }),
+    )
+
+    expect(header).toMatch(/^<header class="[^"]*px-4 md:px-5"/)
+    expect(header).not.toContain('<section')
+    expect(header).not.toContain('rounded-lg')
   })
 })
 

@@ -1,3 +1,4 @@
+import { Canvas } from '@/components/surface'
 import { EmergencyListView } from '@/features/emergency/emergency-list-view'
 import { EmergencyMapView } from '@/features/emergency/emergency-map-view'
 import { messages } from '@/lib/messages'
@@ -49,10 +50,15 @@ export default async function EmergencyPage({ searchParams }: { searchParams: Se
 
     예전에는 여기에 `max-w-screen-md`(768)가 있었고, 1920 에서 목록만 768 로 묶여
     보기 토글이 목록↔지도 사이에서 339px 옮겨 다녔다.
+
+    **`main` 이 L0 바닥이다** (`DESIGN.md §0`, #460). 바닥은 전폭이어야 하므로 `Canvas` 를
+    `main` 에 걸고, 카드를 쌓는 일은 `EmergencyListView` 의 `SurfaceStack` 이 맡는다 —
+    장소 목록(#439) · 일정 목록(#445)과 같은 3층 표면. 지도 갈래(위)는 전폭 미디어라
+    카드 판정에서 빠지고(§0), `Canvas` 도 없다 — 지도가 바닥이다.
   */
   return (
-    <main id="main-content">
+    <Canvas as="main" id="main-content">
       <EmergencyListView listHref={listHref} mapHref={mapHref} />
-    </main>
+    </Canvas>
   )
 }

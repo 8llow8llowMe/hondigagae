@@ -1,27 +1,16 @@
 import { Button } from '@/components/button'
-import { Chip, ChipGroup } from '@/components/chip'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
-import { Band, RowList } from '@/components/surface'
+import { SurfaceList } from '@/components/surface'
 import { EmergencySkeleton } from '@/features/emergency/emergency-skeleton'
-import {
-  applyFilters,
-  countsAreComplete,
-  facilityCounts,
-  labelWithCount,
-  reliefLabel,
-  reliefs,
-} from '@/features/emergency/facility-filters'
+import { applyFilters, reliefLabel, reliefs } from '@/features/emergency/facility-filters'
 import { FacilityRow } from '@/features/emergency/facility-row'
 import { formatDistance } from '@/lib/format/distance'
 import type { PositionFailure } from '@/lib/geo/current-position'
 import { messages } from '@/lib/messages'
+import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
-import {
-  FACILITY_TYPE_CODES,
-  type FacilityFilters,
-  type NearbyFacilityResult,
-} from '@/types/emergency'
+import type { FacilityFilters, NearbyFacilityResult } from '@/types/emergency'
 
 export type EmergencySectionProps = {
   result: NearbyFacilityResult | null
@@ -37,14 +26,15 @@ export type EmergencySectionProps = {
   /** 반경을 더 넓힐 수 있는가 (백엔드 상한 50km) */
   canWiden: boolean
   /**
-   * 데스크톱에 **별도 필터 레일이 있는가** (#419).
+   * 좌우 인셋 — **담는 곳이 정한다** (`inset.ts`, #460).
    *
-   * 켜면 칩 줄이 `lg:hidden` 이 된다 — 레일과 칩이 같은 축을 두 번 보여주지 않게.
-   * **기본값은 false 다.** 지도 SDK 실패 폴백은 이 컴포넌트를 레일 없이 쓰고, 그 경로는
-   * 카카오 키 도메인이 안 맞을 때 **항상** 오므로 예외가 아니다 — 무조건 숨기면
-   * 데스크톱 폴백이 필터를 통째로 잃는다.
+   * 목록 갈래는 이 섹션을 `Surface`(L1) 안에 담으므로 기본값이 `card`(16/20)다. 지도 SDK
+   * 실패 폴백은 카드 없는 페이지에 그대로 세우므로 `main`(16/40)을 넘긴다 — 페이지 값을
+   * 카드 안에서 쓰면 내용이 두 번 밀리고(§0), 카드 값을 카드 밖에서 쓰면 안내 줄(40)과
+   * 행(20)이 다른 세로선에 선다. 로딩·오류·0건·목록 네 상태가 전부 같은 값을 받는다 —
+   * 상태가 바뀌는 순간 왼쪽 선이 뛰지 않아야 한다 (#451 이 담기 화면에서 잡은 회귀).
    */
-  hasRail?: boolean
+  inset?: Inset
 }
 
 /**
@@ -53,11 +43,16 @@ export type EmergencySectionProps = {
  * props 로만 데이터를 받는 presentational 컴포넌트다 — node 환경에서 테스트하기 위해서다
  * (docs/testing-guide.md §1).
  *
+ * **필터 칩은 여기 없다** (#460). 칩은 목록을 좁히는 도구라 카드 밖에 서야 하고
+ * (`/places` #439 와 같은 판정), 이 섹션은 카드 **안**의 내용이다 —
+ * `EmergencyFilterChips` 가 따로 있고 호출부가 카드 밖에 세운다. 이 컴포넌트가 그리는
+ * 것은 위치 안내 · 기준 줄 · 목록(또는 0건 안내) · 출처, 넷이다.
+ *
  * **위치를 못 얻어도 목록은 남는다.** 거리 줄만 사라지고 목록과 전화는 그대로다
  * (아트보드 03 "위치 권한 없음"). 이 화면은 급할 때 여는 화면이라 위치 하나 때문에
  * 비어 버리면 안 된다.
  *
- * 지도(아트보드 02 · 04 우측)는 **이 범위가 아니다** — 이슈 #14(카카오 키 대기).
+ * 지도(아트보드 02 · 04 우측)는 **이 범위가 아니다** — `emergency-map-view.tsx`.
  */
 export function EmergencySection({
   result,
@@ -70,9 +65,9 @@ export function EmergencySection({
   onRetryPosition,
   onWidenRadius,
   canWiden,
-  hasRail = false,
+  inset = 'card',
 }: EmergencySectionProps) {
-  if (loading) return <EmergencySkeleton />
+  if (loading) return <EmergencySkeleton inset={inset} />
 
   if (errorStatus !== null || result === null) {
     return (
@@ -80,70 +75,36 @@ export function EmergencySection({
         title={messages.emergency.errorTitle}
         description={messages.common.temporaryErrorDescription}
         onRetry={onRetry}
+        inset={inset}
       />
     )
   }
 
   const all = result.facilities
   const visible = applyFilters(all, filters)
-  const counts = facilityCounts(all)
-  // 잘린 목록에서 센 개수는 전체가 아니다 — 틀린 개수는 없는 개수보다 나쁘다
-  const showCounts = countsAreComplete(result)
   const showDistance = positionFallback === null
 
   return (
     <>
       {positionFallback !== null && (
-        <PositionNotice reason={positionFallback} onRetry={onRetryPosition} />
+        <PositionNotice reason={positionFallback} onRetry={onRetryPosition} inset={inset} />
       )}
 
-      <div className={cn('flex flex-col gap-2 px-4 pt-3 md:px-10', hasRail && 'lg:hidden')}>
-        <ChipGroup
-          label={messages.emergency.typeGroupLabel}
-          exclusive
-          className="flex flex-wrap gap-1.5"
-        >
-          <Chip
-            exclusive
-            selected={filters.type === null}
-            onSelect={() => onFiltersChange({ ...filters, type: null })}
-          >
-            {labelWithCount(messages.emergency.typeAll, counts.all, showCounts)}
-          </Chip>
-          {FACILITY_TYPE_CODES.map((code) => (
-            <Chip
-              key={code}
-              exclusive
-              selected={filters.type === code}
-              onSelect={() => onFiltersChange({ ...filters, type: code })}
-            >
-              {labelWithCount(messages.emergency.typeByCode[code], counts.byType[code], showCounts)}
-            </Chip>
-          ))}
-        </ChipGroup>
-
-        <ChipGroup label={messages.emergency.narrowGroupLabel} className="flex flex-wrap gap-1.5">
-          <Chip
-            selected={filters.open24Only}
-            onSelect={() => onFiltersChange({ ...filters, open24Only: !filters.open24Only })}
-          >
-            {labelWithCount(messages.emergency.open24, counts.open24, showCounts)}
-          </Chip>
-          <Chip
-            selected={filters.openNowOnly}
-            onSelect={() => onFiltersChange({ ...filters, openNowOnly: !filters.openNowOnly })}
-          >
-            {labelWithCount(messages.emergency.openNow, counts.openNow, showCounts)}
-          </Chip>
-        </ChipGroup>
-
-        {/* 백엔드 스키마가 화면에 알리라고 명시한 사실이다 */}
-        {filters.open24Only && (
-          <p className="text-caption text-fg-muted break-keep">{messages.emergency.open24Note}</p>
+      {/*
+        기준 줄 — 카드 제목(위치 안내가 있으면 그 아래) 바로 아래라 위 선이 없다(제목 아래
+        선은 카드의 몫, `SurfaceList` 머리주석). 위치 안내와 이 줄 사이에도 선이 없다 — 2a 는
+        안내에 `border-b` 를 걸었지만, 둘은 같은 화자("무엇을 기준으로 얼마나 찾았나")라 한
+        머리 블록이고 선은 그 블록과 목록 사이 한 곳에만 둔다. 아래 선은 목록이 아니라 이 줄이 긋는다 — 목록의 `[&>li+li]` 는 첫 항목 위에
+        선을 두지 않으므로, 기준 줄과 첫 행 사이 경계는 여기서 그려야 한다.
+        세로 여백 `pt-3`/`pb-3` 은 행(`py-3`)과 같은 값이다 — 카드 제목(`pb-3`) 아래 24, 폴백의
+        칩 선 아래 12 로 어디에 서도 행과 같은 리듬이다.
+      */}
+      <div
+        className={cn(
+          'border-border flex items-baseline justify-between gap-3 border-b pt-3 pb-3',
+          INSET_CLASS[inset],
         )}
-      </div>
-
-      <div className="border-border mt-3 flex items-baseline justify-between gap-3 border-t px-4 pt-3 pb-2 md:px-10">
+      >
         <p className="text-caption text-fg-muted font-semibold tabular-nums">
           {messages.emergency.sortNote.replace('{radius}', formatDistance(result.radius))}
         </p>
@@ -160,22 +121,31 @@ export function EmergencySection({
           onFiltersChange={onFiltersChange}
           onWidenRadius={onWidenRadius}
           canWiden={canWiden}
+          inset={inset}
         />
       ) : (
-        <RowList>
-          {visible.map((facility, index) => (
+        <SurfaceList>
+          {visible.map((facility) => (
             <FacilityRow
               key={facility.facilityId}
               facility={facility}
               showDistance={showDistance}
-              last={index === visible.length - 1}
+              inset={inset}
             />
           ))}
-        </RowList>
+        </SurfaceList>
       )}
 
-      <Band />
-      <p className="text-caption text-fg-muted px-4 py-4 break-keep md:px-10">
+      {/*
+        출처는 다른 화자다 — 2a 는 8px `Band` 로 갈랐다. 카드 안에서 밴드는 각진 불투명 면이
+        되어 radius 12 모서리를 덮으므로(§0) 1px 선으로 바꿨다.
+      */}
+      <p
+        className={cn(
+          'text-caption text-fg-muted border-border border-t py-4 break-keep',
+          INSET_CLASS[inset],
+        )}
+      >
         {messages.emergency.source.replace('{provider}', result.providerName)}
       </p>
     </>
@@ -195,6 +165,7 @@ function EmptyResult({
   onFiltersChange,
   onWidenRadius,
   canWiden,
+  inset,
 }: {
   all: NearbyFacilityResult['facilities']
   filters: FacilityFilters
@@ -202,6 +173,7 @@ function EmptyResult({
   onFiltersChange: (next: FacilityFilters) => void
   onWidenRadius: () => void
   canWiden: boolean
+  inset: Inset
 }) {
   const options = reliefs(all, filters)
 
@@ -221,12 +193,13 @@ function EmptyResult({
             </Button>
           ) : undefined
         }
+        inset={inset}
       />
     )
   }
 
   return (
-    <div className="flex flex-col items-start gap-2 px-4 py-6 md:px-10">
+    <div className={cn('flex flex-col items-start gap-2 py-6', INSET_CLASS[inset])}>
       <h3 className="text-title-2 text-fg font-semibold">{messages.emergency.narrowedTitle}</h3>
       <div className="mt-1 flex flex-wrap gap-2">
         {options.map((option) => (
@@ -244,7 +217,15 @@ function EmptyResult({
 }
 
 /** 위치를 못 얻었을 때. **목록 위에 얹고 목록을 지우지 않는다** */
-function PositionNotice({ reason, onRetry }: { reason: PositionFailure; onRetry: () => void }) {
+function PositionNotice({
+  reason,
+  onRetry,
+  inset,
+}: {
+  reason: PositionFailure
+  onRetry: () => void
+  inset: Inset
+}) {
   const text =
     reason === 'denied'
       ? messages.emergency.positionDenied
@@ -255,7 +236,7 @@ function PositionNotice({ reason, onRetry }: { reason: PositionFailure; onRetry:
           : messages.emergency.positionTimeout
 
   return (
-    <div className="border-border flex flex-col items-start gap-2 border-b px-4 py-3 md:px-10">
+    <div className={cn('flex flex-col items-start gap-2 pt-3 pb-3', INSET_CLASS[inset])}>
       <p className="text-body-2 text-fg break-keep">{text}</p>
       {/*
         **다시 시도할 것이 없는 두 갈래에는 버튼을 두지 않는다.** 미지원 브라우저는

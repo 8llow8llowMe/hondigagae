@@ -7,7 +7,6 @@ import {
   EmergencySection,
   type EmergencySectionProps,
 } from '@/features/emergency/emergency-section'
-import { MAX_SIZE } from '@/lib/api/emergency'
 import { messages } from '@/lib/messages'
 import { facility } from '@/test/fixtures/emergency'
 import { DEFAULT_FACILITY_FILTERS } from '@/types/emergency'
@@ -44,9 +43,18 @@ describe('EmergencySection — 상태 배타성', () => {
     expect(markup).not.toContain('제주24시동물병원')
   })
 
-  it('로딩 중에도 칩 자리를 잡아 둔다 — 나중에 생기면 목록이 아래로 밀린다', () => {
-    // 칩 3 + 토글 2 자리
-    expect(render({ loading: true }).match(/rounded-md/g)?.length ?? 0).toBeGreaterThanOrEqual(5)
+  /*
+    **칩 자리를 더 흉내 내지 않는다** (#460). 칩이 카드 밖 `EmergencyFilterChips` 로 나가
+    응답과 무관하게 실제로 서 있으므로, 스켈레톤이 칩 폭을 잡아 두면 실제 칩 아래 가짜 칩이
+    한 줄 더 생긴다. 남는 것은 카드 안 내용 — 기준 줄과 행 셋이다.
+  */
+  it('로딩 스켈레톤은 칩 자리를 그리지 않는다 — 칩은 카드 밖에 실제로 서 있다', () => {
+    const markup = render({ loading: true })
+
+    expect(markup).not.toContain('w-20')
+    expect(markup).not.toContain('w-28')
+    // 전화 버튼 자리 셋만 rounded-md 다
+    expect(markup.match(/rounded-md/g)?.length ?? 0).toBe(3)
   })
 
   it('오류에서는 재시도를 준다', () => {
@@ -230,118 +238,129 @@ describe('EmergencySection — 결과 없음', () => {
   })
 })
 
-describe('EmergencySection — 칩 개수', () => {
-  it('다 받았으면 개수를 붙인다', () => {
-    expect(render()).toContain(`${messages.emergency.typeAll} 1`)
-  })
-
-  /*
-    **#297.** 반경 안 총계보다 적게 받았으면 잘렸다 — `totalCount` 가 자르기 전 총계가
-    되면서(BE #285 / PR #296) 이 판정이 상한 도달 우회를 대신한다.
-  */
-  it('총계보다 적게 받았으면 숫자를 빼고 라벨만 쓴다', () => {
-    const markup = render({
-      result: {
-        facilities: [facility()],
-        totalCount: 136,
-        radius: 10_000,
-        open24Only: false,
-        providerName: '출처',
-      },
-    })
-
-    expect(markup).toContain(messages.emergency.typeAll)
-    expect(markup).not.toContain(`${messages.emergency.typeAll} 1`)
-  })
-
-  /*
-    상한 도달 우회(#281)를 걷은 결과 — 상한만큼 왔는데 총계도 그만큼이면 다 받은 것이라
-    개수를 붙인다. 우회는 이 응답에서 숫자를 뺐다.
-  */
-  it('상한만큼 왔는데 총계도 그만큼이면 개수를 붙인다', () => {
-    const markup = render({
-      result: {
-        facilities: Array.from({ length: MAX_SIZE }, (_, index) =>
-          facility({ facilityId: String(index) }),
-        ),
-        totalCount: MAX_SIZE,
-        radius: 10_000,
-        open24Only: false,
-        providerName: '출처',
-      },
-    })
-
-    expect(markup).toContain(`${messages.emergency.typeAll} ${MAX_SIZE}`)
-  })
-
-  it('24시간을 켜면 결과가 적다는 사실을 알린다 (백엔드 스키마 지침)', () => {
-    const markup = render({ filters: { ...DEFAULT_FACILITY_FILTERS, open24Only: true } })
-
-    expect(markup).toContain(messages.emergency.open24Note)
-  })
-})
-
 /*
-  **#205.** 유형 칩 라벨을 응답 목록에서 역추적하고 있었다 —
-  `facilities.find((f) => f.facilityType.code === code)?.facilityType.name ?? code`.
-
-  이 화면은 유형을 **서버로 보내지 않고 클라이언트에서 좁힌다** (칩마다 개수를 보여주려고,
-  `lib/api/emergency.ts`). 그래서 **개수 0 인 칩도 반드시 그리는데**, 그 칩은 목록에 표본이
-  없어 `?? code` 로 떨어졌다 — dev `/emergency` 에 `ANIMAL_HOSPITAL 0 · ANIMAL_PHARMACY 0`
-  이 그대로 나갔다. 데이터가 차더라도 "반경 안에 병원만 있는" 흔한 경우에 재현된다.
+  **#205.** 유형 칩 라벨은 `EmergencyFilterChips` 로 옮겨 갔고 그 테스트도 함께 갔다
+  (`emergency-filter-chips.test.ts`). 여기 남는 것은 그 반대편 — **목록 행은 그대로 서버
+  metadata 를 쓴다.** 거기는 데이터가 있는 자리라 `frontend/CLAUDE.md` 의 "서버 enum
+  metadata 를 그대로 렌더한다" 가 적용된다 — #205 가 그 규칙을 화면 전체로 뒤집은 것이
+  아님을 고정한다.
 */
-describe('EmergencySection — 유형 칩 라벨 (#205)', () => {
-  const EMPTY: EmergencySectionProps['result'] = {
-    facilities: [],
-    totalCount: 0,
-    radius: 10_000,
-    open24Only: false,
-    providerName: '출처',
-  }
-
-  it('결과가 0건이어도 enum 코드를 노출하지 않는다', () => {
-    const markup = render({ result: EMPTY })
-
-    expect(markup).not.toContain('ANIMAL_')
-  })
-
-  /*
-    개수까지 붙여서 본다. 라벨만 검사하면 페이지 제목("병원 · 약국")에 같은 낱말이 있어
-    칩이 코드로 떨어져도 테스트가 통과한다.
-  */
-  it('결과가 0건이어도 두 유형을 한국어로 그린다', () => {
-    const markup = render({ result: EMPTY })
-
-    expect(markup).toContain(`${messages.emergency.typeByCode.ANIMAL_HOSPITAL} 0`)
-    expect(markup).toContain(`${messages.emergency.typeByCode.ANIMAL_PHARMACY} 0`)
-  })
-
-  /* 실제로 가장 자주 밟는 경로다 — 반경 안에 병원만 있는 경우 */
-  it('병원만 있는 목록에서도 약국 칩이 한국어다', () => {
-    const markup = render()
-
-    expect(markup).not.toContain('ANIMAL_')
-    expect(markup).toContain(`${messages.emergency.typeByCode.ANIMAL_PHARMACY} 0`)
-  })
-
-  /*
-    **목록 행은 그대로 서버 metadata 를 쓴다.** 거기는 데이터가 있는 자리라
-    `frontend/CLAUDE.md` 의 "서버 enum metadata 를 그대로 렌더한다" 가 적용된다 —
-    이 PR 이 그 규칙을 화면 전체로 뒤집은 것이 아님을 고정한다.
-  */
+describe('EmergencySection — 유형 표기', () => {
   it('목록 행의 유형 표기는 서버 name 을 계속 쓴다', () => {
     const markup = render({
       result: {
-        ...EMPTY,
         facilities: [
           facility({
             facilityType: { code: 'ANIMAL_PHARMACY', name: '동물약국', description: null },
           }),
         ],
         totalCount: 1,
+        radius: 10_000,
+        open24Only: false,
+        providerName: '출처',
       },
     })
 
     expect(markup).toContain('동물약국')
+    expect(markup).not.toContain('ANIMAL_')
+  })
+})
+
+/*
+  **3층 표면** (`DESIGN.md §0`, #460). 이 섹션은 목록 갈래에서 `Surface`(L1) 안에 담기고,
+  지도 SDK 폴백에서는 카드 없는 페이지에 그대로 선다. 인셋은 담는 곳이 정한다 (`inset.ts`).
+*/
+describe('EmergencySection — 3층 표면 (#460)', () => {
+  it('기본 인셋은 card(16/20) 다 — 카드 안에서 페이지 인셋 40 을 쓰면 내용이 두 번 밀린다', () => {
+    const markup = render()
+
+    expect(markup).toContain('md:px-5')
+    expect(markup).not.toContain('md:px-10')
+  })
+
+  it('inset="main" 을 받으면 네 상태가 전부 페이지 값 40 으로 선다 — 폴백은 카드가 아니다', () => {
+    const states: Partial<EmergencySectionProps>[] = [
+      {},
+      { loading: true },
+      { errorStatus: 500, result: null },
+      {
+        result: {
+          facilities: [],
+          totalCount: 0,
+          radius: 10_000,
+          open24Only: false,
+          providerName: '출처',
+        },
+      },
+      // 조건을 켜서 0건 — `reliefs` 갈래
+      {
+        result: {
+          facilities: [facility({ openNow: false })],
+          totalCount: 1,
+          radius: 10_000,
+          open24Only: false,
+          providerName: '출처',
+        },
+        filters: { ...DEFAULT_FACILITY_FILTERS, openNowOnly: true },
+      },
+      // 위치 안내
+      { positionFallback: 'denied' },
+    ]
+
+    for (const state of states) {
+      const markup = render({ ...state, inset: 'main' })
+
+      expect(markup).toContain('md:px-10')
+      expect(markup).not.toContain('md:px-5')
+    }
+  })
+
+  it('로딩 · 오류 · 목록 · 0건이 같은 인셋에 선다 — 상태가 바뀌는 순간 왼쪽 선이 뛰지 않는다', () => {
+    const loading = render({ loading: true })
+    const error = render({ errorStatus: 500, result: null })
+    const list = render()
+
+    for (const markup of [loading, error, list]) expect(markup).toContain('px-4 md:px-5')
+  })
+
+  it('필터 칩이 없다 — 칩은 카드 밖 EmergencyFilterChips 의 몫이다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain(`${messages.emergency.typeAll} 1`)
+    expect(markup).not.toContain('aria-pressed')
+  })
+
+  /*
+    2a 의 8px `Band` 는 카드 안에서 각진 불투명 면이 되어 radius 12 모서리를 덮는다(§0).
+    출처 줄은 1px 위 선으로 갈린다.
+  */
+  it('Band 가 없고 출처 줄은 1px 위 선으로 갈린다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain('bg-band h-2')
+    expect(markup).toMatch(/border-t[^"]*"[^>]*>[^<]*한국문화정보원/)
+  })
+
+  /*
+    구분선 규약은 행이 아니라 목록이 갖는다 (#439 `SurfaceList`). React 가 임의 variant 를
+    `[&amp;&gt;li+li]` 로 이스케이프한다 — 소스 문자열이 아니라 렌더 결과를 본다.
+  */
+  it('행 사이 선은 SurfaceList 가 긋고 행은 스스로 border-b 를 갖지 않는다', () => {
+    const markup = render({
+      result: {
+        facilities: [facility({ facilityId: '1' }), facility({ facilityId: '2' })],
+        totalCount: 2,
+        radius: 10_000,
+        open24Only: false,
+        providerName: '출처',
+      },
+    })
+
+    expect(markup).toContain('[&amp;&gt;li+li]:border-t')
+    expect(markup).not.toMatch(/<li[^>]*border-b/)
+  })
+
+  it('스켈레톤도 같은 목록 규약을 쓴다 — 데이터가 오는 순간 선이 뛰지 않는다', () => {
+    expect(render({ loading: true })).toContain('[&amp;&gt;li+li]:border-t')
   })
 })

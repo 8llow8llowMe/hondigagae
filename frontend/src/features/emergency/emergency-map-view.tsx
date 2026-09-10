@@ -10,12 +10,14 @@ import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from '@/components/icon
 import { MapSheet, type SheetStop } from '@/components/map-sheet'
 import { ViewToggle } from '@/components/view-toggle'
 import { EmergencyFilterBar } from '@/features/emergency/emergency-filter-bar'
+import { EmergencyFilterChips } from '@/features/emergency/emergency-filter-chips'
 import { EmergencyBoardSection } from '@/features/emergency/emergency-list-view'
 import { EmergencyMapPanel } from '@/features/emergency/emergency-map-panel'
 import { EmergencyMapSkeleton } from '@/features/emergency/emergency-map-skeleton'
 import {
   applyFilters,
   countsAreComplete,
+  facilityCounts,
   reliefLabel,
   reliefs,
 } from '@/features/emergency/facility-filters'
@@ -29,6 +31,7 @@ import type { PositionResult } from '@/lib/geo/current-position'
 import type { MapSdkFailure } from '@/lib/map/sdk'
 import { boundsCenter, isWithinBounds, type MapBounds } from '@/lib/map/viewport'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { NearbyFacilityItem } from '@/types/emergency'
 
@@ -290,12 +293,33 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         {/* 안내 한 줄 — 배너(링크형)가 아니다. 갈 곳이 없고 알릴 사실만 있다 */}
         <p
           role="status"
-          className="text-caption text-fg-muted bg-bg-sunken border-border border-b px-4 py-3 font-medium md:px-10"
+          className={cn(
+            'text-caption text-fg-muted bg-bg-sunken border-border border-b py-3 font-medium',
+            // 아래 칩·목록과 같은 축 — 값이 한 곳(`inset.ts`)에 있어야 한 곳만 어긋난다
+            INSET_CLASS.main,
+          )}
         >
           {failureMessage(failure)}
         </p>
-        {/* **자기 보드를 넘긴다.** `EmergencyListView` 를 렌더하면 보드가 두 벌이 된다 */}
-        <EmergencyBoardSection board={board} />
+        {/*
+          **레일이 없으니 칩은 모든 폭에서 남는다** — `lg:hidden` 을 걸지 않는다 (공통명세 E0 ·
+          E5). 이 갈래는 카드가 없는 페이지라(`Canvas` 도 `Surface` 도 없다 — `/places`
+          폴백 #452 와 같다) 인셋은 페이지 값 `main` 이다. 칩 아래 선(`divider`)은 위 안내 줄과
+          같은 L0 위 스트립 규약이다.
+
+          개수는 **반경 전량**을 센다 — 지도 없이 목록만 있으니 목록 갈래와 같은 기준이다.
+        */}
+        <EmergencyFilterChips
+          filters={board.filters}
+          onFiltersChange={board.setFilters}
+          counts={facilityCounts(inRadius)}
+          showCounts={board.query.data !== undefined && countsAreComplete(board.query.data)}
+          inset="main"
+          divider
+        />
+        {/* **자기 보드를 넘긴다.** `EmergencyListView` 를 렌더하면 보드가 두 벌이 된다.
+         **`inset="main"` 이다** — 카드가 아니다 (`EmergencyBoardSection` 머리주석) */}
+        <EmergencyBoardSection board={board} inset="main" />
       </div>
     )
   }
