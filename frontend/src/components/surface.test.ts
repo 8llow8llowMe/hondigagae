@@ -3,19 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import {
-  Band,
-  Canvas,
-  Row,
-  RowList,
-  Section,
-  Surface,
-  SurfaceBody,
-  SurfaceList,
-  SurfaceRow,
-  SurfaceStack,
-  SurfaceTile,
-} from '@/components/surface'
+import { Band, Canvas, Row, RowList, Section, Surface, SurfaceStack } from '@/components/surface'
 
 /**
  * 표면 프리미티브 — 이슈 #422.
@@ -177,84 +165,5 @@ describe('L1 Surface — 섹션', () => {
     expect(render({ trailing: createElement('a', { href: '/places' }, '전체 보기') })).toContain(
       '전체 보기',
     )
-  })
-})
-
-describe('L2 SurfaceRow — 카드 안의 행', () => {
-  it('테두리를 두르지 않는다 — Surface 의 테두리와 경쟁해 둘 다 죽는다', () => {
-    const classes = classesOf(renderToStaticMarkup(createElement(SurfaceRow, null, '행')))
-
-    // 둘레를 그리는 변은 하나도 없다. 위 구분선(border-t)만 남는다
-    expect(classes).not.toContain('border')
-    expect(classes).not.toContain('border-b')
-    expect(classes).not.toContain('border-l')
-    expect(classes).not.toContain('border-r')
-    expect(classes.filter((name) => name.startsWith('rounded'))).toEqual([])
-  })
-
-  it('구분선은 border-top 이고 첫 행에서만 끈다', () => {
-    expect(renderToStaticMarkup(createElement(SurfaceRow, null, '행'))).toContain('border-t')
-    expect(
-      renderToStaticMarkup(createElement(SurfaceRow, { first: true, children: '행' })),
-    ).not.toContain('border-t')
-  })
-
-  it('interactive 는 hover 채움만 준다 — 높이나 테두리를 바꾸면 목록이 들썩인다', () => {
-    const markup = renderToStaticMarkup(
-      createElement(SurfaceRow, { interactive: true, children: '행' }),
-    )
-
-    const classes = classesOf(markup)
-    expect(classes).toContain('hover:bg-band')
-    expect(classes.filter((name) => name.startsWith('hover:border'))).toEqual([])
-  })
-
-  it('선택된 행은 hover 채움을 겹치지 않는다 — 두 채움이 싸운다', () => {
-    const markup = renderToStaticMarkup(
-      createElement(SurfaceRow, { interactive: true, selected: true, children: '행' }),
-    )
-
-    const classes = classesOf(markup)
-    expect(classes).toContain('bg-row-selected')
-    expect(classes).not.toContain('hover:bg-band')
-  })
-
-  it('li 로 내보낼 수 있다 — 스크린리더가 개수를 읽는다', () => {
-    expect(renderToStaticMarkup(createElement(SurfaceRow, { as: 'li', children: '행' }))).toContain(
-      '<li',
-    )
-  })
-})
-
-describe('L2 SurfaceTile — 채움 아이템', () => {
-  it('radius 8 이다 — 섹션(12)보다 작아야 중첩이 읽힌다', () => {
-    expect(renderToStaticMarkup(createElement(SurfaceTile, null, '칸'))).toContain('rounded-md')
-  })
-
-  it('평상시엔 --band, 선택 시엔 --metric-high-100 이다', () => {
-    expect(renderToStaticMarkup(createElement(SurfaceTile, null, '칸'))).toContain('bg-band')
-    expect(
-      renderToStaticMarkup(createElement(SurfaceTile, { selected: true, children: '칸' })),
-    ).toContain('bg-metric-high-100')
-  })
-
-  it('테두리를 두르지 않는다 — 가로로 늘어서므로 채움이 구분을 맡는다', () => {
-    const classes = classesOf(renderToStaticMarkup(createElement(SurfaceTile, null, '칸')))
-    expect(classes.filter((name) => name.startsWith('border'))).toEqual([])
-  })
-})
-
-describe('SurfaceList · SurfaceBody', () => {
-  it('SurfaceList 는 배경을 칠하지 않는다 — 감싸는 Surface 가 이미 흰색이다', () => {
-    const classes = classesOf(renderToStaticMarkup(createElement(SurfaceList, null, '목록')))
-    expect(classes.filter((name) => name.startsWith('bg-'))).toEqual([])
-  })
-
-  it('SurfaceBody 의 인셋은 16/20 이다 — 2a 의 40 을 쓰면 내용이 두 번 밀린다', () => {
-    const markup = renderToStaticMarkup(createElement(SurfaceBody, null, '본문'))
-
-    const classes = classesOf(markup)
-    expect(classes).toContain('md:px-5')
-    expect(classes).not.toContain('md:px-10')
   })
 })

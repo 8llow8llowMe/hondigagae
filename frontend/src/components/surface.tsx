@@ -8,11 +8,20 @@ import { cn } from '@/lib/utils/cn'
  * | 체계 | 프리미티브 | 상태 |
  * |------|-----------|------|
  * | 2a (DESIGN.md §0 현행) | `Band` · `Section` · `Row` · `RowList` | 유지. 전 화면이 아직 이것을 쓴다 |
- * | 3a (개정안) | `Canvas` · `Surface` · `SurfaceList` · `SurfaceRow` · `SurfaceTile` | **추가.** 아직 아무도 안 쓴다 |
+ * | 3a (개정안) | `Canvas` · `SurfaceStack` · `Surface` | 홈(#428)이 쓴다 |
  *
- * **2a 를 지우지 않는 것이 이 이슈의 핵심이다.** 홈 한 화면(#428)만 3a 로 옮겨
+ * **2a 를 지우지 않는 것이 이 계획의 핵심이다.** 홈 한 화면(#428)만 3a 로 옮겨
  * 검증하고, 통과해야 DESIGN.md §0 을 개정한다. 실패하면 3a 쪽만 지우면 되고 화면은
  * 하나도 건드리지 않은 상태다.
+ *
+ * **3a 는 세 개뿐이다.** #422 는 여기에 `SurfaceBody` · `SurfaceList` · `SurfaceRow` ·
+ * `SurfaceTile` 넷을 더 두었는데, 홈을 실제로 옮겨 보니 **네 개 다 쓸 자리가 없어**
+ * #428 에서 걷었다. 넷 다 "목록 화면에서 이렇게 쓰겠지" 라는 추측으로 만든 API 였고
+ * 아무 화면도 그것을 검증하지 않았다 — 예컨대 `SurfaceRow` 의 `border-top + first` 는
+ * 호출자가 한 번도 써 보지 않은 규약이다.
+ *
+ * 목록·폼 화면을 옮길 때 **그 화면이 실제로 요구하는 모양으로** 다시 만든다.
+ * 미리 만들어 둔 추측보다 그때의 요구가 낫다.
  *
  * ---
  *
@@ -193,8 +202,13 @@ export function SurfaceStack({ children, className }: { children: ReactNode; cla
  * **제목은 카드 안에 있다.** 밖에 두면 어느 묶음의 제목인지 모호해진다 — 지금 목록
  * 5화면이 전부 `<h1>` 을 목록 밖에 두고 있어 이 개정에서 안으로 들어온다.
  *
- * 본문은 두 갈래다. 목록이면 `SurfaceList` 를 그대로 자식으로 넣고(행이 카드 좌우
- * 끝까지 닿아야 구분선이 카드 테두리와 맞물린다), 산문·폼이면 `SurfaceBody` 로 감싼다.
+ * **카드 안 자식은 자기 배경을 갖지 않는다.** 각진 불투명 면이 radius 12 모서리를
+ * 덮는다 — 병원 배너에서 실제로 났다(#428). `overflow-hidden` 으로 풀 수 없다:
+ * 같은 카드 안 `ProfileCard` 의 팝오버가 `absolute`(portal 아님)라 함께 잘린다.
+ *
+ * 좌우 인셋은 `INSET_CLASS.card`(16/20)다. 페이지 인셋 40 을 카드 안에서 쓰면 내용이
+ * 두 번 밀린다. 넘치는 스크롤러는 `INSET_BLEED_END_CLASS.card` 를 쓴다 — `rail` 의
+ * 음수 마진을 쓰면 카드 테두리를 뚫는다.
  */
 export function Surface({
   title,
@@ -256,104 +270,5 @@ export function Surface({
       )}
       {children}
     </section>
-  )
-}
-
-/**
- * `Surface` 안의 산문·폼 영역. 목록에는 쓰지 않는다 — 행은 자기 인셋을 갖는다.
- *
- * 좌우 16(모바일) / 20(데스크톱)이다. **2a 의 40 이 아니다** — 카드가 이미 페이지에서
- * 한 번 들어와 있어 안쪽까지 40 을 주면 내용이 두 번 밀린다.
- */
-export function SurfaceBody({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('px-4 pb-5 md:px-5', className)}>{children}</div>
-}
-
-/**
- * `Surface` 안의 행 목록. `ul`/`li` 로 내보내 스크린리더가 개수를 읽게 한다.
- *
- * 2a 의 `RowList` 와 달리 **배경을 칠하지 않는다** — 감싸는 `Surface` 가 이미 흰색이다.
- */
-export function SurfaceList({ children, className }: { children: ReactNode; className?: string }) {
-  return <ul className={cn('w-full', className)}>{children}</ul>
-}
-
-/**
- * **L2 — 행.** 카드 안의 항목이다.
- *
- * **테두리를 두르지 않는다.** 감싸는 `Surface` 의 테두리와 경쟁해 둘 다 죽는다.
- * 구분선은 `border-top` + 첫 행 제거다 — 2a 의 `Row` 는 `border-bottom` + `last` 인데,
- * 여기서는 카드의 아래 테두리가 이미 목록의 끝을 긋고 있어 마지막 행의 선을 끄는 것보다
- * 첫 행의 선을 끄는 쪽이 사용처에서 셀 것이 없다.
- *
- * **인셋이 좌우 끝까지 가지 않는다** — 구분선을 `px` 안쪽에 넣지 않고 행 전체에 그어
- * 카드 테두리와 같은 세로선에서 만나게 한다. 2a 가 선에 16/40 인셋을 준 것은 전폭
- * 행이라 페이지 가장자리에 닿으면 안 됐기 때문이고, 카드 안에서는 그 이유가 없다.
- *
- * `interactive` 는 hover 채움만 준다. **행 높이나 테두리를 바꾸지 않는다** — 목록이
- * 들썩인다. 항목이 눌러지는 물건이라는 신호를 테두리 대신 이것이 맡는다.
- */
-export function SurfaceRow({
-  as: Tag = 'div',
-  selected = false,
-  interactive = false,
-  first = false,
-  children,
-  className,
-}: {
-  as?: 'div' | 'li'
-  selected?: boolean
-  /** hover 시 채움. 행 전체가 링크·버튼일 때만 준다 */
-  interactive?: boolean
-  /** 첫 행이면 위 구분선을 그리지 않는다 */
-  first?: boolean
-  children: ReactNode
-  className?: string
-}) {
-  return (
-    <Tag
-      className={cn(
-        'px-4 md:px-5',
-        first ? '' : 'border-border border-t',
-        selected && 'bg-row-selected',
-        interactive && !selected && 'hover:bg-band',
-        className,
-      )}
-    >
-      {children}
-    </Tag>
-  )
-}
-
-/**
- * **L2 — 채움 아이템.** 나란히 놓이는 선택지·지표 칸이다 (홈 권역 5칸, 골든타임 시각 칸).
- *
- * 행과 달리 **가로로 늘어서므로 구분선이 아니라 채움으로 나눈다.** `--band` 위에 놓여
- * 카드의 흰 면과 갈리고, radius 8 이라 카드(12)보다 작아 중첩이 읽힌다.
- *
- * `selected` 는 등급 색이 아니라 `--metric-high-100` 이다 — §1 "우선순위를 색으로
- * 만들지 않는다" 를 지키려면 선택 표시와 등급 표시가 같은 축을 쓰면 안 된다.
- */
-export function SurfaceTile({
-  as: Tag = 'div',
-  selected = false,
-  children,
-  className,
-}: {
-  as?: 'div' | 'li'
-  selected?: boolean
-  children: ReactNode
-  className?: string
-}) {
-  return (
-    <Tag
-      className={cn(
-        'min-w-0 rounded-md p-2',
-        selected ? 'bg-metric-high-100' : 'bg-band',
-        className,
-      )}
-    >
-      {children}
-    </Tag>
   )
 }
