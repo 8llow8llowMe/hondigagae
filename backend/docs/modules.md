@@ -168,7 +168,7 @@ yml 목록(`infra.redis.sentinels`)도 계속 받지만 로컬용 탈출구다 �
 - `GET /api/v1/places/{placeId}/related` — 연관 관광지
 - `GET /api/v1/places/{placeId}/suitability` — 여행 적합도 (날씨+혼잡도+반려견 조건, score+reasons)
 - `GET /api/v1/places/{placeId}/walk-safety` — 산책 위험도 (추정 노면온도·열지수, 안전 시간대 제안)
-- `GET /api/v1/walk-courses` — 두루누비 산책·레저 코스
+- `GET /api/v1/walk-courses` — 제주올레 산책 코스 (두루누비는 제주 코스가 0개라 원천 교체, #382)
 - `GET /api/v1/places/nearby` — 좌표 반경 장소 검색 (식당·카페 포함)
 - `GET /api/v1/emergencies/facilities` — 위치 기준 동물병원·동물약국 반경 검색 (제주 214곳)
 
@@ -224,7 +224,7 @@ yml 목록(`infra.redis.sentinels`)도 계속 받지만 로컬용 탈출구다 �
 - TourAPI 관광지/음식점/숙박 데이터 적재
 - 반려동물 동반여행 API 데이터 결합 (출입 가능 여부·이용 조건)
 - 관광지별 연관 관광지 연결성 적재
-- 두루누비 산책 코스 적재
+- 제주올레 산책 코스 적재 (올레코스현황 CSV + TourAPI 좌표 매칭, #383)
 - 혼잡도 예측 주기 적재 + 명칭 매칭 (`congestionImportJob`, 구현)
 - 방문자 추이 예측 데이터 주기 적재 (미착수)
 
