@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { ChevronRightIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
-import { Band } from '@/components/surface'
+import { Surface, SurfaceStack } from '@/components/surface'
 import { PhotoGallery } from '@/features/place/photo-gallery'
 import { PlaceBackLink } from '@/features/place/place-back-link'
 import {
@@ -34,6 +34,8 @@ import { galleryImages } from '@/lib/place/gallery'
 import { parseHomepage } from '@/lib/place/homepage'
 import { indoorLabel } from '@/lib/place/indoor'
 import { toPlainText } from '@/lib/place/text'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { PlaceDetail, PlaceIntro } from '@/types/place'
 
 export type PlaceDetailSectionProps = {
@@ -65,7 +67,22 @@ export type PlaceDetailSectionProps = {
  * 장소 상세 — 아트보드 `혼디가개 장소 상세` 01(모바일 390) · 03(데스크톱 1440) · 04(상태).
  *
  * **데스크톱은 2단이다.** 좌 `--rail-context`(400) sticky = 판정 두 개 + 하단 바,
- * 우 1fr = 갤러리 + 제목 + 기본 정보 + 본문. 열 구분선은 **우측 열의 `border-left`** 다.
+ * 우 1fr = 갤러리 + 제목 + 기본 정보 + 본문.
+ *
+ * **3층 표면이다** (`DESIGN.md §0`, 이슈 #443). `main` 이 L0 바닥(`Canvas`, 페이지가 건다),
+ * 세 개의 `SurfaceStack` 이 그 위에 L1 카드를 쌓는다 — 우측 열이 DOM 상 두 블록이라 스택도
+ * 둘이고, 좌측 레일이 하나다. **열 구분선은 걷었다** — 카드 사이·열 사이로 바닥이 비쳐
+ * L0 이 그 일을 한다 (홈 #428 · 장소 목록 #439 와 같은 이유).
+ *
+ * **카드 판정 3문을 절마다 적용한 결과:**
+ * - 브레드크럼 · 폐업 안내 · 갤러리 · 제목 줄 — **카드가 아니다.** 페이지 머리 · 전폭 미디어 ·
+ *   알림 스트립은 §0 이 카드 밖으로 못박은 것들이다. 바닥 위에 직접 놓는다.
+ * - 기본 정보 · 반려견 동반 정보 · 장소 소개 · 이용 안내 — 각각 **카드**(`DetailCard`).
+ *   제목이 카드 안으로 들어간다.
+ * - 적합도 + 산책 위험도 + (데스크톱) 하단 바 — **한 카드**. 같은 화자가 이어 말한다:
+ *   "오늘 가도 되나 → 지금 걷기 안전한가 → 그러면 담을까". §0 의 "카드 경계는 이야기 단위"
+ *   다. 하단 바를 카드 밖 L0 에 두면 테두리 없는 흰 띠가 되고, 자기 카드로 만들면 §0 이
+ *   금지한 "액션 바 카드" 가 된다.
  *
  * **기본 정보는 레일이 아니라 제목 바로 아래다.** 레일에 있던 동안에는 주소·전화·운영시간이
  * 판정 아래로 밀려, 상세에 들어온 사람이 제일 먼저 묻는 "여기 어디고 몇 시까지 하냐" 가
@@ -173,10 +190,21 @@ export function PlaceDetailSection({
       <div className="rail-layout rail-layout-detail">
         {/*
           우측 열이 **DOM 상 먼저**다 — 모바일에서 갤러리·제목이 판정보다 위에 와야 한다.
-          데스크톱에서만 grid 배치가 이것을 2열로 보낸다.
+          데스크톱에서만 grid 배치가 이것을 2열로 보낸다. `SurfaceStack` 자체가 grid 의
+          자식이다 — 바닥은 `main` 이 칠했고 이 스택은 카드 간격만 맡는다 (홈과 같은 구조).
         */}
-        <div className="rail-detail-main lg:border-border lg:border-l">
-          <div className="pt-4 md:pt-6">
+        <SurfaceStack className="rail-detail-main">
+          {/*
+            **갤러리와 제목 줄은 카드가 아니다** — 전폭 미디어 · 페이지 머리 (§0). 바닥 위에
+            직접 놓이고, 둘의 간격만 이 묶음이 정한다. 모바일은 스택에 여백이 없어 위·아래를
+            여기서 준다 — 아래 16 + 스택 간격 8 = 24 로, 데스크톱 카드 간격과 같은 값이다.
+
+            갤러리는 카드 **가장자리**에 맞춘다(스택의 24 만 받는다 — 갤러리 안에 페이지 인셋이
+            없다). 제목 줄은 카드 **안 글줄**과 같은 인셋(`card`)이다 — 카드 제목과 나란히 서되
+            **카드 테두리 1px 만큼 어긋난다**(실측 444 vs 445). 테두리 없는 요소에 테두리 폭을
+            흉내 내지 않는다.
+          */}
+          <div className="flex flex-col gap-5 pt-4 pb-4 md:gap-6 md:pt-0 md:pb-0">
             {/*
               **`images` 가 비면 `firstImage` 를 쓴다** — dev 실데이터는 `images` 가 전부
               빈 배열이고 사진이 `firstImage` 로만 온다 (`lib/place/gallery.ts`).
@@ -189,63 +217,63 @@ export function PlaceDetailSection({
               title={place.title}
               contentTypeCode={place.contentType.code}
             />
-          </div>
 
-          <header className="flex flex-col gap-3 px-4 pt-5 pb-6 md:px-10">
-            <div className="flex items-start justify-between gap-2 md:items-center">
-              {/*
-                공백 없는 긴 장소명이 가로로 넘치지 않게 한다 (styling-guide.md §4).
+            <header className={cn('flex flex-col gap-3', INSET_CLASS.card)}>
+              <div className="flex items-start justify-between gap-2 md:items-center">
+                {/*
+                  공백 없는 긴 장소명이 가로로 넘치지 않게 한다 (styling-guide.md §4).
 
-                **`min-w-0` 이 없으면 `break-words` 만으로는 줄지 않는다.** flex 항목의 기본
-                `min-width: auto` 는 min-content 아래로 못 내려가고, 한국어는 `keep-all` 이라
-                "제주특별자치도립김창열미술관" 전체가 하나의 끊을 수 없는 덩어리다.
-                375 에서 배지가 우측 인셋을 16px 넘어 화면 끝에 붙었다(실측).
-              */}
-              <h1 className="text-title-1 text-fg lg:text-display min-w-0 flex-1 font-bold break-words lg:font-extrabold">
-                {place.title}
-              </h1>
-              {/*
-                등급 배지는 **판정이 실제로 왔을 때만** 붙인다. 조회 전에 자리를 잡아 두면
-                빈 배지가 잠깐 등급처럼 보인다. 문구는 서버 `name` 그대로다.
-              */}
-              {suitabilityBadge !== null && (
-                <MetricBadge tone={suitabilityTone(suitabilityBadge.code)} className="shrink-0">
-                  {suitabilityBadge.name}
-                </MetricBadge>
-              )}
-            </div>
+                  **`min-w-0` 이 없으면 `break-words` 만으로는 줄지 않는다.** flex 항목의 기본
+                  `min-width: auto` 는 min-content 아래로 못 내려가고, 한국어는 `keep-all` 이라
+                  "제주특별자치도립김창열미술관" 전체가 하나의 끊을 수 없는 덩어리다.
+                  375 에서 배지가 우측 인셋을 16px 넘어 화면 끝에 붙었다(실측).
+                */}
+                <h1 className="text-title-1 text-fg lg:text-display min-w-0 flex-1 font-bold break-words lg:font-extrabold">
+                  {place.title}
+                </h1>
+                {/*
+                  등급 배지는 **판정이 실제로 왔을 때만** 붙인다. 조회 전에 자리를 잡아 두면
+                  빈 배지가 잠깐 등급처럼 보인다. 문구는 서버 `name` 그대로다.
+                */}
+                {suitabilityBadge !== null && (
+                  <MetricBadge tone={suitabilityTone(suitabilityBadge.code)} className="shrink-0">
+                    {suitabilityBadge.name}
+                  </MetricBadge>
+                )}
+              </div>
 
-            {/* 거리는 기준점이 없어 쓰지 않는다. 실내 여부는 #16 으로 들어왔다 */}
-            <p className="text-body-2 text-fg-muted">{metaLine(place)}</p>
+              {/* 거리는 기준점이 없어 쓰지 않는다. 실내 여부는 #16 으로 들어왔다 */}
+              <p className="text-body-2 text-fg-muted">{metaLine(place)}</p>
 
-            <div className="flex flex-wrap items-center gap-1.5">
-              <Badge tone="neutral" size="sm">
-                {place.petAllowanceType.name}
-              </Badge>
-              {place.petInfo !== null && (
-                <>
-                  <Badge tone="neutral" size="sm">
-                    {place.petInfo.allowedPetSize.name}
-                  </Badge>
-                  {place.petInfo.leashRequired && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Badge tone="neutral" size="sm">
+                  {place.petAllowanceType.name}
+                </Badge>
+                {place.petInfo !== null && (
+                  <>
                     <Badge tone="neutral" size="sm">
-                      {messages.place.detailLeashRequired}
+                      {place.petInfo.allowedPetSize.name}
                     </Badge>
-                  )}
-                </>
-              )}
-              {/*
-                실내 여부를 모르면 점선으로 "모름" 을 드러낸다 — 목록 행과 같은 처리다
-                (`place-row.tsx`). 숨기면 실내만·야외만 필터에서 이 장소가 왜 사라지는지
-                설명할 길이 없고, 여기는 그 필터를 가진 목록에서 들어오는 화면이다.
-              */}
-              {place.indoor === null && (
-                <MetricBadge tone="unknown" size="sm">
-                  {messages.place.rowIndoorUnknown}
-                </MetricBadge>
-              )}
-            </div>
-          </header>
+                    {place.petInfo.leashRequired && (
+                      <Badge tone="neutral" size="sm">
+                        {messages.place.detailLeashRequired}
+                      </Badge>
+                    )}
+                  </>
+                )}
+                {/*
+                  실내 여부를 모르면 점선으로 "모름" 을 드러낸다 — 목록 행과 같은 처리다
+                  (`place-row.tsx`). 숨기면 실내만·야외만 필터에서 이 장소가 왜 사라지는지
+                  설명할 길이 없고, 여기는 그 필터를 가진 목록에서 들어오는 화면이다.
+                */}
+                {place.indoor === null && (
+                  <MetricBadge tone="unknown" size="sm">
+                    {messages.place.rowIndoorUnknown}
+                  </MetricBadge>
+                )}
+              </div>
+            </header>
+          </div>
 
           {/*
             ── 기본 정보 ─────────────────────────────────────────────────────
@@ -258,11 +286,8 @@ export function PlaceDetailSection({
             **폭마다 나누지 않는다.** DOM 하나를 옮겨 모바일 순서도 같이 바뀐다 — 트리를
             둘로 나누면 같은 내용이 두 번 렌더돼 스크린리더가 중복해 읽는다
             (`app/globals.css` 의 `.rail-layout-detail` 주석과 같은 규칙).
-
-            인셋도 레일(24)이 아니라 본문(40)을 따른다 — 이제 본문 열의 한 절이다.
           */}
-          <Band />
-          <DetailSection title={messages.place.detailSectionBasic}>
+          <DetailCard title={messages.place.detailSectionBasic}>
             <dl className="flex flex-col gap-3">
               <InfoRow label={messages.place.detailAddress} value={fullAddress(place)} />
               {/* 원천이 준 분류. `contentType`(문화시설)로는 카페·펜션이 갈리지 않는다 (#112) */}
@@ -296,7 +321,7 @@ export function PlaceDetailSection({
               지도 div 를 하나 더 끼우면 목록의 짝 구조가 깨지고, `dd` 안에 넣으면 라벨
               80 + 간격 12 만큼 들여써져 375 에서 지도 폭이 251px 로 쪼그라든다.
 
-              절의 끝에 두면 전폭을 쓰고, 위의 주소가 글자로 말한 것을 그림으로 한 번 더
+              절의 끝에 두면 카드 안 폭을 쓰고, 위의 주소가 글자로 말한 것을 그림으로 한 번 더
               말하는 순서가 된다. 좌표가 없거나 SDK 가 실패하면 스스로 사라진다.
             */}
             <PlaceMiniMap
@@ -305,38 +330,50 @@ export function PlaceDetailSection({
               lat={place.lat}
               lng={place.lng}
             />
-          </DetailSection>
-        </div>
+          </DetailCard>
+        </SurfaceStack>
 
         {/*
-          좌: 판정 + 기본 정보. 데스크톱에서만 sticky 다 — `rail-sticky` 가 레일이 뷰포트보다
+          좌: 판정 카드. 데스크톱에서만 sticky 다 — `rail-sticky` 가 레일이 뷰포트보다
           길어도 바닥에 닿게 자기 스크롤을 준다 (장소 찾기 레일에서 잘렸던 전례가 있다).
+
+          **위 여백** — 모바일은 앞 스택과 8(카드 간격), 태블릿 한 컬럼은 앞 스택의 아래
+          24 가 이미 있어 0, 데스크톱은 자기 열의 첫 요소라 24 다.
         */}
-        <div className="rail-detail-aside rail-sticky">
-          {/* 데스크톱에서는 열 자체가 경계라 밴드를 겹쳐 쌓지 않는다 */}
-          <Band className="lg:hidden" />
-          <PlaceSuitabilityPanel {...suitability} />
-
+        <SurfaceStack className="rail-detail-aside rail-sticky pt-2 md:pt-0 lg:pt-6">
           {/*
-            산책 위험도 (#197). **적합도 바로 아래, 하단 바 위**에 둔다 — 둘 다 판정이라
-            한 묶음으로 읽혀야 하고, 하단 바(담기·저장)가 사이에 끼면 판정이 두 군데로
-            갈린다. 아트보드 03 의 `판정 → 하단 바` 순서는 그대로다 (기본 정보는 우측
-            본문으로 옮겼다).
-
-            **1px 선으로만 나눈다.** 밴드로 끊으면 두 판정이 서로 다른 블록이 되고,
-            "오늘은 적합 / 지금은 위험" 이 같은 장소의 두 축이라는 것이 사라진다.
+            **`title` 이 아니라 `aria-label` 이다.** 두 패널이 라벨·등급어·점수를 한 줄에
+            스스로 그려 `title` 슬롯(제목 + 부제 + 우측 액션)에 맞지 않는다 — 홈 판정 카드와
+            같은 사정이다. 그래서 카드 위에 선이 없고, 첫 패널의 위 여백이 카드 위 여백이다.
           */}
-          <div className="border-border border-t" />
-          <PlaceWalkSafetyPanel {...walkSafety} />
+          <Surface aria-label={messages.place.detailVerdictCardLabel}>
+            <PlaceSuitabilityPanel {...suitability} />
 
-          {/* 데스크톱 하단 바 — 판정 바로 아래, 레일의 끝 (아트보드 03) */}
-          <PlaceDetailActionBar {...actions} className="hidden lg:block" />
-        </div>
+            {/*
+              산책 위험도 (#197). **적합도 바로 아래, 하단 바 위**에 둔다 — 둘 다 판정이라
+              한 묶음으로 읽혀야 하고, 하단 바(담기·저장)가 사이에 끼면 판정이 두 군데로
+              갈린다. 아트보드 03 의 `판정 → 하단 바` 순서는 그대로다.
 
-        {/* 우측 열 아래쪽 — 본문. 위 블록과 같은 열이라 `border-left` 가 이어진다 */}
-        <div className="rail-detail-main lg:border-border lg:border-l">
-          <Band />
-          <DetailSection title={messages.place.detailSectionPet}>
+              **1px 선으로만 나눈다** — L2 구분선(§0). 카드를 둘로 쪼개면 "오늘은 적합 /
+              지금은 위험" 이 같은 장소의 두 축이라는 것이 사라진다.
+            */}
+            <div className="border-border border-t" />
+            <PlaceWalkSafetyPanel {...walkSafety} />
+
+            {/*
+              데스크톱 하단 바 — 판정 카드의 끝 (아트보드 03). 인셋은 카드 값이고 배경은
+              카드가 소유한다 (`PlaceDetailActionBar` 의 `inset` 주석).
+            */}
+            <PlaceDetailActionBar {...actions} inset="card" className="hidden lg:block" />
+          </Surface>
+        </SurfaceStack>
+
+        {/*
+          우측 열 아래쪽 — 본문. 위 블록과 같은 열(grid column 2)에 이어 선다.
+          위 여백은 모바일 8, 그 위로는 0 — 앞 스택의 아래 24 가 카드 간격이다.
+        */}
+        <SurfaceStack className="rail-detail-main pt-2 md:pt-0">
+          <DetailCard title={messages.place.detailSectionPet}>
             <PlacePetInfoSection
               petInfo={place.petInfo}
               allowance={place.petAllowanceType}
@@ -346,44 +383,50 @@ export function PlaceDetailSection({
               petSizeCode={petSizeCode}
               petSizeName={petSizeName}
             />
-          </DetailSection>
+          </DetailCard>
 
-          {/* nullable 은 에러가 아니라 숨김이다 */}
+          {/*
+            nullable 은 에러가 아니라 숨김이다.
+
+            **개요는 카드다.** 판정 3문 ③("항목이 둘 이상")을 글자대로 읽으면 한 문단은 못
+            넘지만, ③ 의 취지는 배지·버튼 하나를 카드로 감싸는 것을 막는 데 있다. 개요는
+            원천이 준 **본문 블록**이고 자기 제목이 있고 혼자 떼어놔도 말이 된다.
+          */}
           {overview !== null && (
-            <>
-              <Band />
-              <DetailSection title={messages.place.detailSectionOverview}>
-                <PlaceOverview text={overview} />
-              </DetailSection>
-            </>
+            <DetailCard title={messages.place.detailSectionOverview}>
+              <PlaceOverview text={overview} />
+            </DetailCard>
           )}
 
           {hasUseGuideValue(place.intro) && (
-            <>
-              <Band />
-              <DetailSection title={messages.place.detailSectionIntro}>
-                <dl className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-x-8 lg:grid-cols-1 xl:grid-cols-2">
-                  <InfoRow label={messages.place.detailRestDate} value={place.intro.restDate} />
-                  <InfoRow label={messages.place.detailParking} value={place.intro.parking} />
-                  <InfoRow
-                    label={messages.place.detailBabyCarriage}
-                    value={place.intro.chkBabyCarriage}
-                  />
-                  <InfoRow
-                    label={messages.place.detailCreditCard}
-                    value={place.intro.chkCreditCard}
-                  />
-                  <InfoRow label={messages.place.detailInfoCenter} value={place.intro.infoCenter} />
-                </dl>
-              </DetailSection>
-            </>
+            <DetailCard title={messages.place.detailSectionIntro}>
+              <dl className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-x-8 lg:grid-cols-1 xl:grid-cols-2">
+                <InfoRow label={messages.place.detailRestDate} value={place.intro.restDate} />
+                <InfoRow label={messages.place.detailParking} value={place.intro.parking} />
+                <InfoRow
+                  label={messages.place.detailBabyCarriage}
+                  value={place.intro.chkBabyCarriage}
+                />
+                <InfoRow
+                  label={messages.place.detailCreditCard}
+                  value={place.intro.chkCreditCard}
+                />
+                <InfoRow label={messages.place.detailInfoCenter} value={place.intro.infoCenter} />
+              </dl>
+            </DetailCard>
           )}
 
-          {/* 사진 출처는 갤러리 바로 아래, 정보 출처는 본문 끝 (DESIGN.md §7-3) */}
+          {/*
+            사진 출처는 갤러리 바로 아래, 정보 출처는 본문 끝 (DESIGN.md §7-3).
+            카드가 아니라 바닥 위의 한 줄이다 — 자료가 아니라 자료의 꼬리표라, 카드로 감싸면
+            본문과 같은 무게가 된다. 인셋은 카드 안 글줄과 같은 축(`card`)이다.
+          */}
           {sourceLine !== null && (
-            <p className="text-caption text-fg-muted px-4 pt-2 pb-8 md:px-10">{sourceLine}</p>
+            <p className={cn('text-caption text-fg-muted pb-4 md:pb-0', INSET_CLASS.card)}>
+              {sourceLine}
+            </p>
           )}
-        </div>
+        </SurfaceStack>
       </div>
 
       {/*
@@ -399,8 +442,14 @@ export function PlaceDetailSection({
 
         **sticky 라 자리를 스스로 차지한다** — 본문 끝에 바 높이만큼 여백을 따로 두지
         않아도 마지막 줄이 가려지지 않는다 (fixed 였다면 필요했다).
+
+        **배경은 이 갈래만 갖는다** — 본문 위를 지나가는 띠라 불투명해야 한다. 카드 안의
+        데스크톱 갈래는 카드가 면을 소유한다 (§0).
       */}
-      <PlaceDetailActionBar {...actions} className="sticky bottom-16 z-30 md:bottom-0 lg:hidden" />
+      <PlaceDetailActionBar
+        {...actions}
+        className="bg-bg sticky bottom-16 z-30 md:bottom-0 lg:hidden"
+      />
     </article>
   )
 }
@@ -415,7 +464,11 @@ function Breadcrumb({ title }: { title: string }) {
   return (
     <nav
       aria-label={messages.place.detailBreadcrumbLabel}
-      className="border-border flex items-center gap-1 border-b px-4 py-1.5 md:px-10"
+      // `content-container` — 1440 캡 안에서 카드 열과 같은 경계를 쓴다 (#376). 홈의 특보 스트립과 같은 자리다
+      className={cn(
+        'border-border content-container flex items-center gap-1 border-b py-1.5',
+        INSET_CLASS.main,
+      )}
     >
       <PlaceBackLink />
       <ChevronRightIcon size={16} aria-hidden className="text-fg-subtle shrink-0" />
@@ -430,12 +483,17 @@ function Breadcrumb({ title }: { title: string }) {
  * **`role="alert"` 을 쓰지 않는다.** 방금 일어난 실패가 아니라 이 장소가 원래 놓인
  * 상태라, 화면에 들어오자마자 낭독을 가로챌 일이 아니다. 제목을 `strong` 으로 두어
  * 훑어 읽을 때 먼저 잡히게만 한다.
+ *
+ * **알림 스트립이라 카드가 아니다** (§0). 예전의 `bg-band` 채움 상자는 흰 바닥 위의 것이었다 —
+ * L0 `--bg-sunken`(#F5F6F8) 위에서는 `--band`(#EEF0F3) 와 대비가 **1.06** 이라 상자가 보이지
+ * 않는다(실측, #443). 채움을 걷고 홈의 특보 스트립(`WeatherWarningStrip`)과 같은 모양 —
+ * 전폭 `border-b` 줄 + 페이지 인셋 — 으로 둔다. 글자 무게(`strong`)가 경고를 맡는다.
  */
 function DelistedNotice() {
   return (
-    // `rail-layout` 밖, 두 열 위다. 캡하지 않으면 1920 에서 아래 본문과 세로선이 꺾인다 (#376)
-    <div className="content-container px-4 py-3 md:px-10">
-      <div className="bg-band rounded-md px-3 py-2">
+    <div className="border-border border-b">
+      {/* 캡하지 않으면 1920 에서 아래 본문과 세로선이 꺾인다 (#376) */}
+      <div className={cn('content-container py-3', INSET_CLASS.main)}>
         <strong className="text-body-2 text-fg block font-semibold">
           {messages.place.detailDelistedTitle}
         </strong>
@@ -446,17 +504,15 @@ function DelistedNotice() {
 }
 
 /**
- * 본문 열의 한 절. 좌우 인셋은 `Row`(px-4 md:px-10)와 같은 값이다.
- *
- * **레일 인셋(lg:px-6) 갈래가 없다.** 기본 정보가 레일에서 본문으로 옮겨 오면서
- * 레일에 남은 것은 판정 패널뿐이고, 그것들은 자기 인셋을 스스로 갖는다.
+ * 본문의 한 절 = **L1 카드 하나** (`Surface`). 제목이 카드 안에 있고(§0), 본문은 카드
+ * 인셋(`INSET_CLASS.card`, 16/20)을 쓴다 — 페이지 인셋 40 을 카드 안에서 쓰면 내용이 두 번
+ * 밀린다. 세로는 `Surface` 의 제목 줄(위 20 · 아래 12)에 본문 아래 20 을 더해 위아래가 같다.
  */
-function DetailSection({ title, children }: { title: string; children: ReactNode }) {
+function DetailCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-3 px-4 py-5 md:px-10">
-      <h2 className="text-title-2 text-fg lg:text-title-1 font-semibold lg:font-bold">{title}</h2>
-      {children}
-    </section>
+    <Surface title={title}>
+      <div className={cn('flex flex-col gap-3 pb-5', INSET_CLASS.card)}>{children}</div>
+    </Surface>
   )
 }
 

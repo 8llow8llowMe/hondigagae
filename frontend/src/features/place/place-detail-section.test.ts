@@ -526,3 +526,78 @@ describe('PlaceDetailSection — 영업 상태 (#294)', () => {
     expect(markup).not.toContain(messages.place.detailOpenNow)
   })
 })
+
+describe('3층 표면 (#443) — 절마다 카드 판정', () => {
+  /** `Surface`(L1) 의 클래스 — `surface.test.ts` 가 값을 잠근다. 여기서는 개수만 센다 */
+  const SURFACE = /<section[^>]*class="bg-bg border-border border-y md:rounded-lg md:border"/g
+
+  it('2a 밴드와 열 구분선을 쓰지 않는다 — 카드 간격과 바닥이 경계다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain('bg-band h-2')
+    expect(markup).not.toContain('lg:border-l')
+  })
+
+  it('기본 정보 · 동반 정보 · 소개 · 이용 안내가 각각 카드고, 판정이 한 카드라 다섯이다', () => {
+    const markup = render()
+
+    expect(markup.match(SURFACE)).toHaveLength(5)
+    for (const title of [
+      messages.place.detailSectionBasic,
+      messages.place.detailSectionPet,
+      messages.place.detailSectionOverview,
+      messages.place.detailSectionIntro,
+    ]) {
+      // 제목이 카드 안의 h2 다 — 카드 밖 h2 는 없다
+      expect(markup).toMatch(new RegExp(`<h2[^>]*>${title}</h2>`))
+    }
+  })
+
+  it('갤러리와 제목 줄은 카드가 아니다 — h1 은 어느 section 안에도 없다', () => {
+    const markup = render()
+    const h1 = markup.indexOf('<h1')
+    const firstSection = markup.search(SURFACE)
+
+    expect(h1).toBeGreaterThan(-1)
+    expect(h1).toBeLessThan(firstSection)
+  })
+
+  it('적합도 · 산책 위험도 · 데스크톱 하단 바가 한 카드다 — 같은 화자가 이어 말한다', () => {
+    const markup = render()
+    const start = markup.indexOf(`aria-label="${messages.place.detailVerdictCardLabel}"`)
+    expect(start).toBeGreaterThan(-1)
+    const card = markup.slice(start, markup.indexOf('</section>', start))
+
+    expect(card).toContain(messages.place.detailSectionSuitability)
+    expect(card).toContain(messages.place.detailWalkSafetyLabel)
+    expect(card).toContain(messages.plan.addToPlanAction)
+    expect(card).toContain('hidden lg:block')
+    // 카드 안 자식은 자기 배경을 갖지 않는다 — 배경은 sticky 갈래(카드 밖)만
+    expect(card).not.toContain('bg-bg sticky')
+  })
+
+  it('폐업 안내는 채움 상자가 아니라 스트립이다 — L0 위에서 --band 는 대비 1.06 으로 보이지 않는다', () => {
+    const markup = render({ place: placeDetailDelisted })
+    const start = markup.indexOf(messages.place.detailDelistedTitle)
+    // 안내는 브레드크럼 다음, 첫 카드 앞이다 — 그 앞 300자 안에 감싸는 두 div 가 있다
+    const strip = markup.slice(Math.max(0, start - 300), start)
+
+    expect(strip).toContain('border-b')
+    expect(strip).not.toContain('bg-band')
+    expect(strip).not.toContain('rounded-md')
+  })
+
+  it('카드 안은 카드 인셋(16/20)이다 — 페이지 인셋 40 은 브레드크럼 한 곳뿐이다', () => {
+    const markup = render()
+
+    expect(markup.match(/md:px-10/g)).toHaveLength(1)
+    expect((markup.match(/md:px-5/g) ?? []).length).toBeGreaterThanOrEqual(6)
+  })
+
+  it('로딩 스켈레톤도 같은 표면이다 — 밴드가 아니라 카드 리듬', () => {
+    const markup = render({ loading: true, place: null })
+
+    expect(markup).not.toContain('bg-band h-2')
+    expect((markup.match(SURFACE) ?? []).length).toBeGreaterThanOrEqual(5)
+  })
+})
