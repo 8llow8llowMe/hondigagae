@@ -27,6 +27,12 @@ spring:
 tour-api:
   service-key: ${TOUR_API_SERVICE_KEY}
 
+# prod 에서 스케줄을 켤지는 아직 미결이다. 운영 데이터에 자동 delisting 이 걸리는 흐름이라
+# dev 에서 몇 주기를 관찰한 뒤 정한다. 켜려면 BATCH_SCHEDULE_ENABLED=true 만 주면 된다.
+batch:
+  schedule:
+    enabled: ${BATCH_SCHEDULE_ENABLED:false}
+
 eureka:
   instance:
     prefer-ip-address: true

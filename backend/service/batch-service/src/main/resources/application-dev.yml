@@ -18,6 +18,13 @@ spring:
 tour-api:
   service-key: ${TOUR_API_SERVICE_KEY}
 
+# dev 는 프로세스 안 Quartz 를 켠다 (#378) — 장소 파이프라인 주 1회(월 03:00 KST),
+# 혼잡도 일 1회(06:00 KST). 컨테이너가 restart: unless-stopped 로 상시 떠 있어
+# 스케줄러가 살아 있을 수 있다. 끄려면 compose 에 BATCH_SCHEDULE_ENABLED=false 를 준다.
+batch:
+  schedule:
+    enabled: ${BATCH_SCHEDULE_ENABLED:true}
+
 eureka:
   instance:
     # Docker 컨테이너 환경: 컨테이너 IP로 등록해야 게이트웨이 lb:// 라우팅이

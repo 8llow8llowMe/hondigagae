@@ -174,7 +174,9 @@ FLUSH PRIVILEGES;
 ```
 
 `batch-service` 는 기동 시 잡을 자동 실행하지 않는다(`spring.batch.job.enabled=false`).
-적재는 별도로 부른다 — `data-refresh-guide.md` 4절.
+단, **dev 는 프로세스 안 Quartz 스케줄이 정해진 시각에 파이프라인을 부른다**(#378 — 장소 월 03:00,
+혼잡도 매일 06:00 KST). 기동 직후 적재가 필요하면 그 시각을 기다리지 말고 직접 부른다 —
+`data-refresh-guide.md` 4절.
 
 ## 배포 후 점검
 

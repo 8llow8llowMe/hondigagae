@@ -118,18 +118,52 @@ place_import_last_success_timestamp{source}  # 소스별 마지막 성공 시각
 - 긴급 시설·이미지 잡·혼잡도 잡은 이 지표에 넣지 않는다. `place_import_rows` 는
   장소 마스터 기준이고, 긴급 시설은 급감 가드 + 경고 로그가 별도로 지킨다.
 
+### 스케줄 발화 지표 (#378)
+
+위 두 지표는 "잡이 성공했나"에 답한다. 그 앞 질문 — **"스케줄러가 살아서 발화는 하고 있나"** —
+은 따로 봐야 한다. 컨테이너가 죽었거나 스위치가 꺼진 채 배포됐으면 실패 로그조차 남지 않는다.
+
+```
+batch_schedule_fire_total{job, result}       # launched / skipped_running / failed
+batch_schedule_last_fire_timestamp{job}      # 잡별 마지막 발화 시각(epoch seconds)
+```
+
+`last_fire` 는 **결과와 무관하게** 발화 시각을 기록한다. 건너뛴 발화도 스케줄러가 살아 있다는
+증거이기 때문이다. 발화 횟수는 Gauge 가 아니라 Counter 다 — 여기서 보는 것은 "마지막 실행에서
+몇 건"이 아니라 "지난 한 주에 몇 번 건너뛰었나"라 누적값이 맞다.
+
+경보 기준.
+
+| 조건 | 심각도 | 뜻 |
+| --- | --- | --- |
+| `time() - batch_schedule_last_fire_timestamp{job="placeDataPipelineJob"} > 8d` | 경고 | 주 1회 스케줄이 한 주기를 통째로 놓쳤다 |
+| `time() - batch_schedule_last_fire_timestamp{job="congestionImportJob"} > 2d` | 경고 | 일 1회 스케줄이 멈췄다 |
+| `increase(batch_schedule_fire_total{result="skipped_running"}[14d]) >= 2` | 경고 | 앞 실행이 계속 안 끝난다. 잡 자체가 오래 걸리거나 STARTED 행이 방치됐다 |
+
+첫 항목의 8일은 주기(7일)에 하루를 더한 값이다. `place_import_last_success_timestamp` 경보(14일)
+보다 먼저 울려야 한다 — 발화가 멈춘 것과 발화는 했는데 잡이 실패한 것은 대응이 다르다.
+
+**구현 방식**: batch-service `schedule` 도메인, `ScheduleMetricsPort` +
+`MicrometerScheduleMetricsAdapter`. 스케줄이 꺼진 환경(local·CI·prod 기본)에서는 발화가 없어
+지표도 나오지 않는다.
+
 ## 외부 API 지표
 
-Resilience4j 가 자동으로 노출한다. 현재 서킷 인스턴스는 없고 기본 정책만 정의돼 있다
-(기상청 연동 시 추가 예정).
+Resilience4j 가 자동으로 노출한다.
 
 ```
 resilience4j_circuitbreaker_state{name}
 resilience4j_circuitbreaker_calls_seconds_count{name, kind="successful|failed"}
 ```
 
-VWorld·식약처는 batch-service 에서만 부르고 서킷을 걸지 않았다. 배치는 실패해도
-사용자 요청을 막지 않으므로 서킷보다 재실행이 맞는 대응이다.
+batch-service 는 제공처 단위로 인스턴스를 나눠 네 개를 쓴다 — `tourapi` / `tats` / `vworld` /
+`mfds` (`application.yml` 의 `resilience4j.circuitbreaker.instances`). 배치라 사용자 요청을
+막지는 않지만, 원천이 죽었을 때 수천 건을 타임아웃까지 두드리며 쿼터만 태우는 것을 막는다.
+`vworld` 는 호출량이 가장 많아 창을 넓게(50/20), `mfds` 는 잡당 한 번뿐이라 좁게(5/3) 잡았다.
+
+다른 서비스도 외부 의존마다 인스턴스를 둔다 — `llm`(ai-service), `kakao`/`naver`(auth-service),
+`kma`/`kma-warning`(tour-service). 서비스 간 Feign 호출은 대상 논리 서비스명을 인스턴스명으로
+쓴다(`tour-service`/`auth-service`/`plan-service`) — `coding-conventions.md` §10.
 
 ## Grafana 대시보드 1차 구성
 
