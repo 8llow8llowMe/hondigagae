@@ -3,7 +3,6 @@ package com.hondigagae.domainlayer.placeimport.adapter.out.file;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedCultureFacility;
-import com.hondigagae.global.properties.CultureFacilityProperties;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,9 +29,8 @@ class CultureFacilityCsvAdapterTest {
     private List<ImportedCultureFacility> readFixture(String... rows) throws IOException {
         Path csv = tempDir.resolve("pet_culture.csv");
         Files.writeString(csv, HEADER + "\n" + String.join("\n", rows) + "\n");
-        CultureFacilityCsvAdapter adapter = new CultureFacilityCsvAdapter(
-            new CultureFacilityProperties(csv.toString()));
-        return adapter.readTravelFacilities("제주특별자치도");
+        // 읽을 파일은 인자로 받는다 (#379) - 포털에서 갓 받은 임시 파일일 수도, 로컬 우회 파일일 수도 있다.
+        return new CultureFacilityCsvAdapter().readTravelFacilities(csv, "제주특별자치도");
     }
 
     @Test

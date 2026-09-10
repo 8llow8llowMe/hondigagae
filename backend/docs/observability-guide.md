@@ -84,13 +84,16 @@ target 파일의 라벨 계약도 동일하게 맞춘다. 대시보드를 프로
 노출하는 지표 둘.
 
 ```
-place_import_rows{source, result}            # upserted / delisted / geocode_failed
+place_import_rows{source, result}            # upserted / delisted / geocode_failed / fallback
 place_import_last_success_timestamp{source}  # 소스별 마지막 성공 시각(epoch seconds)
 ```
 
 `source` 는 `PlaceSourceType` 이름(`TOUR_API` / `CULTURE_PORTAL` / `MFDS`)이다.
 `inserted/updated` 를 나누지 않는 이유: 적재가 JdbcTemplate upsert 라 구분해 세지 않고,
 경보도 그 구분을 쓰지 않는다.
+
+`fallback` 만 단위가 다르다 — 행 수가 아니라 **마지막 실행이 우회 원천을 썼는지**를 담는
+1/0 플래그다 (#379, `CULTURE_PORTAL` 만 쓴다).
 
 경보 기준.
 
@@ -99,8 +102,13 @@ place_import_last_success_timestamp{source}  # 소스별 마지막 성공 시각
 | `time() - place_import_last_success_timestamp{source="MFDS"} > 14d` | 경고 | 주 1회 잡이 2주간 성공 못함 |
 | `place_import_rows{result="geocode_failed"} > 10` | 경고 | VWorld 응답 이상 또는 주소 형식 변화 |
 | `place_import_rows{result="delisted"} > 30` | **심각** | 원천 이상 의심. 급감 가드가 놓쳤을 수 있다 |
+| `place_import_rows{source="CULTURE_PORTAL",result="fallback"} == 1` | 경고 | 포털 자동 다운로드가 실패해 우회 파일로 적재 중. 스크레이퍼·포털 확인 |
 
-마지막 항목이 중요하다. delisting 은 잘못 돌면 데이터를 통째로 날리므로,
+마지막 항목이 왜 필요한가. 우회 적재도 행이 들어오므로 `last_success` 가 갱신되고, 그러면
+포털 스크레이핑이 몇 주째 끊겨 매주 같은 로컬 파일을 다시 넣고 있어도 신선도 경보가 침묵한다.
+WARN 로그(`culture facility source fallback=local`) 하나로는 아무도 그 상태를 보지 않는다.
+
+delisted 항목도 중요하다. delisting 은 잘못 돌면 데이터를 통째로 날리므로,
 급감 가드(`data-refresh-guide.md` 2절)와 이 경보가 이중 방어선이다.
 
 **구현 방식** (batch-service `placeimport` 도메인, `PlaceImportMetricsPort` +
@@ -111,6 +119,16 @@ place_import_last_success_timestamp{source}  # 소스별 마지막 성공 시각
   실행 단위를 읽을 수 없다.
 - `last_success` 는 **단조 증가**로만 갱신하고, **실제로 데이터가 들어온 실행(imported > 0)**
   만 성공으로 친다. 원천이 빈 응답을 준 실행을 성공으로 남기면 경보가 침묵한다.
+- **예외 하나: 검증된 무변경 skip 도 `last_success` 를 갱신한다** (#379). 문화정보원처럼 원천
+  파일이 몇 달에 한 번 바뀌는 소스는, 포털을 실제로 확인해 "지금 올라와 있는 것이 이미 적재한 그
+  파일"임을 안 실행이 곧 성공이다. 적재 건수가 0 이라는 이유로 갱신하지 않으면 아무 문제 없는
+  상태에서 14일 경보가 울리고, 그런 경보는 곧 무시당해 진짜 고장까지 함께 묻힌다.
+  원천을 못 읽어 로컬 우회로 물러난 실행은 이 예외에 들지 않는다 — 그때는 실제로 적재된
+  건수만 성공으로 친다.
+- **우회 여부는 `result="fallback"` 게이지로 따로 드러낸다** (#379). 우회 적재도 행이 들어와
+  `last_success` 를 갱신하므로, 그 게이지가 없으면 포털이 끊긴 상태가 신선도 경보에 잡히지
+  않는다. 파사드가 **모든 실행 경로에서** 1/0 을 쓴다 — 건너뛴 실행과 정상 적재는 0 이라,
+  우회 뒤 정상 실행이 오면 값이 0 으로 되돌아간다.
 - 게이지는 프로세스 메모리에만 있으므로, 기동 시 `PlaceImportMetricsSeeder` 가
   Spring Batch 메타데이터에서 잡별 마지막 COMPLETED 실행 종료 시각을 **씨딩**한다.
   배포 직후에도 신선도 패널이 비지 않는다. `place_import_rows` 는 씨딩하지 않아
@@ -156,10 +174,13 @@ resilience4j_circuitbreaker_state{name}
 resilience4j_circuitbreaker_calls_seconds_count{name, kind="successful|failed"}
 ```
 
-batch-service 는 제공처 단위로 인스턴스를 나눠 네 개를 쓴다 — `tourapi` / `tats` / `vworld` /
-`mfds` (`application.yml` 의 `resilience4j.circuitbreaker.instances`). 배치라 사용자 요청을
-막지는 않지만, 원천이 죽었을 때 수천 건을 타임아웃까지 두드리며 쿼터만 태우는 것을 막는다.
-`vworld` 는 호출량이 가장 많아 창을 넓게(50/20), `mfds` 는 잡당 한 번뿐이라 좁게(5/3) 잡았다.
+batch-service 는 제공처 단위로 인스턴스를 나눠 다섯 개를 쓴다 — `tourapi` / `tats` / `vworld` /
+`mfds` / `datagokr` (`application.yml` 의 `resilience4j.circuitbreaker.instances`). 배치라 사용자
+요청을 막지는 않지만, 원천이 죽었을 때 수천 건을 타임아웃까지 두드리며 쿼터만 태우는 것을 막는다.
+`vworld` 는 호출량이 가장 많아 창을 넓게(50/20), `mfds` 와 `datagokr` 은 잡당 한두 번뿐이라
+좁게(5/3) 잡았다. `datagokr`(공공데이터포털 파일 서버, #379)만 느린 호출 기준이 60초다 —
+30MB 스트리밍이 정상적으로 수십 초 걸려서, 10초 기준이면 성공한 호출이 느린 호출로 집계돼
+서킷이 열리고 자동 갱신이 사실상 꺼진다.
 
 다른 서비스도 외부 의존마다 인스턴스를 둔다 — `llm`(ai-service), `kakao`/`naver`(auth-service),
 `kma`/`kma-warning`(tour-service). 서비스 간 Feign 호출은 대상 논리 서비스명을 인스턴스명으로

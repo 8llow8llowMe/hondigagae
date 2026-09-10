@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.placeimport.adapter.in.batch.tasklet;
 
 import com.hondigagae.domainlayer.placeimport.application.port.in.CultureFacilityImportUseCase;
+import com.hondigagae.domainlayer.placeimport.application.port.in.CultureFacilityImportUseCase.CultureFacilityImportResult;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,6 +17,8 @@ import org.springframework.stereotype.Component;
 public class CultureFacilityImportTasklet implements Tasklet {
 
     private static final String DEFAULT_SIDO = "제주특별자치도";
+    /** 참으로 인정하는 유일한 값. 오타("ture"·"1")를 조용히 참으로 읽으면 매주 30MB 를 다시 받는다. */
+    private static final String FORCE_IMPORT_TRUE = "true";
 
     private final CultureFacilityImportUseCase cultureFacilityImportUseCase;
 
@@ -28,8 +31,12 @@ public class CultureFacilityImportTasklet implements Tasklet {
             ? DEFAULT_SIDO
             : sidoParameter.toString();
 
-        int imported = cultureFacilityImportUseCase.importFacilities(sido);
-        log.info("cultureFacilityImportJob done. sido={}, imported={}", sido, imported);
+        Object forceParameter = jobParameters.get("forceImport");
+        boolean forceImport = forceParameter != null && FORCE_IMPORT_TRUE.equalsIgnoreCase(forceParameter.toString().trim());
+
+        CultureFacilityImportResult result = cultureFacilityImportUseCase.importFacilities(sido, forceImport);
+        log.info("cultureFacilityImportJob done. sido={} imported={} skippedUnchanged={} fileId={} fallback={}",
+            sido, result.imported(), result.skippedUnchanged(), result.fileId(), result.fallbackUsed());
         return RepeatStatus.FINISHED;
     }
 }

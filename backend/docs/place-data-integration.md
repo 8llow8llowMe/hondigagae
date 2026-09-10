@@ -21,6 +21,28 @@
 [data.go.kr/data/15111389](https://www.data.go.kr/data/15111389/fileData.do) — 파일데이터(CSV, 약 30MB, 전국 70,650행).
 **활용신청 없이 다운로드**되므로 인증키가 필요 없다.
 
+### 다운로드 URL 을 찾은 경로 (#379)
+
+"파일데이터라 사람이 받아야 한다"고 오래 적어 뒀지만 그렇지 않았다. 상세 페이지가 서버
+렌더링이고, 그 안 `<script type="application/ld+json">` 블록에 schema.org `DataDownload` 가 들어
+있다. 거기 `contentUrl` 이 로그인·키 없이 200 으로 CSV 를 주는 주소다.
+
+```
+contentUrl: https://www.data.go.kr/cmm/cmm/fileDownload.do
+              ?atchFileId=FILE_000000003214426&fileDetailSn=1&insertDataPrcus=N
+응답 헤더:   Content-Disposition: attachment; filename="한국문화정보원_…_20250324.csv"
+             Content-Length: 30633222
+```
+
+화면 DOM 셀렉터가 아니라 **구조화 메타데이터**를 읽으므로 페이지 개편에 비교적 덜 흔들린다.
+그래도 오픈 API 는 아니라, 못 찾으면 `CULTURE_SOURCE_PAGE_INVALID` 로 분명히 드러내고 배포
+호스트의 우회 파일로 물러난다.
+
+**갱신 감지.** `atchFileId` 는 제공기관이 새 파일을 올리면 바뀐다(장기 규칙은 미확인이라 실제로
+받은 바이트 수를 보조 키로 함께 기록한다). 둘을 `import_source_snapshot` 에 남겨 두고 다음
+실행이 비교해서, 같으면 30MB 를 받지도 7만 행을 파싱하지도 않는다. 세부는
+`data-refresh-guide.md` 1절.
+
 ### 제주 1,191행의 구성
 
 이름·주소가 통째로 같은 중복이 많은 원천이다. 중복 제거는 `sourceKey`(시설명+주소 해시) upsert 가

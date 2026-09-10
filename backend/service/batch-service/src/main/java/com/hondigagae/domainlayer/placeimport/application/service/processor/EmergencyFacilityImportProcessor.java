@@ -4,6 +4,7 @@ import com.hondigagae.domainlayer.placeimport.application.port.out.CultureFacili
 import com.hondigagae.domainlayer.placeimport.application.port.out.EmergencyFacilityBulkPort;
 import com.hondigagae.domainlayer.placeimport.domain.enums.EmergencyFacilityTypeCode;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedEmergencyFacility;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -22,8 +23,8 @@ public class EmergencyFacilityImportProcessor {
     private final CultureFacilityCatalogPort cultureFacilityCatalogPort;
     private final EmergencyFacilityBulkPort emergencyFacilityBulkPort;
 
-    public int importFacilities(String sido) {
-        List<ImportedEmergencyFacility> facilities = cultureFacilityCatalogPort.readEmergencyFacilities(sido);
+    public int importFacilities(Path csvFile, String sido) {
+        List<ImportedEmergencyFacility> facilities = cultureFacilityCatalogPort.readEmergencyFacilities(csvFile, sido);
         if (facilities.isEmpty()) {
             log.warn("emergency facility import found nothing sido={}", sido);
             return 0;

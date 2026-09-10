@@ -30,6 +30,7 @@ import org.springframework.context.annotation.Configuration;
  *   <li>{@code sido} — 시도 명칭 (기본 제주특별자치도). cultureFacilityImport 가 읽는다</li>
  *   <li>{@code region} — 원천의 짧은 지역 표기 (기본 제주). petRestaurantImport 가 읽는다</li>
  *   <li>{@code contentTypeIds} — 콤마 구분 contentTypeId 목록 (생략 시 기본 대상 7종)</li>
+ *   <li>{@code forceImport} — {@code true} 면 문화정보원 원천 파일이 직전과 같아도 다시 적재한다 (#379). 평소에는 주지 않는다</li>
  *   <li>{@code runAt} — 실행마다 새로 주는 식별 파라미터(ISO 시각). <b>재시도도 새 값으로 한다.</b>
  *       같은 값으로 다시 돌리면 {@code JobRestartException} 으로 시작 전에 거부된다(아래 restart 금지)</li>
  * </ul>

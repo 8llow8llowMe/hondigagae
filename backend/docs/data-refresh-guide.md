@@ -10,16 +10,50 @@
 | --- | --- | --- | --- | --- |
 | 식약처 동반출입 음식점 | **빠름** — 제도 시행 5개월에 전국 2,610곳 | 가능 (POST) | **있음** (등록 철회) | **주 1회** |
 | 관광정보 GW (TourAPI) | 느림 | 가능 (API) | 있음 | 주 1회 |
-| 문화정보원 문화시설 | 느림 (파일 부정기 갱신) | **불가 — 수동 다운로드** | 있음 | 월 1회 점검 |
+| 문화정보원 문화시설 | 느림 (파일 부정기 갱신) | 가능 (포털 파일 URL, 키 불필요) | 있음 | 월 1회 점검 |
 | VWorld 지오코더 | — | 배치 중 호출 | — | — |
 
-갱신 설계를 가르는 것은 **변경 속도가 아니라 자동화 가능 여부**다. 식약처는 가장 빨리 변하는데
-자동 수집이 되고, 문화정보원은 천천히 변하는데 사람이 파일을 받아야 한다.
+세 원천 모두 자동 수집이 된다. 갈리는 것은 **무엇을 키로 갱신을 감지하느냐**다 — 식약처와
+TourAPI 는 매번 전량을 다시 받아 upsert 로 덮지만, 문화정보원은 30MB 파일 하나라 "바뀌었는지"를
+먼저 판정하는 편이 훨씬 싸다.
 
-### 문화정보원 파일이 갱신됐는지 아는 법
+### 문화정보원 파일이 갱신됐는지 아는 법 (#379)
 
-포털 상세 페이지를 긁지 않는다. CSV 안에 `최종작성일` 컬럼이 있으므로 **적재 시 그 최대값을
-기록해 두고, 다음 파일의 최대값과 비교**하면 새 파일인지 알 수 있다. 같으면 적재를 건너뛴다.
+**포털 상세 페이지를 긁는다.** `https://www.data.go.kr/data/15111389/fileData.do` 는 서버
+렌더링이고, 그 안 `<script type="application/ld+json">` 블록의 schema.org `DataDownload` 에
+파일 주소가 그대로 들어 있다. 로그인도 인증키도 없이 200 으로 CSV 를 준다.
+
+```
+contentUrl = .../cmm/cmm/fileDownload.do?atchFileId=FILE_000000003214426&fileDetailSn=1&insertDataPrcus=N
+```
+
+화면 DOM 이 아니라 **구조화 메타데이터**를 읽으므로 개편에 비교적 덜 흔들린다. 그래도 공개된
+오픈 API 는 아니다 — 끊길 수 있다는 전제로 실패 처리를 아래 5절에 적어 둔다.
+
+갱신 판정 키는 `import_source_snapshot` 테이블에 남긴다.
+
+| 키 | 쓰임 |
+| --- | --- |
+| `file_id` (`atchFileId`) | **주 키.** 제공기관이 새 파일을 올리면 바뀐다. 상세 페이지만 보고 알 수 있어 30MB 를 받기 전에 판정한다 |
+| `content_length` | **보조 키.** 실제로 받은 바이트 수. `atchFileId` 규칙이 장기적으로 유지된다는 보장이 없어 함께 남긴다 |
+| `source_modified_max` | 교차 확인용. CSV `최종작성일` 컬럼의 최대값. 사람이 "언제 판본인가"를 되짚을 때 본다 |
+
+판정은 두 단계다. 상세 페이지에서 `atchFileId` 만 확인해 직전과 같으면 **내려받지 않고** 끝내고,
+받은 뒤에는 바이트 수까지 맞춰 한 번 더 본다. 다르면 적재하고 새 스냅샷을 남긴다.
+
+**건너뛴 실행도 `place_import_last_success_timestamp` 를 갱신한다.** 원천을 실제로 확인해
+최신임을 안 것이므로 성공이다. 갱신하지 않으면 파일이 몇 달 안 바뀌는 정상 상황에서 14일 경보가
+울리고, 아무 문제 없이 울리는 경보는 곧 무시당한다 (`observability-guide.md`).
+
+파서를 고쳐 같은 파일을 다시 적재해야 하면 `forceImport=true` 를 준다.
+
+```bash
+--spring.batch.job.name=cultureFacilityImportJob sido=제주특별자치도 forceImport=true runAt=<ISO 시각>
+```
+
+스냅샷 테이블 DDL 은 `service/batch-service/src/main/resources/db/import-source-snapshot-mysql.sql`
+하나가 정본이다. local·dev·test 는 `spring.sql.init` 이 기동 시 적용하고, prod 는 런북으로 사람이
+적용한다 (`deploy-guide.md`).
 
 ## 2. 사라진 것을 지우지 못하던 결함 — 해소됨
 
@@ -90,7 +124,7 @@
 | 자식 잡 | 성격 |
 | --- | --- |
 | `placeImportJob` | TourAPI. 변경이 느리고 쿼터 여유가 있다 |
-| `cultureFacilityImportJob` | 파일 갱신 확인 후 조건부 적재. 원천 파일 자체는 월 1회쯤 바뀐다 |
+| `cultureFacilityImportJob` | 포털에서 내려받고 갱신됐을 때만 적재(#379). 원천 파일 자체는 월 1회쯤 바뀐다 |
 | `petRestaurantImportJob` | 등록이 계속 느는 원천이라 가장 자주 갱신할 값어치가 있다 |
 | `placeMergeJob` | 모든 원천이 들어온 상태에서 한 번 판정 (#363) |
 | `placeImageBackfillJob` | 흡수된 행은 대상에서 빠지므로 병합 뒤가 맞다 |
@@ -162,9 +196,27 @@ JobParameter 로 넘긴다. 시간대를 트리거가 직접 못박는 이유는
 | 식약처 경로 404 | 잡 실패, 기존 데이터 유지, delisting 없음 | 없음 (데이터가 낡을 뿐) |
 | VWorld 키 만료 | 잡 실패 (`GEOCODING_KEY_MISSING`) | 없음 |
 | 일부 주소 지오코딩 실패 | 그 행만 제외하고 계속. 건수·업소명 로그 | 몇 곳이 빠짐 |
-| 문화정보원 파일 없음 | 잡 실패 (`CULTURE_CSV_NOT_FOUND`) | 없음 |
+| 문화정보원 포털 페이지/다운로드 실패 | **로컬 우회 파일로 적재**하고 계속. `culture facility source fallback=local` WARN. 스냅샷은 남기지 않는다. 지표 `result=fallback` 으로 드러난다 | 없음 |
+| 받은 파일이 CSV 가 아님 (점검 안내 HTML 등) | 위와 같음 (`CULTURE_DOWNLOAD_INVALID` → 우회) | 없음 |
+| 전송이 끊겨 파일이 잘림 | `Content-Length` 와 실제 바이트 수를 대조해 거부. 위와 같이 우회 | 없음 |
+| 스냅샷 테이블 조회 실패 (미생성 등) | "모른다"로 접고 그냥 내려받아 적재. `culture facility snapshot unavailable` WARN | 없음 (30MB 를 한 번 더 받을 뿐) |
+| 포털도 막히고 로컬 우회 파일도 없음 | 잡 실패 (`CULTURE_CSV_NOT_FOUND`) | 없음 |
 
 공통 원칙은 **낡은 데이터가 빈 데이터보다 낫다**는 것이다. 실패 시 기존 값을 지우지 않는다.
+
+문화정보원 우회 적재가 **스냅샷을 남기지 않는 이유**도 같은 결이다. 우회 파일이 포털에 지금
+올라와 있는 것과 같다는 보장이 없으므로, 남기면 다음 실행이 포털을 보지 않고 건너뛴다 —
+포털이 되살아나도 낡은 파일에 머무는 것이 가장 나쁜 결말이다.
+
+**다만 우회가 오래 이어지는 것은 조용한 고장이다.** 우회 적재도 행이 들어오니
+`last_success` 는 갱신되고, 그러면 스크레이핑이 몇 주째 끊겨 있어도 신선도 경보가 침묵한다.
+그래서 파사드가 매 실행 `place_import_rows{source="CULTURE_PORTAL",result="fallback"}` 에
+1/0 을 쓴다 — 1 이면 경고다 (`observability-guide.md`).
+
+**전송이 끊긴 파일을 걸러 내는 이유**는 스냅샷 때문이다. 30MB 중 5MB 만 받아도 스트리밍은
+정상 종료로 보이고, 잘린 본문은 1MB 하한도 첫 줄 `시설명` 검사도 통과한다. 그대로 적재하면
+잘린 판본이 스냅샷으로 굳고 **다음 실행부터 같은 `atchFileId` 로 영구 SKIP** 된다. 그래서
+헤더 `Content-Length` 가 있으면 디스크에 쓰인 바이트 수와 정확히 같을 때만 통과시킨다.
 
 ## 6. 갱신 상태를 드러내기
 

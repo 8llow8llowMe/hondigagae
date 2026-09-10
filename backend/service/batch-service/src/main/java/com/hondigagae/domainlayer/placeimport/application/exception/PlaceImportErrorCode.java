@@ -28,7 +28,15 @@ public enum PlaceImportErrorCode {
     GEOCODING_CIRCUIT_OPEN("PLACE_IMPORT_013", "VWorld 지오코더 서킷이 열려 있어 호출을 건너뜁니다."),
     MFDS_CIRCUIT_OPEN("PLACE_IMPORT_014", "식약처 파일 서버 서킷이 열려 있어 내려받기를 건너뜁니다."),
     REGION_NOT_SUPPORTED("PLACE_IMPORT_015", "관광 지역코드로 옮길 수 없는 지역입니다. (%s)"),
-    INTRO_JSON_SERIALIZE_FAILED("PLACE_IMPORT_016", "place_intro raw_json 직렬화에 실패했습니다. (sourceKey=%s)");
+    INTRO_JSON_SERIALIZE_FAILED("PLACE_IMPORT_016", "place_intro raw_json 직렬화에 실패했습니다. (sourceKey=%s)"),
+    // 문화정보원 CSV 자동 다운로드 (#379). 여기 실패는 잡을 죽이지 않고 로컬 우회 파일로 물러난다 -
+    // 우회 파일도 없을 때만 잡이 CULTURE_CSV_NOT_FOUND 로 끝난다.
+    CULTURE_SOURCE_PAGE_FAILED("PLACE_IMPORT_017", "문화정보원 상세 페이지를 받지 못했습니다. (%s)"),
+    CULTURE_SOURCE_PAGE_INVALID("PLACE_IMPORT_018", "문화정보원 상세 페이지에서 파일 다운로드 주소를 찾지 못했습니다. (%s)"),
+    CULTURE_DOWNLOAD_FAILED("PLACE_IMPORT_019", "문화정보원 CSV 를 내려받지 못했습니다. (%s)"),
+    // CSV 아님 · 하한 미달 · Content-Length 불일치(전송 중단)를 함께 받는다. 상세는 %s 자리에 담는다.
+    CULTURE_DOWNLOAD_INVALID("PLACE_IMPORT_020", "내려받은 문화정보원 파일이 온전한 CSV 가 아닙니다. (%s)"),
+    CULTURE_SOURCE_CIRCUIT_OPEN("PLACE_IMPORT_021", "공공데이터포털 서킷이 열려 있어 내려받기를 건너뜁니다.");
 
     private final String code;
     private final String message;
