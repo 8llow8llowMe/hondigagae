@@ -47,7 +47,17 @@ export function FilterList({
     <div
       role={exclusive ? 'radiogroup' : 'group'}
       aria-label={label}
-      className={cn('filter-list flex flex-col px-2', className)}
+      /*
+        **행 사이를 4px 띄운다** (#412). 선택은 `bg-band` 이고 hover 도 같은 `bg-band` 라,
+        고른 행 바로 위·아래에 마우스를 올리면 **두 회색이 맞닿아 한 덩어리로 보였다** —
+        어느 쪽이 고른 것이고 어느 쪽이 지나가는 것인지 구분되지 않는다.
+        틈이 있으면 같은 색이어도 둘로 읽힌다.
+
+        **margin 이 아니라 `gap` 이다.** 행마다 margin 을 주면 첫 행 위·마지막 행 아래에도
+        붙어 목록이 담는 곳(시트 · 레일)마다 다른 여백을 갖게 된다. `gap` 은 사이에만 든다.
+        4 는 §4 스케일 안이다.
+      */
+      className={cn('filter-list flex flex-col gap-1 px-2', className)}
     >
       {children}
     </div>
