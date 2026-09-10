@@ -38,6 +38,26 @@ describe('권역 칸 — 폭 산식 (#412)', () => {
     "4px 여유" 라고 적었다. 실제로 둘째 칸부터 값 자리가 65.6px 이라 `최고 31.0℃`(62.9px)
     옆에 2.7px 만 남았고, 폰트 렌더링이 조금만 달라져도 접혔다.
   */
+  /**
+   * 점수 배지 폭 = 좌우 여백 + 나머지.
+   *
+   * **나머지 17.4px 은 글자(`100`, `tabular-nums`) + 투명 테두리 2px 을 합친 값이다.**
+   * 실측으로 잡았다 — `px-2` 33.4 · `px-3` 41.4 · `px-4` 49.4 로 여백 4px 마다 정확히
+   * 8px 씩 움직인다. 테두리를 따로 더하면 이중으로 세게 된다.
+   */
+  function scoreBadgeWidth(): number {
+    const metric = withoutComments(repoSource('src/components/metric.tsx'))
+    const pad = px(/score:\s*'px-(\d+)/.exec(metric)?.[1])
+
+    return 17.4 + pad * 2
+  }
+
+  /*
+    **배지 여백과 칸 폭은 함께 움직여야 한다** (#412 후속). `lg:w-22` 는 하한이 아니라
+    상한이라, 배지가 넓어지면 숫자 자리가 88 아래로 **조용히** 눌린다 — 화면은 한동안
+    멀쩡해 보이다가 폰트가 달라지는 환경에서 접힌다. 그래서 배지 쪽 값을
+    `metric.tsx` 에서 읽어 와 검사한다.
+  */
   it('칸 폭이 인셋·아이콘·숫자 자리·배지의 합을 담는다', () => {
     const cellPx = px(/lg:w-(\d+) lg:shrink-0/.exec(source)?.[1])
     const numsPx = px(/flex flex-col items-start lg:w-(\d+)/.exec(source)?.[1])
@@ -45,10 +65,26 @@ describe('권역 칸 — 폭 산식 (#412)', () => {
     expect(cellPx).not.toBeNaN()
     expect(numsPx).not.toBeNaN()
 
-    // 인셋 13(pl-3 + border-l) + 아이콘 24 + gap 8 + 숫자 + gap 8 + 배지 33.4
-    const required = 13 + 24 + 8 + numsPx + 8 + 33.4
+    // 인셋 13(pl-3 + border-l) + 아이콘 24 + gap 8 + 숫자 + gap 8 + 배지
+    const required = 13 + 24 + 8 + numsPx + 8 + scoreBadgeWidth()
 
     expect(cellPx).toBeGreaterThanOrEqual(required)
+  })
+
+  /*
+    **1440 에서 화살표가 남지 않아야 한다.** 우측 열 가용폭이 953 이고 칸 5개 + gap 4×4
+    이므로 칸 상한은 `(953 − 16) / 5 = 187.4` 다. 1280(가용 793)은 어떤 폭으로도 못
+    지키지만(155 이하가 필요한데 그 폭으로는 값이 접힌다) 1440 은 지킬 수 있다.
+  */
+  it('칸 폭이 1440 상한을 넘지 않는다', () => {
+    const cellPx = px(/lg:w-(\d+) lg:shrink-0/.exec(source)?.[1])
+
+    expect(cellPx).toBeLessThanOrEqual((953 - 16) / 5)
+  })
+
+  /* 숫자만 담는 배지라 낱말용 `md`(8px)와 갈랐다 — 갈라 둔 것이 되돌려지지 않게 잡는다 */
+  it('점수 배지가 score 크기를 쓴다', () => {
+    expect(source).toContain('size="score"')
   })
 
   /* 가장 넓은 줄이 `최고 31.0℃` = 62.9px 이다. 폰트가 달라져도 접히지 않을 몫을 남긴다 */

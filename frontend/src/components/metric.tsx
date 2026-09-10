@@ -29,17 +29,33 @@ const BADGE_TONE: Record<MetricTone, string> = {
 }
 
 /**
- * 크기는 `Badge` 와 **같은 값**이다 (`src/components/badge.tsx`).
+ * `sm` · `md` 는 `Badge` 와 **같은 값**이다 (`src/components/badge.tsx`).
  *
  * 두 배지가 한 줄에 나란히 서는 곳이 있다 — 장소 행의 `동반 가능` `문화시설`(속성) 옆에
  * `실내 여부 미확인`(등급 unknown). 높이가 다르면 그 줄이 어긋나 보인다.
+ *
+ * **`score` 만 그 짝에서 빠진다** (#412). 이 크기는 **숫자만 담는 배지**를 위한 것이고,
+ * 지금 쓰는 곳은 홈 권역 행의 `weatherScore` 하나다 — 나머지 `MetricBadge` 는 전부
+ * 서버 문구(`suitabilityLevel.name` · 혼잡도 `name` · `실내 여부 미확인`)를 담는다.
+ *
+ * **낱말과 숫자는 같은 여백에서 다르게 보인다.** `부분 동반 가능` 을 알맞게 감싸는 8px 이
+ * `100` 에서는 조여 보인다 — 글자 수가 적을수록 좌우 여백이 시각적 무게를 결정한다.
+ * 그래서 12px 를 준다.
+ *
+ * **`score` 는 `Badge` 옆에 서지 않으므로** 짝을 깨지 않는다. 새로 쓸 곳이 생기면
+ * 그 줄에 `Badge` 가 함께 오는지 먼저 본다.
+ *
+ * **여백을 더 키우려면 담는 칸을 함께 본다.** 권역 칸은 폭이 고정(`lg:w-46`)이라 배지가
+ * 넓어지면 숫자 자리가 조용히 눌린다 — `src/styles/overlay-and-region-cell.test.ts` 가
+ * 이 파일의 값을 읽어 칸 폭과 함께 검사한다.
  */
 const BADGE_SIZE: Record<MetricBadgeSize, string> = {
   sm: 'h-5 px-2',
   md: 'px-2 py-1',
+  score: 'px-3 py-1',
 }
 
-export type MetricBadgeSize = 'sm' | 'md'
+export type MetricBadgeSize = 'sm' | 'md' | 'score'
 
 /**
  * 등급 배지.
