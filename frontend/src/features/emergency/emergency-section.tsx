@@ -16,6 +16,7 @@ import { FacilityRow } from '@/features/emergency/facility-row'
 import { formatDistance } from '@/lib/format/distance'
 import type { PositionFailure } from '@/lib/geo/current-position'
 import { messages } from '@/lib/messages'
+import { cn } from '@/lib/utils/cn'
 import {
   FACILITY_TYPE_CODES,
   type FacilityFilters,
@@ -35,6 +36,15 @@ export type EmergencySectionProps = {
   onWidenRadius: () => void
   /** 반경을 더 넓힐 수 있는가 (백엔드 상한 50km) */
   canWiden: boolean
+  /**
+   * 데스크톱에 **별도 필터 레일이 있는가** (#419).
+   *
+   * 켜면 칩 줄이 `lg:hidden` 이 된다 — 레일과 칩이 같은 축을 두 번 보여주지 않게.
+   * **기본값은 false 다.** 지도 SDK 실패 폴백은 이 컴포넌트를 레일 없이 쓰고, 그 경로는
+   * 카카오 키 도메인이 안 맞을 때 **항상** 오므로 예외가 아니다 — 무조건 숨기면
+   * 데스크톱 폴백이 필터를 통째로 잃는다.
+   */
+  hasRail?: boolean
 }
 
 /**
@@ -60,6 +70,7 @@ export function EmergencySection({
   onRetryPosition,
   onWidenRadius,
   canWiden,
+  hasRail = false,
 }: EmergencySectionProps) {
   if (loading) return <EmergencySkeleton />
 
@@ -86,7 +97,7 @@ export function EmergencySection({
         <PositionNotice reason={positionFallback} onRetry={onRetryPosition} />
       )}
 
-      <div className="flex flex-col gap-2 px-4 pt-3 md:px-10">
+      <div className={cn('flex flex-col gap-2 px-4 pt-3 md:px-10', hasRail && 'lg:hidden')}>
         <ChipGroup
           label={messages.emergency.typeGroupLabel}
           exclusive
