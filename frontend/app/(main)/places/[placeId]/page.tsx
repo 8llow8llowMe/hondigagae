@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 import type { Metadata } from 'next'
 
+import { Canvas } from '@/components/surface'
 import { PlaceDetailView } from '@/features/place/place-detail-view'
 import { placeKeys } from '@/features/place/queries'
 import { ApiError } from '@/lib/api/error'
@@ -89,15 +90,18 @@ export default async function PlaceDetailPage({ params }: { params: Params }) {
     가운데 정렬된 좁은 칼럼으로 두면 좌측 레일이 들어갈 자리가 없다.
 
     레이아웃·브레드크럼·본문은 전부 `PlaceDetailSection` 이 소유한다. 여기서 감싸지 않는
-    이유는 **열 구분선이 헤더 줄까지 올라오면 안 되기** 때문이다 — 브레드크럼은 2단 위의
-    전폭 줄이다.
+    이유는 브레드크럼이 2단 위의 전폭 줄이기 때문이다 — 카드 열 안에 들어가면 안 된다.
+
+    **`main` 이 L0 바닥이다** (`DESIGN.md §0`, 이슈 #443). 홈·장소 목록과 같은 3층 표면이고,
+    바닥은 전폭이어야 하므로 `Canvas` 를 `main` 에 건다 — 그 위에 카드를 쌓는 일은
+    `PlaceDetailSection` 의 `SurfaceStack` 이 맡는다.
   */
   return (
-    <main id="main-content">
+    <Canvas as="main" id="main-content">
       <HydrationBoundary state={dehydrate(queryClient)}>
         <PlaceDetailView placeId={placeId} authed={session !== null} />
       </HydrationBoundary>
-    </main>
+    </Canvas>
   )
 }
 
