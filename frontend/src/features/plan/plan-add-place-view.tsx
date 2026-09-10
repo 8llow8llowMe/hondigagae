@@ -7,6 +7,7 @@ import type { ReactNode } from 'react'
 import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
+import { Surface, SurfaceStack } from '@/components/surface'
 import { PlaceFilterChips } from '@/features/place/place-filter-chips'
 import { PlaceListSection } from '@/features/place/place-list-section'
 import { PlaceMapView } from '@/features/place/place-map-view'
@@ -106,8 +107,7 @@ export function PlanAddPlaceView({
         view={view}
       >
         <PlaceListSection
-          /* 이 화면은 아직 2a 라 스켈레톤도 행과 같은 페이지 인셋(16/40)에 선다 — `PlanAddPlaceRow` 와 같은 값 */
-          inset="main"
+          /* 인셋을 넘기지 않는다 — 기본 `card`(16/20)가 카드 안 행(`PlanAddPlaceRow`)과 같은 값이다 (#451) */
           places={[]}
           loading
           errorStatus={null}
@@ -133,6 +133,7 @@ export function PlanAddPlaceView({
           view={view}
         >
           <EmptyState
+            inset="card"
             title={messages.plan.detailBadRequestTitle}
             description={messages.plan.detailBadRequestDescription}
           />
@@ -149,6 +150,7 @@ export function PlanAddPlaceView({
         view={view}
       >
         <ErrorState
+          inset="card"
           title={messages.plan.detailErrorTitle}
           description={messages.plan.errorDescription}
           onRetry={() => void detail.refetch()}
@@ -177,6 +179,7 @@ export function PlanAddPlaceView({
         view={view}
       >
         <EmptyState
+          inset="card"
           title={messages.plan.addPlaceDayMissingTitle.replace('{day}', String(day))}
           description={messages.plan.addPlaceDayMissingDescription.replace(
             '{totalDays}',
@@ -242,6 +245,12 @@ export function PlanAddPlaceView({
             renderListRow={(place) => (
               <PlanAddPlaceRow
                 key={place.placeId}
+                /*
+                  **지도 폴백은 카드가 아니라 페이지 위다** — `PlaceListSection` 도 그쪽에서
+                  `inset="main"` 이고 위 안내 줄이 `md:px-10` 이라, 행이 기본값 `card`(20)로
+                  서면 768 이상에서 안내 줄·스켈레톤(40)과 어긋난다 (`place-map-view.tsx`).
+                */
+                inset="main"
                 place={place}
                 added={addedPlaceIds.has(place.placeId)}
                 pending={addPlace.pending?.placeId === place.placeId}
@@ -266,21 +275,20 @@ export function PlanAddPlaceView({
       listHref={listHref}
       mapHref={mapHref}
       view={view}
+      tools={
+        /* 데스크톱은 좌측 레일이 같은 일을 한다 (페이지가 렌더) */
+        <div className="lg:hidden">
+          {/* `/plans` 는 proxy.ts `PROTECTED_PATHS` 라 미로그인이 여기 닿지 않는다 (#200) */}
+          <PlaceFilterChips filters={filters} authed />
+        </div>
+      }
     >
-      {/* 데스크톱은 좌측 레일이 같은 일을 한다 (페이지가 렌더) */}
-      <div className="lg:hidden">
-        {/* `/plans` 는 proxy.ts `PROTECTED_PATHS` 라 미로그인이 여기 닿지 않는다 (#200) */}
-        <PlaceFilterChips filters={filters} authed />
-      </div>
-
       <PlaceListSection
         /*
-          **스켈레톤 인셋을 행과 맞춘다.** 기본값 `card`(16/20)는 3a 카드 안 값이고, 이 화면은
-          아직 2a 라 행(`PlanAddPlaceRow`)이 페이지 인셋(16/40)에 선다. 넘기지 않으면 첫 로딩과
-          더 받는 중 스켈레톤만 20 에 서서 목록이 실데이터로 바뀌는 순간 왼쪽 선이 20px 뛴다.
-          3a 로 옮길 때 행과 함께 `card` 로 바꾼다.
+          **인셋을 넘기지 않는다** (#451). 기본값 `card`(16/20)가 곧 이 목록의 자리다 —
+          행(`PlanAddPlaceRow`)도 카드 안에서 같은 값을 쓴다. 하나라도 어긋나면 목록이
+          실데이터로 바뀌는 순간 왼쪽 선이 뛴다.
         */
-        inset="main"
         places={places}
         loading={list.isPending}
         errorStatus={toErrorStatus(list.error)}
@@ -310,10 +318,26 @@ export function PlanAddPlaceView({
 }
 
 /**
- * 모든 변형이 공유하는 껍데기 — 뒤로가기 · `h1` · 부제.
+ * 목록 갈래의 모든 상태가 공유하는 껍데기 — 뒤로가기 · `h1` · 부제 + L1 카드 하나.
  *
  * **오류·빈 상태에도 `h1` 이 있어야 한다.** 없으면 문서의 최상위 제목이 필터의
  * `h2 "필터"` 가 되어, 스크린리더 사용자가 무슨 화면인지 알 수 없다 (실측으로 잡았다).
+ *
+ * **3층 표면이다** (`DESIGN.md §0`, #451). 페이지가 `Canvas` 로 L0 바닥을 깔고 여기서
+ * `SurfaceStack` 이 그 위에 쌓는다.
+ *
+ * **카드를 여기서 그린다.** 상태마다 `Surface` 를 반복하면 로딩·오류·빈 결과 중 하나만
+ * 빠뜨려도 카드가 생겼다 사라진다 — 상태에 따라 표면이 바뀌면 안 된다 (#440 판단).
+ * 그래서 `children` 은 항상 카드 안이고, **카드 밖에 서야 하는 필터 칩만 `tools` 로
+ * 따로 받는다** — 칩은 목록을 좁히는 도구이고 카드는 그 결과를 담는다 (#439 · #440).
+ *
+ * **카드에 제목을 주지 않고 `aria-label` 로 이름만 붙인다.** 장소 목록(#439)은 페이지
+ * 제목을 카드 제목(`h2`)으로 넣고 `h1` 을 `sr-only` 로 돌렸지만, 이 화면의 머리는
+ * 뒤로가기 · `h1` · 보기 토글 · 부제로 된 **페이지 머리**이고 **지도 갈래와 같은
+ * 컴포넌트를 쓴다** — 지도에서는 `sr-only` 로 숨길 수 없고(#370, `plan-add-place-map.test.ts`
+ * 가 강제한다) 두 갈래가 같은 `h1` 을 내야 보기 전환이 문서 구조를 바꾸지 않는다(#439 의
+ * 규칙). 머리가 이름을 이미 그리므로 카드는 `aria-label` 만 갖는다 — 장소 상세(#443) ·
+ * 일정 상세(#447)의 일자 카드와 같은 방식이다.
  */
 function PlanAddPlaceShell({
   day,
@@ -322,6 +346,7 @@ function PlanAddPlaceShell({
   listHref,
   mapHref,
   view,
+  tools,
   children,
 }: {
   day: number
@@ -331,10 +356,12 @@ function PlanAddPlaceShell({
   listHref: string
   mapHref: string
   view: ViewMode
+  /** 카드 **밖**에 서는 도구 (모바일 필터 칩). 없으면 그 줄 자체가 없다 */
+  tools?: ReactNode
   children: ReactNode
 }) {
   return (
-    <>
+    <SurfaceStack>
       <PlanAddPlaceHeader
         day={day}
         backHref={backHref}
@@ -342,8 +369,15 @@ function PlanAddPlaceShell({
         listHref={listHref}
         mapHref={mapHref}
         view={view}
+        /* L0 위 페이지 머리지만 글줄은 카드 안과 같은 축이다 */
+        inset="card"
       />
-      {children}
-    </>
+
+      {tools}
+
+      <Surface aria-label={messages.plan.addPlaceTitle.replace('{day}', String(day))}>
+        {children}
+      </Surface>
+    </SurfaceStack>
   )
 }

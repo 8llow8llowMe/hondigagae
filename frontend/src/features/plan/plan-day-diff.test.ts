@@ -78,3 +78,25 @@ describe('PlanDayDiff', () => {
     expect(render()).toContain('<span aria-hidden="true"')
   })
 })
+
+/*
+  #451. 두 열은 카드 판정 3문을 셋 다 통과한다 — 자기 제목이 있고, 혼자 떼어놔도 말이 되고,
+  항목이 여럿이다. 수제 박스(`rounded-md border p-4`)를 `Surface` 로 바꿨다.
+*/
+describe('PlanDayDiff — 3층 표면 (#451)', () => {
+  it('두 열이 L1 카드다 — 수제 박스의 radius 8 을 쓰지 않는다', () => {
+    const markup = render()
+
+    expect(markup.match(/<section/g)).toHaveLength(2)
+    expect(markup).not.toContain('rounded-md')
+    expect(markup).toContain('md:rounded-lg')
+  })
+
+  /*
+    순서가 뜻을 갖는 목록이라 `ol` 이고 `ul` 인 `SurfaceList` 를 쓸 수 없다 — 같은 구분선
+    규약(항목 **사이에만**)을 여기에 건다 (#447 `plan-day-editor` 와 같다).
+  */
+  it('행 구분선을 항목 사이에만 긋는다', () => {
+    expect(render()).toContain('[&amp;&gt;li+li]:border-t')
+  })
+})

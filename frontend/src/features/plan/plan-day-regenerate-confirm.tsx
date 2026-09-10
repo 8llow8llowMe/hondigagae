@@ -2,6 +2,8 @@ import { Button } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
 import { messages } from '@/lib/messages'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 
 /**
  * 재생성 확정 블록 (#128 · 하루재생성-세부명세 R5).
@@ -23,7 +25,17 @@ export function PlanDayRegenerateConfirm({
   error: PlanDaySaveError | null
 }) {
   return (
-    <div className="border-border mt-6 flex flex-col items-start gap-2 border-t pt-4">
+    /*
+      **액션이라 카드가 아니다** (`DESIGN.md §0`, #451) — 비교 카드 아래, L0 바닥 위에 선다
+      (#443 · #447 의 "액션 바는 카드가 아니다" 와 같은 판단).
+
+      **위 구분선을 걷었다.** 3a 에서는 카드 사이 틈으로 비치는 L0 이 그 일을 한다 —
+      선을 남기면 비교 카드의 테두리와 나란히 두 줄로 읽힌다. 세로 여백도 스택의 간격
+      (모바일 8 / 데스크톱 24)이 주므로 아래만 남긴다 (`PlanStatusAction` 과 같은 값).
+
+      인셋은 카드 안 글줄과 같은 축이다 — 버튼이 위 카드의 첫 글자와 세로선을 맞춘다.
+    */
+    <div className={cn('flex flex-col items-start gap-2 pb-4 md:pb-0', INSET_CLASS.card)}>
       <p className="text-body-2 text-fg font-semibold">{messages.plan.regenerateDayIrreversible}</p>
       <p className="text-caption text-fg-muted font-medium">
         {messages.plan.regenerateDayVisitReset}

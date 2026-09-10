@@ -2,6 +2,8 @@ import { Button } from '@/components/button'
 import { Skeleton } from '@/components/skeleton'
 import type { JobPollPhase, JobStepProgress } from '@/lib/ai-plan/job'
 import { messages } from '@/lib/messages'
+import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { CodeNameMetadata } from '@/types/api'
 
 export type AiPlanProgressProps = {
@@ -19,6 +21,14 @@ export type AiPlanProgressProps = {
   canceling: boolean
   /** 취소 요청 자체가 실패했는가. 작업은 계속 돌고 있으므로 진행 표시는 남는다 */
   cancelFailed: boolean
+  /**
+   * 좌우 여백 축 (`EmptyState` · `ErrorState` 와 같은 계약). 기본은 페이지 위 `main`
+   * (16/40)이고 `/ai-plans/jobs/[jobId]` 가 그것을 쓴다.
+   *
+   * 하루 재생성(#451)은 이 표시가 L1 카드 안에 들어가 `card`(16/20)를 넘긴다 — 카드가
+   * 이미 한 번 들어와 있어 안쪽까지 40 을 주면 내용이 두 번 밀린다 (`DESIGN.md §0`).
+   */
+  inset?: Inset
 }
 
 /**
@@ -40,6 +50,7 @@ export function AiPlanProgress({
   onCancel,
   canceling,
   cancelFailed,
+  inset = 'main',
 }: AiPlanProgressProps) {
   /*
     **세부 단계 설명이 있으면 그것이 더 정확하다.** `status.description` 은 "생성 중" 전체를
@@ -78,7 +89,7 @@ export function AiPlanProgress({
       벗어나는 것으로는 작업이 멈추지 않는다.
     */
     return (
-      <div className="flex flex-col items-start gap-2 px-4 py-12 md:px-10">
+      <div className={cn('flex flex-col items-start gap-2 py-12', INSET_CLASS[inset])}>
         <h2 className="text-body-1 text-fg font-semibold">{messages.aiPlan.jobExceededTitle}</h2>
         <p className="text-body-2 text-fg-muted">{messages.aiPlan.jobExceededDescription}</p>
         {cancelFailed && (
@@ -95,7 +106,7 @@ export function AiPlanProgress({
   }
 
   return (
-    <div className="flex flex-col gap-4 px-4 py-10 md:px-10">
+    <div className={cn('flex flex-col gap-4 py-10', INSET_CLASS[inset])}>
       {/*
         `aria-live="polite"` — 진행 문구가 바뀌는 것을 스크린리더가 알아야 한다.
         `role="status"` 를 쓰면 대기 중 내용이 바뀔 때마다 읽히는 것이 자연스럽다.

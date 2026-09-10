@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 
+import { Canvas } from '@/components/surface'
 import { PlaceFilterRail } from '@/features/place/place-filter-rail'
 import { placeKeys } from '@/features/place/queries'
 import { PlanAddPlaceView } from '@/features/plan/plan-add-place-view'
@@ -124,25 +125,33 @@ export default async function PlanAddPlacePage({
   }
 
   return (
-    <main id="main-content" className="rail-layout rail-layout-filter">
+    /*
+      **3층 표면** (`DESIGN.md §0`, 이슈 #451). `main` 이 L0 바닥을 전폭으로 깔고, 카드를
+      쌓는 일은 `PlanAddPlaceView` 의 `SurfaceStack` 이 맡는다.
+
+      **열 구분선을 걷었다.** 2a 에서는 우측 열의 `border-left` 가 두 열을 갈랐는데,
+      3a 는 **L0 바닥이 그 일을 한다** — 카드 사이·열 사이로 바닥이 비친다
+      (`places/(list)/page.tsx` · 홈 #428 과 같은 이유). 선을 남기면 카드 테두리와 선이
+      나란히 두 줄로 읽힌다. 선을 걷고 나면 우측 열 래퍼는 할 일이 없어 함께 걷는다 —
+      뷰의 `SurfaceStack` 이 그대로 두 번째 열이 된다.
+    */
+    <Canvas as="main" id="main-content" className="rail-layout rail-layout-filter">
       {/* 목록 화면과 같은 2단이다. 태블릿은 한 컬럼 — 280 레일을 더하면 768 을 넘는다 */}
       <div className="rail-sticky hidden lg:block">
         <PlaceFilterRail filters={filters} authed />
       </div>
 
-      <div className="lg:border-border lg:border-l">
-        {/* 모바일 필터 칩은 뷰가 제목과 목록 사이에 넣는다 — 목록 아래로 밀리면 못 쓴다 */}
-        <HydrationBoundary state={dehydrate(queryClient)}>
-          <PlanAddPlaceView
-            planId={planId}
-            day={day}
-            filters={filters}
-            view="list"
-            listHref={listHref}
-            mapHref={mapHref}
-          />
-        </HydrationBoundary>
-      </div>
-    </main>
+      {/* 모바일 필터 칩은 뷰가 제목과 목록 사이에 넣는다 — 목록 아래로 밀리면 못 쓴다 */}
+      <HydrationBoundary state={dehydrate(queryClient)}>
+        <PlanAddPlaceView
+          planId={planId}
+          day={day}
+          filters={filters}
+          view="list"
+          listHref={listHref}
+          mapHref={mapHref}
+        />
+      </HydrationBoundary>
+    </Canvas>
   )
 }
