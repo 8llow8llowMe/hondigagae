@@ -88,9 +88,12 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
   return (
     <div ref={rootRef} className="relative">
       {/*
-        `py-8` 은 폭을 가리지 않는다. 위아래가 각각 날짜 줄·판정 줄과 맞닿아 있어
-        `py-4` 로는 프로필이 자기 영역을 갖지 못하고 낀 것처럼 보인다 — 레일이 좁은
-        데스크톱에서도 마찬가지다.
+        `py-10`(40) 은 폭을 가리지 않는다. `py-4` 로는 프로필이 자기 영역을 갖지 못하고
+        낀 것처럼 보인다 — 레일이 좁은 데스크톱에서도 마찬가지다.
+
+        **32 → 40 으로 올렸다** (#428). 예전 근거는 "위아래가 각각 날짜 줄·판정 줄과
+        맞닿아 있어서" 였는데, 3a 에서 **날짜 줄이 판정 카드로 옮겨 가** 위쪽이 카드
+        경계가 됐다. 위가 여백이 아니라 선이 되면 같은 32 라도 더 조여 보인다.
       */}
       <button
         ref={triggerRef}
@@ -99,7 +102,7 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
         aria-haspopup="menu"
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
-          'focus-visible:ring-brand-500 flex w-full items-center gap-4 py-8 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
+          'focus-visible:ring-brand-500 flex w-full items-center gap-4 py-10 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
           // 카드 안 인셋 (#428)
           'px-4 md:px-5',
         )}
