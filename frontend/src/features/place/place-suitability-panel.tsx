@@ -14,13 +14,14 @@ import { cn } from '@/lib/utils/cn'
 import type { DailyWeatherItem, PlaceSuitabilityResponse } from '@/types/insight'
 
 /**
- * 좌우 인셋 — `INSET_CLASS.rail` 을 참조한다. 문자열을 이 파일에 다시 적지 않는다 (#386).
+ * 좌우 인셋 — `INSET_CLASS.card` 를 참조한다. 문자열을 이 파일에 다시 적지 않는다 (#386).
  *
- * **오른쪽만 1024 이상에서 24 로 좁아진다.** 왼쪽은 끝까지 본문과 같은 40 이라, 그 아래
- * 한 컬럼일 때(이 패널이 레일이 아니라 본문의 한 블록일 때)도 제목·행과 같은 축에서
- * 시작한다 — 768 실렌더에서 제목이 40, 이 패널이 24 로 어긋나 있던 자리다.
+ * **이 패널은 L1 카드 안의 L2 다** (`DESIGN.md §0`, #443). 예전에는 레일 인셋(`rail`, 40/24)
+ * 이었는데 — 2a 에서 패널이 레일 열에 직접 놓였기 때문이다 — 3a 에서는 산책 위험도 · 하단
+ * 바와 함께 **판정 카드 하나**에 들어가므로 카드 안 값(16/20)을 쓴다. 페이지 인셋을 카드
+ * 안에서 쓰면 내용이 두 번 밀린다 (§0).
  */
-const INSET = INSET_CLASS.rail
+const INSET = INSET_CLASS.card
 
 export type PlaceSuitabilityPanelProps = {
   /** 조회 전이거나 실패면 null */

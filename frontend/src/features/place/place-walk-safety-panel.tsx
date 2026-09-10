@@ -24,10 +24,10 @@ import { cn } from '@/lib/utils/cn'
 import type { WalkSafetyResponse } from '@/types/insight'
 
 /**
- * 좌우 인셋 — `PlaceSuitabilityPanel` 과 **같은 `INSET_CLASS.rail` 을 참조한다** (#386).
- * 두 판정이 같은 레일에 위아래로 서므로 인셋이 갈리면 등급 줄이 서로 다른 축에서 시작한다.
+ * 좌우 인셋 — `PlaceSuitabilityPanel` 과 **같은 `INSET_CLASS.card` 를 참조한다** (#386 · #443).
+ * 두 판정이 같은 카드에 위아래로 서므로 인셋이 갈리면 등급 줄이 서로 다른 축에서 시작한다.
  */
-const INSET = INSET_CLASS.rail
+const INSET = INSET_CLASS.card
 
 export type PlaceWalkSafetyPanelProps = {
   /** 조회 전이거나 실패면 null */

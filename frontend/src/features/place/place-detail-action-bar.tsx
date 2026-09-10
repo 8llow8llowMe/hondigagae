@@ -3,6 +3,7 @@
 import { FormAlert } from '@/components/form-alert'
 import { BookmarkIcon } from '@/components/icons'
 import { messages } from '@/lib/messages'
+import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
 export type PlaceDetailActions = {
@@ -45,6 +46,11 @@ export type PlaceDetailActions = {
  * `DELETE /favorites/places/{placeId}` 는 장소 가시성을 보지 않아 정상 동작한다. 예전에
  * 저장해 둔 곳을 지울 길이 막히면 그게 더 나쁘다.
  *
+ * **두 자리에 서고 인셋이 갈린다** (#443). 데스크톱은 판정 카드의 끝(L1 안, `card` 16/20),
+ * 모바일은 뷰포트 바닥에 붙는 sticky 띠(`panel` 16)다. 담는 곳이 인셋을 정한다 (`inset.ts`).
+ * **배경도 sticky 갈래만 갖는다** — 카드 안 자식은 자기 배경을 갖지 않는다 (§0). sticky 띠는
+ * 본문 위를 지나가므로 불투명해야 하고, 그쪽 호출자가 `bg-bg` 를 `className` 으로 준다.
+ *
  * 표시 전용이라 node 환경에서 렌더 테스트가 된다 (`testing-guide.md` §1).
  */
 export function PlaceDetailActionBar({
@@ -57,15 +63,20 @@ export function PlaceDetailActionBar({
   onAddToPlan,
   onLogin,
   delisted,
+  inset = 'panel',
   className,
-}: PlaceDetailActions & { className?: string }) {
+}: PlaceDetailActions & {
+  /** 좌우 인셋 — 카드 안이면 `card`, sticky 띠면 `panel`(기본) */
+  inset?: Inset
+  className?: string
+}) {
   // 해제는 살려 둔다 — 잠기는 것은 **새로 저장하는 방향**뿐이다
   const saveBlocked = delisted && !saved
 
   return (
-    <div className={cn('border-border bg-bg border-t', className)}>
+    <div className={cn('border-border border-t', className)}>
       {saveError !== null && (
-        <div className="px-4 pt-3 lg:px-6">
+        <div className={cn('pt-3', INSET_CLASS[inset])}>
           <FormAlert message={saveError} />
         </div>
       )}
@@ -75,12 +86,12 @@ export function PlaceDetailActionBar({
         얻지 못하고, 토스트로 흘리면 눌러 본 사람만 본다.
       */}
       {delisted && (
-        <p className="text-body-2 text-fg-muted px-4 pt-3 lg:px-6">
+        <p className={cn('text-body-2 text-fg-muted pt-3', INSET_CLASS[inset])}>
           {messages.place.detailDelistedActionsBlocked}
         </p>
       )}
 
-      <div className="flex gap-2 px-4 py-3 lg:px-6">
+      <div className={cn('flex gap-2 py-3', INSET_CLASS[inset])}>
         {authed ? (
           /*
             아이콘 버튼이라 이름이 `aria-label` 에만 있다. **누른 상태를 `aria-pressed` 로
