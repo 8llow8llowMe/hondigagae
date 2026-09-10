@@ -10,7 +10,6 @@ import { useSelectedPetStore } from '@/features/nav/selected-pet-store'
 import { MAX_PET_COUNT } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
 import { describePet } from '@/lib/pet/describe'
-import { INSET_CLASS } from '@/lib/ui/inset'
 import { useOverlay } from '@/lib/ui/overlay'
 import { cn } from '@/lib/utils/cn'
 import type { Pet } from '@/types/pet'
@@ -101,7 +100,8 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
           'focus-visible:ring-brand-500 flex w-full items-center gap-4 py-8 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
-          INSET_CLASS.rail,
+          // 카드 안 인셋 (#428)
+          'px-4 md:px-5',
         )}
       >
         <PetAvatar size="hero" name={selected.name} />
@@ -208,7 +208,8 @@ function RegisterPrompt() {
       href="/pets/new"
       className={cn(
         'focus-visible:ring-brand-500 flex items-center gap-3 py-4 focus-visible:ring-2 focus-visible:outline-none',
-        INSET_CLASS.rail,
+        // 카드 안 인셋 (#428)
+        'px-4 md:px-5',
       )}
     >
       <span className="min-w-0 flex-1">

@@ -78,11 +78,21 @@ export function WalkTimesSection({
   const status = goldenWindowStatusOf(data)
 
   return (
+    /*
+      **위 테두리가 카드 테두리로 바뀌었다** (#428). 2a 에서는 이 섹션이 `border-t` 로
+      바로 위 판정과 이어져 "같은 이야기" 임을 말했는데, 3a 에서는 둘이 각자 카드다.
+      **인접이 그 관계를 계속 말한다** — 판정 카드 바로 아래에 붙어 있고 사이에 다른
+      섹션이 끼지 않는다 (`home-view.tsx` 의 좌측 레일 순서).
+
+      **특보 배지가 여기 없다** (#349). 페이지 최상단 `WeatherWarningStrip` 하나가
+      말한다 — 그래야 감싸던 flex 줄도 함께 사라진다.
+    */
     <section aria-label={messages.home.goldenHeading} className="border-border border-t">
-      <div className={cn('flex flex-col gap-3 py-4 md:py-5', INSET_CLASS.rail)}>
+      <div className="flex flex-col gap-3 px-4 py-4 md:px-5 md:py-5">
         {/*
-          **특보 배지가 여기 없다** (#349). 페이지 최상단 `WeatherWarningStrip` 하나가
-          말한다 — 그래야 감싸던 flex 줄도 함께 사라진다.
+          **카드가 아니라 카드 안의 블록이다** (#428). 판정과 같은 카드에 산다 — 갈라
+          놓으면 "지금 나가도 되나 → 그럼 언제 나가나" 가 같은 판정 규칙을 쓴다는 것이
+          안 읽힌다 (`walk-verdict.tsx` 머리주석).
         */}
         <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
           {messages.home.goldenHeading}
@@ -109,8 +119,6 @@ export function WalkTimesSection({
           {messages.home.goldenPavementNote}
         </p>
       </div>
-
-      <div aria-hidden className="bg-band h-2 w-full" />
     </section>
   )
 }
@@ -355,7 +363,7 @@ function HourlyCurve({ data }: { data: WalkTimesResponse }) {
               (DESIGN.md §4 — arbitrary value 금지), 8 은 스케일 안 값이다.
             */
             'flex overflow-x-auto',
-            INSET_BLEED_END_CLASS.rail,
+            INSET_BLEED_END_CLASS.card,
             // 스크롤바 자리는 fade 와 화살표가 대신한다 (`app/globals.css`)
             'scrollbar-none',
             rail.fadeClassName,

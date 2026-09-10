@@ -9,7 +9,6 @@ import { MetricValue, MetricWord } from '@/components/metric'
 import { formatCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
-import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { WalkSafetyResponse } from '@/types/insight'
 
@@ -74,6 +73,15 @@ export function WalkVerdict({
     .join(' · ')
 
   return (
+    /*
+      **카드가 되지 않는다** (#428). 3a 로 옮기면서 이 섹션을 `Surface` 로 올릴까 했는데,
+      그러면 위 머리주석이 막아 둔 것을 그대로 하게 된다 — 프로필과 갈라지면 **판정의
+      화자(누구 기준인가)가 사라진다.** 골든타임과 갈라지면 "지금 나가도 되나 → 그럼
+      언제" 가 같은 판정 규칙이라는 것이 안 읽힌다.
+
+      그래서 카드는 이 셋을 **함께 감싼다** (`home-view.tsx` 좌측 레일). 이 섹션은 그
+      카드 안의 한 블록으로 남고, 위 1px 선이 형제와 잇는 역할을 계속한다.
+    */
     <section
       aria-busy={busy || undefined}
       aria-label={messages.home.walkTodayLabel}
@@ -123,7 +131,8 @@ export function WalkVerdict({
       <div
         className={cn(
           'flex-col gap-3 pt-4 pb-4 md:flex md:py-5',
-          INSET_CLASS.rail,
+          // 카드 안이라 페이지 인셋(40)이 아니라 카드 인셋(20)이다 (#428)
+          'px-4 md:px-5',
           open ? 'flex' : 'hidden',
         )}
       >

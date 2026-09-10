@@ -172,25 +172,60 @@ export function Canvas({ children, className }: { children: ReactNode; className
  */
 export function Surface({
   title,
+  titleId,
+  description,
+  lead,
   trailing,
   children,
   className,
+  ...aria
 }: {
+  /**
+   * 제목 줄을 스스로 그리는 섹션이 쓴다 — 홈 판정은 라벨·등급어·체감온도가 한 줄이라
+   * `title` 슬롯(제목 + 부제 + 우측 액션)에 맞지 않는다.
+   * **`titleId` 와 함께 주지 않는다** — 접근성 이름이 둘이 된다.
+   */
+  'aria-label'?: string
+  'aria-busy'?: boolean | undefined
   /** 없으면 제목 줄 자체를 렌더하지 않는다 */
   title?: ReactNode
+  /**
+   * `h2` 의 id. 사용처가 `aria-labelledby` 로 이 섹션을 가리킬 때 준다.
+   *
+   * **`aria-label` 로 대신하지 않는다** — 제목이 화면에 이미 있는데 같은 문자열을
+   * 속성으로 또 적으면 두 곳이 갈린다.
+   */
+  titleId?: string
+  /** 제목 아래 한 줄. `h2` 밖이라 `p` 를 넣어도 마크업이 깨지지 않는다 */
+  description?: ReactNode
+  /** 제목을 크게 쓰는 주 섹션 (홈 "오늘 갈 만한 곳") */
+  lead?: boolean
   /** 제목 우측 액션 (예: "전체 보기") */
   trailing?: ReactNode
   children: ReactNode
   className?: string
 }) {
   return (
-    <section className={cn('bg-bg border-border border-y md:rounded-lg md:border', className)}>
+    <section
+      {...aria}
+      aria-labelledby={titleId}
+      className={cn('bg-bg border-border border-y md:rounded-lg md:border', className)}
+    >
       {title !== undefined && (
-        <div className="flex items-center justify-between gap-4 px-4 pt-5 pb-3 md:px-5">
-          <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
-            {title}
-          </h2>
-          {trailing}
+        <div className="flex items-start justify-between gap-4 px-4 pt-5 pb-3 md:px-5">
+          <div className="min-w-0">
+            <h2
+              id={titleId}
+              className={cn(
+                'text-title-2 text-fg font-semibold break-keep',
+                lead ? 'md:text-display md:font-extrabold' : 'md:text-title-1 md:font-bold',
+              )}
+            >
+              {title}
+            </h2>
+            {description !== undefined && <div className="mt-1">{description}</div>}
+          </div>
+          {trailing !== undefined && <div className="shrink-0">{trailing}</div>}
         </div>
       )}
       {children}
