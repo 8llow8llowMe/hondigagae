@@ -3,7 +3,16 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { Band, Canvas, Row, RowList, Section, Surface, SurfaceStack } from '@/components/surface'
+import {
+  Band,
+  Canvas,
+  Row,
+  RowList,
+  Section,
+  Surface,
+  SurfaceList,
+  SurfaceStack,
+} from '@/components/surface'
 
 /**
  * 표면 프리미티브 — 이슈 #422 · #428 · #435.
@@ -166,5 +175,71 @@ describe('L1 Surface — 섹션', () => {
     expect(render({ trailing: createElement('a', { href: '/places' }, '전체 보기') })).toContain(
       '전체 보기',
     )
+  })
+})
+
+describe('L2 SurfaceList — 카드 안 목록', () => {
+  function render(count = 3) {
+    return renderToStaticMarkup(
+      createElement(
+        SurfaceList,
+        null,
+        Array.from({ length: count }, (_, index) =>
+          createElement('li', { key: index }, `행 ${index}`),
+        ),
+      ),
+    )
+  }
+
+  it('구분선 규약을 항목이 아니라 목록이 갖는다', () => {
+    /*
+      2a 의 `Row` 는 `border-bottom` 을 행에 걸고 마지막 행이 `last` 로 껐다 — 그래서
+      **행 수를 아는 호출자만 목록을 그릴 수 있었고**, 홈에서 규약이 세 갈래로 갈렸다.
+
+      **임의 variant 는 마크업에서 이스케이프된 형태로 나온다.** React 가 속성값의
+      `&` 와 `>` 를 실체참조로 바꾸므로 `[&>li+li]:` 가 `[&amp;&gt;li+li]:` 가 된다 —
+      소스에 적은 문자열로 단언하면 통과하지 않는다 (여기서 실제로 걸렸다).
+    */
+    const classes = classesOf(render())
+
+    expect(classes).toContain('[&amp;&gt;li+li]:border-t')
+    expect(classes).toContain('[&amp;&gt;li+li]:border-border')
+  })
+
+  it('첫 항목 위에는 선을 긋지 않는다 — 제목 아래 선은 카드의 몫이다', () => {
+    /*
+      `li+li` 는 인접 형제 결합자라 첫 항목에 걸리지 않는다. 무조건부 `border-t` 를
+      쓰면 제목이 없는 카드에서 허공에 선이 뜬다.
+    */
+    const classes = classesOf(render())
+
+    expect(classes.filter((name) => name === 'border-t')).toEqual([])
+  })
+
+  it('ul 로 내보낸다 — 스크린리더가 개수를 읽어야 한다', () => {
+    expect(render()).toContain('<ul')
+  })
+
+  it('좌우 인셋을 갖지 않는다 — 항목마다 세로 여백이 달라 항목이 정한다', () => {
+    const classes = classesOf(render())
+
+    expect(classes.filter((name) => /(^|:)(px|py|p|gap)-/.test(name))).toEqual([])
+  })
+
+  it('바닥을 칠하지 않는다 — 면은 Surface 가 소유한다 (§0)', () => {
+    const classes = classesOf(render())
+
+    expect(classes.filter((name) => name.startsWith('bg-'))).toEqual([])
+  })
+
+  it('aria-busy 를 전달한다 — 재조회 중 목록을 흐리게만 두는 갈래가 쓴다', () => {
+    expect(
+      renderToStaticMarkup(
+        createElement(SurfaceList, {
+          'aria-busy': true,
+          children: createElement('li', null, '행'),
+        }),
+      ),
+    ).toContain('aria-busy="true"')
   })
 })
