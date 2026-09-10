@@ -125,6 +125,8 @@ export const placeMessages = {
   // ── 장소 상세 · 적합도 패널 (아트보드 `혼디가개 장소 상세` 01·03·04) ──────────
 
   detailSectionSuitability: '적합도',
+  /** 판정 카드(적합도 + 산책 위험도 + 담기)의 접근성 이름 — 두 패널이 제목 줄을 스스로 그려 `title` 슬롯이 없다 (#443) */
+  detailVerdictCardLabel: '적합도와 산책 위험도',
 
   /**
    * 화자를 반려견으로 고정한다 — `{name}` 을 반려견 이름으로 치환한다.

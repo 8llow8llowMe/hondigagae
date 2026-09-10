@@ -13,6 +13,8 @@ import { PhotoViewer, type ViewerImage } from '@/features/place/photo-viewer'
 import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { placeIllustration } from '@/lib/place/illustration'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { PlaceImage } from '@/types/place'
 
 /**
@@ -91,8 +93,14 @@ export function PhotoGallery({
       <MobileCarousel images={usable} title={title} onOpen={setViewerIndex} />
       <DesktopStrip images={usable} title={title} onOpen={setViewerIndex} />
 
-      {/* 사진 출처는 갤러리 바로 아래. 정보 출처는 본문 끝 — 각각 자기 자료 옆에서 읽힌다 */}
-      <p className="text-caption text-fg-muted px-4 md:px-10">{messages.place.photoSource}</p>
+      {/*
+        사진 출처는 갤러리 바로 아래. 정보 출처는 본문 끝 — 각각 자기 자료 옆에서 읽힌다.
+        인셋은 제목 줄과 같은 카드 값이다 — 갤러리는 L0 위의 전폭 미디어라 카드 가장자리에
+        맞추고(`SurfaceStack` 의 24), 글줄은 카드 안 글줄과 같은 축에 선다 (#443).
+      */}
+      <p className={cn('text-caption text-fg-muted', INSET_CLASS.card)}>
+        {messages.place.photoSource}
+      </p>
 
       <PhotoViewer
         images={viewerImages}
@@ -131,7 +139,7 @@ function IllustrationTile({ src }: { src: string }) {
         </div>
       </div>
 
-      <div className="hidden px-4 md:block md:px-10">
+      <div className="hidden md:block">
         <div
           className="bg-band relative overflow-hidden rounded-md"
           style={{
@@ -354,7 +362,7 @@ function DesktopStrip({
   const firstHidden = 1 + thumbs.length
 
   return (
-    <div className="hidden px-4 md:block md:px-10">
+    <div className="hidden md:block">
       <div
         className="grid gap-2"
         style={{
