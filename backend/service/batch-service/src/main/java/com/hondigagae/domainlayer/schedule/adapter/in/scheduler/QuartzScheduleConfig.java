@@ -48,6 +48,7 @@ public class QuartzScheduleConfig {
 
     private static final String PLACE_PIPELINE_JOB_NAME = "placeDataPipelineJob";
     private static final String CONGESTION_JOB_NAME = "congestionImportJob";
+    private static final String OLLE_JOB_NAME = "olleCourseImportJob";
 
     /**
      * 두 스케줄이 공유하는 겹침 금지 목록 — place 마스터를 건드리는 잡 전부다.
@@ -88,6 +89,25 @@ public class QuartzScheduleConfig {
         @Qualifier("congestionImportJobDetail") JobDetail congestionImportJobDetail
     ) {
         return newCronTrigger(congestionImportJobDetail, batchScheduleProperties.congestionCron(), batchScheduleProperties.timeZone());
+    }
+
+    /**
+     * 올레는 place 를 건드리지 않는다. 겹침 가드는 자기 자신만 본다.
+     *
+     * <p>파이프라인과 시각이 겹쳐도 Quartz 스레드가 1개라 자연히 뒤에 선다. 장소 반쯤
+     * 들어온 상태가 올레 적재를 더럽히지 않으므로 place 잡 목록에 넣지 않는다.
+     */
+    @Bean
+    public JobDetail olleCourseImportJobDetail() {
+        return newJobDetail(OLLE_JOB_NAME, OLLE_JOB_NAME);
+    }
+
+    @Bean
+    public Trigger olleCourseImportTrigger(
+        BatchScheduleProperties batchScheduleProperties,
+        @Qualifier("olleCourseImportJobDetail") JobDetail olleCourseImportJobDetail
+    ) {
+        return newCronTrigger(olleCourseImportJobDetail, batchScheduleProperties.olleCron(), batchScheduleProperties.timeZone());
     }
 
     /**

@@ -15,7 +15,7 @@
 | `placeMergeJob` | (DB) | 적재 뒤 1회 | 원천이 다른 같은 장소를 `merged_into_id` 로 묶는다 (#363) |
 | `placeImageBackfillJob` | TourAPI 키워드 검색 | 적재 뒤 1회 | 이미지 없는 문화정보원·식약처 장소에 대표 이미지를 빌려 채운다 |
 | `congestionImportJob` | 관광지 집중률 방문자 추이 예측 API | 일 1회 | 30일 rolling. **주기가 달라 파이프라인에 넣지 않는다** |
-| `olleCourseImportJob` | 제주올레 공공 CSV + TourAPI 좌표 | 수동 | 산책 코스 마스터 (#383). 장소 파이프라인과 별개다 |
+| `olleCourseImportJob` | 제주올레 공공 CSV + TourAPI 좌표 | 주 1회 + 수동 | 산책 코스 마스터 (#383). 포털에서 내려받고 갱신됐을 때만 적재 (#441). 장소 파이프라인과 별개다 |
 
 ## 스케줄 (#378)
 
@@ -27,6 +27,7 @@
 | 무엇 | 언제 |
 | --- | --- |
 | `placeDataPipelineJob` | 월 03:00 KST (`0 0 3 ? * MON`) |
+| `olleCourseImportJob` | 월 05:00 KST (`0 0 5 ? * MON`) |
 | `congestionImportJob` | 매일 06:00 KST (`0 0 6 * * ?`) |
 
 - **스위치**: `batch.schedule.enabled` (`BATCH_SCHEDULE_ENABLED`). dev 기본 true, local·CI·prod 기본 false.
@@ -44,11 +45,12 @@
   (JobKey 가 달라 `@DisallowConcurrentExecution` 만으로는 안 막힌다). 그리고 **데몬 스레드**다 —
   `SchedulerFactoryBean` 은 auto-startup 과 무관하게 스레드를 만들므로, non-daemon 이면
   `--spring.main.web-application-type=none` 수동 실행 JVM 이 잡을 끝내고도 죽지 않는다.
-- **실행 중 가드**: 겹치면 안 되는 잡이 돌고 있으면 이번 주기를 건너뛴다. 두 스케줄 모두 place 를
-  건드리는 잡 7개 전부(파이프라인·자식 다섯·혼잡도)를 본다 — 자식 잡 하나만 단독으로 수동 실행
-  중이어도 장소가 반쯤 들어온 상태라 혼잡도가 UNMATCHED 를 대량으로 남기기 때문이다. 판정 근거는
-  Quartz 가 아니라 **배치 메타데이터**다 — 수동 JVM 의 실행은 Quartz 가 모른다. 단 6시간을 넘긴
-  STARTED 는 죽은 JVM 의 잔재로 보고 무시한다. 방치된 행 하나에 스케줄이 영원히 막히는 쪽이 더 나쁘다.
+- **실행 중 가드**: 겹치면 안 되는 잡이 돌고 있으면 이번 주기를 건너뛴다. 장소 파이프라인과 혼잡도는
+  place 를 건드리는 잡 7개 전부(파이프라인·자식 다섯·혼잡도)를 본다 — 자식 잡 하나만 단독으로 수동
+  실행 중이어도 장소가 반쯤 들어온 상태라 혼잡도가 UNMATCHED 를 대량으로 남기기 때문이다. 올레는
+  `walk_course` 만 건드리므로 자기 자신만 본다. 판정 근거는 Quartz 가 아니라 **배치 메타데이터**다 —
+  수동 JVM 의 실행은 Quartz 가 모른다. 단 6시간을 넘긴 STARTED 는 죽은 JVM 의 잔재로 보고 무시한다.
+  방치된 행 하나에 스케줄이 영원히 막히는 쪽이 더 나쁘다.
 - **수동 실행과의 관계**: 겹쳐도 스케줄 쪽이 양보한다(`schedule fire skipped ...` WARN). 반대는
   막지 않으므로 수동 실행은 스케줄 창을 피하는 편이 낫다. 수동 실행 명령은
   `jenkins-cicd-dev-deploy-guide.md` §8.
@@ -112,8 +114,11 @@
 TourAPI 에만 있는 항목(하영올레 등)은 코스가 되지 않고, TourAPI 에 없는 코스(20·18-2)는
 좌표 null 로 적재된다. 매칭 키(코스번호+A/B 변형)의 단일 출처는 `OlleCourseParser` 다.
 
-- CSV 를 받아 `OLLE_COURSE_CSV_PATH`(기본 `data/olle_course.csv`)에 둔다. **원본이 CP949 라도
-  어댑터가 판별해 읽는다** — UTF-8 엄격 디코딩 실패 시 MS949 로 되읽는다
+- **기본은 포털에서 직접 내려받는다** (#441). `atchFileId` 와 바이트 수가 직전과 같으면
+  받지도 적재하지도 않는다. `forceImport=true` 면 같은 파일도 다시 적재한다
+- 포털이 막히면 `OLLE_COURSE_CSV_PATH`(기본 `data/olle_course.csv`) 우회 파일로 물러난다.
+  **원본이 CP949 라도 어댑터가 판별해 읽는다** — UTF-8 엄격 디코딩 실패 시 MS949 로 되읽는다
+- 우회 적재는 스냅샷을 남기지 않는다. 남기면 다음 실행이 포털을 보지 않고 건너뛴다
 - `walk_course` 스키마 원천은 tour-service 의 `WalkCourseEntity` 다 — 로컬에서는 tour-service 를
   먼저 한 번 기동해 테이블을 만든다 (place 와 같은 소유 구조)
 - id 는 코스키에서 결정적으로 나와(`OlleCourseParser.walkCourseId`) 재실행이 멱등하다.

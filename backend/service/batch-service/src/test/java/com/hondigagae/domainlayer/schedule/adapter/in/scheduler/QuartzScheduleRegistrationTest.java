@@ -53,14 +53,16 @@ class QuartzScheduleRegistrationTest {
             "spring.quartz.properties.org.quartz.scheduler.makeSchedulerThreadDaemon=true");
 
     @Test
-    @DisplayName("메모리 스토어 스케줄러에 두 잡과 트리거가 등록된다")
+    @DisplayName("메모리 스토어 스케줄러에 세 잡과 트리거가 등록된다")
     void registersBothJobsInMemoryStore() {
         contextRunner.run(context -> {
             Scheduler scheduler = context.getBean(Scheduler.class);
             assertThat(scheduler.checkExists(JobKey.jobKey("placeDataPipelineJob"))).isTrue();
             assertThat(scheduler.checkExists(JobKey.jobKey("congestionImportJob"))).isTrue();
+            assertThat(scheduler.checkExists(JobKey.jobKey("olleCourseImportJob"))).isTrue();
             assertThat(scheduler.checkExists(TriggerKey.triggerKey("placeDataPipelineJobTrigger"))).isTrue();
             assertThat(scheduler.checkExists(TriggerKey.triggerKey("congestionImportJobTrigger"))).isTrue();
+            assertThat(scheduler.checkExists(TriggerKey.triggerKey("olleCourseImportJobTrigger"))).isTrue();
         });
     }
 
@@ -110,6 +112,23 @@ class QuartzScheduleRegistrationTest {
             ZonedDateTime nextFire = trigger.getNextFireTime().toInstant().atZone(SEOUL);
             assertThat(nextFire.getHour()).isEqualTo(6);
             assertThat(nextFire.getMinute()).isZero();
+        });
+    }
+
+    @Test
+    @DisplayName("올레는 Asia/Seoul 월요일 05:00 에 발화하고 겹침 가드는 자기 자신만 본다")
+    void olleFiresMondayAtFiveAndBlocksOnlyItself() {
+        contextRunner.run(context -> {
+            Scheduler scheduler = context.getBean(Scheduler.class);
+            Trigger trigger = scheduler.getTrigger(TriggerKey.triggerKey("olleCourseImportJobTrigger"));
+            ZonedDateTime nextFire = trigger.getNextFireTime().toInstant().atZone(SEOUL);
+            assertThat(nextFire.getDayOfWeek()).isEqualTo(DayOfWeek.MONDAY);
+            assertThat(nextFire.getHour()).isEqualTo(5);
+            assertThat(nextFire.getMinute()).isZero();
+
+            var jobDataMap = scheduler.getJobDetail(JobKey.jobKey("olleCourseImportJob")).getJobDataMap();
+            assertThat(jobDataMap.getString(SpringBatchLaunchQuartzJob.JOB_NAME_KEY)).isEqualTo("olleCourseImportJob");
+            assertThat(jobDataMap.getString(SpringBatchLaunchQuartzJob.BLOCKED_BY_KEY)).isEqualTo("olleCourseImportJob");
         });
     }
 

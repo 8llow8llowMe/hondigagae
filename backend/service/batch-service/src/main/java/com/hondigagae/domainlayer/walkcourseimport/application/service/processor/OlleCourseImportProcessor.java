@@ -5,6 +5,7 @@ import com.hondigagae.domainlayer.walkcourseimport.application.port.out.OlleCour
 import com.hondigagae.domainlayer.walkcourseimport.application.port.out.WalkCourseBulkPort;
 import com.hondigagae.domainlayer.walkcourseimport.application.port.out.query.OlleCourseCoordinateQueryResult;
 import com.hondigagae.domainlayer.walkcourseimport.domain.model.ImportedWalkCourse;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -28,8 +29,8 @@ public class OlleCourseImportProcessor {
     private final OlleCourseCoordinatePort olleCourseCoordinatePort;
     private final WalkCourseBulkPort walkCourseBulkPort;
 
-    public int importCourses() {
-        List<ImportedWalkCourse> courses = olleCourseCatalogPort.loadCourses();
+    public List<ImportedWalkCourse> importCourses(Path csvFile) {
+        List<ImportedWalkCourse> courses = olleCourseCatalogPort.loadCourses(csvFile);
         Map<String, OlleCourseCoordinateQueryResult> coordinates =
             olleCourseCoordinatePort.fetchCoordinatesByCourseKey();
 
@@ -49,7 +50,7 @@ public class OlleCourseImportProcessor {
         int upserted = walkCourseBulkPort.upsertAll(merged);
         log.info("olle course import finished. courses={}, coordinateMatched={}, upserted={}",
             merged.size(), merged.size() - unmatched, upserted);
-        return upserted;
+        return merged;
     }
 
     private ImportedWalkCourse merge(ImportedWalkCourse course, OlleCourseCoordinateQueryResult coordinate) {
