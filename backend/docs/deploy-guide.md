@@ -107,7 +107,7 @@ docker exec -i vault vault kv put -mount="kv" hondigagae/backend/dev/env \
 | `JWT_ACCESS_KEY` / `JWT_REFRESH_KEY` | 기동 실패 | 자체 생성 (HS512, 64바이트 이상) |
 | `JASYPT_ENCRYPTOR_KEY` | 파이프라인 빌드 단계에서 중단 | 자체 생성 |
 | `OAUTH_KAKAO_*` | 카카오 로그인 불가 | 카카오 개발자센터 |
-| `BATCH_DATA_DIR` | compose 해석 실패로 배포 중단 | 배포 **호스트** 경로 (agent 컨테이너 안 경로가 아니다) |
+| `BATCH_DATA_DIR` | compose 해석 실패로 배포 중단 | 배포 **호스트** 경로 (agent 컨테이너 안 경로가 아니다). 안의 CSV 는 포털 실패 시 우회용이라 비어 있어도 기동·적재가 된다 (#379) |
 | `DB_*`, `*_DB_URL`, `REDIS_*` | 기동 실패 | 인프라 — 아래 "DB 스키마 준비" 절 |
 | `MINIO_*` | 프로필 이미지 업로드 실패 | storage(192.168.0.12) MinIO 에 `hondigagae` 버킷 생성 |
 
@@ -136,6 +136,20 @@ BossPickSeoul 규칙 `{project}_{service}_{env}` 그대로다.
 
 dev 는 `ddl-auto: update` 라 테이블은 첫 기동 때 애플리케이션이 만든다. 사람이 미리 만드는 것은
 스키마와 계정뿐이다. prod 는 `ddl-auto: none` 이므로 별도 마이그레이션 런북이 필요하다.
+
+### batch 스냅샷 테이블 (`import_source_snapshot`, #379)
+
+batch-service 는 JPA 를 쓰지 않아 이 테이블만 `spring.sql.init` 이 만든다. local·dev·test 는
+기동 시 자동이고 **prod 는 `mode: never` 라 사람이 적용한다.** 없으면 컨테이너는 뜨고
+`cultureFacilityImportJob` 만 실패한다.
+
+DDL 의 정본은 하나다 — 아래 파일을 그대로 실행한다(사본을 만들지 않는다).
+
+```bash
+docker exec -i mysql mysql -uroot -p hondigagae_tour < backend/service/batch-service/src/main/resources/db/import-source-snapshot-mysql.sql
+```
+
+`CREATE TABLE IF NOT EXISTS` 라 여러 번 실행해도 안전하다.
 
 **스키마명은 Vault 의 `*_DB_URL` 과 한 글자도 다르면 안 된다.** 없으면 서비스가 기동 시
 `Unknown database 'hondigagae_tour'` 로 죽는다 — JPA 는 테이블은 만들지만 데이터베이스는 만들지 않는다.
@@ -211,7 +225,8 @@ curl -s "http://{host}:7000/api/v1/emergencies/facilities?lat=33.4996&lng=126.53
 | 게이트웨이 503 | 대상 서비스 미기동 또는 Eureka 등록 전 | Eureka 앱 목록 먼저 확인 |
 | 게이트웨이가 엉뚱한 서비스로 보냄 | `*_APP_NAME` 이 등록명과 불일치 | Eureka UI 의 등록명과 대조 |
 | 배포 단계에서 `.env.runtime` key missing | Vault secret 에 키 누락 | `.env.example` 과 대조 |
-| batch 컨테이너가 안 뜸 | `BATCH_DATA_DIR` 미설정 | 배포 호스트에 디렉터리를 만들고 Vault 에 경로 기입 |
+| batch 컨테이너가 안 뜸 | `BATCH_DATA_DIR` 미설정 | 배포 호스트에 디렉터리를 만들고 Vault 에 경로 기입 (디렉터리만 있으면 되고 CSV 는 없어도 된다) |
+| prod 문화시설 적재가 `Table 'import_source_snapshot' doesn't exist` | prod 는 `spring.sql.init.mode=never` | 아래 "batch 스냅샷 테이블" 런북 실행 |
 | 기동 직후 `Unknown database 'hondigagae_…'` | Vault `*_DB_URL` 의 스키마가 MySQL 에 없음 (JPA 는 DB 를 만들지 않는다) | `backend/scripts/mysql/init-dev-schemas.sql` 실행. 스키마명과 URL 을 한 글자까지 맞춘다 |
 | 장소 조회 0건 | 배치 미실행 | `data-refresh-guide.md` 4절 |
 | Gradle 데몬 죽음 (`EXCEPTION_ACCESS_VIOLATION`) | 데몬 힙 부족 | `gradle.properties` 의 `-Xmx2g` 유지, `./gradlew --stop` 후 재시도 |

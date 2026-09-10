@@ -1,9 +1,14 @@
 package com.hondigagae.domainlayer.placeimport.application.service.processor;
 
+import com.hondigagae.domainlayer.placeimport.application.model.CultureFacilityImportOutcome;
 import com.hondigagae.domainlayer.placeimport.application.port.out.CultureFacilityCatalogPort;
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceBulkPort;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedCultureFacility;
+import java.nio.file.Path;
+import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,11 +27,11 @@ public class CultureFacilityImportProcessor {
     private final CultureFacilityCatalogPort cultureFacilityCatalogPort;
     private final PlaceBulkPort placeBulkPort;
 
-    public int importFacilities(String sido) {
-        List<ImportedCultureFacility> facilities = cultureFacilityCatalogPort.readTravelFacilities(sido);
+    public CultureFacilityImportOutcome importFacilities(Path csvFile, String sido) {
+        List<ImportedCultureFacility> facilities = cultureFacilityCatalogPort.readTravelFacilities(csvFile, sido);
         if (facilities.isEmpty()) {
             log.warn("culture facility import found nothing sido={}", sido);
-            return 0;
+            return new CultureFacilityImportOutcome(0, null);
         }
 
         placeBulkPort.upsertCultureFacilities(facilities);
@@ -39,6 +44,18 @@ public class CultureFacilityImportProcessor {
         long open24 = facilities.stream().filter(ImportedCultureFacility::open24).count();
         log.info("culture facility import done sido={} upserted={} withUseTime={} withWeeklyHoursSpec={} open24={}",
             sido, facilities.size(), withUseTime, withWeeklyHoursSpec, open24);
-        return facilities.size();
+        return new CultureFacilityImportOutcome(facilities.size(), maxSourceModifiedAt(facilities));
+    }
+
+    /**
+     * 적재한 행의 최종작성일 최대값. 원천 스냅샷에 남겨 파일 갱신 여부의 보조 근거로 쓴다 (#379).
+     * 형식이 어긋난 행은 파서가 null 로 흘리므로 값이 하나도 없을 수 있다.
+     */
+    private LocalDateTime maxSourceModifiedAt(List<ImportedCultureFacility> facilities) {
+        return facilities.stream()
+            .map(ImportedCultureFacility::sourceModifiedAt)
+            .filter(Objects::nonNull)
+            .max(Comparator.naturalOrder())
+            .orElse(null);
     }
 }

@@ -12,7 +12,6 @@ import com.hondigagae.domainlayer.placeimport.domain.model.OperatingHoursParser;
 import com.hondigagae.domainlayer.placeimport.domain.model.PetFieldParser;
 import com.hondigagae.domainlayer.placeimport.domain.model.PlaceIdFactory;
 import com.hondigagae.shared.travel.schedule.WeeklySchedule;
-import com.hondigagae.global.properties.CultureFacilityProperties;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -26,7 +25,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -40,10 +38,12 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>CSV 파싱</b>: 값 안에 콤마가 들어간 따옴표 필드가 있어 단순 split 으로는 컬럼이 밀린다.
  * 외부 라이브러리를 더하지 않고 따옴표 상태만 추적하는 최소 파서를 둔다.
+ *
+ * <p><b>파일 경로는 인자로 받는다</b> (#379). 포털에서 갓 받은 임시 파일일 수도, 포털이 막혔을 때의
+ * 로컬 우회 파일일 수도 있다. 이 어댑터는 어느 쪽인지 모르고 알 필요도 없다.
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
 
     private static final char DELIMITER = ',';
@@ -79,14 +79,9 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
     private static final List<String> REQUIRED_COLUMNS = List.of(
         COL_NAME, COL_CATEGORY3, COL_SIDO, COL_LAT, COL_LNG, COL_PET_AVAILABLE);
 
-    private final CultureFacilityProperties properties;
-
     @Override
-    public List<ImportedCultureFacility> readTravelFacilities(String sido) {
-        Path path = Path.of(properties.filePath());
-        if (!Files.exists(path)) {
-            throw new PlaceImportException(PlaceImportErrorCode.CULTURE_CSV_NOT_FOUND, path.toString());
-        }
+    public List<ImportedCultureFacility> readTravelFacilities(Path csvFile, String sido) {
+        Path path = requireExisting(csvFile);
 
         List<ImportedCultureFacility> facilities = new ArrayList<>();
         int skippedNonTravel = 0;
@@ -124,11 +119,8 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
     }
 
     @Override
-    public List<ImportedEmergencyFacility> readEmergencyFacilities(String sido) {
-        Path path = Path.of(properties.filePath());
-        if (!Files.exists(path)) {
-            throw new PlaceImportException(PlaceImportErrorCode.CULTURE_CSV_NOT_FOUND, path.toString());
-        }
+    public List<ImportedEmergencyFacility> readEmergencyFacilities(Path csvFile, String sido) {
+        Path path = requireExisting(csvFile);
 
         List<ImportedEmergencyFacility> facilities = new ArrayList<>();
         int skippedNoCoordinate = 0;
@@ -313,6 +305,15 @@ public class CultureFacilityCsvAdapter implements CultureFacilityCatalogPort {
             .admissionFee(value(values, header, COL_ADMISSION_FEE))
             .sourceModifiedAt(toDateTime(value(values, header, COL_MODIFIED)))
             .build();
+    }
+
+    /** 경로가 비었거나 파일이 없으면 적재를 시작하기 전에 실패시킨다. */
+    private Path requireExisting(Path csvFile) {
+        if (csvFile == null || !Files.exists(csvFile)) {
+            throw new PlaceImportException(
+                PlaceImportErrorCode.CULTURE_CSV_NOT_FOUND, csvFile == null ? "경로 없음" : csvFile.toString());
+        }
+        return csvFile;
     }
 
     private String value(List<String> values, Map<String, Integer> header, String column) {

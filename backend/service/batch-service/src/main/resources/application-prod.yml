@@ -2,8 +2,8 @@
 # prod 프로파일
 #
 # dev 와 같은 구조를 유지하고, 운영에서 위험한 항목만 다르게 둔다.
-#   - batch.jdbc.initialize-schema: never — 운영 스키마(BATCH_* 메타 테이블 포함)는
-#     애플리케이션이 만들지 않는다. 스키마는 사람이 런북으로 적용한다.
+#   - batch.jdbc.initialize-schema: never / sql.init.mode: never — 운영 스키마(BATCH_* 메타 테이블,
+#     import_source_snapshot 포함)는 애플리케이션이 만들지 않는다. 스키마는 사람이 런북으로 적용한다.
 #
 # 값은 dev 와 동일한 env 키를 쓰되 Vault prod secret(kv/hondigagae/backend/prod/env)에서 주입된다.
 # ============================================================================
@@ -23,6 +23,11 @@ spring:
   batch:
     jdbc:
       initialize-schema: never
+  # import_source_snapshot 도 마찬가지다 (#379). DDL 은 런북으로 사람이 적용한다 —
+  # resources/db/import-source-snapshot-mysql.sql 이 그 정본이다 (deploy-guide.md "DB 스키마 준비").
+  sql:
+    init:
+      mode: never
 
 tour-api:
   service-key: ${TOUR_API_SERVICE_KEY}

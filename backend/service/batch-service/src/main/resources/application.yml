@@ -10,6 +10,13 @@ spring:
       # 기동 시 잡 자동 실행 금지 — 잡 이름을 지정한 수동 실행만 허용한다.
       # 예) --spring.batch.job.enabled=true --spring.batch.job.name=placeImportJob areaCode=39
       enabled: false
+  # 적재 스냅샷 테이블(import_source_snapshot, #379). Spring Batch 메타 테이블과 같은 정책이다 —
+  # local·dev·test 는 애플리케이션이 만들고(always), prod 는 사람이 런북으로 적용한다(never).
+  # 기본을 never 로 두는 이유: 새 프로파일이 생겼을 때 조용히 DDL 을 도는 쪽이 더 위험하다.
+  sql:
+    init:
+      mode: never
+      schema-locations: classpath:db/import-source-snapshot-mysql.sql
   # 프로세스 안 Quartz (#378). 주기 실행 트리거는 QuartzScheduleConfig 가 코드로 들고 있다.
   quartz:
     # 인스턴스가 하나고 트리거 정의가 코드에 있어 영속할 상태가 없다.
@@ -103,6 +110,15 @@ resilience4j:
         minimum-number-of-calls: 3
         # 수 MB xlsx 를 받는 경로라 느린 호출 기준을 완화한다.
         slow-call-duration-threshold: 30s
+      # 공공데이터포털 파일 서버(#379). 상세 페이지 + 30MB CSV 다운로드 둘을 함께 센다.
+      # 잡당 두 번뿐이라 mfds 와 같은 이유로 창을 좁게 잡는다.
+      datagokr:
+        base-config: default
+        sliding-window-size: 5
+        minimum-number-of-calls: 3
+        # 30MB 스트리밍이 정상적으로 수십 초 걸린다. 10s 기준이면 성공한 호출이 느린 호출로 집계돼
+        # 서킷이 열리고, 그러면 매번 로컬 우회로 물러나 자동 갱신이 사실상 꺼진다.
+        slow-call-duration-threshold: 60s
 
 logging:
   level:
@@ -111,8 +127,25 @@ logging:
 
 # 문화정보원 반려동물 동반 가능 문화시설 CSV.
 # 공공데이터포털 파일데이터라 활용신청도 인증키도 필요 없다 (data.go.kr/data/15111389).
+#
+# 배치가 포털에서 직접 내려받는 것이 기본이다 (#379). 상세 페이지의 JSON-LD 에 파일 주소가 있고,
+# atchFileId 와 바이트 수가 직전 적재와 같으면 30MB 를 받지도 적재하지도 않는다.
 culture-facility:
+  # 포털 실패 시 우회용 파일. 컨테이너에서는 /app/data 가 읽기 전용이라 여기에 쓸 수 없다.
   file-path: ${CULTURE_FACILITY_CSV_PATH:data/pet_culture.csv}
+  # 끄면 종전처럼 위 파일만 읽는다. 빈 문자열(compose 의 ${VAR:-})은 래퍼 타입 Boolean 에 null 로
+  # 떨어지고 CultureFacilityProperties 가 기본값 true 로 접는다(CultureFacilityPropertiesTest).
+  # compose 쪽에도 :-true 를 두는 것은 "켠 것이 의도"임을 배포 파일에서도 읽히게 하려는 것이다.
+  download-enabled: ${CULTURE_FACILITY_DOWNLOAD_ENABLED:true}
+  base-url: ${CULTURE_FACILITY_BASE_URL:https://www.data.go.kr}
+  dataset-id: ${CULTURE_FACILITY_DATASET_ID:15111389}
+  # 비면 JVM 임시 디렉터리(java.io.tmpdir). 30MB 를 쓸 수 있는 곳이어야 한다.
+  download-dir: ${CULTURE_FACILITY_DOWNLOAD_DIR:}
+  # 단계(페이지 읽기·헤더 수신·본문 전송)별 상한이라 실질 상한은 이 값의 배수다.
+  # connect 타임아웃은 openApiWebClient 가 공통으로 잡는다 (WebClientConfig).
+  read-timeout-ms: ${CULTURE_FACILITY_READ_TIMEOUT_MS:120000}
+  # 이보다 작으면 CSV 가 아니라 오류·점검 페이지로 본다 (실측 원본은 약 30MB).
+  min-content-length: ${CULTURE_FACILITY_MIN_CONTENT_LENGTH:1048576}
 
 # 제주올레 코스현황 CSV.
 # 공공데이터포털 파일데이터라 활용신청도 인증키도 필요 없다 (data.go.kr/data/15043496).
