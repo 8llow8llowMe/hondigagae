@@ -130,16 +130,42 @@ export function RowList({ children, className }: { children: ReactNode; classNam
  * **대비를 더 벌리지 않는다.** #FFFFFF ↔ #F5F6F8 은 의도적으로 미묘하다. 여기서 회색을
  * 더 어둡게 하면 §1 의 "계측면처럼 중립적인 표면" 이 깨지고 2a 가 경계하던 대시보드가 된다.
  *
- * **모바일은 좌우 여백이 없다.** `Surface` 가 전폭으로 내려앉기 때문이다. 세로 간격만
- * `gap-2`(8) 로 두는데, 이 8px 이 바닥을 통해 보이는 것이 **2a 의 `Band` 와 같은 값**이다 —
- * 모바일에서 3a 는 밴드를 지우는 것이 아니라 칠하는 대신 비추는 쪽으로 바꾼다.
+ * **바닥만 칠하고 배치는 하지 않는다.** 전폭이어야 하기 때문이다 — 콘텐츠 컨테이너
+ * (`.rail-layout`, 최대 1440)에 걸면 그 바깥이 흰색으로 남는다. 카드를 쌓는 일은
+ * `SurfaceStack` 이 맡는다.
  */
-export function Canvas({ children, className }: { children: ReactNode; className?: string }) {
+export function Canvas({
+  as: Tag = 'div',
+  id,
+  children,
+  className,
+}: {
+  /** 페이지 바닥이면 `main` 이다 — 바닥을 그리려고 래퍼를 하나 더 두지 않는다 */
+  as?: 'div' | 'main'
+  id?: string
+  children: ReactNode
+  className?: string
+}) {
   return (
-    <div className={cn('bg-bg-sunken flex flex-col gap-2 md:gap-6 md:p-6', className)}>
+    <Tag id={id} className={cn('bg-bg-sunken', className)}>
       {children}
-    </div>
+    </Tag>
   )
+}
+
+/**
+ * **L0 위에 카드를 쌓는 열.** `Canvas` 와 갈라 둔 이유가 있다.
+ *
+ * 바닥은 **전폭**이어야 하고 쌓기는 **콘텐츠 폭 안**이어야 한다. 둘을 한 컴포넌트로
+ * 두면 바닥이 콘텐츠 컨테이너를 따라가, 1440 컨테이너 바깥(1800 에서 좌우 177px)이
+ * 흰색으로 남는다 — 실측으로 드러난 문제다. `Canvas` 는 `main` 에 걸어 화면 끝까지
+ * 칠하고, 이 컴포넌트가 열 안에서 간격만 맡는다.
+ *
+ * 모바일은 좌우 여백이 없다 — `Surface` 가 전폭으로 내려앉기 때문이다. 세로 간격
+ * `gap-2`(8)로 바닥이 비치는데, 이 값이 **2a 의 `Band` 와 같다.**
+ */
+export function SurfaceStack({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn('flex flex-col gap-2 md:gap-6 md:p-6', className)}>{children}</div>
 }
 
 /**

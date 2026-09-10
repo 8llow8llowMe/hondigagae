@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { EmergencyIcon } from '@/components/icons'
 import { Skeleton } from '@/components/skeleton'
-import { Canvas, Surface } from '@/components/surface'
+import { Canvas, Surface, SurfaceStack } from '@/components/surface'
 import { useNearbyFacilities } from '@/features/emergency/use-nearby-facilities'
 import { IndoorAlternativesSection } from '@/features/home/indoor-alternatives-section'
 import { PlaceInsightRow } from '@/features/home/place-insight-row'
@@ -61,8 +61,10 @@ const UPCOMING_PLAN_COUNT = 1
 /**
  * 홈 — 아트보드 `01 홈`(모바일 390) / `02 홈`(데스크톱 1440).
  *
- * **3층 표면을 쓰는 첫 화면이다** (#428). 두 열이 각각 `Canvas`(L0) 이고 그 위에
- * `Surface`(L1) 카드가 놓인다. 이 화면이 검증 게이트다 — 여기서 "묶어서 파악" 이
+ * **3층 표면을 쓰는 첫 화면이다** (#428). `main` 이 `Canvas`(L0)로 화면 끝까지 바닥을
+ * 칠하고, 두 열이 각각 `SurfaceStack` 으로 그 위에 `Surface`(L1) 카드를 쌓는다.
+ * **바닥과 쌓기를 가른 이유**: 바닥을 열에 걸면 1440 컨테이너 바깥(1800 에서 좌우
+ * 177px)이 흰색으로 남는다. 이 화면이 검증 게이트다 — 여기서 "묶어서 파악" 이
  * 좋아지지 않으면 3a 를 걷고 나머지 18화면은 손대지 않는다.
  *
  * **데스크톱은 2단이다.** 좌 400 고정(sticky) + 우 가변.
@@ -234,7 +236,8 @@ export function HomeView({
   const upcomingPlans = today === null ? [] : pickUpcomingPlans(plans, today, UPCOMING_PLAN_COUNT)
 
   return (
-    <main id="main-content">
+    /* L0 바닥은 `main` 이 전폭으로 칠한다 — 열에 걸면 1440 컨테이너 바깥이 희게 남는다 */
+    <Canvas as="main" id="main-content">
       <h1 className="sr-only">혼디가개 홈</h1>
 
       {/*
@@ -262,10 +265,10 @@ export function HomeView({
         {/*
           ── 좌: 변하지 않는 맥락.
 
-          **`Canvas` 가 sticky 를 받는다** (#428). 바닥이 열 전체를 칠해야 카드 사이로
-          비친다 — sticky 를 안쪽에 두면 바닥이 카드 높이만큼만 따라온다.
+          **`SurfaceStack` 이 sticky 를 받는다** (#428). 바닥은 `main` 이 이미 칠했고
+          이 요소는 카드 간격만 맡는다.
         */}
-        <Canvas className="lg:sticky lg:top-16 lg:self-start">
+        <SurfaceStack className="lg:sticky lg:top-16 lg:self-start">
           {/*
             날짜 줄은 카드가 아니다 — **페이지 머리**다. 자기 제목이 없고 한 줄이라
             카드 판정 3문 중 둘을 못 넘는다. 바닥 위에 직접 놓는다.
@@ -373,7 +376,7 @@ export function HomeView({
             3a 는 두 경우 다 **카드 사이 간격**이 경계다. 한 컬럼이든 2단이든 같은 값이라
             폭 분기가 필요 없다.
           */}
-        </Canvas>
+        </SurfaceStack>
 
         {/*
           ── 우: 지금 할 일.
@@ -386,7 +389,7 @@ export function HomeView({
           주석이 "배경으로 깔면 우측 열의 흰 목록 행이 덮는다(실측 y=159..569)" 고
           적어 둔 그 문제다. 3a 는 모든 섹션이 흰 카드라 더 심해졌을 것이다.
         */}
-        <Canvas>
+        <SurfaceStack>
           {/*
             권역 비교가 이 열의 머리다. **아래 "맞는 곳" 과 같은 질문을 넓은 단위로 먼저
             답한다** — 권역(어느 권역) → 장소(어느 곳) 로 좁혀 읽힌다.
@@ -604,8 +607,8 @@ export function HomeView({
               )}
             </Surface>
           )}
-        </Canvas>
+        </SurfaceStack>
       </div>
-    </main>
+    </Canvas>
   )
 }
