@@ -124,15 +124,36 @@ dev 서버(`BACKEND_API_URL=https://api-dev.hondigagae.com`)에 직접 붙는다
 
 ### 실행 순서 (배치)
 
+장소 적재 5단계는 `placeDataPipelineJob` 한 잡으로 묶여 있다(#377). 한 줄이면 된다.
+
+```bash
+./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=placeDataPipelineJob areaCode=39 runAt=$(date -Iseconds)"
 ```
-placeImportJob → cultureFacilityImportJob → petRestaurantImportJob → placeMergeJob → placeImageBackfillJob → congestionImportJob
-```
+
+자식 잡 5개가 이 순서로 돈다 — `placeImportJob` → `cultureFacilityImportJob` → `petRestaurantImportJob`
+→ `placeMergeJob` → `placeImageBackfillJob`. 하나가 실패해도 뒤 단계는 계속 가고(모두 멱등),
+실패한 자식이 있으면 부모 잡이 FAILED 로 끝난다.
+
+**재시도는 새 `runAt` 으로 한다.** 부모가 FAILED 로 끝났을 때 같은 `runAt` 을 다시 넣으면
+`JobRestartException` 으로 시작 전에 거부된다(`preventRestart`). 같은 값을 허용하면 Spring Batch 가
+restart 로 보고 이미 끝난 스텝을 건너뛰어 실패한 원천만 다시 적재하고 병합·백필은 돌지 않는데, 잡은
+COMPLETED 로 끝나 알 길이 없다. 다섯 잡이 모두 멱등이라 새 `runAt` 으로 전체를 다시 도는 것이 맞다.
+
+옛 방식대로 잡을 하나씩 단독 실행하는 것도 그대로 된다(`--spring.batch.job.name=<잡 이름>`).
+그때는 위 순서를 직접 지켜야 하고, **단독 실행과 파이프라인에 같은 `runAt` 을 쓰지 않는다** — 자식
+JobInstance 가 이미 COMPLETED 면 파이프라인의 그 단계가 `JobInstanceAlreadyCompleteException` 으로
+FAILED 가 된다(데이터는 멀쩡한데 잡만 실패로 보인다).
 
 `placeMergeJob` 은 **적재가 모두 끝난 뒤 한 번** 돌린다 — 중복 판정에 세 원천이 다 들어와 있어야
-하기 때문이다(#363). 적재 잡을 하나만 돌렸을 때도 이 잡을 이어 돌려야 중복이 목록에서 빠진다.
+하기 때문이다(#363). 적재 잡을 하나만 단독으로 돌렸을 때도 이 잡을 이어 돌려야 중복이 목록에서 빠진다.
 
-`congestionImportJob` 은 장소 마스터가 채워진 뒤에 돌려야 명칭 매칭이 붙는다.
-비어 있으면 전부 UNMATCHED 로 적재되고 적합도 응답에서 혼잡도가 계속 빠진다.
+`congestionImportJob` 은 주기가 달라(일 1회) 파이프라인에 넣지 않았다. 파이프라인 뒤에 따로 돌린다.
+장소 마스터가 채워진 뒤에 돌려야 명칭 매칭이 붙는다 — 비어 있으면 전부 UNMATCHED 로 적재되고
+적합도 응답에서 혼잡도가 계속 빠진다.
+
+```bash
+./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=congestionImportJob runAt=$(date -Iseconds)"
+```
 
 `placeImageBackfillJob` 은 **문화정보원·식약처 적재 뒤**에 돌린다 — 그 두 원천에는 이미지
 필드가 없어서 같은 장소가 TourAPI 에 있으면 대표 이미지를 빌려 채운다. 순서를 앞당기면

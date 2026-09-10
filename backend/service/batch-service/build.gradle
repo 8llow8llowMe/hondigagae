@@ -17,4 +17,7 @@ dependencies {
 
     // 식약처 반려동물 동반출입 음식점 현황이 xlsx 로만 제공된다.
     implementation 'org.apache.poi:poi-ooxml:5.4.1'
+
+    // 컨텍스트 로딩 게이트(BatchServiceApplicationTests) 용 인메모리 DB. 잡 배선은 컴파일로 검증되지 않는다.
+    testRuntimeOnly 'com.h2database:h2'
 }
