@@ -71,6 +71,12 @@ logging:
 culture-facility:
   file-path: ${CULTURE_FACILITY_CSV_PATH:data/pet_culture.csv}
 
+# 제주올레 코스현황 CSV.
+# 공공데이터포털 파일데이터라 활용신청도 인증키도 필요 없다 (data.go.kr/data/15043496).
+# 원본이 CP949 여도 어댑터가 판별해 읽는다.
+olle-course:
+  file-path: ${OLLE_COURSE_CSV_PATH:data/olle_course.csv}
+
 # 식약처 반려동물 동반출입 음식점 등록 현황(xlsx).
 # 인증키가 없다. file-path 에 파일이 있으면 그 파일을, 없으면 원천에서 내려받는다.
 mfds:

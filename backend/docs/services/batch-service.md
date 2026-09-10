@@ -35,6 +35,24 @@
 - 부분 실패가 전체 적재를 막지 않게 잡 단위로 격리한다.
 - 반려동물 동반 정보가 없는 장소는 삭제하지 않고 `PetAllowanceType.UNKNOWN`으로 적재한다.
 
+## olleCourseImportJob (제주올레 산책 코스)
+
+```bash
+./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=olleCourseImportJob"
+```
+
+공식 수치(거리·소요시간·시종점)는 공공데이터포털 [올레코스현황 CSV](https://www.data.go.kr/data/15043496/fileData.do)가,
+시작점 좌표·대표이미지는 TourAPI 레포츠(28)의 올레 항목이 낸다. **CSV 가 기준 목록**이다 —
+TourAPI 에만 있는 항목(하영올레 등)은 코스가 되지 않고, TourAPI 에 없는 코스(20·18-2)는
+좌표 null 로 적재된다. 매칭 키(코스번호+A/B 변형)의 단일 출처는 `OlleCourseParser` 다.
+
+- CSV 를 받아 `OLLE_COURSE_CSV_PATH`(기본 `data/olle_course.csv`)에 둔다. **원본이 CP949 라도
+  어댑터가 판별해 읽는다** — UTF-8 엄격 디코딩 실패 시 MS949 로 되읽는다
+- `walk_course` 스키마 원천은 tour-service 의 `WalkCourseEntity` 다 — 로컬에서는 tour-service 를
+  먼저 한 번 기동해 테이블을 만든다 (place 와 같은 소유 구조)
+- id 는 코스키에서 결정적으로 나와(`OlleCourseParser.walkCourseId`) 재실행이 멱등하다.
+  TourAPI 호출은 **잡 전체에서 1건**(searchKeyword2 한 페이지)이라 쿼터 부담이 없다
+
 ## congestionImportJob (관광지 집중률)
 
 ```bash
