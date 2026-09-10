@@ -65,8 +65,20 @@ export function BottomSheet({
             데스크톱 중앙 패널에서 위만 둥글고 아래는 각진 상태로 보였다.
             모바일은 시트가 화면 바닥에 붙으므로 아래가 각진 것이 맞고, `rounded-t-xl`
             이라 잘릴 것이 없다.
+
+            **데스크톱 폭은 `max-w-sm`(384)이고 `Modal` 과 같은 값이다** (#412).
+            `Modal` 은 `size` 기본값이 `sm` 이라 확인 모달이 전부 384 인데 시트만 448
+            이었다 — 같은 화면에서 뜨는 오버레이 두 계열의 폭이 갈려 있었다.
+            448 은 특히 짧은 시트에서 비어 보였다: `/places` 지도의 `지역` 시트는
+            한 낱말짜리 라디오 셋뿐인데 선택 밴드가 448 을 가로질러, 고를 것이 적다는
+            사실보다 **패널이 비었다**는 인상이 먼저 왔다.
+
+            **384 가 내용의 하한이다.** 가장 내용이 무거운 `ai-plan-place-picker-sheet`
+            (장소 행 + 두 줄 메타)를 384·360 에서 재 보니 384 는 448 과 높이가 같고
+            (379px, 넘침 0) **360 부터 줄이 늘어난다**(397px). 그래서 여기서 더 좁히지
+            않는다.
           */
-          'bg-bg relative flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-t-xl shadow-lg outline-none md:max-w-md md:rounded-xl',
+          'bg-bg relative flex max-h-[85dvh] w-full flex-col overflow-hidden rounded-t-xl shadow-lg outline-none md:max-w-sm md:rounded-xl',
           className,
         )}
       >
