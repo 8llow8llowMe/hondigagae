@@ -45,10 +45,22 @@ import type { WalkSafetyResponse } from '@/types/insight'
 export function WalkVerdict({
   data,
   petName,
+  todayLabel,
   busy = false,
 }: {
   data: WalkSafetyResponse
   petName: string | null
+  /**
+   * `2026-09-10 (목) · 제주시` — **데스크톱에서 이 카드가 날짜 줄을 겸한다** (#428).
+   *
+   * 예전에는 레일 맨 위 바닥 위에 홀로 떠 있었다. 3a 로 바닥이 회색이 되면서 그 줄만
+   * 카드 밖에 남아 **어느 카드의 날짜인지 붙을 곳이 없어졌다.** 판정이 "오늘" 의
+   * 이야기이고 체감온도 라벨과 같은 줄에 설 자리가 비어 있어 여기로 들인다.
+   *
+   * **모바일은 받지 않는다** — 접힌 한 줄이 기본이라 이 패널이 닫혀 있을 수 있다.
+   * 그때는 `home-view` 가 카드 밖에 그대로 그린다.
+   */
+  todayLabel: string
   busy?: boolean
 }) {
   const tone = walkSafetyTone(data.walkSafetyLevel.code)
@@ -136,16 +148,29 @@ export function WalkVerdict({
           open ? 'flex' : 'hidden',
         )}
       >
-        {/* 데스크톱에만 보이는 등급 줄 — 모바일은 위 버튼이 이미 말했다 */}
-        <div className="hidden items-end justify-between gap-3 md:flex">
+        {/*
+          데스크톱에만 보이는 등급 줄 — 모바일은 위 버튼이 이미 말했다.
+
+          **`items-baseline` 이다** (#428). 양쪽이 caption + 값 두 줄로 같은 모양이 되면서,
+          날짜와 `체감온도` 라벨이 **같은 줄에 서야** 한다. `items-end` 로 두면 값 줄의
+          높이가 갈려(16 vs 28) 위 라벨 두 개가 어긋난다 — baseline 은 각 항목의 첫 줄
+          기준선을 맞추므로 caption 끼리 정확히 선다.
+        */}
+        <div className="hidden items-baseline justify-between gap-3 md:flex">
           {/*
             **특보 배지가 여기 없다** (#349). 경보면 서버가 이미 `DANGER` 로 끊어 이 섹션이
             자동 펼침 + tint 인 상태이고, **그 tint 가 곧 배지가 말하던 이유**다. 특보 자체는
             페이지 최상단 스트립이 한 번 말한다.
           */}
-          <span className="text-body-1 flex flex-wrap items-center gap-x-1 gap-y-2 font-semibold">
-            <span className="text-fg-muted">{messages.home.walkTodayLabel}</span>
-            <MetricWord tone={tone}>{data.walkSafetyLevel.name}</MetricWord>
+          <span className="flex min-w-0 flex-col gap-1">
+            {/* 오른쪽 `체감온도` 라벨과 같은 줄. 둘 다 caption/muted 라 무게가 같다 */}
+            <span className="text-caption text-fg-muted font-medium tabular-nums">
+              {todayLabel}
+            </span>
+            <span className="text-body-1 flex flex-wrap items-center gap-x-1 gap-y-2 font-semibold">
+              <span className="text-fg-muted">{messages.home.walkTodayLabel}</span>
+              <MetricWord tone={tone}>{data.walkSafetyLevel.name}</MetricWord>
+            </span>
           </span>
           {/*
             **라벨을 붙인다** (#259). 모바일 접힌 줄은 `feelsLikeLabel` 을 이미 달고 있는데
