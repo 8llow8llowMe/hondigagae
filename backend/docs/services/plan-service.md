@@ -168,6 +168,37 @@ WHERE NOT EXISTS (SELECT 1 FROM plan_pet pp WHERE pp.plan_id = p.id);
 - 항목 단위 판정이 필요해지는 순간은 **산책 위험도**다. 그것은 시각에 따라 갈리므로 같은
   방식으로 접을 수 없고, 별도 조회 설계가 필요하다.
 
+## 여행 브리핑 (`GET /api/v1/plans/{planId}/briefing?date=`)
+
+출발 전날·당일에 **하루치**를 한 번에 주는 조합 API 다 — 그날 일정 요약(항목 수·방문 체크 수·첫/마지막 항목·대표 장소),
+날씨·적합도(위 날씨 브리핑의 하루치), 발효 중인 기상특보, 산책 골든타임. FE 가 화면 하나로 "내일 여행 준비" 를 보여 주기 위한
+것이라 **결정적 조합만 하고 LLM 을 부르지 않는다.** 준비물은 ai-service 의 준비물 API 가 따로 있어 넣지 않는다.
+
+- **재계산하지 않는다.** 날씨는 `PlanWeatherProcessor.briefDay` 를 그대로 부른다(복사가 아니라 하루치 메서드를 공개했다) —
+  대표 장소 선정·아이별 판정·기준 반려견 선택이 같은 경로를 타야 일정 화면과 브리핑 화면이 같은 날을 같게 말한다.
+  특보·골든타임은 tour-service 가 낸 값을 옮기기만 한다. 경보 판정(`recommendationSuppressed`)도 tour 가 준 값이다 —
+  `level == WARNING` 을 이쪽에서 다시 세우면 규칙이 두 서비스로 갈라진다 (#357).
+- **특보·골든타임은 요청 날짜가 오늘일 때만 붙인다** (`today`). 골든타임은 tour 의 `GET /api/v1/insights/walk-times` 가
+  "오늘 남은 시간" 전용이라 내일 이후를 물을 수단이 없고, 특보는 tour 의 적합도 판정과 같은 규칙
+  (`targetDate == today` 일 때만)을 따른다 — 내일 날짜에 오늘 특보를 붙이면 "내일 태풍" 이라는 없는 예보가 화면에 선다.
+  오늘이 아니면 두 필드는 null 이고 각 `*UnavailableReason` 에 이유가 담긴다.
+- **특보 "확인 못 함" 과 "없음" 을 나눈다 (필수).** 이 브리핑의 가장 나쁜 실패는 특보가 떠 있는데 화면이 조용한 것이다.
+  그래서 `WeatherWarningQueryPort` 만 조회 실패를 `PlanException` 으로 올리고, Processor 가 잡아
+  `weatherWarningUnavailableReason` 에 "가져오지 못했다" 를 담는다. `weatherWarning` 과 이유가 **둘 다 null 일 때만**
+  "발효 중인 특보 없음" 이다. 골든타임·날씨는 부가 정보라 기존처럼 빈 값으로 접는다.
+  - 한계: tour-service 자체가 KMA 특보 조회 실패를 "없음" 으로 접는다(`WeatherWarningProcessor`). 이 경계에서 가를 수 있는 것은
+    plan→tour 호출의 실패까지다.
+- 특보는 걸음 좌표와 무관하게 오늘이면 확인한다 — 그래서 walk-times 응답에 실린 특보를 재활용하지 않고 tour 내부 API
+  `GET /internal/v1/weather/warnings`(가장 무거운 한 건) 를 따로 부른다. 장소 항목이 없는 날에도 특보는 나가야 한다.
+- 골든타임은 그날 대표 장소(날씨와 같은 `pickRepresentative`) 좌표로 묻고, 반려견 조건은 **기준 아이**(`basisPetId` —
+  날씨 판정이 고른 점수 최저 아이, 없으면 대표) 것을 넘긴다. 좌표는 tour 내부 후보 API 한 번으로 받는다. 붙이지 못한 이유는
+  셋으로 가른다 — 장소 항목 없음 / 좌표 없음(delisted·원천 좌표 없음) / 조회 실패.
+- **시간대별 곡선(`hourly`)은 싣지 않는다.** 브리핑은 요약이고 곡선을 실으면 응답이 몇 배로 커진다. 응답에 판정 좌표를 함께 내리니
+  곡선이 필요한 화면은 그 좌표로 tour 의 walk-times 를 직접 부른다.
+- 날짜가 일정 기간 밖이면 `PLAN_002`. `date` 는 필수다 — "출발 전날" 인지 "당일" 인지는 FE 가 안다.
+- 원격 호출 수(하루치라 상한이 낮다): auth 특성 1 + tour 적합도(서로 다른 조건 수, 최대 5) + tour 장소 요약 1 + tour 특보 1 +
+  tour 골든타임 1. 오늘이 아니면 뒤의 둘은 나가지 않는다. Facade 에 트랜잭션을 걸지 않는 이유는 날씨 브리핑과 같다.
+
 ## 여행 동행 기능
 
 - `PUT /api/v1/plans/{planId}/items/{planItemId}/visited` — 항목 방문 체크. 일차 항목을
