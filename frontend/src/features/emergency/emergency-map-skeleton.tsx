@@ -5,11 +5,11 @@ const ROW_COUNT = 3
 /**
  * 긴급 시설 **지도 갈래** 패널·시트 전용 로딩.
  *
- * **칩·캡션을 다시 그리지 않는다.** `EmergencySkeleton`(`emergency-skeleton.tsx`)은
- * `EmergencySection`(목록 갈래)이 자기 칩·캡션을 갖지 않아 그 자리까지 함께 그린다.
- * 지도 갈래는 실제 `EmergencyFilterBar` 와 캡션이 패널·시트 머리에 이미 있으므로,
- * 거기에 `EmergencySkeleton` 을 그대로 쓰면 "실제 칩 → 실제 캡션 → 칩 자리 → 칩 자리 →
- * 캡션 자리 → 행" 으로 같은 줄이 두 벌 보인다. `board.position === null` 인 동안(좌표
+ * **캡션을 다시 그리지 않는다.** `EmergencySkeleton`(`emergency-skeleton.tsx`)은
+ * `EmergencySection`(목록 갈래)의 기준 줄 자리까지 함께 그린다 (칩 자리는 #460 에서
+ * 빠졌다 — 칩이 카드 밖에 실제로 서기 때문이다). 지도 갈래는 실제 캡션이 패널·시트 머리에
+ * 이미 있으므로, 거기에 `EmergencySkeleton` 을 그대로 쓰면 "실제 캡션 → 캡션 자리 → 행"
+ * 으로 같은 줄이 두 벌 보인다. `board.position === null` 인 동안(좌표
  * 대기, 거부·정지 시 최대 11초) 이 화면을 여는 모든 사용자가 이 상태를 먼저 본다.
  *
  * **여백은 패널 자신의 16px 한 축이다** (`px-4`, `md:`/`lg:` 없음). `EmergencyMapPanel`

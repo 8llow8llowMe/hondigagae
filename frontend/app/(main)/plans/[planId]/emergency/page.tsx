@@ -1,6 +1,6 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import { Canvas, SurfaceStack } from '@/components/surface'
 import { PlanEmergencyView } from '@/features/plan/plan-emergency-view'
 import { planKeys } from '@/features/plan/queries'
 import { ApiError } from '@/lib/api/error'
@@ -56,19 +56,21 @@ export default async function PlanEmergencyPage({ params }: { params: Params }) 
     if (error instanceof ApiError && error.kind === 'not-found') notFound()
   }
 
-  return (
-    <main id="main-content" className="mx-auto w-full max-w-screen-md">
-      <div className="flex flex-col gap-1 px-4 pt-5 pb-2 md:px-10">
-        <Link
-          href={`/plans/${planId}`}
-          className="text-caption text-link hover:text-link-hover focus-visible:ring-brand-500 self-start rounded-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
-        >
-          {messages.plan.emergencyBack}
-        </Link>
-        <h1 className="text-title-1 text-fg font-semibold">{messages.plan.emergencyHeading}</h1>
-      </div>
+  /*
+    **3층 표면** (`DESIGN.md §0`, #460). 예전 `main` 은 `max-w-screen-md` 한 요소가 바닥과
+    배치를 겸했다 — 그 위에 `bg-bg-sunken` 을 얹으면 768 안쪽만 회색이 된다(#453 이 일정
+    만들기에서 잡은 것과 같은 패턴). 그래서 `Canvas` 가 전폭으로 바닥을 깔고 폭 제한은
+    `SurfaceStack` 이 가져간다. 폭은 일정 만들기(#453)와 같은 `max-w-2xl` — 레일 없는
+    한 단 화면의 카드 폭을 둘이 같은 값으로 쓴다.
 
-      <PlanEmergencyView planId={planId} />
-    </main>
+    **머리(돌아가기 · `h1` · 반경 안내)는 뷰가 그린다** — 반경이 응답에서 오는데 머리와 한
+    덩어리여야 하기 때문이다 (`plan-emergency-view.tsx` 머리주석).
+  */
+  return (
+    <Canvas as="main" id="main-content">
+      <SurfaceStack className="mx-auto w-full max-w-2xl">
+        <PlanEmergencyView planId={planId} />
+      </SurfaceStack>
+    </Canvas>
   )
 }

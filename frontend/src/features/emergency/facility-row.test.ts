@@ -82,3 +82,40 @@ describe('FacilityRow', () => {
     expect(markup).not.toContain(messages.map.directions)
   })
 })
+
+/*
+  **3층 표면** (`DESIGN.md §0`, #460). 행은 카드 안(목록 갈래)과 카드 밖(지도 SDK 폴백)
+  양쪽에서 쓰여 인셋이 하나로 고정될 수 없다 — `PlaceRow` 와 같은 규칙이다.
+*/
+describe('FacilityRow — 3층 표면 (#460)', () => {
+  it('기본 인셋은 card(16/20) 다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(FacilityRow, { facility: facility(), showDistance: true }),
+    )
+
+    expect(markup).toMatch(/^<li class="px-4 md:px-5"/)
+  })
+
+  it('inset="main" 이면 페이지 값 40 이다 — 폴백은 카드가 아니다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(FacilityRow, { facility: facility(), showDistance: true, inset: 'main' }),
+    )
+
+    expect(markup).toMatch(/^<li class="px-4 md:px-10"/)
+  })
+
+  /*
+    구분선은 `SurfaceList` 가 항목 사이에만 긋는다 — 행이 `border-b` 를 갖고 `last` 로 끄던
+    2a 규약은 행 수를 아는 호출자만 목록을 그릴 수 있게 했다 (#439). 자기 배경도 없다 —
+    카드 안 자식은 자기 배경을 갖지 않는다 (§0).
+  */
+  it('구분선도 배경도 스스로 갖지 않는다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(FacilityRow, { facility: facility(), showDistance: true }),
+    )
+    const li = markup.slice(0, markup.indexOf('>'))
+
+    expect(li).not.toContain('border-b')
+    expect(li).not.toContain('bg-bg')
+  })
+})
