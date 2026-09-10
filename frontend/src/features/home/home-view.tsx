@@ -183,14 +183,37 @@ export function HomeView({
   const sortNoteShort = messages.home.sortNoteShort[applied]
 
   const placeById = new Map(places.map((place) => [place.placeId, place]))
-  const remaining = Math.max(0, places.length - loaded.length)
+
+  /*
+    **기준 장소를 추천에서 뺀다** (#428). 좌측 판정이 "{장소} 기준" 으로 이미 그 장소를
+    말하고 있는데 우측 추천 1번에 같은 장소가 다시 섰다 — DESIGN.md §1 "같은 사실을 한
+    화면에서 두 번 말하지 않는다. 반복은 강조가 아니라 소음이다".
+
+    **조회는 그대로 두고 렌더에서만 뺀다.** `basisPlaceId` 는 `localStorage` 에서 오므로
+    첫 렌더에 `null` 이고 하이드레이션 뒤 값이 생긴다 — 질의 집합을 여기에 묶으면 그
+    시점에 키가 바뀌어 재조회가 한 번 더 돈다.
+  */
+  const visible = loaded.filter((data) => data.placeId !== basisPlaceId)
+
+  /*
+    **점수를 낸 곳이 먼저다** (#428). 서버 순서를 그대로 쓰던 동안 `판단 근거 부족`
+    (점수 없음) 항목이 목록 맨 위에서 가장 큰 시각 무게를 받고 있었다 — 정보 가치와
+    시각 무게가 정반대였다. §1 "위계는 크기와 순서로 만든다".
+
+    **점수 안에서는 서버 순서를 지킨다.** 정렬은 "점수가 있나 없나" 한 축뿐이다 —
+    점수끼리 다시 세우면 서버가 고른 순서(적합도 외 요인이 섞인다)를 FE 가 뒤집는다.
+  */
+  const scored = visible.filter((data) => data.score !== null)
+  const unscored = visible.filter((data) => data.score === null)
+
+  const remaining = Math.max(0, places.length - visible.length)
 
   /*
     카드 전부에 똑같이 붙는 문장은 장소별 근거가 아니라 **이 화면의 전제**다 (#304).
     카드에서 걷어 목록 위에 한 번만 적는다 — 남는 문장이 곧 장소 간 차이가 된다.
   */
   const { shared: sharedReasons, perPlace: placeReasons } = splitSharedReasons(
-    loaded.map((data) => data.reasons),
+    scored.map((data) => data.reasons),
   )
 
   /*
@@ -198,8 +221,8 @@ export function HomeView({
     위에서 보여 준 장소는 제외한다 (`collectIndoorAlternatives`).
   */
   const indoorAlternatives = collectIndoorAlternatives(
-    loaded,
-    loaded.map((data) => data.placeId),
+    visible,
+    visible.map((data) => data.placeId),
     INDOOR_ALTERNATIVE_COUNT,
   )
 
@@ -435,7 +458,7 @@ export function HomeView({
               </div>
             )}
 
-            {pending && loaded.length === 0 ? (
+            {pending && visible.length === 0 ? (
               <ul>
                 {Array.from({ length: 2 }, (_, index) => (
                   <li key={index} className="border-border flex gap-3 border-t px-4 py-3 md:px-5">
@@ -453,7 +476,7 @@ export function HomeView({
                 title={messages.common.temporaryErrorTitle}
                 onRetry={() => suitabilities.forEach((query) => void query.refetch())}
               />
-            ) : loaded.length === 0 ? (
+            ) : visible.length === 0 ? (
               <EmptyState
                 title={messages.home.emptyPlacesTitle}
                 description={messages.home.emptyPlacesDesc}
@@ -469,7 +492,7 @@ export function HomeView({
             ) : (
               <div aria-busy={refetching || undefined} className={refetching ? 'opacity-55' : ''}>
                 <ul>
-                  {loaded.map((data, index) => (
+                  {scored.map((data, index) => (
                     <PlaceInsightRow
                       key={data.placeId}
                       data={data}
@@ -485,6 +508,30 @@ export function HomeView({
                     />
                   ))}
                 </ul>
+
+                {/*
+                  **점수를 못 낸 곳은 접어서 개수로만 말한다** (#428). §1 "낮은 우선순위는
+                  접는다". 예전에는 이 항목들이 목록 맨 위에서 썸네일·배지 넷을 달고
+                  가장 큰 자리를 차지했다.
+
+                  **지우지는 않는다.** 목록에서 빼면 사용자는 그 장소가 조회되지 않았다는
+                  것조차 모른 채 "후보가 둘" 이라고 읽는다 — 권역 섹션이 예보 없는 권역을
+                  남기는 것과 같은 이유다.
+
+                  펼침을 두지 않고 `/places` 로 보낸다. 홈은 요약 화면이고, 점수가 없는
+                  장소를 홈에서 더 볼 이유가 없다.
+                */}
+                {unscored.length > 0 && (
+                  <Link
+                    href="/places"
+                    className="text-body-2 text-fg-muted hover:bg-band focus-visible:ring-brand-500 border-border flex min-h-11 items-center justify-between gap-2 border-t px-4 font-medium tabular-nums focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:px-5"
+                  >
+                    <span>
+                      {messages.home.unscoredPlaces.replace('{n}', String(unscored.length))}
+                    </span>
+                    <span aria-hidden>›</span>
+                  </Link>
+                )}
 
                 {remaining > 0 && (
                   <div className="border-border border-t px-4 py-3 md:px-5 md:py-4">
