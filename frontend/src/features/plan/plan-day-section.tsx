@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 
 import { Button, ButtonLink } from '@/components/button'
-import { RowList } from '@/components/surface'
+import { Surface, SurfaceList } from '@/components/surface'
 import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
 import { PlanIndoorAlternatives } from '@/features/plan/plan-indoor-alts'
 import { PlanItemRow, type PlanItemVisit } from '@/features/plan/plan-item-row'
@@ -11,6 +11,8 @@ import { messages } from '@/lib/messages'
 import { weekdayOf } from '@/lib/plan/date'
 import type { PlanItemRowModel } from '@/lib/plan/detail'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { PlaceDetail } from '@/types/place'
 import type { PlanAlternativePlaceItem, PlanDayWeatherItem } from '@/types/plan'
 
@@ -116,102 +118,116 @@ export function PlanDaySection({
   */
   const hasVisited = rows.some((row) => row.item.visited)
 
-  return (
-    <section aria-labelledby={anchorId} className="px-4 md:px-10">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 pt-6">
-        <h2 id={anchorId} className="text-title-1 text-fg font-bold">
-          {messages.plan.dayLabel.replace('{day}', String(day))}
-        </h2>
-        {date !== null && (
-          <span className="text-body-2 text-fg-muted font-medium tabular-nums">
-            {date.slice(5)}
-            {weekday === null ? '' : ` (${weekday})`}
-          </span>
-        )}
+  /*
+    **L1 카드 하나다** (`DESIGN.md §0`, #447). 이름은 `aria-label` 이다 — 헤더가 `N일차 ·
+    날짜 · 버튼 셋`을 한 줄에 그리고 390 에서는 버튼이 다음 줄로 접혀야 해서 `Surface` 의
+    `title` 슬롯(제목 + 우측 액션, 접히지 않음)에 맞지 않는다. `h2` 의 `id` 는 개요의 판정
+    목차가 앵커로 쓰므로 그대로 둔다.
 
-        {!editing && (
-          <div className="ml-auto flex items-center gap-2">
-            {/*
+    좌우 인셋은 카드 안 값(16/20)이고, 항목 목록은 카드 폭을 다 쓰며 위 1px 선으로 헤더와
+    갈린다 — 구분선은 `SurfaceList` 가 항목 사이에만 긋는다.
+  */
+  return (
+    <Surface aria-label={messages.plan.dayLabel.replace('{day}', String(day))}>
+      <div className={INSET_CLASS.card}>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 pt-5">
+          <h2 id={anchorId} className="text-title-1 text-fg font-bold">
+            {messages.plan.dayLabel.replace('{day}', String(day))}
+          </h2>
+          {date !== null && (
+            <span className="text-body-2 text-fg-muted font-medium tabular-nums">
+              {date.slice(5)}
+              {weekday === null ? '' : ` (${weekday})`}
+            </span>
+          )}
+
+          {!editing && (
+            <div className="ml-auto flex items-center gap-2">
+              {/*
               **빈 일자에도 남는다.** 담을 곳이 없는 날이야말로 이 버튼이 필요하다 —
               `순서 편집` 과 달리 항목 수를 보지 않는다.
             */}
-            <ButtonLink href={add.href} variant="secondary" size="sm">
-              {messages.plan.addPlaceAction}
-            </ButtonLink>
+              <ButtonLink href={add.href} variant="secondary" size="sm">
+                {messages.plan.addPlaceAction}
+              </ButtonLink>
 
-            {/*
+              {/*
               **빈 일자에도 남는다** — 빈 날을 채우는 것이 이 기능이 가장 쓸모 있는
               순간이다 (하루재생성-세부명세 R3-2). `순서 편집` 과 달리 항목 수를 보지 않는다.
 
               **일정 자체가 재생성 대상이 아니면 빠진다** — 항목 수가 아니라 기간 때문이다.
             */}
-            {regenerateHref !== null && (
-              <ButtonLink href={regenerateHref} variant="secondary" size="sm">
-                {messages.plan.regenerateDayAction}
-              </ButtonLink>
-            )}
+              {regenerateHref !== null && (
+                <ButtonLink href={regenerateHref} variant="secondary" size="sm">
+                  {messages.plan.regenerateDayAction}
+                </ButtonLink>
+              )}
 
-            {/* 항목이 없으면 바꿀 순서도 없다 */}
-            {rows.length > 0 && (
-              <Button variant="secondary" size="sm" onClick={onStartEdit}>
-                {messages.plan.editDayAction}
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
+              {/* 항목이 없으면 바꿀 순서도 없다 */}
+              {rows.length > 0 && (
+                <Button variant="secondary" size="sm" onClick={onStartEdit}>
+                  {messages.plan.editDayAction}
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
 
-      {/*
+        {/*
         일괄 교체 모델과 부딪히는 지점을 화면이 먼저 말한다 (#124). 편집·담기 두 진입점이
         모두 이 줄 위의 버튼에서 시작하므로 경고를 그 아래 한 번만 둔다.
         **편집 중에는 감춘다** — 그때는 편집기 자체가 저장 지점을 들고 있다.
       */}
-      {!editing && hasVisited && (
-        <p className="text-caption text-fg-muted mt-2 font-medium">
-          {messages.plan.visitResetNotice}
-        </p>
-      )}
+        {!editing && hasVisited && (
+          <p className="text-caption text-fg-muted mt-2 font-medium">
+            {messages.plan.visitResetNotice}
+          </p>
+        )}
 
-      <PlanDayVerdict
-        verdict={verdict}
-        petConditionApplied={petConditionApplied}
-        basisPetName={basisPetName}
-        failed={verdictFailed}
-        onRetry={onRetryVerdict}
-      />
+        <PlanDayVerdict
+          verdict={verdict}
+          petConditionApplied={petConditionApplied}
+          basisPetName={basisPetName}
+          failed={verdictFailed}
+          onRetry={onRetryVerdict}
+        />
+      </div>
 
       {editing ? (
-        // Row 가 자체 좌우 인셋(px-4 / md:px-10)을 갖는다 — 섹션 인셋을 되돌린다
-        <div className="border-border -mx-4 border-t md:-mx-10">{editor}</div>
+        // 편집기 행이 카드 인셋을 스스로 갖는다 — 목록은 카드 폭을 다 쓴다
+        <div className="border-border border-t">{editor}</div>
       ) : rows.length === 0 ? (
-        <p className="text-body-2 text-fg-muted border-border border-t py-6">
+        <p
+          className={cn('text-body-2 text-fg-muted border-border border-t py-6', INSET_CLASS.card)}
+        >
           {messages.plan.dayEmpty}
         </p>
       ) : (
-        <RowList className="border-border -mx-4 border-t md:-mx-10">
-          {rows.map((row, index) => (
+        <SurfaceList className="border-border border-t">
+          {rows.map((row) => (
             <PlanItemRow
               key={row.item.planItemId}
               model={row}
-              last={index === rows.length - 1}
               visit={visit.visitOf(row.item.planItemId)}
             />
           ))}
-        </RowList>
+        </SurfaceList>
       )}
 
       {/* 편집 중에는 감춘다 — 순서를 정리하는 중에 다른 조작을 섞지 않는다 */}
       {!editing && (
-        <PlanIndoorAlternatives
-          alternatives={verdict?.indoorAlternatives ?? []}
-          places={places}
-          addedPlaceIds={add.addedPlaceIds}
-          pendingPlaceId={add.pendingPlaceId}
-          disabled={add.busy}
-          error={add.error}
-          onAdd={add.onAdd}
-        />
+        <div className={INSET_CLASS.card}>
+          <PlanIndoorAlternatives
+            alternatives={verdict?.indoorAlternatives ?? []}
+            places={places}
+            addedPlaceIds={add.addedPlaceIds}
+            pendingPlaceId={add.pendingPlaceId}
+            disabled={add.busy}
+            error={add.error}
+            onAdd={add.onAdd}
+          />
+        </div>
       )}
-    </section>
+    </Surface>
   )
 }

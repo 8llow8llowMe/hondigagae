@@ -11,6 +11,8 @@ import { messages } from '@/lib/messages'
 import type { PlanDayEditItem } from '@/lib/plan/day-items'
 import { hasUnresolvedPlace } from '@/lib/plan/detail'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 
 /**
  * 편집 중인 일자 — 아트보드 03 A(모바일) · B(데스크톱) · C(저장 실패).
@@ -81,12 +83,15 @@ export function PlanDayEditor({
 
   return (
     <div className="py-2">
-      <p className="text-caption text-fg-muted px-4 font-medium md:px-10">
+      <p className={cn('text-caption text-fg-muted font-medium', INSET_CLASS.card)}>
         {messages.plan.editHint}
       </p>
 
-      {/* 순서가 뜻을 갖는 목록이라 ol 이다 (E6) */}
-      <ol className="mt-2">
+      {/*
+        순서가 뜻을 갖는 목록이라 ol 이다 (E6). 구분선 규약은 `SurfaceList` 와 같다 — 항목
+        사이에만 긋는다 (#447). `SurfaceList` 는 `ul` 이라 여기서는 같은 규칙을 `ol` 에 건다.
+      */}
+      <ol className="[&>li+li]:border-border mt-2 [&>li+li]:border-t">
         {items.map((entry, index) => (
           <PlanEditableItemRow
             key={entry.item.planItemId}
@@ -107,13 +112,12 @@ export function PlanDayEditor({
             onHandlePointerEnd={drag.onPointerEnd}
             onMove={onMove}
             onToggleRemoved={onToggleRemoved}
-            last={index === items.length - 1}
           />
         ))}
       </ol>
 
       {/* 순서를 옮길 때마다 거리 숫자가 흔들리면 신뢰가 깨진다 — 숫자 대신 안내다 (E4) */}
-      <p className="text-caption text-fg-muted mt-3 px-4 font-medium md:px-10">
+      <p className={cn('text-caption text-fg-muted mt-3 font-medium', INSET_CLASS.card)}>
         {messages.plan.editDistanceNote}
       </p>
 
@@ -122,7 +126,7 @@ export function PlanDayEditor({
         {announcement}
       </p>
 
-      <div className="mt-3 flex flex-col gap-2 px-4 md:px-10">
+      <div className={cn('mt-3 flex flex-col gap-2', INSET_CLASS.card)}>
         {error !== null && (
           <FormAlert
             message={

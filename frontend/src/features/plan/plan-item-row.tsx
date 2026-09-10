@@ -5,7 +5,6 @@ import { Badge } from '@/components/badge'
 import { Button } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
 import { CheckIcon, ImageIcon } from '@/components/icons'
-import { Row } from '@/components/surface'
 import { formatDistance } from '@/lib/format/distance'
 import { isLongTrip } from '@/lib/geo/distance'
 import { imageSrc } from '@/lib/image/remote-host'
@@ -13,6 +12,7 @@ import { messages } from '@/lib/messages'
 import { placeMetaLine } from '@/lib/place/meta'
 import { isPlaceTarget, type PlanItemRowModel } from '@/lib/plan/detail'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -59,11 +59,9 @@ export type PlanItemVisit = {
  */
 export function PlanItemRow({
   model,
-  last = false,
   visit,
 }: {
   model: PlanItemRowModel
-  last?: boolean
   /** 없으면 토글이 렌더되지 않는다 — 기간 밖 항목 섹션이 그 경로다 */
   visit?: PlanItemVisit
 }) {
@@ -144,8 +142,9 @@ export function PlanItemRow({
     </>
   )
 
+  // L1 카드 안의 L2 항목 — 구분선은 `SurfaceList` 가 사이에만 긋는다, 그래서 `last` 가 없다 (#447)
   return (
-    <Row as="li" last={last}>
+    <li className={INSET_CLASS.card}>
       <div className="flex items-start">
         {href === null ? (
           <div className="flex min-w-0 flex-1 items-start gap-3 py-3 lg:gap-5 lg:py-4">{body}</div>
@@ -172,7 +171,7 @@ export function PlanItemRow({
       {visit !== undefined && visit.error !== null && (
         <FormAlert className="mb-3" message={visit.error.message} />
       )}
-    </Row>
+    </li>
   )
 }
 

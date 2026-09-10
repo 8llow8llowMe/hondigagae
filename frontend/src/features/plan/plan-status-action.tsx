@@ -10,6 +10,8 @@ import { planKeys } from '@/features/plan/queries'
 import { updatePlan } from '@/lib/api/plan'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { PlanDetail } from '@/types/plan'
 
 /**
@@ -53,7 +55,8 @@ export function PlanStatusAction({ plan }: { plan: PlanDetail }) {
   }
 
   return (
-    <div className="flex flex-col gap-2 px-4 py-6 md:px-10">
+    // 액션이라 카드가 아니다 (§0) — 열 끝, 바닥 위. 인셋은 카드 안 글줄과 같은 축이다 (#447)
+    <div className={cn('flex flex-col gap-2 pb-4 md:pb-0', INSET_CLASS.card)}>
       <Button onClick={handleConfirm} loading={saving} className="self-start">
         {messages.plan.statusConfirmAction}
       </Button>
