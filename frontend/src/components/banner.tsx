@@ -9,8 +9,16 @@ import { cn } from '@/lib/utils/cn'
 /**
  * Banner — 상시 진입점 (디자인 가이드 §5). 병원·약국 배너가 대표 사례다.
  *
- * **흰 표면 + 아이콘만 danger 색.** 배경을 붉게 칠하지 않는다 — 상시 진입점이지
- * 경보가 아니다. 붉은 면이 화면에 늘 떠 있으면 진짜 경보를 구분할 수 없게 된다.
+ * **아이콘만 danger 색.** 배경을 붉게 칠하지 않는다 — 상시 진입점이지 경보가 아니다.
+ * 붉은 면이 화면에 늘 떠 있으면 진짜 경보를 구분할 수 없게 된다.
+ *
+ * **자기 배경을 칠하지 않는다** (#428). 예전에는 `bg-bg` 로 흰 면을 스스로 그렸는데,
+ * 2a 에서는 페이지가 이미 흰색이라 그 값이 하는 일이 없었고 3a 에서는 **해가 됐다** —
+ * 각진 흰 면이 감싸는 `Surface` 의 radius 12 모서리를 덮어 카드가 사각으로 보였다.
+ *
+ * **`Surface` 에 `overflow-hidden` 을 주는 쪽으로 풀지 않았다.** 같은 카드 안
+ * `ProfileCard` 의 반려견 스위처 팝오버가 `absolute z-40`(portal 아님)이라 잘린다.
+ * 카드 안 자식은 자기 배경을 갖지 않는다 — 면은 `Surface` 가 소유한다.
  *
  * **모든 상태에서 남는다.** 오류·빈 화면에서도 제거하지 않는다 — 위급할 때 필요한
  * 진입점이 데이터 사정으로 사라지면 안 된다.
@@ -44,7 +52,7 @@ export function Banner({
     <Link
       href={href}
       className={cn(
-        'bg-bg focus-visible:ring-brand-500 flex items-center gap-3 py-4 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
+        'focus-visible:ring-brand-500 flex items-center gap-3 py-4 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
         INSET_CLASS[inset],
         className,
       )}
