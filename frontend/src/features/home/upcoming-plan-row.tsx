@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import { ChevronRightIcon } from '@/components/icons'
 import { daysUntil } from '@/lib/plan/date'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import type { PlanSummaryItem } from '@/types/plan'
 
 /**
@@ -17,30 +18,35 @@ export function UpcomingPlanRow({ plan, today }: { plan: PlanSummaryItem; today:
   const dday = daysUntil(plan.startDate, today)
 
   /*
-    **위 구분선을 그린다.** 적합도 목록과 같은 규칙이다 (DESIGN.md §0 — 같은 묶음 안은
-    1px 구분선). 없으면 섹션 제목과 행 사이가 비어, 목록이 아니라 떠 있는 문장처럼
-    보인다. 여러 건이 되면 행 사이도 이 선이 나눈다.
+    **구분선과 좌우 여백을 스스로 정하지 않는다** (이슈 #439). 예전에는 `border-t` 와
+    페이지 인셋 40 을 직접 걸었는데, 그 주석이 인용한 §0 은 **2a** 였다 — 카드가 없던
+    때라 행 위 선이 유일한 경계였다. 3a 는 카드 테두리가 그 일을 하고, 항목 사이 선은
+    `SurfaceList` 가 긋는다. 인셋도 카드 안 값(16/20)이다.
   */
   return (
-    <Link
-      href={`/plans/${plan.planId}`}
-      className="border-border focus-visible:ring-brand-500 flex items-center gap-3 border-t px-4 pt-3 pb-5 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:gap-8 md:px-10 md:pt-5 md:pb-8"
-    >
-      <span className="min-w-0 flex-1">
-        <span className="text-body-1 text-fg md:text-title-2 block font-semibold">
-          {plan.title}
+    <li className={INSET_CLASS.card}>
+      <Link
+        href={`/plans/${plan.planId}`}
+        className="focus-visible:ring-brand-500 flex items-center gap-3 pt-3 pb-5 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:gap-8 md:pt-5 md:pb-8"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="text-body-1 text-fg md:text-title-2 block font-semibold">
+            {plan.title}
+          </span>
+          <span className="text-caption text-fg-muted mt-1 block font-medium tabular-nums">
+            {plan.startDate} – {plan.endDate.slice(5)}
+            <span className="md:hidden"> · {plan.status.name}</span>
+            {dday !== null && <span className="hidden md:inline"> · D-{dday}</span>}
+          </span>
         </span>
-        <span className="text-caption text-fg-muted mt-1 block font-medium tabular-nums">
-          {plan.startDate} – {plan.endDate.slice(5)}
-          <span className="md:hidden"> · {plan.status.name}</span>
-          {dday !== null && <span className="hidden md:inline"> · D-{dday}</span>}
-        </span>
-      </span>
 
-      {dday !== null && (
-        <span className="text-body-2 md:text-body-1 shrink-0 font-bold tabular-nums">D-{dday}</span>
-      )}
-      <ChevronRightIcon size={20} className="text-fg-subtle shrink-0 md:hidden" />
-    </Link>
+        {dday !== null && (
+          <span className="text-body-2 md:text-body-1 shrink-0 font-bold tabular-nums">
+            D-{dday}
+          </span>
+        )}
+        <ChevronRightIcon size={20} className="text-fg-subtle shrink-0 md:hidden" />
+      </Link>
+    </li>
   )
 }

@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { EmergencyIcon } from '@/components/icons'
 import { Skeleton } from '@/components/skeleton'
-import { Canvas, Surface, SurfaceStack } from '@/components/surface'
+import { Canvas, Surface, SurfaceList, SurfaceStack } from '@/components/surface'
 import { useNearbyFacilities } from '@/features/emergency/use-nearby-facilities'
 import { IndoorAlternativesSection } from '@/features/home/indoor-alternatives-section'
 import { PlaceInsightRow } from '@/features/home/place-insight-row'
@@ -484,9 +484,9 @@ export function HomeView({
             )}
 
             {pending && visible.length === 0 ? (
-              <ul>
+              <SurfaceList>
                 {Array.from({ length: 2 }, (_, index) => (
-                  <li key={index} className="border-border flex gap-3 border-t px-4 py-3 md:px-5">
+                  <li key={index} className="flex gap-3 px-4 py-3 md:px-5">
                     <Skeleton variant="thumbnail" className="size-20 shrink-0 md:size-24" />
                     <div className="min-w-0 flex-1">
                       <Skeleton className="h-6 w-2/3" />
@@ -495,7 +495,7 @@ export function HomeView({
                     </div>
                   </li>
                 ))}
-              </ul>
+              </SurfaceList>
             ) : allFailed ? (
               <ErrorState
                 title={messages.common.temporaryErrorTitle}
@@ -516,13 +516,12 @@ export function HomeView({
               />
             ) : (
               <div aria-busy={refetching || undefined} className={refetching ? 'opacity-55' : ''}>
-                <ul>
+                <SurfaceList>
                   {scored.map((data, index) => (
                     <PlaceInsightRow
                       key={data.placeId}
                       data={data}
                       place={placeById.get(data.placeId)}
-                      first={index === 0}
                       /*
                         1등만 펼치고 나머지는 접는다 (#307). 홈은 요약 화면인데 세 장이
                         전부 펼쳐져 있어 "요약" 이 아니라 "짧은 목록" 이었다 —
@@ -532,7 +531,7 @@ export function HomeView({
                       reasons={placeReasons[index] ?? data.reasons}
                     />
                   ))}
-                </ul>
+                </SurfaceList>
 
                 {/*
                   **점수를 못 낸 곳은 접어서 개수로만 말한다** (#428). §1 "낮은 우선순위는
@@ -613,9 +612,11 @@ export function HomeView({
                 사라졌다고 읽는다.
               */}
               {upcomingPlans.length > 0 ? (
-                upcomingPlans.map((plan) => (
-                  <UpcomingPlanRow key={plan.planId} plan={plan} today={today as Date} />
-                ))
+                <SurfaceList>
+                  {upcomingPlans.map((plan) => (
+                    <UpcomingPlanRow key={plan.planId} plan={plan} today={today as Date} />
+                  ))}
+                </SurfaceList>
               ) : plans.length === 0 ? (
                 <EmptyState
                   title={messages.home.noPlanTitle}
