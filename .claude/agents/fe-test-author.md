@@ -2,6 +2,7 @@
 name: fe-test-author
 description: 혼디가개(hondigagae) FE에 vitest 테스트를 추가·보강할 때 사용한다. 이 저장소는 jsdom/testing-library 없이 node 환경 + renderToStaticMarkup 문자열 assertion 방식을 쓴다. 새 로직·새 분기(특히 에러 분기)의 커버리지가 필요하거나 기존 테스트가 구현과 어긋났을 때가 트리거다.
 tools: Read, Grep, Glob, Bash, Write, Edit
+model: sonnet
 ---
 
 너는 혼디가개 프런트엔드의 **테스트 작성자**다. 이 저장소만의 테스트 방식을 정확히 따른다.

@@ -23,15 +23,17 @@
 
 `.claude/agents/fe-*.md` 에 정의돼 있다.
 
-| 에이전트             | 책임                                            | 코드 수정    |
-| -------------------- | ----------------------------------------------- | ------------ |
-| `fe-spec-writer`     | 기능 명세 작성·갱신. Swagger 실측으로 계약 확정 | ✕ (문서만)   |
-| `fe-implementer`     | 구현 워크호스. 검증 명령까지 통과시킨다         | ○            |
-| `fe-test-author`     | vitest 테스트 작성·보강                         | ○ (테스트만) |
-| `fe-reviewer`        | 변경 diff를 저장소 규약 기준으로 검토           | ✕            |
-| `fe-api-contract`    | FE 호출부 ↔ Swagger 계약 대조                   | ✕            |
-| `fe-design-reviewer` | 실제 화면을 띄워 `DESIGN.md` 기준 검토          | ✕            |
-| `fe-map-reviewer`    | 카카오 지도 연동 전용 검토                      | ✕            |
+| 에이전트             | 모델   | 책임                                            | 코드 수정    |
+| -------------------- | ------ | ----------------------------------------------- | ------------ |
+| `fe-spec-writer`     | Opus   | 기능 명세 작성·갱신. Swagger 실측으로 계약 확정 | ✕ (문서만)   |
+| `fe-implementer`     | Opus   | 구현 워크호스. 검증 명령까지 통과시킨다         | ○            |
+| `fe-test-author`     | Sonnet | vitest 테스트 작성·보강                         | ○ (테스트만) |
+| `fe-reviewer`        | Opus   | 변경 diff를 저장소 규약 기준으로 검토           | ✕            |
+| `fe-api-contract`    | Sonnet | FE 호출부 ↔ Swagger 계약 대조                   | ✕            |
+| `fe-design-reviewer` | Opus   | 실제 화면을 띄워 `DESIGN.md` 기준 검토          | ✕            |
+| `fe-map-reviewer`    | Opus   | 카카오 지도 연동 전용 검토                      | ✕            |
+
+모델 등급의 기준과 세션 모델(Fable)과의 관계는 [docs/claude-agents.md](../../docs/claude-agents.md) 「프론트엔드 전용 역할」이 정본이다 — 계획·설계·최종 판단은 메인 실행자, 하위 에이전트는 역할 파일의 모델로 돈다.
 
 > **주의**: 사용자 전역(`~/.claude/agents/`)에 같은 이름의 다른 프로젝트용(BossPickSeoul) 정의가 있다. 프로젝트 스코프가 우선하지만, **에이전트 출력에 `bosspickseoul` 이나 `commercial-service` 가 등장하면 잘못된 정의를 읽고 있는 것이다.** 즉시 중단하고 보고한다.
 
