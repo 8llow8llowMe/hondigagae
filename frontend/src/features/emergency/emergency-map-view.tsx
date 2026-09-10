@@ -400,18 +400,27 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         </div>
       )}
 
-      {/* 여백이 `/places` 지도 보기와 정확히 같다 — 같은 컨트롤이면 같은 자리에 있어야 한다 */}
-      <div className="absolute top-5 right-4 z-30 flex flex-col items-end gap-2 md:right-10 lg:top-6">
-        <ViewToggle
-          current="map"
-          listHref={listHref}
-          mapHref={mapHref}
-          variant="icon"
-          className="shadow-md"
-        />
+      {/*
+        여백이 `/places` 지도 보기와 정확히 같다 — 같은 컨트롤이면 같은 자리에 있어야 한다.
+        **뷰포트가 아니라 콘텐츠 열(1440)의 오른쪽 끝에 매단다** (#412) — 지도는 전폭이고
+        목록 보기 헤더는 `--content-max` 안이라, 그러지 않으면 1440 위에서 같은 토글이 두
+        보기에서 다른 자리에 선다. 근거와 실측은 `place-map-view.tsx` 의 같은 자리에 있다.
+      */}
+      <div className="pointer-events-none absolute inset-x-0 top-5 z-30 lg:top-6">
+        <div className="content-container flex justify-end px-4 md:px-10">
+          <div className="pointer-events-auto flex flex-col items-end gap-2">
+            <ViewToggle
+              current="map"
+              listHref={listHref}
+              mapHref={mapHref}
+              variant="icon"
+              className="shadow-md"
+            />
 
-        {/* 제주 밖이면 렌더하지 않는다 — 눌러도 갈 곳이 없다 */}
-        {board.inJeju && <MapLocateButton onLocate={board.locate} />}
+            {/* 제주 밖이면 렌더하지 않는다 — 눌러도 갈 곳이 없다 */}
+            {board.inJeju && <MapLocateButton onLocate={board.locate} />}
+          </div>
+        </div>
       </div>
 
       {/* ── 데스크톱: 좌측 400 고정 패널 ─────────────────────────────────── */}

@@ -285,26 +285,43 @@ export function PlaceMapView({
         안에서 제목 오른쪽에 같은 토글을 두는데, 지도가 `top-3 right-3` 이던 탓에 두 보기를
         번갈아 누르면 버튼이 매번 자리를 옮겼다 — 같은 컨트롤이면 같은 자리에 있어야 한다.
 
+        **그 정렬이 1440 위에서 다시 깨져 있었다** (#412). `--content-max`(#376) 가 들어온
+        뒤 목록 헤더는 1440 컨테이너 안에 서는데 **지도는 전폭이라 뷰포트 끝을 잡았다**
+        (DESIGN.md §7-1 — 지도만 `.rail-layout` 에 가입하지 않는다). 1920 실측으로
+        목록 right 1637 · 지도 right 1880, **243px** 벌어졌다 — 정확히 `(1920−1440)/2` 다.
+        그래서 뷰포트가 아니라 **콘텐츠 열의 오른쪽 끝**에 매단다. 1440 이하에서는
+        `.content-container` 가 전폭이라 예전과 같은 자리(16 / 40)다.
+
+        **`pointer-events-none` 이 필수다.** 바깥 줄이 지도 폭을 가로지르므로, 켜 두면
+        상단 띠에서 지도 드래그가 먹지 않는다. 실제로 누르는 스택만 되살린다.
+
         현재 위치 버튼이 **토글 바로 아래**에 붙으므로 둘을 한 세로 스택으로 묶는다.
         따로 배치하면 토글 높이(44)를 두 곳에서 알아야 한다.
+
+        **좌측 패널(`left-4`)은 건드리지 않는다.** 그쪽은 목록 레일(인셋 40)과 원래부터
+        다른 값이고, 지도 가장자리에 붙는 것이 그 표면의 의도다.
       */}
-      <div className="absolute top-5 right-4 z-30 flex flex-col items-end gap-2 md:right-10 lg:top-6">
-        {/*
+      <div className="pointer-events-none absolute inset-x-0 top-5 z-30 lg:top-6">
+        <div className="content-container flex justify-end px-4 md:px-10">
+          <div className="pointer-events-auto flex flex-col items-end gap-2">
+            {/*
           **폭에 따라 두 벌을 두지 않는다** (#240). 아이콘형 하나로 통일했다 — 지도 위에
           글자 버튼이 얹히면 지도를 가리고, 이름은 `title` 호버 툴팁과 `aria-label` 이 맡는다.
         */}
-        {showToggle && (
-          <ViewToggle
-            current="map"
-            listHref={listHref}
-            mapHref={mapHref}
-            variant="icon"
-            className="shadow-md"
-          />
-        )}
+            {showToggle && (
+              <ViewToggle
+                current="map"
+                listHref={listHref}
+                mapHref={mapHref}
+                variant="icon"
+                className="shadow-md"
+              />
+            )}
 
-        {/* 제주 밖이면 렌더하지 않는다 — 눌러도 갈 곳이 없다 */}
-        {inJeju && <MapLocateButton onLocate={locate} />}
+            {/* 제주 밖이면 렌더하지 않는다 — 눌러도 갈 곳이 없다 */}
+            {inJeju && <MapLocateButton onLocate={locate} />}
+          </div>
+        </div>
       </div>
 
       {/* ── 데스크톱: 좌측 400 고정 패널 ─────────────────────────────────── */}
