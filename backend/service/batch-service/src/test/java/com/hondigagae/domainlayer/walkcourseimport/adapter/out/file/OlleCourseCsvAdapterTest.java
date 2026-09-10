@@ -3,7 +3,6 @@ package com.hondigagae.domainlayer.walkcourseimport.adapter.out.file;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.domainlayer.walkcourseimport.domain.model.ImportedWalkCourse;
-import com.hondigagae.global.properties.OlleCourseProperties;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
@@ -59,6 +58,6 @@ class OlleCourseCsvAdapterTest {
     }
 
     private List<ImportedWalkCourse> load(Path path) {
-        return new OlleCourseCsvAdapter(new OlleCourseProperties(path.toString())).loadCourses();
+        return new OlleCourseCsvAdapter().loadCourses(path);
     }
 }

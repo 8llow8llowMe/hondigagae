@@ -82,6 +82,10 @@ x-batch-service-environment: &batch_service_environment
   CULTURE_FACILITY_DOWNLOAD_ENABLED: ${CULTURE_FACILITY_DOWNLOAD_ENABLED:-true}
   # [선택] 내려받을 디렉터리. 비면 컨테이너 임시 디렉터리(java.io.tmpdir). 30MB 가 들어간다.
   CULTURE_FACILITY_DOWNLOAD_DIR: ${CULTURE_FACILITY_DOWNLOAD_DIR:-}
+  # 올레 CSV 우회용. 포털에서 받지 못했을 때만 읽는다.
+  OLLE_COURSE_CSV_PATH: ${OLLE_COURSE_CSV_PATH:-/app/data/olle_course.csv}
+  OLLE_COURSE_DOWNLOAD_ENABLED: ${OLLE_COURSE_DOWNLOAD_ENABLED:-true}
+  OLLE_COURSE_DOWNLOAD_DIR: ${OLLE_COURSE_DOWNLOAD_DIR:-}
 
 x-logging: &default-logging
   driver: "json-file"

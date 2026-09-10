@@ -28,11 +28,11 @@ class QuartzScheduleConfigConditionTest {
         .withUserConfiguration(BatchSchedulePropertiesTestConfig.class, QuartzScheduleConfig.class);
 
     @Test
-    @DisplayName("스케줄이 켜져 있고 수동 실행 JVM 이 아니면 두 잡의 JobDetail 이 등록된다")
+    @DisplayName("스케줄이 켜져 있고 수동 실행 JVM 이 아니면 세 잡의 JobDetail 이 등록된다")
     void registersJobDetailsWhenScheduleEnabled() {
         contextRunner.withPropertyValues("batch.schedule.enabled=true")
             .run(context -> assertThat(context.getBeansOfType(JobDetail.class))
-                .containsOnlyKeys("placeDataPipelineJobDetail", "congestionImportJobDetail"));
+                .containsOnlyKeys("placeDataPipelineJobDetail", "congestionImportJobDetail", "olleCourseImportJobDetail"));
     }
 
     @Test

@@ -41,7 +41,7 @@ class ScheduledJobLaunchFacadeTest {
     private static final String EXPECTED_RUN_AT = "2026-09-14T03:00:00";
 
     private final BatchScheduleProperties batchScheduleProperties =
-        new BatchScheduleProperties(true, "Asia/Seoul", null, null, Duration.ofHours(6));
+        new BatchScheduleProperties(true, "Asia/Seoul", null, null, null, Duration.ofHours(6));
     private final RunningJobGuardProcessor runningJobGuardProcessor = mock(RunningJobGuardProcessor.class);
     private final BatchJobLaunchPort batchJobLaunchPort = mock(BatchJobLaunchPort.class);
     private final ScheduleMetricsPort scheduleMetricsPort = mock(ScheduleMetricsPort.class);

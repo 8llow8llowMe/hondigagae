@@ -155,6 +155,13 @@ FAILED 가 된다(데이터는 멀쩡한데 잡만 실패로 보인다).
 ./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=congestionImportJob runAt=$(date -Iseconds)"
 ```
 
+`olleCourseImportJob` 은 장소 파이프라인 밖이다. 기본은 포털에서 CSV 를 받고, 직전과 같은
+파일이면 건너뛴다. 로컬 우회 파일은 `OLLE_COURSE_CSV_PATH`(기본 `data/olle_course.csv`)다.
+
+```bash
+./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=olleCourseImportJob runAt=$(date -Iseconds)"
+```
+
 `placeImageBackfillJob` 은 **문화정보원·식약처 적재 뒤**에 돌린다 — 그 두 원천에는 이미지
 필드가 없어서 같은 장소가 TourAPI 에 있으면 대표 이미지를 빌려 채운다. 순서를 앞당기면
 채울 대상이 아직 없어 0건으로 끝난다. 재실행은 멱등이다(이미 채워진 행은 대상에서 빠진다).

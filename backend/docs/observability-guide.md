@@ -155,6 +155,7 @@ batch_schedule_last_fire_timestamp{job}      # 잡별 마지막 발화 시각(ep
 | 조건 | 심각도 | 뜻 |
 | --- | --- | --- |
 | `time() - batch_schedule_last_fire_timestamp{job="placeDataPipelineJob"} > 8d` | 경고 | 주 1회 스케줄이 한 주기를 통째로 놓쳤다 |
+| `time() - batch_schedule_last_fire_timestamp{job="olleCourseImportJob"} > 8d` | 경고 | 주 1회 올레 스케줄이 한 주기를 통째로 놓쳤다 |
 | `time() - batch_schedule_last_fire_timestamp{job="congestionImportJob"} > 2d` | 경고 | 일 1회 스케줄이 멈췄다 |
 | `increase(batch_schedule_fire_total{result="skipped_running"}[14d]) >= 2` | 경고 | 앞 실행이 계속 안 끝난다. 잡 자체가 오래 걸리거나 STARTED 행이 방치됐다 |
 

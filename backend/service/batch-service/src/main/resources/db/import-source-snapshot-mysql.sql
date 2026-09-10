@@ -16,7 +16,7 @@
 -- H2(MODE=MySQL) 에서도 그대로 돌아야 한다 — 컨텍스트 로딩 게이트가 이 스크립트를 실행한다.
 CREATE TABLE IF NOT EXISTS import_source_snapshot (
     id                  BIGINT       AUTO_INCREMENT PRIMARY KEY COMMENT 'PK',
-    source              VARCHAR(32)  NOT NULL COMMENT '장소 원천 (PlaceSourceType 이름). 예: CULTURE_PORTAL',
+    source              VARCHAR(32)  NOT NULL COMMENT '원천 식별자. 예: CULTURE_PORTAL, OLLE_COURSE',
     area_code           VARCHAR(8)   NOT NULL COMMENT '적재 범위 관광 지역코드. 적재/delist 범위와 같은 값이어야 한다',
     file_id             VARCHAR(64)  NOT NULL COMMENT '원천 파일 식별자. 문화정보원은 포털의 atchFileId',
     file_name           VARCHAR(255) NULL     COMMENT 'Content-Disposition 파일명. 사람이 어느 판본인지 알아보는 용도',

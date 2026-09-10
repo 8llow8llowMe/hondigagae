@@ -5,7 +5,6 @@ import com.hondigagae.domainlayer.walkcourseimport.application.exception.WalkCou
 import com.hondigagae.domainlayer.walkcourseimport.application.port.out.OlleCourseCatalogPort;
 import com.hondigagae.domainlayer.walkcourseimport.domain.model.ImportedWalkCourse;
 import com.hondigagae.domainlayer.walkcourseimport.domain.model.OlleCourseParser;
-import com.hondigagae.global.properties.OlleCourseProperties;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
@@ -16,7 +15,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -33,16 +31,12 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class OlleCourseCsvAdapter implements OlleCourseCatalogPort {
 
     private static final String[] REQUIRED_COLUMNS = {"코스별", "코스명", "거리", "소요시간정보", "시종점정보", "데이터기준일자"};
 
-    private final OlleCourseProperties olleCourseProperties;
-
     @Override
-    public List<ImportedWalkCourse> loadCourses() {
-        Path path = Path.of(olleCourseProperties.filePath());
+    public List<ImportedWalkCourse> loadCourses(Path path) {
         if (!Files.exists(path)) {
             throw new WalkCourseImportException(WalkCourseImportErrorCode.CSV_NOT_FOUND, path.toAbsolutePath());
         }
@@ -52,7 +46,7 @@ public class OlleCourseCsvAdapter implements OlleCourseCatalogPort {
             throw new WalkCourseImportException(WalkCourseImportErrorCode.CSV_COLUMN_MISSING, "빈 파일");
         }
 
-        List<String> header = Arrays.stream(lines.get(0).replace("﻿", "").split(",", -1))
+        List<String> header = Arrays.stream(lines.get(0).replace("\uFEFF", "").split(",", -1))
             .map(String::trim)
             .toList();
         int[] indices = new int[REQUIRED_COLUMNS.length];

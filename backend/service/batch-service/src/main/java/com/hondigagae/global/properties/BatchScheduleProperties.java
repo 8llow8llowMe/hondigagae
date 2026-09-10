@@ -22,6 +22,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param timeZone cron 을 해석할 시간대. JVM 기본 시간대에 기대지 않는다
  * @param placePipelineCron {@code placeDataPipelineJob} 발화 cron (Quartz 6~7 필드)
  * @param congestionCron {@code congestionImportJob} 발화 cron (Quartz 6~7 필드)
+ * @param olleCron {@code olleCourseImportJob} 발화 cron (Quartz 6~7 필드)
  * @param staleRunningAfter 이 시간을 넘긴 STARTED 실행은 죽은 JVM 의 잔재로 보고 무시한다
  */
 @ConfigurationProperties(prefix = "batch.schedule")
@@ -30,6 +31,7 @@ public record BatchScheduleProperties(
     String timeZone,
     String placePipelineCron,
     String congestionCron,
+    String olleCron,
     Duration staleRunningAfter
 ) {
 
@@ -48,6 +50,11 @@ public record BatchScheduleProperties(
             // 매일 06:00. 30일 rolling 원천이라 하루 한 번이면 충분하고,
             // 파이프라인(03:00)이 길어져도 겹치지 않을 만큼 떨어뜨렸다.
             congestionCron = "0 0 6 * * ?";
+        }
+        if (olleCron == null || olleCron.isBlank()) {
+            // 월요일 05:00. 장소 파이프라인(03:00)과 혼잡도(06:00) 사이.
+            // 파일이 몇 달에 한 번 바뀌므로 주 1회 확인이면 충분하고, 같으면 건너뛴다.
+            olleCron = "0 0 5 ? * MON";
         }
         if (staleRunningAfter == null || staleRunningAfter.isZero() || staleRunningAfter.isNegative()) {
             staleRunningAfter = Duration.ofHours(6);

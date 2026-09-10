@@ -8,6 +8,7 @@ import com.hondigagae.domainlayer.walkcourseimport.application.port.out.WalkCour
 import com.hondigagae.domainlayer.walkcourseimport.application.port.out.query.OlleCourseCoordinateQueryResult;
 import com.hondigagae.domainlayer.walkcourseimport.domain.model.ImportedWalkCourse;
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +22,7 @@ class OlleCourseImportProcessorTest {
     @Test
     @DisplayName("CSV 가 기준 목록이다 - 매칭된 코스는 좌표가 붙고, TourAPI 에 없는 코스는 좌표 null 로 적재된다")
     void csvIsTheSourceListAndUnmatchedStaysWithoutCoordinate() {
-        OlleCourseCatalogPort catalog = () -> List.of(course("1"), course("20"));
+        OlleCourseCatalogPort catalog = path -> List.of(course("1"), course("20"));
         OlleCourseCoordinatePort coordinates = () -> Map.of(
             "1", OlleCourseCoordinateQueryResult.builder()
                 .lat(33.4796d).lng(126.8955d).contentId(126273L).firstImage("http://image").build(),
@@ -29,9 +30,9 @@ class OlleCourseImportProcessorTest {
             "99", OlleCourseCoordinateQueryResult.builder().lat(33.0d).lng(126.0d).build());
         OlleCourseImportProcessor processor = new OlleCourseImportProcessor(catalog, coordinates, bulkPort());
 
-        int count = processor.importCourses();
+        var imported = processor.importCourses(Path.of("unused.csv"));
 
-        assertThat(count).isEqualTo(2);
+        assertThat(imported).hasSize(2);
         assertThat(upserted).hasSize(2);
         ImportedWalkCourse matched = upserted.stream()
             .filter(course -> course.courseKey().equals("1")).findFirst().orElseThrow();

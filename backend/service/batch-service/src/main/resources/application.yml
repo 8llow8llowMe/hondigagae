@@ -58,6 +58,8 @@ batch:
     place-pipeline-cron: ${BATCH_SCHEDULE_PLACE_PIPELINE_CRON:0 0 3 ? * MON}
     # 매일 06:00 KST. 30일 rolling 원천이라 일 1회.
     congestion-cron: ${BATCH_SCHEDULE_CONGESTION_CRON:0 0 6 * * ?}
+    # 월요일 05:00 KST. 파이프라인(03:00)과 혼잡도(06:00) 사이. 파일이 같으면 건너뛴다.
+    olle-cron: ${BATCH_SCHEDULE_OLLE_CRON:0 0 5 ? * MON}
     # 이 시간을 넘긴 STARTED 실행은 죽은 JVM 의 잔재로 보고 무시한다.
     stale-running-after: ${BATCH_SCHEDULE_STALE_RUNNING_AFTER:6h}
 
@@ -150,8 +152,18 @@ culture-facility:
 # 제주올레 코스현황 CSV.
 # 공공데이터포털 파일데이터라 활용신청도 인증키도 필요 없다 (data.go.kr/data/15043496).
 # 원본이 CP949 여도 어댑터가 판별해 읽는다.
+# 배치가 포털에서 직접 내려받는 것이 기본이다. atchFileId 와 바이트 수가 직전 적재와
+# 같으면 받지도 적재하지도 않는다.
 olle-course:
+  # 포털 실패 시 우회용 파일. 컨테이너에서는 /app/data 가 읽기 전용이라 여기에 쓸 수 없다.
   file-path: ${OLLE_COURSE_CSV_PATH:data/olle_course.csv}
+  download-enabled: ${OLLE_COURSE_DOWNLOAD_ENABLED:true}
+  base-url: ${OLLE_COURSE_BASE_URL:https://www.data.go.kr}
+  dataset-id: ${OLLE_COURSE_DATASET_ID:15043496}
+  download-dir: ${OLLE_COURSE_DOWNLOAD_DIR:}
+  read-timeout-ms: ${OLLE_COURSE_READ_TIMEOUT_MS:120000}
+  # 올레 CSV 는 수십 행이라 문화정보원(1MB)보다 낮게 둔다. 이보다 작으면 오류 페이지로 본다.
+  min-content-length: ${OLLE_COURSE_MIN_CONTENT_LENGTH:200}
 
 # 식약처 반려동물 동반출입 음식점 등록 현황(xlsx).
 # 인증키가 없다. file-path 에 파일이 있으면 그 파일을, 없으면 원천에서 내려받는다.

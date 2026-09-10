@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.hondigagae.domainlayer.placeimport.application.port.out.ImportSourceSnapshotPort;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportSourceSnapshot;
+import com.hondigagae.domainlayer.walkcourseimport.application.port.out.OlleCourseSnapshotPort;
+import com.hondigagae.domainlayer.walkcourseimport.domain.model.OlleCourseSnapshot;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +34,9 @@ class BatchServiceApplicationTests {
 
     @Autowired
     private ImportSourceSnapshotPort importSourceSnapshotPort;
+
+    @Autowired
+    private OlleCourseSnapshotPort olleCourseSnapshotPort;
 
     @Test
     void contextLoads() {
@@ -67,5 +72,25 @@ class BatchServiceApplicationTests {
         });
         // 다른 지역의 적재는 이 지역 판정에 섞이지 않는다 (조회 범위가 source + areaCode 다).
         assertThat(importSourceSnapshotPort.findLatest(PlaceSourceType.CULTURE_PORTAL, "1")).isEmpty();
+    }
+
+    @Test
+    void appliesOlleCourseSnapshotRoundTripWithoutMixingCultureRows() {
+        LocalDateTime runStartedAt = LocalDateTime.of(2026, 9, 10, 5, 0);
+        olleCourseSnapshotPort.record(new OlleCourseSnapshot(
+            "FILE_000000001111111", "olle.csv", 4_096L, LocalDateTime.of(2025, 4, 28, 0, 0), 29, runStartedAt));
+
+        Optional<OlleCourseSnapshot> latest = olleCourseSnapshotPort.findLatest();
+
+        assertThat(latest).hasValueSatisfying(snapshot -> {
+            assertThat(snapshot.fileId()).isEqualTo("FILE_000000001111111");
+            assertThat(snapshot.contentLength()).isEqualTo(4_096L);
+            assertThat(snapshot.importedCount()).isEqualTo(29);
+            assertThat(snapshot.sameFileAs("FILE_000000001111111", 4_096L)).isTrue();
+        });
+        // 같은 테이블이어도 source 가 다르면 문화정보원 조회에 올레 행이 섞이지 않는다.
+        Optional<ImportSourceSnapshot> culture =
+            importSourceSnapshotPort.findLatest(PlaceSourceType.CULTURE_PORTAL, "39");
+        assertThat(culture.map(ImportSourceSnapshot::fileId).orElse(null)).isNotEqualTo("FILE_000000001111111");
     }
 }

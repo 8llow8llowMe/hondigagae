@@ -23,7 +23,7 @@ tour-api:
   service-key: ${TOUR_API_SERVICE_KEY}
 
 # dev 는 프로세스 안 Quartz 를 켠다 (#378) — 장소 파이프라인 주 1회(월 03:00 KST),
-# 혼잡도 일 1회(06:00 KST). 컨테이너가 restart: unless-stopped 로 상시 떠 있어
+# 올레 주 1회(월 05:00 KST), 혼잡도 일 1회(06:00 KST). 컨테이너가 restart: unless-stopped 로 상시 떠 있어
 # 스케줄러가 살아 있을 수 있다. 끄려면 compose 에 BATCH_SCHEDULE_ENABLED=false 를 준다.
 batch:
   schedule:
