@@ -11,6 +11,7 @@ import {
 import { MetricBadge } from '@/components/metric'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { Skeleton } from '@/components/skeleton'
+import { Surface } from '@/components/surface'
 import { formatCelsius } from '@/lib/format/celsius'
 import { sortRegionsByScore } from '@/lib/insight/region-order'
 import { suitabilityTone } from '@/lib/insight/tone'
@@ -52,21 +53,16 @@ export function RegionalWeatherSection({
 
   return (
     /*
-      **위 테두리를 긋지 않는다.** 우측 열의 첫 블록이라 위에 이을 것이 없고, 2단에서는
-      열 구분선(`border-left`)이 이미 이 블록의 왼쪽을 잡는다 (DESIGN.md §7-2).
-      아래 밴드는 남긴다 — 다음이 "맞는 곳" 이라 다른 이야기가 시작된다 (§0).
-    */
-    <section aria-label={messages.home.regionHeading}>
-      <div className="flex flex-col gap-3 px-4 py-4 md:px-10 md:py-5">
-        {/*
-          **특보 배지가 여기 없다** (#349). 페이지 최상단 `WeatherWarningStrip` 하나가
-          말한다. 예전에는 이 배지가 **모바일의 유일한 특보 표시**를 겸했는데, 스트립이
-          레이아웃 밖 최상단이라 그 역할까지 함께 가져갔다.
-        */}
-        <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
-          {messages.home.regionHeading}
-        </h2>
+      **아래 밴드가 사라졌다** (#428). 3a 에서는 카드 사이 간격이 경계라, 섹션이 스스로
+      다음과의 경계를 그릴 필요가 없다 — 다음 섹션이 없는 날(조회 실패)에 밴드만 남던
+      문제도 함께 없어진다.
 
+      **특보 배지가 여기 없다** (#349). 페이지 최상단 `WeatherWarningStrip` 하나가
+      말한다. 예전에는 이 배지가 **모바일의 유일한 특보 표시**를 겸했는데, 스트립이
+      레이아웃 밖 최상단이라 그 역할까지 함께 가져갔다.
+    */
+    <Surface titleId="region-heading" title={messages.home.regionHeading}>
+      <div className="flex flex-col gap-3 px-4 pb-4 md:px-5 md:pb-5">
         <Recommendation data={data} />
 
         {/*
@@ -164,9 +160,7 @@ export function RegionalWeatherSection({
           />
         </div>
       </div>
-
-      <div aria-hidden className="bg-band h-2 w-full" />
-    </section>
+    </Surface>
   )
 }
 
@@ -397,15 +391,18 @@ function levelOf(score: number): string {
   return 'LOW'
 }
 
+/**
+ * **스켈레톤도 같은 표면을 쓴다** (#428). 로딩과 완료가 다른 표면을 쓰면 데이터가
+ * 도착하는 순간 카드가 생겼다 사라진 것처럼 보인다.
+ */
 function RegionalWeatherSkeleton() {
   return (
-    <section aria-hidden>
-      <div className="flex flex-col gap-3 px-4 py-4 md:px-10 md:py-5">
+    <Surface>
+      <div aria-hidden className="flex flex-col gap-3 px-4 py-4 md:px-5 md:py-5">
         <Skeleton className="h-5 w-36" />
         <Skeleton className="h-6 w-52" />
         <Skeleton className="h-24 w-full" />
       </div>
-      <div className="bg-band h-2 w-full" />
-    </section>
+    </Surface>
   )
 }

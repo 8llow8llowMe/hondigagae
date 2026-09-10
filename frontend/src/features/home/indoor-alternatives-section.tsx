@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
 import { ChevronRightIcon } from '@/components/icons'
+import { Surface } from '@/components/surface'
 import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
 import type { AlternativePlaceItem } from '@/types/insight'
@@ -27,24 +28,20 @@ export function IndoorAlternativesSection({
   if (alternatives.length === 0) return null
 
   return (
-    <section aria-labelledby="indoor-heading">
-      <div className="px-4 pt-5 pb-2 md:px-10 md:pt-6 md:pb-3">
-        <h2
-          id="indoor-heading"
-          className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold"
-        >
-          {messages.home.indoorHeading}
-        </h2>
-        {/* 거리의 기준점을 밝힌다 — `messages.home.indoorNote` 주석 */}
-        <p className="text-caption text-fg-muted mt-1 font-medium">{messages.home.indoorNote}</p>
-      </div>
-
+    <Surface
+      titleId="indoor-heading"
+      title={messages.home.indoorHeading}
+      /* 거리의 기준점을 밝힌다 — `messages.home.indoorNote` 주석 */
+      description={
+        <p className="text-caption text-fg-muted font-medium">{messages.home.indoorNote}</p>
+      }
+    >
       <ul>
         {alternatives.map((alternative) => (
           <IndoorAlternativeRow key={alternative.placeId} alternative={alternative} />
         ))}
       </ul>
-    </section>
+    </Surface>
   )
 }
 

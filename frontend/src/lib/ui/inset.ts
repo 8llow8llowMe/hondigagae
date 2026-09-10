@@ -39,12 +39,19 @@
  * `emergency-map-panel.tsx`)과 다른 세로선에 선다. `panel` 은 그 트랩을 피하려고 끝까지
  * 평평하다 — 컨테이너 자체가 이미 고정 폭이라 더 넓은 여백을 줄 뷰포트가 없다.
  */
-export type Inset = 'main' | 'rail' | 'panel'
+/**
+ * **`card` 는 3층 표면(#428) 안쪽 전용이다.** 16(모바일) / 20(데스크톱)로, `main` 의
+ * 40 이 아니다 — `Surface` 가 이미 페이지에서 한 번 들어와 있어 안쪽까지 40 을 주면
+ * 내용이 두 번 밀린다. **bleed 값도 함께 갈린다**: 카드 안에서 `rail` 의 음수 마진
+ * (`md:-mr-10`)을 쓰면 스크롤러가 카드 테두리를 뚫고 나간다 (홈 골든타임에서 실제로 났다).
+ */
+export type Inset = 'main' | 'rail' | 'panel' | 'card'
 
 export const INSET_CLASS: Record<Inset, string> = {
   main: 'px-4 md:px-10',
   rail: 'px-4 md:px-10 lg:pr-6',
   panel: 'px-4',
+  card: 'px-4 md:px-5',
 }
 
 /**
@@ -56,6 +63,7 @@ export const INSET_BLEED_CLASS: Record<Inset, string> = {
   main: '-mx-4 px-4 md:-mx-10 md:px-10',
   rail: '-mx-4 px-4 md:-mx-10 md:px-10 lg:-mr-6 lg:pr-6',
   panel: '-mx-4 px-4',
+  card: '-mx-4 px-4 md:-mx-5 md:px-5',
 }
 
 /**
@@ -68,4 +76,5 @@ export const INSET_BLEED_END_CLASS: Record<Inset, string> = {
   main: '-mr-4 pr-4 md:-mr-10 md:pr-10',
   rail: '-mr-4 pr-4 md:-mr-10 md:pr-10 lg:-mr-6 lg:pr-6',
   panel: '-mr-4 pr-4',
+  card: '-mr-4 pr-4 md:-mr-5 md:pr-5',
 }
