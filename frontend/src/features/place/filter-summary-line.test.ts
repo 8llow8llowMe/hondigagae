@@ -9,6 +9,10 @@ describe('filterSummaryLine — 제목 아래 부제', () => {
     expect(filterSummaryLine(DEFAULT_PLACE_FILTERS)).toBe(messages.place.pageDescription)
   })
 
+  it('키워드가 있으면 부제 앞에 둔다', () => {
+    expect(filterSummaryLine({ ...DEFAULT_PLACE_FILTERS, keyword: '성산' })).toBe('성산')
+  })
+
   it('시군구 코드를 라벨로 바꾼다', () => {
     expect(filterSummaryLine({ ...DEFAULT_PLACE_FILTERS, sigunguCode: '4' })).toBe('제주시')
     expect(filterSummaryLine({ ...DEFAULT_PLACE_FILTERS, sigunguCode: '3' })).toBe('서귀포시')

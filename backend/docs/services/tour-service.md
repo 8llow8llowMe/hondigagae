@@ -20,7 +20,7 @@
 
 ## 주요 API (계획)
 
-- `GET /api/v1/places` — 검색 (지역, 유형, 반려견 동반 조건, 커서 기반 `SliceResponse`)
+- `GET /api/v1/places` — 검색 (지역, 유형, 반려견 동반 조건, **keyword** 이름·주소 부분 일치, 커서 기반 `SliceResponse`)
 - `GET /api/v1/places/{placeId}` — 상세 (출입 조건: 실내/실외, 크기 제한, 목줄/케이지 조건)
 - `GET /api/v1/places/{placeId}/related` — 연관 관광지
 - `GET /api/v1/places/{placeId}/suitability` — 여행 적합도 (`score` + `reasons`, `api-design-guide.md` §9)
@@ -33,7 +33,7 @@
   시작점에서 그대로 재사용하므로 "오늘 이 코스 언제 걷기 좋은가"에 신규 API 없이 답한다.
   좌표가 null 인 코스(20·18-2)는 그 동선을 만들지 않는다
 - `GET /api/v1/walk-courses/{walkCourseId}` — 산책 코스 상세
-- `GET /api/v1/places/nearby?lat=&lng=&radius=&contentType=&petSizeType=&petWeightKg=` — 좌표 반경 장소 검색
+- `GET /api/v1/places/nearby?lat=&lng=&radius=&contentType=&petSizeType=&petWeightKg=&keyword=` — 좌표 반경 장소 검색. keyword 는 목록과 같은 이름·주소 부분 일치
 - `GET /api/v1/emergencies/facilities?lat=&lng=&radius=&type=&open24Only=&openNowOnly=&size=` — 긴급 시설 반경 검색.
   `size` 상한은 **250** 이다 — 제주 전역 시설이 214곳이라 반경을 최대로 넓혀도 잘리지 않는다.
   화면이 유형·24시간을 클라이언트에서 좁히며 칩마다 개수를 보여주므로 한 번에 전량을 받아야 한다.
@@ -67,6 +67,9 @@
 ## 데이터 흐름
 
 - 장소/코스/연관 관광지/혼잡도 예측: batch-service가 적재한 DB를 조회한다.
+  장소 키워드 검색(`keyword`)은 DB `LIKE`(이름·주소) 가 원천이고, 같은 조건의 반복
+  조회만 Redis 에 5분 TTL 로 둔다. Redis 장애는 캐시 미스로 취급한다. Elasticsearch
+  는 인프라 미구성이라 이 경로를 쓰지 않는다 (#421).
 - 날씨: 기상청 실시간 호출(`WeatherObservationPort`) + Redis **격자별** 캐시.
   TTL 은 고정값이 아니라 다음 발표 시각에 맞춘다 — 캐시는 성능 최적화가 아니라
   일 1,000건 제한을 방어하는 쿼터 정책이다.

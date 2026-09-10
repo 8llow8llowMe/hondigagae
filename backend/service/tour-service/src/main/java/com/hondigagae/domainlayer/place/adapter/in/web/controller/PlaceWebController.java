@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.NearbyPlaceR
 import com.hondigagae.domainlayer.place.adapter.in.web.dto.response.PlaceDetailResponse;
 import com.hondigagae.domainlayer.place.application.exception.PlaceValidationMessage;
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
+import com.hondigagae.domainlayer.place.application.model.PlaceKeyword;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
 import com.hondigagae.domainlayer.place.application.port.in.PlaceWebUseCase;
 import com.hondigagae.shared.travel.place.AllowedPetSize;
@@ -19,6 +20,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -39,7 +41,8 @@ public class PlaceWebController {
 
     @Operation(summary = "장소 목록 조회",
         description = "지역·타입·반려동물 동반 조건으로 장소를 검색합니다. lastPlaceId 커서 기반 무한 스크롤 응답입니다. "
-            + "비 오는 날 대안을 찾을 때는 indoor=true 로, 소형견만 받는 곳을 피할 때는 allowedPetSize 로 거릅니다.\n\n"
+            + "비 오는 날 대안을 찾을 때는 indoor=true 로, 소형견만 받는 곳을 피할 때는 allowedPetSize 로 거릅니다. "
+            + "이름·주소로 찾을 때는 keyword 를 씁니다 (부분 일치, 대소문자 무시).\n\n"
             + "**필수 파라미터는 없습니다.** 전부 생략하면 전체 장소의 첫 페이지(20개)가 옵니다. "
             + "선택 파라미터는 채운 것만 AND 조건으로 걸립니다.\n\n"
             + "**정렬은 `placeId` 오름차순이며 최신순이 아닙니다.** 아이디 대역이 원천별로 갈려 있어 "
@@ -47,6 +50,7 @@ public class PlaceWebController {
             + "호출 예\n"
             + "- 제주 음식점·카페 20개: `GET /api/v1/places?areaCode=39&contentType=RESTAURANT`\n"
             + "- 중형견 동반 가능한 실내 장소: `GET /api/v1/places?petAllowanceType=ALLOWED&indoor=true&petSizeType=MEDIUM`\n"
+            + "- 성산이 이름이나 주소에 들어간 곳: `GET /api/v1/places?keyword=성산`\n"
             + "- 다음 페이지: 직전 응답 `items` 마지막의 `placeId` 를 `lastPlaceId` 로")
     @GetMapping
     public ResponseEntity<Response<SliceResponse<PlaceItem>>> getPlaces(
@@ -65,6 +69,9 @@ public class PlaceWebController {
         @RequestParam(required = false) Integer petWeightKg,
         @Parameter(description = "[선택] 원천 분류명 그대로 (펜션·카페·박물관·여행지 등). 콘텐츠 타입으로는 갈리지 않는 구분에 씁니다. 생략하면 필터 없음", example = "카페")
         @RequestParam(required = false) String sourceCategory,
+        @Parameter(description = "[선택] 장소명 또는 주소 부분 일치. 공백/빈 값은 필터 없음. 최대 50자", example = "성산")
+        @Size(max = PlaceKeyword.MAX_LENGTH, message = PlaceValidationMessage.KEYWORD_MAX_INVALID)
+        @RequestParam(required = false) String keyword,
         @Parameter(description = "[선택] 커서. 첫 페이지는 생략하고, 다음 페이지는 직전 응답 마지막 항목의 placeId 를 넣습니다(그 아이디 **뒤**부터 옵니다). 예시 값은 형식 안내용", example = "126434") @RequestParam(required = false) Long lastPlaceId,
         @Parameter(description = "[선택, 기본 20] 조회 개수 (1~50)", example = "20")
         @Positive(message = PlaceValidationMessage.SIZE_POSITIVE) @Max(value = 50, message = PlaceValidationMessage.SIZE_MAX_INVALID)
@@ -80,6 +87,7 @@ public class PlaceWebController {
             .petSizeType(petSizeType)
             .petWeightKg(petWeightKg)
             .sourceCategory(sourceCategory)
+            .keyword(keyword)
             .lastPlaceId(lastPlaceId)
             .size(size)
             .build();
@@ -96,6 +104,7 @@ public class PlaceWebController {
             + "**totalCount 는 size 로 자르기 전 총계입니다.** 돌려준 개수보다 크면 반경 안에 더 있다는 뜻입니다.\n\n"
             + "호출 예\n"
             + "- 제주시청 반경 3km 카페: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&radius=3000&sourceCategory=카페`\n"
+            + "- 성산이 이름이나 주소에 들어간 5km 안 장소: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&keyword=성산`\n"
             + "- 소형견 동반 가능한 5km 안 장소: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&petAllowanceType=ALLOWED&petSizeType=SMALL`")
     @GetMapping("/nearby")
     public ResponseEntity<Response<NearbyPlaceResponse>> getNearbyPlaces(
@@ -126,6 +135,9 @@ public class PlaceWebController {
         @RequestParam(required = false) Integer petWeightKg,
         @Parameter(description = "[선택] 원천 분류명 그대로 (카페·펜션·일반음식점 등). 생략하면 필터 없음", example = "카페")
         @RequestParam(required = false) String sourceCategory,
+        @Parameter(description = "[선택] 장소명 또는 주소 부분 일치. 공백/빈 값은 필터 없음. 최대 50자", example = "성산")
+        @Size(max = PlaceKeyword.MAX_LENGTH, message = PlaceValidationMessage.KEYWORD_MAX_INVALID)
+        @RequestParam(required = false) String keyword,
 
         @Parameter(description = "[선택, 기본 15] 조회 개수 (1~50)", example = "15")
         @Positive(message = PlaceValidationMessage.SIZE_POSITIVE)
@@ -143,6 +155,7 @@ public class PlaceWebController {
             .petSizeType(petSizeType)
             .petWeightKg(petWeightKg)
             .sourceCategory(sourceCategory)
+            .keyword(keyword)
             .size(size)
             .build();
         NearbyPlaceResponse response = placeWebUseCase.getNearbyPlaces(criteria);

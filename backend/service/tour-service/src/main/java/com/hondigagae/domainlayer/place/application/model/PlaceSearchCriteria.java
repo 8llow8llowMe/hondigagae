@@ -9,7 +9,7 @@ import lombok.Builder;
 /**
  * 장소 목록 조회 조건. filter + cursor + size 가 함께 움직이므로 Criteria 로 묶는다.
  */
-@Builder
+@Builder(toBuilder = true)
 public record PlaceSearchCriteria(
     String areaCode,
     String sigunguCode,
@@ -24,6 +24,8 @@ public record PlaceSearchCriteria(
     Integer petWeightKg,
     // 원본 분류로 거른다. contentTypeId 39 에 음식점과 카페가 섞여 있어 이 값이 필요하다.
     String sourceCategory,
+    // 장소명·주소 부분 일치. 공백/빈 값은 필터 없음이다.
+    String keyword,
     Long lastPlaceId,
     int size
 ) {

@@ -13,6 +13,12 @@ describe('placeListPath', () => {
     expect(path).toContain('size=20')
   })
 
+  it('keyword 를 목록 경로에 싣는다', () => {
+    expect(placeListPath({ ...DEFAULT_PLACE_FILTERS, keyword: '성산' }, null)).toContain(
+      'keyword=',
+    )
+  })
+
   it('커서를 lastPlaceId 로 붙인다', () => {
     expect(placeListPath(DEFAULT_PLACE_FILTERS, '212481712381923328')).toContain(
       'lastPlaceId=212481712381923328',

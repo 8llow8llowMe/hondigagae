@@ -15,6 +15,9 @@ import type { PlaceFilters } from '@/types/place'
 export function filterSummaryLine(filters: PlaceFilters): string {
   const parts: string[] = []
 
+  if (filters.keyword !== null) {
+    parts.push(filters.keyword)
+  }
   if (filters.sigunguCode !== null) {
     parts.push(SIGUNGU_LABEL[filters.sigunguCode] ?? filters.sigunguCode)
   }

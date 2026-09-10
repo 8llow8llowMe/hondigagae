@@ -123,8 +123,8 @@
   `petAllowanceType`(`ALLOWED` `PARTIALLY_ALLOWED` `NOT_ALLOWED` `UNKNOWN`),
   `indoor`(true 면 실내만), `allowedPetSize`(`ALL`/`SMALL_ONLY`/`SMALL_MEDIUM`/`UNKNOWN`),
   `petWeightKg`(내 반려견 체중, **`Integer`**),
-  `sourceCategory`(원본 분류 자유 문자열, 예: 카페), `lastPlaceId`(커서), `size`(1~50, 기본 20).
-  **모두 단일값이며 배열이 아니다.**
+  `sourceCategory`(원본 분류 자유 문자열, 예: 카페), `keyword`(장소명·주소 부분 일치, 최대 50자), `lastPlaceId`(커서), `size`(1~50, 기본 20).
+  **모두 단일값이며 배열이 아니다.** `keyword` 는 공백/빈 값이면 필터 없음이다 (#421).
 - **`petWeightKg` 는 `petSizeType` 과 한 컨트롤이 함께 켠다** (#126). 아트보드의
   "몽실이가 들어갈 수 있는 곳만" 체크 하나가 두 파라미터를 같이 보낸다 — 같은 축이라
   따로 켜면 판정이 반쪽이 된다. 체중을 모르는 아이는 크기만 보낸다.
@@ -505,7 +505,7 @@
 - **실패가 HTTP 200 + `status=FAILED`** 다 (`api-integration-guide.md` §5).
 - **생성 옵션 두 개가 붙었다** ([#128](https://github.com/8llow8llowMe/hondigagae/issues/128), 아트보드 05): `preferFavorites`(저장한 곳 먼저 — 우선순위)와 `pinnedPlaceIds`(꼭 넣을 장소 — **배치 보장**, 최대 10). **두 문구를 섞지 않는다** — "먼저" 와 "꼭" 은 다른 약속이다.
   - **필드명은 `preferFavorites` 다.** #128 이슈 본문의 `includeFavorites` 는 틀린 이름이고, 그대로 보내면 옵션이 조용히 무시된다.
-  - 꼭 넣을 장소는 **저장한 장소에서 고른다** (`/favorites` 와 같은 캐시). 아트보드의 `검색` 탭은 **`GET /places` 에 이름 검색 파라미터가 없어** 만들지 못했다 (명세 S8-9).
+  - 꼭 넣을 장소는 **저장한 장소에서 고른다** (`/favorites` 와 같은 캐시). 아트보드의 `검색` 탭은 **BE `keyword` 가 열렸다 (#421).** 피커 검색 UI 는 FE 후속 (명세 S8-9).
 - **다중 반려견(`petIds`)은 생성과 저장 양쪽에 붙었다** ([#128](https://github.com/8llow8llowMe/hondigagae/issues/128) · [#174](https://github.com/8llow8llowMe/hondigagae/issues/174) · [다견선택-세부명세.md](features/ai-plan/다견선택-세부명세.md)). 조건 입력이 체크박스 그룹이고 한 마리여도 `petIds` 배열로 보낸다. 담기도 동반한 아이를 전부 실으며 **첫 번째가 대표 반려견**이 된다. 한때는 `PlanCreateRequest.petId` 가 단일이라 담기 직전에 사람이 한 마리를 골랐지만, [#152](https://github.com/8llow8llowMe/hondigagae/issues/152) 가 `develop` 에 들어오면서 그 컨트롤을 걷었다 (명세 S8-8).
 - **일자 판정이 어느 아이 기준인지 말한다** ([#176](https://github.com/8llow8llowMe/hondigagae/issues/176)). 서버가 준 `basisPetId` 는 그날 점수가 **가장 낮은** 아이라 대표와 다를 수 있고 **날마다 달라진다** — 그래서 일정 단위가 아니라 일자마다 말한다. **두 마리 이상일 때만** 나오고, 이름을 못 찾으면(삭제된 반려견·조회 실패) 생략한다. `petSuitabilities[]` 로 아이별 점수를 나열하는 것은 하지 않았다 — 아트보드에 그 화면이 없다.
 - **아트보드 01 을 이탈했다.** 아트보드는 "반려견은 라디오 — 한 마리 / 두 마리를 함께 고르면 판정 기준이 모호해진다" 로 반대 결정을 해 뒀다. 담기 직전의 명시 선택이 그 모호한 구간을 없애므로 이탈했고, 근거의 정본은 세부명세 D1 이다. **아트보드 갱신은 후속.**

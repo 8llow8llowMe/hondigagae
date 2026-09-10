@@ -189,6 +189,11 @@ export type PlaceFilters = {
   petWeightKg: number | null
   /** 원본 분류 자유 문자열 (예: 카페) */
   sourceCategory: string | null
+  /**
+   * 장소명 또는 주소 부분 일치 (#421). 공백/빈 값은 미지정.
+   * 백엔드 `@Size(max = 50)` — 더 긴 값은 URL 에서 미지정으로 떨어뜨린다.
+   */
+  keyword: string | null
 }
 
 /**

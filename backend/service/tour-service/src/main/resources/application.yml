@@ -84,6 +84,11 @@ kma-api:
 
 # 여행 적합도 / 산책 위험도 임계값.
 # 확정된 수의학 기준이 아니라 현재의 판단이므로 배포 없이 조정할 수 있게 프로퍼티로 둔다.
+# 장소 키워드 검색 캐시. 원천은 DB 이고 Redis 는 같은 조건의 반복 조회만 줄인다.
+# Elasticsearch 가 붙기 전까지 LIKE + TTL 로 간다. 장소는 batch 적재라 즉시 무효화는 두지 않는다.
+place:
+  search-cache-seconds: ${PLACE_SEARCH_CACHE_SECONDS:300}
+
 insight:
   rain-probability-percent: ${INSIGHT_RAIN_PROBABILITY_PERCENT:60}
   hot-temperature: ${INSIGHT_HOT_TEMPERATURE:28.0}
