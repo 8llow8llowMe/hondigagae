@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils/cn'
  */
 export function SiteFooter() {
   return (
-    <footer className="site-footer border-border bg-bg-sunken border-t">
+    <footer className="site-footer border-border bg-bg border-t">
       <div className={cn('content-container flex flex-col gap-4 py-8 md:py-10', INSET_CLASS.main)}>
         <div className="flex flex-col gap-2">
           {/*

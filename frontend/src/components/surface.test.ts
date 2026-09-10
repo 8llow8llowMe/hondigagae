@@ -13,6 +13,7 @@ import {
   SurfaceBody,
   SurfaceList,
   SurfaceRow,
+  SurfaceStack,
   SurfaceTile,
 } from '@/components/surface'
 
@@ -82,17 +83,47 @@ describe('L0 Canvas — 페이지 바닥', () => {
     expect(renderToStaticMarkup(createElement(Canvas, null, '내용'))).toContain('bg-bg-sunken')
   })
 
+  it('바닥만 칠하고 배치는 하지 않는다 — 전폭이어야 하기 때문이다', () => {
+    const classes = classesOf(renderToStaticMarkup(createElement(Canvas, null, '내용')))
+
+    /*
+      **여백·간격이 여기 붙으면 안 된다.** 붙는 순간 이 요소가 콘텐츠 컨테이너가 되고,
+      `.rail-layout`(최대 1440) 바깥이 흰색으로 남는다 — 1800 실측에서 좌우 177px 이
+      그렇게 비었다. 배치는 `SurfaceStack` 이 맡는다.
+    */
+    expect(classes.filter((name) => /(^|:)(p|px|py|gap)-/.test(name))).toEqual([])
+    expect(classes).toEqual(['bg-bg-sunken'])
+  })
+
+  it('main 으로 낼 수 있다 — 바닥을 그리려고 래퍼를 하나 더 두지 않는다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(Canvas, { as: 'main', id: 'main-content', children: '내용' }),
+    )
+
+    expect(markup).toContain('<main')
+    expect(markup).toContain('id="main-content"')
+  })
+})
+
+describe('SurfaceStack — L0 위에 카드를 쌓는 열', () => {
   it('모바일은 좌우 여백이 없다 — Surface 가 전폭으로 내려앉기 때문이다', () => {
-    const markup = renderToStaticMarkup(createElement(Canvas, null, '내용'))
+    const classes = classesOf(renderToStaticMarkup(createElement(SurfaceStack, null, '내용')))
 
     // 데스크톱에서만 패딩이 붙는다. 무조건부 p-* 가 있으면 모바일 전폭이 깨진다
-    const classes = classesOf(markup)
     expect(classes).toContain('md:p-6')
     expect(classes.filter((name) => /^p-\d/.test(name))).toEqual([])
   })
 
   it('모바일 세로 간격이 8px 이다 — 바닥이 비쳐 2a 의 Band 와 같은 값이 된다', () => {
-    expect(renderToStaticMarkup(createElement(Canvas, null, '내용'))).toContain('gap-2')
+    expect(classesOf(renderToStaticMarkup(createElement(SurfaceStack, null, '내용')))).toContain(
+      'gap-2',
+    )
+  })
+
+  it('바닥을 칠하지 않는다 — Canvas 가 이미 화면 끝까지 칠했다', () => {
+    const classes = classesOf(renderToStaticMarkup(createElement(SurfaceStack, null, '내용')))
+
+    expect(classes.filter((name) => name.startsWith('bg-'))).toEqual([])
   })
 })
 
