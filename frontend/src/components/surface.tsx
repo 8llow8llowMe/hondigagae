@@ -279,3 +279,41 @@ export function Surface({
     </section>
   )
 }
+
+/**
+ * **L2 — 카드 안 목록.** 구분선을 **항목 사이에만** 긋는다.
+ *
+ * **규약이 항목이 아니라 이 컨테이너에 있다.** 2a 의 `Row` 는 `border-bottom` 을 행에 걸고
+ * 마지막 행이 `last` 로 껐다 — 그래서 **행 수를 아는 호출자만 목록을 그릴 수 있었고**,
+ * 홈에서 규약이 실제로 세 갈래로 갈렸다: 첫 행만 선을 빼는 곳(`place-insight-row`),
+ * 모든 행에 거는 곳(`indoor-alternatives-section` · 적합도 스켈레톤), 그리고 카드 안에서
+ * 페이지 인셋 40 을 쓰던 곳(`upcoming-plan-row`).
+ *
+ * `[&>li+li]` 는 **인접 형제에만** 걸려 첫 항목 위에 선이 생기지 않는다. 제목 아래 선은
+ * 카드의 몫이지 목록의 몫이 아니다 — 그것까지 목록이 그리면 제목이 없는 카드에서
+ * 허공에 선이 뜬다.
+ *
+ * **`ul`/`li` 로 내보내 스크린리더가 개수를 읽게 한다.** 항목은 `li` 여야 하고,
+ * 좌우 인셋은 항목이 `INSET_CLASS.card` 로 준다 — 세로 여백이 항목마다 달라(썸네일 행 12,
+ * 요약 행 20) 여기서 정할 수 없기 때문이다.
+ *
+ * #422 가 미리 만들었던 `SurfaceList` 와 **다른 것이다.** 그때는 `SurfaceRow` 가 스스로
+ * `border-top + first` 를 그리는 짝이었고 아무 화면도 그것을 쓰지 않아 걷었다(#428).
+ * 이번 모양은 장소 목록(#439)이 실제로 요구한 것이고, 홈의 세 호출처가 함께 들어온다.
+ */
+export function SurfaceList({
+  children,
+  className,
+  ...aria
+}: {
+  'aria-busy'?: boolean | undefined
+  'aria-label'?: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <ul {...aria} className={cn('[&>li+li]:border-border [&>li+li]:border-t', className)}>
+      {children}
+    </ul>
+  )
+}
