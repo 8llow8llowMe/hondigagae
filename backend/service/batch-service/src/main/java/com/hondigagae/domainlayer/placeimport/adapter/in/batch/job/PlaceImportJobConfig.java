@@ -17,14 +17,16 @@ import org.springframework.transaction.PlatformTransactionManager;
  *
  * <p>실행 방법 (spring.batch.job.enabled=false 이므로 잡 이름을 지정해 수동 실행한다):
  * <pre>
- * ./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=placeImportJob areaCode=39"
+ * ./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=placeImportJob areaCode=39 runAt=&lt;ISO 시각&gt;"
  * </pre>
  * JobParameters:
  * <ul>
  *   <li>{@code areaCode} — TourAPI 지역코드 (기본 39=제주)</li>
  *   <li>{@code contentTypeIds} — 콤마 구분 contentTypeId 목록 (생략 시 기본 대상 7종, 예: "12,39")</li>
+ *   <li>{@code runAt} — 재실행용 증분 파라미터. 같은 값으로 다시 돌리면 JobInstance 가 이미 완료라 실패한다</li>
  * </ul>
- * 같은 파라미터로 재실행하려면 run.id 같은 증분 파라미터를 추가하거나 기존 JobInstance를 정리한다.
+ *
+ * <p>{@code placeDataPipelineJob} 의 첫 단계이기도 하다 (#377). 단독 실행도 그대로 된다.
  */
 @Configuration
 public class PlaceImportJobConfig {

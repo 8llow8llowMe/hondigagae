@@ -29,6 +29,7 @@ import org.springframework.transaction.PlatformTransactionManager;
  * JobParameters:
  * <ul>
  *   <li>{@code areaCode} — 관광 지역코드 (기본 39). 적재 범위와 같은 값을 넣는다</li>
+ *   <li>{@code runAt} — 실행마다 새로 주는 식별 파라미터(ISO 시각). 같은 값으로는 다시 돌지 않는다</li>
  * </ul>
  */
 @Configuration

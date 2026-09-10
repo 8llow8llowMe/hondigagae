@@ -19,14 +19,16 @@ import org.springframework.transaction.PlatformTransactionManager;
  *
  * <p>실행 방법:
  * <pre>
- * ./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=cultureFacilityImportJob sido=제주특별자치도"
+ * ./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=cultureFacilityImportJob sido=제주특별자치도 runAt=&lt;ISO 시각&gt;"
  * </pre>
  * JobParameters:
  * <ul>
  *   <li>{@code sido} — 시도 명칭 (기본 제주특별자치도)</li>
+ *   <li>{@code runAt} — 재실행용 증분 파라미터. 같은 값으로 다시 돌리면 JobInstance 가 이미 완료라 실패한다</li>
  * </ul>
  *
  * <p>병합은 {@code placeMergeJob} 을 이어 돌린다 (#363).
+ * 다섯 잡을 한 번에 돌리려면 {@code placeDataPipelineJob} 을 쓴다 (#377).
  */
 @Configuration
 public class CultureFacilityImportJobConfig {

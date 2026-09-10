@@ -21,8 +21,13 @@ import org.springframework.transaction.PlatformTransactionManager;
  * <p><b>실행 순서</b>: cultureFacilityImportJob·petRestaurantImportJob 이후에 돌려야 한다 —
  * place 테이블의 이미지 없는 행이 대상 목록이다. 재실행은 멱등이다(이미 채워진 행은 대상에서 빠진다).
  * <pre>
- * java -jar batch.jar --spring.batch.job.enabled=true --spring.batch.job.name=placeImageBackfillJob areaCode=39 runAt=&lt;고유값&gt;
+ * java -jar batch.jar --spring.batch.job.enabled=true --spring.batch.job.name=placeImageBackfillJob areaCode=39 runAt=&lt;ISO 시각&gt;
  * </pre>
+ * JobParameters:
+ * <ul>
+ *   <li>{@code areaCode} — 관광 지역코드 (기본 39)</li>
+ *   <li>{@code runAt} — 실행마다 새로 주는 식별 파라미터(ISO 시각). 같은 값으로는 다시 돌지 않는다</li>
+ * </ul>
  */
 @Configuration
 public class PlaceImageBackfillJobConfig {
