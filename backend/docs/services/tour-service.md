@@ -21,7 +21,9 @@
 - `GET /api/v1/places` — 검색 (지역, 유형, 반려견 동반 조건, 커서 기반 `SliceResponse`)
 - `GET /api/v1/places/{placeId}` — 상세 (출입 조건: 실내/실외, 크기 제한, 목줄/케이지 조건)
 - `GET /api/v1/places/{placeId}/related` — 연관 관광지
-- `GET /api/v1/places/{placeId}/suitability` — 여행 적합도 (`score` + `reasons`, `api-design-guide.md` §9)
+- `GET /api/v1/places/{placeId}/suitability` — 여행 적합도 (`score` + `reasons`, `api-design-guide.md` §9).
+  고온 규칙은 **최고기온과 하루 최고 체감온도 중 큰 값**에 반려견 기준 28/31℃ 를 건다 — 같은 기온이라도 습한 날이 더 깎인다
+  (산책 위험도의 33/35℃ 는 사람 폭염특보 척도로 등급을 말하는 값이라 여기 쓰지 않는다)
 - `GET /api/v1/places/{placeId}/walk-safety` — 산책 위험도 (추정 노면온도 + 기상청 여름철 체감온도 + 안전 시간대).
   체감온도는 기상청 산식으로 계산하며 폭염특보 기준(33/35℃)이 판정 임계다. NOAA 열지수는 참고로 병기하고,
   두 값 모두 계산 근거 문구(feelsLikeBasis/heatIndexBasis)를 함께 내린다
@@ -39,7 +41,8 @@
   한라산이 섬을 기후로 갈라 놓아 성립하는 비교다. 권역마다 **대표 격자 하나**만 봐서 기존 격자 캐시에 얹힌다.
   예보를 못 받은 권역도 `weatherScore = null` 로 목록에 남는다.
   권역 항목에는 최저·최고기온과 **`maxFeelsLikeTemperature`(하루 최고 체감온도)** 가 실린다 —
-  장소 상세 `weather.maxFeelsLikeTemperature` 와 같은 규칙(기상청 여름철 체감온도)이라 두 화면의 숫자가 어긋나지 않는다
+  장소 상세 `weather.maxFeelsLikeTemperature` 와 같은 규칙(기상청 여름철 체감온도)이라 두 화면의 숫자가 어긋나지 않는다.
+  `weatherScore` 의 고온 규칙도 적합도와 같다 — 최고기온과 체감온도 중 큰 값에 28/31℃ 라, 습한 권역은 점수가 내려간다
 - `GET /api/v1/insights/walk-times?lat=&lng=` — 오늘 남은 시간의 산책 안전 곡선 + 골든타임.
   `goldenStart` 가 null 이면 남은 시간이 전부 위험이거나 특보 경보 중이다 —
   아무 구간이나 주면 사용자가 허락으로 읽는다.

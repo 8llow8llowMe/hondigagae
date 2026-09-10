@@ -110,6 +110,109 @@ class SuitabilityEvaluatorTest {
     }
 
     @Nested
+    @DisplayName("고온 규칙 — 체감온도")
+    class HeatRules {
+
+        @Test
+        @DisplayName("같은 기온 30도라도 습한 날은 더 깎인다 - 습도가 점수를 바꾼다 (#407)")
+        void humidityChangesTheScoreAtTheSameAirTemperature() {
+            SuitabilityScore dry = SuitabilityEvaluator.evaluate(
+                input(dryHotWeather(), false, outdoorPlace(), pet()));
+            SuitabilityScore humid = SuitabilityEvaluator.evaluate(
+                input(humidHotWeather(), false, outdoorPlace(), pet()));
+
+            // 건조한 30도는 체감 28.5도라 기온 규칙(-15), 습한 30도는 체감 33.2도라 매우 더움(-30).
+            assertThat(heatReasonOf(dry).scoreDelta()).isEqualTo(-15);
+            SuitabilityReason heat = heatReasonOf(humid);
+            assertThat(heat.scoreDelta()).isEqualTo(-30);
+            assertThat(heat.description()).startsWith("최고 체감온도 33도").contains("기온 30도");
+            assertThat(humid.score()).isLessThan(dry.score());
+        }
+
+        @Test
+        @DisplayName("기온이 임계 아래여도 체감이 넘으면 깎는다 - 기온만 보면 놓치던 날")
+        void penalizesWhenOnlyFeelsLikeCrossesTheThreshold() {
+            SuitabilityScore score = SuitabilityEvaluator.evaluate(
+                input(humidWarmWeather(), false, outdoorPlace(), pet()));
+
+            // 기온 27도는 임계(28) 아래라 기온만 보면 감점이 0 이다. 체감 30.1도로 -15.
+            SuitabilityReason heat = heatReasonOf(score);
+            assertThat(heat.description()).startsWith("최고 체감온도 30도").contains("기온 27도");
+            assertThat(heat.scoreDelta()).isEqualTo(-15);
+        }
+
+        @Test
+        @DisplayName("기온과 체감이 모두 임계를 넘어도 감점은 한 번뿐이다 - 같은 더위를 두 번 세지 않는다")
+        void countsHeatOnlyOnce() {
+            SuitabilityScore score = SuitabilityEvaluator.evaluate(
+                input(veryHotWeather(), false, outdoorPlace(), pet()));
+
+            // 기온 33도·체감 33.5도. 큰 값(체감)으로 한 번만 깎는다.
+            List<SuitabilityReason> heats = score.reasons().stream()
+                .filter(reason -> reason.code() == SuitabilityReasonCode.HEAT_RISK)
+                .toList();
+            assertThat(heats).hasSize(1);
+            assertThat(heats.getFirst().description()).startsWith("최고 체감온도 34도").contains("기온 33도");
+            assertThat(heats.getFirst().scoreDelta()).isEqualTo(-30);
+        }
+
+        @Test
+        @DisplayName("기온이 비어 있어도 체감만으로 판정한다")
+        void judgesWithFeelsLikeAloneWhenAirTemperatureIsMissing() {
+            SuitabilityScore score = SuitabilityEvaluator.evaluate(
+                input(feelsLikeOnlyWeather(), false, outdoorPlace(), pet()));
+
+            // 문장에 없는 기온을 지어내지 않는다.
+            SuitabilityReason heat = heatReasonOf(score);
+            assertThat(heat.description()).startsWith("최고 체감온도 36도").doesNotContain("기온 ");
+            assertThat(heat.scoreDelta()).isEqualTo(-30);
+        }
+
+        @Test
+        @DisplayName("체감이 기온보다 낮은 건조한 날은 기존 기온 규칙 그대로다")
+        void keepsAirTemperatureRuleWhenFeelsLikeIsLower() {
+            SuitabilityScore score = SuitabilityEvaluator.evaluate(
+                input(dryWarmWeather(), false, outdoorPlace(), pet()));
+
+            SuitabilityReason heat = heatReasonOf(score);
+            assertThat(heat.description()).startsWith("최고기온 29도");
+            assertThat(heat.scoreDelta()).isEqualTo(-15);
+        }
+
+        @Test
+        @DisplayName("중기예보는 체감온도가 없어 기온 규칙으로 퇴화한다 - 예외가 아니라 정상 경로다")
+        void fallsBackToAirTemperatureOnMidTermForecast() {
+            SuitabilityScore score = SuitabilityEvaluator.evaluate(
+                input(midTermHotWeather(), false, outdoorPlace(), pet()));
+
+            SuitabilityReason heat = heatReasonOf(score);
+            assertThat(heat.description()).startsWith("최고기온 33도");
+            assertThat(heat.scoreDelta()).isEqualTo(-30);
+        }
+
+        @Test
+        @DisplayName("더위에 약한 아이 가산은 체감 기준으로 깎을 때도 붙는다")
+        void sensitiveExtraAlsoAppliesOnFeelsLikePenalty() {
+            SuitabilityScore normal = SuitabilityEvaluator.evaluate(
+                input(humidHotWeather(), false, outdoorPlace(), pet()));
+            SuitabilityScore sensitive = SuitabilityEvaluator.evaluate(
+                input(humidHotWeather(), false, outdoorPlace(), heatSensitivePet()));
+
+            SuitabilityReason heat = heatReasonOf(sensitive);
+            assertThat(heat.description()).startsWith("최고 체감온도 33도").contains("더위에 약한 아이");
+            assertThat(heat.scoreDelta()).isEqualTo(-42);
+            assertThat(sensitive.score()).isLessThan(normal.score());
+        }
+
+        private SuitabilityReason heatReasonOf(SuitabilityScore score) {
+            return score.reasons().stream()
+                .filter(reason -> reason.code() == SuitabilityReasonCode.HEAT_RISK)
+                .findFirst()
+                .orElseThrow();
+        }
+    }
+
+    @Nested
     @DisplayName("반려견 동반 조건")
     class PetAllowanceRules {
 
@@ -360,6 +463,90 @@ class SuitabilityEvaluatorTest {
             .maxPrecipitationProbability(10).worstPrecipitationType(PrecipitationType.NONE)
             .representativeSkyState(SkyState.CLEAR).maxWindSpeed(3.0d).maxHumidity(80)
             .hourly(List.of())
+            .build();
+    }
+
+    /** 기온 30도·습도 95% — 기상청 여름철 체감온도 33.2도로 매우 더움 임계(31도)를 넘는 날. */
+    private static DailyWeather humidHotWeather() {
+        return DailyWeather.builder()
+            .date(DATE).source(ForecastSource.SHORT_TERM).minTemperature(26.0d).maxTemperature(30.0d)
+            .maxPrecipitationProbability(10).worstPrecipitationType(PrecipitationType.NONE)
+            .representativeSkyState(SkyState.CLEAR).maxWindSpeed(3.0d).maxHumidity(95)
+            .hourly(List.of(reading(14, 30.0d, 95)))
+            .build();
+    }
+
+    /** {@code humidHotWeather()} 와 기온은 같고 습도만 다르다 — 체감 28.5도라 기온 규칙에 머문다. */
+    private static DailyWeather dryHotWeather() {
+        return DailyWeather.builder()
+            .date(DATE).source(ForecastSource.SHORT_TERM).minTemperature(26.0d).maxTemperature(30.0d)
+            .maxPrecipitationProbability(10).worstPrecipitationType(PrecipitationType.NONE)
+            .representativeSkyState(SkyState.CLEAR).maxWindSpeed(3.0d).maxHumidity(40)
+            .hourly(List.of(reading(14, 30.0d, 40)))
+            .build();
+    }
+
+    /** 기온 27도·습도 95% — 기온은 임계(28도) 아래인데 체감 30.1도로 넘는 날. */
+    private static DailyWeather humidWarmWeather() {
+        return DailyWeather.builder()
+            .date(DATE).source(ForecastSource.SHORT_TERM).minTemperature(23.0d).maxTemperature(27.0d)
+            .maxPrecipitationProbability(10).worstPrecipitationType(PrecipitationType.NONE)
+            .representativeSkyState(SkyState.CLEAR).maxWindSpeed(3.0d).maxHumidity(95)
+            .hourly(List.of(reading(14, 27.0d, 95)))
+            .build();
+    }
+
+    /** 기온 33도·습도 60% — 기온도 체감(33.5도)도 매우 더움 임계를 넘는 날. */
+    private static DailyWeather veryHotWeather() {
+        return DailyWeather.builder()
+            .date(DATE).source(ForecastSource.SHORT_TERM).minTemperature(26.0d).maxTemperature(33.0d)
+            .maxPrecipitationProbability(10).worstPrecipitationType(PrecipitationType.NONE)
+            .representativeSkyState(SkyState.CLEAR).maxWindSpeed(3.0d).maxHumidity(60)
+            .hourly(List.of(reading(14, 33.0d, 60)))
+            .build();
+    }
+
+    /** 기온 29도·습도 40% — 체감 27.6도로 기온보다 낮아 기온 규칙만 걸리는 날. */
+    private static DailyWeather dryWarmWeather() {
+        return DailyWeather.builder()
+            .date(DATE).source(ForecastSource.SHORT_TERM).minTemperature(24.0d).maxTemperature(29.0d)
+            .maxPrecipitationProbability(10).worstPrecipitationType(PrecipitationType.NONE)
+            .representativeSkyState(SkyState.CLEAR).maxWindSpeed(3.0d).maxHumidity(40)
+            .hourly(List.of(reading(14, 29.0d, 40)))
+            .build();
+    }
+
+    /**
+     * 최고기온이 비어 있고 시각별 값만 있는 날 — 체감 36.0도로만 판정해야 한다.
+     *
+     * <p>원천이 TMX 를 주지 않는 경우를 가정한 방어 분기다. 기온이 없다고 더위를 놓치면
+     * 안 되고, 문장에 없는 기온을 지어내서도 안 된다.
+     */
+    private static DailyWeather feelsLikeOnlyWeather() {
+        return DailyWeather.builder()
+            .date(DATE).source(ForecastSource.SHORT_TERM).minTemperature(27.0d)
+            .maxPrecipitationProbability(10).worstPrecipitationType(PrecipitationType.NONE)
+            .representativeSkyState(SkyState.CLEAR).maxWindSpeed(3.0d).maxHumidity(90)
+            .hourly(List.of(reading(14, 33.0d, 90)))
+            .build();
+    }
+
+    /** 중기예보의 더운 날 — 시각별 습도가 없어 체감온도가 null 이다. */
+    private static DailyWeather midTermHotWeather() {
+        return DailyWeather.builder()
+            .date(DATE).source(ForecastSource.MID_TERM).minTemperature(26.0d).maxTemperature(33.0d)
+            .maxPrecipitationProbability(20).worstPrecipitationType(PrecipitationType.NONE)
+            .representativeSkyState(SkyState.MOSTLY_CLOUDY)
+            .hourly(List.of())
+            .build();
+    }
+
+    private static WeatherForecast reading(int hour, Double temperature, Integer humidity) {
+        return WeatherForecast.builder()
+            .nx(52).ny(38)
+            .forecastAt(DATE.atTime(hour, 0)).baseAt(DATE.atTime(5, 0))
+            .temperature(temperature).humidity(humidity)
+            .precipitationType(PrecipitationType.NONE).skyState(SkyState.CLEAR)
             .build();
     }
 

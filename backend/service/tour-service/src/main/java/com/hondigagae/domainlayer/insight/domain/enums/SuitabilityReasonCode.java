@@ -28,7 +28,7 @@ public enum SuitabilityReasonCode implements CodeNameDescribable {
 
     // 날씨
     WEATHER_OK("날씨 적정", "기온과 강수 조건이 반려견 활동에 무리가 없습니다."),
-    HEAT_RISK("고온 주의", "기온이 높아 반려견에게 부담이 되는 조건입니다."),
+    HEAT_RISK("고온 주의", "기온 또는 체감온도가 높아 반려견에게 부담이 되는 조건입니다."),
     COLD_RISK("저온 주의", "기온이 낮아 반려견에게 부담이 되는 조건입니다."),
     RAIN_EXPECTED("강수 예보", "비 또는 눈이 예보되어 야외 일정에 영향이 있습니다."),
     WIND_STRONG("강풍 주의", "바람이 강해 소형견 산책에 주의가 필요합니다."),
