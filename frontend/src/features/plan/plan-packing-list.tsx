@@ -7,6 +7,8 @@ import { Button } from '@/components/button'
 import { ErrorState } from '@/components/error-state'
 import { generatePackingList } from '@/lib/api/ai-plan'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { PackingListItem } from '@/types/ai-plan'
 
 /**
@@ -48,16 +50,21 @@ export type PackingListPanelProps = {
  */
 export function PackingListPanel({ items, pending, failed, onGenerate }: PackingListPanelProps) {
   return (
-    <section aria-label={messages.plan.packingHeading} className="border-border border-t">
-      <div className="flex flex-col gap-3 px-4 py-4 md:px-6 md:py-5">
-        {/*
+    /*
+      **카드 안 내용이다** (#447). 카드(`Surface`)와 그 이름(`aria-label`)은 호출부
+      (`plan-detail-section.tsx`)가 만든다 — 여기서 `section` 을 또 열면 랜드마크가 겹친다.
+      예전의 위 `border-t` 와 끝 8px 밴드는 2a 레일에서 이웃과 갈라 서는 장치였고, 3a 는
+      카드 테두리와 간격이 그 일을 한다. 인셋은 카드 값(16/20)이다.
+    */
+    <div className={cn('flex flex-col gap-3 py-4 md:py-5', INSET_CLASS.card)}>
+      {/*
           **`md:` 가 아니라 `lg:` 다** (#358). 홈의 섹션 제목은 `md:text-title-1` 인데
           (DESIGN.md §3-1), 홈에는 화면 안에 보이는 `h1` 이 없다(sr-only). 여기는 같은
           레일 위에 일정 제목 `h1` 이 서 있어서, md 에서 22 로 올리면 그 `h1`(md 까지
           22)과 같은 값이 된다. `lg` 은 레일이 레일이 되는 지점이고 `h1` 이 28 로
           올라가는 지점이기도 하다 — `place-detail-section` 의 섹션 제목과 같은 변형이다.
         */}
-        {/*
+      {/*
           **제목 옆에 AI 배지를 둔다** (#397). accent 는 "AI 가 생성·판단한 것" 표시
           전용이고(DESIGN.md §2-5), 헤더 nav 의 `AI 일정 생성` 배지와 **같은 낱말·같은
           톤**이어야 한다 — 같은 성질의 것을 화면마다 다르게 부르면 다른 기능으로 읽힌다.
@@ -65,26 +72,23 @@ export function PackingListPanel({ items, pending, failed, onGenerate }: Packing
           제목과 배지의 baseline 을 맞추지 않고 `items-center` 로 세운다 — 제목이 lg 에서
           22 로 커지는데 baseline 정렬은 그때 배지를 아래로 떨어뜨린다.
         */}
-        <div className="flex items-center gap-2">
-          <h2 className="text-title-2 text-fg lg:text-title-1 font-semibold lg:font-bold">
-            {messages.plan.packingHeading}
-          </h2>
-          <Badge tone="accent" size="sm" className="font-semibold">
-            {messages.plan.packingAiBadge}
-          </Badge>
-        </div>
-
-        {pending ? (
-          <Pending />
-        ) : items !== null ? (
-          <Result items={items} onRetry={onGenerate} />
-        ) : (
-          <Intro failed={failed} onGenerate={onGenerate} />
-        )}
+      <div className="flex items-center gap-2">
+        <h2 className="text-title-2 text-fg lg:text-title-1 font-semibold lg:font-bold">
+          {messages.plan.packingHeading}
+        </h2>
+        <Badge tone="accent" size="sm" className="font-semibold">
+          {messages.plan.packingAiBadge}
+        </Badge>
       </div>
 
-      <div aria-hidden className="bg-band h-2 w-full" />
-    </section>
+      {pending ? (
+        <Pending />
+      ) : items !== null ? (
+        <Result items={items} onRetry={onGenerate} />
+      ) : (
+        <Intro failed={failed} onGenerate={onGenerate} />
+      )}
+    </div>
   )
 }
 

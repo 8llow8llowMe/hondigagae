@@ -5,9 +5,9 @@ import type { KeyboardEvent, PointerEvent as ReactPointerEvent, Ref } from 'reac
 import { Badge } from '@/components/badge'
 import { Button } from '@/components/button'
 import { ChevronDownIcon } from '@/components/icons'
-import { Row } from '@/components/surface'
 import { messages } from '@/lib/messages'
 import type { MoveDirection, PlanDayEditItem } from '@/lib/plan/day-items'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -41,7 +41,6 @@ export function PlanEditableItemRow({
   downRef,
   onMove,
   onToggleRemoved,
-  last = false,
   rowRef,
   dragging = false,
   onHandlePointerDown,
@@ -61,12 +60,10 @@ export function PlanEditableItemRow({
   downRef: (node: HTMLButtonElement | null) => void
   onMove: (index: number, direction: MoveDirection) => void
   onToggleRemoved: (index: number) => void
-  last?: boolean
   /**
    * 이웃 행의 중간선을 재려면 실제 노드가 필요하다 — `useDragReorder` 가 붙인다.
    *
-   * **`Row` 가 아니라 그 안의 줄에 붙는다.** 공용 `Row` 에 `ref` 를 뚫으면 `div`/`li`
-   * 두 태그를 오가는 컴포넌트에 한 가지 엘리먼트 타입을 강요하게 된다. 중간선 계산에
+   * **`li` 가 아니라 그 안의 줄에 붙는다.** 중간선 계산에
    * 필요한 것은 "이 행이 화면에서 차지하는 세로 구간" 이고, 세로 padding 을 들고 있는
    * 이 줄의 사각형이 곧 그 값이다.
    */
@@ -95,15 +92,16 @@ export function PlanEditableItemRow({
   }
 
   return (
-    <Row
-      as="li"
-      last={last}
+    <li
       /*
+        카드 안의 L2 항목 — 인셋은 카드 값, 구분선은 목록(`ol`)이 사이에만 긋는다 (#447).
+
         끌고 있는 행을 띄운다. **`--shadow-md` 는 "실제로 떠 있는 것" 에만 허용되는데
-        DESIGN.md §6 이 그 목록에 `드래그 중인 항목` 을 명시한다.**
-        `relative z-10` 이 없으면 그림자가 아래 행에 가린다.
+        DESIGN.md §6 이 그 목록에 `드래그 중인 항목` 을 명시한다.** 배경(`bg-bg`)도 그때만
+        갖는다 — 떠 있는 행이 아래 행을 가려야 한다. `relative z-10` 이 없으면 그림자가
+        아래 행에 가린다.
       */
-      className={cn(dragging && 'bg-bg relative z-10 shadow-md')}
+      className={cn(INSET_CLASS.card, dragging && 'bg-bg relative z-10 shadow-md')}
     >
       {/* 끄는 동안 글자가 선택되면 드래그가 텍스트 선택으로 바뀐다 */}
       <div ref={rowRef} className={cn('flex items-center gap-3 py-2', dragging && 'select-none')}>
@@ -183,6 +181,6 @@ export function PlanEditableItemRow({
           </Button>
         </div>
       </div>
-    </Row>
+    </li>
   )
 }

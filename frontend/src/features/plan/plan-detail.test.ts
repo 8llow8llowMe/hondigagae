@@ -162,10 +162,11 @@ describe('PlanDaySection', () => {
     expect(markup).toContain('김창열미술관')
   })
 
-  it('일자 섹션이 자기 제목을 aria-labelledby 로 가리킨다', () => {
+  it('일자 카드가 자기 이름을 갖고, 제목 id 는 목차 앵커로 남는다 (#447)', () => {
     const markup = renderDaySection()
 
-    expect(markup).toContain('aria-labelledby="day1"')
+    // 헤더가 날짜·버튼 셋을 스스로 그려 `title` 슬롯 대신 `aria-label` 이다
+    expect(markup).toContain(`aria-label="${messages.plan.dayLabel.replace('{day}', '1')}"`)
     expect(markup).toContain('id="day1"')
   })
 
@@ -410,5 +411,54 @@ describe('PlanDayVerdict — 기준 반려견 (#176)', () => {
     expect(markup.indexOf('초코 기준이에요')).toBeLessThan(
       markup.indexOf(messages.plan.verdictPetConditionMissing),
     )
+  })
+})
+
+describe('3층 표면 (#447)', () => {
+  const SURFACE = /<section[^>]*class="bg-bg border-border border-y md:rounded-lg md:border[^"]*"/g
+
+  it('일자 섹션은 카드 하나다 — 밴드·페이지 인셋이 없고 항목은 카드 안 목록이다', () => {
+    const markup = renderDaySection()
+
+    expect(markup.match(SURFACE)).toHaveLength(1)
+    expect(markup).not.toContain('bg-band h-2')
+    expect(markup).not.toContain('md:px-10')
+    expect(markup).toContain('[&amp;&gt;li+li]:border-t')
+    expect(markup).toContain('md:px-5')
+  })
+
+  it('빈 일자도 카드 안에서 위 선 아래 안내만 낸다', () => {
+    const markup = renderDaySection({ rows: [] })
+
+    expect(markup.match(SURFACE)).toHaveLength(1)
+    expect(markup).toContain(messages.plan.dayEmpty)
+    expect(markup).not.toContain('[&amp;&gt;li+li]')
+  })
+
+  it('개요의 제목 줄은 카드가 아니고 판정 목차만 카드다 — 데스크톱 전용', () => {
+    const markup = renderOverview()
+    const h1 = markup.indexOf('<h1')
+    const card = markup.search(SURFACE)
+
+    expect(h1).toBeGreaterThan(-1)
+    expect(card).toBeGreaterThan(h1)
+    expect(markup.match(SURFACE)).toHaveLength(1)
+    expect(markup.slice(card, card + 200)).toContain('hidden lg:block')
+    expect(markup).toContain(`<h2`)
+    expect(markup).toContain(messages.plan.verdictTocTitle)
+  })
+
+  it('판정이 없으면 목차 카드를 만들지 않는다 — 빈 카드를 그리지 않는다', () => {
+    const markup = renderOverview({ verdicts: [] })
+
+    expect(markup.match(SURFACE)).toBeNull()
+  })
+
+  it('동행 반려견 줄은 바닥 위라 선을 긋지 않는다', () => {
+    const markup = renderOverview()
+    const start = markup.indexOf('푸들')
+    const around = markup.slice(Math.max(0, start - 400), start)
+
+    expect(around).not.toContain('border-t')
   })
 })

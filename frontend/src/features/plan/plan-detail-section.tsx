@@ -6,7 +6,7 @@ import { Banner } from '@/components/banner'
 import { ConfirmModal } from '@/components/confirm-modal'
 import { EmptyState } from '@/components/empty-state'
 import { EmergencyIcon } from '@/components/icons'
-import { Band } from '@/components/surface'
+import { Surface, SurfaceList, SurfaceStack } from '@/components/surface'
 import { PlanDayEditor } from '@/features/plan/plan-day-editor'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { PlanItemRow } from '@/features/plan/plan-item-row'
@@ -38,9 +38,19 @@ import type { PlanDetail, PlanWeatherResponse } from '@/types/plan'
  *
  * **`.rail-layout` 을 그대로 쓰고 `.rail-layout-detail` 변형은 쓰지 않는다.** 그 변형은
  * DOM 순서와 데스크톱 배치가 다른 장소 상세용이다. 일정 상세는 모바일에서도 개요가 맨
- * 위라 **DOM 순서 그대로(aside 먼저)** 두면 두 레이아웃이 같이 성립한다 (D1).
+ * 위라 **DOM 순서 그대로(레일 먼저)** 두면 두 레이아웃이 같이 성립한다 (D1).
  *
- * 열 구분선은 우측 열의 `lg:border-l` 이다 — sticky 인 좌측 열에 걸면 선이 끊긴다.
+ * **3층 표면이다** (`DESIGN.md §0`, 이슈 #447). `main` 이 L0 바닥(`Canvas`, 페이지가 건다),
+ * 좌 레일과 우 열이 각각 `SurfaceStack` 으로 L1 카드를 쌓는다. **열 구분선과 밴드를
+ * 걷었다** — 카드 사이·열 사이로 바닥이 비쳐 L0 이 그 일을 한다 (홈 #428 과 같은 구조).
+ *
+ * **카드 판정** (장소 상세 #443 의 결정을 그대로 적용한다):
+ * - 제목 줄(제목 · 상태 · 기간 · D-day · 동행 반려견)은 **페이지 머리라 카드가 아니다** —
+ *   바닥 위에 직접 놓는다 (`PlanOverviewPanel`).
+ * - 좌 레일 카드 셋: `일자별 판정` 목차 · `준비물` · `병원 배너`(홈이 배너를 카드에 넣는 것과
+ *   같다 — 상시 진입점은 자기 카드를 갖지 않지만 레일의 한 이야기 "위급하면" 은 카드다).
+ * - 우 열은 **일자마다 카드 하나** (`PlanDaySection`), 기간 밖 항목도 카드.
+ * - 확정 버튼은 **액션이라 카드가 아니다** — 열 끝, 바닥 위에 선다.
  */
 export function PlanDetailSection({
   plan,
@@ -159,7 +169,7 @@ export function PlanDetailSection({
         936px) 안에 들어온다. 넘기 시작하면 `rail-sticky`(자기 스크롤)로 바꿔야 한다 —
         고정 레일이 뷰포트보다 길면 아래쪽에 손이 닿지 않는다 (`globals.css`).
       */}
-      <aside className="lg:sticky lg:top-16 lg:self-start">
+      <SurfaceStack className="lg:sticky lg:top-16 lg:self-start">
         <PlanOverviewPanel
           plan={plan}
           companions={companions}
@@ -174,7 +184,9 @@ export function PlanDetailSection({
           준비물 (#155). **개요 바로 아래, 좌측 레일이다** — 일정 전체를 근거로 만드는
           것이라 특정 일자 옆에 두면 그 날 것으로 읽힌다.
         */}
-        <PlanPackingList planId={plan.planId} />
+        <Surface aria-label={messages.plan.packingHeading}>
+          <PlanPackingList planId={plan.planId} />
+        </Surface>
 
         {/*
           응급 브리핑 진입점 (#125). **배너 하나만 둔다** — 응답이 일자 × 방문 장소 ×
@@ -184,96 +196,95 @@ export function PlanDetailSection({
           **상시로 둔다.** 담긴 장소가 없으면 브리핑이 비지만, 그 사실도 들어가서 봐야
           알 수 있다 — 진입점을 감추면 기능이 있는 줄도 모른다.
         */}
-        <Banner
-          href={`/plans/${plan.planId}/emergency`}
-          title={messages.plan.emergencyHeading}
-          description={messages.plan.emergencyBannerDescription}
-          leading={<EmergencyIcon size={24} />}
-          inset="rail"
-        />
-      </aside>
+        <Surface>
+          <Banner
+            href={`/plans/${plan.planId}/emergency`}
+            title={messages.plan.emergencyHeading}
+            description={messages.plan.emergencyBannerDescription}
+            leading={<EmergencyIcon size={24} />}
+            inset="card"
+          />
+        </Surface>
+      </SurfaceStack>
 
-      <div className="border-border lg:border-l">
-        {days.map((group, index) => (
-          <div key={group.day}>
-            {/*
-              **첫 일자 위에는 밴드를 두지 않는다.** 밴드는 "여기서 다른 이야기가
-              시작된다" 는 신호인데(`surface.tsx`), 열 맨 위에서는 앞에 끊을 것이
-              없어 신호가 아니라 두꺼운 회색 띠 하나로만 보였다.
-            */}
-            {index > 0 && <Band />}
-            <PlanDaySection
-              day={group.day}
-              date={addPlanDays(plan.startDate, group.day - 1)}
-              rows={toItemRows(group.items, lodgingBasisFor(group.day, days))}
-              places={places}
-              verdict={weather?.days.find((entry) => entry.day === group.day)}
-              petConditionApplied={weather?.petConditionApplied ?? true}
-              basisPetName={basisPetNameOf(
-                weather?.days.find((entry) => entry.day === group.day)?.basisPetId ?? null,
-                plan.petIds,
-                petNames,
-              )}
-              verdictFailed={weatherFailed}
-              onRetryVerdict={onRetryWeather}
-              editing={editingDay === group.day}
-              onStartEdit={() => requestEditor(group.day)}
-              regenerateHref={
-                regenerateBlocked ? null : `/plans/${plan.planId}/days/${group.day}/regenerate`
-              }
-              add={{
-                href: `/plans/${plan.planId}/days/${group.day}/add`,
-                addedPlaceIds: placeIdsOf(group.items),
-                /*
+      {/*
+        우: 일자마다 카드 하나. 카드 사이 간격(24 / 모바일 8)이 2a 밴드의 자리를 대신한다.
+
+        **위 여백** — 모바일은 앞 스택(레일)과 8, 태블릿 한 컬럼은 앞 스택의 아래 24 가 이미
+        있어 0, 데스크톱 2단은 자기 열의 첫 요소라 24 다 (장소 상세 #443 과 같은 처리).
+      */}
+      <SurfaceStack className="pt-2 md:pt-0 lg:pt-6">
+        {days.map((group) => (
+          <PlanDaySection
+            key={group.day}
+            day={group.day}
+            date={addPlanDays(plan.startDate, group.day - 1)}
+            rows={toItemRows(group.items, lodgingBasisFor(group.day, days))}
+            places={places}
+            verdict={weather?.days.find((entry) => entry.day === group.day)}
+            petConditionApplied={weather?.petConditionApplied ?? true}
+            basisPetName={basisPetNameOf(
+              weather?.days.find((entry) => entry.day === group.day)?.basisPetId ?? null,
+              plan.petIds,
+              petNames,
+            )}
+            verdictFailed={weatherFailed}
+            onRetryVerdict={onRetryWeather}
+            editing={editingDay === group.day}
+            onStartEdit={() => requestEditor(group.day)}
+            regenerateHref={
+              regenerateBlocked ? null : `/plans/${plan.planId}/days/${group.day}/regenerate`
+            }
+            add={{
+              href: `/plans/${plan.planId}/days/${group.day}/add`,
+              addedPlaceIds: placeIdsOf(group.items),
+              /*
                   **일자로 좁혀 넘긴다.** 훅은 화면 전체에 하나뿐이라, 좁히지 않으면
                   3일차에서 난 실패가 실내 대안 블록이 있는 **모든 일자**에 뜨고
                   같은 장소가 두 일자의 대안일 때 두 행이 함께 스피너를 낸다.
                 */
-                pendingPlaceId:
-                  addPlace.pending?.day === group.day ? addPlace.pending.placeId : null,
-                busy: addPlace.adding,
-                error: addPlace.failure?.target.day === group.day ? addPlace.failure.error : null,
-                onAdd: (alternative) =>
-                  addPlace.add({
-                    day: group.day,
-                    // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
-                    dayItems: group.items,
-                    place: alternative,
-                  }),
-              }}
-              visit={{
-                visitOf: (planItemId) => ({
-                  pending: visit.pending.has(planItemId),
-                  error: visit.failures.get(planItemId) ?? null,
-                  onToggle: (next) => visit.toggle(planItemId, next),
+              pendingPlaceId: addPlace.pending?.day === group.day ? addPlace.pending.placeId : null,
+              busy: addPlace.adding,
+              error: addPlace.failure?.target.day === group.day ? addPlace.failure.error : null,
+              onAdd: (alternative) =>
+                addPlace.add({
+                  day: group.day,
+                  // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
+                  dayItems: group.items,
+                  place: alternative,
                 }),
-              }}
-              editor={
-                editingDay !== group.day ? null : (
-                  <PlanDayEditor
-                    items={edit.items}
-                    dirty={edit.dirty}
-                    saving={edit.saving}
-                    error={edit.error}
-                    announcement={edit.announcement}
-                    focusTarget={edit.focusTarget}
-                    onClearFocus={edit.clearFocus}
-                    onMove={edit.move}
-                    onToggleRemoved={edit.toggle}
-                    onSave={() => edit.save(group.day)}
-                    onCancel={requestCancel}
-                  />
-                )
-              }
-            />
-          </div>
+            }}
+            visit={{
+              visitOf: (planItemId) => ({
+                pending: visit.pending.has(planItemId),
+                error: visit.failures.get(planItemId) ?? null,
+                onToggle: (next) => visit.toggle(planItemId, next),
+              }),
+            }}
+            editor={
+              editingDay !== group.day ? null : (
+                <PlanDayEditor
+                  items={edit.items}
+                  dirty={edit.dirty}
+                  saving={edit.saving}
+                  error={edit.error}
+                  announcement={edit.announcement}
+                  focusTarget={edit.focusTarget}
+                  onClearFocus={edit.clearFocus}
+                  onMove={edit.move}
+                  onToggleRemoved={edit.toggle}
+                  onSave={() => edit.save(group.day)}
+                  onCancel={requestCancel}
+                />
+              )
+            }
+          />
         ))}
 
         <PlanOutOfRangeSection items={outOfRange} />
 
-        <Band />
         <PlanStatusAction plan={plan} />
-      </div>
+      </SurfaceStack>
 
       {/*
         편집한 것을 말없이 버리지 않는다 (E4). 되돌릴 수 없는 확인이라 `ConfirmModal`
@@ -318,21 +329,19 @@ function PlanOutOfRangeSection({ items }: { items: PlanDetail['items'] }) {
   }))
 
   return (
-    <>
-      <Band />
-      <section aria-labelledby="plan-out-of-range" className="px-4 pt-6 md:px-10">
-        <h2 id="plan-out-of-range" className="text-title-1 text-fg font-bold">
-          {messages.plan.outOfRangeTitle}
-        </h2>
-        <p className="text-body-2 text-fg-muted mt-1">{messages.plan.outOfRangeDescription}</p>
-
-        <ul className="border-border -mx-4 mt-4 border-t md:-mx-10">
-          {rows.map((row, index) => (
-            <PlanItemRow key={row.item.planItemId} model={row} last={index === rows.length - 1} />
-          ))}
-        </ul>
-      </section>
-    </>
+    <Surface
+      titleId="plan-out-of-range"
+      title={messages.plan.outOfRangeTitle}
+      description={
+        <p className="text-body-2 text-fg-muted">{messages.plan.outOfRangeDescription}</p>
+      }
+    >
+      <SurfaceList className="border-border border-t">
+        {rows.map((row) => (
+          <PlanItemRow key={row.item.planItemId} model={row} />
+        ))}
+      </SurfaceList>
+    </Surface>
   )
 }
 

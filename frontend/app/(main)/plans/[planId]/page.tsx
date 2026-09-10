@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 
+import { Canvas } from '@/components/surface'
 import { PlanDetailView } from '@/features/plan/plan-detail-view'
 import { planKeys } from '@/features/plan/queries'
 import { ApiError } from '@/lib/api/error'
@@ -61,11 +62,12 @@ export default async function PlanDetailPage({ params }: { params: Params }) {
     **`today` 를 서버에서 만들어 내려보낸다.** 클라이언트가 따로 `new Date()` 를 부르면
     자정 근처에서 서버 렌더와 하이드레이션의 D-day 가 하루 갈린다 (목록과 같은 결정).
   */
+  // `main` 이 L0 바닥이다 (`DESIGN.md §0`, #447) — 카드를 쌓는 일은 `PlanDetailSection` 의 `SurfaceStack` 이 맡는다
   return (
-    <main id="main-content">
+    <Canvas as="main" id="main-content">
       <HydrationBoundary state={dehydrate(queryClient)}>
         <PlanDetailView planId={planId} today={new Date().toISOString()} />
       </HydrationBoundary>
-    </main>
+    </Canvas>
   )
 }

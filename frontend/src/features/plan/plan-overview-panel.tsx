@@ -1,11 +1,14 @@
 import { MetricBadge } from '@/components/metric'
 import { PetAvatar } from '@/components/pet-avatar'
 import { Skeleton } from '@/components/skeleton'
+import { Surface, SurfaceList } from '@/components/surface'
 import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { PlanStatusBadge } from '@/features/plan/plan-status-badge'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { daysUntil, formatPlanDateRange } from '@/lib/plan/date'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { Pet } from '@/types/pet'
 import type { PlanDayWeatherItem, PlanDetail } from '@/types/plan'
 
@@ -14,6 +17,13 @@ import type { PlanDayWeatherItem, PlanDetail } from '@/types/plan'
  *
  * 모바일에서는 레일이 아니라 화면 맨 위의 개요 블록이다. **DOM 순서가 모바일 기준
  * 그대로여도 두 레이아웃이 성립하므로** `.rail-layout-detail` 변형을 쓰지 않는다 (D1).
+ *
+ * **두 조각을 돌려준다** (`DESIGN.md §0`, #447) — 부모 `SurfaceStack` 의 직접 자식이 되어야
+ * 카드 간격을 받기 때문에 fragment 다.
+ * 1. **제목 줄은 페이지 머리라 카드가 아니다** — 장소 상세(#443)와 같은 결정. 동행 반려견도
+ *    여기 든다: "누구와 가는 일정인가" 는 신원의 일부다. 인셋은 카드 안 글줄과 같은 `card`
+ *    (카드 테두리 1px 만큼 어긋나는 것도 #443 과 같다).
+ * 2. **일자별 판정 목차는 카드다** — 자기 제목이 있고 항목이 여럿인 목록. 데스크톱 전용.
  */
 export function PlanOverviewPanel({
   plan,
@@ -50,10 +60,11 @@ export function PlanOverviewPanel({
       고정은 레일 전체(`aside`)가 맡는다 (`plan-detail-section.tsx`). 홈이 좌측 레일을
       한 겹으로 감싸 고정하는 것과 같은 형태다.
     */
-    <div className="flex flex-col gap-5 px-4 py-6 md:px-10 lg:px-8">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-start gap-2">
-          {/*
+    <>
+      <div className={cn('flex flex-col gap-5 pt-4 pb-4 md:pt-0 md:pb-0', INSET_CLASS.card)}>
+        <div className="flex flex-col gap-2">
+          <div className="flex items-start gap-2">
+            {/*
             제목은 서버 상한 60자다. 좌측 400 에서 2~3줄이 되므로 keep-all 로 어절을 지킨다.
 
             **`lg:text-display` 는 저장소의 콘텐츠 화면 `h1` 관례다** (#358) — 일정 목록 ·
@@ -61,46 +72,47 @@ export function PlanOverviewPanel({
             (`text-title-1 font-bold`)을 쓰고 있어서, 화면 제목이 우측 `N일차`(22/700)와
             **모든 폭에서 완전히 같았다.** 그래서 좌측 레일의 준비물도 올릴 자리가 없었다.
           */}
-          <h1 className="text-title-1 text-fg lg:text-display min-w-0 flex-1 font-bold break-keep lg:font-extrabold">
-            {plan.title}
-          </h1>
-          <PlanStatusBadge status={plan.status} className="mt-1" />
-          {/* 제목 줄 우측 상단 — 아이콘 버튼의 히트 영역이 제목 첫 줄과 맞도록 `-mt-1` */}
-          {menu !== null && <div className="-mt-1">{menu}</div>}
+            <h1 className="text-title-1 text-fg lg:text-display min-w-0 flex-1 font-bold break-keep lg:font-extrabold">
+              {plan.title}
+            </h1>
+            <PlanStatusBadge status={plan.status} className="mt-1" />
+            {/* 제목 줄 우측 상단 — 아이콘 버튼의 히트 영역이 제목 첫 줄과 맞도록 `-mt-1` */}
+            {menu !== null && <div className="-mt-1">{menu}</div>}
+          </div>
+
+          <p className="text-body-2 text-fg-muted font-medium tabular-nums">
+            {formatPlanDateRange(plan.startDate, plan.endDate)}
+          </p>
+
+          <p className="text-caption text-fg-muted flex flex-wrap gap-x-2 font-medium tabular-nums">
+            <span>{messages.plan.totalDays.replace('{days}', String(plan.totalDays))}</span>
+            <span aria-hidden>·</span>
+            <span>
+              {plan.budget === null
+                ? messages.plan.budgetEmpty
+                : `${messages.plan.budgetLabel} ${messages.plan.budgetAmount.replace(
+                    '{amount}',
+                    plan.budget.toLocaleString('ko-KR'),
+                  )}`}
+            </span>
+            {dday !== null && (
+              <>
+                <span aria-hidden>·</span>
+                <span className="text-fg font-bold">
+                  {dday === 0
+                    ? messages.plan.ddayToday
+                    : messages.plan.dday.replace('{days}', String(dday))}
+                </span>
+              </>
+            )}
+          </p>
         </div>
 
-        <p className="text-body-2 text-fg-muted font-medium tabular-nums">
-          {formatPlanDateRange(plan.startDate, plan.endDate)}
-        </p>
-
-        <p className="text-caption text-fg-muted flex flex-wrap gap-x-2 font-medium tabular-nums">
-          <span>{messages.plan.totalDays.replace('{days}', String(plan.totalDays))}</span>
-          <span aria-hidden>·</span>
-          <span>
-            {plan.budget === null
-              ? messages.plan.budgetEmpty
-              : `${messages.plan.budgetLabel} ${messages.plan.budgetAmount.replace(
-                  '{amount}',
-                  plan.budget.toLocaleString('ko-KR'),
-                )}`}
-          </span>
-          {dday !== null && (
-            <>
-              <span aria-hidden>·</span>
-              <span className="text-fg font-bold">
-                {dday === 0
-                  ? messages.plan.ddayToday
-                  : messages.plan.dday.replace('{days}', String(dday))}
-              </span>
-            </>
-          )}
-        </p>
+        <PlanPetCard companions={companions} pending={petPending} />
       </div>
 
-      <PlanPetCard companions={companions} pending={petPending} />
-
       <PlanVerdictToc verdicts={verdicts} />
-    </div>
+    </>
   )
 }
 
@@ -116,7 +128,8 @@ function PlanPetCard({ companions, pending }: { companions: readonly Pet[]; pend
   if (companions.length === 0) return null
 
   return (
-    <div className="border-border flex flex-col gap-3 border-t pt-4">
+    // 바닥 위라 선을 긋지 않는다 — 제목 줄과의 간격(20)이 경계다 (#447)
+    <div className="flex flex-col gap-3">
       {companions.map((pet) => (
         <PlanPetRow key={pet.petId} pet={pet} />
       ))}
@@ -155,33 +168,39 @@ function PlanPetRow({ pet }: { pet: Pet }) {
 function PlanVerdictToc({ verdicts }: { verdicts: PlanDayWeatherItem[] }) {
   if (verdicts.length === 0) return null
 
+  /*
+    카드다 (#447). 제목은 `Surface` 의 `h2` 고 `nav` 는 그 안이다 — 카드가 곧 목차라 이름을
+    두 번 붙이지 않는다(`nav` 의 `aria-label` 은 목차 자체의 랜드마크 이름). 줄은 카드 안
+    L2 규약 — 위 1px 선으로 제목과 갈리고 사이는 `SurfaceList` 가 긋는다.
+  */
   return (
-    <nav aria-label={messages.plan.verdictTocTitle} className="hidden lg:block">
-      <h2 className="text-caption text-fg-muted font-semibold">{messages.plan.verdictTocTitle}</h2>
-      <ul className="border-border mt-2 border-t">
-        {verdicts.map((verdict) => (
-          <li key={verdict.day} className="border-border border-b">
-            <a
-              href={`#${planDayAnchorId(verdict.day)}`}
-              className="focus-visible:ring-brand-500 flex min-h-11 items-center justify-between gap-2 py-2 focus-visible:ring-2 focus-visible:outline-none"
-            >
-              <span className="text-body-2 text-fg font-medium">
-                {messages.plan.dayLabel.replace('{day}', String(verdict.day))}
-              </span>
-              {verdict.suitabilityLevel === null ? (
-                // 판정을 못 낸 날을 낮은 등급으로 칠하지 않는다 — 점선 unknown 이다
-                <MetricBadge tone="unknown" size="sm">
-                  {messages.plan.verdictTocUnavailable}
-                </MetricBadge>
-              ) : (
-                <MetricBadge tone={suitabilityTone(verdict.suitabilityLevel.code)} size="sm">
-                  {verdict.suitabilityLevel.name}
-                </MetricBadge>
-              )}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </nav>
+    <Surface title={messages.plan.verdictTocTitle} className="hidden lg:block">
+      <nav aria-label={messages.plan.verdictTocTitle}>
+        <SurfaceList className="border-border border-t">
+          {verdicts.map((verdict) => (
+            <li key={verdict.day} className={INSET_CLASS.card}>
+              <a
+                href={`#${planDayAnchorId(verdict.day)}`}
+                className="focus-visible:ring-brand-500 flex min-h-11 items-center justify-between gap-2 py-2 focus-visible:ring-2 focus-visible:outline-none"
+              >
+                <span className="text-body-2 text-fg font-medium">
+                  {messages.plan.dayLabel.replace('{day}', String(verdict.day))}
+                </span>
+                {verdict.suitabilityLevel === null ? (
+                  // 판정을 못 낸 날을 낮은 등급으로 칠하지 않는다 — 점선 unknown 이다
+                  <MetricBadge tone="unknown" size="sm">
+                    {messages.plan.verdictTocUnavailable}
+                  </MetricBadge>
+                ) : (
+                  <MetricBadge tone={suitabilityTone(verdict.suitabilityLevel.code)} size="sm">
+                    {verdict.suitabilityLevel.name}
+                  </MetricBadge>
+                )}
+              </a>
+            </li>
+          ))}
+        </SurfaceList>
+      </nav>
+    </Surface>
   )
 }
