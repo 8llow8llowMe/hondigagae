@@ -237,11 +237,10 @@ export function PlanAddPlaceView({
             }
             renderRowNotice={(place) => planAddPlaceNotice(place, { failure: addPlace.failure })}
             /* **SDK 가 실패해도 담을 수 있어야 한다.** 없으면 열람 전용 화면이 된다 */
-            renderListRow={(place, last) => (
+            renderListRow={(place) => (
               <PlanAddPlaceRow
                 key={place.placeId}
                 place={place}
-                last={last}
                 added={addedPlaceIds.has(place.placeId)}
                 pending={addPlace.pending?.placeId === place.placeId}
                 disabled={addPlace.adding}
@@ -282,11 +281,10 @@ export function PlanAddPlaceView({
         onLoadMore={() => void list.fetchNextPage()}
         onRetry={() => void list.refetch()}
         onResetFilters={() => router.replace(resetHref, { scroll: false })}
-        renderRow={(place, last) => (
+        renderRow={(place) => (
           <PlanAddPlaceRow
             key={place.placeId}
             place={place}
-            last={last}
             added={addedPlaceIds.has(place.placeId)}
             pending={addPlace.pending?.placeId === place.placeId}
             disabled={addPlace.adding}

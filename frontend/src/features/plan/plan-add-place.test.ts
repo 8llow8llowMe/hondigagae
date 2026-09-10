@@ -116,7 +116,6 @@ function renderRow(overrides: Record<string, unknown> = {}) {
   return renderToStaticMarkup(
     createElement(PlanAddPlaceRow, {
       place: placeSummary,
-      last: true,
       added: false,
       pending: false,
       disabled: false,
