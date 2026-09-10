@@ -4,19 +4,25 @@ import Link from 'next/link'
 import { Badge } from '@/components/badge'
 import { ChevronRightIcon, ImageIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
-import { Row } from '@/components/surface'
 import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { placeIllustration } from '@/lib/place/illustration'
 import { placeMetaLine } from '@/lib/place/meta'
+import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceSummary } from '@/types/place'
 
 /**
- * PlaceRow — **카드가 아니라 행이다** (디자인 가이드 §5).
+ * PlaceRow — **L1 카드 안의 L2 항목이다** (`DESIGN.md §0`).
  * 아트보드 `혼디가개 장소 찾기.dc.html` 01(모바일) · 03(데스크톱) 절.
  *
- * 테두리·라운드·그림자 없이 전폭으로 놓고 구분선으로 나눈다.
+ * **자기 테두리를 두르지 않는다** — 구분선은 `SurfaceList` 가 항목 **사이에만** 긋는다.
+ * 그래서 `last` prop 이 없다: 마지막 행을 아는 것이 행의 일이 아니다.
+ *
+ * **좌우 인셋은 담는 곳이 정한다** (`inset.ts` 의 같은 규칙). 이 행은 카드 안
+ * (`/places` 목록, 16/20)과 카드 밖(지도 SDK 실패 폴백 목록, 16/40) 양쪽에서 쓰여
+ * 값이 하나로 고정될 수 없다. 기본값을 `card` 로 두는 것은 3a 가 정본이기 때문이고,
+ * 카드 밖 사용처가 스스로 밝히게 한다.
  *
  * 썸네일 80(모바일) / 96(데스크톱) · radius 8. **`firstImage` 가 null 이어도 같은
  * 크기의 "이미지 없음" 타일을 남긴다** — 행 높이가 흔들리면 목록을 훑을 수 없다.
@@ -26,9 +32,9 @@ import type { PlaceSummary } from '@/types/place'
  * 근거를 댈 수 없다. 적합도는 상세에서만 말한다 (docs/screen-inventory.md §3).
  * 같은 이유로 아트보드의 **거리(`4.1km`)와 설명 한 줄도 그리지 않는다** — 목록 응답에 없다.
  */
-export function PlaceRow({ place, last = false }: { place: PlaceSummary; last?: boolean }) {
+export function PlaceRow({ place, inset = 'card' }: { place: PlaceSummary; inset?: Inset }) {
   return (
-    <Row as="li" last={last}>
+    <li className={INSET_CLASS[inset]}>
       <Link
         href={`/places/${place.placeId}`}
         className="focus-visible:ring-brand-500 @container flex items-center gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none @lg:gap-5 @lg:py-4"
@@ -36,7 +42,7 @@ export function PlaceRow({ place, last = false }: { place: PlaceSummary; last?: 
         <PlaceRowContent place={place} />
         <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
       </Link>
-    </Row>
+    </li>
   )
 }
 
