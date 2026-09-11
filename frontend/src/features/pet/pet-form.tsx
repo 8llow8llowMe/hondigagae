@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-import type { ReactNode } from 'react'
-
 import { Button } from '@/components/button'
 import { Checkbox } from '@/components/checkbox'
 import { ErrorState } from '@/components/error-state'
@@ -49,8 +47,6 @@ export type PetFormFieldsProps = {
   errorStatus: number | null
   submitting: boolean
   submitLabel: string
-  /** 등록·수정을 가르는 유일한 표시 차이. 수정에서는 삭제 영역이 들어온다 */
-  footer?: ReactNode
   onValueChange: <K extends keyof PetFormValues>(key: K, value: PetFormValues[K]) => void
   onSubmit: () => void
   onRetry: () => void
@@ -68,7 +64,6 @@ export function PetFormFields({
   errorStatus,
   submitting,
   submitLabel,
-  footer,
   onValueChange,
   onSubmit,
   onRetry,
@@ -97,7 +92,7 @@ export function PetFormFields({
       <FormAlert message={errors.form} />
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-title-2 text-fg font-semibold">기본 정보</h2>
+        <h3 className="text-title-2 text-fg font-semibold">기본 정보</h3>
 
         <Field id="name" label={labels.name} error={errors.fields.name} required>
           <Input
@@ -183,7 +178,7 @@ export function PetFormFields({
       </section>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-title-2 text-fg font-semibold">성향</h2>
+        <h3 className="text-title-2 text-fg font-semibold">성향</h3>
 
         <RadioGroup
           id="activityLevel"
@@ -214,7 +209,7 @@ export function PetFormFields({
       </section>
 
       <section className="flex flex-col gap-1">
-        <h2 className="text-title-2 text-fg font-semibold">민감도</h2>
+        <h3 className="text-title-2 text-fg font-semibold">민감도</h3>
 
         <Checkbox
           id="heatSensitive"
@@ -239,8 +234,6 @@ export function PetFormFields({
       <Button type="submit" size="lg" loading={submitting}>
         {submitLabel}
       </Button>
-
-      {footer}
     </form>
   )
 }
@@ -248,7 +241,6 @@ export function PetFormFields({
 export type PetFormProps = {
   initialValues: PetFormValues
   submitLabel: string
-  footer?: ReactNode
   /** 등록은 createPet, 수정은 updatePet 을 넘긴다 */
   onSave: (payload: ReturnType<typeof toPetSavePayload>) => Promise<Pet>
   onSaved: (pet: Pet) => void
@@ -260,7 +252,7 @@ export type PetFormProps = {
  * 백엔드가 `PetSaveRequest` 를 등록·수정에 공유하므로 폼도 하나여야 계약과
  * 어긋나지 않는다 (공통명세 S2). 차이는 props 로 받는다.
  */
-export function PetForm({ initialValues, submitLabel, footer, onSave, onSaved }: PetFormProps) {
+export function PetForm({ initialValues, submitLabel, onSave, onSaved }: PetFormProps) {
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -300,7 +292,6 @@ export function PetForm({ initialValues, submitLabel, footer, onSave, onSaved }:
         errorStatus={errorStatus}
         submitting={isSubmitting}
         submitLabel={submitLabel}
-        footer={footer}
         onValueChange={(key, value) => {
           // 5xx 를 받은 뒤 값을 고치면 ErrorState 를 걷는다 — 등록-세부명세 D4
           setErrorStatus(null)

@@ -73,11 +73,11 @@
 
 ## 2. 반려견 프로필 — 착수 가능
 
-| 화면             | 경로            | API                     | 상태 |
-| ---------------- | --------------- | ----------------------- | ---- |
-| 반려견 목록      | `/pets`         | `GET /members/me/pets`  | 구현 |
-| 반려견 등록      | `/pets/new`     | `POST /members/me/pets` | 구현 |
-| 반려견 수정·삭제 | `/pets/[petId]` | `GET                    | PUT  | DELETE /members/me/pets/{petId}` | 구현 (읽기 전용 상세는 두지 않는다 — 공통명세 S5-1) |
+| 화면             | 경로            | API                                           | 상태                                                                                                                                         |
+| ---------------- | --------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 반려견 목록      | `/pets`         | `GET /members/me/pets`                        | 구현 · **3층 표면** ([#464](https://github.com/8llow8llowMe/hondigagae/issues/464))                                                          |
+| 반려견 등록      | `/pets/new`     | `POST /members/me/pets`                       | 구현 · **3층 표면** ([#464](https://github.com/8llow8llowMe/hondigagae/issues/464))                                                          |
+| 반려견 수정·삭제 | `/pets/[petId]` | `GET`·`PUT`·`DELETE /members/me/pets/{petId}` | 구현 · **3층 표면 — 카드 둘** ([#464](https://github.com/8llow8llowMe/hondigagae/issues/464)) (읽기 전용 상세는 두지 않는다 — 공통명세 S5-1) |
 
 **사진 · 체중 · 대표견도 붙어 있다** ([#126](https://github.com/8llow8llowMe/hondigagae/issues/126))
 

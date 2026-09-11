@@ -1,5 +1,6 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 
+import { Canvas, SurfaceStack } from '@/components/surface'
 import { PetListView } from '@/features/pet/pet-list-view'
 import { petKeys } from '@/features/pet/queries'
 import { petListPath } from '@/lib/api/pet'
@@ -36,26 +37,31 @@ export default async function PetsPage() {
 
   return (
     /*
-      **선은 전폭 방식에서 가져오고, 폭은 다시 묶는다.**
+      **3층 표면** (`DESIGN.md §0`, 이슈 #464). `main` 이 L0 바닥을 전폭으로 깔고,
+      목록이 L1 카드 하나가 된다 — 카드는 `PetListSection` 이 그린다(머리의 등록 버튼이
+      상한에 따라 갈리고 그 값이 응답에서 온다).
 
-      원래 `max-w-2xl` 중앙 정렬이었는데 테두리 없는 좁은 칸이라 목록의 시작과 끝이
-      보이지 않았다. 그래서 전폭 + 제목 띠 + 전폭 행으로 바꿨더니 이번엔 1440 에서
-      한 행이 1150 까지 늘어나 행 내용이 왼쪽 끝에 몰렸다 — 반려견 행은 우측에 붙는
-      액션이 없어(중첩 링크 금지) 폭을 잡아 줄 것이 없다. `/favorites` 가 전폭인 것은
-      1200 이상에서 2열로 접기 때문인데, 최대 5마리인 이 목록에 2열은 과하다.
+      **폭은 그대로 `max-w-screen-md` 다.** 2a 때 정한 이유가 3a 에서도 그대로다 —
+      반려견 행은 우측에 붙는 액션이 없어(중첩 링크 금지) 폭을 잡아 줄 것이 없고, 최대
+      5마리라 `/favorites` 처럼 2열로 접을 것도 못 된다. 다만 **폭을 가진 것이 `main` 이
+      아니라 `SurfaceStack` 이다**: 바닥은 전폭이어야 하고 쌓기가 폭을 갖는다 (#453 · #462).
 
-      `/mypage` 와 같은 `max-w-screen-md` 로 묶는다 — 성격이 같은 화면이고(내 것을
-      모아 둔 목록), 안쪽은 전폭 섹션 규약(px-4 / md:px-10 인셋)을 그대로 쓴다.
+      **2a 헤더 띠(`border-b px-4 py-5`)를 걷었다** — 제목·설명이 카드 머리로 들어갔고,
+      바닥 위에 선 하나만 남기면 카드 테두리와 나란히 두 줄로 읽힌다.
     */
-    <main className="mx-auto w-full max-w-screen-md">
-      <header className="border-border border-b px-4 py-5 md:px-10">
-        <h1 className="text-title-2 text-fg font-extrabold">{messages.pet.listTitle}</h1>
-        <p className="text-body-2 text-fg-muted mt-1">{messages.pet.listDescription}</p>
-      </header>
+    <Canvas as="main" id="main-content">
+      <SurfaceStack className="mx-auto w-full max-w-screen-md">
+        {/*
+          **보이는 제목은 카드의 `h2` 다** (§0 "섹션 제목은 섹션 안에 있다"). 이 화면의
+          카드는 하나뿐이고 그 카드의 이름이 곧 페이지의 이름이라, 밖에 두면 제목만 바닥
+          위에 떠 어느 묶음의 제목인지 모호해진다 — 장소 목록(#439)과 같은 방식이다.
+        */}
+        <h1 className="sr-only">{messages.pet.listTitle}</h1>
 
-      <HydrationBoundary state={dehydrate(queryClient)}>
-        <PetListView />
-      </HydrationBoundary>
-    </main>
+        <HydrationBoundary state={dehydrate(queryClient)}>
+          <PetListView />
+        </HydrationBoundary>
+      </SurfaceStack>
+    </Canvas>
   )
 }

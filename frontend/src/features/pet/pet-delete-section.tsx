@@ -49,7 +49,7 @@ export function PetDeleteConfirm({
   onConfirm,
 }: PetDeleteConfirmProps) {
   return (
-    <div className="border-border mt-2 border-t pt-4">
+    <div className="flex flex-col items-center gap-2">
       {/*
         **채운 빨강이 아니다** (`dangerOutline`). 이 화면의 주 행동은 `저장하기` 인데
         채운 삭제 버튼이 그 바로 아래에서 더 강하게 서 있었다 — 거의 누르지 않는 것이
