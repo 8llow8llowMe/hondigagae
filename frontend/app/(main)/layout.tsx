@@ -59,27 +59,55 @@ export default async function MainLayout({ children }: { children: React.ReactNo
         본문으로 바로가기
       </a>
 
-      <GlobalHeader authed={authed} />
-
       {/*
-        토스트는 `(main)` 에만 둔다. 여기에 두면 **라우트를 옮겨도 provider 가 유지돼**
-        장소 추가 화면에서 담고 일정 상세로 돌아온 뒤 토스트가 그대로 뜬다 (#82 F4).
-        `aboveTabBar` 기본값 그대로다 — 이 그룹에만 고정 탭바가 있다.
-      */}
-      <ToastProvider>
-        {/* 탭바가 fixed 라 본문 하단을 그만큼 비운다. md 부터는 탭바가 없다 */}
-        <div id="main" className="pb-16 md:pb-0">
-          {children}
-        </div>
-      </ToastProvider>
+        **세로 뼈대 — 머리 · 본문 · 푸터가 한 열이고 본문이 남는 높이를 먹는다** (#456③).
 
-      {/*
-        푸터는 `ToastProvider` 밖이다 — 토스트가 필요한 것은 본문의 조작이고, 푸터는
-        상태 없는 표기다. **지도 화면에서는 스스로 빠진다** (`app/globals.css` 의
-        `body:has(.map-canvas-height) .site-footer`) — 자세한 이유는 `SiteFooter` 주석에 있다.
-      */}
-      <SiteFooter />
+        이것이 없으면 내용이 짧은 화면에서 L0 회색이 콘텐츠 높이에서 끊기고 그 아래로
+        흰 `body` 가 보인다 (1280×900 `/places/<없는 id>` 실측: 회색이 274 에서 끝나고
+        푸터 아래 **366px 가 맨 흰색**). `DESIGN.md §0` 은 "흰색은 바닥이 아니라 섹션의
+        색" 이라 적었는데 바닥이 뷰포트를 못 채우면 그 규칙이 뒤집힌다.
 
+        **페이지가 아니라 여기서 한 번 건다.** `min-h` 를 상태 파일이나 짧은 화면마다
+        붙이면 같은 규칙이 열두 곳으로 갈린다 (`route-state-surface.test.ts` 의
+        "여기에 없는 것 — `Canvas` 바닥 높이" 문단이 이 이슈로 미뤄 둔 결정이다).
+
+        **푸터를 밀어내지 않고 바닥에 앉힌다.** `Canvas` 에 `min-h: 100dvh - 헤더` 를
+        주는 안은 같은 흰 공백을 없애지만 **없던 스크롤을 모든 짧은 화면에 만든다** —
+        푸터(260)가 통째로 접힘 아래로 내려가기 때문이다.
+      */}
+      <div className="flex min-h-dvh flex-col">
+        <GlobalHeader authed={authed} />
+
+        {/*
+          토스트는 `(main)` 에만 둔다. 여기에 두면 **라우트를 옮겨도 provider 가 유지돼**
+          장소 추가 화면에서 담고 일정 상세로 돌아온 뒤 토스트가 그대로 뜬다 (#82 F4).
+          `aboveTabBar` 기본값 그대로다 — 이 그룹에만 고정 탭바가 있다.
+        */}
+        <ToastProvider>
+          {/*
+            남는 높이를 먹고 자식(`Canvas`)에게 넘긴다 — `Canvas` 가 `flex-1` 로 받는다.
+
+            **탭바 자리를 여기서 비우지 않는다.** 예전에는 `pb-16 md:pb-0` 이 있었는데,
+            그 padding 은 `Canvas` **밖**이라 모바일에서 회색 바닥과 푸터 사이에 흰 띠
+            64px 을 만들었다 (375×812 실측: 회색이 266 에서 끝나고 푸터가 330 에서 시작).
+            탭바 자리는 이미 두 곳이 비우고 있다 — 푸터는 자기 `padding-block-end`
+            (`app/globals.css` `.site-footer`), 푸터가 빠지는 지도 화면은
+            `.map-canvas-height` 가 `100dvh - 헤더 - 탭바` 로 스스로.
+          */}
+          <div id="main" className="flex flex-1 flex-col">
+            {children}
+          </div>
+        </ToastProvider>
+
+        {/*
+          푸터는 `ToastProvider` 밖이다 — 토스트가 필요한 것은 본문의 조작이고, 푸터는
+          상태 없는 표기다. **지도 화면에서는 스스로 빠진다** (`app/globals.css` 의
+          `body:has(.map-canvas-height) .site-footer`) — 자세한 이유는 `SiteFooter` 주석에 있다.
+        */}
+        <SiteFooter />
+      </div>
+
+      {/* 탭바는 `fixed` 라 세로 뼈대 밖이다 — 열에 넣으면 자리를 두 번 차지한다 */}
       <MobileTabBar authed={authed} />
     </HydrationBoundary>
   )

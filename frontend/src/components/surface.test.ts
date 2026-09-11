@@ -40,7 +40,31 @@ describe('L0 Canvas — 페이지 바닥', () => {
       그렇게 비었다. 배치는 `SurfaceStack` 이 맡는다.
     */
     expect(classes.filter((name) => /(^|:)(p|px|py|gap)-/.test(name))).toEqual([])
-    expect(classes).toEqual(['bg-bg-sunken'])
+    /*
+      **`flex-1` 은 배치가 아니라 높이다** (#456③). 좌우로는 아무것도 하지 않으므로
+      위 규칙과 부딪히지 않는다 — 목록을 정확히 잠가 두는 이유는 여백·폭 클래스가
+      나중에 슬며시 끼는 것을 막기 위해서다.
+    */
+    expect(classes).toEqual(['bg-bg-sunken', 'flex-1'])
+  })
+
+  /*
+    **내용이 짧아도 바닥은 뷰포트 끝까지 간다** (#456③).
+
+    이게 없으면 회색이 콘텐츠 높이에서 끊기고 그 아래로 흰 `body` 가 보인다 —
+    1280×900 `/places/<없는 id>` 실측에서 회색이 274 에서 끝나고 푸터 아래 366px 이
+    맨 흰색이었다. `DESIGN.md §0` 의 "흰색은 바닥이 아니라 섹션의 색" 이 뒤집힌다.
+
+    **`min-h-*` 로 고치지 않는다.** `100dvh - 헤더` 를 박으면 푸터(260)가 통째로 접힘
+    아래로 내려가 **없던 스크롤이 짧은 화면마다 생긴다.** 높이를 주는 쪽은
+    `app/(main)/layout.tsx` 의 세로 뼈대이고 (`main-layout-surface.test.ts` 가 잠근다),
+    여기서는 그 남는 높이를 받기만 한다.
+  */
+  it('남는 높이를 먹는다 — 내용이 짧아도 바닥이 뷰포트에서 끊기지 않는다', () => {
+    const classes = classesOf(renderToStaticMarkup(createElement(Canvas, null, '내용')))
+
+    expect(classes).toContain('flex-1')
+    expect(classes.filter((name) => /(^|:)min-h-/.test(name))).toEqual([])
   })
 
   it('main 으로 낼 수 있다 — 바닥을 그리려고 래퍼를 하나 더 두지 않는다', () => {
