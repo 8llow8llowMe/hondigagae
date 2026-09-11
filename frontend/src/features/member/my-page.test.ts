@@ -192,3 +192,109 @@ describe('AccountSection — 계정 상태 3종이 다르게 그려진다 (D5)',
     expect(markup).toMatch(/<dt[^>]*>버전<\/dt>/)
   })
 })
+
+/**
+ * 3층 표면 (`DESIGN.md §0`, 이슈 #466). **층이 아니라 규약을 잠근다** — 색·여백은
+ * `fe-design-reviewer` 의 브라우저 검토가 보고, 여기서는 마크업에 드러나는 것만 본다:
+ * 카드 수, 무엇이 카드 안이고 무엇이 밖인지, 선을 누가 긋는지.
+ */
+describe('MyPageSections — 3층 표면 (#466)', () => {
+  /** `class` 를 토큰으로 쪼갠다. 문자열 `toContain` 은 `border-border` 안의 `border-b` 에 걸린다 */
+  function classTokens(tag: string): string[] {
+    return (/class="([^"]*)"/.exec(tag)?.[1] ?? '').split(/\s+/).filter(Boolean)
+  }
+
+  function tags(markup: string, name: string): string[] {
+    return [...markup.matchAll(new RegExp(`<${name}\\b[^>]*>`, 'g'))].map((match) => match[0])
+  }
+
+  it('카드가 둘이다 — 내 정보(프로필·반려견·저장한 장소)와 계정', () => {
+    const markup = render()
+
+    expect(tags(markup, 'section')).toHaveLength(2)
+    expect(markup).toMatch(new RegExp(`<h2[^>]*>${messages.member.myPageTitle}</h2>`))
+    expect(markup).toMatch(new RegExp(`<h2[^>]*>${messages.member.accountSection}</h2>`))
+  })
+
+  /** 프로필은 혼자 카드가 되지 못한다 (판정 ①③) — 반려견·저장한 장소와 같은 카드에 든다 */
+  it('프로필과 두 진입점이 같은 카드 안에 있다', () => {
+    const markup = render()
+    const firstCardEnd = markup.indexOf('</section>')
+
+    expect(markup.indexOf('김제주')).toBeLessThan(firstCardEnd)
+    expect(markup.indexOf(messages.member.myPets)).toBeLessThan(firstCardEnd)
+    expect(markup.indexOf(messages.favorite.entryLabel)).toBeLessThan(firstCardEnd)
+  })
+
+  it('반려견·저장한 장소는 목록 항목(li)이고 항목이 자기 구분선을 긋지 않는다', () => {
+    const markup = render()
+    const items = tags(markup, 'li')
+
+    expect(items.length).toBeGreaterThanOrEqual(2)
+    for (const item of items) {
+      expect(classTokens(item)).not.toContain('border-t')
+      expect(classTokens(item)).not.toContain('border-b')
+    }
+    // 선 규약은 목록이 갖는다 — 항목 사이에만 긋는다.
+    // 마크업에서는 `&`·`>` 가 엔티티로 이스케이프된다
+    expect(markup).toContain('[&amp;&gt;li+li]:border-t')
+  })
+
+  /** 액션은 카드가 아니다 (§0 판정에서 "액션 바" 가 빠진다) */
+  it('로그아웃·회원탈퇴는 마지막 카드 밖에 있다', () => {
+    const markup = render()
+    const lastCardEnd = markup.lastIndexOf('</section>')
+
+    expect(markup.indexOf(messages.member.logout)).toBeGreaterThan(lastCardEnd)
+    expect(markup.indexOf(messages.member.withdraw)).toBeGreaterThan(lastCardEnd)
+  })
+
+  /** 소셜 연결·비밀번호 유무가 전부 회원 정보에서 온다 — 값 없이 그리면 단정이 된다 (D5) */
+  it('회원 정보 조회에 실패하면 계정 카드를 내지 않는다', () => {
+    const markup = render({ member: null, errorStatus: 503 })
+
+    expect(tags(markup, 'section')).toHaveLength(1)
+    expect(markup).not.toContain(messages.member.accountSection)
+    expect(markup).toContain(messages.common.retry)
+  })
+
+  /** 제목까지 스켈레톤으로 지우면 조회가 끝나는 순간 카드 높이와 경계가 함께 뛴다 (#451) */
+  it('로딩 중에도 카드 둘과 그 제목이 서 있다', () => {
+    const markup = render({ loading: true })
+
+    expect(tags(markup, 'section')).toHaveLength(2)
+    expect(markup).toContain(messages.member.myPageTitle)
+    expect(markup).toContain(messages.member.accountSection)
+    expect(markup).toContain('aria-busy')
+  })
+})
+
+describe('AccountSection — 카드 안 내용만 낸다 (#466)', () => {
+  function account(state: Parameters<typeof AccountSection>[0]['state'], provider: string | null) {
+    return renderToStaticMarkup(createElement(AccountSection, { state, provider }))
+  }
+
+  /** 카드는 `MyPageSections` 가 그린다 — 여기서 또 그리면 카드 여백이 두 번 낀다 (§3-1) */
+  it('자기 카드를 그리지 않는다', () => {
+    expect(account('general', null)).not.toContain('<section')
+  })
+
+  /**
+   * `unknown` 은 읽기 항목도 이동 항목도 내지 않는다. 그때 빈 `ul` 과 그 아래 `border-t`
+   * 를 그리면 카드 제목 바로 밑에 허공에 선이 하나 뜬다.
+   */
+  it('판별 불가면 빈 목록도 허공 구분선도 만들지 않는다', () => {
+    const markup = account('unknown', null)
+
+    expect(markup).not.toContain('<ul')
+    expect(/<dl\b[^>]*>/.exec(markup)?.[0]).not.toContain('border-t')
+  })
+
+  /** 항목이 있을 때는 버전 줄이 목록과 갈리는 선을 스스로 든다 (목록 선은 자기 li 사이에만 걸린다) */
+  it('항목이 있으면 버전 줄이 위 구분선을 갖는다', () => {
+    const markup = account('general', null)
+
+    expect(markup).toContain('<ul')
+    expect(/<dl\b[^>]*>/.exec(markup)?.[0]).toContain('border-t')
+  })
+})

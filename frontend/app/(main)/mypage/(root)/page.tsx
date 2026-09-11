@@ -1,5 +1,6 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 
+import { Canvas, SurfaceStack } from '@/components/surface'
 import { favoriteKeys } from '@/features/favorite/queries'
 import { MyPageView } from '@/features/member/my-page-view'
 import { memberKeys } from '@/features/member/queries'
@@ -69,16 +70,30 @@ export default async function MyPage() {
   }
 
   return (
-    // 설정 목록이라 데스크톱에서도 레일을 쓰지 않는다 — 맥락 패널에 담을 것이 없다 (D1).
-    // 지도가 붙기 전의 장소 목록과 같은 판단이다.
-    <main className="mx-auto w-full max-w-screen-md">
-      <header className="border-border flex h-14 items-center border-b px-4 md:px-10">
-        <h1 className="text-title-2 text-fg font-extrabold">{messages.member.myPageTitle}</h1>
-      </header>
+    /*
+      **3층 표면** (`DESIGN.md §0`, 이슈 #466). `main` 이 L0 바닥을 전폭으로 깔고,
+      `내 정보` 와 `계정` 이 그 위의 카드 둘이 된다 — 카드는 `MyPageSections` 가 그린다.
 
-      <HydrationBoundary state={dehydrate(queryClient)}>
-        <MyPageView />
-      </HydrationBoundary>
-    </main>
+      **폭은 그대로 `max-w-screen-md` 다.** 설정 목록이라 데스크톱에서도 레일을 쓰지
+      않는다 — 맥락 패널에 담을 것이 없다 (D1). 다만 **폭을 가진 것이 `main` 이 아니라
+      `SurfaceStack` 이다**: 바닥은 전폭이어야 하고 쌓기가 폭을 갖는다 (#453 · #462).
+
+      **2a 헤더 바(`border-b h-14`)를 걷었다** — 제목이 첫 카드의 머리로 들어갔고,
+      바닥 위에 선 하나만 남기면 카드 테두리와 나란히 두 줄로 읽힌다 (#464 와 같다).
+    */
+    <Canvas as="main" id="main-content">
+      <SurfaceStack className="mx-auto w-full max-w-screen-md">
+        {/*
+          **보이는 제목은 첫 카드의 `h2` 다** (§0 "섹션 제목은 섹션 안에 있다").
+          이 화면의 주인공 카드 이름이 곧 페이지의 이름이라, 밖에 두면 제목만 바닥 위에
+          떠 어느 묶음의 제목인지 모호해진다 — 장소 목록(#439) · 반려견(#464)과 같다.
+        */}
+        <h1 className="sr-only">{messages.member.myPageTitle}</h1>
+
+        <HydrationBoundary state={dehydrate(queryClient)}>
+          <MyPageView />
+        </HydrationBoundary>
+      </SurfaceStack>
+    </Canvas>
   )
 }

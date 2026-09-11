@@ -1,13 +1,19 @@
 import Link from 'next/link'
 
 import { ChevronRightIcon } from '@/components/icons'
-import { Section } from '@/components/surface'
+import { SurfaceList } from '@/components/surface'
 import { type AccountState, canSetupPassword } from '@/lib/member/account-state'
 import { providerName } from '@/lib/member/provider'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 
 /**
- * `계정` 섹션 — 아트보드 01 의 세 번째 블록.
+ * `계정` 카드의 **내용**— 아트보드 01 의 세 번째 블록.
+ *
+ * **카드(`Surface`)는 `MyPageSections` 가 그린다** (`styling-guide.md §3-1`). 제목 `계정`
+ * 이 응답과 무관한 정적 값이라 기준의 "정적이면 페이지가" 쪽이다 — 여기서 그리면서 값만
+ * 내려보내면 제목 줄과 목록 사이에 카드 여백이 한 번 더 낀다.
  *
  * ### 아트보드의 예고를 이행한다
  *
@@ -24,9 +30,13 @@ import { messages } from '@/lib/messages'
  *
  * ### 목록 규칙 (D6)
  *
- * `<ul>` 이고, **이동 항목은 `<a>` · 읽기 전용 항목은 `<li>` 안의 텍스트**다. 모양이
+ * `SurfaceList` 이고, **이동 항목은 `<a>` · 읽기 전용 항목은 `<li>` 안의 텍스트**다. 모양이
  * 같아도 역할이 다르다. `버전 1.0.0` 은 조작할 수 없어 목록 항목이 아니라 정의 목록으로
  * 그린다 — `<li>` 에 넣으면 스크린리더가 나머지와 같은 "항목"으로 읽는다.
+ *
+ * **항목이 자기 `border-b` 를 긋지 않는다** (3a, #466). 선은 `SurfaceList` 가 항목
+ * **사이에만** 긋고, 마지막 항목 아래 선은 없다 — 2a 때 마지막 행의 `border-b` 가 버전
+ * 줄 위에 선을 남겨, 목록과 정의 목록이 같은 묶음처럼 읽혔다.
  *
  * `이용약관` · `개인정보 처리방침` 은 **이번에 렌더하지 않는다.** 링크 대상 문서가
  * 아직 없다 — "API 없이 진입점만 만들지 않는다" 와 같은 규칙이다 (D8-1).
@@ -39,42 +49,59 @@ export function AccountSection({
   provider: string | null
 }) {
   const name = providerName(provider)
+  /*
+    둘 다 없는 경우가 실제로 있다 — `unknown`(provider 없음 + 비밀번호 없음)이면 읽기
+    항목도 이동 항목도 내지 않는다. 그때 빈 `ul` 과 그 아래 `border-t` 를 그리면 제목
+    바로 밑에 허공에 선이 하나 뜬다.
+  */
+  const hasItems = name !== null || state !== 'unknown'
 
   return (
-    <Section title={messages.member.accountSection}>
-      <ul>
-        {name !== null && (
-          <li className="border-border flex min-h-14 items-center border-b px-4 py-3 md:px-10">
-            <span className="text-body-1 text-fg">{messages.member.linkedWith(name)}</span>
-          </li>
-        )}
+    <>
+      {hasItems && (
+        <SurfaceList>
+          {name !== null && (
+            <li className={cn('flex min-h-14 items-center py-3', INSET_CLASS.card)}>
+              <span className="text-body-1 text-fg">{messages.member.linkedWith(name)}</span>
+            </li>
+          )}
 
-        {/*
-          판별 불가(`unknown`)면 비밀번호 항목을 내지 않는다. 어느 동작을 제시해도
-          틀리기 때문이다 — 안내는 `/mypage/password` 가 맡는다 (D5).
-        */}
-        {state !== 'unknown' && (
-          <li className="border-border border-b">
-            <Link
-              href="/mypage/password"
-              className="hover:bg-band focus-visible:ring-brand-500 flex min-h-14 items-center gap-3 px-4 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:px-10"
-            >
-              <span className="text-body-1 text-fg flex-1">
-                {canSetupPassword(state)
-                  ? messages.member.passwordSetup
-                  : messages.member.passwordChange}
-              </span>
-              <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
-            </Link>
-          </li>
-        )}
-      </ul>
+          {/*
+            판별 불가(`unknown`)면 비밀번호 항목을 내지 않는다. 어느 동작을 제시해도
+            틀리기 때문이다 — 안내는 `/mypage/password` 가 맡는다 (D5).
+          */}
+          {state !== 'unknown' && (
+            <li className={INSET_CLASS.card}>
+              <Link
+                href="/mypage/password"
+                className="focus-visible:ring-brand-500 flex min-h-14 items-center gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
+              >
+                <span className="text-body-1 text-fg flex-1">
+                  {canSetupPassword(state)
+                    ? messages.member.passwordSetup
+                    : messages.member.passwordChange}
+                </span>
+                <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
+              </Link>
+            </li>
+          )}
+        </SurfaceList>
+      )}
 
-      {/* 조작 불가 정보 — 목록 항목이 아니라 정의 목록이다 (D6) */}
-      <dl className="flex min-h-14 items-center gap-3 px-4 py-3 md:px-10">
+      {/*
+        조작 불가 정보 — 목록 항목이 아니라 정의 목록이다 (D6).
+        **목록 밖이라 선을 스스로 든다.** `SurfaceList` 의 선은 자기 `li` 사이에만 걸린다.
+      */}
+      <dl
+        className={cn(
+          'flex min-h-14 items-center gap-3 py-3',
+          hasItems && 'border-border border-t',
+          INSET_CLASS.card,
+        )}
+      >
         <dt className="text-body-1 text-fg flex-1">{messages.member.version}</dt>
         <dd className="text-body-2 text-fg-muted">{messages.member.versionValue}</dd>
       </dl>
-    </Section>
+    </>
   )
 }
