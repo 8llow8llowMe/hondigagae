@@ -2,15 +2,20 @@ import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
 import { ChevronRightIcon } from '@/components/icons'
-import { Row } from '@/components/surface'
 import { PetPhoto } from '@/features/pet/pet-photo'
 import { PetTraitBadges } from '@/features/pet/pet-trait-badges'
 import { messages } from '@/lib/messages'
 import { petAgeText } from '@/lib/pet/describe'
+import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import type { Pet } from '@/types/pet'
 
 /**
- * 반려견 행. **카드가 아니라 전폭 행이다** (DESIGN.md §0).
+ * 반려견 행 — **L1 카드 안의 L2 항목이다** (`DESIGN.md §0`, 이슈 #464).
+ *
+ * **자기 테두리를 두르지 않는다** — 구분선은 `SurfaceList` 가 항목 **사이에만** 긋는다.
+ * 그래서 `last` prop 이 없다: 마지막 행을 아는 것이 행의 일이 아니다(#439).
+ *
+ * **좌우 인셋은 담는 곳이 정한다** (`inset.ts`). 기본은 카드 안(16/20)이다.
  *
  * 아바타는 **업로드한 사진, 없으면 이름 첫 글자**다 (`PetPhoto`). 사진 필드는
  * 백엔드 PR #107 로 생겼다 — 그전까지 이니셜뿐이라고 적혀 있던 자리다.
@@ -19,13 +24,12 @@ import type { Pet } from '@/types/pet'
  * 데이터에만". 반려견마다 다른 색을 주면 사용자가 그 색을 등급 신호로 읽는다.
  * 구분은 이름 글자가 맡는다.
  *
- * `Row` 에는 `onClick` 이 없다. `Link` 로 감싼다 — `div` + `onClick` 은 키보드로
- * 도달할 수 없다 (목록-세부명세 D6).
+ * **행 전체가 `Link` 다.** `div` + `onClick` 은 키보드로 도달할 수 없다 (목록-세부명세 D6).
  * **행 안에 별도 링크·버튼을 두지 않는다.** 중첩 링크가 된다. 수정·삭제는 이동한 화면에서 한다.
  */
-export function PetRow({ pet, last = false }: { pet: Pet; last?: boolean }) {
+export function PetRow({ pet, inset = 'card' }: { pet: Pet; inset?: Inset }) {
   return (
-    <Row as="li" last={last}>
+    <li className={INSET_CLASS[inset]}>
       <Link
         href={`/pets/${pet.petId}`}
         className="focus-visible:ring-brand-500 flex items-center gap-4 py-4 focus-visible:ring-2 focus-visible:outline-none"
@@ -42,7 +46,12 @@ export function PetRow({ pet, last = false }: { pet: Pet; last?: boolean }) {
 
             <div className="flex min-w-0 flex-col">
               <div className="flex items-center gap-1.5">
-                <h2 className="text-title-2 text-fg truncate font-semibold">{pet.name}</h2>
+                {/*
+                  **`h3` 다.** 카드 제목(`내 반려견`)이 `h2` 라 행이 같은 레벨이면 문서
+                  구조가 평평해진다 — 3a 에서 목록이 카드 안으로 들어오며 한 단 내려왔다
+                  (일정 목록 #445 의 묶음 캡션과 같은 처리).
+                */}
+                <h3 className="text-title-2 text-fg truncate font-semibold">{pet.name}</h3>
                 {/* **대표는 하나뿐이라 배지가 신호로 산다.** 모든 행에 붙는 표시가 아니다 */}
                 {pet.representative && (
                   <Badge tone="neutral" size="sm" className="shrink-0">
@@ -69,6 +78,6 @@ export function PetRow({ pet, last = false }: { pet: Pet; last?: boolean }) {
 
         <ChevronRightIcon size={20} className="text-fg-subtle hidden shrink-0 md:block" />
       </Link>
-    </Row>
+    </li>
   )
 }

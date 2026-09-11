@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 
+import { Canvas, SurfaceStack } from '@/components/surface'
 import { PetEditView } from '@/features/pet/pet-edit-view'
 import { petKeys } from '@/features/pet/queries'
 import { ApiError, isRetriable } from '@/lib/api/error'
@@ -50,12 +51,26 @@ export default async function PetEditPage({ params }: { params: Promise<{ petId:
   }
 
   return (
-    <main className="mx-auto flex max-w-lg flex-col gap-6 px-4 py-6 md:px-6 md:py-8">
-      <h1 className="text-title-1 text-fg font-bold">{messages.pet.editTitle}</h1>
+    /*
+      **3층 표면** (`DESIGN.md §0`, 이슈 #464). 폼 규약은 일정 만들기(#453)와 같고
+      **카드가 둘**이다 — 사진·대표(바로 반영)와 정보 수정(저장해야 반영). 그 판단과
+      삭제·`목록으로` 가 카드 밖인 근거는 `pet-edit-view.tsx` 주석에 있다.
 
-      <HydrationBoundary state={dehydrate(queryClient)}>
-        <PetEditView petId={petId} />
-      </HydrationBoundary>
-    </main>
+      폭이 `max-w-lg`(512)에서 `max-w-2xl`(672)로 넓어졌다 — 등록 화면과 같은 한 단 폭이다.
+    */
+    <Canvas as="main" id="main-content">
+      <SurfaceStack className="mx-auto w-full max-w-2xl">
+        {/*
+          보이는 제목은 카드의 `h2` 들이다 (§0 "섹션 제목은 섹션 안에 있다"). 카드가 둘이라
+          어느 하나가 페이지 이름을 대신할 수 없어, `h1` 은 `sr-only` 로 남되 **문서에는
+          있어야 한다** — 없으면 이 화면에 제목 없는 `h2` 둘만 남는다.
+        */}
+        <h1 className="sr-only">{messages.pet.editTitle}</h1>
+
+        <HydrationBoundary state={dehydrate(queryClient)}>
+          <PetEditView petId={petId} />
+        </HydrationBoundary>
+      </SurfaceStack>
+    </Canvas>
   )
 }

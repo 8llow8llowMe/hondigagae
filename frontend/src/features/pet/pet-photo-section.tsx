@@ -10,6 +10,8 @@ import { PROFILE_IMAGE_ACCEPT } from '@/lib/api/member'
 import { markRepresentativePet, removePetImage, uploadPetImage } from '@/lib/api/pet'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { Pet } from '@/types/pet'
 
 /**
@@ -20,6 +22,10 @@ import type { Pet } from '@/types/pet'
  * 사진은 이미 바뀐 상태다. 한 폼처럼 보이게 묶으면 "저장을 안 눌렀는데 왜 바뀌었나" 가 된다.
  *
  * **등록 화면에는 두지 않는다.** 세 API 모두 `petId` 가 필요해 아이가 먼저 있어야 한다.
+ *
+ * **자기 카드 안의 내용이다** (`DESIGN.md §0`, 이슈 #464). 제목·부제와 테두리는
+ * `PetEditView` 가 세우는 `Surface` 가 갖는다 — 2a 때는 이 블록이 스스로 `border-b` 로
+ * 폼과 갈렸는데, 3a 에서는 **카드 경계가 그 일을 한다**(경계는 이야기 단위다).
  */
 export function PetPhotoSection({ pet }: { pet: Pet }) {
   const queryClient = useQueryClient()
@@ -50,7 +56,7 @@ export function PetPhotoSection({ pet }: { pet: Pet }) {
   }
 
   return (
-    <section className="border-border flex flex-col gap-3 border-b pb-5">
+    <div className={cn('flex flex-col gap-3 pt-2 pb-5', INSET_CLASS.card)}>
       <div className="flex items-center gap-4">
         <PetPhoto name={pet.name} url={pet.profileImageUrl} size={80} />
 
@@ -145,6 +151,6 @@ export function PetPhotoSection({ pet }: { pet: Pet }) {
         {status}
       </p>
       {error !== null && <p className="text-caption text-danger-700">{error}</p>}
-    </section>
+    </div>
   )
 }

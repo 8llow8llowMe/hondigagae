@@ -1,6 +1,4 @@
-import Link from 'next/link'
-
-import { Button } from '@/components/button'
+import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { messages } from '@/lib/messages'
 
@@ -16,10 +14,12 @@ export default function PetNotFound() {
       <EmptyState
         title={messages.pet.notFoundTitle}
         description={messages.pet.notFoundDescription}
+        /* `<Link>` 안에 `<Button>` 을 넣지 않는다 — 탭 정지가 둘이 되고 Space 가 안쪽
+           버튼을 누른다. 버튼 외형의 이동은 `ButtonLink` 다 (styling-guide §2, #464) */
         action={
-          <Link href="/pets">
-            <Button variant="secondary">{messages.pet.backToList}</Button>
-          </Link>
+          <ButtonLink href="/pets" variant="secondary">
+            {messages.pet.backToList}
+          </ButtonLink>
         }
       />
     </main>
