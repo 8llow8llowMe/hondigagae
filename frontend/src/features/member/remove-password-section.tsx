@@ -9,6 +9,8 @@ import { useSessionExit } from '@/features/member/use-session-exit'
 import { removePassword } from '@/lib/api/member'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 
 /**
  * 소셜 전용으로 전환 — 비밀번호 제거. **`linked` 상태에서만 그린다.**
@@ -47,7 +49,18 @@ export function RemovePasswordSection({ providerLabel }: { providerLabel: string
   }
 
   return (
-    <section className="border-border flex flex-col gap-3 border-t pt-6">
+    /*
+      **L0 바닥 위다** (`DESIGN.md §0`, 이슈 #466) — 액션은 카드가 아니고, 담는 것도
+      하나뿐이라 카드 판정 ③ 에 걸린다. 반려견 삭제(#464)와 같은 자리다.
+
+      **2a 의 `border-t pt-6` 을 걷었다.** 위 폼과 이 블록을 가르던 수제 구분선이 하던
+      일을 이제 카드 경계가 맡는다 — 카드 밖으로 나온 순간 선이 하나 더 있으면 경계가
+      두 번 그어진다.
+
+      인셋은 `main`(16/40)이 아니라 **`card`(16/20)** 다. L0 위에 있어도 축은 바로 위
+      카드 안 글줄과 같아야 제목의 첫 글자가 세로선을 잇는다 (#451).
+    */
+    <section className={cn('flex flex-col gap-3 pt-2', INSET_CLASS.card)}>
       <h2 className="text-body-1 text-fg font-semibold">
         {messages.member.removePasswordTitle(providerLabel)}
       </h2>

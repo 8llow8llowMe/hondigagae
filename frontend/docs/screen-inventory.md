@@ -39,15 +39,15 @@
 
 ## 1. 인증 / 회원 — 착수 가능
 
-| 화면          | 경로                                | API                                                                          | 상태                                                |
-| ------------- | ----------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------- |
-| 로그인        | `/(auth)/login`                     | `POST /auth/login`                                                           | **구현 완료** — 소셜 버튼·비밀번호 찾기 진입점 포함 |
-| 소셜 콜백     | `/(auth)/oauth/[provider]/callback` | `GET /auth/{provider}/authorize` → `GET /auth/{provider}/login?code=&state=` | **구현 완료** — kakao·naver, 중복 실행 가드         |
-| 회원가입      | `/(auth)/signup`                    | `POST /auth/email/send-code`, `/verify-code`, `POST /members/signup`         | **구현**                                            |
-| 내 정보       | `/mypage`                           | `GET`·`PATCH /members/me`, `POST`·`DELETE /members/me/profile-image`         | **구현 완료**                                       |
-| 비밀번호 관리 | `/mypage/password`                  | `POST`·`DELETE /members/me/password`, `POST /members/me/password/setup`      | **구현 완료** — 계정 상태 3종 분기                  |
-| 회원 탈퇴     | `/mypage/withdraw`                  | `POST /members/me/withdraw`                                                  | **구현 완료**                                       |
-| 비밀번호 찾기 | `/(auth)/password/reset`            | `POST /auth/password/reset/send-code`, `/auth/password/reset`                | **구현 완료** — 한 라우트 2단계 + 완료 안내         |
+| 화면          | 경로                                | API                                                                          | 상태                                                                                                              |
+| ------------- | ----------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 로그인        | `/(auth)/login`                     | `POST /auth/login`                                                           | **구현 완료** — 소셜 버튼·비밀번호 찾기 진입점 포함                                                               |
+| 소셜 콜백     | `/(auth)/oauth/[provider]/callback` | `GET /auth/{provider}/authorize` → `GET /auth/{provider}/login?code=&state=` | **구현 완료** — kakao·naver, 중복 실행 가드                                                                       |
+| 회원가입      | `/(auth)/signup`                    | `POST /auth/email/send-code`, `/verify-code`, `POST /members/signup`         | **구현**                                                                                                          |
+| 내 정보       | `/mypage`                           | `GET`·`PATCH /members/me`, `POST`·`DELETE /members/me/profile-image`         | **구현 완료** · **3층 표면 — 카드 둘** ([#466](https://github.com/8llow8llowMe/hondigagae/issues/466))            |
+| 비밀번호 관리 | `/mypage/password`                  | `POST`·`DELETE /members/me/password`, `POST /members/me/password/setup`      | **구현 완료** — 계정 상태 3종 분기 · **3층 표면** ([#466](https://github.com/8llow8llowMe/hondigagae/issues/466)) |
+| 회원 탈퇴     | `/mypage/withdraw`                  | `POST /members/me/withdraw`                                                  | **구현 완료** · **3층 표면** ([#466](https://github.com/8llow8llowMe/hondigagae/issues/466))                      |
+| 비밀번호 찾기 | `/(auth)/password/reset`            | `POST /auth/password/reset/send-code`, `/auth/password/reset`                | **구현 완료** — 한 라우트 2단계 + 완료 안내                                                                       |
 
 주의: 소셜 로그인은 **2-step API 흐름** (`auth-guide.md` §1). 서버 리다이렉트가 아니다.
 
