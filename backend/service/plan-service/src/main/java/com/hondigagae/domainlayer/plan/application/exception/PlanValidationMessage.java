@@ -19,6 +19,14 @@ public final class PlanValidationMessage {
     public static final String SIZE_RANGE_INVALID = "PLAN_113:조회 개수는 1 이상 50 이하만 가능합니다.";
     public static final String VISITED_REQUIRED = "PLAN_114:방문 여부는 필수입니다.";
     public static final String PET_IDS_SIZE_INVALID = "PLAN_115:동행 반려견은 최대 5마리까지 지정할 수 있습니다.";
+    public static final String PACKING_ITEMS_REQUIRED = "PLAN_116:준비물 목록은 필수입니다.";
+    public static final String PACKING_ITEMS_SIZE_INVALID = "PLAN_117:준비물은 한 번에 최대 50개까지 보낼 수 있습니다.";
+    public static final String PACKING_CATEGORY_REQUIRED = "PLAN_118:준비물 분류는 필수입니다.";
+    public static final String PACKING_CATEGORY_LENGTH_INVALID = "PLAN_119:준비물 분류는 30자 이하만 가능합니다.";
+    public static final String PACKING_NAME_REQUIRED = "PLAN_120:준비물 이름은 필수입니다.";
+    public static final String PACKING_NAME_LENGTH_INVALID = "PLAN_121:준비물 이름은 100자 이하만 가능합니다.";
+    public static final String PACKING_REASON_LENGTH_INVALID = "PLAN_122:준비물 이유는 500자 이하만 가능합니다.";
+    public static final String PACKING_CHECKED_REQUIRED = "PLAN_123:챙김 여부는 필수입니다.";
 
     private PlanValidationMessage() {
     }
