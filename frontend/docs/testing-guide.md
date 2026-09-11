@@ -13,13 +13,17 @@
 | 렌더          | `renderToStaticMarkup` (react-dom/server)                                |
 | 검증          | 결과 **마크업 문자열** 에 대한 `toContain` / `not.toContain` / `toMatch` |
 
-**왜 이 방식인가**: 설정 부담이 거의 없고, 공모전 일정에서 순수 로직 커버리지를 빠르게 확보할 수 있다. 상호작용(클릭·입력) 테스트가 필요해지면 jsdom + testing-library를 추가 도입하고 이 문서를 갱신한다.
+**왜 이 방식인가**: 설정 부담이 거의 없고, 공모전 일정에서 순수 로직 커버리지를 빠르게 확보할 수 있다.
+
+**레이아웃과 로그인 뒤 화면은 Playwright 가 맡는다 (§12).** 경계를 반드시 읽고 쓴다 — 마크업 문자열로 볼 수 없는 것을 여기서 확인하려 들면 단언이 거짓 안심을 준다.
 
 **한계 (반드시 알 것)**
 
 - `async` server component는 `renderToStaticMarkup` 으로 렌더되지 않는다 → **안에서 쓰는 순수 함수를 뽑아 테스트한다.**
 - React Query hook, Zustand store를 쓰는 컴포넌트는 렌더되지 않는다 → **props로 데이터를 받는 presentational 컴포넌트로 분리**한 뒤 그것을 테스트한다. 이 분리가 테스트 가능성의 핵심이다.
 - 클릭·입력·포커스 이동은 검증할 수 없다. 그 부분은 `fe-design-reviewer` 의 브라우저 검토가 담당한다.
+- **적용된 CSS 와 실제 레이아웃을 볼 수 없다.** `class="..."` 문자열은 보이지만 계산된 값은 아니다 — §12 의 Playwright 가 맡는다.
+- **보호 라우트의 실화면을 볼 수 없다.** `/mypage` · `/pets` · `/favorites` · `/plans` · `/ai-plans` 는 307 로 `/login` 에 걸린다 — 같은 곳.
 
 ## 2. vitest.config.ts
 
@@ -253,3 +257,51 @@ pnpm test:coverage     # 커버리지 리포트
 이 11개가 통과하면 `docs/done-checklist.md` §7의 절반이 자동으로 충족된다.
 
 **#11 을 따로 둔 이유**: 기본값을 URL에서 생략하는 규칙(`architecture-guide.md` §10) 때문에 직렬화와 파싱이 비대칭이 되기 쉽다. round-trip 테스트가 이 비대칭을 바로 잡아낸다. 필터가 늘어날 때마다 케이스를 추가한다.
+
+## 12. Playwright — 레이아웃 · 보호 라우트 (이슈 #467)
+
+**E2E 스위트가 아니다.** vitest 가 볼 수 없는 둘만 맡는다.
+
+```bash
+cd frontend
+pnpm e2e            # 1회 실행 (서버는 설정이 알아서 띄운다)
+pnpm e2e:ui         # 감시 · 디버깅 UI
+pnpm e2e:report     # 마지막 실행 리포트
+```
+
+### 경계 — 무엇을 어디서 쓰는가
+
+| 대상                                          | 도구           | 이유                                             |
+| --------------------------------------------- | -------------- | ------------------------------------------------ |
+| 순수 로직 (`src/lib/**`)                      | vitest         | 입출력이 명확하고 가장 싸다                      |
+| 렌더 분기 (loading / 404 / 5xx / success)     | vitest         | 마크업 문자열로 충분하다                         |
+| 접근성 계약 중 마크업에 드러나는 것           | vitest         | `aria-*` · `role` 은 문자열에 있다               |
+| **계산된 레이아웃** (배경·radius·세로 기준선) | **Playwright** | 문자열에는 없다. 브라우저가 계산해야 한다        |
+| **보호 라우트 가드와 그 뒤의 화면**           | **Playwright** | `proxy.ts` 는 미들웨어라 렌더 테스트가 못 닿는다 |
+| 클릭·입력 단위 상호작용                       | 아직 없음      | 필요해지면 jsdom + testing-library 가 더 싸다    |
+
+**화면 고유의 배치를 Playwright 로 잠그지 않는다.** 여기서 보는 것은 **층 규약**뿐이다 — 화면별 판단은 렌더 테스트와 `fe-design-reviewer` 의 몫이고, 그것까지 여기로 가져오면 디자인을 바꿀 때마다 스펙이 깨진다.
+
+### 왜 백엔드가 필요 없나
+
+`playwright.config.ts` 의 `webServer` 가 **`MOCK_API=true`** 로 dev 서버를 띄운다. 이 플래그는 **BFF 프록시와 `serverFetch`(SSR 프리페치) 양쪽**을 덮으므로(`app/api/bff/[...path]/route.ts` · `src/lib/api/server.ts`), `page.route()` 로 브라우저 요청만 가로채는 방식과 달리 **서버 렌더까지 같은 fixture** 를 본다. `BACKEND_API_URL` 은 닿을 수 없는 주소로 덮어써 둔다 — 실수로 dev 게이트웨이를 때리는 경로를 원천에서 없앤다.
+
+### 알아 둘 제약 셋
+
+1. **`next dev` 로 띄운다 (`next build && next start` 가 아니다).** `isMockEnabled()` 가 `NODE_ENV === 'production'` 에서 항상 false 라, 프로덕션 빌드로는 목을 쓸 수 없다.
+2. **산출물 디렉터리를 `.next-e2e` 로 가른다** (`NEXT_DIST_DIR`). Next 16 은 한 디렉터리에 dev 서버를 하나만 허용해서, 갈라 두지 않으면 사람이 5174 에 띄워 둔 서버를 죽여야 돌아간다. 워크트리를 다른 세션과 공유하므로 남의 서버를 죽이게 된다.
+3. **`toHaveScreenshot` 을 아직 쓰지 않는다.** dev 오버레이가 픽셀을 흔들고, 기준선은 macOS 와 CI(Linux)의 폰트 렌더가 달라 따로 관리해야 한다. 대신 `getComputedStyle` · `getBoundingClientRect` 실측을 단언한다 — 3층 표면 검토에서 실제로 결함을 잡아낸 것이 픽셀 비교가 아니라 이 값들이었다.
+
+### 로그인
+
+`e2e/auth.setup.ts` 가 **실제 로그인 폼으로** 들어가 `storageState` 를 만들고, 나머지 스펙이 그것을 나눠 쓴다. 세션 쿠키를 `seal()` 로 위조하지 않는다 — 그러면 로그인 경로가 검증되지 않고 세션 형식이 바뀔 때 그 파일만 조용히 낡는다. 계정은 목 저장소의 일반 계정(`demo@hondigagae.dev`)이다 (`src/lib/api/mock/store.ts`).
+
+`e2e/.auth/` 는 `.gitignore` 대상이다. 목 계정이지만 쿠키 스냅샷이라 커밋하지 않는다.
+
+### CI
+
+`.github/workflows/frontend-ci.yml` 의 **별도 `e2e` job** 이고 **`continue-on-error: true`** 다. `pnpm verify`(= lint · typecheck · test) 안에 넣지 않는다 — 브라우저 내려받기와 서버 기동이 붙어 시간이 늘고, 기준이 안정될 때까지 PR 을 막지 않는다. 필수 체크로 올리는 시점은 [#467](https://github.com/8llow8llowMe/hondigagae/issues/467) 본문에서 정한다.
+
+### 이 방식이 대체한 것
+
+3층 표면 작업(#455) 내내 쓰던 **임시 하네스** — `renderToStaticMarkup` 결과를 `public/__check/*.html` 로 쓰고 dev 서버 CSS 를 링크해 눈으로 재던 방식이다. 커밋 전마다 손으로 지워야 했고 [#67](https://github.com/8llow8llowMe/hondigagae/issues/67) 이 그 한계를 추적했다. **더 쓰지 않는다.**

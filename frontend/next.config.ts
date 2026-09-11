@@ -3,6 +3,16 @@ import type { NextConfig } from 'next'
 import { REMOTE_IMAGE_HOSTS } from './src/lib/image/remote-host'
 
 const nextConfig: NextConfig = {
+  /*
+    산출물 디렉터리. **기본값을 바꾸지 않는다** — 배포·CI 는 `.next` 를 그대로 쓴다.
+
+    E2E(#467)만 `NEXT_DIST_DIR` 로 갈라 쓴다. Next 16 은 **한 산출물 디렉터리에 dev 서버를
+    하나만** 허용하는데("Another next dev server is already running"), 이 저장소는 사람이
+    5174 에 dev 서버를 띄워 둔 채로 작업한다. 디렉터리를 갈라 두지 않으면 E2E 를 돌릴
+    때마다 그 서버를 죽여야 하고, 워크트리를 다른 세션과 공유하므로 남의 서버를 죽이게 된다.
+  */
+  distDir: process.env.NEXT_DIST_DIR ?? '.next',
+
   // 배포는 이 산출물(.next/standalone)만 컨테이너에 복사한다.
   // 컨테이너 안에서 pnpm install / next build 를 돌리지 않는다 — 배포 대상이
   // 라즈베리파이(aarch64)라 이미지 빌드에 몇 분씩 쓸 수 없기 때문이다.
