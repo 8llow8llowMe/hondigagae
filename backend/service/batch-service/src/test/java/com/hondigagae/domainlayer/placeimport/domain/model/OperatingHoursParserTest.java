@@ -59,6 +59,47 @@ class OperatingHoursParserTest {
     }
 
     @Test
+    @DisplayName("기본 규칙은 요일부 없는 시각 범위를 모름으로 남긴다 — 긴급 시설 openNowOnly 가 이 계약에 기대고 있다")
+    void strictRuleLeavesSegmentWithoutDayExpressionUnknown() {
+        // openNowOnly 는 "지금 확실히 열린 곳"이라 모름도 뺀다. 여기서 매일로 추론하면
+        // 휴무일에 닫힌 동물병원이 "열린 곳"으로 올라온다 (NearbyFacilityQueryProcessor).
+        assertThat(OperatingHoursParser.parseWeekly("09:00~18:00")).isNull();
+        assertThat(OperatingHoursParser.parseWeekly("09:00~18:00, 입장마감 17:30")).isNull();
+    }
+
+    @Test
+    @DisplayName("추론 변이는 요일부 없는 시각 범위를 전 요일로 본다 (TourAPI detailIntro2 원문에 흔한 형태)")
+    void everyDayVariantCoversSegmentWithoutDayExpression() {
+        WeeklySchedule schedule = OperatingHoursParser.parseWeeklyAssumingEveryDay("09:00~18:00");
+
+        assertThat(schedule).isNotNull();
+        assertThat(schedule.toSpec()).isEqualTo("1234567:0900-1800");
+        assertThat(schedule.isOpenAt(MON_10_00)).isTrue();
+        assertThat(schedule.isOpenAt(SUN_14_00)).isTrue();
+        assertThat(schedule.isOpenAt(MON_10_00.withHour(20))).isFalse();
+    }
+
+    @Test
+    @DisplayName("추론 변이에서도 요일부 있는 원문의 해석은 그대로다 — 두 규칙이 갈리는 것은 요일부가 없을 때뿐이다")
+    void everyDayVariantKeepsExplicitDayExpressions() {
+        String raw = "월~금 09:00~21:00, 토 10:00~22:00";
+
+        assertThat(OperatingHoursParser.parseWeeklyAssumingEveryDay(raw).toSpec())
+            .isEqualTo(OperatingHoursParser.parseWeekly(raw).toSpec());
+        // 판정 불가 조건부는 추론 변이에서도 버린다
+        assertThat(OperatingHoursParser.parseWeeklyAssumingEveryDay("법정공휴일 10:00~17:00")).isNull();
+    }
+
+    @Test
+    @DisplayName("추론 변이에서 요일부 없는 앞 구간은 뒤 세그먼트를 못 풀어도 살아남는다")
+    void unparseableTailDoesNotKillLeadingSegment() {
+        WeeklySchedule schedule = OperatingHoursParser.parseWeeklyAssumingEveryDay("09:00~18:00, 입장마감 17:30");
+
+        assertThat(schedule).isNotNull();
+        assertThat(schedule.toSpec()).isEqualTo("1234567:0900-1800");
+    }
+
+    @Test
     @DisplayName("24시간 표기와 자정 넘김 영업을 해석한다")
     void fullDayAndOvernight() {
         WeeklySchedule allDay = OperatingHoursParser.parseWeekly("매일 00:00~24:00");

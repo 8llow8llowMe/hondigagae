@@ -31,7 +31,8 @@
 - [ ] dev 재적재 — 배포 뒤 `cultureFacilityImportJob` 을 다시 돌려 기존 `place_intro` 행을 채운다 (#301).
       컬럼과 코드는 있었고 데이터만 비어 있었다. 재실행 로그 `withWeeklyHoursSpec` 과
       `매일 00:00~24:00` 장소의 `open24: true` 로 확인한다
-- [ ] (후속) TourAPI `detailIntro2` 운영시간 수집 → TOUR_API 출처 장소도 spec 커버
+- [x] (후속) TourAPI `detailIntro2` 운영시간 수집 → TOUR_API 출처 장소도 spec 커버
+      (#361 — `361-tourapi-detail-intro.md`. 쿼터 때문에 실행당 상한을 둔 증분 수집이다)
 - [ ] (후속) 장소 목록 `openNowOnly` 필터 (place_intro 조인)
 
 ## 참고할만한 자료(선택)

@@ -9,6 +9,7 @@ import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceCa
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceContentType;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlace;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlaceImage;
+import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlaceIntro;
 import com.hondigagae.global.properties.TourApiProperties;
 import java.math.BigDecimal;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
@@ -21,6 +22,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -92,6 +94,20 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
     }
 
     @Override
+    public Optional<ImportedPlaceIntro> fetchDetailIntro(long contentId, PlaceContentType contentType) {
+        String rawBody = requestRaw(buildDetailIntroUri(contentId, contentType));
+        JsonNode body = parseAndValidate(rawBody);
+
+        List<JsonNode> items = extractItems(body);
+        // items="" 는 원천에 intro 가 없는 상태다 — 호출은 성공했으니 오류가 아니다.
+        if (items.isEmpty()) {
+            return Optional.empty();
+        }
+        // detailIntro2 는 콘텐츠당 한 건이다. 혹시 여러 건이 와도 첫 건만 쓴다.
+        return Optional.of(TourApiIntroFieldMapper.toImportedPlaceIntro(contentType, items.get(0)));
+    }
+
+    @Override
     public List<ImportedPlace> searchPlacesByKeyword(String keyword, String areaCode) {
         String rawBody = requestRaw(buildSearchKeywordUri(keyword, areaCode));
         JsonNode body = parseAndValidate(rawBody);
@@ -149,6 +165,27 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
                 tourApiProperties.mobileOs(),
                 tourApiProperties.mobileApp(),
                 contentId
+            );
+        return URI.create(url);
+    }
+
+    /**
+     * 상세 소개. 콘텐츠당 한 건이라 한 행(numOfRows=1)만 받는다.
+     * contentTypeId 는 필수 파라미터다 — 빼면 flat 오류 응답이 온다.
+     */
+    private URI buildDetailIntroUri(long contentId, PlaceContentType contentType) {
+        String serviceKey = tourApiProperties.serviceKey();
+        if (serviceKey == null || serviceKey.isBlank()) {
+            throw new PlaceImportException(PlaceImportErrorCode.TOUR_API_SERVICE_KEY_MISSING);
+        }
+        String url = "%s/KorService2/detailIntro2?serviceKey=%s&MobileOS=%s&MobileApp=%s&_type=json&contentId=%d&contentTypeId=%s&pageNo=1&numOfRows=1"
+            .formatted(
+                tourApiProperties.baseUrl(),
+                URLEncoder.encode(serviceKey, StandardCharsets.UTF_8),
+                tourApiProperties.mobileOs(),
+                tourApiProperties.mobileApp(),
+                contentId,
+                contentType.getCode()
             );
         return URI.create(url);
     }
@@ -217,18 +254,32 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
             JsonNode header = root.path("response").path("header");
             String resultCode = header.path("resultCode").asText("");
             if (!OK_RESULT_CODE.equals(resultCode)) {
-                throw new PlaceImportException(PlaceImportErrorCode.TOUR_API_CALL_FAILED,
-                    "%s %s".formatted(resultCode, header.path("resultMsg").asText("")));
+                throw callFailed(resultCode, header.path("resultMsg").asText(""));
             }
             return root.path("response").path("body");
         }
 
         // flat 오류 응답 (예: NO_MANDATORY_REQUEST_PARAMETERS_ERROR)
         if (root.has("resultCode")) {
-            throw new PlaceImportException(PlaceImportErrorCode.TOUR_API_CALL_FAILED,
-                "%s %s".formatted(root.path("resultCode").asText(""), root.path("resultMsg").asText("")));
+            throw callFailed(root.path("resultCode").asText(""), root.path("resultMsg").asText(""));
         }
         throw new PlaceImportException(PlaceImportErrorCode.TOUR_API_RESPONSE_INVALID, truncate(rawBody));
+    }
+
+    /**
+     * 오류 본문을 도메인 예외로 옮긴다.
+     *
+     * <p><b>일일 한도 초과만 따로 구분한다.</b> 포털은 한도 초과도 HTTP 200 + 오류 본문으로
+     * 답하므로 서킷이 세지 않는다. 이 실패는 "이 장소만 실패"가 아니라 "오늘은 더 못 부른다"는
+     * 뜻이라, 장소 단위로 넘기며 계속 도는 호출부가 그것을 알아야 한다 —
+     * 모르면 남은 대상 전부를 실패로 기록하며 헛돈다.
+     */
+    private PlaceImportException callFailed(String resultCode, String resultMsg) {
+        String detail = "%s %s".formatted(resultCode, resultMsg);
+        if (TourApiResultCodes.quotaExceeded(resultCode, resultMsg)) {
+            return new PlaceImportException(PlaceImportErrorCode.TOUR_API_QUOTA_EXCEEDED, detail);
+        }
+        return new PlaceImportException(PlaceImportErrorCode.TOUR_API_CALL_FAILED, detail);
     }
 
     /**

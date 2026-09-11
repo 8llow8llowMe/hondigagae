@@ -23,6 +23,19 @@ public interface PlaceImportUseCase {
     int importPlaceImages();
 
     /**
+     * TourAPI 원천 장소의 상세 소개를 detailIntro2 로 수집해 place_intro 를 upsert 한다.
+     * 장소 적재 뒤에 돈다 — place 테이블의 TourAPI 행이 대상 목록이다.
+     *
+     * <p><b>한 실행에서 전량을 덮지 않는다.</b> 쿼터(일 1,000건)의 대부분을 이미지 스텝이 쓰므로,
+     * 실행당 상한({@code place-intro-import.max-calls-per-run}, 기본 300)만큼만 호출하고
+     * "intro 없는 곳 먼저 → synced_at 오래된 순"으로 고른다. 반복 실행이 전량을 덮고 이후에는
+     * 갱신 순환이 된다.
+     *
+     * @return upsert 한 장소 수
+     */
+    int importPlaceIntros();
+
+    /**
      * 문화정보원·식약처 원천 장소의 대표 이미지를 TourAPI 키워드 검색으로 백필한다.
      * 두 원천의 적재 잡 이후에 돌아야 한다. 정규화 제목 일치 + 좌표 근접 검증을 통과한 곳만 채운다.
      *

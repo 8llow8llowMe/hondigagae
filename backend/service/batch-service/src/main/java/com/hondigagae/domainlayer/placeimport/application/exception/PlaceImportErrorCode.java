@@ -36,7 +36,10 @@ public enum PlaceImportErrorCode {
     CULTURE_DOWNLOAD_FAILED("PLACE_IMPORT_019", "문화정보원 CSV 를 내려받지 못했습니다. (%s)"),
     // CSV 아님 · 하한 미달 · Content-Length 불일치(전송 중단)를 함께 받는다. 상세는 %s 자리에 담는다.
     CULTURE_DOWNLOAD_INVALID("PLACE_IMPORT_020", "내려받은 문화정보원 파일이 온전한 CSV 가 아닙니다. (%s)"),
-    CULTURE_SOURCE_CIRCUIT_OPEN("PLACE_IMPORT_021", "공공데이터포털 서킷이 열려 있어 내려받기를 건너뜁니다.");
+    CULTURE_SOURCE_CIRCUIT_OPEN("PLACE_IMPORT_021", "공공데이터포털 서킷이 열려 있어 내려받기를 건너뜁니다."),
+    // 일일 호출 한도 초과. 서킷이 잡지 못하는 실패다 — 원천은 200 에 오류 본문으로 답하므로
+    // 전송은 성공한 것으로 보인다. 남은 대상을 다 돌아도 결과가 같으니 호출 반복을 멈춰야 한다.
+    TOUR_API_QUOTA_EXCEEDED("PLACE_IMPORT_022", "TourAPI 일일 호출 한도를 초과했습니다. (%s)");
 
     private final String code;
     private final String message;

@@ -28,7 +28,9 @@ import org.hibernate.annotations.Comment;
 public class PlaceIntroEntity extends BaseEntity {
 
     @Id
-    @Comment("장소 소개 아이디 (Snowflake)")
+    // 적재 경로 두 곳이 모두 place.id 를 그대로 넣는다 (1:1). PK 와 UK 가 늘 같은 행을 가리켜야
+    // 배치의 ON DUPLICATE KEY UPDATE 가 결정적이다 — entity-design.md §2 의 "id = place_id 규약".
+    @Comment("장소 소개 아이디 = place.id (1:1, Snowflake 가 아니다)")
     private Long id;
 
     @Column(nullable = false)
