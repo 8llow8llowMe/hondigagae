@@ -48,7 +48,6 @@ function render(overrides: Partial<AiPlanDraftPreviewProps> = {}) {
     coords: EMPTY_COORDS,
     delistedPlaceIds: EMPTY_SET,
     excludedPlaceIds: EMPTY_SET,
-    footer: null,
     ...overrides,
   }
 
@@ -255,6 +254,81 @@ describe('AiPlanDraftPreview — 초안이 비었을 때', () => {
 
     expect(html).toContain(messages.aiPlan.emptyDraftTitle)
     expect(html).not.toContain(messages.common.retry)
+  })
+
+  /*
+    **빈 초안도 카드 안이다** (#440 · #473). 담기 패널은 카드 밖 L0 이므로, 여기까지
+    카드를 빼면 흰 면이 하나도 없는 화면이 된다.
+  */
+  it('빈 초안도 카드 안에서 성립한다', () => {
+    const html = render({ draft: { days: [], reasons: [] } })
+
+    expect(html).toMatch(/^<section [^>]*class="[^"]*rounded-lg/)
+  })
+})
+
+/**
+ * 표면 계약 — 3층 표면 전환 (#473).
+ *
+ * `renderToStaticMarkup` 결과에 대해 단언한다. 이 컴포넌트는 표시 전용이라 node 환경에서
+ * 실제로 렌더되므로, 소스 문자열이 아니라 **나온 마크업**을 본다.
+ */
+describe('AiPlanDraftPreview — 개요 카드 + 일자마다 카드 (#473)', () => {
+  /** L1 카드 = `Surface` 가 내는 `<section>` — radius 12 는 이 층에만 붙는다 */
+  function cardCount(html: string): number {
+    return (html.match(/<section [^>]*class="[^"]*rounded-lg/g) ?? []).length
+  }
+
+  it('개요 하나 + 일자 둘 = 카드 셋이다', () => {
+    expect(cardCount(render())).toBe(3)
+  })
+
+  it('일자가 늘면 카드도 늘어난다 — 일자마다 하나다', () => {
+    const html = render({
+      draft: { days: [{ day: 1, items: [item()] }], reasons: [] },
+      totalDays: null,
+    })
+
+    expect(cardCount(html)).toBe(2)
+  })
+
+  /*
+    **일자 제목이 `h2` 다.** 카드의 제목이고 개요 카드 제목과 같은 레벨이어야 한다 —
+    `h3` 로 남으면 일자 카드에 자기 이름이 없는 셈이 된다.
+  */
+  it('일자 제목이 h2 다', () => {
+    const html = render()
+
+    expect(html).toMatch(/<h2[^>]*>1일차<\/h2>/)
+    expect(html).toMatch(/<h2[^>]*>2일차<\/h2>/)
+  })
+
+  /* 개요 카드의 이름은 화면에 보이는 제목 그 자체다 — `aria-label` 로 따로 적지 않는다 */
+  it('개요 카드가 자기 h2 를 aria-labelledby 로 가리킨다', () => {
+    const html = render()
+
+    expect(html).toContain('aria-labelledby="ai-plan-draft-heading"')
+    expect(html).toContain('id="ai-plan-draft-heading"')
+  })
+
+  /*
+    **페이지 인셋 40(`md:px-10`)이 남아 있지 않다.** 카드가 이미 한 번 들어와 있어
+    안쪽까지 40 을 주면 내용이 두 번 밀린다 (§0).
+  */
+  it('카드 안 인셋이 card(16/20)다 — md:px-10 이 없다', () => {
+    const html = render()
+
+    expect(html).not.toContain('md:px-10')
+    expect(html).toContain('md:px-5')
+  })
+
+  /*
+    부분 생성 블록의 `--band` 채움은 카드 안 L2 채움이라 남는다 (§0).
+    `bg-band` 만 보면 항목 번호 배지(원형)에 걸려 늘 통과한다 — 블록의 서식까지 함께 본다.
+  */
+  it('부분 생성 블록은 bg-band 채움으로 남는다', () => {
+    expect(render()).toContain('bg-band rounded-md px-3 py-2')
+    expect(render({ totalDays: 2 })).not.toContain('bg-band rounded-md px-3 py-2')
   })
 })
 

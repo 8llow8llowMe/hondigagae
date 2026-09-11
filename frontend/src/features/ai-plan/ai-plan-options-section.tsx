@@ -44,7 +44,13 @@ export function AiPlanOptionsSection({
 
   return (
     <div className="flex flex-col gap-5">
-      <h3 className="text-body-1 text-fg font-semibold">{messages.aiPlan.optionGroupLabel}</h3>
+      {/*
+        **`h3` → `h4` 다** (#473). 이 구역은 접기 블록(`AiPlanDetailsDisclosure`) **안**에
+        들어 있는데, 그 머리글이 카드 제목 `h2` 아래로 내려오며 `h3` 가 됐다. 여기가
+        `h3` 로 남으면 자기를 담고 있는 접기와 같은 레벨이 되어, 문서 개요에서 접기의
+        **다음 구역**으로 읽힌다. 건너뜀은 없었지만 포함 관계가 뒤집힌다.
+      */}
+      <h4 className="text-body-1 text-fg font-semibold">{messages.aiPlan.optionGroupLabel}</h4>
 
       <div className="flex flex-col gap-1">
         <Checkbox

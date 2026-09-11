@@ -469,7 +469,8 @@ export function AiPlanCreateForm({
 
         {/*
           **생성 옵션은 접기의 맨 아래다** (아트보드 05 "입력 화면에 붙는 세 항목").
-          자체 `<h3>`(`optionGroupLabel`)을 갖고 있으므로 여기서 제목을 덧붙이지 않는다.
+          자체 `<h4>`(`optionGroupLabel`)을 갖고 있으므로 여기서 제목을 덧붙이지 않는다 —
+          카드 `h2` → 접기 머리글 `h3` → 이 구역 `h4` 순이다 (#473).
         */}
         <AiPlanOptionsSection
           preferFavorites={values.preferFavorites}

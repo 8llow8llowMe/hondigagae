@@ -4,6 +4,8 @@ import { FormAlert } from '@/components/form-alert'
 import { Input } from '@/components/input'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 
 export type AiPlanCommitPanelProps = {
   title: string
@@ -35,6 +37,16 @@ export type AiPlanCommitPanelProps = {
  *
  * **제목 기본값을 미리 채워 두고 고칠 수 있게 한다** (명세 S8 미결 1 — 추천 ②).
  * 초안에 제목이 없고 `POST /plans` 의 `title` 은 필수인데, 빈 칸을 마주하게 하지 않는다.
+ *
+ * **액션이라 카드가 아니다** (`DESIGN.md §0`, #473) — 초안 카드들 아래, L0 바닥 위에 선다
+ * (#443 장소 상세 · #447 일정 상세 · #451 하루 재생성의 "액션 바는 카드가 아니다" 와 같은
+ * 판단). `Surface` 로 감싸면 초안과 같은 무게가 되어, 카드 넷 중 어느 것이 "이제 할 일"
+ * 인지가 사라진다.
+ *
+ * **자리를 스스로 정하지 않는다.** 예전에는 `AiPlanDraftPreview` 의 `footer` 로 들어가
+ * 미리보기 안에서 그려졌는데, 지금은 담는 쪽(`AiPlanJobView`)이 `SurfaceStack` 의 직접
+ * 자식으로 세운다 — 배치 책임이 담는 쪽에 있다 (#464 가 `PetForm` 의 `footer` 를 걷은 것과
+ * 같은 이동). 그래야 카드 사이 간격(모바일 8 / 데스크톱 24)을 스택이 이 블록에도 준다.
  */
 export function AiPlanCommitPanel({
   title,
@@ -57,7 +69,13 @@ export function AiPlanCommitPanel({
         event.preventDefault()
         onSubmit()
       }}
-      className="border-border flex flex-col gap-4 border-t px-4 py-5 md:px-10"
+      /*
+        **위 구분선을 걷었다.** 3a 에서는 카드 사이 틈으로 비치는 L0 이 그 일을 한다 —
+        선을 남기면 마지막 일자 카드의 테두리와 나란히 두 줄로 읽힌다 (#451
+        `PlanDayRegenerateConfirm` 과 같은 처리). 위 여백도 스택의 간격이 주므로 아래만
+        남긴다. 인셋은 카드 안 글줄과 같은 축이라 폼이 위 카드의 첫 글자와 세로선을 맞춘다.
+      */
+      className={cn('flex flex-col gap-4 pb-4 md:pb-0', INSET_CLASS.card)}
     >
       {/*
         **`PLAN_004` 안내와 폼 오류를 겹쳐 내지 않는다.** 서버 문구("일부 장소를 담을

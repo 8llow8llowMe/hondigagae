@@ -55,12 +55,21 @@ describe('AiPlanDetailsDisclosure — 접힘/펼침', () => {
   })
 
   /*
-    폼의 `필수 항목` `<h3>` 를 지운 뒤로 이 머리글이 페이지 `<h1>` 다음 제목이다.
-    `<h2>` 가 빠지면 바로 아래 `AiPlanOptionsSection` 의 `<h3>` 로 단계가 건너뛴다.
+    **`h2` → `h3` 다** (#473). 3층 표면으로 옮기며 폼 전체가 `Surface` 카드 안에 들어갔고
+    그 카드가 `AI 일정 만들기` `<h2>` 를 그린다 — 여기가 `h2` 로 남으면 카드 제목의
+    형제가 되어, 카드 안의 한 구역일 뿐인 접기가 카드와 같은 무게로 읽힌다.
+    지금 순서는 h1(`sr-only`) → h2(카드) → h3(접기) → h4(`AiPlanOptionsSection`)다.
+
     클래스는 보지 않는다 — 여기서 지키려는 것은 레이아웃이 아니라 제목 단계다.
   */
-  it('머리글이 h2 로 선다 — h1 → h2 → h3 을 잇는다', () => {
-    expect(render(false)).toMatch(/<h2[^>]*><button/)
-    expect(render(true)).toMatch(/<h2[^>]*><button/)
+  it('머리글이 h3 로 선다 — 카드 h2 아래 한 단계다', () => {
+    expect(render(false)).toMatch(/<h3[^>]*><button/)
+    expect(render(true)).toMatch(/<h3[^>]*><button/)
+  })
+
+  /* 카드 제목과 같은 레벨로 되돌아가지 않는다 */
+  it('머리글이 h2 가 아니다', () => {
+    expect(render(false)).not.toContain('<h2')
+    expect(render(true)).not.toContain('<h2')
   })
 })

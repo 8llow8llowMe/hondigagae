@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { Skeleton } from '@/components/skeleton'
+import { Surface } from '@/components/surface'
 import { AiPlanCreateForm } from '@/features/ai-plan/ai-plan-create-form'
 import { AiPlanPlacePickerSheet } from '@/features/ai-plan/ai-plan-place-picker-sheet'
 import { aiPlanFormSchema } from '@/features/ai-plan/schemas'
@@ -18,6 +19,8 @@ import { submitAiPlan } from '@/lib/api/ai-plan'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
 import { totalDaysBetween } from '@/lib/plan/date'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { AiPlanFormValues, AiPlanSubmitResult, PinnedPlace } from '@/types/ai-plan'
 import { EMPTY_AI_PLAN_FORM_VALUES } from '@/types/ai-plan'
 import type { Pet } from '@/types/pet'
@@ -27,6 +30,11 @@ import type { Pet } from '@/types/pet'
  *
  * **반려견 목록이 먼저다.** 화면이 반려견을 필수로 두므로 하나도 없으면 폼을 채울
  * 수 없다. 0마리면 폼 대신 등록으로 안내한다 (`PlanCreateView` 와 같은 구조).
+ *
+ * **네 상태가 한 카드에 든다** (`DESIGN.md §0`, #473). 조회 중 · 조회 오류 · 반려견 0마리 ·
+ * 폼이 전부 같은 화자("AI 에게 조건을 주는 일")가 이어 말하는 것이라 카드 경계가 하나다.
+ * **상태에 따라 카드가 생겼다 사라지지 않는다** (#440 판단) — 하나를 카드 밖에 두면
+ * 그 상태에서만 화면의 흰 면이 통째로 없어진다.
  */
 export function AiPlanCreateView({
   fromJobId,
@@ -41,21 +49,28 @@ export function AiPlanCreateView({
 
   if (petsQuery.isPending) {
     return (
-      <div className="flex flex-col gap-4">
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-11 w-full" />
-        <Skeleton className="h-11 w-full" />
-      </div>
+      <AiPlanCreateSurface>
+        {/* 스켈레톤도 카드 안이라 인셋이 `card`(16/20)다 — 폼 래퍼와 같은 세로선에 선다 */}
+        <div className={cn('flex flex-col gap-4 pt-3 pb-6', INSET_CLASS.card)}>
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-full" />
+        </div>
+      </AiPlanCreateSurface>
     )
   }
 
   if (petsQuery.error !== null) {
     return (
-      <ErrorState
-        title={messages.plan.errorTitle}
-        description={messages.plan.errorDescription}
-        onRetry={() => void petsQuery.refetch()}
-      />
+      <AiPlanCreateSurface>
+        {/* 카드 안이라 인셋이 `card`(16/20)다 — 페이지 값 40 을 쓰면 내용이 두 번 밀린다 */}
+        <ErrorState
+          inset="card"
+          title={messages.plan.errorTitle}
+          description={messages.plan.errorDescription}
+          onRetry={() => void petsQuery.refetch()}
+        />
+      </AiPlanCreateSurface>
     )
   }
 
@@ -63,15 +78,42 @@ export function AiPlanCreateView({
 
   if (pets.length === 0) {
     return (
-      <EmptyState
-        title={messages.aiPlan.noPetTitle}
-        description={messages.aiPlan.noPetDescription}
-        action={<ButtonLink href="/pets/new">{messages.aiPlan.noPetAction}</ButtonLink>}
-      />
+      <AiPlanCreateSurface>
+        <EmptyState
+          inset="card"
+          title={messages.aiPlan.noPetTitle}
+          description={messages.aiPlan.noPetDescription}
+          action={<ButtonLink href="/pets/new">{messages.aiPlan.noPetAction}</ButtonLink>}
+        />
+      </AiPlanCreateSurface>
     )
   }
 
-  return <AiPlanCreateFormContainer pets={pets} fromJobId={fromJobId} today={today} />
+  return (
+    <AiPlanCreateSurface>
+      <AiPlanCreateFormContainer pets={pets} fromJobId={fromJobId} today={today} />
+    </AiPlanCreateSurface>
+  )
+}
+
+/**
+ * 네 상태가 공유하는 L1 카드 — 보이는 제목·부제가 여기 있다 (`DESIGN.md §0`, #473).
+ *
+ * **카드를 페이지가 아니라 뷰가 그린다** (#453 이 정한 폼 화면 규약). 페이지가 `Surface` 를
+ * 그리고 뷰가 안만 채우는 안도 되지만, 그러면 세 상태의 `inset="card"` 와 그 인셋이 어느
+ * 카드 안쪽 값인지가 두 파일로 갈린다. **"여기부터 카드 안"** 이 한 파일에서 보이는 쪽을
+ * 골랐다.
+ */
+function AiPlanCreateSurface({ children }: { children: ReactNode }) {
+  return (
+    <Surface
+      lead
+      title={messages.aiPlan.createTitle}
+      description={<p className="text-body-2 text-fg-muted">{messages.aiPlan.createDescription}</p>}
+    >
+      {children}
+    </Surface>
+  )
 }
 
 /**
@@ -160,21 +202,33 @@ function AiPlanCreateFormContainer({
 
   return (
     <>
-      <AiPlanCreateForm
-        values={form.values}
-        errors={form.errors}
-        pets={pets}
-        totalDays={totalDaysBetween(form.values.startDate, form.values.endDate)}
-        submitting={form.isSubmitting}
-        submitCount={form.submitCount}
-        firstErrorField={form.firstErrorField}
-        favoriteCount={favoriteCount}
-        today={today}
-        onValueChange={form.setValue}
-        onOpenPlacePicker={() => setPickerOpen(true)}
-        onSubmit={() => void form.submit()}
-      />
+      {/*
+        **카드 안이라 인셋이 `card`(16/20)다** (§0). 세로 여백은 #453 이 정한 리듬을
+        **이 폼의 `gap` 으로 다시 계산한 값**이다 — 일정 만들기 폼은 `gap-5`(20)라
+        `pt-2 pb-5` 였지만 `AiPlanCreateForm` 의 루트는 `gap-6`(24)다.
+        위 12 는 제목 줄의 `pb-3`(12)에 더해져 24 가 되어 폼 안 간격과 같은 리듬이 되고,
+        아래 24 가 같은 값으로 카드 바닥을 닫는다.
 
+        **폼 자신은 여백을 갖지 않는다** — 담는 쪽이 인셋을 준다.
+      */}
+      <div className={cn('pt-3 pb-6', INSET_CLASS.card)}>
+        <AiPlanCreateForm
+          values={form.values}
+          errors={form.errors}
+          pets={pets}
+          totalDays={totalDaysBetween(form.values.startDate, form.values.endDate)}
+          submitting={form.isSubmitting}
+          submitCount={form.submitCount}
+          firstErrorField={form.firstErrorField}
+          favoriteCount={favoriteCount}
+          today={today}
+          onValueChange={form.setValue}
+          onOpenPlacePicker={() => setPickerOpen(true)}
+          onSubmit={() => void form.submit()}
+        />
+      </div>
+
+      {/* 시트는 오버레이라 카드가 아니다 (§3-2) — `fixed` 라 트리 위치가 배치를 바꾸지 않는다 */}
       <AiPlanPlacePickerSheet
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
