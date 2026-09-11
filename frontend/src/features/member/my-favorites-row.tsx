@@ -45,7 +45,8 @@ export function MyFavoritesRow({
           <BookmarkIcon size={20} />
         </span>
 
-        <span className="min-w-0 flex-1">
+        {/* `h3` 는 flow content 라 `span` 안에 들 수 없다 — `PetRow` 와 같이 `div` 다 */}
+        <div className="min-w-0 flex-1">
           {/* `MyPetsRow` 와 같은 레벨이다 — 카드 안 항목은 `h3` */}
           <h3 className="text-body-1 text-fg block font-semibold">
             {messages.favorite.entryLabel}
@@ -61,7 +62,7 @@ export function MyFavoritesRow({
                     .replace('{max}', String(MAX_FAVORITE_COUNT))}
             </span>
           )}
-        </span>
+        </div>
 
         <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
       </Link>

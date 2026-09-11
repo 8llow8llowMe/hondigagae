@@ -36,16 +36,17 @@ import { cn } from '@/lib/utils/cn'
  * 하나라 ③ 에 걸린다 — 반려견 삭제(#464)와 같은 자리로 L0 바닥 위에 선다. 2a 때 그
  * 블록이 스스로 긋던 `border-t` 가 하던 일을 이제 카드 경계가 맡는다.
  *
- * **네 상태가 카드 머리를 공유한다** (#451). 로딩·오류·판별 불가에서도 카드는 서 있고
- * 몸통만 갈린다 — 다만 그때는 어느 폼인지 단정할 수 없어 **제목 대신 `aria-label`** 을
- * 쓴다 (제목과 접근성 이름이 둘이 되지 않게, `Surface` 주석).
+ * **로딩·오류·판별 불가에서는 카드에 제목을 주지 않는다.** 어느 폼인지 단정할 수 없기
+ * 때문이다. `aria-label` 로 대신 이름 짓지도 않는다 — 이 화면의 카드는 하나뿐이고
+ * `h1`(`sr-only`)이 이미 그것을 이름 짓는다. 같은 문자열을 속성으로 또 적으면 두 곳이
+ * 갈린다 (`Surface` 주석 · 같은 판단이 `withdraw-view.tsx` 에도 있다).
  */
 export function PasswordView() {
   const query = useMyInfo()
 
   if (query.isPending) {
     return (
-      <Surface aria-label={messages.member.passwordTitle} aria-busy>
+      <Surface aria-busy>
         <div aria-hidden className={cn('flex flex-col gap-4 py-5', INSET_CLASS.card)}>
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />
@@ -57,7 +58,7 @@ export function PasswordView() {
   // 404 가 나올 수 없는 리소스다. 남는 것은 일시 장애뿐이라 재시도를 준다
   if (query.isError || query.data === undefined) {
     return (
-      <Surface aria-label={messages.member.passwordTitle}>
+      <Surface>
         <ErrorState
           inset="card"
           title={messages.member.loadFailedTitle}
@@ -77,7 +78,7 @@ export function PasswordView() {
   */
   if (state === 'unknown') {
     return (
-      <Surface aria-label={messages.member.passwordTitle}>
+      <Surface>
         <div className={cn('py-5', INSET_CLASS.card)}>
           <FormNotice message={messages.member.accountStateUnknown} />
         </div>

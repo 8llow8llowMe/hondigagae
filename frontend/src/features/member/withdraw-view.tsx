@@ -53,15 +53,15 @@ export function WithdrawView() {
   return (
     <>
       {/*
-        **사라지는 것들이 카드 하나다** (`DESIGN.md §0`, 이슈 #466). 제목은 주지 않는다 —
-        페이지 머리(`h1`)가 이미 `회원탈퇴` 이고, 같은 이름을 카드에 또 적으면 제목이 두
-        줄로 겹친다. 홈이 프로필 카드를 제목 없이 둔 것과 같다(#428).
+        **사라지는 것들이 카드 하나다** (`DESIGN.md §0`, 이슈 #466). 이 카드가 화면의
+        보이는 제목을 갖고 `h1` 은 `sr-only` 다 — 카드가 하나뿐이라 그 이름이 곧 페이지의
+        이름이다 (반려견 등록 #464 · 일정 만들기 #453 과 같다).
 
-        **`aria-label` 도 주지 않는다.** 이 화면의 카드는 하나뿐이고 `h1` 이 그것을 이미
-        이름 짓는다 — 같은 문자열을 속성으로 또 적으면 두 곳이 갈린다(`Surface` 주석).
+        **`aria-label` 을 주지 않는다.** 제목이 있으면 접근성 이름이 둘이 된다
+        (`Surface` 주석).
       */}
-      <Surface>
-        <div className={cn('flex flex-col gap-5 py-5', INSET_CLASS.card)}>
+      <Surface lead titleId="withdraw-heading" title={messages.member.withdrawTitle}>
+        <div className={cn('flex flex-col gap-5 pt-2 pb-5', INSET_CLASS.card)}>
           <p className="text-body-1 text-fg">{messages.member.withdrawLead}</p>
 
           <ul className="text-body-2 text-fg-muted flex list-disc flex-col gap-1 pl-5">

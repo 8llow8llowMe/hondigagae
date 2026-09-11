@@ -58,7 +58,9 @@ export function RemovePasswordSection({ providerLabel }: { providerLabel: string
       두 번 그어진다.
 
       인셋은 `main`(16/40)이 아니라 **`card`(16/20)** 다. L0 위에 있어도 축은 바로 위
-      카드 안 글줄과 같아야 제목의 첫 글자가 세로선을 잇는다 (#451).
+      카드 안 글줄과 같아야 제목의 첫 글자가 세로선을 잇는다 (#451). `md` 이상에서
+      카드 테두리 1px 만큼 남는 어긋남은 그대로 둔다 — `my-page-sections.tsx` 의 액션
+      블록 주석에 실측이 있다.
     */
     <section className={cn('flex flex-col gap-3 pt-2', INSET_CLASS.card)}>
       <h2 className="text-body-1 text-fg font-semibold">

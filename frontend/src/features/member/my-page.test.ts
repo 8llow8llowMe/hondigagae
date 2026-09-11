@@ -258,6 +258,30 @@ describe('MyPageSections — 3층 표면 (#466)', () => {
     expect(markup).toContain(messages.common.retry)
   })
 
+  /**
+   * **캐시가 살아 있는 채로 refetch 만 실패하는 경로가 실제로 있다** — 페이지가
+   * `/members/me` 를 프리페치하므로 `staleTime` 이 지난 뒤 재조회가 5xx 면 `member` 는
+   * 남고 `errorStatus` 만 채워진다. 오류 판정을 `member === null` 로만 하면 그 구간에서
+   * 계정 카드만 말없이 사라지고 오류도 재시도도 나오지 않는다.
+   */
+  it('회원 정보가 캐시에 남아 있어도 errorStatus 가 있으면 오류와 재시도를 낸다', () => {
+    const markup = render({ member: member(), errorStatus: 503 })
+
+    expect(markup).toContain(messages.member.loadFailedTitle)
+    expect(markup).toContain(messages.common.retry)
+    expect(markup).not.toContain(messages.member.accountSection)
+  })
+
+  /** 2a 는 두 상태에서 early return 이라 액션이 없었다 — 층을 옮기며 새어 나가지 않게 */
+  it('로딩·오류에서는 로그아웃·회원탈퇴를 내지 않는다', () => {
+    for (const state of [{ loading: true }, { member: null, errorStatus: 503 }]) {
+      const markup = render(state)
+
+      expect(markup).not.toContain(messages.member.logout)
+      expect(markup).not.toMatch(/href="\/mypage\/withdraw"/)
+    }
+  })
+
   /** 제목까지 스켈레톤으로 지우면 조회가 끝나는 순간 카드 높이와 경계가 함께 뛴다 (#451) */
   it('로딩 중에도 카드 둘과 그 제목이 서 있다', () => {
     const markup = render({ loading: true })
