@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.placeimport.application.service.processor.Deli
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PlaceImageBackfillProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PlaceImageImportProcessor;
 import com.hondigagae.domainlayer.placeimport.application.service.processor.PlaceImportProcessor;
+import com.hondigagae.domainlayer.placeimport.application.service.processor.PlaceIntroImportProcessor;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceContentType;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceImportResultType;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
@@ -30,6 +31,7 @@ public class PlaceImportFacade implements PlaceImportUseCase {
     private final PlaceImportProcessor placeImportProcessor;
     private final DelistProcessor delistProcessor;
     private final PlaceImageImportProcessor placeImageImportProcessor;
+    private final PlaceIntroImportProcessor placeIntroImportProcessor;
     private final PlaceImageBackfillProcessor placeImageBackfillProcessor;
     private final PlaceImportMetricsPort placeImportMetricsPort;
 
@@ -60,6 +62,11 @@ public class PlaceImportFacade implements PlaceImportUseCase {
     @Override
     public int importPlaceImages() {
         return placeImageImportProcessor.importImages();
+    }
+
+    @Override
+    public int importPlaceIntros() {
+        return placeIntroImportProcessor.importIntros();
     }
 
     @Override

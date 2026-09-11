@@ -70,6 +70,19 @@ tour-api:
   mobile-os: ETC
   mobile-app: hondigagae
 
+# TourAPI 상세 소개(detailIntro2) 적재 (#361). 운영시간·휴무일·주차·문의처를 여기서만 얻는다.
+#
+# 쿼터 근거: 개발계정은 일 1,000건인데 추가 이미지 스텝(detailImage2)이 이미 제주 TourAPI
+# 장소 964곳 전량을 매 실행 호출한다. 그래서 intro 는 실행당 상한만큼만 부르고 대상을
+# "intro 없는 곳 먼저 → synced_at 오래된 순"으로 골라 나눠 덮는다 — 주 1회 실행이
+# 반복되며 전량을 채우고 그 뒤에는 갱신 순환이 된다.
+#
+# 300 은 두 스텝을 같은 날 돌리면 1,264 로 넘친다. 운영계정 전환 전에는 이 값을 낮추거나
+# 두 스텝을 다른 날에 돌린다. 빈 문자열(compose 의 ${VAR:-})은 래퍼 타입 Integer 에 null 로
+# 떨어지고 컴팩트 생성자가 300 으로 접는다.
+place-intro-import:
+  max-calls-per-run: ${PLACE_INTRO_MAX_CALLS_PER_RUN:300}
+
 # 공공 API 서킷 (coding-conventions §10). 제공처 단위로 인스턴스를 분리한다.
 #
 # 배치라 사용자 응답은 없지만 서킷이 필요하다. 원천이 죽었을 때 수천 건을 타임아웃까지

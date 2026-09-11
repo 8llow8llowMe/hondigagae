@@ -86,6 +86,10 @@ x-batch-service-environment: &batch_service_environment
   OLLE_COURSE_CSV_PATH: ${OLLE_COURSE_CSV_PATH:-/app/data/olle_course.csv}
   OLLE_COURSE_DOWNLOAD_ENABLED: ${OLLE_COURSE_DOWNLOAD_ENABLED:-true}
   OLLE_COURSE_DOWNLOAD_DIR: ${OLLE_COURSE_DOWNLOAD_DIR:-}
+  # [선택] TourAPI 운영시간(detailIntro2) 수집의 실행당 호출 상한 (#361). 기본 300.
+  # 개발계정 쿼터가 일 1,000건이고 이미지 단계가 이미 장소당 1콜을 쓰므로 함부로 올리지 않는다.
+  # 실제로 성공하는 호출 수는 이 상한이 아니라 그날 남은 예산이 정한다 (place-data-integration.md §10-3).
+  PLACE_INTRO_MAX_CALLS_PER_RUN: ${PLACE_INTRO_MAX_CALLS_PER_RUN:-300}
 
 x-logging: &default-logging
   driver: "json-file"

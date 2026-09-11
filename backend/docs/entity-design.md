@@ -88,7 +88,7 @@ idx_place_source_modified_at                          (sourceModifiedAt)  — �
 
 | 컬럼 | 타입 | Null | 원천 필드 (타입별 매핑) | 설명 |
 |------|------|------|------|------|
-| id | BIGINT | N | — | PK (Snowflake) |
+| id | BIGINT | N | — | PK. **Snowflake 가 아니라 `place.id` 를 그대로 쓴다** (아래 규약) |
 | place_id | BIGINT | N | — | FK: place.id (**UK**) |
 | info_center | VARCHAR(200) | Y | infocenter / infocenterfood / infocenterlodging | 문의처 |
 | use_time | VARCHAR(300) | Y | usetime / opentimefood / usetimeleports | 운영시간 |
@@ -103,6 +103,13 @@ idx_place_source_modified_at                          (sourceModifiedAt)  — �
 ```text
 uk_place_intro_place_id (placeId)
 ```
+
+**`id = place_id` 규약.** 이 테이블은 유니크 키가 둘이다(PK `id`, UK `place_id`). 적재 경로 두
+곳이 모두 `id` 에 `place.id` 를 넣으므로 두 키가 늘 같은 행을 가리키고, 그래서
+`ON DUPLICATE KEY UPDATE` 가 어느 행을 고칠지 결정적이다
+(`JdbcPlaceBulkAdapter` 문화정보원 경로 · `JdbcPlaceIntroBulkAdapter` TourAPI 경로).
+**여기에 Snowflake id 를 넣는 세 번째 경로가 생기면 두 키가 서로 다른 행에 걸려 엉뚱한 장소의
+운영시간을 덮는다** — 1:1 테이블이므로 PK 를 따로 발급하지 않는다.
 
 ## 3. place_pet_info — 반려동물 동반 정보 (1:1)
 

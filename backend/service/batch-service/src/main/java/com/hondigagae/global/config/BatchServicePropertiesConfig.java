@@ -5,6 +5,7 @@ import com.hondigagae.global.properties.BatchScheduleProperties;
 import com.hondigagae.global.properties.CultureFacilityProperties;
 import com.hondigagae.global.properties.MfdsPetRestaurantProperties;
 import com.hondigagae.global.properties.OlleCourseProperties;
+import com.hondigagae.global.properties.PlaceIntroImportProperties;
 import com.hondigagae.global.properties.TourApiProperties;
 import com.hondigagae.global.properties.VworldProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -17,6 +18,7 @@ import org.springframework.context.annotation.Import;
 })
 @EnableConfigurationProperties({
     TourApiProperties.class,
+    PlaceIntroImportProperties.class,
     CultureFacilityProperties.class,
     MfdsPetRestaurantProperties.class,
     OlleCourseProperties.class,

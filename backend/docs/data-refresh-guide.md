@@ -125,7 +125,7 @@ contentUrl = .../cmm/cmm/fileDownload.do?atchFileId=FILE_000000003214426&fileDet
 
 | 자식 잡 | 성격 |
 | --- | --- |
-| `placeImportJob` | TourAPI. 변경이 느리고 쿼터 여유가 있다 |
+| `placeImportJob` | TourAPI. 목록은 변경이 느리지만 **장소당 상세 호출이 붙어 쿼터가 빠듯하다** — 운영시간 상한 300콜이 먼저, 남은 예산으로 이미지가 돌다 한도에서 멈춘다 (#361) |
 | `cultureFacilityImportJob` | 포털에서 내려받고 갱신됐을 때만 적재(#379). 원천 파일 자체는 월 1회쯤 바뀐다 |
 | `petRestaurantImportJob` | 등록이 계속 느는 원천이라 가장 자주 갱신할 값어치가 있다 |
 | `placeMergeJob` | 모든 원천이 들어온 상태에서 한 번 판정 (#363) |

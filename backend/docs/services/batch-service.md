@@ -9,7 +9,7 @@
 | 잡 | 원천 | 주기(안) | 비고 |
 |-----|------|----------|------|
 | `placeDataPipelineJob` | (자식 잡 5개) | 주 1회 + 수동 | 장소 적재 5단계를 순서대로 잇는 flow job (#377). 수동 실행은 이 한 줄이면 된다 |
-| `placeImportJob` | 국문 관광정보 GW API (TourAPI) | 주 1회 + 수동 | 관광지/음식점/숙박 마스터 + 추가 이미지(detailImage2) |
+| `placeImportJob` | 국문 관광정보 GW API (TourAPI) | 주 1회 + 수동 | 관광지/음식점/숙박 마스터 + 추가 이미지(detailImage2) + 운영시간(detailIntro2, 실행당 상한) |
 | `cultureFacilityImportJob` | 문화정보원 문화시설 (CSV 파일데이터) | 월 1회 | 문화시설 + 긴급 시설. 포털에서 직접 내려받고 갱신됐을 때만 적재 (#379) |
 | `petRestaurantImportJob` | 식약처 반려동물 동반출입 음식점 (xlsx) | 주 1회 | 좌표는 VWorld 지오코딩으로 채운다 |
 | `placeMergeJob` | (DB) | 적재 뒤 1회 | 원천이 다른 같은 장소를 `merged_into_id` 로 묶는다 (#363) |
@@ -124,21 +124,49 @@ TourAPI 에만 있는 항목(하영올레 등)은 코스가 되지 않고, TourA
 - id 는 코스키에서 결정적으로 나와(`OlleCourseParser.walkCourseId`) 재실행이 멱등하다.
   TourAPI 호출은 **잡 전체에서 1건**(searchKeyword2 한 페이지)이라 쿼터 부담이 없다
 
-## congestionImportJob (관광지 집중률)
+## placeImportJob (TourAPI 장소 적재)
 
 ```bash
-./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=congestionImportJob"
+./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=placeImportJob areaCode=39 runAt=<ISO 시각>"
 ```
 
-`placeImportJob` 은 장소 적재 뒤 **추가 이미지 단계(placeImageImportStep)** 를 이어 돈다 —
-TourAPI 원천 행만 대상으로 detailImage2 를 장소당 1회 불러 place_image 를 교체(멱등)한다.
-문화정보원·식약처 원천은 추가 이미지 API 가 없어 대상에서 빠지며, 그 장소들의 상세 갤러리는
-tour-service 의 대표 이미지 폴백이 담당한다.
+목록 적재(`placeImportStep`) 뒤에 **장소당 1회 상세 호출**을 도는 단계 둘이 이어진다. 둘 다
+`place` 테이블의 TourAPI 원천 행이 대상 목록이라 목록 적재 뒤에 와야 한다. **둘의 순서는 곧
+예산 우선순위다** — 하루 한도가 하나뿐이라 먼저 도는 쪽이 예산을 갖는다.
+
+1. **운영시간(`placeIntroImportStep`, #361)** — detailIntro2 를 불러 place_intro 를 upsert 하고
+   `weekly_hours_spec`·`open24` 를 함께 구조화한다. 장소 상세의 `intro.openNow` 가 이 값으로
+   판정된다. 운영시간 필드가 없는 숙박(32)·여행코스(25)·축제(15)는 호출하지 않는다.
+   커버리지는 적재 로그의 `withWeeklyHoursSpec`·`open24` 로 본다
+   (`place-data-integration.md` §10-3). **아직 없는 데이터라 예산을 먼저 쓴다**
+2. **추가 이미지(`placeImageImportStep`)** — detailImage2 를 장소당 1회 불러 place_image 를
+   교체(멱등)한다. 문화정보원·식약처 원천은 추가 이미지 API 가 없어 대상에서 빠지며, 그 장소들의
+   상세 갤러리는 tour-service 의 대표 이미지 폴백이 담당한다. 이미 적재돼 있고 매 실행 전량을
+   다시 받는 쓰임이라, **한도에 닿으면 남은 장소를 건너뛰고 조용히 끝낸다** — 기존 행이 그대로
+   남으므로 잃는 것은 이번 주 갱신뿐이다
+
+**쿼터가 이 잡의 제약이다.** 개발계정은 일 1,000건인데 목록(약 17콜) + 이미지 전량(제주 964콜)만
+으로 이미 한도다. 운영시간 단계는 그래서 실행당 상한(`place-intro-import.max-calls-per-run`,
+기본 300)을 두고 **intro 가 없는 곳 먼저 → `place_intro.synced_at` 오래된 순 → id** 로 고르며,
+순서상 예산을 먼저 받는다. 남은 몫(약 680)으로 이미지 단계가 돌다가 한도에 닿는다 — 매 실행
+이미지 전량까지 갱신해야 하면 이미지 대상 쿼리에도 같은 증분 규칙이 필요하다
+(`place-data-integration.md` §5).
+
+서킷 오픈·키 누락·**일일 한도 초과**는 한 곳 실패로 넘기지 않고 단계를 즉시 끝낸다. 한도 초과는
+포털이 HTTP 200 + 오류 본문으로 답해 서킷이 세지 못하므로 응답 코드로 따로 구분한다
+(`TOUR_API_QUOTA_EXCEEDED`) — 구분하지 않으면 남은 대상 전부가 "실패"로 기록되며 순환에서
+뒤로 밀려 다음 실행에서도 비어 있다.
 
 `placeImageBackfillJob` (독립 실행) — 문화정보원·식약처 원천에는 이미지 필드 자체가 없어,
 같은 장소가 TourAPI 에 있으면 키워드 검색으로 대표 이미지를 빌려 채운다. **정규화 제목 일치 +
 좌표 500m** 이중 검증을 통과한 곳만 채우며(틀린 이미지 > 없는 이미지), 못 채운 곳은 화면
 placeholder 가 담당한다. culture/petRestaurant 적재 이후에 돌려야 하고 재실행은 멱등이다.
+
+## congestionImportJob (관광지 집중률)
+
+```bash
+./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=congestionImportJob"
+```
 
 - **`placeImportJob` 이후에 돌려야 한다.** 장소가 비어 있으면 전부 UNMATCHED 로 적재되고
   적합도 응답에서 혼잡도가 계속 빠진다.
