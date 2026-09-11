@@ -25,28 +25,28 @@
 
 새 UI를 만들기 전에 아래를 확인한다. **없으면 만들고, 있으면 확장한다.** 화면마다 비슷한 버튼을 새로 만들지 않는다.
 
-| 컴포넌트                                   | 위치                               | 비고                                                                                                                                                                                                                                                    |
-| ------------------------------------------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Button`                                   | `src/components/button.tsx`        | variant: primary / secondary / ghost / danger / dangerOutline, size: sm / md / lg. **화면에 놓인 삭제 버튼은 `dangerOutline`** (채움은 확인 다이얼로그 전용)                                                                                            |
-| `Canvas`, `SurfaceStack`, `Surface`        | `src/components/surface.tsx`       | **표면 프리미티브 (3a · `DESIGN.md` §0).** L0 바닥 · 카드 열 · L1 섹션 카드. **새 화면은 이것만 쓴다**                                                                                                                                                  |
-| `Band`, `Section`, `Row`, `RowList`        | `src/components/surface.tsx`       | **2a 잔존.** 전폭 섹션 · 전폭 행(구분선 인셋 16/40) · 8px 밴드. 홈 외 화면이 아직 쓴다 — **새로 쓰지 않는다** (§3-1)                                                                                                                                    |
-| `MetricBadge`, `MetricValue`, `MetricWord` | `src/components/metric.tsx`        | 등급 배지(`sm`/`md`)·지표 값·판정 문장의 술어. **톤 표는 여기가 소유한다** (화면이 다시 만들지 않는다)                                                                                                                                                  |
-| `ReasonList`                               | `src/components/reason-list.tsx`   | XAI 근거. 서버 순서를 재정렬하지 않는다                                                                                                                                                                                                                 |
-| `Banner`                                   | `src/components/banner.tsx`        | 상시 진입점(병원·약국). 흰 표면 + 아이콘만 danger                                                                                                                                                                                                       |
-| `Toast` / `ToastProvider`                  | `src/components/toast.tsx`         | 끝난 일. **undo 금지 · 오류 금지 · 동시에 하나만**                                                                                                                                                                                                      |
-| `BottomSheet`                              | `src/components/bottom-sheet.tsx`  | 모바일 선택. 단계는 같은 시트를 밀어 넣는다                                                                                                                                                                                                             |
-| `ConfirmModal`                             | `src/components/confirm-modal.tsx` | **되돌릴 수 없는 일만.** 영향 범위를 개수로                                                                                                                                                                                                             |
-| `Menu` / `MenuAnchor`                      | `src/components/menu.tsx`          | 데스크톱 팝오버 3–5항목. 모바일에서는 쓰지 않는다. 정렬은 `align`(기본 왼쪽)                                                                                                                                                                            |
-| `Input`                                    | `src/components/input.tsx`         | 라벨·에러·helper text 는 `Field` 가 감싼다                                                                                                                                                                                                              |
-| `DateField`                                | `src/components/date-field.tsx`    | **날짜 입력. `<input type="date">` 를 쓰지 않는다** — 눌러서 달력을 `createPortal` 로 `document.body` 에 띄우는 팝오버다. 담기 시트 안에서도 쓰이기 때문에 그렇다 — `absolute` 로는 시트 패널의 `overflow-hidden` 과 본문의 `overflow-y-auto` 에 잘렸다 |
-| `Calendar`                                 | `src/components/calendar.tsx`      | 달 격자. 기간을 띠로 표시하고 `min`/`max` 밖을 잠근다. 격자 전체가 탭 정지 하나(방향키 이동)                                                                                                                                                            |
-| `Badge`                                    | `src/components/badge.tsx`         | 중립 태그·AI 표시. **등급은 `MetricBadge` 를 쓴다**                                                                                                                                                                                                     |
-| `Chip`, `ChipGroup`                        | `src/components/chip.tsx`          | 모바일 상시 필터(가로). **radius-md(8), 원형 아님.** 배타 축은 `exclusive`, 시트 트리거는 `expanded`                                                                                                                                                    |
-| `FilterList`, `FilterRadio`, `FilterCheck` | `src/components/filter-list.tsx`   | 세로 필터 목록(데스크톱 레일 · 바텀시트). 배타=`FilterRadio` / 다중=`FilterCheck`                                                                                                                                                                       |
-| `EmptyState`                               | `src/components/empty-state.tsx`   | **404/데이터 부재 전용. 재시도 버튼 슬롯 없음**                                                                                                                                                                                                         |
-| `ErrorState`                               | `src/components/error-state.tsx`   | **5xx/일시 장애 전용. 재시도 버튼 필수**                                                                                                                                                                                                                |
-| `Skeleton`                                 | `src/components/skeleton.tsx`      | 실제 콘텐츠와 크기 유사                                                                                                                                                                                                                                 |
-| `PetAvatar`                                | `src/components/pet-avatar.tsx`    | 반려견 이니셜 원형. `sm`(24) / `md`(28) / `lg`(32) / `hero`(96·112). `aria-hidden` — 이름은 항상 옆에 있다                                                                                                                                              |
+| 컴포넌트                                           | 위치                               | 비고                                                                                                                                                                                                                                                    |
+| -------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Button`                                           | `src/components/button.tsx`        | variant: primary / secondary / ghost / danger / dangerOutline, size: sm / md / lg. **화면에 놓인 삭제 버튼은 `dangerOutline`** (채움은 확인 다이얼로그 전용)                                                                                            |
+| `Canvas`, `SurfaceStack`, `Surface`, `SurfaceList` | `src/components/surface.tsx`       | **표면 프리미티브 (3a · `DESIGN.md` §0).** L0 바닥 · 카드 열 · L1 섹션 카드 · L2 카드 안 목록(`columns={2}` 로 xl 2열). **새 화면은 이것만 쓴다**                                                                                                       |
+| `Band`, `Section`, `Row`, `RowList`                | `src/components/surface.tsx`       | **2a 잔존.** 전폭 섹션 · 전폭 행(구분선 인셋 16/40) · 8px 밴드. 홈 외 화면이 아직 쓴다 — **새로 쓰지 않는다** (§3-1)                                                                                                                                    |
+| `MetricBadge`, `MetricValue`, `MetricWord`         | `src/components/metric.tsx`        | 등급 배지(`sm`/`md`)·지표 값·판정 문장의 술어. **톤 표는 여기가 소유한다** (화면이 다시 만들지 않는다)                                                                                                                                                  |
+| `ReasonList`                                       | `src/components/reason-list.tsx`   | XAI 근거. 서버 순서를 재정렬하지 않는다                                                                                                                                                                                                                 |
+| `Banner`                                           | `src/components/banner.tsx`        | 상시 진입점(병원·약국). 흰 표면 + 아이콘만 danger                                                                                                                                                                                                       |
+| `Toast` / `ToastProvider`                          | `src/components/toast.tsx`         | 끝난 일. **undo 금지 · 오류 금지 · 동시에 하나만**                                                                                                                                                                                                      |
+| `BottomSheet`                                      | `src/components/bottom-sheet.tsx`  | 모바일 선택. 단계는 같은 시트를 밀어 넣는다                                                                                                                                                                                                             |
+| `ConfirmModal`                                     | `src/components/confirm-modal.tsx` | **되돌릴 수 없는 일만.** 영향 범위를 개수로                                                                                                                                                                                                             |
+| `Menu` / `MenuAnchor`                              | `src/components/menu.tsx`          | 데스크톱 팝오버 3–5항목. 모바일에서는 쓰지 않는다. 정렬은 `align`(기본 왼쪽)                                                                                                                                                                            |
+| `Input`                                            | `src/components/input.tsx`         | 라벨·에러·helper text 는 `Field` 가 감싼다                                                                                                                                                                                                              |
+| `DateField`                                        | `src/components/date-field.tsx`    | **날짜 입력. `<input type="date">` 를 쓰지 않는다** — 눌러서 달력을 `createPortal` 로 `document.body` 에 띄우는 팝오버다. 담기 시트 안에서도 쓰이기 때문에 그렇다 — `absolute` 로는 시트 패널의 `overflow-hidden` 과 본문의 `overflow-y-auto` 에 잘렸다 |
+| `Calendar`                                         | `src/components/calendar.tsx`      | 달 격자. 기간을 띠로 표시하고 `min`/`max` 밖을 잠근다. 격자 전체가 탭 정지 하나(방향키 이동)                                                                                                                                                            |
+| `Badge`                                            | `src/components/badge.tsx`         | 중립 태그·AI 표시. **등급은 `MetricBadge` 를 쓴다**                                                                                                                                                                                                     |
+| `Chip`, `ChipGroup`                                | `src/components/chip.tsx`          | 모바일 상시 필터(가로). **radius-md(8), 원형 아님.** 배타 축은 `exclusive`, 시트 트리거는 `expanded`                                                                                                                                                    |
+| `FilterList`, `FilterRadio`, `FilterCheck`         | `src/components/filter-list.tsx`   | 세로 필터 목록(데스크톱 레일 · 바텀시트). 배타=`FilterRadio` / 다중=`FilterCheck`                                                                                                                                                                       |
+| `EmptyState`                                       | `src/components/empty-state.tsx`   | **404/데이터 부재 전용. 재시도 버튼 슬롯 없음**                                                                                                                                                                                                         |
+| `ErrorState`                                       | `src/components/error-state.tsx`   | **5xx/일시 장애 전용. 재시도 버튼 필수**                                                                                                                                                                                                                |
+| `Skeleton`                                         | `src/components/skeleton.tsx`      | 실제 콘텐츠와 크기 유사                                                                                                                                                                                                                                 |
+| `PetAvatar`                                        | `src/components/pet-avatar.tsx`    | 반려견 이니셜 원형. `sm`(24) / `md`(28) / `lg`(32) / `hero`(96·112). `aria-hidden` — 이름은 항상 옆에 있다                                                                                                                                              |
 
 **`EmptyState` 와 `ErrorState` 를 분리한 이유**: 404(데이터 부재)와 5xx(일시 장애)의 시각 언어를 다르게 강제하기 위해서다. 한 컴포넌트에 `hasRetry` 플래그를 두면 반드시 잘못 쓰인다. (`api-integration-guide.md` §3)
 
@@ -115,6 +115,7 @@
 | 페이지 바닥을 깐다      | `<Canvas as="main">` — `--bg-sunken`, **전폭**                            |
 | 바닥 위에 카드를 쌓는다 | `<SurfaceStack>` — 간격 모바일 8 / 데스크톱 24                            |
 | 섹션을 그린다           | `<Surface title=...>` — 흰 면 + 1px 테두리 + radius **12**, 그림자 없음   |
+| 카드 안에 목록을 넣는다 | `<SurfaceList>` — 선을 **항목 사이에만** 긋는다. xl 2열은 `columns={2}`   |
 | 같은 카드 안을 나눈다   | 1px 구분선 또는 `--band` 채움. **아이템에 테두리를 두르지 않는다**        |
 | 카드 안 좌우 여백       | `INSET_CLASS.card`(16/20). 넘치는 스크롤러는 `INSET_BLEED_END_CLASS.card` |
 
@@ -133,15 +134,25 @@
 **2a 프리미티브는 아직 코드에 있다.** 홈 외 화면이 `Band` · `Section` · `Row` · `RowList` 를
 쓰고, 화면을 옮길 때 3a 로 바꾼다. **새 화면·새 섹션에는 쓰지 않는다.**
 
-| 옮길 때   | 2a                  | 3a                                        |
-| --------- | ------------------- | ----------------------------------------- |
-| 묶음 경계 | `<Band />`          | 카드 경계 + `SurfaceStack` 간격           |
-| 섹션      | `<Section>`         | `<Surface>` (제목이 **카드 안**으로)      |
-| 목록      | `<RowList>`+`<Row>` | 그 화면이 실제로 요구하는 모양으로 만든다 |
+| 옮길 때   | 2a                  | 3a                                                 |
+| --------- | ------------------- | -------------------------------------------------- |
+| 묶음 경계 | `<Band />`          | 카드 경계 + `SurfaceStack` 간격                    |
+| 섹션      | `<Section>`         | `<Surface>` (제목이 **카드 안**으로)               |
+| 목록      | `<RowList>`+`<Row>` | `<SurfaceList>` + `li` (좌우 인셋은 항목이 갖는다) |
+
+**`Surface` 는 누가 그리나** — 카드 머리 값이 **응답에서 오면 섹션이**, 정적이면 **페이지가**
+그린다. `/places`(#440)는 제목·필터 요약이 서버에서 정해져 페이지가 그리고, 일정 응급
+브리핑(#461)과 저장한 곳(#462)은 반경·개수가 응답에서 와서 섹션이 그린다. 페이지가 그리면서
+값만 카드 안으로 내려보내면 제목 줄과 그 값 사이에 카드 여백이 한 번 더 낀다.
 
 > **목록·폼용 L2 프리미티브를 미리 만들지 않는다.** #422 가 `SurfaceBody` · `SurfaceList` ·
 > `SurfaceRow` · `SurfaceTile` 넷을 추측으로 두었는데 홈을 옮겨 보니 **네 개 다 쓸 자리가
 > 없어** #428 에서 걷었다. 그 화면을 옮길 때의 요구가 미리 만든 추측보다 낫다.
+>
+> 지금 있는 `SurfaceList` 는 장소 목록(#439)이 요구한 모양이고, `columns={2}` 는 저장한
+> 곳(#462)이 요구한 변형이다 — **화면이 먼저 요구했을 때만 넓힌다.** 2열 규칙의 본문은
+> `.surface-list-2col`(`app/globals.css`) 에 있다: 괄호가 든 arbitrary variant
+> (`[&>li:nth-child(2)]:`)는 eslint `noComplexArbitrary` 가 막고 그리로 보낸다.
 
 ## 3-2. 오버레이는 4종만 (가이드 §5-2)
 

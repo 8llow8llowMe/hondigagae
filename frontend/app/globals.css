@@ -309,6 +309,45 @@ body {
   background: color-mix(in srgb, var(--fg) 50%, transparent);
 }
 
+/*
+  **2열 목록 — L2** (DESIGN.md §0, 이슈 #462). `SurfaceList` 의 `columns={2}` 가 붙인다.
+
+  구분선 규약은 항목이 아니라 **목록**이 갖는다(#439). 1열은 `[&>li+li]:border-t` 하나로
+  끝나는데 2열에서는 두 군데가 어긋난다 — ① 첫 시각적 행의 **오른쪽 칸**도 `li+li` 라
+  위선이 그어지고, ② 열 사이 세로선을 그을 자리가 없다. 그 둘만 여기서 바로잡는다.
+  3번째 항목부터는 `li+li` 가 이미 맞게 당긴다.
+
+  Tailwind arbitrary variant(`[&>li:nth-child(2)]:`)로 쓰지 않는다 — 괄호가 든 arbitrary 는
+  eslint `noComplexArbitrary` 가 막고 여기로 보낸다 (`.overlay-backdrop` 과 같은 경로).
+
+  **`xl`(1280) 부터다.** 아트보드는 1200 을 적었지만 이 화면 하나 때문에 breakpoint 토큰을
+  늘리지 않는다 — 근거("1440 에서 행이 1360까지 늘어나 이름과 해제 버튼이 이어지지 않는다")는
+  1280 에서도 그대로 성립한다 (`features/favorite/저장한장소-세부명세.md` D1).
+*/
+@media (width >= 80rem) {
+  .surface-list-2col {
+    display: grid;
+    /* `minmax(0, 1fr)` — 트랙 바닥을 0 으로 내려 긴 장소명이 칸을 밀어내지 못하게 한다 */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* 첫 시각적 행은 **두 칸**이다. 오른쪽 칸의 위선을 걷는다 */
+  .surface-list-2col > li:nth-child(2) {
+    border-block-start-width: 0;
+  }
+
+  /*
+    열 사이 1px — **오른쪽에 짝이 있을 때만 긋는다.** 홀수 개의 마지막 행은 우측 칸이
+    비는데 그때도 그으면 아무것도 없는 공간 옆에 선만 뜬다 (1건일 때 특히 눈에 띈다).
+
+    칸을 그리드가 같은 높이로 늘려 주므로 선이 행 높이 전체를 가른다 — 2a 에서 행
+    안쪽 래퍼에 걸던 때와 달리 내용 높이에 따라 짧아지지 않는다.
+  */
+  .surface-list-2col > li:nth-child(odd):not(:last-child) {
+    border-inline-end: 1px solid var(--border);
+  }
+}
+
 /* 모바일 하단 안전영역. 홈 인디케이터가 있는 기기에서 탭바가 가려지지 않게 한다 */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
