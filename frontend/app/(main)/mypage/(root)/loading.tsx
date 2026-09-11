@@ -32,7 +32,8 @@ export default function MyPageLoading() {
         </Surface>
 
         <Surface title={messages.member.accountSection} aria-busy>
-          <div aria-hidden className={cn('flex flex-col gap-3 pb-5', INSET_CLASS.card)}>
+          {/* 실제 계정 카드 몸통은 `min-h-14` 행 둘(=112)이다 — `gap`·`pb` 를 얹으면 32px 뛴다 */}
+          <div aria-hidden className={cn('flex flex-col', INSET_CLASS.card)}>
             <Skeleton className="h-14 w-full" />
             <Skeleton className="h-14 w-full" />
           </div>

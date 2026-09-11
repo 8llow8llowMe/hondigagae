@@ -46,19 +46,36 @@ export function MyPetsRow({
           </span>
         )}
 
-        <span className="min-w-0 flex-1">
+        {/* `h3` 는 flow content 라 `span` 안에 들 수 없다 — `PetRow` 와 같이 `div` 다 */}
+        <div className="min-w-0 flex-1">
           {/*
-            **`h3` 다.** 카드가 `h2` 를 쓰므로 항목이 같은 레벨이면 문서 구조가 평평해진다
-            — 3a 에서 목록이 카드 안으로 들어오며 한 단 내려왔다 (`PetRow` 와 같은 처리).
-            이 카드는 제목이 없지만(페이지 머리가 이미 `내 정보` 다) 레벨 축은 그대로다.
+            **`h3` 다.** 담는 카드 제목(`내 정보`)이 `h2` 라 항목이 같은 레벨이면 문서
+            구조가 평평해진다 — 3a 에서 목록이 카드 안으로 들어오며 한 단 내려왔다
+            (`PetRow` 와 같은 처리).
           */}
           <h3 className="text-body-1 text-fg block font-semibold">{messages.member.myPets}</h3>
-          <span className="text-body-2 text-fg-muted block truncate">
-            {pets.length === 0
-              ? messages.member.petsEmpty
-              : `${pets.map((pet) => pet.name).join(' · ')} · ${messages.member.petsCount(totalCount, MAX_PET_COUNT)}`}
-          </span>
-        </span>
+
+          {/*
+            **개수는 말줄임 밖에 둔다.** 이름과 개수를 한 문자열로 이어 `truncate` 를
+            걸면 줄 **맨 끝**에 있는 개수가 가장 먼저 버려진다 — 390에서 5마리면
+            `몽실이 · 보리 · 초코라떼 · 코코 ·…` 로 잘려 `5/5` 가 사라졌다. 이 행이
+            존재하는 이유("들어가기 전에 안이 비었는지 알 수 있어야 한다")가 바로 그
+            값이라, 이름만 줄이고 개수는 `shrink-0` 으로 지킨다. 같은 카드의
+            `저장한 장소` 가 개수를 단독 줄로 내는 것과 같은 결과다.
+          */}
+          {pets.length === 0 ? (
+            <span className="text-body-2 text-fg-muted block truncate">
+              {messages.member.petsEmpty}
+            </span>
+          ) : (
+            <span className="text-body-2 text-fg-muted flex min-w-0 gap-1">
+              <span className="truncate">{pets.map((pet) => pet.name).join(' · ')}</span>
+              <span className="shrink-0 tabular-nums">
+                · {messages.member.petsCount(totalCount, MAX_PET_COUNT)}
+              </span>
+            </span>
+          )}
+        </div>
 
         <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
       </Link>

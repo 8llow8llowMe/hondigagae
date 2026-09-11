@@ -78,8 +78,16 @@ export function MyPageSections({
   onLogout,
   onEditProfile,
 }: MyPageSectionsProps) {
-  // 404 가 나올 수 없는 리소스다 — `/members/me` 는 항상 존재한다.
-  // 남는 것은 일시 장애뿐이라 재시도를 준다
+  /*
+    404 가 나올 수 없는 리소스다 — `/members/me` 는 항상 존재한다. 남는 것은 일시
+    장애뿐이라 재시도를 준다.
+
+    **술어가 하나여야 한다.** 카드 본문과 계정 카드 표시를 각각 `member === null` 과
+    `errorStatus !== null` 로 판정하면 둘이 어긋나는 구간
+    (`errorStatus !== null && member !== null` — 프리페치로 캐시가 찬 뒤 refetch 가 5xx
+    로 실패하면 실제로 생긴다)에서 계정 카드만 말없이 사라지고 오류 문구도 재시도도
+    나오지 않는다. 명세 D5 는 그 갈래를 `ErrorState` + 재시도 한 줄로 정해 두었다.
+  */
   const failed = !loading && (errorStatus !== null || member === null)
 
   return (
@@ -96,7 +104,7 @@ export function MyPageSections({
             <Skeleton className="h-14 w-full" />
             <Skeleton className="h-14 w-full" />
           </div>
-        ) : member === null ? (
+        ) : failed || member === null ? (
           <ErrorState
             inset="card"
             title={messages.member.loadFailedTitle}
@@ -169,12 +177,17 @@ export function MyPageSections({
           title={messages.member.accountSection}
           aria-busy={loading || undefined}
         >
-          {loading ? (
-            <div aria-hidden className={cn('flex flex-col gap-3 pb-5', INSET_CLASS.card)}>
+          {loading || member === null ? (
+            /*
+              **높이를 실제 카드에 맞춘다.** 계정 카드의 실제 몸통은 행이 각자 `py-3` 을
+              든 `min-h-14` 둘(=112)이고 카드 아래 여백이 없다. `gap-3 pb-5` 를 쓰면 144 가
+              되어, 조회가 끝나는 순간 카드가 32px 줄며 아래가 통째로 뛴다 (390 실측).
+            */
+            <div aria-hidden className={cn('flex flex-col', INSET_CLASS.card)}>
               <Skeleton className="h-14 w-full" />
               <Skeleton className="h-14 w-full" />
             </div>
-          ) : member === null ? null : (
+          ) : (
             <AccountSection state={toAccountState(member)} provider={member.provider} />
           )}
         </Surface>
@@ -193,23 +206,35 @@ export function MyPageSections({
         축은 바로 위 카드 안 글줄과 같아야 `로그아웃` 의 첫 글자가 `비밀번호 변경` 과
         같은 세로선에 선다 (`plan-add-place-header` 의 `inset` 주석, #451). `main` 을
         쓰면 데스크톱에서 20px 계단이 생긴다.
-      */}
-      <div className={cn('flex flex-col items-start py-2', INSET_CLASS.card)}>
-        <button
-          type="button"
-          onClick={onLogout}
-          className="text-body-1 text-fg focus-visible:ring-brand-500 flex min-h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
-        >
-          {messages.member.logout}
-        </button>
 
-        <Link
-          href="/mypage/withdraw"
-          className="text-body-2 text-fg-muted focus-visible:ring-brand-500 flex min-h-11 items-center font-medium focus-visible:ring-2 focus-visible:outline-none"
-        >
-          {messages.member.withdraw}
-        </Link>
-      </div>
+        **정확히는 1px 왼쪽에 선다** (768에서 44 대 45, 1920에서 620 대 621 — 실측).
+        `Surface` 가 `md:border` 를 쓰므로 카드의 padding box 가 border box 보다 1px
+        안쪽인데 L0 블록에는 상쇄할 테두리가 없다. 모바일은 `border-y` 라 정확히 맞는다.
+        눈으로 보이지 않아 그대로 둔다 — 다음 사람이 다시 재지 않게 적어 둔다.
+
+        **로딩·오류에서는 내지 않는다.** 2a 는 두 상태에서 early return 이라 이 블록이
+        아예 없었다 — 층을 옮기며 조건 밖으로 새어 나가면, 라우트 스켈레톤
+        (`loading.tsx`, 액션 없음)에서 클라이언트 로딩으로 넘어가는 순간 버튼 둘이
+        튀어나온다. 리팩토링이라 동작을 그대로 둔다.
+      */}
+      {!loading && !failed && (
+        <div className={cn('flex flex-col items-start py-2', INSET_CLASS.card)}>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="text-body-1 text-fg focus-visible:ring-brand-500 flex min-h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {messages.member.logout}
+          </button>
+
+          <Link
+            href="/mypage/withdraw"
+            className="text-body-2 text-fg-muted focus-visible:ring-brand-500 flex min-h-11 items-center font-medium focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {messages.member.withdraw}
+          </Link>
+        </div>
+      )}
     </>
   )
 }

@@ -43,21 +43,24 @@ export default async function PasswordPage() {
       폭이 `max-w-screen-md`(768)에서 **`max-w-2xl`(672)** 로 좁아졌다 — 폼 한 단 폭이고
       #453 · #464 와 같은 값이다. 폭을 가진 것은 `main` 이 아니라 `SurfaceStack` 이다.
 
-      **머리는 L0 다.** 뒤로가기와 `h1` 은 어느 카드에도 속하지 않는다(§0 판정에서
-      "페이지 머리" 가 빠진다). 인셋은 `main`(16/40)이 아니라 **`card`(16/20)** 다 —
-      L0 위에 있어도 아래 카드 안 글줄과 같은 세로선에 서야 한다
-      (`plan-add-place-header` 의 `inset` 주석, #451).
-
-      **`h1` 을 `sr-only` 로 내리지 않는다.** 카드 제목은 계정 상태에 따라
-      `비밀번호 변경` / `비밀번호 설정` 으로 갈리므로 페이지 이름(`비밀번호 관리`)을
-      대신할 수 없다 — 반려견 목록(#464)이 `h1` 을 숨긴 조건이 여기서는 성립하지 않는다.
+      **뒤로가기는 L0 다.** 어느 카드에도 속하지 않는다(§0 판정에서 "페이지 머리" 가
+      빠진다). 인셋은 `main`(16/40)이 아니라 **`card`(16/20)** 이고, 데스크톱 세로
+      여백은 `SurfaceStack` 의 `md:p-6` 에 맡긴다 — 둘 다 `plan-add-place-header` 의
+      `inset` 주석(#451)과 같은 값이다.
     */
     <Canvas as="main" id="main-content">
       <SurfaceStack className="mx-auto w-full max-w-2xl">
-        <header className={cn('flex flex-col gap-1 pt-5 pb-1', INSET_CLASS.card)}>
+        {/*
+          **보이는 제목은 카드의 `h2` 다** (§0 "섹션 제목은 섹션 안에 있다"). 카드가
+          하나뿐이라 그 이름이 페이지의 이름을 대신한다 — 반려견 등록(#464) · 일정
+          만들기(#453)와 같다. `h1` 을 보이게 두면 카드 제목(`lead`, 28/800)이 그보다
+          커져 위계가 뒤집힌다 (`DESIGN.md §11`).
+        */}
+        <h1 className="sr-only">{messages.member.passwordTitle}</h1>
+
+        <div className={cn('pt-4 md:pt-0', INSET_CLASS.card)}>
           <MyPageBackLink className="-ml-1" />
-          <h1 className="text-title-1 text-fg font-bold">{messages.member.passwordTitle}</h1>
-        </header>
+        </div>
 
         <HydrationBoundary state={dehydrate(queryClient)}>
           <PasswordView />
