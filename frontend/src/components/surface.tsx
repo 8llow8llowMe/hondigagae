@@ -49,6 +49,16 @@ import { cn } from '@/lib/utils/cn'
  * **바닥만 칠하고 배치는 하지 않는다.** 전폭이어야 하기 때문이다 — 콘텐츠 컨테이너
  * (`.rail-layout`, 최대 1440)에 걸면 그 바깥이 흰색으로 남는다. 카드를 쌓는 일은
  * `SurfaceStack` 이 맡는다.
+ *
+ * **높이는 남는 만큼 먹는다 (`flex-1`, #456③).** 내용이 짧아도 바닥이 뷰포트 끝까지
+ * 이어져야 한다 — 안 그러면 회색이 콘텐츠 높이에서 끊기고 그 아래로 흰 `body` 가 보여
+ * "흰색은 바닥이 아니라 섹션의 색"(`DESIGN.md §0`)이 뒤집힌다. 채울 높이를 주는 쪽은
+ * `app/(main)/layout.tsx` 의 세로 뼈대(`flex min-h-dvh flex-col`)다.
+ *
+ * **`min-h-*` 를 여기에 쓰지 않는다.** `100dvh - 헤더` 를 박으면 푸터가 통째로 접힘
+ * 아래로 내려가 **없던 스크롤이 짧은 화면마다 생긴다.** `flex-1` 은 푸터 자리를 남기고
+ * 그 나머지만 먹는다. 뼈대 밖에 놓인 `Canvas` 에서는 flex 속성이 무시돼 아무 일도
+ * 일어나지 않는다 — 지금은 35곳 전부가 `as="main"` 인 페이지 뿌리다.
  */
 export function Canvas({
   as: Tag = 'div',
@@ -63,7 +73,7 @@ export function Canvas({
   className?: string
 }) {
   return (
-    <Tag id={id} className={cn('bg-bg-sunken', className)}>
+    <Tag id={id} className={cn('bg-bg-sunken flex-1', className)}>
       {children}
     </Tag>
   )

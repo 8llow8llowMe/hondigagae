@@ -265,6 +265,48 @@ test.describe('3층 표면 — not-found', () => {
 
           expect(await hasHorizontalOverflow(page)).toBe(false)
         })
+
+        /*
+          **바닥이 뷰포트에서 끊기지 않는다** (#456③).
+
+          상태 화면은 내용이 짧아 이 드리프트가 가장 잘 드러나는 자리다 — 고치기 전
+          1280×900 실측에서 회색이 274 에서 끝나고 푸터 아래 **366px 가 맨 흰색**이었다.
+          `DESIGN.md §0` 의 "흰색은 바닥이 아니라 섹션의 색" 이 거기서 뒤집힌다.
+
+          **소스 단언(`main-layout-surface.test.ts`)이 못 보는 것을 여기서 본다.** 그쪽은
+          클래스 문자열이 제자리에 있는지만 알고, 그 조합이 실제로 높이를 만들어 내는지는
+          모른다 — `flex-1` 을 받을 부모가 `flex` 를 잃는 식의 회귀는 브라우저에서만 잡힌다.
+
+          **푸터 바닥까지 함께 본다.** 회색만 보면 `min-h` 로 고친 안(기각)도 통과하는데,
+          그 안은 없던 스크롤을 짧은 화면마다 만든다. 문서 높이 = 뷰포트 높이를 같이
+          단언해야 그 갈래가 갈린다.
+        */
+        test(`${name} 에서 바닥이 뷰포트 끝까지 이어진다 — 스크롤은 생기지 않는다`, async ({
+          page,
+        }) => {
+          await page.setViewportSize(size)
+          await page.goto(path)
+          await expect(page.getByRole('heading', { name: title, level: 2 })).toBeVisible()
+
+          const geometry = await page.evaluate(() => {
+            const round = (value: number) => Math.round(value)
+            const footer = document.querySelector('.site-footer')?.getBoundingClientRect()
+            const canvas = document.querySelector('main')?.getBoundingClientRect()
+            return {
+              viewport: window.innerHeight,
+              doc: document.documentElement.scrollHeight,
+              canvasBottom: round(canvas?.bottom ?? -1),
+              footerTop: round(footer?.top ?? -1),
+              footerBottom: round(footer?.bottom ?? -1),
+            }
+          })
+
+          // 회색이 푸터 바로 위까지 온다 — 둘 사이에 흰 띠가 없다
+          expect(geometry.canvasBottom).toBe(geometry.footerTop)
+          // 푸터가 뷰포트 바닥에 앉는다. 내려가면 없던 스크롤이 생긴 것이다
+          expect(geometry.footerBottom).toBe(geometry.viewport)
+          expect(geometry.doc).toBe(geometry.viewport)
+        })
       }
     })
   }
