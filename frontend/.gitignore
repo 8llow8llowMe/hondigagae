@@ -11,3 +11,11 @@ next-env.d.ts
 .env
 .env.*
 !.env.example
+
+# Playwright (#467) — 리포트·트레이스와 로그인 세션 스냅샷.
+# `e2e/.auth/user.json` 은 목 계정 세션이지만 쿠키 스냅샷이라 커밋하지 않는다.
+/playwright-report/
+/test-results/
+/blob-report/
+/e2e/.auth/
+/.next-e2e/

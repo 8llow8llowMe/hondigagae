@@ -41,3 +41,56 @@ jobs:
           BACKEND_API_URL: http://localhost:8000
           AUTH_SESSION_SECRET: ci-placeholder-secret-at-least-32-characters
           NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY: ci-placeholder
+
+  # E2E — 레이아웃·보호 라우트 검증 (이슈 #467).
+  #
+  # **`verify` 와 갈라 둔 별도 job 이고 `continue-on-error` 다.** 브라우저 내려받기와
+  # dev 서버 기동이 붙어 시간이 늘고, 기준이 안정될 때까지 PR 을 막지 않는다.
+  # 필수 체크로 올리는 시점은 #467 본문에서 정한다.
+  #
+  # `verify` 에 의존시키지 않는다 — 둘은 서로 다른 것을 보고, 직렬로 묶으면
+  # lint 한 줄 때문에 레이아웃 결과를 못 보게 된다.
+  e2e:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      # 브라우저는 별도 캐시다. node_modules 캐시에 들어가지 않는다
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+
+      # chromium 하나만 받는다. 지금 스펙은 층 규약과 라우트 가드라 엔진별로 갈리지 않는다
+      - run: pnpm exec playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+      - run: pnpm exec playwright install-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+
+      # 백엔드가 필요 없다 — playwright.config.ts 의 webServer 가 MOCK_API=true 로 띄운다
+      - run: pnpm e2e
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7

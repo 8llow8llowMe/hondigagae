@@ -50,6 +50,9 @@ export default tseslint.config(
   {
     ignores: [
       '.next/**',
+      // E2E 전용 산출물 (#467). dev 서버를 사람이 쓰는 것과 갈라 띄우느라
+      // `NEXT_DIST_DIR=.next-e2e` 를 쓴다 — `.next` 와 같은 성격이라 같이 뺀다
+      '.next-e2e/**',
       'coverage/**',
       'node_modules/**',
       'next-env.d.ts',
