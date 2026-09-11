@@ -24,8 +24,9 @@ import { cn } from '@/lib/utils/cn'
  * 진입점이 데이터 사정으로 사라지면 안 된다.
  *
  * 아트보드(`혼디가개 홈·내비게이션.dc.html`) 실측에 맞춘다 — 우측 꺾쇠가 있고, 설명은
- * 12/500 muted 이며, **위아래 테두리를 스스로 긋지 않는다.** 묶음의 경계는 8px `Band` 가
- * 맡는다 (DESIGN.md §0). 예전에는 `border-y` 를 하드코딩해 밴드와 선이 겹쳤다.
+ * 12/500 muted 이며, **위아래 테두리를 스스로 긋지 않는다.** 묶음의 경계는 담는 쪽이
+ * 맡는다 — 3a 에서는 카드 경계와 `SurfaceStack` 간격이다 (DESIGN.md §0). 예전에는
+ * `border-y` 를 하드코딩해 2a 의 8px 밴드와 선이 겹쳤다.
  */
 export function Banner({
   title,

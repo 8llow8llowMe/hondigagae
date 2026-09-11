@@ -534,7 +534,8 @@
     `AiPlanDraftPreview` 의 `footer` prop 을 걷고 배치를 `AiPlanJobView` 로 옮겼다
     (반려견 폼 #464 가 `PetForm.footer` 를 걷은 것과 같은 이동).
   - 이 전환으로 **2a 프리미티브(`Band`·`Section`·`Row`·`RowList`)의 production 사용처가 0** 이
-    됐다 — 파일 삭제는 로드맵 #455 의 12번이 한다.
+    됐고, 로드맵 #455 의 12번([#475](https://github.com/8llow8llowMe/hondigagae/issues/475))이
+    `surface.tsx` 에서 **네 개를 지웠다.**
 - **생성 옵션 두 개가 붙었다** ([#128](https://github.com/8llow8llowMe/hondigagae/issues/128), 아트보드 05): `preferFavorites`(저장한 곳 먼저 — 우선순위)와 `pinnedPlaceIds`(꼭 넣을 장소 — **배치 보장**, 최대 10). **두 문구를 섞지 않는다** — "먼저" 와 "꼭" 은 다른 약속이다.
   - **필드명은 `preferFavorites` 다.** #128 이슈 본문의 `includeFavorites` 는 틀린 이름이고, 그대로 보내면 옵션이 조용히 무시된다.
   - 꼭 넣을 장소는 **저장한 장소에서 고른다** (`/favorites` 와 같은 캐시). 아트보드의 `검색` 탭은 **BE `keyword` 가 열렸다 (#421).** 피커 검색 UI 는 FE 후속 (명세 S8-9).

@@ -16,7 +16,7 @@
  * 컴포넌트명이 주석 안에 그대로 등장한다 — 걷지 않으면 **주석 문자열에 속아 통과한다**
  * (#451 의 전례). 반대로 "없어야 한다" 는 단언은 걷지 않으면 주석 때문에 실패한다.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -221,51 +221,13 @@ describe('피커 시트 — 2a 프리미티브의 마지막 사용처였다 (#47
   })
 })
 
-/**
- * **2a 프리미티브의 production JSX 사용처가 0 이다** (#455 로드맵 12번의 전제).
- *
- * 이 이슈가 피커 시트를 옮기면서 마지막 사용처가 사라졌다. 12번이 `Band` · `Section` ·
- * `Row` · `RowList` 를 **파일에서 지우는데**, 그 전에 새 사용처가 생기면 그 커밋이 화면을
- * 깬다. `surface.tsx` 의 export 자체는 12번의 몫이라 여기서 지우지 않는다.
- */
-describe('2a 프리미티브는 더 이상 쓰이지 않는다 (#473 → #455 12번)', () => {
-  function sourceFiles(): { path: string; text: string }[] {
-    const files: { path: string; text: string }[] = []
-
-    function walk(dir: string) {
-      for (const entry of readdirSync(dir)) {
-        if (entry === 'node_modules' || entry === '.next' || entry.startsWith('.')) continue
-
-        const full = join(dir, entry)
-        if (statSync(full).isDirectory()) {
-          walk(full)
-          continue
-        }
-        // 프리미티브를 정의하는 파일과 테스트 자신은 금지 문자열을 예시로 담는다
-        if (!entry.endsWith('.tsx') || full.endsWith(join('components', 'surface.tsx'))) continue
-
-        files.push({ path: full.slice(ROOT.length), text: strip(readFileSync(full, 'utf8')) })
-      }
-    }
-
-    for (const dir of ['src', 'app']) walk(join(ROOT, dir))
-
-    return files
-  }
-
-  it.each([
-    ['Band', /<Band[\s/>]/],
-    ['Section', /<Section[\s/>]/],
-    ['Row', /<Row[\s/>]/],
-    ['RowList', /<RowList[\s/>]/],
-  ])('%s 을 JSX 로 쓰는 파일이 없다', (_name, pattern) => {
-    const users = sourceFiles()
-      .filter((file) => pattern.test(file.text))
-      .map((file) => file.path)
-
-    expect(users).toEqual([])
-  })
-})
+/*
+  **`2a 프리미티브는 더 이상 쓰이지 않는다` describe 를 지웠다** (#475). 그 블록은 `Band` ·
+  `Section` · `Row` · `RowList` 를 JSX 로 쓰는 파일이 없다는 것을 `src`/`app` 전체
+  `readdirSync` 워크로 확인했는데, 이 이슈가 네 export 를 `surface.tsx` 에서 실제로
+  지우면서 **같은 계약을 `tsc` 가 먼저 잡는다** — 없는 이름을 import 하면 타입 에러다.
+  워크 비용만 남아서 걷었다.
+*/
 
 describe('/ai-plans/jobs/[jobId] — 페이지는 바닥만 깐다 (#473)', () => {
   it('Canvas 를 쓰고 카드·폭을 뷰에 맡긴다', () => {

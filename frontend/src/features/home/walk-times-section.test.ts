@@ -370,6 +370,23 @@ describe('WalkTimesSection — 상태', () => {
     expect(markup).not.toContain('18:00')
   })
 
+  /*
+    **스켈레톤이 카드 안에서 자기 배경을 갖지 않는다** (`DESIGN.md §0`, #475). 지운 2a
+    `Band` 의 출력(`bg-band h-2 w-full`)이 이 스켈레톤 끝에 하나 남아 있었다 — 카드 안
+    마지막 자식이라 각진 불투명 면이 radius 12 모서리를 덮는다. 일정 상세·목록·응급·장소
+    상세가 이미 같은 단언으로 막아 뒀고, 홈에서 마지막 한 자리가 이 파일이었다.
+
+    **인셋도 실제 섹션과 같아야 한다.** `rail`(16/40)이었어서 로딩이 끝나는 순간 글줄이
+    20px 뛰었다 — 실제 섹션은 `px-4 md:px-5` 다.
+  */
+  it('로딩 스켈레톤이 8px 밴드를 그리지 않고 인셋이 실제 섹션과 같다', () => {
+    const markup = render(null, true)
+
+    expect(markup).not.toContain('bg-band h-2')
+    expect(markup).toContain('px-4 md:px-5')
+    expect(markup).not.toContain('md:px-10')
+  })
+
   it('특보 배지를 함께 그린다', () => {
     expect(render(SUPPRESSED_DAY)).toContain('경보')
     expect(render(GOOD_DAY)).not.toContain('경보')

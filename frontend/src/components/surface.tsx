@@ -3,138 +3,38 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils/cn'
 
 /**
- * 표면 프리미티브 — **두 체계가 한동안 공존한다** (이슈 #422 · #428 · #435).
+ * 표면 프리미티브 — **3a 하나뿐이다** (이슈 #422 · #428 · #435 · #475).
  *
- * | 체계 | 프리미티브 | 상태 |
- * |------|-----------|------|
- * | 3a (DESIGN.md §0 **정본**) | `Canvas` · `SurfaceStack` · `Surface` | 홈이 쓴다. **새 화면은 이것만 쓴다** |
- * | 2a (구 §0) | `Band` · `Section` · `Row` · `RowList` | 잔존. 홈 외 화면이 아직 쓴다. **새로 쓰지 않는다** |
+ * `Canvas`(L0 바닥) · `SurfaceStack`(카드 열) · `Surface`(L1 섹션) ·
+ * `SurfaceList`(L2 카드 안 목록). `DESIGN.md §0` 이 정본이다.
  *
- * **2a 를 지우지 않는 것이 이 계획의 핵심이었다.** 홈 한 화면(#428)만 3a 로 옮겨
- * 검증하고, 통과해야 DESIGN.md §0 을 개정한다 — 실패하면 3a 쪽만 지우면 되고 화면은
- * 하나도 건드리지 않은 상태였다. **게이트는 통과했고 §0 은 3a 로 개정됐다**(#435).
+ * **두 체계가 한동안 공존했다.** 홈 한 화면(#428)만 3a 로 옮겨 검증하고 통과해야 §0 을
+ * 개정하는 계획이었다 — 실패하면 3a 쪽만 지우면 되고 화면은 하나도 건드리지 않은
+ * 상태였다. 게이트는 통과했고(#435) 로드맵 #455 가 화면 열하나를 옮겼다.
+ * **2a 프리미티브(`Band` · `Section` · `Row` · `RowList`)는 그 전환이 끝난 뒤에 지웠다**
+ * (#475) — 먼저 지웠다면 아직 옮기지 않은 화면이 함께 깨졌다.
  *
- * 남은 화면을 옮길 때 2a 를 3a 로 바꾼다. **2a 프리미티브를 지우는 것은 그 전환이 끝난
- * 뒤다** — 지금 지우면 아직 옮기지 않은 화면이 함께 깨진다.
- *
- * **3a 는 세 개뿐이다.** #422 는 여기에 `SurfaceBody` · `SurfaceList` · `SurfaceRow` ·
- * `SurfaceTile` 넷을 더 두었는데, 홈을 실제로 옮겨 보니 **네 개 다 쓸 자리가 없어**
- * #428 에서 걷었다. 넷 다 "목록 화면에서 이렇게 쓰겠지" 라는 추측으로 만든 API 였고
- * 아무 화면도 그것을 검증하지 않았다 — 예컨대 `SurfaceRow` 의 `border-top + first` 는
- * 호출자가 한 번도 써 보지 않은 규약이다.
- *
- * 목록·폼 화면을 옮길 때 **그 화면이 실제로 요구하는 모양으로** 다시 만든다.
- * 미리 만들어 둔 추측보다 그때의 요구가 낫다.
- *
- * ---
- *
- * **2a(구 §0) — 페이지는 흰색이다.** 회색 배경 위에 둥근 흰 카드를 띄우면 대시보드처럼 읽힌다.
- * 묶음의 경계는 8px `Band` 로만 끊고, 같은 묶음 안은 1px 구분선으로 잇는다. 목록은
- * 카드가 아니라 전폭 행이다. 그래서 2a 의 어떤 요소에도 radius·shadow 가 없다.
- *
- * **왜 2a 로 부족한가.** 묶음을 표시할 장치가 밴드 하나뿐이라 홈이 자라면서 두 가지가
- * 드러났다 — 좌우 2단에서 밴드의 y 좌표가 맞지 않고(어긋남 3건), 섹션이 늘수록
- * "여기서 다른 이야기가 시작된다" 는 신호가 반복되며 닳는다.
+ * **2a(구 §0)가 무엇이었나 — 왜 걷었나.** 페이지가 흰색이고, 묶음의 경계는 8px 밴드
+ * 하나가, 같은 묶음 안은 1px 구분선이 맡았다. 목록은 카드가 아니라 전폭 행이라 어떤
+ * 요소에도 radius·shadow 가 없었다. 홈이 자라면서 **묶음을 표시할 장치가 밴드 하나뿐**
+ * 이라는 것이 한계로 드러났다 — 좌우 2단에서 밴드의 y 좌표가 맞지 않고(어긋남 3건),
+ * 섹션이 늘수록 "여기서 다른 이야기가 시작된다" 는 신호가 반복되며 닳는다.
+ * **이 역사를 지우지 않는 이유는 같은 안이 다시 제안되기 때문이다** — 아이템마다 테두리를
+ * 두르는 안을 기각한 근거까지 포함해 `DESIGN.md §0-1` 이 정본이다.
  *
  * **3a 는 면을 층으로 쌓는다.** 바닥(L0) → 섹션(L1) → 아이템(L2). 2a 의 문제의식은
  * 두 가지로 계속 지킨다 — **L1 에 그림자를 주지 않고**(눕는 것이지 뜨는 것이 아니다),
  * **L0 대비를 미묘하게 둔다**(#FFFFFF ↔ #F5F6F8). 대시보드로 읽히는 것은 그림자와
  * 강한 대비가 만든다.
+ *
+ * **미리 만들지 않는다.** #422 는 여기에 `SurfaceBody` · `SurfaceList` · `SurfaceRow` ·
+ * `SurfaceTile` 넷을 더 두었는데, 홈을 실제로 옮겨 보니 **네 개 다 쓸 자리가 없어**
+ * #428 에서 걷었다. 넷 다 "목록 화면에서 이렇게 쓰겠지" 라는 추측으로 만든 API 였고
+ * 아무 화면도 그것을 검증하지 않았다 — 예컨대 `SurfaceRow` 의 `border-top + first` 는
+ * 호출자가 한 번도 써 보지 않은 규약이다. 지금의 `SurfaceList` 는 장소 목록(#439)이
+ * 실제로 요구해서 다시 만든 다른 것이다. **그 화면이 실제로 요구하는 모양**이 미리
+ * 만들어 둔 추측보다 낫다.
  */
-
-/**
- * 8px 밴드 (2a 잔존). **새로 쓰지 않는다** — 3a 는 카드 경계가 이 일을 한다.
- *
- * **성격이 바뀌는 곳에만** 쓴다.
- *
- * "여기서 다른 이야기가 시작된다" 는 유일한 신호이므로, 같은 묶음 안의 항목을
- * 나눌 때 쓰면 신호가 죽는다. 그때는 `Row` 의 구분선이 맡는다.
- * 자료가 아니라 구분자라 `aria-hidden` 이다.
- */
-export function Band({ className }: { className?: string }) {
-  return <div aria-hidden className={cn('bg-band h-2 w-full', className)} />
-}
-
-/**
- * 전폭 섹션 (2a 잔존). **새 섹션은 `Surface` 를 쓴다.**
- *
- * 라운드·그림자·테두리가 없다.
- *
- * 좌우 여백은 16(모바일) / 40(데스크톱) 이고, 이것이 구분선 인셋과 같은 값이라
- * `Row` 의 선이 제목과 같은 축에서 시작한다.
- */
-export function Section({
-  title,
-  trailing,
-  children,
-  className,
-}: {
-  /** 없으면 제목 줄 자체를 렌더하지 않는다 */
-  title?: ReactNode
-  /** 제목 우측 액션 (예: "전체 보기") */
-  trailing?: ReactNode
-  children: ReactNode
-  className?: string
-}) {
-  return (
-    <section className={cn('bg-bg w-full', className)}>
-      {title !== undefined && (
-        <div className="flex items-center justify-between gap-4 px-4 pt-6 pb-5 md:px-10">
-          <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
-            {title}
-          </h2>
-          {trailing}
-        </div>
-      )}
-      {children}
-    </section>
-  )
-}
-
-/**
- * 전폭 행. 목록의 기본 단위다.
- *
- * 구분선은 `border-top` 이 아니라 **`border-bottom` + 마지막 행 제거**로 넣는다.
- * 좌우 인셋 16 / 40 을 주기 위해 선을 의사요소가 아니라 내부 래퍼에 건다 —
- * `border` 를 행 자체에 걸면 전폭으로 그어져 인셋이 사라진다.
- *
- * `selected` 는 tint 만 바꾼다. **행 높이나 테두리를 바꾸지 않는다** — 목록이 들썩인다.
- */
-export function Row({
-  as: Tag = 'div',
-  selected = false,
-  last = false,
-  children,
-  className,
-}: {
-  as?: 'div' | 'li'
-  selected?: boolean
-  /** 마지막 행이면 구분선을 그리지 않는다 */
-  last?: boolean
-  children: ReactNode
-  className?: string
-}) {
-  return (
-    <Tag className={cn(selected ? 'bg-row-selected' : 'bg-bg', className)}>
-      <div className={cn('px-4 md:px-10', last ? '' : 'border-border border-b')}>{children}</div>
-    </Tag>
-  )
-}
-
-/**
- * 행을 담는 목록. `ul`/`li` 로 내보내 스크린리더가 개수를 읽게 한다.
- *
- * 마지막 행의 구분선은 사용처가 `<Row last>` 로 끈다. CSS 로 자동 처리하려면
- * 임의 variant(`[&>li:last-child>div]:border-b-0`)가 필요한데, 그러면 이 목록
- * 바깥에서 `Row` 를 단독으로 쓸 때 규칙이 안 먹어 두 경로가 갈린다.
- */
-export function RowList({ children, className }: { children: ReactNode; className?: string }) {
-  return <ul className={cn('bg-bg w-full', className)}>{children}</ul>
-}
-
-/* ══════════════════════════════════════════════════════════════════════════
-   3a — 3층 표면. DESIGN.md §0 의 정본이다 (이슈 #422 · #428 · #435).
-   ══════════════════════════════════════════════════════════════════════════ */
 
 /**
  * **L0 — 페이지 바닥.** 흰색이 바닥이 아니라 `Surface` 의 색이 된다.
@@ -178,7 +78,7 @@ export function Canvas({
  * 칠하고, 이 컴포넌트가 열 안에서 간격만 맡는다.
  *
  * 모바일은 좌우 여백이 없다 — `Surface` 가 전폭으로 내려앉기 때문이다. 세로 간격
- * `gap-2`(8)로 바닥이 비치는데, 이 값이 **2a 의 `Band` 와 같다.**
+ * `gap-2`(8)로 바닥이 비치는데, 이 값이 **2a 의 8px 밴드와 같다** (#475 에서 삭제).
  */
 export function SurfaceStack({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn('flex flex-col gap-2 md:gap-6 md:p-6', className)}>{children}</div>
@@ -283,8 +183,9 @@ export function Surface({
 /**
  * **L2 — 카드 안 목록.** 구분선을 **항목 사이에만** 긋는다.
  *
- * **규약이 항목이 아니라 이 컨테이너에 있다.** 2a 의 `Row` 는 `border-bottom` 을 행에 걸고
- * 마지막 행이 `last` 로 껐다 — 그래서 **행 수를 아는 호출자만 목록을 그릴 수 있었고**,
+ * **규약이 항목이 아니라 이 컨테이너에 있다.** 2a 의 전폭 행(#475 에서 삭제)은
+ * `border-bottom` 을 행에 걸고 마지막 행이 `last` 로 껐다 — 그래서 **행 수를 아는
+ * 호출자만 목록을 그릴 수 있었고**,
  * 홈에서 규약이 실제로 세 갈래로 갈렸다: 첫 행만 선을 빼는 곳(`place-insight-row`),
  * 모든 행에 거는 곳(`indoor-alternatives-section` · 적합도 스켈레톤), 그리고 카드 안에서
  * 페이지 인셋 40 을 쓰던 곳(`upcoming-plan-row`).
