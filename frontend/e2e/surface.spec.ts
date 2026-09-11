@@ -144,3 +144,128 @@ test.describe('L0 위 블록의 세로 기준선 — /mypage', () => {
     })
   }
 })
+
+/**
+ * **예외 화면도 3층 표면 위에 선다** (#475 — 로드맵 #455 의 12번).
+ *
+ * #467 이 이 스펙을 미뤄 둔 이유가 *"이 파일들이 아직 2a 라 12번에서 옮긴 뒤에 쓰는 것이
+ * 맞다"* 였고, 이 이슈가 그 전제를 해소했다.
+ *
+ * **`not-found` 만 넣는다.** 없는 id 로 라우팅하면 실제로 띄울 수 있다 — `page.tsx` 가
+ * 404 를 받아 `notFound()` 를 던진다. **`error.tsx` 는 넣지 않았다**: 띄우려면 렌더
+ * 중에 실제로 예외가 나야 하는데, 목 저장소는 형식이 맞는 응답만 돌려주고 실패를 주입할
+ * 경로가 없다. 억지로 만들면(빌드 타임 플래그·주입 라우트) 프로덕션에 없는 경로가 생겨
+ * **검증 대상이 아닌 것을 검증하게 된다.** 같은 계약은 `route-state-surface.test.ts` 가
+ * 소스 문자열로 잠근다 — 두 파일은 표면 코드가 한 글자도 다르지 않다.
+ *
+ * **로그인 상태 둘을 함께 고른다** — `/places` 는 공개, `/plans` 는 보호 경로다.
+ */
+/**
+ * **제목을 `level: 2` 로 집는다.** `h1` 은 `sr-only` 이고 상태 컴포넌트의 `h2` 와 같은
+ * 말을 쓴다 — 보이는 제목을 `h2` 가 이미 그리기 때문이다 (#453 · #473 이 받아들인 거래).
+ * 레벨을 안 주면 strict mode 가 둘을 다 잡아 실패한다.
+ */
+const NOT_FOUND_SCREENS = [
+  { path: '/places/99999999', title: '장소를 찾을 수 없어요' },
+  { path: '/plans/99999999', title: '찾을 수 없는 일정이에요' },
+] as const
+
+test.describe('3층 표면 — not-found', () => {
+  for (const { path, title } of NOT_FOUND_SCREENS) {
+    test.describe(path, () => {
+      test('바닥은 --bg-sunken 이고 전폭이다', async ({ page }) => {
+        await page.goto(path)
+        await expect(page.getByRole('heading', { name: title, level: 2 })).toBeVisible()
+
+        const main = page.getByRole('main')
+
+        const [bg, sunken] = await Promise.all([
+          main.evaluate((el) => getComputedStyle(el).backgroundColor),
+          token(page, '--bg-sunken'),
+        ])
+
+        const sunkenRgb = await page.evaluate((value) => {
+          const probe = document.createElement('div')
+          probe.style.backgroundColor = value
+          document.body.append(probe)
+          const computed = getComputedStyle(probe).backgroundColor
+          probe.remove()
+          return computed
+        }, sunken)
+
+        expect(bg).toBe(sunkenRgb)
+      })
+
+      /*
+        **이 둘은 카드가 아니다** — 카드 판정은 그 세그먼트의 정상 화면을 따르는데
+        (`route-state-surface.test.ts` 머리주석), `PlaceDetailSection` ·
+        `PlanDetailView` 는 404 · 400 · 5xx 를 **카드 없이 L0 위에 바로** 그린다.
+        여기서 `/places` · `/plans` 를 고른 것이 바로 그 갈래라 `section` 이 0개다.
+        카드를 그리는 여덟(반려견·저장한 곳·마이페이지·장소 목록·AI 둘)은 소스 단언
+        쪽에서 본다 — 그쪽은 예외를 실제로 띄울 경로가 없다.
+      */
+      test('카드를 그리지 않는다 — 상태가 L0 바닥 위에 직접 선다', async ({ page }) => {
+        await page.goto(path)
+        await expect(page.getByRole('heading', { name: title, level: 2 })).toBeVisible()
+
+        await expect(page.getByRole('main').locator('section')).toHaveCount(0)
+      })
+
+      /*
+        **404 에 재시도 버튼을 달지 않는다** (`frontend/CLAUDE.md` 절대 규칙). 소스
+        단언은 `ErrorState` 를 쓰지 않는다는 것까지만 보고, 실제로 버튼이 한 개도 그려지지
+        않는지는 여기서 본다.
+      */
+      test('재시도 버튼이 없다 — 404 는 데이터 부재다', async ({ page }) => {
+        await page.goto(path)
+        await expect(page.getByRole('heading', { name: title, level: 2 })).toBeVisible()
+
+        await expect(page.getByRole('button', { name: '다시 시도' })).toHaveCount(0)
+      })
+
+      test('h1 이 하나이고 제목 레벨이 한 단씩만 내려간다', async ({ page }) => {
+        await page.goto(path)
+        await expect(page.getByRole('heading', { name: title, level: 2 })).toBeVisible()
+
+        const outline = await headingOutline(page)
+
+        expect(outline.filter((entry) => entry.startsWith('H1:'))).toHaveLength(1)
+
+        let previous = Number(outline[0]?.[1] ?? 1)
+        for (const entry of outline) {
+          const level = Number(entry[1])
+          expect(level).toBeLessThanOrEqual(previous + 1)
+          previous = level
+        }
+      })
+
+      for (const [name, size] of Object.entries(VIEWPORTS)) {
+        /*
+          **글줄이 카드 안 글줄과 같은 축에 선다** — `SurfaceStack` 왼쪽에서 16(모바일) /
+          20(md 이상, 스택의 `md:p-6` 24 를 뺀 값)이다. 인셋을 `card` 가 아니라 `main`
+          으로 주면 md 이상에서 40 이 되어 20px 벌어진다 — 그것을 잡는 것이 목적이다.
+        */
+        test(`${name} 에서 인셋이 카드 축(16/20)이다`, async ({ page }) => {
+          await page.setViewportSize(size)
+          await page.goto(path)
+
+          const heading = page.getByRole('heading', { name: title, level: 2 })
+          await expect(heading).toBeVisible()
+
+          const stack = page.getByRole('main').locator('> div').first()
+          const drift = (await leftEdge(heading)) - (await leftEdge(stack))
+
+          expect(drift).toBe(size.width < 768 ? 16 : 44)
+        })
+
+        test(`${name} 에서 가로로 넘치지 않는다`, async ({ page }) => {
+          await page.setViewportSize(size)
+          await page.goto(path)
+          await expect(page.getByRole('heading', { name: title, level: 2 })).toBeVisible()
+
+          expect(await hasHorizontalOverflow(page)).toBe(false)
+        })
+      }
+    })
+  }
+})

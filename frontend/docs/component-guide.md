@@ -37,8 +37,9 @@
 > 측정값은 경고가 아니므로 등급은 `MetricBadge` 로 가고, 파란 정보 톤은 팔레트에 없다.
 > **`Badge` 의 `brand` 톤을 등급 표시로 전용하지 않는다.**
 >
-> **`Card` 는 폐기했다** — `Band` / `Section` / `Row` / `RowList` 를 쓴다
-> (`src/components/surface.tsx`, DESIGN.md §0).
+> **`Card` 는 폐기했다** — 표면은 `Canvas` / `SurfaceStack` / `Surface` / `SurfaceList`
+> 넷이다 (`src/components/surface.tsx`, DESIGN.md §0). 그 사이에 있던 2a 프리미티브
+> (`Band` / `Section` / `Row` / `RowList`)도 #475 에서 지웠다.
 
 > **`Button` 의 `dangerOutline` 은 저강조 파괴 액션이다** (DESIGN.md §2-6 표).
 > 화면에 그냥 놓여 있는 삭제 버튼이 이것이고, `danger`(채움)는 **확인 다이얼로그의 확정

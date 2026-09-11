@@ -3,24 +3,15 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import {
-  Band,
-  Canvas,
-  Row,
-  RowList,
-  Section,
-  Surface,
-  SurfaceList,
-  SurfaceStack,
-} from '@/components/surface'
+import { Canvas, Surface, SurfaceList, SurfaceStack } from '@/components/surface'
 
 /**
- * 표면 프리미티브 — 이슈 #422 · #428 · #435.
+ * 표면 프리미티브 — 이슈 #422 · #428 · #435 · #475.
  *
- * **이 파일의 절반은 3a 가 2a 를 건드리지 않는다는 것을 지킨다.** §0 은 3a 로 개정됐지만
- * (#435) 2a 프리미티브는 아직 홈 외 화면이 쓰고 있어, 그 화면들은 옮겨질 때까지 시각적으로
- * 무변화여야 한다. 계약이 깨지는 가장 흔한 경로가 "새 프리미티브를 만들면서 옆에 있는 옛
- * 것을 조금 고치는" 것이다.
+ * **2a 무변화 계약이 사라졌다.** 예전에는 이 파일의 절반이 "3a 를 만들면서 옆에 있는 2a 를
+ * 조금 고치지 않는다" 를 지켰는데, 로드맵 #455 가 화면을 전부 옮기고 #475 가 `Band` ·
+ * `Section` · `Row` · `RowList` 를 지우면서 지킬 대상 자체가 없어졌다. 남은 것은 3a 넷의
+ * 계약이다.
  */
 
 /**
@@ -34,47 +25,6 @@ function classesOf(markup: string): string[] {
     (match[1] ?? '').split(/\s+/).filter((name) => name !== ''),
   )
 }
-
-describe('2a 표면 — 3a 가 추가돼도 그대로다 (이슈 #422 무변화 계약)', () => {
-  it('Section 은 여전히 radius·border 가 없다 — 카드가 되면 전 화면이 함께 바뀐다', () => {
-    const markup = renderToStaticMarkup(
-      createElement(Section, {
-        title: '오늘 갈 만한 곳',
-        children: createElement('p', null, '본문'),
-      }),
-    )
-
-    const classes = classesOf(markup)
-    expect(classes.filter((name) => name.startsWith('rounded'))).toEqual([])
-    expect(classes.filter((name) => name.startsWith('border'))).toEqual([])
-    expect(markup).toContain('오늘 갈 만한 곳')
-  })
-
-  it('Section 의 좌우 인셋은 16/40 그대로다 — Row 의 구분선과 같은 축이어야 한다', () => {
-    const markup = renderToStaticMarkup(
-      createElement(Section, { title: '제목', children: createElement('p', null, '본문') }),
-    )
-
-    expect(markup).toContain('px-4')
-    expect(markup).toContain('md:px-10')
-  })
-
-  it('Row 는 구분선을 여전히 border-bottom 으로 긋는다', () => {
-    const markup = renderToStaticMarkup(createElement(Row, null, '행'))
-
-    const classes = classesOf(markup)
-    expect(classes).toContain('border-b')
-    expect(classes).not.toContain('border-t')
-  })
-
-  it('Band 는 8px 회색 띠 그대로다', () => {
-    expect(renderToStaticMarkup(createElement(Band))).toContain('bg-band h-2 w-full')
-  })
-
-  it('RowList 는 흰 배경을 스스로 칠한다 — 전폭 행이라 감싸는 카드가 없다', () => {
-    expect(renderToStaticMarkup(createElement(RowList, null, '목록'))).toContain('bg-bg')
-  })
-})
 
 describe('L0 Canvas — 페이지 바닥', () => {
   it('--bg-sunken 을 바닥으로 깐다 — 흰색은 바닥이 아니라 Surface 의 색이다', () => {
