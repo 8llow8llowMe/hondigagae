@@ -16,6 +16,10 @@ import { cn } from '@/lib/utils/cn'
  * **접혔을 때만 요약을 보인다.** 펼치면 아래에 실제 컨트롤이 있으므로 같은 말을 두 번
  * 하지 않는다.
  *
+ * **자기 면·테두리를 갖지 않는 카드 안 L2 다** (`DESIGN.md §0`, #473). 접기 블록은
+ * "조건을 더 준다" 는 폼과 같은 화자라 카드 판정 3문을 통과하지 못한다 — 자기 카드로
+ * 떼면 같은 이야기가 두 면으로 갈린다. 흰 면 위 간격만으로 구분한다.
+ *
  * 표시 전용이라 node 환경에서 렌더 테스트가 된다 (`testing-guide.md` §1).
  */
 export function AiPlanDetailsDisclosure({
@@ -35,24 +39,28 @@ export function AiPlanDetailsDisclosure({
   return (
     <div className="flex flex-col gap-5">
       {/*
-        **`<h2>` 가 단추를 감싼다 — 대체하는 게 아니다.** 폼에서 `필수 항목` `<h3>` 를
-        지운 뒤 페이지 `<h1>` 다음 제목이 `AiPlanOptionsSection` 의 `<h3>` 라 h1 → h3 으로
-        건너뛰었다. 접기 머리글이 곧 이 구역의 제목이므로 여기를 h2 로 세우면 접힌
-        상태에서도 펼친 상태에서도 h1 → h2 → h3 이 이어진다.
+        **`<h3>` 가 단추를 감싼다 — 대체하는 게 아니다.** 접기 머리글이 곧 이 구역의
+        제목이라 제목 요소가 필요하다.
 
-        단추를 `<h2>` 로 바꾸지는 않는다 — 누를 수 있어야 하고 `aria-expanded` 를 받는
+        **`h2` 에서 내렸다** (#473). 3층 표면으로 옮기면서 폼 전체가 `Surface` 카드 안에
+        들어갔고 그 카드가 `AI 일정 만들기` `<h2>` 를 그린다 — 여기가 `h2` 로 남으면 카드
+        제목의 **형제**가 되어, 카드 안의 한 구역일 뿐인 접기가 카드와 같은 무게로 읽힌다
+        (#464 가 `PetForm` 의 섹션 제목을 `h3` 로 내린 것과 같은 이유). 지금 순서는
+        h1(`sr-only`) → h2(카드) → h3(접기) → h4(`AiPlanOptionsSection`)로 건너뜀이 없다.
+
+        단추를 제목 요소로 바꾸지는 않는다 — 누를 수 있어야 하고 `aria-expanded` 를 받는
         role 은 `button` 이다. **크기는 그대로다**: Tailwind preflight 가 h1~h6 의
         `margin` 을 0 으로, `font-size`/`font-weight` 를 `inherit` 로 되돌려 두므로
         상쇄용 클래스가 필요 없다. 글자 굵기·크기는 아래 `<span>` 이 계속 소유한다.
 
-        **폭은 `<h2>` 가 `flex flex-col` 로 지킨다.** `<button>` 은 `width:auto` 가
+        **폭은 제목 요소가 `flex flex-col` 로 지킨다.** `<button>` 은 `width:auto` 가
         내용에 맞춰 줄어드는 요소라 그냥 감싸면 단추가 글자 폭으로 쪼그라들고, 그러면
         요약의 `ms-auto`(오른쪽 붙이기)와 `truncate` 가 동시에 죽는다. 감싸기 전에는
         바깥 `flex flex-col` 의 flex item 이라 `stretch` 로 늘어나 있었으므로, 같은
-        문맥을 `<h2>` 에 그대로 옮겨 준다 — `w-full`(=100%)로는 안 된다. 그러면
+        문맥을 `<h3>` 에 그대로 옮겨 준다 — `w-full`(=100%)로는 안 된다. 그러면
         `-mx-2` 가 폭에서 빠져 눌린 자리가 오른쪽으로 8px 좁아진다.
       */}
-      <h2 className="flex flex-col">
+      <h3 className="flex flex-col">
         <button
           type="button"
           onClick={onToggle}
@@ -84,7 +92,7 @@ export function AiPlanDetailsDisclosure({
           */}
           {!open && <span className="text-body-2 text-fg-muted ms-auto truncate">{summary}</span>}
         </button>
-      </h2>
+      </h3>
 
       {open && (
         <div id={panelId} className="flex flex-col gap-5">

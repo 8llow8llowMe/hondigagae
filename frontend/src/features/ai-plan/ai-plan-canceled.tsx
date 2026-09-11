@@ -1,5 +1,7 @@
 import { Button, ButtonLink } from '@/components/button'
 import { messages } from '@/lib/messages'
+import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 
 export type AiPlanCanceledProps = {
   /** 입력 조건 요약. 조건을 잃었으면 null */
@@ -9,6 +11,15 @@ export type AiPlanCanceledProps = {
   retrying: boolean
   /** 조건을 되살려 폼으로 */
   changeHref: string
+  /**
+   * 좌우 여백 축 (`AiPlanProgress` · `AiPlanFailed` 와 같은 계약, #473).
+   *
+   * **기본값은 `main`(16/40)이다** — 형제 둘과 같은 값으로 맞춘다. 지금 호출처는
+   * `/ai-plans/jobs/[jobId]` 하나뿐이고 거기서 `card`(16/20)를 넘긴다 — 이 표시가 L1 카드
+   * 안에 들어가고, 카드가 이미 한 번 들어와 있어 안쪽까지 40 을 주면 내용이 두 번 밀린다
+   * (`DESIGN.md §0`).
+   */
+  inset?: Inset
 }
 
 /**
@@ -29,9 +40,10 @@ export function AiPlanCanceled({
   onRetry,
   retrying,
   changeHref,
+  inset = 'main',
 }: AiPlanCanceledProps) {
   return (
-    <div className="flex flex-col items-start gap-3 px-4 py-12 md:px-10">
+    <div className={cn('flex flex-col items-start gap-3 py-12', INSET_CLASS[inset])}>
       <h2 className="text-title-2 text-fg font-semibold">{messages.aiPlan.canceledTitle}</h2>
       <p className="text-body-2 text-fg-muted">{messages.aiPlan.canceledDescription}</p>
 

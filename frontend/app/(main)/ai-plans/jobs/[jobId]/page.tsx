@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 
+import { Canvas } from '@/components/surface'
 import { AiPlanJobView } from '@/features/ai-plan/ai-plan-job-view'
 import { messages } from '@/lib/messages'
 
@@ -16,13 +17,17 @@ export const metadata: Metadata = {
  * (§7 soft 404 규칙과 같은 이유).
  *
  * **`jobId` 가 URL 에 있다.** 새로고침·뒤로가기에서 대기 화면이 살아남는다 (명세 S4).
+ *
+ * **3층 표면이다** (`DESIGN.md §0`, #473). 하루 재생성(#451)과 같은 모양을 따른다 —
+ * 페이지는 `main` 에 L0 바닥만 깔고, 머리와 카드를 쌓는 일은 뷰의 `SurfaceStack` 이 맡는다.
+ * 상태 여섯 중 어느 갈래가 카드를 스스로 그리는지는 상태를 아는 뷰만 알기 때문이다.
  */
 export default async function AiPlanJobPage({ params }: { params: Promise<{ jobId: string }> }) {
   const { jobId } = await params
 
   return (
-    <div className="mx-auto w-full max-w-screen-md">
+    <Canvas as="main" id="main-content">
       <AiPlanJobView jobId={jobId} />
-    </div>
+    </Canvas>
   )
 }

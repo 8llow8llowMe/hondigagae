@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -9,6 +9,7 @@ import { ButtonLink } from '@/components/button'
 import { ConfirmModal } from '@/components/confirm-modal'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
+import { Surface, SurfaceStack } from '@/components/surface'
 import { AiPlanCanceled } from '@/features/ai-plan/ai-plan-canceled'
 import { AiPlanCommitPanel } from '@/features/ai-plan/ai-plan-commit-panel'
 import { AiPlanDraftPreview } from '@/features/ai-plan/ai-plan-draft-preview'
@@ -34,6 +35,8 @@ import { useForm } from '@/lib/form/use-form'
 import type { LatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
 import { formatPlanDateRange, totalDaysBetween } from '@/lib/plan/date'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { AiPlanDraft, AiPlanRequestSnapshot } from '@/types/ai-plan'
 import type { PlanDetail } from '@/types/plan'
 
@@ -52,6 +55,10 @@ function isDelistedFailure(error: unknown): boolean {
  *  4. `FAILED` (**HTTP 200**) → `AiPlanFailed`
  *  5. `CANCELED` (#250) → `AiPlanCanceled` — **실패와 갈라 놓는다**
  *  6. `COMPLETED` → 미리보기 + 담기
+ *
+ * **여섯 갈래가 전부 `AiPlanJobShell` 을 거친다** (`DESIGN.md §0`, #473) — 머리(`h1`)와
+ * 카드 하나. 완료만 `bare` 로 빠져 자기 카드들을 그린다. 껍데기를 씌우는 자리가 여기인
+ * 이유는 **어느 갈래가 카드를 스스로 그리는지 상태를 아는 쪽만 알기 때문**이다 (#451).
  */
 export function AiPlanJobView({ jobId }: { jobId: string }) {
   const { query, phase, polling, recheck, cancel, canceling, cancelFailed } = useAiPlanJob(jobId)
@@ -95,20 +102,29 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
     */
     if (status === 404) {
       return (
-        <EmptyState
-          title={messages.aiPlan.jobNotFoundTitle}
-          description={messages.aiPlan.jobNotFoundDescription}
-          action={<ButtonLink href="/ai-plans/new">{messages.aiPlan.jobNotFoundAction}</ButtonLink>}
-        />
+        <AiPlanJobShell>
+          {/* 카드 안이라 인셋이 `card`(16/20)다 — 페이지 값 40 을 쓰면 내용이 두 번 밀린다 */}
+          <EmptyState
+            inset="card"
+            title={messages.aiPlan.jobNotFoundTitle}
+            description={messages.aiPlan.jobNotFoundDescription}
+            action={
+              <ButtonLink href="/ai-plans/new">{messages.aiPlan.jobNotFoundAction}</ButtonLink>
+            }
+          />
+        </AiPlanJobShell>
       )
     }
 
     return (
-      <ErrorState
-        title={messages.aiPlan.jobErrorTitle}
-        description={messages.aiPlan.jobErrorDescription}
-        onRetry={() => void query.refetch()}
-      />
+      <AiPlanJobShell>
+        <ErrorState
+          inset="card"
+          title={messages.aiPlan.jobErrorTitle}
+          description={messages.aiPlan.jobErrorDescription}
+          onRetry={() => void query.refetch()}
+        />
+      </AiPlanJobShell>
     )
   }
 
@@ -116,13 +132,15 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
 
   if (isJobFailed(job)) {
     return (
-      <AiPlanFailedContainer
-        jobId={jobId}
-        snapshot={snapshot}
-        conditionSummary={conditionSummary}
-        errorMessage={job?.errorMessage ?? null}
-        errorCode={job?.errorCode ?? null}
-      />
+      <AiPlanJobShell>
+        <AiPlanFailedContainer
+          jobId={jobId}
+          snapshot={snapshot}
+          conditionSummary={conditionSummary}
+          errorMessage={job?.errorMessage ?? null}
+          errorCode={job?.errorCode ?? null}
+        />
+      </AiPlanJobShell>
     )
   }
 
@@ -135,11 +153,13 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
   */
   if (isJobCanceled(job)) {
     return (
-      <AiPlanCanceledContainer
-        jobId={jobId}
-        snapshot={snapshot}
-        conditionSummary={conditionSummary}
-      />
+      <AiPlanJobShell>
+        <AiPlanCanceledContainer
+          jobId={jobId}
+          snapshot={snapshot}
+          conditionSummary={conditionSummary}
+        />
+      </AiPlanJobShell>
     )
   }
 
@@ -147,21 +167,24 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
 
   if (job === null || polling) {
     return (
-      <AiPlanProgress
-        status={job?.status ?? null}
-        step={job?.step ?? null}
-        stepProgress={jobStepProgress(job)}
-        phase={phase}
-        onRecheck={recheck}
-        rechecking={query.isFetching}
-        /*
-          **첫 응답 전에는 그만둘 수 없다.** 아직 서버가 이 `jobId` 를 아는지조차 확인되지
-          않았고, 취소는 404 로 떨어질 뿐이다 — 누를 수 없는 버튼을 그리는 대신 뺀다.
-        */
-        onCancel={job === null ? null : cancel}
-        canceling={canceling}
-        cancelFailed={cancelFailed}
-      />
+      <AiPlanJobShell>
+        <AiPlanProgress
+          inset="card"
+          status={job?.status ?? null}
+          step={job?.step ?? null}
+          stepProgress={jobStepProgress(job)}
+          phase={phase}
+          onRecheck={recheck}
+          rechecking={query.isFetching}
+          /*
+            **첫 응답 전에는 그만둘 수 없다.** 아직 서버가 이 `jobId` 를 아는지조차 확인되지
+            않았고, 취소는 404 로 떨어질 뿐이다 — 누를 수 없는 버튼을 그리는 대신 뺀다.
+          */
+          onCancel={job === null ? null : cancel}
+          canceling={canceling}
+          cancelFailed={cancelFailed}
+        />
+      </AiPlanJobShell>
     )
   }
 
@@ -170,11 +193,14 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
   if (draft === null) {
     // `COMPLETED` 인데 초안이 없다 — 계약상 오지 않아야 하지만 화면이 비어 죽지 않게 한다
     return (
-      <EmptyState
-        title={messages.aiPlan.emptyDraftTitle}
-        description={messages.aiPlan.emptyDraftDescription}
-        action={<ButtonLink href="/ai-plans/new">{messages.aiPlan.jobNotFoundAction}</ButtonLink>}
-      />
+      <AiPlanJobShell>
+        <EmptyState
+          inset="card"
+          title={messages.aiPlan.emptyDraftTitle}
+          description={messages.aiPlan.emptyDraftDescription}
+          action={<ButtonLink href="/ai-plans/new">{messages.aiPlan.jobNotFoundAction}</ButtonLink>}
+        />
+      </AiPlanJobShell>
     )
   }
 
@@ -184,43 +210,101 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
       말한다 — 다른 기기에서 같은 URL 을 열면 실제로 이 상태가 된다.
     */
     return (
-      <AiPlanDraftPreview
-        draft={draft}
-        title={messages.aiPlan.previewTitle}
-        startDate=""
-        endDate=""
-        budget={null}
-        totalDays={null}
-        metaLines={metaLines}
-        coords={coords}
-        delistedPlaceIds={delistedPlaceIds}
-        excludedPlaceIds={EMPTY_SET}
-        footer={
-          <EmptyState
-            title={messages.aiPlan.conditionLostTitle}
-            description={messages.aiPlan.conditionLostDescription}
-            action={
-              <ButtonLink href="/ai-plans/new">{messages.aiPlan.conditionLostAction}</ButtonLink>
-            }
-          />
-        }
-      />
+      <AiPlanJobShell bare>
+        <AiPlanDraftPreview
+          draft={draft}
+          title={messages.aiPlan.previewTitle}
+          startDate=""
+          endDate=""
+          budget={null}
+          totalDays={null}
+          metaLines={metaLines}
+          coords={coords}
+          delistedPlaceIds={delistedPlaceIds}
+          excludedPlaceIds={EMPTY_SET}
+        />
+
+        {/*
+          **담기 패널이 서던 자리다.** 카드 밖 L0 이고 인셋만 카드 안 글줄과 같은 축이라
+          위 카드의 첫 글자와 세로선이 맞는다 (`PlanDayRegenerateConfirm` 과 같은 처리).
+          카드로 만들지 않는다 — 이 자리는 액션 슬롯이고, 여기 오는 것은 "왜 담을 수
+          없는가" 한 줄이라 §0 판정 3문의 ③(담는 항목이 둘 이상)을 통과하지 못한다.
+        */}
+        <EmptyState
+          inset="card"
+          title={messages.aiPlan.conditionLostTitle}
+          description={messages.aiPlan.conditionLostDescription}
+          action={
+            <ButtonLink href="/ai-plans/new">{messages.aiPlan.conditionLostAction}</ButtonLink>
+          }
+        />
+      </AiPlanJobShell>
     )
   }
 
   return (
-    <AiPlanCommitContainer
-      jobId={jobId}
-      draft={draft}
-      snapshot={snapshot}
-      metaLines={metaLines}
-      coords={coords}
-      delistedPlaceIds={delistedPlaceIds}
-    />
+    <AiPlanJobShell bare>
+      <AiPlanCommitContainer
+        jobId={jobId}
+        draft={draft}
+        snapshot={snapshot}
+        metaLines={metaLines}
+        coords={coords}
+        delistedPlaceIds={delistedPlaceIds}
+      />
+    </AiPlanJobShell>
   )
 }
 
 const EMPTY_SET: ReadonlySet<string> = new Set()
+
+/**
+ * 모든 상태가 공유하는 껍데기 — `h1` + L1 카드 하나 (`DESIGN.md §0`, #473).
+ *
+ * **여섯 상태 전부에 `h1` 이 있어야 한다.** 없으면 문서의 최상위 제목이 진행 표시의 `h2`
+ * 가 되어 스크린리더 사용자가 무슨 화면인지 알 수 없다 (하루 재생성 #451 과 같은 판단 —
+ * 이 화면은 옮기기 전까지 `h1` 이 아예 없었다).
+ *
+ * **머리는 카드가 아니다** — 페이지 머리(h1)는 §0 의 카드 판정에서 빠진다 (장소 상세
+ * #443 · 일정 상세 #447 · 하루 재생성 #451 과 같은 결정). 인셋만 카드 안 글줄과 같은
+ * 축으로 둬서 아래 카드의 첫 글자와 세로선이 맞는다.
+ *
+ * **본문은 카드 하나다.** 404 · 조회 오류 · 대기 · 작업 실패 · 취소 · 빈 초안이 전부 같은
+ * 화자("이 작업이 어떻게 되고 있는가")가 이어 말하는 것이라 한 카드에 든다 (§0 "카드
+ * 경계는 이야기 단위"). 상태마다 카드를 따로 그리면 하나를 빠뜨렸을 때 카드가 생겼다
+ * 사라진다 (#440 판단). 머리가 이름을 이미 그리므로 카드는 `aria-label` 만 갖는다.
+ *
+ * **폭은 옮기기 전 값(768) 그대로다.** `/ai-plans/new` 는 폼 규약(#453)을 따라 672 지만,
+ * 이 화면은 완료 상태에서 일자 카드가 여럿 서는 목록형이라 좁히면 한 행에 드는 글자가
+ * 준다 — 폭을 바꾸는 것은 이 이슈가 요구한 변경이 아니다.
+ */
+function AiPlanJobShell({
+  /**
+   * `children` 이 **이미 자기 카드를 그린다** — 껍데기가 다시 감싸지 않는다.
+   *
+   * 완료 상태 하나뿐이다: 초안 개요와 일자마다가 각자 L1 카드이고 담기 패널은 액션이라
+   * 카드가 아니다. 카드 안에 카드를 넣으면 §0 의 "층마다 다른 채널" 이 깨진다.
+   */
+  bare = false,
+  children,
+}: {
+  bare?: boolean
+  children: ReactNode
+}) {
+  return (
+    <SurfaceStack className="mx-auto w-full max-w-screen-md">
+      {/* 데스크톱 세로 여백은 `SurfaceStack` 의 `md:p-6` 이 준다 (#451 머리와 같은 값) */}
+      <header className={cn('pt-4 pb-4 md:pt-0 md:pb-0', INSET_CLASS.card)}>
+        {/* 화면 제목과 탭 제목이 같은 키를 쓴다 (R7) */}
+        <h1 className="text-title-1 text-fg lg:text-display font-bold lg:font-extrabold">
+          {messages.aiPlan.jobTitle}
+        </h1>
+      </header>
+
+      {bare ? children : <Surface aria-label={messages.aiPlan.jobTitle}>{children}</Surface>}
+    </SurfaceStack>
+  )
+}
 
 /**
  * 좁힌 지역이 원인일 수 있다는 단서 (#251). 붙일 이유가 없으면 null 이다.
@@ -260,6 +344,8 @@ function AiPlanFailedContainer({
 
   return (
     <AiPlanFailed
+      // 카드 안이다 — 껍데기가 이미 `Surface` 를 그렸다 (§0)
+      inset="card"
       errorMessage={errorMessage}
       hint={narrowedRegionHint(errorCode, snapshot)}
       conditionSummary={conditionSummary}
@@ -289,6 +375,8 @@ function AiPlanCanceledContainer({
 
   return (
     <AiPlanCanceled
+      // 카드 안이다 — 껍데기가 이미 `Surface` 를 그렸다 (§0)
+      inset="card"
       conditionSummary={conditionSummary}
       onRetry={resubmit}
       retrying={retrying}
@@ -378,59 +466,69 @@ function AiPlanCommitContainer({
     },
   })
 
-  return (
-    <AiPlanDraftPreview
-      draft={draft}
-      title={form.values.title}
-      startDate={snapshot.startDate}
-      endDate={snapshot.endDate}
-      budget={snapshot.budget}
-      totalDays={totalDays}
-      metaLines={metaLines}
-      coords={coords}
-      delistedPlaceIds={delistedPlaceIds}
-      excludedPlaceIds={excludedPlaceIds}
-      footer={
-        <>
-          <AiPlanCommitPanel
-            title={form.values.title}
-            errors={form.errors}
-            submitting={form.isSubmitting}
-            delistedBlocked={delistedBlocked}
-            hasDelisted={delistedPlaceIds.size > 0}
-            excludedCount={excludedPlaceIds.size}
-            onTitleChange={(title) => form.setValue('title', title)}
-            onSubmit={() => void form.submit()}
-            onExcludeDelisted={() => {
-              setExcludedPlaceIds(new Set(delistedPlaceIds))
-              setDelistedBlocked(false)
-              /*
-                **직전 실패의 서버 문구를 함께 지운다.** 안 지우면 사용자가 이미 조치한
-                오류("일정에 포함된 장소를 찾을 수 없습니다")가 "N개 항목을 빼고 담아요"
-                옆에 남아, 방금 고친 것이 아직 문제인 것처럼 보인다 (실렌더에서 잡았다).
-              */
-              form.setErrors(NO_FORM_ERRORS)
-            }}
-            onResetExcluded={() => setExcludedPlaceIds(EMPTY_SET)}
-            onDiscard={() => setDiscarding(true)}
-            againHref={`/ai-plans/new?from=${encodeURIComponent(jobId)}`}
-          />
+  /*
+    **셋을 `SurfaceStack` 의 직접 자식으로 내보낸다** (#473). 예전에는 담기 패널을
+    `AiPlanDraftPreview` 의 `footer` 로 넘겨 미리보기가 남의 것을 자기 아래에 그렸는데,
+    3a 에서는 미리보기가 **카드 여럿**이 되고 담기 패널은 **액션이라 카드가 아니다** —
+    카드 안에 액션을 두면 초안의 마지막 일자 카드에 담기 폼이 딸려 들어간다.
+    **배치 책임을 담는 쪽(여기)이 갖는다**: #464 가 `PetForm` 의 `footer` 를 걷고 삭제
+    영역의 배치를 `PetEditView` 로 옮긴 것과 같은 이동이다.
 
-          <ConfirmModal
-            open={discarding}
-            onClose={() => setDiscarding(false)}
-            onConfirm={() => {
-              clearAiPlanRequest(jobId)
-              router.replace('/ai-plans/new')
-            }}
-            title={messages.aiPlan.discardConfirmTitle}
-            description={messages.aiPlan.discardConfirmDescription}
-            confirmLabel={messages.aiPlan.discardConfirm}
-            destructive
-          />
-        </>
-      }
-    />
+    래퍼(`div`)로 묶지 않는다 — 묶으면 카드 사이 간격을 스택이 주지 못한다 (#451 이
+    비교 두 열을 fragment 로 내보낸 것과 같은 이유).
+  */
+  return (
+    <>
+      <AiPlanDraftPreview
+        draft={draft}
+        title={form.values.title}
+        startDate={snapshot.startDate}
+        endDate={snapshot.endDate}
+        budget={snapshot.budget}
+        totalDays={totalDays}
+        metaLines={metaLines}
+        coords={coords}
+        delistedPlaceIds={delistedPlaceIds}
+        excludedPlaceIds={excludedPlaceIds}
+      />
+
+      <AiPlanCommitPanel
+        title={form.values.title}
+        errors={form.errors}
+        submitting={form.isSubmitting}
+        delistedBlocked={delistedBlocked}
+        hasDelisted={delistedPlaceIds.size > 0}
+        excludedCount={excludedPlaceIds.size}
+        onTitleChange={(title) => form.setValue('title', title)}
+        onSubmit={() => void form.submit()}
+        onExcludeDelisted={() => {
+          setExcludedPlaceIds(new Set(delistedPlaceIds))
+          setDelistedBlocked(false)
+          /*
+            **직전 실패의 서버 문구를 함께 지운다.** 안 지우면 사용자가 이미 조치한
+            오류("일정에 포함된 장소를 찾을 수 없습니다")가 "N개 항목을 빼고 담아요"
+            옆에 남아, 방금 고친 것이 아직 문제인 것처럼 보인다 (실렌더에서 잡았다).
+          */
+          form.setErrors(NO_FORM_ERRORS)
+        }}
+        onResetExcluded={() => setExcludedPlaceIds(EMPTY_SET)}
+        onDiscard={() => setDiscarding(true)}
+        againHref={`/ai-plans/new?from=${encodeURIComponent(jobId)}`}
+      />
+
+      <ConfirmModal
+        open={discarding}
+        onClose={() => setDiscarding(false)}
+        onConfirm={() => {
+          clearAiPlanRequest(jobId)
+          router.replace('/ai-plans/new')
+        }}
+        title={messages.aiPlan.discardConfirmTitle}
+        description={messages.aiPlan.discardConfirmDescription}
+        confirmLabel={messages.aiPlan.discardConfirm}
+        destructive
+      />
+    </>
   )
 }
 

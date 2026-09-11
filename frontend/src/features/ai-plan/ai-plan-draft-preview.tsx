@@ -1,8 +1,7 @@
-import type { ReactNode } from 'react'
-
 import { Badge } from '@/components/badge'
 import { EmptyState } from '@/components/empty-state'
 import { ReasonList } from '@/components/reason-list'
+import { Surface, SurfaceList } from '@/components/surface'
 import { AiPlanDraftItemRow } from '@/features/ai-plan/ai-plan-draft-item-row'
 import { formatBudget } from '@/lib/ai-plan/budget'
 import { draftItemDistances } from '@/lib/ai-plan/draft-distance'
@@ -10,6 +9,8 @@ import { draftItemCount } from '@/lib/ai-plan/draft-to-plan'
 import type { LatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
 import { formatPlanDateRange } from '@/lib/plan/date'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { AiPlanDraft, AiPlanScheduleItem } from '@/types/ai-plan'
 
 export type AiPlanDraftPreviewProps = {
@@ -38,8 +39,6 @@ export type AiPlanDraftPreviewProps = {
   delistedPlaceIds: ReadonlySet<string>
   /** 담기에서 빼기로 표시한 `placeId` */
   excludedPlaceIds: ReadonlySet<string>
-  /** 하단 담기 영역 */
-  footer: ReactNode
 }
 
 /**
@@ -52,6 +51,18 @@ export type AiPlanDraftPreviewProps = {
  *    (계약은 `af86c98` 에서 생겼다. 명세 S2 의 "재생성 API 가 없다" 는 낡았다)
  *  - **`이 날 산책`** — 대상 `placeId` 를 고를 근거가 초안에 없다
  *  - **`말로 고치기`** — 수정 API 가 없다
+ *
+ * **카드 여럿이다** (`DESIGN.md §0`, #473). 개요(제목 · AI 배지 · 요약 · 미저장 문구 ·
+ * 부분 생성 · `reasons`)가 카드 하나, 그 다음은 **일자마다 카드 하나**다 (#447 이
+ * `PlanDaySection` 에 내린 결정과 같다 — 일자는 자기 제목이 있고, 혼자 떼어놔도 말이 되며,
+ * 담는 항목이 여럿이라 판정 3문을 통과한다).
+ *
+ * **`SurfaceStack` 을 여기서 그리지 않는다.** 담는 쪽(`AiPlanJobView` 의 껍데기)이 이미
+ * 스택이라, 여기서 래퍼를 하나 더 두면 카드 사이 간격을 스택이 주지 못하고 담기 패널이
+ * 그 래퍼 밖으로 밀린다. fragment 로 카드들을 그대로 내보낸다.
+ *
+ * **담기 패널을 받지 않는다** — `footer` prop 을 걷었다. 액션은 카드가 아니라 카드 밖
+ * L0 이고, 그 배치는 담는 쪽이 갖는다 (#464 가 `PetForm` 의 `footer` 를 걷은 것과 같다).
  *
  * 표시 전용이라 node 환경에서 렌더 테스트가 된다.
  */
@@ -66,7 +77,6 @@ export function AiPlanDraftPreview({
   coords,
   delistedPlaceIds,
   excludedPlaceIds,
-  footer,
 }: AiPlanDraftPreviewProps) {
   const itemCount = draftItemCount(draft)
   const budgetLabel = formatBudget(budget)
@@ -99,59 +109,86 @@ export function AiPlanDraftPreview({
     item.placeId === null ? null : (coords.get(item.placeId) ?? null)
 
   if (madeDays === 0) {
+    /*
+      **빈 초안도 카드 안이다** (#440 판단). 카드 밖에 두면 이 갈래에서만 화면의 흰 면이
+      통째로 사라진다 — 담기 패널은 여전히 카드 밖 L0 에 서 있으므로 흰 면이 하나도 없는
+      화면이 된다. 머리가 이름을 이미 그리므로 카드는 `aria-label` 만 갖는다.
+    */
     return (
-      <>
+      <Surface aria-label={messages.aiPlan.previewTitle}>
         <EmptyState
+          inset="card"
           title={messages.aiPlan.emptyDraftTitle}
           description={messages.aiPlan.emptyDraftDescription}
         />
-        {footer}
-      </>
+      </Surface>
     )
   }
 
   return (
-    <div className="flex flex-col">
-      <header className="flex flex-col gap-2 px-4 pt-5 pb-4 md:px-10">
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-title-1 text-fg font-bold">{title}</h2>
-          {/* accent 는 "AI 가 만든 것" 표시 전용이다 (DESIGN.md §2-5 · 아트보드 03 주석) */}
-          <Badge tone="accent">{messages.aiPlan.draftBadge}</Badge>
-        </div>
-
-        <p className="text-caption text-fg-muted tabular-nums">{summary}</p>
-
-        {/* 저장 시점을 반복해 말한다 — 아트보드 03 주석 */}
-        <p className="text-caption text-fg-subtle">{messages.aiPlan.previewNotSaved}</p>
-      </header>
-
-      {partial && (
-        <div className="bg-band mx-4 mb-4 rounded-md px-3 py-2 md:mx-10">
-          <p className="text-body-2 text-fg font-medium">
-            {messages.aiPlan.partialDays
-              .replace('{total}', String(totalDays))
-              .replace('{made}', String(madeDays))}
-          </p>
-          <p className="text-caption text-fg-muted mt-1">
-            {messages.aiPlan.partialDaysDescription}
-          </p>
-        </div>
-      )}
-
+    <>
       {/*
-        `reasons` 는 **초안 전체에 대한 XAI 라 일자별이 아니다** → 상단에 한 번 낸다
-        (명세 S6). 서버 순서를 재정렬하지 않고 문장도 그대로 쓴다.
+        **개요 카드.** `Surface` 의 `title` 슬롯을 쓰지 않는다 — 제목 옆에 AI 배지가 붙고
+        390 에서 배지가 다음 줄로 접혀야 해서 그 슬롯(제목 + 우측 액션, 접히지 않음)에
+        맞지 않는다 (#447 `PlanDaySection` 과 같은 이유).
+
+        그래서 `aria-label` 이 아니라 **`titleId`** 를 준다: `Surface` 는 `title` 유무와
+        무관하게 `aria-labelledby={titleId}` 를 걸므로, 카드의 이름이 **아래 보이는 `h2`
+        그 자체**가 된다. `aria-label` 로 이름을 따로 적으면 사용자가 고친 제목과 카드
+        이름이 갈리고, 제목을 비우면 이름이 빈 문자열이 된다.
       */}
-      {draft.reasons.length > 0 && (
-        <section className="px-4 pb-5 md:px-10">
-          <h3 className="text-body-1 text-fg mb-2 font-semibold">{messages.aiPlan.reasonsTitle}</h3>
-          <ReasonList
-            reasons={draft.reasons.map((reason) => ({ description: reason.description }))}
-            moreLabel={messages.aiPlan.reasonsMore}
-            lessLabel={messages.aiPlan.reasonsLess}
-          />
-        </section>
-      )}
+      <Surface titleId={DRAFT_HEADING_ID}>
+        <header className={cn('flex flex-col gap-2 pt-5 pb-4', INSET_CLASS.card)}>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 id={DRAFT_HEADING_ID} className="text-title-1 text-fg font-bold break-keep">
+              {title}
+            </h2>
+            {/* accent 는 "AI 가 만든 것" 표시 전용이다 (DESIGN.md §2-5 · 아트보드 03 주석) */}
+            <Badge tone="accent">{messages.aiPlan.draftBadge}</Badge>
+          </div>
+
+          <p className="text-caption text-fg-muted tabular-nums">{summary}</p>
+
+          {/* 저장 시점을 반복해 말한다 — 아트보드 03 주석 */}
+          <p className="text-caption text-fg-subtle">{messages.aiPlan.previewNotSaved}</p>
+        </header>
+
+        {/*
+          **`bg-band` 는 카드 안 L2 채움이라 그대로 둔다** (§0 "같은 카드 안을 나눈다 —
+          1px 구분선 또는 `--band` 채움"). 좌우 마진만 카드 인셋으로 바꿨다.
+        */}
+        {partial && (
+          <div className={cn('mb-4', INSET_CLASS.card)}>
+            <div className="bg-band rounded-md px-3 py-2">
+              <p className="text-body-2 text-fg font-medium">
+                {messages.aiPlan.partialDays
+                  .replace('{total}', String(totalDays))
+                  .replace('{made}', String(madeDays))}
+              </p>
+              <p className="text-caption text-fg-muted mt-1">
+                {messages.aiPlan.partialDaysDescription}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/*
+          `reasons` 는 **초안 전체에 대한 XAI 라 일자별이 아니다** → 개요 카드에 한 번 낸다
+          (명세 S6). 서버 순서를 재정렬하지 않고 문장도 그대로 쓴다.
+        */}
+        {draft.reasons.length > 0 && (
+          <section className={cn('pb-5', INSET_CLASS.card)}>
+            <h3 className="text-body-1 text-fg mb-2 font-semibold">
+              {messages.aiPlan.reasonsTitle}
+            </h3>
+            <ReasonList
+              reasons={draft.reasons.map((reason) => ({ description: reason.description }))}
+              moreLabel={messages.aiPlan.reasonsMore}
+              lessLabel={messages.aiPlan.reasonsLess}
+            />
+          </section>
+        )}
+      </Surface>
 
       {draft.days.map((dayItem) => {
         /*
@@ -161,14 +198,17 @@ export function AiPlanDraftPreview({
           거리만 다시 이어 붙이면 화면과 어긋난다.
         */
         const distances = draftItemDistances(dayItem.items, coordOf)
+        const dayLabel = messages.aiPlan.dayLabel.replace('{day}', String(dayItem.day))
 
         return (
-          <section key={dayItem.day} className="pb-2">
-            <h3 className="text-body-1 text-fg px-4 pt-3 pb-2 font-semibold md:px-10">
-              {messages.aiPlan.dayLabel.replace('{day}', String(dayItem.day))}
-            </h3>
-
-            <ul className="flex flex-col">
+          /*
+            **일자마다 카드 하나** (#447 과 같은 결정). 제목이 `h3` 에서 `h2` 로 올라간다 —
+            카드의 제목이므로, 그리고 옆 개요 카드의 제목과 같은 레벨이어야 한다.
+            `Surface` 의 `title` 슬롯이 그 `h2` 와 `pb-3` 을 그려 준다.
+          */
+          <Surface key={dayItem.day} title={dayLabel}>
+            {/* 항목 목록은 카드 폭을 다 쓰고 위 1px 선으로 제목과 갈린다 (#447) */}
+            <SurfaceList className="border-border border-t">
               {dayItem.items.map((item, index) => (
                 <AiPlanDraftItemRow
                   key={`${dayItem.day}-${index}-${item.title}`}
@@ -180,12 +220,13 @@ export function AiPlanDraftPreview({
                   excluded={item.placeId !== null && excludedPlaceIds.has(item.placeId)}
                 />
               ))}
-            </ul>
-          </section>
+            </SurfaceList>
+          </Surface>
         )
       })}
-
-      {footer}
-    </div>
+    </>
   )
 }
+
+/** 개요 카드가 `aria-labelledby` 로 가리키는 `h2` 의 id */
+const DRAFT_HEADING_ID = 'ai-plan-draft-heading'

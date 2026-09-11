@@ -22,7 +22,13 @@ import {
  * **지도는 전폭 미디어라 카드가 아니다** — §0 판정에서 명시적으로 빠지는 예외다.
  * 기본 URL 을 그대로 쓰면 이 스펙이 "L0 바닥이 없다" 로 지도 갈래를 오진한다.
  */
-const SCREENS = ['/mypage', '/pets', '/favorites', '/places?view=list'] as const
+/**
+ * **`/ai-plans/new` 은 폼 화면 쪽 대표다** (#473). 목록 넷과 달리 카드 하나가 로딩·오류·
+ * 0마리·폼을 전부 담으므로, "상태가 바뀌어도 카드가 생겼다 사라지지 않는다" 를 실제
+ * 렌더에서 받쳐 준다. **작업 상태(`/ai-plans/jobs/[jobId]`)는 넣지 않는다** — 살아 있는
+ * `jobId` 가 있어야 열리는 화면이고, 없는 id 로 열면 404 갈래만 재게 된다.
+ */
+const SCREENS = ['/mypage', '/pets', '/favorites', '/places?view=list', '/ai-plans/new'] as const
 
 test.describe('3층 표면', () => {
   for (const path of SCREENS) {

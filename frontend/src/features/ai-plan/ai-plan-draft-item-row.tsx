@@ -3,6 +3,7 @@ import { itemTypeLabel } from '@/lib/ai-plan/item-type'
 import { formatDistance } from '@/lib/format/distance'
 import { isLongTrip } from '@/lib/geo/distance'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { AiPlanScheduleItem } from '@/types/ai-plan'
 
@@ -57,10 +58,17 @@ export function AiPlanDraftItemRow({
   const title = (item.title ?? '').trim()
   const note = (item.note ?? '').trim()
 
+  /*
+    **L1 카드 안의 L2 항목이다** (`DESIGN.md §0`, #473). 구분선은 `SurfaceList` 가 항목
+    **사이에만** 긋는다 — 그래서 `border-b … last:border-b-0` 이 사라졌다. 좌우 인셋은
+    항목이 갖고(세로 여백이 항목마다 달라 목록이 정할 수 없다) 값은 카드 안 `card`(16/20)다.
+    예전 `md:px-10` 은 페이지 인셋이라 카드 안에서 쓰면 내용이 두 번 밀린다.
+  */
   return (
     <li
       className={cn(
-        'border-border flex gap-3 border-b px-4 py-3 last:border-b-0 md:px-10',
+        'flex gap-3 py-3',
+        INSET_CLASS.card,
         // 빼기로 표시한 항목은 취소선으로 남긴다 — 지우면 무엇을 뺐는지 알 수 없다
         excluded && 'opacity-60',
       )}
