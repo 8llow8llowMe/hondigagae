@@ -210,6 +210,36 @@ WHERE NOT EXISTS (SELECT 1 FROM plan_pet pp WHERE pp.plan_id = p.id);
 - `GET /api/v1/plans?petId=` — 반려견별 여행 히스토리. 여러 마리 일정은 그중 한 마리로 들어 있어도 히트다.
   or-null 조건 대신 메서드를 나눠 조회한다.
 
+## 여행 준비물 (`plan_packing_item`)
+
+`GET|PUT|POST /api/v1/plans/{planId}/packing-items`,
+`PUT .../{packingItemId}/checked`, `DELETE .../{packingItemId}` (이슈 #398).
+세부는 [`docs/features/398-plan-packing-items.md`](../features/398-plan-packing-items.md).
+
+- **저장은 plan-service 가 한다.** ai-service 는 준비물을 생성만 하고 저장하지 않는다 — JPA 가
+  없는 서비스에 저장소를 붙이면 "제안만 한다" 는 성격이 바뀌고, 생성은 됐는데 저장이 실패한 상태를
+  ai-service 가 떠안게 된다. FE 가 생성과 저장을 따로 부르면 실패 지점이 화면에서 구분된다.
+- `plan` 컨텍스트 안에 둔다. 준비물은 일정의 하위 리소스라 소유권 검사가 일정의 것과 같아야 하고,
+  새 컨텍스트로 빼면 `getOwnedPlan` 을 복제하게 된다 — `plan_item`·`plan_pet` 과 같은 부류다.
+  컨트롤러만 `PlanPackingWebController` 로 나눴다(`PlanWebController` 가 이미 10개다).
+- **`PUT` 은 `source = AI` 인 행만 교체한다.** 사용자가 직접 적어 둔 항목은 남는다. 기간 축소 때
+  범위 밖 항목을 자동 삭제하지 않고 `PLAN_008` 로 거부한 것과 같은 판단이다 — 사용자의 기록을
+  말없이 지우지 않는다.
+- **체크 상태는 이름으로 승계한다.** `plan_item` 의 `visited` 는 일차 교체 때 초기화되는데,
+  그쪽은 항목이 통째로 다른 것이 되므로 맞다. 준비물은 "리드줄" 이 다시 나오면 같은 리드줄이다 —
+  승계가 없으면 짐을 반쯤 싼 상태에서 다시 뽑기 한 번에 체크가 전부 날아간다.
+- 이름이 겹치면 사용자 것이 이기고, AI 목록 안의 중복은 첫 것만 남긴다(LLM 이 같은 것을 두 번 낸다).
+  유니크 인덱스 `uk_plan_packing_item_plan_id_name` 이 마지막 방어선이다.
+- **AI 항목 삭제는 벌크 DML 로 즉시 내보낸다.** `plan_item` 이 겪은 함정과 같다 — 파생 delete 는
+  `em.remove` 큐잉이라 flush 때 INSERT 가 먼저 나가고, 교체가 같은 `(planId, name)` 을 재사용하므로
+  유니크 인덱스 위반으로 죽는다.
+- `category` 는 enum 이 아니라 VARCHAR(30) 이다. 값의 원천이 LLM 이라 프롬프트를 고치면 늘어나고,
+  enum 이면 모델이 새 분류를 낸 날 저장이 통째로 실패한다.
+- Facade 에 트랜잭션을 그대로 건다 — 이 유스케이스에는 원격 호출이 하나도 없다. 일정 CRUD·브리핑이
+  트랜잭션을 좁힌 이유(tour·auth 왕복)가 여기에는 해당하지 않는다.
+- 상한은 일정당 50개(`PLAN_013`). 이름 중복은 409 `PLAN_012`, 남의 일정 항목은 404 `PLAN_014`.
+- 남은 것: 다견 준비물(ai-service 가 아직 대표 `petId` 만 읽는다), FE 연동(`useMutation` → `useQuery` + 저장).
+
 ## 장소 즐겨찾기 (favorite 컨텍스트)
 
 - `GET|POST|DELETE /api/v1/favorites/places[/{placeId}]` — 찜 목록/저장/해제. 저장·해제 모두
