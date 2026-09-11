@@ -242,4 +242,41 @@ describe('L2 SurfaceList — 카드 안 목록', () => {
       ),
     ).toContain('aria-busy="true"')
   })
+
+  describe('columns={2} — xl 부터 2열 (#462)', () => {
+    function render2col(count = 4) {
+      return renderToStaticMarkup(
+        createElement(SurfaceList, {
+          columns: 2,
+          children: Array.from({ length: count }, (_, index) =>
+            createElement('li', { key: index }, `행 ${index}`),
+          ),
+        }),
+      )
+    }
+
+    it('기본은 1열이다 — 2열을 요구한 화면만 켠다', () => {
+      expect(classesOf(render())).not.toContain('surface-list-2col')
+    })
+
+    it('2열 규약을 이름 있는 클래스 하나로 붙인다', () => {
+      /*
+        `[&>li:nth-child(2)]:` 같은 arbitrary variant 로 쓰지 않는다 — 괄호가 든
+        arbitrary 는 eslint `noComplexArbitrary` 가 막고 globals.css 로 보낸다
+        (`.overlay-backdrop` 과 같은 경로). 규칙 본문은 `.surface-list-2col` 에 있다.
+      */
+      const classes = classesOf(render2col())
+
+      expect(classes).toContain('surface-list-2col')
+      expect(classes.filter((name) => name.includes('nth-child'))).toEqual([])
+    })
+
+    it('1열 구분선 규약을 그대로 갖는다 — 3번째부터는 li+li 가 맞게 당긴다', () => {
+      /*
+        2열에서 어긋나는 것은 두 군데뿐이다(첫 시각적 행의 오른쪽 칸 위선 · 열 사이
+        세로선). 나머지는 1열과 같은 규칙이라 여기서 지우지 않는다.
+      */
+      expect(classesOf(render2col())).toContain('[&amp;&gt;li+li]:border-t')
+    })
+  })
 })

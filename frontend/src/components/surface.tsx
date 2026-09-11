@@ -302,17 +302,41 @@ export function Surface({
  * 이번 모양은 장소 목록(#439)이 실제로 요구한 것이고, 홈의 세 호출처가 함께 들어온다.
  */
 export function SurfaceList({
+  columns = 1,
   children,
   className,
   ...aria
 }: {
   'aria-busy'?: boolean | undefined
   'aria-label'?: string
+  /**
+   * **`xl`(1280) 부터 2열로 접는다.** 기본은 1열이다.
+   *
+   * 저장한 곳(`/favorites`, #462)이 요구한 변형이다 — 그 화면은 `content-container` 가
+   * 없는 전폭이라 1440 에서 한 행이 1360까지 늘어나고, 그러면 장소명과 우측 해제 버튼이
+   * 눈으로 이어지지 않는다 (아트보드 03 · 명세 D1).
+   *
+   * **규약은 여기 남는다.** 2a 때는 행이 `last`·`lastGridRow`·`columnDivider` 세 prop 으로
+   * 스스로 선을 그었고, 그래서 **행 수와 자기 위치를 아는 호출자만** 목록을 그릴 수 있었다.
+   * 2열에서 어긋나는 것은 두 군데뿐이라(첫 시각적 행의 오른쪽 칸 위선, 열 사이 세로선)
+   * `.surface-list-2col`(globals.css) 이 그것만 바로잡는다.
+   *
+   * `columns` 를 `1 | 2` 로 좁혀 둔다 — 3열을 요구한 화면이 아직 없다. 필요해지는 화면이
+   * 나오면 그때 넓힌다 (#422 에서 추측 API 넷을 걷은 이유다).
+   */
+  columns?: 1 | 2
   children: ReactNode
   className?: string
 }) {
   return (
-    <ul {...aria} className={cn('[&>li+li]:border-border [&>li+li]:border-t', className)}>
+    <ul
+      {...aria}
+      className={cn(
+        '[&>li+li]:border-border [&>li+li]:border-t',
+        columns === 2 && 'surface-list-2col',
+        className,
+      )}
+    >
       {children}
     </ul>
   )

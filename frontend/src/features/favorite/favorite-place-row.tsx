@@ -7,15 +7,23 @@ import { Badge } from '@/components/badge'
 import { FormAlert } from '@/components/form-alert'
 import { BookmarkIcon, ImageIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
-import { Row } from '@/components/surface'
 import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { placeMetaLine } from '@/lib/place/meta'
+import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { FavoritePlaceItem } from '@/types/favorite'
 
 /**
- * 저장한 장소 행 — 아트보드 `혼디가개 저장한 장소` 01·03.
+ * 저장한 장소 행 — **L1 카드 안의 L2 항목이다** (`DESIGN.md §0`).
+ * 아트보드 `혼디가개 저장한 장소` 01·03.
+ *
+ * **자기 테두리를 두르지 않는다** — 구분선은 `SurfaceList` 가 항목 **사이에만** 긋고,
+ * xl 2열의 어긋나는 두 군데(첫 시각적 행의 오른쪽 칸 위선 · 열 사이 세로선)는
+ * `columns={2}` 가 맡는다. 그래서 `last`·`lastGridRow`·`columnDivider` 세 prop 이
+ * 사라졌다 — **마지막 행인지, 몇 번째 칸인지 아는 것은 행의 일이 아니다** (#462).
+ *
+ * **좌우 인셋은 담는 곳이 정한다** (`inset.ts`). 기본은 카드 안(16/20)이다.
  *
  * **`PlaceRowContent` 를 재사용하지 않는다.** `PlaceSummary` 는 `contentType`·
  * `petAllowanceType` 이 metadata 객체인데 여기는 `contentTypeName`·`petAllowanceName`
@@ -30,9 +38,7 @@ import type { FavoritePlaceItem } from '@/types/favorite'
  */
 export function FavoritePlaceRow({
   item,
-  last,
-  lastGridRow = false,
-  columnDivider = false,
+  inset = 'card',
   unsaved,
   pending,
   disabled,
@@ -41,12 +47,8 @@ export function FavoritePlaceRow({
   onToggle,
 }: {
   item: FavoritePlaceItem
-  /** 1열(모바일) 기준 마지막 행 */
-  last: boolean
-  /** 2열 그리드(xl)의 마지막 시각적 행. 거기서만 `border-bottom` 을 끈다 */
-  lastGridRow?: boolean
-  /** 2열 그리드의 좌측 칸. 열 사이 1px 선을 맡는다 (아트보드 03) */
-  columnDivider?: boolean
+  /** 좌우 인셋. 담는 곳이 정한다 (`inset.ts`) */
+  inset?: Inset
   /** 이 세션에서 해제했다. **행은 남고 버튼만 "저장" 으로 돌아간다** (명세 D4) */
   unsaved: boolean
   pending: boolean
@@ -62,16 +64,7 @@ export function FavoritePlaceRow({
   const href = `/places/${item.placeId}`
 
   return (
-    <Row
-      as="li"
-      last={last}
-      className={cn(
-        // 열 사이 1px 선 — 좌측 칸에만 (아트보드 03 "열 사이는 1px 선 하나로 가르고")
-        columnDivider && 'xl:border-border xl:border-e',
-        // `Row` 는 1열 기준으로만 마지막 선을 끈다. 2열의 마지막 행은 두 칸이라 여기서 끈다
-        lastGridRow && '[&>div]:xl:border-b-0',
-      )}
-    >
+    <li className={INSET_CLASS[inset]}>
       <div className="flex items-center gap-3 py-3 lg:gap-5 lg:py-4">
         <div className="bg-band relative size-20 shrink-0 overflow-hidden rounded-md lg:size-24">
           {/* 미등록 호스트를 next/image 에 넘기면 런타임에 던진다 — 플레이스홀더로 떨어뜨린다 */}
@@ -159,7 +152,7 @@ export function FavoritePlaceRow({
       </div>
 
       {error !== null && <FormAlert className="mb-3" message={error} />}
-    </Row>
+    </li>
   )
 }
 

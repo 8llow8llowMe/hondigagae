@@ -93,7 +93,9 @@ describe('FavoriteListSection — 헤더 (아트보드 01)', () => {
     const markup = render({ places: [item], totalCount: MAX_FAVORITE_COUNT })
 
     expect(markup).toContain(messages.favorite.limitReachedBadge)
-    expect(markup).toContain('저장 칸이 가득 찼어요(100곳)')
+    expect(markup).toContain(messages.favorite.limitReachedDescription)
+    // 상태는 개수와 배지가 이미 두 번 말했다 — 문장은 할 일만 맡는다 (§1, #462)
+    expect(markup).not.toContain('저장 칸이 가득 찼어요')
     // 상한이라고 목록을 숨기지 않는다 — 여기서 해제해야 새로 저장할 수 있다
     expect(markup).toContain(item.title as string)
   })
@@ -113,23 +115,119 @@ describe('FavoriteListSection — 정렬 컨트롤 없음 (회귀 감시, 아트
   })
 })
 
-describe('FavoriteListSection — 2열 그리드 구분선 (아트보드 03)', () => {
-  /** `xl:border-e` 가 열 사이 1px 선이다 */
-  const COLUMN_DIVIDER = 'xl:border-e'
-
-  it('오른쪽에 짝이 없으면 열 구분선을 긋지 않는다 — 빈 공간 옆에 선만 남는다', () => {
+describe('FavoriteListSection — 3층 표면 (DESIGN.md §0, #462)', () => {
+  /*
+    이 화면의 카드는 하나이고, **개수가 응답에서 오므로 카드를 이 컴포넌트가 그린다**
+    (#461 브리핑과 같은 판단). 페이지는 바닥과 `sr-only` h1 만 맡는다.
+  */
+  it('카드 하나로 그린다 — Surface 를 쓴다', () => {
+    /*
+      **L1 의 외형은 여기서 단언하지 않는다.** radius·테두리 클래스 문자열은
+      `surface.tsx` 의 것이고 `surface.test.ts` · `token-usage.test.ts`(FLOATING)가 이미
+      소유한다 — 여기서 다시 적으면 프리미티브의 클래스 순서만 바뀌어도 이 화면 테스트가
+      깨진다(원인은 `surface.tsx` 인데 빨간불은 favorite 에 뜬다).
+    */
     const markup = render({ places: [favoritePlaceItem()], totalCount: 1 })
 
-    expect(markup).not.toContain(COLUMN_DIVIDER)
+    expect(markup).toMatch(/^<section [^>]*aria-labelledby="favorite-list-heading"/)
+    // 카드가 하나다 — 목록·상태·AI 안내가 전부 그 안이다
+    expect(markup.match(/<section/g)).toHaveLength(1)
   })
 
-  it('짝이 있으면 왼쪽 칸이 구분선을 맡는다', () => {
+  it('제목이 카드 안 h2 다 — h1 은 페이지가 sr-only 로 갖는다', () => {
+    const markup = render({ places: [favoritePlaceItem()], totalCount: 1 })
+
+    expect(markup).toContain('<h2 id="favorite-list-heading"')
+    expect(markup).toContain(messages.favorite.listTitle)
+    expect(markup).not.toContain('<h1')
+  })
+
+  it('2열 규약을 행이 아니라 목록이 갖는다', () => {
+    /*
+      2a 때는 행이 `last`·`lastGridRow`·`columnDivider` 세 prop 으로 스스로 선을 그었다.
+      이제 `SurfaceList columns={2}` 가 `.surface-list-2col`(globals.css) 하나로 맡는다 —
+      첫 시각적 행의 오른쪽 칸 위선과 열 사이 세로선이 그 안에 있다.
+    */
     const markup = render({
       places: [favoritePlaceItem(), favoritePlaceItem({ placeId: 'b', title: '제주현대미술관' })],
       totalCount: 2,
     })
 
-    expect(markup).toContain(COLUMN_DIVIDER)
+    expect(markup).toContain('surface-list-2col')
+    expect(markup).toContain('[&amp;&gt;li+li]:border-t')
+  })
+
+  it('행은 인셋만 갖는다 — 2a 의 세 prop 이 마크업에서 사라졌다', () => {
+    const markup = render({
+      places: [favoritePlaceItem(), favoritePlaceItem({ placeId: 'b', title: '제주현대미술관' })],
+      totalCount: 2,
+    })
+
+    /*
+      `not.toContain('border-b')` 로는 못 잡는다 — `border-border` 안에 그 문자열이
+      들어 있어 항상 걸린다(여기서 실제로 걸렸다). 행의 class 만 뽑아 **인셋 말고는
+      아무것도 없다**를 단언한다.
+    */
+    const rowClasses = [...markup.matchAll(/<li class="([^"]*)"/g)].map(([, value]) => value)
+
+    expect(rowClasses).toEqual(['px-4 md:px-5', 'px-4 md:px-5'])
+  })
+
+  it('네 상태가 모두 카드 인셋(16/20)에 선다', () => {
+    /*
+      상태마다 축이 다르면 목록이 바뀌는 순간 왼쪽 선이 뛴다 (#451). 페이지 인셋 40 을
+      카드 안에서 쓰면 내용이 두 번 밀린다 (§0).
+    */
+    const CARD_INSET = 'px-4 md:px-5'
+
+    expect(render({ loading: true })).toContain(CARD_INSET)
+    expect(render({ errorStatus: 500 })).toContain(CARD_INSET)
+    expect(render({ places: [], totalCount: 0 })).toContain(CARD_INSET)
+    expect(render({ places: [favoritePlaceItem()], totalCount: 1 })).toContain(CARD_INSET)
+
+    // 페이지 인셋(40)이 카드 안에 남아 있지 않다
+    expect(render({ places: [favoritePlaceItem()], totalCount: 1 })).not.toContain('md:px-10')
+  })
+
+  it('스켈레톤도 같은 목록 규약을 쓴다 — 로딩이 끝날 때 선이 새로 생기지 않는다', () => {
+    const markup = render({ loading: true })
+
+    expect(markup).toContain('surface-list-2col')
+    expect(markup).toContain('aria-busy="true"')
+  })
+
+  it('AI 안내는 카드 안 마지막 블록이고 위에 1px 선을 둔다', () => {
+    const markup = render({ places: [favoritePlaceItem()], totalCount: 1 })
+
+    expect(markup).toContain(messages.favorite.aiHint)
+    expect(markup).toContain('border-t py-4')
+  })
+})
+
+describe('FavoriteListSection — 개수 줄은 셀 수 있을 때만 (#462)', () => {
+  /*
+    로딩 중에는 아직 모르고(`0/100곳` 은 거짓말이다), 오류에는 셀 수 없으며, 0건에는
+    `EmptyState` 가 같은 말을 이미 한다.
+  */
+  it('로딩 중에는 개수를 말하지 않는다', () => {
+    const markup = render({ loading: true })
+
+    expect(markup).not.toContain(messages.favorite.sortFixed)
+    expect(markup).not.toContain('/100곳')
+  })
+
+  it('오류에는 개수를 말하지 않는다', () => {
+    const markup = render({ errorStatus: 500 })
+
+    expect(markup).not.toContain('/100곳')
+  })
+
+  it('0건에는 개수를 말하지 않는다 — 빈 화면에 숫자만 두 줄 는다', () => {
+    const markup = render({ places: [], totalCount: 0 })
+
+    expect(markup).toContain(messages.favorite.emptyTitle)
+    expect(markup).not.toContain('0/100곳')
+    expect(markup).not.toContain('100곳 더 저장할 수 있어요')
   })
 })
 
