@@ -83,6 +83,23 @@ public class OllamaLlmAdapter implements AiLlmPort {
     /** 프롬프트가 컨텍스트 창의 이 비율을 넘으면 경고한다. 넘어서면 입력이 잘릴 위험 구간이다. */
     private static final double CONTEXT_WARN_RATIO = 0.7d;
 
+    /*
+      Ollama 가 응답에 싣는 나노초 지표. Spring AI 의 OllamaChatModel 이 같은 이름으로
+      ChatResponseMetadata 에 옮겨 담는다 (상수가 private 이라 여기에 다시 적는다).
+
+      **이 넷을 나눠 봐야 무엇을 줄일지 정할 수 있다** (#489) — 프리필이 지배적이면
+      place-candidate-size 를 줄이는 것이 듣고, 디코드가 지배적이면 프롬프트를 줄여도
+      거의 그대로라 모델이나 장비를 봐야 한다.
+    */
+    private static final String METADATA_TOTAL_DURATION = "total-duration";
+    private static final String METADATA_LOAD_DURATION = "load-duration";
+    private static final String METADATA_PROMPT_EVAL_DURATION = "prompt-eval-duration";
+    private static final String METADATA_EVAL_DURATION = "eval-duration";
+
+    /** 일정 생성 호출임을 로그에서 가른다. 준비물 생성과 소요 특성이 다르다. */
+    private static final String OPERATION_PLAN = "plan";
+    private static final String OPERATION_PACKING = "packing";
+
     private final OllamaChatModel ollamaChatModel;
     private final AiPlanPromptFactory aiPlanPromptFactory;
     private final AiLlmProperties aiLlmProperties;
@@ -114,7 +131,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
     public PackingList generatePackingList(PackingChecklistQuery query) {
         String userPrompt = aiPlanPromptFactory.packingUserPrompt(query)
             + "\n\n" + packingConverter.getFormat();
-        ChatResponse response = call(new Prompt(
+        ChatResponse response = call(OPERATION_PACKING, new Prompt(
             List.of(new SystemMessage(aiPlanPromptFactory.packingSystemPrompt()), new UserMessage(userPrompt)),
             buildRequestOptions()));
 
@@ -146,7 +163,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
         String userPrompt = aiPlanPromptFactory.userPrompt(query)
             + "\n\n" + outputConverter.getFormat();
 
-        return call(new Prompt(
+        return call(OPERATION_PLAN, new Prompt(
             List.of(new SystemMessage(aiPlanPromptFactory.systemPrompt()), new UserMessage(userPrompt)),
             buildRequestOptions()));
     }
@@ -158,18 +175,22 @@ public class OllamaLlmAdapter implements AiLlmPort {
      * 보고도 "LLM 이 안 떠 있나"와 "너무 오래 걸리나" 중 무엇인지 알 수 없었다 (#232).
      * 사용자에게 할 말도 다르다 — 앞은 잠시 후 다시, 뒤는 조건을 줄이라는 안내다.
      */
-    private ChatResponse call(Prompt prompt) {
+    private ChatResponse call(String operation, Prompt prompt) {
         long startedAt = System.nanoTime();
         try {
-            return circuitBreakerRegistry.circuitBreaker(CIRCUIT_NAME)
+            ChatResponse response = circuitBreakerRegistry.circuitBreaker(CIRCUIT_NAME)
                 .executeSupplier(() -> ollamaChatModel.call(prompt));
+            // 성공 경로에도 소요를 남긴다. 전에는 실패했을 때만 남아서, 정상인데 느린 것을
+            // 로그로 볼 수 없었다 (#489).
+            logTiming(operation, prompt, response, elapsedMillis(startedAt));
+            return response;
         } catch (CallNotPermittedException exception) {
             log.warn("LLM circuit open, skipping call");
             throw new AiPlanException(AiPlanErrorCode.LLM_UNAVAILABLE, exception);
         } catch (AiPlanException exception) {
             throw exception;
         } catch (RuntimeException exception) {
-            long elapsedMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
+            long elapsedMs = elapsedMillis(startedAt);
             boolean timedOut = isTimeout(exception);
             log.error("LLM call failed model={} timedOut={} elapsedMs={} timeoutMs={} type={} reason={}",
                 aiLlmProperties.model(), timedOut, elapsedMs, aiLlmProperties.timeoutMs(),
@@ -303,6 +324,69 @@ public class OllamaLlmAdapter implements AiLlmPort {
             throw new AiPlanException(AiPlanErrorCode.LLM_RESPONSE_INVALID);
         }
         return text;
+    }
+
+    /**
+     * 한 번의 호출이 <b>어디에</b> 시간을 썼는지 남긴다 (#489).
+     *
+     * <p>dev 실측에서 일정 생성 63~71초 중 {@code DRAFTING} 이 98~99.6% 였다. 그런데 그것이
+     * <b>프롬프트를 읽는 시간(프리필)인지 토큰을 뱉는 시간(디코드)인지</b> 구분할 수 없어
+     * 어느 값을 줄여야 하는지 판단할 근거가 없었다. Ollama 는 그 둘을 나눠 주고 Spring AI 가
+     * 메타데이터로 옮겨 담으므로, 여기서 한 줄로 남긴다.
+     *
+     * <p>읽는 법:
+     * <ul>
+     *   <li>{@code prefillMs} 가 크다 → 프롬프트가 길다. {@code ai-llm.place-candidate-size} 를 줄인다</li>
+     *   <li>{@code decodeMs} 가 크다 → 출력이 길거나 장비가 느리다. 프롬프트를 줄여도 거의 그대로다</li>
+     *   <li>{@code loadMs} 가 0 이 아니다 → 모델이 내려갔다 다시 올라왔다. {@code OLLAMA_KEEP_ALIVE} 를 본다</li>
+     *   <li>{@code elapsedMs} 와 {@code totalMs} 차이가 크다 → 대기·전송이 끼었다.
+     *       {@code OLLAMA_NUM_PARALLEL=1} 이라 다른 요청을 기다린 것일 수 있다 (#508)</li>
+     * </ul>
+     *
+     * <p><b>지표가 없어도 조용히 넘어간다.</b> provider 를 바꾸면 이 키들이 없다 — 계측이
+     * 생성을 막으면 안 된다.
+     */
+    private void logTiming(String operation, Prompt prompt, ChatResponse response, long elapsedMs) {
+        log.info("LLM timing operation={} model={} promptChars={} elapsedMs={} totalMs={} loadMs={}"
+                + " prefillMs={} decodeMs={} outputTokens={}",
+            operation, aiLlmProperties.model(), promptChars(prompt), elapsedMs,
+            durationMillis(response, METADATA_TOTAL_DURATION),
+            durationMillis(response, METADATA_LOAD_DURATION),
+            durationMillis(response, METADATA_PROMPT_EVAL_DURATION),
+            durationMillis(response, METADATA_EVAL_DURATION),
+            outputTokens(response));
+    }
+
+    private long elapsedMillis(long startedAtNanos) {
+        return Duration.ofNanos(System.nanoTime() - startedAtNanos).toMillis();
+    }
+
+    /** 프롬프트 글자 수. 후보 수를 줄였을 때 실제로 얼마나 줄었는지 보는 기준이다. */
+    private int promptChars(Prompt prompt) {
+        if (prompt == null || prompt.getInstructions() == null) {
+            return 0;
+        }
+        return prompt.getInstructions().stream()
+            .map(message -> message.getText() == null ? "" : message.getText())
+            .mapToInt(String::length)
+            .sum();
+    }
+
+    private Long durationMillis(ChatResponse response, String key) {
+        if (response == null || response.getMetadata() == null) {
+            return null;
+        }
+        Object raw = response.getMetadata().get(key);
+        // Ollama 는 나노초로 준다. 다른 provider 는 이 키가 아예 없다.
+        return raw instanceof Number number ? Duration.ofNanos(number.longValue()).toMillis() : null;
+    }
+
+    private Long outputTokens(ChatResponse response) {
+        if (response == null || response.getMetadata() == null || response.getMetadata().getUsage() == null) {
+            return null;
+        }
+        return response.getMetadata().getUsage().getCompletionTokens() == null ? null
+            : response.getMetadata().getUsage().getCompletionTokens().longValue();
     }
 
     private void recordUsage(ChatResponse response) {

@@ -30,6 +30,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -410,12 +412,88 @@ class OllamaLlmAdapterTest {
         assertThat(draft.reasons().get(0).description()).isEqualTo("2~3일차 강수확률 80%라 실내 위주");
     }
 
+    @Test
+    @DisplayName("성공한 호출도 소요를 남긴다 — 전에는 실패했을 때만 남아 느린 정상 경로를 볼 수 없었다 (#489)")
+    void logsTimingOnSuccess() {
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"PLACE","placeId":100,"title":"오설록","note":"실내"}]}],
+             "reasons":[]}
+            """);
+
+        adapter.generatePlanDraft(query(candidate(100L, "오설록")));
+
+        String logged = timingLog(appender);
+        assertThat(logged).contains("operation=plan");
+        assertThat(logged).contains("promptChars=");
+        assertThat(logged).contains("elapsedMs=");
+    }
+
+    @Test
+    @DisplayName("Ollama 의 나노초 지표를 밀리초로 갈라 남긴다 — 프리필과 디코드를 구분해야 무엇을 줄일지 정한다")
+    void splitsPrefillAndDecode() {
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        // 프리필 8.2초 · 디코드 56.8초 (dev 실측 63~71초의 모양)
+        stubResponseWithOllamaTiming("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"PLACE","placeId":100,"title":"오설록","note":"실내"}]}],
+             "reasons":[]}
+            """, 8_200_000_000L, 56_800_000_000L);
+
+        adapter.generatePlanDraft(query(candidate(100L, "오설록")));
+
+        String logged = timingLog(appender);
+        assertThat(logged).contains("prefillMs=8200");
+        assertThat(logged).contains("decodeMs=56800");
+        assertThat(logged).contains("totalMs=65000");
+        // 모델이 이미 올라와 있으면 0 이다. 0 이 아니면 KEEP_ALIVE 를 의심할 신호라 지우지 않는다.
+        assertThat(logged).contains("loadMs=0");
+        assertThat(logged).contains("outputTokens=820");
+    }
+
+    @Test
+    @DisplayName("지표가 없는 응답에도 계측이 생성을 막지 않는다 — provider 를 바꾸면 이 키들이 없다")
+    void toleratesMissingTimingMetadata() {
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"PLACE","placeId":100,"title":"오설록","note":"실내"}]}],
+             "reasons":[]}
+            """);
+
+        // 던지지 않는 것이 요점이다
+        assertThat(adapter.generatePlanDraft(query(candidate(100L, "오설록"))).days()).hasSize(1);
+        assertThat(timingLog(appender)).contains("prefillMs=null").contains("decodeMs=null");
+    }
+
+    private String timingLog(ListAppender<ILoggingEvent> appender) {
+        return appender.list.stream()
+            .map(ILoggingEvent::getFormattedMessage)
+            .filter(message -> message.startsWith("LLM timing"))
+            .findFirst()
+            .orElseThrow();
+    }
+
     /** 어댑터 로거에 붙여 남은 로그를 읽는다. 파싱 실패의 진단 값이 실제로 남는지 보려면 이 방법뿐이다. */
     private ListAppender<ILoggingEvent> attachAppender() {
         ListAppender<ILoggingEvent> appender = new ListAppender<>();
         appender.start();
         ((Logger) LoggerFactory.getLogger(OllamaLlmAdapter.class)).addAppender(appender);
         return appender;
+    }
+
+    /** Ollama 가 싣는 나노초 지표를 그대로 흉내 낸 응답. 계측이 그것을 읽는지 본다 (#489). */
+    private void stubResponseWithOllamaTiming(String text, long promptEvalNanos, long evalNanos) {
+        ChatResponseMetadata metadata = ChatResponseMetadata.builder()
+            .keyValue("total-duration", promptEvalNanos + evalNanos)
+            .keyValue("load-duration", 0L)
+            .keyValue("prompt-eval-duration", promptEvalNanos)
+            .keyValue("eval-duration", evalNanos)
+            .usage(new DefaultUsage(7400, 820))
+            .build();
+        when(ollamaChatModel.call(any(Prompt.class)))
+            .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage(text))), metadata));
     }
 
     private void stubResponse(String text) {
