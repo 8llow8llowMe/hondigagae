@@ -48,10 +48,13 @@ public record LlmPlanDraftResponse(
             + "MOVE 처럼 특정 장소가 없는 항목만 null 로 둔다.")
         Long placeId,
 
-        @JsonPropertyDescription("항목 이름. placeId 가 있으면 후보 목록의 장소명과 같아야 한다.")
+        @JsonPropertyDescription(
+            "항목 이름. placeId 가 있으면 후보 목록의 장소명과 같아야 한다. "
+            + "장소가 없는 항목도 '점심 식사' 처럼 무엇을 하는 자리인지 반드시 적는다. 비워 두지 않는다.")
         String title,
 
-        @JsonPropertyDescription("이 항목을 넣은 이유나 주의점을 한 문장으로. 반려견 관점에서 쓴다.")
+        @JsonPropertyDescription(
+            "이 항목을 넣은 이유나 주의점을 한 문장으로. 반려견 관점에서 쓴다. 비워 두지 않는다.")
         String note
     ) {
 

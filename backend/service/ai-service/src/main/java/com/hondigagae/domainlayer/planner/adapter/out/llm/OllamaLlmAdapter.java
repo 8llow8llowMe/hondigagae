@@ -336,6 +336,17 @@ public class OllamaLlmAdapter implements AiLlmPort {
      * <p>걸러낸 항목은 <b>버리지 않고 장소 연결만 끊는다.</b> "카페에서 휴식" 같은 항목 자체는
      * 일정의 흐름으로 쓸모가 있고, 사용자가 직접 장소를 고르면 된다.
      *
+     * <p><b>이름이 없는 항목은 반대로 버린다</b> (#487). 모델이 {@code title} 과 {@code note} 를
+     * 둘 다 빈 문자열로 둔 {@code MEAL} 항목을 내놓는 일이 있는데, 장소 연결이 끊긴 항목과 달리
+     * 이쪽은 <b>남길 것이 하나도 없다</b> — "카페에서 휴식"은 사용자가 장소만 고르면 살아나지만,
+     * 이름도 메모도 없는 줄은 무엇을 하라는 것인지 알 방법이 없다. 그대로 두면 화면에 "이름이 없는
+     * 항목"으로 그려지고, 담으면 그 빈 줄이 일정에도 남는다.
+     *
+     * <p>스키마에 {@code @NotBlank} 를 걸지 않고 여기서 거르는 이유는 <b>한 항목 때문에 초안 전체를
+     * 잃지 않기 위해서다.</b> {@code BeanOutputConverter} 단계에서 막으면 파싱 실패가 되어
+     * {@code LLM_RESPONSE_INVALID} 로 작업이 통째로 죽는데, 나머지 항목은 멀쩡하다.
+     * 프롬프트가 1차 방어, 여기가 마지막 방어인 것은 {@link LlmTextCleaner} 와 같은 결이다.
+     *
      * <p><b>항목 종류도 같은 이유로 다시 본다.</b> 모델이 {@code WALK} 를 골라 놓고 후보 목록의
      * {@code place.id} 를 실어 보내면 두 아이디 공간이 섞인다 — plan-service 에서 {@code WALK} 의
      * {@code targetId} 는 {@code walk_course.id} 이고, 그 유형은 장소 존재 검증에서 빠지므로
@@ -348,6 +359,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
 
         List<AiPlanDraftDay> days = new ArrayList<>();
         int hallucinated = 0;
+        int nameless = 0;
 
         for (LlmPlanDraftResponse.LlmPlanDay day : safeList(draft.days())) {
             List<AiPlanDraftItem> items = new ArrayList<>();
@@ -360,12 +372,20 @@ public class OllamaLlmAdapter implements AiLlmPort {
                         placeId, item.title());
                 }
                 PlaceCandidate matched = unknownPlace || placeId == null ? null : candidateById.get(placeId);
+                // 후보에 있으면 우리 데이터의 이름을 쓴다. 모델이 이름을 조금씩 바꿔 적는 일이 있다.
+                String title = matched != null ? matched.title() : item.title();
+                // 내놓을 이름이 없으면 버린다. 판정 기준은 "모델이 비웠는가" 가 아니라 "이름이 남았는가" 다.
+                if (isBlank(title)) {
+                    nameless++;
+                    log.warn("LLM returned an item without a title day={} itemType={} note={} - dropped",
+                        day.day(), item.itemType(), item.note());
+                    continue;
+                }
                 items.add(AiPlanDraftItem.builder()
                     .itemType(resolveItemType(item.itemType(), matched))
                     // 후보 밖 장소는 연결만 끊는다. 항목 자체는 일정의 흐름으로 쓸모가 있다.
                     .placeId(matched == null ? null : matched.placeId())
-                    // 후보에 있으면 우리 데이터의 이름을 쓴다. 모델이 이름을 조금씩 바꿔 적는 일이 있다.
-                    .title(matched != null ? matched.title() : item.title())
+                    .title(title)
                     .note(LlmTextCleaner.clean(item.note()))
                     .build());
             }
@@ -374,6 +394,9 @@ public class OllamaLlmAdapter implements AiLlmPort {
 
         if (hallucinated > 0) {
             log.warn("LLM plan contained {} places outside the candidate list; place links dropped", hallucinated);
+        }
+        if (nameless > 0) {
+            log.warn("LLM plan contained {} items without a title; items dropped", nameless);
         }
 
         return AiPlanDraft.builder()
@@ -426,5 +449,13 @@ public class OllamaLlmAdapter implements AiLlmPort {
 
     private <T> List<T> safeList(List<T> values) {
         return values == null ? List.of() : values;
+    }
+
+    /**
+     * 내놓을 이름이 없는가. {@code null} · 빈 문자열 · 공백뿐인 값을 모두 같게 본다 — 셋 다 화면에서
+     * "보여 줄 이름이 없다"로 똑같이 끝난다.
+     */
+    private boolean isBlank(String text) {
+        return text == null || text.isBlank();
     }
 }
