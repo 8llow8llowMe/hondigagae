@@ -1,4 +1,9 @@
 dependencies {
+    // 기본 오류 writer 가 공통 응답 봉투(Response/DataHeader)로 쓴다 (#502).
+    // 소비하는 서비스가 common-core 를 이미 직접 선언하므로 implementation 으로 충분하다
+    // (shared-travel 과 같은 판단). common-core 는 security-core 를 모르므로 순환이 아니다.
+    implementation project(':core:common-core')
+
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
     implementation 'org.springframework.boot:spring-boot-starter-security'

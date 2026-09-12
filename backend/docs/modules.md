@@ -99,6 +99,15 @@ yml 목록(`infra.redis.sentinels`)도 계속 받지만 로컬용 탈출구다 �
 
 **포함 기준**: auth-service와 나머지 서비스가 공유하는 보안 구조. 서비스별 인가 정책은 각 서비스에서.
 
+**의존**: `core:common-core` (#502). 기본 오류 writer(`DefaultSecurityErrorResponseWriter`)가
+401·403 을 공통 응답 봉투(`Response`/`DataHeader`)로 쓴다. common-core 는 security-core 를
+모르므로 순환이 아니고, `shared-travel` 과 같은 이유로 `implementation` 이다.
+
+> **기본값이 곧 계약이다.** 전에는 기본 writer 가 `{code, message}` 자체 포맷이었고 세 서비스가
+> `@Primary` 로 같은 설정을 복사해 덮었다. 새 서비스가 그 복사를 잊으면 그 서비스의 401/403 만
+> 봉투 밖으로 나가 프론트가 사유를 통째로 버렸다. security-core 를 붙이는 서비스는 이제
+> **오버라이드 없이 그대로 쓰면 된다.**
+
 ---
 
 ## core/storage-core
