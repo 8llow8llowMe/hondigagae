@@ -74,8 +74,8 @@
 | 메서드 | 경로 | 상태 |
 | --- | --- | --- |
 | POST | `/api/v1/ai-plans` | 일정 생성 제출 (202 + jobId, 멱등). 다중 반려견·대표견 기본값·필수 포함 장소·하루 재생성(planId+regenerateDay) 지원 |
-| GET | `/api/v1/ai-plans/jobs/{jobId}` | 폴링 (SSE 폴백) |
-| GET | `/api/v1/ai-plans/jobs/{jobId}/stream` | SSE — 상태 변경 시에만 이벤트, 종결 시 서버가 닫음 |
+| GET | `/api/v1/ai-plans/jobs/{jobId}` | 폴링 (SSE 폴백). 상태·초안과 함께 제출 조건 `conditions` (#488) |
+| GET | `/api/v1/ai-plans/jobs/{jobId}/stream` | SSE — 상태 변경 시에만 이벤트, 종결 시 서버가 닫음. 페이로드는 폴링과 동일(`conditions` 포함) |
 | POST | `/api/v1/ai-plans/packing-list/{planId}` | 반려견 여행 준비물 AI 생성 (동기, 예보·특성·일정 근거) |
 
 LLM 연동 완료(**Spring AI + Ollama**, 공유 인프라 로컬 LLM, 구조화 출력).
@@ -186,6 +186,7 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | #214 | auth·core | 디코딩 불가 서명 JWT 가 401 이 아니라 500 을 준다 (래퍼 없는 본문) | 머지됨 — 이슈 닫기 대상. 토큰 없음 403→401 `SECURITY_001`, `HttpMessageNotReadableException` 핸들러 4 서비스 |
 | #231 | tour | 추가 요금 원문 "없음" 이 요금 있음으로 판정돼 적합도가 3점 깎인다 | 구현 완료, PR 대기 — `PetExtraFee` 가 원문 뜻(CHARGED/NONE/UNKNOWN)을 읽고 CHARGED 만 감점 |
 | #417 | tour | 적합도·권역 점수 고온 규칙에 체감온도 반영 | 구현 — `applyHeatRule` 이 `max(최고기온, 최고 체감온도)` 에 반려견 기준 28/31℃ 를 건다(감점은 한 번). 30℃ 습도 95% = −30, 30℃ 습도 40% = −15. 응답 스키마 변경 없음. #407 답 |
+| #488 | ai | 작업 조회·SSE 응답에 생성 조건이 없어 다른 브라우저에서 초안을 담지 못한다 | 구현 — `conditions` 블록(지역·기간·반려견·예산·메모)을 폴링·SSE 양쪽에 싣는다. 저장은 그대로(`requestParams` 재사용), `petIds` 는 문자열. **담기는 복원되지만 실패 화면의 "조건 바꾸기" 는 `pinnedPlaceIds`·`preferFavorites` 가 빠져 아직 반쪽**(넓히려면 계약 변경). FE 대응은 #498 |
 
 **완료 (41)**
 

@@ -28,6 +28,14 @@ public record AiPlanJobStatusResponse(
     @Schema(description = "전체 단계 수. 화면의 \"n / m 단계\" 에서 m 이다. 단계가 늘면 이 값도 함께 늘어난다", example = "4")
     int totalSteps,
 
+    @Schema(description = "일정을 만들 때 쓴 생성 조건. **상태를 가리지 않고 채워진다** — 초안을 담는 데 필요한 "
+        + "지역·기간·반려견이 여기 있어서, 작업 주소를 다른 브라우저·기기에서 열어도 화면이 조건을 되살릴 수 있다. "
+        + "제출 때 생략한 값(sigunguCode · budget · requestNote)은 null 이다. "
+        + "블록 자체가 null 인 경우는 저장된 요청 파라미터가 비어 있는 잡뿐이라 정상 경로에서는 생기지 않지만, "
+        + "**화면은 null 가드를 두는 편이 안전하다**",
+        nullable = true)
+    AiPlanJobConditionsResponse conditions,
+
     @Schema(description = "생성된 일정 초안. status=COMPLETED 일 때만 채워지고 그 외에는 null", nullable = true)
     AiPlanDraftResponse planDraft,
 
