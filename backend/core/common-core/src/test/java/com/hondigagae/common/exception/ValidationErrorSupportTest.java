@@ -3,9 +3,10 @@ package com.hondigagae.common.exception;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hondigagae.common.dto.DataHeader;
 import com.hondigagae.common.dto.Response;
-import com.hondigagae.common.dto.ValidationErrorBody;
 import com.hondigagae.common.dto.ValidationErrorItem;
 import java.lang.reflect.Method;
 import java.util.List;
@@ -40,12 +41,12 @@ class ValidationErrorSupportTest {
     void unreadableBodyWithUnknownEnumValue() throws Exception {
         HttpMessageNotReadableException exception = unreadable("{\"name\":\"몽실이\",\"sizeType\":\"HUGE\"}");
 
-        ValidationErrorBody body = bodyOf(exception);
+        DataHeader header = headerOf(exception);
 
-        assertThat(body.errors()).hasSize(1);
-        assertThat(body.errors().getFirst().code()).isEqualTo(DEFAULT_CODE);
-        assertThat(body.errors().getFirst().field()).isEqualTo("sizeType");
-        assertThat(body.message()).contains("sizeType").contains("SMALL, MEDIUM, LARGE");
+        assertThat(header.fieldErrors()).hasSize(1);
+        assertThat(header.fieldErrors().getFirst().code()).isEqualTo(DEFAULT_CODE);
+        assertThat(header.fieldErrors().getFirst().field()).isEqualTo("sizeType");
+        assertThat(header.resultMessage()).contains("sizeType").contains("SMALL, MEDIUM, LARGE");
     }
 
     @Test
@@ -54,7 +55,7 @@ class ValidationErrorSupportTest {
         HttpMessageNotReadableException exception =
             unreadable("{\"name\":\"몽실이\",\"friends\":[{\"name\":\"보리\",\"sizeType\":\"HUGE\"}]}");
 
-        assertThat(bodyOf(exception).errors().getFirst().field()).isEqualTo("friends[0].sizeType");
+        assertThat(headerOf(exception).fieldErrors().getFirst().field()).isEqualTo("friends[0].sizeType");
     }
 
     @Test
@@ -62,10 +63,10 @@ class ValidationErrorSupportTest {
     void unreadableBodyWithBrokenJson() throws Exception {
         HttpMessageNotReadableException exception = unreadable("{\"name\": ");
 
-        ValidationErrorBody body = bodyOf(exception);
+        DataHeader header = headerOf(exception);
 
-        assertThat(body.errors().getFirst().field()).isEqualTo("request");
-        assertThat(body.message()).contains("JSON");
+        assertThat(header.fieldErrors().getFirst().field()).isEqualTo("request");
+        assertThat(header.resultMessage()).contains("JSON");
     }
 
     /** 실제 Jackson 이 던지는 원인 예외를 그대로 감싼다 — Spring 의 메시지 컨버터가 하는 일과 같다. */
@@ -80,12 +81,12 @@ class ValidationErrorSupportTest {
         }
     }
 
-    private static ValidationErrorBody bodyOf(HttpMessageNotReadableException exception) {
+    private static DataHeader headerOf(HttpMessageNotReadableException exception) {
         ResponseEntity<Response<Void>> response = ValidationErrorSupport.toResponse(exception, DEFAULT_CODE);
         assertThat(response.getStatusCode().value()).isEqualTo(400);
         Response<Void> payload = response.getBody();
         assertThat(payload).isNotNull();
-        return (ValidationErrorBody) payload.dataHeader().resultMessage();
+        return payload.dataHeader();
     }
 
     /** 직접 호출하지 않는다 — {@code MethodArgumentNotValidException} 이 요구하는 {@code MethodParameter} 를 리플렉션으로 얻는 자리다. */
@@ -133,10 +134,10 @@ class ValidationErrorSupportTest {
         bindingResult.addError(fieldError("password", "Pattern", "MEMBER_105:문자 구성이 올바르지 않습니다."));
         bindingResult.addError(fieldError("password", "NotBlank", "MEMBER_103:비밀번호는 필수입니다."));
 
-        ValidationErrorBody body = bodyOf(bindingResult);
+        DataHeader header = headerOf(bindingResult);
 
-        assertThat(body.message()).isEqualTo("비밀번호는 필수입니다.");
-        assertThat(body.errors().getFirst().code()).isEqualTo("MEMBER_103");
+        assertThat(header.resultMessage()).isEqualTo("비밀번호는 필수입니다.");
+        assertThat(header.fieldErrors().getFirst().code()).isEqualTo("MEMBER_103");
     }
 
     @Test
@@ -152,6 +153,48 @@ class ValidationErrorSupportTest {
         assertThat(errors.getFirst().message()).isEqualTo("이메일 형식이 올바르지 않습니다.");
     }
 
+    // ── 응답 봉투의 타입 계약 (이슈 #491) ─────────────────────────────────────
+
+    /**
+     * 이 이슈의 본체 — <b>직렬화된 JSON 에서</b> {@code resultMessage} 가 문자열인지 고정한다.
+     * 자바 타입이 이미 String 이라 컴파일러가 막아 주지만, 계약을 읽는 쪽이 보는 것은 JSON 이다.
+     * 예전에는 이 자리가 {@code {"message":..., "errors":[...]}} 객체여서, 문자열을 기대하던
+     * 프론트가 서버 문구를 버리고 "API 오류 (status 400)" 을 대신 보여줬다.
+     */
+    @Test
+    @DisplayName("검증 오류도 resultMessage 는 JSON 문자열이고 필드 목록은 fieldErrors 로 나간다")
+    void validationFailureKeepsResultMessageAsJsonString() throws Exception {
+        BindingResult bindingResult = bindingResult();
+        bindingResult.addError(fieldError("email", "Email", "MEMBER_102:이메일 형식이 올바르지 않습니다."));
+
+        JsonNode header = serialize(bindingResult).get("dataHeader");
+
+        assertThat(header.get("resultMessage").isTextual()).isTrue();
+        assertThat(header.get("resultMessage").asText()).isEqualTo("이메일 형식이 올바르지 않습니다.");
+        assertThat(header.get("resultCode").asText()).isEqualTo("MEMBER_102");
+        assertThat(header.get("fieldErrors").isArray()).isTrue();
+        assertThat(header.get("fieldErrors").get(0).get("field").asText()).isEqualTo("email");
+    }
+
+    /** 검증이 아닌 오류와 <b>같은 타입</b>이어야 통일이다. 한쪽만 문자열이면 고친 것이 아니다. */
+    @Test
+    @DisplayName("검증이 아닌 오류는 resultMessage 타입이 같고 fieldErrors 만 null 이다")
+    void nonValidationFailureHasNullFieldErrors() {
+        JsonNode header = new ObjectMapper()
+            .valueToTree(Response.fail("PLAN_001", "존재하지 않는 여행 일정입니다."))
+            .get("dataHeader");
+
+        assertThat(header.get("resultMessage").isTextual()).isTrue();
+        assertThat(header.get("fieldErrors").isNull()).isTrue();
+    }
+
+    private JsonNode serialize(BindingResult bindingResult) throws Exception {
+        Method method = getClass().getDeclaredMethod("handler", SignupRequest.class);
+        MethodArgumentNotValidException exception =
+            new MethodArgumentNotValidException(new MethodParameter(method, 0), bindingResult);
+        return new ObjectMapper().valueToTree(ValidationErrorSupport.toResponse(exception, DEFAULT_CODE).getBody());
+    }
+
     private BindingResult bindingResult() {
         return new BeanPropertyBindingResult(new SignupRequest("bad", "abc", ""), OBJECT_NAME);
     }
@@ -165,7 +208,7 @@ class ValidationErrorSupportTest {
         return new FieldError(OBJECT_NAME, field, null, false, codes, null, message);
     }
 
-    private ValidationErrorBody bodyOf(BindingResult bindingResult) throws Exception {
+    private DataHeader headerOf(BindingResult bindingResult) throws Exception {
         Method method = getClass().getDeclaredMethod("handler", SignupRequest.class);
         MethodArgumentNotValidException exception =
             new MethodArgumentNotValidException(new MethodParameter(method, 0), bindingResult);
@@ -173,11 +216,11 @@ class ValidationErrorSupportTest {
         ResponseEntity<Response<Void>> response = ValidationErrorSupport.toResponse(exception, DEFAULT_CODE);
         Response<Void> payload = response.getBody();
         assertThat(payload).isNotNull();
-        return (ValidationErrorBody) payload.dataHeader().resultMessage();
+        return payload.dataHeader();
     }
 
     private List<ValidationErrorItem> errorsOf(BindingResult bindingResult) throws Exception {
-        return bodyOf(bindingResult).errors();
+        return headerOf(bindingResult).fieldErrors();
     }
 
     private String resultCodeOf(BindingResult bindingResult) throws Exception {
