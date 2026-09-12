@@ -22,13 +22,40 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class JdbcPlaceImageBulkAdapter implements PlaceImageBulkPort {
 
+    /**
+     * 대상 선정 (#478). {@code source = 'TOUR_API'} 로 가둬 detailImage2 가 없는 원천을 빼고,
+     * 병합·delisted 행도 뺀다 — 화면에 안 나오는 장소에 희소한 쿼터를 쓰지 않는다.
+     *
+     * <p>정렬은 "한 번도 부르지 않은 곳 먼저 → {@code image_synced_at} 오래된 순". MySQL 은
+     * {@code IS NULL} 이 불리언 0/1 이라 {@code DESC} 로 정렬하면 NULL(=1)이 앞에 온다.
+     * 마지막 {@code p.id} 는 동률을 가르는 결정적 기준이다 — 없으면 어느 행이 상한 안에 드는지
+     * 실행마다 달라져, 왜 이 장소가 빠졌는지 나중에 설명할 수 없다. 운영시간 대상 쿼리와 같은 3단이다.
+     *
+     * <p><b>커서가 {@code place_image} 가 아니라 {@code place} 에 있는 이유</b>: 원천이 이미지를
+     * 주지 않는 장소는 {@code place_image} 행이 아예 없어 "언제 확인했나"를 적을 자리가 없다.
+     * 그대로 두면 그 장소들(약 30%)이 NULL 머리를 영원히 독식한다.
+     */
     private static final String SELECT_TARGETS_SQL = """
-        SELECT id, content_id
-        FROM place
-        WHERE source = 'TOUR_API'
-          AND content_id IS NOT NULL
-          AND merged_into_id IS NULL
-          AND delisted_at IS NULL
+        SELECT p.id, p.content_id
+          FROM place p
+         WHERE p.source = 'TOUR_API'
+           AND p.content_id IS NOT NULL
+           AND p.merged_into_id IS NULL
+           AND p.delisted_at IS NULL
+         ORDER BY p.image_synced_at IS NULL DESC, p.image_synced_at ASC, p.id ASC
+         LIMIT ?
+        """;
+
+    /**
+     * 이번 실행에서 확인을 마친 장소의 커서만 민다. 커서가 {@code place} 행에 있어 단순 UPDATE 다
+     * ({@code JdbcPlaceBulkAdapter.MFDS_TOUCH_SYNCED_SQL} 과 같은 모양). {@code synced_at} 은
+     * 목록 적재의 것이라 건드리지 않는다.
+     */
+    private static final String TOUCH_IMAGE_SYNCED_SQL = """
+        UPDATE place
+           SET image_synced_at = NOW(),
+               updated_at = NOW()
+         WHERE id = ?
         """;
 
     private static final String SELECT_BACKFILL_TARGETS_SQL = """
@@ -59,9 +86,19 @@ public class JdbcPlaceImageBulkAdapter implements PlaceImageBulkPort {
     private final JdbcTemplate jdbcTemplate;
 
     @Override
-    public List<PlaceImageTargetQueryResult> findTourApiTargets() {
+    public List<PlaceImageTargetQueryResult> findTourApiTargets(int limit) {
+        // 상한이 0 이하면 LIMIT 0 을 쏘는 대신 접는다 (운영시간 포트와 같은 규칙) —
+        // 프로퍼티가 접히지 않은 상태로 들어왔을 때 쓸모없는 쿼리를 막는다.
+        if (limit <= 0) {
+            return List.of();
+        }
         return jdbcTemplate.query(SELECT_TARGETS_SQL,
-            (rs, rowNum) -> new PlaceImageTargetQueryResult(rs.getLong("id"), rs.getLong("content_id")));
+            (rs, rowNum) -> new PlaceImageTargetQueryResult(rs.getLong("id"), rs.getLong("content_id")), limit);
+    }
+
+    @Override
+    public void touchImageSyncedAt(long placeId) {
+        jdbcTemplate.update(TOUCH_IMAGE_SYNCED_SQL, placeId);
     }
 
     @Override
