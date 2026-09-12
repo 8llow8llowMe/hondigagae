@@ -18,6 +18,11 @@ public interface PlaceImportUseCase {
      * TourAPI 원천 장소의 추가 이미지를 detailImage2 로 수집해 place_image 를 교체한다.
      * 장소 적재 뒤에 돌아야 한다 — place 테이블의 TourAPI 행이 대상 목록이다.
      *
+     * <p><b>한 실행에서 전량을 덮지 않는다 (#478).</b> 운영시간 스텝과 쿼터(일 1,000건)를 나눠
+     * 쓰므로 실행당 상한({@code place-image-import.max-calls-per-run}, 기본 400)만큼만 호출하고
+     * "한 번도 부르지 않은 곳 먼저 → {@code place.image_synced_at} 오래된 순"으로 고른다.
+     * 주 1회 실행 3주면 전량을 한 바퀴 돈다.
+     *
      * @return 적재한 이미지 총 장수
      */
     int importPlaceImages();

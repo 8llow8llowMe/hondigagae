@@ -1,5 +1,7 @@
 package com.hondigagae.domainlayer.placeimport.application.exception;
 
+import java.util.EnumSet;
+import java.util.Set;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -41,6 +43,33 @@ public enum PlaceImportErrorCode {
     // 전송은 성공한 것으로 보인다. 남은 대상을 다 돌아도 결과가 같으니 호출 반복을 멈춰야 한다.
     TOUR_API_QUOTA_EXCEEDED("PLACE_IMPORT_022", "TourAPI 일일 호출 한도를 초과했습니다. (%s)");
 
+    /**
+     * 한 곳의 실패로 넘기지 않고 스텝을 즉시 끝내야 하는 오류. 셋 다 <b>남은 대상을 다 돌아도
+     * 결과가 같은</b> 상태다 — 원천이 죽었거나(서킷), 키가 없거나, 오늘 몫을 다 썼다.
+     *
+     * <p>계속 가면 시간만 태우는 것으로 끝나지 않는다. 두 상세 스텝(운영시간·추가 이미지)이
+     * 모두 <b>증분 커서</b>로 대상을 고르므로, 실패한 장소마다 커서를 밀면 상한만큼의 장소가
+     * 아무것도 받지 못한 채 순환에서 한 바퀴 뒤로 밀린다.
+     */
+    private static final Set<PlaceImportErrorCode> STOPS_THE_STEP = EnumSet.of(
+        TOUR_API_CIRCUIT_OPEN,
+        TOUR_API_SERVICE_KEY_MISSING,
+        TOUR_API_QUOTA_EXCEEDED
+    );
+
     private final String code;
     private final String message;
+
+    /**
+     * {@link #STOPS_THE_STEP} 판정. <b>두 프로세서가 같은 집합을 봐야 해서</b> 여기 둔다 —
+     * 각자 적어 두면 한쪽만 고쳐지고, 그 어긋남은 원천이 실제로 죽은 날에만 드러난다.
+     *
+     * <p>한도 초과의 처리는 스텝마다 다르다. 운영시간 스텝은 그대로 예외를 올려 스텝을 실패로
+     * 끝내고, 이미지 스텝은 <b>이 판정보다 먼저</b> 한도 초과를 가려내 조용히 멈춘다
+     * (그 스텝에서는 예산 소진이 예외가 아니라 정상 경로다). 순서가 뒤집히면 이미지 스텝이
+     * 매주 실패한다.
+     */
+    public static boolean stopsTheStep(PlaceImportErrorCode errorCode) {
+        return STOPS_THE_STEP.contains(errorCode);
+    }
 }
