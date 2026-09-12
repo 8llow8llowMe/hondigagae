@@ -6,8 +6,10 @@ import com.hondigagae.domainlayer.planner.adapter.in.web.dto.item.AiPlanReasonIt
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.item.AiPlanScheduleItem;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanDraftResponse;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.PackingListResponse;
+import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanJobConditionsResponse;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanJobStatusResponse;
 import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanSubmitResponse;
+import com.hondigagae.domainlayer.planner.application.info.AiPlanConditionsInfo;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanDraftInfo;
 import com.hondigagae.domainlayer.planner.application.info.PackingListInfo;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanJobInfo;
@@ -39,9 +41,33 @@ public class AiPlanPresenter {
             .step(step == null ? null : step.toMetadata())
             .stepOrder(step == null ? null : step.order())
             .totalSteps(AiPlanJobStep.total())
+            .conditions(toConditionsResponse(info.conditions()))
             .planDraft(toDraftResponse(info.planDraft()))
             .errorCode(info.errorCode())
             .errorMessage(info.errorMessage())
+            .build();
+    }
+
+    /**
+     * 생성 조건을 응답 모양으로. 초안과 달리 <b>상태를 가리지 않고</b> 내린다 — 대기 중인
+     * 작업도 "무엇을 만들고 있는지" 를 화면이 그대로 보여 줄 수 있어야 한다.
+     *
+     * <p>반려견 식별자는 여기서 문자열로 바꾼다. Snowflake 라 숫자로 내리면 자바스크립트가
+     * 조용히 반올림한다 (coding-conventions §7-1). 경계는 Presenter 다.
+     */
+    private AiPlanJobConditionsResponse toConditionsResponse(AiPlanConditionsInfo conditions) {
+        if (conditions == null) {
+            return null;
+        }
+        List<Long> petIds = conditions.petIds() == null ? List.of() : conditions.petIds();
+        return AiPlanJobConditionsResponse.builder()
+            .areaCode(conditions.areaCode())
+            .sigunguCode(conditions.sigunguCode())
+            .startDate(conditions.startDate())
+            .endDate(conditions.endDate())
+            .petIds(petIds.stream().map(String::valueOf).toList())
+            .budget(conditions.budget())
+            .requestNote(conditions.requestNote())
             .build();
     }
 

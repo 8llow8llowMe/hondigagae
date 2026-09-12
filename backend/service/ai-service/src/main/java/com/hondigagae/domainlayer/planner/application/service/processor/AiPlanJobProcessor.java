@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.planner.application.service.processor;
 import com.hondigagae.domainlayer.planner.application.command.AiPlanCreateCommand;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
+import com.hondigagae.domainlayer.planner.application.info.AiPlanConditionsInfo;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanDraftInfo;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanJobInfo;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanSubmissionInfo;
@@ -119,6 +120,10 @@ public class AiPlanJobProcessor {
             .jobId(job.jobId())
             .status(job.status())
             .step(job.step())
+            // 생성 조건은 제출 때 저장한 requestParams 가 그대로 근거다 — 따로 보관하지 않는다.
+            // 상태와 무관하게 채운다: 브라우저를 넘어온 화면은 초안을 담을 때 조건이 필요하고,
+            // 그것만 따로 물어볼 수단이 없다 (#488).
+            .conditions(AiPlanConditionsInfo.from(job.requestParams()))
             .planDraft(job.status() == AiPlanJobStatus.COMPLETED ? AiPlanDraftInfo.from(job.planDraft()) : null)
             .errorCode(job.errorCode())
             .errorMessage(job.errorMessage())
@@ -210,7 +215,17 @@ public class AiPlanJobProcessor {
         });
     }
 
-    private Map<String, String> toParams(AiPlanCreateCommand command) {
+    /**
+     * 제출 조건을 저장용 문자열 맵으로 옮긴다.
+     *
+     * <p><b>여기 적는 키가 정본이다.</b> 워커({@link AiPlanWorker})가 질의를 만들 때,
+     * 조회 응답({@link AiPlanConditionsInfo#from})이 조건을 되돌릴 때 같은 키를 읽는다.
+     * 읽는 쪽 둘 다 키가 없으면 조용히 빈 값으로 넘어가므로 — 워커는 조건 없는 일정을 만들고
+     * 조회는 조건 없는 응답을 준다 — 키 이름을 바꾼 실수는 실행해 봐야 드러난다.
+     * {@code AiPlanJobConditionsRoundTripTest} 가 키 집합을 고정할 수 있도록
+     * package-private static 으로 연다.
+     */
+    static Map<String, String> toParams(AiPlanCreateCommand command) {
         Map<String, String> params = new LinkedHashMap<>();
         params.put("areaCode", command.areaCode());
         params.put("sigunguCode", command.sigunguCode() == null ? "" : command.sigunguCode());
@@ -244,7 +259,7 @@ public class AiPlanJobProcessor {
         }
     }
 
-    private String joinIds(List<Long> ids) {
+    private static String joinIds(List<Long> ids) {
         return ids == null ? "" : ids.stream()
             .map(String::valueOf).collect(Collectors.joining(","));
     }

@@ -38,8 +38,8 @@ LLM 기반 AI 기능 전담. 선정된 AI 기능의 LLM 호출·프롬프트·�
     강수확률 60%↑ 실내 위주, 최고기온 31℃↑ 야외는 아침·저녁 배치 지시. 커버리지 밖/조회 실패는 절 생략
 - `POST /api/v1/ai-plans/packing-list/{planId}` — 반려견 여행 준비물 목록 생성 (동기, 수십 초 가능).
   일정 개요(필수)·반려견 특성·날씨 전망(관용)을 근거로 항목마다 이 여행 데이터 기반의 이유를 붙인다. 저장하지 않는 제안이다
-- `GET /api/v1/ai-plans/jobs/{jobId}` — 폴링
-- `GET /api/v1/ai-plans/jobs/{jobId}/stream` — SSE
+- `GET /api/v1/ai-plans/jobs/{jobId}` — 폴링. 상태·초안과 함께 제출 때 쓴 생성 조건(`conditions`)을 내린다
+- `GET /api/v1/ai-plans/jobs/{jobId}/stream` — SSE. 이벤트 페이로드가 폴링 응답과 같아 `conditions` 도 함께 온다
 - `POST /api/v1/ai-plans/jobs/{jobId}/cancel` — 작업 취소. 이미 취소된 잡은 200(멱등),
   완료·실패한 잡은 409(AIPLAN_019)
 - `POST /api/v1/ai-plans/{planId}/revisions` — 자연어 일정 수정 ("카페 말고 다른 곳")
@@ -139,6 +139,49 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
 - **PENDING 이면 `step` 이 null 이다.** 0 이나 1 로 채우면 화면이 시작한 것으로 그린다.
 - 종결 상태에서는 마지막으로 밟은 단계가 남는다 — 실패 지점을 아는 것이 진단이다.
 - 그럴듯한 이름을 늘리지 않는다. 여기 있는 단계는 워커가 실제로 밟는 단계여야 한다.
+
+### 생성 조건을 함께 내린다 (필수)
+
+작업 조회·SSE 응답에 `conditions` 블록을 싣는다 — `areaCode` · `sigunguCode` · `startDate` ·
+`endDate` · `petIds` · `budget` · `requestNote` ([#488](https://github.com/8llow8llowMe/hondigagae/issues/488)).
+
+**"다시 볼 수 있다" 와 "담을 수 있다" 는 다른 약속이다.** 대기 화면은 주소를 남겨 두면 다시 볼
+수 있다고 말하는데, 조건이 응답에 없으면 프론트는 제출 조건을 `sessionStorage` 에 `jobId` 키로
+보관하는 수밖에 없다. 그 저장소는 탭·기기·시크릿창을 넘지 못해서, 다른 브라우저로 작업 주소를
+열면 **초안은 전부 그려지는데 하단이 "조건을 다시 알려 주세요" 로 바뀐다.** 서버가 조건을 같이
+내리면 화면이 저장소 없이 복원한다.
+
+- **새로 저장하는 값이 아니다.** 제출 시점에 이미 `AiPlanJob.requestParams` 로 저장돼 있다
+  (멱등 해시의 재료이자 워커의 입력). 조회 시점에 그 문자열 맵을 타입으로 되돌릴 뿐이라
+  저장 스키마도 TTL 도 그대로다.
+- **키 문자열의 정본은 `AiPlanJobProcessor#toParams` 다.** 워커(`AiPlanWorker#toQuery`)와
+  조회(`AiPlanConditionsInfo#from`)가 같은 키를 읽는다. 컴파일러가 잡아 주지 못하는 연결이라
+  `AiPlanJobConditionsRoundTripTest` 가 쓰기-읽기를 묶어 둔다.
+- **폴링과 SSE 가 같은 모양이다.** 둘 다 `AiPlanPresenter#toJobStatusResponse` 를 지나므로
+  갈라질 자리가 없다 — 갈라지면 프론트에 처리 분기가 두 갈래로 생긴다.
+- **상태를 가리지 않고 채운다.** 초안(`planDraft`)과 다르다. PENDING 에도 실어야 대기 화면이
+  "무엇을 만들고 있는지" 를 말할 수 있다.
+- **`petIds` 는 문자열 배열이다.** Snowflake 라 숫자로 내리면 자바스크립트가 조용히 반올림한다
+  (`coding-conventions.md` §7-1). 제출 계약(`AiPlanSubmitPayload`)과 같은 모양이라 화면이
+  받은 값을 그대로 되돌려 보낼 수 있다.
+- **생략 가능한 값(`sigunguCode` · `budget` · `requestNote`)은 null 이다.** 저장은 생략을 빈
+  문자열로 적어 두므로 응답 경계에서 접는다 — 그러지 않으면 "메모 없음" 과 "빈 메모" 가 같아진다.
+- **반려견을 지정하지 않은 제출은 `petIds` 가 빈 배열이다.** 그때 워커는 대표 반려견으로 대신하는데,
+  그 결정은 잡에 기록되지 않으므로 응답도 "지정하지 않았다" 까지만 말한다.
+- **노출 범위는 넓어지지 않는다.** 타인의 `jobId` 는 조건이 실리기 전과 똑같이 404 `AIPLAN_002` 다
+  (존재 자체를 숨긴다). 조건은 소유권 검증을 통과한 뒤에 조립된다 — 이제 새면 존재 사실만이 아니라
+  남의 여행 계획과 메모가 함께 새므로, 그 순서를 `AiPlanJobConditionsExposureTest` 가 고정한다.
+- **해석할 수 없는 값은 그 칸만 비운다.** 저장소(`RedisAiPlanJobStoreAdapter#findById`)가 이미
+  "해석 못 하면 없는 것으로" 를 택했는데 여기서 던지면 같은 손상 하나가 경로마다 다른 증상을 낸다 —
+  폴링은 코드 없는 500 이 되고, SSE 는 구독 콜백이 예외를 삼켜 조용히 멈춘다. 조건은 초안에 덧붙는
+  값이지 조회를 성립시키는 값이 아니다.
+
+**담기에 필요한 조건만 담는다 — "조건 바꾸기" 는 아직 반쪽이다.** 저장된 파라미터 11개 중
+`pinnedPlaceIds` · `preferFavorites` · `planId` · `regenerateDay` 는 응답에 넣지 않았다. 일정 저장이
+받지 않는 값이라 **담기는 완전히 복원된다.** 다만 실패 화면의 "조건 바꾸기" 가 폼을 되살릴 때는
+그 넷도 쓰므로(`frontend/src/types/ai-plan.ts` 의 `AiPlanRequestSnapshot`), 그쪽 복원은 여전히
+프론트 저장소에 기댄다 — 다른 브라우저에서는 "꼭 넣을 장소" 와 "저장한 장소 우선" 이 조용히
+초기화된다. 넓힐지는 계약 변경이라 #488 범위 밖으로 두고 여기 남긴다.
 
 ### 취소는 협조적이다 (필수)
 
