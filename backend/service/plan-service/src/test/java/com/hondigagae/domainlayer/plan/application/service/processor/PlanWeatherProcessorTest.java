@@ -11,10 +11,13 @@ import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPo
 import com.hondigagae.domainlayer.plan.application.port.out.query.PetConditionQueryResult;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlaceSuitabilityQueryResult;
 import com.hondigagae.shared.travel.plan.PlanItemType;
+import com.hondigagae.domainlayer.plan.domain.enums.PlanDayWeatherUnavailableReason;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,12 +31,17 @@ import org.junit.jupiter.api.Test;
 /**
  * 다견 날씨 브리핑 검증.
  *
- * <p>고정하는 것은 셋이다.
+ * <p>고정하는 것은 넷이다.
  * <ul>
  *   <li><b>누구 기준인가</b> — 점수가 가장 낮은 아이. 화면이 "몽실이 기준" 이라고 말할 수 있어야 한다
  *   <li><b>몇 번 부르는가</b> — 조건이 다른 아이 수만큼. 조건이 같으면(특성을 못 받아 전부 일반 조건이 됐을 때 포함) 한 번
  *   <li><b>한 아이의 특성이 없어도</b> — 그 아이는 일반 조건으로 판정에 남고, 브리핑은 나간다
+ *   <li><b>못 낸 이유를 넷으로 가른다</b> — 지난 날짜 · 장소 미지정 · 예보 범위 밖 · 조회 실패 (#492).
+ *       뭉뚱그리면 지난 날짜에 "잠시 후 다시 시도" 라는 지켜지지 않을 안내가 나간다
  * </ul>
+ *
+ * <p>"오늘" 은 {@link Clock} 으로 고정한다 — {@code DAY_1} 이 오늘이다. 시스템 시각을 쓰면
+ * 이 파일의 날짜가 지나는 순간 "지난 날짜" 분기가 모든 테스트를 삼킨다.
  */
 class PlanWeatherProcessorTest {
 
@@ -41,7 +49,9 @@ class PlanWeatherProcessorTest {
     private static final long PLACE_ID = 100L;
     private static final long MONGSIL = 2L;
     private static final long BORI = 5L;
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final LocalDate DAY_1 = LocalDate.of(2026, 9, 12);
+    private static final Clock CLOCK = Clock.fixed(DAY_1.atStartOfDay(SEOUL).toInstant(), SEOUL);
 
     private static final PetConditionQueryResult HEAT_SENSITIVE = PetConditionQueryResult.builder()
         .sizeType("SMALL").heatSensitive(true).build();
@@ -58,13 +68,19 @@ class PlanWeatherProcessorTest {
         planItemRepositoryPort = new StubPlanItemRepositoryPort();
         petConditionQueryPort = new StubPetConditionQueryPort();
         placeSuitabilityQueryPort = new StubPlaceSuitabilityQueryPort();
-        processor = new PlanWeatherProcessor(planItemRepositoryPort, petConditionQueryPort, placeSuitabilityQueryPort);
+        processor = new PlanWeatherProcessor(
+            planItemRepositoryPort, petConditionQueryPort, placeSuitabilityQueryPort, CLOCK);
     }
 
     private static Plan plan() {
+        return planOn(DAY_1);
+    }
+
+    /** 하루짜리 일정. 날짜를 옮겨 가며 일자 판정 사유를 가른다. */
+    private static Plan planOn(LocalDate date) {
         return Plan.builder()
             .id(PLAN_ID).memberId(1L).petId(MONGSIL).areaCode("39").title("몽실이·보리와 제주 당일치기")
-            .startDate(DAY_1).endDate(DAY_1).status(PlanStatus.DRAFT).build();
+            .startDate(date).endDate(date).status(PlanStatus.DRAFT).build();
     }
 
     private static PlanDayWeatherInfo firstDay(PlanWeatherInfo info) {
@@ -151,16 +167,88 @@ class PlanWeatherProcessorTest {
     }
 
     @Test
-    @DisplayName("tour-service 조회가 전부 실패하면 그날은 unavailableReason 이고 아이별 목록은 비어 있다")
+    @DisplayName("tour-service 조회가 전부 실패하면 LOOKUP_FAILED 다 — 넷 중 이것만 재시도가 의미 있는 상태다")
     void unavailableWhenEveryLookupFails() {
         petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE, BORI, ROBUST);
         placeSuitabilityQueryPort.unavailable = true;
 
         PlanWeatherInfo info = processor.brief(1L, plan(), List.of(MONGSIL, BORI));
 
-        assertThat(firstDay(info).unavailableReason()).isNotNull();
+        assertThat(firstDay(info).unavailableReason()).isEqualTo(PlanDayWeatherUnavailableReason.LOOKUP_FAILED);
         assertThat(firstDay(info).basisPetId()).isNull();
         assertThat(firstDay(info).petSuitabilities()).isEmpty();
+        // 장소는 알고 있었다 — 못 낸 것은 판정이지 대표 장소가 아니다
+        assertThat(firstDay(info).representativePlaceId()).isEqualTo(PLACE_ID);
+    }
+
+    @Test
+    @DisplayName("지난 날짜는 PAST_DATE 다 — 예보가 소급되지 않으므로 묻지 않고, 재시도도 권하지 않는다 (#492)")
+    void pastDateIsNeverAsked() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+
+        PlanWeatherInfo info = processor.brief(1L, planOn(DAY_1.minusDays(1)), List.of(MONGSIL));
+
+        PlanDayWeatherUnavailableReason reason = firstDay(info).unavailableReason();
+        assertThat(reason).isEqualTo(PlanDayWeatherUnavailableReason.PAST_DATE);
+        // 일시적 장애와 같은 말을 하지 않는다 — 이 구분이 이 이슈의 본체다
+        assertThat(reason.getDescription())
+            .isNotEqualTo(PlanDayWeatherUnavailableReason.LOOKUP_FAILED.getDescription())
+            .doesNotContain("다시 시도");
+        // 물어도 답이 정해져 있는 날이라 원격 호출이 나가지 않는다
+        assertThat(placeSuitabilityQueryPort.calls).isZero();
+        // 장소는 지정돼 있었다 — "장소가 없어서" 가 아니라는 것이 응답에 남는다
+        assertThat(firstDay(info).representativePlaceId()).isEqualTo(PLACE_ID);
+        assertThat(firstDay(info).petSuitabilities()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("예보가 닿지 않는 먼 미래는 BEYOND_FORECAST_RANGE 다 — 오늘+11일부터")
+    void beyondForecastRangeIsNeverAsked() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+        int horizon = PlanDayWeatherUnavailableReason.FORECAST_HORIZON_DAYS;
+
+        PlanWeatherInfo lastCovered = processor.brief(1L, planOn(DAY_1.plusDays(horizon)), List.of(MONGSIL));
+        PlanWeatherInfo beyond = processor.brief(1L, planOn(DAY_1.plusDays(horizon + 1L)), List.of(MONGSIL));
+
+        // 경계 안쪽(오늘+10)은 실제로 물어본다
+        assertThat(firstDay(lastCovered).unavailableReason()).isNull();
+        assertThat(firstDay(beyond).unavailableReason())
+            .isEqualTo(PlanDayWeatherUnavailableReason.BEYOND_FORECAST_RANGE);
+        assertThat(placeSuitabilityQueryPort.calls).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("장소가 없는 날은 NO_PLACE_ITEM 이다 — 날씨의 문제가 아니라 일정의 문제다")
+    void noPlaceItemKeepsItsOwnReason() {
+        planItemRepositoryPort.items = List.of();
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+
+        PlanWeatherInfo info = processor.brief(1L, plan(), List.of(MONGSIL));
+
+        assertThat(firstDay(info).unavailableReason()).isEqualTo(PlanDayWeatherUnavailableReason.NO_PLACE_ITEM);
+        assertThat(firstDay(info).representativePlaceId()).isNull();
+        assertThat(placeSuitabilityQueryPort.calls).isZero();
+    }
+
+    @Test
+    @DisplayName("여행 중 일정은 일자마다 사유가 갈린다 — 지난 일차는 PAST_DATE, 오늘은 판정이 나간다")
+    void reasonsDifferPerDayWithinOnePlan() {
+        planItemRepositoryPort.items = List.of(
+            PlanItem.builder().id(1L).planId(PLAN_ID).day(1).sequence(0)
+                .itemType(PlanItemType.PLACE).targetId(PLACE_ID).title("성판악").build(),
+            PlanItem.builder().id(2L).planId(PLAN_ID).day(2).sequence(0)
+                .itemType(PlanItemType.PLACE).targetId(PLACE_ID).title("협재해수욕장").build());
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+        Plan plan = Plan.builder()
+            .id(PLAN_ID).memberId(1L).petId(MONGSIL).areaCode("39").title("여행 중인 일정")
+            .startDate(DAY_1.minusDays(1)).endDate(DAY_1).status(PlanStatus.DRAFT).build();
+
+        PlanWeatherInfo info = processor.brief(1L, plan, List.of(MONGSIL));
+
+        assertThat(info.days()).extracting(PlanDayWeatherInfo::unavailableReason)
+            .containsExactly(PlanDayWeatherUnavailableReason.PAST_DATE, null);
+        // 지난 일차 몫의 호출이 빠져 오늘치 한 번만 나간다
+        assertThat(placeSuitabilityQueryPort.calls).isEqualTo(1);
     }
 
     @Test

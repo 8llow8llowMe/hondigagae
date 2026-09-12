@@ -18,6 +18,7 @@ import com.hondigagae.domainlayer.plan.application.port.out.query.WalkTimesQuery
 import com.hondigagae.domainlayer.plan.application.port.out.query.WeatherWarningQueryResult;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
@@ -80,6 +81,8 @@ public class PlanBriefingProcessor {
     private final PlanWeatherProcessor planWeatherProcessor;
     private final WeatherWarningQueryPort weatherWarningQueryPort;
     private final WalkTimesQueryPort walkTimesQueryPort;
+    /** 날씨 판정과 <b>같은</b> "오늘" 을 써야 한다 — 갈리면 자정 경계에서 한 응답 안의 두 값이 어긋난다. */
+    private final Clock clock;
 
     /**
      * 소유권 확인은 다른 유스케이스와 같이 Facade 가 한다 — 이 Processor 는 브리핑 조립만 맡는다.
@@ -104,7 +107,7 @@ public class PlanBriefingProcessor {
         Optional<PlanItem> representative = PlanWeatherProcessor.pickRepresentative(dayItems);
         Optional<PlanPlaceSummaryQueryResult> representativePlace = findSummary(representative);
 
-        boolean today = date.equals(LocalDate.now());
+        boolean today = date.equals(LocalDate.now(clock));
         Long basisPetId = resolveBasisPetId(weather, petIds);
 
         Warning warning = today ? loadWarning(plan, date) : Warning.notToday();

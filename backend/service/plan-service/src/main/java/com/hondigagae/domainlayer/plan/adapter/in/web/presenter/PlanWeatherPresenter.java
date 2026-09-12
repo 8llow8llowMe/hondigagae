@@ -47,7 +47,10 @@ public class PlanWeatherPresenter {
             .weather(toWeatherItem(suitability))
             .indoorAlternatives(toAlternativeItems(suitability))
             .petSuitabilities(toPetSuitabilityItems(day))
-            .unavailableReason(day.unavailableReason())
+            // 코드와 문장을 함께 내린다. 문장만 주면 프론트가 사유별로 다르게 그릴 수 없고,
+            // 코드만 주면 문구가 둘로 갈린다 (#492 / #497).
+            .unavailableReasonCode(day.unavailableReason() == null ? null : day.unavailableReason().name())
+            .unavailableReason(day.unavailableReason() == null ? null : day.unavailableReason().getDescription())
             .build();
     }
 
