@@ -5,6 +5,12 @@
 
 수집 시각: **2026-09-10** (dev 게이트웨이).
 
+> ⚠️ **오류 봉투에 한해 이 스냅샷 4개는 낡았다 ([#491](https://github.com/8llow8llowMe/hondigagae/issues/491) 반영 전).**
+> 네 파일 모두 `DataHeader.resultMessage` 를 `{"type":"object"}` 로 적고 있고 `fieldErrors` 키가
+> 없다. **확정된 계약은 `resultMessage: string` + `fieldErrors: ValidationErrorItem[] | null`** 이고
+> 정본은 `backend/docs/api-design-guide.md` §2-1 이다. 이 항목만큼은 아래 "정본 순서" 를 뒤집어
+> 읽어야 한다 — 위의 `goldenWindowStatus` 전례와 같은 경우다. 배포 후 재수집하며 이 경고를 지운다.
+
 > 이 재수집(#409)에서 구조가 바뀐 곳은 **하나뿐이다** —
 > `RegionWeatherItem +maxFeelsLikeTemperature` (tour-service). 권역 비교 행이 체감온도를
 > 낼 수 있게 됐다는 뜻이고, [#407](https://github.com/8llow8llowMe/hondigagae/issues/407)
