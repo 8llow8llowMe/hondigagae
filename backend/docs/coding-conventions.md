@@ -219,7 +219,13 @@ public ResponseEntity<Response<Void>> handleValidation(MethodArgumentNotValidExc
 }
 ```
 
-**4) 응답 형태** — `resultCode` 는 대표 오류 코드이고, `resultMessage` 에 대표 메시지와 필드별 오류 목록이 담깁니다.
+**4) 응답 형태** — `resultCode` 는 대표 오류 코드, `resultMessage` 는 대표 메시지 **문자열**, 필드별 오류 목록은 `fieldErrors` 입니다. 검증 오류라고 해서 `resultMessage` 의 타입이 달라지지 않습니다 — 계약 전문은 [api-design-guide.md §2-1](api-design-guide.md#2-1-오류-봉투-계약--resultmessage-는-항상-문자열이다-이슈-491) 입니다.
+
+```json
+{"dataHeader":{"success":false,"resultCode":"PET_102",
+  "resultMessage":"반려견 이름은 20자 이하만 가능합니다.",
+  "fieldErrors":[{"code":"PET_102","field":"name","message":"반려견 이름은 20자 이하만 가능합니다."}]}}
+```
 
 한 필드에 제약이 여러 개 걸리면 오류도 여러 개 나옵니다. 오류를 버리지 않고 모두 담되(사용자가 한 번에 모두 고칠 수 있도록) **순서를 고정**합니다. Bean Validation 스펙은 제약 평가 순서를 보장하지 않으므로, 정렬하지 않으면 같은 요청에 `resultCode` 가 달라집니다.
 

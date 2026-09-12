@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.hondigagae.common.dto.Response;
-import com.hondigagae.common.dto.ValidationErrorBody;
 import com.hondigagae.common.dto.ValidationErrorItem;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -40,6 +39,11 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
  * <p>정렬 기준은 (1) DTO 선언 순서 → (2) 제약 우선순위(필수 → 길이 → 범위 → 형식) →
  * (3) 메시지 순이다. resultCode와 대표 메시지는 정렬된 첫 번째 오류를 사용한다.
  * 클라이언트는 입력 항목별로 해당 field의 첫 오류를 보여주면 된다.
+ *
+ * <p><b>응답 모양은 다른 오류와 같다</b> — 대표 메시지는 {@code dataHeader.resultMessage} 에
+ * 문자열로, 필드별 목록은 {@code dataHeader.fieldErrors} 에 담긴다. 예전에는 이 둘을 묶은 객체를
+ * {@code resultMessage} 한 칸에 넣어서 <b>검증 오류에서만 타입이 달랐고</b>, 문자열을 기대하던
+ * 클라이언트가 서버 문구를 통째로 버렸다 (이슈 #491).
  */
 public final class ValidationErrorSupport {
 
@@ -264,10 +268,14 @@ public final class ValidationErrorSupport {
         return fieldOrder.size() + Math.max(appearanceOrder.indexOf(field), 0);
     }
 
+    /**
+     * 대표 메시지는 {@code resultMessage} 에 <b>문자열로</b>, 필드별 목록은 {@code fieldErrors} 에 싣는다.
+     * 두 값을 한 칸에 겹쳐 담지 않는다 — 그러면 클라이언트가 오류 종류마다 타입을 분기해야 한다.
+     */
     private static ResponseEntity<Response<Void>> respond(List<ValidationErrorItem> errors) {
         ValidationErrorItem first = errors.getFirst();
-        ValidationErrorBody body = new ValidationErrorBody(first.message(), errors);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Response.fail(first.code(), body));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(Response.fail(first.code(), first.message(), errors));
     }
 
     /**

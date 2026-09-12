@@ -88,9 +88,10 @@ class NearbyFacilityParameterValidationTest {
         mockMvc.perform(get(PATH).param("lat", "33.4996").param("lng", "126.5312").param("size", "251"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.dataHeader.resultCode").value("EMERGENCY_104"))
-            // 필드 검증 실패는 resultMessage 가 문자열이 아니라 {message, errors} 객체다
-            // (위의 파라미터 누락 경로와 형태가 다르다).
-            .andExpect(jsonPath("$.dataHeader.resultMessage.message")
-                .value(org.hamcrest.Matchers.containsString("250")));
+            // 필드 검증 실패도 resultMessage 는 문자열이다 - 위의 파라미터 누락 경로와 같은 형태다.
+            // 예전에는 이 경로만 {message, errors} 객체라 프론트가 서버 문구를 버렸다 (#491).
+            .andExpect(jsonPath("$.dataHeader.resultMessage")
+                .value(org.hamcrest.Matchers.containsString("250")))
+            .andExpect(jsonPath("$.dataHeader.fieldErrors[0].field").value("size"));
     }
 }

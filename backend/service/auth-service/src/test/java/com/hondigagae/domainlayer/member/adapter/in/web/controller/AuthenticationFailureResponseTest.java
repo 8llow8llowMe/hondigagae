@@ -122,7 +122,9 @@ class AuthenticationFailureResponseTest {
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.dataHeader.success").value(false))
             .andExpect(jsonPath("$.dataHeader.resultCode").value("MEMBER_100"))
-            .andExpect(jsonPath("$.dataHeader.resultMessage.errors[0].field").value("sizeType"));
+            // 필드 정보는 fieldErrors 로 나간다. resultMessage 는 오류 종류와 무관하게 문자열이다 (#491).
+            .andExpect(jsonPath("$.dataHeader.resultMessage").isString())
+            .andExpect(jsonPath("$.dataHeader.fieldErrors[0].field").value("sizeType"));
     }
 
     @Test

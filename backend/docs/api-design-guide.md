@@ -16,6 +16,45 @@
 - 중첩 응답은 `Response`, `Item`, `Presenter` 조합으로 구성한다.
 - 내부용 `Info`를 외부 응답 타입으로 직접 노출하지 않는다.
 
+### 2-1. 오류 봉투 계약 — `resultMessage` 는 항상 문자열이다 (이슈 [#491](https://github.com/8llow8llowMe/hondigagae/issues/491))
+
+`dataHeader` 의 칸마다 타입이 **하나씩만** 있다. 오류 종류에 따라 타입이 갈리지 않는다.
+
+| 필드 | 타입 | 값 |
+|------|------|-----|
+| `success` | `boolean` | 성공 여부 |
+| `resultCode` | `string \| null` | 대표 오류 코드. 성공이면 `null` |
+| `resultMessage` | `string \| null` | **사용자에게 보여줄 대표 메시지.** 성공이면 `null` |
+| `fieldErrors` | `ValidationErrorItem[] \| null` | 필드 단위 검증 오류. **검증 실패가 아니면 `null`** |
+
+`ValidationErrorItem` 은 `{ code, field, message }` 다.
+
+```json
+// 일반 오류 — fieldErrors 가 null
+{"dataHeader":{"success":false,"resultCode":"PLAN_001",
+  "resultMessage":"존재하지 않는 여행 일정입니다.","fieldErrors":null}}
+
+// 검증 오류 — resultMessage 는 그대로 문자열이고, 필드 정보만 fieldErrors 에 더해진다
+{"dataHeader":{"success":false,"resultCode":"PLACE_102",
+  "resultMessage":"size는 50 이하만 가능합니다.",
+  "fieldErrors":[{"code":"PLACE_102","field":"size","message":"size는 50 이하만 가능합니다."}]}}
+```
+
+**왜 한 칸에 두 타입을 태우지 않는가** — 예전에는 `resultMessage` 가 `Object` 라서 Bean Validation
+실패만 `{message, errors}` 객체가 실렸다. 클라이언트는 `typeof === 'string'` 으로 분기할 수밖에
+없었고, **검증 오류에서만 서버가 준 문구를 통째로 버리고** `API 오류 (status 400)` 같은 대체
+문구를 보여줬다. 정확한 안내를 만들어 놓고 타입 때문에 못 쓰는 구조였다.
+
+구현 규칙은 아래 셋이다.
+
+- **`Response.fail(code, message)`** 는 메시지를 `String` 으로만 받는다. 객체를 넘길 방법이 없다.
+- 필드 오류를 함께 실을 때는 **`Response.fail(code, message, fieldErrors)`** 를 쓴다.
+- 핸들러가 이 조합을 직접 만들지 않는다. `common-core` 의 **`ValidationErrorSupport`** 가 유일한
+  생산자이고, 도메인 `*ExceptionHandler` 는 거기에 위임한다 (`coding-conventions.md` §검증 오류).
+
+`resultMessage` 는 **대표 오류 하나의 메시지**다. 여러 필드가 틀렸을 때 이를 이어 붙이지 않는다 —
+전체 목록은 `fieldErrors` 에 있고, 화면은 입력 항목별로 해당 `field` 의 첫 오류를 붙이면 된다.
+
 ## 3. Controller 스타일
 
 - 다른 레이어를 직접 호출하지 않고 `WebUseCase`만 호출한다.
