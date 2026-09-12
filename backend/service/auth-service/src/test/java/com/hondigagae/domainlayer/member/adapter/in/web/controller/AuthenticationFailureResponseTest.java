@@ -10,7 +10,6 @@ import com.hondigagae.domainlayer.auth.adapter.in.web.provider.RefreshCookieProv
 import com.hondigagae.domainlayer.member.application.port.in.MemberWebUseCase;
 import com.hondigagae.domainlayer.pet.adapter.in.web.controller.PetWebController;
 import com.hondigagae.domainlayer.pet.application.port.in.PetWebUseCase;
-import com.hondigagae.global.config.SecurityErrorWriterConfig;
 import com.hondigagae.security.auth.config.AuthSecurityConfigurer;
 import com.hondigagae.security.auth.config.JwtAuthPropertiesConfig;
 import com.hondigagae.security.auth.jwt.JwtAuthProperties;
@@ -36,12 +35,12 @@ import org.springframework.test.web.servlet.MockMvc;
  * 인증 필터 체인을 실제로 통과시켜 <b>어떤 Authorization 갈래도 Response 봉투 밖으로 나가지 않는지</b> 고정한다 (이슈 #214).
  *
  * <p>단위 테스트({@code JwtAuthProviderTest}·{@code JwtAuthFilterTest})는 예외 매핑과 필터 한 겹을 본다. 여기서는
- * {@code AuthSecurityConfigurer} 가 조립한 체인 + {@code @PreAuthorize} + auth-service 의 Response 기반 writer 를
+ * {@code AuthSecurityConfigurer} 가 조립한 체인 + {@code @PreAuthorize} + security-core 의 기본 writer 를
  * 그대로 태워, 이슈 표의 여섯 갈래가 전부 {@code dataHeader.resultCode} 를 가진 401 인지 본다. 토큰 없음이 403 빈 응답으로
  * 나가던 갈래(Spring 기본 진입점)와 서명부 디코딩 불가가 500 으로 나가던 갈래가 이 테스트가 잡는 회귀다.
  */
 @WebMvcTest(controllers = {MemberWebController.class, PetWebController.class})
-@Import({AuthSecurityConfigurer.class, JwtAuthPropertiesConfig.class, SecurityErrorWriterConfig.class})
+@Import({AuthSecurityConfigurer.class, JwtAuthPropertiesConfig.class})
 @TestPropertySource(properties = {
     "jwt.access-key=hondigagae-test-jwt-access-key-0123456789abcdef0123456789abcdef0123456789abcdef",
     "jwt.access-expiration=30m",
