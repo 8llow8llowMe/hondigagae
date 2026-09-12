@@ -54,6 +54,12 @@ public class AiPlanPromptFactory {
            쓰지 말고, 일자는 "2일차", 여러 날은 "1~3일차" 처럼 자연스러운 문장으로 적습니다.
         7. 모든 항목에 title 과 note 를 채웁니다. 장소가 없는 식사 항목도 "점심 식사" 처럼 무엇을
            하는 자리인지 적습니다. 빈 문자열로 두면 사용자에게 이름 없는 빈 줄이 보입니다.
+        8. 사용자에게 보이는 문장은 "~해요" 체로 씁니다. "~한다", "~합니다", "~해라" 를 섞지
+           않습니다. 한 초안 안에서 말투가 갈리면 안 됩니다.
+        9. 장소명 뒤에 조사(은/는, 이/가, 을/를)를 붙이지 않습니다. 장소명이 숫자나 영문으로
+           끝나면 받침 판정이 어긋나므로("애월코스트34은"), 조사가 필요 없는 문장으로 바꿔 씁니다.
+        10. 반려견의 생애 단계는 입력에 적힌 표현만 씁니다. 입력에 없는 "노령견", "노견",
+            "어린 강아지" 같은 단정을 덧붙이지 않습니다.
         """;
 
     public String systemPrompt() {
@@ -71,6 +77,9 @@ public class AiPlanPromptFactory {
         4. 여행과 무관한 물건은 넣지 않습니다.
         5. 이유는 사용자에게 그대로 보이는 문장입니다. 대괄호([ ]) 같은 기호 표기를 쓰지 말고,
            일자는 "2일차", 여러 날은 "1~3일차" 처럼 자연스러운 문장으로 적습니다.
+        6. 이유는 "~해요" 체로 씁니다. "~한다", "~합니다", "~해라" 를 섞지 않습니다.
+        7. 반려견의 생애 단계는 입력에 적힌 표현만 씁니다. 입력에 없는 "노령견", "노견",
+           "어린 강아지" 같은 단정을 덧붙이지 않습니다.
         """;
 
     /**
@@ -324,8 +333,20 @@ public class AiPlanPromptFactory {
             prompt.append("- 견종: ").append(pet.breed()).append('\n');
         }
         if (pet.ageText() != null && !pet.ageText().isBlank()) {
-            prompt.append("- 나이: ").append(pet.ageText())
-                .append(" (나이에 맞는 활동 강도로 짤 것 - 노령견은 이동과 도보를 줄이고 휴식을 자주, 어린 반려견은 낯선 환경 연속 배치를 피할 것)").append('\n');
+            prompt.append("- 나이: ").append(pet.ageText());
+            /*
+              **단계를 값으로 넘긴다** (#493). 전에는 "노령견은 …, 어린 반려견은 …" 을 나이와
+              무관하게 모든 아이에게 붙였다. 모델이 그 낱말을 그대로 끌어다 써서 6살 말티즈의
+              근거에 "노령견의 피로를 최소화한다" 가 나왔다 — 고를 여지를 없애는 쪽이 맞다.
+            */
+            if (pet.lifeStage() != null) {
+                prompt.append(" (").append(pet.lifeStage().getDisplayName()).append(')');
+                String guidance = pet.lifeStage().getPlanningGuidance();
+                if (guidance != null) {
+                    prompt.append(" - ").append(guidance);
+                }
+            }
+            prompt.append('\n');
         }
         if (pet.sizeName() != null) {
             prompt.append("- 크기: ").append(pet.sizeName())
