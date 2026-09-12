@@ -30,9 +30,11 @@ import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.shared.travel.plan.PlanItemType;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -51,8 +53,8 @@ import org.junit.jupiter.api.Test;
  *   <li><b>기준 아이</b> — 날씨 판정이 고른 아이(점수가 가장 낮은 아이)의 조건으로 골든타임을 묻는다
  * </ul>
  *
- * <p>"오늘" 은 {@code LocalDate.now()} 라 일정 날짜를 오늘 기준 상대값으로 만든다 — 시계 빈이 없는 서비스라
- * tour-service 의 골든타임 테스트와 같은 방식이다.
+ * <p>"오늘" 은 {@link Clock} 으로 고정한다 (#492). 시스템 시각을 쓰면 브리핑의 "오늘" 과 날씨 판정의
+ * "지난 날짜" 가 자정 경계에서 어긋날 수 있고, 그 어긋남은 실행 시각에만 재현돼 테스트로 잡히지 않는다.
  */
 class PlanBriefingProcessorTest {
 
@@ -61,8 +63,10 @@ class PlanBriefingProcessorTest {
     private static final long PLACE_ID = 100L;
     private static final long MONGSIL = 2L;
     private static final long BORI = 5L;
-    private static final LocalDate TODAY = LocalDate.now();
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+    private static final LocalDate TODAY = LocalDate.of(2026, 9, 12);
     private static final LocalDate TOMORROW = TODAY.plusDays(1);
+    private static final Clock CLOCK = Clock.fixed(TODAY.atStartOfDay(SEOUL).toInstant(), SEOUL);
 
     private static final PetConditionQueryResult HEAT_SENSITIVE = PetConditionQueryResult.builder()
         .sizeType("SMALL").heatSensitive(true).build();
@@ -88,9 +92,10 @@ class PlanBriefingProcessorTest {
 
         // 날씨는 실제 Processor 를 끼운다 — 브리핑이 같은 판정 경로를 타는지가 검증 대상이다.
         PlanWeatherProcessor planWeatherProcessor = new PlanWeatherProcessor(
-            planItemRepositoryPort, petConditionQueryPort, placeSuitabilityQueryPort);
+            planItemRepositoryPort, petConditionQueryPort, placeSuitabilityQueryPort, CLOCK);
         processor = new PlanBriefingProcessor(
-            planItemRepositoryPort, planPlaceLookupPort, planWeatherProcessor, weatherWarningQueryPort, walkTimesQueryPort);
+            planItemRepositoryPort, planPlaceLookupPort, planWeatherProcessor, weatherWarningQueryPort,
+            walkTimesQueryPort, CLOCK);
 
         when(petConditionQueryPort.findConditions(anyLong(), anyList()))
             .thenReturn(Map.of(MONGSIL, HEAT_SENSITIVE, BORI, ROBUST));

@@ -46,7 +46,20 @@ public record PlanDayWeatherItem(
     List<PlanDayPetSuitabilityItem> petSuitabilities,
 
     @Schema(
-        description = "브리핑을 내지 못한 이유. null 이면 정상이며, 값이 있으면 화면에 그대로 안내한다",
+        description = "브리핑을 내지 못한 사유 코드. null 이면 정상이다. "
+            + "PAST_DATE 지난 날짜 — 예보가 남아 있지 않아 다시 물어도 생기지 않는다 · "
+            + "NO_PLACE_ITEM 그날 일정에 장소 항목이 없음 · "
+            + "BEYOND_FORECAST_RANGE 예보 범위 밖 — 오늘+11일 이후라 기다리면 풀린다 · "
+            + "LOOKUP_FAILED 조회 실패 — 넷 중 이것만 일시적 장애다. "
+            + "재시도를 권할지, 문구를 화면 톤으로 바꿀지는 이 코드로 판단한다 — unavailableReason 문장을 파싱하지 않는다",
+        example = "PAST_DATE",
+        allowableValues = {"PAST_DATE", "NO_PLACE_ITEM", "BEYOND_FORECAST_RANGE", "LOOKUP_FAILED"},
+        nullable = true)
+    String unavailableReasonCode,
+
+    @Schema(
+        description = "브리핑을 내지 못한 이유 문장. null 이면 정상이며, 값이 있으면 화면에 그대로 안내할 수 있다. "
+            + "unavailableReasonCode 와 항상 짝으로 온다",
         example = "이 날짜에는 장소가 지정된 일정 항목이 없어 날씨를 붙이지 못했습니다.",
         nullable = true)
     String unavailableReason

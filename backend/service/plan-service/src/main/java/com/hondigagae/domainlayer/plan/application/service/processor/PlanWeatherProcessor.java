@@ -10,8 +10,10 @@ import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPo
 import com.hondigagae.domainlayer.plan.application.port.out.query.PetConditionQueryResult;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlaceSuitabilityQueryResult;
 import com.hondigagae.shared.travel.plan.PlanItemType;
+import com.hondigagae.domainlayer.plan.domain.enums.PlanDayWeatherUnavailableReason;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -43,18 +45,24 @@ import org.springframework.stereotype.Component;
  *
  * <p>좌표 없는 항목(이동 등)은 대표에서 제외한다. {@code targetId} 가 있는 장소성 항목만
  * 대표가 될 수 있다.
+ *
+ * <p><b>못 낸 이유를 넷으로 가른다</b> ({@link PlanDayWeatherUnavailableReason}). 지난 날짜에
+ * "잠시 후 다시 시도해 주세요" 라고 하면 지켜지지 않을 안내가 되고, 실제 예보 장애와도
+ * 구분되지 않는다 (#492). 날짜만으로 답이 정해지는 둘(지난 날짜 · 예보 범위 밖)은 원격 호출
+ * <b>전에</b> 가른다 — 물어도 결과가 정해져 있는 날에 호출을 내보내지 않는다.
+ *
+ * <p>"오늘" 은 {@link Clock} 에서 얻는다. 시스템 시각을 직접 읽으면 이 판정이 테스트에서
+ * 고정되지 않고, 서비스 기준 시간대(KST)가 배포 환경변수에 흔들린다.
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class PlanWeatherProcessor {
 
-    private static final String NO_PLACE_ITEM = "이 날짜에는 장소가 지정된 일정 항목이 없어 날씨를 붙이지 못했습니다.";
-    private static final String LOOKUP_FAILED = "날씨 정보를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.";
-
     private final PlanItemRepositoryPort planItemRepositoryPort;
     private final PetConditionQueryPort petConditionQueryPort;
     private final PlaceSuitabilityQueryPort placeSuitabilityQueryPort;
+    private final Clock clock;
 
     /**
      * @param petIds 동행 반려견. 비어 있지 않아야 한다 — 옛 일정도 {@code Plan.resolvePetIds} 가 대표 한 마리로 채운다
@@ -116,24 +124,31 @@ public class PlanWeatherProcessor {
         Plan plan, int day, List<PlanItem> items, Map<Long, PetConditionQueryResult> conditions
     ) {
         LocalDate date = plan.startDate().plusDays(day - 1L);
-
         Optional<PlanItem> representative = pickRepresentative(items);
+
+        // 날짜만으로 정해지는 사유가 먼저다 — 장소를 담아도 tour-service 가 멀쩡해도 달라지지 않는다.
+        // 대표 장소는 알아낸 뒤라 그대로 실어 보낸다.
+        Optional<PlanDayWeatherUnavailableReason> byDate =
+            PlanDayWeatherUnavailableReason.byDate(date, LocalDate.now(clock));
+        if (byDate.isPresent()) {
+            return PlanDayWeatherInfo.unavailable(day, date,
+                representative.map(PlanItem::targetId).orElse(null),
+                representative.map(PlanItem::title).orElse(null),
+                byDate.get());
+        }
+
         if (representative.isEmpty()) {
-            return PlanDayWeatherInfo.unavailable(day, date, NO_PLACE_ITEM);
+            return PlanDayWeatherInfo.unavailable(day, date, PlanDayWeatherUnavailableReason.NO_PLACE_ITEM);
         }
 
         PlanItem item = representative.get();
         Map<Long, PlaceSuitabilityQueryResult> resultsByPetId = judgeEachPet(item.targetId(), date, conditions);
         Optional<Long> basisPetId = pickBasisPet(resultsByPetId);
         if (basisPetId.isEmpty()) {
-            log.info("Plan weather unavailable planId={} day={} placeId={}", plan.id(), day, item.targetId());
-            return PlanDayWeatherInfo.builder()
-                .day(day).date(date)
-                .representativePlaceId(item.targetId())
-                .representativePlaceTitle(item.title())
-                .petSuitabilities(List.of())
-                .unavailableReason(LOOKUP_FAILED)
-                .build();
+            // 여기까지 왔으면 예보가 닿는 날짜다 — 남은 설명은 조회 실패뿐이고, 그것만 재시도가 의미 있다.
+            log.warn("Plan weather lookup failed planId={} day={} placeId={}", plan.id(), day, item.targetId());
+            return PlanDayWeatherInfo.unavailable(day, date, item.targetId(), item.title(),
+                PlanDayWeatherUnavailableReason.LOOKUP_FAILED);
         }
 
         return PlanDayWeatherInfo.builder()

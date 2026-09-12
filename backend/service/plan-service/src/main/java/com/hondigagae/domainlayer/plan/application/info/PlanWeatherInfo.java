@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.plan.application.info;
 
+import com.hondigagae.domainlayer.plan.domain.enums.PlanDayWeatherUnavailableReason;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.Builder;
@@ -30,7 +31,8 @@ public record PlanWeatherInfo(
      *                   장소 항목이 없거나 조회에 실패하면 null
      * @param suitability {@code basisPetId} 기준 적합도. 장소 항목이 없거나 조회에 실패하면 null
      * @param petSuitabilities 아이별 점수·등급. 화면이 "누구 기준인지"와 "다른 아이는 어떤지"를 함께 말할 수 있다
-     * @param unavailableReason 브리핑을 못 낸 이유. null 이면 정상이다
+     * @param unavailableReason 브리핑을 못 낸 이유. null 이면 정상이다. <b>문장이 아니라 사유 자체를 든다</b> —
+     *                          문장은 enum 이 갖고 Presenter 가 코드와 함께 내린다 (#492)
      */
     @Builder
     public record PlanDayWeatherInfo(
@@ -41,12 +43,26 @@ public record PlanWeatherInfo(
         Long basisPetId,
         PlanDaySuitabilityInfo suitability,
         List<PetSuitabilityInfo> petSuitabilities,
-        String unavailableReason
+        PlanDayWeatherUnavailableReason unavailableReason
     ) {
 
-        public static PlanDayWeatherInfo unavailable(int day, LocalDate date, String reason) {
+        public static PlanDayWeatherInfo unavailable(
+            int day, LocalDate date, PlanDayWeatherUnavailableReason reason
+        ) {
+            return unavailable(day, date, null, null, reason);
+        }
+
+        /**
+         * 대표 장소를 아는 채로 못 낸 날. <b>장소는 그대로 내린다</b> — 지난 날짜라 예보가 없는 것과
+         * 장소가 없는 것은 다른 사실이고, 화면은 그날 어디를 가기로 했는지를 여전히 보여 준다.
+         */
+        public static PlanDayWeatherInfo unavailable(
+            int day, LocalDate date, Long placeId, String placeTitle, PlanDayWeatherUnavailableReason reason
+        ) {
             return PlanDayWeatherInfo.builder()
-                .day(day).date(date).petSuitabilities(List.of()).unavailableReason(reason).build();
+                .day(day).date(date)
+                .representativePlaceId(placeId).representativePlaceTitle(placeTitle)
+                .petSuitabilities(List.of()).unavailableReason(reason).build();
         }
     }
 
