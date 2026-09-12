@@ -32,6 +32,7 @@
 | `285-nearby-total-count.md` | #285 | 구현 완료 | 반경 검색 `totalCount` 를 진짜 총계로 — 계약 두 안 중 1번을 고른 근거 · `size` 상한 250 |
 | `361-tourapi-detail-intro.md` | #361 | 구현 완료 | TourAPI `detailIntro2` 운영시간 수집 — 쿼터 배분(실행당 상한 300) · 요일부 없는 원문을 매일로 본 근거 |
 | `398-plan-packing-items.md` | #398 | 구현 완료 | 준비물 저장·조회 — 소유 서비스를 plan-service 로 고른 근거 · 재생성이 파괴적 연산이 되는 것을 막는 세 규칙 |
+| `478-incremental-image-import.md` | #478 | 구현 완료 | 추가 이미지 적재 증분화 — 커서를 `place.image_synced_at` 에 둔 근거 · 상한 400 의 산수 · 서킷/키 누락 행동 변화 |
 
 ### 사후 초안에 대해
 
