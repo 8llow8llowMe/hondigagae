@@ -66,7 +66,8 @@ area_visitor_stat                             (Redis 캐시 기본, weather_fore
 | pet_restriction | VARCHAR(500) | Y | (문화정보원) | 제한사항 원문 |
 | pet_extra_fee | VARCHAR(200) | Y | (문화정보원) | 동반 추가 요금 원문 |
 | merged_into_id | BIGINT | Y | (가공) | 중복 병합 시 살아남은 행. 값이 있으면 조회 제외 |
-| synced_at | DATETIME | N | — | 적재 시각 |
+| synced_at | DATETIME | N | — | 적재 시각. 목록 upsert 가 매 실행 갱신한다 |
+| image_synced_at | DATETIME(6) | Y | — | 추가 이미지(detailImage2) 마지막 확인 시각. **증분 대상 선정 커서**(#478). 목록 upsert 는 건드리지 않는다 — 값을 쓰는 것은 이미지 적재 스텝뿐이다 |
 
 인덱스:
 
@@ -315,13 +316,20 @@ uk_area_visitor_stat_stat_level_region_code_base_ymd_tou_div_cd (statLevel, regi
 
 | 대상 | 오퍼레이션 | 주기 | upsert 키 | 비고 |
 |------|-----------|------|-----------|------|
-| place (초기) | KorService2 `areaBasedList2` (areaCode=39, 타입별) + 상세 3종 | 최초 1회 | content_id | 제주 관광지(12)=331건 확인. 전 타입 합산 후 상세 3콜/건 → **개발계정 1,000건/일 제한으로 며칠 분할** |
-| place (증분) | `areaBasedSyncList2` (showflag) | 주 1회 | content_id | modifiedtime 기준 |
+| place (목록) | KorService2 `areaBasedList2` (areaCode=39, 타입별 페이징) | 주 1회 | (source, source_key) | 제주 전 타입 약 964곳 / 약 17콜. 응답에 없어진 장소는 `delisted_at` 으로 내린다 |
+| place_intro (운영시간) | `detailIntro2` — 장소당 1콜 | 주 1회 | place_id | **실행당 상한 300** (`place-intro-import.max-calls-per-run`). 증분 선정 "intro 없는 곳 먼저 → `place_intro.synced_at` 오래된 순 → id" (#361) |
+| place_image (추가 이미지) | `detailImage2` — 장소당 1콜 | 주 1회 | place_id 단위 교체 | **실행당 상한 400** (`place-image-import.max-calls-per-run`). 증분 선정 "한 번도 안 부른 곳 먼저 → `place.image_synced_at` 오래된 순 → id". 전량 커버 3주 순환 (#478) |
 | pet 마킹 | KorPetTourService2 `areaBasedList2`(areaCode=39) + `detailPetTour2` | 주 1회 | place_id | 제주 관광지 타입 29건 확인 (전 타입 확인 필요) |
 | walk_route/course | Durunubi `routeList`/`courseList` | 월 1회 | route_idx / crs_idx | sigun으로 제주 필터 |
 | stat_spot + congestion | `tatsCnctrRatedList` (areaCd=50 × signguCd 50110/50130) | 일 1회 | spot+base_ymd | 서귀포만 4,284행(30일×143곳) 확인 |
 | related_place | TarRlteTarService1 `areaBasedList1` (연월별) | 월 1회 | base_ym+spot+rlte_tats_cd | |
 | area_visitor_stat | metco/locgo `RegnVisitrDDList` | 일 1회 (D-4~) | level+region+ymd+tou_div | 전국 응답 → 제주만 필터 |
+
+**개발계정 쿼터 일 1,000건이 이 표의 제약이다.** 장소당 1콜인 두 단계(운영시간·추가 이미지)를
+전량 돌리면 한 번에 1,900콜이라 확실히 넘긴다. 그래서 둘 다 **실행당 상한 + 증분 대상 선정**으로
+나눠 덮는다 — "며칠 분할" 이 아니라 "몇 주 순환" 이 실제 형태다. 같은 날 최악 합은
+`17(목록) + 300(운영시간) + 400(이미지) + 276(수동 이미지 백필) + 1(올레) = 994` 다
+(근거: `features/478-incremental-image-import.md`).
 
 ## 12. JPA 엔티티 스켈레톤 예시 (place)
 
