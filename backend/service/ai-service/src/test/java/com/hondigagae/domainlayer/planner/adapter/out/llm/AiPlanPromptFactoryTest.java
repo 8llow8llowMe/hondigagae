@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuer
 import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
 import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
+import com.hondigagae.domainlayer.planner.application.model.PetLifeStage;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import java.util.List;
@@ -20,6 +21,51 @@ class AiPlanPromptFactoryTest {
 
     private final AiPlanPromptFactory factory = new AiPlanPromptFactory();
 
+    @Test
+    @DisplayName("생애 단계를 값으로 적는다 — 나이와 무관한 \"노령견\" 단정을 막는다 (#493)")
+    void writesLifeStageForAge() {
+        String prompt = factory.userPrompt(query(List.of(PetCondition.builder()
+            .ageText("6년")
+            .lifeStage(PetLifeStage.ADULT)
+            .build())));
+
+        assertThat(prompt).contains("- 나이: 6년 (성견)");
+        // 성견에는 활동 제약이 없다 — 괄호 뒤에 아무것도 붙지 않는다
+        assertThat(prompt).doesNotContain("노령견");
+    }
+
+    @Test
+    @DisplayName("노령견에는 단계와 함께 활동 제약을 적는다")
+    void writesSeniorGuidance() {
+        String prompt = factory.userPrompt(query(List.of(PetCondition.builder()
+            .ageText("11년 2개월")
+            .lifeStage(PetLifeStage.SENIOR)
+            .build())));
+
+        assertThat(prompt).contains("- 나이: 11년 2개월 (노령견) - 이동과 도보를 줄이고 휴식을 자주 둘 것");
+    }
+
+    @Test
+    @DisplayName("나이는 있는데 단계를 모르면 단계를 지어 적지 않는다")
+    void omitsLifeStageWhenUnknown() {
+        String prompt = factory.userPrompt(query(List.of(PetCondition.builder()
+            .ageText("6년")
+            .build())));
+
+        assertThat(prompt).contains("- 나이: 6년");
+        assertThat(prompt).doesNotContain("(성견)");
+        assertThat(prompt).doesNotContain("노령견");
+    }
+
+    @Test
+    @DisplayName("시스템 프롬프트가 말투·조사·생애 단계를 못 박는다 (#493)")
+    void systemPromptPinsTextRules() {
+        String system = factory.systemPrompt();
+
+        assertThat(system).contains("~해요");
+        assertThat(system).contains("조사");
+        assertThat(system).contains("생애 단계는 입력에 적힌 표현만");
+    }
     @Test
     @DisplayName("반려견 특성이 있으면 크기·체중·민감성·산책 선호가 프롬프트에 실린다")
     void petSectionCarriesTraits() {

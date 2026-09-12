@@ -5,6 +5,7 @@ import com.hondigagae.domainlayer.planner.adapter.out.client.feign.dto.PetCondit
 import com.hondigagae.domainlayer.planner.adapter.out.client.support.InternalResponseSupport;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
+import com.hondigagae.domainlayer.planner.application.model.PetLifeStage;
 import com.hondigagae.domainlayer.planner.application.port.out.PetConditionQueryPort;
 import com.hondigagae.shared.travel.pet.ActivityLevel;
 import com.hondigagae.shared.travel.pet.PetSizeType;
@@ -76,6 +77,7 @@ public class PetConditionClientAdapter implements PetConditionQueryPort {
             .sizeName(sizeName(body.sizeType()))
             .weightText(weightText(body.weightKg()))
             .ageText(ageText(body.ageMonths()))
+            .lifeStage(PetLifeStage.fromAgeMonths(body.ageMonths()))
             .heatSensitive(body.heatSensitive())
             .coldSensitive(body.coldSensitive())
             .noiseSensitive(body.noiseSensitive())
