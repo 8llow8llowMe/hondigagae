@@ -176,6 +176,82 @@ class OllamaLlmAdapterTest {
     }
 
     @Test
+    @DisplayName("이름도 메모도 없는 MEAL 은 버린다 — 화면에 \"이름이 없는 항목\" 으로 그려진다 (#487)")
+    void dropsItemWithoutTitle() {
+        // dev 에서 실제로 온 모양이다. 장소 연결이 끊긴 항목과 달리 이쪽은 남길 것이 하나도 없다.
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"PLACE","placeId":100,"title":"오설록","note":"실내"},
+              {"itemType":"MEAL","placeId":null,"title":"","note":""}]}],
+             "reasons":[]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "오설록")));
+
+        // 같은 날의 멀쩡한 항목은 남는다 — 한 항목 때문에 초안을 통째로 잃지 않는다
+        assertThat(draft.days().get(0).items()).extracting(AiPlanDraft.AiPlanDraftItem::title)
+            .containsExactly("오설록");
+    }
+
+    @Test
+    @DisplayName("공백뿐인 이름도 버린다 — 빈 문자열과 같게 본다")
+    void dropsItemWithBlankTitle() {
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"MEAL","placeId":null,"title":"   ","note":"점심"}]}],
+             "reasons":[]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "오설록")));
+
+        assertThat(draft.days().get(0).items()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("이름이 null 인 항목도 버린다")
+    void dropsItemWithNullTitle() {
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"MEAL","placeId":null,"note":"점심"}]}],
+             "reasons":[]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "오설록")));
+
+        assertThat(draft.days().get(0).items()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("후보에 있는 장소는 모델이 이름을 비워도 살아남는다 — 이름을 우리 데이터에서 가져온다")
+    void keepsItemWhenCandidateSuppliesTheTitle() {
+        // 버리는 기준은 "모델이 비웠는가" 가 아니라 "내놓을 이름이 없는가" 다.
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"MEAL","placeId":100,"title":"","note":""}]}],
+             "reasons":[]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "오설록")));
+
+        assertThat(draft.days().get(0).items()).extracting(AiPlanDraft.AiPlanDraftItem::title)
+            .containsExactly("오설록");
+    }
+
+    @Test
+    @DisplayName("후보 밖 장소에 이름까지 없으면 버린다 — 링크를 끊고 나면 남는 것이 없다")
+    void dropsHallucinatedItemWithoutTitle() {
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"PLACE","placeId":999,"title":"","note":""}]}],
+             "reasons":[]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "오설록")));
+
+        assertThat(draft.days().get(0).items()).isEmpty();
+    }
+
+    @Test
     @DisplayName("마크다운 코드 펜스로 감싼 JSON 도 해석한다 — 로컬 모델이 자주 내는 형태다")
     void toleratesMarkdownFencedJson() {
         stubResponse("""
