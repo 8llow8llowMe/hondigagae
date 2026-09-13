@@ -452,10 +452,21 @@ test.describe('3층 표면 — not-found', () => {
  * 레일 맨 앞에 `목록으로 건너뛰기`.
  */
 test.describe('필터 레일 건너뛰기 — #472', () => {
+  /*
+    **`/emergency?view=list` 가 #546 에서 들어왔다.** #472 는 셋만 고치고 이 화면을
+    빠뜨렸는데, 1280 실측 개요가 `h2 필터 → h3 셋 → h1 병원 · 약국` 이었다 — 급할 때 여는
+    화면이라 그 순서가 특히 나빴다.
+
+    **처방이 셋과 조금 다르다.** 저쪽은 `h1` 이 `sr-only` 라 `.rail-layout` 맨 앞으로 옮기면
+    끝이었지만, 이 화면의 `h1` 은 #537 이후 **보이는 제목**이라 그냥 옮기면 grid 아이템이
+    되어 2단이 깨진다. `.rail-heading`(globals.css)이 제목 줄을 두 열 위에 얹는다.
+    여기서 잠그는 계약(랜드마크 · 건너뛰기 링크 · 목적지)은 넷이 같다.
+  */
   const RAIL_SCREENS = [
     { path: '/places?view=list', list: 'place-list' },
     { path: '/plans', list: 'plan-list' },
     { path: '/plans/223456789012000001/days/1/add?view=list', list: 'plan-add-place-list' },
+    { path: '/emergency?view=list', list: 'emergency-list' },
   ] as const
 
   for (const { path, list } of RAIL_SCREENS) {
@@ -475,6 +486,20 @@ test.describe('필터 레일 건너뛰기 — #472', () => {
     test(`${path} — 건너뛰기 링크가 필터를 지나 목록으로 보낸다`, async ({ page }) => {
       await page.setViewportSize(VIEWPORTS.desktop)
       await page.goto(path)
+
+      /*
+        **목록이 실제로 찬 뒤에 누른다.** `/emergency` 는 서버 프리페치가 없고 좌표를 먼저
+        물어(`getCurrentPosition`) 로딩 구간이 길다 — 골격만 있는 동안에는 목적지 안에
+        포커스를 받을 것이 하나도 없어 Tab 이 컨테이너를 그냥 지나간다. 제품 동작으로는
+        맞고(빈 목록은 건너뛸 것이 없다) 이 테스트가 묻는 것은 **찬 목록**의 탭 순서다.
+
+        **`:visible` 이 필요하다.** 목적지 안의 첫 `button` 은 모바일 필터 칩인데
+        데스크톱에서 `lg:hidden` 이라 `display: none` 이다 — 그냥 `.first()` 를 쓰면
+        포커스를 받을 수 없는 그것에 걸려 영영 기다린다.
+      */
+      await expect(
+        page.locator(`#${list}`).locator('a[href]:visible, button:visible').first(),
+      ).toBeVisible()
 
       await page.getByRole('complementary').getByRole('link').first().press('Enter')
       await page.keyboard.press('Tab')
@@ -502,12 +527,94 @@ test.describe('필터 레일 건너뛰기 — #472', () => {
     **1024 미만에서는 레일이 없다.** 그때는 칩(`#457`)이 같은 일을 하고, 랜드마크도
     건너뛰기 링크도 있을 이유가 없다 — 있으면 포커스가 보이지 않는 곳으로 간다.
   */
-  test('tablet 에서는 레일도 건너뛰기 링크도 포커스를 받지 않는다', async ({ page }) => {
-    await page.setViewportSize(VIEWPORTS.tablet)
-    await page.goto('/places?view=list')
+  for (const { path } of RAIL_SCREENS) {
+    test(`${path} — tablet 에서는 레일도 건너뛰기 링크도 포커스를 받지 않는다`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(VIEWPORTS.tablet)
+      await page.goto(path)
 
-    await expect(page.getByRole('complementary')).toBeHidden()
-    await expect(page.getByRole('link', { name: messages.common.skipToList })).toBeHidden()
+      await expect(page.getByRole('complementary')).toBeHidden()
+      await expect(page.getByRole('link', { name: messages.common.skipToList })).toBeHidden()
+    })
+  }
+})
+
+/**
+ * **제목이 필터보다 먼저 읽혀야 한다** — 이슈 #546 · #472.
+ *
+ * 레일 건너뛰기(위)와 **다른 축**이다. 저쪽은 키보드가 필터를 지나칠 수 있는가를 묻고,
+ * 이쪽은 **제목 탐색(DOM 순서)** 이 페이지 이름을 먼저 주는가를 묻는다. 건너뛰기 링크가
+ * 있어도 개요가 `h2 필터` 로 시작하면 스크린리더 사용자는 여기가 어디인지 모른 채
+ * 필터 하위 항목부터 만난다.
+ *
+ * **`/emergency` 는 `h1` 이 보이는 제목이라 자리가 하나 더 걸린다.** 그래서 순서만이 아니라
+ * **두 열 위에 얹혔는지**(= 레일보다 위에 그려지는지)도 함께 본다 — `aria-*` 로만 순서를
+ * 바꾸면 이 단언이 걸린다.
+ */
+test.describe('제목이 필터보다 먼저다 — #546', () => {
+  test('데스크톱 개요가 h1 → h2 필터 → h3 셋 이다', async ({ page }) => {
+    await page.setViewportSize(VIEWPORTS.desktop)
+    await page.goto('/emergency?view=list')
+
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+
+    const outline = await page.evaluate(() =>
+      [...document.querySelectorAll('main h1, main h2, main h3')].map(
+        (h) => `${h.tagName}:${(h.textContent ?? '').trim()}`,
+      ),
+    )
+
+    /* 푸터(`데이터 출처`)는 `main` 밖이라 걸리지 않는다 */
+    expect(outline.slice(0, 5)).toEqual([
+      `H1:${messages.emergency.pageTitle}`,
+      `H2:${messages.place.filterTitle}`,
+      'H3:검색 반경',
+      'H3:시설 유형',
+      'H3:영업 조건',
+    ])
+  })
+
+  /*
+    **시각 순서도 같아야 한다.** DOM 만 고치고 제목을 우측 열에 남기면 제목이 레일의
+    **오른쪽**에 서서, 좌측 열을 먼저 읽는 시각 순서와 DOM 순서가 어긋난다.
+
+    **`y` 비교만으로는 못 잡는다.** 제목을 우측 열(`grid-column: 2`)에 두어도 auto-placement
+    가 레일을 다음 행으로 밀어 `y` 는 그대로 통과한다(뮤테이션으로 확인). 두 열 위에
+    얹혔다는 것은 **제목이 좌측 열의 가로 띠 안에서 시작한다**는 뜻이고, 그것이 이 단언이다.
+  */
+  test('제목 줄이 레일 위에 · 좌측 열에서 시작한다', async ({ page }) => {
+    await page.setViewportSize(VIEWPORTS.desktop)
+    await page.goto('/emergency?view=list')
+
+    const heading = await page.getByRole('heading', { level: 1 }).boundingBox()
+    const rail = await page.getByRole('complementary').boundingBox()
+
+    expect(heading).not.toBeNull()
+    expect(rail).not.toBeNull()
+
+    const { x: headingX, y: headingY } = heading as { x: number; y: number }
+    const { x: railX, y: railY, width: railWidth } = rail as { x: number; y: number; width: number }
+
+    expect(headingY).toBeLessThan(railY)
+    expect(headingX).toBeLessThan(railX + railWidth)
+  })
+
+  /*
+    **1024 미만에서는 이미 #537 이 고쳐 뒀다** — 레일이 없고 제목 줄이 맨 위다.
+    `.rail-heading` 은 grid 규칙이라 여기서는 적용되지 않는데, 그때도 순서가 유지되는지
+    본다 (DOM 순서 그대로 쌓인다).
+  */
+  test('모바일에서도 제목이 칩보다 먼저다', async ({ page }) => {
+    await page.setViewportSize(VIEWPORTS.mobile)
+    await page.goto('/emergency?view=list')
+
+    const heading = await page.getByRole('heading', { level: 1 }).boundingBox()
+    const chips = await page.getByRole('button', { name: /반경/ }).first().boundingBox()
+
+    expect(heading).not.toBeNull()
+    expect(chips).not.toBeNull()
+    expect((heading as { y: number }).y).toBeLessThan((chips as { y: number }).y)
   })
 })
 

@@ -73,8 +73,9 @@ describe('목록 갈래는 3층 표면이다 (#460)', () => {
   it('우측 열이 SurfaceStack 이고 목록이 Surface 하나다', () => {
     const view = block(listView, 'EmergencyListView')
 
-    expect(view).toContain('<SurfaceStack>')
-    expect(view.match(/<Surface\b/g)?.length).toBe(1)
+    /* #546 에서 건너뛰기 목적지가 되며 `id` · `tabIndex` · `md:pt-0` 이 붙었다 */
+    expect(view).toMatch(/<SurfaceStack\b/)
+    expect(view.match(/<Surface\b(?!Stack)/g)?.length).toBe(1)
   })
 
   /* L0 바닥이 열 사이로 비쳐 그 일을 한다 — 선을 남기면 카드 테두리와 두 줄로 읽힌다 */
@@ -208,5 +209,68 @@ describe('폴백 갈래는 레일도 카드도 얻지 않는다 (#419 · #460)',
     const tag = chips.slice(0, chips.indexOf('/>'))
 
     expect(tag).not.toContain('lg:hidden')
+  })
+})
+
+/*
+  **제목이 필터보다 먼저 읽혀야 한다** — 이슈 #546.
+
+  #472 가 `/places` · `/plans` · 담기 셋에 준 처방(랜드마크 · 건너뛰기 링크 · `h1` 을 앞으로)을
+  이 화면에도 적용한다. 1280 실측 개요가 `h2 필터 → h3 셋 → h1 병원 · 약국` 이었다.
+
+  **실제 순서와 자리는 `e2e/surface.spec.ts` 가 잰다.** 여기서 잠그는 것은 소스에 그 계약이
+  적혀 있는가다 — 랜드마크·링크·목적지는 셋이 짝이라 하나만 빠져도 조용히 무효가 된다.
+*/
+describe('제목이 필터보다 먼저다 (#546)', () => {
+  const view = block(listView, 'EmergencyListView')
+
+  it('레일이 라벨 붙은 aside 다', () => {
+    expect(view).toMatch(/<aside\s+aria-label=\{messages\.place\.filterTitle\}/)
+    /* 랜드마크가 아니면 보조기기가 이 구간을 통째로 건너뛸 수 없다 */
+    expect(view).not.toMatch(/<div className="rail-sticky/)
+  })
+
+  it('건너뛰기 링크가 레일 안 맨 앞이다', () => {
+    const aside = view.slice(view.indexOf('<aside'))
+    const skip = aside.indexOf('<SkipLink')
+    const rail = aside.indexOf('<EmergencyFilterRail')
+
+    expect(skip).toBeGreaterThan(-1)
+    expect(skip).toBeLessThan(rail)
+  })
+
+  /*
+    **목적지 id 를 두 곳에 적지 않는다.** 링크와 `SurfaceStack` 이 같은 상수를 쓴다 —
+    문자열을 복제하면 갈렸을 때 링크가 조용히 아무 데도 가지 않는다.
+  */
+  it('링크와 목적지가 같은 상수를 쓴다', () => {
+    expect(listView).toContain("const LIST_ANCHOR_ID = 'emergency-list'")
+    expect(view).toContain('<SkipLink href={`#${LIST_ANCHOR_ID}`}>')
+    expect(view).toMatch(/<SurfaceStack id=\{LIST_ANCHOR_ID\} tabIndex=\{-1\}/)
+  })
+
+  /*
+    **제목 줄이 두 열 위에 얹힌다.** `.rail-heading`(globals.css)이 `grid-column: 1 / -1` 을
+    준다 — 이것이 없으면 제목이 우측 열에 남아 DOM 순서와 시각 순서가 어긋난다.
+  */
+  it('제목 줄이 rail-heading 으로 두 열 위에 선다', () => {
+    const heading = view.indexOf('rail-heading')
+    const aside = view.indexOf('<aside')
+    const stack = view.indexOf('<SurfaceStack')
+
+    expect(heading).toBeGreaterThan(-1)
+    /* 소스 순서가 곧 DOM 순서다 — 제목 → 레일 → 목록 */
+    expect(heading).toBeLessThan(aside)
+    expect(aside).toBeLessThan(stack)
+  })
+
+  /*
+    **스택 밖으로 나온 제목 줄이 스택이 주던 여백을 스스로 진다.** 바깥 `md:px-6` 이
+    `SurfaceStack` 의 `md:p-6` 자리를, 안쪽 `INSET_CLASS.card` 가 카드 인셋을 쓴다.
+    스택은 `md:pt-0` 으로 자기 위 여백을 내놓는다 — 둘 다 두면 768 에서 48 로 벌어진다.
+  */
+  it('제목 줄과 스택이 여백을 두 번 넣지 않는다', () => {
+    expect(view).toMatch(/rail-heading[^"]*md:px-6/)
+    expect(view).toMatch(/<SurfaceStack[^>]*className="md:pt-0"/)
   })
 })

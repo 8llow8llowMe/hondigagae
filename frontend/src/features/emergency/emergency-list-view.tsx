@@ -1,5 +1,6 @@
 'use client'
 
+import { SkipLink } from '@/components/skip-link'
 import { Surface, SurfaceStack } from '@/components/surface'
 import { ViewToggle } from '@/components/view-toggle'
 import { EmergencyFilterChips } from '@/features/emergency/emergency-filter-chips'
@@ -14,13 +15,19 @@ import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
 /**
+ * 건너뛰기 링크의 목적지 — 레일 맨 앞 링크와 `SurfaceStack` 의 `id` 가 같은 값을 써야
+ * 한다. 문자열을 두 곳에 적으면 갈렸을 때 링크가 조용히 아무 데도 가지 않는다.
+ */
+const LIST_ANCHOR_ID = 'emergency-list'
+
+/**
  * 목록 갈래 — `?view=list`. **`/places` 목록과 같은 2단이다** (좌 280 필터 레일 / 우 목록, #419).
  *
  * **grid 를 페이지가 아니라 이 컴포넌트가 갖는다.** `/places` 는 레일이 URL 주도라 서버
  * 컴포넌트가 좌측 칸에 바로 꽂지만, 이 화면은 조회에 좌표가 필요해 서버 프리페치가 없고
  * 조건·반경·개수를 `useEmergencyBoard` 가 쥔다. 레일이 보드를 봐야 하므로 grid 가 클라이언트
- * 경계 안으로 들어오고, 제목·`ViewToggle` 도 우측 열 안이라 함께 내려왔다 — 제목 줄은
- * #537 에서 카드 밖으로 나왔지만 **여전히 우측 열 안**이다 (레일 위로 올라가지 않는다).
+ * 경계 안으로 들어오고, 제목·`ViewToggle` 도 함께 내려왔다 — #537 에서 카드 밖으로,
+ * #546 에서 **두 열 위**로 올라갔다 (`.rail-heading`).
  * **바닥(`Canvas`)은 페이지의 `main` 이 깐다** — 바닥은 전폭이어야 하고 grid 는 1440 컨테이너
  * 안이라 둘을 한 요소로 둘 수 없다 (§0 · `styling-guide.md` §3-1).
  *
@@ -50,20 +57,7 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
 
   return (
     <div className="rail-layout rail-layout-filter">
-      {/* `rail-sticky`(globals.css) — 레일이 뷰포트보다 길어도 바닥에 닿을 수 있게 자기 스크롤을 준다 */}
-      <div className="rail-sticky hidden lg:block">
-        <EmergencyFilterRail
-          filters={board.filters}
-          onFiltersChange={board.setFilters}
-          radius={board.radius}
-          onRadiusChange={board.setRadius}
-          counts={counts}
-          showCounts={showCounts}
-        />
-      </div>
-
-      <SurfaceStack>
-        {/*
+      {/*
           **제목 줄이 맨 위다** (#537). 예전에는 카드 **위**에 모바일 칩 다섯 개가 두 줄로
           깔리고 제목은 그 아래 카드의 `h2` 였다 — 375 에서 페이지에 들어온 사용자가
           "여기가 어디인가" 를 알기 전에 필터 두 줄을 먼저 지났고, 보기 토글은 그보다도 더
@@ -76,18 +70,34 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
           밖이어야 한다. 카드는 `aria-label` 로 이름을 갖는다 (담기 화면과 같은 모양 —
           `EmergencySectionProps.headingLevel` 주석이 그 조합을 이미 적어 뒀다).
 
-          **`/places` 는 아직 옛 순서다.** 두 화면을 같이 옮길지는 #537 범위 밖이라
-          건드리지 않았다 — 거기는 검색 필드까지 카드 밖에 있어 순서 판단이 하나 더 걸린다.
+          **`/places` 는 다른 처방이다.** 거기는 `h1` 이 `sr-only` 라 `.rail-layout` 맨 앞으로
+          그냥 옮기면 끝이었다(#472) — `position: absolute` 라 grid 트랙도 만들지 않는다.
+          이 화면의 `h1` 은 보이는 제목이라 같은 자리로 옮기면 grid 아이템이 되어 2단이
+          깨지고, 그래서 `.rail-heading` 이 필요했다.
 
           `h1` 이 이제 **보이는** 제목이라 `sr-only` 를 걷었다. 지도 갈래(`page.tsx`)가 내는
           `h1` 과 같은 문자열이라 보기 전환이 문서 구조를 바꾸지 않는 것은 그대로다.
         */}
-        {/*
+      {/*
+          **제목 줄이 `SurfaceStack` 밖으로 나왔다** (#546). 스택 안에 있는 동안에는 그것이
+          곧 **우측 열 안**이라, 1024 이상에서 `h1` 이 레일의 `h2 필터` 보다 DOM 뒤였다 —
+          제목 탐색 개요가 `h2 필터 → h3 셋 → h1 병원 · 약국` 이었다(1280 실측).
+          `.rail-heading`(globals.css)이 이 줄을 **두 열 위**에 얹어 순서를 바로잡는다.
+
+          **밖으로 나오면서 스택이 주던 여백을 스스로 진다.** 바깥이 `md:px-6` 으로 스택의
+          `md:p-6` 자리를, 안쪽이 `INSET_CLASS.card` 로 카드 인셋을 쓴다 — 합이 768 에서
+          44 로 **지금과 같은 값**이다. 아래쪽도 같다: 모바일 `pb-2`(8) 는 스택의 `gap-2`,
+          `md:pb-6`(24) 는 `md:gap-6` 과 같은 값이고, 스택이 `md:pt-0` 으로 자기 위 여백을
+          내놓아 두 번 들어가지 않는다.
+        */}
+      {/*
           **인셋은 칩·행과 같은 `card` 다** (`inset.ts`). 왼쪽 세로선은 페이지가 하나로
           쓰는 기준선이라 제목만 다른 값을 쓰면 768 에서 제목 24 · 필터 44 · 행 44 로
-          한 번 꺾인다 (실측으로 잡았다). 카드 밖이라고 `main`(40)을 쓰는 것도 아니다 —
-          이 줄은 `SurfaceStack` 안이고 스택이 768 부터 24 를 이미 넣는다.
+          한 번 꺾인다 (#537 이 실측으로 잡았다). 카드 밖이라고 `main`(40)을 쓰는 것도
+          아니다 — 1024 에서 레일 카드 모서리가 그 40 을 이미 지고 있고(`.filter-rail`),
+          이 줄은 카드가 아니라 그 위에 선 **글줄**이다.
         */}
+      <div className="rail-heading pb-2 md:px-6 md:pt-6 md:pb-6">
         <div
           className={cn('flex items-center justify-between gap-3 pt-3 md:pt-0', INSET_CLASS.card)}
         >
@@ -104,7 +114,40 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
           {/* 세 화면이 같은 세그먼트 컨트롤을 쓴다 */}
           <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
         </div>
+      </div>
 
+      {/*
+          **`aside` 다 — `complementary` 랜드마크** (#546 · #472 와 같은 처방). 레일은 목록을
+          좁히는 도구이고 본문이 아니다. 랜드마크로 내보내야 보조기기가 통째로 건너뛴다.
+
+          **건너뛰기 링크를 레일 맨 앞에 둔다.** 전역 스킵 링크(`#main-content`)는 레일
+          **앞**으로 보내므로 이 구간을 건너뛰지 못한다 — 키보드 사용자가 목록에 닿으려면
+          검색 반경 · 시설 유형 · 영업 조건 셋을 전부 지나야 했다. `relative` 는 그 링크가
+          레일 좌상단에 뜨게 한다 (`SkipLink` 머리주석).
+
+          `rail-sticky`(globals.css) — 레일이 뷰포트보다 길어도 바닥에 닿을 수 있게 자기
+          스크롤을 준다.
+        */}
+      <aside
+        aria-label={messages.place.filterTitle}
+        className="rail-sticky relative hidden lg:block"
+      >
+        <SkipLink href={`#${LIST_ANCHOR_ID}`}>{messages.common.skipToList}</SkipLink>
+        <EmergencyFilterRail
+          filters={board.filters}
+          onFiltersChange={board.setFilters}
+          radius={board.radius}
+          onRadiusChange={board.setRadius}
+          counts={counts}
+          showCounts={showCounts}
+        />
+      </aside>
+
+      {/*
+          **스택이 `md:pt-0` 이다** — 위 제목 줄이 `md:pb-6` 으로 그 간격을 이미 냈다.
+          둘 다 두면 768 에서 제목과 칩 사이가 48 로 벌어진다.
+        */}
+      <SurfaceStack id={LIST_ANCHOR_ID} tabIndex={-1} className="md:pt-0">
         {/*
           **모바일 필터는 카드 밖이다.** 필터는 목록을 좁히는 **도구**이고 카드는 그 결과를
           담는다 — §0 의 카드 판정 3문에서 ① 자기 제목이 없어 걸린다 (#439 · #445 와 같은
