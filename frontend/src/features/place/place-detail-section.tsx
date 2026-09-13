@@ -148,18 +148,7 @@ export function PlaceDetailSection({
 
     // 컨트롤러가 @PathVariable long 이라 숫자가 아닌 placeId 는 404 가 아니라 400 이다.
     // 주소 자체가 잘못된 것이므로 재시도해도 같은 400 이다 — 재시도를 주지 않는다
-    if (kind === 'validation') {
-      return (
-        <DetailStateShell heading={messages.common.validationErrorTitle}>
-          <EmptyState
-            title={messages.common.validationErrorTitle}
-            description={toMessage(errorMessage, messages.place.detailNotFoundDescription)}
-            inset="card"
-            action={<PlaceBackLink />}
-          />
-        </DetailStateShell>
-      )
-    }
+    if (kind === 'validation') return <PlaceDetailInvalidId errorMessage={errorMessage} />
 
     // 5xx · 무응답 — 재시도를 제공한다
     return (
@@ -488,6 +477,33 @@ export function PlaceDetailSection({
  * 예전에는 **문서에 `h1` 이 하나도 없었다** — 서버가 잡았을 때는 경계가 `sr-only h1` 을
  * 그렸다. 보이는 제목은 상태 컴포넌트의 제목이 이미 그리므로 여기서도 `sr-only` 다.
  */
+/**
+ * 주소의 `placeId` 자체가 잘못됐다 — 400(`PLACE_113`).
+ *
+ * **두 곳이 같은 화면을 그린다** (#496). 서버가 형식을 먼저 보고 요청 없이 여기로 오는
+ * 길(`app/(main)/places/[placeId]/page.tsx`)과, 어떤 이유로든 400 을 받아 화면 안에서
+ * 잡는 길이다. **한 벌로 두지 않으면 "누가 잡았는가" 에 따라 문구가 갈린다** — #480 이
+ * 인셋에서 잡은 것과 같은 축이다.
+ *
+ * **재시도를 주지 않는다.** 주소가 잘못된 것이라 다시 물어도 같은 400 이다
+ * (`api-integration-guide.md` §3 · `EmptyState` 에 `onRetry` 슬롯이 없다).
+ *
+ * `errorMessage` 는 **서버가 실제로 답했을 때만** 온다. 요청 없이 가른 길에는 없고,
+ * 그때는 기본 문구로 떨어진다 — 이슈가 실측한 화면 그대로다.
+ */
+export function PlaceDetailInvalidId({ errorMessage }: { errorMessage?: unknown }) {
+  return (
+    <DetailStateShell heading={messages.common.validationErrorTitle}>
+      <EmptyState
+        title={messages.common.validationErrorTitle}
+        description={toMessage(errorMessage, messages.place.detailNotFoundDescription)}
+        inset="card"
+        action={<PlaceBackLink />}
+      />
+    </DetailStateShell>
+  )
+}
+
 function DetailStateShell({ heading, children }: { heading: string; children: ReactNode }) {
   return (
     <SurfaceStack className="content-container">

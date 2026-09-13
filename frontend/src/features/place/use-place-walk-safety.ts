@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { clientFetch } from '@/lib/api/client'
 import { walkSafetyPath } from '@/lib/api/insight'
 import { conditionKey, INSIGHT_QUERY_OPTIONS, insightKeys } from '@/lib/insight/queries'
+import { isPlaceId } from '@/lib/place/place-id'
 import type { PetCondition, WalkSafetyResponse } from '@/types/insight'
 
 /**
@@ -26,10 +27,18 @@ import type { PetCondition, WalkSafetyResponse } from '@/types/insight'
  * 없어도 값 자체가 참이다 (적합도의 점수와 다른 점이다).
  */
 export function usePlaceWalkSafety(placeId: string, condition: PetCondition | null) {
+  /*
+    **형식이 틀린 `placeId` 면 켜지 않는다** (#496). 컨트롤러가 `@PathVariable long` 이라
+    답이 400 으로 정해져 있다. 라우트가 이미 그런 주소를 가르지만, **이 훅이 다른 곳에서도
+    불릴 수 있어** 여기서도 잠근다 — 가드가 한쪽에만 있으면 새 진입로가 조용히 400 을 낸다.
+  */
+  const enabled = isPlaceId(placeId)
+
   return useQuery({
     queryKey: insightKeys.walkSafety(placeId, conditionKey(condition)),
     queryFn: () => clientFetch<WalkSafetyResponse>(walkSafetyPath(placeId, condition)),
     placeholderData: (previous) => previous,
+    enabled,
     ...INSIGHT_QUERY_OPTIONS,
   })
 }
