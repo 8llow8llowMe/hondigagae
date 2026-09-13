@@ -63,9 +63,52 @@ function code(relative: string): string {
   return strip(readFileSync(`${ROOT}${relative}`, 'utf8'))
 }
 
-/** `<EmptyState …/>` · `<ErrorState …/>` 열기 태그를 통째로 집는다 (여러 줄) */
+/**
+ * `<EmptyState …>` · `<ErrorState …>` 의 **열기 태그**를 통째로 집는다 (여러 줄).
+ *
+ * **정규식으로 하지 않는다.** `/<(?:Empty|Error)State\b[\s\S]*?\/>/` 는 **prop 안에 든
+ * self-closing 자식의 `/>` 에서 잘린다.** 저장소 전체 80개 태그를 두 방식으로 돌려 센
+ * 결과 실제로 갈리는 것이 **셋**이고 전부 `action={<PlaceBackLink />}` 다 —
+ * `place-detail-section.tsx` 둘과 `app/(main)/places/[placeId]/not-found.tsx` 하나.
+ * **마지막 하나는 아래 열두 파일 표에 들어 있다.**
+ *
+ * 오늘의 판정은 그대로다(셋 다 `2` 이고 `headingLevel` 이 아예 없다). 하지만 그 세그먼트가
+ * 제목 있는 카드를 갖게 되는 날, `headingLevel={3}` 을 `action` **뒤에** 적으면 잘린 사본에
+ * 안 들어와 **코드는 맞는데 단언이 깨진다.** prop 순서가 계약이 되는 것은 함정이다.
+ *
+ * `<ButtonLink …>…</ButtonLink>` 처럼 자식을 감싸는 형태는 `/>` 가 없어 잘리지 않는다 —
+ * 나머지 다섯 호출처가 그 모양이라 정규식으로도 통과했다. 그 우연에 기대지 않는다.
+ *
+ * 그래서 중괄호 깊이를 세며 **깊이 0 의 `>`** 까지 걷는다. 문자열 안의 괄호는 세지 않는다.
+ */
 function stateTags(source: string): string[] {
-  return [...source.matchAll(/<(?:Empty|Error)State\b[\s\S]*?\/>/g)].map((match) => match[0])
+  const tags: string[] = []
+
+  for (const start of [...source.matchAll(/<(?:Empty|Error)State\b/g)].map((m) => m.index)) {
+    let depth = 0
+    let quote: string | null = null
+
+    for (let i = start; i < source.length; i += 1) {
+      const char = source[i] as string
+
+      if (quote !== null) {
+        if (char === quote) quote = null
+        continue
+      }
+      if (char === '"' || char === "'" || char === '`') {
+        quote = char
+        continue
+      }
+      if (char === '{') depth += 1
+      else if (char === '}') depth -= 1
+      else if (char === '>' && depth === 0) {
+        tags.push(source.slice(start, i + 1))
+        break
+      }
+    }
+  }
+
+  return tags
 }
 
 describe('EmptyState · ErrorState — 제목 레벨 prop', () => {
