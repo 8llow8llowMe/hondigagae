@@ -20,6 +20,7 @@ import type {
   PlanSummaryItem,
   PlanWeatherResponse,
 } from '@/types/plan'
+import { NO_PLACE_ITEM_REASON_CODE } from '@/types/plan'
 
 /**
  * 여행 일정 mock.
@@ -799,10 +800,28 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
         weather: null,
         indoorAlternatives: [],
         petSuitabilities: [],
-        unavailableReason:
-          representativePlaceId === null
-            ? '이 날은 담은 장소가 없어 판정할 기준이 없습니다.'
-            : '기상 예보는 11일까지만 제공돼 이 날은 아직 판단할 수 없습니다.',
+        /*
+          **코드와 문장은 짝이다** (#492 · #497). 화면이 사유마다 다르게 그리므로 mock 이
+          코드를 빼면 계약의 모양이 달라진다 — `NO_PLACE_ITEM` 은 화면이 서버 문장을
+          감추는 유일한 갈래라, 코드가 없으면 mock 에서만 문구가 두 번 나온다.
+
+          **문장은 서버 enum(`PlanDayWeatherUnavailableReason`)의 것을 그대로 쓴다.**
+          여기서 바꿔 적으면 화면이 실제로 받는 문장과 다른 것으로 검증하게 된다.
+
+          `PAST_DATE` 는 mock 이 "오늘" 을 모르므로 나지 않는다 — 지난 날짜 갈래는
+          `plan-day-verdict.test.ts` 가 직접 덮는다.
+        */
+        ...(representativePlaceId === null
+          ? {
+              unavailableReasonCode: NO_PLACE_ITEM_REASON_CODE,
+              unavailableReason:
+                '이 날짜에는 장소가 지정된 일정 항목이 없어 날씨를 붙이지 못했습니다.',
+            }
+          : {
+              unavailableReasonCode: 'BEYOND_FORECAST_RANGE',
+              unavailableReason:
+                '예보는 오늘부터 11일까지만 제공되어 이 날짜는 아직 판정할 수 없습니다.',
+            }),
       }
     }
 
@@ -901,6 +920,7 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
       indoorAlternatives: rainy ? indoorAlternatives(representativePlaceId) : [],
       petSuitabilities,
       unavailableReason: null,
+      unavailableReasonCode: null,
     }
   })
 

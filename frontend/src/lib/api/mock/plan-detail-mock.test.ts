@@ -166,6 +166,24 @@ describe('일정 판정 mock — /weather', () => {
     expect(third?.unavailableReason).not.toBeNull()
   })
 
+  /*
+    **코드와 문장은 짝이다** (#492 · #497). 화면이 사유마다 다르게 그리므로 mock 이 코드를
+    빠뜨리면 **mock 에서만** 빈 일차 문구가 두 번 나오는 계약 드리프트가 생긴다.
+  */
+  it('판정을 못 낸 일자는 사유 코드와 문장이 짝으로 온다', () => {
+    const third = weatherOf(PLAN).days[2]
+
+    expect(third?.unavailableReasonCode).not.toBeNull()
+    expect(third?.unavailableReason).not.toBeNull()
+  })
+
+  it('판정이 나온 일자는 코드도 문장도 null 이다 — 정상은 정상으로 읽혀야 한다', () => {
+    const first = weatherOf(PLAN).days[0]
+
+    expect(first?.unavailableReasonCode).toBeNull()
+    expect(first?.unavailableReason).toBeNull()
+  })
+
   it('항목이 없는 일자는 판정 기준이 없다 — representativePlaceId 가 null 이다', () => {
     const third = weatherOf(PLAN).days[2]
 

@@ -134,6 +134,7 @@ export const planVerdict: PlanDayWeatherItem = {
   },
   indoorAlternatives: [],
   unavailableReason: null,
+  unavailableReasonCode: null,
 }
 
 export const pet: Pet = {
