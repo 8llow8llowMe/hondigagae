@@ -4,7 +4,6 @@ import { useState } from 'react'
 
 import { Banner } from '@/components/banner'
 import { ConfirmModal } from '@/components/confirm-modal'
-import { EmptyState } from '@/components/empty-state'
 import { EmergencyIcon } from '@/components/icons'
 import { Surface, SurfaceList, SurfaceStack } from '@/components/surface'
 import { PlanDayEditor } from '@/features/plan/plan-day-editor'
@@ -343,9 +342,4 @@ function PlanOutOfRangeSection({ items }: { items: PlanDetail['items'] }) {
       </SurfaceList>
     </Surface>
   )
-}
-
-/** 일자가 하나도 없는 일정 — `totalDays` 가 0 이하일 때만 나온다 (서버 결함) */
-export function PlanNoDays() {
-  return <EmptyState title={messages.plan.dayEmpty} />
 }
