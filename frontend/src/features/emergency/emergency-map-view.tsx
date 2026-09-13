@@ -312,6 +312,8 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         <EmergencyFilterChips
           filters={board.filters}
           onFiltersChange={board.setFilters}
+          radius={board.radius}
+          onRadiusChange={board.setRadius}
           counts={facilityCounts(inRadius)}
           showCounts={board.query.data !== undefined && countsAreComplete(board.query.data)}
           inset="main"

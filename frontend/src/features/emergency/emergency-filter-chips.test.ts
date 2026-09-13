@@ -6,7 +6,9 @@ import { describe, expect, it } from 'vitest'
 import { EmergencyFilterChips } from '@/features/emergency/emergency-filter-chips'
 import { countsAreComplete, facilityCounts } from '@/features/emergency/facility-filters'
 import { MAX_SIZE } from '@/lib/api/emergency'
+import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
+import { RADIUS_OPTIONS } from '@/lib/url/emergency-filters'
 import { facility, facilityResult } from '@/test/fixtures/emergency'
 import { DEFAULT_FACILITY_FILTERS, type NearbyFacilityResult } from '@/types/emergency'
 
@@ -17,6 +19,8 @@ function render(result: NearbyFacilityResult | null, overrides: Partial<Props> =
   const props: Props = {
     filters: DEFAULT_FACILITY_FILTERS,
     onFiltersChange: () => undefined,
+    radius: RADIUS_OPTIONS[0],
+    onRadiusChange: () => undefined,
     counts: facilityCounts(result?.facilities ?? []),
     showCounts: result !== null && countsAreComplete(result),
     ...overrides,
@@ -147,5 +151,61 @@ describe('EmergencyFilterChips — 인셋 (#460)', () => {
 
     const divided = render(ONE, { divider: true })
     expect(divided.slice(0, divided.indexOf('>'))).toContain('border-border border-b')
+  })
+})
+
+/*
+  **#537 — 두 축이 생김새로 갈린다.**
+
+  예전에는 칩 다섯 개가 두 줄이었다. 윗줄(전체·병원·약국)은 **택일**, 아랫줄(24시간·지금
+  진료중)은 **다중**인데 컨트롤이 똑같아, 사용자가 병원과 약국을 함께 켤 수 있다고 기대했다.
+  `components/chip.tsx` 가 "축의 성격이 컨트롤 종류를 정한다" 고 적은 규칙을 화면 층에서
+  한 번 더 적용한 것이다.
+*/
+describe('EmergencyFilterChips — 축 분리 (#537)', () => {
+  it('택일 축은 radiogroup 한 덩어리다 — 칩이 아니다', () => {
+    const markup = render(ONE)
+
+    expect(markup).toContain(`role="radiogroup" aria-label="${messages.emergency.typeGroupLabel}"`)
+    // 택일 칸은 radio 셋 — 전체 · 병원 · 약국
+    expect(markup.match(/role="radio"/g)?.length).toBe(3)
+    // 택일 축이 토글로 새지 않는다. 다중 축(24시간 · 진료중) 둘만 aria-pressed 다
+    expect(markup.match(/aria-pressed=/g)?.length).toBe(2)
+  })
+
+  /* 폭이 라벨 길이를 따라가면 택일 축에서 특정 값이 시각적으로 우대된다 */
+  it('세그먼트가 전폭이고 칸이 균등하다', () => {
+    const markup = render(ONE)
+    const group = markup.slice(markup.indexOf('role="radiogroup"'))
+
+    expect(group.slice(0, group.indexOf('>'))).toContain('w-full')
+    expect(group.match(/flex-1/g)?.length).toBe(3)
+  })
+
+  /*
+    **반경이 모바일에 올라왔다.** 이전에는 목록에서 반경을 바꾸려면 지도 갈래로 갔다 와야
+    했다 — 0건 화면의 "더 넓게 찾기" 뿐이라 결과가 있는데 부족한 사용자는 넓힐 수 없었다.
+  */
+  it('반경 축이 다중 선택 줄에 칩으로 선다', () => {
+    const markup = render(ONE, { radius: RADIUS_OPTIONS[0] })
+
+    expect(markup).toContain(
+      messages.emergency.radiusLabel.replace('{radius}', formatDistance(RADIUS_OPTIONS[0])),
+    )
+  })
+
+  /*
+    **반경은 필터가 아니라 조회 파라미터다.** 기본값이 아니면 사용자가 손댄 축이라 tint 가
+    붙는다 — `초기화` 가 이 축을 되돌리지 않는 것과 짝이다.
+  */
+  it('기본 반경이 아니면 칩에 tint 가 붙는다', () => {
+    // 튜플 리터럴 인덱스다 — `length - 1` 은 number 로 넓어져 `| undefined` 가 붙는다
+    const widened = RADIUS_OPTIONS[1]
+
+    expect(render(ONE, { radius: widened })).toContain(
+      messages.emergency.radiusLabel.replace('{radius}', formatDistance(widened)),
+    )
+    // 시트를 여는 트리거라 aria-expanded 다 — aria-pressed 면 "이미 적용됨" 으로 들린다
+    expect(render(ONE, { radius: widened })).toContain('aria-expanded="false"')
   })
 })
