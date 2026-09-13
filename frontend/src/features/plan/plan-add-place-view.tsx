@@ -365,7 +365,13 @@ function PlanAddPlaceShell({
   children: ReactNode
 }) {
   return (
-    <SurfaceStack>
+    /*
+      **건너뛰기 링크의 목적지다** (#472). 페이지가 레일 맨 앞에 둔 `목록으로 건너뛰기` 가
+      여기로 온다 — 전역 스킵 링크(`#main`)는 레일 **앞**이라 이 구간을 못 건너뛴다.
+      `tabIndex={-1}` 의 근거는 `surface.tsx` 의 `SurfaceStack` 주석에 있다 — Chromium 만
+      보면 없어도 되지만 보조기기 조합을 위해 둔다.
+    */
+    <SurfaceStack id="plan-add-place-list" tabIndex={-1}>
       <PlanAddPlaceHeader
         day={day}
         backHref={backHref}

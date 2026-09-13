@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 
 import { Button } from '@/components/button'
 import { PlusIcon } from '@/components/icons'
+import { SkipLink } from '@/components/skip-link'
 import { Surface, SurfaceStack } from '@/components/surface'
 import { usePetList } from '@/features/pet/use-pet-list'
 import { PlanCreateSheet } from '@/features/plan/plan-create-sheet'
@@ -92,8 +93,27 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
 
   return (
     <>
-      {/* 2단은 1024+ 부터다. 280 레일 + 본문은 768 에 들어가지 않아 가로 스크롤이 난다 */}
-      <div className="rail-sticky hidden lg:block">
+      {/*
+        **`h1` 이 문서의 첫 제목이다** (#472). 예전에는 이것이 목록 카드와 같은 열 안에
+        있어, 제목으로 탐색하면 `h2 필터` 와 그 하위가 **페이지 제목보다 먼저** 나왔다.
+        보이는 제목은 여전히 카드의 `h2` 다 — `sr-only` 는 `position: absolute` 라
+        자리도 grid 트랙도 만들지 않는다.
+      */}
+      <h1 className="sr-only">{messages.plan.pageTitle}</h1>
+
+      {/*
+        2단은 1024+ 부터다. 280 레일 + 본문은 768 에 들어가지 않아 가로 스크롤이 난다.
+
+        **`aside` 다 — `complementary` 랜드마크** (#472). 레일은 목록을 좁히는 도구이고
+        본문이 아니다. 랜드마크로 내보내야 보조기기가 통째로 건너뛸 수 있다.
+        **건너뛰기 링크**는 전역 스킵 링크(`#main`)가 레일 **앞**으로 보내 이 구간을
+        못 건너뛰는 것을 메운다. `relative` 는 그 링크가 레일 좌상단에 뜨게 한다.
+      */}
+      <aside
+        aria-label={messages.plan.filterTitle}
+        className="rail-sticky relative hidden lg:block"
+      >
+        <SkipLink href="#plan-list">{messages.common.skipToList}</SkipLink>
         <PlanFilterRail
           filters={filters}
           onChange={apply}
@@ -102,14 +122,14 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
           statusCounts={statusCounts}
           petCounts={petCounts}
         />
-      </div>
+      </aside>
 
       {/*
         **3층 표면** (`DESIGN.md §0`, 이슈 #445). 우측 열은 `SurfaceStack` 하나고 목록이 L1 카드
         하나다 — 장소 목록(#439)과 같은 모양. **열 구분선을 걷었다** — L0 바닥이 열 사이로
         비쳐 그 일을 한다.
       */}
-      <SurfaceStack>
+      <SurfaceStack id="plan-list" tabIndex={-1}>
         {/*
           **필터는 카드 밖이다.** 상태 탭·반려견 칩은 목록을 좁히는 **도구**이고 카드는 그
           결과를 담는다 — 데스크톱 레일이 카드 밖에 서 있는 것과 같은 자리다 (#439 와 같은 판단).
@@ -124,8 +144,6 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
           하나뿐이고 그 이름이 곧 페이지의 이름이라, 밖에 두면 어느 묶음의 제목인지 모호해진다.
           보이는 제목은 카드의 `h2`, 페이지의 `h1` 은 `sr-only` — 장소 목록(#439)과 같은 방식이다.
         */}
-        <h1 className="sr-only">{messages.plan.pageTitle}</h1>
-
         <Surface
           lead
           titleId="plan-list-heading"

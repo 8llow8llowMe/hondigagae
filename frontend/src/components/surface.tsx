@@ -98,8 +98,31 @@ export function Canvas({
  * 모바일은 좌우 여백이 없다 — `Surface` 가 전폭으로 내려앉기 때문이다. 세로 간격
  * `gap-2`(8)로 바닥이 비치는데, 이 값이 **2a 의 8px 밴드와 같다** (#475 에서 삭제).
  */
-export function SurfaceStack({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('flex flex-col gap-2 md:gap-6 md:p-6', className)}>{children}</div>
+export function SurfaceStack({
+  id,
+  children,
+  className,
+  ...rest
+}: {
+  /**
+   * 건너뛰기 링크의 목적지가 될 때 준다 (#472) — `Canvas` 의 `id` 와 같은 이유다.
+   *
+   * **`tabIndex={-1}` 을 함께 준다** — 다만 *측정으로 증명된 것은 아니다.* Chromium 은
+   * 이것이 없어도 앵커 목적지로 **순차 포커스 시작점**을 옮겨서, e2e 가 두 경우를
+   * 구별하지 못한다(뮤테이션으로 확인). 보조기기·구형 브라우저 조합에서 포커스가
+   * `body` 에 남는 사례가 알려져 있어 WAI 가 권하는 처방을 그대로 둔다.
+   */
+  id?: string
+  tabIndex?: -1
+  'aria-label'?: string
+  children: ReactNode
+  className?: string
+}) {
+  return (
+    <div {...rest} id={id} className={cn('flex flex-col gap-2 md:gap-6 md:p-6', className)}>
+      {children}
+    </div>
+  )
 }
 
 /**
