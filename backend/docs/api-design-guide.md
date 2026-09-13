@@ -55,6 +55,38 @@
 `resultMessage` 는 **대표 오류 하나의 메시지**다. 여러 필드가 틀렸을 때 이를 이어 붙이지 않는다 —
 전체 목록은 `fieldErrors` 에 있고, 화면은 입력 항목별로 해당 `field` 의 첫 오류를 붙이면 된다.
 
+### 2-2. 게이트웨이도 같은 봉투를 낸다 (이슈 [#529](https://github.com/8llow8llowMe/hondigagae/issues/529))
+
+**봉투 계약의 경계는 서비스가 아니라 클라이언트가 받는 응답 전부다.** 요청이 서비스까지
+가지 못하고 게이트웨이에서 끝나도 응답 모양은 같아야 한다 — 클라이언트는 어디서 끊겼는지
+모르고, 알 필요도 없다.
+
+- **api-gateway 의 JWT 거부는 `Response.fail` 봉투로 나간다.** 게이트웨이는 이미 `common-core` 를
+  의존하므로 봉투 DTO 를 그대로 쓴다.
+- **WebFlux 라 `@ControllerAdvice` 가 아니다.** `WebExceptionHandler` 를 `@Order(-2)` 로 등록한다
+  (`JwtAuthExceptionWebHandler`). **`ErrorWebExceptionHandler` 타입으로 올리면 안 된다** — 부트의
+  `ErrorWebFluxAutoConfiguration` 이 기본 핸들러를
+  `@ConditionalOnMissingBean(ErrorWebExceptionHandler.class)` 로 걸어서, 그 타입으로 빈을 올리는
+  순간 **JWT 와 무관한 모든 오류의 기본 처리까지 사라진다.** 상위 타입으로 등록하고 내 것이
+  아닌 예외는 그대로 다시 던져 기본 핸들러에게 넘긴다. `-2` 인 이유는 기본 핸들러가 `-1` 이라서다.
+- **인증 오류 코드는 `SECURITY_00x` 하나로 통일한다.** 같은 만료 토큰이 auth-service(nginx 직결)
+  로 가면 `SECURITY_002`, 게이트웨이를 거치면 다른 코드로 올 이유가 없다 — 사용자에게 일어난
+  일은 하나다. **프론트가 코드로 분기하므로 두 체계가 섞이면 분기를 두 벌 갖게 된다.**
+  게이트웨이는 서블릿 스택을 끌고 오는 security-core 를 의존하지 않으므로 코드 문자열을
+  복사해 두고, 어긋남은 테스트가 소스를 대조해 막는다 (`JwtErrorCodeContractTest`).
+- **상태 코드는 사유마다 다르다.** 만료·형식 오류·서명 불일치·폐기는 `401`, 검증 불가(Redis 장애)는
+  `503` 이다. 전부 `500` 으로 접으면 두 가지가 깨진다 — 프론트 BFF 가 **401 일 때만** 재발급을
+  시도하므로 세션이 스스로 복구되지 못하고, 의도한 실패가 진짜 장애와 구분되지 않는다.
+
+```json
+// 게이트웨이가 만료 토큰을 거부한 응답 — 서비스의 401 과 같은 모양, 같은 코드다
+{"dataHeader":{"success":false,"resultCode":"SECURITY_002",
+  "resultMessage":"토큰이 만료되었습니다.","fieldErrors":null},"dataBody":null}
+```
+
+**토큰이 없는 요청은 거부하지 않는다.** 게이트웨이는 그대로 통과시키고 인증 판정은 서비스가
+한다 — 공개 API(`/places` 등)가 미로그인으로도 200 이어야 하기 때문이다.
+
 ## 3. Controller 스타일
 
 - 다른 레이어를 직접 호출하지 않고 `WebUseCase`만 호출한다.
