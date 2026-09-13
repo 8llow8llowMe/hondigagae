@@ -98,6 +98,11 @@ type CardContract =
       kind: 'card'
       /** 열기 태그 안에 있어야 하는 조각들 — 이름표는 정상 화면과 **같은 `messages` 키** */
       probes: string[]
+      /**
+       * 이름표가 **없는** 카드다 (`<Surface>` 민짜). `probes` 로는 표현할 수 없어
+       * 따로 표시하고 전용 단언이 짝을 잠근다 — 비밀번호 변경 하나가 그렇다.
+       */
+      nameless?: true
       /** 이름표의 출처 */
       source: string
     }
@@ -112,6 +117,19 @@ type StateFile = {
   state: 'EmptyState' | 'ErrorState'
   /** 폭의 출처가 되는 정상 화면 소스와 거기 있어야 하는 값 */
   widthSource: { path: string; contains: string }
+  /**
+   * 이 경계의 `h1` 이 쓰는 `messages` 키 — **정상 화면의 `h1` 과 같아야 하는 경우에만** 준다.
+   *
+   * 아홉이 그렇다. 나머지 다섯은 정상 화면 쪽 `page.tsx` 에 `h1` 이 없어 비교 대상이
+   * 없다: 상세 넷(`places/[placeId]` · `plans/[planId]`)은 경계가 **오류 전용 이름**
+   * (`detailErrorTitle` · `detailNotFoundTitle`)을 쓰고, AI 작업 상태는 `h1` 을
+   * 뷰 컴포넌트가 그린다. 그쪽은 화면 이름을 물려받는 계약이 아니다.
+   *
+   * **#481 이 이 필드를 요구했다.** 마이페이지 경계 하나가 셋을 덮던 시절, 폼 화면에서
+   * 예외가 뜨면 문서 최상위 제목이 `내 정보` 로 바뀌었다 — 폭보다 이쪽이 더 나쁘다.
+   * 폭만 잠근 단언은 그 증상을 못 잡았다 (뮤테이션으로 확인).
+   */
+  heading?: string
   card: CardContract
 }
 
@@ -138,6 +156,7 @@ const STATE_FILES: StateFile[] = [
   },
   {
     path: 'app/(main)/ai-plans/new/error.tsx',
+    heading: 'messages.aiPlan.createTitle',
     width: 'mx-auto w-full max-w-2xl',
     state: 'ErrorState',
     widthSource: { path: 'app/(main)/ai-plans/new/page.tsx', contains: 'max-w-2xl' },
@@ -150,6 +169,7 @@ const STATE_FILES: StateFile[] = [
   },
   {
     path: 'app/(main)/favorites/error.tsx',
+    heading: 'messages.favorite.listTitle',
     width: 'content-container',
     state: 'ErrorState',
     widthSource: { path: 'app/(main)/favorites/page.tsx', contains: 'content-container' },
@@ -161,6 +181,7 @@ const STATE_FILES: StateFile[] = [
   },
   {
     path: 'app/(main)/mypage/error.tsx',
+    heading: 'messages.member.myPageTitle',
     width: 'mx-auto w-full max-w-screen-md',
     state: 'ErrorState',
     widthSource: { path: 'app/(main)/mypage/(root)/page.tsx', contains: 'max-w-screen-md' },
@@ -170,8 +191,49 @@ const STATE_FILES: StateFile[] = [
       source: 'src/features/member/my-page-sections.tsx',
     },
   },
+  /*
+    **마이페이지 세그먼트는 경계가 셋이다** (#481). 예전에는 위 하나가 셋을 덮었는데
+    폭도 `h1` 도 루트 기준이라, 두 폼 화면에서 예외가 뜨면 글줄이 768 로 넓어지고
+    문서의 이름이 `내 정보` 로 바뀌었다. 셋을 **각자 자기 정상 화면과 쌍으로** 잠근다.
+
+    **둘의 카드 이름표가 갈리는 것이 의도다.** 탈퇴는 `WithdrawView` 가 제목 있는 카드를
+    그리므로 같은 키를 쓰고, 비밀번호는 `PasswordView` 의 **오류 갈래**가 이름 없는
+    `<Surface>` 다 — 성공 갈래 제목(`setup ? passwordSetup : passwordChange`)이 응답을
+    봐야 정해지는데 경계에는 그 응답이 없다. 정상 화면이 오류에서 제목을 뺀 이유가
+    그것이고 경계도 같은 자리에 선다.
+  */
+  {
+    path: 'app/(main)/mypage/password/error.tsx',
+    heading: 'messages.member.passwordTitle',
+    width: 'mx-auto w-full max-w-2xl',
+    state: 'ErrorState',
+    widthSource: { path: 'app/(main)/mypage/password/page.tsx', contains: 'max-w-2xl' },
+    card: {
+      kind: 'card',
+      /*
+        **이름 없는 카드다.** `probes` 가 비면 위 루프가 아무것도 단언하지 않아 짝이
+        공허해지므로, 아래 `이름 없는 카드도 정상 화면과 짝을 이룬다` 가 대신 잠근다.
+      */
+      probes: [],
+      nameless: true,
+      source: 'src/features/member/password-view.tsx',
+    },
+  },
+  {
+    path: 'app/(main)/mypage/withdraw/error.tsx',
+    heading: 'messages.member.withdrawTitle',
+    width: 'mx-auto w-full max-w-2xl',
+    state: 'ErrorState',
+    widthSource: { path: 'app/(main)/mypage/withdraw/page.tsx', contains: 'max-w-2xl' },
+    card: {
+      kind: 'card',
+      probes: ['lead', 'title={messages.member.withdrawTitle}'],
+      source: 'src/features/member/withdraw-view.tsx',
+    },
+  },
   {
     path: 'app/(main)/pets/error.tsx',
+    heading: 'messages.pet.listTitle',
     width: 'mx-auto w-full max-w-screen-md',
     state: 'ErrorState',
     widthSource: { path: 'app/(main)/pets/page.tsx', contains: 'max-w-screen-md' },
@@ -183,6 +245,7 @@ const STATE_FILES: StateFile[] = [
   },
   {
     path: 'app/(main)/pets/[petId]/error.tsx',
+    heading: 'messages.pet.editTitle',
     width: 'mx-auto w-full max-w-2xl',
     state: 'ErrorState',
     widthSource: { path: 'app/(main)/pets/[petId]/page.tsx', contains: 'max-w-2xl' },
@@ -196,6 +259,7 @@ const STATE_FILES: StateFile[] = [
   },
   {
     path: 'app/(main)/pets/[petId]/not-found.tsx',
+    heading: 'messages.pet.editTitle',
     width: 'mx-auto w-full max-w-2xl',
     state: 'EmptyState',
     widthSource: { path: 'app/(main)/pets/[petId]/page.tsx', contains: 'max-w-2xl' },
@@ -207,6 +271,7 @@ const STATE_FILES: StateFile[] = [
   },
   {
     path: 'app/(main)/places/(list)/error.tsx',
+    heading: 'messages.place.pageTitle',
     width: 'content-container',
     state: 'ErrorState',
     widthSource: { path: 'app/(main)/places/(list)/page.tsx', contains: 'rail-layout' },
@@ -367,6 +432,37 @@ describe('라우트 상태 파일이 3층 표면 위에 선다 (#475)', () => {
  * **그래서 양쪽에 같은 단언을 건다** — 정상 화면이 카드를 걷거나 이름표를 바꾸면 경계
  * 단언이 같이 깨져야 한다. 한쪽만 보는 단언이 #464 폭 드리프트를 놓친 방식이다.
  */
+/*
+  **`h1` 은 화면의 이름이다 — 경계가 그것을 바꾸면 안 된다** (#481).
+
+  마이페이지 경계 하나가 세그먼트 셋을 덮던 시절, 비밀번호를 바꾸던 중 예외가 나면
+  문서 최상위 제목이 `내 정보` 로 바뀌었다. 스크린리더에는 지금 어느 화면에서 실패했는지가
+  **폭보다 먼저** 전해진다. 폭만 잠근 단언은 그 증상을 못 잡는다 — 뮤테이션으로 확인했다
+  (`h1` 키를 루트 값으로 되돌려도 122개가 전부 초록이었다).
+
+  아홉만 본다. 나머지 다섯은 정상 화면 `page.tsx` 에 `h1` 이 없어 비교 대상이 없다.
+*/
+describe('h1 이 정상 화면의 이름과 같다 (#481)', () => {
+  const NAMED = STATE_FILES.filter((entry) => entry.heading !== undefined)
+
+  // 표가 줄면 단언도 조용히 줄어든다 — 개수를 박아 그것을 막는다
+  it('아홉이 이 계약을 갖는다', () => {
+    expect(NAMED).toHaveLength(9)
+  })
+
+  it.each(NAMED)(
+    '$path — 정상 화면과 같은 messages 키를 h1 에 쓴다',
+    ({ path, heading, widthSource }) => {
+      const key = heading as string
+      const h1 = new RegExp(`<h1[^>]*>\\{${key.replace(/\./g, '\\.')}\\}</h1>`)
+
+      expect(code(path)).toMatch(h1)
+      /* 짝의 반대쪽 — 정상 화면이 이름을 바꾸면 경계도 따라와야 한다 */
+      expect(code(widthSource.path)).toMatch(h1)
+    },
+  )
+})
+
 describe('카드 판정이 정상 화면과 쌍을 이룬다 (#475)', () => {
   it.each(CARDED)('$path — 정상 화면과 같은 카드를 그린다', ({ path, card }) => {
     if (card.kind !== 'card') throw new Error('unreachable')
@@ -380,6 +476,28 @@ describe('카드 판정이 정상 화면과 쌍을 이룬다 (#475)', () => {
       expect(normal).toMatch(surfaceTag(probe))
     }
   })
+
+  /*
+    **이름 없는 카드도 정상 화면과 짝을 이룬다** (#481). `probes` 가 비어 위 루프가
+    건너뛰는 자리를 여기서 메운다 — 한쪽이 이름을 갖게 되면 깨져야 한다.
+
+    비밀번호 변경이 그렇다: 성공 갈래의 카드 제목은
+    `setup ? passwordSetup : passwordChange` 로 **응답을 봐야 정해지는데** 경계에는 그
+    응답이 없다. 정상 화면이 오류 갈래에서 제목을 뺀 이유가 그것이고, 경계도 같은 자리에
+    선다. 양쪽 다 **민짜 `<Surface>` 가 상태를 감싼다** 로 잠근다.
+  */
+  it.each(CARDED.filter((entry) => entry.card.kind === 'card' && entry.card.nameless === true))(
+    '$path — 이름 없는 카드도 정상 화면과 짝을 이룬다',
+    ({ path, card, state }) => {
+      if (card.kind !== 'card') throw new Error('unreachable')
+
+      const bare = new RegExp(`<Surface>\\s*<${state}\\b`)
+
+      expect(code(path)).toMatch(bare)
+      /* 짝의 반대쪽 — 정상 화면이 이름을 갖게 되면 경계도 함께 옮겨야 한다 */
+      expect(code(card.source)).toMatch(bare)
+    },
+  )
 
   /*
     **`Surface` 가 상태 컴포넌트를 실제로 감싼다.** 열기 태그만 보면 카드를 그려 놓고
