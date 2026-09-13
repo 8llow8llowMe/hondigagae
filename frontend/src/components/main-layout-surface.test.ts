@@ -1,7 +1,13 @@
 /**
- * `(main)` 레이아웃의 세로 뼈대 — 이슈 #456③.
+ * 앱 셸의 세로 뼈대 — 이슈 #456③ · #494.
  *
- * **소스를 문자열로 읽는다.** `app/(main)/layout.tsx` 는 `readSession()` 을 부르고
+ * **뼈대는 `src/features/nav/app-shell.tsx` 가 갖는다.** 원래 `(main)` 레이아웃 안에
+ * 있었는데, 전역 404 가 같은 헤더·푸터를 써야 하면서 뽑아냈다 (#494) — 주소가 어느
+ * 라우트와도 안 맞으면 Next 는 **루트 레이아웃 안에서** 루트 `not-found.tsx` 만 그려
+ * 그룹 레이아웃이 닿지 않는다. **뼈대가 두 벌이 되면 한쪽만 고쳐지므로** 여기서 한 벌임을
+ * 함께 잠근다.
+ *
+ * **소스를 문자열로 읽는다.** 셸을 쓰는 `app/(main)/layout.tsx` 는 `readSession()` 을 부르고
  * `prefetchQuery` 를 기다리는 async 서버 컴포넌트라 node 환경에서 렌더할 방법이 없다
  * (`testing-guide.md` §1). 여기서 지키려는 것도 렌더 결과가 아니라 **높이 계약**이다 —
  * 누가 뷰포트 높이를 잡고, 누가 그 남는 높이를 먹고, 탭바 자리는 어디가 비우는가.
@@ -21,7 +27,7 @@
  *
  * ### 여기서 잠그는 결정 셋
  *
- * 1. **뷰포트 높이는 레이아웃이 한 번 잡는다** (`flex min-h-dvh flex-col`). 내용이 짧은
+ * 1. **뷰포트 높이는 셸이 한 번 잡는다** (`flex min-h-dvh flex-col`). 내용이 짧은
  *    화면에서 L0 회색이 콘텐츠 높이에서 끊기고 그 아래로 흰 `body` 가 보이던 것이
  *    이 이슈의 출발이다 — 1280×900 `/places/<없는 id>` 실측: 회색이 274 에서 끝나고
  *    푸터 아래 **366px 가 맨 흰색**. `DESIGN.md §0` 의 "흰색은 바닥이 아니라 섹션의 색" 이
@@ -51,11 +57,13 @@ import { describe, expect, it } from 'vitest'
 import { Canvas } from '@/components/surface'
 import { readSource, readSourceWithoutComments } from '@/test/source'
 
+const SHELL = 'src/features/nav/app-shell.tsx'
 const LAYOUT = 'app/(main)/layout.tsx'
+const NOT_FOUND = 'app/not-found.tsx'
 
-describe('(main) 레이아웃 — 세로 뼈대', () => {
-  it('뷰포트 높이를 레이아웃이 한 번 잡는다 — 페이지마다 min-h 를 붙이지 않는다', () => {
-    const source = readSourceWithoutComments(LAYOUT)
+describe('앱 셸 — 세로 뼈대', () => {
+  it('뷰포트 높이를 셸이 한 번 잡는다 — 페이지마다 min-h 를 붙이지 않는다', () => {
+    const source = readSourceWithoutComments(SHELL)
 
     expect(source).toContain('flex min-h-dvh flex-col')
     // 뼈대는 하나여야 한다. 둘이 되면 어느 쪽이 높이를 잡는지 화면마다 갈린다
@@ -63,7 +71,7 @@ describe('(main) 레이아웃 — 세로 뼈대', () => {
   })
 
   it('머리 · 본문 · 푸터가 그 열 안에 있다 — 탭바만 fixed 라 밖이다', () => {
-    const source = readSourceWithoutComments(LAYOUT)
+    const source = readSourceWithoutComments(SHELL)
     const skeleton = source.indexOf('flex min-h-dvh flex-col')
     const closing = source.indexOf('</div>', source.indexOf('<SiteFooter />'))
 
@@ -78,9 +86,27 @@ describe('(main) 레이아웃 — 세로 뼈대', () => {
   })
 
   it('본문 래퍼가 남는 높이를 먹고 Canvas 에 넘긴다', () => {
-    expect(readSourceWithoutComments(LAYOUT)).toMatch(
+    expect(readSourceWithoutComments(SHELL)).toMatch(
       /<div id="main" className="flex flex-1 flex-col">/,
     )
+  })
+
+  /*
+    **셸을 쓰는 곳이 둘이고, 둘 다 뼈대를 다시 그리지 않는다** (#494).
+
+    404 는 저장소에서 **가장 짧은 화면**이라 `min-h-dvh` + `flex-1` 짝이 깨지면 푸터 아래
+    흰 띠가 가장 먼저 거기서 난다. 그때 레이아웃만 보는 단언은 아무것도 못 잡는다.
+  */
+  it('셸을 쓰는 곳이 둘이고 어느 쪽도 뼈대를 베껴 쓰지 않는다', () => {
+    for (const path of [LAYOUT, NOT_FOUND]) {
+      const source = readSourceWithoutComments(path)
+
+      expect(source).toContain('<AppShell')
+      // 뼈대 조각을 여기서 다시 적으면 셸과 갈린다
+      expect(source).not.toContain('min-h-dvh')
+      expect(source).not.toContain('<GlobalHeader')
+      expect(source).not.toContain('<MobileTabBar')
+    }
   })
 
   /*
@@ -89,7 +115,7 @@ describe('(main) 레이아웃 — 세로 뼈대', () => {
     한쪽이 사라지면 모바일 마지막 줄이 탭바 뒤로 들어간다.
   */
   it('탭바 자리를 본문 래퍼가 비우지 않는다 — 푸터와 지도가 각자 비운다', () => {
-    expect(readSourceWithoutComments(LAYOUT)).not.toMatch(/id="main"[^>]*\bpb-/)
+    expect(readSourceWithoutComments(SHELL)).not.toMatch(/id="main"[^>]*\bpb-/)
 
     const css = readSource('app/globals.css')
     expect(css).toMatch(/\.site-footer\s*\{[^}]*padding-block-end:\s*calc\(var\(--tabbar-h\)/)
