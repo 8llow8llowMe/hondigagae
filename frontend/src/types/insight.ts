@@ -342,4 +342,12 @@ export type PetCondition = {
   noiseSensitive: boolean
   activityLevel: string | null
   breed: string | null
+  /**
+   * 사회성 (`LOW` · `MEDIUM` · `HIGH`) — **적합도만 읽는다** (#430 · BE #425).
+   *
+   * 혼잡 `HIGH` 인 날 `LOW` 인 아이의 감점이 커지고 근거 문장이 함께 내려온다. 산책
+   * 위험도 · 골든타임 · 권역 비교는 **혼잡을 보지 않아** 서버가 이 파라미터를 받지 않는다
+   * (dev Swagger 실측: `petSociality` 를 선언하는 경로는 `suitability` 하나뿐이다).
+   */
+  petSociality: string | null
 }

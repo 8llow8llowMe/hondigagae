@@ -660,6 +660,44 @@ test.describe('카드 안 상태의 세로선 — #485', () => {
  * **vitest 로는 확인할 수 없는 갈래다** — 지키려는 것이 마크업이 아니라 **나간 요청의
  * 개수**다. 화면은 고치기 전에도 올바른 오류를 그렸으므로 렌더 단언으로는 회귀를 못 잡는다.
  */
+/**
+ * **적합도 요청에 사회성이 실린다** — 이슈 #430 (BE #425).
+ *
+ * 사회성 `LOW` 인 아이는 혼잡 `HIGH` 인 날 감점이 커지고 근거 문장이 함께 내려온다.
+ * **FE 가 파라미터를 넘겨야 그 축이 켜진다** — 넘기지 않아도 응답은 200 이라 화면만
+ * 봐서는 빠진 것을 모른다. 그래서 나가는 요청을 직접 본다.
+ *
+ * dev Swagger 실측(2026-09-13): `petSociality` 를 선언하는 경로는
+ * `/places/{placeId}/suitability` 하나뿐이고 enum 은 `LOW` · `MEDIUM` · `HIGH` 다.
+ */
+test.describe('적합도 요청의 사회성 — #430', () => {
+  /** 목 저장소의 첫 장소 (`place-data.ts` 의 `ID_BASE`) */
+  const PLACE = '/places/212481712381923329'
+
+  test('반려견을 고른 상태면 petSociality 가 실린다', async ({ page }) => {
+    const suitability: string[] = []
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (url.pathname.includes('/suitability')) suitability.push(url.search)
+    })
+
+    await page.goto(PLACE)
+    await expect(page.getByRole('main')).toBeVisible()
+    // 기준 반려견은 클라이언트 localStorage 가 정한다 — 훅이 켜질 여지를 준다
+    await page.waitForTimeout(1000)
+
+    expect(suitability.length).toBeGreaterThan(0)
+    /*
+      **다른 조건과 함께 실려야 한다.** 사회성만 보면 조건 조립이 통째로 빠진 경우를
+      놓친다 — `toInsightQuery` 가 한 곳에서 넷을 다 만든다.
+    */
+    for (const search of suitability) {
+      expect(search).toMatch(/petSociality=(LOW|MEDIUM|HIGH)/)
+      expect(search).toContain('petSizeType=')
+    }
+  })
+})
+
 test.describe('잘못된 placeId — 요청을 보내지 않는다 (#496)', () => {
   const BAD = '/places/abc'
   /** 목 저장소의 첫 장소 (`place-data.ts` 의 `ID_BASE`). 18자리 Snowflake 다 */
