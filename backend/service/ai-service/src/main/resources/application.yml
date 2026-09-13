@@ -23,7 +23,10 @@ ai:
   plan:
     job:
       ttl-seconds: ${AI_PLAN_JOB_TTL_SECONDS:86400}
-      # 동시 실행 2 + 대기열 4(AsyncConfig) 기준 최악 대기 240초를 덮는 값. 세 값은 한 세트다.
+      # 실효 동시성 1 기준이다 (#508). 잡 1건이 워커를 쥐는 벽시계 최악값은
+      # 게이트 대기 90 + 모델 호출 120 + 내부 조회(5초 x 최대 7회) 35 = 245초 (PENDING/RUNNING 공통).
+      # 동시 실행 1 + 대기열 1(AsyncConfig) 이므로 대기열 끝의 최악 대기는 1 x 245 = 245초 -> 300초가 덮는다.
+      # 대기열을 키우면 이 값도 함께 올린다 (대기열 길이 x 245초 <= 이 값). 세 값은 한 세트다.
       pending-timeout-seconds: ${AI_PLAN_JOB_PENDING_TIMEOUT_SECONDS:300}
       running-timeout-seconds: ${AI_PLAN_JOB_RUNNING_TIMEOUT_SECONDS:300}
 
@@ -35,7 +38,14 @@ ai-llm:
   base-url: ${AI_LLM_BASE_URL:http://localhost:11434}
   api-key: ${AI_LLM_API_KEY:}
   model: ${AI_LLM_MODEL:qwen2.5:7b-instruct}
+  # 모델 호출 read timeout. LlmCallGate 에서 차례를 받은 뒤부터 잰다 - 남을 기다린 시간이
+  # 섞이면 동시 제출이 서로의 예산을 깎아 둘 다 죽는다 (#508).
   timeout-ms: ${AI_LLM_TIMEOUT_MS:120000}
+  # 모델 호출 차례를 기다리는 최대 시간. 넘기면 AIPLAN_021(붐빔)로 가른다.
+  # 90초 = 실측 한 턴(66초)보다 넉넉하되 최악 한 턴(timeout-ms 120초)보다는 짧게.
+  # 키우면 잡 1건의 최악값이 커져 위 pending-timeout-seconds 산술의 여유가 줄고,
+  # 동기 준비물 생성이 요청 스레드를 붙잡는 시간도 함께 늘어난다.
+  queue-wait-ms: ${AI_LLM_QUEUE_WAIT_MS:90000}
   max-tokens: ${AI_LLM_MAX_TOKENS:4000}
   # 컨텍스트 창(num_ctx). 프롬프트 + 출력이 함께 들어간다.
   # 명시하지 않으면 Ollama 가 2,048 로 잡아 일정 프롬프트(실측 11,160자)가 조용히 잘린다.

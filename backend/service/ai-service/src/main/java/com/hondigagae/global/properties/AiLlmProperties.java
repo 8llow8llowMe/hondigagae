@@ -10,6 +10,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * 예전에 있던 {@code enabled=false} + 스텁 어댑터는 프론트 개발자가 백엔드를 로컬에 띄우지 않고
  * dev 서버에 직접 붙기로 하면서 제거했다 — 분기 하나가 사라진 만큼 dev 와 로컬이 같은 경로를 탄다.
  *
+ * <p>{@code queueWaitMs} 만 provider 로 나가지 않는 값이다 — 앱 안 {@code LlmCallGate} 의 대기
+ * 예산이다. {@code timeoutMs} 와 함께 읽어야 잡 1건의 최악 소요가 나오므로 여기 같이 둔다.
+ *
  * <p>provider 는 Spring AI 모듈 스위치다({@link AiLlmProvider}). 기본은 공유 인프라의
  * Ollama(로컬 LLM)이고, 모델 교체는 {@code model} 값만 바꾸면 된다 — 어댑터는
  * {@code AiLlmPort} 뒤에 있어 application 계층에 provider 가 드러나지 않는다.
@@ -22,7 +25,14 @@ public record AiLlmProperties(
     String apiKey,
     String model,
     // 모델 호출 read timeout(ms). 외부 호출은 타임아웃을 반드시 명시한다 (coding-conventions §10).
+    // 이 시계는 LlmCallGate 에서 차례를 받은 뒤부터 돈다 — 남을 기다린 시간이 여기 섞이면
+    // 동시 제출 2건이 서로의 예산을 깎아 둘 다 죽는다 (#508).
     Long timeoutMs,
+    // 모델 호출 차례를 기다릴 수 있는 최대 시간(ms). 넘기면 AIPLAN_021(LLM_BUSY) 다.
+    // 기본 90초는 "실측 한 턴(66초)보다 넉넉하되 최악 한 턴(timeoutMs 120초)보다는 짧게" 다.
+    // timeoutMs 와 같게 두면 잡 1건의 최악값이 커져 대기열·PENDING 타임아웃 산술의 여유가 사라지고,
+    // 동기 준비물 생성이 요청 스레드를 4분까지 붙잡는다 (#508).
+    Long queueWaitMs,
     Integer maxTokens,
     // 컨텍스트 창(num_ctx). 프롬프트와 출력이 함께 들어가는 창이다.
     // 명시하지 않으면 Ollama 가 2,048 로 잡고 프롬프트를 조용히 자른다 (#232).
@@ -51,6 +61,9 @@ public record AiLlmProperties(
         if (timeoutMs == null || timeoutMs <= 0) {
             // 일정 생성은 리포트보다 출력이 길다. 로컬 LLM 기준 여유를 둔다.
             timeoutMs = 120_000L;
+        }
+        if (queueWaitMs == null || queueWaitMs <= 0) {
+            queueWaitMs = 90_000L;
         }
         if (maxTokens == null || maxTokens <= 0) {
             maxTokens = 4_000;

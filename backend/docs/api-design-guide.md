@@ -123,6 +123,15 @@ LLM 호출 등 응답이 길어지는 작업(AI 여행 플래너 일정 생성, 
   - **빈 이름 규칙**: `{도메인}{용도}TaskExecutor` camelCase (예: `aiPlanTaskExecutor`). 빈 이름이 Micrometer `executor_*` 메트릭의 `name` 태그로 노출되므로, 이름만으로 서비스·용도가 드러나게 짓는다.
   - **thread name prefix 규칙**: 빈 이름과 대응되는 읽기 쉬운 kebab (예: 빈 `aiPlanTaskExecutor` → prefix `ai-plan-worker-`).
   - **풀 사이징 / 종료**: `corePoolSize` / `maxPoolSize` / `queueCapacity` 를 명시하고, graceful shutdown(`setWaitForTasksToCompleteOnShutdown(true)` + `setAwaitTerminationSeconds(...)`)을 설정한다.
+  - **풀 크기는 뒤에 있는 자원의 상한을 넘지 않는다** (이슈 [#508](https://github.com/8llow8llowMe/hondigagae/issues/508)).
+    워커가 GPU·외부 API 처럼 **동시성이 고정된 자원**을 부르면, 풀을 키워도 처리량은 그 자원의 상한에 묶인다.
+    넘겨 잡으면 초과분이 **자원 안에서 이미 전송된 채로** 기다리게 되고, 그동안 각자의 read timeout 시계가 돌아
+    **남을 기다린 시간이 자기 예산을 깎는다** — 동시 2건이면 뒤에 온 요청만이 아니라 **먼저 온 요청까지** 함께 죽는다.
+    기다림은 반드시 **호출 밖**(대기열 또는 세마포어)에 두고, 타임아웃은 **차례를 받은 뒤부터** 재게 한다.
+  - **대기열 길이 × 1건 최악 소요 ≤ PENDING 타임아웃**이어야 한다. 셋은 한 세트라 하나만 바꾸면
+    대기열 끝의 잡이 정상 대기 중에 타임아웃 FAILED 로 판정된다. 근거 산술을 빈 javadoc 에 적는다.
+  - **혼잡 실패와 요청 자체의 실패는 다른 에러 코드로 가른다.** 사용자가 할 일이 "잠시 후 다시" 와
+    "요청을 줄여라" 로 갈리는데, 한 코드로 묶으면 남이 눌러서 실패한 사용자에게 자기 조건을 탓하게 만든다.
 - **상태 저장** — Redis Hash / String + TTL 24h. JPA 가 없는 서비스는 Redis 로 충분, 장기 audit 필요 시 DB 추가
 - **idempotency 키** — `{prefix}:{domain}:job:idempotency:{memberId}:{requestHash}` 패턴. requestHash 는 `SHA256(jobType | param1=v1 | ...)` 앞 32자
 - **에러** — Exception → ErrorCode 매핑은 동기 endpoint 와 동일 패턴 사용, 단 작업 실패는 200 OK + `status=FAILED` + `errorCode/errorMessage` 로 응답 (HTTP 5xx 가 아님)

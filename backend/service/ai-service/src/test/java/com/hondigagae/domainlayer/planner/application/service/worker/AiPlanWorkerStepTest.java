@@ -162,7 +162,7 @@ class AiPlanWorkerStepTest {
         return new AiPlanWorker(
             store, events, llm, candidates,
             new StubPetConditions(), new StubPlanOutlines(), new StubFavorites(), new StubWeather(),
-            new AiLlmProperties(null, null, null, null, null, null, null, null, null, null));
+            new AiLlmProperties(null, null, null, null, null, null, null, null, null, null, null));
     }
 
     private static AiPlanJob pendingJob(String sigunguCode) {

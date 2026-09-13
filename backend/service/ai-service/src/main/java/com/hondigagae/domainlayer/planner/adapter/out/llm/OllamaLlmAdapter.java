@@ -104,6 +104,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
     private final AiPlanPromptFactory aiPlanPromptFactory;
     private final AiLlmProperties aiLlmProperties;
     private final CircuitBreakerRegistry circuitBreakerRegistry;
+    private final LlmCallGate llmCallGate;
 
     private final BeanOutputConverter<LlmPlanDraftResponse> outputConverter =
         new BeanOutputConverter<>(LlmPlanDraftResponse.class);
@@ -174,8 +175,18 @@ public class OllamaLlmAdapter implements AiLlmPort {
      * <p><b>타임아웃을 연결 불가와 가른다.</b> 전에는 둘 다 AIPLAN_007 이라, dev 에서 실패를
      * 보고도 "LLM 이 안 떠 있나"와 "너무 오래 걸리나" 중 무엇인지 알 수 없었다 (#232).
      * 사용자에게 할 말도 다르다 — 앞은 잠시 후 다시, 뒤는 조건을 줄이라는 안내다.
+     *
+     * <p><b>차례를 먼저 받는다</b> ({@link LlmCallGate}). 대기를 게이트가 흡수하므로 아래
+     * 시계·서킷·read timeout 은 모두 <b>내 차례가 온 뒤</b>만 잰다 — 남을 기다린 시간이
+     * 섞이면 동시 제출이 서로의 예산을 깎아 둘 다 죽고(#508), 정상 대기가 서킷의 slow-call 로
+     * 집계돼 멀쩡한 provider 를 차단한다.
      */
     private ChatResponse call(String operation, Prompt prompt) {
+        return llmCallGate.inTurn(operation, () -> dispatch(operation, prompt));
+    }
+
+    /** 차례를 받은 뒤의 실제 호출. 여기서부터가 "모델이 쓴 시간" 이다. */
+    private ChatResponse dispatch(String operation, Prompt prompt) {
         long startedAt = System.nanoTime();
         try {
             ChatResponse response = circuitBreakerRegistry.circuitBreaker(CIRCUIT_NAME)

@@ -30,8 +30,17 @@ public enum AiPlanErrorCode {
     JOB_NOT_CANCELABLE("AIPLAN_019", "이미 끝난 작업은 취소할 수 없습니다.", HttpStatus.CONFLICT),
     // 모델 호출 자체가 제한 시간을 넘긴 경우. LLM_UNAVAILABLE(연결 불가·서킷 열림)과 가른다 -
     // 사용자가 할 일이 다르고("조건을 줄여 보세요" vs "잠시 후"), 운영이 볼 곳도 다르다.
+    //
+    // 이 문구는 #508 전까지 거짓이었다. 동시 제출 2건이면 서로를 기다리다 둘 다 여기로 떨어져,
+    // 조건과 무관한 실패에 대고 조건을 탓했다. 이제 대기는 LlmCallGate 가 흡수하고 이 시계는
+    // 차례가 온 뒤부터 도므로, 여기 오는 것은 정말로 "내 요청이 무겁다" 뿐이다.
     LLM_TIMEOUT("AIPLAN_020", "AI 일정 생성이 제한 시간을 넘겼습니다. 여행 기간이나 조건을 줄여 다시 시도해 주세요.",
         HttpStatus.GATEWAY_TIMEOUT),
+    // 차례를 기다리다 못 받은 경우 - 혼잡이지 조건 문제가 아니다 (#508).
+    // LLM_TIMEOUT(내 요청이 무겁다) · JOB_QUEUE_FULL(제출 자체를 거절) 과 셋이 서로 다른 사건이다.
+    // 사용자가 할 일은 "조건을 줄인다" 가 아니라 "조건 그대로 잠시 뒤 다시 누른다" 다.
+    LLM_BUSY("AIPLAN_021", "지금 AI 일정 생성 요청이 몰려 있습니다. 조건은 그대로 두고 잠시 후 다시 시도해 주세요.",
+        HttpStatus.SERVICE_UNAVAILABLE),
 
     // 요청 검증(Bean Validation) 전용 코드 — 1xx 대역.
     INVALID_REQUEST("AIPLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
