@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 
+import { messages } from '../src/lib/messages'
 import {
   hasHorizontalOverflow,
   headingOutline,
@@ -479,6 +480,37 @@ test.describe('모바일 필터 칩의 세로선 — #457', () => {
         expect(Math.abs((chipLeft as number) - titleLeft)).toBeLessThanOrEqual(1)
       })
     }
+  }
+})
+
+/**
+ * **마이페이지 첫 카드의 두 행이 한 세로선에서 출발한다** — 이슈 #468.
+ *
+ * 리딩 자리 폭이 갈려 있었다: `저장한 장소` 는 40px 고정 원형인데 `내 반려견` 은 32px
+ * 아바타 N개를 겹쳐 `32 + 24(N-1)` 로 변했고 0마리면 블록이 사라졌다. 390 실측에서
+ * 글줄이 16 · 60 · 84 · 156 으로 움직여 **어느 마릿수에서도** 68 과 맞지 않았다.
+ *
+ * **여기서만 실제 좌표를 잰다** — 유닛 쪽은 node 환경이라 구조만 본다. 목 계정의
+ * 마릿수 하나만 재지만, 마릿수에 따라 개수가 변하지 않는다는 것은 유닛이 넷(0·1·2·5)을
+ * 본다. 둘이 함께 있어야 계약이 닫힌다.
+ */
+test.describe('마이페이지 리딩 슬롯 — #468', () => {
+  for (const name of ['mobile', 'tablet', 'desktop'] as const) {
+    test(`${name} — 반려견·저장한 장소 글줄이 같은 세로선에 선다`, async ({ page }) => {
+      await page.setViewportSize(VIEWPORTS[name])
+      await page.goto('/mypage')
+
+      const card = page.getByRole('main').locator('section').first()
+      await expect(card).toBeVisible()
+
+      const headings = card.getByRole('heading', { level: 3 })
+      const pets = headings.filter({ hasText: messages.member.myPets })
+      const favorites = headings.filter({ hasText: messages.favorite.entryLabel })
+      await expect(pets).toBeVisible()
+      await expect(favorites).toBeVisible()
+
+      expect(await leftEdge(pets)).toBe(await leftEdge(favorites))
+    })
   }
 })
 

@@ -198,6 +198,56 @@ describe('AccountSection — 계정 상태 3종이 다르게 그려진다 (D5)',
  * `fe-design-reviewer` 의 브라우저 검토가 보고, 여기서는 마크업에 드러나는 것만 본다:
  * 카드 수, 무엇이 카드 안이고 무엇이 밖인지, 선을 누가 긋는지.
  */
+/**
+ * **두 행의 리딩 슬롯이 같은 폭이어야 글줄이 한 세로선에 선다** — 이슈 #468.
+ *
+ * 예전에는 `내 반려견` 이 아바타 N개를 겹쳐 폭이 `32 + 24(N-1)` 로 변했고 0마리면 블록
+ * 자체가 사라졌다. 390 실측에서 글줄이 16(0마리) · 60(1) · 84(2) · 156(5) 으로 움직여
+ * **어느 마릿수에서도** 바로 아래 `저장한 장소`(68)와 맞지 않았다.
+ *
+ * **여기서 재는 것은 좌표가 아니라 구조다** — node 환경이라 레이아웃이 없다
+ * (`testing-guide.md` §1). 두 행의 리딩이 **같은 `size-10` 원형 하나**이고 마릿수에
+ * 따라 개수가 변하지 않는다는 것을 본다. 실제 좌표는 `e2e/surface.spec.ts` 가 잰다.
+ */
+describe('마이페이지 첫 카드의 리딩 슬롯 (#468)', () => {
+  const COUNTS = [0, 1, 2, 5] as const
+
+  function leadingCircles(markup: string): number {
+    return (markup.match(/size-10/g) ?? []).length
+  }
+
+  it.each(COUNTS)('반려견 %i마리에서도 리딩 원형은 둘뿐이다 — 두 행이 하나씩', (count) => {
+    const pets = Array.from({ length: count }, (_, index) =>
+      pet({ petId: `12345678901200000${index + 1}`, name: `개${index + 1}` }),
+    )
+
+    expect(leadingCircles(render({ pets, petsTotalCount: count }))).toBe(2)
+  })
+
+  /*
+    **0마리에서 슬롯이 사라지지 않는다.** 그때 글줄이 16 까지 당겨지던 것이 이 이슈에서
+    가장 크게 벌어진 자리(52px)였다. 등록하러 가는 행이 되므로 채움은 `PlusIcon` 이다.
+  */
+  it('0마리면 슬롯에 PlusIcon 이 선다 — 비우지 않는다', () => {
+    const markup = render({ pets: [], petsTotalCount: 0 })
+
+    expect(markup).toContain('bg-band')
+    expect(leadingCircles(markup)).toBe(2)
+  })
+
+  /*
+    **개수를 세는 일은 부제가 한다.** 아바타를 하나로 줄인 근거라, 부제가 실제로 이름과
+    `N/5` 를 내는지 함께 잠근다 — 한쪽이 사라지면 슬롯 결정의 전제가 깨진다.
+  */
+  it('부제가 이름 전부와 N/5마리 를 낸다 — 아바타를 하나로 줄인 전제다', () => {
+    const pets = [pet({ name: '몽실이' }), pet({ petId: '123456789012000002', name: '보리' })]
+    const markup = render({ pets, petsTotalCount: 2 })
+
+    expect(markup).toContain('몽실이 · 보리')
+    expect(markup).toContain(messages.pet.countOfMax.replace('{count}', '2').replace('{max}', '5'))
+  })
+})
+
 describe('MyPageSections — 3층 표면 (#466)', () => {
   /** `class` 를 토큰으로 쪼갠다. 문자열 `toContain` 은 `border-border` 안의 `border-b` 에 걸린다 */
   function classTokens(tag: string): string[] {

@@ -1,6 +1,6 @@
 import Link from 'next/link'
 
-import { ChevronRightIcon } from '@/components/icons'
+import { ChevronRightIcon, PlusIcon } from '@/components/icons'
 import { PetAvatar } from '@/components/pet-avatar'
 import { MAX_PET_COUNT } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
@@ -15,7 +15,7 @@ import type { Pet } from '@/types/pet'
  * **hover 채움도 걷었다**: 카드 안 자식이 불투명 면을 가지면 radius 12 모서리를 덮는다(§0).
  *
  * **계정 설정보다 위에 있다.** 탭바가 4개 고정이라 반려견은 이 화면을 통해서만
- * 들어온다 (아트보드 01 주석). 아바타를 겹쳐 보여 몇 마리인지 바로 읽히게 한다.
+ * 들어온다 (아트보드 01 주석).
  *
  * **조회 실패는 이 행을 통째로 숨긴다** — 그 판단은 호출부(`MyPageView`)가 한다.
  * 여기까지 왔다면 그릴 값이 있다는 뜻이다 (0마리 포함).
@@ -37,13 +37,28 @@ export function MyPetsRow({
         href="/pets"
         className="focus-visible:ring-brand-500 flex min-h-14 items-center gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
       >
-        {pets.length > 0 && (
-          // 겹침. 아바타는 aria-hidden 이고 이름은 아래 줄에 글자로 함께 있다
-          <span className="flex shrink-0 -space-x-2">
-            {pets.map((pet) => (
-              <PetAvatar key={pet.petId} name={pet.name} size="lg" className="ring-bg ring-2" />
-            ))}
+        {/*
+          **리딩은 40px 고정 슬롯이다** (#468). 예전에는 아바타 N개를 `-space-x-2` 로 겹쳐
+          폭이 `32 + 24(N-1)` 로 변했고 0마리면 블록 자체가 사라졌다 — 390 실측에서 글줄이
+          16(0마리) · 60(1) · 84(2) · 156(5) 으로 움직여, 바로 아래 `저장한 장소`(68)와
+          **어느 마릿수에서도 맞지 않았다.** `inset.ts` 가 "왼쪽 세로선은 페이지의 기준선"
+          이라고 적어 둔 것과 같은 유형이고, #466 이 둘을 한 카드에 붙이면서 드러났다.
+
+          **개수를 세는 일은 아바타가 아니라 부제가 한다.** 아래 줄이 이름을 전부 늘어놓고
+          `N/5` 까지 낸다 — 겹친 원을 세는 것보다 정확하다. 그래서 슬롯에는 **한 마리만**
+          둔다. `+N` 배지는 만들지 않는다: 이 저장소에 그 패턴이 없고 사용처가 여기
+          하나뿐이라, 추측으로 API 를 만드는 #422 의 전례가 된다.
+
+          **0마리는 `PlusIcon` 이다.** 슬롯을 비우면 글줄이 다시 16 으로 당겨진다. 이 행은
+          그때 "등록하러 가기" 가 되므로(`/pets` 로 가고 부제가 `아직 등록한 반려견이
+          없어요`) 채움도 그 말을 한다 — 옆 행의 `bg-band` 원형과 같은 모양이다.
+        */}
+        {pets[0] === undefined ? (
+          <span className="bg-band text-fg-muted flex size-10 shrink-0 items-center justify-center rounded-full">
+            <PlusIcon size={20} />
           </span>
+        ) : (
+          <PetAvatar name={pets[0].name} size="xl" />
         )}
 
         {/* `h3` 는 flow content 라 `span` 안에 들 수 없다 — `PetRow` 와 같이 `div` 다 */}
@@ -62,6 +77,11 @@ export function MyPetsRow({
             존재하는 이유("들어가기 전에 안이 비었는지 알 수 있어야 한다")가 바로 그
             값이라, 이름만 줄이고 개수는 `shrink-0` 으로 지킨다. 같은 카드의
             `저장한 장소` 가 개수를 단독 줄로 내는 것과 같은 결과다.
+
+            **단위를 붙인다** (#468). 예전에는 `member.petsCount` 가 `2/5` 로 단위 없이
+            냈는데 바로 아래 `저장한 장소` 는 `12/100곳` 이다 — 다른 밴드였을 때는 안
+            보였지만 #466 이 둘을 연속 두 줄로 붙이면서 나란히 읽힌다. 반려견 목록 화면이
+            이미 쓰는 `pet.countOfMax`(`N/5마리`)로 맞췄다 (#464).
           */}
           {pets.length === 0 ? (
             <span className="text-body-2 text-fg-muted block truncate">
@@ -71,7 +91,10 @@ export function MyPetsRow({
             <span className="text-body-2 text-fg-muted flex min-w-0 gap-1">
               <span className="truncate">{pets.map((pet) => pet.name).join(' · ')}</span>
               <span className="shrink-0 tabular-nums">
-                · {messages.member.petsCount(totalCount, MAX_PET_COUNT)}
+                ·{' '}
+                {messages.pet.countOfMax
+                  .replace('{count}', String(totalCount))
+                  .replace('{max}', String(MAX_PET_COUNT))}
               </span>
             </span>
           )}

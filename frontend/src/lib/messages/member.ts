@@ -23,7 +23,6 @@ export const memberMessages = {
 
   myPets: '내 반려견',
   petsEmpty: '아직 등록한 반려견이 없어요',
-  petsCount: (count: number, max: number) => `${count}/${max}`,
 
   accountSection: '계정',
   passwordChange: '비밀번호 변경',
