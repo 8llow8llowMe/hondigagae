@@ -66,9 +66,13 @@ export function PlanCreateForm({
     제출 실패 시 첫 오류 필드로 포커스를 옮긴다. `errors` 를 의존성으로 쓰면 입력 중인
     필드에서 포커스를 훔친다 (`use-form.ts` 의 `submitCount` JSDoc).
 
-    **`id` 만으로는 라디오 그룹을 못 찾는다.** `RadioGroup` 은 `<fieldset>` 을 렌더하고
-    개별 라디오에 `${id}-${value}` 를 붙이므로 `#petId` 에 해당하는 요소가 없다.
-    `[name]` 을 함께 본다 — 라디오는 그룹 이름이 필드명이다.
+    **`[name]` 을 함께 보는 것은 우회로 시작됐다.** `RadioGroup` 이 `<fieldset>` 에 `id` 를
+    달지 않던 동안 `#petId` 에 해당하는 요소가 없었기 때문이다 — 개별 라디오에는
+    `${id}-${value}` 가 붙는다. #538 이 그 `id`(+ `tabIndex={-1}`)를 컴포넌트에 넣어
+    근본 원인을 닫았고, 이제 이 선택자는 문서 순서상 앞인 `<fieldset>` 을 잡는다.
+    **그쪽이 더 낫다** — `aria-describedby` 가 fieldset 에 걸려 있어 포커스가 오는 순간
+    오류 문구가 함께 읽힌다. 두 갈래를 남겨 두는 것은 필드명이 `name` 에만 있는
+    컨트롤이 뒤에 생겨도 이 한 줄이 계속 맞기 때문이다.
   */
   useEffect(() => {
     if (submitCount === 0 || firstErrorField === null) return

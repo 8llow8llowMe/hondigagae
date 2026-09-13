@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { Surface } from '@/components/surface'
+import { useToast } from '@/components/toast'
 import { isPetLimitExceeded, PetForm } from '@/features/pet/pet-form'
 import { PET_INVALIDATE_KEY } from '@/features/pet/queries'
 import { createPet } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
 import { EMPTY_PET_FORM_VALUES } from '@/lib/pet/form'
+import { withObjectParticle } from '@/lib/text/korean'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
@@ -28,6 +30,8 @@ import { cn } from '@/lib/utils/cn'
 export function PetCreateView() {
   const router = useRouter()
   const queryClient = useQueryClient()
+  // `ToastProvider` 는 `(main)` 레이아웃이고 이 화면도 `/pets/new` 라 그 안이다
+  const { showToast } = useToast()
 
   return (
     <Surface lead titleId="pet-create-heading" title={messages.pet.newTitle}>
@@ -50,8 +54,21 @@ export function PetCreateView() {
               throw error
             }
           }}
-          onSaved={() => {
+          onSaved={(pet) => {
             void queryClient.invalidateQueries({ queryKey: PET_INVALIDATE_KEY })
+            /*
+              **토스트가 맞는 자리다** — `styling-guide.md` §3-2 의 "이미 끝났다". 오류를
+              토스트로 말하지 않는 규칙과 부딪히지 않는다: 이것은 성공 알림이다.
+
+              **여기서 띄우고 이동한다.** provider 가 `(main)` 그룹 레이아웃이라 `/pets` 로
+              옮겨도 살아 있고, 폼 화면은 곧 사라져 결과를 남길 자리가 없다.
+
+              **`PetForm` 이 아니라 이 뷰가 문구를 갖는다.** 폼은 등록·수정 공용이라
+              (공통명세 S2) "등록했어요" 를 그 안에 두면 수정에서도 그 말이 나온다.
+            */
+            showToast({
+              message: messages.pet.registeredToast.replace('{name}', withObjectParticle(pet.name)),
+            })
             // push 를 쓰면 뒤로가기로 폼에 돌아와 같은 반려견을 두 번 등록할 수 있다
             router.replace('/pets')
           }}
