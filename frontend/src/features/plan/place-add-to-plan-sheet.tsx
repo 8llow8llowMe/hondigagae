@@ -172,12 +172,14 @@ function SelectPlanStep({
           <PlanListSkeleton rows={2} />
         ) : list.isError ? (
           <ErrorState
+            headingLevel={3}
             title={messages.plan.errorTitle}
             description={messages.plan.errorDescription}
             onRetry={() => void list.refetch()}
           />
         ) : plans.length === 0 ? (
           <EmptyState
+            headingLevel={3}
             title={messages.plan.addToPlanEmptyTitle}
             description={messages.plan.addToPlanEmptyDescription}
           />
@@ -227,6 +229,7 @@ function CreatePlanStep({
   if (petsQuery.error !== null) {
     return (
       <ErrorState
+        headingLevel={3}
         title={messages.plan.errorTitle}
         description={messages.plan.errorDescription}
         onRetry={() => void petsQuery.refetch()}
@@ -238,7 +241,11 @@ function CreatePlanStep({
 
   if (pets.length === 0) {
     return (
-      <EmptyState title={messages.plan.noPetTitle} description={messages.plan.noPetDescription} />
+      <EmptyState
+        headingLevel={3}
+        title={messages.plan.noPetTitle}
+        description={messages.plan.noPetDescription}
+      />
     )
   }
 
