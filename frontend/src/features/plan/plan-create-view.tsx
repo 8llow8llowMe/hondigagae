@@ -55,9 +55,13 @@ export function PlanCreateView({
   if (petsQuery.error !== null) {
     return (
       <PlanCreateSurface>
-        {/* 카드 안이라 인셋이 `card`(16/20)다 — 페이지 값 40 을 쓰면 내용이 두 번 밀린다 */}
+        {/*
+          카드 안이라 인셋이 `card`(16/20)다 — 페이지 값 40 을 쓰면 내용이 두 번 밀린다.
+          제목도 한 단 내린다 — `PlanCreateSurface` 의 `h2` 와 형제가 되면 안 된다 (#456①)
+        */}
         <ErrorState
           inset="card"
+          headingLevel={3}
           title={messages.plan.errorTitle}
           description={messages.plan.errorDescription}
           onRetry={() => void petsQuery.refetch()}
@@ -73,6 +77,7 @@ export function PlanCreateView({
       <PlanCreateSurface>
         <EmptyState
           inset="card"
+          headingLevel={3}
           title={messages.plan.noPetTitle}
           description={messages.plan.noPetDescription}
           action={<ButtonLink href="/pets/new">{messages.plan.noPetAction}</ButtonLink>}

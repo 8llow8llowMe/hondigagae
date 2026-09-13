@@ -22,6 +22,13 @@ export function PlaceListView({ filters }: { filters: PlaceFilters }) {
 
   return (
     <PlaceListSection
+      /*
+        **제목을 한 단 내린다** (#456①). 이 목록을 담는 카드는 페이지가 그리고
+        (`app/(main)/places/(list)/page.tsx` 의 `<Surface lead titleId="place-list-heading">`)
+        그 카드가 `h2` 를 이미 갖는다. 세 사용처 중 여기만 `3` 이다 — 담기 화면과 지도
+        폴백은 제목 있는 카드가 아니라 기본값 `2` 로 둔다.
+      */
+      headingLevel={3}
       places={places}
       loading={query.isPending}
       errorStatus={toErrorStatus(query.error)}

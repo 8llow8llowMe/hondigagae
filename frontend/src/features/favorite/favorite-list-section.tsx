@@ -161,6 +161,7 @@ function FavoriteListBody({
     return (
       <ErrorState
         inset={inset}
+        headingLevel={3}
         title={messages.favorite.loadFailedTitle}
         description={messages.favorite.loadFailedDescription}
         onRetry={onRetry}
@@ -172,6 +173,7 @@ function FavoriteListBody({
     return (
       <EmptyState
         inset={inset}
+        headingLevel={3}
         title={messages.favorite.emptyTitle}
         description={messages.favorite.emptyDescription}
         action={

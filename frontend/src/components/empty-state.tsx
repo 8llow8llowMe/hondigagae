@@ -10,6 +10,22 @@ export type EmptyStateProps = {
   action?: ReactNode
   /** 좌우 여백 축 (DESIGN.md §7). 좌측 레일 안에 놓을 때는 `rail` — `ErrorState` 와 같다 */
   inset?: Inset
+  /**
+   * 제목의 heading 레벨 — **제목을 가진 `Surface` 안이면 `3`** 이다 (#456① · #469).
+   *
+   * 기본값 `2` 는 카드 밖이거나 `aria-label` 만 가진 카드 안일 때다. 그런 자리에서는
+   * 위가 페이지 `h1` 하나라 `h2` 가 맞다.
+   *
+   * **`inset` 에서 유도하지 않는다.** 두 축은 이미 갈려 있다 — 카드 안인데 `inset` 을 안 준
+   * 자리가 열 곳이고(#485), 반대로 카드 밖인데 카드 글줄에 맞추려 `inset="card"` 를 쓰는
+   * 자리도 있다. 한쪽을 다른 쪽에서 읽으면 그 열 곳이 조용히 `h3` 가 된다.
+   *
+   * **`Surface` 가 context 로 내려보낼 수도 없다.** 서버 컴포넌트라 context 를 못 쓴다.
+   *
+   * **레벨만 바꾸고 크기는 그대로다.** 카드 제목(`text-title-2`)보다 이미 작은
+   * `text-body-1` 이라 더 줄일 것이 없다 — 바뀌는 것은 문서 개요뿐이다.
+   */
+  headingLevel?: 2 | 3
   className?: string
 }
 
@@ -30,12 +46,15 @@ export function EmptyState({
   description,
   action,
   inset = 'main',
+  headingLevel = 2,
   className,
 }: EmptyStateProps) {
+  const Heading = `h${headingLevel}` as const
+
   return (
     <div className={cn('flex flex-col items-start gap-2 py-12', INSET_CLASS[inset], className)}>
       {/* 중립 톤 — danger 를 쓰지 않는다 (DESIGN.md §2) */}
-      <h2 className="text-body-1 text-fg font-semibold">{title}</h2>
+      <Heading className="text-body-1 text-fg font-semibold">{title}</Heading>
       {description !== undefined && <p className="text-body-2 text-fg-muted">{description}</p>}
       {action !== undefined && <div className="mt-2">{action}</div>}
     </div>

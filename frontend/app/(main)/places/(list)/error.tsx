@@ -44,6 +44,7 @@ export default function PlacesError({ reset }: { error: Error; reset: () => void
             title={messages.place.errorTitle}
             description={messages.common.temporaryErrorDescription}
             inset="card"
+            headingLevel={3}
             onRetry={reset}
           />
         </Surface>

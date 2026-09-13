@@ -17,6 +17,18 @@ export type ErrorStateProps = {
    * 오류 화면에서 유일하게 만지는 것이 그 버튼이라 가장 눈에 띄는 자리였다.
    */
   inset?: Inset
+  /**
+   * 제목의 heading 레벨 — **제목을 가진 `Surface` 안이면 `3`** 이다 (#456① · #469).
+   *
+   * 이게 없을 때 `/mypage` 오류의 실측 아웃라인이 `h1:내 정보` → `h2:내 정보`(카드) →
+   * `h2:내 정보를 불러오지 못했어요` 였다 — 카드 **내용**의 제목이 카드 **자신**의 제목과
+   * 형제로 읽힌다. 3a 가 "상태가 카드 머리를 공유한다"(#451)를 규약으로 삼으면서 제목 있는
+   * 카드 안에 상태가 들어가는 자리가 계속 늘었고, 목록 항목은 이미 `h3` 로 한 단
+   * 내려갔는데(#464 · #466) 상태 컴포넌트만 예외로 남아 있었다.
+   *
+   * 기본값·유도하지 않는 이유·크기를 그대로 두는 이유는 `EmptyState` 쪽 주석이 정본이다.
+   */
+  headingLevel?: 2 | 3
   className?: string
 }
 
@@ -35,11 +47,14 @@ export function ErrorState({
   onRetry,
   retryLabel = messages.common.retry,
   inset = 'main',
+  headingLevel = 2,
   className,
 }: ErrorStateProps) {
+  const Heading = `h${headingLevel}` as const
+
   return (
     <div className={cn('flex flex-col items-start gap-2 py-12', INSET_CLASS[inset], className)}>
-      <h2 className="text-body-1 text-fg font-semibold">{title}</h2>
+      <Heading className="text-body-1 text-fg font-semibold">{title}</Heading>
       {description !== undefined && <p className="text-body-2 text-fg-muted">{description}</p>}
       {/* 이 상태에서 화면의 유일한 조작 대상이다. 모바일 터치 영역 44px (DESIGN.md §7) */}
       <Button variant="secondary" size="md" className="mt-1" onClick={onRetry}>

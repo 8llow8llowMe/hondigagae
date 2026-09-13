@@ -61,9 +61,18 @@ export function PlanListSection({
 }: PlanListSectionProps) {
   if (loading) return <PlanListSkeleton />
 
+  /*
+    **네 상태 전부 `headingLevel={3}` 이다** (#456①). 카드는 이 파일이 아니라 호출부
+    (`plan-list-view.tsx` 의 `<Surface lead titleId="plan-list-heading">`)가 그리는데,
+    **호출부가 하나뿐이고 그 카드가 제목을 갖는다.** prop 으로 뚫지 않은 이유가 그것이다 —
+    값이 갈리는 화면이 아직 없다 (#422 의 "미리 만들지 않는다").
+    갈리는 날 `PlaceListSection` · `EmergencySection` 처럼 `담는 곳이 정한다` 로 바꾼다.
+    이 짝은 `state-heading-level.test.ts` 가 정상 화면 쪽과 함께 잠근다.
+  */
   if (errorStatus !== null) {
     return (
       <ErrorState
+        headingLevel={3}
         title={messages.plan.errorTitle}
         description={messages.plan.errorDescription}
         onRetry={onRetry}
@@ -173,6 +182,7 @@ function FilteredEmpty({
 }) {
   return (
     <EmptyState
+      headingLevel={3}
       title={messages.plan.filteredEmptyTitle}
       description={
         totalCount === null
@@ -198,6 +208,7 @@ function NoPlans({ hasPets, firstPetName }: { hasPets: boolean; firstPetName: st
   if (!hasPets) {
     return (
       <EmptyState
+        headingLevel={3}
         title={messages.plan.noPetTitle}
         description={messages.plan.noPetDescription}
         action={<ButtonLink href="/pets/new">{messages.plan.noPetAction}</ButtonLink>}
@@ -207,6 +218,7 @@ function NoPlans({ hasPets, firstPetName }: { hasPets: boolean; firstPetName: st
 
   return (
     <EmptyState
+      headingLevel={3}
       title={messages.plan.emptyTitle}
       description={
         firstPetName === null

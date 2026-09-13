@@ -117,10 +117,18 @@ describe('목록 갈래는 3층 표면이다 (#460)', () => {
     expect(view.slice(chips, surface)).toMatch(/className="lg:hidden"/)
   })
 
-  it('목록 갈래는 EmergencyBoardSection 에 inset 을 넘기지 않는다 — 기본값 card 가 카드 안 값이다', () => {
+  /*
+    **두 축의 기본값이 반대라 한쪽만 넘긴다** (#456①). `inset` 은 "카드 안인가" 를 물어
+    기본이 `card` 고, `headingLevel` 은 "그 카드가 `h2` 를 갖는가" 를 물어 기본이 `2` 다.
+    목록 갈래는 제목 있는 카드라 두 답이 갈린다 — `inset` 은 기본값 그대로, 레벨만 넘긴다.
+  */
+  it('목록 갈래는 inset 을 넘기지 않고 headingLevel 만 넘긴다', () => {
     const view = block(listView, 'EmergencyListView')
 
-    expect(view).toMatch(/<EmergencyBoardSection board=\{board\} \/>/)
+    expect(view).toMatch(/<EmergencyBoardSection board=\{board\} headingLevel=\{3\} \/>/)
+
+    // 짝의 반대쪽 — 그 카드가 실제로 제목을 갖는다. 걷으면 레벨 단언이 함께 깨져야 한다
+    expect(view).toMatch(/<Surface\b[\s\S]*?\btitle=/)
   })
 
   it('EmergencyBoardSection 이 inset 을 받아 EmergencySection 에 그대로 넘긴다', () => {

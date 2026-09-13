@@ -326,6 +326,12 @@ export function HomeView({
                 )}
                 {walkSafety.isError && (
                   <div className="border-border border-t">
+                    {/*
+                      **여기만 `h2` 로 남는다** (#456①). 이 카드(311행 `<Surface>`)는 제목도
+                      `aria-label` 도 없어 위에 `h2` 가 없다 — 한 단 내리면 페이지 `h1` 과
+                      이 제목 사이가 비어 레벨을 건너뛴다. 카드 안이라고 무조건 `h3` 가
+                      아니라, **그 카드가 `h2` 를 갖고 있을 때만** 내린다.
+                    */}
                     <ErrorState
                       title={messages.home.verdictErrorTitle}
                       inset="rail"
@@ -502,11 +508,13 @@ export function HomeView({
               </SurfaceList>
             ) : allFailed ? (
               <ErrorState
+                headingLevel={3}
                 title={messages.common.temporaryErrorTitle}
                 onRetry={() => suitabilities.forEach((query) => void query.refetch())}
               />
             ) : visible.length === 0 ? (
               <EmptyState
+                headingLevel={3}
                 title={messages.home.emptyPlacesTitle}
                 description={messages.home.emptyPlacesDesc}
                 action={
@@ -623,11 +631,13 @@ export function HomeView({
                 </SurfaceList>
               ) : plans.length === 0 ? (
                 <EmptyState
+                  headingLevel={3}
                   title={messages.home.noPlanTitle}
                   description={messages.home.noPlanDesc}
                 />
               ) : (
                 <EmptyState
+                  headingLevel={3}
                   title={messages.home.noUpcomingPlanTitle}
                   description={messages.home.noUpcomingPlanDesc}
                 />

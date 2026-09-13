@@ -118,6 +118,46 @@ test.describe('3층 표면', () => {
 })
 
 /**
+ * **제목 있는 카드 안의 상태는 `h3` 다** (#456① · #469).
+ *
+ * 위 `h1 이 하나이고 …` 는 **레벨을 건너뛰는 것**만 본다 — `h2` 다음에 또 `h2` 가 오는
+ * 것은 건너뛰기가 아니라 통과한다. 정작 이 이슈의 증상이 그 형제 `h2` 둘이었다:
+ * 카드 제목과 상태 제목이 같은 레벨이라 **카드 내용의 제목이 카드 자신의 제목처럼**
+ * 읽혔다. 그래서 자리를 콕 집어 따로 잠근다.
+ *
+ * **소스 단언(`state-heading-level.test.ts`)이 못 보는 것을 여기서 본다.** 그쪽은
+ * `headingLevel={3}` 이 호출처에 적혀 있는지만 알고, 그 값이 실제로 `h3` 태그가 되어
+ * 카드 `h2` 아래 붙는지는 모른다 — 컴포넌트가 prop 을 무시해도 통과한다.
+ *
+ * **0건을 `keyword` 로 만든다.** 목이 제목·주소를 훑어 거르므로(`mock/index.ts`)
+ * 실재하지 않는 낱말이면 빈 상태가 확실히 선다. 목록에 의존하지 않아 fixture 가 바뀌어도
+ * 흔들리지 않는다.
+ */
+test.describe('카드 안 상태 제목 — #456①', () => {
+  test('/places 빈 결과에서 카드 h2 아래 상태가 h3 로 선다', async ({ page }) => {
+    await page.goto('/places?view=list&keyword=존재하지않는장소이름ZZZ')
+
+    const card = page.getByRole('main').locator('section').first()
+    await expect(card).toBeVisible()
+
+    // 카드 자신의 제목은 h2 다
+    await expect(card.getByRole('heading', { level: 2 })).toHaveCount(1)
+
+    /*
+      상태 제목은 그 아래 h3 다. 이름으로 집지 않는다 — 서버 문구(`resultMessage`)가
+      오면 그대로 노출하는 자리라(`styling-guide.md` §7) 문자열이 고정이 아니다.
+    */
+    const stateHeading = card.getByRole('heading', { level: 3 })
+    await expect(stateHeading).toHaveCount(1)
+    await expect(stateHeading).toBeVisible()
+
+    // 형제 h2 가 둘이 되는 것이 이 이슈의 증상이었다 — 카드 안에 h2 는 하나뿐이어야 한다
+    const outline = await headingOutline(page)
+    expect(outline.filter((entry) => entry.startsWith('H1:'))).toHaveLength(1)
+  })
+})
+
+/**
  * **L0 위 블록은 카드 안 글줄과 같은 세로선에 선다** (`plan-add-place-header`, #451).
  *
  * `md` 이상에서 카드 테두리 1px 만큼 남는 어긋남은 의도된 것이다 — `Surface` 가

@@ -107,6 +107,7 @@ export function MyPageSections({
         ) : failed || member === null ? (
           <ErrorState
             inset="card"
+            headingLevel={3}
             title={messages.member.loadFailedTitle}
             description={messages.member.loadFailedDescription}
             onRetry={onRetry}

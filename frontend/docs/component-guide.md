@@ -190,7 +190,7 @@ type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
 | `RadioGroup`                | `<fieldset>` + `<legend>` 로 그룹 라벨. 각 항목의 `<label htmlFor>` 가 자기 input 을 가리킴. `error` 시 `aria-invalid` + `aria-describedby` |
 | `Checkbox`                  | 자체 `<label htmlFor>`. `error` 시 `aria-invalid` + `aria-describedby`                                                                      |
 | `Skeleton`                  | `aria-hidden` (스크린리더에 의미 없는 반복 읽기 방지)                                                                                       |
-| `EmptyState` / `ErrorState` | 제목이 heading 요소여야 한다                                                                                                                |
+| `EmptyState` / `ErrorState` | 제목이 heading 요소여야 한다. **레벨은 담는 곳이 정한다** — `headingLevel` (`styling-guide.md` §3-1)                                        |
 | `InfoTip`                   | hover · focus · click **셋 다** 열고 `Esc`·바깥 클릭이 닫는다. `title` 속성을 쓰지 않는다. `md` 미만은 `BottomSheet` 로 떨어뜨린다          |
 
 ### 선택 계열은 `Field` 로 감싸지 않는다
