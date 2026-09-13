@@ -3,27 +3,40 @@
 이 폴더는 **게이트웨이가 실제로 서빙하는 OpenAPI 문서를 파일로 고정해 둔 것**이다.
 백엔드가 로컬에 뜨지 않아도 계약을 읽을 수 있고, 계약이 언제 어떻게 바뀌었는지 diff 로 보인다.
 
-수집 시각: **2026-09-10** (dev 게이트웨이).
+수집 시각: **2026-09-13** (dev 게이트웨이).
 
-> ⚠️ **오류 봉투에 한해 이 스냅샷 4개는 낡았다 ([#491](https://github.com/8llow8llowMe/hondigagae/issues/491) 반영 전).**
-> 네 파일 모두 `DataHeader.resultMessage` 를 `{"type":"object"}` 로 적고 있고 `fieldErrors` 키가
-> 없다. **확정된 계약은 `resultMessage: string` + `fieldErrors: ValidationErrorItem[] | null`** 이고
-> 정본은 `backend/docs/api-design-guide.md` §2-1 이다. 이 항목만큼은 아래 "정본 순서" 를 뒤집어
-> 읽어야 한다 — 위의 `goldenWindowStatus` 전례와 같은 경우다. 배포 후 재수집하며 이 경고를 지운다.
+> **오류 봉투 경고를 지웠다 (#534).** 직전 스냅샷은 `DataHeader.resultMessage` 를
+> `{"type":"object"}` 로 적고 `fieldErrors` 키가 없어, 그 항목만 "정본 순서" 를 뒤집어 읽어야
+> 했다. 이번 재수집으로 네 서비스 모두 **`resultMessage: string` + `fieldErrors:
+> ValidationErrorItem[] | null`** 이 스냅샷에 들어왔다 — 더 이상 예외가 아니다.
+> FE 대응은 이미 끝나 있다 (#501 / PR #533).
 
-> 이 재수집(#409)에서 구조가 바뀐 곳은 **하나뿐이다** —
+> **이번 재수집(#534)에서 바뀐 것 — 네 서비스 전부 + 새 표면 8개.**
+>
+> 공통으로 `DataHeader +fieldErrors` 와 `DataHeader.resultMessage: object -> string`,
+> `+schema ValidationErrorItem` 이 들어왔다 (#491). 그 밖에 서비스별로:
+>
+> - **tour** — `+op GET /walk-courses`, `GET /walk-courses/{walkCourseId}` (산책 코스 2종,
+>   **FE 가 존재 자체를 모르던 표면**) · `PlaceCongestionResponse +leastCrowded`
+> - **plan** — `+op` 6개 (여행 브리핑 1 · 준비물 5) · `PlanDayWeatherItem +unavailableReasonCode`
+> - **ai** — `AiPlanJobStatusResponse +conditions` (`+schema AiPlanJobConditionsResponse`)
+> - **auth** — 공통 변경만
+>
+> **`PlaceCongestionResponse.leastCrowded` 가 서버에 실재하는 것이 확인됐다** —
+> [#430](https://github.com/8llow8llowMe/hondigagae/issues/430) 의 남은 절반이 기다리던 필드다.
+> 다만 `GET /places/{placeId}/congestions` 자체가 FE 미연동이라 **붙일 화면이 아직 없다**
+> (기간 그래프를 둘 자리가 아트보드에 없다 — `frontend/docs/screen-inventory.md`).
+>
+> **새 표면 8개를 FE 에 연동하지 않는다.** 이 재수집은 기준선을 맞추고 무엇이 생겼는지
+> 기록하는 데까지다 — 연동 여부는 화면 이슈로 따로 판단한다.
+
+> 앞선 재수집(#409, 2026-09-10)의 기록: 구조가 바뀐 곳은 **하나뿐이었다** —
 > `RegionWeatherItem +maxFeelsLikeTemperature` (tour-service). 권역 비교 행이 체감온도를
 > 낼 수 있게 됐다는 뜻이고, [#407](https://github.com/8llow8llowMe/hondigagae/issues/407)
 > 이 기다리는 값이기도 하다. **FE 타입에는 아직 없다** — 표시 여부가 #407 의 답에 걸려
-> 있어 일부러 안 붙였다 (`features/_index.md` 드리프트 표).
-> auth-service 의 4줄 diff 는 `PetSaveRequest.sizeType`·`weightKg` 의 description 보강이고
-> operation·schema·필드는 그대로다. 새로 명시된 `PET_004` 경계 규칙은 FE 가 이미 지킨다
-> (`lib/pet/size.ts`, #369).
+> 있어 일부러 안 붙였다 (`features/_index.md` 드리프트 표). 이번 재수집에서도 그대로다.
 >
-> **plan-service 가 살아났다.** 2026-09-03 에는 503 이라 일정·즐겨찾기 13개를 로컬 소스로만
-> 대조할 수 있었는데, 이번에는 네 서비스 모두 200 이다.
->
-> 앞선 재수집(2026-09-07)의 기록: 구조가 바뀐 곳은 tour-service 셋이었다 (#292) —
+> 그 전(2026-09-07)의 기록: tour-service 셋이었다 (#292) —
 > `WalkSafetyResponse +feelsLikeCelsius/+feelsLikeBasis/+heatIndexBasis`,
 > `PlaceIntroItem +open24/+openNow`, `WalkTimesResponse +goldenWindowStatus`.
 > **`goldenWindowStatus` 는 FE 가 이미 쓰던 필드였다** — 스냅샷만 낡아 있었다. 스냅샷을
@@ -31,10 +44,10 @@
 
 | 파일                                                     | 서비스                                  | operations | schemas |
 | -------------------------------------------------------- | --------------------------------------- | ---------- | ------- |
-| [`openapi/auth-service.json`](openapi/auth-service.json) | 회원 · 인증/인가                        | 29         | 35      |
-| [`openapi/tour-service.json`](openapi/tour-service.json) | 관광 데이터 · 여행 인사이트 · 긴급 시설 | 10         | 38      |
-| [`openapi/plan-service.json`](openapi/plan-service.json) | 여행 일정 · 즐겨찾기                    | 13         | 33      |
-| [`openapi/ai-service.json`](openapi/ai-service.json)     | AI 여행 플래너                          | 5          | 15      |
+| [`openapi/auth-service.json`](openapi/auth-service.json) | 회원 · 인증/인가                        | 29         | 36      |
+| [`openapi/tour-service.json`](openapi/tour-service.json) | 관광 데이터 · 여행 인사이트 · 긴급 시설 | 12         | 44      |
+| [`openapi/plan-service.json`](openapi/plan-service.json) | 여행 일정 · 즐겨찾기 · 준비물           | 19         | 47      |
+| [`openapi/ai-service.json`](openapi/ai-service.json)     | AI 여행 플래너                          | 5          | 17      |
 
 > **표의 숫자는 스냅샷에서 센다.** 예전 `22` · `8` · `4` 는 아래 인벤토리와도 어긋나 있었다 —
 > 표는 손으로 적고 인벤토리는 따로 늘려 온 탓이다. 재수집할 때 이 줄도 함께 고친다.
@@ -123,7 +136,7 @@ auth-service 로 직결시킨다 — 배포에서 사설 IP 대신 공개 도메
 ## 엔드포인트 인벤토리
 
 `FE 경로` 는 `frontend/src/lib/api/paths.ts` 에 그 경로가 등록돼 있는지다 (화면 연동 여부는
-`frontend/docs/screen-inventory.md`). **57 operations 중 52개가 등록돼 있고 5개가 비어 있다.**
+`frontend/docs/screen-inventory.md`). **65 operations 중 52개가 등록돼 있고 13개가 비어 있다.**
 
 ### `auth-service` — 회원 및 인증/인가 서비스
 
@@ -173,6 +186,8 @@ auth-service 로 직결시킨다 — 배포에서 사설 IP 대신 공개 도메
 | `GET`  | `/places/{placeId}/congestions`        | 공개 | **없음** | 장소 기간 혼잡도     |
 | `GET`  | `/places/{placeId}/suitability`        | 공개 | ✅       | 장소 여행 적합도     |
 | `GET`  | `/places/{placeId}/walk-safety`        | 공개 | ✅       | 장소 산책 위험도     |
+| `GET`  | `/walk-courses`                        | 공개 | **없음** | 산책 코스 목록       |
+| `GET`  | `/walk-courses/{walkCourseId}`         | 공개 | **없음** | 산책 코스 상세       |
 
 ### `plan-service` — 여행 일정 서비스
 
@@ -187,9 +202,15 @@ auth-service 로 직결시킨다 — 배포에서 사설 IP 대신 공개 도메
 | `GET`    | `/plans/{planId}`                            | 🔒   | ✅      | 여행 일정 상세 조회        |
 | `PUT`    | `/plans/{planId}`                            | 🔒   | ✅      | 여행 일정 수정             |
 | `DELETE` | `/plans/{planId}`                            | 🔒   | ✅      | 여행 일정 삭제             |
+| `GET`    | `/plans/{planId}/briefing`                   | 🔒   | **없음** | 여행 브리핑 (하루치)       |
 | `PUT`    | `/plans/{planId}/days/{day}/items`           | 🔒   | ✅      | 일자별 일정 항목 일괄 교체 |
 | `GET`    | `/plans/{planId}/emergency`                  | 🔒   | ✅      | 일정 응급 브리핑           |
 | `PUT`    | `/plans/{planId}/items/{planItemId}/visited` | 🔒   | ✅      | 일정 항목 방문 체크        |
+| `GET`    | `/plans/{planId}/packing-items`              | 🔒   | **없음** | 여행 준비물 조회           |
+| `PUT`    | `/plans/{planId}/packing-items`              | 🔒   | **없음** | 여행 준비물 저장 (AI 결과 교체) |
+| `POST`   | `/plans/{planId}/packing-items`              | 🔒   | **없음** | 여행 준비물 직접 추가      |
+| `DELETE` | `/plans/{planId}/packing-items/{packingItemId}` | 🔒 | **없음** | 여행 준비물 삭제           |
+| `PUT`    | `/plans/{planId}/packing-items/{packingItemId}/checked` | 🔒 | **없음** | 여행 준비물 챙김 체크 |
 | `GET`    | `/plans/{planId}/weather`                    | 🔒   | ✅      | 일정 날씨 브리핑           |
 
 ### `ai-service` — AI 서비스
@@ -202,10 +223,14 @@ auth-service 로 직결시킨다 — 배포에서 사설 IP 대신 공개 도메
 | `POST` | `/ai-plans/jobs/{jobId}/cancel`   | 🔒   | ✅      | 일정 생성 작업 취소 (협조적)       |
 | `POST` | `/ai-plans/packing-list/{planId}` | 🔒   | ✅      | 반려견 여행 준비물 목록 생성       |
 
-### FE 경로가 없는 5개
+### FE 경로가 없는 13개
 
 미착수 기능이라 호출부를 만들지 않은 것이다 (없는 API 를 상상해 mock 으로 채우지 않는다는
 규칙과 같은 판단 — api-integration-guide §9).
+
+**8개는 이번 재수집(#534)에서 새로 드러났다** — 산책 코스 2 · 여행 브리핑 1 · 준비물 5.
+FE 가 존재 자체를 모르던 표면이라 **연동 여부를 판단한 적이 없다**: 위의 다섯과 성격이
+다르므로(저 다섯은 "보고 접었다") 표에서도 갈라 적는다.
 
 | 경로                                                       | 무엇                              | 비고                                                          |
 | ---------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------- |
@@ -213,3 +238,11 @@ auth-service 로 직결시킨다 — 배포에서 사설 IP 대신 공개 도메
 | `POST /members/signup/dev`                                 | 이메일 인증 없이 테스트 계정 생성 | **운영 프로필에는 없다.** dev 연동 테스트 계정을 만들 때 쓴다 |
 | `GET /emergencies/facilities/{facilityId}`                 | 긴급 시설 상세                    | 목록만 쓰고 상세 화면이 없다                                  |
 | `GET /places/{placeId}/congestions`                        | 장소 기간 혼잡도 (30일)           | 적합도(약 11일)보다 멀리 답할 수 있는 유일한 지표             |
+
+**이번 재수집에서 새로 드러난 8개** (아직 판단 전):
+
+| 경로                                                                     | 무엇                    | 비고                                                                              |
+| ------------------------------------------------------------------------ | ----------------------- | --------------------------------------------------------------------------------- |
+| `GET /walk-courses` · `GET /walk-courses/{walkCourseId}`                 | 산책 코스 목록 · 상세   | 공개 API. 장소와 별개 표면이라 어느 화면에 얹을지부터 정해야 한다                 |
+| `GET /plans/{planId}/briefing`                                           | 여행 브리핑 (하루치)    | 기존 `/emergency` · `/weather` 와 겹치는 범위가 있는지 확인이 먼저다              |
+| `GET` · `PUT` · `POST /plans/{planId}/packing-items` 외 2                | 여행 준비물 CRUD        | `POST /ai-plans/packing-list/{planId}`(연동됨)가 만든 결과를 **저장·체크**하는 짝. 지금은 생성만 하고 보관하지 않는다 |

@@ -140,7 +140,7 @@
           "AI 여행 플래너"
         ],
         "summary": "AI 여행 일정 생성 작업 조회",
-        "description": "작업 상태와 결과를 조회합니다. 본인 작업만 조회할 수 있으며 타인의 jobId는 404로 응답합니다. 작업 실패는 200 OK + status=FAILED + errorCode/errorMessage 로 표현합니다.\n\n**필수: jobId(경로).** 쿼리 파라미터는 없습니다. status.code 는 PENDING 대기 중 · RUNNING 생성 중 · COMPLETED 완료 · FAILED 실패 · CANCELED 취소됨 이며, COMPLETED 일 때만 planDraft 가, FAILED 일 때만 errorCode/errorMessage 가 채워집니다. RUNNING 이면 `step`·`stepOrder`·`totalSteps` 로 세부 진행을 그릴 수 있습니다 — **PENDING 이면 step 이 null 이니 0/1 단계로 그리지 마세요.** 대기·실행 제한 시간(기본 30초·300초)을 넘긴 작업은 조회 시점에 FAILED(AIPLAN_006)로 바뀌고, 작업 기록은 보관 기간(기본 24시간)이 지나면 사라져 404 가 됩니다.\n\n호출 예: `GET /api/v1/ai-plans/jobs/8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00`",
+        "description": "작업 상태와 결과를 조회합니다. 본인 작업만 조회할 수 있으며 타인의 jobId는 404로 응답합니다. 작업 실패는 200 OK + status=FAILED + errorCode/errorMessage 로 표현합니다.\n\n**필수: jobId(경로).** 쿼리 파라미터는 없습니다. status.code 는 PENDING 대기 중 · RUNNING 생성 중 · COMPLETED 완료 · FAILED 실패 · CANCELED 취소됨 이며, COMPLETED 일 때만 planDraft 가, FAILED 일 때만 errorCode/errorMessage 가 채워집니다. RUNNING 이면 `step`·`stepOrder`·`totalSteps` 로 세부 진행을 그릴 수 있습니다 — **PENDING 이면 step 이 null 이니 0/1 단계로 그리지 마세요.** 대기·실행 제한 시간(기본 30초·300초)을 넘긴 작업은 조회 시점에 FAILED(AIPLAN_006)로 바뀌고, 작업 기록은 보관 기간(기본 24시간)이 지나면 사라져 404 가 됩니다.\n\n**`conditions` 에 제출 때 쓴 생성 조건(지역·기간·반려견·예산·메모)이 상태와 무관하게 함께 내려갑니다.** 초안을 일정으로 담으려면 이 값들이 필요한데, 브라우저에 보관해 두면 다른 기기·시크릿창에서 작업 주소를 열었을 때 담기가 막힙니다. 화면은 이 블록으로 조건을 복원하면 됩니다. `petIds` 는 Snowflake 라 문자열 배열이고, 제출 때 생략한 값은 null 입니다.\n\n호출 예: `GET /api/v1/ai-plans/jobs/8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00`",
         "operationId": "getJobStatus",
         "parameters": [
           {
@@ -179,7 +179,7 @@
           "AI 여행 플래너"
         ],
         "summary": "일정 생성 작업 상태 스트리밍 (SSE)",
-        "description": "비동기 일정 생성 작업의 상태 변경을 Server-Sent Events 로 스트리밍합니다.\n이벤트 data 는 작업 상태 조회 응답의 dataBody 와 동일한 JSON 입니다. 본인이 제출한 작업만 구독할 수 있습니다.\n\n수신 주기: 이벤트는 주기적으로 오지 않고 상태가 바뀔 때만 전송됩니다.\n일반적으로 구독 즉시 현재 상태 스냅샷 1회 -> RUNNING 전이 1회 -> COMPLETED/FAILED 1회, 총 2~3회 수신 후\n서버가 연결을 종료합니다 (일정 생성은 로컬 LLM 기준 수십 초 소요).\n25초 간격 하트비트는 SSE 코멘트 프레임이라 onmessage 로 수신되지 않으며 클라이언트 처리가 필요 없습니다.\n\n브라우저 기본 EventSource 는 Authorization 헤더를 지원하지 않으므로\nfetch 기반 SSE 클라이언트(예: @microsoft/fetch-event-source)를 사용하세요.\n연결이 끊기면 GET /jobs/{jobId} 폴링으로 폴백하면 됩니다.\n\n이벤트 이름은 `job-update` 하나입니다(클라이언트는 이 이름으로 리스너를 등록합니다).\n종료 조건: status.code 가 COMPLETED / FAILED / CANCELED 인 이벤트를 보낸 직후 서버가 연결을 닫습니다.\n취소는 별도 이벤트가 아니라 CANCELED 상태 이벤트로 옵니다 — 취소 버튼을 눌렀으면 이 이벤트로 화면을 정리하면 됩니다.\n구독 시점에 이미 종결 상태면 그 스냅샷 1회를 보내고 바로 닫습니다.\njobId 가 없거나 타인의 것이면 스트림이 열리기 전에 일반 JSON 오류(404, AIPLAN_002)로 응답합니다.\n\n**필수: jobId(경로).** 쿼리 파라미터는 없습니다.\n\n호출 예: `GET /api/v1/ai-plans/jobs/8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00/stream` (Accept: text/event-stream, Authorization: Bearer 토큰)",
+        "description": "비동기 일정 생성 작업의 상태 변경을 Server-Sent Events 로 스트리밍합니다.\n이벤트 data 는 작업 상태 조회 응답의 dataBody 와 동일한 JSON 입니다. 본인이 제출한 작업만 구독할 수 있습니다.\n폴링 응답과 같은 모양이라 `conditions`(제출 때 쓴 생성 조건)도 매 이벤트에 함께 실립니다 — 구독만으로 화면이 조건을 복원할 수 있습니다.\n\n수신 주기: 이벤트는 주기적으로 오지 않고 상태가 바뀔 때만 전송됩니다.\n일반적으로 구독 즉시 현재 상태 스냅샷 1회 -> RUNNING 전이 1회 -> COMPLETED/FAILED 1회, 총 2~3회 수신 후\n서버가 연결을 종료합니다 (일정 생성은 로컬 LLM 기준 수십 초 소요).\n25초 간격 하트비트는 SSE 코멘트 프레임이라 onmessage 로 수신되지 않으며 클라이언트 처리가 필요 없습니다.\n\n브라우저 기본 EventSource 는 Authorization 헤더를 지원하지 않으므로\nfetch 기반 SSE 클라이언트(예: @microsoft/fetch-event-source)를 사용하세요.\n연결이 끊기면 GET /jobs/{jobId} 폴링으로 폴백하면 됩니다.\n\n이벤트 이름은 `job-update` 하나입니다(클라이언트는 이 이름으로 리스너를 등록합니다).\n종료 조건: status.code 가 COMPLETED / FAILED / CANCELED 인 이벤트를 보낸 직후 서버가 연결을 닫습니다.\n취소는 별도 이벤트가 아니라 CANCELED 상태 이벤트로 옵니다 — 취소 버튼을 눌렀으면 이 이벤트로 화면을 정리하면 됩니다.\n구독 시점에 이미 종결 상태면 그 스냅샷 1회를 보내고 바로 닫습니다.\njobId 가 없거나 타인의 것이면 스트림이 열리기 전에 일반 JSON 오류(404, AIPLAN_002)로 응답합니다.\n\n**필수: jobId(경로).** 쿼리 파라미터는 없습니다.\n\n호출 예: `GET /api/v1/ai-plans/jobs/8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00/stream` (Accept: text/event-stream, Authorization: Bearer 토큰)",
         "operationId": "streamJobStatus",
         "parameters": [
           {
@@ -358,26 +358,61 @@
       },
       "DataHeader": {
         "type": "object",
+        "description": "공통 응답 헤더",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "성공 여부"
           },
           "resultCode": {
-            "type": "string"
+            "type": "string",
+            "description": "대표 오류 코드. 성공이면 null"
           },
           "resultMessage": {
-            "type": "object"
+            "type": "string",
+            "description": "사용자에게 보여줄 대표 오류 메시지. 성공이면 null. 오류 종류와 무관하게 항상 문자열이다"
+          },
+          "fieldErrors": {
+            "type": "array",
+            "description": "필드 단위 검증 오류 목록. 검증 실패가 아니면 null",
+            "items": {
+              "$ref": "#/components/schemas/ValidationErrorItem"
+            }
           }
         }
       },
       "ResponseAiPlanSubmitResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/AiPlanSubmitResponse"
+            "$ref": "#/components/schemas/AiPlanSubmitResponse",
+            "description": "응답 본문. 실패면 null"
+          }
+        }
+      },
+      "ValidationErrorItem": {
+        "type": "object",
+        "description": "필드 단위 검증 오류 항목",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "오류 코드 (도메인별 검증 코드)",
+            "example": "MEMBER_109"
+          },
+          "field": {
+            "type": "string",
+            "description": "오류가 발생한 필드명",
+            "example": "nickname"
+          },
+          "message": {
+            "type": "string",
+            "description": "오류 메시지",
+            "example": "닉네임은 10자 이하만 가능합니다."
           }
         }
       },
@@ -428,12 +463,15 @@
       },
       "ResponsePackingListResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/PackingListResponse"
+            "$ref": "#/components/schemas/PackingListResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -476,6 +514,55 @@
           }
         }
       },
+      "AiPlanJobConditionsResponse": {
+        "type": "object",
+        "description": "일정을 만들 때 쓴 생성 조건 DTO. 제출(POST /ai-plans) 때 받은 값을 그대로 돌려준다. **초안을 담는 데 필요한 조건만 담는다** — pinnedPlaceIds · preferFavorites · planId · regenerateDay 는 일정 저장이 받지 않는 값이라 포함하지 않는다",
+        "properties": {
+          "areaCode": {
+            "type": "string",
+            "description": "여행 지역 코드 (관광 areaCode, 제주=39)",
+            "example": 39
+          },
+          "sigunguCode": {
+            "type": "string",
+            "description": "관광 시군구코드 (제주시=4 · 서귀포시=3). 제출 때 지정하지 않았으면 null — 지역 전체로 짰다는 뜻이다",
+            "example": 4
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "description": "여행 시작일 (yyyy-MM-dd)",
+            "example": "2026-09-11"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "description": "여행 종료일 (yyyy-MM-dd)",
+            "example": "2026-09-13"
+          },
+          "petIds": {
+            "type": "array",
+            "description": "동반 반려견 식별자 목록. **Snowflake 라 문자열로 내린다** (제출 계약과 같다). 제출 때 지정하지 않았으면 빈 배열이고, 그때는 회원의 대표 반려견으로 일정을 짰다",
+            "example": [
+              "1234567890123456789"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "budget": {
+            "type": "integer",
+            "format": "int64",
+            "description": "예산 (원 단위). 제출 때 지정하지 않았으면 null",
+            "example": 400000
+          },
+          "requestNote": {
+            "type": "string",
+            "description": "요청 메모 (자연어 요구사항). 제출 때 지정하지 않았으면 null",
+            "example": "산책 위주로, 더위에 약한 아이라 실내 위주로 부탁해요"
+          }
+        }
+      },
       "AiPlanJobStatusResponse": {
         "type": "object",
         "description": "AI 여행 일정 생성 작업 상태 응답 DTO",
@@ -509,6 +596,10 @@
             "format": "int32",
             "description": "전체 단계 수. 화면의 \"n / m 단계\" 에서 m 이다. 단계가 늘면 이 값도 함께 늘어난다",
             "example": 4
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/AiPlanJobConditionsResponse",
+            "description": "일정을 만들 때 쓴 생성 조건. **상태를 가리지 않고 채워진다** — 초안을 담는 데 필요한 지역·기간·반려견이 여기 있어서, 작업 주소를 다른 브라우저·기기에서 열어도 화면이 조건을 되살릴 수 있다. 제출 때 생략한 값(sigunguCode · budget · requestNote)은 null 이다. 블록 자체가 null 인 경우는 저장된 요청 파라미터가 비어 있는 잡뿐이라 정상 경로에서는 생기지 않지만, **화면은 null 가드를 두는 편이 안전하다**"
           },
           "planDraft": {
             "$ref": "#/components/schemas/AiPlanDraftResponse",
@@ -575,12 +666,15 @@
       },
       "ResponseAiPlanJobStatusResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/AiPlanJobStatusResponse"
+            "$ref": "#/components/schemas/AiPlanJobStatusResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
