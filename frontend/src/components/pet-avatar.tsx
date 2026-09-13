@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils/cn'
 
-export type PetAvatarSize = 'sm' | 'md' | 'lg' | 'hero'
+export type PetAvatarSize = 'sm' | 'md' | 'lg' | 'xl' | 'hero'
 
 /**
  * 반려견 이니셜 원형.
@@ -28,6 +28,11 @@ const SIZE: Record<PetAvatarSize, string> = {
   md: 'size-7 text-caption font-bold',
   /** 데스크톱 일정 행 */
   lg: 'size-8 text-body-2 font-bold',
+  /**
+   * 마이페이지 `내 반려견` 행의 리딩 슬롯 (#468) — **같은 카드의 `저장한 장소` 가 쓰는
+   * 40px 원형과 같은 값이다.** 두 행의 리딩이 같은 폭이어야 글줄이 한 세로선에 선다.
+   */
+  xl: 'size-10 text-body-1 font-bold',
   /** 홈 프로필 카드 — 96(모바일) / 112(데스크톱) */
   hero: 'size-24 md:size-28 text-avatar md:text-avatar-lg font-extrabold',
 }
