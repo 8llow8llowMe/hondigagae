@@ -29,6 +29,8 @@ export function PlaceListView({ filters }: { filters: PlaceFilters }) {
         폴백은 제목 있는 카드가 아니라 기본값 `2` 로 둔다.
       */
       headingLevel={3}
+      // 0건 문구가 무엇으로 찾았는지 되돌려 준다 (#431)
+      keyword={filters.keyword}
       places={places}
       loading={query.isPending}
       errorStatus={toErrorStatus(query.error)}

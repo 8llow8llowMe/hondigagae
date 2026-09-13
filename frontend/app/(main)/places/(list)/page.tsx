@@ -8,6 +8,7 @@ import { PlaceFilterChips } from '@/features/place/place-filter-chips'
 import { PlaceFilterRail } from '@/features/place/place-filter-rail'
 import { PlaceListView } from '@/features/place/place-list-view'
 import { PlaceMapView } from '@/features/place/place-map-view'
+import { PlaceSearchField } from '@/features/place/place-search-field'
 import { placeKeys } from '@/features/place/queries'
 import { placeListPath, type PlaceSlice } from '@/lib/api/place'
 import { serverFetch } from '@/lib/api/server'
@@ -133,6 +134,16 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
           §0 의 카드 판정 3문에서 "혼자 떼어놔도 말이 되는가" 에 걸린다(필터만 있는 화면은
           없다). 데스크톱 레일이 카드 밖에 서 있는 것과 같은 자리다.
         */}
+        {/*
+          **검색은 모든 폭에서 같은 자리다** (#431). 필터 칩은 `lg:hidden` 이고 레일이
+          1024 이상을 맡지만, 레일에는 검색을 두지 않았다 — 그러면 같은 도구가 폭에 따라
+          다른 곳에 서고, 좁은 화면에서는 칩 줄 위에 또 하나가 생긴다.
+
+          **카드 밖인 것은 칩과 같은 이유다** — 검색은 목록을 좁히는 도구이고 카드는 그
+          결과를 담는다.
+        */}
+        <PlaceSearchField filters={filters} />
+
         <div className="lg:hidden">
           <PlaceFilterChips filters={filters} authed={authed} />
         </div>

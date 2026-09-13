@@ -245,7 +245,12 @@ describe('부모에 따라 갈리는 둘 — 담는 곳이 정한다', () => {
  */
 const SHEETS = [
   { path: 'src/features/plan/place-add-to-plan-sheet.tsx', states: 4 },
-  { path: 'src/features/ai-plan/ai-plan-place-picker-sheet.tsx', states: 2 },
+  /*
+    **넷이다** — `저장한 장소` 둘(오류 · 0건)과 `검색` 둘(오류 · 0건). #431 로 검색 탭이
+    열리며 둘에서 넷이 됐다. **탭이 늘어나는 쪽으로 드리프트가 난다** — 새 탭에 상태를
+    붙이며 레벨을 빠뜨리는 것이 이 단언이 막는 모양이다.
+  */
+  { path: 'src/features/ai-plan/ai-plan-place-picker-sheet.tsx', states: 4 },
 ] as const
 
 describe('BottomSheet 안 상태 — 시트 제목도 h2 다', () => {
