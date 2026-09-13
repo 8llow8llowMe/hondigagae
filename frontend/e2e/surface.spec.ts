@@ -200,22 +200,36 @@ test.describe('3층 표면', () => {
  * 흔들리지 않는다.
  */
 test.describe('카드 안 상태 제목 — #456①', () => {
-  test('/places 빈 결과에서 카드 h2 아래 상태가 h3 로 선다', async ({ page }) => {
+  /*
+    **#531 로 이 화면의 짝이 반대로 뒤집혔다.** 페이지 제목이 카드 **위** 제목 줄로
+    올라가면서 목록 카드가 `h2` 를 잃고 `aria-label` 만 갖게 됐고, 그 짝으로 카드 안
+    상태 제목이 `h3` → `h2` 로 올라왔다.
+
+    **이 파일에서 `h3` 쪽을 실제 브라우저로 보는 화면은 이제 없다** — 나머지 제목 있는
+    카드 넷(`ai-plans/new` · `favorites` · `mypage` · `pets`)은 0건을 URL 하나로 만들 수
+    없어 여기로 데려오지 못했다. `h3` 짝은 유닛이 잡는다
+    (`state-heading-level.test.ts` 가 뷰 셋과 라우트 상태 파일 열둘을 표로 잠근다).
+    여기서는 **뒤집힌 쪽**이 실제로 서는지를 본다.
+  */
+  test('/places 빈 결과에서 카드가 제목 없이 상태를 h2 로 세운다', async ({ page }) => {
     await page.goto('/places?view=list&keyword=존재하지않는장소이름ZZZ')
 
     const card = page.getByRole('main').locator('section').first()
     await expect(card).toBeVisible()
 
-    // 카드 자신의 제목은 h2 다
-    await expect(card.getByRole('heading', { level: 2 })).toHaveCount(1)
+    // 카드는 자기 제목을 갖지 않는다 — 이름은 `aria-label` 이 잇는다
+    await expect(card).toHaveAttribute('aria-label', /.+/)
 
     /*
-      상태 제목은 그 아래 h3 다. 이름으로 집지 않는다 — 서버 문구(`resultMessage`)가
+      상태 제목은 카드 안 h2 다. 이름으로 집지 않는다 — 서버 문구(`resultMessage`)가
       오면 그대로 노출하는 자리라(`styling-guide.md` §7) 문자열이 고정이 아니다.
     */
-    const stateHeading = card.getByRole('heading', { level: 3 })
+    const stateHeading = card.getByRole('heading', { level: 2 })
     await expect(stateHeading).toHaveCount(1)
     await expect(stateHeading).toBeVisible()
+
+    // 카드가 제목을 도로 가져가면(=h3 로 내려가면) 위 단언과 함께 깨져야 한다
+    await expect(card.getByRole('heading', { level: 3 })).toHaveCount(0)
 
     /*
       **형제 `h2` 가 둘이 되는 것이 이 이슈의 증상이었다.** 카드 안 `h2` 하나는 위에서
@@ -226,6 +240,8 @@ test.describe('카드 안 상태 제목 — #456①', () => {
     const outline = await headingOutline(page)
     expect(outline.filter((entry) => entry.startsWith('H1:'))).toHaveLength(1)
     expect(await card.getByRole('heading', { level: 2 }).count()).toBe(1)
+    // 개요의 첫 제목은 여전히 h1 이다 — 보이는 제목 줄은 `aria-hidden` 사본이라 끼어들지 않는다 (#472 · #531)
+    expect(outline[0]?.startsWith('H1:')).toBe(true)
   })
 })
 
@@ -639,23 +655,45 @@ test.describe('제목이 필터보다 먼저다 — #546', () => {
  * 것이 맞으므로 뷰포트마다 기대값을 따로 두지 않고 **"1px 이내" 하나로 본다.**
  */
 test.describe('모바일 필터 칩의 세로선 — #457', () => {
+  /*
+    **기준선을 화면마다 따로 준다** (#531).
+
+    원래는 둘 다 "카드 제목(`h2`)" 이 기준이었다. `/places` 는 #531 로 그 제목이 카드
+    **위** 제목 줄로 올라가 카드에 `h2` 가 없어졌다 — 카드를 `has: h2` 로 찾던 locator 가
+    아무것도 못 잡아 깨졌다(#536 이 일정에서 먼저 밟은 것과 같은 모양이다).
+
+    **잡으려는 것은 "칩이 본문 글줄과 같은 세로선에 서는가" 이지 "카드에 제목이 있는가"
+    가 아니다.** 그래서 `/places` 는 그 제목을 대신한 **제목 줄의 글자**를, `/plans` 는
+    그대로 **카드 제목**을 기준으로 삼는다. 둘 다 `INSET_CLASS.card` 를 쓰므로 재는
+    값의 뜻은 같다.
+  */
   const CHIP_SCREENS = [
-    { path: '/places?view=list', label: '장소 찾기' },
-    { path: '/plans', label: '일정' },
+    { path: '/places?view=list', label: '장소 찾기', reference: 'titleLine' },
+    { path: '/plans', label: '일정', reference: 'cardHeading' },
   ] as const
 
-  for (const { path, label } of CHIP_SCREENS) {
+  for (const { path, label, reference } of CHIP_SCREENS) {
     for (const name of ['mobile', 'tablet'] as const) {
-      test(`${label} ${name} — 칩 글줄이 카드 제목과 1px 안에 선다`, async ({ page }) => {
+      test(`${label} ${name} — 칩 글줄이 본문 글줄과 1px 안에 선다`, async ({ page }) => {
         await page.setViewportSize(VIEWPORTS[name])
         await page.goto(path)
 
         const main = page.getByRole('main')
-        const card = main
-          .locator('section')
-          .filter({ has: page.locator('h2') })
-          .first()
-        await expect(card).toBeVisible()
+        /*
+          `/places` 의 기준은 제목 줄의 글자다. **`aria-hidden` 사본이라 role 로 못
+          집는다** — 진짜 `h1` 은 캔버스 맨 앞의 `sr-only` 쪽이고(#472), 이 글자는 그것을
+          눈으로 보여주는 사본이다. 그래서 DOM 으로 집는다.
+        */
+        const anchor =
+          reference === 'titleLine'
+            ? main.locator('p[aria-hidden]').first()
+            : main
+                .locator('section')
+                .filter({ has: page.locator('h2') })
+                .first()
+                .getByRole('heading', { level: 2 })
+                .first()
+        await expect(anchor).toBeVisible()
 
         /*
           칩 스트립 = 좌우 padding 을 가진 `border-b` 블록 중 **보이는** 첫 번째.
@@ -682,7 +720,7 @@ test.describe('모바일 필터 칩의 세로선 — #457', () => {
         })
 
         expect(chipLeft).not.toBeNull()
-        const titleLeft = await leftEdge(card.getByRole('heading', { level: 2 }).first())
+        const titleLeft = await leftEdge(anchor)
 
         expect(Math.abs((chipLeft as number) - titleLeft)).toBeLessThanOrEqual(1)
       })
