@@ -90,6 +90,7 @@ export function PetFormFields({
         */
         <ErrorState
           headingLevel={3}
+          inset="card"
           title={messages.common.temporaryErrorTitle}
           description={messages.common.temporaryErrorDescription}
           onRetry={onRetry}

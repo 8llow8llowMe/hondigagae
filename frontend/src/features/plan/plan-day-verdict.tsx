@@ -52,6 +52,16 @@ export function PlanDayVerdict({
 }) {
   if (failed) {
     return (
+      /*
+        **인셋을 0 으로 덮는 것이 맞다** (#485 에서 확인). 담는 쪽(`plan-day-section` 의
+        `<div className={INSET_CLASS.card}>`)이 이미 카드 인셋을 줘서, 여기서 `inset` 을
+        주면 내용이 두 번 밀린다 — `inset` 축이 정리돼도 이 override 는 사라지지 않는다.
+
+        `component-guide.md §3`(컴포넌트 `className` 으로 padding 을 덮지 않는다)에 걸리는
+        형태이지만, `Inset` 에 `none` 을 더하면 이 한 자리 때문에 행·스켈레톤 열다섯 곳의
+        `inset` prop 이 전부 "인셋 없음" 을 받을 수 있게 넓어진다. **저장소에서 이 형태는
+        여기 하나뿐이다** — 늘어나면 그때 `none` 을 만든다 (#422 "미리 만들지 않는다").
+      */
       <ErrorState
         title={messages.plan.verdictErrorTitle}
         onRetry={onRetry}

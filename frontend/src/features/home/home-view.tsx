@@ -319,7 +319,14 @@ export function HomeView({
             {basisPlaceId !== null && (
               <>
                 {walkSafety.isPending && (
-                  <div className={cn('border-border border-t py-4', INSET_CLASS.rail)}>
+                  /*
+                    **카드 안이라 `rail` 이 아니라 `card` 다** (#485). 이 카드는 레일에
+                    서지만 인셋 축은 `Surface` 안쪽이라 형제(`ProfileCard` · `WalkVerdict`)가
+                    전부 `px-4 md:px-5` 를 쓴다. 여기만 `rail`(md 40) 이면 **로딩(40) →
+                    오류(40) → 성공(20)** 으로 재시도를 누르는 동안 글자가 좌우로 움직인다
+                    — `ErrorState` 의 `inset` JSDoc 이 적어 둔 바로 그 자리다.
+                  */
+                  <div className={cn('border-border border-t py-4', INSET_CLASS.card)}>
                     <Skeleton className="h-7 w-40" />
                     <Skeleton className="mt-2 h-5 w-56" />
                   </div>
@@ -334,7 +341,7 @@ export function HomeView({
                     */}
                     <ErrorState
                       title={messages.home.verdictErrorTitle}
-                      inset="rail"
+                      inset="card"
                       onRetry={() => void walkSafety.refetch()}
                     />
                   </div>
@@ -509,12 +516,14 @@ export function HomeView({
             ) : allFailed ? (
               <ErrorState
                 headingLevel={3}
+                inset="card"
                 title={messages.common.temporaryErrorTitle}
                 onRetry={() => suitabilities.forEach((query) => void query.refetch())}
               />
             ) : visible.length === 0 ? (
               <EmptyState
                 headingLevel={3}
+                inset="card"
                 title={messages.home.emptyPlacesTitle}
                 description={messages.home.emptyPlacesDesc}
                 action={
@@ -632,12 +641,14 @@ export function HomeView({
               ) : plans.length === 0 ? (
                 <EmptyState
                   headingLevel={3}
+                  inset="card"
                   title={messages.home.noPlanTitle}
                   description={messages.home.noPlanDesc}
                 />
               ) : (
                 <EmptyState
                   headingLevel={3}
+                  inset="card"
                   title={messages.home.noUpcomingPlanTitle}
                   description={messages.home.noUpcomingPlanDesc}
                 />

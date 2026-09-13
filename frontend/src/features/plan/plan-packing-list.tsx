@@ -113,7 +113,7 @@ function Intro({ failed, onGenerate }: { failed: boolean; onGenerate: () => void
         아래 버튼을 함께 남기면 같은 동작의 버튼이 나란히 선다.
       */}
       {failed ? (
-        <ErrorState title={messages.plan.packingErrorTitle} onRetry={onGenerate} />
+        <ErrorState inset="card" title={messages.plan.packingErrorTitle} onRetry={onGenerate} />
       ) : (
         <Button variant="secondary" onClick={onGenerate} className="self-start">
           {messages.plan.packingCta}

@@ -357,3 +357,64 @@ test.describe('3층 표면 — not-found', () => {
     })
   }
 })
+
+/**
+ * **카드 안 상태의 좌우 인셋 — #485.**
+ *
+ * `EmptyState` · `ErrorState` 의 `inset` 기본값은 `main`(16/40)이고 카드 안 글줄은
+ * `card`(16/20)다. 카드 안에서 `inset` 을 안 주면 상태 글줄만 형제보다 **데스크톱에서
+ * 20px 오른쪽**으로 밀린다. 모바일(16)은 같아서 `md` 이상에서만 갈린다 — **그래서 눈으로
+ * 보다가 놓치기 쉽고, vitest 는 클래스 문자열만 봐서 실제 세로선을 못 본다.**
+ *
+ * `state-inset.test.ts` 가 "호출처에 `inset` 이 적혀 있는가" 를 잠그고, 여기서는 그 값이
+ * **실제로 같은 세로선을 만드는가**를 잰다. 두 축이 따로 필요한 이유는 값이 `card` 여도
+ * 담는 쪽이 이미 인셋을 줬으면 결과가 어긋날 수 있어서다.
+ */
+test.describe('카드 안 상태의 세로선 — #485', () => {
+  test('/plans 필터 0건에서 상태 글줄이 카드 제목과 같은 세로선에 선다', async ({ page }) => {
+    await page.setViewportSize(VIEWPORTS.desktop)
+
+    /*
+      **없는 반려견으로 걸러 0건을 만든다.** 목 저장소에 일정이 넷 있어 필터 없이는 빈
+      상태가 나지 않는다. `petId` 는 URL 이 소유하는 필터다 (`lib/url/plan-filters.ts`).
+    */
+    await page.goto('/plans?petId=000000000000000000')
+
+    const card = page
+      .getByRole('main')
+      .locator('section')
+      .filter({ has: page.locator('h2') })
+      .first()
+    await expect(card).toBeVisible()
+
+    const cardHeading = card.getByRole('heading', { level: 2 }).first()
+    const stateHeading = card.getByRole('heading', { level: 3 }).first()
+    await expect(stateHeading).toBeVisible()
+
+    /*
+      **카드 제목이 기준선이다.** 카드 자신의 인셋(20)으로 서 있으므로, 상태가 기본값
+      (`main`, 40)으로 흘러가면 여기서 20px 차이로 잡힌다.
+    */
+    expect(await leftEdge(stateHeading)).toBe(await leftEdge(cardHeading))
+  })
+
+  /*
+    **모바일에서는 원래 같았다** — 둘 다 16 이라 어긋남이 안 보인다. 그 사실을 함께
+    잠그지 않으면, 나중에 `card` 의 모바일 값이 움직여도 데스크톱 단언만으로는 안 걸린다.
+  */
+  test('모바일에서도 같은 세로선이다 — 원래 어긋나지 않던 쪽', async ({ page }) => {
+    await page.setViewportSize(VIEWPORTS.mobile)
+    await page.goto('/plans?petId=000000000000000000')
+
+    const card = page
+      .getByRole('main')
+      .locator('section')
+      .filter({ has: page.locator('h2') })
+      .first()
+    const cardHeading = card.getByRole('heading', { level: 2 }).first()
+    const stateHeading = card.getByRole('heading', { level: 3 }).first()
+    await expect(stateHeading).toBeVisible()
+
+    expect(await leftEdge(stateHeading)).toBe(await leftEdge(cardHeading))
+  })
+})

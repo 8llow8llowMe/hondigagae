@@ -73,6 +73,7 @@ export function PlanListSection({
     return (
       <ErrorState
         headingLevel={3}
+        inset="card"
         title={messages.plan.errorTitle}
         description={messages.plan.errorDescription}
         onRetry={onRetry}
@@ -183,6 +184,7 @@ function FilteredEmpty({
   return (
     <EmptyState
       headingLevel={3}
+      inset="card"
       title={messages.plan.filteredEmptyTitle}
       description={
         totalCount === null
@@ -209,6 +211,7 @@ function NoPlans({ hasPets, firstPetName }: { hasPets: boolean; firstPetName: st
     return (
       <EmptyState
         headingLevel={3}
+        inset="card"
         title={messages.plan.noPetTitle}
         description={messages.plan.noPetDescription}
         action={<ButtonLink href="/pets/new">{messages.plan.noPetAction}</ButtonLink>}
@@ -219,6 +222,7 @@ function NoPlans({ hasPets, firstPetName }: { hasPets: boolean; firstPetName: st
   return (
     <EmptyState
       headingLevel={3}
+      inset="card"
       title={messages.plan.emptyTitle}
       description={
         firstPetName === null
