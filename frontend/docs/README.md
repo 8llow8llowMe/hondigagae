@@ -21,7 +21,7 @@
 - `component-guide.md`
   - 컴포넌트 계약: prop 네이밍, variant/size 표준 집합, `className` 정책, 합성 기준, 접근성 계약
 - `form-guide.md`
-  - 폼 규약(T4): zod + 자체 훅 결정, **백엔드 400 `resultMessage` → 필드 매핑**, 중복 제출 방지, 이탈 경고
+  - 폼 규약(T4): zod + 자체 훅 결정, **백엔드 400 `fieldErrors` → 필드 매핑**, 중복 제출 방지, 이탈 경고
 - `external-api-guide.md`
   - 카카오 지도 SDK 로딩·키 관리·마커/경로 렌더 규약
 - `tooling-guide.md`
@@ -73,13 +73,13 @@
 
 세부는 `api-integration-guide.md`. 정본은 Swagger이며, 서술 문서는 `backend/docs/api-design-guide.md`.
 
-| 항목         | 값                                                          |
-| ------------ | ----------------------------------------------------------- |
-| 게이트웨이   | `http://localhost:8000` (dev `6000`, prod `9000`)           |
-| 통합 Swagger | `http://localhost:8000/swagger-ui.html`                     |
-| 공통 래퍼    | `{dataHeader:{success,resultCode,resultMessage}, dataBody}` |
-| 목록         | `SliceResponse<T> = {contents, hasNext}` 커서 기반          |
-| 에러         | HTTP 상태로 분기. `resultCode` 는 `{도메인}_{번호}`         |
+| 항목         | 값                                                                      |
+| ------------ | ----------------------------------------------------------------------- |
+| 게이트웨이   | `http://localhost:8000` (dev `6000`, prod `9000`)                       |
+| 통합 Swagger | `http://localhost:8000/swagger-ui.html`                                 |
+| 공통 래퍼    | `{dataHeader:{success,resultCode,resultMessage,fieldErrors}, dataBody}` |
+| 목록         | `SliceResponse<T> = {contents, hasNext}` 커서 기반                      |
+| 에러         | HTTP 상태로 분기. `resultCode` 는 `{도메인}_{번호}`                     |
 
 ## 스킬 사용 예시
 

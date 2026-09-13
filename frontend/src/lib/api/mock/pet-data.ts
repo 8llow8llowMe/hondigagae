@@ -1,7 +1,7 @@
 import type { MockResult } from '@/lib/api/mock/auth-data'
 import { memberIdOf, type MockPet, mockStore, nextPetId } from '@/lib/api/mock/store'
 import { MAX_PET_COUNT } from '@/lib/api/pet'
-import type { ApiResponse } from '@/types/api'
+import type { ApiResponse, ValidationErrorItem } from '@/types/api'
 import type { Pet, PetList } from '@/types/pet'
 
 /**
@@ -20,19 +20,24 @@ function ok<T>(dataBody: T): ApiResponse<T> {
   return { dataHeader: { success: true, resultCode: null, resultMessage: null }, dataBody }
 }
 
-function fail(status: number, resultCode: string, resultMessage: unknown): MockResult {
+function fail(
+  status: number,
+  resultCode: string,
+  resultMessage: string,
+  fieldErrors: ValidationErrorItem[] | null = null,
+): MockResult {
   return {
     status,
-    payload: { dataHeader: { success: false, resultCode, resultMessage }, dataBody: null },
+    payload: {
+      dataHeader: { success: false, resultCode, resultMessage, fieldErrors },
+      dataBody: null,
+    },
   }
 }
 
-/** Bean Validation 실패는 `{ message, errors: [...] }` 형태로 온다 — ValidationErrorSupport */
-function failValidation(errors: { code: string; field: string; message: string }[]): MockResult {
-  return fail(400, 'PET_100', {
-    message: errors[0]?.message ?? '요청 값이 올바르지 않습니다.',
-    errors,
-  })
+/** 검증 실패는 문자열 `resultMessage` + `fieldErrors` 로 온다 — ValidationErrorSupport (#491) */
+function failValidation(errors: ValidationErrorItem[]): MockResult {
+  return fail(400, 'PET_100', errors[0]?.message ?? '요청 값이 올바르지 않습니다.', errors)
 }
 
 const SIZE_CODES: Record<string, { name: string; description: string }> = {

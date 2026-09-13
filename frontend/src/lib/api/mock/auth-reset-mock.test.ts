@@ -149,12 +149,12 @@ describe('POST /auth/password/reset', () => {
     const result = reset(GENERAL_EMAIL, MOCK_PASSWORD_RESET_CODE, 'short')
 
     expect(result?.status).toBe(400)
-    const raw = result?.payload.dataHeader.resultMessage as {
-      errors: { code: string; field: string }[]
-    }
+    const fieldErrors = result?.payload.dataHeader.fieldErrors ?? []
     // 필드명이 `newPassword` 여야 화면의 입력에 오류가 붙는다 (요청 DTO 와 같은 이름)
-    expect(raw.errors[0]?.field).toBe('newPassword')
-    expect(raw.errors[0]?.code).toBe('AUTH_107')
+    expect(fieldErrors[0]?.field).toBe('newPassword')
+    expect(fieldErrors[0]?.code).toBe('AUTH_107')
+    // 대표 메시지는 문자열이다 — 객체를 실으면 화면에 [object Object] 가 나간다 (#491)
+    expect(typeof result?.payload.dataHeader.resultMessage).toBe('string')
   })
 
   it('검증 실패는 코드 검증보다 먼저이고 DTO 선언 순서로 정렬된다', () => {
@@ -163,10 +163,8 @@ describe('POST /auth/password/reset', () => {
     sendCode(GENERAL_EMAIL)
     const result = reset(GENERAL_EMAIL, '', 'Ab1!')
 
-    const raw = result?.payload.dataHeader.resultMessage as {
-      errors: { code: string; field: string }[]
-    }
-    expect(raw.errors.map((it) => it.field)).toEqual(['code', 'newPassword'])
-    expect(raw.errors.map((it) => it.code)).toEqual(['AUTH_104', 'AUTH_107'])
+    const fieldErrors = result?.payload.dataHeader.fieldErrors ?? []
+    expect(fieldErrors.map((it) => it.field)).toEqual(['code', 'newPassword'])
+    expect(fieldErrors.map((it) => it.code)).toEqual(['AUTH_104', 'AUTH_107'])
   })
 })

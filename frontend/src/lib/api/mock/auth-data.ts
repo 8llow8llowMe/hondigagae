@@ -1,7 +1,7 @@
 import { type MockStore, mockStore, nextMemberId } from '@/lib/api/mock/store'
 import { EMAIL_PATTERN } from '@/lib/form/email-pattern'
 import { PASSWORD_PATTERN } from '@/lib/form/password-pattern'
-import type { ApiResponse } from '@/types/api'
+import type { ApiResponse, ValidationErrorItem } from '@/types/api'
 
 /**
  * 인증 mock.
@@ -92,20 +92,34 @@ function ok<T>(dataBody: T): ApiResponse<T> {
   return { dataHeader: { success: true, resultCode: null, resultMessage: null }, dataBody }
 }
 
-function fail(status: number, resultCode: string, resultMessage: unknown): MockResult {
+function fail(
+  status: number,
+  resultCode: string,
+  resultMessage: string,
+  fieldErrors: ValidationErrorItem[] | null = null,
+): MockResult {
   return {
     status,
-    payload: { dataHeader: { success: false, resultCode, resultMessage }, dataBody: null },
+    payload: {
+      dataHeader: { success: false, resultCode, resultMessage, fieldErrors },
+      dataBody: null,
+    },
   }
 }
 
-type FieldError = { code: string; field: string; message: string }
+type FieldError = ValidationErrorItem
 
-/** 백엔드 ValidationErrorBody 형태로 만든다 — 첫 오류가 대표 메시지다 */
+/**
+ * 백엔드 검증 실패 봉투를 만든다 — 첫 오류가 대표 메시지다.
+ *
+ * **`resultMessage` 는 문자열이고 필드 목록은 `fieldErrors` 로 나간다** (#491 · #501).
+ * 여기가 옛 `{ message, errors }` 를 계속 만들면 로컬·e2e 는 하위호환 분기만 밟아
+ * 실서버가 쓰는 경로가 한 번도 실행되지 않는다.
+ */
 function failValidation(errors: FieldError[]): MockResult {
   const first = errors[0]
   if (first === undefined) return fail(400, 'MEMBER_100', '요청 값이 올바르지 않습니다.')
-  return fail(400, first.code, { message: first.message, errors })
+  return fail(400, first.code, first.message, errors)
 }
 
 function parse(body: string | null): Record<string, unknown> {

@@ -17,7 +17,7 @@
 ## 2. 타입 / 데이터
 
 - [ ] **`memberId` 를 `string` 으로 타이핑했다.** 다른 ID는 Swagger로 확인했다
-- [ ] `resultMessage` 를 `unknown` 으로 받고 렌더 직전 정규화한다 (백엔드 타입은 `Object`)
+- [ ] `resultMessage`(항상 문자열)와 `fieldErrors`(검증 실패에만)를 자리 나눠 읽는다 — 렌더 직전 `toMessage()` 로 정규화한다
 - [ ] nullable 응답을 non-null로 가정하지 않는다 (`.map`/`.length` 직접 호출 없음)
 - [ ] nullable 섹션은 에러가 아니라 **숨김** 으로 처리한다
 - [ ] `SliceResponse` 를 `{contents, hasNext}` 로 다룬다

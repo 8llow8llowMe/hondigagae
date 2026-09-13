@@ -47,10 +47,10 @@ function envelopeMissing(status: number): ApiError {
 export function unwrap<T>(response: ApiResponse<T>, status: number): T {
   if (!hasEnvelope(response)) throw envelopeMissing(status)
 
-  const { success, resultCode, resultMessage } = response.dataHeader
+  const { success, resultCode, resultMessage, fieldErrors } = response.dataHeader
 
   if (!success || response.dataBody === null) {
-    throw new ApiError(status, resultCode, resultMessage)
+    throw new ApiError(status, resultCode, resultMessage, fieldErrors ?? null)
   }
 
   return response.dataBody
@@ -66,13 +66,18 @@ export function unwrap<T>(response: ApiResponse<T>, status: number): T {
 export function unwrapVoid(response: ApiResponse<unknown>, status: number): void {
   if (!hasEnvelope(response)) throw envelopeMissing(status)
 
-  const { success, resultCode, resultMessage } = response.dataHeader
-  if (!success) throw new ApiError(status, resultCode, resultMessage)
+  const { success, resultCode, resultMessage, fieldErrors } = response.dataHeader
+  if (!success) throw new ApiError(status, resultCode, resultMessage, fieldErrors ?? null)
 }
 
 /**
  * resultMessage 를 화면에 쓸 문자열로 정규화한다.
- * 백엔드 타입이 Object 이므로 문자열이 아닐 수 있다.
+ *
+ * **계약상으로는 항상 문자열이다** (#491 — `dataHeader.resultMessage: string | null`).
+ * 그래도 검사를 남기는 이유는 타입이 거짓말을 하는 갈래가 실재하기 때문이다:
+ * 게이트웨이가 대신 답하면 봉투 밖 본문이 오고(#203, 위 `hasEnvelope` 참고), 그때
+ * `envelopeMissing()` 이 `null` 을 싣는다. 문자열이 아닌 값을 그대로 화면에 내보내면
+ * `[object Object]` 가 나간다.
  */
 export function toMessage(raw: unknown, fallback: string): string {
   if (typeof raw === 'string' && raw.trim().length > 0) return raw

@@ -33,19 +33,22 @@ export type ApiResponse<T> = {
   dataHeader: {
     success: boolean
     resultCode: string | null
-    resultMessage: unknown | null // 백엔드 타입이 Object 다. string 으로 타이핑하지 않는다
+    resultMessage: string | null // 오류 종류와 무관하게 항상 문자열이다 (#491)
+    fieldErrors?: ValidationErrorItem[] | null // 필드 단위 검증 오류. 검증 실패가 아니면 null
   }
   dataBody: T | null
 }
 ```
 
 - 성공: `{ dataHeader: { success: true, resultCode: null, resultMessage: null }, dataBody: T }`
-- 실패: `{ dataHeader: { success: false, resultCode: "PET_001", resultMessage: "..." }, dataBody: null }`
+- 실패: `{ dataHeader: { success: false, resultCode: "PET_001", resultMessage: "...", fieldErrors: null }, dataBody: null }`
+- 검증 실패: `fieldErrors` 가 `[{ code, field, message }]` 로 채워진다 — `resultMessage` 는 그중 첫 오류의 메시지다
 
 **규칙**
 
 - `dataBody` 를 바로 쓰지 않는다. 반드시 `src/lib/api/response.ts` 를 경유해 `dataHeader.success` 를 판별한다.
-- `resultMessage` 는 문자열이 아닐 수 있다. Bean Validation 실패 시 필드별 구조가 들어온다. **`unknown` 으로 받고 렌더 직전 정규화한다.**
+- `resultMessage` 는 **항상 문자열**이다 (#491). 필드별 오류는 `fieldErrors` 로 분리됐다 — 폼 매핑은 `docs/form-guide.md` §4.
+- 그래도 렌더 직전 `toMessage()` 로 정규화한다. 게이트웨이가 대신 답하면 **봉투 자체가 오지 않아** 타입이 거짓말을 한다 (#203).
 - **래퍼가 온다고 가정하지 않는다.** 아래 §2-1 을 먼저 읽는다.
 
 ### 2-1. 래퍼가 없는 응답 — 게이트웨이가 대신 답할 때
@@ -87,7 +90,12 @@ export function unwrap<T>(res: ApiResponse<T>, status: number): T {
   if (!hasEnvelope(res)) throw new ApiError(status, null, null)
 
   if (!res.dataHeader.success || res.dataBody === null) {
-    throw new ApiError(status, res.dataHeader.resultCode, res.dataHeader.resultMessage)
+    throw new ApiError(
+      status,
+      res.dataHeader.resultCode,
+      res.dataHeader.resultMessage,
+      res.dataHeader.fieldErrors ?? null,
+    )
   }
   return res.dataBody
 }

@@ -1,3 +1,5 @@
+import type { ValidationErrorItem } from '@/types/api'
+
 /** 에러 종류. UI 분기의 단일 기준이다 — docs/api-integration-guide.md §3 */
 export type ErrorKind =
   | 'validation' // 400 — 입력 수정 유도
@@ -15,13 +17,28 @@ export class ApiError extends Error {
   readonly status: number
   readonly resultCode: string | null
   readonly rawMessage: unknown
+  /**
+   * 필드 단위 검증 오류 (#491 · #501). 검증 실패가 아니면 `null` 이다.
+   *
+   * **`rawMessage` 와 자리를 나눈다.** 서버가 대표 메시지와 필드 목록을
+   * `resultMessage` / `fieldErrors` 두 키로 분리했으므로 여기서도 합치지 않는다 —
+   * 합치면 `toFormErrors()` 가 다시 갈라야 하고, 그 과정에서 대표 메시지가
+   * 문자열이라는 사실이 필드 목록을 가려 버린다(이 이슈가 난 원인).
+   */
+  readonly fieldErrors: ValidationErrorItem[] | null
 
-  constructor(status: number, resultCode: string | null, rawMessage: unknown) {
+  constructor(
+    status: number,
+    resultCode: string | null,
+    rawMessage: unknown,
+    fieldErrors: ValidationErrorItem[] | null = null,
+  ) {
     super(typeof rawMessage === 'string' ? rawMessage : `API 오류 (status ${status})`)
     this.name = 'ApiError'
     this.status = status
     this.resultCode = resultCode
     this.rawMessage = rawMessage
+    this.fieldErrors = fieldErrors
   }
 
   get kind(): ErrorKind {
