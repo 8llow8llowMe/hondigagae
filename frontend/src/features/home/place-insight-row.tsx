@@ -19,18 +19,43 @@ import type {
 import type { PlaceSummary } from '@/types/place'
 
 /**
+ * 서버가 "판정하지 않았다" 를 말하는 코드. 적합도 등급 · 혼잡도 · 동반 가능 여부가
+ * 모두 이 값을 쓴다 — **낱말(`정보 없음`)이 아니라 이 코드로 거른다** (#530).
+ */
+const UNKNOWN_CODE = 'UNKNOWN'
+
+/**
  * 적합도 행 — 아트보드 `01 홈 · P2` (모바일) / `02 홈` 우측 (데스크톱).
  *
  * **카드가 아니라 전폭 행이다.** 구분선은 좌우 인셋 16(모바일) / 40(데스크톱).
  *
- * 썸네일 80(모바일) / 96(데스크톱) radius 8. `firstImage` 가 null 이어도 **같은 크기의
- * "이미지 없음" 타일**을 남긴다 — 행 높이가 흔들리면 목록을 훑을 수 없다.
+ * `firstImage` 가 null 이어도 **같은 크기의 "이미지 없음" 타일**을 남긴다 — 행 높이가
+ * 흔들리면 목록을 훑을 수 없다.
  *
- * **배지 자리가 폭마다 다르다** — 모바일은 제목 오른쪽, 데스크톱은 **행의 오른쪽 위**
- * (점수 열 옆 판정 열). 문구는 양쪽 다 서버 `name` 그대로다.
+ * ### 두 축을 쓴다 — 폭 축은 컨테이너, 인셋 축은 뷰포트 (#530)
  *
- * **점수는 제목 아래로 내린다** — 썸네일이 왼쪽 기둥을 잡으므로 오른쪽에 또 기둥을
- * 세우면 제목이 눌린다. 데스크톱은 폭이 있어 우측 열로 뺀다.
+ * **접기는 `@container` 다** (`place-row.tsx` 와 같은 방식). 고정 열 둘(태그 144 · 판정
+ * 112)을 `md:`(뷰포트)로 켜 두었더니 **768 에서 본문에 200px 대만 남아** 근거 문장이 넉
+ * 줄로 쪼개졌고, 1024 에서는 좌측 레일 400 을 빼고 나면 본문이 **76px** 이었다. 뷰포트는
+ * 이 행이 실제로 받은 폭을 모른다 — 같은 1024 라도 한 컬럼이면 행이 895px 이다.
+ *
+ * 그래서 `@2xl`(672)부터만 3단이다. **672 는 "본문에 320 이상 남는 폭"** 이다 —
+ * 썸네일 96 + gap 20 + 태그 144 + gap 20 + 판정 112 + gap 20 = 412 가 열들의 몫이라,
+ * 672 에서 본문이 260, 1280 의 744 에서 332 다. 그 아래는 접는다.
+ *
+ * **바뀌는 것은 열 구성뿐이다. 밀도는 `md:` 로 남는다** — 인셋 · gap · 세로 여백 ·
+ * 썸네일 크기 · 근거 문장. 이유가 둘이다. (1) 좌우 인셋은 담는 카드의 제목(`px-4 md:px-5`)
+ * 과 같은 축이어야 한다 — 갈리면 같은 카드 안에서 제목과 행의 왼쪽 세로선이 폭에 따라
+ * 어긋난다 (`lib/ui/inset.ts` 머리주석의 "지그재그"). (2) 나머지는 **화면이 작다**는 사실에
+ * 딸린 값이지 행이 좁다는 사실에 딸린 값이 아니다 — 390px 에서 썸네일을 줄이면 목록을
+ * 알아보는 유일한 단서를 가장 좁은 화면에서 뺏는 것이 되고, 근거 두 줄을 넣을 세로 공간도
+ * 거기에만 없다. `.scroll-rail` 화살표가 폭이 아니라 입력 방식으로 갈리는 것과 같은 결이다.
+ *
+ * ### 접은 모양
+ *
+ * 태그는 **제목 위**로(`order-first`), 등급 배지와 점수는 **제목 줄 오른쪽**으로 합친다.
+ * 고정 열이 없어지니 본문이 행 전체를 쓴다. **DOM 순서는 제목 → 메타 → 태그 그대로다** —
+ * 스크린리더는 이름을 먼저 읽는다. 시각 순서만 바꾼다 (`place-row.tsx` 와 같은 규약).
  */
 export function PlaceInsightRow({
   data,
@@ -41,14 +66,16 @@ export function PlaceInsightRow({
   data: PlaceSuitabilityResponse
   /** 목록 응답의 장소. 썸네일·주소·실내 여부는 인사이트 응답에 없다 */
   place: PlaceSummary | undefined
-  /** 첫 행은 위 구분선을 그리지 않는다 — 섹션 제목과 붙는다 */
   /**
    * 2·3등을 접는다 — #307. `DESIGN.md` §1 의 *"낮은 우선순위는 접는다"*.
    *
-   * **데스크톱에서만 접힌다.** 접는 것(근거 · 속성 태그)이 애초에 `md:` 전용이라
-   * 모바일에는 접을 것이 없고, 390px 에서 썸네일까지 줄이면 목록을 알아보는 유일한
-   * 단서를 가장 좁은 화면에서 뺏는 것이 된다. 그래서 이 prop 이 바꾸는 클래스는
-   * **전부 `md:` 접두를 가진다** — 모바일 출력은 접기 전과 같다.
+   * **이제 모든 폭에서 접힌다** (#530). 예전에는 접는 것(근거 · 속성 태그)이 전부 `md:`
+   * 전용이라 모바일 출력이 접기 전과 같았고, **같은 행이 폭에 따라 접힘을 지키기도
+   * 무시하기도 했다.** 태그가 접은 모양에서도 제목 위에 자리를 갖게 되면서 그 예외가
+   * 사라졌다 — 1등만 태그를 단다.
+   *
+   * **썸네일 축소는 `md:` 에 남는다.** 390px 에서 96 → 48 까지 줄이면 목록을 알아보는
+   * 유일한 단서를 가장 좁은 화면에서 뺏는 것이 된다.
    *
    * **펼치는 장치를 두지 않는다.** 행 전체가 `<Link>` 라 그 안의 `<button>` 은 무효
    * HTML 이고, 근거 전문은 이미 상세 화면이 갖고 있다 (`place-suitability-panel`).
@@ -70,7 +97,7 @@ export function PlaceInsightRow({
 }) {
   const tone = suitabilityTone(data.suitabilityLevel.code)
   const { penalties, informational } = splitReasons(reasons)
-  // 데스크톱에만 근거 문장을 둔다. 모바일은 세로 공간이 없다
+  // 근거 문장은 좁은 행에 둘 세로 공간이 없다 — 그때는 상세에서 읽는다
   const lines = [...penalties, ...informational].slice(0, 2)
 
   return (
@@ -78,7 +105,7 @@ export function PlaceInsightRow({
       <Link
         href={`/places/${data.placeId}`}
         className={cn(
-          'focus-visible:ring-brand-500 flex items-center gap-3 px-4 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:gap-5 md:px-10',
+          'focus-visible:ring-brand-500 @container flex items-center gap-3 px-4 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:gap-5 md:px-10',
           collapsed ? 'md:py-3' : 'md:py-5',
         )}
       >
@@ -88,19 +115,26 @@ export function PlaceInsightRow({
           `<a>` 는 flow content 를 담을 수 있으므로 행 내부 래퍼는 `div` 다.
           **`span` 으로 두면 안 된다** — `MetricValue` 가 `div` 를 렌더해 `span` 안의 `div`
           가 되고, 무효 HTML 이라 하이드레이션 경고가 난다.
+
+          **`flex flex-col` 이다** — 접힌 모양에서 태그가 `order-first` 로 제목 위에 서려면
+          이 래퍼가 flex 컨테이너여야 한다.
         */}
-        <div className="min-w-0 flex-1">
-          {/*
-            모바일은 제목과 배지를 양끝으로 벌린다. **데스크톱은 배지를 여기 두지 않는다** —
-            오른쪽 판정 열로 옮겼다(아래 주석).
-          */}
+        <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-start justify-between gap-2">
             <span className="text-title-2 text-fg min-w-0 flex-1 font-semibold break-words">
               {data.placeTitle}
             </span>
-            <MetricBadge tone={tone} className="shrink-0 md:hidden">
-              {data.suitabilityLevel.name}
-            </MetricBadge>
+
+            {/*
+              접은 모양의 판정 — **등급 배지와 점수를 제목 줄 오른쪽에 합친다.** 예전에는
+              배지만 여기 서고 점수는 메타 아래 제 줄을 따로 썼다. 등급어와 수치는 같은
+              판정을 두 해상도로 말하는 것이라 떨어뜨릴 이유가 없고, 붙이면 행이 한 줄
+              짧아진다.
+            */}
+            <div className="flex shrink-0 items-center gap-1.5 @2xl:hidden">
+              <MetricBadge tone={tone}>{data.suitabilityLevel.name}</MetricBadge>
+              <Score score={data.score} tone={tone} size="row" />
+            </div>
           </div>
 
           <p className="text-caption text-fg-muted mt-1 font-medium tabular-nums">
@@ -125,20 +159,24 @@ export function PlaceInsightRow({
           )}
 
           {/*
-            모바일 점수 — 제목 아래. **혼잡도를 같은 줄에 둔다** — 아래로 한 줄을 더 쓰면
-            80px 썸네일 행에 네 줄이 되어 행 높이가 늘어난다.
+            접은 모양의 태그 — **제목 위**(`order-first`). DOM 은 제목 → 메타 → 태그 그대로라
+            스크린리더는 이름을 먼저 읽는다 (`place-row.tsx` 와 같은 규약).
+
+            **접힌 행에는 두지 않는다** — 아래 고정 열과 같은 규칙이다. 예전에는 이 규칙이
+            `md:` 뒤에 있어 **모바일에서만 무효**였고, 그 결과 같은 행이 폭에 따라 접힘을
+            지키기도 무시하기도 했다.
           */}
-          {/* 둘 다 없으면 줄을 만들지 않는다 — 빈 `div` 의 `mt-1` 만 남는다 */}
-          {(data.score !== null || data.congestion !== null) && (
-            <div className="mt-1 flex items-center gap-2 md:hidden">
-              <Score score={data.score} tone={tone} size="row" />
-              <CongestionBadge congestion={data.congestion} />
-            </div>
+          {!collapsed && (
+            <RowTags
+              place={place}
+              congestion={data.congestion}
+              className="order-first mb-1.5 @2xl:hidden"
+            />
           )}
         </div>
 
         {/*
-          데스크톱 속성 태그 열 — 동반 가능 여부를 첫 태그로, 혼잡도는 마지막.
+          넓은 행의 속성 태그 열 — 동반 가능 여부를 첫 태그로, 혼잡도는 마지막.
 
           **속성 배지와 등급 배지가 한 줄에 섞인다.** `components/metric.tsx` 가 두 배지의
           크기를 같은 값으로 못박아 둔 이유가 이 자리다 — 높이가 갈리면 줄이 어긋난다.
@@ -148,28 +186,17 @@ export function PlaceInsightRow({
           **`place` 가 없어도 이 열은 남는다.** 혼잡도는 `place` 가 아니라 적합도 응답에서
           오므로, 목록 응답이 비어도 혼잡도는 말할 수 있다.
         */}
-        <div
-          className={cn(
-            'w-36 shrink-0 flex-wrap justify-end gap-1.5 self-start',
+        {!collapsed && (
+          <RowTags
+            place={place}
+            congestion={data.congestion}
             // 속성 태그는 1등에서만. 접힌 행에 남기면 접기 전후 폭이 같아 위계가 안 읽힌다
-            collapsed ? 'hidden' : 'hidden md:flex',
-          )}
-        >
-          {place !== undefined && (
-            <>
-              <Badge tone="neutral">{place.petAllowanceType.name}</Badge>
-              {place.indoor !== null && (
-                <Badge tone="neutral">
-                  {place.indoor ? messages.home.indoor : messages.home.outdoor}
-                </Badge>
-              )}
-            </>
-          )}
-          <CongestionBadge congestion={data.congestion} />
-        </div>
+            className="hidden w-36 shrink-0 justify-end self-start @2xl:flex"
+          />
+        )}
 
         {/*
-          데스크톱 판정 열 — **배지가 점수 바로 위**, 행의 오른쪽 끝.
+          넓은 행의 판정 열 — **배지가 점수 바로 위**, 행의 오른쪽 끝.
 
           배지를 제목 옆에 두면 제목 길이에 따라 x 가 흔들리고 근거 문장과 같은 폭에서
           경쟁한다. 점수 위로 모으면 둘이 한 덩어리로 읽힌다 — 등급어와 수치는 같은
@@ -183,7 +210,7 @@ export function PlaceInsightRow({
         */}
         <div
           className={cn(
-            'hidden w-28 shrink-0 flex-col items-end gap-1.5 self-start md:flex',
+            'hidden w-28 shrink-0 flex-col items-end gap-1.5 self-start @2xl:flex',
             // 접힌 행은 세로 가운데 — 근거가 없어 덩어리 하나뿐이라 위로 붙일 이유가 없다
             collapsed && 'self-center',
           )}
@@ -208,6 +235,57 @@ export function PlaceInsightRow({
 }
 
 /**
+ * 행 태그 — 동반 가능 여부 · 실내/야외 · 혼잡도. **접은 모양과 넓은 모양이 같은 것을
+ * 그린다** — 자리만 `className` 으로 갈린다.
+ *
+ * **`petAllowanceType.code === 'UNKNOWN'` 이면 그리지 않는다** (#530). 서버 `name` 이
+ * `정보 없음` 이라, 그대로 두면 `야외` · `혼잡도 정보 없음` 옆에 **무엇의 정보가 없다는
+ * 것인지 말하지 않는 배지**가 한 자리를 차지했다. 옆 배지가 낱말을 갖고 있어 더 헷갈린다 —
+ * 읽는 사람은 `정보 없음` 을 바로 앞 태그에 걸어 읽는다.
+ *
+ * **낱말을 보태지 않는다.** 혼잡도는 `CongestionBadge` 가 `혼잡도 정보 없음` 으로 보태는데
+ * (명세가 정해 둔 문구다), 동반 가능 여부는 그런 문구가 정해져 있지 않다 — 여기서 지어내면
+ * FE 가 서버 문구를 다시 쓰는 것이 된다 (api-integration-guide.md §6). 없는 값은 **자리도
+ * 내지 않는다**: 실내 여부(`indoor === null`)를 이 행이 이미 그렇게 다룬다.
+ *
+ * **`code` 로 거른다.** `name` 은 서버 문구라 언제든 바뀔 수 있고, 문구 비교는 그때 조용히
+ * 어긋난다 (docs/api-integration-guide.md §6).
+ *
+ * 셋 다 없으면 **`null` 이다.** 빈 `div` 를 남기면 `order-first mb-1.5` 만 남아 제목 위에
+ * 6px 이 뜬다.
+ */
+function RowTags({
+  place,
+  congestion,
+  className,
+}: {
+  place: PlaceSummary | undefined
+  congestion: CongestionItem | null
+  className?: string
+}) {
+  const allowance =
+    place !== undefined && place.petAllowanceType.code !== UNKNOWN_CODE
+      ? place.petAllowanceType.name
+      : null
+  const indoor =
+    place === undefined || place.indoor === null
+      ? null
+      : place.indoor
+        ? messages.home.indoor
+        : messages.home.outdoor
+
+  if (allowance === null && indoor === null && congestion === null) return null
+
+  return (
+    <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
+      {allowance !== null && <Badge tone="neutral">{allowance}</Badge>}
+      {indoor !== null && <Badge tone="neutral">{indoor}</Badge>}
+      <CongestionBadge congestion={congestion} />
+    </div>
+  )
+}
+
+/**
  * 혼잡도 배지 — 공통명세 S3-3 · 홈-세부명세 D5-1 §12.
  *
  * **섹션 부제가 "오늘 날씨와 혼잡도 반영" 이라고 말하는데 화면에는 없었다.** 값은
@@ -228,7 +306,7 @@ export function PlaceInsightRow({
 function CongestionBadge({ congestion }: { congestion: CongestionItem | null }) {
   if (congestion === null) return null
 
-  const unknown = congestion.level.code === 'UNKNOWN'
+  const unknown = congestion.level.code === UNKNOWN_CODE
 
   return (
     <MetricBadge tone={congestionTone(congestion.level.code)}>

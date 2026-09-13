@@ -244,9 +244,18 @@ export function PlaceDetailSection({
               <p className="text-body-2 text-fg-muted">{metaLine(place)}</p>
 
               <div className="flex flex-wrap items-center gap-1.5">
-                <Badge tone="neutral" size="sm">
-                  {place.petAllowanceType.name}
-                </Badge>
+                {/*
+                  **`UNKNOWN` 이면 그리지 않는다** (#530) — 목록 행과 같은 처리다
+                  (`place-row.tsx` 의 `PlaceBadges` 주석이 근거를 갖고 있다). 서버 `name` 이
+                  `정보 없음` 이라 옆 태그에 걸려 읽힌다. **동반 조건을 감추는 것이 아니다** —
+                  아래 `반려견 동반` 섹션이 `PlacePetInfoSection` 으로 같은 `allowance` 를
+                  받아 문장으로 말한다 (`place-pet-info.tsx`).
+                */}
+                {place.petAllowanceType.code !== 'UNKNOWN' && (
+                  <Badge tone="neutral" size="sm">
+                    {place.petAllowanceType.name}
+                  </Badge>
+                )}
                 {place.petInfo !== null && (
                   <>
                     <Badge tone="neutral" size="sm">

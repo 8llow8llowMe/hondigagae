@@ -17,6 +17,7 @@ import { sortRegionsByScore } from '@/lib/insight/region-order'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { resolveWeatherGlyph, type WeatherIconKind } from '@/lib/insight/weather-icon'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { RegionalWeatherResponse, RegionWeatherItem } from '@/types/insight'
 
@@ -35,8 +36,13 @@ import type { RegionalWeatherResponse, RegionWeatherItem } from '@/types/insight
  * 레일이 1277px 로 부풀어 `lg:sticky` 가 뷰포트(936px)를 넘겨 무력화돼 있었다. 시간축
  * 판단(판정 · 골든타임)은 좌측에 그대로 남는다.
  *
- * **1024 이상에서 권역을 가로로 편다.** 우측 열은 1000px 급이라 4개를 세로로 쌓으면
- * 오른쪽이 비고 371px 를 세로로 먹는다. 가로 4칸이면 장소 목록의 범위 머리말처럼 읽힌다.
+ * **모든 폭에서 권역을 가로로 편다** (#530). 1024 이상만 가로였는데, **권역은 서로
+ * 견주라고 있는 표다** — 세로로 세우면 값이 한 번에 한 권역만 보여 비교가 안 되고,
+ * 좁은 폭일수록 카드 한 장이 화면의 5분의 1을 먹는다. 비교가 목적인 표에서 "좁으니까
+ * 세로로 쌓는다" 는 그 목적을 폭에 따라 버리는 것이다.
+ *
+ * 가로 레일의 장치(스냅 · 우측 페이드 · 화살표)는 `.scroll-rail` 이 이미 갖고 있어
+ * 폭에 따라 새로 만들 것이 없다 — 1024 이상에서만 쓰던 것을 아래로 내렸을 뿐이다.
  */
 export function RegionalWeatherSection({
   data,
@@ -62,103 +68,108 @@ export function RegionalWeatherSection({
       레이아웃 밖 최상단이라 그 역할까지 함께 가져갔다.
     */
     <Surface titleId="region-heading" title={messages.home.regionHeading}>
-      <div className="flex flex-col gap-3 px-4 pb-4 md:px-5 md:pb-5">
+      <div className={cn('pb-3', INSET_CLASS.card)}>
         <Recommendation data={data} />
+      </div>
 
-        {/*
-          **예보를 못 받은 권역도 남는다.** 목록에서 지우면 사용자는 그 권역이 조회되지
-          않았다는 것조차 모른 채 "비교 대상이 넷" 이라고 읽는다.
+      {/*
+        **표 위에 1px 선을 넣는다** (#530). 추천 문장과 비교표는 같은 인셋의 본문 글줄이라
+        선이 없으면 한 덩어리로 읽혔다 — 위는 **서버가 고른 답**이고 아래는 **그 답을
+        견주는 근거**다. 묶음 안을 잇는 것은 선이다 (DESIGN.md §0).
+      */}
+      {/*
+        **예보를 못 받은 권역도 남는다.** 목록에서 지우면 사용자는 그 권역이 조회되지
+        않았다는 것조차 모른 채 "비교 대상이 넷" 이라고 읽는다.
 
-          한 컬럼(~1023)은 전폭 행 + 1px 구분선이고, 2단(1024+)은 가로 칸 + 1px 세로
-          구분선이다. 어느 쪽이든 묶음 안을 잇는 것은 선이다 (DESIGN.md §0).
+        **칸 수를 고정하지 않는다** (`grid-cols-N` 을 쓰지 않는다). 권역 수는 서버가
+        정한다 — dev 실측은 5개(제주시 · 서귀포 · 동부 · 서부 · 한라산)인데 4칸 grid 로
+        두면 다섯째가 두 번째 줄로 떨어져 칸 높이가 두 배가 됐다. 늘거나 줄어도 한 줄이다.
+      */}
+      {/*
+        **점수 높은 순이다** (`sortRegionsByScore`). 서버는 지리 순서로 주는데, 그대로
+        두면 추천 권역이 어디 있을지 알 수 없다 — 실측에서 100점짜리가 맨 끝이었고
+        바로 위 문장은 그 권역을 가리키고 있었다. 동점은 서버 순서를 지킨다.
+      */}
+      {/*
+        **칸을 쥐어짜지 않고 레일로 넘긴다** (#342). 칸이 `min-w-0` 까지 줄면 다섯 칸이
+        쪼그라든다 — 값 묶음이 136px 를 요구하는데 칸이 그보다 좁아지면 안에서 다시 접힌다.
 
-          **칸 수를 고정하지 않는다** (`grid-cols-N` 이 아니라 `flex-1`). 권역 수는 서버가
-          정한다 — dev 실측은 5개(제주시 · 서귀포 · 동부 · 서부 · 한라산)인데 4칸 grid 로
-          두면 다섯째가 두 번째 줄로 떨어져 칸 높이가 두 배가 됐다. 늘거나 줄어도 한 줄이다.
-        */}
-        {/*
-          **점수 높은 순이다** (`sortRegionsByScore`). 서버는 지리 순서로 주는데, 그대로
-          두면 추천 권역이 어디 있을지 알 수 없다 — 실측에서 100점짜리가 맨 끝이었고
-          바로 위 문장은 그 권역을 가리키고 있었다. 동점은 서버 순서를 지킨다.
-        */}
-        {/*
-          **2단에서 칸을 쥐어짜지 않고 레일로 넘긴다** (#342). 칸이 `min-w-0` 까지 줄면
-          1024~1280 에서 다섯 칸이 쪼그라든다 — 값 묶음이 136px 를 요구하는데 칸이 그보다
-          좁아지면 안에서 다시 접힌다.
+        **폭은 고정이다** (`w-44` 176 / `lg:w-46` 184). 예전에는 `lg:min-w-38 lg:flex-1` 이라
+        **폭에 따라 152~191 사이를 오갔고**, 1170 같은 중간 폭에서 바닥값으로 내려앉은 채
+        마지막 칸이 65px 만 보이며 잘렸다 (#395). 폭이 뷰포트마다 달라지면 같은 칸이
+        화면마다 다른 물건처럼 보이고, 잘린 칸은 "더 있다" 가 아니라 "깨졌다" 로 읽힌다.
 
-          **폭은 `lg:w-44`(176px) 고정이다.** 예전에는 `lg:min-w-38 lg:flex-1` 이라
-          **폭에 따라 152~191 사이를 오갔고**, 1170 같은 중간 폭에서 바닥값으로 내려앉은 채
-          마지막 칸이 65px 만 보이며 잘렸다 (#395). 폭이 뷰포트마다 달라지면 같은 칸이
-          화면마다 다른 물건처럼 보이고, 잘린 칸은 "더 있다" 가 아니라 "깨졌다" 로 읽힌다.
+        **152 였던 값을 176 으로 올렸다** (#412). 152 의 산식이 틀려 있었다 — "값 묶음
+        136 + 칸 인셋 12 = 148 에 4px 여유" 라고 적었는데, **인셋은 첫 칸에만 없다.**
+        둘째 칸부터는 `pl-3`(12) + `border-l`(1) 이 매번 들어가 값 자리가
+        **78.6 → 65.6px** 로 줄었다. 가장 넓은 줄 `최고 31.0℃` 가 62.9px 이라 남는 것이
+        **2.7px** 이었고, 폰트 렌더링이 조금만 달라지면 `최고` 와 `27.0℃` 사이에서 줄이
+        접혀 칸 높이가 배로 뛰었다. 첫 칸만 멀쩡해 보여 더 늦게 드러났다.
 
-          **152 였던 값을 176 으로 올렸다** (#412). 152 의 산식이 틀려 있었다 — "값 묶음
-          136 + 칸 인셋 12 = 148 에 4px 여유" 라고 적었는데, **인셋은 첫 칸에만 없다.**
-          둘째 칸부터는 `lg:pl-3`(12) + `lg:border-l`(1) 이 매번 들어가 값 자리가
-          **78.6 → 65.6px** 로 줄었다. 가장 넓은 줄 `최고 31.0℃` 가 62.9px 이라 남는 것이
-          **2.7px** 이었고, 폰트 렌더링이 조금만 달라지면 `최고` 와 `27.0℃` 사이에서 줄이
-          접혀 칸 높이가 배로 뛰었다. 첫 칸만 멀쩡해 보여 더 늦게 드러났다.
+        **184 의 산식**: 인셋 13 + 아이콘 24 + gap 8 + 숫자 자리 88 + gap 8 + 배지 41.4
+        = 182.4. 숫자 자리를 `lg:w-22`(88px)로 **고정**해 62.9px 짜리 줄에 25px 여유를
+        둔다 — 이 여유가 폰트가 달라져도 접히지 않게 하는 몫이다.
 
-          **184 의 산식**: 인셋 13 + 아이콘 24 + gap 8 + 숫자 자리 88 + gap 8 + 배지 41.4
-          = 182.4. 숫자 자리를 `lg:w-22`(88px)로 **고정**해 62.9px 짜리 줄에 25px 여유를
-          둔다 — 이 여유가 폰트가 달라져도 접히지 않게 하는 몫이다.
+        **좁은 폭은 한 단 아래다** (#530, `w-44` 176 + 숫자 자리 `w-20` 80). 세로 목록을
+        걷고 모든 폭에서 가로 레일이 되면서 375 의 가용폭 343 이 이 칸의 새 기준이 됐다 —
+        184 로 두면 둘째 칸이 159px 만 보인다. **둘은 반드시 함께 내린다**: 칸만 줄이면
+        숫자 자리 88 이 174.4 를 요구해 값 줄이 조용히 접힌다 (위 #412 의 재발이다).
+        80 도 62.9px 짜리 줄에 17.1px 을 남긴다.
 
-          **배지가 41.4 인 것은 `size="score"`(px-3) 때문이다.** 숫자만 담는 배지라
-          낱말용 8px 에서는 조여 보였다 (`components/metric.tsx`). 배지를 더 키우면
-          **숫자 자리가 눌린다** — `lg:w-22` 는 하한이 아니라 상한이라, 남는 폭이 모자라면
-          조용히 줄어든다. 그래서 이 둘은 함께 움직여야 하고 테스트가 그 관계를 잡는다.
+        **배지가 41.4 인 것은 `size="score"`(px-3) 때문이다.** 숫자만 담는 배지라
+        낱말용 8px 에서는 조여 보였다 (`components/metric.tsx`). 배지를 더 키우면
+        **숫자 자리가 눌린다** — `w-20`/`lg:w-22` 는 하한이 아니라 상한이라, 남는 폭이
+        모자라면 조용히 줄어든다. 그래서 이 둘은 함께 움직여야 하고 테스트가 그 관계를 잡는다.
 
-          **상한은 187.4 다.** 1440 의 우측 열 가용폭이 953 이라 `(953−16)/5 = 187.4` 를
-          넘기면 **1440 에서도 화살표가 남는다.** 184 는 936 이라 들어간다 (실측).
-          배지를 `px-4`(49.4)로 키우면 필요 폭이 190.4 가 되어 이 상한을 넘는다.
+        **상한은 187.4 다.** 1440 의 우측 열 가용폭이 953 이라 `(953−16)/5 = 187.4` 를
+        넘기면 **1440 에서도 화살표가 남는다.** 184 는 936 이라 들어간다 (실측).
+        배지를 `px-4`(49.4)로 키우면 필요 폭이 190.4 가 되어 이 상한을 넘는다.
 
-          **1280 에서는 화살표가 남는다.** `184×5 + gap 4×4 = 936` 이 1280 의 가용폭 793 을
-          넘긴다 — #395 는 이것을 피하려고 152 를 골랐지만, 그 선택이 지키려던 "한 줄"
-          자체가 깨지고 있었다. **접히는 칸보다 화살표가 낫다.** 1280 을 화살표 없이
-          채우려면 칸이 155px 이하여야 하는데(`(793−16)/5`), 그 폭으로는 접힘을 못 막는다 —
-          두 조건은 동시에 만족할 수 없다.
+        **1280 에서는 화살표가 남는다.** `184×5 + gap 4×4 = 936` 이 1280 의 가용폭 793 을
+        넘긴다 — #395 는 이것을 피하려고 152 를 골랐지만, 그 선택이 지키려던 "한 줄"
+        자체가 깨지고 있었다. **접히는 칸보다 화살표가 낫다.** 1280 을 화살표 없이
+        채우려면 칸이 155px 이하여야 하는데(`(793−16)/5`), 그 폭으로는 접힘을 못 막는다 —
+        두 조건은 동시에 만족할 수 없다.
+      */}
+      <div className={cn('scroll-rail border-border border-t py-3 md:py-4', INSET_CLASS.card)}>
+        <ul
+          ref={rail.ref}
+          onScroll={rail.onScroll}
+          className={cn(
+            'flex gap-x-1 overflow-x-auto',
+            // 스크롤바 자리는 fade 와 화살표가 대신한다 (`app/globals.css`)
+            'scrollbar-none',
+            /*
+              **칸이 중간에서 잘린 채 멈추지 않게 한다** (#395). 고정 폭이라 어느 위치에서
+              멈추든 칸 모양은 같지만, 멈추는 자리가 칸 경계가 아니면 마지막 칸이 반쯤
+              보인 채 남아 "더 있다" 가 아니라 "깨졌다" 로 읽힌다.
 
-          한 컬럼(~1023)에서는 세로 목록이라 넘칠 폭이 없다 — `fade` 가 `none` 이고
-          `ScrollRailArrows` 도 스스로 그리지 않는다.
-        */}
-        <div className="scroll-rail lg:min-w-0">
-          <ul
-            ref={rail.ref}
-            onScroll={rail.onScroll}
-            className={cn(
-              'flex flex-col lg:flex-row lg:gap-x-1 lg:overflow-x-auto',
-              // 스크롤바 자리는 fade 와 화살표가 대신한다 (`app/globals.css`)
-              'scrollbar-none',
-              /*
-                **칸이 중간에서 잘린 채 멈추지 않게 한다** (#395). 고정 폭이라 어느 위치에서
-                멈추든 칸 모양은 같지만, 멈추는 자리가 칸 경계가 아니면 마지막 칸이 반쯤
-                보인 채 남아 "더 있다" 가 아니라 "깨졌다" 로 읽힌다.
+              **마지막 칸만 `snap-end` 다.** 스냅 지점이 칸 시작(0 · 180 · 360 …)뿐이면
+              넘치는 폭이 칸 하나보다 작을 때(1170 실측 87px < 152) 0 말고는 닿을 자리가
+              없어 **마지막 칸을 끝까지 볼 수 없다.** 마지막 칸의 끝을 컨테이너 끝에
+              맞추면 그 자리가 곧 `maxScroll` 이라 한 번 넘기면 통째로 드러난다.
 
-                **마지막 칸만 `snap-end` 다.** 스냅 지점이 칸 시작(0 · 156 · 312 …)뿐이면
-                넘치는 폭이 칸 하나보다 작을 때(1170 실측 87px < 152) 0 말고는 닿을 자리가
-                없어 **마지막 칸을 끝까지 볼 수 없다.** 마지막 칸의 끝을 컨테이너 끝에
-                맞추면 그 자리가 곧 `maxScroll` 이라 한 번 넘기면 통째로 드러난다.
+              1170 실측: `scrollTo(87)` → 87 에 눕고 마지막 칸이 완전히 보인다.
+              중간(`40`)으로 밀면 0 으로 되돌아온다 — **칸 중간에서 멈추지 않는다**는 것이
+              이 규칙의 전부다.
 
-                1170 실측: `scrollTo(87)` → 87 에 눕고 마지막 칸이 완전히 보인다.
-                중간(`40`)으로 밀면 0 으로 되돌아온다 — **칸 중간에서 멈추지 않는다**는 것이
-                이 규칙의 전부다.
+              **`lg:` 한정을 걷었다** (#530). 그 아래가 세로 목록이던 동안에는 가로로 스냅할
+              축이 없었는데, 이제 모든 폭이 같은 레일이라 규칙도 하나다.
+            */
+            'snap-x snap-mandatory',
+            rail.fadeClassName,
+          )}
+        >
+          {sortRegionsByScore(data.regions).map((region) => (
+            <RegionRow key={region.region.code} item={region} />
+          ))}
+        </ul>
 
-                `lg:` 로 한정한다 — 그 아래는 세로 목록이라 가로로 스냅할 축이 없다.
-              */
-              'lg:snap-x lg:snap-mandatory',
-              rail.fadeClassName,
-            )}
-          >
-            {sortRegionsByScore(data.regions).map((region) => (
-              <RegionRow key={region.region.code} item={region} />
-            ))}
-          </ul>
-
-          <ScrollRailArrows
-            rail={rail}
-            prevLabel={messages.home.regionRailPrev}
-            nextLabel={messages.home.regionRailNext}
-          />
-        </div>
+        <ScrollRailArrows
+          rail={rail}
+          prevLabel={messages.home.regionRailPrev}
+          nextLabel={messages.home.regionRailNext}
+        />
       </div>
     </Surface>
   )
@@ -275,31 +286,31 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
 
   return (
     /*
-      한 컬럼은 가로 행(이름 ↔ 값), 2단은 세로 칸(이름 위, 값 아래)이다. 2단에서 아래
-      테두리를 걷고 왼쪽 테두리로 갈아 끼운다 — 첫 칸에는 선을 두지 않는다.
+      세로 칸이다 — 이름 위, 값 아래. 칸 사이는 왼쪽 1px 선이 잇고 첫 칸에는 두지 않는다.
+
+      **한 컬럼용 가로 행 변형을 걷었다** (#530). 그 형태는 이름 ↔ 값을 양끝으로 벌린
+      전폭 행이라 값끼리 세로로 줄을 서지 않았고, **권역을 서로 견주는 일**을 좁은 폭에서만
+      포기하고 있었다.
     */
-    <li className="border-border/60 flex items-center justify-between gap-3 border-b py-2 last:border-b-0 lg:w-46 lg:shrink-0 lg:snap-start lg:flex-col lg:items-start lg:gap-1 lg:border-b-0 lg:border-l lg:py-0 lg:pl-3 lg:first:border-l-0 lg:first:pl-0 lg:last:snap-end">
+    <li className="border-border/60 flex w-44 shrink-0 snap-start flex-col items-start gap-1 border-l pl-3 first:border-l-0 first:pl-0 last:snap-end lg:w-46">
       <span className="text-body-2 min-w-0 font-semibold">{item.region.name}</span>
 
       {/*
         **아이콘 / 숫자 / 배지 세 자리로 가른다** (#342). 숫자 두 값을 세로로 쌓는다.
 
-        **이 배치가 2단 접힘을 푼다.** 예전에는 값 넷이 가로로 흘러 `아이콘 16 + 최고 62 +
-        강수 52 + 배지 34 + gap 24 ≈ 188px` 를 요구했고, 2단(1024+) 칸이 실측 143~156px 라
-        두 줄로 접혔다 (#314 이전부터 그랬다). 세로로 쌓으면 `아이콘 24 + 숫자 62 +
-        배지 34 + gap 16 ≈ 136px` 로 줄어 한 줄에 들어간다.
-
-        한 컬럼(~1023)에서는 행 높이가 39 → 약 48px 로 늘지만, 섹션 하단의 보조 문구 줄이
-        함께 빠져(#342) 섹션 전체로는 거의 같다.
+        **이 배치가 칸 접힘을 푼다.** 예전에는 값 넷이 가로로 흘러 `아이콘 16 + 최고 62 +
+        강수 52 + 배지 34 + gap 24 ≈ 188px` 를 요구했고, 칸이 실측 143~156px 라 두 줄로
+        접혔다 (#314 이전부터 그랬다). 세로로 쌓으면 `아이콘 24 + 숫자 62 + 배지 34 +
+        gap 16 ≈ 136px` 로 줄어 한 줄에 들어간다.
 
         **숫자 줄이 둘에서 셋으로 늘었다** (#352, 최저기온). 가장 넓은 줄은
         `최고 31.0℃`(62.9px)이고 `최저 24.0℃` 도 같은 폭이라 늘어난 것은 높이뿐이다.
 
         **그때 잰 `79px` 는 첫 칸 값이었다** (#412). 나머지 네 칸은 인셋 13px 이 더 빠져
         65.6px 이고, 62.9px 짜리 줄에 2.7px 만 남아 있었다. 지금은 숫자 자리를
-        `lg:w-22`(88px)로 고정해 어느 칸에서도 같은 폭이다.
+        `w-20`(80) / `lg:w-22`(88)로 고정해 어느 칸에서도 같은 폭이다.
       */}
-      <span className="text-caption text-fg-muted flex shrink-0 items-center gap-2 font-medium tabular-nums lg:w-full lg:shrink">
+      <span className="text-caption text-fg-muted flex w-full items-center gap-2 font-medium tabular-nums">
         {/*
           **다섯 줄을 훑을 때 낱말보다 픽토그램이 빠르다** (#314). `skyState` · `precipitationType`
           이 이미 응답에 오는데 화면이 둘 다 버리고 있었다 — BE 작업 없이 붙일 수 있었다.
@@ -319,11 +330,11 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
           내지 않는다.** 빈 flex 항목을 남기면 부모의 `gap-2` 가 그 자리에도 붙어
           예보를 못 받은 권역(`한라산권`)의 배지가 8px 밀린다.
 
-          그래서 배지는 `justify-between` 에 기대지 않고 `lg:ml-auto` 로 밀어 붙인다 —
+          그래서 배지는 `justify-between` 에 기대지 않고 `ml-auto` 로 밀어 붙인다 —
           자식이 배지 하나뿐인 칸(`한라산권`)에서 `justify-between` 은 그것을 **왼쪽**에
           두고, 다섯 칸의 배지가 열을 이루지 못한다 (1280 실측: 넷은 우측 끝, 하나는 85px 앞).
 
-          **그래서 `lg:justify-between` 을 걷었다** (#412). `ml-auto` 가 남는 공간을 전부
+          **그래서 `justify-between` 을 걷었다** (#412). `ml-auto` 가 남는 공간을 전부
           먹어 버리므로 `justify-between` 은 애초에 발동할 자리가 없다 — 실측으로 확인했다
           (빼도 다섯 칸의 배지 우측 끝이 617·797·977·1157·1337 로 한 픽셀도 안 움직인다).
           같은 일을 두 규칙이 하면 나중에 어느 쪽을 고쳐야 하는지 알 수 없다.
@@ -331,12 +342,13 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
           **`ml-auto` 는 반대로 필수다.** 함께 걷으면 `한라산권` 배지가 1337 → 1236 으로
           100px 어긋난다. 이 칸만 아이콘도 숫자도 없어 배지가 곧 첫 자식이기 때문이다.
 
-          **남는 공간을 줄이는 쪽으로 고쳤다.** 칸이 176 이 되면서 `ml-auto` 가 먹는 틈이
+          **남는 공간을 줄이는 쪽으로 고쳤다.** 칸이 184 가 되면서 `ml-auto` 가 먹는 틈이
           34.7px 까지 벌어져 배지가 숫자에서 떨어져 보였다 — 숫자 자리를 88px 로 고정해
-          9.6px 로 되돌렸다 (152 시절의 10.7px 과 같은 밀도다).
+          9.6px 로 되돌렸다 (152 시절의 10.7px 과 같은 밀도다). 좁은 폭(176 + 80)도 같은
+          9.6px 이다 — 칸과 숫자 자리를 **같이** 한 단 내렸기 때문이다.
         */}
         {hasNumbers && (
-          <span className="flex flex-col items-start lg:w-22">
+          <span className="flex w-20 flex-col items-start lg:w-22">
             {maxTemperature !== null && (
               <span>
                 {messages.home.regionTempPrefix} {maxTemperature}℃
@@ -364,13 +376,13 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
           <MetricBadge
             size="score"
             tone={suitabilityTone(levelOf(item.weatherScore as number))}
-            className="lg:ml-auto"
+            className="ml-auto"
           >
             {item.weatherScore}
           </MetricBadge>
         ) : (
           /* `unknown` 톤은 점선 테두리를 쓴다 — 0 점과 다른 모양이어야 한다 (DESIGN.md §2-3) */
-          <MetricBadge tone="unknown" className="lg:ml-auto">
+          <MetricBadge tone="unknown" className="ml-auto">
             {messages.home.regionScoreUnavailable}
           </MetricBadge>
         )}

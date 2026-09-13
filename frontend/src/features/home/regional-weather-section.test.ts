@@ -123,8 +123,58 @@ describe('RegionalWeatherSection — 날씨 아이콘 (#342)', () => {
     값이 둘 다 없는 권역(`한라산권`)에 빈 flex 항목을 남기면 부모의 `gap-2` 가 그 자리에도
     붙어 배지가 8px 밀린다. 두 줄로 쌓으면서 감싼 `<span>` 이 생겨 처음 생긴 갈래다.
   */
+  /* 클래스 문자열이 실제 마크업과 같아야 한다 — 갈리면 이 단언이 헛되이 통과한다 */
   it('값이 없는 권역에 빈 숫자 자리를 남기지 않는다', () => {
-    expect(render(GOOD_DAY)).not.toContain('<span class="flex flex-col items-start"></span>')
+    const markup = render(GOOD_DAY)
+    const numbers = '<span class="flex w-20 flex-col items-start lg:w-22">'
+
+    expect(markup).toContain(numbers)
+    expect(markup).not.toContain(`${numbers}</span>`)
+  })
+})
+
+/*
+  #530 — 권역 표가 1024 미만에서 세로 목록으로 풀렸다. **권역은 서로 견주라고 있는
+  표인데** 세로로 세우면 한 번에 한 권역만 보여 비교가 안 되고, 좁은 폭일수록 칸 한 장이
+  화면의 5분의 1을 먹는다.
+*/
+describe('RegionalWeatherSection — 모든 폭에서 가로 레일 (#530)', () => {
+  const markup = render(GOOD_DAY)
+
+  it('좁은 폭에서도 세로 목록으로 풀지 않는다', () => {
+    expect(markup).not.toContain('flex-col lg:flex-row')
+    expect(markup).not.toContain('lg:overflow-x-auto')
+  })
+
+  /* 스냅·넘침이 `lg:` 뒤에 남으면 좁은 폭에서 칸이 중간에 잘린 채 멈춘다 */
+  it('스냅과 가로 넘침이 폭 분기 없이 걸린다', () => {
+    expect(markup).toContain('overflow-x-auto')
+    expect(markup).toContain('snap-x snap-mandatory')
+    expect(markup).not.toContain('lg:snap-x')
+  })
+
+  /*
+    **칸 폭은 좁은 폭에서 한 단 낮다** — 375 의 가용폭 343 에서 184 로 두면 둘째 칸이
+    159px 만 보인다. 숫자 자리도 함께 내려간다 (`styles/overlay-and-region-cell.test.ts`
+    가 그 관계를 산식으로 잡는다).
+  */
+  it('칸 폭이 좁은 폭과 lg 로 갈린다', () => {
+    expect(markup).toContain('w-44')
+    expect(markup).toContain('lg:w-46')
+  })
+
+  /*
+    **표 위에 1px 선을 넣는다.** 추천 문장과 비교표는 같은 인셋의 본문 글줄이라 선이
+    없으면 한 덩어리로 읽혔다 — 위는 서버가 고른 답이고 아래는 그 답을 견주는 근거다.
+  */
+  it('추천 문장과 표 사이에 1px 선이 있다', () => {
+    const recommendation = markup.indexOf('서귀포권이')
+    const divider = markup.indexOf('border-t')
+    const firstCell = markup.indexOf('w-44')
+
+    expect(recommendation).toBeGreaterThan(-1)
+    expect(divider).toBeGreaterThan(recommendation)
+    expect(divider).toBeLessThan(firstCell)
   })
 })
 

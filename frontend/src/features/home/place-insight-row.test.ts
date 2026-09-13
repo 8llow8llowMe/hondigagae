@@ -8,6 +8,7 @@ import { messages } from '@/lib/messages'
 import { suitability, suitabilityInsufficient } from '@/test/fixtures/insight'
 import { placeSummary } from '@/test/fixtures/place'
 import type { CongestionItem, PlaceSuitabilityResponse } from '@/types/insight'
+import type { PlaceSummary } from '@/types/place'
 
 function render(data: PlaceSuitabilityResponse) {
   return renderToStaticMarkup(createElement(PlaceInsightRow, { data, place: placeSummary }))
@@ -185,8 +186,14 @@ describe('PlaceInsightRow — 접힘', () => {
     갈리는 것은 `text-display`(28/900) 대 `text-title-1`(22/900) 뿐이다 (§3-3 — 그 사이 크기는 없다).
   */
   it('접힌 행의 점수는 한 단계 작다', () => {
-    expect(collapsed()).toContain('text-title-1')
     expect(render(data)).toContain('text-display')
+    /*
+      **`not.toContain` 쪽이 본 단언이다** (#530). 접은 모양의 판정 묶음이 늘 `row`(22/900)
+      라, `toContain('text-title-1')` 만으로는 넓은 행의 점수 열이 `hero` 로 되돌아가도
+      통과한다 — 접힌 행에 `text-display` 가 **없다**는 것이 위계를 지키는 조건이다.
+    */
+    expect(collapsed()).toContain('text-title-1')
+    expect(collapsed()).not.toContain('text-display')
   })
 
   /*
@@ -205,5 +212,133 @@ describe('PlaceInsightRow — 접힘', () => {
   */
   it('모바일 썸네일 크기는 건드리지 않는다', () => {
     expect(collapsed()).toContain('size-20')
+  })
+})
+
+/*
+  #530 — 고정 열 둘(태그 144 · 판정 112)이 `md:`(뷰포트)로 켜져 있어 **768 에서 본문에
+  200px 대만 남았고**, 1024 의 우측 열에서는 76px 이었다. 뷰포트는 행이 실제로 받은 폭을
+  모른다 — `place-row.tsx` 가 같은 이유로 이미 `@container` 를 쓰고 있다.
+*/
+describe('PlaceInsightRow — 컨테이너 쿼리로 접는 행 (#530)', () => {
+  const markup = render({ ...suitability, reasons: REASONS_WITHOUT_CONGESTION })
+
+  it('행이 자기 폭을 재는 컨테이너가 된다', () => {
+    expect(markup).toContain('@container')
+  })
+
+  /*
+    **고정 열 둘은 컨테이너 축에서만 선다.** `md:flex` 로 되돌리면 1024 의 우측 열처럼
+    좁은 컨테이너에서 본문이 다시 눌린다.
+  */
+  it('고정 열 둘이 뷰포트가 아니라 컨테이너 폭으로 켜진다', () => {
+    expect(markup).toContain('@2xl:flex')
+    expect(markup).not.toContain('md:flex')
+  })
+
+  /* 좁은 행에서는 그 두 열이 아예 자리를 내지 않는다 */
+  it('좁은 행에서는 고정 열 둘이 숨는다', () => {
+    expect(markup).toContain('hidden w-36')
+    expect(markup).toContain('hidden w-28')
+  })
+
+  /*
+    **등급 배지와 점수를 제목 줄 오른쪽에 합친다.** 예전에는 배지만 제목 옆에 서고 점수는
+    메타 아래 제 줄을 따로 썼다 — 같은 판정을 두 해상도로 말하는 값이라 붙어 있어야 하고,
+    붙이면 행이 한 줄 짧아진다.
+  */
+  it('접은 모양은 등급 배지와 점수가 한 묶음이다', () => {
+    expect(markup).toContain('@2xl:hidden')
+    // 넓은 행으로 켜질 때 이 묶음이 사라져야 배지·점수가 두 번 보이지 않는다
+    expect(markup.match(/@2xl:hidden/g)?.length).toBeGreaterThanOrEqual(2)
+  })
+
+  /*
+    **DOM 순서는 제목 → 메타 → 태그 그대로다** — 시각 순서만 `order-first` 로 바꾼다.
+    스크린리더는 이름을 먼저 읽는다 (`place-row.tsx` 와 같은 규약).
+  */
+  it('태그는 제목 위로 올리되 DOM 에서는 메타 뒤에 남는다', () => {
+    expect(markup).toContain('order-first')
+    expect(markup.indexOf(suitability.placeTitle)).toBeLessThan(markup.indexOf('order-first'))
+  })
+
+  /* 접힌 행은 태그를 달지 않는다 — 두 모양 다 같은 규칙이다 (예전에는 모바일만 예외였다) */
+  it('접힌 행은 좁은 행에서도 태그를 달지 않는다', () => {
+    const collapsed = renderToStaticMarkup(
+      createElement(PlaceInsightRow, {
+        data: { ...suitability, reasons: REASONS_WITHOUT_CONGESTION },
+        place: placeSummary,
+        collapsed: true,
+      }),
+    )
+
+    expect(collapsed).not.toContain('order-first')
+    expect(collapsed).not.toContain(placeSummary.petAllowanceType.name)
+  })
+})
+
+/*
+  #530 — 동반 정보가 없는 장소가 서버 `name` 그대로 `정보 없음` 배지를 달고 `야외` ·
+  `혼잡도 정보 없음` 옆에 섰다. 낱말을 갖고 있는 이웃 때문에 **무엇의 정보가 없다는
+  것인지** 더 안 읽혔다.
+*/
+describe('PlaceInsightRow — 동반 정보 없음 (#530)', () => {
+  const unknownAllowance: PlaceSummary = {
+    ...placeSummary,
+    petAllowanceType: { code: 'UNKNOWN', name: '정보 없음', description: null },
+  }
+
+  function withPlace(place: PlaceSummary) {
+    return renderToStaticMarkup(
+      createElement(PlaceInsightRow, {
+        data: { ...suitability, congestion: CROWDED, reasons: REASONS_WITHOUT_CONGESTION },
+        place,
+      }),
+    )
+  }
+
+  it('UNKNOWN 이면 동반 배지를 그리지 않는다', () => {
+    expect(withPlace(unknownAllowance)).not.toContain('정보 없음')
+  })
+
+  /* 판정한 장소는 그대로다 — 거르는 것은 `UNKNOWN` 하나뿐이다 */
+  it('판정이 있는 장소의 동반 배지는 서버 문구 그대로 남는다', () => {
+    expect(withPlace(placeSummary)).toContain(placeSummary.petAllowanceType.name)
+  })
+
+  /*
+    **문구가 아니라 `code` 로 거른다.** `name` 은 서버 문구라 언제든 바뀌고, 문구 비교는
+    그때 조용히 어긋난다 (api-integration-guide.md §6).
+  */
+  it('같은 문구라도 code 가 다르면 그린다', () => {
+    const sameWording: PlaceSummary = {
+      ...placeSummary,
+      petAllowanceType: { code: 'NOT_ALLOWED', name: '정보 없음', description: null },
+    }
+
+    expect(withPlace(sameWording)).toContain('정보 없음')
+  })
+
+  /* 동반 배지만 빠진다 — 같은 줄의 실내/야외 · 혼잡도는 그대로다 */
+  it('옆 태그는 함께 사라지지 않는다', () => {
+    const markup = withPlace(unknownAllowance)
+
+    expect(markup).toContain(messages.home.indoor)
+    expect(markup).toContain(CROWDED.level.name)
+  })
+
+  /*
+    **셋 다 없으면 태그 묶음 자체를 내지 않는다.** 빈 `div` 를 남기면 `order-first mb-1.5`
+    만 남아 제목 위에 6px 이 뜬다.
+  */
+  it('그릴 태그가 하나도 없으면 묶음을 만들지 않는다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(PlaceInsightRow, {
+        data: { ...suitability, congestion: null, reasons: REASONS_WITHOUT_CONGESTION },
+        place: { ...unknownAllowance, indoor: null },
+      }),
+    )
+
+    expect(markup).not.toContain('order-first')
   })
 })

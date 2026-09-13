@@ -22,7 +22,7 @@ function render(data: WalkSafetyResponse) {
   )
 }
 
-describe('날짜 줄 — 데스크톱은 이 카드가 겸한다 (#428)', () => {
+describe('날짜 줄 — 이 카드가 겸한다 (#428 · #530)', () => {
   it('체감온도 라벨과 같은 줄에 날짜가 선다', () => {
     const markup = render(walkSafety)
 
@@ -32,6 +32,31 @@ describe('날짜 줄 — 데스크톱은 이 카드가 겸한다 (#428)', () => 
       갈리는데(16 vs 28), `items-end` 로 두면 위 caption 두 개가 어긋난다.
     */
     expect(markup).toContain('items-baseline')
+  })
+
+  /*
+    **모바일도 같은 자리다** (#530). #428 은 여기를 데스크톱 전용으로 두고 모바일은
+    `home-view` 가 카드 밖에 그리게 했는데, 3a 바닥 위의 그 자리는 어느 카드에도 붙지
+    않는다. 접힌 줄 위에도 caption 자리가 있었다.
+  */
+  it('모바일 접힌 줄에도 날짜가 선다', () => {
+    const markup = render(walkSafety)
+
+    // 모바일 버튼(`md:hidden`)과 데스크톱 패널(`md:flex`) 양쪽에 한 번씩
+    expect(markup.match(new RegExp(TODAY_LABEL.replace(/[().·]/g, '\\$&'), 'g'))).toHaveLength(2)
+  })
+
+  /*
+    **접힘과 무관하게 보인다.** 날짜를 펼침 패널 안에만 두면 기본 상태(접힘)에서 날짜가
+    사라진다 — 그 버튼은 `open` 과 상관없이 늘 렌더된다.
+  */
+  it('모바일 날짜가 펼침 패널 밖에 있다', () => {
+    const markup = render(walkSafety)
+    const button = markup.indexOf('<button')
+    const buttonEnd = markup.indexOf('</button>')
+
+    expect(markup.indexOf(TODAY_LABEL)).toBeGreaterThan(button)
+    expect(markup.indexOf(TODAY_LABEL)).toBeLessThan(buttonEnd)
   })
 })
 
