@@ -7,7 +7,12 @@ import { ReasonList } from '@/components/reason-list'
 import { displayTemperature } from '@/lib/insight/temperature'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
-import { MID_TERM_FORECAST_CODE, type PlanDayWeatherItem } from '@/types/plan'
+import {
+  MID_TERM_FORECAST_CODE,
+  NO_PLACE_ITEM_REASON_CODE,
+  PAST_DATE_REASON_CODE,
+  type PlanDayWeatherItem,
+} from '@/types/plan'
 
 /**
  * 한 일자의 판정 — 아트보드 01·02, 실패는 06 ③.
@@ -16,8 +21,8 @@ import { MID_TERM_FORECAST_CODE, type PlanDayWeatherItem } from '@/types/plan'
  * 판정은 외부 예보라 한쪽이 죽어도 다른 쪽은 살아 있다 (D3).
  *
  * **`score`/`suitabilityLevel` 이 null 인 것은 "판정을 못 낸 것" 이지 "낮은 것" 이
- * 아니다.** 0점이나 회색 등급 배지로 만들지 않고 `unavailableReason` 을 **문장 그대로**
- * 쓴다 (아트보드 01 주석).
+ * 아니다.** 0점이나 회색 등급 배지로 만들지 않고 사유를 문장으로 말한다 (아트보드 01 주석).
+ * 어떤 문장을 말할지는 `unavailableSentence` 가 사유 코드로 가른다 (#497).
  */
 export function PlanDayVerdict({
   verdict,
@@ -25,6 +30,7 @@ export function PlanDayVerdict({
   basisPetName,
   failed,
   onRetry,
+  dayHasItems,
 }: {
   /** 아직 안 왔으면 `undefined` */
   verdict: PlanDayWeatherItem | undefined
@@ -38,6 +44,11 @@ export function PlanDayVerdict({
   /** 판정 조회가 5xx 로 실패했다 */
   failed: boolean
   onRetry: () => void
+  /**
+   * 그날 일정에 항목이 하나라도 있는가 (#497). **`NO_PLACE_ITEM` 을 감출지 가르는 데만
+   * 쓴다** — 항목이 없는 날은 아래 빈 일차 안내가 같은 말을 이미 하기 때문이다.
+   */
+  dayHasItems: boolean
 }) {
   if (failed) {
     return (
@@ -51,60 +62,104 @@ export function PlanDayVerdict({
 
   if (verdict === undefined) return null
 
+  if (verdict.score === null || verdict.suitabilityLevel === null) {
+    // 등급 배지를 만들지 않는다. 무엇을 말할지는 사유 코드가 정한다
+    const sentence = unavailableSentence(verdict, dayHasItems)
+
+    // **말할 것이 없으면 자리도 만들지 않는다** — 빈 여백만 남는다
+    if (sentence === null) return null
+
+    return (
+      <div className="flex flex-col gap-3 py-4">
+        <p className="text-body-2 text-fg-muted">{sentence}</p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-3 py-4">
-      {verdict.score === null || verdict.suitabilityLevel === null ? (
-        // 등급 배지를 만들지 않는다. 서버가 준 이유를 그대로 옮긴다
-        <p className="text-body-2 text-fg-muted">{verdict.unavailableReason}</p>
-      ) : (
-        <>
-          <div className="flex flex-wrap items-center gap-3">
-            <MetricBadge tone={suitabilityTone(verdict.suitabilityLevel.code)}>
-              {verdict.suitabilityLevel.name}
-            </MetricBadge>
+      <div className="flex flex-wrap items-center gap-3">
+        <MetricBadge tone={suitabilityTone(verdict.suitabilityLevel.code)}>
+          {verdict.suitabilityLevel.name}
+        </MetricBadge>
 
-            {/*
-              **체감온도가 이 자리의 기본값이다** (#253 · 아트보드 01). 못 받은 날
-              (중기예보 구간)에만 최고기온이 서고, 그때는 라벨이 함께 바뀐다 —
-              고르는 규칙은 `lib/insight/temperature.ts` 하나이고 장소 상세와 공유한다.
-            */}
-            <VerdictTemperatureValue weather={verdict.weather} />
+        {/*
+          **체감온도가 이 자리의 기본값이다** (#253 · 아트보드 01). 못 받은 날
+          (중기예보 구간)에만 최고기온이 서고, 그때는 라벨이 함께 바뀐다 —
+          고르는 규칙은 `lib/insight/temperature.ts` 하나이고 장소 상세와 공유한다.
+        */}
+        <VerdictTemperatureValue weather={verdict.weather} />
 
-            {verdict.representativePlaceId !== null && (
-              // 산책 위험도는 장소 상세가 소유한다. 기준 장소가 없으면 부를 대상이 없다
-              <ButtonLink
-                href={`/places/${verdict.representativePlaceId}`}
-                variant="secondary"
-                size="sm"
-                className="ml-auto"
-              >
-                {messages.plan.walkAction}
-              </ButtonLink>
-            )}
-          </div>
+        {verdict.representativePlaceId !== null && (
+          // 산책 위험도는 장소 상세가 소유한다. 기준 장소가 없으면 부를 대상이 없다
+          <ButtonLink
+            href={`/places/${verdict.representativePlaceId}`}
+            variant="secondary"
+            size="sm"
+            className="ml-auto"
+          >
+            {messages.plan.walkAction}
+          </ButtonLink>
+        )}
+      </div>
 
-          {/*
-            서버 순서를 유지한다 — `reasons` 는 점수 영향이 큰 순서로 온다.
-            정보성(`scoreDelta === 0`)만 한 단계 흐리게 내린다. **장소 적합도 패널과 같은
-            처리다** (`place-suitability-panel.tsx`) — 같은 모양의 근거를 두 화면이 다르게
-            보여 주고 있었다 (#148).
-          */}
-          <ReasonList
-            reasons={verdict.reasons.map((reason) => ({
-              description: reason.description,
-              informational: reason.scoreDelta === 0,
-            }))}
-          />
+      {/*
+        서버 순서를 유지한다 — `reasons` 는 점수 영향이 큰 순서로 온다.
+        정보성(`scoreDelta === 0`)만 한 단계 흐리게 내린다. **장소 적합도 패널과 같은
+        처리다** (`place-suitability-panel.tsx`) — 같은 모양의 근거를 두 화면이 다르게
+        보여 주고 있었다 (#148).
+      */}
+      <ReasonList
+        reasons={verdict.reasons.map((reason) => ({
+          description: reason.description,
+          informational: reason.scoreDelta === 0,
+        }))}
+      />
 
-          <PlanVerdictNotes
-            verdict={verdict}
-            petConditionApplied={petConditionApplied}
-            basisPetName={basisPetName}
-          />
-        </>
-      )}
+      <PlanVerdictNotes
+        verdict={verdict}
+        petConditionApplied={petConditionApplied}
+        basisPetName={basisPetName}
+      />
     </div>
   )
+}
+
+/**
+ * 판정을 못 낸 날에 무엇을 말할 것인가 — **사유 코드로 가른다** (#497).
+ *
+ * 서버 문장을 늘 그대로 그리면 빈 일차에서 아래 `이 날은 아직 담은 곳이 없어요.` 와 **같은
+ * 사실을 두 번** 말하고, 서버는 합쇼체라 한 화면 안에서 말투까지 갈린다.
+ *
+ * **가르는 기준은 "그 사실을 누가 아는가" 다.** 코드만으로 화면이 다 아는 사실은 화면이
+ * 자기 말투로 말하고, 문장에 서버만 아는 값이 들어 있으면 서버 문장을 쓴다.
+ *
+ * `null` 이면 이 자리에 아무것도 그리지 않는다.
+ */
+function unavailableSentence(verdict: PlanDayWeatherItem, dayHasItems: boolean): string | null {
+  switch (verdict.unavailableReasonCode) {
+    case NO_PLACE_ITEM_REASON_CODE:
+      /*
+        **항목이 하나도 없을 때만 감춘다.** 그때만 빈 일차 안내가 같은 말을 이미 한다.
+
+        산책 항목만 있는 날은 `NO_PLACE_ITEM` 이면서 항목이 있어 그 안내가 나지 않는다
+        (`WALK` 의 `targetId` 는 장소가 아니라 판정 기준이 못 된다). 거기서도 감추면
+        **판정이 왜 없는지 아무도 말하지 않게 된다.**
+      */
+      return dayHasItems ? verdict.unavailableReason : null
+
+    case PAST_DATE_REASON_CODE:
+      // 지난 날이라는 사실은 코드가 다 말해 준다 — 화면 말투로 옮긴다
+      return messages.plan.verdictPastDate
+
+    default:
+      /*
+        **모르는 코드까지 여기로 온다.** `BEYOND_FORECAST_RANGE` 의 문장에는 예보 범위(11일)가
+        들어 있는데 그것은 서버 상수라 화면이 베껴 두면 갈리고, `LOOKUP_FAILED` 는 넷 중
+        **유일한 장애**라 감추면 아무도 못 알아챈다. 서버가 사유를 늘려도 이 갈래가 받는다.
+      */
+      return verdict.unavailableReason
+  }
 }
 
 /**

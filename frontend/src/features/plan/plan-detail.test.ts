@@ -31,6 +31,8 @@ function renderVerdict(overrides: Partial<PlanDayWeatherItem> | null = {}, extra
       basisPetName: null,
       failed: false,
       onRetry: () => undefined,
+      // 항목이 있는 날이 기본이다 — 이 갈래는 `NO_PLACE_ITEM` 감추기와 무관하다 (#497)
+      dayHasItems: true,
       ...extra,
     }),
   )
@@ -172,6 +174,30 @@ describe('PlanDaySection', () => {
 
   it('항목이 0개면 빈 안내를 낸다', () => {
     expect(renderDaySection({ rows: [] })).toContain(messages.plan.dayEmpty)
+  })
+
+  /*
+    **같은 사실을 두 번 말하지 않는다** (#497). 빈 일차에는 서버의 `NO_PLACE_ITEM` 문장과
+    화면의 빈 일차 안내가 나란히 섰고, 서버는 합쇼체라 말투까지 갈렸다.
+
+    남는 쪽은 화면 문장이다 — 서버 문장은 "날씨를 붙이지 못했다" 는 내부 사정(일자 판정
+    파이프라인)을 노출하는데, 사용자에게는 담은 곳이 없다는 것이 전부다.
+  */
+  it('빈 일차에서 서버 문장과 화면 문장이 같은 말을 두 번 하지 않는다 (#497)', () => {
+    const serverSentence = '이 날짜에는 장소가 지정된 일정 항목이 없어 날씨를 붙이지 못했습니다.'
+    const markup = renderDaySection({
+      rows: [],
+      verdict: {
+        ...planVerdict,
+        score: null,
+        suitabilityLevel: null,
+        unavailableReasonCode: 'NO_PLACE_ITEM',
+        unavailableReason: serverSentence,
+      },
+    })
+
+    expect(markup).toContain(messages.plan.dayEmpty)
+    expect(markup).not.toContain(serverSentence)
   })
 
   it('실내 대안이 비면 블록을 렌더하지 않는다 — 비 예보가 없는 일자다', () => {

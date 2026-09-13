@@ -122,8 +122,26 @@ export type PlanDayWeatherItem = {
    * `petIds` 와 길이가 다를 수 있다(그 아이만 조회에 실패하면 빠진다). 순서는 `petIds` 순이다.
    */
   petSuitabilities: PlanDayPetSuitabilityItem[]
-  /** null 이면 정상. 값이 있으면 **화면에 그대로 안내한다** */
+  /**
+   * 판정을 못 낸 이유의 **문장**. null 이면 정상이다.
+   *
+   * **그대로 그리지 않는다** — 사유마다 화면이 할 일이 다르다 (#497).
+   * 무엇을 그릴지는 아래 `unavailableReasonCode` 가 정한다.
+   */
   unavailableReason: string | null
+  /**
+   * 판정을 못 낸 이유의 **코드** (#492 · [PR #503](https://github.com/8llow8llowMe/hondigagae/pull/503)).
+   * 문장과 **짝으로** 온다 — 정상인 날은 둘 다 null 이고, 값이 있으면 둘 다 있다.
+   *
+   * **문장을 파싱하지 않으려고 있는 필드다.** 사유마다 다르게 그려야 하는데 문장만 오면
+   * 화면이 문자열을 뜯어보게 된다 (`backend/docs/services/plan-service.md` 의
+   * "일자 판정 불가 사유"). 네 가지는 성질이 달라 뭉뚱그리면 사용자에게 하는 말이 틀린다.
+   *
+   * **union 이 아니라 `string` 이다** — `forecastSourceCode` 와 같은 이유다. 서버가 사유를
+   * 늘렸을 때 모르는 코드가 타입 오류가 되는 것이 아니라, 화면이 서버 문장으로 물러설 수
+   * 있어야 한다.
+   */
+  unavailableReasonCode: string | null
 }
 
 /**
@@ -168,6 +186,18 @@ export type PlanDailyWeatherItem = {
 
 /** 중기예보 구간. 이 값이면 판정 옆에 출처를 밝힌다 */
 export const MID_TERM_FORECAST_CODE = 'MID_TERM'
+
+/**
+ * 그날 일정에 장소 항목이 없다. **항목이 하나도 없는 날이면 빈 일차 안내가 같은 말을 이미
+ * 한다** — 그때만 서버 문장을 감춘다 (#497).
+ */
+export const NO_PLACE_ITEM_REASON_CODE = 'NO_PLACE_ITEM'
+
+/**
+ * 이미 지난 날짜. **예보는 소급되지 않으므로 재시도를 권하지 않는다.** 코드가 사실을 다
+ * 말해 주므로 화면이 자기 말투로 옮긴다 (#497).
+ */
+export const PAST_DATE_REASON_CODE = 'PAST_DATE'
 
 /** `GET /plans/{planId}/weather` */
 export type PlanWeatherResponse = {

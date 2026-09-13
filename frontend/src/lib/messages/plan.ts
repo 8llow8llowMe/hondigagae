@@ -224,6 +224,14 @@ export const planMessages = {
   /** 목차에서 판정을 못 낸 날. 낮은 등급으로 칠하지 않고 점선 unknown 으로 둔다 */
   verdictTocUnavailable: '판정 없음',
   verdictErrorTitle: '이 날 판정을 불러오지 못했어요.',
+  /**
+   * 지난 날짜라 판정이 없는 날 (#497 · 서버 사유 `PAST_DATE`).
+   *
+   * **서버 문장을 쓰지 않고 화면이 직접 말한다.** 코드가 사실을 다 말해 주는데 서버 문장은
+   * 합쇼체라 한 화면 안에서 말투가 갈린다 (`DESIGN.md` 문구 톤). **재시도를 권하지 않는
+   * 문장이어야 한다** — 예보는 소급되지 않아 다시 물어도 생기지 않는다.
+   */
+  verdictPastDate: '지난 날이라 날씨 판정을 확인할 수 없어요.',
   /** 반려견 특성 조회에 실패해 일반 조건으로 판정한 경우 */
   verdictPetConditionMissing: '반려견 특성을 반영하지 못해 일반 조건으로 판정했어요.',
   /** `{source}` 치환 — 서버가 준 `forecastSourceName` */

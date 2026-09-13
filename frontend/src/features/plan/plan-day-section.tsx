@@ -190,6 +190,12 @@ export function PlanDaySection({
           basisPetName={basisPetName}
           failed={verdictFailed}
           onRetry={onRetryVerdict}
+          /*
+            **아래 빈 일차 안내와 같은 말을 두 번 하지 않게 한다** (#497). 항목이 없는 날은
+            `이 날은 아직 담은 곳이 없어요.` 가 이미 그 사실을 말하므로 판정 자리의 서버
+            문장(`NO_PLACE_ITEM`)이 빠진다.
+          */
+          dayHasItems={rows.length > 0}
         />
       </div>
 
