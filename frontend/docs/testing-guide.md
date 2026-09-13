@@ -172,6 +172,32 @@ export const placeSummary: PlaceSummary = {
 - 문자열 ID는 문자열로 둔다.
 - 네트워크를 실제로 타지 않는다. `fetch` 를 모킹하지 말고 **함수에 fixture를 주입**하는 구조를 우선한다.
 
+### 소스 단언은 주석을 걷은 사본에 (`src/test/source.ts`)
+
+렌더할 수 없는 계약 — 라우트 규약 파일(`error.tsx` · `not-found.tsx` · `loading.tsx` ·
+`layout.tsx`)이나 **한 파일에 없는 짝**(카드를 그리는 곳과 상태를 그리는 곳이 다를 때) — 은
+소스를 문자열로 읽어 단언한다. 그때 **반드시 주석을 걷은 사본에 대해** 한다.
+
+- **걷지 않으면 주석에 속아 통과한다.** 이 저장소의 주석은 근거를 길게 적어 클래스명·
+  컴포넌트명이 그대로 등장한다 (#451 에서 실제로 났고, 뒤이어 뮤테이션으로 확인한 것만 셋이다).
+- **반대 방향도 있다.** "이 prop 을 넘기지 않는다" 를 주석으로 적어 둔 파일에서는, 걷지
+  않으면 그 낱말 때문에 단언이 **헛되이 실패**한다.
+
+```ts
+// src/test/source.ts
+import { openingTags, readSource, readSourceWithoutComments, stripComments } from '@/test/source'
+```
+
+- `readSourceWithoutComments(relPath)` — 계약 단언의 기본. 경로는 **저장소 루트(`frontend/`) 기준**이다.
+- `readSource(relPath)` — 주석까지 그대로 (css 처럼 걷을 이유가 없을 때).
+- `openingTags(source, /<Foo\b/g)` — JSX **열기 태그**를 통째로 집는다. 정규식
+  (`/<Foo\b[\s\S]*?\/>/`)은 `action={<Bar />}` 처럼 prop 안에 든 self-closing 자식의
+  `/>` 에서 **잘린다** — 저장소에 실재하는 모양이라 스캐너를 쓴다.
+
+**각자 만들지 않는다** (#458). 예전에는 아홉 파일이 각자 갖고 있었고 이름도 범위도 갈렸다 —
+`strip`+`code` · `withoutComments` · `source` · 인라인 `replace` · `code`. 그중 **둘은 블록
+주석만 걷고 일곱은 줄 주석까지 걷어** 같은 이름이 다른 일을 했다.
+
 ## 6. fixture를 Swagger 실측으로 만드는 절차
 
 **상상한 응답으로 테스트하면 계약 드리프트를 못 잡는다.** 통과하는 테스트가 거짓 안심을 준다.

@@ -1,14 +1,12 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-
 import { describe, expect, it } from 'vitest'
 
 import { SiteFooter } from '@/features/nav/site-footer'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
+import { readSource as repoSource } from '@/test/source'
 import { readGlobalsCss } from '@/test/tokens'
 
 /**
@@ -18,10 +16,6 @@ import { readGlobalsCss } from '@/test/tokens'
  */
 const markup = renderToStaticMarkup(createElement(SiteFooter))
 const globals = readGlobalsCss()
-
-function repoSource(relative: string): string {
-  return readFileSync(fileURLToPath(new URL(`../../../${relative}`, import.meta.url)), 'utf8')
-}
 
 describe('SiteFooter — 내용 (#399)', () => {
   /* 이 푸터의 존재 이유다. 공모전 출품물이고 화면 곳곳이 공공데이터를 쓴다 */

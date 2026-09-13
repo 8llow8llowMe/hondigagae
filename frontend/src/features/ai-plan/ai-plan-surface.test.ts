@@ -16,22 +16,9 @@
  * 컴포넌트명이 주석 안에 그대로 등장한다 — 걷지 않으면 **주석 문자열에 속아 통과한다**
  * (#451 의 전례). 반대로 "없어야 한다" 는 단언은 걷지 않으면 주석 때문에 실패한다.
  */
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-
 import { describe, expect, it } from 'vitest'
 
-const ROOT = fileURLToPath(new URL('../../../', import.meta.url))
-
-/** 블록 주석과 줄 주석을 걷은 소스 — 계약은 코드에만 있다 */
-function strip(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-}
-
-function code(relative: string): string {
-  return strip(readFileSync(join(ROOT, relative), 'utf8'))
-}
+import { readSourceWithoutComments as code } from '@/test/source'
 
 const newPage = code('app/(main)/ai-plans/new/page.tsx')
 const jobPage = code('app/(main)/ai-plans/jobs/[jobId]/page.tsx')

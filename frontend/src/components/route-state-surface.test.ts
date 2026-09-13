@@ -53,64 +53,17 @@
  * `src/components/main-layout-surface.test.ts` 가 잠근다. 열둘 중 어느 파일도 높이를
  * 스스로 정하지 않으므로 이 파일은 그대로다.
  */
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-
 import { describe, expect, it } from 'vitest'
 
-const ROOT = fileURLToPath(new URL('../../', import.meta.url))
-
-/** 블록 주석과 줄 주석을 걷은 소스 — 계약은 코드에만 있다 */
-function strip(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-}
-
-function code(relative: string): string {
-  return strip(readFileSync(`${ROOT}${relative}`, 'utf8'))
-}
+import { openingTags, readSource, readSourceWithoutComments as code } from '@/test/source'
 
 function escapeRegExp(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-/**
- * `<EmptyState …>` · `<ErrorState …>` 의 **열기 태그**를 하나씩 집는다 (여러 줄).
- *
- * **정규식으로 하지 않는다** — `[\s\S]*?\/>` 는 `action={<PlaceBackLink />}` 처럼 prop 안에
- * 든 self-closing 자식의 `/>` 에서 잘린다. 상세 화면의 404·400 갈래가 바로 그 모양이라
- * 여기서는 실제로 잘린다. 중괄호 깊이를 세며 깊이 0 의 `>` 까지 걷는다.
- *
- * `state-heading-level.test.ts` 에 같은 것이 있다 — **#458** 이 이런 소스 단언 헬퍼를
- * `src/test` 로 승격하는 이슈이고, 그때 한 곳으로 모은다.
- */
+/** `<EmptyState …>` · `<ErrorState …>` 의 열기 태그 — 스캐너는 `src/test/source.ts` 가 갖는다 */
 function stateTags(source: string): string[] {
-  const tags: string[] = []
-
-  for (const start of [...source.matchAll(/<(?:Empty|Error)State\b/g)].map((m) => m.index)) {
-    let depth = 0
-    let quote: string | null = null
-
-    for (let i = start; i < source.length; i += 1) {
-      const char = source[i] as string
-
-      if (quote !== null) {
-        if (char === quote) quote = null
-        continue
-      }
-      if (char === '"' || char === "'" || char === '`') {
-        quote = char
-        continue
-      }
-      if (char === '{') depth += 1
-      else if (char === '}') depth -= 1
-      else if (char === '>' && depth === 0) {
-        tags.push(source.slice(start, i + 1))
-        break
-      }
-    }
-  }
-
-  return tags
+  return openingTags(source, /<(?:Empty|Error)State\b/g)
 }
 
 /**
@@ -633,7 +586,7 @@ describe('상태 파일의 폭이 그 세그먼트의 정상 화면과 같다 (#
     이 규칙이 갈라지면 예외 화면의 왼쪽 기준선이 정상 화면과 어긋난다.
   */
   it('content-container 와 rail-layout 이 같은 캡 규칙을 공유한다', () => {
-    const globals = readFileSync(`${ROOT}app/globals.css`, 'utf8')
+    const globals = readSource('app/globals.css')
 
     expect(globals).toMatch(
       /\.content-container,\s*\n\.rail-layout\s*\{[^}]*max-inline-size:\s*var\(--content-max\)/,

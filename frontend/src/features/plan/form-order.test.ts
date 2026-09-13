@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-
 import { describe, expect, it } from 'vitest'
+
+import { readSource as repoSource } from '@/test/source'
 
 /**
  * 두 일정 만들기 화면이 **같은 순서로 묻는지** — 이슈 #400.
@@ -17,10 +16,6 @@ import { describe, expect, it } from 'vitest'
  * 받는 표시 컴포넌트지만 `AiPlanCreateForm` 은 접기 안에 필드를 감추므로(#354) 렌더
  * 마크업에서의 순서가 화면의 묻는 순서와 다르다. 지키려는 것은 **작성 순서**다.
  */
-
-function repoSource(relative: string): string {
-  return readFileSync(fileURLToPath(new URL(`../../../${relative}`, import.meta.url)), 'utf8')
-}
 
 /** `id="..."` 가 소스에 처음 나오는 자리 */
 function firstIndexOfField(source: string, id: string): number {

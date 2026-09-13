@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-
 import { describe, expect, it } from 'vitest'
+
+import { readSource as repoSource, stripComments as withoutComments } from '@/test/source'
 
 /**
  * 값이 **두 곳에 나뉘어 있어 눈으로는 못 잡는** 산술 두 건의 회귀 검사 — 이슈 #412.
@@ -10,10 +9,6 @@ import { describe, expect, it } from 'vitest'
  *  (2) `BottomSheet` 데스크톱 폭 ↔ `Modal` 기본 폭. 갈리면 같은 화면에서 뜨는 오버레이
  *      두 계열의 폭이 달라진다.
  */
-
-function repoSource(relative: string): string {
-  return readFileSync(fileURLToPath(new URL(`../../${relative}`, import.meta.url)), 'utf8')
-}
 
 /** Tailwind 스페이싱 스케일: `w-44` 의 `44` → 176px */
 function px(step: string | undefined): number {
@@ -25,9 +20,6 @@ function px(step: string | undefined): number {
  * 근거 주석이 같은 클래스 이름을 인용하고 있어서(그것이 이 저장소의 주석 방식이다)
  * 원문 그대로 훑으면 걷어낸 클래스가 여전히 있는 것처럼 잡힌다.
  */
-function withoutComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-}
 
 describe('권역 칸 — 폭 산식 (#412)', () => {
   const source = withoutComments(repoSource('src/features/home/regional-weather-section.tsx'))

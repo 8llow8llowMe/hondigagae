@@ -1,9 +1,6 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-
 import { describe, expect, it } from 'vitest'
 
 import { PlaceListSection } from '@/features/place/place-list-section'
@@ -19,6 +16,7 @@ import {
   planDetail,
   planVerdict,
 } from '@/test/fixtures/plan'
+import { readSource, stripComments } from '@/test/source'
 import type { PlaceDetail } from '@/types/place'
 
 /** 명세: docs/features/plan/일자편집-세부명세.md F절 (이슈 #82) */
@@ -214,11 +212,7 @@ describe('PlanDaySection — 장소 추가 진입', () => {
 })
 
 describe('담기 성공 후 화면에 남는다 (#370)', () => {
-  /* vitest 의 cwd 에 기대지 않는다 — 테스트 파일 기준으로 잡는다 */
-  const source = readFileSync(
-    fileURLToPath(new URL('./plan-add-place-view.tsx', import.meta.url)),
-    'utf8',
-  )
+  const source = readSource('src/features/plan/plan-add-place-view.tsx')
 
   /*
     일자편집 명세 F5(396행)는 원래 "그 일자로 replace 이동" 이었다. #370 이 뒤집었다 —
@@ -236,10 +230,7 @@ describe('담기 성공 후 화면에 남는다 (#370)', () => {
 })
 
 describe('행과 그 행을 담는 목록이 같은 인셋에 선다 (#451)', () => {
-  const source = readFileSync(
-    fileURLToPath(new URL('./plan-add-place-view.tsx', import.meta.url)),
-    'utf8',
-  )
+  const source = readSource('src/features/plan/plan-add-place-view.tsx')
 
   /*
     **불변식은 "카드 안이냐" 가 아니라 "행과 목록이 같은 축에 서느냐" 다.**
@@ -257,8 +248,11 @@ describe('행과 그 행을 담는 목록이 같은 인셋에 선다 (#451)', ()
   /**
    * **주석을 걷은 소스로 본다.** 이 파일의 결정 주석이 `inset="main"` 같은 값을 그대로
    * 인용하므로, 걷지 않으면 **속성을 지워도 주석이 단언을 통과시킨다** (실제로 잡았다).
+   *
+   * 헬퍼는 `src/test/source.ts` 가 갖는다 (#458) — 예전에는 아홉 파일이 각자 갖고 있었고
+   * **둘은 블록 주석만, 일곱은 줄 주석까지** 걷어 같은 이름이 다른 일을 했다.
    */
-  const code = source.replace(/\/\*[\s\S]*?\*\//g, '')
+  const code = stripComments(source)
 
   /** 첩첩 태그가 없어 non-greedy 로 한 태그를 정확히 끊는다 */
   const ROW_TAG = /<PlanAddPlaceRow\b[\s\S]*?\/>/
@@ -333,10 +327,7 @@ describe('행과 그 행을 담는 목록이 같은 인셋에 선다 (#451)', ()
 })
 
 describe('담기 목록이 3층 표면 위에 선다 (#451)', () => {
-  const source = readFileSync(
-    fileURLToPath(new URL('./plan-add-place-view.tsx', import.meta.url)),
-    'utf8',
-  )
+  const source = readSource('src/features/plan/plan-add-place-view.tsx')
 
   it('껍데기가 SurfaceStack 과 Surface 를 쓴다 — 2a 프리미티브를 쓰지 않는다', () => {
     expect(source).toContain("import { Surface, SurfaceStack } from '@/components/surface'")
@@ -349,12 +340,7 @@ describe('담기 목록이 3층 표면 위에 선다 (#451)', () => {
     선을 남기면 카드 테두리와 나란히 두 줄로 읽힌다 (`places/(list)/page.tsx` · 홈 #428).
   */
   it('페이지가 열 구분선을 그리지 않는다 — 바닥이 두 열을 가른다', () => {
-    const page = readFileSync(
-      fileURLToPath(
-        new URL('../../../app/(main)/plans/[planId]/days/[day]/add/page.tsx', import.meta.url),
-      ),
-      'utf8',
-    )
+    const page = readSource('app/(main)/plans/[planId]/days/[day]/add/page.tsx')
 
     expect(page).not.toContain('lg:border-l')
     expect(page).toContain('<Canvas as="main"')
