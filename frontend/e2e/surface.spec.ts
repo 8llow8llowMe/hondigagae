@@ -160,6 +160,17 @@ test.describe('3층 표면', () => {
 
         expect(outline.filter((entry) => entry.startsWith('H1:'))).toHaveLength(1)
 
+        /*
+          **첫 제목이 `h1` 이다** — #472 가 정리한 뒤 올린 단언이다.
+
+          예전에는 `/places?view=list` 에서 필터 레일이 `main` 안 목록보다 **앞**이라
+          개요가 `h2 필터` → `h3` 셋 → `h1 장소 찾기` 였다. 처음 온 사람이 "여기가
+          어디인가" 를 알기 전에 필터 하위 항목 셋을 지났고, 페이지 제목보다 상위처럼
+          보이는 `h2` 가 그 앞에 있었다. `h1` 이 `sr-only` 라 **캔버스 맨 앞으로** 옮기는
+          것으로 풀렸다 — 보이는 제목은 여전히 카드의 `h2` 다.
+        */
+        expect(outline[0]?.startsWith('H1:')).toBe(true)
+
         let previous = Number(outline[0]?.[1] ?? 1)
         for (const entry of outline) {
           const level = Number(entry[1])
@@ -425,6 +436,81 @@ test.describe('3층 표면 — not-found', () => {
  * **실제로 같은 세로선을 만드는가**를 잰다. 두 축이 따로 필요한 이유는 값이 `card` 여도
  * 담는 쪽이 이미 인셋을 줬으면 결과가 어긋날 수 있어서다.
  */
+/**
+ * **필터 레일은 건너뛸 수 있어야 한다** — 이슈 #472.
+ *
+ * 레일이 `main` 안에서 목록보다 **앞**이라 스크린리더의 제목 탐색(DOM 순서)도, 키보드
+ * 탭 순서도 필터를 먼저 만났다. 전역 스킵 링크(`#main`)는 레일 **앞**으로 보내므로
+ * 이 구간을 건너뛰지 못했다.
+ *
+ * **DOM 순서는 그대로 뒀다.** 레일을 목록 뒤로 보내면 개요는 고쳐지지만 **탭 순서가 시각
+ * 순서와 반대**가 된다 — 좌측 열이 먼저 보이는데 포커스는 우측 목록(항목 수십 개)을 다 지난
+ * 뒤에야 온다. 상세 화면(`rail-layout-detail`)이 DOM 을 뒤집은 것은 **모바일 스택 순서**
+ * 때문인데, 이 레일은 `hidden lg:block` 이라 그 이유가 없다.
+ *
+ * 대신 셋을 준다: `h1` 을 캔버스 맨 앞으로 · 레일을 `complementary` 랜드마크로 ·
+ * 레일 맨 앞에 `목록으로 건너뛰기`.
+ */
+test.describe('필터 레일 건너뛰기 — #472', () => {
+  const RAIL_SCREENS = [
+    { path: '/places?view=list', list: 'place-list' },
+    { path: '/plans', list: 'plan-list' },
+    { path: '/plans/223456789012000001/days/1/add?view=list', list: 'plan-add-place-list' },
+  ] as const
+
+  for (const { path, list } of RAIL_SCREENS) {
+    test(`${path} — 레일이 라벨 붙은 complementary 다`, async ({ page }) => {
+      await page.setViewportSize(VIEWPORTS.desktop)
+      await page.goto(path)
+
+      const rail = page.getByRole('complementary')
+      await expect(rail).toHaveCount(1)
+      /* 라벨이 없으면 랜드마크 목록에서 어느 것인지 구별되지 않는다 */
+      await expect(rail).toHaveAttribute('aria-label', /.+/)
+
+      /* 건너뛰기 링크가 레일 **안 맨 앞**이라 레일에 들어서자마자 빠져나갈 수 있다 */
+      await expect(rail.getByRole('link').first()).toHaveAttribute('href', `#${list}`)
+    })
+
+    test(`${path} — 건너뛰기 링크가 필터를 지나 목록으로 보낸다`, async ({ page }) => {
+      await page.setViewportSize(VIEWPORTS.desktop)
+      await page.goto(path)
+
+      await page.getByRole('complementary').getByRole('link').first().press('Enter')
+      await page.keyboard.press('Tab')
+
+      /*
+        **다음 Tab 이 목록 안에서 이어지는지** 본다 — 링크가 실제로 레일을 건너뛰게
+        하는가가 이 이슈의 요구다.
+
+        **`tabIndex={-1}` 의 유무는 여기서 갈리지 않는다.** Chromium 은 그것이 없어도
+        앵커 목적지로 순차 포커스 시작점을 옮긴다(뮤테이션으로 확인 — 떼도 초록이었다).
+        그 prop 은 보조기기 조합을 위한 처방이라 소스 단언 쪽에서 잠근다
+        (`plan-add-place.test.ts`).
+      */
+      expect(
+        await page.evaluate((id) => {
+          const target = document.getElementById(id)
+          const active = document.activeElement
+          return target !== null && active !== null && target.contains(active)
+        }, list),
+      ).toBe(true)
+    })
+  }
+
+  /*
+    **1024 미만에서는 레일이 없다.** 그때는 칩(`#457`)이 같은 일을 하고, 랜드마크도
+    건너뛰기 링크도 있을 이유가 없다 — 있으면 포커스가 보이지 않는 곳으로 간다.
+  */
+  test('tablet 에서는 레일도 건너뛰기 링크도 포커스를 받지 않는다', async ({ page }) => {
+    await page.setViewportSize(VIEWPORTS.tablet)
+    await page.goto('/places?view=list')
+
+    await expect(page.getByRole('complementary')).toBeHidden()
+    await expect(page.getByRole('link', { name: messages.common.skipToList })).toBeHidden()
+  })
+})
+
 /**
  * **모바일 필터 칩도 카드 글줄과 같은 축이다** — 이슈 #457.
  *

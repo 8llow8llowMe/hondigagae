@@ -56,4 +56,6 @@ export const commonMessages = {
    * `{name}` 치환.
    */
   feelsLikeProvider: '출처 {name}',
+  /** 필터 레일을 건너뛰고 목록으로 (#472) */
+  skipToList: '목록으로 건너뛰기',
 } as const

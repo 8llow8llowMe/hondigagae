@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 
+import { SkipLink } from '@/components/skip-link'
 import { Canvas } from '@/components/surface'
 import { PlaceFilterRail } from '@/features/place/place-filter-rail'
 import { placeKeys } from '@/features/place/queries'
@@ -136,10 +137,29 @@ export default async function PlanAddPlacePage({
       뷰의 `SurfaceStack` 이 그대로 두 번째 열이 된다.
     */
     <Canvas as="main" id="main-content" className="rail-layout rail-layout-filter">
-      {/* 목록 화면과 같은 2단이다. 태블릿은 한 컬럼 — 280 레일을 더하면 768 을 넘는다 */}
-      <div className="rail-sticky hidden lg:block">
+      {/*
+        목록 화면과 같은 2단이다. 태블릿은 한 컬럼 — 280 레일을 더하면 768 을 넘는다.
+
+        **`aside` 다 — `complementary` 랜드마크** (#472). 레일은 목록을 좁히는 도구이고
+        본문이 아니다. 랜드마크로 내보내야 보조기기가 통째로 건너뛸 수 있다.
+
+        **건너뛰기 링크를 레일 맨 앞에 둔다.** 전역 스킵 링크(`#main`)는 레일 **앞**으로
+        보내므로 이 구간을 건너뛰지 못한다 — 키보드 사용자가 목록에 닿으려면 필터
+        컨트롤을 전부 지나야 했다. `relative` 는 그 링크가 레일 좌상단에 뜨게 한다.
+
+        **이 화면만 `h1` 을 레일 앞으로 올리지 못한다.** `/places` · `/plans` 는 페이지
+        제목이 `sr-only` 라 캔버스 맨 앞으로 옮기면 그만이지만, 여기 제목(`1일차에 담을
+        장소`)은 **보이는 페이지 머리**다 (#451 이 L0 위에 둔 것). 위로 옮기면 화면에서도
+        레일 위로 올라간다. 그래서 이 화면의 개요는 `h2 필터` 가 `h1` 보다 먼저인 채로
+        남고, 대신 **랜드마크와 건너뛰기 링크**가 그 구간을 넘게 해 준다 (#472).
+      */}
+      <aside
+        aria-label={messages.place.filterTitle}
+        className="rail-sticky relative hidden lg:block"
+      >
+        <SkipLink href="#plan-add-place-list">{messages.common.skipToList}</SkipLink>
         <PlaceFilterRail filters={filters} authed />
-      </div>
+      </aside>
 
       {/* 모바일 필터 칩은 뷰가 제목과 목록 사이에 넣는다 — 목록 아래로 밀리면 못 쓴다 */}
       <HydrationBoundary state={dehydrate(queryClient)}>

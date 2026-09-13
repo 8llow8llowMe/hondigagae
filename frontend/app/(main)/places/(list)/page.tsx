@@ -1,5 +1,6 @@
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 
+import { SkipLink } from '@/components/skip-link'
 import { Canvas, Surface, SurfaceStack } from '@/components/surface'
 import { ViewToggle } from '@/components/view-toggle'
 import { filterSummaryLine } from '@/features/place/filter-summary-line'
@@ -99,11 +100,34 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
     <Canvas as="main" id="main-content" className="rail-layout rail-layout-filter">
       {/* `rail-sticky`(globals.css) — 레일이 뷰포트보다 길어도 바닥에 닿을 수 있게
           자기 스크롤을 준다. 실측: 1280×900 에서 레일 1067px 이라 실내·야외 축이 잘렸다 */}
-      <div className="rail-sticky hidden lg:block">
-        <PlaceFilterRail filters={filters} authed={authed} />
-      </div>
+      {/*
+        **`h1` 이 문서의 첫 제목이다** (#472). 예전에는 이것이 목록 카드와 같은 열 안에
+        있어, 제목으로 탐색하면 개요가 `h2 필터` → `h3` 셋 → **`h1` 장소 찾기** 순서였다 —
+        이 화면에 처음 온 사람이 "여기가 어디인가" 를 알기 전에 필터 하위 항목 셋을 먼저
+        지났고, 페이지 제목보다 상위처럼 보이는 `h2` 가 그 앞에 있었다.
 
-      <SurfaceStack>
+        **보이는 제목은 여전히 카드의 `h2` 다** (§0). `sr-only` 라 자리를 차지하지 않는다 —
+        `position: absolute` 이므로 grid 트랙도 만들지 않는다 (실측으로 확인).
+      */}
+      <h1 className="sr-only">{messages.place.pageTitle}</h1>
+
+      {/*
+        **`aside` 다 — `complementary` 랜드마크** (#472). 레일은 목록을 좁히는 도구이고
+        본문이 아니다. 랜드마크로 내보내야 보조기기가 통째로 건너뛸 수 있다.
+
+        **건너뛰기 링크를 레일 맨 앞에 둔다.** 전역 스킵 링크(`#main`)는 레일 **앞**으로
+        보내므로 이 구간을 건너뛰지 못한다 — 키보드 사용자가 목록에 닿으려면 필터
+        컨트롤을 전부 지나야 했다. `relative` 는 그 링크가 레일 좌상단에 뜨게 한다.
+      */}
+      <aside
+        aria-label={messages.place.filterTitle}
+        className="rail-sticky relative hidden lg:block"
+      >
+        <SkipLink href="#place-list">{messages.common.skipToList}</SkipLink>
+        <PlaceFilterRail filters={filters} authed={authed} />
+      </aside>
+
+      <SurfaceStack id="place-list" tabIndex={-1}>
         {/*
           **필터는 카드 밖이다.** 칩은 목록을 좁히는 **도구**이고 카드는 그 결과를 담는다 —
           §0 의 카드 판정 3문에서 "혼자 떼어놔도 말이 되는가" 에 걸린다(필터만 있는 화면은
@@ -127,8 +151,6 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
           방식이고, 추측으로 만든 API 를 아무 화면도 검증하지 않는 것이 #422 에서
           프리미티브 넷을 걷은 이유다. 필요해지는 화면이 나오면 그때 만든다.
         */}
-        <h1 className="sr-only">{messages.place.pageTitle}</h1>
-
         <Surface
           lead
           titleId="place-list-heading"

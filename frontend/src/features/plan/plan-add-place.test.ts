@@ -331,7 +331,12 @@ describe('담기 목록이 3층 표면 위에 선다 (#451)', () => {
 
   it('껍데기가 SurfaceStack 과 Surface 를 쓴다 — 2a 프리미티브를 쓰지 않는다', () => {
     expect(source).toContain("import { Surface, SurfaceStack } from '@/components/surface'")
-    expect(source).toContain('<SurfaceStack>')
+    /*
+      **`id` 와 `tabIndex` 가 붙는다** (#472). 레일의 `목록으로 건너뛰기` 가 여기로 온다.
+      `tabIndex={-1}` 은 Chromium 에서는 없어도 동작해 e2e 가 구별하지 못하지만(뮤테이션으로
+      확인), 보조기기 조합을 위한 처방이라 **여기서 문자열로 잠근다.**
+    */
+    expect(source).toContain('<SurfaceStack id="plan-add-place-list" tabIndex={-1}>')
     expect(source).toContain('<Surface aria-label=')
   })
 
