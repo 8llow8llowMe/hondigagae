@@ -151,9 +151,15 @@ test.describe('카드 안 상태 제목 — #456①', () => {
     await expect(stateHeading).toHaveCount(1)
     await expect(stateHeading).toBeVisible()
 
-    // 형제 h2 가 둘이 되는 것이 이 이슈의 증상이었다 — 카드 안에 h2 는 하나뿐이어야 한다
+    /*
+      **형제 `h2` 가 둘이 되는 것이 이 이슈의 증상이었다.** 카드 안 `h2` 하나는 위에서
+      이미 봤으니, 여기서는 **페이지 전체**로 넓혀 본다 — 카드 밖 어딘가가 같은 자리에
+      `h2` 를 하나 더 그려도 잡히게. `/places` 는 필터 레일이 `h2` 를 갖는 화면이라
+      개수가 아니라 **카드 안쪽 것이 하나뿐인지**가 기준이다.
+    */
     const outline = await headingOutline(page)
     expect(outline.filter((entry) => entry.startsWith('H1:'))).toHaveLength(1)
+    expect(await card.getByRole('heading', { level: 2 }).count()).toBe(1)
   })
 })
 

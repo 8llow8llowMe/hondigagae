@@ -10,9 +10,11 @@
  *
  * ### 여기서 잠그는 결정 셋
  *
- * 1. **레벨을 내리는 기준은 "카드 안인가" 가 아니라 "그 카드가 `h2` 를 갖는가" 다.**
- *    `aria-label` 만 있는 카드(담기 화면 · AI 작업 상태 · 반려견 수정)는 위에 `h2` 가 없어
+ * 1. **레벨을 내리는 기준은 "카드 안인가" 가 아니라 "바로 위에 `h2` 가 있는가" 다.**
+ *    `aria-label` 만 있는 카드(AI 작업 상태 · 반려견 수정 · 담기 목록)는 위에 `h2` 가 없어
  *    `h2` 가 맞다 — 거기서 내리면 `h1` 과 사이가 비어 레벨을 건너뛴다.
+ *    **카드만이 아니다**: `title` 을 넘긴 `BottomSheet` 도 `h2` 를 그리고, 그 제목은
+ *    `text-body-1 font-semibold` 로 상태 제목과 **클래스까지 같다**. 시트 여섯 곳도 `3` 이다.
  * 2. **`inset` 에서 유도하지 않는다.** 두 축은 이미 갈려 있다 — 카드 안인데 `inset` 을 안 준
  *    자리가 열 곳이고(#485), 반대로 카드 밖인데 카드 글줄에 맞추려 `inset="card"` 를 쓰는
  *    자리도 있다(`ai-plan-job-view` 의 담기 패널). 한쪽에서 다른 쪽을 읽으면 그 열 곳이
@@ -40,6 +42,18 @@
  * 주석이 그 안에 들어올 수 있다 — 실제로 `place-list-view` · `plan-add-place-view` ·
  * `place-map-view` 셋이 태그 안에 `/* … *&#47;` 로 근거를 적고 있다. 누가 거기에
  * `headingLevel={3}` 을 인용하면 걷지 않는 한 그 태그가 통과한다.
+ *
+ * ### 이 파일이 못 보는 것 — 한계를 적어 둔다
+ *
+ * `drawsHeading()` 은 **파일에 제목 있는 면이 하나라도 있는가**만 본다. 한 파일에 면이
+ * 여럿이면 **그 상태가 그중 어느 면 안인지 구별하지 못한다.** 반례가 실재한다:
+ * `pet-edit-view.tsx` 는 `aria-label` 만 있는 카드 셋(로딩 갈래)과 제목 있는 카드 둘을
+ * 함께 갖는다 — 폼이 `aria-label` 쪽으로 옮겨가도 이 단언은 그대로 통과한다.
+ *
+ * **트리를 파싱하지 않는 대가다.** 대신 진짜 구조는 e2e 가 본다 —
+ * `e2e/surface.spec.ts` 의 `카드 안 상태 제목` 이 실제 브라우저에서 카드 `h2` 아래
+ * 상태가 `h3` 로 서는지 확인한다. 여기서는 **"값이 호출처에 적혀 있는가" 와 "짝의
+ * 반대쪽이 제목을 갖는가"** 둘만 잠근다.
  */
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -81,10 +95,10 @@ function code(relative: string): string {
  *
  * 그래서 중괄호 깊이를 세며 **깊이 0 의 `>`** 까지 걷는다. 문자열 안의 괄호는 세지 않는다.
  */
-function stateTags(source: string): string[] {
+function openingTags(source: string, pattern: RegExp): string[] {
   const tags: string[] = []
 
-  for (const start of [...source.matchAll(/<(?:Empty|Error)State\b/g)].map((m) => m.index)) {
+  for (const start of [...source.matchAll(pattern)].map((m) => m.index)) {
     let depth = 0
     let quote: string | null = null
 
@@ -109,6 +123,23 @@ function stateTags(source: string): string[] {
   }
 
   return tags
+}
+
+function stateTags(source: string): string[] {
+  return openingTags(source, /<(?:Empty|Error)State\b/g)
+}
+
+/**
+ * **제목을 그리는 면이 있는가** — 제목 있는 `Surface`(L1) 또는 `title` 을 넘긴
+ * `BottomSheet`. 둘 다 `h2` 를 그리고, 시트 제목은 `text-body-1 font-semibold` 로
+ * `EmptyState` 제목과 **클래스까지 같다**.
+ *
+ * 여기도 정규식(`/<Surface\b[^>]*\btitle=/`)을 쓰지 않는다 — `[^>]*` 라 `title` 앞에
+ * `>` 를 품은 prop(`description={<>…</>}` 같은)이 오면 못 찾아 **prop 순서가 계약이 된다.**
+ * 태그를 정확히 집어 그 안에서 찾는다.
+ */
+function drawsHeading(source: string): boolean {
+  return openingTags(source, /<(?:Surface|BottomSheet)\b/g).some((tag) => /\btitle=/.test(tag))
 }
 
 describe('EmptyState · ErrorState — 제목 레벨 prop', () => {
@@ -165,8 +196,8 @@ describe('제목 있는 카드를 스스로 그리는 화면', () => {
   it.each(OWNS_ITS_CARD)('$path — 카드가 h2 를 그리므로 상태는 전부 h3 다', ({ path, states }) => {
     const source = code(path)
 
-    // 짝의 한쪽 — 이 파일이 제목 있는 카드를 그린다는 사실
-    expect(source).toMatch(/<Surface\b[^>]*\btitle=/)
+    // 짝의 한쪽 — 이 파일이 제목 있는 면을 그린다는 사실
+    expect(drawsHeading(source)).toBe(true)
 
     const tags = stateTags(source)
     expect(tags).toHaveLength(states)
@@ -184,12 +215,19 @@ const CARD_IN_PARENT = [
   {
     path: 'src/features/plan/plan-list-section.tsx',
     states: 4,
-    card: { path: 'src/features/plan/plan-list-view.tsx', titleId: 'plan-list-heading' },
+    cards: [{ path: 'src/features/plan/plan-list-view.tsx', probe: 'plan-list-heading' }],
   },
   {
     path: 'src/features/pet/pet-form.tsx',
     states: 1,
-    card: { path: 'src/features/pet/pet-edit-view.tsx', title: 'messages.pet.editFormTitle' },
+    /*
+      **호출부 둘을 모두 잠근다.** `pet-form.tsx` 주석이 "등록·수정 **둘 다** 제목 있는 카드
+      안" 을 근거로 대는데 한쪽만 보면 `pet-create-view` 가 제목을 잃어도 아무것도 안 깨진다.
+    */
+    cards: [
+      { path: 'src/features/pet/pet-edit-view.tsx', probe: 'messages.pet.editFormTitle' },
+      { path: 'src/features/pet/pet-create-view.tsx', probe: 'pet-create-heading' },
+    ],
   },
 ] as const
 
@@ -203,13 +241,11 @@ describe('카드를 호출처가 그리는 화면', () => {
       expect(tag).toContain('headingLevel={3}')
     }
 
-    // 짝의 반대쪽 — 그 카드가 실제로 제목을 갖는다
-    const card = code(entry.card.path)
-    expect(card).toMatch(/<Surface\b[^>]*\btitle=/)
-    if ('titleId' in entry.card) {
-      expect(card).toContain(entry.card.titleId)
-    } else {
-      expect(card).toContain(entry.card.title)
+    // 짝의 반대쪽 — 그 카드들이 실제로 제목을 갖는다
+    for (const card of entry.cards) {
+      const cardSource = code(card.path)
+      expect(drawsHeading(cardSource)).toBe(true)
+      expect(cardSource).toContain(card.probe)
     }
   })
 })
@@ -258,6 +294,39 @@ describe('부모에 따라 갈리는 둘 — 담는 곳이 정한다', () => {
     // `aria-label` 만 있는 카드 · 카드 없음 — 넘기지 않아 기본값 2 로 남는다
     expect(code('src/features/plan/plan-add-place-view.tsx')).not.toContain('headingLevel')
     expect(code('src/features/place/place-map-view.tsx')).not.toContain('headingLevel')
+  })
+})
+
+/**
+ * **`BottomSheet` 안 여섯** — 카드가 아니지만 같은 증상이다.
+ *
+ * `bottom-sheet.tsx` 가 `title` 을 `h2` 로 그리고 그 클래스가 `text-body-1 font-semibold` 라
+ * 상태 제목과 **완전히 같다.** 시트가 `role="dialog" aria-modal="true"` 라 개요 손상 범위는
+ * 카드보다 좁지만, 규칙을 면 종류별로 갈라 둘 이유가 없어 같이 내린다.
+ */
+const SHEETS = [
+  { path: 'src/features/plan/place-add-to-plan-sheet.tsx', states: 4 },
+  { path: 'src/features/ai-plan/ai-plan-place-picker-sheet.tsx', states: 2 },
+] as const
+
+describe('BottomSheet 안 상태 — 시트 제목도 h2 다', () => {
+  it.each(SHEETS)('$path — 상태는 전부 h3 다', ({ path, states }) => {
+    const source = code(path)
+
+    // 짝의 한쪽 — 이 시트가 `title` 을 넘겨 `h2` 를 그린다
+    expect(drawsHeading(source)).toBe(true)
+
+    const tags = stateTags(source)
+    expect(tags).toHaveLength(states)
+    for (const tag of tags) {
+      expect(tag).toContain('headingLevel={3}')
+    }
+  })
+
+  it('BottomSheet 이 제목을 h2 로, 상태와 같은 클래스로 그린다 — 이 짝이 전제다', () => {
+    const sheet = code('src/components/bottom-sheet.tsx')
+
+    expect(sheet).toContain('<h2 className="text-body-1 text-fg font-semibold">{title}</h2>')
   })
 })
 

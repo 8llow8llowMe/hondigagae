@@ -129,6 +129,7 @@ function PickerBody({
         ) : errorStatus !== null ? (
           <ErrorState
             inset="panel"
+            headingLevel={3}
             title={messages.aiPlan.pickerLoadFailedTitle}
             description={messages.favorite.loadFailedDescription}
             onRetry={() => void query.refetch()}
@@ -136,6 +137,7 @@ function PickerBody({
         ) : places.length === 0 ? (
           <EmptyState
             inset="panel"
+            headingLevel={3}
             title={messages.aiPlan.pickerEmptyTitle}
             description={messages.aiPlan.pickerEmptyDescription}
           />

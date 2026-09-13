@@ -218,6 +218,10 @@ function EmptyResult({
     지도 SDK 실패 폴백(카드 없음)에서 `h1` → `h3` 로 레벨을 건너뛰었다 — 그 갈래에는
     사이를 메울 `h2` 가 없다. 위의 `EmptyState` 갈래와 **같은 값**이어야 한다:
     둘은 같은 자리에 배타적으로 서는 같은 상태다.
+
+    **타입 스케일은 다르다** — 이쪽이 `text-title-2`, `EmptyState` 가 `text-body-1` 이다.
+    이번에 맞춘 것은 문서 개요(레벨)뿐이고 크기는 손대지 않았다. 둘을 같은 크기로 볼지는
+    별개 판단이라 여기서 섞지 않는다.
   */
   const NarrowedHeading = `h${headingLevel}` as const
 
