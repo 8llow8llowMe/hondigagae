@@ -96,6 +96,57 @@ describe('RadioGroup', () => {
     expect(markup).toContain('소형견')
     expect(markup).not.toContain('text-caption')
   })
+
+  /*
+    **#538 실측 결함의 회귀 방지.** 폼의 첫 오류 필드 포커스는
+    `querySelector('#' + field)?.focus()` 한 줄이라(`pet-form.tsx`), 이 둘 중 하나만 빠져도
+    **크기·활동량·사회성이 첫 오류일 때 포커스도 스크롤도 조용히 실패한다.**
+
+    두 단언을 한 테스트에 묶는 이유는 둘이 하나의 계약이기 때문이다 — `id` 만 있으면
+    조회는 되는데 `<fieldset>` 이 포커스 대상이 아니라 `focus()` 가 무시되고, `tabIndex`
+    만 있으면 조회가 `null` 을 돌려준다. 한쪽만 지키는 상태를 통과시키면 안 된다.
+  */
+  it('fieldset 이 id 와 tabIndex 를 함께 갖는다 — 첫 오류 필드 포커스가 닿는 조건 (#538)', () => {
+    const markup = radio()
+
+    expect(markup).toContain('<fieldset id="sizeType"')
+    expect(markup).toContain('tabindex="-1"')
+  })
+
+  it('선택지 id 는 그룹 id 와 갈린다 — fieldset 의 id 와 부딪히면 조회가 엉뚱한 것을 잡는다', () => {
+    const markup = radio()
+
+    // `sizeType` 은 fieldset 이 하나만 갖고, 선택지는 전부 `sizeType-<code>` 다
+    expect(markup.match(/id="sizeType"/g)).toHaveLength(1)
+  })
+
+  describe('columns={3} — 3지선다 선택 카드 (#538)', () => {
+    it('선택지를 3칸 그리드로 세운다', () => {
+      expect(radio({ columns: 3 })).toContain('grid-cols-3')
+    })
+
+    it('기본값은 세로 목록이다 — 3지선다가 아닌 그룹까지 바뀌지 않는다', () => {
+      expect(radio()).not.toContain('grid-cols-3')
+    })
+
+    /* 3칸에서도 `description` 은 남는다 — 선택의 근거라 줄일 수 없는 값이다 */
+    it('3칸에서도 description 을 그대로 노출한다', () => {
+      const markup = radio({ columns: 3 })
+
+      expect(markup).toContain('체중 10kg 미만')
+      expect(markup).toContain('체중 25kg 이상')
+    })
+
+    /* 배선이 두 벌이 되면 한쪽만 고친 채로 남는다 — 입력은 한 번만 그린다 */
+    it('3칸에서도 name · checked · 오류 배선이 세로 목록과 같다', () => {
+      const markup = radio({ columns: 3, value: 'LARGE', error: '크기 구분은 필수입니다.' })
+
+      expect(markup.match(/name="sizeType"/g)).toHaveLength(3)
+      expect(markup.match(/checked=""/g)).toHaveLength(1)
+      expect(markup).toContain('id="sizeType-LARGE"')
+      expect(markup).toContain(`aria-describedby="${fieldErrorId('sizeType')}"`)
+    })
+  })
 })
 
 function checkbox(props: Record<string, unknown> = {}) {

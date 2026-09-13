@@ -101,12 +101,20 @@ describe('만들기 폼 — 화면', () => {
     expect(html).not.toContain('type="number"')
   })
 
-  it('라디오 그룹의 오류는 name 으로 찾는다 — fieldset 에는 id 가 없다', () => {
-    // RadioGroup 은 `${id}-${value}` 를 개별 라디오에 붙이므로 `#petId` 는 없다.
-    // 포커스 이동 effect 가 `[name="petId"]` 를 함께 보는 근거다
+  it('라디오 그룹이 그룹 이름을 id 와 name 둘 다로 노출한다 — 포커스 이동이 닿는 조건', () => {
+    /*
+      **#538 에서 `RadioGroup` 이 `<fieldset>` 에 `id` 와 `tabIndex={-1}` 을 갖게 됐다.**
+      예전에는 `${id}-${value}` 가 개별 라디오에만 붙어 `#petId` 에 해당하는 요소가 없었고,
+      그래서 포커스 effect 가 `[name]` 을 함께 보는 우회로 열려 있었다.
+
+      우회는 그대로 둔다 — 선택자가 `[id], [name]` 둘 다라 이제 문서 순서상 앞인
+      `<fieldset>` 을 잡는다. **그쪽이 더 낫다**: `aria-describedby` 가 fieldset 에 걸려
+      있어(`radio-group.tsx`) 포커스가 오는 순간 오류 문구가 함께 읽힌다. 개별 라디오에는
+      그 배선이 없다.
+    */
     const html = render()
     expect(html).toContain('name="petId"')
-    expect(html).not.toContain('id="petId"')
+    expect(html).toContain('<fieldset id="petId"')
   })
 
   it('폼 전체 오류는 role="alert" 로 알린다', () => {

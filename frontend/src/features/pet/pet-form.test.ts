@@ -171,6 +171,100 @@ describe('PetFormFields — 오류 표시', () => {
   })
 })
 
+/*
+  **#538.** 아홉 필드가 375 에서 네 화면이라, 틀린 필드가 접힘 아래면 빨간 글자가 화면에
+  없어 무엇이 잘못됐는지 알 수 없었다.
+
+  **토스트가 아니라 `FormAlert` 다.** `styling-guide.md` §3-2 — "오류를 토스트로 말하지
+  않는다. 오류는 섹션 안에 남아야 다시 시도할 수 있다." 요약이 사라지면 스크롤해 내려간
+  뒤 남은 개수를 다시 볼 길이 없다.
+*/
+describe('PetFormFields — 제출 실패 요약 (#538)', () => {
+  function summary(count: number) {
+    return messages.pet.submitInvalidSummary.replace('{count}', String(count))
+  }
+
+  it('필드 오류 개수를 role="alert" 로 요약한다', () => {
+    const markup = render({
+      errors: {
+        fields: { name: messages.pet.nameRequired, birthYm: messages.pet.birthYmFormat },
+        form: null,
+      },
+    })
+
+    expect(markup).toContain('role="alert"')
+    expect(markup).toContain(summary(2))
+  })
+
+  it('오류가 없으면 요약을 렌더하지 않는다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain('role="alert"')
+    expect(markup).not.toContain('확인이 필요한 항목')
+  })
+
+  /* 서버 문장이 개수보다 구체적이다 — 같은 자리에 둘을 겹쳐 쌓지 않는다 */
+  it('서버가 준 폼 전체 오류가 요약을 이긴다', () => {
+    const markup = render({
+      errors: {
+        fields: { sizeType: messages.pet.weightSizeMismatch },
+        form: messages.pet.limitReached,
+      },
+    })
+
+    expect(markup).toContain(messages.pet.limitReached)
+    expect(markup).not.toContain(summary(1))
+  })
+
+  /* 필드 문구와 포커스는 그대로 남는다 — 요약이 그것을 대체하지 않는다 */
+  it('요약이 필드별 오류 문구를 대체하지 않는다', () => {
+    const markup = render({ errors: { fields: { name: messages.pet.nameRequired }, form: null } })
+
+    expect(markup).toContain(summary(1))
+    expect(markup).toContain(messages.pet.nameRequired)
+    expect(markup).toContain(`id="${fieldErrorId('name')}"`)
+  })
+
+  /*
+    **"입력하지 않은" 이라고 쓰지 않는다.** 크기·활동량·사회성은 초기값이 이미 있어
+    (`EMPTY_PET_FORM_VALUES`) 미입력으로 실패하지 않는다 — 실제로 걸리는 것은 생년월
+    형식·체중 범위·체중↔크기 모순처럼 **채웠는데 어긋난** 값이다.
+  */
+  it('미입력이라고 단정하지 않는다 — 채웠는데 어긋난 값이 더 흔하다', () => {
+    const markup = render({
+      errors: { fields: { sizeType: messages.pet.weightSizeMismatch }, form: null },
+    })
+
+    expect(markup).not.toContain('입력하지 않은')
+    expect(markup).toContain(summary(1))
+  })
+})
+
+describe('PetFormFields — 3칸 선택 카드와 하단 바 (#538)', () => {
+  /* 셋 다 3지선다다. 한 줄에 서야 필수 넷이 한 화면 안으로 들어온다 */
+  it('크기 · 활동량 · 사회성이 3칸 그리드다', () => {
+    expect(render().match(/grid-cols-3/g)).toHaveLength(3)
+  })
+
+  /*
+    **`sticky` 라 자리를 스스로 차지한다** — 본문 끝에 바 높이만큼 여백을 따로 두지 않아도
+    마지막 줄이 가려지지 않는다 (`fixed` 였다면 필요했다).
+
+    **오프셋이 폭마다 갈린다** — 비켜야 할 모바일 탭바가 `md:hidden` 이라 768 부터 사라진다.
+    `bottom-16` 만 두면 그 폭에서 바가 바닥에서 64px 떠 아래로 본문이 비친다.
+  */
+  it('제출 버튼이 탭바를 비켜 선 sticky 바 안에 있다', () => {
+    const markup = render()
+    const bar = markup.slice(markup.lastIndexOf('<div class='))
+
+    expect(bar).toContain('sticky')
+    expect(bar).toContain('bottom-16')
+    expect(bar).toContain('md:bottom-0')
+    expect(bar).toContain('type="submit"')
+    expect(bar).toContain(messages.pet.register)
+  })
+})
+
 describe('PetFormFields — 수정 초기값', () => {
   const pet: Pet = {
     petId: '123456789012000001',
