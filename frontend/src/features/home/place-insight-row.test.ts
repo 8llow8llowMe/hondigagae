@@ -223,6 +223,17 @@ describe('PlaceInsightRow — 접힘', () => {
 describe('PlaceInsightRow — 컨테이너 쿼리로 접는 행 (#530)', () => {
   const markup = render({ ...suitability, reasons: REASONS_WITHOUT_CONGESTION })
 
+  /** 접힌 행. 혼잡도가 실제로 온 날이라야 "혼잡도만 남는다" 를 볼 수 있다 */
+  function collapsedNarrow() {
+    return renderToStaticMarkup(
+      createElement(PlaceInsightRow, {
+        data: { ...suitability, congestion: CROWDED, reasons: REASONS_WITHOUT_CONGESTION },
+        place: placeSummary,
+        collapsed: true,
+      }),
+    )
+  }
+
   it('행이 자기 폭을 재는 컨테이너가 된다', () => {
     expect(markup).toContain('@container')
   })
@@ -262,18 +273,45 @@ describe('PlaceInsightRow — 컨테이너 쿼리로 접는 행 (#530)', () => {
     expect(markup.indexOf(suitability.placeTitle)).toBeLessThan(markup.indexOf('order-first'))
   })
 
-  /* 접힌 행은 태그를 달지 않는다 — 두 모양 다 같은 규칙이다 (예전에는 모바일만 예외였다) */
-  it('접힌 행은 좁은 행에서도 태그를 달지 않는다', () => {
-    const collapsed = renderToStaticMarkup(
+  /*
+    **접힌 행은 속성 태그를 달지 않는다** — 동반 가능 여부 · 실내/야외는 안 바뀌는 값이라
+    상세에서 읽으면 되고, 세 행에 같은 무게로 서면 위계가 안 읽힌다.
+  */
+  it('접힌 행은 좁은 행에서도 속성 태그를 달지 않는다', () => {
+    /*
+      **태그 줄만 떼어내 본다.** `실내` 는 바로 위 메타 줄(`제주시 한림읍 · 실내`)에도
+      있어서 마크업 전체에 `not.toContain` 을 걸면 속성 태그가 아니라 메타를 잡는다.
+    */
+    const tags = /order-first[^"]*">(.*?)<\/div>/.exec(collapsedNarrow())?.[1] ?? ''
+
+    expect(tags).not.toContain(placeSummary.petAllowanceType.name)
+    expect(tags).not.toContain(messages.home.indoor)
+    expect(tags).toContain(CROWDED.level.name)
+  })
+
+  /*
+    **혼잡도는 접지 않는다.** 섹션 부제가 "날씨·혼잡도 반영" 이라고 말하는 값이라
+    2·3등에서 지우면 그 문장이 화면에서 근거를 잃는다 — `CongestionBadge` 가 생긴 이유다.
+  */
+  it('접힌 행에도 혼잡도 배지는 남는다', () => {
+    const markup = collapsedNarrow()
+
+    expect(markup).toContain(CROWDED.level.name)
+    // 태그 줄 자체는 서므로 제목 위 자리도 그대로다
+    expect(markup).toContain('order-first')
+  })
+
+  /* 그릴 것이 혼잡도뿐인데 그마저 없으면 태그 줄을 만들지 않는다 */
+  it('접힌 행에 혼잡도가 없으면 태그 줄을 만들지 않는다', () => {
+    const markup = renderToStaticMarkup(
       createElement(PlaceInsightRow, {
-        data: { ...suitability, reasons: REASONS_WITHOUT_CONGESTION },
+        data: { ...suitability, congestion: null, reasons: REASONS_WITHOUT_CONGESTION },
         place: placeSummary,
         collapsed: true,
       }),
     )
 
-    expect(collapsed).not.toContain('order-first')
-    expect(collapsed).not.toContain(placeSummary.petAllowanceType.name)
+    expect(markup).not.toContain('order-first')
   })
 })
 

@@ -72,7 +72,11 @@ export function PlaceInsightRow({
    * **이제 모든 폭에서 접힌다** (#530). 예전에는 접는 것(근거 · 속성 태그)이 전부 `md:`
    * 전용이라 모바일 출력이 접기 전과 같았고, **같은 행이 폭에 따라 접힘을 지키기도
    * 무시하기도 했다.** 태그가 접은 모양에서도 제목 위에 자리를 갖게 되면서 그 예외가
-   * 사라졌다 — 1등만 태그를 단다.
+   * 사라졌다.
+   *
+   * **접는 것은 안 바뀌는 값이다** — 근거 문장과 속성 태그(동반 가능 여부 · 실내/야외).
+   * **혼잡도는 접지 않는다**: 오늘의 판정이고 섹션 부제가 이미 말한 값이라, 2·3등에서
+   * 지우면 그 문장이 화면에서 근거를 잃는다.
    *
    * **썸네일 축소는 `md:` 에 남는다.** 390px 에서 96 → 48 까지 줄이면 목록을 알아보는
    * 유일한 단서를 가장 좁은 화면에서 뺏는 것이 된다.
@@ -162,17 +166,27 @@ export function PlaceInsightRow({
             접은 모양의 태그 — **제목 위**(`order-first`). DOM 은 제목 → 메타 → 태그 그대로라
             스크린리더는 이름을 먼저 읽는다 (`place-row.tsx` 와 같은 규약).
 
-            **접힌 행에는 두지 않는다** — 아래 고정 열과 같은 규칙이다. 예전에는 이 규칙이
-            `md:` 뒤에 있어 **모바일에서만 무효**였고, 그 결과 같은 행이 폭에 따라 접힘을
-            지키기도 무시하기도 했다.
+            **접힌 행은 혼잡도만 남긴다** (`attributes={false}`). 접는 것은 **안 바뀌는
+            값**(동반 가능 여부 · 실내/야외)이다 — 그건 장소를 고른 뒤 상세에서 읽으면 되고,
+            세 행에 같은 무게로 서면 위계가 안 읽힌다. 혼잡도는 다르다: **오늘의 판정**이고
+            섹션 부제가 "날씨·혼잡도 반영" 이라고 이미 말한 값이라, 2·3등에서 지우면 그
+            문장이 화면에서 근거를 잃는다 (`CongestionBadge` 머리주석 — 이 배지가 생긴
+            이유가 그것이다).
+
+            **아래 고정 열은 접힌 행에 아예 없다.** 그쪽은 144px 짜리 열이라 남기면 접기
+            전후 폭이 같아지지만, 여기는 배지 하나가 태그 줄에 붙을 뿐이다.
+
+            실측(접힌 행 / 1등 행): 375 는 **110 / 110** 으로 80px 썸네일이 양쪽 높이를 잡아
+            차이가 없고, 768 은 **110 / 176**, 1024 는 **110 / 220** 이다. 접기 전 76 에서
+            34 늘었지만 1등과의 간격이 66~110 이라 위계는 크기가 그대로 만든다. 1280 이상
+            (3단)은 이 줄이 `@2xl:hidden` 이라 **88 그대로**다.
           */}
-          {!collapsed && (
-            <RowTags
-              place={place}
-              congestion={data.congestion}
-              className="order-first mb-1.5 @2xl:hidden"
-            />
-          )}
+          <RowTags
+            place={place}
+            congestion={data.congestion}
+            attributes={!collapsed}
+            className="order-first mb-1.5 @2xl:hidden"
+          />
         </div>
 
         {/*
@@ -235,8 +249,8 @@ export function PlaceInsightRow({
 }
 
 /**
- * 행 태그 — 동반 가능 여부 · 실내/야외 · 혼잡도. **접은 모양과 넓은 모양이 같은 것을
- * 그린다** — 자리만 `className` 으로 갈린다.
+ * 행 태그 — 동반 가능 여부 · 실내/야외 · 혼잡도. 자리는 `className` 이 정하고,
+ * **무엇까지 그릴지는 `attributes` 가 정한다.**
  *
  * **`petAllowanceType.code === 'UNKNOWN'` 이면 그리지 않는다** (#530). 서버 `name` 이
  * `정보 없음` 이라, 그대로 두면 `야외` · `혼잡도 정보 없음` 옆에 **무엇의 정보가 없다는
@@ -257,18 +271,24 @@ export function PlaceInsightRow({
 function RowTags({
   place,
   congestion,
+  attributes = true,
   className,
 }: {
   place: PlaceSummary | undefined
   congestion: CongestionItem | null
+  /**
+   * 속성 태그(동반 가능 여부 · 실내/야외)를 함께 그릴지. **접힌 행은 `false` 다** —
+   * 안 바뀌는 값은 접고 오늘의 판정(혼잡도)만 남긴다.
+   */
+  attributes?: boolean
   className?: string
 }) {
   const allowance =
-    place !== undefined && place.petAllowanceType.code !== UNKNOWN_CODE
+    attributes && place !== undefined && place.petAllowanceType.code !== UNKNOWN_CODE
       ? place.petAllowanceType.name
       : null
   const indoor =
-    place === undefined || place.indoor === null
+    !attributes || place === undefined || place.indoor === null
       ? null
       : place.indoor
         ? messages.home.indoor
