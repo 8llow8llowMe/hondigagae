@@ -32,6 +32,7 @@ describe('toPetCondition', () => {
       noiseSensitive: false,
       activityLevel: 'MEDIUM',
       breed: '말티즈',
+      petSociality: 'HIGH',
     })
     expect(JSON.stringify(condition)).not.toContain('petId')
   })
@@ -58,11 +59,26 @@ describe('toInsightQuery', () => {
       noiseSensitive: false,
       activityLevel: null,
       breed: null,
+      petSociality: null,
     })
 
     expect(query).not.toContain('petSizeType')
     expect(query).not.toContain('activityLevel')
     expect(query).not.toContain('breed')
+    expect(query).not.toContain('petSociality')
+  })
+
+  /*
+    **사회성은 적합도만 읽는다** (#430 · BE #425). 혼잡 `HIGH` 인 날 `LOW` 인 아이의
+    감점이 커지고 근거 문장이 함께 내려온다 — 넘기지 않으면 서버가 그 축을 못 본다.
+
+    dev Swagger 실측(2026-09-13): `petSociality` 를 선언하는 경로는
+    `/places/{placeId}/suitability` 하나뿐이고 enum 은 `LOW` · `MEDIUM` · `HIGH` 다.
+    나머지 셋에도 같이 실려 가지만 Spring 이 모르는 파라미터를 무시한다 — 축마다 다른
+    조립을 두지 않는 이유는 `walkTimesPath` 주석에 있다.
+  */
+  it('사회성을 보낸다 — 적합도가 혼잡 축에서 읽는 값이다', () => {
+    expect(toInsightQuery(toPetCondition(pet))).toContain('petSociality=HIGH')
   })
 
   it('조건이 없으면 빈 문자열이다', () => {
@@ -82,5 +98,10 @@ describe('경로 조립', () => {
 
   it('조건이 있으면 쿼리를 붙인다', () => {
     expect(suitabilityPath('123', toPetCondition(pet))).toContain('/places/123/suitability?')
+  })
+
+  /* 적합도가 실제로 이 값을 달고 나가는지 — 조립 단계만 보면 경로에서 빠져도 모른다 */
+  it('적합도 경로에 사회성이 실린다', () => {
+    expect(suitabilityPath('123', toPetCondition(pet))).toContain('petSociality=HIGH')
   })
 })

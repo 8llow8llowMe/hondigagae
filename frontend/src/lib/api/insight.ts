@@ -21,6 +21,7 @@ export function toPetCondition(pet: Pet | null): PetCondition | null {
     noiseSensitive: pet.noiseSensitive,
     activityLevel: pet.activityLevel.code,
     breed: pet.breed,
+    petSociality: pet.sociality.code,
   }
 }
 
@@ -45,6 +46,7 @@ export function toInsightQuery(
     if (condition.petSizeType !== null) params.set('petSizeType', condition.petSizeType)
     if (condition.activityLevel !== null) params.set('activityLevel', condition.activityLevel)
     if (condition.breed !== null && condition.breed !== '') params.set('breed', condition.breed)
+    if (condition.petSociality !== null) params.set('petSociality', condition.petSociality)
     params.set('heatSensitive', String(condition.heatSensitive))
     params.set('coldSensitive', String(condition.coldSensitive))
     params.set('noiseSensitive', String(condition.noiseSensitive))
@@ -68,8 +70,11 @@ export function walkSafetyPath(placeId: string, condition: PetCondition | null):
  * 그 사실을 화면이 "제주시 기준" 으로 밝힌다. 이 함수는 좌표의 출처를 판단하지 않는다.
  *
  * 반려견 조건 파라미터는 적합도·산책 위험도와 같은 조립을 쓴다. 서버가 받지 않는
- * `noiseSensitive` 가 섞여 가지만 Spring 이 모르는 쿼리 파라미터를 무시하므로 안전하고,
- * 축마다 다른 조립을 두면 조건이 갈릴 때 어느 쪽이 맞는지 알 수 없어진다.
+ * `noiseSensitive` · `petSociality` 가 섞여 가지만 Spring 이 모르는 쿼리 파라미터를
+ * 무시하므로 안전하고, 축마다 다른 조립을 두면 조건이 갈릴 때 어느 쪽이 맞는지 알 수 없어진다.
+ *
+ * **dev Swagger 실측(2026-09-13)으로 확인했다** — `petSociality` 를 선언하는 경로는
+ * `/places/{placeId}/suitability` 하나뿐이고, 골든타임은 `noiseSensitive` 도 받지 않는다.
  */
 export function walkTimesPath(lat: number, lng: number, condition: PetCondition | null): string {
   return paths.insights.walkTimes(toInsightQuery(condition, { lat: String(lat), lng: String(lng) }))
