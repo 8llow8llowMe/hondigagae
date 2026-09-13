@@ -5,6 +5,7 @@ import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 import type { Metadata } from 'next'
 
 import { Canvas } from '@/components/surface'
+import { PlaceDetailInvalidId } from '@/features/place/place-detail-section'
 import { PlaceDetailView } from '@/features/place/place-detail-view'
 import { placeKeys } from '@/features/place/queries'
 import { ApiError } from '@/lib/api/error'
@@ -13,6 +14,7 @@ import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { placeDetailFallbackTitle } from '@/lib/place/detail-title'
+import { isPlaceId } from '@/lib/place/place-id'
 import { toPlainText } from '@/lib/place/text'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import type { PlaceDetail } from '@/types/place'
@@ -43,6 +45,13 @@ const loadPlaceDetail = cache((placeId: string) =>
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { placeId } = await params
 
+  /*
+    **형식이 틀리면 묻지 않는다** (#496). 컨트롤러가 `@PathVariable long` 이라 답이 400 으로
+    정해져 있다 — 여기서 걸러야 브라우저에 보이지 않는 서버 왕복까지 없어진다.
+    탭 제목은 페이지가 그릴 화면과 같은 말을 한다.
+  */
+  if (!isPlaceId(placeId)) return { title: `${messages.common.validationErrorTitle} · 혼디가개` }
+
   try {
     const place = await loadPlaceDetail(placeId)
 
@@ -58,6 +67,27 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 export default async function PlaceDetailPage({ params }: { params: Params }) {
   const { placeId } = await params
+
+  /*
+    **보내기 전에 가른다** (#496). `/places/abc` 는 상세·적합도·산책 안전 **세 요청이 모두
+    나가 400 이 3건** 났다 — 컨트롤러가 `@PathVariable long` 이라 숫자가 아니면 답이 정해져
+    있는데도 물어본 것이다. 적합도·산책 안전은 **반려견 조건까지 쿼리에 실어** 보내므로,
+    실패가 확정된 요청에 개인 조건이 실려 나가기도 했다.
+
+    **`notFound()` 가 아니다.** 이것은 400(`PLACE_113`)이지 404 가 아니고, 화면 안에서
+    같은 400 을 잡았을 때와 **같은 말을 해야 한다** (#480 의 축). 그래서 경계 파일이 아니라
+    화면과 같은 컴포넌트를 그린다.
+
+    **여기서 끊으면 클라이언트 훅이 아예 마운트되지 않아** 요청이 0건이다. 훅 쪽
+    `enabled` 가드는 다른 진입로를 위한 이중 방어다.
+  */
+  if (!isPlaceId(placeId)) {
+    return (
+      <Canvas as="main" id="main-content">
+        <PlaceDetailInvalidId />
+      </Canvas>
+    )
+  }
 
   // 게스트 블록의 CTA 가 로그인으로 갈지 반려견 등록으로 갈지 가른다.
   // **토큰을 넘기지 않는다** — 판정은 공개 API 이고 로그인 여부만 필요하다

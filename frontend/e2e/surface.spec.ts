@@ -418,3 +418,87 @@ test.describe('카드 안 상태의 세로선 — #485', () => {
     expect(await leftEdge(stateHeading)).toBe(await leftEdge(cardHeading))
   })
 })
+
+/**
+ * **잘못된 `placeId` 에서 요청이 나가지 않는다 — #496.**
+ *
+ * `/places/abc` 는 상세·적합도·산책 안전 **세 요청이 모두 나가 400 이 3건** 났다. 백엔드
+ * 상세 컨트롤러가 `@PathVariable long` 이라 숫자가 아니면 답이 400 으로 정해져 있는데도
+ * 물어본 것이다. 적합도·산책 안전은 **반려견 조건까지 쿼리에 실어** 보내므로, 실패가
+ * 확정된 요청에 개인 조건이 실려 나가기도 했다.
+ *
+ * **vitest 로는 확인할 수 없는 갈래다** — 지키려는 것이 마크업이 아니라 **나간 요청의
+ * 개수**다. 화면은 고치기 전에도 올바른 오류를 그렸으므로 렌더 단언으로는 회귀를 못 잡는다.
+ */
+test.describe('잘못된 placeId — 요청을 보내지 않는다 (#496)', () => {
+  const BAD = '/places/abc'
+  /** 목 저장소의 첫 장소 (`place-data.ts` 의 `ID_BASE`). 18자리 Snowflake 다 */
+  const FIRST_MOCK_PLACE_ID = '212481712381923329'
+
+  test('BFF 로 나가는 요청이 0건이다', async ({ page }) => {
+    const calls: string[] = []
+    page.on('request', (request) => {
+      const { pathname } = new URL(request.url())
+      if (pathname.startsWith('/api/bff/')) calls.push(pathname)
+    })
+
+    await page.goto(BAD)
+    await expect(page.getByRole('main')).toBeVisible()
+    // 클라이언트 훅이 늦게 켜질 여지를 준다 — 마운트 직후 0건인 것만으로는 부족하다
+    await page.waitForTimeout(1000)
+
+    expect(calls).toEqual([])
+  })
+
+  /*
+    **문구를 바꾸는 이슈가 아니다.** 요청만 없애고 화면은 그대로여야 한다 — 서버가 400 을
+    답해 화면 안에서 잡았을 때와 **같은 말을 해야** 하고(#480 의 축), 주소가 잘못된 것이라
+    재시도 버튼을 붙이지 않는다.
+  */
+  test('오류 화면은 그대로다 — 재시도 버튼은 없다', async ({ page }) => {
+    await page.goto(BAD)
+
+    const main = page.getByRole('main')
+    await expect(main).toContainText('요청 조건이 올바르지 않아요')
+    await expect(main).toContainText('주소가 잘못되었거나 삭제된 장소예요')
+    await expect(main.getByRole('link', { name: '장소 목록으로' })).toBeVisible()
+    await expect(main.getByRole('button', { name: '다시 시도' })).toHaveCount(0)
+  })
+
+  test('콘솔에 오류가 찍히지 않는다 — 400 셋이 진짜 오류를 덮었다', async ({ page }) => {
+    const errors: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error') errors.push(message.text())
+    })
+
+    await page.goto(BAD)
+    await expect(page.getByRole('main')).toBeVisible()
+    await page.waitForTimeout(1000)
+
+    expect(errors).toEqual([])
+  })
+
+  /*
+    **가드가 정상 주소까지 막으면 화면이 통째로 빈다.** 목 저장소의 첫 장소 id 를 쓴다
+    (`place-data.ts` 의 `ID_BASE`) — Snowflake 18자리라 **`Number()` 로 바꾸면 정밀도를
+    잃는 길이**이기도 하다. 판정을 문자열 패턴으로 둔 이유가 여기서 함께 지켜진다.
+
+    상세는 서버가 프리페치해 브라우저 요청이 없을 수 있으므로, **적합도·산책 안전이
+    실제로 나가는지**를 본다 — 둘은 클라이언트 전용이라 가드가 잘못 걸리면 사라진다.
+  */
+  test('올바른 id 는 판정 조회가 그대로 나간다', async ({ page }) => {
+    const calls: string[] = []
+    page.on('request', (request) => {
+      const { pathname } = new URL(request.url())
+      if (/^\/api\/bff\/places\/\d+\/(suitability|walk-safety)$/.test(pathname)) {
+        calls.push(pathname)
+      }
+    })
+
+    await page.goto(`/places/${FIRST_MOCK_PLACE_ID}`)
+    await expect(page.getByRole('main')).toBeVisible()
+    await page.waitForTimeout(1000)
+
+    expect(calls.length).toBeGreaterThan(0)
+  })
+})
