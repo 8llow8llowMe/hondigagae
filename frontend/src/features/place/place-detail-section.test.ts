@@ -292,6 +292,43 @@ describe('PlaceDetailSection — 서버 문구를 그대로 쓴다', () => {
   })
 })
 
+/*
+  #530 — 헤더의 동반 배지가 서버 `name` 그대로 `정보 없음` 이라, `중소형견 가능` ·
+  `목줄 필요` 옆에서 **무엇의 정보가 없다는 것인지** 말하지 않는 배지가 됐다.
+  목록 행 · 홈 행과 같은 처리다 (`place-row.tsx` 의 `PlaceBadges` 주석이 근거다).
+*/
+describe('PlaceDetailSection — 동반 정보 없음 (#530)', () => {
+  const unknown: PlaceDetail = {
+    ...placeDetail,
+    petAllowanceType: { code: 'UNKNOWN', name: '동반 정보 없음', description: null },
+  }
+
+  it('UNKNOWN 이면 헤더 배지를 그리지 않는다', () => {
+    expect(render({ place: unknown })).not.toContain('동반 정보 없음')
+  })
+
+  /*
+    **동반 조건을 감추는 것이 아니다.** 아래 `반려견 동반` 섹션이 같은 `allowance` 를
+    받아 문장으로 말한다 (`place-pet-info.tsx`) — 헤더에서 뺀 것은 배지 한 칸뿐이다.
+  */
+  it('동반 섹션은 그대로 남는다', () => {
+    const markup = render({ place: unknown })
+
+    expect(markup).toContain(messages.place.detailSectionPet)
+    expect(markup).toContain(placeDetail.petInfo?.allowedPetSize.name ?? '')
+  })
+
+  /* 문구가 아니라 `code` 로 거른다 — `name` 은 서버 문구라 언제든 바뀐다 */
+  it('같은 문구라도 code 가 다르면 그린다', () => {
+    const sameWording: PlaceDetail = {
+      ...placeDetail,
+      petAllowanceType: { code: 'NOT_ALLOWED', name: '동반 정보 없음', description: null },
+    }
+
+    expect(render({ place: sameWording })).toContain('동반 정보 없음')
+  })
+})
+
 describe('PlaceDetailSection — 외부 원문 처리', () => {
   it('개요의 br 태그를 개행으로 바꿔 평문으로 렌더한다', () => {
     const markup = render()

@@ -151,13 +151,26 @@ export function PlaceRowContent({
  * 동반 가능 여부를 첫 태그로 — 가이드 §5. **등급 색을 쓰지 않는다.** 동반 가능/불가는
  * 적합도 등급이 아니라 장소의 속성이고, 색을 주면 사용자가 그것을 적합도 신호로 읽는다.
  * 구분은 서버 `name` 문구가 맡는다 (DESIGN.md §2-3).
+ *
+ * **`petAllowanceType.code === 'UNKNOWN'` 이면 그 태그를 그리지 않는다** (#530). 서버
+ * `name` 이 `정보 없음` 이라, 그대로 두면 옆의 카테고리 태그와 나란히 서서 **무엇의
+ * 정보가 없다는 것인지 말하지 않는 배지**가 된다 — 읽는 사람은 바로 옆 태그에 걸어 읽는다.
+ *
+ * **낱말을 보태지 않는다.** 실내 여부는 `place-row 실내 정보 없음` 처럼 명세가 문구를
+ * 정해 둬 점선 배지로 남지만(아래), 동반 가능 여부는 그런 문구가 없다 — 여기서 지어내면
+ * FE 가 서버 문구를 다시 쓰는 것이 된다 (api-integration-guide.md §6).
+ *
+ * **`code` 로 거른다.** `name` 은 서버 문구라 언제든 바뀔 수 있고, 문구 비교는 그때
+ * 조용히 어긋난다.
  */
 function PlaceBadges({ place, className }: { place: PlaceSummary; className?: string }) {
   return (
     <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
-      <Badge tone="neutral" size="sm">
-        {place.petAllowanceType.name}
-      </Badge>
+      {place.petAllowanceType.code !== 'UNKNOWN' && (
+        <Badge tone="neutral" size="sm">
+          {place.petAllowanceType.name}
+        </Badge>
+      )}
       <Badge tone="neutral" size="sm">
         {place.contentType.name}
       </Badge>

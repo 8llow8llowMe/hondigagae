@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { PlaceRow } from '@/features/place/place-row'
 import { messages } from '@/lib/messages'
 import { placeSummary } from '@/test/fixtures/place'
+import type { PlaceSummary } from '@/types/place'
 
 function render(place = placeSummary) {
   return renderToStaticMarkup(createElement(PlaceRow, { place }))
@@ -212,5 +213,42 @@ describe('PlaceRow — 좁은 컨테이너에서도 제목이 남는다 (#240)',
     expect(markup.indexOf('제주특별자치도립김창열미술관')).toBeLessThan(
       markup.indexOf('order-first'),
     )
+  })
+})
+
+/*
+  #530 — 동반 정보가 없는 장소가 서버 `name` 그대로 `정보 없음` 배지를 달고 카테고리
+  태그 옆에 섰다. 낱말을 갖고 있는 이웃 때문에 **무엇의 정보가 없다는 것인지** 더
+  안 읽혔다 — 홈 행 · 상세 헤더와 같은 처리다.
+*/
+describe('PlaceRow — 동반 정보 없음 (#530)', () => {
+  const unknown: PlaceSummary = {
+    ...placeSummary,
+    petAllowanceType: { code: 'UNKNOWN', name: '정보 없음', description: null },
+  }
+
+  it('UNKNOWN 이면 동반 배지를 그리지 않는다', () => {
+    expect(render(unknown)).not.toContain('정보 없음')
+  })
+
+  /* 동반 배지만 빠진다 — 카테고리와 실내 미확인 배지는 그대로다 */
+  it('옆 태그는 함께 사라지지 않는다', () => {
+    const markup = render({ ...unknown, indoor: null })
+
+    expect(markup).toContain(placeSummary.contentType.name)
+    expect(markup).toContain(messages.place.rowIndoorUnknown)
+  })
+
+  /*
+    **문구가 아니라 `code` 로 거른다.** `name` 은 서버 문구라 언제든 바뀌고, 문구 비교는
+    그때 조용히 어긋난다 (api-integration-guide.md §6).
+  */
+  it('같은 문구라도 code 가 다르면 그린다', () => {
+    const sameWording: PlaceSummary = {
+      ...placeSummary,
+      petAllowanceType: { code: 'NOT_ALLOWED', name: '정보 없음', description: null },
+    }
+
+    expect(render(sameWording)).toContain('정보 없음')
   })
 })

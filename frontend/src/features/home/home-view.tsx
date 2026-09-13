@@ -39,7 +39,7 @@ import {
   resolveBasisPlaceId,
   splitSharedReasons,
 } from '@/lib/insight/reasons'
-import { readRecentPlaceId } from '@/lib/insight/recent-place'
+import { clearRecentPlaceId, isBasisPlaceGone, readRecentPlaceId } from '@/lib/insight/recent-place'
 import { pickWeatherWarning } from '@/lib/insight/weather-warning'
 import { messages } from '@/lib/messages'
 import { resolveSelectedPet } from '@/lib/nav/selected-pet'
@@ -128,8 +128,30 @@ export function HomeView({
   const selectedPet = resolveSelectedPet(pets, storedPetId ?? null)
   const condition = toPetCondition(selectedPet)
 
-  const basisPlaceId = resolveBasisPlaceId(recentPlaceId, null)
-  const walkSafety = useWalkSafety(basisPlaceId, condition)
+  const storedBasisPlaceId = resolveBasisPlaceId(recentPlaceId, null)
+  const walkSafety = useWalkSafety(storedBasisPlaceId, condition)
+
+  /*
+    **죽은 기준 장소를 스스로 버린다** (#530). `localStorage` 의 id 가 가리키는 장소가
+    서버에서 사라지면 이 조회는 영원히 404 이고, 홈은 `오늘 판정을 불러오지 못했어요` 로
+    굳는다 — 404 에는 재시도 버튼도 없으니(`api-integration-guide.md` §3) 사용자가
+    빠져나갈 길이 화면에 없다.
+
+    **첫 방문자와 같은 상태로 떨어뜨린다.** 기준이 없는 것은 오류가 아니라 아직 기준을
+    고르지 않은 것이고, 그 화면은 이미 있다 (`basisPlaceId === null` → 섹션 미렌더).
+
+    **렌더에서도 같이 끊는다.** effect 만 두면 저장소를 비우기 전 한 프레임 동안
+    `ErrorState` 가 번쩍인다 — 지워질 것이 정해진 오류를 한 번 보여 주는 셈이다.
+  */
+  const basisGone = isBasisPlaceGone(walkSafety.error)
+  const basisPlaceId = basisGone ? null : storedBasisPlaceId
+
+  useEffect(() => {
+    if (!basisGone) return
+
+    clearRecentPlaceId()
+    setRecentPlaceId(null)
+  }, [basisGone])
   /*
     골든타임 좌표 (#180). **`/emergency` 와 같은 `getCurrentPosition()` 을 쓴다** — 거부·
     타임아웃·미지원을 그 함수가 이미 구분해 처리하고, 어느 경우에도 제주 중심 좌표를
@@ -233,8 +255,12 @@ export function HomeView({
     일정이 "다가오는 일정" 으로 뜬다 (`pickUpcomingPlans`).
   */
   /*
-    데스크톱 날짜 줄의 자리를 가른다 (#428). **판정 패널이 실제로 서는 날에만** 그쪽이
-    날짜를 맡는다 — 스켈레톤·오류 상태에는 `체감온도` 줄 자체가 없어 날짜가 사라진다.
+    날짜 줄의 자리를 가른다 (#428 · #530). **판정 패널이 실제로 서는 날에만** 그쪽이
+    날짜를 맡는다 — 스켈레톤·오류 상태에는 판정 줄 자체가 없어 날짜가 사라진다.
+
+    **폭 분기가 없다** (#530). 예전에는 이 조건이 `md:hidden` 과 곱해져 데스크톱만
+    판정에 날짜를 넘기고 모바일은 카드 밖에 남겼다 — 같은 줄이 폭에 따라 다른 물건이
+    됐다. 이제 `WalkVerdict` 가 두 폭 모두 자기 자리에 날짜를 그린다.
   */
   const verdictShown = basisPlaceId !== null && walkSafety.data !== undefined
 
@@ -276,29 +302,6 @@ export function HomeView({
         */}
         <SurfaceStack className="lg:sticky lg:top-16 lg:self-start">
           {/*
-            날짜 줄은 카드가 아니다 — **페이지 머리**다. 자기 제목이 없고 한 줄이라
-            카드 판정 3문 중 둘을 못 넘는다. 바닥 위에 직접 놓는다.
-
-            **데스크톱에 판정이 서면 이 줄을 감춘다** (#428). 3a 로 바닥이 회색이 되면서
-            이 줄만 카드 밖에 떠 **어느 카드의 날짜인지 붙을 곳이 없어졌다.** 판정 카드가
-            `체감온도` 라벨과 같은 줄에 자리를 갖고 있어 그리로 들였다 (`WalkVerdict`).
-
-            **모바일은 여기 남는다.** 판정이 접힌 한 줄이 기본이라 그 패널이 닫혀 있을 수
-            있고, 그러면 날짜가 어디에도 없게 된다.
-
-            **판정이 없으면(기준 장소 없음 · 조회 실패 · 로딩) 데스크톱에서도 여기 남는다** —
-            첫 방문자가 날짜를 잃지 않는다.
-          */}
-          <p
-            className={cn(
-              'text-caption text-fg-muted px-4 pt-3 font-medium tabular-nums md:px-1 md:pt-1',
-              verdictShown && 'md:hidden',
-            )}
-          >
-            {todayLabel}
-          </p>
-
-          {/*
             **카드 하나에 셋을 담는다** — `[누구 · 지금 안전한가 · 언제 나가나]`.
             아래 병원 배너가 `[위급하면]` 으로 두 번째 카드다. 이 레일이 두 이야기라는
             정의(DESIGN.md §7-1)를 카드 경계가 그대로 옮긴 것이다.
@@ -309,6 +312,30 @@ export function HomeView({
             카드 안은 1px 선이 잇는다 — 각 블록이 자기 `border-t` 를 그대로 들고 있다.
           */}
           <Surface>
+            {/*
+              **날짜 줄이 카드 안으로 들어왔다** (#530). 3a 로 바닥이 회색이 되면서 이 줄만
+              카드 밖에 떠 **어느 카드의 날짜인지 붙을 곳이 없었다.** #428 이 데스크톱만
+              판정 패널로 들였고 모바일은 바닥 위에 남겨, 같은 줄이 폭에 따라 다른 물건이
+              됐다.
+
+              **판정이 서는 날은 그리지 않는다.** 그때는 `WalkVerdict` 가 `오늘 산책 {등급}`
+              바로 위에 같은 caption 으로 날짜를 그린다 — **두 폭 모두 거기다.** 여기에도
+              두면 한 카드가 같은 날짜를 두 번 말한다.
+
+              **판정이 없을 때만 이 자리다** (기준 장소 없음 · 조회 실패 · 로딩). 첫
+              방문자가 날짜를 잃지 않으면서, 잃지 않는 자리가 **카드 밖이 아니다.**
+            */}
+            {!verdictShown && (
+              <p
+                className={cn(
+                  'text-caption text-fg-muted pt-4 font-medium tabular-nums',
+                  INSET_CLASS.card,
+                )}
+              >
+                {todayLabel}
+              </p>
+            )}
+
             {authed ? (
               <ProfileCard pets={pets} totalCount={petList.data?.totalCount ?? pets.length} />
             ) : (
@@ -500,6 +527,17 @@ export function HomeView({
               </div>
             )}
 
+            {/*
+              **목록과 머리말 사이에 1px 선을 넣는다** (#530). 카드 제목 · 부제 · 공통 근거가
+              전부 같은 인셋의 본문 글줄이라, 선이 없으면 첫 행이 바로 위 문장과 한 덩어리로
+              읽혔다 — `SurfaceList` 는 **항목 사이에만** 선을 긋고 첫 항목 위는 카드의
+              몫이라고 정해 두었다 (`components/surface.tsx`). 그 몫을 여기서 낸다.
+
+              **행을 감싼 쪽에 건다.** 목록에 걸면 `unscored` · `remaining` 행이 있는 날과
+              없는 날에 선의 개수가 갈리지 않지만, 스켈레톤 · 오류 · 빈 상태에는 선이 붙지
+              않아야 한다 — 그 셋은 행이 아니라 **카드가 통째로 하는 말**이라 위에 선을
+              그으면 머리말에서 떨어져 나온다.
+            */}
             {pending && visible.length === 0 ? (
               <SurfaceList>
                 {Array.from({ length: 2 }, (_, index) => (
@@ -536,7 +574,10 @@ export function HomeView({
                 }
               />
             ) : (
-              <div aria-busy={refetching || undefined} className={refetching ? 'opacity-55' : ''}>
+              <div
+                aria-busy={refetching || undefined}
+                className={cn('border-border border-t', refetching && 'opacity-55')}
+              >
                 <SurfaceList>
                   {scored.map((data, index) => (
                     <PlaceInsightRow
