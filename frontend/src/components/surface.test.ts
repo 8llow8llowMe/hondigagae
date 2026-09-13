@@ -41,11 +41,26 @@ describe('L0 Canvas — 페이지 바닥', () => {
     */
     expect(classes.filter((name) => /(^|:)(p|px|py|gap)-/.test(name))).toEqual([])
     /*
-      **`flex-1` 은 배치가 아니라 높이다** (#456③). 좌우로는 아무것도 하지 않으므로
-      위 규칙과 부딪히지 않는다 — 목록을 정확히 잠가 두는 이유는 여백·폭 클래스가
-      나중에 슬며시 끼는 것을 막기 위해서다.
+      **`flex-1` 은 배치가 아니라 높이이고 `w-full` 은 전폭 그 자체다.** 둘 다 위 규칙과
+      부딪히지 않는다 — 목록을 정확히 잠가 두는 이유는 여백·컨테이너 클래스가 나중에
+      슬며시 끼는 것을 막기 위해서다.
     */
-    expect(classes).toEqual(['bg-bg-sunken', 'flex-1'])
+    expect(classes).toEqual(['bg-bg-sunken', 'w-full', 'flex-1'])
+  })
+
+  /*
+    **전폭을 클래스로 못박는다** (#520).
+
+    `stretch` 에 기대면 안 된다 — 이것은 `(main)` 뼈대(`flex min-h-dvh flex-col`) 안의
+    flex 아이템이고, **flex 아이템은 cross 축 margin 이 `auto` 면 `stretch` 가 무효가 된다.**
+    사용처가 `rail-layout`(`margin-inline: auto`)을 이 요소에 직접 다는 네 라우트가 그렇게
+    깨졌다: 1920 `/places` 바닥이 1440 이 아니라 707, 390 `/plans` 는 240 이었다.
+
+    폭을 **실제로** 보는 것은 `e2e/surface.spec.ts` 다 — 여기서는 클래스가 사라지지
+    않는지만 잠근다.
+  */
+  it('전폭을 stretch 에 기대지 않는다 — w-full 을 스스로 갖는다', () => {
+    expect(classesOf(renderToStaticMarkup(createElement(Canvas, null, '내용')))).toContain('w-full')
   })
 
   /*
