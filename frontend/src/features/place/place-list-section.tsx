@@ -36,6 +36,13 @@ export type PlaceListSectionProps = {
   onRetry: () => void
   onResetFilters: () => void
   /**
+   * 걸려 있는 검색어 (#431). **0건 문구가 무엇으로 찾았는지 되돌려 주는 데만 쓴다.**
+   *
+   * `null` 이면 필터만 걸린 0건이라 기존 문구 그대로다 — 담기 화면·지도 폴백처럼 검색
+   * 입력이 없는 사용처는 넘기지 않는다.
+   */
+  keyword?: string | null
+  /**
    * 행을 다르게 그린다. 기본은 장소 상세로 가는 `PlaceRow` 다.
    *
    * 일정에 담는 화면(#82)이 같은 4상태(로딩·오류·빈 결과·목록)와 무한 스크롤을
@@ -79,6 +86,7 @@ export function PlaceListSection({
   onLoadMore,
   onRetry,
   onResetFilters,
+  keyword = null,
   inset = 'card',
   headingLevel = 2,
   renderRow = (place) => <PlaceRow key={place.placeId} place={place} inset={inset} />,
@@ -144,8 +152,21 @@ export function PlaceListSection({
       <EmptyState
         inset={inset}
         headingLevel={headingLevel}
-        title={messages.place.emptyTitle}
-        description={messages.place.emptyDescription}
+        /*
+          **검색어가 걸렸으면 그 말을 되돌려 준다** (#431). 입력은 화면 위에 남아 있지만,
+          결과가 비었을 때 사용자가 확인하는 것은 "내가 뭘로 찾았지" 다.
+
+          **설명은 검색어만 탓하지 않는다** — 필터가 함께 걸려 있을 수 있어 둘 다 짚고,
+          `초기화` 버튼은 그대로다 (그 버튼이 검색어까지 지운다 — `DEFAULT_PLACE_FILTERS`).
+        */
+        title={
+          keyword === null
+            ? messages.place.emptyTitle
+            : messages.place.searchEmptyTitle.replace('{keyword}', keyword)
+        }
+        description={
+          keyword === null ? messages.place.emptyDescription : messages.place.searchEmptyDescription
+        }
         action={
           <Button variant="secondary" size="md" onClick={onResetFilters}>
             {messages.place.resetFilters}

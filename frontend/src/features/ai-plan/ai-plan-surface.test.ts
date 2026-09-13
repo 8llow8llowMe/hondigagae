@@ -197,8 +197,14 @@ describe('피커 시트 — 2a 프리미티브의 마지막 사용처였다 (#47
     expect(pickerSheet).not.toContain('md:px-6')
     expect(pickerSheet).not.toContain('INSET_CLASS.card')
     expect(pickerSheet).not.toContain('inset="card"')
-    expect(pickerSheet.match(/INSET_CLASS\.panel/g)).toHaveLength(4)
-    expect(pickerSheet.match(/inset="panel"/g)).toHaveLength(2)
+    /*
+      **#431 로 검색 탭이 열리며 자리가 늘었다.** `INSET_CLASS.panel` 넷 → 다섯(검색 폼
+      한 줄), `inset="panel"` 둘 → 넷(검색 탭의 오류 · 0건). 개수를 잠그는 이유는
+      **자리가 느는 쪽으로 드리프트가 나기 때문**이다 — 새 탭에 한 줄 더 붙이며 축을
+      빠뜨리면 그 줄만 시트 머리와 어긋난다.
+    */
+    expect(pickerSheet.match(/INSET_CLASS\.panel/g)).toHaveLength(5)
+    expect(pickerSheet.match(/inset="panel"/g)).toHaveLength(4)
   })
 
   /* 오버레이는 카드가 아니다 (§3-2 · radius 16 채널) — 시트 골격을 건드리지 않는다 */
