@@ -17,7 +17,9 @@ import {
 } from '@/features/place/place-filter-fields'
 import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { DEFAULT_PLACE_FILTERS, toPlaceFilterQuery } from '@/lib/url/place-filters'
+import { cn } from '@/lib/utils/cn'
 import type { PlaceFilters } from '@/types/place'
 
 /** 열려 있는 시트. `null` 이면 닫힘 */
@@ -76,7 +78,18 @@ export function PlaceFilterChips({
   const dirty = toPlaceFilterQuery(filters) !== toPlaceFilterQuery(DEFAULT_PLACE_FILTERS)
 
   return (
-    <div className="border-border border-b px-4 py-3 md:px-10">
+    /*
+      **인셋은 카드 축(`card`, 16/20)이다** (#457). 예전에는 `md:px-10` 을 직접 적어
+      768 에서 스택 인셋 24 위에 40 이 얹혀 글줄이 64 에 섰다 — 바로 아래 카드 제목
+      (24+1+20 = 45)과 19px 갈렸다. 칩은 카드 밖 도구지만(#439) **L0 위에 놓이는 블록도
+      카드 안 글줄과 같은 축**이어야 한다 (`plan-add-place-header` 의 `inset` 주석, #451).
+
+      카드 테두리 1px 만큼(44 vs 45) 남는 차이는 #443 · #447 과 같은 의도다.
+
+      **`border-b` 는 남긴다.** L0 위 스트립은 아래 카드와 자기를 가르는 줄이 필요하다 —
+      홈 특보 스트립과 같은 모양이다. 선은 padding 밖이라 전폭 그대로다.
+    */
+    <div className={cn('border-border border-b py-3', INSET_CLASS.card)}>
       <ChipGroup label={messages.place.filterTitle} className="flex flex-wrap gap-1.5">
         <Chip
           selected={allowedOnly}
