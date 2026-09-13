@@ -514,12 +514,18 @@ test.describe('필터 레일 건너뛰기 — #472', () => {
 /**
  * **모바일 필터 칩도 카드 글줄과 같은 축이다** — 이슈 #457.
  *
- * 칩은 카드 **밖** 도구다(#439) — 목록을 좁히는 도구이고 카드는 그 결과를 담는다.
- * 그래도 L0 위에 놓이는 블록은 **카드 안 글줄과 같은 축**이어야 한다
- * (`plan-add-place-header` 의 `inset` 주석, #451).
- *
  * 예전에는 칩이 `md:px-10` 을 직접 적어, `SurfaceStack` 의 `md:p-6`(24) 위에 40 이 얹혀
  * 768 에서 글줄이 64 에 섰다 — 카드 제목(24+1+20 = 45)과 19px 갈렸다.
+ *
+ * **칩이 카드 안인지 밖인지는 화면마다 갈린다.** 장소 찾기는 아직 카드 **밖** 도구이고
+ * (#439), 일정은 #536 에서 제목 줄 아래 카드 **안**으로 들어왔다 — 카드 밖 맨 위에 두면
+ * 페이지 제목보다 먼저 읽히기 때문이다. 장소(#531) · 병원·약국(#537)이 뒤따른다.
+ *
+ * **그래서 이 검사는 위치가 아니라 세로선만 본다.** 자리가 어디든 칩 글줄은 카드 안 글줄과
+ * 같은 축에 서야 한다 (`plan-add-place-header` 의 `inset` 주석, #451) — 오히려 카드 안으로
+ * 들어온 쪽이 그 축을 더 직접 쓴다. **여기에 "칩이 카드보다 앞" 을 다시 넣지 말 것**:
+ * #536 이전의 판정(`compareDocumentPosition`)이 그것이었고, 일정이 옮겨 오면서 칩 스트립을
+ * 아예 못 찾아 `chipLeft === null` 로 깨졌다.
  *
  * **`toBe` 가 아니라 1px 허용이다.** 카드 테두리 1px 만큼 남는 차이는 #443 · #447 과 같은
  * 의도이고, 모바일은 카드가 전폭이라 테두리가 좌우에 없어 정확히 같아진다 — 두 값이 다른
@@ -544,16 +550,24 @@ test.describe('모바일 필터 칩의 세로선 — #457', () => {
           .first()
         await expect(card).toBeVisible()
 
-        /* 칩 스트립 = 카드보다 앞에 오는 `border-b` 블록 중 좌우 padding 을 가진 것 */
+        /*
+          칩 스트립 = 좌우 padding 을 가진 `border-b` 블록 중 **보이는** 첫 번째.
+
+          **폭 0 을 거르는 것이 핵심이다.** 데스크톱 레일(`hidden lg:block`)은 이 폭에서
+          `display:none` 인데 `getComputedStyle` 은 그때도 값을 돌려주므로, #535 가 레일에
+          1px 테두리를 준 뒤로는 레일 안 블록이 조건에 걸릴 수 있다. 그러면 `getBoundingClientRect`
+          가 0 을 내고 이 검사는 **틀린 값으로 통과**한다.
+        */
         const chipLeft = await page.evaluate(() => {
           const root = document.querySelector('main') as HTMLElement
-          const target = root.querySelector('section') as HTMLElement
-          const strip = [...root.querySelectorAll('div')].find(
-            (d) =>
-              getComputedStyle(d).borderBottomWidth !== '0px' &&
-              getComputedStyle(d).paddingLeft !== '0px' &&
-              (d.compareDocumentPosition(target) & 4) !== 0,
-          )
+          const strip = [...root.querySelectorAll('div')].find((d) => {
+            const style = getComputedStyle(d)
+            return (
+              style.borderBottomWidth !== '0px' &&
+              style.paddingLeft !== '0px' &&
+              d.getBoundingClientRect().width > 0
+            )
+          })
           const first = strip?.querySelector('button, a, span')
           return first === undefined || first === null
             ? null
