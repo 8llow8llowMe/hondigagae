@@ -54,9 +54,10 @@ class OllamaLlmAdapterTest {
 
     @BeforeEach
     void setUp() {
-        AiLlmProperties properties = new AiLlmProperties(null, null, null, null, null, null, null, null, null, null);
+        AiLlmProperties properties = new AiLlmProperties(null, null, null, null, null, null, null, null, null, null, null);
         adapter = new OllamaLlmAdapter(
-            ollamaChatModel, new AiPlanPromptFactory(), properties, CircuitBreakerRegistry.ofDefaults());
+            ollamaChatModel, new AiPlanPromptFactory(), properties, CircuitBreakerRegistry.ofDefaults(),
+            new LlmCallGate(properties));
     }
 
     @Test

@@ -75,7 +75,7 @@ class PlanPromptSizeTest {
             + promptFactory.userPrompt(query(PRODUCTION_CANDIDATE_SIZE))
             + outputConverter.getFormat();
         AiLlmProperties defaults =
-            new AiLlmProperties(null, null, null, null, null, null, null, null, null, null);
+            new AiLlmProperties(null, null, null, null, null, null, null, null, null, null, null);
 
         assertThat(defaults.contextTokens()).isGreaterThan(prompt.length());
         // 출력도 같은 창에 들어간다. 프롬프트 + 출력 예산이 창을 넘으면 다시 잘린다.
