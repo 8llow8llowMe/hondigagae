@@ -34,7 +34,7 @@
 // package.json
 {
   "packageManager": "pnpm@<설치된 버전>",
-  "engines": { "node": ">=20.0.0" },
+  "engines": { "node": "^20.19.0 || ^22.13.0 || >=24" },
 }
 ```
 
@@ -43,7 +43,19 @@
 20
 ```
 
-- Next.js가 요구하는 최소 Node 버전을 확인해 `engines` 에 반영한다. 임의로 낮추지 않는다.
+- **`engines.node` 는 Next 가 아니라 의존성 전체의 최댓값이다** (#459). 예전에는 `>=20.9.0`
+  이었는데 그것이 Next 의 요구였고, 실제로는 **eslint 계열 · vite · rolldown ·
+  prettier-plugin-tailwindcss 가 `^20.19.0`** 을 건다. 20.10 인 PC 에서 `pnpm verify` 와
+  pre-push 가 막혔다. 임의로 낮추지 않고, **올릴 때는 다음 명령으로 실측한다**:
+
+  ```bash
+  node -e 'const fs=require("fs"),p=require("path");const b="node_modules/.pnpm";const o=new Map();for(const d of fs.readdirSync(b)){const nm=p.join(b,d,"node_modules");let ps;try{ps=fs.readdirSync(nm)}catch{continue}for(const q of ps){const ds=q.startsWith("@")?fs.readdirSync(p.join(nm,q)).map(x=>p.join(q,x)):[q];for(const r of ds){try{const j=JSON.parse(fs.readFileSync(p.join(nm,r,"package.json"),"utf8"));if(j.engines?.node)o.set(j.name,j.engines.node)}catch{}}}}for(const[k,v]of[...o].sort())console.log(k,v)'
+  ```
+
+- **구간을 셋으로 적는다** (`^20.19.0 || ^22.13.0 || >=24`). `>=20.19.0` 한 줄로 두면 21.x 와
+  22.0~22.12 를 허용하는데 **eslint 와 vite 가 그 구간을 지원하지 않는다** — 거기서 깨진다.
+- **`.nvmrc` 는 `20` 그대로 둔다.** 패치까지 박으면 보안 업데이트가 멈춘다. Node 20 은
+  유지보수 단계라 최신 20.x 가 곧 20.19.x 이고, 위 하한을 항상 만족한다.
 - `packageManager` 필드를 두면 Corepack이 버전을 고정한다. **npm/yarn 사용을 막는 1차 방어선이다.**
 
 ## 3. package.json 스크립트 계약

@@ -5,7 +5,7 @@
 
 ## 1. 사전 준비
 
-- Node.js 20 이상
+- Node.js **20.19 이상** (`.nvmrc` 의 `20` 이 곧 최신 20.x 다). 20.10 같은 구버전에서는 `pnpm verify` 가 막힌다 — 하한의 근거는 `docs/tooling-guide.md` §2
 - pnpm (`npm i -g pnpm`)
 - 백엔드 기동 (장소·일정·인증 API를 쓰는 화면은 백엔드가 필요하다)
 
