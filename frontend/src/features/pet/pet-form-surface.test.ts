@@ -11,17 +11,11 @@
  * **주석을 걷은 사본에 대해 단언한다.** 이 저장소의 주석은 근거를 길게 적어 클래스명·
  * 컴포넌트명이 주석 안에 그대로 등장한다 — 걷지 않으면 주석 문자열에 속아 통과한다.
  */
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-
 import { describe, expect, it } from 'vitest'
 
+import { readSourceWithoutComments as code } from '@/test/source'
+
 /** 블록 주석과 줄 주석을 걷은 소스 — 계약은 코드에만 있다 */
-function code(relative: string): string {
-  return readFileSync(fileURLToPath(new URL(`../../../${relative}`, import.meta.url)), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '')
-}
 
 const newPage = code('app/(main)/pets/new/page.tsx')
 const editPage = code('app/(main)/pets/[petId]/page.tsx')

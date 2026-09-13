@@ -46,29 +46,16 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-
 import { describe, expect, it } from 'vitest'
 
 import { Canvas } from '@/components/surface'
-
-const ROOT = fileURLToPath(new URL('../../', import.meta.url))
-
-/** 블록 주석과 줄 주석을 걷은 소스 — 계약은 코드에만 있다 */
-function strip(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-}
-
-function code(relative: string): string {
-  return strip(readFileSync(`${ROOT}${relative}`, 'utf8'))
-}
+import { readSource, readSourceWithoutComments } from '@/test/source'
 
 const LAYOUT = 'app/(main)/layout.tsx'
 
 describe('(main) 레이아웃 — 세로 뼈대', () => {
   it('뷰포트 높이를 레이아웃이 한 번 잡는다 — 페이지마다 min-h 를 붙이지 않는다', () => {
-    const source = code(LAYOUT)
+    const source = readSourceWithoutComments(LAYOUT)
 
     expect(source).toContain('flex min-h-dvh flex-col')
     // 뼈대는 하나여야 한다. 둘이 되면 어느 쪽이 높이를 잡는지 화면마다 갈린다
@@ -76,7 +63,7 @@ describe('(main) 레이아웃 — 세로 뼈대', () => {
   })
 
   it('머리 · 본문 · 푸터가 그 열 안에 있다 — 탭바만 fixed 라 밖이다', () => {
-    const source = code(LAYOUT)
+    const source = readSourceWithoutComments(LAYOUT)
     const skeleton = source.indexOf('flex min-h-dvh flex-col')
     const closing = source.indexOf('</div>', source.indexOf('<SiteFooter />'))
 
@@ -91,7 +78,9 @@ describe('(main) 레이아웃 — 세로 뼈대', () => {
   })
 
   it('본문 래퍼가 남는 높이를 먹고 Canvas 에 넘긴다', () => {
-    expect(code(LAYOUT)).toMatch(/<div id="main" className="flex flex-1 flex-col">/)
+    expect(readSourceWithoutComments(LAYOUT)).toMatch(
+      /<div id="main" className="flex flex-1 flex-col">/,
+    )
   })
 
   /*
@@ -100,9 +89,9 @@ describe('(main) 레이아웃 — 세로 뼈대', () => {
     한쪽이 사라지면 모바일 마지막 줄이 탭바 뒤로 들어간다.
   */
   it('탭바 자리를 본문 래퍼가 비우지 않는다 — 푸터와 지도가 각자 비운다', () => {
-    expect(code(LAYOUT)).not.toMatch(/id="main"[^>]*\bpb-/)
+    expect(readSourceWithoutComments(LAYOUT)).not.toMatch(/id="main"[^>]*\bpb-/)
 
-    const css = readFileSync(`${ROOT}app/globals.css`, 'utf8')
+    const css = readSource('app/globals.css')
     expect(css).toMatch(/\.site-footer\s*\{[^}]*padding-block-end:\s*calc\(var\(--tabbar-h\)/)
     expect(css).toMatch(
       /\.map-canvas-height\s*\{[^}]*100dvh - var\(--header-h\) - var\(--tabbar-h\)/,

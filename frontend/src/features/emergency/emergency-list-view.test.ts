@@ -10,15 +10,9 @@
  * **소스 단언은 블록 주석을 걷은 사본에 대해 한다** (#451 전례). 결정 주석이 `inset="main"` ·
  * `lg:border-l` 같은 값을 그대로 인용하므로 원문으로 보면 주석에 속아 통과한다.
  */
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-
 import { describe, expect, it } from 'vitest'
 
-function source(relative: string): string {
-  const raw = readFileSync(fileURLToPath(new URL(`../../../${relative}`, import.meta.url)), 'utf8')
-  return raw.replace(/\/\*[\s\S]*?\*\//g, '')
-}
+import { readSourceWithoutComments as source } from '@/test/source'
 
 const listView = source('src/features/emergency/emergency-list-view.tsx')
 const mapView = source('src/features/emergency/emergency-map-view.tsx')
