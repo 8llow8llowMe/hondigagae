@@ -52,6 +52,16 @@ export type PlaceListSectionProps = {
    * `renderRow` 를 직접 준 사용처는 자기 행의 인셋도 자기가 정한다.
    */
   inset?: Inset
+  /**
+   * 빈·오류 상태 제목의 heading 레벨. **이 목록을 담는 곳이 정한다** — `inset` 과 같은 축이다.
+   *
+   * **여기는 세 사용처가 실제로 갈린다** (#456①): `/places` 는 제목 있는 카드 안이라 `3`,
+   * 담기 화면(#82)은 `aria-label` 만 있는 카드 안이라 `2`, 지도 SDK 실패 폴백은 카드가
+   * 아니라 `2` 다. 기본값 `2` 는 그중 둘이라 `inset` 의 기본값(`card`)과 짝이 맞지 않는데,
+   * **두 축이 원래 다른 것을 묻기 때문이다** — `inset` 은 "카드 안인가", 이쪽은 "그 카드가
+   * 제목을 갖는가". 한쪽에서 다른 쪽을 읽으면 담기 화면이 조용히 `h3` 가 된다.
+   */
+  headingLevel?: 2 | 3
 }
 
 /**
@@ -70,6 +80,7 @@ export function PlaceListSection({
   onRetry,
   onResetFilters,
   inset = 'card',
+  headingLevel = 2,
   renderRow = (place) => <PlaceRow key={place.placeId} place={place} inset={inset} />,
 }: PlaceListSectionProps) {
   if (loading) {
@@ -91,6 +102,7 @@ export function PlaceListSection({
         <EmptyState
           /* 네 상태가 목록과 같은 축에 선다 — 기본 `main`(40)은 카드 안에서 두 번 밀린다 (§0) */
           inset={inset}
+          headingLevel={headingLevel}
           title={toMessage(errorMessage, messages.place.emptyTitle)}
           description={messages.place.emptyDescription}
           action={
@@ -106,6 +118,7 @@ export function PlaceListSection({
       return (
         <ErrorState
           inset={inset}
+          headingLevel={headingLevel}
           title={messages.common.validationErrorTitle}
           description={toMessage(errorMessage, messages.place.emptyDescription)}
           retryLabel={messages.place.resetFilters}
@@ -118,6 +131,7 @@ export function PlaceListSection({
     return (
       <ErrorState
         inset={inset}
+        headingLevel={headingLevel}
         title={messages.place.errorTitle}
         description={messages.common.temporaryErrorDescription}
         onRetry={onRetry}
@@ -129,6 +143,7 @@ export function PlaceListSection({
     return (
       <EmptyState
         inset={inset}
+        headingLevel={headingLevel}
         title={messages.place.emptyTitle}
         description={messages.place.emptyDescription}
         action={

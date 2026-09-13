@@ -83,7 +83,13 @@ export function PetFormFields({
       }}
     >
       {isTemporaryError && (
+        /*
+          카드는 이 파일이 아니라 호출부가 그린다 — 등록(`pet-create-view`)·수정
+          (`pet-edit-view`) **둘 다** `<Surface lead title=...>` 안이라 제목을 한 단
+          내린다 (#456①). 갈리는 호출부가 없어 prop 으로 뚫지 않았다.
+        */
         <ErrorState
+          headingLevel={3}
           title={messages.common.temporaryErrorTitle}
           description={messages.common.temporaryErrorDescription}
           onRetry={onRetry}

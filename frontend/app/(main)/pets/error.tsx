@@ -38,6 +38,7 @@ export default function PetsError({ reset }: { error: Error; reset: () => void }
             title={messages.pet.loadFailedTitle}
             description={messages.pet.loadFailedDescription}
             inset="card"
+            headingLevel={3}
             onRetry={reset}
           />
         </Surface>

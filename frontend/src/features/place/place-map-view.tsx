@@ -236,7 +236,10 @@ export function PlaceMapView({
           {failureMessage(failure)}
         </p>
         <PlaceListSection
-          /* 폴백 목록은 카드가 아니라 페이지 위다 — 카드 인셋 20 을 쓰면 위 안내 줄(40)과 어긋난다 */
+          /*
+            폴백 목록은 카드가 아니라 페이지 위다 — 카드 인셋 20 을 쓰면 위 안내 줄(40)과
+            어긋난다. 카드가 없으니 `headingLevel` 도 기본값 `2` 그대로 둔다 (#456①).
+          */
           inset="main"
           places={listPlaces}
           loading={listQuery.isPending}

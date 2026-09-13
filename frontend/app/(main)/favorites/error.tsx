@@ -42,6 +42,7 @@ export default function FavoritesError({ reset }: { error: Error; reset: () => v
             title={messages.favorite.loadFailedTitle}
             description={messages.favorite.loadFailedDescription}
             inset="card"
+            headingLevel={3}
             onRetry={reset}
           />
         </Surface>

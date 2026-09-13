@@ -43,6 +43,7 @@ export default function MyPageError({ reset }: { error: Error; reset: () => void
             title={messages.member.loadFailedTitle}
             description={messages.member.loadFailedDescription}
             inset="card"
+            headingLevel={3}
             onRetry={reset}
           />
         </Surface>

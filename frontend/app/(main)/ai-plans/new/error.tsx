@@ -42,6 +42,7 @@ export default function AiPlanNewError({ reset }: { error: Error; reset: () => v
             title={messages.aiPlan.jobErrorTitle}
             description={messages.common.temporaryErrorDescription}
             inset="card"
+            headingLevel={3}
             onRetry={reset}
           />
         </Surface>

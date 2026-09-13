@@ -100,7 +100,8 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
             <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
           }
         >
-          <EmergencyBoardSection board={board} />
+          {/* 이 카드가 `h2`(`title`)를 그리므로 상태 제목은 한 단 내려간다 (#456①) */}
+          <EmergencyBoardSection board={board} headingLevel={3} />
         </Surface>
       </SurfaceStack>
     </div>
@@ -117,13 +118,19 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
  * **`inset` 기본값이 `card` 다** (#460). 목록 갈래는 이것을 `Surface` 안에 담고, 폴백은
  * 카드 없는 페이지에 세우므로 `main` 을 넘긴다 — 넘기지 않으면 폴백의 행만 20 에 서고
  * 안내 줄은 40 에 서서 세로선이 갈린다 (#452 리뷰가 담기 화면에서 잡은 회귀).
+ *
+ * **`headingLevel` 은 기본값이 `2` 다** (#456①). 두 축의 기본값이 반대인 것이 의도다 —
+ * `inset` 은 "카드 안인가" 라 카드가 기본이고, 이쪽은 "그 카드가 `h2` 를 갖는가" 라
+ * 갖지 않는 쪽이 기본이다. 목록 갈래만 제목 있는 카드에 담으므로 거기서 `3` 을 넘긴다.
  */
 export function EmergencyBoardSection({
   board,
   inset = 'card',
+  headingLevel = 2,
 }: {
   board: EmergencyBoard
   inset?: Inset
+  headingLevel?: 2 | 3
 }) {
   return (
     <EmergencySection
@@ -139,6 +146,7 @@ export function EmergencyBoardSection({
       onWidenRadius={board.widenRadius}
       canWiden={board.canWiden}
       inset={inset}
+      headingLevel={headingLevel}
     />
   )
 }

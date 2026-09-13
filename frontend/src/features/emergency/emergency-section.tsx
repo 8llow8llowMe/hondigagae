@@ -35,6 +35,15 @@ export type EmergencySectionProps = {
    * 상태가 바뀌는 순간 왼쪽 선이 뛰지 않아야 한다 (#451 이 담기 화면에서 잡은 회귀).
    */
   inset?: Inset
+  /**
+   * 빈·오류 상태 제목의 heading 레벨 — **담는 곳이 정한다.** `inset` 과 같은 축이다 (#456①).
+   *
+   * 목록 갈래는 제목 있는 `Surface` 안이라 `3` 을 받고, 지도 SDK 실패 폴백은 카드가 없어
+   * 기본값 `2` 다. **`inset` 에서 유도하지 않는다** — `inset` 은 "카드 안인가" 를 묻고
+   * 이쪽은 "그 카드가 `h2` 를 갖는가" 를 묻는다. 담기 화면처럼 `aria-label` 만 있는 카드는
+   * 두 답이 갈린다 (`card` 인데 `2`).
+   */
+  headingLevel?: 2 | 3
 }
 
 /**
@@ -66,6 +75,7 @@ export function EmergencySection({
   onWidenRadius,
   canWiden,
   inset = 'card',
+  headingLevel = 2,
 }: EmergencySectionProps) {
   if (loading) return <EmergencySkeleton inset={inset} />
 
@@ -76,6 +86,7 @@ export function EmergencySection({
         description={messages.common.temporaryErrorDescription}
         onRetry={onRetry}
         inset={inset}
+        headingLevel={headingLevel}
       />
     )
   }
@@ -122,6 +133,7 @@ export function EmergencySection({
           onWidenRadius={onWidenRadius}
           canWiden={canWiden}
           inset={inset}
+          headingLevel={headingLevel}
         />
       ) : (
         <SurfaceList>
@@ -166,6 +178,7 @@ function EmptyResult({
   onWidenRadius,
   canWiden,
   inset,
+  headingLevel,
 }: {
   all: NearbyFacilityResult['facilities']
   filters: FacilityFilters
@@ -174,6 +187,7 @@ function EmptyResult({
   onWidenRadius: () => void
   canWiden: boolean
   inset: Inset
+  headingLevel: 2 | 3
 }) {
   const options = reliefs(all, filters)
 
@@ -194,13 +208,24 @@ function EmptyResult({
           ) : undefined
         }
         inset={inset}
+        headingLevel={headingLevel}
       />
     )
   }
 
+  /*
+    **0건 안내도 상태 제목이라 같은 레벨을 쓴다** (#456①). 예전에는 `h3` 로 박혀 있어
+    지도 SDK 실패 폴백(카드 없음)에서 `h1` → `h3` 로 레벨을 건너뛰었다 — 그 갈래에는
+    사이를 메울 `h2` 가 없다. 위의 `EmptyState` 갈래와 **같은 값**이어야 한다:
+    둘은 같은 자리에 배타적으로 서는 같은 상태다.
+  */
+  const NarrowedHeading = `h${headingLevel}` as const
+
   return (
     <div className={cn('flex flex-col items-start gap-2 py-6', INSET_CLASS[inset])}>
-      <h3 className="text-title-2 text-fg font-semibold">{messages.emergency.narrowedTitle}</h3>
+      <NarrowedHeading className="text-title-2 text-fg font-semibold">
+        {messages.emergency.narrowedTitle}
+      </NarrowedHeading>
       <div className="mt-1 flex flex-wrap gap-2">
         {options.map((option) => (
           <Button

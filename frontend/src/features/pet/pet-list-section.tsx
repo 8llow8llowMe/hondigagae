@@ -131,6 +131,7 @@ function PetListBody({ pets, totalCount, loading, errorStatus, onRetry }: PetLis
     return (
       <ErrorState
         inset={inset}
+        headingLevel={3}
         title={messages.pet.loadFailedTitle}
         description={messages.pet.loadFailedDescription}
         onRetry={onRetry}
@@ -142,6 +143,7 @@ function PetListBody({ pets, totalCount, loading, errorStatus, onRetry }: PetLis
     return (
       <EmptyState
         inset={inset}
+        headingLevel={3}
         title={messages.pet.emptyTitle}
         description={messages.pet.emptyDescription}
         action={<ButtonLink href="/pets/new">{messages.pet.register}</ButtonLink>}

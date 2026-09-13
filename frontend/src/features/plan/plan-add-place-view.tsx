@@ -288,6 +288,10 @@ export function PlanAddPlaceView({
           **인셋을 넘기지 않는다** (#451). 기본값 `card`(16/20)가 곧 이 목록의 자리다 —
           행(`PlanAddPlaceRow`)도 카드 안에서 같은 값을 쓴다. 하나라도 어긋나면 목록이
           실데이터로 바뀌는 순간 왼쪽 선이 뛴다.
+
+          **`headingLevel` 도 넘기지 않는다** (#456①). 카드 안이지만 `PlanAddPlaceShell` 의
+          카드는 `aria-label` 만 갖고 `h2` 를 그리지 않는다 — 위가 페이지 `h1` 하나라
+          기본값 `2` 가 맞다. **`inset` 이 `card` 라고 해서 `h3` 가 되지는 않는다.**
         */
         places={places}
         loading={list.isPending}
