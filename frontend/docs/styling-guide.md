@@ -129,6 +129,13 @@
 - **모바일(<768) 섹션은 전폭이다.** radius 와 좌우 테두리를 걷고 상하만 남긴다.
 - **바닥과 쌓기를 한 컴포넌트로 두지 않는다.** 바닥은 전폭이어야 하고(`main` 이 `Canvas`)
   쌓기는 콘텐츠 폭 안이어야 한다 — 합치면 1440 컨테이너 바깥이 흰색으로 남는다.
+- **`margin-inline: auto` 를 가진 클래스를 `Canvas` 에 직접 달면 조심한다** (#520).
+  `Canvas` 는 `(main)` 뼈대 안의 **flex 아이템**이고, **flex 아이템은 cross 축 margin 이
+  `auto` 면 `stretch` 가 무효가 되어 내용 폭으로 줄어든 뒤 가운데 정렬된다.**
+  `rail-layout` · `content-container` 가 그 모양이라 네 라우트의 바닥이 쪼그라들었다
+  (1920 `/places` 707 · 390 `/plans` 240). `Canvas` 가 `w-full` 을 스스로 가져 그 경로를
+  막는다 — `max-inline-size` 는 그대로라 1440 캡과 가운데 정렬은 유지된다.
+  **폭은 클래스가 아니라 실제 값으로 잠근다**: `e2e/surface.spec.ts` 의 `바닥이 전폭이다`.
 - **바닥 높이는 레이아웃이 한 번 정한다** (#456③). `app/(main)/layout.tsx` 가
   `flex min-h-dvh flex-col` 로 뷰포트를 잡고 본문 래퍼가 `flex-1` 로 남는 높이를 먹으면,
   `Canvas` 가 자기 `flex-1` 로 그것을 받아 회색이 뷰포트 끝까지 이어진다.

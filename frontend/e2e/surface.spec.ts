@@ -28,7 +28,19 @@ import {
  * 렌더에서 받쳐 준다. **작업 상태(`/ai-plans/jobs/[jobId]`)는 넣지 않는다** — 살아 있는
  * `jobId` 가 있어야 열리는 화면이고, 없는 id 로 열면 404 갈래만 재게 된다.
  */
-const SCREENS = ['/mypage', '/pets', '/favorites', '/places?view=list', '/ai-plans/new'] as const
+/**
+ * **`/plans` 를 넣는 이유는 `rail-layout` 이다** (#520). `Canvas` 가 `margin-inline: auto` 를
+ * 가진 클래스를 **직접** 다는 라우트가 `/places` 와 `/plans` 둘인데, 회귀가 가장 크게 난
+ * 쪽이 `/plans` 였다 (390 에서 바닥 240). 한쪽만 재면 다른 쪽 드리프트를 못 잡는다.
+ */
+const SCREENS = [
+  '/mypage',
+  '/pets',
+  '/favorites',
+  '/places?view=list',
+  '/plans',
+  '/ai-plans/new',
+] as const
 
 test.describe('3층 표면', () => {
   for (const path of SCREENS) {
@@ -54,6 +66,48 @@ test.describe('3층 표면', () => {
 
         expect(bg).toBe(sunkenRgb)
       })
+
+      /*
+        **이름값을 하게 만든다** (#520). 위 단언은 `전폭이다` 라고 적혀 있으면서 **배경색만**
+        봤다 — 그래서 #484 가 `(main)` 을 flex 열로 바꿨을 때 `rail-layout` 을 직접 다는
+        라우트의 바닥이 내용 폭으로 쪼그라든 것을 아무것도 잡지 못했다
+        (1920 `/places` 707 · 390 `/plans` 240).
+
+        **flex 아이템은 cross 축 margin 이 `auto` 면 `stretch` 가 무효가 된다** — 그 클래스를
+        `Canvas` 에 직접 다는 화면이 있으므로 폭은 실제로 재야 한다. `Canvas` 쪽 유닛 단언은
+        `w-full` 이 붙어 있는지만 알고, 그것이 실제로 전폭을 만드는지는 모른다.
+
+        **1440 캡도 함께 본다** — `w-full` 이 `max-inline-size` 를 덮어 캡을 깨면 그것도 버그다.
+      */
+      for (const [name, size] of Object.entries(VIEWPORTS)) {
+        test(`${name} 에서 바닥이 전폭이다`, async ({ page }) => {
+          await page.setViewportSize(size)
+          await page.goto(path)
+          await expect(page.getByRole('main')).toBeVisible()
+
+          const floor = await page.evaluate(() => {
+            const main = document.querySelector('main') as HTMLElement
+            const box = main.getBoundingClientRect()
+            const cap = getComputedStyle(main).maxInlineSize
+            return {
+              width: Math.round(box.width),
+              left: Math.round(box.left),
+              viewport: window.innerWidth,
+              cap: cap === 'none' ? null : Math.round(Number.parseFloat(cap)),
+            }
+          })
+
+          const cap = floor.cap ?? Number.POSITIVE_INFINITY
+          const expected = Math.min(floor.viewport, cap)
+
+          expect(floor.width).toBe(expected)
+          /*
+            캡보다 좁은 뷰포트면 왼쪽 끝(0), 넓으면 `margin-inline: auto` 가 가운데로 보낸다.
+            **둘을 함께 본다** — 폭만 보면 `w-full` 이 캡을 덮어 전폭이 돼도 통과한다.
+          */
+          expect(floor.left).toBe(Math.round((floor.viewport - expected) / 2))
+        })
+      }
 
       test('카드는 흰 면 + 그림자 없음이고, radius 는 md 에서만 붙는다', async ({ page }) => {
         await page.setViewportSize(VIEWPORTS.mobile)

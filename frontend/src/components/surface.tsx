@@ -59,6 +59,14 @@ import { cn } from '@/lib/utils/cn'
  * 아래로 내려가 **없던 스크롤이 짧은 화면마다 생긴다.** `flex-1` 은 푸터 자리를 남기고
  * 그 나머지만 먹는다. 뼈대 밖에 놓인 `Canvas` 에서는 flex 속성이 무시돼 아무 일도
  * 일어나지 않는다 — 지금은 35곳 전부가 `as="main"` 인 페이지 뿌리다.
+ *
+ * **폭은 `w-full` 로 못박는다 (#520).** 뼈대 안에서 이것은 flex 아이템인데,
+ * **flex 아이템은 cross 축 margin 이 `auto` 면 `stretch` 가 무효가 되고 내용 폭으로
+ * 줄어든 뒤 가운데 정렬된다.** 사용처가 `rail-layout`(= `margin-inline: auto` +
+ * `max-inline-size`)을 이 요소에 직접 다는 네 라우트가 그렇게 깨졌다 — #484 가 `#main` 을
+ * flex 열로 바꾼 뒤 1920 에서 `/places` 바닥이 1440 이 아니라 **707** 이었고 390 에서
+ * `/plans` 는 **240** 이었다. `w-full` 이 cross 크기를 `auto` 밖으로 빼내 그 경로를 막는다.
+ * `max-inline-size` 는 그대로 살아 1440 캡과 가운데 정렬이 유지된다.
  */
 export function Canvas({
   as: Tag = 'div',
@@ -73,7 +81,7 @@ export function Canvas({
   className?: string
 }) {
   return (
-    <Tag id={id} className={cn('bg-bg-sunken flex-1', className)}>
+    <Tag id={id} className={cn('bg-bg-sunken w-full flex-1', className)}>
       {children}
     </Tag>
   )
