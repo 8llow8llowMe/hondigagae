@@ -56,7 +56,7 @@ describe('shouldKeepPolling', () => {
   })
 
   /*
-    **취소도 종결이다** (#250). 빠뜨리면 취소한 작업을 상한(90초)까지 2초마다 두드리고,
+    **취소도 종결이다** (#250). 빠뜨리면 취소한 작업을 폴링 상한까지 2초마다 두드리고,
     화면은 그동안 진행 중으로 남는다 — 서버는 이미 상태를 못 박고 SSE 도 닫은 뒤다.
   */
   it('취소되면 폴링을 멈춘다', () => {
@@ -128,20 +128,37 @@ describe('jobPollInterval', () => {
   })
 })
 
-describe('jobPollPhase — 명세 S7 (30초 · 90초)', () => {
-  it('30초 전에는 아무 말도 하지 않는다 — 정상 소요 시간이다', () => {
+describe('jobPollPhase — 명세 S7', () => {
+  it('안내 시점 전에는 아무 말도 하지 않는다 — 정상 소요 시간이다', () => {
     expect(jobPollPhase(0)).toBe('normal')
     expect(jobPollPhase(JOB_POLL_SLOW_MS - 1)).toBe('normal')
   })
 
-  it('30초를 넘기면 기다려 달라고 덧붙인다', () => {
+  it('안내 시점을 넘기면 기다려 달라고 덧붙인다', () => {
     expect(jobPollPhase(JOB_POLL_SLOW_MS)).toBe('slow')
     expect(jobPollPhase(JOB_POLL_LIMIT_MS - 1)).toBe('slow')
   })
 
-  it('90초를 넘기면 폴링을 끝낸 국면이다', () => {
+  it('상한을 넘기면 폴링을 끝낸 국면이다', () => {
     expect(jobPollPhase(JOB_POLL_LIMIT_MS)).toBe('exceeded')
-    expect(jobPollPhase(120_000)).toBe('exceeded')
+    expect(jobPollPhase(JOB_POLL_LIMIT_MS * 2)).toBe('exceeded')
+  })
+
+  /*
+    **두 임계값은 백엔드 예산에 매여 있다** (#495 · `ai-service/application.yml`).
+    숫자를 여기에 박으면 BE 가 예산을 바꿔도 테스트가 따라가지 않으므로, 검사하는 것은
+    값 자체가 아니라 **그 값이 서 있는 관계**다.
+  */
+  it('정상 소요 실측(dev 52~80초)이 안내에 걸리지 않는다', () => {
+    expect(jobPollPhase(80_000)).toBe('normal')
+  })
+
+  it('상한이 백엔드 판정 시각(300초)보다 뒤에 온다 — 서버 판정을 받아 보여 준다', () => {
+    expect(JOB_POLL_LIMIT_MS).toBeGreaterThan(300_000)
+  })
+
+  it('안내 시점이 상한보다 먼저다', () => {
+    expect(JOB_POLL_SLOW_MS).toBeLessThan(JOB_POLL_LIMIT_MS)
   })
 })
 
