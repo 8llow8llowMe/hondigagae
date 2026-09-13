@@ -150,11 +150,8 @@ describe('일정 mock — 생성', () => {
 
   it('제목이 60자를 넘으면 PLAN_104 다', () => {
     const result = create({ ...VALID, title: 'ㄱ'.repeat(61) })
-    const raw = (result?.payload.dataHeader.resultMessage ?? {}) as {
-      errors?: { code: string }[]
-    }
     expect(result?.status).toBe(400)
-    expect(raw.errors?.[0]?.code).toBe('PLAN_104')
+    expect(result?.payload.dataHeader.fieldErrors?.[0]?.code).toBe('PLAN_104')
   })
 
   it('음수 예산은 PLAN_107 이다', () => {

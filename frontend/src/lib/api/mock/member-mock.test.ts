@@ -102,11 +102,12 @@ describe('PATCH /members/me — 닉네임만 바꾼다', () => {
     expect(result?.payload.dataHeader.resultCode).toBe('MEMBER_109')
   })
 
-  /** 필드 오류는 `{ message, errors: [...] }` 구조로 와야 폼이 필드에 매핑할 수 있다 */
-  it('검증 실패는 필드별 구조로 온다', () => {
-    const raw = call('/members/me', 'PATCH', { nickname: '' })?.payload.dataHeader.resultMessage
+  /** 필드 오류는 `fieldErrors` 로 와야 폼이 필드에 매핑할 수 있다 — #491 */
+  it('검증 실패는 문자열 대표 메시지 + fieldErrors 로 온다', () => {
+    const header = call('/members/me', 'PATCH', { nickname: '' })?.payload.dataHeader
 
-    expect(raw).toMatchObject({ errors: [{ field: 'nickname', code: 'MEMBER_108' }] })
+    expect(typeof header?.resultMessage).toBe('string')
+    expect(header?.fieldErrors).toMatchObject([{ field: 'nickname', code: 'MEMBER_108' }])
   })
 })
 

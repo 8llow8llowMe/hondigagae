@@ -401,7 +401,7 @@ describe('resolveMock — 인증', () => {
     expect(result?.payload.dataHeader.resultCode).toBe('MEMBER_001')
   })
 
-  it('필드 검증 실패는 ValidationErrorBody 형태로 온다', () => {
+  it('필드 검증 실패는 문자열 resultMessage + fieldErrors 로 온다 (#491)', () => {
     const result = resolveMock(
       '/members/signup',
       'POST',
@@ -410,12 +410,11 @@ describe('resolveMock — 인증', () => {
     )
 
     expect(result?.status).toBe(400)
-    const raw = result?.payload.dataHeader.resultMessage as {
-      message: string
-      errors: { code: string; field: string; message: string }[]
-    }
-    expect(Array.isArray(raw.errors)).toBe(true)
-    expect(raw.errors[0]?.field).toBe('password')
+    // 대표 메시지가 문자열이 아니면 화면에 [object Object] 가 나간다
+    expect(typeof result?.payload.dataHeader.resultMessage).toBe('string')
+    const fieldErrors = result?.payload.dataHeader.fieldErrors
+    expect(Array.isArray(fieldErrors)).toBe(true)
+    expect(fieldErrors?.[0]?.field).toBe('password')
   })
 
   it('mock 이 모르는 POST 는 null 이라 게이트웨이로 넘어간다', () => {

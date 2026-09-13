@@ -42,38 +42,39 @@ export type FormErrors = {
 }
 ```
 
-필드 오류와 폼 전체 오류를 **한 타입에 담되 자리를 나눈다.** 백엔드가 두 종류를 모두
-`resultMessage` 로 내려주기 때문이다 (§4).
+필드 오류와 폼 전체 오류를 **한 타입에 담되 자리를 나눈다.** 백엔드도 대표 메시지
+(`resultMessage`)와 필드 목록(`fieldErrors`)을 두 키로 나눠 내려준다 (§4).
 
 ## 4. 서버 400 → 필드 매핑 (핵심)
 
 ### 4.1 백엔드가 내려주는 두 가지 형태
 
-**(a) Bean Validation 실패** — `resultMessage` 가 **객체**다.
+정본은 `backend/docs/api-design-guide.md` §2-1 이다. **`resultMessage` 는 오류 종류와
+무관하게 항상 문자열이고**, 필드 목록은 `fieldErrors` 로 분리돼 있다 (#491).
+
+**(a) 검증 실패** — `fieldErrors` 가 **배열**이다.
 
 ```jsonc
 {
   "dataHeader": {
     "success": false,
     "resultCode": "MEMBER_104", // 정렬된 첫 오류의 코드
-    "resultMessage": {
-      "message": "비밀번호는 8자 이상 20자 이하여야 합니다.", // 첫 오류의 메시지
-      "errors": [
-        {
-          "code": "MEMBER_104",
-          "field": "password",
-          "message": "비밀번호는 8자 이상 20자 이하여야 합니다.",
-        },
-        { "code": "MEMBER_105", "field": "password", "message": "비밀번호는 공백 없이 ..." },
-        { "code": "MEMBER_108", "field": "nickname", "message": "닉네임은 필수입니다." },
-      ],
-    },
+    "resultMessage": "비밀번호는 8자 이상 20자 이하여야 합니다.", // 첫 오류의 메시지
+    "fieldErrors": [
+      {
+        "code": "MEMBER_104",
+        "field": "password",
+        "message": "비밀번호는 8자 이상 20자 이하여야 합니다.",
+      },
+      { "code": "MEMBER_105", "field": "password", "message": "비밀번호는 공백 없이 ..." },
+      { "code": "MEMBER_108", "field": "nickname", "message": "닉네임은 필수입니다." },
+    ],
   },
   "dataBody": null,
 }
 ```
 
-**(b) 도메인 예외** — `resultMessage` 가 **문자열**이다.
+**(b) 도메인 예외** — `fieldErrors` 가 **`null`** 이다.
 
 ```jsonc
 {
@@ -81,29 +82,33 @@ export type FormErrors = {
     "success": false,
     "resultCode": "MEMBER_001",
     "resultMessage": "이미 가입된 이메일 (a@b.c)입니다.",
+    "fieldErrors": null,
   },
   "dataBody": null,
 }
 ```
 
-`resultMessage` 는 백엔드 `DataHeader` 에서 `Object` 타입이다. **`string` 으로 좁히지 않는다.**
+> **두 형태를 `resultMessage` 만 보고 가르지 않는다.** 둘 다 문자열이라 갈리지 않는다 —
+> **가르는 것은 `fieldErrors` 의 유무다.** 문자열이면 폼 전체 오류로 단정하던 옛 구현이
+> 계약 통일 직후 모든 폼의 필드 오류를 통째로 죽였다 (#501).
 
 ### 4.2 매핑 규칙
 
-1. **`errors[]` 를 순회하되 필드별 첫 오류만 채택한다. 뒤 항목으로 덮어쓰지 않는다.**
+1. **`fieldErrors[]` 를 순회하되 필드별 첫 오류만 채택한다. 뒤 항목으로 덮어쓰지 않는다.**
    백엔드 `ValidationErrorSupport` 가 이미 정렬해서 내려준다:
    **(1) DTO 선언 순서 → (2) 제약 우선순위 → (3) 메시지**.
    제약 우선순위는 `필수(0) → 길이(1) → 범위(2) → 형식(3)` 으로, 사용자가 먼저 고쳐야 할 것이 앞에 온다.
    덮어쓰면 이 정렬이 통째로 무의미해진다. 위 예시에서 비밀번호는 `MEMBER_104`(길이)를 보여야지
    `MEMBER_105`(문자 구성)를 보이면 안 된다.
-2. `resultMessage` 가 **문자열**이면 `form` 에 넣는다. 필드 오류가 아니다.
+2. `fieldErrors` 가 없으면(`null`·`undefined`) `resultMessage` 를 `form` 에 넣는다.
+   필드 오류가 아니다.
 3. 형태가 어느 쪽도 아니면 `fields` 는 비우고 `form` 에 화면 기본 문구를 넣는다.
    **빈 오류로 조용히 성공한 것처럼 보이게 두지 않는다.**
 4. **서버 문구를 그대로 쓴다.** FE 에서 한국어로 다시 쓰지 않는다 (`api-integration-guide.md` §6).
 
 ### 4.3 필드명 정합성
 
-`errors[].field` 는 백엔드 DTO 의 필드명이다. 폼 상태의 키를 **요청 DTO 필드명과 같게** 둔다.
+`fieldErrors[].field` 는 백엔드 DTO 의 필드명이다. 폼 상태의 키를 **요청 DTO 필드명과 같게** 둔다.
 다르면 매핑 테이블이 필요해지고, 백엔드가 필드를 바꿀 때 조용히 깨진다.
 
 `field` 가 `"request"` 면 백엔드가 필드를 특정하지 못한 경우다 → `form` 으로 보낸다.
@@ -175,7 +180,7 @@ password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
 
 - [ ] 폼 상태 키가 요청 DTO 필드명과 같다
 - [ ] zod 스키마에 대응 백엔드 코드 주석이 있다
-- [ ] 서버 400 을 `field-errors` 로 병합한다 (`errors[]` 형태·문자열 형태 둘 다)
+- [ ] 서버 400 을 `field-errors` 로 병합한다 (`fieldErrors` 형태·문자열 형태 둘 다)
 - [ ] 필드별 첫 오류만 표시한다
 - [ ] 폼 전체 오류가 `role="alert"` 로 나온다
 - [ ] 제출 중 중복 방지가 두 겹이다

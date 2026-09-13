@@ -119,14 +119,19 @@ FE 작업을 시작하는 누구나(사람·에이전트) **① 무엇을 만들
 
 ```ts
 type Response<T> = {
-  dataHeader: { success: boolean; resultCode: string | null; resultMessage: unknown | null }
+  dataHeader: {
+    success: boolean
+    resultCode: string | null
+    resultMessage: string | null
+    fieldErrors?: ValidationErrorItem[] | null
+  }
   dataBody: T | null
 }
 ```
 
 - 성공: `{ dataHeader: { success: true, resultCode: null, resultMessage: null }, dataBody: T }`
 - 실패: `{ dataHeader: { success: false, resultCode: "PET_001", resultMessage: "..." }, dataBody: null }`
-- **`resultMessage` 는 `Object` 타입이다.** 문자열이 아닐 수 있다(Bean Validation은 필드별 맵을 담는다). FE 타입은 `unknown` 으로 받고 렌더 직전 정규화한다.
+- **`resultMessage` 는 항상 문자열이다** (#491). 필드별 오류는 `fieldErrors` 로 분리돼 있다. 렌더 직전 `toMessage()` 로 정규화하는 것은 그대로다 — 게이트웨이가 대신 답하면 봉투 자체가 오지 않는다(#203).
 
 ### 3-3. 에러 규약
 

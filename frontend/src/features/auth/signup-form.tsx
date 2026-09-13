@@ -138,12 +138,12 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
         setCodeErrorStatus(error.status)
 
         // AUTH_004(코드 불일치): 도메인 예외라 서버가 필드를 특정하지 않는다.
-        // 코드 필드 오류로 보여야 하므로(D4) toFormErrors 가 필드 오류로 읽을 모양으로
-        // 다시 감싼다. field-errors.ts 는 건드리지 않는다 — 소비만 한다.
+        // 코드 필드 오류로 보여야 하므로(D4) `fieldErrors` 자리에 직접 실어 준다.
+        // field-errors.ts 는 건드리지 않는다 — 소비만 한다.
         if (error.resultCode === 'AUTH_004') {
-          throw new ApiError(error.status, error.resultCode, {
-            errors: [{ field: 'code', message: error.message }],
-          })
+          throw new ApiError(error.status, error.resultCode, error.rawMessage, [
+            { code: error.resultCode, field: 'code', message: error.message },
+          ])
         }
 
         // AUTH_005(코드 만료): 1단계로 되돌린다 — 정본 D4. 빈 useEffect 로 감시하지

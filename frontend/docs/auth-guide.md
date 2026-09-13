@@ -97,7 +97,7 @@ export const PROTECTED_PATHS = [
 
 - 재전송 쿨다운을 두고 남은 시간을 표시한다.
 - 코드 만료 시간을 화면에 드러낸다 (실제 TTL은 백엔드 확인).
-- 검증 실패 사유는 `resultMessage` 를 그대로 노출한다.
+- 검증 실패 사유는 `resultMessage` · `fieldErrors[].message` 를 그대로 노출한다.
 
 ## 7. 로그아웃
 

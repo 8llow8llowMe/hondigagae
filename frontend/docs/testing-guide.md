@@ -100,7 +100,7 @@ describe('PlaceListSection', () => {
 
 마크업 문자열 검증보다 훨씬 견고하다. 이 프로젝트에서 특히 중요한 것:
 
-- `dataHeader.success` 판별과 `resultMessage` 정규화 (**문자열이 아닐 수 있다**)
+- `dataHeader.success` 판별, `resultMessage` 정규화, `fieldErrors` → 필드 매핑
 - HTTP 상태 → 에러 종류 매핑 (404 / 401 / 400 / 5xx)
 - **비동기 job 상태 판정** — HTTP 200 + `status=FAILED` 를 **실패로** 판정하는지
 - `SliceResponse` 페이지 병합과 `hasNext` 종료 판정
@@ -135,11 +135,15 @@ export function ok<T>(dataBody: T): ApiResponse<T> {
   return { dataHeader: { success: true, resultCode: null, resultMessage: null }, dataBody }
 }
 
-export function fail(resultCode: string, resultMessage: unknown = null): ApiResponse<never> {
-  return { dataHeader: { success: false, resultCode, resultMessage }, dataBody: null }
+export function fail(
+  resultCode: string,
+  resultMessage: string | null = null,
+  fieldErrors: ValidationErrorItem[] | null = null,
+): ApiResponse<never> {
+  return { dataHeader: { success: false, resultCode, resultMessage, fieldErrors }, dataBody: null }
 }
 
-/** Bean Validation 실패처럼 resultMessage 가 문자열이 아닌 경우 */
+/** 검증 실패 — 대표 메시지는 문자열이고 필드 목록은 fieldErrors 로 간다 */
 export function failWithFields(resultCode: string, fields: Record<string, string>) {
   return fail(resultCode, fields)
 }
@@ -235,7 +239,7 @@ head -60 /tmp/places.json
 
 - [ ] 에러 분기 판정 함수
 - [ ] 비동기 job 실패 판정 (HTTP 200 + `FAILED`)
-- [ ] `resultMessage` 정규화 (비문자열 입력 포함)
+- [ ] `resultMessage` 정규화 (비문자열 입력 포함) · `fieldErrors` → 필드 매핑
 - [ ] `SliceResponse` 병합 / `hasNext` 종료
 - [ ] 포맷 함수 전부
 - [ ] 좌표 파싱·검증

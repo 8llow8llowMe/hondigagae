@@ -9,7 +9,7 @@ import {
   nextPlanId,
   nextPlanItemId,
 } from '@/lib/api/mock/store'
-import type { ApiResponse, CodeNameMetadata, SliceResponse } from '@/types/api'
+import type { ApiResponse, CodeNameMetadata, SliceResponse, ValidationErrorItem } from '@/types/api'
 import type { ScoreMetricMetadata } from '@/types/insight'
 import type {
   PlanAlternativePlaceItem,
@@ -38,19 +38,24 @@ function ok<T>(dataBody: T): ApiResponse<T> {
   return { dataHeader: { success: true, resultCode: null, resultMessage: null }, dataBody }
 }
 
-function fail(status: number, resultCode: string, resultMessage: unknown): MockResult {
+function fail(
+  status: number,
+  resultCode: string,
+  resultMessage: string,
+  fieldErrors: ValidationErrorItem[] | null = null,
+): MockResult {
   return {
     status,
-    payload: { dataHeader: { success: false, resultCode, resultMessage }, dataBody: null },
+    payload: {
+      dataHeader: { success: false, resultCode, resultMessage, fieldErrors },
+      dataBody: null,
+    },
   }
 }
 
-/** Bean Validation 실패는 `{ message, errors: [...] }` 형태로 온다 — ValidationErrorSupport */
-function failValidation(errors: { code: string; field: string; message: string }[]): MockResult {
-  return fail(400, 'PLAN_100', {
-    message: errors[0]?.message ?? '요청 값이 올바르지 않습니다.',
-    errors,
-  })
+/** 검증 실패는 문자열 `resultMessage` + `fieldErrors` 로 온다 — ValidationErrorSupport (#491) */
+function failValidation(errors: ValidationErrorItem[]): MockResult {
+  return fail(400, 'PLAN_100', errors[0]?.message ?? '요청 값이 올바르지 않습니다.', errors)
 }
 
 // 토큰이 없거나 유효하지 않은 요청은 도메인에 닿기 전에 security-core 가 막는다 —

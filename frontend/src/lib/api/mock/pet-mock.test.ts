@@ -33,10 +33,8 @@ function listBody(token: string | null = DEMO_TOKEN): PetList {
 }
 
 function errorsOf(result: ReturnType<typeof call>): { code: string; field: string }[] {
-  const message = result?.payload.dataHeader.resultMessage as {
-    errors?: { code: string; field: string }[]
-  }
-  return message.errors ?? []
+  // 검증 실패의 필드 목록은 `resultMessage` 가 아니라 `fieldErrors` 로 온다 (#491)
+  return result?.payload.dataHeader.fieldErrors ?? []
 }
 
 describe('반려견 mock — 인증', () => {
