@@ -15,6 +15,11 @@ import { PLAN_STATUS_FILTERS, type PlanFilters, type PlanStatusFilter } from '@/
 /**
  * 좁히기 컨트롤 — 아트보드 04(모바일) · 05(데스크톱 레일).
  *
+ * **서는 자리가 폭에 따라 갈린다.** 1024 이상은 좌측 레일(`PlanFilterRail`)이고, 그 아래는
+ * 탭·칩이 **목록 카드 안**에 제목 줄 바로 아래로 들어간다 (#536). 카드 밖 맨 위에 두면
+ * 페이지 제목보다 먼저 읽혀, 이 화면이 무엇인지 알기 전에 조건부터 지나게 된다.
+ * 자리를 정하는 쪽은 `plan-list-view.tsx` 이고 그 주석이 근거의 정본이다.
+ *
  * **축의 성격이 컨트롤 종류를 정한다** (아트보드 04 주석).
  *
  * | 축     | 모바일           | 데스크톱      |
@@ -51,7 +56,12 @@ const STATUS_LABELS: Record<PlanStatusFilter, string> = {
   COMPLETED: '완료',
 }
 
-/** 모바일 — 전폭 균등 4열, 48px. 밑줄은 시각 표현일 뿐이고 의미는 라디오다 */
+/**
+ * 모바일 — **카드 폭**을 균등 4열로 가르고 48px. 밑줄은 시각 표현일 뿐이고 의미는 라디오다.
+ *
+ * 좌우 인셋을 주지 않는다 — 밑줄 탭은 칸이 담는 면의 폭을 그대로 나눠야 어느 칸이 켜졌는지
+ * 읽힌다. 아래 `border-b` 는 §0 의 "같은 카드 안을 나누는 1px 구분선" 이다.
+ */
 export function PlanStatusTabs({
   filters,
   onChange,
@@ -99,7 +109,15 @@ export function PlanPetChips({
   return (
     <div
       aria-label={messages.plan.petGroupLabel}
-      /* 인셋은 카드 축이다 — 근거는 `place-filter-chips.tsx` 가 정본이다 (#457) */
+      /*
+        **인셋은 카드 축이다** (#457). #536 이 이 줄을 카드 안으로 들여보내면서 그 값이
+        빌려 온 축이 아니라 **담는 카드 자신의 인셋**이 됐다 — 768 실측에서 칩 왼쪽 끝이
+        카드 제목과 같은 20 에 선다(테두리 1px 차이는 #443 · #447 과 같은 의도다).
+
+        **`border-b` 는 남긴다.** 위치가 바뀌어도 하는 일은 같다 — 이제는 카드 밖에서
+        아래 카드와 자기를 가르는 줄이 아니라, **같은 카드 안에서 도구와 결과를 가르는**
+        1px 구분선이다 (§0). 선은 padding 밖이라 카드 폭 그대로 간다.
+      */
       className={cn('border-border flex flex-wrap gap-1.5 border-b py-3', INSET_CLASS.card)}
     >
       {pets.map((pet) => {

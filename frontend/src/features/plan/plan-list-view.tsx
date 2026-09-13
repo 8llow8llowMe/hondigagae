@@ -131,19 +131,6 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
       */}
       <SurfaceStack id="plan-list" tabIndex={-1}>
         {/*
-          **모바일 칩은 카드 밖이다.** 상태 탭·반려견 칩은 목록을 좁히는 **도구**이고 카드는
-          그 결과를 담는다 — §0 의 카드 판정 3문에서 ① 자기 제목이 없고 ③ 축이 하나뿐이라
-          걸린다 (#439 와 같은 판단).
-
-          **데스크톱 레일은 반대로 카드다** (#535) — 자기 제목과 축 셋을 갖고 랜드마크로
-          혼자 선다. 근거는 `app/globals.css` 의 `.filter-rail` 주석이 정본이다.
-        */}
-        <div className="lg:hidden">
-          <PlanStatusTabs filters={filters} onChange={apply} statusCounts={statusCounts} />
-          <PlanPetChips filters={filters} onChange={apply} pets={pets} />
-        </div>
-
-        {/*
           **페이지 제목이 카드 제목으로 들어왔다** (§0 "섹션 제목은 섹션 안에 있다"). 카드가
           하나뿐이고 그 이름이 곧 페이지의 이름이라, 밖에 두면 어느 묶음의 제목인지 모호해진다.
           보이는 제목은 카드의 `h2`, 페이지의 `h1` 은 `sr-only` — 장소 목록(#439)과 같은 방식이다.
@@ -190,6 +177,28 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
             ) : undefined
           }
         >
+          {/*
+            **모바일 필터는 제목 줄 아래, 카드 안이다** (#536). 1024 미만에서는 이것이 목록
+            위에 서는 유일한 블록이라, 카드 밖에 두면 **페이지 제목보다 먼저 읽힌다** — 이
+            화면이 무엇인지 알기 전에 조건부터 지나게 된다 (375 · 768 실측). 제목을 대신
+            밖으로 빼는 길은 §0 이 막는다("섹션 제목은 섹션 안에 있다"): 카드가 하나뿐이라
+            제목만 회색 바닥에 뜨고 그 아래 카드는 이름 없는 상자가 된다.
+
+            **칩이 카드가 된 것은 아니다** (#535). §0 의 카드 판정 3문에서 ① 자기 제목이
+            없고 ③ 축이 하나뿐이라 여전히 걸린다 — 그래서 `Surface` 로 감싸지 않고 목록
+            카드 안에 그대로 눕는다. 도구와 결과는 카드 경계가 아니라 **1px 구분선**이
+            가른다 (칩 줄의 `border-b`, 반려견이 없으면 탭의 `border-b`).
+
+            **데스크톱 레일은 반대로 카드다** (#535) — 자기 제목과 축 셋을 갖고 랜드마크로
+            혼자 선다. 근거는 `app/globals.css` 의 `.filter-rail` 주석이 정본이다. 레일은
+            제목 줄 **옆** 열이라 이 순서 문제가 애초에 없고, 그래서 `lg:hidden` 로 정확히
+            갈린다.
+          */}
+          <div className="lg:hidden">
+            <PlanStatusTabs filters={filters} onChange={apply} statusCounts={statusCounts} />
+            <PlanPetChips filters={filters} onChange={apply} pets={pets} />
+          </div>
+
           {section}
         </Surface>
       </SurfaceStack>
