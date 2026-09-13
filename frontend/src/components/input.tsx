@@ -63,6 +63,19 @@ export function Input({
       className={cn(
         // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
         'text-body-1 h-11 w-full rounded-md border px-3',
+        /*
+          **배경을 명시한다** (#531). 예전에는 투명이라 담는 면의 색을 그대로 입었다 —
+          흰 카드 위(로그인·회원가입·반려견 폼·모달 열둘)에서는 `--bg` 와 같은 색이라 차이가
+          없었지만, **L0 회색 바닥(`--bg-sunken` #F5F6F8) 위에 놓인 장소 검색만** 입력란이
+          바닥과 같은 회색이 되어 "여기에 쓸 수 있다" 가 읽히지 않았다. 테두리 하나로 버티던
+          자리다.
+
+          그래서 `--bg`(#FFFFFF)를 못박는다 — **흰 카드 위 사용처는 값이 같아 픽셀이 바뀌지
+          않고**, 회색 바닥 위에서만 입력란이 면으로 떠오른다. 회색 위에서만 흰 배경을 주는
+          변형(`bg-bg lg:bg-transparent` 류)을 두지 않는 이유는, 같은 컴포넌트가 폭이 아니라
+          **담는 면**에 따라 갈리면 사용처가 자기 바닥색을 알아야 하기 때문이다.
+        */
+        'bg-bg',
         'placeholder:text-fg-subtle',
         'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
         'disabled:cursor-not-allowed disabled:opacity-50',

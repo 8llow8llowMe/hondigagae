@@ -330,6 +330,21 @@ export function PlaceMapView({
       </div>
 
       {/* ── 데스크톱: 좌측 400 고정 패널 ─────────────────────────────────── */}
+      {/*
+        ── 여닫기는 **갈아끼우기가 아니라 슬라이드다** (#531)
+
+        예전에는 `panelOpen ? <패널> : <펼치기 버튼>` 으로 **서로 다른 DOM 이 교체**돼
+        트랜지션을 걸 대상이 아예 없었다 — 400px 패널이 한 프레임에 나타나고 사라졌다.
+        이제 패널은 **항상 마운트된 채** 왼쪽으로 밀려나고, 펼치기 버튼만 그 위에서
+        나타난다.
+
+        **`prefers-reduced-motion` 은 전역이 잡는다** — `app/globals.css` 의 매체질의가
+        모든 요소의 `transition-duration` 을 0.01ms 로 덮으므로 여기에 `motion-reduce:`
+        변형을 따로 적지 않는다 (적으면 규칙이 두 군데가 된다).
+
+        **닫힌 패널은 `inert` 다.** 화면 밖으로 밀려났을 뿐 DOM 에는 남아 있어, 그대로
+        두면 Tab 이 보이지 않는 목록 수십 항목을 지나간다.
+      */}
       <div
         className={cn(
           // 상단은 보기 전환 토글과 **같은 높이**다 (lg 헤더의 `pt-6`) — 8px 어긋나면
@@ -339,50 +354,76 @@ export function PlaceMapView({
           // 16 이었을 때는 패널이 그 위에 바로 얹혀 축척이 눌려 보였다 (실측: 막대가
           // 바닥에서 0~19px, 왼쪽 6px 부터 129px 폭). 32 면 13px 이 남는다.
           'absolute top-6 bottom-8 left-4 z-30 hidden lg:block',
-          panelOpen ? 'map-panel-width' : 'w-auto',
         )}
       >
-        {panelOpen ? (
-          // 접기 탭이 패널 **밖으로** 튀어나오므로 여기서 자르지 않는다
-          <div className="relative h-full">
-            {/*
+        {/*
+          **펼치기 버튼은 패널과 형제이고 자리가 고정이다.** 패널이 밀려나도 이 버튼은
+          원래 자리(패널 좌상단)에 그대로 서서, 접기 전후로 손잡이가 같은 자리에 있다.
+          열려 있는 동안에는 패널 아래 깔리므로 `opacity-0` 과 함께 클릭도 막는다.
+        */}
+        <button
+          type="button"
+          onClick={() => setPanelOpen(true)}
+          aria-expanded={false}
+          aria-label={messages.map.expandPanel}
+          tabIndex={panelOpen ? -1 : undefined}
+          className={cn(
+            'bg-bg border-border text-fg-muted hover:text-fg focus-visible:ring-brand-500 absolute top-0 left-0 flex size-11 items-center justify-center rounded-xl border shadow-lg transition-opacity focus-visible:ring-2 focus-visible:outline-none',
+            panelOpen && 'pointer-events-none opacity-0',
+          )}
+        >
+          <ChevronRightIcon size={20} />
+        </button>
+
+        {/* 접기 탭이 패널 **밖으로** 튀어나오므로 여기서 자르지 않는다 */}
+        <div
+          inert={!panelOpen}
+          className={cn(
+            'map-panel-width relative h-full transition-transform',
+            // 닫히면 패널 오른쪽 끝이 뷰포트 x=0 에 닿도록 자기 폭 + 왼쪽 여백(16)만큼 민다.
+            // `-translate-x-full`(폭만큼)로는 `left-4` 때문에 16px 조각이 남는다.
+            // 값이 `calc()` 라 globals.css 의 이름 있는 클래스다 (`.map-panel-collapsed`)
+            !panelOpen && 'map-panel-collapsed',
+          )}
+        >
+          {/*
               **오른쪽 위만 각지다** (`rounded-tr-none`). 둥근 모서리에 탭을 붙이면 그
               곡선만큼 지도가 초승달로 비쳐 탭이 떠 있는 것처럼 보인다. 그 자리는 탭이
               덮는 자리이므로 각지게 두는 것이 맞다.
             */}
-            <div className="bg-bg border-border flex h-full w-full flex-col overflow-hidden rounded-xl rounded-tr-none border shadow-lg">
-              {/*
+          <div className="bg-bg border-border flex h-full w-full flex-col overflow-hidden rounded-xl rounded-tr-none border shadow-lg">
+            {/*
                 **패널 머리에는 필터가 온다.** 예전에는 "지도에 보이는 곳 20" 이 제목으로
                 앉아 있었는데, 제목이 할 일이 없는 자리다 — 이 패널이 무엇인지는 안에 든
                 목록이 이미 말한다. 개수는 아래 캡션으로 내렸다.
               */}
-              <div className="border-border border-b px-3 py-2">
-                <PlaceMapFilterBar filters={filters} authed={authed} />
-              </div>
-
-              <p className="text-caption text-fg-muted border-border bg-bg-sunken border-b px-4 py-2 font-medium">
-                {countLine}
-              </p>
-
-              <div className="min-h-0 flex-1 overflow-y-auto">
-                {visible.length === 0 ? (
-                  <EmptyState
-                    title={messages.map.emptyInView}
-                    description={messages.map.emptyInViewDescription}
-                  />
-                ) : (
-                  <PlaceMapPanel
-                    places={visible}
-                    selectedId={selectedId}
-                    onSelect={setSelectedId}
-                    renderRowAction={renderRowAction}
-                    renderRowNotice={renderRowNotice}
-                  />
-                )}
-              </div>
+            <div className="border-border border-b px-3 py-2">
+              <PlaceMapFilterBar filters={filters} authed={authed} />
             </div>
 
-            {/*
+            <p className="text-caption text-fg-muted border-border bg-bg-sunken border-b px-4 py-2 font-medium">
+              {countLine}
+            </p>
+
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {visible.length === 0 ? (
+                <EmptyState
+                  title={messages.map.emptyInView}
+                  description={messages.map.emptyInViewDescription}
+                />
+              ) : (
+                <PlaceMapPanel
+                  places={visible}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                  renderRowAction={renderRowAction}
+                  renderRowNotice={renderRowNotice}
+                />
+              )}
+            </div>
+          </div>
+
+          {/*
               ── 접기 탭 ──────────────────────────────────────────────────────
 
               **패널 안이 아니라 밖에 붙는다.** 안쪽 머리에 두면 목록의 컨트롤처럼 읽혀서
@@ -392,28 +433,17 @@ export function PlaceMapView({
               높이는 **닫혔을 때 펼치기 버튼이 서는 자리**와 같다(`top-0` · 44) — 접고
               펴는 동작에서 손잡이가 제자리에 남아 있어야 같은 것으로 보인다.
             */}
-            <button
-              type="button"
-              onClick={() => setPanelOpen(false)}
-              aria-expanded
-              aria-label={messages.map.collapsePanel}
-              title={messages.map.collapsePanel}
-              className="bg-bg border-border text-fg-muted hover:text-fg focus-visible:ring-brand-500 absolute top-0 -right-6 flex h-11 w-6 items-center justify-center rounded-r-lg border border-l-0 shadow-md focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
-            >
-              <ChevronLeftIcon size={16} />
-            </button>
-          </div>
-        ) : (
           <button
             type="button"
-            onClick={() => setPanelOpen(true)}
-            aria-expanded={false}
-            aria-label={messages.map.expandPanel}
-            className="bg-bg border-border text-fg-muted hover:text-fg focus-visible:ring-brand-500 flex size-11 items-center justify-center rounded-xl border shadow-lg focus-visible:ring-2 focus-visible:outline-none"
+            onClick={() => setPanelOpen(false)}
+            aria-expanded
+            aria-label={messages.map.collapsePanel}
+            title={messages.map.collapsePanel}
+            className="bg-bg border-border text-fg-muted hover:text-fg focus-visible:ring-brand-500 absolute top-0 -right-6 flex h-11 w-6 items-center justify-center rounded-r-lg border border-l-0 shadow-md focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
           >
-            <ChevronRightIcon size={20} />
+            <ChevronLeftIcon size={16} />
           </button>
-        )}
+        </div>
       </div>
 
       {/* ── 모바일: 하단 시트 3단 ────────────────────────────────────────── */}

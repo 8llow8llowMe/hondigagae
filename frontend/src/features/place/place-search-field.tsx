@@ -6,7 +6,9 @@ import { Button } from '@/components/button'
 import { Input } from '@/components/input'
 import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { KEYWORD_MAX_LENGTH, normalizeKeyword } from '@/lib/url/place-filters'
+import { cn } from '@/lib/utils/cn'
 import type { PlaceFilters } from '@/types/place'
 
 const INPUT_ID = 'place-keyword'
@@ -25,6 +27,11 @@ const INPUT_ID = 'place-keyword'
  * **지도 보기에는 두지 않는다.** 지도 갈래는 필터 레일도 칩도 없다 — 아트보드 05 가 지도를
  * 바탕으로 두기 때문이고, 조건은 URL 에 남아 `nearbyPlacesPath` 가 그대로 싣는다
  * (`lib/api/place.ts`). 검색만 예외로 두면 지도 위에 도구가 하나만 떠 규칙이 갈린다.
+ *
+ * **좌우 인셋을 스스로 갖는다** (#531). `SurfaceStack` 직속이라 모바일에서 스택이 좌우
+ * 여백을 주지 않고(카드가 전폭으로 내려앉는 화면이다), 이 폼만 `px` 를 안 받아 **입력란이
+ * 화면 가장자리에 붙어 있었다** — 바로 아래 칩 줄(`INSET_CLASS.card`)과 목록 행은 16 에
+ * 서는데 검색만 0 이었다. 같은 축을 쓴다: 왼쪽 세로선은 페이지가 하나로 쓴다(`inset.ts`).
  *
  * ### 즉시 반영하지 않는다
  *
@@ -54,7 +61,7 @@ export function PlaceSearchField({ filters }: { filters: PlaceFilters }) {
       // `search` 랜드마크 — 보조기기가 이 구간을 이름으로 찾는다
       role="search"
       aria-label={messages.place.searchLabel}
-      className="flex items-start gap-2"
+      className={cn('flex items-start gap-2 pt-3', INSET_CLASS.card)}
       onSubmit={(event) => {
         event.preventDefault()
         submit(normalizeKeyword(text))

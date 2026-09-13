@@ -7,6 +7,7 @@ import { Button } from '@/components/button'
 import { Chip, ChipGroup } from '@/components/chip'
 import { FilterListHeading } from '@/components/filter-list'
 import { CheckIcon, ChevronDownIcon, SlidersIcon } from '@/components/icons'
+import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { useSelectedPet } from '@/features/nav/use-selected-pet'
 import { CONTENT_TYPE_LABEL, SIGUNGU_LABEL } from '@/features/place/filter-labels'
 import {
@@ -17,7 +18,7 @@ import {
 } from '@/features/place/place-filter-fields'
 import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { messages } from '@/lib/messages'
-import { INSET_CLASS } from '@/lib/ui/inset'
+import { INSET_BLEED_CLASS, INSET_CLASS } from '@/lib/ui/inset'
 import { DEFAULT_PLACE_FILTERS, toPlaceFilterQuery } from '@/lib/url/place-filters'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceFilters } from '@/types/place'
@@ -47,6 +48,8 @@ export function PlaceFilterChips({
 }) {
   const { apply, reset } = usePlaceFilterNav()
   const { pet } = useSelectedPet(authed)
+
+  const rail = useScrollRail<HTMLDivElement>()
 
   const [open, setOpen] = useState<OpenSheet | null>(null)
   // 시트 초안. 열 때 현재 값을 복사하고 적용 전까지 URL 을 건드리지 않는다
@@ -78,57 +81,101 @@ export function PlaceFilterChips({
   const dirty = toPlaceFilterQuery(filters) !== toPlaceFilterQuery(DEFAULT_PLACE_FILTERS)
 
   return (
-    /*
-      **인셋은 카드 축(`card`, 16/20)이다** (#457). 예전에는 `md:px-10` 을 직접 적어
-      768 에서 스택 인셋 24 위에 40 이 얹혀 글줄이 64 에 섰다 — 바로 아래 카드 제목
-      (24+1+20 = 45)과 19px 갈렸다. 칩은 카드 밖 도구지만(#439) **L0 위에 놓이는 블록도
-      카드 안 글줄과 같은 축**이어야 한다 (`plan-add-place-header` 의 `inset` 주석, #451).
+    <>
+      {/*
+        **인셋은 카드 축(`card`, 16/20)이다** (#457). 예전에는 `md:px-10` 을 직접 적어
+        768 에서 스택 인셋 24 위에 40 이 얹혀 글줄이 64 에 섰다 — 바로 아래 카드 제목
+        (24+1+20 = 45)과 19px 갈렸다. 칩은 카드 밖 도구지만(#439) **L0 위에 놓이는 블록도
+        카드 안 글줄과 같은 축**이어야 한다 (`plan-add-place-header` 의 `inset` 주석, #451).
 
-      카드 테두리 1px 만큼(44 vs 45) 남는 차이는 #443 · #447 과 같은 의도다.
+        카드 테두리 1px 만큼(44 vs 45) 남는 차이는 #443 · #447 과 같은 의도다.
 
-      **`border-b` 는 남긴다.** L0 위 스트립은 아래 카드와 자기를 가르는 줄이 필요하다 —
-      홈 특보 스트립과 같은 모양이다. 선은 padding 밖이라 전폭 그대로다.
-    */
-    <div className={cn('border-border border-b py-3', INSET_CLASS.card)}>
-      <ChipGroup label={messages.place.filterTitle} className="flex flex-wrap gap-1.5">
-        <Chip
-          selected={allowedOnly}
-          onSelect={() => apply({ ...filters, petAllowanceType: allowedOnly ? null : 'ALLOWED' })}
+        **`border-b` 는 남긴다.** L0 위 스트립은 아래 카드와 자기를 가르는 줄이 필요하다 —
+        홈 특보 스트립과 같은 모양이다. 선은 padding 밖이라 전폭 그대로다.
+
+        ── 줄바꿈이 아니라 가로 스크롤이다 (#531)
+
+        칩이 넷~다섯(초기화 포함)이라 375 에서 **두 줄로 접혔고**, 그 두 줄이 화면 첫
+        화면을 통째로 먹었다. 지도 갈래의 같은 축(`PlaceMapFilterBar`)은 이미 가로
+        스크롤러라 두 갈래가 다른 문법을 쓰고 있었다.
+
+        **`ChipGroup` 자신이 스크롤러다** — 바깥 div 를 스크롤러로 삼으면 넘치는 방향의
+        `padding-right` 가 무시돼 마지막 칩이 여백 없이 잘린다 (`scroll-rail.tsx` 머리주석).
+        그래서 인셋은 `INSET_BLEED_CLASS.card` 로 바깥 padding 을 상쇄하고 같은 값을 안쪽에
+        되돌린다 — 칩은 화면 끝까지 이어져 스크롤되되 첫 칩은 16 에 선다.
+      */}
+      <div className={cn('scroll-rail border-border border-b py-3', INSET_CLASS.card)}>
+        <ChipGroup
+          ref={rail.ref}
+          onScroll={rail.onScroll}
+          label={messages.place.filterTitle}
+          className={cn(
+            'flex scrollbar-none gap-1.5 overflow-x-auto',
+            INSET_BLEED_CLASS.card,
+            rail.fadeClassName,
+          )}
         >
-          {allowedOnly && <CheckIcon size={16} strokeWidth={2} />}
-          {messages.place.filterAllowedOnly}
-        </Chip>
-
-        <Chip
-          selected={filters.contentType !== null}
-          expanded={open === 'contentType'}
-          onSelect={() => openSheet('contentType')}
-        >
-          {contentTypeLabel}
-          <ChevronDownIcon size={16} />
-        </Chip>
-
-        <Chip
-          selected={filters.sigunguCode !== null}
-          expanded={open === 'region'}
-          onSelect={() => openSheet('region')}
-        >
-          {regionLabel}
-          <ChevronDownIcon size={16} />
-        </Chip>
-
-        <Chip selected={moreActive} expanded={open === 'more'} onSelect={() => openSheet('more')}>
-          <SlidersIcon size={16} />
-          {messages.place.filterMore}
-        </Chip>
-
-        {dirty && (
-          <Chip selected={false} onSelect={reset}>
-            {messages.place.resetFilters}
+          {/* 스크롤러 안에서는 칩이 줄어들면 안 된다 — `shrink-0` 이 없으면 flex 가
+              칩을 쥐어짜 글자가 잘리고, 넘치지 않으니 스크롤도 생기지 않는다 */}
+          <Chip
+            className="shrink-0"
+            selected={allowedOnly}
+            onSelect={() => apply({ ...filters, petAllowanceType: allowedOnly ? null : 'ALLOWED' })}
+          >
+            {allowedOnly && <CheckIcon size={16} strokeWidth={2} />}
+            {messages.place.filterAllowedOnly}
           </Chip>
-        )}
-      </ChipGroup>
 
+          <Chip
+            className="shrink-0"
+            selected={filters.contentType !== null}
+            expanded={open === 'contentType'}
+            onSelect={() => openSheet('contentType')}
+          >
+            {contentTypeLabel}
+            <ChevronDownIcon size={16} />
+          </Chip>
+
+          <Chip
+            className="shrink-0"
+            selected={filters.sigunguCode !== null}
+            expanded={open === 'region'}
+            onSelect={() => openSheet('region')}
+          >
+            {regionLabel}
+            <ChevronDownIcon size={16} />
+          </Chip>
+
+          <Chip
+            className="shrink-0"
+            selected={moreActive}
+            expanded={open === 'more'}
+            onSelect={() => openSheet('more')}
+          >
+            <SlidersIcon size={16} />
+            {messages.place.filterMore}
+          </Chip>
+
+          {dirty && (
+            <Chip className="shrink-0" selected={false} onSelect={reset}>
+              {messages.place.resetFilters}
+            </Chip>
+          )}
+        </ChipGroup>
+
+        <ScrollRailArrows
+          rail={rail}
+          prevLabel={messages.place.filterTypePrev}
+          nextLabel={messages.place.filterTypeNext}
+        />
+      </div>
+
+      {/*
+        **시트는 `.scroll-rail` 밖이다.** 그 클래스는 `position: relative` 만이 아니라
+        `contain: layout` 을 함께 걸고(`app/globals.css`), **`contain: layout` 은
+        `position: fixed` 자손의 containing block 이 된다** — 안에 두면 전면을 덮어야 할
+        시트가 칩 한 줄 크기로 갇힌다.
+      */}
       <BottomSheet
         open={open === 'contentType'}
         onClose={() => setOpen(null)}
@@ -164,7 +211,7 @@ export function PlaceFilterChips({
           heading={messages.place.filterPetSizeLabel}
         />
       </BottomSheet>
-    </div>
+    </>
   )
 }
 

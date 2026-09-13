@@ -575,10 +575,14 @@ describe('3층 표면 (#443) — 절마다 카드 판정', () => {
     expect(markup).not.toContain('lg:border-l')
   })
 
-  it('기본 정보 · 동반 정보 · 소개 · 이용 안내가 각각 카드고, 판정이 한 카드라 다섯이다', () => {
+  /*
+    **여섯이 됐다** (#531). 갤러리 + 제목이 한 장의 카드로 묶이면서 다섯에서 하나 늘었다 —
+    그 아래가 전부 흰 카드인데 화면의 이름만 회색 바닥에 얹혀 있던 것을 고친 것이다.
+  */
+  it('머리 · 기본 정보 · 동반 정보 · 소개 · 이용 안내 · 판정이 각각 카드라 여섯이다', () => {
     const markup = render()
 
-    expect(markup.match(SURFACE)).toHaveLength(5)
+    expect(markup.match(SURFACE)).toHaveLength(6)
     for (const title of [
       messages.place.detailSectionBasic,
       messages.place.detailSectionPet,
@@ -590,13 +594,27 @@ describe('3층 표면 (#443) — 절마다 카드 판정', () => {
     }
   })
 
-  it('갤러리와 제목 줄은 카드가 아니다 — h1 은 어느 section 안에도 없다', () => {
-    const markup = render()
-    const h1 = markup.indexOf('<h1')
-    const firstSection = markup.search(SURFACE)
+  /*
+    **#531 이 뒤집었다.** 예전에는 "전폭 미디어 · 페이지 머리는 카드가 아니다"(§0)를 근거로
+    `h1` 이 첫 카드보다 **앞**에 있는지를 잠갔다. 이 화면은 그 아래가 전부 흰 카드라 제목만
+    회색 바닥에 얹혀 있었고, 판정 3문을 다시 물으면 셋 다 "예" 다 (자기 제목 `h1` · 혼자
+    떼어도 말이 됨 · 갤러리와 제목 블록 둘).
 
-    expect(h1).toBeGreaterThan(-1)
-    expect(h1).toBeLessThan(firstSection)
+    이제 `h1` 은 **첫 카드 안**이고, 그 카드는 `aria-label` 이 아니라 `aria-labelledby` 로
+    이 `h1` 을 가리킨다 — 같은 문자열을 속성에 다시 적으면 두 곳이 갈린다.
+  */
+  it('갤러리와 제목 줄이 첫 카드다 — h1 이 그 안에 있고 카드가 그것을 이름으로 쓴다', () => {
+    const markup = render()
+    const firstSection = markup.search(SURFACE)
+    const h1 = markup.indexOf('<h1')
+
+    expect(firstSection).toBeGreaterThan(-1)
+    expect(h1).toBeGreaterThan(firstSection)
+
+    // 카드의 접근성 이름이 그 h1 이다 (문자열 사본이 아니라 참조)
+    const headingId = /<h1[^>]*\bid="([^"]+)"/.exec(markup)?.[1]
+    expect(headingId).toBeDefined()
+    expect(markup).toContain(`aria-labelledby="${headingId}"`)
   })
 
   it('적합도 · 산책 위험도 · 데스크톱 하단 바가 한 카드다 — 같은 화자가 이어 말한다', () => {

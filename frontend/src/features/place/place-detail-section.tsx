@@ -63,6 +63,9 @@ export type PlaceDetailSectionProps = {
   actions: PlaceDetailActions
 }
 
+/** 갤러리 + 제목 카드가 `aria-labelledby` 로 가리키는 `h1` 의 id (#531) */
+const DETAIL_HEADING_ID = 'place-detail-heading'
+
 /**
  * 장소 상세 — 아트보드 `혼디가개 장소 상세` 01(모바일 390) · 03(데스크톱 1440) · 04(상태).
  *
@@ -193,32 +196,52 @@ export function PlaceDetailSection({
         */}
         <SurfaceStack className="rail-detail-main">
           {/*
-            **갤러리와 제목 줄은 카드가 아니다** — 전폭 미디어 · 페이지 머리 (§0). 바닥 위에
-            직접 놓이고, 둘의 간격만 이 묶음이 정한다. 모바일은 스택에 여백이 없어 위·아래를
-            여기서 준다 — 아래 16 + 스택 간격 8 = 24 로, 데스크톱 카드 간격과 같은 값이다.
+            ── 갤러리 + 제목이 **한 장의 카드다** (#531)
 
-            갤러리는 카드 **가장자리**에 맞춘다(스택의 24 만 받는다 — 갤러리 안에 페이지 인셋이
-            없다). 제목 줄은 카드 **안 글줄**과 같은 인셋(`card`)이다 — 카드 제목과 나란히 서되
-            **카드 테두리 1px 만큼 어긋난다**(실측 444 vs 445). 테두리 없는 요소에 테두리 폭을
-            흉내 내지 않는다.
+            **예전에는 카드가 아니었다** — "전폭 미디어 · 페이지 머리는 카드가 아니다"(§0)를
+            근거로 L0 바닥 위에 직접 놓았다. 그런데 이 화면은 **그 아래 전부가 흰 카드다**
+            (기본 정보 · 반려견 동반 · 장소 소개 · 이용 안내 · 판정). 그래서 화면의 이름인
+            제목만 회색 바닥에 얹혀, 페이지에서 가장 중요한 블록이 가장 덜 중요해 보였다.
+
+            **§0 을 뒤집은 것이 아니라 판정 3문을 다시 물은 것이다.** ① 자기 제목이 있는가 —
+            `h1` 이 여기 있다. ② 혼자 떼어놔도 말이 되는가 — 사진·이름·등급·동반 조건은
+            그것만으로 "이 장소가 무엇인가" 를 답한다. ③ 담는 항목이 둘 이상인가 — 갤러리와
+            제목 블록 둘이다. 셋 다 "예" 다. §0 이 카드에서 뺀 "전폭 미디어" 는 **갤러리가
+            전폭일 때**의 이야기인데, 이 갤러리는 자기 인셋과 radius 를 갖는 타일 묶음이라
+            애초에 전폭이 아니다.
+
+            **카드 이름은 `titleId` 로 `h1` 을 가리킨다** — `aria-label` 로 같은 문자열을
+            다시 적으면 두 곳이 갈린다 (`Surface` 머리주석).
+
+            갤러리는 **md 부터만** 인셋을 받는다(`md:px-5`). 모바일 캐러셀은 자기 `px-4` 를
+            이미 갖고 있어(`photo-gallery.tsx`) 여기서 또 주면 16 이 두 겹으로 32 가 된다.
+            데스크톱 스트립은 자기 인셋이 없어 카드 테두리에 그대로 닿으므로 여기서 20 을
+            준다 — `INSET_CLASS.card` 의 데스크톱 값과 같다.
+
+            제목 줄은 카드 **안 글줄**과 같은 인셋(`card`)이다. 이제 진짜 카드 안이라
+            예전 주석이 적어 둔 "테두리 1px 만큼 어긋난다"(444 vs 445)가 사라지고 아래
+            카드들과 정확히 같은 세로선에 선다.
           */}
-          <div className="flex flex-col gap-5 pt-4 pb-4 md:gap-6 md:pt-0 md:pb-0">
-            {/*
+          <Surface titleId={DETAIL_HEADING_ID}>
+            <div className="flex flex-col gap-5 py-4 md:gap-6 md:py-5">
+              {/*
               **`images` 가 비면 `firstImage` 를 쓴다** — dev 실데이터는 `images` 가 전부
               빈 배열이고 사진이 `firstImage` 로만 온다 (`lib/place/gallery.ts`).
 
               사진이 하나도 없으면 **카테고리 일러스트**가 그 자리를 채운다 (DESIGN.md §7-3).
               그래서 `contentType.code` 를 넘긴다 — 한국어 `name` 으로 고르지 않는다.
             */}
-            <PhotoGallery
-              images={galleryImages(place.images, place.firstImage, place.cpyrhtDivCd)}
-              title={place.title}
-              contentTypeCode={place.contentType.code}
-            />
+              <div className="md:px-5">
+                <PhotoGallery
+                  images={galleryImages(place.images, place.firstImage, place.cpyrhtDivCd)}
+                  title={place.title}
+                  contentTypeCode={place.contentType.code}
+                />
+              </div>
 
-            <header className={cn('flex flex-col gap-3', INSET_CLASS.card)}>
-              <div className="flex items-start justify-between gap-2 md:items-center">
-                {/*
+              <header className={cn('flex flex-col gap-3', INSET_CLASS.card)}>
+                <div className="flex items-start justify-between gap-2 md:items-center">
+                  {/*
                   공백 없는 긴 장소명이 가로로 넘치지 않게 한다 (styling-guide.md §4).
 
                   **`min-w-0` 이 없으면 `break-words` 만으로는 줄지 않는다.** flex 항목의 기본
@@ -226,61 +249,65 @@ export function PlaceDetailSection({
                   "제주특별자치도립김창열미술관" 전체가 하나의 끊을 수 없는 덩어리다.
                   375 에서 배지가 우측 인셋을 16px 넘어 화면 끝에 붙었다(실측).
                 */}
-                <h1 className="text-title-1 text-fg lg:text-display min-w-0 flex-1 font-bold break-words lg:font-extrabold">
-                  {place.title}
-                </h1>
-                {/*
+                  <h1
+                    id={DETAIL_HEADING_ID}
+                    className="text-title-1 text-fg lg:text-display min-w-0 flex-1 font-bold break-words lg:font-extrabold"
+                  >
+                    {place.title}
+                  </h1>
+                  {/*
                   등급 배지는 **판정이 실제로 왔을 때만** 붙인다. 조회 전에 자리를 잡아 두면
                   빈 배지가 잠깐 등급처럼 보인다. 문구는 서버 `name` 그대로다.
                 */}
-                {suitabilityBadge !== null && (
-                  <MetricBadge tone={suitabilityTone(suitabilityBadge.code)} className="shrink-0">
-                    {suitabilityBadge.name}
-                  </MetricBadge>
-                )}
-              </div>
+                  {suitabilityBadge !== null && (
+                    <MetricBadge tone={suitabilityTone(suitabilityBadge.code)} className="shrink-0">
+                      {suitabilityBadge.name}
+                    </MetricBadge>
+                  )}
+                </div>
 
-              {/* 거리는 기준점이 없어 쓰지 않는다. 실내 여부는 #16 으로 들어왔다 */}
-              <p className="text-body-2 text-fg-muted">{metaLine(place)}</p>
+                {/* 거리는 기준점이 없어 쓰지 않는다. 실내 여부는 #16 으로 들어왔다 */}
+                <p className="text-body-2 text-fg-muted">{metaLine(place)}</p>
 
-              <div className="flex flex-wrap items-center gap-1.5">
-                {/*
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {/*
                   **`UNKNOWN` 이면 그리지 않는다** (#530) — 목록 행과 같은 처리다
                   (`place-row.tsx` 의 `PlaceBadges` 주석이 근거를 갖고 있다). 서버 `name` 이
                   `정보 없음` 이라 옆 태그에 걸려 읽힌다. **동반 조건을 감추는 것이 아니다** —
                   아래 `반려견 동반` 섹션이 `PlacePetInfoSection` 으로 같은 `allowance` 를
                   받아 문장으로 말한다 (`place-pet-info.tsx`).
                 */}
-                {place.petAllowanceType.code !== 'UNKNOWN' && (
-                  <Badge tone="neutral" size="sm">
-                    {place.petAllowanceType.name}
-                  </Badge>
-                )}
-                {place.petInfo !== null && (
-                  <>
+                  {place.petAllowanceType.code !== 'UNKNOWN' && (
                     <Badge tone="neutral" size="sm">
-                      {place.petInfo.allowedPetSize.name}
+                      {place.petAllowanceType.name}
                     </Badge>
-                    {place.petInfo.leashRequired && (
+                  )}
+                  {place.petInfo !== null && (
+                    <>
                       <Badge tone="neutral" size="sm">
-                        {messages.place.detailLeashRequired}
+                        {place.petInfo.allowedPetSize.name}
                       </Badge>
-                    )}
-                  </>
-                )}
-                {/*
+                      {place.petInfo.leashRequired && (
+                        <Badge tone="neutral" size="sm">
+                          {messages.place.detailLeashRequired}
+                        </Badge>
+                      )}
+                    </>
+                  )}
+                  {/*
                   실내 여부를 모르면 점선으로 "모름" 을 드러낸다 — 목록 행과 같은 처리다
                   (`place-row.tsx`). 숨기면 실내만·야외만 필터에서 이 장소가 왜 사라지는지
                   설명할 길이 없고, 여기는 그 필터를 가진 목록에서 들어오는 화면이다.
                 */}
-                {place.indoor === null && (
-                  <MetricBadge tone="unknown" size="sm">
-                    {messages.place.rowIndoorUnknown}
-                  </MetricBadge>
-                )}
-              </div>
-            </header>
-          </div>
+                  {place.indoor === null && (
+                    <MetricBadge tone="unknown" size="sm">
+                      {messages.place.rowIndoorUnknown}
+                    </MetricBadge>
+                  )}
+                </div>
+              </header>
+            </div>
+          </Surface>
 
           {/*
             ── 기본 정보 ─────────────────────────────────────────────────────

@@ -28,7 +28,18 @@ export function PlaceListView({ filters }: { filters: PlaceFilters }) {
         그 카드가 `h2` 를 이미 갖는다. 세 사용처 중 여기만 `3` 이다 — 담기 화면과 지도
         폴백은 제목 있는 카드가 아니라 기본값 `2` 로 둔다.
       */
-      headingLevel={3}
+      /*
+        **카드가 제목을 잃어 `2` 로 내려왔다** (#531). 페이지 제목이 카드 위 제목 줄로
+        올라가면서 `Surface` 의 `title` 을 걷었으므로, 이 카드 안의 상태 제목은 더 이상
+        `h2` 아래가 아니다. 값을 지워 기본값에 맡기지 않는 것은 "이 카드가 제목을
+        갖는가" 라는 판단을 소스에 남겨 두기 위해서다 (`state-heading-level.test.ts` 가 짝).
+      */
+      headingLevel={2}
+      /*
+        **2열은 이 화면만이다** (#531). `xl`(1280)+ 에서만 접히고, 담기 화면·지도 폴백은
+        폭이 좁아 기본값 1열로 남는다 — 열 수를 담는 곳이 정하는 이유다.
+      */
+      columns={2}
       // 0건 문구가 무엇으로 찾았는지 되돌려 준다 (#431)
       keyword={filters.keyword}
       places={places}
