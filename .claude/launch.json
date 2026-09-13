@@ -20,6 +20,26 @@
         "dev:alt"
       ],
       "port": 5174
+    },
+    {
+      "name": "frontend-dev-alt2",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "-C",
+        "frontend",
+        "dev:alt2"
+      ],
+      "port": 5175
+    },
+    {
+      "name": "frontend-dev-alt3",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "-C",
+        "frontend",
+        "dev:alt3"
+      ],
+      "port": 5176
     }
   ]
 }
