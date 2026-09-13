@@ -221,6 +221,58 @@ describe('AI 일정 mock — 상태 전이', () => {
   })
 })
 
+/**
+ * 작업 조회가 **생성 조건을 함께 내리는가** (#488 · FE #498).
+ *
+ * 이 블록이 없으면 다른 브라우저·기기에서 작업 주소를 열었을 때 초안을 담을 수 없다 —
+ * 대기 화면이 약속한 *"다른 기기에서 주소를 열어도 이어서 담을 수 있어요"* 가 거짓이 된다.
+ */
+describe('AI 일정 mock — 생성 조건 (#488)', () => {
+  it('상태를 가리지 않고 조건이 실린다 — 진행 중에도 완료에도 있다', () => {
+    const jobId = newJob()
+
+    for (const times of [1, 2, 3]) {
+      expect(pollTimes(jobId, times).conditions).not.toBeNull()
+    }
+  })
+
+  it('제출한 값을 그대로 돌려준다', () => {
+    const jobId = newJob({ ...VALID, petIds: ['123456789012000001'], budget: 400_000 })
+    const conditions = pollTimes(jobId, 1).conditions
+
+    expect(conditions?.areaCode).toBe('39')
+    expect(conditions?.startDate).toBe(VALID.startDate)
+    expect(conditions?.endDate).toBe(VALID.endDate)
+    expect(conditions?.petIds).toEqual(['123456789012000001'])
+    expect(conditions?.budget).toBe(400_000)
+  })
+
+  it('제출 때 생략한 값은 null 이다', () => {
+    const conditions = pollTimes(newJob(), 1).conditions
+
+    expect(conditions?.sigunguCode).toBeNull()
+    expect(conditions?.budget).toBeNull()
+    expect(conditions?.requestNote).toBeNull()
+  })
+
+  /*
+    **담는 데 필요한 것만 담는다.** 서버가 `pinnedPlaceIds`·`preferFavorites` 를 뺀 것은
+    `POST /plans` 가 받지 않는 값이기 때문이다 — mock 이 함께 내리면 **화면이 계약에 없는
+    값에 기대게 되고**, 그 값으로 재제출하면 "같은 조건" 이 거짓이 된다.
+  */
+  it('담기가 받지 않는 값은 내리지 않는다', () => {
+    const jobId = newJob({
+      ...VALID,
+      preferFavorites: true,
+      pinnedPlaceIds: ['212481712381923329'],
+    })
+    const conditions = pollTimes(jobId, 1).conditions as Record<string, unknown>
+
+    expect(conditions).not.toHaveProperty('preferFavorites')
+    expect(conditions).not.toHaveProperty('pinnedPlaceIds')
+  })
+})
+
 describe('AI 일정 mock — sigunguCode (#251)', () => {
   it('시군구를 실어 보내면 접수된다', () => {
     expect(submit({ ...VALID, sigunguCode: '4' })?.status).toBe(202)

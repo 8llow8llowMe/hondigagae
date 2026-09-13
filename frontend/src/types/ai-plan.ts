@@ -200,6 +200,47 @@ export type AiPlanJob = {
    */
   errorCode: string | null
   errorMessage: string | null
+  /**
+   * 이 작업을 만들 때 쓴 생성 조건 (#488 · FE #498). **상태를 가리지 않고 채워진다.**
+   *
+   * **이것이 있어서 다른 브라우저·기기에서도 초안을 담을 수 있다.** 예전에는 조건이
+   * `sessionStorage` 에만 있어, 대기 화면이 약속한 *"주소를 남겨 두면 다시 볼 수 있어요"*
+   * 가 **보기까지만** 참이었다 — 다른 브라우저에서 열면 초안은 그려지는데 담기가 막혔다.
+   *
+   * **담는 데 필요한 것만 담긴다.** `pinnedPlaceIds` · `preferFavorites` 는 `POST /plans`
+   * 가 받지 않는 값이라 서버가 일부러 뺐다 — 그래서 이 값으로는 **"같은 조건으로 다시
+   * 만들기" 를 할 수 없다** (그 둘이 빠진 채 재제출되면 버튼이 말하는 "같은 조건" 이
+   * 사실이 아니게 된다). 재제출은 보관본이 있을 때만 한다.
+   *
+   * **`null` 가드를 둔다.** 저장된 요청 파라미터가 비어 있는 잡뿐이라 정상 경로에서는
+   * 생기지 않지만, 스키마가 nullable 로 적혀 있다.
+   */
+  conditions: AiPlanJobConditions | null
+}
+
+/**
+ * 작업 조회가 함께 내리는 생성 조건 (#488). 제출 때 받은 값을 그대로 돌려준다.
+ *
+ * **`AiPlanRequestSnapshot` 과 모양이 다르다.** 이쪽은 서버 계약이고 저쪽은 화면 보관본이라,
+ * 옮기는 일은 `lib/ai-plan/conditions.ts` 한 곳이 한다.
+ */
+export type AiPlanJobConditions = {
+  areaCode: string
+  /** 제출 때 지정하지 않았으면 `null` — "제주 전체" 다 */
+  sigunguCode: string | null
+  startDate: string
+  endDate: string
+  /**
+   * 동반 반려견. **이름은 오지 않는다** — 화면이 회원의 반려견 목록에서 맞춘다.
+   *
+   * **제출 때 지정하지 않았으면 빈 배열이고, 그때는 서버가 회원의 대표 반려견으로 짰다.**
+   * 어느 아이였는지는 응답에 없다 — 화면이 짐작하면 **남의 아이에 일정이 붙는다.**
+   */
+  petIds: string[]
+  /** 원 단위. 제출 때 지정하지 않았으면 `null` */
+  budget: number | null
+  /** 제출 때 지정하지 않았으면 `null` */
+  requestNote: string | null
 }
 
 /**

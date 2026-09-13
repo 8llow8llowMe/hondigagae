@@ -792,11 +792,30 @@ function jobBody(
     totalSteps: TOTAL_STEPS,
   }
 
+  /*
+    **생성 조건은 상태를 가리지 않고 실린다** (#488 · FE #498). 다른 브라우저·기기에서
+    작업 주소를 열어도 초안을 담을 수 있게 하는 값이라, 진행 중에도 실패에도 있다.
+
+    **담는 데 필요한 것만 담는다** — `pinnedPlaceIds`·`preferFavorites`·`planId`·
+    `regenerateDay` 는 `POST /plans` 가 받지 않아 서버가 일부러 뺐다. mock 이 그것들을
+    함께 내리면 **화면이 계약에 없는 값에 기대게 된다.**
+  */
+  const conditions = {
+    areaCode: job.areaCode,
+    sigunguCode: job.sigunguCode,
+    startDate: job.startDate,
+    endDate: job.endDate,
+    petIds: job.petIds,
+    budget: job.budget,
+    requestNote: job.requestNote,
+  }
+
   if (status === 'FAILED') {
     return {
       jobId: job.jobId,
       status: STATUS.FAILED as CodeNameMetadata,
       ...steps,
+      conditions,
       planDraft: null,
       // AIPLAN_012 — 실패 이유가 조건 문제일 수 있다는 것을 화면이 다뤄야 한다
       errorCode: 'AIPLAN_012',
@@ -809,6 +828,7 @@ function jobBody(
       jobId: job.jobId,
       status: STATUS[status] as CodeNameMetadata,
       ...steps,
+      conditions,
       planDraft: null,
       /*
         **취소도 여기로 온다 — `errorCode` 를 채우지 않는다.** 채우면 화면이
@@ -823,6 +843,7 @@ function jobBody(
     jobId: job.jobId,
     status: STATUS.COMPLETED as CodeNameMetadata,
     ...steps,
+    conditions,
     planDraft: draftFor(job),
     errorCode: null,
     errorMessage: null,

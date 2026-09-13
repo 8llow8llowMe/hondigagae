@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode, useMemo, useState } from 'react'
+import { type ReactNode, useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -19,9 +19,11 @@ import { aiPlanCommitSchema } from '@/features/ai-plan/schemas'
 import { useAiPlanJob } from '@/features/ai-plan/use-ai-plan-job'
 import { useAiPlanResubmit } from '@/features/ai-plan/use-ai-plan-resubmit'
 import { useDraftPlaces } from '@/features/ai-plan/use-draft-places'
+import { usePetList } from '@/features/pet/use-pet-list'
 import { SIGUNGU_LABEL } from '@/features/place/filter-labels'
 import { planKeys } from '@/features/plan/queries'
 import { formatBudget } from '@/lib/ai-plan/budget'
+import { snapshotFromConditions } from '@/lib/ai-plan/conditions'
 import { defaultPlanTitle } from '@/lib/ai-plan/draft-title'
 import { draftToPlanPayload } from '@/lib/ai-plan/draft-to-plan'
 import { isNarrowedRegionFailure } from '@/lib/ai-plan/failure-hint'
@@ -60,7 +62,7 @@ function isDelistedFailure(error: unknown): boolean {
  * 카드 하나. 완료만 `bare` 로 빠져 자기 카드들을 그린다. 껍데기를 씌우는 자리가 여기인
  * 이유는 **어느 갈래가 카드를 스스로 그리는지 상태를 아는 쪽만 알기 때문**이다 (#451).
  */
-export function AiPlanJobView({ jobId }: { jobId: string }) {
+export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolean }) {
   const { query, phase, polling, recheck, cancel, canceling, cancelFailed } = useAiPlanJob(jobId)
 
   /*
@@ -75,10 +77,38 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
     **프리페치나 `HydrationBoundary` 를 붙이거나 진행 분기에서 조건을 그리기 시작하면
     그 순간 mismatch 가 된다.** 그때는 읽기를 effect 로 옮긴다.
   */
-  const [snapshot] = useState<AiPlanRequestSnapshot | null>(() => readAiPlanRequest(jobId))
+  const [stored] = useState<AiPlanRequestSnapshot | null>(() => readAiPlanRequest(jobId))
 
   const job = query.data ?? null
   const draft = job?.planDraft ?? null
+
+  /*
+    **이름은 회원의 반려견 목록에서 맞춘다** (#498). 서버 조건은 `petIds` 만 주는데, 이름이
+    비면 일정 제목 기본값이 `제주 3일 여행` 으로 떨어져 **같은 초안을 어느 브라우저에서
+    담느냐에 따라 제목이 갈린다.** 이 목록은 헤더 스위처가 쓰는 것과 **같은 key** 라
+    `(main)` 레이아웃의 프리페치에 얹히고 새 요청이 나가지 않는다.
+  */
+  const petList = usePetList(authed)
+  const petNameOf = useCallback(
+    (petId: string) => petList.data?.pets.find((pet) => pet.petId === petId)?.name ?? '',
+    [petList.data],
+  )
+
+  /*
+    **조건은 두 곳에서 온다** (#498).
+
+    `stored` 는 제출한 그 탭의 `sessionStorage` 보관본이라 `pinnedPlaces`·`preferFavorites`
+    까지 안다. `restored` 는 서버가 함께 내린 생성 조건(#488)이라 **담는 데 필요한 것만**
+    안다 — 대신 **다른 브라우저·기기에서도 있다.**
+
+    담기는 둘 중 있는 쪽으로 하고(보관본 우선), 재제출은 보관본으로만 한다 — 아래
+    `AiPlanFailedContainer` 주석 참고.
+  */
+  const restored = useMemo(
+    () => snapshotFromConditions(job?.conditions ?? null, petNameOf),
+    [job?.conditions, petNameOf],
+  )
+  const snapshot = stored ?? restored
 
   const { metaLines, coords, delistedPlaceIds } = useDraftPlaces(draft)
 
@@ -135,7 +165,13 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
       <AiPlanJobShell>
         <AiPlanFailedContainer
           jobId={jobId}
-          snapshot={snapshot}
+          /*
+            **재제출에는 보관본만 넘긴다** (#498). 서버 복원본에는 `pinnedPlaceIds`·
+            `preferFavorites` 가 없어(계약에 아예 없다) 그대로 다시 내면 **꼭 넣으라고 고른
+            장소가 조용히 빠진 초안**이 나온다 — 버튼이 말하는 "같은 조건" 이 거짓이 된다.
+            `null` 이면 호출부가 버튼을 감추고 `조건 바꾸기` 로 폼에서 확인하게 한다.
+          */
+          snapshot={stored}
           conditionSummary={conditionSummary}
           errorMessage={job?.errorMessage ?? null}
           errorCode={job?.errorCode ?? null}
@@ -156,7 +192,8 @@ export function AiPlanJobView({ jobId }: { jobId: string }) {
       <AiPlanJobShell>
         <AiPlanCanceledContainer
           jobId={jobId}
-          snapshot={snapshot}
+          // 실패 화면과 같은 이유로 보관본만이다 (#498)
+          snapshot={stored}
           conditionSummary={conditionSummary}
         />
       </AiPlanJobShell>
