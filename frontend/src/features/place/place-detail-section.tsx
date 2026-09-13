@@ -135,11 +135,14 @@ export function PlaceDetailSection({
     // 데이터 부재다. 재시도 버튼을 붙이지 않고 서버 문구를 그대로 노출한다
     if (kind === 'not-found') {
       return (
-        <EmptyState
-          title={toMessage(errorMessage, messages.place.detailNotFoundTitle)}
-          description={messages.place.detailNotFoundDescription}
-          action={<PlaceBackLink />}
-        />
+        <DetailStateShell heading={messages.place.detailNotFoundTitle}>
+          <EmptyState
+            title={toMessage(errorMessage, messages.place.detailNotFoundTitle)}
+            description={messages.place.detailNotFoundDescription}
+            inset="card"
+            action={<PlaceBackLink />}
+          />
+        </DetailStateShell>
       )
     }
 
@@ -147,21 +150,27 @@ export function PlaceDetailSection({
     // 주소 자체가 잘못된 것이므로 재시도해도 같은 400 이다 — 재시도를 주지 않는다
     if (kind === 'validation') {
       return (
-        <EmptyState
-          title={messages.common.validationErrorTitle}
-          description={toMessage(errorMessage, messages.place.detailNotFoundDescription)}
-          action={<PlaceBackLink />}
-        />
+        <DetailStateShell heading={messages.common.validationErrorTitle}>
+          <EmptyState
+            title={messages.common.validationErrorTitle}
+            description={toMessage(errorMessage, messages.place.detailNotFoundDescription)}
+            inset="card"
+            action={<PlaceBackLink />}
+          />
+        </DetailStateShell>
       )
     }
 
     // 5xx · 무응답 — 재시도를 제공한다
     return (
-      <ErrorState
-        title={messages.place.detailErrorTitle}
-        description={messages.common.temporaryErrorDescription}
-        onRetry={onRetry}
-      />
+      <DetailStateShell heading={messages.place.detailErrorTitle}>
+        <ErrorState
+          title={messages.place.detailErrorTitle}
+          description={messages.common.temporaryErrorDescription}
+          inset="card"
+          onRetry={onRetry}
+        />
+      </DetailStateShell>
     )
   }
 
@@ -457,6 +466,34 @@ export function PlaceDetailSection({
         className="bg-bg sticky bottom-16 z-30 md:bottom-0 lg:hidden"
       />
     </article>
+  )
+}
+
+/**
+ * 상태 갈래의 껍데기 — **서버 경계와 같은 축에 세운다** (#480).
+ *
+ * 같은 404·오류가 "누가 잡았는가" 에 따라 다른 자리에 서 있었다. 서버가 404 를 잡으면
+ * `app/(main)/places/[placeId]/not-found.tsx` 가 뜨는데 거기는 `content-container`(1440 캡)
+ * 안에서 인셋이 `card` 라 md 이상에서 글줄이 44 다. 화면 안 재조회가 404 를 잡으면 여기가
+ * 뜨는데 **캡도 없고 인셋도 기본값 `main`(40)** 이었다 — 1920 에서 글줄이 화면 왼쪽 끝에
+ * 붙고, 서버가 잡았을 때와 눈에 띄게 달랐다.
+ *
+ * `error-state.tsx` 의 `inset` 주석이 막으려던 모양 그대로다 — *"로딩(24) → 오류(40) →
+ * 성공(24) 이 서로 다른 인셋을 썼다"*.
+ *
+ * **경계 쪽으로 맞췄다.** 캡 없는 40 은 넓은 화면에서 글줄이 갈 데까지 가고, #475 가
+ * 라우트 상태 파일을 옮길 때 이미 캡 + 44 를 고른 판단이 있다.
+ *
+ * **`h1` 도 경계와 같은 키를 쓴다.** 이 갈래들은 `<article>` 에 닿기 전에 반환하므로
+ * 예전에는 **문서에 `h1` 이 하나도 없었다** — 서버가 잡았을 때는 경계가 `sr-only h1` 을
+ * 그렸다. 보이는 제목은 상태 컴포넌트의 제목이 이미 그리므로 여기서도 `sr-only` 다.
+ */
+function DetailStateShell({ heading, children }: { heading: string; children: ReactNode }) {
+  return (
+    <SurfaceStack className="content-container">
+      <h1 className="sr-only">{heading}</h1>
+      {children}
+    </SurfaceStack>
   )
 }
 

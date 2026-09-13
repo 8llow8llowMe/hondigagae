@@ -1,8 +1,11 @@
 'use client'
 
+import type { ReactNode } from 'react'
+
 import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
+import { SurfaceStack } from '@/components/surface'
 import { usePetList } from '@/features/pet/use-pet-list'
 import { PlanDetailSection } from '@/features/plan/plan-detail-section'
 import { useAnchorScroll } from '@/features/plan/use-anchor-scroll'
@@ -61,24 +64,30 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
     */
     if (detail.error instanceof ApiError && detail.error.status === 400) {
       return (
-        <EmptyState
-          title={messages.plan.detailBadRequestTitle}
-          description={messages.plan.detailBadRequestDescription}
-          action={
-            <ButtonLink href="/plans" variant="secondary">
-              {messages.plan.backToList}
-            </ButtonLink>
-          }
-        />
+        <DetailStateShell heading={messages.plan.detailBadRequestTitle}>
+          <EmptyState
+            title={messages.plan.detailBadRequestTitle}
+            description={messages.plan.detailBadRequestDescription}
+            inset="card"
+            action={
+              <ButtonLink href="/plans" variant="secondary">
+                {messages.plan.backToList}
+              </ButtonLink>
+            }
+          />
+        </DetailStateShell>
       )
     }
 
     return (
-      <ErrorState
-        title={messages.plan.detailErrorTitle}
-        description={messages.plan.errorDescription}
-        onRetry={() => void detail.refetch()}
-      />
+      <DetailStateShell heading={messages.plan.detailErrorTitle}>
+        <ErrorState
+          title={messages.plan.detailErrorTitle}
+          description={messages.plan.errorDescription}
+          inset="card"
+          onRetry={() => void detail.refetch()}
+        />
+      </DetailStateShell>
     )
   }
 
@@ -105,5 +114,29 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
       onRetryWeather={() => void weather.refetch()}
       today={new Date(today)}
     />
+  )
+}
+
+/**
+ * 상태 갈래의 껍데기 — **서버 경계와 같은 축에 세운다** (#480).
+ *
+ * 같은 404·오류가 "누가 잡았는가" 에 따라 다른 자리에 서 있었다. 서버가 404 를 잡으면
+ * `app/(main)/plans/[planId]/not-found.tsx` 가 뜨는데 거기는 `content-container`(1440 캡)
+ * 안에서 인셋이 `card` 라 md 이상에서 글줄이 44 다. 화면 안 재조회가 잡으면 여기가 뜨는데
+ * **캡도 없고 인셋도 기본값 `main`(40)** 이었다.
+ *
+ * **경계 쪽으로 맞췄다** — 캡 없는 40 은 넓은 화면에서 글줄이 갈 데까지 가고, #475 가
+ * 라우트 상태 파일을 옮길 때 이미 캡 + 44 를 고른 판단이 있다. 장소 상세
+ * (`place-detail-section.tsx`)의 같은 이름 껍데기와 짝이다.
+ *
+ * **`h1` 도 경계와 같은 키를 쓴다.** 이 갈래들은 정상 화면 트리에 닿기 전에 반환하므로
+ * 예전에는 문서에 `h1` 이 하나도 없었다 — 서버가 잡았을 때는 경계가 `sr-only h1` 을 그렸다.
+ */
+function DetailStateShell({ heading, children }: { heading: string; children: ReactNode }) {
+  return (
+    <SurfaceStack className="content-container">
+      <h1 className="sr-only">{heading}</h1>
+      {children}
+    </SurfaceStack>
   )
 }

@@ -18,9 +18,10 @@ import { messages } from '@/lib/messages'
  * 폭은 `error.tsx` 와 같은 `content-container`(1440 캡)다 — 레일이 없으므로 `rail-layout`
  * 의 grid 절반은 쓰지 않는다.
  *
- * **다만 정상 화면과 축이 아직 갈린다** — 그쪽 상태는 `inset` 기본값 `main`(40)이고 폭 캡도
- * 없는데, 이 경계는 `card` 인셋에 1440 캡이라 md 이상에서 44 다. 어느 쪽으로 맞출지는
- * **#480** 이 정한다.
+ * **정상 화면의 갈래도 같은 축이다** (#480). 예전에는 그쪽이 `inset` 기본값 `main`(40)에
+ * 폭 캡도 없어 1920 에서 글줄이 화면 왼쪽 끝에 붙었다 — 같은 404 인데 누가 잡았는지에 따라
+ * 자리가 달랐다. 경계 쪽으로 맞췄고, `PlaceDetailSection` 의 `DetailStateShell` 이 같은
+ * `content-container` + `card` 를 쓴다. 1920 실측으로 둘 다 컨테이너 1440 · 글줄 284 다.
  *
  * **`h1` 이 상태 자체를 말한다.** 이 화면의 이름은 응답에서 오는 장소명인데 그 장소가
  * 없다. `placeDetailFallbackTitle` 이 404 에서 고르는 탭 제목과 같은 말이다.

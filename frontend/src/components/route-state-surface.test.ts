@@ -34,8 +34,8 @@
  * 2. **인셋은 `card`(16/20)다.** 카드 안이므로 카드 인셋이고, 카드가 없는 넷도 정상 화면의
  *    글줄과 같은 세로선에 서야 전환이 튀지 않는다 (#443 · #447 · #451 의 페이지 머리와
  *    같은 자리). 하드코딩 문자열 금지 — `md:px-6` 은 #386 이 걷은 폐기값이다.
- *    카드 없는 넷은 정상 화면 쪽이 `inset` 기본값 `main`(40) 에 캡도 없어 아직 갈리는데,
- *    어느 쪽으로 맞출지는 **#480** 이 정한다 (이 파일의 범위 밖).
+ *    카드 없는 넷은 정상 화면 쪽이 `inset` 기본값 `main`(40) 에 캡도 없어 갈려 있었는데,
+ *    **#480 이 경계 쪽(캡 + 44)으로 맞췄다** — 이 파일이 양쪽에 같은 단언을 걸어 잠근다.
  * 3. **폭은 그 세그먼트의 정상 화면에서 온다.** 정상 화면 쪽 값까지 함께 잠근다 —
  *    #464 가 반려견 폼을 512 → 672 로 넓혔을 때 `page.tsx` 만 따라가고 상태 파일 둘이
  *    `max-w-lg` 에 남아 있었다. 한쪽만 보는 단언은 그 드리프트를 못 잡는다.
@@ -71,6 +71,46 @@ function code(relative: string): string {
 
 function escapeRegExp(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * `<EmptyState …>` · `<ErrorState …>` 의 **열기 태그**를 하나씩 집는다 (여러 줄).
+ *
+ * **정규식으로 하지 않는다** — `[\s\S]*?\/>` 는 `action={<PlaceBackLink />}` 처럼 prop 안에
+ * 든 self-closing 자식의 `/>` 에서 잘린다. 상세 화면의 404·400 갈래가 바로 그 모양이라
+ * 여기서는 실제로 잘린다. 중괄호 깊이를 세며 깊이 0 의 `>` 까지 걷는다.
+ *
+ * `state-heading-level.test.ts` 에 같은 것이 있다 — **#458** 이 이런 소스 단언 헬퍼를
+ * `src/test` 로 승격하는 이슈이고, 그때 한 곳으로 모은다.
+ */
+function stateTags(source: string): string[] {
+  const tags: string[] = []
+
+  for (const start of [...source.matchAll(/<(?:Empty|Error)State\b/g)].map((m) => m.index)) {
+    let depth = 0
+    let quote: string | null = null
+
+    for (let i = start; i < source.length; i += 1) {
+      const char = source[i] as string
+
+      if (quote !== null) {
+        if (char === quote) quote = null
+        continue
+      }
+      if (char === '"' || char === "'" || char === '`') {
+        quote = char
+        continue
+      }
+      if (char === '{') depth += 1
+      else if (char === '}') depth -= 1
+      else if (char === '>' && depth === 0) {
+        tags.push(source.slice(start, i + 1))
+        break
+      }
+    }
+  }
+
+  return tags
 }
 
 /**
@@ -425,13 +465,6 @@ describe('라우트 상태 파일이 3층 표면 위에 선다 (#475)', () => {
   )
 })
 
-/**
- * **카드 판정은 그 세그먼트의 정상 화면이 소유한다** (#475).
- *
- * 정상 화면이 상태를 카드에 담으면 라우트 경계도 담고, 담지 않으면 경계도 담지 않는다.
- * **그래서 양쪽에 같은 단언을 건다** — 정상 화면이 카드를 걷거나 이름표를 바꾸면 경계
- * 단언이 같이 깨져야 한다. 한쪽만 보는 단언이 #464 폭 드리프트를 놓친 방식이다.
- */
 /*
   **`h1` 은 화면의 이름이다 — 경계가 그것을 바꾸면 안 된다** (#481).
 
@@ -463,6 +496,13 @@ describe('h1 이 정상 화면의 이름과 같다 (#481)', () => {
   )
 })
 
+/**
+ * **카드 판정은 그 세그먼트의 정상 화면이 소유한다** (#475).
+ *
+ * 정상 화면이 상태를 카드에 담으면 라우트 경계도 담고, 담지 않으면 경계도 담지 않는다.
+ * **그래서 양쪽에 같은 단언을 건다** — 정상 화면이 카드를 걷거나 이름표를 바꾸면 경계
+ * 단언이 같이 깨져야 한다. 한쪽만 보는 단언이 #464 폭 드리프트를 놓친 방식이다.
+ */
 describe('카드 판정이 정상 화면과 쌍을 이룬다 (#475)', () => {
   it.each(CARDED)('$path — 정상 화면과 같은 카드를 그린다', ({ path, card }) => {
     if (card.kind !== 'card') throw new Error('unreachable')
@@ -508,13 +548,73 @@ describe('카드 판정이 정상 화면과 쌍을 이룬다 (#475)', () => {
   })
 
   /*
-    정상 화면이 상태를 **감싸지 않고 그대로 반환한다** — `PlaceDetailSection` ·
-    `PlanDetailView` 는 404 · 400 · 5xx 를 L0 위에 바로 그린다. 여기에 `Surface` 가 끼면
-    이 단언이 먼저 깨지고, 그때 경계 넷도 함께 카드로 옮긴다.
+    정상 화면이 상태를 **카드에 담지 않는다** — `PlaceDetailSection` · `PlanDetailView` 는
+    404 · 400 · 5xx 를 L0 위에 바로 그린다. 양쪽 다 `Surface` 가 없어야 하고, 어느 한쪽에
+    끼면 그때 넷을 함께 카드로 옮긴다.
+
+    **`Surface` 만 본다 — `SurfaceStack` 은 카드가 아니라 카드 열이다.** #480 이 화면 안
+    갈래를 경계와 같은 축(`content-container` + `card` 인셋)에 세우면서 양쪽 다
+    `SurfaceStack` 을 쓰게 됐다. `/<Surface[\s/>]/` 가 `<SurfaceStack` 을 물지 않는 것은
+    `S` 가 `[\s/>]` 에 없기 때문이고, 그 우연에 기대지 않으려고 단어 경계로 못박는다.
   */
   it.each(UNCARDED)('$path — 정상 화면이 카드를 쓰지 않으므로 경계도 쓰지 않는다', (file) => {
-    expect(code(file.path)).not.toMatch(/<Surface[\s/>]/)
-    expect(code(file.card.source)).toMatch(new RegExp(`return \\(\\s*<${file.state}\\b`))
+    const noCard = /<Surface\b(?!Stack|List)/
+
+    expect(code(file.path)).not.toMatch(noCard)
+
+    /*
+      **정상 화면 쪽은 파일 전체를 볼 수 없다** — 상세 화면의 성공 갈래는 카드를 여럿
+      쓴다. 보는 것은 **상태 갈래**다: `DetailStateShell` 이 감싸고 그 껍데기 안에
+      카드가 없어야 한다. 예전에는 `return (<EmptyState` 로 "그대로 반환한다" 를
+      단언했는데, #480 이 축을 맞추려고 껍데기를 씌우면서 그 모양이 바뀌었다.
+    */
+    const normal = code(file.card.source)
+    expect(normal).toMatch(new RegExp(`<DetailStateShell\\b[^>]*>\\s*<${file.state}\\b`))
+
+    /* 껍데기 **함수 하나**로 자른다 — 파일 끝까지 자르면 뒤따르는 헬퍼의 카드가 섞인다 */
+    const from = normal.indexOf('function DetailStateShell')
+    const shell = normal.slice(from, normal.indexOf('\n}\n', from))
+
+    expect(shell).toContain('<SurfaceStack className="content-container">')
+    expect(shell).not.toMatch(noCard)
+  })
+
+  /*
+    **같은 404·오류가 "누가 잡았는가" 에 따라 다른 축에 서지 않는다** (#480).
+
+    서버가 404 를 잡으면 경계가, 화면 안 재조회가 잡으면 정상 화면의 갈래가 뜬다. 예전에는
+    경계만 `content-container`(1440 캡) + `card` 인셋이고 화면 안 갈래는 **캡도 없고 인셋도
+    기본값 `main`(40)** 이었다 — 1920 에서 글줄이 화면 왼쪽 끝에 붙었다.
+    `error-state.tsx` 의 `inset` 주석이 막으려던 모양 그대로다.
+
+    **양쪽에 같은 단언을 건다.** 한쪽만 보면 다시 갈린다 — 그것이 이 이슈가 생긴 방식이다.
+  */
+  it.each(UNCARDED)('$path — 화면 안 갈래와 같은 축에 선다 (#480)', (file) => {
+    for (const source of [code(file.path), code(file.card.source)]) {
+      expect(source).toContain('content-container')
+      /* 폐기값이다 — #386 이 걷었고 40 은 카드 안에서 두 번 밀린다 */
+      expect(source).not.toContain('md:px-10')
+
+      /*
+        **갈래마다 본다.** 파일에 `inset="card"` 가 하나라도 있으면 통과하는 단언은
+        셋 중 하나가 빠져도 못 잡는다 — 뮤테이션으로 확인했다. 이 이슈가 생긴 방식이
+        정확히 그것이다: 화면 안 갈래 **다섯이** `inset` 을 안 넘겨 기본값 `main`(40)에 섰다.
+      */
+      const tags = stateTags(source)
+      expect(tags.length).toBeGreaterThan(0)
+      for (const tag of tags) {
+        expect(tag).toContain('inset="card"')
+      }
+    }
+  })
+
+  /*
+    **`h1` 이 사라지지 않는다** (#480). 화면 안 갈래는 정상 화면 트리에 닿기 전에 반환하므로
+    예전에는 **문서에 `h1` 이 하나도 없었다** — 서버가 잡았을 때만 경계가 `sr-only h1` 을
+    그렸다. 같은 실패인데 한쪽에서만 문서에 이름이 있었다.
+  */
+  it.each(UNCARDED)('$path — 화면 안 갈래도 sr-only h1 을 그린다 (#480)', (file) => {
+    expect(code(file.card.source)).toMatch(/<h1 className="sr-only">/)
   })
 })
 
