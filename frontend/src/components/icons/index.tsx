@@ -178,6 +178,21 @@ export function PhoneIcon(props: IconProps) {
   )
 }
 
+/**
+ * 길찾기 — 시설 행의 전화 옆 버튼 (#537).
+ *
+ * **`PinIcon` 을 쓰지 않는다.** 핀은 "여기 있다"(위치)이고 이 버튼은 "여기로 간다"(이동)다 —
+ * 같은 행에서 주소 줄이 이미 위치를 말하므로 핀을 또 쓰면 두 개가 같은 것을 가리킨다.
+ * 방향을 가진 화살촉이라 52px 버튼 안에서 전화 수화기와 실루엣이 겹치지 않는다.
+ */
+export function DirectionsIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3 11 22 2l-9 19-2-8z" />
+    </Svg>
+  )
+}
+
 /** 필터 "더보기" — 슬라이더 3단 (아트보드 `01 목록 — 모바일`) */
 export function SlidersIcon(props: IconProps) {
   return (

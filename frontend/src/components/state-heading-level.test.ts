@@ -228,7 +228,19 @@ describe('부모에 따라 갈리는 둘 — 담는 곳이 정한다', () => {
 
   it('세 사용처가 실제로 갈린다 — 제목 있는 카드에서만 3 을 넘긴다', () => {
     expect(code('src/features/place/place-list-view.tsx')).toContain('headingLevel={3}')
-    expect(code('src/features/emergency/emergency-list-view.tsx')).toContain('headingLevel={3}')
+
+    /*
+      **`emergency-list-view` 가 이쪽을 떠났다** (#537). 목록 갈래의 카드가 제목을 잃고
+      `aria-label` 만 갖게 되면서 — 페이지 제목이 카드 위 제목 줄로 올라갔다 — 그 카드
+      안의 상태는 더 이상 `h2` 아래가 아니다. 값이 `3` 에서 `2` 로 내려간 것이 회귀가
+      아니라 짝의 반대쪽이 함께 움직인 결과다.
+
+      **그래도 `not.toContain('headingLevel')` 쪽에 두지 않는다.** 기본값이 `2` 라
+      넘기지 않아도 결과는 같지만, 이 화면은 한때 `3` 이었으므로 값을 지우면 "카드가
+      제목을 갖는가" 라는 판단이 소스에서 사라진다. 명시해서 다음 사람이 되돌릴 때
+      이 단언이 걸리게 둔다.
+    */
+    expect(code('src/features/emergency/emergency-list-view.tsx')).toContain('headingLevel={2}')
 
     // `aria-label` 만 있는 카드 · 카드 없음 — 넘기지 않아 기본값 2 로 남는다
     expect(code('src/features/plan/plan-add-place-view.tsx')).not.toContain('headingLevel')

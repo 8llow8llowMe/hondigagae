@@ -1,16 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-
-import { BottomSheet } from '@/components/bottom-sheet'
-import { Button } from '@/components/button'
 import { Chip, ChipGroup } from '@/components/chip'
-import { ChevronDownIcon } from '@/components/icons'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
+import { EmergencyRadiusChip } from '@/features/emergency/emergency-radius-chip'
 import { facilityCounts, labelWithCount } from '@/features/emergency/facility-filters'
-import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
-import { RADIUS_OPTIONS } from '@/lib/url/emergency-filters'
 import { cn } from '@/lib/utils/cn'
 import {
   DEFAULT_FACILITY_FILTERS,
@@ -53,10 +47,6 @@ export function EmergencyFilterBar({
   showCounts: boolean
   className?: string
 }) {
-  const [open, setOpen] = useState(false)
-  // 시트 초안. 열 때 현재 값을 복사하고 적용 전까지 조회를 건드리지 않는다
-  const [draft, setDraft] = useState(radius)
-
   const counts = facilityCounts(facilities)
   const rail = useScrollRail<HTMLDivElement>()
 
@@ -66,6 +56,8 @@ export function EmergencyFilterBar({
 
     반경도 URL 에 실리지만(`?radius=40000`) 그 구분은 그대로다 — `EmergencyBoardParams`
     가 반경을 `filters` 밖에 두는 이유가 이것이다 (`lib/url/emergency-filters.ts`).
+    칩과 시트 자체는 `EmergencyRadiusChip` 이 갖는다 (#537) — 목록 갈래의 모바일 필터에도
+    같은 손잡이가 필요해져 떼어냈다.
   */
   const dirty =
     filters.type !== DEFAULT_FACILITY_FILTERS.type ||
@@ -113,18 +105,7 @@ export function EmergencyFilterBar({
 
       {/* ── 2행: 반경 · 영업 조건 · 초기화 ──────────────────────────────── */}
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <Chip
-          selected={radius !== RADIUS_OPTIONS[0]}
-          expanded={open}
-          onSelect={() => {
-            setDraft(radius)
-            setOpen(true)
-          }}
-          className="shrink-0"
-        >
-          {messages.emergency.radiusLabel.replace('{radius}', formatDistance(radius))}
-          <ChevronDownIcon size={16} />
-        </Chip>
+        <EmergencyRadiusChip radius={radius} onRadiusChange={onRadiusChange} />
 
         <ChipGroup label={messages.emergency.narrowGroupLabel} className="flex gap-1.5">
           <Chip
@@ -156,47 +137,6 @@ export function EmergencyFilterBar({
       {filters.open24Only && (
         <p className="text-caption text-fg-muted break-keep">{messages.emergency.open24Note}</p>
       )}
-
-      <BottomSheet
-        open={open}
-        onClose={() => setOpen(false)}
-        title={messages.emergency.radiusSheetTitle}
-        footer={
-          <div className="flex gap-2">
-            <Button variant="secondary" size="lg" className="flex-1" onClick={() => setOpen(false)}>
-              {messages.place.filterCancel}
-            </Button>
-            <Button
-              variant="primary"
-              size="lg"
-              className="flex-2"
-              onClick={() => {
-                onRadiusChange(draft)
-                setOpen(false)
-              }}
-            >
-              {messages.place.filterApply}
-            </Button>
-          </div>
-        }
-      >
-        <ChipGroup
-          label={messages.emergency.radiusGroupLabel}
-          exclusive
-          className="flex flex-wrap gap-1.5 px-4 py-3"
-        >
-          {RADIUS_OPTIONS.map((option) => (
-            <Chip
-              key={option}
-              exclusive
-              selected={draft === option}
-              onSelect={() => setDraft(option)}
-            >
-              {formatDistance(option)}
-            </Chip>
-          ))}
-        </ChipGroup>
-      </BottomSheet>
     </div>
   )
 }
