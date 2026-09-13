@@ -227,7 +227,16 @@ describe('부모에 따라 갈리는 둘 — 담는 곳이 정한다', () => {
   })
 
   it('세 사용처가 실제로 갈린다 — 제목 있는 카드에서만 3 을 넘긴다', () => {
-    expect(code('src/features/place/place-list-view.tsx')).toContain('headingLevel={3}')
+    /*
+      **`place-list-view` 가 이쪽을 떠났다** (#531). 목록 카드가 제목을 잃고 `aria-label`
+      만 갖게 되면서 — 페이지 제목이 카드 위 제목 줄로 올라갔다 — 그 카드 안의 상태는 더
+      이상 `h2` 아래가 아니다. 값이 `3` → `2` 로 내려간 것은 회귀가 아니라 짝의 반대쪽이
+      함께 움직인 결과다. `emergency-list-view`(#537)가 먼저 같은 길을 갔다.
+
+      **그래도 값을 지워 기본값에 맡기지 않는다** — 지우면 "이 카드가 제목을 갖는가" 라는
+      판단이 소스에서 사라져, 제목을 카드로 되돌리는 변경이 아무 데서도 걸리지 않는다.
+    */
+    expect(code('src/features/place/place-list-view.tsx')).toContain('headingLevel={2}')
 
     /*
       **`emergency-list-view` 가 이쪽을 떠났다** (#537). 목록 갈래의 카드가 제목을 잃고
@@ -289,8 +298,9 @@ describe('BottomSheet 안 상태 — 시트 제목도 h2 다', () => {
 /**
  * 라우트 상태 파일 열둘 — `route-state-surface.test.ts` 가 잡아 둔 카드 판정과 **같은 표**다.
  *
- * 제목 있는 카드는 다섯이고, `aria-label` 만 있는 셋과 카드가 없는 넷은 `h2` 로 남는다.
- * 열둘을 모두 적는 이유는 **빠뜨림을 잡기 위해서다** — 다섯만 적으면 새 세그먼트가
+ * 제목 있는 카드는 넷이고, `aria-label` 만 있는 넷과 카드가 없는 넷은 `h2` 로 남는다.
+ * (#531 로 `places/(list)` 가 앞에서 뒤로 옮겨 왔다 — 다섯에서 넷이 됐다.)
+ * 열둘을 모두 적는 이유는 **빠뜨림을 잡기 위해서다** — 넷만 적으면 새 세그먼트가
  * 생겼을 때 아무 단언도 깨지지 않는다.
  */
 const ROUTE_STATE_FILES = [
@@ -298,10 +308,11 @@ const ROUTE_STATE_FILES = [
   { path: 'app/(main)/favorites/error.tsx', level: 3 },
   { path: 'app/(main)/mypage/error.tsx', level: 3 },
   { path: 'app/(main)/pets/error.tsx', level: 3 },
-  { path: 'app/(main)/places/(list)/error.tsx', level: 3 },
   { path: 'app/(main)/ai-plans/jobs/[jobId]/error.tsx', level: 2 },
   { path: 'app/(main)/pets/[petId]/error.tsx', level: 2 },
   { path: 'app/(main)/pets/[petId]/not-found.tsx', level: 2 },
+  /* 제목이 카드 위 제목 줄로 올라가 `aria-label` 만 남았다 — `2` 로 내려왔다 (#531) */
+  { path: 'app/(main)/places/(list)/error.tsx', level: 2 },
   { path: 'app/(main)/places/[placeId]/error.tsx', level: 2 },
   { path: 'app/(main)/places/[placeId]/not-found.tsx', level: 2 },
   { path: 'app/(main)/plans/[planId]/error.tsx', level: 2 },

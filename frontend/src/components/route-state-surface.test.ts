@@ -270,7 +270,13 @@ const STATE_FILES: StateFile[] = [
     widthSource: { path: 'app/(main)/places/(list)/page.tsx', contains: 'rail-layout' },
     card: {
       kind: 'card',
-      probes: ['lead', 'title={messages.place.pageTitle}'],
+      /*
+        **카드가 제목을 잃었다** (#531). 페이지 제목이 카드 위 제목 줄로 올라가면서
+        `lead`·`title` 이 걷히고 이름은 `aria-label` 이 이었다 — 반려견 수정(위)과 같은
+        모양이다. 경계와 정상 화면 양쪽에 같은 단언이 걸리므로, 한쪽만 제목을 되돌리면
+        여기가 깨진다.
+      */
+      probes: ['aria-label={messages.place.pageTitle}'],
       source: 'app/(main)/places/(list)/page.tsx',
     },
   },

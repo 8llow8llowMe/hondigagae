@@ -15,8 +15,10 @@ import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { parsePlaceFilters, toPlaceFilterQuery } from '@/lib/url/place-filters'
 import { parseViewMode, PLACES_DEFAULT_VIEW, viewModeHref } from '@/lib/url/view-mode'
+import { cn } from '@/lib/utils/cn'
 
 export const metadata = {
   title: `${messages.place.pageTitle} · 혼디가개`,
@@ -107,8 +109,10 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
         이 화면에 처음 온 사람이 "여기가 어디인가" 를 알기 전에 필터 하위 항목 셋을 먼저
         지났고, 페이지 제목보다 상위처럼 보이는 `h2` 가 그 앞에 있었다.
 
-        **보이는 제목은 여전히 카드의 `h2` 다** (§0). `sr-only` 라 자리를 차지하지 않는다 —
-        `position: absolute` 이므로 grid 트랙도 만들지 않는다 (실측으로 확인).
+        **여기 남는 것은 `sr-only` 사본이다** (#531). 보이는 제목은 아래 제목 줄로 내려갔는데,
+        그것은 우측 열 안이라 다시 레일 **뒤**가 된다 — `h1` 을 레일 앞에 두려고 #472 가
+        만든 자리를 그대로 지키고, 눈에 보이는 쪽만 열 안에서 따로 그린다.
+        `aria-hidden` 으로 보이는 제목을 접근성 트리에서 빼 이름이 두 번 들리지 않게 한다.
       */}
       <h1 className="sr-only">{messages.place.pageTitle}</h1>
 
@@ -129,6 +133,39 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
       </aside>
 
       <SurfaceStack id="place-list" tabIndex={-1}>
+        {/*
+          **제목 줄이 맨 위다** (#531). 375 실측에서 보기 토글이 y=295 에 섰다 — 검색과 칩
+          아래로 밀려 있어 지도 갈래의 떠 있는 토글(y=105)과 190px 어긋났고, 페이지에 들어온
+          사용자가 "여기가 어디인가" 를 알기 전에 도구 두 줄을 먼저 지났다. #537 이 병원·약국
+          에서 같은 순서를 먼저 고쳤고 두 화면이 `ViewToggle` 을 공유하므로 규칙도 같이 간다.
+
+          **여기 제목은 `h1` 이 아니다.** 진짜 `h1` 은 위 캔버스 맨 앞의 `sr-only` 사본이고
+          (#472 가 레일보다 앞에 두려고 만든 자리), 이 줄은 그것을 눈으로 보여주는 사본이다.
+          여기에 `h1` 을 두면 DOM 에서 레일 **뒤**라 #472 가 고친 개요가 도로 깨진다 —
+          `H2:필터 → H3 셋 → H1:장소 찾기`. `aria-hidden` 이라 이름이 두 번 들리지 않는다.
+
+          **#537(`/emergency`)은 이 사본 방식을 쓰지 않았다** — 그 화면은 `sr-only h1` 을
+          캔버스 앞으로 올리는 #472 처방을 아직 안 받아서 열 안의 `h1` 이 유일한 제목이다.
+          그래서 거기 개요는 아직 `H2:필터` 가 먼저다(#546 이 그 후속이고, **이 화면의
+          사본 방식이 거기서도 답이 된다**).
+        */}
+        <div
+          className={cn('flex items-center justify-between gap-3 pt-3 md:pt-0', INSET_CLASS.card)}
+        >
+          <div className="flex min-w-0 flex-col gap-1">
+            {/* `aria-hidden` 은 **제목 글자에만** 건다 (아래 토글은 그대로 남아야 한다) */}
+            <p aria-hidden className="text-title-1 text-fg font-semibold break-keep">
+              {messages.place.pageTitle}
+            </p>
+            {/* 부제는 데스크톱에서만 — 모바일은 아래 칩이 같은 것을 보여준다 */}
+            <p className="text-caption text-fg-muted hidden font-medium lg:block">
+              {filterSummaryLine(filters)}
+            </p>
+          </div>
+          {/* 세 화면이 같은 세그먼트 컨트롤을 쓴다 — 아트보드 05 마지막 단락 */}
+          <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
+        </div>
+
         {/*
           **모바일 칩은 카드 밖이다.** 칩은 목록을 좁히는 **도구**이고 카드는 그 결과를
           담는다 — §0 의 카드 판정 3문에서 ① 자기 제목이 없고 ③ 축이 하나뿐이라 걸린다.
@@ -165,21 +202,16 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
           방식이고, 추측으로 만든 API 를 아무 화면도 검증하지 않는 것이 #422 에서
           프리미티브 넷을 걷은 이유다. 필요해지는 화면이 나오면 그때 만든다.
         */}
-        <Surface
-          lead
-          titleId="place-list-heading"
-          title={messages.place.pageTitle}
-          /* 부제는 데스크톱에서만 — 모바일은 위의 칩이 같은 것을 보여준다 */
-          description={
-            <p className="text-caption text-fg-muted hidden font-medium lg:block">
-              {filterSummaryLine(filters)}
-            </p>
-          }
-          /* 세 화면이 같은 세그먼트 컨트롤을 쓴다 — 아트보드 05 마지막 단락 */
-          trailing={
-            <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
-          }
-        >
+        {/*
+          **카드가 제목을 잃고 `aria-label` 로 이름을 갖는다** (#531). 제목 줄이 위로
+          올라갔으므로 여기 `title` 을 남기면 같은 이름이 화면에 두 번 선다. `titleId` 와
+          `aria-label` 을 함께 주지 않는 것은 접근성 이름이 둘이 되기 때문이다
+          (`Surface` 머리주석) — 그래서 `titleId` 도 함께 걷었다.
+
+          부제(`filterSummaryLine`)는 제목 줄로 따라 올라갔다. 데스크톱 전용인 것은 그대로다 —
+          모바일은 칩이 같은 것을 보여준다.
+        */}
+        <Surface aria-label={messages.place.pageTitle}>
           <HydrationBoundary state={dehydrate(queryClient)}>
             <PlaceListView filters={filters} />
           </HydrationBoundary>

@@ -69,6 +69,18 @@ export type PlaceListSectionProps = {
    * 제목을 갖는가". 한쪽에서 다른 쪽을 읽으면 담기 화면이 조용히 `h3` 가 된다.
    */
   headingLevel?: 2 | 3
+  /**
+   * 목록을 `xl`(1280)+ 에서 2열로 접는다 (#531). 기본은 1열이다.
+   *
+   * **담는 곳이 정한다** — `inset`·`headingLevel` 과 같은 축이다. 2열이 답답하지 않으려면
+   * 한 칸이 충분히 넓어야 하는데 그 폭은 **이 목록이 아니라 바깥 레이아웃**이 정하기
+   * 때문이다: `/places` 는 좌측 280 레일을 뺀 나머지를 쓰고, 일정에 담는 시트는 그보다
+   * 훨씬 좁다. 여기서 켜 두면 좁은 사용처가 조용히 2열이 된다.
+   *
+   * 스켈레톤·`loadingMore` 스켈레톤도 같은 값을 받는다 — 로딩과 목록이 다른 열 수로 서면
+   * 응답이 오는 순간 행이 좌우로 튄다.
+   */
+  columns?: 1 | 2
 }
 
 /**
@@ -89,11 +101,12 @@ export function PlaceListSection({
   keyword = null,
   inset = 'card',
   headingLevel = 2,
+  columns = 1,
   renderRow = (place) => <PlaceRow key={place.placeId} place={place} inset={inset} />,
 }: PlaceListSectionProps) {
   if (loading) {
     return (
-      <SurfaceList>
+      <SurfaceList columns={columns}>
         {Array.from({ length: SKELETON_COUNT }, (_, index) => (
           <PlaceRowSkeleton key={index} inset={inset} />
         ))}
@@ -183,7 +196,7 @@ export function PlaceListSection({
         붙이면 새 목록의 첫 항목에는 `[&>li+li]` 가 걸리지 않아 **이어붙는 자리에만
         구분선이 빠진다.** 스켈레톤도 같은 목록의 항목이라 `li` 로 두는 것이 맞다.
       */}
-      <SurfaceList>
+      <SurfaceList columns={columns}>
         {places.map((place) => renderRow(place))}
         {loadingMore &&
           Array.from({ length: LOAD_MORE_SKELETON_COUNT }, (_, index) => (

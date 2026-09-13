@@ -29,8 +29,11 @@ import { cn } from '@/lib/utils/cn'
  * (Next 규약). 칩·필터의 스켈레톤을 지어내면 실제와 다른 모양이 잠깐 서므로, 열의 **자리만**
  * 세우고 내용은 비운다 — 잡으려는 것이 카드의 가로 위치이기 때문이다.
  *
- * **제목 자리도 카드 안이다.** 목록의 제목이 카드 제목으로 들어갔기 때문이다 —
- * 밖에 두면 로딩 중에만 제목이 카드 위에 뜬다.
+ * **제목 자리는 카드 밖이다** (#531). 목록의 제목이 카드 **위** 제목 줄로 올라갔기
+ * 때문이다 — 안에 두면 로딩이 끝나는 순간 제목이 카드 밖으로 뛴다. 그 줄의 오른쪽
+ * 보기 토글 자리도 함께 비워 둔다: 토글은 `searchParams` 에서 만든 링크가 필요한데
+ * `loading.tsx` 는 그것을 받지 않고(Next 규약), 자리를 비우지 않으면 로딩이 끝날 때
+ * 제목이 토글 폭만큼 옆으로 밀린다.
  *
  * 좌우 인셋은 문자열이 아니라 `INSET_CLASS.card` 참조다 — 규칙이 한 군데 있으면 한
  * 군데만 어긋난다 (`lib/ui/inset.ts`, #386).
@@ -44,13 +47,19 @@ export default function PlacesLoading() {
       <SurfaceStack>
         <h1 className="sr-only">{messages.place.pageTitle}</h1>
 
-        <Surface>
-          <div className={cn('pt-5 pb-3', INSET_CLASS.card)}>
-            <Skeleton variant="text" className="h-9 w-40" />
-            <Skeleton variant="text" className="mt-2 h-5 w-56" />
+        <div
+          className={cn('flex items-center justify-between gap-3 pt-3 md:pt-0', INSET_CLASS.card)}
+        >
+          <div className="flex min-w-0 flex-col gap-1">
+            <Skeleton variant="text" className="h-8 w-40" />
+            <Skeleton variant="text" className="hidden h-5 w-56 lg:block" />
           </div>
+          {/* 보기 토글 자리 — 위 주석 참고 */}
+          <Skeleton variant="text" className="h-11 w-22 shrink-0" />
+        </div>
 
-          <SurfaceList>
+        <Surface>
+          <SurfaceList columns={2}>
             {Array.from({ length: 6 }, (_, index) => (
               <PlaceRowSkeleton key={index} />
             ))}
