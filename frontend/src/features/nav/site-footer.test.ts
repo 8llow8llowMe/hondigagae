@@ -92,10 +92,20 @@ describe('SiteFooter — 지도 화면에서는 빠진다 (#399)', () => {
     expect(md).toContain('padding-block-end: 0')
   })
 
-  it('(main) 레이아웃이 푸터를 한 번만 조립한다', () => {
-    const layout = repoSource('app/(main)/layout.tsx')
+  /*
+    **조립처는 `AppShell` 한 곳이다** (#494). 예전에는 `(main)` 레이아웃이 직접 그렸는데,
+    전역 404 가 같은 셸을 써야 하면서 뽑아냈다 — 라우트 그룹 레이아웃은 루트
+    `not-found.tsx` 까지 닿지 않는다. **두 벌이 되면 한쪽만 고쳐진다.**
+  */
+  it('앱 셸이 푸터를 한 번만 조립한다', () => {
+    const shell = repoSource('src/features/nav/app-shell.tsx')
 
-    expect(layout).toContain('<SiteFooter />')
-    expect(layout.match(/<SiteFooter/g)?.length).toBe(1)
+    expect(shell).toContain('<SiteFooter />')
+    expect(shell.match(/<SiteFooter/g)?.length).toBe(1)
+
+    // 셸을 거치지 않고 따로 그리는 곳이 생기지 않았다
+    for (const path of ['app/(main)/layout.tsx', 'app/not-found.tsx']) {
+      expect(repoSource(path)).not.toContain('<SiteFooter')
+    }
   })
 })
