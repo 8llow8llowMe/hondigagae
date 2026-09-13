@@ -132,7 +132,7 @@ export function PlanFilterRail({
   petCounts,
 }: PlanFilterControlsProps & { onReset: () => void }) {
   return (
-    <div className="filter-rail flex flex-col pb-4">
+    <div className="filter-rail flex flex-col pb-5">
       <div className="filter-rail-title flex items-baseline justify-between gap-2 px-5 pt-5 pb-3">
         <h2 className="text-body-1 text-fg font-semibold">{messages.plan.filterTitle}</h2>
         <button

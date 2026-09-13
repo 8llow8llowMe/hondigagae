@@ -131,8 +131,12 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
       */}
       <SurfaceStack id="plan-list" tabIndex={-1}>
         {/*
-          **필터는 카드 밖이다.** 상태 탭·반려견 칩은 목록을 좁히는 **도구**이고 카드는 그
-          결과를 담는다 — 데스크톱 레일이 카드 밖에 서 있는 것과 같은 자리다 (#439 와 같은 판단).
+          **모바일 칩은 카드 밖이다.** 상태 탭·반려견 칩은 목록을 좁히는 **도구**이고 카드는
+          그 결과를 담는다 — §0 의 카드 판정 3문에서 ① 자기 제목이 없고 ③ 축이 하나뿐이라
+          걸린다 (#439 와 같은 판단).
+
+          **데스크톱 레일은 반대로 카드다** (#535) — 자기 제목과 축 셋을 갖고 랜드마크로
+          혼자 선다. 근거는 `app/globals.css` 의 `.filter-rail` 주석이 정본이다.
         */}
         <div className="lg:hidden">
           <PlanStatusTabs filters={filters} onChange={apply} statusCounts={statusCounts} />

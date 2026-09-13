@@ -118,6 +118,12 @@
 | 같은 카드 안을 나눈다   | 1px 구분선 또는 `--band` 채움. **아이템에 테두리를 두르지 않는다**        |
 | 카드 안 좌우 여백       | `INSET_CLASS.card`(16/20). 넘치는 스크롤러는 `INSET_BLEED_END_CLASS.card` |
 
+- **필터 레일은 카드지만 `Surface` 를 쓰지 않는다** (#535). `app/globals.css` 의
+  `.filter-rail` 이 면 · 테두리 · radius 를 직접 준다. 이유 둘: (1) `Surface` 는 모바일에서
+  전폭으로 풀리는데(`border-y md:rounded-lg md:border`) 레일은 `hidden lg:block` 이라 그
+  갈래가 영영 안 쓰이고, (2) 레일의 좌우 인셋 규칙이 이미 `.filter-rail` 자손 선택자로
+  걸려 있어 면만 따로 컴포넌트로 빼면 값이 두 곳으로 갈린다. **모바일 시트는 같은 컨트롤을
+  쓰지만 `.filter-rail` 을 달지 않아 카드가 되지 않는다.**
 - **좌측 레일은 `complementary` 랜드마크이고 건너뛸 수 있어야 한다** (#472). 레일은 목록을
   좁히는 **도구**라 본문이 아니다 — `<aside aria-label=…>` 로 내보내고, 레일 맨 앞에
   `목록으로 건너뛰기`(`SkipLink`)를 둔다. 전역 스킵 링크(`#main`)는 레일 **앞**으로 보내므로
