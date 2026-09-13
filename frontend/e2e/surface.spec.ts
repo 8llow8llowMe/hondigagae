@@ -424,6 +424,64 @@ test.describe('3층 표면 — not-found', () => {
  * **실제로 같은 세로선을 만드는가**를 잰다. 두 축이 따로 필요한 이유는 값이 `card` 여도
  * 담는 쪽이 이미 인셋을 줬으면 결과가 어긋날 수 있어서다.
  */
+/**
+ * **모바일 필터 칩도 카드 글줄과 같은 축이다** — 이슈 #457.
+ *
+ * 칩은 카드 **밖** 도구다(#439) — 목록을 좁히는 도구이고 카드는 그 결과를 담는다.
+ * 그래도 L0 위에 놓이는 블록은 **카드 안 글줄과 같은 축**이어야 한다
+ * (`plan-add-place-header` 의 `inset` 주석, #451).
+ *
+ * 예전에는 칩이 `md:px-10` 을 직접 적어, `SurfaceStack` 의 `md:p-6`(24) 위에 40 이 얹혀
+ * 768 에서 글줄이 64 에 섰다 — 카드 제목(24+1+20 = 45)과 19px 갈렸다.
+ *
+ * **`toBe` 가 아니라 1px 허용이다.** 카드 테두리 1px 만큼 남는 차이는 #443 · #447 과 같은
+ * 의도이고, 모바일은 카드가 전폭이라 테두리가 좌우에 없어 정확히 같아진다 — 두 값이 다른
+ * 것이 맞으므로 뷰포트마다 기대값을 따로 두지 않고 **"1px 이내" 하나로 본다.**
+ */
+test.describe('모바일 필터 칩의 세로선 — #457', () => {
+  const CHIP_SCREENS = [
+    { path: '/places?view=list', label: '장소 찾기' },
+    { path: '/plans', label: '일정' },
+  ] as const
+
+  for (const { path, label } of CHIP_SCREENS) {
+    for (const name of ['mobile', 'tablet'] as const) {
+      test(`${label} ${name} — 칩 글줄이 카드 제목과 1px 안에 선다`, async ({ page }) => {
+        await page.setViewportSize(VIEWPORTS[name])
+        await page.goto(path)
+
+        const main = page.getByRole('main')
+        const card = main
+          .locator('section')
+          .filter({ has: page.locator('h2') })
+          .first()
+        await expect(card).toBeVisible()
+
+        /* 칩 스트립 = 카드보다 앞에 오는 `border-b` 블록 중 좌우 padding 을 가진 것 */
+        const chipLeft = await page.evaluate(() => {
+          const root = document.querySelector('main') as HTMLElement
+          const target = root.querySelector('section') as HTMLElement
+          const strip = [...root.querySelectorAll('div')].find(
+            (d) =>
+              getComputedStyle(d).borderBottomWidth !== '0px' &&
+              getComputedStyle(d).paddingLeft !== '0px' &&
+              (d.compareDocumentPosition(target) & 4) !== 0,
+          )
+          const first = strip?.querySelector('button, a, span')
+          return first === undefined || first === null
+            ? null
+            : Math.round(first.getBoundingClientRect().left)
+        })
+
+        expect(chipLeft).not.toBeNull()
+        const titleLeft = await leftEdge(card.getByRole('heading', { level: 2 }).first())
+
+        expect(Math.abs((chipLeft as number) - titleLeft)).toBeLessThanOrEqual(1)
+      })
+    }
+  }
+})
+
 test.describe('카드 안 상태의 세로선 — #485', () => {
   test('/plans 필터 0건에서 상태 글줄이 카드 제목과 같은 세로선에 선다', async ({ page }) => {
     await page.setViewportSize(VIEWPORTS.desktop)

@@ -7,6 +7,7 @@ import { FilterCheck, FilterList, FilterListHeading, FilterRadio } from '@/compo
 import { PetAvatar } from '@/components/pet-avatar'
 import { messages } from '@/lib/messages'
 import { describePet } from '@/lib/pet/describe'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { Pet } from '@/types/pet'
 import { PLAN_STATUS_FILTERS, type PlanFilters, type PlanStatusFilter } from '@/types/plan'
@@ -98,7 +99,8 @@ export function PlanPetChips({
   return (
     <div
       aria-label={messages.plan.petGroupLabel}
-      className="border-border flex flex-wrap gap-1.5 border-b px-4 py-3 md:px-10"
+      /* 인셋은 카드 축이다 — 근거는 `place-filter-chips.tsx` 가 정본이다 (#457) */
+      className={cn('border-border flex flex-wrap gap-1.5 border-b py-3', INSET_CLASS.card)}
     >
       {pets.map((pet) => {
         const selected = filters.petIds.includes(pet.petId)
