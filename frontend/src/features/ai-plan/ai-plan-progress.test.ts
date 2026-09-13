@@ -56,11 +56,11 @@ describe('AiPlanProgress — 서버 문구만 쓴다 (명세 S2 · S7)', () => {
 })
 
 describe('AiPlanProgress — 폴링 국면 (명세 S4)', () => {
-  it('30초 전에는 기다림에 대해 아무 말도 하지 않는다', () => {
+  it('안내 시점 전에는 기다림에 대해 아무 말도 하지 않는다', () => {
     expect(render({ phase: 'normal' })).not.toContain(messages.aiPlan.jobSlowNotice)
   })
 
-  it('30초를 넘기면 안내를 덧붙인다', () => {
+  it('안내 시점을 넘기면 안내를 덧붙인다', () => {
     const html = render({ phase: 'slow' })
 
     expect(html).toContain(messages.aiPlan.jobSlowNotice)
@@ -68,12 +68,21 @@ describe('AiPlanProgress — 폴링 국면 (명세 S4)', () => {
     expect(html).toContain(SERVER_DESCRIPTION)
   })
 
-  it('90초를 넘기면 진행 표시를 걷고 수동 확인을 준다', () => {
+  it('상한을 넘기면 진행 표시를 걷고 수동 확인을 준다', () => {
     const html = render({ phase: 'exceeded' })
 
     expect(html).toContain(messages.aiPlan.jobExceededTitle)
     expect(html).toContain(messages.aiPlan.jobExceededAction)
     expect(html).not.toContain(SERVER_DESCRIPTION)
+  })
+
+  /*
+    **설명문은 "작업이 계속되고 있다" 를 말하는 유일한 자리다** (#495). 제목과 버튼만
+    단언하면 이 `<p>` 를 지워도 초록불이라, 화면이 멈춘 것을 본 사람에게 작업도 멈췄다는
+    오해를 남긴 채 통과한다.
+  */
+  it('상한을 넘겨도 작업이 계속되고 있다고 말한다', () => {
+    expect(render({ phase: 'exceeded' })).toContain(messages.aiPlan.jobExceededDescription)
   })
 
   it('상한 초과는 실패가 아니다 — 오류 문구를 쓰지 않는다', () => {

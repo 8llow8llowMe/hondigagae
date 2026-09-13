@@ -117,7 +117,7 @@ export function useAiPlanJob(jobId: string) {
       **`jobId` 를 의존성에 넣는다.** 리셋을 별도 effect 로 분리하면 `jobId` 만 바뀌고
       `polling`·`phase` 가 그대로일 때 이 effect 가 재실행되지 않아 `startedAt` 이
       `null` 로 남고, 매 tick 이 early return 해 **경과 시간이 영구히 0** 이 된다 —
-      30초 안내와 90초 상한이 절대 발동하지 않는다.
+      대기 안내와 폴링 상한이 절대 발동하지 않는다.
     */
   }, [jobId, polling, phase])
 

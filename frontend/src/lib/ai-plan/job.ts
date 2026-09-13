@@ -55,7 +55,7 @@ export function isJobCanceled(job: JobLike | null | undefined): boolean {
  * 폴링을 계속해야 하는가.
  * 완료·실패·**취소**에서 반드시 멈춘다. 멈추지 않는 폴링이 대표 사고다.
  *
- * **`CANCELED` 를 빠뜨리면 취소한 작업을 상한(90초)까지 두드린다** — 서버는 이미 종결
+ * **`CANCELED` 를 빠뜨리면 취소한 작업을 폴링 상한까지 두드린다** — 서버는 이미 종결
  * 상태로 못 박고 SSE 도 닫았는데 화면만 진행 중으로 남는다 (#250).
  */
 export function shouldKeepPolling(job: JobLike | null | undefined): boolean {
@@ -110,20 +110,49 @@ export const JOB_POLL_INTERVAL_MS = 2000
 export const JOB_STREAM_SAFETY_POLL_MS = 30_000
 
 /**
- * 안내를 덧붙이는 시점(ms). 이 전에는 아무 말도 하지 않는다 — 정상 소요 시간이다
- * (제출 화면이 "20초쯤 걸려요" 로 이미 기대를 맞춰 뒀다).
+ * 안내를 덧붙이는 시점(ms). 이 전에는 아무 말도 하지 않는다 — 정상 소요 시간이다.
+ *
+ * **30초는 정상 경로를 전부 붙잡았다** (#495). dev 실측이 52 · 60 · 80초라 가장 빠른
+ * 실행조차 이 값을 넘겨, 아무 문제 없는 생성이 항상 "오래 걸림" 안내를 봤다. 안내가
+ * 늘 뜨면 안내가 아니다.
+ *
+ * **90초인 이유는 BE `ai-llm.queue-wait-ms` 와 같은 값이기 때문이다.** 모델 호출 차례를
+ * 기다리는 상한이 90초이므로(`ai-service/application.yml`), 여기를 넘겼다는 것은 한 턴이
+ * 느린 것이 아니라 **내 잡이 게이트에서 줄을 섰다**는 뜻이다 — 그때가 정확히 기다려
+ * 달라고 말해야 하는 시점이다. 한 턴만으로 90초를 넘기려면 실측 최악(80초)보다 느려야 한다.
+ *
+ * 소요 자체는 하드웨어가 정한다 — #489 는 iGPU 공유 메모리 + 같은 호스트의 Jenkins 라는
+ * 구성에서 **60~70초가 정상**이고 CI 가 도는 동안은 그보다 느리다고 결론냈다.
  */
-export const JOB_POLL_SLOW_MS = 30_000
+export const JOB_POLL_SLOW_MS = 90_000
 
 /**
  * 폴링 상한(ms). 넘으면 멈추고 수동 확인을 준다 (명세 S8 미결 3).
- *
- * 근거: 백엔드 스키마가 "로컬 LLM 기준 수십 초" 라 한다. 90초는 그 3배 여유다.
  * **무제한이면 죽은 작업을 영원히 두드린다.**
  *
- * `AIPLAN_006 JOB_TIMEOUT`(504) 은 서버 쪽 타임아웃이라 이 상한과 별개다.
+ * **서버가 판정을 내릴 때까지는 기다린다** (#495). 이전 값 90초는 "수십 초의 3배 여유"
+ * 라고 적혀 있었지만, BE 가 실제로 쥐고 있는 예산은 그보다 훨씬 크다
+ * (`ai-service/application.yml` 의 `ai-plan.job`):
+ *
+ * ```text
+ * 잡 1건이 워커를 쥐는 벽시계 최악값
+ *   = 게이트 대기 90 + 모델 호출 120 + 내부 조회(5초 x 최대 7회) 35 = 245초
+ * pending/running-timeout-seconds: 300  ← BE 가 AIPLAN_006 을 내리는 시각
+ * ```
+ *
+ * 90초는 그 예산의 0.3배라 **서버가 결론을 내기 한참 전에 화면이 먼저 손을 뗐다.**
+ * 330초는 BE 상한 300초 + 판정·전파 여유 30초다. 서버가 `FAILED` 로 바꾸면
+ * `shouldKeepPolling` 이 폴링을 자연 종료시키고 화면은 **이유가 적힌 실패 화면**을 띄운다 —
+ * `AIPLAN_006 JOB_TIMEOUT`(504) 도 그렇게 도착한다. 이 상수가 발동하는 것은 이제
+ * **서버조차 판정을 내리지 못한** 진짜 이상 상황뿐이고, 그것이 원래 이 상한의 목적이다.
+ *
+ * BE 의 세 값(`queue-wait-ms` · `timeout-ms` · `pending/running-timeout-seconds`)이 한 세트로
+ * 움직이므로, 그쪽이 바뀌면 이 값도 함께 본다.
+ *
+ * **대가**: 구독이 끊겨 2초 폴링으로 떨어진 갈래에서 최악 요청 수가 45 → 165 회가 된다.
+ * 구독이 살아 있으면 `JOB_STREAM_SAFETY_POLL_MS`(30초) 주기라 11회다.
  */
-export const JOB_POLL_LIMIT_MS = 90_000
+export const JOB_POLL_LIMIT_MS = 330_000
 
 /** 대기 화면이 말해야 하는 국면 — 명세 S7 */
 export type JobPollPhase = 'normal' | 'slow' | 'exceeded'
