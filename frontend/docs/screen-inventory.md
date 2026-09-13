@@ -509,6 +509,24 @@
 - **기간을 줄여도 백엔드가 항목을 정리하지 않는다.** `PlanCommandProcessor.updatePlan` 은 `startDate`/`endDate` 만 바꾸고 `day > totalDays` 가 된 항목을 그대로 둔다 → 상세 응답에 기간 밖 항목이 섞여 온다. **그래서 화면은 기간 수정을 열지 않는다** (BE 후속 요청). 다른 경로로 생긴 기간 밖 항목은 상세 화면이 별도 섹션으로 드러낸다.
 - **날씨 브리핑(`PlanWeatherResponse`)의 `days` 는 일정 일수만큼 항상 채워진다.** (명세의 `dailyBriefings` 는 실제 필드명이 아니다 — `features/_index.md` 드리프트 표) 빈 배열을 방어할 필요가 없다. 대신 각 일자의 예보 필드가 null 일 수 있다 (§3-1 `DailyWeatherItem` 과 같은 타입).
 
+**FE 미연동 (백엔드는 구현됨 — 2026-09-13 재수집, [#534](https://github.com/8llow8llowMe/hondigagae/issues/534))**
+
+| API                            | 응답                   | 비고                                        |
+| ------------------------------ | ---------------------- | ------------------------------------------- |
+| `GET /plans/{planId}/briefing` | `PlanBriefingResponse` | `date` **필수**. 출발 전날·당일 하루치 묶음 |
+
+**새 판정이 아니라 기존 판정의 묶음이다.** 그날 일정 요약(항목 수 · 방문 수 · 첫/마지막
+항목 · 대표 장소) · 날씨/적합도 · 발효 중인 기상특보 · 산책 골든타임을 한 응답에 담는다.
+서버 설명이 _"전부 기존 판정을 그대로 중계하는 결정적 조합이고 LLM 을 부르지 않습니다"_
+라고 못박는다. **준비물은 여기 없다** — ai-service 쪽을 따로 부른다.
+
+- **기상특보·골든타임은 `today=true` 일 때만 채워진다.** 과거·미래 날짜로 부르면 그 두
+  자리가 비고, 이유가 `weatherWarningUnavailableReason` · `walkTimesUnavailableReason` 로 온다.
+- **지금 화면이 이미 같은 것을 따로 부르고 있다** — 일정 상세가 `GET /plans/{planId}` +
+  `GET /plans/{planId}/weather` 를, 응급 브리핑이 `GET /plans/{planId}/emergency` 를 쓴다.
+  그래서 이것은 "없던 기능" 이 아니라 **왕복을 줄이는 합본**이고, 붙일지는 화면이 정한다 —
+  §4 상세와 겹치는 범위를 먼저 재 봐야 한다. #534 에서는 기록까지만 한다.
+
 ## 5. AI 일정 생성 — **구현 완료**
 
 | 화면           | 경로                     | API                                                 | 상태                                                                                                                |
@@ -601,6 +619,25 @@
   번호는 `petIds` 순서이고 아이 이름이 아니다. 대괄호 접두(`[반려견 2]`)는 BE #233 으로 없어졌고,
   서버가 남은 대괄호를 걷어내 내려 준다 — 화면은 문장을 그대로 그린다.
 
+**FE 미연동 (백엔드는 구현됨 — 2026-09-13 재수집, [#534](https://github.com/8llow8llowMe/hondigagae/issues/534))**
+
+| API                                                         | 무엇                |
+| ----------------------------------------------------------- | ------------------- |
+| `GET /plans/{planId}/packing-items`                         | 여행 준비물 조회    |
+| `PUT /plans/{planId}/packing-items`                         | 저장 (AI 결과 교체) |
+| `POST /plans/{planId}/packing-items`                        | 직접 추가           |
+| `DELETE /plans/{planId}/packing-items/{packingItemId}`      | 삭제                |
+| `PUT /plans/{planId}/packing-items/{packingItemId}/checked` | 챙김 체크           |
+
+**이 다섯이 위의 "결과가 저장되지 않는다" 를 뒤집는다.** 지금 화면은 `POST
+/ai-plans/packing-list/{planId}` 로 **생성만 하고 보관하지 않아**, 새로고침하면 사라진다는
+사실을 문구로 밝히고 있다. 서버는 이제 그 결과를 저장·체크·편집할 수 있다.
+
+**그래도 이번에는 붙이지 않는다.** #534 는 기준선을 맞추는 재수집이고, 준비물 화면을
+"한 번 보고 버리는 목록" 에서 "체크하며 쓰는 목록" 으로 바꾸는 것은 **화면 결정**이다 —
+생성 시점·교체 규칙(`PUT` 이 AI 결과를 통째로 갈아끼운다)·체크 상태의 수명까지 정해야
+한다. 별도 FE 이슈로 뗀다.
+
 **AI 선정 게이트(§7)에 걸리지 않는다고 판단했다** — §6 목록에 없고, §6 이 밝힌 기준("패키지
 자체가 없다")과 달리 `AiPackingProcessor` 가 있으며, BE 가 이슈 #155 로 추적해 출시했다.
 다만 **`CLAUDE.md` 가 가리키는 "README 의 AI 기능 10종 후보 풀" 이 지금 README 에 없다** —
@@ -679,10 +716,26 @@
 | [#382](https://github.com/8llow8llowMe/hondigagae/issues/382) | 제주올레 산책 코스 조회 API — `walkcourse` 컨텍스트 착수 | 진행 중 (PR [#384](https://github.com/8llow8llowMe/hondigagae/pull/384)) |
 | [#383](https://github.com/8llow8llowMe/hondigagae/issues/383) | 제주올레 코스 적재 배치 — 공공 CSV + TourAPI 좌표·이미지 | 열림                                                                     |
 
-**그래도 지금은 만들지 않는다.** PR #384 가 머지되기 전에는 계약이 확정되지 않았고,
-`walkcourse` 스키마가 스냅샷(`docs/api/openapi/tour-service.json`)에 아직 없다.
+> **착수 신호가 떨어졌다** (2026-09-13 재수집, [#534](https://github.com/8llow8llowMe/hondigagae/issues/534)).
+> 아래가 기다리던 그 시점이다 — tour-service 스냅샷에 operation 둘이 잡혔다.
+>
+> | API                                | 응답                       |
+> | ---------------------------------- | -------------------------- |
+> | `GET /walk-courses`                | `WalkCourseListResponse`   |
+> | `GET /walk-courses/{walkCourseId}` | `WalkCourseDetailResponse` |
+>
+> 경로는 `walkcourse` 가 아니라 **`walk-courses`** 이고 **공개 API**(인증 없음)다.
+> `WalkCourseItem` · `WalkCourseListResponse` · `WalkCourseDetailResponse` 셋이 스키마에
+> 들어와 있다.
+>
+> **그래도 #534 에서는 화면을 만들지 않는다** — 재수집은 기준선을 맞추는 데까지다.
+> 다음 단계는 §8 갱신 규칙 그대로다: **이 절을 §1~5 형식으로 옮기고 FE 이슈를 연다.**
+> 그때 아트보드에 산책 코스 자리가 있는지부터 확인한다.
+
+**#534 이전의 기록.** PR #384 가 머지되기 전에는 계약이 확정되지 않았고,
+`walkcourse` 스키마가 스냅샷(`docs/api/openapi/tour-service.json`)에 아직 없었다.
 **#384 가 머지되면 이 절을 §1~5 형식으로 옮기고 FE 이슈를 연다** (§8 갱신 규칙).
-착수 신호는 스냅샷 재수집에서 `walkcourse` operation 이 잡히는 시점이다.
+착수 신호는 스냅샷 재수집에서 그 operation 이 잡히는 시점이다.
 
 ## 7. AI 기능 선정 게이트
 

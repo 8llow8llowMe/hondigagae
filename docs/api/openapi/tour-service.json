@@ -25,18 +25,124 @@
       "description": "여행 중 반려견에게 문제가 생겼을 때 필요한 시설을 찾습니다."
     },
     {
+      "name": "산책 코스",
+      "description": "제주올레 코스를 반려견 조건에 맞춰 찾습니다."
+    },
+    {
       "name": "장소",
       "description": "반려동물 동반 조건 기반 장소 검색과 상세 조회 API를 제공합니다."
     }
   ],
   "paths": {
+    "/api/v1/walk-courses": {
+      "get": {
+        "tags": [
+          "산책 코스"
+        ],
+        "summary": "산책 코스 목록",
+        "description": "제주올레 코스(27개 + A/B 변형) 목록입니다. 기본 정렬은 코스번호 순입니다.\n\npetActivityLevel 을 주면 반려견 활동량으로 거릅니다 — LOW 는 4시간 이하, MEDIUM 은 6시간 이하 코스만 남고 HIGH 는 거르지 않습니다. 활동량 설명(\"장시간 활동을 힘들어합니다\" 등)에서 끌어낸 서비스 정의 기준입니다.\n\n**lat/lng 가 null 인 코스가 있습니다**(원천에 좌표가 없는 20·18-2코스). 좌표가 있는 코스는 `GET /api/v1/insights/walk-times?lat=&lng=` 에 그대로 넣어 \"오늘 이 코스 언제 걷기 좋은가\"(골든타임)를 이어 볼 수 있습니다 — 좌표가 null 이면 그 동선을 만들지 마세요.\n\n호출 예\n- 전체: `GET /api/v1/walk-courses`\n- 활동량 낮은 아이가 걸을 만한 짧은 코스부터: `GET /api/v1/walk-courses?petActivityLevel=LOW&sort=DISTANCE_ASC`",
+        "operationId": "searchWalkCourses",
+        "parameters": [
+          {
+            "name": "petActivityLevel",
+            "in": "query",
+            "description": "[선택] 반려견 활동량. 주면 소요시간 상한으로 거릅니다 — LOW 4시간 · MEDIUM 6시간 · HIGH 제한 없음",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOW",
+                "MEDIUM",
+                "HIGH"
+              ]
+            },
+            "example": "LOW"
+          },
+          {
+            "name": "maxDistanceKm",
+            "in": "query",
+            "description": "[선택] 최대 거리(km). 0.1~50",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 50.0,
+              "minimum": 0.1
+            },
+            "example": 12.0
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "[선택, 기본 COURSE_NO] 정렬. COURSE_NO 코스번호 · DISTANCE_ASC/DESC 거리 · DURATION_ASC 소요시간",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COURSE_NO",
+                "DISTANCE_ASC",
+                "DISTANCE_DESC",
+                "DURATION_ASC"
+              ]
+            },
+            "example": "COURSE_NO"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWalkCourseListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/walk-courses/{walkCourseId}": {
+      "get": {
+        "tags": [
+          "산책 코스"
+        ],
+        "summary": "산책 코스 상세",
+        "description": "목록에서 고른 코스 한 곳의 상세입니다. 목록이 내려주는 walkCourseId 를 그대로 씁니다. lat/lng 의 뜻은 목록과 같습니다 — 좌표가 있으면 골든타임(walk-times)으로 이어집니다.",
+        "operationId": "getWalkCourseDetail",
+        "parameters": [
+          {
+            "name": "walkCourseId",
+            "in": "path",
+            "description": "[필수] 산책 코스 아이디. 목록 응답의 walkCourseId 를 그대로 씁니다. 예시 값은 형식 안내용",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 212481712381923328
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseWalkCourseDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/places": {
       "get": {
         "tags": [
           "장소"
         ],
         "summary": "장소 목록 조회",
-        "description": "지역·타입·반려동물 동반 조건으로 장소를 검색합니다. lastPlaceId 커서 기반 무한 스크롤 응답입니다. 비 오는 날 대안을 찾을 때는 indoor=true 로, 소형견만 받는 곳을 피할 때는 allowedPetSize 로 거릅니다.\n\n**필수 파라미터는 없습니다.** 전부 생략하면 전체 장소의 첫 페이지(20개)가 옵니다. 선택 파라미터는 채운 것만 AND 조건으로 걸립니다.\n\n**정렬은 `placeId` 오름차순이며 최신순이 아닙니다.** 아이디 대역이 원천별로 갈려 있어 사진·개요가 있는 관광정보(TourAPI) 장소가 먼저 오고, 이미지가 없는 문화정보원·식약처 장소가 뒤에 옵니다.\n\n호출 예\n- 제주 음식점·카페 20개: `GET /api/v1/places?areaCode=39&contentType=RESTAURANT`\n- 중형견 동반 가능한 실내 장소: `GET /api/v1/places?petAllowanceType=ALLOWED&indoor=true&petSizeType=MEDIUM`\n- 다음 페이지: 직전 응답 `items` 마지막의 `placeId` 를 `lastPlaceId` 로",
+        "description": "지역·타입·반려동물 동반 조건으로 장소를 검색합니다. lastPlaceId 커서 기반 무한 스크롤 응답입니다. 비 오는 날 대안을 찾을 때는 indoor=true 로, 소형견만 받는 곳을 피할 때는 allowedPetSize 로 거릅니다. 이름·주소로 찾을 때는 keyword 를 씁니다 (부분 일치, 대소문자 무시).\n\n**필수 파라미터는 없습니다.** 전부 생략하면 전체 장소의 첫 페이지(20개)가 옵니다. 선택 파라미터는 채운 것만 AND 조건으로 걸립니다.\n\n**정렬은 `placeId` 오름차순이며 최신순이 아닙니다.** 아이디 대역이 원천별로 갈려 있어 사진·개요가 있는 관광정보(TourAPI) 장소가 먼저 오고, 이미지가 없는 문화정보원·식약처 장소가 뒤에 옵니다.\n\n호출 예\n- 제주 음식점·카페 20개: `GET /api/v1/places?areaCode=39&contentType=RESTAURANT`\n- 중형견 동반 가능한 실내 장소: `GET /api/v1/places?petAllowanceType=ALLOWED&indoor=true&petSizeType=MEDIUM`\n- 성산이 이름이나 주소에 들어간 곳: `GET /api/v1/places?keyword=성산`\n- 다음 페이지: 직전 응답 `items` 마지막의 `placeId` 를 `lastPlaceId` 로",
         "operationId": "getPlaces",
         "parameters": [
           {
@@ -158,6 +264,18 @@
               "type": "string"
             },
             "example": "카페"
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "description": "[선택] 장소명 또는 주소 부분 일치. 공백/빈 값은 필터 없음. 최대 50자",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 50,
+              "minLength": 0
+            },
+            "example": "성산"
           },
           {
             "name": "lastPlaceId",
@@ -468,6 +586,21 @@
               "type": "string"
             },
             "example": "퍼그"
+          },
+          {
+            "name": "petSociality",
+            "in": "query",
+            "description": "[선택] 사회성. LOW 면 혼잡도 감점을 키웁니다 - 다른 개나 낯선 사람을 불편해하는 아이는 붐비는 날이 부담입니다. 보통/높음은 판정에 영향이 없습니다",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "LOW",
+                "MEDIUM",
+                "HIGH"
+              ]
+            },
+            "example": "LOW"
           }
         ],
         "responses": {
@@ -551,7 +684,7 @@
           "장소"
         ],
         "summary": "주변 장소 검색",
-        "description": "좌표 기준 반경 안의 장소를 가까운 순으로 찾습니다. 여행 중 다음 일정을 고를 때 쓰는 조회라 커서가 아니라 상위 N 개를 돌려줍니다. 식사할 곳을 찾을 때는 contentType=RESTAURANT 로, 카페만 볼 때는 sourceCategory=카페 를 함께 씁니다. 여기 담긴 음식점은 지자체에 반려동물 동반출입 업소로 등록된 곳이라 동반 가능 여부가 확인된 정보입니다.\n\n**필수: lat, lng.** 나머지는 생략 가능하고 radius 기본 5000m, size 기본 15 입니다.\n\n**totalCount 는 size 로 자르기 전 총계입니다.** 돌려준 개수보다 크면 반경 안에 더 있다는 뜻입니다.\n\n호출 예\n- 제주시청 반경 3km 카페: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&radius=3000&sourceCategory=카페`\n- 소형견 동반 가능한 5km 안 장소: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&petAllowanceType=ALLOWED&petSizeType=SMALL`",
+        "description": "좌표 기준 반경 안의 장소를 가까운 순으로 찾습니다. 여행 중 다음 일정을 고를 때 쓰는 조회라 커서가 아니라 상위 N 개를 돌려줍니다. 식사할 곳을 찾을 때는 contentType=RESTAURANT 로, 카페만 볼 때는 sourceCategory=카페 를 함께 씁니다. 여기 담긴 음식점은 지자체에 반려동물 동반출입 업소로 등록된 곳이라 동반 가능 여부가 확인된 정보입니다.\n\n**필수: lat, lng.** 나머지는 생략 가능하고 radius 기본 5000m, size 기본 15 입니다.\n\n**totalCount 는 size 로 자르기 전 총계입니다.** 돌려준 개수보다 크면 반경 안에 더 있다는 뜻입니다.\n\n호출 예\n- 제주시청 반경 3km 카페: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&radius=3000&sourceCategory=카페`\n- 성산이 이름이나 주소에 들어간 5km 안 장소: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&keyword=성산`\n- 소형견 동반 가능한 5km 안 장소: `GET /api/v1/places/nearby?lat=33.4996&lng=126.5312&petAllowanceType=ALLOWED&petSizeType=SMALL`",
         "operationId": "getNearbyPlaces",
         "parameters": [
           {
@@ -693,6 +826,18 @@
               "type": "string"
             },
             "example": "카페"
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "description": "[선택] 장소명 또는 주소 부분 일치. 공백/빈 값은 필터 없음. 최대 50자",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 50,
+              "minLength": 0
+            },
+            "example": "성산"
           },
           {
             "name": "size",
@@ -1083,6 +1228,223 @@
   },
   "components": {
     "schemas": {
+      "DataHeader": {
+        "type": "object",
+        "description": "공통 응답 헤더",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "성공 여부"
+          },
+          "resultCode": {
+            "type": "string",
+            "description": "대표 오류 코드. 성공이면 null"
+          },
+          "resultMessage": {
+            "type": "string",
+            "description": "사용자에게 보여줄 대표 오류 메시지. 성공이면 null. 오류 종류와 무관하게 항상 문자열이다"
+          },
+          "fieldErrors": {
+            "type": "array",
+            "description": "필드 단위 검증 오류 목록. 검증 실패가 아니면 null",
+            "items": {
+              "$ref": "#/components/schemas/ValidationErrorItem"
+            }
+          }
+        }
+      },
+      "ResponseWalkCourseListResponse": {
+        "type": "object",
+        "description": "공통 응답 래퍼",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/WalkCourseListResponse",
+            "description": "응답 본문. 실패면 null"
+          }
+        }
+      },
+      "ValidationErrorItem": {
+        "type": "object",
+        "description": "필드 단위 검증 오류 항목",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "오류 코드 (도메인별 검증 코드)",
+            "example": "MEMBER_109"
+          },
+          "field": {
+            "type": "string",
+            "description": "오류가 발생한 필드명",
+            "example": "nickname"
+          },
+          "message": {
+            "type": "string",
+            "description": "오류 메시지",
+            "example": "닉네임은 10자 이하만 가능합니다."
+          }
+        }
+      },
+      "WalkCourseItem": {
+        "type": "object",
+        "description": "산책 코스 목록 항목 DTO",
+        "properties": {
+          "walkCourseId": {
+            "type": "string",
+            "description": "산책 코스 아이디",
+            "example": 212481712381923328
+          },
+          "courseLabel": {
+            "type": "string",
+            "description": "코스 이름표. 올레 코스는 번호가 곧 사용자가 아는 이름이다",
+            "example": "1코스"
+          },
+          "name": {
+            "type": "string",
+            "description": "코스명 (구간)",
+            "example": "시흥-광치기"
+          },
+          "distanceKm": {
+            "type": "number",
+            "description": "거리(km)",
+            "example": 15.1
+          },
+          "durationText": {
+            "type": "string",
+            "description": "소요시간 원문",
+            "example": "4~5시간"
+          },
+          "startEndPoint": {
+            "type": "string",
+            "description": "시종점 원문",
+            "example": "시흥리정류장-광치기해변"
+          },
+          "lat": {
+            "type": "number",
+            "format": "double",
+            "description": "시작점 위도 (WGS84). 원천에 좌표가 없는 코스는 null",
+            "example": 33.4796218839
+          },
+          "lng": {
+            "type": "number",
+            "format": "double",
+            "description": "시작점 경도 (WGS84). 원천에 좌표가 없는 코스는 null",
+            "example": 126.8955024257
+          },
+          "firstImage": {
+            "type": "string",
+            "description": "대표 이미지 URL. 없으면 null"
+          }
+        }
+      },
+      "WalkCourseListResponse": {
+        "type": "object",
+        "description": "산책 코스 목록 응답 DTO",
+        "properties": {
+          "courses": {
+            "type": "array",
+            "description": "코스 목록. 기본은 코스번호 순이다",
+            "items": {
+              "$ref": "#/components/schemas/WalkCourseItem"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "조건에 맞는 코스 수. 코스는 30개 안팎이라 잘리지 않고 전부 내려간다",
+            "example": 29
+          },
+          "petActivityLevelApplied": {
+            "type": "boolean",
+            "description": "반려견 활동량 필터가 적용됐는지",
+            "example": true
+          },
+          "providerName": {
+            "type": "string",
+            "description": "정보 출처",
+            "example": "제주특별자치도 올레코스현황 · 한국관광공사 TourAPI"
+          }
+        }
+      },
+      "ResponseWalkCourseDetailResponse": {
+        "type": "object",
+        "description": "공통 응답 래퍼",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/WalkCourseDetailResponse",
+            "description": "응답 본문. 실패면 null"
+          }
+        }
+      },
+      "WalkCourseDetailResponse": {
+        "type": "object",
+        "description": "산책 코스 상세 응답 DTO",
+        "properties": {
+          "walkCourseId": {
+            "type": "string",
+            "description": "산책 코스 아이디",
+            "example": 212481712381923328
+          },
+          "courseLabel": {
+            "type": "string",
+            "description": "코스 이름표",
+            "example": "3코스 (A)"
+          },
+          "name": {
+            "type": "string",
+            "description": "코스명 (구간)",
+            "example": "온평-표선(A)"
+          },
+          "distanceKm": {
+            "type": "number",
+            "description": "거리(km)",
+            "example": 20.9
+          },
+          "durationText": {
+            "type": "string",
+            "description": "소요시간 원문",
+            "example": "6~7시간"
+          },
+          "startEndPoint": {
+            "type": "string",
+            "description": "시종점 원문",
+            "example": "온평포구-제주민속촌주차장입구"
+          },
+          "lat": {
+            "type": "number",
+            "format": "double",
+            "description": "시작점 위도 (WGS84). 원천에 좌표가 없는 코스는 null",
+            "example": 33.4052580126
+          },
+          "lng": {
+            "type": "number",
+            "format": "double",
+            "description": "시작점 경도 (WGS84). 원천에 좌표가 없는 코스는 null",
+            "example": 126.9039284074
+          },
+          "firstImage": {
+            "type": "string",
+            "description": "대표 이미지 URL. 없으면 null"
+          },
+          "baseDate": {
+            "type": "string",
+            "description": "원천 데이터 기준일자",
+            "example": "2025-04-28"
+          },
+          "providerName": {
+            "type": "string",
+            "description": "정보 출처",
+            "example": "제주특별자치도 올레코스현황 · 한국관광공사 TourAPI"
+          }
+        }
+      },
       "CodeNameDescriptionMetadata": {
         "type": "object",
         "description": "코드명 메타데이터 DTO",
@@ -1101,20 +1463,6 @@
             "type": "string",
             "description": "코드 의미 설명",
             "example": "코드 의미를 설명하는 문장입니다."
-          }
-        }
-      },
-      "DataHeader": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "resultCode": {
-            "type": "string"
-          },
-          "resultMessage": {
-            "type": "object"
           }
         }
       },
@@ -1204,12 +1552,15 @@
       },
       "ResponseSliceResponsePlaceItem": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/SliceResponsePlaceItem"
+            "$ref": "#/components/schemas/SliceResponsePlaceItem",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -1480,23 +1831,29 @@
       },
       "ResponsePlaceDetailResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/PlaceDetailResponse"
+            "$ref": "#/components/schemas/PlaceDetailResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
       "ResponseWalkSafetyResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/WalkSafetyResponse"
+            "$ref": "#/components/schemas/WalkSafetyResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -1879,12 +2236,15 @@
       },
       "ResponsePlaceSuitabilityResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/PlaceSuitabilityResponse"
+            "$ref": "#/components/schemas/PlaceSuitabilityResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -1964,17 +2324,24 @@
             "items": {
               "$ref": "#/components/schemas/DailyCongestionItem"
             }
+          },
+          "leastCrowded": {
+            "$ref": "#/components/schemas/DailyCongestionItem",
+            "description": "기간 중 가장 덜 붐비는 날. 집중률을 아는 날짜 중 최저이고 동률이면 가장 이른 날짜다. 아는 날이 하나도 없으면 null 이다 - 데이터 없음은 한산함이 아니다"
           }
         }
       },
       "ResponsePlaceCongestionResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/PlaceCongestionResponse"
+            "$ref": "#/components/schemas/PlaceCongestionResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -2021,12 +2388,15 @@
       },
       "ResponseNearbyPlaceResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/NearbyPlaceResponse"
+            "$ref": "#/components/schemas/NearbyPlaceResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -2066,12 +2436,15 @@
       },
       "ResponseWalkTimesResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/WalkTimesResponse"
+            "$ref": "#/components/schemas/WalkTimesResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -2227,12 +2600,15 @@
       },
       "ResponseRegionalWeatherResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/RegionalWeatherResponse"
+            "$ref": "#/components/schemas/RegionalWeatherResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -2346,12 +2722,15 @@
       },
       "ResponseNearbyFacilityResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/NearbyFacilityResponse"
+            "$ref": "#/components/schemas/NearbyFacilityResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -2424,12 +2803,15 @@
       },
       "ResponseEmergencyFacilityDetailResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/EmergencyFacilityDetailResponse"
+            "$ref": "#/components/schemas/EmergencyFacilityDetailResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       }

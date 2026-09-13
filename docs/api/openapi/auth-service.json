@@ -1197,15 +1197,26 @@
       },
       "DataHeader": {
         "type": "object",
+        "description": "공통 응답 헤더",
         "properties": {
           "success": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "성공 여부"
           },
           "resultCode": {
-            "type": "string"
+            "type": "string",
+            "description": "대표 오류 코드. 성공이면 null"
           },
           "resultMessage": {
-            "type": "object"
+            "type": "string",
+            "description": "사용자에게 보여줄 대표 오류 메시지. 성공이면 null. 오류 종류와 무관하게 항상 문자열이다"
+          },
+          "fieldErrors": {
+            "type": "array",
+            "description": "필드 단위 검증 오류 목록. 검증 실패가 아니면 null",
+            "items": {
+              "$ref": "#/components/schemas/ValidationErrorItem"
+            }
           }
         }
       },
@@ -1305,12 +1316,36 @@
       },
       "ResponsePetResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/PetResponse"
+            "$ref": "#/components/schemas/PetResponse",
+            "description": "응답 본문. 실패면 null"
+          }
+        }
+      },
+      "ValidationErrorItem": {
+        "type": "object",
+        "description": "필드 단위 검증 오류 항목",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "오류 코드 (도메인별 검증 코드)",
+            "example": "MEMBER_109"
+          },
+          "field": {
+            "type": "string",
+            "description": "오류가 발생한 필드명",
+            "example": "nickname"
+          },
+          "message": {
+            "type": "string",
+            "description": "오류 메시지",
+            "example": "닉네임은 10자 이하만 가능합니다."
           }
         }
       },
@@ -1356,12 +1391,15 @@
       },
       "ResponseVoid": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "type": "object"
+            "type": "object",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -1383,12 +1421,15 @@
       },
       "ResponseMemberDevSignupResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/MemberDevSignupResponse"
+            "$ref": "#/components/schemas/MemberDevSignupResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -1410,12 +1451,15 @@
       },
       "ResponseMemberProfileImageUploadResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/MemberProfileImageUploadResponse"
+            "$ref": "#/components/schemas/MemberProfileImageUploadResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -1437,12 +1481,15 @@
       },
       "ResponsePetProfileImageUploadResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/PetProfileImageUploadResponse"
+            "$ref": "#/components/schemas/PetProfileImageUploadResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -1489,12 +1536,15 @@
       },
       "ResponseTokenReissueResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/TokenReissueResponse"
+            "$ref": "#/components/schemas/TokenReissueResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -1595,12 +1645,15 @@
       },
       "ResponseAuthGeneralLoginResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/AuthGeneralLoginResponse"
+            "$ref": "#/components/schemas/AuthGeneralLoginResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -1709,12 +1762,15 @@
       },
       "ResponseMemberMyInfoResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/MemberMyInfoResponse"
+            "$ref": "#/components/schemas/MemberMyInfoResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -1833,12 +1889,15 @@
       },
       "ResponsePetsResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/PetsResponse"
+            "$ref": "#/components/schemas/PetsResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -1855,12 +1914,15 @@
       },
       "ResponseAuthOAuthAuthorizeResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/AuthOAuthAuthorizeResponse"
+            "$ref": "#/components/schemas/AuthOAuthAuthorizeResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -1907,12 +1969,15 @@
       },
       "ResponseAuthSessionsResponse": {
         "type": "object",
+        "description": "공통 응답 래퍼",
         "properties": {
           "dataHeader": {
-            "$ref": "#/components/schemas/DataHeader"
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
           },
           "dataBody": {
-            "$ref": "#/components/schemas/AuthSessionsResponse"
+            "$ref": "#/components/schemas/AuthSessionsResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       }

@@ -35,31 +35,41 @@
 명세는 게이트웨이가 안 떠 있어 **Swagger 를 부르지 못한 상태**로 작성됐다. 구현하며 백엔드
 소스를 실측한 결과 아래가 달랐다. **실측이 정본이고, 명세 문서는 기록으로 남긴다.**
 
-| feature  | 명세                                                 | 실제                                                                                                                                                                                                     |
-| -------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| home     | 실내 대안 `alternativePlaces`                        | **`indoorAlternatives`**                                                                                                                                                                                 |
-| home     | 적합도 등급 `HIGH/MEDIUM/LOW/UNKNOWN`                | **`HIGH/MEDIUM/LOW/INSUFFICIENT`**                                                                                                                                                                       |
-| home     | 산책 위험도도 같은 4단                               | **`SAFE/CAUTION/DANGER/UNKNOWN`** — 코드 체계가 다르다                                                                                                                                                   |
-| home     | 혼잡도도 같은 톤 매핑                                | **의미가 반대다** — `LOW` 가 "한산"(좋음), `HIGH` 가 "혼잡"                                                                                                                                              |
-| home     | 일정 날씨 `title` · `dailyBriefings[]`               | **`planTitle`** · **`days[]`**                                                                                                                                                                           |
-| home     | 인사이트 조회에 `petId`                              | **반려견 속성을 개별 쿼리 파라미터로** 보낸다 (공개 API 다)                                                                                                                                              |
-| place    | 목록 항목에 크기 정보 없음                           | **`allowedPetSize`(metadata) · `maxPetWeightKg`** 가 있다                                                                                                                                                |
-| place    | 목록 필터에 반려견 기준 축 없음                      | **`petSizeType` · `petWeightKg`** 파라미터가 있다                                                                                                                                                        |
-| plan     | 날씨 `skyState`·`precipitationType` 이 metadata 객체 | **`skyStateName`·`precipitationTypeName` 문자열** (#80 에서 타입 수정)                                                                                                                                   |
-| plan     | 날씨에 예보 출처·풍속·습도 없음                      | **`forecastSourceCode`/`Name` · `maxWindSpeed` · `maxHumidity`** 가 있다                                                                                                                                 |
-| plan     | 항목 행에 주소 · **실내 여부**                       | **해소됨** — #16 으로 상세 응답에 `indoor` 가 들어왔고 #112 에서 붙였다                                                                                                                                  |
-| plan     | 항목당 `GET /places/{id}` 보강                       | **걷었다** — #86 으로 `PlanItemDetail.place` 가 주소·실내·이미지·좌표를 함께 주고, FE #115 에서 항목 보강을 뗐다. 남은 보강은 실내 대안뿐이다                                                            |
-| favorite | 목록 항목에 저장일 있음(아트보드 03)                 | **없다** — `FavoritePlaceItem` 에 날짜 필드가 없다. `FavoriteEntity` 는 `BaseEntity` 상속이라 DB 에는 있다 (BE 요청 #127 D9-1)                                                                           |
-| favorite | 단건 저장 여부 조회 없음                             | **생겼다** — `GET /favorites/places/{placeId}` → `{placeId, favorited}` (`4a4f2cd`). 아직 쓰지 않는다                                                                                                    |
-| home     | 골든타임 응답에 곡선이 빈 이유가 없음                | **생겼다** — `WalkTimesResponse.forecastCoverage`(`AVAILABLE`/`DAY_ENDED`/`UNAVAILABLE`). **아직 쓰지 않는다** — [#262](https://github.com/8llow8llowMe/hondigagae/issues/262)                           |
-| home     | 권역 비교 행에 체감온도 없음                         | **생겼다** — `RegionWeatherItem.maxFeelsLikeTemperature`(2026-09-10 재수집, #409). **FE 타입에 아직 없다** — 표시 여부가 [#407](https://github.com/8llow8llowMe/hondigagae/issues/407) 의 답에 걸려 있다 |
+| feature  | 명세                                                 | 실제                                                                                                                                                                                                                                      |
+| -------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| home     | 실내 대안 `alternativePlaces`                        | **`indoorAlternatives`**                                                                                                                                                                                                                  |
+| home     | 적합도 등급 `HIGH/MEDIUM/LOW/UNKNOWN`                | **`HIGH/MEDIUM/LOW/INSUFFICIENT`**                                                                                                                                                                                                        |
+| home     | 산책 위험도도 같은 4단                               | **`SAFE/CAUTION/DANGER/UNKNOWN`** — 코드 체계가 다르다                                                                                                                                                                                    |
+| home     | 혼잡도도 같은 톤 매핑                                | **의미가 반대다** — `LOW` 가 "한산"(좋음), `HIGH` 가 "혼잡"                                                                                                                                                                               |
+| home     | 일정 날씨 `title` · `dailyBriefings[]`               | **`planTitle`** · **`days[]`**                                                                                                                                                                                                            |
+| home     | 인사이트 조회에 `petId`                              | **반려견 속성을 개별 쿼리 파라미터로** 보낸다 (공개 API 다)                                                                                                                                                                               |
+| place    | 목록 항목에 크기 정보 없음                           | **`allowedPetSize`(metadata) · `maxPetWeightKg`** 가 있다                                                                                                                                                                                 |
+| place    | 목록 필터에 반려견 기준 축 없음                      | **`petSizeType` · `petWeightKg`** 파라미터가 있다                                                                                                                                                                                         |
+| plan     | 날씨 `skyState`·`precipitationType` 이 metadata 객체 | **`skyStateName`·`precipitationTypeName` 문자열** (#80 에서 타입 수정)                                                                                                                                                                    |
+| plan     | 날씨에 예보 출처·풍속·습도 없음                      | **`forecastSourceCode`/`Name` · `maxWindSpeed` · `maxHumidity`** 가 있다                                                                                                                                                                  |
+| plan     | 항목 행에 주소 · **실내 여부**                       | **해소됨** — #16 으로 상세 응답에 `indoor` 가 들어왔고 #112 에서 붙였다                                                                                                                                                                   |
+| plan     | 항목당 `GET /places/{id}` 보강                       | **걷었다** — #86 으로 `PlanItemDetail.place` 가 주소·실내·이미지·좌표를 함께 주고, FE #115 에서 항목 보강을 뗐다. 남은 보강은 실내 대안뿐이다                                                                                             |
+| favorite | 목록 항목에 저장일 있음(아트보드 03)                 | **없다** — `FavoritePlaceItem` 에 날짜 필드가 없다. `FavoriteEntity` 는 `BaseEntity` 상속이라 DB 에는 있다 (BE 요청 #127 D9-1)                                                                                                            |
+| favorite | 단건 저장 여부 조회 없음                             | **생겼다** — `GET /favorites/places/{placeId}` → `{placeId, favorited}` (`4a4f2cd`). 아직 쓰지 않는다                                                                                                                                     |
+| home     | 골든타임 응답에 곡선이 빈 이유가 없음                | **생겼다** — `WalkTimesResponse.forecastCoverage`(`AVAILABLE`/`DAY_ENDED`/`UNAVAILABLE`). **아직 쓰지 않는다** — [#262](https://github.com/8llow8llowMe/hondigagae/issues/262)                                                            |
+| home     | 권역 비교 행에 체감온도 없음                         | **생겼다** — `RegionWeatherItem.maxFeelsLikeTemperature`(2026-09-10 재수집, #409). **FE 타입에 아직 없다** — 표시 여부가 [#407](https://github.com/8llow8llowMe/hondigagae/issues/407) 의 답에 걸려 있다                                  |
+| place    | 기간 혼잡도에 추천일 없음                            | **생겼다** — `PlaceCongestionResponse.leastCrowded`(2026-09-13 재수집, #534). **FE 타입에 없다** — `GET /places/{id}/congestions` 자체가 미연동이라 붙일 화면이 아직 없다 ([#430](https://github.com/8llow8llowMe/hondigagae/issues/430)) |
 
-> 위 표는 **2026-09-10 스냅샷 재수집**까지 반영했다 (`docs/api/openapi/`, #409). 이번에
-> 구조가 갈린 것은 `RegionWeatherItem.maxFeelsLikeTemperature` 하나다. 나머지는 FE 호출
-> 경로 44개를 서버 operation 57개와 전수 대조해 **없는 엔드포인트를 부르는 곳이 없음**을
-> 확인했다. FE 가 아직 안 붙인 서버 경로 5개(`/auth/sessions` 2종 ·
-> `/emergencies/facilities/{id}` · `/members/signup/dev` · `/places/{id}/congestions`)는
-> 전부 `screen-inventory.md` 에 사유와 함께 적혀 있다.
+> 위 표는 **2026-09-13 스냅샷 재수집**까지 반영했다 (`docs/api/openapi/`, #534).
+>
+> **이번에 새로 갈린 것은 `PlaceCongestionResponse.leastCrowded` 하나다.** 함께 들어온
+> 필드 셋(`DataHeader.fieldErrors` · `PlanDayWeatherItem.unavailableReasonCode` ·
+> `AiPlanJobStatusResponse.conditions`)은 **FE 가 이미 쓰고 있다** — 스냅샷만 뒤늦게
+> 따라왔다. 위 `goldenWindowStatus` 전례와 같은 모양이라, 스냅샷을 정본으로 믿고
+> "없는 필드" 로 판단하면 틀린다는 근거가 하나 더 늘었다.
+>
+> **새 operation 8개가 들어왔다** — `/walk-courses` 2종(tour) · 여행 브리핑 1 · 준비물
+> 5종(plan). 셋 다 FE 가 **존재 자체를 모르던 표면**이라 "안 붙였다" 가 아니라 "판단한 적이
+> 없다" 다. 연동 여부는 화면 이슈로 따로 본다 — 목록과 사유는 `screen-inventory.md` 와
+> 루트 `docs/api/README.md` 에 있다.
+>
+> FE 호출 경로를 서버 operation **65개**와 전수 대조해 **없는 엔드포인트를 부르는 곳이
+> 없음**을 확인했다. FE 가 안 붙인 서버 경로는 **13개**(기존 5 + 신규 8)다.
 >
 > 앞선 **2026-09-06 재수집**에서 갈린 것은 `forecastCoverage` 하나였고, 그때 함께 들어온
 > 신규 필드(`sigunguCode` · `step`/`stepOrder`/`totalSteps` ·
