@@ -1,9 +1,12 @@
-import { METRIC_FILL_TONE, MetricBadge } from '@/components/metric'
+import { MetricBadge } from '@/components/metric'
+import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { Skeleton } from '@/components/skeleton'
 import {
   barHeightPercent,
   CONGESTION_DAYS,
   type CongestionDays,
+  type CongestionFill,
+  congestionFill,
   formatCongestionRange,
   splitDay,
 } from '@/lib/insight/congestion'
@@ -192,6 +195,12 @@ function LeastCrowded({ item }: { item: DailyCongestionItem | null }) {
           .replace('{day}', parts.day)
           .replace('{weekday}', parts.weekday)}
       </span>
+      {/*
+        **배지는 막대와 다른 축을 쓴다** (#603). 배지는 등급 이름(`한산`·`보통`·`혼잡`)을
+        글자로 말하므로 색이 그 글자를 따라야 한다. 막대는 `HIGH` 안을 집중률로 한 번 더
+        가르지만(`congestionFill`) 그 넷째 칸에는 대응하는 이름이 없다 — 배지에 같은 램프를
+        쓰면 `혼잡` 이라 적힌 배지가 두 가지 색으로 뜬다.
+      */}
       <MetricBadge tone={congestionTone(item.level.code)} size="sm" className="ml-auto">
         {item.level.name}
       </MetricBadge>
@@ -211,9 +220,13 @@ function LeastCrowded({ item }: { item: DailyCongestionItem | null }) {
 /**
  * 날짜 축 막대.
  *
- * **7일은 남는 폭을 나눠 갖고, 30일은 가로 스크롤 레일이다.** 30칸을 폭에 맞춰 나누면
- * 한 칸이 10px 밑으로 내려가 날짜를 적을 자리가 없어진다 — **날짜 없는 막대는 고를 수
- * 없다.** 칸 폭을 고정(2rem)하고 넘치는 만큼 구르게 두면 두 기간이 같은 막대를 쓴다.
+ * **두 기간이 같은 칸 폭을 쓴다** (#603). 예전에는 7일이 `flex-1` 로 남는 폭을 나눠 가졌다 —
+ * 976px 본문 열에서 한 칸이 130px 이 되어 **막대가 트랙 높이보다 넓었고**, 그러면 높이
+ * 차이가 면적 차이에 묻혀 "어느 날이 덜 붐비나" 가 눈으로 안 읽혔다. 폭을 고정해 왼쪽으로
+ * 붙이고 오른쪽을 비운다 — 빈 자리는 읽을 수 없는 그래프보다 낫다.
+ *
+ * 30일은 그 폭 그대로 넘치는 만큼 구른다. 두 기간의 막대가 같은 폭·같은 트랙이라 펼쳐도
+ * 그림이 튀지 않는다.
  */
 function Chart({
   items,
@@ -225,77 +238,105 @@ function Chart({
   pickedDate: string | null
   days: CongestionDays
 }) {
+  /*
+    **훅이 이른 반환보다 위다.** 아래 `items.length === 0` 은 전부 `UNKNOWN` 인 장소에서
+    실제로 걸리는 갈래라, 순서가 뒤집히면 그 장소를 열 때마다 훅 개수가 달라진다.
+  */
+  const rail = useScrollRail<HTMLUListElement>()
+
   if (items.length === 0) return null
 
   const extended = days === CONGESTION_DAYS.extended
 
   return (
     /*
-      **넘치는 쪽만 카드 끝까지 연다** (`INSET_BLEED_END_CLASS.card`). 인셋 안에서 자르면
-      마지막 칸이 여백 앞에서 끊겨 **깨진 막대**로 보인다 — 더 있다는 신호가 아니라 렌더
-      오류처럼 읽힌다. 왼쪽은 그대로 둔다: 기간의 시작이라 잘릴 것이 없다.
-
-      `rail` 의 음수 마진을 쓰면 카드 테두리를 뚫는다 (`lib/ui/inset.ts`).
-
-      ── **`scroll-rail` 은 선택이 아니다** (#603)
-
-      `overflow-x-auto` 만으로는 이 레일이 새어 나간다. 칸마다 붙는 `sr-only` 라벨
-      (`9월 1일 화요일 혼잡`)이 `position: absolute` 인데, 이 `div` 가 `position: static`
-      이면 그 30개의 컨테이닝 블록이 **여기가 아니라 바깥의 positioned 조상**이 된다.
-      스크롤러가 자기 내용을 클립하고 있어도 저것들은 클립되지 않고, 정적 위치가 조상의
-      `scrollWidth` 로 그대로 샌다.
-
-      실측(`/places/126434` 30일): 1440 에서 좌측 판정 레일이 가로로 770px 스크롤됐고
-      (`scrollWidth` 1164 / `clientWidth` 394), 390 에서는 페이지가 통째로 넘쳤다
-      (`documentElement.scrollWidth` 390 → 1135). DESIGN.md §7 이 버그로 못박은 증상이다.
-
-      `.scroll-rail` 이 `position: relative` 로 기준면을 이 `div` 로 되돌리고
-      `contain: layout` 으로 남은 전파를 끊는다. **둘 다 필요하다** — 홈 골든타임 곡선이
-      같은 것을 겪고 `app/globals.css` 에 근거를 적어 뒀다. `overflow: hidden` 으로도
-      숫자는 맞출 수 있지만 그건 위의 full-bleed 를 잘라 먹는다.
+      **`.scroll-rail` 은 화살표의 기준면이자 넘침 차단막이다** (`app/globals.css`).
+      `position: relative` 가 화살표를 앉히고 `contain: layout` 이 전파를 끊는다 — 칸마다
+      붙는 `sr-only` 라벨이 `position: absolute` 라, 기준면이 없으면 그 30개의 정적 위치가
+      조상의 `scrollWidth` 로 새어 390 에서 페이지가 통째로 가로로 넘쳤다.
     */
-    <div
-      className={cn(
-        extended && 'scroll-rail overflow-x-auto',
-        extended && INSET_BLEED_END_CLASS.card,
-      )}
-    >
-      <ul className={cn('flex items-end gap-1.5', extended && 'w-max')}>
+    <div className={cn('relative', extended && 'scroll-rail')}>
+      <ul
+        ref={rail.ref}
+        onScroll={rail.onScroll}
+        className={cn(
+          /*
+            **세로 여백이 장식이 아니다** (#603). `overflow-x: auto` 를 주면 `overflow-y` 가
+            `visible` 로 남지 못하고 함께 `auto` 가 된다 — 가로만 열었는데 세로도 클립된다.
+            트랙이 스크롤러 맨 위에 붙어 있어 선택 표시(`outline-offset-2`, 위로 4px)와
+            100% 막대 끝이 그 선에서 잘렸다. 4px 를 비워 두고 바깥에서 같은 값을 당겨
+            카드 안 세로 리듬은 그대로 둔다.
+          */
+          'flex items-end gap-1.5 py-1',
+          extended && 'overflow-x-auto',
+          /*
+            **넘치는 쪽만 카드 끝까지 연다** (`INSET_BLEED_END_CLASS.card`). 인셋 안에서
+            자르면 마지막 칸이 여백 앞에서 끊겨 **깨진 막대**로 보인다 — 더 있다는 신호가
+            아니라 렌더 오류처럼 읽힌다. 왼쪽은 그대로 둔다: 기간의 시작이라 잘릴 것이 없다.
+
+            `rail` 의 음수 마진을 쓰면 카드 테두리를 뚫는다 (`lib/ui/inset.ts`).
+          */
+          extended && INSET_BLEED_END_CLASS.card,
+          /*
+            스크롤바를 숨기고 **페이드와 화살표가 그 신호를 대신한다** — 홈 골든타임 곡선과
+            같은 장치다(`walk-times-section.tsx`). 상시 스크롤바는 활성 밑줄·진행 표시줄로
+            오독된다(`app/globals.css`).
+          */
+          extended && 'scrollbar-none',
+          extended && rail.fadeClassName,
+        )}
+      >
         {items.map((item) => (
-          <DayColumn
-            key={item.date}
-            item={item}
-            picked={item.date === pickedDate}
-            extended={extended}
-          />
+          <DayColumn key={item.date} item={item} picked={item.date === pickedDate} />
         ))}
       </ul>
+
+      {/* 갈 수 있는 쪽에만 뜬다 — 나타나고 사라지는 것 자체가 "여기가 끝" 이라는 신호다 */}
+      {extended && (
+        <ScrollRailArrows
+          rail={rail}
+          prevLabel={messages.place.detailCongestionPrevDays}
+          nextLabel={messages.place.detailCongestionNextDays}
+        />
+      )}
     </div>
   )
 }
 
-/** 트랙 높이 = 집중률 100. 기간 안 최댓값으로 정규화하지 않는다 (`lib/insight/congestion.ts`) */
-const TRACK_HEIGHT = 'h-24'
+/**
+ * 트랙 높이 = 집중률 100. 기간 안 최댓값으로 정규화하지 않는다 (`lib/insight/congestion.ts`).
+ *
+ * **96 에서 144 로 올렸다** (#603). 칸 폭을 36 으로 줄인 것만으로는 부족했다 — 축이 0~100
+ * 고정이라 실데이터가 60~90 에 몰리면 막대 끝이 트랙 위쪽 30% 안에서만 움직이고, 96px
+ * 트랙에서 그 구간은 29px 다. 144 면 43px 이 되어 같은 차이가 눈에 걸린다.
+ */
+const TRACK_HEIGHT = 'h-36'
 
-function DayColumn({
-  item,
-  picked,
-  extended,
-}: {
-  item: DailyCongestionItem
-  picked: boolean
-  /** 30일은 칸 폭을 고정(32)하고 넘치는 만큼 구른다. 7일은 남는 폭을 나눠 갖는다 */
-  extended: boolean
-}) {
+/** 칸 폭 — 7일·30일이 같이 쓴다. 날짜(`21월`)가 접히지 않는 최소치다 */
+const COLUMN_WIDTH = 'w-9'
+
+/**
+ * 막대 색 — 단계는 `congestionFill` 이 정하고 여기는 토큰만 건다.
+ *
+ * `busy` 만 `--metric-*` 밖이다. 서버 등급 `HIGH` 를 집중률로 다시 가르는 자리인데
+ * 노랑(`mid`)과 빨강(`critical`) 사이가 비어 있어 전용 토큰을 냈다 (DESIGN.md §2-3).
+ */
+const CONGESTION_FILL_CLASS: Record<CongestionFill, string> = {
+  low: 'bg-metric-high-500',
+  moderate: 'bg-metric-mid-500',
+  busy: 'bg-congestion-busy-500',
+  packed: 'bg-metric-critical-500',
+  unknown: '',
+}
+
+function DayColumn({ item, picked }: { item: DailyCongestionItem; picked: boolean }) {
   const parts = splitDay(item.date)
   const rate = item.concentrationRate
 
   return (
     <li
-      className={cn(
-        'flex flex-col items-center gap-1.5',
-        extended ? 'w-8 shrink-0' : 'min-w-0 flex-1',
-      )}
+      // 7일도 30일도 같은 폭이다 — 남는 폭을 나눠 갖지 않는다 (`Chart` 머리주석)
+      className={cn('flex shrink-0 flex-col items-center gap-1.5', COLUMN_WIDTH)}
     >
       <div
         className={cn(
@@ -317,7 +358,10 @@ function DayColumn({
       >
         {rate !== null && (
           <div
-            className={cn('w-full rounded-sm', METRIC_FILL_TONE[congestionTone(item.level.code)])}
+            className={cn(
+              'w-full rounded-sm',
+              CONGESTION_FILL_CLASS[congestionFill(item.level.code, rate)],
+            )}
             style={{ height: `${barHeightPercent(rate)}%` }}
           />
         )}
@@ -335,6 +379,10 @@ function DayColumn({
       {/*
         막대의 높이와 색은 스크린리더에 아무 말도 하지 못한다. 등급은 서버 `name` 을 그대로
         읽어 준다 — `UNKNOWN` 도 "정보 없음" 이라는 이름을 갖고 있어 따로 문구를 만들지 않는다.
+
+        **집중률까지 읽는다** (#603). 막대가 네 칸으로 갈렸는데 등급 이름은 셋뿐이라, 넷째
+        칸(`packed`)이 **색으로만 남는다** — DESIGN.md §2-3 이 금지한 자리다. 숫자를 함께
+        읽어 주면 같은 `혼잡` 안의 70 과 92 가 보조기기에서도 갈린다.
       */}
       <span className="sr-only">
         {parts === null
@@ -344,6 +392,7 @@ function DayColumn({
               .replace('{day}', parts.day)
               .replace('{weekday}', parts.weekday)}{' '}
         {item.level.name}
+        {rate !== null && ` ${messages.place.detailCongestionRateLabel} ${rate}`}
       </span>
     </li>
   )

@@ -149,6 +149,32 @@ describe('PlaceCongestionPanel — 기간', () => {
   })
 
   /*
+    30일에만 구르는 레일이 된다 (#603) — 7일은 36px × 7칸 = 288px 라 구를 것이 없다.
+
+    **화살표는 여기서 못 본다.** `ScrollRailArrows` 는 스크롤 여지를 **잰 뒤에만** 그린다
+    (`useScrollRail` 의 `fade`), 서버 렌더에는 레이아웃이 없어 언제나 `none` 이다. 홈 곡선도
+    같아서 `walk-times-section.test.ts` 가 화살표 대신 `scroll-rail` 을 센다. 실제로 뜨는지는
+    `e2e/place-congestion.spec.ts` 가 본다.
+  */
+  it('30일에만 구르는 레일이 된다 — 스크롤바는 숨기고 페이드·화살표에 맡긴다', () => {
+    const extended = render({ days: CONGESTION_DAYS.extended })
+
+    expect(extended).toContain('scrollbar-none')
+    expect(extended).toContain('overflow-x-auto')
+    expect(render()).not.toContain('overflow-x-auto')
+  })
+
+  /*
+    **`overflow-x: auto` 는 세로도 클립한다** (#603) — `overflow-y` 가 `visible` 로 남지
+    못하고 함께 `auto` 가 된다. 트랙이 스크롤러 맨 위에 붙어 있어 선택 표시
+    (`outline-offset-2`, 위로 4px)와 100% 막대 끝이 그 선에서 잘렸다. 세로 여백 4px 가
+    그 자리를 비운다 — 지우면 30일 보기의 막대 윗부분이 다시 잘린다.
+  */
+  it('레일에 세로 여백을 둬 선택 표시가 잘리지 않게 한다', () => {
+    expect(render({ days: CONGESTION_DAYS.extended })).toContain('py-1')
+  })
+
+  /*
     **`scroll-rail` 은 장식이 아니라 가로 넘침의 유일한 방어막이다** (#603).
 
     날짜 칸마다 붙는 `sr-only` 라벨은 `position: absolute` 다. 스크롤러가 `position: static`
@@ -169,5 +195,52 @@ describe('PlaceCongestionPanel — 기간', () => {
   it('30일 레일에만 scroll-rail 을 준다 — sr-only 라벨이 조상으로 새지 않게', () => {
     expect(render({ days: CONGESTION_DAYS.extended })).toContain('scroll-rail')
     expect(render()).not.toContain('scroll-rail')
+  })
+})
+
+describe('PlaceCongestionPanel — 막대 색 (#603)', () => {
+  /*
+    **등급 셋으로는 다채로울 수 없다.** 서버는 `LOW`·`MODERATE`·`HIGH` 를 주는데 실데이터가
+    `HIGH` 한 칸에 몰려, 30일을 펼치면 막대가 회색 한 덩어리로 깔렸다. `HIGH` 안쪽만 집중률
+    80 에서 다시 가른다 — hue 는 서버 등급을 따르므로 배지 문구와 어긋나는 날이 없다.
+
+    fixture 의 `9월 1일`(71.8)과 `9월 7일`(68.3)이 `HIGH` 이고 둘 다 80 미만이라 `busy` 다.
+  */
+  it('HIGH 를 집중률 80 에서 busy 와 packed 로 가른다', () => {
+    const packed = {
+      ...congestion,
+      dailyCongestions: congestion.dailyCongestions.map((item) =>
+        item.level.code === 'HIGH' ? { ...item, concentrationRate: 88.2 } : item,
+      ),
+    }
+
+    expect(render()).toContain('bg-congestion-busy-500')
+    expect(render()).not.toContain('bg-metric-critical-500')
+    expect(render({ data: packed })).toContain('bg-metric-critical-500')
+  })
+
+  /*
+    **집중률을 모르면 더 붉게 칠하지 않는다** — 둘로 가를 근거가 없는데 `packed` 로 두면
+    모르는 것을 아는 것처럼 말하게 된다.
+  */
+  it('집중률이 없는 HIGH 는 busy 에 남는다', () => {
+    const rateless = {
+      ...congestion,
+      dailyCongestions: congestion.dailyCongestions.map((item) =>
+        item.level.code === 'HIGH' ? { ...item, concentrationRate: null } : item,
+      ),
+    }
+
+    expect(render({ data: rateless })).not.toContain('bg-metric-critical-500')
+  })
+
+  /*
+    막대가 넷으로 갈렸는데 등급 이름은 셋뿐이라, 넷째 칸이 **색으로만** 남으면 DESIGN.md
+    §2-3 을 어긴다. `sr-only` 가 등급 이름과 집중률을 함께 읽어 그 축을 메운다.
+  */
+  it('보조기기에 등급 이름과 집중률을 함께 읽어 준다', () => {
+    const markup = render()
+
+    expect(markup).toContain(`${messages.place.detailCongestionRateLabel} 71.8`)
   })
 })
