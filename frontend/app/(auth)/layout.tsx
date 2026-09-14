@@ -27,7 +27,19 @@ import { Wordmark } from '@/components/brand/wordmark'
  * **락업(심볼 + 워드마크)을 그대로 쓴다.** B0 는 "인터페이스 안은 무채색" 이지만 **로고
  * 자리**를 예외로 두고 조건 셋(24px · `--brand-500` 하나 · 로고 자리에만)을 걸었다
  * (#240, `DESIGN.md` §1). 여기는 헤더가 없는 화면에서 헤더 로고가 서던 자리라 그 예외
- * 안이다 — 조건을 넓히지 않으려고 `BrandSymbol` 의 기본 크기를 그대로 둔다.
+ * 안이다.
+ *
+ * **여기서만 락업을 2배로 그린다** (심볼 48 · 워드마크 40×148 · gap 16, `DESIGN.md` §1 개정).
+ * 24px 조건이 막으려던 것은 *"화면의 첫 시선을 데이터가 아니라 로고가 받는 것"* 인데
+ * **이 넷에는 데이터가 없다** — 헤더도 없어 로고가 화면의 유일한 신원 단서이고, 헤더에서
+ * 쓰던 크기 그대로 두면 그 단서가 폼 위에 붙은 각주처럼 읽힌다. 조건을 숫자가 아니라
+ * **자리**로 다시 묶었고, 임의 크기는 `BrandSymbol` · `Wordmark` 의 `size` 열거가 막는다.
+ *
+ * **정확히 2배다 — 2.2배가 아니다.** 요청 범위(2.0~2.2배) 안에서 2.0 만 세 값이 전부
+ * 정수로 떨어지고(48 / 40×148 / gap 16) 8px 스케일 위에 선다. 2.2 는 심볼이 52.8 이라
+ * 반올림하는 순간 심볼:워드마크 비율이 원본(1.2)에서 어긋나 **락업이 미세하게 틀어진다**.
+ * 375px 에서 실측한 락업 폭은 212px(내용 폭 343 의 62%)로, 2.2배(232px · 68%)와 화면
+ * 인상 차이가 거의 없으면서 여백이 더 남는다.
  *
  * **바닥(L0)을 칠하지 않는다.** 이 그룹은 `Canvas` 를 쓰지 않는 흰 화면이고, 표식을
  * 넣는다고 카드나 회색 바닥을 새로 들이지 않는다 — 폼 넷이 전부 좁은 중앙 열이다.
@@ -51,13 +63,17 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         {/*
           44px — 모바일 최소 터치 영역 (DESIGN.md §7). 헤더 로고 링크와 같은 값이고,
           글자 크기가 아니라 히트 영역만 키운다.
+
+          **`h-11` 이 아니라 `min-h-11` 이다.** 심볼이 48px 이라 고정 44px 안에서는
+          위아래가 잘린다. 최소값으로 두면 기준(44)은 그대로 지키면서 내용이 더 클 때
+          링크가 따라 자란다 — 래퍼의 `min-h-dvh` 와 같은 판단이다.
         */}
         <Link
           href="/"
-          className="text-fg focus-visible:ring-brand-500 inline-flex h-11 items-center gap-2 rounded-md focus-visible:ring-2 focus-visible:outline-none"
+          className="text-fg focus-visible:ring-brand-500 inline-flex min-h-11 items-center gap-4 rounded-md focus-visible:ring-2 focus-visible:outline-none"
         >
-          <BrandSymbol />
-          <Wordmark />
+          <BrandSymbol size={48} />
+          <Wordmark height={40} />
         </Link>
       </header>
 
