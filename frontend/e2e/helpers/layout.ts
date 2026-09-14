@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 
 /**
  * 3층 표면(`DESIGN.md §0`) 검증용 실측 헬퍼.
@@ -24,17 +24,43 @@ export type SurfaceStyle = {
   borderLeftWidth: string
 }
 
+/**
+ * **떨어져 나간 노드를 읽지 않도록 재시도한다** (이슈 #581).
+ *
+ * `loading.tsx` 가 있는 라우트는 Suspense 경계를 만들고, 폴백이 풀리는 순간 React 가
+ * 서브트리를 **통째로 교체**한다. 이 저장소의 폴백은 실화면과 같은 층·같은 랜드마크를
+ * 일부러 그리므로(#475) 로케이터는 폴백 쪽에 먼저 붙고, 그 직후 노드가 detach 된다.
+ *
+ * `locator.evaluate()` 는 **attach 를 한 번만 기다리고 재해소하지 않는다.** 떨어져 나간
+ * 노드에서 `getComputedStyle` 을 부르면 모든 속성이 **빈 문자열**이라, 단언이
+ * `Received: ""` 로 깨졌다. CI 는 `retries: 1` 이라 이것을 가려 왔다.
+ *
+ * 그래서 **붙어 있는 노드를 읽을 때까지** 다시 읽는다 — 폴백을 읽든 실화면을 읽든 층
+ * 규약은 양쪽이 같이 따르므로(그것이 폴백을 그렇게 그린 이유다) 어느 쪽을 재도 검증은
+ * 유효하다. 막으려는 것은 **교체되는 순간에 걸리는 것** 하나다.
+ */
 export async function surfaceStyle(card: Locator): Promise<SurfaceStyle> {
-  return card.evaluate((el) => {
-    const style = getComputedStyle(el)
-    return {
-      backgroundColor: style.backgroundColor,
-      boxShadow: style.boxShadow,
-      borderTopLeftRadius: style.borderTopLeftRadius,
-      borderTopWidth: style.borderTopWidth,
-      borderLeftWidth: style.borderLeftWidth,
-    }
-  })
+  let latest: SurfaceStyle | null = null
+
+  await expect
+    .poll(async () => {
+      latest = await card.evaluate((el) => {
+        const style = getComputedStyle(el)
+        return {
+          backgroundColor: style.backgroundColor,
+          boxShadow: style.boxShadow,
+          borderTopLeftRadius: style.borderTopLeftRadius,
+          borderTopWidth: style.borderTopWidth,
+          borderLeftWidth: style.borderLeftWidth,
+        }
+      })
+      // 떨어져 나간 노드의 신호. 붙어 있으면 최소한 배경색은 값을 낸다
+      return latest.backgroundColor
+    })
+    .not.toBe('')
+
+  if (latest === null) throw new Error('표면 스타일을 읽지 못했다')
+  return latest
 }
 
 /** 요소의 왼쪽 세로선 (뷰포트 기준 px). 기준선 어긋남을 재는 데 쓴다 */

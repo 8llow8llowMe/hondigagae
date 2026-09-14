@@ -326,6 +326,19 @@ pnpm e2e:report     # 마지막 실행 리포트
 2. **산출물 디렉터리를 `.next-e2e` 로 가른다** (`NEXT_DIST_DIR`). Next 16 은 한 디렉터리에 dev 서버를 하나만 허용해서, 갈라 두지 않으면 사람이 5174 에 띄워 둔 서버를 죽여야 돌아간다. 워크트리를 다른 세션과 공유하므로 남의 서버를 죽이게 된다.
 3. **`toHaveScreenshot` 을 아직 쓰지 않는다.** dev 오버레이가 픽셀을 흔들고, 기준선은 macOS 와 CI(Linux)의 폰트 렌더가 달라 따로 관리해야 한다. 대신 `getComputedStyle` · `getBoundingClientRect` 실측을 단언한다 — 3층 표면 검토에서 실제로 결함을 잡아낸 것이 픽셀 비교가 아니라 이 값들이었다.
 
+### 계산 스타일은 `locator.evaluate()` 로 읽지 않는다 (#581)
+
+`loading.tsx` 가 있는 라우트(`/mypage` · `/pets` · `/favorites` · `/places`)는 **Suspense 경계**를 만들고, 폴백이 풀리는 순간 React 가 서브트리를 **통째로 교체**한다. 이 저장소의 폴백은 레이아웃 점프를 막으려고 **실화면과 같은 층·같은 랜드마크를 일부러 그린다**(#475) — 그래서 로케이터가 폴백 쪽에 먼저 붙고, 그 직후 노드가 detach 된다.
+
+`locator.evaluate()` 는 **attach 를 한 번만 기다리고 재해소하지 않는다.** 떨어져 나간 노드에서 `getComputedStyle` 을 부르면 모든 속성이 **빈 문자열**이라 단언이 `Received: ""` 로 깨진다. CI 는 `retries: 1` 이라 이것이 오래 가려져 있었다.
+
+- ✅ **자동 재시도 단언을 쓴다** — `await expect(main).toHaveCSS('background-color', rgb)`. 재시도마다 로케이터를 다시 해소하므로 경합이 구조적으로 사라진다.
+- ✅ 여러 속성을 한 번에 읽어야 하면 `surfaceStyle()`(`e2e/helpers/layout.ts`)을 쓴다 — 붙어 있는 노드를 읽을 때까지 재시도한다.
+- ✅ `page.evaluate(() => document.querySelector('main'))` 형태는 **브라우저 안에서 그 시점에 다시 조회**하므로 안전하다. 바꾸지 않아도 된다.
+- ❌ `await locator.evaluate((el) => getComputedStyle(el).x)` 를 `goto` 직후에 쓰지 않는다.
+
+폴백을 재도 층 규약 검증은 유효하다 — 폴백이 같은 규약을 따르도록 그려져 있는 것이 그 이유다. 막으려는 것은 **교체되는 순간에 걸리는 것** 하나다.
+
 ### 로그인
 
 `e2e/auth.setup.ts` 가 **실제 로그인 폼으로** 들어가 `storageState` 를 만들고, 나머지 스펙이 그것을 나눠 쓴다. 세션 쿠키를 `seal()` 로 위조하지 않는다 — 그러면 로그인 경로가 검증되지 않고 세션 형식이 바뀔 때 그 파일만 조용히 낡는다. 계정은 목 저장소의 일반 계정(`demo@hondigagae.dev`)이다 (`src/lib/api/mock/store.ts`).
