@@ -324,7 +324,9 @@ pnpm e2e:report     # 마지막 실행 리포트
 
 1. **`next dev` 로 띄운다 (`next build && next start` 가 아니다).** `isMockEnabled()` 가 `NODE_ENV === 'production'` 에서 항상 false 라, 프로덕션 빌드로는 목을 쓸 수 없다.
 2. **산출물 디렉터리를 `.next-e2e` 로 가른다** (`NEXT_DIST_DIR`). Next 16 은 한 디렉터리에 dev 서버를 하나만 허용해서, 갈라 두지 않으면 사람이 5174 에 띄워 둔 서버를 죽여야 돌아간다. 워크트리를 다른 세션과 공유하므로 남의 서버를 죽이게 된다.
-3. **`toHaveScreenshot` 을 아직 쓰지 않는다.** dev 오버레이가 픽셀을 흔들고, 기준선은 macOS 와 CI(Linux)의 폰트 렌더가 달라 따로 관리해야 한다. 대신 `getComputedStyle` · `getBoundingClientRect` 실측을 단언한다 — 3층 표면 검토에서 실제로 결함을 잡아낸 것이 픽셀 비교가 아니라 이 값들이었다.
+3. **`toHaveScreenshot` 을 쓰지 않는다** — [#483](https://github.com/8llow8llowMe/hondigagae/issues/483) 에서 **도입하지 않기로 정했다.** dev 오버레이가 픽셀을 흔들고, 기준선은 macOS 와 CI(Linux)의 폰트 렌더가 달라 따로 관리해야 한다. 대신 `getComputedStyle` · `getBoundingClientRect` 실측을 단언한다.
+   **그 편이 실제로 더 잘 잡았다.** 지금까지 잡아낸 결함을 전수 집계했을 때 **픽셀 비교로만 잡혔을 항목은 0건**이었다 — 바닥 폭(`getBoundingClientRect`) · 열 간격(rect 차) · 재검색 오탐(`haversine`) · 겹침(`elementFromPoint`) · 스냅과 자동 스크롤(`scrollLeft` · `scrollY` 시계열)이 전부 값 단언이었다. 이 서비스에서 깨지는 것은 **색·여백·정렬의 수치**이고, 그것은 계산된 값이 더 정확하고 안정적으로 잡는다.
+   **뒤집을 조건은 하나다** — 픽셀로만 잡히는 결함이 실제로 나오면 그 사례가 곧 도입 근거가 된다. 그때 다시 판단한다.
 
 ### 계산 스타일은 `locator.evaluate()` 로 읽지 않는다 (#581)
 
