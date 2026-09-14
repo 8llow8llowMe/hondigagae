@@ -482,3 +482,114 @@ export const EMPTY_PLAN_FORM_VALUES: PlanFormValues = {
   endDate: '',
   budget: '',
 }
+
+// ─── 여행 준비물 저장 (#398 BE · #586 FE) ─────────────────────────────────────
+
+/**
+ * 저장된 준비물 한 항목 — `PlanPackingDetailItem`.
+ *
+ * **AI 생성 결과(`types/ai-plan.ts` 의 `PackingListItem`)와 다른 타입이다.** 저쪽은
+ * ai-service 가 그 자리에서 만들어 주는 제안이고(식별자·상태가 없다), 이쪽은
+ * plan-service 에 **저장된** 항목이다. 둘을 한 타입으로 합치면 "아이디가 있을 때도
+ * 없을 때도 있는" 타입이 되고, 체크·삭제를 할 수 있는지 없는지가 타입에서 사라진다.
+ */
+export type PlanPackingDetailItem = {
+  packingItemId: string
+  /**
+   * 분류. **enum 이 아니라 문자열이다** — 값의 원천이 AI 라 고정 목록이 아니고, 화면은
+   * 받은 문자열을 그대로 묶어 보여 준다 (서버 스키마 설명).
+   */
+  category: string
+  name: string
+  /**
+   * 이 여행 데이터를 근거로 한 준비 이유. **사용자가 직접 추가한 항목은 null 이다** —
+   * 서버가 `POST` 에서 `reason` 을 아예 받지 않는다. *"이 여행의 일정·날씨를 읽은 AI 만
+   * 붙일 수 있는 값"* 이라는 것이 그 이유다.
+   */
+  reason: string | null
+  /**
+   * 출처 metadata (`AI` / `USER`). **`name` 을 그대로 렌더한다** — 한국어 매핑 테이블을
+   * 만들지 않는다. 코드로 가르는 것은 재생성 때 교체되는지 여부 하나뿐이다.
+   */
+  source: CodeNameMetadata
+  /** 챙김 체크. **재생성해도 같은 이름의 항목에 승계된다** */
+  checked: boolean
+  /** 표시 순서 (0부터). 서버가 이 순서로 정렬해 준다 — 화면이 다시 정렬하지 않는다 */
+  sortOrder: number
+}
+
+/**
+ * `GET` · `PUT` · `POST /plans/{planId}/packing-items` 응답.
+ *
+ * **세 오퍼레이션이 같은 모양을 돌려준다** — 저장·추가 뒤에 다시 조회하지 않고
+ * `setQueryData` 로 갈아끼운다 (`updatePlan` 과 같은 처리).
+ */
+export type PlanPackingListResponse = {
+  planId: string
+  /** 표시 순서 오름차순. 자를 일이 없는 **전량** 조회다 */
+  items: PlanPackingDetailItem[]
+  /** `items.length` 와 같다 (서버 설명). 화면은 배열을 세면 되고 이 값은 대조용이다 */
+  totalCount: number
+  checkedCount: number
+  /**
+   * AI 항목이 마지막으로 저장된 시각. **AI 항목이 하나도 없으면 null 이다.**
+   *
+   * **`items` 가 비었다는 것만으로 "아직 만든 적 없다" 로 읽지 않는다** — 만든 뒤 전부
+   * 지웠을 수 있고, 그때 화면이 또 LLM 을 돌리면 사용자가 지운 것을 되살린다.
+   * 생성을 권하는 갈래는 `items` 가 비고 **이 값이 null 일 때** 하나뿐이다.
+   */
+  generatedAt: string | null
+}
+
+/**
+ * AI 결과 저장 요청 (`PUT`). **AI 항목만 교체하고 사용자 항목은 남는다.**
+ *
+ * 빈 목록을 보내면 AI 항목이 모두 삭제된다 — 화면은 그 경로를 쓰지 않는다.
+ * 서버가 같은 이름의 챙김 체크를 승계하므로, 재생성해도 반쯤 싸 둔 체크가 날아가지 않는다.
+ */
+export type PlanPackingItemsSavePayload = {
+  /** 최대 50개. 사용자 항목과 이름이 겹치는 AI 항목은 서버가 버린다 */
+  items: PlanPackingItemPayload[]
+}
+
+/** 저장 항목 하나. `reason` 은 생략 가능하다 (AI 가 이유를 못 낸 항목) */
+export type PlanPackingItemPayload = {
+  /** 30자 이하 */
+  category: string
+  /** 100자 이하 */
+  name: string
+  /** 500자 이하 */
+  reason?: string
+}
+
+/**
+ * 직접 추가 요청 (`POST`). **`reason` 을 받지 않는다** — 서버가 아예 열어 두지 않았다.
+ *
+ * 중복 이름은 `PLAN_012`(409), 50개 초과는 `PLAN_013`(400) 이다.
+ */
+export type PlanPackingItemAddPayload = {
+  category: string
+  name: string
+}
+
+/** 챙김 체크 요청. **해제도 같은 경로다** — 본문의 `checked` 가 방향을 정한다 */
+export type PlanPackingItemCheckedPayload = {
+  checked: boolean
+}
+
+/**
+ * 직접 추가 항목의 출처 코드. **이 코드만 가른다** — 나머지는 `source.name` 을 그대로 쓴다.
+ *
+ * 쓰임은 하나다: 사용자가 적어 둔 항목에는 `이유` 자리가 비는데, 그것이 *"AI 가 이유를
+ * 못 냈다"* 가 아니라 *"직접 적은 것이라 이유가 없다"* 라는 것을 화면이 말할 수 있어야 한다.
+ */
+export const PACKING_SOURCE_USER_CODE = 'USER'
+
+/** 이미 같은 이름의 준비물이 있다 (`PlanErrorCode.PACKING_ITEM_NAME_DUPLICATED`) */
+export const PACKING_NAME_DUPLICATED_CODE = 'PLAN_012'
+
+/** 일정당 50개 상한 (`PlanErrorCode.PACKING_ITEM_LIMIT_EXCEEDED`) */
+export const PACKING_LIMIT_EXCEEDED_CODE = 'PLAN_013'
+
+/** 일정당 준비물 상한. 서버 `PLAN_013` 복제본이다 */
+export const PACKING_ITEM_MAX = 50

@@ -6,6 +6,10 @@ import type {
   PlanCreatePayload,
   PlanDayItemsReplacePayload,
   PlanDetail,
+  PlanPackingItemAddPayload,
+  PlanPackingItemCheckedPayload,
+  PlanPackingItemsSavePayload,
+  PlanPackingListResponse,
   PlanSummaryItem,
   PlanUpdatePayload,
   PlanWeatherResponse,
@@ -154,5 +158,75 @@ export function markItemVisited(
   return clientFetchVoid(planItemVisitedPath(planId, planItemId), {
     method: 'PUT',
     body: { visited },
+  })
+}
+
+// ─── 여행 준비물 저장 (#586) ─────────────────────────────────────────────────
+
+/**
+ * 저장된 준비물 조회.
+ *
+ * **일정 상세가 준비물 절에서 가장 먼저 부르는 것이 이 함수다.** 예전에는 화면이
+ * `generatePackingList`(ai-service)로 곧장 갔고, 그래서 상세를 열 때마다 LLM 이 다시
+ * 돌았다. 저장된 것이 있으면 다시 돌리지 않는다 (서버 스키마 설명).
+ */
+export function fetchPackingItems(planId: string): Promise<PlanPackingListResponse> {
+  return clientFetch<PlanPackingListResponse>(paths.plans.packingItems(planId))
+}
+
+/**
+ * AI 생성 결과 저장. **AI 항목만 교체하고 사용자가 직접 추가한 항목은 남는다** —
+ * 직접 적어 둔 것을 재생성이 말없이 지우지 않으려는 서버 규칙이다.
+ *
+ * 응답이 목록 전체라 호출부가 `setQueryData` 로 갈아끼운다.
+ */
+export function savePackingItems(
+  planId: string,
+  payload: PlanPackingItemsSavePayload,
+): Promise<PlanPackingListResponse> {
+  return clientFetch<PlanPackingListResponse>(paths.plans.packingItems(planId), {
+    method: 'PUT',
+    body: payload,
+  })
+}
+
+/**
+ * 직접 추가. `source=USER` 로 저장되어 **AI 재생성에도 지워지지 않는다.**
+ *
+ * 실패가 둘이다 — 중복 이름 `PLAN_012`(409) · 50개 초과 `PLAN_013`(400).
+ * 둘은 사용자가 할 일이 달라 화면이 갈라 말한다.
+ */
+export function addPackingItem(
+  planId: string,
+  payload: PlanPackingItemAddPayload,
+): Promise<PlanPackingListResponse> {
+  return clientFetch<PlanPackingListResponse>(paths.plans.packingItems(planId), {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+/**
+ * 항목 삭제. 응답이 `Response<Void>` 라 **`clientFetchVoid` 를 써야 한다** —
+ * `deletePlan` 과 같은 이유다 (`unwrap()` 은 `dataBody === null` 을 실패로 본다).
+ */
+export function deletePackingItem(planId: string, packingItemId: string): Promise<void> {
+  return clientFetchVoid(paths.plans.packingItem(planId, packingItemId), { method: 'DELETE' })
+}
+
+/**
+ * 챙김 체크. 해제도 같은 함수다 — `checked` 가 방향을 정한다.
+ *
+ * **응답이 `Response<Void>` 다.** 갱신된 목록이 오지 않으므로 호출부가 캐시를 직접
+ * 손보거나 다시 읽어야 한다 — 저장·추가(목록 전체 반환)와 다른 점이다.
+ */
+export function setPackingItemChecked(
+  planId: string,
+  packingItemId: string,
+  payload: PlanPackingItemCheckedPayload,
+): Promise<void> {
+  return clientFetchVoid(paths.plans.packingItemChecked(planId, packingItemId), {
+    method: 'PUT',
+    body: payload,
   })
 }

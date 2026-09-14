@@ -68,11 +68,65 @@ export const planMessages = {
   /**
    * **대기 문구가 시간을 먼저 말한다.** 동기 API 라 수십 초가 걸릴 수 있고(컨트롤러 설명),
    * 아무 안내 없이 기다리게 하면 사용자는 고장으로 읽는다.
+   *
+   * **저장이 생긴 뒤에도 문구를 줄이지 않는다** (#586). 기다리는 것은 **첫 1회뿐**이지만,
+   * 그 1회 동안 사용자가 겪는 일은 전과 똑같다.
    */
   packingPending: 'AI가 이 일정을 읽고 있어요',
   packingPendingNote: '수십 초 걸릴 수 있어요. 화면을 닫지 마세요.',
-  /** 결과를 서버가 보관하지 않는다 — 저장된 것으로 오해하면 나중에 다시 열어 보려다 잃는다 */
-  packingNotSaved: '저장되지 않는 제안이에요. 화면을 벗어나면 사라져요.',
+  /*
+    `packingNotSaved`('저장되지 않는 제안이에요. 화면을 벗어나면 사라져요.')를 여기 뒀었다.
+    **#586 이 저장을 붙이면서 거짓말이 됐다** — plan-service 가 결과를 보관한다.
+
+    반대말(`packingSavedNote`)로 갈아탔다. "사라진다" 를 지우기만 하면 사용자는 저장 여부를
+    화면 어디서도 알 수 없는데, 이 절은 **다시 눌러도 되는지**(LLM 이 또 도는지)가 곧
+    비용이라 저장된다는 사실이 그대로 행동을 바꾼다.
+  */
+  /** 결과가 이 일정에 남는다 (#586). 다시 열 때 LLM 을 또 돌리지 않는 근거이기도 하다 */
+  packingSavedNote: '이 일정에 저장돼요. 다시 열어도 그대로예요.',
+  /** `{checked}` · `{total}` 치환. **0/N 도 보여 준다** — 아직 아무것도 안 챙겼다는 사실이다 */
+  packingCheckedSummary: '{checked} / {total} 챙김',
+  /**
+   * 재생성이 무엇을 건드리지 **않는지** 말한다 (#586). 서버 규칙이 그렇다 — AI 항목만
+   * 교체하고, 사용자 항목은 남고, 같은 이름의 챙김 체크는 승계된다. 이것을 말하지 않으면
+   * 반쯤 싸 둔 사람이 `다시 만들기` 를 누르지 못한다.
+   */
+  packingRegenerateNote: '다시 만들어도 직접 추가한 것과 챙김 표시는 그대로예요.',
+  /** 직접 추가 항목의 출처 배지. `source.name` 대신 쓰지 않는다 — 이것은 자리 이름이다 */
+  packingUserBadge: '직접 추가',
+  /** 직접 추가한 항목에는 이유가 없다. **"AI 가 이유를 못 냈다" 와 다르다** */
+  packingUserNoReason: '직접 적어 둔 항목이에요.',
+  packingAddAction: '직접 추가',
+  packingAddTitle: '빠진 준비물 추가',
+  /** 서버가 `reason` 을 받지 않는 이유를 그대로 옮긴다 — 화면이 이유 칸을 왜 안 주는지의 답이다 */
+  packingAddHint: '이유는 AI만 붙일 수 있어요. 이름과 분류만 적어요.',
+  packingAddCategoryLabel: '분류',
+  packingAddCategoryPlaceholder: '예: 반려견 케어',
+  /** `{categories}` 치환. 이미 쓰이는 분류를 알려 준다 — 같은 이름이면 같은 묶음에 붙는다 */
+  packingAddCategoryHint: '이미 쓰는 분류: {categories}',
+  packingAddNameLabel: '준비물 이름',
+  packingAddNamePlaceholder: '예: 배변봉투',
+  packingAddSubmit: '추가',
+  packingAddCancel: '취소',
+  /** `{name}` 치환. icon-only 버튼의 접근 가능한 이름 */
+  packingRemoveLabel: '{name} 삭제',
+
+  errorPackingCategoryRequired: '분류를 적어 주세요.',
+  errorPackingNameRequired: '준비물 이름을 적어 주세요.',
+  // PLAN_012
+  errorPackingNameDuplicated: '이미 같은 이름의 준비물이 있습니다.',
+  // PLAN_013
+  errorPackingLimitExceeded: '준비물은 일정당 최대 50개까지 저장할 수 있습니다.',
+  packingAddError: '준비물을 추가하지 못했어요. 잠시 후 다시 시도해 주세요.',
+  packingRemoveError: '준비물을 지우지 못했어요. 잠시 후 다시 시도해 주세요.',
+  /** 체크는 낙관적으로 먼저 그린다 — 실패하면 되돌리고 **되돌렸다는 사실**을 말한다 */
+  packingCheckError: '챙김 표시를 저장하지 못했어요. 표시를 되돌렸어요.',
+  packingLoadErrorTitle: '준비물을 불러오지 못했어요',
+  /*
+    `packingClearedTitle`('준비물을 모두 지웠어요')를 잠깐 뒀었다. **서버가 그 상태를
+    구분해 주지 않는다** — `generatedAt` 은 AI 항목이 하나도 없으면 null 이라, 만든 뒤
+    전부 지우면 "아직 안 만들었다" 와 같은 응답이 된다. 구분하는 척하는 문구를 두지 않는다.
+  */
   /*
     `packingSinglePetNote`('대표 반려견 기준이에요')를 여기 뒀었다. #179 로 `AiPackingProcessor`
     가 동행 반려견 전체를 벌크 조회하게 되면서 거짓이 됐다.

@@ -110,7 +110,28 @@ export type MockPlan = {
    * 항목을 실어 보낸다 (ai-plan 명세 S5). 직접 만들기는 보내지 않아 빈 배열이다.
    */
   items: MockPlanItem[]
+  /**
+   * 저장된 여행 준비물 (#586). **AI 결과와 사용자 항목이 한 배열에 섞여 있다** —
+   * 백엔드도 한 테이블이고 `source` 로만 갈린다. 재생성이 `AI` 만 교체한다.
+   */
+  packingItems: MockPackingItem[]
+  /**
+   * AI 항목이 마지막으로 저장된 시각. **AI 항목이 하나도 없으면 null 이다** —
+   * 화면이 "아직 만든 적 없다" 와 "만든 뒤 전부 지웠다" 를 이 값으로 가른다.
+   */
+  packingGeneratedAt: string | null
   deleted: boolean
+}
+
+/** 준비물 항목 하나. `source` 는 `AI` / `USER` 다 */
+export type MockPackingItem = {
+  packingItemId: string
+  category: string
+  name: string
+  /** 사용자 항목은 null — 서버가 `POST` 에서 `reason` 을 받지 않는다 */
+  reason: string | null
+  source: 'AI' | 'USER'
+  checked: boolean
 }
 
 /**
@@ -233,6 +254,7 @@ export type MockStore = {
   nextPlanSeq: number
   /** planItemId 조립용 순번 */
   nextPlanItemSeq: number
+  nextPackingItemSeq: number
   /** AI 일정 생성 작업. jobId 는 UUID 라 Snowflake 조립 규칙을 쓰지 않는다 */
   aiPlanJobs: MockAiPlanJob[]
   /** jobId 조립용 순번 */
@@ -299,6 +321,16 @@ const PLAN_ITEM_ID_SEQ_DIGITS = 6
 export function nextPlanItemId(store: MockStore): string {
   const id = `${PLAN_ITEM_ID_PREFIX}${String(store.nextPlanItemSeq).padStart(PLAN_ITEM_ID_SEQ_DIGITS, '0')}`
   store.nextPlanItemSeq += 1
+  return id
+}
+
+/** packingItemId. 발급 규칙은 `planItemId` 와 같다 — 같은 서비스의 Snowflake 다 */
+const PACKING_ITEM_ID_PREFIX = '423456789012'
+const PACKING_ITEM_ID_SEQ_DIGITS = 6
+
+export function nextPackingItemId(store: MockStore): string {
+  const id = `${PACKING_ITEM_ID_PREFIX}${String(store.nextPackingItemSeq).padStart(PACKING_ITEM_ID_SEQ_DIGITS, '0')}`
+  store.nextPackingItemSeq += 1
   return id
 }
 
@@ -483,6 +515,8 @@ function createStore(): MockStore {
         endDate: '2026-09-14',
         budget: 400000,
         status: 'DRAFT',
+        packingItems: [],
+        packingGeneratedAt: null,
         deleted: false,
         /*
           3일 일정. **거리 규칙 4종을 한 fixture 에서 전부 드러낸다.**
@@ -595,6 +629,8 @@ function createStore(): MockStore {
         endDate: '2026-10-04',
         budget: null,
         status: 'CONFIRMED',
+        packingItems: [],
+        packingGeneratedAt: null,
         deleted: false,
         /*
           2일 일정인데 **3일차 항목이 남아 있다.** 기간을 줄여도 서버가 항목을 정리하지
@@ -660,6 +696,8 @@ function createStore(): MockStore {
         budget: 250000,
         status: 'COMPLETED',
         items: [],
+        packingItems: [],
+        packingGeneratedAt: null,
         deleted: false,
       },
       {
@@ -675,6 +713,8 @@ function createStore(): MockStore {
         budget: null,
         status: 'CONFIRMED',
         items: [],
+        packingItems: [],
+        packingGeneratedAt: null,
         deleted: false,
       },
       {
@@ -691,12 +731,15 @@ function createStore(): MockStore {
         budget: null,
         status: 'DRAFT',
         items: [],
+        packingItems: [],
+        packingGeneratedAt: null,
         deleted: false,
       },
     ],
     nextPlanSeq: 5,
     // 항목 fixture 가 1~19 를 이미 쓴다. 1 로 두면 새로 담은 항목이 시드와 같은 id 를 받는다
     nextPlanItemSeq: 20,
+    nextPackingItemSeq: 1,
     aiPlanJobs: [],
     nextAiPlanJobSeq: 1,
     /*

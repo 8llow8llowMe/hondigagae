@@ -3,9 +3,11 @@ import { mockPlanEmergency } from '@/lib/api/mock/emergency-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import {
   memberIdOf,
+  type MockPackingItem,
   type MockPlan,
   type MockPlanItem,
   mockStore,
+  nextPackingItemId,
   nextPlanId,
   nextPlanItemId,
 } from '@/lib/api/mock/store'
@@ -17,6 +19,7 @@ import type {
   PlanDetail,
   PlanItemDetail,
   PlanItemPlace,
+  PlanPackingListResponse,
   PlanSummaryItem,
   PlanWeatherResponse,
 } from '@/types/plan'
@@ -379,6 +382,35 @@ export function resolvePlanMock(
     }))
   }
 
+  /*
+    저장된 여행 준비물 (#586). **체크 경로가 목록 경로보다 앞이다** — 뒤에 두면
+    `/packing-items/{id}/checked` 를 `/packing-items/{id}` 정규식이 먼저 잡는다.
+  */
+  const packingChecked = /^\/plans\/([^/]+)\/packing-items\/([^/]+)\/checked$/.exec(path)
+  if (packingChecked !== null && method === 'PUT') {
+    return withPlan(memberId, packingChecked[1] ?? '', (plan) =>
+      setPackingChecked(plan, packingChecked[2] ?? '', body),
+    )
+  }
+
+  const packingItem = /^\/plans\/([^/]+)\/packing-items\/([^/]+)$/.exec(path)
+  if (packingItem !== null && method === 'DELETE') {
+    return withPlan(memberId, packingItem[1] ?? '', (plan) =>
+      removePackingItem(plan, packingItem[2] ?? ''),
+    )
+  }
+
+  const packingItems = /^\/plans\/([^/]+)\/packing-items$/.exec(path)
+  if (packingItems !== null) {
+    const rawId = packingItems[1] ?? ''
+
+    if (method === 'GET') {
+      return withPlan(memberId, rawId, (plan) => ({ status: 200, payload: ok(toPacking(plan)) }))
+    }
+    if (method === 'PUT') return withPlan(memberId, rawId, (plan) => savePacking(plan, body))
+    if (method === 'POST') return withPlan(memberId, rawId, (plan) => addPacking(plan, body))
+  }
+
   const detail = /^\/plans\/([^/]+)$/.exec(path)
   if (detail !== null) {
     const rawId = detail[1] ?? ''
@@ -704,6 +736,8 @@ function create(memberId: string, body: string | null): MockResult {
       `[]` 로 고정하면 담은 직후 빈 일정이 보이고 항목 검증도 확인할 수 없다.
     */
     items,
+    packingItems: [],
+    packingGeneratedAt: null,
     deleted: false,
   }
   store.plans.push(plan)
@@ -1127,4 +1161,168 @@ function toStoredItem(
     */
     visited: false,
   }
+}
+
+// ─── 여행 준비물 (#398 BE · #586 FE) ─────────────────────────────────────────
+
+/** 본문 파싱. 깨진 JSON 은 `null` 이고 호출부가 `PLAN_100` 으로 돌려준다 */
+function parseBody(body: string | null): Record<string, unknown> | null {
+  try {
+    return body === null ? {} : (JSON.parse(body) as Record<string, unknown>)
+  } catch {
+    return null
+  }
+}
+
+/** 일정당 상한. 서버 `PLAN_013` 과 같은 값이어야 mock 이 더 느슨해지지 않는다 */
+const PACKING_MAX = 50
+
+const PACKING_SOURCE: Record<'AI' | 'USER', CodeNameMetadata> = {
+  AI: { code: 'AI', name: 'AI', description: 'AI가 이 일정을 읽고 고른 항목입니다.' },
+  USER: { code: 'USER', name: '직접 추가', description: '사용자가 직접 더한 항목입니다.' },
+}
+
+function toPacking(plan: MockPlan): PlanPackingListResponse {
+  const items = plan.packingItems.map((item, index) => ({
+    packingItemId: item.packingItemId,
+    category: item.category,
+    name: item.name,
+    reason: item.reason,
+    source: PACKING_SOURCE[item.source],
+    checked: item.checked,
+    // **저장 순서가 곧 표시 순서다** — 서버가 `sortOrder` 오름차순으로 내려 준다
+    sortOrder: index,
+  }))
+
+  return {
+    planId: plan.planId,
+    items,
+    totalCount: items.length,
+    checkedCount: items.filter((item) => item.checked).length,
+    // AI 항목이 하나도 없으면 null 이다 — 화면의 두 갈래가 이 값으로 갈린다
+    generatedAt: plan.packingItems.some((item) => item.source === 'AI')
+      ? plan.packingGeneratedAt
+      : null,
+  }
+}
+
+/** 이름 비교. **대소문자·앞뒤 공백을 무시한다** — 서버가 그렇게 판정한다 */
+function sameName(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase()
+}
+
+/**
+ * AI 결과 저장. **AI 항목만 교체하고 사용자 항목은 남긴다.**
+ *
+ * 같은 이름의 챙김 체크를 승계하고, 사용자 항목과 이름이 겹치는 AI 항목과 보낸 목록 안의
+ * 중복은 버린다(첫 것만 남는다) — 전부 서버가 적어 둔 규칙이다.
+ */
+function savePacking(plan: MockPlan, body: string | null): MockResult {
+  const parsed = parseBody(body)
+  if (parsed === null) return fail(400, 'PLAN_100', '요청 본문을 읽을 수 없습니다.')
+
+  const incoming = Array.isArray(parsed.items) ? (parsed.items as Record<string, unknown>[]) : null
+  if (incoming === null) {
+    return failValidation([
+      { code: 'PLAN_116', field: 'items', message: '저장할 준비물 목록은 필수입니다.' },
+    ])
+  }
+
+  const kept = plan.packingItems.filter((item) => item.source === 'USER')
+  const checkedBefore = new Map(
+    plan.packingItems.map((item) => [item.name.trim().toLowerCase(), item.checked]),
+  )
+
+  const next: MockPackingItem[] = []
+  for (const raw of incoming) {
+    const category = typeof raw.category === 'string' ? raw.category : ''
+    const name = typeof raw.name === 'string' ? raw.name : ''
+    if (category.trim() === '' || name.trim() === '') {
+      return failValidation([
+        { code: 'PLAN_117', field: 'items', message: '준비물 분류와 이름은 필수입니다.' },
+      ])
+    }
+    // 사용자 항목·보낸 목록 안의 중복은 버린다
+    if (kept.some((item) => sameName(item.name, name))) continue
+    if (next.some((item) => sameName(item.name, name))) continue
+
+    next.push({
+      packingItemId: nextPackingItemId(mockStore()),
+      category,
+      name,
+      reason: typeof raw.reason === 'string' && raw.reason.trim() !== '' ? raw.reason : null,
+      source: 'AI',
+      checked: checkedBefore.get(name.trim().toLowerCase()) ?? false,
+    })
+  }
+
+  if (next.length + kept.length > PACKING_MAX) {
+    return fail(400, 'PLAN_013', '준비물은 일정당 최대 50개까지 저장할 수 있습니다.')
+  }
+
+  plan.packingItems = [...next, ...kept]
+  plan.packingGeneratedAt = next.length === 0 ? null : new Date().toISOString().slice(0, 19)
+
+  return { status: 200, payload: ok(toPacking(plan)) }
+}
+
+/** 직접 추가. 중복 이름은 409 `PLAN_012`, 상한 초과는 400 `PLAN_013` 이다 */
+function addPacking(plan: MockPlan, body: string | null): MockResult {
+  const parsed = parseBody(body)
+  if (parsed === null) return fail(400, 'PLAN_100', '요청 본문을 읽을 수 없습니다.')
+
+  const category = typeof parsed.category === 'string' ? parsed.category.trim() : ''
+  const name = typeof parsed.name === 'string' ? parsed.name.trim() : ''
+
+  const errors: ValidationErrorItem[] = []
+  if (category === '')
+    errors.push({ code: 'PLAN_118', field: 'category', message: '준비물 분류는 필수입니다.' })
+  if (name === '')
+    errors.push({ code: 'PLAN_119', field: 'name', message: '준비물 이름은 필수입니다.' })
+  if (errors.length > 0) return failValidation(errors)
+
+  if (plan.packingItems.some((item) => sameName(item.name, name))) {
+    return fail(409, 'PLAN_012', '이미 같은 이름의 준비물이 있습니다.')
+  }
+  if (plan.packingItems.length >= PACKING_MAX) {
+    return fail(400, 'PLAN_013', '준비물은 일정당 최대 50개까지 저장할 수 있습니다.')
+  }
+
+  // 표시 순서는 기존 항목 맨 뒤로 붙는다 (서버 설명)
+  plan.packingItems.push({
+    packingItemId: nextPackingItemId(mockStore()),
+    category,
+    name,
+    // **사용자 항목에는 이유가 없다** — 서버가 `reason` 을 받지 않는다
+    reason: null,
+    source: 'USER',
+    checked: false,
+  })
+
+  return { status: 200, payload: ok(toPacking(plan)) }
+}
+
+/** 삭제. **AI 항목과 사용자 항목을 구분하지 않는다** — 둘 다 지울 수 있다 */
+function removePackingItem(plan: MockPlan, packingItemId: string): MockResult {
+  const index = plan.packingItems.findIndex((item) => item.packingItemId === packingItemId)
+  if (index === -1) return fail(404, 'PLAN_014', '존재하지 않는 준비물 항목입니다.')
+
+  plan.packingItems.splice(index, 1)
+  return { status: 200, payload: ok(null) }
+}
+
+/** 챙김 체크. 응답이 `Response<Void>` 다 — 갱신된 목록을 돌려주지 않는다 */
+function setPackingChecked(plan: MockPlan, packingItemId: string, body: string | null): MockResult {
+  const parsed = parseBody(body)
+  if (parsed === null || typeof parsed.checked !== 'boolean') {
+    return failValidation([
+      { code: 'PLAN_120', field: 'checked', message: '챙김 여부는 필수입니다.' },
+    ])
+  }
+
+  const item = plan.packingItems.find((entry) => entry.packingItemId === packingItemId)
+  if (item === undefined) return fail(404, 'PLAN_014', '존재하지 않는 준비물 항목입니다.')
+
+  item.checked = parsed.checked
+  return { status: 200, payload: ok(null) }
 }
