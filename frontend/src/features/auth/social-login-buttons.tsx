@@ -1,14 +1,32 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { type ReactNode, useRef, useState } from 'react'
 
-import { Button } from '@/components/button'
+import { Button, type ButtonVariant } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
+import { KakaoMark, NaverMark } from '@/features/auth/provider-mark'
 import { oauthAuthorize } from '@/lib/api/auth'
-import { OAUTH_PROVIDERS, oauthProviderName } from '@/lib/auth/oauth-provider'
+import { OAUTH_PROVIDERS, type OAuthProviderId, oauthProviderName } from '@/lib/auth/oauth-provider'
 import { rememberReturnTo } from '@/lib/auth/oauth-return-to'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
+
+/**
+ * 제공자별 외형. **두 축(변형 · 마크)만 갈린다** — 높이·곡률·글자 크기는 갈리지 않는다.
+ *
+ * 각 사 가이드는 자기 버튼의 절대 크기를 다르게 정해 두었지만(카카오 45 · 네이버 54),
+ * 두 버튼은 **한 화면에 세로로 나란히 선다.** 그 자리에서 높이가 갈리면 가이드를 지킨
+ * 대가로 우리 화면이 어긋나므로 크기는 `Button` 의 `lg`(48) 하나로 묶는다 — 각 사
+ * 가이드가 실제로 고정하는 것은 **색과 마크와 문구**이고, 높이는 그 셋이 아니다.
+ *
+ * `Record<OAuthProviderId, …>` 라 제공자를 늘리면 **여기 누락을 타입체커가 잡는다**
+ * (component-guide.md §2).
+ */
+const PROVIDER_BRAND: Record<OAuthProviderId, { variant: ButtonVariant; mark: ReactNode }> = {
+  kakao: { variant: 'kakao', mark: <KakaoMark /> },
+  // 흰 배경 변형이다 — 초록 채움은 2.25:1 로 AA 미달 (DESIGN.md §2-8, NaverMark 주석)
+  naver: { variant: 'secondary', mark: <NaverMark /> },
+}
 
 /**
  * 소셜 로그인 진입점. 로그인·회원가입 두 화면에 붙는다 — 미가입 이메일이면 서버가
@@ -19,8 +37,10 @@ import { messages } from '@/lib/messages'
  * `location.assign` 인 이유는 목적지가 외부 오리진(제공자 인가 페이지)이라 Next 라우터가
  * 다룰 수 없기 때문이다.
  *
- * 로고 대신 텍스트 버튼이다. 각 사 브랜드 가이드라인을 지킨 로고 자산을 확보하기 전까지의
- * 상태이고(정본 D8-1), 어느 쪽이든 **제공자 이름은 텍스트로 남는다** (D6).
+ * **각 사 공식 마크를 단다** — 정본 D8-1 이 "자산이 없어 ①텍스트 버튼으로 머지했다,
+ * ②공식 로고는 후속 이슈" 로 남긴 것을 여기서 닫는다. 자산은 Figma
+ * `카카오 네이버 로그인 디자인 가이드 (Community)` 에서 받았다 (`provider-mark.tsx`).
+ * **마크를 달아도 제공자 이름은 텍스트로 남는다** (D6: "로고만 두지 않는다").
  */
 export function SocialLoginButtons({ returnTo }: { returnTo: string }) {
   const [error, setError] = useState<string | null>(null)
@@ -55,11 +75,17 @@ export function SocialLoginButtons({ returnTo }: { returnTo: string }) {
       <FormAlert message={error} />
       {OAUTH_PROVIDERS.map((provider) => {
         const name = oauthProviderName(provider) ?? provider
+        const brand = PROVIDER_BRAND[provider]
         return (
           <Button
             key={provider}
-            variant="secondary"
+            variant={brand.variant}
             size="lg"
+            /*
+              `loading` 이면 `Button` 이 스스로 `disabled` + `aria-busy` 를 켠다. 마크는
+              그대로 둔다 — 누른 버튼에서 마크가 사라지면 "어느 쪽을 눌렀는지" 를 잃는다.
+            */
+            leading={brand.mark}
             loading={pending === provider}
             disabled={pending !== null && pending !== provider}
             onClick={() => start(provider)}

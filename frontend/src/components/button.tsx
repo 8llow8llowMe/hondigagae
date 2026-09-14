@@ -4,7 +4,7 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 
 import { cn } from '@/lib/utils/cn'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline'
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline' | 'kakao'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
 type BaseProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 'children'> & {
@@ -47,6 +47,23 @@ const VARIANT: Record<ButtonVariant, string> = {
     테두리 `danger-500` 은 비텍스트라 3:1 기준이고 4.53:1 로 통과한다.
   */
   dangerOutline: 'border border-danger-500 bg-bg text-danger-900 hover:bg-danger-100',
+  /*
+    **소셜 로그인 전용 — `DESIGN.md` §2-8 의 브랜드 예외.**
+
+    `className` 으로 덮지 않고 변형을 추가한 이유는 `component-guide.md` §3 이 그렇게
+    정했기 때문이다 ("금지 — 외형 덮어쓰기. **variant를 추가하거나** DESIGN.md를 갱신한다").
+    카카오 노랑은 제공자 가이드가 고정한 값이라 호출부가 고를 수 있으면 안 된다.
+
+    **네이버는 여기 없다.** 네이버 초록 채움 + 흰 글자는 **2.25:1 로 AA 미달**이라
+    §2-8 이 흰 배경 변형을 쓰라고 못박았고, 그 변형의 외형(흰 면 + 1px 테두리 + 본문색
+    글자)은 위 `secondary` 와 **같다.** 같은 것을 이름만 바꿔 하나 더 두지 않는다 —
+    갈리는 것은 마크뿐이고 그것은 `NaverMark` 가 들고 있다.
+
+    hover 는 `danger` 와 같은 `opacity-90` 이다. 노랑을 어둡게/밝게 만드는 순간
+    "가이드가 고정한 값" 이 두 개가 되고, 각 사 가이드는 **버튼 색 변경을 금지**한다 —
+    투명도는 색을 바꾸는 것이 아니라 눌림을 알리는 상호작용 피드백이다.
+  */
+  kakao: 'bg-kakao-bg text-kakao-fg hover:opacity-90 active:opacity-90',
 }
 
 const SIZE: Record<ButtonSize, string> = {

@@ -95,7 +95,18 @@ export const authMessages = {
     가 이미 행동을 안내한다 (AUTH_008 은 어느 소셜로 가입됐는지까지 말해 준다).
     여기 있는 것은 우리가 쓰는 라벨과, 서버 문구가 없을 때의 최후 문구뿐이다.
   */
-  socialLoginLabel: (provider: string) => `${provider}로 계속하기`,
+  /*
+    **"…로 계속하기" 가 아니라 "… 로그인" 이다** (공식 마크 도입, 소셜콜백-세부명세 D8-1).
+
+    각 사 브랜드 가이드는 자기 마크를 단 버튼의 **문구까지 정한다.** Figma
+    `카카오 네이버 로그인 디자인 가이드 (Community)` 의 두 컴포넌트가 각각
+    `카카오 로그인`(node `122:59`) · `네이버 로그인`(node `122:123`) 을 들고 있고,
+    "…로 계속하기" 는 어느 쪽 허용 문구에도 없다. 마크를 다는 이상 문구도 따라간다.
+
+    **회원가입 화면에서도 "로그인" 이다.** 미가입 이메일이면 서버가 자동으로 가입시켜
+    두 화면의 결과가 같으므로(정본 D8-3) 그 자리에서 실제로 일어나는 일이 로그인이다.
+  */
+  socialLoginLabel: (provider: string) => `${provider} 로그인`,
   socialRetryLabel: (provider: string) => `${provider} 다시 시도`,
   oauthExchanging: '로그인하고 있어요',
   oauthInvalidTitle: '잘못된 접근이에요',
