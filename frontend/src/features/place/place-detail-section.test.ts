@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
+import type { PlaceCongestionPanelProps } from '@/features/place/place-congestion-panel'
 import type { PlaceDetailActions } from '@/features/place/place-detail-action-bar'
 import {
   PlaceDetailSection,
@@ -10,8 +11,10 @@ import {
 } from '@/features/place/place-detail-section'
 import type { PlaceSuitabilityPanelProps } from '@/features/place/place-suitability-panel'
 import type { PlaceWalkSafetyPanelProps } from '@/features/place/place-walk-safety-panel'
+import { CONGESTION_DAYS } from '@/lib/insight/congestion'
 import { messages } from '@/lib/messages'
 import {
+  congestion as congestionFixture,
   suitability as suitabilityFixture,
   walkSafety as walkSafetyFixture,
 } from '@/test/fixtures/insight'
@@ -42,6 +45,16 @@ const walkSafety: PlaceWalkSafetyPanelProps = {
   petName: '몽실이',
 }
 
+/** 기간 혼잡도도 도착한 상태 (#430). 분기는 `place-congestion-panel.test.ts` 가 본다 */
+const congestion: PlaceCongestionPanelProps = {
+  data: congestionFixture,
+  loading: false,
+  failed: false,
+  onRetry: () => undefined,
+  days: CONGESTION_DAYS.default,
+  onDaysChange: () => undefined,
+}
+
 /** 하단 바의 기본 상태 — 로그인 · 미저장 · 아직 담지 않음 */
 const actions: PlaceDetailActions = {
   authed: true,
@@ -63,6 +76,7 @@ function render(overrides: Partial<PlaceDetailSectionProps> = {}) {
     onRetry: () => undefined,
     suitability,
     walkSafety,
+    congestion,
     petName: '몽실이',
     petSizeCode: 'SMALL',
     petSizeName: '소형견',
@@ -576,13 +590,17 @@ describe('3층 표면 (#443) — 절마다 카드 판정', () => {
   })
 
   /*
-    **여섯이 됐다** (#531). 갤러리 + 제목이 한 장의 카드로 묶이면서 다섯에서 하나 늘었다 —
-    그 아래가 전부 흰 카드인데 화면의 이름만 회색 바닥에 얹혀 있던 것을 고친 것이다.
+    **여섯에서 일곱이 됐다** (#430). 갤러리 + 제목이 한 장의 카드로 묶여 다섯에서 여섯이
+    됐고(#531), 기간 혼잡도가 판정 카드 **밖**의 새 카드로 서면서 하나 더 늘었다.
+
+    혼잡도를 판정 카드 안에 넣지 않은 이유는 §0 의 "카드 경계는 이야기 단위" 다 — 저 카드는
+    "오늘 가도 되나 → 지금 걷기 안전한가 → 그러면 담을까" 이고, 이쪽은 다른 시간 축
+    ("이번 주엔 언제")이다.
   */
-  it('머리 · 기본 정보 · 동반 정보 · 소개 · 이용 안내 · 판정이 각각 카드라 여섯이다', () => {
+  it('머리 · 기본 정보 · 동반 정보 · 소개 · 이용 안내 · 판정 · 기간 혼잡도가 각각 카드라 일곱이다', () => {
     const markup = render()
 
-    expect(markup.match(SURFACE)).toHaveLength(6)
+    expect(markup.match(SURFACE)).toHaveLength(7)
     for (const title of [
       messages.place.detailSectionBasic,
       messages.place.detailSectionPet,

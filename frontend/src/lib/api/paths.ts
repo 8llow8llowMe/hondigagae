@@ -49,6 +49,12 @@ export const paths = {
       query ? `/places/${placeId}/suitability?${query}` : `/places/${placeId}/suitability`,
     walkSafety: (placeId: string, query: string) =>
       query ? `/places/${placeId}/walk-safety?${query}` : `/places/${placeId}/walk-safety`,
+    /**
+     * 기간 혼잡도 (#430). **반려견 조건을 받지 않는다** — 붐빔은 장소와 날짜의 속성이라
+     * 반려견이 바뀌어도 같은 값이다 (dev Swagger 실측 2026-09-14).
+     */
+    congestions: (placeId: string, query: string) =>
+      query ? `/places/${placeId}/congestions?${query}` : `/places/${placeId}/congestions`,
   },
   insights: {
     /**

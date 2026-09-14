@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { suitabilityPath, toInsightQuery, toPetCondition, walkSafetyPath } from '@/lib/api/insight'
+import {
+  congestionsPath,
+  suitabilityPath,
+  toInsightQuery,
+  toPetCondition,
+  walkSafetyPath,
+} from '@/lib/api/insight'
+import { CONGESTION_DAYS } from '@/lib/insight/congestion'
 import type { Pet } from '@/types/pet'
 
 const pet: Pet = {
@@ -103,5 +110,44 @@ describe('경로 조립', () => {
   /* 적합도가 실제로 이 값을 달고 나가는지 — 조립 단계만 보면 경로에서 빠져도 모른다 */
   it('적합도 경로에 사회성이 실린다', () => {
     expect(suitabilityPath('123', toPetCondition(pet))).toContain('petSociality=HIGH')
+  })
+})
+
+/*
+  기간 혼잡도 (#430). 계약은 dev Swagger 실측(2026-09-14)이다 —
+  `fromDate` 기본 오늘 · `days` 기본 7(1~30) · 반려견 조건 파라미터 없음.
+*/
+describe('기간 혼잡도 경로 (#430)', () => {
+  /*
+    **기본값이어도 명시한다.** 백엔드 기본값이 7 에서 바뀌면 응답 기간이 조용히 달라지고,
+    카드 머리의 기간 표기만 서버를 따라가 화면이 스스로 어긋난다.
+  */
+  it('기본 기간도 days 를 실어 보낸다', () => {
+    expect(congestionsPath('123', CONGESTION_DAYS.default)).toBe('/places/123/congestions?days=7')
+  })
+
+  it('펼침은 30일이다 — 혼잡도 예측이 닿는 끝까지다', () => {
+    expect(congestionsPath('123', CONGESTION_DAYS.extended)).toBe('/places/123/congestions?days=30')
+  })
+
+  /*
+    **`fromDate` 를 보내지 않는다.** 생략하면 서버가 오늘로 잡는다 — 권역 비교(`date`)와
+    같은 판단이다. FE 가 날짜를 만들면 브라우저 타임존이 KST 가 아닌 사용자에게 어제부터의
+    기간이 나간다.
+  */
+  it('fromDate 를 보내지 않는다 — 오늘은 서버가 정한다', () => {
+    expect(congestionsPath('123', CONGESTION_DAYS.default)).not.toContain('fromDate')
+  })
+
+  /*
+    **반려견 조건을 싣지 않는다.** 붐빔은 장소와 날짜의 속성이라 반려견이 바뀌어도 같은
+    답이고, 실으면 조회 key 가 반려견마다 갈려 같은 응답을 여러 벌 캐시한다.
+  */
+  it('반려견 조건이 섞이지 않는다', () => {
+    const path = congestionsPath('123', CONGESTION_DAYS.default)
+
+    expect(path).not.toContain('petSizeType')
+    expect(path).not.toContain('petSociality')
+    expect(path).not.toContain('heatSensitive')
   })
 })

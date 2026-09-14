@@ -5,6 +5,7 @@ import { resolveAuthMock } from '@/lib/api/mock/auth-data'
 import { mockNearbyFacilities } from '@/lib/api/mock/emergency-data'
 import { resolveFavoriteMock } from '@/lib/api/mock/favorite-data'
 import {
+  mockCongestions,
   mockRegionalWeather,
   mockSuitability,
   mockWalkSafety,
@@ -174,11 +175,20 @@ export function resolveMock(
 
   // 인사이트는 상세보다 먼저 본다 — /places/{id}/suitability 가 상세 정규식에 안 걸리지만
   // 순서를 명시해 두면 상세 규칙을 넓힐 때 실수하지 않는다
-  const insight = /^\/places\/(\d+)\/(suitability|walk-safety)$/.exec(path)
+  const insight = /^\/places\/(\d+)\/(suitability|walk-safety|congestions)$/.exec(path)
   if (insight !== null) {
     const placeId = insight[1] as string
 
     if (insight[2] === 'suitability') return { status: 200, payload: ok(mockSuitability(placeId)) }
+
+    /*
+      기간 혼잡도 (#430). **`days` 가 없으면 7 이다** — 계약의 기본값이고, mock 이 다른
+      기본값을 쓰면 파라미터를 빠뜨린 호출이 화면에서만 정상으로 보인다.
+    */
+    if (insight[2] === 'congestions') {
+      const days = Number.parseInt(params.get('days') ?? '7', 10)
+      return { status: 200, payload: ok(mockCongestions(placeId, days)) }
+    }
 
     return {
       status: 200,

@@ -9,6 +9,11 @@ import { Surface, SurfaceStack } from '@/components/surface'
 import { PhotoGallery } from '@/features/place/photo-gallery'
 import { PlaceBackLink } from '@/features/place/place-back-link'
 import {
+  CONGESTION_HEADING_ID,
+  PlaceCongestionPanel,
+  type PlaceCongestionPanelProps,
+} from '@/features/place/place-congestion-panel'
+import {
   PlaceDetailActionBar,
   type PlaceDetailActions,
 } from '@/features/place/place-detail-action-bar'
@@ -55,6 +60,8 @@ export type PlaceDetailSectionProps = {
    * 적합도가 죽을 때 노면 온도까지 함께 사라진다.
    */
   walkSafety: PlaceWalkSafetyPanelProps
+  /** 기간 혼잡도 (#430). 판정 둘과 **따로 실패한다** — 엔드포인트가 다르다 */
+  congestion: PlaceCongestionPanelProps
   /** 선택된 반려견 — 동반 정보에 대입한다 */
   petName: string | null
   petSizeCode: string | null
@@ -125,6 +132,7 @@ export function PlaceDetailSection({
   onRetry,
   suitability,
   walkSafety,
+  congestion,
   petName,
   petSizeCode,
   petSizeName,
@@ -400,6 +408,21 @@ export function PlaceDetailSection({
               카드가 소유한다 (`PlaceDetailActionBar` 의 `inset` 주석).
             */}
             <PlaceDetailActionBar {...actions} inset="card" className="hidden lg:block" />
+          </Surface>
+
+          {/*
+            기간 혼잡도 (#430) — **판정 카드 밖, 바로 아래의 새 L1 카드다.**
+
+            판정 카드 안에 넣지 않는 이유는 §0 의 "카드 경계는 이야기 단위" 다. 저 카드가
+            하는 말은 "오늘 가도 되나 → 지금 걷기 안전한가 → 그러면 담을까" 이고, 이 카드는
+            **다른 시간 축**("이번 주엔 언제")이다. 같은 카드에 넣으면 하단 바가 이야기
+            가운데로 들어오거나, 담기 뒤에 새 질문이 붙는다.
+
+            **접힌 서랍으로도 넣지 않는다** — 이 서비스의 차별점이 기본 상태에서 안 보인다.
+            제목은 패널이 스스로 `h2` 로 그리고 카드는 `titleId` 로 그것을 가리킨다.
+          */}
+          <Surface titleId={CONGESTION_HEADING_ID}>
+            <PlaceCongestionPanel {...congestion} />
           </Surface>
         </SurfaceStack>
 

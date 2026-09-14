@@ -7,12 +7,14 @@ import { usePlaceFavorite } from '@/features/favorite/use-place-favorite'
 import { useSelectedPet } from '@/features/nav/use-selected-pet'
 import { PlaceDetailSection } from '@/features/place/place-detail-section'
 import { PlaceLoginPromptSheet } from '@/features/place/place-login-prompt-sheet'
+import { usePlaceCongestion } from '@/features/place/use-place-congestion'
 import { usePlaceDetail } from '@/features/place/use-place-detail'
 import { usePlaceSuitability } from '@/features/place/use-place-suitability'
 import { usePlaceWalkSafety } from '@/features/place/use-place-walk-safety'
 import { PlaceAddToPlanSheet } from '@/features/plan/place-add-to-plan-sheet'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { toPetCondition } from '@/lib/api/insight'
+import { CONGESTION_DAYS, type CongestionDays } from '@/lib/insight/congestion'
 import { writeRecentPlaceId } from '@/lib/insight/recent-place'
 
 /**
@@ -48,6 +50,17 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
     `conditionKey` 로 갈려야 반려견 전환이 두 판정에 동시에 반영되기 때문이다.
   */
   const walkSafety = usePlaceWalkSafety(placeId, condition)
+
+  /*
+    기간 혼잡도 (#430). **반려견 조건을 넘기지 않는다** — 붐빔은 장소와 날짜의 속성이라
+    반려견이 바뀌어도 같은 답이고, 서버도 이 경로에서는 조건 파라미터를 선언하지 않는다.
+
+    **기간은 이 화면 안에서 끝나는 상태다** (`useState`, architecture-guide.md §10). 카드
+    하나의 펼침이라 링크로 공유할 대상이 아니다 — `/places/{id}` 를 받은 사람이 봐야 하는
+    것은 그 장소이지 내가 펼쳐 둔 30일이 아니다.
+  */
+  const [congestionDays, setCongestionDays] = useState<CongestionDays>(CONGESTION_DAYS.default)
+  const congestion = usePlaceCongestion(placeId, congestionDays)
 
   const favorite = usePlaceFavorite({ placeId, authed })
 
@@ -98,6 +111,18 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
           failed: walkSafety.isError,
           onRetry: () => void walkSafety.refetch(),
           petName: pet?.name ?? null,
+        }}
+        /*
+          기간 혼잡도는 **게스트에게도 그린다** — 산책 위험도와 같다. 붐빔은 장소와 날짜의
+          속성이라 반려견이 없어도 값이 참이고, 반려견을 고르라고 막을 이유가 없다.
+        */
+        congestion={{
+          data: congestion.data ?? null,
+          loading: congestion.isPending,
+          failed: congestion.isError,
+          onRetry: () => void congestion.refetch(),
+          days: congestionDays,
+          onDaysChange: setCongestionDays,
         }}
         petName={pet?.name ?? null}
         petSizeCode={pet?.sizeType.code ?? null}

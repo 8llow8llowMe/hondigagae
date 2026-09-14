@@ -949,14 +949,15 @@ test.describe('잘못된 placeId — 요청을 보내지 않는다 (#496)', () =
     (`place-data.ts` 의 `ID_BASE`) — Snowflake 18자리라 **`Number()` 로 바꾸면 정밀도를
     잃는 길이**이기도 하다. 판정을 문자열 패턴으로 둔 이유가 여기서 함께 지켜진다.
 
-    상세는 서버가 프리페치해 브라우저 요청이 없을 수 있으므로, **적합도·산책 안전이
-    실제로 나가는지**를 본다 — 둘은 클라이언트 전용이라 가드가 잘못 걸리면 사라진다.
+    상세는 서버가 프리페치해 브라우저 요청이 없을 수 있으므로, **적합도·산책 안전·기간
+    혼잡도가 실제로 나가는지**를 본다 — 셋 다 클라이언트 전용이라 가드가 잘못 걸리면
+    사라진다. 기간 혼잡도는 #430 에서 같은 가드를 복사해 왔다.
   */
   test('올바른 id 는 판정 조회가 그대로 나간다', async ({ page }) => {
     const calls: string[] = []
     page.on('request', (request) => {
       const { pathname } = new URL(request.url())
-      if (/^\/api\/bff\/places\/\d+\/(suitability|walk-safety)$/.test(pathname)) {
+      if (/^\/api\/bff\/places\/\d+\/(suitability|walk-safety|congestions)$/.test(pathname)) {
         calls.push(pathname)
       }
     })

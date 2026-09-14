@@ -18,6 +18,14 @@ export const insightKeys = {
   suitability: (placeId: string, conditionKey: string) =>
     [...insightKeys.all, 'suitability', placeId, conditionKey] as const,
   /**
+   * 기간 혼잡도 (#430). **조건이 아니라 일수가 key 에 들어간다** — 이 엔드포인트는 반려견
+   * 조건을 받지 않고(붐빔은 장소와 날짜의 속성이다), 7일과 30일은 응답 자체가 다르다.
+   *
+   * 조건을 key 에 섞으면 반려견을 바꿀 때마다 같은 답을 다시 받아 온다.
+   */
+  congestions: (placeId: string, days: number) =>
+    [...insightKeys.all, 'congestions', placeId, days] as const,
+  /**
    * 골든타임 (#158). **좌표가 key 에 들어간다** — 장소 축이 아니라 좌표 축이라
    * placeId 로 캐시하면 다른 지점의 곡선을 재사용하게 된다.
    *

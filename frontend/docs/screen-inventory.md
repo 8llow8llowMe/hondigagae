@@ -213,27 +213,32 @@
 | 산책 골든타임  | `/` 홈                          | `GET /insights/walk-times`                 | **구현** (#167)                      |
 | 권역 날씨 비교 | `/` 홈                          | `GET /insights/regional-weather`           | **구현** (#169)                      |
 | 기상특보 표시  | `/` 홈 · `/places/[placeId]` 내 | 적합도·산책 위험도 응답의 `weatherWarning` | **구현** (#165)                      |
+| 기간 혼잡도    | `/places/[placeId]` 내          | `GET /places/{placeId}/congestions`        | **구현** (#430)                      |
 
 근거: tour-service `insight` 컨텍스트 / `PlaceInsightWebController` **실측**.
 이 서비스의 차별점이 담긴 응답이라 계약을 자세히 적어 둔다.
 
-**FE 미연동 (백엔드는 구현됨 — PR #138)**
+**`GET /places/{placeId}/congestions` — `PlaceCongestionResponse`** (BE PR #138 · #425)
 
-| API                                 | 응답                                                                                                                                        | 비고                                                                                              |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `GET /places/{placeId}/congestions` | `PlaceCongestionResponse` — `dailyCongestions[]`(`date` · `level` · `concentrationRate`) + **`leastCrowded`**(같은 모양 하나 · 없으면 null) | 기간 혼잡도(`fromDate` 기본 오늘, `days` 기본 7 · 1~30). 데이터 없는 날짜도 `UNKNOWN` 으로 남긴다 |
+| 필드                                   | 타입                          | 화면 지침                                                                                                     |
+| -------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `fromDate` · `toDate`                  | `LocalDate`                   | **카드 머리의 기간 표기가 이 둘이다.** FE 가 `days` 로 계산하지 않는다 — 서버가 기간을 자르면 표기만 늘어난다 |
+| `dailyCongestions[]`                   | `DailyCongestionItem[]`       | `date` · `level` · `concentrationRate`. **데이터 없는 날짜도 `UNKNOWN` 으로 자리를 지킨다 — 걸러내지 않는다** |
+| `dailyCongestions[].concentrationRate` | `Double \| null`              | 0~100. **`UNKNOWN` 이면 null 이다** — 0 으로 렌더하면 막대가 "가장 한산한 날" 처럼 보인다                     |
+| `leastCrowded`                         | `DailyCongestionItem \| null` | 같은 모양 하나. **없으면 null** 이고, 그때는 **자리를 만들지 않는다** — 아는 날이 하나도 없다는 뜻이다        |
 
-**당장 붙일 곳이 없다.** 적합도 응답의 `congestion`(그 날 하나)으로 화면이 이미 채워져
-있고, **기간 그래프를 둘 자리는 아직 아트보드에 없다.** 연동보다 "있다는 사실" 을 먼저
-기록한다.
+- 조회는 `fromDate`(기본 오늘) · `days`(기본 7 · 1~30)다. FE 는 **`fromDate` 를 보내지 않고**
+  (브라우저 타임존이 KST 가 아니면 어제부터의 기간이 나간다) `days` 만 7 · 30 둘 중 하나로 보낸다.
+- **반려견 조건을 받지 않는다** (dev Swagger 실측 2026-09-14). 붐빔은 장소와 날짜의 속성이다.
+- `leastCrowded` 규칙(UNKNOWN 제외 최저 집중률, 동률이면 가장 이른 날짜)은 BE 의
+  `CongestionSnapshot.leastCrowded` **한 곳**이다 — **FE 가 다시 고르지 않는다.** 같은 기간에
+  다른 날을 추천하게 된다.
+- **혼잡도 예측은 30일 rolling 이라 예보(약 11일)보다 멀리 답한다.** 적합도가 `INSUFFICIENT`
+  로 비는 날짜도 여기서는 붐빔 정도를 말할 수 있다.
 
-**`leastCrowded` 는 BE #425(PR #429)가 더했다** — dev Swagger 실측(2026-09-13)으로 확인한
-`PlaceCongestionResponse` 의 필드다. 규칙(UNKNOWN 제외 최저 집중률, 동률이면 가장 이른
-날짜)은 BE 의 `CongestionSnapshot.leastCrowded` 한 곳이라 **FE 가 다시 고르지 않는다** —
-같은 기간에 다른 날을 추천하게 된다. **`null` 이면 자리를 만들지 않는다**: 아는 날이 하나도
-없다는 뜻이지 한산하다는 뜻이 아니다.
-
-이 필드를 화면에 쓰려면 기간 혼잡도 화면부터 있어야 한다 — #430 이 그 절반을 남겨 뒀다.
+**FE 연동은 #430 이 했다** — 장소 상세의 판정 카드 **아래 새 L1 카드**(`PlaceCongestionPanel`)다.
+적합도 응답의 `congestion`(그 날 하나)과 겹치지 않는다: 장소 상세는 그 필드를 화면에 쓰지
+않고(혼잡 배지는 홈의 `place-insight-row` 뿐이다), 두 값은 시간 축이 다르다.
 
 **`GET /places/{placeId}/suitability` — `PlaceSuitabilityResponse`**
 
