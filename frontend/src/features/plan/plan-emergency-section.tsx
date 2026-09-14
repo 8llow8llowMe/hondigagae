@@ -35,30 +35,45 @@ export function PlanEmergencyHeader({
 }) {
   return (
     /*
-      **제목 줄 배치는 `flex-wrap` 하나로 한다** (#539). 모바일에서 뒤로가기가 `h1` 왼쪽에
-      붙고, 데스크톱에서는 `BackLink` 의 `md:basis-full` 이 한 줄을 통째로 차지해 지금처럼
-      제목 **위**에 선다. 노드를 두 벌 두지 않으므로 라벨 문구의 출처가 하나로 남는다.
-    */
+        **모바일만 flex 다** (#539). `md:block` 으로 데스크톱을 원래의 블록 흐름으로 되돌린다 —
+        `BackLink` 에 `md:basis-full` 을 주는 방식은 줄바꿈과 **폭**이 한 속성에 묶여 있어,
+        데스크톱에서 링크 상자가 줄 전체(실측 1832px)가 되고 클릭 영역과 포커스 링이 함께
+        커졌다. 자리만 바꾸려던 것이 판정 영역을 바꾼 셈이라 되돌렸다.
+
+        `items-start` 로 첫 줄에 맞춘다 — `BackLink` 의 `-my-[7px]` 이 마진 상자를 제목 첫
+        줄 높이(30px)로 맞춰 두므로, 제목이 두 줄이 되거나 옆에 더 높은 것이 서도 아이콘이
+        따라 내려가지 않는다. 줄 사이 `gap-x-1` 은 포커스 링(2px)이 제목 첫 글자를 덮지
+        않게 하는 최소값이다.
+      */
     <header
-      className={cn('flex flex-wrap items-center pt-4 pb-4 md:pt-0 md:pb-0', INSET_CLASS.card)}
-    >
-      <BackLink
-        href={`/plans/${planId}`}
-        label={messages.plan.emergencyBack}
-        variant="titleRow"
-        className="-ml-1"
-      />
-      <h1 className="text-title-1 text-fg lg:text-display font-bold break-keep md:mt-1 lg:font-extrabold">
-        {messages.plan.emergencyHeading}
-      </h1>
-      {radiusMeters !== null && (
-        <p className="text-caption text-fg-muted mt-1 basis-full font-medium">
-          {messages.plan.emergencyRadiusNote.replace(
-            '{km}',
-            String(Math.round(radiusMeters / 1000)),
-          )}
-        </p>
+      className={cn(
+        'flex flex-wrap items-start gap-x-1 pt-4 pb-4 md:block md:pt-0 md:pb-0',
+        INSET_CLASS.card,
       )}
+    >
+      <BackLink href={`/plans/${planId}`} label={messages.plan.emergencyBack} variant="titleRow" />
+      {/*
+        **제목과 부제가 한 덩어리다.** 부제를 헤더 직속에 두면 모바일에서 제목만 아이콘
+        만큼(40px) 밀려 한 헤더 안에 왼쪽 기준선이 둘이 된다 (`lib/ui/inset.ts` 가 지그재그
+        기준선을 실패 사례로 적어 둔 그 모양이다).
+
+        `min-w-0 flex-1` 은 폭 가드다 — 없으면 `h1` 의 기본 크기가 max-content 라 문구가
+        길어지는 순간 제목이 다음 줄로 내려가고 **아이콘만 혼자 한 줄에 남는다.** 320에서
+        여유가 55px 뿐이다(실측).
+      */}
+      <div className="min-w-0 flex-1 md:flex-none">
+        <h1 className="text-title-1 text-fg lg:text-display font-bold break-keep md:mt-1 lg:font-extrabold">
+          {messages.plan.emergencyHeading}
+        </h1>
+        {radiusMeters !== null && (
+          <p className="text-caption text-fg-muted mt-1 font-medium">
+            {messages.plan.emergencyRadiusNote.replace(
+              '{km}',
+              String(Math.round(radiusMeters / 1000)),
+            )}
+          </p>
+        )}
+      </div>
     </header>
   )
 }

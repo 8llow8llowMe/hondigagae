@@ -53,38 +53,36 @@ export function PlanAddPlaceHeader({
     <header
       className={cn(
         INSET_CLASS[inset],
-        // 제목 줄 배치는 `flex-wrap` 하나로 한다 — `back-link.tsx` 의 `md:basis-full` 주석 (#539)
-        'flex flex-wrap items-center',
+        // 헤더 배치는 `plan-emergency-section` 주석이 정본이다 (#539)
+        'flex flex-wrap items-start gap-x-1 md:block',
         // 데스크톱 세로 여백은 `SurfaceStack` 의 `md:p-6` 이 준다 (#447 개요 패널과 같은 값)
         inset === 'card' ? 'pt-4 pb-4 md:pt-0 md:pb-0' : 'pt-5 pb-3 lg:pt-6',
       )}
     >
-      <BackLink
-        href={backHref}
-        label={messages.plan.addPlaceBack}
-        variant="titleRow"
-        className="-ml-1"
-      />
+      <BackLink href={backHref} label={messages.plan.addPlaceBack} variant="titleRow" />
 
       {/*
-        **제목과 토글은 한 덩어리로 남는다.** 모바일에서 뒤로가기가 이 줄 왼쪽에 붙어
-        `[←][제목 ............ 토글]` 이 되려면 이 `div` 가 남은 폭을 다 먹어야 한다 —
-        `flex-1`. 데스크톱에서는 `BackLink` 가 `md:basis-full` 로 제 줄을 가져가 이 덩어리가
-        다음 줄로 내려가고, 결과는 지금과 같다 (#539).
+        **제목·부제·토글이 한 덩어리다.** 모바일에서 뒤로가기가 이 줄 왼쪽에 붙어
+        `[←][제목 ............ 토글]` 이 되려면 이 `div` 가 남은 폭을 다 먹어야 한다
+        (`flex-1`). 부제를 이 안에 두는 이유는 `plan-emergency-section` 주석과 같다 —
+        밖에 두면 제목만 40px 밀려 헤더 안에 왼쪽 기준선이 둘이 된다.
 
-        세 화면 중 여기만 제목 줄 오른쪽에 내용이 있다.
+        세 화면 중 여기만 제목 줄 오른쪽에 내용이 있다. `ViewToggle`(46px)이 줄 높이를
+        키우지만, `BackLink` 의 마진 상자가 제목 첫 줄에 맞춰져 있어 아이콘은 따라가지 않는다.
       */}
-      <div className="flex flex-1 items-start justify-between gap-3">
-        <h1 className="text-title-1 text-fg lg:text-display font-bold md:mt-1 lg:font-extrabold">
-          {messages.plan.addPlaceTitle.replace('{day}', String(day))}
-        </h1>
-        {/* 네 화면이 같은 세그먼트 컨트롤을 쓴다 — 아트보드 05 마지막 단락 */}
-        <ViewToggle current={view} listHref={listHref} mapHref={mapHref} variant="icon" />
-      </div>
+      <div className="min-w-0 flex-1 md:flex-none">
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-title-1 text-fg lg:text-display font-bold md:mt-1 lg:font-extrabold">
+            {messages.plan.addPlaceTitle.replace('{day}', String(day))}
+          </h1>
+          {/* 네 화면이 같은 세그먼트 컨트롤을 쓴다 — 아트보드 05 마지막 단락 */}
+          <ViewToggle current={view} listHref={listHref} mapHref={mapHref} variant="icon" />
+        </div>
 
-      <p className="text-caption text-fg-muted mt-1 basis-full font-medium">
-        {planTitle === undefined ? subtitle : `${planTitle} · ${subtitle}`}
-      </p>
+        <p className="text-caption text-fg-muted mt-1 font-medium">
+          {planTitle === undefined ? subtitle : `${planTitle} · ${subtitle}`}
+        </p>
+      </div>
     </header>
   )
 }

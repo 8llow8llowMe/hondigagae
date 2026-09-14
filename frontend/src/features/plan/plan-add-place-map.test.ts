@@ -151,10 +151,12 @@ describe('PlanAddPlaceHeader — 두 보기가 나눠 쓰는 머리', () => {
   */
   it('보이는 h1 과 돌아가기 링크를 둔다 — 지도에서도 숨기지 않는다', () => {
     const markup = renderHeader()
-    const h1Class = /<h1[^>]*class="([^"]*)"/.exec(markup)?.[1] ?? ''
+    // 매치 실패를 단언으로 드러낸다 — `?? ''` 로 흘리면 `['']` 이 되어 아래가 공허 통과한다
+    const h1 = /<h1[^>]*class="([^"]*)"/.exec(markup)
+    expect(h1).not.toBeNull()
 
     expect(markup).toContain('<h1')
-    expect(h1Class.split(/\s+/)).not.toContain('sr-only')
+    expect((h1?.[1] ?? '').split(/\s+/)).not.toContain('sr-only')
     expect(markup).toContain('href="/plans/1#day-2"')
     expect(markup).toContain(messages.plan.addPlaceTitle.replace('{day}', '2'))
     // 퇴로의 이름은 아이콘이 되어도 남는다 — 스크린리더가 읽을 말이 사라지면 퇴로가 없다

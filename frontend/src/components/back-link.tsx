@@ -32,6 +32,42 @@ import { cn } from '@/lib/utils/cn'
  */
 type BackLinkVariant = 'inline' | 'titleRow'
 
+/**
+ * variant 별 추가 클래스 — `component-guide.md` §11 ("`Record<Union, string>` 으로 맵을 선언").
+ * 불리언 분기로 두면 세 번째 값이 생겼을 때 타입체커가 잡지 못한다.
+ *
+ * **`titleRow` 는 모바일에서만 다르다.** `md` 이상은 전부 `md:` 로 되돌려 `inline` 과 같은
+ * 모습이 되므로, 데스크톱에서는 일곱 호출부가 지금까지처럼 한 모양이다.
+ */
+const VARIANT_CLASS: Record<BackLinkVariant, string> = {
+  inline: '',
+  titleRow: [
+    /*
+      **44px 를 상자 크기가 아니라 패딩으로 만든다** (DESIGN.md §7).
+
+      `min-w-11 justify-center` 로 44px 를 만들면 아이콘이 상자 **가운데**로 밀려 잉크가
+      글줄 세로선에서 15.5px 오른쪽에 선다(실측). 패딩으로 만들면 아이콘은 왼쪽에 남고
+      터치 영역만 넓어진다 — 잉크는 `-ml-4` 와 합쳐 데스크톱 `←`(3.5px)와 같은 어긋남에 든다.
+    */
+    '-ml-4 px-3',
+    /*
+      **세로 레이아웃 상자를 제목 첫 줄에 맞춘다.** `h-11`(44) 그대로면 `ViewToggle`(46)이
+      줄 높이를 키울 때 아이콘만 8px 아래로 내려가고, 제목이 두 줄이 되면 **두 줄 사이**에
+      앉는다(실측). 음수 세로 마진으로 마진 상자를 제목 첫 줄 높이에 맞추면, 부모
+      `items-start` 아래에서 중심이 저절로 맞는다. 터치 영역은 44 그대로다.
+
+      **1px 어긋난다 — 의도다.** 딱 맞는 값은 `(44 − 30) / 2 = 7px` 인데
+      (`--text-title-1--line-height` = 30px), 7 은 스케일 밖이라 arbitrary value 룰이 막는다.
+      `-my-2`(8px)면 마진 상자가 28 이 되어 아이콘 중심이 글줄 중심보다 **1px 위**다.
+      스케일을 벗어나는 것보다 1px 이 낫다 — #443 · #447 이 카드 테두리 1px 을 같은 이유로
+      두고 간 자리다.
+    */
+    '-my-2',
+    // 데스크톱은 옛 모습 그대로 — `-ml-1` 광학 보정, 패딩·음수 마진 없음
+    'md:-ml-1 md:my-0 md:px-0',
+  ].join(' '),
+}
+
 export function BackLink({
   href,
   label,
@@ -58,30 +94,28 @@ export function BackLink({
         // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
         'text-body-2 text-link hover:text-link-hover inline-flex h-11 items-center gap-1 font-semibold',
         'focus-visible:ring-brand-500 rounded-md focus-visible:ring-2 focus-visible:outline-none',
-        /*
-          **자리 이동을 노드 하나로 한다.** `flex-wrap` 부모(호출부 `header`)에서
-          `basis-full` 은 한 줄을 통째로 차지하므로, 데스크톱에서는 지금처럼 제목 **위**에
-          서고 모바일(`basis-auto`)에서는 제목 왼쪽에 붙는다.
-
-          `md:hidden` / `hidden md:block` 으로 두 벌을 두지 않는다 — 라벨 문구가 두 곳이
-          되면 아래 `sr-only` 가 지키려는 "이름의 출처는 하나" 가 무너진다.
-        */
-        titleRow && 'md:basis-full',
-        // 라벨이 빠지면 가로가 아이콘 폭으로 쪼그라든다 — 세로(`h-11`)만으로는 44x44 가 안 된다
-        titleRow && 'min-w-11 justify-center md:min-w-0 md:justify-start',
+        VARIANT_CLASS[variant],
         className,
       )}
     >
       {/*
-        **화살표의 모습이 variant 를 탄다.** `inline` 은 글자 흐름 안(장소 상세는 breadcrumb
-        `장소 목록으로 › 제목`)에 서서 글리프가 글줄 baseline 에 맞는 편이 낫고, `titleRow` 는
-        모바일에서 **아이콘 단독**이라 텍스트 글리프의 광학 중심이 폰트에 따라 흔들린다.
-        둘을 `ChevronLeftIcon` 으로 합치는 안은 손대지 않기로 한 네 호출부의 모습을 바꾸므로
-        #539 범위 밖이다 — breadcrumb 이 이미 옆에 `ChevronRightIcon` 을 두고 있어 합칠
-        근거는 있다. 별도로 판단한다.
+        **화살표는 브레이크포인트를 탄다 — variant 가 아니다.**
+
+        처음에는 `titleRow` 전체를 `ChevronLeftIcon` 으로 뒀는데, 그러면 **데스크톱에서**
+        일정 세 화면만 `‹` 가 되고 마이페이지·장소 상세는 `←` 로 남아 같은 자리·같은 문구가
+        화살표만 갈린다. 바꾸기로 한 것은 모바일뿐인데 손대지 않기로 한 곳과의 불일치를
+        새로 만든 셈이라 되돌렸다.
+
+        둘 다 `aria-hidden` 이라 두 벌이어도 **이름의 출처는 여전히 하나**다 — 아래 `sr-only`
+        라벨이 그 일을 혼자 한다. 노드를 두 벌 두지 않는 규칙은 이름을 가진 것에만 건다.
       */}
       {titleRow ? (
-        <ChevronLeftIcon size={20} aria-hidden className="shrink-0" />
+        <>
+          <ChevronLeftIcon size={20} aria-hidden className="shrink-0 md:hidden" />
+          <span aria-hidden className="hidden md:inline">
+            ←
+          </span>
+        </>
       ) : (
         <span aria-hidden>←</span>
       )}
@@ -89,9 +123,12 @@ export function BackLink({
         **`aria-label` 을 쓰지 않는다.** 라벨을 DOM 에 두고 시각적으로만 감추면 접근성
         이름과 보이는 문구가 한 출처에서 나와 둘이 어긋날 수 없다 — `aria-label` 을 따로
         두면 문구를 고칠 때 한쪽만 고치는 사고가 나고, 그때 보이는 말과 읽히는 말이 갈린다.
-        이름은 브레이크포인트와 무관하게 같다.
+        이름은 브레이크포인트와 무관하게 같다. (`DESIGN.md` §9 의 icon-only 규칙 예외)
+
+        `|| undefined` 로 빈 `class=""` 를 지운다 — `inline` 에서 `cn(false)` 가 `''` 를
+        내면 React 가 `class=""` 를 렌더해, 손대지 않기로 한 네 호출부의 DOM 이 바뀐다.
       */}
-      <span className={cn(titleRow && 'sr-only md:not-sr-only')}>{label}</span>
+      <span className={cn(titleRow && 'sr-only md:not-sr-only') || undefined}>{label}</span>
     </Link>
   )
 }
