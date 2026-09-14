@@ -47,6 +47,11 @@ export function UpcomingPlanRow({ plan, today }: { plan: PlanSummaryItem; today:
             {/*
               데스크톱은 기둥의 말을 날짜 줄에도 되풀이한다(원래 ` · D-16`). 여행 중이면
               되풀이 대신 **며칠째인지**를 적는다 — 기둥이 이미 `여행 중` 이라고 말했다.
+
+              **모바일 날짜 줄에는 넣지 않는다.** 그 자리는 상태명(`초안`/`확정`)이 쓰고
+              있고, 좁은 폭에 셋을 세우면 줄이 넘친다. 목록 행은 상태명을 배지로 빼 두어
+              자리가 남으므로 모바일에서도 `오늘 N일차` 를 붙인다 — 두 화면의 차이는
+              날짜 줄에 무엇이 이미 서 있는지에서 온다.
             */}
             {phaseNote !== null ? (
               <span className="hidden md:inline"> · {phaseNote}</span>
