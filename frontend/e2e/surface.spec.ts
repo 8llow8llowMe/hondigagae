@@ -915,7 +915,21 @@ test.describe('잘못된 placeId — 요청을 보내지 않는다 (#496)', () =
     await expect(main.getByRole('button', { name: '다시 시도' })).toHaveCount(0)
   })
 
-  test('콘솔에 오류가 찍히지 않는다 — 400 셋이 진짜 오류를 덮었다', async ({ page }) => {
+  /*
+    **세던 것이 셋에서 하나로 줄었다** (#563). 이 문서 자체가 이제 400 으로 나간다 —
+    `@PathVariable long` 이라 답이 400 으로 정해져 있는데 응답은 200 이었던 것을
+    `proxy.ts` 가 고쳤다 (`docs/architecture-guide.md` §7). 브라우저는 4xx 문서에
+    **자기 상태를 한 줄 찍는다**: 없앨 수 없고, 없애려면 상태 코드를 다시 틀리게 해야 한다.
+
+    그래서 "0건" 이 아니라 **"문서 자신의 한 줄뿐"** 을 센다. #496 이 지키려던 것은
+    `/places/abc` 하나에 상세·적합도·산책 안전 **API 400 이 3건** 나서 진짜 오류를 덮던
+    일이고, 그 셋이 다시 나가면 같은 문장이 4줄이 되어 여기서 걸린다.
+  */
+  const DOCUMENT_400 = /status of 400/
+
+  test('콘솔 오류가 문서 자신의 400 한 줄뿐이다 — API 400 셋이 진짜 오류를 덮었다', async ({
+    page,
+  }) => {
     const errors: string[] = []
     page.on('console', (message) => {
       if (message.type() === 'error') errors.push(message.text())
@@ -925,7 +939,10 @@ test.describe('잘못된 placeId — 요청을 보내지 않는다 (#496)', () =
     await expect(page.getByRole('main')).toBeVisible()
     await page.waitForTimeout(1000)
 
-    expect(errors).toEqual([])
+    // 400 과 무관한 오류는 한 줄도 없어야 한다
+    expect(errors.filter((text) => !DOCUMENT_400.test(text))).toEqual([])
+    // 400 줄은 문서 응답 하나뿐이다. 훅이 되살아나 API 400 이 나가면 여기가 늘어난다
+    expect(errors.filter((text) => DOCUMENT_400.test(text))).toHaveLength(1)
   })
 
   /*
