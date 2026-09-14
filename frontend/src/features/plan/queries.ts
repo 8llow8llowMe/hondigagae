@@ -19,6 +19,14 @@ export const planKeys = {
    * 다른 쪽은 살아 있어야 한다.
    */
   emergency: (planId: string) => [...planKeys.all, 'emergency', planId] as const,
+  /**
+   * 저장된 여행 준비물 (#586). **상세와 key 를 나눈다** — 준비물만 실패해도 일정 본문은
+   * 그대로 남아야 하고, 체크·추가·삭제 뒤에 그 절만 갱신할 수 있어야 한다.
+   *
+   * 예전에는 key 가 아예 없었다. 생성 결과를 서버가 보관하지 않아 `useMutation` 이었고,
+   * 캐시할 것이 없었다 — 저장이 생기면서 조회가 됐다.
+   */
+  packing: (planId: string) => [...planKeys.all, 'packing', planId] as const,
 }
 
 /** api-integration-guide.md §7 표준값 — 일정 목록·상세는 30초 / 10분 (mutation 빈번) */

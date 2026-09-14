@@ -86,6 +86,20 @@ export const paths = {
     /** 항목 방문 체크 (#124). 해제도 같은 경로다 — 본문의 `visited` 가 방향을 정한다 */
     itemVisited: (planId: string, planItemId: string) =>
       `/plans/${planId}/items/${planItemId}/visited`,
+    /**
+     * 저장된 여행 준비물 (#398 BE · #586 FE). **한 경로에 세 메서드가 붙는다** —
+     * 조회(`GET`) · AI 결과 저장(`PUT`, AI 항목만 교체) · 직접 추가(`POST`).
+     *
+     * **`aiPlans.packingList` 와 다른 서비스다.** 저쪽(ai-service)은 만들기만 하고
+     * 보관하지 않는다. 보관은 여기(plan-service)다.
+     */
+    packingItems: (planId: string) => `/plans/${planId}/packing-items`,
+    /** 항목 삭제. AI 항목과 직접 추가 항목을 구분하지 않는다 — 둘 다 지울 수 있다 */
+    packingItem: (planId: string, packingItemId: string) =>
+      `/plans/${planId}/packing-items/${packingItemId}`,
+    /** 챙김 체크. 해제도 같은 경로다 — 본문의 `checked` 가 방향을 정한다 */
+    packingItemChecked: (planId: string, packingItemId: string) =>
+      `/plans/${planId}/packing-items/${packingItemId}/checked`,
   },
   aiPlans: {
     submit: '/ai-plans',
@@ -105,8 +119,12 @@ export const paths = {
      */
     jobCancel: (jobId: string) => `/ai-plans/jobs/${jobId}/cancel`,
     /**
-     * 반려견 여행 준비물 생성 (#155). **POST 인데 조회에 가깝다** — 서버가 결과를
-     * 저장하지 않는 제안이라 재호출하면 다른 목록이 온다.
+     * 반려견 여행 준비물 **생성** (#155). 서버가 결과를 보관하지 않으므로 재호출하면
+     * 다른 목록이 온다.
+     *
+     * **보관은 plan-service 가 한다** (#586). 화면은 이 경로를 매번 부르지 않고
+     * `plans.packingItems` 를 먼저 읽어, 저장된 것이 없을 때만 여기에 온다 —
+     * 있으면 LLM 을 다시 돌리지 않는다.
      */
     packingList: (planId: string) => `/ai-plans/packing-list/${planId}`,
   },

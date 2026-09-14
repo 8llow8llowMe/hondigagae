@@ -98,8 +98,13 @@ const INSET_REQUIRED = [
   { path: 'src/features/plan/plan-list-section.tsx', states: 4 },
   /* 등록·수정 두 화면 모두 제목 있는 카드 안이다 */
   { path: 'src/features/pet/pet-form.tsx', states: 1 },
-  /* `plan-detail-section.tsx` 의 `aria-label` 카드 안. 제목이 없어 레벨은 2 로 남는다 */
-  { path: 'src/features/plan/plan-packing-list.tsx', states: 1 },
+  /*
+    `plan-detail-section.tsx` 의 `aria-label` 카드 안. 제목이 없어 레벨은 2 로 남는다.
+
+    **둘이 된 것은 #586 이다.** 저장이 붙으면서 실패가 생성 하나에서 **조회 실패**까지
+    둘이 됐다.
+  */
+  { path: 'src/features/plan/plan-packing-list.tsx', states: 2 },
   /*
     홈은 다섯 전부 카드 안이다. **넷은 `card` 이고 하나는 레일 카드 안의 판정 자리**인데,
     그 자리도 형제가 `px-4 md:px-5` 라 `card` 다 (#485 에서 `rail` 에서 고쳤다).
