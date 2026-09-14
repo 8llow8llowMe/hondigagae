@@ -148,6 +148,27 @@ describe('만들기 폼 — 검증', () => {
     expect(validate(planFormSchema, values({ budget: '1.5' })).ok).toBe(false)
   })
 
+  /*
+    상한이 없던 시절에는 큰 수가 그대로 나가 서버가 역직렬화에서 깨졌고, 그 응답이
+    필드를 못 짚어 **"요청 본문을 읽을 수 없습니다. JSON 형식을 확인해 주세요."** 가
+    폼 상단 배너로 떴다 (#566). 경계는 dev 실측값이다.
+  */
+  it('Integer 상한을 넘는 예산은 막고, 오류를 예산 칸에 붙인다', () => {
+    expect(validate(planFormSchema, values({ budget: '2147483647' })).ok).toBe(true)
+
+    const result = validate(planFormSchema, values({ budget: '2147483648' }))
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.errors.fields.budget).toBe(messages.plan.errorBudgetTooLarge)
+  })
+
+  it('서식이 틀린 예산에는 "너무 커요" 가 아니라 서식 오류를 말한다', () => {
+    const result = validate(planFormSchema, values({ budget: 'abc' }))
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.errors.fields.budget).toBe(messages.plan.errorBudgetNegative)
+  })
+
   it('60자를 넘는 제목은 막는다 — 서버 제한과 같은 값이다', () => {
     expect(validate(planFormSchema, values({ title: 'ㄱ'.repeat(61) })).ok).toBe(false)
     expect(validate(planFormSchema, values({ title: 'ㄱ'.repeat(60) })).ok).toBe(true)

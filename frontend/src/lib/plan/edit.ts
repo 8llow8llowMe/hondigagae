@@ -1,4 +1,5 @@
 import { messages } from '@/lib/messages'
+import { planBudgetIssue } from '@/lib/plan/budget'
 import type { PlanUpdatePayload } from '@/types/plan'
 
 /**
@@ -22,11 +23,25 @@ export function validatePlanEdit(values: PlanEditValues): Record<string, string>
   if (title.length === 0) errors.title = messages.plan.errorTitleRequired
   else if (title.length > TITLE_MAX) errors.title = messages.plan.errorTitleTooLong
 
-  const budget = values.budget.trim()
-  if (budget !== '') {
-    // 서버는 `@PositiveOrZero` 다. 소수·문자·음수를 여기서 먼저 걸러 왕복을 아낀다
-    const parsed = Number(budget)
-    if (!Number.isInteger(parsed) || parsed < 0) errors.budget = messages.plan.errorBudgetNegative
+  /*
+    서버는 `@PositiveOrZero` 다. 소수·문자·음수를 여기서 먼저 걸러 왕복을 아낀다.
+
+    **상한도 본다.** 만들기 폼과 같은 판정(`planBudgetIssue`)을 쓴다 — 예전에는 이쪽만
+    상한이 없어, 수정 모달로 큰 수를 넣으면 서버가 역직렬화에서 깨지며 개발자용 문구가
+    그대로 떴다 (#566).
+
+    같은 함수로 옮기면서 `1e3` · `+5` 처럼 `Number()` 는 통과하지만 서식이 아닌 값도
+    함께 막힌다. 만들기 폼은 원래 막고 있었으므로 두 폼이 이제 같은 답을 낸다.
+  */
+  switch (planBudgetIssue(values.budget)) {
+    case 'invalid':
+      errors.budget = messages.plan.errorBudgetNegative
+      break
+    case 'too-large':
+      errors.budget = messages.plan.errorBudgetTooLarge
+      break
+    default:
+      break
   }
 
   return errors

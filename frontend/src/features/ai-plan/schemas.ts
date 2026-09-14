@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { MAX_PINNED_PLACES } from '@/lib/ai-plan/pinned'
+import { MANWON } from '@/lib/ai-plan/submit'
 import { MAX_PET_COUNT } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
 
@@ -61,11 +62,24 @@ export const aiPlanFormSchema = z
      * **`0` 을 거부한다.** 계약이 `@Positive` 라 `0` 은 400 이고, "상관없음" 은 빈 값으로
      * 표현한다 (`src/lib/ai-plan/submit.ts`). `Number('')` 이 `0` 이라 조건 순서가 중요하다.
      */
-    budgetManwon: z.string().refine((value) => {
-      const trimmed = value.trim()
-      if (trimmed === '') return true
-      return /^\d+$/.test(trimmed) && Number(trimmed) > 0
-    }, messages.aiPlan.errorBudgetPositive),
+    budgetManwon: z
+      .string()
+      .refine((value) => {
+        const trimmed = value.trim()
+        if (trimmed === '') return true
+        return /^\d+$/.test(trimmed) && Number(trimmed) > 0
+      }, messages.aiPlan.errorBudgetPositive)
+      /**
+       * **상한도 본다** (#566 과 같은 결함). 서버 `budget` 은 `Long` 이지만 여기서 걸리는
+       * 것은 그 한참 앞이다 — 만원을 원으로 10000 배 해 보내므로, 변환 결과가
+       * `Number.MAX_SAFE_INTEGER` 를 넘으면 **화면이 보여 준 수와 서버가 받는 수가 달라진다.**
+       * 정확히 표현되는 범위까지만 받는다.
+       */
+      .refine((value) => {
+        const trimmed = value.trim()
+        if (trimmed === '' || !/^\d+$/.test(trimmed)) return true
+        return Number.isSafeInteger(Number(trimmed) * MANWON)
+      }, messages.aiPlan.errorBudgetTooLarge),
     /** 체크박스가 값을 고정한다. 스키마에 두는 것은 폼 값 전체를 한 타입으로 검증하기 위해서다 */
     preferFavorites: z.boolean(),
     /**
