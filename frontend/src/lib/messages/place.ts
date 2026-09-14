@@ -14,6 +14,15 @@ export const placeMessages = {
   /** `role="search"` 랜드마크의 이름이자 입력의 `sr-only` 라벨 */
   searchLabel: '장소 이름·주소로 찾기',
   searchPlaceholder: '이름이나 주소로 찾기',
+  /**
+   * 지도 위에 뜨는 검색창용 짧은 placeholder (#596).
+   *
+   * **375 에서 자리가 없다.** 보기 토글(90) 왼쪽에 남는 폭이 245 이고, 거기서 아이콘
+   * 제출 버튼(44)과 간격을 빼면 입력이 193 이다 — 긴 문구는 잘린다. 잘린 placeholder 는
+   * 짧은 문구보다 나쁘다. `messages.emergency.searchPlaceholderShort` 와 같은 값이고
+   * 같은 이유다 — 두 화면이 같은 자리에 같은 컨트롤을 둔다.
+   */
+  searchPlaceholderShort: '이름·주소 검색',
   searchAction: '검색',
   /**
    * 검색어가 걸린 0건. **무엇으로 찾았는지 되돌려 준다** — 입력은 화면 위에 남아 있지만,

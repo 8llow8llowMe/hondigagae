@@ -125,6 +125,9 @@
   `petWeightKg`(내 반려견 체중, **`Integer`**),
   `sourceCategory`(원본 분류 자유 문자열, 예: 카페), `keyword`(장소명·주소 부분 일치, 최대 50자), `lastPlaceId`(커서), `size`(1~50, 기본 20).
   **모두 단일값이며 배열이 아니다.** `keyword` 는 공백/빈 값이면 필터 없음이다 (#421).
+  화면 입력은 **목록 갈래와 지도 갈래 양쪽**에 있다 ([#431](https://github.com/8llow8llowMe/hondigagae/issues/431) ·
+  지도는 [#596](https://github.com/8llow8llowMe/hondigagae/issues/596)) — 정규화는
+  `lib/url/keyword.ts` 한 곳이고 `/emergency` 와 같은 규칙을 쓴다.
 - **`petWeightKg` 는 `petSizeType` 과 한 컨트롤이 함께 켠다** (#126). 아트보드의
   "몽실이가 들어갈 수 있는 곳만" 체크 하나가 두 파라미터를 같이 보낸다 — 같은 축이라
   따로 켜면 판정이 반쪽이 된다. 체중을 모르는 아이는 크기만 보낸다.
