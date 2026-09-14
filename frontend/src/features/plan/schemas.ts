@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { messages } from '@/lib/messages'
+import { planBudgetIssue } from '@/lib/plan/budget'
 
 /**
  * 만들기 폼 스키마. **백엔드 제약의 복제본이다** (form-guide.md §5).
@@ -35,10 +36,21 @@ export const planFormSchema = z
     /**
      * PLAN_107. 선택 입력이라 빈 값을 허용한다 — 여기서 막으면 선택 입력이 사실상
      * 필수가 된다. 소수점·음수·문자를 함께 거른다 (`Number('')` 은 0 이라 조건 순서가 중요).
+     *
+     * **상한도 여기서 본다.** 서버 `budget` 이 `Integer` 라 넘기면 Bean Validation 이 아니라
+     * Jackson 역직렬화에서 깨지고, 그 응답은 필드를 못 짚어 개발자용 문구가 폼 상단 배너로
+     * 뜬다 (#566). 판정은 `lib/plan/budget.ts` 한 곳이 갖고 수정 폼과 함께 쓴다.
+     *
+     * 서식 검사를 먼저 건다 — `abc` 에 "너무 커요" 라고 말하면 안 된다.
      */
-    budget: z.string().refine((value) => value.trim() === '' || /^\d+$/.test(value.trim()), {
-      message: messages.plan.errorBudgetNegative,
-    }),
+    budget: z
+      .string()
+      .refine((value) => planBudgetIssue(value) !== 'invalid', {
+        message: messages.plan.errorBudgetNegative,
+      })
+      .refine((value) => planBudgetIssue(value) !== 'too-large', {
+        message: messages.plan.errorBudgetTooLarge,
+      }),
   })
   /**
    * PLAN_003 을 화면이 먼저 본다. 서버도 400 으로 막지만 **왕복 없이 그 자리에서
