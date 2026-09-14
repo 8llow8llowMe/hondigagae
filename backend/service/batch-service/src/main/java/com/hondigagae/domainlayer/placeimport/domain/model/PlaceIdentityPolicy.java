@@ -24,6 +24,16 @@ public final class PlaceIdentityPolicy {
     public static final double MERGE_PARTIAL_NAME_RADIUS_M = 300d;
     /** 대표 이미지 백필에서 같은 장소로 볼 거리 상한. 제주 시가지에서 같은 이름의 다른 지점을 걸러내는 값이다. */
     public static final double IMAGE_BACKFILL_RADIUS_M = 500d;
+    /**
+     * 긴급 시설 중복 접기에서 같은 시설로 볼 거리 상한.
+     *
+     * <p>병합과 같은 1,000m 지만 <b>근거가 다르다.</b> 저쪽은 "원천마다 기준점이 달라서"(오름 정상 vs 입구)
+     * 넉넉히 잡은 값이고, 이쪽은 <b>같은 상호의 다른 지점을 삼키지 않기 위한 상한</b>이다. 전국 CSV 실측에서
+     * 이름과 전화가 모두 같은데 1km 를 넘는 조합이 12개 나왔고 전부 별개 지점이었다 —
+     * {@code 22세기 약국}(대구/순천 143km), {@code 경남수의동물병원}(창녕/진주 48km),
+     * {@code 백화점약국}(안양/광명 10.6km). <b>이 값을 올리지 않는다.</b>
+     */
+    public static final double EMERGENCY_DUPLICATE_RADIUS_M = 1_000d;
 
     private PlaceIdentityPolicy() {
     }
@@ -56,5 +66,36 @@ public final class PlaceIdentityPolicy {
      */
     public static boolean isSamePlaceForImageBackfill(String titleA, String titleB, double distanceMeters) {
         return PlaceNameMatcher.isExactMatch(titleA, titleB) && distanceMeters <= IMAGE_BACKFILL_RADIUS_M;
+    }
+
+    /**
+     * 긴급 시설 두 행을 같은 시설로 접어도 되는지 판정한다.
+     *
+     * <p>세 가지를 <b>모두</b> 만족해야 한다 — 이름 완전일치, 전화번호 일치, {@value #EMERGENCY_DUPLICATE_RADIUS_M}m 이내.
+     *
+     * <p><b>전화만으로는 절대 접지 않는다.</b> 제주 214곳 중 전화를 공유하는 번호가 5개인데 그중 3개는
+     * 이름이 전혀 다른 별개 시설이다 — {@code 태흥동물병원}/{@code 나음동물병원}(064-722-3440),
+     * {@code 사랑동물병원}/{@code 봄이든 동물병원}(064-745-9975),
+     * {@code 두리약국}/{@code 밝은사랑약국}/{@code 큰곰동물약국}(064-744-9952, 같은 건물 3곳).
+     *
+     * <p><b>전화가 없으면 접지 않는다.</b> 이름과 거리만으로 접는 규칙은 실측으로 검증하지 않았다.
+     * 주소 표기까지 같은 행은 이미 {@code sourceKey} 가 접으므로, 여기서 더 접어 얻을 것이 크지 않다.
+     *
+     * <p>{@link PlaceNameMatcher#isPartialMatch 부분일치}도 받지 않는다. {@code 노형동물병원} 과
+     * {@code 노형24시동물병원} 이 같은 곳이라는 근거가 원천에 없다.
+     */
+    public static boolean isSameEmergencyFacility(
+        String nameA, String telA, String nameB, String telB, double distanceMeters) {
+        String left = digitsOf(telA);
+        String right = digitsOf(telB);
+        if (left.isEmpty() || !left.equals(right)) {
+            return false;
+        }
+        return PlaceNameMatcher.isExactMatch(nameA, nameB) && distanceMeters <= EMERGENCY_DUPLICATE_RADIUS_M;
+    }
+
+    /** {@code 064-749-7585} 와 {@code 0647497585} 를 같게 본다. 원천이 표기를 섞어 쓴다. */
+    private static String digitsOf(String tel) {
+        return tel == null ? "" : tel.replaceAll("\\D", "");
     }
 }

@@ -1,0 +1,159 @@
+package com.hondigagae.domainlayer.placeimport.domain.model;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 긴급 시설 적재 직전의 중복 접기.
+ *
+ * <h2>왜 필요한가</h2>
+ *
+ * <p>유일성 기준이 {@code sourceKey}({@code SHA-256(이름|주소)}) 하나뿐이라, 원천이 같은 시설을
+ * <b>표기만 달리해</b> 넣은 행이 각각 별개 시설로 적재된다. dev 에서 실제로 나온 쌍이다 (#569):
+ *
+ * <pre>
+ * 24시똑똑똑 동물메디컬센터   제주시 도령로 129   064-749-7585
+ * 24시똑똑똑동물메디컬센터    제주시 도령로 129   064-749-7585
+ * </pre>
+ *
+ * <p>{@link PlaceIdFactory#sourceKeyOf} 안의 정규화는 공백 <b>런</b>을 한 칸으로 접을 뿐
+ * 내부 공백을 없애지 않아 둘이 다른 키가 된다.
+ *
+ * <h2>왜 여기서 접는가 — {@code sourceKeyOf} 를 고치지 않는 이유</h2>
+ *
+ * <p>{@code sourceKeyOf} 는 {@code emergency_facility} 말고 {@code place}(CULTURE_PORTAL·MFDS)도
+ * 쓴다. 정규화를 강화하면 주소에 공백이 없는 행이 0건이라 <b>place id 가 전국 3,516키 전부 바뀌는데,
+ * place 쪽에서 실제로 접히는 건수는 0</b>이다 (전국 CSV 실측). 얻는 것 없이
+ * {@code favorite.place_id} · {@code plan_item.target_id} · {@code place_image} 참조만 끊긴다.
+ *
+ * <p>여기서 접으면 <b>생존 행의 id 가 그대로 유지된다.</b> 접혀서 upsert 되지 않은 행은
+ * {@code synced_at} 이 낡아 같은 잡의 delist 가 {@code delisted_at} 을 찍고 조회에서 사라진다 —
+ * 마이그레이션 SQL 도 스키마 변경도 필요 없다.
+ *
+ * <h2>접지 않는 것</h2>
+ *
+ * <p>{@code 노형 꿈 동물병원}(월광로 32)과 {@code 노형꿈동물병원}(우령서로 89)은 전화가 같지만
+ * <b>3,502m 떨어져 있고</b> 법정동·좌표·휴무일·주차 여부·설명이 전부 다르다. 이전(移轉)인지
+ * 2호점인지 원천만으로는 판정할 수 없어 <b>접지 않는다</b> —
+ * {@link PlaceIdentityPolicy#EMERGENCY_DUPLICATE_RADIUS_M} 이 이 판단을 고정한다.
+ */
+public final class EmergencyFacilityDeduplicator {
+
+    private EmergencyFacilityDeduplicator() {
+    }
+
+    /**
+     * 접은 결과.
+     *
+     * @param facilities upsert 할 행. 입력 순서를 보존한다
+     * @param mergedNotes 접힌 조합의 사람이 읽을 설명. 적재 로그에 남겨 원천 품질을 추적한다
+     */
+    public record Result(List<ImportedEmergencyFacility> facilities, List<String> mergedNotes) {
+    }
+
+    /**
+     * 같은 시설로 판정되는 행을 하나로 접는다.
+     *
+     * <p>두 단계다.
+     * <ol>
+     *   <li>{@code sourceKey} 가 같은 행을 접는다. 지금까지 DB 의 {@code ON DUPLICATE KEY UPDATE} 가
+     *       하던 일을 앞으로 당긴 것이라 <b>결과가 같아야 한다</b> — 그래서 배치 적용 순서와 같이
+     *       <b>나중 행이 이긴다.</b></li>
+     *   <li>(종류, 정규화 이름, 전화 숫자)로 묶고, 묶음 안이 전부
+     *       {@link PlaceIdentityPolicy#EMERGENCY_DUPLICATE_RADIUS_M} 이내일 때만 하나로 접는다.</li>
+     * </ol>
+     *
+     * <p><b>묶음 안에 한 쌍이라도 멀면 그 묶음은 통째로 남긴다.</b> 일부만 접으면 "어느 것이 어느 것과
+     * 같은가" 를 순서가 정하게 되는데, 그 판단의 근거가 원천에 없다. 전부 남기는 쪽이 정직하다.
+     */
+    public static Result fold(List<ImportedEmergencyFacility> facilities) {
+        List<ImportedEmergencyFacility> distinct = foldBySourceKey(facilities);
+
+        // 이름·전화가 같은 것끼리만 모은다. 거리 계산은 이 묶음 안에서만 하므로 전국 12,930행에서도 싸다
+        Map<String, List<ImportedEmergencyFacility>> buckets = new LinkedHashMap<>();
+        List<ImportedEmergencyFacility> unfoldable = new ArrayList<>();
+
+        for (ImportedEmergencyFacility facility : distinct) {
+            String key = bucketKeyOf(facility);
+            if (key == null) {
+                unfoldable.add(facility);
+                continue;
+            }
+            buckets.computeIfAbsent(key, ignored -> new ArrayList<>()).add(facility);
+        }
+
+        List<ImportedEmergencyFacility> kept = new ArrayList<>(unfoldable);
+        List<String> mergedNotes = new ArrayList<>();
+
+        for (List<ImportedEmergencyFacility> bucket : buckets.values()) {
+            if (bucket.size() == 1 || !allWithinRadius(bucket)) {
+                kept.addAll(bucket);
+                continue;
+            }
+
+            ImportedEmergencyFacility survivor = bucket.stream().min(bySurvivalOrder()).orElseThrow();
+            kept.add(survivor);
+            bucket.stream()
+                .filter(dropped -> !dropped.sourceKey().equals(survivor.sourceKey()))
+                .forEach(dropped -> mergedNotes.add("%s(%s) <- %s(%s)".formatted(
+                    survivor.name(), survivor.addr(), dropped.name(), dropped.addr())));
+        }
+
+        return new Result(kept, mergedNotes);
+    }
+
+    private static List<ImportedEmergencyFacility> foldBySourceKey(List<ImportedEmergencyFacility> facilities) {
+        Map<String, ImportedEmergencyFacility> byKey = new LinkedHashMap<>();
+        for (ImportedEmergencyFacility facility : facilities) {
+            // put 은 값만 덮고 자리는 처음 그대로다 — 나중 행이 이기면서 입력 순서도 보존된다
+            byKey.put(facility.sourceKey(), facility);
+        }
+        return new ArrayList<>(byKey.values());
+    }
+
+    /**
+     * 접기 후보를 모을 키. <b>접을 수 없는 행은 {@code null}</b> — 전화가 없거나 좌표가 없으면
+     * 거리 가드를 걸 수 없고, 가드 없는 이름 접기는 실측으로 검증하지 않았다.
+     */
+    private static String bucketKeyOf(ImportedEmergencyFacility facility) {
+        String tel = facility.tel() == null ? "" : facility.tel().replaceAll("\\D", "");
+        String name = PlaceNameMatcher.normalize(facility.name());
+        if (tel.isEmpty() || name.isEmpty() || facility.lat() == null || facility.lng() == null) {
+            return null;
+        }
+        return facility.facilityType().name() + "|" + name + "|" + tel;
+    }
+
+    /** 묶음 안의 모든 쌍이 상한 안에 있는가. 묶음은 2~3개라 전수 비교가 싸다. */
+    private static boolean allWithinRadius(List<ImportedEmergencyFacility> bucket) {
+        for (int i = 0; i < bucket.size(); i++) {
+            for (int j = i + 1; j < bucket.size(); j++) {
+                ImportedEmergencyFacility left = bucket.get(i);
+                ImportedEmergencyFacility right = bucket.get(j);
+                double distance = PlaceNameMatcher.distanceMeters(
+                    left.lat().doubleValue(), left.lng().doubleValue(),
+                    right.lat().doubleValue(), right.lng().doubleValue());
+                if (!PlaceIdentityPolicy.isSameEmergencyFacility(
+                    left.name(), left.tel(), right.name(), right.tel(), distance)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 어느 행을 남길지. <b>결정적이어야 한다</b> — 실행할 때마다 다른 행이 살아남으면 id 가 흔들려
+     * 멱등성이 깨진다.
+     *
+     * <p>{@code sourceModifiedAt} 최신 → 없는 쪽이 뒤 → 동률이면 {@code sourceKey} 사전순.
+     */
+    private static Comparator<ImportedEmergencyFacility> bySurvivalOrder() {
+        return Comparator
+            .comparing(ImportedEmergencyFacility::sourceModifiedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+            .thenComparing(ImportedEmergencyFacility::sourceKey);
+    }
+}
