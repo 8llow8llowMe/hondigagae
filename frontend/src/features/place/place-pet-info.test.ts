@@ -67,9 +67,9 @@ describe('sizeVerdictLine — 규정을 옮기는 것과 판단을 돕는 것은
   it('받아 주면 반려견 이름과 크기를 넣어 말한다', () => {
     const line = sizeVerdictLine(petInfo, '몽실이', 'SMALL', '소형견')
 
-    expect(line).toBe(
-      messages.place.detailPetSizeAllowed.replace('{name}', '몽실이').replace('{size}', '소형견'),
-    )
+    // 템플릿을 다시 조립해 비교하지 않는다 — 치환자 이름이 바뀌면 `.replace` 가 조용히
+    // 아무것도 안 해 **템플릿을 템플릿과 비교하는** 통과가 된다. 조사까지 글자로 적는다 (#558)
+    expect(line).toBe('몽실이(소형견)은 들어갈 수 있어요.')
   })
 
   it('SMALL_ONLY 에 대형견이면 들어가기 어렵다고 말한다', () => {
@@ -83,9 +83,7 @@ describe('sizeVerdictLine — 규정을 옮기는 것과 판단을 돕는 것은
       '대형견',
     )
 
-    expect(line).toBe(
-      messages.place.detailPetSizeBlocked.replace('{name}', '초코').replace('{size}', '대형견'),
-    )
+    expect(line).toBe('초코(대형견)은 들어가기 어려울 수 있어요.')
   })
 
   it('UNKNOWN 을 "불가" 로 말하지 않는다 — 판단할 수 없다고만 말한다', () => {

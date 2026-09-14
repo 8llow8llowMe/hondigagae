@@ -3,6 +3,7 @@ import { MetricBadge } from '@/components/metric'
 import { messages } from '@/lib/messages'
 import { petSizeVerdict } from '@/lib/place/pet-size'
 import { toPlainText } from '@/lib/place/text'
+import { withParenthesizedParticle, withTopicParticle } from '@/lib/text/korean'
 import { cn } from '@/lib/utils/cn'
 import type { EnumMetadata } from '@/types/api'
 import type { PlacePetInfo } from '@/types/place'
@@ -215,5 +216,10 @@ export function sizeVerdictLine(
       ? messages.place.detailPetSizeAllowed
       : messages.place.detailPetSizeBlocked
 
-  return template.replace('{name}', petName).replace('{size}', petSizeName)
+  // 조사는 **괄호 안 크기 이름**의 받침을 본다 (`withParenthesizedParticle` 주석).
+  // 판정 대상을 화제로 올리는 문장이라 주격(이/가)이 아니라 주제격(은/는)이다
+  return template.replace(
+    '{nameWithSize}',
+    withParenthesizedParticle(petName, petSizeName, withTopicParticle),
+  )
 }

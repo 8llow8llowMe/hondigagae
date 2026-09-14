@@ -64,8 +64,18 @@ export const placeMessages = {
     '실내 여부가 확인되지 않은 곳은 실내만·야외만에 나오지 않아요. 전체에서만 볼 수 있어요.',
 
   filterPetSizeLabel: '견종 크기 제한',
-  /** `{name}` · `{size}` 를 치환한다 — 화자를 반려견으로 유지한다 (아트보드 02) */
-  filterPetSizeLabelFor: '{name}({size})가 들어갈 수 있는 곳만',
+  /**
+   * 화자를 반려견으로 유지한다 (아트보드 02).
+   *
+   * **`{nameWithSize}` 한 자리에 `이름(크기)+조사` 를 통째로 넣는다 —
+   * `withParenthesizedParticle(name, size, withSubjectParticle)`.** 예전에는
+   * `{name}({size})가` 로 조사를 박아 두었는데, `{size}` 는 서버 metadata 의 이름이라
+   * **소형견·중형견·대형견 셋 다 받침으로 끝난다** — 즉 `가` 는 모든 경우에 비문이었다
+   * ("갱얼쥐(소형견)**가**"). 조사 자리를 치환값 안으로 들여야 헬퍼가 닿는다.
+   *
+   * **받침 판정 기준은 괄호 안이다** — 근거는 `withParenthesizedParticle` 주석.
+   */
+  filterPetSizeLabelFor: '{nameWithSize} 들어갈 수 있는 곳만',
   filterPetSizeHint: '선택한 반려견 기준으로 걸러요. 반려견을 바꾸면 결과도 바뀝니다.',
   /**
    * 체중을 아는 아이면 그 기준까지 쓴다는 것을 밝힌다 — `{weight}` 치환.
@@ -298,10 +308,16 @@ export const placeMessages = {
 
   /**
    * 규정을 옮기는 것과 판단을 돕는 것의 차이 — 아트보드가 "몽실이는 소형견이라 해당하지
-   * 않아요" 까지 쓴다. `{name}` · `{size}` 치환.
+   * 않아요" 까지 쓴다.
+   *
+   * **`{nameWithSize}` 한 자리에 `이름(크기)+조사` 를 통째로 넣는다 —
+   * `withParenthesizedParticle(name, size, withTopicParticle)`.** `filterPetSizeLabelFor` 와
+   * 같은 이유다: `{size}` 가 늘 받침으로 끝나 박아 둔 `는` 이 모든 경우에 비문이었다
+   * ("갱얼쥐(소형견)**는**"). **주격(이/가)이 아니라 주제격(은/는)이다** — 판정 대상을
+   * 화제로 올리는 문장이다 (`withTopicParticle` 주석).
    */
-  detailPetSizeAllowed: '{name}({size})는 들어갈 수 있어요.',
-  detailPetSizeBlocked: '{name}({size})는 들어가기 어려울 수 있어요.',
+  detailPetSizeAllowed: '{nameWithSize} 들어갈 수 있어요.',
+  detailPetSizeBlocked: '{nameWithSize} 들어가기 어려울 수 있어요.',
   /** **`UNKNOWN` 은 "불가" 가 아니라 "모름" 이다** (backend `AllowedPetSize#allows`) */
   detailPetSizeUnknown: '동반 가능 크기가 등록되지 않아 {name} 기준으로 판단할 수 없어요.',
 
