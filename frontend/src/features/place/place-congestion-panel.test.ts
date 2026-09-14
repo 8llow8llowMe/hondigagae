@@ -147,4 +147,27 @@ describe('PlaceCongestionPanel — 기간', () => {
     expect(markup).toContain(messages.place.detailCongestionCollapse)
     expect(markup).toContain(messages.place.detailCongestionExtendedNote)
   })
+
+  /*
+    **`scroll-rail` 은 장식이 아니라 가로 넘침의 유일한 방어막이다** (#603).
+
+    날짜 칸마다 붙는 `sr-only` 라벨은 `position: absolute` 다. 스크롤러가 `position: static`
+    이면 그 30개의 컨테이닝 블록이 스크롤러가 아니라 **바깥의 positioned 조상**이 된다 —
+    스크롤러가 자기 내용을 클립하고 있어도 저것들은 클립되지 않고, 정적 위치가 조상의
+    `scrollWidth` 로 그대로 샌다.
+
+    실측(`/places/126434` 30일 보기): 1440 에서 좌측 판정 레일이 가로로 770px 스크롤됐고
+    (`scrollWidth` 1164 / `clientWidth` 394), 390 에서는 페이지가 통째로 넘쳤다
+    (`documentElement.scrollWidth` 390 → 1135). DESIGN.md §7 이 버그로 못박은 그 증상이다.
+
+    `.scroll-rail` 이 `position: relative` 로 기준면을 되돌리고 `contain: layout` 으로 남은
+    전파를 끊는다 — 홈 곡선에서 같은 것을 겪고 `app/globals.css` 에 적어 둔 처방이다.
+
+    **문자열 assertion 은 클래스가 붙었는지까지만 잠근다.** 실제 넘침은
+    `e2e/place-congestion.spec.ts` 가 잰다.
+  */
+  it('30일 레일에만 scroll-rail 을 준다 — sr-only 라벨이 조상으로 새지 않게', () => {
+    expect(render({ days: CONGESTION_DAYS.extended })).toContain('scroll-rail')
+    expect(render()).not.toContain('scroll-rail')
+  })
 })
