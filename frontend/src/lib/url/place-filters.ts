@@ -1,3 +1,4 @@
+import { normalizeKeyword } from '@/lib/url/keyword'
 import { PET_SIZE_CODES } from '@/types/pet'
 import {
   ALLOWED_PET_SIZE_CODES,
@@ -73,23 +74,6 @@ function readWeight(value: string | null): number | null {
 
 function readText(value: string | null): string | null {
   return value !== null && value.trim() !== '' ? value.trim() : null
-}
-
-/**
- * 백엔드 `keyword` 최대 길이 (#421). **검색 입력도 이 값을 쓴다** (#431) — 두 곳이 각자
- * 적어 두면 입력이 허용한 길이를 URL 이 조용히 버리는 짝이 생긴다.
- */
-export const KEYWORD_MAX_LENGTH = 50
-
-/**
- * 검색어 정규화 — **URL 읽기와 검색 입력이 같은 규칙을 쓴다** (#431).
- *
- * 공백만 있으면 "검색어 없음" 이다 (백엔드도 공백/빈 값을 필터 없음으로 본다).
- * **최대 길이를 넘으면 버린다** — 그대로 보내면 400 이라, 조건 없이 보여 주는 쪽이 낫다.
- */
-export function normalizeKeyword(value: string | null): string | null {
-  const text = readText(value)
-  return text !== null && text.length <= KEYWORD_MAX_LENGTH ? text : null
 }
 
 export function parsePlaceFilters(params: RawParams): PlaceFilters {

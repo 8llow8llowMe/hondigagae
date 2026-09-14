@@ -1,4 +1,5 @@
 import { DEFAULT_RADIUS_METERS, MAX_RADIUS_METERS } from '@/lib/api/emergency'
+import { normalizeKeyword } from '@/lib/url/keyword'
 import {
   DEFAULT_FACILITY_FILTERS,
   FACILITY_TYPE_CODES,
@@ -11,8 +12,10 @@ import {
  *
  * 규약 (docs/architecture-guide.md §10)
  *  - 키 이름은 백엔드 파라미터 이름과 같게 둔다 (`radius`). 화면에서만 좁히는 축
- *    (`type` · `open24Only` · `openNowOnly`)은 보낼 서버 파라미터가 없으므로
- *    `FacilityFilters` 의 필드명을 그대로 쓴다
+ *    (`type` · `open24Only` · `openNowOnly` · `keyword`)은 보낼 서버 파라미터가 없으므로
+ *    `FacilityFilters` 의 필드명을 그대로 쓴다. **`keyword` 는 `/places` 와 같은 키다**
+ *    (#584) — 이 화면은 화면에서 좁히고 저쪽은 서버로 보내지만, 같은 뜻의 값이 화면마다
+ *    다른 키로 URL 에 실리면 주소를 손으로 고치는 사용자가 매번 다시 배워야 한다
  *  - 기본값은 URL 에서 생략한다 → 빈 URL = 기본 상태
  *  - 잘못된 값은 예외를 던지지 않고 기본값으로 떨어뜨린다 (URL 은 사용자가 손으로 고친다)
  *  - `view` 는 이 모듈이 읽지도 쓰지도 않는다 — `lib/url/view-mode.ts` 소유다.
@@ -90,6 +93,8 @@ export function parseEmergencyBoardParams(params: RawParams): EmergencyBoardPara
       type: readFacilityType(read(params, 'type')),
       open24Only: readFlag(read(params, 'open24Only')),
       openNowOnly: readFlag(read(params, 'openNowOnly')),
+      // 정규화는 `/places` 와 같은 한 곳을 쓴다 (`lib/url/keyword.ts`)
+      keyword: normalizeKeyword(read(params, 'keyword')),
     },
     radius: readRadius(read(params, 'radius')),
   }
@@ -102,6 +107,7 @@ export function toEmergencyBoardQuery({ filters, radius }: EmergencyBoardParams)
   if (filters.type !== null) params.set('type', filters.type)
   if (filters.open24Only) params.set('open24Only', 'true')
   if (filters.openNowOnly) params.set('openNowOnly', 'true')
+  if (filters.keyword !== null) params.set('keyword', filters.keyword)
   if (radius !== DEFAULT_RADIUS_METERS) params.set('radius', String(radius))
 
   return params.toString()

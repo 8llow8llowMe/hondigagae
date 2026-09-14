@@ -5,13 +5,19 @@ import { Surface, SurfaceStack } from '@/components/surface'
 import { ViewToggle } from '@/components/view-toggle'
 import { EmergencyFilterChips } from '@/features/emergency/emergency-filter-chips'
 import { EmergencyFilterRail } from '@/features/emergency/emergency-filter-rail'
+import { EmergencySearchField } from '@/features/emergency/emergency-search-field'
 import { EmergencySection } from '@/features/emergency/emergency-section'
 import { emergencySummaryLine } from '@/features/emergency/emergency-summary-line'
-import { countsAreComplete, facilityCounts } from '@/features/emergency/facility-filters'
+import {
+  countsAreComplete,
+  facilityCounts,
+  narrowByKeyword,
+} from '@/features/emergency/facility-filters'
 import { type EmergencyBoard, useEmergencyBoard } from '@/features/emergency/use-emergency-board'
 import { toErrorStatus } from '@/lib/api/error'
 import { messages } from '@/lib/messages'
-import type { Inset } from '@/lib/ui/inset'
+import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 
 /**
  * 건너뛰기 링크의 목적지 — 레일 맨 앞 링크와 `SurfaceStack` 의 `id` 가 같은 값을 써야
@@ -50,7 +56,12 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
     조회가 끝날 때 화면이 튀지 않는다. 그때 셀 배열이 없으므로 개수는 0 이고,
     `showCounts` 가 false 라 라벨에서 숫자가 빠진다 — 0 을 사실처럼 적지 않는다.
   */
-  const counts = facilityCounts(result?.facilities ?? [])
+  /*
+    **검색어까지 좁힌 뒤에 센다** (#584). 칩 개수는 "그 칩만 눌렀을 때" 의 수인데, 검색어는
+    칩이 아니라 범위라 빼고 세면 검색 중에 칩이 반경 전량의 수를 말한다 — 눌러서 나오는
+    결과와 어긋난다 (`facilityCounts` 머리주석).
+  */
+  const counts = facilityCounts(narrowByKeyword(result?.facilities ?? [], board.filters.keyword))
   // 잘린 목록에서 센 개수는 전체가 아니다 — 틀린 개수는 없는 개수보다 나쁘다
   const showCounts = result !== null && countsAreComplete(result)
 
@@ -125,16 +136,31 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
           trailing={
             <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
           }
+          /*
+            **검색은 `lg:hidden` 이 아니다** (#584). 아래 칩 줄은 레일이 같은 축을 두 번
+            보여주지 않도록 데스크톱에서 숨지만, 검색은 레일에 짝이 없다 — 레일에 넣으면
+            1024 미만에서 통째로 사라진다 (`EmergencySearchField` 머리주석).
+
+            **도구는 머리의 좌우 여백 밖이라 인셋을 스스로 든다** (`Surface` 머리주석).
+            아래 여백은 칩 줄의 `py-3` 과 머리 래퍼의 `pb-3` 이 진다.
+          */
           tools={
-            <EmergencyFilterChips
-              filters={board.filters}
-              onFiltersChange={board.setFilters}
-              radius={board.radius}
-              onRadiusChange={board.setRadius}
-              counts={counts}
-              showCounts={showCounts}
-              className="lg:hidden"
-            />
+            <>
+              <EmergencySearchField
+                filters={board.filters}
+                onFiltersChange={board.setFilters}
+                className={cn('pt-3', INSET_CLASS.card)}
+              />
+              <EmergencyFilterChips
+                filters={board.filters}
+                onFiltersChange={board.setFilters}
+                radius={board.radius}
+                onRadiusChange={board.setRadius}
+                counts={counts}
+                showCounts={showCounts}
+                className="lg:hidden"
+              />
+            </>
           }
         >
           {/* 카드가 `h2` 를 되찾았으므로 상태 제목이 한 단 내려간다 (#456① · #556) */}

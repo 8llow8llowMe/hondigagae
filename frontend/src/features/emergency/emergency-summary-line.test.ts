@@ -22,6 +22,25 @@ describe('emergencySummaryLine — 데스크톱 부제 (#419)', () => {
   })
 
   /*
+    **검색어는 이 줄에 넣지 않는다** (#584). 이 부제는 데스크톱에서만 그려지는데, 바로
+    아래 검색 입력이 같은 폭에서 그 글자를 이미 들고 있다 — 부제에 또 적으면 같은 말이
+    두 번이다.
+
+    **형제 화면과 반대 결정이라 잠근다.** `/places` 의 `filterSummaryLine` 은 `keyword` 를
+    넣는데(거기는 검색 입력이 본문 열에 있고 부제는 레일 밖이다) 이쪽은 뺐다. 근거 없이
+    둘을 맞추려는 변경이 조용히 들어오지 않게 여기서 막는다.
+  */
+  it('검색어가 걸려도 줄이 변하지 않는다', () => {
+    const withKeyword = emergencySummaryLine(
+      { ...DEFAULT_FACILITY_FILTERS, keyword: '한라' },
+      10000,
+    )
+
+    expect(withKeyword).toBe(emergencySummaryLine(DEFAULT_FACILITY_FILTERS, 10000))
+    expect(withKeyword).not.toContain('한라')
+  })
+
+  /*
     **반경은 항상 첫 자리다.** 이 화면에서 "무엇을 보고 있는가" 의 뼈대가 반경이고,
     조건은 그 안을 좁힌다. 순서가 조건에 따라 흔들리면 눈이 매번 다시 훑어야 한다.
   */

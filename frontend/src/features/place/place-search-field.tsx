@@ -7,7 +7,7 @@ import { Input } from '@/components/input'
 import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
-import { KEYWORD_MAX_LENGTH, normalizeKeyword } from '@/lib/url/place-filters'
+import { KEYWORD_MAX_LENGTH, normalizeKeyword } from '@/lib/url/keyword'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceFilters } from '@/types/place'
 

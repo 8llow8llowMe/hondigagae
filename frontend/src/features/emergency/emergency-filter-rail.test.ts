@@ -55,6 +55,14 @@ describe('EmergencyFilterRail — 데스크톱 필터 레일 (#419)', () => {
     expect(markup).not.toContain('초기화')
   })
 
+  /*
+    **레일에는 검색 입력이 없지만 `초기화` 는 검색어까지 지운다** (#584). `dirty` 가
+    검색어를 모르면 검색어만 걸린 상태에서 버튼이 사라져, 되돌릴 것이 남았는데 손잡이가 없다.
+  */
+  it('검색어만 걸려 있어도 초기화가 나온다', () => {
+    expect(render({ ...DEFAULT_FACILITY_FILTERS, keyword: '한라' })).toContain('초기화')
+  })
+
   /* 레일 인셋 규약(`.filter-rail`)을 타는 컨테이너여야 왼쪽 기준선 40 에 선다 (#386) */
   it('filter-rail 컨테이너를 쓴다', () => {
     expect(render(DEFAULT_FACILITY_FILTERS)).toContain('filter-rail')

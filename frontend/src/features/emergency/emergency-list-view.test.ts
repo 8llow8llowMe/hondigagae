@@ -133,6 +133,29 @@ describe('목록 갈래는 3층 표면이다 (#460)', () => {
     expect(view.slice(chips)).toMatch(/className="lg:hidden"/)
   })
 
+  /*
+    **검색은 같은 `tools` 슬롯이지만 `lg:hidden` 이 아니다** (#584).
+
+    칩은 레일이 같은 축을 두 번 보여주지 않도록 데스크톱에서 숨지만 **검색은 레일에 짝이
+    없다** — 레일(`hidden lg:block`)에 넣으면 1024 미만에서 통째로 사라진다. 이 화면에서
+    가장 다툴 만한 결정이고(이슈 본문은 "필터 레일과 모바일 필터 시트" 를 적었다),
+    `className="lg:hidden"` 한 줄이면 조용히 뒤집힌다.
+  */
+  it('검색이 tools 슬롯 안에서 칩보다 위에 서고 lg 에서 숨지 않는다', () => {
+    const view = block(listView, 'EmergencyListView')
+    const tools = view.indexOf('tools={')
+    const search = view.indexOf('<EmergencySearchField')
+    const chips = view.indexOf('<EmergencyFilterChips')
+
+    expect(search).toBeGreaterThan(tools)
+    expect(chips).toBeGreaterThan(search)
+
+    const tag = view.slice(search, view.indexOf('/>', search))
+    expect(tag).not.toContain('lg:hidden')
+    // 카드 머리는 좌우 여백 밖이라 도구가 인셋을 스스로 든다 (`Surface` 머리주석)
+    expect(tag).toContain('INSET_CLASS.card')
+  })
+
   /* 반경 축이 모바일에도 올라왔다 (#537) — 데스크톱 레일만 갖고 있던 손잡이다 */
   it('모바일 칩이 반경 축을 보드에서 받는다', () => {
     const view = block(listView, 'EmergencyListView')
@@ -195,6 +218,21 @@ describe('폴백 갈래는 레일도 카드도 얻지 않는다 (#419 · #460)',
     expect(fallback).not.toMatch(/<EmergencyFilterChips[\s\S]*?className="[^"]*border/)
   })
 
+  /*
+    **폴백에도 검색이 남는다** (#584). 이 갈래는 목록 갈래를 통째로 대체하므로, 검색을
+    빼면 `?keyword=` 를 달고 들어온 사용자가 그것을 지울 방법이 없다 —
+    `EmergencyFilterChips` 에는 `초기화` 가 없고 0건일 때의 완화 버튼뿐이다.
+  */
+  it('폴백에 검색이 남고 lg:hidden 이 아니다', () => {
+    const search = fallback.indexOf('<EmergencySearchField')
+    expect(search).toBeGreaterThan(-1)
+
+    const tag = fallback.slice(search, fallback.indexOf('/>', search))
+    expect(tag).not.toContain('lg:hidden')
+    // 카드 없는 페이지라 인셋은 칩·목록과 같은 `main` 이다
+    expect(tag).toContain('INSET_CLASS.main')
+  })
+
   /* 폴백에는 레일이 없다 — 칩을 lg 에서 숨기면 데스크톱이 필터를 통째로 잃는다 */
   it('폴백의 칩은 lg:hidden 이 아니다', () => {
     const chips = fallback.slice(fallback.indexOf('<EmergencyFilterChips'))
@@ -254,5 +292,58 @@ describe('제목이 필터보다 먼저다 (#546)', () => {
   it('우측 스택이 list-column 이고 카드가 fill 이다', () => {
     expect(view).toMatch(/<SurfaceStack[^>]*className="list-column"/)
     expect(view).toMatch(/<Surface\s+fill/)
+  })
+})
+
+/*
+  **지도 갈래의 검색 자리** — 이슈 #584.
+
+  `/places`(#431)가 "지도 갈래에는 두지 않는다" 로 접었던 결정을 뒤집은 자리라, 무엇을
+  근거로 뒤집었고 자리가 왜 둘인지가 소스에 남아야 한다. 두 자리는 **동시에 렌더되고
+  CSS 로만 갈린다** — `/places` 지도가 패널과 시트를 그렇게 두는 것과 같다.
+*/
+describe('지도 갈래는 검색을 두 자리에 둔다 (#584)', () => {
+  /* 오버레이는 지도 위 떠 있는 줄, 패널은 그 뒤 — `map-panel-width` 가 경계다 */
+  const overlay = mapView.slice(
+    mapView.indexOf('pointer-events-none absolute inset-x-0 top-5'),
+    mapView.indexOf('map-panel-width'),
+  )
+
+  /* 1024 미만 전용 — 그 위는 좌측 패널이 같은 일을 한다. 둘 다 그리면 검색창이 둘이다 */
+  it('오버레이 검색은 보기 토글보다 앞이고 lg 에서 숨는다', () => {
+    const search = overlay.indexOf('<EmergencySearchField')
+    const toggle = overlay.indexOf('<ViewToggle')
+
+    expect(search).toBeGreaterThan(-1)
+    expect(toggle).toBeGreaterThan(search)
+
+    const tag = overlay.slice(search, overlay.indexOf('/>', search))
+    expect(tag).toContain('lg:hidden')
+    // 375 에 245 밖에 없다 — 글자 버튼이면 입력이 177 로 줄어 placeholder 가 잘린다
+    expect(tag).toContain('compact')
+    // 768 에서 538 로 벌어지지 않게 상한을 둔다
+    expect(tag).toContain('max-w-md')
+  })
+
+  /* 패널 툴바 안쪽이 374 라 목록 갈래 모바일 검색(343)보다 넓다 — 줄일 이유가 없다 */
+  it('패널 검색은 필터바보다 위이고 compact 가 아니다', () => {
+    const panel = mapView.slice(mapView.indexOf('map-panel-width'))
+    const search = panel.indexOf('<EmergencySearchField')
+    const toolbar = panel.indexOf('{toolbar}')
+
+    expect(search).toBeGreaterThan(-1)
+    expect(toolbar).toBeGreaterThan(search)
+
+    const tag = panel.slice(search, panel.indexOf('/>', search))
+    expect(tag).not.toContain('compact')
+  })
+
+  /*
+    **두 검색이 동시에 문서에 있다** — 같은 `id` 면 `htmlFor` 가 어느 입력을 가리키는지
+    문서가 정하지 못하고, 보조기기가 라벨 없는 입력을 하나 보게 된다.
+  */
+  it('두 자리의 입력 id 가 다르다', () => {
+    expect(mapView).toContain('id="emergency-keyword-map"')
+    expect(mapView).toContain('id="emergency-keyword-panel"')
   })
 })

@@ -14,10 +14,12 @@ import { EmergencyFilterChips } from '@/features/emergency/emergency-filter-chip
 import { EmergencyBoardSection } from '@/features/emergency/emergency-list-view'
 import { EmergencyMapPanel } from '@/features/emergency/emergency-map-panel'
 import { EmergencyMapSkeleton } from '@/features/emergency/emergency-map-skeleton'
+import { EmergencySearchField } from '@/features/emergency/emergency-search-field'
 import {
   applyFilters,
   countsAreComplete,
   facilityCounts,
+  narrowByKeyword,
   reliefLabel,
   reliefs,
 } from '@/features/emergency/facility-filters'
@@ -322,13 +324,29 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
           같은 L0 위 스트립 규약이다.
 
           개수는 **반경 전량**을 센다 — 지도 없이 목록만 있으니 목록 갈래와 같은 기준이다.
+          단 검색어까지는 먼저 좁힌다 (#584) — 검색어는 축이 아니라 범위다
+          (`facilityCounts` 머리주석).
         */}
+        {/*
+          **검색도 이 갈래에 남아야 한다** (#584). 이 폴백은 카카오 키 도메인이 안 맞을 때
+          **항상** 오는 경로라 예외가 아니고(E5), 여기서는 목록 갈래가 통째로 대체된다 —
+          입력을 빼면 `?keyword=` 를 달고 들어온 사용자가 그것을 지울 방법이 없다
+          (`EmergencyFilterChips` 에는 `초기화` 가 없고, 0건일 때의 완화 버튼뿐이다).
+          지도 갈래에 검색을 두지 않는다는 판단은 **지도가 실제로 그려질 때**의 이야기다.
+
+          인셋은 아래 칩·목록과 같은 페이지 값 `main` 이다.
+        */}
+        <EmergencySearchField
+          filters={board.filters}
+          onFiltersChange={board.setFilters}
+          className={cn('pt-3', INSET_CLASS.main)}
+        />
         <EmergencyFilterChips
           filters={board.filters}
           onFiltersChange={board.setFilters}
           radius={board.radius}
           onRadiusChange={board.setRadius}
-          counts={facilityCounts(inRadius)}
+          counts={facilityCounts(narrowByKeyword(inRadius, board.filters.keyword))}
           showCounts={board.query.data !== undefined && countsAreComplete(board.query.data)}
           inset="main"
           divider
@@ -383,7 +401,8 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
 
   const toolbar = (
     <EmergencyFilterBar
-      facilities={inBounds}
+      /* 검색어까지 좁힌 뒤 세게 한다 (#584) — 검색어는 축이 아니라 범위다 */
+      facilities={narrowByKeyword(inBounds, board.filters.keyword)}
       filters={board.filters}
       onFiltersChange={board.setFilters}
       radius={board.radius}
@@ -448,8 +467,30 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         보기에서 다른 자리에 선다. 근거와 실측은 `place-map-view.tsx` 의 같은 자리에 있다.
       */}
       <div className="pointer-events-none absolute inset-x-0 top-5 z-30 lg:top-6">
-        <div className="content-container flex justify-end px-4 md:px-10">
-          <div className="pointer-events-auto flex flex-col items-end gap-2">
+        <div className="content-container flex items-start justify-end gap-2 px-4 md:px-10">
+          {/*
+            **검색은 토글 **왼쪽**, 1024 미만에서만** (#584). 그 위는 좌측 패널 머리가
+            같은 일을 하고(아래), 둘 다 그리면 데스크톱 지도에 검색창이 둘이 된다.
+
+            **`flex-1 min-w-0` 이라 남는 폭을 전부 먹는다** — 토글·내 위치 버튼은
+            `shrink-0` 로 자기 크기를 지키므로, 375 에서 245 / 768 에서 590 이 검색 몫이다.
+            `items-start` 는 검색(44)과 토글 묶음(토글 44 + 내 위치 44)의 **윗변**을 맞춘다:
+            `items-end` 면 검색이 내 위치 버튼 옆까지 내려간다.
+          */}
+          <EmergencySearchField
+            filters={board.filters}
+            onFiltersChange={board.setFilters}
+            compact
+            id="emergency-keyword-map"
+            /*
+              **`max-w-md` 로 상한을 둔다.** 768 실측에서 상한이 없으면 입력이 538px 로
+              벌어져, 짧은 placeholder 하나를 담고 지도를 가로로 길게 가린다. 375 에서는
+              `flex-1` 이 준 245 가 상한보다 작아 그대로다 — 좁은 쪽은 손대지 않는다.
+            */
+            className="pointer-events-auto max-w-md min-w-0 flex-1 lg:hidden"
+          />
+
+          <div className="pointer-events-auto flex shrink-0 flex-col items-end gap-2">
             <ViewToggle
               current="map"
               listHref={listHref}
@@ -477,6 +518,23 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
           // 접기 탭이 패널 밖으로 튀어나오므로 여기서 자르지 않는다
           <div className="relative h-full">
             <div className="bg-bg border-border flex h-full w-full flex-col overflow-hidden rounded-xl rounded-tr-none border shadow-lg">
+              {/*
+                **검색이 패널 맨 위다** (#584) — 목록 갈래가 검색을 칩 위에 두는 것과 같은
+                순서다. 검색어는 축이 아니라 **범위**이고 칩은 그 안을 좁힌다
+                (`facility-filters.ts` 의 `narrowByKeyword`).
+
+                **`compact` 가 아니다.** 이 패널 툴바 안쪽은 374px 로 목록 갈래의 모바일
+                검색(343px)보다 넓다 — 글자 버튼이 들어가는 자리에서 아이콘으로 줄이면
+                같은 컨트롤이 화면마다 다른 이유 없이 갈린다. 오버레이만 자리가 없다.
+              */}
+              <div className="border-border border-b px-3 py-2">
+                <EmergencySearchField
+                  filters={board.filters}
+                  onFiltersChange={board.setFilters}
+                  id="emergency-keyword-panel"
+                />
+              </div>
+
               <div className="border-border border-b px-3 py-2">{toolbar}</div>
 
               {board.fallback !== null && (
@@ -597,9 +655,25 @@ function PanelBody({
   if (visible.length === 0) {
     const options = reliefs(inBounds, board.filters)
 
+    /* 무엇으로 찾았는지 되돌려 준다 (#584) — `EmergencySection` 의 0건과 같은 규칙이다 */
+    const title =
+      board.filters.keyword === null
+        ? messages.emergency.narrowedTitle
+        : messages.emergency.searchNarrowedTitle.replace('{keyword}', board.filters.keyword)
+
+    /* 잘린 목록에서 "없어요" 를 확언하지 않는다 — `EmergencySection` 과 같은 규칙 (#584) */
+    const truncated = board.query.data !== undefined && !countsAreComplete(board.query.data)
+
     return (
       <div className="flex flex-col items-start gap-2 px-4 py-6">
-        <h3 className="text-title-2 text-fg font-semibold">{messages.emergency.narrowedTitle}</h3>
+        <h3 className="text-title-2 text-fg font-semibold">{title}</h3>
+
+        {truncated && board.filters.keyword !== null && (
+          <p className="text-body-2 text-fg-muted break-keep">
+            {messages.emergency.searchTruncatedNote}
+          </p>
+        )}
+
         <div className="mt-1 flex flex-wrap gap-2">
           {options.map((option) => (
             <Button

@@ -38,10 +38,16 @@ export function EmergencyFilterRail({
   }
   showCounts: boolean
 }) {
+  /*
+    **검색어도 `dirty` 다** (#584). 레일에는 검색 입력이 없지만 `초기화` 는
+    `DEFAULT_FACILITY_FILTERS` 로 통째로 되돌아가 검색어까지 지운다 — 그 사실을 `dirty` 가
+    모르면 검색어만 걸린 상태에서 버튼이 사라져, 되돌릴 것이 남았는데 손잡이가 없다.
+  */
   const dirty =
     filters.type !== DEFAULT_FACILITY_FILTERS.type ||
     filters.open24Only !== DEFAULT_FACILITY_FILTERS.open24Only ||
-    filters.openNowOnly !== DEFAULT_FACILITY_FILTERS.openNowOnly
+    filters.openNowOnly !== DEFAULT_FACILITY_FILTERS.openNowOnly ||
+    filters.keyword !== DEFAULT_FACILITY_FILTERS.keyword
 
   return (
     <div className="filter-rail pb-5">
