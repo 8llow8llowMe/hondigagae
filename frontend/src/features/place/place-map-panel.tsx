@@ -84,10 +84,22 @@ export function PlaceMapPanel({
                   12px 라 실측 폭이 28.8px 였다 — 세로만 `h-11` 로 잡고 가로를 비워 둔
                   탓이다. DESIGN.md §7 의 최소 터치 영역은 **44×44** 로 두 축 모두다.
                 */}
+                {/*
+                  **버튼 모양이다** (이슈 #553). 예전에는 글자뿐(`text-link`)이라 바로 아래
+                  `담기`(`Button variant="secondary"`)와 나란히 섰을 때 **한쪽만 버튼처럼
+                  보였다** — 같은 열에서 같은 무게로 고르는 두 갈래인데 한쪽은 링크, 한쪽은
+                  버튼이라 위계가 없는 곳에 위계가 생겼다.
+
+                  **`ButtonLink` 로 바꾸지 않는다.** 그 컴포넌트는 `iconOnly` 가 아니면
+                  `aria-label` 을 버린다(타입이 막는다). 목록 안의 `상세` 는 낱말만으로는
+                  어느 장소인지 말하지 못해 이름이 반드시 필요하다. 그래서 모양만
+                  `VARIANT.secondary` + `SIZE.md` 와 같은 값으로 맞춘다 — 두 버튼이 갈리면
+                  같은 열에서 테두리 색과 높이가 어긋난다.
+                */}
                 <Link
                   href={`/places/${place.placeId}`}
                   aria-label={messages.map.rowDetailLabel.replace('{title}', place.title)}
-                  className="text-caption text-link hover:text-link-hover focus-visible:ring-brand-500 flex h-11 min-w-11 items-center justify-center rounded-md px-1 font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                  className="border-border-strong bg-bg text-fg hover:bg-band text-body-1 focus-visible:ring-brand-500 flex h-11 min-w-11 items-center justify-center rounded-md border px-4 font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                 >
                   {messages.map.rowDetail}
                 </Link>
