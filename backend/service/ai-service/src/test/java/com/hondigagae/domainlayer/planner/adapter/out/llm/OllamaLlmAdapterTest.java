@@ -413,6 +413,65 @@ class OllamaLlmAdapterTest {
         assertThat(draft.reasons().get(0).description()).isEqualTo("2~3일차 강수확률 80%라 실내 위주");
     }
 
+    /*
+     * #570. 조사 교정이 `note`·`reason` 에 **실제로 걸려 있는지** 본다. 단위 테스트
+     * (`KoreanParticleFixerTest`)만으로는 `cleanUserFacing` 호출 한 줄이 빠져도 초록이다.
+     */
+    @Test
+    @DisplayName("장소명 뒤에 잘못 붙은 조사를 근거·메모에서 바로잡는다 (#570)")
+    void fixesParticlesAfterCandidateTitles() {
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"PLACE","placeId":100,"title":"제주 애월코스트34","note":"제주 애월코스트34은 숙소예요"}]}],
+             "reasons":[{"code":"PET_OK","name":"동반 가능",
+                         "description":"제주 애월코스트34은 소형견만 가능해요"}]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "제주 애월코스트34")));
+
+        assertThat(draft.days().get(0).items().get(0).note()).isEqualTo("제주 애월코스트34는 숙소예요");
+        assertThat(draft.reasons().get(0).description()).isEqualTo("제주 애월코스트34는 소형견만 가능해요");
+    }
+
+    @Test
+    @DisplayName("같은 장소가 여러 날에 걸치면 경고를 남긴다 (#570)")
+    void warnsWhenTheSamePlaceRepeatsAcrossDays() {
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        stubResponse("""
+            {"days":[
+              {"day":1,"items":[{"itemType":"PLACE","placeId":100,"title":"애월한담공원","note":"산책"}]},
+              {"day":2,"items":[{"itemType":"PLACE","placeId":100,"title":"애월한담공원","note":"또 산책"}]}],
+             "reasons":[]}
+            """);
+
+        adapter.generatePlanDraft(query(candidate(100L, "애월한담공원")));
+
+        assertThat(appender.list).anyMatch(event ->
+            event.getFormattedMessage().contains("same place on multiple days")
+                && event.getFormattedMessage().contains("애월한담공원"));
+    }
+
+    /*
+     * **숙소 제외가 깨지면 정상적인 2박 일정마다 경고가 남는다.** 그러면 이 로그를 "재발을 세는
+     * 자리" 로 쓰겠다는 설계가 바로 무력해진다 — 그래서 참·거짓 양쪽을 다 밟아 둔다.
+     */
+    @Test
+    @DisplayName("같은 숙소에 이어 묵는 것은 경고하지 않는다 (#570)")
+    void doesNotWarnWhenTheSameLodgingRepeats() {
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        stubResponse("""
+            {"days":[
+              {"day":1,"items":[{"itemType":"LODGING","placeId":100,"title":"제주 애월코스트34","note":"숙박"}]},
+              {"day":2,"items":[{"itemType":"LODGING","placeId":100,"title":"제주 애월코스트34","note":"숙박"}]}],
+             "reasons":[]}
+            """);
+
+        adapter.generatePlanDraft(query(candidate(100L, "제주 애월코스트34")));
+
+        assertThat(appender.list).noneMatch(event ->
+            event.getFormattedMessage().contains("same place on multiple days"));
+    }
+
     @Test
     @DisplayName("성공한 호출도 소요를 남긴다 — 전에는 실패했을 때만 남아 느린 정상 경로를 볼 수 없었다 (#489)")
     void logsTimingOnSuccess() {

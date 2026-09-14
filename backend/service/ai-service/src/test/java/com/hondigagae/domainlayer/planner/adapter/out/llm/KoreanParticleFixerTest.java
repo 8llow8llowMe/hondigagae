@@ -15,7 +15,8 @@ import org.junit.jupiter.api.Test;
 class KoreanParticleFixerTest {
 
     private static final List<String> CANDIDATES = List.of(
-        "제주 애월코스트34", "애월한담공원", "노형", "노형수목원길", "카페 1100", "Dog Cafe", "협재해수욕장");
+        "제주 애월코스트34", "애월한담공원", "노형", "노형수목원길", "카페 1100", "Dog Cafe", "협재해수욕장",
+        "카페공작소(애월점)", "블루오션 Pension");
 
     @Test
     @DisplayName("숫자로 끝나는 장소명의 조사를 바로잡는다 — dev 실측 문장")
@@ -29,9 +30,9 @@ class KoreanParticleFixerTest {
     }
 
     @Test
-    @DisplayName("숫자 읽기로 받침을 판정한다 — 1·7·8 은 ㄹ, 3·6·0 은 받침 있음, 2·4·5·9 는 없음")
+    @DisplayName("숫자 읽기로 받침을 판정한다 — 0·1·3·6·7·8 은 받침 있음, 2·4·5·9 는 없음")
     void readsDigitsAsKorean() {
-        // 1100 → "천백" 이 아니라 마지막 자리 0("영")으로 본다 — 받침 ㅇ
+        // 1100 은 "천백" 이라 ㄱ 받침이다. 끝자리 0 만 봐도 십·백·천·만 중 하나라 언제나 받침이 있다
         assertThat(KoreanParticleFixer.fix("카페 1100는 넓어요.", CANDIDATES)).isEqualTo("카페 1100은 넓어요.");
     }
 
@@ -55,14 +56,18 @@ class KoreanParticleFixerTest {
             .isEqualTo("제주 애월코스트34와 함께");
     }
 
+    /*
+     * 한국어 도로명이 문자 그대로 `<지명>+로` 라서, 지명이 후보 제목이면 `노형로 12` 의 `로` 가
+     * 조사로 잡혀 `노형으로 12` 가 된다. 뒤 글자를 보는 가드로는 막을 수 없는 구조적 충돌이라
+     * 쌍 자체를 뺐다.
+     */
     @Test
-    @DisplayName("으로/로 는 받침 ㄹ 을 따로 본다 — 공원으로 / 노형수목원길로")
-    void handlesEuroRo() {
+    @DisplayName("으로/로 는 일부러 고치지 않는다 — 도로명을 깨뜨린다")
+    void neverTouchesEuroRo() {
+        assertThat(KoreanParticleFixer.fix("제주시 노형로 12 로 가요.", CANDIDATES))
+            .isEqualTo("제주시 노형로 12 로 가요.");
         assertThat(KoreanParticleFixer.fix("애월한담공원로 이동해요.", CANDIDATES))
-            .isEqualTo("애월한담공원으로 이동해요.");
-        // "길" 은 ㄹ 받침이라 "으로" 가 아니라 "로" 다
-        assertThat(KoreanParticleFixer.fix("노형수목원길으로 걸어요.", CANDIDATES))
-            .isEqualTo("노형수목원길로 걸어요.");
+            .isEqualTo("애월한담공원로 이동해요.");
     }
 
     /*
@@ -91,11 +96,21 @@ class KoreanParticleFixerTest {
         assertThat(KoreanParticleFixer.fix(text, CANDIDATES)).isEqualTo(text);
     }
 
+    /*
+     * **이 클래스는 이미 붙어 있는 조사를 덮어쓴다.** 프론트 `korean.ts` 처럼 "판정 불가 = 받침 없음"
+     * 으로 두면, 빗나갔을 때 맞던 문장이 틀린 문장이 된다 — 고치려는 버그와 같은 종류다.
+     * `Pension` 은 읽으면 "펜션"(ㄴ 받침)이라 `은` 이 맞고, `)` 로는 아무것도 알 수 없다.
+     */
     @Test
-    @DisplayName("영문으로 끝나면 받침 없음으로 본다 — 프론트 korean.ts 와 같은 선택")
-    void treatsLatinEndingAsNoJongseong() {
+    @DisplayName("받침을 모르면 손대지 않는다 — 괄호·영문으로 끝나는 제목")
+    void leavesUndecidableEndingsAlone() {
+        assertThat(KoreanParticleFixer.fix("카페공작소(애월점)은 실내예요.", CANDIDATES))
+            .isEqualTo("카페공작소(애월점)은 실내예요.");
+        assertThat(KoreanParticleFixer.fix("블루오션 Pension은 조용해요.", CANDIDATES))
+            .isEqualTo("블루오션 Pension은 조용해요.");
+        // 반대 방향으로도 안 건드린다 — 원문을 그대로 둔다
         assertThat(KoreanParticleFixer.fix("Dog Cafe은 실내예요.", CANDIDATES))
-            .isEqualTo("Dog Cafe는 실내예요.");
+            .isEqualTo("Dog Cafe은 실내예요.");
     }
 
     @Test
