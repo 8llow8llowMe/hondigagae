@@ -273,17 +273,20 @@ gh issue close <번호> --comment "PR #<번호> 로 머지됐습니다."
 <a id="auto-close-decision"></a>
 
 **이 선택은 재검토했고 유지하기로 했다** ([#150](https://github.com/8llow8llowMe/hondigagae/issues/150)).
-근거는 아래 실측이다 — 머지된 PR 200건과 그때 열려 있던 이슈 9건을 대조했다.
+근거는 아래 실측이다 (**2026-09-14 기준**) — 머지된 PR 200건과 그때 열려 있던 이슈 9건을 대조했다.
 
 | 항목 | 값 |
 |------|-----|
 | `Issue Number: #N` 을 채운 머지 PR | 최근 100건 중 **100건** |
 | GitHub 이 인식한 자동 닫기 참조 | **0건** |
-| 머지 PR 이 참조했는데 **아직 열린** 이슈 | **5건** |
-| 그중 **부분 완료라 열려 있는 것이 맞는** 이슈 | **3건** — [#286](https://github.com/8llow8llowMe/hondigagae/issues/286) (4/5) · [#430](https://github.com/8llow8llowMe/hondigagae/issues/430) (1/9) · [#569](https://github.com/8llow8llowMe/hondigagae/issues/569) (4/5) |
+| 머지 PR 이 참조했는데 **그 시점에 열려 있던** 이슈 | **5건** |
+| 그중 **참조한 PR 이 머지된 뒤에도 열려 있어야 했던** 이슈 | **3건** — [#286](https://github.com/8llow8llowMe/hondigagae/issues/286) (PR #288 · 4/5 · B 미결) · [#430](https://github.com/8llow8llowMe/hondigagae/issues/430) (PR #527 · 1/9) · [#569](https://github.com/8llow8llowMe/hondigagae/issues/569) (PR #579 · 4/5) |
 | **정리 누락** (끝났는데 체크박스가 안 갱신됨) | **2건** — [#570](https://github.com/8llow8llowMe/hondigagae/issues/570) (PR #580) · [#596](https://github.com/8llow8llowMe/hondigagae/issues/596) (PR #597) |
 
-**도입했다면 3건이 잘못 닫혔다.** 부분 완료가 예외가 아니다 — 이슈를 화면/기능 단위로 쪼개도
+이 표는 **그 시점의 스냅숏**이다. 위 이슈들은 이후 각자 닫히거나 진행되므로, 지금 상태를 보려면
+아래 `check-issue-sync.sh` 를 돌린다.
+
+**도입했다면 3건이 그 PR 머지 시점에 잘못 닫혔다.** 부분 완료가 예외가 아니다 — 이슈를 화면/기능 단위로 쪼개도
 완료 조건 하나하나가 다 끝나는 PR 은 오히려 드물다. 위 처리 표의 두 갈래가 그 현실이고,
 자동 닫기는 그 분기를 없앤다. 잘못 닫힌 것을 되돌리는 비용이 안 닫힌 것을 닫는 비용보다 크다.
 
