@@ -55,11 +55,7 @@ test.describe('3층 표면', () => {
       test('바닥은 --bg-sunken 이고 전폭이다', async ({ page }) => {
         await page.goto(path)
         const main = page.getByRole('main')
-
-        const [bg, sunken] = await Promise.all([
-          main.evaluate((el) => getComputedStyle(el).backgroundColor),
-          token(page, '--bg-sunken'),
-        ])
+        const sunken = await token(page, '--bg-sunken')
 
         // 토큰 문자열과 계산된 rgb 를 직접 비교할 수 없다 — 같은 값을 다시 칠해 비교한다
         const sunkenRgb = await page.evaluate((value) => {
@@ -71,7 +67,13 @@ test.describe('3층 표면', () => {
           return computed
         }, sunken)
 
-        expect(bg).toBe(sunkenRgb)
+        /*
+          **`main.evaluate()` 로 읽지 않는다** (이슈 #581). `loading.tsx` 가 있는 라우트는
+          Suspense 가 풀리며 서브트리를 통째로 교체하고, 그때 먼저 해소해 둔 `main` 이
+          떨어져 나가 `getComputedStyle` 이 빈 문자열을 냈다. `toHaveCSS` 는 재시도마다
+          로케이터를 **다시 해소**하므로 그 경합이 구조적으로 사라진다.
+        */
+        await expect(main).toHaveCSS('background-color', sunkenRgb)
       })
 
       /*
@@ -336,11 +338,7 @@ test.describe('3층 표면 — not-found', () => {
         await expect(page.getByRole('heading', { name: title, level: 2 })).toBeVisible()
 
         const main = page.getByRole('main')
-
-        const [bg, sunken] = await Promise.all([
-          main.evaluate((el) => getComputedStyle(el).backgroundColor),
-          token(page, '--bg-sunken'),
-        ])
+        const sunken = await token(page, '--bg-sunken')
 
         const sunkenRgb = await page.evaluate((value) => {
           const probe = document.createElement('div')
@@ -351,7 +349,8 @@ test.describe('3층 표면 — not-found', () => {
           return computed
         }, sunken)
 
-        expect(bg).toBe(sunkenRgb)
+        // 위 §3층 표면과 같은 이유로 자동 재시도 단언을 쓴다 (#581)
+        await expect(main).toHaveCSS('background-color', sunkenRgb)
       })
 
       /*
