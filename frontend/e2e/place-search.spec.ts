@@ -38,9 +38,10 @@ test.describe('장소 검색 (#431)', () => {
   })
 
   /*
-    **보기를 바꿔도 조건이 남는다.** 지도 갈래에는 검색 입력을 두지 않았고(필터 칩·레일과
-    같은 판단), 조건은 URL 에 남아 `nearbyPlacesPath` 가 그대로 싣는다. 그 전제가 깨지면
-    목록에서 좁혀 둔 검색이 지도로 넘어갈 때 조용히 풀린다.
+    **보기를 바꿔도 조건이 남는다.** 조건은 URL 에 남아 `nearbyPlacesPath` 가 그대로
+    싣는다 — 그 전제가 깨지면 목록에서 좁혀 둔 검색이 지도로 넘어갈 때 조용히 풀린다.
+
+    **지도 갈래에도 검색 입력이 생겼다** (#596) — 아래 `지도 보기 검색` 절이 잰다.
   */
   test('지도로 넘어가도 keyword 가 남는다', async ({ page }) => {
     await page.goto(`/places?view=list&keyword=${encodeURIComponent(KEYWORD)}`)
@@ -79,5 +80,78 @@ test.describe('장소 검색 (#431)', () => {
     await page.goto('/places?view=list&keyword=존재하지않는장소이름ZZZ')
 
     await expect(page.getByRole('main')).toContainText('존재하지않는장소이름ZZZ')
+  })
+})
+
+/**
+ * 지도 보기의 검색 — 이슈 #596.
+ *
+ * #431 이 *"지도 갈래에는 두지 않는다"* 로 접었던 결정을 뒤집은 자리다. 뒤집은 이유가
+ * **지도에서 검색어가 걸린 것을 알 방법이 없다**는 것이라, 잴 것도 그것이다: `?keyword=`
+ * 를 달고 들어오면 화면이 그 글자를 되돌려 주는가, 그리고 지우는 길이 있는가.
+ *
+ * **`MOCK_API=true` 라 카카오 SDK 는 뜨지 않는다** — e2e 에서 `/places` 지도 갈래는 SDK
+ * 실패 폴백으로 떨어진다. 그 갈래에 검색이 남아야 한다는 것 자체가 #596 의 결정 하나라
+ * (폴백에는 필터 칩도 `초기화` 도 없어 검색어를 지울 길이 사라진다), 여기서 재는 것이 곧
+ * 그 결정이다. 실제 SDK 위 오버레이·패널 자리는 소스 단언이 잠근다
+ * (`src/features/place/place-map-search.test.ts`).
+ */
+test.describe('지도 보기 검색 (#596)', () => {
+  test('지도 갈래에도 검색이 있고 URL 의 검색어를 들고 있다', async ({ page }) => {
+    await page.goto(`/places?keyword=${encodeURIComponent(KEYWORD)}`)
+
+    await expect(
+      page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).first(),
+    ).toHaveValue(KEYWORD)
+  })
+
+  test('지도 갈래에서 제출하면 keyword 가 URL 에 실린다', async ({ page }) => {
+    await page.goto('/places')
+
+    /*
+      **폴백이 자리를 잡은 뒤에 친다.** SDK 실패는 지도 스켈레톤이 한 번 그려진 뒤에 오고
+      그때 서브트리가 통째로 교체된다 — 교체 전 입력에 채우면 떨어져 나간 노드에 엔터를
+      치게 되어 아무 일도 일어나지 않는다 (#581 과 같은 성질).
+    */
+    await expect(page.getByRole('main').locator('li').first()).toBeVisible()
+
+    const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).first()
+    await box.fill(KEYWORD)
+    await box.press('Enter')
+
+    await expect(page).toHaveURL(new RegExp(`keyword=${encodeURIComponent(KEYWORD)}`))
+  })
+
+  /*
+    **폴백에는 필터 칩도 `초기화` 도 없다.** 검색어를 지울 길이 이 입력 하나뿐이라,
+    비우고 제출하면 조건이 풀려야 한다 (`normalizeKeyword` 가 빈 값을 `null` 로).
+  */
+  test('검색창을 비우고 제출하면 검색어가 풀린다', async ({ page }) => {
+    await page.goto(`/places?keyword=${encodeURIComponent(KEYWORD)}`)
+
+    /*
+      **`role="status"` 만으로는 모자라다.** 안내 줄은 SDK 실패 **직후**에 뜨지만 그때
+      목록은 아직 조회 중이고, 데이터가 도착하며 서브트리가 한 번 더 그려진다 — `fill`
+      과 `press` 사이에 그 교체가 끼면 떨어져 나간 입력에 엔터를 치게 된다. 전체 스위트의
+      부하에서 실제로 났다. **행이 찬 뒤**가 진짜 안정 지점이다.
+    */
+    await expect(page.getByRole('main').locator('li').first()).toBeVisible()
+
+    const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).first()
+    await box.fill('')
+    await box.press('Enter')
+
+    await expect(page).not.toHaveURL(/keyword=/)
+  })
+
+  /*
+    **담기 화면은 켜지 않는다** — 그 화면은 목록 갈래에도 검색이 없어서, 지도에만 켜면
+    같은 화면의 두 보기가 다른 도구를 갖는다 (`PlaceMapView` 의 `searchable` 주석).
+  */
+  test('담기 화면 지도에는 검색이 없다', async ({ page }) => {
+    await page.goto('/plans/223456789012000001/days/1/add')
+
+    await expect(page.getByRole('status').first()).toBeVisible()
+    await expect(page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' })).toHaveCount(0)
   })
 })

@@ -14,6 +14,7 @@ import { MapLocateButton } from '@/features/map/map-locate-button'
 import { PlaceListSection, type PlaceListSectionProps } from '@/features/place/place-list-section'
 import { PlaceMapFilterBar } from '@/features/place/place-map-filter-bar'
 import { PlaceMapPanel } from '@/features/place/place-map-panel'
+import { PlaceSearchField } from '@/features/place/place-search-field'
 import { useNearbyPlaces } from '@/features/place/use-nearby-places'
 import { usePlaceList } from '@/features/place/use-place-list'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
@@ -29,6 +30,7 @@ import {
   type MapBounds,
 } from '@/lib/map/viewport'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceFilters, PlaceSummary } from '@/types/place'
 
@@ -59,6 +61,7 @@ export function PlaceMapView({
   filters,
   authed,
   fill = false,
+  searchable = false,
   listHref,
   mapHref,
   renderRowAction,
@@ -76,6 +79,14 @@ export function PlaceMapView({
    * `false`(기본)면 스스로 `map-canvas-height` 로 뷰포트를 채운다.
    */
   fill?: boolean | undefined
+  /**
+   * 지도 위·패널·폴백에 이름·주소 검색을 그린다 (#596). **기본은 끔이다.**
+   *
+   * `/places` 만 켠다. 담기 화면(#370)은 **목록 갈래에도 검색이 없어서**, 지도에만 켜면
+   * 같은 화면의 두 보기가 다른 도구를 갖는다 — 그 화면에 검색을 들일지는 별개 판단이라
+   * 여기서 슬쩍 결정하지 않는다.
+   */
+  searchable?: boolean | undefined
   /**
    * 지도 우상단에 떠 있는 보기 전환의 목적지. **둘 다 있어야 토글을 그린다.**
    * 헤더가 토글을 갖는 화면은 주지 않는다 — 같은 컨트롤이 두 개 뜨면 안 된다.
@@ -244,6 +255,23 @@ export function PlaceMapView({
         >
           {failureMessage(failure)}
         </p>
+
+        {/*
+          **폴백에도 검색이 남는다** (#596). 이 갈래에는 필터 칩도 `초기화` 도 없어
+          (`onResetFilters` 가 no-op 다), 검색을 빼면 `?keyword=` 를 달고 들어온 사용자가
+          그것을 지울 길이 화면에서 사라진다. 카카오 키 도메인이 안 맞을 때 **항상** 오는
+          경로라 예외가 아니다.
+
+          카드 없는 페이지라 인셋은 위 안내 줄·아래 목록과 같은 `main` 이다.
+        */}
+        {searchable && (
+          <PlaceSearchField
+            filters={filters}
+            id="place-keyword-fallback"
+            className={cn('flex items-start gap-2 py-3', INSET_CLASS.main)}
+          />
+        )}
+
         <PlaceListSection
           /*
             폴백 목록은 카드가 아니라 페이지 위다 — 카드 인셋 20 을 쓰면 위 안내 줄(40)과
@@ -256,6 +284,8 @@ export function PlaceMapView({
           errorMessage={
             listQuery.error instanceof ApiError ? listQuery.error.rawMessage : undefined
           }
+          /* 0건이면 무엇으로 찾았는지 되돌려 준다 — 목록 갈래가 같은 prop 을 넘긴다 */
+          keyword={filters.keyword}
           hasNext={listQuery.data?.pages.at(-1)?.hasNext ?? false}
           loadingMore={listQuery.isFetchingNextPage}
           onLoadMore={() => void listQuery.fetchNextPage()}
@@ -316,8 +346,28 @@ export function PlaceMapView({
         다른 값이고, 지도 가장자리에 붙는 것이 그 표면의 의도다.
       */}
       <div className="pointer-events-none absolute inset-x-0 top-5 z-30 lg:top-6">
-        <div className="content-container flex justify-end px-4 md:px-10">
-          <div className="pointer-events-auto flex flex-col items-end gap-2">
+        <div className="content-container flex items-start justify-end gap-2 px-4 md:px-10">
+          {/*
+            **검색은 토글 왼쪽, 1024 미만에서만** (#596). 그 위는 좌측 패널 머리가 같은
+            일을 하므로 둘 다 그리면 데스크톱 지도에 검색창이 둘이 된다.
+
+            **`flex-1 min-w-0` 이라 남는 폭을 먹고 `max-w-md` 로 멈춘다** — 상한이 없으면
+            768 에서 입력이 538 로 벌어져 짧은 문구 하나를 담고 지도를 가로로 길게 가린다.
+            375 에서는 `flex-1` 이 준 245 가 상한보다 작아 그대로다.
+
+            `items-start` 는 검색(44)과 토글 묶음(토글 44 + 내 위치 44)의 **윗변**을
+            맞춘다 — `items-end` 면 검색이 내 위치 버튼 옆까지 내려간다.
+          */}
+          {searchable && (
+            <PlaceSearchField
+              filters={filters}
+              compact
+              id="place-keyword-map"
+              className="pointer-events-auto max-w-md min-w-0 flex-1 lg:hidden"
+            />
+          )}
+
+          <div className="pointer-events-auto flex shrink-0 flex-col items-end gap-2">
             {/*
           **폭에 따라 두 벌을 두지 않는다** (#240). 아이콘형 하나로 통일했다 — 지도 위에
           글자 버튼이 얹히면 지도를 가리고, 이름은 `title` 호버 툴팁과 `aria-label` 이 맡는다.
@@ -409,6 +459,24 @@ export function PlaceMapView({
                 앉아 있었는데, 제목이 할 일이 없는 자리다 — 이 패널이 무엇인지는 안에 든
                 목록이 이미 말한다. 개수는 아래 캡션으로 내렸다.
               */}
+            {/*
+              **검색이 패널 맨 위다** (#596) — 목록 갈래가 검색을 칩 위에 두는 것과 같은
+              순서다. 검색어는 목록을 좁히는 **범위**이고 칩은 그 안의 축이다.
+
+              **`compact` 가 아니다.** 이 패널 툴바 안쪽은 374px 로 목록 갈래의 모바일
+              검색(343px)보다 넓다 — 글자 버튼이 들어가는 자리에서 아이콘으로 줄이면 같은
+              컨트롤이 이유 없이 화면마다 갈린다. 오버레이만 자리가 없다.
+            */}
+            {searchable && (
+              <div className="border-border border-b px-3 py-2">
+                <PlaceSearchField
+                  filters={filters}
+                  id="place-keyword-panel"
+                  className="flex items-start gap-2"
+                />
+              </div>
+            )}
+
             <div className="border-border border-b px-3 py-2">
               <PlaceMapFilterBar filters={filters} authed={authed} />
             </div>
