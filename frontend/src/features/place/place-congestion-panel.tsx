@@ -236,8 +236,30 @@ function Chart({
       오류처럼 읽힌다. 왼쪽은 그대로 둔다: 기간의 시작이라 잘릴 것이 없다.
 
       `rail` 의 음수 마진을 쓰면 카드 테두리를 뚫는다 (`lib/ui/inset.ts`).
+
+      ── **`scroll-rail` 은 선택이 아니다** (#603)
+
+      `overflow-x-auto` 만으로는 이 레일이 새어 나간다. 칸마다 붙는 `sr-only` 라벨
+      (`9월 1일 화요일 혼잡`)이 `position: absolute` 인데, 이 `div` 가 `position: static`
+      이면 그 30개의 컨테이닝 블록이 **여기가 아니라 바깥의 positioned 조상**이 된다.
+      스크롤러가 자기 내용을 클립하고 있어도 저것들은 클립되지 않고, 정적 위치가 조상의
+      `scrollWidth` 로 그대로 샌다.
+
+      실측(`/places/126434` 30일): 1440 에서 좌측 판정 레일이 가로로 770px 스크롤됐고
+      (`scrollWidth` 1164 / `clientWidth` 394), 390 에서는 페이지가 통째로 넘쳤다
+      (`documentElement.scrollWidth` 390 → 1135). DESIGN.md §7 이 버그로 못박은 증상이다.
+
+      `.scroll-rail` 이 `position: relative` 로 기준면을 이 `div` 로 되돌리고
+      `contain: layout` 으로 남은 전파를 끊는다. **둘 다 필요하다** — 홈 골든타임 곡선이
+      같은 것을 겪고 `app/globals.css` 에 근거를 적어 뒀다. `overflow: hidden` 으로도
+      숫자는 맞출 수 있지만 그건 위의 full-bleed 를 잘라 먹는다.
     */
-    <div className={cn(extended && 'overflow-x-auto', extended && INSET_BLEED_END_CLASS.card)}>
+    <div
+      className={cn(
+        extended && 'scroll-rail overflow-x-auto',
+        extended && INSET_BLEED_END_CLASS.card,
+      )}
+    >
       <ul className={cn('flex items-end gap-1.5', extended && 'w-max')}>
         {items.map((item) => (
           <DayColumn

@@ -452,10 +452,15 @@ describe('원천에서 사라진 장소 — 안내를 먼저 보여 준다 (#146
 
   좌측 레일에 있던 동안에는 주소·전화·운영시간이 판정 아래로 밀려 있었다 — 상세에 들어온
   사람이 제일 먼저 묻는 "여기 어디고 몇 시까지 하냐" 가 판정보다 뒤였던 것이다.
+  **판정보다 앞**이라는 것이 이 묶음이 지키는 것이다.
 
   **DOM 순서 하나로 두 폭을 만든다.** 데스크톱은 grid 가 판정을 좌측 열로 보내지만
   (`.rail-layout-detail`), 모바일은 이 순서 그대로 쌓인다. 그래서 여기서 순서가 뒤집히면
   모바일이 곧바로 회귀한다 — 트리를 폭마다 나누면 스크린리더가 같은 내용을 두 번 읽는다.
+
+  **#603 이 혼잡도를 제목과 기본 정보 사이로 들여보냈다.** 전체 순서는
+  갤러리 → 제목 → 기간 혼잡도 → 기본 정보 → 판정 → 본문이 된다. 혼잡도도 "언제 올까" 라
+  위치를 묻기 전 질문이므로, 기본 정보가 판정보다 앞이라는 규칙은 그대로다.
 */
 describe('PlaceDetailSection — 기본 정보의 자리', () => {
   it('제목 다음, 판정보다 먼저 온다', () => {
@@ -474,12 +479,30 @@ describe('PlaceDetailSection — 기본 정보의 자리', () => {
     expect(basic).toBeLessThan(verdict)
   })
 
-  it('본문 절(반려견 동반 정보)보다는 앞이다 — 순서가 갤러리 → 제목 → 기본 정보 → 판정 → 본문이다', () => {
+  it('본문 절(반려견 동반 정보)보다는 앞이다 — 순서가 갤러리 → 제목 → 혼잡도 → 기본 정보 → 판정 → 본문이다', () => {
     const markup = render()
 
     expect(markup.indexOf(messages.place.detailSectionBasic)).toBeLessThan(
       markup.indexOf(messages.place.detailSectionPet),
     )
+  })
+
+  /*
+    **혼잡도가 기본 정보보다 앞이다** (#603) — 좌측 판정 레일에서 우측 본문 열의 제목
+    아래로 옮겨 온 자리다.
+
+    문자열 위치로 잠그는 이유는 위 묶음과 같다: 데스크톱 배치는 grid 가 하지만 모바일은
+    이 DOM 순서 그대로 쌓이므로, 여기서 뒤집히면 390 이 곧바로 회귀한다.
+  */
+  it('기간 혼잡도가 제목과 기본 정보 사이에 선다', () => {
+    const markup = render()
+
+    const title = markup.indexOf(placeDetail.title)
+    const congestionTitle = markup.indexOf(messages.place.detailCongestionTitle)
+    const basic = markup.indexOf(messages.place.detailSectionBasic)
+
+    expect(congestionTitle).toBeGreaterThan(title)
+    expect(congestionTitle).toBeLessThan(basic)
   })
 
   it('좌표가 있으면 기본 정보 안에 길찾기가 함께 선다 (#14)', () => {
