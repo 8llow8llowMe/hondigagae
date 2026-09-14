@@ -168,7 +168,7 @@ export function PasswordResetView() {
   // 틀린 것은 코드지 비밀번호가 아니다. submitCount 만 의존하는 이유는 use-form.ts 참고
   useEffect(() => {
     if (resetForm.submitCount === 0) return
-    if (resetForm.firstErrorField === 'code') {
+    if (resetForm.errors.fields.code !== undefined) {
       // keepError: 방금 띄운 코드 오류를 이 호출이 지우면 무음 실패가 된다
       resetForm.setValue('code', '', { keepError: true })
       containerRef.current?.querySelector<HTMLElement>('#code')?.focus()

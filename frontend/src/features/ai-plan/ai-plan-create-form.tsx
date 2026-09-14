@@ -16,6 +16,7 @@ import { SIGUNGU_CODES, SIGUNGU_LABEL } from '@/features/place/filter-labels'
 import { BUDGET_PRESETS_MANWON } from '@/lib/ai-plan/budget'
 import { type DetailsInput, detailsSummary, hasAnyDetail } from '@/lib/ai-plan/details'
 import type { FormErrors } from '@/lib/form/field-errors'
+import { focusFirstError, hasFieldErrors } from '@/lib/form/focus-first-error'
 import { messages } from '@/lib/messages'
 import { describePet } from '@/lib/pet/describe'
 import type { AiPlanFormValues } from '@/types/ai-plan'
@@ -30,7 +31,6 @@ export type AiPlanCreateFormProps = {
   submitting: boolean
   /** 제출이 실패로 끝난 횟수. 포커스 이동의 **유일한 안정적인 트리거**다 */
   submitCount: number
-  firstErrorField: string | null
   /**
    * 저장한 장소 개수. `null` 은 "아직 모른다" 이고 `0` 과 다르다 (#128) —
    * `AiPlanOptionsSection` 의 같은 이름 prop 주석 참고.
@@ -79,7 +79,6 @@ export function AiPlanCreateForm({
   totalDays,
   submitting,
   submitCount,
-  firstErrorField,
   favoriteCount,
   today,
   onValueChange,
@@ -124,6 +123,11 @@ export function AiPlanCreateForm({
     **접힌 섹션 안의 필드에서 오류가 나면 먼저 펼친다.** 안 그러면 제출이 조용히 실패한다 —
     포커스를 옮길 요소가 마운트돼 있지 않고, 오류 메시지도 화면에 없다.
 
+    **"첫 오류" 가 아니라 "오류 중 하나라도" 로 본다** (#560). 예전에는 스키마 키 선언
+    순서로 고른 `firstErrorField` 하나만 확인했는데, 그러면 접기 **밖** 필드가 그 순서에서
+    앞서기만 해도 접힌 오류가 화면에 영영 안 나왔다. 어느 오류든 접기 안에 있으면 펼치는
+    것이 이 effect 가 하려던 일이고, 그러면 순서에 기댈 일도 없다.
+
     `submitCount` 를 트리거로 쓴다 (`errors` 를 쓰면 입력 중에 다시 돈다 —
     `use-form.ts` 의 `submitCount` JSDoc).
 
@@ -134,11 +138,11 @@ export function AiPlanCreateForm({
     (`focusedSubmitCountRef` 주석).
   */
   useEffect(() => {
-    if (submitCount === 0 || firstErrorField === null) return
-    if (COLLAPSED_FIELDS.has(firstErrorField)) {
+    if (submitCount === 0) return
+    if (Object.keys(errors.fields).some((field) => COLLAPSED_FIELDS.has(field))) {
       setDetailsOpen(true)
     }
-  }, [submitCount, firstErrorField])
+  }, [submitCount])
 
   /*
     **이미 포커스를 옮겨 준 `submitCount`.** `0` 은 "아직 아무 제출도 처리하지 않았다".
@@ -170,24 +174,20 @@ export function AiPlanCreateForm({
   const focusedSubmitCountRef = useRef(0)
 
   /*
-    제출 실패 시 첫 오류 필드로 포커스를 옮긴다. `errors` 를 의존성으로 쓰면 입력 중인
-    필드에서 포커스를 훔친다 (`use-form.ts` 의 `submitCount` JSDoc).
+    제출 실패 시 **화면에서 첫 번째로 보이는** 오류 필드로 포커스를 옮긴다. `errors` 를
+    의존성으로 쓰면 입력 중인 필드에서 포커스를 훔친다 (`use-form.ts` 의 `submitCount`
+    JSDoc). 대상을 고르는 일은 `focusFirstError` 가 DOM 순서로 한다 (#560) — 이 화면은
+    지금 스키마 순서와 화면 순서가 **우연히** 맞아 증상이 없었을 뿐이다.
 
     `detailsOpen` 이 의존성에 있는 것은 위 두 번째 패스 때문이다 — 재실행 자체는
     `focusedSubmitCountRef` 가 걸러 준다.
-
-    라디오 그룹은 `id` 로 찾을 수 없어 `[name]` 을 함께 본다 (`PlanCreateForm` 과 동일).
   */
   useEffect(() => {
-    if (submitCount === 0 || firstErrorField === null) return
+    if (submitCount === 0 || !hasFieldErrors(errors)) return
     if (focusedSubmitCountRef.current === submitCount) return
-    const target = formRef.current?.querySelector<HTMLElement>(
-      `[id="${firstErrorField}"], [name="${firstErrorField}"]`,
-    )
-    if (target === null || target === undefined) return
+    if (!focusFirstError(formRef.current, errors)) return
     focusedSubmitCountRef.current = submitCount
-    target.focus()
-  }, [submitCount, firstErrorField, detailsOpen])
+  }, [submitCount, detailsOpen])
 
   const budgetSelected = values.budgetManwon.trim()
 

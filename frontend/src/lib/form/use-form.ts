@@ -38,8 +38,6 @@ export type UseFormReturn<TValues> = {
   setErrors: (errors: FormErrors) => void
   reset: (values?: TValues) => void
   submit: () => Promise<void>
-  /** 제출 실패 시 포커스를 옮길 대상 */
-  firstErrorField: string | null
   /**
    * 실패로 끝난 제출 횟수. 성공 시에는 증가하지 않는다.
    *
@@ -144,8 +142,15 @@ export function useForm<TValues extends Record<string, unknown>, TResult>({
     }
   }, [onSubmit, onSuccess, schema, values])
 
-  const firstErrorField = Object.keys(errors.fields)[0] ?? null
+  /*
+    **첫 오류 필드를 여기서 고르지 않는다** (#560).
 
+    예전에는 `Object.keys(errors.fields)[0]` 를 `firstErrorField` 로 내려보냈다. 그 순서는
+    **zod 스키마의 키 선언 순서**이지 화면 순서가 아니라서, 두 순서가 어긋난 폼에서는
+    포커스가 위의 오류를 지나쳐 아래로 갔다 — `/plans/new` 가 그랬다. 훅은 DOM 을 모르므로
+    애초에 답할 수 없는 질문이었다. 판정은 컨테이너를 쥔 호출부가 `focusFirstError` 로
+    한다 (`focus-first-error.ts`).
+  */
   return {
     values,
     errors,
@@ -155,7 +160,6 @@ export function useForm<TValues extends Record<string, unknown>, TResult>({
     setErrors,
     reset,
     submit,
-    firstErrorField,
     submitCount,
   }
 }

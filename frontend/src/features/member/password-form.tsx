@@ -13,6 +13,7 @@ import {
 } from '@/features/member/schemas'
 import { useSessionExit } from '@/features/member/use-session-exit'
 import { changePassword, setupPassword } from '@/lib/api/member'
+import { focusFirstError } from '@/lib/form/focus-first-error'
 import { useForm } from '@/lib/form/use-form'
 
 /**
@@ -36,7 +37,7 @@ export function PasswordForm({ mode }: { mode: PasswordFormMode }) {
   const queryClient = useQueryClient()
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const { values, errors, isSubmitting, setValue, submit, firstErrorField, submitCount } = useForm<
+  const { values, errors, isSubmitting, setValue, submit, submitCount } = useForm<
     PasswordFormValues,
     void
   >({
@@ -66,8 +67,9 @@ export function PasswordForm({ mode }: { mode: PasswordFormMode }) {
   // 다시 돌아 타이핑 중인 필드에서 포커스를 훔치는 것을 피한다.
   // 근거는 use-form.ts 의 submitCount 주석.
   useEffect(() => {
-    if (submitCount === 0 || firstErrorField === null) return
-    containerRef.current?.querySelector<HTMLElement>(`#${firstErrorField}`)?.focus()
+    // 대상은 DOM 순서로 고른다 — 스키마 키 선언 순서가 아니다 (#560)
+    if (submitCount === 0) return
+    focusFirstError(containerRef.current, errors)
   }, [submitCount])
 
   return (

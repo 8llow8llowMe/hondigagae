@@ -13,6 +13,7 @@ import { petFormSchema } from '@/features/pet/schemas'
 import { ApiError, classify, NO_RESPONSE_STATUS } from '@/lib/api/error'
 import { PET_LIMIT_EXCEEDED_CODE } from '@/lib/api/pet'
 import type { FormErrors } from '@/lib/form/field-errors'
+import { focusFirstError } from '@/lib/form/focus-first-error'
 import { useForm } from '@/lib/form/use-form'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { messages } from '@/lib/messages'
@@ -335,32 +336,36 @@ export function PetForm({ initialValues, submitLabel, onSave, onSaved }: PetForm
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const { values, errors, isSubmitting, isDirty, setValue, submit, firstErrorField, submitCount } =
-    useForm<PetFormValues, Pet>({
-      schema: petFormSchema,
-      initialValues,
-      onSubmit: async (submitted) => {
-        try {
-          // 빈 값을 null 로, enum 을 code 로 — 이 변환을 건너뛰면
-          // birthYm: '' 가 400(PET_104)이 된다 (공통명세 S3-3)
-          const result = await onSave(toPetSavePayload(submitted))
-          setErrorStatus(null)
-          return result
-        } catch (error) {
-          setErrorStatus(toStatus(error))
-          throw error
-        }
-      },
-      onSuccess: (pet) => onSaved(pet),
-    })
+  const { values, errors, isSubmitting, isDirty, setValue, submit, submitCount } = useForm<
+    PetFormValues,
+    Pet
+  >({
+    schema: petFormSchema,
+    initialValues,
+    onSubmit: async (submitted) => {
+      try {
+        // 빈 값을 null 로, enum 을 code 로 — 이 변환을 건너뛰면
+        // birthYm: '' 가 400(PET_104)이 된다 (공통명세 S3-3)
+        const result = await onSave(toPetSavePayload(submitted))
+        setErrorStatus(null)
+        return result
+      } catch (error) {
+        setErrorStatus(toStatus(error))
+        throw error
+      }
+    },
+    onSuccess: (pet) => onSaved(pet),
+  })
 
   useUnsavedWarning(isDirty && !isSubmitting)
 
   // submitCount 만 의존한다. errors 를 넣으면 두 필드가 동시 오류일 때 한 필드를
   // 타이핑하다 포커스를 빼앗긴다 — 이슈 #24 발견 7.
   useEffect(() => {
-    if (submitCount === 0 || firstErrorField === null) return
-    containerRef.current?.querySelector<HTMLElement>(`#${firstErrorField}`)?.focus()
+    // 대상은 DOM 순서로 고른다 — 이 화면은 스키마 순서와 화면 순서가 **우연히** 맞아
+    // 증상이 없었을 뿐이다 (#560)
+    if (submitCount === 0) return
+    focusFirstError(containerRef.current, errors)
   }, [submitCount])
 
   return (

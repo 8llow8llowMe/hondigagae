@@ -162,19 +162,30 @@ password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
 - 모든 입력에 `label` 을 연결한다 (`id` / `htmlFor`). placeholder 를 label 대신 쓰지 않는다.
 - 오류 시 `aria-invalid="true"` + `aria-describedby` 로 오류 메시지를 연결한다.
 - **폼 전체 오류는 `role="alert"`** 로 낸다. 제출 후 화면 변화가 없으면 스크린리더 사용자가 실패를 모른다.
-- 제출 실패 시 **첫 오류 필드로 포커스를 옮긴다.**
+- 제출 실패 시 **화면에서 첫 번째로 보이는 오류 필드로 포커스를 옮긴다.**
+  - **판정 기준은 DOM 순서다.** zod 스키마의 키 선언 순서가 아니다 — 두 순서는 언제든 어긋날 수
+    있고, 어긋나면 포커스가 위의 오류를 지나쳐 아래로 간다 ([#560](https://github.com/8llow8llowMe/hondigagae/issues/560)
+    실측: `/plans/new` 가 시작일·종료일 오류를 지나쳐 제목으로 갔다).
+  - 고르는 일은 `src/lib/form/focus-first-error.ts` 의 `focusFirstError(container, errors)` 하나가
+    맡는다. **폼마다 따로 구현하지 않는다** — 새 폼도 이 함수를 부른다.
+  - **언제 부를지는 여전히 `submitCount` 하나가 정한다.** `errors` 를 effect 의존성에 넣으면 입력
+    중인 필드에서 포커스를 훔친다 (`use-form.ts` 의 `submitCount` JSDoc).
+  - **접힌 섹션 안의 필드는 먼저 펼친다.** 포커스를 옮길 요소가 마운트돼 있지 않고 오류 메시지도
+    화면에 없어 제출이 조용히 실패한다. 펼침 판정도 "첫 오류" 가 아니라 **"오류 중 하나라도 접기
+    안인가"** 로 본다 (`ai-plan-create-form.tsx` 의 `COLLAPSED_FIELDS`).
 - 비밀번호 표시 토글은 `aria-pressed` 로 상태를 알린다.
 
 ## 9. 테스트
 
 `testing-guide.md` §1 방식(node + `renderToStaticMarkup`)을 그대로 따른다.
 
-| 대상               | 방법                                                                       |
-| ------------------ | -------------------------------------------------------------------------- |
-| `field-errors`     | 순수 함수 테스트. **필드 중복 시 첫 오류 채택**, 문자열 형태, 비정상 형태  |
-| `validate`         | 순수 함수 테스트. 필드별 첫 issue                                          |
-| 폼 컴포넌트        | props 로 `FormErrors` 를 주입해 마크업에 `aria-invalid` / 메시지 노출 확인 |
-| 제출·입력 상호작용 | **테스트 불가.** 브라우저 실측으로 검증한다 (`fe-design-reviewer`)         |
+| 대상                | 방법                                                                                                  |
+| ------------------- | ----------------------------------------------------------------------------------------------------- |
+| `field-errors`      | 순수 함수 테스트. **필드 중복 시 첫 오류 채택**, 문자열 형태, 비정상 형태                             |
+| `validate`          | 순수 함수 테스트. 필드별 첫 issue                                                                     |
+| 폼 컴포넌트         | props 로 `FormErrors` 를 주입해 마크업에 `aria-invalid` / 메시지 노출 확인                            |
+| `focus-first-error` | 선택자를 만드는 **순수 함수만** node 에서 테스트한다. DOM 순서 판정은 `e2e/form-field-errors.spec.ts` |
+| 제출·입력 상호작용  | **테스트 불가.** 브라우저 실측으로 검증한다 (`fe-design-reviewer`)                                    |
 
 ## 10. 새 폼 체크리스트
 
@@ -184,6 +195,6 @@ password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
 - [ ] 필드별 첫 오류만 표시한다
 - [ ] 폼 전체 오류가 `role="alert"` 로 나온다
 - [ ] 제출 중 중복 방지가 두 겹이다
-- [ ] 제출 실패 시 첫 오류 필드로 포커스가 간다
+- [ ] 제출 실패 시 `focusFirstError` 로 **화면의 첫 오류** 필드에 포커스가 간다 (§8)
 - [ ] 401 / 409 / 429 분기를 화면 문구로 확정했다
 - [ ] `done-checklist.md` 를 통과했다
