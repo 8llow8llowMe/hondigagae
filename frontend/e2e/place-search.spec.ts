@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+import { mapFallbackReady } from './helpers/map-fallback'
+
 /**
  * 장소 이름·주소 검색 — 이슈 #431 (계약은 #421).
  *
@@ -30,6 +32,13 @@ test.describe('장소 검색 (#431)', () => {
 
   test('검색 버튼으로도 같은 일이 일어난다', async ({ page }) => {
     await page.goto('/places?view=list')
+
+    /*
+      **행이 선 뒤에 친다.** 기다리지 않고 치면 하이드레이션 전에 누르게 되어 핸들러가
+      아직 없다 — 누른 자국도 남지 않는다. `#place-list` 는 실화면에만 있는 `id` 라
+      (`loading.tsx` 의 골격에는 없다) 이 대기가 곧 "실화면이 섰다" 는 뜻이다.
+    */
+    await expect(page.locator('#place-list').getByRole('listitem').first()).toBeVisible()
 
     await page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).fill(KEYWORD)
     await page.getByRole('button', { name: '검색', exact: true }).click()
@@ -109,11 +118,11 @@ test.describe('지도 보기 검색 (#596)', () => {
     await page.goto('/places')
 
     /*
-      **폴백이 자리를 잡은 뒤에 친다.** SDK 실패는 지도 스켈레톤이 한 번 그려진 뒤에 오고
-      그때 서브트리가 통째로 교체된다 — 교체 전 입력에 채우면 떨어져 나간 노드에 엔터를
-      치게 되어 아무 일도 일어나지 않는다 (#581 과 같은 성질).
+      **폴백이 자리를 잡은 뒤에 친다.** 교체 전 입력에 채우면 그 값이 새 입력에 덮이고
+      엔터는 떨어져 나간 노드로 간다 — `main li` 로 기다리던 것이 **지도 갈래 좌측 패널의
+      목록**에 붙어 교체 전에 풀렸다 (`helpers/map-fallback.ts` 가 근거).
     */
-    await expect(page.getByRole('main').locator('li').first()).toBeVisible()
+    await mapFallbackReady(page)
 
     const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).first()
     await box.fill(KEYWORD)
@@ -130,12 +139,11 @@ test.describe('지도 보기 검색 (#596)', () => {
     await page.goto(`/places?keyword=${encodeURIComponent(KEYWORD)}`)
 
     /*
-      **`role="status"` 만으로는 모자라다.** 안내 줄은 SDK 실패 **직후**에 뜨지만 그때
-      목록은 아직 조회 중이고, 데이터가 도착하며 서브트리가 한 번 더 그려진다 — `fill`
-      과 `press` 사이에 그 교체가 끼면 떨어져 나간 입력에 엔터를 치게 된다. 전체 스위트의
-      부하에서 실제로 났다. **행이 찬 뒤**가 진짜 안정 지점이다.
+      **`role="status"` 도 `main li` 도 모자랐다.** 둘 다 폴백 **이전**의 지도 갈래에
+      이미 있어서, 대기가 교체 전에 풀렸다 — 그때 채운 값은 새 입력에 덮인다
+      (`helpers/map-fallback.ts` 가 근거).
     */
-    await expect(page.getByRole('main').locator('li').first()).toBeVisible()
+    await mapFallbackReady(page)
 
     const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).first()
     await box.fill('')
@@ -151,7 +159,7 @@ test.describe('지도 보기 검색 (#596)', () => {
   test('담기 화면 지도에는 검색이 없다', async ({ page }) => {
     await page.goto('/plans/223456789012000001/days/1/add')
 
-    await expect(page.getByRole('status').first()).toBeVisible()
+    await mapFallbackReady(page)
     await expect(page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' })).toHaveCount(0)
   })
 })
