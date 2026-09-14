@@ -1,5 +1,7 @@
 package com.hondigagae.common.exception;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.exc.InputCoercionException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
@@ -7,6 +9,7 @@ import com.hondigagae.common.dto.Response;
 import com.hondigagae.common.dto.ValidationErrorItem;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import java.io.IOException;
 import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -132,6 +135,20 @@ public final class ValidationErrorSupport {
             String field = fieldPathOf(mismatched);
             return respond(List.of(new ValidationErrorItem(defaultCode, field, "%s 값의 형식이 올바르지 않습니다.".formatted(field))));
         }
+        /*
+          정수 범위 초과. `InputCoercionException` 은 `JsonMappingException` 이 아니라
+          `StreamReadException` 쪽이라 위 두 분기에 걸리지 않고 아래 폴백으로 떨어졌다.
+          그래서 `budget: 2147483648`(`Integer` 필드) 하나가 **"요청 본문을 읽을 수 없습니다.
+          JSON 형식을 확인해 주세요."** 로 돌아왔다 — 개발자용 문구가 필드도 못 짚은 채
+          사용자 화면의 폼 상단 배너로 그대로 떴다 (#566).
+
+          경로가 없어 `JsonMappingException` 처럼 되짚을 수 없으므로 파서가 마지막으로 읽던
+          필드 이름을 쓴다. 범위를 벗어난 값을 읽다 던진 예외라 그 이름이 문제의 필드다.
+        */
+        if (cause instanceof InputCoercionException coercion) {
+            String field = currentFieldOf(coercion);
+            return respond(List.of(new ValidationErrorItem(defaultCode, field, "%s 값이 허용 범위를 벗어났습니다.".formatted(field))));
+        }
         return respond(List.of(new ValidationErrorItem(defaultCode, UNKNOWN_FIELD, "요청 본문을 읽을 수 없습니다. JSON 형식을 확인해 주세요.")));
     }
 
@@ -149,6 +166,28 @@ public final class ValidationErrorSupport {
             }
         }
         return path.isEmpty() ? UNKNOWN_FIELD : path.toString();
+    }
+
+    /**
+     * 파서가 마지막으로 읽던 필드 이름. {@link InputCoercionException} 은 {@code getPath()} 가 없어
+     * {@link #fieldPathOf(JsonMappingException)} 처럼 경로를 되짚을 수 없다.
+     *
+     * <p>중첩 객체에서는 잎 이름만 나와 {@code items[0].budget} 이 {@code budget} 이 된다.
+     * 본문 전체를 가리키는 {@code request} 보다는 낫다는 판단이다 — 이 예외가 나는 자리는
+     * 숫자 필드 하나이고, 화면이 그 이름으로 오류를 붙일 수 있으면 목적을 다한다.
+     */
+    private static String currentFieldOf(InputCoercionException exception) {
+        JsonParser parser = exception.getProcessor();
+        if (parser == null) {
+            return UNKNOWN_FIELD;
+        }
+        try {
+            String name = parser.currentName();
+            return name == null || name.isBlank() ? UNKNOWN_FIELD : name;
+        } catch (IOException readFailed) {
+            // 이미 깨진 스트림이다. 이름을 못 읽는 것이 응답을 막을 이유는 아니다
+            return UNKNOWN_FIELD;
+        }
     }
 
     private static String describeInvalidFormat(InvalidFormatException exception, String field) {
