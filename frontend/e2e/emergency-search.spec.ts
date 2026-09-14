@@ -1,6 +1,7 @@
 import { expect, type Page, test } from '@playwright/test'
 
 import { messages } from '../src/lib/messages'
+import { mapFallbackReady } from './helpers/map-fallback'
 
 /**
  * 병원·약국 이름·주소 검색 — 이슈 #584.
@@ -20,7 +21,26 @@ import { messages } from '../src/lib/messages'
  * 한라동물병원 · 서귀포동물병원 · 가까운약국.
  */
 const SEARCH = messages.emergency.searchLabel
-const LIST = '#emergency-list li'
+
+/**
+ * **골격의 행을 세지 않는다** — e2e 플레이크의 근본원인 둘 중 하나.
+ *
+ * `#emergency-list li` 로 세면 로딩 골격(`emergency-skeleton.tsx`)의 자리표시 행
+ * **세 개**가 함께 걸린다. 골격은 `<div aria-hidden>` 안이지만 CSS 선택자는 그것을
+ * 가리지 않고, `toBeVisible()` 도 참이다. 그래서 "목록이 찼다" 는 대기가 **아직 조회
+ * 중일 때** 풀렸고, 그 뒤 채우고 제출한 것이 하이드레이션 전이라 아무 일도 일어나지
+ * 않거나(URL 그대로) `useSearchParams()` 가 아직 빈 값이라 **다른 조건을 덮어썼다**
+ * (`type=ANIMAL_PHARMACY` 가 떨어져 0건 대신 1건).
+ *
+ * 실패 로그가 그 숫자를 그대로 보여줬다 — `5 × resolved to 3 elements`(골격 행 수
+ * `ROW_COUNT = 3`) → `7 × resolved to 1 element`.
+ *
+ * **역할 로케이터는 접근성 트리를 본다.** `aria-hidden` 안은 애초에 매칭되지 않으므로
+ * 골격이 걸릴 수 없다 — 실데이터가 온 뒤에야 풀린다.
+ */
+function rows(page: Page) {
+  return page.locator('#emergency-list').getByRole('listitem')
+}
 
 /** 이름에만 있는 말 — 한라동물병원 한 곳 */
 const BY_NAME = '한라'
@@ -33,8 +53,8 @@ const NO_MATCH = '존재하지않는시설ZZZ'
  * (`getCurrentPosition`) 로딩 구간이 길다 — 골격만 있는 동안 센 0 은 검색 결과가 아니다.
  */
 async function settled(page: Page): Promise<number> {
-  await expect(page.locator(LIST).first()).toBeVisible()
-  return page.locator(LIST).count()
+  await expect(rows(page).first()).toBeVisible()
+  return rows(page).count()
 }
 
 test.describe('병원·약국 검색 (#584)', () => {
@@ -48,7 +68,7 @@ test.describe('병원·약국 검색 (#584)', () => {
     await page.getByRole('searchbox', { name: SEARCH }).press('Enter')
 
     await expect(page).toHaveURL(new RegExp(`keyword=${encodeURIComponent(BY_NAME)}`))
-    await expect(page.locator(LIST)).toHaveCount(1)
+    await expect(rows(page)).toHaveCount(1)
   })
 
   test('검색 버튼으로도 같은 일이 일어난다', async ({ page }) => {
@@ -59,15 +79,15 @@ test.describe('병원·약국 검색 (#584)', () => {
     await page.getByRole('button', { name: messages.emergency.searchAction, exact: true }).click()
 
     await expect(page).toHaveURL(new RegExp(`keyword=${encodeURIComponent(BY_NAME)}`))
-    await expect(page.locator(LIST)).toHaveCount(1)
+    await expect(rows(page)).toHaveCount(1)
   })
 
   /* 이름과 주소를 한 건초더미로 본다 — 주소만으로도 찾혀야 한다 */
   test('주소의 말로도 찾는다', async ({ page }) => {
     await page.goto(`/emergency?view=list&keyword=${encodeURIComponent(BY_ADDR)}`)
 
-    await expect(page.locator(LIST)).toHaveCount(1)
-    await expect(page.locator(LIST).first()).toContainText('서귀포')
+    await expect(rows(page)).toHaveCount(1)
+    await expect(rows(page).first()).toContainText('서귀포')
   })
 
   /*
@@ -84,7 +104,7 @@ test.describe('병원·약국 검색 (#584)', () => {
 
     /* 약국 중에 "한라" 는 없다 — 0건 안내로 떨어진다 */
     expect(pharmacies).toBeGreaterThan(0)
-    await expect(page.locator(LIST)).toHaveCount(0)
+    await expect(rows(page)).toHaveCount(0)
     await expect(page.getByRole('main')).toContainText(BY_NAME)
   })
 
@@ -171,15 +191,18 @@ test.describe('지도 갈래 검색 (#584)', () => {
     await page.goto('/emergency')
 
     /*
-      **폴백이 자리를 잡은 뒤에 친다.** SDK 실패는 지도 스켈레톤이 한 번 그려진 뒤에
-      오고, 그때 서브트리가 통째로 교체된다 — 교체 전 입력에 채우면 떨어져 나간 노드에
-      엔터를 치게 되어 아무 일도 일어나지 않는다 (`e2e/helpers/layout.ts` 가 같은 교체를
-      두고 적어 둔 #581 과 같은 성질이다).
+      **폴백이 자리를 잡은 뒤에 친다.** 교체 전 입력에 채우면 그 값이 새 입력에 덮이고
+      엔터는 떨어져 나간 노드로 간다 — `role="status"` 로 기다리던 것이 **지도 갈래의
+      "지도를 불러오는 중"** 에 붙어 교체 전에 풀렸다 (`helpers/map-fallback.ts` 가 근거).
     */
-    await expect(page.getByRole('status').first()).toBeVisible()
+    await mapFallbackReady(page)
 
-    const rows = page.getByRole('main').locator('li')
-    const before = await rows.count()
+    /*
+      **폴백에는 `#emergency-list` 가 없다** — 그 갈래는 카드(`SurfaceStack`)를 쓰지
+      않는다. 그래도 역할로 세는 이유는 같다: 골격이 `aria-hidden` 이라 걸리지 않는다.
+    */
+    const visible = page.getByRole('main').getByRole('listitem')
+    const before = await visible.count()
     expect(before).toBeGreaterThan(1)
 
     const box = page.getByRole('searchbox', { name: SEARCH }).first()
@@ -187,7 +210,7 @@ test.describe('지도 갈래 검색 (#584)', () => {
     await box.press('Enter')
 
     await expect(page).toHaveURL(new RegExp(`keyword=${encodeURIComponent(BY_NAME)}`))
-    await expect(rows).toHaveCount(1)
+    await expect(visible).toHaveCount(1)
   })
 
   /*
@@ -196,7 +219,7 @@ test.describe('지도 갈래 검색 (#584)', () => {
   */
   test('검색창을 비우고 제출하면 검색어가 풀린다', async ({ page }) => {
     await page.goto(`/emergency?keyword=${encodeURIComponent(BY_NAME)}`)
-    await expect(page.getByRole('status').first()).toBeVisible()
+    await mapFallbackReady(page)
 
     const box = page.getByRole('searchbox', { name: SEARCH }).first()
     await expect(box).toHaveValue(BY_NAME)
