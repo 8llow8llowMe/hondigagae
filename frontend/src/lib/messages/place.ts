@@ -389,6 +389,12 @@ export const placeMessages = {
   detailCongestionExpand: '30일까지 보기',
   detailCongestionCollapse: '7일만 보기',
   /**
+   * 30일 레일의 좌우 화살표 (#603). **"이전 / 다음" 만으로는 무엇의 이전인지 알 수 없다** —
+   * 홈 곡선의 라벨과 같은 규칙으로 대상을 밝힌다.
+   */
+  detailCongestionPrevDays: '이전 날짜 보기',
+  detailCongestionNextDays: '다음 날짜 보기',
+  /**
    * 전부 `UNKNOWN` — `leastCrowded` 가 `null` 인 갈래다. **404 가 아니라 빈 상태다**:
    * 장소는 있고 연결된 관광지 통계가 없는 것이라 재시도 버튼을 달지 않는다.
    */
