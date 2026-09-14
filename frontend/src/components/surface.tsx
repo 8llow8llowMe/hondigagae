@@ -162,13 +162,30 @@ export function SurfaceStack({
  * 좌우 인셋은 `INSET_CLASS.card`(16/20)다. 페이지 인셋 40 을 카드 안에서 쓰면 내용이
  * 두 번 밀린다. 넘치는 스크롤러는 `INSET_BLEED_END_CLASS.card` 를 쓴다 — `rail` 의
  * 음수 마진을 쓰면 카드 테두리를 뚫는다.
+ *
+ * ### `fill` — 목록 패널 (이슈 #556)
+ *
+ * **도구가 카드 밖이라는 규칙의 갈래다.** §0 은 "필터·검색은 목록을 좁히는 **도구**이고
+ * 카드는 그 **결과**를 담는다" 로 도구를 카드 밖에 두게 했다. 목록 4화면에서 그 규칙이
+ * 실제로 만든 것은 **바닥 위에 떠 있는 글줄 두세 줄**이었고, 제목 자리가 화면마다 갈렸다
+ * (바닥 위 · 카드 안 · 두 열 위 셋).
+ *
+ * `fill` 카드는 그 둘을 한 표면 안에서 **위아래로** 가른다 — 머리가 도구를, 본문이 결과를
+ * 맡고 본문만 구른다. 도구와 결과가 갈려 있다는 §0 의 의도는 그대로이고, 갈리는 축만
+ * "카드 안/밖" 에서 "머리/본문" 으로 옮긴다.
+ *
+ * **`lg` 전용이다.** 1024 미만에서는 레일이 없고 페이지 스크롤 하나라, 머리를 고정할 열
+ * 높이 자체가 없다. 그 아래에서는 평범한 카드로 흐른다.
  */
 export function Surface({
   title,
   titleId,
   description,
   lead,
+  leading,
+  tools,
   trailing,
+  fill = false,
   children,
   className,
   ...aria
@@ -193,36 +210,166 @@ export function Surface({
   description?: ReactNode
   /** 제목을 크게 쓰는 주 섹션 (홈 "오늘 갈 만한 곳") */
   lead?: boolean
-  /** 제목 우측 액션 (예: "전체 보기") */
+  /**
+   * 제목 **위** 한 줄 — 담기 화면의 `일정으로 돌아가기` 하나가 쓴다 (#556).
+   *
+   * **이 화면의 유일한 퇴로라 머리 안이어야 한다.** 바닥 위에 두면 목록을 내려가는 동안
+   * 화면 밖으로 사라지는데, `fill` 머리는 고정이라 늘 남는다.
+   */
+  leading?: ReactNode
+  /**
+   * 제목 줄 **아래**, 머리 안 — 검색 · 모바일 필터 칩 (#556).
+   *
+   * **`children`(결과)과 갈라 두는 것이 핵심이다.** 여기 든 것은 머리와 함께 고정되고
+   * `children` 만 구른다. `fill` 이 아니면 그냥 제목 아래에 흐른다.
+   */
+  tools?: ReactNode
+  /** 제목 우측 액션 (예: "전체 보기" · 보기 토글 · `새 일정 만들기`) */
   trailing?: ReactNode
+  /**
+   * 열 높이를 다 쓰고 **본문만 구른다** (#556). 머리주석의 `fill` 절이 정본이다.
+   *
+   * 짧은 목록에서는 카드 아래쪽에 빈 자리가 생긴다 — 네 화면이 같은 모양이 되는 값이
+   * 그보다 크다고 봤다 (이슈 #556 의 결정 1).
+   */
+  fill?: boolean
   children: ReactNode
   className?: string
 }) {
+  const hasHead = title !== undefined || leading !== undefined || tools !== undefined
+
   return (
     <section
       {...aria}
       aria-labelledby={titleId}
-      className={cn('bg-bg border-border border-y md:rounded-lg md:border', className)}
+      className={cn(
+        'bg-bg border-border border-y md:rounded-lg md:border',
+        // 열을 채우고 머리/본문으로 가른다 — `min-h-0` 이 없으면 본문이 트랙 밖으로 자란다
+        fill && 'lg:flex lg:min-h-0 lg:flex-1 lg:flex-col',
+        className,
+      )}
     >
-      {title !== undefined && (
-        <div className="flex items-start justify-between gap-4 px-4 pt-5 pb-3 md:px-5">
-          <div className="min-w-0">
-            <h2
-              id={titleId}
-              className={cn(
-                'text-title-2 text-fg font-semibold break-keep',
-                lead ? 'md:text-display md:font-extrabold' : 'md:text-title-1 md:font-bold',
-              )}
-            >
-              {title}
-            </h2>
-            {description !== undefined && <div className="mt-1">{description}</div>}
+      {hasHead && (
+        /*
+          **아래 선은 `fill` 에만 있다.** 본문이 머리 밑으로 흘러 들어가므로 경계가 없으면
+          글자가 머리에 닿은 채 사라진다. 구르지 않는 카드에는 필요 없다.
+        */
+        <div className={cn(fill && 'border-border shrink-0 border-b')}>
+          <div
+            className={cn(
+              'px-4 md:px-5',
+              /*
+                **`fill` 머리는 위 여백이 16 이다** (기본 20). 보기 토글이 이 안으로
+                들어오면서 지도 갈래의 떠 있는 토글보다 내려가는데, 4px 을 줄여 그 어긋남을
+                줄인다 (이슈 #556 의 결정 3).
+
+                **1920 실측: 지도 88 · 목록 105 로 17px 이다** (20 이었다면 21px). 목업에
+                적었던 "17 → 13" 은 카드 테두리 1px 과 토글의 `items-start` 를 빼고 센
+                값이라 4px 낙관적이었다 — 실측이 정본이다.
+
+                **더 줄이지 않는다.** 0 으로 맞추려면 머리에 위 여백이 없어야 하는데 그러면
+                제목이 테두리에 붙는다. 4px 을 더 깎는 것(12)보다 §4 스케일 위의 16 이 낫다.
+              */
+              fill ? 'pt-4' : 'pt-5',
+              // 도구가 있으면 그쪽 위 여백이 간격을 진다 — 둘 다 두면 24 로 벌어진다
+              tools === undefined && 'pb-3',
+            )}
+          >
+            {/*
+              **모바일에서 뒤로가기가 제목 **왼쪽**, 같은 줄에 선다** (#539). `flex-wrap` 이
+              제목 덩어리를 다음 줄로 넘기지 않게 하려면 그 덩어리가 남은 폭을 다 먹어야
+              한다(`flex-1`). `md` 이상은 `block` 으로 되돌려 예전처럼 제목 **위**에 선다 —
+              #539 가 바꾸기로 한 것은 모바일뿐이다.
+
+              `leading` 이 없으면 감싸지 않는다 — 빈 flex 컨테이너가 제목 줄의 `gap` 을
+              괜히 하나 더 만든다.
+            */}
+            {leading !== undefined && (
+              <div className="mb-2 flex flex-wrap items-start gap-x-1 md:mb-0 md:block">
+                {leading}
+                <div className="min-w-0 flex-1 md:mt-2 md:flex-none">
+                  <HeadTitleRow
+                    title={title}
+                    titleId={titleId}
+                    description={description}
+                    lead={lead}
+                    trailing={trailing}
+                  />
+                </div>
+              </div>
+            )}
+
+            {leading === undefined && title !== undefined && (
+              <HeadTitleRow
+                title={title}
+                titleId={titleId}
+                description={description}
+                lead={lead}
+                trailing={trailing}
+              />
+            )}
           </div>
-          {trailing !== undefined && <div className="shrink-0">{trailing}</div>}
+
+          {/*
+            **도구는 머리의 좌우 여백 **밖**이다.** 검색 폼과 필터 칩은 자기 인셋을 스스로
+            들고 있고(`INSET_CLASS.card`), 칩 줄은 그 위에 **음수 마진 bleed** 까지 얹어
+            카드 끝까지 스크롤된다 (`place-filter-chips` 머리주석). 여기서 padding 을 한 번
+            더 주면 글줄이 두 번 밀리고 bleed 계산이 어긋난다.
+          */}
+          {tools}
         </div>
       )}
-      {children}
+      {fill ? (
+        /*
+          **여기만 구른다.** `overflow` 를 `lg` 로 좁히는 것은 그 아래에서 열 높이가 없어
+          스크롤 컨테이너가 초점 링을 자르기만 하기 때문이다.
+        */
+        <div className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto">{children}</div>
+      ) : (
+        children
+      )}
     </section>
+  )
+}
+
+/**
+ * 머리의 제목 줄 — 제목 + 부제 + 우측 액션.
+ *
+ * **`leading` 이 있고 없고에 따라 감싸는 곳이 달라서 뽑았다** (#556). 모바일 제목 줄
+ * (#539)은 뒤로가기와 제목 덩어리를 `flex-wrap` 한 줄에 세우는데, 뒤로가기가 없는 세 화면은
+ * 그 래퍼가 필요 없다 — 두 갈래가 같은 줄을 그리도록 한 곳에 둔다.
+ */
+function HeadTitleRow({
+  title,
+  titleId,
+  description,
+  lead,
+  trailing,
+}: {
+  title: ReactNode
+  titleId?: string | undefined
+  description?: ReactNode
+  lead?: boolean | undefined
+  trailing?: ReactNode
+}) {
+  if (title === undefined) return null
+
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="min-w-0">
+        <h2
+          id={titleId}
+          className={cn(
+            'text-title-2 text-fg font-semibold break-keep',
+            lead ? 'md:text-display md:font-extrabold' : 'md:text-title-1 md:font-bold',
+          )}
+        >
+          {title}
+        </h2>
+        {description !== undefined && <div className="mt-1">{description}</div>}
+      </div>
+      {trailing !== undefined && <div className="shrink-0">{trailing}</div>}
+    </div>
   )
 }
 

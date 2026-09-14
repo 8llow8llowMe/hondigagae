@@ -47,18 +47,24 @@ export default function PlacesLoading() {
       <SurfaceStack className="list-column">
         <h1 className="sr-only">{messages.place.pageTitle}</h1>
 
-        <div
-          className={cn('flex items-center justify-between gap-3 pt-3 md:pt-0', INSET_CLASS.card)}
+        {/*
+          **실화면과 같은 카드 하나다** (#556). 제목·검색·토글이 전부 카드 머리로 들어갔으므로
+          골격도 그 안에 선다 — 바닥 위에 뼈대를 따로 세우면 조회가 끝나는 순간 블록이
+          셋에서 하나로 접히며 화면이 튄다.
+        */}
+        <Surface
+          fill
+          title={messages.place.pageTitle}
+          description={<Skeleton variant="text" className="hidden h-5 w-56 lg:block" />}
+          /* 보기 토글 자리 — 링크가 아직 없으므로 크기만 잡는다 */
+          trailing={<Skeleton variant="text" className="h-11 w-22 shrink-0" />}
+          tools={
+            <div className={cn('flex items-start gap-2 pt-3', INSET_CLASS.card)}>
+              <Skeleton variant="text" className="h-11 flex-1" />
+              <Skeleton variant="text" className="h-11 w-16 shrink-0" />
+            </div>
+          }
         >
-          <div className="flex min-w-0 flex-col gap-1">
-            <Skeleton variant="text" className="h-8 w-40" />
-            <Skeleton variant="text" className="hidden h-5 w-56 lg:block" />
-          </div>
-          {/* 보기 토글 자리 — 위 주석 참고 */}
-          <Skeleton variant="text" className="h-11 w-22 shrink-0" />
-        </div>
-
-        <Surface>
           <SurfaceList columns={2}>
             {Array.from({ length: 6 }, (_, index) => (
               <PlaceRowSkeleton key={index} />

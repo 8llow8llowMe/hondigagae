@@ -42,9 +42,19 @@ export function PlaceFilterChips({
   filters,
   /** 미로그인이면 반려견 목록을 조회하지 않는다 — 크기 축 컨트롤이 빠진다 (#200) */
   authed,
+  divider = false,
+  className,
 }: {
   filters: PlaceFilters
   authed: boolean
+  /**
+   * 아래 구분선. **기본은 없다** (#556) — 이제 두 사용처가 모두 카드 머리 안이고
+   * (`Surface fill`), 머리 자신이 아래 선을 그으므로 여기서 또 그으면 2px 로 겹친다.
+   * `EmergencyFilterChips` 가 먼저 같은 이유로 갖고 있던 prop 이고 기본값도 같다.
+   */
+  divider?: boolean
+  /** 레이아웃 유틸리티만 — 폭에 따라 숨기는 `lg:hidden` 이 이것으로 온다 */
+  className?: string
 }) {
   const { apply, reset } = usePlaceFilterNav()
   const { pet } = useSelectedPet(authed)
@@ -86,12 +96,13 @@ export function PlaceFilterChips({
         **인셋은 카드 축(`card`, 16/20)이다** (#457). 예전에는 `md:px-10` 을 직접 적어
         768 에서 스택 인셋 24 위에 40 이 얹혀 글줄이 64 에 섰다 — 바로 아래 카드 제목
         (24+1+20 = 45)과 19px 갈렸다. 칩은 카드 밖 도구지만(#439) **L0 위에 놓이는 블록도
-        카드 안 글줄과 같은 축**이어야 한다 (`plan-add-place-header` 의 `inset` 주석, #451).
+        카드 안 글줄과 같은 축**이어야 한다 (`lib/ui/inset.ts` 의 `card` 주석, #451).
 
         카드 테두리 1px 만큼(44 vs 45) 남는 차이는 #443 · #447 과 같은 의도다.
 
-        **`border-b` 는 남긴다.** L0 위 스트립은 아래 카드와 자기를 가르는 줄이 필요하다 —
-        홈 특보 스트립과 같은 모양이다. 선은 padding 밖이라 전폭 그대로다.
+        **`border-b` 는 `divider` 로 갈렸다** (#556). L0 위 스트립이던 동안에는 아래 카드와
+        자기를 가르는 줄이 필요했는데, 이제 두 사용처가 모두 카드 **머리 안**이라 머리가
+        그 줄을 긋는다. 선은 padding 밖이라 켜면 전폭 그대로다.
 
         ── 줄바꿈이 아니라 가로 스크롤이다 (#531)
 
@@ -104,7 +115,14 @@ export function PlaceFilterChips({
         그래서 인셋은 `INSET_BLEED_CLASS.card` 로 바깥 padding 을 상쇄하고 같은 값을 안쪽에
         되돌린다 — 칩은 화면 끝까지 이어져 스크롤되되 첫 칩은 16 에 선다.
       */}
-      <div className={cn('scroll-rail border-border border-b py-3', INSET_CLASS.card)}>
+      <div
+        className={cn(
+          'scroll-rail py-3',
+          divider && 'border-border border-b',
+          INSET_CLASS.card,
+          className,
+        )}
+      >
         <ChipGroup
           ref={rail.ref}
           onScroll={rail.onScroll}

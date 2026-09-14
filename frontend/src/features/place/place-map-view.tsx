@@ -66,6 +66,7 @@ export function PlaceMapView({
   mutedPlaceIds,
   renderListRow,
   sheetMaxTopInset,
+  panelTopInset,
 }: {
   filters: PlaceFilters
   /** 미로그인이면 반려견 목록을 조회하지 않는다 — 필터의 크기 축이 빠진다 (#200) */
@@ -100,6 +101,14 @@ export function PlaceMapView({
    * 떠 있는 `/places` 기준이라 그런 화면에서는 헤더를 통째로 덮는다.
    */
   sheetMaxTopInset?: number | undefined
+  /**
+   * 데스크톱 좌측 패널의 위 여백(px). 주지 않으면 기본 24(`top-6`)다.
+   *
+   * **위에 떠 있는 것이 있는 화면이 자기 높이를 알려 준다** (#556). 담기 지도는 뒤로가기와
+   * 제목을 같은 기둥(`left-4`) 위에 띄우므로 패널이 그만큼 내려와야 겹치지 않는다 —
+   * `sheetMaxTopInset` 이 모바일 시트에 대해 하는 일과 같은 축이다.
+   */
+  panelTopInset?: number | undefined
 }) {
   const [bounds, setBounds] = useState<MapBounds | null>(null)
   /** 지도를 옮겼는지. 처음 `idle` 한 번은 이동이 아니다 */
@@ -353,8 +362,11 @@ export function PlaceMapView({
           // 하단은 32 다. **카카오 축척·로고 막대가 지도 왼쪽 아래 20px 를 쓴다** —
           // 16 이었을 때는 패널이 그 위에 바로 얹혀 축척이 눌려 보였다 (실측: 막대가
           // 바닥에서 0~19px, 왼쪽 6px 부터 129px 폭). 32 면 13px 이 남는다.
-          'absolute top-6 bottom-8 left-4 z-30 hidden lg:block',
+          'absolute bottom-8 left-4 z-30 hidden lg:block',
+          // 기본 24. 위에 떠 있는 것이 있는 화면은 `panelTopInset` 으로 밀어 내린다 (#556)
+          panelTopInset === undefined && 'top-6',
         )}
+        style={panelTopInset === undefined ? undefined : { top: panelTopInset }}
       >
         {/*
           **펼치기 버튼은 패널과 형제이고 자리가 고정이다.** 패널이 밀려나도 이 버튼은

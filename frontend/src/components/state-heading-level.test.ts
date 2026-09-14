@@ -226,33 +226,20 @@ describe('부모에 따라 갈리는 둘 — 담는 곳이 정한다', () => {
     expect(source).not.toMatch(/<h3[^>]*>\{messages\.emergency\.narrowedTitle\}/)
   })
 
-  it('세 사용처가 실제로 갈린다 — 제목 있는 카드에서만 3 을 넘긴다', () => {
+  it('네 사용처가 실제로 갈린다 — 제목 있는 카드에서만 3 을 넘긴다', () => {
     /*
-      **`place-list-view` 가 이쪽을 떠났다** (#531). 목록 카드가 제목을 잃고 `aria-label`
-      만 갖게 되면서 — 페이지 제목이 카드 위 제목 줄로 올라갔다 — 그 카드 안의 상태는 더
-      이상 `h2` 아래가 아니다. 값이 `3` → `2` 로 내려간 것은 회귀가 아니라 짝의 반대쪽이
-      함께 움직인 결과다. `emergency-list-view`(#537)가 먼저 같은 길을 갔다.
+      **셋이 이쪽으로 돌아왔다** (#556). #531 · #537 이 제목을 카드 **위**로 올렸을 때는
+      목록 카드가 `aria-label` 만 갖는 면이라 그 안의 상태가 `h2` 였다. 제목이 카드 **머리**
+      로 들어오면서 카드가 다시 `h2` 를 그리므로 상태는 한 단 내려간 `h3` 다.
 
-      **그래도 값을 지워 기본값에 맡기지 않는다** — 지우면 "이 카드가 제목을 갖는가" 라는
-      판단이 소스에서 사라져, 제목을 카드로 되돌리는 변경이 아무 데서도 걸리지 않는다.
+      **값을 지워 기본값에 맡기지 않는다** — 지우면 "이 카드가 제목을 갖는가" 라는 판단이
+      소스에서 사라져, 제목을 다시 카드 밖으로 빼는 변경이 아무 데서도 걸리지 않는다.
     */
-    expect(code('src/features/place/place-list-view.tsx')).toContain('headingLevel={2}')
+    expect(code('src/features/place/place-list-view.tsx')).toContain('headingLevel={3}')
+    expect(code('src/features/emergency/emergency-list-view.tsx')).toContain('headingLevel={3}')
+    expect(code('src/features/plan/plan-add-place-view.tsx')).toContain('headingLevel={3}')
 
-    /*
-      **`emergency-list-view` 가 이쪽을 떠났다** (#537). 목록 갈래의 카드가 제목을 잃고
-      `aria-label` 만 갖게 되면서 — 페이지 제목이 카드 위 제목 줄로 올라갔다 — 그 카드
-      안의 상태는 더 이상 `h2` 아래가 아니다. 값이 `3` 에서 `2` 로 내려간 것이 회귀가
-      아니라 짝의 반대쪽이 함께 움직인 결과다.
-
-      **그래도 `not.toContain('headingLevel')` 쪽에 두지 않는다.** 기본값이 `2` 라
-      넘기지 않아도 결과는 같지만, 이 화면은 한때 `3` 이었으므로 값을 지우면 "카드가
-      제목을 갖는가" 라는 판단이 소스에서 사라진다. 명시해서 다음 사람이 되돌릴 때
-      이 단언이 걸리게 둔다.
-    */
-    expect(code('src/features/emergency/emergency-list-view.tsx')).toContain('headingLevel={2}')
-
-    // `aria-label` 만 있는 카드 · 카드 없음 — 넘기지 않아 기본값 2 로 남는다
-    expect(code('src/features/plan/plan-add-place-view.tsx')).not.toContain('headingLevel')
+    // 카드 없음(지도 SDK 폴백) — 넘기지 않아 기본값 2 로 남는다
     expect(code('src/features/place/place-map-view.tsx')).not.toContain('headingLevel')
   })
 })
@@ -311,8 +298,8 @@ const ROUTE_STATE_FILES = [
   { path: 'app/(main)/ai-plans/jobs/[jobId]/error.tsx', level: 2 },
   { path: 'app/(main)/pets/[petId]/error.tsx', level: 2 },
   { path: 'app/(main)/pets/[petId]/not-found.tsx', level: 2 },
-  /* 제목이 카드 위 제목 줄로 올라가 `aria-label` 만 남았다 — `2` 로 내려왔다 (#531) */
-  { path: 'app/(main)/places/(list)/error.tsx', level: 2 },
+  /* 제목이 카드 **머리** 로 돌아와 카드가 다시 `h2` 를 그린다 — `3` 이다 (#556) */
+  { path: 'app/(main)/places/(list)/error.tsx', level: 3 },
   { path: 'app/(main)/places/[placeId]/error.tsx', level: 2 },
   { path: 'app/(main)/places/[placeId]/not-found.tsx', level: 2 },
   { path: 'app/(main)/plans/[planId]/error.tsx', level: 2 },

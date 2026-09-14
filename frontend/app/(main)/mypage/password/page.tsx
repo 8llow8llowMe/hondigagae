@@ -45,7 +45,7 @@ export default async function PasswordPage() {
 
       **뒤로가기는 L0 다.** 어느 카드에도 속하지 않는다(§0 판정에서 "페이지 머리" 가
       빠진다). 인셋은 `main`(16/40)이 아니라 **`card`(16/20)** 이고, 데스크톱 세로
-      여백은 `SurfaceStack` 의 `md:p-6` 에 맡긴다 — 둘 다 `plan-add-place-header` 의
+      여백은 `SurfaceStack` 의 `md:p-6` 에 맡긴다 — 둘 다 `lib/ui/inset.ts` 의
       `inset` 주석(#451)과 같은 값이다.
     */
     <Canvas as="main" id="main-content">

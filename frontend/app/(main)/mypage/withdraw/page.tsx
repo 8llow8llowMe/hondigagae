@@ -21,7 +21,7 @@ export default function WithdrawPage() {
 
       **뒤로가기는 L0 다.** 어느 카드에도 속하지 않는다. 인셋은 아래 카드 안 글줄과
       같은 축(`card`, 16/20)이고 데스크톱 세로 여백은 `SurfaceStack` 의 `md:p-6` 이
-      맡는다 — `plan-add-place-header`(#451)와 같다.
+      맡는다 — `lib/ui/inset.ts`(#451)와 같다.
     */
     <Canvas as="main" id="main-content">
       <SurfaceStack className="mx-auto w-full max-w-2xl">

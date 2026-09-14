@@ -147,12 +147,17 @@ export default async function PlanAddPlacePage({
         보내므로 이 구간을 건너뛰지 못한다 — 키보드 사용자가 목록에 닿으려면 필터
         컨트롤을 전부 지나야 했다. `relative` 는 그 링크가 레일 좌상단에 뜨게 한다.
 
-        **이 화면만 `h1` 을 레일 앞으로 올리지 못한다.** `/places` · `/plans` 는 페이지
-        제목이 `sr-only` 라 캔버스 맨 앞으로 옮기면 그만이지만, 여기 제목(`1일차에 담을
-        장소`)은 **보이는 페이지 머리**다 (#451 이 L0 위에 둔 것). 위로 옮기면 화면에서도
-        레일 위로 올라간다. 그래서 이 화면의 개요는 `h2 필터` 가 `h1` 보다 먼저인 채로
-        남고, 대신 **랜드마크와 건너뛰기 링크**가 그 구간을 넘게 해 준다 (#472).
+        **`h1` 이 이제 레일 앞에 선다** (#556). #451 은 제목이 **보이는** 페이지 머리라
+        위로 못 올렸고, 그래서 이 화면의 개요만 `h2 필터` 가 `h1` 보다 먼저였다. 제목이 우측
+        카드 머리(`Surface` 의 `h2`)로 들어가면서 그 제약이 풀려, `/places` · `/plans` 와 같이
+        `sr-only` 사본을 캔버스 맨 앞에 둔다 — `position: absolute` 라 grid 트랙을 만들지
+        않으므로 2단이 깨지지 않는다.
+
+        **지도 갈래에는 두지 않는다** (위 분기). 거기는 떠 있는 머리 카드가 **보이는** `h1` 을
+        그리므로 여기서 또 내면 문서에 `h1` 이 둘이 된다.
       */}
+      <h1 className="sr-only">{messages.plan.addPlaceTitle.replace('{day}', String(day))}</h1>
+
       <aside
         aria-label={messages.place.filterTitle}
         className="rail-column relative hidden lg:block"

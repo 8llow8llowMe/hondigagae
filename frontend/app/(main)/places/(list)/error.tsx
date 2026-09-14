@@ -3,8 +3,6 @@
 import { ErrorState } from '@/components/error-state'
 import { Canvas, Surface, SurfaceStack } from '@/components/surface'
 import { messages } from '@/lib/messages'
-import { INSET_CLASS } from '@/lib/ui/inset'
-import { cn } from '@/lib/utils/cn'
 
 /**
  * 세그먼트 렌더 중 발생한 예상 못 한 예외.
@@ -15,12 +13,16 @@ import { cn } from '@/lib/utils/cn'
  *
  * **카드 판정은 그 세그먼트의 정상 화면을 따른다** — 정상 화면이 상태(로딩·오류·빈)를
  * 카드에 담으면 라우트 경계도 담고, 담지 않으면 경계도 담지 않는다. 여기서는
- * `page.tsx` 가 `<Surface aria-label={messages.place.pageTitle}>` 하나에 목록을 담고
- * `loading.tsx` 도 같은 카드를 흉내 내므로, 경계도 **같은 카드·같은 이름표**를 쓴다.
+ * `page.tsx` 가 `<Surface fill title={messages.place.pageTitle}>` 하나에 목록을 담고
+ * `loading.tsx` 도 같은 카드를 흉내 내므로, 경계도 **같은 카드·같은 제목**을 쓴다.
  *
- * **카드가 제목을 잃었다** (#531). 페이지 제목이 카드 **위** 제목 줄로 올라가면서
- * `page.tsx` 의 `lead`·`title` 이 걷혔고, 경계도 따라왔다 — 한쪽만 옮기면 오류가 뜨는
- * 순간 제목이 카드 안팎으로 뛴다. 이름은 `aria-label` 이 잇는다.
+ * **카드가 제목을 되찾았다** (#556). #531 이 페이지 제목을 카드 **위** 로 올렸던 것을
+ * 되돌려 카드 **머리** 로 넣었고, 경계도 따라왔다 — 한쪽만 옮기면 오류가 뜨는 순간
+ * 제목이 카드 안팎으로 뛴다.
+ *
+ * **`fill` 은 붙이지 않는다.** 그 규칙은 `.list-column` 이 잡아 주는 열 높이를 카드가
+ * 채우는 것인데(`Surface` 의 `fill` 절), 이 경계는 `rail-layout` 에 가입하지 않아
+ * 채울 열 자체가 없다 — 붙이면 `flex-1` 이 받을 부모가 없어 아무 일도 하지 않는다.
  *
  * **제목 줄에 보기 토글을 두지 않는다.** 정상 화면의 토글은 `listHref`/`mapHref` 가
  * 필요하고 그것은 `searchParams` 에서 온다 — 오류 경계는 그것을 받지 않는다 (부제를
@@ -48,21 +50,13 @@ export default function PlacesError({ reset }: { error: Error; reset: () => void
       <SurfaceStack className="content-container">
         <h1 className="sr-only">{messages.place.pageTitle}</h1>
 
-        {/* 정상 화면의 제목 줄과 같은 자리·같은 인셋이다 — 제목 글자는 위 `h1` 의 사본이라
-            `aria-hidden` 이고, 그래서 이름이 두 번 들리지 않는다 */}
-        <div className={cn('pt-3 md:pt-0', INSET_CLASS.card)}>
-          <p aria-hidden className="text-title-1 text-fg font-semibold break-keep">
-            {messages.place.pageTitle}
-          </p>
-        </div>
-
-        <Surface aria-label={messages.place.pageTitle}>
+        <Surface titleId="place-list-heading" title={messages.place.pageTitle}>
           <ErrorState
             title={messages.place.errorTitle}
             description={messages.common.temporaryErrorDescription}
             inset="card"
-            /* 카드가 `h2` 를 그리지 않으므로 상태 제목이 한 단 올라간다 (#456① · #531) */
-            headingLevel={2}
+            /* 카드가 `h2` 를 되찾았으므로 상태 제목이 한 단 내려간다 (#456① · #556) */
+            headingLevel={3}
             onRetry={reset}
           />
         </Surface>
