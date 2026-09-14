@@ -42,9 +42,9 @@ export default function PlacesLoading() {
   return (
     <Canvas as="main" id="main-content" className="rail-layout rail-layout-filter">
       {/* 레일의 자리만 잡는다 — 내용은 위 주석 참고 */}
-      <div aria-hidden className="hidden lg:block" />
+      <div aria-hidden className="rail-column hidden lg:block" />
 
-      <SurfaceStack>
+      <SurfaceStack className="list-column">
         <h1 className="sr-only">{messages.place.pageTitle}</h1>
 
         <div

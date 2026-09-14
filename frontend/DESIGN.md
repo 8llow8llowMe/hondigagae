@@ -553,7 +553,11 @@ className = 'text-title-2 text-fg md:text-title-1 font-semibold md:font-bold'
 | `--band-h`          | 8             | 밴드 높이 (2a 의 값 — 3a 는 카드 경계가 대신한다) |
 
 - **콘텐츠는 1440 에서 멈추고 중앙 정렬한다** (`--content-max`). 캡은 `app/globals.css` 의
-  `.content-container, .rail-layout` 한 규칙이 갖는다.
+  `.content-container` 와 `.rail-layout` 두 규칙이 **같은 토큰으로** 갖는다.
+  표현이 갈린 이유는 후자가 **스스로 L0 바닥을 칠하는 `Canvas`** 에도 붙기 때문이다 —
+  폭을 직접 줄이면 1600 에서 좌우 각 77px 이 흰 `body` 로 남는다. 그래서 `.rail-layout` 은
+  `padding-inline: max(0px, calc((100% - var(--content-max)) / 2))` 로, 전폭을 유지한 채
+  안쪽 내용 상자만 1440 으로 만든다.
 - **지도 화면만 전폭이다.** 전폭은 예외 처리가 아니라 `.rail-layout` 에 **가입하지 않는 것**이다.
 - 검색 필드가 있는 헤더는 **64**, 없으면 **56**.
 - **모바일 우선으로 작성한다.** 데스크톱 스타일을 미디어 쿼리로 덧붙인다.
@@ -724,13 +728,23 @@ className = 'text-title-2 text-fg md:text-title-1 font-semibold md:font-bold'
 
 ```tsx
 <main className="rail-layout rail-layout-filter">
-  <div className="hidden lg:sticky lg:top-16 lg:block">{/* 필터 */}</div>
-  <div className="lg:border-border lg:border-l">{/* 목록 */}</div>
+  <aside className="rail-column hidden lg:block">{/* 필터 */}</aside>
+  <SurfaceStack className="list-column">{/* 목록 */}</SurfaceStack>
 </main>
 ```
 
 **레일은 `hidden lg:block` 이다.** 2단이 켜지는 폭(1024)과 레일이 보이는 폭이 어긋나면
 태블릿에서 레일이 본문 위에 쌓이거나 가로 스크롤이 난다.
+
+**목록 2단(`rail-layout-filter`)은 1024 이상에서 열마다 자기 스크롤을 갖는다** (#553).
+묶음 높이를 `100dvh - 헤더` 로 못박고, 좌우 열이 각각 `overflow-y: auto` 다.
+
+- 좌측은 **열이 아니라 그 안의 카드(`.filter-rail`)가 스크롤한다** — 열이 들면 세로
+  스크롤바가 카드 테두리 **밖**에 뜬다.
+- **`overscroll-behavior` 를 걸지 않는다.** 연쇄를 끊으면 열 끝에서 페이지가 멈춰 푸터에
+  손이 닿지 않는다. 페이지 스크롤에 남는 몫이 정확히 푸터 높이다.
+- **1024 미만은 페이지 스크롤 하나다.** 레일이 없고, 화면 안에 스크롤 영역을 나누면
+  모바일 브라우저 주소창 접힘이 멈춘다.
 
 **2단 묶음에 `min-block-size: calc(100dvh - var(--header-h))` 를 준다.**
 구조를 나누는 선이 콘텐츠 길이에 따라 잘리면 구분이 아니라 우연처럼 읽힌다 — 일정이

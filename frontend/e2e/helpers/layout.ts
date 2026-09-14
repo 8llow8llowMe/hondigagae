@@ -65,6 +65,14 @@ export async function headingOutline(page: Page): Promise<string[]> {
   )
 }
 
+/**
+ * `--content-max` 의 사본 — 콘텐츠 컨테이너가 멈추는 폭 (`src/styles/tokens.css`).
+ *
+ * **토큰을 읽어 오지 않는다.** 그러면 토큰이 바뀔 때 검사도 같이 움직여 아무것도 못 잡는다.
+ * 두 값이 갈라지는 것은 `src/styles/content-max.test.ts` 가 잡는다.
+ */
+export const CONTENT_MAX = 1440
+
 export const VIEWPORTS = {
   mobile: { width: 390, height: 844 },
   tablet: { width: 768, height: 1024 },

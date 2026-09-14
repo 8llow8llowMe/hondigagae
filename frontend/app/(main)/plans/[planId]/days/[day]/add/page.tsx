@@ -155,7 +155,7 @@ export default async function PlanAddPlacePage({
       */}
       <aside
         aria-label={messages.place.filterTitle}
-        className="rail-sticky relative hidden lg:block"
+        className="rail-column relative hidden lg:block"
       >
         <SkipLink href="#plan-add-place-list">{messages.common.skipToList}</SkipLink>
         <PlaceFilterRail filters={filters} authed />

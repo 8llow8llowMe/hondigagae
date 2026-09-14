@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 
 import { messages } from '../src/lib/messages'
 import {
+  CONTENT_MAX,
   hasHorizontalOverflow,
   headingOutline,
   leftEdge,
@@ -30,9 +31,14 @@ import {
  * `jobId` 가 있어야 열리는 화면이고, 없는 id 로 열면 404 갈래만 재게 된다.
  */
 /**
- * **`/plans` 를 넣는 이유는 `rail-layout` 이다** (#520). `Canvas` 가 `margin-inline: auto` 를
- * 가진 클래스를 **직접** 다는 라우트가 `/places` 와 `/plans` 둘인데, 회귀가 가장 크게 난
- * 쪽이 `/plans` 였다 (390 에서 바닥 240). 한쪽만 재면 다른 쪽 드리프트를 못 잡는다.
+ * **`/plans` 를 넣는 이유는 `rail-layout` 이다** (#520). `Canvas` 가 **캡 클래스를 직접**
+ * 다는 라우트가 `/places` 와 `/plans` 둘인데, 회귀가 가장 크게 난 쪽이 `/plans` 였다
+ * (390 에서 바닥 240). 한쪽만 재면 다른 쪽 드리프트를 못 잡는다.
+ *
+ * #520 당시 그 클래스는 `margin-inline: auto` 였고, **flex 아이템은 cross 축 margin 이
+ * `auto` 면 `stretch` 가 무효가 된다**는 것이 원인이었다. #553 이 `.rail-layout` 을 좌우
+ * 패딩 캡으로 바꿔 그 경로 자체를 없앴지만, 재는 자리는 그대로 둔다 — 두 라우트가 여전히
+ * 캡 클래스를 `Canvas` 에 직접 단다.
  */
 const SCREENS = [
   '/mypage',
@@ -78,10 +84,15 @@ test.describe('3층 표면', () => {
         `Canvas` 에 직접 다는 화면이 있으므로 폭은 실제로 재야 한다. `Canvas` 쪽 유닛 단언은
         `w-full` 이 붙어 있는지만 알고, 그것이 실제로 전폭을 만드는지는 모른다.
 
-        **1440 캡도 함께 본다** — `w-full` 이 `max-inline-size` 를 덮어 캡을 깨면 그것도 버그다.
+        **1440 캡도 함께 본다** — 캡이 깨지면 그것도 버그다.
+
+        **캡을 재는 자리가 바뀌었다** (#553). `.rail-layout` 은 이제 폭을 줄이지 않고
+        **좌우 패딩**으로 1440 을 만든다 — `Canvas` 에 직접 붙는 클래스라, 폭을 줄이면
+        회색 바닥이 1440 에서 끊기고 그 바깥이 흰 `body` 로 남았다(1600 실측 좌우 77px).
+        그래서 바깥 상자는 **항상 전폭**이고, 캡은 안쪽 내용 상자에서 잰다.
       */
       for (const [name, size] of Object.entries(VIEWPORTS)) {
-        test(`${name} 에서 바닥이 전폭이다`, async ({ page }) => {
+        test(`${name} 에서 바닥이 전폭이고 내용은 1440 에서 멈춘다`, async ({ page }) => {
           await page.setViewportSize(size)
           await page.goto(path)
           await expect(page.getByRole('main')).toBeVisible()
@@ -89,10 +100,17 @@ test.describe('3층 표면', () => {
           const floor = await page.evaluate(() => {
             const main = document.querySelector('main') as HTMLElement
             const box = main.getBoundingClientRect()
-            const cap = getComputedStyle(main).maxInlineSize
+            const style = getComputedStyle(main)
+            const cap = style.maxInlineSize
+            const padding =
+              Number.parseFloat(style.paddingInlineStart) +
+              Number.parseFloat(style.paddingInlineEnd)
             return {
               width: Math.round(box.width),
               left: Math.round(box.left),
+              content: Math.round(box.width - padding),
+              padStart: Math.round(Number.parseFloat(style.paddingInlineStart)),
+              padEnd: Math.round(Number.parseFloat(style.paddingInlineEnd)),
               viewport: window.innerWidth,
               cap: cap === 'none' ? null : Math.round(Number.parseFloat(cap)),
             }
@@ -104,9 +122,23 @@ test.describe('3층 표면', () => {
           expect(floor.width).toBe(expected)
           /*
             캡보다 좁은 뷰포트면 왼쪽 끝(0), 넓으면 `margin-inline: auto` 가 가운데로 보낸다.
-            **둘을 함께 본다** — 폭만 보면 `w-full` 이 캡을 덮어 전폭이 돼도 통과한다.
+            **둘을 함께 본다** — 폭만 보면 캡이 깨져 전폭이 돼도 통과한다.
           */
           expect(floor.left).toBe(Math.round((floor.viewport - expected) / 2))
+
+          /*
+            **캡하는 화면만 캡을 본다.** `main` 이 `.rail-layout` 인 두 라우트만 여기서
+            캡하고, 나머지(`/mypage` · `/pets` · `/favorites` · `/ai-plans/new`)는
+            **바닥이 전폭인 채 캡을 안쪽 `SurfaceStack` 이 진다** (§0 — 바닥과 쌓기를 한
+            컴포넌트로 두지 않는다). 무조건 재면 그 넷을 1920 에서 오진한다.
+          */
+          if (floor.cap !== null) {
+            expect(floor.cap).toBe(CONTENT_MAX)
+          } else if (floor.padStart > 0) {
+            // 패딩으로 캡하는 쪽 — 안쪽 내용 상자가 1440 이고 좌우가 같아야 가운데다
+            expect(floor.content).toBe(CONTENT_MAX)
+            expect(floor.padStart).toBe(floor.padEnd)
+          }
         })
       }
 
@@ -405,13 +437,16 @@ test.describe('3층 표면 — not-found', () => {
           클래스 문자열이 제자리에 있는지만 알고, 그 조합이 실제로 높이를 만들어 내는지는
           모른다 — `flex-1` 을 받을 부모가 `flex` 를 잃는 식의 회귀는 브라우저에서만 잡힌다.
 
-          **푸터 바닥까지 함께 본다.** 회색만 보면 `min-h` 로 고친 안(기각)도 통과하는데,
-          그 안은 없던 스크롤을 짧은 화면마다 만든다. 문서 높이 = 뷰포트 높이를 같이
-          단언해야 그 갈래가 갈린다.
+          **푸터 자리까지 함께 본다.** 회색만 보면 바닥이 뷰포트를 넘겨 자라는 갈래도
+          통과한다 — 문서 높이가 정확히 **뷰포트 + 푸터**인지를 같이 단언해야 갈린다.
+
+          **#553 이 "스크롤이 생기지 않는다" 를 "푸터 몫만 생긴다" 로 바꿨다.** 예전에는
+          바닥이 `flex-1` 로 `100dvh - 헤더 - 푸터` 까지만 자라 푸터가 접힘 위에 앉았는데,
+          그러면 `.rail-layout` 세 화면(`100dvh - 헤더`)과 회색이 끝나는 자리가 260px
+          달랐다. 이제 `Canvas` 가 `.page-canvas` 로 같은 값을 갖고, 남는 스크롤은 푸터 몫
+          하나뿐이다 — **그 양을 재는 것이 "없던 스크롤이 생기지 않는다" 의 새 형태다.**
         */
-        test(`${name} 에서 바닥이 뷰포트 끝까지 이어진다 — 스크롤은 생기지 않는다`, async ({
-          page,
-        }) => {
+        test(`${name} 에서 바닥이 접힘까지 이어지고 스크롤은 푸터 몫뿐이다`, async ({ page }) => {
           await page.setViewportSize(size)
           await page.goto(path)
           await expect(page.getByRole('heading', { name: title, level: 2 })).toBeVisible()
@@ -425,15 +460,16 @@ test.describe('3층 표면 — not-found', () => {
               doc: document.documentElement.scrollHeight,
               canvasBottom: round(canvas?.bottom ?? -1),
               footerTop: round(footer?.top ?? -1),
-              footerBottom: round(footer?.bottom ?? -1),
+              footerHeight: round(footer?.height ?? -1),
             }
           })
 
           // 회색이 푸터 바로 위까지 온다 — 둘 사이에 흰 띠가 없다
           expect(geometry.canvasBottom).toBe(geometry.footerTop)
-          // 푸터가 뷰포트 바닥에 앉는다. 내려가면 없던 스크롤이 생긴 것이다
-          expect(geometry.footerBottom).toBe(geometry.viewport)
-          expect(geometry.doc).toBe(geometry.viewport)
+          // 바닥이 접힘(뷰포트 바닥)에서 끝난다 — 짧아도 길어도 아니다
+          expect(geometry.canvasBottom).toBe(geometry.viewport)
+          // 굴릴 것은 푸터뿐이다
+          expect(geometry.doc - geometry.viewport).toBe(geometry.footerHeight)
         })
       }
     })

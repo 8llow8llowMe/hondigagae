@@ -24,8 +24,11 @@ describe('L0 Canvas — 페이지 바닥', () => {
       **`flex-1` 은 배치가 아니라 높이이고 `w-full` 은 전폭 그 자체다.** 둘 다 위 규칙과
       부딪히지 않는다 — 목록을 정확히 잠가 두는 이유는 여백·컨테이너 클래스가 나중에
       슬며시 끼는 것을 막기 위해서다.
+
+      `page-canvas`(globals.css)도 높이다 — `100dvh - 헤더` 를 화면마다 갈리지 않게 한
+      곳에서 준다 (#553).
     */
-    expect(classes).toEqual(['bg-bg-sunken', 'w-full', 'flex-1'])
+    expect(classes).toEqual(['page-canvas', 'bg-bg-sunken', 'w-full', 'flex-1'])
   })
 
   /*
@@ -50,15 +53,17 @@ describe('L0 Canvas — 페이지 바닥', () => {
     1280×900 `/places/<없는 id>` 실측에서 회색이 274 에서 끝나고 푸터 아래 366px 이
     맨 흰색이었다. `DESIGN.md §0` 의 "흰색은 바닥이 아니라 섹션의 색" 이 뒤집힌다.
 
-    **`min-h-*` 로 고치지 않는다.** `100dvh - 헤더` 를 박으면 푸터(260)가 통째로 접힘
-    아래로 내려가 **없던 스크롤이 짧은 화면마다 생긴다.** 높이를 주는 쪽은
-    `app/(main)/layout.tsx` 의 세로 뼈대이고 (`main-layout-surface.test.ts` 가 잠근다),
-    여기서는 그 남는 높이를 받기만 한다.
+    **최소 높이는 Tailwind `min-h-*` 가 아니라 `.page-canvas`(globals.css)가 준다** (#553).
+    값(`100dvh - 헤더`)을 한 곳에 두려는 것이다 — `.rail-layout` 도 같은 값을 쓰는데,
+    유틸리티로 흩으면 두 규칙이 조용히 갈린다. 남는 높이를 받는 `flex-1` 은 그대로다
+    (주는 쪽은 `app/(main)/layout.tsx` 의 세로 뼈대이고 `main-layout-surface.test.ts` 가 잠근다).
   */
   it('남는 높이를 먹는다 — 내용이 짧아도 바닥이 뷰포트에서 끊기지 않는다', () => {
     const classes = classesOf(renderToStaticMarkup(createElement(Canvas, null, '내용')))
 
     expect(classes).toContain('flex-1')
+    expect(classes).toContain('page-canvas')
+    // 높이 규칙은 `.page-canvas` 한 곳이다 — 유틸리티로 흩지 않는다
     expect(classes.filter((name) => /(^|:)min-h-/.test(name))).toEqual([])
   })
 

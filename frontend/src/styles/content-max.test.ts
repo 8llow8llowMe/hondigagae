@@ -32,17 +32,36 @@ describe('콘텐츠 컨테이너 — 토큰 (#376)', () => {
   })
 })
 
-describe('콘텐츠 컨테이너 — 캡 규칙 (#376)', () => {
-  const rule = globals.match(/^\.content-container,\s*\n\.rail-layout\s*\{[^}]*\}/m)?.[0]
+/*
+  **두 클래스가 캡을 다르게 표현한다 — 값만 같다** (이슈 #553).
 
-  it('.content-container 와 .rail-layout 이 한 규칙에서 캡된다', () => {
-    // 값이 두 군데로 갈라지면 헤더 내용과 본문의 좌우 경계가 어긋난다
-    expect(rule).toBeDefined()
+  `.content-container` 는 배경을 칠하지 않는 것에 붙어 폭을 직접 줄이고,
+  `.rail-layout` 은 **스스로 L0 바닥을 칠하는 `Canvas`** 에도 붙어 전폭으로 남아야 한다
+  (1600 실측에서 좌우 각 77px 이 흰 `body` 로 남았다). 그래서 후자는 좌우 패딩으로 캡한다.
+
+  검사가 지키는 것은 "한 규칙" 이 아니라 **값이 갈라지지 않는 것**이다 — 둘 다
+  `var(--content-max)` 를 쓰는지, 그리고 `.rail-layout` 이 폭을 직접 줄이지 않는지를 본다.
+*/
+describe('콘텐츠 컨테이너 — 캡 규칙 (#376 · #553)', () => {
+  const container = globals.match(/^\.content-container\s*\{[^}]*\}/m)?.[0]
+  const rail = globals.match(/^\.rail-layout\s*\{[^}]*\}/m)?.[0]
+
+  it('.content-container 는 폭으로 캡한다', () => {
+    expect(container).toBeDefined()
+    expect(container).toContain('max-inline-size: var(--content-max)')
+    expect(container).toContain('margin-inline: auto')
+  })
+
+  it('.rail-layout 은 좌우 패딩으로 캡한다 — 바닥이 1440 에서 끊기지 않게', () => {
+    expect(rail).toBeDefined()
+    expect(rail).toContain('padding-inline: max(0px, calc((100% - var(--content-max)) / 2))')
+    // 폭을 직접 줄이면 `Canvas` 의 회색 바닥이 그 폭에서 끝나고 바깥이 흰색으로 남는다
+    expect(rail).not.toContain('max-inline-size')
   })
 
   it('토큰으로 캡한다 — 리터럴 1440 을 다시 적지 않는다', () => {
-    expect(rule).toContain('max-inline-size: var(--content-max)')
-    expect(rule).toContain('margin-inline: auto')
+    expect(container).not.toContain('1440')
+    expect(rail).not.toContain('1440')
   })
 
   it('캡 규칙이 @media 밖 최상위에 있다', () => {
@@ -50,7 +69,8 @@ describe('콘텐츠 컨테이너 — 캡 규칙 (#376)', () => {
       헤더는 lg 미만에서도 이 클래스를 쓰고, 레일의 grid 선언만 lg 안에 남는다.
       최상위 규칙은 들여쓰기가 0 이고 @media 안은 2 다 (prettier 가 강제한다).
     */
-    expect(globals).toMatch(/^\.content-container,/m)
+    expect(globals).toMatch(/^\.content-container\s*\{/m)
+    expect(globals).toMatch(/^\.rail-layout\s*\{/m)
   })
 })
 

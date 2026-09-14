@@ -336,7 +336,10 @@ describe('담기 목록이 3층 표면 위에 선다 (#451)', () => {
       `tabIndex={-1}` 은 Chromium 에서는 없어도 동작해 e2e 가 구별하지 못하지만(뮤테이션으로
       확인), 보조기기 조합을 위한 처방이라 **여기서 문자열로 잠근다.**
     */
-    expect(source).toContain('<SurfaceStack id="plan-add-place-list" tabIndex={-1}>')
+    // `list-column`(globals.css)이 lg 에서 우측 열에 자기 스크롤을 준다 (#553)
+    expect(source).toContain(
+      '<SurfaceStack id="plan-add-place-list" tabIndex={-1} className="list-column">',
+    )
     expect(source).toContain('<Surface aria-label=')
   })
 
