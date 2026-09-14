@@ -17,6 +17,7 @@ import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
 import { usePlanDayEdit } from '@/features/plan/use-plan-day-edit'
 import { usePlanVisit } from '@/features/plan/use-plan-visit'
 import { dayRegenerateBlock } from '@/lib/ai-plan/regenerate'
+import { todayDay } from '@/lib/date/day'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { messages } from '@/lib/messages'
 import { basisPetNameOf } from '@/lib/plan/basis-pet'
@@ -185,7 +186,7 @@ export function PlanDetailSection({
           today={today}
           verdicts={weather?.days ?? []}
           /* 관리 진입점은 일정의 신원 옆에 둔다 — `PlanManageMenu` 주석 참고 */
-          menu={<PlanManageMenu plan={plan} />}
+          menu={<PlanManageMenu plan={plan} today={todayDay(today)} />}
           /*
             **확정 액션이 개요 카드 바로 아래다** (이슈 #553). 예전에는 우측 일자 열의
             **맨 끝**이라, 3일 일정이면 마지막 날 카드까지 굴려야 버튼이 나왔다 — 초안을

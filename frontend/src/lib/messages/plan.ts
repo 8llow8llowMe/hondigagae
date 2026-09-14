@@ -170,7 +170,7 @@ export const planMessages = {
   fieldBudget: '예산 (선택)',
   fieldBudgetHint: '원 단위로 적어요. 나중에 바꿀 수 있어요.',
 
-  // 아래 넷은 백엔드 PlanValidationMessage / PlanErrorCode 복제본이다.
+  // 아래 다섯은 백엔드 PlanValidationMessage / PlanErrorCode 복제본이다.
   // 대응 코드 주석은 **바로 윗줄**에 둔다 — message-tone.test.ts 가 그 위치를 본다
   // PLAN_103
   errorTitleRequired: '일정 제목은 필수입니다.',
@@ -180,6 +180,8 @@ export const planMessages = {
   errorBudgetNegative: '예산은 0 이상이어야 합니다.',
   // PLAN_003
   errorDateRange: '여행 시작일은 종료일보다 늦을 수 없습니다.',
+  // PLAN_009
+  errorPeriodTooLong: '여행 기간은 최대 30일까지 만들 수 있습니다.',
 
   errorPetRequired: '반려견을 골라 주세요.',
   errorStartDateRequired: '시작일을 골라 주세요.',
@@ -309,10 +311,23 @@ export const planMessages = {
   statusRevertError: '되돌리지 못했어요. 잠시 후 다시 시도해 주세요.',
 
   manageLabel: '일정 관리',
-  editAction: '이름·예산 수정',
+  /**
+   * **`기간` 이 들어간다** (#585). 메뉴 항목은 안에서 무엇을 고칠 수 있는지로 읽히므로,
+   * 기간 편집을 열면서 문구를 그대로 두면 메뉴만 보고는 날짜를 고칠 수 있다는 것을 모른다.
+   */
+  editAction: '이름·기간·예산 수정',
   editTitle: '일정 수정',
   editSubmit: '저장',
   editCancel: '취소',
+  /**
+   * 기간을 **줄일 때만** 실패할 수 있다는 사실을 미리 말한다 (#585).
+   *
+   * 서버는 줄어든 기간 밖에 항목이 남으면 `PLAN_008` 로 거부한다 — 고아 항목을 만들지
+   * 않으려는 규칙이라 FE 가 미리 막을 수 없다(어느 일차에 항목이 있는지는 상세 응답에
+   * 있지만, 그 판정을 화면이 복제하면 서버 규칙이 바뀔 때 두 곳이 갈린다). 대신 **막힐 수
+   * 있다는 것과 막혔을 때 할 일**을 먼저 알려 둔다. 실제 거부 문구는 서버 것을 그대로 쓴다.
+   */
+  editPeriodHint: '기간을 줄이면 새 기간 밖에 남는 항목을 먼저 정리해야 저장돼요.',
   /** 예산을 비우는 방법이 서버에 없다 — 0 을 보낸다 (D4). 그 사실을 문구로 알린다 */
   editBudgetHint: '예산을 지우면 0원으로 저장돼요.',
   editError: '수정하지 못했어요. 잠시 후 다시 시도해 주세요.',

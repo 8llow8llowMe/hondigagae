@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 import { messages } from '@/lib/messages'
 import { planBudgetIssue } from '@/lib/plan/budget'
+import { planPeriodIssue } from '@/lib/plan/period'
 
 /**
  * 만들기 폼 스키마. **백엔드 제약의 복제본이다** (form-guide.md §5).
@@ -55,12 +56,19 @@ export const planFormSchema = z
   /**
    * PLAN_003 을 화면이 먼저 본다. 서버도 400 으로 막지만 **왕복 없이 그 자리에서
    * 말해 주는 편이 낫다.** 오류는 종료일에 붙인다 — 사용자가 방금 고른 쪽이다.
+   *
+   * **판정은 `planPeriodIssue` 가 갖는다** (#585). 수정 폼도 기간을 편집하게 되면서 같은
+   * 판정을 둘 곳이 두 곳이 됐다 — 문자열 비교를 여기 남겨 두면 한쪽만 고치는 날이 온다.
    */
-  .refine(
-    (values) =>
-      values.startDate === '' || values.endDate === '' || values.startDate <= values.endDate,
-    {
-      message: messages.plan.errorDateRange,
-      path: ['endDate'],
-    },
-  )
+  .refine((values) => planPeriodIssue(values.startDate, values.endDate) !== 'reversed', {
+    message: messages.plan.errorDateRange,
+    path: ['endDate'],
+  })
+  /**
+   * PLAN_009. **예전에는 어느 폼도 보지 않았다** — 31일짜리를 고르면 서버가 왕복 뒤에
+   * 돌려줬다. 상한을 아는 판정이 생겼으므로 만들기도 같이 막는다 (#585).
+   */
+  .refine((values) => planPeriodIssue(values.startDate, values.endDate) !== 'too-long', {
+    message: messages.plan.errorPeriodTooLong,
+    path: ['endDate'],
+  })

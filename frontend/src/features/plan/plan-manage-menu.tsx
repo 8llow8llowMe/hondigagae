@@ -19,7 +19,7 @@ import { messages } from '@/lib/messages'
 import type { PlanDetail } from '@/types/plan'
 
 /**
- * 일정 관리 — 이름·예산 수정 · 일정 삭제.
+ * 일정 관리 — 이름·기간·예산 수정 · 일정 삭제.
  *
  * **좌 레일(개요 패널) 우측 상단에 둔다.** 원래는 우측 본문 맨 위에 있었는데, 이 메뉴가
  * 다루는 것은 일자 목록이 아니라 **일정 그 자체**(이름 · 예산 · 존재 여부)다. 개요 패널이
@@ -34,7 +34,7 @@ import type { PlanDetail } from '@/types/plan'
  *
  * icon-only 라 `aria-label` 이 접근 가능한 이름이다 (D6). 키보드 순회는 `Menu` 가 보장한다.
  */
-export function PlanManageMenu({ plan }: { plan: PlanDetail }) {
+export function PlanManageMenu({ plan, today }: { plan: PlanDetail; today: string }) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -115,7 +115,7 @@ export function PlanManageMenu({ plan }: { plan: PlanDetail }) {
         />
       </MenuAnchor>
 
-      <PlanEditModal plan={plan} open={editOpen} onClose={() => setEditOpen(false)} />
+      <PlanEditModal plan={plan} today={today} open={editOpen} onClose={() => setEditOpen(false)} />
 
       {/*
         **`ConfirmModal` 이 취소 좌측 · 기본 포커스 취소를 보장한다** — 파괴 버튼에 포커스를
