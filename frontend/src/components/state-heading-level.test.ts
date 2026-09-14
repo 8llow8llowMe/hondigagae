@@ -294,7 +294,7 @@ const ROUTE_STATE_FILES = [
   { path: 'app/(main)/ai-plans/new/error.tsx', level: 3 },
   { path: 'app/(main)/favorites/error.tsx', level: 3 },
   { path: 'app/(main)/mypage/error.tsx', level: 3 },
-  { path: 'app/(main)/pets/error.tsx', level: 3 },
+  { path: 'app/(main)/pets/(list)/error.tsx', level: 3 },
   { path: 'app/(main)/ai-plans/jobs/[jobId]/error.tsx', level: 2 },
   { path: 'app/(main)/pets/[petId]/error.tsx', level: 2 },
   { path: 'app/(main)/pets/[petId]/not-found.tsx', level: 2 },

@@ -225,11 +225,11 @@ const STATE_FILES: StateFile[] = [
     },
   },
   {
-    path: 'app/(main)/pets/error.tsx',
+    path: 'app/(main)/pets/(list)/error.tsx',
     heading: 'messages.pet.listTitle',
     width: 'mx-auto w-full max-w-screen-md',
     state: 'ErrorState',
-    widthSource: { path: 'app/(main)/pets/page.tsx', contains: 'max-w-screen-md' },
+    widthSource: { path: 'app/(main)/pets/(list)/page.tsx', contains: 'max-w-screen-md' },
     card: {
       kind: 'card',
       probes: ['lead', 'title={messages.pet.listTitle}'],
@@ -336,9 +336,9 @@ const LOADING_FILES: LoadingFile[] = [
     layoutSource: 'app/(main)/mypage/(root)/page.tsx',
   },
   {
-    path: 'app/(main)/pets/loading.tsx',
+    path: 'app/(main)/pets/(list)/loading.tsx',
     layout: { on: 'SurfaceStack', className: 'mx-auto w-full max-w-screen-md' },
-    layoutSource: 'app/(main)/pets/page.tsx',
+    layoutSource: 'app/(main)/pets/(list)/page.tsx',
   },
   {
     path: 'app/(main)/places/(list)/loading.tsx',

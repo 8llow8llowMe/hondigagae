@@ -231,6 +231,16 @@ GET /places?... → 404                           →  EmptyState
 
 공개 화면은 크롤러가 없는 리소스를 정상 페이지로 인식하므로 이걸 방치하면 안 된다.
 
+**같은 일이 `/pets` 에서 또 일어났다** ([#563](https://github.com/8llow8llowMe/hondigagae/issues/563), 2026-09-14 실측).
+`app/(main)/pets/loading.tsx` 가 자식인 `[petId]` 까지 감싸, `page.tsx` 가 `notFound()` 를
+부르는데도 `/pets/{없는 id}` 가 **200** 으로 나갔다. 처방은 같다 — 목록을 `pets/(list)/` 로
+옮겼다. **보호 화면이라 크롤러가 못 들어와도 고친다**: 모니터링이 읽는 값이고, 여기서
+`loading.tsx` 를 어디에 두는지가 다음 화면의 본보기가 된다.
+
+> 이 규칙은 `loading.tsx` 에만 걸린다. `error.tsx` 는 Error Boundary 라 Suspense 경계를
+> 만들지 않는다 — 다만 목록 문구를 쓰는 경계가 상세·등록까지 덮는 것은 별개로 부적절하므로
+> `loading.tsx` 와 함께 `(list)` 로 옮긴다.
+
 **규칙**
 
 - **`notFound()` 를 쓰는 세그먼트의 조상에 `loading.tsx` 를 두지 않는다.**
@@ -241,6 +251,24 @@ GET /places?... → 404                           →  EmptyState
   넘어가므로 체감 지연이 작고, **상태 코드 정확성을 우선한다.**
 
 - **AI 일정 생성 대기는 `loading.tsx` 가 아니다.** 폴링 중 상태이므로 화면 안에서 진행 표시를 렌더한다 (`api-integration-guide.md` §5).
+
+### 404 가 아닌 상태 코드는 `proxy.ts` 가 낸다 ([#563](https://github.com/8llow8llowMe/hondigagae/issues/563))
+
+`notFound()` 는 **404 하나만** 낼 수 있고, server component 에는 상태 코드를 정하는 다른
+수단이 없다. 그런데 404 가 답이 아닌 경우가 있다 — `/places/abc` 는 컨트롤러가
+`@PathVariable long` 이라 답이 **400**(`PLACE_113`)으로 정해져 있다 (`screen-inventory.md` §3).
+화면은 그 400 을 구분해 `요청 조건이 올바르지 않아요` 를 그리는데 **응답만 200** 으로 나갔다.
+
+**규칙**
+
+- 404 가 아닌 상태 코드가 필요하면 `proxy.ts` 에서 **같은 주소로 `rewrite` 하며 상태만
+  바꾼다.** `NextResponse.rewrite(request.nextUrl, { status })` 는 페이지를 정상적으로
+  렌더하고 코드만 교체한다 (Next 16 실측).
+- `redirect` 도 `new Response(...)` 도 쓰지 않는다 — 둘 다 사용자가 보던 화면을 잃는다.
+- **판정 함수를 베끼지 않는다.** 화면과 같은 함수(`isPlaceId`)를 임포트한다. 두 벌이 되면
+  게이트와 화면이 갈린다.
+- 공개 경로를 이 목적으로 `config.matcher` 에 넣어도 **보호 판정은 `PROTECTED_PATHS` 가
+  따로 본다** — 매처에 있다고 로그인을 요구하지 않는다.
 
 ### `generateMetadata` 의 실패 문구는 본문과 같은 판정을 쓴다 ([#206](https://github.com/8llow8llowMe/hondigagae/issues/206))
 
