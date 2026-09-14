@@ -278,6 +278,13 @@ export const planMessages = {
 
   statusConfirmAction: '일정 확정하기',
   statusConfirmError: '확정하지 못했어요. 잠시 후 다시 시도해 주세요.',
+  /**
+   * 확정을 되돌린다 (#565). **확인 대화상자를 붙이지 않는 근거가 이 문구 자체다** —
+   * 되돌릴 수 있는 동작에 확인을 붙이면 되돌릴 수 없다는 거짓말이 된다. 삭제만
+   * `되돌릴 수 없어요` 로 확인을 받는다.
+   */
+  statusRevertAction: '초안으로 되돌리기',
+  statusRevertError: '되돌리지 못했어요. 잠시 후 다시 시도해 주세요.',
 
   manageLabel: '일정 관리',
   editAction: '이름·예산 수정',
