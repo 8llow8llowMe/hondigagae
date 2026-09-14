@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 
+import { ScrollbarReveal } from '@/components/scrollbar-reveal'
 import { MASK_ICON_COLOR, THEME_COLOR } from '@/lib/brand/chrome-colors'
 import { QueryProvider } from '@/lib/query/query-provider'
 
@@ -100,6 +101,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko">
       <body className="font-sans antialiased">
+        {/*
+          스크롤바를 구르는 동안에만 드러낸다 (#553). **루트 레이아웃이다** — `(main)` 에
+          두면 `(auth)` 그룹 넷이 빠져 로그인 화면만 스크롤바가 상시 보인다.
+        */}
+        <ScrollbarReveal />
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>
