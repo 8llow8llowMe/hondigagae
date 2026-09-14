@@ -134,7 +134,8 @@ describe('PetSizeField — 화자를 반려견으로 유지한다', () => {
       createElement(PetSizeField, { filters: DEFAULT_PLACE_FILTERS, onChange: noop, pet }),
     )
 
-    expect(markup).toContain('몽실이(소형견)가 들어갈 수 있는 곳만')
+    // 조사는 괄호 안 `소형견` 의 받침을 본다 — `가` 가 아니라 `이` 다 (#558)
+    expect(markup).toContain('몽실이(소형견)이 들어갈 수 있는 곳만')
   })
 
   it('반려견이 없으면 컨트롤을 렌더하지 않는다', () => {

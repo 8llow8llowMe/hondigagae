@@ -190,8 +190,12 @@ export const petMessages = {
    * **왜 대표가 필요한지 말한다.** "대표" 만 있으면 즐겨찾기 같은 장식으로 읽힌다.
    */
   representativeHelp: 'AI 일정에서 반려견을 고르지 않으면 대표 아이를 기준으로 짜요.',
-  /** `{name}` 치환 — 지정 직후 안내 */
-  representativeDone: '{name}를 대표로 지정했어요.',
+  /**
+   * 지정 직후 안내 — `{name}` 은 **목적격 조사를 붙여** 치환한다 (`withObjectParticle`).
+   * 조사를 `를` 로 박아 두면 받침 있는 이름이 "초롱**를**" 이 된다. 같은 파일의
+   * `deleteConfirmTitle` · `registeredToast` 는 이미 헬퍼를 거친다.
+   */
+  representativeDone: '{name} 대표로 지정했어요.',
   representativeFailed: '대표로 지정하지 못했어요. 잠시 후 다시 시도해 주세요.',
 
   /** 근거: backend shared-travel PetSizeType / ActivityLevel / SocialityLevel */

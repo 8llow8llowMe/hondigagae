@@ -10,6 +10,7 @@ import { PROFILE_IMAGE_ACCEPT } from '@/lib/api/member'
 import { markRepresentativePet, removePetImage, uploadPetImage } from '@/lib/api/pet'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
+import { withObjectParticle } from '@/lib/text/korean'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { Pet } from '@/types/pet'
@@ -134,7 +135,9 @@ export function PetPhotoSection({ pet }: { pet: Pet }) {
             onClick={() =>
               void run(
                 () => represent.mutateAsync(),
-                messages.pet.representativeDone.replace('{name}', pet.name),
+                // 목적격 조사(을/를)는 이름의 받침에 따라 갈린다 — 같은 화면의
+                // 삭제 확인 문구가 이미 같은 헬퍼를 거친다 (`pet-delete-section.tsx`)
+                messages.pet.representativeDone.replace('{name}', withObjectParticle(pet.name)),
                 messages.pet.representativeFailed,
               )
             }

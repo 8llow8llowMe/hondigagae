@@ -72,3 +72,33 @@ export function withTopicParticle(word: string): string {
 export function withCompanionParticle(word: string): string {
   return attach(word, '과', '와')
 }
+
+/**
+ * 괄호 주석이 붙은 말에 조사를 붙인다 — `몽실이(소형견)이`.
+ *
+ * **받침은 괄호 앞이 아니라 괄호 *안* 마지막 글자로 판정한다.** 기준은 소리 내어 읽는
+ * 순서다 — 사람도 스크린리더도 괄호 안을 건너뛰지 않고 "몽실이 소형견이" 로 읽으므로,
+ * 조사 바로 앞에 오는 소리는 `견` 이지 `이`(이름의 끝)가 아니다. 괄호 앞을 기준으로
+ * 잡으면 "…소형견 **가**" 라고 들리는 비문이 된다.
+ *
+ * **기존 헬퍼를 그대로 못 쓰는 이유**는 `attach` 가 **마지막 글자**를 보기 때문이다.
+ * 완성된 `몽실이(소형견)` 의 마지막 글자는 `)` 라 판정 불가(= 받침 없음)로 떨어져
+ * 괄호 앞뒤 어느 쪽도 보지 않는다. 그래서 **주석에만** 헬퍼를 먹이고 거기서 붙은 조사를
+ * 떼어 괄호 뒤로 옮긴다 — 받침 판정 규칙을 이 파일에 한 벌로 유지하려는 것이다.
+ *
+ * @param word 괄호 앞에 오는 말 (반려견 이름)
+ * @param note 괄호 안 주석 (크기 이름). 받침 판정의 기준이 된다
+ * @param withParticle 붙일 조사 헬퍼 — `withSubjectParticle` 처럼 이 파일의 것을 준다
+ */
+export function withParenthesizedParticle(
+  word: string,
+  note: string,
+  withParticle: (value: string) => string,
+): string {
+  // 주석이 비면 괄호를 그리지 않는다 — `몽실이()이` 가 나오면 안 되고, 이때는 이름이
+  // 조사 바로 앞에 오므로 판정 기준도 이름으로 돌아간다
+  if (note.trim() === '') return withParticle(word)
+
+  // `withParticle(note)` 는 `주석+조사` 라 주석 길이만큼 잘라 내면 조사만 남는다
+  return `${word}(${note})${withParticle(note).slice(note.length)}`
+}

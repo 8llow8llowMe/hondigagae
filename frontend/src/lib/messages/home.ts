@@ -213,8 +213,12 @@ export const homeMessages = {
    * **`추천 여행지` 로 바꾸지 않는다.** 위 문단이 `맞는 곳` 을 기각한 근거가 그대로 적용된다 —
    * `pickTopPlaces` 는 앞 세 개를 그대로 집으므로 `0/100` · `판단 근거 부족` 장소가 첫째로
    * 설 수 있고, 실제로 그렇게 나간다. 그것을 `추천` 이라고 부르면 화면이 못 지킬 말을 한다.
+   *
+   * **`{name}` 에는 동반격 조사를 붙여 넣는다 — `withCompanionParticle()`.** 조사를 `과` 로
+   * 박아 두었더니 dev 에서 "오늘 갱얼쥐**과** 갈 만한 곳" 이 나갔다. 받침 없는 이름에는
+   * `와` 다. 같은 자리를 `src/lib/ai-plan/draft-title.ts` 는 이미 헬퍼로 짓고 있었다.
    */
-  suitabilityHeading: '오늘 {name}과 갈 만한 곳',
+  suitabilityHeading: '오늘 {name} 갈 만한 곳',
   suitabilityFallback: '오늘 갈 만한 곳',
   /**
    * 무엇을 반영해 적은 값인지 (`appliedFactorsOf`).
