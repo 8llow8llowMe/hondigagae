@@ -110,4 +110,45 @@ class OperatingHoursParserTest {
         assertThat(overnight.isOpenAt(MON_10_00.withHour(2))).isTrue();
         assertThat(overnight.isOpenAt(MON_10_00.withHour(13))).isFalse();
     }
+
+    /*
+      아래 넷은 dev 긴급 시설 214건 실측에서 `open24 = true` 로 올라왔던 값 그대로다.
+      다섯 건 중 셋이 거짓이었다 — 급할 때 찾는 화면이라 거짓 양성이 가장 비싸다.
+    */
+
+    @Test
+    @DisplayName("상호에 24시가 있어도 운영시간이 말하면 그쪽을 따른다 (24시동물병원 원문)")
+    void nameDoesNotBeatOperatingHours() {
+        // 월~금만 열고 토·일은 쉰다. 상호만 "24시" 다
+        assertThat(OperatingHoursParser.isOpen24("24시동물병원", "월~금 09:00~19:00")).isFalse();
+        // 에이스팜24시약국 원문
+        assertThat(
+            OperatingHoursParser.isOpen24("에이스팜24시약국", "월~금 12:30~22:00, 토 12:30~22:00, 일 12:30~22:00"))
+            .isFalse();
+    }
+
+    @Test
+    @DisplayName("10:00~24:00 을 24시간으로 읽지 않는다 — 앞자리 숫자가 붙은 부분 매칭 (청사약국 원문)")
+    void doesNotMatchHoursWithLeadingDigit() {
+        assertThat(OperatingHoursParser.isOpen24(null, "월~금 10:00~24:00, 토 10:00~24:00")).isFalse();
+        assertThat(OperatingHoursParser.isOpen24(null, "20:00~24:00")).isFalse();
+    }
+
+    @Test
+    @DisplayName("진짜 24시간은 그대로 통과한다 (24시똑똑똑동물메디컬센터 원문)")
+    void realAllDayStillPasses() {
+        assertThat(OperatingHoursParser.isOpen24("24시똑똑똑동물메디컬센터", "매일 00:00~24:00")).isTrue();
+        // 상호에 24시가 없어도 운영시간이 말하면 24시간이다
+        assertThat(OperatingHoursParser.isOpen24("연북로동물병원", "매일 0:00~24:00")).isTrue();
+    }
+
+    @Test
+    @DisplayName("운영시간을 모를 때만 상호 신호를 폴백으로 쓴다")
+    void nameIsFallbackWhenHoursUnknown() {
+        assertThat(OperatingHoursParser.isOpen24("24시동물병원", null)).isTrue();
+        // 원천이 "정보없음" 으로 채워 보내는 값도 모름이다 — 운영시간으로 읽으면 폴백이 죽는다
+        assertThat(OperatingHoursParser.isOpen24("24시동물병원", "정보없음")).isTrue();
+        assertThat(OperatingHoursParser.isOpen24("연북로동물병원", null)).isFalse();
+        assertThat(OperatingHoursParser.isOpen24(null, null)).isFalse();
+    }
 }

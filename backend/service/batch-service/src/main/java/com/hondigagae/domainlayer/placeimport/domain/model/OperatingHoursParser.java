@@ -21,10 +21,20 @@ import java.util.regex.Pattern;
 public final class OperatingHoursParser {
 
     private static final String UNKNOWN_MARK = "정보없음";
-    /** 00:00~24:00 형태만 24시간으로 인정한다. */
-    private static final Pattern ALL_DAY_HOURS = Pattern.compile("0?0:00\s*~\s*24:00");
-    /** 상호에 "24시"가 들어간 경우. 운영시간이 비어 있어도 이 신호는 신뢰한다. */
-    private static final Pattern NAME_24H = Pattern.compile("24\s*시");
+    /**
+     * 00:00~24:00 형태만 24시간으로 인정한다.
+     *
+     * <p><b>앞자리 숫자를 막는 {@code (?<!\d)} 가 핵심이다.</b> 없으면 {@code find()} 가
+     * {@code "10:00~24:00"} 안의 {@code "0:00~24:00"} 을 잡아 <b>오전 10시에 여는 곳이
+     * 24시간이 된다</b> — 청사약국(10:00~24:00)이 실제로 그렇게 올라왔다.
+     *
+     * <p>공백은 {@code "\\s"}(정규식 공백류)로 쓴다. 자바 15 부터 문자열 리터럴의
+     * {@code \s} 는 <b>스페이스 문자 하나</b>라, 예전 {@code "\s*"} 는 "공백 0개 이상" 이
+     * 아니라 "스페이스 0개 이상" 이었다 — 탭이 섞인 원문을 놓친다.
+     */
+    private static final Pattern ALL_DAY_HOURS = Pattern.compile("(?<!\\d)0?0:00\\s*~\\s*24:00");
+    /** 상호에 "24시"가 들어간 경우. <b>운영시간을 모를 때만</b> 보는 폴백이다 — {@link #isOpen24}. */
+    private static final Pattern NAME_24H = Pattern.compile("24\\s*시");
 
     private OperatingHoursParser() {
     }
@@ -150,10 +160,24 @@ public final class OperatingHoursParser {
         return null;
     }
 
+    /**
+     * 24시간 영업 여부.
+     *
+     * <p><b>운영시간이 상호를 이긴다.</b> 예전에는 상호에 "24시" 가 있으면 운영시간을 보지도
+     * 않고 {@code true} 였다. 그래서 <b>24시동물병원</b>(월~금 09:00~19:00, 매주 토·일 휴무)과
+     * <b>에이스팜24시약국</b>(12:30~22:00)이 긴급 시설의 "24시간" 필터에 올라왔다 —
+     * 급할 때 찾는 화면이라 <b>거짓 양성이 거짓 음성보다 훨씬 비싸다.</b>
+     *
+     * <p>상호 신호는 버리지 않고 <b>운영시간을 모를 때의 폴백</b>으로 남긴다.
+     * {@link #NAME_24H} 주석이 적어 둔 원래 의도("운영시간이 비어 있어도 이 신호는 신뢰한다")가
+     * 그것이었고, 구현만 그 의도를 넘어서 있었다.
+     */
     public static boolean isOpen24(String name, String operatingHours) {
-        if (name != null && NAME_24H.matcher(name).find()) {
-            return true;
+        // 호출부가 이미 정규화해 넘기기도 하지만 멱등이다. "정보없음" 을 운영시간으로 읽지 않는 것이 요점이다
+        String hours = normalizeHours(operatingHours);
+        if (hours != null) {
+            return ALL_DAY_HOURS.matcher(hours).find();
         }
-        return operatingHours != null && ALL_DAY_HOURS.matcher(operatingHours).find();
+        return name != null && NAME_24H.matcher(name).find();
     }
 }
