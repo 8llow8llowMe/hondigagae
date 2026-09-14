@@ -26,7 +26,7 @@ import { useEmergencyBoard } from '@/features/emergency/use-emergency-board'
 import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
 import { formatDistance } from '@/lib/format/distance'
-import { SELECTED_FACILITY_MAP_LEVEL, toLatLng } from '@/lib/geo/coord'
+import { type LatLng, SELECTED_FACILITY_MAP_LEVEL, toLatLng } from '@/lib/geo/coord'
 import type { PositionResult } from '@/lib/geo/current-position'
 import type { MapSdkFailure } from '@/lib/map/sdk'
 import { boundsCenter, isWithinBounds, type MapBounds } from '@/lib/map/viewport'
@@ -61,6 +61,20 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
   const board = useEmergencyBoard()
 
   const [bounds, setBounds] = useState<MapBounds | null>(null)
+  /*
+    **카메라가 마지막으로 놓은 지도 중심** (#578). 재검색을 권할지는 `board.anchor` 가
+    아니라 이것과 비교해 정한다.
+
+    `camera` 는 기준점을 화면 위쪽 35%(`JEJU_MAP_SEA_RATIO`) 지점에 놓으므로 **지도
+    중심은 기준점보다 남쪽**이고, 그 거리는 확대 단계에 비례해 커진다(첫 화면 4~5.5km).
+    기준점과 비교하면 그 의도된 오프셋이 "사용자가 옮겼다" 로 읽혀, 조작 0회에서
+    버튼이 뜨고 누를 때마다 지도가 남하했다.
+
+    **사용자가 끄는 동안에는 갱신되지 않는다** — `camera` 는 기준점·반경이 바뀔 때만
+    다시 만들어진다(`useEmergencyBoard`). 그래서 이 값은 "우리가 놓은 자리" 로 남고,
+    드래그가 벌린 거리가 그대로 잰다.
+  */
+  const [cameraCenter, setCameraCenter] = useState<LatLng | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   /*
     선택 순간의 `bounds` 를 얼려 둔다 (B1).
@@ -352,7 +366,7 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
   */
   const offerResearch = shouldOfferResearch({
     bounds,
-    anchor: board.anchor,
+    origin: cameraCenter,
     radius: board.radius,
     selected: selectedId !== null,
   })
@@ -393,6 +407,7 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         selectedId={selectedId}
         onSelect={handleSelect}
         onBoundsChange={handleBounds}
+        onCameraApplied={setCameraCenter}
         camera={board.camera}
         /* 고르면 도로가 읽히는 단계까지 확대한다 — `/places` 보다 한 단계 깊다 */
         selectedLevel={SELECTED_FACILITY_MAP_LEVEL}

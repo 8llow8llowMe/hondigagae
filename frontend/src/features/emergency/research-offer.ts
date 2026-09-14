@@ -3,7 +3,7 @@ import { haversineMeters } from '@/lib/geo/distance'
 import { boundsCenter, type MapBounds } from '@/lib/map/viewport'
 
 /**
- * 지금 보고 있는 자리가 **조회한 자리에서 충분히 벗어났는가** — 이슈 #396.
+ * 지금 보고 있는 자리가 **카메라가 놓아 준 자리에서 충분히 벗어났는가** — 이슈 #396.
  *
  * `/places` 는 지도를 옮기면 스스로 재조회하지만 이 화면은 그러지 않는다. 재조회하면
  * `distanceMeters` 가 지도 중심 기준이 되어 "가까운 순 · 480m" 이 거짓이 되기 때문이다
@@ -21,8 +21,24 @@ export const RESEARCH_OFFER_RATIO = 0.3
 export function shouldOfferResearch(params: {
   /** 지금 지도가 보여주는 영역. 첫 `idle` 전이면 null */
   bounds: MapBounds | null
-  /** 지금 목록이 조회된 기준점. 좌표를 아직 못 받았으면 null */
-  anchor: LatLng | null
+  /**
+   * **카메라가 마지막으로 놓은 지도 중심.** 조회 기준점(`anchor`)이 아니다 — 이슈 #578.
+   *
+   * 지도를 놓는 규칙(`framedCenterLat`)은 기준점을 화면 정중앙이 아니라 위쪽
+   * `JEJU_MAP_SEA_RATIO`(35%) 지점에 놓는다. 위쪽은 바다, 아래쪽은 육지로 열리게 하려는
+   * 의도된 프레이밍이다(`lib/geo/coord.ts`). 그래서 **지도 중심은 기준점보다 화면 높이의
+   * 15% 만큼 남쪽**이고, 그 거리는 확대 단계에 비례해 커진다 — 섬 전체가 보이는 첫
+   * 화면에서 4~5.5km 였다.
+   *
+   * 예전에는 여기에 `anchor` 를 넘겼다. 그러면 **그 의도된 오프셋이 "사용자가 지도를
+   * 옮겼다" 로 읽혀** 조작 0회에서 버튼이 떴고, 누르면 기준점이 지도 중심으로 옮겨가며
+   * 카메라가 같은 규칙으로 다시 프레이밍해 오프셋이 그대로 재생됐다 — 버튼이 사라지지
+   * 않고 누를 때마다 지도가 4km 씩 남하했다.
+   *
+   * **재는 것은 "우리가 놓은 자리"와 "지금 보이는 자리"의 차이다.** 카메라가 놓기 전
+   * (아직 못 받았으면) null 이고, 그때는 권하지 않는다.
+   */
+  origin: LatLng | null
   /** 조회 반경(m) */
   radius: number
   /**
@@ -35,12 +51,12 @@ export function shouldOfferResearch(params: {
    */
   selected: boolean
 }): boolean {
-  const { bounds, anchor, radius, selected } = params
+  const { bounds, origin, radius, selected } = params
 
-  if (selected || bounds === null || anchor === null) return false
+  if (selected || bounds === null || origin === null) return false
   if (!Number.isFinite(radius) || radius <= 0) return false
 
-  const moved = haversineMeters(anchor, boundsCenter(bounds))
+  const moved = haversineMeters(origin, boundsCenter(bounds))
   if (moved === null) return false
 
   return moved > radius * RESEARCH_OFFER_RATIO

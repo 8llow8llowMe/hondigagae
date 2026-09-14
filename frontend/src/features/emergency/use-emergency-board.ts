@@ -107,8 +107,30 @@ export function useEmergencyBoard() {
     `spanMeters` 가 지름이다 — 반경 10km 를 담으려면 20km 폭이 필요하다.
   */
   const camera = useMemo(
-    () => (anchor === null ? null : { anchor, spanMeters: radius * 2 }),
-    [anchor?.lat, anchor?.lng, radius],
+    () =>
+      anchor === null
+        ? null
+        : {
+            anchor,
+            spanMeters: radius * 2,
+            /*
+              **재검색으로 옮긴 자리는 화면 정중앙에 놓는다** (#578).
+
+              기본 프레이밍(`JEJU_MAP_SEA_RATIO` = 0.35)은 **첫 화면**의 규칙이다 —
+              제주 북쪽 해안을 위쪽 35% 에 두어 위는 바다, 아래는 육지로 열리게 한다.
+              그런데 재검색의 기준점은 **사용자가 방금 보고 있던 지도 중심**이라, 같은
+              규칙을 걸면 그 점이 35% 지점으로 올라가며 **화면이 통째로 남쪽으로 밀린다**
+              (실측 약 4km). "여기를 보여줘" 라고 눌렀는데 다른 데를 보여주는 꼴이다.
+
+              `anchorRatio: 0.5` 면 놓는 자리와 기준점이 같아져 지도가 움직이지 않고
+              목록만 다시 조회된다.
+
+              **`exactOptionalPropertyTypes` 라 키를 아예 뺀다** — `undefined` 를 넣으면
+              타입이 맞지 않는다. 빠지면 `MapCanvas` 가 `JEJU_MAP_SEA_RATIO` 를 쓴다.
+            */
+            ...(searchCenter === null ? {} : { anchorRatio: 0.5 }),
+          },
+    [anchor?.lat, anchor?.lng, radius, searchCenter === null],
   )
 
   return {

@@ -64,6 +64,7 @@ export function MapCanvas({
   selectedId,
   onSelect,
   onBoundsChange,
+  onCameraApplied,
   center,
   camera,
   selectedLevel,
@@ -81,6 +82,18 @@ export function MapCanvas({
    * 버리고 주변 검색으로 갈아탄다 (architecture-guide.md §9 "지도 뷰: 별도 조회 금지").
    */
   onBoundsChange?: (bounds: MapBounds, userMoved: boolean) => void
+  /**
+   * **카메라가 지도 중심을 어디에 놓았는지** 알린다 — 이슈 #578.
+   *
+   * `camera` 는 기준점을 화면 정중앙이 아니라 위쪽 `seaRatio` 지점에 놓으므로
+   * (`framedCamera`) **실제 지도 중심은 기준점과 다르다.** 그 차이를 모르는 바깥에서는
+   * "지도가 옮겨졌는지" 를 기준점과 비교해 재게 되고, 그러면 **우리가 만든 프레이밍
+   * 오프셋이 사용자의 이동으로 읽힌다.**
+   *
+   * 그래서 놓은 자리를 그대로 돌려준다 — 이것을 아는 곳이 여기뿐이다
+   * (컨테이너 크기와 확대 단계가 여기에만 있다).
+   */
+  onCameraApplied?: (center: LatLng) => void
   /** 지도 중심을 밖에서 옮길 때 (현재 위치 버튼). 같은 값을 다시 주면 움직이지 않는다 */
   center?: LatLng | null
   /**
@@ -133,10 +146,12 @@ export function MapCanvas({
   const selectRef = useRef(onSelect)
   const boundsRef = useRef(onBoundsChange)
   const failureRef = useRef(onFailure)
+  const cameraAppliedRef = useRef(onCameraApplied)
   useEffect(() => {
     selectRef.current = onSelect
     boundsRef.current = onBoundsChange
     failureRef.current = onFailure
+    cameraAppliedRef.current = onCameraApplied
   })
 
   // ── 지도 생성. **의존성이 비어 있어야 한다** ──────────────────────────────
@@ -367,6 +382,9 @@ export function MapCanvas({
     // 한 프레임 동안 엉뚱한 곳이 보인다 (선택 핀 확대에서 같은 판단을 했다)
     map.setLevel(next.level)
     map.setCenter(new maps.LatLng(next.lat, next.lng))
+
+    // 놓은 자리를 알린다 — 바깥이 "사용자가 옮겼는지" 를 이 자리 기준으로 잰다 (#578)
+    cameraAppliedRef.current?.({ lat: next.lat, lng: next.lng })
   }, [camera, status])
 
   // 패널을 접거나 시트를 올리면 컨테이너 폭이 바뀐다 → 되잡지 않으면 지도가 잘린다
