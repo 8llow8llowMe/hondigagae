@@ -221,27 +221,27 @@ function RegenerateShell({
   return (
     <SurfaceStack>
       {/* 데스크톱 세로 여백은 `SurfaceStack` 의 `md:p-6` 이 준다 (#447 개요 패널과 같은 값) */}
-      {/* 제목 줄 배치는 `flex-wrap` 하나로 한다 — `plan-emergency-section` 주석과 같다 (#539) */}
+      {/* 헤더 배치는 `plan-emergency-section` 주석이 정본이다 (#539) */}
       <header
-        className={cn('flex flex-wrap items-center pt-4 pb-4 md:pt-0 md:pb-0', INSET_CLASS.card)}
+        className={cn(
+          'flex flex-wrap items-start gap-x-1 pt-4 pb-4 md:block md:pt-0 md:pb-0',
+          INSET_CLASS.card,
+        )}
       >
         {/*
           **`addPlaceBack` 을 그대로 쓴다** — 문구가 `일정으로 돌아가기` 로 화면에
           매이지 않았고 목적지도 같다. 같은 말을 위한 키를 새로 만들지 않는다.
         */}
-        <BackLink
-          href={backHref}
-          label={messages.plan.addPlaceBack}
-          variant="titleRow"
-          className="-ml-1"
-        />
-        <h1 className="text-title-1 text-fg lg:text-display font-bold md:mt-1 lg:font-extrabold">
-          {/* 화면 제목과 탭 제목이 같은 키를 쓴다 (R7) */}
-          {messages.plan.regenerateDayPageTitle.replace('{day}', String(day))}
-        </h1>
-        {planTitle !== undefined && (
-          <p className="text-caption text-fg-muted mt-1 basis-full font-medium">{planTitle}</p>
-        )}
+        <BackLink href={backHref} label={messages.plan.addPlaceBack} variant="titleRow" />
+        <div className="min-w-0 flex-1 md:flex-none">
+          <h1 className="text-title-1 text-fg lg:text-display font-bold md:mt-1 lg:font-extrabold">
+            {/* 화면 제목과 탭 제목이 같은 키를 쓴다 (R7) */}
+            {messages.plan.regenerateDayPageTitle.replace('{day}', String(day))}
+          </h1>
+          {planTitle !== undefined && (
+            <p className="text-caption text-fg-muted mt-1 font-medium">{planTitle}</p>
+          )}
+        </div>
       </header>
 
       {bare ? (

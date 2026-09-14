@@ -32,6 +32,7 @@
 | `MetricValue` | `tone` 위와 동일 (생략 = 중립)                                     | `hero` \| `row`      | `row`                 |
 | `Chip`        | `selected` \| `exclusive` (외형 variant 없음)                      | —                    | 다중 축               |
 | `Input`       | — (에러는 `error` prop)                                            | `md` \| `lg`         | `md`                  |
+| `BackLink`    | `inline` \| `titleRow`                                             | —                    | `inline`              |
 
 > **`Badge` 의 `warn` · `info` 톤은 3차 세트에서 폐기했다** (DESIGN.md §2-7).
 > 측정값은 경고가 아니므로 등급은 `MetricBadge` 로 가고, 파란 정보 톤은 팔레트에 없다.
@@ -40,6 +41,11 @@
 > **`Card` 는 폐기했다** — 표면은 `Canvas` / `SurfaceStack` / `Surface` / `SurfaceList`
 > 넷이다 (`src/components/surface.tsx`, DESIGN.md §0). 그 사이에 있던 2a 프리미티브
 > (`Band` / `Section` / `Row` / `RowList`)도 #475 에서 지웠다.
+
+> **`BackLink` 의 `titleRow` 는 모바일 전용 차이다** (#539). `md` 이상에서는 `inline` 과
+> 같은 모습으로 되돌아가므로, 데스크톱에서 일곱 호출부가 한 모양이다. 제목 줄 왼쪽 아이콘은
+> **`h1` 이 보이는 화면**에서만 뜻이 있다 — 마이페이지 하위 두 화면처럼 보이는 제목이 카드
+> 안 `h2` 인 곳에는 그 자리가 없다.
 
 > **`Button` 의 `dangerOutline` 은 저강조 파괴 액션이다** (DESIGN.md §2-6 표).
 > 화면에 그냥 놓여 있는 삭제 버튼이 이것이고, `danger`(채움)는 **확인 다이얼로그의 확정

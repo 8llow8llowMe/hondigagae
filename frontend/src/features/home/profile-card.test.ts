@@ -5,20 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { ProfileCard } from '@/features/home/profile-card'
 import { pet } from '@/test/fixtures/plan'
-
-/**
- * 홈 좌측 레일의 프로필 블록.
- *
- * **이 파일이 생긴 이유는 세로 여백 하나다** (#428). `py-10`(40)은 로그인 + 반려견이
- * 선택된 상태에서만 렌더되는 갈래라 로컬 mock(게스트)에서는 브라우저로 볼 수 없다.
- * 값이 조용히 되돌아가지 않게 여기서 잠근다.
- */
-
-function classesOf(markup: string): string[] {
-  return [...markup.matchAll(/class="([^"]*)"/g)].flatMap((match) =>
-    (match[1] ?? '').split(/\s+/).filter((name) => name !== ''),
-  )
-}
+import { classesOf } from '@/test/markup'
 
 describe('ProfileCard — 반려견이 선택된 갈래', () => {
   const markup = renderToStaticMarkup(createElement(ProfileCard, { pets: [pet], totalCount: 1 }))

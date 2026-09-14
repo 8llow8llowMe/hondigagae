@@ -4,27 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { Canvas, Surface, SurfaceList, SurfaceStack } from '@/components/surface'
-
-/**
- * 표면 프리미티브 — 이슈 #422 · #428 · #435 · #475.
- *
- * **2a 무변화 계약이 사라졌다.** 예전에는 이 파일의 절반이 "3a 를 만들면서 옆에 있는 2a 를
- * 조금 고치지 않는다" 를 지켰는데, 로드맵 #455 가 화면을 전부 옮기고 #475 가 `Band` ·
- * `Section` · `Row` · `RowList` 를 지우면서 지킬 대상 자체가 없어졌다. 남은 것은 3a 넷의
- * 계약이다.
- */
-
-/**
- * 클래스를 토큰으로 쪼갠다.
- *
- * **`toContain` 으로 클래스를 보면 안 된다** — `border-border`(색 토큰)가 `border-b` 와
- * `border` 를 부분 문자열로 품어 둘 다 오탐한다. 실제로 이 파일에서 두 번 걸렸다.
- */
-function classesOf(markup: string): string[] {
-  return [...markup.matchAll(/class="([^"]*)"/g)].flatMap((match) =>
-    (match[1] ?? '').split(/\s+/).filter((name) => name !== ''),
-  )
-}
+import { classesOf } from '@/test/markup'
 
 describe('L0 Canvas — 페이지 바닥', () => {
   it('--bg-sunken 을 바닥으로 깐다 — 흰색은 바닥이 아니라 Surface 의 색이다', () => {
