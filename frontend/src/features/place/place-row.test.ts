@@ -187,18 +187,22 @@ describe('PlaceRow — 좁은 컨테이너에서도 제목이 남는다 (#240)',
     **뷰포트 breakpoint 가 컨테이너 폭을 모르는 것이 원인이었다.** 태그 우측 열
     (`w-56` = 224px)을 `lg:` 로 두었더니 데스크톱의 지도 좌측 패널(폭 400px)에서
     96px 썸네일 + gap + 224px 을 빼고 제목에 40~50px 만 남아 `테…` 로 잘렸다.
-    컨테이너 쿼리로 바꿨으므로 **소비처가 `@container` 를 주고 규칙이 `@lg:` 여야 한다** —
-    둘 중 하나가 빠지면 그 자리에서 잘림이 되살아난다.
+    컨테이너 쿼리로 바꿨으므로 **소비처가 `@container` 를 주고 규칙이 컨테이너 기준이어야
+    한다** — 둘 중 하나가 빠지면 그 자리에서 잘림이 되살아난다.
+
+    **배지 열의 전환점만 `@xl`(576)이다** (#553). `@lg`(512)였을 때 `/places` 2열 목록의
+    칸 폭이 511/512 로 경계를 스쳐 **같은 목록의 두 칸이 다른 배치**로 그려졌다.
+    자세한 근거는 `place-row.tsx` 머리주석이 정본이다.
   */
   it('부모가 컨테이너를 열고 태그 규칙이 컨테이너 기준이다', () => {
     const markup = render()
 
     expect(markup).toContain('@container')
     // 넓은 컨테이너: 우측 고정 열
-    expect(markup).toContain('@lg:flex')
+    expect(markup).toContain('@xl:flex')
     // 좁은 컨테이너: 텍스트 블록 안 + 제목 위로 (order-first)
     expect(markup).toContain('order-first')
-    expect(markup).toContain('@lg:hidden')
+    expect(markup).toContain('@xl:hidden')
     /*
       뷰포트 기준 규칙이 남아 있으면 같은 결함이 재발한다. `@` 가 붙지 않은 `lg:` 만
       잡아야 하므로 부분문자열로 보지 않는다 — `@lg:hidden` 이 `lg:hidden` 을 포함한다.
