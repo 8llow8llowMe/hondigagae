@@ -94,7 +94,6 @@ public class AiPlanWorker {
             current.set(advanceTo(current.get(), AiPlanJobStep.DRAFTING, stepTimer));
             // LLM 포트는 domain model을 주고, 잡에도 domain 그대로 저장한다. Info 변환은 응답 조립 시점(Processor)에 한다.
             AiPlanDraft draft = aiLlmPort.generatePlanDraft(query);
-            stepTimer.finish();
             log.info("AI plan draft generated jobId={} days={}", running.jobId(),
                 draft.days() == null ? 0 : draft.days().size());
 
@@ -123,6 +122,12 @@ public class AiPlanWorker {
                 AiPlanErrorCode.JOB_FAILED.getCode(), AiPlanErrorCode.JOB_FAILED.getMessage(), Instant.now()
             ));
         } finally {
+            /*
+             * **여기서 닫아야 모든 경로가 남는다.** 성공 경로에만 두면 취소·타임아웃·LLM 실패에서
+             * 마지막 단계의 소요시간이 통째로 비는데, 하필 그게 "왜 오래 걸렸나" 를 가장 알고 싶은
+             * 실행이다. `finish()` 는 이미 닫힌 뒤 다시 불려도 안전하다.
+             */
+            stepTimer.finish();
             aiPlanJobStorePort.releaseIdempotencyKey(running.memberId(), running.requestHash(), running.jobId());
             // 종결(완료/실패/취소) 저장은 위 모든 경로에서 finally 이전에 끝난다. 여기서 한 번만 알린다.
             aiPlanJobEventPort.publishJobUpdated(running.jobId());

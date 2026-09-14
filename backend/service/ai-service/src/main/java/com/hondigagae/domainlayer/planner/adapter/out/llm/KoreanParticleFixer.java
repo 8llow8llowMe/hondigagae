@@ -40,43 +40,50 @@ final class KoreanParticleFixer {
     private static final char HANGUL_BASE = 0xAC00;
     private static final char HANGUL_LAST = 0xD7A3;
     private static final int JONGSEONG_COUNT = 28;
-    /** 종성 인덱스 8 = {@code ㄹ}. 으로/로 만 이 값을 따로 본다. */
-    private static final int JONGSEONG_RIEUL = 8;
 
     /** 마지막 글자의 받침 상태. */
     private enum Ending {
-        /** 받침 없음 — {@code 는} · {@code 가} · {@code 를} · {@code 와} · {@code 로} */
+        /** 받침 없음 — {@code 는} · {@code 가} · {@code 를} · {@code 와} */
         NONE,
-        /** 받침 {@code ㄹ} — 은/는 계열은 받침 있음과 같고, 으로/로 만 갈린다 */
-        RIEUL,
-        /** 그 밖의 받침 — {@code 은} · {@code 이} · {@code 을} · {@code 과} · {@code 으로} */
-        OTHER
+        /** 그 밖의 받침 — {@code 은} · {@code 이} · {@code 을} · {@code 과} */
+        OTHER,
+        /**
+         * 판정할 수 없음 — 이때는 <b>손대지 않는다.</b>
+         *
+         * <p>프론트 {@code lib/text/korean.ts} 는 판정 불가를 "받침 없음" 으로 본다. <b>여기서 그렇게
+         * 하면 안 된다</b> — 저쪽은 조사가 <i>없는</i> 자리에 새로 붙이므로 빗나가도 본전이지만,
+         * 여기는 <b>이미 붙어 있는 조사를 덮어쓴다.</b> 빗나가면 맞던 문장이 틀린 문장이 되고,
+         * 그건 이 클래스가 고치려는 버그와 정확히 같은 종류다.
+         *
+         * <p>실제로 걸리는 입력이 있다. 후보 제목은 tour-service 원문 그대로라
+         * {@code 카페공작소(애월점)} 처럼 괄호로 끝나거나 {@code ...Pension} 처럼 영문으로 끝난다.
+         * 앞은 {@code )} 라 아무것도 알 수 없고, 뒤는 읽으면 "펜션"(ㄴ 받침)이라 오히려 받침이 있다.
+         */
+        UNKNOWN
     }
 
-    /**
-     * 조사 짝. <b>긴 것을 먼저 본다</b> — {@code 으로} 를 {@code 로} 보다 뒤에 두면
-     * {@code "공원으로"} 에서 {@code 로} 만 잡혀 {@code "공원으으로"} 가 된다.
-     */
-    private record Particle(String withJong, String withoutJong, boolean rieulCountsAsNone) {
+    /** 조사 짝. */
+    private record Particle(String withJong, String withoutJong) {
 
         String correctFor(Ending ending) {
-            if (ending == Ending.NONE) {
-                return withoutJong;
-            }
-            if (ending == Ending.RIEUL && rieulCountsAsNone) {
-                return withoutJong;
-            }
-            return withJong;
+            return ending == Ending.OTHER ? withJong : withoutJong;
         }
     }
 
+    /**
+     * 고치는 조사.
+     *
+     * <p><b>{@code 으로}/{@code 로} 는 일부러 뺐다.</b> 한국어 도로명이 문자 그대로
+     * {@code <지명>+로} 라서, 지명이 후보 제목이면 {@code "노형로 12"} 의 {@code 로} 가 조사로 잡혀
+     * {@code "노형으로 12"} 가 된다 — 뒤 글자를 보는 가드로는 막을 수 없는 구조적 충돌이다.
+     * 보고된 것도, 프롬프트 규칙 9번이 나열한 것도 {@code 은/는 · 이/가 · 을/를} 뿐이라
+     * 이 쌍은 애초에 범위 밖이다.
+     */
     private static final List<Particle> PARTICLES = List.of(
-        // 받침 ㄹ 뒤에는 "으로" 가 아니라 "로" 다 — 서울로 / 제주로 / 공원으로
-        new Particle("으로", "로", true),
-        new Particle("은", "는", false),
-        new Particle("이", "가", false),
-        new Particle("을", "를", false),
-        new Particle("과", "와", false)
+        new Particle("은", "는"),
+        new Particle("이", "가"),
+        new Particle("을", "를"),
+        new Particle("과", "와")
     );
 
     private KoreanParticleFixer() {
@@ -123,6 +130,11 @@ final class KoreanParticleFixer {
             out.append(text, cursor, afterName);
             cursor = afterName;
 
+            // 받침을 모르면 덮어쓰지 않는다 — 원문이 맞았을 수 있다
+            if (ending == Ending.UNKNOWN) {
+                continue;
+            }
+
             for (Particle particle : PARTICLES) {
                 int length = matchedLength(text, afterName, particle);
                 if (length == 0) {
@@ -153,35 +165,38 @@ final class KoreanParticleFixer {
     /**
      * 마지막 글자의 받침. 한글이면 종성으로, 숫자면 <b>읽는 소리</b>로 판정한다.
      *
-     * <p>{@code 4} 는 "사" 라 받침이 없고 {@code 1} 은 "일" 이라 {@code ㄹ} 받침이다.
-     * 한글도 숫자도 아니면(영문·기호) 받침 없음으로 본다 — 프론트
-     * {@code lib/text/korean.ts} 의 "판정 불가는 받침 없음" 과 같은 선택이다.
+     * <p>{@code 4} 는 "사" 라 받침이 없고 {@code 6} 은 "육" 이라 {@code ㄱ} 받침이다.
+     * <b>한글도 숫자도 아니면 {@link Ending#UNKNOWN} 이고, 그때는 조사를 건드리지 않는다.</b>
      */
     private static Ending endingOf(String name) {
         String trimmed = name.strip();
         if (trimmed.isEmpty()) {
-            return Ending.NONE;
+            return Ending.UNKNOWN;
         }
 
         char last = trimmed.charAt(trimmed.length() - 1);
-        if (last >= HANGUL_BASE && last <= HANGUL_LAST) {
-            int jongseong = (last - HANGUL_BASE) % JONGSEONG_COUNT;
-            if (jongseong == 0) {
-                return Ending.NONE;
-            }
-            return jongseong == JONGSEONG_RIEUL ? Ending.RIEUL : Ending.OTHER;
+        if (isHangulSyllable(last)) {
+            return (last - HANGUL_BASE) % JONGSEONG_COUNT == 0 ? Ending.NONE : Ending.OTHER;
         }
         if (last >= '0' && last <= '9') {
             return digitEnding(last);
         }
-        return Ending.NONE;
+        return Ending.UNKNOWN;
     }
 
-    /** 영(ㅇ)·일(ㄹ)·이·삼(ㅁ)·사·오·육(ㄱ)·칠(ㄹ)·팔(ㄹ)·구 */
+    /**
+     * 끝자리 숫자의 받침. <b>한자어 읽기 기준</b>이다 — 영(ㅇ)·일(ㄹ)·이·삼(ㅁ)·사·오·육(ㄱ)·
+     * 칠(ㄹ)·팔(ㄹ)·구.
+     *
+     * <p><b>끝자리 하나만 봐도 된다.</b> 몇 자리든 마지막 음절은 끝자리가 정하기 때문이다 —
+     * {@code 16}은 "십육"(ㄱ), {@code 100}은 "백"(ㄱ), {@code 21}은 "이십일"(ㄹ).
+     * 0 으로 끝나면 십(ㅂ)·백(ㄱ)·천(ㄴ)·만(ㄴ) 중 하나라 언제나 받침이 있다.
+     *
+     * <p>{@code 은/는} 계열은 {@code ㄹ} 을 다른 받침과 같게 보므로 여기서 갈라 둘 필요가 없다.
+     */
     private static Ending digitEnding(char digit) {
         return switch (digit) {
-            case '1', '7', '8' -> Ending.RIEUL;
-            case '0', '3', '6' -> Ending.OTHER;
+            case '0', '1', '3', '6', '7', '8' -> Ending.OTHER;
             default -> Ending.NONE;
         };
     }
