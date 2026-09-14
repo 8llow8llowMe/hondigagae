@@ -43,8 +43,17 @@ describe('EmergencyMapPanel', () => {
     */
     expect(markup).toContain('bg-row-selected')
 
-    // 행의 `class` 만 본다 — 안쪽 상태 배지가 쓰는 색은 선택 표시가 아니다
-    const li = markup.slice(markup.indexOf('<li'), markup.indexOf('>'))
+    /*
+      행의 `class` 만 본다 — 안쪽 상태 배지가 쓰는 색은 선택 표시가 아니다.
+
+      **끝 인덱스를 `<li` **뒤에서부터** 찾아야 한다.** 그냥 `indexOf('>')` 로 잡으면
+      바깥 `<ul …>` 의 `>` 가 먼저 걸려 시작보다 앞 인덱스가 나오고, `slice` 가 빈
+      문자열을 돌려 **단언이 아무것도 보지 않는다.**
+    */
+    const open = markup.indexOf('<li')
+    const li = markup.slice(open, markup.indexOf('>', open))
+
+    expect(li).toContain('bg-row-selected')
     expect(li).not.toContain('metric-')
   })
 

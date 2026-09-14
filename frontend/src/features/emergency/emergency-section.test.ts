@@ -110,12 +110,12 @@ describe('EmergencySection — openNow 3상태 (아트보드 주석)', () => {
     (`metric-mid` · `metric-low`)은 여전히 이 화면에 없어야 한다 — 그것이 나타나면 배지가
     다시 척도로 읽히고 있다는 뜻이다.
   */
-  it('중간 등급 색을 쓰지 않는다 — 상태는 척도가 아니라 두 값이다', () => {
-    expect(render()).not.toMatch(/metric-(mid|low|critical)/)
+  it('등급 색을 쓰지 않는다 — 상태는 척도가 아니라 두 값이다', () => {
+    expect(render()).not.toMatch(/metric-(high|mid|low|critical)/)
   })
 
   it('진료중은 초록, 영업 종료는 빨강이다 (#598)', () => {
-    expect(render()).toContain('bg-metric-high-100')
+    expect(render()).toContain('bg-status-open-100')
 
     const closed = render({
       result: {
@@ -127,7 +127,7 @@ describe('EmergencySection — openNow 3상태 (아트보드 주석)', () => {
       },
     })
 
-    expect(closed).toContain('bg-danger-100')
+    expect(closed).toContain('bg-status-closed-100')
   })
 })
 

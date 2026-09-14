@@ -111,15 +111,6 @@ export const emergencyMessages = {
    */
   directionsLabel: '{name} 길찾기',
 
-  /*
-    **`hoursExpand`("전체 시간표") · `hoursCollapse` 는 #598 에서 걷었다.** 운영시간을
-    한 줄(`line-clamp-1`)로 접던 것을 두 줄로 늘리면서 펼치기 버튼이 할 일을 잃었다 —
-    근거는 `facility-row.tsx` 의 `FacilityHours` 머리주석이다. 원문을 요약하지 않는다는
-    규칙 자체는 그대로고(정본은 `types/emergency.ts` 의 `operatingHours` 주석),
-    **"지금 여는가" 는 그 줄이 아니라 배지가 답한다** (`statusOpen` · `statusClosed` ·
-    `statusUnknown`).
-  */
-
   // ── 지도 ───────────────────────────────────────────────────────────────
 
   /** `MapSheet` 의 접근성 이름. **`/places` 와 달라야 한다** */

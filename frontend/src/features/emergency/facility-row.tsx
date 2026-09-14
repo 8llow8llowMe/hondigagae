@@ -30,6 +30,10 @@ import type { NearbyFacilityItem } from '@/types/emergency'
  * 행에 걸고 마지막 행이 `last` 로 껐는데, 그러면 행 수를 아는 호출자만 목록을 그릴 수 있다.
  * 선은 `SurfaceList` 가 항목 **사이에만** 긋는다 (#439 가 정한 L2 규약).
  *
+ * **`'use client'` 은 남긴다.** #598 에서 `전체 시간표` 펼치기를 걷으면서 이 파일의 훅이
+ * 사라졌지만(이제 링크와 버튼 마크업뿐이다), 소비처가 전부 client 컴포넌트라 떼든 남기든
+ * 런타임이 같다 — **경계 표시로** 남긴다.
+ *
  * **좌우 인셋은 담는 곳이 정한다** (`inset.ts`). 목록 갈래는 카드 안이라 `card`(16/20),
  * 지도 SDK 폴백은 카드가 없어 `main`(16/40) — `PlaceRow` 와 같은 규칙이다. 자기 배경도
  * 없다: 카드 안 자식은 자기 배경을 갖지 않는다 (§0).
@@ -100,21 +104,30 @@ export function FacilityRowContent({
         쓰던 것을 첫 줄 오른쪽 끝으로 올린다 — 목록을 훑을 때 눈이 왼쪽(무엇)과
         오른쪽(지금 여는가) 두 기둥만 보면 된다.
 
-        `items-start` 다. 이름이 두 줄로 감기면 배지가 가운데로 내려가 첫 줄과 어긋난다.
-        `24시간` 은 상태 옆에 붙인다 — 유형과 달리 "지금 갈 수 있는가" 쪽 사실이다.
+        ── **이름이 길면 상태가 아랫줄로 내려간다** (`flex-wrap` + `basis-[min-content]`)
 
-        **왼쪽 묶음은 `flex-wrap` 이다.** 오른쪽이 `shrink-0` 이라 좁은 칸에서 줄어드는
-        쪽은 이름뿐인데, 이름을 더 깎느니 유형 배지를 아랫줄로 내리는 쪽이 낫다 — 375
-        실측에서 `365건강온누리약국` 이 그 경계다. 상태는 그때도 첫 줄 끝에 남는다.
+        오른쪽 묶음은 `shrink-0` 이라 좁은 칸에서 줄어드는 쪽은 이름뿐인데, 375 에서 첫 줄
+        가용 폭이 219px 이고 `영업 여부 확인 필요` 하나가 110px 을 가져간다 — 남는 109px 은
+        `제주축산업협동조합`(한 어절 145px) 같은 이름을 어절째로 담지 못한다. 그대로 두면
+        `break-words` 가 **어절 한가운데를 끊어**(`제주축산업협` / `동조합`) DESIGN.md §3-3
+        (한국어는 어절 단위로 감는다)을 뒤집는다.
+
+        그래서 왼쪽 묶음의 **기준 크기를 `min-content`(= 가장 긴 어절)로** 준다. 둘이 한
+        줄에 서지 못하면 flex 가 줄을 바꾸므로, **이름이 짧으면 한 줄, 길면 이름이 줄 전체를
+        쓰고 상태가 아랫줄 오른쪽에 선다.** 판단이 CSS 안에서 스스로 갈려 브레이크포인트를
+        두지 않아도 된다.
+
+        `flex-1`(= `flex: 1 1 0%`)이 아니라 `grow` 인 것이 핵심이다 — `flex-1` 은 기준
+        크기를 0 으로 덮어 **언제나 한 줄**로 만든다.
+
+        `break-words` 는 그래도 남긴다. 줄 전체(219px)로도 담기지 않는 한 어절
+        (`제주특별자치도동물의료원부속24시응급진료센터`)이 실제로 있고, 그때는 끊는 것이
+        가려지는 것보다 낫다 — `break-keep` 이 함께 있어 **어절로 감을 수 있으면 먼저 감는다.**
+
+        `24시간` 은 상태 옆에 붙인다 — 유형과 달리 "지금 갈 수 있는가" 쪽 사실이다.
       */}
-      <div className="flex items-start gap-2">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
-          {/*
-            **`break-words` 를 함께 준다.** `break-keep` 만 두면 공백 없는 긴 이름
-            (`365건강온누리약국`)이 한 덩어리라 min-content 가 칸보다 커지고, 줄지 못한
-            내용이 오른쪽 상태 배지 **아래로 깔린다**(375 실측). `break-words` 는 그 한
-            경우에만 낱자로 끊는다 — 띄어쓰기가 있는 이름은 그대로 어절에서 감긴다.
-          */}
+      <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
+        <div className="flex min-w-0 grow basis-[min-content] flex-wrap items-center gap-x-1.5 gap-y-1">
           <span className="text-title-2 text-fg min-w-0 font-semibold break-words break-keep">
             {facility.name}
           </span>
@@ -126,7 +139,8 @@ export function FacilityRowContent({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
+        {/* `ml-auto` — 아랫줄로 내려갔을 때도 오른쪽 기둥에 남는다 */}
+        <div className="ml-auto flex shrink-0 items-center gap-1">
           {facility.open24 && <Badge tone="neutral">{messages.emergency.open24}</Badge>}
           <OpenStatus openNow={facility.openNow} />
         </div>
@@ -183,22 +197,29 @@ function FacilityHours({ facility }: { facility: NearbyFacilityItem }) {
   }
 
   /*
-    **휴무를 같은 줄에 이어 붙인다.** 따로 줄을 만들면 두 줄이 세 줄이 된다. 휴무는
-    "오늘 여는가" 가 아니라 "언제 닫는가" 라, 배지가 이미 오늘을 답한 뒤에 오는 사실이다.
-  */
-  const rest =
-    facility.restDate === null ? null : ` · ${facility.restDate} ${messages.emergency.restPrefix}`
-
-  /*
     **`line-clamp-2` 다.** 넘치는 것을 그대로 흘리지 않는 이유는 #537 과 같다 — 원문
     길이는 시설마다 제각각이라(`법정공휴일` 항목까지 붙는 곳이 있다) 상한이 없으면 한
     행이 목록의 리듬을 혼자 깬다. 지도 패널도 같은 경로를 탄다.
+
+    ── **휴무는 그 상한 밖이다** (#598 리뷰에서 뒤집은 것)
+
+    #537 은 휴무를 **같은 줄에 이어 붙였다** — *"따로 줄을 만들면 접어서 번 한 줄을 도로
+    내놓는다"*. 그때는 `전체 시간표` 버튼이 있어 잘린 뒤도 펼쳐 볼 수 있었다. **이 PR 이
+    그 버튼을 걷으면서 전제가 사라졌다**: 375 실측에서 운영시간 117줄 중 **75줄(64%)이
+    두 줄에서 잘리고, 잘린 75줄은 전부 휴무 절을 달고 있었다.** 시설 상세 라우트도 없어
+    (#148) `매주 수요일 휴무` 를 되찾을 길이 아무 데도 없었다.
+
+    휴무를 자기 줄로 뺀다. 한 줄을 내주지만 **이 화면에서 가장 비싼 실패("닫힌 병원으로
+    달려가기")를 막는 정보**이고, 짧아서 잘리지 않는다. 운영시간 원문은 그대로 두 줄이다.
   */
+  const rest =
+    facility.restDate === null ? null : `${facility.restDate} ${messages.emergency.restPrefix}`
+
   return (
-    <p className="text-body-2 text-fg line-clamp-2 tabular-nums">
-      {facility.operatingHours}
-      {rest !== null && <span className="text-fg-muted">{rest}</span>}
-    </p>
+    <>
+      <p className="text-body-2 text-fg line-clamp-2 tabular-nums">{facility.operatingHours}</p>
+      {rest !== null && <p className="text-body-2 text-fg-muted break-keep tabular-nums">{rest}</p>}
+    </>
   )
 }
 
@@ -214,10 +235,21 @@ function FacilityHours({ facility }: { facility: NearbyFacilityItem }) {
  * 둘이 붙어 **어느 쪽이 상태인지가 모양으로 구별되지 않는다.** 급할 때 훑는 화면이라
  * 색이 여기서는 장식이 아니라 축이다.
  *
- * **등급 색 금지와 충돌하지 않는다.** 금지의 뜻은 "산책 위험도 등급을 다른 데서 흉내내지
- * 말라" 이고(`badge.tsx` · DESIGN.md §2-3), 여기 초록/빨강은 등급이 아니라 **열림/닫힘
- * 두 값**이라 세 단계 척도로 읽힐 여지가 없다. 그래서 `MetricBadge` 가 아니라 `Badge` 의
- * `brand` · `danger` 톤을 그대로 쓴다 — 톤을 새로 내지 않았다.
+ * ── **자기 톤을 쓴다** — 등급 토큰도 장애 토큰도 빌리지 않는다
+ *
+ * 처음에는 값이 같다는 이유로 `brand`(= `metric-high`) · `danger` 를 그대로 썼는데,
+ * 리뷰에서 둘 다 걸렸다. `metric-high` 초록은 홈의 `여행 적합` 배지와 **픽셀 단위로
+ * 같아** 같은 색이 한쪽에서는 3단계 척도의 한 칸, 다른 쪽에서는 두 값 중 하나가 된다.
+ * `--danger-*` 는 DESIGN.md §2-6 이 **5xx 일시 장애 전용**으로 못박은 것인데, 문 닫은
+ * 병원은 장애가 아니고 목록의 **72%(135행 중 97행)** 가 그 배지를 단다.
+ *
+ * 그래서 `status-open` · `status-closed` 톤을 냈다 (DESIGN.md §2-9). 값은 각각 그 둘과
+ * 같지만 이름을 분리한다 — `--link` 가 `--metric-high-500` 과 값이 같아도 이름을 지키는
+ * 것과 같은 규칙이고, 나중에 갈라야 할 때 한 줄만 고치면 된다.
+ *
+ * **색은 유일한 채널이 아니다.** 두 tint 의 명도 대비가 1.02:1 이라 적록색약에게는 밝기가
+ * 같다 — `진료중` 은 `strong` 으로 무게를 함께 올린다. 예전 규칙("색이 아니라 무게로
+ * 가른다")을 버린 것이 아니라 **그 위에 색을 얹은 것**이다.
  *
  * ── `null` 은 색을 받지 않는다
  *
@@ -239,8 +271,16 @@ function OpenStatus({ openNow }: { openNow: boolean | null }) {
     )
   }
 
+  /*
+    **무게를 `className` 으로 덮지 않는다.** `component-guide.md` §3 이 `font-*` 를 금지
+    열에 두고 있어 `Badge` 의 `strong` prop 으로 연다.
+
+    **진료중만 무게를 올린다.** 색이 유일한 채널이면 안 되기 때문이다 — 두 tint 의 명도
+    대비가 1.02:1 이라 적록색약에게는 밝기가 같다. 예전 규칙("색이 아니라 무게로 가른다")이
+    사라진 것이 아니라, **무게 위에 색이 얹힌 것**이다.
+  */
   return (
-    <Badge tone={openNow ? 'brand' : 'danger'} className="font-semibold">
+    <Badge tone={openNow ? 'status-open' : 'status-closed'} strong={openNow}>
       {openNow ? messages.emergency.statusOpen : messages.emergency.statusClosed}
     </Badge>
   )
