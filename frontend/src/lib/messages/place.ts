@@ -362,6 +362,41 @@ export const placeMessages = {
   detailCopyrightType3: '공공누리 제3유형 (출처 표시·변경 금지)',
   detailCopyrightUnknown: '출처 표시 대상',
 
+  // ── 장소 상세 · 기간 혼잡도 (#430) ──────────────────────────────────────
+
+  /**
+   * 카드 제목. **"기간 혼잡도" 라는 계약 용어를 쓰지 않는다** — 사용자가 이 카드에서 하는
+   * 일은 등급을 확인하는 것이 아니라 **갈 날을 고르는 것**이다.
+   */
+  detailCongestionTitle: '언제 가면 덜 붐빌까',
+  /**
+   * 서버가 고른 날(`leastCrowded`). **`null` 이면 이 줄을 그리지 않는다** — 아는 날이
+   * 하나도 없다는 뜻이라, 빈 자리는 "한산한 날이 없다" 로 읽힌다.
+   */
+  detailCongestionLeastLabel: '가장 덜 붐비는 날',
+  detailCongestionLeastDay: '{month}월 {day}일 ({weekday})',
+  /** 집중률은 단위가 없는 지표(0~100)다. **숫자는 이 줄에만 적는다** */
+  detailCongestionRateLabel: '집중률',
+  /** 막대 하나를 보조기기에 읽어 주는 줄. 색·높이는 스크린리더에 아무 말도 하지 못한다 */
+  detailCongestionBar: '{month}월 {day}일 {weekday}요일',
+  /**
+   * 점선 트랙의 뜻. **이 줄이 없으면 빈 칸이 "한산한 날" 로 읽힌다** — 서버가 데이터 없는
+   * 날짜를 목록에서 빼지 않는 이유와 같다.
+   */
+  detailCongestionUnknownNote: '점선은 아직 모르는 날이에요. 한산하다는 뜻이 아니에요.',
+  /** 30일을 펼쳤을 때. 이 카드가 적합도보다 멀리 본다는 것을 그 자리에서 말한다 */
+  detailCongestionExtendedNote: '혼잡도 예측은 30일까지 있어요. 날씨 판정은 11일까지예요.',
+  detailCongestionExpand: '30일까지 보기',
+  detailCongestionCollapse: '7일만 보기',
+  /**
+   * 전부 `UNKNOWN` — `leastCrowded` 가 `null` 인 갈래다. **404 가 아니라 빈 상태다**:
+   * 장소는 있고 연결된 관광지 통계가 없는 것이라 재시도 버튼을 달지 않는다.
+   */
+  detailCongestionEmptyTitle: '이 장소는 혼잡도 자료가 아직 없어요',
+  detailCongestionEmptyDescription: '한산하다는 뜻은 아니에요. 자료가 쌓이면 보여 드려요.',
+  /** 조회 실패. 이 카드만 덮는다 — 판정·기본 정보는 그대로 쓸모가 있다 */
+  detailCongestionErrorTitle: '혼잡도를 불러오지 못했어요',
+
   // ── 장소 상세 · 사진 뷰어 ───────────────────────────────────────────────
 
   /**

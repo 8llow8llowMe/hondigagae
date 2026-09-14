@@ -1,4 +1,9 @@
-import type { PlaceSuitabilityResponse, WalkSafetyResponse } from '@/types/insight'
+import type { CodeNameMetadata } from '@/types/api'
+import type {
+  PlaceCongestionResponse,
+  PlaceSuitabilityResponse,
+  WalkSafetyResponse,
+} from '@/types/insight'
 import type { PlanSummaryItem } from '@/types/plan'
 
 /**
@@ -168,6 +173,77 @@ export const suitabilityWithIndoor: PlaceSuitabilityResponse = {
       allowedPetSize: { code: 'SMALL', name: '소형견', description: '소형견만 동반 가능합니다.' },
     },
   ],
+}
+
+/** `CongestionLevel` 의 `displayName` / `description` 그대로 — 문구를 창작하지 않는다 */
+const CONGESTION_LOW: CodeNameMetadata = {
+  code: 'LOW',
+  name: '한산',
+  description: '관광객 집중도가 낮아 여유로울 것으로 예상됩니다.',
+}
+
+const CONGESTION_MODERATE: CodeNameMetadata = {
+  code: 'MODERATE',
+  name: '보통',
+  description: '관광객 집중도가 평소 수준입니다.',
+}
+
+const CONGESTION_HIGH: CodeNameMetadata = {
+  code: 'HIGH',
+  name: '혼잡',
+  description: '관광객 집중도가 높아 붐빌 것으로 예상됩니다.',
+}
+
+/** **`UNKNOWN` 은 "한산" 이 아니라 "모름" 이다.** 집중률이 `null` 인 유일한 등급이다 */
+const CONGESTION_UNKNOWN: CodeNameMetadata = {
+  code: 'UNKNOWN',
+  name: '정보 없음',
+  description: '이 장소에 연결된 혼잡도 예측 데이터가 없습니다.',
+}
+
+/**
+ * 기간 혼잡도 (#430). 날짜·집중률은 Swagger `@Schema(example)`(`2026-09-01`~`2026-09-07`,
+ * `37.2`)의 기간을 그대로 쓰고, 등급 문구는 `CongestionLevel` 의 `displayName` /
+ * `description` 이다.
+ *
+ * **중간(`2026-09-04`)을 `UNKNOWN` 으로 둔다.** 데이터 없는 날짜가 목록에서 빠지지 않는
+ * 것이 이 계약의 핵심이고, 끝이 아니라 가운데에 둬야 "구멍" 이 화면에서 보인다.
+ *
+ * `leastCrowded` 는 **서버가 고른 값**이다 — `UNKNOWN` 을 제외한 최저(`21.4`). 테스트가
+ * 이 값을 다시 계산하지 않는다.
+ */
+export const congestion: PlaceCongestionResponse = {
+  placeId: '212481712381923328',
+  fromDate: '2026-09-01',
+  toDate: '2026-09-07',
+  dailyCongestions: [
+    { date: '2026-09-01', level: CONGESTION_HIGH, concentrationRate: 71.8 },
+    { date: '2026-09-02', level: CONGESTION_MODERATE, concentrationRate: 37.2 },
+    { date: '2026-09-03', level: CONGESTION_LOW, concentrationRate: 28.6 },
+    { date: '2026-09-04', level: CONGESTION_UNKNOWN, concentrationRate: null },
+    { date: '2026-09-05', level: CONGESTION_LOW, concentrationRate: 21.4 },
+    { date: '2026-09-06', level: CONGESTION_MODERATE, concentrationRate: 44.9 },
+    { date: '2026-09-07', level: CONGESTION_HIGH, concentrationRate: 68.3 },
+  ],
+  leastCrowded: { date: '2026-09-05', level: CONGESTION_LOW, concentrationRate: 21.4 },
+}
+
+/**
+ * 아는 날이 하나도 없는 장소 — **`leastCrowded` 가 `null` 인 갈래**.
+ *
+ * 이 장소에 연결된 관광지 통계가 없다는 뜻이지 한산하다는 뜻이 아니다. 화면이 그 둘을
+ * 섞으면 "가장 덜 붐비는 날" 자리가 비어 "한산한 날이 없다" 로 읽힌다.
+ */
+export const congestionAllUnknown: PlaceCongestionResponse = {
+  placeId: '212481712381923329',
+  fromDate: '2026-09-01',
+  toDate: '2026-09-07',
+  dailyCongestions: congestion.dailyCongestions.map((item) => ({
+    date: item.date,
+    level: CONGESTION_UNKNOWN,
+    concentrationRate: null,
+  })),
+  leastCrowded: null,
 }
 
 export const upcomingPlan: PlanSummaryItem = {

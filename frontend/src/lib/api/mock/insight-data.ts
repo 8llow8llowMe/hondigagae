@@ -2,6 +2,8 @@ import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import type { CodeNameMetadata } from '@/types/api'
 import type {
   CongestionItem,
+  DailyCongestionItem,
+  PlaceCongestionResponse,
   PlaceSuitabilityResponse,
   RegionalWeatherResponse,
   ScoreMetricMetadata,
@@ -132,6 +134,88 @@ function bucketOf(placeId: string): number {
 
 function titleOf(placeId: string): string {
   return MOCK_PLACES.find((place) => place.placeId === placeId)?.title ?? '제주 장소'
+}
+
+const CONGESTION_LEVELS: Record<string, CodeNameMetadata> = {
+  LOW: {
+    code: 'LOW',
+    name: '한산',
+    description: '관광객 집중도가 낮아 여유로울 것으로 예상됩니다.',
+  },
+  MODERATE: {
+    code: 'MODERATE',
+    name: '보통',
+    description: '관광객 집중도가 평소 수준입니다.',
+  },
+  HIGH: CONGESTION_HIGH.level,
+  UNKNOWN: CONGESTION_UNKNOWN.level,
+}
+
+/**
+ * 기간 혼잡도 (#430). `fromDate` 는 서버가 오늘로 잡지만 **mock 은 고정 날짜를 쓴다** —
+ * 실행한 날에 따라 스냅샷이 흔들리면 e2e 가 날짜마다 다른 화면을 본다.
+ *
+ * 갈래를 셋으로 둔다 (`bucketOf`):
+ *  - 0 · 1 — 값이 있는 주. **중간에 `UNKNOWN` 날짜를 섞는다** (점선 트랙을 화면에서 봐야 한다)
+ *  - 2 — **전부 `UNKNOWN` · `leastCrowded: null`.** 적합도가 `INSUFFICIENT` 인 장소와 같은
+ *    버킷이라, 판정도 혼잡도도 답하지 못하는 장소가 어떻게 보이는지 한 화면에서 확인된다
+ *
+ * 집중률은 **서버가 고르는 규칙과 같은 답이 나오게** 둔다 — `UNKNOWN` 제외 최저,
+ * 동률이면 이른 날짜. mock 이 다른 날을 고르면 화면이 아니라 mock 이 틀린 것이다.
+ */
+const CONGESTION_FROM_DATE = '2026-08-29'
+
+/** 버킷별 집중률 패턴. `null` 은 데이터 없는 날짜다 — **목록에서 빼지 않는다** */
+const CONGESTION_RATES: Record<number, (number | null)[]> = {
+  0: [68.4, 41.2, 28.9, 24.5, null, 52.1, 77.3],
+  1: [35.0, 62.8, null, 44.6, 31.7, 29.4, 58.2],
+  2: [null, null, null, null, null, null, null],
+}
+
+function congestionLevelOf(rate: number | null): CodeNameMetadata {
+  if (rate === null) return CONGESTION_LEVELS.UNKNOWN as CodeNameMetadata
+  if (rate < 35) return CONGESTION_LEVELS.LOW as CodeNameMetadata
+  if (rate < 60) return CONGESTION_LEVELS.MODERATE as CodeNameMetadata
+  return CONGESTION_LEVELS.HIGH as CodeNameMetadata
+}
+
+export function mockCongestions(placeId: string, days: number): PlaceCongestionResponse {
+  const pattern = CONGESTION_RATES[bucketOf(placeId)] ?? []
+  const from = Date.parse(`${CONGESTION_FROM_DATE}T00:00:00Z`)
+
+  const dailyCongestions: DailyCongestionItem[] = Array.from({ length: days }, (_, offset) => {
+    // 패턴을 주 단위로 되풀이한다 — 30일도 같은 리듬으로 채워 레일을 실제로 굴려 본다
+    const rate = pattern[offset % pattern.length] ?? null
+
+    return {
+      date: new Date(from + offset * 86_400_000).toISOString().slice(0, 10),
+      level: congestionLevelOf(rate),
+      concentrationRate: rate,
+    }
+  })
+
+  /*
+    **서버 규칙을 그대로 흉내낸다** — `UNKNOWN` 제외 최저 집중률, 동률이면 가장 이른 날짜.
+    아는 날이 하나도 없으면 `null` 이다. FE 는 이 값을 그대로 쓰므로, mock 이 다른 날을
+    고르면 화면에서 티가 나지 않고 조용히 틀린다.
+  */
+  const known = dailyCongestions.filter((item) => item.concentrationRate !== null)
+  const leastCrowded =
+    known.reduce<DailyCongestionItem | null>(
+      (best, item) =>
+        best === null || (item.concentrationRate ?? 0) < (best.concentrationRate ?? 0)
+          ? item
+          : best,
+      null,
+    ) ?? null
+
+  return {
+    placeId,
+    fromDate: CONGESTION_FROM_DATE,
+    toDate: dailyCongestions[dailyCongestions.length - 1]?.date ?? CONGESTION_FROM_DATE,
+    dailyCongestions,
+    leastCrowded,
+  }
 }
 
 export function mockSuitability(placeId: string): PlaceSuitabilityResponse {

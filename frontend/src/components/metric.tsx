@@ -142,6 +142,25 @@ export function MetricWord({
   )
 }
 
+/**
+ * 등급 **면** — 글자가 얹히지 않는 채움 전용 (#430 의 기간 혼잡도 막대).
+ *
+ * **`-500` 층인 이유는 여기에 텍스트가 없기 때문이다.** 비텍스트 요소는 3:1 기준이라
+ * `-500` 이 통과하고, tint(`-100`)로 칠하면 막대가 배경(`--band`)과 거의 구별되지 않는다.
+ * **이 표로 칠한 면 위에 글자를 얹지 않는다** — 얹어야 하면 `-100` 층(`BADGE_TONE`)이다.
+ *
+ * **`unknown` 은 비어 있다.** `--metric-unknown-500` 은 점선 테두리 전용이라 면을 칠할 색이
+ * 없고, 모르는 날을 옅은 면으로 칠하면 그것이 "낮은 값" 으로 읽힌다. 호출부가 채우기 전에
+ * 값이 있는지부터 가른다.
+ */
+export const METRIC_FILL_TONE: Record<MetricTone, string> = {
+  critical: 'bg-metric-critical-500',
+  high: 'bg-metric-high-500',
+  mid: 'bg-metric-mid-500',
+  low: 'bg-metric-low-500',
+  unknown: '',
+}
+
 /** 큰 숫자에 쓰는 등급 색. 22px 이상 + weight 900 에만 허용된다 (DESIGN.md §2-3). */
 const VALUE_TONE: Record<MetricTone, string> = {
   critical: 'text-metric-critical-500',

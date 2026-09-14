@@ -1,4 +1,5 @@
 import { paths } from '@/lib/api/paths'
+import type { CongestionDays } from '@/lib/insight/congestion'
 import type { PetCondition } from '@/types/insight'
 import type { Pet } from '@/types/pet'
 
@@ -61,6 +62,24 @@ export function suitabilityPath(placeId: string, condition: PetCondition | null)
 
 export function walkSafetyPath(placeId: string, condition: PetCondition | null): string {
   return paths.places.walkSafety(placeId, toInsightQuery(condition))
+}
+
+/**
+ * 기간 혼잡도 (#430).
+ *
+ * **반려견 조건을 싣지 않는다.** 붐빔은 장소와 날짜의 속성이라 반려견이 바뀌어도 같은
+ * 값이고, dev Swagger 실측(2026-09-14)에서도 이 경로는 조건 파라미터를 선언하지 않는다.
+ * 조건을 함께 보내면 조회 key 가 반려견마다 갈려 같은 답을 여러 벌 캐시하게 된다.
+ *
+ * **`fromDate` 를 보내지 않는다.** 생략하면 서버가 오늘로 잡는다 — 권역 비교(`date`)와
+ * 같은 판단이다. FE 가 날짜를 만들면 브라우저 타임존이 KST 가 아닌 사용자에게 어제부터의
+ * 기간이 나간다.
+ *
+ * **`days` 는 기본값(7)이어도 명시한다.** 백엔드 기본값이 바뀌면 조용히 다른 기간이 오고,
+ * 그때 카드 머리의 기간 표기만 서버 응답을 따라가 화면이 스스로 어긋난다.
+ */
+export function congestionsPath(placeId: string, days: CongestionDays): string {
+  return paths.places.congestions(placeId, new URLSearchParams({ days: String(days) }).toString())
 }
 
 /**

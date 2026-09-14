@@ -98,6 +98,45 @@ export type CongestionItem = {
   concentrationRate: number | null
 }
 
+/**
+ * 일자별 혼잡도 — `CongestionItem` 에 날짜가 붙은 모양이다.
+ *
+ * **데이터가 없는 날짜도 목록에서 빠지지 않는다.** 서버가 `UNKNOWN` 으로 자리를 지켜
+ * 보낸다 — 빠뜨리면 날짜 축에 구멍이 생겨 사용자가 그 날을 "한산한 날" 로 읽는다.
+ */
+export type DailyCongestionItem = CongestionItem & {
+  /** 예측 일자 (`yyyy-MM-dd`) */
+  date: string
+}
+
+/**
+ * `GET /places/{placeId}/congestions` — 기간 혼잡도 (#430).
+ *
+ * **적합도의 `congestion`(그 날 하나)과 시간 축이 다르다.** 이쪽은 기간이고, 혼잡도 예측은
+ * 30일 rolling 이라 예보(약 11일)보다 멀리 답한다 — 적합도가 `INSUFFICIENT` 로 비는
+ * 날짜도 여기서는 붐빔 정도를 말할 수 있다.
+ */
+export type PlaceCongestionResponse = {
+  /** Snowflake 라 문자열이다. `Number()` 를 거치지 않는다 */
+  placeId: string
+  /**
+   * 조회 시작일 · 종료일. **화면의 기간 표기는 이 두 값을 쓴다** — FE 가 `days` 로
+   * 계산하면 서버가 자른 기간과 어긋난다.
+   */
+  fromDate: string
+  toDate: string
+  dailyCongestions: DailyCongestionItem[]
+  /**
+   * 기간 중 가장 덜 붐비는 날. 규칙(`UNKNOWN` 제외 최저 집중률, 동률이면 가장 이른 날짜)은
+   * BE `CongestionSnapshot.leastCrowded` **한 곳**이다 — **FE 가 다시 고르지 않는다.**
+   * 같은 기간에 다른 날을 추천하게 된다.
+   *
+   * **`null` 이면 자리를 만들지 않는다.** 아는 날이 하나도 없다는 뜻이지 한산하다는
+   * 뜻이 아니다.
+   */
+  leastCrowded: DailyCongestionItem | null
+}
+
 /** 실내 대안 장소. 장소명 필드가 `title` 이다 (`placeTitle` 이 아니다) */
 export type AlternativePlaceItem = {
   placeId: string
