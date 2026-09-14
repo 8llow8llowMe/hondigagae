@@ -38,6 +38,10 @@ function formatDay(date: string): string | null {
   return weekday === null ? null : `${date} (${weekday})`
 }
 
+/** 일정이 오늘 기준 어디에 있는지. 갈래별 설명은 {@link planPhaseOf} 에 있다. */
+export type PlanPhase =
+  { kind: 'upcoming'; days: number } | { kind: 'ongoing'; day: number } | { kind: 'past' }
+
 /**
  * 일정이 오늘 기준 어디에 있는지. **날짜 축의 판정은 여기 하나뿐이다.**
  *
@@ -61,10 +65,12 @@ function formatDay(date: string): string | null {
  *
  * 날짜를 못 읽으면 `null` 이다. 호출부는 배지를 그리지 않고 다가오는 쪽에 둔다 —
  * 지난 쪽으로 미는 편이 더 위험하다 (`isPastPlan` 과 같은 판단).
+ *
+ * 기간이 역전된(`endDate < startDate`) 깨진 데이터는 `past` 로 떨어진다 — `ongoing` 은
+ * `시작일 < 오늘 ≤ 종료일` 을 요구하므로 역전에서는 나올 수 없다. 같은 파일의
+ * `totalDaysBetween` 은 역전에 `null` 을 주는데, 저쪽은 "셀 수 없다" 이고 이쪽은 "이미
+ * 끝난 것으로 본다" 라 답이 갈리는 것이 맞다.
  */
-export type PlanPhase =
-  { kind: 'upcoming'; days: number } | { kind: 'ongoing'; day: number } | { kind: 'past' }
-
 export function planPhaseOf(startDate: string, endDate: string, today: Date): PlanPhase | null {
   const start = parseDay(startDate)
   if (start === null || parseDay(endDate) === null) return null

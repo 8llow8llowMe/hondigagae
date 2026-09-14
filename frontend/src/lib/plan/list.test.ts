@@ -101,6 +101,15 @@ describe('날짜 판정 — D-day · 여행 중 · 지남을 한 함수가 답�
     expect(planPhaseOf('없음', '2026-08-29', TODAY)).toBeNull()
     expect(planPhaseOf('2026-08-29', '없음', TODAY)).toBeNull()
   })
+
+  /*
+    기간이 역전된 깨진 데이터. 같은 파일의 `totalDaysBetween` 은 여기서 `null` 을 주는데,
+    저쪽은 "셀 수 없다" 이고 이쪽은 "이미 끝난 것으로 본다" 라 답이 갈리는 게 맞다.
+    중요한 건 `ongoing` 으로 새지 않는 것이다 — `오늘 -3일차` 같은 말이 나가면 안 된다.
+  */
+  it('기간이 역전돼도 여행 중으로 새지 않는다', () => {
+    expect(planPhaseOf('2026-08-29', '2026-08-26', TODAY)).toEqual({ kind: 'past' })
+  })
 })
 
 describe('지난 일정 판정 — 날짜 기준이고 상태 기준이 아니다', () => {

@@ -72,10 +72,13 @@ export function PlanOverviewPanel({
    */
   action?: React.ReactNode
 }) {
+  /*
+    **여기만 `여행 중` 이 아니라 `오늘 4일차` 를 쓴다.** 이 줄은 배지 기둥이 아니라 설명
+    줄이고, 바로 왼쪽에 `총 4일` 이 서 있어 며칠째인지가 붙어야 두 값이 서로를 설명한다.
+    목록·홈과 어긋난 말이 아니라 **같은 판정에서 나온 더 자세한 말**이다.
+  */
   const phase = planPhaseOf(plan.startDate, plan.endDate, today)
-  // 여행 중이면 `여행 중` 대신 `오늘 4일차` 를 쓴다 — 이 줄은 기둥이 아니라 설명 줄이고,
-  // 옆에 `총 4일` 이 이미 서 있어 며칠째인지가 붙어야 두 값이 서로를 설명한다
-  const phaseLabel = planPhaseNote(phase) ?? planPhaseLabel(phase)
+  const phaseText = planPhaseNote(phase) ?? planPhaseLabel(phase)
 
   return (
     /*
@@ -129,10 +132,10 @@ export function PlanOverviewPanel({
                       plan.budget.toLocaleString('ko-KR'),
                     )}`}
               </span>
-              {phaseLabel !== null && (
+              {phaseText !== null && (
                 <>
                   <span aria-hidden>·</span>
-                  <span className="text-fg font-bold">{phaseLabel}</span>
+                  <span className="text-fg font-bold">{phaseText}</span>
                 </>
               )}
             </p>

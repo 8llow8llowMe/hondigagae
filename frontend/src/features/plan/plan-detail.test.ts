@@ -372,6 +372,21 @@ describe('PlanOverviewPanel', () => {
     expect(renderOverview()).toContain('초안')
   })
 
+  /*
+    #561. 이 줄은 배지 기둥이 아니라 설명 줄이라 `여행 중` 이 아니라 `오늘 N일차` 를 쓴다 —
+    바로 왼쪽에 `총 3일` 이 서 있어 두 값이 서로를 설명한다. 목록·홈과 어긋난 말이 아니라
+    같은 판정에서 나온 더 자세한 말이다.
+  */
+  it('여행 중이면 D-day 자리에 며칠째인지를 쓴다', () => {
+    const markup = renderOverview({
+      plan: { ...planDetail, startDate: '2026-08-30', endDate: '2026-09-02' },
+    })
+
+    expect(markup).toContain('오늘 3일차')
+    expect(markup).toContain('총 3일')
+    expect(markup).not.toMatch(/D-\d/)
+  })
+
   it('서버가 모르는 상태 코드를 내려도 이름 그대로 초안처럼 그린다 (공통명세 S7)', () => {
     const markup = renderOverview({
       plan: {

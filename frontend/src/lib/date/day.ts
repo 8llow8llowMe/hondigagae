@@ -46,7 +46,7 @@ export function todayDay(today: Date): string {
 /**
  * 달력의 칸 → 그 날의 **로컬 정오** `Date`. 못 읽으면 `null`.
  *
- * `todayUtc()` 를 받는 함수들(`daysUntil` · `isPastPlan`)에 **서버가 정한 오늘**을 넘기기
+ * `todayUtc()` 를 받는 함수들(`planPhaseOf` · `isPastPlan`)에 **서버가 정한 오늘**을 넘기기
  * 위한 것이다. 클라이언트 컴포넌트가 스스로 `new Date()` 를 부르면 SSR 과 하이드레이션이
  * 자정을 걸쳐 갈릴 수 있고, 그러면 같은 화면이 서버에서는 A 일정을, 브라우저에서는 B
  * 일정을 고른다 (`app/(main)/page.tsx` 의 `todayLabel` 이 서버에서 만들어지는 것과 같은 이유).
