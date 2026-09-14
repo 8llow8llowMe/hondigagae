@@ -1,4 +1,4 @@
-import { isPastPlan } from '@/lib/plan/date'
+import { planPhaseOf } from '@/lib/plan/date'
 import type { PlanFilters, PlanStatusFilter, PlanSummaryItem } from '@/types/plan'
 
 /**
@@ -29,32 +29,42 @@ export function hasActiveFilters(filters: PlanFilters): boolean {
 }
 
 export type PlanGroups = {
+  ongoing: PlanSummaryItem[]
   upcoming: PlanSummaryItem[]
   past: PlanSummaryItem[]
 }
 
 /**
- * 다가오는 / 지난으로 나눈다. **날짜 기준이고 상태 기준이 아니다** (공통명세 S4) —
+ * 여행 중 / 다가오는 / 지난으로 나눈다. **날짜 기준이고 상태 기준이 아니다** (공통명세 S4) —
  * `COMPLETED` 로 가는 경로가 서버에 없어 상태로 나누면 지난 일정이 영원히 빈다.
  *
+ * **`여행 중` 이 셋째 칸이다** (#561). 전에는 "지난 게 아니면 전부 다가오는" 이라 오늘
+ * 여행 중인 일정이 `다가오는 일정` 제목 아래 D-day 도 없이 섰다. 판정은 이 파일이 하지
+ * 않고 `planPhaseOf` 하나에 맡긴다 — 목록·홈·상세가 같은 답을 말해야 한다.
+ *
  * 서버 정렬은 `id DESC`(만든 순서)라 여행 목록에서 의미가 없어 재정렬한다.
- * 다가오는 것은 가까운 여행이 위로, 지난 것은 최근 여행이 위로 온다.
+ * 여행 중·다가오는 것은 가까운 여행이 위로, 지난 것은 최근 여행이 위로 온다.
  */
 export function groupPlans(plans: readonly PlanSummaryItem[], today: Date): PlanGroups {
+  const ongoing: PlanSummaryItem[] = []
   const upcoming: PlanSummaryItem[] = []
   const past: PlanSummaryItem[] = []
 
   for (const plan of plans) {
-    if (isPastPlan(plan.endDate, today)) past.push(plan)
+    const phase = planPhaseOf(plan.startDate, plan.endDate, today)
+    // 날짜를 못 읽으면(`null`) 다가오는 쪽이다 — 지난 쪽으로 미는 편이 더 위험하다
+    if (phase?.kind === 'past') past.push(plan)
+    else if (phase?.kind === 'ongoing') ongoing.push(plan)
     else upcoming.push(plan)
   }
 
   // 같은 날 출발하는 일정이 여러 개면 planId 로 순서를 고정한다 —
   // 비교 함수가 0 을 돌려주면 브라우저마다 순서가 갈릴 수 있다
+  ongoing.sort((a, b) => compare(a.startDate, b.startDate) || compare(a.planId, b.planId))
   upcoming.sort((a, b) => compare(a.startDate, b.startDate) || compare(a.planId, b.planId))
   past.sort((a, b) => compare(b.endDate, a.endDate) || compare(b.planId, a.planId))
 
-  return { upcoming, past }
+  return { ongoing, upcoming, past }
 }
 
 function compare(a: string, b: string): number {

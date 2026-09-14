@@ -39,17 +39,41 @@ function formatDay(date: string): string | null {
 }
 
 /**
- * 남은 일수. 이미 시작한 일정은 `null` — D-day 를 말하지 않는다.
+ * 일정이 오늘 기준 어디에 있는지. **날짜 축의 판정은 여기 하나뿐이다.**
  *
- * 홈의 "다가오는 일정" 행과 목록이 **같은 함수를 쓴다.** 두 화면이 같은 일정에 다른
- * D-day 를 말하면 어느 쪽이 맞는지 알 수 없다.
+ * 홈의 "다가오는 일정" 행 · 목록 · 상세가 **같은 함수를 쓴다.** 두 화면이 같은 일정에
+ * 다른 말을 하면 어느 쪽이 맞는지 알 수 없다.
+ *
+ * 예전에는 `daysUntil`(남은 일수)과 `isPastPlan`(지남)이 따로 답했다. 둘 다 각자 맞았는데
+ * **그 사이가 비어 있었다** — 이미 시작했고 아직 안 끝난 일정이 D-day 도 없이 "다가오는
+ * 일정" 에 서 있었다 (#561, dev 실측 `2026-09-11 ~ 09-14` 일정을 09-14 에 봤을 때).
+ * 갈래가 둘뿐이라 생긴 구멍이라 **갈래를 셋으로 못박는다.**
+ *
+ * | 갈래 | 조건 | 화면 |
+ * |------|------|------|
+ * | `past` | 종료일 < 오늘 | 지난 일정 |
+ * | `ongoing` | 시작일 < 오늘 ≤ 종료일 | `여행 중` · `오늘 N일차` |
+ * | `upcoming` | 오늘 ≤ 시작일 | `D-N` (당일은 `D-DAY`) |
+ *
+ * **출발 당일(`days === 0`)은 `upcoming` 에 남긴다.** 그날 화면이 할 말은 `D-DAY` 이고
+ * 그게 `여행 중` 보다 강하다. 그래서 `ongoing.day` 는 **항상 2 이상**이고, 하루짜리
+ * 일정은 `여행 중` 을 거치지 않는다.
+ *
+ * 날짜를 못 읽으면 `null` 이다. 호출부는 배지를 그리지 않고 다가오는 쪽에 둔다 —
+ * 지난 쪽으로 미는 편이 더 위험하다 (`isPastPlan` 과 같은 판단).
  */
-export function daysUntil(startDate: string, today: Date): number | null {
+export type PlanPhase =
+  { kind: 'upcoming'; days: number } | { kind: 'ongoing'; day: number } | { kind: 'past' }
+
+export function planPhaseOf(startDate: string, endDate: string, today: Date): PlanPhase | null {
   const start = parseDay(startDate)
-  if (start === null) return null
+  if (start === null || parseDay(endDate) === null) return null
+
+  if (isPastPlan(endDate, today)) return { kind: 'past' }
 
   const days = Math.round((start - todayUtc(today)) / 86_400_000)
-  return days < 0 ? null : days
+  // days < 0 이면 이미 출발했고, 위에서 아직 안 끝난 것이 확인됐다 — 오늘이 여행 기간 안이다
+  return days >= 0 ? { kind: 'upcoming', days } : { kind: 'ongoing', day: 1 - days }
 }
 
 /** 종료일이 오늘보다 이전이면 지난 일정이다. **상태(`COMPLETED`)와는 다른 축이다** */

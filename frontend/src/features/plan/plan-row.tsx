@@ -3,9 +3,9 @@ import Link from 'next/link'
 import { ChevronRightIcon } from '@/components/icons'
 import { PetAvatar } from '@/components/pet-avatar'
 import { PlanStatusBadge } from '@/features/plan/plan-status-badge'
-import { messages } from '@/lib/messages'
 import { companionLabel } from '@/lib/plan/companion-pets'
-import { daysUntil, formatPlanDateRange } from '@/lib/plan/date'
+import { formatPlanDateRange, planPhaseOf } from '@/lib/plan/date'
+import { planPhaseLabel, planPhaseNote } from '@/lib/plan/phase-text'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import type { PlanSummaryItem } from '@/types/plan'
 
@@ -39,7 +39,9 @@ export function PlanRow({
   petNames: readonly string[]
   today: Date
 }) {
-  const dday = daysUntil(plan.startDate, today)
+  const phase = planPhaseOf(plan.startDate, plan.endDate, today)
+  const phaseLabel = planPhaseLabel(phase)
+  const phaseNote = planPhaseNote(phase)
   const companion = companionLabel(petNames)
 
   return (
@@ -59,6 +61,8 @@ export function PlanRow({
             </span>
             <span className="text-caption text-fg-muted mt-1 block font-medium tabular-nums">
               {formatPlanDateRange(plan.startDate, plan.endDate)}
+              {/* 여행 중일 때만 붙는다 — 기둥의 `여행 중` 이 며칠째인지까지는 못 말한다 */}
+              {phaseNote !== null && ` · ${phaseNote}`}
             </span>
           </span>
 
@@ -73,11 +77,9 @@ export function PlanRow({
           </span>
         )}
 
-        {dday !== null && (
-          <span className="text-body-2 text-fg self-end font-bold tabular-nums lg:w-14 lg:self-auto lg:text-right">
-            {dday === 0
-              ? messages.plan.ddayToday
-              : messages.plan.dday.replace('{days}', String(dday))}
+        {phaseLabel !== null && (
+          <span className="text-body-2 text-fg self-end font-bold whitespace-nowrap tabular-nums lg:w-14 lg:self-auto lg:text-right">
+            {phaseLabel}
           </span>
         )}
 

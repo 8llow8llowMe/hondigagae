@@ -89,22 +89,36 @@ export function PlanListSection({
     )
   }
 
-  const { upcoming, past } = groupPlans(plans, today)
+  const { ongoing, upcoming, past } = groupPlans(plans, today)
 
   return (
     <div className="pb-5">
+      {/*
+        **여행 중이 맨 위다** (#561). 오늘 일어나고 있는 일이 제일 위에 온다 — 아래 두
+        묶음이 각각 앞·뒤를 맡으므로 시간순으로도 이 자리가 맞다.
+      */}
+      {ongoing.length > 0 && (
+        <PlanGroup
+          title={messages.plan.sectionOngoing}
+          plans={ongoing}
+          petNames={petNames}
+          today={today}
+        />
+      )}
+
       {upcoming.length > 0 && (
         <PlanGroup
           title={messages.plan.sectionUpcoming}
           plans={upcoming}
           petNames={petNames}
           today={today}
+          divided={ongoing.length > 0}
         />
       )}
 
       {/*
-        **두 묶음은 한 카드 안의 L2 다.** 같은 화자(내 일정)가 시간으로 나눈 것이라 카드를
-        둘로 쪼개지 않는다 — §0 "카드 경계는 이야기 단위". 2a 는 둘 사이를 8px 밴드로 끊었는데,
+        **묶음들은 한 카드 안의 L2 다.** 같은 화자(내 일정)가 시간으로 나눈 것이라 카드를
+        쪼개지 않는다 — §0 "카드 경계는 이야기 단위". 2a 는 둘 사이를 8px 밴드로 끊었는데,
         3a 의 카드 안에서는 밴드가 각진 불투명 면이 되어 카드 모서리를 덮는다. 뒤 묶음의
         제목 줄 위에 **1px 구분선**을 그어 가른다 — 캡션 제목이 함께 있어 목록의 연속으로
         읽히지 않는다.
@@ -115,7 +129,7 @@ export function PlanListSection({
           plans={past}
           petNames={petNames}
           today={today}
-          divided={upcoming.length > 0}
+          divided={ongoing.length > 0 || upcoming.length > 0}
         />
       )}
 
