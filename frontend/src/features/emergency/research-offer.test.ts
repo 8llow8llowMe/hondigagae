@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import { RESEARCH_OFFER_RATIO, shouldOfferResearch } from '@/features/emergency/research-offer'
-import type { MapBounds } from '@/lib/map/viewport'
+import { JEJU_MAP_SEA_RATIO } from '@/lib/geo/coord'
+import { JEJU_QUERY_CENTER } from '@/lib/geo/current-position'
+import { haversineMeters } from '@/lib/geo/distance'
+import { framedCenterLat, type MapBounds } from '@/lib/map/viewport'
 
 /*
   **#396.** `/places` 는 지도를 옮기면 스스로 재조회하지만 이 화면은 그러지 않는다 —
@@ -9,6 +12,7 @@ import type { MapBounds } from '@/lib/map/viewport'
   (PR #373). 재조회 시점을 사용자가 쥐되, **권할 때와 아닐 때를 이 함수가 가른다.**
 */
 
+/** 카메라가 지도 중심을 놓은 자리. **조회 기준점이 아니다** — #578 */
 const JEJU = { lat: 33.4996, lng: 126.5312 }
 
 /** 중심이 `center` 이고 대략 `spanDeg` 만큼 벌어진 영역 */
@@ -31,7 +35,7 @@ describe('shouldOfferResearch — 권할 때 (#396)', () => {
     expect(
       shouldOfferResearch({
         bounds: boundsAround(movedNorth(JEJU, 4_000)),
-        anchor: JEJU,
+        origin: JEJU,
         radius,
         selected: false,
       }),
@@ -42,7 +46,7 @@ describe('shouldOfferResearch — 권할 때 (#396)', () => {
     expect(
       shouldOfferResearch({
         bounds: boundsAround(movedNorth(JEJU, 500)),
-        anchor: JEJU,
+        origin: JEJU,
         radius: 10_000,
         selected: false,
       }),
@@ -57,8 +61,8 @@ describe('shouldOfferResearch — 권할 때 (#396)', () => {
   it('같은 이동 거리라도 반경이 좁으면 권하고 넓으면 권하지 않는다', () => {
     const bounds = boundsAround(movedNorth(JEJU, 800))
 
-    expect(shouldOfferResearch({ bounds, anchor: JEJU, radius: 1_000, selected: false })).toBe(true)
-    expect(shouldOfferResearch({ bounds, anchor: JEJU, radius: 40_000, selected: false })).toBe(
+    expect(shouldOfferResearch({ bounds, origin: JEJU, radius: 1_000, selected: false })).toBe(true)
+    expect(shouldOfferResearch({ bounds, origin: JEJU, radius: 40_000, selected: false })).toBe(
       false,
     )
   })
@@ -70,10 +74,10 @@ describe('shouldOfferResearch — 권할 때 (#396)', () => {
     const justUnder = boundsAround(movedNorth(JEJU, radius * RESEARCH_OFFER_RATIO - 200))
     const justOver = boundsAround(movedNorth(JEJU, radius * RESEARCH_OFFER_RATIO + 200))
 
-    expect(shouldOfferResearch({ bounds: justUnder, anchor: JEJU, radius, selected: false })).toBe(
+    expect(shouldOfferResearch({ bounds: justUnder, origin: JEJU, radius, selected: false })).toBe(
       false,
     )
-    expect(shouldOfferResearch({ bounds: justOver, anchor: JEJU, radius, selected: false })).toBe(
+    expect(shouldOfferResearch({ bounds: justOver, origin: JEJU, radius, selected: false })).toBe(
       true,
     )
   })
@@ -89,21 +93,21 @@ describe('shouldOfferResearch — 권하지 않을 때 (#396)', () => {
     expect(
       shouldOfferResearch({
         bounds: boundsAround(movedNorth(JEJU, 9_000)),
-        anchor: JEJU,
+        origin: JEJU,
         radius: 10_000,
         selected: true,
       }),
     ).toBe(false)
   })
 
-  it('첫 idle 전(bounds 없음)이거나 좌표를 못 받았으면(anchor 없음) 권하지 않는다', () => {
+  it('첫 idle 전(bounds 없음)이거나 카메라가 아직 놓기 전(origin 없음)이면 권하지 않는다', () => {
     expect(
-      shouldOfferResearch({ bounds: null, anchor: JEJU, radius: 10_000, selected: false }),
+      shouldOfferResearch({ bounds: null, origin: JEJU, radius: 10_000, selected: false }),
     ).toBe(false)
     expect(
       shouldOfferResearch({
         bounds: boundsAround(JEJU),
-        anchor: null,
+        origin: null,
         radius: 10_000,
         selected: false,
       }),
@@ -113,9 +117,75 @@ describe('shouldOfferResearch — 권하지 않을 때 (#396)', () => {
   it('반경이 값이 아니면 권하지 않는다 — 0 으로 나눈 비율에 기대지 않는다', () => {
     const bounds = boundsAround(movedNorth(JEJU, 9_000))
 
-    expect(shouldOfferResearch({ bounds, anchor: JEJU, radius: 0, selected: false })).toBe(false)
-    expect(shouldOfferResearch({ bounds, anchor: JEJU, radius: Number.NaN, selected: false })).toBe(
+    expect(shouldOfferResearch({ bounds, origin: JEJU, radius: 0, selected: false })).toBe(false)
+    expect(shouldOfferResearch({ bounds, origin: JEJU, radius: Number.NaN, selected: false })).toBe(
       false,
     )
+  })
+})
+
+/*
+  **이 함수가 `anchor` 가 아니라 `origin` 을 받는 이유** — 이슈 #578.
+
+  지도를 놓는 규칙(`framedCenterLat`)은 기준점을 화면 정중앙이 아니라 위쪽
+  `JEJU_MAP_SEA_RATIO`(35%) 지점에 놓는다. 그래서 **지도 중심은 기준점보다 남쪽**이고,
+  그 거리는 확대 단계에 비례한다. 예전에는 여기에 기준점을 넘겨 **그 의도된 오프셋이
+  사용자의 이동으로 읽혔다** — 조작 0회에서 버튼이 떴다.
+
+  아래 둘은 실측값(1440×900 · level 8 · 반경 10km 에서 4,060m)을 재현하는 구성이다.
+*/
+describe('프레이밍 오프셋을 사용자 이동으로 읽지 않는다 (#578)', () => {
+  /** 첫 화면 실측 — 데스크톱 1440×900 의 지도 높이와 그때의 확대 단계 */
+  const MAP_HEIGHT_PX = 836
+  const MAP_LEVEL = 8
+  const RADIUS = 10_000
+
+  /** 카메라가 실제로 놓는 자리. 기준점보다 `(0.5 - seaRatio)` 만큼 남쪽이다 */
+  const placed = {
+    lat: framedCenterLat(JEJU_QUERY_CENTER.lat, MAP_HEIGHT_PX, MAP_LEVEL, JEJU_MAP_SEA_RATIO),
+    lng: JEJU_QUERY_CENTER.lng,
+  }
+
+  it('조작 0회 — 카메라가 놓은 자리로 재면 권하지 않는다', () => {
+    expect(
+      shouldOfferResearch({
+        bounds: boundsAround(placed),
+        origin: placed,
+        radius: RADIUS,
+        selected: false,
+      }),
+    ).toBe(false)
+  })
+
+  /*
+    **프레이밍 규칙을 바꾸면 이 검사가 깨진다 — 그때는 지우지 말고 다시 판단한다.**
+    `seaRatio` 가 0.5 가 되면 오프셋이 사라져 위험 자체가 없어지고, 더 치우치면
+    위험이 커진다. 어느 쪽이든 `origin` 의 존재 이유가 달라지는 변경이다.
+  */
+  it('그 오프셋은 임계값을 넘는다 — 기준점으로 재면 조작 0회에 권해 버렸다 (회귀)', () => {
+    const offset = haversineMeters(JEJU_QUERY_CENTER, placed)
+
+    expect(offset).not.toBeNull()
+    expect(offset ?? 0).toBeGreaterThan(RADIUS * RESEARCH_OFFER_RATIO)
+
+    expect(
+      shouldOfferResearch({
+        bounds: boundsAround(placed),
+        origin: JEJU_QUERY_CENTER,
+        radius: RADIUS,
+        selected: false,
+      }),
+    ).toBe(true)
+  })
+
+  it('놓인 자리에서 사용자가 반경의 30% 밖으로 끌면 권한다', () => {
+    expect(
+      shouldOfferResearch({
+        bounds: boundsAround(movedNorth(placed, RADIUS * RESEARCH_OFFER_RATIO + 200)),
+        origin: placed,
+        radius: RADIUS,
+        selected: false,
+      }),
+    ).toBe(true)
   })
 })
