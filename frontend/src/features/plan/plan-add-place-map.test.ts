@@ -143,14 +143,22 @@ describe('PlanAddPlaceHeader — 두 보기가 나눠 쓰는 머리', () => {
   /*
     지도 보기에서도 h1 을 sr-only 로 숨기지 않는다 — /places 지도는 전역 nav 로 나갈 수
     있지만 이 화면의 퇴로는 `일정으로 돌아가기` 뿐이다.
+
+    **`markup` 전체에서 `sr-only` 를 찾던 단언을 `h1` 로 좁혔다** (#539). 뒤로가기가
+    모바일에서 아이콘이 되면서 그 **라벨**이 `sr-only md:not-sr-only` 를 달았는데, 그것은
+    이 테스트가 막으려던 일(제목을 숨기는 것)이 아니다 — 링크는 그대로 보이고 이름도
+    스크린리더에 그대로 읽힌다. 뭉툭한 검사가 무관한 변경에 걸린 자리다.
   */
   it('보이는 h1 과 돌아가기 링크를 둔다 — 지도에서도 숨기지 않는다', () => {
     const markup = renderHeader()
+    const h1Class = /<h1[^>]*class="([^"]*)"/.exec(markup)?.[1] ?? ''
 
     expect(markup).toContain('<h1')
-    expect(markup).not.toContain('sr-only')
+    expect(h1Class.split(/\s+/)).not.toContain('sr-only')
     expect(markup).toContain('href="/plans/1#day-2"')
     expect(markup).toContain(messages.plan.addPlaceTitle.replace('{day}', '2'))
+    // 퇴로의 이름은 아이콘이 되어도 남는다 — 스크린리더가 읽을 말이 사라지면 퇴로가 없다
+    expect(markup).toContain(messages.plan.addPlaceBack)
   })
 
   it('일정 제목을 받으면 부제 앞에 붙이고, 없으면 부제만 남긴다', () => {

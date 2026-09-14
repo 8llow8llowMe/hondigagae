@@ -34,13 +34,25 @@ export function PlanEmergencyHeader({
   radiusMeters: number | null
 }) {
   return (
-    <header className={cn('flex flex-col pt-4 pb-4 md:pt-0 md:pb-0', INSET_CLASS.card)}>
-      <BackLink href={`/plans/${planId}`} label={messages.plan.emergencyBack} className="-ml-1" />
-      <h1 className="text-title-1 text-fg lg:text-display mt-1 font-bold break-keep lg:font-extrabold">
+    /*
+      **제목 줄 배치는 `flex-wrap` 하나로 한다** (#539). 모바일에서 뒤로가기가 `h1` 왼쪽에
+      붙고, 데스크톱에서는 `BackLink` 의 `md:basis-full` 이 한 줄을 통째로 차지해 지금처럼
+      제목 **위**에 선다. 노드를 두 벌 두지 않으므로 라벨 문구의 출처가 하나로 남는다.
+    */
+    <header
+      className={cn('flex flex-wrap items-center pt-4 pb-4 md:pt-0 md:pb-0', INSET_CLASS.card)}
+    >
+      <BackLink
+        href={`/plans/${planId}`}
+        label={messages.plan.emergencyBack}
+        variant="titleRow"
+        className="-ml-1"
+      />
+      <h1 className="text-title-1 text-fg lg:text-display font-bold break-keep md:mt-1 lg:font-extrabold">
         {messages.plan.emergencyHeading}
       </h1>
       {radiusMeters !== null && (
-        <p className="text-caption text-fg-muted mt-1 font-medium">
+        <p className="text-caption text-fg-muted mt-1 basis-full font-medium">
           {messages.plan.emergencyRadiusNote.replace(
             '{km}',
             String(Math.round(radiusMeters / 1000)),
