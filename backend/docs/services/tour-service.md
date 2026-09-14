@@ -38,7 +38,7 @@
 - `GET /api/v1/walk-courses/{walkCourseId}` — 산책 코스 상세
 - `GET /api/v1/places/nearby?lat=&lng=&radius=&contentType=&petSizeType=&petWeightKg=&keyword=` — 좌표 반경 장소 검색. keyword 는 목록과 같은 이름·주소 부분 일치
 - `GET /api/v1/emergencies/facilities?lat=&lng=&radius=&type=&open24Only=&openNowOnly=&size=` — 긴급 시설 반경 검색.
-  `size` 상한은 **250** 이다 — 제주 전역 시설이 214곳이라 반경을 최대로 넓혀도 잘리지 않는다.
+  `size` 상한은 **250** 이다 — 제주 전역 시설이 213곳이라 반경을 최대로 넓혀도 잘리지 않는다.
   화면이 유형·24시간을 클라이언트에서 좁히며 칩마다 개수를 보여주므로 한 번에 전량을 받아야 한다.
   두 조회 모두 **`totalCount` 는 `size` 로 자르기 전 총계**다 (`api-design-guide.md` §5-1, 이슈 #285)
 - `GET /api/v1/emergencies/facilities/{facilityId}` — 긴급 시설 상세.

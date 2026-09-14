@@ -22,6 +22,12 @@ class EmergencyFacilityDeduplicatorTest {
 
     private static ImportedEmergencyFacility facility(
         String name, String addr, String tel, BigDecimal lat, BigDecimal lng, LocalDateTime modifiedAt) {
+        return facility(name, addr, tel, lat, lng, modifiedAt, null);
+    }
+
+    private static ImportedEmergencyFacility facility(
+        String name, String addr, String tel, BigDecimal lat, BigDecimal lng, LocalDateTime modifiedAt,
+        String operatingHours) {
         return ImportedEmergencyFacility.builder()
             .sourceKey(PlaceIdFactory.sourceKeyOf(name, addr))
             .facilityType(EmergencyFacilityTypeCode.ANIMAL_HOSPITAL)
@@ -30,6 +36,7 @@ class EmergencyFacilityDeduplicatorTest {
             .lat(lat)
             .lng(lng)
             .tel(tel)
+            .operatingHours(operatingHours)
             .sourceModifiedAt(modifiedAt)
             .build();
     }
@@ -121,6 +128,11 @@ class EmergencyFacilityDeduplicatorTest {
             .containsExactly("24시똑똑똑동물메디컬센터");
     }
 
+    /*
+     * 좌표 없는 행은 `CultureFacilityCsvAdapter` 가 읽는 단계에서 이미 거른다(skippedNoCoordinate).
+     * 여기까지 올 수 없지만 방어로 남기고, 다음 사람이 "왜 이 경로가 안 잡히지" 를 다시 파지 않도록
+     * 적어 둔다. 전화 null 은 실재한다 — 동물병원 224/225 만 전화를 준다.
+     */
     @Test
     @DisplayName("접을 수 없는 행은 그대로 통과시킨다 — 전화·좌표가 없으면 가드를 걸 수 없다")
     void passesThroughRowsThatCannotBeFolded() {
@@ -133,6 +145,62 @@ class EmergencyFacilityDeduplicatorTest {
             List.of(noTel, noCoordinate));
 
         assertThat(result.facilities()).hasSize(2);
+    }
+
+    /*
+     * 전국 실측에서 접기 후보 10개 묶음 중 **5개가 운영시간이 서로 달랐다** —
+     * `24시 지구촌 동물메디컬 센터`(매일 00:00~24:00) vs `24시지구촌동물메디컬센터`(매일 09:00~23:00).
+     * 임의로 하나를 고르면 24시간 병원이 아닌 곳이 되거나 그 반대가 된다.
+     */
+    @Test
+    @DisplayName("운영시간이 엇갈리면 접지 않는다 — 급할 때 찾는 화면에서 틀린 시간이 최악이다")
+    void keepsBothWhenOperatingHoursConflict() {
+        ImportedEmergencyFacility open24 = facility("24시 지구촌 동물메디컬 센터", "제주특별자치도 제주시 가령로 1",
+            "064-700-0001", DORYEONG_LAT, DORYEONG_LNG, null, "매일 00:00~24:00");
+        ImportedEmergencyFacility daytime = facility("24시지구촌동물메디컬센터", "제주특별자치도 제주시 가령로 1-1",
+            "064-700-0001", DORYEONG_LAT, DORYEONG_LNG, null, "매일 09:00~23:00");
+
+        EmergencyFacilityDeduplicator.Result result = EmergencyFacilityDeduplicator.fold(List.of(open24, daytime));
+
+        assertThat(result.facilities()).hasSize(2);
+        assertThat(result.mergedNotes()).isEmpty();
+        assertThat(result.conflictNotes()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("한쪽만 운영시간을 가지면 엇갈림이 아니다 — 가진 쪽이 살아남는다")
+    void keepsTheRowThatKnowsOperatingHours() {
+        ImportedEmergencyFacility known = facility("24시똑똑똑 동물메디컬센터", "제주특별자치도 제주시 도령로 129",
+            "064-749-7585", DORYEONG_LAT, DORYEONG_LNG, LocalDateTime.of(2024, 1, 1, 0, 0), "매일 00:00~24:00");
+        ImportedEmergencyFacility unknown = facility("24시똑똑똑동물메디컬센터", "제주특별자치도 제주시 도령로 129",
+            "064-749-7585", DORYEONG_LAT, DORYEONG_LNG, LocalDateTime.of(2025, 3, 24, 0, 0), null);
+
+        // 시간을 모르는 쪽이 더 최신인데도, 아는 쪽이 이겨야 한다 — 접기가 정보를 줄이면 안 된다
+        EmergencyFacilityDeduplicator.Result result = EmergencyFacilityDeduplicator.fold(List.of(known, unknown));
+
+        assertThat(result.facilities()).hasSize(1);
+        assertThat(result.facilities().get(0).operatingHours()).isEqualTo("매일 00:00~24:00");
+    }
+
+    /*
+     * `allWithinRadius` 가 묶음을 통째로 남기는 분기. 일부만 접으면 "어느 것이 어느 것과 같은가" 를
+     * 입력 순서가 정하게 되고 멱등성이 깨진다 — 그 결정을 여기서 잠근다.
+     */
+    @Test
+    @DisplayName("한 쌍이라도 멀면 묶음을 통째로 남긴다 — 가까운 쌍만 골라 접지 않는다")
+    void keepsWholeBucketWhenAnyPairIsFarApart() {
+        List<ImportedEmergencyFacility> rows = List.of(
+            facility("행복동물병원", "제주특별자치도 제주시 가까운로 1", "064-700-1234",
+                new BigDecimal("33.4990"), new BigDecimal("126.5310"), null),
+            facility("행복 동물병원", "제주특별자치도 제주시 가까운로 2", "064-700-1234",
+                new BigDecimal("33.4991"), new BigDecimal("126.5311"), null),
+            facility("행복동물병원", "제주특별자치도 서귀포시 먼로 3", "064-700-1234",
+                new BigDecimal("33.2541"), new BigDecimal("126.5600"), null));
+
+        EmergencyFacilityDeduplicator.Result result = EmergencyFacilityDeduplicator.fold(rows);
+
+        assertThat(result.facilities()).hasSize(3);
+        assertThat(result.mergedNotes()).isEmpty();
     }
 
     @Test

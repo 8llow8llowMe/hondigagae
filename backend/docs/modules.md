@@ -179,7 +179,7 @@ yml 목록(`infra.redis.sentinels`)도 계속 받지만 로컬용 탈출구다 �
 - `GET /api/v1/places/{placeId}/walk-safety` — 산책 위험도 (추정 노면온도·열지수, 안전 시간대 제안)
 - `GET /api/v1/walk-courses` — 제주올레 산책 코스 (두루누비는 제주 코스가 0개라 원천 교체, #382)
 - `GET /api/v1/places/nearby` — 좌표 반경 장소 검색 (식당·카페 포함)
-- `GET /api/v1/emergencies/facilities` — 위치 기준 동물병원·동물약국 반경 검색 (제주 214곳)
+- `GET /api/v1/emergencies/facilities` — 위치 기준 동물병원·동물약국 반경 검색 (제주 213곳)
 
 **컨텍스트**: `place`, `insight`(적합도·혼잡도·날씨), `emergency`, `walkcourse`(미착수)
 

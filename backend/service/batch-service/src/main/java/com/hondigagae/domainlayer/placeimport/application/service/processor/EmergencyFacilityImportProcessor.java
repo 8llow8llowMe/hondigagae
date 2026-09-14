@@ -43,6 +43,15 @@ public class EmergencyFacilityImportProcessor {
             log.info("emergency facility duplicates folded sido={} count={} merged={}",
                 sido, deduplicated.mergedNotes().size(), deduplicated.mergedNotes());
         }
+        if (!deduplicated.conflictNotes().isEmpty()) {
+            /*
+             * 같은 시설로 보이는데 운영시간·휴무가 엇갈려 접지 않은 것. **목록에 두 번 뜬다.**
+             * 원천이 고쳐지기를 기다리는 상태라 info 가 아니라 warn 이다 —
+             * 어느 쪽 시간이 맞는지는 우리가 정할 수 없다.
+             */
+            log.warn("emergency facility duplicates left unfolded (conflicting hours) sido={} count={} pairs={}",
+                sido, deduplicated.conflictNotes().size(), deduplicated.conflictNotes());
+        }
 
         emergencyFacilityBulkPort.upsertAll(facilities);
 
