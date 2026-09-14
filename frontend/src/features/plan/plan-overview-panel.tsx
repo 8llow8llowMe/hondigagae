@@ -18,12 +18,24 @@ import type { PlanDayWeatherItem, PlanDetail } from '@/types/plan'
  * 모바일에서는 레일이 아니라 화면 맨 위의 개요 블록이다. **DOM 순서가 모바일 기준
  * 그대로여도 두 레이아웃이 성립하므로** `.rail-layout-detail` 변형을 쓰지 않는다 (D1).
  *
- * **두 조각을 돌려준다** (`DESIGN.md §0`, #447) — 부모 `SurfaceStack` 의 직접 자식이 되어야
- * 카드 간격을 받기 때문에 fragment 다.
- * 1. **제목 줄은 페이지 머리라 카드가 아니다** — 장소 상세(#443)와 같은 결정. 동행 반려견도
- *    여기 든다: "누구와 가는 일정인가" 는 신원의 일부다. 인셋은 카드 안 글줄과 같은 `card`
- *    (카드 테두리 1px 만큼 어긋나는 것도 #443 과 같다).
- * 2. **일자별 판정 목차는 카드다** — 자기 제목이 있고 항목이 여럿인 목록. 데스크톱 전용.
+ * **세 조각을 돌려준다** (`DESIGN.md §0`, #447 · #553) — 부모 `SurfaceStack` 의 직접
+ * 자식이 되어야 카드 간격을 받기 때문에 fragment 다.
+ * 1. **제목 줄도 카드다** (#553). 동행 반려견도 여기 든다: "누구와 가는 일정인가" 는
+ *    신원의 일부다.
+ * 2. **확정 액션** (`action` 슬롯) — 카드가 아니라 바닥 위에 선다.
+ * 3. **일자별 판정 목차는 카드다** — 자기 제목이 있고 항목이 여럿인 목록. 데스크톱 전용.
+ *
+ * ### 제목 줄이 카드가 된 이유 (#553)
+ *
+ * #447 은 장소 상세(#443)를 따라 "페이지 머리(h1)는 카드가 아니다" 로 두었다. 그런데 이
+ * 화면의 제목 줄은 **제목만이 아니다** — 상태 배지 · 기간 · 예산 · D-day · 동행 반려견까지
+ * 담은 개요다. §0 의 카드 판정 3문에 그대로 걸린다: ① 자기 제목(일정 이름)이 있고,
+ * ② 혼자 떼어놔도 "무슨 일정인가" 로 읽히며, ③ 담는 항목이 둘 이상이다.
+ *
+ * 카드가 아니던 동안에는 바로 아래 `준비물` · `병원` 카드와 **왼쪽 세로선은 같은데
+ * 테두리만 없어서**, 회색 바닥 위에 글자가 떠 있고 그 아래로 카드가 시작되는 모양이었다.
+ *
+ * **장소 상세는 그대로 둔다.** 거기 페이지 머리는 제목 + 한 줄 메타라 ③ 에 걸린다.
  */
 export function PlanOverviewPanel({
   plan,
@@ -32,6 +44,7 @@ export function PlanOverviewPanel({
   today,
   verdicts,
   menu = null,
+  action = null,
 }: {
   plan: PlanDetail
   /** 조회 실패·삭제된 반려견이면 `null` — **카드만 빠지고 화면은 그대로다** (D5) */
@@ -47,6 +60,16 @@ export function PlanOverviewPanel({
    * 여기서 직접 import 하면 패널 전체가 클라이언트로 넘어가고 렌더 테스트도 무거워진다.
    */
   menu?: React.ReactNode
+  /**
+   * 확정 액션(`PlanStatusAction`) — 개요 카드 **바로 아래**에 선다 (이슈 #553).
+   *
+   * **자리를 슬롯으로 받는 이유**는 그것이 개요와 목차 사이여야 하기 때문이다. 호출부에서
+   * `<PlanOverviewPanel />` 뒤에 그냥 두면 이 컴포넌트가 fragment 라 **목차 카드 뒤**로
+   * 내려간다 — 데스크톱에서 확정 버튼이 일자 목차 아래로 밀린다.
+   *
+   * `menu` 와 같은 이유로 주입이다 — 액션은 상태·요청을 갖는 클라이언트 컴포넌트다.
+   */
+  action?: React.ReactNode
 }) {
   const dday = daysUntil(plan.startDate, today)
 
@@ -61,10 +84,17 @@ export function PlanOverviewPanel({
       한 겹으로 감싸 고정하는 것과 같은 형태다.
     */
     <>
-      <div className={cn('flex flex-col gap-5 pt-4 pb-4 md:pt-0 md:pb-0', INSET_CLASS.card)}>
-        <div className="flex flex-col gap-2">
-          <div className="flex items-start gap-2">
-            {/*
+      {/*
+        **카드가 `title` 슬롯을 쓰지 않는다.** 그 슬롯은 `h2` 를 그리는데 여기 제목은
+        페이지의 `h1` 이고, 상태 배지·관리 메뉴가 같은 줄에 선다. `aria-label` 도 주지
+        않는다 — 안의 `h1` 이 이미 이 묶음의 이름이라 접근성 이름이 둘이 된다
+        (`Surface` 머리주석).
+      */}
+      <Surface>
+        <div className={cn('flex flex-col gap-5 py-4 md:py-5', INSET_CLASS.card)}>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-start gap-2">
+              {/*
             제목은 서버 상한 60자다. 좌측 400 에서 2~3줄이 되므로 keep-all 로 어절을 지킨다.
 
             **`lg:text-display` 는 저장소의 콘텐츠 화면 `h1` 관례다** (#358) — 일정 목록 ·
@@ -72,44 +102,47 @@ export function PlanOverviewPanel({
             (`text-title-1 font-bold`)을 쓰고 있어서, 화면 제목이 우측 `N일차`(22/700)와
             **모든 폭에서 완전히 같았다.** 그래서 좌측 레일의 준비물도 올릴 자리가 없었다.
           */}
-            <h1 className="text-title-1 text-fg lg:text-display min-w-0 flex-1 font-bold break-keep lg:font-extrabold">
-              {plan.title}
-            </h1>
-            <PlanStatusBadge status={plan.status} className="mt-1" />
-            {/* 제목 줄 우측 상단 — 아이콘 버튼의 히트 영역이 제목 첫 줄과 맞도록 `-mt-1` */}
-            {menu !== null && <div className="-mt-1">{menu}</div>}
+              <h1 className="text-title-1 text-fg lg:text-display min-w-0 flex-1 font-bold break-keep lg:font-extrabold">
+                {plan.title}
+              </h1>
+              <PlanStatusBadge status={plan.status} className="mt-1" />
+              {/* 제목 줄 우측 상단 — 아이콘 버튼의 히트 영역이 제목 첫 줄과 맞도록 `-mt-1` */}
+              {menu !== null && <div className="-mt-1">{menu}</div>}
+            </div>
+
+            <p className="text-body-2 text-fg-muted font-medium tabular-nums">
+              {formatPlanDateRange(plan.startDate, plan.endDate)}
+            </p>
+
+            <p className="text-caption text-fg-muted flex flex-wrap gap-x-2 font-medium tabular-nums">
+              <span>{messages.plan.totalDays.replace('{days}', String(plan.totalDays))}</span>
+              <span aria-hidden>·</span>
+              <span>
+                {plan.budget === null
+                  ? messages.plan.budgetEmpty
+                  : `${messages.plan.budgetLabel} ${messages.plan.budgetAmount.replace(
+                      '{amount}',
+                      plan.budget.toLocaleString('ko-KR'),
+                    )}`}
+              </span>
+              {dday !== null && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span className="text-fg font-bold">
+                    {dday === 0
+                      ? messages.plan.ddayToday
+                      : messages.plan.dday.replace('{days}', String(dday))}
+                  </span>
+                </>
+              )}
+            </p>
           </div>
 
-          <p className="text-body-2 text-fg-muted font-medium tabular-nums">
-            {formatPlanDateRange(plan.startDate, plan.endDate)}
-          </p>
-
-          <p className="text-caption text-fg-muted flex flex-wrap gap-x-2 font-medium tabular-nums">
-            <span>{messages.plan.totalDays.replace('{days}', String(plan.totalDays))}</span>
-            <span aria-hidden>·</span>
-            <span>
-              {plan.budget === null
-                ? messages.plan.budgetEmpty
-                : `${messages.plan.budgetLabel} ${messages.plan.budgetAmount.replace(
-                    '{amount}',
-                    plan.budget.toLocaleString('ko-KR'),
-                  )}`}
-            </span>
-            {dday !== null && (
-              <>
-                <span aria-hidden>·</span>
-                <span className="text-fg font-bold">
-                  {dday === 0
-                    ? messages.plan.ddayToday
-                    : messages.plan.dday.replace('{days}', String(dday))}
-                </span>
-              </>
-            )}
-          </p>
+          <PlanPetCard companions={companions} pending={petPending} />
         </div>
+      </Surface>
 
-        <PlanPetCard companions={companions} pending={petPending} />
-      </div>
+      {action}
 
       <PlanVerdictToc verdicts={verdicts} />
     </>
@@ -128,7 +161,7 @@ function PlanPetCard({ companions, pending }: { companions: readonly Pet[]; pend
   if (companions.length === 0) return null
 
   return (
-    // 바닥 위라 선을 긋지 않는다 — 제목 줄과의 간격(20)이 경계다 (#447)
+    // 카드 안이라 선을 긋지 않는다 — 제목 줄과의 간격(20)이 경계다 (#447 · #553)
     <div className="flex flex-col gap-3">
       {companions.map((pet) => (
         <PlanPetRow key={pet.petId} pet={pet} />
