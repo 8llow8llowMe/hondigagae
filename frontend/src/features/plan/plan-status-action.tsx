@@ -55,9 +55,17 @@ export function PlanStatusAction({ plan }: { plan: PlanDetail }) {
   }
 
   return (
-    // 액션이라 카드가 아니다 (§0) — 열 끝, 바닥 위. 인셋은 카드 안 글줄과 같은 축이다 (#447)
-    <div className={cn('flex flex-col gap-2 pb-4 md:pb-0', INSET_CLASS.card)}>
-      <Button onClick={handleConfirm} loading={saving} className="self-start">
+    /*
+      액션이라 카드가 아니다 (§0) — **개요 카드 바로 아래, 바닥 위**다 (#553).
+      인셋은 카드 안 글줄과 같은 축이다 (#447).
+    */
+    <div className={cn('flex flex-col gap-2', INSET_CLASS.card)}>
+      {/*
+        **전폭이다** (#553). `self-start` 였을 때는 우측 일자 열(1024 에서 700px 이상)에서
+        낱말 폭(`일정 확정하기` 6글자)만큼만 서서 열 왼쪽 끝에 작게 붙어 있었다.
+        280~400 폭 레일에서는 전폭이 그 열의 유일한 행동이라는 뜻이 된다.
+      */}
+      <Button onClick={handleConfirm} loading={saving} className="w-full">
         {messages.plan.statusConfirmAction}
       </Button>
       <FormAlert message={errorMessage} />

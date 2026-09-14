@@ -461,26 +461,34 @@ describe('3층 표면 (#447)', () => {
     expect(markup).not.toContain('[&amp;&gt;li+li]')
   })
 
-  it('개요의 제목 줄은 카드가 아니고 판정 목차만 카드다 — 데스크톱 전용', () => {
+  /*
+    **개요도 카드다** (#553). #447 은 "페이지 머리라 카드가 아니다" 로 두었는데, 이 줄은
+    제목만이 아니라 상태 · 기간 · 예산 · D-day · 동행 반려견을 담은 개요라 §0 의 판정 3문에
+    셋 다 걸린다. 근거는 `plan-overview-panel.tsx` 머리주석이 정본이다.
+  */
+  it('개요와 판정 목차가 각각 카드다 — 목차는 데스크톱 전용', () => {
     const markup = renderOverview()
     const h1 = markup.indexOf('<h1')
-    const card = markup.search(SURFACE)
+    const cards = markup.match(SURFACE)
 
     expect(h1).toBeGreaterThan(-1)
-    expect(card).toBeGreaterThan(h1)
-    expect(markup.match(SURFACE)).toHaveLength(1)
-    expect(markup.slice(card, card + 200)).toContain('hidden lg:block')
+    expect(cards).toHaveLength(2)
+    // 개요 카드가 `h1` 을 감싼다 — 카드가 먼저 열려야 한다
+    expect(markup.search(SURFACE)).toBeLessThan(h1)
+    // 목차 카드만 `hidden lg:block` 이다 — 개요는 모든 폭에서 보인다
+    const toc = markup.indexOf(messages.plan.verdictTocTitle)
+    expect(markup.slice(0, toc)).toContain('hidden lg:block')
     expect(markup).toContain(`<h2`)
-    expect(markup).toContain(messages.plan.verdictTocTitle)
   })
 
-  it('판정이 없으면 목차 카드를 만들지 않는다 — 빈 카드를 그리지 않는다', () => {
+  it('판정이 없으면 목차 카드를 만들지 않는다 — 개요 카드만 남는다', () => {
     const markup = renderOverview({ verdicts: [] })
 
-    expect(markup.match(SURFACE)).toBeNull()
+    expect(markup.match(SURFACE)).toHaveLength(1)
+    expect(markup).not.toContain(messages.plan.verdictTocTitle)
   })
 
-  it('동행 반려견 줄은 바닥 위라 선을 긋지 않는다', () => {
+  it('동행 반려견 줄은 카드 안이라 선을 긋지 않는다', () => {
     const markup = renderOverview()
     const start = markup.indexOf('푸들')
     const around = markup.slice(Math.max(0, start - 400), start)
