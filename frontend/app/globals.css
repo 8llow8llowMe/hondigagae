@@ -129,6 +129,20 @@ body {
 
   macOS 기본값(오버레이 스크롤바)에서는 폭을 차지하지 않아 차이가 거의 보이지 않는다.
   효과는 Windows 와 "스크롤 막대 항상 표시" 설정에서 드러나므로 검증도 그 상태로 한다.
+
+  ── 평소에는 투명하고, 구르는 동안에만 드러난다 (이슈 #553)
+
+  **자리는 항상 잡아 둔다.** 막대만 투명해지고 트랙 폭(6px)은 그대로라, 나타나고 사라질
+  때 내용이 좌우로 밀리지 않는다. 폭까지 0 으로 두는 안(`scrollbar-width: none` ↔ `thin`
+  토글)은 스크롤이 시작될 때마다 열 폭이 6px 씩 흔들린다.
+
+  **`[data-scrolling]` 은 `ScrollbarReveal`(src/components/scrollbar-reveal.tsx)이 붙인다.**
+  스크롤 이벤트는 버블하지 않으므로 캡처 단계에서 한 번만 듣고, 이벤트가 멎으면 지운다.
+  **뷰포트 스크롤은 `body` 에 붙는다** — 이 파일이 아래 탭바 규칙에서 이미 확인한 대로
+  뷰포트 스크롤바를 잡는 의사요소는 `body::` 뿐이다.
+
+  **JS 가 죽으면 스크롤바가 영영 안 보인다.** 그래서 hover 는 `[data-scrolling]` 밖에도
+  남겨 둔다 — 마우스를 얹으면 어느 상태에서나 드러난다.
 */
 ::-webkit-scrollbar {
   width: 6px;
@@ -140,17 +154,26 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: var(--border-strong);
+  background-color: transparent;
   border-radius: 999px;
+  transition: background-color 180ms ease-out;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--fg-subtle);
 }
 
+[data-scrolling]::-webkit-scrollbar-thumb {
+  background-color: var(--border-strong);
+}
+
 @supports not selector(::-webkit-scrollbar) {
   * {
     scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  [data-scrolling] {
     scrollbar-color: var(--border-strong) transparent;
   }
 }

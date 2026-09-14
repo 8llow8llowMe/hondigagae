@@ -305,6 +305,13 @@ AI 조건 입력·작업 상태), 장소 상세 · 일정 상세의 넷은 정�
 > **세로 스크롤바는 숨기지 않고 얇게만 쓴다.** `globals.css` 가 전역으로 6px + 둥근 thumb
 > (`--border-strong`, hover `--fg-subtle`)를 준다. 사용처에서 따로 지정하지 않는다.
 >
+> **다만 평소에는 투명하고, 구르는 동안에만 드러난다** (#553). `ScrollbarReveal`
+> (`src/components/scrollbar-reveal.tsx`)이 `document` 의 캡처 단계에서 `scroll` 을 한 번만
+> 듣고 그 요소에 `data-scrolling` 을 붙였다 900ms 뒤 뗀다 — `scroll` 은 버블하지 않으므로
+> 컨테이너마다 리스너를 달지 않는다. **뷰포트 스크롤은 `body` 에 붙인다**(아래 탭바 규칙과
+> 같은 실측). **트랙 폭 6px 은 항상 남는다** — 폭까지 토글하면 스크롤이 시작될 때마다 열 폭이
+> 흔들린다. hover 는 `data-scrolling` 밖에도 남겨 둔다: JS 가 죽어도 마우스로 찾을 수 있어야 한다.
+>
 > 표준 속성(`scrollbar-width`/`scrollbar-color`)과 `::-webkit-scrollbar` 를 **같은 요소에
 > 함께 걸지 않는다** — Chromium 은 표준 속성이 있으면 의사요소를 통째로 무시해서 6px 대신
 > `thin` 기본값(11px)이 나온다. 두 계열은 `@supports not selector(::-webkit-scrollbar)` 로
