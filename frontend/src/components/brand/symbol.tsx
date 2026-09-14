@@ -8,6 +8,10 @@ import { cn } from '@/lib/utils/cn'
  * 워드마크만 썼다. 그 결정을 뒤집었으니 **판정 색과 경쟁하지 않게 하는 것이 조건**이다.
  *
  *  - 크기를 24px 로 묶는다. 여기서 커지면 헤더가 브랜드 배너가 된다
+ *    - **`(auth)` 셸만 48px 을 쓴다** (`DESIGN.md` §1 개정). 24px 조건이 막으려던 것은
+ *      "화면의 첫 시선을 데이터가 아니라 로고가 받는 것" 인데, 인증 화면에는 **데이터가
+ *      없다** — 로고가 그 화면의 유일한 신원 단서다. 조건을 숫자가 아니라 **자리**로
+ *      다시 묶어 `size` 를 열거로 제한한다: 임의 크기는 타입이 막는다
  *  - 색은 `--brand-500` 하나다. 판정 등급 색(`--metric-*`)을 쓰지 않는다 —
  *    브랜드가 등급을 말하게 되면 사용자가 로고를 신호로 읽는다 (브랜드 명세 B2)
  *  - 심볼은 **로고 자리에만** 둔다. 빈 상태·버튼·배지에 장식으로 흘리지 않는다
@@ -15,12 +19,19 @@ import { cn } from '@/lib/utils/cn'
  * 자산은 `docs/hondi_img/logo-lockup.svg` 의 심볼부와 같은 좌표다 — 파비콘·PWA
  * 아이콘과 같은 모양이라 탭·홈 화면에서 본 것을 헤더에서 다시 알아본다.
  */
-export function BrandSymbol({ className }: { className?: string }) {
+export function BrandSymbol({
+  size = 24,
+  className,
+}: {
+  /** 24 = 헤더 · `(auth)` 셸 밖의 로고 자리. 48 = `(auth)` 셸 전용 (`DESIGN.md` §1) */
+  size?: 24 | 48
+  className?: string
+}) {
   return (
     <svg
       viewBox="0 0 32 32"
-      width={24}
-      height={24}
+      width={size}
+      height={size}
       role="presentation"
       aria-hidden="true"
       focusable="false"

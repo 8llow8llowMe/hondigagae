@@ -19,12 +19,28 @@ describe('BrandSymbol — 헤더에 허용된 유일한 채도 (#240)', () => {
     expect(markup).not.toMatch(/#[0-9A-Fa-f]{6}/)
   })
 
-  /** 커지면 헤더가 브랜드 배너가 된다 — 24px 로 묶는다 */
-  it('24px 로 묶는다', () => {
+  /**
+   * 커지면 헤더가 브랜드 배너가 된다 — **기본값이 24px 이어야** 호출부가 크기를 정하지
+   * 않은 모든 자리(헤더·푸터)가 조건 안에 남는다.
+   */
+  it('기본 크기가 24px 다', () => {
     const markup = renderToStaticMarkup(createElement(BrandSymbol))
 
     expect(markup).toContain('width="24"')
     expect(markup).toContain('height="24"')
+  })
+
+  /**
+   * `(auth)` 셸 전용 크기 — `DESIGN.md` §1 개정. 조건을 숫자 하나에서 **자리**로 옮겼고,
+   * 임의 크기는 `size` 열거(24 | 48)가 타입으로 막는다.
+   */
+  it('48px 은 정사각을 유지한다 — 폭만 커지면 심볼이 눌린다', () => {
+    const markup = renderToStaticMarkup(createElement(BrandSymbol, { size: 48 }))
+
+    expect(markup).toContain('width="48"')
+    expect(markup).toContain('height="48"')
+    // viewBox 가 그대로여야 48 에서도 같은 모양이다 — 라운드 사각이 따라 커진다
+    expect(markup).toContain('viewBox="0 0 32 32"')
   })
 
   /**

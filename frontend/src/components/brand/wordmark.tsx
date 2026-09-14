@@ -21,7 +21,22 @@ import { cn } from '@/lib/utils/cn'
  * **`viewBox` 를 손대지 않는다.** 원본이 이미 잉크 경계에 딱 맞게 잘려 있다
  * (333.72 × 90.14, 비율 3.702). 여백을 더하면 헤더에서 로고만 작아 보인다.
  */
-export function Wordmark({ className }: { className?: string }) {
+
+/**
+ * 높이 → 폭. **폭을 계산하지 않고 적어 둔다** — `height * 3.702` 를 매번 반올림하면
+ * 값이 어디서 정해지는지 흩어지고, 허용 높이가 둘뿐이라 계산할 것도 없다.
+ * 40 = 20 의 정확히 2배라 락업 비율이 `BrandSymbol` 24→48 과 **같은 배율로** 움직인다.
+ */
+const WORDMARK_WIDTH: Record<20 | 40, number> = { 20: 74, 40: 148 }
+
+export function Wordmark({
+  height = 20,
+  className,
+}: {
+  /** 20 = 헤더·푸터. 40 = `(auth)` 셸 전용 — `BrandSymbol` 의 48 과 짝이다 */
+  height?: 20 | 40
+  className?: string
+}) {
   return (
     <svg
       viewBox="2.34 -80.57 333.72 90.14"
@@ -29,8 +44,8 @@ export function Wordmark({ className }: { className?: string }) {
         높이만 정하고 폭은 비율이 정한다. 20px 은 기존 로고 텍스트와 같은 크기다
         (`--text-emphasis`, globals.css 가 "쓰는 곳은 등급어와 로고 둘뿐" 이라 적어 둔 값).
       */
-      height={20}
-      width={74}
+      height={height}
+      width={WORDMARK_WIDTH[height]}
       fill="currentColor"
       role="img"
       aria-label="혼디가개"
