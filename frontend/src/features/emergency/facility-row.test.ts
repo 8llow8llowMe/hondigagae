@@ -208,14 +208,30 @@ describe('FacilityHours — 두 줄까지 흘린다 (#598)', () => {
     expect(markup).not.toContain('aria-expanded')
   })
 
-  /* 휴무를 따로 줄로 빼면 두 줄이 세 줄이 된다 */
-  it('휴무는 같은 줄에 이어 붙는다', () => {
-    const markup = row({ operatingHours: LONG, restDate: '매주 수요일' })
-    const hours = markup.slice(markup.indexOf(LONG))
+  /*
+    **휴무는 자기 줄을 갖는다 — #537 의 "같은 줄에 이어 붙인다" 를 뒤집은 것이다.**
 
-    expect(hours.slice(0, hours.indexOf('</p>'))).toContain(
-      `매주 수요일 ${messages.emergency.restPrefix}`,
-    )
+    그때 근거는 *"따로 줄을 만들면 접어서 번 한 줄을 도로 내놓는다"* 였는데, 잘린 뒤를
+    `전체 시간표` 로 펼쳐 볼 수 있다는 전제가 함께 있었다. 이 PR 이 그 버튼을 걷으면서
+    전제가 사라졌다 — 375 실측에서 운영시간 117줄 중 75줄(64%)이 잘렸고 **잘린 75줄이
+    전부 휴무를 달고 있었다.** 시설 상세도 없어(#148) 되찾을 길이 없다.
+  */
+  it('휴무가 운영시간과 다른 줄에 있다 — 잘려서 사라지지 않는다', () => {
+    const markup = row({ operatingHours: LONG, restDate: '매주 수요일' })
+    const hoursLine = markup.slice(markup.indexOf(LONG))
+
+    // 운영시간 줄이 끝난 **뒤**에 온다
+    expect(hoursLine.slice(0, hoursLine.indexOf('</p>'))).not.toContain('매주 수요일')
+    expect(markup).toContain(`매주 수요일 ${messages.emergency.restPrefix}`)
+  })
+
+  /* 잘리는 상한은 운영시간 원문에만 건다 — 휴무 줄은 짧아 감을 이유가 없다 */
+  it('휴무 줄에는 line-clamp 를 걸지 않는다', () => {
+    const markup = row({ operatingHours: LONG, restDate: '매주 수요일' })
+    const restStart = markup.indexOf('매주 수요일')
+    const restLine = markup.slice(markup.lastIndexOf('<p', restStart), restStart)
+
+    expect(restLine).not.toContain('line-clamp')
   })
 
   /* 원문이 없는 곳은 "닫힘" 과 구분된다 */
@@ -252,13 +268,39 @@ describe('FacilityRowContent — 1행 배치와 상태 색 (#598)', () => {
   })
 
   /*
-    **색이 아니라 무게로 가르던 규칙을 뒤집은 것이다** (`OpenStatus` 머리주석).
+    **색이 아니라 무게로 가르던 규칙 "위에" 색을 얹은 것이다** (`OpenStatus` 머리주석).
     끝자리에서 `24시간` 과 나란히 서면 회색 배지 둘이 모양으로 구별되지 않는다.
-    톤은 새로 내지 않고 `Badge` 의 `brand` · `danger` 를 그대로 쓴다.
   */
-  it('진료중은 초록(brand), 영업 종료는 빨강(danger) 톤이다', () => {
-    expect(content({ openNow: true })).toContain('bg-metric-high-100')
-    expect(content({ openNow: false })).toContain('bg-danger-100')
+  it('진료중은 status-open, 영업 종료는 status-closed 톤이다', () => {
+    expect(content({ openNow: true })).toContain('bg-status-open-100')
+    expect(content({ openNow: false })).toContain('bg-status-closed-100')
+  })
+
+  /*
+    **등급 토큰도 장애 토큰도 빌리지 않는다** (DESIGN.md §2-9). 값이 같아도 이름을
+    분리하는 자리라, 이 단언이 깨지면 토큰의 뜻이 화면마다 갈리기 시작한 것이다 —
+    `metric-high` 초록은 홈의 `여행 적합` 과 픽셀 단위로 같고, `danger` 는 5xx 전용이다.
+  */
+  it('등급·장애 토큰을 빌려 쓰지 않는다', () => {
+    for (const openNow of [true, false]) {
+      const markup = content({ openNow })
+
+      expect(markup).not.toContain('metric-')
+      expect(markup).not.toContain('danger-')
+    }
+  })
+
+  /*
+    **색이 유일한 채널이면 안 된다.** 두 tint 의 명도 대비가 1.02:1 이라 적록색약에게는
+    밝기가 같다 — 진료중만 무게를 올려 두 번째 채널을 남긴다.
+  */
+  it('진료중은 무게를 함께 올린다 — 영업 종료는 기본 무게다', () => {
+    expect(content({ openNow: true })).toContain('font-semibold')
+
+    const closed = content({ openNow: false })
+    const badge = closed.slice(closed.indexOf('bg-status-closed-100') - 200)
+
+    expect(badge.slice(0, badge.indexOf('>'))).not.toContain('font-semibold')
   })
 
   /*
@@ -272,6 +314,41 @@ describe('FacilityRowContent — 1행 배치와 상태 색 (#598)', () => {
     expect(markup).toContain('border-dashed')
     expect(markup).not.toContain('bg-metric-high-100')
     expect(markup).not.toContain('bg-danger-100')
+  })
+
+  /*
+    **이름이 길면 상태가 아랫줄로 내려간다** (`flex-wrap` + `basis-[min-content]`).
+
+    `flex-1`(= `flex: 1 1 0%`)로 되돌리면 기준 크기가 0 이 되어 **언제나 한 줄**이 되고,
+    375 에서 이름 칸이 48~109px 로 쪼그라들어 `break-words` 가 어절 한가운데를 끊는다
+    (`제주축산업협` / `동조합`) — DESIGN.md §3-3 이 막은 모양이다. 실측으로 135행 중
+    어절이 끊기는 행이 33 → 0 으로 바뀐 자리다.
+  */
+  it('왼쪽 묶음의 기준 크기가 min-content 다 — flex-1 이 아니다', () => {
+    const markup = content()
+
+    expect(markup).toContain('basis-[min-content]')
+    expect(markup).not.toContain('flex-1')
+  })
+
+  /*
+    오른쪽 묶음이 줄어들면 `진료중` 이 반으로 접힌다. 줄어드는 쪽은 이름이어야 하고,
+    이름은 위 `basis-[min-content]` 로 **줄 대신 줄바꿈**을 고른다.
+  */
+  it('오른쪽 상태 묶음은 줄어들지 않는다', () => {
+    const markup = content()
+    const right = markup.slice(markup.indexOf('ml-auto'))
+
+    expect(right.slice(0, right.indexOf('>'))).toContain('shrink-0')
+  })
+
+  /*
+    **`items-start` 다.** `items-center` 면 이름이 두 줄로 감길 때 배지가 가운데로 내려가
+    첫 줄과 어긋난다 — 375 에서 실제로 감기는 행이 있다(`제주대학교 수의과대학 부설동물병원`
+    3줄).
+  */
+  it('1행이 위쪽 정렬이다 — 이름이 감겨도 배지가 첫 줄에 선다', () => {
+    expect(content()).toMatch(/<div class="flex flex-wrap items-start/)
   })
 
   /*

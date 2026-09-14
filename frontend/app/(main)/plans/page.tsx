@@ -47,7 +47,9 @@ export default async function PlansPage({ searchParams }: { searchParams: Search
   }
 
   /*
-    데스크톱은 **좌 280 필터 레일(sticky) / 우 가변** 2단이다 (아트보드 05).
+    데스크톱은 **좌 280 필터 레일 / 우 가변** 2단이다 (아트보드 05). 레일은 sticky 도
+    자기 스크롤도 갖지 않는다 — 행 높이를 레일이 정하고 목록 열이 sticky 로 접힘 안에
+    남는다 (#598, globals.css 의 `.rail-layout-filter`).
     2단은 1024+ 부터 — 280 레일에 본문을 더하면 768 에 들어가지 않아 가로 스크롤이 난다.
 
     **`today` 를 서버에서 만들어 내려보낸다.** 클라이언트가 따로 `new Date()` 를 부르면
