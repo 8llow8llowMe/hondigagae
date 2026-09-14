@@ -257,6 +257,21 @@ export function AiPlanCreateForm({
                 }
               }}
               invalid={errors.fields.startDate !== undefined}
+              /*
+                **지난 날짜는 달력에서 아예 고를 수 없다** (#562). 서버가
+                `AIPLAN_017`(`여행 시작일은 오늘 이후여야 합니다.`)로 막지만, 그
+                판정만 두면 사용자가 **고를 수 있는 날짜를 골랐는데 거절당한다** —
+                왕복 한 번을 쓰고 나서야 "그건 못 고른다" 를 듣는 셈이다.
+
+                **서버 검증을 대신하는 것이 아니다.** 조건을 되살리는
+                경로(`?from={jobId}`)로 어제 만든 조건이 돌아오면 값은 과거인 채
+                제출될 수 있고, 그때 말해 주는 것은 여전히 서버다. 여기서 줄이는
+                것은 **사람이 방금 고른 날짜가 거절당하는 경우**다.
+
+                같은 화면의 종료일이 이미 `min` 으로 시작일 이전을 막고 있었다 —
+                시작일에만 빠져 있었다.
+              */
+              min={today}
               rangeStart={values.startDate}
               rangeEnd={values.endDate}
             />
@@ -279,9 +294,16 @@ export function AiPlanCreateForm({
               open={endDateOpen}
               onOpenChange={setEndDateOpen}
               invalid={errors.fields.endDate !== undefined}
-              // 시작일보다 이른 날짜는 달력에서 아예 고를 수 없다. 스키마의 refine 은
-              // 조건을 되살리는 경로(`?from={jobId}`)를 위한 2차 방어로 남는다
-              min={values.startDate === '' ? null : values.startDate}
+              /*
+                시작일보다 이른 날짜는 달력에서 아예 고를 수 없다. 스키마의 refine 은
+                조건을 되살리는 경로(`?from={jobId}`)를 위한 2차 방어로 남는다.
+
+                **시작일이 아직 비었으면 오늘로 막는다** (#562). 시작일이 오늘 이후로
+                묶인 이상 종료일이 그보다 이를 수 없는데, `null` 로 두면 종료일부터
+                고르는 사람이 지난 날짜를 골랐다가 시작일을 고르는 순간 그 값이
+                지워진다 — 고를 수 없는 날짜를 한 번 고르게 하고 되무르는 셈이다.
+              */
+              min={values.startDate === '' ? today : values.startDate}
               rangeStart={values.startDate}
               rangeEnd={values.endDate}
             />
