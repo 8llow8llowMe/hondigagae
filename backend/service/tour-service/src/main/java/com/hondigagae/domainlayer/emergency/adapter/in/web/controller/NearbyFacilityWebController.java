@@ -70,7 +70,7 @@ public class NearbyFacilityWebController {
             + "함께 빠지므로 결과가 줄어듭니다", example = "false")
         @RequestParam(defaultValue = "false") boolean openNowOnly,
 
-        @Parameter(description = "[선택, 기본 10] 조회 개수 (1~250). 제주 전역 시설이 214곳이라 "
+        @Parameter(description = "[선택, 기본 10] 조회 개수 (1~250). 제주 전역 시설이 213곳이라 "
             + "250 이면 반경을 최대(50km)로 넓혀도 잘리지 않습니다 — 화면에서 유형·24시간을 좁히며 "
             + "개수를 함께 보여주려면 한 번에 전량을 받아야 하기 때문입니다", example = "10")
         @Min(value = 1, message = EmergencyValidationMessage.SIZE_RANGE_INVALID)

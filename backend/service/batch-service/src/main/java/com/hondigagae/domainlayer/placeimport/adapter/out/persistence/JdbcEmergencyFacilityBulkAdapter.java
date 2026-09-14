@@ -19,7 +19,11 @@ import org.springframework.stereotype.Component;
  * <p>테이블 스키마의 원천은 tour-service 의 EmergencyFacilityEntity(JPA)다.
  *
  * <p>CSV 에 이름·주소·좌표가 똑같은 중복이 많은데 source_key(시설명+주소 해시)가 UK 라
- * 별도 처리 없이 정리된다 — 제주 841행이 214곳이 된다.
+ * <b>표기까지 같은 중복</b>은 여기서 정리된다 — 제주 841행이 214곳이 된다.
+ *
+ * <p><b>표기가 다른 중복은 여기까지 오지 않는다</b> (#569). 이름의 공백 한 칸만 달라도 해시가
+ * 갈려 UK 가 안 걸리므로, {@code EmergencyFacilityDeduplicator} 가 이 어댑터를 부르기 전에
+ * 한 번 더 접는다. 즉 이 메서드가 받는 목록은 <b>이미 접힌 213행</b>이다.
  */
 @Component
 @RequiredArgsConstructor

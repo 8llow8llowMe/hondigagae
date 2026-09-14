@@ -86,16 +86,22 @@ public final class PlaceIdentityPolicy {
      */
     public static boolean isSameEmergencyFacility(
         String nameA, String telA, String nameB, String telB, double distanceMeters) {
-        String left = digitsOf(telA);
-        String right = digitsOf(telB);
+        String left = telDigitsOf(telA);
+        String right = telDigitsOf(telB);
         if (left.isEmpty() || !left.equals(right)) {
             return false;
         }
         return PlaceNameMatcher.isExactMatch(nameA, nameB) && distanceMeters <= EMERGENCY_DUPLICATE_RADIUS_M;
     }
 
-    /** {@code 064-749-7585} 와 {@code 0647497585} 를 같게 본다. 원천이 표기를 섞어 쓴다. */
-    private static String digitsOf(String tel) {
+    /**
+     * 전화번호 비교에 쓰는 정규화. {@code 064-749-7585} 와 {@code 0647497585} 를 같게 본다 —
+     * 원천이 표기를 섞어 쓴다.
+     *
+     * <p>접기 후보를 모으는 쪽({@code EmergencyFacilityDeduplicator})도 이것을 쓴다. 같은 정규화를
+     * 두 군데에 두면 한쪽만 고쳐졌을 때 "같은 묶음인데 정책은 다르다고 한다" 가 조용히 생긴다.
+     */
+    public static String telDigitsOf(String tel) {
         return tel == null ? "" : tel.replaceAll("\\D", "");
     }
 }

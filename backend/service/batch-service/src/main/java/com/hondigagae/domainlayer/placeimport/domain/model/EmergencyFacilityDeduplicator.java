@@ -5,6 +5,9 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 긴급 시설 적재 직전의 중복 접기.
@@ -48,10 +51,16 @@ public final class EmergencyFacilityDeduplicator {
     /**
      * 접은 결과.
      *
-     * @param facilities upsert 할 행. 입력 순서를 보존한다
+     * @param facilities upsert 할 행. <b>입력 순서가 아니다</b> — 접을 수 없는 행이 앞, 나머지가 뒤다.
+     *                   접고 나면 {@code sourceKey} 가 전부 유일해 upsert 결과는 순서와 무관하다
      * @param mergedNotes 접힌 조합의 사람이 읽을 설명. 적재 로그에 남겨 원천 품질을 추적한다
+     * @param conflictNotes 같은 시설로 보이는데 <b>운영 정보가 엇갈려</b> 접지 않은 조합.
+     *                      원천이 고쳐지기 전까지 목록에 두 번 뜨므로 추적해야 한다
      */
-    public record Result(List<ImportedEmergencyFacility> facilities, List<String> mergedNotes) {
+    public record Result(
+        List<ImportedEmergencyFacility> facilities,
+        List<String> mergedNotes,
+        List<String> conflictNotes) {
     }
 
     /**
@@ -87,10 +96,19 @@ public final class EmergencyFacilityDeduplicator {
 
         List<ImportedEmergencyFacility> kept = new ArrayList<>(unfoldable);
         List<String> mergedNotes = new ArrayList<>();
+        List<String> conflictNotes = new ArrayList<>();
 
         for (List<ImportedEmergencyFacility> bucket : buckets.values()) {
             if (bucket.size() == 1 || !allWithinRadius(bucket)) {
                 kept.addAll(bucket);
+                continue;
+            }
+            if (hasConflictingHours(bucket)) {
+                kept.addAll(bucket);
+                conflictNotes.add(bucket.stream()
+                    .map(row -> "%s(%s) 운영시간=%s 휴무=%s".formatted(
+                        row.name(), row.addr(), row.operatingHours(), row.restDate()))
+                    .collect(Collectors.joining(" | ")));
                 continue;
             }
 
@@ -102,7 +120,33 @@ public final class EmergencyFacilityDeduplicator {
                     survivor.name(), survivor.addr(), dropped.name(), dropped.addr())));
         }
 
-        return new Result(kept, mergedNotes);
+        return new Result(kept, mergedNotes, conflictNotes);
+    }
+
+    /**
+     * 운영 정보가 엇갈리는가. <b>엇갈리면 접지 않는다.</b>
+     *
+     * <p>전국 실측에서 접기 후보 10개 묶음 중 <b>5개가 운영시간이 서로 달랐다</b> —
+     * {@code 24시 지구촌 동물메디컬 센터}는 {@code 매일 00:00~24:00}, 같은 전화·같은 이름의 다른 행은
+     * {@code 매일 09:00~23:00} 이다. 둘 중 하나를 임의로 고르면 <b>24시간 병원이 아닌 곳이 되거나 그
+     * 반대가 된다</b> — 급할 때 찾는 화면에서 가장 나쁜 종류의 오류다.
+     *
+     * <p>그래서 <b>어느 쪽이 맞는지 원천이 말해 주지 않으면 접지 않는다.</b> 목록에 두 번 뜨는 것이
+     * 틀린 시간을 하나만 뜨게 하는 것보다 낫다. 대신 {@link Result#conflictNotes} 로 남겨 원천이
+     * 고쳐지는지 추적한다.
+     *
+     * <p>한쪽만 값을 가진 경우는 엇갈림이 아니다 — 그때는 값을 가진 쪽이 생존한다
+     * ({@link #bySurvivalOrder}).
+     */
+    private static boolean hasConflictingHours(List<ImportedEmergencyFacility> bucket) {
+        return conflicts(bucket, ImportedEmergencyFacility::operatingHours)
+            || conflicts(bucket, ImportedEmergencyFacility::restDate);
+    }
+
+    private static boolean conflicts(
+        List<ImportedEmergencyFacility> bucket, Function<ImportedEmergencyFacility, String> field) {
+        // null 은 "모름" 이라 엇갈림이 아니다. 값이 둘 이상 나오는 경우만 엇갈림이다
+        return bucket.stream().map(field).filter(Objects::nonNull).distinct().count() > 1;
     }
 
     private static List<ImportedEmergencyFacility> foldBySourceKey(List<ImportedEmergencyFacility> facilities) {
@@ -119,7 +163,8 @@ public final class EmergencyFacilityDeduplicator {
      * 거리 가드를 걸 수 없고, 가드 없는 이름 접기는 실측으로 검증하지 않았다.
      */
     private static String bucketKeyOf(ImportedEmergencyFacility facility) {
-        String tel = facility.tel() == null ? "" : facility.tel().replaceAll("\\D", "");
+        // 전화 정규화는 정책이 소유한다 — 여기서 따로 구현하면 버킷과 판정이 갈라진다
+        String tel = PlaceIdentityPolicy.telDigitsOf(facility.tel());
         String name = PlaceNameMatcher.normalize(facility.name());
         if (tel.isEmpty() || name.isEmpty() || facility.lat() == null || facility.lng() == null) {
             return null;
@@ -149,11 +194,23 @@ public final class EmergencyFacilityDeduplicator {
      * 어느 행을 남길지. <b>결정적이어야 한다</b> — 실행할 때마다 다른 행이 살아남으면 id 가 흔들려
      * 멱등성이 깨진다.
      *
-     * <p>{@code sourceModifiedAt} 최신 → 없는 쪽이 뒤 → 동률이면 {@code sourceKey} 사전순.
+     * <p><b>운영시간이 있는 쪽이 먼저다.</b> 이 원천은 결측이 많아(동물병원 114/225 만 운영시간을 준다)
+     * 한쪽만 시간을 가진 중복 쌍이 흔하고, 시간 없는 쪽이 이기면 급할 때 찾는 화면이 "정보 없음" 이
+     * 된다. 접기 전에는 두 행이 다 떠서 사용자가 시간 있는 쪽을 볼 수 있었으므로, 그대로 두면
+     * <b>접기가 정보를 줄이는 변경</b>이 된다.
+     *
+     * <p><b>행을 통째로 남기고 필드를 섞지 않는다.</b> {@code open24}·{@code weeklyHoursSpec} 은
+     * 이름과 운영시간에서 파생한 값이라, 다른 행의 시간만 끌어오면 파생값과 어긋난다.
+     * 시간이 서로 엇갈리는 묶음은 애초에 접지 않으므로({@link #hasConflictingHours}) 섞을 일도 없다.
+     *
+     * <p>그다음은 {@code sourceModifiedAt} 최신 → 없는 쪽이 뒤 → 동률이면 {@code sourceKey} 사전순.
+     * {@code sourceKey} 는 접기 전에 이미 유일해져 있어 항상 타이를 깬다.
      */
     private static Comparator<ImportedEmergencyFacility> bySurvivalOrder() {
         return Comparator
-            .comparing(ImportedEmergencyFacility::sourceModifiedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+            .comparing((ImportedEmergencyFacility row) -> row.operatingHours() == null)
+            .thenComparing(ImportedEmergencyFacility::sourceModifiedAt,
+                Comparator.nullsLast(Comparator.reverseOrder()))
             .thenComparing(ImportedEmergencyFacility::sourceKey);
     }
 }
