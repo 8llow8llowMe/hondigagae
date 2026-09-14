@@ -1,13 +1,10 @@
 'use client'
 
-import { useId, useState } from 'react'
-
 import { Badge } from '@/components/badge'
 import { DirectionsIcon, PhoneIcon } from '@/components/icons'
 import { formatDistance } from '@/lib/format/distance'
 import { directionsUrl } from '@/lib/geo/map-link'
 import { messages } from '@/lib/messages'
-import { shortAddress } from '@/lib/place/address'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { NearbyFacilityItem } from '@/types/emergency'
@@ -21,8 +18,8 @@ import type { NearbyFacilityItem } from '@/types/emergency'
  *
  * **진료시간은 서버 문자열 그대로 렌더한다.** `"월~금 09:00~19:00, 토 09:00~13:00"` 을
  * 파싱해 "오늘 19:00까지" 로 요약하지 않는다 — 서식이 조금만 달라도 틀린 시간을 말하게 된다.
- * **#537 이 "오늘 기준 한 줄" 을 요구했을 때도 이 규칙은 그대로 두고 접기만 더했다**
- * (`FacilityHours`).
+ * **#537 이 "오늘 기준 한 줄" 을, #598 이 "두 줄로 날짜·시간" 을 요구했을 때도 이 규칙은
+ * 그대로다** — 바꾼 것은 판정이 아니라 **몇 줄까지 흘리는가**뿐이다 (`FacilityHours`).
  *
  * **내용(`FacilityRowContent`)과 액션(`CallButton` · `DirectionsButton` · `DirectionsLink`)이
  * 갈려 있다.** 지도 패널은 내용만 선택 버튼으로 감싸고 액션은 그 **형제**로 둔다 —
@@ -51,8 +48,7 @@ export function FacilityRow({
     <li className={INSET_CLASS[inset]}>
       <div className="flex items-center gap-3 py-3">
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          {/* 목록 행에만 접기를 준다 — 지도 패널은 이 내용을 `<button>` 안에 넣는다 */}
-          <FacilityRowContent facility={facility} showDistance={showDistance} expandableHours />
+          <FacilityRowContent facility={facility} showDistance={showDistance} />
         </div>
 
         {/*
@@ -82,42 +78,61 @@ export function FacilityRow({
 export function FacilityRowContent({
   facility,
   showDistance,
-  expandableHours = false,
 }: {
   facility: NearbyFacilityItem
   showDistance: boolean
-  /**
-   * 운영시간을 접고 펼 수 있게 한다 (#537).
-   *
-   * **기본값이 `false` 인 것이 의도다.** 펼치기는 `<button>` 인데 지도 패널은 이 내용을
-   * 통째로 선택 `<button>` 안에 넣는다 — 버튼 안의 버튼은 만들 수 없다. 접기가 필요한
-   * 쪽(목록 행)이 명시적으로 켠다.
-   */
-  expandableHours?: boolean
 }) {
+  /*
+    **주소를 자르지 않는다** (#598). 예전에는 `shortAddress()` 로 `제주시` 까지만 보여
+    같은 시·군의 두 병원이 메타 줄에서 구별되지 않았다 — 이 화면에서 주소는 "어디쯤인지"
+    가 아니라 **찾아갈 곳**이라, 다른 목록(`/places`)과 달리 전체가 정보다. 그쪽은 축약을
+    계속 쓴다 (`lib/place/address.ts` 는 이 화면을 잃어도 사용처가 넷 남는다).
+  */
   const meta = [
     showDistance ? formatDistance(facility.distanceMeters) : null,
-    shortAddress(facility.addr),
+    facility.addr,
   ].filter((part): part is string => part !== null && part !== '')
 
   return (
     <>
-      <div className="flex items-center gap-1.5">
-        <span className="text-title-2 text-fg font-semibold break-keep">{facility.name}</span>
-        {/* 유형은 병원이 기본이라 약국일 때만 붙인다 — 모든 행에 붙으면 신호가 죽는다 */}
-        {facility.facilityType.code === 'ANIMAL_PHARMACY' && (
-          <Badge tone="neutral" size="sm" className="shrink-0">
-            {facility.facilityType.name}
-          </Badge>
-        )}
+      {/*
+        **1행 = `이름 [유형] ···(공백)··· [상태]`** (#598). 상태가 이름 아래 자기 줄을
+        쓰던 것을 첫 줄 오른쪽 끝으로 올린다 — 목록을 훑을 때 눈이 왼쪽(무엇)과
+        오른쪽(지금 여는가) 두 기둥만 보면 된다.
+
+        `items-start` 다. 이름이 두 줄로 감기면 배지가 가운데로 내려가 첫 줄과 어긋난다.
+        `24시간` 은 상태 옆에 붙인다 — 유형과 달리 "지금 갈 수 있는가" 쪽 사실이다.
+
+        **왼쪽 묶음은 `flex-wrap` 이다.** 오른쪽이 `shrink-0` 이라 좁은 칸에서 줄어드는
+        쪽은 이름뿐인데, 이름을 더 깎느니 유형 배지를 아랫줄로 내리는 쪽이 낫다 — 375
+        실측에서 `365건강온누리약국` 이 그 경계다. 상태는 그때도 첫 줄 끝에 남는다.
+      */}
+      <div className="flex items-start gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
+          {/*
+            **`break-words` 를 함께 준다.** `break-keep` 만 두면 공백 없는 긴 이름
+            (`365건강온누리약국`)이 한 덩어리라 min-content 가 칸보다 커지고, 줄지 못한
+            내용이 오른쪽 상태 배지 **아래로 깔린다**(375 실측). `break-words` 는 그 한
+            경우에만 낱자로 끊는다 — 띄어쓰기가 있는 이름은 그대로 어절에서 감긴다.
+          */}
+          <span className="text-title-2 text-fg min-w-0 font-semibold break-words break-keep">
+            {facility.name}
+          </span>
+          {/* 유형은 병원이 기본이라 약국일 때만 붙인다 — 모든 행에 붙으면 신호가 죽는다 */}
+          {facility.facilityType.code === 'ANIMAL_PHARMACY' && (
+            <Badge tone="neutral" size="sm" className="shrink-0">
+              {facility.facilityType.name}
+            </Badge>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1">
+          {facility.open24 && <Badge tone="neutral">{messages.emergency.open24}</Badge>}
+          <OpenStatus openNow={facility.openNow} />
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-1">
-        {facility.open24 && <Badge tone="neutral">{messages.emergency.open24}</Badge>}
-        <OpenStatus openNow={facility.openNow} />
-      </div>
-
-      <FacilityHours facility={facility} expandable={expandableHours} />
+      <FacilityHours facility={facility} />
 
       {meta.length > 0 && (
         <p className="text-body-2 text-fg-muted break-keep tabular-nums">{meta.join(' · ')}</p>
@@ -132,122 +147,88 @@ export function FacilityRowContent({
 }
 
 /**
- * 접힌 운영시간이 한 줄을 넘어가는 글자 수 기준.
+ * 운영시간 — **원문을 그대로 두고 두 줄까지 흘린다** (#537 → #598).
  *
- * **높이를 재지 않고 글자 수로 가른다** (`PlaceOverview` 의 `COLLAPSE_THRESHOLD` 와 같은
- * 이유). 실제 높이는 렌더 후에만 알 수 있는데 그때 펼치기 버튼이 나타나면 버튼이 뒤늦게
- * 끼어들어 행이 밀린다. 서버 렌더와 클라이언트 렌더가 같은 결론을 내야 하이드레이션도
- * 어긋나지 않는다.
+ * ── 파싱하지 않는 이유 (#598 이 "두 줄로 날짜·시간" 을 요구했을 때 다시 확인한 것)
  *
- * 값의 근거는 375 실측이다. 글자 칸이 215px(`FacilityRow` 주석의 산식)이고 `text-body-2`
- * 한 줄에 24자쯤 들어간다. dev 실측에서 `연중무휴 24시간`(9자) · `월~금 09:00~19:00`(16자)는
- * 한 줄이고, `월~금 09:00~19:00, 토 09:00~13:00`(32자)부터 넘친다.
- */
-const HOURS_COLLAPSE_THRESHOLD = 24
-
-/**
- * 운영시간 한 줄 — **원문을 그대로 두고 접기만 한다** (#537).
- *
- * ── 파싱하지 않는 이유 (이슈가 "오늘 기준 한 줄" 을 요구했을 때 다시 확인한 것)
- *
- * 요일별 원문에서 오늘 구간만 뽑아 "오늘 09:30~20:00" 으로 적는 안은 기각돼 있다 —
- * 정본은 `types/emergency.ts` 의 `operatingHours` 주석이다. dev 실측이 그 근거를 그대로
- * 보여준다:
+ * 요일과 시각을 갈라 각각 한 줄에 두는 안은 원문을 파싱해야 하는데, 그것은 **두 번
+ * 기각된 안**이다 — 정본은 `types/emergency.ts` 의 `operatingHours` 주석이다. dev 실측이
+ * 그 근거를 그대로 보여준다:
  *
  *     월~화, 목~금,토 09:30~20:00, 일 09:30~14:00   ← 요일 목록 + 범위, 공백 불규칙, 수요일 없음
  *     월~금 09:00~21:00, 토 09:00~21:00, 법정공휴일 09:00~21:00   ← 일요일 항목 자체가 없음
  *
  * 수요일에 첫 줄을 잘못 읽으면 **닫힌 병원으로 달려가게 된다.** 이 화면에서 가장 비싼
- * 실패라, 얻는 것(한 줄)보다 잃는 것이 크다.
+ * 실패라, 얻는 것(정렬된 두 줄)보다 잃는 것이 크다.
+ *
+ * **쉼표로 끊긴 조각 하나하나가 이미 `요일 + 시각` 이다.** 원문을 두 줄까지 흘리는 것으로
+ * 요구를 충족하면서 파싱 금지도 지킨다.
+ *
+ * ── 접기를 걷었다 (#598)
+ *
+ * #537 이 `전체 시간표` 펼치기 버튼을 둔 것은 **한 줄**(`line-clamp-1`)로 접은 나머지에
+ * 손이 닿게 하려는 것이었다. 두 줄이면 dev 실측 문자열이 대부분 끝까지 보여 버튼이
+ * 눌러도 아무 일이 없는 자리가 된다 — 그리고 그 버튼은 44px 터치 영역을 들고 있어
+ * **행마다 한 줄을 더 먹었다.** 접기를 걷는 쪽이 두 줄을 내주고도 행이 짧아진다.
+ *
+ * 걷으면서 **행에서 유일한 상태가 사라졌다** — 이 파일은 이제 훅을 쓰지 않는다.
  *
  * **"지금 여는가" 는 이 줄이 아니라 위의 `OpenStatus` 배지가 답한다** — 서버가 계산한
- * `openNow` 다. 이슈가 지적한 "급할 때 필요한 것은 지금 여는가" 는 이미 배지가 답하고
- * 있었고, 문제는 그 아래 원문이 카드 한 장을 네 줄로 불리는 것이었다. 그래서 고친 것은
- * **판정이 아니라 높이**다.
- *
- * ── 접기 방식
- *
- * `<details>` 가 아니라 `aria-expanded` + `aria-controls` 버튼이다 (`PlaceOverview` ·
- * `AiPlanDetailsDisclosure` 와 같은 방식). 짧아서 접을 것이 없는 곳에는 버튼을 두지
- * 않는다 — `연중무휴 24시간` 옆의 펼치기는 눌러도 아무 일이 없다.
+ * `openNow` 다. 이 줄은 그 근거를 확인하는 자리다.
  */
-function FacilityHours({
-  facility,
-  expandable,
-}: {
-  facility: NearbyFacilityItem
-  expandable: boolean
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const bodyId = useId()
-
+function FacilityHours({ facility }: { facility: NearbyFacilityItem }) {
   // 없으면 없다고 말한다 — "닫힘" 과 구분된다
   if (!facility.operatingHoursKnown || facility.operatingHours === null) {
     return <p className="text-body-2 text-fg-muted break-keep">{messages.emergency.hoursUnknown}</p>
   }
 
   /*
-    **휴무를 같은 줄에 이어 붙인다.** 따로 줄을 만들면 접어서 번 한 줄을 도로 내놓는다.
-    접힌 동안 `매주 수요일 휴무` 가 말줄임에 들어가는 것은 감수한다 — 휴무는 "오늘 여는가"
-    가 아니라 "언제 닫는가" 라, 배지가 이미 오늘을 답한 뒤에 오는 사실이다.
+    **휴무를 같은 줄에 이어 붙인다.** 따로 줄을 만들면 두 줄이 세 줄이 된다. 휴무는
+    "오늘 여는가" 가 아니라 "언제 닫는가" 라, 배지가 이미 오늘을 답한 뒤에 오는 사실이다.
   */
   const rest =
     facility.restDate === null ? null : ` · ${facility.restDate} ${messages.emergency.restPrefix}`
 
-  const collapsible =
-    expandable && (facility.operatingHours + (rest ?? '')).length > HOURS_COLLAPSE_THRESHOLD
-
-  const text = (
-    <>
+  /*
+    **`line-clamp-2` 다.** 넘치는 것을 그대로 흘리지 않는 이유는 #537 과 같다 — 원문
+    길이는 시설마다 제각각이라(`법정공휴일` 항목까지 붙는 곳이 있다) 상한이 없으면 한
+    행이 목록의 리듬을 혼자 깬다. 지도 패널도 같은 경로를 탄다.
+  */
+  return (
+    <p className="text-body-2 text-fg line-clamp-2 tabular-nums">
       {facility.operatingHours}
       {rest !== null && <span className="text-fg-muted">{rest}</span>}
-    </>
-  )
-
-  if (!collapsible) {
-    /*
-      **접지 않을 때도 `line-clamp-1` 이다.** 기준(24자)은 375 에서 잰 값이라 더 좁은
-      화면이나 큰 글자 설정에서는 짧은 문자열도 넘칠 수 있다 — 그때 행이 소리 없이
-      두 줄이 되는 것보다 한 줄을 지키는 쪽이 목록의 리듬을 지킨다. 지도 패널(`expandable`
-      이 false)도 이 경로를 탄다.
-    */
-    return <p className="text-body-2 text-fg line-clamp-1 tabular-nums">{text}</p>
-  }
-
-  return (
-    <div className="flex min-w-0 flex-col items-start">
-      <p
-        id={bodyId}
-        className={cn('text-body-2 text-fg tabular-nums', expanded ? 'break-keep' : 'line-clamp-1')}
-      >
-        {text}
-      </p>
-
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-controls={bodyId}
-        onClick={() => setExpanded((previous) => !previous)}
-        // 44px — 급할 때 누르는 화면이라 최소 터치 영역을 지킨다 (DESIGN.md §7)
-        className="text-caption text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
-      >
-        {expanded ? messages.emergency.hoursCollapse : messages.emergency.hoursExpand}
-      </button>
-    </div>
+    </p>
   )
 }
 
 /**
  * 영업 상태 3상태 — `openNow` 가 근거다.
  *
- * **등급 색을 쓰지 않는다** (아트보드 주석). 초록·주황은 산책 위험도 전용이고
- * 영업 여부는 판정이 아니다. `null` 은 점선으로 "모름" 을 드러낸다.
+ * ── **색으로 가른다** (#598) — 예전 규칙을 뒤집은 것이다
  *
- * **장소 상세의 `PlaceOpenStatus` 와 합치지 않았다** (#294). 규칙(등급색 금지 · 색이
- * 아니라 무게)은 같지만 문구가 다르고(`진료중` vs `영업 중`) `null` 처리가 갈린다 —
- * 이 화면은 `operatingHoursKnown: false` 처럼 **원문조차 없는 곳**이 있어 "모름" 이
- * 정보지만, 장소는 운영시간 원문이 항상 함께 있어 정보가 아니다. 규칙을 바꿀 때는
- * 양쪽을 같이 본다.
+ * 이 자리는 *"진료중은 채운 태그, 영업 종료는 흐리게 — 색이 아니라 무게로 가른다"* 였다
+ * (아트보드 주석: 초록·주황은 산책 위험도 전용이고 영업 여부는 판정이 아니다).
+ * **뒤집은 근거는 배지가 1행 오른쪽 끝으로 올라간 것이다.** 자기 줄에 혼자 있을 때는
+ * 무게 차이만으로도 읽혔지만, 이름 옆 끝자리에서 `24시간` 과 나란히 서고 나면 회색 배지
+ * 둘이 붙어 **어느 쪽이 상태인지가 모양으로 구별되지 않는다.** 급할 때 훑는 화면이라
+ * 색이 여기서는 장식이 아니라 축이다.
+ *
+ * **등급 색 금지와 충돌하지 않는다.** 금지의 뜻은 "산책 위험도 등급을 다른 데서 흉내내지
+ * 말라" 이고(`badge.tsx` · DESIGN.md §2-3), 여기 초록/빨강은 등급이 아니라 **열림/닫힘
+ * 두 값**이라 세 단계 척도로 읽힐 여지가 없다. 그래서 `MetricBadge` 가 아니라 `Badge` 의
+ * `brand` · `danger` 톤을 그대로 쓴다 — 톤을 새로 내지 않았다.
+ *
+ * ── `null` 은 색을 받지 않는다
+ *
+ * `null` 은 "닫힘" 이 아니라 **판정할 수 없음**이다. 여기에 세 번째 색을 주면 초록·빨강의
+ * 대비가 묽어지고, "확인 필요" 가 "주의" 로 읽힌다. 점선 중립을 그대로 둔다 —
+ * `operatingHoursKnown: false` 처럼 원문조차 없는 곳이 있어 "모름" 자체가 정보다.
+ *
+ * **장소 상세의 `PlaceOpenStatus` 와 합치지 않았다** (#294). 문구가 다르고(`진료중` vs
+ * `영업 중`) `null` 처리가 갈린다 — 그쪽은 운영시간 원문이 항상 함께 와 "모름" 이 정보가
+ * 아니다. **이제 색 규칙도 갈렸다**: 그 화면의 배지는 카드 안에서 자기 줄을 갖고 있어
+ * 위 근거가 적용되지 않는다. 규칙을 또 바꿀 때는 양쪽을 같이 본다.
  */
 function OpenStatus({ openNow }: { openNow: boolean | null }) {
   if (openNow === null) {
@@ -259,8 +240,7 @@ function OpenStatus({ openNow }: { openNow: boolean | null }) {
   }
 
   return (
-    // 진료중은 채운 태그, 영업 종료는 흐리게 — 색이 아니라 무게로 가른다
-    <Badge tone="neutral" className={openNow ? 'text-fg font-semibold' : ''}>
+    <Badge tone={openNow ? 'brand' : 'danger'} className="font-semibold">
       {openNow ? messages.emergency.statusOpen : messages.emergency.statusClosed}
     </Badge>
   )

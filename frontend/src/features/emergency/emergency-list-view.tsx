@@ -92,8 +92,8 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
           검색 반경 · 시설 유형 · 영업 조건 셋을 전부 지나야 했다. `relative` 는 그 링크가
           레일 좌상단에 뜨게 한다 (`SkipLink` 머리주석).
 
-          `rail-column`(globals.css) — 화면 높이가 `100dvh - 헤더` 로 못박힌 열이고, 스크롤은
-          그 안의 카드(`.filter-rail`)가 갖는다. 레일이 뷰포트보다 길어도 바닥에 닿는다.
+          `rail-column`(globals.css) — **아무도 스크롤하지 않는 열**이다 (#598). 행 높이를
+          레일이 정하므로 레일은 언제나 제 길이대로 서고, 넘치는 몫은 페이지가 진다.
         */}
       <aside
         aria-label={messages.place.filterTitle}

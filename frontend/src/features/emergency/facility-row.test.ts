@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { DirectionsLink, FacilityRow, FacilityRowContent } from '@/features/emergency/facility-row'
 import { messages } from '@/lib/messages'
-import { facility } from '@/test/fixtures/emergency'
+import { facility, pharmacy } from '@/test/fixtures/emergency'
 
 describe('FacilityRowContent', () => {
   it('이름과 진료시간 원문을 그대로 쓴다 — 요약하지 않는다', () => {
@@ -158,18 +158,19 @@ describe('FacilityRow — 3층 표면 (#460)', () => {
 })
 
 /*
-  **#537 — 운영시간을 한 줄로 접는다. 파싱하지 않는다.**
+  **#537 이 한 줄로 접었고, #598 이 두 줄로 늘리며 펼치기를 걷었다. 파싱은 여전히 안 한다.**
 
-  이슈는 "오늘 기준 한 줄" 을 요구했지만 요일별 원문에서 오늘 구간을 뽑는 안은 기각돼
-  있다 (`types/emergency.ts` 의 `operatingHours` 주석이 정본). dev 실측이 근거다 —
-  `월~화, 목~금,토 09:30~20:00, 일 09:30~14:00` 처럼 요일 목록·범위·불규칙한 공백이 섞이고
-  수요일이 아예 빠진 곳, 일요일 항목 자체가 없는 곳이 있다. 수요일에 첫 줄을 잘못 읽으면
-  **닫힌 병원으로 달려가게 된다.**
+  두 이슈가 요구한 것은 각각 "오늘 기준 한 줄" 과 "두 줄로 날짜, 시간" 인데, 둘 다 원문을
+  요일·시각으로 쪼개는 안을 뜻할 수 있었고 **두 번 다 기각했다** (`types/emergency.ts` 의
+  `operatingHours` 주석이 정본). dev 실측이 근거다 — `월~화, 목~금,토 09:30~20:00,
+  일 09:30~14:00` 처럼 요일 목록·범위·불규칙한 공백이 섞이고 수요일이 아예 빠진 곳,
+  일요일 항목 자체가 없는 곳이 있다. 수요일에 첫 줄을 잘못 읽으면 **닫힌 병원으로
+  달려가게 된다.**
 
-  그래서 고친 것은 **판정이 아니라 높이**다. "지금 여는가" 는 서버가 계산한 `openNow` 배지가
-  계속 답한다.
+  그래서 두 번 다 고친 것은 **판정이 아니라 높이**다. "지금 여는가" 는 서버가 계산한
+  `openNow` 배지가 계속 답한다.
 */
-describe('FacilityHours — 한 줄로 접기 (#537)', () => {
+describe('FacilityHours — 두 줄까지 흘린다 (#598)', () => {
   const LONG = '월~화, 목~금,토 09:30~20:00, 일 09:30~14:00'
 
   function row(overrides: Parameters<typeof facility>[0] = {}) {
@@ -178,36 +179,36 @@ describe('FacilityHours — 한 줄로 접기 (#537)', () => {
     )
   }
 
-  it('원문을 그대로 쓴다 — 오늘 요일로 요약하지 않는다', () => {
+  it('원문을 그대로 쓴다 — 요일과 시각으로 쪼개지 않는다', () => {
     const markup = row({ operatingHours: LONG, restDate: null })
 
     expect(markup).toContain(LONG)
     expect(markup).not.toContain('오늘')
   })
 
-  it('접힌 동안은 한 줄이다', () => {
-    expect(row({ operatingHours: LONG, restDate: null })).toContain('line-clamp-1')
-  })
-
-  /* 펼치기는 `aria-expanded` + `aria-controls` 다 — `PlaceOverview` 와 같은 방식 */
-  it('긴 시간표에는 펼치기 버튼이 붙고 본문을 가리킨다', () => {
+  /*
+    한 줄이 아니라 두 줄이다. 상한 자체는 남는다 — 원문 길이가 시설마다 제각각이라
+    (`법정공휴일` 항목까지 붙는 곳이 있다) 없으면 한 행이 목록의 리듬을 혼자 깬다.
+  */
+  it('두 줄에서 자른다 — line-clamp-1 이 아니다', () => {
     const markup = row({ operatingHours: LONG, restDate: null })
 
-    expect(markup).toContain(messages.emergency.hoursExpand)
-    expect(markup).toMatch(/aria-expanded="false" aria-controls="([^"]+)"/)
-
-    const controls = /aria-controls="([^"]+)"/.exec(markup)?.[1]
-    expect(markup).toContain(`<p id="${controls}"`)
+    expect(markup).toContain('line-clamp-2')
+    expect(markup).not.toContain('line-clamp-1')
   })
 
-  /* 눌러도 아무 일이 없는 버튼은 두지 않는다 — `연중무휴 24시간` 은 한 줄에 들어간다 */
-  it('짧은 시간표에는 펼치기 버튼을 두지 않는다', () => {
-    const markup = row({ operatingHours: '연중무휴 24시간', restDate: null })
+  /*
+    **#598 이 `전체 시간표` 를 걷었다.** 한 줄로 접은 나머지에 손이 닿게 하려던 버튼인데,
+    두 줄이면 대부분 끝까지 보이는 데다 44px 터치 영역이 행마다 한 줄을 더 먹었다.
+  */
+  it('펼치기 버튼을 두지 않는다 — 긴 시간표에도', () => {
+    const markup = row({ operatingHours: LONG, restDate: null })
 
-    expect(markup).not.toContain(messages.emergency.hoursExpand)
+    expect(markup).not.toContain('전체 시간표')
+    expect(markup).not.toContain('aria-expanded')
   })
 
-  /* 휴무를 따로 줄로 빼면 접어서 번 한 줄을 도로 내놓는다 */
+  /* 휴무를 따로 줄로 빼면 두 줄이 세 줄이 된다 */
   it('휴무는 같은 줄에 이어 붙는다', () => {
     const markup = row({ operatingHours: LONG, restDate: '매주 수요일' })
     const hours = markup.slice(markup.indexOf(LONG))
@@ -217,28 +218,83 @@ describe('FacilityHours — 한 줄로 접기 (#537)', () => {
     )
   })
 
-  /* 원문이 없는 곳은 "닫힘" 과 구분된다 — 접을 것도 없다 */
-  it('시간표가 없으면 없다고 말하고 버튼도 두지 않는다', () => {
+  /* 원문이 없는 곳은 "닫힘" 과 구분된다 */
+  it('시간표가 없으면 없다고 말한다', () => {
     const markup = row({ operatingHours: null, operatingHoursKnown: false })
 
     expect(markup).toContain(messages.emergency.hoursUnknown)
-    expect(markup).not.toContain(messages.emergency.hoursExpand)
+  })
+})
+
+/*
+  **#598 — 1행이 `이름 [유형] ···(공백)··· [상태]` 다.**
+
+  상태 배지가 이름 아래 자기 줄을 쓰던 것을 첫 줄 오른쪽 끝으로 올렸다. 목록을 훑을 때
+  눈이 왼쪽(무엇)과 오른쪽(지금 여는가) 두 기둥만 보면 된다.
+*/
+describe('FacilityRowContent — 1행 배치와 상태 색 (#598)', () => {
+  function content(overrides: Parameters<typeof facility>[0] = {}) {
+    return renderToStaticMarkup(
+      createElement(FacilityRowContent, { facility: facility(overrides), showDistance: true }),
+    )
+  }
+
+  /*
+    이름과 상태가 **같은 flex 행**에 있어야 한다. 둘이 갈리면 상태가 자기 줄로 되돌아간
+    것이라, 그때 색 결정(아래)의 근거도 함께 사라진다.
+  */
+  it('이름과 상태 배지가 한 줄에 있다', () => {
+    const markup = content()
+    const firstRow = markup.slice(0, markup.indexOf('</div></div>'))
+
+    expect(firstRow).toContain('제주24시동물병원')
+    expect(firstRow).toContain(messages.emergency.statusOpen)
   })
 
   /*
-    **지도 패널은 이 내용을 통째로 선택 `<button>` 안에 넣는다.** 펼치기가 기본으로 켜지면
-    버튼 안의 버튼이 되어 마크업이 깨진다 — 그래서 `expandableHours` 기본값이 `false` 다.
+    **색이 아니라 무게로 가르던 규칙을 뒤집은 것이다** (`OpenStatus` 머리주석).
+    끝자리에서 `24시간` 과 나란히 서면 회색 배지 둘이 모양으로 구별되지 않는다.
+    톤은 새로 내지 않고 `Badge` 의 `brand` · `danger` 를 그대로 쓴다.
   */
-  it('FacilityRowContent 는 기본으로 펼치기를 그리지 않는다 — 버튼 안에 들어가는 경로다', () => {
-    const markup = renderToStaticMarkup(
-      createElement(FacilityRowContent, {
-        facility: facility({ operatingHours: LONG, restDate: null }),
-        showDistance: true,
-      }),
-    )
+  it('진료중은 초록(brand), 영업 종료는 빨강(danger) 톤이다', () => {
+    expect(content({ openNow: true })).toContain('bg-metric-high-100')
+    expect(content({ openNow: false })).toContain('bg-danger-100')
+  })
 
-    expect(markup).toContain(LONG)
-    expect(markup).not.toContain('<button')
-    expect(markup).toContain('line-clamp-1')
+  /*
+    `null` 은 "닫힘" 이 아니라 **판정할 수 없음**이다. 세 번째 색을 주면 초록·빨강의 대비가
+    묽어지고 "확인 필요" 가 "주의" 로 읽힌다 — 점선 중립을 그대로 둔다.
+  */
+  it('영업 여부를 모르면 색을 주지 않는다 — 점선 중립이다', () => {
+    const markup = content({ openNow: null })
+
+    expect(markup).toContain(messages.emergency.statusUnknown)
+    expect(markup).toContain('border-dashed')
+    expect(markup).not.toContain('bg-metric-high-100')
+    expect(markup).not.toContain('bg-danger-100')
+  })
+
+  /*
+    **주소를 자르지 않는다.** 예전에는 `shortAddress()` 로 `제주시` 까지만 보여 같은 시·군의
+    두 병원이 메타 줄에서 구별되지 않았다 — 이 화면에서 주소는 "어디쯤인지" 가 아니라
+    찾아갈 곳이다. `/places` 는 축약을 계속 쓴다.
+  */
+  it('주소를 전체로 보여준다 — 시·군까지 자르지 않는다', () => {
+    expect(content()).toContain('제주특별자치도 제주시 연북로 100')
+  })
+
+  /*
+    **유형 배지는 약국에만 붙인다** (`facility-row.tsx` 의 해당 줄). 목록 대부분이 병원이라
+    전부 붙이면 신호가 죽고, 1행 오른쪽 끝 상태 배지와도 자리를 다툰다.
+  */
+  it('유형 배지는 약국에만 붙는다', () => {
+    // `size="sm"` 배지는 이 행에서 유형 배지 하나뿐이다 — 이름에 `동물병원` 이 들어가는
+    // 시설이 많아 문자열로는 가려낼 수 없다 (`제주24시동물병원`)
+    expect(content()).not.toContain('h-5 px-2')
+    expect(
+      renderToStaticMarkup(
+        createElement(FacilityRowContent, { facility: pharmacy(), showDistance: true }),
+      ),
+    ).toContain('동물약국')
   })
 })
