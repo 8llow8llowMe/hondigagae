@@ -28,7 +28,7 @@
 | 컴포넌트                                           | 위치                               | 비고                                                                                                                                                                                                                                                    |
 | -------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Button`                                           | `src/components/button.tsx`        | variant: primary / secondary / ghost / danger / dangerOutline, size: sm / md / lg. **화면에 놓인 삭제 버튼은 `dangerOutline`** (채움은 확인 다이얼로그 전용)                                                                                            |
-| `Canvas`, `SurfaceStack`, `Surface`, `SurfaceList` | `src/components/surface.tsx`       | **표면 프리미티브 (3a · `DESIGN.md` §0).** L0 바닥 · 카드 열 · L1 섹션 카드 · L2 카드 안 목록(`columns={2}` 로 xl 2열). **새 화면은 이것만 쓴다**                                                                                                       |
+| `Canvas`, `SurfaceStack`, `Surface`, `SurfaceList` | `src/components/surface.tsx`       | **표면 프리미티브 (3a · `DESIGN.md` §0).** L0 바닥 · 카드 열 · L1 섹션 카드 · L2 카드 안 목록(`columns={2}` 로 xl 2열). 목록 화면은 `Surface fill` 로 **머리 고정 + 본문만 스크롤** (§0). **새 화면은 이것만 쓴다**                                     |
 | `MetricBadge`, `MetricValue`, `MetricWord`         | `src/components/metric.tsx`        | 등급 배지(`sm`/`md`)·지표 값·판정 문장의 술어. **톤 표는 여기가 소유한다** (화면이 다시 만들지 않는다)                                                                                                                                                  |
 | `ReasonList`                                       | `src/components/reason-list.tsx`   | XAI 근거. 서버 순서를 재정렬하지 않는다                                                                                                                                                                                                                 |
 | `Banner`                                           | `src/components/banner.tsx`        | 상시 진입점(병원·약국). 흰 표면 + 아이콘만 danger                                                                                                                                                                                                       |
@@ -181,6 +181,13 @@
   `Canvas` 가 자기 `flex-1` 로 그것을 받아 회색이 뷰포트 끝까지 이어진다.
   **화면·상태 파일마다 `min-h` 를 붙이지 않는다** — 같은 규칙이 열두 곳으로 갈린다.
   계약은 `src/components/main-layout-surface.test.ts` 가 주는 쪽·받는 쪽 **쌍으로** 잠근다.
+- **목록 화면의 우측 열은 카드 하나다** (#556). 제목 · 부제 · 검색 · 필터 칩 · 보기 토글이
+  `Surface` 의 `title`/`description`/`tools`/`trailing`/`leading` 슬롯으로 들어가고, 1024
+  이상에서 **머리는 고정되고 본문(목록)만 구른다**. 도구를 카드 밖에 두던 규칙이 사라진 것이
+  아니라 갈리는 축이 "카드 안/밖" 에서 "머리/본문" 으로 옮긴 것이다 — 근거는 `DESIGN.md §0`
+  과 `surface.tsx` 의 `fill` 절이 정본이다.
+  - **도구는 머리의 좌우 여백 밖에 렌더된다.** 검색 폼과 필터 칩이 자기 인셋을 이미 들고
+    있고, 칩 줄은 그 위에 음수 마진 bleed 까지 얹어 카드 끝까지 스크롤된다.
 - **그 최소 높이는 `100dvh - 헤더` 다** (#553). `Canvas` 가 `.page-canvas`(globals.css)로
   함께 단다. #456③ 은 "푸터(260)가 통째로 접힘 아래로 내려가 없던 스크롤이 생긴다" 는
   이유로 이것을 기각했었는데, **`.rail-layout` 세 화면은 이미 같은 값을 갖고 있었다** —

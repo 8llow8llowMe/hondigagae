@@ -11,8 +11,7 @@ import { countsAreComplete, facilityCounts } from '@/features/emergency/facility
 import { type EmergencyBoard, useEmergencyBoard } from '@/features/emergency/use-emergency-board'
 import { toErrorStatus } from '@/lib/api/error'
 import { messages } from '@/lib/messages'
-import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
-import { cn } from '@/lib/utils/cn'
+import type { Inset } from '@/lib/ui/inset'
 
 /**
  * 건너뛰기 링크의 목적지 — 레일 맨 앞 링크와 `SurfaceStack` 의 `id` 가 같은 값을 써야
@@ -58,63 +57,20 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
   return (
     <div className="rail-layout rail-layout-filter">
       {/*
-          **제목 줄이 맨 위다** (#537). 예전에는 카드 **위**에 모바일 칩 다섯 개가 두 줄로
-          깔리고 제목은 그 아래 카드의 `h2` 였다 — 375 에서 페이지에 들어온 사용자가
-          "여기가 어디인가" 를 알기 전에 필터 두 줄을 먼저 지났고, 보기 토글은 그보다도 더
-          아래라 지도 갈래의 떠 있는 토글과 세로 위치가 크게 어긋났다. 급할 때 여는
-          화면이라 그 순서가 특히 나빴다.
+        **`h1` 이 문서의 첫 제목이다** (#546 · #556). 제목이 우측 카드 안으로 내려가면
+        DOM 에서 레일의 `h2 필터` 보다 뒤가 되어 제목 탐색 개요가
+        `h2 필터 → h3 셋 → h1 병원 · 약국` 이 된다 — #546 이 `.rail-heading` 으로 고쳤던 바로
+        그 순서다.
 
-          **그래서 제목이 카드 밖으로 나왔다.** §0 의 "섹션 제목은 섹션 안에 있다" 를
-          되돌린 것이 아니라, **페이지 머리(h1)는 카드가 아니다** 는 같은 §0 의 다른 조항을
-          적용한 것이다 — 제목이 필터보다 위에 서려면 필터가 카드 밖인 이상 제목도 카드
-          밖이어야 한다. 카드는 `aria-label` 로 이름을 갖는다 (담기 화면과 같은 모양 —
-          `EmergencySectionProps.headingLevel` 주석이 그 조합을 이미 적어 뒀다).
+        **`sr-only` 사본으로 되돌린다.** `position: absolute` 라 grid 트랙을 만들지 않아
+        2단을 깨지 않으면서 레일보다 앞에 설 수 있다 — `/places` 가 #472 부터 쓰는 방식이고,
+        #546 주석이 "이 화면의 `h1` 은 보이는 제목이라 같은 자리로 옮길 수 없다" 고 적어 둔
+        제약이 **제목이 카드 머리로 들어가면서 풀렸다.** 보이는 제목은 카드의 `h2` 다.
 
-          **`/places` 는 다른 처방이다.** 거기는 `h1` 이 `sr-only` 라 `.rail-layout` 맨 앞으로
-          그냥 옮기면 끝이었다(#472) — `position: absolute` 라 grid 트랙도 만들지 않는다.
-          이 화면의 `h1` 은 보이는 제목이라 같은 자리로 옮기면 grid 아이템이 되어 2단이
-          깨지고, 그래서 `.rail-heading` 이 필요했다.
-
-          `h1` 이 이제 **보이는** 제목이라 `sr-only` 를 걷었다. 지도 갈래(`page.tsx`)가 내는
-          `h1` 과 같은 문자열이라 보기 전환이 문서 구조를 바꾸지 않는 것은 그대로다.
-        */}
-      {/*
-          **제목 줄이 `SurfaceStack` 밖으로 나왔다** (#546). 스택 안에 있는 동안에는 그것이
-          곧 **우측 열 안**이라, 1024 이상에서 `h1` 이 레일의 `h2 필터` 보다 DOM 뒤였다 —
-          제목 탐색 개요가 `h2 필터 → h3 셋 → h1 병원 · 약국` 이었다(1280 실측).
-          `.rail-heading`(globals.css)이 이 줄을 **두 열 위**에 얹어 순서를 바로잡는다.
-
-          **밖으로 나오면서 스택이 주던 여백을 스스로 진다.** 바깥이 `md:px-6` 으로 스택의
-          `md:p-6` 자리를, 안쪽이 `INSET_CLASS.card` 로 카드 인셋을 쓴다 — 합이 768 에서
-          44 로 **지금과 같은 값**이다. 아래쪽도 같다: 모바일 `pb-2`(8) 는 스택의 `gap-2`,
-          `md:pb-6`(24) 는 `md:gap-6` 과 같은 값이고, 스택이 `md:pt-0` 으로 자기 위 여백을
-          내놓아 두 번 들어가지 않는다.
-        */}
-      {/*
-          **인셋은 칩·행과 같은 `card` 다** (`inset.ts`). 왼쪽 세로선은 페이지가 하나로
-          쓰는 기준선이라 제목만 다른 값을 쓰면 768 에서 제목 24 · 필터 44 · 행 44 로
-          한 번 꺾인다 (#537 이 실측으로 잡았다). 카드 밖이라고 `main`(40)을 쓰는 것도
-          아니다 — 1024 에서 레일 카드 모서리가 그 40 을 이미 지고 있고(`.filter-rail`),
-          이 줄은 카드가 아니라 그 위에 선 **글줄**이다.
-        */}
-      <div className="rail-heading pb-2 md:px-6 md:pt-6 md:pb-6">
-        <div
-          className={cn('flex items-center justify-between gap-3 pt-3 md:pt-0', INSET_CLASS.card)}
-        >
-          <div className="flex min-w-0 flex-col gap-1">
-            <h1 className="text-title-1 text-fg font-semibold break-keep">
-              {messages.emergency.pageTitle}
-            </h1>
-            {/* 부제는 데스크톱에서만 — 모바일은 아래 칩이 같은 것을 보여준다 */}
-            <p className="text-caption text-fg-muted hidden font-medium lg:block">
-              {emergencySummaryLine(board.filters, board.radius)}
-            </p>
-          </div>
-
-          {/* 세 화면이 같은 세그먼트 컨트롤을 쓴다 */}
-          <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
-        </div>
-      </div>
+        지도 갈래(`page.tsx`)가 내는 `h1` 과 같은 문자열이라 보기 전환이 문서 구조를 바꾸지
+        않는 것은 그대로다.
+      */}
+      <h1 className="sr-only">{messages.emergency.pageTitle}</h1>
 
       {/*
           **`aside` 다 — `complementary` 랜드마크** (#546 · #472 와 같은 처방). 레일은 목록을
@@ -143,40 +99,46 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
         />
       </aside>
 
-      {/*
-          **스택이 `md:pt-0` 이다** — 위 제목 줄이 `md:pb-6` 으로 그 간격을 이미 냈다.
-          둘 다 두면 768 에서 제목과 칩 사이가 48 로 벌어진다.
-        */}
-      <SurfaceStack id={LIST_ANCHOR_ID} tabIndex={-1} className="list-column md:pt-0">
+      <SurfaceStack id={LIST_ANCHOR_ID} tabIndex={-1} className="list-column">
         {/*
-          **모바일 필터는 카드 밖이다.** 필터는 목록을 좁히는 **도구**이고 카드는 그 결과를
-          담는다 — §0 의 카드 판정 3문에서 ① 자기 제목이 없어 걸린다 (#439 · #445 와 같은
-          판단). 축이 셋으로 늘었어도(#537 이 반경을 올렸다) 판정은 그대로다: 제목이 없고,
-          떼어 놓으면 무엇을 좁히는지 알 수 없다.
+          **제목과 도구가 카드 머리로 들어왔다** (#556). #537 이 제목을 카드 밖으로 꺼낸 것은
+          "필터가 카드 밖인 이상 제목도 카드 밖이어야 한다" 는 이유였는데, 이제 **둘 다 카드
+          머리 안**이라 그 전제가 사라졌다 — 제목이 필터보다 위라는 #537 의 결론은 머리 안에서
+          그대로 지켜진다.
 
-          **데스크톱 레일은 반대로 카드다** (#535) — 자기 제목과 축 셋을 갖고 랜드마크로
-          혼자 선다. 근거는 `app/globals.css` 의 `.filter-rail` 주석이 정본이다.
-
-          `lg:hidden` 은 레일과 칩이 같은 축을 두 번 보여주지 않게 하는 것이다 — 지도 SDK
-          폴백은 레일이 없어 이 클래스를 걸지 않는다 (`emergency-map-view.tsx`).
+          **모바일 칩도 머리 안이다.** 필터는 목록을 좁히는 도구이고 본문은 그 결과다 —
+          갈리는 축이 "카드 안/밖" 에서 "머리/본문" 으로 옮겨 갔다 (`Surface` 의 `fill` 절).
+          `lg:hidden` 은 레일과 칩이 같은 축을 두 번 보여주지 않게 하는 것이고, 지도 SDK
+          폴백은 레일이 없어 그 클래스를 걸지 않는다 (`emergency-map-view.tsx`).
         */}
-        <EmergencyFilterChips
-          filters={board.filters}
-          onFiltersChange={board.setFilters}
-          radius={board.radius}
-          onRadiusChange={board.setRadius}
-          counts={counts}
-          showCounts={showCounts}
-          className="lg:hidden"
-        />
-
-        {/*
-          **카드가 제목을 갖지 않으므로 `aria-label` 로 이름을 준다.** `titleId` 와 함께
-          주지 않는다 — 접근성 이름이 둘이 된다 (`Surface` 머리주석).
-        */}
-        <Surface aria-label={messages.emergency.pageTitle}>
-          {/* 카드가 `h2` 를 그리지 않으므로 상태 제목이 문서의 두 번째 단이다 (#456①) */}
-          <EmergencyBoardSection board={board} headingLevel={2} />
+        <Surface
+          fill
+          titleId="emergency-list-heading"
+          title={messages.emergency.pageTitle}
+          /* 부제는 데스크톱에서만 — 모바일은 아래 칩이 같은 것을 보여준다 */
+          description={
+            <p className="text-caption text-fg-muted hidden font-medium lg:block">
+              {emergencySummaryLine(board.filters, board.radius)}
+            </p>
+          }
+          /* 네 화면이 같은 세그먼트 컨트롤을 쓴다 */
+          trailing={
+            <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
+          }
+          tools={
+            <EmergencyFilterChips
+              filters={board.filters}
+              onFiltersChange={board.setFilters}
+              radius={board.radius}
+              onRadiusChange={board.setRadius}
+              counts={counts}
+              showCounts={showCounts}
+              className="lg:hidden"
+            />
+          }
+        >
+          {/* 카드가 `h2` 를 되찾았으므로 상태 제목이 한 단 내려간다 (#456① · #556) */}
+          <EmergencyBoardSection board={board} headingLevel={3} />
         </Surface>
       </SurfaceStack>
     </div>

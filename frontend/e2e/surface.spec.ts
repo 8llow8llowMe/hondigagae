@@ -243,25 +243,23 @@ test.describe('카드 안 상태 제목 — #456①', () => {
     (`state-heading-level.test.ts` 가 뷰 셋과 라우트 상태 파일 열둘을 표로 잠근다).
     여기서는 **뒤집힌 쪽**이 실제로 서는지를 본다.
   */
-  test('/places 빈 결과에서 카드가 제목 없이 상태를 h2 로 세운다', async ({ page }) => {
+  test('/places 빈 결과에서 카드 제목 아래 상태가 h3 로 선다', async ({ page }) => {
     await page.goto('/places?view=list&keyword=존재하지않는장소이름ZZZ')
 
     const card = page.getByRole('main').locator('section').first()
     await expect(card).toBeVisible()
 
-    // 카드는 자기 제목을 갖지 않는다 — 이름은 `aria-label` 이 잇는다
-    await expect(card).toHaveAttribute('aria-label', /.+/)
+    // **카드가 제목을 되찾았다** (#556) — 이름은 `aria-label` 이 아니라 그 `h2` 가 잇는다
+    await expect(card).not.toHaveAttribute('aria-label', /.+/)
+    await expect(card.getByRole('heading', { level: 2 })).toHaveCount(1)
 
     /*
-      상태 제목은 카드 안 h2 다. 이름으로 집지 않는다 — 서버 문구(`resultMessage`)가
+      상태 제목은 그 아래 h3 다. 이름으로 집지 않는다 — 서버 문구(`resultMessage`)가
       오면 그대로 노출하는 자리라(`styling-guide.md` §7) 문자열이 고정이 아니다.
     */
-    const stateHeading = card.getByRole('heading', { level: 2 })
+    const stateHeading = card.getByRole('heading', { level: 3 })
     await expect(stateHeading).toHaveCount(1)
     await expect(stateHeading).toBeVisible()
-
-    // 카드가 제목을 도로 가져가면(=h3 로 내려가면) 위 단언과 함께 깨져야 한다
-    await expect(card.getByRole('heading', { level: 3 })).toHaveCount(0)
 
     /*
       **형제 `h2` 가 둘이 되는 것이 이 이슈의 증상이었다.** 카드 안 `h2` 하나는 위에서
@@ -278,7 +276,7 @@ test.describe('카드 안 상태 제목 — #456①', () => {
 })
 
 /**
- * **L0 위 블록은 카드 안 글줄과 같은 세로선에 선다** (`plan-add-place-header`, #451).
+ * **L0 위 블록은 카드 안 글줄과 같은 세로선에 선다** (`lib/ui/inset.ts` 의 `card` 주석, #451).
  *
  * `md` 이상에서 카드 테두리 1px 만큼 남는 어긋남은 의도된 것이다 — `Surface` 가
  * `md:border` 를 써서 padding box 가 border box 보다 1px 안쪽인데, L0 블록에는 상쇄할
@@ -681,7 +679,7 @@ test.describe('제목이 필터보다 먼저다 — #546', () => {
  * 페이지 제목보다 먼저 읽히기 때문이다. 장소(#531) · 병원·약국(#537)이 뒤따른다.
  *
  * **그래서 이 검사는 위치가 아니라 세로선만 본다.** 자리가 어디든 칩 글줄은 카드 안 글줄과
- * 같은 축에 서야 한다 (`plan-add-place-header` 의 `inset` 주석, #451) — 오히려 카드 안으로
+ * 같은 축에 서야 한다 (`lib/ui/inset.ts` 의 `card` 주석, #451) — 오히려 카드 안으로
  * 들어온 쪽이 그 축을 더 직접 쓴다. **여기에 "칩이 카드보다 앞" 을 다시 넣지 말 것**:
  * #536 이전의 판정(`compareDocumentPosition`)이 그것이었고, 일정이 옮겨 오면서 칩 스트립을
  * 아예 못 찾아 `chipLeft === null` 로 깨졌다.
@@ -698,62 +696,51 @@ test.describe('모바일 필터 칩의 세로선 — #457', () => {
     **위** 제목 줄로 올라가 카드에 `h2` 가 없어졌다 — 카드를 `has: h2` 로 찾던 locator 가
     아무것도 못 잡아 깨졌다(#536 이 일정에서 먼저 밟은 것과 같은 모양이다).
 
-    **잡으려는 것은 "칩이 본문 글줄과 같은 세로선에 서는가" 이지 "카드에 제목이 있는가"
-    가 아니다.** 그래서 `/places` 는 그 제목을 대신한 **제목 줄의 글자**를, `/plans` 는
-    그대로 **카드 제목**을 기준으로 삼는다. 둘 다 `INSET_CLASS.card` 를 쓰므로 재는
-    값의 뜻은 같다.
+    **#556 이후 두 화면이 같은 기준을 쓴다.** `/places` 의 제목이 카드 머리로 들어오면서
+    둘 다 **카드 제목**(`h2`)이 기준이 됐다 — `INSET_CLASS.card` 를 쓰는 것은 그대로다.
+  */
+  /*
+    `strip` 은 칩 줄을 집는 선택자다. **한 조건으로 둘 다 집을 수 없다** — `/places` 는 가로
+    스크롤러(`.scroll-rail`)고 `/plans` 는 `flex-wrap` 줄이다. #556 전에는 둘 다 `border-b` 를
+    가져 한 조건으로 됐는데, 카드 머리가 그 선을 대신 그으면서 `/places` 쪽이 내놓았다.
   */
   const CHIP_SCREENS = [
-    { path: '/places?view=list', label: '장소 찾기', reference: 'titleLine' },
-    { path: '/plans', label: '일정', reference: 'cardHeading' },
+    { path: '/places?view=list', label: '장소 찾기', strip: '.scroll-rail' },
+    { path: '/plans', label: '일정', strip: `[aria-label="${messages.plan.petGroupLabel}"]` },
   ] as const
 
-  for (const { path, label, reference } of CHIP_SCREENS) {
+  for (const { path, label, strip: stripSelector } of CHIP_SCREENS) {
     for (const name of ['mobile', 'tablet'] as const) {
       test(`${label} ${name} — 칩 글줄이 본문 글줄과 1px 안에 선다`, async ({ page }) => {
         await page.setViewportSize(VIEWPORTS[name])
         await page.goto(path)
 
         const main = page.getByRole('main')
-        /*
-          `/places` 의 기준은 제목 줄의 글자다. **`aria-hidden` 사본이라 role 로 못
-          집는다** — 진짜 `h1` 은 캔버스 맨 앞의 `sr-only` 쪽이고(#472), 이 글자는 그것을
-          눈으로 보여주는 사본이다. 그래서 DOM 으로 집는다.
-        */
-        const anchor =
-          reference === 'titleLine'
-            ? main.locator('p[aria-hidden]').first()
-            : main
-                .locator('section')
-                .filter({ has: page.locator('h2') })
-                .first()
-                .getByRole('heading', { level: 2 })
-                .first()
+        const anchor = main
+          .locator('section')
+          .filter({ has: page.locator('h2') })
+          .first()
+          .getByRole('heading', { level: 2 })
+          .first()
         await expect(anchor).toBeVisible()
 
         /*
-          칩 스트립 = 좌우 padding 을 가진 `border-b` 블록 중 **보이는** 첫 번째.
+          칩 스트립 = 화면별 `strip` 선택자에 걸리는 것 중 **보이는** 첫 번째.
 
           **폭 0 을 거르는 것이 핵심이다.** 데스크톱 레일(`hidden lg:block`)은 이 폭에서
-          `display:none` 인데 `getComputedStyle` 은 그때도 값을 돌려주므로, #535 가 레일에
-          1px 테두리를 준 뒤로는 레일 안 블록이 조건에 걸릴 수 있다. 그러면 `getBoundingClientRect`
-          가 0 을 내고 이 검사는 **틀린 값으로 통과**한다.
+          `display:none` 인데 `getComputedStyle` 은 그때도 값을 돌려준다. 그러면
+          `getBoundingClientRect` 가 0 을 내고 이 검사는 **틀린 값으로 통과**한다.
         */
-        const chipLeft = await page.evaluate(() => {
+        const chipLeft = await page.evaluate((selector) => {
           const root = document.querySelector('main') as HTMLElement
-          const strip = [...root.querySelectorAll('div')].find((d) => {
-            const style = getComputedStyle(d)
-            return (
-              style.borderBottomWidth !== '0px' &&
-              style.paddingLeft !== '0px' &&
-              d.getBoundingClientRect().width > 0
-            )
-          })
+          const strip = [...root.querySelectorAll(selector)].find(
+            (d) => d.getBoundingClientRect().width > 0,
+          )
           const first = strip?.querySelector('button, a, span')
           return first === undefined || first === null
             ? null
             : Math.round(first.getBoundingClientRect().left)
-        })
+        }, stripSelector)
 
         expect(chipLeft).not.toBeNull()
         const titleLeft = await leftEdge(anchor)

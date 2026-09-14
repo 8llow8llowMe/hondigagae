@@ -135,7 +135,13 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
           하나뿐이고 그 이름이 곧 페이지의 이름이라, 밖에 두면 어느 묶음의 제목인지 모호해진다.
           보이는 제목은 카드의 `h2`, 페이지의 `h1` 은 `sr-only` — 장소 목록(#439)과 같은 방식이다.
         */}
+        {/*
+          **`fill` — 열 높이를 다 쓰고 본문만 구른다** (#556). 이 화면이 네 목록의 기준이라
+          구조는 그대로고, 바뀌는 것은 카드가 바닥까지 내려간다는 것 하나다. 일정이 넷뿐이면
+          아래쪽에 빈 자리가 생기는데, 네 화면이 같은 모양이 되는 값이 그보다 크다고 봤다.
+        */}
         <Surface
+          fill
           lead
           titleId="plan-list-heading"
           title={messages.plan.pageTitle}

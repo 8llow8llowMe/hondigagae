@@ -15,10 +15,8 @@ import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
-import { INSET_CLASS } from '@/lib/ui/inset'
 import { parsePlaceFilters, toPlaceFilterQuery } from '@/lib/url/place-filters'
 import { parseViewMode, PLACES_DEFAULT_VIEW, viewModeHref } from '@/lib/url/view-mode'
-import { cn } from '@/lib/utils/cn'
 
 export const metadata = {
   title: `${messages.place.pageTitle} · 혼디가개`,
@@ -133,86 +131,51 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
         <PlaceFilterRail filters={filters} authed={authed} />
       </aside>
 
+      {/*
+        **우측 열은 카드 하나다** (#556). 예전에는 제목 줄 · 검색 · 칩 · 목록 넷이 바닥 위에
+        따로 서 있었다. 제목과 도구가 카드 머리로 들어가고 목록만 본문에 남는다 —
+        §0 의 "도구는 카드 밖" 이 "도구는 머리, 결과는 본문" 으로 바뀐다
+        (`Surface` 머리주석의 `fill` 절이 정본이다).
+      */}
       <SurfaceStack id="place-list" tabIndex={-1} className="list-column">
         {/*
-          **제목 줄이 맨 위다** (#531). 375 실측에서 보기 토글이 y=295 에 섰다 — 검색과 칩
-          아래로 밀려 있어 지도 갈래의 떠 있는 토글(y=105)과 190px 어긋났고, 페이지에 들어온
-          사용자가 "여기가 어디인가" 를 알기 전에 도구 두 줄을 먼저 지났다. #537 이 병원·약국
-          에서 같은 순서를 먼저 고쳤고 두 화면이 `ViewToggle` 을 공유하므로 규칙도 같이 간다.
+          **보이는 제목은 카드의 `h2` 다.** 진짜 `h1` 은 위 캔버스 맨 앞의 `sr-only` 사본이고
+          (#472 가 레일보다 앞에 두려고 만든 자리), 여기에 `h1` 을 두면 DOM 에서 레일 **뒤**라
+          #472 가 고친 개요가 도로 깨진다 — `H2:필터 → H3 셋 → H1:장소 찾기`.
 
-          **여기 제목은 `h1` 이 아니다.** 진짜 `h1` 은 위 캔버스 맨 앞의 `sr-only` 사본이고
-          (#472 가 레일보다 앞에 두려고 만든 자리), 이 줄은 그것을 눈으로 보여주는 사본이다.
-          여기에 `h1` 을 두면 DOM 에서 레일 **뒤**라 #472 가 고친 개요가 도로 깨진다 —
-          `H2:필터 → H3 셋 → H1:장소 찾기`. `aria-hidden` 이라 이름이 두 번 들리지 않는다.
-
-          **#537(`/emergency`)은 이 사본 방식을 쓰지 않았다** — 그 화면은 `sr-only h1` 을
-          캔버스 앞으로 올리는 #472 처방을 아직 안 받아서 열 안의 `h1` 이 유일한 제목이다.
-          그래서 거기 개요는 아직 `H2:필터` 가 먼저다(#546 이 그 후속이고, **이 화면의
-          사본 방식이 거기서도 답이 된다**).
+          보조기기에서 "장소 찾기" 가 h1·h2 로 두 번 들린다. `/plans` 가 이미 같은 방식이고
+          (#445), #531 이 쓰던 `p aria-hidden` 사본은 제목이 카드 밖일 때만 필요했다.
         */}
-        <div
-          className={cn('flex items-center justify-between gap-3 pt-3 md:pt-0', INSET_CLASS.card)}
-        >
-          <div className="flex min-w-0 flex-col gap-1">
-            {/* `aria-hidden` 은 **제목 글자에만** 건다 (아래 토글은 그대로 남아야 한다) */}
-            <p aria-hidden className="text-title-1 text-fg font-semibold break-keep">
-              {messages.place.pageTitle}
-            </p>
-            {/* 부제는 데스크톱에서만 — 모바일은 아래 칩이 같은 것을 보여준다 */}
+        <Surface
+          fill
+          titleId="place-list-heading"
+          title={messages.place.pageTitle}
+          /* 부제는 데스크톱에서만 — 모바일은 아래 칩이 같은 것을 보여준다 */
+          description={
             <p className="text-caption text-fg-muted hidden font-medium lg:block">
               {filterSummaryLine(filters)}
             </p>
-          </div>
-          {/* 세 화면이 같은 세그먼트 컨트롤을 쓴다 — 아트보드 05 마지막 단락 */}
-          <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
-        </div>
+          }
+          /* 네 화면이 같은 세그먼트 컨트롤을 쓴다 — 아트보드 05 마지막 단락 */
+          trailing={
+            <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
+          }
+          /*
+            **검색과 칩이 머리 안이다** (#556). 둘 다 목록을 좁히는 도구이고, `fill` 머리는
+            고정이라 목록을 내려가도 "무엇으로 좁히고 있었는지" 가 화면에 남는다 — 예전에는
+            열 전체가 굴러 검색이 위로 사라졌다.
 
-        {/*
-          **모바일 칩은 카드 밖이다.** 칩은 목록을 좁히는 **도구**이고 카드는 그 결과를
-          담는다 — §0 의 카드 판정 3문에서 ① 자기 제목이 없고 ③ 축이 하나뿐이라 걸린다.
-
-          **데스크톱 레일은 반대로 카드다** (#535). 같은 필터인데 갈리는 이유는 판정 3문의
-          답이 갈리기 때문이다 — 레일은 자기 제목(`h2 필터`)이 있고 축을 셋 이상 담으며
-          `complementary` 랜드마크로 혼자 선다. 칩 한 줄은 그 셋 다 아니다.
-        */}
-        {/*
-          **검색은 모든 폭에서 같은 자리다** (#431). 필터 칩은 `lg:hidden` 이고 레일이
-          1024 이상을 맡지만, 레일에는 검색을 두지 않았다 — 그러면 같은 도구가 폭에 따라
-          다른 곳에 서고, 좁은 화면에서는 칩 줄 위에 또 하나가 생긴다.
-
-          **카드 밖인 것은 칩과 같은 이유다** — 검색은 목록을 좁히는 도구이고 카드는 그
-          결과를 담는다.
-        */}
-        <PlaceSearchField filters={filters} />
-
-        <div className="lg:hidden">
-          <PlaceFilterChips filters={filters} authed={authed} />
-        </div>
-
-        {/*
-          **페이지 제목이 카드 제목으로 들어왔다** (§0 "섹션 제목은 섹션 안에 있다").
-          이 화면의 카드는 하나뿐이고 그 카드의 이름이 곧 페이지의 이름이라, 밖에 두면
-          제목만 바닥 위에 떠 어느 묶음의 제목인지 모호해진다.
-
-          그래서 **보이는 제목은 카드의 `h2`** 이고, 페이지의 `h1` 은 `sr-only` 로 남긴다 —
-          **이 라우트의 지도 갈래(위)와 `emergency` 가 이미 쓰는 방식이다.** 두 갈래가 같은
-          `h1` 을 내야 보기 전환이 문서 구조를 바꾸지 않는다.
-
-          보조기기에서 "장소 찾기" 가 h1·h2 로 두 번 들린다. `Surface` 에 제목 레벨 prop 을
-          더하면 없앨 수 있지만 **그러면 한 규칙에 두 경로가 생긴다** — 홈은 `sr-only` h1
-          방식이고, 추측으로 만든 API 를 아무 화면도 검증하지 않는 것이 #422 에서
-          프리미티브 넷을 걷은 이유다. 필요해지는 화면이 나오면 그때 만든다.
-        */}
-        {/*
-          **카드가 제목을 잃고 `aria-label` 로 이름을 갖는다** (#531). 제목 줄이 위로
-          올라갔으므로 여기 `title` 을 남기면 같은 이름이 화면에 두 번 선다. `titleId` 와
-          `aria-label` 을 함께 주지 않는 것은 접근성 이름이 둘이 되기 때문이다
-          (`Surface` 머리주석) — 그래서 `titleId` 도 함께 걷었다.
-
-          부제(`filterSummaryLine`)는 제목 줄로 따라 올라갔다. 데스크톱 전용인 것은 그대로다 —
-          모바일은 칩이 같은 것을 보여준다.
-        */}
-        <Surface aria-label={messages.place.pageTitle}>
+            **검색은 모든 폭에서 같은 자리다** (#431). 칩은 `lg:hidden` 이고 레일이 1024
+            이상을 맡지만, 레일에는 검색을 두지 않았다 — 그러면 같은 도구가 폭에 따라 다른
+            곳에 서고, 좁은 화면에서는 칩 줄 위에 또 하나가 생긴다.
+          */
+          tools={
+            <>
+              <PlaceSearchField filters={filters} />
+              <PlaceFilterChips filters={filters} authed={authed} className="lg:hidden" />
+            </>
+          }
+        >
           <HydrationBoundary state={dehydrate(queryClient)}>
             <PlaceListView filters={filters} />
           </HydrationBoundary>

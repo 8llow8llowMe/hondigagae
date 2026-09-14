@@ -229,6 +229,10 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0 · 3a)', () => {
       'src/features/emergency/emergency-map-view.tsx',
       // 지도 우상단에 얹히는 현재 위치 버튼 — 보기 전환 토글과 같은 스택에 뜬다
       'src/features/map/map-locate-button.tsx',
+      // 담기 지도의 떠 있는 머리 카드 (#556) — 좌측 패널과 **같은 기둥**에 뜨는 표면이라
+      // 패널과 같은 곡률(16)·그림자를 쓴다. 뒤로가기가 이 화면의 유일한 퇴로라 접히는
+      // 패널 안에 넣을 수 없어 별도 표면으로 떠 있다
+      'src/features/plan/plan-add-place-view.tsx',
       // ── 드래그 중인 항목 (DESIGN.md §6 이 --shadow-md 용도에 명시한다) ─────
       // 끌고 있는 행은 손끝에 들려 목록 위에 떠 있다. 평면 카드를 띄우려고 이 목록에
       // 넣는 것이 규칙을 무너뜨리는 경로이므로, 여기 추가하기 전에 그것이 **실제로

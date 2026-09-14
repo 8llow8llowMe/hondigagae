@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest'
 
 import { PlaceMapPanel } from '@/features/place/place-map-panel'
 import { planAddPlaceAction, planAddPlaceNotice } from '@/features/plan/plan-add-place-action'
-import { PlanAddPlaceHeader } from '@/features/plan/plan-add-place-header'
 import { messages } from '@/lib/messages'
 import { placeSummary, placeWithoutCoordinate } from '@/test/fixtures/place'
+import { readSource } from '@/test/source'
 
 /** 명세: docs/features/plan/담기지도-세부명세.md (이슈 #370) */
 
@@ -126,86 +126,69 @@ describe('지도 패널의 담기 실패 알림', () => {
   })
 })
 
-describe('PlanAddPlaceHeader — 두 보기가 나눠 쓰는 머리', () => {
-  function renderHeader(overrides: Partial<Parameters<typeof PlanAddPlaceHeader>[0]> = {}) {
-    return renderToStaticMarkup(
-      createElement(PlanAddPlaceHeader, {
-        day: 2,
-        backHref: '/plans/1#day-2',
-        listHref: '/plans/1/days/2/add?view=list',
-        mapHref: '/plans/1/days/2/add',
-        view: 'map' as const,
-        ...overrides,
-      }),
-    )
-  }
+/**
+ * 지도 갈래의 **떠 있는 머리** — 이슈 #556.
+ *
+ * #370 은 두 보기가 `PlanAddPlaceHeader` 하나를 나눠 쓰게 했는데, #556 이 목록의 머리를
+ * 카드 안으로 넣으면서 두 갈래가 정말로 달라졌다 — 목록은 `Surface` 의 머리 슬롯,
+ * 지도는 좌측 패널 기둥 위에 뜨는 카드다. 그 컴포넌트는 사라졌다.
+ *
+ * **소스 단언이다.** 지도 갈래는 `usePlanDetail` · `usePlaceList` 를 타는 클라이언트
+ * 트리라 node 환경에서 통째로 렌더할 수 없다 (`testing-guide.md` §1).
+ */
+describe('지도 갈래의 떠 있는 머리 (#556)', () => {
+  const source = readSource('src/features/plan/plan-add-place-view.tsx')
+  /*
+    **`<PlanAddPlaceShell` 로 끝을 잡지 않는다.** 그 태그는 로딩·오류 갈래가 **먼저** 쓰므로
+    `indexOf` 가 지도 분기보다 앞을 가리켜 빈 문자열이 나온다 (실제로 그렇게 헛통과했다).
+    지도 분기 다음에 오는 최상위 `return (` 까지로 자른다.
+  */
+  const mapStart = source.indexOf("if (view === 'map')")
+  const mapBranch = source.slice(mapStart, source.indexOf('\n  return (', mapStart))
 
   /*
-    지도 보기에서도 h1 을 sr-only 로 숨기지 않는다 — /places 지도는 전역 nav 로 나갈 수
-    있지만 이 화면의 퇴로는 `일정으로 돌아가기` 뿐이다.
-
-    **`markup` 전체에서 `sr-only` 를 찾던 단언을 `h1` 로 좁혔다** (#539). 뒤로가기가
-    모바일에서 아이콘이 되면서 그 **라벨**이 `sr-only md:not-sr-only` 를 달았는데, 그것은
-    이 테스트가 막으려던 일(제목을 숨기는 것)이 아니다 — 링크는 그대로 보이고 이름도
-    스크린리더에 그대로 읽힌다. 뭉툭한 검사가 무관한 변경에 걸린 자리다.
+    지도 보기에서도 `h1` 을 숨기지 않는다 — `/places` 지도는 전역 nav 로 나갈 수 있지만
+    이 화면의 퇴로는 `일정으로 돌아가기` 뿐이다. 접히는 패널 안에 넣을 수 없는 이유도 같다.
   */
-  it('보이는 h1 과 돌아가기 링크를 둔다 — 지도에서도 숨기지 않는다', () => {
-    const markup = renderHeader()
-    // 매치 실패를 단언으로 드러낸다 — `?? ''` 로 흘리면 `['']` 이 되어 아래가 공허 통과한다
-    const h1 = /<h1[^>]*class="([^"]*)"/.exec(markup)
-    expect(h1).not.toBeNull()
-
-    expect(markup).toContain('<h1')
-    expect((h1?.[1] ?? '').split(/\s+/)).not.toContain('sr-only')
-    expect(markup).toContain('href="/plans/1#day-2"')
-    expect(markup).toContain(messages.plan.addPlaceTitle.replace('{day}', '2'))
-    // 퇴로의 이름은 아이콘이 되어도 남는다 — 스크린리더가 읽을 말이 사라지면 퇴로가 없다
-    expect(markup).toContain(messages.plan.addPlaceBack)
-  })
-
-  it('일정 제목을 받으면 부제 앞에 붙이고, 없으면 부제만 남긴다', () => {
-    expect(renderHeader({ planTitle: '제주 3박4일' })).toContain('제주 3박4일 ·')
-    expect(renderHeader()).toContain(messages.plan.addPlaceSubtitle.replace('{day}', '2'))
+  it('보이는 h1 과 돌아가기 링크가 떠 있는 카드 안에 있다', () => {
+    expect(mapBranch).toMatch(/<h1 className="text-title-2/)
+    expect(mapBranch).not.toMatch(/<h1 className="[^"]*sr-only/)
+    expect(mapBranch).toContain('<BackLink href={backHref}')
+    expect(mapBranch).toContain('messages.plan.addPlaceTitle')
   })
 
   /*
-    #451 이 목록 갈래를 3층 표면으로 옮기면서 머리의 인셋이 갈렸다. 지도는 전폭 미디어라
-    페이지 인셋(16/40) 그대로고, 목록은 `SurfaceStack` 안이라 카드 안 글줄과 같은 축
-    (16/20)이어야 아래 카드의 첫 글자와 세로선이 맞는다.
+    **패널과 같은 기둥·같은 곡률이다.** 1440 열에 맞추면 폭에 따라 "패널 위" 와 "지도
+    한복판" 으로 그림이 갈린다 (`plan-add-place-view` 머리 카드 주석).
   */
-  it('목록 갈래는 카드 인셋에 선다 — inset="card" 면 20 이고 40 이 아니다', () => {
-    const markup = renderHeader({ view: 'list', inset: 'card' })
-
-    expect(markup).toContain('md:px-5')
-    expect(markup).not.toContain('md:px-10')
+  it('좌측 패널 기둥에 붙고 패널과 같은 곡률을 쓴다', () => {
+    expect(mapBranch).toMatch(/start-4[^"]*lg:end-auto/)
+    expect(mapBranch).toContain('rounded-xl')
+    // 폭 400 은 `.map-panel-width`(globals.css)와 같은 값이다 — 그 클래스는 `lg:` variant 를
+    // 만들 수 없어 Tailwind 유틸리티로 쓴다 (`plan-add-place-view` 주석)
+    expect(mapBranch).toContain('lg:w-100')
+    // 패널은 그만큼 내려온다 — 겹치면 둘 다 못 읽는다
+    expect(mapBranch).toContain('panelTopInset={PANEL_TOP_INSET}')
   })
 
-  it('기본은 페이지 인셋이다 — 지도 갈래는 값을 넘기지 않는다', () => {
-    const markup = renderHeader()
-
-    expect(markup).toContain('md:px-10')
-    expect(markup).not.toContain('md:px-5')
+  /*
+    **토글을 지도에게 맡긴다** (#412 가 `/places` 에서 고친 것과 같은 규칙). 머리가 들고
+    있으면 뷰포트 오른쪽 끝에 서서 목록 갈래(1440 열 안)와 253px 어긋난다.
+  */
+  it('보기 전환을 PlaceMapView 에 넘긴다 — 머리가 토글을 갖지 않는다', () => {
+    expect(mapBranch).toContain('listHref={listHref}')
+    expect(mapBranch).toContain('mapHref={mapHref}')
+    expect(mapBranch).not.toContain('<ViewToggle')
   })
 
-  it('보기 전환 토글이 현재 보기를 눌린 상태로 알린다', () => {
-    const onMap = renderHeader({ view: 'map' })
-    const onList = renderHeader({ view: 'list' })
+  /* 지도가 상단까지 찬다 — 머리가 흐름에서 빠졌다 */
+  it('지도가 머리 아래가 아니라 전체 높이를 쓴다', () => {
+    expect(mapBranch).toContain('<div className="map-canvas-height relative">')
+    expect(mapBranch).not.toContain('map-canvas-height flex flex-col')
+  })
 
-    /*
-      실제 마크업은 `aria-current` 가 (있을 때만) `href` 보다 앞에 오고 그 사이에 활성
-      여부에 따라 값이 달라지는 `class` 가 낀다 — `aria-current="true" aria-label="..."
-      title="..." class="..." href="...">` 순서. `href` 를 직접 붙여 보는 대신, 활성
-      링크에만 붙는 `aria-current` 가 어느 `aria-label`(지도로 보기/목록으로 보기)에
-      붙는지로 "두 보기에서 눌린 쪽이 다르다" 를 검증한다.
-    */
-    // 지도 보기면 지도 링크가 눌려 있고 목록 링크는 아니다
-    expect(onMap).toContain('aria-current="true" aria-label="지도로 보기"')
-    expect(onMap).not.toContain('aria-current="true" aria-label="목록으로 보기"')
-    expect(onMap).toContain('href="/plans/1/days/2/add"')
-    expect(onMap).toContain('href="/plans/1/days/2/add?view=list"')
-
-    // 목록 보기면 반대다
-    expect(onList).toContain('aria-current="true" aria-label="목록으로 보기"')
-    expect(onList).not.toContain('aria-current="true" aria-label="지도로 보기"')
+  /* 부제는 목록에만 둔다 — 지도 위 카드는 작을수록 좋다 */
+  it('떠 있는 머리에 부제를 두지 않는다', () => {
+    expect(mapBranch).not.toContain('addPlaceSubtitle')
   })
 })

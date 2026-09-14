@@ -345,18 +345,15 @@ body {
     max-block-size: calc(100dvh - var(--header-h));
 
     /*
-      두 열이 남는 높이를 전부 먹는 한 행이다.
+      **두 열이 남는 높이를 전부 먹는 한 행이다.**
 
-      `/emergency` 만 제목 줄(`.rail-heading`)이 두 열 위에 얹혀 행이 하나 더 있다
-      (#546). 그 줄은 내용만큼(`auto`)만 쓰고 나머지를 열이 가져간다.
-      `/places` · `/plans` 의 `h1` 은 `sr-only`(= `position: absolute`)라 트랙을 만들지
-      않으므로 이 판정에 걸리지 않는다.
+      #553 때는 `/emergency` 만 제목 줄이 두 열 위에 얹혀(`.rail-heading`, #546) 행이 하나
+      더 있었다. #556 이 그 제목을 우측 카드 머리로 내리면서 네 화면이 모두 한 행이 됐고,
+      `:has()` 로 갈라 두던 예외가 사라졌다.
+
+      네 화면의 `h1` 은 전부 `sr-only`(= `position: absolute`)라 트랙을 만들지 않는다.
     */
     grid-template-rows: minmax(0, 1fr);
-  }
-
-  .rail-layout-filter:has(> .rail-heading) {
-    grid-template-rows: auto minmax(0, 1fr);
   }
 
   /*
@@ -385,23 +382,24 @@ body {
     padding-block: 24px;
   }
 
-  /*
-    **제목 줄이 있는 화면(`/emergency`)은 위 24 를 내놓는다.** 그 화면의 우측 스택은
-    `md:pt-0` 이라(제목 줄의 `md:pb-6` 이 그 간격을 이미 냈다) 첫 카드가 행 맨 위에서
-    시작한다 — 레일에만 24 를 주면 두 열의 카드 윗변이 24px 어긋난다.
-  */
-  .rail-layout-filter:has(> .rail-heading) > .rail-column {
-    padding-block-start: 0;
-  }
-
   .rail-layout-filter > .rail-column > .filter-rail {
     max-block-size: 100%;
     overflow-y: auto;
   }
 
-  /* 우측 목록 열 — 안쪽 여백은 `SurfaceStack` 의 `md:p-6` 이라 스크롤 영역 안에 든다 */
+  /*
+    우측 목록 열 — **스크롤은 열이 아니라 카드의 본문이 갖는다** (이슈 #556).
+
+    #553 은 열에 `overflow-y: auto` 를 줬는데, 그러면 카드가 통째로 굴러 **제목과 검색이
+    위로 사라진다** — 목록을 40행쯤 내려간 뒤 "무엇으로 좁히고 있었는지" 를 보려면 맨 위까지
+    되돌아와야 했다. 열은 높이만 잡고, 카드가 `Surface fill` 로 그 높이를 채우며 머리를
+    고정한 채 본문만 굴린다.
+
+    **열이 클립해야 한다.** 카드가 `flex-1` 로 열을 채우지만, 열이 `visible` 이면 안쪽
+    본문이 아직 스크롤 컨테이너를 만들기 전 한 프레임에 카드가 열 밖으로 비어져 나온다.
+  */
   .rail-layout-filter > .list-column {
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   /*
@@ -423,28 +421,6 @@ body {
 
   .rail-layout-detail > .rail-detail-main {
     grid-column: 2;
-  }
-
-  /*
-    페이지 제목 줄을 **두 열 위에 얹는다** — 이슈 #546.
-
-    `h1` 이 레일보다 **앞**에 서야 제목 탐색 개요가 `h1 → h2 필터` 가 된다. `/places` 는
-    `h1` 이 `sr-only` 라 그냥 맨 앞으로 옮기면 끝이었지만(#472), 이 화면의 `h1` 은 #537
-    이후 **보이는 제목**이라 같은 자리로 옮기면 grid 아이템이 되어 2단이 깨진다.
-
-    **DOM 을 뒤집는 안은 쓰지 않는다.** 레일을 목록 뒤로 보내면 개요는 고쳐지지만 탭
-    순서가 시각 순서와 반대가 된다 — `e2e/surface.spec.ts` 의 `필터 레일 건너뛰기 — #472`
-    머리주석이 그 기각 근거의 정본이다.
-
-    **`aria-*` 로만 푸는 안도 쓰지 않는다.** 화면과 접근성 트리가 갈라지고, 레일 `h2` 를
-    `h3` 이하로 내리는 안은 제목 레벨이 내용이 아니라 **위치**를 따라가게 된다.
-
-    두 열 위에 얹으면 DOM 순서(제목 → 레일 → 목록)와 시각 순서가 **둘 다** 맞는다.
-    1024 미만에서는 `.rail-layout` 이 grid 가 아니라 이 규칙이 적용되지 않는다 — 그때는
-    DOM 순서 그대로 쌓이고, 그것이 이미 #537 이 만든 모바일 순서다.
-  */
-  .rail-layout > .rail-heading {
-    grid-column: 1 / -1;
   }
 
   /*

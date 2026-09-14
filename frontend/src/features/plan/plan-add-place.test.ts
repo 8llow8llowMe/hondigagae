@@ -336,11 +336,19 @@ describe('담기 목록이 3층 표면 위에 선다 (#451)', () => {
       `tabIndex={-1}` 은 Chromium 에서는 없어도 동작해 e2e 가 구별하지 못하지만(뮤테이션으로
       확인), 보조기기 조합을 위한 처방이라 **여기서 문자열로 잠근다.**
     */
-    // `list-column`(globals.css)이 lg 에서 우측 열에 자기 스크롤을 준다 (#553)
+    // `list-column`(globals.css)이 lg 에서 열 높이를 잡고 카드가 `fill` 로 채운다 (#553 · #556)
     expect(source).toContain(
       '<SurfaceStack id="plan-add-place-list" tabIndex={-1} className="list-column">',
     )
-    expect(source).toContain('<Surface aria-label=')
+    /*
+      **카드가 제목·뒤로가기·토글을 머리로 받는다** (#556). #451 때는 그것들이 바닥 위
+      `PlanAddPlaceHeader` 였고 카드는 `aria-label` 만 가졌는데, 그 컴포넌트는 이 개정에서
+      사라졌다 — 목록은 카드 머리를, 지도는 떠 있는 카드를 각자 그린다.
+    */
+    expect(source).toMatch(/<Surface\s+fill/)
+    expect(source).toContain('title={title}')
+    expect(source).toContain('leading={<BackLink')
+    expect(source).not.toContain('PlanAddPlaceHeader')
   })
 
   /*

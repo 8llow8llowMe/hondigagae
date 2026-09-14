@@ -88,57 +88,49 @@ describe('목록 갈래는 3층 표면이다 (#460)', () => {
     였다: 375 에서 페이지에 들어온 사용자가 "여기가 어디인가" 를 알기 전에 필터 두 줄을
     지났다. 급할 때 여는 화면이라 그 순서가 특히 나빴다.
 
-    **그래서 `h1` 이 `sr-only` 를 벗고 보이는 제목이 됐다.** 카드는 제목을 잃고
-    `aria-label` 로 이름을 갖는다 — 제목과 `aria-label` 을 함께 주면 접근성 이름이 둘이
-    된다 (`Surface` 머리주석).
+    **#556 이 그 제목을 카드 **머리** 로 되돌렸다.** 되돌린 것이 아니라 자리가 바뀐 것이다 —
+    머리 안에서도 제목은 필터(칩)보다 위이고, 이제 제목·도구·목록이 한 표면 안에 든다.
+    `h1` 은 `sr-only` 로 격자 맨 앞에 남아 레일보다 앞선다 (#546 이 `.rail-heading` 으로
+    풀던 문제를 같은 결과로 푼다).
   */
-  it('h1 이 보이는 제목이고 카드는 aria-label 로 이름을 갖는다 (#537)', () => {
+  it('h1 은 sr-only 로 레일 앞에 서고 보이는 제목은 카드의 h2 다 (#556)', () => {
     const view = block(listView, 'EmergencyListView')
 
-    expect(view).toMatch(
-      /<h1 className="text-title-1[^"]*">\s*\{messages\.emergency\.pageTitle\}\s*<\/h1>/,
-    )
-    expect(view).not.toContain('<h1 className="sr-only">')
+    const h1 = view.indexOf('<h1 className="sr-only">')
+    const aside = view.indexOf('<aside')
 
-    expect(view).toMatch(/<Surface aria-label=\{messages\.emergency\.pageTitle\}>/)
-    // 제목을 도로 카드에 넣으면 이름이 둘이 된다
-    expect(view).not.toMatch(/<Surface\b[\s\S]*?\btitle=/)
+    expect(h1).toBeGreaterThan(-1)
+    /* 소스 순서가 곧 DOM 순서다 — `h1` → 레일 → 목록 */
+    expect(h1).toBeLessThan(aside)
 
-    // 지도 갈래는 그대로 sr-only h1 이다 — 두 갈래가 같은 h1 을 내야 전환이 구조를 안 바꾼다
+    // 보이는 제목은 카드가 그린다. `aria-label` 과 함께 주면 이름이 둘이 된다
+    expect(view).toMatch(/title=\{messages\.emergency\.pageTitle\}/)
+    expect(view).not.toMatch(/<Surface\b[\s\S]*?aria-label=/)
+
+    // 지도 갈래도 sr-only h1 이다 — 두 갈래가 같은 h1 을 내야 전환이 구조를 안 바꾼다
     expect(page).toContain('<h1 className="sr-only">{messages.emergency.pageTitle}</h1>')
   })
 
-  it('보기 토글과 부제가 카드 밖 제목 줄에 있다 (#537)', () => {
+  it('보기 토글과 부제가 카드 머리 슬롯에 있다 (#556)', () => {
     const view = block(listView, 'EmergencyListView')
 
-    const title = view.indexOf('<h1 className="text-title-1')
-    const surface = view.indexOf('<Surface ')
-
-    // 카드의 슬롯이 아니라 제목 줄의 형제다
-    expect(view).not.toMatch(/trailing=\{/)
-    expect(view).not.toMatch(/description=\{/)
-
-    for (const mark of ['<ViewToggle current="list"', 'emergencySummaryLine']) {
-      const at = view.indexOf(mark)
-      expect(at).toBeGreaterThan(title)
-      expect(at).toBeLessThan(surface)
-    }
+    // 카드 밖 제목 줄의 형제가 아니라 카드의 슬롯이다
+    expect(view).toMatch(/trailing=\{\s*<ViewToggle current="list"/)
+    expect(view).toMatch(/description=\{[\s\S]{0,200}emergencySummaryLine/)
   })
 
   /*
-   **칩은 카드 밖이다.** 목록을 좁히는 도구이고 카드는 그 결과를 담는다 (#439 판단).
-   **그리고 #537 이후로는 제목 줄 뒤다** — 소스 순서로 `h1` < 칩 < `<Surface` 를 본다.
+   **칩은 카드 머리의 `tools` 슬롯이다** (#556). 목록을 좁히는 도구와 그 결과를 가르는 축이
+   "카드 안/밖" 에서 "머리/본문" 으로 옮겨 갔다 (`Surface` 의 `fill` 절).
    */
-  it('필터 칩이 제목 줄과 Surface 사이에 서고 lg 에서 숨는다', () => {
+  it('필터 칩이 카드 머리의 tools 슬롯에 서고 lg 에서 숨는다', () => {
     const view = block(listView, 'EmergencyListView')
-    const title = view.indexOf('<h1 className="text-title-1')
+    const tools = view.indexOf('tools={')
     const chips = view.indexOf('<EmergencyFilterChips')
-    const surface = view.indexOf('<Surface ')
 
-    expect(title).toBeGreaterThan(-1)
-    expect(chips).toBeGreaterThan(title)
-    expect(chips).toBeLessThan(surface)
-    expect(view.slice(chips, surface)).toMatch(/className="lg:hidden"/)
+    expect(tools).toBeGreaterThan(-1)
+    expect(chips).toBeGreaterThan(tools)
+    expect(view.slice(chips)).toMatch(/className="lg:hidden"/)
   })
 
   /* 반경 축이 모바일에도 올라왔다 (#537) — 데스크톱 레일만 갖고 있던 손잡이다 */
@@ -154,16 +146,16 @@ describe('목록 갈래는 3층 표면이다 (#460)', () => {
   /*
     **두 축의 기본값이 반대라 한쪽만 넘긴다** (#456①). `inset` 은 "카드 안인가" 를 물어
     기본이 `card` 고, `headingLevel` 은 "그 카드가 `h2` 를 갖는가" 를 물어 기본이 `2` 다.
-    **#537 로 카드가 제목을 잃어 두 답이 다시 만났다** — `inset` 도 레벨도 기본값이라
-    레벨은 명시적으로 `2` 를 넘겨 그 사실을 소스에 남긴다.
+    **#556 으로 카드가 제목을 되찾아 두 답이 다시 갈렸다** — 카드가 `h2` 를 그리므로
+    상태 제목은 한 단 내려간 `3` 이다.
   */
-  it('카드가 제목을 잃었으므로 상태 제목이 h2 다', () => {
+  it('카드가 제목을 되찾았으므로 상태 제목이 h3 다', () => {
     const view = block(listView, 'EmergencyListView')
 
-    expect(view).toMatch(/<EmergencyBoardSection board=\{board\} headingLevel=\{2\} \/>/)
+    expect(view).toMatch(/<EmergencyBoardSection board=\{board\} headingLevel=\{3\} \/>/)
 
-    // 짝의 반대쪽 — 그 카드가 실제로 제목을 갖지 않는다. 도로 넣으면 레벨 단언이 함께 깨진다
-    expect(view).not.toMatch(/<Surface\b[\s\S]*?\btitle=/)
+    // 짝의 반대쪽 — 그 카드가 실제로 제목을 갖는다. 도로 걷으면 레벨 단언이 함께 깨진다
+    expect(view).toMatch(/title=\{messages\.emergency\.pageTitle\}/)
   })
 
   it('EmergencyBoardSection 이 inset 을 받아 EmergencySection 에 그대로 넘긴다', () => {
@@ -250,28 +242,17 @@ describe('제목이 필터보다 먼저다 (#546)', () => {
   })
 
   /*
-    **제목 줄이 두 열 위에 얹힌다.** `.rail-heading`(globals.css)이 `grid-column: 1 / -1` 을
-    준다 — 이것이 없으면 제목이 우측 열에 남아 DOM 순서와 시각 순서가 어긋난다.
+    **`.rail-heading` 이 사라졌다** (#556). #546 이 제목 줄을 두 열 위에 얹어 DOM 순서를
+    바로잡았는데, 제목이 카드 머리로 내려가고 `sr-only h1` 이 그 자리를 대신하면서 그 클래스를
+    쓰는 곳이 없어졌다 — globals.css 에서도 걷었다.
   */
-  it('제목 줄이 rail-heading 으로 두 열 위에 선다', () => {
-    const heading = view.indexOf('rail-heading')
-    const aside = view.indexOf('<aside')
-    const stack = view.indexOf('<SurfaceStack')
-
-    expect(heading).toBeGreaterThan(-1)
-    /* 소스 순서가 곧 DOM 순서다 — 제목 → 레일 → 목록 */
-    expect(heading).toBeLessThan(aside)
-    expect(aside).toBeLessThan(stack)
+  it('rail-heading 을 더 이상 쓰지 않는다', () => {
+    expect(view).not.toContain('rail-heading')
   })
 
-  /*
-    **스택 밖으로 나온 제목 줄이 스택이 주던 여백을 스스로 진다.** 바깥 `md:px-6` 이
-    `SurfaceStack` 의 `md:p-6` 자리를, 안쪽 `INSET_CLASS.card` 가 카드 인셋을 쓴다.
-    스택은 `md:pt-0` 으로 자기 위 여백을 내놓는다 — 둘 다 두면 768 에서 48 로 벌어진다.
-  */
-  it('제목 줄과 스택이 여백을 두 번 넣지 않는다', () => {
-    expect(view).toMatch(/rail-heading[^"]*md:px-6/)
-    // `list-column`(globals.css)이 우측 열에 자기 스크롤을 준다 (#553)
-    expect(view).toMatch(/<SurfaceStack[^>]*className="list-column md:pt-0"/)
+  /* `list-column`(globals.css)이 열 높이를 잡고, 카드가 `fill` 로 그것을 채운다 (#553 · #556) */
+  it('우측 스택이 list-column 이고 카드가 fill 이다', () => {
+    expect(view).toMatch(/<SurfaceStack[^>]*className="list-column"/)
+    expect(view).toMatch(/<Surface\s+fill/)
   })
 })
