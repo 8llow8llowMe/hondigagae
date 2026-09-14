@@ -20,6 +20,8 @@ import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.net.SocketTimeoutException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -452,9 +454,18 @@ public class OllamaLlmAdapter implements AiLlmPort {
             .collect(Collectors.toMap(PlaceCandidate::placeId, Function.identity(), (left, right) -> left));
         Set<Long> knownIds = candidateById.keySet();
 
+        // 조사 교정이 쓸 이름. 후보 밖 장소는 우리가 아는 이름이 아니라 손대지 않는다.
+        List<String> candidateTitles = candidates.stream().map(PlaceCandidate::title).toList();
+
         List<AiPlanDraftDay> days = new ArrayList<>();
         int hallucinated = 0;
         int nameless = 0;
+        /*
+         * 일자 간 장소 중복 감지 (#570). 1일차·2일차가 둘 다 `애월한담공원` 으로 시작한 적이 있다.
+         * **숙소는 세지 않는다** — 같은 곳에 이어 묵는 것이 정상이고, 그건 결과 항목의
+         * `itemType == LODGING` 으로만 갈린다 (후보 데이터에는 분류 코드가 없다).
+         */
+        Map<Long, Set<Integer>> nonLodgingPlaceDays = new LinkedHashMap<>();
 
         for (LlmPlanDraftResponse.LlmPlanDay day : safeList(draft.days())) {
             List<AiPlanDraftItem> items = new ArrayList<>();
@@ -476,12 +487,19 @@ public class OllamaLlmAdapter implements AiLlmPort {
                         day.day(), item.itemType(), item.note());
                     continue;
                 }
+                PlanItemType itemType = resolveItemType(item.itemType(), matched);
+                if (matched != null && itemType != PlanItemType.LODGING) {
+                    nonLodgingPlaceDays
+                        .computeIfAbsent(matched.placeId(), ignored -> new LinkedHashSet<>())
+                        .add(day.day());
+                }
+
                 items.add(AiPlanDraftItem.builder()
-                    .itemType(resolveItemType(item.itemType(), matched))
+                    .itemType(itemType)
                     // 후보 밖 장소는 연결만 끊는다. 항목 자체는 일정의 흐름으로 쓸모가 있다.
                     .placeId(matched == null ? null : matched.placeId())
                     .title(title)
-                    .note(LlmTextCleaner.clean(item.note()))
+                    .note(cleanUserFacing(item.note(), candidateTitles))
                     .build());
             }
             days.add(AiPlanDraftDay.builder().day(day.day()).items(items).build());
@@ -493,6 +511,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
         if (nameless > 0) {
             log.warn("LLM plan contained {} items without a title; items dropped", nameless);
         }
+        warnOnRepeatedPlaces(nonLodgingPlaceDays, candidateById);
 
         return AiPlanDraft.builder()
             .days(days)
@@ -500,11 +519,38 @@ public class OllamaLlmAdapter implements AiLlmPort {
             .reasons(safeList(draft.reasons()).stream()
                 .map(reason -> AiPlanDraftReason.builder()
                     .code(reason.code())
-                    .name(LlmTextCleaner.clean(reason.name()))
-                    .description(LlmTextCleaner.clean(reason.description()))
+                    .name(cleanUserFacing(reason.name(), candidateTitles))
+                    .description(cleanUserFacing(reason.description(), candidateTitles))
                     .build())
                 .toList())
             .build();
+    }
+
+    /**
+     * 사용자에게 그대로 보이는 문장을 정리한다. 표기 정리({@link LlmTextCleaner}) 뒤에 장소명 조사를
+     * 바로잡는다({@link KoreanParticleFixer}) — 순서가 중요하다. 대괄호를 먼저 걷어내야
+     * {@code "[애월코스트34]은"} 의 조사가 장소명 바로 뒤에 놓인다.
+     */
+    private String cleanUserFacing(String text, List<String> candidateTitles) {
+        return KoreanParticleFixer.fix(LlmTextCleaner.clean(text), candidateTitles);
+    }
+
+    /**
+     * 같은 장소가 여러 날에 걸쳐 있으면 남긴다 (#570).
+     *
+     * <p><b>항목을 지우지 않는다.</b> 지우면 그 일자에 구멍이 나고, 무엇으로 메울지는 여기서 알 수
+     * 없다. 프롬프트가 1차 방어이고 여기는 <b>재발을 세는 자리</b>다 — 로그가 계속 길어지면 프롬프트가
+     * 아니라 후보 풀(전 기간 공통 50곳)을 일자별로 나누는 쪽이 원인이라는 뜻이다.
+     */
+    private void warnOnRepeatedPlaces(Map<Long, Set<Integer>> placeDays, Map<Long, PlaceCandidate> candidateById) {
+        placeDays.forEach((placeId, dayNumbers) -> {
+            if (dayNumbers.size() < 2) {
+                return;
+            }
+            PlaceCandidate candidate = candidateById.get(placeId);
+            log.warn("LLM placed the same place on multiple days placeId={} title={} days={}",
+                placeId, candidate == null ? null : candidate.title(), dayNumbers);
+        });
     }
 
     /**

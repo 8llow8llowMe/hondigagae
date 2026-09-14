@@ -23,6 +23,7 @@ import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJob;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStatus;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStep;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -80,12 +81,20 @@ public class AiPlanWorker {
         // 단계를 옮길 때마다 최신 잡으로 갈아 끼운다. 종결 저장이 마지막 단계 위에서
         // 이뤄져야 어느 단계에서 실패했는지가 응답에 남는다.
         AtomicReference<AiPlanJob> current = new AtomicReference<>(running);
+        /*
+         * 단계별 소요시간을 잰다 (#570). 대기 화면이 1/4 에서 4/4 로 튄다는 보고가 있었는데,
+         * 네 단계가 모두 기록된다는 것은 코드로 확인됐다 — 남은 가설은 "2·3단계가 너무 짧다" 이고
+         * 그것을 가릴 증거가 없었다. 여기서 재면 표현을 손대야 하는지 아닌지를 말할 수 있다.
+         */
+        StepTimer stepTimer = new StepTimer(jobId);
         try {
-            AiPlanGenerationQuery query = toQuery(running, step -> current.set(advanceTo(current.get(), step)));
+            AiPlanGenerationQuery query =
+                toQuery(running, step -> current.set(advanceTo(current.get(), step, stepTimer)));
 
-            current.set(advanceTo(current.get(), AiPlanJobStep.DRAFTING));
+            current.set(advanceTo(current.get(), AiPlanJobStep.DRAFTING, stepTimer));
             // LLM 포트는 domain model을 주고, 잡에도 domain 그대로 저장한다. Info 변환은 응답 조립 시점(Processor)에 한다.
             AiPlanDraft draft = aiLlmPort.generatePlanDraft(query);
+            stepTimer.finish();
             log.info("AI plan draft generated jobId={} days={}", running.jobId(),
                 draft.days() == null ? 0 : draft.days().size());
 
@@ -134,7 +143,7 @@ public class AiPlanWorker {
      * <p>단계마다 Redis 를 한 번 더 읽지만 왕복 네 번은 LLM 한 번에 비하면 없는 값이다.
      * 읽기와 저장 사이의 남은 창은 저장소의 종결 보호 저장이 막는다.
      */
-    private AiPlanJob advanceTo(AiPlanJob job, AiPlanJobStep step) {
+    private AiPlanJob advanceTo(AiPlanJob job, AiPlanJobStep step, StepTimer stepTimer) {
         AiPlanJob latest = aiPlanJobStorePort.findById(job.jobId()).orElse(job);
         if (latest.status().isTerminal()) {
             throw new JobCanceledException(step);
@@ -144,7 +153,51 @@ public class AiPlanWorker {
             throw new JobCanceledException(step);
         }
         aiPlanJobEventPort.publishJobUpdated(job.jobId());
+        stepTimer.enter(step);
         return advanced;
+    }
+
+    /**
+     * 단계별 소요시간을 남긴다 (#570).
+     *
+     * <p><b>화면 동작을 바꾸지 않는다.</b> 지금 아는 것은 "사용자가 2·3단계를 못 봤다" 뿐이고,
+     * 그것이 진행이 누락된 것인지 단계가 짧은 것인지는 갈리지 않았다. 짧은 것이라면 진행 막대는
+     * 정직한 것이고, 균등한 4등분처럼 보이게 손대는 쪽이 오히려 거짓 진행률이 된다 —
+     * {@link AiPlanJobStep} 머리주석이 "화면이 단계를 지어내면 거짓 진행률이 된다" 고 못박아 뒀다.
+     * 그래서 <b>먼저 재기만 한다.</b>
+     *
+     * <p>스레드 하나가 한 잡을 처음부터 끝까지 도므로 동기화하지 않는다.
+     */
+    private static final class StepTimer {
+
+        private final String jobId;
+        private AiPlanJobStep enteredStep;
+        private long enteredAtNanos;
+
+        private StepTimer(String jobId) {
+            this.jobId = jobId;
+        }
+
+        private void enter(AiPlanJobStep step) {
+            logEnteredStep();
+            enteredStep = step;
+            enteredAtNanos = System.nanoTime();
+        }
+
+        /** 마지막 단계(DRAFTING)는 다음 전이가 없어 여기서 닫는다. */
+        private void finish() {
+            logEnteredStep();
+            enteredStep = null;
+        }
+
+        private void logEnteredStep() {
+            if (enteredStep == null) {
+                return;
+            }
+            log.info("AI plan job step done jobId={} step={} order={}/{} elapsedMs={}",
+                jobId, enteredStep, enteredStep.order(), AiPlanJobStep.total(),
+                Duration.ofNanos(System.nanoTime() - enteredAtNanos).toMillis());
+        }
     }
 
     /** 취소·타임아웃 등 종결로 인한 중단. 실패가 아니라서 오류 경로와 섞지 않으려고 따로 둔다. */

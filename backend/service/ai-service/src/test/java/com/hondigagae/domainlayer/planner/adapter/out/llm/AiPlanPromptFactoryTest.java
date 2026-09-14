@@ -66,6 +66,20 @@ class AiPlanPromptFactoryTest {
         assertThat(system).contains("조사");
         assertThat(system).contains("생애 단계는 입력에 적힌 표현만");
     }
+
+    /*
+     * #570. 1일차·2일차가 둘 다 `애월한담공원` 으로 시작한 초안이 나왔는데, 프롬프트에 회피
+     * 지시가 **아예 없었다.** 숙소까지 함께 못박지 않으면 모델이 숙소를 날마다 바꾼다.
+     */
+    @Test
+    @DisplayName("시스템 프롬프트가 일자 간 장소 중복을 막고 숙소는 예외로 둔다 (#570)")
+    void systemPromptForbidsRepeatingPlacesAcrossDays() {
+        String system = factory.systemPrompt();
+
+        assertThat(system).contains("같은 장소를 여러 날에 넣지 않습니다");
+        assertThat(system).contains("LODGING");
+    }
+
     @Test
     @DisplayName("반려견 특성이 있으면 크기·체중·민감성·산책 선호가 프롬프트에 실린다")
     void petSectionCarriesTraits() {
