@@ -87,8 +87,23 @@ describe('앱 셸 — 세로 뼈대', () => {
 
   it('본문 래퍼가 남는 높이를 먹고 Canvas 에 넘긴다', () => {
     expect(readSourceWithoutComments(SHELL)).toMatch(
-      /<div id="main" className="flex flex-1 flex-col">/,
+      /<div id="main" tabIndex=\{-1\} className="flex flex-1 flex-col">/,
     )
+  })
+
+  /*
+    **스킵 링크의 목적지는 포커스를 받을 수 있어야 한다** (#558).
+
+    `tabIndex={-1}` 이 없으면 `본문으로 바로가기` 를 눌러도 포커스가 `body` 에 남는다 —
+    dev 실측에서 다섯 화면 전부 Enter 직후 `document.activeElement` 가 `BODY` 였다.
+    **문자열 단언인 이유**: vitest 는 `environment: 'node'` 라 실제 포커스를 못 본다
+    (`docs/testing-guide.md §1`). 포커스 자체는 `e2e/skip-link.spec.ts` 가 잰다.
+  */
+  it('스킵 링크가 가리키는 본문이 포커스를 받을 수 있다', () => {
+    const source = readSourceWithoutComments(SHELL)
+
+    expect(source).toContain('href="#main"')
+    expect(source).toMatch(/<div id="main" tabIndex=\{-1\}/)
   })
 
   /*
