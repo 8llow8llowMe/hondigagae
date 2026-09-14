@@ -111,7 +111,7 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
       */}
       <aside
         aria-label={messages.plan.filterTitle}
-        className="rail-sticky relative hidden lg:block"
+        className="rail-column relative hidden lg:block"
       >
         <SkipLink href="#plan-list">{messages.common.skipToList}</SkipLink>
         <PlanFilterRail
@@ -129,7 +129,7 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
         하나다 — 장소 목록(#439)과 같은 모양. **열 구분선을 걷었다** — L0 바닥이 열 사이로
         비쳐 그 일을 한다.
       */}
-      <SurfaceStack id="plan-list" tabIndex={-1}>
+      <SurfaceStack id="plan-list" tabIndex={-1} className="list-column">
         {/*
           **페이지 제목이 카드 제목으로 들어왔다** (§0 "섹션 제목은 섹션 안에 있다"). 카드가
           하나뿐이고 그 이름이 곧 페이지의 이름이라, 밖에 두면 어느 묶음의 제목인지 모호해진다.

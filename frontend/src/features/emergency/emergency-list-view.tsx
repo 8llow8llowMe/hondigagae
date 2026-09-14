@@ -125,12 +125,12 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
           검색 반경 · 시설 유형 · 영업 조건 셋을 전부 지나야 했다. `relative` 는 그 링크가
           레일 좌상단에 뜨게 한다 (`SkipLink` 머리주석).
 
-          `rail-sticky`(globals.css) — 레일이 뷰포트보다 길어도 바닥에 닿을 수 있게 자기
-          스크롤을 준다.
+          `rail-column`(globals.css) — 화면 높이가 `100dvh - 헤더` 로 못박힌 열이고, 스크롤은
+          그 안의 카드(`.filter-rail`)가 갖는다. 레일이 뷰포트보다 길어도 바닥에 닿는다.
         */}
       <aside
         aria-label={messages.place.filterTitle}
-        className="rail-sticky relative hidden lg:block"
+        className="rail-column relative hidden lg:block"
       >
         <SkipLink href={`#${LIST_ANCHOR_ID}`}>{messages.common.skipToList}</SkipLink>
         <EmergencyFilterRail
@@ -147,7 +147,7 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
           **스택이 `md:pt-0` 이다** — 위 제목 줄이 `md:pb-6` 으로 그 간격을 이미 냈다.
           둘 다 두면 768 에서 제목과 칩 사이가 48 로 벌어진다.
         */}
-      <SurfaceStack id={LIST_ANCHOR_ID} tabIndex={-1} className="md:pt-0">
+      <SurfaceStack id={LIST_ANCHOR_ID} tabIndex={-1} className="list-column md:pt-0">
         {/*
           **모바일 필터는 카드 밖이다.** 필터는 목록을 좁히는 **도구**이고 카드는 그 결과를
           담는다 — §0 의 카드 판정 3문에서 ① 자기 제목이 없어 걸린다 (#439 · #445 와 같은

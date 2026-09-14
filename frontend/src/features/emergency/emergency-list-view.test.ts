@@ -33,7 +33,7 @@ describe('목록 갈래가 필터 레일 2단을 쓴다 (#419)', () => {
 
   /* `/places` 와 같은 갈림 — 레일은 lg 부터, 칩은 lg 미만 */
   it('레일은 hidden lg:block 이다', () => {
-    expect(listView).toMatch(/rail-sticky[^"]*hidden lg:block/)
+    expect(listView).toMatch(/rail-column[^"]*hidden lg:block/)
   })
 
   /*
@@ -271,6 +271,7 @@ describe('제목이 필터보다 먼저다 (#546)', () => {
   */
   it('제목 줄과 스택이 여백을 두 번 넣지 않는다', () => {
     expect(view).toMatch(/rail-heading[^"]*md:px-6/)
-    expect(view).toMatch(/<SurfaceStack[^>]*className="md:pt-0"/)
+    // `list-column`(globals.css)이 우측 열에 자기 스크롤을 준다 (#553)
+    expect(view).toMatch(/<SurfaceStack[^>]*className="list-column md:pt-0"/)
   })
 })

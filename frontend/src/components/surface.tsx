@@ -55,10 +55,15 @@ import { cn } from '@/lib/utils/cn'
  * "흰색은 바닥이 아니라 섹션의 색"(`DESIGN.md §0`)이 뒤집힌다. 채울 높이를 주는 쪽은
  * `app/(main)/layout.tsx` 의 세로 뼈대(`flex min-h-dvh flex-col`)다.
  *
- * **`min-h-*` 를 여기에 쓰지 않는다.** `100dvh - 헤더` 를 박으면 푸터가 통째로 접힘
- * 아래로 내려가 **없던 스크롤이 짧은 화면마다 생긴다.** `flex-1` 은 푸터 자리를 남기고
- * 그 나머지만 먹는다. 뼈대 밖에 놓인 `Canvas` 에서는 flex 속성이 무시돼 아무 일도
- * 일어나지 않는다 — 지금은 35곳 전부가 `as="main"` 인 페이지 뿌리다.
+ * **`100dvh - 헤더` 를 `.page-canvas`(globals.css)로 함께 준다 (#553).** 예전에는 이것을
+ * 여기에 두지 않았다 — 푸터가 통째로 접힘 아래로 내려가 **없던 스크롤이 짧은 화면마다
+ * 생긴다**는 이유였다. 그런데 `.rail-layout` 세 화면은 이미 같은 값을 갖고 있어서,
+ * 실제로 생긴 것은 "스크롤이 없는 화면" 이 아니라 **회색 바닥이 끝나는 자리가 화면마다
+ * 260px 씩 다른 상태**였다. 규칙을 둘로 두는 것보다 통일하는 쪽이 낫다.
+ *
+ * `flex-1` 은 그대로 둔다 — 내용이 그보다 길면 그쪽이 이긴다. 뼈대 밖에 놓인 `Canvas`
+ * 에서는 flex 속성이 무시돼 아무 일도 일어나지 않는다 — 지금은 35곳 전부가 `as="main"`
+ * 인 페이지 뿌리다.
  *
  * **폭은 `w-full` 로 못박는다 (#520).** 뼈대 안에서 이것은 flex 아이템인데,
  * **flex 아이템은 cross 축 margin 이 `auto` 면 `stretch` 가 무효가 되고 내용 폭으로
@@ -81,7 +86,7 @@ export function Canvas({
   className?: string
 }) {
   return (
-    <Tag id={id} className={cn('bg-bg-sunken w-full flex-1', className)}>
+    <Tag id={id} className={cn('page-canvas bg-bg-sunken w-full flex-1', className)}>
       {children}
     </Tag>
   )

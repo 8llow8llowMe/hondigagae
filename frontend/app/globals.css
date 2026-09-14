@@ -198,11 +198,52 @@ body {
 
   Tailwind arbitrary(`max-w-[var(--content-max)]`)로 쓰지 않는다 — 대괄호 안 함수 호출은
   eslint `noComplexArbitrary` 가 막고, Tailwind 가 조용히 클래스를 만들지 않을 수 있다.
+
+  **두 클래스가 캡을 다른 방식으로 표현한다** (이슈 #553) — 값(`--content-max`)은 하나다.
+
+  `.content-container` 는 **배경을 칠하지 않는 것**에 붙는다 (헤더 안쪽 줄 · 특보 줄 ·
+  `SurfaceStack`). 폭을 직접 줄이고 `margin-inline: auto` 로 가운데 세우면 된다.
+
+  `.rail-layout` 은 **스스로 L0 바닥을 칠하는 것**에도 붙는다 — `/places` · `/plans` ·
+  장소 담기 셋은 `Canvas`(`bg-bg-sunken`)에 이 클래스를 직접 단다. 거기에 폭 캡을 걸면
+  **바닥이 1440 에서 끊기고 그 바깥이 흰 `body` 로 남는다** (1600 실측: 좌우 각 77px).
+  `DESIGN.md §0` 의 "흰색은 바닥이 아니라 섹션의 색" 이 그 폭부터 뒤집힌다.
+
+  그래서 여기서는 캡을 **폭이 아니라 좌우 패딩**으로 표현한다. 요소는 전폭으로 남아
+  배경이 화면 끝까지 이어지고, `box-sizing: border-box` 라 안쪽 내용 상자는 정확히
+  1440 이며 grid 열도 그 안에서 잡힌다. `max(0px, …)` 이 1440 미만에서 음수 패딩을 막는다.
+
+  **`Canvas` 를 감싸는 래퍼를 하나 더 두는 안은 쓰지 않는다.** `Canvas` 는 "바닥을 칠하되
+  배치는 하지 않는다" 가 규약인데(`surface.tsx`), 래퍼를 넣으면 이 클래스를 다는 자리가
+  라우트마다 갈린다 — 지금은 네 라우트가 `Canvas` 에 직접 달고 다섯 곳이 그 안의 `div` 에 단다.
 */
-.content-container,
-.rail-layout {
+.content-container {
   max-inline-size: var(--content-max);
   margin-inline: auto;
+}
+
+.rail-layout {
+  padding-inline: max(0px, calc((100% - var(--content-max)) / 2));
+}
+
+/*
+  L0 바닥의 최소 높이 — `Canvas` 가 항상 단다 (이슈 #553).
+
+  **화면마다 본문 높이가 갈려 있었다.** `.rail-layout` 세 화면은 `100dvh - 헤더` 를
+  갖는데(위 `min-block-size`), 나머지(`/plans/new` · `/ai-plans/new` · `/pets` ·
+  `/favorites` · `/mypage`)는 `flex-1` 만 있어 **`100dvh - 헤더 - 푸터`** 로 끝났다.
+  같은 서비스 안에서 회색 바닥이 끝나는 자리가 화면마다 260px 씩 달랐다.
+
+  값을 한 곳에서 준다. `flex-1` 은 그대로 둔다 — 내용이 이보다 길면 그쪽이 이긴다.
+
+  **푸터가 접힘 아래로 내려간다.** `surface.tsx` 가 "짧은 화면마다 없던 스크롤이 생긴다"
+  는 이유로 미뤄 뒀던 것인데, `.rail-layout` 세 화면이 이미 그 상태였으므로 **통일하는
+  쪽이 두 규칙을 두는 것보다 낫다.** 푸터는 굴리면 나온다.
+
+  **지도 화면에는 걸리지 않는다** — 그 갈래는 `Canvas` 를 쓰지 않는다(지도가 바닥이다).
+*/
+.page-canvas {
+  min-block-size: calc(100dvh - var(--header-h));
 }
 
 /*
@@ -255,6 +296,89 @@ body {
   */
   .rail-layout-filter {
     grid-template-columns: var(--rail-filter) minmax(0, 1fr);
+
+    /*
+      ── 목록 2단은 **열마다 자기 스크롤**을 갖는다 (이슈 #553)
+
+      예전에는 두 열이 페이지 스크롤 하나를 나눠 썼다. 그래서 셋이 함께 어긋났다:
+      ① 무한 스크롤이 페이지 스크롤을 계속 먹어 목록이 끝나지 않았고,
+      ② 짧은 쪽(레일)은 이미 끝났는데 긴 쪽(목록) 때문에 계속 굴러야 했고,
+      ③ 레일이 `overscroll-behavior: contain` 으로 연쇄를 끊어 **푸터에 닿을 수 없었다.**
+
+      화면 높이를 `100dvh - 헤더` 로 못박고 두 열에 각자 스크롤을 준다. 페이지 스크롤은
+      그 아래 푸터를 드러내는 몫만 남는다 — 열 끝에서 계속 굴리면 기본 연쇄로 페이지가
+      이어받아 푸터가 올라온다 (그래서 여기에는 `overscroll-behavior` 를 걸지 않는다).
+
+      **`block-size` 만으로는 못박히지 않는다.** 이 클래스는 `Canvas`(= `flex-1` 인 flex
+      아이템)에도 붙는데, flex 아이템의 주축 크기는 `flex-basis: 0%` 가 `height` 를
+      대신한다. `max-block-size` 는 그 뒤에 클램프로 걸리므로 두 속성을 함께 준다.
+      아래쪽은 `.rail-layout` 의 `min-block-size` 가 같은 값으로 이미 받치고 있다.
+
+      **1024 미만에는 걸지 않는다.** 이 규칙 전체가 `lg` 안이고, 그 아래에서는 레일이
+      아예 없으며(`hidden lg:block`) 화면 안에 스크롤 영역을 나누면 모바일 브라우저
+      주소창 접힘이 멈춘다.
+    */
+    block-size: calc(100dvh - var(--header-h));
+    max-block-size: calc(100dvh - var(--header-h));
+
+    /*
+      두 열이 남는 높이를 전부 먹는 한 행이다.
+
+      `/emergency` 만 제목 줄(`.rail-heading`)이 두 열 위에 얹혀 행이 하나 더 있다
+      (#546). 그 줄은 내용만큼(`auto`)만 쓰고 나머지를 열이 가져간다.
+      `/places` · `/plans` 의 `h1` 은 `sr-only`(= `position: absolute`)라 트랙을 만들지
+      않으므로 이 판정에 걸리지 않는다.
+    */
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .rail-layout-filter:has(> .rail-heading) {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  /*
+    **`min-block-size: 0` 이 없으면 열이 트랙 밖으로 자란다.** grid 아이템의 기본
+    `min-height` 는 `auto` 라 안쪽 내용이 트랙을 밀어내고, 그러면 `overflow-y: auto` 가
+    발동하지 못한다 — 위 `minmax(0, 1fr)` 이 트랙에 한 것과 같은 처방을 아이템에 건다.
+  */
+  .rail-layout-filter > .rail-column,
+  .rail-layout-filter > .list-column {
+    min-block-size: 0;
+  }
+
+  /*
+    좌측 레일 열 — **스크롤은 이 열이 아니라 안쪽 카드가 갖는다** (이슈 #553).
+
+    예전에는 `.rail-sticky` 가 이 자리에서 `overflow-y: auto` 를 들었다. 그런데 카드
+    (`.filter-rail`)는 그 **안**이라, 세로 스크롤바가 카드 테두리 **바깥**에 떴다 —
+    카드가 스크롤되는데 막대는 카드 밖에 있는 모양이다.
+
+    열은 클리핑만 하고(`overflow: hidden`) 스크롤은 카드가 든다. 위아래 24px 는 우측 열
+    `SurfaceStack` 의 `md:p-6` 과 같은 값이다 — 예전에는 레일이 헤더에 딱 붙어 서서
+    우측 첫 카드와 24px 어긋났다.
+  */
+  .rail-layout-filter > .rail-column {
+    overflow: hidden;
+    padding-block: 24px;
+  }
+
+  /*
+    **제목 줄이 있는 화면(`/emergency`)은 위 24 를 내놓는다.** 그 화면의 우측 스택은
+    `md:pt-0` 이라(제목 줄의 `md:pb-6` 이 그 간격을 이미 냈다) 첫 카드가 행 맨 위에서
+    시작한다 — 레일에만 24 를 주면 두 열의 카드 윗변이 24px 어긋난다.
+  */
+  .rail-layout-filter:has(> .rail-heading) > .rail-column {
+    padding-block-start: 0;
+  }
+
+  .rail-layout-filter > .rail-column > .filter-rail {
+    max-block-size: 100%;
+    overflow-y: auto;
+  }
+
+  /* 우측 목록 열 — 안쪽 여백은 `SurfaceStack` 의 `md:p-6` 이라 스크롤 영역 안에 든다 */
+  .rail-layout-filter > .list-column {
+    overflow-y: auto;
   }
 
   /*
@@ -309,6 +433,13 @@ body {
 
     레일에 자기 스크롤을 준다. 세로 스크롤바는 숨기지 않는다 — 가로 칩 줄과 달리
     활성 밑줄로 오독될 여지가 없고, 더 있다는 유일한 신호다.
+
+    **남은 사용처는 장소 상세의 판정 레일 하나다** (이슈 #553). 목록 3화면과 장소 담기는
+    `.rail-column`(위)으로 옮겼다 — 거기는 화면 높이가 못박혀 있어 sticky 가 할 일이 없다.
+
+    **`overscroll-behavior: contain` 을 걷었다.** "레일 끝에서 계속 굴려도 뒤 목록이 따라
+    움직이지 않게" 두려던 것인데, 실제로는 **레일 끝에서 페이지가 아예 멈춰** 푸터까지
+    내려갈 수 없었다. 뒤가 따라 움직이는 편이 손이 닿지 않는 것보다 낫다.
   */
   .rail-sticky {
     position: sticky;
@@ -316,8 +447,6 @@ body {
     align-self: start;
     max-block-size: calc(100dvh - var(--header-h));
     overflow-y: auto;
-    /* 레일 끝에서 계속 굴려도 뒤 목록이 따라 움직이지 않게 한다 */
-    overscroll-behavior: contain;
   }
 }
 
@@ -697,6 +826,21 @@ body {
 .filter-rail .filter-list-heading,
 .filter-rail .filter-rail-title {
   padding-inline: 20px;
+}
+
+/*
+  제목 줄 아래 가로선 — 이슈 #553.
+
+  축 묶음 사이에는 이미 1px 구분선이 있는데(`border-t` 를 축마다 컴포넌트가 준다)
+  **`필터` 제목과 첫 축 사이에만 선이 없었다.** 그래서 첫 축(`반려견 동반`)이 제목에
+  딸린 부제처럼 붙어 읽히고, 아래 축들과 무게가 달라 보였다.
+
+  선은 제목 줄의 몫이라 카드 **전폭**으로 긋는다 — `padding-inline: 20` 은 글자에만
+  걸리므로 `border-block-end` 는 그 바깥 테두리에서 테두리까지 이어진다. 축 사이 선
+  (`FilterList` 를 감싼 `div` 의 `border-t`)과 같은 폭이다.
+*/
+.filter-rail .filter-rail-title {
+  border-block-end: 1px solid var(--border);
 }
 
 .filter-rail .filter-list {

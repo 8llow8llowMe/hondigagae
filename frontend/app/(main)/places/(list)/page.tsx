@@ -101,8 +101,9 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
       같은 이유로 걷었다. 선을 남기면 카드 테두리와 선이 나란히 두 줄로 읽힌다.
     */
     <Canvas as="main" id="main-content" className="rail-layout rail-layout-filter">
-      {/* `rail-sticky`(globals.css) — 레일이 뷰포트보다 길어도 바닥에 닿을 수 있게
-          자기 스크롤을 준다. 실측: 1280×900 에서 레일 1067px 이라 실내·야외 축이 잘렸다 */}
+      {/* `rail-column`(globals.css) — 화면 높이가 `100dvh - 헤더` 로 못박힌 열이고,
+          스크롤은 그 안의 카드(`.filter-rail`)가 갖는다. 레일이 뷰포트보다 길어도 바닥에
+          닿을 수 있어야 한다 — 1280×900 실측에서 레일 1067px 이라 실내·야외 축이 잘렸다 */}
       {/*
         **`h1` 이 문서의 첫 제목이다** (#472). 예전에는 이것이 목록 카드와 같은 열 안에
         있어, 제목으로 탐색하면 개요가 `h2 필터` → `h3` 셋 → **`h1` 장소 찾기** 순서였다 —
@@ -126,13 +127,13 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
       */}
       <aside
         aria-label={messages.place.filterTitle}
-        className="rail-sticky relative hidden lg:block"
+        className="rail-column relative hidden lg:block"
       >
         <SkipLink href="#place-list">{messages.common.skipToList}</SkipLink>
         <PlaceFilterRail filters={filters} authed={authed} />
       </aside>
 
-      <SurfaceStack id="place-list" tabIndex={-1}>
+      <SurfaceStack id="place-list" tabIndex={-1} className="list-column">
         {/*
           **제목 줄이 맨 위다** (#531). 375 실측에서 보기 토글이 y=295 에 섰다 — 검색과 칩
           아래로 밀려 있어 지도 갈래의 떠 있는 토글(y=105)과 190px 어긋났고, 페이지에 들어온

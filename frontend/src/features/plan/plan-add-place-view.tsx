@@ -371,7 +371,7 @@ function PlanAddPlaceShell({
       `tabIndex={-1}` 의 근거는 `surface.tsx` 의 `SurfaceStack` 주석에 있다 — Chromium 만
       보면 없어도 되지만 보조기기 조합을 위해 둔다.
     */
-    <SurfaceStack id="plan-add-place-list" tabIndex={-1}>
+    <SurfaceStack id="plan-add-place-list" tabIndex={-1} className="list-column">
       <PlanAddPlaceHeader
         day={day}
         backHref={backHref}

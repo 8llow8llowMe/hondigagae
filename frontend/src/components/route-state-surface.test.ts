@@ -587,16 +587,17 @@ describe('상태 파일의 폭이 그 세그먼트의 정상 화면과 같다 (#
   })
 
   /*
-    `rail-layout` 화면 셋이 `content-container` 로 갈아타는 근거다. 두 클래스가 한 규칙을
-    공유하므로 grid 절반만 빼면 컨테이너(1440 캡 + 가운데 정렬)는 정확히 같다.
-    이 규칙이 갈라지면 예외 화면의 왼쪽 기준선이 정상 화면과 어긋난다.
+    `rail-layout` 화면 셋이 `content-container` 로 갈아타는 근거다. 두 클래스는 캡을
+    **다르게 표현하지만 값이 같다** — 상태 파일은 바닥을 칠하지 않으므로 폭으로 줄이는
+    `content-container` 쪽이고, `rail-layout` 은 `Canvas` 에도 붙어 전폭으로 남아야 해서
+    좌우 패딩으로 같은 1440 을 만든다 (#553). 안쪽 내용 상자는 두 경로가 같다.
+    이 값이 갈라지면 예외 화면의 왼쪽 기준선이 정상 화면과 어긋난다.
   */
-  it('content-container 와 rail-layout 이 같은 캡 규칙을 공유한다', () => {
+  it('content-container 와 rail-layout 이 같은 캡 값을 쓴다', () => {
     const globals = readSource('app/globals.css')
 
-    expect(globals).toMatch(
-      /\.content-container,\s*\n\.rail-layout\s*\{[^}]*max-inline-size:\s*var\(--content-max\)/,
-    )
+    expect(globals).toMatch(/\.content-container\s*\{[^}]*max-inline-size:\s*var\(--content-max\)/)
+    expect(globals).toMatch(/\.rail-layout\s*\{[^}]*var\(--content-max\)/)
   })
 })
 

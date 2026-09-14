@@ -80,7 +80,12 @@ test.describe('전역 404', () => {
     레이아웃에서 뽑아낼 때 `min-h-dvh` + `flex-1` 짝을 한 벌로 유지했는지가 이 단언이다 —
     한쪽만 남으면 푸터 아래로 흰 띠가 생긴다.
   */
-  test('바닥이 뷰포트 끝까지 이어지고 없던 스크롤이 생기지 않는다', async ({ page }) => {
+  /*
+    **#553 이 "없던 스크롤이 생기지 않는다" 를 "푸터 몫만 생긴다" 로 바꿨다.** `Canvas` 가
+    `.page-canvas` 로 `100dvh - 헤더` 를 갖게 되어 푸터가 접힘 아래로 내려간다. 근거는
+    `docs/styling-guide.md` 의 바닥 높이 항목이 정본이다.
+  */
+  test('바닥이 접힘까지 이어지고 스크롤은 푸터 몫뿐이다', async ({ page }) => {
     await page.goto(MISSING)
 
     const geometry = await page.evaluate(() => {
@@ -92,13 +97,13 @@ test.describe('전역 404', () => {
         doc: document.documentElement.scrollHeight,
         canvasBottom: round(canvas?.bottom ?? -1),
         footerTop: round(footer?.top ?? -1),
-        footerBottom: round(footer?.bottom ?? -1),
+        footerHeight: round(footer?.height ?? -1),
       }
     })
 
     expect(geometry.canvasBottom).toBe(geometry.footerTop)
-    expect(geometry.footerBottom).toBe(geometry.viewport)
-    expect(geometry.doc).toBe(geometry.viewport)
+    expect(geometry.canvasBottom).toBe(geometry.viewport)
+    expect(geometry.doc - geometry.viewport).toBe(geometry.footerHeight)
   })
 
   test('세션이 있으면 보호 경로 아래의 없는 주소도 404 다', async ({ page }) => {
