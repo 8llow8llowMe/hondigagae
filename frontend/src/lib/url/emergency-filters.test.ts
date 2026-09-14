@@ -35,6 +35,19 @@ describe('parseEmergencyBoardParams', () => {
     })
   })
 
+  /* 정규화 규칙 자체는 `lib/url/keyword.test.ts` 가 고정한다 — 여기서는 실리는지만 본다 */
+  it('검색어를 읽고 앞뒤 공백을 걷는다 (#584)', () => {
+    expect(parseEmergencyBoardParams(new URLSearchParams('keyword=한라')).filters.keyword).toBe(
+      '한라',
+    )
+    expect(parseEmergencyBoardParams({ keyword: '  한라  ' }).filters.keyword).toBe('한라')
+  })
+
+  it('공백뿐이거나 상한을 넘는 검색어는 미지정이다', () => {
+    expect(parseEmergencyBoardParams({ keyword: '   ' }).filters.keyword).toBeNull()
+    expect(parseEmergencyBoardParams({ keyword: '가'.repeat(51) }).filters.keyword).toBeNull()
+  })
+
   it('RADIUS_OPTIONS 에 있는 반경을 읽는다', () => {
     expect(parseEmergencyBoardParams(new URLSearchParams('radius=40000')).radius).toBe(40_000)
   })
@@ -85,7 +98,7 @@ describe('toEmergencyBoardQuery', () => {
 
   it('boolean 은 켜졌을 때만 키를 넣는다', () => {
     const query = toEmergencyBoardQuery({
-      filters: { type: null, open24Only: true, openNowOnly: false },
+      filters: { ...DEFAULT_FACILITY_FILTERS, open24Only: true },
       radius: DEFAULT_RADIUS_METERS,
     })
 
@@ -101,6 +114,16 @@ describe('toEmergencyBoardQuery', () => {
     )
   })
 
+  it('검색어는 값이 있을 때만 키를 넣는다 (#584)', () => {
+    expect(
+      toEmergencyBoardQuery({
+        filters: { ...DEFAULT_FACILITY_FILTERS, keyword: '한라' },
+        radius: DEFAULT_RADIUS_METERS,
+      }),
+    ).toBe('keyword=%ED%95%9C%EB%9D%BC')
+    expect(toEmergencyBoardQuery(DEFAULT_EMERGENCY_BOARD_PARAMS)).not.toContain('keyword')
+  })
+
   it('`view` 를 내보내지 않는다', () => {
     expect(
       toEmergencyBoardQuery({ filters: DEFAULT_FACILITY_FILTERS, radius: 20_000 }),
@@ -114,11 +137,26 @@ describe('toEmergencyBoardQuery', () => {
 describe('왕복', () => {
   const cases: EmergencyBoardParams[] = [
     DEFAULT_EMERGENCY_BOARD_PARAMS,
-    { filters: { type: 'ANIMAL_HOSPITAL', open24Only: false, openNowOnly: false }, radius: 10_000 },
-    { filters: { type: null, open24Only: true, openNowOnly: true }, radius: 40_000 },
     {
-      filters: { type: 'ANIMAL_PHARMACY', open24Only: true, openNowOnly: false },
+      filters: { ...DEFAULT_FACILITY_FILTERS, type: 'ANIMAL_HOSPITAL' },
+      radius: 10_000,
+    },
+    {
+      filters: { ...DEFAULT_FACILITY_FILTERS, open24Only: true, openNowOnly: true },
+      radius: 40_000,
+    },
+    {
+      filters: { ...DEFAULT_FACILITY_FILTERS, type: 'ANIMAL_PHARMACY', open24Only: true },
       radius: MAX_RADIUS_METERS,
+    },
+    // 검색어가 실린 왕복 — 공백을 품은 검색어까지 (#584)
+    {
+      filters: { ...DEFAULT_FACILITY_FILTERS, keyword: '제주 동물병원' },
+      radius: DEFAULT_RADIUS_METERS,
+    },
+    {
+      filters: { ...DEFAULT_FACILITY_FILTERS, keyword: '한라', open24Only: true },
+      radius: 20_000,
     },
   ]
 

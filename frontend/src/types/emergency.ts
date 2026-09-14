@@ -86,12 +86,27 @@ export type FacilityFilters = {
   type: FacilityTypeCode | null
   open24Only: boolean
   openNowOnly: boolean
+  /**
+   * 시설명 · 주소 검색어 (#584). null 이면 검색어 없음.
+   *
+   * **다른 세 축과 성격이 다르다 — 축이 아니라 범위다.** 유형·24시간·진료중은 받아 온
+   * 목록을 세 방향으로 자르지만, 검색어는 *"어느 목록을 보고 있는가"* 를 바꾼다. 그래서
+   * 칩 개수도 검색어를 적용한 뒤에 센다 (`facilityCounts` 를 부르는 쪽이 `narrowByKeyword`
+   * 를 먼저 태운다) — 검색 중인데 칩이 반경 전량의 수를 말하면 눌러서 나오는 결과와
+   * 어긋난다.
+   *
+   * **그래도 `FacilityFilters` 안이다.** `초기화` 가 검색어까지 지워야 "초기화했는데
+   * 결과가 그대로" 가 되지 않는다 — `/places` 가 `PlaceFilters.keyword` 로 같은 판단을
+   * 내렸다 (#431). 반경만 밖에 남는다 (조회 파라미터라서다 — `EmergencyBoardParams`).
+   */
+  keyword: string | null
 }
 
 export const DEFAULT_FACILITY_FILTERS: FacilityFilters = {
   type: null,
   open24Only: false,
   openNowOnly: false,
+  keyword: null,
 }
 
 // ─── 일정 응급 브리핑 (#125) ──────────────────────────────────────────────────

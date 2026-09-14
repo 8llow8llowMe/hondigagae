@@ -24,6 +24,10 @@ import {
  * 서로를 부정하고, 다른 조건이 이미 걸린 배열을 세면 칩이 화면 목록과 같은 수가 되어
  * 아무것도 알려주지 못한다 (`facilityCounts` 머리주석).
  *
+ * **검색어만 예외다** (#584) — 호출부가 `narrowByKeyword` 로 **먼저 좁혀** 넘긴다. 검색어는
+ * 축이 아니라 범위라, 칩을 눌러도 검색어는 유지된다: 검색 중에 칩이 반경 전량의 수를
+ * 말하면 눌러서 실제로 나오는 개수와 어긋난다.
+ *
  * **반경이 이 줄에 있는 이유:** 이 화면은 지도를 옮겨도 재조회하지 않으므로
  * (거리가 내 위치 기준으로 남아야 한다) 반경이 "더 넓게 찾기" 의 유일한 손잡이다.
  * 0건 화면에만 두면 지도에서는 닿을 수 없다.
@@ -37,8 +41,8 @@ export function EmergencyFilterBar({
   showCounts,
   className,
 }: {
-  /** **영역 안 · 필터 적용 전** 배열 */
-  facilities: NearbyFacilityItem[]
+  /** **영역 안 · 검색어까지만 적용한** 배열 (머리주석) — 칩 축은 아직 걸지 않는다 */
+  facilities: readonly NearbyFacilityItem[]
   filters: FacilityFilters
   onFiltersChange: (next: FacilityFilters) => void
   radius: number
@@ -62,7 +66,13 @@ export function EmergencyFilterBar({
   const dirty =
     filters.type !== DEFAULT_FACILITY_FILTERS.type ||
     filters.open24Only !== DEFAULT_FACILITY_FILTERS.open24Only ||
-    filters.openNowOnly !== DEFAULT_FACILITY_FILTERS.openNowOnly
+    filters.openNowOnly !== DEFAULT_FACILITY_FILTERS.openNowOnly ||
+    /*
+      **지도 갈래에는 검색 입력이 없다** (#584 — `/places` 와 같은 판단). 그래서 목록에서
+      좁혀 온 검색어를 푸는 손잡이가 이 `초기화` 하나뿐이고, `dirty` 가 검색어를 모르면
+      그 하나마저 사라진다.
+    */
+    filters.keyword !== DEFAULT_FACILITY_FILTERS.keyword
 
   return (
     <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>

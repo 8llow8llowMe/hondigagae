@@ -3,7 +3,12 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { SurfaceList } from '@/components/surface'
 import { EmergencySkeleton } from '@/features/emergency/emergency-skeleton'
-import { applyFilters, reliefLabel, reliefs } from '@/features/emergency/facility-filters'
+import {
+  applyFilters,
+  countsAreComplete,
+  reliefLabel,
+  reliefs,
+} from '@/features/emergency/facility-filters'
 import { FacilityRow } from '@/features/emergency/facility-row'
 import { formatDistance } from '@/lib/format/distance'
 import type { PositionFailure } from '@/lib/geo/current-position'
@@ -129,6 +134,8 @@ export function EmergencySection({
           all={all}
           filters={filters}
           radius={result.radius}
+          /* 잘린 목록에서 "없어요" 를 확언하지 않는다 — `searchTruncatedNote` 주석 */
+          truncated={!countsAreComplete(result)}
           onFiltersChange={onFiltersChange}
           onWidenRadius={onWidenRadius}
           canWiden={canWiden}
@@ -174,6 +181,7 @@ function EmptyResult({
   all,
   filters,
   radius,
+  truncated,
   onFiltersChange,
   onWidenRadius,
   canWiden,
@@ -183,6 +191,8 @@ function EmptyResult({
   all: NearbyFacilityResult['facilities']
   filters: FacilityFilters
   radius: number
+  /** `countsAreComplete` 의 반대 — 반경 안에 못 받아 온 곳이 남아 있다 */
+  truncated: boolean
   onFiltersChange: (next: FacilityFilters) => void
   onWidenRadius: () => void
   canWiden: boolean
@@ -225,11 +235,35 @@ function EmptyResult({
   */
   const NarrowedHeading = `h${headingLevel}` as const
 
+  /*
+    **검색어가 걸려 있으면 무엇으로 찾았는지 되돌려 준다** (#584). 검색은 사용자가 친 말이
+    조건이라, "조건에 맞는 곳이 없어요" 로만 끝나면 자기가 무엇을 쳤는지 입력을 다시 봐야
+    한다 — `/places` 의 `searchEmptyTitle` 과 같은 판단이다 (#431).
+
+    **검색어만 탓하지는 않는다.** 칩이 함께 걸려 있을 수 있어, 아래 완화 버튼은 검색어와
+    칩을 모두 후보로 준다 (`reliefs`). 제목이 바뀌는 것은 *무엇을* 찾았는지를 말하기
+    위해서지 원인을 지목하기 위해서가 아니다.
+  */
+  const title =
+    filters.keyword === null
+      ? messages.emergency.narrowedTitle
+      : messages.emergency.searchNarrowedTitle.replace('{keyword}', filters.keyword)
+
   return (
     <div className={cn('flex flex-col items-start gap-2 py-6', INSET_CLASS[inset])}>
-      <NarrowedHeading className="text-title-2 text-fg font-semibold">
-        {messages.emergency.narrowedTitle}
-      </NarrowedHeading>
+      <NarrowedHeading className="text-title-2 text-fg font-semibold">{title}</NarrowedHeading>
+
+      {/*
+        **검색이 걸린 채 목록이 잘렸으면 범위를 밝힌다** (#584). 칩은 같은 조건에서 이미
+        숫자를 빼는데(`countsAreComplete`) 검색만 "없어요" 를 확언하면 비대칭이다.
+        검색어가 없을 때는 띄우지 않는다 — 칩만으로 0건이 된 것은 받아 온 범위와 무관하다.
+      */}
+      {truncated && filters.keyword !== null && (
+        <p className="text-body-2 text-fg-muted break-keep">
+          {messages.emergency.searchTruncatedNote}
+        </p>
+      )}
+
       <div className="mt-1 flex flex-wrap gap-2">
         {options.map((option) => (
           <Button

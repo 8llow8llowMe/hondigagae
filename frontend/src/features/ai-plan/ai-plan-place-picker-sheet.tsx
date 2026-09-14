@@ -17,11 +17,8 @@ import { mergeSlices } from '@/lib/api/slice'
 import { messages } from '@/lib/messages'
 import { placeMetaLine } from '@/lib/place/meta'
 import { INSET_CLASS } from '@/lib/ui/inset'
-import {
-  DEFAULT_PLACE_FILTERS,
-  KEYWORD_MAX_LENGTH,
-  normalizeKeyword,
-} from '@/lib/url/place-filters'
+import { KEYWORD_MAX_LENGTH, normalizeKeyword } from '@/lib/url/keyword'
+import { DEFAULT_PLACE_FILTERS } from '@/lib/url/place-filters'
 import { cn } from '@/lib/utils/cn'
 import type { PinnedPlace } from '@/types/ai-plan'
 

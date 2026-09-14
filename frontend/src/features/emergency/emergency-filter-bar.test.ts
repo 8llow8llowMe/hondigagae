@@ -72,6 +72,16 @@ describe('EmergencyFilterBar', () => {
     expect(markup).toContain(messages.place.resetFilters)
   })
 
+  /*
+    **지도 갈래에는 검색 입력이 없다** (#584). 목록에서 좁혀 온 검색어를 푸는 손잡이가
+    이 `초기화` 하나뿐이라, `dirty` 가 검색어를 모르면 그 하나마저 사라진다.
+  */
+  it('검색어만 걸려 있어도 초기화가 나온다', () => {
+    const markup = render({ filters: { ...DEFAULT_FACILITY_FILTERS, keyword: '한라' } })
+
+    expect(markup).toContain(messages.place.resetFilters)
+  })
+
   it('반경은 초기화 대상이 아니다 — 필터가 아니라 조회 파라미터다', () => {
     const markup = render({ radius: MAX_RADIUS_METERS })
 

@@ -14,6 +14,10 @@ import type { FacilityFilters } from '@/types/emergency'
  * 그래서 `filterSummaryLine` 과 달리 **빈 줄이 될 수 없어** 화면 설명으로 되돌아가는 갈래가
  * 없다 — 반경은 언제나 걸려 있다.
  *
+ * **검색어는 넣지 않는다** (#584). 이 줄은 데스크톱에서만 그려지는데, 바로 아래 검색
+ * 입력이 같은 폭에서 그 글자를 이미 들고 있다 — 부제에 또 적으면 같은 말이 두 번이다.
+ * 칩·레일에는 검색어를 보여주는 자리가 따로 없어 축들만 여기 모인다.
+ *
  * 순수 함수라 node 환경에서 그대로 테스트한다 (docs/testing-guide.md §1).
  */
 export function emergencySummaryLine(filters: FacilityFilters, radius: number): string {

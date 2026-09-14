@@ -218,6 +218,71 @@ describe('EmergencySection — 결과 없음', () => {
     expect(markup).toContain(messages.emergency.reliefOpenNow.replace('{n}', '1'))
   })
 
+  /*
+    **검색은 사용자가 친 말이 조건이다** (#584). 무엇으로 찾았는지 되돌려 주지 않으면
+    0건 화면에서 입력을 다시 봐야 한다. 검색어만 탓하지 않으려고 완화 버튼은 그대로 준다.
+  */
+  it('검색어로 0건이면 무엇으로 찾았는지 되돌려 주고 지우는 길을 준다', () => {
+    const markup = render({
+      result: two,
+      filters: { ...DEFAULT_FACILITY_FILTERS, keyword: '없는이름ZZZ' },
+    })
+
+    expect(markup).toContain('없는이름ZZZ')
+    expect(markup).not.toContain(messages.emergency.narrowedTitle)
+    expect(markup).toContain(messages.emergency.reliefKeyword.replace('{n}', '2'))
+  })
+
+  /*
+    **잘린 목록에서는 "없어요" 를 확언하지 않는다** (#584). 칩은 같은 조건에서 이미 숫자를
+    빼는데(`countsAreComplete`) 검색만 단언하면, 급할 때 여는 화면이 **있는 병원을 없다고**
+    말한다. `totalCount` 가 받은 개수보다 크면 반경 안에 못 받아 온 곳이 남아 있다.
+  */
+  it('목록이 잘린 채 검색이 0건이면 범위를 밝힌다', () => {
+    const markup = render({
+      result: { ...two, totalCount: 300 },
+      filters: { ...DEFAULT_FACILITY_FILTERS, keyword: '없는이름ZZZ' },
+    })
+
+    expect(markup).toContain(messages.emergency.searchTruncatedNote)
+  })
+
+  it('다 받아 온 목록이면 그 안내를 띄우지 않는다', () => {
+    const markup = render({
+      result: two,
+      filters: { ...DEFAULT_FACILITY_FILTERS, keyword: '없는이름ZZZ' },
+    })
+
+    expect(markup).not.toContain(messages.emergency.searchTruncatedNote)
+  })
+
+  /* 칩만으로 0건이 된 것은 받아 온 범위와 무관하다 — 검색어가 없으면 띄우지 않는다 */
+  it('검색어 없이 잘린 목록이면 그 안내를 띄우지 않는다', () => {
+    const markup = render({
+      result: {
+        ...two,
+        facilities: [facility({ facilityId: '2', openNow: false })],
+        totalCount: 300,
+      },
+      filters: { ...DEFAULT_FACILITY_FILTERS, openNowOnly: true },
+    })
+
+    expect(markup).not.toContain(messages.emergency.searchTruncatedNote)
+  })
+
+  it('검색어가 없으면 0건 제목은 그대로다', () => {
+    const markup = render({
+      result: {
+        ...two,
+        facilities: [facility({ facilityId: '2', openNow: false })],
+        totalCount: 1,
+      },
+      filters: { ...DEFAULT_FACILITY_FILTERS, openNowOnly: true },
+    })
+
+    expect(markup).toContain(messages.emergency.narrowedTitle)
+  })
+
   it('조건을 켜지 않았는데 0건이면 반경 문제로 안내한다', () => {
     const markup = render({
       result: { ...two, facilities: [], totalCount: 0 },
