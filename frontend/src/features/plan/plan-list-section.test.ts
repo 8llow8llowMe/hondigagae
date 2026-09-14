@@ -193,11 +193,12 @@ describe('일정 행', () => {
     expect(render()).toContain('D-16')
   })
 
-  it('이미 시작한 일정에는 D-day 를 붙이지 않는다', () => {
+  it('이미 시작한 일정에는 D-day 를 붙이지 않는다 — 대신 여행 중이라고 말한다 (#561)', () => {
     const html = render({
       plans: [plan({ startDate: '2026-08-26', endDate: '2026-08-28' })],
     })
     expect(html).not.toMatch(/D-\d/)
+    expect(html).toContain(messages.plan.ongoing)
   })
 
   it('긴 제목이 잘리지 않게 min-w-0 을 함께 둔다 — break-keep 만으로는 줄지 않는다', () => {
@@ -254,5 +255,84 @@ describe('3층 표면 (#445) — 카드 안의 L2', () => {
     expect(markup).toContain('[&amp;&gt;li+li]:border-t')
     expect(markup).toContain('md:px-5')
     expect(markup).not.toContain('md:px-10')
+  })
+})
+
+/**
+ * #561 — dev 에서 `2026-09-11 ~ 09-14` 일정을 09-14 에 보니 "다가오는 일정" 에 D-day 도
+ * 없이 서 있었다. 배지 자리가 빈 채라 바로 아래 `D-11` 과 나란히 놓여 더 눈에 띄었다.
+ *
+ * **두 가지를 함께 잠근다** — 묶음이 어디로 가는지와, 기둥에 무슨 말이 서는지.
+ */
+describe('여행 중 — 다가오는 일정과 지난 일정 사이의 셋째 칸', () => {
+  const ongoing = plan({
+    planId: '223456789012000009',
+    title: '갱얼쥐랑 3박 4일 가즈아',
+    startDate: '2026-08-24',
+    endDate: '2026-08-27',
+  })
+
+  const pastPlan = plan({
+    planId: '223456789012000003',
+    startDate: '2026-05-02',
+    endDate: '2026-05-03',
+  })
+
+  function countOf(markup: string, text: string): number {
+    return markup.split(text).length - 1
+  }
+
+  it('오늘이 여행 기간 안이면 "다가오는 일정" 이 아니라 "여행 중" 아래 선다', () => {
+    const markup = render({ plans: [ongoing] })
+
+    expect(markup).toContain(messages.plan.sectionOngoing)
+    expect(markup).not.toContain(messages.plan.sectionUpcoming)
+  })
+
+  /*
+    묶음 제목과 기둥의 배지가 **같은 문자열**이라 `toContain` 만으로는 배지가 그려졌는지
+    알 수 없다 — 제목만 있어도 통과한다. 그래서 개수로 센다: 제목 1 + 배지 1 = 2.
+  */
+  it('D-day 자리를 비워 두지 않는다 — 기둥에 여행 중이 선다', () => {
+    const markup = render({ plans: [ongoing] })
+
+    expect(countOf(markup, messages.plan.ongoing)).toBe(2)
+    expect(markup).not.toMatch(/D-\d/)
+  })
+
+  it('며칠째인지는 날짜 줄이 말한다 — 마지막 날이면 4일차다', () => {
+    expect(render({ plans: [ongoing] })).toContain('오늘 4일차')
+  })
+
+  it('여행 중이 맨 위다 — 오늘 일어나는 일이 먼저 온다', () => {
+    const markup = render({ plans: [plan(), ongoing, pastPlan] })
+
+    expect(markup.indexOf(messages.plan.sectionOngoing)).toBeLessThan(
+      markup.indexOf(messages.plan.sectionUpcoming),
+    )
+    expect(markup.indexOf(messages.plan.sectionUpcoming)).toBeLessThan(
+      markup.indexOf(messages.plan.sectionPast),
+    )
+  })
+
+  it('여행 중이 앞에 있으면 다가오는 묶음이 위 선을 긋는다', () => {
+    const markup = render({ plans: [plan(), ongoing] })
+    const upcomingStart = markup.indexOf(messages.plan.sectionUpcoming)
+    const upcomingSection = markup.slice(
+      markup.lastIndexOf('<section', upcomingStart),
+      upcomingStart,
+    )
+
+    expect(upcomingSection).toContain('border-t')
+  })
+
+  /* 출발 당일은 `D-DAY` 가 더 강하다 — `여행 중` 으로 덮지 않는다 (`planPhaseOf` 머리주석) */
+  it('출발 당일은 여행 중이 아니라 D-DAY 다', () => {
+    const markup = render({
+      plans: [plan({ startDate: '2026-08-27', endDate: '2026-08-29' })],
+    })
+
+    expect(markup).toContain(messages.plan.ddayToday)
+    expect(markup).not.toContain(messages.plan.sectionOngoing)
   })
 })

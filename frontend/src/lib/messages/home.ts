@@ -249,6 +249,11 @@ export const homeMessages = {
   emptyPlacesDesc: '장소를 찾아보세요.',
   findPlaces: '장소 찾기',
   upcomingHeading: '다가오는 일정',
+  /**
+   * 이 섹션에 선 일정이 **오늘 여행 중**일 때의 제목 (#561). 같은 섹션이고 제목만 바뀐다 —
+   * 홈이 한 건만 세우기 때문에 가능한 표기다 (`home-view` `showsOngoingPlan` 주석).
+   */
+  ongoingHeading: '진행 중인 일정',
   noPlanTitle: '아직 일정이 없어요',
   noPlanDesc: '반려견에게 맞는 일정을 만들어보세요.',
   /**

@@ -6,7 +6,8 @@ import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { PlanStatusBadge } from '@/features/plan/plan-status-badge'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
-import { daysUntil, formatPlanDateRange } from '@/lib/plan/date'
+import { formatPlanDateRange, planPhaseOf } from '@/lib/plan/date'
+import { planPhaseLabel, planPhaseNote } from '@/lib/plan/phase-text'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { Pet } from '@/types/pet'
@@ -71,7 +72,10 @@ export function PlanOverviewPanel({
    */
   action?: React.ReactNode
 }) {
-  const dday = daysUntil(plan.startDate, today)
+  const phase = planPhaseOf(plan.startDate, plan.endDate, today)
+  // 여행 중이면 `여행 중` 대신 `오늘 4일차` 를 쓴다 — 이 줄은 기둥이 아니라 설명 줄이고,
+  // 옆에 `총 4일` 이 이미 서 있어 며칠째인지가 붙어야 두 값이 서로를 설명한다
+  const phaseLabel = planPhaseNote(phase) ?? planPhaseLabel(phase)
 
   return (
     /*
@@ -125,14 +129,10 @@ export function PlanOverviewPanel({
                       plan.budget.toLocaleString('ko-KR'),
                     )}`}
               </span>
-              {dday !== null && (
+              {phaseLabel !== null && (
                 <>
                   <span aria-hidden>·</span>
-                  <span className="text-fg font-bold">
-                    {dday === 0
-                      ? messages.plan.ddayToday
-                      : messages.plan.dday.replace('{days}', String(dday))}
-                  </span>
+                  <span className="text-fg font-bold">{phaseLabel}</span>
                 </>
               )}
             </p>

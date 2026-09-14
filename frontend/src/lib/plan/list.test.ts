@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { daysUntil, formatPlanDateRange, isPastPlan, weekdayOf } from '@/lib/plan/date'
+import { formatPlanDateRange, isPastPlan, planPhaseOf, weekdayOf } from '@/lib/plan/date'
 import {
   countByPet,
   countByStatus,
@@ -68,17 +68,38 @@ describe('날짜 — 타임존에 흔들리지 않는다', () => {
   })
 })
 
-describe('D-day', () => {
+describe('날짜 판정 — D-day · 여행 중 · 지남을 한 함수가 답한다', () => {
   it('아트보드의 D-16 을 재현한다', () => {
-    expect(daysUntil('2026-09-12', TODAY)).toBe(16)
+    expect(planPhaseOf('2026-09-12', '2026-09-14', TODAY)).toEqual({ kind: 'upcoming', days: 16 })
   })
 
-  it('오늘 출발이면 0 이다 — null 이 아니다', () => {
-    expect(daysUntil('2026-08-27', TODAY)).toBe(0)
+  it('오늘 출발이면 D-DAY 쪽이다 — 여행 중이 아니다', () => {
+    expect(planPhaseOf('2026-08-27', '2026-08-29', TODAY)).toEqual({ kind: 'upcoming', days: 0 })
   })
 
-  it('이미 시작한 일정은 D-day 를 말하지 않는다', () => {
-    expect(daysUntil('2026-08-26', TODAY)).toBeNull()
+  it('하루짜리 일정을 당일에 봐도 여행 중을 거치지 않는다', () => {
+    expect(planPhaseOf('2026-08-27', '2026-08-27', TODAY)).toEqual({ kind: 'upcoming', days: 0 })
+  })
+
+  /*
+    #561 이 실제로 걸린 경계다 — dev 에서 `2026-09-11 ~ 09-14` 일정을 09-14 에 보니
+    "다가오는 일정" 에 D-day 없이 서 있었다. 여기 세 건이 그 구간 전체를 덮는다.
+  */
+  it('이미 출발했고 오늘이 기간 안이면 여행 중이다 — 2일차부터 센다', () => {
+    expect(planPhaseOf('2026-08-26', '2026-08-29', TODAY)).toEqual({ kind: 'ongoing', day: 2 })
+  })
+
+  it('마지막 날에도 아직 여행 중이다 — 이게 비어 있던 칸이다', () => {
+    expect(planPhaseOf('2026-08-24', '2026-08-27', TODAY)).toEqual({ kind: 'ongoing', day: 4 })
+  })
+
+  it('종료 다음 날부터 지난 일정이다', () => {
+    expect(planPhaseOf('2026-08-24', '2026-08-26', TODAY)).toEqual({ kind: 'past' })
+  })
+
+  it('날짜를 못 읽으면 null 이다 — 지난 쪽으로 밀지 않는다', () => {
+    expect(planPhaseOf('없음', '2026-08-29', TODAY)).toBeNull()
+    expect(planPhaseOf('2026-08-29', '없음', TODAY)).toBeNull()
   })
 })
 
@@ -131,6 +152,37 @@ describe('나누기 · 재정렬', () => {
     const x = plan({ planId: 'x', startDate: '2026-09-12' })
     const y = plan({ planId: 'y', startDate: '2026-09-12' })
     expect(groupPlans([y, x], TODAY).upcoming.map((p) => p.planId)).toEqual(['x', 'y'])
+  })
+
+  /*
+    #561. 전에는 칸이 `upcoming` / `past` 둘뿐이라 여행 중인 일정이 "다가오는 일정" 으로
+    갔다. 아래 두 건이 그 회귀를 막는다 — 셋으로 갈리는지와, 셋 다 서로를 침범하지 않는지.
+  */
+  it('오늘이 여행 기간 안이면 여행 중으로 간다 — 다가오는 쪽이 아니다', () => {
+    const NOW = plan({ planId: 'n', startDate: '2026-08-24', endDate: '2026-08-27' })
+    const { ongoing, upcoming, past } = groupPlans([NOW], TODAY)
+
+    expect(ongoing.map((p) => p.planId)).toEqual(['n'])
+    expect(upcoming).toHaveLength(0)
+    expect(past).toHaveLength(0)
+  })
+
+  it('세 칸이 각자 자기 것만 가져간다', () => {
+    const NOW = plan({ planId: 'n', startDate: '2026-08-24', endDate: '2026-08-27' })
+    const { ongoing, upcoming, past } = groupPlans([B, OLD, NOW, A], TODAY)
+
+    expect(ongoing.map((p) => p.planId)).toEqual(['n'])
+    expect(upcoming.map((p) => p.planId)).toEqual(['a', 'b'])
+    expect(past.map((p) => p.planId)).toEqual(['c'])
+  })
+
+  it('날짜를 못 읽으면 다가오는 쪽에 둔다', () => {
+    const BROKEN = plan({ planId: 'z', startDate: '없음', endDate: '없음' })
+    const { ongoing, upcoming, past } = groupPlans([BROKEN], TODAY)
+
+    expect(upcoming.map((p) => p.planId)).toEqual(['z'])
+    expect(ongoing).toHaveLength(0)
+    expect(past).toHaveLength(0)
   })
 })
 

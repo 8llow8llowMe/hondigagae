@@ -43,6 +43,7 @@ import { clearRecentPlaceId, isBasisPlaceGone, readRecentPlaceId } from '@/lib/i
 import { pickWeatherWarning } from '@/lib/insight/weather-warning'
 import { messages } from '@/lib/messages'
 import { resolveSelectedPet } from '@/lib/nav/selected-pet'
+import { planPhaseOf } from '@/lib/plan/date'
 import { pickUpcomingPlans } from '@/lib/plan/upcoming'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -266,6 +267,20 @@ export function HomeView({
 
   const today = dayToLocalNoon(todayIso)
   const upcomingPlans = today === null ? [] : pickUpcomingPlans(plans, today, UPCOMING_PLAN_COUNT)
+
+  /*
+    섹션 제목은 **고른 일정을 따라간다** (#561). `UPCOMING_PLAN_COUNT === 1` 이라 이 섹션에
+    서는 일정은 하나인데, 그게 여행 중이면 제목이 `다가오는 일정` 인 채로는 행의 `여행 중`
+    배지와 정면으로 어긋난다 — 행만 고치고 제목을 두면 모순이 제목으로 옮겨갈 뿐이다.
+
+    **여러 건을 세우게 되면 이 규칙을 다시 봐야 한다** — 여행 중과 다가오는 것이 한 섹션에
+    섞이면 어느 쪽도 제목이 될 수 없다. 그때는 일정 목록처럼 묶음을 갈라야 한다.
+  */
+  const showsOngoingPlan =
+    today !== null &&
+    upcomingPlans.some(
+      (plan) => planPhaseOf(plan.startDate, plan.endDate, today)?.kind === 'ongoing',
+    )
 
   return (
     /* L0 바닥은 `main` 이 전폭으로 칠한다 — 열에 걸면 1440 컨테이너 바깥이 희게 남는다 */
@@ -654,11 +669,13 @@ export function HomeView({
             <IndoorAlternativesSection alternatives={indoorAlternatives} />
           )}
 
-          {/* 다가오는 일정. 미로그인이면 섹션 미렌더 */}
+          {/* 다가오는 일정(여행 중이면 제목이 바뀐다). 미로그인이면 섹션 미렌더 */}
           {authed && (
             <Surface
               titleId="plan-heading"
-              title={messages.home.upcomingHeading}
+              title={
+                showsOngoingPlan ? messages.home.ongoingHeading : messages.home.upcomingHeading
+              }
               trailing={
                 plans.length > 0 ? (
                   <Link href="/plans" className="text-body-2 text-link font-semibold">
