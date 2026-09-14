@@ -194,7 +194,8 @@ export function PlaceDetailSection({
           데스크톱에서만 grid 배치가 이것을 2열로 보낸다. `SurfaceStack` 자체가 grid 의
           자식이다 — 바닥은 `main` 이 칠했고 이 스택은 카드 간격만 맡는다 (홈과 같은 구조).
         */}
-        <SurfaceStack className="rail-detail-main">
+        {/* 열 사이 24 — 마주 보는 쪽만 절반을 낸다 (globals.css `.rail-layout` 주석, #559) */}
+        <SurfaceStack className="rail-detail-main lg:pl-3">
           {/*
             ── 갤러리 + 제목이 **한 장의 카드다** (#531)
 
@@ -374,7 +375,7 @@ export function PlaceDetailSection({
           **위 여백** — 모바일은 앞 스택과 8(카드 간격), 태블릿 한 컬럼은 앞 스택의 아래
           24 가 이미 있어 0, 데스크톱은 자기 열의 첫 요소라 24 다.
         */}
-        <SurfaceStack className="rail-detail-aside rail-sticky pt-2 md:pt-0 lg:pt-6">
+        <SurfaceStack className="rail-detail-aside rail-sticky pt-2 md:pt-0 lg:pt-6 lg:pr-3">
           {/*
             **`title` 이 아니라 `aria-label` 이다.** 두 패널이 라벨·등급어·점수를 한 줄에
             스스로 그려 `title` 슬롯(제목 + 부제 + 우측 액션)에 맞지 않는다 — 홈 판정 카드와
@@ -406,7 +407,7 @@ export function PlaceDetailSection({
           우측 열 아래쪽 — 본문. 위 블록과 같은 열(grid column 2)에 이어 선다.
           위 여백은 모바일 8, 그 위로는 0 — 앞 스택의 아래 24 가 카드 간격이다.
         */}
-        <SurfaceStack className="rail-detail-main pt-2 md:pt-0">
+        <SurfaceStack className="rail-detail-main pt-2 md:pt-0 lg:pl-3">
           <DetailCard title={messages.place.detailSectionPet}>
             <PlacePetInfoSection
               petInfo={place.petInfo}

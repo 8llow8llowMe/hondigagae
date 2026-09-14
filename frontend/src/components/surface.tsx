@@ -253,8 +253,15 @@ export function Surface({
         /*
           **아래 선은 `fill` 에만 있다.** 본문이 머리 밑으로 흘러 들어가므로 경계가 없으면
           글자가 머리에 닿은 채 사라진다. 구르지 않는 카드에는 필요 없다.
+
+          **아래 여백은 제목 줄이 아니라 이 래퍼가 진다** (이슈 #559). #556 은 그것을
+          `tools === undefined` 일 때만 제목 줄에 줬는데, 그래서 **도구가 있지만 그 폭에서
+          숨겨진 경우**가 빠졌다 — `/emergency` · 담기의 칩은 `lg:hidden` 이고 `/places` 의
+          검색 폼은 자기 아래 여백이 없다. 1440 실측으로 세 화면 모두 내용과 구분선 사이가
+          **1px**(테두리뿐)이었다. 래퍼가 지면 도구가 있든 없든, 보이든 숨든 항상 붙는다.
+          `fill` 이 아닌 카드는 합이 `pt-5 pb-3` 그대로라 무변화다.
         */
-        <div className={cn(fill && 'border-border shrink-0 border-b')}>
+        <div className={cn('pb-3', fill && 'border-border shrink-0 border-b')}>
           <div
             className={cn(
               'px-4 md:px-5',
@@ -271,8 +278,6 @@ export function Surface({
                 제목이 테두리에 붙는다. 4px 을 더 깎는 것(12)보다 §4 스케일 위의 16 이 낫다.
               */
               fill ? 'pt-4' : 'pt-5',
-              // 도구가 있으면 그쪽 위 여백이 간격을 진다 — 둘 다 두면 24 로 벌어진다
-              tools === undefined && 'pb-3',
             )}
           >
             {/*

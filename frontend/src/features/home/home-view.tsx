@@ -300,7 +300,8 @@ export function HomeView({
           **`SurfaceStack` 이 sticky 를 받는다** (#428). 바닥은 `main` 이 이미 칠했고
           이 요소는 카드 간격만 맡는다.
         */}
-        <SurfaceStack className="lg:sticky lg:top-16 lg:self-start">
+        {/* 열 사이 24 — 마주 보는 쪽만 절반을 낸다 (globals.css `.rail-layout` 주석, #559) */}
+        <SurfaceStack className="lg:sticky lg:top-16 lg:self-start lg:pr-3">
           {/*
             **카드 하나에 셋을 담는다** — `[누구 · 지금 안전한가 · 언제 나가나]`.
             아래 병원 배너가 `[위급하면]` 으로 두 번째 카드다. 이 레일이 두 이야기라는
@@ -455,7 +456,7 @@ export function HomeView({
           주석이 "배경으로 깔면 우측 열의 흰 목록 행이 덮는다(실측 y=159..569)" 고
           적어 둔 그 문제다. 3a 는 모든 섹션이 흰 카드라 더 심해졌을 것이다.
         */}
-        <SurfaceStack>
+        <SurfaceStack className="lg:pl-3">
           {/*
             권역 비교가 이 열의 머리다. **아래 "맞는 곳" 과 같은 질문을 넓은 단위로 먼저
             답한다** — 권역(어느 권역) → 장소(어느 곳) 로 좁혀 읽힌다.

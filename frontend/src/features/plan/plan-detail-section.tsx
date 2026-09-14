@@ -176,7 +176,8 @@ export function PlanDetailSection({
         배너가 그 위로 올라와 글자가 겹친다 (실측 scrollY=700: 개요 top 64~519 고정,
         준비물 top −181, 배너 top −18).
       */}
-      <SurfaceStack>
+      {/* 열 사이 24 — 마주 보는 쪽만 절반을 낸다 (globals.css `.rail-layout` 주석, #559) */}
+      <SurfaceStack className="lg:pr-3">
         <PlanOverviewPanel
           plan={plan}
           companions={companions}
@@ -192,8 +193,9 @@ export function PlanDetailSection({
             일자에 딸린 것처럼 읽혔다.
 
             **상태 배지 바로 아래가 맞는 자리다.** `초안 → 확정` 은 그 배지가 말하는 값을
-            바꾸는 일이고, 좌측 레일은 lg 에서 자기 스크롤을 갖는 열이라 일자 카드를
-            아무리 굴려도 버튼이 시야에서 사라지지 않는다.
+            바꾸는 일이다. 페이지 맨 위에서 늘 보이고, 마지막 날 카드까지 굴려야 나오던
+            예전보다 훨씬 가깝다 — 다만 레일이 고정이 아니므로 길게 내려가면 함께 올라간다
+            (위 레일 주석의 "치르는 값").
           */
           action={<PlanStatusAction plan={plan} />}
         />
@@ -231,7 +233,7 @@ export function PlanDetailSection({
         **위 여백** — 모바일은 앞 스택(레일)과 8, 태블릿 한 컬럼은 앞 스택의 아래 24 가 이미
         있어 0, 데스크톱 2단은 자기 열의 첫 요소라 24 다 (장소 상세 #443 과 같은 처리).
       */}
-      <SurfaceStack className="pt-2 md:pt-0 lg:pt-6">
+      <SurfaceStack className="pt-2 md:pt-0 lg:pt-6 lg:pl-3">
         {days.map((group) => (
           <PlanDaySection
             key={group.day}
