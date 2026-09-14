@@ -169,7 +169,7 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
   // (use-form.ts 의 submitCount 주석, login-form.tsx 의 같은 패턴 참고)
   useEffect(() => {
     if (codeForm.submitCount === 0) return
-    if (codeForm.firstErrorField === 'code') {
+    if (codeForm.errors.fields.code !== undefined) {
       // keepError: true — 방금 표시한 코드 필드 오류를 이 호출이 지우면 안 된다.
       // setValue 의 기본 동작은 "사용자가 고쳤다"로 보고 그 필드 오류를 지우는데,
       // 여기는 프로그램이 재입력을 유도하려고 비우는 것이라 오류는 남아야 사용자가

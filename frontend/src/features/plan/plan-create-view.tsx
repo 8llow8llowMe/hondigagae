@@ -163,7 +163,6 @@ function PlanCreateFormContainer({ pets, today }: { pets: Pet[]; today: string }
         pets={pets}
         submitting={form.isSubmitting}
         submitCount={form.submitCount}
-        firstErrorField={form.firstErrorField}
         today={today}
         onValueChange={form.setValue}
         onSubmit={() => void form.submit()}

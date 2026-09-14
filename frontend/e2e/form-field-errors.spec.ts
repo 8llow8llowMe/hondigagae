@@ -68,3 +68,47 @@ test.describe('서버 필드 오류 렌더 (#501)', () => {
     await expect(codeInput).toBeFocused()
   })
 })
+
+/**
+ * **제출 실패 시 포커스가 화면의 첫 오류로 가는가** — 이슈 #560.
+ *
+ * ### 왜 e2e 인가
+ *
+ * 지키려는 것이 마크업이 아니라 **DOM 순서와 포커스**다. vitest 는 node 환경이라
+ * `document` 도 effect 도 없어(`docs/testing-guide.md` §1) 이 회귀를 원리적으로 못 잡는다.
+ * 실제로 못 잡았다 — `/plans/new` 는 스키마 키 선언 순서(`petId → title → startDate → …`)
+ * 로 고른 첫 필드가 **제목**이라, 빈 채로 제출하면 위의 두 오류를 지나쳐 맨 아래로 갔다.
+ *
+ * ### 왜 `/plans/new` 인가
+ *
+ * **스키마 순서와 화면 순서가 어긋난 유일한 폼**이기 때문이다. `/ai-plans/new` 와
+ * `/pets/new` 는 두 순서가 **우연히** 같아 증상이 없었다 — 즉 이 스펙이 지키는 것은
+ * "이 화면이 맞다" 가 아니라 **"화면 순서를 바꿔도 포커스가 따라온다"** 는 성질이다.
+ */
+test.describe('제출 실패 시 첫 오류 포커스 (#560)', () => {
+  test('빈 채로 제출하면 화면의 첫 오류로 간다 — 스키마 선언 순서를 따르지 않는다', async ({
+    page,
+  }) => {
+    await page.goto('/plans/new')
+
+    await page.getByRole('button', { name: '만들기', exact: true }).click()
+
+    // 오류가 여럿 떠야 순서 판정이 의미를 갖는다. 하나뿐이면 어떤 규칙이든 통과한다
+    await expect(page.locator('#startDate-error')).toBeVisible()
+    await expect(page.locator('#endDate-error')).toBeVisible()
+    await expect(page.locator('#title-error')).toBeVisible()
+
+    // 화면 순서는 시작일 → 종료일 → 반려견 → 제목 → 예산 이다
+    await expect(page.locator('#startDate')).toBeFocused()
+
+    /*
+      **오류 문구의 DOM 순서까지 함께 못박는다.** `#startDate` 하나만 단언하면 화면이
+      재배치될 때 이 스펙이 조용히 낡는다 — 여기서 확인하는 성질은 "포커스가 **문서 순서상
+      첫 오류**에 있다" 이므로 그 문서 순서도 같이 읽어 둔다.
+    */
+    const errorIds = await page
+      .locator('main [id$="-error"]')
+      .evaluateAll((nodes) => nodes.map((node) => node.id))
+    expect(errorIds[0]).toBe('startDate-error')
+  })
+})

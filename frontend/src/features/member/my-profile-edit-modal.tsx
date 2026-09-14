@@ -15,6 +15,7 @@ import {
   useUploadProfileImage,
 } from '@/features/member/use-my-info'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
+import { hasFieldErrors } from '@/lib/form/focus-first-error'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
 import type { MemberMyInfo } from '@/types/member'
@@ -50,15 +51,17 @@ export function MyProfileEditModal({
   const [imageError, setImageError] = useState<string | null>(null)
   const [imageStatus, setImageStatus] = useState<string | null>(null)
 
-  const { values, errors, isSubmitting, setValue, submit, reset, firstErrorField, submitCount } =
-    useForm<NicknameValues, void>({
-      schema: nicknameSchema,
-      initialValues: { nickname: member.nickname },
-      onSubmit: async (submitted) => {
-        await update.mutateAsync({ nickname: submitted.nickname })
-      },
-      onSuccess: onClose,
-    })
+  const { values, errors, isSubmitting, setValue, submit, reset, submitCount } = useForm<
+    NicknameValues,
+    void
+  >({
+    schema: nicknameSchema,
+    initialValues: { nickname: member.nickname },
+    onSubmit: async (submitted) => {
+      await update.mutateAsync({ nickname: submitted.nickname })
+    },
+    onSuccess: onClose,
+  })
 
   /*
     열릴 때마다 서버의 현재 닉네임으로 되돌린다. 닫고 다시 열면 지난번에 고치다 만 값이
@@ -74,7 +77,9 @@ export function MyProfileEditModal({
 
   // submitCount 만 의존한다 — 입력 중 포커스를 훔치지 않기 위해서다 (use-form.ts 주석)
   useEffect(() => {
-    if (submitCount === 0 || firstErrorField === null) return
+    // 필드가 닉네임 하나라 대상이 고정이다. 다만 "오류가 있는가" 는 물어야 한다 —
+    // 필드로 좁혀지지 않는 폼 오류만 있을 때 포커스를 옮기면 엉뚱한 곳을 가리킨다
+    if (submitCount === 0 || !hasFieldErrors(errors)) return
     nicknameRef.current?.focus()
   }, [submitCount])
 

@@ -39,7 +39,6 @@ function render(overrides: Partial<PlanCreateFormProps> = {}) {
     pets: [pet()],
     submitting: false,
     submitCount: 0,
-    firstErrorField: null,
     today: '2026-09-02',
     onValueChange: () => undefined,
     onSubmit: () => undefined,

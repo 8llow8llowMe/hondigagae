@@ -309,7 +309,6 @@ function CreatePlanForm({
         // 만들기와 담기가 이어져 있어 **담는 중에도 제출을 잠근다**
         submitting={form.isSubmitting || add.pending}
         submitCount={form.submitCount}
-        firstErrorField={form.firstErrorField}
         today={today}
         onValueChange={form.setValue}
         onSubmit={() => void form.submit()}

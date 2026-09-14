@@ -224,7 +224,6 @@ function AiPlanCreateFormContainer({
           totalDays={totalDaysBetween(form.values.startDate, form.values.endDate)}
           submitting={form.isSubmitting}
           submitCount={form.submitCount}
-          firstErrorField={form.firstErrorField}
           favoriteCount={favoriteCount}
           today={today}
           onValueChange={form.setValue}

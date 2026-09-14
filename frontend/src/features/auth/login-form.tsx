@@ -15,6 +15,7 @@ import { loginSchema, type LoginValues } from '@/features/auth/schemas'
 import { login, type LoginResult } from '@/lib/api/auth'
 import { ApiError, classify, NO_RESPONSE_STATUS } from '@/lib/api/error'
 import type { FormErrors } from '@/lib/form/field-errors'
+import { focusFirstError, hasFieldErrors } from '@/lib/form/focus-first-error'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
 
@@ -135,7 +136,7 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
   // 첫 오류 필드·비밀번호 재포커스에 쓴다 — 필드 id 로 실제 입력 요소를 찾는다.
   const formContainerRef = useRef<HTMLDivElement>(null)
 
-  const { values, errors, isSubmitting, setValue, submit, firstErrorField, submitCount } = useForm<
+  const { values, errors, isSubmitting, setValue, submit, submitCount } = useForm<
     LoginValues,
     LoginResult
   >({
@@ -160,7 +161,7 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
     },
   })
 
-  // submitCount 만 의존한다. errors/firstErrorField 를 넣으면 입력 중 setValue 가
+  // submitCount 만 의존한다. errors 를 넣으면 입력 중 setValue 가
   // 남은 필드 오류를 지우며 errors 객체를 새로 만들 때마다 effect 가 다시 돌아
   // 타이핑 중인 필드에서 포커스를 훔친다. submitCount 는 "제출이 실패로 끝났다"
   // 는 이벤트만 신호로 쓰므로 이 문제와, 같은 오류가 연속될 때 값이 안 바뀌어
@@ -168,8 +169,9 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
   useEffect(() => {
     if (submitCount === 0) return
 
-    if (firstErrorField !== null) {
-      formContainerRef.current?.querySelector<HTMLElement>(`#${firstErrorField}`)?.focus()
+    // 대상은 DOM 순서로 고른다 — 스키마 키 선언 순서가 아니다 (#560)
+    if (hasFieldErrors(errors)) {
+      focusFirstError(formContainerRef.current, errors)
       return
     }
 

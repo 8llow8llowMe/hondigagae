@@ -9,6 +9,7 @@ import { FormAlert } from '@/components/form-alert'
 import { Input } from '@/components/input'
 import { RadioGroup } from '@/components/radio-group'
 import type { FormErrors } from '@/lib/form/field-errors'
+import { focusFirstError } from '@/lib/form/focus-first-error'
 import { messages } from '@/lib/messages'
 import { describePet } from '@/lib/pet/describe'
 import type { Pet } from '@/types/pet'
@@ -21,7 +22,6 @@ export type PlanCreateFormProps = {
   submitting: boolean
   /** 제출이 실패로 끝난 횟수. 포커스 이동의 **유일한 안정적인 트리거**다 */
   submitCount: number
-  firstErrorField: string | null
   /** `'YYYY-MM-DD'`. 달력의 오늘 표시에 쓴다 — 어디서 오는지는 사용처 주석 참고 */
   today: string
   onValueChange: <K extends keyof PlanFormValues>(key: K, value: PlanFormValues[K]) => void
@@ -48,7 +48,6 @@ export function PlanCreateForm({
   pets,
   submitting,
   submitCount,
-  firstErrorField,
   today,
   onValueChange,
   onSubmit,
@@ -63,24 +62,21 @@ export function PlanCreateForm({
   const [endDateOpen, setEndDateOpen] = useState(false)
 
   /*
-    제출 실패 시 첫 오류 필드로 포커스를 옮긴다. `errors` 를 의존성으로 쓰면 입력 중인
-    필드에서 포커스를 훔친다 (`use-form.ts` 의 `submitCount` JSDoc).
+    제출 실패 시 **화면에서 첫 번째로 보이는** 오류 필드로 포커스를 옮긴다.
 
-    **`[name]` 을 함께 보는 것은 우회로 시작됐다.** `RadioGroup` 이 `<fieldset>` 에 `id` 를
-    달지 않던 동안 `#petId` 에 해당하는 요소가 없었기 때문이다 — 개별 라디오에는
-    `${id}-${value}` 가 붙는다. #538 이 그 `id`(+ `tabIndex={-1}`)를 컴포넌트에 넣어
-    근본 원인을 닫았고, 이제 이 선택자는 문서 순서상 앞인 `<fieldset>` 을 잡는다.
-    **그쪽이 더 낫다** — `aria-describedby` 가 fieldset 에 걸려 있어 포커스가 오는 순간
-    오류 문구가 함께 읽힌다. 두 갈래를 남겨 두는 것은 필드명이 `name` 에만 있는
-    컨트롤이 뒤에 생겨도 이 한 줄이 계속 맞기 때문이다.
+    **이 화면이 #560 의 출발점이다.** 예전에는 `useForm` 이 스키마 키 선언 순서로 고른
+    `firstErrorField` 를 받았는데, 이 폼은 화면이 `시작일 → 종료일 → 반려견 → 제목 →
+    예산` 이고 `planFormSchema` 는 `petId → title → startDate → …` 라 **빈 채로 제출하면
+    위의 두 오류를 지나쳐 제목으로 갔다.** 판정을 DOM 순서로 옮겨 순서를 맞출 필요 자체를
+    없앴다 — `focus-first-error.ts`.
+
+    `errors` 를 의존성으로 쓰면 입력 중인 필드에서 포커스를 훔친다. 트리거는 여전히
+    `submitCount` 하나다 (`use-form.ts` 의 `submitCount` JSDoc).
   */
   useEffect(() => {
-    if (submitCount === 0 || firstErrorField === null) return
-    const target = formRef.current?.querySelector<HTMLElement>(
-      `[id="${firstErrorField}"], [name="${firstErrorField}"]`,
-    )
-    target?.focus()
-  }, [submitCount, firstErrorField])
+    if (submitCount === 0) return
+    focusFirstError(formRef.current, errors)
+  }, [submitCount])
 
   return (
     <form
