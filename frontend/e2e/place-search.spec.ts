@@ -114,21 +114,39 @@ test.describe('지도 보기 검색 (#596)', () => {
     ).toHaveValue(KEYWORD)
   })
 
-  test('지도 갈래에서 제출하면 keyword 가 URL 에 실린다', async ({ page }) => {
+  /*
+    **URL 만 보면 절반이다.** `/places` 가 `/emergency` 와 갈리는 지점이 검색어를 **서버로
+    보낸다**는 것이고(#421), 이 이슈 본문도 *"그 경로가 실제로 도는지 확인해야 한다"* 로
+    못박았다. `keyword` 가 주소창에 실리는 것은 그 경로가 돌았다는 증거가 되지 못한다 —
+    `router.replace` 만 되고 조회가 안 나가도 URL 은 똑같이 바뀐다.
+
+    **목록이 좁아지는 것으로 잰다.** 폴백 목록도 `usePlaceList(filters)` 라, 제출로 바뀐
+    `keyword` 를 물고 BFF 를 다시 친다. 개수가 달라졌다면 왕복이 돈 것이다. 목록 갈래가
+    위에서 쓰는 방식과 같다 (`not.toHaveCount(before)`).
+  */
+  test('지도 갈래에서 제출하면 keyword 가 URL 에 실리고 목록이 좁혀진다', async ({ page }) => {
     await page.goto('/places')
 
     /*
       **폴백이 자리를 잡은 뒤에 친다.** 교체 전 입력에 채우면 그 값이 새 입력에 덮이고
       엔터는 떨어져 나간 노드로 간다 — `main li` 로 기다리던 것이 **지도 갈래 좌측 패널의
       목록**에 붙어 교체 전에 풀렸다 (`helpers/map-fallback.ts` 가 근거).
+
+      **개수를 세는 데에도 이 대기가 필요하다.** 교체 전에 세면 좌측 패널 목록을 세고
+      제출 뒤에는 폴백 목록을 세게 되어, 재조회와 무관하게 개수가 달라진다.
     */
     await mapFallbackReady(page)
+
+    const rows = page.getByRole('main').locator('li')
+    const before = await rows.count()
+    expect(before).toBeGreaterThan(0)
 
     const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).first()
     await box.fill(KEYWORD)
     await box.press('Enter')
 
     await expect(page).toHaveURL(new RegExp(`keyword=${encodeURIComponent(KEYWORD)}`))
+    await expect(rows).not.toHaveCount(before)
   })
 
   /*
