@@ -100,8 +100,34 @@ describe('EmergencySection — openNow 3상태 (아트보드 주석)', () => {
     expect(markup).not.toContain(messages.emergency.statusClosed)
   })
 
-  it('등급 색을 쓰지 않는다 — 초록·주황은 산책 위험도 전용이다', () => {
-    expect(render()).not.toMatch(/metric-(high|mid|low|critical)/)
+  /*
+    **#598 이 "색이 아니라 무게로 가른다" 를 뒤집었다.** 상태 배지가 1행 오른쪽 끝으로
+    올라가 `24시간` 과 나란히 서고 나면 회색 배지 둘이 모양으로 구별되지 않는다 —
+    근거는 `facility-row.tsx` 의 `OpenStatus` 머리주석이다.
+
+    **금지가 사라진 것은 아니다.** 아트보드가 막은 것은 *등급 척도를 흉내내는 것*이고
+    (초록·주황·빨강 세 단계), 여기 초록/빨강은 열림/닫힘 **두 값**이다. 그래서 중간 등급
+    (`metric-mid` · `metric-low`)은 여전히 이 화면에 없어야 한다 — 그것이 나타나면 배지가
+    다시 척도로 읽히고 있다는 뜻이다.
+  */
+  it('중간 등급 색을 쓰지 않는다 — 상태는 척도가 아니라 두 값이다', () => {
+    expect(render()).not.toMatch(/metric-(mid|low|critical)/)
+  })
+
+  it('진료중은 초록, 영업 종료는 빨강이다 (#598)', () => {
+    expect(render()).toContain('bg-metric-high-100')
+
+    const closed = render({
+      result: {
+        facilities: [facility({ openNow: false })],
+        totalCount: 1,
+        radius: 10_000,
+        open24Only: false,
+        providerName: '출처',
+      },
+    })
+
+    expect(closed).toContain('bg-danger-100')
   })
 })
 

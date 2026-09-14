@@ -111,19 +111,14 @@ export const emergencyMessages = {
    */
   directionsLabel: '{name} 길찾기',
 
-  /**
-   * 운영시간 접기/펼치기 (#537).
-   *
-   * **원문을 요약하지 않고 한 줄로 접기만 한다.** 요일별 원문을 "오늘 19:00까지" 로 파싱하는
-   * 안은 기각돼 있다 — `types/emergency.ts` 의 `operatingHours` 주석이 정본이다. dev 실측에
-   * `월~화, 목~금,토 09:30~20:00, 일 09:30~14:00`(수요일이 빠진 요일 목록)나 일요일 항목
-   * 자체가 없는 곳이 있어, 틀린 판정이 곧 "닫힌 병원으로 달려가기" 가 된다.
-   *
-   * **"지금 여는가" 는 이 줄이 아니라 배지가 답한다** — 서버가 계산한 `openNow` 다
-   * (`statusOpen` · `statusClosed` · `statusUnknown`). 이 줄은 그 근거를 확인하는 자리다.
-   */
-  hoursExpand: '전체 시간표',
-  hoursCollapse: '접기',
+  /*
+    **`hoursExpand`("전체 시간표") · `hoursCollapse` 는 #598 에서 걷었다.** 운영시간을
+    한 줄(`line-clamp-1`)로 접던 것을 두 줄로 늘리면서 펼치기 버튼이 할 일을 잃었다 —
+    근거는 `facility-row.tsx` 의 `FacilityHours` 머리주석이다. 원문을 요약하지 않는다는
+    규칙 자체는 그대로고(정본은 `types/emergency.ts` 의 `operatingHours` 주석),
+    **"지금 여는가" 는 그 줄이 아니라 배지가 답한다** (`statusOpen` · `statusClosed` ·
+    `statusUnknown`).
+  */
 
   // ── 지도 ───────────────────────────────────────────────────────────────
 

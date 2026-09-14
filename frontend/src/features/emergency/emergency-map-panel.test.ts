@@ -34,9 +34,18 @@ describe('EmergencyMapPanel', () => {
     const markup = render({ selectedId: target.facilityId })
 
     expect(markup).toContain('aria-pressed="true"')
-    // 선택 배경은 --row-selected 다. 판정 색(metric-*)을 쓰지 않는다
+    /*
+      선택 배경은 `--row-selected` 다 — 판정 색을 선택 표시로 쓰지 않는다.
+
+      **`metric-` 전부를 막던 것을 좁혔다** (#598). 상태 배지가 `진료중` 초록으로
+      `metric-high` 를 쓰게 됐는데(`OpenStatus` 머리주석), 그것은 선택 표시가 아니라
+      행의 내용이다. 이 테스트가 지키는 것은 **선택된 행의 배경**이므로 거기만 본다.
+    */
     expect(markup).toContain('bg-row-selected')
-    expect(markup).not.toContain('metric-')
+
+    // 행의 `class` 만 본다 — 안쪽 상태 배지가 쓰는 색은 선택 표시가 아니다
+    const li = markup.slice(markup.indexOf('<li'), markup.indexOf('>'))
+    expect(li).not.toContain('metric-')
   })
 
   it('선택된 행에만 길찾기가 나온다', () => {

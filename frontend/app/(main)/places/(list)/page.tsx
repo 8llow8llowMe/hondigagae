@@ -105,9 +105,10 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
       같은 이유로 걷었다. 선을 남기면 카드 테두리와 선이 나란히 두 줄로 읽힌다.
     */
     <Canvas as="main" id="main-content" className="rail-layout rail-layout-filter">
-      {/* `rail-column`(globals.css) — 화면 높이가 `100dvh - 헤더` 로 못박힌 열이고,
-          스크롤은 그 안의 카드(`.filter-rail`)가 갖는다. 레일이 뷰포트보다 길어도 바닥에
-          닿을 수 있어야 한다 — 1280×900 실측에서 레일 1067px 이라 실내·야외 축이 잘렸다 */}
+      {/* `rail-column`(globals.css) — **아무도 스크롤하지 않는 열**이다 (#598). 행 높이를
+          레일이 정하므로 레일은 언제나 제 길이대로 서고, 넘치는 몫은 페이지가 진다.
+          이 화면이 그 근거였다 — 1280×900 실측에서 레일 1088px / 가용 786px 이라 실내·야외
+          축이 카드 안 스크롤 홈에 갇혀 있었다 */}
       {/*
         **`h1` 이 문서의 첫 제목이다** (#472). 예전에는 이것이 목록 카드와 같은 열 안에
         있어, 제목으로 탐색하면 개요가 `h2 필터` → `h3` 셋 → **`h1` 장소 찾기** 순서였다 —
