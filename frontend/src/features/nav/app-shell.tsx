@@ -58,8 +58,22 @@ export function AppShell({ authed, children }: { authed: boolean; children: Reac
       <div className="flex min-h-dvh flex-col">
         <GlobalHeader authed={authed} />
 
-        {/* 남는 높이를 먹고 자식(`Canvas`)에게 넘긴다 — `Canvas` 가 `flex-1` 로 받는다 */}
-        <div id="main" className="flex flex-1 flex-col">
+        {/*
+          남는 높이를 먹고 자식(`Canvas`)에게 넘긴다 — `Canvas` 가 `flex-1` 로 받는다.
+
+          **`tabIndex={-1}` 이 스킵 링크의 목적지 조건이다.** 이것이 없으면 `div` 는
+          포커스를 받을 수 없어 `본문으로 바로가기` 를 눌러도 포커스가 `body` 에 남는다 —
+          dev 실측에서 `/` · `/places?view=list` · `/plans` · `/plans/new` · `/mypage`
+          전부 Enter 직후 `document.activeElement` 가 `BODY` 였다. 같은 문서의
+          `#place-list`(`SurfaceStack tabIndex={-1}`)는 정상이라 **패턴이 아니라 누락이었다.**
+
+          Chromium 은 이것 없이도 **순차 포커스 시작점**만은 옮겨 준다(`surface.tsx` 의
+          `SurfaceStack` 주석) — 그래서 "다음 Tab 이 본문 안으로 들어간다" 만 보면 멀쩡해
+          보인다. 그러나 포커스 자체가 옮겨지지 않으면 스크린리더가 읽기 지점을 옮기지
+          않고, 그 보정이 없는 브라우저에서는 헤더부터 다시 훑게 된다. WAI 가 권하는
+          처방을 그대로 둔다.
+        */}
+        <div id="main" tabIndex={-1} className="flex flex-1 flex-col">
           {children}
         </div>
 
