@@ -37,7 +37,12 @@ describe('planBudgetIssue — 예산 판정', () => {
 })
 
 describe('validatePlanEdit — 수정 폼도 같은 상한을 본다', () => {
-  const values = (budget: string) => ({ title: '제주 2박 3일', budget })
+  const values = (budget: string) => ({
+    title: '제주 2박 3일',
+    startDate: '2026-09-12',
+    endDate: '2026-09-14',
+    budget,
+  })
 
   it('상한을 넘기면 예산 칸에 오류가 붙는다', () => {
     expect(validatePlanEdit(values('2147483648')).budget).toBe(messages.plan.errorBudgetTooLarge)

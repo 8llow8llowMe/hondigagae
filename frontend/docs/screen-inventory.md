@@ -426,7 +426,7 @@
 | 일정 목록                   | `/plans`                                     | `GET /plans` (커서)                                                                  | **구현** (#75)                                                                         |
 | 일정 생성                   | `/plans/new`                                 | `POST /plans`                                                                        | **구현** (#75)                                                                         |
 | 일정 상세 (타임라인 + 판정) | `/plans/[planId]`                            | `GET /plans/{planId}` + `GET /plans/{planId}/weather`                                | **구현** (#80)                                                                         |
-| 일정 수정·삭제              | `/plans/[planId]` 내                         | `PUT` · `DELETE /plans/{planId}`                                                     | **구현** (#80) — 이름·예산·상태만. **기간 수정은 열지 않는다**(아래)                   |
+| 일정 수정·삭제              | `/plans/[planId]` 내                         | `PUT` · `DELETE /plans/{planId}`                                                     | **구현** (#80) — 이름·기간·예산·상태. **기간 수정은 #585 로 열었다**(아래)             |
 | 일자 항목 편집              | `/plans/[planId]` 내 모드                    | `PUT /plans/{planId}/days/{day}/items` (**일괄 교체**)                               | **구현** (#81)                                                                         |
 | 일정에 장소 담기            | `/plans/[planId]/days/[day]/add` + 실내 대안 | `PUT /plans/{planId}/days/{day}/items` (**같은 일괄 교체**)                          | **구현** (#82) — 새 API 없음. **지도 보기 추가, 기본 보기가 지도**(#370) — 새 API 없음 |
 | 하루 재생성                 | `/plans/[planId]/days/[day]/regenerate`      | `POST /ai-plans` (`planId`+`regenerateDay`) → `PUT /plans/{planId}/days/{day}/items` | **구현** (#128) — 새 API 없음. 정본 `docs/features/ai-plan/하루재생성-세부명세.md`     |
@@ -506,7 +506,8 @@
   key 를 `placeKeys.detail` 로 공유해 장소 상세를 보고 온 곳은 요청이 아예 나가지 않는다.
 - 장소 항목은 백엔드가 tour-service Feign으로 존재를 검증한다 → 없는 `placeId` 는 실패한다.
 - **일정의 소유권은 plan-service에 있다.** AI는 제안만 하고 확정은 여기서만 일어난다.
-- **기간을 줄여도 백엔드가 항목을 정리하지 않는다.** `PlanCommandProcessor.updatePlan` 은 `startDate`/`endDate` 만 바꾸고 `day > totalDays` 가 된 항목을 그대로 둔다 → 상세 응답에 기간 밖 항목이 섞여 온다. **그래서 화면은 기간 수정을 열지 않는다** (BE 후속 요청). 다른 경로로 생긴 기간 밖 항목은 상세 화면이 별도 섹션으로 드러낸다.
+- **기간을 줄이면 백엔드가 `PLAN_008` 로 거부한다 — 고아 항목은 더 이상 생기지 않는다.** 예전에는 `PlanCommandProcessor.updatePlan` 이 `startDate`/`endDate` 만 바꾸고 `day > totalDays` 가 된 항목을 그대로 둬서 **화면이 기간 수정을 열지 않았다.** BE 가 `99c6a41f` 로 저장 앞에 검사를 넣으면서(`backend/docs/services/plan-service.md`) 그 근거가 사라졌고, **FE 는 #585 로 기간 편집을 열었다.** 화면이 어느 일차에 항목이 있는지 다시 세지 않는다 — 판정을 복제하면 서버 규칙이 바뀔 때 두 곳이 갈린다. 거부 문구는 서버 것을 폼 배너로 그대로 띄운다. 다른 경로로 이미 생긴 기간 밖 항목은 상세 화면이 별도 섹션으로 드러낸다.
+- **기간 상한 30일(`PLAN_009`)은 만들기·수정 두 폼이 `lib/plan/period.ts` 하나로 본다** (#585). 예전에는 어느 쪽도 보지 않아 31일짜리가 서버 왕복 뒤에 막혔다.
 - **날씨 브리핑(`PlanWeatherResponse`)의 `days` 는 일정 일수만큼 항상 채워진다.** (명세의 `dailyBriefings` 는 실제 필드명이 아니다 — `features/_index.md` 드리프트 표) 빈 배열을 방어할 필요가 없다. 대신 각 일자의 예보 필드가 null 일 수 있다 (§3-1 `DailyWeatherItem` 과 같은 타입).
 
 **FE 미연동 (백엔드는 구현됨 — 2026-09-13 재수집, [#534](https://github.com/8llow8llowMe/hondigagae/issues/534))**
