@@ -16,6 +16,7 @@ import { PlanReviewList } from '@/features/plan/plan-review-panel'
 import { PlanStatusAction } from '@/features/plan/plan-status-action'
 import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
 import { usePlanDayEdit } from '@/features/plan/use-plan-day-edit'
+import { usePlanStatus } from '@/features/plan/use-plan-status'
 import { usePlanVisit } from '@/features/plan/use-plan-visit'
 import { dayRegenerateBlock } from '@/lib/ai-plan/regenerate'
 import { todayDay } from '@/lib/date/day'
@@ -111,6 +112,13 @@ export function PlanDetailSection({
   */
   const visit = usePlanVisit({ planId: plan.planId })
 
+  /*
+    상태 전이 (#653). **진입점이 둘로 갈려서 상태를 여기서 든다** — 정방향은 개요 아래
+    전폭 버튼(`PlanStatusAction`), 역방향은 `⋯` 메뉴(`PlanManageMenu`) 안이다. 각자
+    들면 한쪽이 저장 중인 것을 다른 쪽이 모른다 (명세 D11-2).
+  */
+  const status = usePlanStatus(plan.planId)
+
   // 편집한 것을 브라우저 이탈로 잃지 않게 한다. 저장 중은 제외한다 (form-guide.md §7)
   useUnsavedWarning(edit.dirty && !edit.saving)
 
@@ -156,7 +164,7 @@ export function PlanDetailSection({
   const regenerateBlocked = dayRegenerateBlock(plan, today) !== null
 
   return (
-    <div className="rail-layout">
+    <div className="rail-layout rail-layout-split">
       {/*
         **레일을 고정하지 않는다 — 페이지가 레일만큼 길어진다.**
 
@@ -181,15 +189,25 @@ export function PlanDetailSection({
         준비물 top −181, 배너 top −18).
       */}
       {/* 열 사이 24 — 마주 보는 쪽만 절반을 낸다 (globals.css `.rail-layout` 주석, #559) */}
-      <SurfaceStack className="lg:pr-3">
+      <SurfaceStack className="rail-split-top lg:pr-3">
         <PlanOverviewPanel
           plan={plan}
           companions={companions}
           petPending={petPending}
           today={today}
           verdicts={weather?.days ?? []}
-          /* 관리 진입점은 일정의 신원 옆에 둔다 — `PlanManageMenu` 주석 참고 */
-          menu={<PlanManageMenu plan={plan} today={todayDay(today)} />}
+          /*
+            관리 진입점은 일정의 신원 옆에 둔다 — `PlanManageMenu` 주석 참고.
+            **역방향 상태 변경도 이 메뉴 안이다** (#653).
+          */
+          menu={
+            <PlanManageMenu
+              plan={plan}
+              today={todayDay(today)}
+              statusSaving={status.saving}
+              onStatusAction={status.run}
+            />
+          }
           /*
             **확정 액션이 개요 카드 바로 아래다** (이슈 #553). 예전에는 우측 일자 열의
             **맨 끝**이라, 3일 일정이면 마지막 날 카드까지 굴려야 버튼이 나왔다 — 초안을
@@ -201,44 +219,15 @@ export function PlanDetailSection({
             예전보다 훨씬 가깝다 — 다만 레일이 고정이 아니므로 길게 내려가면 함께 올라간다
             (위 레일 주석의 "치르는 값").
           */
-          action={<PlanStatusAction plan={plan} />}
+          action={
+            <PlanStatusAction
+              statusCode={plan.status.code}
+              saving={status.saving}
+              errorMessage={status.errorMessage}
+              onAction={status.run}
+            />
+          }
         />
-
-        {/*
-          준비물 (#155). **개요 바로 아래, 좌측 레일이다** — 일정 전체를 근거로 만드는
-          것이라 특정 일자 옆에 두면 그 날 것으로 읽힌다.
-        */}
-        <Surface aria-label={messages.plan.packingHeading}>
-          <PlanPackingList planId={plan.planId} />
-        </Surface>
-
-        {/*
-          여행 후기 (#615). **완료 일정에만 카드를 연다.** 초안·확정에서 GET 을 치면
-          `PLAN_016` 이 난다. 일정 전체의 이야기라 특정 일자 옆이 아니라 레일에 둔다.
-        */}
-        {isReviewSectionVisible(plan.status.code) && (
-          <Surface aria-label={messages.plan.reviewHeading}>
-            <PlanReviewList plan={plan} />
-          </Surface>
-        )}
-
-        {/*
-          응급 브리핑 진입점 (#125). **배너 하나만 둔다** — 응답이 일자 × 방문 장소 ×
-          최대 3곳이라 여기 펼치면 개요·준비물이 그만큼 밀린다. 홈이 `/emergency` 를
-          배너로 여는 것과 같은 형태다.
-
-          **상시로 둔다.** 담긴 장소가 없으면 브리핑이 비지만, 그 사실도 들어가서 봐야
-          알 수 있다 — 진입점을 감추면 기능이 있는 줄도 모른다.
-        */}
-        <Surface>
-          <Banner
-            href={`/plans/${plan.planId}/emergency`}
-            title={messages.plan.emergencyHeading}
-            description={messages.plan.emergencyBannerDescription}
-            leading={<EmergencyIcon size={24} />}
-            inset="card"
-          />
-        </Surface>
       </SurfaceStack>
 
       {/*
@@ -247,7 +236,7 @@ export function PlanDetailSection({
         **위 여백** — 모바일은 앞 스택(레일)과 8, 태블릿 한 컬럼은 앞 스택의 아래 24 가 이미
         있어 0, 데스크톱 2단은 자기 열의 첫 요소라 24 다 (장소 상세 #443 과 같은 처리).
       */}
-      <SurfaceStack className="pt-2 md:pt-0 lg:pt-6 lg:pl-3">
+      <SurfaceStack className="rail-split-main pt-2 md:pt-0 lg:pt-6 lg:pl-3">
         {days.map((group) => (
           <PlanDaySection
             key={group.day}
@@ -316,6 +305,58 @@ export function PlanDetailSection({
         ))}
 
         <PlanOutOfRangeSection items={outOfRange} />
+      </SurfaceStack>
+
+      {/*
+        ── 준비물 · 후기 · 배너는 **일자 뒤**다 (#653 · 진단 PL-3 · 명세 D11-3)
+
+        예전에는 개요 바로 아래, 일자보다 위였다 — 390 실측에서 준비물(246px)과 배너(76px)가
+        세 상태 모두에서 일자를 아래로 밀었고, 완료 일정은 후기(304px)까지 더해져 `1일차` 가
+        **954px**(1.13 화면 아래)였다. 준비물은 **출발 전날 과업**이고 후기는 다녀온 뒤의
+        것이라, 오늘 이 화면을 연 사람이 찾는 것(그 날 판정과 담은 장소)보다 앞에 설 이유가 없다.
+
+        **데스크톱에서는 여전히 좌측 레일이다** — `.rail-layout-split` 이 이 블록을 1열 2행에
+        놓아 개요 아래로 되돌린다. 모바일 순서만 바뀐다 (globals.css).
+
+        `pt-2 lg:pt-6` 은 앞 블록과의 간격이다 — 모바일에서는 일자 스택과 8, 데스크톱에서는
+        개요 스택과 24. `SurfaceStack` 안쪽 간격과 같은 값이다.
+      */}
+      <SurfaceStack className="rail-split-bottom pt-2 lg:pt-6 lg:pr-3">
+        {/*
+          준비물 (#155). **개요 바로 아래, 좌측 레일이다** — 일정 전체를 근거로 만드는
+          것이라 특정 일자 옆에 두면 그 날 것으로 읽힌다.
+        */}
+        <Surface aria-label={messages.plan.packingHeading}>
+          <PlanPackingList planId={plan.planId} />
+        </Surface>
+
+        {/*
+          여행 후기 (#615). **완료 일정에만 카드를 연다.** 초안·확정에서 GET 을 치면
+          `PLAN_016` 이 난다. 일정 전체의 이야기라 특정 일자 옆이 아니라 레일에 둔다.
+        */}
+        {isReviewSectionVisible(plan.status.code) && (
+          <Surface aria-label={messages.plan.reviewHeading}>
+            <PlanReviewList plan={plan} />
+          </Surface>
+        )}
+
+        {/*
+          응급 브리핑 진입점 (#125). **배너 하나만 둔다** — 응답이 일자 × 방문 장소 ×
+          최대 3곳이라 여기 펼치면 개요·준비물이 그만큼 밀린다. 홈이 `/emergency` 를
+          배너로 여는 것과 같은 형태다.
+
+          **상시로 둔다.** 담긴 장소가 없으면 브리핑이 비지만, 그 사실도 들어가서 봐야
+          알 수 있다 — 진입점을 감추면 기능이 있는 줄도 모른다.
+        */}
+        <Surface>
+          <Banner
+            href={`/plans/${plan.planId}/emergency`}
+            title={messages.plan.emergencyHeading}
+            description={messages.plan.emergencyBannerDescription}
+            leading={<EmergencyIcon size={24} />}
+            inset="card"
+          />
+        </Surface>
       </SurfaceStack>
 
       {/*
