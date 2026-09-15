@@ -3,7 +3,7 @@
 > 대상: `app/(main)/about/page.tsx` · `features/about/about-view.tsx` · `lib/messages/about.ts` · `DESIGN.md`(표면 예외 1절 추가)
 > 이슈: [#635](https://github.com/8llow8llowMe/hondigagae/issues/635)
 > 작성: 2026-09-15 (모션 §6-4 같은 날 추가)
-> 상태: 설계 확정 · 사용자 승인 (구현 계획은 `docs/superpowers/plans/`)
+> 상태: **구현 완료** (#635, 2026-09-15) — 계획 `docs/superpowers/plans/2026-09-15-about-landing.md`, 세부명세 `frontend/docs/features/about/소개페이지-세부명세.md`
 > 목업: `frontend/docs/features/about/소개페이지-목업.html` (정적 HTML 1장, 브라우저로 연다)
 
 **Goal:** 로그인 없이 열리는 `/about` 을 **서비스 소개 페이지**로 확장한다. 첫 방문 보호자가
