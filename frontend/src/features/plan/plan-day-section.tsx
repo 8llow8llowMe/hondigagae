@@ -211,9 +211,14 @@ export function PlanDaySection({
         달라 제목 줄의 `⋯` 안이다.
 
         편집 중에는 감춘다 — 그때는 편집기가 저장 지점을 들고 있다.
+
+        **`pb-5` 를 준다.** 다음에 오는 `PlanIndoorAlternatives` 는 대안이 없으면 `null`
+        이라(`plan-indoor-alts.tsx`), **비 예보가 없는 날 = 대부분의 날**은 이 줄이 카드의
+        마지막 요소다 — 아래 여백이 없으면 버튼이 카드 테두리에 붙는다(실측 1px).
+        헤더의 `pt-5` 와 짝을 맞춘다.
       */}
       {!editing && (
-        <div className={cn('flex flex-wrap items-center gap-2 pt-3', INSET_CLASS.card)}>
+        <div className={cn('flex flex-wrap items-center gap-2 pt-3 pb-5', INSET_CLASS.card)}>
           {/*
             **빈 일자에도 남는다.** 담을 곳이 없는 날이야말로 이 버튼이 필요하다 —
             `순서 편집` 과 달리 항목 수를 보지 않는다.

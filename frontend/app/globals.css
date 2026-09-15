@@ -521,7 +521,18 @@ body {
 
     행 사이 간격은 ③ 이 자기 `pt-*` 로 낸다 — 열 사이를 `lg:pr-3`/`lg:pl-3` 로 내는 기존
     문법과 같다. `row-gap` 을 주면 ② 가 두 행에 걸쳐 있어 **본문 안쪽에도 틈이 생긴다.**
+
+    **행 크기를 명시해야 한다.** `.rail-layout` 의 행은 기본이 `auto` 인데, CSS Grid 는
+    **여러 트랙에 걸친 아이템의 초과분을 걸친 트랙에 균등 분배**한다 — ② 가 좌측보다 길면
+    그 절반이 row 1 에 얹혀 ① 과 ③ 사이가 벌어진다. 실측에서 1280 기준 **325~523px** 이
+    비었고 일수가 늘수록 커졌다(3일 일정 523px). `max-content minmax(0, 1fr)` 을 주면
+    걸친 아이템이 초과분을 **flexible 트랙(row 2)으로 넘기므로** row 1 이 ① 의 높이에
+    딱 맞는다. `.rail-layout-filter` 가 이미 같은 이유로 `grid-template-rows` 를 쓴다.
   */
+  .rail-layout-split {
+    grid-template-rows: max-content minmax(0, 1fr);
+  }
+
   .rail-layout-split > .rail-split-top {
     grid-column: 1;
     grid-row: 1;
