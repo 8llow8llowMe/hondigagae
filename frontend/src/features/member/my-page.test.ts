@@ -190,10 +190,16 @@ describe('AccountSection — 계정 상태 3종이 다르게 그려진다 (D5)',
   /*
     **계정 상태와 무관하게 나온다.** 약관은 소셜 계정에도 비밀번호 계정에도, 판별
     불가(`unknown`)한 계정에도 똑같이 적용된다 — 상태로 갈리면 어떤 회원은 자기에게
-    적용되는 문서에 마이페이지에서 닿지 못한다.
+    적용되는 문서에 마이페이지에서 닿지 못한다. 네 상태를 전부 돈다 — `general` ·
+    `unknown` 만 보면 `social-only` · `linked` 에서 조용히 조건에 걸려도 잡지 못한다.
   */
-  it('계정 상태가 unknown 이어도 약관 항목은 나온다', () => {
-    const markup = account('unknown', null)
+  it.each([
+    ['general', null],
+    ['social-only', 'KAKAO'],
+    ['linked', 'KAKAO'],
+    ['unknown', null],
+  ] as const)('계정 상태가 %s 이어도 약관 항목은 나온다', (state, provider) => {
+    const markup = account(state, provider)
 
     for (const link of LEGAL_LINKS) {
       expect(markup).toContain(`href="${link.href}"`)
@@ -371,13 +377,19 @@ describe('AccountSection — 카드 안 내용만 낸다 (#466)', () => {
 
   /**
    * **#610 이후 `unknown` 도 빈 목록이 아니다** — 읽기·이동 항목은 없어도 약관 항목
-   * 둘은 상태와 무관하게 항상 들어온다. 그래서 `ul` 도 `dl` 의 `border-t` 도 항상 선다 —
-   * "허공의 선을 만들지 않는다" 는 이제 반대 방향(항상 선을 긋는다)으로 지켜진다.
+   * 둘은 상태와 무관하게 항상 들어온다. `toContain('<ul')` 만으로는 증명되지 않는다 —
+   * `SurfaceList` 의 `<ul>` 은 `hasItems` 래핑을 걷은 뒤로 내부가 비어 있어도 항상
+   * 렌더되므로, 여기서는 **약관 링크의 `href` 가 실제로 들어 있는지** 를 본다. 그래야
+   * `LEGAL_LINKS.map` 이 다시 `state` 조건 안으로 들어가는 회귀를 이 테스트가 잡는다.
+   * `dl` 의 `border-t` 도 항상 선다 — "허공의 선을 만들지 않는다" 는 이제 반대
+   * 방향(항상 선을 긋는다)으로 지켜진다.
    */
-  it('판별 불가여도 약관 항목이 있어 목록과 구분선이 항상 선다', () => {
+  it('판별 불가여도 약관 항목은 실재 라우트로 나오고 구분선도 항상 선다', () => {
     const markup = account('unknown', null)
 
-    expect(markup).toContain('<ul')
+    for (const link of LEGAL_LINKS) {
+      expect(markup).toContain(`href="${link.href}"`)
+    }
     expect(/<dl\b[^>]*>/.exec(markup)?.[0]).toContain('border-t')
   })
 
