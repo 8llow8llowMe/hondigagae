@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { VERDICT_SPECIMEN } from '@/features/about/about-specimen-data'
+import { GoldenCurveSpecimen } from '@/features/about/golden-curve-specimen'
 import { VerdictSpecimen } from '@/features/about/verdict-specimen'
 import { messages } from '@/lib/messages'
 
@@ -42,5 +43,33 @@ describe('VerdictSpecimen — 히어로 판정 카드', () => {
 
   it('숨김 클래스가 없다', () => {
     expect(markup).not.toContain('opacity-0')
+  })
+})
+
+describe('GoldenCurveSpecimen — 골든타임 곡선', () => {
+  const markup = renderToStaticMarkup(createElement(GoldenCurveSpecimen))
+
+  it('그래프는 role=img + 한 문장 라벨이다', () => {
+    expect(markup).toContain('role="img"')
+    expect(markup).toContain(messages.about.specimen.curveAria)
+  })
+
+  it('정적 렌더는 다 그려진 상태다 — dashoffset 0', () => {
+    expect(markup).toContain('stroke-dashoffset:0')
+    expect(markup).not.toContain('stroke-dashoffset:1;')
+  })
+
+  it('노면 선만 등급 색이다 — 기온 선은 중립', () => {
+    expect(markup).toContain('stroke-metric-critical-500')
+    expect(markup).toContain('stroke-fg-muted')
+  })
+
+  it('추천 구간 면은 tint 층이다 — 글자를 얹지 않는 면', () => {
+    expect(markup).toContain('fill-metric-high-100')
+  })
+
+  it('부제에 추천 구간이 치환돼 들어간다', () => {
+    expect(markup).toContain(VERDICT_SPECIMEN.window)
+    expect(markup).not.toContain('{window}')
   })
 })

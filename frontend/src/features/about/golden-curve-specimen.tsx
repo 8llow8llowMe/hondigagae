@@ -1,0 +1,142 @@
+'use client'
+
+import { type CSSProperties, useRef } from 'react'
+
+import { GOLDEN_CURVE_SPECIMEN, VERDICT_SPECIMEN } from '@/features/about/about-specimen-data'
+import { useRevealOnce } from '@/features/about/use-reveal-once'
+import { messages } from '@/lib/messages'
+import { cn } from '@/lib/utils/cn'
+
+const DRAW_MS = 800
+
+/**
+ * 골든타임 곡선 예시 (#635, 명세 §5-3 · §6-4).
+ *
+ * 선은 `pathLength=1` 위에서 `stroke-dashoffset` 1 → 0 으로 그려진다. **정적 렌더는 0(다
+ * 그려짐)** 이고 `armed` 일 때만 1 이다 — JS 없이도 곡선이 보인다. 추천 구간 면은 선이 끝난
+ * 뒤(800ms) 200ms 로 나타난다.
+ *
+ * `armed` 동안에는 transition 을 끈다 — `useRevealOnce` 의 소비자 계약이다. 이미 다 그려진
+ * 선에 전환이 켜진 채로 시작 상태(dashoffset 1)를 붙이면, 그 붙임 자체가 800ms 짜리 "지우기"
+ * 로 전환돼 정작 `revealed` 에서 볼 재생이 남지 않는다. 꺼 두면 시작 프레임이 즉시 칠해지고
+ * 다음 프레임에 전환이 켜지며 그리기가 재생된다. 본보기는 `reveal.tsx`.
+ *
+ * SVG 속성 전환은 Tailwind 유틸리티가 없어 인라인 `style` 로 건다. 색은 유틸리티
+ * (`stroke-*` · `fill-*`)다 — 노면 선만 `metric-critical-500`, 기온은 `fg-muted`, 추천 구간
+ * 면은 `metric-high-100`(글자를 얹지 않는 tint 층).
+ */
+export function GoldenCurveSpecimen() {
+  const ref = useRef<SVGSVGElement>(null)
+  const phase = useRevealOnce(ref, true)
+  const drawing = phase === 'armed'
+  const copy = messages.about.specimen
+  const data = GOLDEN_CURVE_SPECIMEN
+
+  const lineStyle: CSSProperties = {
+    strokeDasharray: 1,
+    strokeDashoffset: drawing ? 1 : 0,
+    transition: drawing ? 'none' : `stroke-dashoffset ${DRAW_MS}ms ease-out`,
+  }
+
+  return (
+    <div className="bg-bg border-border -mx-4 border-y md:mx-0 md:rounded-lg md:border">
+      <div className="px-4 pt-4 md:px-5">
+        <p className="text-title-2 text-fg font-semibold">{copy.curveTitle}</p>
+        <p className="text-caption text-fg-muted mt-1 font-medium">
+          {copy.curveSub.replace('{window}', VERDICT_SPECIMEN.window)}
+        </p>
+      </div>
+      <div className="px-4 pt-3 pb-4 md:px-5">
+        <svg
+          ref={ref}
+          viewBox="0 0 360 150"
+          className="block h-auto w-full"
+          role="img"
+          aria-label={copy.curveAria}
+        >
+          <rect
+            x={data.windowX}
+            y={8}
+            width={data.windowWidth}
+            height={118}
+            rx={4}
+            className={cn(
+              'fill-metric-high-100',
+              drawing ? 'opacity-0 transition-none' : 'transition-opacity duration-200 ease-out',
+            )}
+            style={{ transitionDelay: drawing ? '0ms' : `${DRAW_MS}ms` }}
+          />
+          <g className="stroke-border" strokeWidth={1}>
+            <line x1={12} y1={126} x2={348} y2={126} />
+            <line x1={12} y1={86} x2={348} y2={86} strokeDasharray="3 4" />
+            <line x1={12} y1={46} x2={348} y2={46} strokeDasharray="3 4" />
+          </g>
+          <g className="fill-fg-muted text-caption font-medium">
+            {data.hours.map((hour) => (
+              <text key={hour.label} x={hour.x} y={143}>
+                {hour.label}
+              </text>
+            ))}
+            <text x={330} y={42} textAnchor="end">
+              50℃
+            </text>
+            <text x={330} y={82} textAnchor="end">
+              30℃
+            </text>
+          </g>
+          <path
+            d={data.temperaturePath}
+            pathLength={1}
+            fill="none"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            className="stroke-fg-muted"
+            style={lineStyle}
+          />
+          <path
+            d={data.pavementPath}
+            pathLength={1}
+            fill="none"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            className="stroke-metric-critical-500"
+            style={lineStyle}
+          />
+          <g
+            className={
+              drawing ? 'opacity-0 transition-none' : 'transition-opacity duration-150 ease-out'
+            }
+            style={{ transitionDelay: drawing ? '0ms' : `${DRAW_MS}ms` }}
+          >
+            <circle cx={data.peak.x} cy={data.peak.y} r={4} className="fill-metric-critical-500" />
+            <text
+              x={data.peak.x + 8}
+              y={data.peak.y - 2}
+              className="fill-metric-critical-700 text-caption font-bold"
+            >
+              {data.peak.label}
+            </text>
+          </g>
+        </svg>
+        <ul className="text-caption text-fg-muted mt-2 flex flex-wrap gap-x-4 gap-y-1.5 font-medium">
+          <li className="flex items-center gap-1.5">
+            <span aria-hidden className="bg-fg-muted inline-block h-0.5 w-3 rounded-sm" />
+            {copy.curveLegendTemperature}
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="bg-metric-critical-500 inline-block h-0.5 w-3 rounded-sm"
+            />
+            {copy.curveLegendPavement}
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span aria-hidden className="bg-metric-high-100 inline-block h-2.5 w-3.5 rounded-sm" />
+            {copy.curveLegendWindow}
+          </li>
+        </ul>
+        <p className="text-caption text-fg-muted mt-3 font-medium">{copy.curveNote}</p>
+      </div>
+    </div>
+  )
+}
