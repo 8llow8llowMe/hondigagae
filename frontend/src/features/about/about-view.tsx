@@ -21,6 +21,7 @@ import { IntroBand } from '@/features/about/intro-band'
 import { PlacesSpecimen } from '@/features/about/places-specimen'
 import { PlanSpecimen } from '@/features/about/plan-specimen'
 import { Reveal } from '@/features/about/reveal'
+import { Tag } from '@/features/about/tag'
 import { VerdictSpecimen } from '@/features/about/verdict-specimen'
 import { LEGAL_LINKS } from '@/lib/legal/links'
 import { messages } from '@/lib/messages'
@@ -54,7 +55,7 @@ import { cn } from '@/lib/utils/cn'
  *
  * **히어로 예시 열이 12 중 5 인 이유는 폭이다.** 3열 중 1열(`lg:grid-cols-3`)이면 1024 에서
  * 판정 카드가 272px 로 **모바일보다 좁아진다** — 카드 안 수치 세 개가 한 줄에 서지 못한다.
- * 12열 5칸은 `gap-16` 기준 1024 에서 356px, 1280 에서 409px 로 모바일(358)보다 좁아지지 않는다.
+ * 12열 5칸은 `gap-16` 기준 1024 에서 356px, 1280 에서 409px 로 모바일(358)과 거의 같다.
  */
 export function AboutView() {
   const about = messages.about
@@ -210,12 +211,9 @@ export function AboutView() {
               <p className="text-body-2 text-fg mt-3 font-semibold">{about.specimen.indoorTitle}</p>
               <div className="mt-1 flex flex-wrap gap-1.5">
                 {INDOOR_SPECIMEN.map((item) => (
-                  <span
-                    key={item}
-                    className="bg-band text-caption text-fg-muted inline-flex h-5.5 items-center rounded-sm px-2 font-medium"
-                  >
+                  <Tag key={item} tone="neutral">
                     {item}
-                  </span>
+                  </Tag>
                 ))}
               </div>
             </FeatureCard>

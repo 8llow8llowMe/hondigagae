@@ -6,6 +6,7 @@ import { MetricBadge } from '@/components/metric'
 import { VERDICT_SPECIMEN } from '@/features/about/about-specimen-data'
 import { useRevealOnce } from '@/features/about/use-reveal-once'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
 const COUNT_UP_MS = 600
@@ -112,7 +113,7 @@ export function VerdictSpecimen() {
       aria-label={copy.verdictAria}
       className="bg-bg border-border -mx-4 border-y md:mx-0 md:rounded-lg md:border"
     >
-      <div className="flex items-start justify-between gap-3 px-4 pt-4 md:px-5">
+      <div className={cn('flex items-start justify-between gap-3 pt-4', INSET_CLASS.card)}>
         <div>
           <p className="text-caption text-fg-muted font-semibold">{copy.verdictLabel}</p>
           <p className="text-title-2 text-fg mt-1 font-semibold">{copy.verdictTitle}</p>
@@ -128,7 +129,7 @@ export function VerdictSpecimen() {
           {copy.verdictGrade}
         </MetricBadge>
       </div>
-      <div className="px-4 pt-3 pb-4 md:px-5">
+      <div className={cn('pt-3 pb-4', INSET_CLASS.card)}>
         <div className="grid grid-cols-3 gap-2 lg:gap-3">
           <Metric label={copy.temperatureLabel} value={t} final={temperature} decimals={0} />
           <Metric label={copy.pavementLabel} value={p} final={pavement} decimals={1} hot />

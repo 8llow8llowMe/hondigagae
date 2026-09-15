@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { Reveal, REVEAL_HIDDEN_CLASS } from '@/features/about/reveal'
 import { readSourceWithoutComments } from '@/test/source'
+import { readGlobalsCss } from '@/test/tokens'
 
 /**
  * 스크롤 등장 래퍼 (#635, 명세 §6-4 1단).
@@ -86,5 +87,22 @@ describe('useRevealOnce — 소스 규칙', () => {
 
   it('보이는데 재생하지 않는 경로에서 armed 를 idle 로 되돌린다', () => {
     expect(source).toContain("setPhase('idle')")
+  })
+})
+
+/**
+ * 감속 설정은 전역 규칙 하나가 잡는다 (검토 최종 Important 1).
+ *
+ * `transition-duration` 만 0.01ms 로 덮으면 **지연은 그대로 남는다** — 곡선의 추천 구간 면과
+ * 봉우리 라벨(800ms), 막대의 색 전환(820ms)이 인라인 `transitionDelay` 를 쓰기 때문에,
+ * 감속을 켠 사용자에게도 끝 상태가 0.8초 뒤에 나타난다. 지연까지 꺼야 "즉시 끝 상태"가 된다.
+ */
+describe('prefers-reduced-motion — 지연까지 끈다', () => {
+  const globals = readGlobalsCss()
+
+  it('감속 블록이 transition-delay 를 0s 로 덮는다', () => {
+    expect(globals).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*?transition-delay:\s*0s !important/,
+    )
   })
 })

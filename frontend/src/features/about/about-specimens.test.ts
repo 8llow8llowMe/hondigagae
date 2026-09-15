@@ -16,6 +16,7 @@ import { PlacesSpecimen } from '@/features/about/places-specimen'
 import { PlanSpecimen } from '@/features/about/plan-specimen'
 import { VerdictSpecimen } from '@/features/about/verdict-specimen'
 import { messages } from '@/lib/messages'
+import { readSourceWithoutComments } from '@/test/source'
 
 /**
  * 고정 예시 4개 (#635, 명세 §6-4 2단). **끝 상태가 정본이다** — 정적 마크업에 최종값이 있고
@@ -176,4 +177,23 @@ describe('EmergencySpecimen — 가까운 병원·약국 예시', () => {
   it('예시 캡션이 있다 — 실제 거리로 읽히지 않게', () => {
     expect(markup).toContain(messages.about.specimen.emergencyNote)
   })
+})
+
+/**
+ * 좌우 인셋은 `INSET_CLASS` 하나가 정한다 (검토 최종 Important 3).
+ *
+ * `px-4 … md:px-5` 를 컴포넌트마다 손으로 적으면 `lib/ui/inset` 이 바뀔 때 여기만 남는다 —
+ * 그 드리프트가 `inset.ts` 주석이 기록한 실측 사고(판정 40 · 골든타임 24)의 원인이었다.
+ */
+describe('예시 카드 — 인셋을 문자열로 적지 않는다', () => {
+  for (const file of [
+    'src/features/about/verdict-specimen.tsx',
+    'src/features/about/golden-curve-specimen.tsx',
+  ]) {
+    it(`${file} 은 INSET_CLASS.card 를 쓴다`, () => {
+      const source = readSourceWithoutComments(file)
+      expect(source).toContain('INSET_CLASS.card')
+      expect(source).not.toContain('md:px-5')
+    })
+  }
 })

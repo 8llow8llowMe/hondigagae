@@ -5,6 +5,8 @@ import { type CSSProperties, useRef } from 'react'
 import { GOLDEN_CURVE_SPECIMEN, VERDICT_SPECIMEN } from '@/features/about/about-specimen-data'
 import { useRevealOnce } from '@/features/about/use-reveal-once'
 import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 
 const DRAW_MS = 800
 
@@ -47,13 +49,13 @@ export function GoldenCurveSpecimen() {
 
   return (
     <div className="bg-bg border-border -mx-4 border-y md:mx-0 md:rounded-lg md:border">
-      <div className="px-4 pt-4 md:px-5">
+      <div className={cn('pt-4', INSET_CLASS.card)}>
         <p className="text-title-2 text-fg font-semibold">{copy.curveTitle}</p>
         <p className="text-caption text-fg-muted mt-1 font-medium">
           {copy.curveSub.replace('{window}', VERDICT_SPECIMEN.window)}
         </p>
       </div>
-      <div className="px-4 pt-3 pb-4 md:px-5">
+      <div className={cn('pt-3 pb-4', INSET_CLASS.card)}>
         <svg
           ref={ref}
           viewBox="0 0 360 150"
@@ -139,18 +141,15 @@ export function GoldenCurveSpecimen() {
         </svg>
         <ul className="text-caption text-fg-muted mt-2 flex flex-wrap gap-x-4 gap-y-1.5 font-medium">
           <li className="flex items-center gap-1.5">
-            <span aria-hidden className="bg-fg-muted inline-block h-0.5 w-3 rounded-sm" />
+            <span aria-hidden className="bg-fg-muted inline-block h-1 w-3 rounded-sm" />
             {copy.curveLegendTemperature}
           </li>
           <li className="flex items-center gap-1.5">
-            <span
-              aria-hidden
-              className="bg-metric-critical-500 inline-block h-0.5 w-3 rounded-sm"
-            />
+            <span aria-hidden className="bg-metric-critical-500 inline-block h-1 w-3 rounded-sm" />
             {copy.curveLegendPavement}
           </li>
           <li className="flex items-center gap-1.5">
-            <span aria-hidden className="bg-metric-high-100 inline-block h-2.5 w-3.5 rounded-sm" />
+            <span aria-hidden className="bg-metric-high-100 inline-block h-3 w-4 rounded-sm" />
             {copy.curveLegendWindow}
           </li>
         </ul>
