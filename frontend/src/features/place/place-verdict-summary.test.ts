@@ -144,15 +144,32 @@ describe('판정 요약 3줄 — 자리', () => {
     ≥1024 는 좌측 레일이 적합도·산책을 이미 첫 화면에 세우고 혼잡도는 본문 맨 위에 있다.
     요약을 거기서도 그리면 **같은 답이 한 화면에 두 번** 선다.
   */
-  it('데스크톱에서는 그리지 않는다 — lg:hidden', () => {
-    const source = readSourceWithoutComments('src/features/place/place-verdict-summary.tsx')
+  it('데스크톱에서는 그리지 않는다 — 요약 래퍼가 lg:hidden 이다', () => {
+    /*
+      **소스 문자열이 아니라 마크업에서 잰다** (`testing-guide.md` §5 — 소스 단언은 렌더할
+      수 없는 계약에만). 파일 어딘가에 `lg:hidden` 이 있는지를 물으면 그 클래스가 셰브론으로
+      옮겨가도 통과한다. 물어야 할 것은 **목록을 감싼 그 요소**가 감춰지는가다.
+    */
+    const wrapper = markup.match(/<div class="([^"]*)"><ul[^>]*aria-label="이 장소 한눈에 보기"/)
 
-    expect(source).toContain('lg:hidden')
+    expect(wrapper).not.toBeNull()
+    expect(wrapper?.[1]).toContain('lg:hidden')
   })
 
-  /* 44px — 모바일 최소 터치 영역 (DESIGN.md §7) */
+  /*
+    44px — 모바일 최소 터치 영역 (DESIGN.md §7).
+
+    **`markup` 전체에서 `min-h-11` 을 찾으면 안 된다** — 같은 문서의 `TelLink`·
+    `HomepageLink` 가 이미 그 클래스를 내고 픽스처에 `tel`·`homepage` 가 둘 다 있어,
+    요약 줄에서 통째로 지워도 통과한다. 요약 줄의 **여는 태그 안**에서 찾는다.
+  */
   it('줄 높이가 44px 이상이다', () => {
-    expect(markup).toContain('min-h-11')
+    for (const id of Object.values(VERDICT_ANCHOR)) {
+      const openTag = markup.match(new RegExp(`<a href="#${id}"[^>]*>`))?.[0]
+
+      expect(openTag).toBeDefined()
+      expect(openTag).toContain('min-h-11')
+    }
   })
 })
 

@@ -382,6 +382,12 @@ export const placeMessages = {
   /** `{feelsLike}` 가 `null` 이면 등급만 쓴다 — `0.0℃` 는 영하로 읽힌다 */
   detailSummaryWalkValue: '{grade} · 체감 {feelsLike}℃',
   detailSummaryCongestionLabel: '덜 붐비는 날',
+  /**
+   * **등급을 빼지 않는다.** 기간이 전부 붐비는 주라면 가장 덜 붐비는 날도 `혼잡` 이고,
+   * 그때 날짜만 내면 이 줄이 추천처럼 읽힌다 — 혼잡도 패널이 같은 이유로 초록 면을
+   * 거절하고 등급 배지를 반드시 붙인다 (`place-congestion-panel.tsx` `LeastCrowded`).
+   */
+  detailSummaryCongestionValue: '{day} · {grade}',
 
   // ── 장소 상세 · 기간 혼잡도 (#430) ──────────────────────────────────────
 

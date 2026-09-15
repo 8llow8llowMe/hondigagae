@@ -89,6 +89,10 @@ function walkLine(walk: WalkSource): VerdictSummaryLine | null {
  *
  * **서버가 고른 날을 그대로 쓴다.** FE 가 최저값을 다시 고르면 같은 기간에 다른 날을
  * 추천하게 된다.
+ *
+ * **등급을 반드시 함께 말한다.** 기간이 전부 붐비는 주라면 **가장 덜 붐비는 날도 `혼잡`**
+ * 이다 — 그때 날짜만 내면 `덜 붐비는 날 · 9월 21일 (월)` 이 추천처럼 읽힌다. 혼잡도 패널이
+ * 같은 이유로 초록 면(tint)을 거절하고 등급 배지를 반드시 붙인다 (`LeastCrowded` 주석).
  */
 function congestionLine(congestion: CongestionSource): VerdictSummaryLine | null {
   const label = messages.place.detailSummaryCongestionLabel
@@ -101,10 +105,14 @@ function congestionLine(congestion: CongestionSource): VerdictSummaryLine | null
   const parts = splitDay(least.date)
   if (parts === null) return null
 
-  const value = messages.place.detailCongestionLeastDay
+  const day = messages.place.detailCongestionLeastDay
     .replace('{month}', parts.month)
     .replace('{day}', parts.day)
     .replace('{weekday}', parts.weekday)
+
+  const value = messages.place.detailSummaryCongestionValue
+    .replace('{day}', day)
+    .replace('{grade}', least.level.name)
 
   return { label, value, anchorId: VERDICT_ANCHOR.congestion }
 }
