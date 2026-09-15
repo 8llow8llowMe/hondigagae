@@ -406,6 +406,21 @@ describe('PlanOverviewPanel', () => {
     expect(markup).toContain('여행 적합')
   })
 
+  /*
+    목차 배지도 적합도 축이다 (#652). 같은 등급어가 혼잡도에도 쓰이므로 화면마다 축을
+    밝히는 규칙이 갈리면 사용자가 배운 것이 깨진다 (등급배지-축라벨-세부명세 D5).
+  */
+  it('목차 배지가 적합도 축임을 말한다', () => {
+    const markup = renderOverview()
+    const axis = messages.common.metricAxisSuitability
+
+    /* 목차 항목 하나로 범위를 좁힌다 — 개요 카드가 같은 낱말을 내면 단언이 공허해진다 */
+    const tocItem = markup.slice(markup.indexOf('href="#day1"'), markup.indexOf('</a>'))
+
+    expect(tocItem).toContain(`>${axis} </span>`)
+    expect(tocItem).toContain(`</span>${planVerdict.suitabilityLevel?.name}</span>`)
+  })
+
   it('판정을 못 낸 날은 목차에서 점선 unknown 이다 — 낮은 등급으로 칠하지 않는다', () => {
     const markup = renderOverview({
       verdicts: [{ ...planVerdict, score: null, suitabilityLevel: null }],
@@ -413,6 +428,17 @@ describe('PlanOverviewPanel', () => {
 
     expect(markup).toContain(messages.plan.verdictTocUnavailable)
     expect(markup).toContain('border-dashed')
+  })
+
+  /* 판정을 못 낸 날도 축은 적합도다 — `판정 없음` 만 서면 무엇의 판정인지 알 수 없다 */
+  it('판정을 못 낸 목차 배지도 적합도 축임을 말한다', () => {
+    const markup = renderOverview({
+      verdicts: [{ ...planVerdict, score: null, suitabilityLevel: null }],
+    })
+    const tocItem = markup.slice(markup.indexOf('href="#day1"'), markup.indexOf('</a>'))
+
+    expect(tocItem).toContain(`>${messages.common.metricAxisSuitability} </span>`)
+    expect(tocItem).toContain(`</span>${messages.plan.verdictTocUnavailable}</span>`)
   })
 
   it('예산이 없으면 미정으로 말한다 — 0원으로 단정하지 않는다', () => {

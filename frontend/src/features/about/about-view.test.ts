@@ -81,6 +81,24 @@ describe('AboutView — 8절 (#635)', () => {
     expect(markup).toContain(messages.about.specimen.suitabilityGrade)
   })
 
+  /*
+    **예시는 실화면을 보여 주는 것이 일이다** (#652 · 등급배지-축라벨-세부명세 D8-3).
+    예전에는 여기만 `적합도 높음` 이라 소개 페이지가 실제로 없는 화면을 보여 줬다 —
+    실제 서버 `name` 은 `여행 적합` 이고 축은 배지가 붙인다.
+  */
+  it('적합도 예시가 실화면과 같은 어휘를 쓴다', () => {
+    const axis = messages.common.metricAxisSuitability
+    const badge = markup.slice(
+      markup.indexOf(`>${axis} </span>`),
+      markup.indexOf(`>${axis} </span>`) + 120,
+    )
+
+    expect(markup).toContain(`>${axis} </span>`)
+    expect(badge).toContain(`</span>${messages.about.specimen.suitabilityGrade}</span>`)
+    /* 축 라벨이 문구 상수로 되돌아가면 배지가 `적합도 적합도 …` 가 된다 */
+    expect(messages.about.specimen.suitabilityGrade).not.toContain(axis)
+  })
+
   it('정적 마크업에 숨김 클래스가 없다 — JS 없이도 보인다', () => {
     for (const cls of [...REVEAL_HIDDEN_CLASS.split(' '), 'scale-y-0']) {
       expect(markup).not.toContain(cls)
