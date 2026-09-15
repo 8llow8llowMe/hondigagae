@@ -384,8 +384,15 @@ export const placeMessages = {
    * 날짜를 목록에서 빼지 않는 이유와 같다.
    */
   detailCongestionUnknownNote: '점선은 아직 모르는 날이에요. 한산하다는 뜻이 아니에요.',
-  /** 30일을 펼쳤을 때. 이 카드가 적합도보다 멀리 본다는 것을 그 자리에서 말한다 */
+  /**
+   * 30일 보기의 각주. **기본 상태에서 보인다** (#603) — 30일이 기본이 되면서, 이 카드가
+   * 적합도보다 멀리 본다는 것이 첫 화면에서 바로 읽힌다.
+   */
   detailCongestionExtendedNote: '혼잡도 예측은 30일까지 있어요. 날씨 판정은 11일까지예요.',
+  /**
+   * 기간 토글. **이름은 전환 방향이고 기본값이 아니다** — 기본이 30일이라 첫 화면에 서는
+   * 것은 `Collapse`(`7일만 보기`) 쪽이다.
+   */
   detailCongestionExpand: '30일까지 보기',
   detailCongestionCollapse: '7일만 보기',
   /**

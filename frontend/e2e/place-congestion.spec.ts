@@ -36,55 +36,62 @@ import { CONTENT_MAX, hasHorizontalOverflow, VIEWPORTS } from './helpers/layout'
 /** 목 저장소의 첫 장소. `surface.spec.ts` 도 이 id 로 상세를 연다 */
 const PLACE = '/places/212481712381923329'
 
-/** `CONGESTION_DAYS.extended` — 혼잡도 예측이 답할 수 있는 끝이다 */
-const EXTENDED_DAYS = 30
+/** `CONGESTION_DAYS.month` — 혼잡도 예측이 답할 수 있는 끝이고, **첫 화면의 기본값**이다 */
+const MONTH_DAYS = 30
+
+/** `CONGESTION_DAYS.week` — 좁히는 쪽 선택지 */
+const WEEK_DAYS = 7
 
 /**
  * **`--content-max` 폭을 따로 잰다.**
  *
  * 공용 `VIEWPORTS.desktop` 은 1920 인데, 거기서는 이 결함이 **화면 밖으로 나가지 않는다** —
- * `.rail-layout` 이 1440 으로 캡을 걸어 본문 열이 x=640 에서 시작하고, 30칸 1134px 은
- * 1774 에서 끝나 1920 안에 들어간다. 수정을 통째로 되돌리고 돌려도 1920 은 통과했다(실측).
+ * `.rail-layout` 이 1440 으로 캡을 걸어 본문 열이 x=640 에서 시작하고, 30칸은 1774 에서 끝나
+ * 1920 안에 들어간다. 수정을 통째로 되돌리고 돌려도 1920 은 통과했다(실측).
  *
- * 1440 은 본문 열이 x=400 에서 시작해 1534 로 끝난다 — **콘텐츠 캡과 같은 폭이 가장 빡빡한
- * 데스크톱**이고, 이 저장소의 아트보드 기준 폭(03)이기도 하다. 넓은 화면만 재면 데스크톱을
- * 쟀다고 착각하면서 정작 기준 폭을 놓친다.
+ * 1440 은 본문 열이 x=400 에서 시작해 화면 밖으로 나간다 — **콘텐츠 캡과 같은 폭이 가장
+ * 빡빡한 데스크톱**이고, 이 저장소의 아트보드 기준 폭(03)이기도 하다. 넓은 화면만 재면
+ * 데스크톱을 쟀다고 착각하면서 정작 기준 폭을 놓친다.
  */
 const CONTENT_MAX_VIEWPORT = { width: CONTENT_MAX, height: 900 } as const
 
 const WIDTHS = { ...VIEWPORTS, contentMax: CONTENT_MAX_VIEWPORT } as const
 
 /**
- * 30일로 펼치고 **칸이 다 설 때까지** 기다린다.
+ * **칸이 다 설 때까지 기다린다.**
  *
- * 칸 수로 기다리는 이유는 버튼 문구만 보면 **재조회 중에 통과**하기 때문이다 — `days` 가
- * 바뀌면 새 요청이 나가고 그동안 7칸이 남아 있거나 스켈레톤이 선다. 그 순간에 폭을 재면
- * 넘치기 전 상태를 재고 지나간다.
+ * 30일이 기본이 되면서 클릭이 필요 없어졌지만, 기다리는 이유는 그대로다 — 조회 중에는
+ * 스켈레톤이 서고 그 순간에 폭을 재면 넘치기 전 상태를 재고 지나간다.
  */
-async function expandToThirtyDays(page: Page) {
+async function monthRail(page: Page) {
   const card = page.getByRole('region', { name: messages.place.detailCongestionTitle })
 
-  await card.getByRole('button', { name: messages.place.detailCongestionExpand }).click()
-
-  await expect(
-    card.getByRole('button', { name: messages.place.detailCongestionCollapse }),
-  ).toBeVisible()
-  await expect(card.getByRole('listitem')).toHaveCount(EXTENDED_DAYS)
+  await expect(card.getByRole('listitem')).toHaveCount(MONTH_DAYS)
 
   return card
 }
 
 test.describe('기간 혼잡도 — 30일 레일 (#603)', () => {
   for (const [name, viewport] of Object.entries(WIDTHS)) {
-    test(`${name} — 30일을 펼쳐도 페이지가 가로로 넘치지 않는다`, async ({ page }) => {
+    test(`${name} — 기본값인 30일에서 페이지가 가로로 넘치지 않는다`, async ({ page }) => {
       await page.setViewportSize(viewport)
       await page.goto(PLACE)
 
-      // 펼치기 전에는 넘치지 않는다 — 넘침이 이 조작 때문임을 분명히 한다
-      expect(await hasHorizontalOverflow(page)).toBe(false)
+      const card = await monthRail(page)
 
-      await expandToThirtyDays(page)
+      await expect.poll(() => hasHorizontalOverflow(page)).toBe(false)
 
+      /*
+        **7일로 좁혔다 되돌아와도 그대로다.** 레일을 만드는 분기가 `days` 에 달려 있어,
+        토글이 스크롤러·페이드·화살표를 떼었다 붙인다 — 그 왕복에서 넘침이 되살아나는지는
+        첫 렌더만 재서는 알 수 없다.
+      */
+      await card.getByRole('button', { name: messages.place.detailCongestionCollapse }).click()
+      await expect(card.getByRole('listitem')).toHaveCount(WEEK_DAYS)
+      await expect.poll(() => hasHorizontalOverflow(page)).toBe(false)
+
+      await card.getByRole('button', { name: messages.place.detailCongestionExpand }).click()
+      await expect(card.getByRole('listitem')).toHaveCount(MONTH_DAYS)
       await expect.poll(() => hasHorizontalOverflow(page)).toBe(false)
     })
   }
@@ -107,7 +114,7 @@ test.describe('기간 혼잡도 — 30일 레일 (#603)', () => {
     await page.setViewportSize(CONTENT_MAX_VIEWPORT)
     await page.goto(PLACE)
 
-    const card = await expandToThirtyDays(page)
+    const card = await monthRail(page)
 
     const measured = await card.evaluate((section) => {
       const scroller = [...section.querySelectorAll('*')].find((el) => {
