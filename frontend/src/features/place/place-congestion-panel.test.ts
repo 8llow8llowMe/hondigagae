@@ -59,7 +59,12 @@ describe('PlaceCongestionPanel — 서버가 고른 날', () => {
 
     expect(markup).toContain(messages.place.detailCongestionLeastLabel)
     expect(markup).toContain('9월 5일 (토)')
-    expect(markup).toContain('21.4')
+    /*
+      **`21.4` 로 재면 안 된다** (#651). 집중률 표시가 정수로 가면서 그 문자열은 이제
+      막대의 `style="height:21.4%"` 로만 남는다 — 집중률 줄이 통째로 사라져도 통과한다.
+      화면이 읽는 값은 정수다.
+    */
+    expect(markup).toContain(`${messages.place.detailCongestionRateLabel} 21`)
   })
 
   /* 등급 문구는 서버 `name` 이다. FE 가 한국어 매핑 테이블을 만들지 않는다 */
@@ -250,18 +255,32 @@ describe('PlaceCongestionPanel — 막대 색 (#603)', () => {
 /**
  * 집중률 표현 (#651 · 진단 D-3).
  *
- * `57.77` 은 높은 값인지 낮은 값인지 화면에 비교 기준이 없었다. 계산 규칙 자체는
- * `lib/insight/congestion.test.ts` 가 분기별로 잰다 — 여기서는 **화면에 나오는 모양**만 본다.
+ * `57.77` 은 높은 값인지 낮은 값인지 화면에 비교 기준이 없었다.
+ *
+ * **계산 규칙은 여기서 재지 않는다.** 반올림 순서 · `UNKNOWN` 제외 · 비교 생략은
+ * `lib/insight/congestion.test.ts` 가 분기별로 잰다. 여기서 같은 것을 다시 재려 하면
+ * 픽스처가 두 구현에서 같은 값을 내 **항진식이 되기 쉽다** — 실제로 이 픽스처는 반올림
+ * 순서를 뒤집어도 `24` 로 같다. 이 파일은 **화면에 나오는 모양**만 본다.
  */
 describe('PlaceCongestionPanel — 집중률 표현 (#651)', () => {
   /** 픽스처 7일: 71.8 · 37.2 · 28.6 · null · 21.4 · 44.9 · 68.3 → 아는 날 6일, 평균 45 */
-  const rateLine = (markup: string) =>
-    markup.match(new RegExp(`${messages.place.detailCongestionRateLabel}[^<]*`))?.[0] ?? ''
+  /**
+   * 집중률 줄만 떼어 낸다.
+   *
+   * **매치 실패를 `''` 로 삼키지 않는다** — 그 위에 쌓은 `not.toContain` 이 전부 공허하게
+   * 통과한다. 줄이 사라지는 것 자체가 회귀다.
+   */
+  const rateLine = (markup: string) => {
+    const line = markup.match(new RegExp(`${messages.place.detailCongestionRateLabel}[^<]*`))?.[0]
+
+    expect(line).toBeDefined()
+    return line!
+  }
 
   it('집중률에 소수점이 없다', () => {
     const markup = render()
 
-    expect(markup).not.toMatch(/집중률 \d+\.\d/)
+    expect(markup).not.toMatch(new RegExp(`${messages.place.detailCongestionRateLabel} \\d+\\.\\d`))
   })
 
   it('평균과 차이를 함께 말한다', () => {
@@ -271,17 +290,6 @@ describe('PlaceCongestionPanel — 집중률 표현 (#651)', () => {
     expect(line).toContain('21')
     expect(line).toContain('45')
     expect(line).toContain('24')
-  })
-
-  /*
-    화면에 보이는 세 숫자가 서로 맞아야 한다 — 평균 − 값 = 차이. 원값으로 빼면 어긋난다.
-  */
-  it('화면의 세 숫자가 서로 맞는다', () => {
-    const line = rateLine(render())
-    const numbers = [...line.matchAll(/\d+/g)].map(([n]) => Number(n))
-
-    expect(numbers).toHaveLength(3)
-    expect(numbers[1]! - numbers[0]!).toBe(numbers[2])
   })
 
   /* 아는 날이 하나뿐이면 "평균보다 0 낮아요" 가 된다 — 비교 문구를 붙이지 않는다 */
