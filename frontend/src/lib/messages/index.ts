@@ -6,6 +6,7 @@ import { favoriteMessages } from '@/lib/messages/favorite'
 import { footerMessages } from '@/lib/messages/footer'
 import { authMessages, formMessages } from '@/lib/messages/form'
 import { homeMessages } from '@/lib/messages/home'
+import { legalMessages } from '@/lib/messages/legal'
 import { mapMessages } from '@/lib/messages/map'
 import { memberMessages } from '@/lib/messages/member'
 import { petMessages } from '@/lib/messages/pet'
@@ -43,6 +44,7 @@ export const messages = {
   favorite: favoriteMessages,
   footer: footerMessages,
   about: aboutMessages,
+  legal: legalMessages,
   map: mapMessages,
   pet: petMessages,
   member: memberMessages,
