@@ -27,6 +27,13 @@ export const planKeys = {
    * 캐시할 것이 없었다 — 저장이 생기면서 조회가 됐다.
    */
   packing: (planId: string) => [...planKeys.all, 'packing', planId] as const,
+  /**
+   * 여행 후기 (#615). **상세와 key 를 나눈다** — 후기만 404(`PLAN_015`)여도 일정
+   * 본문은 그대로 남아야 하고, 쓰기·고친 뒤에는 이 절만 갱신하면 된다.
+   *
+   * 목록에는 `hasReview` 가 없어 목록 key 를 건드리지 않는다.
+   */
+  review: (planId: string) => [...planKeys.all, 'review', planId] as const,
 }
 
 /** api-integration-guide.md §7 표준값 — 일정 목록·상세는 30초 / 10분 (mutation 빈번) */

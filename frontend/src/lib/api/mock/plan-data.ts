@@ -6,10 +6,13 @@ import {
   type MockPackingItem,
   type MockPlan,
   type MockPlanItem,
+  type MockPlanReviewItem,
   mockStore,
   nextPackingItemId,
   nextPlanId,
   nextPlanItemId,
+  nextReviewId,
+  nextReviewItemId,
 } from '@/lib/api/mock/store'
 import type { ApiResponse, CodeNameMetadata, SliceResponse, ValidationErrorItem } from '@/types/api'
 import type { ScoreMetricMetadata } from '@/types/insight'
@@ -20,6 +23,8 @@ import type {
   PlanItemDetail,
   PlanItemPlace,
   PlanPackingListResponse,
+  PlanReviewPlaceItem,
+  PlanReviewResponse,
   PlanSummaryItem,
   PlanWeatherResponse,
 } from '@/types/plan'
@@ -411,6 +416,18 @@ export function resolvePlanMock(
     if (method === 'POST') return withPlan(memberId, rawId, (plan) => addPacking(plan, body))
   }
 
+  /*
+    여행 후기 (#614). **상세 catch-all 보다 앞이다** — 뒤에 두면
+    `/plans/{id}/reviews` 를 `/plans/{id}` 가 먼저 잡는다.
+  */
+  const reviews = /^\/plans\/([^/]+)\/reviews$/.exec(path)
+  if (reviews !== null) {
+    const rawId = reviews[1] ?? ''
+    if (method === 'GET') return withPlan(memberId, rawId, (plan) => getReview(plan))
+    if (method === 'POST') return withPlan(memberId, rawId, (plan) => createReview(plan, body))
+    if (method === 'PUT') return withPlan(memberId, rawId, (plan) => updateReview(plan, body))
+  }
+
   const detail = /^\/plans\/([^/]+)$/.exec(path)
   if (detail !== null) {
     const rawId = detail[1] ?? ''
@@ -738,6 +755,7 @@ function create(memberId: string, body: string | null): MockResult {
     items,
     packingItems: [],
     packingGeneratedAt: null,
+    review: null,
     deleted: false,
   }
   store.plans.push(plan)
@@ -1325,4 +1343,281 @@ function setPackingChecked(plan: MockPlan, packingItemId: string, body: string |
 
   item.checked = parsed.checked
   return { status: 200, payload: ok(null) }
+}
+
+// ─── 여행 후기 (#614) ────────────────────────────────────────────────────────
+
+const REVIEW_BODY_MAX = 2000
+const REVIEW_COMMENT_MAX = 200
+const REVIEW_ITEMS_MAX = 50
+
+type ParsedReviewItem = {
+  planItemId: string
+  rating: number
+  comment: string | null
+}
+
+type ParsedReview =
+  MockResult | { ok: true; overallRating: number; body: string | null; items: ParsedReviewItem[] }
+
+function requireCompleted(plan: MockPlan): MockResult | null {
+  if (plan.status !== 'COMPLETED') {
+    return fail(400, 'PLAN_016', '완료된 일정만 후기를 쓰거나 볼 수 있습니다.')
+  }
+  return null
+}
+
+function getReview(plan: MockPlan): MockResult {
+  const blocked = requireCompleted(plan)
+  if (blocked !== null) return blocked
+  if (plan.review === null) return fail(404, 'PLAN_015', '작성한 여행 후기가 없습니다.')
+  return { status: 200, payload: ok(toReview(plan.planId, plan.review)) }
+}
+
+function createReview(plan: MockPlan, body: string | null): MockResult {
+  const blocked = requireCompleted(plan)
+  if (blocked !== null) return blocked
+  if (plan.review !== null) return fail(409, 'PLAN_017', '이미 이 일정의 후기를 작성했습니다.')
+
+  const parsed = parseReviewUpsert(body)
+  if (!('ok' in parsed)) return parsed
+
+  const snapshots = resolveReviewItemsForCreate(plan, parsed.items)
+  if (!('ok' in snapshots)) return snapshots
+
+  const now = new Date().toISOString().slice(0, 19)
+  const store = mockStore()
+  plan.review = {
+    reviewId: nextReviewId(store),
+    overallRating: parsed.overallRating,
+    body: parsed.body,
+    items: snapshots.items,
+    createdAt: now,
+    updatedAt: now,
+  }
+  return { status: 200, payload: ok(toReview(plan.planId, plan.review)) }
+}
+
+function updateReview(plan: MockPlan, body: string | null): MockResult {
+  const blocked = requireCompleted(plan)
+  if (blocked !== null) return blocked
+  if (plan.review === null) return fail(404, 'PLAN_015', '작성한 여행 후기가 없습니다.')
+
+  const parsed = parseReviewUpsert(body)
+  if (!('ok' in parsed)) return parsed
+
+  const snapshots = resolveReviewItemsForUpdate(plan, plan.review.items, parsed.items)
+  if (!('ok' in snapshots)) return snapshots
+
+  plan.review = {
+    ...plan.review,
+    overallRating: parsed.overallRating,
+    body: parsed.body,
+    items: snapshots.items,
+    updatedAt: new Date().toISOString().slice(0, 19),
+  }
+  return { status: 200, payload: ok(toReview(plan.planId, plan.review)) }
+}
+
+function parseReviewUpsert(body: string | null): ParsedReview {
+  let parsed: Record<string, unknown>
+  try {
+    parsed = body === null ? {} : (JSON.parse(body) as Record<string, unknown>)
+  } catch {
+    return fail(400, 'PLAN_100', '요청 값이 올바르지 않습니다.')
+  }
+
+  const errors: ValidationErrorItem[] = []
+
+  if (parsed.overallRating === undefined || parsed.overallRating === null) {
+    errors.push({ code: 'PLAN_126', field: 'overallRating', message: '전체 만족도는 필수입니다.' })
+  } else if (
+    typeof parsed.overallRating !== 'number' ||
+    !Number.isInteger(parsed.overallRating) ||
+    parsed.overallRating < 1 ||
+    parsed.overallRating > 5
+  ) {
+    errors.push({
+      code: 'PLAN_127',
+      field: 'overallRating',
+      message: '전체 만족도는 1 이상 5 이하여야 합니다.',
+    })
+  }
+
+  if (parsed.body !== undefined && parsed.body !== null) {
+    if (typeof parsed.body !== 'string') {
+      return fail(400, 'PLAN_100', '요청 값이 올바르지 않습니다.')
+    }
+    if (parsed.body.length > REVIEW_BODY_MAX) {
+      errors.push({
+        code: 'PLAN_128',
+        field: 'body',
+        message: '후기 본문은 2000자 이하만 가능합니다.',
+      })
+    }
+  }
+
+  if (parsed.items === undefined || parsed.items === null) {
+    errors.push({
+      code: 'PLAN_129',
+      field: 'items',
+      message: '장소별 후기 목록은 필수입니다.',
+    })
+  } else if (!Array.isArray(parsed.items)) {
+    return fail(400, 'PLAN_100', '요청 값이 올바르지 않습니다.')
+  } else if (parsed.items.length > REVIEW_ITEMS_MAX) {
+    errors.push({
+      code: 'PLAN_130',
+      field: 'items',
+      message: '장소별 후기는 한 번에 최대 50개까지 보낼 수 있습니다.',
+    })
+  }
+
+  const items: ParsedReviewItem[] = []
+  if (Array.isArray(parsed.items)) {
+    parsed.items.forEach((raw, index) => {
+      if (typeof raw !== 'object' || raw === null) return
+      const entry = raw as Record<string, unknown>
+      const planItemId = toPetIdString(entry.planItemId)
+      if (!POSITIVE_ID_PATTERN.test(planItemId)) {
+        errors.push({
+          code: 'PLAN_131',
+          field: `items[${index}].planItemId`,
+          message: '일정 항목 아이디는 양수여야 합니다.',
+        })
+      }
+      if (entry.rating === undefined || entry.rating === null) {
+        errors.push({
+          code: 'PLAN_132',
+          field: `items[${index}].rating`,
+          message: '장소 만족도는 필수입니다.',
+        })
+      } else if (
+        typeof entry.rating !== 'number' ||
+        !Number.isInteger(entry.rating) ||
+        entry.rating < 1 ||
+        entry.rating > 5
+      ) {
+        errors.push({
+          code: 'PLAN_133',
+          field: `items[${index}].rating`,
+          message: '장소 만족도는 1 이상 5 이하여야 합니다.',
+        })
+      }
+      if (entry.comment !== undefined && entry.comment !== null) {
+        if (typeof entry.comment !== 'string') return
+        if (entry.comment.length > REVIEW_COMMENT_MAX) {
+          errors.push({
+            code: 'PLAN_134',
+            field: `items[${index}].comment`,
+            message: '장소 한 줄 후기는 200자 이하만 가능합니다.',
+          })
+        }
+      }
+      items.push({
+        planItemId,
+        rating: typeof entry.rating === 'number' ? entry.rating : 0,
+        comment:
+          typeof entry.comment === 'string' && entry.comment.trim() !== '' ? entry.comment : null,
+      })
+    })
+  }
+
+  if (errors.length > 0) return failValidation(errors)
+
+  const seen = new Set<string>()
+  for (const item of items) {
+    if (seen.has(item.planItemId)) {
+      return fail(400, 'PLAN_020', '같은 일정 항목을 후기에 두 번 넣을 수 없습니다.')
+    }
+    seen.add(item.planItemId)
+  }
+
+  const text = typeof parsed.body === 'string' && parsed.body.trim() !== '' ? parsed.body : null
+
+  return { ok: true, overallRating: parsed.overallRating as number, body: text, items }
+}
+
+function isEligiblePlaceVisit(item: MockPlanItem | undefined): item is MockPlanItem {
+  return item !== undefined && PLACE_TARGET_TYPES.has(item.itemType) && item.visited
+}
+
+function resolveReviewItemsForCreate(
+  plan: MockPlan,
+  commands: ParsedReviewItem[],
+): MockResult | { ok: true; items: MockPlanReviewItem[] } {
+  const store = mockStore()
+  const items: MockPlanReviewItem[] = []
+  for (const command of commands) {
+    const current = plan.items.find((item) => item.planItemId === command.planItemId)
+    if (!isEligiblePlaceVisit(current)) {
+      return fail(400, 'PLAN_018', '다녀온 장소 항목만 후기에 담을 수 있습니다.')
+    }
+    items.push({
+      reviewItemId: nextReviewItemId(store),
+      planItemId: current.planItemId,
+      placeId: current.targetId,
+      title: current.title,
+      rating: command.rating,
+      comment: command.comment,
+    })
+  }
+  return { ok: true, items }
+}
+
+function resolveReviewItemsForUpdate(
+  plan: MockPlan,
+  previous: MockPlanReviewItem[],
+  commands: ParsedReviewItem[],
+): MockResult | { ok: true; items: MockPlanReviewItem[] } {
+  const store = mockStore()
+  const previousById = new Map(previous.map((item) => [item.planItemId, item]))
+  const items: MockPlanReviewItem[] = []
+  for (const command of commands) {
+    const current = plan.items.find((item) => item.planItemId === command.planItemId)
+    if (isEligiblePlaceVisit(current)) {
+      items.push({
+        reviewItemId: nextReviewItemId(store),
+        planItemId: current.planItemId,
+        placeId: current.targetId,
+        title: current.title,
+        rating: command.rating,
+        comment: command.comment,
+      })
+      continue
+    }
+    const snapshot = previousById.get(command.planItemId)
+    if (snapshot === undefined) {
+      return fail(400, 'PLAN_018', '다녀온 장소 항목만 후기에 담을 수 있습니다.')
+    }
+    items.push({
+      reviewItemId: nextReviewItemId(store),
+      planItemId: snapshot.planItemId,
+      placeId: snapshot.placeId,
+      title: snapshot.title,
+      rating: command.rating,
+      comment: command.comment,
+    })
+  }
+  return { ok: true, items }
+}
+
+function toReview(planId: string, review: NonNullable<MockPlan['review']>): PlanReviewResponse {
+  const items: PlanReviewPlaceItem[] = review.items.map((item) => ({
+    reviewItemId: item.reviewItemId,
+    planItemId: item.planItemId,
+    placeId: item.placeId,
+    title: item.title,
+    rating: item.rating,
+    comment: item.comment,
+  }))
+  return {
+    reviewId: review.reviewId,
+    planId,
+    overallRating: review.overallRating,
+    body: review.body,
+    items,
+    createdAt: review.createdAt,
+    updatedAt: review.updatedAt,
+  }
 }

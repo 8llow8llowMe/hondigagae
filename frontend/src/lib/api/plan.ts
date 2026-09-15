@@ -10,6 +10,8 @@ import type {
   PlanPackingItemCheckedPayload,
   PlanPackingItemsSavePayload,
   PlanPackingListResponse,
+  PlanReviewResponse,
+  PlanReviewUpsertPayload,
   PlanSummaryItem,
   PlanUpdatePayload,
   PlanWeatherResponse,
@@ -226,6 +228,50 @@ export function setPackingItemChecked(
   payload: PlanPackingItemCheckedPayload,
 ): Promise<void> {
   return clientFetchVoid(paths.plans.packingItemChecked(planId, packingItemId), {
+    method: 'PUT',
+    body: payload,
+  })
+}
+
+// ─── 여행 후기 (#614 BE · #615 FE) ───────────────────────────────────────────
+
+/**
+ * 내 후기 조회.
+ *
+ * **완료 일정에서만 부른다.** 초안·확정은 `PLAN_016`(400) 이고, 후기가 없으면
+ * `PLAN_015`(404) 다. 404 는 데이터 부재라 재시도 버튼이 없다.
+ *
+ * 응답이 있으면 `setQueryData` 로 캐시에 두고, 없으면 빈 상태(쓰기 CTA)로 간다.
+ */
+export function fetchPlanReview(planId: string): Promise<PlanReviewResponse> {
+  return clientFetch<PlanReviewResponse>(paths.plans.reviews(planId))
+}
+
+/**
+ * 후기 작성. 이미 있으면 `PLAN_017`(409) 이다 — 그때는 PUT 이다.
+ *
+ * 응답이 저장된 후기 전체라 호출부가 `setQueryData` 로 갈아끼운다.
+ */
+export function createPlanReview(
+  planId: string,
+  payload: PlanReviewUpsertPayload,
+): Promise<PlanReviewResponse> {
+  return clientFetch<PlanReviewResponse>(paths.plans.reviews(planId), {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+/**
+ * 후기 수정. 후기가 없으면 `PLAN_015`, 완료가 아니면 `PLAN_016` 이다.
+ *
+ * `items` 는 **전량 교체**다. 빈 배열을 보내면 장소 평가가 전부 사라진다.
+ */
+export function updatePlanReview(
+  planId: string,
+  payload: PlanReviewUpsertPayload,
+): Promise<PlanReviewResponse> {
+  return clientFetch<PlanReviewResponse>(paths.plans.reviews(planId), {
     method: 'PUT',
     body: payload,
   })

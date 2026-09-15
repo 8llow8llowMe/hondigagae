@@ -593,3 +593,86 @@ export const PACKING_LIMIT_EXCEEDED_CODE = 'PLAN_013'
 
 /** 일정당 준비물 상한. 서버 `PLAN_013` 복제본이다 */
 export const PACKING_ITEM_MAX = 50
+
+/**
+ * `GET` · `POST` · `PUT /plans/{planId}/reviews` 응답 (#614 BE · #615 FE).
+ *
+ * **일정당 후기 하나**라 경로에 reviewId 가 없다. 작성 시점의 장소 제목·placeId 는
+ * 스냅샷이라, 일차를 교체해 항목이 사라져도 후기 행은 남는다.
+ *
+ * `createdAt` / `updatedAt` 은 서버 `LocalDateTime` 이라 타임존 접미가 없다
+ * (`2026-09-15T11:20:00`).
+ */
+export type PlanReviewResponse = {
+  reviewId: string
+  planId: string
+  /** 1~5 */
+  overallRating: number
+  /** 없으면 null */
+  body: string | null
+  items: PlanReviewPlaceItem[]
+  createdAt: string
+  updatedAt: string
+}
+
+/** 후기 안의 방문 장소 평가. 클라이언트가 다시 보내는 키는 `reviewItemId` 가 아니라 `planItemId` 다 */
+export type PlanReviewPlaceItem = {
+  reviewItemId: string
+  planItemId: string
+  /** 작성 시점의 장소 아이디. 대상 없는 항목이면 null */
+  placeId: string | null
+  title: string
+  /** 1~5 */
+  rating: number
+  /** 없으면 null */
+  comment: string | null
+}
+
+/**
+ * `POST` · `PUT /plans/{planId}/reviews` 요청.
+ *
+ * `items` 는 필수 배열이다. 빈 목록이면 전체 만족도만 남긴다. PUT 은 **전량 교체**다.
+ * `planItemId` 는 Snowflake 라 **문자열로 보낸다** — `Number()` 를 거치면 정밀도를 잃는다.
+ */
+export type PlanReviewUpsertPayload = {
+  overallRating: number
+  body: string | null
+  items: PlanReviewItemPayload[]
+}
+
+export type PlanReviewItemPayload = {
+  planItemId: string
+  rating: number
+  comment: string | null
+}
+
+/** 후기가 없다 (`PlanErrorCode.REVIEW_NOT_FOUND`) */
+export const REVIEW_NOT_FOUND_CODE = 'PLAN_015'
+
+/** 완료가 아닌 일정에 후기를 읽거나 쓴다 (`PlanErrorCode.REVIEW_PLAN_NOT_COMPLETED`) */
+export const REVIEW_PLAN_NOT_COMPLETED_CODE = 'PLAN_016'
+
+/** 이미 후기가 있다 (`PlanErrorCode.REVIEW_ALREADY_EXISTS`) */
+export const REVIEW_ALREADY_EXISTS_CODE = 'PLAN_017'
+
+/** 다녀온 장소 항목이 아니다 (`PlanErrorCode.REVIEW_ITEM_NOT_ELIGIBLE`) */
+export const REVIEW_ITEM_NOT_ELIGIBLE_CODE = 'PLAN_018'
+
+/** 같은 planItemId 를 두 번 보냈다 (`PlanErrorCode.REVIEW_ITEM_DUPLICATED`) */
+export const REVIEW_ITEM_DUPLICATED_CODE = 'PLAN_020'
+
+/** 후기에 담을 수 있는 항목 유형. 백엔드 `PlanItemType.isPlaceTarget()` 과 같다 */
+export const REVIEW_PLACE_ITEM_TYPES = ['PLACE', 'MEAL', 'LODGING'] as const
+
+/** 전체 만족도·장소 만족도 범위. 서버 `@Min(1)` · `@Max(5)` 복제본이다 */
+export const REVIEW_RATING_MIN = 1
+export const REVIEW_RATING_MAX = 5
+
+/** 후기 본문 상한. 서버 `PLAN_128` 복제본이다 */
+export const REVIEW_BODY_MAX = 2000
+
+/** 장소별 후기 상한. 서버 `PLAN_130` 복제본이다 */
+export const REVIEW_ITEMS_MAX = 50
+
+/** 장소 한 줄 후기 상한. 서버 `PLAN_134` 복제본이다 */
+export const REVIEW_COMMENT_MAX = 200
