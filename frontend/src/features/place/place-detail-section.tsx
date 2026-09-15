@@ -25,6 +25,8 @@ import {
   PlaceSuitabilityPanel,
   type PlaceSuitabilityPanelProps,
 } from '@/features/place/place-suitability-panel'
+import { PlaceVerdictSummary } from '@/features/place/place-verdict-summary'
+import { VERDICT_ANCHOR } from '@/features/place/place-verdict-summary-lines'
 import {
   PlaceWalkSafetyPanel,
   type PlaceWalkSafetyPanelProps,
@@ -315,6 +317,19 @@ export function PlaceDetailSection({
                   )}
                 </div>
               </header>
+
+              {/*
+                ── 판정 요약 3줄 (#650 · 진단 D-1)
+
+                **이름 바로 아래가 자리다.** 390 실측에서 동반(1797)·산책(1519)이 1.8~2.1
+                화면 아래였다 — 이름을 읽은 사람의 다음 질문이 "데려가도 되나 · 지금 나가도
+                되나" 인데 그 답이 화면 두 장 밑에 있었다.
+
+                **카드 안이다.** 이 세 줄은 "이 장소가 무엇인가" 의 답이라 이름과 한 몸이고,
+                카드를 쪼개면 §0 에서 이름과 답이 다른 이야기가 된다. `lg:hidden` 근거는
+                컴포넌트 머리 주석에 있다.
+              */}
+              <PlaceVerdictSummary place={place} walkSafety={walkSafety} congestion={congestion} />
             </div>
           </Surface>
 
@@ -442,7 +457,7 @@ export function PlaceDetailSection({
           위 여백은 모바일 8, 그 위로는 0 — 앞 스택의 아래 24 가 카드 간격이다.
         */}
         <SurfaceStack className="rail-detail-main pt-2 md:pt-0 lg:pl-3">
-          <DetailCard title={messages.place.detailSectionPet}>
+          <DetailCard title={messages.place.detailSectionPet} titleId={VERDICT_ANCHOR.pet}>
             <PlacePetInfoSection
               petInfo={place.petInfo}
               allowance={place.petAllowanceType}
@@ -638,9 +653,19 @@ function DelistedNotice() {
  * 인셋(`INSET_CLASS.card`, 16/20)을 쓴다 — 페이지 인셋 40 을 카드 안에서 쓰면 내용이 두 번
  * 밀린다. 세로는 `Surface` 의 제목 줄(위 20 · 아래 12)에 본문 아래 20 을 더해 위아래가 같다.
  */
-function DetailCard({ title, children }: { title: string; children: ReactNode }) {
+/** `titleId` 는 판정 요약 3줄의 앵커가 이 카드를 가리킬 때 준다 (#650) */
+function DetailCard({
+  title,
+  titleId,
+  children,
+}: {
+  title: string
+  /** `exactOptionalPropertyTypes` — `Surface` 로 그대로 넘기려면 `undefined` 를 적어야 한다 */
+  titleId?: string | undefined
+  children: ReactNode
+}) {
   return (
-    <Surface title={title}>
+    <Surface title={title} titleId={titleId}>
       <div className={cn('flex flex-col gap-3 pb-5', INSET_CLASS.card)}>{children}</div>
     </Surface>
   )

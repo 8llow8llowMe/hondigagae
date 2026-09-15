@@ -205,7 +205,7 @@ export function Surface({
    * **`aria-label` 로 대신하지 않는다** — 제목이 화면에 이미 있는데 같은 문자열을
    * 속성으로 또 적으면 두 곳이 갈린다.
    */
-  titleId?: string
+  titleId?: string | undefined
   /** 제목 아래 한 줄. `h2` 밖이라 `p` 를 넣어도 마크업이 깨지지 않는다 */
   description?: ReactNode
   /** 제목을 크게 쓰는 주 섹션 (홈 "오늘 갈 만한 곳") */
@@ -362,11 +362,19 @@ function HeadTitleRow({
   return (
     <div className="flex items-start justify-between gap-4">
       <div className="min-w-0">
+        {/*
+          **`titleId` 가 있으면 `scroll-mt` 도 같이 온다** (#650). `titleId` 는 바깥에서
+          이 제목을 가리키라고 여는 문이고, 그 문으로 들어오는 방법에는 `aria-labelledby`
+          말고 **앵커 이동**도 있다. 헤더가 `sticky top-0 h-14` 라 여백이 없으면 뛴 제목이
+          헤더 뒤로 들어간다 — 약관 목차가 같은 이유로 같은 값을 쓴다
+          (`legal-document-view.tsx`). 호출부마다 다시 적게 하면 한 곳이 빠진다.
+        */}
         <h2
           id={titleId}
           className={cn(
             'text-title-2 text-fg font-semibold break-keep',
             lead ? 'md:text-display md:font-extrabold' : 'md:text-title-1 md:font-bold',
+            titleId !== undefined && 'scroll-mt-20',
           )}
         >
           {title}

@@ -16,6 +16,7 @@ import { MetricValue, MetricWord } from '@/components/metric'
 import { ReasonList } from '@/components/reason-list'
 import { Skeleton } from '@/components/skeleton'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
+import { VERDICT_ANCHOR } from '@/features/place/place-verdict-summary-lines'
 import { formatCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
@@ -103,7 +104,14 @@ export function PlaceWalkSafetyPanel({
           이미 내려놓았고 배지는 그렇게 된 이유를 말한다.
         */}
         <p className="text-body-1 flex flex-wrap items-center gap-x-1 gap-y-2 font-semibold">
-          <span className="text-fg-muted">{messages.place.detailWalkSafetyLabel}</span>
+          {/*
+            판정 요약 3줄의 `지금 산책` 줄이 이리로 뛴다 (#650). **`scroll-mt-20` 이 없으면
+            헤더(`sticky top-0 h-14`) 뒤로 들어간다** — 약관 목차가 같은 이유로 같은 값을
+            쓴다 (`legal-document-view.tsx`).
+          */}
+          <span id={VERDICT_ANCHOR.walk} className="text-fg-muted scroll-mt-20">
+            {messages.place.detailWalkSafetyLabel}
+          </span>
           <MetricWord tone={tone}>{data.walkSafetyLevel.name}</MetricWord>
           <WeatherWarningBadge warning={data.weatherWarning} />
         </p>
