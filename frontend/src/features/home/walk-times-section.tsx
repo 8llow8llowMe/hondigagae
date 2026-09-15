@@ -1,10 +1,16 @@
 'use client'
 
-import { METRIC_WORD_TONE, MetricWord } from '@/components/metric'
+import { METRIC_WORD_TONE } from '@/components/metric'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { Skeleton } from '@/components/skeleton'
 import { formatCelsius } from '@/lib/format/celsius'
-import { markGoldenWindow } from '@/lib/insight/golden-window'
+import type { GoldenWindowRun } from '@/lib/insight/golden-window'
+import {
+  describeGoldenWindow,
+  formatHourRuns,
+  markGoldenWindow,
+  SAFE_CODE,
+} from '@/lib/insight/golden-window'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { INSET_BLEED_END_CLASS, INSET_CLASS } from '@/lib/ui/inset'
@@ -149,10 +155,17 @@ function GoldenWindow({ data }: { data: WalkTimesResponse }) {
     **`-700` 층이다** (`METRIC_WORD_TONE`). `-500` 은 22px 이상 **+ weight 900** 에만
     허용되는데 이 시각은 700 이고, MID 의 `-500` 은 흰 배경에서 3.85:1 이라 글자로 쓰면
     대비가 무너진다.
+
+    **등급 배지가 이 줄에서 빠졌다** (#637). `11:00 – 23:00 [주의]` 는 창 **전체**가
+    주의라는 말로 읽혔는데 실제로 주의는 창 안의 두 칸이었다 — 배지가 가진 정보는 원래
+    "어디가 주의인가" 이고 배지에는 그것을 적을 자리가 없다. 아래 문장이 그 자리다.
+
+    **한 시각짜리 창에는 문장도 붙이지 않는다** (#200). 한 칸을 "내내" 라고 말할 수 없고,
+    그 칸의 등급은 곡선 셀이 이미 색과 `sr-only` 로 전한다.
   */
   return (
-    <p className="text-body-1 flex flex-wrap items-baseline gap-x-2 gap-y-1 font-semibold tabular-nums">
-      <span className={cn('text-title-1 font-bold', METRIC_WORD_TONE[tone])}>
+    <div className="flex flex-col gap-1">
+      <p className={cn('text-title-1 font-bold tabular-nums', METRIC_WORD_TONE[tone])}>
         {single ? (
           messages.home.goldenSingleHour.replace('{time}', hourMinute(data.goldenStart))
         ) : (
@@ -160,10 +173,92 @@ function GoldenWindow({ data }: { data: WalkTimesResponse }) {
             {hourMinute(data.goldenStart)} – {hourMinute(data.goldenEnd)}
           </>
         )}
+      </p>
+
+      {!single && <GoldenWindowLevels data={data} />}
+    </div>
+  )
+}
+
+/**
+ * 문장에서 등급 색을 받는 조각 — `{level} 등급`.
+ *
+ * **낱말을 여기서 새로 쓰지 않는다.** 이 문자열은 `goldenAllSafe` · `goldenCautionRuns`
+ * 두 템플릿에 그대로 들어 있는 조각이고, 문장을 세 도막(앞 · 등급어 · 뒤)으로 가르는
+ * 데만 쓴다. `{level}` 자리에는 서버 `walkSafetyLevel.name` 이 들어간다.
+ *
+ * 템플릿에서 이 조각이 사라지면 강조가 조용히 빠지므로 테스트가 그것을 잡는다
+ * (`walk-times-section.test.ts`).
+ */
+const LEVEL_TOKEN = '{level} 등급'
+
+/**
+ * 문장이 두 줄을 넘지 않게 하는 글자 수 (골든타임-문구-세부명세 D4-2).
+ *
+ * 390px 에서 `body-1` 두 문장이 세 줄이 되면 헤드라인보다 문장이 커 보인다. 넘으면
+ * **뒤 문장(좋은 구간)을 뺀다** — 곡선이 그 구간을 면으로 이미 보여 준다 (홈-세부명세 D4-1-c).
+ */
+const SENTENCE_MAX_LENGTH = 60
+
+/**
+ * 창 안의 등급 분포를 말하는 한 줄 — [#637](https://github.com/8llow8llowMe/hondigagae/issues/637).
+ *
+ * **`goldenLevel` 을 쓰지 않는다.** 그 값은 창 하나에 등급 하나를 붙인 것이라 "창 안
+ * 어디가 주의인가" 를 말하지 못한다 — 그것이 배지가 모순으로 읽힌 이유다. 이 문장은
+ * `hourly` 의 시각별 등급을 근거로 쓴다 (`describeGoldenWindow`).
+ *
+ * **등급어에만 색을 준다.** 색이 유일한 채널이 아니어야 하므로(DESIGN.md §2-3) 문장이
+ * 낱말로 먼저 말하고, 색은 어디가 등급어인지 눈이 잡게 돕는 보조 채널이다. `-700` 층이다.
+ */
+function GoldenWindowLevels({ data }: { data: WalkTimesResponse }) {
+  const { runs, worst } = describeGoldenWindow(data.hourly, data.goldenStart, data.goldenEnd)
+
+  /*
+    창 안 시각을 하나도 못 찾은 날 — 헤드라인만 두고 **조용히** 문장을 걷는다. 응답이
+    어긋난 것이지 사용자가 할 일이 있는 상태가 아니다.
+  */
+  if (worst === null) return null
+
+  const text = runs.length === 1 ? messages.home.goldenAllSafe : mixedLevelsText(runs, worst)
+  const [before = '', after = ''] = text.split(LEVEL_TOKEN)
+
+  return (
+    <p className="text-body-1 text-fg-muted">
+      {before}
+      <span className={cn('font-semibold', METRIC_WORD_TONE[walkSafetyTone(worst.code)])}>
+        {LEVEL_TOKEN.replace('{level}', worst.name)}
       </span>
-      {data.goldenLevel !== null && <MetricWord tone={tone}>{data.goldenLevel.name}</MetricWord>}
+      {after}
     </p>
   )
+}
+
+/**
+ * 창 안에 등급이 둘 이상일 때의 문장.
+ *
+ * **"어디가 주의인가" 를 먼저 말한다.** 사람이 이 창에서 피해야 하는 시각이 그것이고,
+ * 좋은 구간은 뒤에 덧붙는다 — 좋은 구간부터 말하면 주의가 단서처럼 뒤에 묻힌다.
+ *
+ * **안전 구간이 없으면 뒤 문장을 붙이지 않는다** — 없는 위안을 만들지 않는다.
+ */
+function mixedLevelsText(runs: readonly GoldenWindowRun[], worst: GoldenWindowRun): string {
+  const risky = runs.filter((run) => run.code !== SAFE_CODE)
+  const safe = runs.filter((run) => run.code === SAFE_CODE)
+
+  const warning = messages.home.goldenCautionRuns
+    .replace('{runs}', formatHourRuns(risky.map((run) => run.hours)))
+    .replace('{pavement}', String(worst.maxPavement))
+
+  if (safe.length === 0) return warning
+
+  const better = messages.home.goldenBetterRuns.replace(
+    '{runs}',
+    formatHourRuns(safe.map((run) => run.hours)),
+  )
+  // 길이는 **렌더될 문장**으로 잰다 — `{level}` 자리에 들어갈 서버 이름의 길이가 다르다
+  const rendered = `${warning}${better}`.replace('{level}', worst.name)
+
+  return rendered.length > SENTENCE_MAX_LENGTH ? warning : `${warning}${better}`
 }
 
 /** 서버 `GoldenWindowStatus`. 모르는 값이 오면 옛 갈래로 떨어진다 — `goldenWindowStatusOf` */

@@ -83,16 +83,20 @@ describe('WalkTimesSection — 추천 구간', () => {
   }
 
   /*
-    **추천 문장 한 줄만 떼어 본다** (#312). 예전에는 마크업 전체에 `not.toContain` 을 걸어
+    **헤드라인 한 줄만 떼어 본다** (#312). 예전에는 마크업 전체에 `not.toContain` 을 걸어
     두었는데, 곡선 셀의 노면 숫자가 등급 색을 갖게 되면서 그 단정이 무너졌다 — 그 색은
-    이 문장과 무관한 다른 자리의 사실이다. 검사 대상은 처음부터 이 한 줄이었다.
+    이 줄과 무관한 다른 자리의 사실이다. 검사 대상은 처음부터 이 한 줄이었다.
+
+    **`text-body-1` 이 아니라 `text-title-1` 로 찾는다** (#637). 예전에는 배지를 담으려고
+    `text-body-1` flex 줄 안에 시각 span 이 들어 있었는데, 배지가 빠지면서 감쌀 것이
+    없어졌다 — 시각이 곧 그 줄이다. 아래 등급 문장이 `text-body-1` 을 쓴다.
   */
-  function recommendationLine(markup: string): string {
-    return /<p class="text-body-1[^>]*>.*?<\/p>/.exec(markup)?.[0] ?? ''
+  function headlineLine(markup: string): string {
+    return /<p class="text-title-1[^>]*>.*?<\/p>/.exec(markup)?.[0] ?? ''
   }
 
-  it('추천 시각과 등급어가 같은 등급 색을 쓴다', () => {
-    const line = recommendationLine(render(CAUTION_GOLDEN))
+  it('추천 시각이 구간의 등급 색을 쓴다', () => {
+    const line = headlineLine(render(CAUTION_GOLDEN))
 
     expect(line).toContain('18:00')
     expect(line).toContain('text-metric-mid-700')
@@ -581,6 +585,161 @@ describe('WalkTimesSection — 골든타임이 없는 이유 (#270)', () => {
 
     expect(markup).toContain(messages.home.goldenNone)
   })
+})
+
+/*
+  #637. **헤드라인 옆 배지가 창 전체의 등급으로 읽혔다.** `11:00 – 23:00 [주의]` 는
+  "좋은 시간이라면서 주의?" 라는 모순이고, 실제로 주의는 창 안의 두 칸(14 · 15시)이었다
+  (2026-09-15 dev 실측). 배지가 가진 정보는 원래 **어디가 주의인가** 인데 배지에는 그것을
+  적을 자리가 없다 — 그 자리를 문장으로 옮겼다.
+*/
+describe('WalkTimesSection — 창 안 등급 문장 (#637)', () => {
+  const DAY = '2026-08-29T'
+
+  function walkHour(hh: number, code: string, name: string, pavement: number) {
+    return {
+      at: `${DAY}${String(hh).padStart(2, '0')}:00:00`,
+      walkSafetyLevel: { code, name, description: null, scoreDescription: null },
+      temperature: 30,
+      estimatedPavementCelsius: pavement,
+      precipitationProbability: 0,
+    }
+  }
+
+  /** 실측의 모양 — 창은 11–23 이고 그 안에서 14 · 15 만 주의다 */
+  const MIXED_DAY: WalkTimesResponse = {
+    ...GOOD_DAY,
+    hourly: [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23].map((hh) =>
+      hh === 14 || hh === 15
+        ? walkHour(hh, 'CAUTION', '주의', hh === 15 ? 46.3 : 45.9)
+        : walkHour(hh, 'SAFE', '안전', 32),
+    ),
+    goldenStart: `${DAY}11:00:00`,
+    goldenEnd: `${DAY}23:00:00`,
+    goldenLevel: { code: 'CAUTION', name: '주의', description: null, scoreDescription: null },
+  }
+
+  /*
+    **배지는 창 하나에 등급 하나를 붙인다.** 그 모양으로는 "창 안 어디가 주의인가" 를
+    말할 수 없어서 사용자가 창 전체를 주의로 읽었다 — 이 이슈의 제보가 그것이다.
+  */
+  it('헤드라인 줄에 등급 배지를 세우지 않는다', () => {
+    const line = headlineOf(render(MIXED_DAY))
+
+    expect(line).toContain('11:00 – 23:00')
+    expect(line).not.toContain('주의')
+    // `MetricWord` 의 고정 크기 (20/800). 이 줄에 배지가 남으면 여기서 걸린다
+    expect(line).not.toContain('text-emphasis')
+  })
+
+  it('창 안의 주의 구간과 노면 최고온도를 문장으로 말한다', () => {
+    const markup = render(MIXED_DAY)
+
+    expect(markup).toContain('14–15시는 노면이 46℃까지 올라')
+    // 등급어가 색을 받는 span 안에 있어 마크업에서는 문장이 끊긴다
+    expect(markup).toContain('주의 등급</span>이에요.')
+  })
+
+  /* 곡선이 좋은 구간을 면으로 보여 주지만, 색만으로 말하지 않는다 (DESIGN.md §2-3) */
+  it('창 안의 좋은 구간을 이어서 말한다', () => {
+    expect(render(MIXED_DAY)).toContain('11–13시 · 16–23시가 좋아요.')
+  })
+
+  /* 소수는 곡선 셀(표)의 것이다. 문장에 들어오면 데이터 냄새가 난다 (진단 G-2) */
+  it('문장 속 노면온도에 소수를 쓰지 않는다', () => {
+    expect(render(MIXED_DAY)).not.toContain('46.3℃까지')
+  })
+
+  /*
+    **등급어에만 색을 준다.** 문장이 낱말로 먼저 말하고 색은 어디가 등급어인지 눈이 잡게
+    돕는 보조 채널이다 — `-700` 층이라 16px 글자에서 대비가 선다 (`METRIC_WORD_TONE`).
+  */
+  it('등급어에 등급 톤을 준다', () => {
+    expect(render(MIXED_DAY)).toContain('text-metric-mid-700">주의 등급</span>')
+  })
+
+  it('창 안 등급이 하나뿐이면 내내 그 등급이라고 말한다', () => {
+    // GOOD_DAY 의 창(18–21)은 전부 안전이다
+    expect(render(GOOD_DAY)).toContain('이 시간대는 내내 ')
+    expect(render(GOOD_DAY)).toContain('안전 등급</span>이에요')
+    expect(render(GOOD_DAY)).not.toContain('좋아요.')
+  })
+
+  /*
+    **서버가 준 등급 이름을 그대로 쓴다.** 창 안이 전부 주의인 날에도 FE 가 한국어를
+    고르지 않는다 — messages 에 `주의` 가 들어가면 서버가 이름을 고쳐도 화면은 옛 이름을 말한다.
+  */
+  it('창 안이 전부 주의여도 서버 이름을 그대로 쓴다', () => {
+    const markup = render({
+      ...MIXED_DAY,
+      hourly: [11, 12, 13].map((hh) => walkHour(hh, 'CAUTION', '주의', 46)),
+      goldenEnd: `${DAY}13:00:00`,
+    })
+
+    expect(markup).toContain('이 시간대는 내내 ')
+    expect(markup).toContain('주의 등급</span>이에요')
+  })
+
+  /* 한 칸을 "내내" 라고 말할 수 없다. 그 칸의 등급은 곡선 셀이 이미 전한다 (#200) */
+  it('한 시각짜리 창에는 문장을 붙이지 않는다', () => {
+    const at = `${DAY}23:00:00`
+    const markup = render({ ...MIXED_DAY, goldenStart: at, goldenEnd: at })
+
+    expect(markup).toContain(messages.home.goldenSingleHour.replace('{time}', '23:00'))
+    expect(markup).not.toContain('등급이에요')
+  })
+
+  /* 응답이 어긋난 날. 사용자가 할 일이 있는 상태가 아니므로 조용히 헤드라인만 남긴다 */
+  it('창 안 시각이 하나도 없으면 문장 없이 헤드라인만 남긴다', () => {
+    const markup = render({ ...MIXED_DAY, hourly: [] })
+
+    expect(markup).toContain('11:00 – 23:00')
+    expect(markup).not.toContain('등급이에요')
+  })
+
+  /*
+    **D4-2.** 390px 에서 두 문장이 세 줄이 되면 문장이 헤드라인보다 커 보인다. 넘으면
+    뒤 문장을 뺀다 — 곡선이 좋은 구간을 면으로 이미 보여 준다 (홈-세부명세 D4-1-c).
+  */
+  it('두 문장이 너무 길면 좋은 구간 문장을 뺀다', () => {
+    const markup = render({
+      ...MIXED_DAY,
+      hourly: [11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23].map((hh) =>
+        hh % 2 === 0 && hh <= 18
+          ? walkHour(hh, 'CAUTION', '주의', 46)
+          : walkHour(hh, 'SAFE', '안전', 32),
+      ),
+    })
+
+    expect(markup).toContain('노면이 46℃까지 올라')
+    expect(markup).not.toContain('좋아요.')
+  })
+
+  /*
+    **`{level}` 은 FE 가 쓰지 않는다** (`frontend/CLAUDE.md` enum 규칙). 서버가 등급 이름을
+    고치면 화면이 그대로 따라야 하는데, messages 에 한국어 등급어가 박히면 옛 이름이 남는다.
+  */
+  it('문구에 한국어 등급어를 박아 두지 않는다', () => {
+    for (const template of [messages.home.goldenAllSafe, messages.home.goldenCautionRuns]) {
+      expect(template).toContain('{level}')
+      for (const level of ['안전', '주의', '위험']) {
+        expect(template).not.toContain(level)
+      }
+    }
+  })
+
+  /*
+    **강조는 `{level} 등급` 조각을 찾아 건다.** 템플릿에서 그 조각이 사라지면 색이 조용히
+    빠지고 문장은 멀쩡해 보인다 — 눈으로는 못 잡는 종류의 회귀라 여기서 고정한다.
+  */
+  it('두 문구 모두 등급어 조각을 담는다', () => {
+    expect(messages.home.goldenAllSafe).toContain('{level} 등급')
+    expect(messages.home.goldenCautionRuns).toContain('{level} 등급')
+  })
+
+  function headlineOf(markup: string): string {
+    return /<p class="text-title-1[^>]*>.*?<\/p>/.exec(markup)?.[0] ?? ''
+  }
 })
 
 /*
