@@ -41,8 +41,23 @@ import { Wordmark } from '@/components/brand/wordmark'
  * 375px 에서 실측한 락업 폭은 212px(내용 폭 343 의 62%)로, 2.2배(232px · 68%)와 화면
  * 인상 차이가 거의 없으면서 여백이 더 남는다.
  *
- * **바닥(L0)을 칠하지 않는다.** 이 그룹은 `Canvas` 를 쓰지 않는 흰 화면이고, 표식을
- * 넣는다고 카드나 회색 바닥을 새로 들이지 않는다 — 폼 넷이 전부 좁은 중앙 열이다.
+ * **바닥(L0)을 칠하고 폼을 카드(L1)에 담는다.** #532 때는 그 반대였다 — "폼 넷이 전부
+ * 좁은 중앙 열" 이라 회색 바닥도 카드도 들이지 않았다. 그런데 흰 폼을 흰 바닥에 그냥
+ * 올려 두면 **입력할 영역의 경계가 화면에 없다**: 넓은 화면일수록 중앙 384px 열이 빈 흰
+ * 면 한가운데 떠 있는 글줄 묶음으로 읽힌다. 앱의 나머지 35화면이 이미 회색 바닥 위 흰
+ * 카드(`DESIGN.md §0` 의 3층 표면)인데 로그인만 다른 세계였다.
+ *
+ * **`Canvas` 를 쓰지 않고 여기서 직접 칠한다.** `Canvas` 는 `page-canvas`
+ * (`min-block-size: calc(100dvh - var(--header-h))`)를 함께 들고 오는데, 그 뺄셈은
+ * `GlobalHeader` 가 있는 `(main)` 그룹의 전제다. **이 그룹에는 헤더가 없어서** 그대로
+ * 쓰면 회색 바닥이 화면 끝에서 56px 못 미쳐 끊긴다. `token-usage.test.ts` 가
+ * `bg-bg-sunken` 의 소유자를 검사하므로 그 허용 목록에 이 파일을 근거와 함께 올려 뒀다 —
+ * 지도 화면 넷과 같은 "`Canvas` 밖에서 자기 바탕을 칠하는" 예외다.
+ *
+ * **모바일에서도 테두리를 두른다.** `Surface`(L1)는 768 미만에서 radius 와 좌우 테두리를
+ * 걷고 전폭으로 내려앉는데, 그것은 **페이지 폭을 다 쓰는 섹션**의 규칙이다. 이 카드는
+ * 어느 폭에서도 384px 을 넘지 않는 중앙 열이라 전폭으로 펴질 일이 없고, 좌우 테두리를
+ * 걷으면 회색 바닥 위에 위아래 선만 떠 있는 모양이 된다.
  */
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -58,7 +73,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       최소값이라 래퍼가 내용만큼 자라고 `justify-center` 가 무효가 된다 (회원가입처럼
       긴 폼이 그 갈래다).
     */
-    <div className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center gap-8 px-4 py-10">
+    <div className="bg-bg-sunken flex min-h-dvh w-full flex-col items-center justify-center gap-8 px-4 py-10">
       <header className="flex justify-center">
         {/*
           44px — 모바일 최소 터치 영역 (DESIGN.md §7). 헤더 로고 링크와 같은 값이고,
@@ -77,7 +92,21 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </Link>
       </header>
 
-      <main>{children}</main>
+      {/*
+        **폭 제한이 카드로 내려왔다.** 예전에는 바깥 래퍼가 `max-w-sm` 을 들고 표식과 폼을
+        함께 좁혔는데, 바닥을 칠하는 지금 그 자리에 폭 제한이 남아 있으면 **회색이 384px
+        띠로만 칠해진다.** 래퍼는 전폭으로 두고 `items-center` 로 가운데를 잡는다.
+
+        radius 는 12(`rounded-lg`)다 — `Surface` 와 같은 L1 값이고, 16 은 모달·바텀시트처럼
+        **떠 있는 것** 의 신호라 여기서 가져가면 안 된다 (`surface.tsx` 머리주석).
+        그림자도 같은 이유로 주지 않는다 — 섹션은 페이지 위에 눕지 뜨지 않는다 (§6).
+
+        좌우 인셋은 카드 규약(`px-4 md:px-5`)을 따른다. 390px 에서 카드 안 내용 폭은
+        326px 이다 — 전폭이던 358px 에서 32px 을 내주고 경계를 얻는다.
+      */}
+      <main className="bg-bg border-border w-full max-w-sm rounded-lg border px-4 py-6 md:px-5">
+        {children}
+      </main>
     </div>
   )
 }

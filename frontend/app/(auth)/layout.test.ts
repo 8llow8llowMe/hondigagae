@@ -116,3 +116,56 @@ describe('인증 셸 — 랜드마크와 높이 (#532)', () => {
     expect(mainTag).not.toContain('justify-center')
   })
 })
+
+describe('인증 셸 — 회색 바닥 위 카드', () => {
+  const wrapper = markup.slice(0, markup.indexOf('>') + 1)
+  const mainTag = markup.slice(
+    markup.indexOf('<main'),
+    markup.indexOf('>', markup.indexOf('<main')) + 1,
+  )
+
+  /*
+    흰 폼을 흰 바닥에 올려 두면 입력할 영역의 경계가 화면에 없다. 나머지 35화면이 이미
+    회색 바닥 위 흰 카드(`DESIGN.md §0`)인데 인증 넷만 다른 세계였다.
+  */
+  it('바닥이 L0 회색이다', () => {
+    expect(wrapper).toContain('bg-bg-sunken')
+  })
+
+  /*
+    **폭 제한이 바깥 래퍼에 남아 있으면 회색이 384px 띠로만 칠해진다.** 래퍼는 전폭이고
+    가운데 정렬만 하며, `max-w-sm` 은 카드가 갖는다.
+  */
+  it('폭 제한은 카드가 갖는다 — 바닥은 전폭이다', () => {
+    expect(wrapper).not.toContain('max-w-sm')
+    expect(wrapper).toContain('items-center')
+    expect(mainTag).toContain('max-w-sm')
+  })
+
+  /*
+    L1 카드 — 흰 면 + 1px 테두리 + radius 12. **16 이 아니다**: 16(`rounded-xl`)은
+    모달·바텀시트처럼 떠 있는 것의 신호라 섹션이 가져가면 그 신호가 죽는다
+    (`surface.tsx` 머리주석 · DESIGN.md §5).
+  */
+  it('카드가 흰 면 · 테두리 · radius 12 다', () => {
+    expect(mainTag).toContain('bg-bg')
+    expect(mainTag).toContain('border-border')
+    expect(mainTag).toMatch(/\brounded-lg\b/)
+    expect(mainTag).not.toContain('rounded-xl')
+  })
+
+  /* 섹션은 페이지 위에 눕지 뜨지 않는다 — DESIGN.md §6 */
+  it('카드에 그림자를 주지 않는다', () => {
+    expect(mainTag).not.toMatch(/\bshadow-/)
+  })
+
+  /*
+    **모바일에서도 테두리를 두른다.** `Surface` 가 768 미만에서 좌우 테두리를 걷는 것은
+    페이지 폭을 다 쓰는 섹션의 규칙이고, 이 카드는 어느 폭에서도 384px 중앙 열이라
+    전폭으로 펴질 일이 없다 — 좌우를 걷으면 회색 위에 위아래 선만 뜬다.
+  */
+  it('모바일에서 테두리를 걷지 않는다', () => {
+    expect(mainTag).not.toContain('border-y')
+    expect(mainTag).not.toContain('md:rounded-lg')
+  })
+})
