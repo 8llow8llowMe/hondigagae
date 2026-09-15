@@ -11,6 +11,11 @@ import { toErrorStatus } from '@/lib/api/error'
  * `localStorage` 에 `placeId` 하나만 남긴다 — **토큰이 아니므로 허용된다**
  * (`auth-guide.md` 는 토큰만 금지한다).
  *
+ * **여기가 비어도 판정은 선다** (#636). 예전 머리주석은 "기준이 없으면 판정 섹션 자체를
+ * 렌더하지 않는다" 였는데, 이제 `resolveBasisPlaceId()` 의 셋째 단이 대표 지점으로 받는다
+ * (`basis-place.ts` · 홈-첫방문-판정-세부명세 D3-1). 이 모듈이 담는 것은 **사용자가 고른**
+ * 기준이고, 아무것도 고르지 않았을 때의 기본값은 저쪽 몫이다.
+ *
  * BE 가 홈 요약 API 를 주면(S6-1) 이 모듈과 `resolveBasisPlaceId()` 호출부만 바뀐다.
  */
 const STORAGE_KEY = 'hdg_recent_place'
@@ -19,7 +24,7 @@ export function readRecentPlaceId(): string | null {
   try {
     return globalThis.localStorage?.getItem(STORAGE_KEY) ?? null
   } catch {
-    // 사파리 프라이빗 모드 등에서 던진다. 기준이 없으면 판정 섹션을 렌더하지 않을 뿐이다
+    // 사파리 프라이빗 모드 등에서 던진다. 고른 기준이 없으면 대표 지점으로 떨어질 뿐이다
     return null
   }
 }
