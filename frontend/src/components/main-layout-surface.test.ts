@@ -128,12 +128,16 @@ describe('앱 셸 — 세로 뼈대', () => {
     **`pb-*` 가 `Canvas` 밖에 있으면 회색과 푸터 사이에 흰 띠가 생긴다.** 탭바 자리를
     비워야 한다는 요구 자체는 살아 있고, 그것을 비우는 두 곳을 아래에서 함께 잠근다 —
     한쪽이 사라지면 모바일 마지막 줄이 탭바 뒤로 들어간다.
+
+    **비우는 쪽이 푸터에서 `Canvas` 로 옮겨 갔다.** 푸터가 768 미만에서 통째로 빠지면서
+    그 `padding-block-end` 도 같이 사라졌기 때문이다 — 감춘 요소는 여백을 주지 못한다.
+    `.page-canvas` 는 `Canvas` **자신**이라 위 규칙(바깥이면 흰 띠)을 깨지 않는다.
   */
-  it('탭바 자리를 본문 래퍼가 비우지 않는다 — 푸터와 지도가 각자 비운다', () => {
+  it('탭바 자리를 본문 래퍼가 비우지 않는다 — Canvas 와 지도가 각자 비운다', () => {
     expect(readSourceWithoutComments(SHELL)).not.toMatch(/id="main"[^>]*\bpb-/)
 
     const css = readSource('app/globals.css')
-    expect(css).toMatch(/\.site-footer\s*\{[^}]*padding-block-end:\s*calc\(var\(--tabbar-h\)/)
+    expect(css).toMatch(/\.page-canvas\s*\{[^}]*padding-block-end:\s*calc\(var\(--tabbar-h\)/)
     expect(css).toMatch(
       /\.map-canvas-height\s*\{[^}]*100dvh - var\(--header-h\) - var\(--tabbar-h\)/,
     )

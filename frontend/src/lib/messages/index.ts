@@ -1,3 +1,4 @@
+import { aboutMessages } from '@/lib/messages/about'
 import { aiPlanMessages } from '@/lib/messages/ai-plan'
 import { commonMessages } from '@/lib/messages/common'
 import { emergencyMessages } from '@/lib/messages/emergency'
@@ -41,6 +42,7 @@ export const messages = {
   emergency: emergencyMessages,
   favorite: favoriteMessages,
   footer: footerMessages,
+  about: aboutMessages,
   map: mapMessages,
   pet: petMessages,
   member: memberMessages,

@@ -44,10 +44,13 @@ describe('SiteFooter — 내용 (#399)', () => {
   /*
     이용약관·개인정보처리방침·문의는 아직 페이지가 없다. 자리만 잡아 두면 눌러 보고
     아무 일도 일어나지 않는다 — 없는 링크를 만들지 않는다.
+
+    **`/about` 하나는 예외가 아니라 규칙 그대로다** — 그 화면이 실제로 있다. 개수를
+    세는 이유는 "페이지가 생겼으니" 를 구실로 빈 링크가 다시 늘지 않게 하기 위해서다.
   */
-  it('갈 곳 없는 링크를 두지 않는다', () => {
-    expect(markup).not.toContain('<a ')
-    expect(markup).not.toContain('href')
+  it('갈 곳 있는 링크만 둔다 — /about 하나뿐이다', () => {
+    expect(markup.match(/<a /g)?.length).toBe(1)
+    expect(markup.match(/href="([^"]*)"/g)).toEqual(['href="/about"'])
   })
 })
 
@@ -81,13 +84,27 @@ describe('SiteFooter — 지도 화면에서는 빠진다 (#399)', () => {
     expect(globals).toMatch(/body:has\(\.map-canvas-height\) \.site-footer \{\s*display: none;/)
   })
 
-  /* 탭바가 `fixed` 라 마지막 줄이 그 뒤로 들어간다. 탭바는 768 미만에만 있다 */
-  it('모바일에서 탭바 자리를 비우고, 768 이상에서는 비우지 않는다', () => {
-    const base = /^\.site-footer \{[^}]*\}/m.exec(globals)?.[0]
+  /*
+    **768 미만에는 탭바가 있다** — 그 위에 푸터가 또 붙으면 내비게이션이 두 겹이다.
+    경계는 탭바의 `md:hidden` 과 같은 하나뿐이라, 태블릿을 따로 가르지 않는다.
+  */
+  it('768 미만에서는 감춰진다 — 탭바와 같은 경계다', () => {
+    expect(globals).toMatch(/@media \(width < 48rem\) \{\s*\.site-footer \{\s*display: none;/)
+  })
 
-    expect(base).toContain('var(--tabbar-h)')
+  /*
+    **감춘 요소는 여백도 주지 못한다.** 예전에는 이 푸터의 `padding-block-end` 가 모바일
+    하단 클리어런스였는데, 모바일에서 빠지면서 `.page-canvas` 가 물려받았다. 옮겨 간
+    자리를 여기서도 잠근다 — 한쪽만 보면 여백이 통째로 사라져도 아무도 모른다.
+  */
+  it('탭바 자리는 .page-canvas 가 비운다 — 푸터가 아니다', () => {
+    expect(/^\.site-footer \{[^}]*\}/m.exec(globals)?.[0]).toBeUndefined()
 
-    const md = /@media \(width >= 48rem\) \{\s*\.site-footer \{[^}]*\}/.exec(globals)?.[0]
+    const canvas = /^\.page-canvas \{[^}]*\}/m.exec(globals)?.[0]
+
+    expect(canvas).toContain('padding-block-end: calc(var(--tabbar-h)')
+
+    const md = /@media \(width >= 48rem\) \{\s*\.page-canvas \{[^}]*\}/.exec(globals)?.[0]
 
     expect(md).toContain('padding-block-end: 0')
   })

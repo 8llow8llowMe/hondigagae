@@ -718,6 +718,29 @@ export function HomeView({
           )}
         </SurfaceStack>
       </div>
+
+      {/*
+        **모바일에서 `/about` 으로 가는 유일한 통로다.** 768 미만에는 푸터가 없고
+        (`app/globals.css` `.site-footer`), 헤더는 로고·응급·로그인만, 탭바 네 칸 중 둘은
+        보호 라우트다 — 비로그인 방문자가 데이터 출처에 닿을 수 있는 자리가 여기밖에 없다.
+        푸터를 감추는 것과 이 줄은 한 쌍이라 따로 떼지 않는다.
+
+        **`md:hidden` 이다** — 768 이상은 푸터가 같은 링크를 이미 갖고 있다. 두 곳이
+        동시에 보이면 같은 목적지가 한 화면에 두 번 선다.
+
+        **`Canvas` 안, 2열 밖이다.** 바깥에 두면 회색 바닥이 이 줄 위에서 끊긴다. 어느 한
+        열의 사실도 아니라 열 안에 넣지 않는다 — 기상특보 줄(#349)과 같은 자리 판단이다.
+
+        인셋은 `card` 다 — L0 바닥 위에 직접 놓이는 블록의 규칙이다 (`lib/ui/inset.ts`).
+      */}
+      <div className={cn('pb-6 md:hidden', INSET_CLASS.card)}>
+        <Link
+          href="/about"
+          className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
+        >
+          {messages.about.title}
+        </Link>
+      </div>
     </Canvas>
   )
 }
