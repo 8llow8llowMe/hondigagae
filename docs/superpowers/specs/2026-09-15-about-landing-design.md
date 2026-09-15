@@ -1,9 +1,9 @@
 # 서비스 소개 페이지 — `/about` 확장 설계
 
 > 대상: `app/(main)/about/page.tsx` · `features/about/about-view.tsx` · `lib/messages/about.ts` · `DESIGN.md`(표면 예외 1절 추가)
-> 이슈: **미발행** — 구현 착수 전 `[FE] feat:` 이슈로 발행한다 (`docs/git-workflow.md`)
-> 작성: 2026-09-15
-> 상태: 설계 확정 (구현 계획 미작성)
+> 이슈: [#635](https://github.com/8llow8llowMe/hondigagae/issues/635)
+> 작성: 2026-09-15 (모션 §6-4 같은 날 추가)
+> 상태: 설계 확정 · 사용자 승인 (구현 계획은 `docs/superpowers/plans/`)
 > 목업: `frontend/docs/features/about/소개페이지-목업.html` (정적 HTML 1장, 브라우저로 연다)
 
 **Goal:** 로그인 없이 열리는 `/about` 을 **서비스 소개 페이지**로 확장한다. 첫 방문 보호자가
@@ -404,8 +404,7 @@ P1 은 앞 셋에서, P2 는 둘째~넷째에서, P3 는 마지막에서 자기 
 
 ## 12. 후속 · 미결
 
-- **이슈 발행이 먼저다.** 이 문서는 설계이고, 브랜치는 이슈 뒤에 판다. 지금 워크트리
-  브랜치(`claude/hondigagae-landing-page-bb243b`)는 설계 문서 커밋용이다.
+- 이슈는 #635 로 발행했고 브랜치는 `feature/fe/635-about-landing` 이다.
 - 규모 숫자(315 · 214)는 구현 시 dev 게이트웨이에서 실측한다. 갈리면 실측이 이긴다.
 - OG 이미지 · 공유 카드 문구는 `brand` 명세 몫이다. 소개 페이지 전용 `og:description` 을 둘지는
   구현 계획에서 정한다 — 추천은 `messages.about.description` 재사용.
