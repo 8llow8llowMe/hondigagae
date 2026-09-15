@@ -74,7 +74,10 @@ export const termsOfService: LegalDocument = {
             '만 14세 미만인 사람은 회원으로 가입할 수 없습니다.',
           ],
         },
-        { kind: 'text', text: '운영자는 다음에 해당하는 신청에 대하여 승낙을 거부하거나 사후에 이용계약을 해지할 수 있습니다.' },
+        {
+          kind: 'text',
+          text: '운영자는 다음에 해당하는 신청에 대하여 승낙을 거부하거나 사후에 이용계약을 해지할 수 있습니다.',
+        },
         {
           kind: 'list',
           items: [
