@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
+import { aboutMessages } from '@/lib/messages/about'
 import { homeMessages } from '@/lib/messages/home'
 
 /**
@@ -73,5 +74,23 @@ describe('문구 어미 — 해요체로 통일한다 (DESIGN.md §1)', () => {
 describe('개수를 단정하는 문구 — 서버가 세는 값을 FE 가 적어 두지 않는다', () => {
   it('홈 응급 배너 문구에 개수가 박혀 있지 않다', () => {
     expect(homeMessages.emergencyDesc).not.toMatch(/\d+\s*곳/)
+  })
+})
+
+/**
+ * 소개 페이지(#635) 문구 — 규모 숫자는 `features/about/about-specimen-data.ts` 의 상수이고
+ * **문구에는 없다.** 홈 응급 배너가 `3곳` 이라 말하는 동안 목록은 0건이던 위의 사례와 같은
+ * 판단이다. 예외 없이 `aboutMessages` 전체를 훑는다.
+ */
+describe('소개 페이지 문구 — 개수를 적어 두지 않는다', () => {
+  function leaves(value: unknown): string[] {
+    if (typeof value === 'string') return [value]
+    if (Array.isArray(value)) return value.flatMap(leaves)
+    if (value !== null && typeof value === 'object') return Object.values(value).flatMap(leaves)
+    return []
+  }
+
+  it('aboutMessages 어디에도 "N곳" 이 없다', () => {
+    expect(leaves(aboutMessages).filter((text) => /\d+\s*곳/.test(text))).toEqual([])
   })
 })
