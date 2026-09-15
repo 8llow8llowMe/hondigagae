@@ -1,6 +1,7 @@
 import { expect, type Page, test } from '@playwright/test'
 
 import { messages } from '../src/lib/messages'
+import { denyGeolocation } from './helpers/geolocation'
 import { mapFallbackReady } from './helpers/map-fallback'
 
 /**
@@ -231,5 +232,91 @@ test.describe('지도 갈래 검색 (#584)', () => {
     await box.press('Enter')
 
     await expect(page).not.toHaveURL(/keyword=/)
+  })
+})
+
+/**
+ * 목록 우선 · 위치 폴백 머리 — 이슈 #639 (UI/UX 감사 E-1 · E-2).
+ *
+ * ### 왜 e2e 인가
+ *
+ * 재는 것이 전부 **실제 뷰포트 안의 자리와 크기**다 — 첫 화면에 무엇이 서는가, 버튼이
+ * 스크롤 없이 보이는가, 44px 인가, 권역을 누르면 기준 줄이 실제로 바뀌는가. node 환경
+ * 렌더 테스트는 문자열만 보므로 이 중 어느 것도 볼 수 없다.
+ *
+ * **위치 권한은 거부로 고정한다** (`denyGeolocation`). 폴백 머리는 권한이 없을 때만
+ * 서는 블록이라, 권한 상태가 실행마다 흔들리면 스펙이 무엇을 재는지가 흔들린다.
+ */
+test.describe('긴급 시설 목록 우선 (#639)', () => {
+  /** 세부명세 D1 이 첫 화면 계산에 쓴 실측 폭·높이 */
+  const PHONE = { width: 390, height: 844 }
+
+  test.beforeEach(async ({ page }) => {
+    await denyGeolocation(page)
+    await page.setViewportSize(PHONE)
+  })
+
+  /*
+    **기본 보기가 목록이다.** 예전에는 `/emergency` 가 지도로 열려 첫 화면이 클러스터
+    알약이 겹친 캔버스였다 — 읽을 수 있는 것이 하나도 없었다.
+  */
+  test('첫 화면에 지도 캔버스가 없고 카드 제목이 보인다', async ({ page }) => {
+    await page.goto('/emergency')
+
+    await expect(page.locator('#emergency-list-heading')).toHaveText(messages.emergency.pageTitle)
+    await expect(page.locator('.map-canvas-height')).toHaveCount(0)
+  })
+
+  /*
+    **가장 급한 행동이 가장 높은 위계다** (E-2). 예전에는 목록 위에 얹힌 secondary
+    버튼이라 스크롤을 내리면 사라졌다.
+  */
+  test('내 위치 버튼이 스크롤 없이 보이고 44px 다', async ({ page }) => {
+    await page.goto('/emergency')
+
+    const locate = page.getByRole('button', { name: messages.emergency.locateCta })
+    await expect(locate).toBeVisible()
+
+    expect(await page.evaluate(() => window.scrollY)).toBe(0)
+
+    const box = await locate.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44)
+    // 첫 화면 안에 통째로 들어와야 "스크롤 없이 보인다" 가 참이다
+    expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(PHONE.height)
+  })
+
+  /*
+    **권역을 고르면 기준점이 옮겨 가고 거리가 되살아난다.** 제주 중심 폴백은 사용자가
+    고르지 않은 자리라 거리를 감추지만, 권역은 직접 고른 자리다.
+  */
+  test('권역을 고르면 기준 줄이 바뀌고 거리가 되살아난다', async ({ page }) => {
+    await page.goto('/emergency')
+
+    const main = page.getByRole('main')
+    await expect(main).toContainText(messages.emergency.basisJeju)
+
+    await page.getByRole('button', { name: messages.emergency.regionLabel.SEOGWIPO }).click()
+
+    await expect(main).toContainText('서귀포 기준')
+    await expect(rows(page).first()).toContainText(/\d+(\.\d+)?km|\d+m/)
+  })
+
+  /*
+    **폴백 머리가 서도 첫 화면에 행이 남는다** (D1 — 위치 블록 약 140px). 머리가 화면을
+    다 먹으면 "목록 우선" 이 이름뿐이 된다.
+  */
+  test('첫 화면 안에 시설 행이 둘 이상 보인다', async ({ page }) => {
+    await page.goto('/emergency')
+    await expect(rows(page).first()).toBeVisible()
+
+    const boxes = await rows(page).evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const rect = node.getBoundingClientRect()
+        return rect.top + rect.height
+      }),
+    )
+
+    expect(boxes.filter((bottom) => bottom <= PHONE.height).length).toBeGreaterThanOrEqual(2)
   })
 })
