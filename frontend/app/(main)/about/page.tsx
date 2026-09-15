@@ -1,4 +1,4 @@
-import { Canvas, SurfaceStack } from '@/components/surface'
+import { Canvas } from '@/components/surface'
 import { AboutView } from '@/features/about/about-view'
 import { messages } from '@/lib/messages'
 
@@ -8,22 +8,21 @@ export const metadata = {
 }
 
 /**
- * 서비스 소개 — `/about`.
+ * 서비스 소개 — `/about` (#611 → #635).
  *
- * **보호 경로가 아니다.** `proxy.ts` `PROTECTED_PATHS` 에 넣지 않는다 — 이 화면의 존재
- * 이유가 **비로그인 모바일 방문자에게 데이터 출처를 보여 주는 것**이라, 로그인 뒤에 두면
- * 표기하지 않은 것과 같다 (`about-view.tsx` 머리 주석).
+ * **보호 경로가 아니다.** `proxy.ts` `PROTECTED_PATHS` 에 넣지 않는다 — 심사자가 로그인 없이
+ * 모바일로 둘러본다.
  *
- * **프리페치도 세션 조회도 없다.** 백엔드를 부르지 않는 정적 화면이라 `HydrationBoundary`
- * 를 두지 않는다 — 없는 주소 하나에 왕복을 만들지 않는 `app/not-found.tsx` 와 같은 판단이다.
+ * **프리페치도 세션 조회도 없다.** 백엔드를 부르지 않는 정적 화면이라 `HydrationBoundary` 를
+ * 두지 않는다.
+ *
+ * **`SurfaceStack` 을 쓰지 않는다.** 그린/연녹 밴드가 전폭이어야 해서(§0 "바닥은 전폭")
+ * `Canvas` 바로 아래에 `IntroBand` 가 쌓인다. 안쪽 폭 1152 는 밴드가 갖는다.
  */
 export default function AboutPage() {
   return (
-    /* L0 바닥은 `main` 이 전폭으로 칠하고 폭은 `SurfaceStack` 이 갖는다 (#453 · #462) */
     <Canvas as="main" id="main-content">
-      <SurfaceStack className="mx-auto w-full max-w-screen-md">
-        <AboutView />
-      </SurfaceStack>
+      <AboutView />
     </Canvas>
   )
 }
