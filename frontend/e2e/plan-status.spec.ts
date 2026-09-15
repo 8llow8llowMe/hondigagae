@@ -100,6 +100,17 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     // ── 되돌리기 — 메뉴 안에서 ────────────────────────────────────────────
     await openManageMenu()
     await expect(revertItem).toBeVisible()
+
+    /*
+      **파괴적 항목은 마지막이고 역방향은 그 위다** (명세 D11-2). 역방향은 되돌릴 수
+      있으므로 `danger-900` + 구분선 자리(삭제)와 섞이면 안 된다.
+    */
+    await expect(page.getByRole('menuitem')).toHaveText([
+      '이름·기간·예산 수정',
+      '초안으로 되돌리기',
+      '일정 삭제',
+    ])
+
     await revertItem.click()
 
     await expect(confirmAction).toBeVisible()
@@ -129,9 +140,16 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
   })
 
   /*
-    **준비물은 일자 뒤다** (#653 · 진단 PL-3 · 명세 D11-3). 390 실측에서 준비물·배너가
-    `1일차` 를 초안 700 · 확정 694 · 완료 954 로 밀어내고 있었다. DOM 순서가 곧 읽는
-    순서이므로 그 순서를 못박는다 — 데스크톱 배치는 grid 가 되돌린다.
+    **`.rail-layout-split` 의 층 규약이다** (#653 · 명세 D11-3, `app/globals.css`).
+
+    이 클래스가 약속하는 것은 *"레일이 본문 앞뒤 둘로 갈리고, `lg` 미만에서는 DOM 순서대로
+    쌓인다"* 이고 **그 약속은 브라우저가 계산해야 보인다** — 클래스가 붙었는지로는 검증되지
+    않는다 (testing-guide.md §12 의 "공용 컴포넌트의 반응형 계약" 갈래).
+    `PlanDetailSection` 은 React Query 훅을 들어 `renderToStaticMarkup` 으로 볼 수 없고,
+    이 클래스의 사용처는 지금 이 화면 하나라 **모든 사용처를 보는 것**이기도 하다.
+
+    **픽셀 임계값(`< 844` 같은 것)은 재지 않는다.** 그것이 §12 가 막는 "화면 고유의 배치" 다
+    — 개요 카드가 한 줄만 늘어도 깨진다. 순서만 본다.
   */
   test('모바일에서 일자가 준비물보다 먼저다', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
@@ -149,7 +167,11 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     const packingTop = (await packing.boundingBox())?.y ?? 0
 
     expect(dayTop).toBeLessThan(packingTop)
-    // 첫 화면 안에 든다 — 이 변경이 되돌려지면 여기서 걸린다
-    expect(dayTop).toBeLessThan(844)
+
+    /* 아래 레일 안의 순서도 약속이다 — 준비물 → (후기) → 배너 */
+    const bannerTop =
+      (await page.getByRole('link', { name: /가는 곳 주변 병원·약국/ }).boundingBox())?.y ?? 0
+
+    expect(packingTop).toBeLessThan(bannerTop)
   })
 })
