@@ -15,6 +15,7 @@ import { EmergencyBoardSection } from '@/features/emergency/emergency-list-view'
 import { EmergencyMapPanel } from '@/features/emergency/emergency-map-panel'
 import { EmergencyMapSkeleton } from '@/features/emergency/emergency-map-skeleton'
 import { EmergencySearchField } from '@/features/emergency/emergency-search-field'
+import { emergencyBasisLabel } from '@/features/emergency/emergency-summary-line'
 import {
   applyFilters,
   countsAreComplete,
@@ -23,6 +24,7 @@ import {
   reliefLabel,
   reliefs,
 } from '@/features/emergency/facility-filters'
+import { PositionFallbackHead } from '@/features/emergency/position-fallback-head'
 import { shouldOfferResearch } from '@/features/emergency/research-offer'
 import { useEmergencyBoard } from '@/features/emergency/use-emergency-board'
 import type { MapPin } from '@/features/map/map-canvas'
@@ -336,6 +338,21 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
 
           인셋은 아래 칩·목록과 같은 페이지 값 `main` 이다.
         */}
+        {/*
+          **위치 폴백 블록이 이 갈래에도 선다** (#639). `EmergencySection` 이 갖고 있던
+          `PositionNotice` 가 카드 머리로 올라가면서, 여기에 다시 세우지 않으면 이 갈래만
+          "왜 거리가 없는지" 를 말하지 않게 된다 — 카카오 키 도메인이 안 맞을 때 **항상**
+          오는 경로라 예외가 아니다 (공통명세 E5).
+
+          카드가 없는 페이지라 인셋은 아래 칩·목록과 같은 `main` 이다.
+        */}
+        <PositionFallbackHead
+          reason={board.fallback}
+          regionCode={board.regionCode}
+          onRegionChange={board.researchAtRegion}
+          onLocate={board.locate}
+          inset="main"
+        />
         <EmergencySearchField
           filters={board.filters}
           onFiltersChange={board.setFilters}
@@ -367,16 +384,14 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
   const hideViewportClaim = selectedId !== null || boundsStale
   const countLine = `${visibleCountLabel(visible.length, hideViewportClaim)} · ${messages.emergency.radiusLabel.replace('{radius}', formatDistance(board.radius))}`
   /*
-    거리·정렬의 기준을 말한다 — 세 갈래다 (#396). 재검색으로 기준점을 옮기면
+    거리·정렬의 기준을 말한다 — 네 갈래다 (#396 · #639). 재검색·권역으로 기준점을 옮기면
     거리는 여전히 진짜 거리지만 **내 위치에서가 아니다.** 감추지 않고 기준을 바꿔 말한다:
     사용자가 직접 밀어 놓고 누른 자리라 그 자리에서 480m 인 것은 알고 싶은 사실이다.
+
+    **문구 갈래는 목록 갈래와 같은 함수가 갖는다** (`emergencyBasisLabel`) — 인라인으로
+    두면 한쪽만 고쳐져 같은 화면의 두 보기가 다른 기준을 주장한다.
   */
-  const basisLine =
-    board.basis === 'map'
-      ? messages.emergency.basisMap
-      : board.basis === 'current'
-        ? messages.emergency.basisCurrent
-        : messages.emergency.basisJeju
+  const basisLine = emergencyBasisLabel(board.basis, board.regionCode)
 
   /*
     조회한 자리에서 충분히 벗어났을 때만 재검색을 권한다 (#396). 판정은

@@ -25,8 +25,8 @@ function render(overrides: Partial<EmergencySectionProps> = {}) {
     onRetry: () => undefined,
     filters: DEFAULT_FACILITY_FILTERS,
     onFiltersChange: () => undefined,
-    positionFallback: null,
-    onRetryPosition: () => undefined,
+    basis: 'current',
+    regionCode: null,
     onWidenRadius: () => undefined,
     canWiden: true,
     ...overrides,
@@ -168,56 +168,49 @@ describe('EmergencySection — 운영시간·전화', () => {
   })
 })
 
-describe('EmergencySection — 위치 폴백', () => {
-  it('폴백이면 거리를 표시하지 않는다 — 제주 중심에서 480m 를 "480m" 로 쓸 수 없다', () => {
-    const markup = render({ positionFallback: 'denied' })
+/*
+  **위치 안내 자체는 이제 이 섹션의 몫이 아니다** (#639) — 카드 머리의
+  `PositionFallbackHead` 가 맡고 그 렌더 분기는 `position-fallback-head.test.ts` 가 잰다.
+  여기 남은 것은 **기준을 말하는가 · 거리를 감추는가** 둘이다.
+*/
+describe('EmergencySection — 기준과 거리', () => {
+  it('제주 중심 폴백이면 거리를 표시하지 않는다 — 거기서 480m 를 "480m" 로 쓸 수 없다', () => {
+    const markup = render({ basis: 'jeju' })
 
     expect(markup).not.toContain('480m')
     expect(markup).toContain(messages.emergency.basisJeju)
   })
 
   it('폴백이어도 목록과 전화는 그대로 남는다', () => {
-    const markup = render({ positionFallback: 'denied' })
+    const markup = render({ basis: 'jeju' })
 
     expect(markup).toContain('제주24시동물병원')
     expect(markup).toContain('href="tel:')
   })
 
-  it('네 갈래의 안내가 서로 다르다', () => {
-    expect(render({ positionFallback: 'denied' })).toContain(messages.emergency.positionDenied)
-    expect(render({ positionFallback: 'timeout' })).toContain(messages.emergency.positionTimeout)
-    expect(render({ positionFallback: 'unsupported' })).toContain(
-      messages.emergency.positionUnsupported,
-    )
-    expect(render({ positionFallback: 'outside' })).toContain(messages.emergency.positionOutside)
+  it('네 기준이 서로 다른 말을 한다', () => {
+    expect(render({ basis: 'current' })).toContain(messages.emergency.basisCurrent)
+    expect(render({ basis: 'map' })).toContain(messages.emergency.basisMap)
+    expect(render({ basis: 'jeju' })).toContain(messages.emergency.basisJeju)
+    expect(render({ basis: 'region', regionCode: 'SEOGWIPO' })).toContain('서귀포 기준')
   })
 
   /*
-    제주 밖은 **권한 문제가 아니다.** 좌표는 정확히 받았고 우리 데이터가 제주뿐이다 —
-    권한 문구를 내면 사용자가 브라우저 설정을 뒤진다.
+    **권역은 사용자가 직접 고른 자리다** — `basisMap` 과 같은 판단으로 거리를 보여준다.
+    감추는 것은 사용자가 고르지 않은 제주 중심 폴백뿐이다.
   */
-  it('제주 밖 안내를 권한 문제로 말하지 않는다', () => {
-    const markup = render({ positionFallback: 'outside' })
+  it('권역·지도 기준에서는 거리가 남는다', () => {
+    expect(render({ basis: 'region', regionCode: 'EAST' })).toContain('480m')
+    expect(render({ basis: 'map' })).toContain('480m')
+  })
+
+  /* 위치 안내 문구가 섹션에 남아 있으면 카드 머리와 같은 말을 두 번 하게 된다 */
+  it('위치 실패 안내와 다시 찾기 버튼이 섹션에 없다', () => {
+    const markup = render({ basis: 'jeju' })
 
     expect(markup).not.toContain(messages.emergency.positionDenied)
-    expect(markup).not.toContain(messages.emergency.positionTimeout)
-  })
-
-  it('다시 시도해도 답이 같은 갈래에는 버튼을 주지 않는다', () => {
-    expect(render({ positionFallback: 'unsupported' })).not.toContain(
-      messages.emergency.retryPosition,
-    )
-    // 서울에서 다시 눌러도 서울이다 — 위치를 옮겨야 바뀐다
-    expect(render({ positionFallback: 'outside' })).not.toContain(messages.emergency.retryPosition)
-    expect(render({ positionFallback: 'denied' })).toContain(messages.emergency.retryPosition)
-  })
-
-  it('제주 밖이어도 목록과 거리 기준 표기는 폴백 규칙을 따른다', () => {
-    const markup = render({ positionFallback: 'outside' })
-
-    expect(markup).not.toContain('480m')
-    expect(markup).toContain(messages.emergency.basisJeju)
-    expect(markup).toContain('제주24시동물병원')
+    expect(markup).not.toContain(messages.emergency.retryPosition)
+    expect(markup).not.toContain(messages.emergency.locateCta)
   })
 })
 
@@ -394,8 +387,8 @@ describe('EmergencySection — 3층 표면 (#460)', () => {
         },
         filters: { ...DEFAULT_FACILITY_FILTERS, openNowOnly: true },
       },
-      // 위치 안내
-      { positionFallback: 'denied' },
+      // 제주 중심 폴백 — 거리 줄이 빠지는 갈래
+      { basis: 'jeju' as const },
     ]
 
     for (const state of states) {

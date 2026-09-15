@@ -111,18 +111,55 @@ describe('목록 갈래는 3층 표면이다 (#460)', () => {
     expect(page).toContain('<h1 className="sr-only">{messages.emergency.pageTitle}</h1>')
   })
 
-  it('보기 토글과 부제가 카드 머리 슬롯에 있다 (#556)', () => {
+  /*
+    **부제가 두 줄이 됐다** (#639). 개수 줄(`emergencyHeadSubtitle` — "제주 214곳 · 지금
+    진료중 100곳")은 이 화면에 온 이유 자체라 모든 폭에서 서고, 조건 줄
+    (`emergencySummaryLine`)은 데스크톱에서만 — 모바일은 바로 아래 칩이 같은 것을 보여준다.
+  */
+  it('보기 토글과 부제 두 줄이 카드 머리 슬롯에 있다 (#556 · #639)', () => {
     const view = block(listView, 'EmergencyListView')
 
     // 카드 밖 제목 줄의 형제가 아니라 카드의 슬롯이다
     expect(view).toMatch(/trailing=\{\s*<ViewToggle current="list"/)
-    expect(view).toMatch(/description=\{[\s\S]{0,200}emergencySummaryLine/)
+    expect(view).toContain('description={headDescription}')
+
+    const description = view.slice(view.indexOf('const headDescription'), view.indexOf('return ('))
+    const subtitle = description.indexOf('{subtitle}')
+    const summary = description.indexOf('emergencySummaryLine')
+
+    expect(view).toContain('const subtitle = emergencyHeadSubtitle(result)')
+    expect(subtitle).toBeGreaterThan(-1)
+    expect(summary).toBeGreaterThan(subtitle)
+    // 개수 줄에는 `lg:` 갈림이 없고, 조건 줄에만 있다
+    expect(description.slice(0, subtitle)).not.toContain('lg:block')
+    expect(description.slice(subtitle, summary)).toContain('lg:block')
   })
 
   /*
    **칩은 카드 머리의 `tools` 슬롯이다** (#556). 목록을 좁히는 도구와 그 결과를 가르는 축이
    "카드 안/밖" 에서 "머리/본문" 으로 옮겨 갔다 (`Surface` 의 `fill` 절).
    */
+  /*
+    **위치 폴백 블록이 도구보다 위다** (#639). 칩·검색은 결과를 *좁히는* 도구지만
+    이 블록은 **무엇을 기준으로 찾을지** — 결과의 전제다. 머리(고정 영역)라 목록을
+    굴려도 남는다: 예전 `PositionNotice` 는 본문 맨 위였고 스크롤 한 번이면 사라졌다.
+  */
+  it('위치 폴백 머리가 tools 슬롯 맨 위에 선다 (#639)', () => {
+    const view = block(listView, 'EmergencyListView')
+    const tools = view.indexOf('tools={')
+    const head = view.indexOf('<PositionFallbackHead')
+    const search = view.indexOf('<EmergencySearchField')
+
+    expect(head).toBeGreaterThan(tools)
+    expect(search).toBeGreaterThan(head)
+
+    const tag = view.slice(head, view.indexOf('/>', head))
+    expect(tag).toContain('reason={board.fallback}')
+    expect(tag).toContain('onRegionChange={board.researchAtRegion}')
+    // 목록 본문에 같은 안내가 남으면 같은 말을 두 번 한다
+    expect(listView).not.toContain('positionFallback=')
+  })
+
   it('필터 칩이 카드 머리의 tools 슬롯에 서고 lg 에서 숨는다', () => {
     const view = block(listView, 'EmergencyListView')
     const tools = view.indexOf('tools={')

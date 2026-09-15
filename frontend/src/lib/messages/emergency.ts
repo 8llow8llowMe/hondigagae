@@ -1,3 +1,4 @@
+import type { JejuRegionCode } from '@/lib/geo/jeju-regions'
 import type { FacilityTypeCode } from '@/types/emergency'
 
 /**
@@ -79,6 +80,13 @@ export const emergencyMessages = {
   /** 지도를 옮겼을 때 뜨는 알약 버튼 (#396) */
   researchHere: '이 지역에서 재검색',
   basisJeju: '제주 중심 기준',
+  /**
+   * 권역 세그먼트로 기준점을 옮겼을 때 (#639). `{region}` 치환.
+   *
+   * **`basisMap` 과 같은 판단이다** — 사용자가 직접 고른 자리라 거리를 감추지 않고
+   * 기준을 바꿔 말한다. 감추는 것은 사용자가 고르지 않은 `basisJeju` 뿐이다.
+   */
+  basisRegion: '{region} 기준',
 
   // ── 행 ─────────────────────────────────────────────────────────────────
 
@@ -209,7 +217,59 @@ export const emergencyMessages = {
    * (`positionUnsupported` 와 같은 판단).
    */
   positionOutside: '지금 제주 밖에 있어요.',
+  /**
+   * 지도 갈래 패널·시트의 **문장 안 인라인** 다시 시도 (`emergency-map-view.tsx`).
+   *
+   * 목록 갈래는 이것을 쓰지 않는다 — 거기서는 `locateCta` 가 전폭 primary 버튼이다.
+   * 두 자리의 위계가 다르기 때문이다: 지도는 위치가 없어도 마커가 보이지만, 목록은
+   * 위치가 없으면 거리 줄이 통째로 사라진다.
+   */
   retryPosition: '현재 위치로 다시 찾기',
+
+  // ── 위치 폴백 머리 (목록 갈래 · #639) ─────────────────────────────────
+
+  /**
+   * 폴백 블록의 **primary 버튼** (#639). `retryPosition`("현재 위치로 다시 찾기")과
+   * 달리 **무엇을 얻는지**를 말한다.
+   *
+   * 예전에는 secondary 버튼이 목록 위에 얹혀 있었다 — 응급 화면에서 가장 급한 행동이
+   * 가장 낮은 위계였다 (UI/UX 감사 E-2).
+   */
+  locateCta: '내 위치로 가까운 병원 찾기',
+  /** 버튼 아래 caption — 위치를 못 켜는 사람에게 남은 길을 준다 */
+  regionPickHint: '위치를 켤 수 없으면 지역을 골라 주세요',
+  /**
+   * `denied` 일 때만 한 줄 더.
+   *
+   * **버튼을 눌러도 아무 일이 없을 수 있다는 사실을 말한다.** 브라우저가 권한을 영구
+   * 거부한 상태면 프롬프트가 다시 뜨지 않는다 — 그것을 말하지 않으면 사용자는 버튼을
+   * 반복해 누르며 화면이 고장난 것으로 읽는다.
+   */
+  positionDeniedHint: '브라우저 설정에서 위치 권한을 켜야 다시 물어볼 수 있어요',
+  /**
+   * 권역 세그먼트 라벨 (#639).
+   *
+   * **서버 enum 이 아니라 FE 지리 상수의 라벨이다** (`lib/geo/jeju-regions.ts`).
+   * 홈 권역 날씨의 서버 `regions[].name`(`제주시권` 등)과 이름을 맞추고 싶지만 그 응답은
+   * 이 화면에 오지 않는다 — `typeByCode` 와 같은 자리다: 데이터가 없는 컨트롤의 고정 라벨.
+   */
+  regionLabel: {
+    JEJU_CITY: '제주시',
+    SEOGWIPO: '서귀포',
+    EAST: '동부',
+    WEST: '서부',
+  } satisfies Record<JejuRegionCode, string>,
+  /** 세그먼트 `ChipGroup` 의 축 이름 — 없으면 무엇을 고르는 축인지 읽히지 않는다 */
+  regionGroupLabel: '기준 지역',
+
+  /**
+   * 카드 부제 (#639). `{total}` · `{openNow}` 치환.
+   *
+   * **응답 전에는 렌더하지 않는다** — 숫자 없는 부제는 빈 말이다. 받아 온 목록이 잘렸으면
+   * (`countsAreComplete === false`) 진료중 수가 전체가 아니므로 그때도 감춘다:
+   * 틀린 개수는 없는 개수보다 나쁘다.
+   */
+  subtitle: '제주 {total}곳 · 지금 진료중 {openNow}곳',
 
   /** `{provider}` 치환 */
   source: '정보 출처: {provider}. 진료시간은 실제와 다를 수 있어 방문 전 전화로 확인해 주세요.',
