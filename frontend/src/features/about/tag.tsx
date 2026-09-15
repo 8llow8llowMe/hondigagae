@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils/cn'
 export type AboutTagTone = 'neutral' | 'open' | 'unknown'
 
 /**
- * 예시 행의 작은 태그 (#635). 세 톤이 **같은 높이(22)** 여야 한 줄에서 들쭉날쭉하지 않는다.
+ * 예시 행의 작은 태그 (#635). 세 톤이 **같은 높이(20)** 여야 한 줄에서 들쭉날쭉하지 않는다.
  *
  * `unknown` 은 채움 없이 점선 테두리다 — DESIGN.md §2-3 이 "정보 없음에는 tint 를 주지
  * 않는다" 로 정해 둔 모양이고, 홈·장소 목록의 실제 unknown 배지와 같다.
@@ -26,7 +26,7 @@ const TONE: Record<AboutTagTone, string> = {
  */
 export function Tag({ tone, children }: { tone: AboutTagTone; children: ReactNode }) {
   return (
-    <span className={cn('text-caption inline-flex h-5.5 items-center rounded-sm px-2', TONE[tone])}>
+    <span className={cn('text-caption inline-flex h-5 items-center rounded-sm px-2', TONE[tone])}>
       {children}
     </span>
   )

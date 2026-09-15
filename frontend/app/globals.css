@@ -716,6 +716,8 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    /* 소개 페이지 예시가 인라인 transitionDelay 800/820ms 를 쓴다 — 지연을 안 끄면 끝 상태가 늦게 뜬다 (#635) */
+    transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
 }
