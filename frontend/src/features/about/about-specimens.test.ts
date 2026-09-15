@@ -54,9 +54,14 @@ describe('GoldenCurveSpecimen — 골든타임 곡선', () => {
     expect(markup).toContain(messages.about.specimen.curveAria)
   })
 
-  it('정적 렌더는 다 그려진 상태다 — dashoffset 0', () => {
+  it('정적 렌더는 다 그려진 상태다 — dashoffset 0 · 숨김 없음', () => {
     expect(markup).toContain('stroke-dashoffset:0')
     expect(markup).not.toContain('stroke-dashoffset:1;')
+    expect(markup).not.toContain('opacity-0')
+  })
+
+  it('선은 pathLength=1 위에서 그린다 — 없으면 1px 점선이 된다', () => {
+    expect(markup).toContain('pathLength="1"')
   })
 
   it('노면 선만 등급 색이다 — 기온 선은 중립', () => {
@@ -71,5 +76,13 @@ describe('GoldenCurveSpecimen — 골든타임 곡선', () => {
   it('부제에 추천 구간이 치환돼 들어간다', () => {
     expect(markup).toContain(VERDICT_SPECIMEN.window)
     expect(markup).not.toContain('{window}')
+  })
+
+  it('봉우리 라벨은 판정 카드의 노면 값에서 파생된다', () => {
+    expect(markup).toContain(`${VERDICT_SPECIMEN.pavement.toFixed(1)}℃`)
+  })
+
+  it('예시는 그림이라 y축 눈금을 두지 않는다', () => {
+    expect(markup).not.toContain('50℃')
   })
 })

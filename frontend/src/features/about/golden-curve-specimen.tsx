@@ -5,7 +5,6 @@ import { type CSSProperties, useRef } from 'react'
 import { GOLDEN_CURVE_SPECIMEN, VERDICT_SPECIMEN } from '@/features/about/about-specimen-data'
 import { useRevealOnce } from '@/features/about/use-reveal-once'
 import { messages } from '@/lib/messages'
-import { cn } from '@/lib/utils/cn'
 
 const DRAW_MS = 800
 
@@ -24,6 +23,14 @@ const DRAW_MS = 800
  * SVG 속성 전환은 Tailwind 유틸리티가 없어 인라인 `style` 로 건다. 색은 유틸리티
  * (`stroke-*` · `fill-*`)다 — 노면 선만 `metric-critical-500`, 기온은 `fg-muted`, 추천 구간
  * 면은 `metric-high-100`(글자를 얹지 않는 tint 층).
+ *
+ * **y 축에 눈금을 두지 않는다.** 곡선은 손으로 그린 그림이지 실측 플롯이 아니라, 눈금을 달면
+ * 봉우리의 픽셀 높이가 곧 온도로 읽혀 카드가 말하는 값(29℃ · 56.0℃)과 어긋난다. 값은 봉우리
+ * 라벨 하나로만 말하고, 가로선 3개는 눈금이 아니라 바탕 질감이다.
+ *
+ * **`viewBox` 배율이 타입 스케일을 우회한다.** `w-full` 만 두면 md 이상에서 폭이 2배 가까이
+ * 늘며 12px 글자가 24px, 2.5px 선이 5px 로 같이 커진다. `max-w-md` 로 렌더 폭을 묶고, 선은
+ * `vectorEffect="non-scaling-stroke"` 로 배율과 무관하게 지정한 굵기를 유지한다.
  */
 export function GoldenCurveSpecimen() {
   const ref = useRef<SVGSVGElement>(null)
@@ -50,7 +57,7 @@ export function GoldenCurveSpecimen() {
         <svg
           ref={ref}
           viewBox="0 0 360 150"
-          className="block h-auto w-full"
+          className="mx-auto block h-auto w-full max-w-md"
           role="img"
           aria-label={copy.curveAria}
         >
@@ -60,16 +67,32 @@ export function GoldenCurveSpecimen() {
             width={data.windowWidth}
             height={118}
             rx={4}
-            className={cn(
-              'fill-metric-high-100',
-              drawing ? 'opacity-0 transition-none' : 'transition-opacity duration-200 ease-out',
-            )}
+            className={
+              drawing
+                ? 'fill-metric-high-100 opacity-0 transition-none'
+                : 'fill-metric-high-100 transition-opacity duration-200 ease-out'
+            }
             style={{ transitionDelay: drawing ? '0ms' : `${DRAW_MS}ms` }}
           />
+          {/* stroke-width 는 상속되지만 vector-effect 는 상속되지 않아 선마다 붙인다 */}
           <g className="stroke-border" strokeWidth={1}>
-            <line x1={12} y1={126} x2={348} y2={126} />
-            <line x1={12} y1={86} x2={348} y2={86} strokeDasharray="3 4" />
-            <line x1={12} y1={46} x2={348} y2={46} strokeDasharray="3 4" />
+            <line x1={12} y1={126} x2={348} y2={126} vectorEffect="non-scaling-stroke" />
+            <line
+              x1={12}
+              y1={86}
+              x2={348}
+              y2={86}
+              strokeDasharray="3 4"
+              vectorEffect="non-scaling-stroke"
+            />
+            <line
+              x1={12}
+              y1={46}
+              x2={348}
+              y2={46}
+              strokeDasharray="3 4"
+              vectorEffect="non-scaling-stroke"
+            />
           </g>
           <g className="fill-fg-muted text-caption font-medium">
             {data.hours.map((hour) => (
@@ -77,12 +100,6 @@ export function GoldenCurveSpecimen() {
                 {hour.label}
               </text>
             ))}
-            <text x={330} y={42} textAnchor="end">
-              50℃
-            </text>
-            <text x={330} y={82} textAnchor="end">
-              30℃
-            </text>
           </g>
           <path
             d={data.temperaturePath}
@@ -90,6 +107,7 @@ export function GoldenCurveSpecimen() {
             fill="none"
             strokeWidth={2.5}
             strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
             className="stroke-fg-muted"
             style={lineStyle}
           />
@@ -99,6 +117,7 @@ export function GoldenCurveSpecimen() {
             fill="none"
             strokeWidth={2.5}
             strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
             className="stroke-metric-critical-500"
             style={lineStyle}
           />
