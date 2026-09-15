@@ -521,9 +521,9 @@ git commit -m "[FE] feat: 이용약관 본문 15개 조를 쓴다 (#610)"
 - Consumes: `LegalDocument` (Task 1)
 - Produces: `privacyPolicy: LegalDocument`, `LEGAL_CONTACT: { officerName: string; email: string }`
 
-> **이 태스크에는 사람이 줘야 하는 값이 하나 있다.** `LEGAL_CONTACT.officerName` 은
-> 개인정보 보호책임자의 **실명**이다. 확정 값을 받기 전에는 이 태스크를 완료로
-> 표시하지 않는다 — Step 1 의 테스트가 빈 값에서 실패하도록 만들어 두는 이유가 그것이다.
+> **보호책임자 성명은 확정되었다** — `최성호`. 이 값은
+> 사람이 정하는 값이라 자동으로 채울 수 없고, 비면 Step 1 의 테스트가 실패해
+> 머지되지 않는다.
 
 - [ ] **Step 1: 보호책임자 게이트 테스트를 먼저 쓴다**
 
@@ -576,13 +576,13 @@ Expected: FAIL — `Failed to resolve import "@/lib/legal/contact"`
  * 공개된 개인 번호는 회수할 수 없다.
  */
 export const LEGAL_CONTACT = {
-  officerName: '홍길동',
+  officerName: '최성호',
   email: 'privacy@hondigagae.com',
 } as const
 ```
 
-> `officerName` 의 `'홍길동'` 은 **반드시 실제 성명으로 바꾼다.** 확정 값을 아직
-> 받지 못했다면 이 태스크를 멈추고 사람에게 묻는다.
+> `officerName` 은 확정 값이다 — 사용자가 2026-09-15 에 `최성호` 로 지정했다. 값이
+> 비면 테스트가 실패하므로 비운 채로 머지될 수 없다.
 
 - [ ] **Step 4: 처리방침 본문을 쓴다**
 
@@ -1911,7 +1911,7 @@ cd frontend && pnpm dev:alt
 
 - [ ] **Step 6: 배포 게이트를 확인한다 — 코드로 잡을 수 없는 것**
 
-- [ ] `LEGAL_CONTACT.officerName` 이 **실제 성명**인가 (Task 3 의 `'홍길동'` 이 남아 있지 않은가)
+- [ ] `LEGAL_CONTACT.officerName` 이 `최성호` 로 들어갔는가
 - [ ] 시행일 `2026-09-15` 가 실제 공개일 이후인가 — 아니면 두 문서의 `effectiveDate` 와 `history[0].effectiveDate` 를 함께 고친다
 - [ ] #609 확인 결과가 처리방침 제3조의 "탈퇴 회원의 재가입 제한을 위한 정보" 행에 반영되었는가
 - [ ] **사람이 두 문서 전문을 한 번 읽었는가** — 이 초안은 법률 자문이 아니다
@@ -1941,6 +1941,6 @@ cd frontend && pnpm dev:alt
 | S8-1 배포 게이트 | Task 3 Step 1 (연락처는 테스트로 강제) + Task 9 Step 6 |
 | S9 백엔드 이슈 | 발의 완료 (#607 · #608 · #609) |
 
-**2. 플레이스홀더 점검** — `LEGAL_CONTACT.officerName` 의 `'홍길동'` 이 유일하게 사람이 채워야 하는 값이다. 주석으로 미루지 않고 **테스트가 빈 값에서 실패하도록** 만들었고, Task 3 머리와 Task 9 Step 6 에 이중으로 표시했다. 나머지 단계는 실제 코드를 담고 있다.
+**2. 플레이스홀더 점검** — 남아 있지 않다. 사람이 정해야 했던 유일한 값(보호책임자 성명)은 `최성호` 로 확정됐고, 그럼에도 빈 값에서 실패하는 테스트를 남겨 개정 중 지워지는 것을 막는다. 나머지 단계는 실제 코드를 담고 있다.
 
 **3. 타입 일관성** — `doc` prop 이름이 Task 5 정의와 Task 6 두 라우트의 호출에서 같다. `LEGAL_LINKS` 는 Task 4 에서 정의하고 Task 7 · Task 8 이 같은 이름으로 쓴다. `LEGAL_DOCUMENTS` 는 Task 1 에서 빈 배열로 만들어 Task 2 · Task 3 이 차례로 채운다. `messages.legal.articleLabel` 시그니처 `(no: number) => string` 이 Task 5 렌더러와 Task 5 테스트에서 같다.
