@@ -5,6 +5,7 @@ import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanBriefingR
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanDetailResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanEmergencyResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanWeatherResponse;
+import com.hondigagae.domainlayer.plan.application.command.PlanCopyCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanCreateCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanItemCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanUpdateCommand;
@@ -15,6 +16,8 @@ import java.util.List;
 public interface PlanWebUseCase {
 
     PlanDetailResponse createPlan(long memberId, PlanCreateCommand command);
+
+    PlanDetailResponse copyPlan(long memberId, long planId, PlanCopyCommand command);
 
     SliceResponse<PlanSummaryItem> getMyPlans(long memberId, Long petId, Long lastPlanId, int size);
 

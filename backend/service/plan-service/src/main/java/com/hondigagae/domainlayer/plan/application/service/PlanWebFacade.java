@@ -8,6 +8,7 @@ import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanWeatherRe
 import com.hondigagae.domainlayer.plan.adapter.in.web.presenter.PlanBriefingPresenter;
 import com.hondigagae.domainlayer.plan.adapter.in.web.presenter.PlanPresenter;
 import com.hondigagae.domainlayer.plan.adapter.in.web.presenter.PlanWeatherPresenter;
+import com.hondigagae.domainlayer.plan.application.command.PlanCopyCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanCreateCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanItemCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanUpdateCommand;
@@ -57,6 +58,15 @@ public class PlanWebFacade implements PlanWebUseCase {
         planCommandProcessor.verifyPlaceTargets(command.items());
         Plan plan = planCommandProcessor.createPlan(memberId, command, petIds);
         return planPresenter.toDetailResponse(planQueryProcessor.getPlanDetailInfo(plan));
+    }
+
+    @Override
+    public PlanDetailResponse copyPlan(long memberId, long planId, PlanCopyCommand command) {
+        Plan source = planQueryProcessor.getOwnedPlan(memberId, planId);
+        List<Long> petIds = planCommandProcessor.resolveCopyPetIds(memberId, planQueryProcessor.getPetIds(source));
+        Plan copied = planCommandProcessor.copyPlan(
+            source, command, petIds, planQueryProcessor.getPlanItems(source));
+        return planPresenter.toDetailResponse(planQueryProcessor.getPlanDetailInfo(copied));
     }
 
     @Override

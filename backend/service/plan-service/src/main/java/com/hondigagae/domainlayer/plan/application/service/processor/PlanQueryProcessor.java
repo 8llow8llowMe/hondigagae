@@ -52,6 +52,10 @@ public class PlanQueryProcessor {
         return plan.resolvePetIds(planPetRepositoryPort.findByPlanId(plan.id()));
     }
 
+    public List<PlanItem> getPlanItems(Plan plan) {
+        return planItemRepositoryPort.findByPlanId(plan.id());
+    }
+
     /**
      * 장소 요약이 붙은 일정 상세 (이슈 #86).
      *
