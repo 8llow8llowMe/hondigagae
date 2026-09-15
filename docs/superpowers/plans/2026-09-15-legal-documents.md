@@ -1963,3 +1963,148 @@ cd frontend && pnpm dev:alt2
 **2. 플레이스홀더 점검** — 남아 있지 않다. 사람이 정해야 했던 유일한 값(보호책임자 성명)은 `최성호` 로 확정됐고, 그럼에도 빈 값에서 실패하는 테스트를 남겨 개정 중 지워지는 것을 막는다. 나머지 단계는 실제 코드를 담고 있다.
 
 **3. 타입 일관성** — `doc` prop 이름이 Task 5 정의와 Task 6 두 라우트의 호출에서 같다. `LEGAL_LINKS` 는 Task 4 에서 정의하고 Task 7 · Task 8 이 같은 이름으로 쓴다. `LEGAL_DOCUMENTS` 는 Task 1 에서 빈 배열로 만들어 Task 2 · Task 3 이 차례로 채운다. `messages.legal.articleLabel` 시그니처 `(no: number) => string` 이 Task 5 렌더러와 Task 5 테스트에서 같다.
+
+---
+
+## Task 10: `/about` 에 약관 링크 (리베이스 중 추가)
+
+> **이 태스크는 원래 계획에 없었다.** `origin/develop` 위로 리베이스하면서 드러난 결함에
+> 대응한다 — 이슈 #611 이 `@media (width < 48rem)` 에서 **푸터를 통째로 감췄다.**
+> 그래서 Task 7 이 푸터에 건 약관 링크가 768 미만에서 보이지 않고, 마이페이지는 로그인이
+> 필요하며 `(auth)` 그룹에는 원래 푸터가 없다. 결과적으로 **로그인하지 않은 모바일
+> 방문자는 가입 전에 약관을 읽을 길이 하나도 없다.** 명세의 성공 기준 4번이 모바일에서
+> 거짓이 된다.
+>
+> `/about` 이 정확히 이 문제를 위해 만들어진 화면이다 — "푸터가 감춰지는 모바일에서 푸터
+> 내용이 사라지는 것을 막는 자리"(`app/globals.css` · `about-view.tsx` 머리 주석).
+> 약관도 같은 이유로 같은 자리에 있어야 한다.
+
+**Files:**
+- Modify: `frontend/src/lib/messages/about.ts`
+- Modify: `frontend/src/features/about/about-view.tsx`
+- Modify: `frontend/src/features/about/about-view.test.ts`
+
+**Interfaces:**
+- Consumes: `LEGAL_LINKS` (Task 4), `SurfaceList`·`Surface` (`@/components/surface`), `ChevronRightIcon` (`@/components/icons`)
+- Produces: 없음 (마지막 진입점)
+
+- [ ] **Step 1: 문구를 더한다**
+
+`frontend/src/lib/messages/about.ts` 의 `noticeTitle` 항목 **다음**에 두 줄을 더한다:
+
+```ts
+  legalTitle: '약관',
+  legalDescription: '가입 전에도 읽을 수 있어요.',
+```
+
+- [ ] **Step 2: 실패하는 테스트를 쓴다**
+
+`frontend/src/features/about/about-view.test.ts` 의 `import` 블록에 한 줄을 더한다 (경로 순서상 `@/features/about/about-view` 다음):
+
+```ts
+import { LEGAL_LINKS } from '@/lib/legal/links'
+```
+
+파일 끝에 붙인다:
+
+```ts
+describe('AboutView — 모바일의 약관 도달 경로', () => {
+  /*
+    **이 단언이 지키는 것은 링크가 아니라 접근성이다.** 푸터는 768 미만에서 감춰지고
+    (`app/globals.css`), 마이페이지는 로그인이 필요하며, `(auth)` 그룹에는 푸터가 없다.
+    이 세 가지가 동시에 참이라 **이 화면이 없으면 로그인하지 않은 모바일 방문자는
+    가입 전에 약관을 읽을 수단이 없다.** 약관은 가입 전에 읽는 문서다.
+  */
+  it('약관·처리방침으로 가는 링크를 둔다', () => {
+    expect(markup).toContain(messages.about.legalTitle)
+
+    for (const link of LEGAL_LINKS) {
+      expect(markup).toContain(`href="${link.href}"`)
+      expect(markup).toContain(link.label)
+    }
+  })
+
+  /*
+    푸터·마이페이지와 **같은 목록**을 읽는다. 여기서 문자열을 다시 지으면 같은 문서가
+    화면마다 다른 이름으로 보인다 — 출처 문구를 `messages.footer` 에서 읽는 것과 같은 축이다.
+  */
+  it('링크 라벨을 다시 짓지 않고 LEGAL_LINKS 를 읽는다', () => {
+    const source = readSourceWithoutComments('src/features/about/about-view.tsx')
+
+    expect(source).toContain('LEGAL_LINKS.map')
+    expect(source).not.toContain('이용약관')
+    expect(source).not.toContain('개인정보 처리방침')
+  })
+})
+```
+
+- [ ] **Step 3: 테스트가 실패하는 것을 확인한다**
+
+Run: `cd frontend && pnpm vitest run src/features/about/about-view.test.ts`
+Expected: FAIL — `href="/terms"` 를 찾지 못한다
+
+- [ ] **Step 4: 카드를 더한다**
+
+`frontend/src/features/about/about-view.tsx` 의 import 블록을 아래로 바꾼다 (패키지 블록이 먼저다):
+
+```tsx
+import Link from 'next/link'
+
+import { ChevronRightIcon } from '@/components/icons'
+import { Surface, SurfaceList } from '@/components/surface'
+import { LEGAL_LINKS } from '@/lib/legal/links'
+import { messages } from '@/lib/messages'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
+```
+
+머리 주석의 마지막 문단 **다음**에 한 문단을 더한다:
+
+```tsx
+ * **약관 링크도 같은 이유로 여기 있다** (#610). 푸터가 감춰지는 768 미만에서 마이페이지는
+ * 로그인이 필요하고 `(auth)` 그룹에는 푸터가 없어, 이 화면이 없으면 **가입 전 모바일
+ * 방문자가 약관을 읽을 수단이 사라진다.** 출처와 같은 구조의 문제다.
+```
+
+마지막 `Surface`(`about-notice-heading`) **다음**에 카드를 하나 더한다:
+
+```tsx
+      {/*
+        **이동 항목이라 `SurfaceList` 다** — 마이페이지 계정 섹션과 같은 모양을 쓴다
+        (`account-section.tsx`). 같은 역할의 행이 화면마다 다르게 생기지 않게 한다.
+      */}
+      <Surface
+        titleId="about-legal-heading"
+        title={messages.about.legalTitle}
+        description={messages.about.legalDescription}
+      >
+        <SurfaceList>
+          {LEGAL_LINKS.map((link) => (
+            <li key={link.href} className={INSET_CLASS.card}>
+              <Link
+                href={link.href}
+                className="focus-visible:ring-brand-500 flex min-h-14 items-center gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
+              >
+                <span className="text-body-1 text-fg flex-1">{link.label}</span>
+                <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
+              </Link>
+            </li>
+          ))}
+        </SurfaceList>
+      </Surface>
+```
+
+- [ ] **Step 5: 통과를 확인한다**
+
+Run: `cd frontend && pnpm vitest run src/features/about/about-view.test.ts`
+Expected: PASS
+
+그다음 `pnpm verify` 와 `pnpm format:check` 를 돌린다. 걸리는 파일이 있으면 `pnpm exec prettier --write <경로>`.
+
+- [ ] **Step 6: 커밋**
+
+```bash
+cd frontend
+git add src/lib/messages/about.ts src/features/about/about-view.tsx src/features/about/about-view.test.ts
+git commit -m "[FE] feat: /about 에 약관 링크를 둬 모바일 도달 경로를 연다 (#610)"
+```
