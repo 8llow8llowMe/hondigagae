@@ -108,6 +108,14 @@ describe('일정 상세 mock — 수정 · 삭제', () => {
     expect(after.budget).toBe(before.budget)
   })
 
+  it('완료로 바꿀 수 있다 — 화면 #613 이 이 필드를 쓴다', () => {
+    const after = call(`/plans/${PLAN}`, 'PUT', { status: 'COMPLETED' })?.payload
+      .dataBody as PlanDetail
+
+    expect(after.status.code).toBe('COMPLETED')
+    expect(after.status.name).toBe('완료')
+  })
+
   it('budget 0 은 유효하다 — 예산을 비우는 유일한 방법이다', () => {
     const after = call(`/plans/${PLAN}`, 'PUT', { title: '새 이름', budget: 0 })?.payload
       .dataBody as PlanDetail
