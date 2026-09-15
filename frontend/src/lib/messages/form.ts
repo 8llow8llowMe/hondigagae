@@ -38,8 +38,16 @@ export const authMessages = {
   loginSubmitting: '로그인 중',
   emailLabel: '이메일',
   passwordLabel: '비밀번호',
-  passwordShowShort: '표시',
-  passwordHideShort: '숨기기',
+  /*
+    비밀번호 표시 토글의 이름 (`aria-label`) — 로그인 · 비밀번호 찾기 2단계가 함께 쓴다.
+
+    **아이콘은 `aria-hidden` 이라 이 문구가 버튼의 유일한 이름이다.** 예전에는 입력란
+    **옆**에 선 텍스트 버튼이라 `표시` / `숨기기` 두 글자였는데, 눈 아이콘이 입력란
+    **안**으로 들어가면서 그 짧은 형태는 쓸 자리가 없어져 지웠다 — 소리로만 듣는 쪽에
+    `표시` 는 무엇을 표시하는지 말해 주지 않는다.
+  */
+  passwordShow: '비밀번호 표시',
+  passwordHide: '비밀번호 숨기기',
   toSignup: '회원가입',
   toLogin: '로그인하기',
 
