@@ -174,6 +174,9 @@ test.describe('병원·약국 검색 (#584)', () => {
  * 이유는 **지도에서 검색어가 걸린 것을 알 방법이 없었다**는 것이라, 잴 것도 그것이다:
  * `?keyword=` 를 달고 들어오면 화면이 그 글자를 되돌려 주는가.
  *
+ * **`?view=map` 을 명시한다** (#639). 기본 보기가 목록이 되면서 `/emergency` 만으로는
+ * 지도 갈래에 닿지 않는다 — 생략하면 이 describe 가 통째로 목록 갈래를 재게 된다.
+ *
  * **`MOCK_API=true` 라 카카오 SDK 는 뜨지 않는다** — e2e 환경에서 `/emergency` 의 지도
  * 갈래는 SDK 실패 폴백으로 떨어진다. 그 갈래에도 검색이 남아야 한다는 것 자체가 #584 의
  * 결정 하나라(`EmergencyFilterChips` 에는 `초기화` 가 없어 검색어를 지울 길이 없어진다),
@@ -182,13 +185,13 @@ test.describe('병원·약국 검색 (#584)', () => {
  */
 test.describe('지도 갈래 검색 (#584)', () => {
   test('지도 갈래에도 검색이 있고 URL 의 검색어를 들고 있다', async ({ page }) => {
-    await page.goto(`/emergency?keyword=${encodeURIComponent(BY_NAME)}`)
+    await page.goto(`/emergency?view=map&keyword=${encodeURIComponent(BY_NAME)}`)
 
     await expect(page.getByRole('searchbox', { name: SEARCH }).first()).toHaveValue(BY_NAME)
   })
 
   test('지도 갈래에서 검색하면 URL 에 실리고 목록이 좁혀진다', async ({ page }) => {
-    await page.goto('/emergency')
+    await page.goto('/emergency?view=map')
 
     /*
       **폴백이 자리를 잡은 뒤에 친다.** 교체 전 입력에 채우면 그 값이 새 입력에 덮이고
@@ -218,7 +221,7 @@ test.describe('지도 갈래 검색 (#584)', () => {
     하나뿐이다. 비우고 제출하면 조건이 풀려야 한다 (`normalizeKeyword` 가 빈 값을 `null` 로).
   */
   test('검색창을 비우고 제출하면 검색어가 풀린다', async ({ page }) => {
-    await page.goto(`/emergency?keyword=${encodeURIComponent(BY_NAME)}`)
+    await page.goto(`/emergency?view=map&keyword=${encodeURIComponent(BY_NAME)}`)
     await mapFallbackReady(page)
 
     const box = page.getByRole('searchbox', { name: SEARCH }).first()
