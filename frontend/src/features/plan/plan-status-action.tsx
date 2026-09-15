@@ -1,6 +1,9 @@
 import { PlanStatusActionPanel } from '@/features/plan/plan-status-action-panel'
-import { PLAN_STATUS_ACTION_LABELS } from '@/features/plan/use-plan-status'
-import { forwardStatusAction, type PlanStatusActionSpec } from '@/lib/plan/status-action'
+import {
+  forwardStatusAction,
+  PLAN_STATUS_ACTION_LABELS,
+  type PlanStatusActionSpec,
+} from '@/lib/plan/status-action'
 
 /**
  * 일정 확정 · 완료 — 아트보드 01 + #613.

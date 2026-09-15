@@ -1,3 +1,4 @@
+import { messages } from '@/lib/messages'
 import type { PlanStatusCode } from '@/types/plan'
 
 /**
@@ -59,4 +60,17 @@ export function forwardStatusAction(statusCode: string): PlanStatusActionSpec | 
 /** `⋯` 메뉴로 내려가는 액션. 초안에는 없다 — 되돌아갈 앞 상태가 없다 */
 export function reverseStatusActions(statusCode: string): PlanStatusActionSpec[] {
   return planStatusActions(statusCode).filter((action) => action.direction === 'reverse')
+}
+
+/**
+ * 액션 → 버튼·메뉴 항목의 글자.
+ *
+ * **훅 모듈이 아니라 여기 둔다.** 순수 표인데 `'use client'` 파일에 있으면 이것만 쓰는
+ * 서버 컴포넌트·테스트까지 훅 파일을 임포트하게 된다.
+ */
+export const PLAN_STATUS_ACTION_LABELS: Record<PlanStatusActionKind, string> = {
+  confirm: messages.plan.statusConfirmAction,
+  complete: messages.plan.statusCompleteAction,
+  'revert-draft': messages.plan.statusRevertAction,
+  reopen: messages.plan.statusReopenAction,
 }

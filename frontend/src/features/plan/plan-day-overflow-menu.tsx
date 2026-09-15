@@ -43,7 +43,12 @@ export function PlanDayOverflowMenu({
       <Button
         ref={triggerRef}
         variant="ghost"
-        size="sm"
+        /*
+          **`sm`(32px)이 아니라 `md`(44px)다.** `#653` 이후 이것이 모바일에서
+          `다시 만들기` 의 **유일한 진입점**이라 DESIGN.md §7 의 44px 최소 터치 영역을
+          지켜야 한다 — 같은 카드의 방문 토글이 44 를 지키는 것과 같은 기준이다.
+        */
+        size="md"
         iconOnly
         aria-label={label}
         aria-expanded={open}
