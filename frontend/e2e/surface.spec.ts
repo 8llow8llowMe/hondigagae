@@ -442,6 +442,15 @@ test.describe('3층 표면 — not-found', () => {
           그러면 `.rail-layout` 세 화면(`100dvh - 헤더`)과 회색이 끝나는 자리가 260px
           달랐다. 이제 `Canvas` 가 `.page-canvas` 로 같은 값을 갖고, 남는 스크롤은 푸터 몫
           하나뿐이다 — **그 양을 재는 것이 "없던 스크롤이 생기지 않는다" 의 새 형태다.**
+
+          **768 미만에서는 다시 "스크롤이 아예 없다" 로 돌아간다** (#611). 거기엔 하단
+          탭바가 있어 푸터가 빠지므로 굴릴 몫 자체가 없다. **두 축을 한 테스트에 두는
+          이유**는 재는 것이 같기 때문이다 — 회색이 접힘까지 이어지는가, 그리고 그 아래로
+          **예상한 만큼만** 굴러가는가. 예상값만 폭에 따라 갈린다.
+
+          **모바일에서 "푸터가 없다" 까지 여기서 잰다.** 소스 단언(`site-footer.test.ts`)은
+          `@media` 규칙이 파일에 적혀 있는지만 알고, 그 규칙이 실제로 이 화면에 걸리는지는
+          모른다 — 다른 선택자가 `display` 를 되살리는 식의 회귀는 브라우저에서만 잡힌다.
         */
         test(`${name} 에서 바닥이 접힘까지 이어지고 스크롤은 푸터 몫뿐이다`, async ({ page }) => {
           await page.setViewportSize(size)
@@ -450,7 +459,8 @@ test.describe('3층 표면 — not-found', () => {
 
           const geometry = await page.evaluate(() => {
             const round = (value: number) => Math.round(value)
-            const footer = document.querySelector('.site-footer')?.getBoundingClientRect()
+            const footerNode = document.querySelector('.site-footer')
+            const footer = footerNode?.getBoundingClientRect()
             const canvas = document.querySelector('main')?.getBoundingClientRect()
             return {
               viewport: window.innerHeight,
@@ -458,15 +468,25 @@ test.describe('3층 표면 — not-found', () => {
               canvasBottom: round(canvas?.bottom ?? -1),
               footerTop: round(footer?.top ?? -1),
               footerHeight: round(footer?.height ?? -1),
+              footerShown: footerNode !== null && getComputedStyle(footerNode).display !== 'none',
             }
           })
 
-          // 회색이 푸터 바로 위까지 온다 — 둘 사이에 흰 띠가 없다
-          expect(geometry.canvasBottom).toBe(geometry.footerTop)
+          // 탭바가 있는 폭에는 푸터를 두지 않는다 — 내비게이션이 두 겹으로 읽힌다
+          expect(geometry.footerShown).toBe(size.width >= 768)
+
           // 바닥이 접힘(뷰포트 바닥)에서 끝난다 — 짧아도 길어도 아니다
           expect(geometry.canvasBottom).toBe(geometry.viewport)
-          // 굴릴 것은 푸터뿐이다
-          expect(geometry.doc - geometry.viewport).toBe(geometry.footerHeight)
+
+          if (geometry.footerShown) {
+            // 회색이 푸터 바로 위까지 온다 — 둘 사이에 흰 띠가 없다
+            expect(geometry.canvasBottom).toBe(geometry.footerTop)
+            // 굴릴 것은 푸터뿐이다
+            expect(geometry.doc - geometry.viewport).toBe(geometry.footerHeight)
+          } else {
+            // 푸터가 빠진 폭에는 굴릴 몫이 없다 — 탭바는 `fixed` 라 문서를 늘리지 않는다
+            expect(geometry.doc - geometry.viewport).toBe(0)
+          }
         })
       }
     })
