@@ -60,18 +60,42 @@ describe('PlaceInsightRow — 혼잡도', () => {
     }
 
     expect(data.reasons.some((reason) => reason.description.includes('혼잡'))).toBe(false)
-    expect(render(data)).toContain('혼잡')
+    /*
+      **`toContain('혼잡')` 으로 재지 않는다** — 축 라벨이 `혼잡도` 라 배지 본문을 통째로
+      비워도 통과한다(뮤테이션으로 확인). 등급어는 배지의 마지막 텍스트라 닫는 태그까지
+      묶어 범위를 좁힌다 (testing-guide.md §5).
+    */
+    expect(render(data)).toContain('>혼잡</span>')
   })
 
   /*
     서버 `name` 이 "정보 없음" 인데 배지 하나로 서면 무엇의 정보가 없는지 알 수 없다.
-    명세(D5-1 §12)가 "혼잡도 정보 없음" 을 정해 둔 이유다.
+    명세(D5-1 §12)가 "혼잡도 정보 없음" 을 정해 둔 이유다. **접두어는 #652 에서 문구를
+    떠나 `axis="congestion"` 으로 옮겼으므로 둘을 따로 잰다** — 문구만 재면 무엇의 정보가
+    없는지는 다시 재지 않는 것이 된다.
   */
   it('UNKNOWN 은 무엇의 정보가 없는지 밝힌다', () => {
     const data = { ...suitability, reasons: REASONS_WITHOUT_CONGESTION }
 
     expect(data.congestion?.level.code).toBe('UNKNOWN')
-    expect(render(data)).toContain(messages.home.congestionUnknown)
+    const markup = render(data)
+
+    expect(markup).toContain(`>${messages.common.metricAxisCongestion} </span>`)
+    expect(markup).toContain(`</span>${messages.home.congestionUnknown}</span>`)
+  })
+
+  /* 접두어가 문구와 컴포넌트 양쪽에 남으면 `혼잡도 혼잡도 정보 없음` 이 된다 */
+  it('축 라벨을 문구와 컴포넌트가 겹쳐 붙이지 않는다', () => {
+    const data = { ...suitability, reasons: REASONS_WITHOUT_CONGESTION }
+
+    const axis = messages.common.metricAxisCongestion
+
+    expect(messages.home.congestionUnknown).not.toContain(axis)
+    /*
+      **배지 개수를 세지 않는다** — 행이 모바일·데스크톱 두 벌을 렌더해 개수가 레이아웃에
+      묶인다. 겹침은 한 배지 안에서 일어나므로 그 자리를 바로 본다.
+    */
+    expect(render(data)).not.toContain(`>${axis} </span>${axis}`)
   })
 
   /* UNKNOWN 에 등급 색을 주지 않는다 — 점선 테두리만이다 (DESIGN.md §2-3) */
@@ -100,7 +124,7 @@ describe('PlaceInsightRow — 혼잡도', () => {
       reasons: REASONS_WITHOUT_CONGESTION,
     })
 
-    expect(markup).not.toContain(messages.home.congestionUnknown)
+    expect(markup).not.toContain(`>${messages.common.metricAxisCongestion} </span>`)
   })
 
   /*

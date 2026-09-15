@@ -136,7 +136,9 @@ export function PlaceInsightRow({
               짧아진다.
             */}
             <div className="flex shrink-0 items-center gap-1.5 @2xl:hidden">
-              <MetricBadge tone={tone}>{data.suitabilityLevel.name}</MetricBadge>
+              <MetricBadge tone={tone} axis="suitability">
+                {data.suitabilityLevel.name}
+              </MetricBadge>
               <Score score={data.score} tone={tone} size="row" />
             </div>
           </div>
@@ -235,7 +237,9 @@ export function PlaceInsightRow({
             "여행 적합" 이라 이미 짧고, 잘라내면 "적합" 이 되어 뜻이 달라진다.
             FE 가 서버 문구를 다시 쓰지 않는다 (api-integration-guide.md §6).
           */}
-          <MetricBadge tone={tone}>{data.suitabilityLevel.name}</MetricBadge>
+          <MetricBadge tone={tone} axis="suitability">
+            {data.suitabilityLevel.name}
+          </MetricBadge>
           {/*
             **접힌 행은 `row`(22/900), 1등은 `hero`(28/900).** `DESIGN.md` §1 —
             위계는 크기와 순서로 만든다. 색으로 만들지 않으므로 등급 색은 둘 다 그대로다.
@@ -317,8 +321,10 @@ function RowTags({
  * 공용 매퍼를 쓰면 "혼잡" 이 초록으로 나간다 (`lib/insight/tone.ts`).
  *
  * `UNKNOWN` 은 **낱말을 FE 가 보탠다.** 서버 `name` 이 "정보 없음" 인데 배지 하나로 서면
- * 무엇의 정보가 없는지 알 수 없다 — 명세가 "혼잡도 정보 없음" 을 정해 둔 이유다. 색은
- * 주지 않고 점선 테두리로만 남는다 (DESIGN.md §2-3 — 혼잡도가 실제로 이 상태로 온다).
+ * 무엇의 정보가 없는지 알 수 없다 — 명세(D5-1 §12)가 "혼잡도 정보 없음" 을 정해 둔 이유다.
+ * **그 접두어는 이제 `axis="congestion"` 이 붙인다** (#652) — 같은 문제가 `보통` 에도 있는데
+ * 여기에만 붙어 있었다. 색은 주지 않고 점선 테두리로만 남는다 (DESIGN.md §2-3 — 혼잡도가
+ * 실제로 이 상태로 온다).
  *
  * **`null` 이면 그리지 않는다.** 계약이 `congestion` 자체를 null 로 줄 수 있고, 그때는
  * 등급이 `UNKNOWN` 인 것과도 다르다 — 서버가 이 축을 아예 판정하지 않은 것이다.
@@ -329,7 +335,7 @@ function CongestionBadge({ congestion }: { congestion: CongestionItem | null }) 
   const unknown = congestion.level.code === UNKNOWN_CODE
 
   return (
-    <MetricBadge tone={congestionTone(congestion.level.code)}>
+    <MetricBadge tone={congestionTone(congestion.level.code)} axis="congestion">
       {unknown ? messages.home.congestionUnknown : congestion.level.name}
     </MetricBadge>
   )

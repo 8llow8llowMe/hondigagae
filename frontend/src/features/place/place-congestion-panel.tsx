@@ -215,7 +215,12 @@ function LeastCrowded({
         가르지만(`congestionFill`) 그 넷째 칸에는 대응하는 이름이 없다 — 배지에 같은 램프를
         쓰면 `혼잡` 이라 적힌 배지가 두 가지 색으로 뜬다.
       */}
-      <MetricBadge tone={congestionTone(item.level.code)} size="sm" className="ml-auto">
+      <MetricBadge
+        tone={congestionTone(item.level.code)}
+        size="sm"
+        axis="congestion"
+        className="ml-auto"
+      >
         {item.level.name}
       </MetricBadge>
       {/*

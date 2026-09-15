@@ -105,6 +105,51 @@ describe('PlaceDetailSection — 상태 배타성', () => {
   })
 })
 
+/*
+  **진단 D-2 의 바로 그 배지다.** 390 실측에서 이름 옆 `보통`(적합도)과 혼잡도 카드의
+  `보통`(혼잡도)이 문구·폭 38.74px·tint·글자색까지 같았고, 두 배지를 가르는 단서가 화면에
+  없었다. 이 절이 그 회귀를 잠근다 (#652 · 등급배지-축라벨-세부명세 D5).
+*/
+describe('PlaceDetailSection — 이름 옆 등급 배지가 축을 밝힌다 (#652)', () => {
+  it('제목 옆 배지가 적합도 축임을 말한다', () => {
+    const markup = render()
+    const axis = messages.common.metricAxisSuitability
+
+    /*
+      **마크업 전체에서 `적합도` 를 찾지 않는다** — 같은 화면의 판정 패널·요약 줄이 그 낱말을
+      이미 쓸 수 있어 배지에서 축이 사라져도 통과한다. `<h1>` 부터 그 다음 닫는 태그까지로
+      범위를 좁힌다 (testing-guide.md §5).
+    */
+    const nameRow = markup.slice(markup.indexOf('<h1'), markup.indexOf('</header>'))
+
+    expect(nameRow).toContain(`>${axis} </span>`)
+    expect(nameRow).toContain(`</span>${suitabilityFixture.suitabilityLevel.name}</span>`)
+  })
+
+  /* 등급어는 서버 값 그대로다 — 축 라벨을 붙이는 것이 어휘를 다시 쓰는 일이 되면 안 된다 */
+  it('축 라벨을 붙여도 등급어는 서버 name 그대로다', () => {
+    const markup = render()
+
+    expect(markup).toContain(suitabilityFixture.suitabilityLevel.name)
+    expect(markup).not.toContain(
+      `${messages.common.metricAxisSuitability} ${suitabilityFixture.suitabilityLevel.name}`,
+    )
+  })
+
+  /* 속성 배지는 등급이 아니다 — 문구가 스스로 무엇인지 말하므로 접두어를 붙이지 않는다 */
+  it('실내 여부 미확인 배지에는 축 라벨을 붙이지 않는다', () => {
+    const markup = render({ place: { ...placeDetail, indoor: null } })
+    const badge = markup.slice(
+      markup.indexOf(messages.place.rowIndoorUnknown) - 200,
+      markup.indexOf(messages.place.rowIndoorUnknown),
+    )
+
+    expect(markup).toContain(messages.place.rowIndoorUnknown)
+    expect(badge).not.toContain(`>${messages.common.metricAxisSuitability} </span>`)
+    expect(badge).not.toContain(`>${messages.common.metricAxisCongestion} </span>`)
+  })
+})
+
 describe('PlaceDetailSection — 에러 분기', () => {
   it('데이터 부재(404)에서는 재시도 버튼을 노출하지 않는다', () => {
     const markup = render({ place: null, errorStatus: 404 })

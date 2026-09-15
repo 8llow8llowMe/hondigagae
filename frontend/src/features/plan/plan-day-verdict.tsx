@@ -89,7 +89,7 @@ export function PlanDayVerdict({
   return (
     <div className="flex flex-col gap-3 py-4">
       <div className="flex flex-wrap items-center gap-3">
-        <MetricBadge tone={suitabilityTone(verdict.suitabilityLevel.code)}>
+        <MetricBadge tone={suitabilityTone(verdict.suitabilityLevel.code)} axis="suitability">
           {verdict.suitabilityLevel.name}
         </MetricBadge>
 

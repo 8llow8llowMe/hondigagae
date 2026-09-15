@@ -400,7 +400,17 @@ export const homeMessages = {
    * 판단이다 (`place-insight-row.tsx` `metaLine`).
    */
   indoorNote: '위 목록의 장소에서 가까운 실내예요',
-  congestionUnknown: '혼잡도 정보 없음',
+  /**
+   * 혼잡도 `UNKNOWN` — **서버 `name` 을 쓰지 않고 FE 가 낱말을 보탠다.** 서버가 주는 값은
+   * `정보 없음` 인데, 그 문구가 필요한 이유는 배지가 등급 자리에 서기 때문이지 문구가
+   * 달라서가 아니다.
+   *
+   * **접두어 `혼잡도` 를 여기서 떼었다** (#652). 축 라벨은 `MetricBadge axis="congestion"`
+   * 이 붙이므로 여기 남겨 두면 `혼잡도 혼잡도 정보 없음` 이 된다. 이 키가 원래 접두어를
+   * 달고 있었다는 것이 축 라벨을 규칙으로 올린 근거였다 — 같은 문제가 `보통` 에도 있는데
+   * 여기에만 붙어 있었다.
+   */
+  congestionUnknown: '정보 없음',
   /** 점수를 내지 못한 경우. **0점이 아니다** */
   scoreUnavailable: '판단 근거 부족',
   indoorHeading: '비 올 때 갈 만한 실내',

@@ -26,6 +26,33 @@ function render(overrides: Partial<PlaceCongestionPanelProps> = {}) {
   return renderToStaticMarkup(createElement(PlaceCongestionPanel, props))
 }
 
+/*
+  이 카드의 배지와 장소 상세 이름 옆 배지가 390 실측에서 문구·폭·색까지 같았다 — 같은
+  화면에 선 `보통` 둘이 다른 축이었다 (#652 · 진단 D-2).
+*/
+describe('PlaceCongestionPanel — 배지가 축을 밝힌다 (#652)', () => {
+  it('추천일 배지가 혼잡도 축임을 말한다', () => {
+    const markup = render()
+    const axis = messages.common.metricAxisCongestion
+
+    expect(markup).toContain(`>${axis} </span>`)
+    expect(markup).toContain(`</span>${congestion.leastCrowded?.level.name}</span>`)
+  })
+
+  /* 축은 혼잡도 하나다 — 적합도 라벨이 이 카드에 새어 들어오면 축이 다시 섞인다 */
+  it('이 카드에 적합도 라벨이 새어 들어오지 않는다', () => {
+    expect(render()).not.toContain(`>${messages.common.metricAxisSuitability} </span>`)
+  })
+
+  /* 막대가 글자로 말하는 것은 그대로다 — 축 라벨은 배지에만 붙는다 */
+  it('막대의 sr-only 문구를 바꾸지 않는다', () => {
+    const markup = render()
+
+    expect(markup).toContain('sr-only')
+    expect(markup).not.toContain(`sr-only">${messages.common.metricAxisCongestion}`)
+  })
+})
+
 describe('PlaceCongestionPanel — 상태 배타성', () => {
   /* 제목은 어느 상태에서나 선다 — 카드가 통째로 사라지면 자리가 흔들린다 */
   it('조회 중에도 제목은 두고 본문만 스켈레톤이다', () => {
