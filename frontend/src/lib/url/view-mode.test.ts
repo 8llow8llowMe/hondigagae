@@ -57,9 +57,8 @@ describe('viewModeHref', () => {
 
 /**
  * **각 화면이 자신의 기본 보기 상수를 정한다.** 장소 찾기는 `PLACES_DEFAULT_VIEW: 'map'`,
- * 긴급 시설은 `EMERGENCY_DEFAULT_VIEW: 'map'` 으로, 현재 둘 다 지도를 먼저로 선택했다.
- * 각 상수를 별도로 선언하는 메커니즘 자체는 여전히 중요하다 — 한쪽이 변경되어도 다른 쪽에
- * 자동으로 영향 받지 않기 때문이다.
+ * 긴급 시설은 `EMERGENCY_DEFAULT_VIEW: 'list'` 로 **갈렸다** (#639). 상수를 따로 두는
+ * 메커니즘이 존재하는 이유가 바로 이 갈림이다 — 한쪽을 바꿔도 다른 쪽이 따라 움직이지 않는다.
  *
  * 파싱과 링크 생성에 **같은 기본값**이 들어가야 하는 것이 이 규약의 핵심이다 — 어긋나면
  * 토글이 가리키는 보기와 페이지가 그리는 보기가 달라져 전환이 먹지 않는다.
@@ -104,24 +103,41 @@ describe('화면별 기본 보기 — 장소 찾기는 지도가 먼저다', () 
   })
 })
 
-describe('EMERGENCY_DEFAULT_VIEW', () => {
-  it('긴급 시설의 기본 보기는 지도다', () => {
-    expect(EMERGENCY_DEFAULT_VIEW).toBe('map')
+/*
+  **긴급 시설만 목록으로 되돌아왔다** — 이슈 #639 (UI/UX 감사 E-1).
+
+  #353 이 지도를 기본으로 삼은 근거는 "제주 어디에 무엇이 있나" 였는데, 390px 실측에서
+  첫 화면이 클러스터 알약이 겹친 지도라 **읽을 수 있는 것이 하나도 없었다.** 급할 때 여는
+  화면에서 필요한 것은 전화번호와 이름이고, 그것을 먼저 주는 것은 목록이다.
+  지도는 카드 제목 줄 `ViewToggle` 로 한 탭 거리에 그대로 있다.
+*/
+describe('EMERGENCY_DEFAULT_VIEW — 목록이 먼저다 (#639)', () => {
+  it('긴급 시설의 기본 보기는 목록이다', () => {
+    expect(EMERGENCY_DEFAULT_VIEW).toBe('list')
   })
 
-  it('빈 쿼리는 지도로 떨어진다', () => {
-    expect(parseViewMode({}, EMERGENCY_DEFAULT_VIEW)).toBe('map')
+  it('빈 쿼리는 목록으로 떨어진다', () => {
+    expect(parseViewMode({}, EMERGENCY_DEFAULT_VIEW)).toBe('list')
   })
 
-  it('기본값인 지도는 URL 에서 생략되고 목록이 붙는다', () => {
-    expect(viewModeHref('/emergency', '', 'map', EMERGENCY_DEFAULT_VIEW)).toBe('/emergency')
-    expect(viewModeHref('/emergency', '', 'list', EMERGENCY_DEFAULT_VIEW)).toBe(
-      '/emergency?view=list',
+  it('기본값인 목록은 URL 에서 생략되고 지도가 ?view=map 으로 붙는다', () => {
+    expect(viewModeHref('/emergency', '', 'list', EMERGENCY_DEFAULT_VIEW)).toBe('/emergency')
+    expect(viewModeHref('/emergency', '', 'map', EMERGENCY_DEFAULT_VIEW)).toBe(
+      '/emergency?view=map',
     )
   })
 
-  it('장소 찾기와 같은 값이다 — 두 지도 화면의 URL 모양이 같아야 한다', () => {
-    expect(EMERGENCY_DEFAULT_VIEW).toBe(PLACES_DEFAULT_VIEW)
+  /* 명시된 `?view=list` 링크는 그대로 열린다 — 공유해 둔 링크가 깨지지 않는다 */
+  it('예전 ?view=list 링크도 그대로 목록이다', () => {
+    expect(parseViewMode({ view: 'list' }, EMERGENCY_DEFAULT_VIEW)).toBe('list')
+  })
+
+  /*
+    **폭에 따라 기본값을 가르지 않는다** (세부명세 D8-2). `view` 는 URL 파라미터라
+    기기마다 기본값이 다르면 **같은 링크가 다른 화면을 연다.**
+  */
+  it('장소 찾기와 다른 값이다 — 화면마다 자기 기본값을 갖는다', () => {
+    expect(EMERGENCY_DEFAULT_VIEW).not.toBe(PLACES_DEFAULT_VIEW)
   })
 })
 
