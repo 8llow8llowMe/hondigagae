@@ -69,7 +69,15 @@ export function PlaceCongestionPanel({
   return (
     <div className={cn('flex flex-col gap-3 py-4', INSET)}>
       <div className="flex items-baseline justify-between gap-3">
-        <h2 id={CONGESTION_HEADING_ID} className="text-title-2 text-fg font-semibold break-keep">
+        {/*
+          `scroll-mt-20` 은 판정 요약 3줄의 `덜 붐비는 날` 이 이리로 뛰기 때문이다 (#650).
+          이 `h2` 는 **패널이 직접 그린다** — `Surface` 는 `title` 없이 `titleId` 만 받아
+          `aria-labelledby` 로만 쓰므로 `Surface` 쪽 `scroll-mt` 가 여기엔 닿지 않는다.
+        */}
+        <h2
+          id={CONGESTION_HEADING_ID}
+          className="text-title-2 text-fg scroll-mt-20 font-semibold break-keep"
+        >
           {messages.place.detailCongestionTitle}
         </h2>
         {/* 기간이 없으면 꼬리표 자체를 내지 않는다 — 라벨만 남은 자리를 두지 않는다 */}
