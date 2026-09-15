@@ -46,13 +46,39 @@ describe('resolveBasisPlaceId', () => {
     expect(resolveBasisPlaceId(null, '222')).toBe('222')
   })
 
-  it('둘 다 없으면 null 이다 — 호출부가 판정 섹션을 렌더하지 않는다', () => {
+  it('셋째 인자를 생략하면 둘 다 없을 때 null 이다', () => {
     expect(resolveBasisPlaceId(null, null)).toBeNull()
   })
 
   it('빈 문자열을 값으로 취급하지 않는다', () => {
     expect(resolveBasisPlaceId('', '222')).toBe('222')
     expect(resolveBasisPlaceId('', '')).toBeNull()
+  })
+
+  /*
+    **대표 지점 폴백** (홈-첫방문-판정-세부명세 D3-1). 첫 방문자에게 기준이 없어 판정
+    섹션이 통째로 빠지던 것을 셋째 단으로 받는다.
+  */
+  describe('셋째 폴백 — 대표 지점', () => {
+    it('앞의 둘이 없으면 대표 지점으로 떨어진다', () => {
+      expect(resolveBasisPlaceId(null, null, '126454')).toBe('126454')
+    })
+
+    it('최근 본 장소가 있으면 대표 지점을 쓰지 않는다', () => {
+      expect(resolveBasisPlaceId('111', null, '126454')).toBe('111')
+    })
+
+    it('빈 문자열은 여기서도 값이 아니다', () => {
+      expect(resolveBasisPlaceId('', null, '126454')).toBe('126454')
+    })
+
+    /*
+      대표 지점 자체가 404 일 때 호출부가 `null` 을 넘긴다 (D5-3). 그때는 기준이 없던
+      예전 화면으로 떨어지고, 두 번째 404 에 대표 지점을 다시 시도하지 않는다.
+    */
+    it('대표 지점이 null 이면 null 이다', () => {
+      expect(resolveBasisPlaceId(null, null, null)).toBeNull()
+    })
   })
 })
 

@@ -28,17 +28,26 @@ export function splitReasons(reasons: SuitabilityReasonItem[]): {
 /**
  * 판정 기준이 될 장소를 고른다 — 공통명세 S5-1 (선택지 A 채택).
  *
- * 최근 본 장소 → 다가오는 일정의 첫 장소 → `null`.
- * **`null` 이면 판정 섹션을 렌더하지 않는다** (S4-1). 첫 방문자에게는 기준이 없다.
+ * 최근 본 장소 → 다가오는 일정의 첫 장소 → **대표 지점** → `null`.
+ *
+ * **셋째 단이 첫 방문자를 받는다** (홈-첫방문-판정-세부명세 D3-1). 예전에는 앞의 둘이
+ * 없으면 `null` 이었고 호출부가 판정 섹션을 통째로 빼 버렸다 — 첫 방문 · 새 기기 ·
+ * 시크릿 모드에서 서비스의 첫 문장("지금 가도 되나")이 홈에 없었다는 뜻이다. 이제
+ * `DEFAULT_BASIS_PLACE_ID` 로 떨어지고, 화면은 그것이 대표 지점임을 캡션으로 밝힌다.
+ *
+ * **`null` 이 여전히 나온다.** 셋째 인자를 생략한 호출부(기존 시그니처)와, 대표 지점
+ * 자체가 404 라 호출부가 `null` 을 넘기는 경우다 (D5-3). 그때는 예전처럼 미렌더다.
  *
  * BE 가 홈 요약 API 를 주면(S6-1) 이 함수와 호출부만 바뀐다.
  */
 export function resolveBasisPlaceId(
   recentPlaceId: string | null,
   planFirstPlaceId: string | null,
+  defaultPlaceId: string | null = null,
 ): string | null {
   if (recentPlaceId !== null && recentPlaceId !== '') return recentPlaceId
   if (planFirstPlaceId !== null && planFirstPlaceId !== '') return planFirstPlaceId
+  if (defaultPlaceId !== null && defaultPlaceId !== '') return defaultPlaceId
 
   return null
 }
