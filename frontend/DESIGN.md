@@ -899,7 +899,7 @@ className = 'text-title-2 text-fg md:text-title-1 font-semibold md:font-bold'
 | 토큰                     | 값    | 용도                   |
 | ------------------------ | ----- | ---------------------- |
 | `--gallery-w-mobile`     | 342px | 모바일 캐러셀 항목 폭  |
-| `--gallery-h-mobile`     | 214px | 모바일 고정 높이       |
+| `--gallery-h-mobile`     | 200px | 모바일 고정 높이       |
 | `--gallery-h-desktop`    | 300px | 데스크톱 고정 높이     |
 | `--gallery-w-single-max` | 660px | **1장일 때 멈추는 폭** |
 

@@ -266,7 +266,7 @@ spacing 은 가이드대로 **6** 을 스케일에 넣었다(태그 사이). Tai
 | 375 실렌더    | 가로 스크롤 없음 · 필터 두 축 정상 `radiogroup`(각 1개 선택) · 잔여 `aria-pressed` **0건**                      |
 | 1440 실렌더   | 행 표면 · 구분선 인셋 · 밴드 확인                                                                               |
 | 토큰 해석     | `--radius-md → 8px` · `bg-band → #EEF0F3` · `text-metric-high-700 → #16563C` · `shadow-md → rgba(21,24,29,.08)` |
-| 갤러리        | 모바일 342×214 · `snap-start` · `1/2` 카운터 · 히어로 없음                                                      |
+| 갤러리        | 모바일 342×200 · `snap-start` · `1/2` 카운터 · 히어로 없음                                                      |
 | 콘솔 오류     | 없음                                                                                                            |
 
 신규 테스트: `metric.test.ts`(20) · `place-row.test.ts` · `photo-gallery.test.ts`(15).
