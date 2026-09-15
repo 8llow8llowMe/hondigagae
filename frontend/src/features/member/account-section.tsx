@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import { ChevronRightIcon } from '@/components/icons'
 import { SurfaceList } from '@/components/surface'
+import { LEGAL_LINKS } from '@/lib/legal/links'
 import { type AccountState, canSetupPassword } from '@/lib/member/account-state'
 import { providerName } from '@/lib/member/provider'
 import { messages } from '@/lib/messages'
@@ -38,8 +39,11 @@ import { cn } from '@/lib/utils/cn'
  * **사이에만** 긋고, 마지막 항목 아래 선은 없다 — 2a 때 마지막 행의 `border-b` 가 버전
  * 줄 위에 선을 남겨, 목록과 정의 목록이 같은 묶음처럼 읽혔다.
  *
- * `이용약관` · `개인정보 처리방침` 은 **이번에 렌더하지 않는다.** 링크 대상 문서가
- * 아직 없다 — "API 없이 진입점만 만들지 않는다" 와 같은 규칙이다 (D8-1).
+ * `이용약관` · `개인정보 처리방침` 은 #610 에서 문서와 페이지가 생겨 **이제 렌더한다.**
+ * 규칙("진입점만 먼저 만들지 않는다", D8-1)이 바뀐 것이 아니라 전제가 채워진 것이다.
+ *
+ * **이 둘은 계정 상태로 갈리지 않는다.** 약관은 소셜 계정에도, 비밀번호 계정에도,
+ * 판별 불가한 계정에도 똑같이 적용된다 — 그래서 목록은 **항상 항목을 갖는다**.
  */
 export function AccountSection({
   state,
@@ -50,52 +54,65 @@ export function AccountSection({
 }) {
   const name = providerName(provider)
   /*
-    둘 다 없는 경우가 실제로 있다 — `unknown`(provider 없음 + 비밀번호 없음)이면 읽기
-    항목도 이동 항목도 내지 않는다. 그때 빈 `ul` 과 그 아래 `border-t` 를 그리면 제목
-    바로 밑에 허공에 선이 하나 뜬다.
+    **빈 목록이 더는 나올 수 없다** (#610). 예전에는 `unknown`(provider 없음 + 비밀번호
+    없음)이면 항목이 하나도 없어 빈 `ul` 과 허공의 선이 생겼고, 그래서 `hasItems` 로
+    통째로 감쌌다. 이제 약관 항목 둘이 상태와 무관하게 항상 들어와 그 경우가 사라졌다.
   */
-  const hasItems = name !== null || state !== 'unknown'
 
   return (
     <>
-      {hasItems && (
-        <SurfaceList>
-          {name !== null && (
-            <li className={cn('flex min-h-14 items-center py-3', INSET_CLASS.card)}>
-              <span className="text-body-1 text-fg">{messages.member.linkedWith(name)}</span>
-            </li>
-          )}
+      <SurfaceList>
+        {name !== null && (
+          <li className={cn('flex min-h-14 items-center py-3', INSET_CLASS.card)}>
+            <span className="text-body-1 text-fg">{messages.member.linkedWith(name)}</span>
+          </li>
+        )}
 
-          {/*
+        {/*
             판별 불가(`unknown`)면 비밀번호 항목을 내지 않는다. 어느 동작을 제시해도
             틀리기 때문이다 — 안내는 `/mypage/password` 가 맡는다 (D5).
           */}
-          {state !== 'unknown' && (
-            <li className={INSET_CLASS.card}>
-              <Link
-                href="/mypage/password"
-                className="focus-visible:ring-brand-500 flex min-h-14 items-center gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
-              >
-                <span className="text-body-1 text-fg flex-1">
-                  {canSetupPassword(state)
-                    ? messages.member.passwordSetup
-                    : messages.member.passwordChange}
-                </span>
-                <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
-              </Link>
-            </li>
-          )}
-        </SurfaceList>
-      )}
+        {state !== 'unknown' && (
+          <li className={INSET_CLASS.card}>
+            <Link
+              href="/mypage/password"
+              className="focus-visible:ring-brand-500 flex min-h-14 items-center gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
+            >
+              <span className="text-body-1 text-fg flex-1">
+                {canSetupPassword(state)
+                  ? messages.member.passwordSetup
+                  : messages.member.passwordChange}
+              </span>
+              <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
+            </Link>
+          </li>
+        )}
+
+        {/*
+            **계정 상태로 갈리지 않는다.** 약관은 모든 회원에게 같게 적용되므로 조건 없이
+            낸다 — 목록이 항상 항목을 갖는 이유이기도 하다.
+          */}
+        {LEGAL_LINKS.map((link) => (
+          <li key={link.href} className={INSET_CLASS.card}>
+            <Link
+              href={link.href}
+              className="focus-visible:ring-brand-500 flex min-h-14 items-center gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
+            >
+              <span className="text-body-1 text-fg flex-1">{link.label}</span>
+              <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
+            </Link>
+          </li>
+        ))}
+      </SurfaceList>
 
       {/*
         조작 불가 정보 — 목록 항목이 아니라 정의 목록이다 (D6).
         **목록 밖이라 선을 스스로 든다.** `SurfaceList` 의 선은 자기 `li` 사이에만 걸린다.
+        목록이 항상 항목을 가지므로 선도 항상 긋는다 (#610).
       */}
       <dl
         className={cn(
-          'flex min-h-14 items-center gap-3 py-3',
-          hasItems && 'border-border border-t',
+          'border-border flex min-h-14 items-center gap-3 border-t py-3',
           INSET_CLASS.card,
         )}
       >
