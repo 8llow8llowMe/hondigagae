@@ -36,7 +36,8 @@ export const GOLDEN_CURVE_SPECIMEN = {
     'M12 106 C 40 110, 60 112, 87 96 S 150 32, 192 18 S 260 36, 300 76 S 330 96, 348 104',
   windowX: 72,
   windowWidth: 30,
-  peak: { x: 192, y: 18, label: '56.0℃' },
+  /** 봉우리 라벨은 판정 카드의 노면 값에서 파생한다 — 두 곳이 갈리면 같은 장면이 아니게 된다 */
+  peak: { x: 192, y: 18, label: `${VERDICT_SPECIMEN.pavement.toFixed(1)}℃` },
   hours: [
     { x: 12, label: '00' },
     { x: 72, label: '06' },
