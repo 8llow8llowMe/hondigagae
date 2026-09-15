@@ -88,3 +88,110 @@ describe('LegalDocumentView — 핵심 조문이 빠지지 않는다 (#610)', ()
     expect(privacy).toContain('외부 인공지능 사업자에게 전송되지 않습니다')
   })
 })
+
+/**
+ * L1 카드의 여는 태그 **꼬리**. 클래스 문자열은 `Surface` 의 계약이다
+ * (`components/surface.tsx`).
+ *
+ * **여는 태그로 범위를 좁힌다.** 마크업 전역에 `toContain('bg-bg')` 를 거는 식이면 카드가
+ * 어디에 있든 통과해서, 카드가 본문이 아니라 엉뚱한 곳에만 남아도 초록으로 지나간다.
+ *
+ * **`<section` 부터 적지 않는다** — `titleId` 를 받은 카드는 그 사이에
+ * `aria-labelledby` 가 끼어 머리 카드만 매칭에서 빠진다.
+ */
+const L1_CARD = 'class="bg-bg border-border border-y md:rounded-lg md:border">'
+
+describe('LegalDocumentView — 3층 표면', () => {
+  /*
+    #610 은 본문을 L0 회색 바닥 위 맨 글줄로 두었다 — 제품에서 본문이 카드 밖에 있는
+    유일한 화면이었다. 조문이 카드 **안**에 있는지를 "카드 여는 태그와 조문 사이에 닫는
+    태그가 없다" 로 잰다. 카드를 걷으면 가장 가까운 앞 카드가 목차 카드가 되고, 그 사이에
+    목차 카드의 `</section>` 이 끼어 실패한다.
+  */
+  it('조문이 L1 카드 안에 있다', () => {
+    const article = privacy.indexOf('id="article-1"')
+    const cardOpen = privacy.lastIndexOf(L1_CARD, article)
+
+    expect(cardOpen).toBeGreaterThan(-1)
+    expect(privacy.slice(cardOpen, article)).not.toContain('</section>')
+  })
+
+  /*
+    **머리도 카드다.** §0 의 "페이지 머리는 카드가 아니다" 를 이 화면에서 뒤집은 것은
+    아래가 전부 흰 카드이기 때문이다 — 머리만 회색 바닥에 얹히면 화면의 이름이 가장 덜
+    중요해 보인다 (장소 상세 #531 과 같은 판단). 컴포넌트 머리주석이 근거를 갖고 있다.
+  */
+  it('문서 제목과 시행일이 L1 카드 안에 있다', () => {
+    const title = privacy.indexOf('<h1')
+    const cardOpen = privacy.lastIndexOf(L1_CARD, title)
+
+    expect(cardOpen).toBeGreaterThan(-1)
+    expect(privacy.slice(cardOpen, title)).not.toContain('</section>')
+    /* 카드 이름은 `h1` 을 가리킨다 — `aria-label` 로 같은 문자열을 다시 적지 않는다 */
+    expect(privacy).toContain(`aria-labelledby="legal-document-title"`)
+    expect(privacy).toContain(`id="legal-document-title"`)
+  })
+
+  /* 조문 사이만 긋는다 — 첫 조문 위에 선이 생기면 카드 제목선처럼 읽힌다 */
+  it('조문 경계를 인접 형제 구분선으로 긋는다', () => {
+    expect(privacy).toContain('[&amp;&gt;section+section]:border-t')
+  })
+
+  /*
+    개정 이력은 문서 본문이 아니라 그 문서에 대한 메타라 묶음이 다르다 (§0).
+    **본문 카드와 다른 카드**여야 한다 — 같은 카드로 합치면 제14조 다음 절처럼 읽힌다.
+  */
+  it('개정 이력이 본문과 다른 카드다', () => {
+    /* 제12조 본문에도 `개정 이력` 이라는 말이 있어 제목 쪽을 집는다 */
+    const heading = privacy.indexOf(`font-semibold">${messages.legal.historyLabel}<`)
+    const article = privacy.indexOf('id="article-1"')
+
+    expect(heading).toBeGreaterThan(-1)
+    expect(privacy.lastIndexOf(L1_CARD, heading)).toBeGreaterThan(
+      privacy.lastIndexOf(L1_CARD, article),
+    )
+  })
+})
+
+describe('LegalDocumentView — 목차 레일', () => {
+  /*
+    DOM 순서가 `머리 → 목차 → 본문` 이어야 한다. 데스크톱 2단은 `.rail-layout-detail` 의
+    grid 배치가 만들고(`app/globals.css`), 그 아래에서는 이 순서 그대로 쌓인다 —
+    트리를 폭마다 둘로 나누면 같은 목차가 두 번 렌더돼 스크린리더가 중복해 읽는다.
+  */
+  it('목차가 좌측 레일 열에 서고 본문보다 앞에 온다', () => {
+    const aside = privacy.indexOf('rail-detail-aside')
+    const toc = privacy.indexOf(`aria-label="${messages.legal.tocLabel}"`)
+
+    expect(aside).toBeGreaterThan(-1)
+    expect(toc).toBeGreaterThan(aside)
+    expect(privacy.lastIndexOf('rail-detail-main')).toBeGreaterThan(toc)
+  })
+
+  /*
+    **`hidden lg:block` 을 달지 않는다.** 일정 상세의 `PlanVerdictToc` 는 그렇게 하지만
+    거기는 같은 정보가 본문에도 있다. 여기 목차는 가입 전 모바일에서 제14조로 가는
+    유일한 지름길이고, 숨기면 6000px 을 손으로 굴러야 한다.
+  */
+  it('좁은 폭에서도 목차를 숨기지 않는다', () => {
+    /*
+      **여는 태그 **처음**부터 잰다.** `indexOf('rail-detail-aside')` 부터 자르면 그 앞에
+      붙은 `hidden lg:block` 이 잘려 나가 뮤테이션이 초록으로 지나갔다 (실제로 났다).
+    */
+    const aside = privacy.lastIndexOf('<div', privacy.indexOf('rail-detail-aside'))
+    const lastLink = privacy.indexOf(
+      `href="#article-${privacyPolicy.articles[privacyPolicy.articles.length - 1]?.no}"`,
+    )
+
+    expect(lastLink).toBeGreaterThan(aside)
+    expect(privacy.slice(aside, lastLink)).not.toContain('hidden')
+  })
+
+  /* 모바일 최소 터치 영역 44×44 (DESIGN.md §7-1) — 링크 열넷이 전부 이 규칙 아래다 */
+  it('목차 링크가 44 높이를 갖는다', () => {
+    const open = privacy.indexOf('<a href="#article-1"')
+    const close = privacy.indexOf('</a>', open)
+
+    expect(privacy.slice(open, close)).toContain('min-h-11')
+  })
+})
