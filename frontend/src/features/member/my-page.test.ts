@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { AccountSection } from '@/features/member/account-section'
 import { MyPageSections, type MyPageSectionsProps } from '@/features/member/my-page-sections'
+import { LEGAL_LINKS } from '@/lib/legal/links'
 import { messages } from '@/lib/messages'
 import type { MemberMyInfo } from '@/types/member'
 import type { Pet } from '@/types/pet'
@@ -174,14 +175,29 @@ describe('AccountSection — 계정 상태 3종이 다르게 그려진다 (D5)',
   })
 
   /**
-   * 링크 대상 문서가 아직 없다 — "API 없이 진입점만 만들지 않는다" 와 같은 규칙이다 (D8-1).
-   * 이 단언이 깨지면 죽은 링크를 되살린 것이다.
+   * #610 에서 문서와 페이지가 생겼다. **규칙이 바뀐 것이 아니라 전제가 채워진 것이다** —
+   * "API 없이 진입점만 만들지 않는다" 는 그대로고, 이제 대상이 실재한다 (D8-1).
    */
-  it('이용약관·개인정보 처리방침을 아직 렌더하지 않는다', () => {
+  it('이용약관·개인정보 처리방침을 실재 라우트로 건다', () => {
     const markup = account('general', null)
 
-    expect(markup).not.toContain('이용약관')
-    expect(markup).not.toContain('개인정보 처리방침')
+    for (const link of LEGAL_LINKS) {
+      expect(markup).toContain(`href="${link.href}"`)
+      expect(markup).toContain(link.label)
+    }
+  })
+
+  /*
+    **계정 상태와 무관하게 나온다.** 약관은 소셜 계정에도 비밀번호 계정에도, 판별
+    불가(`unknown`)한 계정에도 똑같이 적용된다 — 상태로 갈리면 어떤 회원은 자기에게
+    적용되는 문서에 마이페이지에서 닿지 못한다.
+  */
+  it('계정 상태가 unknown 이어도 약관 항목은 나온다', () => {
+    const markup = account('unknown', null)
+
+    for (const link of LEGAL_LINKS) {
+      expect(markup).toContain(`href="${link.href}"`)
+    }
   })
 
   /** 조작할 수 없는 정보라 목록 항목이 아니라 정의 목록이다 (D6) */
@@ -354,14 +370,15 @@ describe('AccountSection — 카드 안 내용만 낸다 (#466)', () => {
   })
 
   /**
-   * `unknown` 은 읽기 항목도 이동 항목도 내지 않는다. 그때 빈 `ul` 과 그 아래 `border-t`
-   * 를 그리면 카드 제목 바로 밑에 허공에 선이 하나 뜬다.
+   * **#610 이후 `unknown` 도 빈 목록이 아니다** — 읽기·이동 항목은 없어도 약관 항목
+   * 둘은 상태와 무관하게 항상 들어온다. 그래서 `ul` 도 `dl` 의 `border-t` 도 항상 선다 —
+   * "허공의 선을 만들지 않는다" 는 이제 반대 방향(항상 선을 긋는다)으로 지켜진다.
    */
-  it('판별 불가면 빈 목록도 허공 구분선도 만들지 않는다', () => {
+  it('판별 불가여도 약관 항목이 있어 목록과 구분선이 항상 선다', () => {
     const markup = account('unknown', null)
 
-    expect(markup).not.toContain('<ul')
-    expect(/<dl\b[^>]*>/.exec(markup)?.[0]).not.toContain('border-t')
+    expect(markup).toContain('<ul')
+    expect(/<dl\b[^>]*>/.exec(markup)?.[0]).toContain('border-t')
   })
 
   /** 항목이 있을 때는 버전 줄이 목록과 갈리는 선을 스스로 든다 (목록 선은 자기 li 사이에만 걸린다) */
