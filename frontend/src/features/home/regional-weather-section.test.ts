@@ -12,10 +12,31 @@ function render(data: RegionalWeatherResponse | null, loading = false) {
   return renderToStaticMarkup(createElement(RegionalWeatherSection, { data, loading }))
 }
 
-/** 추천이 있는 날 */
+/** 추천이 있는 날. mock 점수는 `72 · 86 · 64 · 78` 이라 **단독 1위**다 */
 const GOOD_DAY = mockRegionalWeather(false)
 /** 특보 경보로 추천이 없는 날 */
 const BAD_DAY = mockRegionalWeather(true)
+
+/**
+ * 2026-09-15 dev 실측 — 점수 있는 권역이 전부 100 인 날 (#638).
+ *
+ * **드문 날이 아니다.** 날씨만 보는 점수라 섬 전체가 맑으면 다섯이 같은 값으로 나온다.
+ * `한라산권`(예보 없음)은 mock 그대로 null 이라 셈에서 빠진다.
+ */
+const TIED_DAY: RegionalWeatherResponse = {
+  ...GOOD_DAY,
+  regions: GOOD_DAY.regions.map((region) =>
+    region.weatherScore === null ? region : { ...region, weatherScore: 100 },
+  ),
+}
+
+/** 최고점이 둘뿐인 날 — 전부 동점과 갈래가 다르다 */
+const TWO_TIED_DAY: RegionalWeatherResponse = {
+  ...GOOD_DAY,
+  regions: GOOD_DAY.regions.map((region, index) =>
+    region.weatherScore === null ? region : { ...region, weatherScore: index < 2 ? 100 : 60 },
+  ),
+}
 
 describe('RegionalWeatherSection — 추천', () => {
   it('추천 권역과 이유를 서버 문장 그대로 쓴다', () => {
@@ -66,11 +87,110 @@ describe('RegionalWeatherSection — 비교표', () => {
   })
 
   /*
-    **#342 에서 하단 보조 문구를 걷었다.** 점수 배지가 날씨 값 바로 옆에 서 있어 무엇을
-    보고 매긴 점수인지 자리가 말한다. 되살아나면 이 테스트가 먼저 알려준다.
+    **#342 에서 하단 보조 문구를 걷었고 #638 이 머리로 올렸다.** 걷은 이유는 위치였다 —
+    표 아래 한 줄은 배지를 다 읽은 뒤에야 닿아서, 무엇의 100인지 모르는 채로 다섯 칸을
+    훑게 된다. 점수의 뜻은 이제 카드 제목 아래(`Surface description`)가 말한다.
   */
-  it('하단에 보조 문구 줄을 두지 않는다', () => {
-    expect(render(GOOD_DAY)).not.toContain('날씨만 본 점수')
+  it('보조 문구를 표 아래로 되돌리지 않는다', () => {
+    const markup = render(GOOD_DAY)
+    const caption = markup.indexOf(messages.home.regionScoreCaption)
+    const firstCell = markup.indexOf('w-44')
+
+    expect(markup).not.toContain('날씨만 본 점수')
+    expect(caption).toBeGreaterThan(-1)
+    expect(caption).toBeLessThan(firstCell)
+  })
+})
+
+/*
+  **#638 — 무엇의 100인지 화면이 말한다.** 2026-09-15 실측에서 다섯 배지가 전부 `100`
+  이었는데 만점도 단위도 어디에도 없었다. 같은 화면의 장소 적합도는 `90 /100` 으로 쓰고
+  있어서, 권역 배지만 축이 다른 값처럼 보였다.
+*/
+describe('RegionalWeatherSection — 점수 라벨 (#638)', () => {
+  it('카드 제목 아래에서 점수의 뜻과 만점을 밝힌다', () => {
+    expect(render(GOOD_DAY)).toContain(messages.home.regionScoreCaption)
+  })
+
+  it('점수 배지에 단위를 붙인다', () => {
+    const markup = render(GOOD_DAY)
+    const score = GOOD_DAY.regions.find((r) => r.weatherScore !== null)?.weatherScore as number
+
+    expect(markup).toContain(messages.home.regionScoreUnit.replace('{score}', String(score)))
+  })
+
+  /*
+    예보를 못 받은 권역은 `0점` 이 아니라 `예보 없음` 이다 — 모르는 것과 나쁜 것은 다르다.
+    마크업 전체에서 `0점` 을 금지할 수는 없다 (캡션이 `100점 만점` 이다). 그 권역의 칸만 본다.
+  */
+  it('예보 없는 권역에 단위를 붙이지 않는다', () => {
+    const markup = render(GOOD_DAY)
+    const cell = markup.slice(markup.indexOf('한라산권'))
+
+    expect(cell).toContain(messages.home.regionScoreUnavailable)
+    expect(cell).not.toContain('점<')
+  })
+
+  /* 스켈레톤은 제목도 캡션도 없는 표면이다 — 로딩 중에 캡션만 먼저 뜨면 안 된다 */
+  it('로딩 중에는 캡션을 내지 않는다', () => {
+    expect(render(null, true)).not.toContain(messages.home.regionScoreCaption)
+  })
+})
+
+/*
+  **#638 — 동점이면 1위를 단정하지 않는다.** 실측에서 배지 다섯이 전부 `100` 인데 문장은
+  "오늘은 제주시권이 가장 나아요" 였다. 바로 아래 표가 그 말을 받쳐 주지 못하면 사용자는
+  자기가 표를 잘못 읽었다고 생각한다.
+*/
+describe('RegionalWeatherSection — 동점 문장 (#638)', () => {
+  it('점수 있는 권역이 전부 동점이면 한 곳을 고르지 않는다', () => {
+    const markup = render(TIED_DAY)
+
+    expect(markup).toContain(messages.home.regionTiedAll)
+    expect(markup).not.toContain('가장 나아요')
+  })
+
+  it('두 곳만 동점이면 그 이름들을 세운다', () => {
+    const markup = render(TWO_TIED_DAY)
+
+    expect(markup).toContain(messages.home.regionTied.replace('{names}', '서귀포권 · 제주시권'))
+    expect(markup).not.toContain('가장 나아요')
+  })
+
+  /* 서버가 고른 권역을 지우지 않고 앞세운다 — 동점 문장이 바꾸는 것은 "어디가" 뿐이다 */
+  it('서버 추천 권역이 동점 문장의 첫 자리다', () => {
+    const markup = render(TWO_TIED_DAY)
+
+    expect(markup).toContain('오늘은 서귀포권 · 제주시권이')
+  })
+
+  /* 근거 문장은 "왜 좋은가" 라 동점이든 아니든 그대로 붙는다 */
+  it('동점이어도 서버 근거 문장을 그대로 붙인다', () => {
+    expect(render(TIED_DAY)).toContain(TIED_DAY.recommendationReasons[0] as string)
+  })
+
+  it('단독 1위는 현행 문장 그대로다', () => {
+    const markup = render(GOOD_DAY)
+
+    expect(markup).toContain(messages.home.regionRecommended.replace('{name}', '서귀포권'))
+    expect(markup).not.toContain(messages.home.regionTiedAll)
+  })
+
+  /*
+    서버가 추천을 내지 않은 날에 동점을 세어 "어디든 좋아요" 라고 말하면, 서버가 막아 둔
+    문을 화면이 다시 여는 것이 된다. mock 의 경보 날은 점수가 전부 갈려 있지만 여기서는
+    **점수를 전부 같게 만들어** 계산이 돌지 않는다는 것을 직접 잡는다.
+  */
+  it('추천이 없는 날에는 동점을 세지 않는다', () => {
+    const markup = render({
+      ...BAD_DAY,
+      regions: BAD_DAY.regions.map((region) =>
+        region.weatherScore === null ? region : { ...region, weatherScore: 100 },
+      ),
+    })
+
+    expect(markup).toContain(messages.home.regionNone)
+    expect(markup).not.toContain(messages.home.regionTiedAll)
   })
 })
 
