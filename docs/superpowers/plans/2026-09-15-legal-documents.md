@@ -900,8 +900,8 @@ import { privacyPolicy } from '@/lib/legal/privacy-policy'
  */
 const REQUIRED_SECTIONS = [
   '개인정보의 처리 목적',
-  '처리하는 개인정보의 항목',
   '개인정보의 처리 및 보유 기간',
+  '처리하는 개인정보의 항목',
   '개인정보의 제3자 제공',
   '개인정보 처리의 위탁',
   '개인정보의 파기',
