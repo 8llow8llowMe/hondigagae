@@ -16,6 +16,14 @@ export type RevealPhase = 'idle' | 'armed' | 'revealed'
  * 두 프레임을 쓰는 이유: `armed` 가 한 번 그려진 뒤에 `revealed` 로 바뀌어야 CSS transition
  * 이 시작점을 갖는다. 같은 프레임에 두 상태를 바꾸면 전환 없이 끝 상태만 그려진다.
  *
+ * ### 소비자 계약 (지키지 않으면 재생이 보이지 않는다)
+ *
+ * 소비자는 `armed` 동안 transition 을 끄고(`transition-none` 또는 인라인 `transition: 'none'`)
+ * 숨김/시작 상태를 붙이고, `revealed` 에서 transition 을 켠다. 안 그러면 숨김 자체가 전환되어
+ * 재생이 보이지 않는다 — 이미 보이는 요소에 전환이 켜진 채로 숨김을 붙이면 `armed` 프레임이
+ * 페이드아웃의 **시작점**만 그리고, 한 프레임 뒤 숨김을 떼면 아무것도 재생되지 않는다.
+ * 본보기는 `reveal.tsx`.
+ *
  * `done` 은 StrictMode 의 이펙트 이중 실행과 재관측을 막는다 — 재생은 1회다.
  */
 export function useRevealOnce<T extends Element>(
@@ -40,6 +48,12 @@ export function useRevealOnce<T extends Element>(
 
     if (visible) {
       if (!playIfVisible) {
+        /*
+          `armed` 로 남겨 두지 않는다. 앞선 실행이 화면 밖이라 판단해 숨김을 걸어 둔 뒤
+          `playIfVisible` 이 참에서 거짓으로 바뀌면, 되돌리지 않는 한 요소가 숨은 채로
+          굳는다. 이미 `idle` 이면 무해하다.
+        */
+        setPhase('idle')
         done.current = true
         return
       }
