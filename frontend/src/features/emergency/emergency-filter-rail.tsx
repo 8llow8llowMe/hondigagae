@@ -68,7 +68,8 @@ export function EmergencyFilterRail({
       {/*
         **반경이 첫 축이다.** 이 화면은 지도를 옮겨도 재조회하지 않으므로(거리가 내 위치
         기준으로 남아야 한다) 반경이 "더 넓게 찾기" 의 유일한 손잡이고, 나머지 축은 그 안을
-        좁힌다. 부제(`emergencySummaryLine`)가 반경을 맨 앞에 두는 것과 같은 순서다.
+        좁힌다. 목록 위 요약 줄(`가까운 순 · 반경 10.0km`)이 반경을 맨 앞에 두는 것과 같은
+        순서다 — 카드 부제에도 같은 줄이 있었는데 `10.0km` 홀로 서서 읽히지 않아 걷었다 (#639).
       */}
       <FilterListHeading>{messages.emergency.radiusGroupLabel}</FilterListHeading>
       <RadiusField radius={radius} onChange={onRadiusChange} />
