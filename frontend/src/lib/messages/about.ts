@@ -34,4 +34,7 @@ export const aboutMessages = {
   sourcesDescription: '화면에 나오는 정보가 무엇에 근거하는지 적어 두었어요.',
 
   noticeTitle: '알아두실 점',
+
+  legalTitle: '약관',
+  legalDescription: '가입 전에도 읽을 수 있어요.',
 } as const

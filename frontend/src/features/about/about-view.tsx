@@ -1,4 +1,8 @@
-import { Surface } from '@/components/surface'
+import Link from 'next/link'
+
+import { ChevronRightIcon } from '@/components/icons'
+import { Surface, SurfaceList } from '@/components/surface'
+import { LEGAL_LINKS } from '@/lib/legal/links'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -24,6 +28,10 @@ import { cn } from '@/lib/utils/cn'
  * **폭은 `max-w-screen-md` 다** — 읽는 화면이라 레일을 쓰지 않는다. 마이페이지와 같다.
  * 폭을 갖는 것이 `main` 이 아니라 `SurfaceStack` 인 이유는 바닥이 전폭이어야 하기
  * 때문이다 (#453 · #462). 여기서는 페이지 쪽이 `Canvas` 와 `SurfaceStack` 을 그린다.
+ *
+ * **약관 링크도 같은 이유로 여기 있다** (#610). 푸터가 감춰지는 768 미만에서 마이페이지는
+ * 로그인이 필요하고 `(auth)` 그룹에는 푸터가 없어, 이 화면이 없으면 **가입 전 모바일
+ * 방문자가 약관을 읽을 수단이 사라진다.** 출처와 같은 구조의 문제다.
  */
 export function AboutView() {
   return (
@@ -74,6 +82,30 @@ export function AboutView() {
           <p className="text-body-2 text-fg-muted">{messages.footer.disclaimer}</p>
           <p className="text-caption text-fg-subtle font-medium">{messages.footer.contest}</p>
         </div>
+      </Surface>
+
+      {/*
+        **이동 항목이라 `SurfaceList` 다** — 마이페이지 계정 섹션과 같은 모양을 쓴다
+        (`account-section.tsx`). 같은 역할의 행이 화면마다 다르게 생기지 않게 한다.
+      */}
+      <Surface
+        titleId="about-legal-heading"
+        title={messages.about.legalTitle}
+        description={messages.about.legalDescription}
+      >
+        <SurfaceList>
+          {LEGAL_LINKS.map((link) => (
+            <li key={link.href} className={INSET_CLASS.card}>
+              <Link
+                href={link.href}
+                className="focus-visible:ring-brand-500 flex min-h-14 items-center gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
+              >
+                <span className="text-body-1 text-fg flex-1">{link.label}</span>
+                <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
+              </Link>
+            </li>
+          ))}
+        </SurfaceList>
       </Surface>
     </>
   )
