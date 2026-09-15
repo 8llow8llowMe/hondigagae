@@ -345,7 +345,7 @@ export function AboutView() {
             description={
               <p className="text-caption text-fg-muted font-medium">{about.legal.description}</p>
             }
-            className="mt-2 -mx-4 md:mx-0"
+            className="-mx-4 mt-2 md:mx-0"
           >
             <SurfaceList>
               {LEGAL_LINKS.map((link) => (
