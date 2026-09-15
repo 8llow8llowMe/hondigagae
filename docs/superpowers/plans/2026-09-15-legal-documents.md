@@ -1392,7 +1392,7 @@ export default function PrivacyPage() {
 - [ ] **Step 3: 빌드가 되는지 확인한다**
 
 Run: `cd frontend && pnpm typecheck && pnpm build`
-Expected: PASS — 빌드 출력의 라우트 목록에 `/terms` 와 `/privacy` 가 **정적(`○`)** 으로 나온다
+Expected: PASS — 빌드 출력의 라우트 목록에 `/terms` 와 `/privacy` 가 나온다. **둘 다 동적(`ƒ`)이고 그게 맞다**: `(main)/layout.tsx` 가 `readSession()` → `await cookies()` 를 부르므로 그 그룹 **전체**가 이미 동적이다. 이 두 라우트가 새로 만든 성질이 아니다. 정적으로 만들려면 `(main)` 밖으로 빼야 하는데 그러면 헤더·푸터 셸을 잃고, 푸터는 이 작업이 만드는 진입점 둘 중 하나다
 
 - [ ] **Step 4: 커밋**
 
