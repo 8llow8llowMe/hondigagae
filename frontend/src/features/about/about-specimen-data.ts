@@ -82,6 +82,14 @@ export const PLAN_SPECIMEN = [
   },
 ] as const
 
+/**
+ * 여행 적합도 카드의 예시 장소. **뷰에 리터럴로 남기지 않는다** — 예시 장소 이름은 전부
+ * 이 파일이 갖는다. `PLACE_ROWS_SPECIMEN` · `EMERGENCY_ROWS_SPECIMEN` 과 같은 축이다.
+ *
+ * 등급어(`적합도 높음`)와 근거 문장은 `messages.about.specimen` 이다 — 해요체 감시가 그쪽을 본다.
+ */
+export const SUITABILITY_SPECIMEN = { place: '협재 해수욕장' } as const
+
 export const WEATHER_SPECIMEN = [
   { day: '1일차', icon: '☀️', temp: '27℃' },
   { day: '2일차', icon: '🌧️', temp: '23℃' },
