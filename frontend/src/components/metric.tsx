@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 
+import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -15,6 +16,30 @@ import { cn } from '@/lib/utils/cn'
  */
 
 export type MetricTone = 'critical' | 'high' | 'mid' | 'low' | 'unknown'
+
+/**
+ * 배지가 말하는 **축**. 붙이면 등급어 앞에 축 이름이 선다 — `적합도 보통` · `혼잡도 보통`.
+ *
+ * **자유 문자열이 아니라 유니온이다.** 축이 하나 늘 때 타입이 전 호출부를 가리켜야 하고,
+ * `grep` 로 전수 확인이 되어야 한다.
+ *
+ * **두 축뿐인 이유는 충돌하는 어휘가 둘뿐이기 때문이다** (#652 · 진단 G-1·D-2). 적합도
+ * `MEDIUM` 과 혼잡도 `MODERATE` 가 둘 다 `보통` 이라, 장소 상세 이름 옆 배지가 어느 축인지
+ * 화면에 단서가 없었다 — 390 실측에서 문구·폭(38.74px)·tint·글자색이 전부 같았다.
+ * 산책 안전(`안전·주의·위험`)·기상특보(`폭염 경보`)·속성 배지(`실내 여부 미확인`)는
+ * 충돌 상대가 없거나 문구가 이미 축을 말하므로 **붙이지 않는다**
+ * (`docs/features/공통/등급배지-축라벨-세부명세.md` D5 가 호출부 17곳을 전수로 갖는다).
+ */
+export type MetricAxis = 'suitability' | 'congestion'
+
+/**
+ * 축 → 라벨. **어휘 표이지 code→tone 매핑이 아니다** — 이 파일이 code 를 해석하지 않는다는
+ * 규칙은 그대로다. 문구는 `messages` 에서 읽는다 (컴포넌트 안에 한국어 리터럴을 두지 않는다).
+ */
+const METRIC_AXIS_LABEL: Record<MetricAxis, string> = {
+  suitability: messages.common.metricAxisSuitability,
+  congestion: messages.common.metricAxisCongestion,
+}
 
 /**
  * tint 배경 + `-700` 텍스트. `-500` 을 텍스트에 쓰면 대비가 무너진다.
@@ -73,12 +98,22 @@ export type MetricBadgeSize = 'sm' | 'md' | 'score'
 export function MetricBadge({
   tone,
   size = 'md',
+  axis,
   children,
   className,
 }: {
   tone: MetricTone
   /** `sm` 은 `Badge size="sm"` 과 나란히 설 때 (같은 `h-5`) */
   size?: MetricBadgeSize
+  /**
+   * 주면 등급어 앞에 축 이름이 선다 — `적합도 보통`. **값과 무관하게 항상 붙는다** —
+   * `보통` 일 때만 붙이면 배지 모양이 값마다 달라져 "앞 낱말이 축" 이라는 규칙을 배울 수
+   * 없고, 서버가 새 충돌 어휘를 보내면 조용히 깨진다.
+   *
+   * 생략하면 접두어가 없다. 그것이 기본값인 이유는 **대부분의 배지가 축을 말할 필요가
+   * 없기 때문이다** — `MetricAxis` 주석 참고.
+   */
+  axis?: MetricAxis
   /** 서버 `name` 을 그대로 넣는다 */
   children: ReactNode
   className?: string
@@ -94,6 +129,31 @@ export function MetricBadge({
         className,
       )}
     >
+      {/*
+        **축 라벨은 자기 `<span>` 이고, 공백은 그 안에 있다.**
+
+        `{label} {children}` 로 쓰면 React 가 하이드레이션 경계에 주석 노드를 끼워 실제 DOM
+        과 `renderToStaticMarkup` 문자열이 갈린다 — `toContain('적합도 보통')` 이 테스트에서만
+        통과하는 false-green 이 되는 자리다 (testing-guide.md §5). 그래서 라벨을 요소로 뗀다.
+
+        **공백을 여백으로 대신하지 않는다.** 접근성 이름 계산은 인라인 노드를 이어 붙일 때
+        공백을 넣어 주지 않아 배지가 `적합도보통` 한 낱말로 읽힌다 (실측:
+        `textContent === '적합도보통'`). 여백은 눈에만 보이고 귀에는 없다. 공백을 라벨
+        `<span>` 안에 두면 텍스트 노드가 하나라 주석 문제도 생기지 않는다.
+
+        **`me-1`(4px)을 그 위에 더한다.** 12px 공백은 3.1px 이라 `적합도 보통` 이 390
+        화면에서 한 낱말로 뭉쳐 보였다 — 낱말을 가르려고 붙인 라벨이 낱말에 붙어 버리면
+        한 일이 없다. 여백은 **공백을 대신하는 것이 아니라 보태는 것**이라 귀로 읽히는
+        글자는 그대로다. **2px 를 쓰지 않는다** — 스페이싱 스케일 밖이고
+        `styles/token-usage.test.ts` 가 막는다 (DESIGN.md §4).
+
+        **굵기만 한 단계 낮춘다** (본문 600 → 라벨 500). 라벨과 값이 갈려 읽히는데 색은
+        그대로라 대비가 바뀌지 않는다. 크기를 줄이면 12px 밑으로 내려가고, 색을 흐리면
+        MID tint 위 5.16:1 이 무너진다 (DESIGN.md §2-3).
+      */}
+      {axis !== undefined && (
+        <span className="me-1 font-medium">{`${METRIC_AXIS_LABEL[axis]} `}</span>
+      )}
       {children}
     </span>
   )
