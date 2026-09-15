@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 import { Wordmark } from '@/components/brand/wordmark'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -21,11 +23,20 @@ import { cn } from '@/lib/utils/cn'
  * 지도 쪽이 자기 성질(전폭 지도 클래스)로 빠지는 방식이다 — `.rail-layout` 에 가입하지
  * 않는 것으로 전폭을 표현하는 #376 의 설계와 같은 축이다.
  *
- * **모바일 탭바 자리를 비운다** (`.site-footer` 의 `padding-block-end`). 탭바가 `fixed`
- * 라 마지막 줄이 그 뒤로 들어간다.
+ * **768 미만에는 나오지 않는다 — 거기엔 하단 탭바가 있다.** 탭바 위에 푸터가 또 붙으면
+ * 내비게이션이 두 겹으로 읽힌다. 경계는 `md` 하나뿐이다 — 탭바가 `md:hidden` 이라
+ * **태블릿에는 이미 탭바가 없고**, "모바일이냐 태블릿이냐" 로 갈리는 규칙을 새로 만들지
+ * 않는다. 기준은 늘 탭바가 있는가다.
  *
- * **없는 링크를 만들지 않는다** — 이용약관·문의는 아직 페이지가 없다. 자리만 잡아 두면
- * 눌러 보고 아무 일도 일어나지 않는다.
+ * **그래서 `/about` 이 먼저 생겼다.** 이 푸터의 존재 이유가 출처 표기인데 갈 곳 없이
+ * 감추면 모바일에서 출처가 통째로 사라진다 — `features/about/about-view.tsx` 가 같은
+ * 문구(`messages.footer`)를 읽어 그 자리를 맡고, 모바일은 홈 하단 링크로 거기에 닿는다.
+ *
+ * **탭바 자리를 비우는 일은 `.page-canvas` 가 물려받았다** — 감춘 요소는 여백도 주지
+ * 못한다. `app/globals.css` 의 `.page-canvas` 주석이 그 이유의 정본이다.
+ *
+ * **여전히 없는 링크는 만들지 않는다** — 이용약관·문의는 아직 페이지가 없다. 자리만 잡아
+ * 두면 눌러 보고 아무 일도 일어나지 않는다. `/about` 은 그 반대라 링크를 단다.
  */
 export function SiteFooter() {
   return (
@@ -61,6 +72,20 @@ export function SiteFooter() {
         <div className="border-border flex flex-col gap-1 border-t pt-4">
           <p className="text-caption text-fg-muted font-medium">{messages.footer.disclaimer}</p>
           <p className="text-caption text-fg-subtle font-medium">{messages.footer.contest}</p>
+
+          {/*
+            **이 푸터에서 유일한 링크다.** 같은 내용을 읽을 수 있는 화면이 실제로 있어서
+            단다 — 모바일에는 이 푸터가 없고 `/about` 이 그 자리를 맡으므로, 데스크톱에서도
+            그 화면이 어디 있는지는 여기서만 알 수 있다.
+
+            높이 44 를 지킨다 (`self-start` 로 줄 전체가 눌리지 않게 한다).
+          */}
+          <Link
+            href="/about"
+            className="text-caption text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center self-start font-semibold focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {messages.about.title}
+          </Link>
         </div>
       </div>
     </footer>
