@@ -503,6 +503,41 @@ body {
   }
 
   /*
+    일정 상세 변형 — **레일이 본문 앞뒤 둘로 갈린다** (이슈 #653 · 일정상세-세부명세 D11-3).
+
+    장소 상세(`.rail-layout-detail`)와 문제 모양이 다르다. 거기는 레일이 **한 덩어리**로
+    본문 뒤에 오면 됐는데(그래서 `grid-row: 1 / span 2` 하나로 끝난다), 일정 상세는 레일
+    내용이 본문을 사이에 두고 갈린다 — 개요·상태 액션·목차는 모바일에서도 맨 위여야 하고,
+    준비물·후기·배너는 **일자 카드 뒤**여야 한다(진단 PL-3: 준비물이 일차보다 위였다).
+
+    모바일 DOM 순서가 곧 읽는 순서다:
+
+      ① 개요 + 상태 액션 + 판정 목차   → col 1, row 1
+      ② 일자 카드들                     → col 2, 두 행에 걸침
+      ③ 준비물 · 후기 · 배너            → col 1, row 2
+
+    **데스크톱 레일의 보이는 순서는 바뀌지 않는다** — ① 아래 ③ 이라 지금과 같다.
+    1024 미만에서는 `.rail-layout` 이 grid 가 아니므로 ①②③ 이 DOM 순서대로 쌓인다.
+
+    행 사이 간격은 ③ 이 자기 `pt-*` 로 낸다 — 열 사이를 `lg:pr-3`/`lg:pl-3` 로 내는 기존
+    문법과 같다. `row-gap` 을 주면 ② 가 두 행에 걸쳐 있어 **본문 안쪽에도 틈이 생긴다.**
+  */
+  .rail-layout-split > .rail-split-top {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .rail-layout-split > .rail-split-main {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .rail-layout-split > .rail-split-bottom {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  /*
     sticky 레일 자체가 뷰포트보다 길 때 **바닥에 닿을 수 없는 문제**를 막는다.
 
     `position: sticky` 는 요소의 위쪽이 `top` 에 닿으면 고정하는데, 요소가 뷰포트보다
