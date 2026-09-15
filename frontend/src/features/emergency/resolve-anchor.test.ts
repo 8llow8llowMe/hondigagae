@@ -74,8 +74,9 @@ describe('resolveAnchor — 기준점 우선순위 (#639)', () => {
     알고 싶은 사실이다 (`basisMap` 이 #396 에서 같은 판단을 했다).
   */
   it('거리를 감추는 것은 제주 중심 폴백뿐이다', () => {
-    expect(resolveAnchor({ searchCenter: MAP_CENTER, regionCode: null, position: DENIED }).basis)
-      .toBe('map')
+    expect(
+      resolveAnchor({ searchCenter: MAP_CENTER, regionCode: null, position: DENIED }).basis,
+    ).toBe('map')
 
     const region = resolveAnchor({ searchCenter: null, regionCode: 'JEJU_CITY', position: DENIED })
     expect(region.basis).toBe('region')
