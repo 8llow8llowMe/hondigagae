@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { ProfileCard } from '@/features/home/profile-card'
+import { messages } from '@/lib/messages'
 import { pet } from '@/test/fixtures/plan'
 import { classesOf } from '@/test/markup'
 
@@ -52,5 +53,36 @@ describe('ProfileCard — 반려견이 선택된 갈래', () => {
 
     expect(empty).toContain('href="/pets/new"')
     expect(empty).not.toContain('py-10')
+  })
+})
+
+/*
+  **온보딩 행** (#636 · 홈-첫방문-판정-세부명세 D1 · D4). 미로그인 첫 화면에서 서비스가
+  시키는 유일한 일이 링크 톤 한 줄(`반려견 등록 ›`)이었다.
+*/
+describe('ProfileCard — 반려견이 0마리인 갈래', () => {
+  const markup = renderToStaticMarkup(createElement(ProfileCard, { pets: [], totalCount: 0 }))
+
+  it('제목과 설명이 텍스트로 선다', () => {
+    expect(markup).toContain(messages.home.guestProfileTitle)
+    expect(markup).toContain(messages.home.guestProfileDesc)
+  })
+
+  /*
+    **행 전체가 링크였다.** 제목·설명까지 `<a>` 안에 있으면 버튼과 같은 목적지가 포커스를
+    두 번 받는다 (D4). 이제 링크는 버튼 하나다.
+  */
+  it('`/pets/new` 로 가는 링크가 하나뿐이다', () => {
+    expect(markup.split('href="/pets/new"')).toHaveLength(2)
+  })
+
+  it('주 버튼 변형이다 — 링크 톤이 아니다', () => {
+    const classes = classesOf(markup)
+
+    // `ButtonLink` 기본값(primary)의 면. 값은 `components/button.tsx` VARIANT 가 정본이다
+    expect(classes).toContain('bg-brand-600')
+    expect(markup).toContain(messages.home.registerPet)
+    // 예전 링크 톤의 꼬리표. 남아 있으면 버튼과 화살표가 같이 서 있는 것이다
+    expect(markup).not.toContain('›')
   })
 })

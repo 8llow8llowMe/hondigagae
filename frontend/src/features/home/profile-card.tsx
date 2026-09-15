@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
+import { ButtonLink } from '@/components/button'
 import { ChevronDownIcon } from '@/components/icons'
 import { PetAvatar } from '@/components/pet-avatar'
 import { useSelectedPetStore } from '@/features/nav/selected-pet-store'
@@ -205,26 +206,46 @@ function TraitTags({ pet }: { pet: Pet }) {
   )
 }
 
+/**
+ * 반려견이 0마리일 때 프로필 자리 — 홈-첫방문-판정-세부명세 D1 · D4.
+ *
+ * **행 전체가 링크였다** (#636). 미로그인 첫 화면에서 서비스가 사용자에게 시키는 유일한
+ * 일이 `반려견 등록 ›` 라는 **링크 톤 한 줄**이었고, 옆 판정 카드의 본문과 무게가 같아
+ * 무엇을 해야 하는 화면인지 읽히지 않았다. 주 버튼으로 올린다.
+ *
+ * **밴드를 카드 밖에 새로 두지 않는다.** 온보딩은 프로필 자리 그대로다 — `DESIGN.md` §0
+ * 카드 판정("혼자 떼어놔도 말이 되는가")에 걸리고, 판정의 화자(프로필)와 갈라진다.
+ *
+ * **버튼만 링크다.** 행 전체를 `<a>` 로 감싸고 그 안에 버튼을 두면 중첩 링크가 되고,
+ * 감싸지 않아도 같은 목적지가 포커스를 두 번 받는다 (D4).
+ */
 function RegisterPrompt() {
   return (
-    <Link
-      href="/pets/new"
+    <div
       className={cn(
-        'focus-visible:ring-brand-500 flex items-center gap-3 py-4 focus-visible:ring-2 focus-visible:outline-none',
+        'flex items-center gap-3 py-4',
         // 카드 안 인셋 (#428)
         'px-4 md:px-5',
       )}
     >
-      <span className="min-w-0 flex-1">
+      {/*
+        390 에서 제목·설명이 두 줄로 접히고 버튼은 세로 중앙이다 (D1). 한국어 실데이터가
+        길어도 `min-w-0` 이 버튼을 밀어내지 않는다.
+      */}
+      <p className="min-w-0 flex-1">
         <span className="text-body-1 text-fg block font-semibold">
           {messages.home.guestProfileTitle}
         </span>
         <span className="text-body-2 text-fg-muted block">{messages.home.guestProfileDesc}</span>
-      </span>
-      <span className="text-body-2 text-link shrink-0 font-semibold">
-        {messages.home.registerPet} ›
-      </span>
-    </Link>
+      </p>
+      {/*
+        미로그인이면 `proxy.ts` 가 `/login?returnTo=%2Fpets%2Fnew` 로 보낸다 — 여기서
+        세션을 보고 분기하지 않는다 (D4). 보호 경로의 판정은 한 곳에만 둔다.
+      */}
+      <ButtonLink href="/pets/new" className="shrink-0">
+        {messages.home.registerPet}
+      </ButtonLink>
+    </div>
   )
 }
 

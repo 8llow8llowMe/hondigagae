@@ -11,6 +11,13 @@ import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
 /**
+ * 모바일 · 데스크톱이 **같은 라벨**을 쓴다 (#636). 같은 목적지가 폭에 따라 다른 이름을
+ * 갖지 않게 한 자리에 둔다. `messages` 로 올리지 않는 이유는 이 헤더가 예전부터 리터럴을
+ * 써 왔고, 키 하나를 새로 내려면 `회원가입` 까지 함께 옮겨야 해 이 이슈의 범위 밖이다.
+ */
+const LOGIN_LABEL = '로그인'
+
+/**
  * 전역 헤더 — 아트보드 `01 홈`(모바일 56) / `02 홈`(데스크톱 64) / `03 전역 nav`.
  *
  * **서버 컴포넌트다.** 세션으로 분기하는 셸만 담당하고, 활성 판정(`usePathname`)과
@@ -84,6 +91,30 @@ export function GlobalHeader({ authed }: { authed: boolean }) {
           {/* 모바일 헤더의 스위처. 데스크톱은 홈 프로필 카드가 맡는다 */}
           {authed && <PetSwitcherSlot />}
 
+          {/*
+            **모바일 미로그인 진입점** (#636 · 홈-첫방문-판정-세부명세 D1). 아래 `로그인 ·
+            회원가입` 쌍이 `md:flex` 라 768 미만에서는 헤더에 로그인으로 가는 길이 하나도
+            없었다 — 탭바에도 없다(`menu-items.ts`). 첫 화면에서 서비스에 들어오는 문이
+            닫혀 있던 셈이다.
+
+            **버튼이 아니라 텍스트 링크다.** 이 폭의 주 행동은 홈 카드 안 `반려견 등록`
+            버튼이고(D1), 헤더에 같은 무게의 면을 하나 더 두면 첫 화면에 주 버튼이 둘이
+            된다. 로고 · 응급 아이콘과 같은 줄에서 밀도를 키우지 않는 쪽을 고른다.
+
+            **응급 아이콘 왼쪽이다.** 응급은 상시 진입점이라 오른쪽 끝 자리가 고정이다.
+
+            `ButtonLink` 를 `md:hidden` 으로 쓰지 않는다 — 크기·면을 다시 덮어써야 하고,
+            그 덮어쓰기는 `className` 규약이 막는다 (`component-guide.md`).
+          */}
+          {!authed && (
+            <Link
+              href="/login"
+              className="text-body-2 text-link focus-visible:ring-brand-500 inline-flex h-11 items-center rounded-md px-2 font-semibold focus-visible:ring-2 focus-visible:outline-none md:hidden"
+            >
+              {LOGIN_LABEL}
+            </Link>
+          )}
+
           {/* 상시 진입점. 아이콘만 danger 색이고 배경을 채우지 않는다 */}
           <Link
             href="/emergency"
@@ -98,7 +129,7 @@ export function GlobalHeader({ authed }: { authed: boolean }) {
           ) : (
             <div className="hidden items-center gap-1 md:flex">
               <ButtonLink href="/login" variant="ghost">
-                로그인
+                {LOGIN_LABEL}
               </ButtonLink>
               <ButtonLink href="/signup">회원가입</ButtonLink>
             </div>
