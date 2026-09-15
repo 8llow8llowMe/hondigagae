@@ -133,6 +133,15 @@ import { LEGAL_DOCUMENTS } from '@/lib/legal'
  * 기계가 잡을 수 있다. **개정할 때 한 조를 빠뜨리는 것이 가장 흔한 사고다.**
  */
 describe('법률 문서 구조 (#610)', () => {
+  /*
+    **문서가 0개여도 이 파일에 테스트가 하나는 있어야 한다.** 아래 단언은 전부
+    `LEGAL_DOCUMENTS` 순회 안에 있어서, 배열이 비면 실행 가능한 테스트가 없는 파일이
+    된다.
+  */
+  it('검증 대상 목록이 배열이다', () => {
+    expect(Array.isArray(LEGAL_DOCUMENTS)).toBe(true)
+  })
+
   for (const doc of LEGAL_DOCUMENTS) {
     describe(doc.title, () => {
       it('조 번호가 1부터 연속이다', () => {
@@ -194,7 +203,7 @@ export const LEGAL_DOCUMENTS: readonly LegalDocument[] = []
 - [ ] **Step 5: 테스트가 통과하는 것을 확인한다**
 
 Run: `cd frontend && pnpm vitest run src/lib/legal/legal.test.ts`
-Expected: PASS (문서가 0개라 `describe` 안 단언이 아직 돌지 않는다 — Task 2·3 에서 실제로 돈다)
+Expected: PASS — 1개 (`검증 대상 목록이 배열이다`). 문서별 단언은 배열이 비어 아직 돌지 않고, Task 2·3 부터 실제로 돈다
 
 - [ ] **Step 6: 커밋**
 
@@ -527,7 +536,7 @@ git commit -m "[FE] feat: 이용약관 본문 15개 조를 쓴다 (#610)"
 
 - [ ] **Step 1: 보호책임자 게이트 테스트를 먼저 쓴다**
 
-`frontend/src/lib/legal/legal.test.ts` 파일 끝에 붙인다:
+`frontend/src/lib/legal/legal.test.ts` 에 더한다. **`import` 는 파일 머리의 기존 import 들과 같은 자리에 넣고**(경로 알파벳 순서), `describe` 블록만 파일 끝에 붙인다:
 
 ```ts
 import { LEGAL_CONTACT } from '@/lib/legal/contact'
@@ -877,7 +886,7 @@ export const privacyPolicy: LegalDocument = {
 
 - [ ] **Step 5: 법정 기재사항 누락 테스트를 쓴다**
 
-`frontend/src/lib/legal/legal.test.ts` 파일 끝에 붙인다:
+`frontend/src/lib/legal/legal.test.ts` 에 더한다. Step 1 과 같다 — **`import` 는 파일 머리에**, `REQUIRED_SECTIONS` 상수와 `describe` 는 파일 끝에 붙인다:
 
 ```ts
 import { privacyPolicy } from '@/lib/legal/privacy-policy'
@@ -992,7 +1001,7 @@ export const legalMessages = {
 
 - [ ] **Step 2: 배럴에 등록한다**
 
-`frontend/src/lib/messages/index.ts` 에 import 한 줄과 항목 한 줄을 더한다. import 는 `simple-import-sort` 규칙에 맞춰 알파벳 순서를 지킨다 — `authMessages, formMessages` 줄 **다음**, `homeMessages` 줄 **앞**이다:
+`frontend/src/lib/messages/index.ts` 에 import 한 줄과 항목 한 줄을 더한다. `simple-import-sort` 는 **모듈 경로**로 정렬하므로 `@/lib/messages/home` 줄 **다음**, `@/lib/messages/map` 줄 **앞**이다 (가져오는 이름이 아니라 경로 기준이다):
 
 ```ts
 import { legalMessages } from '@/lib/messages/legal'
@@ -1844,7 +1853,12 @@ test.describe('약관 문서 — 로그아웃 상태 (#610)', () => {
   })
 
   test('푸터 링크로 약관에 닿는다', async ({ page }) => {
-    await page.goto('/login')
+    /*
+      **홈에서 출발한다.** 푸터는 `(main)` 레이아웃의 `AppShell` 이 그리므로 `(auth)`
+      그룹(`/login` 등)에는 아예 없다. 홈은 `(main)` 이고, 보호 라우트가 아니며,
+      지도로 뷰포트를 채우지 않는다.
+    */
+    await page.goto('/')
 
     await page.getByRole('navigation', { name: '약관' }).getByRole('link', { name: '이용약관' }).click()
 
@@ -1866,10 +1880,11 @@ test.describe('약관 문서 — 로그아웃 상태 (#610)', () => {
 })
 ```
 
-> **푸터가 없는 화면이 있다.** 지도가 뷰포트를 채우는 라우트는 `globals.css` 의
+> **푸터가 없는 화면이 둘 있다.** (1) `(auth)` 그룹(`/login` · `/signup`)은 `AppShell`
+> 밖이라 헤더도 푸터도 없다. (2) 지도가 뷰포트를 채우는 라우트는 `globals.css` 의
 > `body:has(.map-canvas-height) .site-footer` 가 푸터를 감춘다. 그래서 푸터 링크
-> 테스트는 `/login` 에서 출발한다 — 지도가 없고 로그아웃 상태에서 열리는 화면이다.
-> 이 테스트가 "푸터를 못 찾는다" 로 실패하면 출발 화면부터 의심한다.
+> 테스트는 **홈(`/`)** 에서 출발한다. 이 테스트가 "푸터를 못 찾는다" 로 실패하면
+> 출발 화면부터 의심한다.
 
 - [ ] **Step 2: e2e 를 돌린다**
 
