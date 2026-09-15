@@ -46,6 +46,7 @@ export function WalkVerdict({
   data,
   petName,
   todayLabel,
+  basisIsDefault,
   busy = false,
 }: {
   data: WalkSafetyResponse
@@ -63,6 +64,20 @@ export function WalkVerdict({
    * 늘 보인다. 폭에 따라 날짜가 다른 물건이 되던 분기가 함께 사라진다.
    */
   todayLabel: string
+  /**
+   * 기준이 사용자가 고른 장소가 아니라 **대표 지점**인가 (홈-첫방문-판정-세부명세 D3-1).
+   *
+   * 참이면 기준 줄(`{장소} 기준`) 아래에 한 줄이 더 붙어 그 사실을 말한다. 기준 줄만
+   * 두면 화면이 **사용자가 고른 적 없는 장소를 고른 것처럼** 말하게 된다 — 판정의
+   * 화자가 누구 기준인지 밝히는 이 카드에서 가장 하면 안 되는 일이다.
+   *
+   * **`placeId` 를 받아 여기서 판별하지 않는다.** 판별은 `isDefaultBasis()` 한 곳에
+   * 두고, 이 컴포넌트는 답만 받는다 — 기준 결정은 호출부(`home-view`)의 일이다.
+   *
+   * 기본값을 두지 않는다. 빠뜨리면 캡션이 **조용히 사라지는데**, 그것이 바로 이 카드가
+   * 고치려던 상태다.
+   */
+  basisIsDefault: boolean
   busy?: boolean
 }) {
   const tone = walkSafetyTone(data.walkSafetyLevel.code)
@@ -137,6 +152,19 @@ export function WalkVerdict({
           <span className="text-caption text-fg-muted block font-medium tabular-nums">
             {summary}
           </span>
+          {/*
+            **대표 지점 캡션** (#636). 위 `summary` 가 `{장소} 기준` 이라고 말한 그 장소를
+            사용자가 고른 적이 없을 때, 이 줄이 그 사실을 밝힌다. 데스크톱 패널의 같은
+            자리(기준 줄 바로 아래)와 같은 서체다.
+
+            **접힘 밖이다.** 기준을 설명하는 줄이 기준 줄과 떨어져 있으면 읽히지 않는다 —
+            모바일 기본 상태는 접힘이고, 그때 보이는 것은 이 버튼뿐이다.
+          */}
+          {basisIsDefault && (
+            <span className="text-caption text-fg-muted block font-medium">
+              {messages.home.basisDefaultNote}
+            </span>
+          )}
         </span>
         <ChevronDownIcon
           size={20}
@@ -226,10 +254,23 @@ export function WalkVerdict({
             />
           )}
         </div>
-        <p className="text-caption text-fg-muted hidden font-medium md:block">
-          {data.placeTitle} {messages.home.basisSuffix}
-          {petName !== null && ` · ${petName} ${messages.home.basisSuffix}`}
-        </p>
+        {/*
+          기준 줄. **캡션이 붙으면 둘이 한 덩어리다** (#636) — 바깥 `gap-3` 이 두 줄을
+          갈라 놓으면 안내가 어느 줄에 대한 말인지 멀어진다. 그래서 같은 래퍼 안에서
+          `gap-1` 로 붙인다. 위 `<p>` 안에 이어 쓰지 않는 이유는 성격이 달라서다 — 위는
+          값(어디 기준인가)이고 아래는 그 값이 어떻게 정해졌는지에 대한 안내다.
+        */}
+        <div className="hidden flex-col gap-1 md:flex">
+          <p className="text-caption text-fg-muted font-medium">
+            {data.placeTitle} {messages.home.basisSuffix}
+            {petName !== null && ` · ${petName} ${messages.home.basisSuffix}`}
+          </p>
+          {basisIsDefault && (
+            <p className="text-caption text-fg-muted font-medium">
+              {messages.home.basisDefaultNote}
+            </p>
+          )}
+        </div>
 
         {/*
           **등급이 권하는 행동.** `walkSafetyLevel.description` 은 "짧게 걷고 물과 그늘을

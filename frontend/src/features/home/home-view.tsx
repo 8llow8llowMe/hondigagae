@@ -32,6 +32,7 @@ import { toPetCondition } from '@/lib/api/insight'
 import { dayToLocalNoon } from '@/lib/date/day'
 import { hospitalBannerDescription, pickNearestHospital } from '@/lib/emergency/nearest'
 import { getCurrentPosition, type PositionResult } from '@/lib/geo/current-position'
+import { DEFAULT_BASIS_PLACE_ID, isDefaultBasis } from '@/lib/insight/basis-place'
 import { collectIndoorAlternatives } from '@/lib/insight/indoor'
 import {
   appliedFactorsOf,
@@ -130,7 +131,28 @@ export function HomeView({
   const selectedPet = resolveSelectedPet(pets, storedPetId ?? null)
   const condition = toPetCondition(selectedPet)
 
-  const storedBasisPlaceId = resolveBasisPlaceId(recentPlaceId, null)
+  /*
+    **대표 지점 자체가 404 였는가** (#636 · 명세 D5-3). 운영 DB 에 그 id 가 없으면 몇 번을
+    물어도 같은 404 다 — 한 번 겪으면 기준을 `null` 로 굳혀 예전(기준 없음) 화면으로
+    떨어뜨린다. `useState` 인 이유는 **이 방문 동안만** 유효한 판정이어서다. 저장소에
+    남기면 배치가 장소를 되살려도 그 브라우저만 영원히 판정을 못 본다.
+  */
+  const [defaultBasisGone, setDefaultBasisGone] = useState(false)
+
+  /** 사용자가 **고른** 기준. 셋째 인자를 생략하면 대표 지점 이전의 판정 그대로다 */
+  const pickedBasisPlaceId = resolveBasisPlaceId(recentPlaceId, null)
+  /*
+    고른 것이 없으면 대표 지점으로 떨어진다 (#636 · 명세 D3-1). 첫 방문 · 새 기기 ·
+    시크릿 모드에서 판정 섹션이 통째로 빠지던 자리다.
+
+    **`useWalkSafety` 의 `enabled: placeId !== null` 은 남는다** — 아래 404 폴백이 `null` 을
+    다시 만든다.
+  */
+  const storedBasisPlaceId = resolveBasisPlaceId(
+    recentPlaceId,
+    null,
+    defaultBasisGone ? null : DEFAULT_BASIS_PLACE_ID,
+  )
   const walkSafety = useWalkSafety(storedBasisPlaceId, condition)
 
   /*
@@ -139,8 +161,8 @@ export function HomeView({
     굳는다 — 404 에는 재시도 버튼도 없으니(`api-integration-guide.md` §3) 사용자가
     빠져나갈 길이 화면에 없다.
 
-    **첫 방문자와 같은 상태로 떨어뜨린다.** 기준이 없는 것은 오류가 아니라 아직 기준을
-    고르지 않은 것이고, 그 화면은 이미 있다 (`basisPlaceId === null` → 섹션 미렌더).
+    **이제 한 단 더 좋아진다** (#636). 저장된 id 를 버리면 기준이 `null` 이 되는데, 그
+    `null` 을 대표 지점이 다시 받는다 — 미렌더로 떨어지지 않고 판정이 그대로 선다.
 
     **렌더에서도 같이 끊는다.** effect 만 두면 저장소를 비우기 전 한 프레임 동안
     `ErrorState` 가 번쩍인다 — 지워질 것이 정해진 오류를 한 번 보여 주는 셈이다.
@@ -151,9 +173,22 @@ export function HomeView({
   useEffect(() => {
     if (!basisGone) return
 
-    clearRecentPlaceId()
-    setRecentPlaceId(null)
-  }, [basisGone])
+    /*
+      **고른 기준을 먼저 버린다.** 저장된 id 가 마침 대표 지점과 같을 수도 있어(그 장소를
+      본 적이 있다) 순서가 뒤집히면 저장소가 안 지워진 채 대표 지점만 포기하게 된다.
+    */
+    if (pickedBasisPlaceId !== null) {
+      clearRecentPlaceId()
+      setRecentPlaceId(null)
+      return
+    }
+
+    // 대표 지점이 404 다 — 다시 시도하지 않는다 (D5-3). 개발자에게만 남기는 한 줄이다
+    console.warn(
+      `[home] 대표 기준 장소(${DEFAULT_BASIS_PLACE_ID})를 찾을 수 없어 오늘 판정을 그리지 않습니다. NEXT_PUBLIC_DEFAULT_BASIS_PLACE_ID 를 확인하세요.`,
+    )
+    setDefaultBasisGone(true)
+  }, [basisGone, pickedBasisPlaceId])
   /*
     골든타임 좌표 (#180). **`/emergency` 와 같은 `getCurrentPosition()` 을 쓴다** — 거부·
     타임아웃·미지원을 그 함수가 이미 구분해 처리하고, 어느 경우에도 제주 중심 좌표를
@@ -216,9 +251,9 @@ export function HomeView({
     말하고 있는데 우측 추천 1번에 같은 장소가 다시 섰다 — DESIGN.md §1 "같은 사실을 한
     화면에서 두 번 말하지 않는다. 반복은 강조가 아니라 소음이다".
 
-    **조회는 그대로 두고 렌더에서만 뺀다.** `basisPlaceId` 는 `localStorage` 에서 오므로
-    첫 렌더에 `null` 이고 하이드레이션 뒤 값이 생긴다 — 질의 집합을 여기에 묶으면 그
-    시점에 키가 바뀌어 재조회가 한 번 더 돈다.
+    **조회는 그대로 두고 렌더에서만 뺀다.** `basisPlaceId` 는 `localStorage` 를 읽는
+    effect 뒤에야 정해지므로 첫 렌더와 하이드레이션 뒤의 값이 다르다 — 질의 집합을 여기에
+    묶으면 그 시점에 키가 바뀌어 재조회가 한 번 더 돈다.
   */
   const visible = loaded.filter((data) => data.placeId !== basisPlaceId)
 
@@ -360,7 +395,10 @@ export function HomeView({
               <ProfileCard pets={[]} totalCount={0} />
             )}
 
-            {/* 판정. 기준 장소가 없으면 섹션 자체를 렌더하지 않는다 */}
+            {/*
+              판정. **첫 방문자에게도 선다** (#636) — 고른 기준이 없으면 대표 지점으로
+              떨어진다. 여기가 `null` 인 것은 이제 대표 지점마저 404 인 경우뿐이다 (D5-3).
+            */}
             {basisPlaceId !== null && (
               <>
                 {walkSafety.isPending && (
@@ -396,6 +434,12 @@ export function HomeView({
                     data={walkSafety.data}
                     petName={selectedPet?.name ?? null}
                     todayLabel={todayLabel}
+                    /*
+                      **고른 것이 없을 때만 참이다** (#636). `isDefaultBasis` 만 보면 대표
+                      지점을 실제로 둘러본 사용자에게도 "장소를 보면 그곳 기준으로
+                      바뀌어요" 라고 말하게 된다 — 이미 그렇게 된 상태다.
+                    */
+                    basisIsDefault={pickedBasisPlaceId === null && isDefaultBasis(basisPlaceId)}
                     busy={walkSafety.isFetching && !walkSafety.isPending}
                   />
                 )}
@@ -525,9 +569,10 @@ export function HomeView({
               모바일의 특보는 페이지 최상단 `WeatherWarningStrip` 이 말한다 (#349 — 예전에는
               이 자리에 "위 권역 섹션의 배지" 라고 적혀 있었고, 그 배지는 이제 없다).
 
-              **기준 장소가 없는 첫 방문자에게도 보인다.** 좌측 판정 섹션은 그때 렌더되지
-              않으므로(`resolveBasisPlaceId`), 카드에서만 걷고 끝냈으면 그 사용자는 특보를
-              어디서도 못 봤다. 이 자리는 우측 열이라 로그인 여부와 무관하게 남는다.
+              **좌측 판정에 기대지 않는다.** 예전 근거는 "첫 방문자에게는 판정 섹션이
+              렌더되지 않아 특보를 어디서도 못 본다" 였는데, #636 이 대표 지점 폴백을
+              넣으면서 그 상태가 좁아졌다 — 그래도 대표 지점마저 404 면 판정은 다시
+              사라진다(D5-3). 이 자리는 우측 열이라 로그인 여부와도 무관하게 남는다.
             */}
             {sharedReasons.length > 0 && (
               <div className="hidden px-4 pb-3 md:block md:px-5">
