@@ -72,6 +72,15 @@
   /* 채운 버튼 hover / pressed. 600 에서 명도만 5%p 낮췄다 —
      한 단계(8.6%p) 더 내리면 --link-hover(#16563c)와 거의 같아져 역할이 흐려진다. */
   --brand-700: #1d6646;
+
+  /*
+    소개 페이지 표면 (DESIGN.md §0-2, #635). 값은 --row-selected · --metric-high-100 과 같고
+    **이름만 이 축의 것**이다 — 브랜드 tint 로 읽혀 다른 화면이 가져다 쓰지 못하게 한다.
+    --brand-50/100 은 §2-7 폐기 토큰이라 되살리지 않는다.
+  */
+  --intro-band: #f0f7f3;
+  --intro-tint: #e4f0ea;
+
   --link: #1f7a55;
   --link-hover: #16563c;
 

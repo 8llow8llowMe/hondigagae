@@ -21,12 +21,22 @@ import { cn } from '@/lib/utils/cn'
  */
 export function BrandSymbol({
   size = 24,
+  tone = 'default',
   className,
 }: {
   /** 24 = 헤더 · `(auth)` 셸 밖의 로고 자리. 48 = `(auth)` 셸 전용 (`DESIGN.md` §1) */
   size?: 24 | 48
+  /**
+   * `inverse` 는 그린 면(`--brand-700`) 위용 — 소개 페이지 히어로 하나가 쓴다 (DESIGN.md §0-2,
+   * #635). 사각을 흰색으로, 발바닥을 `--brand-700` 으로 뒤집는다. 브랜드 README 가 막는 것은
+   * "심볼을 등급 색으로 칠하는 것" 이고, 이 뒤집기는 브랜드 두 색 안에서만 움직인다.
+   */
+  tone?: 'default' | 'inverse'
   className?: string
 }) {
+  const square = tone === 'inverse' ? 'var(--bg)' : 'var(--brand-500)'
+  const paw = tone === 'inverse' ? 'var(--brand-700)' : 'var(--bg)'
+
   return (
     <svg
       viewBox="0 0 32 32"
@@ -44,8 +54,8 @@ export function BrandSymbol({
         것과 같은 판단이다. 다만 여기서는 `currentColor` 를 쓸 수 없다: 헤더 링크의
         글자색(`--fg`)을 물려받으면 심볼이 무채색이 되어 예외의 의미가 사라진다.
       */}
-      <rect width="32" height="32" rx="4" fill="var(--brand-500)" />
-      <g fill="var(--bg)">
+      <rect width="32" height="32" rx="4" fill={square} />
+      <g fill={paw}>
         <circle cx="16" cy="7.72" r="3.24" />
         <circle cx="7.84" cy="11.2" r="3.24" />
         <circle cx="24.16" cy="11.2" r="3.24" />

@@ -42,6 +42,8 @@
   --color-brand-700: var(--brand-700);
   --color-link: var(--link);
   --color-link-hover: var(--link-hover);
+  --color-intro-band: var(--intro-band);
+  --color-intro-tint: var(--intro-tint);
 
   /* ── 영업 상태 — DESIGN.md §2-9 */
   --color-status-open-100: var(--status-open-100);
