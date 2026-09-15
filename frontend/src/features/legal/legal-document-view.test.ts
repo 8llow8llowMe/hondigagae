@@ -50,7 +50,7 @@ describe('LegalDocumentView — 블록 (#610)', () => {
     expect(privacy).toContain('<table')
     expect(privacy).toContain('<th')
     expect(privacy).toContain(
-      '반려견 이름, 견종, 출생 연월, 크기, 체중, 활동 성향, 환경 민감도, 사진',
+      '반려견 이름, 견종, 출생 연월, 크기, 체중, 활동량, 산책 선호도, 사회성, 환경 민감도, 사진',
     )
   })
 
