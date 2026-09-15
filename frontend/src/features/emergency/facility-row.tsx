@@ -21,10 +21,22 @@ import type { NearbyFacilityItem } from '@/types/emergency'
  * **#537 이 "오늘 기준 한 줄" 을, #598 이 "두 줄로 날짜·시간" 을 요구했을 때도 이 규칙은
  * 그대로다** — 바꾼 것은 판정이 아니라 **몇 줄까지 흘리는가**뿐이다 (`FacilityHours`).
  *
+ * ── **2단이 아니라 2층이다** (#603)
+ *
+ * 예전에는 `[내용 | 버튼]` 한 층이라 버튼 칸이 **제목 줄의 폭까지 먹었다.** 375 기준으로
+ * 제목 줄에 343 − 52 − 52 − 12 − 8 = 219px 만 남았고, 그 좁은 칸에서 이름과 상태 배지가
+ * 자리를 다투느라 #598 이 `basis-[min-content]` 로 줄바꿈을 따로 설계해야 했다.
+ *
+ * 이제 **머리(`FacilityRowHeader`)가 전폭 343px 을 쓰고**, 그 아래 층만 좌우로 갈라
+ * `[시간·주소 243px | 버튼 88px]` 이 된다. 버튼은 제목과 같은 줄에 있을 이유가 없다 —
+ * 제목은 "무엇인가" 이고 버튼은 "어떻게 갈 것인가" 라 층이 다르다. 머리가 넓어지면서
+ * #598 의 줄바꿈 장치가 목적을 잃어 함께 걷혔다 (`FacilityRowHeader` 머리주석).
+ *
  * **내용(`FacilityRowContent`)과 액션(`CallButton` · `DirectionsButton` · `DirectionsLink`)이
  * 갈려 있다.** 지도 패널은 내용만 선택 버튼으로 감싸고 액션은 그 **형제**로 둔다 —
  * `<a>` 를 `<button>` 안에 넣을 수 없다. 내용을 복제하면 두 목록의 행이 갈리므로
- * 여기서 공유한다.
+ * 여기서 공유한다. **그 내용이 다시 머리와 본문으로 갈렸다** (#603): 목록 행은 둘 사이에
+ * 버튼 층을 끼워야 하고 지도 패널은 둘을 붙여 세워야 해서, 조립은 각자가 한다.
  *
  * **구분선을 스스로 긋지 않는다** (3층 표면, #460). 2a 의 `Row` 는 `border-bottom` 을
  * 행에 걸고 마지막 행이 `last` 로 껐는데, 그러면 행 수를 아는 호출자만 목록을 그릴 수 있다.
@@ -50,19 +62,27 @@ export function FacilityRow({
 }) {
   return (
     <li className={INSET_CLASS[inset]}>
-      <div className="flex items-center gap-3 py-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <FacilityRowContent facility={facility} showDistance={showDistance} />
-        </div>
+      <div className="flex flex-col gap-1.5 py-3">
+        {/* 머리는 전폭이다 — 버튼 칸이 제목 줄을 먹지 않는다 (#603) */}
+        <FacilityRowHeader facility={facility} />
 
         {/*
+          아래 층만 좌우로 갈린다. **`items-center` 다** — 버튼 둘(40px)을 세 줄 안팎의
+          글자 덩어리 한가운데 두는 쪽이, 위에 붙여 아래를 비우는 것보다 덩어리로 읽힌다.
+
           **전화 옆에 길찾기가 붙는다** (#537). 둘은 이 행에서 할 수 있는 두 가지 행동이고
-          같은 무게라 나란히 둔다. `gap-2`(8)는 52px 버튼 둘이 오조작 없이 갈리는 최소값이다 —
-          375 실측으로 글자 칸에 215px 가 남는다 (343 − 52 − 52 − 12 − 8 − 4).
+          같은 무게라 나란히 둔다. `gap-2`(8)는 두 버튼이 오조작 없이 갈리는 최소값이다 —
+          375 에서 글자 칸에 343 − 40 − 40 − 12 − 8 = 243px 이 남는다 (예전 219px).
         */}
-        <div className="flex shrink-0 items-center gap-2">
-          <CallButton name={facility.name} tel={facility.tel} />
-          <DirectionsButton facility={facility} />
+        <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <FacilityRowBody facility={facility} showDistance={showDistance} />
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <CallButton name={facility.name} tel={facility.tel} />
+            <DirectionsButton facility={facility} />
+          </div>
         </div>
       </div>
     </li>
@@ -72,6 +92,10 @@ export function FacilityRow({
 /**
  * 행이 보여주는 사실 — 이름 · 유형 · 영업 상태 · 진료시간 · 거리 · 주소.
  *
+ * **머리와 본문을 붙여 세운 것이다** (#603). 지도 패널은 둘 사이에 끼울 것이 없어 이대로
+ * 쓰고, 목록 행은 버튼 층을 끼워야 해서 `FacilityRowHeader` · `FacilityRowBody` 를 각각
+ * 부른다 — 조립이 갈려도 **머리와 본문의 내용은 한 벌**이다.
+ *
  * **링크도 버튼도 두지 않는다.** 호출부가 이것을 선택 버튼으로 감싸므로, 여기에
  * interactive content 가 있으면 중첩이 된다. 시설 상세 라우트가 없어(이슈 #148)
  * 제목을 링크로 만들 이유도 없다.
@@ -80,6 +104,90 @@ export function FacilityRow({
  * 목록 행과 지도 패널 행에서 그 래퍼가 각각 다른 것(`div` / `button`)이어야 한다.
  */
 export function FacilityRowContent({
+  facility,
+  showDistance,
+}: {
+  facility: NearbyFacilityItem
+  showDistance: boolean
+}) {
+  return (
+    <>
+      <FacilityRowHeader facility={facility} />
+      <FacilityRowBody facility={facility} showDistance={showDistance} />
+    </>
+  )
+}
+
+/**
+ * 머리 한 줄 — **`이름 [유형] [24시간] [상태]` 가 전부 왼쪽에 선다** (#603).
+ *
+ * ── 상태 배지를 오른쪽 끝에서 데려왔다
+ *
+ * #598 은 이 줄을 `이름 [유형] ···(공백)··· [상태]` 로 두 기둥으로 갈랐다 — 근거는
+ * *"목록을 훑을 때 눈이 왼쪽(무엇)과 오른쪽(지금 여는가)만 보면 된다"* 였다. 그 전제는
+ * **제목 줄이 219px 밖에 안 될 때**의 것이다: 좁은 줄에서 두 덩어리를 갈라 두려면 공백을
+ * 밀어 넣는 수밖에 없었다. 머리가 전폭 343px 을 쓰는 지금은 이름과 배지 셋이 한 덩어리로
+ * 다 들어가, 공백을 밀어 넣으면 **상태 배지만 본문 열 바깥에 혼자 떠 있게 된다.**
+ * 배지들을 이름에 붙이면 "무엇이고 지금 어떤가" 가 한 번에 읽힌다.
+ *
+ * ── **세 요소의 높이를 맞춘다**
+ *
+ * 이름은 `text-title-2`(18/26)이고 `Badge` 의 `md` 는 `text-caption`(12/18) + `py-1` 이라
+ * 정확히 26px 이다 — 유형 배지가 쓰던 `sm`(`h-5`, 20px)만 혼자 낮았다. `md` 로 올려 셋을
+ * 같은 26px 에 세운다. `md` 는 아트보드가 쓰는 유일한 배지 값이기도 하다(`badge.tsx`).
+ * 유형·상태 배지가 나란히 설 때 크기를 맞추는 것은 `place-row.tsx` 가 이미 쓰는 규칙이다.
+ *
+ * ── **`items-center` 로 되돌린다** — #598 이 `items-start` 를 요구하던 조건이 사라졌다
+ *
+ * 그때 `items-start` 였던 이유는 *"이름이 두 줄로 감길 때 배지가 가운데로 내려가 첫 줄과
+ * 어긋난다"* 였다. 그 일은 배지 묶음이 `shrink-0` 으로 **같은 줄에 붙박여** 이름만 줄어들
+ * 때 생긴다. 지금은 배지가 `flex-wrap` 으로 **아랫줄로 비켜난다**: 이름의 max-content 와
+ * 배지가 한 줄에 못 들어가면 flex 가 줄을 나누므로, 배지와 같은 줄에 선 이름은 **언제나
+ * 한 줄**이다. 한 줄짜리 이름에 맞추는 정렬이라 `items-center` 가 정확하다.
+ *
+ * ── 긴 이름
+ *
+ * `min-w-0` + `break-keep` + `break-words` 로 **어절 단위로 감고, 한 어절이 줄 전체보다
+ * 길 때만 끊는다** (DESIGN.md §3-3). 전폭이 343px 이라 #598 이 잡았던 어절 중간 끊김
+ * (`제주축산업협` / `동조합`)은 그 한 어절이 343px 을 넘지 않는 한 일어나지 않는다 —
+ * `basis-[min-content]` 를 따로 두지 않아도 되는 이유다.
+ *
+ * `w-full` 은 지도 패널 때문이다 — 거기서는 이 줄이 `items-start` 인 세로 flex 안이라
+ * 그냥 두면 내용 너비로 오그라든다.
+ */
+function FacilityRowHeader({ facility }: { facility: NearbyFacilityItem }) {
+  return (
+    <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
+      <span className="text-title-2 text-fg min-w-0 font-semibold break-words break-keep">
+        {facility.name}
+      </span>
+
+      {/* 유형은 병원이 기본이라 약국일 때만 붙인다 — 모든 행에 붙으면 신호가 죽는다 */}
+      {facility.facilityType.code === 'ANIMAL_PHARMACY' && (
+        <Badge tone="neutral" className="shrink-0">
+          {facility.facilityType.name}
+        </Badge>
+      )}
+
+      {/* `24시간` 은 상태 옆이다 — 유형과 달리 "지금 갈 수 있는가" 쪽 사실이다 */}
+      {facility.open24 && (
+        <Badge tone="neutral" className="shrink-0">
+          {messages.emergency.open24}
+        </Badge>
+      )}
+
+      <OpenStatus openNow={facility.openNow} />
+    </div>
+  )
+}
+
+/**
+ * 머리 아래 사실 — 진료시간 · 휴무 · 거리 · 주소 · 번호 없음 안내.
+ *
+ * 목록 행에서는 이것이 버튼과 좌우로 갈리는 층의 **왼쪽**이고, 지도 패널에서는 머리 바로
+ * 아래다 (`FacilityRow` · `FacilityRowContent`).
+ */
+function FacilityRowBody({
   facility,
   showDistance,
 }: {
@@ -99,53 +207,6 @@ export function FacilityRowContent({
 
   return (
     <>
-      {/*
-        **1행 = `이름 [유형] ···(공백)··· [상태]`** (#598). 상태가 이름 아래 자기 줄을
-        쓰던 것을 첫 줄 오른쪽 끝으로 올린다 — 목록을 훑을 때 눈이 왼쪽(무엇)과
-        오른쪽(지금 여는가) 두 기둥만 보면 된다.
-
-        ── **이름이 길면 상태가 아랫줄로 내려간다** (`flex-wrap` + `basis-[min-content]`)
-
-        오른쪽 묶음은 `shrink-0` 이라 좁은 칸에서 줄어드는 쪽은 이름뿐인데, 375 에서 첫 줄
-        가용 폭이 219px 이고 `영업 여부 확인 필요` 하나가 110px 을 가져간다 — 남는 109px 은
-        `제주축산업협동조합`(한 어절 145px) 같은 이름을 어절째로 담지 못한다. 그대로 두면
-        `break-words` 가 **어절 한가운데를 끊어**(`제주축산업협` / `동조합`) DESIGN.md §3-3
-        (한국어는 어절 단위로 감는다)을 뒤집는다.
-
-        그래서 왼쪽 묶음의 **기준 크기를 `min-content`(= 가장 긴 어절)로** 준다. 둘이 한
-        줄에 서지 못하면 flex 가 줄을 바꾸므로, **이름이 짧으면 한 줄, 길면 이름이 줄 전체를
-        쓰고 상태가 아랫줄 오른쪽에 선다.** 판단이 CSS 안에서 스스로 갈려 브레이크포인트를
-        두지 않아도 된다.
-
-        `flex-1`(= `flex: 1 1 0%`)이 아니라 `grow` 인 것이 핵심이다 — `flex-1` 은 기준
-        크기를 0 으로 덮어 **언제나 한 줄**로 만든다.
-
-        `break-words` 는 그래도 남긴다. 줄 전체(219px)로도 담기지 않는 한 어절
-        (`제주특별자치도동물의료원부속24시응급진료센터`)이 실제로 있고, 그때는 끊는 것이
-        가려지는 것보다 낫다 — `break-keep` 이 함께 있어 **어절로 감을 수 있으면 먼저 감는다.**
-
-        `24시간` 은 상태 옆에 붙인다 — 유형과 달리 "지금 갈 수 있는가" 쪽 사실이다.
-      */}
-      <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
-        <div className="flex min-w-0 grow basis-[min-content] flex-wrap items-center gap-x-1.5 gap-y-1">
-          <span className="text-title-2 text-fg min-w-0 font-semibold break-words break-keep">
-            {facility.name}
-          </span>
-          {/* 유형은 병원이 기본이라 약국일 때만 붙인다 — 모든 행에 붙으면 신호가 죽는다 */}
-          {facility.facilityType.code === 'ANIMAL_PHARMACY' && (
-            <Badge tone="neutral" size="sm" className="shrink-0">
-              {facility.facilityType.name}
-            </Badge>
-          )}
-        </div>
-
-        {/* `ml-auto` — 아랫줄로 내려갔을 때도 오른쪽 기둥에 남는다 */}
-        <div className="ml-auto flex shrink-0 items-center gap-1">
-          {facility.open24 && <Badge tone="neutral">{messages.emergency.open24}</Badge>}
-          <OpenStatus openNow={facility.openNow} />
-        </div>
-      </div>
-
       <FacilityHours facility={facility} />
 
       {meta.length > 0 && (
@@ -187,7 +248,7 @@ export function FacilityRowContent({
  *
  * 걷으면서 **행에서 유일한 상태가 사라졌다** — 이 파일은 이제 훅을 쓰지 않는다.
  *
- * **"지금 여는가" 는 이 줄이 아니라 위의 `OpenStatus` 배지가 답한다** — 서버가 계산한
+ * **"지금 여는가" 는 이 줄이 아니라 머리의 `OpenStatus` 배지가 답한다** — 서버가 계산한
  * `openNow` 다. 이 줄은 그 근거를 확인하는 자리다.
  */
 function FacilityHours({ facility }: { facility: NearbyFacilityItem }) {
@@ -230,10 +291,11 @@ function FacilityHours({ facility }: { facility: NearbyFacilityItem }) {
  *
  * 이 자리는 *"진료중은 채운 태그, 영업 종료는 흐리게 — 색이 아니라 무게로 가른다"* 였다
  * (아트보드 주석: 초록·주황은 산책 위험도 전용이고 영업 여부는 판정이 아니다).
- * **뒤집은 근거는 배지가 1행 오른쪽 끝으로 올라간 것이다.** 자기 줄에 혼자 있을 때는
- * 무게 차이만으로도 읽혔지만, 이름 옆 끝자리에서 `24시간` 과 나란히 서고 나면 회색 배지
- * 둘이 붙어 **어느 쪽이 상태인지가 모양으로 구별되지 않는다.** 급할 때 훑는 화면이라
- * 색이 여기서는 장식이 아니라 축이다.
+ * **뒤집은 근거는 배지가 머리 줄에서 `24시간` 과 나란히 서게 된 것이다.** 자기 줄에 혼자
+ * 있을 때는 무게 차이만으로도 읽혔지만, 회색 배지 둘이 이름 옆에 붙고 나면 **어느 쪽이
+ * 상태인지가 모양으로 구별되지 않는다.** 급할 때 훑는 화면이라 색이 여기서는 장식이
+ * 아니라 축이다. **#603 이 배지들을 오른쪽 끝에서 이름 옆으로 데려오면서 이 근거는 더
+ * 세졌다** — 셋이 한 덩어리로 붙어 있어 색 말고는 가를 것이 없다.
  *
  * ── **자기 톤을 쓴다** — 등급 토큰도 장애 토큰도 빌리지 않는다
  *
@@ -265,7 +327,7 @@ function FacilityHours({ facility }: { facility: NearbyFacilityItem }) {
 function OpenStatus({ openNow }: { openNow: boolean | null }) {
   if (openNow === null) {
     return (
-      <span className="text-caption text-fg-muted border-border-strong inline-flex items-center rounded-sm border border-dashed px-2 py-1 font-semibold">
+      <span className="text-caption text-fg-muted border-border-strong inline-flex shrink-0 items-center rounded-sm border border-dashed px-2 py-1 font-semibold">
         {messages.emergency.statusUnknown}
       </span>
     )
@@ -280,26 +342,32 @@ function OpenStatus({ openNow }: { openNow: boolean | null }) {
     사라진 것이 아니라, **무게 위에 색이 얹힌 것**이다.
   */
   return (
-    <Badge tone={openNow ? 'status-open' : 'status-closed'} strong={openNow}>
+    <Badge tone={openNow ? 'status-open' : 'status-closed'} strong={openNow} className="shrink-0">
       {openNow ? messages.emergency.statusOpen : messages.emergency.statusClosed}
     </Badge>
   )
 }
 
 /**
- * 52px 전화 버튼.
+ * 40px 전화 버튼.
  *
  * **번호가 없어도 자리를 비우지 않는다.** 자리가 사라지면 "이 병원만 뭔가 다르다" 가
  * 아니라 "화면이 깨졌다" 로 읽힌다 (아트보드 주석).
+ *
+ * **52px 에서 40px 로 줄였다** (#603). 버튼이 제목 줄과 같은 층에 있을 때는 행 높이를
+ * 버튼이 정해 52px 이 기준 노릇을 했는데, 아래 층으로 내려오면서 행 높이는 글자 덩어리가
+ * 정하고 버튼은 그 안에 든다. **DESIGN.md §"모바일 최소 터치 영역 44×44" 를 밑도는 값**을
+ * 의도적으로 고른 자리다 — 지도 패널의 `DirectionsLink`(전폭 44px)가 같은 행동의 큰
+ * 과녁을 계속 들고 있고, 목록 행은 40px 두 개를 8px 떼어 오조작 쪽을 막는다.
  */
 export function CallButton({ name, tel }: { name: string; tel: string | null }) {
   const base =
-    'flex size-13 shrink-0 items-center justify-center rounded-md border transition-colors'
+    'flex size-10 shrink-0 items-center justify-center rounded-md border transition-colors'
 
   if (tel === null) {
     return (
       <span aria-hidden className={cn(base, 'border-border text-fg-subtle')}>
-        <PhoneIcon size={24} />
+        <PhoneIcon size={20} />
       </span>
     )
   }
@@ -316,13 +384,13 @@ export function CallButton({ name, tel }: { name: string; tel: string | null }) 
         'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
       )}
     >
-      <PhoneIcon size={24} />
+      <PhoneIcon size={20} />
     </a>
   )
 }
 
 /**
- * 52px 길찾기 버튼 — **목록 행의 전화 옆** (#537).
+ * 40px 길찾기 버튼 — **목록 행의 전화 옆** (#537).
  *
  * ── 예전에는 선택된 한 행에만 있었다
  *
@@ -344,12 +412,12 @@ export function DirectionsButton({ facility }: { facility: NearbyFacilityItem })
   const href = directionsUrl({ name: facility.name, lat: facility.lat, lng: facility.lng })
 
   const base =
-    'flex size-13 shrink-0 items-center justify-center rounded-md border transition-colors'
+    'flex size-10 shrink-0 items-center justify-center rounded-md border transition-colors'
 
   if (href === null) {
     return (
       <span aria-hidden className={cn(base, 'border-border text-fg-subtle')}>
-        <DirectionsIcon size={24} />
+        <DirectionsIcon size={20} />
       </span>
     )
   }
@@ -367,7 +435,7 @@ export function DirectionsButton({ facility }: { facility: NearbyFacilityItem })
         'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
       )}
     >
-      <DirectionsIcon size={24} />
+      <DirectionsIcon size={20} />
     </a>
   )
 }

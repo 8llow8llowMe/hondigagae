@@ -243,33 +243,120 @@ describe('FacilityHours — 두 줄까지 흘린다 (#598)', () => {
 })
 
 /*
-  **#598 — 1행이 `이름 [유형] ···(공백)··· [상태]` 다.**
+  **#603 — 머리 한 줄에 `이름 [유형] [24시간] [상태]` 가 전부 왼쪽으로 붙는다.**
 
-  상태 배지가 이름 아래 자기 줄을 쓰던 것을 첫 줄 오른쪽 끝으로 올렸다. 목록을 훑을 때
-  눈이 왼쪽(무엇)과 오른쪽(지금 여는가) 두 기둥만 보면 된다.
+  #598 은 이 줄을 `이름 [유형] ···(공백)··· [상태]` 로 갈라 두 기둥으로 읽게 했는데, 그
+  전제는 **제목 줄이 219px 밖에 안 될 때**의 것이었다 — 버튼 칸이 같은 층에서 폭을 먹고
+  있었다. 버튼이 아래 층으로 내려가 머리가 전폭 343px 을 쓰는 지금은 넷이 한 덩어리로
+  들어가고, 공백을 밀어 넣으면 상태 배지만 본문 열 바깥에 혼자 뜬다.
 */
-describe('FacilityRowContent — 1행 배치와 상태 색 (#598)', () => {
+describe('FacilityRowHeader — 머리 한 줄 (#603)', () => {
   function content(overrides: Parameters<typeof facility>[0] = {}) {
     return renderToStaticMarkup(
       createElement(FacilityRowContent, { facility: facility(overrides), showDistance: true }),
     )
   }
 
+  /** 머리는 본문 첫 `<p>` 앞까지다 — 진료시간 줄이 본문의 시작이다 */
+  function header(markup: string) {
+    return markup.slice(0, markup.indexOf('<p '))
+  }
+
   /*
     이름과 상태가 **같은 flex 행**에 있어야 한다. 둘이 갈리면 상태가 자기 줄로 되돌아간
     것이라, 그때 색 결정(아래)의 근거도 함께 사라진다.
   */
-  it('이름과 상태 배지가 한 줄에 있다', () => {
-    const markup = content()
-    const firstRow = markup.slice(0, markup.indexOf('</div></div>'))
+  it('이름과 배지가 한 줄에 있다 — 유형·24시간·상태까지', () => {
+    const row = header(
+      renderToStaticMarkup(
+        createElement(FacilityRowContent, {
+          facility: pharmacy({ open24: true }),
+          showDistance: true,
+        }),
+      ),
+    )
 
-    expect(firstRow).toContain('제주24시동물병원')
-    expect(firstRow).toContain(messages.emergency.statusOpen)
+    expect(row).toContain('한라동물약국')
+    expect(row).toContain('동물약국')
+    expect(row).toContain(messages.emergency.open24)
+    expect(row).toContain(messages.emergency.statusClosed)
+  })
+
+  /*
+    **공백으로 밀지 않는다.** `ml-auto` 가 살아 있으면 상태 배지가 다시 오른쪽 끝으로 가고,
+    머리를 전폭으로 넓힌 이 변경의 결과가 화면에서 사라진다.
+  */
+  it('상태 배지를 오른쪽 끝으로 밀지 않는다', () => {
+    expect(content()).not.toContain('ml-auto')
+  })
+
+  /*
+    지도 패널에서는 이 줄이 `items-start` 인 세로 flex 안이라, `w-full` 이 없으면 내용
+    너비로 오그라들어 목록 행과 머리 폭이 갈린다.
+  */
+  it('머리가 전폭이다 — 지도 패널의 세로 flex 안에서도', () => {
+    expect(content()).toMatch(/<div class="flex w-full flex-wrap/)
+  })
+
+  /*
+    **`items-center` 다** — #598 의 `items-start` 를 되돌린 것이다. 그때 근거는 "이름이 두
+    줄로 감기면 배지가 가운데로 내려가 첫 줄과 어긋난다" 였는데, 그 일은 배지가 `shrink-0`
+    으로 같은 줄에 붙박여 이름만 줄어들 때 생긴다. 지금은 배지가 `flex-wrap` 으로 아랫줄로
+    비켜나므로 **배지와 같은 줄에 선 이름은 언제나 한 줄**이다.
+  */
+  it('세 요소를 같은 높이에 세운다 — items-center', () => {
+    expect(content()).toMatch(/<div class="flex w-full flex-wrap items-center/)
+  })
+
+  /*
+    **유형 배지가 `sm`(h-5, 20px) 이면 혼자 낮다.** 이름은 `text-title-2`(18/26)이고
+    `Badge` 의 `md` 는 `text-caption`(12/18) + `py-1` 이라 정확히 26px 이다 — 셋을 같은
+    26px 에 세우려면 유형 배지도 `md` 여야 한다. 배지가 나란히 설 때 크기를 맞추는 것은
+    `place-row.tsx` 가 이미 쓰는 규칙이다.
+  */
+  it('유형 배지가 상태 배지와 같은 높이다 — sm 을 쓰지 않는다', () => {
+    const row = header(
+      renderToStaticMarkup(
+        createElement(FacilityRowContent, { facility: pharmacy(), showDistance: true }),
+      ),
+    )
+
+    expect(row).toContain('동물약국')
+    expect(row).not.toContain('h-5')
+  })
+
+  /*
+    **유형 배지는 약국에만 붙인다.** 목록 대부분이 병원이라 전부 붙이면 신호가 죽는다.
+    이름에 `동물병원` 이 들어가는 시설이 많아(`제주24시동물병원`) 문자열만으로는 가려낼 수
+    없어, **배지의 텍스트 노드**(`>동물병원<`)로 본다.
+  */
+  it('유형 배지는 약국에만 붙는다', () => {
+    expect(content()).not.toContain('>동물병원<')
+    expect(
+      renderToStaticMarkup(
+        createElement(FacilityRowContent, { facility: pharmacy(), showDistance: true }),
+      ),
+    ).toContain('>동물약국<')
+  })
+
+  /*
+    배지가 줄어들면 글자가 반으로 접힌다. 좁은 줄에서 줄어드는 쪽은 이름이어야 하고,
+    이름은 `break-keep` 으로 **어절 단위**로 감는다 (DESIGN.md §3-3).
+  */
+  it('배지는 줄어들지 않고 이름만 줄어든다', () => {
+    const row = header(content())
+    const badge = row.slice(row.indexOf(messages.emergency.statusOpen))
+
+    expect(row).toContain('break-keep')
+    expect(
+      row.slice(row.lastIndexOf('<span', row.indexOf(messages.emergency.statusOpen))),
+    ).toContain('shrink-0')
+    expect(badge).not.toContain('ml-auto')
   })
 
   /*
     **색이 아니라 무게로 가르던 규칙 "위에" 색을 얹은 것이다** (`OpenStatus` 머리주석).
-    끝자리에서 `24시간` 과 나란히 서면 회색 배지 둘이 모양으로 구별되지 않는다.
+    이름 옆에 회색 배지 둘(`동물약국` · `24시간`)과 나란히 서면 모양으로는 구별되지 않는다.
   */
   it('진료중은 status-open, 영업 종료는 status-closed 톤이다', () => {
     expect(content({ openNow: true })).toContain('bg-status-open-100')
@@ -293,14 +380,22 @@ describe('FacilityRowContent — 1행 배치와 상태 색 (#598)', () => {
   /*
     **색이 유일한 채널이면 안 된다.** 두 tint 의 명도 대비가 1.02:1 이라 적록색약에게는
     밝기가 같다 — 진료중만 무게를 올려 두 번째 채널을 남긴다.
+
+    배지 태그를 **여는 `<` 까지 되짚어** 잘라낸다. 고정 길이로 되짚으면 앞 배지(`24시간`)의
+    태그까지 먹어 엉뚱한 클래스를 보게 된다.
   */
   it('진료중은 무게를 함께 올린다 — 영업 종료는 기본 무게다', () => {
-    expect(content({ openNow: true })).toContain('font-semibold')
+    function statusTag(markup: string, tone: string) {
+      const at = markup.indexOf(tone)
+      const open = markup.lastIndexOf('<', at)
 
-    const closed = content({ openNow: false })
-    const badge = closed.slice(closed.indexOf('bg-status-closed-100') - 200)
+      return markup.slice(open, markup.indexOf('>', at))
+    }
 
-    expect(badge.slice(0, badge.indexOf('>'))).not.toContain('font-semibold')
+    expect(statusTag(content({ openNow: true }), 'bg-status-open-100')).toContain('font-semibold')
+    expect(statusTag(content({ openNow: false }), 'bg-status-closed-100')).not.toContain(
+      'font-semibold',
+    )
   })
 
   /*
@@ -317,41 +412,6 @@ describe('FacilityRowContent — 1행 배치와 상태 색 (#598)', () => {
   })
 
   /*
-    **이름이 길면 상태가 아랫줄로 내려간다** (`flex-wrap` + `basis-[min-content]`).
-
-    `flex-1`(= `flex: 1 1 0%`)로 되돌리면 기준 크기가 0 이 되어 **언제나 한 줄**이 되고,
-    375 에서 이름 칸이 48~109px 로 쪼그라들어 `break-words` 가 어절 한가운데를 끊는다
-    (`제주축산업협` / `동조합`) — DESIGN.md §3-3 이 막은 모양이다. 실측으로 135행 중
-    어절이 끊기는 행이 33 → 0 으로 바뀐 자리다.
-  */
-  it('왼쪽 묶음의 기준 크기가 min-content 다 — flex-1 이 아니다', () => {
-    const markup = content()
-
-    expect(markup).toContain('basis-[min-content]')
-    expect(markup).not.toContain('flex-1')
-  })
-
-  /*
-    오른쪽 묶음이 줄어들면 `진료중` 이 반으로 접힌다. 줄어드는 쪽은 이름이어야 하고,
-    이름은 위 `basis-[min-content]` 로 **줄 대신 줄바꿈**을 고른다.
-  */
-  it('오른쪽 상태 묶음은 줄어들지 않는다', () => {
-    const markup = content()
-    const right = markup.slice(markup.indexOf('ml-auto'))
-
-    expect(right.slice(0, right.indexOf('>'))).toContain('shrink-0')
-  })
-
-  /*
-    **`items-start` 다.** `items-center` 면 이름이 두 줄로 감길 때 배지가 가운데로 내려가
-    첫 줄과 어긋난다 — 375 에서 실제로 감기는 행이 있다(`제주대학교 수의과대학 부설동물병원`
-    3줄).
-  */
-  it('1행이 위쪽 정렬이다 — 이름이 감겨도 배지가 첫 줄에 선다', () => {
-    expect(content()).toMatch(/<div class="flex flex-wrap items-start/)
-  })
-
-  /*
     **주소를 자르지 않는다.** 예전에는 `shortAddress()` 로 `제주시` 까지만 보여 같은 시·군의
     두 병원이 메타 줄에서 구별되지 않았다 — 이 화면에서 주소는 "어디쯤인지" 가 아니라
     찾아갈 곳이다. `/places` 는 축약을 계속 쓴다.
@@ -359,19 +419,62 @@ describe('FacilityRowContent — 1행 배치와 상태 색 (#598)', () => {
   it('주소를 전체로 보여준다 — 시·군까지 자르지 않는다', () => {
     expect(content()).toContain('제주특별자치도 제주시 연북로 100')
   })
+})
+
+/*
+  **#603 — 행이 2단이 아니라 2층이다.**
+
+  예전에는 `[내용 | 버튼]` 한 층이라 버튼 칸이 제목 줄의 폭까지 먹었다 (375 에서 제목 줄
+  219px). 이제 머리가 전폭을 쓰고 그 **아래 층**만 `[시간·주소 | 버튼 둘]` 로 갈린다.
+*/
+describe('FacilityRow — 2층 배치 (#603)', () => {
+  function row(overrides: Parameters<typeof facility>[0] = {}) {
+    return renderToStaticMarkup(
+      createElement(FacilityRow, { facility: facility(overrides), showDistance: true }),
+    )
+  }
+
+  /** 버튼이 든 아래 층 — 머리 다음에 오는 좌우 2단 */
+  function actionLayer(markup: string) {
+    return markup.slice(markup.indexOf('<div class="flex items-center gap-3">'))
+  }
 
   /*
-    **유형 배지는 약국에만 붙인다** (`facility-row.tsx` 의 해당 줄). 목록 대부분이 병원이라
-    전부 붙이면 신호가 죽고, 1행 오른쪽 끝 상태 배지와도 자리를 다툰다.
+    **이름이 버튼 층에 없어야 한다.** 있으면 머리가 여전히 버튼과 같은 줄이라는 뜻이고,
+    제목 줄이 버튼 폭만큼 좁아진다 — 이 변경이 되돌려진 상태다.
   */
-  it('유형 배지는 약국에만 붙는다', () => {
-    // `size="sm"` 배지는 이 행에서 유형 배지 하나뿐이다 — 이름에 `동물병원` 이 들어가는
-    // 시설이 많아 문자열로는 가려낼 수 없다 (`제주24시동물병원`)
-    expect(content()).not.toContain('h-5 px-2')
-    expect(
-      renderToStaticMarkup(
-        createElement(FacilityRowContent, { facility: pharmacy(), showDistance: true }),
-      ),
-    ).toContain('동물약국')
+  it('버튼 층에 이름이 없다 — 머리가 그 위에서 전폭을 쓴다', () => {
+    const layer = actionLayer(row())
+
+    // 이름은 `aria-label` 로도 들어가므로 **제목 스타일**이 있는지로 본다
+    expect(layer).toContain('href="tel:')
+    expect(layer).not.toContain('text-title-2')
+  })
+
+  /* 진료시간·주소는 버튼과 같은 층의 왼쪽이다 */
+  it('시간과 주소가 버튼과 같은 층의 왼쪽이다', () => {
+    const layer = actionLayer(row())
+
+    expect(layer).toContain('월~금 09:00~19:00, 토 09:00~13:00')
+    expect(layer).toContain('제주특별자치도 제주시 연북로 100')
+  })
+
+  /*
+    **40px 이다** — 버튼이 제목 줄과 같은 층일 때는 행 높이를 버튼이 정해 52px 이 기준
+    노릇을 했는데, 아래 층으로 내려오면서 행 높이는 글자 덩어리가 정한다. DESIGN.md 의
+    모바일 최소 터치 영역 44×44 를 **의도적으로 밑도는** 값이다 (`CallButton` 머리주석).
+  */
+  it('버튼 둘 다 40px 이다', () => {
+    const markup = row()
+
+    expect(markup).not.toContain('size-13')
+    expect(markup.match(/size-10/g)?.length).toBe(2)
+  })
+
+  /* 골격도 같은 2층이어야 데이터가 오는 순간 행이 튀지 않는다 (#443) */
+  it('머리가 버튼 층보다 앞에 온다', () => {
+    const markup = row()
+
+    expect(markup.indexOf('제주24시동물병원')).toBeLessThan(markup.indexOf('href="tel:'))
   })
 })

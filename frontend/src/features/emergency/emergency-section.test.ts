@@ -53,8 +53,8 @@ describe('EmergencySection — 상태 배타성', () => {
 
     expect(markup).not.toContain('w-20')
     expect(markup).not.toContain('w-28')
-    // 전화 버튼 자리 셋만 rounded-md 다
-    expect(markup.match(/rounded-md/g)?.length ?? 0).toBe(3)
+    // 행 셋 × 버튼 둘(전화·길찾기) 여섯 자리만 rounded-md 다 — 칩이 섞이면 수가 는다 (#603)
+    expect(markup.match(/rounded-md/g)?.length ?? 0).toBe(6)
   })
 
   it('오류에서는 재시도를 준다', () => {
@@ -164,7 +164,7 @@ describe('EmergencySection — 운영시간·전화', () => {
     expect(markup).toContain(messages.emergency.telMissing)
     expect(markup).not.toContain('href="tel:')
     // 자리는 남는다 — 사라지면 "화면이 깨졌다" 로 읽힌다
-    expect(markup).toContain('size-13')
+    expect(markup).toContain('size-10')
   })
 })
 
