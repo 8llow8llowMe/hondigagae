@@ -10,7 +10,7 @@
 | auth-service | `auth`, `member`, `pet` | 구현 |
 | tour-service | `place`, `emergency`, `insight` | 구현 |
 | tour-service | `walkcourse` | 구현 (조회 API. 적재 배치는 #383) |
-| plan-service | `plan` | 구현 (날씨 브리핑 포함) |
+| plan-service | `plan` | 구현 (날씨 브리핑·후기 v1 포함) |
 | ai-service | `planner` | 구현 (Spring AI + 로컬 LLM(Ollama), 기본값은 스텁) |
 | batch-service | `placeimport`, `congestionimport` | 구현 |
 | api-gateway / service-discovery | — | 구현 |
@@ -66,6 +66,7 @@
 | GET·POST·DELETE | `/api/v1/favorites/places[/{placeId}]` | 장소 즐겨찾기 (멱등, 회원당 100곳, GET {placeId} = 여부 확인) |
 | PUT | `/api/v1/plans/{planId}/items/{planItemId}/visited` | 항목 방문 체크 (다녀옴) |
 | GET | `/api/v1/plans/{planId}/emergency` | 일자별 방문 장소 주변 동물병원·약국 브리핑 |
+| GET·POST·PUT | `/api/v1/plans/{planId}/reviews` | 완료된 일정당 후기 하나. 전체 만족도 + 방문 장소별 한 줄. 사진·공개 없음 |
 
 일정의 소유권은 이 서비스에 있다. ai-service 는 제안만 하고 저장·확정은 여기서만 일어난다.
 

@@ -4,10 +4,14 @@ import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanEntity
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanItemEntity;
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanPackingItemEntity;
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanPetEntity;
+import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanReviewEntity;
+import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanReviewItemEntity;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPackingItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
+import com.hondigagae.domainlayer.plan.domain.model.PlanReview;
+import com.hondigagae.domainlayer.plan.domain.model.PlanReviewItem;
 import java.util.List;
 import org.mapstruct.Mapper;
 
@@ -55,4 +59,16 @@ public interface PlanMapper {
 
     // 도메인 리스트 -> 엔티티 리스트
     List<PlanPackingItemEntity> toPackingEntityListFromDomainList(List<PlanPackingItem> items);
+
+    PlanReview toDomainFromEntity(PlanReviewEntity entity);
+
+    PlanReviewEntity toEntityFromDomain(PlanReview review);
+
+    PlanReviewItem toDomainFromEntity(PlanReviewItemEntity entity);
+
+    PlanReviewItemEntity toEntityFromDomain(PlanReviewItem item);
+
+    List<PlanReviewItem> toReviewItemDomainListFromEntityList(List<PlanReviewItemEntity> entities);
+
+    List<PlanReviewItemEntity> toReviewItemEntityListFromDomainList(List<PlanReviewItem> items);
 }

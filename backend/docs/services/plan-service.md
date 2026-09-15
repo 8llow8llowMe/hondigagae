@@ -9,7 +9,7 @@
 ## 컨텍스트
 
 - `plan` — 일정, 일정 항목
-- `review` — 여행 후기, 사진
+- `review` — 여행 후기(v1 저장은 `plan` 패키지). 사진은 미착수
 
 ## 도메인 모델 (기획)
 
@@ -23,7 +23,7 @@
 - `GET|POST /api/v1/plans`
 - `GET|PUT|DELETE /api/v1/plans/{planId}`
 - `PUT /api/v1/plans/{planId}/days/{day}/items` — 일자 단위 항목 일괄 편집
-- `GET|POST /api/v1/plans/{planId}/reviews`
+- `GET|POST|PUT /api/v1/plans/{planId}/reviews` — 완료된 일정당 후기 하나. 사진은 없음
 
 ## 구현 주의점
 
@@ -61,7 +61,54 @@
   존재 검증과 상세 요약 조회가 같은 집합을 써야 해서 도메인으로 올렸다 — `WALK` 의 `targetId`
   는 `walk_course.id` 라 장소로 조회하면 남의 아이디로 없는 장소를 찾는다.
 - `PlanItem`의 다중 대상 FK는 `@Comment`에 분기 기준을 명시한다 (`coding-conventions.md` §9-4).
-- 후기 사진 업로드가 필요해지면 `storage-core` 모듈 추가를 검토한다 (`modules.md`).
+- 후기 사진 업로드가 필요해지면 `storage-core` 모듈 추가를 검토한다 (`modules.md`). v1 은 만족도·본문·장소별 한 줄만 저장한다.
+
+## 여행 후기 v1 (`plan_review`)
+
+다녀옴 다음에 남는 평가가 없었다. 성향 분석은 후기 데이터가 없으면 입력이 없다. 이번은 **구조화된 최소 후기**만 둔다.
+
+- **`plan` 컨텍스트 안에 둔다.** 후기는 `/api/v1/plans/{planId}/reviews` 하위 리소스라 소유권 검사가 일정의 것과 같아야 한다. 새 컨텍스트로 빼면 `getOwnedPlan` 을 복제하게 된다 — 준비물과 같은 판단이다. 컨트롤러만 `PlanReviewWebController` 로 나눴다.
+- **일정당 후기 하나.** `uk_plan_review_plan_id`. POST 는 생성만, 이미 있으면 `PLAN_017` 409. 수정은 PUT. GET 에 후기가 없으면 `PLAN_015` 404.
+- **완료(`COMPLETED`)된 본인 일정만.** 남의 일정은 `PLAN_001` 404. 초안·확정·재오픈은 `PLAN_016` 400 — GET/POST/PUT 전부. 존재 여부를 초안 단계에서 가르지 않는다.
+- 본문은 선택(2000자). 장소별 평가는 다녀온 **장소 항목**(`PlanItemType.isPlaceTarget()` + `visited`)만. WALK 의 `targetId` 는 `walk_course.id` 라 장소 평가가 아니다. 제목·placeId 는 요청에 받지 않고 그때의 일정 항목에서 스냅샷한다.
+- **일차 교체로 항목이 사라져도 후기는 빼지 않는다.** PUT 은 `items` 전량 교체다. 이미 기억한 `planItemId` 는 제목·placeId 를 유지한 채 평점·한 줄만 고친다. 살아 있는 항목이면 제목·placeId 를 현재 값으로 갱신한다.
+- 장소 평가 행 삭제는 벌크 DML 로 즉시 내보낸다 — `plan_item`·준비물이 겪은 함정과 같다. 파생 delete 는 INSERT 가 먼저 나가 유니크 인덱스 위반으로 죽는다.
+- Facade 에 트랜잭션을 그대로 건다 — 이 유스케이스에는 원격 호출이 없다.
+- 범위 밖: 사진, 공개/비공개, 피드, AI 초안(`POST /reviews/drafts`), 성향 분석 조회.
+
+**마이그레이션**
+
+- local/dev(`ddl-auto: update`) — 기동 시 테이블이 만들어진다.
+- prod(`ddl-auto: none`) — 배포 전에 테이블을 만든다.
+
+```sql
+CREATE TABLE plan_review (
+    id              BIGINT       NOT NULL COMMENT '후기 아이디',
+    plan_id         BIGINT       NOT NULL COMMENT '여행 일정 아이디 (FK: plan.id)',
+    overall_rating  INT          NOT NULL COMMENT '전체 만족도 (1~5)',
+    body            VARCHAR(2000) NULL COMMENT '후기 본문',
+    created_at      TIMESTAMP    NOT NULL COMMENT '생성 날짜',
+    updated_at      TIMESTAMP    NOT NULL COMMENT '수정 날짜',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_plan_review_plan_id (plan_id)
+) COMMENT = '여행 일정 후기';
+
+CREATE TABLE plan_review_item (
+    id            BIGINT       NOT NULL COMMENT '후기 장소 평가 아이디',
+    review_id     BIGINT       NOT NULL COMMENT '여행 후기 아이디 (FK: plan_review.id)',
+    plan_item_id  BIGINT       NOT NULL COMMENT '일정 항목 아이디 (FK: plan_item.id, 항목 삭제 후에도 스냅샷 유지)',
+    place_id      BIGINT       NULL COMMENT '장소 아이디 (FK: place.id)',
+    title         VARCHAR(100) NOT NULL COMMENT '작성 시점의 일정 항목 이름',
+    rating        INT          NOT NULL COMMENT '장소 만족도 (1~5)',
+    comment       VARCHAR(200) NULL COMMENT '장소 한 줄 후기',
+    sort_order    INT          NOT NULL COMMENT '표시 순서 (0부터)',
+    created_at    TIMESTAMP    NOT NULL COMMENT '생성 날짜',
+    updated_at    TIMESTAMP    NOT NULL COMMENT '수정 날짜',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_plan_review_item_review_id_plan_item_id (review_id, plan_item_id),
+    KEY idx_plan_review_item_review_id_sort_order (review_id, sort_order)
+) COMMENT = '여행 후기 방문 장소 평가';
+```
 
 ## 동행 반려견 — 여러 마리 (`plan_pet`)
 

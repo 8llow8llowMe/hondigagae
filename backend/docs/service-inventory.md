@@ -50,13 +50,14 @@
   - `GET /api/v1/plans/{planId}/weather` (일자별 날씨 브리핑 + 비 오는 날 실내 대안)
   - `GET|PUT|POST /api/v1/plans/{planId}/packing-items` (여행 준비물 조회/AI 결과 저장/직접 추가)
   - `PUT /api/v1/plans/{planId}/packing-items/{packingItemId}/checked`, `DELETE .../{packingItemId}`
+  - `GET|POST|PUT /api/v1/plans/{planId}/reviews` (완료된 일정당 후기 하나. 사진·공개 없음)
 - 준비물의 **저장은 이 서비스가 한다.** ai-service 는 생성만 하고 저장하지 않는다(JPA 없이 Redis 만 쓰는
   서비스다). `PUT` 은 `source = AI` 인 행만 교체하고 사용자가 직접 추가한 항목은 남기며, 같은 이름의
   챙김 체크를 승계한다 — 저장이 붙은 뒤의 "다시 뽑기" 는 파괴적 연산이기 때문이다.
 - 날씨 브리핑은 적합도를 **다시 계산하지 않고** tour-service 결과를 그대로 옮긴다. 같은 규칙을
   두 곳에서 구현하면 일정 화면과 장소 화면이 같은 날 같은 곳을 다르게 말하게 된다.
   반려견 특성은 auth-service 내부 API(`/internal/v1/pets/conditions`, 벌크)에서 받는다.
-- 상태: 구현 (plan 컨텍스트). **미착수**: `review`(여행 후기), 일정 공유
+- 상태: 구현 (plan 컨텍스트, 후기 v1 포함). **미착수**: 후기 사진·공개, 일정 공유
 
 ## AI Service
 
