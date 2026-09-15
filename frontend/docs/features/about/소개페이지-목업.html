@@ -1,585 +1,1707 @@
 <!doctype html>
 <html lang="ko">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>혼디가개 — 서비스 소개 목업</title>
-<!--
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>혼디가개 — 서비스 소개 목업</title>
+    <!--
   서비스 소개 페이지(/about 확장) 정적 목업.
   정본: docs/superpowers/specs/2026-09-15-about-landing-design.md
   토큰 값은 frontend/DESIGN.md 를 그대로 옮겼다. 새 색은 없다 —
   --intro-band / --intro-tint 은 기존 값(--row-selected / --metric-high-100)을 이름만 새로 부른 것.
   헤더·탭바·푸터는 AppShell 을 흉내 낸 것으로, 이 목업의 대상이 아니다.
 -->
-<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
-<style>
-  :root {
-    /* 표면 · 테두리 */
-    --bg: #FFFFFF; --band: #EEF0F3; --bg-sunken: #F5F6F8;
-    --border: #E3E5EA; --border-strong: #C4C8D0; --row-selected: #F0F7F3;
-    /* 텍스트 */
-    --fg: #15181D; --fg-muted: #596069; --fg-subtle: #878D96; --fg-inverse: #FFFFFF;
-    /* 등급 */
-    --metric-critical-100: #FDECEC; --metric-critical-500: #D54040; --metric-critical-700: #CE2D2D;
-    --metric-high-100: #E4F0EA; --metric-high-500: #1F7A55; --metric-high-700: #16563C;
-    --metric-mid-100: #FEF4E0; --metric-mid-500: #B0761A; --metric-mid-700: #8A5F0F;
-    --metric-low-100: #EEF0F3; --metric-low-500: #6B7280; --metric-low-700: #4B5563;
-    --metric-unknown-500: #A8AEB8;
-    --congestion-bar: #5B8DB8; --congestion-best: #1D5A86;
-    --status-open-bg: #E4F0EA; --status-open-fg: #16563C;
-    /* 액션 */
-    --brand-500: #2E9B6B; --brand-600: #237A54; --brand-700: #1D6646;
-    --link: #1F7A55; --link-hover: #16563C;
-    /* 소개 페이지 표면 예외 (DESIGN.md §0-2 예정) */
-    --intro-band: #F0F7F3; --intro-tint: #E4F0EA;
-    /* radius · shadow */
-    --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
-    --shadow-md: 0 4px 12px rgba(21,24,29,.08);
-    --header-h: 56px; --tabbar-h: 64px; --content: 1152px;
-  }
-  * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
-  body {
-    margin: 0; background: var(--bg-sunken); color: var(--fg);
-    font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
-    font-size: 14px; line-height: 22px; font-weight: 400;
-    font-feature-settings: "tnum";
-  }
-  a { color: inherit; text-decoration: none; }
-  ul { margin: 0; padding: 0; list-style: none; }
-  p { margin: 0; }
-  h1, h2, h3 { margin: 0; }
-  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    <link
+      rel="stylesheet"
+      as="style"
+      crossorigin
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+    />
+    <style>
+      :root {
+        /* 표면 · 테두리 */
+        --bg: #ffffff;
+        --band: #eef0f3;
+        --bg-sunken: #f5f6f8;
+        --border: #e3e5ea;
+        --border-strong: #c4c8d0;
+        --row-selected: #f0f7f3;
+        /* 텍스트 */
+        --fg: #15181d;
+        --fg-muted: #596069;
+        --fg-subtle: #878d96;
+        --fg-inverse: #ffffff;
+        /* 등급 */
+        --metric-critical-100: #fdecec;
+        --metric-critical-500: #d54040;
+        --metric-critical-700: #ce2d2d;
+        --metric-high-100: #e4f0ea;
+        --metric-high-500: #1f7a55;
+        --metric-high-700: #16563c;
+        --metric-mid-100: #fef4e0;
+        --metric-mid-500: #b0761a;
+        --metric-mid-700: #8a5f0f;
+        --metric-low-100: #eef0f3;
+        --metric-low-500: #6b7280;
+        --metric-low-700: #4b5563;
+        --metric-unknown-500: #a8aeb8;
+        --congestion-bar: #5b8db8;
+        --congestion-best: #1d5a86;
+        --status-open-bg: #e4f0ea;
+        --status-open-fg: #16563c;
+        /* 액션 */
+        --brand-500: #2e9b6b;
+        --brand-600: #237a54;
+        --brand-700: #1d6646;
+        --link: #1f7a55;
+        --link-hover: #16563c;
+        /* 소개 페이지 표면 예외 (DESIGN.md §0-2 예정) */
+        --intro-band: #f0f7f3;
+        --intro-tint: #e4f0ea;
+        /* radius · shadow */
+        --radius-sm: 4px;
+        --radius-md: 8px;
+        --radius-lg: 12px;
+        --radius-xl: 16px;
+        --shadow-md: 0 4px 12px rgba(21, 24, 29, 0.08);
+        --header-h: 56px;
+        --tabbar-h: 64px;
+        --content: 1152px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+      body {
+        margin: 0;
+        background: var(--bg-sunken);
+        color: var(--fg);
+        font-family:
+          'Pretendard Variable',
+          Pretendard,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Malgun Gothic',
+          'Apple SD Gothic Neo',
+          sans-serif;
+        font-size: 14px;
+        line-height: 22px;
+        font-weight: 400;
+        font-feature-settings: 'tnum';
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      p {
+        margin: 0;
+      }
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
 
-  /* 타이포 스케일 7단 */
-  .t-page { font-size: 34px; line-height: 44px; font-weight: 800; letter-spacing: -0.01em; }
-  .t-display { font-size: 28px; line-height: 36px; font-weight: 800; letter-spacing: -0.01em; }
-  .t-title-1 { font-size: 22px; line-height: 30px; font-weight: 700; }
-  .t-title-2 { font-size: 18px; line-height: 26px; font-weight: 600; }
-  .t-body-1 { font-size: 16px; line-height: 24px; font-weight: 600; }
-  .t-body-2 { font-size: 14px; line-height: 22px; font-weight: 400; }
-  .t-caption { font-size: 12px; line-height: 18px; font-weight: 500; }
-  .muted { color: var(--fg-muted); }
-  .num { font-variant-numeric: tabular-nums; }
+      /* 타이포 스케일 7단 */
+      .t-page {
+        font-size: 34px;
+        line-height: 44px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+      }
+      .t-display {
+        font-size: 28px;
+        line-height: 36px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+      }
+      .t-title-1 {
+        font-size: 22px;
+        line-height: 30px;
+        font-weight: 700;
+      }
+      .t-title-2 {
+        font-size: 18px;
+        line-height: 26px;
+        font-weight: 600;
+      }
+      .t-body-1 {
+        font-size: 16px;
+        line-height: 24px;
+        font-weight: 600;
+      }
+      .t-body-2 {
+        font-size: 14px;
+        line-height: 22px;
+        font-weight: 400;
+      }
+      .t-caption {
+        font-size: 12px;
+        line-height: 18px;
+        font-weight: 500;
+      }
+      .muted {
+        color: var(--fg-muted);
+      }
+      .num {
+        font-variant-numeric: tabular-nums;
+      }
 
-  /* ── 셸 (기존 AppShell 흉내 — 대상 아님) ─────────────────────── */
-  .shell-header {
-    position: sticky; top: 0; z-index: 40; height: var(--header-h);
-    background: var(--bg); border-bottom: 1px solid var(--border);
-  }
-  .shell-header .in {
-    height: 100%; max-width: 1440px; margin: 0 auto; padding: 0 16px;
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  }
-  .lockup { display: inline-flex; align-items: center; gap: 8px; }
-  .lockup svg.sym { width: 24px; height: 24px; flex: none; }
-  .lockup svg.word { height: 20px; width: 74px; }
-  .shell-header nav { display: none; gap: 24px; }
-  .shell-header nav a { font-weight: 600; font-size: 14px; color: var(--fg-muted); }
-  .shell-header nav a.on { color: var(--fg); }
-  .shell-actions { display: flex; gap: 8px; align-items: center; }
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    min-height: 44px; padding: 0 20px; border-radius: var(--radius-md);
-    font-size: 16px; line-height: 24px; font-weight: 600; border: 1px solid transparent;
-    cursor: pointer; white-space: nowrap;
-  }
-  .btn-sm { min-height: 36px; padding: 0 14px; font-size: 14px; line-height: 22px; }
-  .btn-fill { background: var(--brand-600); color: var(--fg-inverse); }
-  .btn-fill:hover { background: var(--brand-700); }
-  .btn-outline { background: var(--bg); color: var(--fg); border-color: var(--border-strong); }
-  .btn-inverse { background: var(--bg); color: var(--brand-700); }
-  .btn-ghost-inverse { background: transparent; color: var(--fg-inverse); border-color: rgba(255,255,255,.55); }
-  .tabbar {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; height: var(--tabbar-h);
-    background: var(--bg); border-top: 1px solid var(--border);
-    display: grid; grid-template-columns: repeat(4, 1fr);
-  }
-  .tabbar a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12px; line-height: 18px; font-weight: 500; color: var(--fg-muted); }
-  .tabbar a i { width: 22px; height: 22px; border-radius: 6px; background: var(--band); display: block; }
-  .tabbar a.on { color: var(--fg); }
-  .tabbar a.on i { background: var(--fg); }
-  .shell-footer { display: none; background: var(--bg); border-top: 1px solid var(--border); }
-  .shell-footer .in { max-width: 1440px; margin: 0 auto; padding: 24px 40px; display: flex; flex-wrap: wrap; gap: 8px 24px; color: var(--fg-muted); }
-  .shell-footer a { color: var(--link); font-weight: 600; }
+      /* ── 셸 (기존 AppShell 흉내 — 대상 아님) ─────────────────────── */
+      .shell-header {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        height: var(--header-h);
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+      }
+      .shell-header .in {
+        height: 100%;
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 0 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .lockup {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .lockup svg.sym {
+        width: 24px;
+        height: 24px;
+        flex: none;
+      }
+      .lockup svg.word {
+        height: 20px;
+        width: 74px;
+      }
+      .shell-header nav {
+        display: none;
+        gap: 24px;
+      }
+      .shell-header nav a {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--fg-muted);
+      }
+      .shell-header nav a.on {
+        color: var(--fg);
+      }
+      .shell-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 44px;
+        padding: 0 20px;
+        border-radius: var(--radius-md);
+        font-size: 16px;
+        line-height: 24px;
+        font-weight: 600;
+        border: 1px solid transparent;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .btn-sm {
+        min-height: 36px;
+        padding: 0 14px;
+        font-size: 14px;
+        line-height: 22px;
+      }
+      .btn-fill {
+        background: var(--brand-600);
+        color: var(--fg-inverse);
+      }
+      .btn-fill:hover {
+        background: var(--brand-700);
+      }
+      .btn-outline {
+        background: var(--bg);
+        color: var(--fg);
+        border-color: var(--border-strong);
+      }
+      .btn-inverse {
+        background: var(--bg);
+        color: var(--brand-700);
+      }
+      .btn-ghost-inverse {
+        background: transparent;
+        color: var(--fg-inverse);
+        border-color: rgba(255, 255, 255, 0.55);
+      }
+      .tabbar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 40;
+        height: var(--tabbar-h);
+        background: var(--bg);
+        border-top: 1px solid var(--border);
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+      }
+      .tabbar a {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        font-size: 12px;
+        line-height: 18px;
+        font-weight: 500;
+        color: var(--fg-muted);
+      }
+      .tabbar a i {
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        background: var(--band);
+        display: block;
+      }
+      .tabbar a.on {
+        color: var(--fg);
+      }
+      .tabbar a.on i {
+        background: var(--fg);
+      }
+      .shell-footer {
+        display: none;
+        background: var(--bg);
+        border-top: 1px solid var(--border);
+      }
+      .shell-footer .in {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 24px 40px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 24px;
+        color: var(--fg-muted);
+      }
+      .shell-footer a {
+        color: var(--link);
+        font-weight: 600;
+      }
 
-  /* ── 페이지 ────────────────────────────────────────────────────── */
-  main { padding-bottom: var(--tabbar-h); }
-  .band { width: 100%; }
-  .band.green { background: var(--brand-700); color: var(--fg-inverse); }
-  .band.tint { background: var(--intro-band); }
-  .band.plain { background: var(--bg-sunken); }
-  .in { width: 100%; max-width: var(--content); margin: 0 auto; padding: 0 16px; }
+      /* ── 페이지 ────────────────────────────────────────────────────── */
+      main {
+        padding-bottom: var(--tabbar-h);
+      }
+      .band {
+        width: 100%;
+      }
+      .band.green {
+        background: var(--brand-700);
+        color: var(--fg-inverse);
+      }
+      .band.tint {
+        background: var(--intro-band);
+      }
+      .band.plain {
+        background: var(--bg-sunken);
+      }
+      .in {
+        width: 100%;
+        max-width: var(--content);
+        margin: 0 auto;
+        padding: 0 16px;
+      }
 
-  /* 히어로 */
-  .hero .in { padding-top: 40px; padding-bottom: 40px; display: grid; gap: 32px; }
-  .hero .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; line-height: 18px; font-weight: 600; letter-spacing: .02em; color: rgba(255,255,255,.85); }
-  .hero .eyebrow .dot { width: 6px; height: 6px; border-radius: 9999px; background: var(--fg-inverse); }
-  .hero h1 { margin-top: 12px; font-size: 28px; line-height: 36px; font-weight: 800; letter-spacing: -0.01em; word-break: keep-all; }
-  .hero .sub { margin-top: 16px; font-size: 16px; line-height: 26px; font-weight: 400; color: rgba(255,255,255,.88); word-break: keep-all; max-width: 32em; }
-  .hero .ctas { margin-top: 24px; display: flex; flex-wrap: wrap; gap: 8px; }
-  .hero .brandmark { display: inline-flex; align-items: center; gap: 16px; margin-bottom: 24px; }
-  .hero .brandmark svg.sym { width: 48px; height: 48px; }
-  .hero .brandmark svg.word { height: 40px; width: 148px; }
+      /* 히어로 */
+      .hero .in {
+        padding-top: 40px;
+        padding-bottom: 40px;
+        display: grid;
+        gap: 32px;
+      }
+      .hero .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        line-height: 18px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: rgba(255, 255, 255, 0.85);
+      }
+      .hero .eyebrow .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 9999px;
+        background: var(--fg-inverse);
+      }
+      .hero h1 {
+        margin-top: 12px;
+        font-size: 28px;
+        line-height: 36px;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+        word-break: keep-all;
+      }
+      .hero .sub {
+        margin-top: 16px;
+        font-size: 16px;
+        line-height: 26px;
+        font-weight: 400;
+        color: rgba(255, 255, 255, 0.88);
+        word-break: keep-all;
+        max-width: 32em;
+      }
+      .hero .ctas {
+        margin-top: 24px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .hero .brandmark {
+        display: inline-flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+      .hero .brandmark svg.sym {
+        width: 48px;
+        height: 48px;
+      }
+      .hero .brandmark svg.word {
+        height: 40px;
+        width: 148px;
+      }
 
-  /* 카드 공통 */
-  .card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); }
-  .card .head { padding: 16px 16px 0; }
-  .card .body { padding: 12px 16px 16px; }
-  /* 모바일(<768) 카드는 전폭 — radius 와 좌우 테두리를 걷는다 (DESIGN.md §0). */
-  @media (max-width: 767px) {
-    .sec .card, .rules li { border-radius: 0; border-left: 0; border-right: 0; margin-left: -16px; margin-right: -16px; }
-    .stat { border-radius: var(--radius-md); }
-  }
+      /* 카드 공통 */
+      .card {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+      }
+      .card .head {
+        padding: 16px 16px 0;
+      }
+      .card .body {
+        padding: 12px 16px 16px;
+      }
+      /* 모바일(<768) 카드는 전폭 — radius 와 좌우 테두리를 걷는다 (DESIGN.md §0). */
+      @media (max-width: 767px) {
+        .sec .card,
+        .rules li {
+          border-radius: 0;
+          border-left: 0;
+          border-right: 0;
+          margin-left: -16px;
+          margin-right: -16px;
+        }
+        .stat {
+          border-radius: var(--radius-md);
+        }
+      }
 
-  /* 예시 판정 카드 */
-  .verdict .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-  .verdict .label { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--fg-muted); }
-  .verdict .title { font-size: 18px; line-height: 26px; font-weight: 600; color: var(--fg); margin-top: 2px; }
-  .grade {
-    display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: var(--radius-sm);
-    font-size: 14px; line-height: 22px; font-weight: 700;
-  }
-  .grade.critical { background: var(--metric-critical-100); color: var(--metric-critical-700); }
-  .grade.high { background: var(--metric-high-100); color: var(--metric-high-700); }
-  .grade.unknown { background: transparent; color: var(--fg-muted); border: 1px dashed var(--metric-unknown-500); font-weight: 500; }
-  .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
-  .metric { background: var(--band); border-radius: var(--radius-md); padding: 10px 12px; }
-  .metric .k { font-size: 12px; line-height: 18px; font-weight: 500; color: var(--fg-muted); }
-  .metric .v { font-size: 22px; line-height: 30px; font-weight: 900; color: var(--fg); margin-top: 2px; }
-  .metric .v small { font-size: 12px; font-weight: 500; color: var(--fg-muted); margin-left: 2px; }
-  .metric.hot .v { color: var(--metric-critical-500); }
-  .reasons { margin-top: 16px; display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
-  .reasons li { display: flex; gap: 8px; color: var(--fg); }
-  .reasons li::before { content: ""; flex: none; width: 6px; height: 6px; border-radius: 9999px; background: var(--fg-muted); margin-top: 8px; }
-  .reasons li b { font-weight: 600; }
-  .note { margin-top: 12px; font-size: 12px; line-height: 18px; font-weight: 500; color: var(--fg-muted); }
+      /* 예시 판정 카드 */
+      .verdict .top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .verdict .label {
+        font-size: 12px;
+        line-height: 18px;
+        font-weight: 600;
+        color: var(--fg-muted);
+      }
+      .verdict .title {
+        font-size: 18px;
+        line-height: 26px;
+        font-weight: 600;
+        color: var(--fg);
+        margin-top: 2px;
+      }
+      .grade {
+        display: inline-flex;
+        align-items: center;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: var(--radius-sm);
+        font-size: 14px;
+        line-height: 22px;
+        font-weight: 700;
+      }
+      .grade.critical {
+        background: var(--metric-critical-100);
+        color: var(--metric-critical-700);
+      }
+      .grade.high {
+        background: var(--metric-high-100);
+        color: var(--metric-high-700);
+      }
+      .grade.unknown {
+        background: transparent;
+        color: var(--fg-muted);
+        border: 1px dashed var(--metric-unknown-500);
+        font-weight: 500;
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-top: 16px;
+      }
+      .metric {
+        background: var(--band);
+        border-radius: var(--radius-md);
+        padding: 10px 12px;
+      }
+      .metric .k {
+        font-size: 12px;
+        line-height: 18px;
+        font-weight: 500;
+        color: var(--fg-muted);
+      }
+      .metric .v {
+        font-size: 22px;
+        line-height: 30px;
+        font-weight: 900;
+        color: var(--fg);
+        margin-top: 2px;
+      }
+      .metric .v small {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--fg-muted);
+        margin-left: 2px;
+      }
+      .metric.hot .v {
+        color: var(--metric-critical-500);
+      }
+      .reasons {
+        margin-top: 16px;
+        display: grid;
+        gap: 8px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+      }
+      .reasons li {
+        display: flex;
+        gap: 8px;
+        color: var(--fg);
+      }
+      .reasons li::before {
+        content: '';
+        flex: none;
+        width: 6px;
+        height: 6px;
+        border-radius: 9999px;
+        background: var(--fg-muted);
+        margin-top: 8px;
+      }
+      .reasons li b {
+        font-weight: 600;
+      }
+      .note {
+        margin-top: 12px;
+        font-size: 12px;
+        line-height: 18px;
+        font-weight: 500;
+        color: var(--fg-muted);
+      }
 
-  /* 절 */
-  .sec .in { padding-top: 40px; padding-bottom: 40px; display: grid; gap: 24px; }
-  .sec .q { font-size: 12px; line-height: 18px; font-weight: 600; color: var(--link); letter-spacing: .02em; }
-  .sec h2 { font-size: 22px; line-height: 30px; font-weight: 700; margin-top: 4px; word-break: keep-all; }
-  .sec .lead { margin-top: 8px; font-size: 16px; line-height: 26px; font-weight: 400; color: var(--fg-muted); word-break: keep-all; max-width: 34em; }
-  .points { display: grid; gap: 12px; margin-top: 20px; }
-  .points li { display: flex; gap: 12px; align-items: flex-start; color: var(--fg); word-break: keep-all; }
-  .points li .ic { flex: none; width: 28px; height: 28px; border-radius: var(--radius-md); background: var(--intro-tint); display: grid; place-items: center; color: var(--brand-700); }
-  .points li .ic svg { width: 16px; height: 16px; }
-  .points li p { padding-top: 3px; }
-  .more { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; font-weight: 600; color: var(--link); }
-  .more:hover { color: var(--link-hover); }
-  .two { display: grid; gap: 24px; }
+      /* 절 */
+      .sec .in {
+        padding-top: 40px;
+        padding-bottom: 40px;
+        display: grid;
+        gap: 24px;
+      }
+      .sec .q {
+        font-size: 12px;
+        line-height: 18px;
+        font-weight: 600;
+        color: var(--link);
+        letter-spacing: 0.02em;
+      }
+      .sec h2 {
+        font-size: 22px;
+        line-height: 30px;
+        font-weight: 700;
+        margin-top: 4px;
+        word-break: keep-all;
+      }
+      .sec .lead {
+        margin-top: 8px;
+        font-size: 16px;
+        line-height: 26px;
+        font-weight: 400;
+        color: var(--fg-muted);
+        word-break: keep-all;
+        max-width: 34em;
+      }
+      .points {
+        display: grid;
+        gap: 12px;
+        margin-top: 20px;
+      }
+      .points li {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        color: var(--fg);
+        word-break: keep-all;
+      }
+      .points li .ic {
+        flex: none;
+        width: 28px;
+        height: 28px;
+        border-radius: var(--radius-md);
+        background: var(--intro-tint);
+        display: grid;
+        place-items: center;
+        color: var(--brand-700);
+      }
+      .points li .ic svg {
+        width: 16px;
+        height: 16px;
+      }
+      .points li p {
+        padding-top: 3px;
+      }
+      .more {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        min-height: 44px;
+        font-weight: 600;
+        color: var(--link);
+      }
+      .more:hover {
+        color: var(--link-hover);
+      }
+      .two {
+        display: grid;
+        gap: 24px;
+      }
 
-  /* 장소 행 예시 */
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 9999px; border: 1px solid var(--border-strong); font-size: 12px; font-weight: 600; color: var(--fg); background: var(--bg); }
-  .chip.on { background: var(--fg); color: var(--fg-inverse); border-color: var(--fg); }
-  .rows { display: grid; }
-  .row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border); }
-  .row:first-child { border-top: 0; }
-  .row .thumb { flex: none; width: 48px; height: 48px; border-radius: var(--radius-md); background: var(--band); }
-  .row .name { font-size: 16px; line-height: 24px; font-weight: 600; }
-  .row .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-  .tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: var(--radius-sm); background: var(--band); font-size: 12px; font-weight: 500; color: var(--fg-muted); }
-  .tag.dash { background: transparent; border: 1px dashed var(--metric-unknown-500); }
-  .tag.open { background: var(--status-open-bg); color: var(--status-open-fg); font-weight: 600; }
-  .dist { margin-left: auto; font-weight: 600; white-space: nowrap; }
+      /* 장소 행 예시 */
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: 9999px;
+        border: 1px solid var(--border-strong);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--fg);
+        background: var(--bg);
+      }
+      .chip.on {
+        background: var(--fg);
+        color: var(--fg-inverse);
+        border-color: var(--fg);
+      }
+      .rows {
+        display: grid;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 0;
+        border-top: 1px solid var(--border);
+      }
+      .row:first-child {
+        border-top: 0;
+      }
+      .row .thumb {
+        flex: none;
+        width: 48px;
+        height: 48px;
+        border-radius: var(--radius-md);
+        background: var(--band);
+      }
+      .row .name {
+        font-size: 16px;
+        line-height: 24px;
+        font-weight: 600;
+      }
+      .row .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 4px;
+      }
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: var(--radius-sm);
+        background: var(--band);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--fg-muted);
+      }
+      .tag.dash {
+        background: transparent;
+        border: 1px dashed var(--metric-unknown-500);
+      }
+      .tag.open {
+        background: var(--status-open-bg);
+        color: var(--status-open-fg);
+        font-weight: 600;
+      }
+      .dist {
+        margin-left: auto;
+        font-weight: 600;
+        white-space: nowrap;
+      }
 
-  /* 곡선 */
-  .chart { width: 100%; height: auto; display: block; }
-  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; line-height: 18px; font-weight: 500; color: var(--fg-muted); margin-top: 8px; }
-  .legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+      /* 곡선 */
+      .chart {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 16px;
+        font-size: 12px;
+        line-height: 18px;
+        font-weight: 500;
+        color: var(--fg-muted);
+        margin-top: 8px;
+      }
+      .legend i {
+        display: inline-block;
+        width: 12px;
+        height: 3px;
+        border-radius: 2px;
+        vertical-align: middle;
+        margin-right: 6px;
+      }
 
-  /* 2×2 카드 */
-  .grid { display: grid; gap: 8px; }
-  .grid .card h3 { font-size: 18px; line-height: 26px; font-weight: 600; }
-  .grid .card .desc { margin-top: 4px; color: var(--fg-muted); word-break: keep-all; }
-  .grid .card .ex { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border); }
-  .bars { display: flex; align-items: flex-end; gap: 6px; height: 64px; padding: 0 2px; }
-  .bars i { flex: 1; background: var(--congestion-bar); border-radius: 3px 3px 0 0; display: block; }
-  .bars i.best { background: var(--congestion-best); }
-  .days { display: flex; gap: 6px; margin-top: 6px; }
-  .days span { flex: 1; text-align: center; font-size: 12px; color: var(--fg-muted); }
-  .days span.best { color: var(--congestion-best); font-weight: 700; }
-  .tabs { display: flex; gap: 6px; }
-  .tabs span { height: 28px; padding: 0 10px; border-radius: 9999px; background: var(--band); font-size: 12px; font-weight: 600; color: var(--fg-muted); display: inline-flex; align-items: center; }
-  .tabs span.on { background: var(--fg); color: var(--fg-inverse); }
-  .plan { display: grid; gap: 0; margin-top: 8px; }
-  .plan li { display: flex; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); }
-  .plan li:first-child { border-top: 0; }
-  .plan .time { flex: none; width: 44px; color: var(--fg-muted); font-weight: 600; }
-  .plan .what { font-weight: 600; }
-  .plan .sub { color: var(--fg-muted); }
-  .wx { display: flex; gap: 8px; }
-  .wx div { flex: 1; background: var(--band); border-radius: var(--radius-md); padding: 8px; text-align: center; }
-  .wx .d { font-size: 12px; color: var(--fg-muted); font-weight: 600; }
-  .wx .i { font-size: 20px; line-height: 28px; }
-  .wx .t { font-size: 12px; color: var(--fg); font-weight: 600; }
-  .ai { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--fg-muted); }
+      /* 2×2 카드 */
+      .grid {
+        display: grid;
+        gap: 8px;
+      }
+      .grid .card h3 {
+        font-size: 18px;
+        line-height: 26px;
+        font-weight: 600;
+      }
+      .grid .card .desc {
+        margin-top: 4px;
+        color: var(--fg-muted);
+        word-break: keep-all;
+      }
+      .grid .card .ex {
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border);
+      }
+      .bars {
+        display: flex;
+        align-items: flex-end;
+        gap: 6px;
+        height: 64px;
+        padding: 0 2px;
+      }
+      .bars i {
+        flex: 1;
+        background: var(--congestion-bar);
+        border-radius: 3px 3px 0 0;
+        display: block;
+      }
+      .bars i.best {
+        background: var(--congestion-best);
+      }
+      .days {
+        display: flex;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .days span {
+        flex: 1;
+        text-align: center;
+        font-size: 12px;
+        color: var(--fg-muted);
+      }
+      .days span.best {
+        color: var(--congestion-best);
+        font-weight: 700;
+      }
+      .tabs {
+        display: flex;
+        gap: 6px;
+      }
+      .tabs span {
+        height: 28px;
+        padding: 0 10px;
+        border-radius: 9999px;
+        background: var(--band);
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--fg-muted);
+        display: inline-flex;
+        align-items: center;
+      }
+      .tabs span.on {
+        background: var(--fg);
+        color: var(--fg-inverse);
+      }
+      .plan {
+        display: grid;
+        gap: 0;
+        margin-top: 8px;
+      }
+      .plan li {
+        display: flex;
+        gap: 12px;
+        padding: 8px 0;
+        border-top: 1px solid var(--border);
+      }
+      .plan li:first-child {
+        border-top: 0;
+      }
+      .plan .time {
+        flex: none;
+        width: 44px;
+        color: var(--fg-muted);
+        font-weight: 600;
+      }
+      .plan .what {
+        font-weight: 600;
+      }
+      .plan .sub {
+        color: var(--fg-muted);
+      }
+      .wx {
+        display: flex;
+        gap: 8px;
+      }
+      .wx div {
+        flex: 1;
+        background: var(--band);
+        border-radius: var(--radius-md);
+        padding: 8px;
+        text-align: center;
+      }
+      .wx .d {
+        font-size: 12px;
+        color: var(--fg-muted);
+        font-weight: 600;
+      }
+      .wx .i {
+        font-size: 20px;
+        line-height: 28px;
+      }
+      .wx .t {
+        font-size: 12px;
+        color: var(--fg);
+        font-weight: 600;
+      }
+      .ai {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--fg-muted);
+      }
 
-  /* 데이터 절 */
-  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .stat { background: var(--intro-tint); border-radius: var(--radius-lg); padding: 16px; }
-  .stat .n { font-size: 28px; line-height: 36px; font-weight: 900; color: var(--fg); }
-  .stat .n small { font-size: 14px; font-weight: 600; color: var(--fg-muted); margin-left: 2px; }
-  .stat .l { margin-top: 4px; font-size: 12px; line-height: 18px; font-weight: 600; color: var(--fg-muted); word-break: keep-all; }
-  .rules { display: grid; gap: 8px; }
-  .rules li { display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-lg); }
-  .rules li .no { flex: none; width: 24px; height: 24px; border-radius: 9999px; background: var(--fg); color: var(--fg-inverse); font-size: 12px; font-weight: 700; display: grid; place-items: center; }
-  .rules li p { padding-top: 1px; font-weight: 500; }
-  .sources li { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); font-weight: 600; }
-  .sources li:first-child { border-top: 0; }
-  .sources li::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--brand-500); flex: none; }
-  .arch { margin-top: 12px; font-size: 12px; line-height: 18px; color: var(--fg-muted); font-weight: 500; }
+      /* 데이터 절 */
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .stat {
+        background: var(--intro-tint);
+        border-radius: var(--radius-lg);
+        padding: 16px;
+      }
+      .stat .n {
+        font-size: 28px;
+        line-height: 36px;
+        font-weight: 900;
+        color: var(--fg);
+      }
+      .stat .n small {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--fg-muted);
+        margin-left: 2px;
+      }
+      .stat .l {
+        margin-top: 4px;
+        font-size: 12px;
+        line-height: 18px;
+        font-weight: 600;
+        color: var(--fg-muted);
+        word-break: keep-all;
+      }
+      .rules {
+        display: grid;
+        gap: 8px;
+      }
+      .rules li {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        padding: 12px 16px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+      }
+      .rules li .no {
+        flex: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 9999px;
+        background: var(--fg);
+        color: var(--fg-inverse);
+        font-size: 12px;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+      }
+      .rules li p {
+        padding-top: 1px;
+        font-weight: 500;
+      }
+      .sources li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 0;
+        border-top: 1px solid var(--border);
+        font-weight: 600;
+      }
+      .sources li:first-child {
+        border-top: 0;
+      }
+      .sources li::before {
+        content: '';
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+        background: var(--brand-500);
+        flex: none;
+      }
+      .arch {
+        margin-top: 12px;
+        font-size: 12px;
+        line-height: 18px;
+        color: var(--fg-muted);
+        font-weight: 500;
+      }
 
-  /* 마무리 CTA */
-  .cta .in { padding-top: 40px; padding-bottom: 48px; display: grid; gap: 20px; }
-  .cta h2 { font-size: 22px; line-height: 30px; font-weight: 700; word-break: keep-all; }
-  .cta p { color: rgba(255,255,255,.88); font-size: 16px; line-height: 26px; word-break: keep-all; }
-  .cta .ctas { display: flex; flex-wrap: wrap; gap: 8px; }
+      /* 마무리 CTA */
+      .cta .in {
+        padding-top: 40px;
+        padding-bottom: 48px;
+        display: grid;
+        gap: 20px;
+      }
+      .cta h2 {
+        font-size: 22px;
+        line-height: 30px;
+        font-weight: 700;
+        word-break: keep-all;
+      }
+      .cta p {
+        color: rgba(255, 255, 255, 0.88);
+        font-size: 16px;
+        line-height: 26px;
+        word-break: keep-all;
+      }
+      .cta .ctas {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
 
-  /* 목업 표식 */
-  .mock-note { position: fixed; right: 8px; bottom: calc(var(--tabbar-h) + 8px); z-index: 50; background: var(--fg); color: var(--fg-inverse); font-size: 11px; line-height: 16px; padding: 4px 8px; border-radius: 4px; opacity: .8; pointer-events: none; }
+      /* 목업 표식 */
+      .mock-note {
+        position: fixed;
+        right: 8px;
+        bottom: calc(var(--tabbar-h) + 8px);
+        z-index: 50;
+        background: var(--fg);
+        color: var(--fg-inverse);
+        font-size: 11px;
+        line-height: 16px;
+        padding: 4px 8px;
+        border-radius: 4px;
+        opacity: 0.8;
+        pointer-events: none;
+      }
 
-  /* ── 반응형 ───────────────────────────────────────────────────── */
-  @media (min-width: 768px) {
-    :root { --header-h: 64px; }
-    main { padding-bottom: 0; }
-    .tabbar, .mock-note { display: none; }
-    .shell-header .in, .in { padding-left: 24px; padding-right: 24px; }
-    .shell-header nav { display: flex; }
-    .shell-footer { display: block; }
-    .hero .in { padding-top: 64px; padding-bottom: 64px; }
-    .hero h1 { font-size: 34px; line-height: 44px; }
-    .hero .card { max-width: 512px; margin: 0 auto; width: 100%; }
-    .sec .in { padding-top: 64px; padding-bottom: 64px; }
-    .sec h2 { font-size: 28px; line-height: 36px; font-weight: 800; }
-    .grid { grid-template-columns: 1fr 1fr; gap: 24px; }
-    .two { grid-template-columns: 1fr 1fr; align-items: start; gap: 40px; }
-    .stats { gap: 24px; }
-    .stat .n { font-size: 34px; line-height: 44px; }
-    .rules { grid-template-columns: 1fr 1fr; }
-    .cta .in { padding-top: 64px; padding-bottom: 72px; }
-    .cta h2 { font-size: 28px; line-height: 36px; font-weight: 800; }
-  }
-  @media (min-width: 1024px) {
-    .shell-header .in, .in { padding-left: 40px; padding-right: 40px; }
-    .hero .in { grid-template-columns: minmax(0, 1fr) 400px; align-items: center; gap: 64px; }
-    .hero .card { margin: 0; max-width: none; }
-    .two.wide { grid-template-columns: 5fr 7fr; }
-    .verdict .metrics { gap: 12px; }
-  }
-</style>
-</head>
-<body>
-
-<!-- ── 헤더 (AppShell — 대상 아님) ─────────────────────────────── -->
-<header class="shell-header">
-  <div class="in">
-    <a class="lockup" href="#" aria-label="혼디가개 홈">
-      <svg class="sym" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="4" fill="#2E9B6B"/><g fill="#FFFFFF"><circle cx="16" cy="7.72" r="3.24"/><circle cx="7.84" cy="11.2" r="3.24"/><circle cx="24.16" cy="11.2" r="3.24"/><path d="M16 14.5C19.6 14.5 24.1 17.5 24.1 21.6 24.1 25.3 20.6 27.8 16 27.8 11.4 27.8 7.9 25.3 7.9 21.6 7.9 17.5 12.4 14.5 16 14.5Z"/></g></svg>
-      <svg class="word" viewBox="0 0 149 40" aria-hidden="true"><text x="0" y="31" font-family="Pretendard Variable, Pretendard, sans-serif" font-weight="800" font-size="30" fill="#15181D" letter-spacing="-1">혼디가개</text></svg>
-    </a>
-    <nav aria-label="주요">
-      <a href="#">장소 찾기</a><a href="#">여행 일정</a><a href="#">AI 일정 생성</a>
-    </nav>
-    <div class="shell-actions">
-      <a class="btn btn-sm btn-outline" href="#">응급</a>
-      <a class="btn btn-sm btn-fill" href="#">로그인</a>
-    </div>
-  </div>
-</header>
-
-<main id="main-content">
-
-  <!-- ── 1. 히어로 ──────────────────────────────────────────────── -->
-  <section class="band green hero" aria-labelledby="hero-heading">
-    <div class="in">
-      <div>
-        <div class="brandmark" aria-hidden="true">
-          <svg class="sym" viewBox="0 0 32 32"><rect width="32" height="32" rx="4" fill="#FFFFFF"/><g fill="#1D6646"><circle cx="16" cy="7.72" r="3.24"/><circle cx="7.84" cy="11.2" r="3.24"/><circle cx="24.16" cy="11.2" r="3.24"/><path d="M16 14.5C19.6 14.5 24.1 17.5 24.1 21.6 24.1 25.3 20.6 27.8 16 27.8 11.4 27.8 7.9 25.3 7.9 21.6 7.9 17.5 12.4 14.5 16 14.5Z"/></g></svg>
-          <svg class="word" viewBox="0 0 149 40"><text x="0" y="31" font-family="Pretendard Variable, Pretendard, sans-serif" font-weight="800" font-size="30" fill="#FFFFFF" letter-spacing="-1">혼디가개</text></svg>
-        </div>
-        <p class="eyebrow"><span class="dot"></span>반려견과 함께하는 제주 여행</p>
-        <h1 id="hero-heading">동반 가능한 곳만 골라서,<br />지금 가도 되는지까지 봐요</h1>
-        <p class="sub">날씨·노면 온도·혼잡도를 공공데이터로 확인하고, 반려견의 크기와 성향에 맞는 장소로 하루 일정을 짜요. 회원가입 없이도 오늘 판정부터 볼 수 있어요.</p>
-        <div class="ctas">
-          <a class="btn btn-inverse" href="#">오늘 판정 보러 가기</a>
-          <a class="btn btn-ghost-inverse" href="#">장소 찾기</a>
-        </div>
-      </div>
-
-      <div class="card verdict" role="group" aria-label="산책 판정 화면 예시">
-        <div class="head">
-          <div class="top">
-            <div>
-              <p class="label">오늘 산책 · 제주시 기준</p>
-              <p class="title">지금은 나가지 않는 편이 좋아요</p>
-            </div>
-            <span class="grade critical">위험</span>
-          </div>
-        </div>
-        <div class="body">
-          <div class="metrics num">
-            <div class="metric"><p class="k">기온</p><p class="v">29<small>℃</small></p></div>
-            <div class="metric hot"><p class="k">추정 노면(아스팔트)</p><p class="v">56.0<small>℃</small></p></div>
-            <div class="metric"><p class="k">체감온도</p><p class="v">31<small>℃</small></p></div>
-          </div>
-          <ul class="reasons">
-            <li><p>노면 온도가 <b>52℃</b> 를 넘어 발바닥 화상 위험이 있어요</p></li>
-            <li><p>오늘 산책하기 좋은 시간은 <b>06:00–08:00</b> 이에요</p></li>
-          </ul>
-          <p class="note">화면 예시예요. 실제 값은 기상청 실시간 관측으로 계산해요.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── 2. 데려가도 돼요? ─────────────────────────────────────── -->
-  <section class="band plain sec" aria-labelledby="q1">
-    <div class="in two wide">
-      <div>
-        <p class="q">질문 1</p>
-        <h2 id="q1">데려가도 돼요?</h2>
-        <p class="lead">장소마다 갈리는 동반 조건을 내 반려견 기준으로 걸러요.</p>
-        <ul class="points">
-          <li><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 4h12M4 8h8M6 12h4"/></svg></span><p>크기와 체중을 등록하면 그 조건으로 제주의 동반 가능 장소를 걸러요</p></li>
-          <li><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 11h.01"/></svg></span><p>동반 정보가 없는 곳은 '불가'로 단정하지 않고 정보 없음으로 따로 보여 줘요</p></li>
-          <li><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8l6-5 6 5v6H2z"/><path d="M6 14v-4h4v4"/></svg></span><p>실내인지, 지금 운영 중인지도 함께 봐요</p></li>
-        </ul>
-        <a class="more" href="#">장소 찾기 →</a>
-      </div>
-      <div class="card" role="group" aria-label="내 반려견 기준 필터 화면 예시">
-        <div class="head">
-          <div class="chips">
-            <span class="chip on">내 반려견 기준 · 소형 · 7kg</span>
-            <span class="chip">실내</span>
-            <span class="chip">운영 중</span>
-          </div>
-        </div>
-        <div class="body">
-          <div class="rows">
-            <div class="row"><span class="thumb"></span><div><p class="name">사계 해안 산책로</p><div class="meta"><span class="tag">소형·중형 동반 가능</span><span class="tag">실외</span><span class="tag open">운영 중</span></div></div></div>
-            <div class="row"><span class="thumb"></span><div><p class="name">애월 북카페</p><div class="meta"><span class="tag">10kg 이하</span><span class="tag">실내</span><span class="tag open">운영 중</span></div></div></div>
-            <div class="row"><span class="thumb"></span><div><p class="name">저지 예술인마을</p><div class="meta"><span class="tag dash">동반 정보 없음</span><span class="tag">실외</span></div></div></div>
-          </div>
-          <p class="note">화면 예시예요. 장소 이름과 조건은 실제와 달라요.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── 3. 지금 나가도 돼요? ──────────────────────────────────── -->
-  <section class="band tint sec" aria-labelledby="q2">
-    <div class="in two wide">
-      <div>
-        <p class="q">질문 2</p>
-        <h2 id="q2">지금 나가도 돼요?</h2>
-        <p class="lead">기온이 괜찮아도 아스팔트는 뜨거워요. 발바닥이 닿는 온도로 판정해요.</p>
-        <ul class="points">
-          <li><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2v8"/><circle cx="8" cy="12" r="2.5"/></svg></span><p>기상청 실시간 관측으로 노면(아스팔트) 온도를 추정해요</p></li>
-          <li><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12l3-6 3 4 2-2 2 4"/></svg></span><p>체감온도와 함께 안전·주의·위험으로 판정하고 이유를 붙여요</p></li>
-          <li><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg></span><p>하루 중 산책하기 좋은 시간을 골라 줘요</p></li>
-          <li><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2l6 11H2z"/><path d="M8 7v3M8 12h.01"/></svg></span><p>기상특보가 발효되면 그것부터 알려요</p></li>
-        </ul>
-        <a class="more" href="#">오늘 판정 보기 →</a>
-      </div>
-      <div class="card" role="group" aria-label="오늘 산책하기 좋은 시간 곡선 예시">
-        <div class="head">
-          <p class="t-title-2">오늘 산책하기 좋은 시간</p>
-          <p class="t-caption muted" style="margin-top:4px">제주시 기준 · 06:00–08:00 을 추천해요</p>
-        </div>
-        <div class="body">
-          <svg class="chart" viewBox="0 0 360 150" role="img" aria-label="시간대별 기온과 추정 노면 온도 곡선. 06시부터 08시 사이가 추천 구간이에요.">
-            <rect x="72" y="8" width="30" height="118" fill="#E4F0EA" rx="4"/>
-            <g stroke="#E3E5EA" stroke-width="1"><line x1="12" y1="126" x2="348" y2="126"/><line x1="12" y1="86" x2="348" y2="86" stroke-dasharray="3 4"/><line x1="12" y1="46" x2="348" y2="46" stroke-dasharray="3 4"/></g>
-            <g font-size="11" fill="#596069" font-family="Pretendard Variable, Pretendard, sans-serif" font-weight="500">
-              <text x="12" y="143">00</text><text x="72" y="143">06</text><text x="132" y="143">10</text><text x="192" y="143">14</text><text x="252" y="143">18</text><text x="312" y="143">22</text>
-              <text x="330" y="42" text-anchor="end">50℃</text><text x="330" y="82" text-anchor="end">30℃</text>
+      /* ── 반응형 ───────────────────────────────────────────────────── */
+      @media (min-width: 768px) {
+        :root {
+          --header-h: 64px;
+        }
+        main {
+          padding-bottom: 0;
+        }
+        .tabbar,
+        .mock-note {
+          display: none;
+        }
+        .shell-header .in,
+        .in {
+          padding-left: 24px;
+          padding-right: 24px;
+        }
+        .shell-header nav {
+          display: flex;
+        }
+        .shell-footer {
+          display: block;
+        }
+        .hero .in {
+          padding-top: 64px;
+          padding-bottom: 64px;
+        }
+        .hero h1 {
+          font-size: 34px;
+          line-height: 44px;
+        }
+        .hero .card {
+          max-width: 512px;
+          margin: 0 auto;
+          width: 100%;
+        }
+        .sec .in {
+          padding-top: 64px;
+          padding-bottom: 64px;
+        }
+        .sec h2 {
+          font-size: 28px;
+          line-height: 36px;
+          font-weight: 800;
+        }
+        .grid {
+          grid-template-columns: 1fr 1fr;
+          gap: 24px;
+        }
+        .two {
+          grid-template-columns: 1fr 1fr;
+          align-items: start;
+          gap: 40px;
+        }
+        .stats {
+          gap: 24px;
+        }
+        .stat .n {
+          font-size: 34px;
+          line-height: 44px;
+        }
+        .rules {
+          grid-template-columns: 1fr 1fr;
+        }
+        .cta .in {
+          padding-top: 64px;
+          padding-bottom: 72px;
+        }
+        .cta h2 {
+          font-size: 28px;
+          line-height: 36px;
+          font-weight: 800;
+        }
+      }
+      @media (min-width: 1024px) {
+        .shell-header .in,
+        .in {
+          padding-left: 40px;
+          padding-right: 40px;
+        }
+        .hero .in {
+          grid-template-columns: minmax(0, 1fr) 400px;
+          align-items: center;
+          gap: 64px;
+        }
+        .hero .card {
+          margin: 0;
+          max-width: none;
+        }
+        .two.wide {
+          grid-template-columns: 5fr 7fr;
+        }
+        .verdict .metrics {
+          gap: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ── 헤더 (AppShell — 대상 아님) ─────────────────────────────── -->
+    <header class="shell-header">
+      <div class="in">
+        <a class="lockup" href="#" aria-label="혼디가개 홈">
+          <svg class="sym" viewBox="0 0 32 32" aria-hidden="true">
+            <rect width="32" height="32" rx="4" fill="#2E9B6B" />
+            <g fill="#FFFFFF">
+              <circle cx="16" cy="7.72" r="3.24" />
+              <circle cx="7.84" cy="11.2" r="3.24" />
+              <circle cx="24.16" cy="11.2" r="3.24" />
+              <path
+                d="M16 14.5C19.6 14.5 24.1 17.5 24.1 21.6 24.1 25.3 20.6 27.8 16 27.8 11.4 27.8 7.9 25.3 7.9 21.6 7.9 17.5 12.4 14.5 16 14.5Z"
+              />
             </g>
-            <path d="M12 96 C 40 100, 60 104, 87 100 S 140 74, 192 60 S 260 70, 300 88 S 330 98, 348 100" fill="none" stroke="#596069" stroke-width="2.5" stroke-linecap="round"/>
-            <path d="M12 106 C 40 110, 60 112, 87 96 S 150 32, 192 18 S 260 36, 300 76 S 330 96, 348 104" fill="none" stroke="#D54040" stroke-width="2.5" stroke-linecap="round"/>
-            <circle cx="192" cy="18" r="4" fill="#D54040"/>
-            <text x="200" y="16" font-size="11" font-weight="700" fill="#CE2D2D" font-family="Pretendard Variable, Pretendard, sans-serif">56.0℃</text>
           </svg>
-          <div class="legend"><span><i style="background:#596069"></i>기온</span><span><i style="background:#D54040"></i>추정 노면(아스팔트) 온도</span><span><i style="background:#E4F0EA;height:10px;width:14px"></i>추천 구간</span></div>
-          <p class="note">화면 예시예요. 곡선은 기상청 시간별 예보로 매일 새로 계산해요.</p>
+          <svg class="word" viewBox="0 0 149 40" aria-hidden="true">
+            <text
+              x="0"
+              y="31"
+              font-family="Pretendard Variable, Pretendard, sans-serif"
+              font-weight="800"
+              font-size="30"
+              fill="#15181D"
+              letter-spacing="-1"
+            >
+              혼디가개
+            </text>
+          </svg>
+        </a>
+        <nav aria-label="주요">
+          <a href="#">장소 찾기</a><a href="#">여행 일정</a><a href="#">AI 일정 생성</a>
+        </nav>
+        <div class="shell-actions">
+          <a class="btn btn-sm btn-outline" href="#">응급</a>
+          <a class="btn btn-sm btn-fill" href="#">로그인</a>
         </div>
       </div>
-    </div>
-  </section>
+    </header>
 
-  <!-- ── 4. 오늘 어디 가요? ────────────────────────────────────── -->
-  <section class="band plain sec" aria-labelledby="q3">
-    <div class="in">
-      <div>
-        <p class="q">질문 3</p>
-        <h2 id="q3">오늘 어디 가요?</h2>
-        <p class="lead">점수만 주지 않아요. 왜 그런지 이유를 함께 보여 줘요.</p>
-      </div>
-      <div class="grid">
-        <article class="card">
-          <div class="body">
-            <h3>여행 적합도</h3>
-            <p class="desc">날씨·동반 조건·혼잡도를 묶어 등급으로 답하고, 근거를 접어 둬요.</p>
-            <div class="ex">
-              <div class="top" style="display:flex;justify-content:space-between;align-items:center;gap:12px"><p class="t-body-1">협재 해수욕장</p><span class="grade high">적합도 높음</span></div>
-              <ul class="reasons" style="border-top:0;padding-top:0;margin-top:12px">
-                <li><p>오전에는 구름 많고 최고 체감온도 27℃ 예요</p></li>
-                <li><p>이 시기 방문객이 적은 편이에요</p></li>
-              </ul>
+    <main id="main-content">
+      <!-- ── 1. 히어로 ──────────────────────────────────────────────── -->
+      <section class="band green hero" aria-labelledby="hero-heading">
+        <div class="in">
+          <div>
+            <div class="brandmark" aria-hidden="true">
+              <svg class="sym" viewBox="0 0 32 32">
+                <rect width="32" height="32" rx="4" fill="#FFFFFF" />
+                <g fill="#1D6646">
+                  <circle cx="16" cy="7.72" r="3.24" />
+                  <circle cx="7.84" cy="11.2" r="3.24" />
+                  <circle cx="24.16" cy="11.2" r="3.24" />
+                  <path
+                    d="M16 14.5C19.6 14.5 24.1 17.5 24.1 21.6 24.1 25.3 20.6 27.8 16 27.8 11.4 27.8 7.9 25.3 7.9 21.6 7.9 17.5 12.4 14.5 16 14.5Z"
+                  />
+                </g>
+              </svg>
+              <svg class="word" viewBox="0 0 149 40">
+                <text
+                  x="0"
+                  y="31"
+                  font-family="Pretendard Variable, Pretendard, sans-serif"
+                  font-weight="800"
+                  font-size="30"
+                  fill="#FFFFFF"
+                  letter-spacing="-1"
+                >
+                  혼디가개
+                </text>
+              </svg>
+            </div>
+            <p class="eyebrow"><span class="dot"></span>반려견과 함께하는 제주 여행</p>
+            <h1 id="hero-heading">동반 가능한 곳만 골라서,<br />지금 가도 되는지까지 봐요</h1>
+            <p class="sub">
+              날씨·노면 온도·혼잡도를 공공데이터로 확인하고, 반려견의 크기와 성향에 맞는 장소로 하루
+              일정을 짜요. 회원가입 없이도 오늘 판정부터 볼 수 있어요.
+            </p>
+            <div class="ctas">
+              <a class="btn btn-inverse" href="#">오늘 판정 보러 가기</a>
+              <a class="btn btn-ghost-inverse" href="#">장소 찾기</a>
             </div>
           </div>
-        </article>
-        <article class="card">
-          <div class="body">
-            <h3>한산한 날</h3>
-            <p class="desc">앞으로 30일 혼잡도 예측에서 가장 한산한 날을 골라요.</p>
-            <div class="ex">
-              <div class="bars" role="img" aria-label="일주일 혼잡도 막대. 목요일이 가장 한산해요.">
-                <i style="height:70%"></i><i style="height:52%"></i><i style="height:46%"></i><i class="best" style="height:28%"></i><i style="height:58%"></i><i style="height:92%"></i><i style="height:100%"></i>
-              </div>
-              <div class="days"><span>월</span><span>화</span><span>수</span><span class="best">목</span><span>금</span><span>토</span><span>일</span></div>
-              <p class="note">9월 18일(목)이 가장 한산할 것으로 보여요</p>
-            </div>
-          </div>
-        </article>
-        <article class="card">
-          <div class="body">
-            <h3>AI 일정 <span class="ai">· AI 제안</span></h3>
-            <p class="desc">반려견 조건과 여행 기간을 넣으면 하루 단위 초안을 만들어요. 실제 있는 장소만 후보로 써서 없는 곳을 지어내지 않아요.</p>
-            <div class="ex">
-              <div class="tabs"><span class="on">1일차</span><span>2일차</span><span>3일차</span></div>
-              <ul class="plan">
-                <li><span class="time">09:00</span><div><p class="what">사계 해안 산책로</p><p class="sub">실외 · 소형·중형 동반 가능</p></div></li>
-                <li><span class="time">12:30</span><div><p class="what">반려견 동반 식당</p><p class="sub">실내 · 10kg 이하</p></div></li>
-                <li><span class="time">15:00</span><div><p class="what">애월 북카페</p><p class="sub">실내 · 비 오는 날 대안</p></div></li>
-              </ul>
-              <a class="more" href="#" style="min-height:36px">하루만 다시 짜기 →</a>
-            </div>
-          </div>
-        </article>
-        <article class="card">
-          <div class="body">
-            <h3>비가 오면 실내로</h3>
-            <p class="desc">일자별 날씨를 미리 브리핑하고, 비 오는 날은 가까운 실내 대안을 함께 보여 줘요.</p>
-            <div class="ex">
-              <div class="wx" role="img" aria-label="3일 날씨 브리핑 예시. 2일차에 비가 와요.">
-                <div><p class="d">1일차</p><p class="i">☀️</p><p class="t">27℃</p></div>
-                <div><p class="d">2일차</p><p class="i">🌧️</p><p class="t">23℃</p></div>
-                <div><p class="d">3일차</p><p class="i">⛅</p><p class="t">26℃</p></div>
-              </div>
-              <div class="rows" style="margin-top:12px">
-                <div class="row"><div><p class="name" style="font-size:14px;line-height:22px">비가 오면 갈 만한 실내</p><div class="meta"><span class="tag">애월 북카페 · 1.2km</span><span class="tag">실내 놀이터 · 3.4km</span></div></div></div>
-              </div>
-            </div>
-          </div>
-        </article>
-      </div>
-      <a class="more" href="#">AI 일정 만들기 →</a>
-    </div>
-  </section>
 
-  <!-- ── 5. 위급하면? ──────────────────────────────────────────── -->
-  <section class="band tint sec" aria-labelledby="q4">
-    <div class="in two wide">
-      <div>
-        <p class="q">그리고</p>
-        <h2 id="q4">위급하면?</h2>
-        <p class="lead">여행 중 가장 급한 질문에는 가장 짧게 답해요.</p>
-        <ul class="points">
-          <li><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 14s-5-3.5-5-7.5A5 5 0 0 1 13 6.5C13 10.5 8 14 8 14z"/><circle cx="8" cy="6.5" r="1.5"/></svg></span><p>현재 위치 기준으로 동물병원·동물약국을 거리순으로 찾아요</p></li>
-          <li><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="8" r="6"/><path d="M8 4.5V8l2.5 1.5"/></svg></span><p>지금 진료 중인지 함께 보여 줘요</p></li>
-          <li><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M6 2v2M10 2v2"/></svg></span><p>여행 일정 안에서도 한 번에 들어가요</p></li>
-        </ul>
-        <a class="more" href="#">가까운 병원·약국 →</a>
-      </div>
-      <div class="card" role="group" aria-label="긴급 시설 목록 예시">
-        <div class="head"><p class="t-title-2">가까운 동물병원·약국</p><p class="t-caption muted" style="margin-top:4px">현재 위치 기준 · 거리순</p></div>
-        <div class="body">
-          <div class="rows">
-            <div class="row"><div><p class="name">제주 24시 동물의료센터</p><div class="meta"><span class="tag open">진료중</span><span class="tag">동물병원</span></div></div><span class="dist num">1.8km</span></div>
-            <div class="row"><div><p class="name">노형 동물약국</p><div class="meta"><span class="tag open">영업중</span><span class="tag">동물약국</span></div></div><span class="dist num">2.4km</span></div>
+          <div class="card verdict" role="group" aria-label="산책 판정 화면 예시">
+            <div class="head">
+              <div class="top">
+                <div>
+                  <p class="label">오늘 산책 · 제주시 기준</p>
+                  <p class="title">지금은 나가지 않는 편이 좋아요</p>
+                </div>
+                <span class="grade critical">위험</span>
+              </div>
+            </div>
+            <div class="body">
+              <div class="metrics num">
+                <div class="metric">
+                  <p class="k">기온</p>
+                  <p class="v">29<small>℃</small></p>
+                </div>
+                <div class="metric hot">
+                  <p class="k">추정 노면(아스팔트)</p>
+                  <p class="v">56.0<small>℃</small></p>
+                </div>
+                <div class="metric">
+                  <p class="k">체감온도</p>
+                  <p class="v">31<small>℃</small></p>
+                </div>
+              </div>
+              <ul class="reasons">
+                <li>
+                  <p>노면 온도가 <b>52℃</b> 를 넘어 발바닥 화상 위험이 있어요</p>
+                </li>
+                <li>
+                  <p>오늘 산책하기 좋은 시간은 <b>06:00–08:00</b> 이에요</p>
+                </li>
+              </ul>
+              <p class="note">화면 예시예요. 실제 값은 기상청 실시간 관측으로 계산해요.</p>
+            </div>
           </div>
-          <p class="note">화면 예시예요. 시설 이름과 거리는 실제와 달라요.</p>
         </div>
-      </div>
-    </div>
-  </section>
+      </section>
 
-  <!-- ── 6. 무엇을 보고 판단하나요 ─────────────────────────────── -->
-  <section class="band plain sec" aria-labelledby="data">
-    <div class="in">
-      <div>
-        <p class="q">데이터</p>
-        <h2 id="data">무엇을 보고 판단하나요</h2>
-        <p class="lead">화면의 모든 등급에는 출처와 이유가 붙어요.</p>
-      </div>
-      <div class="stats">
-        <div class="stat"><p class="n num">315<small>곳</small></p><p class="l">반려견 동반 가능 장소</p></div>
-        <div class="stat"><p class="n num">214<small>곳</small></p><p class="l">동물병원·동물약국</p></div>
-        <div class="stat"><p class="n num">5<small>곳</small></p><p class="l">공공데이터 원천</p></div>
-      </div>
-      <p class="t-caption muted" style="margin-top:-16px">2026년 9월 적재 기준이에요. 실시간으로 세는 값은 아니에요.</p>
-      <div hidden>
-      </div>
-      <ul class="rules">
-        <li><span class="no">1</span><p>추천에는 항상 근거를 붙여요</p></li>
-        <li><span class="no">2</span><p>공공데이터는 미리 모아 두고, 화면은 그 데이터만 읽어요</p></li>
-        <li><span class="no">3</span><p>AI는 실제 있는 장소 목록 안에서만 골라요</p></li>
-        <li><span class="no">4</span><p>일정의 저장과 확정은 사용자가 해요. AI는 제안만 해요</p></li>
-      </ul>
-      <div class="two">
-        <div class="card">
-          <div class="head"><p class="t-title-2">데이터 출처</p><p class="t-caption muted" style="margin-top:4px">화면에 나오는 정보가 무엇에 근거하는지 적어 두었어요.</p></div>
-          <div class="body">
-            <ul class="sources">
-              <li>한국관광공사 TourAPI</li><li>한국문화정보원</li><li>식품의약품안전처</li><li>기상청</li><li>카카오맵</li>
+      <!-- ── 2. 데려가도 돼요? ─────────────────────────────────────── -->
+      <section class="band plain sec" aria-labelledby="q1">
+        <div class="in two wide">
+          <div>
+            <p class="q">질문 1</p>
+            <h2 id="q1">데려가도 돼요?</h2>
+            <p class="lead">장소마다 갈리는 동반 조건을 내 반려견 기준으로 걸러요.</p>
+            <ul class="points">
+              <li>
+                <span class="ic"
+                  ><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M2 4h12M4 8h8M6 12h4" /></svg
+                ></span>
+                <p>크기와 체중을 등록하면 그 조건으로 제주의 동반 가능 장소를 걸러요</p>
+              </li>
+              <li>
+                <span class="ic"
+                  ><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <circle cx="8" cy="8" r="6" />
+                    <path d="M8 5v3.5M8 11h.01" /></svg
+                ></span>
+                <p>동반 정보가 없는 곳은 '불가'로 단정하지 않고 정보 없음으로 따로 보여 줘요</p>
+              </li>
+              <li>
+                <span class="ic"
+                  ><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M2 8l6-5 6 5v6H2z" />
+                    <path d="M6 14v-4h4v4" /></svg
+                ></span>
+                <p>실내인지, 지금 운영 중인지도 함께 봐요</p>
+              </li>
             </ul>
-            <p class="arch">Next.js BFF · Spring MSA 5서비스 · Spring AI + Ollama</p>
+            <a class="more" href="#">장소 찾기 →</a>
+          </div>
+          <div class="card" role="group" aria-label="내 반려견 기준 필터 화면 예시">
+            <div class="head">
+              <div class="chips">
+                <span class="chip on">내 반려견 기준 · 소형 · 7kg</span>
+                <span class="chip">실내</span>
+                <span class="chip">운영 중</span>
+              </div>
+            </div>
+            <div class="body">
+              <div class="rows">
+                <div class="row">
+                  <span class="thumb"></span>
+                  <div>
+                    <p class="name">사계 해안 산책로</p>
+                    <div class="meta">
+                      <span class="tag">소형·중형 동반 가능</span><span class="tag">실외</span
+                      ><span class="tag open">운영 중</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="row">
+                  <span class="thumb"></span>
+                  <div>
+                    <p class="name">애월 북카페</p>
+                    <div class="meta">
+                      <span class="tag">10kg 이하</span><span class="tag">실내</span
+                      ><span class="tag open">운영 중</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="row">
+                  <span class="thumb"></span>
+                  <div>
+                    <p class="name">저지 예술인마을</p>
+                    <div class="meta">
+                      <span class="tag dash">동반 정보 없음</span><span class="tag">실외</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p class="note">화면 예시예요. 장소 이름과 조건은 실제와 달라요.</p>
+            </div>
           </div>
         </div>
-        <div class="card">
-          <div class="head"><p class="t-title-2">알아두실 점</p></div>
-          <div class="body">
-            <p class="muted">동반 가능 여부와 운영시간은 바뀔 수 있어요. 방문 전 확인해 주세요.</p>
-            <p class="t-caption muted" style="margin-top:8px">2026 관광데이터 활용 공모전 출품작</p>
+      </section>
+
+      <!-- ── 3. 지금 나가도 돼요? ──────────────────────────────────── -->
+      <section class="band tint sec" aria-labelledby="q2">
+        <div class="in two wide">
+          <div>
+            <p class="q">질문 2</p>
+            <h2 id="q2">지금 나가도 돼요?</h2>
+            <p class="lead">기온이 괜찮아도 아스팔트는 뜨거워요. 발바닥이 닿는 온도로 판정해요.</p>
+            <ul class="points">
+              <li>
+                <span class="ic"
+                  ><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M8 2v8" />
+                    <circle cx="8" cy="12" r="2.5" /></svg
+                ></span>
+                <p>기상청 실시간 관측으로 노면(아스팔트) 온도를 추정해요</p>
+              </li>
+              <li>
+                <span class="ic"
+                  ><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M3 12l3-6 3 4 2-2 2 4" /></svg
+                ></span>
+                <p>체감온도와 함께 안전·주의·위험으로 판정하고 이유를 붙여요</p>
+              </li>
+              <li>
+                <span class="ic"
+                  ><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <circle cx="8" cy="8" r="6" />
+                    <path d="M8 4.5V8l2.5 1.5" /></svg
+                ></span>
+                <p>하루 중 산책하기 좋은 시간을 골라 줘요</p>
+              </li>
+              <li>
+                <span class="ic"
+                  ><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M8 2l6 11H2z" />
+                    <path d="M8 7v3M8 12h.01" /></svg
+                ></span>
+                <p>기상특보가 발효되면 그것부터 알려요</p>
+              </li>
+            </ul>
+            <a class="more" href="#">오늘 판정 보기 →</a>
+          </div>
+          <div class="card" role="group" aria-label="오늘 산책하기 좋은 시간 곡선 예시">
+            <div class="head">
+              <p class="t-title-2">오늘 산책하기 좋은 시간</p>
+              <p class="t-caption muted" style="margin-top: 4px">
+                제주시 기준 · 06:00–08:00 을 추천해요
+              </p>
+            </div>
+            <div class="body">
+              <svg
+                class="chart"
+                viewBox="0 0 360 150"
+                role="img"
+                aria-label="시간대별 기온과 추정 노면 온도 곡선. 06시부터 08시 사이가 추천 구간이에요."
+              >
+                <rect x="72" y="8" width="30" height="118" fill="#E4F0EA" rx="4" />
+                <g stroke="#E3E5EA" stroke-width="1">
+                  <line x1="12" y1="126" x2="348" y2="126" />
+                  <line x1="12" y1="86" x2="348" y2="86" stroke-dasharray="3 4" />
+                  <line x1="12" y1="46" x2="348" y2="46" stroke-dasharray="3 4" />
+                </g>
+                <g
+                  font-size="11"
+                  fill="#596069"
+                  font-family="Pretendard Variable, Pretendard, sans-serif"
+                  font-weight="500"
+                >
+                  <text x="12" y="143">00</text>
+                  <text x="72" y="143">06</text>
+                  <text x="132" y="143">10</text>
+                  <text x="192" y="143">14</text>
+                  <text x="252" y="143">18</text>
+                  <text x="312" y="143">22</text>
+                  <text x="330" y="42" text-anchor="end">50℃</text>
+                  <text x="330" y="82" text-anchor="end">30℃</text>
+                </g>
+                <path
+                  d="M12 96 C 40 100, 60 104, 87 100 S 140 74, 192 60 S 260 70, 300 88 S 330 98, 348 100"
+                  fill="none"
+                  stroke="#596069"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                />
+                <path
+                  d="M12 106 C 40 110, 60 112, 87 96 S 150 32, 192 18 S 260 36, 300 76 S 330 96, 348 104"
+                  fill="none"
+                  stroke="#D54040"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                />
+                <circle cx="192" cy="18" r="4" fill="#D54040" />
+                <text
+                  x="200"
+                  y="16"
+                  font-size="11"
+                  font-weight="700"
+                  fill="#CE2D2D"
+                  font-family="Pretendard Variable, Pretendard, sans-serif"
+                >
+                  56.0℃
+                </text>
+              </svg>
+              <div class="legend">
+                <span><i style="background: #596069"></i>기온</span
+                ><span><i style="background: #d54040"></i>추정 노면(아스팔트) 온도</span
+                ><span
+                  ><i style="background: #e4f0ea; height: 10px; width: 14px"></i>추천 구간</span
+                >
+              </div>
+              <p class="note">화면 예시예요. 곡선은 기상청 시간별 예보로 매일 새로 계산해요.</p>
+            </div>
           </div>
         </div>
+      </section>
+
+      <!-- ── 4. 오늘 어디 가요? ────────────────────────────────────── -->
+      <section class="band plain sec" aria-labelledby="q3">
+        <div class="in">
+          <div>
+            <p class="q">질문 3</p>
+            <h2 id="q3">오늘 어디 가요?</h2>
+            <p class="lead">점수만 주지 않아요. 왜 그런지 이유를 함께 보여 줘요.</p>
+          </div>
+          <div class="grid">
+            <article class="card">
+              <div class="body">
+                <h3>여행 적합도</h3>
+                <p class="desc">날씨·동반 조건·혼잡도를 묶어 등급으로 답하고, 근거를 접어 둬요.</p>
+                <div class="ex">
+                  <div
+                    class="top"
+                    style="
+                      display: flex;
+                      justify-content: space-between;
+                      align-items: center;
+                      gap: 12px;
+                    "
+                  >
+                    <p class="t-body-1">협재 해수욕장</p>
+                    <span class="grade high">적합도 높음</span>
+                  </div>
+                  <ul class="reasons" style="border-top: 0; padding-top: 0; margin-top: 12px">
+                    <li><p>오전에는 구름 많고 최고 체감온도 27℃ 예요</p></li>
+                    <li><p>이 시기 방문객이 적은 편이에요</p></li>
+                  </ul>
+                </div>
+              </div>
+            </article>
+            <article class="card">
+              <div class="body">
+                <h3>한산한 날</h3>
+                <p class="desc">앞으로 30일 혼잡도 예측에서 가장 한산한 날을 골라요.</p>
+                <div class="ex">
+                  <div
+                    class="bars"
+                    role="img"
+                    aria-label="일주일 혼잡도 막대. 목요일이 가장 한산해요."
+                  >
+                    <i style="height: 70%"></i><i style="height: 52%"></i><i style="height: 46%"></i
+                    ><i class="best" style="height: 28%"></i><i style="height: 58%"></i
+                    ><i style="height: 92%"></i><i style="height: 100%"></i>
+                  </div>
+                  <div class="days">
+                    <span>월</span><span>화</span><span>수</span><span class="best">목</span
+                    ><span>금</span><span>토</span><span>일</span>
+                  </div>
+                  <p class="note">9월 18일(목)이 가장 한산할 것으로 보여요</p>
+                </div>
+              </div>
+            </article>
+            <article class="card">
+              <div class="body">
+                <h3>AI 일정 <span class="ai">· AI 제안</span></h3>
+                <p class="desc">
+                  반려견 조건과 여행 기간을 넣으면 하루 단위 초안을 만들어요. 실제 있는 장소만
+                  후보로 써서 없는 곳을 지어내지 않아요.
+                </p>
+                <div class="ex">
+                  <div class="tabs">
+                    <span class="on">1일차</span><span>2일차</span><span>3일차</span>
+                  </div>
+                  <ul class="plan">
+                    <li>
+                      <span class="time">09:00</span>
+                      <div>
+                        <p class="what">사계 해안 산책로</p>
+                        <p class="sub">실외 · 소형·중형 동반 가능</p>
+                      </div>
+                    </li>
+                    <li>
+                      <span class="time">12:30</span>
+                      <div>
+                        <p class="what">반려견 동반 식당</p>
+                        <p class="sub">실내 · 10kg 이하</p>
+                      </div>
+                    </li>
+                    <li>
+                      <span class="time">15:00</span>
+                      <div>
+                        <p class="what">애월 북카페</p>
+                        <p class="sub">실내 · 비 오는 날 대안</p>
+                      </div>
+                    </li>
+                  </ul>
+                  <a class="more" href="#" style="min-height: 36px">하루만 다시 짜기 →</a>
+                </div>
+              </div>
+            </article>
+            <article class="card">
+              <div class="body">
+                <h3>비가 오면 실내로</h3>
+                <p class="desc">
+                  일자별 날씨를 미리 브리핑하고, 비 오는 날은 가까운 실내 대안을 함께 보여 줘요.
+                </p>
+                <div class="ex">
+                  <div class="wx" role="img" aria-label="3일 날씨 브리핑 예시. 2일차에 비가 와요.">
+                    <div>
+                      <p class="d">1일차</p>
+                      <p class="i">☀️</p>
+                      <p class="t">27℃</p>
+                    </div>
+                    <div>
+                      <p class="d">2일차</p>
+                      <p class="i">🌧️</p>
+                      <p class="t">23℃</p>
+                    </div>
+                    <div>
+                      <p class="d">3일차</p>
+                      <p class="i">⛅</p>
+                      <p class="t">26℃</p>
+                    </div>
+                  </div>
+                  <div class="rows" style="margin-top: 12px">
+                    <div class="row">
+                      <div>
+                        <p class="name" style="font-size: 14px; line-height: 22px">
+                          비가 오면 갈 만한 실내
+                        </p>
+                        <div class="meta">
+                          <span class="tag">애월 북카페 · 1.2km</span
+                          ><span class="tag">실내 놀이터 · 3.4km</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </div>
+          <a class="more" href="#">AI 일정 만들기 →</a>
+        </div>
+      </section>
+
+      <!-- ── 5. 위급하면? ──────────────────────────────────────────── -->
+      <section class="band tint sec" aria-labelledby="q4">
+        <div class="in two wide">
+          <div>
+            <p class="q">그리고</p>
+            <h2 id="q4">위급하면?</h2>
+            <p class="lead">여행 중 가장 급한 질문에는 가장 짧게 답해요.</p>
+            <ul class="points">
+              <li>
+                <span class="ic"
+                  ><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path d="M8 14s-5-3.5-5-7.5A5 5 0 0 1 13 6.5C13 10.5 8 14 8 14z" />
+                    <circle cx="8" cy="6.5" r="1.5" /></svg
+                ></span>
+                <p>현재 위치 기준으로 동물병원·동물약국을 거리순으로 찾아요</p>
+              </li>
+              <li>
+                <span class="ic"
+                  ><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <circle cx="8" cy="8" r="6" />
+                    <path d="M8 4.5V8l2.5 1.5" /></svg
+                ></span>
+                <p>지금 진료 중인지 함께 보여 줘요</p>
+              </li>
+              <li>
+                <span class="ic"
+                  ><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <rect x="2.5" y="3" width="11" height="10" rx="1.5" />
+                    <path d="M2.5 6.5h11M6 2v2M10 2v2" /></svg
+                ></span>
+                <p>여행 일정 안에서도 한 번에 들어가요</p>
+              </li>
+            </ul>
+            <a class="more" href="#">가까운 병원·약국 →</a>
+          </div>
+          <div class="card" role="group" aria-label="긴급 시설 목록 예시">
+            <div class="head">
+              <p class="t-title-2">가까운 동물병원·약국</p>
+              <p class="t-caption muted" style="margin-top: 4px">현재 위치 기준 · 거리순</p>
+            </div>
+            <div class="body">
+              <div class="rows">
+                <div class="row">
+                  <div>
+                    <p class="name">제주 24시 동물의료센터</p>
+                    <div class="meta">
+                      <span class="tag open">진료중</span><span class="tag">동물병원</span>
+                    </div>
+                  </div>
+                  <span class="dist num">1.8km</span>
+                </div>
+                <div class="row">
+                  <div>
+                    <p class="name">노형 동물약국</p>
+                    <div class="meta">
+                      <span class="tag open">영업중</span><span class="tag">동물약국</span>
+                    </div>
+                  </div>
+                  <span class="dist num">2.4km</span>
+                </div>
+              </div>
+              <p class="note">화면 예시예요. 시설 이름과 거리는 실제와 달라요.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 6. 무엇을 보고 판단하나요 ─────────────────────────────── -->
+      <section class="band plain sec" aria-labelledby="data">
+        <div class="in">
+          <div>
+            <p class="q">데이터</p>
+            <h2 id="data">무엇을 보고 판단하나요</h2>
+            <p class="lead">화면의 모든 등급에는 출처와 이유가 붙어요.</p>
+          </div>
+          <div class="stats">
+            <div class="stat">
+              <p class="n num">315<small>곳</small></p>
+              <p class="l">반려견 동반 가능 장소</p>
+            </div>
+            <div class="stat">
+              <p class="n num">214<small>곳</small></p>
+              <p class="l">동물병원·동물약국</p>
+            </div>
+            <div class="stat">
+              <p class="n num">5<small>곳</small></p>
+              <p class="l">공공데이터 원천</p>
+            </div>
+          </div>
+          <p class="t-caption muted" style="margin-top: -16px">
+            2026년 9월 적재 기준이에요. 실시간으로 세는 값은 아니에요.
+          </p>
+          <div hidden></div>
+          <ul class="rules">
+            <li>
+              <span class="no">1</span>
+              <p>추천에는 항상 근거를 붙여요</p>
+            </li>
+            <li>
+              <span class="no">2</span>
+              <p>공공데이터는 미리 모아 두고, 화면은 그 데이터만 읽어요</p>
+            </li>
+            <li>
+              <span class="no">3</span>
+              <p>AI는 실제 있는 장소 목록 안에서만 골라요</p>
+            </li>
+            <li>
+              <span class="no">4</span>
+              <p>일정의 저장과 확정은 사용자가 해요. AI는 제안만 해요</p>
+            </li>
+          </ul>
+          <div class="two">
+            <div class="card">
+              <div class="head">
+                <p class="t-title-2">데이터 출처</p>
+                <p class="t-caption muted" style="margin-top: 4px">
+                  화면에 나오는 정보가 무엇에 근거하는지 적어 두었어요.
+                </p>
+              </div>
+              <div class="body">
+                <ul class="sources">
+                  <li>한국관광공사 TourAPI</li>
+                  <li>한국문화정보원</li>
+                  <li>식품의약품안전처</li>
+                  <li>기상청</li>
+                  <li>카카오맵</li>
+                </ul>
+                <p class="arch">Next.js BFF · Spring MSA 5서비스 · Spring AI + Ollama</p>
+              </div>
+            </div>
+            <div class="card">
+              <div class="head"><p class="t-title-2">알아두실 점</p></div>
+              <div class="body">
+                <p class="muted">
+                  동반 가능 여부와 운영시간은 바뀔 수 있어요. 방문 전 확인해 주세요.
+                </p>
+                <p class="t-caption muted" style="margin-top: 8px">
+                  2026 관광데이터 활용 공모전 출품작
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 7. 마무리 CTA ─────────────────────────────────────────── -->
+      <section class="band green cta" aria-labelledby="cta">
+        <div class="in">
+          <div>
+            <h2 id="cta">가입 없이 오늘 판정부터 봐요</h2>
+            <p style="margin-top: 8px">
+              반려견을 등록하면 판정과 장소 필터가 내 아이 기준으로 바뀌어요.
+            </p>
+          </div>
+          <div class="ctas">
+            <a class="btn btn-inverse" href="#">홈으로 가기</a>
+            <a class="btn btn-ghost-inverse" href="#">반려견 등록하기</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ── 푸터 (데스크톱만 · AppShell — 대상 아님) ─────────────────── -->
+    <footer class="shell-footer">
+      <div class="in">
+        <span>반려견과 함께 갈 수 있는 곳을 날씨·혼잡까지 보고 고르는 제주 여행 서비스</span>
+        <span
+          >데이터 출처: 한국관광공사 TourAPI · 한국문화정보원 · 식품의약품안전처 · 기상청 ·
+          카카오맵</span
+        >
+        <a href="#">서비스 소개</a>
+        <span>2026 관광데이터 활용 공모전 출품작</span>
       </div>
-    </div>
-  </section>
+    </footer>
 
-  <!-- ── 7. 마무리 CTA ─────────────────────────────────────────── -->
-  <section class="band green cta" aria-labelledby="cta">
-    <div class="in">
-      <div>
-        <h2 id="cta">가입 없이 오늘 판정부터 봐요</h2>
-        <p style="margin-top:8px">반려견을 등록하면 판정과 장소 필터가 내 아이 기준으로 바뀌어요.</p>
-      </div>
-      <div class="ctas">
-        <a class="btn btn-inverse" href="#">홈으로 가기</a>
-        <a class="btn btn-ghost-inverse" href="#">반려견 등록하기</a>
-      </div>
-    </div>
-  </section>
-
-</main>
-
-<!-- ── 푸터 (데스크톱만 · AppShell — 대상 아님) ─────────────────── -->
-<footer class="shell-footer">
-  <div class="in">
-    <span>반려견과 함께 갈 수 있는 곳을 날씨·혼잡까지 보고 고르는 제주 여행 서비스</span>
-    <span>데이터 출처: 한국관광공사 TourAPI · 한국문화정보원 · 식품의약품안전처 · 기상청 · 카카오맵</span>
-    <a href="#">서비스 소개</a>
-    <span>2026 관광데이터 활용 공모전 출품작</span>
-  </div>
-</footer>
-
-<!-- ── 모바일 탭바 (AppShell — 대상 아님) ────────────────────────── -->
-<nav class="tabbar" aria-label="하단">
-  <a href="#"><i></i>홈</a><a href="#"><i></i>장소</a><a href="#"><i></i>일정</a><a href="#"><i></i>내 정보</a>
-</nav>
-<div class="mock-note" aria-hidden="true">목업 · /about</div>
-
-</body>
+    <!-- ── 모바일 탭바 (AppShell — 대상 아님) ────────────────────────── -->
+    <nav class="tabbar" aria-label="하단">
+      <a href="#"><i></i>홈</a><a href="#"><i></i>장소</a><a href="#"><i></i>일정</a
+      ><a href="#"><i></i>내 정보</a>
+    </nav>
+    <div class="mock-note" aria-hidden="true">목업 · /about</div>
+  </body>
 </html>
