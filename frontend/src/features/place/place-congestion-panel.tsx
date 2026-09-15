@@ -5,8 +5,6 @@ import {
   barHeightPercent,
   CONGESTION_DAYS,
   type CongestionDays,
-  type CongestionFill,
-  congestionFill,
   formatCongestionRange,
   splitDay,
 } from '@/lib/insight/congestion'
@@ -261,13 +259,16 @@ function Chart({
         onScroll={rail.onScroll}
         className={cn(
           /*
-            **세로 여백이 장식이 아니다** (#603). `overflow-x: auto` 를 주면 `overflow-y` 가
-            `visible` 로 남지 못하고 함께 `auto` 가 된다 — 가로만 열었는데 세로도 클립된다.
-            트랙이 스크롤러 맨 위에 붙어 있어 선택 표시(`outline-offset-2`, 위로 4px)와
-            100% 막대 끝이 그 선에서 잘렸다. 4px 를 비워 두고 바깥에서 같은 값을 당겨
-            카드 안 세로 리듬은 그대로 둔다.
+            **`overflow-x: auto` 는 세로도 클립한다** — `overflow-y` 가 `visible` 로 남지 못하고
+            함께 `auto` 가 되기 때문이다. 30일 막대 윗부분이 잘리던 원인이 이것이었다: 트랙에
+            `outline-offset-2` 선택 표시가 있어 트랙 상자 **밖 위쪽 4px** 에 그려졌는데, 트랙이
+            스크롤러 맨 위에 붙어 있어 그 4px 가 잘렸다.
+
+            그 표시를 진한 파랑 채움으로 바꾸면서(#603) 트랙 밖에 그리는 것이 하나도 없어져
+            여백이 필요 없어졌다 — 실측 `scrollHeight === clientHeight`. **다시 트랙 밖에
+            무언가를 그리면(테두리·포커스 링) 그만큼 세로 여백을 함께 줘야 한다.**
           */
-          'flex items-end gap-1.5 py-1',
+          'flex items-end gap-1.5',
           extended && 'overflow-x-auto',
           /*
             **넘치는 쪽만 카드 끝까지 연다** (`INSET_BLEED_END_CLASS.card`). 인셋 안에서
@@ -316,18 +317,20 @@ const TRACK_HEIGHT = 'h-36'
 const COLUMN_WIDTH = 'w-9'
 
 /**
- * 막대 색 — 단계는 `congestionFill` 이 정하고 여기는 토큰만 건다.
+ * 막대 색 — **두 값뿐이다** (#603).
  *
- * `busy` 만 `--metric-*` 밖이다. 서버 등급 `HIGH` 를 집중률로 다시 가르는 자리인데
- * 노랑(`mid`)과 빨강(`critical`) 사이가 비어 있어 전용 토큰을 냈다 (DESIGN.md §2-3).
+ * **등급으로 칠하지 않는다.** 막대 높이가 이미 집중률이고 서버 등급도 그 집중률에서
+ * 갈리므로, 색으로 등급을 그리면 **같은 변수를 두 번** 그린다 — 색을 아무리 나눠도 새로
+ * 알려 주는 것이 없고, 실제로 30일을 펼치면 한 등급에 몰려 한 덩어리로 깔렸다.
+ *
+ * 그래서 색은 **"이 날이 답" 하나만** 말한다. 등급은 카드 머리 배지와 `sr-only` 가 계속
+ * 글자로 말하므로 잃는 정보가 없다.
+ *
+ * `--metric-critical-*` 을 붐비는 날에 쓰지 않는 이유도 여기 있다 — 붐비는 날은 위험한
+ * 날이 아니라 사람 많은 날이다 (DESIGN.md §2-3 의 "`LOW` 에 danger 를 쓰지 않는다").
  */
-const CONGESTION_FILL_CLASS: Record<CongestionFill, string> = {
-  low: 'bg-metric-high-500',
-  moderate: 'bg-metric-mid-500',
-  busy: 'bg-congestion-busy-500',
-  packed: 'bg-metric-critical-500',
-  unknown: '',
-}
+const BAR_FILL = 'bg-congestion-bar'
+const BEST_FILL = 'bg-congestion-best'
 
 function DayColumn({ item, picked }: { item: DailyCongestionItem; picked: boolean }) {
   const parts = splitDay(item.date)
@@ -348,20 +351,19 @@ function DayColumn({ item, picked }: { item: DailyCongestionItem; picked: boolea
             점선 테두리 전용인 이유가 정확히 이것이다 (DESIGN.md §2-3).
           */
           rate === null ? 'border-metric-unknown-500 border-2 border-dashed' : 'bg-band',
-          /*
-            서버가 고른 날 표시. **등급 색이 아니라 선택 표시기다** (`--brand-500`,
-            DESIGN.md §2) — 등급 색으로 두르면 붐비는 주의 최선일(`HIGH`)에 초록 테두리가
-            생긴다. 색이 유일한 채널도 아니다: 위의 `LeastCrowded` 가 날짜를 글자로 말한다.
-          */
-          picked && 'outline-brand-500 outline-2 outline-offset-2',
         )}
       >
         {rate !== null && (
+          /*
+            **서버가 고른 날을 색으로 말한다** (#603). 예전에는 트랙에 `--brand-500` 테두리를
+            둘렀는데, 진한 파랑이 그 역할을 하게 되면서 같은 것을 두 번 말하게 됐다 — 신호가
+            둘이면 어느 쪽이 답인지 흐려진다.
+
+            **색이 유일한 채널은 아니다.** 위의 `LeastCrowded` 가 그 날짜를 글자로 말하고,
+            아래 `sr-only` 가 등급과 집중률을 읽는다.
+          */
           <div
-            className={cn(
-              'w-full rounded-sm',
-              CONGESTION_FILL_CLASS[congestionFill(item.level.code, rate)],
-            )}
+            className={cn('w-full rounded-sm', picked ? BEST_FILL : BAR_FILL)}
             style={{ height: `${barHeightPercent(rate)}%` }}
           />
         )}
@@ -369,9 +371,12 @@ function DayColumn({ item, picked }: { item: DailyCongestionItem; picked: boolea
 
       {parts !== null && (
         <span className="text-caption text-fg-muted font-medium tabular-nums">
-          <span className={cn('font-semibold', picked ? 'text-brand-700' : 'text-fg')}>
-            {parts.day}
-          </span>
+          {/*
+            **초록을 남기지 않는다** (#603). 예전에는 선택 표시가 `--brand-500` 테두리였고
+            이 숫자가 그 짝인 `--brand-700` 이었다. 테두리를 진한 파랑으로 갈아탄 지금 이
+            숫자만 초록으로 남으면 한 칸에 색이 셋이 된다 — 강조는 굵기가 진다.
+          */}
+          <span className="text-fg font-semibold">{parts.day}</span>
           {parts.weekday}
         </span>
       )}
@@ -380,9 +385,10 @@ function DayColumn({ item, picked }: { item: DailyCongestionItem; picked: boolea
         막대의 높이와 색은 스크린리더에 아무 말도 하지 못한다. 등급은 서버 `name` 을 그대로
         읽어 준다 — `UNKNOWN` 도 "정보 없음" 이라는 이름을 갖고 있어 따로 문구를 만들지 않는다.
 
-        **집중률까지 읽는다** (#603). 막대가 네 칸으로 갈렸는데 등급 이름은 셋뿐이라, 넷째
-        칸(`packed`)이 **색으로만 남는다** — DESIGN.md §2-3 이 금지한 자리다. 숫자를 함께
-        읽어 주면 같은 `혼잡` 안의 70 과 92 가 보조기기에서도 갈린다.
+        **집중률까지 읽는다** (#603). 이 카드에서 실제로 비교를 해 주는 것은 **막대 높이**인데
+        (색은 답인 하루만 말한다), 높이는 스크린리더에 아무것도 전하지 못한다. 등급 이름만
+        읽으면 같은 `혼잡` 안의 68 과 92 가 한 낱말로 뭉뚱그려진다 — 눈으로는 갈리는 차이가
+        보조기기에서만 사라진다.
       */}
       <span className="sr-only">
         {parts === null

@@ -165,16 +165,6 @@ describe('PlaceCongestionPanel — 기간', () => {
   })
 
   /*
-    **`overflow-x: auto` 는 세로도 클립한다** (#603) — `overflow-y` 가 `visible` 로 남지
-    못하고 함께 `auto` 가 된다. 트랙이 스크롤러 맨 위에 붙어 있어 선택 표시
-    (`outline-offset-2`, 위로 4px)와 100% 막대 끝이 그 선에서 잘렸다. 세로 여백 4px 가
-    그 자리를 비운다 — 지우면 30일 보기의 막대 윗부분이 다시 잘린다.
-  */
-  it('레일에 세로 여백을 둬 선택 표시가 잘리지 않게 한다', () => {
-    expect(render({ days: CONGESTION_DAYS.extended })).toContain('py-1')
-  })
-
-  /*
     **`scroll-rail` 은 장식이 아니라 가로 넘침의 유일한 방어막이다** (#603).
 
     날짜 칸마다 붙는 `sr-only` 라벨은 `position: absolute` 다. 스크롤러가 `position: static`
@@ -200,43 +190,47 @@ describe('PlaceCongestionPanel — 기간', () => {
 
 describe('PlaceCongestionPanel — 막대 색 (#603)', () => {
   /*
-    **등급 셋으로는 다채로울 수 없다.** 서버는 `LOW`·`MODERATE`·`HIGH` 를 주는데 실데이터가
-    `HIGH` 한 칸에 몰려, 30일을 펼치면 막대가 회색 한 덩어리로 깔렸다. `HIGH` 안쪽만 집중률
-    80 에서 다시 가른다 — hue 는 서버 등급을 따르므로 배지 문구와 어긋나는 날이 없다.
+    **색은 "이 날이 답" 하나만 말한다.** 등급으로 칠하지 않는 이유는 막대 높이가 이미
+    집중률이고 서버 등급도 그 집중률에서 갈리기 때문이다 — 색으로 등급을 그리면 같은
+    변수를 두 번 그리게 되고, 실제로 30일을 펼치면 한 등급에 몰려 한 덩어리로 깔렸다.
 
-    fixture 의 `9월 1일`(71.8)과 `9월 7일`(68.3)이 `HIGH` 이고 둘 다 80 미만이라 `busy` 다.
+    fixture 의 `leastCrowded` 는 `2026-09-05`(21.4) 하루다.
   */
-  it('HIGH 를 집중률 80 에서 busy 와 packed 로 가른다', () => {
-    const packed = {
-      ...congestion,
-      dailyCongestions: congestion.dailyCongestions.map((item) =>
-        item.level.code === 'HIGH' ? { ...item, concentrationRate: 88.2 } : item,
-      ),
-    }
+  it('서버가 고른 날만 진한 파랑이고 나머지는 연한 파랑이다', () => {
+    const markup = render()
 
-    expect(render()).toContain('bg-congestion-busy-500')
-    expect(render()).not.toContain('bg-metric-critical-500')
-    expect(render({ data: packed })).toContain('bg-metric-critical-500')
+    expect(markup.match(/bg-congestion-best/g)).toHaveLength(1)
+    // 7일 중 `UNKNOWN` 하루는 막대 자체가 없고(점선 트랙), 고른 하루는 위에서 셌다
+    expect(markup.match(/bg-congestion-bar/g)).toHaveLength(5)
   })
 
   /*
-    **집중률을 모르면 더 붉게 칠하지 않는다** — 둘로 가를 근거가 없는데 `packed` 로 두면
-    모르는 것을 아는 것처럼 말하게 된다.
+    **등급 색을 쓰지 않는다.** 붐비는 날은 위험한 날이 아니라 사람 많은 날이라
+    `--metric-critical-*`(산책 위험 전용)이 맞지 않는다 — DESIGN.md §2-3 의 "`LOW` 에
+    danger 를 쓰지 않는다" 와 같은 규칙이다.
   */
-  it('집중률이 없는 HIGH 는 busy 에 남는다', () => {
-    const rateless = {
-      ...congestion,
-      dailyCongestions: congestion.dailyCongestions.map((item) =>
-        item.level.code === 'HIGH' ? { ...item, concentrationRate: null } : item,
-      ),
-    }
+  it('막대에 등급 색을 쓰지 않는다', () => {
+    const markup = render({ days: CONGESTION_DAYS.extended })
 
-    expect(render({ data: rateless })).not.toContain('bg-metric-critical-500')
+    for (const tone of ['critical', 'high', 'mid', 'low']) {
+      expect(markup).not.toContain(`bg-metric-${tone}-500`)
+    }
   })
 
   /*
-    막대가 넷으로 갈렸는데 등급 이름은 셋뿐이라, 넷째 칸이 **색으로만** 남으면 DESIGN.md
-    §2-3 을 어긴다. `sr-only` 가 등급 이름과 집중률을 함께 읽어 그 축을 메운다.
+    **선택 표시가 둘이면 어느 쪽이 답인지 흐려진다.** 진한 파랑이 그 역할을 가져가면서
+    트랙의 `--brand-500` 테두리와 날짜의 `--brand-700` 을 걷었다.
+  */
+  it('예전 선택 표시(브랜드 테두리·초록 날짜)를 남기지 않는다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain('outline-brand-500')
+    expect(markup).not.toContain('text-brand-700')
+  })
+
+  /*
+    이 카드에서 실제로 비교를 해 주는 것은 막대 **높이**인데 높이는 스크린리더에 아무것도
+    전하지 못한다. 등급 이름만 읽으면 같은 `혼잡` 안의 68 과 92 가 한 낱말로 뭉개진다.
   */
   it('보조기기에 등급 이름과 집중률을 함께 읽어 준다', () => {
     const markup = render()

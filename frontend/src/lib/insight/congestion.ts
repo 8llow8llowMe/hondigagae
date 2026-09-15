@@ -26,49 +26,6 @@ export const CONGESTION_DAYS = {
 export type CongestionDays = (typeof CONGESTION_DAYS)[keyof typeof CONGESTION_DAYS]
 
 /**
- * 막대 색 단계 — **네 칸이다** (#603).
- *
- * **hue 는 서버 등급이 정한다.** FE 가 집중률로 색을 처음부터 다시 나누면 배지가
- * `보통` 이라 말하는 날에 막대가 주황으로 서서 **한 카드 안에서 두 말이 갈린다.**
- *
- * 가르는 것은 `HIGH` 한 칸의 **안쪽뿐이다.** 등급이 셋인데 실데이터가 `HIGH` 에 몰려,
- * 30일을 펼치면 막대가 회색 한 덩어리로 깔렸다 — 색이 있으나 아무것도 구별해 주지 않는
- * 상태다. 같은 `혼잡` 안에서 70 인 날과 92 인 날은 사용자에게 다른 날이다.
- */
-export type CongestionFill = 'low' | 'moderate' | 'busy' | 'packed' | 'unknown'
-
-/**
- * `HIGH` 를 둘로 가르는 집중률.
- *
- * **서버 등급 경계가 아니다.** 등급은 서버가 주고 이 값은 그 안을 다시 나누기만 하므로,
- * 여기를 바꿔도 배지 문구(`level.name`)와 어긋나지 않는다. 80 인 이유는 dev 실데이터에서
- * `HIGH` 가 대략 60~95 에 퍼져 있어 그 한가운데 위라 양쪽에 날이 고르게 남아서다.
- */
-export const PACKED_RATE = 80
-
-/**
- * 등급 코드 + 집중률 → 막대 색 단계.
- *
- * **집중률을 모르면 `HIGH` 라도 `busy` 다** — 둘로 가를 근거가 없는데 더 붉게 칠하면
- * 모르는 것을 아는 것처럼 말하게 된다.
- */
-export function congestionFill(
-  code: string | null | undefined,
-  concentrationRate: number | null,
-): CongestionFill {
-  switch (code) {
-    case 'LOW':
-      return 'low'
-    case 'MODERATE':
-      return 'moderate'
-    case 'HIGH':
-      return concentrationRate !== null && concentrationRate >= PACKED_RATE ? 'packed' : 'busy'
-    default:
-      return 'unknown'
-  }
-}
-
-/**
  * 집중률 → 막대 높이(%). 트랙 전체가 **집중률 100** 이다.
  *
  * **기간 안 최댓값으로 정규화하지 않는다.** 그렇게 하면 전부 20 대인 한산한 주와 전부 80
