@@ -27,6 +27,7 @@ public enum PlanErrorCode {
     REVIEW_ALREADY_EXISTS("PLAN_017", "이미 이 일정의 후기를 작성했습니다.", HttpStatus.CONFLICT),
     REVIEW_ITEM_NOT_ELIGIBLE("PLAN_018", "다녀온 장소 항목만 후기에 담을 수 있습니다.", HttpStatus.BAD_REQUEST),
     REVIEW_ITEM_DUPLICATED("PLAN_020", "같은 일정 항목을 후기에 두 번 넣을 수 없습니다.", HttpStatus.BAD_REQUEST),
+    PLAN_COPY_PERIOD_MISMATCH("PLAN_021", "복사할 여행 기간의 일수는 원본과 같아야 합니다.", HttpStatus.BAD_REQUEST),
     INVALID_REQUEST("PLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
     // 프레임워크 공통 2종은 검증 대역 끝에 둔다 (coding-conventions §8-2). PLAN_115 가 petIds 필드 코드로
     // 쓰이면서 한 칸씩 밀렸고, 준비물 필드 코드가 PLAN_116~123 을 가져가면서 다시 밀었다.

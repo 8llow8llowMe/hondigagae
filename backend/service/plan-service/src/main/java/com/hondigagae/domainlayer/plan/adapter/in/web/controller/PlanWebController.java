@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.plan.adapter.in.web.controller;
 
 import com.hondigagae.common.dto.Response;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanSummaryItem;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanCopyRequest;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanCreateRequest;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanDayItemsReplaceRequest;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanUpdateRequest;
@@ -65,6 +66,27 @@ public class PlanWebController {
         @Valid @RequestBody PlanCreateRequest request
     ) {
         PlanDetailResponse response = planWebUseCase.createPlan(loginActive.memberId(), request.toCommand());
+        return ResponseEntity.ok().body(Response.success(response));
+    }
+
+    @Operation(summary = "여행 일정 복제",
+        description = "지난 일정을 새 DRAFT 일정으로 복제합니다. 항목은 옮기되 방문 체크는 초기화(visited=false)되고, "
+            + "준비물·후기는 가져오지 않습니다. 동행 반려견은 원본을 따르되 더 이상 소유하지 않은 아이는 빼고, "
+            + "남은 아이가 없으면 실패합니다.\n\n"
+            + "**필수: planId (경로), 바디 startDate·endDate.** title 은 생략 가능하고, 생략하면 원본 제목 뒤에 "
+            + "\" (복사)\" 를 붙입니다. 새 기간의 일수는 원본과 같아야 합니다.\n\n"
+            + "호출 예\n"
+            + "- `POST /api/v1/plans/1234567890123456789/copy` "
+            + "`{\"startDate\":\"2027-09-12\",\"endDate\":\"2027-09-14\"}`",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @PostMapping("/{planId}/copy")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<PlanDetailResponse>> copyPlan(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "[필수] 복제할 일정 아이디", required = true, example = "1234567890123456789") @PathVariable long planId,
+        @Valid @RequestBody PlanCopyRequest request
+    ) {
+        PlanDetailResponse response = planWebUseCase.copyPlan(loginActive.memberId(), planId, request.toCommand());
         return ResponseEntity.ok().body(Response.success(response));
     }
 

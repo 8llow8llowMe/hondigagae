@@ -22,6 +22,7 @@
 
 - `GET|POST /api/v1/plans`
 - `GET|PUT|DELETE /api/v1/plans/{planId}`
+- `POST /api/v1/plans/{planId}/copy` — 지난 일정을 새 DRAFT 로 복제
 - `PUT /api/v1/plans/{planId}/days/{day}/items` — 일자 단위 항목 일괄 편집
 - `GET|POST|PUT /api/v1/plans/{planId}/reviews` — 완료된 일정당 후기 하나. 사진은 없음
 
@@ -54,6 +55,14 @@
     시작일 편집을 여는 순간 다시 고아가 생긴다.
   - 고아가 생기면 지울 수단이 없다는 것이 이 규칙의 근거다 — 일자별 교체(`PUT .../days/{day}/items`)는
     범위 밖 일차를 `PLAN_002` 로 막는다.
+- **지난 일정 복제 (`POST /plans/{planId}/copy`).** 항목만 새 `DRAFT` 로 옮긴다 — 준비물·후기·방문
+  체크는 가져오지 않는다. 본인 소유만(남의 일정은 `PLAN_001` 404). 제목은 요청 값 또는 원본 뒤
+  `" (복사)"`. 새 `startDate`/`endDate` 의 **일수는 원본과 같아야** 한다 — 일차 항목을 그대로
+  옮기므로 다르면 `PLAN_021` 400. 동행 반려견은 원본 `petIds` 를 따르되 더 이상 소유하지 않은
+  아이는 빼고, 남은 아이가 없으면 `PLAN_010` 400(대표 반려견 폴백 없음). 복제 항목은
+  `visited=false`, 새 `planItemId`. **장소 검증은 부르지 않는다** — delisted 장소도 항목은
+  남기고 상세 요약만 null 인 기존 규칙을 따른다. 생성 경로의 `verifyPlaceTargets` 를 그대로 쓰면
+  delisted 참조가 있는 일정을 복제할 수 없게 된다.
 - **`PlanItemType` 은 이 서비스가 아니라 `core/shared-travel` 에 있다 (필수).** ai-service 초안의
   `itemType` 이 여기 저장 규칙을 그대로 따라야 하기 때문이다 — 문자열과 주석으로만 맞추던 때
   실제로 어긋났다 (#89).

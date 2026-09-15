@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.plan.application.service.processor;
 
+import com.hondigagae.domainlayer.plan.application.command.PlanCopyCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanCreateCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanItemCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanUpdateCommand;
@@ -31,6 +32,9 @@ public class PlanCommandProcessor {
 
     /** 여행 기간 상한(일). 개인 여행 기준으로 충분하고, 일자 배열과 브리핑 루프의 상한이 된다. */
     private static final int MAX_TRIP_DAYS = 30;
+
+    /** 복제 시 제목을 생략하면 원본 뒤에 붙인다. */
+    private static final String COPY_TITLE_SUFFIX = " (복사)";
 
     private final PlanRepositoryPort planRepositoryPort;
     private final PlanItemRepositoryPort planItemRepositoryPort;
@@ -73,6 +77,77 @@ public class PlanCommandProcessor {
             planItemRepositoryPort.saveAll(toItems(saved.id(), command.items()));
         }
         return saved;
+    }
+
+    /**
+     * 지난 일정을 새 {@code DRAFT} 로 복제한다. 준비물·후기·방문 체크는 가져오지 않는다.
+     *
+     * <p>장소 검증({@link #verifyPlaceTargets})은 부르지 않는다 — 복제는 이미 저장된 항목을
+     * 옮기는 것이고, delisted 장소는 상세 규칙대로 항목은 남기고 요약만 비운다. 생성 경로처럼
+     * 검증하면 delisted 참조가 있는 일정을 복제할 수 없게 된다.
+     *
+     * <p>동행 반려견 필터({@link #resolveCopyPetIds})는 원격 호출이라 Facade 가 트랜잭션 밖에서 부른다.
+     */
+    @Transactional
+    public Plan copyPlan(Plan source, PlanCopyCommand command, List<Long> petIds, List<PlanItem> sourceItems) {
+        validateDateRange(command.startDate(), command.endDate());
+        int newTotalDays = (int) java.time.temporal.ChronoUnit.DAYS.between(command.startDate(), command.endDate()) + 1;
+        if (newTotalDays != source.totalDays()) {
+            throw new PlanException(PlanErrorCode.PLAN_COPY_PERIOD_MISMATCH);
+        }
+
+        Plan plan = Plan.builder()
+            .id(snowflakeIdGenerator.generateId())
+            .memberId(source.memberId())
+            .petId(petIds.get(0))
+            .areaCode(source.areaCode())
+            .sigunguCode(source.sigunguCode())
+            .title(resolveCopyTitle(command.title(), source.title()))
+            .startDate(command.startDate())
+            .endDate(command.endDate())
+            .budget(source.budget())
+            .status(PlanStatus.DRAFT)
+            .deleted(false)
+            .build();
+
+        Plan saved = planRepositoryPort.save(plan);
+        planPetRepositoryPort.saveAll(toPets(saved.id(), petIds));
+
+        if (!CollectionUtils.isEmpty(sourceItems)) {
+            List<PlanItemCommand> itemCommands = sourceItems.stream()
+                .map(item -> PlanItemCommand.builder()
+                    .day(item.day())
+                    .sequence(item.sequence())
+                    .itemType(item.itemType())
+                    .targetId(item.targetId())
+                    .title(item.title())
+                    .memo(item.memo())
+                    .startTime(item.startTime())
+                    .build())
+                .toList();
+            validateSequenceUniqueness(itemCommands);
+            planItemRepositoryPort.saveAll(toItems(saved.id(), itemCommands));
+        }
+        return saved;
+    }
+
+    /**
+     * 복제 시 원본 동행 반려견을 따르되, 삭제됐거나 소유가 아닌 아이는 빼고 남은 아이가 없으면
+     * {@link PlanErrorCode#PET_REQUIRED} 이다 — 대표 반려견 폴백은 쓰지 않는다. 원본에 실려
+     * 있던 동행 구성을 최대한 유지하되, 더 이상 내 반려견이 아닌 아이는 실어 올 수 없기 때문이다.
+     */
+    public List<Long> resolveCopyPetIds(long memberId, List<Long> sourcePetIds) {
+        if (CollectionUtils.isEmpty(sourcePetIds)) {
+            throw new PlanException(PlanErrorCode.PET_REQUIRED);
+        }
+        Set<Long> ownedPetIds = petConditionQueryPort.findOwnedPetIds(memberId, sourcePetIds);
+        List<Long> filtered = sourcePetIds.stream()
+            .filter(ownedPetIds::contains)
+            .toList();
+        if (filtered.isEmpty()) {
+            throw new PlanException(PlanErrorCode.PET_REQUIRED);
+        }
+        return filtered;
     }
 
     /**
@@ -226,6 +301,16 @@ public class PlanCommandProcessor {
             .filter(found -> found.planId() == plan.id())
             .orElseThrow(() -> new PlanException(PlanErrorCode.NOT_FOUND_PLAN_ITEM));
         return planItemRepositoryPort.save(item.withVisited(visited));
+    }
+
+    private String resolveCopyTitle(String requestedTitle, String sourceTitle) {
+        if (requestedTitle != null && !requestedTitle.isBlank()) {
+            return requestedTitle;
+        }
+        if (sourceTitle.length() + COPY_TITLE_SUFFIX.length() <= 60) {
+            return sourceTitle + COPY_TITLE_SUFFIX;
+        }
+        return sourceTitle.substring(0, 60 - COPY_TITLE_SUFFIX.length()) + COPY_TITLE_SUFFIX;
     }
 
     private List<PlanPet> toPets(long planId, List<Long> petIds) {
