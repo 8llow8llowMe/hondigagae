@@ -15,7 +15,7 @@
 - **저장소 루트가 아니라 `frontend/` 에서 `pnpm` 명령을 실행한다.** 워크트리 경로: `/Users/seonghoho/Documents/projects/hondigagae/.claude/worktrees/hondigagae-landing-page-bb243b/frontend`
 - **`git add -A` · `git add .` · `git stash` 금지.** 경로를 하나씩 스테이징한다 (`docs/git-workflow.md` §4-1). 작업 트리를 다른 세션과 공유한다.
 - **커밋 prefix `[FE]`**, 타입 `feat`/`test`/`docs`. 형식: `[FE] feat: ...`. 커밋 끝에 `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>` 한 줄.
-- **문구는 전부 해요체**(`message-tone.test.ts` 가 감시). 금지어: `최고`, `완벽`, `강아지`, `애견`, `펫 프렌들리`, `여행 계획`, `플랜`, `스팟`, `여행 점수`. 용어는 `반려견` · `여행 일정` · `장소` · `여행 적합도` · `반려견 동반 가능`.
+- **문구는 전부 해요체**(`message-tone.test.ts` 가 감시). 금지어(홍보성 용례): `최고의`, `완벽한`, `강아지`, `애견`, `펫 프렌들리`, `여행 계획`, `플랜`, `스팟`, `여행 점수`. **기상 용어 `최고 체감온도` 의 "최고" 는 금지어가 아니다**(홈이 이미 쓴다). 용어는 `반려견` · `여행 일정` · `장소` · `여행 적합도` · `반려견 동반 가능`.
 - **FE 문구에 개수(`\d+곳`)를 적지 않는다** — 규모 타일의 숫자는 `about-specimen-data.ts` 의 상수이고 `messages.about` 에는 숫자가 없다.
 - **`className` 으로 공용 컴포넌트 외형(색·radius·shadow·padding)을 덮지 않는다.** 레이아웃 유틸리티만. 버튼 외형이 필요하면 `Button` 변형을 추가한다.
 - **타이포는 7단 토큰만**: `text-page` `text-display` `text-title-1` `text-title-2` `text-body-1` `text-body-2` `text-caption`. **spacing 은 스케일 `4 6 8 12 16 20 24 32 40 48 64`** 안의 Tailwind 유틸리티만(`p-1`=4 … `p-16`=64). **arbitrary value(`max-w-[1120px]`, `p-[13px]`) 금지.**
