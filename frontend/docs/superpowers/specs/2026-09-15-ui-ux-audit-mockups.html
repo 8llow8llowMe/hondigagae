@@ -1,0 +1,2202 @@
+<title>혼디가개 UX 시안</title>
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap"
+/>
+<style>
+  :root {
+    --page: #f0f2f5;
+    --page-fg: #15181d;
+    --page-muted: #596069;
+    --page-line: #d9dde4;
+    --anno: #3a4fd6;
+    --anno-tint: #e7eaff;
+    --anno-fg: #2536a8;
+    /* 제품 토큰 (frontend/src/styles/tokens.css 그대로) */
+    --bg: #ffffff;
+    --band: #eef0f3;
+    --sunken: #f5f6f8;
+    --border: #e3e5ea;
+    --border-strong: #c4c8d0;
+    --fg: #15181d;
+    --fg-muted: #596069;
+    --fg-subtle: #878d96;
+    --high-100: #e4f0ea;
+    --high-500: #1f7a55;
+    --high-700: #16563c;
+    --mid-100: #fef4e0;
+    --mid-500: #b0761a;
+    --mid-700: #8a5f0f;
+    --crit-100: #fdecec;
+    --crit-500: #d54040;
+    --crit-700: #ce2d2d;
+    --low-100: #eef0f3;
+    --low-700: #4b5563;
+    --unknown: #a8aeb8;
+    --ai-100: #fff1e6;
+    --ai-700: #a24d0a;
+    --kakao: #fee500;
+    --kakao-fg: #191600;
+    --naver: #03c75a;
+    --r-sm: 4px;
+    --r-md: 8px;
+    --r-lg: 12px;
+    --r-xl: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --page: #14161a;
+      --page-fg: #e8eaee;
+      --page-muted: #9aa1ab;
+      --page-line: #2a2e35;
+      --anno: #8a97ff;
+      --anno-tint: #232848;
+      --anno-fg: #c2c8ff;
+    }
+  }
+  :root[data-theme='dark'] {
+    --page: #14161a;
+    --page-fg: #e8eaee;
+    --page-muted: #9aa1ab;
+    --page-line: #2a2e35;
+    --anno: #8a97ff;
+    --anno-tint: #232848;
+    --anno-fg: #c2c8ff;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--page-fg);
+    font-family:
+      Pretendard,
+      'Noto Sans KR',
+      -apple-system,
+      'Apple SD Gothic Neo',
+      'Malgun Gothic',
+      sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding-block: 40px 96px;
+    padding-inline: 20px;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    margin: 0;
+  }
+  .lede {
+    max-width: 66ch;
+    color: var(--page-muted);
+    margin-top: 12px;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    margin-top: 20px;
+    font-size: 13px;
+    color: var(--page-muted);
+    align-items: center;
+  }
+  .legend .co {
+    position: static;
+  }
+  .toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 20px;
+  }
+  .toc a {
+    font-size: 13px;
+    color: var(--anno-fg);
+    background: var(--anno-tint);
+    border-radius: 999px;
+    padding: 4px 10px;
+    text-decoration: none;
+  }
+  .toc a:focus-visible,
+  a:focus-visible,
+  button:focus-visible {
+    outline: 2px solid var(--anno);
+    outline-offset: 2px;
+  }
+
+  section.scr {
+    margin-top: 64px;
+    padding-top: 32px;
+    border-top: 1px solid var(--page-line);
+  }
+  .scr-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    align-items: baseline;
+  }
+  .scr-head h2 {
+    font-size: 22px;
+    font-weight: 700;
+  }
+  .scr-head .ids {
+    font-size: 13px;
+    color: var(--page-muted);
+  }
+  .scr-head .ids b {
+    color: var(--anno-fg);
+    font-weight: 600;
+  }
+  .scr-body {
+    display: grid;
+    grid-template-columns: minmax(0, 390px) minmax(260px, 1fr);
+    gap: 32px;
+    margin-top: 20px;
+    align-items: start;
+  }
+  @media (max-width: 760px) {
+    .scr-body {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  .notes {
+    display: grid;
+    gap: 12px;
+    font-size: 14px;
+  }
+  .notes li {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 10px;
+    list-style: none;
+  }
+  .notes ul {
+    margin: 0;
+    padding: 0;
+    display: contents;
+  }
+  .notes .co {
+    position: static;
+    flex: none;
+    margin-top: 2px;
+  }
+  .notes b {
+    font-weight: 600;
+  }
+  .notes .why {
+    color: var(--page-muted);
+    display: block;
+    margin-top: 2px;
+  }
+  .notes .before {
+    display: block;
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--page-muted);
+    padding-left: 10px;
+    border-left: 2px solid var(--page-line);
+  }
+
+  /* 콜아웃 — 주석. UI 가 아니다 */
+  .co {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--anno);
+    color: #fff;
+    font:
+      700 12px/22px Pretendard,
+      'Noto Sans KR',
+      sans-serif;
+    text-align: center;
+    box-shadow: 0 0 0 3px var(--page);
+    z-index: 5;
+  }
+
+  /* 프레임 */
+  .ph {
+    position: relative;
+    width: 100%;
+    max-width: 390px;
+    background: var(--sunken);
+    color: var(--fg);
+    border-radius: 22px;
+    border: 1px solid var(--page-line);
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .ph.rail {
+    max-width: 400px;
+  }
+  .fold {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 844px;
+    border-top: 2px dashed var(--anno);
+    z-index: 4;
+    pointer-events: none;
+  }
+  .fold::after {
+    content: '첫 화면 끝 · 844px';
+    position: absolute;
+    right: 8px;
+    top: -22px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--anno-fg);
+    background: var(--anno-tint);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+  .hd {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 56px;
+    padding-inline: 16px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.02em;
+  }
+  .logo i {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: var(--high-500);
+    display: inline-block;
+  }
+  .hd .sp {
+    flex: 1;
+  }
+  .ic {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .ic.sos {
+    color: var(--crit-500);
+    border: 1.5px solid var(--crit-500);
+  }
+  .lnk {
+    color: var(--high-500);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .sm {
+    font-size: 12px;
+    color: var(--fg-muted);
+  }
+  .xs {
+    font-size: 12px;
+    color: var(--fg-subtle);
+  }
+  .cap {
+    font-size: 12px;
+    color: var(--fg-muted);
+    font-weight: 500;
+  }
+  .stack {
+    display: grid;
+    gap: 8px;
+    padding-block: 8px;
+  }
+  .stack > *,
+  .ph > *,
+  .rowx > *,
+  .li > * {
+    min-width: 0;
+  }
+  .scroller {
+    display: flex;
+    gap: 8px;
+    overflow: hidden;
+  }
+  .scroller > * {
+    flex: none;
+    width: 150px;
+  }
+  .card {
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 16px;
+  }
+  .card h3 {
+    font-size: 17px;
+    font-weight: 700;
+  }
+  .card h3 small {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--fg-muted);
+    margin-left: 6px;
+  }
+  .rowx {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .grow {
+    flex: 1;
+    min-width: 0;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 44px;
+    padding-inline: 16px;
+    border-radius: var(--r-md);
+    font-weight: 600;
+    font-size: 15px;
+    border: 1px solid transparent;
+    text-decoration: none;
+    color: inherit;
+    background: var(--bg);
+  }
+  .btn.pri {
+    background: var(--high-500);
+    color: #fff;
+  }
+  .btn.sec {
+    border-color: var(--border-strong);
+  }
+  .btn.sm {
+    height: 36px;
+    font-size: 14px;
+    padding-inline: 12px;
+  }
+  .btn.blk {
+    width: 100%;
+  }
+  .btn.kakao {
+    background: var(--kakao);
+    color: var(--kakao-fg);
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    height: 26px;
+    padding-inline: 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--band);
+    color: var(--fg-muted);
+  }
+  .chip.on {
+    background: var(--fg);
+    color: #fff;
+  }
+  .chip.line {
+    background: transparent;
+    border: 1px solid var(--border-strong);
+  }
+  .chip.dash {
+    background: transparent;
+    border: 1px dashed var(--border-strong);
+    color: var(--fg-muted);
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    height: 22px;
+    padding-inline: 8px;
+    border-radius: var(--r-sm);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge.high {
+    background: var(--high-100);
+    color: var(--high-700);
+  }
+  .badge.mid {
+    background: var(--mid-100);
+    color: var(--mid-700);
+  }
+  .badge.crit {
+    background: var(--crit-100);
+    color: var(--crit-700);
+  }
+  .badge.low {
+    background: var(--low-100);
+    color: var(--low-700);
+  }
+  .badge.unk {
+    border: 1px dashed var(--border-strong);
+    color: var(--fg-muted);
+  }
+  .badge.ai {
+    background: var(--ai-100);
+    color: var(--ai-700);
+  }
+  .badge .ax {
+    font-weight: 500;
+    opacity: 0.8;
+    margin-right: 4px;
+  }
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+  .big {
+    font-size: 28px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  .grade {
+    font-size: 20px;
+    font-weight: 800;
+  }
+  .grade.high {
+    color: var(--high-700);
+  }
+  .grade.mid {
+    color: var(--mid-700);
+  }
+  .thumb {
+    width: 64px;
+    height: 64px;
+    border-radius: var(--r-md);
+    background: linear-gradient(135deg, #b9c8b3, #6f8f78);
+    flex: none;
+  }
+  .thumb.sq {
+    width: 56px;
+    height: 56px;
+  }
+  .thumb.ph-none {
+    background: var(--band);
+    display: grid;
+    place-items: center;
+    color: var(--fg-subtle);
+    font-size: 11px;
+  }
+  .list > * + * {
+    border-top: 1px solid var(--border);
+  }
+  .li {
+    display: flex;
+    gap: 12px;
+    padding-block: 12px;
+    align-items: center;
+  }
+  .li .ttl {
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .chev {
+    color: var(--fg-subtle);
+    flex: none;
+  }
+  .tabs {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    height: 56px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--fg-muted);
+    text-align: center;
+    align-items: center;
+  }
+  .tabs b {
+    display: block;
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    background: var(--border-strong);
+    margin: 0 auto 3px;
+  }
+  .tabs .on {
+    color: var(--high-500);
+  }
+  .tabs .on b {
+    background: var(--high-500);
+  }
+  .tabs .sos b {
+    background: var(--crit-500);
+  }
+  .hours {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    font-size: 11px;
+    text-align: center;
+    margin-top: 10px;
+  }
+  .hours div {
+    padding-block: 6px 4px;
+    border-radius: 4px;
+    background: var(--high-100);
+    color: var(--high-700);
+  }
+  .hours div.mid {
+    background: var(--mid-100);
+    color: var(--mid-700);
+  }
+  .hours div b {
+    display: block;
+    font-size: 12px;
+  }
+  .bars {
+    display: flex;
+    gap: 4px;
+    align-items: flex-end;
+    height: 72px;
+    margin-top: 12px;
+  }
+  .bars i {
+    flex: 1;
+    background: #5d8fbf;
+    border-radius: 3px 3px 0 0;
+    display: block;
+  }
+  .bars i.best {
+    background: #1e4f7d;
+  }
+  .bars i.dash {
+    background: repeating-linear-gradient(0deg, transparent 0 3px, #9db9d3 3px 5px);
+  }
+  .dl {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: 6px 12px;
+    font-size: 14px;
+  }
+  .dl dt {
+    color: var(--fg-muted);
+  }
+  .dl dd {
+    margin: 0;
+  }
+  .field {
+    display: grid;
+    gap: 6px;
+    margin-top: 16px;
+  }
+  .field label {
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .field label i {
+    color: var(--crit-500);
+    font-style: normal;
+  }
+  .inp {
+    height: 44px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    padding-inline: 12px;
+    display: flex;
+    align-items: center;
+    color: var(--fg-subtle);
+    background: var(--bg);
+  }
+  .seg {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .seg > div {
+    border: 1px solid var(--border-strong);
+    border-radius: var(--r-md);
+    padding: 10px;
+    font-size: 13px;
+  }
+  .seg > div.on {
+    border-color: var(--high-500);
+    background: var(--high-100);
+  }
+  .seg b {
+    display: block;
+    font-size: 14px;
+  }
+  .steps {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 12px;
+    color: var(--fg-muted);
+  }
+  .steps i {
+    width: 24px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    display: inline-block;
+  }
+  .steps i.on {
+    background: var(--high-500);
+  }
+  .fixbar {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+  .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--high-100);
+    color: var(--high-700);
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    font-size: 13px;
+    flex: none;
+  }
+  .avatar.lg {
+    width: 56px;
+    height: 56px;
+    font-size: 22px;
+  }
+  .band-ob {
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+  .reason {
+    display: grid;
+    gap: 6px;
+    margin-top: 10px;
+    font-size: 13px;
+  }
+  .reason p {
+    margin: 0;
+    padding-left: 10px;
+    border-left: 3px solid var(--border-strong);
+    color: var(--fg-muted);
+  }
+  .kv {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .kv .cap {
+    display: block;
+  }
+  .h-map {
+    height: 120px;
+    background: linear-gradient(180deg, #dfe9f3, #e9eee7);
+    border-radius: var(--r-md);
+    display: grid;
+    place-items: center;
+    color: var(--fg-muted);
+    font-size: 12px;
+    position: relative;
+  }
+  .pin {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--fg);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    position: absolute;
+  }
+  .summary {
+    display: grid;
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
+  .summary > div {
+    display: grid;
+    grid-template-columns: 84px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+  .summary > div + div {
+    border-top: 1px solid var(--border);
+  }
+  .summary .k {
+    color: var(--fg-muted);
+    font-size: 13px;
+  }
+  .gal {
+    height: 200px;
+    background: linear-gradient(160deg, #8fb5a3, #4c7a63);
+    position: relative;
+  }
+  .gal span {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  .sos-row {
+    display: flex;
+    gap: 12px;
+    padding-block: 12px;
+    align-items: flex-start;
+  }
+  .sos-row .ttl {
+    font-weight: 700;
+    font-size: 16px;
+  }
+  .tel {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--r-md);
+    border: 1px solid var(--border-strong);
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex: none;
+  }
+  .aiprev {
+    margin-top: 8px;
+    padding: 10px 12px;
+    background: var(--band);
+    border-radius: var(--r-md);
+    font-size: 13px;
+  }
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--fg-subtle);
+    font-size: 12px;
+    margin-block: 16px;
+  }
+  .divider::before,
+  .divider::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--border);
+  }
+  .menu {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    display: grid;
+    place-items: center;
+    font-weight: 800;
+    letter-spacing: 1px;
+  }
+  .dayhead {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .dayhead h3 {
+    font-size: 20px;
+  }
+  .placeno {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: var(--fg);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: grid;
+    place-items: center;
+    position: absolute;
+    left: 4px;
+    top: 4px;
+  }
+  .rel {
+    position: relative;
+  }
+  .acts {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .toc a {
+      transition: background 0.15s;
+    }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p
+      class="cap"
+      style="
+        color: var(--anno-fg);
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      "
+    >
+      UI/UX 진단 · 2026-09-15 · develop 32427b7e
+    </p>
+    <h1 style="font-size: 32px; font-weight: 800; letter-spacing: -0.02em; margin-top: 6px">
+      혼디가개 UX 시안
+    </h1>
+    <p class="lede">
+      진단 명세서(<code>2026-09-15-ui-ux-audit-design.md</code>)의 P0·P1 발견을 반영한
+      <b>레이아웃 제안</b> 9장. 색·radius·간격은 <code>DESIGN.md</code> 토큰을 그대로 썼고 새 토큰은
+      없다. 문구는 해요체, 판정은 등급어 → 수치 → 근거 순이라는 기존 규칙을 따랐다.
+    </p>
+    <div class="legend">
+      <span><span class="co">1</span></span
+      ><span>보라색 번호 = 주석. 오른쪽 목록의 발견 ID 와 짝이다. UI 가 아니다.</span>
+      <span style="border-top: 2px dashed var(--anno); width: 36px; display: inline-block"></span
+      ><span>390×844 첫 화면이 끝나는 자리. 그 위에 답이 있어야 한다.</span>
+    </div>
+    <nav class="toc" aria-label="시안 목록">
+      <a href="#s1">1 홈 · 첫 방문</a><a href="#s2">2 장소 상세</a><a href="#s3">3 긴급 시설</a
+      ><a href="#s4">4 일정 상세</a><a href="#s5">5 반려견 등록</a><a href="#s6">6 장소 목록 행</a
+      ><a href="#s7">7 AI 일정 · 일정 목록</a><a href="#s8">8 로그인</a
+      ><a href="#s9">9 데스크톱 좌측 레일</a>
+    </nav>
+  </header>
+
+  <!-- ================= 1. 홈 첫 방문 ================= -->
+  <section class="scr" id="s1">
+    <div class="scr-head">
+      <h2>1. 홈 · 첫 방문 (미로그인 · 기준 장소 없음)</h2>
+      <span class="ids">반영 <b>H-1 H-2 H-3 H-4 H-5</b> · 390px</span>
+    </div>
+    <div class="scr-body">
+      <div class="ph">
+        <div class="fold"></div>
+        <div class="hd">
+          <span class="logo"><i></i>혼디가개</span><span class="sp"></span
+          ><span class="ic sos" aria-label="응급">+</span
+          ><a class="lnk" href="#s8" style="font-size: 14px">로그인</a>
+        </div>
+        <div class="stack">
+          <div class="band-ob rel">
+            <span class="co" style="left: -4px; top: -4px">1</span>
+            <div class="grow">
+              <b style="font-size: 15px">우리 아이 기준으로 보려면</b>
+              <div class="sm">크기·더위 민감도까지 넣은 판정을 볼 수 있어요</div>
+            </div>
+            <a class="btn pri sm" href="#s5">반려견 등록</a>
+          </div>
+          <div class="card rel">
+            <span class="co" style="left: -4px; top: -4px">2</span>
+            <div class="sm">2026-09-15 (화) · 제주시</div>
+            <div class="rowx" style="margin-top: 8px; align-items: flex-start">
+              <div class="grow">
+                <div style="font-size: 15px">오늘 산책 <span class="grade high">안전</span></div>
+                <div class="xs" style="margin-top: 2px">
+                  제주시 중심 기준 · 장소를 보면 그곳 기준으로 바뀌어요
+                </div>
+              </div>
+              <div style="text-align: right">
+                <span class="cap">체감온도</span>
+                <div class="num big" style="color: var(--high-700)">
+                  25.5<small style="font-size: 13px; font-weight: 500"> ℃</small>
+                </div>
+              </div>
+            </div>
+            <div class="reason">
+              <p>기온 25도, 추정 노면(아스팔트) 온도 41도로 산책에 무리가 없는 조건입니다.</p>
+            </div>
+          </div>
+          <div class="card rel">
+            <span class="co" style="left: -4px; top: -4px">3</span>
+            <h3>오늘 산책하기 좋은 시간</h3>
+            <div class="num" style="font-size: 22px; margin-top: 6px">11:00 – 23:00</div>
+            <p style="margin: 6px 0 0; font-size: 14px">
+              <b style="color: var(--mid-700)">14–15시는 노면이 46℃까지 올라요.</b> 그 전후가
+              좋아요.
+            </p>
+            <div class="hours">
+              <div>11<b>36°</b></div>
+              <div>12<b>37°</b></div>
+              <div>13<b>38°</b></div>
+              <div class="mid">14<b>46°</b></div>
+              <div class="mid">15<b>44°</b></div>
+              <div>16<b>41°</b></div>
+              <div>17<b>36°</b></div>
+            </div>
+            <div class="xs" style="margin-top: 8px">
+              노면(아스팔트) 온도는 추정치예요 · 옆으로 밀어 23시까지
+            </div>
+          </div>
+          <div class="card rowx">
+            <span class="ic sos">+</span>
+            <div class="grow">
+              <b>주변 동물병원 찾기</b>
+              <div class="sm">지금 진료중 100곳 · 24시간 확인 1곳</div>
+            </div>
+            <span class="chev">›</span>
+          </div>
+          <div class="card rel">
+            <span class="co" style="left: -4px; top: -4px">4</span>
+            <h3>오늘 나가기 좋은 권역 <small>반려견 활동 적합도 /100</small></h3>
+            <p style="margin: 6px 0 0; font-weight: 600">
+              오늘은 어디든 좋아요. 한라산권만 18℃로 쌀쌀해요.
+            </p>
+            <div class="scroller" style="margin-top: 12px">
+              <div
+                style="border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px"
+              >
+                <b>제주시권</b>
+                <div class="sm">구름많음 · 26° / 22° · 비 20%</div>
+                <span class="badge high" style="margin-top: 8px"
+                  ><span class="ax">적합</span>100</span
+                >
+              </div>
+              <div
+                style="border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px"
+              >
+                <b>서귀포권</b>
+                <div class="sm">구름많음 · 27° / 20° · 비 20%</div>
+                <span class="badge high" style="margin-top: 8px"
+                  ><span class="ax">적합</span>100</span
+                >
+              </div>
+              <div
+                style="border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px"
+              >
+                <b>한라산권</b>
+                <div class="sm">구름많음 · 18° / 11°</div>
+                <span class="badge mid" style="margin-top: 8px"
+                  ><span class="ax">무난</span>72</span
+                >
+              </div>
+            </div>
+          </div>
+          <div class="card rel">
+            <span class="co" style="left: -4px; top: -4px">5</span>
+            <h3>오늘 갈 만한 곳 <small>날씨·혼잡도 반영 · 20곳</small></h3>
+            <div class="list" style="margin-top: 4px">
+              <div class="li">
+                <div class="thumb"></div>
+                <div class="grow">
+                  <div class="ttl">성판악</div>
+                  <div class="sm">제주시 조천읍 · 야외</div>
+                  <div style="display: flex; gap: 6px; margin-top: 6px">
+                    <span class="chip">동반 확인 필요</span><span class="badge unk">혼잡 모름</span>
+                  </div>
+                </div>
+                <div style="text-align: right">
+                  <span class="badge high">여행 적합</span>
+                  <div class="num" style="font-size: 22px; margin-top: 4px">
+                    90<small class="xs">/100</small>
+                  </div>
+                </div>
+              </div>
+              <div class="li">
+                <div
+                  class="thumb"
+                  style="background: linear-gradient(135deg, #9fc3d6, #3f6f8a)"
+                ></div>
+                <div class="grow">
+                  <div class="ttl">천제연폭포</div>
+                  <div class="sm">서귀포시 · 야외</div>
+                  <div style="display: flex; gap: 6px; margin-top: 6px">
+                    <span class="chip">동반 가능</span
+                    ><span class="badge crit"><span class="ax">혼잡</span>붐빔</span>
+                  </div>
+                </div>
+                <div style="text-align: right">
+                  <span class="badge mid">무난</span>
+                  <div class="num" style="font-size: 22px; margin-top: 4px">
+                    75<small class="xs">/100</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <a class="btn sec blk" href="#s6" style="margin-top: 12px">장소 18곳 더 보기</a>
+          </div>
+        </div>
+        <div class="tabs">
+          <span class="on"><b></b>홈</span><span><b></b>장소</span
+          ><span class="sos"><b></b>응급</span><span><b></b>일정</span><span><b></b>내 정보</span>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li>
+            <span class="co">1</span>
+            <div>
+              <b>H-4 온보딩 밴드가 첫 화면의 유일한 주 버튼.</b
+              ><span class="why"
+                >미로그인·반려견 0마리 모두 같은 자리. 등록이 끝나면 프로필 카드로 바뀐다(이미 있는
+                갈래). 헤더에는 로그인 텍스트 링크 하나.</span
+              ><span class="before"
+                >현재: "반려견을 등록해 주세요 · 반려견 등록 ›" 링크 톤 스트립. 모바일 헤더에 로그인
+                진입점 없음.</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">2</span>
+            <div>
+              <b>H-1 기준 장소가 없어도 판정을 그린다.</b
+              ><span class="why"
+                >FE 고정 대표 지점(제주시 중심)으로 조회하고 기준 줄이 그 사실을 말한다. 장소 상세를
+                보면 그곳 기준으로 승격(현행 로직 유지).</span
+              ><span class="before"
+                >현재: 첫 방문·새 기기·시크릿 모드에서 이 섹션 자체가 렌더되지 않는다
+                (<code>use-home-insight.ts:24</code>).</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">3</span>
+            <div>
+              <b>H-2 창과 등급을 한 줄에 두지 않는다.</b
+              ><span class="why"
+                >창은 숫자로, 주의 구간은 문장으로. 시간표는 노면온도 한 줄만 남겨 높이를
+                절반으로.</span
+              ><span class="before"
+                >현재: "11:00 – 23:00 <b>주의</b>" — 좋은 시간인데 주의로 읽힌다.</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">4</span>
+            <div>
+              <b>H-3 점수에 축 라벨, 동점에는 동점 문장.</b
+              ><span class="why"
+                >제목 옆 캡션 "반려견 활동 적합도 /100", 숫자는 "적합 100" 배지. 5권역 동점이면
+                1위를 단정하지 않는다.</span
+              ><span class="before">현재: 라벨 없는 "100" 다섯 개 + "제주시권이 가장 나아요".</span>
+            </div>
+          </li>
+          <li>
+            <span class="co">5</span>
+            <div>
+              <b>H-5 이름 → 주소 → 상태 칩 순.</b
+              ><span class="why"
+                >동반 여부·혼잡도를 행 단위 칩으로 내리고, 모름은 점선(§2-3 UNKNOWN 처방). 목록 위에
+                떠 있던 "동반 가능 여부가 원천에 없어…" 문장은 지운다(H-6).</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co" style="background: var(--page-muted)">·</span>
+            <div>
+              <b>G-3 하단 탭에 응급.</b
+              ><span class="why">P2. 헤더 아이콘은 유지하되 탭 5개로. 별도 검증 후 결정.</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 2. 장소 상세 ================= -->
+  <section class="scr" id="s2">
+    <div class="scr-head">
+      <h2>2. 장소 상세 · 판정 요약을 위로</h2>
+      <span class="ids">반영 <b>D-1 D-2 D-3 D-4 G-1</b> · 390px · 미로그인</span>
+    </div>
+    <div class="scr-body">
+      <div class="ph">
+        <div class="fold"></div>
+        <div class="hd">
+          <span class="logo"><i></i>혼디가개</span><span class="sp"></span
+          ><span class="ic sos">+</span>
+        </div>
+        <div style="padding: 10px 16px; font-size: 13px">
+          <a class="lnk" href="#s6">← 장소 목록</a> <span class="xs">› 수월봉</span>
+        </div>
+        <div class="gal rel">
+          <span class="co" style="left: 12px; top: 12px">1</span><span>1/9 · 한국관광공사</span>
+        </div>
+        <div class="card" style="border-top: 0">
+          <div class="rowx">
+            <h3 style="font-size: 24px" class="grow">수월봉</h3>
+            <span class="badge mid rel"
+              ><span class="co" style="right: -10px; top: -14px">2</span
+              ><span class="ax">혼잡</span>보통</span
+            >
+          </div>
+          <div class="sm">제주시 한경면 고산리 · 관광지 · 야외</div>
+          <div class="summary rel">
+            <span class="co" style="left: -10px; top: -10px">3</span>
+            <div>
+              <span class="k">동반</span
+              ><span><span class="badge unk">정보 없음</span> 방문 전 전화로 확인해 주세요</span
+              ><span class="chev">›</span>
+            </div>
+            <div>
+              <span class="k">지금 산책</span
+              ><span
+                ><span class="grade high" style="font-size: 16px">안전</span> · 체감
+                <span class="num">25.5℃</span> · 노면 41℃</span
+              ><span class="chev">›</span>
+            </div>
+            <div>
+              <span class="k">덜 붐비는 날</span
+              ><span><b>9월 21일 (월)</b> · 30일 중 가장 한산</span><span class="chev">›</span>
+            </div>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="card rel">
+            <span class="co" style="left: -4px; top: -4px">4</span>
+            <div class="rowx">
+              <h3 class="grow">언제 가면 덜 붐빌까</h3>
+              <span class="xs">9.15 – 10.14</span>
+            </div>
+            <div
+              style="
+                margin-top: 10px;
+                padding: 10px 12px;
+                background: var(--band);
+                border-radius: var(--r-md);
+              "
+            >
+              <div class="sm">가장 덜 붐비는 날</div>
+              <div class="rowx">
+                <b style="font-size: 17px" class="grow">9월 21일 (월)</b
+                ><span class="badge high"><span class="ax">혼잡</span>한산</span>
+              </div>
+              <div class="sm" style="margin-top: 2px">
+                집중률 <span class="num">58</span> · 이 장소 30일 평균보다
+                <span class="num">22</span> 낮아요
+              </div>
+            </div>
+            <div class="bars">
+              <i style="height: 60%"></i><i style="height: 68%"></i><i style="height: 64%"></i
+              ><i style="height: 70%"></i><i style="height: 66%"></i><i style="height: 62%"></i
+              ><i class="best" style="height: 42%"></i><i style="height: 72%"></i
+              ><i style="height: 80%"></i><i style="height: 74%"></i><i style="height: 69%"></i
+              ><i style="height: 84%"></i><i class="dash" style="height: 70%"></i
+              ><i class="dash" style="height: 70%"></i>
+            </div>
+            <div class="xs" style="margin-top: 6px">
+              점선은 아직 모르는 날이에요 · 한산하다는 뜻이 아니에요 ·
+              <a class="lnk" href="#s2">7일만 보기</a>
+            </div>
+          </div>
+          <div class="card">
+            <h3>기본 정보</h3>
+            <dl class="dl" style="margin-top: 10px">
+              <dt>주소</dt>
+              <dd>제주시 한경면 고산리 3760</dd>
+              <dt>홈페이지</dt>
+              <dd><a class="lnk" href="#s2">visitjeju.net</a></dd>
+            </dl>
+            <div class="h-map" style="margin-top: 12px">
+              <span class="pin" style="left: 48%; top: 38%">●</span>지도 · 길찾기
+            </div>
+          </div>
+          <div class="card">
+            <h3>반려견 동반 정보</h3>
+            <p style="margin: 8px 0 0">
+              <span class="badge unk">정보 없음</span> 동반 가능 여부가 등록되지 않았어요. 방문 전
+              전화로 확인해 주세요.
+            </p>
+          </div>
+        </div>
+        <div class="fixbar rel">
+          <span class="co" style="left: -4px; top: -4px">5</span
+          ><a class="btn sec" href="#s2" style="flex: 0 0 44px; padding: 0" aria-label="저장">☆</a
+          ><a class="btn pri grow" href="#s8">로그인하고 일정에 담기</a>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li>
+            <span class="co">1</span>
+            <div>
+              <b>D-1 갤러리는 200px.</b
+              ><span class="why"
+                >사진은 행을 잡아 주는 장치이고 근거는 문장이다(<code>DESIGN.md</code> §10). 첫
+                화면을 판정에 양보한다.</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">2</span>
+            <div>
+              <b>G-1 · D-2 배지에 축 라벨.</b
+              ><span class="why"
+                >"혼잡 보통". 서버 enum description 을 그대로 쓰되 앞에 축 이름을 붙인다 — 어휘
+                변경은 BE 이슈.</span
+              ><span class="before">현재: 이름 옆 "보통" 만. 적합도의 "보통" 과 같은 말이다.</span>
+            </div>
+          </li>
+          <li>
+            <span class="co">3</span>
+            <div>
+              <b>D-1 판정 요약 3줄이 첫 화면 안.</b
+              ><span class="why"
+                >서비스의 세 질문에 각각 한 줄로 답하고, 줄마다 아래 세부 섹션의 앵커다. 순서는 동반
+                → 지금 → 언제.</span
+              ><span class="before"
+                >현재: 동반 정보·산책 판정이 4~5 스크롤 아래(혼잡도 차트 → 기본 정보 → 지도
+                다음).</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">4</span>
+            <div>
+              <b>D-3 집중률은 정수 + 상대 표현.</b
+              ><span class="why"
+                >"58 · 평균보다 22 낮아요". 막대 위 회색 잔여 영역은 지운다. 점선 범례와 7일 토글은
+                그대로 — 잘 된 부분.</span
+              ><span class="before">현재: "집중률 57.77" — 단위·기준 없음.</span>
+            </div>
+          </li>
+          <li>
+            <span class="co">5</span>
+            <div>
+              <b>D-4 액션은 하단 고정 바.</b
+              ><span class="why"
+                >저장(아이콘) + 주 액션 1개. 미로그인은 라벨이 결과를 말한다 — "로그인하고 일정에
+                담기".</span
+              ><span class="before"
+                >현재: "로그인 | 일정에 담기" 두 버튼이 차트 아래 본문 중간에.</span
+              >
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. 긴급 시설 ================= -->
+  <section class="scr" id="s3">
+    <div class="scr-head">
+      <h2>3. 긴급 시설 · 목록 우선, 위치가 주 버튼</h2>
+      <span class="ids">반영 <b>E-1 E-2 E-3 E-4</b> · 390px · 위치 권한 없음</span>
+    </div>
+    <div class="scr-body">
+      <div class="ph">
+        <div class="fold"></div>
+        <div class="hd">
+          <span class="logo"><i></i>혼디가개</span><span class="sp"></span
+          ><a class="btn sec sm rel" href="#s3"
+            ><span class="co" style="right: -10px; top: -12px">1</span>지도</a
+          >
+        </div>
+        <div class="card" style="border-top: 0">
+          <h3 style="font-size: 22px">가까운 병원·약국</h3>
+          <div class="sm">제주 214곳 · 지금 진료중 100곳</div>
+          <a class="btn pri blk rel" href="#s3" style="margin-top: 12px"
+            ><span class="co" style="left: -4px; top: -4px">2</span>내 위치로 가까운 병원 찾기</a
+          >
+          <div class="sm" style="margin-top: 10px">위치를 켤 수 없으면 지역을 골라 주세요</div>
+          <div style="display: flex; gap: 6px; margin-top: 6px">
+            <span class="chip on">제주시</span><span class="chip line">서귀포</span
+            ><span class="chip line">동부</span><span class="chip line">서부</span>
+          </div>
+        </div>
+        <div class="card rel" style="border-top: 0">
+          <span class="co" style="left: -4px; top: -4px">3</span>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap">
+            <span class="chip on">지금 진료중 100</span><span class="chip line">24시간 1</span
+            ><span class="chip line">전체 135</span>
+          </div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px">
+            <span class="chip">병원 50</span><span class="chip">약국 85</span
+            ><span class="chip">반경 10km ▾</span>
+          </div>
+          <div class="xs" style="margin-top: 8px">
+            제주시 중심 기준 · 가까운 순 · 24시간 진료가 확인된 곳은 1곳뿐이에요
+          </div>
+        </div>
+        <div class="card list rel" style="padding-block: 0">
+          <span class="co" style="left: -4px; top: -4px">4</span>
+          <div class="sos-row">
+            <div class="grow">
+              <div class="rowx">
+                <span class="ttl grow">제주24시동물병원</span><span class="badge high">진료중</span>
+              </div>
+              <div style="font-size: 14px; margin-top: 2px"><b>24:00까지</b> · 24시간</div>
+              <div class="sm">1.3km · 제주시 연북로 100</div>
+            </div>
+            <a class="tel" href="#s3" aria-label="전화">전화</a>
+          </div>
+          <div class="sos-row">
+            <div class="grow">
+              <div class="rowx">
+                <span class="ttl grow">청사약국</span
+                ><span class="chip" style="height: 22px">동물약국</span
+                ><span class="badge high">영업중</span>
+              </div>
+              <div style="font-size: 14px; margin-top: 2px">
+                <b>24:00까지</b> ·
+                <a class="lnk" href="#s3" style="font-weight: 500; font-size: 13px">요일별 시간</a>
+              </div>
+              <div class="sm">2.0km · 제주시 중앙로 234</div>
+            </div>
+            <a class="tel" href="#s3" aria-label="전화">전화</a>
+          </div>
+          <div class="sos-row">
+            <div class="grow">
+              <div class="rowx">
+                <span class="ttl grow">한라동물병원</span><span class="badge crit">영업 종료</span>
+              </div>
+              <div style="font-size: 14px; margin-top: 2px">내일 <b>10:00</b> 부터</div>
+              <div class="sm">3.4km · 제주시 도남동 22</div>
+            </div>
+            <a class="tel" href="#s3" aria-label="전화">전화</a>
+          </div>
+          <div class="sos-row">
+            <div class="grow">
+              <div class="rowx">
+                <span class="ttl grow">서귀포동물병원</span
+                ><span class="badge unk">영업 여부 확인 필요</span>
+              </div>
+              <div class="sm" style="margin-top: 2px">
+                진료시간이 등록돼 있지 않아요 · 전화로 확인해 주세요
+              </div>
+              <div class="sm">8.1km · 서귀포시 중앙로 45</div>
+            </div>
+            <a class="tel" href="#s3" aria-label="전화">전화</a>
+          </div>
+        </div>
+        <div class="tabs">
+          <span><b></b>홈</span><span><b></b>장소</span
+          ><span class="sos on"><b style="background: var(--crit-500)"></b>응급</span
+          ><span><b></b>일정</span><span><b></b>내 정보</span>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li>
+            <span class="co">1</span>
+            <div>
+              <b>E-1 목록이 기본, 지도는 토글.</b
+              ><span class="why"
+                >응급 과업은 "가장 가까운 열린 곳에 전화" 다. 지도로 가면 클러스터는 라벨 알약이
+                아니라 숫자 원형 마커(32px)로 — 겹치지 않는다.</span
+              ><span class="before"
+                >현재: 지도가 기본. "이 지역 42곳 · 14곳 · 21곳 · 8곳…" 알약이 서로 겹쳐 읽히지
+                않는다.</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">2</span>
+            <div>
+              <b>E-2 위치 요청이 화면의 주 버튼.</b
+              ><span class="why"
+                >거부·실패 시 지역 세그먼트 폴백. 권한 없이도 2탭 안에 "내 지역 가까운 순" 이
+                나온다.</span
+              ><span class="before"
+                >현재: "위치 권한이 없어 거리를 계산할 수 없어요 · <u>현재 위치로 다시 찾기</u>"
+                작은 링크.</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">3</span>
+            <div>
+              <b>E-3 필터 첫 줄은 "지금 진료중" 기본 ON.</b
+              ><span class="why"
+                >종류(병원·약국)와 반경은 둘째 줄. 24시간 1곳이라는 데이터 한계는 캡션이 정직하게
+                말한다.</span
+              ><span class="before"
+                >현재: 전체 135 · 병원 50 · 약국 85 / 반경 · 24시간 1 · 지금 진료중 100 — 여섯
+                번째.</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">4</span>
+            <div>
+              <b>E-4 영업시간은 오늘 한 줄.</b
+              ><span class="why"
+                >"24:00까지" / "내일 10:00부터". 요일별 전문은 링크로 접는다. 상태
+                3종(진료중·종료·확인 필요)은 §2-9 토큰과 점선 처방 그대로. 우측 44px 전화 버튼은
+                현행 유지 — 이 화면에서 가장 잘 된 요소.</span
+              ><span class="before"
+                >현재: "월~금 10:00~24:00, 토 10:00~24:00, 일 10:00~24:00, 법정공휴일 10:00~24:00"
+                4줄.</span
+              >
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 4. 일정 상세 ================= -->
+  <section class="scr" id="s4">
+    <div class="scr-head">
+      <h2>4. 일정 상세 · 판정 먼저, 드문 액션은 메뉴로</h2>
+      <span class="ids">반영 <b>PL-2 PL-3 PL-4 PL-5</b> · 390px</span>
+    </div>
+    <div class="scr-body">
+      <div class="ph">
+        <div class="fold"></div>
+        <div class="hd">
+          <span class="logo"><i></i>혼디가개</span><span class="sp"></span
+          ><span class="chip line">몽실이 ▾</span><span class="ic sos">+</span>
+        </div>
+        <div class="card rel" style="border-top: 0">
+          <span class="co" style="left: -4px; top: -4px">1</span>
+          <div class="rowx">
+            <h3 style="font-size: 22px" class="grow">초코와 가을 서귀포</h3>
+            <span class="badge low">확정</span><span class="menu" aria-label="더 보기">⋯</span>
+          </div>
+          <div class="sm" style="margin-top: 4px">
+            2026-10-03 (토) – 10-04 (일) · 총 2일 · <b class="num" style="color: var(--fg)">D-18</b>
+          </div>
+          <div class="rowx" style="margin-top: 10px">
+            <span class="avatar">초</span>
+            <div><b>초코</b> <span class="sm">대형견 · 추위 민감</span></div>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="card rel">
+            <span class="co" style="left: -4px; top: -4px">2</span>
+            <div class="dayhead">
+              <h3>1일차</h3>
+              <span class="sm">10-03 (토)</span>
+            </div>
+            <div class="rowx" style="margin-top: 10px">
+              <span class="badge high">여행 적합</span>
+              <div class="grow">
+                <span class="cap">최고 체감온도</span>
+                <div class="num" style="font-size: 22px; line-height: 1.1">
+                  27.5<small style="font-size: 12px; font-weight: 500"> ℃</small>
+                </div>
+              </div>
+              <a class="btn sec sm" href="#s4">이 날 산책</a>
+            </div>
+            <div class="reason">
+              <p>반려견과 함께 입장할 수 있는 장소입니다.</p>
+              <p>최고기온 26도로 반려견에게 무리가 없습니다.</p>
+            </div>
+            <div class="list" style="margin-top: 12px">
+              <div class="li">
+                <div
+                  class="thumb rel"
+                  style="background: linear-gradient(135deg, #9fc3d6, #3f6f8a)"
+                >
+                  <span class="placeno">1</span>
+                </div>
+                <div class="grow">
+                  <div class="ttl">함덕 서우봉 해변</div>
+                  <div class="sm">
+                    제주시 조천읍 ·
+                    <span class="chip" style="height: 20px; font-size: 11px">동반 가능</span>
+                  </div>
+                </div>
+                <span class="chev">›</span>
+              </div>
+              <div class="li">
+                <div class="thumb ph-none rel"><span class="placeno">2</span>사진 없음</div>
+                <div class="grow">
+                  <div class="ttl">
+                    동문재래시장
+                    <span class="chip" style="height: 20px; font-size: 11px">식사</span>
+                  </div>
+                  <div class="sm">제주시 · 야외 · 직선 13.6km 이동</div>
+                </div>
+                <span class="chev">›</span>
+              </div>
+            </div>
+            <div class="acts rel">
+              <span class="co" style="left: -10px; top: -6px">3</span
+              ><a class="btn sec sm grow" href="#s4">장소 추가</a
+              ><a class="btn sec sm grow" href="#s4">순서 편집</a
+              ><span class="menu" aria-label="더 보기">⋯</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="dayhead">
+              <h3>2일차</h3>
+              <span class="sm">10-04 (일)</span>
+            </div>
+            <div class="rowx" style="margin-top: 10px">
+              <span class="badge mid">무난</span>
+              <div class="grow">
+                <span class="cap">최고기온</span>
+                <div class="num" style="font-size: 22px; line-height: 1.1">
+                  24<small style="font-size: 12px; font-weight: 500"> ℃</small>
+                </div>
+              </div>
+              <a class="btn sec sm" href="#s4">이 날 산책</a>
+            </div>
+            <div class="reason"><p>강수확률이 80%라 야외 활동이 어려울 수 있습니다.</p></div>
+            <div class="xs" style="margin-top: 6px">중기예보 기준이라 대략적인 값이에요</div>
+            <div class="list" style="margin-top: 12px">
+              <div class="li">
+                <div class="thumb ph-none rel"><span class="placeno">1</span>사진 없음</div>
+                <div class="grow">
+                  <div class="ttl">제주현대미술관</div>
+                  <div class="sm">제주시 한경면 · 실내</div>
+                </div>
+                <span class="chev">›</span>
+              </div>
+            </div>
+            <div
+              style="
+                margin-top: 12px;
+                padding: 12px;
+                background: var(--band);
+                border-radius: var(--r-md);
+              "
+            >
+              <b style="font-size: 14px">비가 오면 갈 만한 실내</b>
+              <div class="rowx" style="margin-top: 8px">
+                <div class="grow">
+                  <a class="lnk" href="#s4">도립김창열미술관</a>
+                  <div class="xs">제주시 한림읍 · 직선 13.2km</div>
+                </div>
+                <a class="btn sec sm" href="#s4">담기</a>
+              </div>
+            </div>
+            <div class="acts">
+              <a class="btn sec sm grow" href="#s4">장소 추가</a
+              ><a class="btn sec sm grow" href="#s4">순서 편집</a><span class="menu">⋯</span>
+            </div>
+          </div>
+          <div class="card rowx">
+            <span class="ic sos">+</span>
+            <div class="grow">
+              <b>가는 곳 주변 병원·약국</b>
+              <div class="sm">1일차 함덕 1.3km 제주24시동물병원 · 출발 전에 훑어보세요</div>
+            </div>
+            <span class="chev">›</span>
+          </div>
+          <div class="card rel">
+            <span class="co" style="left: -4px; top: -4px">4</span>
+            <div class="rowx">
+              <h3 class="grow">여행 준비물 <span class="badge ai">AI</span></h3>
+              <span class="xs">D-1 에 위로 올라와요</span>
+            </div>
+            <p class="sm" style="margin: 6px 0 0">
+              날짜·장소·날씨·초코의 특성을 읽고 챙길 것을 골라요. 직접 추가한 항목은 다시 만들어도
+              남아요.
+            </p>
+            <div class="rowx" style="margin-top: 10px">
+              <a class="btn sec sm" href="#s4">AI로 준비물 챙기기</a
+              ><a class="lnk" href="#s4" style="font-size: 14px">직접 추가</a>
+            </div>
+          </div>
+        </div>
+        <div class="tabs">
+          <span><b></b>홈</span><span><b></b>장소</span><span class="sos"><b></b>응급</span
+          ><span class="on"><b></b>일정</span><span><b></b>내 정보</span>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li>
+            <span class="co">1</span>
+            <div>
+              <b>PL-2 상태 변경은 ⋯ 메뉴 안으로.</b
+              ><span class="why"
+                >헤더는 제목 · 상태 · 날짜 · D-day · 반려견만. "초안으로 되돌리기" 같은 드문 액션이
+                첫 화면의 유일한 전폭 버튼이면 안 된다.</span
+              ><span class="before"
+                >현재: 헤더 바로 아래 전폭 secondary 버튼 "초안으로 되돌리기".</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">2</span>
+            <div>
+              <b>PL-3 첫 화면에 1일차 판정.</b
+              ><span class="why"
+                >준비물 카드를 아래로 내려 1일차 판정·장소가 844px 안에 들어온다.</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">3</span>
+            <div>
+              <b>PL-4 · PL-5 액션은 장소 아래, ✓ 아이콘 제거.</b
+              ><span class="why"
+                >판정 → 장소 → 액션 순. "다시 만들기" 는 ⋯ 로. 뜻이 없던 우측 ✓ 대신 chevron 과 동반
+                칩.</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">4</span>
+            <div>
+              <b>PL-3 준비물은 시간 기반 승격.</b
+              ><span class="why"
+                >출발 전날(D-1) 이하일 때만 헤더 아래로 올라온다. 캡션이 그 규칙을 말해 준다. "직접
+                추가한 항목은 남아요" 문구는 현행 유지.</span
+              >
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 5. 반려견 등록 ================= -->
+  <section class="scr" id="s5">
+    <div class="scr-head">
+      <h2>5. 반려견 등록 · 2단계, 필수는 둘</h2>
+      <span class="ids">반영 <b>PT-1</b> · 390px</span>
+    </div>
+    <div class="scr-body">
+      <div class="ph">
+        <div class="hd">
+          <span class="logo"><i></i>혼디가개</span><span class="sp"></span
+          ><span class="ic sos">+</span>
+        </div>
+        <div class="card rel" style="border-top: 0; min-height: 700px">
+          <span class="co" style="left: -4px; top: -4px">1</span>
+          <div class="steps"><i class="on"></i><i></i><span>1 / 2 · 기본</span></div>
+          <h3 style="font-size: 22px; margin-top: 10px">누구와 가나요</h3>
+          <p class="sm" style="margin: 4px 0 0">
+            이름과 크기만 있으면 홈 판정이 우리 아이 기준으로 바뀌어요.
+          </p>
+          <div class="field">
+            <label>이름 <i>*</i></label>
+            <div class="inp">몽실이</div>
+          </div>
+          <div class="field rel">
+            <span class="co" style="left: -10px; top: -6px">2</span><label>크기 <i>*</i></label>
+            <div class="seg">
+              <div class="on"><b>소형견</b>10kg 미만</div>
+              <div><b>중형견</b>10–25kg</div>
+              <div><b>대형견</b>25kg 이상</div>
+            </div>
+            <div class="sm">입장 제한을 걸러 주고, 노면온도 기준이 소형견은 더 낮아져요</div>
+          </div>
+          <div class="field">
+            <label>품종 <span class="xs" style="font-weight: 400">(선택)</span></label>
+            <div class="inp">말티즈</div>
+          </div>
+          <a class="btn pri blk rel" href="#s1" style="margin-top: 24px"
+            ><span class="co" style="left: -4px; top: -4px">3</span>등록하고 홈에서 보기</a
+          >
+          <a class="btn sec blk" href="#s5" style="margin-top: 8px"
+            >더위·소음 민감도도 적기 <span class="xs">2단계</span></a
+          >
+          <p class="xs" style="text-align: center; margin: 10px 0 0">
+            2단계는 나중에 반려견 정보에서 언제든 채울 수 있어요
+          </p>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li>
+            <span class="co">1</span>
+            <div>
+              <b>PT-1 1단계 = 이름 · 크기.</b
+              ><span class="why"
+                >판정에 실제로 쓰이는 축은 크기와 민감도다. 최소 입력으로 등록을 끝내고 홈이 바뀌는
+                보상을 즉시 준다. 진행 표시는 2점.</span
+              ><span class="before"
+                >현재: 9개 필드가 한 화면(2.5 스크린). 하단 고정 "등록하기" 가 아래 필드 존재를
+                가린다.</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">2</span>
+            <div>
+              <b>필드마다 효과 힌트 1줄.</b
+              ><span class="why"
+                >"이 값이 판정을 어떻게 바꾸나" 를 말한다. 체중 힌트("입장 체중 제한이 있는 곳을
+                걸러 줄 때 써요")가 좋은 선례라 같은 톤으로 확장. 2단계: "더위 민감 → 노면온도
+                기준이 5℃ 낮아져요".</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">3</span>
+            <div>
+              <b>주 버튼 라벨이 결과를 말한다.</b
+              ><span class="why"
+                >"등록하고 홈에서 보기". 2단계는 secondary, 건너뛰기 가능은 캡션으로.</span
+              >
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 6. 장소 목록 행 ================= -->
+  <section class="scr" id="s6">
+    <div class="scr-head">
+      <h2>6. 장소 목록 · 행에 이 서비스만의 정보</h2>
+      <span class="ids">반영 <b>P-1 P-2 P-3 G-1</b> · 390px 목록 뷰</span>
+    </div>
+    <div class="scr-body">
+      <div class="ph">
+        <div class="hd">
+          <span class="logo"><i></i>혼디가개</span><span class="sp"></span
+          ><a class="btn sec sm" href="#s6">지도</a>
+        </div>
+        <div class="card" style="border-top: 0">
+          <div class="inp" style="justify-content: space-between">
+            이름·주소로 찾기 <span>⌕</span>
+          </div>
+          <div class="rel" style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px">
+            <span class="co" style="left: -10px; top: -8px">1</span
+            ><span class="chip on">동반 가능</span><span class="chip on">확인 필요</span
+            ><span class="chip line">실내</span><span class="chip line">관광지</span
+            ><span class="chip line">음식점</span><span class="chip line">지역 ▾</span>
+          </div>
+          <div class="xs" style="margin-top: 8px">
+            지도에 보이는 19곳 · 동반 불가는 뺐어요 · 오늘 적합도는 보이는 행만 계산해요
+          </div>
+        </div>
+        <div class="card list rel" style="padding-block: 0">
+          <span class="co" style="left: -4px; top: -4px">2</span>
+          <div class="li">
+            <div class="thumb"></div>
+            <div class="grow">
+              <div class="ttl">수월봉</div>
+              <div class="sm">제주시 한경면 고산리 · 야외</div>
+              <div style="display: flex; gap: 6px; margin-top: 6px">
+                <span class="chip">동반 확인 필요</span
+                ><span class="badge mid"><span class="ax">혼잡</span>보통</span>
+              </div>
+            </div>
+            <div style="text-align: right; flex: none">
+              <span class="cap">오늘 적합</span>
+              <div class="num" style="font-size: 22px">75</div>
+            </div>
+            <span class="chev">›</span>
+          </div>
+          <div class="li">
+            <div class="thumb" style="background: linear-gradient(135deg, #c9b99a, #7a6a4a)"></div>
+            <div class="grow">
+              <div class="ttl">성판악</div>
+              <div class="sm">제주시 조천읍 · 야외</div>
+              <div style="display: flex; gap: 6px; margin-top: 6px">
+                <span class="chip">동반 확인 필요</span><span class="badge unk">혼잡 모름</span>
+              </div>
+            </div>
+            <div style="text-align: right; flex: none">
+              <span class="cap">오늘 적합</span>
+              <div class="num" style="font-size: 22px">90</div>
+            </div>
+            <span class="chev">›</span>
+          </div>
+          <div class="li">
+            <div class="thumb" style="background: linear-gradient(135deg, #9fc3d6, #3f6f8a)"></div>
+            <div class="grow">
+              <div class="ttl">천제연폭포</div>
+              <div class="sm">서귀포시 · 야외</div>
+              <div style="display: flex; gap: 6px; margin-top: 6px">
+                <span class="chip">동반 가능</span
+                ><span class="badge crit"><span class="ax">혼잡</span>붐빔</span>
+              </div>
+            </div>
+            <div style="text-align: right; flex: none">
+              <span class="cap">오늘 적합</span>
+              <div class="num" style="font-size: 22px">75</div>
+            </div>
+            <span class="chev">›</span>
+          </div>
+          <div class="li">
+            <div class="thumb" style="background: linear-gradient(135deg, #d9c6b0, #8c6a4d)"></div>
+            <div class="grow">
+              <div class="ttl">오설록 티뮤지엄</div>
+              <div class="sm">서귀포시 안덕면 · 실내</div>
+              <div style="display: flex; gap: 6px; margin-top: 6px">
+                <span class="chip">동반 가능</span><span class="chip">실내</span>
+              </div>
+            </div>
+            <div style="text-align: right; flex: none">
+              <span class="cap">오늘 적합</span>
+              <div class="xs" style="margin-top: 6px">계산 중</div>
+            </div>
+            <span class="chev">›</span>
+          </div>
+        </div>
+        <div class="tabs">
+          <span><b></b>홈</span><span class="on"><b></b>장소</span
+          ><span class="sos"><b></b>응급</span><span><b></b>일정</span><span><b></b>내 정보</span>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li>
+            <span class="co">1</span>
+            <div>
+              <b>P-3 동반 필터는 두 값, 둘 다 기본 ON.</b
+              ><span class="why"
+                >"동반 가능" · "확인 필요" 를 포함하고 "동반 불가" 만 뺀다. 원천에 동반 정보가 없는
+                곳이 많아 ON/OFF 하나로는 결과가 사라지는 딜레마를 푼다.</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">2</span>
+            <div>
+              <b>P-1 · P-2 행 = 이름 · 주소 · 동반 칩 · 혼잡 배지 · 오늘 적합.</b
+              ><span class="why"
+                >카테고리 칩("관광지") 대신 반려견 관련 상태. 적합도는 보이는 행 10개만 지연 조회(홈
+                <code>PlaceInsightRow</code> 재사용), 조회 전은 "계산 중". 행 전체가 링크라 "상세"
+                버튼은 지우고 chevron.</span
+              ><span class="before"
+                >현재: 사진 · "관광지" · 이름 · 주소 · "상세" 버튼 — 어느 관광 앱에나 있는 행.</span
+              >
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 7. AI 일정 폼 + 일정 목록 ================= -->
+  <section class="scr" id="s7">
+    <div class="scr-head">
+      <h2>7. AI 일정 폼 · 일정 목록 행</h2>
+      <span class="ids">반영 <b>AI-1 PL-1</b> · 390px 일부</span>
+    </div>
+    <div class="scr-body">
+      <div style="display: grid; gap: 24px">
+        <div class="ph">
+          <div class="hd">
+            <span class="logo"><i></i>혼디가개</span><span class="sp"></span
+            ><span class="chip line">몽실이 ▾</span>
+          </div>
+          <div class="card" style="border-top: 0">
+            <h3 style="font-size: 22px">AI 일정 만들기 <span class="badge ai">AI</span></h3>
+            <p class="sm" style="margin: 4px 0 0">반려견과 기간만 정하면 제주 일정을 짜 드려요</p>
+            <div class="rel" style="margin-top: 12px">
+              <span class="co" style="left: -10px; top: -8px">1</span>
+              <div class="cap">AI 가 보는 것</div>
+              <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px">
+                <span class="chip line">날씨·기상특보</span
+                ><span class="chip line">혼잡도 예측</span
+                ><span class="chip line">동반 가능 여부</span
+                ><span class="chip line">하루 이동량</span>
+              </div>
+            </div>
+            <div class="field">
+              <label>여행 기간 <i>*</i></label>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+                <div class="inp">10-03 (토)</div>
+                <div class="inp">10-04 (일)</div>
+              </div>
+            </div>
+            <div class="field rel">
+              <span class="co" style="left: -10px; top: -6px">2</span
+              ><label
+                >함께 갈 반려견 <i>*</i>
+                <span class="xs" style="font-weight: 400">여러 마리 가능해요</span></label
+              >
+              <div class="seg" style="grid-template-columns: 1fr 1fr">
+                <div class="on"><b>☑ 몽실이</b>말티즈 · 소형견</div>
+                <div><b>☐ 초코</b>대형견</div>
+              </div>
+              <div class="aiprev">
+                몽실이는 <b>소형견 · 더위 민감</b>이라 오후 2–4시는 실내로 두고, 노면이 뜨거운 날은
+                해변 대신 숲길을 골라요.
+              </div>
+            </div>
+            <div class="field">
+              <label>하고 싶은 여행 <span class="xs" style="font-weight: 400">(선택)</span></label>
+              <div class="inp" style="height: 72px; align-items: flex-start; padding-top: 10px">
+                사람 많은 곳은 피하고, 오전엔 바다 산책…
+              </div>
+            </div>
+            <a class="btn pri blk" href="#s7" style="margin-top: 20px">일정 만들기</a>
+            <p class="xs" style="text-align: center; margin: 8px 0 0">
+              1~2분 걸려요 · 기다리지 않아도 끝나면 일정 목록에 초안으로 들어와요
+            </p>
+          </div>
+        </div>
+        <div class="ph">
+          <div class="hd">
+            <span class="logo"><i></i>혼디가개</span><span class="sp"></span
+            ><span class="chip line">몽실이 ▾</span>
+          </div>
+          <div class="card list rel" style="border-top: 0; padding-block: 0">
+            <span class="co" style="left: -4px; top: -4px">3</span>
+            <div class="li">
+              <div class="grow">
+                <div class="rowx">
+                  <span class="ttl grow">초코와 가을 서귀포</span
+                  ><span class="badge low">확정</span>
+                </div>
+                <div class="sm">10-03 (토) – 10-04 (일) · 2일 · 장소 3곳 · 서귀포</div>
+                <div class="rowx" style="margin-top: 6px; gap: 6px">
+                  <span class="avatar" style="width: 22px; height: 22px; font-size: 11px">초</span
+                  ><span class="badge high">1일차 여행 적합</span
+                  ><span class="badge mid">2일차 무난</span>
+                </div>
+              </div>
+              <div style="text-align: right"><b class="num" style="font-size: 16px">D-18</b></div>
+              <span class="chev">›</span>
+            </div>
+            <div class="li">
+              <div class="grow">
+                <div class="rowx">
+                  <span class="ttl grow">몽실이와 제주 2박 3일</span
+                  ><span class="badge unk">초안</span>
+                </div>
+                <div class="sm">09-12 (토) – 09-14 (월) · 3일 · 장소 7곳 · 제주시 · AI 제안</div>
+                <div class="rowx" style="margin-top: 6px; gap: 6px">
+                  <span class="avatar" style="width: 22px; height: 22px; font-size: 11px">몽</span
+                  ><span class="xs">지난 일정 · 판정은 그날 기준이었어요</span>
+                </div>
+              </div>
+              <span class="chev">›</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li>
+            <span class="co">1</span>
+            <div>
+              <b>AI-1 "AI 가 보는 것" 칩 4개.</b
+              ><span class="why"
+                >신뢰 신호. 후보 장소 목록으로 환각을 막는다는 설계(README)를 사용자 언어로 옮긴 것.
+                칩은 비활성 정보 칩(line)이라 필터로 오해되지 않게 캡션을 위에 둔다.</span
+              ><span class="before">현재: 폼만. 신뢰 신호는 "만드는 데 1~2분쯤 걸려요" 한 줄.</span>
+            </div>
+          </li>
+          <li>
+            <span class="co">2</span>
+            <div>
+              <b>반려견을 고르면 조건 반영 미리보기 1줄.</b
+              ><span class="why"
+                >"소형견 · 더위 민감 → 오후 실내". 프로필을 채운 보상이 여기서도 보인다. AI-3: 다중
+                선택이라는 사실을 라벨 옆에 말한다.</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">3</span>
+            <div>
+              <b>PL-1 일정 목록 행에 요약 줄.</b
+              ><span class="why"
+                >기간 · 장소 수 · 권역 · 출처(AI 제안), 함께 가는 반려견 아바타, 일차별 판정 배지.
+                다가오는 일정만 D-day.</span
+              ><span class="before">현재: 이름 · 날짜 · 상태 배지 · D-18. 내용이 없다.</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 8. 로그인 ================= -->
+  <section class="scr" id="s8">
+    <div class="scr-head">
+      <h2>8. 로그인 · 소셜 먼저, 이유를 말한다</h2>
+      <span class="ids">반영 <b>A-1 A-2</b> · 390px · <code>returnTo=/pets/new</code></span>
+    </div>
+    <div class="scr-body">
+      <div class="ph">
+        <div style="padding: 64px 20px 40px; background: var(--bg); min-height: 640px">
+          <div class="logo" style="justify-content: center; font-size: 28px">
+            <i style="width: 32px; height: 32px; border-radius: 8px"></i>혼디가개
+          </div>
+          <p class="rel" style="text-align: center; margin: 20px 0 0; font-size: 15px">
+            <span class="co" style="left: -4px; top: -12px">1</span>반려견 정보를 저장하려면
+            로그인이 필요해요
+          </p>
+          <div class="rel" style="display: grid; gap: 8px; margin-top: 24px">
+            <span class="co" style="left: -10px; top: -10px">2</span>
+            <a class="btn kakao blk" href="#s8">카카오 로그인</a>
+            <a class="btn sec blk" href="#s8"><b style="color: var(--naver)">N</b> 네이버 로그인</a>
+          </div>
+          <div class="divider">또는</div>
+          <a class="btn sec blk" href="#s8">이메일로 로그인 ▾</a>
+          <p class="sm" style="text-align: center; margin: 20px 0 0">
+            처음이세요? <a class="lnk" href="#s8">회원가입</a> ·
+            <a class="lnk" href="#s8" style="color: var(--fg-muted); font-weight: 400"
+              >비밀번호 찾기</a
+            >
+          </p>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li>
+            <span class="co">1</span>
+            <div>
+              <b>A-2 왜 로그인하는지 한 줄.</b
+              ><span class="why"
+                ><code>returnTo</code> 에 따라 문장이 갈린다 — /pets → "반려견 정보를 저장하려면",
+                /plans → "일정을 저장하려면", 직접 진입 → 서비스 한 줄 소개.</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co">2</span>
+            <div>
+              <b>A-1 소셜이 위, 이메일은 접힘.</b
+              ><span class="why"
+                >실사용·시연 모두 카카오가 1순위다. 버튼 색·마크·라벨은 <code>DESIGN.md</code> §2-8
+                그대로(카카오 채움, 네이버 흰 면 + 초록 마크, 높이 lg 48). 이메일 폼은 펼치면 현행
+                그대로.</span
+              ><span class="before"
+                >현재: 이메일·비밀번호 폼 → 로그인 → 회원가입 · 비밀번호 찾기 → 소셜 2개 (맨
+                아래).</span
+              >
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 9. 데스크톱 좌측 레일 ================= -->
+  <section class="scr" id="s9">
+    <div class="scr-head">
+      <h2>9. 홈 데스크톱 · 좌측 맥락 패널 (400px 발췌)</h2>
+      <span class="ids"
+        >반영 <b>H-1 H-4</b> · 1280 중 좌 400 · <code>DESIGN.md</code> §7-1 좌우 역할 유지</span
+      >
+    </div>
+    <div class="scr-body">
+      <div
+        class="ph rail"
+        style="border-radius: var(--r-lg); background: var(--sunken); padding: 24px 0 24px 24px"
+      >
+        <div style="display: grid; gap: 24px; padding-right: 24px">
+          <div
+            style="
+              background: var(--bg);
+              border: 1px solid var(--border);
+              border-radius: var(--r-lg);
+              padding: 20px;
+            "
+            class="rel"
+          >
+            <span class="co" style="left: -8px; top: -8px">1</span>
+            <div class="rowx">
+              <div class="grow">
+                <b style="font-size: 16px">우리 아이 기준으로 보려면</b>
+                <div class="sm">크기·더위 민감도까지 넣은 판정을 볼 수 있어요</div>
+              </div>
+              <a class="btn pri sm" href="#s5">반려견 등록</a>
+            </div>
+            <div style="border-top: 1px solid var(--border); margin-block: 16px"></div>
+            <div class="sm">2026-09-15 (화) · 제주시</div>
+            <div class="rowx" style="margin-top: 8px; align-items: flex-start">
+              <div class="grow">
+                <div style="font-size: 15px">오늘 산책 <span class="grade high">안전</span></div>
+                <div class="xs">제주시 중심 기준 · 장소를 보면 그곳 기준으로 바뀌어요</div>
+              </div>
+              <div style="text-align: right">
+                <span class="cap">체감온도</span>
+                <div class="num big" style="color: var(--high-700)">
+                  25.5<small style="font-size: 13px; font-weight: 500"> ℃</small>
+                </div>
+              </div>
+            </div>
+            <div class="reason">
+              <p>기온 25도, 추정 노면(아스팔트) 온도 41도로 산책에 무리가 없는 조건입니다.</p>
+            </div>
+            <div style="border-top: 1px solid var(--border); margin-block: 16px"></div>
+            <h3 style="font-size: 17px">오늘 산책하기 좋은 시간</h3>
+            <div class="num" style="font-size: 22px; margin-top: 6px">11:00 – 23:00</div>
+            <p style="margin: 6px 0 0; font-size: 14px">
+              <b style="color: var(--mid-700)">14–15시는 노면이 46℃까지 올라요.</b> 그 전후가
+              좋아요.
+            </p>
+            <div class="hours">
+              <div>11<b>36°</b></div>
+              <div>12<b>37°</b></div>
+              <div>13<b>38°</b></div>
+              <div class="mid">14<b>46°</b></div>
+              <div class="mid">15<b>44°</b></div>
+              <div>16<b>41°</b></div>
+              <div>17<b>36°</b></div>
+            </div>
+          </div>
+          <div
+            style="
+              background: var(--bg);
+              border: 1px solid var(--border);
+              border-radius: var(--r-lg);
+              padding: 16px 20px;
+            "
+            class="rowx"
+          >
+            <span class="ic sos">+</span>
+            <div class="grow">
+              <b>주변 동물병원 찾기</b>
+              <div class="sm">지금 진료중 100곳 · 24시간 확인 1곳</div>
+            </div>
+            <span class="chev">›</span>
+          </div>
+        </div>
+      </div>
+      <div class="notes">
+        <ul>
+          <li>
+            <span class="co">1</span>
+            <div>
+              <b>좌 400 = 맥락 패널의 카드 둘은 그대로.</b
+              ><span class="why"
+                >[누구 · 지금 안전한가 · 언제 나가나] 한 카드 + [위급하면] 한 카드라는 §7-1 경계를
+                지킨다. 바뀌는 것은 카드 안 첫 블록(온보딩 밴드 → 프로필로 교체)과 판정
+                기본값(H-1)뿐. 우측 열(권역 → 갈 만한 곳 → 일정)은 §1 모바일과 같은 문구
+                변경만.</span
+              >
+            </div>
+          </li>
+          <li>
+            <span class="co" style="background: var(--page-muted)">·</span>
+            <div>
+              <b>미로그인 데스크톱 헤더의 "회원가입" 주 버튼은 유지.</b
+              ><span class="why">이미 잘 되어 있다. 모바일에만 진입점이 없었다(H-4).</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer
+    style="
+      margin-top: 72px;
+      padding-top: 24px;
+      border-top: 1px solid var(--page-line);
+      font-size: 13px;
+      color: var(--page-muted);
+    "
+  >
+    <p style="margin: 0">
+      시안은 레이아웃 제안이다. 구현은
+      <code>Canvas · SurfaceStack · Surface · SurfaceList</code> 표면 프리미티브와
+      <code>INSET_CLASS</code> 인셋 규칙 위에서 한다. 발견 ID 와 이슈 분해는 명세서 §2 · §4.
+    </p>
+  </footer>
+</div>
