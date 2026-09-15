@@ -143,7 +143,49 @@ describe('verdictSummaryLines — 덜 붐비는 날 줄', () => {
   it('서버가 고른 날을 혼잡도 패널과 같은 문구로 말한다', () => {
     const value = valueOf(messages.place.detailSummaryCongestionLabel, placeDetail)
 
-    expect(value).toBe('9월 5일 (토)')
+    expect(value).toContain('9월 5일 (토)')
+  })
+
+  /*
+    **기간이 전부 붐비는 주라면 가장 덜 붐비는 날도 `혼잡` 이다.** 그때 날짜만 내면 이 줄이
+    추천처럼 읽힌다 — 혼잡도 패널이 같은 이유로 초록 면을 거절하고 등급 배지를 반드시
+    붙인다 (`LeastCrowded` 주석).
+  */
+  it('등급을 함께 말한다 — 전부 붐비는 주에도 추천처럼 읽히지 않는다', () => {
+    const crowded: CongestionSource = {
+      data: {
+        ...congestionFixture,
+        leastCrowded: {
+          date: '2026-09-05',
+          level: { code: 'HIGH', name: '혼잡', description: null },
+          concentrationRate: 88.1,
+        },
+      },
+      loading: false,
+      failed: false,
+    }
+    const value = valueOf(messages.place.detailSummaryCongestionLabel, placeDetail, walkOk, crowded)
+
+    expect(value).toContain('혼잡')
+  })
+
+  /*
+    혼잡도 패널의 `LeastCrowded` 도 같은 방어를 갖고 있다 — `splitDay` 가 `null` 이면
+    아무것도 그리지 않는다. 두 곳이 함께 움직여야 하는 분기다.
+  */
+  it('날짜를 읽을 수 없으면 줄을 만들지 않는다', () => {
+    const broken: CongestionSource = {
+      data: {
+        ...congestionFixture,
+        leastCrowded: { ...congestionFixture.leastCrowded!, date: '날짜아님' },
+      },
+      loading: false,
+      failed: false,
+    }
+
+    expect(labelsOf(placeDetail, walkOk, broken)).not.toContain(
+      messages.place.detailSummaryCongestionLabel,
+    )
   })
 
   /*

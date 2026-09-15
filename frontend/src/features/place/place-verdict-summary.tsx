@@ -1,5 +1,6 @@
 import { ChevronRightIcon } from '@/components/icons'
 import { Skeleton } from '@/components/skeleton'
+import { SurfaceList } from '@/components/surface'
 import {
   type VerdictSummaryLine,
   verdictSummaryLines,
@@ -47,19 +48,23 @@ export function PlaceVerdictSummary({
     */
     <div className="border-border border-t lg:hidden">
       {/*
-        **`ul` 이다.** 세 줄은 목록이다 — 한 문장으로 이으면 스크린리더가 세 답을 한 덩어리로
-        읽는다 (`/about` 출처 목록과 같은 근거).
+        **`SurfaceList` 다** — L2 카드 안 목록. 세 줄은 목록이라 한 문장으로 이으면
+        스크린리더가 세 답을 한 덩어리로 읽는다 (`/about` 출처 목록과 같은 근거).
+
+        **구분선을 항목에 직접 걸지 않는다.** `SurfaceList` 머리주석이 근거를 갖고 있다 —
+        항목이 `index > 0` 이나 `last` 로 선을 그으면 **행 수를 아는 호출자만** 목록을 그릴
+        수 있게 되고, 그래서 규약이 화면마다 세 갈래로 갈렸던 이력이 있다 (#428 · #439).
 
         **이름은 `aria-label` 로 준다.** 제목(`h2`)을 새로 만들면 `h1` 바로 아래에 붙어
         카드 제목 위계가 흔들린다 — 이 카드의 이름은 이미 `h1` 이다.
       */}
-      <ul aria-label={messages.place.detailSummaryLabel} className={INSET_CLASS.card}>
-        {lines.map((line, index) => (
-          <li key={line.label} className={cn(index > 0 && 'border-border border-t')}>
+      <SurfaceList aria-label={messages.place.detailSummaryLabel} className={INSET_CLASS.card}>
+        {lines.map((line) => (
+          <li key={line.label}>
             <SummaryRow line={line} />
           </li>
         ))}
-      </ul>
+      </SurfaceList>
     </div>
   )
 }
