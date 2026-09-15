@@ -7,12 +7,16 @@ import { EmergencyFilterChips } from '@/features/emergency/emergency-filter-chip
 import { EmergencyFilterRail } from '@/features/emergency/emergency-filter-rail'
 import { EmergencySearchField } from '@/features/emergency/emergency-search-field'
 import { EmergencySection } from '@/features/emergency/emergency-section'
-import { emergencySummaryLine } from '@/features/emergency/emergency-summary-line'
+import {
+  emergencyHeadSubtitle,
+  emergencySummaryLine,
+} from '@/features/emergency/emergency-summary-line'
 import {
   countsAreComplete,
   facilityCounts,
   narrowByKeyword,
 } from '@/features/emergency/facility-filters'
+import { PositionFallbackHead } from '@/features/emergency/position-fallback-head'
 import { type EmergencyBoard, useEmergencyBoard } from '@/features/emergency/use-emergency-board'
 import { toErrorStatus } from '@/lib/api/error'
 import { messages } from '@/lib/messages'
@@ -64,6 +68,18 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
   const counts = facilityCounts(narrowByKeyword(result?.facilities ?? [], board.filters.keyword))
   // 잘린 목록에서 센 개수는 전체가 아니다 — 틀린 개수는 없는 개수보다 나쁘다
   const showCounts = result !== null && countsAreComplete(result)
+
+  const subtitle = emergencyHeadSubtitle(result)
+  const headDescription = (
+    <>
+      {subtitle !== null && (
+        <p className="text-caption text-fg-muted font-medium tabular-nums">{subtitle}</p>
+      )}
+      <p className="text-caption text-fg-muted hidden font-medium lg:block">
+        {emergencySummaryLine(board.filters, board.radius)}
+      </p>
+    </>
+  )
 
   return (
     <div className="rail-layout rail-layout-filter">
@@ -126,12 +142,17 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
           fill
           titleId="emergency-list-heading"
           title={messages.emergency.pageTitle}
-          /* 부제는 데스크톱에서만 — 모바일은 아래 칩이 같은 것을 보여준다 */
-          description={
-            <p className="text-caption text-fg-muted hidden font-medium lg:block">
-              {emergencySummaryLine(board.filters, board.radius)}
-            </p>
-          }
+          /*
+            부제 두 줄 — 성격이 다르다.
+
+            **개수 줄은 모든 폭에서 보인다** (#639). "제주에 몇 곳이 있고 지금 몇 곳이
+            열려 있나" 는 이 화면에 온 이유 자체라, 좁은 폭에서 먼저 버릴 것이 아니다.
+            응답 전·잘린 목록에서는 `null` 이라 줄이 아예 서지 않는다
+            (`emergencyHeadSubtitle`).
+
+            **조건 줄은 데스크톱에서만** — 모바일은 바로 아래 칩이 같은 것을 보여준다.
+          */
+          description={headDescription}
           /* 네 화면이 같은 세그먼트 컨트롤을 쓴다 */
           trailing={
             <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
@@ -146,6 +167,20 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
           */
           tools={
             <>
+              {/*
+                **위치 폴백 블록이 검색·칩보다 위다** (#639). 칩은 결과를 *좁히는* 도구지만
+                이 블록은 **무엇을 기준으로 찾을지** — 결과의 전제다. 전제가 도구 아래
+                서면 사용자는 좁히기부터 시작한 뒤에야 기준이 틀렸다는 것을 안다.
+
+                머리(고정 영역)라 목록을 굴려도 남는다. 예전 `PositionNotice` 는 본문
+                맨 위였고 스크롤 한 번이면 사라졌다.
+              */}
+              <PositionFallbackHead
+                reason={board.fallback}
+                regionCode={board.regionCode}
+                onRegionChange={board.researchAtRegion}
+                onLocate={board.locate}
+              />
               <EmergencySearchField
                 filters={board.filters}
                 onFiltersChange={board.setFilters}
@@ -210,8 +245,8 @@ export function EmergencyBoardSection({
       onRetry={() => void board.query.refetch()}
       filters={board.filters}
       onFiltersChange={board.setFilters}
-      positionFallback={board.fallback}
-      onRetryPosition={board.locate}
+      basis={board.basis}
+      regionCode={board.regionCode}
       onWidenRadius={board.widenRadius}
       canWiden={board.canWiden}
       inset={inset}

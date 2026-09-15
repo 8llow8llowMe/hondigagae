@@ -3,6 +3,7 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { SurfaceList } from '@/components/surface'
 import { EmergencySkeleton } from '@/features/emergency/emergency-skeleton'
+import { emergencyBasisLabel } from '@/features/emergency/emergency-summary-line'
 import {
   applyFilters,
   countsAreComplete,
@@ -10,8 +11,9 @@ import {
   reliefs,
 } from '@/features/emergency/facility-filters'
 import { FacilityRow } from '@/features/emergency/facility-row'
+import { type EmergencyBasis, showsDistance } from '@/features/emergency/resolve-anchor'
 import { formatDistance } from '@/lib/format/distance'
-import type { PositionFailure } from '@/lib/geo/current-position'
+import type { JejuRegionCode } from '@/lib/geo/jeju-regions'
 import { messages } from '@/lib/messages'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -24,9 +26,18 @@ export type EmergencySectionProps = {
   onRetry: () => void
   filters: FacilityFilters
   onFiltersChange: (next: FacilityFilters) => void
-  /** null 이면 현재 위치를 쓰고 있다. 값이 있으면 제주 중심 폴백이다 */
-  positionFallback: PositionFailure | null
-  onRetryPosition: () => void
+  /**
+   * 거리·정렬의 기준 (`resolve-anchor.ts`). **`jeju` 에서만 거리를 감춘다** —
+   * 사용자가 고르지 않은 자리라 "480m" 가 거짓말이 된다.
+   *
+   * **위치 실패 안내는 여기 없다** (#639). 그것은 카드 **머리**의 `PositionFallbackHead`
+   * 가 맡는다 — 목록 본문 맨 위에 얹혀 있던 예전 `PositionNotice` 는 스크롤을 내리면
+   * 사라졌고, 급한 행동(위치 다시 찾기)이 화면에서 가장 낮은 위계였다. 이 섹션에 남은
+   * 몫은 **기준을 말하는 것**뿐이다.
+   */
+  basis: EmergencyBasis
+  /** `basis === 'region'` 일 때 어느 권역인가. 요약 줄 문구에만 쓴다 */
+  regionCode: JejuRegionCode | null
   onWidenRadius: () => void
   /** 반경을 더 넓힐 수 있는가 (백엔드 상한 50km) */
   canWiden: boolean
@@ -60,7 +71,12 @@ export type EmergencySectionProps = {
  * **필터 칩은 여기 없다** (#460). 칩은 목록을 좁히는 도구라 카드 밖에 서야 하고
  * (`/places` #439 와 같은 판정), 이 섹션은 카드 **안**의 내용이다 —
  * `EmergencyFilterChips` 가 따로 있고 호출부가 카드 밖에 세운다. 이 컴포넌트가 그리는
- * 것은 위치 안내 · 기준 줄 · 목록(또는 0건 안내) · 출처, 넷이다.
+ * 것은 기준 줄 · 목록(또는 0건 안내) · 출처, 셋이다.
+ *
+ * **위치 안내도 여기 없다** (#639). 예전에는 목록 맨 위에 `PositionNotice` 가 얹혀
+ * 있었는데, 본문은 구르는 영역이라 스크롤을 내리면 사라졌고 "내 위치로 다시 찾기" 가
+ * secondary 버튼이라 응급 화면에서 **가장 급한 행동이 가장 낮은 위계**였다 (감사 E-2).
+ * 지금은 카드 머리의 `PositionFallbackHead` 가 맡는다 — 고정 영역이라 결과를 굴려도 남는다.
  *
  * **위치를 못 얻어도 목록은 남는다.** 거리 줄만 사라지고 목록과 전화는 그대로다
  * (아트보드 03 "위치 권한 없음"). 이 화면은 급할 때 여는 화면이라 위치 하나 때문에
@@ -75,8 +91,8 @@ export function EmergencySection({
   onRetry,
   filters,
   onFiltersChange,
-  positionFallback,
-  onRetryPosition,
+  basis,
+  regionCode,
   onWidenRadius,
   canWiden,
   inset = 'card',
@@ -98,14 +114,10 @@ export function EmergencySection({
 
   const all = result.facilities
   const visible = applyFilters(all, filters)
-  const showDistance = positionFallback === null
+  const showDistance = showsDistance(basis)
 
   return (
     <>
-      {positionFallback !== null && (
-        <PositionNotice reason={positionFallback} onRetry={onRetryPosition} inset={inset} />
-      )}
-
       {/*
         기준 줄 — 카드 제목(위치 안내가 있으면 그 아래) 바로 아래라 위 선이 없다(제목 아래
         선은 카드의 몫, `SurfaceList` 머리주석). 위치 안내와 이 줄 사이에도 선이 없다 — 2a 는
@@ -124,8 +136,9 @@ export function EmergencySection({
         <p className="text-caption text-fg-muted font-semibold tabular-nums">
           {messages.emergency.sortNote.replace('{radius}', formatDistance(result.radius))}
         </p>
+        {/* 네 갈래를 한 함수가 갖는다 (#639) — 지도 갈래 캡션 줄과 같은 말을 해야 한다 */}
         <p className="text-caption text-fg-muted font-medium">
-          {showDistance ? messages.emergency.basisCurrent : messages.emergency.basisJeju}
+          {emergencyBasisLabel(basis, regionCode)}
         </p>
       </div>
 
@@ -275,45 +288,6 @@ function EmptyResult({
           </Button>
         ))}
       </div>
-    </div>
-  )
-}
-
-/** 위치를 못 얻었을 때. **목록 위에 얹고 목록을 지우지 않는다** */
-function PositionNotice({
-  reason,
-  onRetry,
-  inset,
-}: {
-  reason: PositionFailure
-  onRetry: () => void
-  inset: Inset
-}) {
-  const text =
-    reason === 'denied'
-      ? messages.emergency.positionDenied
-      : reason === 'unsupported'
-        ? messages.emergency.positionUnsupported
-        : reason === 'outside'
-          ? messages.emergency.positionOutside
-          : messages.emergency.positionTimeout
-
-  return (
-    <div className={cn('flex flex-col items-start gap-2 pt-3 pb-3', INSET_CLASS[inset])}>
-      <p className="text-body-2 text-fg break-keep">{text}</p>
-      {/*
-        **다시 시도할 것이 없는 두 갈래에는 버튼을 두지 않는다.** 미지원 브라우저는
-        눌러도 같은 답이고, 제주 밖(`outside`)은 좌표를 이미 정확히 받은 상태라
-        다시 물어도 같은 좌표가 온다 — 위치를 옮겨야 바뀐다.
-
-        44px 를 지킨다 — 아트보드도 `min-height:44px` 다. 급할 때 누르는 버튼이라
-        작게 두면 안 된다 (DESIGN.md §7).
-      */}
-      {reason !== 'unsupported' && reason !== 'outside' && (
-        <Button variant="secondary" onClick={onRetry}>
-          {messages.emergency.retryPosition}
-        </Button>
-      )}
     </div>
   )
 }
