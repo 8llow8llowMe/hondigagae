@@ -362,6 +362,27 @@ export const placeMessages = {
   detailCopyrightType3: '공공누리 제3유형 (출처 표시·변경 금지)',
   detailCopyrightUnknown: '출처 표시 대상',
 
+  // ── 장소 상세 · 판정 요약 3줄 (#650 · 진단 D-1) ─────────────────────────
+
+  /*
+    **제목 아래 세 줄은 화면의 답이지 섹션 이름이 아니다.** 390 실측에서 동반(1797)·
+    산책(1519)이 1.8~2.1 화면 아래라, 이름을 읽은 사람이 스크롤 없이 답을 보게 한다.
+    정본: `docs/features/place/장소상세-판정요약-세부명세.md` D4.
+  */
+  detailSummaryLabel: '이 장소 한눈에 보기',
+  detailSummaryPetLabel: '동반',
+  /**
+   * `petAllowanceType.code === 'UNKNOWN'`.
+   *
+   * **'불가' 로 단정하지 않는다** (#530). 태그 줄은 이 배지를 감추지만(옆 태그에 걸려
+   * 읽힌다) 여기서는 그것이 답 자체라 말한다 — 원천에 없는 것이지 안 된다는 것이 아니다.
+   */
+  detailSummaryPetUnknown: '정보 없음 · 방문 전 확인해요',
+  detailSummaryWalkLabel: '지금 산책',
+  /** `{feelsLike}` 가 `null` 이면 등급만 쓴다 — `0.0℃` 는 영하로 읽힌다 */
+  detailSummaryWalkValue: '{grade} · 체감 {feelsLike}℃',
+  detailSummaryCongestionLabel: '덜 붐비는 날',
+
   // ── 장소 상세 · 기간 혼잡도 (#430) ──────────────────────────────────────
 
   /**
