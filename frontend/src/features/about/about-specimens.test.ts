@@ -119,6 +119,15 @@ describe('PlanSpecimen — AI 일정 일자 탭', () => {
     expect(markup).toContain('role="tablist"')
     expect(markup.match(/aria-selected="true"/g)?.length).toBe(1)
     expect(markup).toContain(PLAN_SPECIMEN[0].day)
+    // 선택된 것이 **1일차** 인지까지 본다 — 개수만 세면 어느 탭이든 하나면 통과한다
+    expect(markup).toMatch(
+      /<button[^>]*id="about-plan-tab-0"[^>]*aria-selected="true"|<button[^>]*aria-selected="true"[^>]*id="about-plan-tab-0"/,
+    )
+  })
+
+  it('탭 셋이 같은 패널 하나를 가리킨다 — 없는 id 를 가리키지 않는다', () => {
+    expect(markup).toContain('role="tabpanel"')
+    expect(markup.match(/aria-controls="about-plan-panel"/g)?.length).toBe(PLAN_SPECIMEN.length)
   })
 
   it('1일차 항목 셋이 처음부터 보인다', () => {
