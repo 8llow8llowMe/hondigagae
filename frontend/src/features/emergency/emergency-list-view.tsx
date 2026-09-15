@@ -7,10 +7,7 @@ import { EmergencyFilterChips } from '@/features/emergency/emergency-filter-chip
 import { EmergencyFilterRail } from '@/features/emergency/emergency-filter-rail'
 import { EmergencySearchField } from '@/features/emergency/emergency-search-field'
 import { EmergencySection } from '@/features/emergency/emergency-section'
-import {
-  emergencyHeadSubtitle,
-  emergencySummaryLine,
-} from '@/features/emergency/emergency-summary-line'
+import { emergencyHeadSubtitle } from '@/features/emergency/emergency-summary-line'
 import {
   countsAreComplete,
   facilityCounts,
@@ -70,16 +67,6 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
   const showCounts = result !== null && countsAreComplete(result)
 
   const subtitle = emergencyHeadSubtitle(result)
-  const headDescription = (
-    <>
-      {subtitle !== null && (
-        <p className="text-caption text-fg-muted font-medium tabular-nums">{subtitle}</p>
-      )}
-      <p className="text-caption text-fg-muted hidden font-medium lg:block">
-        {emergencySummaryLine(board.filters, board.radius)}
-      </p>
-    </>
-  )
 
   return (
     <div className="rail-layout rail-layout-filter">
@@ -143,16 +130,19 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
           titleId="emergency-list-heading"
           title={messages.emergency.pageTitle}
           /*
-            부제 두 줄 — 성격이 다르다.
+            **부제는 개수 한 줄이다** (#639). "제주에 몇 곳이 있고 지금 몇 곳이 열려
+            있나" 는 이 화면에 온 이유 자체라 모든 폭에서 선다. 응답 전·잘린 목록에서는
+            `null` 이라 줄이 아예 서지 않는다 (`emergencyHeadSubtitle`).
 
-            **개수 줄은 모든 폭에서 보인다** (#639). "제주에 몇 곳이 있고 지금 몇 곳이
-            열려 있나" 는 이 화면에 온 이유 자체라, 좁은 폭에서 먼저 버릴 것이 아니다.
-            응답 전·잘린 목록에서는 `null` 이라 줄이 아예 서지 않는다
-            (`emergencyHeadSubtitle`).
-
-            **조건 줄은 데스크톱에서만** — 모바일은 바로 아래 칩이 같은 것을 보여준다.
+            **조건 줄(`emergencySummaryLine`)은 걷었다.** 데스크톱 전용 둘째 줄이었는데
+            1280 실측에서 `10.0km` 홀로 서서 무슨 값인지 읽히지 않았다 — 반경은 좌측
+            레일의 선택값과 목록 위 요약 줄(`가까운 순 · 반경 10.0km`)이 이미 말한다.
           */
-          description={headDescription}
+          description={
+            subtitle === null ? undefined : (
+              <p className="text-caption text-fg-muted font-medium tabular-nums">{subtitle}</p>
+            )
+          }
           /* 네 화면이 같은 세그먼트 컨트롤을 쓴다 */
           trailing={
             <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />

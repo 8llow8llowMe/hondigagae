@@ -112,27 +112,23 @@ describe('목록 갈래는 3층 표면이다 (#460)', () => {
   })
 
   /*
-    **부제가 두 줄이 됐다** (#639). 개수 줄(`emergencyHeadSubtitle` — "제주 214곳 · 지금
-    진료중 100곳")은 이 화면에 온 이유 자체라 모든 폭에서 서고, 조건 줄
-    (`emergencySummaryLine`)은 데스크톱에서만 — 모바일은 바로 아래 칩이 같은 것을 보여준다.
+    **부제는 개수 한 줄이다** (#639). "제주 214곳 · 지금 진료중 100곳" 은 이 화면에 온
+    이유 자체라 모든 폭에서 선다.
+
+    **데스크톱 전용 조건 줄(`emergencySummaryLine`, #419)은 걷었다** — 1280 실측에서
+    `10.0km` 홀로 서서 무슨 값인지 읽히지 않았다. 반경은 좌측 레일의 선택값과 목록 위
+    요약 줄(`가까운 순 · 반경 10.0km`)이 이미 말한다. 되돌아오면 같은 결함이 다시 선다.
   */
-  it('보기 토글과 부제 두 줄이 카드 머리 슬롯에 있다 (#556 · #639)', () => {
+  it('보기 토글과 부제 한 줄이 카드 머리 슬롯에 있다 (#556 · #639)', () => {
     const view = block(listView, 'EmergencyListView')
 
     // 카드 밖 제목 줄의 형제가 아니라 카드의 슬롯이다
     expect(view).toMatch(/trailing=\{\s*<ViewToggle current="list"/)
-    expect(view).toContain('description={headDescription}')
-
-    const description = view.slice(view.indexOf('const headDescription'), view.indexOf('return ('))
-    const subtitle = description.indexOf('{subtitle}')
-    const summary = description.indexOf('emergencySummaryLine')
-
     expect(view).toContain('const subtitle = emergencyHeadSubtitle(result)')
-    expect(subtitle).toBeGreaterThan(-1)
-    expect(summary).toBeGreaterThan(subtitle)
-    // 개수 줄에는 `lg:` 갈림이 없고, 조건 줄에만 있다
-    expect(description.slice(0, subtitle)).not.toContain('lg:block')
-    expect(description.slice(subtitle, summary)).toContain('lg:block')
+    expect(view).toMatch(/description=\{[\s\S]{0,200}\{subtitle\}/)
+
+    // `lg:` 로 갈리는 둘째 부제가 되돌아오면 여기서 걸린다
+    expect(listView).not.toContain('emergencySummaryLine')
   })
 
   /*
