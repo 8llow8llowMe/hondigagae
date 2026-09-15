@@ -30,6 +30,24 @@ function render(
   )
 }
 
+/* 일정 화면의 등급어도 같은 축 어휘를 쓴다 — 화면마다 갈리면 배운 규칙이 깨진다 (#652) */
+describe('PlanDayVerdict — 판정 배지가 축을 밝힌다 (#652)', () => {
+  it('판정 배지가 적합도 축임을 말한다', () => {
+    const html = render()
+    const axis = messages.common.metricAxisSuitability
+
+    expect(html).toContain(`>${axis} </span>`)
+    expect(html).toContain(`</span>${planVerdict.suitabilityLevel?.name}</span>`)
+  })
+
+  /* 등급어는 서버 값 그대로다 — 라벨이 어휘를 다시 쓰는 일이 되면 안 된다 */
+  it('축 라벨과 등급어가 한 문자열로 붙지 않는다', () => {
+    expect(render()).not.toContain(
+      `${messages.common.metricAxisSuitability} ${planVerdict.suitabilityLevel?.name}`,
+    )
+  })
+})
+
 describe('PlanDayVerdict — 판정 옆 큰 숫자 (#253)', () => {
   it('체감온도를 그 이름으로 보여 준다', () => {
     const html = render({ weather: weather({ maxFeelsLikeTemperature: 33.4 }) })

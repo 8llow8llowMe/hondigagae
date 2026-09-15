@@ -168,7 +168,9 @@ export function AboutView() {
             >
               <div className="flex items-center justify-between gap-3">
                 <p className="text-body-1 text-fg">{SUITABILITY_SPECIMEN.place}</p>
-                <MetricBadge tone="high">{about.specimen.suitabilityGrade}</MetricBadge>
+                <MetricBadge tone="high" axis="suitability">
+                  {about.specimen.suitabilityGrade}
+                </MetricBadge>
               </div>
               <ul className="mt-3 grid gap-2">
                 {about.specimen.suitabilityReasons.map((reason) => (

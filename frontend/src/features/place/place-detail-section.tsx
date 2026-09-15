@@ -271,7 +271,11 @@ export function PlaceDetailSection({
                   빈 배지가 잠깐 등급처럼 보인다. 문구는 서버 `name` 그대로다.
                 */}
                   {suitabilityBadge !== null && (
-                    <MetricBadge tone={suitabilityTone(suitabilityBadge.code)} className="shrink-0">
+                    <MetricBadge
+                      tone={suitabilityTone(suitabilityBadge.code)}
+                      axis="suitability"
+                      className="shrink-0"
+                    >
                       {suitabilityBadge.name}
                     </MetricBadge>
                   )}

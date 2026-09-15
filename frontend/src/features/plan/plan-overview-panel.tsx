@@ -224,11 +224,15 @@ function PlanVerdictToc({ verdicts }: { verdicts: PlanDayWeatherItem[] }) {
                 </span>
                 {verdict.suitabilityLevel === null ? (
                   // 판정을 못 낸 날을 낮은 등급으로 칠하지 않는다 — 점선 unknown 이다
-                  <MetricBadge tone="unknown" size="sm">
+                  <MetricBadge tone="unknown" size="sm" axis="suitability">
                     {messages.plan.verdictTocUnavailable}
                   </MetricBadge>
                 ) : (
-                  <MetricBadge tone={suitabilityTone(verdict.suitabilityLevel.code)} size="sm">
+                  <MetricBadge
+                    tone={suitabilityTone(verdict.suitabilityLevel.code)}
+                    size="sm"
+                    axis="suitability"
+                  >
                     {verdict.suitabilityLevel.name}
                   </MetricBadge>
                 )}

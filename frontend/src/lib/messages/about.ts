@@ -67,7 +67,12 @@ export const aboutMessages = {
     curveLegendWindow: '추천 구간',
     curveNote: '화면 예시예요. 곡선은 기상청 시간별 예보로 매일 새로 계산해요.',
 
-    suitabilityGrade: '적합도 높음',
+    /**
+     * **서버 `name` 그대로다.** 예전에는 `적합도 높음` 이었는데 실제 적합도 `HIGH` 의
+     * `name` 은 `여행 적합` 이라, 소개 페이지가 실제로 없는 화면을 보여 주고 있었다.
+     * 축(`적합도`)은 이제 배지의 `axis` 가 붙인다 (#652 · 명세 D8-3).
+     */
+    suitabilityGrade: '여행 적합',
     suitabilityReasons: [
       '오전에는 구름 많고 최고 체감온도 27℃ 예요',
       '이 시기 방문객이 적은 편이에요',
