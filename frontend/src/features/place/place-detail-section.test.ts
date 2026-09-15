@@ -11,7 +11,7 @@ import {
 } from '@/features/place/place-detail-section'
 import type { PlaceSuitabilityPanelProps } from '@/features/place/place-suitability-panel'
 import type { PlaceWalkSafetyPanelProps } from '@/features/place/place-walk-safety-panel'
-import { CONGESTION_DAYS } from '@/lib/insight/congestion'
+import { CONGESTION_DEFAULT_DAYS } from '@/lib/insight/congestion'
 import { messages } from '@/lib/messages'
 import {
   congestion as congestionFixture,
@@ -51,7 +51,7 @@ const congestion: PlaceCongestionPanelProps = {
   loading: false,
   failed: false,
   onRetry: () => undefined,
-  days: CONGESTION_DAYS.default,
+  days: CONGESTION_DEFAULT_DAYS,
   onDaysChange: () => undefined,
 }
 

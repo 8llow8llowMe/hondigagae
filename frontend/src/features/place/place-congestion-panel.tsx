@@ -156,7 +156,7 @@ function PanelBody({
               {messages.place.detailCongestionUnknownNote}
             </p>
           )}
-          {days === CONGESTION_DAYS.extended && (
+          {days === CONGESTION_DAYS.month && (
             <p className="text-caption text-fg-muted">
               {messages.place.detailCongestionExtendedNote}
             </p>
@@ -244,7 +244,7 @@ function Chart({
 
   if (items.length === 0) return null
 
-  const extended = days === CONGESTION_DAYS.extended
+  const isMonth = days === CONGESTION_DAYS.month
 
   return (
     /*
@@ -253,7 +253,7 @@ function Chart({
       붙는 `sr-only` 라벨이 `position: absolute` 라, 기준면이 없으면 그 30개의 정적 위치가
       조상의 `scrollWidth` 로 새어 390 에서 페이지가 통째로 가로로 넘쳤다.
     */
-    <div className={cn('relative', extended && 'scroll-rail')}>
+    <div className={cn('relative', isMonth && 'scroll-rail')}>
       <ul
         ref={rail.ref}
         onScroll={rail.onScroll}
@@ -269,7 +269,7 @@ function Chart({
             무언가를 그리면(테두리·포커스 링) 그만큼 세로 여백을 함께 줘야 한다.**
           */
           'flex items-end gap-1.5',
-          extended && 'overflow-x-auto',
+          isMonth && 'overflow-x-auto',
           /*
             **넘치는 쪽만 카드 끝까지 연다** (`INSET_BLEED_END_CLASS.card`). 인셋 안에서
             자르면 마지막 칸이 여백 앞에서 끊겨 **깨진 막대**로 보인다 — 더 있다는 신호가
@@ -277,14 +277,14 @@ function Chart({
 
             `rail` 의 음수 마진을 쓰면 카드 테두리를 뚫는다 (`lib/ui/inset.ts`).
           */
-          extended && INSET_BLEED_END_CLASS.card,
+          isMonth && INSET_BLEED_END_CLASS.card,
           /*
             스크롤바를 숨기고 **페이드와 화살표가 그 신호를 대신한다** — 홈 골든타임 곡선과
             같은 장치다(`walk-times-section.tsx`). 상시 스크롤바는 활성 밑줄·진행 표시줄로
             오독된다(`app/globals.css`).
           */
-          extended && 'scrollbar-none',
-          extended && rail.fadeClassName,
+          isMonth && 'scrollbar-none',
+          isMonth && rail.fadeClassName,
         )}
       >
         {items.map((item) => (
@@ -293,7 +293,7 @@ function Chart({
       </ul>
 
       {/* 갈 수 있는 쪽에만 뜬다 — 나타나고 사라지는 것 자체가 "여기가 끝" 이라는 신호다 */}
-      {extended && (
+      {isMonth && (
         <ScrollRailArrows
           rail={rail}
           prevLabel={messages.place.detailCongestionPrevDays}
@@ -418,16 +418,16 @@ function DaysToggle({
   days: CongestionDays
   onDaysChange: (days: CongestionDays) => void
 }) {
-  const extended = days === CONGESTION_DAYS.extended
+  const isMonth = days === CONGESTION_DAYS.month
 
   return (
     <button
       type="button"
-      onClick={() => onDaysChange(extended ? CONGESTION_DAYS.default : CONGESTION_DAYS.extended)}
+      onClick={() => onDaysChange(isMonth ? CONGESTION_DAYS.week : CONGESTION_DAYS.month)}
       // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
       className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center self-start font-semibold focus-visible:ring-2 focus-visible:outline-none"
     >
-      {extended ? messages.place.detailCongestionCollapse : messages.place.detailCongestionExpand}
+      {isMonth ? messages.place.detailCongestionCollapse : messages.place.detailCongestionExpand}
     </button>
   )
 }
@@ -437,9 +437,21 @@ function BodySkeleton() {
   return (
     <div className="flex flex-col gap-3">
       <Skeleton variant="text" className="h-14 w-full rounded-md" />
-      <div aria-hidden className="grid grid-cols-7 gap-1.5">
-        {[0, 1, 2, 3, 4, 5, 6].map((slot) => (
-          <Skeleton key={slot} variant="text" className={cn('w-full rounded-sm', TRACK_HEIGHT)} />
+      {/*
+        **기본이 30일이라 스켈레톤도 레일 모양이다** (#603). 7칸 그리드였을 때는 로딩이
+        끝나는 순간 7칸이 30칸 레일로 바뀌어 카드가 한 번 출렁였다.
+
+        칸 수를 폭에 맞춰 세지 않는다 — 넘치는 만큼 `overflow-hidden` 이 자른다. 실제
+        레일도 같은 자리에서 잘려 보이므로(구를 수 있다는 신호는 화살표가 낸다) 로딩과
+        본화면의 실루엣이 맞는다. `aria-hidden` 이라 칸 수가 보조기기에 새지 않는다.
+      */}
+      <div aria-hidden className="flex gap-1.5 overflow-hidden">
+        {Array.from({ length: CONGESTION_DAYS.month }, (_, slot) => (
+          <Skeleton
+            key={slot}
+            variant="text"
+            className={cn('shrink-0 rounded-sm', COLUMN_WIDTH, TRACK_HEIGHT)}
+          />
         ))}
       </div>
     </div>

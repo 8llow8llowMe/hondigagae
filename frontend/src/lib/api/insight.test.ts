@@ -123,11 +123,11 @@ describe('기간 혼잡도 경로 (#430)', () => {
     카드 머리의 기간 표기만 서버를 따라가 화면이 스스로 어긋난다.
   */
   it('기본 기간도 days 를 실어 보낸다', () => {
-    expect(congestionsPath('123', CONGESTION_DAYS.default)).toBe('/places/123/congestions?days=7')
+    expect(congestionsPath('123', CONGESTION_DAYS.week)).toBe('/places/123/congestions?days=7')
   })
 
   it('펼침은 30일이다 — 혼잡도 예측이 닿는 끝까지다', () => {
-    expect(congestionsPath('123', CONGESTION_DAYS.extended)).toBe('/places/123/congestions?days=30')
+    expect(congestionsPath('123', CONGESTION_DAYS.month)).toBe('/places/123/congestions?days=30')
   })
 
   /*
@@ -136,7 +136,7 @@ describe('기간 혼잡도 경로 (#430)', () => {
     기간이 나간다.
   */
   it('fromDate 를 보내지 않는다 — 오늘은 서버가 정한다', () => {
-    expect(congestionsPath('123', CONGESTION_DAYS.default)).not.toContain('fromDate')
+    expect(congestionsPath('123', CONGESTION_DAYS.week)).not.toContain('fromDate')
   })
 
   /*
@@ -144,7 +144,7 @@ describe('기간 혼잡도 경로 (#430)', () => {
     답이고, 실으면 조회 key 가 반려견마다 갈려 같은 응답을 여러 벌 캐시한다.
   */
   it('반려견 조건이 섞이지 않는다', () => {
-    const path = congestionsPath('123', CONGESTION_DAYS.default)
+    const path = congestionsPath('123', CONGESTION_DAYS.week)
 
     expect(path).not.toContain('petSizeType')
     expect(path).not.toContain('petSociality')

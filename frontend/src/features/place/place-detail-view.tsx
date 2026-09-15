@@ -14,7 +14,7 @@ import { usePlaceWalkSafety } from '@/features/place/use-place-walk-safety'
 import { PlaceAddToPlanSheet } from '@/features/plan/place-add-to-plan-sheet'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { toPetCondition } from '@/lib/api/insight'
-import { CONGESTION_DAYS, type CongestionDays } from '@/lib/insight/congestion'
+import { CONGESTION_DEFAULT_DAYS, type CongestionDays } from '@/lib/insight/congestion'
 import { writeRecentPlaceId } from '@/lib/insight/recent-place'
 
 /**
@@ -59,7 +59,7 @@ export function PlaceDetailView({ placeId, authed }: { placeId: string; authed: 
     하나의 펼침이라 링크로 공유할 대상이 아니다 — `/places/{id}` 를 받은 사람이 봐야 하는
     것은 그 장소이지 내가 펼쳐 둔 30일이 아니다.
   */
-  const [congestionDays, setCongestionDays] = useState<CongestionDays>(CONGESTION_DAYS.default)
+  const [congestionDays, setCongestionDays] = useState<CongestionDays>(CONGESTION_DEFAULT_DAYS)
   const congestion = usePlaceCongestion(placeId, congestionDays)
 
   const favorite = usePlaceFavorite({ placeId, authed })

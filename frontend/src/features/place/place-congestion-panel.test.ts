@@ -7,7 +7,7 @@ import {
   PlaceCongestionPanel,
   type PlaceCongestionPanelProps,
 } from '@/features/place/place-congestion-panel'
-import { CONGESTION_DAYS } from '@/lib/insight/congestion'
+import { CONGESTION_DAYS, CONGESTION_DEFAULT_DAYS } from '@/lib/insight/congestion'
 import { messages } from '@/lib/messages'
 import { congestion, congestionAllUnknown } from '@/test/fixtures/insight'
 
@@ -17,7 +17,8 @@ function render(overrides: Partial<PlaceCongestionPanelProps> = {}) {
     loading: false,
     failed: false,
     onRetry: () => undefined,
-    days: CONGESTION_DAYS.default,
+    // 화면의 기본값과 같다 — 기본이 7일이던 시절의 습관으로 두면 테스트만 다른 화면을 본다
+    days: CONGESTION_DEFAULT_DAYS,
     onDaysChange: () => undefined,
     ...overrides,
   }
@@ -137,12 +138,18 @@ describe('PlaceCongestionPanel — 기간', () => {
     expect(render()).toContain('9.1 – 9.7')
   })
 
-  it('기본은 7일이고 30일로 펼칠 수 있다', () => {
-    expect(render()).toContain(messages.place.detailCongestionExpand)
+  /*
+    **기본이 30일이다** (#603). 7일은 좁히는 쪽 선택지로 남는다 — 이 카드의 값은 "언제
+    갈까" 에 멀리까지 답하는 것이고, 폭으로 기본값을 가를 수 없는 이유는
+    `CONGESTION_DEFAULT_DAYS` 주석에 있다.
+  */
+  it('기본은 30일이고 7일로 좁힐 수 있다', () => {
+    expect(render()).toContain(messages.place.detailCongestionCollapse)
+    expect(render({ days: CONGESTION_DAYS.week })).toContain(messages.place.detailCongestionExpand)
   })
 
-  it('펼친 상태에서는 되돌리는 버튼과 예측 범위를 말한다', () => {
-    const markup = render({ days: CONGESTION_DAYS.extended })
+  it('30일에서는 되돌리는 버튼과 예측 범위를 말한다', () => {
+    const markup = render()
 
     expect(markup).toContain(messages.place.detailCongestionCollapse)
     expect(markup).toContain(messages.place.detailCongestionExtendedNote)
@@ -157,11 +164,11 @@ describe('PlaceCongestionPanel — 기간', () => {
     `e2e/place-congestion.spec.ts` 가 본다.
   */
   it('30일에만 구르는 레일이 된다 — 스크롤바는 숨기고 페이드·화살표에 맡긴다', () => {
-    const extended = render({ days: CONGESTION_DAYS.extended })
+    const markup = render()
 
-    expect(extended).toContain('scrollbar-none')
-    expect(extended).toContain('overflow-x-auto')
-    expect(render()).not.toContain('overflow-x-auto')
+    expect(markup).toContain('scrollbar-none')
+    expect(markup).toContain('overflow-x-auto')
+    expect(render({ days: CONGESTION_DAYS.week })).not.toContain('overflow-x-auto')
   })
 
   /*
@@ -183,8 +190,8 @@ describe('PlaceCongestionPanel — 기간', () => {
     `e2e/place-congestion.spec.ts` 가 잰다.
   */
   it('30일 레일에만 scroll-rail 을 준다 — sr-only 라벨이 조상으로 새지 않게', () => {
-    expect(render({ days: CONGESTION_DAYS.extended })).toContain('scroll-rail')
-    expect(render()).not.toContain('scroll-rail')
+    expect(render()).toContain('scroll-rail')
+    expect(render({ days: CONGESTION_DAYS.week })).not.toContain('scroll-rail')
   })
 })
 
@@ -210,7 +217,7 @@ describe('PlaceCongestionPanel — 막대 색 (#603)', () => {
     danger 를 쓰지 않는다" 와 같은 규칙이다.
   */
   it('막대에 등급 색을 쓰지 않는다', () => {
-    const markup = render({ days: CONGESTION_DAYS.extended })
+    const markup = render()
 
     for (const tone of ['critical', 'high', 'mid', 'low']) {
       expect(markup).not.toContain(`bg-metric-${tone}-500`)
