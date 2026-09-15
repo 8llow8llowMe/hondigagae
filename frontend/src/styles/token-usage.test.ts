@@ -275,7 +275,17 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0 · 3a)', () => {
       'src/features/emergency/emergency-map-view.tsx',
     ]
 
-    const allowed = new Set([OWNER, ...MAP_GROUND])
+    /*
+      인증 셸(`(auth)`)은 `AppShell` 밖이라 `GlobalHeader` 가 **없다.** `Canvas` 가 함께
+      들고 오는 `page-canvas`(`100dvh - var(--header-h)`)는 그 헤더가 있다는 전제이고,
+      헤더가 없는 여기서는 회색 바닥이 화면 끝에서 56px 못 미쳐 끊긴다. 소유자를 옮기는
+      것이 아니라 **`Canvas` 를 쓸 수 없는 화면이 자기 바탕을 칠하는** 같은 예외다.
+
+      **이 목록도 늘리지 않는다** — `(auth)` 는 레이아웃 하나가 그룹 넷을 전부 덮는다.
+    */
+    const AUTH_GROUND = ['app/(auth)/layout.tsx']
+
+    const allowed = new Set([OWNER, ...MAP_GROUND, ...AUTH_GROUND])
     const found = FILES.filter(({ path }) => !allowed.has(path.replace(/\\/g, '/'))).flatMap(
       ({ path, text }) =>
         classLiterals(text)
