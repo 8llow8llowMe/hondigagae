@@ -78,9 +78,11 @@ function Metric({
 /**
  * 히어로 판정 카드 예시 (#635, 명세 §5-1 · §6-4).
  *
- * 히어로는 로드 시 보이므로 `playIfVisible` 로 **마운트 직후** 재생한다. 숫자가 끝나면
- * (`revealed` 뒤 150ms) 배지가 나타난다 — 배지는 `opacity` 전환이라 전역 reduced-motion
- * 규칙이 덮는다. **배지는 다른 등급을 거치지 않는다** — `위험` 하나가 나타날 뿐이다.
+ * 히어로는 로드 시 보이므로 `playIfVisible` 로 **마운트 직후** 재생한다. 배지는 숫자와
+ * **독립적으로** `revealed` 에서 150ms 페이드인한다 — 숫자 완료(600ms)를 기다리지 않으므로
+ * `COUNT_UP_MS` 를 바꿔도 배지 타이밍은 그대로다. 배지는 `opacity` 전환이라 전역
+ * reduced-motion 규칙이 덮는다. **배지는 다른 등급을 거치지 않는다** — `위험` 하나가
+ * 나타날 뿐이다.
  *
  * 배지 클래스가 삼항인 것은 `useRevealOnce` 의 소비자 계약이다 — `armed` 동안 전환을 꺼야
  * 숨김 프레임이 즉시 칠해진다. `transition-*` 와 `transition-none` 은 tailwind-merge 에서
