@@ -5,6 +5,7 @@ import { ErrorState } from '@/components/error-state'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
 import { FormNotice } from '@/components/form-notice'
+import { EyeIcon, EyeOffIcon } from '@/components/icons'
 import { Input } from '@/components/input'
 import type { EmailValues, PasswordResetValues } from '@/features/auth/schemas'
 import { classify } from '@/lib/api/error'
@@ -193,25 +194,27 @@ export function PasswordResetCodeStep({
         error={errors.fields.newPassword}
         required
       >
-        <div className="flex gap-2">
-          <Input
-            id="newPassword"
-            type={showPassword ? 'text' : 'password'}
-            autoComplete="new-password"
-            value={values.newPassword}
-            onValueChange={(value) => onValueChange('newPassword', value)}
-            invalid={errors.fields.newPassword !== undefined}
-          />
-          {/* 아이콘 자산이 없어 텍스트 버튼이다 — LoginFormFields 와 같은 이유 */}
-          <Button
-            variant="secondary"
-            size="md"
-            aria-pressed={showPassword}
-            onClick={onTogglePassword}
-          >
-            {showPassword ? messages.auth.passwordHideShort : messages.auth.passwordShowShort}
-          </Button>
-        </div>
+        {/* 입력란 안 눈 아이콘 — 배선·근거 전부 `LoginFormFields` 와 같다 */}
+        <Input
+          id="newPassword"
+          type={showPassword ? 'text' : 'password'}
+          autoComplete="new-password"
+          value={values.newPassword}
+          onValueChange={(value) => onValueChange('newPassword', value)}
+          invalid={errors.fields.newPassword !== undefined}
+          action={
+            <Button
+              variant="ghost"
+              size="md"
+              iconOnly
+              aria-label={showPassword ? messages.auth.passwordHide : messages.auth.passwordShow}
+              aria-pressed={showPassword}
+              aria-controls="newPassword"
+              leading={showPassword ? <EyeOffIcon size={20} /> : <EyeIcon size={20} />}
+              onClick={onTogglePassword}
+            />
+          }
+        />
       </Field>
 
       <Button type="submit" size="lg" loading={submitting} className="mt-2">

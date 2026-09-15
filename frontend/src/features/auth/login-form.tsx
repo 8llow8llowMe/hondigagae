@@ -10,6 +10,7 @@ import { Button } from '@/components/button'
 import { ErrorState } from '@/components/error-state'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
+import { EyeIcon, EyeOffIcon } from '@/components/icons'
 import { Input } from '@/components/input'
 import { loginSchema, type LoginValues } from '@/features/auth/schemas'
 import { login, type LoginResult } from '@/lib/api/auth'
@@ -36,9 +37,16 @@ export type LoginFormFieldsProps = {
  * 표시 전용. 상태를 갖지 않아 node 환경에서 렌더 테스트가 된다
  * — docs/testing-guide.md §1.
  *
- * 비밀번호 표시 토글은 아이콘이 아니라 텍스트 버튼이다. `Button` 의 `iconOnly`
- * 는 타입으로 `children` 을 금지하고(component-guide.md §7), 아직 아이콘 SVG
- * 자산이 없어 `iconOnly` 를 쓰면 빈 버튼이 된다. `aria-pressed` 로 상태를 알린다.
+ * **비밀번호 표시 토글은 입력란 안 눈 아이콘이다.** 예전에는 `표시` / `숨기기` 텍스트
+ * 버튼이 입력란 **옆에** 섰다 — `iconOnly` 가 타입으로 `children` 을 금지하는데
+ * (component-guide.md §7) 그때는 눈 아이콘 자산이 없어 쓰면 빈 버튼이 됐기 때문이다.
+ * 자산이 생겼으니(`EyeIcon` · `EyeOffIcon`) 원래 자리로 옮긴다: 버튼이 가져가던 44px +
+ * gap 8px 가 입력란으로 돌아가 **입력란이 열 끝까지 선다.**
+ *
+ * **이름은 아이콘이 아니라 `aria-label` 이 준다** — 아이콘은 `aria-hidden` 이다.
+ * `표시` / `숨기기` 두 글자는 옆에 입력란이 보일 때만 뜻이 통하므로, 소리로만 듣는
+ * 쪽에는 `비밀번호 표시` / `비밀번호 숨기기` 로 대상까지 말한다. 상태는 그대로
+ * `aria-pressed` 가 알린다.
  */
 export function LoginFormFields({
   values,
@@ -98,24 +106,34 @@ export function LoginFormFields({
         error={errors.fields.password}
         required
       >
-        <div className="flex gap-2">
-          <Input
-            id="password"
-            type={showPassword ? 'text' : 'password'}
-            autoComplete="current-password"
-            value={values.password}
-            onValueChange={(value) => onValueChange('password', value)}
-            invalid={errors.fields.password !== undefined}
-          />
-          <Button
-            variant="secondary"
-            size="md"
-            aria-pressed={showPassword}
-            onClick={onTogglePassword}
-          >
-            {showPassword ? messages.auth.passwordHideShort : messages.auth.passwordShowShort}
-          </Button>
-        </div>
+        <Input
+          id="password"
+          type={showPassword ? 'text' : 'password'}
+          autoComplete="current-password"
+          value={values.password}
+          onValueChange={(value) => onValueChange('password', value)}
+          invalid={errors.fields.password !== undefined}
+          action={
+            /*
+              `ghost` 다 — 입력란 **안**에 서는 버튼이라 자기 면을 가지면 입력란 안에 상자가
+              하나 더 생긴다. hover 에서만 `--band` 가 깔린다.
+
+              `aria-controls` 로 어느 입력란을 여닫는지 잇는다. 텍스트 버튼일 때는 바로 옆에
+              붙어 있어 자리가 그 관계를 말했지만, 아이콘은 입력란 안으로 들어가 시각적으로만
+              붙어 있다.
+            */
+            <Button
+              variant="ghost"
+              size="md"
+              iconOnly
+              aria-label={showPassword ? messages.auth.passwordHide : messages.auth.passwordShow}
+              aria-pressed={showPassword}
+              aria-controls="password"
+              leading={showPassword ? <EyeOffIcon size={20} /> : <EyeIcon size={20} />}
+              onClick={onTogglePassword}
+            />
+          }
+        />
       </Field>
 
       <Button type="submit" size="lg" loading={submitting} className="mt-2">

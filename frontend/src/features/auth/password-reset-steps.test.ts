@@ -162,6 +162,26 @@ describe('PasswordResetCodeStep', () => {
     expect(codeStep({ showPassword: false })).toContain('aria-pressed="false"')
     expect(codeStep({ showPassword: true })).toContain('aria-pressed="true"')
   })
+
+  /*
+    **아이콘 버튼의 이름은 `aria-label` 뿐이다** — 눈 아이콘이 `aria-hidden` 이라
+    라벨이 빠지면 스크린리더에 이름 없는 버튼으로 남는다. `Button` 의 `iconOnly` 유니온이
+    타입으로 강제하지만, 문구가 상태를 따라 바뀌는 것까지는 타입이 못 본다.
+  */
+  it('눈 아이콘이 상태별 이름을 갖는다 — 아이콘 자체는 이름이 없다', () => {
+    expect(codeStep({ showPassword: false })).toContain(
+      `aria-label="${messages.auth.passwordShow}"`,
+    )
+    expect(codeStep({ showPassword: true })).toContain(`aria-label="${messages.auth.passwordHide}"`)
+  })
+
+  /*
+    아이콘이 입력란 **안**으로 들어가 시각적으로만 붙어 있다 — 텍스트 버튼일 때는 바로 옆
+    자리가 그 관계를 말했다. `aria-controls` 가 어느 입력란을 여닫는지 잇는다.
+  */
+  it('토글이 자기가 여닫는 입력란을 가리킨다', () => {
+    expect(codeStep()).toContain('aria-controls="newPassword"')
+  })
 })
 
 describe('PasswordResetDone', () => {
