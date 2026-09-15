@@ -97,12 +97,20 @@ describe('congestionRateSummary — 집중률 표현 (#651 · 진단 D-3)', () =
     읽는 사람이 기대하는 차이는 26 이다. 화면의 세 숫자가 서로 맞아야 한다.
   */
   it('차이는 반올림한 값끼리 뺀 값이다 — 화면의 세 숫자가 맞는다', () => {
-    const summary = congestionRateSummary(57.4, [day('2026-09-21', 57.4), day('2026-09-22', 107.6)])
+    /*
+      **두 구현이 갈리는 값을 일부러 고른 조합이다.** 평균이 정확히 82.5 라 `Math.round`
+      가 올림하고(83), 값은 57.4 라 내림한다(57) — 반올림하고 빼면 26, 빼고 반올림하면
+      `round(25.1)` = 25 다. 셋 다 집중률 축(0~100) 안에 있다.
+    */
+    const summary = congestionRateSummary(57.4, [
+      day('2026-09-21', 57.4),
+      day('2026-09-22', 90.1),
+      day('2026-09-23', 100),
+    ])
 
     expect(summary.rate).toBe(57)
     expect(summary.average).toBe(83)
     expect(summary.belowAverage).toBe(26)
-    expect(summary.average! - summary.rate).toBe(summary.belowAverage)
   })
 
   /*
@@ -145,8 +153,13 @@ describe('congestionRateSummary — 집중률 표현 (#651 · 진단 D-3)', () =
     expect(summary.belowAverage).toBeNull()
   })
 
-  /* 반올림 때문에 평균이 값보다 낮아지는 경우 — 음수 차이를 내보내지 않는다 */
-  it('차이가 양수가 아니면 null 이다', () => {
+  /*
+    **방어 코드 커버리지다 — 호출부는 이 입력을 만들 수 없다.** `leastCrowded` 는 아는 날의
+    최솟값이고 `Math.round` 는 단조라 `round(최솟값) <= round(평균)` 이 언제나 성립한다.
+    즉 `> 0` 가드가 실제로 거르는 것은 **0 하나**뿐이다(바로 위 "모든 값이 같으면"). 그래도
+    이 함수는 임의의 값을 받을 수 있으므로 음수가 새지 않는지 잰다.
+  */
+  it('차이가 양수가 아니면 null 이다 — 방어 코드', () => {
     const summary = congestionRateSummary(80, [day('2026-09-21', 80), day('2026-09-22', 60)])
 
     expect(summary.average).toBe(70)
