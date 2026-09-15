@@ -14,11 +14,13 @@ import { Skeleton } from '@/components/skeleton'
 import { Surface } from '@/components/surface'
 import { formatCelsius } from '@/lib/format/celsius'
 import { sortRegionsByScore } from '@/lib/insight/region-order'
+import { findTiedTop, type TiedTopRegions } from '@/lib/insight/region-tie'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { resolveWeatherGlyph, type WeatherIconKind } from '@/lib/insight/weather-icon'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
+import type { CodeNameMetadata } from '@/types/api'
 import type { RegionalWeatherResponse, RegionWeatherItem } from '@/types/insight'
 
 /**
@@ -67,7 +69,20 @@ export function RegionalWeatherSection({
       말한다. 예전에는 이 배지가 **모바일의 유일한 특보 표시**를 겸했는데, 스트립이
       레이아웃 밖 최상단이라 그 역할까지 함께 가져갔다.
     */
-    <Surface titleId="region-heading" title={messages.home.regionHeading}>
+    /*
+      **제목 아래 캡션이 점수의 뜻과 만점을 밝힌다** (#638). 배지가 `100` 뿐이던 동안에는
+      무엇의 100인지 화면 어디에도 없었다 — #342 는 "배지가 날씨 값 바로 옆이라 자리가
+      말한다" 고 보고 보조 문구를 걷었는데, 값 묶음이 세로로 쌓이면서 배지가 숫자에서
+      떨어져(`ml-auto`) 그 전제가 무너졌다.
+
+      **하단이 아니라 머리다.** 표 아래 한 줄은 배지를 다 읽은 뒤에야 닿는다.
+      `Surface` 가 이미 받는 `description` 자리라 새 자리를 만들지 않는다.
+    */
+    <Surface
+      titleId="region-heading"
+      title={messages.home.regionHeading}
+      description={messages.home.regionScoreCaption}
+    >
       <div className={cn('pb-3', INSET_CLASS.card)}>
         <Recommendation data={data} />
       </div>
@@ -181,17 +196,29 @@ export function RegionalWeatherSection({
  * **없는 날에 "그나마 여기" 를 쓰지 않는다.** 특보 경보이거나 어느 권역도 예보를 못 받은
  * 날이고, 적합도는 0점·산책은 위험이라고 말하는 같은 서비스가 여기서만 나가라고 하면 안 된다
  * (`RegionalWeatherResponse` javadoc). 그때도 아래 비교표는 그대로 둔다 — 여전히 정보다.
+ *
+ * **동점이면 1위를 단정하지 않는다** (#638). 2026-09-15 실측에서 다섯 배지가 전부 `100`
+ * 인데 이 문장은 "오늘은 제주시권이 가장 나아요" 였다 — 바로 아래 표가 그 말을 받쳐 주지
+ * 못하면 사용자는 자기가 표를 잘못 읽었다고 생각한다. 판정은 `findTiedTop` 이 한다.
  */
 function Recommendation({ data }: { data: RegionalWeatherResponse }) {
   if (data.recommendedRegion === null) {
+    /*
+      **여기서는 동점을 세지 않는다.** 서버가 추천을 내지 않은 날이라, 점수가 같은 권역을
+      찾아 "어디든 좋아요" 라고 말하면 서버가 막아 둔 문을 화면이 다시 여는 것이 된다.
+    */
     return <p className="text-body-1 text-fg-muted font-semibold">{messages.home.regionNone}</p>
   }
 
+  const tied = findTiedTop(data.regions, data.recommendedRegion)
+
   return (
     <div className="flex flex-col gap-1">
-      <p className="text-body-1 font-semibold">
-        {messages.home.regionRecommended.replace('{name}', data.recommendedRegion.name)}
-      </p>
+      {/*
+        **문장이 바꾸는 것은 "어디가" 뿐이다.** 아래 `recommendationReasons` 는 서버가 준
+        완성형 근거라 동점이든 아니든 그대로 붙는다 — 그쪽이 "왜 좋은가" 를 말한다.
+      */}
+      <p className="text-body-1 font-semibold">{headline(data.recommendedRegion, tied)}</p>
       {/*
         추천 이유는 **문장 배열**이다 (근거 객체가 아니다). 서버가 완성형으로 주므로
         FE 가 다시 쓰지 않는다 (styling-guide.md §7).
@@ -202,6 +229,29 @@ function Recommendation({ data }: { data: RegionalWeatherResponse }) {
         </p>
       ))}
     </div>
+  )
+}
+
+/**
+ * 추천 문장 한 줄 (#638).
+ *
+ * **동점이 2곳 이상일 때만 갈린다.** 1곳이면 그것이 곧 단독 1위라 현행 문장 그대로다.
+ *
+ * **전부 동점이면 이름을 나열하지 않는다.** 다섯을 늘어놓아도 "고를 것이 없다" 는 뜻은
+ * 같은데 줄만 길어진다.
+ *
+ * 이름 구분자는 ` · ` 다 — 같은 카드의 다른 문장(캡션)과 같은 기호를 쓴다.
+ */
+function headline(recommended: CodeNameMetadata, tied: TiedTopRegions): string {
+  if (tied.regions.length < 2) {
+    return messages.home.regionRecommended.replace('{name}', recommended.name)
+  }
+
+  if (tied.isAll) return messages.home.regionTiedAll
+
+  return messages.home.regionTied.replace(
+    '{names}',
+    tied.regions.map((item) => item.region.name).join(' · '),
   )
 }
 
@@ -378,7 +428,11 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
             tone={suitabilityTone(levelOf(item.weatherScore as number))}
             className="ml-auto"
           >
-            {item.weatherScore}
+            {/*
+              **단위를 붙인다** (#638). 숫자만 두면 개수인지 순위인지 점수인지 배지가
+              말하지 못한다 — 만점은 카드 캡션이 말하고 여기서는 한 글자만 붙인다.
+            */}
+            {messages.home.regionScoreUnit.replace('{score}', String(item.weatherScore))}
           </MetricBadge>
         ) : (
           /* `unknown` 톤은 점선 테두리를 쓴다 — 0 점과 다른 모양이어야 한다 (DESIGN.md §2-3) */

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { messages } from '@/lib/messages'
 import { readSource as repoSource, stripComments as withoutComments } from '@/test/source'
 
 /**
@@ -41,8 +42,36 @@ describe('권역 칸 — 폭 산식 (#412 · #530)', () => {
     const metric = withoutComments(repoSource('src/components/metric.tsx'))
     const pad = px(/score:\s*'px-(\d+)/.exec(metric)?.[1])
 
-    return 17.4 + pad * 2
+    return 17.4 + unitWidth() + pad * 2
   }
+
+  /**
+   * 배지가 숫자 뒤에 더 담는 글자의 폭 — `regionScoreUnit` 의 `{score}` 밖 (#638).
+   *
+   * **`100` 이던 배지가 `100점` 이 됐다.** 한글 한 글자는 `text-caption`(12px)에서 폭이
+   * 글자 크기와 같다고 본다 — 390 실측은 10.4px 이라 12 는 **보수적인 쪽**이고, 이 모델은
+   * 과대평가하는 방향으로만 틀린다.
+   *
+   * **문구에서 읽는다.** 단위가 두 글자로 늘면 산식이 따라 움직여야 하는데, 숫자를 여기
+   * 박아 두면 그때 조용히 어긋난다.
+   */
+  function unitWidth(): number {
+    return [...messages.home.regionScoreUnit.replace('{score}', '')].length * 12
+  }
+
+  /**
+   * 숫자 자리에 **실제로** 남는 폭 = 칸 − 인셋 13 − 아이콘 24 − gap 8 − gap 8 − 배지.
+   *
+   * **`w-20`/`lg:w-22` 는 하한이 아니라 상한이다.** 이 값이 선언한 폭보다 작으면 숫자
+   * 자리가 조용히 눌리고, 화면에 드러나는 것은 넘침이 아니라 **값 줄 접힘**이다 (#412).
+   * 그래서 선언값이 아니라 **남는 폭**으로 잰다 — 선언값으로 재면 눌린 칸을 놓친다.
+   */
+  function effectiveNums(cell: number): number {
+    return cell - 13 - 24 - 8 - 8 - scoreBadgeWidth()
+  }
+
+  /** 가장 넓은 값 줄 `최고 31.0℃` 의 실측 폭. `최저 24.0℃` 도 같다 */
+  const WIDEST_LINE = 62.9
 
   /*
     **배지 여백과 칸 폭은 함께 움직여야 한다** (#412 후속). 숫자 자리 폭은 하한이 아니라
@@ -70,13 +99,19 @@ describe('권역 칸 — 폭 산식 (#412 · #530)', () => {
     }
   }
 
-  it('칸 폭이 인셋·아이콘·숫자 자리·배지의 합을 담는다', () => {
+  /*
+    **선언한 숫자 자리를 다 담지는 못한다** (#638). 배지가 `100점` 으로 늘면서 390 실측에서
+    둘째 칸부터 80 → **71.2** 로 눌렸다 — 가장 넓은 줄 62.9 에 8.3px 이 남는다(`점` 이 붙기
+    전에는 17.1px 이었다). 접히지는 않지만 여유가 절반으로 줄었고, 그 몫이 이 검사가 지키는
+    전부다. 배지를 더 키우거나 값 줄이 길어지면 여기서 먼저 걸린다.
+  */
+  it('칸 폭이 눌린 뒤에도 가장 넓은 값 줄을 담는다', () => {
     for (const { cell, nums } of Object.values(widths())) {
       expect(cell).not.toBeNaN()
       expect(nums).not.toBeNaN()
 
-      // 인셋 13(pl-3 + border-l) + 아이콘 24 + gap 8 + 숫자 + gap 8 + 배지
-      expect(cell).toBeGreaterThanOrEqual(13 + 24 + 8 + nums + 8 + scoreBadgeWidth())
+      // 폰트 렌더링이 달라져도 접히지 않을 몫 5px 을 남긴다
+      expect(effectiveNums(cell)).toBeGreaterThanOrEqual(WIDEST_LINE + 5)
     }
   })
 
