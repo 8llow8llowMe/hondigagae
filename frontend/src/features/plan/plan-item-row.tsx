@@ -124,12 +124,12 @@ export function PlanItemRow({
           </h4>
           {/* `장소` 는 기본값이라 라벨이 잡음이다. 성격이 다른 유형만 알린다 */}
           {item.itemType.code !== 'PLACE' && <Badge size="sm">{item.itemType.name}</Badge>}
-          {/* 색·투명도만으로 전달하지 않기 위한 낱말 (#124) */}
-          {item.visited && (
-            <Badge tone="brand" size="sm">
-              {messages.plan.visitedLabel}
-            </Badge>
-          )}
+          {/*
+            **`다녀옴` 배지를 걷었다** (#653 · 진단 PL-5 · 명세 D11-5). 낱말로 말한다는
+            #124 의 요구는 그대로인데, **그 일을 이제 토글 버튼이 한다** — 버튼이
+            `iconOnly` 를 벗고 `다녀옴` 을 달면서 배지와 같은 낱말이 한 행에 두 번 섰다.
+            남길 쪽은 버튼이다: 체크 **전에도** 보여 `✓` 가 무엇인지 말해 준다.
+          */}
         </div>
 
         {/* nullable 은 오류가 아니라 숨김이다. 둘 다 없으면 줄 자체가 사라진다 */}
@@ -202,13 +202,26 @@ function PlanItemVisitToggle({
         */
         variant={item.visited ? 'secondary' : 'ghost'}
         size="md"
-        iconOnly
         aria-label={item.visited ? messages.plan.visitedAction : messages.plan.visitAction}
         aria-pressed={item.visited}
         loading={visit.pending}
         leading={<CheckIcon size={20} />}
         onClick={() => visit.onToggle(!item.visited)}
-      />
+      >
+        {/*
+          **`iconOnly` 를 벗었다** (#653 · 진단 PL-5). `✓` 하나로는 방문 완료인지 동반
+          확인인지 알 수 없었다 — `aria-label` 과 `aria-pressed` 는 **이미 있었으므로
+          스크린리더는 뜻을 들었고, 눈으로 볼 때만 뜻이 없었다.** 그것도 체크 **전에만**
+          그랬다(체크하면 행에 `다녀옴` 배지가 떴다). 즉 기능을 모르는 사람에게만 안 보였다.
+
+          **보이는 글자가 상태에 따라 갈린다.** 체크 전에 `다녀옴` 이라고 적으면 훑는
+          사람에게 그 행이 이미 다녀온 것으로 읽힌다 — 모르는 것보다 **틀리게 아는 것**이
+          나쁘다. 체크 전에는 누르면 일어날 일(`다녀옴 표시`)을, 뒤에는 상태(`다녀옴`)를
+          말한다. `aria-label` 은 양쪽 다 행동을 말하므로(위 주석) 이 글자와 갈린다 —
+          눈은 상태를 보고 귀는 `aria-pressed` 로 상태를 듣기 때문에 둘 다 성립한다.
+        */}
+        {item.visited ? messages.plan.visitedLabel : messages.plan.visitToggleLabel}
+      </Button>
     </div>
   )
 }

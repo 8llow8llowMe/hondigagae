@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 
 import { Button, ButtonLink } from '@/components/button'
 import { Surface, SurfaceList } from '@/components/surface'
+import { PlanDayOverflowMenu } from '@/features/plan/plan-day-overflow-menu'
 import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
 import { PlanIndoorAlternatives } from '@/features/plan/plan-indoor-alts'
 import { PlanItemRow, type PlanItemVisit } from '@/features/plan/plan-item-row'
@@ -141,34 +142,14 @@ export function PlanDaySection({
             </span>
           )}
 
-          {!editing && (
-            <div className="ml-auto flex items-center gap-2">
-              {/*
-              **빈 일자에도 남는다.** 담을 곳이 없는 날이야말로 이 버튼이 필요하다 —
-              `순서 편집` 과 달리 항목 수를 보지 않는다.
-            */}
-              <ButtonLink href={add.href} variant="secondary" size="sm">
-                {messages.plan.addPlaceAction}
-              </ButtonLink>
-
-              {/*
-              **빈 일자에도 남는다** — 빈 날을 채우는 것이 이 기능이 가장 쓸모 있는
-              순간이다 (하루재생성-세부명세 R3-2). `순서 편집` 과 달리 항목 수를 보지 않는다.
-
-              **일정 자체가 재생성 대상이 아니면 빠진다** — 항목 수가 아니라 기간 때문이다.
-            */}
-              {regenerateHref !== null && (
-                <ButtonLink href={regenerateHref} variant="secondary" size="sm">
-                  {messages.plan.regenerateDayAction}
-                </ButtonLink>
-              )}
-
-              {/* 항목이 없으면 바꿀 순서도 없다 */}
-              {rows.length > 0 && (
-                <Button variant="secondary" size="sm" onClick={onStartEdit}>
-                  {messages.plan.editDayAction}
-                </Button>
-              )}
+          {/*
+            **액션은 이 줄을 떠났다** (#653 · 진단 PL-4 · 명세 D11-4). 390 실측에서 액션 셋이
+            `top 749`, 판정이 `top 781` — 그 날 갈 수 있는지를 말하는 판정보다 **도구가
+            32px 위**였다. 남은 것은 `다시 만들기` 하나이고, 그것도 오버플로 안이다.
+          */}
+          {!editing && regenerateHref !== null && (
+            <div className="ml-auto">
+              <PlanDayOverflowMenu day={day} regenerateHref={regenerateHref} />
             </div>
           )}
         </div>
@@ -218,6 +199,36 @@ export function PlanDaySection({
             />
           ))}
         </SurfaceList>
+      )}
+
+      {/*
+        ── 액션 줄 — **판정과 항목을 읽은 뒤에 온다** (#653 · 진단 PL-4 · 명세 D11-4)
+
+        예전에는 제목 줄 오른쪽이라 판정보다 위였다. 읽는 순서(이 날 갈 만한가 → 어디를
+        담았나 → 고칠까)와 탭 순서가 이제 같다.
+
+        **`다시 만들기` 는 여기 없다** — 하루를 통째로 갈아엎는 것이라 나머지 둘과 무게가
+        달라 제목 줄의 `⋯` 안이다.
+
+        편집 중에는 감춘다 — 그때는 편집기가 저장 지점을 들고 있다.
+      */}
+      {!editing && (
+        <div className={cn('flex flex-wrap items-center gap-2 pt-3', INSET_CLASS.card)}>
+          {/*
+            **빈 일자에도 남는다.** 담을 곳이 없는 날이야말로 이 버튼이 필요하다 —
+            `순서 편집` 과 달리 항목 수를 보지 않는다.
+          */}
+          <ButtonLink href={add.href} variant="secondary" size="sm">
+            {messages.plan.addPlaceAction}
+          </ButtonLink>
+
+          {/* 항목이 없으면 바꿀 순서도 없다 */}
+          {rows.length > 0 && (
+            <Button variant="secondary" size="sm" onClick={onStartEdit}>
+              {messages.plan.editDayAction}
+            </Button>
+          )}
+        </div>
       )}
 
       {/* 편집 중에는 감춘다 — 순서를 정리하는 중에 다른 조작을 섞지 않는다 */}
