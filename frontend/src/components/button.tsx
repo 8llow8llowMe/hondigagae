@@ -100,6 +100,19 @@ export function Button({
       aria-busy={loading || undefined}
       className={cn(
         'inline-flex items-center justify-center rounded-md font-semibold transition-colors',
+        /*
+          **Tailwind v4 의 preflight 가 `button` 에 `cursor: default` 를 준다** — v3 까지는
+          브라우저 기본값(`auto`)이라 아무것도 안 해도 손 모양이었는데, v4 로 오면서
+          앱 안 모든 버튼이 화살표로 바뀌었다.
+
+          그래서 **여기 한 곳에서 되돌린다.** 사용처가 `className="cursor-pointer"` 로
+          붙이면 화면마다 붙은 것과 빠진 것이 갈리고, 그것은 `component-guide.md` §3 이
+          말하는 "외형은 컴포넌트가 소유한다" 의 반대다.
+
+          아래 `disabled:cursor-not-allowed` 가 이것을 이긴다 — `:disabled` 가 붙은 만큼
+          선택자 명시도가 높아서, 순서와 무관하게 비활성 버튼은 금지 커서다.
+        */
+        'cursor-pointer',
         'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
         'disabled:cursor-not-allowed disabled:opacity-50',
         VARIANT[variant],
