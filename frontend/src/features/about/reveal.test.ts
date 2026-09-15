@@ -39,16 +39,52 @@ describe('Reveal — 정적 렌더', () => {
     expect(markup).toContain('duration-200')
     expect(markup).toContain('ease-out')
   })
+
+  it('보이는 상태에서는 transition 을 끄지 않는다 — 정적 마크업에 transition-none 이 없다', () => {
+    expect(markup).not.toContain('transition-none')
+  })
 })
 
-describe('useRevealOnce — 규칙', () => {
+/**
+ * `armed` 동안 transition 을 끄는 소비자 계약 (검토 1차 Important).
+ *
+ * 요소는 이미 `transition duration-200 ease-out` 을 달고 **보이는 채로** 칠해져 있다. 그
+ * 상태에서 숨김 클래스를 붙이면 그 붙임 자체가 전환 대상이 되어, `armed` 프레임은 200ms
+ * 페이드아웃의 **시작점**만 그린다. 다음 프레임에 클래스를 떼면 눈에 보이는 재생이 없다.
+ *
+ * 그래서 `armed` 동안에는 transition 을 꺼 숨김 상태를 **즉시** 칠하고, `revealed` 에서
+ * transition 을 켠다. `Reveal` 은 `playIfVisible: false` 라 이 경로를 타지 않지만, Task 4~6
+ * 의 표본이 그대로 베낄 계약이므로 여기서 형태를 잡는다.
+ */
+describe('Reveal — armed 계약', () => {
+  const source = readSourceWithoutComments('src/features/about/reveal.tsx')
+
+  it('소스에 armed 용 transition-none 이 있다', () => {
+    expect(source).toContain('transition-none')
+  })
+
+  it('숨김 클래스와 transition-none 이 같은 분기에 있다', () => {
+    expect(source).toContain(`cn('transition-none', REVEAL_HIDDEN_CLASS)`)
+  })
+})
+
+/**
+ * 훅은 소스 문자열로만 본다 — node 환경 vitest 에는 `IntersectionObserver` 도 rAF 도
+ * 레이아웃도 없어 위상 전이를 렌더로 재현할 수 없다 (`docs/testing-guide.md` §1). 그래서
+ * 아래 이름은 **소스에 그 호출/가드가 있다**까지만 말한다. 실제 동작은 브라우저 계측 몫이다.
+ */
+describe('useRevealOnce — 소스 규칙', () => {
   const source = readSourceWithoutComments('src/features/about/use-reveal-once.ts')
 
-  it('IntersectionObserver 를 cleanup 에서 disconnect 한다', () => {
+  it('소스에 observer.disconnect() 호출이 있다 (cleanup 동작은 브라우저 계측 몫)', () => {
     expect(source).toContain('observer.disconnect()')
   })
 
-  it('IntersectionObserver 가 없는 환경에서는 손대지 않는다', () => {
+  it('IntersectionObserver 부재 가드가 소스에 있다', () => {
     expect(source).toContain("typeof IntersectionObserver === 'undefined'")
+  })
+
+  it('보이는데 재생하지 않는 경로에서 armed 를 idle 로 되돌린다', () => {
+    expect(source).toContain("setPhase('idle')")
   })
 })
