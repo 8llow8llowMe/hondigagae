@@ -84,6 +84,27 @@ describe('토큰 대비 — band · 선택 행 위에서도 읽힌다', () => {
   })
 })
 
+/**
+ * 혼잡도 막대는 **흰 배경이 아니라 트랙 위**에 그려진다 (#603).
+ *
+ * 흰 배경으로 재면 통과하는데 화면에서는 안 보이는 값이 나온다 — 막대는 `--band`
+ * 트랙 안에 들어앉기 때문이다. "연한 파랑" 을 더 연하게 가져갈 수 없는 이유가 여기 있고,
+ * 이 테스트가 그 바닥을 지킨다.
+ */
+describe('토큰 대비 — 혼잡도 막대는 트랙(--band) 위에서 잰다 (비텍스트 3:1)', () => {
+  it.each([['--congestion-bar'], ['--congestion-best']])('%s 가 3:1 이상이다', (name) => {
+    expect(contrastRatio(token(name), token('--band'))).toBeGreaterThanOrEqual(3)
+  })
+
+  it('고른 날(best)이 나머지(bar)보다 확실히 진하다', () => {
+    const bar = contrastRatio(token('--congestion-bar'), token('--band'))
+    const best = contrastRatio(token('--congestion-best'), token('--band'))
+
+    // 두 배 차이를 요구한다. 한 끗 차이면 "이 날이 답" 이 한눈에 안 읽힌다
+    expect(best).toBeGreaterThanOrEqual(bar * 2)
+  })
+})
+
 describe('토큰 대비 — 채운 표면 위 흰 글자', () => {
   /**
    * **주요 버튼 채움은 `--brand-600` 이다** (이슈 #61).

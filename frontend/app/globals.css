@@ -33,7 +33,8 @@
   --color-metric-low-500: var(--metric-low-500);
   --color-metric-low-700: var(--metric-low-700);
   --color-metric-unknown-500: var(--metric-unknown-500);
-  --color-congestion-busy-500: var(--congestion-busy-500);
+  --color-congestion-bar: var(--congestion-bar);
+  --color-congestion-best: var(--congestion-best);
 
   /* ── 액션 · 링크 — DESIGN.md §2-4 */
   --color-brand-500: var(--brand-500);
