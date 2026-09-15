@@ -107,15 +107,38 @@ describe('PlanItemRow — 방문 체크 토글 (#124)', () => {
     expect(markup).toContain(`aria-label="${messages.plan.visitedAction}"`)
   })
 
-  it('체크된 항목은 낱말로도 말한다 — 색·투명도만으로 전달하지 않는다', () => {
-    /*
-      **`aria-label` 에 걸리지 않게 배지 텍스트로 본다.** `다녀옴` 은 토글 이름
-      (`다녀옴으로 표시`)의 substring 이라 낱낱으로 찾으면 꺼진 행에서도 걸린다.
-    */
-    const badge = `>${messages.plan.visitedLabel}<`
+  /*
+    낱말로도 말한다는 요구는 그대로이고(#124), **그 일을 하는 요소가 배지에서 토글 버튼으로
+    옮겨 갔다** (#653 · 진단 PL-5 · 명세 D11-5). 버튼이 `iconOnly` 를 벗으면서 같은 낱말이
+    한 행에 두 번 서서 배지를 걷었다.
 
-    expect(renderWithVisit({ visited: true, visit: idleVisit })).toContain(badge)
-    expect(renderWithVisit({ visited: false, visit: idleVisit })).not.toContain(badge)
+    **`aria-label` 에 걸리지 않게 닫는 태그까지 묶어 본다.** `다녀옴` 은 토글 이름
+    (`다녀옴으로 표시`)의 substring 이라 낱낱으로 찾으면 꺼진 행에서도 걸린다.
+  */
+  it('체크된 항목은 낱말로도 말한다 — 색·투명도만으로 전달하지 않는다', () => {
+    const visited = `${messages.plan.visitedLabel}</button>`
+
+    expect(renderWithVisit({ visited: true, visit: idleVisit })).toContain(visited)
+    expect(renderWithVisit({ visited: false, visit: idleVisit })).not.toContain(visited)
+  })
+
+  /*
+    **체크 전에 `다녀옴` 이라고 적지 않는다.** 아직 안 간 행에 그 낱말이 있으면 훑는
+    사람에게 그 행이 이미 다녀온 것으로 읽힌다 — 모르는 것보다 틀리게 아는 것이 나쁘다.
+  */
+  it('체크 전에는 상태가 아니라 할 일을 적는다', () => {
+    const markup = renderWithVisit({ visited: false, visit: idleVisit })
+
+    expect(markup).toContain(`${messages.plan.visitToggleLabel}</button>`)
+    expect(markup).not.toContain(`>${messages.plan.visitedLabel}</button>`)
+  })
+
+  /* 같은 사실을 배지와 버튼이 두 번 말하지 않는다 — 배지를 걷은 근거 */
+  it('체크된 행에서 다녀옴이 한 번만 보인다', () => {
+    const markup = renderWithVisit({ visited: true, visit: idleVisit })
+    const visible = markup.match(new RegExp(`>${messages.plan.visitedLabel}<`, 'g')) ?? []
+
+    expect(visible).toHaveLength(1)
   })
 
   it('저장 중이면 그 행의 토글만 잠기고 aria-busy 가 붙는다', () => {

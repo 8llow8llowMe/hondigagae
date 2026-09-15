@@ -213,11 +213,23 @@ describe('PlanDaySection', () => {
     expect(rainy).toContain('오설록 티뮤지엄 카페')
   })
 
-  it('일자 헤더에 다시 만들기가 있고 재생성 라우트를 가리킨다 (#128)', () => {
-    const markup = renderDaySection({ regenerateHref: '/plans/1/days/2/regenerate' })
+  /*
+    **`다시 만들기` 는 이제 `⋯` 안이다** (#653 · 진단 PL-4 · 명세 D11-4). 닫힌 `Menu` 는
+    `null` 을 렌더하므로(`menu.tsx:81`) 정적 마크업에서 항목 자체를 볼 수 없다 — **여기서는
+    트리거의 존재를, 항목과 링크는 e2e 가 본다** (`e2e/plan-status.spec.ts`).
+  */
+  it('일자 헤더에 재생성 오버플로 트리거가 있다 (#128 · #653)', () => {
+    const markup = renderDaySection({ regenerateHref: '/plans/1/days/1/regenerate' })
 
-    expect(markup).toContain(messages.plan.regenerateDayAction)
-    expect(markup).toContain('href="/plans/1/days/2/regenerate"')
+    expect(markup).toContain(`aria-label="${messages.plan.dayMenuLabel.replace('{day}', '1')}"`)
+  })
+
+  /* 일자마다 이름이 갈려야 한다 — 3일 일정이면 같은 `⋯` 가 셋이다 */
+  it('오버플로 트리거의 이름에 일자가 들어간다', () => {
+    const markup = renderDaySection({ day: 3, regenerateHref: '/plans/1/days/3/regenerate' })
+
+    expect(markup).toContain(`aria-label="${messages.plan.dayMenuLabel.replace('{day}', '3')}"`)
+    expect(markup).not.toContain(messages.plan.dayMenuLabel.replace('{day}', '1'))
   })
 
   /*
@@ -225,9 +237,14 @@ describe('PlanDaySection', () => {
     항목 수를 보지 않는다 (`장소 추가` 와 같은 판단).
   */
   it('항목이 0개인 날에도 남는다', () => {
-    const markup = renderDaySection({ rows: [], regenerateHref: '/plans/1/days/3/regenerate' })
+    const markup = renderDaySection({
+      rows: [],
+      day: 3,
+      regenerateHref: '/plans/1/days/3/regenerate',
+    })
 
-    expect(markup).toContain(messages.plan.regenerateDayAction)
+    expect(markup).toContain(messages.plan.dayMenuLabel.replace('{day}', '3'))
+    expect(markup).toContain(messages.plan.addPlaceAction)
     expect(markup).not.toContain(messages.plan.editDayAction)
   })
 
@@ -237,14 +254,46 @@ describe('PlanDaySection', () => {
     11일 이상 일정은 눌러도 서버 문구만 받는다 — `AiPlanFailed.manualHref` 와 같은 판단으로
     갈래에서 뺀다. 어느 일정이 그런지는 `dayRegenerateBlock` 이 판정한다.
   */
-  it('regenerateHref 가 null 이면 다시 만들기를 내지 않는다', () => {
+  /* 메뉴가 비면 `⋯` 도 내지 않는다 — 눌러도 아무것도 없는 트리거를 두지 않는다 */
+  it('regenerateHref 가 null 이면 오버플로 트리거 자체를 내지 않는다', () => {
     const markup = renderDaySection({ regenerateHref: null })
 
     expect(markup).not.toContain(messages.plan.regenerateDayAction)
     expect(markup).not.toContain('/regenerate')
+    expect(markup).not.toContain(messages.plan.dayMenuLabel.replace('{day}', '1'))
     // 나머지 진입점은 그대로다 — 막힌 것은 재생성뿐이다
     expect(markup).toContain(messages.plan.addPlaceAction)
     expect(markup).toContain(messages.plan.editDayAction)
+  })
+
+  /*
+    ── 순서 (#653 · 진단 PL-4 · 명세 D11-7 #7)
+
+    예전에는 액션 셋이 제목 줄 오른쪽이라 판정보다 위였다 — 390 실측에서 액션 top 749,
+    판정 top 781. **읽는 순서와 탭 순서가 이제 같다.**
+  */
+  it('판정 → 항목 → 액션 순서다', () => {
+    const markup = renderDaySection()
+    const title = planDetail.items[0]!.title
+
+    const verdict = markup.indexOf(messages.plan.verdictFeelsLikeLabel)
+    const item = markup.indexOf(title)
+    const action = markup.indexOf(messages.plan.addPlaceAction)
+
+    expect(verdict).toBeGreaterThan(-1)
+    expect(item).toBeGreaterThan(verdict)
+    expect(action).toBeGreaterThan(item)
+  })
+
+  /* 오버플로는 제목 줄에 남는다 — 판정 위에서 걷어낸 것은 액션 셋이지 `⋯` 가 아니다 */
+  it('오버플로 트리거만 판정보다 위에 남는다', () => {
+    const markup = renderDaySection()
+
+    const trigger = markup.indexOf(messages.plan.dayMenuLabel.replace('{day}', '1'))
+    const verdict = markup.indexOf(messages.plan.verdictFeelsLikeLabel)
+
+    expect(trigger).toBeGreaterThan(-1)
+    expect(trigger).toBeLessThan(verdict)
   })
 })
 

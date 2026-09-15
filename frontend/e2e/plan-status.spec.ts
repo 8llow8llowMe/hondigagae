@@ -12,6 +12,12 @@ import { expect, type Page, test } from '@playwright/test'
  * 그리고 이 화면의 **판단 근거 자체가 왕복이다.** 확정에 확인 대화상자를 붙이지 않기로
  * 한 것은 `확정 → 초안` 이 실제로 되기 때문인데, 그 전제가 깨지면(백엔드가 전이 가드를
  * 넣는다거나) 확인 없는 확정이 그 순간 잘못된 설계가 된다. 이 스펙이 그 전제를 지킨다.
+ *
+ * ### 메뉴 안은 여기서만 볼 수 있다 (#653)
+ *
+ * 역방향 상태 변경(`초안으로 되돌리기`)과 일자의 `다시 만들기` 가 `⋯` 메뉴로 내려갔는데,
+ * 닫힌 `Menu` 는 `null` 을 렌더한다(`src/components/menu.tsx`). 즉 **정적 마크업 테스트로는
+ * 항목도 링크도 볼 수 없다** — 열어서 확인할 수 있는 곳이 여기뿐이다.
  */
 test.describe('일정 확정과 되돌리기 (#565)', () => {
   /** 폼을 거치지 않고 초안 일정을 하나 만든다 — 시작 상태를 고정하기 위해서다 */
@@ -55,11 +61,26 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     await page.goto(`/plans/${planId}`)
 
     const confirmAction = page.getByRole('button', { name: '일정 확정하기' })
-    const revertAction = page.getByRole('button', { name: '초안으로 되돌리기' })
+    const manageMenu = page.getByRole('button', { name: '일정 관리' })
+    const revertItem = page.getByRole('menuitem', { name: '초안으로 되돌리기' })
+
+    /*
+      **정방향은 버튼, 역방향은 메뉴다** (#653 · 진단 PL-2 · 명세 D11-2). 390 실측에서
+      완료 일정의 유일한 전폭 버튼이 `확정으로 되돌리기` 였다 — 여행의 진행 방향을 거스르는
+      것이 화면에서 가장 강한 자리를 차지할 이유가 없다. 이 스펙이 그 갈래를 못박는다.
+    */
+    async function openManageMenu() {
+      await manageMenu.click()
+      await expect(page.getByRole('menu')).toBeVisible()
+    }
 
     // ── 초안 ──────────────────────────────────────────────────────────────
     await expect(confirmAction).toBeVisible()
-    await expect(revertAction).toHaveCount(0)
+
+    // 초안에는 되돌아갈 앞 상태가 없다 — 메뉴를 열어도 항목이 없다
+    await openManageMenu()
+    await expect(revertItem).toHaveCount(0)
+    await page.keyboard.press('Escape')
 
     // ── 확정 ──────────────────────────────────────────────────────────────
     await confirmAction.click()
@@ -71,13 +92,64 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     */
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
 
-    await expect(revertAction).toBeVisible()
+    // 확정의 정방향은 `여행 완료하기` 다. 되돌리기는 화면에 버튼으로 서지 않는다
+    await expect(page.getByRole('button', { name: '여행 완료하기' })).toBeVisible()
     await expect(confirmAction).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '초안으로 되돌리기' })).toHaveCount(0)
 
-    // ── 되돌리기 ──────────────────────────────────────────────────────────
-    await revertAction.click()
+    // ── 되돌리기 — 메뉴 안에서 ────────────────────────────────────────────
+    await openManageMenu()
+    await expect(revertItem).toBeVisible()
+    await revertItem.click()
 
     await expect(confirmAction).toBeVisible()
-    await expect(revertAction).toHaveCount(0)
+  })
+
+  /*
+    **일자 오버플로 안의 `다시 만들기`** (#653 · 진단 PL-4 · 명세 D11-4).
+
+    `href` 로 넣은 것이 핵심이라 링크로 남아 있는지까지 본다 — `onSelect` + `router.push` 로
+    흉내내면 새 탭·가운데클릭·주소 복사가 죽는다 (`menu.tsx` 주석).
+  */
+  test('일자 오버플로에 다시 만들기가 링크로 있다', async ({ page }) => {
+    await page.goto('/plans')
+    const planId = await createDraftPlan(page)
+
+    await page.goto(`/plans/${planId}`)
+
+    // 액션은 판정·항목을 읽은 뒤에 온다 — 제목 줄에 남는 것은 `⋯` 하나다
+    // (`장소 추가` 는 모달이 아니라 라우트라 `ButtonLink` = `<a>` 다)
+    await expect(page.getByRole('link', { name: '장소 추가' }).first()).toBeVisible()
+
+    await page.getByRole('button', { name: '1일차 관리' }).click()
+
+    const regenerate = page.getByRole('menuitem', { name: '다시 만들기' })
+    await expect(regenerate).toBeVisible()
+    await expect(regenerate).toHaveAttribute('href', `/plans/${planId}/days/1/regenerate`)
+  })
+
+  /*
+    **준비물은 일자 뒤다** (#653 · 진단 PL-3 · 명세 D11-3). 390 실측에서 준비물·배너가
+    `1일차` 를 초안 700 · 확정 694 · 완료 954 로 밀어내고 있었다. DOM 순서가 곧 읽는
+    순서이므로 그 순서를 못박는다 — 데스크톱 배치는 grid 가 되돌린다.
+  */
+  test('모바일에서 일자가 준비물보다 먼저다', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/plans')
+    const planId = await createDraftPlan(page)
+
+    await page.goto(`/plans/${planId}`)
+
+    const day = page.getByRole('heading', { name: '1일차' })
+    const packing = page.getByRole('heading', { name: '여행 준비물' })
+    await expect(day).toBeVisible()
+    await expect(packing).toBeVisible()
+
+    const dayTop = (await day.boundingBox())?.y ?? 0
+    const packingTop = (await packing.boundingBox())?.y ?? 0
+
+    expect(dayTop).toBeLessThan(packingTop)
+    // 첫 화면 안에 든다 — 이 변경이 되돌려지면 여기서 걸린다
+    expect(dayTop).toBeLessThan(844)
   })
 })
