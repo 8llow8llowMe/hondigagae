@@ -93,7 +93,8 @@ export const PLAN_SPECIMEN = [
  * 여행 적합도 카드의 예시 장소. **뷰에 리터럴로 남기지 않는다** — 예시 장소 이름은 전부
  * 이 파일이 갖는다. `PLACE_ROWS_SPECIMEN` · `EMERGENCY_ROWS_SPECIMEN` 과 같은 축이다.
  *
- * 등급어(`적합도 높음`)와 근거 문장은 `messages.about.specimen` 이다 — 해요체 감시가 그쪽을 본다.
+ * 등급어(`여행 적합` — 서버 `name` 그대로)와 근거 문장은 `messages.about.specimen` 이다 —
+ * 해요체 감시가 그쪽을 본다. 축(`적합도`)은 배지가 붙인다 (#652).
  */
 export const SUITABILITY_SPECIMEN = { place: '협재 해수욕장' } as const
 

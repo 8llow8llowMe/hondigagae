@@ -35,8 +35,18 @@ describe('PlaceCongestionPanel — 배지가 축을 밝힌다 (#652)', () => {
     const markup = render()
     const axis = messages.common.metricAxisCongestion
 
-    expect(markup).toContain(`>${axis} </span>`)
-    expect(markup).toContain(`</span>${congestion.leastCrowded?.level.name}</span>`)
+    /*
+      **추천일 줄로 범위를 좁힌다.** 마크업 전체에 걸면 아래 막대 목록의 `sr-only` 가
+      같은 낱말을 내는 날 통과해 버린다 — 지금은 안 내지만 그때 이 단언이 조용히
+      공허해진다 (testing-guide.md §5).
+    */
+    const leastRow = markup.slice(
+      markup.indexOf(messages.place.detailCongestionLeastLabel),
+      markup.indexOf('<ol'),
+    )
+
+    expect(leastRow).toContain(`>${axis} </span>`)
+    expect(leastRow).toContain(`</span>${congestion.leastCrowded?.level.name}</span>`)
   })
 
   /* 축은 혼잡도 하나다 — 적합도 라벨이 이 카드에 새어 들어오면 축이 다시 섞인다 */
@@ -44,12 +54,18 @@ describe('PlaceCongestionPanel — 배지가 축을 밝힌다 (#652)', () => {
     expect(render()).not.toContain(`>${messages.common.metricAxisSuitability} </span>`)
   })
 
-  /* 막대가 글자로 말하는 것은 그대로다 — 축 라벨은 배지에만 붙는다 */
+  /*
+    막대가 글자로 말하는 것은 그대로다 — 축 라벨은 배지에만 붙는다.
+
+    **`not.toContain('sr-only">혼잡도')` 로 재지 않는다.** `sr-only` 의 첫 텍스트는 언제나
+    날짜라 그 단언은 구조상 참일 수밖에 없다(뮤테이션으로 확인: 막대의 `level.name` 을
+    바꿔도 통과했다). 실제 문구를 통째로 잰다.
+  */
   it('막대의 sr-only 문구를 바꾸지 않는다', () => {
     const markup = render()
 
-    expect(markup).toContain('sr-only')
-    expect(markup).not.toContain(`sr-only">${messages.common.metricAxisCongestion}`)
+    expect(markup).toContain('9월 4일 금요일 정보 없음')
+    expect(markup).not.toContain(`정보 없음${messages.common.metricAxisCongestion}`)
   })
 })
 
