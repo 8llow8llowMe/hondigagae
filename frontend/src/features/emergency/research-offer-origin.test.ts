@@ -63,9 +63,13 @@ describe('재검색 판정은 카메라가 놓은 중심과 비교한다 (#578)'
     **재검색으로 옮긴 자리는 정중앙에 놓는다** (#578). 기본 프레이밍은 첫 화면의 규칙이고,
     재검색의 기준점은 사용자가 방금 보고 있던 지도 중심이라 같은 규칙을 걸면 화면이
     통째로 남쪽으로 밀린다 (실측 약 4km).
+
+    **권역 세그먼트도 같은 길이다** (#639) — 사용자가 직접 지목한 자리라 성격이 같다.
   */
-  it('재검색 상태에서는 카메라가 기준점을 정중앙에 놓는다', () => {
+  it('재검색·권역 상태에서는 카메라가 기준점을 정중앙에 놓는다', () => {
     const board = source('src/features/emergency/use-emergency-board.ts')
-    expect(board).toMatch(/searchCenter === null \? \{\} : \{ anchorRatio: 0\.5 \}/)
+    expect(board).toMatch(
+      /searchCenter === null && regionCode === null \? \{\} : \{ anchorRatio: 0\.5 \}/,
+    )
   })
 })

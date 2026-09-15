@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { resolveAnchor, showsDistance } from '@/features/emergency/resolve-anchor'
 import { useEmergencyNav } from '@/features/emergency/use-emergency-nav'
 import { useNearbyFacilities } from '@/features/emergency/use-nearby-facilities'
 import { MAX_RADIUS_METERS } from '@/lib/api/emergency'
@@ -11,6 +12,7 @@ import {
   type PositionFailure,
   type PositionResult,
 } from '@/lib/geo/current-position'
+import type { JejuRegionCode } from '@/lib/geo/jeju-regions'
 
 /**
  * 이 화면의 상태 묶음. **화면당 하나만 만든다** — 두 벌이 마운트되면
@@ -52,6 +54,15 @@ export function useEmergencyBoard() {
     영역에서 반경을 역산해 넣으면 `radius` 칩이 말하는 값과 실제 조회 반경이 갈린다.
   */
   const [searchCenter, setSearchCenter] = useState<LatLng | null>(null)
+  /*
+    **권역 세그먼트로 고른 기준 지역** (#639). `null` 이면 고르지 않았다.
+
+    **URL 에 두지 않는다** (세부명세 D3-1 · D8-4). `radius`·`filters` 는 "무엇을 보고 있나"
+    라 링크로 건네는 값이지만, 기준점은 **필터가 아니라 세션 맥락**이다 — 내가 위치를
+    쓸 수 없어 서귀포를 골랐다는 사실은 링크를 받는 사람에게 아무 뜻도 없다.
+    (좌표를 URL 에 두지 않는 이유와 같다 — 이 훅 머리주석의 `position` 설명.)
+  */
+  const [regionCode, setRegionCode] = useState<JejuRegionCode | null>(null)
   const { filters, radius, setFilters, setRadius, widenRadius } = useEmergencyNav()
 
   /*
@@ -62,42 +73,45 @@ export function useEmergencyBoard() {
     거리를 표시하고 정렬 근거로 쓰므로 기준점이 바뀌면 목록도 바뀌어야 한다.
   */
   const locate = useCallback(() => {
-    // "내 위치" 는 옮겨 둔 기준점을 되돌리는 조작이기도 하다 (#396)
+    // "내 위치" 는 옮겨 둔 기준점을 되돌리는 조작이기도 하다 (#396 · #639)
     setSearchCenter(null)
+    setRegionCode(null)
     void getCurrentPosition().then(setPosition)
   }, [])
 
   /** 지도 중심으로 기준점을 옮긴다 — 반경은 그대로다 (#396) */
   const researchAt = useCallback((center: LatLng) => setSearchCenter(center), [])
 
+  /**
+   * 권역으로 기준점을 옮긴다 — 반경은 그대로다 (#639).
+   *
+   * **지도 재검색을 함께 비운다.** 둘이 동시에 살아 있으면 `resolveAnchor` 에서 지도가
+   * 이겨(D3-1) 방금 누른 칩이 아무 일도 하지 않은 것처럼 보인다.
+   *
+   * `null` 을 주면 해제다 — 같은 칩을 다시 누르면 제주 중심 기준으로 돌아간다.
+   */
+  const researchAtRegion = useCallback((code: JejuRegionCode | null) => {
+    setSearchCenter(null)
+    setRegionCode(code)
+  }, [])
+
   useEffect(() => {
     locate()
   }, [locate])
 
   /*
-    조회 기준점. 재검색으로 옮겼으면 그 자리, 아니면 내 위치다.
+    조회 기준점과 그 기준의 이름. **우선순위는 순수 함수가 갖는다** (`resolve-anchor.ts`,
+    세부명세 D3-1) — 네 갈래가 훅 안에 인라인으로 있으면 node 환경에서 잴 수 없다.
 
     **`query` 도 `camera` 도 이 하나를 본다** — 둘이 다른 점을 보면 "여기를 조회했다"
     는 주장과 화면이 보여주는 자리가 어긋난다.
   */
-  const anchor: LatLng | null =
-    searchCenter ?? (position === null ? null : { lat: position.lat, lng: position.lng })
+  const { anchor, basis } = resolveAnchor({ searchCenter, regionCode, position })
 
   const query = useNearbyFacilities(anchor, radius)
 
   const fallback: PositionFailure | null =
     position !== null && position.kind === 'fallback' ? position.reason : null
-
-  /*
-    거리·정렬이 **무엇을 기준으로 한 값인지.** 화면이 이 셋을 서로 다른 문구로 말한다.
-
-    - `current` — 내 위치. 거리를 그대로 보여준다
-    - `map` — 재검색으로 옮긴 지도 중심. 거리는 **진짜 거리지만 내 위치에서가 아니다**
-    - `jeju` — 좌표를 못 받아 제주 중심으로 폴백. 거리를 감춘다 (제주 중심에서 480m 인
-      것을 "480m" 로 쓸 수 없다)
-  */
-  const basis: 'current' | 'map' | 'jeju' =
-    searchCenter !== null ? 'map' : fallback === null ? 'current' : 'jeju'
 
   /*
     지도 카메라. **`useMemo` 가 필수다** — 렌더 중에 새 객체를 만들면 `MapCanvas` 의
@@ -125,12 +139,16 @@ export function useEmergencyBoard() {
               `anchorRatio: 0.5` 면 놓는 자리와 기준점이 같아져 지도가 움직이지 않고
               목록만 다시 조회된다.
 
+              **권역 세그먼트도 같은 길로 간다** (#639). 사용자가 "서귀포" 를 고른 자리는
+              재검색과 똑같이 **직접 지목한 자리**라 화면 정중앙이 맞다 — 35% 규칙을 걸면
+              고른 권역이 위로 밀려 올라가 화면 아래 절반이 다른 권역이 된다.
+
               **`exactOptionalPropertyTypes` 라 키를 아예 뺀다** — `undefined` 를 넣으면
               타입이 맞지 않는다. 빠지면 `MapCanvas` 가 `JEJU_MAP_SEA_RATIO` 를 쓴다.
             */
-            ...(searchCenter === null ? {} : { anchorRatio: 0.5 }),
+            ...(searchCenter === null && regionCode === null ? {} : { anchorRatio: 0.5 }),
           },
-    [anchor?.lat, anchor?.lng, radius, searchCenter === null],
+    [anchor?.lat, anchor?.lng, radius, searchCenter === null, regionCode === null],
   )
 
   return {
@@ -138,12 +156,16 @@ export function useEmergencyBoard() {
     camera,
     /** null 이면 내 위치를 쓰고 있다. 값이 있으면 제주 중심 폴백이다 */
     fallback,
-    /** 조회 기준점. 재검색으로 옮겼으면 지도 중심이다 */
+    /** 조회 기준점. 재검색·권역으로 옮겼으면 그 자리다 */
     anchor,
-    /** 거리·정렬의 기준 — `current` · `map` · `jeju` */
+    /** 거리·정렬의 기준 — `map` · `region` · `current` · `jeju` (`resolve-anchor.ts`) */
     basis,
-    /** 폴백이면 거리를 감춘다 — 제주 중심에서 480m 인 것을 "480m" 로 쓸 수 없다 */
-    showDistance: basis !== 'jeju',
+    /** 제주 중심 폴백에서만 거리를 감춘다 — 그 자리에서 480m 를 "480m" 로 쓸 수 없다 */
+    showDistance: showsDistance(basis),
+    /** 권역 세그먼트로 고른 기준 지역. `null` 이면 고르지 않았다 (#639) */
+    regionCode,
+    /** 권역으로 기준점을 옮긴다. `null` 이면 해제 (#639) */
+    researchAtRegion,
     /** 재검색으로 기준점을 옮긴 상태인가 */
     researched: searchCenter !== null,
     researchAt,
