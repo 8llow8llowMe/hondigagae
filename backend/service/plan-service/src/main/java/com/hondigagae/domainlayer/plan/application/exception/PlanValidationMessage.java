@@ -27,6 +27,15 @@ public final class PlanValidationMessage {
     public static final String PACKING_NAME_LENGTH_INVALID = "PLAN_121:준비물 이름은 100자 이하만 가능합니다.";
     public static final String PACKING_REASON_LENGTH_INVALID = "PLAN_122:준비물 이유는 500자 이하만 가능합니다.";
     public static final String PACKING_CHECKED_REQUIRED = "PLAN_123:챙김 여부는 필수입니다.";
+    public static final String REVIEW_OVERALL_RATING_REQUIRED = "PLAN_126:전체 만족도는 필수입니다.";
+    public static final String REVIEW_OVERALL_RATING_RANGE_INVALID = "PLAN_127:전체 만족도는 1 이상 5 이하여야 합니다.";
+    public static final String REVIEW_BODY_LENGTH_INVALID = "PLAN_128:후기 본문은 2000자 이하만 가능합니다.";
+    public static final String REVIEW_ITEMS_REQUIRED = "PLAN_129:장소별 후기 목록은 필수입니다.";
+    public static final String REVIEW_ITEMS_SIZE_INVALID = "PLAN_130:장소별 후기는 한 번에 최대 50개까지 보낼 수 있습니다.";
+    public static final String REVIEW_ITEM_ID_POSITIVE = "PLAN_131:일정 항목 아이디는 양수여야 합니다.";
+    public static final String REVIEW_ITEM_RATING_REQUIRED = "PLAN_132:장소 만족도는 필수입니다.";
+    public static final String REVIEW_ITEM_RATING_RANGE_INVALID = "PLAN_133:장소 만족도는 1 이상 5 이하여야 합니다.";
+    public static final String REVIEW_ITEM_COMMENT_LENGTH_INVALID = "PLAN_134:장소 한 줄 후기는 200자 이하만 가능합니다.";
 
     private PlanValidationMessage() {
     }

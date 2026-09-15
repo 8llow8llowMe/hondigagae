@@ -22,6 +22,11 @@ public enum PlanErrorCode {
     PACKING_ITEM_NAME_DUPLICATED("PLAN_012", "이미 같은 이름의 준비물이 있습니다.", HttpStatus.CONFLICT),
     PACKING_ITEM_LIMIT_EXCEEDED("PLAN_013", "준비물은 일정당 최대 50개까지 저장할 수 있습니다.", HttpStatus.BAD_REQUEST),
     NOT_FOUND_PACKING_ITEM("PLAN_014", "존재하지 않는 준비물 항목입니다.", HttpStatus.NOT_FOUND),
+    REVIEW_NOT_FOUND("PLAN_015", "작성한 여행 후기가 없습니다.", HttpStatus.NOT_FOUND),
+    REVIEW_PLAN_NOT_COMPLETED("PLAN_016", "완료된 일정만 후기를 쓰거나 볼 수 있습니다.", HttpStatus.BAD_REQUEST),
+    REVIEW_ALREADY_EXISTS("PLAN_017", "이미 이 일정의 후기를 작성했습니다.", HttpStatus.CONFLICT),
+    REVIEW_ITEM_NOT_ELIGIBLE("PLAN_018", "다녀온 장소 항목만 후기에 담을 수 있습니다.", HttpStatus.BAD_REQUEST),
+    REVIEW_ITEM_DUPLICATED("PLAN_020", "같은 일정 항목을 후기에 두 번 넣을 수 없습니다.", HttpStatus.BAD_REQUEST),
     INVALID_REQUEST("PLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
     // 프레임워크 공통 2종은 검증 대역 끝에 둔다 (coding-conventions §8-2). PLAN_115 가 petIds 필드 코드로
     // 쓰이면서 한 칸씩 밀렸고, 준비물 필드 코드가 PLAN_116~123 을 가져가면서 다시 밀었다.

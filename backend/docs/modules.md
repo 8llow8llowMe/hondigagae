@@ -195,7 +195,7 @@ yml 목록(`infra.redis.sentinels`)도 계속 받지만 로컬용 탈출구다 �
 - `GET|POST /api/v1/plans`, `GET|PUT|DELETE /api/v1/plans/{planId}`
 - `PUT /api/v1/plans/{planId}/days/{day}/items` — 일정 항목 편집
 - `GET /api/v1/plans/{planId}/weather` — 일자별 날씨 브리핑 + 비 오는 날 실내 대안
-- `POST /api/v1/plans/{planId}/reviews` — 여행 후기
+- `GET|POST|PUT /api/v1/plans/{planId}/reviews` — 여행 후기 v1 (사진·공개 없음)
 - 일정 공유 링크 (향후 카카오 메시지 연계)
 
 **컨텍스트**: `plan`, `review`
