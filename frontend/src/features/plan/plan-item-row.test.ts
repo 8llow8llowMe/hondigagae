@@ -100,6 +100,17 @@ describe('PlanItemRow — 방문 체크 토글 (#124)', () => {
     expect(markup).toContain(`aria-label="${messages.plan.visitAction}"`)
   })
 
+  /*
+    **WCAG 2.5.3 Label in Name** (#653). 토글이 `iconOnly` 를 벗으면서 보이는 글자가
+    생겼다 — 접근 가능한 이름이 그 글자를 **포함하지 않으면** 음성 제어 사용자가 화면에
+    보이는 그대로 말했을 때 버튼이 잡히지 않는다. 아이콘만이던 시절에는 없던 제약이라
+    글자를 붙이면서 새로 생겼고, 이 단언이 그 관계를 잠근다.
+  */
+  it('보이는 글자가 접근 가능한 이름에 들어 있다 — 양쪽 상태 모두', () => {
+    expect(messages.plan.visitAction).toContain(messages.plan.visitToggleLabel)
+    expect(messages.plan.visitedAction).toContain(messages.plan.visitedLabel)
+  })
+
   it('체크된 항목은 aria-pressed=true 이고 이름이 "해제" 다 — 누르면 일어날 일을 말한다', () => {
     const markup = renderWithVisit({ visited: true, visit: idleVisit })
 
