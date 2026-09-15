@@ -26,7 +26,7 @@ export function EmergencyMapSkeleton() {
             <Skeleton variant="text" className="h-4 w-2/5" />
             <Skeleton variant="text" className="h-4 w-1/2" />
           </div>
-          <Skeleton variant="card" className="size-13 shrink-0 rounded-md" />
+          <Skeleton variant="card" className="size-10 shrink-0 rounded-md" />
         </li>
       ))}
     </ul>

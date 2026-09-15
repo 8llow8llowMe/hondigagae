@@ -29,13 +29,26 @@ export function EmergencySkeleton({ inset = 'card' }: { inset?: Inset }) {
       <SurfaceList>
         {Array.from({ length: ROW_COUNT }, (_, index) => (
           <li key={index} className={INSET_CLASS[inset]}>
-            <div className="flex items-center gap-3 py-3">
-              <div className="flex flex-1 flex-col gap-2">
-                <Skeleton variant="text" className="h-6 w-3/5" />
-                <Skeleton variant="text" className="h-4 w-2/5" />
-                <Skeleton variant="text" className="h-4 w-1/2" />
+            {/*
+              **실데이터와 같은 2층이다** (#603) — 머리 한 줄이 전폭이고, 아래 층만
+              `[글자 | 버튼 둘]` 로 갈린다. 골격이 한 층이면 데이터가 오는 순간 제목이
+              왼쪽으로 늘어나며 행이 튄다.
+            */}
+            <div className="flex flex-col gap-1.5 py-3">
+              <Skeleton variant="text" className="h-6 w-3/5" />
+
+              <div className="flex items-center gap-3">
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Skeleton variant="text" className="h-4 w-4/5" />
+                  <Skeleton variant="text" className="h-4 w-2/5" />
+                </div>
+
+                {/* 행의 버튼이 둘이다 — 하나만 두면 폭이 88 대신 40 으로 잡힌다 */}
+                <div className="flex shrink-0 items-center gap-2">
+                  <Skeleton variant="card" className="size-10 rounded-md" />
+                  <Skeleton variant="card" className="size-10 rounded-md" />
+                </div>
               </div>
-              <Skeleton variant="card" className="size-13 shrink-0 rounded-md" />
             </div>
           </li>
         ))}
