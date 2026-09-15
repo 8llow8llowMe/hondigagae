@@ -16,11 +16,48 @@ const HEAT_WAVE_WARNING: WeatherWarningItem = {
 
 const TODAY_LABEL = '2026-08-29 (금) · 제주시'
 
-function render(data: WalkSafetyResponse) {
+function render(data: WalkSafetyResponse, basisIsDefault = false) {
   return renderToStaticMarkup(
-    createElement(WalkVerdict, { data, petName: '몽실이', todayLabel: TODAY_LABEL }),
+    createElement(WalkVerdict, {
+      data,
+      petName: '몽실이',
+      todayLabel: TODAY_LABEL,
+      basisIsDefault,
+    }),
   )
 }
+
+/*
+  **대표 지점 캡션** (#636 · 홈-첫방문-판정-세부명세 D4). 기준 줄은 `{장소} 기준` 이라고만
+  말하는데, 그 장소를 사용자가 고른 적이 없으면 화면이 고른 척을 하게 된다.
+*/
+describe('대표 지점 캡션', () => {
+  it('대표 지점이면 기준 줄 아래에 한 줄이 붙는다', () => {
+    expect(render(walkSafety, true)).toContain(messages.home.basisDefaultNote)
+  })
+
+  it('사용자가 고른 장소면 붙지 않는다', () => {
+    expect(render(walkSafety, false)).not.toContain(messages.home.basisDefaultNote)
+  })
+
+  /*
+    **모바일 접힌 줄에도 선다.** 데스크톱 패널에만 두면 390 기본 상태(접힘)에서 캡션이
+    사라져, 정작 첫 방문자가 제일 많이 보는 화면에서만 설명이 없다 — 날짜 줄이 #530 에서
+    같은 이유로 양쪽에 섰다.
+  */
+  it('모바일 접힌 줄과 데스크톱 패널 양쪽에 한 번씩 선다', () => {
+    const markup = render(walkSafety, true)
+
+    // 문구에 `.` 이 있어 정규식으로 세지 않는다 — 리터럴로 쪼갠다
+    expect(markup.split(messages.home.basisDefaultNote)).toHaveLength(3)
+  })
+
+  it('모바일 캡션이 펼침 패널 밖(버튼 안)에 있다', () => {
+    const markup = render(walkSafety, true)
+
+    expect(markup.indexOf(messages.home.basisDefaultNote)).toBeLessThan(markup.indexOf('</button>'))
+  })
+})
 
 describe('날짜 줄 — 이 카드가 겸한다 (#428 · #530)', () => {
   it('체감온도 라벨과 같은 줄에 날짜가 선다', () => {
