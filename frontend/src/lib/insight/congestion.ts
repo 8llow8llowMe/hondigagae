@@ -1,4 +1,5 @@
 import { parseDay, weekdayOf } from '@/lib/date/day'
+import type { DailyCongestionItem } from '@/types/insight'
 
 /**
  * 기간 혼잡도의 순수 규칙 (#430).
@@ -60,6 +61,56 @@ export function barHeightPercent(concentrationRate: number): number {
   if (!Number.isFinite(concentrationRate)) return 4
 
   return Math.max(4, Math.min(100, concentrationRate))
+}
+
+/**
+ * 집중률 줄이 말할 것 — 정수 값 · 같은 기간 평균 · 그 차이 (#651 · 진단 D-3).
+ *
+ * **왜 상대 표현인가.** `집중률 57.77` 은 높은 값인지 낮은 값인지 화면 어디에도 비교 기준이
+ * 없다. 수월봉 30일 실측에서 그 값은 **평균보다 25 낮은 날**인데 화면은 그 사실을 말하지
+ * 않았다. 소수 둘째 자리는 예측값의 정밀도를 실제보다 높게 보이게 한다.
+ *
+ * **`UNKNOWN` 을 평균에서 뺀다.** `concentrationRate` 가 `null` 인 날은 값이 없는 것이지
+ * 0 이 아니다 — 넣으면 평균이 내려가 "평균보다 낮다" 가 과장된다.
+ *
+ * **"FE 가 다시 고르지 않는다" 규칙과 충돌하지 않는다.** 그 규칙이 막는 것은 서버의 답
+ * (`leastCrowded`)을 FE 가 다시 정하는 것이다. 평균은 답이 아니라 **서버가 보낸 분포를
+ * 그대로 요약한 값**이고, 어떤 날을 고르지도 바꾸지도 않는다.
+ */
+export type CongestionRateSummary = {
+  /** 정수로 내린 집중률 */
+  rate: number
+  /** 같은 기간 아는 날들의 평균(정수). 낼 수 없으면 `null` */
+  average: number | null
+  /** 평균보다 얼마나 낮은가(정수, 양수). 비교할 것이 없거나 차이가 0 이면 `null` */
+  belowAverage: number | null
+}
+
+export function congestionRateSummary(
+  concentrationRate: number,
+  items: DailyCongestionItem[],
+): CongestionRateSummary {
+  const rate = Math.round(concentrationRate)
+  const known = items
+    .map((item) => item.concentrationRate)
+    .filter((value): value is number => value !== null && Number.isFinite(value))
+
+  /*
+    아는 날이 하나뿐이면 그 하나가 곧 평균이다 — "평균보다 0 낮아요" 는 말이 아니다.
+    호출부가 줄을 만들지 않도록 `null` 로 돌려준다.
+  */
+  if (known.length < 2) return { rate, average: null, belowAverage: null }
+
+  const average = Math.round(known.reduce((sum, value) => sum + value, 0) / known.length)
+
+  /*
+    **반올림한 값끼리 뺀다.** 원값으로 빼면 화면의 세 숫자가 서로 안 맞는다 — 평균 82.5(→83)
+    와 값 57.4(→57)의 원값 차는 25.1(→25)이지만, 화면에는 `83` 과 `57` 이 적혀 있어
+    읽는 사람이 기대하는 차이는 26 이다.
+  */
+  const belowAverage = average - rate
+
+  return { rate, average, belowAverage: belowAverage > 0 ? belowAverage : null }
 }
 
 /**

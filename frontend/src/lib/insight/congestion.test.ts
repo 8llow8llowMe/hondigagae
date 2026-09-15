@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { barHeightPercent, formatCongestionRange, splitDay } from '@/lib/insight/congestion'
+import {
+  barHeightPercent,
+  congestionRateSummary,
+  formatCongestionRange,
+  splitDay,
+} from '@/lib/insight/congestion'
+import type { DailyCongestionItem } from '@/types/insight'
 
 /*
   막대 높이 — **트랙 전체가 집중률 100** 이다. 기간 안 최댓값으로 정규화하면 전부 20 대인
@@ -54,5 +60,96 @@ describe('splitDay', () => {
 
   it('없는 날짜면 null 이다', () => {
     expect(splitDay('2026-02-31')).toBeNull()
+  })
+})
+
+describe('congestionRateSummary — 집중률 표현 (#651 · 진단 D-3)', () => {
+  /** 이 함수는 `level` 을 보지 않는다 — 평균은 `concentrationRate` 만으로 갈린다 */
+  const day = (date: string, concentrationRate: number | null): DailyCongestionItem => ({
+    date,
+    level:
+      concentrationRate === null
+        ? { code: 'CONGESTION_UNKNOWN', name: '정보 없음', description: null }
+        : { code: 'MODERATE', name: '보통', description: null },
+    concentrationRate,
+  })
+
+  /* 소수 둘째 자리는 예측값의 정밀도를 실제보다 높게 보이게 한다 */
+  it('집중률을 정수로 내린다', () => {
+    const summary = congestionRateSummary(57.77, [day('2026-09-21', 57.77), day('2026-09-22', 79)])
+
+    expect(summary.rate).toBe(58)
+  })
+
+  it('평균도 정수로 낸다', () => {
+    const summary = congestionRateSummary(57.77, [
+      day('2026-09-21', 57.77),
+      day('2026-09-22', 79),
+      day('2026-09-23', 88.18),
+    ])
+
+    // (57.77 + 79 + 88.18) / 3 = 74.98…
+    expect(summary.average).toBe(75)
+  })
+
+  /*
+    **반올림한 값끼리 뺀다.** 원값 차는 25.1(→25)이지만 화면에는 83 과 57 이 적혀 있어
+    읽는 사람이 기대하는 차이는 26 이다. 화면의 세 숫자가 서로 맞아야 한다.
+  */
+  it('차이는 반올림한 값끼리 뺀 값이다 — 화면의 세 숫자가 맞는다', () => {
+    const summary = congestionRateSummary(57.4, [day('2026-09-21', 57.4), day('2026-09-22', 107.6)])
+
+    expect(summary.rate).toBe(57)
+    expect(summary.average).toBe(83)
+    expect(summary.belowAverage).toBe(26)
+    expect(summary.average! - summary.rate).toBe(summary.belowAverage)
+  })
+
+  /*
+    `concentrationRate` 가 `null` 인 날은 값이 없는 것이지 0 이 아니다 — 평균에 넣으면
+    "평균보다 낮다" 가 과장된다.
+  */
+  it('UNKNOWN 은 평균에서 뺀다', () => {
+    const withUnknown = congestionRateSummary(60, [
+      day('2026-09-21', 60),
+      day('2026-09-22', 80),
+      day('2026-09-23', null),
+      day('2026-09-24', null),
+    ])
+    const withoutUnknown = congestionRateSummary(60, [day('2026-09-21', 60), day('2026-09-22', 80)])
+
+    expect(withUnknown.average).toBe(70)
+    expect(withUnknown.average).toBe(withoutUnknown.average)
+  })
+
+  /* 아는 날이 하나면 그 하나가 곧 평균이다 — "평균보다 0 낮아요" 는 말이 아니다 */
+  it('아는 날이 하나뿐이면 비교하지 않는다', () => {
+    const summary = congestionRateSummary(58, [day('2026-09-21', 58), day('2026-09-22', null)])
+
+    expect(summary.rate).toBe(58)
+    expect(summary.average).toBeNull()
+    expect(summary.belowAverage).toBeNull()
+  })
+
+  it('아는 날이 없으면 비교하지 않는다', () => {
+    const summary = congestionRateSummary(58, [day('2026-09-21', null)])
+
+    expect(summary.average).toBeNull()
+    expect(summary.belowAverage).toBeNull()
+  })
+
+  it('모든 값이 같으면 차이를 말하지 않는다', () => {
+    const summary = congestionRateSummary(70, [day('2026-09-21', 70), day('2026-09-22', 70)])
+
+    expect(summary.average).toBe(70)
+    expect(summary.belowAverage).toBeNull()
+  })
+
+  /* 반올림 때문에 평균이 값보다 낮아지는 경우 — 음수 차이를 내보내지 않는다 */
+  it('차이가 양수가 아니면 null 이다', () => {
+    const summary = congestionRateSummary(80, [day('2026-09-21', 80), day('2026-09-22', 60)])
+
+    expect(summary.average).toBe(70)
+    expect(summary.belowAverage).toBeNull()
   })
 })
