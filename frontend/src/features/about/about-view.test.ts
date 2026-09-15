@@ -61,8 +61,16 @@ describe('AboutView — 8절 (#635)', () => {
   })
 
   it('링크는 전부 실제 라우트다 — 갈 곳 있는 링크만', () => {
+    // `/terms` · `/privacy` 는 약관 절이 `LEGAL_LINKS` 에서 읽는다 (#610)
     expect(new Set(hrefs)).toEqual(
-      new Set(['/', '/places', '/ai-plans/new', '/emergency', '/pets/new']),
+      new Set([
+        '/',
+        '/places',
+        '/ai-plans/new',
+        '/emergency',
+        '/pets/new',
+        ...LEGAL_LINKS.map((link) => link.href),
+      ]),
     )
   })
 
