@@ -363,6 +363,19 @@ export const planMessages = {
    */
   statusRevertAction: '초안으로 되돌리기',
   statusRevertError: '되돌리지 못했어요. 잠시 후 다시 시도해 주세요.',
+  /**
+   * 확정된 여행을 마친다 (#613). **초안에서는 이 버튼을 열지 않는다** — 확정하지
+   * 않은 여행을 마친 것으로 말하지 않는다. 잘못 닫았으면 `statusReopenAction` 으로
+   * 확정만 되돌린다. 확인 대화상자를 붙이지 않는다 — 되돌릴 수 있는 동작이다.
+   */
+  statusCompleteAction: '여행 완료하기',
+  statusCompleteError: '완료로 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.',
+  /**
+   * 완료를 확정으로 되돌린다. **초안으로는 가지 않는다.** 다녀온 기록을 작성 중으로
+   * 되돌리는 것은 다른 판단이다.
+   */
+  statusReopenAction: '확정으로 되돌리기',
+  statusReopenError: '되돌리지 못했어요. 잠시 후 다시 시도해 주세요.',
 
   manageLabel: '일정 관리',
   /**
