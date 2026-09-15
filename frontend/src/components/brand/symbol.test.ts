@@ -54,3 +54,18 @@ describe('BrandSymbol — 헤더에 허용된 유일한 채도 (#240)', () => {
     expect(markup).not.toContain('aria-label')
   })
 })
+
+describe('BrandSymbol — inverse 톤 (그린 면 위, #635)', () => {
+  it('사각은 흰색, 발바닥은 brand-700 이다 — 등급 색을 쓰지 않는다', () => {
+    const markup = renderToStaticMarkup(createElement(BrandSymbol, { size: 48, tone: 'inverse' }))
+    expect(markup).toContain('fill="var(--bg)"')
+    expect(markup).toContain('fill="var(--brand-700)"')
+    expect(markup).not.toContain('fill="var(--brand-500)"')
+    expect(markup).not.toContain('metric-')
+  })
+
+  it('기본 톤은 바뀌지 않는다 — brand-500 사각 + 흰 발바닥', () => {
+    const markup = renderToStaticMarkup(createElement(BrandSymbol))
+    expect(markup).toContain('fill="var(--brand-500)"')
+  })
+})

@@ -4,7 +4,15 @@ import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 
 import { cn } from '@/lib/utils/cn'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'dangerOutline' | 'kakao'
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'ghost'
+  | 'danger'
+  | 'dangerOutline'
+  | 'kakao'
+  | 'inverse'
+  | 'inverseOutline'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
 type BaseProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 'children'> & {
@@ -64,6 +72,15 @@ const VARIANT: Record<ButtonVariant, string> = {
     투명도는 색을 바꾸는 것이 아니라 눌림을 알리는 상호작용 피드백이다.
   */
   kakao: 'bg-kakao-bg text-kakao-fg hover:opacity-90 active:opacity-90',
+  /*
+    그린 밴드(`--brand-700`) 위에 서는 둘 — 소개 페이지(`/about`) 전용 (DESIGN.md §0-2, #635).
+    `inverse` 는 흰 면 + `--brand-700` 글자(6.91:1), `inverseOutline` 은 투명 면 + 흰 글자 +
+    흰 55% 테두리. hover 는 `inverse` 가 연녹(`--intro-band`), outline 이 흰 10% 채움 —
+    둘 다 색을 새로 만들지 않는다.
+  */
+  inverse: 'bg-bg text-brand-700 hover:bg-intro-band active:bg-intro-band',
+  inverseOutline:
+    'border border-fg-inverse/55 text-fg-inverse hover:bg-fg-inverse/10 active:bg-fg-inverse/10',
 }
 
 const SIZE: Record<ButtonSize, string> = {

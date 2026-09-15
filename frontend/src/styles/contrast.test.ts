@@ -206,3 +206,24 @@ describe('토큰 대비 — 날씨 픽토그램 (비텍스트 3:1)', () => {
     expect(contrastRatio(token('--weather-sun'), WHITE)).toBeLessThan(4.5)
   })
 })
+
+describe('토큰 대비 — 소개 페이지 표면 (DESIGN.md §0-2, #635)', () => {
+  it.each([['--fg'], ['--fg-muted']])('%s 가 --intro-band 위에서 4.5:1 이상이다', (name) => {
+    expect(contrastRatio(token(name), token('--intro-band'))).toBeGreaterThanOrEqual(4.5)
+  })
+
+  it.each([['--fg'], ['--fg-muted']])('%s 가 --intro-tint 위에서 4.5:1 이상이다', (name) => {
+    expect(contrastRatio(token(name), token('--intro-tint'))).toBeGreaterThanOrEqual(4.5)
+  })
+
+  /* 새 색이 아니다 — 팔레트의 값을 이름만 새로 부른 것 (명세 §6-2) */
+  it('밴드 토큰은 기존 값과 같다 — 22번째 색을 만들지 않는다', () => {
+    expect(token('--intro-band')).toBe(token('--row-selected'))
+    expect(token('--intro-tint')).toBe(token('--metric-high-100'))
+  })
+
+  /* 그린 밴드 위 글자 — 채운 버튼 hover 와 같은 쌍이지만 이 화면은 면 전체가 이 색이다 */
+  it('그린 밴드(--brand-700) 위 흰 글자가 4.5:1 이상이다', () => {
+    expect(contrastRatio(token('--fg-inverse'), token('--brand-700'))).toBeGreaterThanOrEqual(4.5)
+  })
+})
