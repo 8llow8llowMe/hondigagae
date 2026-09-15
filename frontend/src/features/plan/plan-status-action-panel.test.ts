@@ -4,21 +4,15 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { PlanStatusActionPanel } from '@/features/plan/plan-status-action-panel'
+import { PLAN_STATUS_ACTION_LABELS } from '@/features/plan/use-plan-status'
 import { messages } from '@/lib/messages'
-import { planStatusActions } from '@/lib/plan/status-action'
-
-const LABELS = {
-  confirm: messages.plan.statusConfirmAction,
-  complete: messages.plan.statusCompleteAction,
-  'revert-draft': messages.plan.statusRevertAction,
-  reopen: messages.plan.statusReopenAction,
-}
+import { forwardStatusAction } from '@/lib/plan/status-action'
 
 function render(statusCode: string, errorMessage: string | null = null) {
   return renderToStaticMarkup(
     createElement(PlanStatusActionPanel, {
-      actions: planStatusActions(statusCode),
-      labels: LABELS,
+      action: forwardStatusAction(statusCode),
+      labels: PLAN_STATUS_ACTION_LABELS,
       errorMessage,
       saving: false,
       onAction: () => undefined,
@@ -26,26 +20,33 @@ function render(statusCode: string, errorMessage: string | null = null) {
   )
 }
 
-describe('PlanStatusActionPanel — 상태별 버튼', () => {
-  it('초안은 확정만 그리고 완료는 그리지 않는다', () => {
+/*
+  **정방향만 이 패널에 선다** (#653 · 진단 PL-2 · 명세 D11-2). 역방향은 `⋯` 메뉴가 갖고,
+  그쪽은 `plan-manage-menu` 쪽 테스트가 본다.
+*/
+describe('PlanStatusActionPanel — 정방향 액션만 그린다', () => {
+  it('초안은 확정만 그린다', () => {
     const markup = render('DRAFT')
+
     expect(markup).toContain(messages.plan.statusConfirmAction)
     expect(markup).not.toContain(messages.plan.statusCompleteAction)
-    expect(markup).not.toContain(messages.plan.statusRevertAction)
   })
 
-  it('확정은 완료와 초안 되돌리기를 함께 그린다', () => {
+  it('확정은 완료만 그리고 초안 되돌리기는 그리지 않는다 — 그쪽은 메뉴다', () => {
     const markup = render('CONFIRMED')
+
     expect(markup).toContain(messages.plan.statusCompleteAction)
-    expect(markup).toContain(messages.plan.statusRevertAction)
+    expect(markup).not.toContain(messages.plan.statusRevertAction)
     expect(markup).not.toContain(messages.plan.statusConfirmAction)
   })
 
-  it('완료는 확정으로 되돌리기만 그린다 — 초안 되돌리기는 없다', () => {
-    const markup = render('COMPLETED')
-    expect(markup).toContain(messages.plan.statusReopenAction)
-    expect(markup).not.toContain(messages.plan.statusRevertAction)
-    expect(markup).not.toContain(messages.plan.statusCompleteAction)
+  /*
+    **완료 일정에는 전폭 버튼이 없다.** 390 실측에서 그 화면의 유일한 전폭 버튼이
+    `확정으로 되돌리기`(top 252) 였다 — 다녀온 일정이 가장 세게 미는 것이 되돌리기일
+    이유가 없다. 그 화면의 할 일은 읽는 것이다.
+  */
+  it('완료는 버튼을 하나도 그리지 않는다', () => {
+    expect(render('COMPLETED')).toBe('')
   })
 
   it('모르는 코드에서는 자리를 만들지 않는다', () => {
@@ -54,6 +55,18 @@ describe('PlanStatusActionPanel — 상태별 버튼', () => {
 
   it('실패 문구는 버튼 아래에 그대로 둔다', () => {
     const markup = render('CONFIRMED', messages.plan.statusCompleteError)
+
     expect(markup).toContain(messages.plan.statusCompleteError)
+  })
+
+  /*
+    **버튼이 없어도 실패는 말해야 한다.** 역방향은 메뉴 안에서 시작하는데 메뉴는 선택과
+    동시에 닫히므로, 완료 일정에서 `확정으로 되돌리기` 가 실패하면 그 사실을 낼 자리가
+    이 패널뿐이다. 이 단언이 `action === undefined` 조기 반환을 막는다.
+  */
+  it('버튼이 없는 완료 상태에서도 실패 문구는 낸다', () => {
+    const markup = render('COMPLETED', messages.plan.statusReopenError)
+
+    expect(markup).toContain(messages.plan.statusReopenError)
   })
 })
