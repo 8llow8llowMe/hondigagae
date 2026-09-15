@@ -10,13 +10,6 @@ import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 import type { PlanStatusActionKind, PlanStatusActionSpec } from '@/lib/plan/status-action'
 
-export const PLAN_STATUS_ACTION_LABELS: Record<PlanStatusActionKind, string> = {
-  confirm: messages.plan.statusConfirmAction,
-  complete: messages.plan.statusCompleteAction,
-  'revert-draft': messages.plan.statusRevertAction,
-  reopen: messages.plan.statusReopenAction,
-}
-
 const ACTION_ERRORS: Record<PlanStatusActionKind, string> = {
   confirm: messages.plan.statusConfirmError,
   complete: messages.plan.statusCompleteError,

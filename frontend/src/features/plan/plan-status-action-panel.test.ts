@@ -4,9 +4,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { PlanStatusActionPanel } from '@/features/plan/plan-status-action-panel'
-import { PLAN_STATUS_ACTION_LABELS } from '@/features/plan/use-plan-status'
 import { messages } from '@/lib/messages'
-import { forwardStatusAction } from '@/lib/plan/status-action'
+import { forwardStatusAction, PLAN_STATUS_ACTION_LABELS } from '@/lib/plan/status-action'
 
 function render(statusCode: string, errorMessage: string | null = null) {
   return renderToStaticMarkup(

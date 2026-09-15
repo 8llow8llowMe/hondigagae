@@ -12,12 +12,15 @@ import { MoreIcon } from '@/components/icons'
 import { Menu, MenuAnchor } from '@/components/menu'
 import { PlanEditModal } from '@/features/plan/plan-edit-modal'
 import { planKeys } from '@/features/plan/queries'
-import { PLAN_STATUS_ACTION_LABELS } from '@/features/plan/use-plan-status'
 import { ApiError } from '@/lib/api/error'
 import { deletePlan } from '@/lib/api/plan'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
-import { type PlanStatusActionSpec, reverseStatusActions } from '@/lib/plan/status-action'
+import {
+  PLAN_STATUS_ACTION_LABELS,
+  type PlanStatusActionSpec,
+  reverseStatusActions,
+} from '@/lib/plan/status-action'
 import type { PlanDetail } from '@/types/plan'
 
 /**
@@ -46,20 +49,22 @@ import type { PlanDetail } from '@/types/plan'
  * **저장 중에는 메뉴를 열 수 있지만 상태 항목이 잠긴다** — 진행은 `usePlanStatus` 한 곳이
  * 들어 전폭 버튼과 이 항목이 같은 것을 본다.
  *
+ * **`status` 는 필수이고 둘을 한 덩어리로 받는다.** 선택 prop 으로 두면 새 호출부가
+ * 빠뜨렸을 때 **역방향 상태 변경의 유일한 진입점이 타입 오류 없이 사라지고**, `saving`
+ * 만 빠뜨리면 잠금이 조용히 없어진다. 이 저장소가 `iconOnly`/`aria-label` 을 타입으로
+ * 강제하는 것과 같은 이유다 (component-guide.md §5).
+ *
  * icon-only 라 `aria-label` 이 접근 가능한 이름이다 (D6). 키보드 순회는 `Menu` 가 보장한다.
  */
 export function PlanManageMenu({
   plan,
   today,
-  statusSaving = false,
-  onStatusAction,
+  status,
 }: {
   plan: PlanDetail
   today: string
-  /** 상태 전이가 진행 중이다. 전폭 버튼과 같은 상태를 본다 (`usePlanStatus`) */
-  statusSaving?: boolean
-  /** 없으면 상태 항목을 내지 않는다 — 목록·테스트가 메뉴만 쓸 때의 경로다 */
-  onStatusAction?: ((action: PlanStatusActionSpec) => void) | undefined
+  /** `usePlanStatus` 가 돌려주는 것 그대로. 전폭 버튼과 같은 진행·실행을 본다 */
+  status: { saving: boolean; run: (action: PlanStatusActionSpec) => void }
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -134,16 +139,14 @@ export function PlanManageMenu({
               (`plan-status-action.tsx`). 초안에는 되돌아갈 앞 상태가 없어 이 갈래가 비고,
               그때 메뉴는 예전과 똑같이 `수정 · 삭제` 둘이다.
             */
-            ...(onStatusAction === undefined
-              ? []
-              : reverseStatusActions(plan.status.code).map((action) => ({
-                  label: PLAN_STATUS_ACTION_LABELS[action.kind],
-                  disabled: statusSaving,
-                  onSelect: () => {
-                    setMenuOpen(false)
-                    onStatusAction(action)
-                  },
-                }))),
+            ...reverseStatusActions(plan.status.code).map((action) => ({
+              label: PLAN_STATUS_ACTION_LABELS[action.kind],
+              disabled: status.saving,
+              onSelect: () => {
+                setMenuOpen(false)
+                status.run(action)
+              },
+            })),
             {
               label: messages.plan.deleteAction,
               destructive: true,
