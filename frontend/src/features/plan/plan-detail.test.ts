@@ -224,6 +224,22 @@ describe('PlanDaySection', () => {
     expect(markup).toContain(`aria-label="${messages.plan.dayMenuLabel.replace('{day}', '1')}"`)
   })
 
+  /*
+    **44px 최소 터치 영역** (DESIGN.md §7). `#653` 이후 이 트리거가 모바일에서
+    `다시 만들기` 의 **유일한 진입점**이라 `sm`(32px)으로 두면 규칙을 깬다 —
+    같은 카드의 방문 토글이 44 를 지키는 것과 같은 기준이다.
+  */
+  it('오버플로 트리거가 44px 터치 영역을 갖는다', () => {
+    const markup = renderDaySection({ regenerateHref: '/plans/1/days/1/regenerate' })
+    const trigger = markup.slice(
+      markup.indexOf(`aria-label="${messages.plan.dayMenuLabel.replace('{day}', '1')}"`) - 400,
+      markup.indexOf(`aria-label="${messages.plan.dayMenuLabel.replace('{day}', '1')}"`),
+    )
+
+    expect(trigger).toContain('h-11 w-11')
+    expect(trigger).not.toContain('h-8 w-8')
+  })
+
   /* 일자마다 이름이 갈려야 한다 — 3일 일정이면 같은 `⋯` 가 셋이다 */
   it('오버플로 트리거의 이름에 일자가 들어간다', () => {
     const markup = renderDaySection({ day: 3, regenerateHref: '/plans/1/days/3/regenerate' })
@@ -258,8 +274,11 @@ describe('PlanDaySection', () => {
   it('regenerateHref 가 null 이면 오버플로 트리거 자체를 내지 않는다', () => {
     const markup = renderDaySection({ regenerateHref: null })
 
-    expect(markup).not.toContain(messages.plan.regenerateDayAction)
-    expect(markup).not.toContain('/regenerate')
+    /*
+      **항목·href 로 재지 않는다.** 닫힌 `Menu` 는 `null` 이라(`menu.tsx:81`) 그 둘은
+      `regenerateHref` 가 무엇이든 정적 마크업에 안 나온다 — 무효한 단언이 된다.
+      실제로 갈리는 것은 트리거뿐이고, 메뉴 안은 `e2e/plan-status.spec.ts` 가 본다.
+    */
     expect(markup).not.toContain(messages.plan.dayMenuLabel.replace('{day}', '1'))
     // 나머지 진입점은 그대로다 — 막힌 것은 재생성뿐이다
     expect(markup).toContain(messages.plan.addPlaceAction)
@@ -273,16 +292,22 @@ describe('PlanDaySection', () => {
     판정 top 781. **읽는 순서와 탭 순서가 이제 같다.**
   */
   it('판정 → 항목 → 액션 순서다', () => {
-    const markup = renderDaySection()
-    const title = planDetail.items[0]!.title
+    const rows = planDetail.items
+      .slice(0, 2)
+      .map((item) => ({ item, distanceMeters: null, distanceKind: null }))
+    const markup = renderDaySection({ rows })
 
     const verdict = markup.indexOf(messages.plan.verdictFeelsLikeLabel)
-    const item = markup.indexOf(title)
+    /*
+      **마지막 항목 기준으로 잰다.** 첫 항목만 보면 액션 줄이 항목 1과 2 사이로 가도
+      통과한다 — 목록 **전체** 뒤에 있는지가 이 단언이 지키려는 것이다.
+    */
+    const lastItem = markup.lastIndexOf(rows[1]!.item.title)
     const action = markup.indexOf(messages.plan.addPlaceAction)
 
     expect(verdict).toBeGreaterThan(-1)
-    expect(item).toBeGreaterThan(verdict)
-    expect(action).toBeGreaterThan(item)
+    expect(lastItem).toBeGreaterThan(verdict)
+    expect(action).toBeGreaterThan(lastItem)
   })
 
   /* 오버플로는 제목 줄에 남는다 — 판정 위에서 걷어낸 것은 액션 셋이지 `⋯` 가 아니다 */
