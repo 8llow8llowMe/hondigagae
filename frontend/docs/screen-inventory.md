@@ -432,17 +432,18 @@
 
 ## 4. 여행 일정 — 착수 가능
 
-| 화면                        | 경로                                         | API                                                                                  | 상태                                                                                   |
-| --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
-| 일정 목록                   | `/plans`                                     | `GET /plans` (커서)                                                                  | **구현** (#75)                                                                         |
-| 일정 생성                   | `/plans/new`                                 | `POST /plans`                                                                        | **구현** (#75)                                                                         |
-| 일정 상세 (타임라인 + 판정) | `/plans/[planId]`                            | `GET /plans/{planId}` + `GET /plans/{planId}/weather`                                | **구현** (#80)                                                                         |
-| 일정 수정·삭제              | `/plans/[planId]` 내                         | `PUT` · `DELETE /plans/{planId}`                                                     | **구현** (#80) — 이름·기간·예산·상태. **기간 수정은 #585.** **완료 전이는 #613**       |
-| 일자 항목 편집              | `/plans/[planId]` 내 모드                    | `PUT /plans/{planId}/days/{day}/items` (**일괄 교체**)                               | **구현** (#81)                                                                         |
-| 일정에 장소 담기            | `/plans/[planId]/days/[day]/add` + 실내 대안 | `PUT /plans/{planId}/days/{day}/items` (**같은 일괄 교체**)                          | **구현** (#82) — 새 API 없음. **지도 보기 추가, 기본 보기가 지도**(#370) — 새 API 없음 |
-| 하루 재생성                 | `/plans/[planId]/days/[day]/regenerate`      | `POST /ai-plans` (`planId`+`regenerateDay`) → `PUT /plans/{planId}/days/{day}/items` | **구현** (#128) — 새 API 없음. 정본 `docs/features/ai-plan/하루재생성-세부명세.md`     |
-| 일정 날씨 브리핑            | `/plans/[planId]` 내                         | `GET /plans/{planId}/weather`                                                        | **구현** (#80) — 일자 판정으로 통합                                                    |
-| 항목 방문 체크              | `/plans/[planId]` 내 항목 행                 | `PUT /plans/{planId}/items/{planItemId}/visited`                                     | **구현** (#124) — 해제도 같은 API                                                      |
+| 화면                        | 경로                                         | API                                                                                  | 상태                                                                                       |
+| --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| 일정 목록                   | `/plans`                                     | `GET /plans` (커서)                                                                  | **구현** (#75)                                                                             |
+| 일정 생성                   | `/plans/new`                                 | `POST /plans`                                                                        | **구현** (#75)                                                                             |
+| 일정 상세 (타임라인 + 판정) | `/plans/[planId]`                            | `GET /plans/{planId}` + `GET /plans/{planId}/weather`                                | **구현** (#80)                                                                             |
+| 일정 수정·삭제              | `/plans/[planId]` 내                         | `PUT` · `DELETE /plans/{planId}`                                                     | **구현** (#80) — 이름·기간·예산·상태. **기간 수정은 #585.** **완료 전이는 #613**             |
+| 일자 항목 편집              | `/plans/[planId]` 내 모드                    | `PUT /plans/{planId}/days/{day}/items` (**일괄 교체**)                               | **구현** (#81)                                                                             |
+| 일정에 장소 담기            | `/plans/[planId]/days/[day]/add` + 실내 대안 | `PUT /plans/{planId}/days/{day}/items` (**같은 일괄 교체**)                          | **구현** (#82) — 새 API 없음. **지도 보기 추가, 기본 보기가 지도**(#370) — 새 API 없음     |
+| 하루 재생성                 | `/plans/[planId]/days/[day]/regenerate`      | `POST /ai-plans` (`planId`+`regenerateDay`) → `PUT /plans/{planId}/days/{day}/items` | **구현** (#128) — 새 API 없음. 정본 `docs/features/ai-plan/하루재생성-세부명세.md`         |
+| 일정 날씨 브리핑            | `/plans/[planId]` 내                         | `GET /plans/{planId}/weather`                                                        | **구현** (#80) — 일자 판정으로 통합                                                        |
+| 항목 방문 체크              | `/plans/[planId]` 내 항목 행                 | `PUT /plans/{planId}/items/{planItemId}/visited`                                     | **구현** (#124) — 해제도 같은 API                                                          |
+| 여행 후기                   | `/plans/[planId]` 좌측 레일                  | `GET` · `POST` · `PUT /plans/{planId}/reviews`                                       | **구현** (#615) — **완료 일정만.** 목록 "후기 미작성" 밴드는 `hasReview` 가 없어 넣지 않음 |
 
 **일정 응급 브리핑** — [#125](https://github.com/8llow8llowMe/hondigagae/issues/125) · BE PR #105
 
@@ -716,13 +717,13 @@
 
 **아래 화면은 만들지 않는다.** 호출부·mock도 만들지 않는다.
 
-| 화면                      | 필요한 백엔드          | 비고                  |
-| ------------------------- | ---------------------- | --------------------- |
-| 여행 후기 작성·공유       | plan-service `review`  | 미착수                |
-| 일정 공유                 | plan-service           | 미착수                |
-| AI 여행 상담사 / 비서     | ai-service `assistant` | 미착수                |
-| 반려견 성향 분석 리포트   | ai-service `analysis`  | 미착수                |
-| 여행 스타일 학습 / 개인화 | —                      | AI 기능 후보, 선정 전 |
+| 화면                      | 필요한 백엔드          | 비고                           |
+| ------------------------- | ---------------------- | ------------------------------ |
+| 여행 후기 공유 · 피드     | plan-service           | 미착수 — 작성·보기는 §4 (#615) |
+| 일정 공유                 | plan-service           | 미착수                         |
+| AI 여행 상담사 / 비서     | ai-service `assistant` | 미착수                         |
+| 반려견 성향 분석 리포트   | ai-service `analysis`  | 미착수                         |
+| 여행 스타일 학습 / 개인화 | —                      | AI 기능 후보, 선정 전          |
 
 **이 절에서 빠진 것 (백엔드가 구현했다)**
 
@@ -730,9 +731,11 @@
 | ----------------------------- | --------------------------------- |
 | 여행 적합도 분석 (점수 + XAI) | **§3-1 로 이동** — 구현됐다       |
 | 긴급 동물병원                 | **§5-2 와 중복이었다** — 구현됐다 |
+| 여행 후기 작성·보기           | **§4 로 이동** — #614 · #615      |
 
 확인 방법: `tour-service/domainlayer/` 에 `insight` · `emergency` 컨텍스트가 있고 각각 컨트롤러가 있다.
-`review` · `assistant` · `analysis` 는 **패키지 자체가 없다** — 그것이 미착수의 근거다.
+`assistant` · `analysis` 는 **패키지 자체가 없다** — 그것이 미착수의 근거다.
+여행 후기 작성·보기는 plan-service `GET|POST|PUT /plans/{planId}/reviews` 로 **착수됐다** (#614 BE · #615 FE) — §4.
 **2026-09-10 재확인**: dev 게이트웨이 OpenAPI 재수집(operation 57개)에 세 컨텍스트의 경로가 하나도 없다.
 **`walkcourse` 는 이 목록에서 빠졌다** — §6-1 로 옮겼다.
 

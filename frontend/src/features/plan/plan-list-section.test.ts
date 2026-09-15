@@ -62,7 +62,7 @@ describe('일정 목록 — 아트보드에 있으나 계약이 주지 않는 �
     expect(render()).not.toContain('제주시')
   })
 
-  it('후기 진입점을 만들지 않는다 — plan-service 에 review 가 없다', () => {
+  it('후기 진입점을 만들지 않는다 — 목록에 hasReview 가 없어 미작성 밴드를 상세 GET 으로 가른다', () => {
     const html = render({
       plans: [
         plan({

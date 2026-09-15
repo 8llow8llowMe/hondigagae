@@ -120,7 +120,32 @@ export type MockPlan = {
    * 화면이 "아직 만든 적 없다" 와 "만든 뒤 전부 지웠다" 를 이 값으로 가른다.
    */
   packingGeneratedAt: string | null
+  /**
+   * 여행 후기 (#614). **일정당 하나**라 배열이 아니다. 없으면 null.
+   *
+   * 장소 평가는 스냅샷이라 일정 항목이 사라져도 후기 행은 남는다.
+   */
+  review: MockPlanReview | null
   deleted: boolean
+}
+
+/** 일정 후기 하나. 응답 DTO 가 아니라 **저장 형태**다 */
+export type MockPlanReview = {
+  reviewId: string
+  overallRating: number
+  body: string | null
+  items: MockPlanReviewItem[]
+  createdAt: string
+  updatedAt: string
+}
+
+export type MockPlanReviewItem = {
+  reviewItemId: string
+  planItemId: string
+  placeId: string | null
+  title: string
+  rating: number
+  comment: string | null
 }
 
 /** 준비물 항목 하나. `source` 는 `AI` / `USER` 다 */
@@ -255,6 +280,10 @@ export type MockStore = {
   /** planItemId 조립용 순번 */
   nextPlanItemSeq: number
   nextPackingItemSeq: number
+  /** reviewId 조립용 순번 */
+  nextReviewSeq: number
+  /** reviewItemId 조립용 순번 */
+  nextReviewItemSeq: number
   /** AI 일정 생성 작업. jobId 는 UUID 라 Snowflake 조립 규칙을 쓰지 않는다 */
   aiPlanJobs: MockAiPlanJob[]
   /** jobId 조립용 순번 */
@@ -331,6 +360,25 @@ const PACKING_ITEM_ID_SEQ_DIGITS = 6
 export function nextPackingItemId(store: MockStore): string {
   const id = `${PACKING_ITEM_ID_PREFIX}${String(store.nextPackingItemSeq).padStart(PACKING_ITEM_ID_SEQ_DIGITS, '0')}`
   store.nextPackingItemSeq += 1
+  return id
+}
+
+/** reviewId. 발급 규칙은 `planItemId` 와 같다 — 같은 서비스의 Snowflake 다 */
+const REVIEW_ID_PREFIX = '523456789012'
+const REVIEW_ID_SEQ_DIGITS = 6
+
+export function nextReviewId(store: MockStore): string {
+  const id = `${REVIEW_ID_PREFIX}${String(store.nextReviewSeq).padStart(REVIEW_ID_SEQ_DIGITS, '0')}`
+  store.nextReviewSeq += 1
+  return id
+}
+
+const REVIEW_ITEM_ID_PREFIX = '623456789012'
+const REVIEW_ITEM_ID_SEQ_DIGITS = 6
+
+export function nextReviewItemId(store: MockStore): string {
+  const id = `${REVIEW_ITEM_ID_PREFIX}${String(store.nextReviewItemSeq).padStart(REVIEW_ITEM_ID_SEQ_DIGITS, '0')}`
+  store.nextReviewItemSeq += 1
   return id
 }
 
@@ -517,6 +565,7 @@ function createStore(): MockStore {
         status: 'DRAFT',
         packingItems: [],
         packingGeneratedAt: null,
+        review: null,
         deleted: false,
         /*
           3일 일정. **거리 규칙 4종을 한 fixture 에서 전부 드러낸다.**
@@ -631,6 +680,7 @@ function createStore(): MockStore {
         status: 'CONFIRMED',
         packingItems: [],
         packingGeneratedAt: null,
+        review: null,
         deleted: false,
         /*
           2일 일정인데 **3일차 항목이 남아 있다.** 기간을 줄여도 서버가 항목을 정리하지
@@ -695,9 +745,38 @@ function createStore(): MockStore {
         endDate: '2026-05-04',
         budget: 250000,
         status: 'COMPLETED',
-        items: [],
+        /*
+          **다녀온 장소 두 곳**을 심는다. 후기 작성 폼의 장소 평가는
+          `visited && PLACE/MEAL/LODGING` 만 보여 주므로, 빈 항목이면 전체 만족도만
+          남기는 갈래만 로컬에서 보게 된다.
+        */
+        items: [
+          {
+            planItemId: '323456789012000020',
+            day: 1,
+            sequence: 0,
+            itemType: 'PLACE',
+            targetId: placeId(0),
+            title: '제주특별자치도립김창열미술관',
+            memo: null,
+            startTime: '10:00:00',
+            visited: true,
+          },
+          {
+            planItemId: '323456789012000021',
+            day: 2,
+            sequence: 0,
+            itemType: 'MEAL',
+            targetId: placeId(6),
+            title: '동문재래시장',
+            memo: null,
+            startTime: '12:30:00',
+            visited: true,
+          },
+        ],
         packingItems: [],
         packingGeneratedAt: null,
+        review: null,
         deleted: false,
       },
       {
@@ -715,6 +794,7 @@ function createStore(): MockStore {
         items: [],
         packingItems: [],
         packingGeneratedAt: null,
+        review: null,
         deleted: false,
       },
       {
@@ -733,13 +813,16 @@ function createStore(): MockStore {
         items: [],
         packingItems: [],
         packingGeneratedAt: null,
+        review: null,
         deleted: false,
       },
     ],
     nextPlanSeq: 5,
-    // 항목 fixture 가 1~19 를 이미 쓴다. 1 로 두면 새로 담은 항목이 시드와 같은 id 를 받는다
-    nextPlanItemSeq: 20,
+    // 항목 fixture 가 1~21 을 이미 쓴다. 1 로 두면 새로 담은 항목이 시드와 같은 id 를 받는다
+    nextPlanItemSeq: 22,
     nextPackingItemSeq: 1,
+    nextReviewSeq: 1,
+    nextReviewItemSeq: 1,
     aiPlanJobs: [],
     nextAiPlanJobSeq: 1,
     /*
@@ -785,7 +868,8 @@ function isCurrentShape(store: MockStore | undefined): store is MockStore {
     // 켜 둔 개발 서버의 옛 상태가 그대로 굴러가 provider 가 undefined 로 읽힌다
     store.members.every((member) => 'provider' in member) &&
     // 일정 항목이 뒤에 추가됐다. HMR 로 살아남은 낡은 스토어는 버린다 (#59 와 같은 사고)
-    store.plans.every((plan) => Array.isArray(plan.items)) &&
+    store.plans.every((plan) => Array.isArray(plan.items) && 'review' in plan) &&
+    typeof store.nextReviewSeq === 'number' &&
     // AI 작업 목록도 같은 이유로 본다
     Array.isArray(store.aiPlanJobs) &&
     // 비밀번호 재설정·소셜 로그인 상태가 뒤에 추가됐다 (#85). 낡은 스토어는 버린다 —

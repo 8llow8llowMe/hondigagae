@@ -651,4 +651,35 @@ export const planMessages = {
   addToPlanLoginDescription: '로그인하면 {title} 담을 수 있어요. 지금 보던 화면으로 돌아와요.',
   addToPlanLoginAction: '로그인',
   addToPlanLoginDismiss: '둘러보기 계속',
+
+  // ── 여행 후기 (#615) ──────────────────────────────────────────────────────
+  reviewHeading: '여행 후기',
+  /**
+   * 완료했는데 아직 안 쓴 상태. **재시도가 아니라 다음 행동** 이다 —
+   * 404 `PLAN_015` 는 데이터 부재다.
+   */
+  reviewEmptyTitle: '아직 후기가 없어요',
+  reviewEmptyDescription: '다녀온 여행이 어땠는지 남겨 두면 다음에 일정을 고를 때 도움이 돼요.',
+  reviewWriteAction: '후기 쓰기',
+  reviewEditAction: '후기 고치기',
+  reviewCancelAction: '취소',
+  reviewSubmitCreate: '후기 남기기',
+  reviewSubmitUpdate: '후기 저장',
+  reviewOverallLabel: '전체 만족도',
+  /** `{rating}` 치환. **1~5 숫자를 그대로 쓴다** — 별점 한국어 매핑 테이블을 만들지 않는다 */
+  reviewOverallValue: '전체 만족도 {rating}',
+  reviewBodyLabel: '여행이 어땠나요',
+  reviewBodyHint: '없어도 돼요. 2000자까지 적을 수 있어요.',
+  reviewBodyPlaceholder: '둘째 날이 더워서 실내 위주로 다녔어요.',
+  reviewPlacesLabel: '다녀온 장소',
+  /**
+   * 장소 평점은 빼도 된다. 서버도 빈 `items` 를 받는다 —
+   * 전체 만족도만 남겨도 후기가 성립한다.
+   */
+  reviewPlacesHint: '다녀온 장소만 골라 적을 수 있어요. 빼도 돼요.',
+  reviewPlaceRatingLabel: '장소 만족도',
+  reviewPlaceCommentLabel: '한 줄 후기',
+  reviewPlaceCommentHint: '없어도 돼요. 200자까지예요.',
+  reviewLoadErrorTitle: '후기를 불러오지 못했어요',
+  reviewSaveError: '후기를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.',
 } as const

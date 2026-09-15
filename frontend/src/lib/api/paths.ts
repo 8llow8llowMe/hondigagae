@@ -106,6 +106,13 @@ export const paths = {
     /** 챙김 체크. 해제도 같은 경로다 — 본문의 `checked` 가 방향을 정한다 */
     packingItemChecked: (planId: string, packingItemId: string) =>
       `/plans/${planId}/packing-items/${packingItemId}/checked`,
+    /**
+     * 여행 후기 v1 (#614 BE · #615 FE). **한 경로에 세 메서드가 붙는다** —
+     * 조회(`GET`) · 작성(`POST`) · 수정(`PUT`). 일정당 하나라 경로에 reviewId 가 없다.
+     *
+     * **완료(`COMPLETED`)된 일정만** 호출한다. 초안·확정은 `PLAN_016` 이다.
+     */
+    reviews: (planId: string) => `/plans/${planId}/reviews`,
   },
   aiPlans: {
     submit: '/ai-plans',

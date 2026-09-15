@@ -12,6 +12,7 @@ import { PlanItemRow } from '@/features/plan/plan-item-row'
 import { PlanManageMenu } from '@/features/plan/plan-manage-menu'
 import { PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
 import { PlanPackingList } from '@/features/plan/plan-packing-list'
+import { PlanReviewList } from '@/features/plan/plan-review-panel'
 import { PlanStatusAction } from '@/features/plan/plan-status-action'
 import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
 import { usePlanDayEdit } from '@/features/plan/use-plan-day-edit'
@@ -29,6 +30,7 @@ import {
   type PlanItemRowModel,
   toItemRows,
 } from '@/lib/plan/detail'
+import { isReviewSectionVisible } from '@/lib/plan/review'
 import type { Pet } from '@/types/pet'
 import type { PlaceDetail } from '@/types/place'
 import type { PlanDetail, PlanWeatherResponse } from '@/types/plan'
@@ -47,8 +49,9 @@ import type { PlanDetail, PlanWeatherResponse } from '@/types/plan'
  * **카드 판정**:
  * - 제목 줄(제목 · 상태 · 기간 · D-day · 동행 반려견)도 **카드다** (#553) — 판정 3문에
  *   셋 다 걸린다. 근거는 `PlanOverviewPanel` 머리주석이 정본이다.
- * - 좌 레일 카드 넷: `개요` · `일자별 판정` 목차 · `준비물` · `병원 배너`(홈이 배너를 카드에
- *   넣는 것과 같다 — 상시 진입점은 자기 카드를 갖지 않지만 레일의 한 이야기 "위급하면" 은 카드다).
+ * - 좌 레일 카드: `개요` · `일자별 판정` 목차 · `준비물` · **완료면 `후기`** · `병원 배너`
+ *   (홈이 배너를 카드에 넣는 것과 같다 — 상시 진입점은 자기 카드를 갖지 않지만 레일의 한
+ *   이야기 "위급하면" 은 카드다).
  * - 우 열은 **일자마다 카드 하나** (`PlanDaySection`), 기간 밖 항목도 카드.
  * - 확정 버튼은 **액션이라 카드가 아니다** — 개요 카드 아래, 바닥 위에 선다 (#553).
  */
@@ -208,6 +211,16 @@ export function PlanDetailSection({
         <Surface aria-label={messages.plan.packingHeading}>
           <PlanPackingList planId={plan.planId} />
         </Surface>
+
+        {/*
+          여행 후기 (#615). **완료 일정에만 카드를 연다.** 초안·확정에서 GET 을 치면
+          `PLAN_016` 이 난다. 일정 전체의 이야기라 특정 일자 옆이 아니라 레일에 둔다.
+        */}
+        {isReviewSectionVisible(plan.status.code) && (
+          <Surface aria-label={messages.plan.reviewHeading}>
+            <PlanReviewList plan={plan} />
+          </Surface>
+        )}
 
         {/*
           응급 브리핑 진입점 (#125). **배너 하나만 둔다** — 응답이 일자 × 방문 장소 ×
