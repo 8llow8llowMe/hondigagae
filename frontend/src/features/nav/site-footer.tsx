@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import { Wordmark } from '@/components/brand/wordmark'
+import { LEGAL_LINKS } from '@/lib/legal/links'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -35,8 +36,13 @@ import { cn } from '@/lib/utils/cn'
  * **탭바 자리를 비우는 일은 `.page-canvas` 가 물려받았다** — 감춘 요소는 여백도 주지
  * 못한다. `app/globals.css` 의 `.page-canvas` 주석이 그 이유의 정본이다.
  *
- * **여전히 없는 링크는 만들지 않는다** — 이용약관·문의는 아직 페이지가 없다. 자리만 잡아
- * 두면 눌러 보고 아무 일도 일어나지 않는다. `/about` 은 그 반대라 링크를 단다.
+ * **없는 링크는 여전히 만들지 않는다.** 규칙은 그대로고 전제만 바뀌었다 — 이용약관·
+ * 개인정보 처리방침은 #610 에서 페이지가 생겨 링크를 걸었고, `/about` 도 같은 이유로
+ * 단다. **문의는 아직 페이지가 없어 넣지 않는다.**
+ *
+ * **이 푸터는 768 아래에서 감춰진다** (`app/globals.css`). 그래서 약관 링크가 여기만
+ * 있으면 **모바일 방문자는 가입 전에 약관을 읽을 길이 없다** — 마이페이지는 로그인이
+ * 필요하고 `(auth)` 그룹에는 푸터가 없다. `/about` 이 그 경로를 함께 맡는 이유다.
  */
 export function SiteFooter() {
   return (
@@ -69,7 +75,27 @@ export function SiteFooter() {
           </ul>
         </div>
 
-        <div className="border-border flex flex-col gap-1 border-t pt-4">
+        <div className="border-border flex flex-col gap-2 border-t pt-4">
+          {/*
+            **링크 묶음도 목록이다** — 출처 목록과 같은 이유로 `<ul>` 로 둔다. 랜드마크
+            이름을 주는 것은 스크린리더 사용자가 푸터 안에서 이 묶음을 골라 들어오기
+            위해서다.
+          */}
+          <nav aria-label={messages.footer.legalLabel}>
+            <ul className="flex flex-wrap gap-x-4 gap-y-1">
+              {LEGAL_LINKS.map((link) => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    className="text-caption text-fg-muted hover:text-fg focus-visible:ring-brand-500 font-medium focus-visible:ring-2 focus-visible:outline-none"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
           <p className="text-caption text-fg-muted font-medium">{messages.footer.disclaimer}</p>
           <p className="text-caption text-fg-subtle font-medium">{messages.footer.contest}</p>
 
