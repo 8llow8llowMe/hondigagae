@@ -24,6 +24,7 @@
 - 좌우 인셋은 문자열을 새로 적지 않고 `INSET_CLASS`(`src/lib/ui/inset.ts`)를 참조한다.
 - 커밋 prefix 는 `[FE]`, 제목에 `(#610)` 을 단다.
 - 작업 트리를 다른 세션과 공유한다. **`git add -A` · `git add .` · `git stash` 를 쓰지 않는다** — 경로를 하나씩 적어 스테이징한다.
+- **커밋 전에 `pnpm format:check` 를 돌리고, 이 태스크가 만들거나 고친 파일이 걸리면 `prettier --write <그 경로들>` 로 맞춘다.** 이 계획의 코드 블록은 prettier 포맷이 아니다 (긴 한국어 배열 리터럴이 100자 줄바꿈 규칙과 어긋난다). `pnpm verify` 에는 `format:check` 가 없지만 **`.githooks/pre-push` 와 CI 가 `format:check` 를 먼저 돌리므로**, 맞추지 않으면 푸시가 막힌다. **prettier 는 문자열 리터럴 *내용* 을 바꾸지 않는다** — 줄바꿈만 다시 잡으므로 법률 본문은 그대로다. 전사 정확성은 "문자열 안의 글자" 이지 "줄바꿈 위치" 가 아니다.
 
 ---
 
