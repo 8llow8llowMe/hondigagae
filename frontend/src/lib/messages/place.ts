@@ -402,8 +402,18 @@ export const placeMessages = {
    */
   detailCongestionLeastLabel: '가장 덜 붐비는 날',
   detailCongestionLeastDay: '{month}월 {day}일 ({weekday})',
-  /** 집중률은 단위가 없는 지표(0~100)다. **숫자는 이 줄에만 적는다** */
+  /** 집중률은 단위가 없는 지표(0~100)다. **숫자는 이 줄에만 적는다.** `%` 를 붙이지 않는다 */
   detailCongestionRateLabel: '집중률',
+  /**
+   * 같은 기간 평균과의 차이 (#651 · 진단 D-3).
+   *
+   * **`57.77` 만으로는 높은지 낮은지 알 수 없었다** — 화면 어디에도 비교 기준이 없었다.
+   * 비교할 것이 없으면(아는 날 1일, 전부 같은 값) 이 줄을 붙이지 않는다.
+   *
+   * **`30일 중 가장 한산` 이라 쓰지 않는다.** 기간은 7일일 수도 있고, 전부 붐비는 주라면
+   * 가장 덜 붐비는 날도 `혼잡` 이다 — 등급은 옆 배지가 말한다.
+   */
+  detailCongestionRateCompare: '· 이 기간 평균 {average}보다 {below} 낮아요',
   /** 막대 하나를 보조기기에 읽어 주는 줄. 색·높이는 스크린리더에 아무 말도 하지 못한다 */
   detailCongestionBar: '{month}월 {day}일 {weekday}요일',
   /**
