@@ -3,8 +3,14 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { VERDICT_SPECIMEN } from '@/features/about/about-specimen-data'
+import {
+  CONGESTION_SPECIMEN,
+  PLAN_SPECIMEN,
+  VERDICT_SPECIMEN,
+} from '@/features/about/about-specimen-data'
+import { CongestionSpecimen } from '@/features/about/congestion-specimen'
 import { GoldenCurveSpecimen } from '@/features/about/golden-curve-specimen'
+import { PlanSpecimen } from '@/features/about/plan-specimen'
 import { VerdictSpecimen } from '@/features/about/verdict-specimen'
 import { messages } from '@/lib/messages'
 
@@ -84,5 +90,43 @@ describe('GoldenCurveSpecimen — 골든타임 곡선', () => {
 
   it('예시는 그림이라 y축 눈금을 두지 않는다', () => {
     expect(markup).not.toContain('50℃')
+  })
+})
+
+describe('CongestionSpecimen — 한산한 날 막대', () => {
+  const markup = renderToStaticMarkup(createElement(CongestionSpecimen))
+
+  it('막대는 congestion 토큰이다 — 등급 색을 쓰지 않는다 (§2-3 #603)', () => {
+    expect(markup.match(/bg-congestion-bar/g)?.length).toBe(CONGESTION_SPECIMEN.heights.length - 1)
+    expect(markup.match(/bg-congestion-best/g)?.length).toBe(1)
+    expect(markup).not.toContain('bg-metric-')
+  })
+
+  it('정적 렌더는 자라난 상태다 — scale-y-0 없음', () => {
+    expect(markup).not.toContain('scale-y-0')
+  })
+
+  it('가장 한산한 날을 문장으로도 말한다 — 색만으로 전달하지 않는다', () => {
+    expect(markup).toContain(CONGESTION_SPECIMEN.bestDate)
+    expect(markup).toContain('role="img"')
+  })
+})
+
+describe('PlanSpecimen — AI 일정 일자 탭', () => {
+  const markup = renderToStaticMarkup(createElement(PlanSpecimen))
+
+  it('탭은 tablist 이고 1일차가 선택돼 있다', () => {
+    expect(markup).toContain('role="tablist"')
+    expect(markup.match(/aria-selected="true"/g)?.length).toBe(1)
+    expect(markup).toContain(PLAN_SPECIMEN[0].day)
+  })
+
+  it('1일차 항목 셋이 처음부터 보인다', () => {
+    for (const item of PLAN_SPECIMEN[0].items) expect(markup).toContain(item.title)
+  })
+
+  it('다시 짜기 링크는 실제 화면이 아니라 예시 안 문구다 — a 태그가 아니다', () => {
+    expect(markup).toContain(messages.about.specimen.planRegenerate)
+    expect(markup).not.toContain('<a ')
   })
 })
