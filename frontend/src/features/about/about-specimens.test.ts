@@ -5,11 +5,14 @@ import { describe, expect, it } from 'vitest'
 
 import {
   CONGESTION_SPECIMEN,
+  EMERGENCY_ROWS_SPECIMEN,
   PLAN_SPECIMEN,
   VERDICT_SPECIMEN,
 } from '@/features/about/about-specimen-data'
 import { CongestionSpecimen } from '@/features/about/congestion-specimen'
+import { EmergencySpecimen } from '@/features/about/emergency-specimen'
 import { GoldenCurveSpecimen } from '@/features/about/golden-curve-specimen'
+import { PlacesSpecimen } from '@/features/about/places-specimen'
 import { PlanSpecimen } from '@/features/about/plan-specimen'
 import { VerdictSpecimen } from '@/features/about/verdict-specimen'
 import { messages } from '@/lib/messages'
@@ -137,5 +140,40 @@ describe('PlanSpecimen — AI 일정 일자 탭', () => {
   it('다시 짜기 링크는 실제 화면이 아니라 예시 안 문구다 — a 태그가 아니다', () => {
     expect(markup).toContain(messages.about.specimen.planRegenerate)
     expect(markup).not.toContain('<a ')
+  })
+})
+
+/**
+ * 서버 예시 둘 — 상태가 없어 `'use client'` 가 아니다 (#635 fix 1).
+ *
+ * `about-view.test.ts` 가 `AboutView` 를 통째로 렌더해 이미 덮지만, 파일로 떼어낸 뒤에는
+ * **그 자체로 서는지**도 본다 — 호출자 없이 렌더되지 않으면 서버 컴포넌트가 아니다.
+ */
+describe('PlacesSpecimen — 내 반려견 기준 필터 예시', () => {
+  const markup = renderToStaticMarkup(createElement(PlacesSpecimen))
+
+  it('동반 정보 없음은 점선 태그다 — 불가로 단정하지 않는다', () => {
+    expect(markup).toContain(messages.about.specimen.unknownTag)
+    expect(markup).toMatch(/border-metric-unknown-500[^"]*border-dashed/)
+  })
+
+  it('필터 칩 문구를 messages 에서 읽는다 — 뷰에 한국어를 박지 않는다', () => {
+    expect(markup).toContain(messages.about.specimen.filterIndoor)
+    expect(markup).toContain(messages.about.specimen.filterOpen)
+  })
+})
+
+describe('EmergencySpecimen — 가까운 병원·약국 예시', () => {
+  const markup = renderToStaticMarkup(createElement(EmergencySpecimen))
+
+  it('두 시설이 이름과 거리로 선다', () => {
+    for (const row of EMERGENCY_ROWS_SPECIMEN) {
+      expect(markup).toContain(row.name)
+      expect(markup).toContain(row.distance)
+    }
+  })
+
+  it('예시 캡션이 있다 — 실제 거리로 읽히지 않게', () => {
+    expect(markup).toContain(messages.about.specimen.emergencyNote)
   })
 })

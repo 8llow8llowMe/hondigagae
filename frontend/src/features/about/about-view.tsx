@@ -9,16 +9,16 @@ import { ChevronRightIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
 import { Surface, SurfaceList } from '@/components/surface'
 import {
-  EMERGENCY_ROWS_SPECIMEN,
   INDOOR_SPECIMEN,
-  PLACE_ROWS_SPECIMEN,
   SCALE_SPECIMEN,
   SUITABILITY_SPECIMEN,
   WEATHER_SPECIMEN,
 } from '@/features/about/about-specimen-data'
 import { CongestionSpecimen } from '@/features/about/congestion-specimen'
+import { EmergencySpecimen } from '@/features/about/emergency-specimen'
 import { GoldenCurveSpecimen } from '@/features/about/golden-curve-specimen'
 import { IntroBand } from '@/features/about/intro-band'
+import { PlacesSpecimen } from '@/features/about/places-specimen'
 import { PlanSpecimen } from '@/features/about/plan-specimen'
 import { Reveal } from '@/features/about/reveal'
 import { VerdictSpecimen } from '@/features/about/verdict-specimen'
@@ -47,10 +47,14 @@ import { cn } from '@/lib/utils/cn'
  *
  * **`h1` 이 보인다** — 히어로가 화면 제목이라 `h2` 는 `lg:` 에서 올라간다 (DESIGN.md §3-1 #358).
  *
- * **2단 배치는 12열 그리드 위에 세운다.** `grid-cols-[minmax(0,1fr)_400px]` 같은 arbitrary
- * 값은 lint 가 막는다 — 괄호가 든 arbitrary 를 Tailwind 가 조용히 무시하는 사고가 있었다
- * (`eslint.config.mjs` `noComplexArbitrary`). 히어로는 3열 중 2열이 카피, 질문 절은 12열 중
- * 5:7 이다.
+ * **2단 배치는 전부 12열 그리드 위에 세운다.** `grid-cols-[minmax(0,1fr)_400px]` 같은
+ * arbitrary 값은 lint 가 막는다 — 괄호가 든 arbitrary 를 Tailwind 가 조용히 무시하는 사고가
+ * 있었다 (`eslint.config.mjs` `noComplexArbitrary`). 히어로는 카피 7 : 예시 5, 질문 절은
+ * 카피 5 : 예시 7 이다.
+ *
+ * **히어로 예시 열이 12 중 5 인 이유는 폭이다.** 3열 중 1열(`lg:grid-cols-3`)이면 1024 에서
+ * 판정 카드가 272px 로 **모바일보다 좁아진다** — 카드 안 수치 세 개가 한 줄에 서지 못한다.
+ * 12열 5칸은 `gap-16` 기준 1024 에서 356px, 1280 에서 409px 로 모바일(358)보다 좁아지지 않는다.
  */
 export function AboutView() {
   const about = messages.about
@@ -61,9 +65,9 @@ export function AboutView() {
       <IntroBand
         tone="brand"
         labelledBy="about-hero-heading"
-        className="grid gap-8 lg:grid-cols-3 lg:items-center lg:gap-16"
+        className="grid gap-8 lg:grid-cols-12 lg:items-center lg:gap-16"
       >
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-7">
           {/*
             락업 — `(auth)` 셸과 같은 2배 크기(심볼 48 · 워드마크 40). 히어로에는 데이터가 없어
             로고가 첫 시선을 받아도 된다 (DESIGN.md §1 · §0-2). 워드마크는 currentColor 라
@@ -99,7 +103,10 @@ export function AboutView() {
             </ButtonLink>
           </div>
         </div>
-        <VerdictSpecimen />
+        {/* 예시는 자기 열을 갖는다 — `VerdictSpecimen` 이 grid 아이템이면 열 폭을 알 수 없다 */}
+        <div className="lg:col-span-5">
+          <VerdictSpecimen />
+        </div>
       </IntroBand>
 
       {/* ── 2. 데려가도 돼요? ── */}
@@ -119,58 +126,7 @@ export function AboutView() {
           link={about.q1.link}
         />
         <Reveal className="mt-6 lg:col-span-7 lg:mt-0">
-          <Surface aria-label={about.specimen.placesAria} className="-mx-4 md:mx-0">
-            <div className={cn('flex flex-wrap gap-1.5 pt-4', INSET_CLASS.card)}>
-              <span className="bg-fg text-fg-inverse text-caption inline-flex h-7 items-center rounded-full px-3 font-semibold">
-                {about.specimen.placesChip}
-              </span>
-              <span className="border-border-strong text-caption text-fg inline-flex h-7 items-center rounded-full border px-3 font-semibold">
-                실내
-              </span>
-              <span className="border-border-strong text-caption text-fg inline-flex h-7 items-center rounded-full border px-3 font-semibold">
-                운영 중
-              </span>
-            </div>
-            <ul className={cn('pt-3 pb-4', INSET_CLASS.card)}>
-              {PLACE_ROWS_SPECIMEN.map((row, index) => (
-                <li
-                  key={row.name}
-                  className={cn(
-                    'flex items-center gap-3 py-3',
-                    index > 0 && 'border-border border-t',
-                  )}
-                >
-                  <span aria-hidden className="bg-band size-12 shrink-0 rounded-md" />
-                  <div>
-                    <p className="text-body-1 text-fg">{row.name}</p>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {'unknown' in row && (
-                        <span className="border-metric-unknown-500 text-caption text-fg-muted inline-flex h-5.5 items-center rounded-sm border border-dashed px-2 font-medium">
-                          {about.specimen.unknownTag}
-                        </span>
-                      )}
-                      {row.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="bg-band text-caption text-fg-muted inline-flex h-5.5 items-center rounded-sm px-2 font-medium"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                      {'open' in row && (
-                        <span className="bg-status-open-100 text-status-open-700 text-caption inline-flex h-5.5 items-center rounded-sm px-2 font-semibold">
-                          운영 중
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <p className={cn('text-caption text-fg-muted pb-4 font-medium', INSET_CLASS.card)}>
-              {about.specimen.placesNote}
-            </p>
-          </Surface>
+          <PlacesSpecimen />
         </Reveal>
       </IntroBand>
 
@@ -287,43 +243,7 @@ export function AboutView() {
           link={about.q4.link}
         />
         <Reveal className="mt-6 lg:col-span-7 lg:mt-0">
-          <Surface aria-label={about.specimen.emergencyAria} className="-mx-4 md:mx-0">
-            <div className={cn('pt-4', INSET_CLASS.card)}>
-              <p className="text-title-2 text-fg font-semibold">{about.specimen.emergencyTitle}</p>
-              <p className="text-caption text-fg-muted mt-1 font-medium">
-                {about.specimen.emergencySub}
-              </p>
-            </div>
-            <ul className={cn('pt-3', INSET_CLASS.card)}>
-              {EMERGENCY_ROWS_SPECIMEN.map((row, index) => (
-                <li
-                  key={row.name}
-                  className={cn(
-                    'flex items-center gap-3 py-3',
-                    index > 0 && 'border-border border-t',
-                  )}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-body-1 text-fg">{row.name}</p>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      <span className="bg-status-open-100 text-status-open-700 text-caption inline-flex h-5.5 items-center rounded-sm px-2 font-semibold">
-                        {row.status}
-                      </span>
-                      <span className="bg-band text-caption text-fg-muted inline-flex h-5.5 items-center rounded-sm px-2 font-medium">
-                        {row.kind}
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-body-2 text-fg shrink-0 font-semibold tabular-nums">
-                    {row.distance}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className={cn('text-caption text-fg-muted pt-3 pb-4 font-medium', INSET_CLASS.card)}>
-              {about.specimen.emergencyNote}
-            </p>
-          </Surface>
+          <EmergencySpecimen />
         </Reveal>
       </IntroBand>
 
