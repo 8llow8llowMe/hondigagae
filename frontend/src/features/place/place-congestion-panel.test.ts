@@ -242,6 +242,65 @@ describe('PlaceCongestionPanel — 막대 색 (#603)', () => {
   it('보조기기에 등급 이름과 집중률을 함께 읽어 준다', () => {
     const markup = render()
 
-    expect(markup).toContain(`${messages.place.detailCongestionRateLabel} 71.8`)
+    // 눈으로 보는 값과 갈리지 않게 **정수**로 읽는다 (#651) — 71.8 → 72
+    expect(markup).toContain(`${messages.place.detailCongestionRateLabel} 72`)
+  })
+})
+
+/**
+ * 집중률 표현 (#651 · 진단 D-3).
+ *
+ * `57.77` 은 높은 값인지 낮은 값인지 화면에 비교 기준이 없었다. 계산 규칙 자체는
+ * `lib/insight/congestion.test.ts` 가 분기별로 잰다 — 여기서는 **화면에 나오는 모양**만 본다.
+ */
+describe('PlaceCongestionPanel — 집중률 표현 (#651)', () => {
+  /** 픽스처 7일: 71.8 · 37.2 · 28.6 · null · 21.4 · 44.9 · 68.3 → 아는 날 6일, 평균 45 */
+  const rateLine = (markup: string) =>
+    markup.match(new RegExp(`${messages.place.detailCongestionRateLabel}[^<]*`))?.[0] ?? ''
+
+  it('집중률에 소수점이 없다', () => {
+    const markup = render()
+
+    expect(markup).not.toMatch(/집중률 \d+\.\d/)
+  })
+
+  it('평균과 차이를 함께 말한다', () => {
+    const line = rateLine(render())
+
+    // leastCrowded 21.4 → 21, 평균 45 → 24 낮다
+    expect(line).toContain('21')
+    expect(line).toContain('45')
+    expect(line).toContain('24')
+  })
+
+  /*
+    화면에 보이는 세 숫자가 서로 맞아야 한다 — 평균 − 값 = 차이. 원값으로 빼면 어긋난다.
+  */
+  it('화면의 세 숫자가 서로 맞는다', () => {
+    const line = rateLine(render())
+    const numbers = [...line.matchAll(/\d+/g)].map(([n]) => Number(n))
+
+    expect(numbers).toHaveLength(3)
+    expect(numbers[1]! - numbers[0]!).toBe(numbers[2])
+  })
+
+  /* 아는 날이 하나뿐이면 "평균보다 0 낮아요" 가 된다 — 비교 문구를 붙이지 않는다 */
+  it('비교할 것이 없으면 숫자만 낸다', () => {
+    const onlyOne = {
+      ...congestion,
+      dailyCongestions: [
+        congestion.dailyCongestions[4]!,
+        { ...congestion.dailyCongestions[0]!, concentrationRate: null },
+      ],
+    }
+    const line = rateLine(render({ data: onlyOne }))
+
+    expect(line).toContain('21')
+    expect(line).not.toContain('평균')
+  })
+
+  /** 집중률은 단위가 없는 0~100 지표다 */
+  it('% 를 붙이지 않는다', () => {
+    expect(rateLine(render())).not.toContain('%')
   })
 })

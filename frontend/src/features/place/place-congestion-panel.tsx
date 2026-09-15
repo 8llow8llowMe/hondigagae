@@ -5,6 +5,7 @@ import {
   barHeightPercent,
   CONGESTION_DAYS,
   type CongestionDays,
+  congestionRateSummary,
   formatCongestionRange,
   splitDay,
 } from '@/lib/insight/congestion'
@@ -135,7 +136,7 @@ function PanelBody({
 
   return (
     <>
-      <LeastCrowded item={data.leastCrowded} />
+      <LeastCrowded item={data.leastCrowded} items={data.dailyCongestions} />
 
       <Chart
         items={data.dailyCongestions}
@@ -184,7 +185,14 @@ function PanelBody({
  * 붐비는 주라면 **가장 덜 붐비는 날도 `HIGH`** 다 — 그때 초록 면은 없는 한산함을 말한다.
  * 등급은 배지가 서버 `name` 그대로 말하고, 면은 자리만 만든다.
  */
-function LeastCrowded({ item }: { item: DailyCongestionItem | null }) {
+function LeastCrowded({
+  item,
+  items,
+}: {
+  item: DailyCongestionItem | null
+  /** 같은 기간 전체 — 평균을 내는 데만 쓴다 (#651) */
+  items: DailyCongestionItem[]
+}) {
   if (item === null) return null
 
   const parts = splitDay(item.date)
@@ -215,11 +223,40 @@ function LeastCrowded({ item }: { item: DailyCongestionItem | null }) {
         이미 비교를 해 준다. 서버가 고른 날에만 근거가 되는 수치를 붙인다.
       */}
       {item.concentrationRate !== null && (
-        <span className="text-caption text-fg-muted w-full font-medium tabular-nums">
-          {messages.place.detailCongestionRateLabel} {item.concentrationRate}
-        </span>
+        <RateLine concentrationRate={item.concentrationRate} items={items} />
       )}
     </div>
+  )
+}
+
+/**
+ * 집중률 줄 — 정수 + 같은 기간 평균과의 차이 (#651 · 진단 D-3).
+ *
+ * **`57.77` 만으로는 높은지 낮은지 알 수 없었다.** 화면 어디에도 비교 기준이 없었고,
+ * 수월봉 30일 실측에서 그 값은 **평균보다 25 낮은 날**이었다. 비교할 것이 없으면
+ * (아는 날 1일, 또는 전부 같은 값) 숫자만 낸다 — "평균보다 0 낮아요" 는 말이 아니다.
+ *
+ * **`30일 중 가장 한산` 이라 쓰지 않는다.** 기간은 7일일 수도 있고, 전부 붐비는 주라면
+ * 가장 덜 붐비는 날도 `혼잡` 이다 — 등급은 옆 배지가 계속 말한다.
+ */
+function RateLine({
+  concentrationRate,
+  items,
+}: {
+  concentrationRate: number
+  items: DailyCongestionItem[]
+}) {
+  const { rate, average, belowAverage } = congestionRateSummary(concentrationRate, items)
+
+  return (
+    <span className="text-caption text-fg-muted w-full font-medium tabular-nums">
+      {messages.place.detailCongestionRateLabel} {rate}
+      {average !== null &&
+        belowAverage !== null &&
+        ` ${messages.place.detailCongestionRateCompare
+          .replace('{average}', String(average))
+          .replace('{below}', String(belowAverage))}`}
+    </span>
   )
 }
 
@@ -406,7 +443,8 @@ function DayColumn({ item, picked }: { item: DailyCongestionItem; picked: boolea
               .replace('{day}', parts.day)
               .replace('{weekday}', parts.weekday)}{' '}
         {item.level.name}
-        {rate !== null && ` ${messages.place.detailCongestionRateLabel} ${rate}`}
+        {/* 눈으로 보는 값과 갈리지 않게 **여기도 정수다** (#651) — 예전에는 `79` 와 `87.42` 가 섞였다 */}
+        {rate !== null && ` ${messages.place.detailCongestionRateLabel} ${Math.round(rate)}`}
       </span>
     </li>
   )
