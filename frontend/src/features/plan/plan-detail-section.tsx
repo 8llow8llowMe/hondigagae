@@ -200,14 +200,7 @@ export function PlanDetailSection({
             관리 진입점은 일정의 신원 옆에 둔다 — `PlanManageMenu` 주석 참고.
             **역방향 상태 변경도 이 메뉴 안이다** (#653).
           */
-          menu={
-            <PlanManageMenu
-              plan={plan}
-              today={todayDay(today)}
-              statusSaving={status.saving}
-              onStatusAction={status.run}
-            />
-          }
+          menu={<PlanManageMenu plan={plan} today={todayDay(today)} status={status} />}
           /*
             **확정 액션이 개요 카드 바로 아래다** (이슈 #553). 예전에는 우측 일자 열의
             **맨 끝**이라, 3일 일정이면 마지막 날 카드까지 굴려야 버튼이 나왔다 — 초안을
@@ -318,10 +311,12 @@ export function PlanDetailSection({
         **데스크톱에서는 여전히 좌측 레일이다** — `.rail-layout-split` 이 이 블록을 1열 2행에
         놓아 개요 아래로 되돌린다. 모바일 순서만 바뀐다 (globals.css).
 
-        `pt-2 lg:pt-6` 은 앞 블록과의 간격이다 — 모바일에서는 일자 스택과 8, 데스크톱에서는
-        개요 스택과 24. `SurfaceStack` 안쪽 간격과 같은 값이다.
+        간격은 `pt-2 md:pt-0` 이다 — 모바일 8, 그 위로는 0. **`lg:pt-6` 을 주지 않는다**:
+        일자 스택과 달리 이 블록은 데스크톱에서 **자기 열의 첫 요소가 아니라 위 레일 다음**
+        이고, `SurfaceStack` 의 `md:p-6` 이 위 레일 아래쪽에 이미 24 를 내고 있다. 주면
+        24 가 둘 겹쳐 48 이 된다 (실측). `md:pt-0` 을 빠뜨려도 같은 일이 768~1023 에서 난다.
       */}
-      <SurfaceStack className="rail-split-bottom pt-2 lg:pt-6 lg:pr-3">
+      <SurfaceStack className="rail-split-bottom pt-2 md:pt-0 lg:pr-3">
         {/*
           준비물 (#155). **개요 바로 아래, 좌측 레일이다** — 일정 전체를 근거로 만드는
           것이라 특정 일자 옆에 두면 그 날 것으로 읽힌다.
