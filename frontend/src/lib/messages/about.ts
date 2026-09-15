@@ -54,6 +54,9 @@ export const aboutMessages = {
     placesChip: '내 반려견 기준 · 소형 · 7kg',
     placesNote: '화면 예시예요. 장소 이름과 조건은 실제와 달라요.',
     unknownTag: '동반 정보 없음',
+    /** 필터 칩 · 행 태그 둘 다 쓴다 — 같은 낱말이 화면에서 갈리지 않게 한 곳에서 읽는다 */
+    filterIndoor: '실내',
+    filterOpen: '운영 중',
 
     curveAria: '시간대별 기온과 추정 노면 온도 곡선 예시. 06시부터 08시 사이가 추천 구간이에요.',
     curveTitle: '오늘 산책하기 좋은 시간',

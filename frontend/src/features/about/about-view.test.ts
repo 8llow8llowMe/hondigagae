@@ -20,17 +20,6 @@ import { readSourceWithoutComments } from '@/test/source'
 const markup = renderToStaticMarkup(createElement(AboutView))
 const hrefs = [...markup.matchAll(/href="([^"]*)"/g)].map((match) => match[1])
 
-/**
- * 속성값을 걷고 **화면에 읽히는 글자만** 남긴다.
- *
- * 숫자를 마크업 전체에서 세면 **SVG 좌표에 걸린다** — 히어로 락업의 `Wordmark` 글리프
- * 외곽선에 `H315.75` 가 두 번 들어 있어서, 규모 숫자 `315` 가 3회로 세어졌다. 그것은 같은
- * 사실을 두 번 말한 것이 아니라 글자 모양의 좌표다.
- *
- * React 는 텍스트 노드의 `"` 도 이스케이프하므로 따옴표 쌍은 전부 속성값이다.
- */
-const text = markup.replace(/"[^"]*"/g, '')
-
 describe('AboutView — 출처 표기 (#611 의 존재 이유를 잃지 않는다)', () => {
   it('데이터 출처를 남긴다 — 푸터와 같은 다섯 곳', () => {
     expect(markup).toContain(messages.footer.sourcesLabel)
@@ -78,8 +67,8 @@ describe('AboutView — 8절 (#635)', () => {
   })
 
   it('최종값이 처음부터 DOM 에 있다', () => {
-    for (const text of ['>29<', '>56.0<', '>31<', messages.about.specimen.verdictGrade]) {
-      expect(markup).toContain(text)
+    for (const fragment of ['>29<', '>56.0<', '>31<', messages.about.specimen.verdictGrade]) {
+      expect(markup).toContain(fragment)
     }
     expect(markup).toContain(messages.about.specimen.suitabilityGrade)
   })
@@ -91,8 +80,17 @@ describe('AboutView — 8절 (#635)', () => {
   })
 
   it('규모 숫자는 타일 한 곳에만 있다 — 같은 사실을 두 번 말하지 않는다', () => {
-    expect(text.match(new RegExp(String(SCALE_SPECIMEN.places), 'g'))?.length).toBe(1)
-    expect(text.match(new RegExp(String(SCALE_SPECIMEN.emergency), 'g'))?.length).toBe(1)
+    /*
+      **글자 자리(`>숫자<`)만 센다.** 마크업 전체에서 세면 SVG 좌표에 걸린다 — 히어로 락업
+      `Wordmark` 의 글리프 외곽선에 `H315.75` 가 두 번 들어 있어 `315` 가 3회로 세어졌다.
+      그것은 같은 사실을 두 번 말한 것이 아니라 글자 모양의 좌표다.
+
+      타일은 `>315<span …>곳</span>` 으로 그리므로 `>315<` 가 정확히 한 번 나온다.
+    */
+    const textOccurrences = (value: number) => markup.match(new RegExp(`>${value}<`, 'g'))?.length
+
+    expect(textOccurrences(SCALE_SPECIMEN.places)).toBe(1)
+    expect(textOccurrences(SCALE_SPECIMEN.emergency)).toBe(1)
     expect(markup).toContain(messages.about.data.scaleNote)
   })
 
