@@ -23,16 +23,16 @@
 
 **새 값을 임의로 추가하지 않는다.** 추가는 `DESIGN.md` 갱신과 함께 한다.
 
-| 컴포넌트      | `variant`                                                          | `size`               | 기본값                |
-| ------------- | ------------------------------------------------------------------ | -------------------- | --------------------- |
-| `Button`      | `primary` \| `secondary` \| `ghost` \| `danger` \| `dangerOutline` | `sm` \| `md` \| `lg` | `primary` / `md`      |
-| `Badge`       | `neutral` \| `brand` \| `accent` \| `danger`                       | `sm` \| `md`         | `neutral` / `md`      |
-| `MetricBadge` | `tone`: `critical` \| `high` \| `mid` \| `low` \| `unknown`        | `sm` \| `md`         | 톤 없음 (필수) / `md` |
-| `MetricWord`  | `tone` 위와 동일                                                   | — (`emphasis` 고정)  | 없음 (필수)           |
-| `MetricValue` | `tone` 위와 동일 (생략 = 중립)                                     | `hero` \| `row`      | `row`                 |
-| `Chip`        | `selected` \| `exclusive` (외형 variant 없음)                      | —                    | 다중 축               |
-| `Input`       | — (에러는 `error` prop)                                            | `md` \| `lg`         | `md`                  |
-| `BackLink`    | `inline` \| `titleRow`                                             | —                    | `inline`              |
+| 컴포넌트      | `variant`                                                                                                      | `size`               | 기본값                |
+| ------------- | -------------------------------------------------------------------------------------------------------------- | -------------------- | --------------------- |
+| `Button`      | `primary` \| `secondary` \| `ghost` \| `danger` \| `dangerOutline` \| `kakao` \| `inverse` \| `inverseOutline` | `sm` \| `md` \| `lg` | `primary` / `md`      |
+| `Badge`       | `neutral` \| `brand` \| `accent` \| `danger`                                                                   | `sm` \| `md`         | `neutral` / `md`      |
+| `MetricBadge` | `tone`: `critical` \| `high` \| `mid` \| `low` \| `unknown`                                                    | `sm` \| `md`         | 톤 없음 (필수) / `md` |
+| `MetricWord`  | `tone` 위와 동일                                                                                               | — (`emphasis` 고정)  | 없음 (필수)           |
+| `MetricValue` | `tone` 위와 동일 (생략 = 중립)                                                                                 | `hero` \| `row`      | `row`                 |
+| `Chip`        | `selected` \| `exclusive` (외형 variant 없음)                                                                  | —                    | 다중 축               |
+| `Input`       | — (에러는 `error` prop)                                                                                        | `md` \| `lg`         | `md`                  |
+| `BackLink`    | `inline` \| `titleRow`                                                                                         | —                    | `inline`              |
 
 > **`Badge` 의 `warn` · `info` 톤은 3차 세트에서 폐기했다** (DESIGN.md §2-7).
 > 측정값은 경고가 아니므로 등급은 `MetricBadge` 로 가고, 파란 정보 톤은 팔레트에 없다.
@@ -51,6 +51,10 @@
 > 화면에 그냥 놓여 있는 삭제 버튼이 이것이고, `danger`(채움)는 **확인 다이얼로그의 확정
 > 버튼**처럼 그 순간의 주 행동일 때만 쓴다. 더보기 메뉴 안의 삭제는 버튼이 아니라
 > `Menu` 의 `destructive` 항목이다.
+
+> **`Button` 의 `inverse` · `inverseOutline` 은 소개 페이지(`/about`) 그린 밴드 전용이다**
+> (DESIGN.md §0-2). 밴드 배경(`--brand-700`) 위에서 대비를 맞춘 반전 버튼이라 다른 화면의
+> 흰/연한 배경 위에서는 쓰지 않는다.
 
 - **같은 의미에 다른 이름을 쓰지 않는다.** 어떤 컴포넌트는 `danger`, 다른 건 `error` 가 되면 사용처에서 매번 확인해야 한다.
 - `size` 값은 항상 `sm`/`md`/`lg` 에서 고른다. `xs`/`xl` 이 필요하면 정말 필요한지 먼저 검토한다.
