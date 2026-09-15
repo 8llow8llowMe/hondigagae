@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { SiteFooter } from '@/features/nav/site-footer'
+import { LEGAL_LINKS } from '@/lib/legal/links'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { readSource as repoSource } from '@/test/source'
@@ -33,7 +34,15 @@ describe('SiteFooter — 내용 (#399)', () => {
   */
   it('출처를 <ul> 로 둔다 — 한 문장으로 잇지 않는다', () => {
     expect(markup).toContain('<ul')
-    expect(markup.match(/<li>/g)?.length).toBe(messages.footer.sources.length)
+
+    /*
+      **푸터 전체가 아니라 출처 목록만 센다.** #610 에서 약관 링크가 들어오며 푸터에
+      `<li>` 가 두 종류가 됐다 — 전체를 세면 링크를 하나 더할 때마다 이 단언이 엉뚱하게
+      깨진다. 출처 제목과 그 뒤 첫 `</ul>` 사이를 잘라 그 안에서만 센다.
+    */
+    const sourcesList = markup.split(messages.footer.sourcesLabel)[1]?.split('</ul>')[0] ?? ''
+
+    expect(sourcesList.match(/<li>/g)?.length).toBe(messages.footer.sources.length)
   })
 
   it('공모전 표기와 한계 안내를 남긴다', () => {
@@ -42,15 +51,31 @@ describe('SiteFooter — 내용 (#399)', () => {
   })
 
   /*
-    이용약관·개인정보처리방침·문의는 아직 페이지가 없다. 자리만 잡아 두면 눌러 보고
-    아무 일도 일어나지 않는다 — 없는 링크를 만들지 않는다.
-
-    **`/about` 하나는 예외가 아니라 규칙 그대로다** — 그 화면이 실제로 있다. 개수를
-    세는 이유는 "페이지가 생겼으니" 를 구실로 빈 링크가 다시 늘지 않게 하기 위해서다.
+    이용약관·개인정보 처리방침은 #610 에서, `/about` 은 #611 에서 실제로 생긴 화면이다.
+    **규칙은 그대로다** — 없는 링크를 만들지 않는다. 바뀐 것은 전제뿐이라 단언을
+    "링크가 없다"(#399) → "/about 하나뿐"(#611) → **"이 셋 말고는 없다"** 로 옮긴다.
+    문의는 여전히 페이지가 없어 들어오면 여기서 걸린다.
   */
-  it('갈 곳 있는 링크만 둔다 — /about 하나뿐이다', () => {
-    expect(markup.match(/<a /g)?.length).toBe(1)
-    expect(markup.match(/href="([^"]*)"/g)).toEqual(['href="/about"'])
+  it('약관·처리방침 링크가 실재 라우트를 가리킨다', () => {
+    for (const link of LEGAL_LINKS) {
+      expect(markup).toContain(`href="${link.href}"`)
+      expect(markup).toContain(link.label)
+    }
+  })
+
+  /*
+    **개수가 아니라 목록을 센다.** 개수만 보면 죽은 링크 하나가 살아 있는 링크 하나와
+    맞바뀌어도 통과한다. 순서는 DOM 순서다 — 약관 묶음이 `/about` 보다 위에 있다.
+  */
+  it('갈 곳 있는 링크만 둔다 — 약관 둘과 /about 뿐이다', () => {
+    expect(markup.match(/href="([^"]*)"/g)).toEqual([
+      ...LEGAL_LINKS.map((link) => `href="${link.href}"`),
+      'href="/about"',
+    ])
+  })
+
+  it('약관 링크 묶음에 랜드마크 이름을 준다', () => {
+    expect(markup).toContain(`aria-label="${messages.footer.legalLabel}"`)
   })
 })
 
