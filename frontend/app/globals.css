@@ -827,17 +827,44 @@ body {
   outline-offset: 2px;
 }
 
-/* 묶음 — "이 지역 12곳". 누르면 그 구역으로 확대한다 */
+/*
+  묶음 — **지름 32 숫자 원형 마커**. 누르면 그 구역으로 확대한다.
+
+  라벨 알약("이 지역 12곳")이었을 때는 폭이 글자 수를 따라 늘어(개수가 두 자리만 돼도
+  90px 를 넘었다) 390px 밀집 구간에서 알약끼리 서로 덮었다 — 진단 E-1 [P0] · 시안 §3 ①.
+
+  **폭·높이를 고정값으로 박는다.** `padding` 으로 원을 만들면 자릿수마다 폭이 달라져
+  다시 알약이 된다. 글자는 `lib/map/cluster.ts` 의 `clusterMarkerText` 가 네 글자
+  안으로 접고, 그 네 글자가 12px(디자인 §10 의 최소 글자) 로 지름 32 안에 들어간다.
+  개수는 `aria-label` 이 "이 지역 12곳" 으로 마저 말한다.
+
+  `flex-shrink: 0` 은 `CustomOverlay` 가 감싸는 요소의 레이아웃을 우리가 정하지 않기
+  때문이다 — SDK 쪽 컨테이너가 flex 면 고정 폭이 눌린다.
+*/
 .map-cluster {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
-  padding: 8px 12px;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-full);
   background: var(--bg);
   color: var(--fg);
   font-size: 12px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  /*
+    네 글자(`999+`)가 안쪽 30px 에 **간신히** 들어가는 값이다 (390px 실측: 29.5px).
+    두 자리는 15.25 → 14.77 로 눈에 띄지 않게 줄 뿐이다.
+
+    더 조여도 소용없다 — `-0.08em` 까지 내려도 네 글자는 좌우 1.2px 밖에 못 벌린다.
+    네 글자는 1000곳 이상이 한 셀에 묶여야 나오고, 긴급 시설 전체가 135곳이다.
+  */
+  letter-spacing: -0.04em;
+  line-height: 1;
   white-space: nowrap;
   box-shadow: var(--shadow-md);
   cursor: pointer;

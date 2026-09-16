@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { cellSizeFor, clusterByGrid, type ClusterInput } from '@/lib/map/cluster'
+import {
+  cellSizeFor,
+  clusterByGrid,
+  type ClusterInput,
+  clusterMarkerLabel,
+  clusterMarkerText,
+} from '@/lib/map/cluster'
+import { messages } from '@/lib/messages'
 
 function input(id: string, lat: number, lng: number): ClusterInput<string> {
   return { item: id, coord: { lat, lng } }
@@ -64,5 +71,45 @@ describe('clusterByGrid', () => {
 
   it('빈 입력은 빈 결과다', () => {
     expect(clusterByGrid([], 0.01)).toEqual([])
+  })
+})
+
+describe('clusterMarkerText', () => {
+  it('숫자만 쓴다 — 원 안에 "이 지역 …곳" 이 들어가면 원이 알약으로 돌아간다', () => {
+    expect(clusterMarkerText(3)).toBe('3')
+    expect(clusterMarkerText(42)).toBe('42')
+  })
+
+  it('세 자리도 그대로 쓴다 — 135 는 실제로 나오는 값이다', () => {
+    expect(clusterMarkerText(135)).toBe('135')
+    expect(clusterMarkerText(999)).toBe('999')
+  })
+
+  it('네 자리부터 접는다 — 지름 32 를 넘기느니 접는 쪽이 낫다', () => {
+    expect(clusterMarkerText(1000)).toBe('999+')
+    expect(clusterMarkerText(12345)).toBe('999+')
+  })
+
+  it('어떤 개수든 네 글자를 넘지 않는다 — 원이 늘어나는 유일한 경로를 막는다', () => {
+    for (const count of [2, 9, 10, 99, 100, 135, 999, 1000, 99999]) {
+      expect(clusterMarkerText(count).length).toBeLessThanOrEqual(4)
+    }
+  })
+
+  it('망가진 입력에도 글자를 만든다 — 마커가 빈 원으로 뜨지 않는다', () => {
+    expect(clusterMarkerText(Number.NaN)).toBe('0')
+    expect(clusterMarkerText(-5)).toBe('0')
+    expect(clusterMarkerText(4.7)).toBe('4')
+  })
+})
+
+describe('clusterMarkerLabel', () => {
+  it('보조기기에는 접지 않은 실제 개수를 말한다 — 눈에 보이는 999+ 는 접힌 값이다', () => {
+    expect(clusterMarkerLabel(42)).toBe('이 지역 42곳')
+    expect(clusterMarkerLabel(1200)).toBe('이 지역 1200곳')
+  })
+
+  it('문구는 messages 정본에서 온다', () => {
+    expect(clusterMarkerLabel(7)).toBe(messages.map.clusterCount.replace('{n}', '7'))
   })
 })
