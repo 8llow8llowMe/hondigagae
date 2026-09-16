@@ -351,7 +351,17 @@ pnpm e2e:report     # 마지막 실행 리포트
 
 ### CI
 
-`.github/workflows/frontend-ci.yml` 의 **별도 `e2e` job** 이고 **`continue-on-error: true`** 다. `pnpm verify`(= lint · typecheck · test) 안에 넣지 않는다 — 브라우저 내려받기와 서버 기동이 붙어 시간이 늘고, 기준이 안정될 때까지 PR 을 막지 않는다. 필수 체크로 올리는 시점은 [#467](https://github.com/8llow8llowMe/hondigagae/issues/467) 본문에서 정한다.
+`.github/workflows/frontend-ci.yml` 의 **별도 `e2e` job** 이다. `pnpm verify`(= lint · typecheck · test) 안에 넣지 않는다 — 브라우저 내려받기와 서버 기동이 붙어 시간이 늘고, 직렬로 묶으면 lint 한 줄 때문에 레이아웃 결과를 못 보게 된다.
+
+**`continue-on-error` 는 걷었다** ([#587](https://github.com/8llow8llowMe/hondigagae/issues/587)). 연속 24회 무결로 선행 조건을 채웠다. **e2e 가 깨지면 워크플로가 빨간불이 된다.**
+
+**아직 required status check 는 아니다.** 저장소가 private + Free 라 브랜치 보호 API 가 403 이고, public 전환이냐 플랜 업그레이드냐를 고르는 결정이 남아 있다 ([#286](https://github.com/8llow8llowMe/hondigagae/issues/286)). 그때까지 **머지 버튼 자체는 막히지 않는다** — 빨간불을 보고도 머지하지 않는 것은 사람의 몫이다.
+
+> **워크플로 conclusion 만 보고 판단하지 않는다.** `continue-on-error` 시절에는 e2e 가 깨져도 `gh run list` 의 conclusion 이 전부 `success` 로 보였다. 이제는 그렇지 않지만, 개별 job 을 봐야 어느 spec 이 깨졌는지 알 수 있다.
+>
+> ```bash
+> gh run view <runId> --json jobs --jq '.jobs[] | "\(.name): \(.conclusion)"'
+> ```
 
 ### 이 방식이 대체한 것
 

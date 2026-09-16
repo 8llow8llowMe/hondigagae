@@ -44,15 +44,18 @@ jobs:
 
   # E2E — 레이아웃·보호 라우트 검증 (이슈 #467).
   #
-  # **`verify` 와 갈라 둔 별도 job 이고 `continue-on-error` 다.** 브라우저 내려받기와
-  # dev 서버 기동이 붙어 시간이 늘고, 기준이 안정될 때까지 PR 을 막지 않는다.
-  # 필수 체크로 올리는 시점은 #467 본문에서 정한다.
+  # **`continue-on-error` 를 걷었다 (#587).** 연속 24회 무결(기준 `5a879b46`, job
+  # conclusion 집계)로 선행 조건을 채웠다. 이제 e2e 가 깨지면 워크플로가 빨간불이 된다.
+  #
+  # **다만 아직 required status check 는 아니다** — 저장소가 private + Free 라
+  # 브랜치 보호 API 가 403 이고, public 전환이냐 플랜 업그레이드냐를 고르는 결정이
+  # 남아 있다 (#286). 그때까지 머지 버튼 자체는 막히지 않는다. **빨간불을 보고도
+  # 머지하지 않는 것은 사람의 몫이다.**
   #
   # `verify` 에 의존시키지 않는다 — 둘은 서로 다른 것을 보고, 직렬로 묶으면
   # lint 한 줄 때문에 레이아웃 결과를 못 보게 된다.
   e2e:
     runs-on: ubuntu-latest
-    continue-on-error: true
     defaults:
       run:
         working-directory: frontend
