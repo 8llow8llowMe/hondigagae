@@ -36,7 +36,8 @@ const SDK_ORIGIN = 'https://dapi.kakao.com/v2/maps/sdk.js'
 export function kakaoSdkUrl(appKey: string): string {
   // `libraries` 를 붙이지 않는다. 묶음 마커는 SDK 의 MarkerClusterer 가 아니라
   // `lib/map/cluster.ts` 가 계산한다 — 우리 핀이 라벨을 가진 CustomOverlay 라
-  // 그 라이브러리가 묶지 못하고, 묶음 문구("이 지역 12곳")도 아트보드가 정해 뒀다
+  // 그 라이브러리가 묶지 못하고, 묶음도 **보이는 글자(숫자)와 읽히는 이름
+  // ("이 지역 12곳")이 다른** 마커라 기본 렌더로는 그 둘을 가를 수 없다
   const params = new URLSearchParams({
     appkey: appKey,
     autoload: 'false',

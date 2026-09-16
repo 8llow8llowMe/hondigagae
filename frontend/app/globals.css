@@ -840,8 +840,14 @@ body {
 
   `flex-shrink: 0` 은 `CustomOverlay` 가 감싸는 요소의 레이아웃을 우리가 정하지 않기
   때문이다 — SDK 쪽 컨테이너가 flex 면 고정 폭이 눌린다.
+
+  **보이는 원은 32 지만 누르는 자리는 44 다** (`::before`). `done-checklist.md` 의
+  44px 규칙이 "지도 마커 포함" 이라고 못박고 있는데, 원을 44 로 키우면 겹침을 줄이려고
+  줄인 폭을 도로 내주게 된다. 그래서 **크기와 히트를 분리했다** — 레이아웃 박스는
+  32×32 그대로라 겹침 측정값이 흔들리지 않는다.
 */
 .map-cluster {
+  position: relative;
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
@@ -868,6 +874,22 @@ body {
   white-space: nowrap;
   box-shadow: var(--shadow-md);
   cursor: pointer;
+}
+
+/*
+  누르는 자리만 44×44 로 넓힌다. 레이아웃에 참여하지 않으므로 원의 크기도, 이웃 마커와의
+  겹침 측정값도 그대로다.
+
+  **`-7px` 이지 `-6px` 이 아니다.** `position: absolute` 의 기준은 테두리를 뺀
+  **패딩 박스(30px)** 라, `-6px` 은 42 가 된다 (실측). `30 + 7 × 2 = 44`.
+
+  **모서리를 둥글리지 않는다** — 손가락은 네모난 영역을 더 잘 맞춘다. 원으로 깎으면
+  44 를 선언하고 실제로는 그보다 작은 면적을 주게 된다.
+*/
+.map-cluster::before {
+  position: absolute;
+  inset: -7px;
+  content: '';
 }
 
 /* 지도 하단 시트의 최소 단계 — 탭바 위에 앉는다.

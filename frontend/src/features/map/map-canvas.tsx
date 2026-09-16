@@ -277,7 +277,18 @@ export function MapCanvas({
           원이 좌표 위쪽에 통째로 떠서, 이웃한 묶음끼리 가로로 어긋난 것처럼 읽힌다.
         */
         yAnchor: isCluster ? 0.5 : 1,
-        zIndex: !isCluster && first.id === selectedId ? 10 : 1,
+        /*
+          선택 핀(10) > **묶음(2)** > 일반 핀(1).
+
+          묶음이 일반 핀과 같은 층이면 DOM 삽입 순서가 승패를 가른다. 핀은 이름표라
+          가로로 길고(`.map-pin` `max-width: 180px`) 묶음은 32px 원이라, 핀이 뒤에
+          만들어지면 원이 통째로 덮여 **누를 수 없는 묶음**이 된다 — 알약이었을 때는
+          덮여도 남는 폭이 있었다.
+
+          묶음이 위에 오는 것이 의미상으로도 맞다. 묶음은 "그 아래 여러 곳" 을 대표하고,
+          그것을 눌러야 아래의 개별 핀에 닿을 수 있다.
+        */
+        zIndex: isCluster ? 2 : first.id === selectedId ? 10 : 1,
         clickable: true,
       })
       overlay.setMap(map)
