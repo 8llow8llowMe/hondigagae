@@ -138,13 +138,6 @@ export const emergencyMessages = {
   hoursDayWeekday: '{day}요일',
   /** 앞으로 이레 안에 여는 날이 없다 — 드물지만 말은 있어야 한다 */
   hoursClosedToday: '오늘은 쉬어요',
-  /**
-   * 요일 전문 펼치기의 라벨 (#654 E-4).
-   *
-   * **원문을 지우지 않는다.** 오늘 한 줄은 요약이고, 요약이 틀렸을 때 사용자가 확인할
-   * 곳이 있어야 한다 — #598 이 접기를 걷은 이유(*"잘린 뒤를 되찾을 길이 없다"*)의 반대편이다.
-   */
-  hoursDetail: '요일별 시간',
 
   /** `{name}` 치환 — icon-only 버튼의 접근성 이름 */
   callLabel: '{name} 전화하기',

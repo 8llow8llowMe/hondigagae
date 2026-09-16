@@ -142,8 +142,23 @@ describe('EmergencySection — openNow 3상태 (아트보드 주석)', () => {
 })
 
 describe('EmergencySection — 운영시간·전화', () => {
-  it('진료시간 원문을 그대로 렌더한다 — 파싱해 요약하지 않는다', () => {
-    expect(render()).toContain('월~금 09:00~19:00, 토 09:00~13:00')
+  /*
+    **읽지 못한 원문은 그대로 흘린다** (#654 E-4의 가드 폴백). 여기 `openNow: null` 은
+    서버가 판정하지 못한 곳이라 FE 도 요약하지 않는다 — 원문이 통째로 선다.
+    읽은 갈래(오늘 한 줄)는 `facility-row.test.ts` 가 잰다.
+  */
+  it('요약을 세우지 못하면 진료시간 원문을 그대로 렌더한다', () => {
+    const markup = render({
+      result: {
+        facilities: [facility({ open24: false, openNow: null })],
+        totalCount: 1,
+        radius: 10_000,
+        open24Only: false,
+        providerName: '출처',
+      },
+    })
+
+    expect(markup).toContain('월~금 09:00~19:00, 토 09:00~13:00')
   })
 
   it('operatingHoursKnown 이 false 면 등록돼 있지 않다고 말한다', () => {
