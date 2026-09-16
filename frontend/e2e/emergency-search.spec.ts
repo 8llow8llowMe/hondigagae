@@ -50,6 +50,25 @@ const BY_ADDR = '서귀포시'
 const NO_MATCH = '존재하지않는시설ZZZ'
 
 /**
+ * **표본이 필요한 검색 케이스는 기본 필터를 열고 잰다** (#654 E-3).
+ *
+ * `openNowOnly` 가 기본 ON 이 되면서 목 네 곳 중 **둘이 감춰진다** — `서귀포동물병원`
+ * (`openNow: null`, 진료시간 미등록)과 `가까운약국`(`openNow: false`). 주소 검색과
+ * 유형 필터 조합이 그 둘을 표본으로 쓰고 있어 실제로 깨졌다.
+ *
+ * **여기서 재는 것은 검색 사슬이지 기본 필터값이 아니다.** 기본값이 바뀔 때마다 무관한
+ * 테스트가 깨지면, 고치는 사람이 "검색이 깨졌나" 를 먼저 의심하느라 시간을 버린다.
+ * 그래서 표본이 필요한 케이스는 **필터를 명시적으로 열고** 센다.
+ *
+ * **기본값 자체는 아래 `기본 «지금 진료중» ON` describe 가 따로 잠근다** — 그쪽을 두지
+ * 않고 이 파라미터만 더하면, 기본값이 통째로 되돌아가도 e2e 는 초록이다.
+ *
+ * 표본을 세지 않는 케이스(입력 값 되돌리기 · 0건 안내 · 모바일 노출)에는 붙이지 않는다 —
+ * 필요 없는 파라미터가 붙으면 그 테스트가 무엇에 기대는지 읽는 사람이 헷갈린다.
+ */
+const OPEN_FILTER = 'openNowOnly=false'
+
+/**
  * **목록이 실제로 찬 뒤에 잰다.** `/emergency` 는 서버 프리페치가 없고 좌표를 먼저 물어
  * (`getCurrentPosition`) 로딩 구간이 길다 — 골격만 있는 동안 센 0 은 검색 결과가 아니다.
  */
@@ -60,7 +79,7 @@ async function settled(page: Page): Promise<number> {
 
 test.describe('병원·약국 검색 (#584)', () => {
   test('엔터로 제출하면 URL 에 keyword 가 실리고 목록이 좁혀진다', async ({ page }) => {
-    await page.goto('/emergency?view=list')
+    await page.goto(`/emergency?view=list&${OPEN_FILTER}`)
 
     const before = await settled(page)
     expect(before).toBeGreaterThan(1)
@@ -73,7 +92,7 @@ test.describe('병원·약국 검색 (#584)', () => {
   })
 
   test('검색 버튼으로도 같은 일이 일어난다', async ({ page }) => {
-    await page.goto('/emergency?view=list')
+    await page.goto(`/emergency?view=list&${OPEN_FILTER}`)
     await settled(page)
 
     await page.getByRole('searchbox', { name: SEARCH }).fill(BY_NAME)
@@ -85,7 +104,7 @@ test.describe('병원·약국 검색 (#584)', () => {
 
   /* 이름과 주소를 한 건초더미로 본다 — 주소만으로도 찾혀야 한다 */
   test('주소의 말로도 찾는다', async ({ page }) => {
-    await page.goto(`/emergency?view=list&keyword=${encodeURIComponent(BY_ADDR)}`)
+    await page.goto(`/emergency?view=list&${OPEN_FILTER}&keyword=${encodeURIComponent(BY_ADDR)}`)
 
     await expect(rows(page)).toHaveCount(1)
     await expect(rows(page).first()).toContainText('서귀포')
@@ -96,7 +115,7 @@ test.describe('병원·약국 검색 (#584)', () => {
     무시되는 화면을 본다.
   */
   test('검색어와 유형 필터가 함께 적용된다', async ({ page }) => {
-    await page.goto('/emergency?view=list&type=ANIMAL_PHARMACY')
+    await page.goto(`/emergency?view=list&${OPEN_FILTER}&type=ANIMAL_PHARMACY`)
 
     const pharmacies = await settled(page)
 
@@ -192,7 +211,7 @@ test.describe('지도 갈래 검색 (#584)', () => {
   })
 
   test('지도 갈래에서 검색하면 URL 에 실리고 목록이 좁혀진다', async ({ page }) => {
-    await page.goto('/emergency?view=map')
+    await page.goto(`/emergency?view=map&${OPEN_FILTER}`)
 
     /*
       **폴백이 자리를 잡은 뒤에 친다.** 교체 전 입력에 채우면 그 값이 새 입력에 덮이고
@@ -232,6 +251,85 @@ test.describe('지도 갈래 검색 (#584)', () => {
     await box.press('Enter')
 
     await expect(page).not.toHaveURL(/keyword=/)
+  })
+})
+
+/**
+ * 기본 «지금 진료중» ON — 이슈 #654 (UI/UX 감사 E-3).
+ *
+ * ### 왜 e2e 인가
+ *
+ * 기본값 자체는 단위 테스트가 잰다(`emergency-section.test.ts` · `emergency-filters.test.ts`).
+ * **여기서만 볼 수 있는 것은 «URL 파라미터 없이 들어왔을 때 실제로 무엇이 사라지는가»** 다 —
+ * 기본값 상수 · URL 파서 · `applyFilters` · 렌더가 한 줄로 이어져야 성립하고, 그 사슬은
+ * node 환경 렌더 테스트로 볼 수 없다.
+ *
+ * **이 describe 가 없으면 회귀를 못 막는다.** 위 검색 케이스들은 표본이 필요해
+ * `openNowOnly=false` 를 싣고 있어서, 기본값이 통째로 `false` 로 되돌아가도 전부 초록이다.
+ *
+ * ### 감춰지는 것이 둘이고 이유가 다르다
+ *
+ * | 시설 | `openNow` | 왜 감춰지나 |
+ * | --- | --- | --- |
+ * | `가까운약국` | `false` | 지금 닫혀 있다 |
+ * | `서귀포동물병원` | `null` | **판정할 수 없다** — 진료시간이 등록돼 있지 않다 |
+ *
+ * `null` 까지 감추는 것은 설계된 대가다 (세부명세 D11-4) — "지금 진료중" 은 **확인된 곳만**
+ * 보겠다는 뜻이라, 판정 못 한 곳을 넣으면 그 토글이 약속을 지키지 못한다. 둘을 함께 재는
+ * 것은 그 판단이 조용히 뒤집히지 않게 하려는 것이다.
+ */
+test.describe('기본 «지금 진료중» ON (#654 E-3)', () => {
+  /** 서버가 진료중이라고 한 곳 */
+  const OPEN = ['제주24시동물병원', '한라동물병원']
+  /** `openNow` 가 `false`(닫힘) · `null`(판정 불가)인 곳 */
+  const HIDDEN = ['가까운약국', '서귀포동물병원']
+
+  /* 파라미터를 하나도 싣지 않는다 — 그것이 이 describe 의 전제다 */
+  test('파라미터 없이 열면 진료중이 아닌 곳이 목록에 없다', async ({ page }) => {
+    await page.goto('/emergency?view=list')
+
+    const list = page.locator('#emergency-list')
+    await expect(rows(page).first()).toBeVisible()
+
+    for (const name of OPEN) await expect(list).toContainText(name)
+    for (const name of HIDDEN) await expect(list).not.toContainText(name)
+  })
+
+  /* 끄면 돌아온다 — 감추는 것이지 버리는 것이 아니다 */
+  test('openNowOnly=false 를 실으면 감춰졌던 곳이 나타난다', async ({ page }) => {
+    await page.goto(`/emergency?view=list&${OPEN_FILTER}`)
+
+    const list = page.locator('#emergency-list')
+    await expect(rows(page).first()).toBeVisible()
+
+    for (const name of [...OPEN, ...HIDDEN]) await expect(list).toContainText(name)
+  })
+
+  /*
+    **기본값은 URL 에서 생략한다** (architecture-guide.md §10 · 세부명세 D11-5).
+
+    `openNowOnly` 는 기본이 `true` 라 **꺼짐이 실리고 켜짐이 빠진다** — 방향이 다른 축들과
+    반대다. `if (filters.openNowOnly)` 로 두면 끈 것이 URL 에 남지 않아 새로고침·공유에서
+    도로 켜지고, 반대로 켜짐을 실으면 "빈 URL = 기본 상태" 규약이 깨진다.
+
+    **토글을 실제로 왕복시켜 잰다.** 파서만 보면 단위 테스트와 같은 것을 두 번 재는 것이고,
+    깨지는 자리는 칩/레일이 만든 URL 이다.
+  */
+  test('기본 상태에서는 URL 에 openNowOnly 키가 실리지 않는다', async ({ page }) => {
+    await page.goto('/emergency?view=list')
+    await expect(rows(page).first()).toBeVisible()
+    await expect(page).not.toHaveURL(/openNowOnly/)
+
+    /* 데스크톱 기본 뷰포트라 레일의 `role="checkbox"` 다 (모바일 칩은 `lg:hidden`) */
+    const toggle = page.getByRole('checkbox', { name: new RegExp(messages.emergency.openNow) })
+    await expect(toggle).toBeChecked()
+
+    await toggle.click()
+    await expect(page).toHaveURL(/openNowOnly=false/)
+
+    await toggle.click()
+    await expect(page).not.toHaveURL(/openNowOnly/)
+    await expect(toggle).toBeChecked()
   })
 })
 
