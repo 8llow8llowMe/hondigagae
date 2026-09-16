@@ -248,6 +248,7 @@ function FacilityRowBody({
  * | `operatingHoursKnown === false` 또는 원문 `null` | `진료시간이 등록돼 있지 않아요` |
  * | `summarizeTodayHours()` 가 `null` | **원문 그대로** (`line-clamp-2`) — 가드 폴백 |
  * | 요약이 섰다 | **오늘 한 줄만.** 원문도 손잡이도 없다 |
+ * | 요약이 `24시간` 갈래 | **아무것도 그리지 않는다** — `[24시간]` 배지가 이미 말한다 |
  *
  * ── 파싱을 다시 연 근거 (#537 · #598 이 두 번 기각한 자리다)
  *
@@ -303,6 +304,14 @@ function FacilityHours({ facility, now }: { facility: NearbyFacilityItem; now: D
     facility.restDate === null ? null : `${facility.restDate} ${messages.emergency.restPrefix}`
 
   const today = summarizeTodayHours(facility, now)
+  /*
+    **`null` 이 두 곳에서 오고 뜻이 다르다.**
+
+    `today === null` 은 *"읽지 못했다"* — 원문을 그대로 그린다.
+    `label === null` 은 *"읽었는데 새로 말할 것이 없다"* — `24시간` 갈래이고, 머리
+    배지가 이미 말하고 있어 **아무것도 그리지 않는다** (`todayHoursLabel` 머리주석).
+  */
+  const label = today === null ? null : todayHoursLabel(today)
 
   return (
     <>
@@ -318,7 +327,7 @@ function FacilityHours({ facility, now }: { facility: NearbyFacilityItem; now: D
           **원문을 함께 그리지 않는다.** 이 한 줄이 그 원문을 읽어 만든 것이고, 오늘에
           대해 원문이 더 말할 것은 없다 — 나란히 두면 같은 사실이 두 번 선다.
         */
-        <p className="text-body-2 text-fg font-semibold tabular-nums">{todayHoursLabel(today)}</p>
+        label !== null && <p className="text-body-2 text-fg font-semibold tabular-nums">{label}</p>
       )}
 
       {rest !== null && <p className="text-body-2 text-fg-muted break-keep tabular-nums">{rest}</p>}

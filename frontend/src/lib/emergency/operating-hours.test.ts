@@ -334,8 +334,19 @@ describe('summarizeTodayHours — 오늘 한 줄', () => {
 })
 
 describe('todayHoursLabel — 문구', () => {
-  it('네 갈래를 모두 문장으로 만든다', () => {
-    expect(todayHoursLabel({ kind: 'open24' })).toBe('24시간 운영')
+  /*
+    **`open24` 만 `null` 이다** (#654 · 디자인 리뷰). 머리의 `[24시간]` 배지가 이미 말하고
+    있어 이 줄이 더하는 정보가 0비트다 — 상태 절을 배지에 넘긴 것(D12-2) · 펼치기를
+    걷은 것(D12-4)과 같은 논리의 세 번째 적용이다.
+
+    **`summarizeTodayHours` 의 `null` 과 뜻이 다르다.** 그쪽은 "읽지 못했다"(→ 원문을
+    그린다)이고 이쪽은 "읽었는데 새로 말할 것이 없다"(→ 아무것도 그리지 않는다).
+  */
+  it('24시간 갈래는 그릴 줄이 없다 — null', () => {
+    expect(todayHoursLabel({ kind: 'open24' })).toBeNull()
+  })
+
+  it('나머지 세 갈래를 문장으로 만든다', () => {
     expect(todayHoursLabel({ kind: 'openUntil', until: '24:00' })).toBe('오늘 24:00까지')
     expect(todayHoursLabel({ kind: 'opensAt', dayOffset: 1, weekday: 4, at: '10:00' })).toBe(
       '내일 10:00부터',
