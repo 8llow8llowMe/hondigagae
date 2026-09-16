@@ -315,8 +315,13 @@ export function summarizeTodayHours(facility: FacilityHoursFields, now: Date): T
 
   /*
     **24시간은 마감 시각을 말하지 않는다.** `연중무휴 24시간` 같은 원문은 아래 문법으로
-    읽히지 않기도 하고, 읽힌다 해도 "24:00까지" 는 거짓이다. 서버가 24시간이라고 했고
-    지금 진료중이라고도 했을 때만 그렇게 쓴다.
+    읽히지 않기도 하고, 읽힌다 해도 "24:00까지" 는 거짓이다.
+
+    **여기 오는 `open24` 는 `openNow === true` 하나뿐이다.** 위에서 `null` 을 이미
+    걷어냈고, `open24 && openNow === false`(24시간이라면서 지금 닫힘)는 **자료가 스스로
+    모순된 상태**라 우리가 고를 근거가 없다 — `null` 로 떨어뜨려 원문을 그대로 보인다.
+    그래서 `TodayHours['open24']` 는 **"오늘 하루 종일 연다"** 는 뜻이 확정된 갈래이고,
+    화면은 그 사실을 `[24시간]` 배지로 이미 말하고 있다 (`todayHoursLabel`).
   */
   if (facility.open24) return facility.openNow ? { kind: 'open24' } : null
 
@@ -379,11 +384,27 @@ function readToday(
   return { kind: 'closedToday' }
 }
 
-/** 오늘 한 줄의 문구. 상태 배지가 이미 말한 것은 되풀이하지 않는다 */
-export function todayHoursLabel(today: TodayHours): string {
+/**
+ * 오늘 한 줄의 문구. **그릴 줄이 없으면 `null`** 이다.
+ *
+ * ── `open24` 는 줄을 갖지 않는다 — 머리 배지가 이미 말한다
+ *
+ * `제주24시동물병원` 행은 26px 짜리 머리 한 줄 안에서 같은 사실을 **세 번** 말하고
+ * 있었다: 이름(`제주**24시**동물병원`) · 배지(`[24시간]`) · 오늘 줄(`24시간 운영`).
+ *
+ * **이 저장소가 이미 두 번 쓴 논리다.** 상태 절(`진료중 ·`)을 배지에 넘긴 것(D12-2)과
+ * 펼치기를 걷은 것(D12-4 — *"접기 전과 후의 정보량이 같으면 그것은 접기가 아니다"*)이
+ * 같은 판단이고, 여기서만 적용되지 않았다. `open24` 갈래에서 이 줄이 더하는 정보는
+ * **0비트**다 — 다른 갈래처럼 시각을 말하지도 않는다(24시간에는 마감이 없다).
+ *
+ * **`null` 은 "읽지 못했다" 가 아니다.** 그쪽은 `summarizeTodayHours` 가 돌려주는
+ * `null` 이고 호출부가 원문을 그린다. 이 `null` 은 **읽었는데 새로 말할 것이 없다**는
+ * 뜻이라 호출부는 아무것도 그리지 않는다 (`FacilityHours`).
+ */
+export function todayHoursLabel(today: TodayHours): string | null {
   switch (today.kind) {
     case 'open24':
-      return messages.emergency.hoursOpen24
+      return null
     case 'openUntil':
       return messages.emergency.hoursOpenUntil.replace('{time}', today.until)
     case 'opensAt':

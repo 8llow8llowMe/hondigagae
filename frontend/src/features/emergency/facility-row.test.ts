@@ -284,13 +284,42 @@ describe('FacilityHours — 오늘 한 줄과 원문 갈래 (#654 E-4)', () => {
       expect(markup).toContain('월요일 10:00부터')
     })
 
-    it('24시간으로 확인된 곳은 마감 시각을 말하지 않는다', () => {
+    /*
+      **24시간 갈래는 오늘 줄을 아예 그리지 않는다** (#654 · 디자인 리뷰).
+
+      예전에는 `24시간 운영` 한 줄이 섰는데, 그러면 `제주24시동물병원` 행이 26px 짜리
+      머리 한 줄 안에서 같은 사실을 **세 번** 말한다: 이름(`제주24시동물병원`) ·
+      배지(`[24시간]`) · 오늘 줄(`24시간 운영`).
+
+      **이 저장소가 이미 두 번 쓴 논리다** — 상태 절을 배지에 넘긴 것(D12-2)과 펼치기를
+      걷은 것(D12-4, *"접기 전과 후의 정보량이 같으면 그것은 접기가 아니다"*)이 같은
+      판단이고, 여기서만 적용되지 않았다.
+    */
+    it('24시간으로 확인된 곳은 오늘 줄을 그리지 않는다 — 배지가 이미 말한다', () => {
       const markup = row({ open24: true, openNow: true, operatingHours: '연중무휴 24시간' })
 
-      expect(markup).toContain(messages.emergency.hoursOpen24)
+      // 머리 배지는 남는다
+      expect(markup).toContain(messages.emergency.open24)
+      // 오늘 줄도 원문도 없다
+      expect(markup).not.toContain('24시간 운영')
       expect(markup).not.toContain('까지')
       expect(markup).not.toContain('연중무휴 24시간')
     })
+
+    /*
+      **`open24 && openNow !== true` 는 요약이 서지 않는 갈래다.** `openNow === null` 은
+      서버가 판정하지 못한 것이고, `openNow === false`(24시간이라면서 지금 닫힘)는
+      자료가 스스로 모순된 상태라 우리가 고를 근거가 없다 — 둘 다 원문으로 떨어진다.
+      위 갈래에서 줄을 걷은 것이 여기까지 번지지 않았는지 잠근다.
+    */
+    it.each([false, null])(
+      '24시간인데 진료중이 아니면 원문이 그대로 선다 — openNow=%s',
+      (openNow) => {
+        const markup = row({ open24: true, openNow, operatingHours: '연중무휴 24시간' })
+
+        expect(markup).toContain('연중무휴 24시간')
+      },
+    )
   })
 
   describe('읽지 못한 갈래 — #598 의 렌더 그대로다', () => {
@@ -577,9 +606,16 @@ describe('FacilityRowHeader — 머리 한 줄 (#603)', () => {
   219px). 이제 머리가 전폭을 쓰고 그 **아래 층**만 `[시간·주소 | 버튼 둘]` 로 갈린다.
 */
 describe('FacilityRow — 2층 배치 (#603)', () => {
+  /** 2026-09-16(수) 12:00 — 오늘 줄이 시각에 따라 갈리므로 고정한다 (#654) */
+  const WED_NOON = new Date(2026, 8, 16, 12)
+
   function row(overrides: Parameters<typeof facility>[0] = {}) {
     return renderToStaticMarkup(
-      createElement(FacilityRow, { facility: facility(overrides), showDistance: true }),
+      createElement(FacilityRow, {
+        facility: facility(overrides),
+        showDistance: true,
+        now: WED_NOON,
+      }),
     )
   }
 
@@ -602,10 +638,20 @@ describe('FacilityRow — 2층 배치 (#603)', () => {
 
   /* 진료시간·주소는 버튼과 같은 층의 왼쪽이다 */
   it('시간과 주소가 버튼과 같은 층의 왼쪽이다', () => {
-    // 기본 fixture 는 24시간이라 진료시간 줄이 오늘 한 줄로 줄어 있다 (#654)
-    const layer = actionLayer(row())
+    /*
+      기본 fixture 는 24시간이라 **진료시간 줄이 아예 없다** (#654) — 이 층이 재는 것은
+      "글자 덩어리가 버튼 왼쪽에 있는가" 이므로 오늘 줄이 서는 갈래로 잰다.
+    */
+    const layer = actionLayer(
+      row({
+        open24: false,
+        openNow: true,
+        restDate: null,
+        operatingHours: '월~금 09:00~19:00',
+      }),
+    )
 
-    expect(layer).toContain(messages.emergency.hoursOpen24)
+    expect(layer).toContain('오늘 19:00까지')
     expect(layer).toContain('제주특별자치도 제주시 연북로 100')
   })
 
