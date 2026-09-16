@@ -227,6 +227,33 @@ export const METRIC_FILL_TONE: Record<MetricTone, string> = {
   unknown: '',
 }
 
+/**
+ * 등급 **tint 면** — `METRIC_FILL_TONE` 의 짝이다. **글자가 얹히는 면**에 쓴다
+ * ([#656](https://github.com/8llow8llowMe/hondigagae/issues/656) 의 골든타임 곡선 칸).
+ *
+ * `-500` 면 위에는 글자를 얹지 않는다(비텍스트 3:1 기준으로 고른 층이다). 12px 숫자가 그
+ * 위에 서는 자리는 텍스트 대비 규칙에 걸리므로 **`-100` 층으로 내린다** — 그 위의 `-700`
+ * 글자가 tint 배경에서 4.55~7.39:1 로 AA 를 넘는다 (DESIGN.md §2-3).
+ *
+ * **`unknown` 은 `--metric-*` 밖이다.** 등급을 모르는 자리에 등급 색을 주지 않는 것이
+ * §2-3 이고(`UNKNOWN` 에는 tint 가 없다), `METRIC_FILL_TONE` 처럼 비우지도 않는다 —
+ * 이 표를 쓰는 자리는 **면이 있고 없고가 그 자체로 뜻인 자리**라(추천 구간 안/밖) 비우면
+ * 모르는 칸이 구간 **밖**으로 읽힌다. 그래서 등급을 말하지 않는 중립 면(`--band`)을 준다.
+ * 모른다는 사실은 같은 자리의 글자(`METRIC_WORD_TONE.unknown` = `--fg-muted`)와 `sr-only` 가
+ * 낱말로 말한다 — 색이 유일한 채널이 아니다.
+ *
+ * `--band` 는 값이 `--metric-low-100` 과 같지만 **이 표를 쓰는 축에는 `low` 가 없다**
+ * (`walkSafetyTone` 은 `SAFE`/`CAUTION`/`DANGER` → `high`/`mid`/`critical`). 두 면이 한
+ * 화면에서 같이 나올 축이 생기면 그때 갈라야 한다.
+ */
+export const METRIC_TINT_TONE: Record<MetricTone, string> = {
+  critical: 'bg-metric-critical-100',
+  high: 'bg-metric-high-100',
+  mid: 'bg-metric-mid-100',
+  low: 'bg-metric-low-100',
+  unknown: 'bg-band',
+}
+
 /** 큰 숫자에 쓰는 등급 색. 22px 이상 + weight 900 에만 허용된다 (DESIGN.md §2-3). */
 const VALUE_TONE: Record<MetricTone, string> = {
   critical: 'text-metric-critical-500',
