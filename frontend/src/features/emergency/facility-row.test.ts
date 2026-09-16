@@ -8,13 +8,40 @@ import { messages } from '@/lib/messages'
 import { facility, pharmacy } from '@/test/fixtures/emergency'
 
 describe('FacilityRowContent', () => {
-  it('이름과 진료시간 원문을 그대로 쓴다 — 요약하지 않는다', () => {
+  it('이름과 진료시간 원문을 그대로 쓴다', () => {
     const markup = renderToStaticMarkup(
       createElement(FacilityRowContent, { facility: facility(), showDistance: true }),
     )
 
     expect(markup).toContain('제주24시동물병원')
     expect(markup).toContain('월~금 09:00~19:00, 토 09:00~13:00')
+  })
+
+  /*
+    **지도 패널 갈래는 펼치기를 쓰지 않는다** (#654). 이 묶음은 호출부가 선택 버튼으로
+    감싸는데(`emergency-map-panel.tsx`) `<summary>` 는 interactive content 라 `<button>`
+    안에 들어갈 수 없다 — `<a>` 를 넣지 못하는 것과 같은 제약이다. 대신 오늘 한 줄과
+    원문을 **둘 다** 그려 감추는 것이 없게 한다.
+  */
+  it('오늘 한 줄과 원문을 함께 그리고 details 를 쓰지 않는다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(FacilityRowContent, {
+        facility: facility({
+          open24: false,
+          openNow: true,
+          restDate: null,
+          operatingHours: '월~금 09:00~19:00, 토 09:00~13:00',
+        }),
+        showDistance: true,
+        // 2026-09-16 은 수요일
+        now: new Date(2026, 8, 16, 12),
+      }),
+    )
+
+    expect(markup).toContain('오늘 19:00까지')
+    expect(markup).toContain('월~금 09:00~19:00, 토 09:00~13:00')
+    expect(markup).not.toContain('<details')
+    expect(markup).not.toContain('<summary')
   })
 
   it('showDistance 가 false 면 거리를 감춘다 — 제주 중심 기준 거리를 내 위치로 읽는다', () => {
@@ -115,8 +142,8 @@ describe('FacilityRow', () => {
     )
 
     expect(markup).not.toContain('map.kakao.com/link/to/')
-    // 전화 링크 하나만 남고, 길찾기 아이콘 자리는 그대로다
-    expect(markup.match(/<svg/g)?.length).toBe(2)
+    // 전화·길찾기 아이콘 둘 + 오늘 한 줄의 펼치기 셰브런 하나 (#654)
+    expect(markup.match(/<svg/g)?.length).toBe(3)
   })
 })
 
@@ -158,66 +185,176 @@ describe('FacilityRow — 3층 표면 (#460)', () => {
 })
 
 /*
-  **#537 이 한 줄로 접었고, #598 이 두 줄로 늘리며 펼치기를 걷었다. 파싱은 여전히 안 한다.**
+  **#537 이 한 줄로 접었고, #598 이 두 줄로 늘리며 펼치기를 걷었다. #654 가 오늘 한 줄로
+  접으면서 펼치기를 되살렸다.**
 
-  두 이슈가 요구한 것은 각각 "오늘 기준 한 줄" 과 "두 줄로 날짜, 시간" 인데, 둘 다 원문을
-  요일·시각으로 쪼개는 안을 뜻할 수 있었고 **두 번 다 기각했다** (`types/emergency.ts` 의
-  `operatingHours` 주석이 정본). dev 실측이 근거다 — `월~화, 목~금,토 09:30~20:00,
-  일 09:30~14:00` 처럼 요일 목록·범위·불규칙한 공백이 섞이고 수요일이 아예 빠진 곳,
-  일요일 항목 자체가 없는 곳이 있다. 수요일에 첫 줄을 잘못 읽으면 **닫힌 병원으로
-  달려가게 된다.**
+  앞의 두 이슈가 기각한 것은 **검증 없는 파싱**이다 — dev 실측에 `월~화, 목~금,토
+  09:30~20:00, 일 09:30~14:00` 처럼 수요일이 아예 빠진 원문이 있고, 첫 줄을 오늘로 잘못
+  읽으면 **닫힌 병원으로 달려가게 된다.** #654 는 그 금지를 불변식으로 바꿔 세운다
+  (`lib/emergency/operating-hours.ts`): 상태는 서버 `openNow` 만 근거로 삼고, 조각 하나라도
+  못 읽으면 침묵하고, 원문에서 읽은 개폐가 서버와 어긋나면 읽기를 버린다.
 
-  그래서 두 번 다 고친 것은 **판정이 아니라 높이**다. "지금 여는가" 는 서버가 계산한
-  `openNow` 배지가 계속 답한다.
+  그래서 이 파일이 재는 것은 **두 갈래가 각각 무엇을 그리는가**다. 읽기 자체는
+  `lib/emergency/operating-hours.test.ts` 가 잰다.
 */
-describe('FacilityHours — 두 줄까지 흘린다 (#598)', () => {
+describe('FacilityHours — 오늘 한 줄과 원문 갈래 (#654 E-4)', () => {
+  /** dev 실측 — 수요일이 빠져 있고 앞 두 조각에 시각이 없다 */
   const LONG = '월~화, 목~금,토 09:30~20:00, 일 09:30~14:00'
+  /** 2026-09-16 은 수요일. 로컬 성분으로 만든다 (TZ 무관) */
+  const WED_NOON = new Date(2026, 8, 16, 12)
 
-  function row(overrides: Parameters<typeof facility>[0] = {}) {
+  function row(overrides: Parameters<typeof facility>[0] = {}, now = WED_NOON) {
     return renderToStaticMarkup(
-      createElement(FacilityRow, { facility: facility(overrides), showDistance: true }),
+      createElement(FacilityRow, { facility: facility(overrides), showDistance: true, now }),
     )
   }
 
-  it('원문을 그대로 쓴다 — 요일과 시각으로 쪼개지 않는다', () => {
-    const markup = row({ operatingHours: LONG, restDate: null })
+  describe('읽은 갈래 — 오늘 한 줄로 접고 원문은 펼치기 안에 둔다', () => {
+    const OPEN_WED = {
+      open24: false,
+      openNow: true,
+      restDate: null,
+      operatingHours: '월~금 09:00~19:00, 토 09:00~13:00',
+    } as const
 
-    expect(markup).toContain(LONG)
-    expect(markup).not.toContain('오늘')
+    it('오늘 마감 시각을 말한다 — 상태는 되풀이하지 않는다', () => {
+      const markup = row(OPEN_WED)
+
+      expect(markup).toContain('오늘 19:00까지')
+      // `진료중` 은 머리 배지의 몫이다 — 시간 줄이 같은 말을 두 번 하지 않는다
+      expect(markup.slice(markup.indexOf('<details'))).not.toContain(messages.emergency.statusOpen)
+    })
+
+    /*
+      **원문을 지우지 않는다.** 요약이 틀렸을 때 확인할 곳이 없으면 #598 이 걷어낸
+      "잘린 뒤를 되찾을 길이 없다" 가 그대로 돌아온다. 시설 상세 라우트도 없다 (#148).
+    */
+    it('원문을 펼치기 안에 그대로 남긴다', () => {
+      const markup = row(OPEN_WED)
+
+      expect(markup).toContain('<details')
+      expect(markup).toContain(messages.emergency.hoursDetail)
+      expect(markup).toContain('월~금 09:00~19:00, 토 09:00~13:00')
+    })
+
+    /*
+      **펼치기가 제 줄을 갖지 않는다.** #598 이 `전체 시간표` 버튼을 걷은 이유가
+      *"44px 터치 영역이 행마다 한 줄을 더 먹었다"* 였다 — 오늘 한 줄 자체가 `<summary>` 라
+      손잡이가 새 줄을 만들지 않으면서 44px 을 지킨다 (DESIGN.md §7).
+    */
+    it('펼치기 손잡이가 오늘 한 줄 자신이고 44px 이다', () => {
+      const markup = row(OPEN_WED)
+      const summary = markup.slice(markup.indexOf('<summary'), markup.indexOf('</summary>'))
+
+      expect(summary).toContain('min-h-11')
+      expect(summary).toContain('오늘 19:00까지')
+    })
+
+    it('닫혀 있으면 다시 여는 시각을 말한다', () => {
+      const markup = row(
+        { open24: false, openNow: false, restDate: null, operatingHours: '월~금 10:00~19:00' },
+        new Date(2026, 8, 16, 21),
+      )
+
+      expect(markup).toContain('내일 10:00부터')
+    })
+
+    /*
+      **오늘이 휴무면 다음 영업일을 찾는다** (#654). 토요일 밤 · 일요일 휴무면 다음은
+      이틀 뒤 월요일이다 — "내일" 이라고 쓰면 닫힌 병원 앞에 서게 된다.
+    */
+    it('내일이 휴무면 그 다음 영업일을 말한다', () => {
+      const markup = row(
+        {
+          open24: false,
+          openNow: false,
+          restDate: '일요일',
+          operatingHours: '월~금 10:00~19:00, 토 10:00~14:00',
+        },
+        // 2026-09-19 는 토요일
+        new Date(2026, 8, 19, 21),
+      )
+
+      expect(markup).toContain('월요일 10:00부터')
+    })
+
+    it('24시간으로 확인된 곳은 마감 시각을 말하지 않는다', () => {
+      const markup = row({ open24: true, openNow: true, operatingHours: '연중무휴 24시간' })
+
+      expect(markup).toContain(messages.emergency.hoursOpen24)
+      expect(markup).not.toContain('까지')
+    })
+  })
+
+  describe('읽지 못한 갈래 — #598 의 렌더 그대로다', () => {
+    /** 수요일이 빠진 원문인데 서버는 진료중이라고 한다 → 읽기를 버린다 */
+    const UNREADABLE = {
+      open24: false,
+      openNow: true,
+      restDate: null,
+      operatingHours: LONG,
+    } as const
+
+    it('원문을 그대로 쓰고 시각을 지어내지 않는다', () => {
+      const markup = row(UNREADABLE)
+
+      expect(markup).toContain(LONG)
+      expect(markup).not.toContain('까지')
+      expect(markup).not.toContain('부터')
+    })
+
+    /*
+      상한은 남는다 — 원문 길이가 시설마다 제각각이라(`법정공휴일` 항목까지 붙는 곳이
+      있다) 없으면 한 행이 목록의 리듬을 혼자 깬다.
+    */
+    it('두 줄에서 자른다 — line-clamp-1 이 아니다', () => {
+      const markup = row(UNREADABLE)
+
+      expect(markup).toContain('line-clamp-2')
+      expect(markup).not.toContain('line-clamp-1')
+    })
+
+    /* 접을 요약이 없으면 펼치기도 없다 — 눌러도 아무 일이 없는 손잡이를 두지 않는다 */
+    it('펼치기를 두지 않는다', () => {
+      const markup = row(UNREADABLE)
+
+      expect(markup).not.toContain('<details')
+      expect(markup).not.toContain(messages.emergency.hoursDetail)
+    })
+
+    /*
+      **서버가 판정하지 못한 곳도 이 갈래다.** `openNow === null` 은 "닫힘" 이 아니라
+      "판정할 수 없음" 이고 머리 배지도 점선 "확인 필요" 를 단다 — 시간 줄만 혼자
+      시각을 확언하면 같은 행이 두 가지를 말한다.
+    */
+    it('openNow 가 null 이면 요약하지 않는다', () => {
+      const markup = row({
+        open24: false,
+        openNow: null,
+        restDate: null,
+        operatingHours: '월~금 09:00~19:00',
+      })
+
+      expect(markup).toContain(messages.emergency.statusUnknown)
+      expect(markup).not.toContain('<details')
+      expect(markup).toContain('월~금 09:00~19:00')
+    })
   })
 
   /*
-    한 줄이 아니라 두 줄이다. 상한 자체는 남는다 — 원문 길이가 시설마다 제각각이라
-    (`법정공휴일` 항목까지 붙는 곳이 있다) 없으면 한 행이 목록의 리듬을 혼자 깬다.
-  */
-  it('두 줄에서 자른다 — line-clamp-1 이 아니다', () => {
-    const markup = row({ operatingHours: LONG, restDate: null })
+    **휴무는 자기 줄을 갖는다 — #537 의 "같은 줄에 이어 붙인다" 를 #598 이 뒤집은 것이다.**
 
-    expect(markup).toContain('line-clamp-2')
-    expect(markup).not.toContain('line-clamp-1')
-  })
-
-  /*
-    **#598 이 `전체 시간표` 를 걷었다.** 한 줄로 접은 나머지에 손이 닿게 하려던 버튼인데,
-    두 줄이면 대부분 끝까지 보이는 데다 44px 터치 영역이 행마다 한 줄을 더 먹었다.
-  */
-  it('펼치기 버튼을 두지 않는다 — 긴 시간표에도', () => {
-    const markup = row({ operatingHours: LONG, restDate: null })
-
-    expect(markup).not.toContain('전체 시간표')
-    expect(markup).not.toContain('aria-expanded')
-  })
-
-  /*
-    **휴무는 자기 줄을 갖는다 — #537 의 "같은 줄에 이어 붙인다" 를 뒤집은 것이다.**
-
-    그때 근거는 *"따로 줄을 만들면 접어서 번 한 줄을 도로 내놓는다"* 였는데, 잘린 뒤를
-    `전체 시간표` 로 펼쳐 볼 수 있다는 전제가 함께 있었다. 이 PR 이 그 버튼을 걷으면서
-    전제가 사라졌다 — 375 실측에서 운영시간 117줄 중 75줄(64%)이 잘렸고 **잘린 75줄이
-    전부 휴무를 달고 있었다.** 시설 상세도 없어(#148) 되찾을 길이 없다.
+    375 실측에서 운영시간 117줄 중 75줄(64%)이 잘렸고 **잘린 75줄이 전부 휴무를 달고
+    있었다.** 시설 상세도 없어(#148) 되찾을 길이 없다. 오늘 한 줄이 되어도 휴무는
+    **다음 방문의 사실**이라 오늘 줄에 섞이지 않는다.
   */
   it('휴무가 운영시간과 다른 줄에 있다 — 잘려서 사라지지 않는다', () => {
-    const markup = row({ operatingHours: LONG, restDate: '매주 수요일' })
+    const markup = row({
+      open24: false,
+      openNow: true,
+      operatingHours: LONG,
+      restDate: '매주 수요일',
+    })
     const hoursLine = markup.slice(markup.indexOf(LONG))
 
     // 운영시간 줄이 끝난 **뒤**에 온다
@@ -227,7 +364,12 @@ describe('FacilityHours — 두 줄까지 흘린다 (#598)', () => {
 
   /* 잘리는 상한은 운영시간 원문에만 건다 — 휴무 줄은 짧아 감을 이유가 없다 */
   it('휴무 줄에는 line-clamp 를 걸지 않는다', () => {
-    const markup = row({ operatingHours: LONG, restDate: '매주 수요일' })
+    const markup = row({
+      open24: false,
+      openNow: true,
+      operatingHours: LONG,
+      restDate: '매주 수요일',
+    })
     const restStart = markup.indexOf('매주 수요일')
     const restLine = markup.slice(markup.lastIndexOf('<p', restStart), restStart)
 
