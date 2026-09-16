@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  parseRestDays,
   parseWeeklyHours,
   summarizeTodayHours,
   todayHoursLabel,
@@ -75,6 +76,20 @@ describe('parseWeeklyHours — 원문을 요일별 구간으로', () => {
     expect(parseWeeklyHours('')).toBeNull()
   })
 
+  it('연중무휴는 주 7일로 편다', () => {
+    const weekly = parseWeeklyHours('연중무휴 09:00~18:00')
+
+    expect(Object.keys(weekly ?? {})).toHaveLength(7)
+  })
+
+  /*
+   **`격주 무휴` 는 주 7일이 아니다.** `includes('무휴')` 로 잡던 예전 코드는 이것을
+   **매일 09:00~18:00** 으로 펴, 쉬는 주에 "오늘 18:00까지" 라고 말했다.
+   */
+  it('격주 무휴를 주 7일로 펴지 않는다', () => {
+    expect(parseWeeklyHours('격주 무휴 09:00~18:00')).toBeNull()
+  })
+
   it('같은 요일에 서로 다른 시각이 붙으면 포기한다 — 어느 쪽이 맞는지 알 수 없다', () => {
     expect(parseWeeklyHours('월 09:00~12:00, 월 14:00~18:00')).toBeNull()
   })
@@ -83,6 +98,42 @@ describe('parseWeeklyHours — 원문을 요일별 구간으로', () => {
     const weekly = parseWeeklyHours('월~일 22:00~02:00')
 
     expect(weekly?.[1]).toMatchObject({ from: 22 * 60, to: 26 * 60, toLabel: '02:00' })
+  })
+})
+
+describe('parseRestDays — 매주 반복되는 휴무만 읽는다', () => {
+  it('요일 하나로 옮겨지는 문구를 읽는다', () => {
+    expect(parseRestDays(null)).toEqual(new Set())
+    expect(parseRestDays('연중무휴')).toEqual(new Set())
+    expect(parseRestDays('일요일')).toEqual(new Set([0]))
+    // `매주` 는 매주 반복이라 요일 하나로 정확히 옮겨진다
+    expect(parseRestDays('매주 수요일')).toEqual(new Set([3]))
+  })
+
+  /*
+    **서수·주기 수식어가 붙으면 통째로 포기한다.** 이 모듈의 단위는 요일이고
+    `weekly[3]` 은 "수요일" 이지 "몇 번째 수요일" 이 아니다 — 눌러 담으면 **여는 날이
+    휴무로 승격**된다. 예전에는 요일 글자만 훑어 넷 중 셋이 매주 휴무가 됐고,
+    마지막 하나만 요일 글자가 없어 **우연히** 통과했다.
+  */
+  it.each([
+    '둘째·넷째 수요일',
+    '매월 셋째 토요일',
+    '둘째, 넷째 일요일 휴진',
+    '둘째 넷째 주 정기 휴진',
+    '격주 목요일',
+    '마지막 주 화요일',
+  ])('달 단위·격주 주기는 null — %s', (restDate) => {
+    expect(parseRestDays(restDate)).toBeNull()
+  })
+
+  /*
+    **`무휴` 를 부분 문자열로 보지 않는다.** `includes('무휴')` 는 `격주 무휴` 를
+    "휴무 없음" 으로 읽어 같은 계열의 거짓말을 만든다 — 주기를 모르면 "모르겠다" 가
+    안전한 실패이지 "쉬는 날 없음" 이 아니다.
+  */
+  it('격주 무휴를 연중무휴로 읽지 않는다', () => {
+    expect(parseRestDays('격주 무휴')).toBeNull()
   })
 })
 
@@ -243,6 +294,32 @@ describe('summarizeTodayHours — 오늘 한 줄', () => {
           at(16, 21),
         ),
       ).toBeNull()
+    })
+
+    /*
+      **격주·월 단위 휴진을 매주 휴무로 승격시키지 않는다** (리뷰에서 잡힌 결함).
+
+      2026-09-02 는 **첫째** 수요일이라 `둘째·넷째 수요일` 휴무인 곳은 **여는 날**이다.
+      08:00 에 서버는 `openNow=false`(아직 안 열림)라고 하고, 요일 글자만 훑던 예전
+      코드는 오늘을 휴무로 보아 **`내일 09:00부터`** 를 내놓았다 — 한 시간 뒤 여는
+      병원을 하루 뒤로 민다.
+
+      **`openNow` 가드가 이것을 못 잡는다.** 08:00 시점엔 "휴무다" 와 "아니다" 두 읽기가
+      **둘 다 «지금 닫힘»** 이라 불리언이 일치한다 (머리주석 "남는 위험" 1).
+    */
+    it('여는 날 아침에 격주 휴진을 매주 휴무로 읽어 하루 미루지 않는다', () => {
+      const summary = summarizeTodayHours(
+        facility({
+          open24: false,
+          openNow: false,
+          restDate: '둘째·넷째 수요일',
+          operatingHours: '월~금 09:00~18:00',
+        }),
+        // 2026-09-02(수) 08:00 — 첫째 수요일이라 오늘 09:00 에 연다
+        at(2, 8),
+      )
+
+      expect(summary).toBeNull()
     })
 
     it('24시간인데 서버가 진료중이라고 하지 않으면 null', () => {
