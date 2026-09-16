@@ -28,8 +28,22 @@ import type { NearbyFacilityItem } from '@/types/emergency'
  * 그래서 이 요약은 새 사실을 만들지 않는다 — **서버가 이미 단정한 사실의 표현**이고,
  * 표현이 사실과 갈리는 순간 표현을 버린다.
  *
- * 남는 위험은 닫혔을 때의 **다음 영업 시각** 하나다. 그것은 서버가 검증해 주지 않으므로
- * 휴무 문구(`restDate`)를 읽지 못하면 아예 말하지 않는다 (`parseRestDays`).
+ * ── 남는 위험 — **가드가 검증하는 것은 개/폐 한 비트뿐이다**
+ *
+ * 불변식 3 은 `openNow` 와 우리 읽기의 **불리언**만 맞춰 본다. 그래서 **두 읽기가 같은
+ * 개/폐를 내놓으면서 시각만 다른 경우**는 통과한다. 알려진 잔여 위험 둘:
+ *
+ * 1. **닫혔을 때의 다음 영업 시각.** 서버가 검증해 주지 않는다. 휴무 문구(`restDate`)를
+ *    읽지 못하거나 **달 단위·격주 주기**면 아예 말하지 않는다 (`parseRestDays` ·
+ *    `IRREGULAR_CYCLE`).
+ * 2. **물려받은 시각의 마감.** 기각 근거 원문(`월~화, 목~금,토 09:30~20:00, …`)은
+ *    **월요일 마감을 명시한 적이 없고**, 뒤에서 앞으로 물려받는 규칙(`parseWeeklyHours`)이
+ *    토요일 값을 빌려온다. 월요일 15:00 · `openNow=true` 면 양쪽 다 "열림" 이라 가드를
+ *    통과해 `오늘 20:00까지` 가 선다. 통상 독법상 타당한 추론이지만 **검증된 사실은 아니다.**
+ *
+ * 2번은 **감수한다** — 물려받기를 막으면 그 서식이 통째로 요약을 못 받고, 폴백이 같은
+ * 원문이라 사용자가 잃는 것도 없다. 적어 두는 것은 "가드가 전부를 막는다" 고 읽히지
+ * 않게 하기 위해서다. 시각까지 검증하려면 서버가 `todayOpenTo` 를 줘야 한다 (BE 후속).
  */
 
 /** `Date.getDay()` 색인 — 0=일 … 6=토 */
@@ -96,6 +110,22 @@ function toMinutes(label: string): number | null {
 }
 
 /**
+ * **매주 반복이 아님을 뜻하는 수식어.** 하나라도 섞이면 읽기를 포기한다.
+ *
+ * 이 모듈이 다루는 단위는 **요일**이다 — `weekly[3]` 은 "수요일" 이지 "몇 번째 수요일" 이
+ * 아니다. `둘째·넷째 수요일` 같은 문구를 요일 하나로 눌러 담으면 **첫째 수요일(여는 날)이
+ * 휴무로 승격**되어, 한 시간 뒤 여는 병원을 "내일 09:00부터" 로 하루 미룬다. 달을 모르는
+ * 자료구조로 달 단위 주기를 표현할 수 없으므로 **표현하지 않는다**(`parseRestDays`).
+ *
+ * **`openNow` 가드(불변식 3)가 이것을 잡지 못한다.** 여는 날 아침 08:00 이면 "휴무다" 와
+ * "아니다" 두 읽기가 **둘 다 «지금 닫힘»** 이라 불리언이 일치한다 — 가드는 개/폐 한
+ * 비트만 검증하고 다음 영업 시각은 검증하지 않는다 (머리주석 "남는 위험").
+ *
+ * `매주` 는 여기 없다 — 그것은 매주 반복이라 요일 하나로 정확히 옮겨진다.
+ */
+const IRREGULAR_CYCLE = /격주|매월|마지막|홀수|짝수|주차|번째|[첫둘셋넷섯]째|\d+\s*주/
+
+/**
  * 요일 조각 — `월` · `월~금` · `연중무휴` · `법정공휴일`.
  *
  * `'skip'` 은 **요일로 옮길 수 없지만 원문을 포기할 이유도 아닌** 조각이다
@@ -105,7 +135,17 @@ function toMinutes(label: string): number | null {
 function parseDayChunk(text: string): WeekdayIndex[] | 'skip' | null {
   const compact = text.replace(/\s+/g, '')
   if (compact === '') return null
-  if (compact.includes('무휴') || compact === '매일') return [...WEEK_ORDER]
+  // 주기 수식어가 붙으면 요일로 펼 수 없다 — `격주 무휴` 를 주 7일로 펴지 않는다
+  if (IRREGULAR_CYCLE.test(compact)) return null
+  /*
+    **부분 문자열이 아니라 전체 일치다.** `includes('무휴')` 는 `격주무휴` 까지 잡아
+    **격주 휴무를 연중무휴로 뒤집었다.** 위 `IRREGULAR_CYCLE` 이 그 갈래를 먼저 막지만,
+    여기서도 전체 일치로 좁혀 둔다 — 수식어 목록이 모든 표기를 알 수는 없고, 그때
+    안전한 실패는 "모르겠다(`null`)" 이지 "주 7일 영업" 이 아니다.
+  */
+  if (compact === '연중무휴' || compact === '무휴' || compact === '매일' || compact === '365일') {
+    return [...WEEK_ORDER]
+  }
   if (compact === '법정공휴일' || compact === '공휴일' || compact === '국가공휴일') return 'skip'
 
   const day = '([월화수목금토일])(?:요일)?'
@@ -224,17 +264,35 @@ export function parseWeeklyHours(text: string): WeeklyHours | null {
 }
 
 /**
- * 휴무 문구 → 요일 집합. **읽지 못하면 `null`** 이다.
+ * 휴무 문구 → **매주 반복되는** 요일 집합. **읽지 못하면 `null`** 이다.
  *
  * 서버 `openNow` 가 오늘의 개폐를 검증해 주지만 **다음 영업일은 검증해 주지 않는다.**
  * `둘째·넷째 수요일` 처럼 요일 하나로 옮길 수 없는 문구에서 "내일 10:00" 을 만들면
  * 닫힌 병원 앞에 서게 되므로, 그런 문구는 요약 자체를 포기한다.
+ *
+ * ── **서수·주기 수식어를 먼저 본다** (리뷰에서 잡힌 결함)
+ *
+ * 요일 글자만 훑으면 `둘째·넷째 수요일` 이 `{수}` 가 되어 **매주 수요일 휴무**로 승격된다.
+ * 실측: `월~금 09:00~18:00` · `둘째·넷째 수요일` · **첫째 수요일 08:00**(여는 날) ·
+ * 서버 `openNow=false` → `내일 09:00부터`. **한 시간 뒤 여는 병원을 하루 뒤로 민다.**
+ * `매월 셋째 토요일` 은 이틀 뒤(`월요일 09:00부터`)까지 밀렸다.
+ *
+ * 위 머리주석이 이미 약속한 동작인데 코드만 어긋나 있었다. `IRREGULAR_CYCLE` 이 그 약속을
+ * 실행한다 — 달을 모르는 자료구조로 달 단위 주기를 표현할 수 없으므로 표현하지 않는다.
+ *
+ * `무휴` 도 **전체 일치**로 좁혔다. `includes('무휴')` 는 `격주 무휴` 를 "휴무 없음" 으로
+ * 읽어 같은 계열의 거짓말을 만든다.
  */
 export function parseRestDays(restDate: string | null): Set<WeekdayIndex> | null {
   if (restDate === null) return new Set()
 
   const text = restDate.trim()
-  if (text === '' || text.includes('무휴') || text === '없음') return new Set()
+  if (text === '') return new Set()
+  // 달 단위·격주 주기는 요일 집합으로 옮길 수 없다 — 요일 글자를 읽기 **전에** 막는다
+  if (IRREGULAR_CYCLE.test(text)) return null
+
+  const compact = text.replace(/\s+/g, '')
+  if (compact === '연중무휴' || compact === '무휴' || compact === '없음') return new Set()
 
   const days = new Set<WeekdayIndex>()
   for (const matched of text.matchAll(/([월화수목금토일])요일/g)) {
