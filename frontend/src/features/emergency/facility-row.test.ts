@@ -8,9 +8,17 @@ import { messages } from '@/lib/messages'
 import { facility, pharmacy } from '@/test/fixtures/emergency'
 
 describe('FacilityRowContent', () => {
-  it('이름과 진료시간 원문을 그대로 쓴다', () => {
+  /** 2026-09-16 은 수요일. 로컬 성분으로 만든다 (TZ 무관) */
+  const WED_NOON = new Date(2026, 8, 16, 12)
+
+  it('이름을 그대로 쓰고, 요약을 세우지 못하면 진료시간 원문을 그린다', () => {
     const markup = renderToStaticMarkup(
-      createElement(FacilityRowContent, { facility: facility(), showDistance: true }),
+      createElement(FacilityRowContent, {
+        // `openNow === null` — 서버가 판정하지 못했으니 FE 도 판정하지 않는다
+        facility: facility({ open24: false, openNow: null }),
+        showDistance: true,
+        now: WED_NOON,
+      }),
     )
 
     expect(markup).toContain('제주24시동물병원')
@@ -18,12 +26,11 @@ describe('FacilityRowContent', () => {
   })
 
   /*
-    **지도 패널 갈래는 펼치기를 쓰지 않는다** (#654). 이 묶음은 호출부가 선택 버튼으로
-    감싸는데(`emergency-map-panel.tsx`) `<summary>` 는 interactive content 라 `<button>`
-    안에 들어갈 수 없다 — `<a>` 를 넣지 못하는 것과 같은 제약이다. 대신 오늘 한 줄과
-    원문을 **둘 다** 그려 감추는 것이 없게 한다.
+    **목록 행과 같은 렌더다** (#654 리뷰). 한때 목록 행만 `<details>` 로 접고 이 갈래는
+    호출부가 선택 버튼으로 감싸(`emergency-map-panel.tsx`) `<summary>` 를 넣을 수 없어
+    갈라 뒀는데, 접기를 통째로 걷으면서 그 분기가 사라졌다.
   */
-  it('오늘 한 줄과 원문을 함께 그리고 details 를 쓰지 않는다', () => {
+  it('요약이 서면 오늘 한 줄만 그린다 — 원문도 펼치기도 없다', () => {
     const markup = renderToStaticMarkup(
       createElement(FacilityRowContent, {
         facility: facility({
@@ -33,13 +40,12 @@ describe('FacilityRowContent', () => {
           operatingHours: '월~금 09:00~19:00, 토 09:00~13:00',
         }),
         showDistance: true,
-        // 2026-09-16 은 수요일
-        now: new Date(2026, 8, 16, 12),
+        now: WED_NOON,
       }),
     )
 
     expect(markup).toContain('오늘 19:00까지')
-    expect(markup).toContain('월~금 09:00~19:00, 토 09:00~13:00')
+    expect(markup).not.toContain('월~금 09:00~19:00')
     expect(markup).not.toContain('<details')
     expect(markup).not.toContain('<summary')
   })
@@ -142,8 +148,8 @@ describe('FacilityRow', () => {
     )
 
     expect(markup).not.toContain('map.kakao.com/link/to/')
-    // 전화·길찾기 아이콘 둘 + 오늘 한 줄의 펼치기 셰브런 하나 (#654)
-    expect(markup.match(/<svg/g)?.length).toBe(3)
+    // 전화 링크 하나만 남고, 길찾기 아이콘 자리는 그대로다
+    expect(markup.match(/<svg/g)?.length).toBe(2)
   })
 })
 
@@ -186,7 +192,8 @@ describe('FacilityRow — 3층 표면 (#460)', () => {
 
 /*
   **#537 이 한 줄로 접었고, #598 이 두 줄로 늘리며 펼치기를 걷었다. #654 가 오늘 한 줄로
-  접으면서 펼치기를 되살렸다.**
+  줄이면서 펼치기는 되살리지 않았다** — 접을 것이 원문 한 필드뿐이라 펼쳐도 같은 데이터가
+  나온다 (`FacilityHours` 머리주석).
 
   앞의 두 이슈가 기각한 것은 **검증 없는 파싱**이다 — dev 실측에 `월~화, 목~금,토
   09:30~20:00, 일 09:30~14:00` 처럼 수요일이 아예 빠진 원문이 있고, 첫 줄을 오늘로 잘못
@@ -209,7 +216,7 @@ describe('FacilityHours — 오늘 한 줄과 원문 갈래 (#654 E-4)', () => {
     )
   }
 
-  describe('읽은 갈래 — 오늘 한 줄로 접고 원문은 펼치기 안에 둔다', () => {
+  describe('읽은 갈래 — 오늘 한 줄만 그린다', () => {
     const OPEN_WED = {
       open24: false,
       openNow: true,
@@ -221,33 +228,32 @@ describe('FacilityHours — 오늘 한 줄과 원문 갈래 (#654 E-4)', () => {
       const markup = row(OPEN_WED)
 
       expect(markup).toContain('오늘 19:00까지')
-      // `진료중` 은 머리 배지의 몫이다 — 시간 줄이 같은 말을 두 번 하지 않는다
-      expect(markup.slice(markup.indexOf('<details'))).not.toContain(messages.emergency.statusOpen)
+      // `진료중` 은 머리 배지의 몫이다 — 시간 줄이 같은 말을 두 번 하지 않는다.
+      // 머리(첫 `<p ` 앞)를 잘라낸 나머지에는 상태 문구가 없어야 한다
+      expect(markup.slice(markup.indexOf('<p '))).not.toContain(messages.emergency.statusOpen)
     })
 
     /*
-      **원문을 지우지 않는다.** 요약이 틀렸을 때 확인할 곳이 없으면 #598 이 걷어낸
-      "잘린 뒤를 되찾을 길이 없다" 가 그대로 돌아온다. 시설 상세 라우트도 없다 (#148).
+      **원문이 DOM 에 없다** (#654 리뷰에서 뒤집은 것). 한때 원문을 `<details>` 안에 뒀고
+      근거는 *"요약이 틀렸을 때 확인할 곳이 있어야 한다"* 였는데, **접을 것이 원문 한
+      필드뿐이라 성립하지 않는다**: 오늘 한 줄은 그 한 필드를 읽어 만든 것이고, 요약이
+      선 순간 원문에 오늘에 대해 더 말할 것이 없다. 못 읽었을 때는 애초에 아래 갈래로
+      떨어져 원문이 통째로 선다.
     */
-    it('원문을 펼치기 안에 그대로 남긴다', () => {
+    it('원문을 함께 그리지 않는다 — 같은 사실이 두 번 서지 않는다', () => {
       const markup = row(OPEN_WED)
 
-      expect(markup).toContain('<details')
-      expect(markup).toContain(messages.emergency.hoursDetail)
-      expect(markup).toContain('월~금 09:00~19:00, 토 09:00~13:00')
+      expect(markup).not.toContain('월~금 09:00~19:00')
+      expect(markup).not.toContain('09:00~13:00')
     })
 
-    /*
-      **펼치기가 제 줄을 갖지 않는다.** #598 이 `전체 시간표` 버튼을 걷은 이유가
-      *"44px 터치 영역이 행마다 한 줄을 더 먹었다"* 였다 — 오늘 한 줄 자체가 `<summary>` 라
-      손잡이가 새 줄을 만들지 않으면서 44px 을 지킨다 (DESIGN.md §7).
-    */
-    it('펼치기 손잡이가 오늘 한 줄 자신이고 44px 이다', () => {
+    /* 손잡이도 남기지 않는다 — 눌러도 아무 일이 없는 자리가 된다 */
+    it('펼치기 손잡이를 두지 않는다', () => {
       const markup = row(OPEN_WED)
-      const summary = markup.slice(markup.indexOf('<summary'), markup.indexOf('</summary>'))
 
-      expect(summary).toContain('min-h-11')
-      expect(summary).toContain('오늘 19:00까지')
+      expect(markup).not.toContain('<details')
+      expect(markup).not.toContain('<summary')
+      expect(markup).not.toContain('min-h-11')
     })
 
     it('닫혀 있으면 다시 여는 시각을 말한다', () => {
@@ -283,6 +289,7 @@ describe('FacilityHours — 오늘 한 줄과 원문 갈래 (#654 E-4)', () => {
 
       expect(markup).toContain(messages.emergency.hoursOpen24)
       expect(markup).not.toContain('까지')
+      expect(markup).not.toContain('연중무휴 24시간')
     })
   })
 
@@ -314,12 +321,12 @@ describe('FacilityHours — 오늘 한 줄과 원문 갈래 (#654 E-4)', () => {
       expect(markup).not.toContain('line-clamp-1')
     })
 
-    /* 접을 요약이 없으면 펼치기도 없다 — 눌러도 아무 일이 없는 손잡이를 두지 않는다 */
+    /* 이 갈래에도 손잡이는 없다 — 화면에 접기라는 장치 자체가 없다 */
     it('펼치기를 두지 않는다', () => {
       const markup = row(UNREADABLE)
 
       expect(markup).not.toContain('<details')
-      expect(markup).not.toContain(messages.emergency.hoursDetail)
+      expect(markup).not.toContain('<summary')
     })
 
     /*
@@ -595,9 +602,10 @@ describe('FacilityRow — 2층 배치 (#603)', () => {
 
   /* 진료시간·주소는 버튼과 같은 층의 왼쪽이다 */
   it('시간과 주소가 버튼과 같은 층의 왼쪽이다', () => {
+    // 기본 fixture 는 24시간이라 진료시간 줄이 오늘 한 줄로 줄어 있다 (#654)
     const layer = actionLayer(row())
 
-    expect(layer).toContain('월~금 09:00~19:00, 토 09:00~13:00')
+    expect(layer).toContain(messages.emergency.hoursOpen24)
     expect(layer).toContain('제주특별자치도 제주시 연북로 100')
   })
 

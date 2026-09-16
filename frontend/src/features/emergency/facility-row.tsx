@@ -1,7 +1,7 @@
 'use client'
 
 import { Badge } from '@/components/badge'
-import { ChevronDownIcon, DirectionsIcon, PhoneIcon } from '@/components/icons'
+import { DirectionsIcon, PhoneIcon } from '@/components/icons'
 import { summarizeTodayHours, todayHoursLabel } from '@/lib/emergency/operating-hours'
 import { formatDistance } from '@/lib/format/distance'
 import { directionsUrl } from '@/lib/geo/map-link'
@@ -22,6 +22,9 @@ import type { NearbyFacilityItem } from '@/types/emergency'
  * 않는다"** 이고, 그 불변식은 `lib/emergency/operating-hours.ts` 가 세 겹으로 세운다
  * (상태는 서버 `openNow` 만 · 못 읽으면 침묵 · 서버와 어긋나면 버린다). #537 · #598 이
  * 두 번 기각한 것은 **검증 없는** 파싱이었다 (`FacilityHours` 머리주석).
+ *
+ * **접기는 두지 않는다.** 접을 것이 원문 한 필드뿐이라 펼쳐도 같은 데이터가 나온다
+ * (`FacilityHours` 머리주석). 그래서 목록 행과 지도 패널의 진료시간 렌더가 **같다**.
  *
  * ── **2단이 아니라 2층이다** (#603)
  *
@@ -127,18 +130,7 @@ export function FacilityRowContent({
   return (
     <>
       <FacilityRowHeader facility={facility} />
-      {/*
-        **펼치기를 두지 않는다** (#654). 이 묶음은 호출부가 **선택 버튼으로 감싼다** —
-        `<summary>` 는 interactive content 라 `<button>` 안에 넣을 수 없다 (`<a>` 를 넣지
-        못하는 것과 같은 제약, 이 파일 머리주석). 대신 오늘 한 줄과 원문을 **둘 다** 그려
-        감추는 것이 없게 한다. 선택된 한 행만 보는 패널이라 줄 하나를 더 내줄 수 있다.
-      */}
-      <FacilityRowBody
-        facility={facility}
-        showDistance={showDistance}
-        now={now}
-        collapsible={false}
-      />
+      <FacilityRowBody facility={facility} showDistance={showDistance} now={now} />
     </>
   )
 }
@@ -216,13 +208,10 @@ function FacilityRowBody({
   facility,
   showDistance,
   now,
-  collapsible = true,
 }: {
   facility: NearbyFacilityItem
   showDistance: boolean
   now: Date
-  /** `false` 면 `<details>` 대신 오늘 한 줄과 원문을 나란히 그린다 (`FacilityRowContent`) */
-  collapsible?: boolean
 }) {
   /*
     **주소를 자르지 않는다** (#598). 예전에는 `shortAddress()` 로 `제주시` 까지만 보여
@@ -237,7 +226,7 @@ function FacilityRowBody({
 
   return (
     <>
-      <FacilityHours facility={facility} now={now} collapsible={collapsible} />
+      <FacilityHours facility={facility} now={now} />
 
       {meta.length > 0 && (
         <p className="text-body-2 text-fg-muted break-keep tabular-nums">{meta.join(' · ')}</p>
@@ -252,7 +241,13 @@ function FacilityRowBody({
 }
 
 /**
- * 운영시간 — **오늘 한 줄로 접고 요일 전문은 펼치기로 둔다** (#654 E-4).
+ * 운영시간 — **세 갈래뿐이다** (#654 E-4).
+ *
+ * | 조건 | 그리는 것 |
+ * | --- | --- |
+ * | `operatingHoursKnown === false` 또는 원문 `null` | `진료시간이 등록돼 있지 않아요` |
+ * | `summarizeTodayHours()` 가 `null` | **원문 그대로** (`line-clamp-2`) — 가드 폴백 |
+ * | 요약이 섰다 | **오늘 한 줄만.** 원문도 손잡이도 없다 |
  *
  * ── 파싱을 다시 연 근거 (#537 · #598 이 두 번 기각한 자리다)
  *
@@ -268,32 +263,27 @@ function FacilityRowBody({
  * 읽은 개폐가 서버와 어긋나면 읽기를 버린다. **위 두 문자열은 그 검증을 통과하지
  * 못하거나(수요일 없음 + 서버가 진료중) 통과한 채로만 요약된다.**
  *
- * 그래서 이 컴포넌트에는 **두 갈래가 남는다**: 요약이 선 갈래(오늘 한 줄 + 펼치기)와
- * `null` 로 떨어진 갈래(#598 그대로 — 원문 `line-clamp-2`). 기본값은 예전 동작이다.
+ * **둘째 갈래(원문 폴백)가 그 불변식의 몸통이다.** 요약을 못 세웠을 때 침묵하는 자리라
+ * 지운 적이 없고 지우지 않는다 — 셋째 갈래에서 원문을 안 그리는 것은 "감춘다" 가 아니라
+ * **이미 다 말했다**는 뜻이다.
  *
- * ── 접기를 되살렸다 — 이번에는 한 줄을 더 먹지 않는다
+ * ── **접기를 두지 않는다** (#654 리뷰에서 뒤집은 것)
  *
- * #598 이 `전체 시간표` 버튼을 걷은 이유는 *"그 버튼이 44px 터치 영역을 들고 행마다 한
- * 줄을 더 먹었다"* 였다. 지금은 **오늘 한 줄 자체가 `<summary>`** 라 펼치기 손잡이가 제
- * 줄을 갖지 않는다 — `min-h-11` 로 44px 터치 영역(DESIGN.md §7)을 지키면서, 예전에
- * 원문이 쓰던 두 줄(최대 44px)과 같은 높이에 든다.
+ * 한때 오늘 한 줄을 `<summary>` 로 만들고 원문을 `<details>` 안에 뒀다. 근거는 *"요약이
+ * 틀렸을 때 확인할 곳이 있어야 한다"* 였는데, **접을 것이 원문 한 필드뿐이라 성립하지
+ * 않는다**: 오늘 한 줄은 그 한 필드를 읽어 만든 것이고, 요약이 선 순간 원문에는 오늘에
+ * 대해 더 말할 것이 남아 있지 않다. 못 읽었을 때는 애초에 둘째 갈래로 떨어져 원문이
+ * 통째로 서 있다. 그래서 펼치기는 **같은 데이터를 두 번 보여주는 손잡이**였다 —
+ * 접기 전과 후의 정보량이 같으면 그것은 접기가 아니다.
  *
- * **`<details>` 라 JS 없이 열린다.** 이 화면은 급할 때 여는 화면이라 hydration 전에도
- * 손잡이가 살아 있어야 한다.
+ * 걷으면서 **목록 행과 지도 패널의 렌더가 같아졌다.** `<summary>` 를 선택 `<button>` 안에
+ * 넣을 수 없어 갈라 뒀던 분기(`collapsible`)가 통째로 사라졌다.
  *
  * **"지금 여는가" 는 이 줄이 아니라 머리의 `OpenStatus` 배지가 답한다** — 서버가 계산한
  * `openNow` 다. 이 줄은 **시각**만 맡는다 (감사 문구 `진료중 · 24:00까지` 의 앞 절을
  * 배지에 넘긴 것이다).
  */
-function FacilityHours({
-  facility,
-  now,
-  collapsible,
-}: {
-  facility: NearbyFacilityItem
-  now: Date
-  collapsible: boolean
-}) {
+function FacilityHours({ facility, now }: { facility: NearbyFacilityItem; now: Date }) {
   // 없으면 없다고 말한다 — "닫힘" 과 구분된다
   if (!facility.operatingHoursKnown || facility.operatingHours === null) {
     return <p className="text-body-2 text-fg-muted break-keep">{messages.emergency.hoursUnknown}</p>
@@ -316,52 +306,19 @@ function FacilityHours({
 
   return (
     <>
-      {today === null || !collapsible ? (
+      {today === null ? (
         /*
-          읽지 못했다 — **#598 의 렌더 그대로다.** 원문 길이는 시설마다 제각각이라
-          (`법정공휴일` 항목까지 붙는 곳이 있다) 상한이 없으면 한 행이 목록의 리듬을 혼자
-          깬다. 여기에 펼치기를 달지 않는 것은 접을 요약이 없기 때문이다 — `<summary>` 에
-          원문을 넣으면 접기 전과 후가 같아 눌러도 아무 일이 없는 손잡이가 된다.
+          읽지 못했거나 서버 `openNow` 와 어긋났다 — **#598 의 렌더 그대로다.** 원문 길이는
+          시설마다 제각각이라(`법정공휴일` 항목까지 붙는 곳이 있다) 상한이 없으면 한 행이
+          목록의 리듬을 혼자 깬다.
         */
-        <>
-          {/* 지도 패널 갈래 — 요약이 섰으면 **원문과 나란히** 그린다 (`FacilityRowContent`) */}
-          {today !== null && (
-            <p className="text-body-2 text-fg font-semibold tabular-nums">
-              {todayHoursLabel(today)}
-            </p>
-          )}
-          <p
-            className={cn(
-              'line-clamp-2 tabular-nums',
-              today === null ? 'text-body-2 text-fg' : 'text-body-2 text-fg-muted',
-            )}
-          >
-            {facility.operatingHours}
-          </p>
-        </>
+        <p className="text-body-2 text-fg line-clamp-2 tabular-nums">{facility.operatingHours}</p>
       ) : (
-        <details className="group">
-          <summary
-            className={cn(
-              // 44px — 급할 때 누르는 손잡이라 최소 터치 영역을 지킨다 (DESIGN.md §7)
-              'flex min-h-11 cursor-pointer list-none items-center gap-1.5 [&::-webkit-details-marker]:hidden',
-              'focus-visible:ring-brand-500 rounded-sm focus-visible:ring-2 focus-visible:outline-none',
-            )}
-          >
-            <span className="text-body-2 text-fg font-semibold tabular-nums">
-              {todayHoursLabel(today)}
-            </span>
-            <span className="text-caption text-fg-muted break-keep">
-              {messages.emergency.hoursDetail}
-            </span>
-            <ChevronDownIcon
-              size={16}
-              className="text-fg-subtle shrink-0 transition-transform group-open:rotate-180"
-            />
-          </summary>
-
-          <p className="text-body-2 text-fg-muted pb-1 tabular-nums">{facility.operatingHours}</p>
-        </details>
+        /*
+          **원문을 함께 그리지 않는다.** 이 한 줄이 그 원문을 읽어 만든 것이고, 오늘에
+          대해 원문이 더 말할 것은 없다 — 나란히 두면 같은 사실이 두 번 선다.
+        */
+        <p className="text-body-2 text-fg font-semibold tabular-nums">{todayHoursLabel(today)}</p>
       )}
 
       {rest !== null && <p className="text-body-2 text-fg-muted break-keep tabular-nums">{rest}</p>}
