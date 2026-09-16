@@ -1,6 +1,6 @@
 'use client'
 
-import { METRIC_WORD_TONE } from '@/components/metric'
+import { METRIC_TINT_TONE, METRIC_WORD_TONE } from '@/components/metric'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { Skeleton } from '@/components/skeleton'
 import { formatCelsius } from '@/lib/format/celsius'
@@ -412,11 +412,23 @@ function HourlyCurve({ data }: { data: WalkTimesResponse }) {
     `17:00 – 23:00` 을 추천해 놓고 아래 셀 중 어느 것이 그 구간인지 표시가 없어,
     시각을 하나씩 대조해야 문장과 그림이 이어졌다.
 
-    **면의 색은 구간의 등급(`goldenLevel`)이다.** 칸마다의 등급이 아니다 — 이 면이
-    말하는 것은 "서버가 추천한 구간" 하나이고, 칸마다 색이 갈리면 면이 아니라 줄무늬가 된다.
+    **면의 색은 이제 칸마다의 등급이다** ([#656](https://github.com/8llow8llowMe/hondigagae/issues/656)).
+    #312 는 구간 전체를 `goldenLevel` 한 톤으로 칠하면서 *"칸마다 색이 갈리면 면이 아니라
+    줄무늬가 된다"* 고 적었는데, 그 판단이 틀린 것으로 드러났다 — `11:00 – 23:00` 창 안에서
+    14 · 15시만 주의였던 날(2026-09-15 dev 실측) 면은 그 사실을 한 번도 말하지 못했다.
+    **한 톤이 감춘 것은 줄무늬가 아니라 구간 안의 차이였다.**
+
+    #637 이 같은 사실을 헤드라인 아래 문장으로 옮겼다. 면도 같은 말을 해야 문장과 그림이
+    어긋나지 않는다 — 문장이 `14–15시는 … 주의` 라고 적는데 면이 내내 한 색이면, 이 섹션이
+    두 번 겪은 실패(곡선과 문장이 서로 다른 말을 한다, #270)가 다시 난다.
+
+    **줄무늬 걱정은 칸 간격이 이미 막는다.** 칸 사이를 `gap` 이 아니라 셀 안쪽 padding 으로
+    주므로 같은 등급이 이어지는 칸은 tint 가 정확히 맞닿아 한 면이 된다 — 색이 갈리는 자리에만
+    경계가 생기고, 그 경계가 곧 "여기서 등급이 바뀐다" 는 정보다.
+
+    `goldenLevel` 은 이제 곡선에서 쓰지 않는다. 헤드라인 시각의 색으로만 남는다 (`GoldenWindow`).
   */
   const marks = markGoldenWindow(hourly, data.goldenStart, data.goldenEnd)
-  const windowTone = walkSafetyTone(data.goldenLevel?.code)
 
   // 판정 자리의 `NoForecast` 가 이미 말했다 — 같은 문장을 두 번 두지 않는다 (#204)
   if (hourly.length === 0) return null
@@ -465,12 +477,7 @@ function HourlyCurve({ data }: { data: WalkTimesResponse }) {
           )}
         >
           {hourly.map((hour, index) => (
-            <HourCell
-              key={hour.at}
-              hour={hour}
-              inGoldenWindow={marks[index]?.inWindow ?? false}
-              windowTone={windowTone}
-            />
+            <HourCell key={hour.at} hour={hour} inGoldenWindow={marks[index]?.inWindow ?? false} />
           ))}
         </ul>
 
@@ -512,25 +519,6 @@ function RowLabels() {
 }
 
 /**
- * 추천 구간 tint 면 — **`-100` 층**이다 (#312).
- *
- * 예전에는 이 색이 `-500` 층 세로 막대에 있었다. 그 막대는 `h-8 w-2` 고정이라 **길이가
- * 변하지 않으면서 막대의 형태를 하고 있었다** — 사람은 막대를 보면 길이를 읽으려 하는데
- * 읽을 것이 없었다. `DESIGN.md` §10 이 이미 금지한 것이기도 하다 (장식성 세로 바는
- * `ReasonList` 근거 부호의 3px 바에만).
- *
- * 그 색을 **문장이 가리키는 구간**으로 옮겼다. 면은 12px 숫자의 배경이 되므로 텍스트 대비
- * 규칙에 걸린다 — `-500` 이 아니라 tint 층인 `-100` 을 쓴다.
- */
-const WINDOW_TINT: Record<string, string> = {
-  critical: 'bg-metric-critical-100',
-  high: 'bg-metric-high-100',
-  mid: 'bg-metric-mid-100',
-  low: 'bg-metric-low-100',
-  unknown: 'bg-band',
-}
-
-/**
  * 한 시각 — **시각 · 기온 · 막대 · 노면온도** ([#269](https://github.com/8llow8llowMe/hondigagae/issues/269)).
  *
  * **예전에는 숫자가 하나뿐이었다.** 노면온도만 찍혀 있어 사용자가 그것을 기온으로 읽었다 —
@@ -548,18 +536,15 @@ const WINDOW_TINT: Record<string, string> = {
  * 자리와 색만으로 전달하지 않는다 (DESIGN.md §2-3) — 두 채널이 같은 사실을 말한다.
  *
  * **세로 막대를 걷었다** (#312). `h-8 w-2` 고정이라 길이가 변하지 않으면서 막대의 형태를
- * 하고 있었고, 그 색은 추천 구간 표시로 옮겼다 (`WINDOW_TINT`).
+ * 하고 있었고, 그 색은 추천 구간 표시로 옮겼다 — 이 칸의 tint 면이 그것이다.
  */
 function HourCell({
   hour,
   inGoldenWindow,
-  windowTone,
 }: {
   hour: HourlyWalkSafetyItem
   /** 이 칸이 서버가 추천한 구간에 드는가 (`markGoldenWindow`) */
   inGoldenWindow: boolean
-  /** 구간 전체의 등급 톤. 칸마다의 등급이 아니다 */
-  windowTone: string
 }) {
   const tone = walkSafetyTone(hour.walkSafetyLevel.code)
   const temperature = formatCelsius(hour.temperature)
@@ -570,8 +555,28 @@ function HourCell({
       className={cn(
         // 두 칸이 맞닿아 8px 이 된다 — 스케일 안 값이다 (DESIGN.md §4: 4 · 6 · 8 …)
         'flex shrink-0 flex-col items-center gap-1.5 px-1 py-1',
-        // 라운드를 주지 않는다 — 목록·섹션에 라운드가 없다 (DESIGN.md §0)
-        inGoldenWindow && WINDOW_TINT[windowTone],
+        /*
+          **추천 구간 tint 면 — `-100` 층이다** (#312). 예전에는 이 색이 `-500` 층 세로
+          막대에 있었다. 면은 12px 숫자의 배경이 되므로 텍스트 대비 규칙에 걸린다 —
+          `-500` 이 아니라 tint 층이다 (DESIGN.md §2-3).
+
+          **톤은 이 칸의 등급에서 온다** (#656). 예전에는 구간 전체가 `goldenLevel` 한
+          톤이라, 창 안에서 시각별로 안전도가 갈리는 것이 면에 나타나지 않았다.
+
+          **표를 여기서 만들지 않는다.** 등급 톤 → 클래스 표는 `components/metric.tsx` 가
+          갖는다 (이슈 #68 — 복제하면 등급 색 하나를 고칠 때 화면마다 갈린다). 등급을
+          모르는 칸이 중립 면(`--band`)을 받는 근거도 그 표의 주석에 있다.
+
+          **점선을 쓰지 않는다.** 장소 상세 혼잡도의 `점선은 아직 모르는 날이에요` 는
+          **그릴 막대가 없는** 칸의 표기인데, 여기 칸에는 기온·노면 숫자가 그대로 있고
+          모르는 것은 등급 하나뿐이다. 점선 테두리를 칸마다 두르면 **모르는 칸이 이어질 때
+          그 사이에 선이 생겨** 바로 아래 규칙과 정면으로 어긋나기도 한다.
+
+          라운드를 주지 않는다 — 목록·섹션에 라운드가 없다 (DESIGN.md §0). **여기서는 그것이
+          면을 잇는 조건이기도 하다**: 모서리를 깎으면 같은 등급이 이어지는 칸 사이에 흰 틈이
+          생겨 한 면으로 안 읽힌다.
+        */
+        inGoldenWindow && METRIC_TINT_TONE[tone],
       )}
       // 3rem(칸) + 8px(안쪽 여백). 예전 피치(48 + gap 6)보다 칸당 2px 넓다
       style={{ minWidth: '3.5rem' }}

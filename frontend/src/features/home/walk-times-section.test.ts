@@ -743,6 +743,161 @@ describe('WalkTimesSection — 창 안 등급 문장 (#637)', () => {
 })
 
 /*
+  #656. **추천 구간 면이 단색 한 톤이었다.** `goldenLevel` 하나로 구간 전체를 칠했으므로
+  창 안에서 시각별로 안전도가 갈리는 것이 면에는 한 번도 나타나지 않았다 — #637 이 같은
+  사실을 문장으로 말하게 만든 뒤에도 그림은 옛말을 했다.
+
+  면은 이제 **칸마다의 `walkSafetyLevel`** 로 칠한다.
+*/
+describe('WalkTimesSection — 곡선 면의 시각별 등급 (#656)', () => {
+  const DAY = '2026-08-29T'
+
+  function walkHour(hh: number, code: string, name: string, pavement: number) {
+    return {
+      at: `${DAY}${String(hh).padStart(2, '0')}:00:00`,
+      walkSafetyLevel: { code, name, description: null, scoreDescription: null },
+      temperature: 30,
+      estimatedPavementCelsius: pavement,
+      precipitationProbability: 0,
+    }
+  }
+
+  /** 실측의 모양 — 창은 11–23 이고 그 안에서 14 · 15 만 주의다 (#637 과 같은 날) */
+  const MIXED_DAY: WalkTimesResponse = {
+    ...GOOD_DAY,
+    hourly: [11, 12, 13, 14, 15, 16, 17].map((hh) =>
+      hh === 14 || hh === 15
+        ? walkHour(hh, 'CAUTION', '주의', 46)
+        : walkHour(hh, 'SAFE', '안전', 32),
+    ),
+    goldenStart: `${DAY}11:00:00`,
+    goldenEnd: `${DAY}17:00:00`,
+    goldenLevel: { code: 'CAUTION', name: '주의', description: null, scoreDescription: null },
+  }
+
+  /** 셀마다 어떤 면을 받았는지. 면이 없으면 `null` */
+  const FILLS = [
+    'bg-metric-critical-100',
+    'bg-metric-high-100',
+    'bg-metric-mid-100',
+    'bg-metric-low-100',
+    'bg-band',
+  ]
+
+  function fillsOf(markup: string): (string | null)[] {
+    return markup
+      .split('<li ')
+      .slice(1)
+      .map((cell) => cell.slice(0, cell.indexOf('>')))
+      .map((head) => FILLS.find((fill) => head.includes(fill)) ?? null)
+  }
+
+  /*
+    **이 단언이 이슈 그 자체다.** 예전 화면은 창 전체를 `goldenLevel`(주의) 한 톤으로 칠해
+    아래 7칸이 전부 `bg-metric-mid-100` 이었다 — 11–13시가 안전이라는 사실이 면에 없었다.
+  */
+  it('창 안을 시각별 등급으로 칠한다', () => {
+    expect(fillsOf(render(MIXED_DAY))).toEqual([
+      'bg-metric-high-100', // 11시 안전
+      'bg-metric-high-100', // 12시
+      'bg-metric-high-100', // 13시
+      'bg-metric-mid-100', //  14시 주의
+      'bg-metric-mid-100', //  15시 주의
+      'bg-metric-high-100', // 16시 안전
+      'bg-metric-high-100', // 17시
+    ])
+  })
+
+  /*
+    **`goldenLevel` 은 더 이상 면을 정하지 않는다.** 창 안이 전부 안전인데 서버가 창 등급을
+    `CAUTION` 으로 주는 날(반올림·다른 기준)에 면이 통째로 황갈색이 되면, 곡선과 문장이
+    서로 다른 말을 하는 #270 의 실패가 다시 난다.
+  */
+  it('창 등급이 아니라 칸의 등급으로 칠한다', () => {
+    const allSafeWindow: WalkTimesResponse = {
+      ...MIXED_DAY,
+      hourly: [11, 12, 13].map((hh) => walkHour(hh, 'SAFE', '안전', 32)),
+      goldenEnd: `${DAY}13:00:00`,
+    }
+
+    expect(fillsOf(render(allSafeWindow))).toEqual([
+      'bg-metric-high-100',
+      'bg-metric-high-100',
+      'bg-metric-high-100',
+    ])
+  })
+
+  /*
+    **단일 등급 회귀.** 창 안이 한 등급뿐인 날은 예전과 똑같이 한 면이어야 한다 — 칸마다
+    칠한다고 해서 같은 등급이 이어지는 자리에 색이 갈리면 안 된다.
+  */
+  it('창 안 등급이 하나뿐이면 예전처럼 한 톤으로 이어진다', () => {
+    // GOOD_DAY 는 18:00 – 21:00 추천이고 그 네 칸이 전부 안전이다
+    expect(fillsOf(render(GOOD_DAY))).toEqual([
+      null, //                14시
+      null, //                15시
+      null, //                16시
+      null, //                17시
+      'bg-metric-high-100', // 18시
+      'bg-metric-high-100', // 19시
+      'bg-metric-high-100', // 20시
+      'bg-metric-high-100', // 21시
+    ])
+  })
+
+  /*
+    **면을 잇는 것은 라운드 없음과 `gap` 없음이다.** 칸 사이를 `gap` 으로 벌리거나 셀에
+    모서리를 깎으면 같은 등급이 이어지는 칸 사이에 흰 틈이 생겨 한 면으로 안 읽힌다 (#312).
+    칸마다 칠하는 지금은 그것이 더 중요하다 — 틈이 있으면 "등급이 갈리는 자리" 와 구별되지 않는다.
+  */
+  it('같은 등급이 이어지는 칸 사이에 경계를 만들지 않는다', () => {
+    const markup = render(MIXED_DAY)
+    const cells = markup
+      .split('<li ')
+      .slice(1)
+      .map((cell) => cell.slice(0, cell.indexOf('>')))
+
+    for (const head of cells) {
+      expect(head).not.toContain('rounded')
+      expect(head).not.toContain('border')
+    }
+
+    // 셀을 담는 `<ul>` 에 `gap` 이 없다 — 간격은 셀 안쪽 padding 이 준다
+    const list = /<ul [^>]*class="([^"]*)"/.exec(markup)?.[1] ?? ''
+    expect(list).not.toContain('gap-')
+  })
+
+  /*
+    **창 밖은 등급이 무엇이든 면이 없다.** 면이 말하는 첫째 사실은 "서버가 추천한 구간" 이고,
+    칸마다 칠하게 됐다고 해서 곡선 전체가 등급 히트맵이 되면 추천 구간이 사라진다.
+  */
+  it('창 밖 칸은 위험 등급이어도 면을 받지 않는다', () => {
+    // GOOD_DAY 의 14 · 15 · 16시는 노면 50℃ 이상이라 DANGER 인데 창(18–21) 밖이다
+    expect(render(GOOD_DAY)).not.toContain('bg-metric-critical-100')
+  })
+
+  /*
+    **등급을 모르는 칸.** 등급 색을 주지 않는다 (DESIGN.md §2-3 — `UNKNOWN` 에는 tint 가 없다).
+    그렇다고 비우면 그 칸이 창 밖으로 읽혀 문장이 적은 시각과 면이 어긋나므로, 등급을 말하지
+    않는 중립 면으로 자리만 지킨다. 모른다는 사실은 노면 숫자의 `--fg-muted` 와 `sr-only` 가
+    낱말로 말한다 — 색이 유일한 채널이 아니다.
+  */
+  it('등급을 모르는 칸은 등급 색 대신 중립 면을 받는다', () => {
+    const unknownHour: WalkTimesResponse = {
+      ...MIXED_DAY,
+      hourly: [11, 12, 13].map((hh) =>
+        hh === 12 ? walkHour(hh, 'UNKNOWN', '정보 없음', 32) : walkHour(hh, 'SAFE', '안전', 32),
+      ),
+      goldenEnd: `${DAY}13:00:00`,
+    }
+    const markup = render(unknownHour)
+
+    expect(fillsOf(markup)).toEqual(['bg-metric-high-100', 'bg-band', 'bg-metric-high-100'])
+    expect(markup).toContain('<span class="sr-only">정보 없음</span>')
+  })
+})
+
+/*
   **조건이 없는 조회**(게스트·반려견 미등록)는 기본 갈래다. #262 가 조합 규칙을 넣으면서
   `heatSensitive` 파라미터가 아예 없는 경우가 `false/false` 로 접혀 게스트 홈이 늘
   "예보 없음" 을 보게 됐다 — 브라우저 실측에서 잡았다. 조합은 **시나리오를 고르는 장치**이지
