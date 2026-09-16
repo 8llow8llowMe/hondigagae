@@ -1,7 +1,8 @@
 'use client'
 
 import { Badge } from '@/components/badge'
-import { DirectionsIcon, PhoneIcon } from '@/components/icons'
+import { ChevronDownIcon, DirectionsIcon, PhoneIcon } from '@/components/icons'
+import { summarizeTodayHours, todayHoursLabel } from '@/lib/emergency/operating-hours'
 import { formatDistance } from '@/lib/format/distance'
 import { directionsUrl } from '@/lib/geo/map-link'
 import { messages } from '@/lib/messages'
@@ -16,10 +17,11 @@ import type { NearbyFacilityItem } from '@/types/emergency'
  * "3.12km 병원" 보다 위로 올라간다. 거리가 우선이고 유형은 태그로 구분한다
  * (아트보드 주석).
  *
- * **진료시간은 서버 문자열 그대로 렌더한다.** `"월~금 09:00~19:00, 토 09:00~13:00"` 을
- * 파싱해 "오늘 19:00까지" 로 요약하지 않는다 — 서식이 조금만 달라도 틀린 시간을 말하게 된다.
- * **#537 이 "오늘 기준 한 줄" 을, #598 이 "두 줄로 날짜·시간" 을 요구했을 때도 이 규칙은
- * 그대로다** — 바꾼 것은 판정이 아니라 **몇 줄까지 흘리는가**뿐이다 (`FacilityHours`).
+ * **진료시간은 읽을 수 있을 때만 오늘 한 줄로 줄인다** (#654 E-4). 읽지 못하면 서버
+ * 문자열을 그대로 그린다 — 지키는 것은 "파싱하지 않는다" 가 아니라 **"틀린 시간을 말하지
+ * 않는다"** 이고, 그 불변식은 `lib/emergency/operating-hours.ts` 가 세 겹으로 세운다
+ * (상태는 서버 `openNow` 만 · 못 읽으면 침묵 · 서버와 어긋나면 버린다). #537 · #598 이
+ * 두 번 기각한 것은 **검증 없는** 파싱이었다 (`FacilityHours` 머리주석).
  *
  * ── **2단이 아니라 2층이다** (#603)
  *
@@ -55,10 +57,19 @@ export function FacilityRow({
   /** 위치 폴백이면 거리를 숨긴다 — 제주 중심에서 480m 인 것을 "480m" 라고 쓸 수 없다 */
   showDistance,
   inset = 'card',
+  now = new Date(),
 }: {
   facility: NearbyFacilityItem
   showDistance: boolean
   inset?: Inset
+  /**
+   * 오늘 한 줄의 기준 시각 — **테스트에서 시각을 고정하기 위한 이음새다** (#654).
+   *
+   * 기본값이 `new Date()` 라 소비처는 아무것도 넘기지 않는다. 화면이 열린 채 자정을
+   * 넘겨도 이 줄은 갱신되지 않는데, 그때는 서버 `openNow` 도 같이 낡아 있고 요약은
+   * 그 값과 어긋나는 순간 원문으로 떨어진다 (`summarizeTodayHours`).
+   */
+  now?: Date
 }) {
   return (
     <li className={INSET_CLASS[inset]}>
@@ -76,7 +87,7 @@ export function FacilityRow({
         */}
         <div className="flex items-center gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-            <FacilityRowBody facility={facility} showDistance={showDistance} />
+            <FacilityRowBody facility={facility} showDistance={showDistance} now={now} />
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
@@ -106,14 +117,28 @@ export function FacilityRow({
 export function FacilityRowContent({
   facility,
   showDistance,
+  now = new Date(),
 }: {
   facility: NearbyFacilityItem
   showDistance: boolean
+  /** 오늘 한 줄의 기준 시각 — `FacilityRow` 와 같은 이음새다 (#654) */
+  now?: Date
 }) {
   return (
     <>
       <FacilityRowHeader facility={facility} />
-      <FacilityRowBody facility={facility} showDistance={showDistance} />
+      {/*
+        **펼치기를 두지 않는다** (#654). 이 묶음은 호출부가 **선택 버튼으로 감싼다** —
+        `<summary>` 는 interactive content 라 `<button>` 안에 넣을 수 없다 (`<a>` 를 넣지
+        못하는 것과 같은 제약, 이 파일 머리주석). 대신 오늘 한 줄과 원문을 **둘 다** 그려
+        감추는 것이 없게 한다. 선택된 한 행만 보는 패널이라 줄 하나를 더 내줄 수 있다.
+      */}
+      <FacilityRowBody
+        facility={facility}
+        showDistance={showDistance}
+        now={now}
+        collapsible={false}
+      />
     </>
   )
 }
@@ -190,9 +215,14 @@ function FacilityRowHeader({ facility }: { facility: NearbyFacilityItem }) {
 function FacilityRowBody({
   facility,
   showDistance,
+  now,
+  collapsible = true,
 }: {
   facility: NearbyFacilityItem
   showDistance: boolean
+  now: Date
+  /** `false` 면 `<details>` 대신 오늘 한 줄과 원문을 나란히 그린다 (`FacilityRowContent`) */
+  collapsible?: boolean
 }) {
   /*
     **주소를 자르지 않는다** (#598). 예전에는 `shortAddress()` 로 `제주시` 까지만 보여
@@ -207,7 +237,7 @@ function FacilityRowBody({
 
   return (
     <>
-      <FacilityHours facility={facility} />
+      <FacilityHours facility={facility} now={now} collapsible={collapsible} />
 
       {meta.length > 0 && (
         <p className="text-body-2 text-fg-muted break-keep tabular-nums">{meta.join(' · ')}</p>
@@ -222,63 +252,118 @@ function FacilityRowBody({
 }
 
 /**
- * 운영시간 — **원문을 그대로 두고 두 줄까지 흘린다** (#537 → #598).
+ * 운영시간 — **오늘 한 줄로 접고 요일 전문은 펼치기로 둔다** (#654 E-4).
  *
- * ── 파싱하지 않는 이유 (#598 이 "두 줄로 날짜·시간" 을 요구했을 때 다시 확인한 것)
+ * ── 파싱을 다시 연 근거 (#537 · #598 이 두 번 기각한 자리다)
  *
- * 요일과 시각을 갈라 각각 한 줄에 두는 안은 원문을 파싱해야 하는데, 그것은 **두 번
- * 기각된 안**이다 — 정본은 `types/emergency.ts` 의 `operatingHours` 주석이다. dev 실측이
- * 그 근거를 그대로 보여준다:
+ * 기각 근거는 dev 실측 서식의 불규칙함이었다:
  *
  *     월~화, 목~금,토 09:30~20:00, 일 09:30~14:00   ← 요일 목록 + 범위, 공백 불규칙, 수요일 없음
  *     월~금 09:00~21:00, 토 09:00~21:00, 법정공휴일 09:00~21:00   ← 일요일 항목 자체가 없음
  *
- * 수요일에 첫 줄을 잘못 읽으면 **닫힌 병원으로 달려가게 된다.** 이 화면에서 가장 비싼
- * 실패라, 얻는 것(정렬된 두 줄)보다 잃는 것이 크다.
+ * *"수요일에 첫 줄을 잘못 읽으면 닫힌 병원으로 달려가게 된다"* — 이 화면에서 가장 비싼
+ * 실패다. 그 규칙이 지키려던 것은 **"틀린 시간을 말하지 않는다"** 이고,
+ * `lib/emergency/operating-hours.ts` 는 그것을 금지가 아니라 **불변식**으로 세운다:
+ * 상태는 서버 `openNow` 만 근거로 삼고 · 조각 하나라도 못 읽으면 침묵하고 · 원문에서
+ * 읽은 개폐가 서버와 어긋나면 읽기를 버린다. **위 두 문자열은 그 검증을 통과하지
+ * 못하거나(수요일 없음 + 서버가 진료중) 통과한 채로만 요약된다.**
  *
- * **쉼표로 끊긴 조각 하나하나가 이미 `요일 + 시각` 이다.** 원문을 두 줄까지 흘리는 것으로
- * 요구를 충족하면서 파싱 금지도 지킨다.
+ * 그래서 이 컴포넌트에는 **두 갈래가 남는다**: 요약이 선 갈래(오늘 한 줄 + 펼치기)와
+ * `null` 로 떨어진 갈래(#598 그대로 — 원문 `line-clamp-2`). 기본값은 예전 동작이다.
  *
- * ── 접기를 걷었다 (#598)
+ * ── 접기를 되살렸다 — 이번에는 한 줄을 더 먹지 않는다
  *
- * #537 이 `전체 시간표` 펼치기 버튼을 둔 것은 **한 줄**(`line-clamp-1`)로 접은 나머지에
- * 손이 닿게 하려는 것이었다. 두 줄이면 dev 실측 문자열이 대부분 끝까지 보여 버튼이
- * 눌러도 아무 일이 없는 자리가 된다 — 그리고 그 버튼은 44px 터치 영역을 들고 있어
- * **행마다 한 줄을 더 먹었다.** 접기를 걷는 쪽이 두 줄을 내주고도 행이 짧아진다.
+ * #598 이 `전체 시간표` 버튼을 걷은 이유는 *"그 버튼이 44px 터치 영역을 들고 행마다 한
+ * 줄을 더 먹었다"* 였다. 지금은 **오늘 한 줄 자체가 `<summary>`** 라 펼치기 손잡이가 제
+ * 줄을 갖지 않는다 — `min-h-11` 로 44px 터치 영역(DESIGN.md §7)을 지키면서, 예전에
+ * 원문이 쓰던 두 줄(최대 44px)과 같은 높이에 든다.
  *
- * 걷으면서 **행에서 유일한 상태가 사라졌다** — 이 파일은 이제 훅을 쓰지 않는다.
+ * **`<details>` 라 JS 없이 열린다.** 이 화면은 급할 때 여는 화면이라 hydration 전에도
+ * 손잡이가 살아 있어야 한다.
  *
  * **"지금 여는가" 는 이 줄이 아니라 머리의 `OpenStatus` 배지가 답한다** — 서버가 계산한
- * `openNow` 다. 이 줄은 그 근거를 확인하는 자리다.
+ * `openNow` 다. 이 줄은 **시각**만 맡는다 (감사 문구 `진료중 · 24:00까지` 의 앞 절을
+ * 배지에 넘긴 것이다).
  */
-function FacilityHours({ facility }: { facility: NearbyFacilityItem }) {
+function FacilityHours({
+  facility,
+  now,
+  collapsible,
+}: {
+  facility: NearbyFacilityItem
+  now: Date
+  collapsible: boolean
+}) {
   // 없으면 없다고 말한다 — "닫힘" 과 구분된다
   if (!facility.operatingHoursKnown || facility.operatingHours === null) {
     return <p className="text-body-2 text-fg-muted break-keep">{messages.emergency.hoursUnknown}</p>
   }
 
   /*
-    **`line-clamp-2` 다.** 넘치는 것을 그대로 흘리지 않는 이유는 #537 과 같다 — 원문
-    길이는 시설마다 제각각이라(`법정공휴일` 항목까지 붙는 곳이 있다) 상한이 없으면 한
-    행이 목록의 리듬을 혼자 깬다. 지도 패널도 같은 경로를 탄다.
+    ── **휴무는 오늘 한 줄 밖이다** (#598 에서 정한 것을 그대로 지킨다)
 
-    ── **휴무는 그 상한 밖이다** (#598 리뷰에서 뒤집은 것)
+    #537 은 휴무를 운영시간과 **같은 줄에 이어 붙였다** — *"따로 줄을 만들면 접어서 번 한
+    줄을 도로 내놓는다"*. #598 이 그것을 뒤집었다: 375 실측에서 운영시간 117줄 중
+    **75줄(64%)이 두 줄에서 잘렸고, 잘린 75줄은 전부 휴무 절을 달고 있었다.**
 
-    #537 은 휴무를 **같은 줄에 이어 붙였다** — *"따로 줄을 만들면 접어서 번 한 줄을 도로
-    내놓는다"*. 그때는 `전체 시간표` 버튼이 있어 잘린 뒤도 펼쳐 볼 수 있었다. **이 PR 이
-    그 버튼을 걷으면서 전제가 사라졌다**: 375 실측에서 운영시간 117줄 중 **75줄(64%)이
-    두 줄에서 잘리고, 잘린 75줄은 전부 휴무 절을 달고 있었다.** 시설 상세 라우트도 없어
-    (#148) `매주 수요일 휴무` 를 되찾을 길이 아무 데도 없었다.
-
-    휴무를 자기 줄로 뺀다. 한 줄을 내주지만 **이 화면에서 가장 비싼 실패("닫힌 병원으로
-    달려가기")를 막는 정보**이고, 짧아서 잘리지 않는다. 운영시간 원문은 그대로 두 줄이다.
+    오늘 한 줄이 되어도 휴무는 제 줄에 남는다. `매주 수요일 휴무` 는 **오늘의 사실이
+    아니라 다음 방문의 사실**이라 오늘 줄에 섞을 수 없고, 짧아서 잘리지도 않는다.
   */
   const rest =
     facility.restDate === null ? null : `${facility.restDate} ${messages.emergency.restPrefix}`
 
+  const today = summarizeTodayHours(facility, now)
+
   return (
     <>
-      <p className="text-body-2 text-fg line-clamp-2 tabular-nums">{facility.operatingHours}</p>
+      {today === null || !collapsible ? (
+        /*
+          읽지 못했다 — **#598 의 렌더 그대로다.** 원문 길이는 시설마다 제각각이라
+          (`법정공휴일` 항목까지 붙는 곳이 있다) 상한이 없으면 한 행이 목록의 리듬을 혼자
+          깬다. 여기에 펼치기를 달지 않는 것은 접을 요약이 없기 때문이다 — `<summary>` 에
+          원문을 넣으면 접기 전과 후가 같아 눌러도 아무 일이 없는 손잡이가 된다.
+        */
+        <>
+          {/* 지도 패널 갈래 — 요약이 섰으면 **원문과 나란히** 그린다 (`FacilityRowContent`) */}
+          {today !== null && (
+            <p className="text-body-2 text-fg font-semibold tabular-nums">
+              {todayHoursLabel(today)}
+            </p>
+          )}
+          <p
+            className={cn(
+              'line-clamp-2 tabular-nums',
+              today === null ? 'text-body-2 text-fg' : 'text-body-2 text-fg-muted',
+            )}
+          >
+            {facility.operatingHours}
+          </p>
+        </>
+      ) : (
+        <details className="group">
+          <summary
+            className={cn(
+              // 44px — 급할 때 누르는 손잡이라 최소 터치 영역을 지킨다 (DESIGN.md §7)
+              'flex min-h-11 cursor-pointer list-none items-center gap-1.5 [&::-webkit-details-marker]:hidden',
+              'focus-visible:ring-brand-500 rounded-sm focus-visible:ring-2 focus-visible:outline-none',
+            )}
+          >
+            <span className="text-body-2 text-fg font-semibold tabular-nums">
+              {todayHoursLabel(today)}
+            </span>
+            <span className="text-caption text-fg-muted break-keep">
+              {messages.emergency.hoursDetail}
+            </span>
+            <ChevronDownIcon
+              size={16}
+              className="text-fg-subtle shrink-0 transition-transform group-open:rotate-180"
+            />
+          </summary>
+
+          <p className="text-body-2 text-fg-muted pb-1 tabular-nums">{facility.operatingHours}</p>
+        </details>
+      )}
+
       {rest !== null && <p className="text-body-2 text-fg-muted break-keep tabular-nums">{rest}</p>}
     </>
   )

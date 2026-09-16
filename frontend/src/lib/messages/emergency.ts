@@ -119,6 +119,33 @@ export const emergencyMessages = {
   /** `restDate` 앞에 붙인다 */
   restPrefix: '휴무',
 
+  /**
+   * 오늘 한 줄 (#654 E-4). `lib/emergency/operating-hours.ts` 의 `todayHoursLabel` 이 쓴다.
+   *
+   * **상태(`진료중` · `영업 종료`)를 되풀이하지 않는다.** 바로 위 머리에 `OpenStatus`
+   * 배지가 서버 `openNow` 를 그대로 말하고 있어, 같은 행이 같은 말을 두 번 하면 급할 때
+   * 훑는 눈이 어느 쪽을 봐야 할지 잃는다. 이 줄이 맡는 것은 **시각**뿐이다 —
+   * 감사 문구(`진료중 · 24:00까지`)에서 앞 절을 배지에 넘긴 것이다 (시안 §3 ④).
+   */
+  hoursOpen24: '24시간 운영',
+  /** `{time}` 치환 — `openNow === true` 인 곳의 오늘 마감 시각 */
+  hoursOpenUntil: '오늘 {time}까지',
+  /** `{day}` · `{time}` 치환 — 닫혀 있는 곳이 다시 여는 시각 */
+  hoursOpensAt: '{day} {time}부터',
+  hoursDayToday: '오늘',
+  hoursDayTomorrow: '내일',
+  /** `{day}` 치환 — 이틀 뒤부터는 요일로 말한다 ("모레" 는 세어 보게 만든다) */
+  hoursDayWeekday: '{day}요일',
+  /** 앞으로 이레 안에 여는 날이 없다 — 드물지만 말은 있어야 한다 */
+  hoursClosedToday: '오늘은 쉬어요',
+  /**
+   * 요일 전문 펼치기의 라벨 (#654 E-4).
+   *
+   * **원문을 지우지 않는다.** 오늘 한 줄은 요약이고, 요약이 틀렸을 때 사용자가 확인할
+   * 곳이 있어야 한다 — #598 이 접기를 걷은 이유(*"잘린 뒤를 되찾을 길이 없다"*)의 반대편이다.
+   */
+  hoursDetail: '요일별 시간',
+
   /** `{name}` 치환 — icon-only 버튼의 접근성 이름 */
   callLabel: '{name} 전화하기',
   /** `tel === null`. **버튼을 숨기지 않고 이유와 다음 방법을 준다** */
