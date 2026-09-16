@@ -9,7 +9,12 @@ import {
   type LatLng,
   toLatLng,
 } from '@/lib/geo/coord'
-import { cellSizeFor, clusterByGrid } from '@/lib/map/cluster'
+import {
+  cellSizeFor,
+  clusterByGrid,
+  clusterMarkerLabel,
+  clusterMarkerText,
+} from '@/lib/map/cluster'
 import { loadKakaoMaps, MapSdkError, type MapSdkFailure } from '@/lib/map/sdk'
 import { framedCamera, framedCenterLat, type MapBounds } from '@/lib/map/viewport'
 import { messages } from '@/lib/messages'
@@ -264,7 +269,14 @@ export function MapCanvas({
       const overlay = new maps.CustomOverlay({
         position: new maps.LatLng(group.center.lat, group.center.lng),
         content,
-        yAnchor: 1,
+        /*
+          **핀과 묶음이 좌표를 잡는 자리가 다르다.**
+
+          핀은 이름표라 아래 끝이 그 자리를 가리킨다(`yAnchor: 1`). 묶음은 원이고
+          가리킬 뾰족한 끝이 없어서 **원의 중심**을 좌표에 놓는다(`0.5`) — 1 로 두면
+          원이 좌표 위쪽에 통째로 떠서, 이웃한 묶음끼리 가로로 어긋난 것처럼 읽힌다.
+        */
+        yAnchor: isCluster ? 0.5 : 1,
         zIndex: !isCluster && first.id === selectedId ? 10 : 1,
         clickable: true,
       })
@@ -440,12 +452,24 @@ function pinElement(pin: MapPin, selected: boolean, onClick: () => void): HTMLEl
   return button
 }
 
-/** 묶음. 누르면 그 구역으로 확대한다 */
+/**
+ * 묶음. **지름 32 숫자 원형 마커다** (진단 E-1 [P0] · 시안 §3 ①). 누르면 그 구역으로
+ * 확대한다.
+ *
+ * 라벨 알약("이 지역 42곳")이었을 때는 폭이 글자 수만큼 늘어 390px 밀집 구간에서
+ * 알약끼리 서로 덮었다. 폭을 고정하면 겹침 면적이 줄고, **개수가 늘어도 그 폭이
+ * 변하지 않는다** — 글자는 `clusterMarkerText` 가 네 글자 안으로 접는다.
+ *
+ * **문구를 지우는 것이 아니라 옮긴다.** 보조기기는 여전히 "이 지역 42곳" 을 읽는다
+ * (`aria-label`). 숫자만 남은 마커는 눈으로는 읽히지만 이름으로는 "42" 가 되어,
+ * 무엇이 42인지 알 수 없어진다.
+ */
 function clusterElement(count: number, onClick: () => void): HTMLElement {
   const button = document.createElement('button')
   button.type = 'button'
   button.className = 'map-cluster'
-  button.textContent = messages.map.clusterCount.replace('{n}', String(count))
+  button.textContent = clusterMarkerText(count)
+  button.setAttribute('aria-label', clusterMarkerLabel(count))
   button.addEventListener('click', onClick)
   return button
 }
