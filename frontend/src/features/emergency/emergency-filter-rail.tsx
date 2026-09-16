@@ -66,13 +66,25 @@ export function EmergencyFilterRail({
       </div>
 
       {/*
-        **반경이 첫 축이다.** 이 화면은 지도를 옮겨도 재조회하지 않으므로(거리가 내 위치
-        기준으로 남아야 한다) 반경이 "더 넓게 찾기" 의 유일한 손잡이고, 나머지 축은 그 안을
-        좁힌다. 목록 위 요약 줄(`가까운 순 · 반경 10.0km`)이 반경을 맨 앞에 두는 것과 같은
-        순서다 — 카드 부제에도 같은 줄이 있었는데 `10.0km` 홀로 서서 읽히지 않아 걷었다 (#639).
+        **영업 조건이 첫 축이다** (#654 E-3).
+
+        여기는 오래 **반경**이 첫 축이었다 — *"지도를 옮겨도 재조회하지 않으므로 반경이
+        «더 넓게 찾기» 의 유일한 손잡이고 나머지 축은 그 안을 좁힌다"* (#535). 그 말은
+        지금도 맞지만 **순서의 근거로는 약하다**: 반경을 넓히는 사람은 이미 결과를 보고
+        부족하다고 판단한 사람이라 축을 찾아 내려갈 여유가 있다. 급한 사용자가 처음
+        찾는 것은 `지금 진료중` 이고(감사 E-3 — 그 축이 여섯 번째였다), 그 칩은 이제
+        **기본이 켜져 있어** 레일 맨 위에서 "왜 목록이 짧은가" 에 바로 답한다.
+
+        모바일 칩 줄과 같은 순서다 (`EmergencyFilterChips`) — 두 표면이 다른 순서로
+        같은 축을 늘어놓으면 폭을 바꿨을 때 사용자가 다시 배워야 한다.
       */}
-      <FilterListHeading>{messages.emergency.radiusGroupLabel}</FilterListHeading>
-      <RadiusField radius={radius} onChange={onRadiusChange} />
+      <FilterListHeading>{messages.emergency.narrowGroupLabel}</FilterListHeading>
+      <NarrowFields
+        filters={filters}
+        onChange={onFiltersChange}
+        counts={counts}
+        showCounts={showCounts}
+      />
 
       <div className="border-border mt-3 border-t">
         <FilterListHeading>{messages.emergency.typeGroupLabel}</FilterListHeading>
@@ -85,13 +97,8 @@ export function EmergencyFilterRail({
       </div>
 
       <div className="border-border mt-3 border-t">
-        <FilterListHeading>{messages.emergency.narrowGroupLabel}</FilterListHeading>
-        <NarrowFields
-          filters={filters}
-          onChange={onFiltersChange}
-          counts={counts}
-          showCounts={showCounts}
-        />
+        <FilterListHeading>{messages.emergency.radiusGroupLabel}</FilterListHeading>
+        <RadiusField radius={radius} onChange={onRadiusChange} />
       </div>
     </div>
   )

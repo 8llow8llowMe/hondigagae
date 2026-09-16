@@ -102,10 +102,27 @@ export type FacilityFilters = {
   keyword: string | null
 }
 
+/**
+ * **`openNowOnly` 만 기본이 `true` 다** (#654 E-3).
+ *
+ * 이 화면을 여는 사람의 과업은 *"지금 갈 수 있는 곳에 전화"* 하나다. 감사 실측에서
+ * `지금 진료중` 은 칩 여섯 개 중 **여섯 번째**였고, 급한 사용자가 그것을 찾아 누르기
+ * 전까지 목록은 문 닫은 병원과 섞여 있었다.
+ *
+ * **대가를 안다.** 이 기본값은 `openNow !== true` 인 곳을 감춘다 — 닫힌 곳뿐 아니라
+ * **판정할 수 없는 곳(`openNow === null`)까지** 함께다 (`applyFilters`). dev 실측
+ * (제주시청 · 10km)에서 135곳 중 100곳만 남는다. 그 35곳으로 돌아가는 손잡이가
+ * **두 군데**에 있어 성립하는 기본값이다: 첫 칩(이제 맨 앞이다)과 0건 화면의
+ * `"지금 진료중" 끄면 {n}곳` 완화 버튼(`reliefs` 가 이미 첫 후보로 올린다).
+ *
+ * **URL 직렬화가 이 기본값을 따라간다** — 꺼진 상태가 `?openNowOnly=false` 로 실린다
+ * (`lib/url/emergency-filters.ts`). 기본값을 바꿀 때 그쪽을 같이 보지 않으면
+ * "끄고 공유한 링크가 켜진 채로 열린다".
+ */
 export const DEFAULT_FACILITY_FILTERS: FacilityFilters = {
   type: null,
   open24Only: false,
-  openNowOnly: false,
+  openNowOnly: true,
   keyword: null,
 }
 

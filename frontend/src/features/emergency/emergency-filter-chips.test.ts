@@ -4,7 +4,11 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { EmergencyFilterChips } from '@/features/emergency/emergency-filter-chips'
-import { countsAreComplete, facilityCounts } from '@/features/emergency/facility-filters'
+import {
+  countsAreComplete,
+  facilityCounts,
+  open24Note,
+} from '@/features/emergency/facility-filters'
 import { MAX_SIZE } from '@/lib/api/emergency'
 import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
@@ -75,10 +79,20 @@ describe('EmergencyFilterChips — 개수', () => {
     expect(markup).not.toContain(`${messages.emergency.typeAll} 0`)
   })
 
-  it('24시간을 켜면 결과가 적다는 사실을 알린다 (백엔드 스키마 지침)', () => {
-    const markup = render(ONE, { filters: { ...DEFAULT_FACILITY_FILTERS, open24Only: true } })
+  /*
+    **켰을 때가 아니라 늘 선다** (#654 E-3). `24시간 1` 이 "제주에 한 곳뿐" 으로 읽히는
+    오해는 칩을 켜기 전에 이미 자리를 잡는다 — 숫자가 보이는 내내 한계도 보여야 한다.
+  */
+  it('24시간 개수 옆에 데이터 한계를 늘 적는다 (백엔드 스키마 지침)', () => {
+    expect(render(ONE)).toContain(open24Note(1, true))
+    expect(render(ONE, { filters: { ...DEFAULT_FACILITY_FILTERS, open24Only: true } })).toContain(
+      open24Note(1, true),
+    )
+  })
 
-    expect(markup).toContain(messages.emergency.open24Note)
+  /** 잘린 목록에서는 칩이 숫자를 빼므로 이 줄도 숫자를 뺀다 — 한쪽만 말하면 서로를 부정한다 */
+  it('개수를 쓸 수 없으면 한계도 숫자 없이 말한다', () => {
+    expect(render(null)).toContain(messages.emergency.open24NoteUnknown)
   })
 })
 
@@ -207,5 +221,34 @@ describe('EmergencyFilterChips — 축 분리 (#537)', () => {
     )
     // 시트를 여는 트리거라 aria-expanded 다 — aria-pressed 면 "이미 적용됨" 으로 들린다
     expect(render(ONE, { radius: widened })).toContain('aria-expanded="false"')
+  })
+})
+
+/*
+  **E-3 — 급할 때 필요한 축이 먼저 온다** (#654).
+
+  감사 실측(390)에서 이 줄은 `전체 135 · 병원 50 · 약국 85 / 반경 10.0km · 24시간 1 ·
+  지금 진료중 100` 이었다 — 이 화면을 여는 사람의 과업이 *"지금 갈 수 있는 곳에 전화"*
+  하나인데 그 축이 **여섯 번째**였다.
+
+  **시안(§3 ③)은 `전체` 를 첫 줄에 올려 두었지만 따르지 않았다.** 그러면 택일 축
+  (`전체 · 병원 · 약국`)이 두 줄로 갈라지는데, 그것은 #537 이 칩에서 세그먼트로 올린
+  **한 덩어리**다 — 갈라 두면 사용자는 `전체` 를 진료중·24시간과 함께 켜는 토글로 읽는다.
+  순서만 따르고 묶음은 지킨다.
+*/
+describe('EmergencyFilterChips — 축 순서 (#654 E-3)', () => {
+  const ORDER = ['지금 진료중', '24시간', '전체', '병원', '약국', '반경']
+
+  it('지금 진료중이 첫 컨트롤이고 반경이 마지막이다', () => {
+    const markup = render(ONE)
+    const positions = ORDER.map((label) => markup.indexOf(label))
+
+    expect(positions.some((index) => index < 0)).toBe(false)
+    expect(positions).toEqual([...positions].sort((left, right) => left - right))
+  })
+
+  /** 줄 수는 그대로 둘이다 — 급한 화면에서 세로를 더 쓰지 않는다 */
+  it('택일 축은 한 덩어리로 남는다 — 세그먼트를 칩으로 되돌리지 않는다', () => {
+    expect(render(ONE)).toContain('role="radiogroup"')
   })
 })

@@ -26,13 +26,34 @@ describe('parseEmergencyBoardParams', () => {
     expect(parseEmergencyBoardParams(new URLSearchParams('type=CLINIC')).filters.type).toBeNull()
   })
 
-  it('boolean 은 `true` 만 인정한다 — `1` 은 켜지지 않는다', () => {
+  /*
+    **읽지 못한 값은 «꺼짐» 이 아니라 «그 축의 기본값» 으로 떨어진다** (#654 E-3).
+    `openNowOnly` 가 기본 ON 이 되면서 두 축의 답이 갈린다 — 예전처럼 `1` 을 일괄
+    `false` 로 떨어뜨리면 기본 상태와 다른 화면이 열린다.
+  */
+  it('boolean 은 `true`·`false` 두 글자만 인정하고 나머지는 기본값이다', () => {
     const params = new URLSearchParams('open24Only=true&openNowOnly=1')
 
     expect(parseEmergencyBoardParams(params).filters).toMatchObject({
       open24Only: true,
-      openNowOnly: false,
+      openNowOnly: DEFAULT_FACILITY_FILTERS.openNowOnly,
     })
+  })
+
+  /**
+   * **기본 ON 인 축은 «꺼짐» 이 URL 에 실려야 한다** (#654 E-3). 이것이 깨지면
+   * "지금 진료중을 끄고 공유한 링크가 켜진 채로 열린다".
+   */
+  it('기본 ON 인 축은 `false` 를 읽는다', () => {
+    expect(
+      parseEmergencyBoardParams(new URLSearchParams('openNowOnly=false')).filters.openNowOnly,
+    ).toBe(false)
+  })
+
+  it('파라미터가 없으면 기본 상태다 — 지금 진료중이 켜져 있다', () => {
+    expect(parseEmergencyBoardParams(new URLSearchParams('')).filters).toEqual(
+      DEFAULT_FACILITY_FILTERS,
+    )
   })
 
   /* 정규화 규칙 자체는 `lib/url/keyword.test.ts` 가 고정한다 — 여기서는 실리는지만 본다 */
@@ -96,13 +117,27 @@ describe('toEmergencyBoardQuery', () => {
     expect(toEmergencyBoardQuery(DEFAULT_EMERGENCY_BOARD_PARAMS)).toBe('')
   })
 
-  it('boolean 은 켜졌을 때만 키를 넣는다', () => {
+  it('boolean 은 기본값과 다를 때만 키를 넣는다', () => {
     const query = toEmergencyBoardQuery({
       filters: { ...DEFAULT_FACILITY_FILTERS, open24Only: true },
       radius: DEFAULT_RADIUS_METERS,
     })
 
     expect(query).toBe('open24Only=true')
+  })
+
+  /*
+    **기본 ON 인 축은 «켜짐» 이 아니라 «꺼짐» 이 실린다** (#654 E-3). `if (flag)` 로
+    두면 끈 것이 URL 에 남지 않아 새로고침·공유에서 도로 켜진다.
+  */
+  it('기본 ON 인 축은 꺼졌을 때 false 를 싣는다', () => {
+    expect(
+      toEmergencyBoardQuery({
+        filters: { ...DEFAULT_FACILITY_FILTERS, openNowOnly: false },
+        radius: DEFAULT_RADIUS_METERS,
+      }),
+    ).toBe('openNowOnly=false')
+    expect(toEmergencyBoardQuery(DEFAULT_EMERGENCY_BOARD_PARAMS)).not.toContain('openNowOnly')
   })
 
   it('기본 반경은 생략하고 넓힌 반경만 싣는다', () => {
@@ -144,6 +179,15 @@ describe('왕복', () => {
     {
       filters: { ...DEFAULT_FACILITY_FILTERS, open24Only: true, openNowOnly: true },
       radius: 40_000,
+    },
+    // 기본 ON 인 축을 끈 왕복 — 생략 규칙이 뒤집히는 자리다 (#654)
+    {
+      filters: { ...DEFAULT_FACILITY_FILTERS, openNowOnly: false },
+      radius: DEFAULT_RADIUS_METERS,
+    },
+    {
+      filters: { ...DEFAULT_FACILITY_FILTERS, openNowOnly: false, open24Only: true },
+      radius: 20_000,
     },
     {
       filters: { ...DEFAULT_FACILITY_FILTERS, type: 'ANIMAL_PHARMACY', open24Only: true },

@@ -198,6 +198,26 @@ export function labelWithCount(label: string, count: number, show: boolean): str
 }
 
 /**
+ * `24시간` 칩 옆 안내 — **데이터 한계를 개수와 함께 정직하게 말한다** (#654 E-3).
+ *
+ * `24시간 1` 이라는 칩은 *"제주에 24시간 병원이 한 곳"* 으로 읽히지만 실제로는
+ * *"원본 데이터에 24시간이라고 적힌 곳이 한 곳"* 이다. 그 차이를 칩이 스스로 말할 수
+ * 없어(라벨은 `labelWithCount` 가 숫자만 붙인다) 옆줄이 맡는다.
+ *
+ * **`labelWithCount` 와 같은 `showCounts` 를 받는다.** 잘린 목록에서 센 수는 전체가
+ * 아니므로, 칩이 숫자를 빼는 순간 이 줄도 숫자를 뺀다 — 한쪽만 숫자를 말하면
+ * 화면 안에서 두 문장이 서로를 부정한다.
+ *
+ * 목록 갈래(칩·레일)와 지도 툴바가 함께 쓴다. `labelWithCount` 와 같은 이유로 여기 하나만 둔다.
+ */
+export function open24Note(count: number, showCounts: boolean): string {
+  if (!showCounts) return messages.emergency.open24NoteUnknown
+  if (count === 0) return messages.emergency.open24NoteNone
+
+  return messages.emergency.open24Note.replace('{n}', String(count))
+}
+
+/**
  * `reliefs()` 결과 한 항목을 화면 문구로 바꾼다.
  *
  * 목록 갈래(`EmergencySection`)와 지도 갈래(`EmergencyMapView`)가 함께 쓴다.

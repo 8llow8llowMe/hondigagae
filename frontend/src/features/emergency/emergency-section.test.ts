@@ -9,7 +9,17 @@ import {
 } from '@/features/emergency/emergency-section'
 import { messages } from '@/lib/messages'
 import { facility } from '@/test/fixtures/emergency'
-import { DEFAULT_FACILITY_FILTERS } from '@/types/emergency'
+import { DEFAULT_FACILITY_FILTERS, type FacilityFilters } from '@/types/emergency'
+
+/**
+ * **아무 축도 걸지 않은 상태** — `DEFAULT_FACILITY_FILTERS` 가 아니다 (#654 E-3).
+ *
+ * 기본값은 이제 `openNowOnly: true` 라 `openNow !== true` 인 곳이 목록에서 빠진다.
+ * 이 파일이 재는 것은 **행이 무엇을 그리는가**(상태 배지 3상태 · 운영시간 · 전화)이고,
+ * 그 단언에 기본 필터를 걸면 재려는 행이 아예 렌더되지 않는다. 거르기 자체는
+ * `facility-filters.test.ts` 가 잰다. 기본값이 거른다는 사실만 아래에서 따로 잰다.
+ */
+const SHOW_ALL: FacilityFilters = { ...DEFAULT_FACILITY_FILTERS, openNowOnly: false }
 
 function render(overrides: Partial<EmergencySectionProps> = {}) {
   const props: EmergencySectionProps = {
@@ -23,7 +33,7 @@ function render(overrides: Partial<EmergencySectionProps> = {}) {
     loading: false,
     errorStatus: null,
     onRetry: () => undefined,
-    filters: DEFAULT_FACILITY_FILTERS,
+    filters: SHOW_ALL,
     onFiltersChange: () => undefined,
     basis: 'current',
     regionCode: null,
@@ -244,7 +254,7 @@ describe('EmergencySection — 결과 없음', () => {
   it('검색어로 0건이면 무엇으로 찾았는지 되돌려 주고 지우는 길을 준다', () => {
     const markup = render({
       result: two,
-      filters: { ...DEFAULT_FACILITY_FILTERS, keyword: '없는이름ZZZ' },
+      filters: { ...SHOW_ALL, keyword: '없는이름ZZZ' },
     })
 
     expect(markup).toContain('없는이름ZZZ')
@@ -260,7 +270,7 @@ describe('EmergencySection — 결과 없음', () => {
   it('목록이 잘린 채 검색이 0건이면 범위를 밝힌다', () => {
     const markup = render({
       result: { ...two, totalCount: 300 },
-      filters: { ...DEFAULT_FACILITY_FILTERS, keyword: '없는이름ZZZ' },
+      filters: { ...SHOW_ALL, keyword: '없는이름ZZZ' },
     })
 
     expect(markup).toContain(messages.emergency.searchTruncatedNote)
@@ -269,7 +279,7 @@ describe('EmergencySection — 결과 없음', () => {
   it('다 받아 온 목록이면 그 안내를 띄우지 않는다', () => {
     const markup = render({
       result: two,
-      filters: { ...DEFAULT_FACILITY_FILTERS, keyword: '없는이름ZZZ' },
+      filters: { ...SHOW_ALL, keyword: '없는이름ZZZ' },
     })
 
     expect(markup).not.toContain(messages.emergency.searchTruncatedNote)
@@ -446,5 +456,59 @@ describe('EmergencySection — 3층 표면 (#460)', () => {
 
   it('스켈레톤도 같은 목록 규약을 쓴다 — 데이터가 오는 순간 선이 뛰지 않는다', () => {
     expect(render({ loading: true })).toContain('[&amp;&gt;li+li]:border-t')
+  })
+})
+
+/*
+  **기본이 «지금 진료중» 이다** (#654 E-3).
+
+  이 화면을 여는 사람의 과업은 *"지금 갈 수 있는 곳에 전화"* 하나인데, 감사 실측에서
+  그 축은 칩 여섯 개 중 여섯 번째였다. 대가는 분명하다 — `openNow !== true` 인 곳이
+  닫힌 곳뿐 아니라 **판정할 수 없는 곳(`null`)까지** 함께 감춰진다. 그래서 되돌아가는
+  손잡이가 **두 군데** 있어야 성립한다: 첫 칩(카드 밖 `EmergencyFilterChips`)과 0건
+  화면의 완화 버튼이다. 이 파일은 뒤쪽을 잰다.
+*/
+describe('EmergencySection — 기본이 지금 진료중이다 (#654 E-3)', () => {
+  const MIXED = {
+    facilities: [
+      facility({ facilityId: '1', name: '지금여는병원', openNow: true }),
+      facility({ facilityId: '2', name: '문닫은병원', openNow: false }),
+      facility({
+        facilityId: '3',
+        name: '확인필요병원',
+        openNow: null,
+        operatingHoursKnown: false,
+        operatingHours: null,
+      }),
+    ],
+    totalCount: 3,
+    radius: 10_000,
+    open24Only: false,
+    providerName: '출처',
+  }
+
+  it('기본 조건에서는 진료중만 남는다 — 판정할 수 없는 곳도 함께 빠진다', () => {
+    const markup = render({ result: MIXED, filters: DEFAULT_FACILITY_FILTERS })
+
+    expect(markup).toContain('지금여는병원')
+    expect(markup).not.toContain('문닫은병원')
+    expect(markup).not.toContain('확인필요병원')
+  })
+
+  it('끄면 전부 돌아온다', () => {
+    const markup = render({ result: MIXED, filters: SHOW_ALL })
+
+    expect(markup).toContain('문닫은병원')
+    expect(markup).toContain('확인필요병원')
+  })
+
+  /** 기본값 때문에 0건이 되면 되돌아갈 길이 화면 안에 있어야 한다 */
+  it('기본값 때문에 0건이면 끄는 길을 첫 후보로 준다', () => {
+    const markup = render({
+      result: { ...MIXED, facilities: [MIXED.facilities[1]!], totalCount: 1 },
+      filters: DEFAULT_FACILITY_FILTERS,
+    })
+
+    expect(markup).toContain(messages.emergency.reliefOpenNow.replace('{n}', '1'))
   })
 })

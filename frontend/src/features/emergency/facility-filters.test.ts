@@ -9,7 +9,11 @@ import {
   reliefs,
 } from '@/features/emergency/facility-filters'
 import { MAX_SIZE } from '@/lib/api/emergency'
-import { DEFAULT_FACILITY_FILTERS, type NearbyFacilityItem } from '@/types/emergency'
+import {
+  DEFAULT_FACILITY_FILTERS,
+  type FacilityFilters,
+  type NearbyFacilityItem,
+} from '@/types/emergency'
 
 function facility(overrides: Partial<NearbyFacilityItem> = {}): NearbyFacilityItem {
   return {
@@ -47,27 +51,33 @@ const PHARMACY_CLOSED = facility({
 
 const ALL = [HOSPITAL_24, HOSPITAL_OPEN, HOSPITAL_UNKNOWN, PHARMACY_CLOSED]
 
+/**
+ * **아무 축도 걸지 않은 상태** — `DEFAULT_FACILITY_FILTERS` 가 아니다 (#654 E-3).
+ *
+ * 기본값은 이제 `openNowOnly: true` 다. "조건이 없으면" 을 재는 단언에서 그것을 그대로
+ * 쓰면 `openNow !== true` 인 곳이 빠진 결과를 "거르지 않은 결과" 라고 부르게 된다.
+ */
+const NO_FILTERS: FacilityFilters = { ...DEFAULT_FACILITY_FILTERS, openNowOnly: false }
+
 describe('applyFilters — 거르기만 하고 정렬을 건드리지 않는다', () => {
   it('조건이 없으면 서버 순서 그대로다', () => {
-    expect(applyFilters(ALL, DEFAULT_FACILITY_FILTERS)).toEqual(ALL)
+    expect(applyFilters(ALL, NO_FILTERS)).toEqual(ALL)
   })
 
   it('24시간을 위로 올려 재정렬하지 않는다 — "가까운 순" 과 어긋난다', () => {
-    const result = applyFilters(ALL, DEFAULT_FACILITY_FILTERS)
+    const result = applyFilters(ALL, NO_FILTERS)
 
     expect(result.map((f) => f.distanceMeters)).toEqual([500, 1200, 3100, 4400])
   })
 
   it('유형으로 거른다', () => {
-    const result = applyFilters(ALL, { ...DEFAULT_FACILITY_FILTERS, type: 'ANIMAL_PHARMACY' })
+    const result = applyFilters(ALL, { ...NO_FILTERS, type: 'ANIMAL_PHARMACY' })
 
     expect(result).toEqual([PHARMACY_CLOSED])
   })
 
   it('24시간으로 거른다', () => {
-    expect(applyFilters(ALL, { ...DEFAULT_FACILITY_FILTERS, open24Only: true })).toEqual([
-      HOSPITAL_24,
-    ])
+    expect(applyFilters(ALL, { ...NO_FILTERS, open24Only: true })).toEqual([HOSPITAL_24])
   })
 
   /**
@@ -158,11 +168,11 @@ describe('countsAreComplete — 잘린 목록에서 센 개수는 전체가 아�
 
 describe('reliefs — 무엇을 끄면 몇 개가 되는지 실제로 센다', () => {
   it('켜지 않은 조건은 제안하지 않는다', () => {
-    expect(reliefs(ALL, DEFAULT_FACILITY_FILTERS)).toEqual([])
+    expect(reliefs(ALL, NO_FILTERS)).toEqual([])
   })
 
   it('끈 뒤의 개수를 세어 준다', () => {
-    const result = reliefs(ALL, { ...DEFAULT_FACILITY_FILTERS, openNowOnly: true })
+    const result = reliefs(ALL, { ...NO_FILTERS, openNowOnly: true })
 
     expect(result).toHaveLength(1)
     expect(result[0]?.kind).toBe('openNowOnly')
@@ -171,7 +181,7 @@ describe('reliefs — 무엇을 끄면 몇 개가 되는지 실제로 센다', (
 
   it('여러 조건이 켜져 있으면 각각의 경로를 준다', () => {
     const result = reliefs(ALL, {
-      ...DEFAULT_FACILITY_FILTERS,
+      ...NO_FILTERS,
       type: 'ANIMAL_PHARMACY',
       open24Only: false,
       openNowOnly: true,

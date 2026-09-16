@@ -3,7 +3,11 @@
 import { Chip, ChipGroup } from '@/components/chip'
 import { EmergencyRadiusChip } from '@/features/emergency/emergency-radius-chip'
 import { EmergencyTypeSegment } from '@/features/emergency/emergency-type-segment'
-import { type facilityCounts, labelWithCount } from '@/features/emergency/facility-filters'
+import {
+  type facilityCounts,
+  labelWithCount,
+  open24Note,
+} from '@/features/emergency/facility-filters'
 import { messages } from '@/lib/messages'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -30,10 +34,18 @@ export type FacilityCounts = ReturnType<typeof facilityCounts>
  * 사용자는 넓힐 방법이 없었다. 데스크톱은 레일의 `RadiusField` 가 이미 그 구멍을 막고
  * 있었고(#535) 모바일만 남아 있었다.
  *
- * **반경 칩이 24시간·진료중과 한 줄인 것은 셋 다 "결과를 넓히거나 좁히는" 손잡이이기
- * 때문이지 셋이 같은 축이라서가 아니다.** 반경은 조회 파라미터라 `초기화` 가 건드리지
- * 않고(`EmergencyRadiusChip` 머리주석) 시트로 값을 고르며, 나머지 둘은 `ChipGroup` 안의
- * 토글이다 — 보조기기에는 그 구분이 role 로 그대로 나간다.
+ * ── 줄 순서를 뒤집었다 (#654 E-3)
+ *
+ * #537 이 세운 두 줄은 `[유형 세그먼트] / [반경 · 24시간 · 진료중]` 이었다 — 감사 실측에서
+ * **`지금 진료중` 이 이 화면의 여섯 번째 컨트롤**이었다는 뜻이다. 이 화면을 여는 사람의
+ * 과업은 *"지금 갈 수 있는 곳에 전화"* 하나인데 그 축이 가장 늦게 읽혔다.
+ * 지금은 `[진료중 · 24시간] / [유형 세그먼트 · 반경]` 이고, 첫 칩은 **기본이 켜져 있다**
+ * (`DEFAULT_FACILITY_FILTERS`). **줄 수는 그대로 둘이다** — 급한 화면에서 세로를 더 쓰지 않는다.
+ *
+ * **반경이 유형 세그먼트와 한 줄인 것은 둘이 같은 축이라서가 아니다.** 반경은 조회
+ * 파라미터라 `초기화` 가 건드리지 않고(`EmergencyRadiusChip` 머리주석) 시트로 값을 고르며,
+ * 유형은 택일 세그먼트다 — 보조기기에는 그 구분이 role 로 그대로 나간다. 둘은 급한
+ * 순간의 2순위("무엇을" · "얼마나 넓게")라는 점만 같아 한 줄에 선다.
  *
  * **좌우 인셋은 담는 곳이 정한다** (`inset.ts`). 목록 갈래는 `SurfaceStack` 안 카드 밖이라
  * `card`(768 에서 24 + 20 = 44, 카드 제목 45 와 1px 차이 — #443 이 정한 의도) 이고,
@@ -78,42 +90,60 @@ export function EmergencyFilterChips({
         className,
       )}
     >
-      <EmergencyTypeSegment
-        filters={filters}
-        onFiltersChange={onFiltersChange}
-        counts={counts}
-        showCounts={showCounts}
-      />
-
       {/*
-        다중 선택 축 한 줄. **`flex-wrap` 을 남겨 둔다** — 375 에서 셋이 한 줄에 들어가지만
-        (실측 343px 중 반경 96 + 24시간 84 + 진료중 104 = 284), 개수가 세 자리로 붙으면
-        마지막 칩이 넘친다. 가로 스크롤러로 만들지 않는 것은 축이 셋뿐이라 감출 것이
-        없어서다 — 지도 툴바(`EmergencyFilterBar`)는 유형까지 한 줄이라 스크롤러를 쓴다.
+        **첫 줄이 영업 조건이다** (#654 E-3). `flex-wrap` 을 남겨 둔다 — 375 에서 둘이 한 줄에
+        넉넉히 들어가지만(실측 343px 중 진료중 104 + 24시간 84 = 188) 개수가 세 자리로
+        붙으면 넘친다. 가로 스크롤러로 만들지 않는 것은 축이 둘뿐이라 감출 것이 없어서다 —
+        지도 툴바(`EmergencyFilterBar`)는 유형까지 한 줄이라 스크롤러를 쓴다.
       */}
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <EmergencyRadiusChip radius={radius} onRadiusChange={onRadiusChange} />
-
         <ChipGroup label={messages.emergency.narrowGroupLabel} className="flex flex-wrap gap-1.5">
-          <Chip
-            selected={filters.open24Only}
-            onSelect={() => onFiltersChange({ ...filters, open24Only: !filters.open24Only })}
-          >
-            {labelWithCount(messages.emergency.open24, counts.open24, showCounts)}
-          </Chip>
           <Chip
             selected={filters.openNowOnly}
             onSelect={() => onFiltersChange({ ...filters, openNowOnly: !filters.openNowOnly })}
           >
             {labelWithCount(messages.emergency.openNow, counts.openNow, showCounts)}
           </Chip>
+          <Chip
+            selected={filters.open24Only}
+            onSelect={() => onFiltersChange({ ...filters, open24Only: !filters.open24Only })}
+          >
+            {labelWithCount(messages.emergency.open24, counts.open24, showCounts)}
+          </Chip>
         </ChipGroup>
       </div>
 
-      {/* 백엔드 스키마가 화면에 알리라고 명시한 사실이다 */}
-      {filters.open24Only && (
-        <p className="text-caption text-fg-muted break-keep">{messages.emergency.open24Note}</p>
-      )}
+      {/*
+        **둘째 줄은 유형과 반경이다** — 무엇을 찾는가(유형)와 얼마나 넓게(반경)는 급한
+        순간의 2순위다. 시안(§3 ③)은 `전체` 를 첫 줄에 올려 두었지만 그러면 택일 축
+        하나가 두 줄로 갈라진다 — `전체 · 병원 · 약국` 은 #537 이 칩에서 세그먼트로
+        올린 **한 덩어리**이고(`EmergencyTypeSegment` 머리주석), 갈라 두면 사용자는
+        `전체` 를 진료중·24시간과 함께 켜는 토글로 읽는다. 순서만 따르고 묶음은 지킨다.
+
+        세그먼트가 `flex-1 min-w-0`, 반경 칩이 `shrink-0` — 390 에서 세그먼트 세 칸에
+        각 ~85px 이 남아 `전체 135` 가 들어간다(넘치면 칸 안에서 말줄임, 칸 높이는 44 고정).
+      */}
+      <div className="flex min-w-0 items-center gap-1.5">
+        <div className="min-w-0 flex-1">
+          <EmergencyTypeSegment
+            filters={filters}
+            onFiltersChange={onFiltersChange}
+            counts={counts}
+            showCounts={showCounts}
+          />
+        </div>
+
+        <EmergencyRadiusChip radius={radius} onRadiusChange={onRadiusChange} />
+      </div>
+
+      {/*
+        백엔드 스키마가 화면에 알리라고 명시한 사실이다. **칩을 켰을 때만이 아니라 늘
+        선다** (#654) — `24시간 1` 이 "제주에 한 곳뿐" 으로 읽히는 오해는 켜기 전에
+        이미 자리를 잡는다.
+      */}
+      <p className="text-caption text-fg-muted break-keep">
+        {open24Note(counts.open24, showCounts)}
+      </p>
     </div>
   )
 }
