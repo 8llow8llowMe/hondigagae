@@ -73,9 +73,18 @@ function readFacilityType(value: string | null): FacilityTypeCode | null {
     : null
 }
 
-/** 켜짐은 `true` 하나만 인정한다. `1`·`on` 은 켜지지 않는다 — 쓰는 쪽이 `true` 만 쓴다 */
-function readFlag(value: string | null): boolean {
-  return value === 'true'
+/**
+ * `true` · `false` 두 글자만 인정하고 나머지는 **그 축의 기본값**으로 떨어뜨린다.
+ * `1`·`on` 은 읽지 않는다 — 쓰는 쪽이 이 두 글자만 쓴다.
+ *
+ * **기본값을 인자로 받는 것은 `openNowOnly` 가 기본 ON 이기 때문이다** (#654 E-3).
+ * 예전처럼 `value === 'true'` 로 두면 파라미터가 없는 URL(= 기본 상태)에서 그 축이
+ * 꺼진 채 열려, 같은 화면이 주소를 어떻게 열었느냐에 따라 다른 목록을 보여준다.
+ */
+function readFlag(value: string | null, fallback: boolean): boolean {
+  if (value === 'true') return true
+  if (value === 'false') return false
+  return fallback
 }
 
 /**
@@ -91,8 +100,8 @@ export function parseEmergencyBoardParams(params: RawParams): EmergencyBoardPara
   return {
     filters: {
       type: readFacilityType(read(params, 'type')),
-      open24Only: readFlag(read(params, 'open24Only')),
-      openNowOnly: readFlag(read(params, 'openNowOnly')),
+      open24Only: readFlag(read(params, 'open24Only'), DEFAULT_FACILITY_FILTERS.open24Only),
+      openNowOnly: readFlag(read(params, 'openNowOnly'), DEFAULT_FACILITY_FILTERS.openNowOnly),
       // 정규화는 `/places` 와 같은 한 곳을 쓴다 (`lib/url/keyword.ts`)
       keyword: normalizeKeyword(read(params, 'keyword')),
     },
@@ -105,8 +114,17 @@ export function toEmergencyBoardQuery({ filters, radius }: EmergencyBoardParams)
   const params = new URLSearchParams()
 
   if (filters.type !== null) params.set('type', filters.type)
-  if (filters.open24Only) params.set('open24Only', 'true')
-  if (filters.openNowOnly) params.set('openNowOnly', 'true')
+  /*
+    **기본값과 다를 때만 싣는다 — 켜짐이 아니라.** `openNowOnly` 는 기본 ON 이라
+    (#654 E-3) 꺼진 상태가 `?openNowOnly=false` 로 실린다. `if (filters.openNowOnly)` 로
+    두면 끈 것이 URL 에 남지 않아 새로고침·공유에서 도로 켜진다.
+  */
+  if (filters.open24Only !== DEFAULT_FACILITY_FILTERS.open24Only) {
+    params.set('open24Only', String(filters.open24Only))
+  }
+  if (filters.openNowOnly !== DEFAULT_FACILITY_FILTERS.openNowOnly) {
+    params.set('openNowOnly', String(filters.openNowOnly))
+  }
   if (filters.keyword !== null) params.set('keyword', filters.keyword)
   if (radius !== DEFAULT_RADIUS_METERS) params.set('radius', String(radius))
 

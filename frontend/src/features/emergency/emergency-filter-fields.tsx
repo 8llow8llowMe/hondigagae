@@ -1,7 +1,7 @@
 'use client'
 
 import { FilterCheck, FilterList, FilterRadio } from '@/components/filter-list'
-import { labelWithCount } from '@/features/emergency/facility-filters'
+import { labelWithCount, open24Note } from '@/features/emergency/facility-filters'
 import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
 import { RADIUS_OPTIONS } from '@/lib/url/emergency-filters'
@@ -61,34 +61,39 @@ export function TypeField({ filters, onChange, counts, showCounts }: FieldProps)
 }
 
 /**
- * 영업 조건 — 24시간 · 지금 진료중. 함께 걸 수 있으므로 체크다.
+ * 영업 조건 — **지금 진료중 · 24시간** 순서다. 함께 걸 수 있으므로 체크다.
+ *
+ * **순서가 뒤집혔다** (#654 E-3). 감사 실측에서 `지금 진료중` 은 이 화면의 여섯 번째
+ * 컨트롤이었다 — 이 화면을 여는 사람의 과업이 *"지금 갈 수 있는 곳에 전화"* 하나인데,
+ * 그 축이 가장 늦게 읽혔다. 이제 첫 축의 첫 값이고 **기본이 켜져 있다**
+ * (`DEFAULT_FACILITY_FILTERS`). 레일의 축 순서도 함께 뒤집혔다 (`EmergencyFilterRail`).
  *
  * **24시간 안내 문장을 이 필드가 갖는다.** 백엔드 스키마가 화면에 알리라고 명시한 사실인데,
  * 밖에 두면 레일과 칩 줄 중 한쪽에서 빠진다 — 실제로 지도 갈래와 목록 갈래가 각자 갖고 있었다.
+ * **이제 칩을 켰을 때가 아니라 늘 선다** (#654): `24시간 1` 이 "제주에 한 곳뿐" 으로
+ * 읽히는 오해는 켜기 전에 이미 자리를 잡는다 (`open24Note`).
  */
 export function NarrowFields({ filters, onChange, counts, showCounts }: FieldProps) {
   return (
     <>
       <FilterList label={messages.emergency.narrowGroupLabel}>
         <FilterCheck
-          selected={filters.open24Only}
-          onSelect={() => onChange({ ...filters, open24Only: !filters.open24Only })}
-        >
-          {labelWithCount(messages.emergency.open24, counts.open24, showCounts)}
-        </FilterCheck>
-        <FilterCheck
           selected={filters.openNowOnly}
           onSelect={() => onChange({ ...filters, openNowOnly: !filters.openNowOnly })}
         >
           {labelWithCount(messages.emergency.openNow, counts.openNow, showCounts)}
         </FilterCheck>
+        <FilterCheck
+          selected={filters.open24Only}
+          onSelect={() => onChange({ ...filters, open24Only: !filters.open24Only })}
+        >
+          {labelWithCount(messages.emergency.open24, counts.open24, showCounts)}
+        </FilterCheck>
       </FilterList>
 
-      {filters.open24Only && (
-        <p className="text-caption text-fg-muted px-4 pb-1 break-keep">
-          {messages.emergency.open24Note}
-        </p>
-      )}
+      <p className="text-caption text-fg-muted px-4 pb-1 break-keep">
+        {open24Note(counts.open24, showCounts)}
+      </p>
     </>
   )
 }

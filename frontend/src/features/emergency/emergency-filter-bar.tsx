@@ -3,7 +3,7 @@
 import { Chip, ChipGroup } from '@/components/chip'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { EmergencyRadiusChip } from '@/features/emergency/emergency-radius-chip'
-import { facilityCounts, labelWithCount } from '@/features/emergency/facility-filters'
+import { facilityCounts, labelWithCount, open24Note } from '@/features/emergency/facility-filters'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
 import {
@@ -76,7 +76,41 @@ export function EmergencyFilterBar({
 
   return (
     <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
-      {/* ── 1행: 유형 ─────────────────────────────────────────────────────
+      {/* ── 1행: 영업 조건 · 반경 · 초기화 ───────────────────────────────
+          **목록 갈래와 같은 순서다** (#654 E-3). 두 갈래가 같은 축을 다른 순서로
+          늘어놓으면 보기를 전환할 때 사용자가 다시 배워야 한다 — 상태는 이미
+          `useEmergencyBoard` 하나를 공유하고 있다. `지금 진료중` 은 **기본이 켜져 있어**
+          (`DEFAULT_FACILITY_FILTERS`) 여기서도 첫 칩이어야 "왜 마커가 줄었나" 에 답한다 */}
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        <ChipGroup label={messages.emergency.narrowGroupLabel} className="flex gap-1.5">
+          <Chip
+            selected={filters.openNowOnly}
+            onSelect={() => onFiltersChange({ ...filters, openNowOnly: !filters.openNowOnly })}
+          >
+            {labelWithCount(messages.emergency.openNow, counts.openNow, showCounts)}
+          </Chip>
+          <Chip
+            selected={filters.open24Only}
+            onSelect={() => onFiltersChange({ ...filters, open24Only: !filters.open24Only })}
+          >
+            {labelWithCount(messages.emergency.open24, counts.open24, showCounts)}
+          </Chip>
+        </ChipGroup>
+
+        <EmergencyRadiusChip radius={radius} onRadiusChange={onRadiusChange} />
+
+        {dirty && (
+          <Chip
+            selected={false}
+            onSelect={() => onFiltersChange(DEFAULT_FACILITY_FILTERS)}
+            className="shrink-0"
+          >
+            {messages.place.resetFilters}
+          </Chip>
+        )}
+      </div>
+
+      {/* ── 2행: 유형 ─────────────────────────────────────────────────────
           `.scroll-rail`(globals.css)이 화살표를 앉히는 기준면이고 **묶음 자신이
           스크롤러**다. 바깥 div 를 스크롤러로 삼으면 마지막 칩이 잘린다 */}
       <div className="scroll-rail">
@@ -113,39 +147,16 @@ export function EmergencyFilterBar({
         />
       </div>
 
-      {/* ── 2행: 반경 · 영업 조건 · 초기화 ──────────────────────────────── */}
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <EmergencyRadiusChip radius={radius} onRadiusChange={onRadiusChange} />
-
-        <ChipGroup label={messages.emergency.narrowGroupLabel} className="flex gap-1.5">
-          <Chip
-            selected={filters.open24Only}
-            onSelect={() => onFiltersChange({ ...filters, open24Only: !filters.open24Only })}
-          >
-            {labelWithCount(messages.emergency.open24, counts.open24, showCounts)}
-          </Chip>
-          <Chip
-            selected={filters.openNowOnly}
-            onSelect={() => onFiltersChange({ ...filters, openNowOnly: !filters.openNowOnly })}
-          >
-            {labelWithCount(messages.emergency.openNow, counts.openNow, showCounts)}
-          </Chip>
-        </ChipGroup>
-
-        {dirty && (
-          <Chip
-            selected={false}
-            onSelect={() => onFiltersChange(DEFAULT_FACILITY_FILTERS)}
-            className="shrink-0"
-          >
-            {messages.place.resetFilters}
-          </Chip>
-        )}
-      </div>
-
-      {/* 백엔드 스키마가 화면에 알리라고 명시한 사실이다 */}
+      {/*
+        백엔드 스키마가 화면에 알리라고 명시한 사실이다. **여기만 켰을 때 뜬다** —
+        목록 갈래(`EmergencyFilterChips` · `NarrowFields`)는 늘 세워 두지만, 이 줄은
+        375 시트 툴바 위에 얹혀 세로가 없다. 캡션 한 줄이 전화 버튼을 화면 밖으로
+        미는 일이 실제로 있었다 (`messages.emergency.positionDenied` 주석).
+      */}
       {filters.open24Only && (
-        <p className="text-caption text-fg-muted break-keep">{messages.emergency.open24Note}</p>
+        <p className="text-caption text-fg-muted break-keep">
+          {open24Note(counts.open24, showCounts)}
+        </p>
       )}
     </div>
   )

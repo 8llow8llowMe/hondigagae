@@ -40,8 +40,14 @@ describe('EmergencyFilterRail — 데스크톱 필터 레일 (#419)', () => {
     expect(render(DEFAULT_FACILITY_FILTERS)).not.toContain('초기화')
   })
 
+  /* `openNowOnly` 는 기본 ON 이라 «걸린 조건» 이 아니다 (#654) — 유형으로 잰다 */
   it('조건이 걸리면 초기화가 나온다', () => {
-    expect(render({ ...DEFAULT_FACILITY_FILTERS, openNowOnly: true })).toContain('초기화')
+    expect(render({ ...DEFAULT_FACILITY_FILTERS, type: 'ANIMAL_PHARMACY' })).toContain('초기화')
+  })
+
+  /** 기본 ON 인 축을 **끈** 것도 되돌릴 것이 남은 상태다 */
+  it('지금 진료중을 끄면 초기화가 나온다', () => {
+    expect(render({ ...DEFAULT_FACILITY_FILTERS, openNowOnly: false })).toContain('초기화')
   })
 
   /*
@@ -66,5 +72,30 @@ describe('EmergencyFilterRail — 데스크톱 필터 레일 (#419)', () => {
   /* 레일 인셋 규약(`.filter-rail`)을 타는 컨테이너여야 왼쪽 기준선 40 에 선다 (#386) */
   it('filter-rail 컨테이너를 쓴다', () => {
     expect(render(DEFAULT_FACILITY_FILTERS)).toContain('filter-rail')
+  })
+})
+
+/*
+  **레일의 축 순서도 뒤집혔다** (#654 E-3). 여기는 오래 반경이 첫 축이었는데
+  (*"지도를 옮겨도 재조회하지 않으므로 반경이 «더 넓게 찾기» 의 유일한 손잡이"*, #535),
+  그 말은 지금도 맞지만 **순서의 근거로는 약하다** — 반경을 넓히는 사람은 이미 결과를
+  보고 부족하다고 판단한 사람이라 축을 찾아 내려갈 여유가 있다.
+
+  모바일 칩 줄과 같은 순서여야 한다 (`EmergencyFilterChips`) — 두 표면이 다른 순서로
+  같은 축을 늘어놓으면 폭을 바꿨을 때 사용자가 다시 배워야 한다.
+*/
+describe('EmergencyFilterRail — 축 순서 (#654 E-3)', () => {
+  it('영업 조건 · 시설 유형 · 검색 반경 순이다', () => {
+    const markup = render(DEFAULT_FACILITY_FILTERS)
+    const positions = ['영업 조건', '시설 유형', '검색 반경'].map((label) => markup.indexOf(label))
+
+    expect(positions.some((index) => index < 0)).toBe(false)
+    expect(positions).toEqual([...positions].sort((left, right) => left - right))
+  })
+
+  it('영업 조건 안에서도 지금 진료중이 먼저다', () => {
+    const markup = render(DEFAULT_FACILITY_FILTERS)
+
+    expect(markup.indexOf('지금 진료중')).toBeLessThan(markup.indexOf('24시간'))
   })
 })

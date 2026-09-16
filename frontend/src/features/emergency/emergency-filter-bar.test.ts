@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { EmergencyFilterBar } from '@/features/emergency/emergency-filter-bar'
+import { open24Note } from '@/features/emergency/facility-filters'
 import { MAX_RADIUS_METERS } from '@/lib/api/emergency'
 import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
@@ -55,10 +56,14 @@ describe('EmergencyFilterBar', () => {
     )
   })
 
-  it('24시간을 켜면 결과가 적다는 사실을 알린다 — 백엔드 스키마가 명시한 안내다', () => {
-    expect(render()).not.toContain(messages.emergency.open24Note)
+  /*
+    **여기만 켰을 때 뜬다** (#654). 목록 갈래는 이 줄을 늘 세우지만 지도 툴바는 375 시트
+    위에 얹혀 세로가 없다 — 캡션 한 줄이 전화 버튼을 화면 밖으로 미는 일이 실제로 있었다.
+  */
+  it('24시간을 켜면 데이터 한계를 개수와 함께 알린다 — 백엔드 스키마가 명시한 안내다', () => {
+    expect(render()).not.toContain('24시간 진료가 확인된 곳')
     expect(render({ filters: { ...DEFAULT_FACILITY_FILTERS, open24Only: true } })).toContain(
-      messages.emergency.open24Note,
+      open24Note(1, true),
     )
   })
 
@@ -66,8 +71,16 @@ describe('EmergencyFilterBar', () => {
     expect(render()).not.toContain(messages.place.resetFilters)
   })
 
+  /* `openNowOnly` 는 기본 ON 이라 «걸린 조건» 이 아니다 (#654) — 유형으로 잰다 */
   it('조건이 걸려 있으면 초기화가 나온다', () => {
-    const markup = render({ filters: { ...DEFAULT_FACILITY_FILTERS, openNowOnly: true } })
+    const markup = render({ filters: { ...DEFAULT_FACILITY_FILTERS, type: 'ANIMAL_PHARMACY' } })
+
+    expect(markup).toContain(messages.place.resetFilters)
+  })
+
+  /** 기본 ON 인 축을 **끈** 것도 되돌릴 것이 남은 상태다 */
+  it('지금 진료중을 끄면 초기화가 나온다', () => {
+    const markup = render({ filters: { ...DEFAULT_FACILITY_FILTERS, openNowOnly: false } })
 
     expect(markup).toContain(messages.place.resetFilters)
   })
