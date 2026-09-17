@@ -7,6 +7,7 @@ import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanPetCon
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanPetEntity;
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanReviewEntity;
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanReviewItemEntity;
+import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanShareLinkEntity;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPackingItem;
@@ -14,6 +15,7 @@ import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPetCondition;
 import com.hondigagae.domainlayer.plan.domain.model.PlanReview;
 import com.hondigagae.domainlayer.plan.domain.model.PlanReviewItem;
+import com.hondigagae.domainlayer.plan.domain.model.PlanShareLink;
 import java.util.List;
 import org.mapstruct.Mapper;
 
@@ -79,4 +81,10 @@ public interface PlanMapper {
     List<PlanReviewItem> toReviewItemDomainListFromEntityList(List<PlanReviewItemEntity> entities);
 
     List<PlanReviewItemEntity> toReviewItemEntityListFromDomainList(List<PlanReviewItem> items);
+
+    // 엔티티 -> 도메인
+    PlanShareLink toDomainFromEntity(PlanShareLinkEntity entity);
+
+    // 도메인 -> 엔티티 (createdAt·updatedAt 은 BaseEntity 의 감사 필드라 저장 시 채워진다)
+    PlanShareLinkEntity toEntityFromDomain(PlanShareLink shareLink);
 }

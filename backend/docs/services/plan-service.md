@@ -25,6 +25,8 @@
 - `POST /api/v1/plans/{planId}/copy` — 지난 일정을 새 DRAFT 로 복제
 - `PUT /api/v1/plans/{planId}/days/{day}/items` — 일자 단위 항목 일괄 편집
 - `GET|POST|PUT /api/v1/plans/{planId}/reviews` — 일정당 후기 하나. 작성·수정은 완료된 일정만, 조회는 상태와 무관. 사진은 없음
+- `GET|POST|DELETE /api/v1/plans/{planId}/share-link` — 읽기 전용 공유 링크 발급·조회·폐기 (인증)
+- `GET /api/v1/shared-plans/{token}` — 공유 링크로 일정 열기 (**비인증**)
 
 ## 구현 주의점
 
@@ -119,6 +121,98 @@ CREATE TABLE plan_review_item (
     KEY idx_plan_review_item_review_id_sort_order (review_id, sort_order)
 ) COMMENT = '여행 후기 방문 장소 평가';
 ```
+
+## 일정 공유 링크 (`plan_share_link`)
+
+짠 일정을 동행자·가족에게 보여 줄 수단이 없었다. 계정을 만들게 하지 않고 **주소만으로 읽히는 링크**를 연다.
+
+- **소유권.** 발급·조회·폐기는 전부 본인 일정만이다 — 남의 일정은 기존 `getOwnedPlan` 이 던지는 `PLAN_001` 404 로
+  존재 자체를 노출하지 않는다. 공개 조회만 인증 없이 열린다.
+- **확정·완료만 공유한다.** `PlanStatus.isShareable()`(`!= DRAFT`)이 판정하고, **발급 시점과 공개 조회 시점
+  양쪽에서** 본다. 발급 때만 보면 확정 후 초안으로 되돌린 일정이 이미 나간 링크로 계속 열린다 —
+  사용자는 "되돌렸으니 안 보이겠지" 로 읽는다. 발급 거부는 `PLAN_022` 400, 되돌린 뒤 공개 조회는 `PLAN_023` 404 다.
+- **만료는 발급 시각 + 30일 고정.** 요청 바디가 없다 — 무기한 링크를 만들 수단을 아예 두지 않는다.
+  시각은 **주입받은 `Clock` 빈**(`PlanServiceBeansConfig`, `Asia/Seoul`)으로만 읽는다. `LocalDateTime.now()` 를
+  직접 부르면 JVM 기본 시간대(`TIME_ZONE` 환경변수)에 따라 "30일" 이 29일이나 31일이 된다. `createdAt` 과 산술하지 않는다.
+- **발급은 멱등.** 유효한(미폐기·미만료) 링크가 있으면 새로 만들지 않고 그 토큰을 돌려준다. 여러 개를 흩뿌리면
+  어느 것이 도는지 알 수 없고 폐기가 그중 하나만 닫는 착각이 생긴다. **링크 회전은 DELETE 후 POST** 뿐이다.
+- **폐기는 행 삭제가 아니라 `revoked_at` 타임스탬프.** 지우면 "폐기된 링크" 와 "없던 토큰" 이 구분되지 않아
+  유출 경로를 추적할 근거가 사라진다. DELETE 는 해당 일정의 **미폐기 행을 전부** 닫고 0건이어도 200 이다 —
+  동시 INSERT 로 남은 형제 행이 살아남으면 "껐다" 고 믿는 동안 옛 링크가 열린다. 이미 폐기된 행의 시각은 덮어쓰지 않는다.
+- **토큰**은 `SecureRandom` 32바이트를 URL-safe Base64(패딩 없음)로 옮긴 43자다. 평문 저장 + `uk_plan_share_link_token`.
+  토큰 자체가 열람 권한이라 **게이트웨이 로그에서 마스킹한다** (`LoggingGlobalApiGatewayFilter`, `/api/v1/shared-plans/***`).
+  마스킹이 없으면 Loki 를 볼 수 있는 사람이 곧 그 일정을 볼 수 있는 사람이 된다.
+- **실패 코드는 둘로만 갈린다.** 없음·폐기·일정 소프트삭제·비공유 상태는 전부 `PLAN_023` 404 로 **같게** 답한다 —
+  구분해 주면 토큰을 찍어 보는 쪽에 "이 토큰은 있었다" 를 흘린다. 만료만 `PLAN_024` 410 이다. 받은 사람이
+  "새 링크를 달라" 고 말할 수 있어야 하기 때문이다.
+- **공개 응답에서 뺀 것**(`SharedPlanResponse`·`SharedPlanItemItem`): `planId`(소유자 API 를 찍어 볼 실마리),
+  `petId`·`petIds`, `budget`, `planItemId`, `memo`, `visited`. 준비물·후기·응급 브리핑은 애초에 상세 응답에 없고
+  각자 별도 API 다. 이 감춤은 코드로 증명되지 않아 `PlanShareLinkPresenterTest` 가 **record component 이름 집합을
+  정확히 고정**한다 — 필드를 더하면 테스트가 깨져 "남에게 보여도 되는가" 를 다시 묻게 된다.
+- **접두어를 따로 둔 이유** (`/api/v1/shared-plans`). `/api/v1/plans/**` 아래 두면 "인증이 필요한 일정 API" 와
+  "토큰만으로 열리는 API" 가 한 경로 트리에 섞인다. 나중에 게이트웨이·보안을 경로 기준으로 조일 때 공개
+  엔드포인트 하나 때문에 트리 전체를 열어 두게 된다. 접두어가 나뉘면 "이 접두어는 공개" 가 경로만 보고 읽힌다.
+  대신 **게이트웨이 라우트를 세 프로파일 모두에 추가해야 한다** — `GatewayRouteCoverageTest` 가 그것을 고정한다 (#202).
+- **`permitAll` 은 어노테이션을 안 쓰는 것으로 걸린다.** `ResourceServerSecurityConfigurer` 가 이미
+  `anyRequest().permitAll()` 이고 인증은 `@PreAuthorize` 로만 건다. `SharedPlanWebController` 에는
+  `@PreAuthorize`·`@AuthenticationPrincipal`·`@SecurityRequirement` 가 없고, `MemberLoginActive` import 도 없어야 한다.
+- **조회 흐름은 복제하지 않는다.** 소유자 경로와 갈라지는 지점은 `getOwnedPlan`(memberId 필터) ↔
+  `resolveSharedPlan`(token 필터) **하나뿐**이고, 그 뒤 `PlanQueryProcessor.getPlanDetailInfo` 로 합류한다.
+  항목 조회와 장소 요약(tour-service 1회 호출)이 두 벌이 되면 한쪽만 고쳐질 자리가 생긴다.
+- **공개 조회 Facade 메서드에는 트랜잭션을 걸지 않는다.** `getPlanDetailInfo` 가 tour-service 원격 호출을 하기
+  때문이다 (architecture-guide §3 의 문서화된 예외). 공유 링크는 주소만 알면 누구나 두드릴 수 있어 이 경로가
+  DB 커넥션을 오래 잡으면 영향이 특히 크다. 소유자 3종은 원격 호출이 없어 Facade 에 그대로 건다.
+
+**마이그레이션**
+
+- local/dev(`ddl-auto: update`) — 기동 시 테이블이 만들어진다.
+- prod(`ddl-auto: none`) — 배포 전에 테이블을 만든다.
+
+`expires_at`·`revoked_at` 은 **`DATETIME(6)`** 이다. 엔티티에 `columnDefinition` 이 없어 Hibernate 는
+`datetime(6)` 을 만드는데 문서 DDL 만 `TIMESTAMP` 면 **dev(`ddl-auto: update`)와 prod(수기 DDL)의 스키마가
+갈린다.** 게다가 `TIMESTAMP` 는 2038 천장이 있고, `expires_at` 이 이 테이블의 첫 TIMESTAMP 컬럼이라 서버
+설정에 따라 `DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` 가 암묵적으로 붙을 수 있다.
+`entity-design.md` 의 다른 `LocalDateTime` 컬럼도 전부 `DATETIME` 이다.
+`created_at`/`updated_at` 의 `TIMESTAMP` 는 `BaseEntity` 의 `columnDefinition` 과 일치하므로 그대로 둔다 —
+엔티티에 `columnDefinition = "TIMESTAMP"` 를 다는 반대 방향은 택하지 않는다.
+
+```sql
+CREATE TABLE plan_share_link (
+    id          BIGINT      NOT NULL COMMENT '공유 링크 아이디',
+    plan_id     BIGINT      NOT NULL COMMENT '여행 일정 아이디 (FK: plan.id)',
+    token       VARCHAR(64) COLLATE utf8mb4_bin NOT NULL COMMENT '공유 토큰 (SecureRandom 32바이트의 URL-safe Base64, 43자). 대소문자를 구분해야 하므로 utf8mb4_bin',
+    expires_at  DATETIME(6) NOT NULL COMMENT '만료 시각 (발급 시각 + 30일)',
+    revoked_at  DATETIME(6) NULL COMMENT '폐기 시각. null 이면 유효한 링크다 (행을 지우지 않고 닫는다)',
+    created_at  TIMESTAMP   NOT NULL COMMENT '생성 날짜',
+    updated_at  TIMESTAMP   NOT NULL COMMENT '수정 날짜',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_plan_share_link_token (token),
+    KEY idx_plan_share_link_plan_id_revoked_at (plan_id, revoked_at)
+) COMMENT = '여행 일정 읽기 전용 공유 링크';
+```
+
+### 남은 위험 (이 이슈로 닫히지 않는 것)
+
+게이트웨이 로그 마스킹은 **완결된 방어가 아니다.** 아래는 알고 남긴 것들이다.
+
+- **[보안 MEDIUM] 앞단 nginx access log 는 여전히 평문이다.** 가려지는 것은 게이트웨이 애플리케이션 로그뿐이다.
+  nginx 가 TLS 를 종료하고 `combined` 포맷의 `$request` 가 전체 경로를 남기므로 **로그 열람권만 있는 사람이
+  토큰을 그대로 얻을 수 있다.** 링크 수명 30일이 그 잔여 위험의 상한이다. nginx `log_format` 치환은 인프라
+  레포 몫이라 이 PR 밖이다.
+- **[보안 MEDIUM] 공개 경로가 인증 경로와 `tour-service` 서킷 인스턴스를 공유한다.** 공유 링크가 공개적으로
+  퍼지면(이 기능이 기대하는 정상 사용) 크롤러·미리보기 봇의 반복 요청이 tour-service 호출로 증폭되고, 서킷이
+  열리면 **로그인 사용자의 일정 상세에서도 장소 요약이 빈다**(500 은 아니다 — 요약 실패는 삼키는 규칙이다).
+  레이트 리밋이 저장소 전체에 없다. 후속 이슈에서 게이트웨이 `RequestRateLimiter` 를 이 라우트에만 거는 것을
+  먼저 본다 — 짧은 TTL 캐시는 폐기 즉시성을 해치므로 리밋이 먼저다.
+- **[DB LOW] 보존/정리 정책이 없다.** 행을 지우지 않으므로 만료·미폐기 행이 쌓인다. 현실 규모에서는 무시할
+  수준이지만(한 일정당 재발급 주기마다 1행) 정리 배치는 아직 없다. 정리 배치가 생기면 그때 `(expires_at)`
+  인덱스가 필요해진다 — **지금 미리 만들지 않는다.**
+- **[DB LOW] 만료가 항상 410 으로 보이지는 않는다.** 만료된 옛 토큰이라도 그 사이 주인이 새 링크를 발급했다가
+  폐기하면 410 이 아니라 404 가 된다 — 폐기를 만료보다 먼저 판정하기 때문이다.
+- **검증 공백**: `idx_plan_share_link_plan_id_revoked_at` 의 역방향 인덱스 스캔(filesort 없음)과 콜레이션 동작은
+  **MySQL 전용 의미론이라 H2 슬라이스로 증명되지 않는다.** dev 반영 뒤
+  `EXPLAIN SELECT * FROM plan_share_link WHERE plan_id=? AND revoked_at IS NULL ORDER BY id DESC LIMIT 1` 로
+  `Backward index scan` 과 `Using filesort` 부재를 확인할 것.
 
 ## 동행 반려견 — 여러 마리 (`plan_pet`)
 

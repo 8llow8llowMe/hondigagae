@@ -29,6 +29,12 @@ public enum PlanErrorCode {
     PLAN_COMPLETED_PET_LOCKED("PLAN_019", "완료된 일정의 동행 반려견은 바꿀 수 없습니다.", HttpStatus.BAD_REQUEST),
     REVIEW_ITEM_DUPLICATED("PLAN_020", "같은 일정 항목을 후기에 두 번 넣을 수 없습니다.", HttpStatus.BAD_REQUEST),
     PLAN_COPY_PERIOD_MISMATCH("PLAN_021", "복사할 여행 기간의 일수는 원본과 같아야 합니다.", HttpStatus.BAD_REQUEST),
+    // 공유 링크 (#627). 없음·폐기·삭제된 일정·비공유 상태는 전부 PLAN_023 404 로 같게 답한다 —
+    // 어느 쪽인지 알려 주면 토큰을 찍어 보는 쪽에 "이 토큰은 있었다" 를 흘리게 된다.
+    // 만료만 PLAN_024 410 으로 가른다. 받는 쪽이 "새 링크를 달라" 고 말할 수 있어야 하기 때문이다.
+    SHARE_PLAN_NOT_SHAREABLE("PLAN_022", "확정되거나 완료된 일정만 공유할 수 있습니다.", HttpStatus.BAD_REQUEST),
+    SHARE_LINK_NOT_FOUND("PLAN_023", "유효하지 않은 공유 링크입니다.", HttpStatus.NOT_FOUND),
+    SHARE_LINK_EXPIRED("PLAN_024", "만료된 공유 링크입니다. 링크를 만든 사람에게 새 링크를 요청해 주세요.", HttpStatus.GONE),
     INVALID_REQUEST("PLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
     // 프레임워크 공통 2종은 검증 대역 끝에 둔다 (coding-conventions §8-2). PLAN_115 가 petIds 필드 코드로
     // 쓰이면서 한 칸씩 밀렸고, 준비물 필드 코드가 PLAN_116~123 을 가져가면서 다시 밀었다.
