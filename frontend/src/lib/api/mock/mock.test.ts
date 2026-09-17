@@ -8,6 +8,16 @@ import { isAllowedImageHost } from '@/lib/image/remote-host'
 import type { SliceResponse } from '@/types/api'
 import type { PlaceDetail, PlaceSummary } from '@/types/place'
 
+/**
+ * 가입 동의 3종 — 백엔드가 `@AssertTrue` 로 **필수**로 요구한다 (#688).
+ * 다른 것을 확인하는 가입 테스트들은 이 값을 함께 실어야 동의 검증에 먼저 걸리지 않는다.
+ */
+const SIGNUP_CONSENT = {
+  termsAgreed: true,
+  privacyAgreed: true,
+  ageOver14Confirmed: true,
+} as const
+
 function list(search: string) {
   const result = resolveMock('/places', 'GET', search, null)
   if (result === null) throw new Error('mock 이 경로를 처리하지 못했다')
@@ -365,6 +375,7 @@ describe('resolveMock — 인증', () => {
         password: 'password123!',
         name: '홍길동',
         nickname: '길동짱',
+        ...SIGNUP_CONSENT,
       }),
     )
 
@@ -394,6 +405,7 @@ describe('resolveMock — 인증', () => {
         password: 'password123!',
         name: '홍길동',
         nickname: '길동짱',
+        ...SIGNUP_CONSENT,
       }),
     )
 
@@ -489,6 +501,7 @@ describe('resolveMock — 인증', () => {
         password: 'password123!',
         name: '김철수',
         nickname: '철수독',
+        ...SIGNUP_CONSENT,
       }),
     )
 
@@ -508,7 +521,13 @@ describe('resolveMock — 인증', () => {
         '/members/signup',
         'POST',
         '',
-        JSON.stringify({ email, password: 'password123!', name: '홍길동', nickname }),
+        JSON.stringify({
+          email,
+          password: 'password123!',
+          name: '홍길동',
+          nickname,
+          ...SIGNUP_CONSENT,
+        }),
       )
       expect(result?.status).toBe(200)
     }
@@ -540,7 +559,7 @@ describe('resolveMock — 인증', () => {
       '/members/signup',
       'POST',
       '',
-      JSON.stringify({ email, password, name: '홍길동', nickname: '길동이' }),
+      JSON.stringify({ email, password, name: '홍길동', nickname: '길동이', ...SIGNUP_CONSENT }),
     )
 
     const created = mockStore().members.find((member) => member.email === email)

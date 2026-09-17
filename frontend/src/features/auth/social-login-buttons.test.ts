@@ -11,6 +11,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { SocialLoginButtons } from '@/features/auth/social-login-buttons'
+import { NO_SIGNUP_CONSENT, type SignupConsent } from '@/lib/auth/signup-consent'
+import { messages } from '@/lib/messages'
 
 const markup = renderToStaticMarkup(createElement(SocialLoginButtons, { returnTo: '/' }))
 
@@ -71,5 +73,56 @@ describe('소셜 로그인 버튼 — 브랜드 예외는 토큰으로만 (DESIG
   /* 값을 박으면 토큰과 두 곳으로 갈린다 — 린트가 className 만 보므로 여기서 마크까지 본다 */
   it('마크에 raw 색상값이 없다', () => {
     expect(markup).not.toMatch(/#[0-9A-Fa-f]{3,8}\b/)
+  })
+})
+
+/**
+ * 가입 화면에서만 동의로 잠근다 — 이슈 #688.
+ *
+ * **잠그는 자리가 여기뿐이다.** `/authorize` 는 동의가 비어도 성공하고, 거부는 인가코드를
+ * 태운 뒤인 콜백에서 일어난다 — 그 코드는 1회용이라 되돌릴 수 없다.
+ */
+describe('소셜 로그인 버튼 — 가입 동의 게이트 (#688)', () => {
+  function withConsent(consent: SignupConsent): string {
+    return renderToStaticMarkup(createElement(SocialLoginButtons, { returnTo: '/', consent }))
+  }
+
+  /*
+    `disabled` 라는 글자만 보면 안 된다 — `Button` 의 클래스에 `disabled:opacity-50` 이
+    들어 있어 항상 참이 된다. 실제 속성은 `disabled=""` 로 직렬화된다.
+  */
+  const DISABLED_ATTRIBUTE = 'disabled=""'
+
+  it('로그인 화면(동의를 넘기지 않음)은 잠그지 않는다 — 기존 회원 전용이다', () => {
+    expect(markup).not.toContain(DISABLED_ATTRIBUTE)
+    expect(markup).not.toContain(messages.auth.socialConsentRequired)
+  })
+
+  it('동의가 비면 두 버튼을 잠그고 이유를 글자로 말한다', () => {
+    const blocked = withConsent(NO_SIGNUP_CONSENT)
+
+    expect(blocked.match(/disabled=""/g) ?? []).toHaveLength(2)
+    expect(blocked).toContain(messages.auth.socialConsentRequired)
+  })
+
+  it('하나라도 비면 잠긴다', () => {
+    const blocked = withConsent({
+      termsAgreed: true,
+      privacyAgreed: true,
+      ageOver14Confirmed: false,
+    })
+
+    expect(blocked).toContain(DISABLED_ATTRIBUTE)
+  })
+
+  it('셋 다 켜지면 열리고 안내도 사라진다', () => {
+    const allowed = withConsent({
+      termsAgreed: true,
+      privacyAgreed: true,
+      ageOver14Confirmed: true,
+    })
+
+    expect(allowed).not.toContain(DISABLED_ATTRIBUTE)
+    expect(allowed).not.toContain(messages.auth.socialConsentRequired)
   })
 })

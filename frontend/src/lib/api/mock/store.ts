@@ -7,6 +7,8 @@
  *
  * 프로덕션 빌드에서는 `isMockEnabled()` 가 항상 false 라 이 상태에 도달하지 않는다.
  */
+import type { SignupConsent } from '@/lib/auth/signup-consent'
+
 export type MockMember = {
   memberId: string
   email: string
@@ -258,15 +260,20 @@ export type MockStore = {
   /** 비밀번호 재설정 코드. email → 코드·시도 횟수 */
   passwordResetCodes: Map<string, MockPasswordResetCode>
   /**
-   * 발급했지만 아직 쓰지 않은 OAuth state. 원소는 `` `${provider}:${state}` `` 다 —
+   * 발급했지만 아직 쓰지 않은 OAuth state. 키는 `` `${provider}:${state}` `` 다 —
    * 백엔드도 state 를 키로 provider 를 값으로 저장하고 둘이 맞는지 대조한다.
+   *
+   * **값이 가입 동의다** (#688). 백엔드도 `/authorize` 에서 받은 동의를 state 와 함께
+   * 보관했다가 콜백에서 꺼내 쓴다 (`RedisOAuthStateStoreAdapter`) — 인가코드가 1회용이라
+   * 콜백에서 다시 받을 수 없기 때문이다. Set 으로 두면 mock 이 동의를 잊어버려
+   * 미동의 최초 연동이 로컬에서만 통과한다.
    *
    * **교환에 성공하든 실패하든 조회 시점에 소비한다** (Redis `GETDEL` —
    * `RedisOAuthStateStoreAdapter.consume`). 그래서 같은 콜백 URL 을 두 번 태우면
    * 두 번째는 `AUTH_010` 이다 — **화면의 중복 실행 가드를 확인할 수 있는 성질이 이것이다.**
    * 10분 TTL 은 흉내 내지 않는다 (mock 에 시계를 두면 테스트가 시간에 묶인다).
    */
-  oauthStates: Set<string>
+  oauthStates: Map<string, SignupConsent>
   /** OAuth code·state 조립용 순번 */
   nextOAuthSeq: number
   /** memberId 조립용 순번. Number.MAX_SAFE_INTEGER 안쪽 값만 들고 있는다 — nextMemberId() 참고 */
@@ -471,7 +478,7 @@ function createStore(): MockStore {
     verifiedEmails: new Set<string>(),
     pendingEmails: new Set<string>(),
     passwordResetCodes: new Map<string, MockPasswordResetCode>(),
-    oauthStates: new Set<string>(),
+    oauthStates: new Map<string, SignupConsent>(),
     nextOAuthSeq: 1,
     nextMemberSeq: 4,
     pets: [
@@ -875,7 +882,8 @@ function isCurrentShape(store: MockStore | undefined): store is MockStore {
     // 비밀번호 재설정·소셜 로그인 상태가 뒤에 추가됐다 (#85). 낡은 스토어는 버린다 —
     // `?? new Map()` 으로 덮으면 옛 상태로 계속 굴러가며 증상만 사라진다
     store.passwordResetCodes instanceof Map &&
-    store.oauthStates instanceof Set &&
+    // 동의를 함께 들면서 Set → Map 이 됐다 (#688). 낡은 스토어(Set)는 여기서 버려진다
+    store.oauthStates instanceof Map &&
     // 즐겨찾기가 뒤에 추가됐다 (#118). 낡은 스토어는 버린다 — 위와 같은 이유다
     Array.isArray(store.favorites)
   )

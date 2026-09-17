@@ -14,6 +14,16 @@ describe('oauthNextAction — 오류 코드를 다음 행동으로만 가른다'
     expect(oauthNextAction('AUTH_008')).toBe('signin')
   })
 
+  /*
+    **우리 쪽 가입 동의는 제공자 동의와 다른 행동이다** (#688). `consent` 로 합치면
+    화면이 "제공자 동의 화면에서 켜고 다시 시도" 로 안내하는데, 켤 곳은 우리 회원가입
+    화면의 체크박스다.
+  */
+  it('가입 동의 누락은 회원가입 화면으로 보내야 한다', () => {
+    expect(oauthNextAction('MEMBER_010')).toBe('signup-consent')
+    expect(oauthNextAction('MEMBER_011')).toBe('signup-consent')
+  })
+
   it('나머지는 처음부터 다시다', () => {
     expect(oauthNextAction('AUTH_007')).toBe('retry')
     expect(oauthNextAction('AUTH_010')).toBe('retry')

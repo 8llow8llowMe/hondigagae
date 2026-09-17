@@ -1,3 +1,5 @@
+import { isSignupConsentCode } from '@/lib/auth/signup-consent'
+
 /**
  * 소셜 로그인 실패의 **다음 행동**을 정한다.
  *
@@ -12,6 +14,14 @@
 export type OAuthNextAction =
   /** 제공자 동의 화면에서 항목을 켜고 다시 시도해야 한다 */
   | 'consent'
+  /**
+   * **우리 쪽** 가입 동의가 비었다 — 회원가입 화면에서 동의한 뒤 다시 시도해야 한다 (#688).
+   *
+   * `consent` 와 갈라 두는 이유는 고칠 자리가 다르기 때문이다: 저쪽은 제공자의 동의
+   * 화면이고, 이쪽은 우리 회원가입 화면의 체크박스다. 로그인 화면의 소셜 버튼은 동의를
+   * 싣지 않으므로(기존 회원 전용) 신규 사용자가 거기로 들어오면 반드시 여기로 온다.
+   */
+  | 'signup-consent'
   /** 이미 다른 소셜로 가입된 계정 — 그 소셜로 로그인해야 한다 */
   | 'signin'
   /** 처음부터 다시 (state 만료·인증 실패·제공자 장애·일시 오류) */
@@ -37,6 +47,8 @@ const CONSENT_CODES = new Set([
 export function oauthNextAction(resultCode: string | null): OAuthNextAction {
   if (resultCode === null) return 'retry'
   if (CONSENT_CODES.has(resultCode)) return 'consent'
+  // MEMBER_010(문서 동의 누락) / MEMBER_011(만 14세 미확인) — 판정은 한 곳에 둔다
+  if (isSignupConsentCode(resultCode)) return 'signup-consent'
   // 이미 다른 소셜로 가입된 계정 — 같은 소셜로 다시 눌러도 결과가 같다
   if (resultCode === 'AUTH_008') return 'signin'
   return 'retry'

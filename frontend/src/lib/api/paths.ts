@@ -1,3 +1,5 @@
+import type { SignupConsent } from '@/lib/auth/signup-consent'
+
 /**
  * 백엔드 경로를 한 곳에 모은다. 전송 계층(client.ts / server.ts)이 갈려도
  * 경로·타입은 공유한다 — docs/architecture-guide.md §8.
@@ -10,7 +12,19 @@ export const paths = {
     login: '/auth/login',
     logout: '/auth/logout',
     reissue: '/auth/token/reissue',
-    oauthAuthorize: (provider: string) => `/auth/${provider}/authorize`,
+    /**
+     * 동의 3종은 **선택**이고 기본이 false 다. 최초 연동(= 신규 가입)에서만 쓰이므로
+     * 기존 회원 로그인 경로는 `consent` 없이 부른다 — 값을 붙여도 무시되지만,
+     * 받지도 않은 동의를 true 로 실어 보내면 이력에 거짓이 남는다 (#688).
+     */
+    oauthAuthorize: (provider: string, consent?: SignupConsent) =>
+      consent === undefined
+        ? `/auth/${provider}/authorize`
+        : `/auth/${provider}/authorize?${new URLSearchParams({
+            termsAgreed: String(consent.termsAgreed),
+            privacyAgreed: String(consent.privacyAgreed),
+            ageOver14Confirmed: String(consent.ageOver14Confirmed),
+          }).toString()}`,
     oauthLogin: (provider: string, code: string, state: string) =>
       `/auth/${provider}/login?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`,
     emailSendCode: '/auth/email/send-code',

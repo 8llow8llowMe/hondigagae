@@ -61,6 +61,27 @@ export const signupProfileSchema = z.object({
 })
 
 /**
+ * 가입 동의·만 14세 확인 — 이슈 #688 (백엔드 #607 · #608).
+ *
+ * **`signupProfileSchema` 에 합치지 않는다.** 동의는 3단계(프로필)의 값이 아니라
+ * **가입 화면 전체의 값**이다: 같은 화면의 소셜 버튼도 이 동의를 받아야 `/authorize` 를
+ * 부를 수 있고, 그 버튼은 1단계부터 보인다. 3단계 폼 값으로 가두면 소셜로 가입하려는
+ * 사용자는 동의할 방법이 없다 (회원가입-세부명세.md D8-5).
+ *
+ * `z.literal(true)` 가 아니라 `z.boolean().refine(...)` 인 이유는 **추론 타입**이다.
+ * `z.literal(true)` 는 타입이 `true` 라 체크 해제 상태(`false`)를 담을 수 없어 화면
+ * 상태 타입으로 쓸 수 없다. 백엔드도 `boolean` 필드에 `@AssertTrue` 를 거는 같은 모양이다.
+ */
+export const signupConsentSchema = z.object({
+  // MEMBER_115
+  termsAgreed: z.boolean().refine((agreed) => agreed, messages.form.termsAgreementRequired),
+  // MEMBER_116
+  privacyAgreed: z.boolean().refine((agreed) => agreed, messages.form.privacyAgreementRequired),
+  // MEMBER_117
+  ageOver14Confirmed: z.boolean().refine((confirmed) => confirmed, messages.form.ageOver14Required),
+})
+
+/**
  * 비밀번호 재설정 2단계 (코드 + 새 비밀번호).
  *
  * **필드명이 `newPassword` 다** — 요청 DTO(`AuthPasswordResetRequest`)와 같게 둔다.
@@ -86,4 +107,5 @@ export type LoginValues = z.infer<typeof loginSchema>
 export type EmailValues = z.infer<typeof emailSchema>
 export type CodeValues = z.infer<typeof codeSchema>
 export type SignupProfileValues = z.infer<typeof signupProfileSchema>
+export type SignupConsentValues = z.infer<typeof signupConsentSchema>
 export type PasswordResetValues = z.infer<typeof passwordResetSchema>

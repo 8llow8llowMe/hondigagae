@@ -13,13 +13,16 @@ import { mockStore, resetMockStore } from '@/lib/api/mock/store'
 
 type AuthorizeBody = { authorizationUrl: string }
 
-function authorize(provider: string) {
-  return resolveMock(`/auth/${provider}/authorize`, 'GET', '', null)
+/** 동의 3종을 모두 실은 쿼리 — 화면의 가입 경로가 보내는 모양이다 (#688) */
+const AGREED_QUERY = '?termsAgreed=true&privacyAgreed=true&ageOver14Confirmed=true'
+
+function authorize(provider: string, search = AGREED_QUERY) {
+  return resolveMock(`/auth/${provider}/authorize`, 'GET', search, null)
 }
 
 /** authorize 가 만들어 준 콜백 주소에서 code·state 를 꺼낸다 */
-function issued(provider: string): { code: string; state: string } {
-  const body = authorize(provider)?.payload.dataBody as AuthorizeBody
+function issued(provider: string, search = AGREED_QUERY): { code: string; state: string } {
+  const body = authorize(provider, search)?.payload.dataBody as AuthorizeBody
   const params = new URLSearchParams(body.authorizationUrl.split('?')[1] ?? '')
   return { code: params.get('code') ?? '', state: params.get('state') ?? '' }
 }
@@ -48,6 +51,31 @@ describe('GET /auth/{provider}/authorize', () => {
 
     expect(result?.status).toBe(400)
     expect(result?.payload.dataHeader.resultCode).toBe('AUTH_007')
+  })
+
+  /*
+    **동의는 state 와 함께 보관된다** (#688). 콜백은 인가코드를 이미 태운 뒤라 동의를
+    다시 받을 수 없어서, 백엔드도 여기서 받아 state 옆에 넣어 둔다. mock 이 이 값을
+    잊으면 미동의 최초 연동이 로컬에서만 통과한다.
+  */
+  it('동의를 state 와 함께 보관한다', () => {
+    const { state } = issued('kakao')
+
+    expect(mockStore().oauthStates.get(`KAKAO:${state}`)).toEqual({
+      termsAgreed: true,
+      privacyAgreed: true,
+      ageOver14Confirmed: true,
+    })
+  })
+
+  it('동의 쿼리가 없으면 전부 false 로 보관한다 — 백엔드 기본값과 같다', () => {
+    const { state } = issued('kakao', '')
+
+    expect(mockStore().oauthStates.get(`KAKAO:${state}`)).toEqual({
+      termsAgreed: false,
+      privacyAgreed: false,
+      ageOver14Confirmed: false,
+    })
   })
 })
 
@@ -148,6 +176,42 @@ describe('GET /auth/{provider}/login', () => {
       expect(result?.status).toBe(400)
       expect(result?.payload.dataHeader.resultCode).toBe(expected)
     }
+  })
+
+  /*
+    **동의 검사는 신규 생성 직전에만 돈다** (#688 · 백엔드 `validateSignupConsent`).
+    `kakao` 는 이미 가입된 `social@` 이라 동의가 비어도 통과해야 하고, `naver` 는 미가입
+    이메일이라 자동 회원가입 경로로 빠져 거부된다. 이 대비가 깨지면 기존 회원의 소셜
+    로그인이 동의 화면 없이는 불가능해진다.
+  */
+  it('기존 회원의 로그인은 동의가 비어도 통과한다', () => {
+    const { code, state } = issued('kakao', '')
+
+    expect(login('kakao', code, state)?.status).toBe(200)
+  })
+
+  it('문서 동의 없는 최초 연동은 400 MEMBER_010 이다', () => {
+    const { code, state } = issued('naver', '?ageOver14Confirmed=true')
+    const result = login('naver', code, state)
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('MEMBER_010')
+    // 거부됐으면 회원이 만들어지면 안 된다
+    expect(mockStore().members.some((member) => member.provider === 'NAVER')).toBe(false)
+  })
+
+  it('만 14세 확인 없는 최초 연동은 400 MEMBER_011 이다 — MEMBER_010 과 코드를 나눈다', () => {
+    const { code, state } = issued('naver', '?termsAgreed=true&privacyAgreed=true')
+    const result = login('naver', code, state)
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('MEMBER_011')
+  })
+
+  it('둘 다 비면 MEMBER_010 이 먼저 나간다 — 백엔드와 같은 순서다', () => {
+    const { code, state } = issued('naver', '')
+
+    expect(login('naver', code, state)?.payload.dataHeader.resultCode).toBe('MEMBER_010')
   })
 
   it('제공자 통신 불가는 502 AUTH_014 다', () => {
