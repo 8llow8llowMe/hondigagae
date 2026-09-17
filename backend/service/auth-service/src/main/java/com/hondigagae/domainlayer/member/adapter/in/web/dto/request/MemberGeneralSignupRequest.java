@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /**
- * 동의 플래그는 <b>primitive {@code boolean}</b> 이어야 한다. {@code @AssertTrue} 는 null 을
+ * 동의·확인 플래그는 <b>primitive {@code boolean}</b> 이어야 한다. {@code @AssertTrue} 는 null 을
  * 유효로 보기 때문에, 래퍼 {@code Boolean} 을 쓰면 필드를 아예 빼고 보낸 요청이 검증을 통과해
  * 동의 없이 가입된다. primitive 면 Jackson 이 누락된 필드를 {@code false} 로 채우고
  * {@code @AssertTrue} 가 그대로 걸러낸다.
@@ -47,7 +47,11 @@ public record MemberGeneralSignupRequest(
 
     @Schema(description = "개인정보 처리방침 동의 여부. 필수 동의라 true 가 아니면 가입할 수 없습니다", example = "true", requiredMode = Schema.RequiredMode.REQUIRED)
     @AssertTrue(message = MemberValidationMessage.PRIVACY_AGREEMENT_REQUIRED)
-    boolean privacyAgreed
+    boolean privacyAgreed,
+
+    @Schema(description = "만 14세 이상 확인 여부. 필수라 true 가 아니면 가입할 수 없습니다", example = "true", requiredMode = Schema.RequiredMode.REQUIRED)
+    @AssertTrue(message = MemberValidationMessage.AGE_OVER_14_REQUIRED)
+    boolean ageOver14Confirmed
 ) {
 
 }

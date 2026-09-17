@@ -44,9 +44,12 @@ public class MemberWebController {
 
     @Operation(summary = "일반 회원가입",
         description = "일반 회원으로 가입합니다. 먼저 이메일 인증코드 발송·검증(`/api/v1/auth/email/*`)을 마쳐야 하고, 검증 후 30분 안에 가입해야 합니다.\n\n"
-            + "인증 불필요. **필수: 요청 바디의 email, password(영문자·숫자·특수문자 포함 8~20자), name(10자 이내), nickname(10자 이내).**\n\n"
+            + "인증 불필요. **필수: 요청 바디의 email, password(영문자·숫자·특수문자 포함 8~20자), name(10자 이내), nickname(10자 이내), "
+            + "termsAgreed, privacyAgreed, ageOver14Confirmed(셋 다 true).**\n\n"
+            + "체크박스 셋은 각각 다른 코드로 막힙니다 — 이용약관 `MEMBER_115`, 개인정보 처리방침 `MEMBER_116`, 만 14세 이상 확인 `MEMBER_117`.\n\n"
             + "호출 예: `POST /api/v1/members/signup` "
-            + "`{\"email\":\"user@example.com\",\"password\":\"P@ssw0rd!\",\"name\":\"홍길동\",\"nickname\":\"길동짱\"}`")
+            + "`{\"email\":\"user@example.com\",\"password\":\"P@ssw0rd!\",\"name\":\"홍길동\",\"nickname\":\"길동짱\","
+            + "\"termsAgreed\":true,\"privacyAgreed\":true,\"ageOver14Confirmed\":true}`")
     @PostMapping("/signup")
     public ResponseEntity<Response<Void>> generalSignup(@Valid @RequestBody MemberGeneralSignupRequest request) {
         memberWebUseCase.generalSignup(MemberGeneralSignupCommand.from(request));

@@ -43,11 +43,11 @@ public class MemberConsentEntity extends BaseEntity {
 
     @Column(nullable = false, length = 30)
     @Enumerated(EnumType.STRING)
-    @Comment("동의 항목 (TERMS_OF_SERVICE/PRIVACY_POLICY)")
+    @Comment("동의·확인 항목 (TERMS_OF_SERVICE/PRIVACY_POLICY/AGE_OVER_14) - AGE_OVER_14 는 문서 동의가 아니라 자기신고 확인이라 철회 대상이 아니다")
     private ConsentType type;
 
     @Column(nullable = false, length = 20)
-    @Comment("동의한 문서의 버전 - 정본은 프론트 legal 상수, 백엔드는 legal.*-version 설정으로 맞춘다")
+    @Comment("근거 문서의 버전 - 정본은 프론트 legal 상수, 백엔드는 legal.*-version 설정으로 맞춘다. AGE_OVER_14 는 만 14세 기준을 규정하는 이용약관 버전을 박는다")
     private String documentVersion;
 
     @Column(nullable = false)

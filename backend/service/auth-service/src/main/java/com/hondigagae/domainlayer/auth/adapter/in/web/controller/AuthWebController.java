@@ -122,21 +122,25 @@ public class AuthWebController {
 
     @Operation(summary = "소셜 로그인 인가 URL 생성",
         description = "provider(kakao/naver) 인가 페이지 URL을 생성합니다. CSRF 방어용 state가 포함되며 10분간 유효합니다. 프론트는 이 URL로 리다이렉트합니다.\n\n"
-            + "인증 불필요. **필수: provider(경로).** 동의 값(termsAgreed/privacyAgreed)은 선택이며 기본 false 입니다.\n\n"
-            + "**신규 가입이면 동의가 필수입니다.** 동의 값은 state 와 함께 보관됐다가 최초 연동(= 신규 가입) 때만 쓰이고, "
-            + "이미 가입한 회원의 로그인에는 영향을 주지 않습니다. 동의 없이 최초 연동을 시도하면 콜백(소셜 로그인)에서 "
-            + "`MEMBER_010` 으로 거부됩니다. 인가코드가 1회용이라 콜백에서 동의를 새로 받을 수 없어 이 단계에서 받습니다.\n\n"
-            + "호출 예: `GET /api/v1/auth/kakao/authorize?termsAgreed=true&privacyAgreed=true` → 응답의 authorizeUrl 로 브라우저를 이동시킵니다")
+            + "인증 불필요. **필수: provider(경로).** 동의·확인 값(termsAgreed/privacyAgreed/ageOver14Confirmed)은 선택이며 기본 false 입니다.\n\n"
+            + "**신규 가입이면 세 값이 모두 필수입니다.** 이 값들은 state 와 함께 보관됐다가 최초 연동(= 신규 가입) 때만 쓰이고, "
+            + "이미 가입한 회원의 로그인에는 영향을 주지 않습니다. 빠진 채로 최초 연동을 시도하면 콜백(소셜 로그인)에서 "
+            + "문서 동의 누락은 `MEMBER_010`, 만 14세 이상 확인 누락은 `MEMBER_011` 로 거부됩니다 — 프론트가 강조할 체크박스가 달라 코드를 나눴습니다. "
+            + "인가코드가 1회용이라 콜백에서 다시 받을 수 없어 이 단계에서 받습니다.\n\n"
+            + "호출 예: `GET /api/v1/auth/kakao/authorize?termsAgreed=true&privacyAgreed=true&ageOver14Confirmed=true` "
+            + "→ 응답의 authorizeUrl 로 브라우저를 이동시킵니다")
     @GetMapping("/{provider}/authorize")
     public ResponseEntity<Response<AuthOAuthAuthorizeResponse>> generateOAuthAuthorizationUrl(
         @Parameter(description = "[필수] 소셜 로그인 제공자. kakao 카카오 · naver 네이버 (소문자)", required = true, example = "kakao") @PathVariable OAuthProvider provider,
         @Parameter(description = "[선택] 이용약관 동의 여부. 신규 가입이 되는 최초 연동에서만 필요하고, 이미 가입한 회원의 로그인에는 쓰이지 않습니다", example = "true")
         @RequestParam(defaultValue = "false") boolean termsAgreed,
         @Parameter(description = "[선택] 개인정보 처리방침 동의 여부. 신규 가입이 되는 최초 연동에서만 필요하고, 이미 가입한 회원의 로그인에는 쓰이지 않습니다", example = "true")
-        @RequestParam(defaultValue = "false") boolean privacyAgreed
+        @RequestParam(defaultValue = "false") boolean privacyAgreed,
+        @Parameter(description = "[선택] 만 14세 이상 확인 여부. 신규 가입이 되는 최초 연동에서만 필요하고, 이미 가입한 회원의 로그인에는 쓰이지 않습니다", example = "true")
+        @RequestParam(defaultValue = "false") boolean ageOver14Confirmed
     ) {
         AuthOAuthAuthorizeResponse response = authWebUseCase.generateOAuthAuthorizationUrl(
-            provider, new OAuthSignupConsent(termsAgreed, privacyAgreed));
+            provider, new OAuthSignupConsent(termsAgreed, privacyAgreed, ageOver14Confirmed));
         return ResponseEntity.ok().body(Response.success(response));
     }
 
@@ -144,8 +148,9 @@ public class AuthWebController {
         description = "provider 콜백의 인가코드와 state로 로그인합니다. 미가입 이메일이면 자동 회원가입 후 로그인합니다. 응답은 일반 로그인과 동일합니다(accessToken + refresh 쿠키).\n\n"
             + "인증 불필요. **필수: provider(경로), code, state.** 둘 다 provider 가 콜백 URL 의 쿼리로 넘겨준 값을 그대로 전달합니다. "
             + "state 가 인가 URL 생성 때 발급한 값과 다르거나 10분이 지났으면 실패합니다.\n\n"
-            + "자동 회원가입이 일어나는 최초 연동에서 인가 URL 생성 때 동의를 받지 않았다면 `MEMBER_010` 으로 거부됩니다. "
-            + "이미 가입한 회원의 로그인은 동의와 무관하게 통과합니다.\n\n"
+            + "자동 회원가입이 일어나는 최초 연동에서 인가 URL 생성 때 문서 동의를 받지 않았다면 `MEMBER_010`, "
+            + "만 14세 이상 확인을 받지 않았다면 `MEMBER_011` 로 거부됩니다. "
+            + "이미 가입한 회원의 로그인은 동의·확인과 무관하게 통과합니다.\n\n"
             + "호출 예: `GET /api/v1/auth/kakao/login?code=<콜백 code>&state=<콜백 state>`")
     @GetMapping("/{provider}/login")
     public ResponseEntity<Response<AuthGeneralLoginResponse>> loginWithOAuthCode(

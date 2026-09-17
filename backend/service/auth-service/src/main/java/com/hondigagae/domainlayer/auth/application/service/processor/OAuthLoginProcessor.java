@@ -165,21 +165,37 @@ public class OAuthLoginProcessor {
     }
 
     /**
-     * 소셜 최초 연동 = 신규 가입이다. 그래서 일반 가입과 같은 기준으로 동의를 요구하고,
+     * 소셜 최초 연동 = 신규 가입이다. 그래서 일반 가입과 같은 기준으로 동의·확인을 요구하고,
      * 같은 모양의 이력을 남긴다.
      */
     private Member signupOAuthMember(
         OAuthProvider provider, String email, OAuthMemberQueryResult oAuthMember, OAuthSignupConsent consent
     ) {
-        if (!consent.agreedAll()) {
-            throw new MemberException(MemberErrorCode.CONSENT_REQUIRED);
-        }
+        validateSignupConsent(consent);
 
         Member created = createOAuthMember(provider, email, oAuthMember);
         // 이력 생성 규칙(필수 항목·박제할 버전·항목 간 같은 시각)은 member 컨텍스트의 단일 지점에
         // 있다. 여기서 직접 만들면 항목이 늘어날 때 소셜 경로만 옛 규칙으로 남는다.
         memberConsentProcessor.recordSignupConsents(created.id());
         return created;
+    }
+
+    /**
+     * 거부 사유를 <b>항목별로 갈라</b> 던진다. 하나로 뭉뚱그리면 프론트가 어느 체크박스를 강조할지
+     * 알 수 없어서, 사용자는 "동의를 다 했는데 왜 안 되지"를 겪는다. 콜백은 인가코드를 이미 태운
+     * 뒤라 되돌아갈 곳이 동의 화면뿐이고, 그래서 사유가 정확해야 한다.
+     *
+     * <p>문서 동의를 먼저 본다 — 두 종류가 함께 비어 있으면 {@code MEMBER_010} 이 나가는 것이
+     * 이 경로의 기존 동작이고, 만 14세 확인은 그 뒤에 붙은 분기다.
+     */
+    private void validateSignupConsent(OAuthSignupConsent consent) {
+        if (consent.agreedAll()) {
+            return;
+        }
+        if (!consent.termsAgreed() || !consent.privacyAgreed()) {
+            throw new MemberException(MemberErrorCode.CONSENT_REQUIRED);
+        }
+        throw new MemberException(MemberErrorCode.AGE_REQUIREMENT_NOT_MET);
     }
 
     private Member createOAuthMember(OAuthProvider provider, String email, OAuthMemberQueryResult oAuthMember) {

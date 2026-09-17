@@ -34,14 +34,15 @@ class MemberConsentProcessorTest {
     @BeforeEach
     void setUp() {
         consentRepositoryPort = new RecordingConsentRepositoryPort();
-        // 두 버전을 일부러 다르게 둔다 — 한 값을 두 항목에 복사하는 실수를 값이 같으면 못 잡는다.
+        // 두 버전을 일부러 다르게 둔다 — 한 값을 여러 항목에 복사하는 실수를 값이 같으면 못 잡는다.
+        // 특히 AGE_OVER_14 에 처리방침 버전을 박는 실수는 두 값이 같으면 영원히 드러나지 않는다.
         processor = new MemberConsentProcessor(
             consentRepositoryPort, new SnowflakeIdGenerator(1, 1),
             new LegalDocumentProperties(TERMS_VERSION, PRIVACY_VERSION));
     }
 
     @Test
-    @DisplayName("필수 동의 2건을 설정된 문서 버전으로 남긴다")
+    @DisplayName("필수 동의·확인 3건을 설정된 문서 버전으로 남긴다")
     void recordsRequiredConsentsWithConfiguredVersions() {
         processor.recordSignupConsents(MEMBER_ID);
 
@@ -49,7 +50,22 @@ class MemberConsentProcessorTest {
             .extracting(MemberConsent::memberId, MemberConsent::type, MemberConsent::documentVersion)
             .containsExactly(
                 tuple(MEMBER_ID, ConsentType.TERMS_OF_SERVICE, TERMS_VERSION),
-                tuple(MEMBER_ID, ConsentType.PRIVACY_POLICY, PRIVACY_VERSION));
+                tuple(MEMBER_ID, ConsentType.PRIVACY_POLICY, PRIVACY_VERSION),
+                tuple(MEMBER_ID, ConsentType.AGE_OVER_14, TERMS_VERSION));
+    }
+
+    @Test
+    @DisplayName("만 14세 이상 확인에는 근거 문서인 이용약관 버전을 박는다")
+    void stampsTermsVersionOnAgeConfirmation() {
+        // 만 14세 미만 가입 불가를 규정하는 것은 이용약관이다. 처리방침 버전을 박으면 나중에
+        // "그때 그 조항이 어떤 문장이었는가"를 복원할 때 엉뚱한 문서를 펼치게 된다.
+        processor.recordSignupConsents(MEMBER_ID);
+
+        assertThat(consentRepositoryPort.saved)
+            .filteredOn(consent -> consent.type() == ConsentType.AGE_OVER_14)
+            .singleElement()
+            .extracting(MemberConsent::documentVersion)
+            .isEqualTo(TERMS_VERSION);
     }
 
     @Test
@@ -57,9 +73,10 @@ class MemberConsentProcessorTest {
     void recordsEveryConsentAtTheSameInstant() {
         processor.recordSignupConsents(MEMBER_ID);
 
-        assertThat(consentRepositoryPort.saved).hasSize(2);
-        assertThat(consentRepositoryPort.saved.get(0).agreedAt())
-            .isEqualTo(consentRepositoryPort.saved.get(1).agreedAt());
+        assertThat(consentRepositoryPort.saved).hasSize(3);
+        assertThat(consentRepositoryPort.saved)
+            .extracting(MemberConsent::agreedAt)
+            .containsOnly(consentRepositoryPort.saved.get(0).agreedAt());
     }
 
     @Test

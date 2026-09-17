@@ -1,7 +1,7 @@
 package com.hondigagae.domainlayer.auth.application.model;
 
 /**
- * 소셜 최초 연동(= 신규 가입)에 쓰는 동의 플래그.
+ * 소셜 최초 연동(= 신규 가입)에 쓰는 동의·확인 플래그.
  *
  * <p>이 값은 {@code /authorize} 시점에 받아 state 와 함께 보관했다가 콜백에서 꺼내 쓴다.
  * 콜백에서 다시 받지 않는 이유는 <b>OAuth 인가코드가 1회용</b>이기 때문이다 — 콜백에서
@@ -15,17 +15,22 @@ package com.hondigagae.domainlayer.auth.application.model;
  *
  * <p>이미 가입한 회원의 로그인에는 쓰이지 않으므로 기본값은 전부 {@code false} 여도 된다.
  */
-public record OAuthSignupConsent(boolean termsAgreed, boolean privacyAgreed) {
+public record OAuthSignupConsent(boolean termsAgreed, boolean privacyAgreed, boolean ageOver14Confirmed) {
 
-    private static final OAuthSignupConsent NONE = new OAuthSignupConsent(false, false);
+    private static final OAuthSignupConsent NONE = new OAuthSignupConsent(false, false, false);
 
     /** 동의를 받지 않은 상태. 기존 회원 로그인 경로에서만 유효하다. */
     public static OAuthSignupConsent none() {
         return NONE;
     }
 
-    /** 필수 동의를 모두 받았는지. 신규 회원 생성 직전에만 묻는다. */
+    /**
+     * 가입에 필요한 항목을 모두 받았는지. 신규 회원 생성 직전에만 묻는다.
+     *
+     * <p>거부 사유는 이 값으로 알 수 없다. 어느 항목이 비었는지에 따라 프론트가 강조할 체크박스가
+     * 달라서, 실제 예외 코드는 호출부가 항목별로 갈라 던진다.
+     */
     public boolean agreedAll() {
-        return termsAgreed && privacyAgreed;
+        return termsAgreed && privacyAgreed && ageOver14Confirmed;
     }
 }

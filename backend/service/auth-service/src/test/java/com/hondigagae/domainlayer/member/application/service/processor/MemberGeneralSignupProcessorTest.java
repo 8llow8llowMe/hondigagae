@@ -64,7 +64,7 @@ class MemberGeneralSignupProcessorTest {
         processor.generalSignup(command(true, true));
 
         long memberId = memberRepositoryPort.findByEmail(EMAIL).orElseThrow().id();
-        assertThat(consentRepositoryPort.saved).hasSize(2);
+        assertThat(consentRepositoryPort.saved).hasSize(3);
         assertThat(consentRepositoryPort.saved).allSatisfy(
             consent -> assertThat(consent.memberId()).isEqualTo(memberId));
     }
@@ -96,6 +96,31 @@ class MemberGeneralSignupProcessorTest {
 
         assertThat(memberRepositoryPort.findByEmail(EMAIL)).isEmpty();
         assertThat(consentRepositoryPort.saved).isEmpty();
+    }
+
+    @Test
+    @DisplayName("만 14세 이상 확인이 없으면 회원도 이력도 남지 않는다")
+    void rejectsWithoutAgeConfirmation() {
+        emailVerificationPort.markVerified(EMAIL);
+
+        assertThatThrownBy(() -> processor.generalSignup(command(true, true, false)))
+            .isInstanceOf(MemberException.class)
+            // 동의 누락(MEMBER_010)과 다른 코드여야 한다 — 프론트가 강조할 체크박스가 다르다.
+            .hasFieldOrPropertyWithValue("errorCode", MemberErrorCode.AGE_REQUIREMENT_NOT_MET);
+
+        assertThat(memberRepositoryPort.findByEmail(EMAIL)).isEmpty();
+        assertThat(consentRepositoryPort.saved).isEmpty();
+    }
+
+    @Test
+    @DisplayName("만 14세 확인 검사도 이메일 인증보다 먼저다 — 확인 없는 요청은 인증 플래그를 건드리지 않는다")
+    void checksAgeBeforeTouchingVerificationFlag() {
+        emailVerificationPort.markVerified(EMAIL);
+
+        assertThatThrownBy(() -> processor.generalSignup(command(true, true, false)))
+            .isInstanceOf(MemberException.class);
+
+        assertThat(emailVerificationPort.isVerified(EMAIL)).isTrue();
     }
 
     @Test
@@ -139,10 +164,15 @@ class MemberGeneralSignupProcessorTest {
 
     // --- fixtures ---
 
+    /** 문서 동의만 바꾸는 경우. 만 14세 확인은 전용 테스트가 따로 보므로 통과값으로 고정한다. */
     private MemberGeneralSignupCommand command(boolean termsAgreed, boolean privacyAgreed) {
+        return command(termsAgreed, privacyAgreed, true);
+    }
+
+    private MemberGeneralSignupCommand command(boolean termsAgreed, boolean privacyAgreed, boolean ageOver14Confirmed) {
         return MemberGeneralSignupCommand.builder()
             .email(EMAIL).password(PASSWORD).name("테스터").nickname("테스터")
-            .termsAgreed(termsAgreed).privacyAgreed(privacyAgreed)
+            .termsAgreed(termsAgreed).privacyAgreed(privacyAgreed).ageOver14Confirmed(ageOver14Confirmed)
             .build();
     }
 
