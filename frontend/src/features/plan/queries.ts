@@ -34,6 +34,13 @@ export const planKeys = {
    * 목록에는 `hasReview` 가 없어 목록 key 를 건드리지 않는다.
    */
   review: (planId: string) => [...planKeys.all, 'review', planId] as const,
+  /**
+   * 공유 링크 (#628). **상세와 key 를 나눈다** — 링크가 없어 404(`PLAN_023`)여도 일정
+   * 본문은 그대로 남아야 하고, 발급·폐기 뒤에는 이 key 만 갱신하면 된다.
+   *
+   * **상세 응답에 공유 여부가 없어** 상세 key 를 건드릴 일이 없다 (후기와 같은 판단).
+   */
+  shareLink: (planId: string) => [...planKeys.all, 'share-link', planId] as const,
 }
 
 /** api-integration-guide.md §7 표준값 — 일정 목록·상세는 30초 / 10분 (mutation 빈번) */
