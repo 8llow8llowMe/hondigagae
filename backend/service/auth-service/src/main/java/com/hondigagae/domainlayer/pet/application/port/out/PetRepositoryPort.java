@@ -18,4 +18,10 @@ public interface PetRepositoryPort {
     List<String> findAllProfileImageKeys();
 
     Optional<Pet> findRepresentativeByMemberId(long memberId);
+
+    /**
+     * 회원의 반려견 행을 물리 삭제한다. 보존 기간이 지난 탈퇴 회원 정리 전용이라 소프트 삭제
+     * 여부를 보지 않는다 — 부모(member)가 사라지는 마당에 남겨 둘 이유가 없다.
+     */
+    void deleteAllByMemberIdIn(List<Long> memberIds);
 }

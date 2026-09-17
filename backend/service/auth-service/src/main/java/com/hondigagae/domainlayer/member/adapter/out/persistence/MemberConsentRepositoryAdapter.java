@@ -23,4 +23,9 @@ public class MemberConsentRepositoryAdapter implements MemberConsentRepositoryPo
             .toList();
         memberConsentRepository.saveAll(entities);
     }
+
+    @Override
+    public void deleteAllByMemberIdIn(List<Long> memberIds) {
+        memberConsentRepository.deleteAllByMemberIdIn(memberIds);
+    }
 }

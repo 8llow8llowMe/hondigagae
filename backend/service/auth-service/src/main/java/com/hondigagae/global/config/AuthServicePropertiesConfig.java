@@ -6,6 +6,7 @@ import com.hondigagae.global.properties.AuthSessionProperties;
 import com.hondigagae.global.properties.EmailSendLimitProperties;
 import com.hondigagae.global.properties.LegalDocumentProperties;
 import com.hondigagae.global.properties.LoginAttemptProperties;
+import com.hondigagae.global.properties.WithdrawnEmailProperties;
 import com.hondigagae.persistence.config.SnowflakePropertiesConfig;
 import com.hondigagae.redis.config.RedisPropertiesConfig;
 import com.hondigagae.security.auth.config.JwtAuthPropertiesConfig;
@@ -25,7 +26,7 @@ import org.springframework.context.annotation.Import;
 })
 @EnableConfigurationProperties({
     LoginAttemptProperties.class, AuthSessionProperties.class, EmailSendLimitProperties.class,
-    LegalDocumentProperties.class
+    LegalDocumentProperties.class, WithdrawnEmailProperties.class
 })
 public class AuthServicePropertiesConfig {
 

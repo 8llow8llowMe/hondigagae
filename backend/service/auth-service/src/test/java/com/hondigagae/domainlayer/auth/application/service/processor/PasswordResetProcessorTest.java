@@ -306,13 +306,27 @@ class PasswordResetProcessorTest {
         }
 
         @Override
+        public boolean existsByEmailIn(java.util.List<String> emails) {
+            return emails.stream().anyMatch(members::containsKey);
+        }
+
+        @Override
         public Optional<Member> findById(long memberId) {
             return members.values().stream().filter(member -> member.id() == memberId).findFirst();
         }
-    
+
         @Override
         public java.util.List<String> findAllProfileImageKeys() {
             return java.util.List.of();
+        }
+
+        @Override
+        public java.util.List<Long> findWithdrawnMemberIdsBefore(java.time.LocalDateTime threshold, int limit) {
+            return java.util.List.of();
+        }
+
+        @Override
+        public void deleteAllByIdIn(java.util.List<Long> memberIds) {
         }
     }
 

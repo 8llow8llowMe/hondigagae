@@ -9,8 +9,10 @@ import com.hondigagae.domainlayer.auth.application.port.out.EmailVerificationSto
 import com.hondigagae.domainlayer.auth.application.port.out.MailSendPort;
 import com.hondigagae.domainlayer.auth.application.service.support.VerificationCodeGenerator;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
+import com.hondigagae.domainlayer.member.application.service.support.WithdrawnEmailHasher;
 import com.hondigagae.domainlayer.member.domain.model.Member;
 import com.hondigagae.global.properties.EmailSendLimitProperties;
+import com.hondigagae.global.properties.WithdrawnEmailProperties;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,19 +28,26 @@ class EmailVerificationProcessorTest {
 
     private static final String CLIENT_IP = "203.0.113.10";
     private static final int IP_MAX_SEND_COUNT = 3;
+    private static final String WITHDRAWN_EMAIL = "withdrawn@example.com";
 
     private StubEmailVerificationStorePort storePort;
     private StubMailSendPort mailSendPort;
+    private StubMemberRepositoryPort memberRepositoryPort;
+    private WithdrawnEmailHasher withdrawnEmailHasher;
     private EmailVerificationProcessor processor;
 
     @BeforeEach
     void setUp() {
         storePort = new StubEmailVerificationStorePort();
         mailSendPort = new StubMailSendPort();
+        memberRepositoryPort = new StubMemberRepositoryPort();
+        withdrawnEmailHasher = new WithdrawnEmailHasher(
+            new WithdrawnEmailProperties("email-verification-test-pepper-0123456789"));
         processor = new EmailVerificationProcessor(
             storePort,
             mailSendPort,
-            new StubMemberRepositoryPort(),
+            memberRepositoryPort,
+            withdrawnEmailHasher,
             new EmailSendLimitProperties(IP_MAX_SEND_COUNT, Duration.ofHours(1)),
             new VerificationCodeGenerator()
         );
@@ -49,6 +58,35 @@ class EmailVerificationProcessorTest {
         processor.sendCode("user1@example.com", CLIENT_IP);
 
         assertThat(mailSendPort.sentCodes).hasSize(1);
+    }
+
+    /**
+     * 탈퇴 회원의 email 은 다이제스트로 치환돼 있어 원문 조회에 잡히지 않는다. 원문만 보면 탈퇴한
+     * 주소로 인증코드가 발급되고 verified 플래그까지 잡힌 뒤 마지막 가입에서야 막힌다 —
+     * "기가입 이메일에는 코드를 주지 않는다"가 탈퇴자에게만 깨진다.
+     */
+    @Test
+    void sendCode_withdrawnEmail_sendsAlreadyRegisteredNoticeInsteadOfCode() {
+        memberRepositoryPort.register(withdrawnEmailHasher.hash(WITHDRAWN_EMAIL));
+
+        processor.sendCode(WITHDRAWN_EMAIL, CLIENT_IP);
+
+        assertThat(mailSendPort.sentCodes).isEmpty();
+        assertThat(mailSendPort.alreadyRegisteredNotices).containsExactly(WITHDRAWN_EMAIL);
+        // 코드가 저장되지 않아야 한다 — 저장되면 verifyCode 로 verified 플래그까지 잡을 수 있다.
+        assertThat(storePort.findCode(WITHDRAWN_EMAIL)).isEmpty();
+    }
+
+    @Test
+    void sendCode_activeEmail_sendsAlreadyRegisteredNoticeInsteadOfCode() {
+        // 원문으로 남아 있는 기가입(ACTIVE) 계정도 같은 경로를 탄다 — 두 경우의 응답이 같아야
+        // 발송 결과로 탈퇴/가입 상태를 구분할 수 없다.
+        memberRepositoryPort.register("active@example.com");
+
+        processor.sendCode("active@example.com", CLIENT_IP);
+
+        assertThat(mailSendPort.sentCodes).isEmpty();
+        assertThat(mailSendPort.alreadyRegisteredNotices).containsExactly("active@example.com");
     }
 
     @Test
@@ -201,6 +239,7 @@ class EmailVerificationProcessorTest {
     private static class StubMailSendPort implements MailSendPort {
 
         private final List<String> sentCodes = new ArrayList<>();
+        private final List<String> alreadyRegisteredNotices = new ArrayList<>();
 
         @Override
         public void sendVerificationCode(String email, String code) {
@@ -209,6 +248,7 @@ class EmailVerificationProcessorTest {
 
         @Override
         public void sendAlreadyRegisteredNotice(String email) {
+            alreadyRegisteredNotices.add(email);
         }
 
         @Override
@@ -232,7 +272,14 @@ class EmailVerificationProcessorTest {
         }
     }
 
+    /** email 컬럼에 실제로 들어 있는 값만 들고 있는다 — 탈퇴 행이면 그 값이 다이제스트다. */
     private static class StubMemberRepositoryPort implements MemberRepositoryPort {
+
+        private final Set<String> storedEmails = new HashSet<>();
+
+        void register(String storedEmail) {
+            storedEmails.add(storedEmail);
+        }
 
         @Override
         public Member save(Member domain) {
@@ -245,13 +292,27 @@ class EmailVerificationProcessorTest {
         }
 
         @Override
+        public boolean existsByEmailIn(java.util.List<String> emails) {
+            return emails.stream().anyMatch(storedEmails::contains);
+        }
+
+        @Override
         public Optional<Member> findById(long memberId) {
             return Optional.empty();
         }
-    
+
         @Override
         public java.util.List<String> findAllProfileImageKeys() {
             return java.util.List.of();
+        }
+
+        @Override
+        public java.util.List<Long> findWithdrawnMemberIdsBefore(java.time.LocalDateTime threshold, int limit) {
+            return java.util.List.of();
+        }
+
+        @Override
+        public void deleteAllByIdIn(java.util.List<Long> memberIds) {
         }
     }
 }

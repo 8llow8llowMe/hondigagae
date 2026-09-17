@@ -9,10 +9,15 @@ import com.hondigagae.domainlayer.member.application.exception.MemberException;
 import com.hondigagae.domainlayer.member.application.port.out.MemberConsentRepositoryPort;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
 import com.hondigagae.domainlayer.member.application.port.out.SignupEmailVerificationPort;
+import com.hondigagae.domainlayer.member.application.service.support.WithdrawnEmailHasher;
+import com.hondigagae.domainlayer.member.domain.enums.MemberStatus;
 import com.hondigagae.domainlayer.member.domain.model.Member;
 import com.hondigagae.domainlayer.member.domain.model.MemberConsent;
 import com.hondigagae.global.properties.LegalDocumentProperties;
+import com.hondigagae.global.properties.WithdrawnEmailProperties;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
+import com.hondigagae.security.common.enums.SecurityRole;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,10 +41,12 @@ class MemberGeneralSignupProcessorTest {
 
     private static final String EMAIL = "tester@example.com";
     private static final String PASSWORD = "Password1!";
+    private static final String TEST_PEPPER = "general-signup-test-pepper-0123456789abcdef";
 
     private StubMemberRepositoryPort memberRepositoryPort;
     private RecordingConsentRepositoryPort consentRepositoryPort;
     private StubEmailVerificationPort emailVerificationPort;
+    private WithdrawnEmailHasher withdrawnEmailHasher;
     private MemberGeneralSignupProcessor processor;
 
     @BeforeEach
@@ -47,13 +54,33 @@ class MemberGeneralSignupProcessorTest {
         memberRepositoryPort = new StubMemberRepositoryPort();
         consentRepositoryPort = new RecordingConsentRepositoryPort();
         emailVerificationPort = new StubEmailVerificationPort();
+        withdrawnEmailHasher = new WithdrawnEmailHasher(new WithdrawnEmailProperties(TEST_PEPPER));
         // 동의 프로세서는 스텁으로 바꾸지 않고 실물을 쓴다 — 두 가입 경로가 같은 규칙을 탄다는
         // 것이 이 구조의 요점이라, 그 연결을 테스트에서 끊으면 검증할 것이 남지 않는다.
         MemberConsentProcessor consentProcessor = new MemberConsentProcessor(
             consentRepositoryPort, new SnowflakeIdGenerator(1, 1), new LegalDocumentProperties("1.0", "1.2"));
         processor = new MemberGeneralSignupProcessor(
-            memberRepositoryPort, consentProcessor, emailVerificationPort,
+            memberRepositoryPort, consentProcessor, emailVerificationPort, withdrawnEmailHasher,
             new BCryptPasswordEncoder(4), new SnowflakeIdGenerator(1, 1));
+    }
+
+    @Test
+    @DisplayName("탈퇴한 이메일로 다시 가입하면 기존과 동일하게 중복 이메일로 거부한다")
+    void rejectsSignupWithWithdrawnEmail() {
+        // 탈퇴 회원의 email 은 다이제스트로 치환돼 있어 원문 조회만으로는 잡히지 않는다.
+        // 응답은 계정 상태를 노출하지 않도록 기존과 같은 MEMBER_001 을 유지한다.
+        memberRepositoryPort.save(Member.builder()
+            .id(99L).email(EMAIL).name("테스터").nickname("테스터")
+            .role(SecurityRole.USER).status(MemberStatus.ACTIVE)
+            .build()
+            .withdraw(withdrawnEmailHasher.hash(EMAIL), LocalDateTime.now()));
+        emailVerificationPort.markVerified(EMAIL);
+
+        assertThatThrownBy(() -> processor.generalSignup(command(true, true)))
+            .isInstanceOf(MemberException.class)
+            .hasFieldOrPropertyWithValue("errorCode", MemberErrorCode.EXIST_MEMBER_EMAIL);
+
+        assertThat(consentRepositoryPort.saved).isEmpty();
     }
 
     @Test
@@ -184,6 +211,11 @@ class MemberGeneralSignupProcessorTest {
         public void saveAll(List<MemberConsent> consents) {
             saved.addAll(consents);
         }
+
+        @Override
+        public void deleteAllByMemberIdIn(List<Long> memberIds) {
+            saved.removeIf(consent -> memberIds.contains(consent.memberId()));
+        }
     }
 
     private static class StubEmailVerificationPort implements SignupEmailVerificationPort {
@@ -221,6 +253,11 @@ class MemberGeneralSignupProcessorTest {
         }
 
         @Override
+        public boolean existsByEmailIn(List<String> emails) {
+            return emails.stream().anyMatch(email -> findByEmail(email).isPresent());
+        }
+
+        @Override
         public Optional<Member> findById(long memberId) {
             return Optional.ofNullable(members.get(memberId));
         }
@@ -228,6 +265,16 @@ class MemberGeneralSignupProcessorTest {
         @Override
         public List<String> findAllProfileImageKeys() {
             return List.of();
+        }
+
+        @Override
+        public List<Long> findWithdrawnMemberIdsBefore(LocalDateTime threshold, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public void deleteAllByIdIn(List<Long> memberIds) {
+            memberIds.forEach(members::remove);
         }
     }
 }

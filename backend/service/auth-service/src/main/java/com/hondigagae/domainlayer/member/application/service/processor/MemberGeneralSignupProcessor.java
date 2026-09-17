@@ -5,10 +5,12 @@ import com.hondigagae.domainlayer.member.application.exception.MemberErrorCode;
 import com.hondigagae.domainlayer.member.application.exception.MemberException;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
 import com.hondigagae.domainlayer.member.application.port.out.SignupEmailVerificationPort;
+import com.hondigagae.domainlayer.member.application.service.support.EmailNormalizer;
+import com.hondigagae.domainlayer.member.application.service.support.WithdrawnEmailHasher;
 import com.hondigagae.domainlayer.member.domain.enums.MemberStatus;
 import com.hondigagae.domainlayer.member.domain.model.Member;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
-import java.util.Locale;
+import java.util.List;
 import com.hondigagae.security.common.enums.SecurityRole;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -21,12 +23,13 @@ public class MemberGeneralSignupProcessor {
     private final MemberRepositoryPort memberRepositoryPort;
     private final MemberConsentProcessor memberConsentProcessor;
     private final SignupEmailVerificationPort signupEmailVerificationPort;
+    private final WithdrawnEmailHasher withdrawnEmailHasher;
     private final PasswordEncoder passwordEncoder;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
 
     public void generalSignup(MemberGeneralSignupCommand command) {
         // 이메일은 인증 플래그 키(Redis)와 정합되도록 trim + 소문자로 정규화해 저장/검증한다.
-        String email = command.email().trim().toLowerCase(Locale.ROOT);
+        String email = EmailNormalizer.normalize(command.email());
 
         // 1. 필수 동의 검증
         validateConsented(command);
@@ -66,7 +69,7 @@ public class MemberGeneralSignupProcessor {
      * @return 만들어진 회원. 생성된 아이디를 호출부가 응답에 실을 수 있게 돌려준다
      */
     public Member devSignup(MemberGeneralSignupCommand command) {
-        String email = command.email().trim().toLowerCase(Locale.ROOT);
+        String email = EmailNormalizer.normalize(command.email());
         validateConsented(command);
         validateAgeConfirmed(command);
         validateEmailNotExists(email);
@@ -117,9 +120,16 @@ public class MemberGeneralSignupProcessor {
         }
     }
 
+    /**
+     * 이미 쓰이고 있는 이메일인지 본다. 계정 상태(탈퇴/정지) 노출을 막기 위해 상태와 무관하게
+     * 동일한 응답({@code MEMBER_001})을 반환한다.
+     *
+     * <p>원문과 다이제스트를 <b>함께</b> 본다 — 탈퇴 회원의 email 은 다이제스트로 치환돼 있어
+     * 원문 조회만으로는 잡히지 않고, 그러면 탈퇴자가 같은 이메일로 다시 가입할 수 있다.
+     * 두 값을 한 번의 쿼리로 묶어 조회 수가 늘지 않게 한다.
+     */
     private void validateEmailNotExists(String email) {
-        // 계정 상태(탈퇴/정지) 노출을 막기 위해 상태와 무관하게 동일한 응답을 반환한다.
-        if (memberRepositoryPort.findByEmail(email).isPresent()) {
+        if (memberRepositoryPort.existsByEmailIn(List.of(email, withdrawnEmailHasher.hash(email)))) {
             throw new MemberException(MemberErrorCode.EXIST_MEMBER_EMAIL, email);
         }
     }

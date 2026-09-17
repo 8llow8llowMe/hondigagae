@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.member.domain.model;
 import com.hondigagae.domainlayer.member.domain.enums.MemberStatus;
 import com.hondigagae.domainlayer.member.domain.enums.OAuthProvider;
 import com.hondigagae.security.common.enums.SecurityRole;
+import java.time.LocalDateTime;
 import lombok.Builder;
 
 /**
@@ -26,19 +27,33 @@ public record Member(
     SecurityRole role,
     // 소셜 가입/연결 제공자. null이면 일반(이메일+비밀번호) 계정.
     OAuthProvider provider,
-    MemberStatus status
+    MemberStatus status,
+    // 탈퇴 시각. ACTIVE/SUSPENDED 회원은 null 이다. 보존 기간 경과 판정의 유일한 기준점이다.
+    LocalDateTime withdrawnAt
 ) {
 
     private static final String WITHDRAWN_MASK = "탈퇴회원";
 
     /**
      * 논리 탈퇴 상태로 전이한다. 개인정보 노출을 줄이기 위해 이름/닉네임을 마스킹하고
-     * 프로필 이미지와 비밀번호 해시를 제거한다. email은 유지되어 동일 이메일 재가입이 차단된다.
+     * 프로필 이미지와 비밀번호 해시를 제거하며, <b>email 을 되돌릴 수 없는 다이제스트로 치환한다</b>.
+     *
+     * <p>원문을 남기지 않는 이유는 처리 목적이 끝난 개인정보를 무기한 보관하지 않기 위해서다
+     * (개인정보 보호법 제21조). 동일 이메일 재가입 차단은 원문 비교 대신 <b>다이제스트 비교</b>로
+     * 그대로 달성된다 — 같은 이메일은 항상 같은 다이제스트로 계산되기 때문이다.
+     *
+     * <p><b>도메인이 다이제스트를 계산하지 않는다.</b> 계산에는 설정으로 주입되는 비밀값(pepper)이
+     * 필요한데, 도메인이 인프라 비밀을 알기 시작하면 순수 값 객체가 아니게 되고 테스트도 설정에
+     * 묶인다. 계산은 애플리케이션 계층(프로세서 + {@code WithdrawnEmailHasher})이 하고 여기에는
+     * 결과 값만 들어온다. 같은 이유로 탈퇴 시각도 밖에서 받는다.
+     *
+     * @param emailDigest 정규화된 이메일의 HMAC 다이제스트 (hex 64자)
+     * @param withdrawnAt 탈퇴 시각. 보존 기간(30일) 경과 판정에 쓰인다
      */
-    public Member withdraw() {
-        return toBuilder().password(null).name(WITHDRAWN_MASK).nickname(WITHDRAWN_MASK)
+    public Member withdraw(String emailDigest, LocalDateTime withdrawnAt) {
+        return toBuilder().email(emailDigest).password(null).name(WITHDRAWN_MASK).nickname(WITHDRAWN_MASK)
             .profileImageUrl(null).profileImageKey(null)
-            .status(MemberStatus.WITHDRAWN).build();
+            .status(MemberStatus.WITHDRAWN).withdrawnAt(withdrawnAt).build();
     }
 
     /**
@@ -82,6 +97,6 @@ public record Member(
         return Member.builder()
             .id(id).email(email).password(password).name(name).nickname(nickname)
             .profileImageUrl(profileImageUrl).profileImageKey(profileImageKey)
-            .role(role).provider(provider).status(status);
+            .role(role).provider(provider).status(status).withdrawnAt(withdrawnAt);
     }
 }

@@ -8,12 +8,17 @@ import com.hondigagae.domainlayer.member.application.exception.MemberException;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
 import com.hondigagae.domainlayer.member.domain.enums.MemberStatus;
 import com.hondigagae.domainlayer.member.domain.enums.OAuthProvider;
+import com.hondigagae.domainlayer.member.application.service.support.WithdrawnEmailHasher;
 import com.hondigagae.domainlayer.member.domain.model.Member;
+import com.hondigagae.global.properties.WithdrawnEmailProperties;
 import com.hondigagae.security.common.enums.SecurityRole;
+import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,9 +28,12 @@ class MemberCommandProcessorTest {
     private static final long GENERAL_ID = 1L;
     private static final long SOCIAL_ONLY_ID = 2L;
     private static final long LINKED_ID = 3L;
+    private static final String GENERAL_EMAIL = "general@example.com";
+    private static final String TEST_PEPPER = "member-command-test-pepper-0123456789abcdef";
 
     private PasswordEncoder passwordEncoder;
     private StubMemberRepositoryPort memberRepositoryPort;
+    private WithdrawnEmailHasher withdrawnEmailHasher;
     private MemberCommandProcessor processor;
 
     @BeforeEach
@@ -33,14 +41,41 @@ class MemberCommandProcessorTest {
         // bcrypt strength 4 — 실제 인코딩 로직을 그대로 쓰면서 테스트 시간만 줄인다.
         passwordEncoder = new BCryptPasswordEncoder(4);
         memberRepositoryPort = new StubMemberRepositoryPort();
+        withdrawnEmailHasher = new WithdrawnEmailHasher(new WithdrawnEmailProperties(TEST_PEPPER));
         processor = new MemberCommandProcessor(
-            new MemberQueryProcessor(memberRepositoryPort), memberRepositoryPort, passwordEncoder);
+            new MemberQueryProcessor(memberRepositoryPort), memberRepositoryPort,
+            withdrawnEmailHasher, passwordEncoder);
 
-        memberRepositoryPort.register(member(GENERAL_ID, "general@example.com",
+        memberRepositoryPort.register(member(GENERAL_ID, GENERAL_EMAIL,
             passwordEncoder.encode("Password1!"), null));
         memberRepositoryPort.register(member(SOCIAL_ONLY_ID, "social@example.com", null, OAuthProvider.KAKAO));
         memberRepositoryPort.register(member(LINKED_ID, "linked@example.com",
             passwordEncoder.encode("Password1!"), OAuthProvider.KAKAO));
+    }
+
+    @Test
+    @DisplayName("탈퇴하면 이메일 원문이 사라지고 그 자리에 다이제스트가 남는다")
+    void withdraw_replacesEmailWithDigest() {
+        processor.withdraw(GENERAL_ID);
+
+        Member withdrawn = memberRepositoryPort.findById(GENERAL_ID).orElseThrow();
+        // 원문이 남으면 처리 목적이 끝난 개인정보를 무기한 보관하는 것이 된다.
+        assertThat(withdrawn.email()).isNotEqualTo(GENERAL_EMAIL);
+        // 재가입 차단은 "같은 이메일 → 같은 다이제스트" 위에 서 있다.
+        assertThat(withdrawn.email()).isEqualTo(withdrawnEmailHasher.hash(GENERAL_EMAIL));
+        assertThat(withdrawn.status()).isEqualTo(MemberStatus.WITHDRAWN);
+    }
+
+    @Test
+    @DisplayName("탈퇴 시각이 채워진다 — 보존 기간 경과 판정의 유일한 기준점이다")
+    void withdraw_fillsWithdrawnAt() {
+        LocalDateTime before = LocalDateTime.now();
+
+        processor.withdraw(GENERAL_ID);
+
+        Member withdrawn = memberRepositoryPort.findById(GENERAL_ID).orElseThrow();
+        assertThat(withdrawn.withdrawnAt()).isNotNull();
+        assertThat(withdrawn.withdrawnAt()).isAfterOrEqualTo(before);
     }
 
     @Test
@@ -114,13 +149,28 @@ class MemberCommandProcessorTest {
         }
 
         @Override
+        public boolean existsByEmailIn(List<String> emails) {
+            return emails.stream().anyMatch(email -> findByEmail(email).isPresent());
+        }
+
+        @Override
         public Optional<Member> findById(long memberId) {
             return Optional.ofNullable(members.get(memberId));
         }
-    
+
         @Override
-        public java.util.List<String> findAllProfileImageKeys() {
-            return java.util.List.of();
+        public List<String> findAllProfileImageKeys() {
+            return List.of();
+        }
+
+        @Override
+        public List<Long> findWithdrawnMemberIdsBefore(LocalDateTime threshold, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public void deleteAllByIdIn(List<Long> memberIds) {
+            memberIds.forEach(members::remove);
         }
     }
 }

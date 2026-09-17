@@ -218,13 +218,27 @@ class JwtTokenProcessorTest {
         }
 
         @Override
+        public boolean existsByEmailIn(java.util.List<String> emails) {
+            return emails.stream().anyMatch(email -> findByEmail(email).isPresent());
+        }
+
+        @Override
         public Optional<Member> findById(long memberId) {
             return Optional.ofNullable(members.get(memberId));
         }
-    
+
         @Override
         public java.util.List<String> findAllProfileImageKeys() {
             return java.util.List.of();
+        }
+
+        @Override
+        public java.util.List<Long> findWithdrawnMemberIdsBefore(java.time.LocalDateTime threshold, int limit) {
+            return java.util.List.of();
+        }
+
+        @Override
+        public void deleteAllByIdIn(java.util.List<Long> memberIds) {
         }
     }
 }

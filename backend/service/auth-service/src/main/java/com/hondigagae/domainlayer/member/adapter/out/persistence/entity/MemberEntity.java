@@ -11,6 +11,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -73,4 +74,8 @@ public class MemberEntity extends BaseEntity {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private MemberStatus status;
+
+    @Comment("탈퇴 시각 (ACTIVE 회원은 null) - 보존 기간(30일) 경과 판정 기준")
+    @Column(columnDefinition = "TIMESTAMP")
+    private LocalDateTime withdrawnAt;
 }

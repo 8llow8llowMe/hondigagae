@@ -15,6 +15,8 @@ import com.hondigagae.domainlayer.member.application.exception.MemberErrorCode;
 import com.hondigagae.domainlayer.member.application.exception.MemberException;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
 import com.hondigagae.domainlayer.member.application.service.processor.MemberConsentProcessor;
+import com.hondigagae.domainlayer.member.application.service.support.EmailNormalizer;
+import com.hondigagae.domainlayer.member.application.service.support.WithdrawnEmailHasher;
 import com.hondigagae.domainlayer.member.domain.enums.MemberStatus;
 import com.hondigagae.domainlayer.member.domain.enums.OAuthProvider;
 import com.hondigagae.domainlayer.member.domain.model.Member;
@@ -42,6 +44,7 @@ public class OAuthLoginProcessor {
     private final OAuthStateStorePort oAuthStateStorePort;
     private final MemberRepositoryPort memberRepositoryPort;
     private final MemberConsentProcessor memberConsentProcessor;
+    private final WithdrawnEmailHasher withdrawnEmailHasher;
     private final MailSendPort mailSendPort;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -92,7 +95,7 @@ public class OAuthLoginProcessor {
     @Transactional
     public GeneralLoginInfo login(OAuthProvider provider, OAuthCallbackInfo callbackInfo) {
         OAuthMemberQueryResult oAuthMember = callbackInfo.member();
-        String email = EmailVerificationProcessor.normalize(oAuthMember.email());
+        String email = EmailNormalizer.normalize(oAuthMember.email());
 
         Member member = memberRepositoryPort.findByEmail(email)
             .map(existing -> resolveExistingMember(existing, provider, oAuthMember))
@@ -136,6 +139,12 @@ public class OAuthLoginProcessor {
     private Member resolveExistingMember(Member existing, OAuthProvider provider, OAuthMemberQueryResult oAuthMember) {
         // 상태 먼저 확인 — 탈퇴/정지 회원은 소셜 로그인도 차단
         switch (existing.status()) {
+            // ⚠ 이 분기는 #609 이후 사실상 도달하지 않는다. 탈퇴 행의 email 은 다이제스트로
+            //   치환돼 있어 호출부의 findByEmail(원문)에 애초에 잡히지 않기 때문이다. 마이그레이션
+            //   전에 원문이 남아 있는 옛 탈퇴 행에만 해당한다.
+            //   **재가입 차단의 실질 수단은 여기가 아니라 signupOAuthMember 의 validateNotWithdrawn**
+            //   (다이제스트로 조회)이다. 이 분기를 근거로 그쪽을 "중복"이라며 지우면 그 순간
+            //   소셜 재가입이 뚫린다.
             case WITHDRAWN -> throw new MemberException(MemberErrorCode.MEMBER_ALREADY_WITHDRAWN);
             case SUSPENDED -> throw new MemberException(MemberErrorCode.MEMBER_SUSPENDED);
             case ACTIVE -> {
@@ -171,6 +180,7 @@ public class OAuthLoginProcessor {
     private Member signupOAuthMember(
         OAuthProvider provider, String email, OAuthMemberQueryResult oAuthMember, OAuthSignupConsent consent
     ) {
+        validateNotWithdrawn(email);
         validateSignupConsent(consent);
 
         Member created = createOAuthMember(provider, email, oAuthMember);
@@ -178,6 +188,29 @@ public class OAuthLoginProcessor {
         // 있다. 여기서 직접 만들면 항목이 늘어날 때 소셜 경로만 옛 규칙으로 남는다.
         memberConsentProcessor.recordSignupConsents(created.id());
         return created;
+    }
+
+    /**
+     * 탈퇴 이력이 있는 이메일이면 신규 가입을 막는다.
+     *
+     * <p><b>이 검사가 없으면 탈퇴자가 소셜로 재가입된다.</b> 탈퇴 회원의 {@code email} 은
+     * 다이제스트로 치환돼 있어 원문 조회({@code findByEmail})에 잡히지 않고, 그대로 신규 생성
+     * 경로로 빠진다. 원문을 보관하던 때 {@code resolveExistingMember} 가 막던 것과 <b>같은
+     * 응답</b>({@code MEMBER_004})을 유지해 동작을 보존한다.
+     *
+     * <p>동의 검사보다 먼저 두는 것도 기존 동작 보존이다 — 예전에는 상태 판정이 동의 흐름보다
+     * 앞이라, 탈퇴자는 동의 여부와 무관하게 {@code MEMBER_004} 를 받았다.
+     *
+     * <p>{@code findByEmail} 이 한 번 더 도는 것은 신규 가입 분기뿐이라 로그인 비용에 영향이 없다.
+     *
+     * <p><b>{@code resolveExistingMember} 의 {@code case WITHDRAWN} 이 이 검사를 대신하지 못한다.</b>
+     * 그쪽은 원문 조회에 걸린 행만 보므로 마이그레이션 이전의 옛 행에만 해당한다. 중복으로 보고
+     * 이 메서드를 지우면 재가입 차단이 그대로 뚫린다.
+     */
+    private void validateNotWithdrawn(String email) {
+        if (memberRepositoryPort.findByEmail(withdrawnEmailHasher.hash(email)).isPresent()) {
+            throw new MemberException(MemberErrorCode.MEMBER_ALREADY_WITHDRAWN);
+        }
     }
 
     /**

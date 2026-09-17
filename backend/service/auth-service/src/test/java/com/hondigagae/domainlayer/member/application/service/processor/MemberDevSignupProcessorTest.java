@@ -9,12 +9,15 @@ import com.hondigagae.domainlayer.member.application.exception.MemberException;
 import com.hondigagae.domainlayer.member.application.port.out.MemberConsentRepositoryPort;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
 import com.hondigagae.domainlayer.member.application.port.out.SignupEmailVerificationPort;
+import com.hondigagae.domainlayer.member.application.service.support.WithdrawnEmailHasher;
 import com.hondigagae.domainlayer.member.domain.enums.MemberStatus;
 import com.hondigagae.domainlayer.member.domain.model.Member;
 import com.hondigagae.domainlayer.member.domain.model.MemberConsent;
 import com.hondigagae.global.properties.LegalDocumentProperties;
+import com.hondigagae.global.properties.WithdrawnEmailProperties;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import com.hondigagae.security.common.enums.SecurityRole;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -36,6 +39,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 class MemberDevSignupProcessorTest {
 
     private static final String PASSWORD = "Password1!";
+    private static final String TEST_PEPPER = "dev-signup-test-pepper-0123456789abcdef";
 
     private PasswordEncoder passwordEncoder;
     private StubMemberRepositoryPort memberRepositoryPort;
@@ -54,7 +58,8 @@ class MemberDevSignupProcessorTest {
         MemberConsentProcessor consentProcessor = new MemberConsentProcessor(
             consentRepositoryPort, new SnowflakeIdGenerator(1, 1), new LegalDocumentProperties("1.0", "1.2"));
         processor = new MemberGeneralSignupProcessor(
-            memberRepositoryPort, consentProcessor, emailVerificationPort, passwordEncoder,
+            memberRepositoryPort, consentProcessor, emailVerificationPort,
+            new WithdrawnEmailHasher(new WithdrawnEmailProperties(TEST_PEPPER)), passwordEncoder,
             new SnowflakeIdGenerator(1, 1));
     }
 
@@ -185,6 +190,11 @@ class MemberDevSignupProcessorTest {
         public void saveAll(List<MemberConsent> consents) {
             saved.addAll(consents);
         }
+
+        @Override
+        public void deleteAllByMemberIdIn(List<Long> memberIds) {
+            saved.removeIf(consent -> memberIds.contains(consent.memberId()));
+        }
     }
 
     private static class RecordingEmailVerificationPort implements SignupEmailVerificationPort {
@@ -220,6 +230,11 @@ class MemberDevSignupProcessorTest {
         }
 
         @Override
+        public boolean existsByEmailIn(List<String> emails) {
+            return emails.stream().anyMatch(email -> findByEmail(email).isPresent());
+        }
+
+        @Override
         public Optional<Member> findById(long memberId) {
             return Optional.ofNullable(members.get(memberId));
         }
@@ -227,6 +242,16 @@ class MemberDevSignupProcessorTest {
         @Override
         public List<String> findAllProfileImageKeys() {
             return List.of();
+        }
+
+        @Override
+        public List<Long> findWithdrawnMemberIdsBefore(LocalDateTime threshold, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public void deleteAllByIdIn(List<Long> memberIds) {
+            memberIds.forEach(members::remove);
         }
     }
 }
