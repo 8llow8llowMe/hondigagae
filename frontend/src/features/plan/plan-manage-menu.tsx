@@ -11,11 +11,13 @@ import { FormAlert } from '@/components/form-alert'
 import { MoreIcon } from '@/components/icons'
 import { Menu, MenuAnchor } from '@/components/menu'
 import { PlanEditModal } from '@/features/plan/plan-edit-modal'
+import { PlanShareModal } from '@/features/plan/plan-share-modal'
 import { planKeys } from '@/features/plan/queries'
 import { ApiError } from '@/lib/api/error'
 import { deletePlan } from '@/lib/api/plan'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
+import { isShareablePlan } from '@/lib/plan/share-link'
 import {
   PLAN_STATUS_ACTION_LABELS,
   type PlanStatusActionSpec,
@@ -72,6 +74,7 @@ export function PlanManageMenu({
 
   const [menuOpen, setMenuOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -139,6 +142,25 @@ export function PlanManageMenu({
               (`plan-status-action.tsx`). 초안에는 되돌아갈 앞 상태가 없어 이 갈래가 비고,
               그때 메뉴는 예전과 똑같이 `수정 · 삭제` 둘이다.
             */
+            /*
+              **공유는 확정·완료에만 있다** (#628). 초안에서 항목을 보여 주고 누르면
+              `PLAN_022` 400 을 띄우는 방식을 쓰지 않는다 — 눌러서 배우게 하는 자리가
+              아니다. 판정은 백엔드 `PlanStatus.isShareable()` 복제본을 쓴다.
+
+              **역방향 상태 변경보다 위다.** 공유는 되돌릴 수 있는 평범한 액션이고,
+              아래 둘(되돌리기 · 삭제)로 갈수록 무게가 는다.
+            */
+            ...(isShareablePlan(plan.status.code)
+              ? [
+                  {
+                    label: messages.plan.shareAction,
+                    onSelect: () => {
+                      setMenuOpen(false)
+                      setShareOpen(true)
+                    },
+                  },
+                ]
+              : []),
             ...reverseStatusActions(plan.status.code).map((action) => ({
               label: PLAN_STATUS_ACTION_LABELS[action.kind],
               disabled: status.saving,
@@ -160,6 +182,8 @@ export function PlanManageMenu({
       </MenuAnchor>
 
       <PlanEditModal plan={plan} today={today} open={editOpen} onClose={() => setEditOpen(false)} />
+
+      <PlanShareModal planId={plan.planId} open={shareOpen} onClose={() => setShareOpen(false)} />
 
       {/*
         **`ConfirmModal` 이 취소 좌측 · 기본 포커스 취소를 보장한다** — 파괴 버튼에 포커스를
