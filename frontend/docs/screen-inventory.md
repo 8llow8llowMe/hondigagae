@@ -445,6 +445,8 @@
 | 일정 날씨 브리핑            | `/plans/[planId]` 내                         | `GET /plans/{planId}/weather`                                                        | **구현** (#80) — 일자 판정으로 통합                                                        |
 | 항목 방문 체크              | `/plans/[planId]` 내 항목 행                 | `PUT /plans/{planId}/items/{planItemId}/visited`                                     | **구현** (#124) — 해제도 같은 API                                                          |
 | 여행 후기                   | `/plans/[planId]` 좌측 레일                  | `GET` · `POST` · `PUT /plans/{planId}/reviews`                                       | **구현** (#615) — **완료 일정만.** 목록 "후기 미작성" 밴드는 `hasReview` 가 없어 넣지 않음 |
+| 일정 공유 링크 발급·폐기    | `/plans/[planId]` 관리 메뉴 안 모달          | `GET` · `POST` · `DELETE /plans/{planId}/share-link`                                 | **구현** (#628) — **확정·완료만.** `POST`·`DELETE` 둘 다 멱등                              |
+| 공유된 일정 열람            | `/shared-plans/[token]`                      | `GET /shared-plans/{token}` (**비인증**)                                             | **구현** (#628) — 정본 `docs/features/plan/일정공유-세부명세.md`                           |
 
 **일정 응급 브리핑** — [#125](https://github.com/8llow8llowMe/hondigagae/issues/125) · BE PR #105
 
@@ -721,7 +723,6 @@
 | 화면                      | 필요한 백엔드          | 비고                           |
 | ------------------------- | ---------------------- | ------------------------------ |
 | 여행 후기 공유 · 피드     | plan-service           | 미착수 — 작성·보기는 §4 (#615) |
-| 일정 공유                 | plan-service           | 미착수                         |
 | AI 여행 상담사 / 비서     | ai-service `assistant` | 미착수                         |
 | 반려견 성향 분석 리포트   | ai-service `analysis`  | 미착수                         |
 | 여행 스타일 학습 / 개인화 | —                      | AI 기능 후보, 선정 전          |
@@ -733,6 +734,7 @@
 | 여행 적합도 분석 (점수 + XAI) | **§3-1 로 이동** — 구현됐다       |
 | 긴급 동물병원                 | **§5-2 와 중복이었다** — 구현됐다 |
 | 여행 후기 작성·보기           | **§4 로 이동** — #614 · #615      |
+| 일정 공유                     | **§4 로 이동** — #627 · #628      |
 
 확인 방법: `tour-service/domainlayer/` 에 `insight` · `emergency` 컨텍스트가 있고 각각 컨트롤러가 있다.
 `assistant` · `analysis` 는 **패키지 자체가 없다** — 그것이 미착수의 근거다.
