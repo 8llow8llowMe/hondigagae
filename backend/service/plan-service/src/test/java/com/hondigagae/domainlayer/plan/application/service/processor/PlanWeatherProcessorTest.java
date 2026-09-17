@@ -15,6 +15,7 @@ import com.hondigagae.domainlayer.plan.domain.enums.PlanDayWeatherUnavailableRea
 import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
+import com.hondigagae.domainlayer.plan.domain.model.PlanPetCondition;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -61,6 +62,7 @@ class PlanWeatherProcessorTest {
     private StubPlanItemRepositoryPort planItemRepositoryPort;
     private StubPetConditionQueryPort petConditionQueryPort;
     private StubPlaceSuitabilityQueryPort placeSuitabilityQueryPort;
+    private StubPlanPetConditionRepositoryPort planPetConditionRepositoryPort;
     private PlanWeatherProcessor processor;
 
     @BeforeEach
@@ -68,8 +70,10 @@ class PlanWeatherProcessorTest {
         planItemRepositoryPort = new StubPlanItemRepositoryPort();
         petConditionQueryPort = new StubPetConditionQueryPort();
         placeSuitabilityQueryPort = new StubPlaceSuitabilityQueryPort();
+        planPetConditionRepositoryPort = new StubPlanPetConditionRepositoryPort();
         processor = new PlanWeatherProcessor(
-            planItemRepositoryPort, petConditionQueryPort, placeSuitabilityQueryPort, CLOCK);
+            planItemRepositoryPort, petConditionQueryPort, planPetConditionRepositoryPort,
+            placeSuitabilityQueryPort, CLOCK);
     }
 
     private static Plan plan() {
@@ -268,12 +272,66 @@ class PlanWeatherProcessorTest {
 
     // ── 스텁 ───────────────────────────────────────────────────────────────
 
-    private static class StubPetConditionQueryPort implements PetConditionQueryPort {
+@Test
+    @DisplayName("완료된 일정은 완료 시점 스냅샷으로 판정한다 — 다녀온 뒤 프로필을 고쳐도 그때 기준이 흔들리지 않는다")
+    void completedPlanUsesSnapshot() {
+        // 지금 프로필은 더위에 강하다고 말하지만, 다녀올 당시에는 더위에 약했다.
+        petConditionQueryPort.conditions = Map.of(MONGSIL, ROBUST);
+        planPetConditionRepositoryPort.saveAll(List.of(snapshot(MONGSIL, true)));
+        placeSuitabilityQueryPort.scoreOf = condition -> condition.heatSensitive() ? 42 : 81;
+
+        PlanWeatherInfo info = processor.brief(1L, completedPlan(), List.of(MONGSIL));
+
+        assertThat(firstDay(info).suitability().score()).isEqualTo(42);
+        // 스냅샷이 있으면 원천을 묻지 않는다 — 기록을 읽는 데 남의 서비스를 왕복할 이유가 없다.
+        assertThat(petConditionQueryPort.calls).isZero();
+    }
+
+    @Test
+    @DisplayName("진행 중인 일정은 지금 프로필을 읽는다 — 아이 상태가 바뀌면 다음 판정에 곧바로 반영된다")
+    void ongoingPlanUsesLiveConditions() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+        // 초안인데도 스냅샷이 남아 있는 상황(완료했다가 되돌림). 진행 중이면 쓰지 않는다.
+        planPetConditionRepositoryPort.saveAll(List.of(snapshot(MONGSIL, false)));
+        placeSuitabilityQueryPort.scoreOf = condition -> condition.heatSensitive() ? 42 : 81;
+
+        PlanWeatherInfo info = processor.brief(1L, plan(), List.of(MONGSIL));
+
+        assertThat(firstDay(info).suitability().score()).isEqualTo(42);
+        assertThat(petConditionQueryPort.calls).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("스냅샷이 없는 완료 일정은 예전처럼 원천을 읽는다 — 없는 기록을 지어내지 않는다")
+    void completedPlanWithoutSnapshotFallsBackToLive() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE);
+        placeSuitabilityQueryPort.scoreOf = condition -> condition.heatSensitive() ? 42 : 81;
+
+        PlanWeatherInfo info = processor.brief(1L, completedPlan(), List.of(MONGSIL));
+
+        assertThat(firstDay(info).suitability().score()).isEqualTo(42);
+        assertThat(petConditionQueryPort.calls).isEqualTo(1);
+    }
+
+    private static Plan completedPlan() {
+        return planOn(DAY_1).toBuilder().status(PlanStatus.COMPLETED).build();
+    }
+
+    private static PlanPetCondition snapshot(long petId, boolean heatSensitive) {
+        return PlanPetCondition.builder()
+            .id(petId).planId(PLAN_ID).petId(petId)
+            .sizeType("SMALL").heatSensitive(heatSensitive)
+            .build();
+    }
+
+        private static class StubPetConditionQueryPort implements PetConditionQueryPort {
 
         private Map<Long, PetConditionQueryResult> conditions = Map.of();
+        private int calls;
 
         @Override
         public Map<Long, PetConditionQueryResult> findConditions(long memberId, List<Long> petIds) {
+            calls++;
             Map<Long, PetConditionQueryResult> found = new HashMap<>();
             petIds.forEach(petId -> {
                 if (conditions.containsKey(petId)) {

@@ -191,6 +191,57 @@ FROM plan p
 WHERE NOT EXISTS (SELECT 1 FROM plan_pet pp WHERE pp.plan_id = p.id);
 ```
 
+### 완료 시점 반려견 특성 스냅샷 (`plan_pet_condition`)
+
+**진행 중인 일정은 auth-service 를 매번 다시 읽고, 완료된 일정은 완료 시점 스냅샷을 읽는다.**
+
+이 서비스는 반려견 특성의 사본을 두지 않는 것이 원칙이었다. 진행 중 판정이 낡은 값을 쓰지
+않게 하려는 규칙이고, 그건 지금도 맞다 — 체중·민감도를 고치면 다음 판정에 곧바로 반영되어야
+한다. **완료된 여행은 반대다.** 다녀온 뒤 프로필을 고쳤다고 "그때 몽실이 기준" 이 뒤늦게
+달라지면 그 기록은 거짓이 된다. 그래서 사본을 두는 자리를 **완료 시점 하나로 좁혔다.**
+
+- **찍는 시점은 `COMPLETED` 로 넘어가는 전이 한 번뿐이다.** 이미 완료된 일정에 다시
+  `COMPLETED` 를 보내는 것은 전이가 아니라 다시 찍지 않는다 — 그때 찍으면 다녀온 뒤 고친
+  프로필이 "그때 기준" 으로 둔갑한다 (`PlanCommandProcessor.completesNow`).
+- **되돌린 뒤 다시 완료하면 그 시점으로 다시 찍는다.** 되돌린 동안 동행견을 바꿀 수 있어서
+  (`petIds` 수정), 옛 스냅샷을 그대로 두면 이번 여행에 가지도 않은 아이의 특성이 기록으로
+  남는다. 교체는 `plan_pet` 과 같은 이유로 **벌크 DML 로 먼저 지운다.**
+- **보관 범위는 `PetConditionQueryResult` 와 같다** — 견종·크기·더위/추위/소음 민감·활동량.
+  이 서비스가 실제로 tour-service 판정에 넘기는 축뿐이다. 이름·생년월 원문은 애초에 내부
+  계약(`PetConditionResponse`)이 내보내지 않는다. `ageMonths`·체중·사회성은 이 서비스가 아직
+  받지도 읽지도 않아 넣지 않았다 — 읽지 않는 값을 "기록" 이라는 이유로 더 쌓지 않는다.
+  판정이 그 축을 쓰게 되면 포트를 넓히면서 같이 넣는다.
+- **스냅샷이 없는 완료 일정은 예전처럼 원천을 읽는다.** 이 기능 이전에 완료된 일정이다.
+  없는 기록을 지어내지 않는다.
+- 조회 경로는 하나다 — `PlanWeatherProcessor.loadConditions(memberId, plan, petIds)` 가 상태를
+  보고 고른다. 원천을 직접 읽는 `loadConditions(memberId, petIds)` 는 **스냅샷을 찍는 쪽**이
+  쓴다. 사본을 두 곳에서 만들면 "완료면 스냅샷" 규칙이 갈라진다.
+- 원격 조회라 Facade 가 **트랜잭션 밖에서** 특성을 먼저 읽고, 상태 변경과 스냅샷 저장은 한
+  트랜잭션에 묶는다 (`createPlan` 의 반려견 확인과 같은 순서).
+
+**마이그레이션**
+
+- local/dev(`ddl-auto: update`) — 기동 시 만들어진다.
+- prod(`ddl-auto: none`) — 배포 전에 테이블을 만든다. 옛 행 이관은 **없다** (읽기 폴백이 대신한다).
+
+```sql
+CREATE TABLE plan_pet_condition (
+    id              BIGINT      NOT NULL COMMENT '일정 반려견 특성 스냅샷 아이디',
+    plan_id         BIGINT      NOT NULL COMMENT '여행 일정 아이디 (FK: plan.id)',
+    pet_id          BIGINT      NOT NULL COMMENT '반려견 아이디 (FK: pet.id, 프로필 삭제 후에도 스냅샷 유지)',
+    breed           VARCHAR(50)  NULL COMMENT '완료 시점의 견종',
+    size_type       VARCHAR(20)  NULL COMMENT '완료 시점의 크기 구분',
+    heat_sensitive  BIT(1)      NOT NULL COMMENT '완료 시점의 더위 민감 여부',
+    cold_sensitive  BIT(1)      NOT NULL COMMENT '완료 시점의 추위 민감 여부',
+    noise_sensitive BIT(1)      NOT NULL COMMENT '완료 시점의 소음 민감 여부',
+    activity_level  VARCHAR(20)  NULL COMMENT '완료 시점의 활동량',
+    created_at      TIMESTAMP   NOT NULL COMMENT '생성 날짜',
+    updated_at      TIMESTAMP   NOT NULL COMMENT '수정 날짜',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_plan_pet_condition_plan_id_pet_id (plan_id, pet_id)
+) COMMENT = '일정 완료 시점의 동행 반려견 특성 스냅샷';
+```
+
 ### 반려견별 히스토리 (`GET /plans?petId=`)
 
 **한 마리라도 동행이면 히트**다. `plan.pet_id = :petId OR plan.id IN (select plan_id from plan_pet where pet_id = :petId)` —

@@ -9,16 +9,20 @@ import com.hondigagae.domainlayer.plan.application.exception.PlanException;
 import com.hondigagae.domainlayer.plan.application.port.out.PetConditionQueryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlaceVerifyQueryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlanPetConditionRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanPetRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanRepositoryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PetConditionQueryResult;
 import com.hondigagae.shared.travel.plan.PlanItemType;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
+import com.hondigagae.domainlayer.plan.domain.model.PlanPetCondition;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +43,7 @@ public class PlanCommandProcessor {
     private final PlanRepositoryPort planRepositoryPort;
     private final PlanItemRepositoryPort planItemRepositoryPort;
     private final PlanPetRepositoryPort planPetRepositoryPort;
+    private final PlanPetConditionRepositoryPort planPetConditionRepositoryPort;
     private final PlaceVerifyQueryPort placeVerifyQueryPort;
     private final PetConditionQueryPort petConditionQueryPort;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
@@ -194,9 +199,16 @@ public class PlanCommandProcessor {
      *               <p>날씨 판정·준비물은 여기서 다시 계산하지 않는다. 다음 조회가 새 {@code petIds} 를
      *               읽어 판정하고, 이미 만든 준비물은 지우지 않는다 — 사용자가 손으로 고친 준비물을
      *               동행견 교체가 말없이 날리는 일은 없어야 한다.
+     * @param petConditionsAtCompletion 일정이 <b>이번 요청으로</b> {@code COMPLETED} 가 될 때만 채워
+     *               들어오는, 그 시점의 동행 반려견 특성이다. 그 외에는 {@code null} 이고 스냅샷을
+     *               건드리지 않는다. 원격 조회라 Facade 가 트랜잭션 밖에서 미리 끝낸다.
+     *               <p>이미 완료된 일정을 다시 완료하는 요청은 상태가 바뀌지 않으므로 다시 찍지 않는다.
+     *               되돌린 뒤 다시 완료하면 <b>그 시점으로 다시 찍는다</b> — 되돌린 동안 동행견을 바꿀 수
+     *               있어서(#621), 옛 스냅샷을 그대로 두면 이번 여행에 가지도 않은 아이의 특성이 기록으로 남는다.
      */
     @Transactional
-    public Plan updatePlan(Plan plan, PlanUpdateCommand command, List<Long> petIds) {
+    public Plan updatePlan(Plan plan, PlanUpdateCommand command, List<Long> petIds,
+        Map<Long, PetConditionQueryResult> petConditionsAtCompletion) {
         LocalDate startDate = command.startDate() != null ? command.startDate() : plan.startDate();
         LocalDate endDate = command.endDate() != null ? command.endDate() : plan.endDate();
         validateDateRange(startDate, endDate);
@@ -234,7 +246,27 @@ public class PlanCommandProcessor {
             planPetRepositoryPort.deleteByPlanId(saved.id());
             planPetRepositoryPort.saveAll(toPets(saved.id(), petIds));
         }
+        if (petConditionsAtCompletion != null) {
+            // 같은 이유로 삭제가 먼저다 — 다시 완료하는 경로가 같은 (planId, petId) 를 재사용한다.
+            planPetConditionRepositoryPort.deleteByPlanId(saved.id());
+            planPetConditionRepositoryPort.saveAll(toPetConditions(saved.id(), petConditionsAtCompletion));
+        }
         return saved;
+    }
+
+    /**
+     * 이번 요청으로 일정이 완료되는가. 이미 완료된 일정에 다시 {@code COMPLETED} 를 보내는 것은
+     * 전이가 아니다 — 그때 다시 찍으면 다녀온 뒤 고친 프로필이 "그때 기준" 으로 둔갑한다.
+     */
+    public static boolean completesNow(Plan plan, PlanUpdateCommand command) {
+        return command.status() == PlanStatus.COMPLETED && plan.status() != PlanStatus.COMPLETED;
+    }
+
+    private List<PlanPetCondition> toPetConditions(long planId, Map<Long, PetConditionQueryResult> conditions) {
+        return conditions.entrySet().stream()
+            .map(entry -> PlanPetCondition.of(
+                snowflakeIdGenerator.generateId(), planId, entry.getKey(), entry.getValue()))
+            .toList();
     }
 
     @Transactional

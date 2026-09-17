@@ -167,7 +167,8 @@ class PlanCopyTest {
         StubPetConditionQueryPort petPort
     ) {
         return new PlanCommandProcessor(
-            plans, items, pets, new StubPlaceVerifyQueryPort(), petPort, new SnowflakeIdGenerator(1, 1));
+            plans, items, pets, new StubPlanPetConditionRepositoryPort(),
+            new StubPlaceVerifyQueryPort(), petPort, new SnowflakeIdGenerator(1, 1));
     }
 
     private static class StubPlanRepositoryPort implements PlanRepositoryPort {

@@ -49,6 +49,7 @@ class PlanCommandProcessorTest {
     private StubPlanRepositoryPort planRepositoryPort;
     private StubPlanPetRepositoryPort planPetRepositoryPort;
     private StubPetConditionQueryPort petConditionQueryPort;
+    private StubPlanPetConditionRepositoryPort planPetConditionRepositoryPort;
     private PlanCommandProcessor processor;
 
     @BeforeEach
@@ -56,9 +57,11 @@ class PlanCommandProcessorTest {
         planRepositoryPort = new StubPlanRepositoryPort();
         planPetRepositoryPort = new StubPlanPetRepositoryPort();
         petConditionQueryPort = new StubPetConditionQueryPort();
+        planPetConditionRepositoryPort = new StubPlanPetConditionRepositoryPort();
         processor = new PlanCommandProcessor(
             planRepositoryPort, new StubPlanItemRepositoryPort(), planPetRepositoryPort,
-            new StubPlaceVerifyQueryPort(), petConditionQueryPort, new SnowflakeIdGenerator(1, 1));
+            planPetConditionRepositoryPort, new StubPlaceVerifyQueryPort(), petConditionQueryPort,
+            new SnowflakeIdGenerator(1, 1));
     }
 
     private static PlanCreateCommand command(List<Long> petIds) {
@@ -208,7 +211,7 @@ class PlanCommandProcessorTest {
     @DisplayName("완료된 일정도 동행견을 빼면 다른 필드는 고칠 수 있다 — 잠긴 것은 동행견뿐이다")
     void updateAllowsOtherFieldsOnCompletedPlan() {
         Plan updated = processor.updatePlan(plan(PlanStatus.COMPLETED, 2L),
-            PlanUpdateCommand.builder().title("다녀온 제주").build(), null);
+            PlanUpdateCommand.builder().title("다녀온 제주").build(), null, null);
 
         assertThat(updated.title()).isEqualTo("다녀온 제주");
         assertThat(updated.petId()).isEqualTo(2L);
@@ -222,7 +225,7 @@ class PlanCommandProcessorTest {
 
         Plan updated = processor.updatePlan(plan,
             PlanUpdateCommand.builder().status(PlanStatus.COMPLETED).petIds(petIds).build(),
-            processor.resolvePetIdsForUpdate(MEMBER_ID, petIds));
+            processor.resolvePetIdsForUpdate(MEMBER_ID, petIds), null);
 
         assertThat(updated.status()).isEqualTo(PlanStatus.COMPLETED);
         assertThat(updated.petId()).isEqualTo(9L);
@@ -246,7 +249,69 @@ class PlanCommandProcessorTest {
     private Plan updatePets(Plan plan, List<Long> petIds) {
         PlanUpdateCommand command = PlanUpdateCommand.builder().petIds(petIds).build();
         return processor.updatePlan(plan, command,
-            command.petIds() == null ? null : processor.resolvePetIdsForUpdate(MEMBER_ID, command.petIds()));
+            command.petIds() == null ? null : processor.resolvePetIdsForUpdate(MEMBER_ID, command.petIds()),
+            null);
+    }
+
+    // ── 완료 시점 반려견 특성 스냅샷 (#629) ────────────────────────────────
+
+    @Test
+    @DisplayName("완료로 넘어가면 그 시점의 반려견 특성을 스냅샷으로 남긴다")
+    void snapshotsPetConditionsOnCompletion() {
+        Plan plan = plan(PlanStatus.CONFIRMED, 2L);
+
+        processor.updatePlan(plan, PlanUpdateCommand.builder().status(PlanStatus.COMPLETED).build(),
+            null, Map.of(2L, condition("포메라니안", true)));
+
+        assertThat(planPetConditionRepositoryPort.stored).singleElement()
+            .satisfies(snapshot -> {
+                assertThat(snapshot.planId()).isEqualTo(plan.id());
+                assertThat(snapshot.petId()).isEqualTo(2L);
+                assertThat(snapshot.breed()).isEqualTo("포메라니안");
+                assertThat(snapshot.heatSensitive()).isTrue();
+            });
+    }
+
+    @Test
+    @DisplayName("완료 전이가 아니면 스냅샷을 건드리지 않는다 — 제목만 고치는 요청이 기록을 다시 쓰지 않는다")
+    void keepsSnapshotWhenNotCompleting() {
+        processor.updatePlan(plan(PlanStatus.CONFIRMED, 2L),
+            PlanUpdateCommand.builder().title("제목만 바꾼다").build(), null, null);
+
+        assertThat(planPetConditionRepositoryPort.stored).isEmpty();
+        assertThat(planPetConditionRepositoryPort.deleteCalls).isZero();
+    }
+
+    @Test
+    @DisplayName("다시 완료하면 옛 스냅샷을 걷고 그 시점으로 다시 찍는다 — 되돌린 동안 동행견이 바뀔 수 있다")
+    void recompletingReplacesSnapshot() {
+        Plan plan = plan(PlanStatus.CONFIRMED, 2L);
+        processor.updatePlan(plan, PlanUpdateCommand.builder().status(PlanStatus.COMPLETED).build(),
+            null, Map.of(2L, condition("포메라니안", true)));
+
+        processor.updatePlan(plan, PlanUpdateCommand.builder().status(PlanStatus.COMPLETED).build(),
+            null, Map.of(9L, condition("비숑프리제", false)));
+
+        assertThat(planPetConditionRepositoryPort.deleteCalls).isEqualTo(2);
+        assertThat(planPetConditionRepositoryPort.stored).singleElement()
+            .satisfies(snapshot -> assertThat(snapshot.petId()).isEqualTo(9L));
+    }
+
+    @Test
+    @DisplayName("이미 완료된 일정에 다시 COMPLETED 를 보내는 것은 전이가 아니다 — 그때 다시 찍으면 기록이 거짓이 된다")
+    void completesNowOnlyOnTransition() {
+        PlanUpdateCommand toCompleted = PlanUpdateCommand.builder().status(PlanStatus.COMPLETED).build();
+
+        assertThat(PlanCommandProcessor.completesNow(plan(PlanStatus.CONFIRMED, 2L), toCompleted)).isTrue();
+        assertThat(PlanCommandProcessor.completesNow(plan(PlanStatus.DRAFT, 2L), toCompleted)).isTrue();
+        assertThat(PlanCommandProcessor.completesNow(plan(PlanStatus.COMPLETED, 2L), toCompleted)).isFalse();
+        // 상태를 건드리지 않는 요청도 전이가 아니다.
+        assertThat(PlanCommandProcessor.completesNow(plan(PlanStatus.CONFIRMED, 2L),
+            PlanUpdateCommand.builder().title("제목만").build())).isFalse();
+    }
+
+    private static PetConditionQueryResult condition(String breed, boolean heatSensitive) {
+        return PetConditionQueryResult.builder().breed(breed).heatSensitive(heatSensitive).build();
     }
 
     // ── 스텁 ───────────────────────────────────────────────────────────────

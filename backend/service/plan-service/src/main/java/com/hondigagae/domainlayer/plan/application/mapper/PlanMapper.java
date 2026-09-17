@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.plan.application.mapper;
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanEntity;
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanItemEntity;
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanPackingItemEntity;
+import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanPetConditionEntity;
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanPetEntity;
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanReviewEntity;
 import com.hondigagae.domainlayer.plan.adapter.out.persistence.entity.PlanReviewItemEntity;
@@ -10,6 +11,7 @@ import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPackingItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
+import com.hondigagae.domainlayer.plan.domain.model.PlanPetCondition;
 import com.hondigagae.domainlayer.plan.domain.model.PlanReview;
 import com.hondigagae.domainlayer.plan.domain.model.PlanReviewItem;
 import java.util.List;
@@ -47,6 +49,12 @@ public interface PlanMapper {
 
     // 도메인 리스트 -> 엔티티 리스트
     List<PlanPetEntity> toPetEntityListFromDomainList(List<PlanPet> pets);
+
+    // 엔티티 리스트 -> 도메인 리스트 (완료 시점 반려견 특성 스냅샷)
+    List<PlanPetCondition> toPetConditionDomainListFromEntityList(List<PlanPetConditionEntity> entities);
+
+    // 도메인 리스트 -> 엔티티 리스트
+    List<PlanPetConditionEntity> toPetConditionEntityListFromDomainList(List<PlanPetCondition> conditions);
 
     // 엔티티 -> 도메인
     PlanPackingItem toDomainFromEntity(PlanPackingItemEntity entity);
