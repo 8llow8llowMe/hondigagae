@@ -135,11 +135,14 @@ public class PlanWebController {
 
     @Operation(summary = "여행 일정 수정",
         description = "일정 기본 정보를 수정합니다. 전달한 필드만 반영되고 생략한 필드는 기존 값을 유지합니다. "
-            + "기간을 줄일 때 기존 항목의 일차가 새 기간을 벗어나면 실패합니다.\n\n"
-            + "**필수: planId (경로).** 바디 필드(title·startDate·endDate·budget·status)는 모두 선택입니다.\n\n"
+            + "기간을 줄일 때 기존 항목의 일차가 새 기간을 벗어나면 실패합니다. "
+            + "petIds 를 보내면 동행 반려견을 **목록 전체로 교체**합니다(첫 번째가 대표). 생략하면 기존 동행견을 유지하고, "
+            + "빈 목록은 PLAN_010, 본인 소유가 아닌 아이가 있으면 PLAN_011, 이미 완료된 일정이면 PLAN_019 입니다.\n\n"
+            + "**필수: planId (경로).** 바디 필드(title·startDate·endDate·budget·status·petIds)는 모두 선택입니다.\n\n"
             + "호출 예\n"
             + "- 제목만 변경: `PUT /api/v1/plans/1234567890123456789` `{\"title\":\"몽실이와 제주 2박 3일\"}`\n"
-            + "- 확정 처리: `PUT /api/v1/plans/1234567890123456789` `{\"status\":\"CONFIRMED\"}`",
+            + "- 확정 처리: `PUT /api/v1/plans/1234567890123456789` `{\"status\":\"CONFIRMED\"}`\n"
+            + "- 동행견 교체: `PUT /api/v1/plans/1234567890123456789` `{\"petIds\":[2,5]}`",
         security = {@SecurityRequirement(name = "bearerAuth")})
     @PutMapping("/{planId}")
     @PreAuthorize("isAuthenticated()")

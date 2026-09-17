@@ -54,7 +54,7 @@ class PlanPeriodShrinkTest {
         StubPlanItemRepositoryPort items = new StubPlanItemRepositoryPort(item(3));
         PlanCommandProcessor processor = processor(items);
 
-        assertThatThrownBy(() -> processor.updatePlan(plan(3), shrinkTo(2)))
+        assertThatThrownBy(() -> processor.updatePlan(plan(3), shrinkTo(2), null))
             .isInstanceOf(PlanException.class)
             .hasFieldOrPropertyWithValue("errorCode", PlanErrorCode.PLAN_PERIOD_SHRINK_CONFLICT);
     }
@@ -67,7 +67,7 @@ class PlanPeriodShrinkTest {
         StubPlanRepositoryPort plans = new StubPlanRepositoryPort();
         PlanCommandProcessor processor = processor(plans, items);
 
-        assertThatThrownBy(() -> processor.updatePlan(plan(3), shrinkTo(2)))
+        assertThatThrownBy(() -> processor.updatePlan(plan(3), shrinkTo(2), null))
             .isInstanceOf(PlanException.class);
 
         assertThat(plans.saved).isNull();
@@ -80,7 +80,7 @@ class PlanPeriodShrinkTest {
         // 2일차 항목만 있는 3일 일정을 2일로 줄이는 것은 막을 이유가 없다.
         PlanCommandProcessor processor = processor(new StubPlanItemRepositoryPort(item(1), item(2)));
 
-        assertThatCode(() -> processor.updatePlan(plan(3), shrinkTo(2))).doesNotThrowAnyException();
+        assertThatCode(() -> processor.updatePlan(plan(3), shrinkTo(2), null)).doesNotThrowAnyException();
     }
 
     @Test
@@ -90,7 +90,7 @@ class PlanPeriodShrinkTest {
         StubPlanItemRepositoryPort items = new StubPlanItemRepositoryPort(item(3));
         PlanCommandProcessor processor = processor(items);
 
-        assertThatCode(() -> processor.updatePlan(plan(3), shrinkTo(5))).doesNotThrowAnyException();
+        assertThatCode(() -> processor.updatePlan(plan(3), shrinkTo(5), null)).doesNotThrowAnyException();
         assertThat(items.lookups).isZero();
     }
 
@@ -100,7 +100,7 @@ class PlanPeriodShrinkTest {
         StubPlanItemRepositoryPort items = new StubPlanItemRepositoryPort(item(3));
         PlanCommandProcessor processor = processor(items);
 
-        processor.updatePlan(plan(3), PlanUpdateCommand.builder().title("제목만 바꾼다").build());
+        processor.updatePlan(plan(3), PlanUpdateCommand.builder().title("제목만 바꾼다").build(), null);
 
         assertThat(items.lookups).isZero();
     }
@@ -115,7 +115,7 @@ class PlanPeriodShrinkTest {
 
         PlanUpdateCommand command = PlanUpdateCommand.builder().startDate(START.plusDays(1)).build();
 
-        assertThatThrownBy(() -> processor.updatePlan(plan(3), command))
+        assertThatThrownBy(() -> processor.updatePlan(plan(3), command, null))
             .isInstanceOf(PlanException.class)
             .hasFieldOrPropertyWithValue("errorCode", PlanErrorCode.PLAN_PERIOD_SHRINK_CONFLICT);
     }
@@ -236,6 +236,11 @@ class PlanPeriodShrinkTest {
 
         @Override
         public List<PlanPet> findByPlanIds(Collection<Long> planIds) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void deleteByPlanId(long planId) {
             throw new UnsupportedOperationException();
         }
     }

@@ -26,6 +26,7 @@ public enum PlanErrorCode {
     REVIEW_PLAN_NOT_COMPLETED("PLAN_016", "완료된 일정만 후기를 쓰거나 볼 수 있습니다.", HttpStatus.BAD_REQUEST),
     REVIEW_ALREADY_EXISTS("PLAN_017", "이미 이 일정의 후기를 작성했습니다.", HttpStatus.CONFLICT),
     REVIEW_ITEM_NOT_ELIGIBLE("PLAN_018", "다녀온 장소 항목만 후기에 담을 수 있습니다.", HttpStatus.BAD_REQUEST),
+    PLAN_COMPLETED_PET_LOCKED("PLAN_019", "완료된 일정의 동행 반려견은 바꿀 수 없습니다.", HttpStatus.BAD_REQUEST),
     REVIEW_ITEM_DUPLICATED("PLAN_020", "같은 일정 항목을 후기에 두 번 넣을 수 없습니다.", HttpStatus.BAD_REQUEST),
     PLAN_COPY_PERIOD_MISMATCH("PLAN_021", "복사할 여행 기간의 일수는 원본과 같아야 합니다.", HttpStatus.BAD_REQUEST),
     INVALID_REQUEST("PLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),

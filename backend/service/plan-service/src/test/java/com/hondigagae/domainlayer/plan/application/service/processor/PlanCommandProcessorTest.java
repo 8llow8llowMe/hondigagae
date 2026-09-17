@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.hondigagae.domainlayer.plan.application.command.PlanCreateCommand;
+import com.hondigagae.domainlayer.plan.application.command.PlanUpdateCommand;
 import com.hondigagae.domainlayer.plan.application.exception.PlanErrorCode;
 import com.hondigagae.domainlayer.plan.application.exception.PlanException;
 import com.hondigagae.domainlayer.plan.application.port.out.PetConditionQueryPort;
@@ -12,6 +13,7 @@ import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPo
 import com.hondigagae.domainlayer.plan.application.port.out.PlanPetRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PetConditionQueryResult;
+import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
@@ -30,7 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.Slice;
 
 /**
- * 다견 담기 — 생성 시 반려견 결정 규칙 검증.
+ * 다견 담기 — 생성·수정 시 반려견 결정 규칙 검증.
  *
  * <p>고정하는 것은 셋이다.
  * <ul>
@@ -141,6 +143,112 @@ class PlanCommandProcessorTest {
         assertThat(planPetRepositoryPort.saved).isEmpty();
     }
 
+    // ── 수정으로 동행견 바꾸기 (#621) ──────────────────────────────────────
+
+    @Test
+    @DisplayName("petIds 를 보내면 동행견을 목록 전체로 교체하고 첫 번째가 새 대표가 된다")
+    void updateReplacesPets() {
+        Plan updated = updatePets(plan(PlanStatus.DRAFT, 2L), List.of(9L, 2L));
+
+        assertThat(updated.petId()).isEqualTo(9L);
+        assertThat(planPetRepositoryPort.saved).extracting(PlanPet::petId).containsExactly(9L, 2L);
+        // 지우고 넣는 순서가 아니면 같은 (planId, petId) 가 겹쳐 유니크 인덱스 위반으로 죽는다.
+        assertThat(planPetRepositoryPort.deleteCalls).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("petIds 를 생략하면 동행견을 건드리지 않는다 — 제목만 고치는 요청이 아이를 지우지 않는다")
+    void updateWithoutPetIdsKeepsPets() {
+        Plan updated = updatePets(plan(PlanStatus.DRAFT, 2L), null);
+
+        assertThat(updated.petId()).isEqualTo(2L);
+        assertThat(planPetRepositoryPort.deleteCalls).isZero();
+        assertThat(planPetRepositoryPort.saved).isEmpty();
+    }
+
+    @Test
+    @DisplayName("빈 petIds 는 400 PET_REQUIRED — 대표 반려견으로 되살리지 않는다")
+    void updateRejectsEmptyPetIds() {
+        petConditionQueryPort.representativePetId = REPRESENTATIVE_PET_ID;
+
+        assertThatThrownBy(() -> updatePets(plan(PlanStatus.DRAFT, 2L), List.of()))
+            .isInstanceOf(PlanException.class)
+            .extracting(exception -> ((PlanException) exception).getErrorCode())
+            .isEqualTo(PlanErrorCode.PET_REQUIRED);
+        // 생성 경로의 폴백이 새어 들어오면 사용자가 지우려던 아이가 말없이 돌아온다.
+        assertThat(petConditionQueryPort.representativeCalls).isZero();
+        assertThat(planPetRepositoryPort.deleteCalls).isZero();
+    }
+
+    @Test
+    @DisplayName("본인 소유가 아닌 petId 가 섞이면 수정도 400 NOT_FOUND_PET 다")
+    void updateRejectsPetIdsNotOwnedByMember() {
+        petConditionQueryPort.ownedPetIds = Set.of(2L);
+
+        assertThatThrownBy(() -> updatePets(plan(PlanStatus.DRAFT, 2L), List.of(2L, 999L)))
+            .isInstanceOf(PlanException.class)
+            .extracting(exception -> ((PlanException) exception).getErrorCode())
+            .isEqualTo(PlanErrorCode.NOT_FOUND_PET);
+        assertThat(planRepositoryPort.saved).isNull();
+        assertThat(planPetRepositoryPort.deleteCalls).isZero();
+    }
+
+    @Test
+    @DisplayName("완료된 일정의 동행견은 바꾸지 못한다 — 다녀온 기록의 판정 근거가 뒤늦게 흔들린다")
+    void updateRejectsPetChangeOnCompletedPlan() {
+        assertThatThrownBy(() -> updatePets(plan(PlanStatus.COMPLETED, 2L), List.of(9L)))
+            .isInstanceOf(PlanException.class)
+            .extracting(exception -> ((PlanException) exception).getErrorCode())
+            .isEqualTo(PlanErrorCode.PLAN_COMPLETED_PET_LOCKED);
+        assertThat(planRepositoryPort.saved).isNull();
+        assertThat(planPetRepositoryPort.deleteCalls).isZero();
+    }
+
+    @Test
+    @DisplayName("완료된 일정도 동행견을 빼면 다른 필드는 고칠 수 있다 — 잠긴 것은 동행견뿐이다")
+    void updateAllowsOtherFieldsOnCompletedPlan() {
+        Plan updated = processor.updatePlan(plan(PlanStatus.COMPLETED, 2L),
+            PlanUpdateCommand.builder().title("다녀온 제주").build(), null);
+
+        assertThat(updated.title()).isEqualTo("다녀온 제주");
+        assertThat(updated.petId()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("같은 요청으로 완료하면서 동행견을 바꾸는 것은 막지 않는다 — 아직 기록이 확정되기 전이다")
+    void allowsPetChangeWhileCompleting() {
+        Plan plan = plan(PlanStatus.CONFIRMED, 2L);
+        List<Long> petIds = List.of(9L);
+
+        Plan updated = processor.updatePlan(plan,
+            PlanUpdateCommand.builder().status(PlanStatus.COMPLETED).petIds(petIds).build(),
+            processor.resolvePetIdsForUpdate(MEMBER_ID, petIds));
+
+        assertThat(updated.status()).isEqualTo(PlanStatus.COMPLETED);
+        assertThat(updated.petId()).isEqualTo(9L);
+    }
+
+    private static Plan plan(PlanStatus status, long petId) {
+        return Plan.builder()
+            .id(500L)
+            .memberId(MEMBER_ID)
+            .petId(petId)
+            .areaCode("39")
+            .title("몽실이와 제주 2박 3일")
+            .startDate(LocalDate.of(2026, 9, 12))
+            .endDate(LocalDate.of(2026, 9, 14))
+            .status(status)
+            .deleted(false)
+            .build();
+    }
+
+    /** Facade 와 같은 순서 — 반려견 확인(원격)은 트랜잭션 밖, 저장은 트랜잭션 안. */
+    private Plan updatePets(Plan plan, List<Long> petIds) {
+        PlanUpdateCommand command = PlanUpdateCommand.builder().petIds(petIds).build();
+        return processor.updatePlan(plan, command,
+            command.petIds() == null ? null : processor.resolvePetIdsForUpdate(MEMBER_ID, command.petIds()));
+    }
+
     // ── 스텁 ───────────────────────────────────────────────────────────────
 
     private static class StubPlanRepositoryPort implements PlanRepositoryPort {
@@ -167,6 +275,7 @@ class PlanCommandProcessorTest {
     private static class StubPlanPetRepositoryPort implements PlanPetRepositoryPort {
 
         private final List<PlanPet> saved = new ArrayList<>();
+        private int deleteCalls;
 
         @Override
         public List<PlanPet> saveAll(List<PlanPet> pets) {
@@ -182,6 +291,12 @@ class PlanCommandProcessorTest {
         @Override
         public List<PlanPet> findByPlanIds(Collection<Long> planIds) {
             throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void deleteByPlanId(long planId) {
+            deleteCalls++;
+            saved.clear();
         }
     }
 

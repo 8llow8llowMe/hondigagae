@@ -104,7 +104,11 @@ public class PlanWebFacade implements PlanWebUseCase {
     @Override
     public PlanDetailResponse updatePlan(long memberId, long planId, PlanUpdateCommand command) {
         Plan plan = planQueryProcessor.getOwnedPlan(memberId, planId);
-        Plan updated = planCommandProcessor.updatePlan(plan, command);
+        // petIds 를 보냈을 때만 소유 검증을 부른다 — 원격 호출이라 트랜잭션 밖에서 먼저 끝낸다
+        // (createPlan 과 같은 이유).
+        List<Long> petIds = command.petIds() == null ? null
+            : planCommandProcessor.resolvePetIdsForUpdate(memberId, command.petIds());
+        Plan updated = planCommandProcessor.updatePlan(plan, command, petIds);
         return planPresenter.toDetailResponse(planQueryProcessor.getPlanDetailInfo(updated));
     }
 

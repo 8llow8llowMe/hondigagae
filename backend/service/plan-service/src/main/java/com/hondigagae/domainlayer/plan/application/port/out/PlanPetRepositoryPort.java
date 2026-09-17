@@ -20,4 +20,7 @@ public interface PlanPetRepositoryPort {
 
     /** 목록 화면용 벌크 조회 — 일정마다 따로 부르면 페이지 크기만큼 왕복한다 (coding-conventions §9-7). */
     List<PlanPet> findByPlanIds(Collection<Long> planIds);
+
+    /** 동행견 교체용. 지운 뒤 새로 넣는다. */
+    void deleteByPlanId(long planId);
 }

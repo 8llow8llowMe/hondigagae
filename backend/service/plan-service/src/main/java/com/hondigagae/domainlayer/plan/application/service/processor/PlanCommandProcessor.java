@@ -172,14 +172,45 @@ public class PlanCommandProcessor {
             .orElseThrow(() -> new PlanException(PlanErrorCode.PET_REQUIRED));
     }
 
+    /**
+     * 수정 경로의 동행견 확인. 소유 검증은 생성과 같은 규칙을 그대로 쓰되 <b>폴백이 없다</b>.
+     *
+     * <p>생성은 빈 목록을 대표 반려견으로 대신하지만, 수정에서 빈 목록은 "동행견을 모두 빼겠다"
+     * 는 뜻이다. 여기서 대표 반려견으로 되살리면 사용자가 지우려던 아이가 말없이 돌아온다.
+     * 일정에는 최소 한 마리가 있어야 하므로 {@code PLAN_010} 으로 거절한다.
+     */
+    public List<Long> resolvePetIdsForUpdate(long memberId, List<Long> requested) {
+        if (CollectionUtils.isEmpty(requested)) {
+            throw new PlanException(PlanErrorCode.PET_REQUIRED);
+        }
+        return resolvePetIds(memberId, requested);
+    }
+
+    /**
+     * @param petIds {@code null} 이면 동행견을 건드리지 않는다. 목록이 오면 {@code plan.pet_id}(대표)와
+     *               {@code plan_pet}(전체)을 <b>함께</b> 맞춘다 — 한쪽만 고치면 대표와 목록이 어긋난다.
+     *               소유 검증은 원격 호출이라 Facade 가 트랜잭션 밖에서 미리 끝낸다
+     *               ({@link #resolvePetIdsForUpdate}).
+     *               <p>날씨 판정·준비물은 여기서 다시 계산하지 않는다. 다음 조회가 새 {@code petIds} 를
+     *               읽어 판정하고, 이미 만든 준비물은 지우지 않는다 — 사용자가 손으로 고친 준비물을
+     *               동행견 교체가 말없이 날리는 일은 없어야 한다.
+     */
     @Transactional
-    public Plan updatePlan(Plan plan, PlanUpdateCommand command) {
+    public Plan updatePlan(Plan plan, PlanUpdateCommand command, List<Long> petIds) {
         LocalDate startDate = command.startDate() != null ? command.startDate() : plan.startDate();
         LocalDate endDate = command.endDate() != null ? command.endDate() : plan.endDate();
         validateDateRange(startDate, endDate);
 
+        // 이미 완료된 일정은 다녀온 기록이다 — 동행견을 바꾸면 그때의 판정 근거가 뒤늦게 흔들린다.
+        // 같은 요청으로 완료하면서 바꾸는 것은 막지 않는다. 아직 기록이 확정되기 전이다.
+        if (petIds != null && plan.status() == PlanStatus.COMPLETED) {
+            throw new PlanException(PlanErrorCode.PLAN_COMPLETED_PET_LOCKED);
+        }
+
         Plan updated = plan.toBuilder()
             .title(command.title() != null ? command.title() : plan.title())
+            // 대표 반려견 = 첫 번째. 생성과 같은 규칙이다.
+            .petId(petIds != null ? petIds.get(0) : plan.petId())
             .startDate(startDate)
             .endDate(endDate)
             .budget(command.budget() != null ? command.budget() : plan.budget())
@@ -196,7 +227,14 @@ public class PlanCommandProcessor {
             }
         }
 
-        return planRepositoryPort.save(updated);
+        Plan saved = planRepositoryPort.save(updated);
+
+        if (petIds != null) {
+            // 삭제가 먼저다. 큐잉되면 같은 (planId, petId) 가 옛 행과 겹쳐 유니크 인덱스 위반으로 죽는다.
+            planPetRepositoryPort.deleteByPlanId(saved.id());
+            planPetRepositoryPort.saveAll(toPets(saved.id(), petIds));
+        }
+        return saved;
     }
 
     @Transactional
