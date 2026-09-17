@@ -8,16 +8,26 @@ import {
   type CodeValues,
   emailSchema,
   type EmailValues,
+  signupConsentSchema,
   signupProfileSchema,
   type SignupProfileValues,
 } from '@/features/auth/schemas'
+import { SignupConsentFields } from '@/features/auth/signup-consent-fields'
 import { CodeStep, EmailStep, ProfileStep } from '@/features/auth/signup-steps'
 import { sendEmailCode, signup, verifyEmailCode } from '@/lib/api/auth'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
+import {
+  hasConsentErrors,
+  type SignupConsent,
+  type SignupConsentKey,
+  toConsentErrors,
+} from '@/lib/auth/signup-consent'
 import { remainingSeconds } from '@/lib/form/cooldown'
-import { apiErrorToFormErrors, type FormErrors } from '@/lib/form/field-errors'
+import { apiErrorToFormErrors, type FormErrors, NO_FORM_ERRORS } from '@/lib/form/field-errors'
+import { focusFirstError } from '@/lib/form/focus-first-error'
 import { useForm } from '@/lib/form/use-form'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
+import { validate } from '@/lib/form/validate'
 import { messages } from '@/lib/messages'
 
 /** 백엔드 send-code 쿨다운 (AuthWebController 문서 실측) */
@@ -32,8 +42,19 @@ type Step = 'email' | 'code' | 'profile'
  * **인증 상태는 프론트가 아니라 서버가 들고 있다.** `verify-code` 는 토큰을 주지
  * 않고 서버에 "이 이메일은 인증됨(30분)" 을 남긴다. 새로고침하면 1단계로
  * 돌아가는 것은 의도된 동작이다 — 회원가입-세부명세.md D3/D8-1.
+ *
+ * **동의 값은 이 컴포넌트가 소유하지 않는다.** 같은 화면의 소셜 버튼도 같은 동의를
+ * 써야 해서 `SignupScreen` 이 들고 있고, 여기는 값을 받아 그리고 검증한다 (#688).
+ * 검증 결과(`consentErrors`)만 여기 남는 이유는 그것이 **이 폼의 제출 결과**이기
+ * 때문이다 — 서버 오류도 같은 제출에서 돌아온다.
  */
-export function SignupForm({ returnTo }: { returnTo: string }) {
+export type SignupFormProps = {
+  returnTo: string
+  consent: SignupConsent
+  onConsentChange: (key: SignupConsentKey, checked: boolean) => void
+}
+
+export function SignupForm({ returnTo, consent, onConsentChange }: SignupFormProps) {
   const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -53,6 +74,10 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
   // 두 오류 모두 도착 시점엔 codeForm/profileForm 오류로 세팅되지만 그 단계는 더 이상
   // 화면에 없다 — 되돌아간 1단계에 별도로 실어야 사용자가 이유를 알 수 있다 (D4).
   const [stepBackMessage, setStepBackMessage] = useState<string | null>(null)
+
+  // 동의 블록의 오류. 클라이언트 검증(MEMBER_115/116/117 복제본)과 서버 응답
+  // (MEMBER_115/116/117 · MEMBER_010/011)이 같은 자리에 모인다 — #688
+  const [consentErrors, setConsentErrors] = useState<FormErrors>(NO_FORM_ERRORS)
 
   // 필드로 좁혀지지 않는 5xx·무응답을 단계별로 구분한다 — LoginFormFields 와 같은 패턴
   const [emailErrorStatus, setEmailErrorStatus] = useState<number | null>(null)
@@ -185,16 +210,32 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
     initialValues: { password: '', name: '', nickname: '' },
     onSubmit: async (values) => {
       try {
-        await signup({ email, ...values })
+        // 동의 3종은 필수 필드다 — 빠뜨리면 MEMBER_115/116/117 로 400 이다 (#688)
+        await signup({ email, ...values, ...consent })
         setDuplicateEmail(null)
+        setConsentErrors(NO_FORM_ERRORS)
       } catch (error) {
         if (!(error instanceof ApiError)) {
           setProfileErrorStatus(NO_RESPONSE_STATUS)
           setDuplicateEmail(null)
+          setConsentErrors(NO_FORM_ERRORS)
           throw error
         }
 
         setProfileErrorStatus(error.status)
+
+        /*
+          동의 관련 실패를 동의 블록으로 옮긴다. `MEMBER_115/116/117` 은 `field` 가 함께
+          와서 기존 매핑을 그대로 타고, `MEMBER_010/011` 은 `field` 가 없어 **코드로**
+          어느 체크박스인지 판정한다 (`toConsentErrors` 의 JSDoc).
+        */
+        setConsentErrors(
+          toConsentErrors(
+            apiErrorToFormErrors(error, messages.form.submitFailed),
+            error.resultCode,
+            consent,
+          ),
+        )
 
         // 409: 이 요청에서만 이메일 중복이 드러난다 — send-code 가 계정 열거 방지로
         // 가입 여부와 무관하게 항상 성공하기 때문이다(정본 D4). 여기서만 판정한다.
@@ -261,15 +302,77 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
       })
   }, [cooldownSeconds, email, codeForm.setErrors])
 
+  /**
+   * 동의 값을 바꾸면 그 항목의 오류만 지운다. `useForm.setValue` 의 기본 동작과 같은
+   * 판단이다 — 전체를 지우면 아직 켜지 않은 항목의 안내까지 사라진다.
+   */
+  const handleConsentChange = useCallback(
+    (key: SignupConsentKey, checked: boolean) => {
+      setConsentErrors((previous) => {
+        if (previous.fields[key] === undefined) return previous
+        const fields = { ...previous.fields }
+        delete fields[key]
+        return { fields, form: previous.form }
+      })
+      onConsentChange(key, checked)
+    },
+    [onConsentChange],
+  )
+
+  /**
+   * 3단계 제출. **동의를 먼저 본다.**
+   *
+   * `profileForm` 값에 동의가 없으므로(`signupConsentSchema` 의 JSDoc) `useForm` 의
+   * 검증이 대신해 주지 못한다. 서버에 보내고 400 을 받아 표시해도 결과는 같지만,
+   * 켜지 않은 체크박스를 확인하려고 왕복할 이유가 없다 — 클라이언트 검증은 백엔드
+   * 제약의 복제본이라는 규칙 그대로다 (form-guide.md §5).
+   */
+  const handleProfileSubmit = useCallback(() => {
+    const result = validate(signupConsentSchema, consent)
+    if (!result.ok) {
+      setConsentErrors(result.errors)
+      focusFirstError(containerRef.current, result.errors)
+      return
+    }
+    setConsentErrors(NO_FORM_ERRORS)
+    void profileForm.submit()
+  }, [consent, profileForm.submit])
+
   const emailStepErrors: FormErrors =
     stepBackMessage !== null
       ? { fields: emailForm.errors.fields, form: stepBackMessage }
       : emailForm.errors
 
+  /*
+    동의 오류가 체크박스에 붙었으면 폼 전체 오류는 끈다 — 같은 문구가 `FormAlert` 와
+    체크박스 아래에 두 번 보인다. "필드 오류가 잡혔으면 대표 메시지를 또 띄우지 않는다"는
+    `field-errors.ts` 의 판단을 동의 블록 너머로 이은 것이다.
+  */
+  const profileStepErrors: FormErrors = hasConsentErrors(consentErrors)
+    ? { fields: profileForm.errors.fields, form: null }
+    : profileForm.errors
+
+  /*
+    **동의 블록은 모든 단계에서 보인다.** 같은 화면의 소셜 버튼이 1단계부터 눌리는데,
+    동의를 3단계 안에 가두면 소셜로 가입하려는 사용자는 동의할 방법이 없다 — 인가코드가
+    1회용이라 콜백에서 받을 수도 없다 (회원가입-세부명세.md D8-5).
+
+    제목 바로 아래에 두어 "무엇에 동의하고 가입하는지" 를 입력 전에 읽게 한다. 3단계에서는
+    이 자리가 곧 제출 버튼 위이기도 하다.
+  */
+  const consentBlock = (
+    <SignupConsentFields
+      consent={consent}
+      errors={consentErrors}
+      onConsentChange={handleConsentChange}
+    />
+  )
+
   if (step === 'email') {
     return (
       <div ref={containerRef} className="flex flex-col gap-6">
         <h1 className="text-title-1 text-fg font-bold">{messages.auth.signupTitle}</h1>
+        {consentBlock}
         <EmailStep
           values={emailForm.values}
           errors={emailStepErrors}
@@ -292,6 +395,7 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
     return (
       <div ref={containerRef} className="flex flex-col gap-6">
         <h1 className="text-title-1 text-fg font-bold">{messages.auth.signupTitle}</h1>
+        {consentBlock}
         <CodeStep
           email={email}
           values={codeForm.values}
@@ -323,9 +427,10 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
   return (
     <div ref={containerRef} className="flex flex-col gap-6">
       <h1 className="text-title-1 text-fg font-bold">{messages.auth.signupTitle}</h1>
+      {consentBlock}
       <ProfileStep
         values={profileForm.values}
-        errors={profileForm.errors}
+        errors={profileStepErrors}
         errorStatus={profileErrorStatus}
         submitting={profileForm.isSubmitting}
         duplicateEmail={duplicateEmail}
@@ -333,7 +438,12 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
         // errors.form 이 있으면(409 포함) 성공 안내를 끈다 — 안 그러면 "이메일 인증이
         // 완료됐어요."(role=status) 와 오류(role=alert) 가 동시에 뜬다. 새 state 를
         // 늘리지 않고 이미 있는 errors.form 으로 판정한다 — 이슈 #24 최종 리뷰 M7.
-        notice={profileForm.errors.form === null ? messages.auth.codeVerified : undefined}
+        // 동의 오류로 막힌 경우에도 끈다 — 실패했는데 성공 안내가 남으면 안 된다.
+        notice={
+          profileStepErrors.form === null && !hasConsentErrors(consentErrors)
+            ? messages.auth.codeVerified
+            : undefined
+        }
         onValueChange={(key, value) => {
           // duplicateEmail 은 여기서 지우지 않는다 — 409 이후에도 "로그인하기" 링크가
           // 계속 보여야 한다(정본 D4). 지우는 지점은 profileForm 의 다음 제출 결과
@@ -343,8 +453,8 @@ export function SignupForm({ returnTo }: { returnTo: string }) {
           setProfileErrorStatus(null)
           profileForm.setValue(key, value)
         }}
-        onSubmit={() => void profileForm.submit()}
-        onRetry={() => void profileForm.submit()}
+        onSubmit={handleProfileSubmit}
+        onRetry={handleProfileSubmit}
       />
     </div>
   )

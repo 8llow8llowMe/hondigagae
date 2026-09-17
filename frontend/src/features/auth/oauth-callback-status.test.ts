@@ -104,6 +104,36 @@ describe('OAuthCallbackStatus', () => {
     expect(markup).toContain(messages.common.temporaryErrorDescription)
   })
 
+  /*
+    **동의 누락만 목적지가 /signup 이다** (#688). 로그인 화면으로 돌려보내면 그쪽
+    소셜 버튼은 동의를 싣지 않아 같은 실패를 그대로 반복한다 — 인가코드가 1회용이라
+    사용자는 제공자 인가 화면부터 매번 다시 밟게 된다.
+  */
+  it('MEMBER_010 은 회원가입 화면으로 보내고 서버 사유를 그대로 보여준다', () => {
+    const markup = render('kakao', {
+      status: 'failed',
+      error: domainError(
+        400,
+        'MEMBER_010',
+        '이용약관과 개인정보 처리방침에 동의해야 가입할 수 있습니다.',
+      ),
+    })
+
+    expect(markup).toContain('이용약관과 개인정보 처리방침에 동의해야 가입할 수 있습니다.')
+    expect(markup).toContain('href="/signup"')
+    expect(markup).toContain(messages.auth.toSignupConsent)
+  })
+
+  it('MEMBER_011 도 같은 곳으로 보낸다', () => {
+    const markup = render('naver', {
+      status: 'failed',
+      error: domainError(400, 'MEMBER_011', '만 14세 이상만 가입할 수 있습니다.'),
+    })
+
+    expect(markup).toContain('만 14세 이상만 가입할 수 있습니다.')
+    expect(markup).toContain('href="/signup"')
+  })
+
   it('ApiError 가 아닌 실패도 다음 행동을 준다', () => {
     const markup = render('kakao', { status: 'failed', error: new Error('boom') })
 

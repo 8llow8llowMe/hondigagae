@@ -1,5 +1,6 @@
 import { clientFetch, clientFetchVoid } from '@/lib/api/client'
 import { paths } from '@/lib/api/paths'
+import type { SignupConsent } from '@/lib/auth/signup-consent'
 
 /**
  * 인증 API 호출부.
@@ -10,7 +11,14 @@ import { paths } from '@/lib/api/paths'
 export type LoginRequest = { email: string; password: string }
 export type LoginResult = { memberId: string }
 
-export type SignupRequest = {
+/**
+ * 일반 회원가입 요청.
+ *
+ * **동의 3종은 선택이 아니라 필수다** (백엔드 #607 · #608). `@AssertTrue` 라
+ * 빠뜨리거나 `false` 면 400 이고, 각각 `MEMBER_115` / `MEMBER_116` / `MEMBER_117` 로
+ * `field` 와 함께 온다 — `MemberGeneralSignupRequest` 실측.
+ */
+export type SignupRequest = SignupConsent & {
   email: string
   password: string
   name: string
@@ -69,8 +77,19 @@ export function resetPassword(values: PasswordResetRequest): Promise<void> {
 /** 소셜 로그인 1단계. 이 URL 로 사용자를 보내는 것은 **우리가** 한다 (서버가 리다이렉트하지 않는다) */
 export type OAuthAuthorizeResult = { authorizationUrl: string }
 
-export function oauthAuthorize(provider: string): Promise<OAuthAuthorizeResult> {
-  return clientFetch<OAuthAuthorizeResult>(paths.auth.oauthAuthorize(provider))
+/**
+ * `consent` 는 **최초 연동(= 신규 가입)에서만** 쓰인다. 기존 회원 로그인은 생략한다
+ * — 백엔드 기본값이 전부 false 이고, 이미 가입한 회원의 로그인은 동의 여부와 무관하게
+ * 통과한다 (`OAuthLoginProcessor`).
+ *
+ * **여기가 동의를 실을 수 있는 유일한 지점이다.** 콜백의 인가코드는 1회용이라 그
+ * 시점에 거부당하면 사용자가 제공자 인가 화면부터 다시 밟아야 한다.
+ */
+export function oauthAuthorize(
+  provider: string,
+  consent?: SignupConsent,
+): Promise<OAuthAuthorizeResult> {
+  return clientFetch<OAuthAuthorizeResult>(paths.auth.oauthAuthorize(provider, consent))
 }
 
 /**

@@ -12,6 +12,8 @@ import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 
 const LOGIN_PATH = '/login'
+/** 가입 동의를 실을 수 있는 유일한 입구 — 소셜 `/authorize` 호출 전이다 (#688) */
+const SIGNUP_PATH = '/signup'
 
 /**
  * 교환 상태별 화면. **상태를 갖지 않아 node 환경에서 렌더 테스트가 된다**
@@ -89,15 +91,27 @@ export function OAuthCallbackStatus({
   const label =
     action === 'consent' && providerName !== null
       ? messages.auth.socialRetryLabel(providerName)
-      : action === 'signin'
-        ? messages.auth.toLogin
-        : messages.common.retry
+      : action === 'signup-consent'
+        ? messages.auth.toSignupConsent
+        : action === 'signin'
+          ? messages.auth.toLogin
+          : messages.common.retry
+
+  /*
+    **동의 누락만 목적지가 다르다** (#688). 동의는 `/authorize` 를 부르기 **전에만**
+    실을 수 있고(인가코드 1회용), 그 입구가 회원가입 화면의 동의 블록이다. 로그인
+    화면으로 보내면 같은 실패를 그대로 반복한다 — 그쪽 소셜 버튼은 동의를 싣지 않는다.
+
+    사유 문구는 여기서도 서버 것(`message`)을 그대로 쓴다. `MEMBER_010` 은 "이용약관과
+    개인정보 처리방침에 동의해야", `MEMBER_011` 은 "만 14세 이상만" 이라고 이미 말한다.
+  */
+  const destination = action === 'signup-consent' ? SIGNUP_PATH : LOGIN_PATH
 
   return (
     <EmptyState
       title={messages.auth.oauthFailedTitle}
       description={message}
-      action={<ButtonLink href={LOGIN_PATH}>{label}</ButtonLink>}
+      action={<ButtonLink href={destination}>{label}</ButtonLink>}
     />
   )
 }

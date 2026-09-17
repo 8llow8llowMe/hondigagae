@@ -26,6 +26,12 @@ export const formMessages = {
   nicknameRequired: '닉네임은 필수입니다.',
   // MEMBER_109
   nicknameLength: '닉네임은 10자 이하만 가능합니다.',
+  // MEMBER_115
+  termsAgreementRequired: '이용약관에 동의해야 가입할 수 있습니다.',
+  // MEMBER_116
+  privacyAgreementRequired: '개인정보 처리방침에 동의해야 가입할 수 있습니다.',
+  // MEMBER_117
+  ageOver14Required: '만 14세 이상만 가입할 수 있습니다.',
 
   /** 응답 형태를 해석하지 못했을 때의 최후 문구 */
   submitFailed: '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.',
@@ -72,6 +78,36 @@ export const authMessages = {
   signupSubmit: '가입하기',
   signingUp: '가입 중',
   signupDone: '가입이 완료됐어요. 로그인해 주세요.',
+
+  /*
+    가입 동의·만 14세 확인 (이슈 #688).
+
+    **세 항목 다 필수라 "선택" 이 없다.** 라벨에 `(필수)` 를 붙이는 것은 장식이 아니라,
+    선택 동의가 섞인 다른 서비스의 가입 화면을 겪은 사용자가 "안 켜도 되는 것" 으로
+    읽는 것을 막는다. 실제로 셋 다 켜지 않으면 가입이 400 으로 막힌다.
+
+    **거부 문구는 여기에 없다.** `MEMBER_115/116/117` · `MEMBER_010/011` 의
+    `resultMessage` 를 그대로 쓴다 (클라이언트 검증 문구는 `formMessages` 의 복제본).
+  */
+  consentHeading: '가입 동의',
+  termsConsentLabel: '(필수) 이용약관에 동의해요',
+  privacyConsentLabel: '(필수) 개인정보 처리방침에 동의해요',
+  ageConsentLabel: '(필수) 만 14세 이상이에요',
+  /* 링크 글자는 짧게 두고, 무엇의 전문인지는 접근 가능한 이름이 말한다 (WCAG 2.5.3) */
+  consentDocumentLinkText: '전문 보기',
+  consentDocumentLinkLabel: (title: string) => `${title} 전문 보기 (새 창)`,
+  /*
+    소셜 버튼이 비활성인 이유. **버튼만 흐리게 두지 않는다** — 왜 못 누르는지 보이지
+    않으면 사용자는 고장으로 읽는다.
+  */
+  socialConsentRequired: '소셜 계정으로 가입하려면 위 동의 항목에 모두 체크해 주세요.',
+  /*
+    소셜 콜백이 `MEMBER_010` / `MEMBER_011` 로 실패했을 때의 다음 행동.
+
+    목적지가 `/login` 이 아니라 `/signup` 인 이유: 동의는 `/authorize` 단계에서만
+    실을 수 있고(인가코드 1회용), 그 입구가 회원가입 화면의 동의 블록이다.
+  */
+  toSignupConsent: '회원가입에서 동의하기',
 
   /*
     비밀번호 찾기 (이슈 #85 · 비밀번호찾기-세부명세.md D5).

@@ -1,4 +1,5 @@
 import { type MockStore, mockStore, nextMemberId } from '@/lib/api/mock/store'
+import type { SignupConsent } from '@/lib/auth/signup-consent'
 import { EMAIL_PATTERN } from '@/lib/form/email-pattern'
 import { PASSWORD_PATTERN } from '@/lib/form/password-pattern'
 import type { ApiResponse, ValidationErrorItem } from '@/types/api'
@@ -136,6 +137,34 @@ function text(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
+/**
+ * `@AssertTrue` 의 재현. **`=== true` 로만 통과시킨다** — 백엔드는 primitive `boolean`
+ * 이라 필드를 아예 빼고 보낸 요청도 Jackson 이 `false` 로 채워 걸러낸다
+ * (`MemberGeneralSignupRequest` 의 클래스 주석). `Boolean(value)` 로 느슨하게 받으면
+ * mock 에서만 `"true"` 같은 문자열이 통과한다.
+ */
+function flag(value: unknown): boolean {
+  return value === true
+}
+
+/** `?a=1` 과 `a=1` 을 같게 다룬다 — 호출부가 어느 쪽으로 넘겨도 되게 한 곳에 모은다 */
+function searchParams(search: string): URLSearchParams {
+  return new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
+}
+
+/**
+ * 쿼리의 동의 3종을 읽는다. 없으면 false — 백엔드도 `@RequestParam(defaultValue = "false")`
+ * 라 **선택**이다. 여기서 기본을 true 로 두면 미동의 최초 연동이 로컬에서만 통과한다.
+ */
+function readConsent(search: string): SignupConsent {
+  const params = searchParams(search)
+  return {
+    termsAgreed: params.get('termsAgreed') === 'true',
+    privacyAgreed: params.get('privacyAgreed') === 'true',
+    ageOver14Confirmed: params.get('ageOver14Confirmed') === 'true',
+  }
+}
+
 // 이메일·비밀번호 정규식은 자체 정의하지 않고 FE 스키마와 공유하는 lib/form 의
 // EMAIL_PATTERN · PASSWORD_PATTERN 을 그대로 쓴다. mock 이 FE 스키마보다 엄격하면
 // 실제로는 통과할 이메일(`a@b`)이 mock 에서만 400 으로 거부되는 드리프트가 생긴다
@@ -183,6 +212,30 @@ function validateSignup(values: Record<string, unknown>): FieldError[] {
       code: 'MEMBER_109',
       field: 'nickname',
       message: '닉네임은 10자 이하만 가능합니다.',
+    })
+
+  /*
+    동의·확인 3종 (#688 · 백엔드 #607 · #608). **DTO 선언 순서상 닉네임 뒤다.**
+    `@AssertTrue` 라 누락과 `false` 가 같은 오류이고, 셋은 서로 독립이라 하나가 걸려도
+    나머지를 계속 검사한다 — 사용자가 체크박스를 하나씩 켜며 왕복하지 않게 한다.
+  */
+  if (!flag(values.termsAgreed))
+    errors.push({
+      code: 'MEMBER_115',
+      field: 'termsAgreed',
+      message: '이용약관에 동의해야 가입할 수 있습니다.',
+    })
+  if (!flag(values.privacyAgreed))
+    errors.push({
+      code: 'MEMBER_116',
+      field: 'privacyAgreed',
+      message: '개인정보 처리방침에 동의해야 가입할 수 있습니다.',
+    })
+  if (!flag(values.ageOver14Confirmed))
+    errors.push({
+      code: 'MEMBER_117',
+      field: 'ageOver14Confirmed',
+      message: '만 14세 이상만 가입할 수 있습니다.',
     })
 
   return errors
@@ -303,18 +356,21 @@ function oauthLogin(store: MockStore, rawProvider: string, search: string): Mock
     return fail(400, 'AUTH_007', `지원하지 않는 소셜 로그인 제공자입니다. (${rawProvider})`)
   }
 
-  const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
+  const params = searchParams(search)
   const code = params.get('code') ?? ''
   const state = params.get('state') ?? ''
 
   // 백엔드 validateState: 공란도 모르는 state 도 같은 AUTH_010 이다
-  if (state.length === 0 || !store.oauthStates.has(`${provider}:${state}`)) {
+  const storedConsent = store.oauthStates.get(`${provider}:${state}`)
+  if (state.length === 0 || storedConsent === undefined) {
     return fail(
       401,
       'AUTH_010',
       '유효하지 않은 소셜 로그인 요청입니다. 처음부터 다시 시도해주세요.',
     )
   }
+  // `/authorize` 때 받아 둔 동의를 여기서 꺼내 쓴다 — 콜백에서는 다시 받을 수 없다 (#688)
+  const consent = storedConsent
   store.oauthStates.delete(`${provider}:${state}`)
 
   if (code.length === 0) {
@@ -346,6 +402,20 @@ function oauthLogin(store: MockStore, rawProvider: string, search: string): Mock
 
   const existing = store.members.find((it) => it.email === profile.email)
   if (existing === undefined) {
+    /*
+      **신규 생성 직전에만 동의를 본다** — 백엔드 `validateSignupConsent` 와 같은 자리다.
+      이미 가입한 회원의 로그인은 동의와 무관하게 통과해야 하므로 이 분기 밖에 두면 안 된다.
+
+      **문서 동의를 먼저 본다.** 둘이 함께 비면 `MEMBER_010` 이 나가 `MEMBER_011` 을
+      가린다 — 백엔드가 그 순서이고, mock 이 다르면 화면이 겪는 코드가 갈린다.
+    */
+    if (!consent.termsAgreed || !consent.privacyAgreed) {
+      return fail(400, 'MEMBER_010', '이용약관과 개인정보 처리방침에 동의해야 가입할 수 있습니다.')
+    }
+    if (!consent.ageOver14Confirmed) {
+      return fail(400, 'MEMBER_011', '만 14세 이상만 가입할 수 있습니다.')
+    }
+
     // 미가입 이메일 → 자동 회원가입 후 로그인. **비밀번호는 null 이다** (소셜 전용 계정)
     const member = {
       memberId: nextMemberId(store),
@@ -563,8 +633,12 @@ export function resolveAuthMock(
     const seq = store.nextOAuthSeq
     store.nextOAuthSeq += 1
     const state = `mockstate${String(seq).padStart(6, '0')}`
-    // state 는 provider 와 함께 저장한다 — 백엔드도 provider 를 값으로 저장하고 대조한다
-    store.oauthStates.add(`${provider}:${state}`)
+    /*
+      state 는 provider 와 함께 저장한다 — 백엔드도 provider 를 값으로 저장하고 대조한다.
+      **동의도 여기서 함께 보관한다** (#688): 콜백은 인가코드를 이미 태운 뒤라 동의를
+      다시 받을 수 없어, 백엔드도 state 와 같은 자리에 넣어 둔다.
+    */
+    store.oauthStates.set(`${provider}:${state}`, readConsent(search))
 
     /*
       **우리 콜백으로 곧장 돌려보낸다.** 실제 응답은 제공자의 인가 페이지 절대 URL 이지만,

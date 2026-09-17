@@ -8,6 +8,7 @@ import { KakaoMark, NaverMark } from '@/features/auth/provider-mark'
 import { oauthAuthorize } from '@/lib/api/auth'
 import { OAUTH_PROVIDERS, type OAuthProviderId, oauthProviderName } from '@/lib/auth/oauth-provider'
 import { rememberReturnTo } from '@/lib/auth/oauth-return-to'
+import { isSignupConsentComplete, type SignupConsent } from '@/lib/auth/signup-consent'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 
@@ -42,15 +43,39 @@ const PROVIDER_BRAND: Record<OAuthProviderId, { variant: ButtonVariant; mark: Re
  * `카카오 네이버 로그인 디자인 가이드 (Community)` 에서 받았다 (`provider-mark.tsx`).
  * **마크를 달아도 제공자 이름은 텍스트로 남는다** (D6: "로고만 두지 않는다").
  */
-export function SocialLoginButtons({ returnTo }: { returnTo: string }) {
+export type SocialLoginButtonsProps = {
+  returnTo: string
+  /**
+   * 가입 화면에서만 넘긴다 — 이슈 #688.
+   *
+   * **넘기면 "가입 입구" 로 동작한다**: 셋 다 켜질 때까지 버튼을 잠그고, 켜지면
+   * `/authorize` 쿼리에 실어 보낸다. 최초 연동(= 신규 가입)에서만 쓰이는 값이라
+   * 기존 회원의 로그인은 영향받지 않는다.
+   *
+   * **로그인 화면은 넘기지 않는다.** 그쪽은 이미 가입한 회원의 입구라 동의를 물을
+   * 이유가 없다. 신규 사용자가 거기서 눌러 최초 연동이 되면 콜백이 `MEMBER_010` /
+   * `MEMBER_011` 로 거부하고, `OAuthCallbackStatus` 가 회원가입 화면으로 안내한다.
+   */
+  consent?: SignupConsent | undefined
+}
+
+export function SocialLoginButtons({ returnTo, consent }: SocialLoginButtonsProps) {
   const [error, setError] = useState<string | null>(null)
   // 어느 버튼이 진행 중인지. 두 버튼에 같은 loading 을 걸면 누르지 않은 쪽도 도는 것처럼 보인다
   const [pending, setPending] = useState<string | null>(null)
   // disabled 반영 전 연속 클릭을 막는다 (form-guide.md §6) — 두 버튼을 번갈아 누르는 것도 막힌다
   const startingRef = useRef(false)
 
+  /*
+    **동의를 안 받았으면 아예 부르지 않는다.** `/authorize` 는 동의가 비어도 성공하고,
+    거부는 인가코드를 태운 뒤인 콜백에서 일어난다 — 그 코드는 1회용이라 사용자가
+    제공자 인가 화면부터 다시 밟아야 한다. 여기서 막는 것이 유일하게 되돌릴 수 있는
+    지점이다 (#688).
+  */
+  const consentBlocked = consent !== undefined && !isSignupConsentComplete(consent)
+
   const start = (provider: string) => {
-    if (startingRef.current) return
+    if (startingRef.current || consentBlocked) return
     startingRef.current = true
     setPending(provider)
     setError(null)
@@ -58,7 +83,7 @@ export function SocialLoginButtons({ returnTo }: { returnTo: string }) {
     // 제공자로 나가기 **전에** 저장한다. 이동 후에는 우리 코드가 돌지 않는다
     rememberReturnTo(returnTo)
 
-    void oauthAuthorize(provider)
+    void oauthAuthorize(provider, consent)
       .then((result) => {
         globalThis.location.assign(result.authorizationUrl)
       })
@@ -73,6 +98,14 @@ export function SocialLoginButtons({ returnTo }: { returnTo: string }) {
   return (
     <div className="flex flex-col gap-3">
       <FormAlert message={error} />
+      {/*
+        **버튼만 흐리게 두지 않는다.** 왜 못 누르는지 보이지 않으면 사용자는 고장으로
+        읽는다. `role` 을 붙이지 않는 것은 이것이 오류가 아니라 상시 안내라서다 —
+        체크박스를 켜면 조용히 사라진다.
+      */}
+      {consentBlocked && (
+        <p className="text-caption text-fg-muted">{messages.auth.socialConsentRequired}</p>
+      )}
       {OAUTH_PROVIDERS.map((provider) => {
         const name = oauthProviderName(provider) ?? provider
         const brand = PROVIDER_BRAND[provider]
@@ -87,7 +120,7 @@ export function SocialLoginButtons({ returnTo }: { returnTo: string }) {
             */
             leading={brand.mark}
             loading={pending === provider}
-            disabled={pending !== null && pending !== provider}
+            disabled={consentBlocked || (pending !== null && pending !== provider)}
             onClick={() => start(provider)}
           >
             {messages.auth.socialLoginLabel(name)}
