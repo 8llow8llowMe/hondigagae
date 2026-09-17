@@ -8,7 +8,9 @@ public record MemberGeneralSignupCommand(
     String email,
     String password,
     String name,
-    String nickname
+    String nickname,
+    boolean termsAgreed,
+    boolean privacyAgreed
 ) {
 
     public static MemberGeneralSignupCommand from(MemberGeneralSignupRequest request) {
@@ -17,6 +19,8 @@ public record MemberGeneralSignupCommand(
             .password(request.password())
             .name(request.name())
             .nickname(request.nickname())
+            .termsAgreed(request.termsAgreed())
+            .privacyAgreed(request.privacyAgreed())
             .build();
     }
 }

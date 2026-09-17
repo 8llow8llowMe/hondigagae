@@ -7,6 +7,7 @@ import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueR
 import com.hondigagae.domainlayer.auth.application.command.AuthGeneralLoginCommand;
 import com.hondigagae.domainlayer.auth.application.command.TokenReissueCommand;
 import com.hondigagae.domainlayer.auth.application.info.AuthCookieResult;
+import com.hondigagae.domainlayer.auth.application.model.OAuthSignupConsent;
 import com.hondigagae.domainlayer.member.domain.enums.OAuthProvider;
 
 public interface AuthWebUseCase {
@@ -35,7 +36,11 @@ public interface AuthWebUseCase {
 
     void verifyEmailVerificationCode(String email, String code);
 
-    AuthOAuthAuthorizeResponse generateOAuthAuthorizationUrl(OAuthProvider provider);
+    /**
+     * 인가 URL을 생성한다. consent 는 이 연동이 신규 가입이 될 때만 쓰이며, state 와 함께
+     * 보관됐다가 콜백에서 소비된다 (인가코드가 1회용이라 콜백에서 동의를 새로 받을 수 없다).
+     */
+    AuthOAuthAuthorizeResponse generateOAuthAuthorizationUrl(OAuthProvider provider, OAuthSignupConsent consent);
 
     AuthCookieResult<AuthGeneralLoginResponse> oauthLogin(OAuthProvider provider, String authCode, String state);
 }

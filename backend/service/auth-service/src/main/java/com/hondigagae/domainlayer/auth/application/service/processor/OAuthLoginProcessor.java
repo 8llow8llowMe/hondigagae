@@ -3,14 +3,18 @@ package com.hondigagae.domainlayer.auth.application.service.processor;
 import com.hondigagae.domainlayer.auth.application.exception.AuthErrorCode;
 import com.hondigagae.domainlayer.auth.application.exception.AuthException;
 import com.hondigagae.domainlayer.auth.application.info.GeneralLoginInfo;
+import com.hondigagae.domainlayer.auth.application.info.OAuthCallbackInfo;
+import com.hondigagae.domainlayer.auth.application.model.OAuthSignupConsent;
 import com.hondigagae.domainlayer.auth.application.port.out.MailSendPort;
 import com.hondigagae.domainlayer.auth.application.port.out.OAuthStateStorePort;
 import com.hondigagae.domainlayer.auth.application.port.out.query.OAuthMemberQueryResult;
+import com.hondigagae.domainlayer.auth.application.port.out.query.OAuthStateQueryResult;
 import com.hondigagae.domainlayer.auth.application.service.oauth.OAuthAuthorizationUrlRouter;
 import com.hondigagae.domainlayer.auth.application.service.oauth.OAuthMemberQueryRouter;
 import com.hondigagae.domainlayer.member.application.exception.MemberErrorCode;
 import com.hondigagae.domainlayer.member.application.exception.MemberException;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
+import com.hondigagae.domainlayer.member.application.service.processor.MemberConsentProcessor;
 import com.hondigagae.domainlayer.member.domain.enums.MemberStatus;
 import com.hondigagae.domainlayer.member.domain.enums.OAuthProvider;
 import com.hondigagae.domainlayer.member.domain.model.Member;
@@ -37,46 +41,62 @@ public class OAuthLoginProcessor {
     private final OAuthMemberQueryRouter memberQueryRouter;
     private final OAuthStateStorePort oAuthStateStorePort;
     private final MemberRepositoryPort memberRepositoryPort;
+    private final MemberConsentProcessor memberConsentProcessor;
     private final MailSendPort mailSendPort;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
     private final SecureRandom secureRandom = new SecureRandom();
 
     /**
      * CSRF 방어용 일회성 state를 발급해 인가 URL에 포함시킨다.
+     *
+     * <p>신규 가입 동의를 <b>여기서</b> 받아 state 와 함께 보관한다. 콜백에서 받지 않는 이유는
+     * OAuth 인가코드가 1회용이기 때문이다 — 콜백에서 동의 누락으로 거부하면 같은 코드로는
+     * 재시도할 수 없고, 사용자는 provider 인가 화면부터 다시 밟아야 한다. 인가 전에 받아 두면
+     * 동의 없이 눌러도 우리 화면에서 되돌릴 수 있다.
      */
-    public String generateAuthorizationUrl(OAuthProvider provider) {
+    public String generateAuthorizationUrl(OAuthProvider provider, OAuthSignupConsent consent) {
         byte[] stateBytes = new byte[STATE_BYTE_LENGTH];
         secureRandom.nextBytes(stateBytes);
         String state = HexFormat.of().formatHex(stateBytes);
 
-        oAuthStateStorePort.save(state, provider, STATE_TTL);
+        oAuthStateStorePort.save(state, provider, consent, STATE_TTL);
         return authorizationUrlRouter.generateUrl(provider, state);
     }
 
     /**
      * provider 왕복(HTTP)만 담당한다. DB 트랜잭션 밖에서 호출해 커넥션 점유를 피한다.
+     *
+     * <p>state 소비는 일회성이라 여기서만 동의를 꺼낼 수 있다. 다음 단계(회원 조회/생성)는
+     * 별도 트랜잭션이므로 프로필과 동의를 함께 묶어 돌려준다.
      */
-    public OAuthMemberQueryResult fetchOAuthMember(OAuthProvider provider, String authCode, String state) {
-        // 1. state 검증(일회성 소비) — 우리가 발급한 요청인지, provider가 바뀌지 않았는지 확인
-        validateState(provider, state);
+    public OAuthCallbackInfo fetchOAuthMember(OAuthProvider provider, String authCode, String state) {
+        // 1. state 검증(일회성 소비) — 우리가 발급한 요청인지, provider가 바뀌지 않았는지 확인하고
+        //    인가 전에 받아 둔 동의를 함께 꺼낸다
+        OAuthSignupConsent consent = validateState(provider, state);
 
         // 2. provider로부터 사용자 프로필 조회 및 필수 항목(부분 동의) 검증
         OAuthMemberQueryResult oAuthMember = memberQueryRouter.fetchMember(provider, authCode, state);
         validateRequiredProfile(oAuthMember);
 
-        return oAuthMember;
+        return new OAuthCallbackInfo(oAuthMember, consent);
     }
 
     /**
-     * 조회한 프로필로 회원을 조회/생성한다. 외부 HTTP를 포함하지 않는 이 구간만 트랜잭션 대상이다.
+     * 조회한 프로필로 회원을 조회/생성한다. 외부 HTTP를 포함하지 않는 이 구간만 트랜잭션 대상이라,
+     * 신규 회원과 그 동의 이력은 한 트랜잭션에 묶여 함께 커밋되거나 함께 사라진다.
+     *
+     * <p>consent 는 <b>신규 생성 경로에서만</b> 본다. 이미 가입한 회원에게 로그인할 때마다 소급
+     * 동의를 요구하지 않는 것이 이 서비스의 방침이다 — 동의는 수집·이용 시점에 받는 것이고,
+     * 재동의는 문서 개정 시 별도 흐름으로 다룰 일이다.
      */
     @Transactional
-    public GeneralLoginInfo login(OAuthProvider provider, OAuthMemberQueryResult oAuthMember) {
+    public GeneralLoginInfo login(OAuthProvider provider, OAuthCallbackInfo callbackInfo) {
+        OAuthMemberQueryResult oAuthMember = callbackInfo.member();
         String email = EmailVerificationProcessor.normalize(oAuthMember.email());
 
         Member member = memberRepositoryPort.findByEmail(email)
             .map(existing -> resolveExistingMember(existing, provider, oAuthMember))
-            .orElseGet(() -> createOAuthMember(provider, email, oAuthMember));
+            .orElseGet(() -> signupOAuthMember(provider, email, oAuthMember, callbackInfo.consent()));
 
         return GeneralLoginInfo.of(member.id(), member.role());
     }
@@ -99,17 +119,18 @@ public class OAuthLoginProcessor {
         }
     }
 
-    private void validateState(OAuthProvider provider, String state) {
+    private OAuthSignupConsent validateState(OAuthProvider provider, String state) {
         if (!StringUtils.hasText(state)) {
             throw new AuthException(AuthErrorCode.INVALID_OAUTH_STATE);
         }
 
-        OAuthProvider savedProvider = oAuthStateStorePort.consume(state)
+        OAuthStateQueryResult saved = oAuthStateStorePort.consume(state)
             .orElseThrow(() -> new AuthException(AuthErrorCode.INVALID_OAUTH_STATE));
 
-        if (savedProvider != provider) {
+        if (saved.provider() != provider) {
             throw new AuthException(AuthErrorCode.INVALID_OAUTH_STATE);
         }
+        return saved.consent();
     }
 
     private Member resolveExistingMember(Member existing, OAuthProvider provider, OAuthMemberQueryResult oAuthMember) {
@@ -141,6 +162,24 @@ public class OAuthLoginProcessor {
             throw new AuthException(AuthErrorCode.UNMATCHED_OAUTH_PROVIDER, existing.provider().getDescription());
         }
         return existing;
+    }
+
+    /**
+     * 소셜 최초 연동 = 신규 가입이다. 그래서 일반 가입과 같은 기준으로 동의를 요구하고,
+     * 같은 모양의 이력을 남긴다.
+     */
+    private Member signupOAuthMember(
+        OAuthProvider provider, String email, OAuthMemberQueryResult oAuthMember, OAuthSignupConsent consent
+    ) {
+        if (!consent.agreedAll()) {
+            throw new MemberException(MemberErrorCode.CONSENT_REQUIRED);
+        }
+
+        Member created = createOAuthMember(provider, email, oAuthMember);
+        // 이력 생성 규칙(필수 항목·박제할 버전·항목 간 같은 시각)은 member 컨텍스트의 단일 지점에
+        // 있다. 여기서 직접 만들면 항목이 늘어날 때 소셜 경로만 옛 규칙으로 남는다.
+        memberConsentProcessor.recordSignupConsents(created.id());
+        return created;
     }
 
     private Member createOAuthMember(OAuthProvider provider, String email, OAuthMemberQueryResult oAuthMember) {

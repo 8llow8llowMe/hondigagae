@@ -11,8 +11,9 @@ import com.hondigagae.domainlayer.auth.application.info.AuthCookieResult;
 import com.hondigagae.domainlayer.auth.application.info.GeneralLoginInfo;
 import com.hondigagae.domainlayer.auth.application.info.JwtTokenIssueInfo;
 import com.hondigagae.domainlayer.auth.application.info.JwtTokenReissueInfo;
+import com.hondigagae.domainlayer.auth.application.info.OAuthCallbackInfo;
+import com.hondigagae.domainlayer.auth.application.model.OAuthSignupConsent;
 import com.hondigagae.domainlayer.auth.application.port.in.AuthWebUseCase;
-import com.hondigagae.domainlayer.auth.application.port.out.query.OAuthMemberQueryResult;
 import com.hondigagae.domainlayer.auth.application.service.processor.EmailVerificationProcessor;
 import com.hondigagae.domainlayer.auth.application.service.processor.GeneralLoginProcessor;
 import com.hondigagae.domainlayer.auth.application.service.processor.JwtTokenProcessor;
@@ -105,18 +106,20 @@ public class AuthWebFacade implements AuthWebUseCase {
     }
 
     @Override
-    public AuthOAuthAuthorizeResponse generateOAuthAuthorizationUrl(OAuthProvider provider) {
-        String authorizationUrl = oAuthLoginProcessor.generateAuthorizationUrl(provider);
+    public AuthOAuthAuthorizeResponse generateOAuthAuthorizationUrl(OAuthProvider provider, OAuthSignupConsent consent) {
+        String authorizationUrl = oAuthLoginProcessor.generateAuthorizationUrl(provider, consent);
         return authPresenter.toOAuthAuthorizeResponse(authorizationUrl);
     }
 
     @Override
     public AuthCookieResult<AuthGeneralLoginResponse> oauthLogin(OAuthProvider provider, String authCode, String state) {
         // 1. state 검증 + provider 프로필 조회 — 외부 HTTP 왕복이므로 트랜잭션 밖에서 수행한다.
-        OAuthMemberQueryResult oAuthMember = oAuthLoginProcessor.fetchOAuthMember(provider, authCode, state);
+        //    state 를 소비하면서 인가 시점에 받아 둔 동의도 함께 꺼낸다 (일회성이라 여기서만 가능).
+        OAuthCallbackInfo callbackInfo = oAuthLoginProcessor.fetchOAuthMember(provider, authCode, state);
 
-        // 2. 회원 조회/생성 (Processor의 트랜잭션 경계) 후 토큰 발급
-        GeneralLoginInfo loginInfo = oAuthLoginProcessor.login(provider, oAuthMember);
+        // 2. 회원 조회/생성 (Processor의 트랜잭션 경계) 후 토큰 발급.
+        //    콜백 결과를 풀어헤치지 않고 통째로 넘긴다 — 그 안을 무엇에 어떻게 쓰는지는 프로세서 몫이다.
+        GeneralLoginInfo loginInfo = oAuthLoginProcessor.login(provider, callbackInfo);
         JwtTokenIssueInfo jwtTokenIssueInfo = jwtTokenProcessor.issueTokens(loginInfo.memberId(), loginInfo.role());
 
         // 3. Presenter를 통한 Info -> Response 변환

@@ -48,7 +48,7 @@ class MemberDevSignupProfileGuardTest {
          */
         @Bean
         MemberGeneralSignupProcessor memberGeneralSignupProcessor() {
-            return new MemberGeneralSignupProcessor(null, null, null, null);
+            return new MemberGeneralSignupProcessor(null, null, null, null, null);
         }
     }
 
