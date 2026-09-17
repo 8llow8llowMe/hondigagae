@@ -24,7 +24,7 @@
 - `GET|PUT|DELETE /api/v1/plans/{planId}`
 - `POST /api/v1/plans/{planId}/copy` — 지난 일정을 새 DRAFT 로 복제
 - `PUT /api/v1/plans/{planId}/days/{day}/items` — 일자 단위 항목 일괄 편집
-- `GET|POST|PUT /api/v1/plans/{planId}/reviews` — 완료된 일정당 후기 하나. 사진은 없음
+- `GET|POST|PUT /api/v1/plans/{planId}/reviews` — 일정당 후기 하나. 작성·수정은 완료된 일정만, 조회는 상태와 무관. 사진은 없음
 
 ## 구현 주의점
 
@@ -78,7 +78,8 @@
 
 - **`plan` 컨텍스트 안에 둔다.** 후기는 `/api/v1/plans/{planId}/reviews` 하위 리소스라 소유권 검사가 일정의 것과 같아야 한다. 새 컨텍스트로 빼면 `getOwnedPlan` 을 복제하게 된다 — 준비물과 같은 판단이다. 컨트롤러만 `PlanReviewWebController` 로 나눴다.
 - **일정당 후기 하나.** `uk_plan_review_plan_id`. POST 는 생성만, 이미 있으면 `PLAN_017` 409. 수정은 PUT. GET 에 후기가 없으면 `PLAN_015` 404.
-- **완료(`COMPLETED`)된 본인 일정만.** 남의 일정은 `PLAN_001` 404. 초안·확정·재오픈은 `PLAN_016` 400 — GET/POST/PUT 전부. 존재 여부를 초안 단계에서 가르지 않는다.
+- **쓰기는 완료(`COMPLETED`)된 본인 일정만.** 남의 일정은 `PLAN_001` 404. 초안·확정·재오픈에 POST/PUT 하면 `PLAN_016` 400. 존재 여부를 초안 단계에서 가르지 않는다.
+- **조회는 상태를 보지 않는다.** 본인 소유이기만 하면 초안·확정·완료 어디서든 읽힌다. 완료를 확정으로 되돌릴 수 있는데(재오픈) GET 까지 `COMPLETED` 로 막으면 되돌리는 순간 이미 쓴 후기가 API 에서 사라져 화면은 쓴 적 없는 것처럼 보인다. 되돌리기는 상태를 바꾸는 것이지 기록을 지우는 것이 아니다.
 - 본문은 선택(2000자). 장소별 평가는 다녀온 **장소 항목**(`PlanItemType.isPlaceTarget()` + `visited`)만. WALK 의 `targetId` 는 `walk_course.id` 라 장소 평가가 아니다. 제목·placeId 는 요청에 받지 않고 그때의 일정 항목에서 스냅샷한다.
 - **일차 교체로 항목이 사라져도 후기는 빼지 않는다.** PUT 은 `items` 전량 교체다. 이미 기억한 `planItemId` 는 제목·placeId 를 유지한 채 평점·한 줄만 고친다. 살아 있는 항목이면 제목·placeId 를 현재 값으로 갱신한다.
 - 장소 평가 행 삭제는 벌크 DML 로 즉시 내보낸다 — `plan_item`·준비물이 겪은 함정과 같다. 파생 delete 는 INSERT 가 먼저 나가 유니크 인덱스 위반으로 죽는다.

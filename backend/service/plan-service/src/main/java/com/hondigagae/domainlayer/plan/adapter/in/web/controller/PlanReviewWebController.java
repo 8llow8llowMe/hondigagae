@@ -27,14 +27,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/plans")
-@Tag(name = "여행 후기", description = "완료된 일정의 여행 후기 조회/작성/수정 API를 제공합니다.")
+@Tag(name = "여행 후기", description = "여행 후기 조회/작성/수정 API를 제공합니다. 작성·수정은 완료된 일정만 받고, 조회는 일정 상태와 무관합니다.")
 public class PlanReviewWebController {
 
     private final PlanReviewWebUseCase planReviewWebUseCase;
 
     @Operation(summary = "여행 후기 조회",
         description = "일정에 작성한 후기를 조회합니다. 본인 소유가 아니면 404로 응답합니다. "
-            + "**완료(COMPLETED)된 일정만** 볼 수 있습니다. 초안·확정은 PLAN_016, 후기가 없으면 PLAN_015 입니다. "
+            + "**일정 상태와 무관하게** 읽을 수 있습니다 — 완료를 확정으로 되돌려도 이미 쓴 후기는 그대로 보입니다. "
+            + "후기가 없으면 PLAN_015 입니다. "
             + "일차를 교체해 사라진 장소 항목도 당시 제목·장소 아이디로 남습니다. 사진·공개 범위는 없습니다.\n\n"
             + "**필수: planId (경로).**\n\n"
             + "호출 예\n"

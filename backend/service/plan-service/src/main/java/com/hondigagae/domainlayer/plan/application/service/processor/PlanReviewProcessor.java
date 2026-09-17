@@ -44,8 +44,16 @@ public class PlanReviewProcessor {
     private final PlanItemRepositoryPort planItemRepositoryPort;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
 
+    /**
+     * 조회는 <b>상태를 보지 않는다</b> — 본인 소유이기만 하면 읽힌다.
+     *
+     * <p>완료를 확정으로 되돌릴 수 있는데(#613) 여기서 {@code COMPLETED} 를 요구하면
+     * 되돌리는 순간 이미 쓴 후기가 API 에서 사라진다. 화면은 쓴 적 없는 것처럼 보이고
+     * 다시 완료해야 글을 본다. 되돌리기는 상태를 바꾸는 것이지 기록을 지우는 것이 아니다.
+     *
+     * <p>쓰기(POST/PUT)만 완료를 문으로 둔다 — 다녀오기 전에 평가를 받지 않는다.
+     */
     public PlanReviewInfo getReview(Plan plan) {
-        requireCompleted(plan);
         PlanReview review = planReviewRepositoryPort.findByPlanId(plan.id())
             .orElseThrow(() -> new PlanException(PlanErrorCode.REVIEW_NOT_FOUND));
         return toInfo(review, planReviewItemRepositoryPort.findByReviewId(review.id()));
