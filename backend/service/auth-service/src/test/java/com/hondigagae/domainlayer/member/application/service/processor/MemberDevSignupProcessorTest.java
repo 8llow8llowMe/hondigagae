@@ -6,10 +6,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.hondigagae.domainlayer.member.application.command.MemberGeneralSignupCommand;
 import com.hondigagae.domainlayer.member.application.exception.MemberErrorCode;
 import com.hondigagae.domainlayer.member.application.exception.MemberException;
+import com.hondigagae.domainlayer.member.application.port.out.MemberConsentRepositoryPort;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
 import com.hondigagae.domainlayer.member.application.port.out.SignupEmailVerificationPort;
 import com.hondigagae.domainlayer.member.domain.enums.MemberStatus;
 import com.hondigagae.domainlayer.member.domain.model.Member;
+import com.hondigagae.domainlayer.member.domain.model.MemberConsent;
+import com.hondigagae.global.properties.LegalDocumentProperties;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import com.hondigagae.security.common.enums.SecurityRole;
 import java.util.ArrayList;
@@ -36,6 +39,7 @@ class MemberDevSignupProcessorTest {
 
     private PasswordEncoder passwordEncoder;
     private StubMemberRepositoryPort memberRepositoryPort;
+    private RecordingConsentRepositoryPort consentRepositoryPort;
     private RecordingEmailVerificationPort emailVerificationPort;
     private MemberGeneralSignupProcessor processor;
 
@@ -44,9 +48,14 @@ class MemberDevSignupProcessorTest {
         // bcrypt strength 4 — 실제 인코딩 로직을 그대로 쓰면서 테스트 시간만 줄인다.
         passwordEncoder = new BCryptPasswordEncoder(4);
         memberRepositoryPort = new StubMemberRepositoryPort();
+        consentRepositoryPort = new RecordingConsentRepositoryPort();
         emailVerificationPort = new RecordingEmailVerificationPort();
+        // 동의 프로세서는 실물을 쓴다 — 개발 가입이 일반 가입과 같은 규칙을 탄다는 것이 요점이다.
+        MemberConsentProcessor consentProcessor = new MemberConsentProcessor(
+            consentRepositoryPort, new SnowflakeIdGenerator(1, 1), new LegalDocumentProperties("1.0", "1.2"));
         processor = new MemberGeneralSignupProcessor(
-            memberRepositoryPort, emailVerificationPort, passwordEncoder, new SnowflakeIdGenerator(1, 1));
+            memberRepositoryPort, consentProcessor, emailVerificationPort, passwordEncoder,
+            new SnowflakeIdGenerator(1, 1));
     }
 
     @Test
@@ -109,12 +118,54 @@ class MemberDevSignupProcessorTest {
         assertThat(member.status()).isEqualTo(MemberStatus.ACTIVE);
     }
 
+    @Test
+    @DisplayName("동의 이력도 일반 가입과 똑같이 남긴다")
+    void recordsConsentHistoryLikeGeneralSignup() {
+        // 개발 계정만 이력이 비어 있으면, 이력을 읽는 쪽이 "없을 수도 있는 값"을 다루게 되고
+        // 그 분기는 운영에서 검증되지 않는다. 이력의 내용은 MemberConsentProcessorTest 가 본다.
+        Member member = processor.devSignup(command("tester@example.com"));
+
+        assertThat(consentRepositoryPort.saved).hasSize(2);
+        assertThat(consentRepositoryPort.saved).allSatisfy(
+            consent -> assertThat(consent.memberId()).isEqualTo(member.id()));
+    }
+
+    @Test
+    @DisplayName("동의 없는 요청은 개발 가입에서도 막힌다")
+    void stillRejectsWithoutConsent() {
+        // 인증만 건너뛰고 나머지는 같은 코드를 탄다는 원칙이 동의에도 적용된다.
+        assertThatThrownBy(() -> processor.devSignup(commandWithoutConsent("tester@example.com")))
+            .isInstanceOf(MemberException.class)
+            .hasFieldOrPropertyWithValue("errorCode", MemberErrorCode.CONSENT_REQUIRED);
+
+        assertThat(memberRepositoryPort.findByEmail("tester@example.com")).isEmpty();
+        assertThat(consentRepositoryPort.saved).isEmpty();
+    }
+
     // --- fixtures ---
 
     private MemberGeneralSignupCommand command(String email) {
         return MemberGeneralSignupCommand.builder()
             .email(email).password(PASSWORD).name("테스터").nickname("테스터")
+            .termsAgreed(true).privacyAgreed(true)
             .build();
+    }
+
+    private MemberGeneralSignupCommand commandWithoutConsent(String email) {
+        return MemberGeneralSignupCommand.builder()
+            .email(email).password(PASSWORD).name("테스터").nickname("테스터")
+            .termsAgreed(false).privacyAgreed(false)
+            .build();
+    }
+
+    private static class RecordingConsentRepositoryPort implements MemberConsentRepositoryPort {
+
+        private final List<MemberConsent> saved = new ArrayList<>();
+
+        @Override
+        public void saveAll(List<MemberConsent> consents) {
+            saved.addAll(consents);
+        }
     }
 
     private static class RecordingEmailVerificationPort implements SignupEmailVerificationPort {

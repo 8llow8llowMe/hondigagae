@@ -108,3 +108,11 @@ oauth:
     client-id: ${OAUTH_NAVER_CLIENT_ID}
     client-secret: ${OAUTH_NAVER_CLIENT_SECRET}
     redirect-uri: ${OAUTH_NAVER_REDIRECT_URI}
+
+# 가입 동의 이력에 남길 법적 문서 버전.
+# 정본은 프론트 frontend/src/lib/legal/{terms-of-service,privacy-policy}.ts 의 version 이다.
+# 다른 prod 설정과 달리 기본값을 둔다 — 버전 환경변수 누락으로 가입 전체가 죽는 것보다
+# 직전 버전으로라도 이력이 남는 편이 낫다. 개정할 때 프론트와 이 값을 같이 올린다.
+legal:
+  terms-version: ${LEGAL_TERMS_VERSION:1.0}
+  privacy-version: ${LEGAL_PRIVACY_VERSION:1.0}
