@@ -2,16 +2,21 @@ package com.hondigagae.domainlayer.plan.adapter.out.client;
 
 import com.hondigagae.domainlayer.plan.adapter.out.client.feign.PetConditionClient;
 import com.hondigagae.domainlayer.plan.adapter.out.client.feign.PlaceSuitabilityClient;
+import com.hondigagae.domainlayer.plan.adapter.out.client.feign.PlaceWalkSafetyClient;
 import com.hondigagae.domainlayer.plan.adapter.out.client.feign.dto.PetConditionClientResponse;
 import com.hondigagae.domainlayer.plan.adapter.out.client.feign.dto.PlaceSuitabilityClientResponse;
+import com.hondigagae.domainlayer.plan.adapter.out.client.feign.dto.PlaceWalkSafetyClientResponse;
 import com.hondigagae.domainlayer.plan.adapter.out.client.support.InternalResponseSupport;
 import com.hondigagae.domainlayer.plan.application.exception.PlanErrorCode;
 import com.hondigagae.domainlayer.plan.application.exception.PlanException;
 import com.hondigagae.domainlayer.plan.application.port.out.PetConditionQueryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlaceSuitabilityQueryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlaceWalkSafetyQueryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PetConditionQueryResult;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlaceSuitabilityQueryResult;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlaceWalkSafetyQueryResult;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,10 +29,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * 일정 날씨 브리핑이 쓰는 내부 호출 어댑터.
+ * 일정 날씨 브리핑·산책 위험도가 쓰는 내부 호출 어댑터.
  *
- * <p>두 포트를 한 어댑터가 구현한다. 대상 서비스는 다르지만 <b>쓰이는 자리가 하나</b>라
- * 응집도가 유지된다 (coding-conventions §12-1).
+ * <p>세 포트를 한 어댑터가 구현한다. 대상 서비스는 다르지만 <b>쓰이는 자리가 하나</b>라
+ * 응집도가 유지된다 (coding-conventions §12-1). 세 번째인 {@link PlaceWalkSafetyQueryPort} 도
+ * 같은 자리다 — 항목 위험도는 반려견 특성(auth)과 그날 기준 반려견(적합도)을 그대로 이어받아
+ * 묻는 것이라, 앞의 둘과 <b>같은 요청 안에서만</b> 불린다.
  *
  * <p><b>실패를 예외로 올리지 않고 빈 값으로 바꾼다.</b> 날씨 브리핑은 부가 정보이고,
  * tour-service 가 흔들렸다고 사용자가 자기 일정을 못 보게 되면 안 된다. 어느 일자가 비었는지는
@@ -36,10 +43,12 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class PlanInsightClientAdapter implements PetConditionQueryPort, PlaceSuitabilityQueryPort {
+public class PlanInsightClientAdapter
+    implements PetConditionQueryPort, PlaceSuitabilityQueryPort, PlaceWalkSafetyQueryPort {
 
     private final PetConditionClient petConditionClient;
     private final PlaceSuitabilityClient placeSuitabilityClient;
+    private final PlaceWalkSafetyClient placeWalkSafetyClient;
     private final InternalResponseSupport internalResponseSupport;
 
     @Override
@@ -142,6 +151,46 @@ public class PlanInsightClientAdapter implements PetConditionQueryPort, PlaceSui
                 placeId, targetDate, exception.getErrorCode().getCode());
             return Optional.empty();
         }
+    }
+
+    /**
+     * 항목 시각 기준 산책 위험도. 적합도와 같은 이유로 <b>실패를 빈 값으로 바꾼다</b> —
+     * 항목 하나가 비어도 나머지 항목과 일정 자체는 보여 준다.
+     */
+    @Override
+    public Optional<PlaceWalkSafetyQueryResult> findWalkSafety(
+        long placeId, LocalDateTime targetDateTime, PetConditionQueryResult pet
+    ) {
+        try {
+            PlaceWalkSafetyClientResponse body = internalResponseSupport.requestAndUnwrapOrNull(
+                InternalResponseSupport.TOUR_SERVICE,
+                () -> placeWalkSafetyClient.getWalkSafety(
+                    placeId, targetDateTime, pet.sizeType(),
+                    pet.heatSensitive(), pet.coldSensitive(), pet.noiseSensitive(),
+                    pet.activityLevel(), pet.breed()));
+            return Optional.ofNullable(body).map(this::toQueryResult);
+        } catch (PlanException exception) {
+            log.warn("Walk safety lookup failed placeId={} at={} errorCode={}",
+                placeId, targetDateTime, exception.getErrorCode().getCode());
+            return Optional.empty();
+        }
+    }
+
+    private PlaceWalkSafetyQueryResult toQueryResult(PlaceWalkSafetyClientResponse body) {
+        return PlaceWalkSafetyQueryResult.builder()
+            .placeId(toPlaceId(body.placeId()))
+            .placeTitle(body.placeTitle())
+            .targetDateTime(body.targetDateTime())
+            .levelCode(body.walkSafetyLevel() == null ? null : body.walkSafetyLevel().code())
+            .levelName(body.walkSafetyLevel() == null ? null : body.walkSafetyLevel().name())
+            .levelDescription(body.walkSafetyLevel() == null ? null : body.walkSafetyLevel().description())
+            .estimatedPavementCelsius(body.estimatedPavementCelsius())
+            .feelsLikeCelsius(body.feelsLikeCelsius())
+            .temperature(body.temperature())
+            .saferWindowStart(body.saferWindowStart())
+            .saferWindowEnd(body.saferWindowEnd())
+            .petConditionApplied(body.petConditionApplied())
+            .build();
     }
 
     private PlaceSuitabilityQueryResult toQueryResult(PlaceSuitabilityClientResponse body) {

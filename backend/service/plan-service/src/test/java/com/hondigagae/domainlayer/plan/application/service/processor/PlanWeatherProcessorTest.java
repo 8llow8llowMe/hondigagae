@@ -324,7 +324,7 @@ class PlanWeatherProcessorTest {
             .build();
     }
 
-        private static class StubPetConditionQueryPort implements PetConditionQueryPort {
+    private static class StubPetConditionQueryPort implements PetConditionQueryPort {
 
         private Map<Long, PetConditionQueryResult> conditions = Map.of();
         private int calls;
