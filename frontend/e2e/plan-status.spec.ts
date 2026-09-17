@@ -63,6 +63,7 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     const confirmAction = page.getByRole('button', { name: '일정 확정하기' })
     const manageMenu = page.getByRole('button', { name: '일정 관리' })
     const revertItem = page.getByRole('menuitem', { name: '초안으로 되돌리기' })
+    const shareItem = page.getByRole('menuitem', { name: '공유 링크' })
 
     /*
       **정방향은 버튼, 역방향은 메뉴다** (#653 · 진단 PL-2 · 명세 D11-2). 390 실측에서
@@ -80,6 +81,13 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     // 초안에는 되돌아갈 앞 상태가 없다 — 메뉴를 열어도 항목이 없다
     await openManageMenu()
     await expect(revertItem).toHaveCount(0)
+
+    /*
+      **초안에는 공유도 없다** (#628). 서버가 초안 공유를 `PLAN_022` 로 막으므로 항목을
+      보여 주고 눌러서 배우게 하지 않는다 — 항목 자체가 없다. 누군가 "일단 띄우고 오류로
+      안내하자" 로 되돌리면 여기서 걸린다.
+    */
+    await expect(shareItem).toHaveCount(0)
     await page.keyboard.press('Escape')
 
     // ── 확정 ──────────────────────────────────────────────────────────────
@@ -104,9 +112,13 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     /*
       **파괴적 항목은 마지막이고 역방향은 그 위다** (명세 D11-2). 역방향은 되돌릴 수
       있으므로 `danger-900` + 구분선 자리(삭제)와 섞이면 안 된다.
+
+      **`공유 링크` 는 역방향 위다** (#628) — 아래로 갈수록 무게가 는다. 확정·완료에만
+      있으므로 위 초안 갈래에서는 이 배열에 없었다.
     */
     await expect(page.getByRole('menuitem')).toHaveText([
       '이름·기간·예산 수정',
+      '공유 링크',
       '초안으로 되돌리기',
       '일정 삭제',
     ])
