@@ -30,6 +30,7 @@ public final class MemberValidationMessage {
     // 같은 대역을 공유하므로 번호를 재사용하지 않고 115부터 이어 붙인다.
     public static final String TERMS_AGREEMENT_REQUIRED = "MEMBER_115:이용약관에 동의해야 가입할 수 있습니다.";
     public static final String PRIVACY_AGREEMENT_REQUIRED = "MEMBER_116:개인정보 처리방침에 동의해야 가입할 수 있습니다.";
+    public static final String AGE_OVER_14_REQUIRED = "MEMBER_117:만 14세 이상만 가입할 수 있습니다.";
 
     /** 비밀번호 문자 구성 규칙. 길이는 @Size 가 담당하므로 여기서는 구성만 본다 (§8-2 중복 검사 금지). */
     public static final String PASSWORD_REGEXP = "^(?=.*[A-Za-z])(?=.*\\d)(?=.*[!@#$%^&*()\\-_=+\\[\\]{};:'\",.<>/?\\\\|])\\S+$";

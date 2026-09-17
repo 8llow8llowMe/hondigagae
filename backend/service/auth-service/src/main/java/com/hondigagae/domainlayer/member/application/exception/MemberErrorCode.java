@@ -21,9 +21,11 @@ public enum MemberErrorCode {
     // 소셜 최초 연동 경로 전용. 일반 가입은 @AssertTrue(MEMBER_115/116)가 web 경계에서 막지만,
     // 소셜은 동의를 /authorize 에서 미리 받아 두므로 콜백 시점에야 누락을 알 수 있다.
     CONSENT_REQUIRED("MEMBER_010", "이용약관과 개인정보 처리방침에 동의해야 가입할 수 있습니다.", HttpStatus.BAD_REQUEST),
+    // 동의 누락과 별개 코드다. 둘을 MEMBER_010 으로 합치면 프론트가 어느 체크박스를 강조할지 알 수 없다.
+    AGE_REQUIREMENT_NOT_MET("MEMBER_011", "만 14세 이상만 가입할 수 있습니다.", HttpStatus.BAD_REQUEST),
 
     // 요청 검증(Bean Validation) 대역 — 1xx.
-    // 필드별 코드(MEMBER_101~112, 115~116)는 MemberValidationMessage 가 단일 기준점이며, 여기서는 중복 정의하지 않는다.
+    // 필드별 코드(MEMBER_101~112, 115~117)는 MemberValidationMessage 가 단일 기준점이며, 여기서는 중복 정의하지 않는다.
     INVALID_REQUEST("MEMBER_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
     PARAMETER_TYPE_INVALID("MEMBER_113", "요청 파라미터 형식이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
     PARAMETER_REQUIRED("MEMBER_114", "필수 요청 파라미터가 누락되었습니다.", HttpStatus.BAD_REQUEST);

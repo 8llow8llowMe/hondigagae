@@ -38,18 +38,23 @@ public class MemberConsentProcessor {
     private final LegalDocumentProperties legalDocumentProperties;
 
     /**
-     * 가입 시 받는 필수 동의 전부를 <b>같은 시각</b>으로 한 번에 남긴다. 항목별로 시각이 갈리면
+     * 가입 시 받는 필수 동의·확인 전부를 <b>같은 시각</b>으로 한 번에 남긴다. 항목별로 시각이 갈리면
      * "한 화면에서 함께 동의했다"는 사실이 이력에서 사라진다.
      *
      * <p>동의 여부 자체는 여기서 묻지 않는다 — 이 메서드에 닿았다는 것은 호출자가 이미 필수 동의를
      * 확인했다는 뜻이다. 확인 책임을 가입 경로에 두는 이유는 경로마다 거부 방식이 다르기 때문이다
-     * (일반 가입은 요청 검증, 소셜은 콜백에서 {@code MEMBER_010}).
+     * (일반 가입은 요청 검증, 소셜은 콜백에서 {@code MEMBER_010}/{@code MEMBER_011}).
+     *
+     * <p>만 14세 이상 확인도 <b>이력으로 남긴다.</b> 게이트만 걸고 기록하지 않으면 "물어봤고
+     * 확인받았다"를 나중에 입증할 수 없다 — 동의에 대해 막은 것과 같은 구멍이다. 이 항목의 버전이
+     * {@code termsVersion} 인 이유는 {@link ConsentType#AGE_OVER_14} 에 적어 뒀다.
      */
     public void recordSignupConsents(long memberId) {
         LocalDateTime agreedAt = LocalDateTime.now();
         memberConsentRepositoryPort.saveAll(List.of(
             consent(memberId, ConsentType.TERMS_OF_SERVICE, legalDocumentProperties.termsVersion(), agreedAt),
-            consent(memberId, ConsentType.PRIVACY_POLICY, legalDocumentProperties.privacyVersion(), agreedAt)));
+            consent(memberId, ConsentType.PRIVACY_POLICY, legalDocumentProperties.privacyVersion(), agreedAt),
+            consent(memberId, ConsentType.AGE_OVER_14, legalDocumentProperties.termsVersion(), agreedAt)));
     }
 
     private MemberConsent consent(long memberId, ConsentType type, String documentVersion, LocalDateTime agreedAt) {

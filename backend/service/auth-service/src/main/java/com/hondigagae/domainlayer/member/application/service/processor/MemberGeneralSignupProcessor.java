@@ -31,13 +31,16 @@ public class MemberGeneralSignupProcessor {
         // 1. 필수 동의 검증
         validateConsented(command);
 
-        // 2. 이메일 인증 완료 여부 검증
+        // 2. 만 14세 이상 확인 검증
+        validateAgeConfirmed(command);
+
+        // 3. 이메일 인증 완료 여부 검증
         validateEmailVerified(email);
 
-        // 3. 이메일 중복 검증
+        // 4. 이메일 중복 검증
         validateEmailNotExists(email);
 
-        // 4. 회원 생성 및 저장 후 동의 이력 기록, 마지막으로 인증 플래그 소비
+        // 5. 회원 생성 및 저장 후 동의 이력 기록, 마지막으로 인증 플래그 소비
         //    동의 이력은 회원 저장 뒤에 남긴다 — memberId 가 있어야 하고, 중복 이메일로 막힌
         //    요청이 동의 이력만 남기는 일도 없어야 한다.
         Member member = memberRepositoryPort.save(createMember(command, email));
@@ -65,6 +68,7 @@ public class MemberGeneralSignupProcessor {
     public Member devSignup(MemberGeneralSignupCommand command) {
         String email = command.email().trim().toLowerCase(Locale.ROOT);
         validateConsented(command);
+        validateAgeConfirmed(command);
         validateEmailNotExists(email);
 
         Member member = memberRepositoryPort.save(createMember(command, email));
@@ -77,7 +81,7 @@ public class MemberGeneralSignupProcessor {
      *
      * <p>web 경계의 {@code @AssertTrue}(MEMBER_115/116)와 <b>중복 검사가 아니다.</b> 그쪽이
      * 지키는 것은 "요청 형식이 올바른가"이고, 여기서 지키는 것은 <b>"우리가 남기는 동의 행이
-     * 실제 동의를 반영한다"는 불변식</b>이다. 가입 성공 경로가 무조건 동의 2행을 남기기 때문에,
+     * 실제 동의를 반영한다"는 불변식</b>이다. 가입 성공 경로가 무조건 동의 행을 남기기 때문에,
      * 이 검사가 없으면 DTO 를 거치지 않는 호출자가 생기는 순간 동의하지 않은 회원의 동의 이력이
      * 만들어진다 — 이력의 신뢰성이 통째로 무너지는 방식이다. 소셜 경로도 같은 이유로
      * {@code OAuthLoginProcessor} 안에서 한 번 더 확인한다.
@@ -85,6 +89,25 @@ public class MemberGeneralSignupProcessor {
     private void validateConsented(MemberGeneralSignupCommand command) {
         if (!command.termsAgreed() || !command.privacyAgreed()) {
             throw new MemberException(MemberErrorCode.CONSENT_REQUIRED);
+        }
+    }
+
+    /**
+     * 만 14세 미만의 가입을 막는다. 개인정보 보호법 제22조의2 는 만 14세 미만의 개인정보를 법정대리인
+     * 동의 없이 처리하지 못하게 하는데, 이 서비스는 법정대리인 동의 흐름을 갖고 있지 않다.
+     *
+     * <p><b>동의 누락(MEMBER_010)과 코드를 나눈 이유</b> — 같은 요청에서 막히는 두 체크박스가
+     * 서로 다른 것이라, 하나로 합치면 프론트가 어느 쪽을 강조할지 알 수 없다. 사용자는 "동의를
+     * 다 했는데 왜 안 되지"를 겪는다.
+     *
+     * <p>{@code validateConsented} 와 마찬가지로 web 경계의 {@code @AssertTrue}(MEMBER_117)와
+     * 중복이 아니다. 가입 성공 경로가 무조건 {@code AGE_OVER_14} 이력 1행을 남기기 때문에, 이
+     * 검사가 없으면 DTO 를 거치지 않는 호출자가 생기는 순간 확인받지 않은 회원의 확인 이력이
+     * 만들어진다.
+     */
+    private void validateAgeConfirmed(MemberGeneralSignupCommand command) {
+        if (!command.ageOver14Confirmed()) {
+            throw new MemberException(MemberErrorCode.AGE_REQUIREMENT_NOT_MET);
         }
     }
 

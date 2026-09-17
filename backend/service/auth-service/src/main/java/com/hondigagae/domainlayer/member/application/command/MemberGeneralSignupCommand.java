@@ -10,7 +10,8 @@ public record MemberGeneralSignupCommand(
     String name,
     String nickname,
     boolean termsAgreed,
-    boolean privacyAgreed
+    boolean privacyAgreed,
+    boolean ageOver14Confirmed
 ) {
 
     public static MemberGeneralSignupCommand from(MemberGeneralSignupRequest request) {
@@ -21,6 +22,7 @@ public record MemberGeneralSignupCommand(
             .nickname(request.nickname())
             .termsAgreed(request.termsAgreed())
             .privacyAgreed(request.privacyAgreed())
+            .ageOver14Confirmed(request.ageOver14Confirmed())
             .build();
     }
 }

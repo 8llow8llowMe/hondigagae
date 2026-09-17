@@ -119,13 +119,13 @@ class MemberDevSignupProcessorTest {
     }
 
     @Test
-    @DisplayName("동의 이력도 일반 가입과 똑같이 남긴다")
+    @DisplayName("동의·확인 이력도 일반 가입과 똑같이 남긴다")
     void recordsConsentHistoryLikeGeneralSignup() {
         // 개발 계정만 이력이 비어 있으면, 이력을 읽는 쪽이 "없을 수도 있는 값"을 다루게 되고
         // 그 분기는 운영에서 검증되지 않는다. 이력의 내용은 MemberConsentProcessorTest 가 본다.
         Member member = processor.devSignup(command("tester@example.com"));
 
-        assertThat(consentRepositoryPort.saved).hasSize(2);
+        assertThat(consentRepositoryPort.saved).hasSize(3);
         assertThat(consentRepositoryPort.saved).allSatisfy(
             consent -> assertThat(consent.memberId()).isEqualTo(member.id()));
     }
@@ -142,19 +142,38 @@ class MemberDevSignupProcessorTest {
         assertThat(consentRepositoryPort.saved).isEmpty();
     }
 
+    @Test
+    @DisplayName("만 14세 이상 확인이 없는 요청은 개발 가입에서도 막힌다")
+    void stillRejectsWithoutAgeConfirmation() {
+        // 연령 게이트를 개발 경로에만 열어 두면, 운영에서 막히는 입력으로 만든 계정이 개발 DB 에 쌓인다.
+        assertThatThrownBy(() -> processor.devSignup(commandWithoutAgeConfirmation("tester@example.com")))
+            .isInstanceOf(MemberException.class)
+            .hasFieldOrPropertyWithValue("errorCode", MemberErrorCode.AGE_REQUIREMENT_NOT_MET);
+
+        assertThat(memberRepositoryPort.findByEmail("tester@example.com")).isEmpty();
+        assertThat(consentRepositoryPort.saved).isEmpty();
+    }
+
     // --- fixtures ---
 
     private MemberGeneralSignupCommand command(String email) {
         return MemberGeneralSignupCommand.builder()
             .email(email).password(PASSWORD).name("테스터").nickname("테스터")
-            .termsAgreed(true).privacyAgreed(true)
+            .termsAgreed(true).privacyAgreed(true).ageOver14Confirmed(true)
+            .build();
+    }
+
+    private MemberGeneralSignupCommand commandWithoutAgeConfirmation(String email) {
+        return MemberGeneralSignupCommand.builder()
+            .email(email).password(PASSWORD).name("테스터").nickname("테스터")
+            .termsAgreed(true).privacyAgreed(true).ageOver14Confirmed(false)
             .build();
     }
 
     private MemberGeneralSignupCommand commandWithoutConsent(String email) {
         return MemberGeneralSignupCommand.builder()
             .email(email).password(PASSWORD).name("테스터").nickname("테스터")
-            .termsAgreed(false).privacyAgreed(false)
+            .termsAgreed(false).privacyAgreed(false).ageOver14Confirmed(true)
             .build();
     }
 

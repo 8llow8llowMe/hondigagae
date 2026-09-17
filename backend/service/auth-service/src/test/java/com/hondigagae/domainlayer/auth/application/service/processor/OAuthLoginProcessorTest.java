@@ -74,12 +74,12 @@ class OAuthLoginProcessorTest {
     }
 
     @Test
-    @DisplayName("신규 회원은 동의를 모두 받았을 때 생성되고 동의 이력 2건이 남는다")
+    @DisplayName("신규 회원은 동의·확인을 모두 받았을 때 생성되고 이력 3건이 남는다")
     void createsMemberAndRecordsConsentsWhenAgreedAll() {
-        GeneralLoginInfo loginInfo = processor.login(PROVIDER, callback(new OAuthSignupConsent(true, true)));
+        GeneralLoginInfo loginInfo = processor.login(PROVIDER, callback(new OAuthSignupConsent(true, true, true)));
 
         assertThat(memberRepositoryPort.findByEmail(EMAIL)).isPresent();
-        assertThat(consentRepositoryPort.saved).hasSize(2);
+        assertThat(consentRepositoryPort.saved).hasSize(3);
         assertThat(consentRepositoryPort.saved).allSatisfy(
             consent -> assertThat(consent.memberId()).isEqualTo(loginInfo.memberId()));
     }
@@ -87,7 +87,7 @@ class OAuthLoginProcessorTest {
     @Test
     @DisplayName("신규 회원이 이용약관에 동의하지 않았으면 회원도 만들지 않고 거부한다")
     void rejectsNewMemberWithoutTermsAgreement() {
-        assertThatThrownBy(() -> processor.login(PROVIDER, callback(new OAuthSignupConsent(false, true))))
+        assertThatThrownBy(() -> processor.login(PROVIDER, callback(new OAuthSignupConsent(false, true, true))))
             .isInstanceOf(MemberException.class)
             .hasFieldOrPropertyWithValue("errorCode", MemberErrorCode.CONSENT_REQUIRED);
 
@@ -99,11 +99,34 @@ class OAuthLoginProcessorTest {
     @Test
     @DisplayName("신규 회원이 개인정보 처리방침에 동의하지 않았으면 거부한다")
     void rejectsNewMemberWithoutPrivacyAgreement() {
-        assertThatThrownBy(() -> processor.login(PROVIDER, callback(new OAuthSignupConsent(true, false))))
+        assertThatThrownBy(() -> processor.login(PROVIDER, callback(new OAuthSignupConsent(true, false, true))))
             .isInstanceOf(MemberException.class)
             .hasFieldOrPropertyWithValue("errorCode", MemberErrorCode.CONSENT_REQUIRED);
 
         assertThat(memberRepositoryPort.findByEmail(EMAIL)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("문서 동의는 했지만 만 14세 확인이 없으면 동의 누락과 다른 코드로 거부한다")
+    void rejectsNewMemberWithoutAgeConfirmationUsingItsOwnCode() {
+        // MEMBER_010 으로 나가면 프론트는 이미 켜져 있는 동의 체크박스를 강조하게 되고,
+        // 사용자는 "동의를 다 했는데 왜 안 되지"를 겪는다. 콜백은 인가코드를 이미 태운 뒤라
+        // 돌아갈 곳이 동의 화면뿐이라서 사유가 정확해야 한다.
+        assertThatThrownBy(() -> processor.login(PROVIDER, callback(new OAuthSignupConsent(true, true, false))))
+            .isInstanceOf(MemberException.class)
+            .hasFieldOrPropertyWithValue("errorCode", MemberErrorCode.AGE_REQUIREMENT_NOT_MET);
+
+        assertThat(memberRepositoryPort.findByEmail(EMAIL)).isEmpty();
+        assertThat(consentRepositoryPort.saved).isEmpty();
+    }
+
+    @Test
+    @DisplayName("문서 동의와 만 14세 확인이 함께 비어 있으면 문서 동의 누락으로 거부한다")
+    void reportsConsentFirstWhenEverythingIsMissing() {
+        // 둘 다 비면 먼저 안내할 것은 문서 동의다 — #607 이 정한 이 경로의 기존 동작을 유지한다.
+        assertThatThrownBy(() -> processor.login(PROVIDER, callback(OAuthSignupConsent.none())))
+            .isInstanceOf(MemberException.class)
+            .hasFieldOrPropertyWithValue("errorCode", MemberErrorCode.CONSENT_REQUIRED);
     }
 
     @Test
@@ -122,11 +145,11 @@ class OAuthLoginProcessorTest {
     }
 
     @Test
-    @DisplayName("인가 시점에 받은 동의가 state 에 실려 콜백까지 전달된다")
+    @DisplayName("인가 시점에 받은 동의·확인이 state 에 실려 콜백까지 전달된다")
     void carriesConsentFromAuthorizeToCallback() {
-        // 인가코드가 1회용이라 콜백에서 동의를 새로 받을 수 없다. 이 왕복이 끊기면
-        // 최초 연동이 전부 MEMBER_010 으로 막힌다.
-        processor.generateAuthorizationUrl(PROVIDER, new OAuthSignupConsent(true, true));
+        // 인가코드가 1회용이라 콜백에서 다시 받을 수 없다. 이 왕복이 끊기면
+        // 최초 연동이 전부 MEMBER_010 또는 MEMBER_011 로 막힌다.
+        processor.generateAuthorizationUrl(PROVIDER, new OAuthSignupConsent(true, true, true));
 
         OAuthStateQueryResult consumed = stateStorePort.consume(stateStorePort.lastState).orElseThrow();
 

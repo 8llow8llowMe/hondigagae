@@ -49,9 +49,11 @@ public class MemberDevSignupWebController {
 
             운영 프로필에서는 이 API 가 등록되지 않아 404 입니다.
 
-            인증 불필요. **필수: 요청 바디의 email, password(영문자·숫자·특수문자 포함 8~20자), name, nickname** — 일반 가입과 같은 바디입니다.
+            인증 불필요. **필수: 요청 바디의 email, password(영문자·숫자·특수문자 포함 8~20자), name, nickname,
+            termsAgreed, privacyAgreed, ageOver14Confirmed(셋 다 true)** — 일반 가입과 같은 바디입니다.
 
-            호출 예: `POST /api/v1/members/signup/dev` `{"email":"dev1@example.com","password":"P@ssw0rd!","name":"홍길동","nickname":"길동짱"}`"""
+            호출 예: `POST /api/v1/members/signup/dev` `{"email":"dev1@example.com","password":"P@ssw0rd!","name":"홍길동",
+            "nickname":"길동짱","termsAgreed":true,"privacyAgreed":true,"ageOver14Confirmed":true}`"""
     )
     @PostMapping("/signup/dev")
     public ResponseEntity<Response<MemberDevSignupResponse>> devSignup(
