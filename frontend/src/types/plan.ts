@@ -676,3 +676,80 @@ export const REVIEW_ITEMS_MAX = 50
 
 /** 장소 한 줄 후기 상한. 서버 `PLAN_134` 복제본이다 */
 export const REVIEW_COMMENT_MAX = 200
+
+// ─── 공유 링크 (#627 BE · #628 FE) ────────────────────────────────────────────
+
+/**
+ * 일정 주인이 받는 공유 링크 (`PlanShareLinkResponse`).
+ *
+ * **토큰 자체가 열람 권한이다.** 로그·분석 도구·쿼리스트링에 싣지 않는다 — 백엔드도
+ * 게이트웨이 로그에서 이 값을 가린다.
+ */
+export type PlanShareLink = {
+  planId: string
+  /** URL-safe Base64 43자 */
+  token: string
+  /** `YYYY-MM-DDTHH:mm:ss` — 발급 시각 + 30일 */
+  expiresAt: string
+}
+
+/**
+ * 공유 링크로 열리는 일정 (`SharedPlanResponse`). **비인증 응답이다.**
+ *
+ * **`PlanDetail` 과 타입을 합치지 않는다.** 백엔드가 의도적으로 뺀 필드가 있다 —
+ * `planId`(소유자 API 를 찍어 볼 실마리) · `petId`/`petIds`(남의 반려견 아이디) ·
+ * `budget`(사적인 값). 합치면 그 셋이 optional 로 새어 들어가 **화면이 "있을 수도
+ * 있는 값" 으로 다루게 되고, 자리를 만들게 된다.**
+ *
+ * 준비물·후기·응급 브리핑은 애초에 상세 응답에 없고 각자 별도 API 라 여기에도 없다.
+ */
+export type SharedPlan = {
+  title: string
+  areaCode: string
+  sigunguCode: string | null
+  startDate: string
+  endDate: string
+  totalDays: number
+  /** 공유되는 것은 `CONFIRMED` · `COMPLETED` 뿐이다 */
+  status: CodeNameMetadata
+  /** 일차·순서 오름차순 */
+  items: SharedPlanItem[]
+}
+
+/**
+ * 공유 링크로 보이는 일정 항목 (`SharedPlanItemItem`).
+ *
+ * **`PlanItemDetail` 에서 빠진 것**: `planItemId`(편집용 식별자) · `memo`(주인의 사적인
+ * 메모) · `visited`(여행 중 체크). 링크를 받은 사람은 "어디를 언제 가는지" 만 본다.
+ *
+ * `place` 는 `PlanItemPlace` 와 **같은 타입이다** — 백엔드가 두 응답에서 같은
+ * `PlanItemPlaceItem` 을 쓴다.
+ */
+export type SharedPlanItem = {
+  /** 1부터 */
+  day: number
+  sequence: number
+  itemType: CodeNameMetadata
+  targetId: string | null
+  title: string
+  /** `HH:mm:ss` */
+  startTime: string | null
+  place: PlanItemPlace | null
+}
+
+/** 공유할 수 없는 상태다 — 초안 (`PlanErrorCode.SHARE_PLAN_NOT_SHAREABLE`) */
+export const SHARE_PLAN_NOT_SHAREABLE_CODE = 'PLAN_022'
+
+/** 없거나 폐기된 링크 (`PlanErrorCode.SHARE_LINK_NOT_FOUND`) */
+export const SHARE_LINK_NOT_FOUND_CODE = 'PLAN_023'
+
+/** 만료된 링크 (`PlanErrorCode.SHARE_LINK_EXPIRED`) — 404 가 아니라 410 이다 */
+export const SHARE_LINK_EXPIRED_CODE = 'PLAN_024'
+
+/**
+ * 공유할 수 있는 일정 상태. 백엔드 `PlanStatus.isShareable()` 복제본이다.
+ *
+ * **발급 시점과 조회 시점 양쪽에서 돈다** — 확정한 뒤 초안으로 되돌리면 이미 만든
+ * 링크도 막힌다.
+ */
+export const SHAREABLE_PLAN_STATUSES = ['CONFIRMED', 'COMPLETED'] as const

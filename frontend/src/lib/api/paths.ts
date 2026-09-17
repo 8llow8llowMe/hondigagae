@@ -113,6 +113,34 @@ export const paths = {
      * **완료(`COMPLETED`)된 일정만** 호출한다. 초안·확정은 `PLAN_016` 이다.
      */
     reviews: (planId: string) => `/plans/${planId}/reviews`,
+    /**
+     * 공유 링크 — 소유자 전용 (#627 BE · #628 FE). **한 경로에 세 메서드가 붙는다** —
+     * 조회(`GET`) · 발급(`POST`, 본문 없음) · 폐기(`DELETE`).
+     *
+     * **`POST` 와 `DELETE` 는 둘 다 멱등이다.** 유효한 링크가 있으면 `POST` 는 새로
+     * 만들지 않고 그것을 돌려주고(이미 보낸 링크를 재클릭으로 조용히 죽이지 않는다),
+     * 폐기할 것이 없어도 `DELETE` 는 200 이다.
+     *
+     * **확정·완료만** 호출한다. 초안은 `PLAN_022` 400 이다.
+     */
+    shareLink: (planId: string) => `/plans/${planId}/share-link`,
+  },
+  /**
+   * 공유된 일정 — **비인증 경로다** (#627 BE · #628 FE).
+   *
+   * **`plans` 가 아니라 최상위에 둔다.** 백엔드가 `/api/v1/shared-plans` 로 접두어를
+   * 가른 것과 같은 이유다 — "인증이 필요한 일정 API" 와 "토큰만으로 열리는 API" 가 한
+   * 트리에 섞이면 경로 기준으로 조일 수 없다. 여기서 `plans` 안에 넣으면 그 구분이
+   * 프론트에서만 도로 사라진다.
+   */
+  sharedPlans: {
+    /**
+     * 토큰으로 일정 읽기. **`serverFetch` 를 토큰 없이 부른다** — 공개 API 다.
+     *
+     * 실패가 둘로 갈린다 — 없는 토큰·폐기·삭제된 일정·초안 회귀는 전부 `PLAN_023`
+     * 404 로 **같게** 오고(어느 쪽인지 알려 주지 않는다), 만료만 `PLAN_024` 410 이다.
+     */
+    detail: (token: string) => `/shared-plans/${encodeURIComponent(token)}`,
   },
   aiPlans: {
     submit: '/ai-plans',

@@ -710,4 +710,64 @@ export const planMessages = {
   reviewPlaceCommentHint: '없어도 돼요. 200자까지예요.',
   reviewLoadErrorTitle: '후기를 불러오지 못했어요',
   reviewSaveError: '후기를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.',
+
+  // ── 공유 링크 (#628) ──────────────────────────────────────────────────
+  // 발급·폐기는 `/plans/[planId]` 관리 메뉴 안 모달, 열람은 `/shared-plans/[token]`.
+
+  shareAction: '공유 링크',
+  shareTitle: '공유 링크',
+  /**
+   * **보이지 않는 것을 먼저 말한다.** 링크를 주는 쪽이 가장 먼저 묻는 것이
+   * "어디까지 보이나" 다 — 예산과 메모는 응답에서 빠져 있다(`SharedPlanResponse`).
+   * 그 사실을 여기서 말하지 않으면 확인할 방법이 없다.
+   */
+  shareDescription:
+    '링크를 아는 사람은 로그인 없이 이 일정을 볼 수 있어요. 예산과 메모는 보이지 않아요.',
+  shareIssueAction: '링크 만들기',
+  shareIssueError: '링크를 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
+  shareLoadError: '공유 링크를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+  shareLinkFieldLabel: '공유 링크 주소',
+  shareCopyAction: '복사',
+  shareCopiedLabel: '복사됨',
+  /** 비 HTTPS · 구형 브라우저에서 `navigator.clipboard` 가 없다. 조용히 실패하지 않는다 */
+  shareCopyError: '복사하지 못했어요. 주소를 직접 복사해 주세요.',
+  shareRevokeAction: '링크 폐기',
+  shareRevokeConfirmTitle: '공유 링크를 폐기할까요?',
+  /**
+   * **"다른 링크가 나온다" 를 말한다.** 재발급이 같은 링크를 돌려줄 것으로 기대하면
+   * 이미 보낸 링크가 죽은 것을 모른 채 넘어간다 (BE 가 POST 를 멱등으로 만든 이유와
+   * 같은 축이다 — 죽이는 것은 이 버튼뿐이어야 한다).
+   */
+  shareRevokeConfirmDescription:
+    '이미 보낸 링크가 즉시 열리지 않게 돼요. 다시 만들면 다른 주소가 나와요.',
+  shareRevokeError: '폐기하지 못했어요. 잠시 후 다시 시도해 주세요.',
+  /** `{date}` 치환 */
+  shareExpiryOn: '{date}까지 볼 수 있어요',
+  shareExpiryToday: '오늘까지 볼 수 있어요',
+  shareExpired: '만료됐어요',
+
+  // 열람 화면 — 받은 사람이 본다
+
+  /**
+   * **일정 제목을 탭 제목에 넣지 않는다.** 브라우저 히스토리·탭 제목으로 남의 일정
+   * 이름이 새는 것을 줄인다. 이 화면은 `noindex` 이기도 하다.
+   */
+  sharedPageTitle: '공유된 여행 일정',
+  sharedReadOnlyNote: '공유받은 일정이라 볼 수만 있어요.',
+  /**
+   * **`dayEmpty` 와 갈라 둔다.** 소유자 문구("아직 담은 곳이 없어요")의 `아직` 은
+   * 지금 담으라는 말이라 **담을 수 없는 사람에게는 할 일을 잘못 알린다.**
+   */
+  sharedDayEmpty: '이 날은 담은 곳이 없어요.',
+  /**
+   * 404 — 없는 토큰 · 폐기 · 삭제된 일정 · 초안 회귀가 **전부 여기로 온다.**
+   * 서버가 어느 쪽인지 알려 주지 않으므로(토큰 존재 여부를 흘리지 않는다) 화면도
+   * 원인을 단정하지 않는다.
+   */
+  sharedNotFoundTitle: '유효하지 않은 링크예요',
+  sharedNotFoundDescription: '링크가 폐기됐거나 일정이 지워졌어요.',
+  /** 410 — 만료만 따로 온다. 받은 사람이 할 수 있는 일이 있는 유일한 갈래다 */
+  sharedExpiredTitle: '만료된 링크예요',
+  sharedExpiredDescription: '링크를 만든 사람에게 새 링크를 요청해 주세요.',
+  sharedErrorTitle: '일정을 불러오지 못했어요',
 } as const

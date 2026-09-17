@@ -12,6 +12,7 @@ import type {
   PlanPackingListResponse,
   PlanReviewResponse,
   PlanReviewUpsertPayload,
+  PlanShareLink,
   PlanSummaryItem,
   PlanUpdatePayload,
   PlanWeatherResponse,
@@ -275,4 +276,39 @@ export function updatePlanReview(
     method: 'PUT',
     body: payload,
   })
+}
+
+// ─── 공유 링크 (#628) ─────────────────────────────────────────────────────────
+
+/**
+ * 현재 유효한 공유 링크.
+ *
+ * **404(`PLAN_023`)는 오류가 아니다.** "한 번도 발급하지 않았거나 이미 폐기·만료됐다"
+ * 는 뜻이고 어느 쪽이든 할 일은 같다 — 새로 발급하는 것이다. 호출부는 404 를 잡아
+ * `null`("아직 공유 중이 아니다")로 접고 빈 상태를 그린다.
+ */
+export function fetchPlanShareLink(planId: string): Promise<PlanShareLink> {
+  return clientFetch<PlanShareLink>(paths.plans.shareLink(planId))
+}
+
+/**
+ * 공유 링크 발급. **본문이 없다** — 유효 기간은 서버가 30일로 고정한다.
+ *
+ * **멱등이다.** 아직 폐기·만료되지 않은 링크가 있으면 새로 만들지 않고 그 토큰을
+ * 그대로 돌려준다 — 두 번 눌러도 이미 보낸 링크가 죽지 않는다. 링크를 바꾸려면
+ * `revokePlanShareLink` 로 폐기한 뒤 다시 부른다.
+ *
+ * 초안이면 `PLAN_022`(400) 다. 화면은 확정·완료에서만 이 버튼을 그려 닿지 않는다.
+ */
+export function issuePlanShareLink(planId: string): Promise<PlanShareLink> {
+  return clientFetch<PlanShareLink>(paths.plans.shareLink(planId), { method: 'POST' })
+}
+
+/**
+ * 공유 링크 폐기. **멱등이라 폐기할 것이 없어도 200 이다** — 404 분기를 만들지 않는다.
+ *
+ * 되돌릴 수 없다. 다시 발급하면 **다른 토큰**이 나오고 이미 보낸 링크는 죽는다.
+ */
+export function revokePlanShareLink(planId: string): Promise<void> {
+  return clientFetchVoid(paths.plans.shareLink(planId), { method: 'DELETE' })
 }
