@@ -44,6 +44,12 @@ spring:
           uri: lb://plan-service
           predicates:
             - Path=/api/v1/favorites/**
+        # 일정 읽기 전용 공유 링크 (#627). 비인증으로 열리는 공개 경로라 인증이 필요한
+        # /api/v1/plans/** 와 접두어를 나눴다 — "이 접두어는 공개" 가 경로만 보고 읽혀야 한다.
+        - id: plan-service-shared-plans
+          uri: lb://plan-service
+          predicates:
+            - Path=/api/v1/shared-plans/**
         - id: ai-service-ai-plans
           uri: lb://ai-service
           predicates:

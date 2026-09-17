@@ -9,10 +9,8 @@ import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanEmergency
 import com.hondigagae.domainlayer.plan.application.info.PlanEmergencyInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemInfo;
-import com.hondigagae.domainlayer.plan.application.info.PlanItemPlaceInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanSummaryInfo;
 import com.hondigagae.shared.travel.plan.PlanItemType;
-import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.persistence.dto.SliceResponse;
 import java.util.List;
 import org.springframework.data.domain.Slice;
@@ -36,7 +34,7 @@ public class PlanPresenter {
             .startDate(info.startDate())
             .endDate(info.endDate())
             .budget(info.budget())
-            .status(toStatusMetadata(info.status()))
+            .status(info.status().toMetadata())
             .totalDays(info.totalDays())
             .items(items)
             .build();
@@ -55,7 +53,7 @@ public class PlanPresenter {
             .title(info.title())
             .startDate(info.startDate())
             .endDate(info.endDate())
-            .status(toStatusMetadata(info.status()))
+            .status(info.status().toMetadata())
             .build();
     }
 
@@ -104,26 +102,8 @@ public class PlanPresenter {
             .memo(info.memo())
             .startTime(info.startTime())
             .visited(info.visited())
-            .place(toPlaceItem(info.place()))
+            .place(PlanItemPlaceItem.from(info.place()))
             .build();
-    }
-
-    /** 요약이 없으면 객체 통째로 null 이다 — 빈 껍데기를 내려 화면이 값 없음을 못 알아채게 하지 않는다 */
-    private PlanItemPlaceItem toPlaceItem(PlanItemPlaceInfo place) {
-        if (place == null) {
-            return null;
-        }
-        return PlanItemPlaceItem.builder()
-            .addr1(place.addr1())
-            .indoor(place.indoor())
-            .firstImage(place.firstImage())
-            .lat(place.lat())
-            .lng(place.lng())
-            .build();
-    }
-
-    private CodeNameDescriptionMetadata toStatusMetadata(PlanStatus status) {
-        return CodeNameDescriptionMetadata.of(status.name(), status.getDisplayName(), status.getDescription());
     }
 
     /** Snowflake 아이디 목록은 문자열로 내린다 (coding-conventions §7-1). */
