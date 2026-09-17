@@ -243,6 +243,11 @@ class PlanCopyTest {
         public List<PlanPet> findByPlanIds(Collection<Long> planIds) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public void deleteByPlanId(long planId) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static class StubPetConditionQueryPort implements PetConditionQueryPort {

@@ -300,6 +300,11 @@ class PlanQueryProcessorTest {
             bulkCalls += 1;
             return pets.stream().filter(pet -> planIds.contains(pet.planId())).toList();
         }
+
+        @Override
+        public void deleteByPlanId(long planId) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static class StubPlanItemRepositoryPort implements PlanItemRepositoryPort {

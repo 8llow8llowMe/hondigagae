@@ -34,4 +34,9 @@ public class PlanPetRepositoryAdapter implements PlanPetRepositoryPort {
         }
         return planMapper.toPetDomainListFromEntityList(planPetRepository.findByPlanIdInOrderByIdAsc(planIds));
     }
+
+    @Override
+    public void deleteByPlanId(long planId) {
+        planPetRepository.deleteByPlanId(planId);
+    }
 }
