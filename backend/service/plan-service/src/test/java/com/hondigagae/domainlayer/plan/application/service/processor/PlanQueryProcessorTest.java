@@ -6,17 +6,21 @@ import com.hondigagae.domainlayer.plan.application.exception.PlanErrorCode;
 import com.hondigagae.domainlayer.plan.application.exception.PlanException;
 import com.hondigagae.domainlayer.plan.application.info.PlanInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemInfo;
+import com.hondigagae.domainlayer.plan.application.info.PlanItemWalkCourseInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanSummaryInfo;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanPetRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanPlaceLookupPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanRepositoryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlanWalkCourseQueryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlanPlaceSummaryQueryResult;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlanWalkCourseSummaryQueryResult;
 import com.hondigagae.shared.travel.plan.PlanItemType;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -45,10 +49,14 @@ class PlanQueryProcessorTest {
     private static final long CAFE_ID = 200L;
     private static final long DELISTED_ID = 300L;
     private static final long WALK_COURSE_ID = 777L;
+    /** 없는 코스를 가리키는 targetId. tour-service 응답에서 조용히 빠진다 (이슈 #619). */
+    private static final long GONE_WALK_COURSE_ID = 888L;
+    private static final long OTHER_WALK_COURSE_ID = 999L;
 
     private StubPlanItemRepositoryPort planItemRepositoryPort;
     private StubPlanPetRepositoryPort planPetRepositoryPort;
     private StubPlanPlaceLookupPort planPlaceLookupPort;
+    private StubPlanWalkCourseQueryPort planWalkCourseQueryPort;
     private StubPlanRepositoryPort planRepositoryPort;
     private PlanQueryProcessor processor;
 
@@ -57,9 +65,10 @@ class PlanQueryProcessorTest {
         planItemRepositoryPort = new StubPlanItemRepositoryPort();
         planPetRepositoryPort = new StubPlanPetRepositoryPort();
         planPlaceLookupPort = new StubPlanPlaceLookupPort();
+        planWalkCourseQueryPort = new StubPlanWalkCourseQueryPort();
         planRepositoryPort = new StubPlanRepositoryPort();
-        processor = new PlanQueryProcessor(
-            planRepositoryPort, planItemRepositoryPort, planPetRepositoryPort, planPlaceLookupPort);
+        processor = new PlanQueryProcessor(planRepositoryPort, planItemRepositoryPort,
+            planPetRepositoryPort, planPlaceLookupPort, planWalkCourseQueryPort);
     }
 
     private static Plan plan() {
@@ -235,6 +244,116 @@ class PlanQueryProcessorTest {
         assertThat(itemAt(info, 0).place()).isNull();
     }
 
+    // ── 산책 코스 요약 (이슈 #619) ───────────────────────────────────────────
+
+    @Test
+    @DisplayName("WALK 항목에 코스 이름표·거리·소요시간·활동량 힌트가 붙는다")
+    void detailCarriesWalkCourseSummary() {
+        planItemRepositoryPort.items = List.of(item(0, PlanItemType.WALK, WALK_COURSE_ID, "올레 1코스 걷기"));
+
+        PlanInfo info = processor.getPlanDetailInfo(plan());
+
+        assertThat(itemAt(info, 0).walkCourse()).isNotNull();
+        assertThat(itemAt(info, 0).walkCourse().courseLabel()).isEqualTo("1코스");
+        assertThat(itemAt(info, 0).walkCourse().name()).isEqualTo("시흥-광치기");
+        assertThat(itemAt(info, 0).walkCourse().distanceKm()).isEqualByComparingTo("15.1");
+        assertThat(itemAt(info, 0).walkCourse().durationText()).isEqualTo("4~5시간");
+        assertThat(itemAt(info, 0).walkCourse().durationMaxMinutes()).isEqualTo(300);
+        // 코드만이 아니라 표시명·설명까지 온다 — 웹 경계에서 metadata 객체로 내리기 위한 값이다
+        assertThat(itemAt(info, 0).walkCourse().fitsActivityLevels())
+            .extracting(PlanItemWalkCourseInfo.ActivityFit::code).containsExactly("MEDIUM", "HIGH");
+        assertThat(itemAt(info, 0).walkCourse().fitsActivityLevels())
+            .extracting(PlanItemWalkCourseInfo.ActivityFit::name).containsExactly("보통", "높음");
+    }
+
+    @Test
+    @DisplayName("tour-service 가 죽어도 WALK 항목은 남는다 — 코스 요약만 비고 일정은 응답한다")
+    void degradesWalkCourseWhenTourServiceIsDown() {
+        planItemRepositoryPort.items = List.of(
+            item(0, PlanItemType.WALK, WALK_COURSE_ID, "올레 1코스 걷기"),
+            item(1, PlanItemType.MOVE, null, "숙소로 이동"));
+        planWalkCourseQueryPort.unavailable = true;
+
+        PlanInfo info = processor.getPlanDetailInfo(plan());
+
+        // 코스 요약은 장식이다 — 못 받았다고 사용자가 자기 일정을 못 보면 안 된다
+        assertThat(info.items()).hasSize(2);
+        assertThat(itemAt(info, 0).title()).isEqualTo("올레 1코스 걷기");
+        assertThat(itemAt(info, 0).walkCourse()).isNull();
+    }
+
+    @Test
+    @DisplayName("없는 코스를 가리키는 항목만 요약이 null 이고 나머지는 멀쩡하다")
+    void keepsItemWhenWalkCourseIsGone() {
+        planItemRepositoryPort.items = List.of(
+            item(0, PlanItemType.WALK, GONE_WALK_COURSE_ID, "사라진 코스"),
+            item(1, PlanItemType.WALK, WALK_COURSE_ID, "올레 1코스 걷기"));
+
+        PlanInfo info = processor.getPlanDetailInfo(plan());
+
+        assertThat(info.items()).hasSize(2);
+        assertThat(itemAt(info, 0).title()).isEqualTo("사라진 코스");
+        assertThat(itemAt(info, 0).walkCourse()).isNull();
+        assertThat(itemAt(info, 1).walkCourse()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("WALK 항목이 여러 개여도 tour-service 를 한 번만 부른다")
+    void looksUpWalkCoursesOnce() {
+        planItemRepositoryPort.items = List.of(
+            item(0, PlanItemType.WALK, WALK_COURSE_ID, "1일차 산책"),
+            item(1, PlanItemType.WALK, OTHER_WALK_COURSE_ID, "2일차 산책"),
+            item(2, PlanItemType.WALK, WALK_COURSE_ID, "3일차 산책 (같은 코스 왕복)"));
+
+        processor.getPlanDetailInfo(plan());
+
+        assertThat(planWalkCourseQueryPort.calls).isEqualTo(1);
+        assertThat(planWalkCourseQueryPort.requestedIds).containsExactly(WALK_COURSE_ID, OTHER_WALK_COURSE_ID);
+    }
+
+    @Test
+    @DisplayName("WALK 항목이 없으면 코스 조회를 아예 부르지 않는다")
+    void skipsWalkLookupWhenNoWalkItem() {
+        planItemRepositoryPort.items = List.of(
+            item(0, PlanItemType.PLACE, MUSEUM_ID, "김창열미술관"),
+            item(1, PlanItemType.MOVE, null, "숙소로 이동"));
+
+        PlanInfo info = processor.getPlanDetailInfo(plan());
+
+        assertThat(planWalkCourseQueryPort.calls).isZero();
+        // Map.of().get(null) 이 NPE 를 던지는 자리다 — 장소 요약이 같은 경로로 한 번 죽었다
+        assertThat(itemAt(info, 0).walkCourse()).isNull();
+        assertThat(itemAt(info, 1).walkCourse()).isNull();
+    }
+
+    @Test
+    @DisplayName("장소 항목과 WALK 항목이 섞여도 각자 제 요약만 받는다 — 아이디 공간이 다르다")
+    void placeAndWalkItemsGetTheirOwnSummary() {
+        planItemRepositoryPort.items = List.of(
+            item(0, PlanItemType.PLACE, MUSEUM_ID, "김창열미술관"),
+            item(1, PlanItemType.WALK, WALK_COURSE_ID, "올레 1코스 걷기"));
+
+        PlanInfo info = processor.getPlanDetailInfo(plan());
+
+        assertThat(planPlaceLookupPort.requestedIds).containsExactly(MUSEUM_ID);
+        assertThat(planWalkCourseQueryPort.requestedIds).containsExactly(WALK_COURSE_ID);
+        assertThat(itemAt(info, 0).place()).isNotNull();
+        assertThat(itemAt(info, 0).walkCourse()).isNull();
+        assertThat(itemAt(info, 1).place()).isNull();
+        assertThat(itemAt(info, 1).walkCourse()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("내부 outline 경로(getPlanInfo)는 코스 조회도 부르지 않는다")
+    void plainInfoDoesNotLookUpWalkCourse() {
+        planItemRepositoryPort.items = List.of(item(0, PlanItemType.WALK, WALK_COURSE_ID, "올레 1코스 걷기"));
+
+        PlanInfo info = processor.getPlanInfo(plan());
+
+        assertThat(planWalkCourseQueryPort.calls).isZero();
+        assertThat(itemAt(info, 0).walkCourse()).isNull();
+    }
+
     // ── 동행 반려견 (다견 담기) ──────────────────────────────────────────────
 
     @Test
@@ -374,6 +493,51 @@ class PlanQueryProcessorTest {
                         .addr("제주특별자치도 서귀포시 안덕면")
                         .build())
                 .toList();
+        }
+    }
+
+    /**
+     * {@code GONE_WALK_COURSE_ID} 는 응답에서 빠진다 — 저장 시 검증되지 않은 targetId 를
+     * tour-service 가 조용히 빼고 주는 것과 같다.
+     */
+    private static class StubPlanWalkCourseQueryPort implements PlanWalkCourseQueryPort {
+
+        private int calls;
+        private boolean unavailable;
+        private final List<Long> requestedIds = new ArrayList<>();
+
+        @Override
+        public List<PlanWalkCourseSummaryQueryResult> findSummaries(List<Long> walkCourseIds) {
+            calls += 1;
+            requestedIds.addAll(walkCourseIds);
+
+            if (unavailable) {
+                throw new PlanException(PlanErrorCode.INTERNAL_SERVICE_UNAVAILABLE);
+            }
+
+            return walkCourseIds.stream()
+                .filter(walkCourseId -> walkCourseId != GONE_WALK_COURSE_ID)
+                .map(walkCourseId -> PlanWalkCourseSummaryQueryResult.builder()
+                    .walkCourseId(walkCourseId)
+                    .name("시흥-광치기")
+                    .courseLabel("1코스")
+                    .distanceKm(new BigDecimal("15.1"))
+                    .durationText("4~5시간")
+                    .durationMaxMinutes(300)
+                    .lat(33.4d)
+                    .lng(126.5d)
+                    .firstImage("https://example.test/course.jpg")
+                    .fitsActivityLevels(List.of(activityFit("MEDIUM", "보통"), activityFit("HIGH", "높음")))
+                    .build())
+                .toList();
+        }
+
+        private static PlanWalkCourseSummaryQueryResult.ActivityFit activityFit(String code, String name) {
+            return PlanWalkCourseSummaryQueryResult.ActivityFit.builder()
+                .code(code)
+                .name(name)
+                .description(name + " 활동량 설명")
+                .build();
         }
     }
 

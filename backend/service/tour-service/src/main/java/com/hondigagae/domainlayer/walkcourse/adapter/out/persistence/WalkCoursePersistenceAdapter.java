@@ -4,6 +4,7 @@ import com.hondigagae.domainlayer.walkcourse.adapter.out.persistence.entity.Walk
 import com.hondigagae.domainlayer.walkcourse.adapter.out.persistence.repository.WalkCourseRepository;
 import com.hondigagae.domainlayer.walkcourse.application.port.out.WalkCourseRepositoryPort;
 import com.hondigagae.domainlayer.walkcourse.application.port.out.query.WalkCourseQueryResult;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,17 @@ public class WalkCoursePersistenceAdapter implements WalkCourseRepositoryPort {
     @Override
     public Optional<WalkCourseQueryResult> findById(long walkCourseId) {
         return walkCourseRepository.findById(walkCourseId).map(this::toQueryResult);
+    }
+
+    /** 빈 컬렉션이면 즉시 끊는다 - 쿼리로 내려가면 {@code in ()} 가 나간다. */
+    @Override
+    public List<WalkCourseQueryResult> findByIds(Collection<Long> walkCourseIds) {
+        if (walkCourseIds.isEmpty()) {
+            return List.of();
+        }
+        return walkCourseRepository.findByIdIn(walkCourseIds).stream()
+            .map(this::toQueryResult)
+            .toList();
     }
 
     private WalkCourseQueryResult toQueryResult(WalkCourseEntity entity) {

@@ -44,6 +44,12 @@ public record PlanItemDetailItem(
         description = "항목이 가리키는 장소 요약. 장소를 가리키지 않는 항목(WALK·MOVE)이거나 "
             + "원천에서 사라진(delisted) 장소면 null 이다 — 그때도 항목 자체는 응답에 남는다",
         nullable = true)
-    PlanItemPlaceItem place
+    PlanItemPlaceItem place,
+
+    @Schema(
+        description = "항목이 가리키는 산책 코스 요약. 산책(WALK) 항목이 아니거나 코스를 찾지 못하면 "
+            + "null 이다 — 그때도 항목 자체는 응답에 남는다",
+        nullable = true)
+    PlanItemWalkCourseItem walkCourse
 ) {
 }

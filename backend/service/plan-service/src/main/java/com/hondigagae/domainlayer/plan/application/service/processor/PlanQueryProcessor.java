@@ -5,15 +5,19 @@ import com.hondigagae.domainlayer.plan.application.exception.PlanException;
 import com.hondigagae.domainlayer.plan.application.info.PlanInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemPlaceInfo;
+import com.hondigagae.domainlayer.plan.application.info.PlanItemWalkCourseInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanSummaryInfo;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanPetRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanPlaceLookupPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanRepositoryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlanWalkCourseQueryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlanPlaceSummaryQueryResult;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlanWalkCourseSummaryQueryResult;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
+import com.hondigagae.shared.travel.plan.PlanItemType;
 import java.util.List;
 import java.util.Objects;
 import java.util.Map;
@@ -33,6 +37,7 @@ public class PlanQueryProcessor {
     private final PlanItemRepositoryPort planItemRepositoryPort;
     private final PlanPetRepositoryPort planPetRepositoryPort;
     private final PlanPlaceLookupPort planPlaceLookupPort;
+    private final PlanWalkCourseQueryPort planWalkCourseQueryPort;
 
     /**
      * 본인 소유의 활성 일정을 조회한다.
@@ -70,15 +75,16 @@ public class PlanQueryProcessor {
     public PlanInfo getPlanDetailInfo(Plan plan) {
         List<PlanItem> items = planItemRepositoryPort.findByPlanId(plan.id());
         Map<Long, PlanPlaceSummaryQueryResult> summaries = findPlaceSummaries(items);
+        Map<Long, PlanWalkCourseSummaryQueryResult> walkCourses = findWalkCourseSummaries(items);
 
         return toPlanInfo(plan, items.stream()
-            .map(item -> toItemInfo(item, findSummary(summaries, item)))
+            .map(item -> toItemInfo(item, findSummary(summaries, item), findWalkCourse(walkCourses, item)))
             .toList());
     }
 
     public PlanInfo getPlanInfo(Plan plan) {
         List<PlanItemInfo> items = planItemRepositoryPort.findByPlanId(plan.id()).stream()
-            .map(item -> toItemInfo(item, null))
+            .map(item -> toItemInfo(item, null, null))
             .toList();
 
         return toPlanInfo(plan, items);
@@ -111,7 +117,13 @@ public class PlanQueryProcessor {
         */
         try {
             return planPlaceLookupPort.findSummaries(placeIds).stream()
-                .collect(Collectors.toMap(PlanPlaceSummaryQueryResult::placeId, Function.identity()));
+                // 병합 규칙을 명시한다. 오늘은 PK in 조회라 키가 겹칠 수 없지만, 인자 3개짜리
+                // toMap 은 키 충돌에 IllegalStateException 을 던지고 그것은 PlanException 이
+                // 아니라 **아래 catch 에 걸리지 않고 500 으로 나간다** — "요약은 장식이라 항목은
+                // 남긴다" 는 이 메서드의 설계 의도와 정반대다. 대상 쿼리가 조인으로 바뀌는 날
+                // 조용히 깨질 자리라 먼저 닫아 둔다 (코스 요약도 같다).
+                .collect(Collectors.toMap(PlanPlaceSummaryQueryResult::placeId, Function.identity(),
+                    (first, second) -> first));
         } catch (PlanException exception) {
             log.warn("Plan item place decoration failed, returning items without place. errorCode={}",
                 exception.getErrorCode().getCode());
@@ -140,6 +152,63 @@ public class PlanQueryProcessor {
      */
     private static Long placeTargetIdOf(PlanItem item) {
         return item.itemType().isPlaceTarget() ? item.targetId() : null;
+    }
+
+    /**
+     * 산책 코스로 조회할 수 있는 {@code targetId} 만 돌려준다 (이슈 #619).
+     *
+     * <p>{@link #placeTargetIdOf} 와 짝이다 — {@code WALK} 의 {@code targetId} 는
+     * {@code walk_course.id} 이고, 나머지 유형의 {@code targetId} 는 {@code place.id} 라
+     * 코스로 물으면 남의 아이디로 없는 코스를 찾는다.
+     */
+    private static Long walkTargetIdOf(PlanItem item) {
+        return item.itemType() == PlanItemType.WALK ? item.targetId() : null;
+    }
+
+    /**
+     * 항목이 가리키는 산책 코스를 <b>한 번에</b> 받아 온다 — 장소 요약과 같은 이유다.
+     *
+     * <p>중복을 제거한다: 왕복 산책처럼 같은 코스를 하루에 두 번 담는 일정이 있다.
+     */
+    private Map<Long, PlanWalkCourseSummaryQueryResult> findWalkCourseSummaries(List<PlanItem> items) {
+        List<Long> walkCourseIds = items.stream()
+            .map(PlanQueryProcessor::walkTargetIdOf)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+
+        if (walkCourseIds.isEmpty()) {
+            return Map.of();
+        }
+
+        /*
+          **tour-service 장애를 일정 상세 조회 실패로 번지게 하지 않는다.** 일정은 우리 DB 의
+          자료이고 코스 요약은 장식이다 — 요약을 못 받았다고 사용자가 자기 일정을 못 보게 되면
+          안 된다. 바로 위 장소 요약이 같은 판단을 이미 했다 (services/plan-service.md).
+        */
+        try {
+            return planWalkCourseQueryPort.findSummaries(walkCourseIds).stream()
+                // 병합 규칙은 장소 요약과 같은 이유로 명시한다 (바로 위 주석).
+                .collect(Collectors.toMap(PlanWalkCourseSummaryQueryResult::walkCourseId, Function.identity(),
+                    (first, second) -> first));
+        } catch (PlanException exception) {
+            log.warn("Plan item walk course decoration failed, returning items without walk course. errorCode={}",
+                exception.getErrorCode().getCode());
+            return Map.of();
+        }
+    }
+
+    /**
+     * 산책이 아닌 항목은 <b>코스 목록을 뒤지지 않는다.</b>
+     *
+     * <p>{@code walkCourses.get(null)} 로 쓰면 안 된다 — 요약이 하나도 없을 때 돌려주는
+     * {@code Map.of()} 는 {@code get(null)} 에 <b>NPE 를 던진다</b> ({@code HashMap} 과 다르다).
+     * 장소 요약이 같은 경로로 한 번 죽었다 ({@link #findSummary} 주석).
+     */
+    private static PlanWalkCourseSummaryQueryResult findWalkCourse(
+        Map<Long, PlanWalkCourseSummaryQueryResult> walkCourses, PlanItem item) {
+        Long walkCourseId = walkTargetIdOf(item);
+        return walkCourseId == null ? null : walkCourses.get(walkCourseId);
     }
 
     private PlanInfo toPlanInfo(Plan plan, List<PlanItemInfo> items) {
@@ -174,7 +243,8 @@ public class PlanQueryProcessor {
         return plans.map(plan -> toSummaryInfo(plan, plan.resolvePetIds(petsByPlanId.get(plan.id()))));
     }
 
-    private PlanItemInfo toItemInfo(PlanItem item, PlanPlaceSummaryQueryResult summary) {
+    private PlanItemInfo toItemInfo(
+        PlanItem item, PlanPlaceSummaryQueryResult summary, PlanWalkCourseSummaryQueryResult walkCourse) {
         return PlanItemInfo.builder()
             .planItemId(item.id())
             .day(item.day())
@@ -186,6 +256,7 @@ public class PlanQueryProcessor {
             .startTime(item.startTime())
             .visited(item.visited())
             .place(toPlaceInfo(summary))
+            .walkCourse(toWalkCourseInfo(walkCourse))
             .build();
     }
 
@@ -203,6 +274,34 @@ public class PlanQueryProcessor {
             .firstImage(summary.firstImage())
             .lat(summary.lat())
             .lng(summary.lng())
+            .build();
+    }
+
+    /**
+     * 요약이 없으면 null 이다. 없는 코스를 가리키는 {@code targetId}(저장 시 검증되지 않는다)
+     * 이거나 tour-service 가 답하지 못한 경우인데, <b>항목 자체는 남긴다</b> — 사용자가 담아 둔
+     * 자료다.
+     */
+    private PlanItemWalkCourseInfo toWalkCourseInfo(PlanWalkCourseSummaryQueryResult walkCourse) {
+        if (walkCourse == null) {
+            return null;
+        }
+        return PlanItemWalkCourseInfo.builder()
+            .name(walkCourse.name())
+            .courseLabel(walkCourse.courseLabel())
+            .distanceKm(walkCourse.distanceKm())
+            .durationText(walkCourse.durationText())
+            .durationMaxMinutes(walkCourse.durationMaxMinutes())
+            .lat(walkCourse.lat())
+            .lng(walkCourse.lng())
+            .firstImage(walkCourse.firstImage())
+            .fitsActivityLevels(walkCourse.fitsActivityLevels().stream()
+                .map(fit -> PlanItemWalkCourseInfo.ActivityFit.builder()
+                    .code(fit.code())
+                    .name(fit.name())
+                    .description(fit.description())
+                    .build())
+                .toList())
             .build();
     }
 

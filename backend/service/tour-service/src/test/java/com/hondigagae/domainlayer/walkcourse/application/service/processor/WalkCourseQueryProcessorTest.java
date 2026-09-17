@@ -10,8 +10,10 @@ import com.hondigagae.domainlayer.walkcourse.application.model.WalkCourseSearchQ
 import com.hondigagae.domainlayer.walkcourse.application.port.out.WalkCourseRepositoryPort;
 import com.hondigagae.domainlayer.walkcourse.application.port.out.query.WalkCourseQueryResult;
 import com.hondigagae.domainlayer.walkcourse.domain.enums.WalkCourseSort;
+import com.hondigagae.domainlayer.walkcourse.domain.model.WalkCourseActivityFit;
 import com.hondigagae.shared.travel.pet.ActivityLevel;
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -90,6 +92,53 @@ class WalkCourseQueryProcessorTest {
         assertThat(processor.getDetail(101L).courseLabel()).isEqualTo("10-1코스");
     }
 
+    // ── 아이디 벌크 조회 (일정 항목 요약, #619) ───────────────────────────────
+
+    @Test
+    @DisplayName("아이디 목록으로 코스 요약을 한 번에 주고, 코스번호 순으로 세운다")
+    void candidatesComeBackInCourseOrder() {
+        List<WalkCourseInfo> courses = processor.getCandidates(List.of(20L, 1L, 3L));
+
+        assertThat(courses).extracting(WalkCourseInfo::walkCourseId).containsExactly(1L, 3L, 20L);
+    }
+
+    @Test
+    @DisplayName("없는 아이디는 조용히 빠진다 — getDetail 과 달리 예외를 던지지 않는다")
+    void candidatesSkipUnknownIdsSilently() {
+        List<WalkCourseInfo> courses = processor.getCandidates(List.of(1L, 999L));
+
+        assertThat(courses).extracting(WalkCourseInfo::walkCourseId).containsExactly(1L);
+    }
+
+    @Test
+    @DisplayName("빈 입력은 빈 목록이다")
+    void candidatesOfEmptyInputAreEmpty() {
+        assertThat(processor.getCandidates(List.of())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("활동량 힌트가 목록 필터와 같은 상한을 쓴다 — 목록에 나오는데 힌트에 없는 코스가 없다")
+    void fitHintMatchesListFilter() {
+        for (WalkCourseInfo course : processor.getCandidates(List.of(1L, 3L, 101L, 20L))) {
+            for (ActivityLevel level : ActivityLevel.values()) {
+                assertThat(course.fitActivityLevels().contains(level))
+                    .as("코스 %d / %s", course.walkCourseId(), level)
+                    .isEqualTo(WalkCourseActivityFit.fits(level, course.durationMaxMinutes()));
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("소요시간을 모르는 코스는 활동량 세 값이 다 담긴다 — 지우지 않는다")
+    void unknownDurationFitsEveryLevel() {
+        WalkCourseInfo unknown = new WalkCourseQueryProcessor(new StubPort(List.of(
+            course(7, "7", null, 70, "17.6", "미상", null)))).getCandidates(List.of(7L)).get(0);
+
+        assertThat(unknown.durationMaxMinutes()).isNull();
+        assertThat(unknown.fitActivityLevels())
+            .containsExactly(ActivityLevel.LOW, ActivityLevel.MEDIUM, ActivityLevel.HIGH);
+    }
+
     private static WalkCourseQueryResult course(
         long id, String courseNo, String variant, int order, String distanceKm, String durationText, Integer maxMinutes
     ) {
@@ -114,6 +163,16 @@ class WalkCourseQueryProcessorTest {
         @Override
         public List<WalkCourseQueryResult> findAll() {
             return courses;
+        }
+
+        @Override
+        public List<WalkCourseQueryResult> findByIds(Collection<Long> walkCourseIds) {
+            if (walkCourseIds.isEmpty()) {
+                return List.of();
+            }
+            return courses.stream()
+                .filter(course -> walkCourseIds.contains(course.walkCourseId()))
+                .toList();
         }
 
         @Override

@@ -49,6 +49,41 @@
     없는 브리핑이 "가까운 병원이 없다" 는 착각을 준다.
   - **원천에서 사라진(delisted) 장소는 요약만 null 이고 항목은 남는다.** 사용자가 담아 둔 자료다.
   - `indoor` 의 null 은 "실외" 가 아니라 "원천에 정보 없음" 이다. `false` 로 바꾸지 않는다.
+- **일정 상세의 `WALK` 항목에 산책 코스 요약이 붙는다** (#619, `courseLabel` · `distanceKm` ·
+  `durationText` · `durationMaxMinutes` · `firstImage` · `lat` · `lng` · `fitsActivityLevels`).
+  `WALK` 의 `targetId` 는 `walk_course.id` 라 장소 요약 경로에서 빠지고, 그래서 산책 항목만
+  이름 말고는 아무것도 없는 줄로 내려가고 있었다. tour-service 내부 코스 API
+  (`GET /internal/v1/walk-courses/candidates`)를 **한 번** 부르고 중복 아이디는 제거한다.
+  - **장소 요약과 같은 자리의 같은 판단이다 — tour-service 장애를 상세 조회 실패로 번지게 하지
+    않는다.** 코스 요약은 장식이라, 못 받으면 `walkCourse` 만 비운 채 항목은 그대로 응답한다.
+    두 요약은 서로 독립이다: 코스 조회가 실패해도 장소 요약은 붙고 그 반대도 같다.
+  - **코스를 찾지 못하면 요약만 null 이고 항목은 남는다.** 사용자가 담아 둔 자료다.
+  - 활동량 적합 판정(`fitsActivityLevels`)은 **tour-service 가 한다.** 여기서 상한을 다시
+    계산하면 두 서비스가 같은 코스를 다르게 읽는다 — 그리고 남의 반려견 활동량을 tour-service 로
+    넘기지 않아도 된다.
+  - 공개 응답에서는 **`{code, name, description}` metadata 객체**로 내린다 (coding-conventions §11).
+    같은 `PlanItemDetailItem` 안의 `itemType` 이 이미 metadata 라, 한쪽만 raw 문자열이면 화면이
+    두 가지 해석 코드를 갖게 된다. 내부 경계(Feign·QueryResult·Info)에서는 세 값을 편 채 나르고
+    metadata 는 Presenter 가 씌운다 — 기상특보가 같은 방식이다.
+  - `durationMaxMinutes` 의 null 은 "제한 없음" 이 아니라 "원천 문구를 파싱하지 못했다" 이다.
+    그래서 `durationText` 원문을 함께 내린다.
+  - **남은 위험 / 후속** (#619 검토에서 드러남, 이 변경에서 고치지 않았다)
+    - **[DB MEDIUM] `WALK` 의 `targetId` 는 저장 시 검증되지 않는다.** `PlanCommandProcessor.verifyPlaceTargets`
+      는 `isPlaceTarget()` 인 항목만 확인하고 walk_course 대응물이 없다. `PlanItemType` javadoc 이
+      "AI 초안이 `WALK` 항목에 `place.id` 를 실어 보냈고 아무도 막지 않았다" 를 이미 적고 있다.
+      **선행 결함이고 #619 가 만든 것이 아니다.** 검증을 켜면 지금 성공하는 저장이 거부되기 시작하므로
+      별도 판단이 필요하다 → 후속 이슈.
+    - **[DB MEDIUM] 일정 항목 수 상한이 없어 `IN` 절·질의문자열이 무한정 길어질 수 있다.**
+      walk_course id 가 19자리라 파라미터 1개당 약 34바이트, Tomcat 기본 8KB 헤더 한도 기준
+      **약 240개**에서 깨진다. 깨져도 장애 삼킴이 먹어 **요약만 비는 조용한 품질 저하**다.
+      준비물 50·반려견 5·후기 항목 50 은 전부 `@Size` 가 있는데 일정 항목만 없다.
+      **장소 경로도 같은 구조**라 한쪽만 고치면 비대칭이 된다 → 후속 이슈에서 양쪽을 함께 본다.
+    - **[검증 공백] 서비스 간 계약을 고정하는 테스트가 없다.** tour 의 `WalkCourseCandidateInternalResponse` 와
+      plan 의 `PlanWalkCourseClientResponse` 필드 일치는 사람이 눈으로 맞춘 것이라, 한쪽 필드명을 바꿔도
+      컴파일·테스트가 전부 통과한 채 **런타임에 조용히 null** 이 된다. 저장소에 내부 컨트롤러 슬라이스·
+      client-adapter 테스트 선례가 한 건도 없어 이 변경만의 이탈은 아니다.
+    - **[참고] `durationMaxMinutes == null` 은 "제한 없음" 이 아니라 "원문 파싱 실패" 다.**
+      FE 가 무제한으로 읽으면 활동량 판정이 뒤집힌다.
 - **기간을 줄일 때 범위 밖 항목이 남으면 `PLAN_008` 로 거부한다 (필수).** 자동 삭제하지 않는다 —
   사용자가 담아 둔 기록을 말없이 지우는 일이고, 되돌릴 수단도 없다. 항목을 먼저 정리하게 한다.
   - 검사는 **저장 앞**에 있어야 한다. 뒤에 두면 기간만 줄어든 채 고아가 남아 결함이 그대로 재현된다.
@@ -565,3 +600,11 @@ tour-service 는 시각별 예보 목록이 덮는 날짜 밖이면 `OUT_OF_RANG
 - 일차별 항목의 제목·유형·placeId 만 내보낸다. 메모·시간대 같은 개인 기록은 경계를 넘기지 않는다.
 - `petId`(대표)와 `petIds`(동행 전체)를 함께 내보낸다. ai-service 의 준비물 생성은 아직 `petId` 만 읽는다 — 다견 준비물은 ai 쪽 후속이다.
 - 내부 호출이라도 memberId 로 소유권을 다시 확인한다 — 남의 planId 로는 404.
+
+이 서비스가 **부르는** 내부 API (tour-service, 전부 벌크 1회 호출이다):
+
+- `GET /internal/v1/places/visible-ids?placeIds=` — 저장 시 장소 존재 검증.
+- `GET /internal/v1/places/candidates?placeIds=` — 일정 상세 항목의 장소 요약, 즐겨찾기 목록의 장소 요약,
+  응급 브리핑의 검색 중심점.
+- `GET /internal/v1/walk-courses/candidates?walkCourseIds=` — 일정 상세 `WALK` 항목의 산책 코스 요약 (#619).
+  **tour 장애 시 요약만 비우고 항목은 남긴다** — 장소 요약과 같은 판단이고, 두 요약은 서로 독립이다.
