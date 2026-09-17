@@ -67,6 +67,17 @@
   게이트웨이가 라우팅하지 않으며, delisted 를 제외해 새 일정 항목이 사라진 장소를 참조하지 못하게 한다
 - `GET /internal/v1/places/candidates?placeIds=` — (내부 전용) 아이디로 후보 요약 조회.
   ai-service 의 필수 포함 장소를 프롬프트 후보에 합칠 때 쓴다. enum 은 표시명으로 변환해 준다
+- `GET /internal/v1/walk-courses/candidates?walkCourseIds=` — (내부 전용) 아이디로 산책 코스 요약 조회 (#619).
+  plan-service 가 일정 상세의 `WALK` 항목에 이름표·거리·소요시간·대표 이미지를 붙일 때 쓴다.
+  **없는 아이디는 조용히 빠진다** — plan-service 의 `WALK` `targetId` 는 저장 시 검증되지 않아 없는 코스를
+  가리킬 수 있고(수기로 정리된 행도 마찬가지다), 그 항목 하나 때문에 일정이 통째로 안 보이면 안 된다.
+  적재는 upsert 뿐이라 **재적재로 행이 사라지지는 않는다** — 근거를 거기 두면 나중에 이 정책이 되돌려진다.
+  `fitsActivityLevels` 로 **이 코스를 걸을 만한 활동량**(`ActivityLevel` 의 `{code, name, description}` 목록)을 함께 내린다.
+  내부 DTO 라 공통 metadata 타입 대신 세 값을 펴서 주고(`WeatherWarningInternalResponse` 와 같은 이유),
+  소비 측이 자기 웹 응답에서 metadata 로 씌운다.
+  판정의 주인이 이 서비스(`WalkCourseActivityFit`)라 여기서 계산하며, 그래야 plan-service 가 남의 반려견 활동량을
+  tour-service 로 넘기지 않아도 된다. 소요시간을 모르는 코스(`durationMaxMinutes` null)는 세 값이 다 담기는데,
+  이는 "아무 아이나 된다"가 아니라 "모른다"는 뜻이다
 - `GET /internal/v1/weather/daily?areaCode=` — (내부 전용) 제주 대표 지점의 일자별 예보(단기+중기, 약 11일).
   ai-service 가 일정 생성·준비물 프롬프트에 싣는다. 기존 격자 캐시를 타 KMA 호출이 늘지 않고, 제주(39) 외 코드는 빈 목록
 - `GET /internal/v1/weather/warnings` — (내부 전용) 제주에 발효 중인 특보 중 **가장 무거운 한 건**. 없으면 `dataBody` 가 null 인 200.

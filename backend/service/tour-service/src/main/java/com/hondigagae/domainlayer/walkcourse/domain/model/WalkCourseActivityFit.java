@@ -1,6 +1,8 @@
 package com.hondigagae.domainlayer.walkcourse.domain.model;
 
 import com.hondigagae.shared.travel.pet.ActivityLevel;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * 반려견 활동량 → 걸을 수 있는 소요시간 상한.
@@ -38,5 +40,19 @@ public final class WalkCourseActivityFit {
             case MEDIUM -> durationMaxMinutes <= MEDIUM_MAX_MINUTES;
             case HIGH -> true;
         };
+    }
+
+    /**
+     * 이 소요시간의 코스가 맞는 활동량 전부. <b>판정은 {@link #fits} 하나뿐이다</b> - 여기서
+     * 상한을 다시 적으면 목록 필터와 요약 힌트가 어긋나 "목록에는 나오는데 힌트에는 없는" 코스가
+     * 생긴다.
+     *
+     * <p>소요시간을 모르는 코스는 {@code fits} 가 전부 참이라 세 값이 다 담긴다 - 모른다는 것을
+     * "아무 아이나 된다" 로 읽지 않도록, 소비처는 {@code durationMaxMinutes} 가 null 인지 함께 본다.
+     */
+    public static List<ActivityLevel> fittingLevels(Integer durationMaxMinutes) {
+        return Arrays.stream(ActivityLevel.values())
+            .filter(activityLevel -> fits(activityLevel, durationMaxMinutes))
+            .toList();
     }
 }
