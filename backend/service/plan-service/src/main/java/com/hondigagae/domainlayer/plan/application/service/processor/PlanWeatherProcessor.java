@@ -7,12 +7,15 @@ import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo.PlanDayW
 import com.hondigagae.domainlayer.plan.application.port.out.PetConditionQueryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlaceSuitabilityQueryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlanPetConditionRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PetConditionQueryResult;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlaceSuitabilityQueryResult;
 import com.hondigagae.shared.travel.plan.PlanItemType;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanDayWeatherUnavailableReason;
+import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
+import com.hondigagae.domainlayer.plan.domain.model.PlanPetCondition;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -61,6 +64,7 @@ public class PlanWeatherProcessor {
 
     private final PlanItemRepositoryPort planItemRepositoryPort;
     private final PetConditionQueryPort petConditionQueryPort;
+    private final PlanPetConditionRepositoryPort planPetConditionRepositoryPort;
     private final PlaceSuitabilityQueryPort placeSuitabilityQueryPort;
     private final Clock clock;
 
@@ -68,7 +72,7 @@ public class PlanWeatherProcessor {
      * @param petIds 동행 반려견. 비어 있지 않아야 한다 — 옛 일정도 {@code Plan.resolvePetIds} 가 대표 한 마리로 채운다
      */
     public PlanWeatherInfo brief(long memberId, Plan plan, List<Long> petIds) {
-        Map<Long, PetConditionQueryResult> conditions = loadConditions(memberId, petIds);
+        Map<Long, PetConditionQueryResult> conditions = loadConditions(memberId, plan, petIds);
         Map<Integer, List<PlanItem>> itemsByDay = planItemRepositoryPort.findByPlanId(plan.id()).stream()
             .collect(Collectors.groupingBy(PlanItem::day));
 
@@ -96,9 +100,40 @@ public class PlanWeatherProcessor {
      *
      * <p><b>여행 브리핑이 하루치만 재사용한다 — 복사하지 않고 같은 판정 경로를 쓰기 위해
      * 공개했다.</b> 사본을 두면 "특성을 못 받으면 일반 조건" 같은 규칙이 두 곳으로 갈라진다.
+     *
+     * <p>이쪽은 <b>항상 원천(auth-service)을 읽는다</b>. 완료 시점 스냅샷을 찍는 경로가 이 값을
+     * 쓰고, 조회는 상태를 보는 {@link #loadConditions(long, Plan, List)} 를 쓴다.
      */
     public Map<Long, PetConditionQueryResult> loadConditions(long memberId, List<Long> petIds) {
-        Map<Long, PetConditionQueryResult> found = petConditionQueryPort.findConditions(memberId, petIds);
+        return fill(petIds, petConditionQueryPort.findConditions(memberId, petIds));
+    }
+
+    /**
+     * 일정 상태에 맞는 특성을 읽는다.
+     *
+     * <p><b>완료된 일정은 완료 시점 스냅샷을 쓴다</b> (#629). 다녀온 뒤 프로필을 고쳤다고
+     * "그때 몽실이 기준" 이 달라지면 그 기록은 거짓이 된다. 진행 중(초안·확정)인 일정은 반대로
+     * 매번 다시 읽는다 — 체중·민감도를 고치면 다음 판정에 곧바로 반영되어야 한다.
+     *
+     * <p>스냅샷이 없는 완료 일정은 이 기능 이전에 완료된 것이다. 그때는 예전처럼 원격을 읽는다 —
+     * 없는 기록을 지어내지 않는다.
+     */
+    public Map<Long, PetConditionQueryResult> loadConditions(long memberId, Plan plan, List<Long> petIds) {
+        if (plan.status() == PlanStatus.COMPLETED) {
+            Map<Long, PetConditionQueryResult> snapshot = planPetConditionRepositoryPort.findByPlanId(plan.id())
+                .stream()
+                .collect(Collectors.toMap(PlanPetCondition::petId, PlanPetCondition::toQueryResult,
+                    (first, second) -> first, LinkedHashMap::new));
+            if (!snapshot.isEmpty()) {
+                return fill(petIds, snapshot);
+            }
+        }
+        return loadConditions(memberId, petIds);
+    }
+
+    private static Map<Long, PetConditionQueryResult> fill(
+        List<Long> petIds, Map<Long, PetConditionQueryResult> found
+    ) {
         Map<Long, PetConditionQueryResult> conditions = new LinkedHashMap<>();
         for (Long petId : petIds) {
             conditions.put(petId, found.getOrDefault(petId, PetConditionQueryResult.unknown()));

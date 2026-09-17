@@ -92,7 +92,8 @@ class PlanBriefingProcessorTest {
 
         // 날씨는 실제 Processor 를 끼운다 — 브리핑이 같은 판정 경로를 타는지가 검증 대상이다.
         PlanWeatherProcessor planWeatherProcessor = new PlanWeatherProcessor(
-            planItemRepositoryPort, petConditionQueryPort, placeSuitabilityQueryPort, CLOCK);
+            planItemRepositoryPort, petConditionQueryPort, new StubPlanPetConditionRepositoryPort(),
+            placeSuitabilityQueryPort, CLOCK);
         processor = new PlanBriefingProcessor(
             planItemRepositoryPort, planPlaceLookupPort, planWeatherProcessor, weatherWarningQueryPort,
             walkTimesQueryPort, CLOCK);

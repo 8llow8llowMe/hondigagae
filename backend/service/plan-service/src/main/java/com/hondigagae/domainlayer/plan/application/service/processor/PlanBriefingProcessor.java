@@ -100,7 +100,7 @@ public class PlanBriefingProcessor {
             .sorted(Comparator.comparingInt(PlanItem::sequence))
             .toList();
 
-        Map<Long, PetConditionQueryResult> conditions = planWeatherProcessor.loadConditions(memberId, petIds);
+        Map<Long, PetConditionQueryResult> conditions = planWeatherProcessor.loadConditions(memberId, plan, petIds);
         PlanDayWeatherInfo weather = planWeatherProcessor.briefDay(plan, day, dayItems, conditions);
 
         // 대표 장소는 날씨 판정과 같은 것을 쓴다. 다르면 한 화면에 서로 다른 장소가 기준으로 선다.

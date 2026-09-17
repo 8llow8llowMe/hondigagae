@@ -18,6 +18,7 @@ import com.hondigagae.domainlayer.plan.application.info.PlanInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanSummaryInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo;
 import com.hondigagae.domainlayer.plan.application.port.in.PlanWebUseCase;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PetConditionQueryResult;
 import com.hondigagae.domainlayer.plan.application.service.processor.PlanBriefingProcessor;
 import com.hondigagae.domainlayer.plan.application.service.processor.PlanCommandProcessor;
 import com.hondigagae.domainlayer.plan.application.service.processor.PlanEmergencyProcessor;
@@ -27,6 +28,7 @@ import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.persistence.dto.SliceResponse;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
@@ -108,7 +110,14 @@ public class PlanWebFacade implements PlanWebUseCase {
         // (createPlan 과 같은 이유).
         List<Long> petIds = command.petIds() == null ? null
             : planCommandProcessor.resolvePetIdsForUpdate(memberId, command.petIds());
-        Plan updated = planCommandProcessor.updatePlan(plan, command, petIds);
+        // 완료로 넘어가는 순간의 반려견 특성을 기록으로 남긴다 (#629). 이것도 원격 호출이라
+        // 트랜잭션 밖에서 먼저 읽는다. 완료 전이가 아니면 null 이고 스냅샷은 그대로 둔다.
+        Map<Long, PetConditionQueryResult> petConditionsAtCompletion = null;
+        if (PlanCommandProcessor.completesNow(plan, command)) {
+            List<Long> completingPetIds = petIds != null ? petIds : planQueryProcessor.getPetIds(plan);
+            petConditionsAtCompletion = planWeatherProcessor.loadConditions(memberId, completingPetIds);
+        }
+        Plan updated = planCommandProcessor.updatePlan(plan, command, petIds, petConditionsAtCompletion);
         return planPresenter.toDetailResponse(planQueryProcessor.getPlanDetailInfo(updated));
     }
 
