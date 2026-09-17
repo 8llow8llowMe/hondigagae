@@ -5,6 +5,7 @@ export type ErrorKind =
   | 'validation' // 400 — 입력 수정 유도
   | 'unauthorized' // 401 — 재발급 1회 → 로그인 유도
   | 'not-found' // 404 — 데이터 부재 또는 타인 리소스
+  | 'gone' // 410 — 있었지만 만료됐다 (PLAN_024 공유 링크)
   | 'conflict' // 409 — 이미 존재 (MEMBER_001 이메일 중복)
   | 'rate-limited' // 429 — 쿨다운·잠금 (AUTH_003 / AUTH_015)
   | 'forbidden' // 그 외 4xx
@@ -53,6 +54,16 @@ export class ApiError extends Error {
  */
 export function classify(status: number): ErrorKind {
   if (status === 404) return 'not-found'
+  /*
+    **410 을 404 와 합치지 않는다** (#628). 백엔드가 일부러 갈랐다 — 공유 링크의
+    없음·폐기·삭제는 전부 404 로 **같게** 답해 "이 토큰은 있었다" 를 흘리지 않고,
+    만료만 410 이다. 받은 사람이 "새 링크를 달라" 고 말할 수 있는 경우가 그것뿐이라
+    화면이 다른 말을 해야 한다 (`PlanErrorCode.SHARE_LINK_EXPIRED`).
+
+    `'forbidden'` 으로 떨어뜨려도 재시도 버튼은 안 뜨지만(둘 다 `temporary` 가 아니다)
+    문구가 일반 4xx 것이 된다. 분기 기준은 이 타입 하나다.
+  */
+  if (status === 410) return 'gone'
   if (status === 401) return 'unauthorized'
   if (status === 400) return 'validation'
   if (status === 409) return 'conflict'

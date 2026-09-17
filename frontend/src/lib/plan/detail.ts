@@ -29,7 +29,18 @@ const LODGING_TYPE = 'LODGING'
  * 비었을 때 그것이 결손인가**를 가르는 자리다.
  */
 export function isPlaceTarget(item: PlanItemDetail): boolean {
-  return PLACE_TARGET_TYPES.has(item.itemType.code) && item.targetId !== null
+  return isPlaceTargetOf(item.itemType.code, item.targetId)
+}
+
+/**
+ * 같은 판정을 **필드 두 개로** 묻는다 — 공유 열람 항목(`SharedPlanItem`)이 쓴다 (#628).
+ *
+ * `isPlaceTarget` 이 `PlanItemDetail` 을 받아서 공유 항목에 못 쓰는데, 호출부가 집합을
+ * 복사하면 **백엔드가 유형을 늘렸을 때 한쪽만 고쳐진다.** 그 어긋남은 "공유 링크로
+ * 열면 장소 링크만 안 걸린다" 로 나타나 눈에 잘 띄지 않는다.
+ */
+export function isPlaceTargetOf(itemTypeCode: string, targetId: string | null): boolean {
+  return PLACE_TARGET_TYPES.has(itemTypeCode) && targetId !== null
 }
 
 /**
@@ -61,37 +72,53 @@ export function alternativePlaceIds(alternatives: PlanAlternativePlaceItem[]): s
   return [...new Set(alternatives.map((alternative) => alternative.placeId))]
 }
 
-export type PlanDayGroup = {
+export type PlanDayGroup<T extends DayPositioned = PlanItemDetail> = {
   /** 1부터 */
   day: number
-  items: PlanItemDetail[]
+  items: T[]
 }
 
-export type GroupedPlanItems = {
+export type GroupedPlanItems<T extends DayPositioned = PlanItemDetail> = {
   /** `totalDays` 만큼 **항상** 만들어진다. 항목이 없는 일자도 섹션을 갖는다 */
-  days: PlanDayGroup[]
+  days: PlanDayGroup<T>[]
   /**
    * `day > totalDays` 인 고아 항목. 기간을 줄여도 서버가 항목을 정리하지 않아 생긴다
    * (`PlanCommandProcessor.updatePlan`). **숨기지 않는다** — 숨기면 사용자가 자료가
    * 사라진 것을 모른다 (D4).
    */
-  outOfRange: PlanItemDetail[]
+  outOfRange: T[]
 }
+
+/**
+ * 일자 안에서 자리를 갖는 항목. **그룹핑에 필요한 최소 모양이다.**
+ *
+ * 소유자 상세(`PlanItemDetail`)와 공유 열람(`SharedPlanItem`)이 이 둘만 공유한다 —
+ * 공유 응답에는 `planItemId`·`memo`·`visited` 가 없다 (#628).
+ */
+export type DayPositioned = { day: number; sequence: number }
 
 /**
  * 항목을 일자별로 나눈다. 같은 일자 안은 `sequence` 오름차순이다.
  *
  * **`totalDays` 가 섹션 수를 정한다.** 항목 배열에서 유추하지 않는다 — 항목이 없는
  * 일자도 "이 날은 아직 담은 곳이 없어요" 를 보여줘야 한다.
+ *
+ * **제네릭인 이유** (#628): 공유 열람 화면이 같은 규칙을 쓴다. 여기 담긴 판단
+ * (`totalDays` 가 섹션 수다 · 같은 일자는 `sequence` 순 · `day > totalDays` 는 고아)은
+ * 소유자가 보든 링크로 받은 사람이 보든 같아야 하는데, 복사해 두면 **한쪽만 고쳐지는
+ * 날**이 온다. 기존 호출부는 추론으로 그대로 통과한다.
  */
-export function groupItemsByDay(items: PlanItemDetail[], totalDays: number): GroupedPlanItems {
+export function groupItemsByDay<T extends DayPositioned>(
+  items: T[],
+  totalDays: number,
+): GroupedPlanItems<T> {
   const safeTotal = Number.isInteger(totalDays) && totalDays > 0 ? totalDays : 0
 
-  const days: PlanDayGroup[] = Array.from({ length: safeTotal }, (_, index) => ({
+  const days: PlanDayGroup<T>[] = Array.from({ length: safeTotal }, (_, index) => ({
     day: index + 1,
     items: [],
   }))
-  const outOfRange: PlanItemDetail[] = []
+  const outOfRange: T[] = []
 
   for (const item of items) {
     const group = days[item.day - 1]
@@ -106,7 +133,7 @@ export function groupItemsByDay(items: PlanItemDetail[], totalDays: number): Gro
   return { days, outOfRange }
 }
 
-function bySequence(a: PlanItemDetail, b: PlanItemDetail): number {
+function bySequence(a: DayPositioned, b: DayPositioned): number {
   return a.sequence - b.sequence
 }
 

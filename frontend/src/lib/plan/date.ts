@@ -119,3 +119,24 @@ export function totalDaysBetween(startDate: string, endDate: string): number | n
 
   return Math.round((end - start) / 86_400_000) + 1
 }
+
+/**
+ * 항목 시작 시각 — `'10:30:00'` → `'10:30'`. 못 읽으면 `null`.
+ *
+ * **초를 버린다.** 백엔드 `LocalTime` 이 초까지 주지만 여행 일정에서 초는 의미가 없고,
+ * `10:30:00` 은 시간표가 아니라 기계 값으로 읽힌다.
+ *
+ * **시각을 만들어 내지 않는다** — `null` 이면 `null` 이다. 공유 열람에서 시간 열이
+ * 비는 것이 "미정" 이고, `00:00` 으로 채우면 자정 출발로 읽힌다.
+ */
+export function planItemTimeLabel(startTime: string | null): string | null {
+  if (startTime === null) return null
+
+  const matched = /^(\d{2}):(\d{2})(?::\d{2})?$/.exec(startTime)
+  if (matched === null) return null
+
+  const [, hour, minute] = matched as unknown as [string, string, string]
+  if (Number(hour) > 23 || Number(minute) > 59) return null
+
+  return `${hour}:${minute}`
+}
