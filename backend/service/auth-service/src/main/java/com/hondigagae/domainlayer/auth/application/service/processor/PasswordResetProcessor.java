@@ -8,6 +8,7 @@ import com.hondigagae.domainlayer.auth.application.port.out.MailSendPort;
 import com.hondigagae.domainlayer.auth.application.port.out.PasswordResetStorePort;
 import com.hondigagae.domainlayer.auth.application.service.support.VerificationCodeGenerator;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
+import com.hondigagae.domainlayer.member.application.service.support.EmailNormalizer;
 import com.hondigagae.domainlayer.member.domain.enums.MemberStatus;
 import com.hondigagae.domainlayer.member.domain.model.Member;
 import com.hondigagae.global.properties.EmailSendLimitProperties;
@@ -44,7 +45,7 @@ public class PasswordResetProcessor {
     private final EmailSendLimitProperties emailSendLimitProperties;
 
     public void sendResetCode(String rawEmail, String clientIp) {
-        String email = EmailVerificationProcessor.normalize(rawEmail);
+        String email = EmailNormalizer.normalize(rawEmail);
 
         // 1. IP 발송 상한 → 이메일 쿨다운 (회원가입 발송과 동일한 순서/방어)
         long ipSendCount = emailVerificationStorePort.increaseIpSendCount(clientIp, emailSendLimitProperties.ipWindow());
@@ -77,7 +78,7 @@ public class PasswordResetProcessor {
 
     @Transactional
     public void resetPassword(String rawEmail, String code, String newPassword) {
-        String email = EmailVerificationProcessor.normalize(rawEmail);
+        String email = EmailNormalizer.normalize(rawEmail);
 
         // 1. 코드 검증 — 실패가 누적되면 코드를 무효화해 브루트포스를 차단한다
         String storedCode = passwordResetStorePort.findCode(email)

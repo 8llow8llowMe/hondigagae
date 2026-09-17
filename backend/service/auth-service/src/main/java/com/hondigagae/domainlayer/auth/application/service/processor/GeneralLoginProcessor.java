@@ -8,6 +8,7 @@ import com.hondigagae.domainlayer.auth.application.port.out.LoginAttemptStorePor
 import com.hondigagae.domainlayer.member.application.exception.MemberErrorCode;
 import com.hondigagae.domainlayer.member.application.exception.MemberException;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
+import com.hondigagae.domainlayer.member.application.service.support.EmailNormalizer;
 import com.hondigagae.domainlayer.member.domain.model.Member;
 import com.hondigagae.global.properties.LoginAttemptProperties;
 import java.util.Optional;
@@ -45,7 +46,7 @@ public class GeneralLoginProcessor {
      */
     public GeneralLoginInfo generalLogin(AuthGeneralLoginCommand command) {
         // Redis 키(case-sensitive)와 DB 저장값(정규화된 이메일) 정합을 위해 동일하게 정규화한다.
-        String email = EmailVerificationProcessor.normalize(command.email());
+        String email = EmailNormalizer.normalize(command.email());
 
         // 1. 잠금 검사 — 회원 조회보다 먼저 수행해 잠긴 이메일에는 DB 조회/bcrypt 비용조차 주지 않는다.
         if (loginAttemptStorePort.isLocked(email)) {

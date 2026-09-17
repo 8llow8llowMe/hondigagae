@@ -107,5 +107,10 @@ class MemberConsentProcessorTest {
             saveAllCalls++;
             saved.addAll(consents);
         }
+
+        @Override
+        public void deleteAllByMemberIdIn(List<Long> memberIds) {
+            saved.removeIf(consent -> memberIds.contains(consent.memberId()));
+        }
     }
 }

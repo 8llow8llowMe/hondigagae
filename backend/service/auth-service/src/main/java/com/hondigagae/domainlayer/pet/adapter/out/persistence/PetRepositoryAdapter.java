@@ -51,4 +51,9 @@ public class PetRepositoryAdapter implements PetRepositoryPort {
         return petRepository.findFirstByMemberIdAndRepresentativeTrueAndDeletedFalseOrderByIdAsc(memberId)
             .map(petMapper::toDomainFromEntity);
     }
+
+    @Override
+    public void deleteAllByMemberIdIn(List<Long> memberIds) {
+        petRepository.deleteAllByMemberIdIn(memberIds);
+    }
 }

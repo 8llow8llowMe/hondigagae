@@ -47,6 +47,12 @@ x-auth-service-environment: &auth_service_environment
   JWT_BLACKLIST_FAIL_OPEN: ${JWT_BLACKLIST_FAIL_OPEN:-false}
   AUTH_LOGIN_MAX_FAILURE_COUNT: ${AUTH_LOGIN_MAX_FAILURE_COUNT:-5}
   AUTH_LOGIN_LOCK_DURATION: ${AUTH_LOGIN_LOCK_DURATION:-PT10M}
+  # 탈퇴 회원 이메일 다이제스트용 pepper. 기본값을 두지 않는다 — 비밀 없이 도는 해시보다
+  # 기동 실패가 낫다. 한번 정하면 바꾸지 않는다(바꾸면 기존 다이제스트와 대조가 불가능해진다).
+  WITHDRAWN_EMAIL_PEPPER: ${WITHDRAWN_EMAIL_PEPPER}
+  # 가입 동의 이력에 남길 문서 버전. 비밀값이 아니라 실제 값을 그대로 넘긴다.
+  LEGAL_TERMS_VERSION: ${LEGAL_TERMS_VERSION:-1.0}
+  LEGAL_PRIVACY_VERSION: ${LEGAL_PRIVACY_VERSION:-1.0}
   # 일반 로그인 이메일 인증코드 발송용.
   MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
   MAIL_PORT: ${MAIL_PORT:-587}

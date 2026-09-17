@@ -18,14 +18,17 @@ import com.hondigagae.domainlayer.member.application.exception.MemberException;
 import com.hondigagae.domainlayer.member.application.port.out.MemberConsentRepositoryPort;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
 import com.hondigagae.domainlayer.member.application.service.processor.MemberConsentProcessor;
+import com.hondigagae.domainlayer.member.application.service.support.WithdrawnEmailHasher;
 import com.hondigagae.domainlayer.member.domain.enums.MemberStatus;
 import com.hondigagae.domainlayer.member.domain.enums.OAuthProvider;
 import com.hondigagae.domainlayer.member.domain.model.Member;
 import com.hondigagae.domainlayer.member.domain.model.MemberConsent;
 import com.hondigagae.global.properties.LegalDocumentProperties;
+import com.hondigagae.global.properties.WithdrawnEmailProperties;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import com.hondigagae.security.common.enums.SecurityRole;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,10 +50,12 @@ class OAuthLoginProcessorTest {
 
     private static final OAuthProvider PROVIDER = OAuthProvider.KAKAO;
     private static final String EMAIL = "tester@example.com";
+    private static final String TEST_PEPPER = "oauth-login-test-pepper-0123456789abcdef";
 
     private StubOAuthStateStorePort stateStorePort;
     private StubMemberRepositoryPort memberRepositoryPort;
     private RecordingConsentRepositoryPort consentRepositoryPort;
+    private WithdrawnEmailHasher withdrawnEmailHasher;
     private OAuthLoginProcessor processor;
 
     @BeforeEach
@@ -63,12 +68,16 @@ class OAuthLoginProcessorTest {
         // 이력의 내용(항목·버전·시각)은 MemberConsentProcessorTest 가 본다.
         MemberConsentProcessor consentProcessor = new MemberConsentProcessor(
             consentRepositoryPort, new SnowflakeIdGenerator(1, 1), new LegalDocumentProperties("1.0", "1.2"));
+        // 해시는 실물을 쓴다 — 탈퇴 차단이 "탈퇴 시 저장한 값"과 "로그인 시 계산한 값"이 같다는
+        // 전제 위에 서 있어서, 그 계산을 스텁으로 바꾸면 검증할 것이 남지 않는다.
+        withdrawnEmailHasher = new WithdrawnEmailHasher(new WithdrawnEmailProperties(TEST_PEPPER));
         processor = new OAuthLoginProcessor(
             new OAuthAuthorizationUrlRouter(Set.of(new StubAuthorizationUrlProvider())),
             new OAuthMemberQueryRouter(Set.of()),
             stateStorePort,
             memberRepositoryPort,
             consentProcessor,
+            withdrawnEmailHasher,
             new NoOpMailSendPort(),
             new SnowflakeIdGenerator(1, 1));
     }
@@ -145,6 +154,44 @@ class OAuthLoginProcessorTest {
     }
 
     @Test
+    @DisplayName("탈퇴한 이메일로 소셜 로그인하면 신규 가입되지 않고 MEMBER_ALREADY_WITHDRAWN 이 난다")
+    void rejectsSocialLoginForWithdrawnEmail() {
+        // #609 의 핵심 회귀 지점. 탈퇴 회원의 email 은 다이제스트로 치환돼 있어 원문 조회에
+        // 잡히지 않는다 — 방어가 없으면 그대로 신규 생성 경로로 빠져 탈퇴자가 재가입된다.
+        Member withdrawn = Member.builder()
+            .id(1L).email(EMAIL).name("테스터").nickname("테스터")
+            .role(SecurityRole.USER).provider(PROVIDER).status(MemberStatus.ACTIVE)
+            .build()
+            .withdraw(withdrawnEmailHasher.hash(EMAIL), LocalDateTime.now());
+        memberRepositoryPort.save(withdrawn);
+
+        assertThatThrownBy(() -> processor.login(PROVIDER, callback(new OAuthSignupConsent(true, true, true))))
+            .isInstanceOf(MemberException.class)
+            .hasFieldOrPropertyWithValue("errorCode", MemberErrorCode.MEMBER_ALREADY_WITHDRAWN);
+
+        // 원문 이메일로는 아무 회원도 없어야 한다 — 새로 만들어졌다면 여기에 잡힌다.
+        assertThat(memberRepositoryPort.findByEmail(EMAIL)).isEmpty();
+        assertThat(consentRepositoryPort.saved).isEmpty();
+    }
+
+    @Test
+    @DisplayName("탈퇴 회원 차단은 동의 검사보다 먼저다 — 동의를 안 했어도 탈퇴 사유로 거부한다")
+    void reportsWithdrawnBeforeConsentForWithdrawnEmail() {
+        // 원문을 보관하던 때는 상태 판정이 동의 흐름보다 앞이라 탈퇴자는 동의 여부와 무관하게
+        // MEMBER_004 를 받았다. 그 응답을 그대로 유지한다.
+        Member withdrawn = Member.builder()
+            .id(1L).email(EMAIL).name("테스터").nickname("테스터")
+            .role(SecurityRole.USER).provider(PROVIDER).status(MemberStatus.ACTIVE)
+            .build()
+            .withdraw(withdrawnEmailHasher.hash(EMAIL), LocalDateTime.now());
+        memberRepositoryPort.save(withdrawn);
+
+        assertThatThrownBy(() -> processor.login(PROVIDER, callback(OAuthSignupConsent.none())))
+            .isInstanceOf(MemberException.class)
+            .hasFieldOrPropertyWithValue("errorCode", MemberErrorCode.MEMBER_ALREADY_WITHDRAWN);
+    }
+
+    @Test
     @DisplayName("인가 시점에 받은 동의·확인이 state 에 실려 콜백까지 전달된다")
     void carriesConsentFromAuthorizeToCallback() {
         // 인가코드가 1회용이라 콜백에서 다시 받을 수 없다. 이 왕복이 끊기면
@@ -209,6 +256,11 @@ class OAuthLoginProcessorTest {
         public void saveAll(List<MemberConsent> consents) {
             saved.addAll(consents);
         }
+
+        @Override
+        public void deleteAllByMemberIdIn(List<Long> memberIds) {
+            saved.removeIf(consent -> memberIds.contains(consent.memberId()));
+        }
     }
 
     private static class StubMemberRepositoryPort implements MemberRepositoryPort {
@@ -227,6 +279,11 @@ class OAuthLoginProcessorTest {
         }
 
         @Override
+        public boolean existsByEmailIn(List<String> emails) {
+            return emails.stream().anyMatch(email -> findByEmail(email).isPresent());
+        }
+
+        @Override
         public Optional<Member> findById(long memberId) {
             return Optional.ofNullable(members.get(memberId));
         }
@@ -234,6 +291,16 @@ class OAuthLoginProcessorTest {
         @Override
         public List<String> findAllProfileImageKeys() {
             return List.of();
+        }
+
+        @Override
+        public List<Long> findWithdrawnMemberIdsBefore(LocalDateTime threshold, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public void deleteAllByIdIn(List<Long> memberIds) {
+            memberIds.forEach(members::remove);
         }
     }
 

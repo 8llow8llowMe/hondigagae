@@ -5,7 +5,9 @@ import com.hondigagae.domainlayer.member.application.exception.MemberException;
 import com.hondigagae.domainlayer.member.application.info.MemberMyInfo;
 import com.hondigagae.domainlayer.member.application.info.MemberProfileImageChangeResult;
 import com.hondigagae.domainlayer.member.application.port.out.MemberRepositoryPort;
+import com.hondigagae.domainlayer.member.application.service.support.WithdrawnEmailHasher;
 import com.hondigagae.domainlayer.member.domain.model.Member;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -17,15 +19,21 @@ public class MemberCommandProcessor {
 
     private final MemberQueryProcessor memberQueryProcessor;
     private final MemberRepositoryPort memberRepositoryPort;
+    private final WithdrawnEmailHasher withdrawnEmailHasher;
     private final PasswordEncoder passwordEncoder;
 
     /**
      * 논리 탈퇴. 남아 있던 프로필 이미지 키를 함께 반환해 호출부가 커밋 후 객체를 정리하게 한다.
+     *
+     * <p>이메일은 여기서 계산한 다이제스트로 치환된다 — 원문은 이 시점 이후 <b>어디에도 남지
+     * 않는다</b>. 계산에 설정 비밀(pepper)이 필요해 도메인이 아니라 이 계층이 맡는다.
+     * 탈퇴 시각은 보존 기간(30일) 경과 판정에 쓰이며 {@code WithdrawnMemberPurgeScheduler} 가 읽는다.
      */
     public String withdraw(long memberId) {
         Member member = memberQueryProcessor.getActiveMember(memberId);
         String previousObjectKey = member.profileImageKey();
-        memberRepositoryPort.save(member.withdraw());
+        String emailDigest = withdrawnEmailHasher.hash(member.email());
+        memberRepositoryPort.save(member.withdraw(emailDigest, LocalDateTime.now()));
         return previousObjectKey;
     }
 

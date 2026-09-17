@@ -253,5 +253,10 @@ class PetCommandProcessorTest {
                 .filter(java.util.Objects::nonNull)
                 .toList();
         }
+
+        @Override
+        public void deleteAllByMemberIdIn(List<Long> memberIds) {
+            store.values().removeIf(pet -> memberIds.contains(pet.memberId()));
+        }
     }
 }

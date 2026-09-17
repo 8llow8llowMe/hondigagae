@@ -109,3 +109,11 @@ auth:
 legal:
   terms-version: ${LEGAL_TERMS_VERSION:1.0}
   privacy-version: ${LEGAL_PRIVACY_VERSION:1.0}
+
+# 탈퇴 회원 이메일을 다이제스트로 치환할 때 쓰는 pepper.
+# 로컬은 편의를 위해 명시적인 가짜값을 둔다 — 이 값으로 만든 다이제스트는 비밀이 아니다.
+# dev/prod 는 기본값 없이 Vault 의 WITHDRAWN_EMAIL_PEPPER 를 쓴다.
+# ⚠️ 한번 정하면 바꾸지 않는다. 바꾸면 기존 다이제스트와 대조가 불가능해져 재가입 차단이 뚫린다.
+member:
+  withdrawn-email:
+    pepper: ${WITHDRAWN_EMAIL_PEPPER:local-development-only-pepper-not-a-secret}
