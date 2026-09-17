@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /**
- * 후기 작성 규칙 검증. 완료된 일정에만 받고, 장소 평가는 그때의 항목을 기억한다.
+ * 후기 규칙 검증. 쓰기는 완료된 일정에만 받고, 조회는 상태를 보지 않는다. 장소 평가는 그때의 항목을 기억한다.
  */
 class PlanReviewProcessorTest {
 
@@ -59,27 +59,51 @@ class PlanReviewProcessorTest {
     }
 
     @Test
-    @DisplayName("초안 일정은 후기를 쓰거나 보지 못한다 — 완료가 문이다")
-    void rejectsDraftPlan() {
+    @DisplayName("초안 일정은 후기를 쓰지 못한다 — 완료가 쓰기의 문이다")
+    void rejectsDraftPlanWrite() {
         Plan draft = plan(PlanStatus.DRAFT);
 
-        assertThatThrownBy(() -> processor.getReview(draft))
+        assertThatThrownBy(() -> processor.createReview(draft, command(4, List.of())))
             .isInstanceOf(PlanException.class)
             .extracting(ex -> ((PlanException) ex).getErrorCode())
             .isEqualTo(PlanErrorCode.REVIEW_PLAN_NOT_COMPLETED);
-        assertThatThrownBy(() -> processor.createReview(draft, command(4, List.of())))
+        assertThatThrownBy(() -> processor.updateReview(draft, command(4, List.of())))
             .isInstanceOf(PlanException.class)
             .extracting(ex -> ((PlanException) ex).getErrorCode())
             .isEqualTo(PlanErrorCode.REVIEW_PLAN_NOT_COMPLETED);
     }
 
     @Test
-    @DisplayName("확정 일정도 후기를 거절한다 — 다녀오기 전에 평가를 받지 않는다")
-    void rejectsConfirmedPlan() {
+    @DisplayName("확정 일정도 후기 쓰기를 거절한다 — 다녀오기 전에 평가를 받지 않는다")
+    void rejectsConfirmedPlanWrite() {
         assertThatThrownBy(() -> processor.createReview(plan(PlanStatus.CONFIRMED), command(4, List.of())))
             .isInstanceOf(PlanException.class)
             .extracting(ex -> ((PlanException) ex).getErrorCode())
             .isEqualTo(PlanErrorCode.REVIEW_PLAN_NOT_COMPLETED);
+    }
+
+    @Test
+    @DisplayName("완료를 확정으로 되돌려도 이미 쓴 후기는 그대로 조회된다 — 되돌리기가 기록을 지우지 않는다")
+    void getReviewSurvivesReopen() {
+        processor.createReview(completedPlan(), command(4, List.of(itemCommand(PLACE_ITEM_ID, 5, "그늘이 많았다."))));
+
+        PlanReviewInfo reopened = processor.getReview(plan(PlanStatus.CONFIRMED));
+
+        assertThat(reopened.overallRating()).isEqualTo(4);
+        assertThat(reopened.items()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("초안·확정에서 후기가 없으면 PLAN_015 다 — 조회를 막는 것은 상태가 아니라 후기의 존재다")
+    void getReviewWithoutRowIsNotFoundRegardlessOfStatus() {
+        assertThatThrownBy(() -> processor.getReview(plan(PlanStatus.DRAFT)))
+            .isInstanceOf(PlanException.class)
+            .extracting(ex -> ((PlanException) ex).getErrorCode())
+            .isEqualTo(PlanErrorCode.REVIEW_NOT_FOUND);
+        assertThatThrownBy(() -> processor.getReview(plan(PlanStatus.CONFIRMED)))
+            .isInstanceOf(PlanException.class)
+            .extracting(ex -> ((PlanException) ex).getErrorCode())
+            .isEqualTo(PlanErrorCode.REVIEW_NOT_FOUND);
     }
 
     @Test
