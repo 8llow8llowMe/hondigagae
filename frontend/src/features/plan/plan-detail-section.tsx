@@ -31,6 +31,7 @@ import {
   type PlanItemRowModel,
   toItemRows,
 } from '@/lib/plan/detail'
+import { isPackingPromoted } from '@/lib/plan/packing-promotion'
 import { isReviewSectionVisible } from '@/lib/plan/review'
 import type { Pet } from '@/types/pet'
 import type { PlaceDetail } from '@/types/place'
@@ -163,6 +164,29 @@ export function PlanDetailSection({
   */
   const regenerateBlocked = dayRegenerateBlock(plan, today) !== null
 
+  /*
+    **출발이 가까우면 준비물이 일자 위다** (#665 · 진단 PL-3 · 명세 D11-9). `D-1` · `D-0`
+    둘뿐이고 여행 중·지난 일정은 기본 자리를 지킨다 — 짐은 떠나기 전에 싼다.
+
+    **이 화면의 시간 의존은 이 한 줄이 전부다** — 아래 JSX 는 `boolean` 만 본다. 판정을
+    컴포넌트 안에 두지 않는 이유는 `regenerateBlocked` 와 같다.
+  */
+  const packingPromoted = isPackingPromoted(plan, today)
+
+  /*
+    준비물 (#155). **개요를 근거로 만드는 일정 전체의 것이라 좌측 레일이다** — 특정 일자
+    옆에 두면 그 날 것으로 읽힌다.
+
+    **한 자리에만 선다.** 두 자리에 렌더하고 한쪽을 `hidden` 으로 두지 않는다 —
+    스크린리더가 두 번 읽고, `PlanPackingList` 가 `useQuery` 를 들어 **마운트가 둘**이
+    된다 (D11-9-3 의 기각 표).
+  */
+  const packingCard = (
+    <Surface aria-label={messages.plan.packingHeading}>
+      <PlanPackingList planId={plan.planId} />
+    </Surface>
+  )
+
   return (
     <div className="rail-layout rail-layout-split">
       {/*
@@ -221,6 +245,19 @@ export function PlanDetailSection({
             />
           }
         />
+
+        {/*
+          **승격 갈래에서 준비물이 여기 붙는다** (#665 · D11-9-3). 옮기는 것은 이 카드
+          **하나**이고 `.rail-layout-split` 규칙도 새 클래스도 건드리지 않는다 — 옮겨야
+          하는 카드가 하필 `row 1`/`row 2` 의 이음매에 있어서, 데스크톱 좌측 열에서 읽는
+          자리는 두 갈래가 **같다**(개요 → 준비물 → (후기) → 배너). 모바일 순서만 바뀐다.
+
+          **자기 여백을 붙이지 않는다** — 카드 사이 간격은 `SurfaceStack` 이 낸다
+          (모바일 8 · `md` 24). 승격해도 정방향 상태 버튼보다는 아래다: 확정·완료 액션은
+          `PlanOverviewPanel` 이 `action` 으로 카드 안에 내므로 상태 배지와 그 배지를
+          바꾸는 버튼 사이에 이 카드가 끼지 않는다.
+        */}
+        {packingPromoted && packingCard}
       </SurfaceStack>
 
       {/*
@@ -308,6 +345,11 @@ export function PlanDetailSection({
         **954px**(1.13 화면 아래)였다. 준비물은 **출발 전날 과업**이고 후기는 다녀온 뒤의
         것이라, 오늘 이 화면을 연 사람이 찾는 것(그 날 판정과 담은 장소)보다 앞에 설 이유가 없다.
 
+        **그 근거가 뒤집히는 이틀만 준비물이 빠진다** (#665 · 명세 D11-9). `D-1` · `D-0` 에는
+        그날 이 화면을 연 사람이 찾는 것이 짐 목록이라 위 레일로 옮겨 간다. **후기·배너는
+        승격 대상이 아니다** — 후기는 다녀온 뒤의 것이고 배너는 상시 진입점이라 둘 다
+        D-day 와 무관하다.
+
         **데스크톱에서는 여전히 좌측 레일이다** — `.rail-layout-split` 이 이 블록을 1열 2행에
         놓아 개요 아래로 되돌린다. 모바일 순서만 바뀐다 (globals.css).
 
@@ -318,12 +360,13 @@ export function PlanDetailSection({
       */}
       <SurfaceStack className="rail-split-bottom pt-2 md:pt-0 lg:pr-3">
         {/*
-          준비물 (#155). **개요 바로 아래, 좌측 레일이다** — 일정 전체를 근거로 만드는
-          것이라 특정 일자 옆에 두면 그 날 것으로 읽힌다.
+          준비물의 **기본 자리**다 (#653). 승격 갈래(`D-1` · `D-0`)에서는 위 레일 끝으로
+          옮겨 가 여기서 빠진다 (#665 · D11-9).
+
+          **`pt-2 md:pt-0` 은 승격 갈래에서도 그대로다** — 이 스택은 두 갈래 모두 일자
+          뒤(모바일) · 위 레일 뒤(데스크톱)라 아래 근거가 그대로 성립한다.
         */}
-        <Surface aria-label={messages.plan.packingHeading}>
-          <PlanPackingList planId={plan.planId} />
-        </Surface>
+        {!packingPromoted && packingCard}
 
         {/*
           여행 후기 (#615). **완료 일정에만 카드를 연다.** 초안·확정에서 GET 을 치면
