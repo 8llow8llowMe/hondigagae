@@ -64,6 +64,7 @@ export function WalkTimesSection({
   loading = false,
   positionFallback = false,
   onRetry,
+  retryLabel,
 }: {
   data: WalkTimesResponse | null
   loading?: boolean
@@ -77,6 +78,15 @@ export function WalkTimesSection({
    * 누를 수는 있는데 아무 일도 없는 버튼을 두지 않는다.
    */
   onRetry?: () => void
+  /**
+   * 재조회 버튼의 **접근 이름**. 기본은 `다시 시도` 이고 홈은 그것을 쓴다.
+   *
+   * 산책 코스 상세만 `날씨 다시 불러오기` 를 넘긴다 (`코스상세-세부명세.md` D6) — 그
+   * 화면에서는 이 버튼이 코스 조회의 재시도와 나란히 설 수 있어 `다시 시도` 만으로는
+   * 무엇을 다시 하는지 모른다. **판정 문구는 여기서 갈리지 않는다** (D5-1): 갈리는 것은
+   * 버튼 이름 하나뿐이고, 기본값이 옛 문구라 홈 마크업은 그대로다.
+   */
+  retryLabel?: string
 }) {
   // 조회 실패는 섹션을 통째로 숨긴다 — 홈의 최소 골격에 이 섹션은 없다 (공통명세 S4-1)
   if (data === null) return loading ? <WalkTimesSkeleton /> : null
@@ -115,7 +125,7 @@ export function WalkTimesSection({
         ) : status === 'ALL_HOURS_RISKY' ? (
           <NoGoldenWindow />
         ) : (
-          <NoForecast coverage={data.forecastCoverage} onRetry={onRetry} />
+          <NoForecast coverage={data.forecastCoverage} onRetry={onRetry} retryLabel={retryLabel} />
         )}
 
         <HourlyCurve data={data} />
@@ -353,9 +363,11 @@ const COVERAGE_UNAVAILABLE = 'UNAVAILABLE'
 function NoForecast({
   coverage,
   onRetry,
+  retryLabel = messages.common.retry,
 }: {
   coverage: CodeNameMetadata | null
   onRetry?: (() => void) | undefined
+  retryLabel?: string | undefined
 }) {
   const server = coverage !== null && coverage.code !== 'AVAILABLE' ? coverage : null
   const retryable = server?.code === COVERAGE_UNAVAILABLE && onRetry !== undefined
@@ -381,7 +393,7 @@ function NoForecast({
           onClick={onRetry}
           className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
         >
-          {messages.common.retry}
+          {retryLabel}
         </button>
       )}
     </div>

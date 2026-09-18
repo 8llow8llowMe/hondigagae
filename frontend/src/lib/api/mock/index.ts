@@ -16,6 +16,7 @@ import { resolvePetMock } from '@/lib/api/mock/pet-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import { mockPlaceDetail } from '@/lib/api/mock/place-detail-data'
 import { resolvePlanMock } from '@/lib/api/mock/plan-data'
+import { resolveWalkCourseMock } from '@/lib/api/mock/walk-course-data'
 import { toLatLng } from '@/lib/geo/coord'
 import { haversineMeters } from '@/lib/geo/distance'
 import { allowsPetSize } from '@/lib/place/pet-size'
@@ -124,6 +125,14 @@ export function resolveMock(
   if (method !== 'GET') return null
 
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
+
+  /*
+    산책 코스 (#618). **공개 API 라 accessToken 을 보지 않는다.** 목록·상세 둘 다 이
+    resolver 가 갖는다 — 400·404 갈래가 목록과 상세에 걸쳐 있어 한 곳에 두어야 실서버와
+    같은 모양을 흉내 낼 수 있다.
+  */
+  const walkCourse = resolveWalkCourseMock(path, method, search)
+  if (walkCourse !== null) return walkCourse
 
   if (path === '/places') return placeList(params)
 

@@ -34,7 +34,7 @@
 | AI 일정 생성  | 구현 (Ollama) | **구현 완료** (§5)             |
 | 장소 인사이트 | 구현          | **가능** (신규 — §3-1)         |
 | 긴급 시설     | 구현          | **가능** (§5-2)                |
-| 산책 코스     | **진행 중**   | **대기** (§6-1 — BE PR #384)   |
+| 산책 코스     | 구현          | **가능** (§5-3 — 명세 #618)    |
 | 그 외 전부    | 미착수        | **대기** (§6)                  |
 
 ## 1. 인증 / 회원 — 착수 가능
@@ -716,6 +716,62 @@
 > 백엔드가 `String` 으로 내린다 — _"Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로
 > 문자열로 내린다"_. FE 타입도 `string` 이고 **`number` 로 타이핑하면 정밀도가 손상된다.**
 
+## 5-3. 산책 코스 (제주올레) — 착수 가능
+
+| 화면      | 경로                           | API                                | 상태                                                                                                |
+| --------- | ------------------------------ | ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 코스 목록 | `/walk-courses`                | `GET /walk-courses`                | **구현 완료** ([#618](https://github.com/8llow8llowMe/hondigagae/issues/618)) — 커서 없이 29개 전량 |
+| 코스 상세 | `/walk-courses/[walkCourseId]` | `GET /walk-courses/{walkCourseId}` | **구현 완료** (#618) — 좌표가 있으면 `GET /insights/walk-times` 로 골든타임까지 이어진다            |
+
+명세: `docs/features/walk-course/` (`공통명세.md` · `코스목록-세부명세.md` · `코스상세-세부명세.md`).
+
+> **이 절은 §6-1 "BE 착수됨. 아직 만들지 않는다" 였다.** #618 로 열리면서 §8 갱신 규칙대로 §1~5 형식으로 옮겼다.
+> 그전 기록: [#382](https://github.com/8llow8llowMe/hondigagae/issues/382) BE 착수(PR #384 · 2026-09-09 `1f021e90`) ·
+> [#383](https://github.com/8llow8llowMe/hondigagae/issues/383) 적재 배치 · [#409](https://github.com/8llow8llowMe/hondigagae/issues/409)
+> 원천이 두루누비가 아니라 **제주올레**로 교체 · [#534](https://github.com/8llow8llowMe/hondigagae/issues/534) 스냅샷 재수집에서 operation 둘 확인.
+
+**공개 API다.** dev OpenAPI 의 두 operation 모두 `security` 키가 없다 → `proxy.ts` `PROTECTED_PATHS` 에 넣지 않는다.
+`/places` 와 같다.
+
+**계약 실측 (dev 게이트웨이 실호출 · 2026-09-18 · 로컬 BE 미기동)**
+
+| 확인                                        | 결과                                                                                        |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `GET /walk-courses`                         | 200 · `courses[]` · `totalCount: 29` · `petActivityLevelApplied` · `providerName`           |
+| `?petActivityLevel=LOW` / `MEDIUM` / `HIGH` | **6 / 24 / 29개** — `HIGH` 는 필터 없음과 결과가 같다                                       |
+| `?petActivityLevel=low`                     | **400** `WALKCOURSE_113` (enum 대소문자)                                                    |
+| `?maxDistanceKm=99`                         | **400** `WALKCOURSE_101` + `fieldErrors[0].field = maxDistanceKm`                           |
+| `GET /walk-courses/{없는 id}`               | **404** `WALKCOURSE_001` — **재시도 버튼을 달지 않는다**                                    |
+| `GET /walk-courses/abc`                     | **400** `WALKCOURSE_113` — `@PathVariable long` 이라 `/places/{placeId}` 와 같은 모양(#563) |
+
+파라미터: `petActivityLevel`(`LOW`/`MEDIUM`/`HIGH`), `maxDistanceKm`(0.1~50), `sort`(`COURSE_NO` 기본 ·
+`DISTANCE_ASC` · `DISTANCE_DESC` · `DURATION_ASC`). **커서가 없다** — 코스가 29개뿐이라 전량이 온다.
+
+**화면 설계에 직결되는 것**
+
+- **활동량 상한은 서버가 갖는다** — `LOW` 4시간(240분) · `MEDIUM` 6시간(360분) · `HIGH` 제한 없음
+  (`WalkCourseActivityFit`). **FE 가 다시 계산하지 않는다.** 소요시간을 모르는 코스는 어느 활동량에서도 걸러지지 않는다.
+- **`petActivityLevel` 기본값은 대표견의 활동량이다.** URL(`?activity=`)이 비어 있을 때만 서버 컴포넌트가 채우고,
+  미로그인·반려견 없음·펫 조회 실패·`HIGH` 면 **파라미터를 보내지 않는다**. 적용 여부는 응답의
+  `petActivityLevelApplied` 로 판정한다 — 로컬 상태로 판정하지 않는다.
+- **`lat`/`lng` 가 null 인 코스에는 골든타임 동선을 만들지 않는다** (`WalkCourseItem` 주석이 명시한다).
+  요청 자체를 보내지 않고 패널도 세우지 않는다. **`lat ?? 0` 을 쓰면 기니만 앞바다 예보가 200 으로 온다.**
+- **좌표가 있는 코스는 4개뿐이다** (2026-09-18 dev 실측 — 2 · 3(B) · 4 · 15(B)코스). 이슈·스키마 설명은
+  "20·18-2코스" 두 개로 적고 있지만 **실데이터가 다르다.** `firstImage` 가 있는 코스도 **정확히 같은 4개**다 —
+  둘 다 TourAPI 매칭에서 오고 그 매칭이 4건만 성공했다(적재 #383). 그래서 **좌표·이미지 없는 쪽이 기본 모양**이고,
+  목록은 사진 카드 그리드가 아니라 텍스트 행이다.
+- **`petActivityLevel=LOW` 를 적용하면 좌표 있는 코스가 0개가 된다** (4개 모두 `4~5시간`·`5~6시간`). 활동량 낮은
+  아이의 보호자는 골든타임을 한 번도 못 본다 — 결함이 아니라 데이터 분포다.
+- `walkCourseId` 는 응답에서 **문자열**이다(내부는 long · Snowflake). `number` 로 타이핑하면 정밀도가 손상된다.
+- **응답에 enum metadata 가 하나도 없다.** 활동량은 요청 파라미터로만 등장한다 → 활동량 이름은
+  `pet.activityLevel.name`(반려견 프로필)에서 가져온다. BE 후속 요청은 `코스목록-세부명세.md` D9.
+- **`durationText` 는 원문 문자열**(`4~5시간`)이다. 파싱하지 않는다. `durationMaxMinutes` 는 **일정 항목 요약
+  (`PlanItemWalkCourseItem`)에는 있는데 코스 목록·상세에는 없다** — 같은 코스를 두 API 가 다르게 설명한다.
+- **`startEndPoint` 를 갈라 쓰지 않는다.** `제주민속촌주차장 입구-남원포구` 처럼 공백과 하이픈이 섞여 있다.
+- **`baseDate` 는 문자열이다.** `Date` 로 파싱하면 KST 기준 하루 밀린다.
+
+**일정에 코스 담기는 §4 다** — [#620](https://github.com/8llow8llowMe/hondigagae/issues/620) (`itemType=WALK`).
+
 ## 6. 대기 — 백엔드 미착수
 
 **아래 화면은 만들지 않는다.** 호출부·mock도 만들지 않는다.
@@ -740,38 +796,7 @@
 `assistant` · `analysis` 는 **패키지 자체가 없다** — 그것이 미착수의 근거다.
 여행 후기 작성·보기는 plan-service `GET|POST|PUT /plans/{planId}/reviews` 로 **착수됐다** (#614 BE · #615 FE) — §4.
 **2026-09-10 재확인**: dev 게이트웨이 OpenAPI 재수집(operation 57개)에 세 컨텍스트의 경로가 하나도 없다.
-**`walkcourse` 는 이 목록에서 빠졌다** — §6-1 로 옮겼다.
-
-### 6-1. 산책 코스 — **BE 착수됨. 아직 만들지 않는다**
-
-**이 절에 "미착수" 로 적혀 있었는데 틀렸다** ([#409](https://github.com/8llow8llowMe/hondigagae/issues/409)).
-원천도 **두루누비가 아니라 제주올레로 교체**됐다.
-
-| 이슈                                                          | 내용                                                     | 상태                                                                     |
-| ------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------ |
-| [#382](https://github.com/8llow8llowMe/hondigagae/issues/382) | 제주올레 산책 코스 조회 API — `walkcourse` 컨텍스트 착수 | 진행 중 (PR [#384](https://github.com/8llow8llowMe/hondigagae/pull/384)) |
-| [#383](https://github.com/8llow8llowMe/hondigagae/issues/383) | 제주올레 코스 적재 배치 — 공공 CSV + TourAPI 좌표·이미지 | 열림                                                                     |
-
-> **착수 신호가 떨어졌다** (2026-09-13 재수집, [#534](https://github.com/8llow8llowMe/hondigagae/issues/534)).
-> 아래가 기다리던 그 시점이다 — tour-service 스냅샷에 operation 둘이 잡혔다.
->
-> | API                                | 응답                       |
-> | ---------------------------------- | -------------------------- |
-> | `GET /walk-courses`                | `WalkCourseListResponse`   |
-> | `GET /walk-courses/{walkCourseId}` | `WalkCourseDetailResponse` |
->
-> 경로는 `walkcourse` 가 아니라 **`walk-courses`** 이고 **공개 API**(인증 없음)다.
-> `WalkCourseItem` · `WalkCourseListResponse` · `WalkCourseDetailResponse` 셋이 스키마에
-> 들어와 있다.
->
-> **그래도 #534 에서는 화면을 만들지 않는다** — 재수집은 기준선을 맞추는 데까지다.
-> 다음 단계는 §8 갱신 규칙 그대로다: **이 절을 §1~5 형식으로 옮기고 FE 이슈를 연다.**
-> 그때 아트보드에 산책 코스 자리가 있는지부터 확인한다.
-
-**#534 이전의 기록.** PR #384 가 머지되기 전에는 계약이 확정되지 않았고,
-`walkcourse` 스키마가 스냅샷(`docs/api/openapi/tour-service.json`)에 아직 없었다.
-**#384 가 머지되면 이 절을 §1~5 형식으로 옮기고 FE 이슈를 연다** (§8 갱신 규칙).
-착수 신호는 스냅샷 재수집에서 그 operation 이 잡히는 시점이다.
+**`walkcourse` 는 이 목록에서 빠졌다** — §5-3 으로 옮겼다 (#618).
 
 ## 7. AI 기능 선정 게이트
 

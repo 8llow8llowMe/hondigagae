@@ -12,6 +12,7 @@ import { memberMessages } from '@/lib/messages/member'
 import { petMessages } from '@/lib/messages/pet'
 import { placeMessages } from '@/lib/messages/place'
 import { planMessages } from '@/lib/messages/plan'
+import { walkCourseMessages } from '@/lib/messages/walk-course'
 
 /**
  * FE가 만드는 화면 문구의 단일 출처.
@@ -38,6 +39,7 @@ export const messages = {
   common: commonMessages,
   home: homeMessages,
   place: placeMessages,
+  walkCourse: walkCourseMessages,
   plan: planMessages,
   aiPlan: aiPlanMessages,
   emergency: emergencyMessages,
