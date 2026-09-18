@@ -1,9 +1,5 @@
 import { PlanStatusActionPanel } from '@/features/plan/plan-status-action-panel'
-import {
-  forwardStatusAction,
-  PLAN_STATUS_ACTION_LABELS,
-  type PlanStatusActionSpec,
-} from '@/lib/plan/status-action'
+import { PLAN_STATUS_ACTION_LABELS, type PlanStatusActionSpec } from '@/lib/plan/status-action'
 
 /**
  * 일정 확정 · 완료 — 아트보드 01 + #613.
@@ -19,6 +15,13 @@ import {
  * 전부 내리면 `#553` 이 확정 버튼을 마지막 일자 끝에서 개요 아래로 끌어올린 결정까지
  * 되돌린다. 갈린 축은 `direction` 이고 정본은 `lib/plan/status-action.ts` 다.
  *
+ * ## 축이 하나 늘었다 — 시점 (#732)
+ *
+ * **출발 전(`upcoming`)에는 `여행 완료하기` 도 메뉴로 내려간다.** 방향으로는 정방향이지만
+ * 그날 누를 수 있는 일이 아니고, 390 실측에서 D-1 화면의 **유일한 filled 버튼**이 바로
+ * 그것이었다. `확정하기` 는 그대로 남는다 — 전날의 초안은 확정할 수 있다.
+ * 판정은 `planStatusActionLayout()` 하나가 하고, **이 컴포넌트는 결과만 받는다.**
+ *
  * ## 확인 대화상자를 붙이지 않는다 (#565 · #613)
  *
  * **되돌릴 수 있기 때문이다.** 백엔드에 상태 전이 가드가 없다. 초안 ↔ 확정, 확정 ↔ 완료는
@@ -30,19 +33,23 @@ import {
  * `usePlanStatus` 한 곳이 들고, 여기는 결과만 받는다 (명세 D11-2).
  */
 export function PlanStatusAction({
-  statusCode,
+  action,
   saving,
   errorMessage,
   onAction,
 }: {
-  statusCode: string
+  /**
+   * 버튼으로 설 액션. **호출부가 `planStatusActionLayout()` 으로 정해 넘긴다** (#732) —
+   * 상태 코드에서 다시 셈하면 메뉴 쪽과 판정이 갈린다. `undefined` 면 버튼이 없다.
+   */
+  action: PlanStatusActionSpec | undefined
   saving: boolean
   errorMessage: string | null
   onAction: (action: PlanStatusActionSpec) => void
 }) {
   return (
     <PlanStatusActionPanel
-      action={forwardStatusAction(statusCode)}
+      action={action}
       labels={PLAN_STATUS_ACTION_LABELS}
       errorMessage={errorMessage}
       saving={saving}

@@ -24,7 +24,7 @@ import { todayDay } from '@/lib/date/day'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { messages } from '@/lib/messages'
 import { basisPetNameOf } from '@/lib/plan/basis-pet'
-import { addPlanDays } from '@/lib/plan/date'
+import { addPlanDays, planPhaseOf } from '@/lib/plan/date'
 import { placeIdsOf } from '@/lib/plan/day-items'
 import {
   groupItemsByDay,
@@ -34,6 +34,7 @@ import {
 } from '@/lib/plan/detail'
 import { isPackingPromoted } from '@/lib/plan/packing-promotion'
 import { isReviewSectionVisible } from '@/lib/plan/review'
+import { planStatusActionLayout } from '@/lib/plan/status-action'
 import {
   dayBeyondForecastReason,
   dayHasLookupFailed,
@@ -189,6 +190,18 @@ export function PlanDetailSection({
   const regenerateBlocked = dayRegenerateBlock(plan, today) !== null
 
   /*
+    **상태 전이 액션의 자리를 한 번만 셈한다** (#732). 전폭 버튼과 `⋮` 메뉴가 같은 결과를
+    나눠 받는다 — 각자 판정하면 같은 액션이 둘 다에 서거나 어느 쪽에도 없는 날이 생긴다.
+
+    시점 축은 `planPhaseOf` 하나다. 개요 배지·일자 배지·준비물 자리가 전부 같은 `PlanPhase`
+    에서 나오므로, 여기만 다른 셈을 쓰면 배지는 `D-1` 인데 버튼은 여행이 시작된 것처럼 군다.
+  */
+  const statusLayout = planStatusActionLayout(
+    plan.status.code,
+    planPhaseOf(plan.startDate, plan.endDate, today),
+  )
+
+  /*
     **출발이 가까우면 준비물이 일자 위다** (#665 · 진단 PL-3 · 명세 D11-9). `D-1` · `D-0`
     둘뿐이고 여행 중·지난 일정은 기본 자리를 지킨다 — 짐은 떠나기 전에 싼다.
 
@@ -246,9 +259,18 @@ export function PlanDetailSection({
           verdicts={weather?.days ?? []}
           /*
             관리 진입점은 일정의 신원 옆에 둔다 — `PlanManageMenu` 주석 참고.
-            **역방향 상태 변경도 이 메뉴 안이다** (#653).
+            **역방향 상태 변경도 이 메뉴 안이다** (#653). 출발 전에는 `여행 완료하기` 도
+            여기로 내려온다 (#732).
           */
-          menu={<PlanManageMenu plan={plan} pets={pets} today={todayDay(today)} status={status} />}
+          menu={
+            <PlanManageMenu
+              plan={plan}
+              pets={pets}
+              today={todayDay(today)}
+              status={status}
+              statusActions={statusLayout.menu}
+            />
+          }
           /*
             **확정 액션이 개요 카드 바로 아래다** (이슈 #553). 예전에는 우측 일자 열의
             **맨 끝**이라, 3일 일정이면 마지막 날 카드까지 굴려야 버튼이 나왔다 — 초안을
@@ -259,10 +281,15 @@ export function PlanDetailSection({
             바꾸는 일이다. 페이지 맨 위에서 늘 보이고, 마지막 날 카드까지 굴려야 나오던
             예전보다 훨씬 가깝다 — 다만 레일이 고정이 아니므로 길게 내려가면 함께 올라간다
             (위 레일 주석의 "치르는 값").
+
+            **출발 전에는 이 자리가 빌 수 있다** (#732). `여행 완료하기` 는 D-1 에 누를 수
+            있는 일이 아닌데도 화면에서 가장 큰 색면이었다 — `upcoming` 에서는 `⋮` 메뉴로
+            내려가고, 그 빈 자리를 판정 스트립(개요 카드 안)이 대신 갖는다. 초안의
+            `확정하기` 는 그대로 남는다.
           */
           action={
             <PlanStatusAction
-              statusCode={plan.status.code}
+              action={statusLayout.button}
               saving={status.saving}
               errorMessage={status.errorMessage}
               onAction={status.run}

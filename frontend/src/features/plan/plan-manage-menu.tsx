@@ -21,11 +21,7 @@ import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 import { canCopyPlan } from '@/lib/plan/copy'
 import { isShareablePlan } from '@/lib/plan/share-link'
-import {
-  PLAN_STATUS_ACTION_LABELS,
-  type PlanStatusActionSpec,
-  reverseStatusActions,
-} from '@/lib/plan/status-action'
+import { PLAN_STATUS_ACTION_LABELS, type PlanStatusActionSpec } from '@/lib/plan/status-action'
 import type { Pet } from '@/types/pet'
 import type { PlanDetail } from '@/types/plan'
 
@@ -67,6 +63,7 @@ export function PlanManageMenu({
   pets,
   today,
   status,
+  statusActions,
 }: {
   plan: PlanDetail
   /**
@@ -77,6 +74,13 @@ export function PlanManageMenu({
   today: string
   /** `usePlanStatus` 가 돌려주는 것 그대로. 전폭 버튼과 같은 진행·실행을 본다 */
   status: { saving: boolean; run: (action: PlanStatusActionSpec) => void }
+  /**
+   * 이 메뉴에 설 상태 전이 액션 (#732). **호출부가 `planStatusActionLayout()` 으로 정한다** —
+   * 예전에는 이 컴포넌트가 `reverseStatusActions()` 를 직접 불렀는데, 시점 축이 생기면서
+   * (출발 전에는 `여행 완료하기` 도 여기로 내려온다) 버튼 쪽과 판정이 갈릴 수 있게 됐다.
+   * 한 번 셈한 결과를 나눠 받으면 같은 액션이 두 곳에 서거나 사라지는 갈래가 없다.
+   */
+  statusActions: PlanStatusActionSpec[]
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
@@ -182,9 +186,13 @@ export function PlanManageMenu({
                 ]
               : []),
             /*
-              **정방향은 여기 없다.** `확정하기` · `완료하기` 는 개요 아래 전폭 버튼이다
-              (`plan-status-action.tsx`). 초안에는 되돌아갈 앞 상태가 없어 이 갈래가 비고,
-              그때 메뉴는 예전과 똑같이 `수정 · 삭제` 둘이다.
+              **정방향은 대개 여기 없다.** `확정하기` · `완료하기` 는 개요 아래 전폭
+              버튼이다 (`plan-status-action.tsx`). 초안에는 되돌아갈 앞 상태가 없어 이
+              갈래가 비고, 그때 메뉴는 예전과 똑같이 `수정 · 삭제` 둘이다.
+
+              **예외가 하나 생겼다** (#732): 출발 전(`upcoming`)의 `여행 완료하기` 는
+              그날 누를 수 있는 일이 아니라 이 배열로 내려온다. 정방향이 먼저, 역방향이
+              그 뒤인 순서는 `planStatusActionLayout()` 이 정한다.
             */
             /*
               **공유는 확정·완료에만 있다** (#628). 초안에서 항목을 보여 주고 누르면
@@ -205,7 +213,7 @@ export function PlanManageMenu({
                   },
                 ]
               : []),
-            ...reverseStatusActions(plan.status.code).map((action) => ({
+            ...statusActions.map((action) => ({
               label: PLAN_STATUS_ACTION_LABELS[action.kind],
               disabled: status.saving,
               onSelect: () => {
