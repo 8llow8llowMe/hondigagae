@@ -101,6 +101,32 @@ class PlanCopyTest {
     }
 
     @Test
+    @DisplayName("존재하지 않는 산책 코스를 참조하는 항목도 복제된다 — 복제 경로는 타깃을 검증하지 않는다")
+    void copiesWalkItemsReferencingMissingCourse() {
+        StubPlanItemRepositoryPort items = new StubPlanItemRepositoryPort(walkItem(1, 30L, 999L));
+        /*
+          코스 검증(#715)은 생성·일자 교체 경로에만 있다. 여기서도 거부하면 검증이 없던 시절에
+          저장된 targetId 나 원천에서 사라진 코스를 참조하는 옛 일정을 복제할 수 없게 된다 —
+          사용자가 고칠 수 없는 과거 자료 때문에 새 일정을 못 만드는 일이라, delisted 장소를
+          복제에서 허용한 것과 같은 판단이다. 아무 코스도 존재하지 않는 스텁으로 고정한다.
+        */
+        StubPlanWalkCourseQueryPort walkCoursePort = new StubPlanWalkCourseQueryPort();
+        PlanCommandProcessor processor = processor(new StubPlanRepositoryPort(), items,
+            new StubPlanPetRepositoryPort(), new StubPetConditionQueryPort(Set.of(7L)), walkCoursePort);
+
+        Plan copied = processor.copyPlan(
+            sourcePlan(3), copyCommand(null, NEW_START), List.of(7L), items.items);
+
+        assertThat(items.saved).singleElement()
+            .satisfies(item -> {
+                assertThat(item.itemType()).isEqualTo(PlanItemType.WALK);
+                assertThat(item.targetId()).isEqualTo(999L);
+                assertThat(item.planId()).isEqualTo(copied.id());
+            });
+        assertThat(walkCoursePort.requests).isEmpty();
+    }
+
+    @Test
     @DisplayName("소유하지 않은 반려견은 빼고 남은 아이만 복제한다")
     void filtersOutUnownedPets() {
         StubPlanPetRepositoryPort pets = new StubPlanPetRepositoryPort();
@@ -154,6 +180,19 @@ class PlanCopyTest {
             .build();
     }
 
+    private static PlanItem walkItem(int day, long itemId, long walkCourseId) {
+        return PlanItem.builder()
+            .id(itemId)
+            .planId(SOURCE_PLAN_ID)
+            .day(day)
+            .sequence(1)
+            .itemType(PlanItemType.WALK)
+            .targetId(walkCourseId)
+            .title("올레 7코스")
+            .visited(false)
+            .build();
+    }
+
     private static PlanItem visitedItem(int day, long itemId, boolean visited) {
         return PlanItem.builder()
             .id(itemId)
@@ -173,9 +212,19 @@ class PlanCopyTest {
         StubPlanPetRepositoryPort pets,
         StubPetConditionQueryPort petPort
     ) {
+        return processor(plans, items, pets, petPort, new StubPlanWalkCourseQueryPort());
+    }
+
+    private PlanCommandProcessor processor(
+        StubPlanRepositoryPort plans,
+        StubPlanItemRepositoryPort items,
+        StubPlanPetRepositoryPort pets,
+        StubPetConditionQueryPort petPort,
+        StubPlanWalkCourseQueryPort walkCoursePort
+    ) {
         return new PlanCommandProcessor(
             plans, items, pets, new StubPlanPetConditionRepositoryPort(),
-            new StubPlaceVerifyQueryPort(), petPort, new SnowflakeIdGenerator(1, 1));
+            new StubPlaceVerifyQueryPort(), walkCoursePort, petPort, new SnowflakeIdGenerator(1, 1));
     }
 
     private static class StubPlanRepositoryPort implements PlanRepositoryPort {

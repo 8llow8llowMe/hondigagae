@@ -49,7 +49,7 @@ public class PlanWebFacade implements PlanWebUseCase {
 
     /**
      * 생성·수정·상세·일자 교체에 {@code @Transactional} 을 걸지 않는다 — 반려견 확인(auth-service),
-     * 장소 검증·요약(tour-service)이 원격 호출이라 트랜잭션 안에서 부르면 DB 커넥션을 잡은 채
+     * 타깃 검증(장소·산책 코스)·요약(tour-service)이 원격 호출이라 트랜잭션 안에서 부르면 DB 커넥션을 잡은 채
      * 상대 응답을 기다리게 되고, tour 의 지연이 plan CRUD 전체의 커넥션 풀 고갈로 번진다
      * (architecture-guide §3 의 문서화된 예외 — 날씨·응급 브리핑과 같은 결정).
      * DB 쓰기 구간은 {@link PlanCommandProcessor} 의 메서드 단위 트랜잭션이 묶는다.
@@ -57,7 +57,7 @@ public class PlanWebFacade implements PlanWebUseCase {
     @Override
     public PlanDetailResponse createPlan(long memberId, PlanCreateCommand command) {
         List<Long> petIds = planCommandProcessor.resolvePetIds(memberId, command.petIds());
-        planCommandProcessor.verifyPlaceTargets(command.items());
+        planCommandProcessor.verifyItemTargets(command.items());
         Plan plan = planCommandProcessor.createPlan(memberId, command, petIds);
         return planPresenter.toDetailResponse(planQueryProcessor.getPlanDetailInfo(plan));
     }
@@ -131,7 +131,7 @@ public class PlanWebFacade implements PlanWebUseCase {
     @Override
     public PlanDetailResponse replaceDayItems(long memberId, long planId, int day, List<PlanItemCommand> commands) {
         Plan plan = planQueryProcessor.getOwnedPlan(memberId, planId);
-        planCommandProcessor.verifyPlaceTargets(commands);
+        planCommandProcessor.verifyItemTargets(commands);
         planCommandProcessor.replaceDayItems(plan, day, commands);
         return planPresenter.toDetailResponse(planQueryProcessor.getPlanDetailInfo(plan));
     }

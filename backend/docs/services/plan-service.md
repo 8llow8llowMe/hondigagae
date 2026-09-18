@@ -35,6 +35,28 @@
   장소 검증은 tour-service 내부 벌크 API(`GET /internal/v1/places/visible-ids`)를 **한 번** 불러
   수행한다 — 항목마다 따로 부르면 저장 한 번에 원격 왕복이 항목 수만큼 생긴다 (coding-conventions §9-7).
   delisted 장소는 존재하지 않는 것으로 오므로, 원천에서 사라진 장소를 새 항목이 참조하는 것도 여기서 막힌다.
+- **항목 타깃 검증의 입구는 `PlanCommandProcessor.verifyItemTargets` 하나다 (#715).** 유형마다
+  `targetId` 의 아이디 공간이 달라 장소와 산책 코스를 따로 묻되, **종류마다 원격 호출은 한 번**이고
+  Facade 가 트랜잭션 밖에서 부른다(생성 · 일자 교체).
+  - **`WALK` 의 `targetId` 도 이제 검증된다** — 없는 코스를 가리키면 `PLAN_025` 400
+    (`NOT_FOUND_PLAN_WALK_COURSE`, "일정 항목의 산책 코스를 찾을 수 없습니다."). 전에는 그대로
+    저장돼 제목만 남은 항목이 됐고, 상세의 빈 `walkCourse` 는 "코스 없음" 과 "tour-service 일시
+    장애" 를 구분해 주지 못해 사용자에게 원인을 말해 줄 수 없었다.
+  - **`PLAN_004`(장소)를 재사용하지 않는다.** 문구가 "장소를 찾을 수 없습니다" 라 코스에 대해서는
+    사실이 아니고, 코드가 있는 이유는 클라이언트가 **무엇이** 잘못됐는지 알기 위해서다. 성격은
+    같아서(같은 본문을 다시 보내면 같은 400) 프론트는 둘 다 재시도 버튼 없는 400 으로 다룬다.
+  - **`isPlaceTarget()` 을 넓혀 장소 검증에 태우지 않는다 (필수).** 그 판정의 뜻은 "`targetId` 가
+    `place.id` 인가" 이고, 응급 브리핑(`PlanEmergencyProcessor`)과 상세 요약
+    (`PlanQueryProcessor.placeTargetIdOf`)이 같은 판정으로 조회 대상을 고른다 — 넓히면 그 두 경로가
+    `walk_course.id` 를 장소 아이디 공간에서 찾는다. 이름이 흐려지는 문제가 아니라 동작이 깨진다.
+  - 존재 확인에 **코스 요약 조회(`PlanWalkCourseQueryPort.findSummaries`)를 그대로 쓴다.** 목록에
+    없는 아이디는 결과에서 빠지므로 아이디 집합 비교로 충분하다. 전용 엔드포인트를 새로 열면 검증에
+    필요 없는 본문은 덜지만 tour-service 내부 API 가 하나 늘고 두 경로가 같은 표를 각자 묻게 된다 —
+    한 번 저장에 담기는 코스는 몇 개 수준이고, 같은 API 를 일정 상세가 이미 매 조회 부른다.
+  - **같은 포트를 읽기는 관용으로, 저장은 거부로 쓴다.** 상세 조회는 빠진 아이디의 항목을 지우지 않고
+    요약만 비우고(사용자가 담아 둔 자료다), 저장은 그 상태를 새로 만들지 않도록 거절한다. 포트
+    javadoc 이 두 의미를 함께 적고 있다.
+  - `targetId` 가 null 인 항목은 **묻지 않는다** — 장소 경로와 같은 처리다(대상 없이 제목만 있는 줄).
 - **일정 상세 항목에 장소 요약이 붙는다** (`addr1` · `indoor` · `firstImage` · `lat` · `lng`).
   tour-service 내부 후보 API(`GET /internal/v1/places/candidates`)를 **한 번** 부르고 중복
   아이디는 제거한다 — 프론트가 항목마다 `GET /places/{placeId}` 를 부르던 것을 없애기 위한
@@ -68,11 +90,10 @@
   - `durationMaxMinutes` 의 null 은 "제한 없음" 이 아니라 "원천 문구를 파싱하지 못했다" 이다.
     그래서 `durationText` 원문을 함께 내린다.
   - **남은 위험 / 후속** (#619 검토에서 드러남, 이 변경에서 고치지 않았다)
-    - **[DB MEDIUM] `WALK` 의 `targetId` 는 저장 시 검증되지 않는다.** `PlanCommandProcessor.verifyPlaceTargets`
-      는 `isPlaceTarget()` 인 항목만 확인하고 walk_course 대응물이 없다. `PlanItemType` javadoc 이
-      "AI 초안이 `WALK` 항목에 `place.id` 를 실어 보냈고 아무도 막지 않았다" 를 이미 적고 있다.
-      **선행 결함이고 #619 가 만든 것이 아니다.** 검증을 켜면 지금 성공하는 저장이 거부되기 시작하므로
-      별도 판단이 필요하다 → 후속 이슈.
+    - ~~**[DB MEDIUM] `WALK` 의 `targetId` 는 저장 시 검증되지 않는다.**~~ **#715 에서 닫았다** —
+      `verifyItemTargets` 가 코스 존재를 확인하고 없으면 `PLAN_025` 400 이다(위 "항목 타깃 검증" 절).
+      검증 전에 저장된 행은 **남아 있을 수 있다** — 코드로 정리하지 않았고, 읽기 경로가 관용적이라
+      화면은 죽지 않는다(요약만 빈다).
     - **[DB MEDIUM] 일정 항목 수 상한이 없어 `IN` 절·질의문자열이 무한정 길어질 수 있다.**
       walk_course id 가 19자리라 파라미터 1개당 약 34바이트, Tomcat 기본 8KB 헤더 한도 기준
       **약 240개**에서 깨진다. 깨져도 장애 삼킴이 먹어 **요약만 비는 조용한 품질 저하**다.
@@ -104,15 +125,22 @@
   그대로 맞춰도 다시 거절당한다. 프론트가 클라이언트에서 역전·상한을 먼저 막는 것도 이 순서다.
   동행 반려견은 원본 `petIds` 를 따르되 더 이상 소유하지 않은
   아이는 빼고, 남은 아이가 없으면 `PLAN_010` 400(대표 반려견 폴백 없음). 복제 항목은
-  `visited=false`, 새 `planItemId`. **장소 검증은 부르지 않는다** — delisted 장소도 항목은
-  남기고 상세 요약만 null 인 기존 규칙을 따른다. 생성 경로의 `verifyPlaceTargets` 를 그대로 쓰면
+  `visited=false`, 새 `planItemId`. **타깃 검증은 부르지 않는다** — delisted 장소도 항목은
+  남기고 상세 요약만 null 인 기존 규칙을 따른다. 생성 경로의 `verifyItemTargets` 를 그대로 쓰면
   delisted 참조가 있는 일정을 복제할 수 없게 된다.
+  - **산책 코스도 같다 (#715).** 저장 경로에 코스 검증이 생겼지만 복제에는 걸지 않는다 — 검증이
+    없던 시절에 저장된 `targetId` 나 원천에서 사라진 코스를 참조하는 옛 일정을 복제할 수 없게 되고,
+    그것은 사용자가 고칠 수 없는 과거 자료 때문에 새 일정을 못 만드는 일이다. 회귀는
+    `PlanCopyTest` 가 고정한다(코스가 하나도 없는 스텁으로 복제가 통과하는지).
 - **`PlanItemType` 은 이 서비스가 아니라 `core/shared-travel` 에 있다 (필수).** ai-service 초안의
   `itemType` 이 여기 저장 규칙을 그대로 따라야 하기 때문이다 — 문자열과 주석으로만 맞추던 때
   실제로 어긋났다 (#89).
 - **`targetId` 가 `place.id` 인지의 판정은 `PlanItemType.isPlaceTarget()` 이 갖는다.** 저장 시
   존재 검증과 상세 요약 조회가 같은 집합을 써야 해서 도메인으로 올렸다 — `WALK` 의 `targetId`
   는 `walk_course.id` 라 장소로 조회하면 남의 아이디로 없는 장소를 찾는다.
+  - **이 집합에 `WALK` 를 넣어 코스 검증을 해결하지 않는다 (#715).** 같은 판정에 기대는 경로가
+    셋(저장 검증 · 상세 요약 · 응급 브리핑)이라, 넓히면 나머지 둘이 `walk_course.id` 를 장소로
+    조회한다. 코스는 `PlanItemType.WALK` 를 직접 보는 별도 검증으로 확인한다.
 - `PlanItem`의 다중 대상 FK는 `@Comment`에 분기 기준을 명시한다 (`coding-conventions.md` §9-4).
 - 후기 사진 업로드가 필요해지면 `storage-core` 모듈 추가를 검토한다 (`modules.md`). v1 은 만족도·본문·장소별 한 줄만 저장한다.
 
@@ -614,4 +642,5 @@ tour-service 는 시각별 예보 목록이 덮는 날짜 밖이면 `OUT_OF_RANG
 - `GET /internal/v1/places/candidates?placeIds=` — 일정 상세 항목의 장소 요약, 즐겨찾기 목록의 장소 요약,
   응급 브리핑의 검색 중심점.
 - `GET /internal/v1/walk-courses/candidates?walkCourseIds=` — 일정 상세 `WALK` 항목의 산책 코스 요약 (#619).
+  저장 시 코스 존재 검증도 이 API 를 쓴다 (#715) — 목록에 없는 아이디가 결과에서 빠지는 동작이 곧 존재 확인이다.
   **tour 장애 시 요약만 비우고 항목은 남긴다** — 장소 요약과 같은 판단이고, 두 요약은 서로 독립이다.
