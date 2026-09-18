@@ -134,3 +134,61 @@ describe('AiPlanFailed — 화면만 아는 단서 (#251)', () => {
     expect(html).not.toContain('지역을 넓혀')
   })
 })
+
+describe('AiPlanFailed — 서버 문구를 인용으로 둔다 (#710)', () => {
+  const SERVER = 'AI 일정 생성이 제한 시간을 넘겼습니다.'
+
+  /*
+    **말투가 갈리는 것을 배치로 푼다.** DESIGN.md §1 은 서버 문구를 해요체 규칙의 예외로
+    두지만, 그 예외를 제목 바로 아래 같은 급의 문단에 놓으면 **한 화면이 두 사람의 말투로
+    말한다** — §1 이 정확히 금지하는 그림이다. 문구는 한 글자도 고치지 않고 자리만 바꾼다.
+  */
+  it('서버 문구를 고치지 않고 인용 자리에 둔다', () => {
+    const html = render({ errorMessage: SERVER })
+
+    expect(html).toContain(SERVER)
+    expect(html).toMatch(/border-l-2[^"]*"[^>]*>AI 일정 생성이 제한 시간을 넘겼습니다\./)
+  })
+
+  /* 한쪽 선에 둥근 모서리를 주면 선이 허공에서 꺾인다 */
+  it('한쪽 테두리에 radius 를 주지 않는다', () => {
+    const quoted = render({ errorMessage: SERVER })
+    const block = quoted.slice(quoted.indexOf('border-l-2'))
+
+    expect(block.slice(0, block.indexOf('>'))).not.toContain('rounded')
+  })
+})
+
+describe('AiPlanFailed — 조건과 액션의 순서 (#710)', () => {
+  const SUMMARY = '2026-09-18 (금) – 09-20 (일) · 몽'
+
+  /*
+    **"무엇이 남아 있나" 를 읽어야 "그래서 다시 시도할 수 있다" 가 이해된다.** 예전에는
+    조건이 버튼 **아래** caption 이라 순서가 거꾸로였다.
+  */
+  it('조건 블록이 버튼보다 위에 있다', () => {
+    const html = render({ conditionSummary: SUMMARY })
+
+    expect(html.indexOf(SUMMARY)).toBeLessThan(html.indexOf(messages.aiPlan.failedRetry))
+    expect(html).toContain(messages.aiPlan.jobConditionKeptLabel)
+  })
+
+  /*
+    **버튼 위계를 2단으로 줄인다.** `ghost` 는 배경도 테두리도 없어 채움·테두리 옆에서
+    버튼으로 읽히지 않았다. `AI 없이 직접 만들기` 는 AI 를 포기하는 길이라 무게도 다르다.
+  */
+  it('직접 만들기를 버튼 행에서 내려 링크로 둔다', () => {
+    const html = render()
+    const manual = html.slice(html.indexOf(messages.aiPlan.failedManual) - 300)
+
+    expect(manual).toContain('underline')
+    expect(html.indexOf(messages.aiPlan.failedChange)).toBeLessThan(
+      html.indexOf(messages.aiPlan.failedManual),
+    )
+  })
+
+  /* 44px — 버튼 행에서 내려와도 누를 수 있는 크기는 그대로다 (DESIGN.md §7) */
+  it('링크가 최소 터치 영역을 지킨다', () => {
+    expect(render()).toMatch(/<a[^>]*h-11[^>]*>AI 없이 직접 만들기/)
+  })
+})

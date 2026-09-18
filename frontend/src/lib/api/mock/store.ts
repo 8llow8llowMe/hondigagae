@@ -176,8 +176,12 @@ export type MockAiPlanJob = {
   /**
    * 시나리오. `normal` 완료 · `failed` 실패 · `partial` 일수 부족 ·
    * **`delisted` 는 사라진 장소를 섞어 담기를 `PLAN_004` 로 막는다.**
+   *
+   * **`timeout` 은 `failed` 와 실패 코드가 다르다** (#710 · #711). `AIPLAN_006` 은 화면이
+   * 붙이는 단서(기간을 줄여 보라)가 `AIPLAN_012`(지역을 넓혀 보라)와 갈리는 갈래라,
+   * 한 시나리오로 묶으면 그 분기를 로컬에서 열 수 없다.
    */
-  scenario: 'normal' | 'failed' | 'partial' | 'delisted'
+  scenario: 'normal' | 'failed' | 'partial' | 'delisted' | 'timeout'
   /** 동반 반려견. **`petIds` 가 `petId` 를 이긴다** — 서버 `effectivePetIds()` (#128) */
   petIds: string[]
   areaCode: string

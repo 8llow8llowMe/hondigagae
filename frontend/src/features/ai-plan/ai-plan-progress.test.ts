@@ -25,6 +25,11 @@ function render(overrides: Partial<AiPlanProgressProps> = {}) {
   return renderToStaticMarkup(createElement(AiPlanProgress, props))
 }
 
+/** 마크업에 그 조각이 몇 번 나오는가 — 눈금 칸처럼 개수가 곧 계약인 것을 센다 */
+function count(html: string, needle: string): number {
+  return html.split(needle).length - 1
+}
+
 describe('AiPlanProgress — 서버 문구만 쓴다 (명세 S2 · S7)', () => {
   it('서버 status.description 을 그대로 렌더한다', () => {
     expect(render()).toContain(SERVER_DESCRIPTION)
@@ -164,5 +169,105 @@ describe('AiPlanProgress — 그만두기 (#250)', () => {
     expect(html).toContain(messages.aiPlan.jobCancelFailed)
     // 작업은 계속 돌고 있다 — 진행 표시를 걷지 않는다
     expect(html).toContain(SERVER_DESCRIPTION)
+  })
+})
+
+describe('AiPlanProgress — 경과 시간 (#710)', () => {
+  /*
+    **`4 / 4단계` 하나로는 기다리는 구간에서 화면이 아무 말도 하지 않는다.** 네 단계 중
+    `DRAFTING`(LLM 호출)이 전체의 90% 이상이라 사람이 보는 거의 모든 시간이 마지막 한
+    칸이고, 그 동안 숫자가 멈춰 있다.
+  */
+  it('경과 시간과 예상 시간을 함께 말한다', () => {
+    const html = render({ elapsedMs: 72_000 })
+
+    expect(html).toContain('1분 12초')
+    expect(html).toContain('1~2분')
+  })
+
+  it('값을 받지 못하면 그 줄이 없다', () => {
+    expect(render()).not.toContain('지남')
+  })
+
+  /*
+    **1초마다 바뀌는 값이라 낭독 영역 밖이어야 한다.** 안에 있으면 스크린리더가 매 초
+    읽고, 그 소음에 정작 바뀐 단계 이름이 묻힌다. 이 화면에서 `aria-live` 영역은 하나이므로
+    그 뒤를 보면 밖인지 알 수 있다.
+  */
+  it('경과 시간을 낭독하지 않는다', () => {
+    const html = render({ elapsedMs: 72_000, stepProgress: { order: 4, total: 4 } })
+
+    /*
+      **값을 담은 요소 자체가 `aria-hidden` 이어야 한다.** 낭독 영역 밖에 두는 것만으로는
+      부족하다 — 나중에 누가 이 줄을 `role="status"` 안으로 옮기면 그날부터 매 초 읽힌다.
+    */
+    expect(html).toMatch(/<p aria-hidden="true"[^>]*>1분 12초 지남/)
+  })
+
+  it('상한 초과 화면에서도 얼마나 기다렸는지 말한다', () => {
+    expect(render({ phase: 'exceeded', elapsedMs: 330_000 })).toContain('5분 30초')
+  })
+})
+
+describe('AiPlanProgress — 단계 눈금 (#710)', () => {
+  /*
+    **칸 수는 서버가 준 `total` 이다.** 상수로 박으면 백엔드가 단계를 늘릴 때 눈금과
+    `n / m단계` 가 어긋난다 — 같은 값을 두 번 적지 않는다는 규칙(#250)이 눈금에도 적용된다.
+  */
+  it('총 단계 수만큼 칸을 그린다', () => {
+    const five = render({ stepProgress: { order: 2, total: 5 } })
+    const four = render({ stepProgress: { order: 2, total: 4 } })
+
+    expect(count(five, 'rounded-full')).toBe(5)
+    expect(count(four, 'rounded-full')).toBe(4)
+  })
+
+  /*
+    **지나간 칸과 지금 칸이 갈려야 `4 / 4` 가 "끝났는데 멈췄다" 로 읽히지 않는다.**
+    앞의 셋이 채워져 있으면 같은 숫자가 "마지막 하나를 하고 있다" 가 된다.
+  */
+  it('지나간 칸·지금 칸·남은 칸을 구분한다', () => {
+    const html = render({ stepProgress: { order: 4, total: 4 } })
+
+    expect(count(html, 'rounded-full bg-fg"')).toBe(3)
+    expect(count(html, 'animate-pulse')).toBe(1)
+  })
+
+  it('첫 단계에서는 채운 칸이 없다', () => {
+    const html = render({ stepProgress: { order: 1, total: 4 } })
+
+    expect(count(html, 'rounded-full bg-fg"')).toBe(0)
+    expect(count(html, 'rounded-full bg-band')).toBe(3)
+  })
+
+  /* 단계가 없으면 눈금도 없다 — `PENDING` 에서 0칸을 그리면 시작한 것으로 보인다 */
+  it('단계 값이 없으면 눈금을 그리지 않는다', () => {
+    expect(count(render(), 'rounded-full')).toBe(0)
+  })
+
+  /*
+    **스켈레톤을 걷었다.** 완료되면 `bare` 로 빠져 전혀 다른 카드 여럿이 뜨므로 "이 모양이
+    곧 온다" 는 약속이 애초에 참이 아니었고, `prefers-reduced-motion` 에서는 정지한 회색
+    덩어리였다.
+  */
+  it('초안 자리를 흉내 내는 스켈레톤이 없다', () => {
+    expect(render({ stepProgress: { order: 4, total: 4 } })).not.toContain('h-16 w-full')
+  })
+})
+
+describe('AiPlanProgress — 조건 블록 (#710)', () => {
+  const SUMMARY = '2026-09-18 (금) – 09-20 (일) · 몽'
+
+  /* 기다리는 동안이야말로 "지금 뭘 만들고 있나" 가 궁금하다 */
+  it('무엇을 만들고 있는지 보여 준다', () => {
+    const html = render({ conditionSummary: SUMMARY })
+
+    expect(html).toContain(messages.aiPlan.jobConditionLabel)
+    expect(html).toContain(SUMMARY)
+  })
+
+  /* 다른 기기에서 같은 주소를 열면 실제로 이 상태가 된다 (명세 S5 함정 1) */
+  it('조건을 잃으면 라벨째 그리지 않는다', () => {
+    expect(render()).not.toContain(messages.aiPlan.jobConditionLabel)
   })
 })

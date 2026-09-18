@@ -220,6 +220,11 @@ function scenarioOf(requestNote: string | null, candidateCount: number): MockAiP
   if (candidateCount === 0) return 'failed'
 
   const note = requestNote ?? ''
+  /*
+    **`시간초과` 를 `실패` 보다 먼저 본다.** dev 에서 실제로 난 실패가 이쪽이고(#711),
+    두 낱말이 한 메모에 있으면 더 구체적인 쪽을 고르는 것이 맞다.
+  */
+  if (note.includes('시간초과')) return 'timeout'
   if (note.includes('실패')) return 'failed'
   if (note.includes('일부')) return 'partial'
   if (note.includes('사라진')) return 'delisted'
@@ -369,7 +374,7 @@ export function resolveAiPlanStreamMock(
   /** **취소가 시나리오를 이긴다** — 종결은 되돌아가지 않는다 (#250) */
   const terminal: JobStatusCode = job.canceled
     ? 'CANCELED'
-    : job.scenario === 'failed'
+    : isFailingScenario(job)
       ? 'FAILED'
       : 'COMPLETED'
 
@@ -816,15 +821,23 @@ function jobBody(
   }
 
   if (status === 'FAILED') {
+    /*
+      **실패 코드가 둘이다.** 화면이 붙이는 단서가 코드마다 갈리므로(#710) mock 도 갈라
+      둬야 그 분기를 로컬에서 볼 수 있다 — `AIPLAN_012` 는 지역을, `AIPLAN_006` 은 기간을
+      가리킨다. 문구는 백엔드 `AiPlanErrorCode` 복제본이라 고쳐 쓰지 않는다.
+    */
+    const timedOut = job.scenario === 'timeout'
+
     return {
       jobId: job.jobId,
       status: STATUS.FAILED as CodeNameMetadata,
       ...steps,
       conditions,
       planDraft: null,
-      // AIPLAN_012 — 실패 이유가 조건 문제일 수 있다는 것을 화면이 다뤄야 한다
-      errorCode: 'AIPLAN_012',
-      errorMessage: '여행 일정에 넣을 반려견 동반 가능 장소를 찾지 못했습니다.',
+      errorCode: timedOut ? 'AIPLAN_006' : 'AIPLAN_012',
+      errorMessage: timedOut
+        ? 'AI 일정 생성이 제한 시간을 넘겼습니다.'
+        : '여행 일정에 넣을 반려견 동반 가능 장소를 찾지 못했습니다.',
     }
   }
 
@@ -869,7 +882,17 @@ function statusOf(job: MockAiPlanJob): JobStatusCode {
   if (job.canceled) return 'CANCELED'
   if (job.pollCount === 0) return 'PENDING'
   if (job.pollCount === 1) return 'RUNNING'
-  return job.scenario === 'failed' ? 'FAILED' : 'COMPLETED'
+  return isFailingScenario(job) ? 'FAILED' : 'COMPLETED'
+}
+
+/**
+ * 작업 실패로 끝나는 시나리오인가 (#710).
+ *
+ * **두 곳이 같은 판정을 한다** — 폴링(`statusOf`)과 스트림(`terminal`). 한쪽만 고치면
+ * 구독으로 본 결과와 폴링으로 본 결과가 갈린다.
+ */
+function isFailingScenario(job: MockAiPlanJob): boolean {
+  return job.scenario === 'failed' || job.scenario === 'timeout'
 }
 
 /** 아직 돌고 있는가 — 백엔드 `AiPlanJobStatus.isInFlight()` 복제본. 멱등 술어가 쓴다 */
