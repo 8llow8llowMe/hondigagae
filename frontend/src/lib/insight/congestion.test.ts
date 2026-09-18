@@ -4,9 +4,44 @@ import {
   barHeightPercent,
   congestionRateSummary,
   formatCongestionRange,
+  isCongestionEmpty,
   splitDay,
 } from '@/lib/insight/congestion'
+import { congestion, congestionAllUnknown } from '@/test/fixtures/insight'
 import type { DailyCongestionItem } from '@/types/insight'
+
+/*
+  **차트를 그릴지 말지를 가르는 한 줄이다** (#731). 전부 `UNKNOWN` 인 기간에는 레일·막대·
+  점선 격자·날짜 축을 통째로 내지 않고 빈 상태 블록 하나만 세운다.
+
+  경계를 잘못 잡으면 **이미 출시된 정상 갈래가 회귀한다** — 아는 날이 하루라도 있으면 그
+  날이 답이고, 답이 있는 카드에서 차트를 지우면 서비스가 할 말을 스스로 가린다. 그래서
+  판정을 화면이 아니라 여기 한 곳에 두고 갈래마다 잰다.
+*/
+describe('isCongestionEmpty', () => {
+  /*
+    **`hasUnknown` 이 아니라 `leastCrowded === null` 이다.** 서버가 `UNKNOWN` 을 제외하고
+    최저 집중률을 고르므로, 아는 날이 하나도 없을 때만 그 값이 `null` 이 된다.
+  */
+  it('전부 모르는 날이면 비었다고 본다', () => {
+    expect(isCongestionEmpty(congestionAllUnknown)).toBe(true)
+  })
+
+  /*
+    **여기가 이 변경의 가장 위험한 지점이다.** 픽스처 7일 중 하루(`2026-09-04`)가 `UNKNOWN`
+    인데, 그 하루 때문에 차트가 사라지면 정상 갈래가 통째로 무너진다 — 점선은 그쪽에서
+    여전히 옳은 기호다.
+  */
+  it('일부만 모르는 날이면 비지 않았다', () => {
+    expect(congestion.dailyCongestions.some((item) => item.concentrationRate === null)).toBe(true)
+    expect(isCongestionEmpty(congestion)).toBe(false)
+  })
+
+  /* 서버가 날짜 목록 자체를 비워 보내는 갈래도 같은 빈 상태다 */
+  it('날짜 목록이 비어도 빈 상태다', () => {
+    expect(isCongestionEmpty({ ...congestionAllUnknown, dailyCongestions: [] })).toBe(true)
+  })
+})
 
 /*
   막대 높이 — **트랙 전체가 집중률 100** 이다. 기간 안 최댓값으로 정규화하면 전부 20 대인
