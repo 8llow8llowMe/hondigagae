@@ -3,11 +3,15 @@ package com.hondigagae.domainlayer.auth.application.service.processor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.hondigagae.domainlayer.auth.application.exception.AuthErrorCode;
+import com.hondigagae.domainlayer.auth.application.exception.AuthException;
 import com.hondigagae.domainlayer.auth.application.info.GeneralLoginInfo;
+import com.hondigagae.domainlayer.auth.application.info.OAuthAuthorizationInfo;
 import com.hondigagae.domainlayer.auth.application.info.OAuthCallbackInfo;
 import com.hondigagae.domainlayer.auth.application.model.OAuthSignupConsent;
 import com.hondigagae.domainlayer.auth.application.port.out.MailSendPort;
 import com.hondigagae.domainlayer.auth.application.port.out.OAuthAuthorizationUrlProvider;
+import com.hondigagae.domainlayer.auth.application.port.out.OAuthMemberQueryPort;
 import com.hondigagae.domainlayer.auth.application.port.out.OAuthStateStorePort;
 import com.hondigagae.domainlayer.auth.application.port.out.query.OAuthMemberQueryResult;
 import com.hondigagae.domainlayer.auth.application.port.out.query.OAuthStateQueryResult;
@@ -45,6 +49,9 @@ import org.junit.jupiter.api.Test;
  * <p>이 경로의 어려움은 동의를 받는 시점과 쓰는 시점이 다르다는 것이다 — 인가 URL 을 만들 때
  * 받아서 state 에 얹어 두고, 콜백에서 신규 회원을 만들 때 꺼내 쓴다. 그래서 확인할 것이 셋이다:
  * 신규면 동의가 필수인가, 동의가 이력으로 남는가, 그리고 <b>기존 회원은 건드리지 않는가</b>.
+ *
+ * <p>거기에 하나가 더 붙는다 — <b>그 동의가 정말 이 브라우저의 것인가</b>. state 가 쿠키에
+ * 묶이지 않으면 제3자가 만든 인가 URL 로 남의 이름의 동의 이력이 남는다 (#681).
  */
 class OAuthLoginProcessorTest {
 
@@ -63,7 +70,8 @@ class OAuthLoginProcessorTest {
         stateStorePort = new StubOAuthStateStorePort();
         memberRepositoryPort = new StubMemberRepositoryPort();
         consentRepositoryPort = new RecordingConsentRepositoryPort();
-        // 프로필 조회 라우터는 provider 왕복(HTTP) 전용이라 이 테스트가 보는 경로에서는 쓰이지 않는다.
+        // 프로필 조회 라우터는 provider 왕복(HTTP) 자리다. state 검증이 통과했을 때만 여기까지
+        // 오므로, 고정 프로필을 돌려주는 스텁으로 "여기까지 왔는지"를 함께 본다.
         // 동의 프로세서는 실물을 쓴다 — 소셜 경로가 일반 가입과 같은 규칙을 탄다는 것이 요점이다.
         // 이력의 내용(항목·버전·시각)은 MemberConsentProcessorTest 가 본다.
         MemberConsentProcessor consentProcessor = new MemberConsentProcessor(
@@ -73,7 +81,7 @@ class OAuthLoginProcessorTest {
         withdrawnEmailHasher = new WithdrawnEmailHasher(new WithdrawnEmailProperties(TEST_PEPPER));
         processor = new OAuthLoginProcessor(
             new OAuthAuthorizationUrlRouter(Set.of(new StubAuthorizationUrlProvider())),
-            new OAuthMemberQueryRouter(Set.of()),
+            new OAuthMemberQueryRouter(Set.of(new StubMemberQueryPort())),
             stateStorePort,
             memberRepositoryPort,
             consentProcessor,
@@ -196,15 +204,65 @@ class OAuthLoginProcessorTest {
     void carriesConsentFromAuthorizeToCallback() {
         // 인가코드가 1회용이라 콜백에서 다시 받을 수 없다. 이 왕복이 끊기면
         // 최초 연동이 전부 MEMBER_010 또는 MEMBER_011 로 막힌다.
-        processor.generateAuthorizationUrl(PROVIDER, new OAuthSignupConsent(true, true, true));
+        OAuthAuthorizationInfo info = processor.generateAuthorizationUrl(PROVIDER, new OAuthSignupConsent(true, true, true));
 
-        OAuthStateQueryResult consumed = stateStorePort.consume(stateStorePort.lastState).orElseThrow();
+        // 발급한 state 원문을 그대로 올려보내야 web 계층이 같은 값을 쿠키로 심을 수 있다.
+        assertThat(info.state()).isEqualTo(stateStorePort.lastState);
+        assertThat(info.authorizationUrl()).contains(info.state());
+
+        OAuthStateQueryResult consumed = stateStorePort.consume(info.state()).orElseThrow();
 
         assertThat(consumed.provider()).isEqualTo(PROVIDER);
         assertThat(consumed.consent().agreedAll()).isTrue();
     }
 
+    @Test
+    @DisplayName("쿠키 state 가 쿼리 state 와 같으면 state 를 소비하고 동의를 꺼내 온다")
+    void consumesStateWhenCookieMatches() {
+        String state = issuedState(new OAuthSignupConsent(true, true, true));
+
+        OAuthCallbackInfo callbackInfo = processor.fetchOAuthMember(PROVIDER, "auth-code", state, state);
+
+        assertThat(callbackInfo.consent().agreedAll()).isTrue();
+        assertThat(callbackInfo.member().email()).isEqualTo(EMAIL);
+        // 일회성이므로 이 시점에 state 는 없어야 한다.
+        assertThat(stateStorePort.consume(state)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("쿠키 state 가 다르면 거부하고 Redis state 를 소비하지 않는다")
+    void rejectsAndKeepsStateWhenCookieMismatches() {
+        // 검증 순서의 회귀 지점이다. Redis 를 먼저 소비하면, 쿠키 불일치로 어차피 거부될 요청이
+        // 멀쩡한 state 를 태워 버려 정상 사용자의 재시도까지 함께 막힌다.
+        String state = issuedState(new OAuthSignupConsent(true, true, true));
+
+        assertThatThrownBy(() -> processor.fetchOAuthMember(PROVIDER, "auth-code", state, "attacker-state"))
+            .isInstanceOf(AuthException.class)
+            .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.INVALID_OAUTH_STATE);
+
+        assertThat(stateStorePort.consume(state)).isPresent();
+    }
+
+    @Test
+    @DisplayName("state 쿠키가 없으면 거부한다 — 쿠키 없는 콜백을 통과시키지 않는다")
+    void rejectsWhenStateCookieIsMissing() {
+        // 쿠키가 없으면 "이 브라우저가 발급받은 요청"이라는 근거가 없다. 공격자에게 사유를
+        // 알려줄 이유가 없어 코드는 기존 AUTH_010 그대로 쓴다.
+        String state = issuedState(new OAuthSignupConsent(true, true, true));
+
+        assertThatThrownBy(() -> processor.fetchOAuthMember(PROVIDER, "auth-code", state, null))
+            .isInstanceOf(AuthException.class)
+            .hasFieldOrPropertyWithValue("errorCode", AuthErrorCode.INVALID_OAUTH_STATE);
+
+        assertThat(stateStorePort.consume(state)).isPresent();
+    }
+
     // --- fixtures ---
+
+    /** 인가 단계를 실제로 밟아 state 를 얻는다 — 저장 형식까지 실물 경로를 쓴다. */
+    private String issuedState(OAuthSignupConsent consent) {
+        return processor.generateAuthorizationUrl(PROVIDER, consent).state();
+    }
 
     /** 콜백에서 확보한 것 — provider 프로필은 고정이고, 테스트마다 다른 것은 동의뿐이다. */
     private OAuthCallbackInfo callback(OAuthSignupConsent consent) {
@@ -227,6 +285,21 @@ class OAuthLoginProcessorTest {
         @Override
         public String generateUrl(String state) {
             return "https://example.test/authorize?state=" + state;
+        }
+    }
+
+    /** provider 왕복 자리. state 검증을 통과했을 때만 여기까지 온다. */
+    private static class StubMemberQueryPort implements OAuthMemberQueryPort {
+
+        @Override
+        public OAuthProvider supports() {
+            return PROVIDER;
+        }
+
+        @Override
+        public OAuthMemberQueryResult fetchMember(String authCode, String state) {
+            return OAuthMemberQueryResult.builder()
+                .email(EMAIL).emailVerified(true).name("테스터").nickname("테스터").build();
         }
     }
 

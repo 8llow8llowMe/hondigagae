@@ -3,6 +3,7 @@ package com.hondigagae.domainlayer.auth.application.service.processor;
 import com.hondigagae.domainlayer.auth.application.exception.AuthErrorCode;
 import com.hondigagae.domainlayer.auth.application.exception.AuthException;
 import com.hondigagae.domainlayer.auth.application.info.GeneralLoginInfo;
+import com.hondigagae.domainlayer.auth.application.info.OAuthAuthorizationInfo;
 import com.hondigagae.domainlayer.auth.application.info.OAuthCallbackInfo;
 import com.hondigagae.domainlayer.auth.application.model.OAuthSignupConsent;
 import com.hondigagae.domainlayer.auth.application.port.out.MailSendPort;
@@ -22,6 +23,8 @@ import com.hondigagae.domainlayer.member.domain.enums.OAuthProvider;
 import com.hondigagae.domainlayer.member.domain.model.Member;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import com.hondigagae.security.common.enums.SecurityRole;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.HexFormat;
@@ -36,7 +39,12 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class OAuthLoginProcessor {
 
-    private static final Duration STATE_TTL = Duration.ofMinutes(10);
+    /**
+     * state 의 수명. web 계층의 state 쿠키가 <b>같은 값</b>을 maxAge 로 쓰기 때문에 public 이다 —
+     * 두 곳에 따로 적어 두면 한쪽만 고쳐졌을 때 쿠키와 Redis 의 수명이 갈리고, 쿠키가 먼저 죽으면
+     * 아직 유효한 state 를 가진 정상 사용자가 거부된다.
+     */
+    public static final Duration STATE_TTL = Duration.ofMinutes(10);
     private static final int STATE_BYTE_LENGTH = 16;
 
     private final OAuthAuthorizationUrlRouter authorizationUrlRouter;
@@ -56,14 +64,18 @@ public class OAuthLoginProcessor {
      * OAuth 인가코드가 1회용이기 때문이다 — 콜백에서 동의 누락으로 거부하면 같은 코드로는
      * 재시도할 수 없고, 사용자는 provider 인가 화면부터 다시 밟아야 한다. 인가 전에 받아 두면
      * 동의 없이 눌러도 우리 화면에서 되돌릴 수 있다.
+     *
+     * <p>state 원문을 URL 과 함께 돌려주는 것은 web 계층이 그 값을 쿠키로도 심어야 하기
+     * 때문이다 — 쿠키에 묶이지 않은 state 는 "발급자의 주장"일 뿐이고, 그 주장으로 남의 동의
+     * 이력을 만들 수 있다.
      */
-    public String generateAuthorizationUrl(OAuthProvider provider, OAuthSignupConsent consent) {
+    public OAuthAuthorizationInfo generateAuthorizationUrl(OAuthProvider provider, OAuthSignupConsent consent) {
         byte[] stateBytes = new byte[STATE_BYTE_LENGTH];
         secureRandom.nextBytes(stateBytes);
         String state = HexFormat.of().formatHex(stateBytes);
 
         oAuthStateStorePort.save(state, provider, consent, STATE_TTL);
-        return authorizationUrlRouter.generateUrl(provider, state);
+        return OAuthAuthorizationInfo.of(authorizationUrlRouter.generateUrl(provider, state), state);
     }
 
     /**
@@ -71,11 +83,13 @@ public class OAuthLoginProcessor {
      *
      * <p>state 소비는 일회성이라 여기서만 동의를 꺼낼 수 있다. 다음 단계(회원 조회/생성)는
      * 별도 트랜잭션이므로 프로필과 동의를 함께 묶어 돌려준다.
+     *
+     * @param cookieState 인가 시점에 브라우저로 내려보낸 state 쿠키 값. 없으면 {@code null}
      */
-    public OAuthCallbackInfo fetchOAuthMember(OAuthProvider provider, String authCode, String state) {
-        // 1. state 검증(일회성 소비) — 우리가 발급한 요청인지, provider가 바뀌지 않았는지 확인하고
-        //    인가 전에 받아 둔 동의를 함께 꺼낸다
-        OAuthSignupConsent consent = validateState(provider, state);
+    public OAuthCallbackInfo fetchOAuthMember(OAuthProvider provider, String authCode, String state, String cookieState) {
+        // 1. state 검증(쿠키 대조 + 일회성 소비) — 이 브라우저가 발급받은 요청인지, provider가
+        //    바뀌지 않았는지 확인하고 인가 전에 받아 둔 동의를 함께 꺼낸다
+        OAuthSignupConsent consent = validateState(provider, state, cookieState);
 
         // 2. provider로부터 사용자 프로필 조회 및 필수 항목(부분 동의) 검증
         OAuthMemberQueryResult oAuthMember = memberQueryRouter.fetchMember(provider, authCode, state);
@@ -122,8 +136,31 @@ public class OAuthLoginProcessor {
         }
     }
 
-    private OAuthSignupConsent validateState(OAuthProvider provider, String state) {
-        if (!StringUtils.hasText(state)) {
+    /**
+     * state 가 <b>이 브라우저</b>의 것인지까지 확인한다(double-submit).
+     *
+     * <p>Redis 만 보면 인가 URL 을 발급받은 주체와 provider 에서 인증하는 주체가 다를 수 있다.
+     * 공격자가 동의를 켠 인가 URL 을 피해자에게 클릭시키면 피해자 이름으로 동의 이력이 남는다.
+     * 인가 응답에 심은 쿠키와 대조하면 그 state 는 공격자 브라우저에만 있으므로 거부된다.
+     *
+     * <p><b>쿠키 대조를 Redis 소비보다 먼저 한다.</b> 순서가 뒤집히면, 쿠키 불일치로 어차피
+     * 거부될 요청이 멀쩡한 state 를 태워 버려 정상 사용자의 재시도까지 막는다.
+     *
+     * <p>쿠키가 아예 없는 요청도 거부한다. 사유는 기존 {@code INVALID_OAUTH_STATE} 그대로다 —
+     * "쿠키가 없어서 막혔다"를 알려줄 이유가 없다. 배포 직후 10분(= state TTL)은 구버전
+     * 프론트에서 온 콜백이 여기 걸리고, 사용자는 인가부터 다시 밟으면 된다.
+     *
+     * <p>비교는 {@link java.security.MessageDigest#isEqual(byte[], byte[])} 로 한다. 길이가 같으면
+     * 상수 시간이라, 응답 시간 차이로 유효한 state 를 한 바이트씩 맞춰 볼 표면을 만들지 않는다.
+     */
+    private OAuthSignupConsent validateState(OAuthProvider provider, String state, String cookieState) {
+        if (!StringUtils.hasText(state) || !StringUtils.hasText(cookieState)) {
+            throw new AuthException(AuthErrorCode.INVALID_OAUTH_STATE);
+        }
+
+        if (!MessageDigest.isEqual(state.getBytes(StandardCharsets.UTF_8), cookieState.getBytes(StandardCharsets.UTF_8))) {
+            // 원문을 남기지 않는다 — 로그가 유효한 state 를 그대로 들고 있게 된다
+            log.warn("[OAuthLoginProcessor] oauth state cookie mismatch: provider={}", provider);
             throw new AuthException(AuthErrorCode.INVALID_OAUTH_STATE);
         }
 

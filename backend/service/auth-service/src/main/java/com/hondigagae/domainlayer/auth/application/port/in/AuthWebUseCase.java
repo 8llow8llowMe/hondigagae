@@ -7,6 +7,7 @@ import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueR
 import com.hondigagae.domainlayer.auth.application.command.AuthGeneralLoginCommand;
 import com.hondigagae.domainlayer.auth.application.command.TokenReissueCommand;
 import com.hondigagae.domainlayer.auth.application.info.AuthCookieResult;
+import com.hondigagae.domainlayer.auth.application.info.OAuthStateCookieResult;
 import com.hondigagae.domainlayer.auth.application.model.OAuthSignupConsent;
 import com.hondigagae.domainlayer.member.domain.enums.OAuthProvider;
 
@@ -39,8 +40,14 @@ public interface AuthWebUseCase {
     /**
      * 인가 URL을 생성한다. consent 는 이 연동이 신규 가입이 될 때만 쓰이며, state 와 함께
      * 보관됐다가 콜백에서 소비된다 (인가코드가 1회용이라 콜백에서 동의를 새로 받을 수 없다).
+     *
+     * <p>state 원문을 함께 돌려주는 것은 컨트롤러가 그 값을 쿠키로도 심어야 하기 때문이다.
      */
-    AuthOAuthAuthorizeResponse generateOAuthAuthorizationUrl(OAuthProvider provider, OAuthSignupConsent consent);
+    OAuthStateCookieResult<AuthOAuthAuthorizeResponse> generateOAuthAuthorizationUrl(OAuthProvider provider, OAuthSignupConsent consent);
 
-    AuthCookieResult<AuthGeneralLoginResponse> oauthLogin(OAuthProvider provider, String authCode, String state);
+    /**
+     * 소셜 콜백 로그인. cookieState 는 인가 응답에 심은 state 쿠키 값이며, 쿼리 state 와 일치할
+     * 때만 state 를 소비한다 — 없거나 다르면 {@code INVALID_OAUTH_STATE} 로 거부한다.
+     */
+    AuthCookieResult<AuthGeneralLoginResponse> oauthLogin(OAuthProvider provider, String authCode, String state, String cookieState);
 }
