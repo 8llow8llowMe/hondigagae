@@ -14,11 +14,11 @@ import { clientFetch } from '@/lib/api/client'
 import { ApiError } from '@/lib/api/error'
 import { toPetCondition, walkTimesPath } from '@/lib/api/insight'
 import { fetchPlanBriefing } from '@/lib/api/plan'
-import { weekdayOf } from '@/lib/date/day'
 import { conditionKey, INSIGHT_QUERY_OPTIONS, insightKeys } from '@/lib/insight/queries'
 import { messages } from '@/lib/messages'
 import { basisPetNameOf } from '@/lib/plan/basis-pet'
 import type { BriefingTarget } from '@/lib/plan/briefing'
+import { formatPlanDay } from '@/lib/plan/date'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { WalkTimesResponse } from '@/types/insight'
@@ -103,6 +103,12 @@ export function PlanBriefingView({ planId, target }: { planId: string; target: B
       ) : (
         <PlanBriefingSection
           briefing={data}
+          /*
+            **`kind` 를 그대로 내려보낸다** (#733). 갈래 판정은 `pickBriefingDate` 하나가
+            갖고, 화면은 그 값을 문구·카드 노출에 쓴다 — 여기서 날짜를 다시 비교하면
+            판정 축이 둘이 된다.
+          */
+          kind={target.kind}
           basisPetName={basisPetNameOf(
             data.basisPetId,
             data.petIds,
@@ -120,22 +126,23 @@ export function PlanBriefingView({ planId, target }: { planId: string; target: B
 }
 
 /**
- * `{제목} · {N}일차 09-13 (일)` — **응답의 값으로 만든다.**
+ * `{제목} · 9월 13일 (일) · 2일차` — **응답의 값으로 만든다.**
  *
  * 화면이 고른 날짜를 쓰지 않는다. 서버는 자기 `Clock` 을 보므로 자정 전후에 FE 가 고른
  * 날짜와 응답의 `date`·`day` 가 갈릴 수 있다 (`lib/plan/briefing.ts` 주석).
+ *
+ * **날짜 모양은 `formatPlanDay` 가 소유한다** (#732 · #733). 예전에는 여기서
+ * `date.slice(5)` + `weekdayOf` 로 `09-13 (일)` 을 조립했는데, 같은 일정의 개요는
+ * `2026년 9월 13일 (일)` 이라 **같은 날을 두 모양으로** 불렀다. 포맷터가 `null` 을 주는
+ * (못 읽는) 날짜는 서버 문자열을 그대로 세운다 — 부제 한 줄 때문에 화면을 접지 않는다.
  */
 function subtitleOf(data: PlanBriefingResponse | undefined): string | null {
   if (data === undefined) return null
 
-  const weekday = weekdayOf(data.date)
-  const line = messages.plan.briefingSubtitle
+  return messages.plan.briefingSubtitle
     .replace('{title}', data.planTitle)
+    .replace('{date}', formatPlanDay(data.date) ?? data.date)
     .replace('{day}', String(data.day))
-    .replace('{date}', data.date.slice(5))
-
-  // 요일을 못 읽으면 괄호를 비워 두지 않는다 — 빈 `()` 는 고장으로 읽힌다
-  return weekday === null ? line.replace(' ({weekday})', '') : line.replace('{weekday}', weekday)
 }
 
 /**

@@ -942,16 +942,30 @@ export const planMessages = {
   briefingHeading: '여행 브리핑',
   briefingPageTitle: '출발 전 여행 브리핑',
   briefingBack: '일정으로 돌아가기',
-  /** `{title}` · `{day}` · `{date}` · `{weekday}` 치환 — 값은 전부 **응답**의 것이다 */
-  briefingSubtitle: '{title} · {day}일차 {date} ({weekday})',
+  /**
+   * `{title}` · `{date}` · `{day}` 치환 — 값은 전부 **응답**의 것이다.
+   *
+   * **`{date}` 는 `formatPlanDay()` 가 만든 `9월 19일 (토)` 다** (#733). 예전에는 여기서
+   * `09-19 (토)` 를 조립했는데, 같은 일정의 개요가 `2026년 9월 19일 (토)` 라 **같은 날을
+   * 두 모양으로** 부르고 있었다. 날짜를 글자로 옮기는 곳은 `lib/plan/date.ts` 하나다 (#732).
+   *
+   * **날짜가 일차보다 앞이다.** 브리핑을 여는 사람이 먼저 맞춰 보는 것은 몇 일차인지가
+   * 아니라 **어느 날**인지다 — 전날 밤에 여는 갈래가 특히 그렇다.
+   */
+  briefingSubtitle: '{title} · {date} · {day}일차',
 
   /**
    * 일정 상세의 진입 배너 (일정상세-세부명세 D16-3). **날짜 축 하나로만 노출을 가른다** —
    * 상태(`COMPLETED`)를 보지 않는다.
+   *
+   * **설명도 같은 축으로 갈린다** (#733). 전날 브리핑에는 특보도 골든타임도 없는데
+   * (그 날은 서버가 둘 다 null 로 준다) 배너가 넷을 약속하면 **약속과 화면이 어긋난다** —
+   * 별도 라우트까지 만들어 들어온 대가가 빈 카드 둘이었다.
    */
   briefingBannerEveTitle: '내일 출발 · 브리핑 보기',
   briefingBannerTodayTitle: '오늘의 브리핑',
-  briefingBannerDescription: '그날 일정 · 날씨 · 특보 · 산책 시간을 한 번에 봐요',
+  briefingBannerEveDescription: '내일 볼 것 미리 보기',
+  briefingBannerTodayDescription: '그날 일정 · 날씨 · 특보 · 산책 시간을 한 번에 봐요',
 
   /**
    * 기간 밖 — **요청 자체를 하지 않는다** (`pickBriefingDate` 가 null). 데이터 부재라
@@ -971,20 +985,50 @@ export const planMessages = {
   briefingScheduleHeading: '그날 일정',
   /** `{count}` · `{visited}` 치환. **`visited` 가 0 이어도 적는다** — 그 0 이 정보다 */
   briefingScheduleCounts: '항목 {count}개 · 다녀온 곳 {visited}개',
-  /** `{time}` · `{title}` 치환. 시각이 없는 항목은 `briefingScheduleFirstNoTime` 을 쓴다 */
-  briefingScheduleFirst: '처음 {time} {title}',
-  briefingScheduleFirstNoTime: '처음 {title}',
-  briefingScheduleLast: '마지막 {time} {title}',
-  briefingScheduleLastNoTime: '마지막 {title}',
-  /** `{title}` 치환 — 그날 판정의 기준이 된 장소다 */
+  /**
+   * 동선의 처음과 마지막 사이에 낀 항목 수 — `{count}` 치환 (#733).
+   *
+   * **`처음` · `마지막` 라벨을 대신한다.** 예전에는 라벨과 값이 한 노드에 같은 굵기로
+   * 들어가 `처음 함덕 서우봉 해변` 이 한 문장처럼 읽혔다. 순서는 이제 점·선이 말하므로
+   * 글자로 다시 말하지 않고, 그 자리에 **응답이 실제로 아는 값**을 넣는다.
+   *
+   * **이동 거리가 아니다.** 브리핑 응답의 `schedule` 에는 좌표가 없어(`walkTimes` 안에만
+   * 온다) 항목 사이 거리를 낼 수 없다 — 지어내지 않고 셀 수 있는 것을 센다.
+   */
+  briefingScheduleBetween: '사이 {count}곳',
+  /** 동선 항목에 붙는 태그. 별도 줄(`briefingScheduleBasisPlace`)을 없앤 자리다 (#733) */
+  briefingScheduleBasisTag: '기준 장소',
+  /** `{title}` 치환 — 기준 장소가 처음·마지막 **어느 쪽도 아닐 때만** 쓰는 줄이다 */
   briefingScheduleBasisPlace: '이 날 기준 장소 · {title}',
   briefingScheduleOpenDay: '이 날 일정 보기',
   briefingScheduleEmptyTitle: '이 날에는 담긴 항목이 없어요',
   briefingScheduleEmptyAction: '일정에 장소 담기',
 
-  briefingWeatherHeading: '날씨와 적합도',
+  /**
+   * 날씨 카드 제목 — **갈래를 제목이 말한다** (#733).
+   *
+   * 전날에 여는 브리핑과 당일에 여는 브리핑이 같은 `날씨와 적합도` 였다. 이 화면이 보는
+   * 날은 하나뿐인데 그 날이 언제인지를 제목이 말하지 않으면, 일정 상세의 일자 카드와
+   * 구분이 되지 않는다.
+   */
+  briefingWeatherEveHeading: '내일 날씨와 적합도',
+  briefingWeatherTodayHeading: '오늘 날씨와 적합도',
   /** 프레젠터상 나오지 않아야 하는 조합이다 — 그래도 자리를 비워 두지 않는다 */
   briefingWeatherMissing: '날씨 판정을 받지 못했어요',
+  /**
+   * 하루 지표 줄 — `{value}` 치환 (#733).
+   *
+   * **응답에 이미 있는데 버리고 있던 값이다.** `PlanDailyWeatherItem` 의 `skyStateName` ·
+   * `minTemperature` · `maxTemperature` · `maxPrecipitationProbability` 를 판정 카드가
+   * 하나도 쓰지 않았다 — 큰 숫자(최고 체감온도) 하나로는 전날 밤에 "내일 언제 나갈까" 를
+   * 정할 수 없다.
+   *
+   * **시간대를 말하지 않는다.** 이 값들은 전부 **하루치 집계**라 `아침` · `낮` 같은 구간
+   * 라벨을 붙이면 응답에 없는 사실을 화면이 지어내는 것이 된다 (BE 후속 요청).
+   */
+  briefingWeatherMaxTemperature: '최고 {value}℃',
+  briefingWeatherMinTemperature: '최저 {value}℃',
+  briefingWeatherPrecipitation: '강수 {value}%',
 
   briefingWarningHeading: '기상특보',
   /**
@@ -1018,4 +1062,16 @@ export const planMessages = {
   /** `{title}` 치환. **"현재 위치 기준" 이라고 쓰지 않는다** — 그날 대표 장소 좌표 기준이다 */
   briefingWalkBasis: '{title} 기준 · 노면(아스팔트) 온도는 추정치예요',
   briefingWalkBasisNoPlace: '노면(아스팔트) 온도는 추정치예요',
+
+  /**
+   * 전날 갈래에서 **카드 둘을 대신하는 각주 한 줄** (#733).
+   *
+   * 예전에는 특보·골든타임 카드가 정상 크기로 서서 안내 한 줄씩만 담았다 — 화면 아래
+   * 절반이 값 없는 카드였다.
+   *
+   * **`확인하지 못했어요`(실패)가 아니라 `열려요`(대기)다.** 실제 상태는 장애가 아니라
+   * "아직 때가 아님" 이고, 실패 톤으로 말하면 사용자가 고칠 수 없는 것을 고치려 든다.
+   * 굵기도 본문(400)이다 — 제목 굵기(600)에 보조 텍스트 색을 얹으면 위계가 어긋난다.
+   */
+  briefingEveFootnote: '기상특보와 산책 골든타임은 내일 아침에 열려요.',
 } as const

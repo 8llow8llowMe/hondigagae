@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import { BackLink } from '@/components/back-link'
+import { Badge } from '@/components/badge'
 import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { METRIC_WORD_TONE } from '@/components/metric'
@@ -11,6 +12,8 @@ import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
+import type { BriefingTarget } from '@/lib/plan/briefing'
+import { type BriefingDayFact, briefingDayFacts } from '@/lib/plan/briefing-day-facts'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { HourlyWalkSafetyItem } from '@/types/insight'
@@ -20,6 +23,7 @@ import type {
   PlanBriefingSchedule,
   PlanBriefingWalkTimes,
   PlanBriefingWeatherWarning,
+  PlanDailyWeatherItem,
 } from '@/types/plan'
 
 /**
@@ -92,21 +96,35 @@ export function PlanBriefingHeader({
  */
 export function PlanBriefingSection({
   briefing,
+  kind,
   basisPetName,
   curve,
 }: {
   briefing: PlanBriefingResponse
+  /**
+   * `pickBriefingDate` 가 이미 돌려주는 갈래 (#733). **새 판정 축을 만들지 않는다** —
+   * 화면이 다시 날짜를 비교하지 않고 진입 배너가 쓰던 값을 그대로 받는다.
+   */
+  kind: BriefingTarget['kind']
   /** 두 마리 이상 일정에서만 채워진다 — 판정은 `basisPetNameOf()` 가 갖는다 */
   basisPetName: string | null
   curve: PlanBriefingCurve
 }) {
+  const deferred = isDeferredDay(briefing, kind)
+
   return (
     <>
       <Surface title={messages.plan.briefingScheduleHeading}>
         <ScheduleCard planId={briefing.planId} day={briefing.day} schedule={briefing.schedule} />
       </Surface>
 
-      <Surface title={messages.plan.briefingWeatherHeading}>
+      <Surface
+        title={
+          kind === 'EVE'
+            ? messages.plan.briefingWeatherEveHeading
+            : messages.plan.briefingWeatherTodayHeading
+        }
+      >
         <div className={INSET_CLASS.card}>
           {briefing.weather === null ? (
             <p className="text-body-2 text-fg-muted py-4">{messages.plan.briefingWeatherMissing}</p>
@@ -132,26 +150,68 @@ export function PlanBriefingSection({
               dayHasItems={briefing.schedule.itemCount > 0}
             />
           )}
+
+          <DayFactsRow weather={briefing.weather?.weather ?? null} />
         </div>
       </Surface>
 
-      <Surface title={messages.plan.briefingWarningHeading}>
-        <WeatherWarningCard
-          warning={briefing.weatherWarning}
-          reason={briefing.weatherWarningUnavailableReason}
-        />
-      </Surface>
+      {/*
+        **전날에는 이 둘을 그리지 않는다** (#733). 서버가 당일에만 채우는 값이라
+        (`today === false` 면 둘 다 null + 이유 문장) 카드가 정상 크기로 서서 안내 한 줄만
+        담았다 — 화면 아래 절반이 값 없는 카드였다.
+      */}
+      {!deferred && (
+        <>
+          <Surface title={messages.plan.briefingWarningHeading}>
+            <WeatherWarningCard
+              warning={briefing.weatherWarning}
+              reason={briefing.weatherWarningUnavailableReason}
+            />
+          </Surface>
 
-      <Surface title={messages.plan.briefingWalkHeading}>
-        <WalkTimesCard
-          walkTimes={briefing.walkTimes}
-          reason={briefing.walkTimesUnavailableReason}
-          representativePlaceTitle={briefing.schedule.representativePlaceTitle}
-          curve={curve}
-        />
-      </Surface>
+          <Surface title={messages.plan.briefingWalkHeading}>
+            <WalkTimesCard
+              walkTimes={briefing.walkTimes}
+              reason={briefing.walkTimesUnavailableReason}
+              representativePlaceTitle={briefing.schedule.representativePlaceTitle}
+              curve={curve}
+            />
+          </Surface>
+        </>
+      )}
+
+      {/*
+        **각주는 카드가 아니다** (DESIGN.md §0 의 카드 판정 3문 — 자기 제목이 없다).
+        `Surface` 로 감싸면 접은 카드 둘이 카드 하나로 바뀔 뿐이다.
+
+        굵기는 본문(400)이다 — 이슈가 지적한 `16px/600 + 보조 텍스트 색` 을 되풀이하지
+        않는다. 모바일에서 `Surface` 가 전폭이라 인셋은 카드 안 글줄과 같은 `card` 다.
+      */}
+      {deferred && (
+        <p className={cn('text-body-2 text-fg-muted py-4 break-keep', INSET_CLASS.card)}>
+          {messages.plan.briefingEveFootnote}
+        </p>
+      )}
     </>
   )
+}
+
+/**
+ * 특보·골든타임을 **아직 볼 수 없는 날인가** (#733).
+ *
+ * **갈래는 `pickBriefingDate` 의 `kind` 다** — 화면이 날짜를 다시 비교하지 않는다.
+ *
+ * **그런데 `kind` 만으로 접지 않는다.** `kind` 는 FE 시계로 고른 값이고 서버는 자기
+ * `Clock` 을 보므로 자정 전후에 둘이 갈릴 수 있다(`lib/plan/briefing.ts` 주석). 그때
+ * `kind === 'EVE'` 인데 응답에는 **발효 중인 태풍경보**가 실려 올 수 있고, 그것을 카드째
+ * 접으면 이 화면이 가장 크게 지키고 있는 규칙(_"이유가 있는데 '없음' 으로 쓰면 태풍경보를
+ * 조용히 지운다"_)을 뒤에서 깨는 셈이 된다.
+ *
+ * 그래서 **값이 실제로 비어 있을 때만** 접는다. 새 판정 축이 아니라 이슈가 한 문장으로
+ * 적은 것("값이 없는 카드를 그리지 않는다") 그대로다.
+ */
+function isDeferredDay(briefing: PlanBriefingResponse, kind: BriefingTarget['kind']): boolean {
+  return kind === 'EVE' && briefing.weatherWarning === null && briefing.walkTimes === null
 }
 
 /**
@@ -185,40 +245,48 @@ function ScheduleCard({
     )
   }
 
+  const basisTitle = schedule.representativePlaceTitle
+  const last = schedule.itemCount > 1 ? schedule.lastItem : null
+
+  /*
+    **기준 장소를 제목으로 맞춘다.** 응답의 `representativePlaceId` 는 **장소** id 이고
+    항목이 들고 있는 것은 `planItemId` 라, 둘을 잇는 열쇠가 응답에 없다 — 제목이 같으면
+    같은 곳으로 본다. 어느 쪽과도 맞지 않으면(가운데 항목이 기준인 날) 예전처럼 아래 줄로
+    남는다. **서버가 `representativePlanItemId` 를 주면 그때 제목 대조를 걷는다** (BE 후속).
+  */
+  const basisOnFirst = basisTitle !== null && schedule.firstItem.title === basisTitle
+  const basisOnLast = !basisOnFirst && basisTitle !== null && last?.title === basisTitle
+  const basisLine = basisTitle !== null && !basisOnFirst && !basisOnLast ? basisTitle : null
+
   return (
-    <div className={cn('flex flex-col items-start gap-2 pb-4', INSET_CLASS.card)}>
+    <div className={cn('flex flex-col items-start gap-3 pb-4', INSET_CLASS.card)}>
       <p className="text-body-2 text-fg tabular-nums">
         {messages.plan.briefingScheduleCounts
           .replace('{count}', String(schedule.itemCount))
           .replace('{visited}', String(schedule.visitedCount))}
       </p>
 
-      <p className="text-body-1 text-fg font-semibold break-keep">
-        {itemLine(
-          schedule.firstItem,
-          messages.plan.briefingScheduleFirst,
-          messages.plan.briefingScheduleFirstNoTime,
-        )}
-      </p>
+      {/*
+        **순서를 글자가 아니라 점·선이 말한다** (#733). 예전에는 `처음` · `마지막` 이 값과
+        **같은 노드·같은 굵기**로 들어가 `처음 함덕 서우봉 해변` 이 한 문장처럼 읽혔다.
 
-      {/* 항목이 하나면 처음과 마지막이 같은 항목이다 — 같은 줄을 두 번 두지 않는다 */}
-      {schedule.itemCount > 1 && schedule.lastItem !== null && (
-        <p className="text-body-1 text-fg font-semibold break-keep">
-          {itemLine(
-            schedule.lastItem,
-            messages.plan.briefingScheduleLast,
-            messages.plan.briefingScheduleLastNoTime,
-          )}
-        </p>
-      )}
+        **`ol` 이다** — 라벨을 걷어도 순서가 마크업에 남아야 스크린리더가 같은 것을 읽는다.
+      */}
+      <ol className="w-full">
+        <FlowNode
+          item={schedule.firstItem}
+          basis={basisOnFirst}
+          betweenCount={last === null ? 0 : schedule.itemCount - 2}
+          connected={last !== null}
+        />
+        {/* 항목이 하나면 처음과 마지막이 같은 항목이다 — 같은 줄을 두 번 두지 않는다 */}
+        {last !== null && <FlowNode item={last} basis={basisOnLast} betweenCount={0} />}
+      </ol>
 
-      {schedule.representativePlaceTitle !== null && (
+      {basisLine !== null && (
         <p className="text-caption text-fg-muted break-keep">
           {schedule.representativePlaceId === null ? (
-            messages.plan.briefingScheduleBasisPlace.replace(
-              '{title}',
-              schedule.representativePlaceTitle,
-            )
+            messages.plan.briefingScheduleBasisPlace.replace('{title}', basisLine)
           ) : (
             /*
               **id 가 없으면 링크를 렌더하지 않는다** (명세 D4). 제목만 오는 경우가 있어
@@ -228,10 +296,7 @@ function ScheduleCard({
               href={`/places/${schedule.representativePlaceId}`}
               className="text-link hover:text-link-hover focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:outline-none"
             >
-              {messages.plan.briefingScheduleBasisPlace.replace(
-                '{title}',
-                schedule.representativePlaceTitle,
-              )}
+              {messages.plan.briefingScheduleBasisPlace.replace('{title}', basisLine)}
             </Link>
           )}
         </p>
@@ -250,14 +315,100 @@ function ScheduleCard({
 }
 
 /**
- * `처음 10:30 협재해수욕장` — **시각은 문자열 슬라이스로 만든다.**
+ * 동선의 한 마디 — 점 · 이어지는 선 · 항목 (#733).
  *
- * `Date` 로 파싱하면 서버가 준 지역 시각이 브라우저 타임존으로 밀린다 (홈 `hourMinute`
- * 과 같은 규칙). 시각이 없는 항목은 `:` 잔재 없이 제목만 남는 템플릿을 쓴다.
+ * **시각은 문자열 슬라이스로 만든다.** `Date` 로 파싱하면 서버가 준 지역 시각이 브라우저
+ * 타임존으로 밀린다 (홈 `hourMinute` 과 같은 규칙). 시각이 없는 항목은 그 칸을 비운다 —
+ * `--:--` 같은 자리표시를 만들지 않는다.
+ *
+ * **선 사이에 이동 거리를 넣지 못했다.** 브리핑 응답의 `schedule` 에는 좌표가 없어
+ * (`walkTimes` 안에만 온다) 거리를 낼 수 없다 — 대신 응답이 아는 값(사이에 낀 항목 수)을
+ * 센다. 거리는 BE 후속 요청이다.
  */
-function itemLine(item: PlanBriefingItemSummary, withTime: string, withoutTime: string): string {
-  if (item.startTime === null) return withoutTime.replace('{title}', item.title)
-  return withTime.replace('{time}', item.startTime.slice(0, 5)).replace('{title}', item.title)
+function FlowNode({
+  item,
+  basis,
+  betweenCount,
+  connected = false,
+}: {
+  item: PlanBriefingItemSummary
+  /** 그날 판정의 기준이 된 장소인가 — 맞으면 별도 줄 대신 태그로 붙는다 */
+  basis: boolean
+  /** 이 마디와 다음 마디 사이에 낀 항목 수. `0` 이면 줄을 내지 않는다 */
+  betweenCount: number
+  /** 아래로 선을 잇는가 (마지막 마디는 잇지 않는다) */
+  connected?: boolean
+}) {
+  return (
+    <li className="flex gap-3 pb-4 last:pb-0">
+      {/*
+        점과 선은 장식이다 — 순서는 `ol` 이 이미 말한다.
+
+        **선을 `absolute` 로 띄우지 않는다.** `flex-1` 이 마디 높이만큼 늘어나므로 제목이
+        두 줄로 접히는 긴 장소명(한국어 실데이터)에서도 선이 따라 자란다.
+      */}
+      <span aria-hidden className="flex w-2 shrink-0 flex-col items-center pt-2">
+        <span className="bg-border-strong size-2 shrink-0 rounded-full" />
+        {connected && <span className="bg-border w-px flex-1" />}
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-body-1 text-fg font-semibold break-keep">
+          {item.startTime !== null && (
+            <span className="text-fg-muted tabular-nums">{item.startTime.slice(0, 5)} </span>
+          )}
+          {item.title}
+        </p>
+
+        {basis && (
+          <span className="mt-1 inline-flex">
+            <Badge tone="neutral" size="sm">
+              {messages.plan.briefingScheduleBasisTag}
+            </Badge>
+          </span>
+        )}
+
+        {betweenCount > 0 && (
+          <p className="text-caption text-fg-muted mt-2 tabular-nums">
+            {messages.plan.briefingScheduleBetween.replace('{count}', String(betweenCount))}
+          </p>
+        )}
+      </div>
+    </li>
+  )
+}
+
+/**
+ * 하루 지표 줄 — **브리핑 날씨 카드에만 있는 부분이다** (#733).
+ *
+ * 무엇을 세우고 무엇을 빼는지의 판단은 `lib/plan/briefing-day-facts.ts` 가 갖는다 (거기
+ * 머리주석이 "시간축을 만들지 못한 이유" 의 정본이다). 여기는 글자로 옮기기만 한다.
+ */
+function DayFactsRow({ weather }: { weather: PlanDailyWeatherItem | null }) {
+  const facts = briefingDayFacts(weather)
+  if (facts.length === 0) return null
+
+  return (
+    <p className="text-caption text-fg-muted border-border flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-3 pb-4 font-medium tabular-nums">
+      {facts.map((fact) => (
+        <span key={fact.kind}>{factText(fact)}</span>
+      ))}
+    </p>
+  )
+}
+
+function factText(fact: BriefingDayFact): string {
+  switch (fact.kind) {
+    case 'sky':
+      // 서버가 표시용 이름으로 낮춰 준 값이다 — 화면이 다시 쓰지 않는다
+      return fact.name
+    case 'maxTemperature':
+      return messages.plan.briefingWeatherMaxTemperature.replace('{value}', fact.value.toFixed(1))
+    case 'minTemperature':
+      return messages.plan.briefingWeatherMinTemperature.replace('{value}', fact.value.toFixed(1))
+    case 'precipitation':
+      return messages.plan.briefingWeatherPrecipitation.replace('{value}', String(fact.value))
+  }
 }
 
 /**
@@ -296,7 +447,13 @@ function WeatherWarningCard({
           </p>
         ) : (
           <>
-            <p className="text-body-1 text-fg-muted font-semibold">
+            {/*
+              **본문 굵기(400)다** (#733). 예전에는 `body-1`(16/600 — 제목 굵기)에 보조
+              텍스트 색을 얹고 있었다. 크기·굵기는 제목인데 색은 본문이라 위계가 어긋났고,
+              무엇보다 **이 줄은 답이 아니라 답이 없다는 안내**라 제목 무게를 가질 자리가
+              아니다. 아래 서버 문장과 같은 등급으로 내리고 굵기만 갈라 둔다.
+            */}
+            <p className="text-body-2 text-fg-muted font-semibold">
               {messages.plan.briefingWarningUnavailableTitle}
             </p>
             {/* 서버 문장 그대로 — 화면이 다시 쓰지 않는다 */}
