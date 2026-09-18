@@ -1,5 +1,6 @@
-import type { MetricTone } from '@/components/metric'
+import type { MetricBadgeSurface } from '@/components/metric'
 import { MetricBadge } from '@/components/metric'
+import { weatherWarningTone } from '@/lib/insight/tone'
 import { cn } from '@/lib/utils/cn'
 import type { WeatherWarningItem } from '@/types/insight'
 
@@ -13,35 +14,34 @@ import type { WeatherWarningItem } from '@/types/insight'
  * **`Badge` 가 아니라 `MetricBadge` 를 쓴다.** `danger` 는 시스템 오류(5xx) 톤이고
  * `accent` 는 AI 생성 표시 전용이다 (DESIGN.md §2-5·§2-6). 기상특보는 둘 다 아니라
  * **판정 축의 위험 상태**라 등급과 같은 `--metric-*` 을 쓴다.
+ *
+ * **단계 → 톤 매핑은 `lib/insight/tone.ts` 가 갖는다** (#709). 스트립이 같은 매핑으로 면을
+ * 칠하게 되면서 이 파일 안에 두면 같은 특보의 배지와 면이 갈릴 수 있게 됐다.
  */
 export function WeatherWarningBadge({
   warning,
+  surface,
   className,
 }: {
   warning: WeatherWarningItem | null
+  /**
+   * 같은 톤의 `-100` 면 위에 설 때 `tint` 를 준다 — 홈 특보 스트립이 그 자리다.
+   * 안 주면 `--bg` 위 기본 채움이다 (`MetricBadge` 의 `surface`).
+   */
   // `exactOptionalPropertyTypes` — 그대로 넘기려면 undefined 를 명시해야 한다
+  surface?: MetricBadgeSurface | undefined
   className?: string | undefined
 }) {
   if (warning === null) return null
 
   return (
     // `MetricBadge` 의 className 이 undefined 를 받지 않는다 (`exactOptionalPropertyTypes`)
-    <MetricBadge tone={warningTone(warning.level.code)} className={cn(className)}>
+    <MetricBadge
+      tone={weatherWarningTone(warning.level.code)}
+      surface={surface ?? 'default'}
+      className={cn(className)}
+    >
       {warning.type.name} {warning.level.name}
     </MetricBadge>
   )
-}
-
-/**
- * 특보 단계 → 톤.
- *
- * **모르는 코드는 경보로 읽는다.** 백엔드 `WeatherWarningLevel.from` 이 "경보" 를 먼저 보고
- * 못 알아봤을 때 낮은 쪽으로 접지 않는 것과 같은 이유다 — 표기가 바뀌었을 뿐인데 태풍경보를
- * 주의보 색으로 그리면 그 화면이 위험을 축소해 말한다.
- *
- * 주의보에 `low`(회색)를 쓰지 않는다. 그 톤은 "적합도 낮음 · 정보 없음" 쪽으로 읽혀
- * "조건이 나빠지고 있다" 는 뜻이 사라진다. `mid`(앰버)가 주의에 맞는 색이다.
- */
-function warningTone(levelCode: string): MetricTone {
-  return levelCode === 'ADVISORY' ? 'mid' : 'critical'
 }

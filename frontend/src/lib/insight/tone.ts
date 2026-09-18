@@ -70,3 +70,21 @@ export function congestionTone(code: string | null | undefined): MetricTone {
       return 'unknown'
   }
 }
+
+/**
+ * 기상특보 단계 — shared-travel `WeatherWarningLevel`.
+ *
+ * **모르는 코드는 경보로 읽는다.** 백엔드 `WeatherWarningLevel.from` 이 "경보" 를 먼저 보고
+ * 못 알아봤을 때 낮은 쪽으로 접지 않는 것과 같은 이유다 — 표기가 바뀌었을 뿐인데 태풍경보를
+ * 주의보 색으로 그리면 그 화면이 위험을 축소해 말한다.
+ *
+ * **주의보에 `low`(회색)를 쓰지 않는다.** 그 톤은 "적합도 낮음 · 정보 없음" 쪽으로 읽혀
+ * "조건이 나빠지고 있다" 는 뜻이 사라진다. `mid`(앰버)가 주의에 맞는 색이다.
+ *
+ * **`weather-warning-badge.tsx` 에서 이리로 옮겼다** (#709). 배지 혼자 쓰던 것을 스트립이
+ * 함께 쓰게 되면서다 — 축별 code→톤 매퍼는 이 파일이 소유한다는 규칙이 원래 그렇다
+ * (`token-usage.test.ts` 의 `OWNERS`).
+ */
+export function weatherWarningTone(levelCode: string | null | undefined): MetricTone {
+  return levelCode === 'ADVISORY' ? 'mid' : 'critical'
+}

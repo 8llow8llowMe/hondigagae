@@ -61,6 +61,47 @@ const BADGE_TONE: Record<MetricTone, string> = {
 }
 
 /**
+ * **같은 톤의 tint 면 위에 선 배지** — 면과 채움을 맞바꾼다
+ * ([#709](https://github.com/8llow8llowMe/hondigagae/issues/709)).
+ *
+ * `BADGE_TONE` 은 배지가 `--bg` 위에 선다고 전제한다. 그 배지를 **자기와 같은 `-100` 면**
+ * 위에 얹으면 채움과 배경이 같은 색이 되어 **대비 1.00:1** 이다 — 배지가 사라지고 글자만
+ * 남는다. 홈 특보 스트립이 정확히 그 자리다 (면도 뱃지도 `--metric-mid-100`).
+ *
+ * 그래서 **뒤집는다**: 채움은 `--bg`, 테두리는 `-500`, 글자는 `-700`.
+ *
+ * | 확인한 값                        | mid      | critical |
+ * | -------------------------------- | -------- | -------- |
+ * | `-700` 글자 ↔ 흰 배지 면 (4.5:1) | 5.64:1   | 5.20:1   |
+ * | `-500` 테두리 ↔ tint 면 (3:1)    | 3.53:1   | 3.97:1   |
+ *
+ * 둘 다 `BADGE_TONE` 이 tint 위에서 내는 값(5.16 · 4.55)보다 **오른다** — 뒤집기가 대비를
+ * 깎지 않는다. `-500` 을 테두리에 쓰는 것은 §2-3 이 그 층에 준 역할 그대로다
+ * (`-500` = 흰 배경 위 마크·**테두리**·큰 숫자).
+ *
+ * **`-500` 을 채움으로 쓰고 흰 글자를 얹는 안은 기각했다.** 그 층은 비텍스트 3:1 기준으로
+ * 고른 것이라 글자를 얹지 않는 것이 §2-3 이다.
+ *
+ * **`unknown` 은 뒤집을 것이 없다** — 원래 채움이 없고 점선 테두리뿐이라 tint 위에서도 그대로
+ * 읽힌다. 면만 `--bg` 로 채워 tint 에서 떼어 놓는다.
+ */
+const BADGE_TONE_ON_TINT: Record<MetricTone, string> = {
+  critical: 'bg-bg border-metric-critical-500 text-metric-critical-700',
+  high: 'bg-bg border-metric-high-500 text-metric-high-700',
+  mid: 'bg-bg border-metric-mid-500 text-metric-mid-700',
+  low: 'bg-bg border-metric-low-500 text-metric-low-700',
+  unknown: 'bg-bg border border-dashed border-border-strong text-fg-muted',
+}
+
+/** 배지가 앉는 면. `tint` 는 **같은 톤의 `-100` 면** 위를 뜻한다 (`BADGE_TONE_ON_TINT`) */
+export type MetricBadgeSurface = 'default' | 'tint'
+
+const BADGE_SURFACE: Record<MetricBadgeSurface, Record<MetricTone, string>> = {
+  default: BADGE_TONE,
+  tint: BADGE_TONE_ON_TINT,
+}
+
+/**
  * `sm` · `md` 는 `Badge` 와 **같은 값**이다 (`src/components/badge.tsx`).
  *
  * 두 배지가 한 줄에 나란히 서는 곳이 있다 — 장소 행의 `동반 가능` `문화시설`(속성) 옆에
@@ -105,6 +146,7 @@ export type MetricBadgeSize = 'sm' | 'md' | 'score'
 export function MetricBadge({
   tone,
   size = 'md',
+  surface = 'default',
   axis,
   children,
   className,
@@ -112,6 +154,14 @@ export function MetricBadge({
   tone: MetricTone
   /** `sm` 은 `Badge size="sm"` 과 나란히 설 때 (같은 `h-5`) */
   size?: MetricBadgeSize
+  /**
+   * 배지가 앉는 면. **`tint` 는 같은 톤의 `-100` 면 위**를 뜻한다 — 거기서는 채움과 배경이
+   * 같은 색이라(1.00:1) 배지가 사라지므로 면과 채움을 맞바꾼다 (`BADGE_TONE_ON_TINT`).
+   *
+   * **다른 톤의 tint 위에는 주지 않는다.** 그때는 채움이 이미 배경과 갈리므로 기본이 맞고,
+   * 뒤집으면 배지가 까닭 없이 흰 칩으로 뜬다.
+   */
+  surface?: MetricBadgeSurface
   /**
    * 주면 등급어 앞에 축 이름이 선다 — `적합도 보통`. **값과 무관하게 항상 붙는다** —
    * `보통` 일 때만 붙이면 배지 모양이 값마다 달라져 "앞 낱말이 축" 이라는 규칙을 배울 수
@@ -132,7 +182,7 @@ export function MetricBadge({
         // 그 배지만 2px 높다. 투명 테두리로 자리를 미리 잡아 톤과 무관하게 높이를 맞춘다
         'text-caption inline-flex items-center rounded-sm border border-transparent font-semibold whitespace-nowrap',
         BADGE_SIZE[size],
-        BADGE_TONE[tone],
+        BADGE_SURFACE[surface][tone],
         className,
       )}
     >
@@ -259,6 +309,34 @@ export const METRIC_TINT_TONE: Record<MetricTone, string> = {
   mid: 'bg-metric-mid-100',
   low: 'bg-metric-low-100',
   unknown: 'bg-band',
+}
+
+/**
+ * `METRIC_TINT_TONE` 면의 **경계선 색** — `-500` 실선이다
+ * ([#709](https://github.com/8llow8llowMe/hondigagae/issues/709)).
+ *
+ * **tint 면이 넓게 깔릴 때 이 선이 유일한 명도 채널이다.** 홈 특보 스트립은 `Canvas` 안이라
+ * `--bg-sunken`(`#F5F6F8`) 위에 서는데, 그 바닥과 tint 의 대비가 `--metric-mid-100` **1.01:1** ·
+ * `--metric-critical-100` **1.06:1** 이다 — **색상(hue)만 다르고 밝기가 같다.** 면만 깔면
+ * 적록색약에게는 아무것도 칠하지 않은 것과 구별되지 않는다. §2-9 가 영업 상태 두 tint 를 두고
+ * *"색만으로 가르지 않는다(1.02:1)"* 고 못박은 것과 같은 자리다.
+ *
+ * `-500` 은 tint 면 위에서 3.53~3.97:1 이라 **비텍스트 3:1** 을 넘는다. `--border`(tint 위
+ * 1.15:1)로는 선이 있는지조차 보이지 않는다.
+ *
+ * **면 없이 이 선만 쓰지 않는다.** 짝으로 쓰라고 있는 표다 — 선만 남으면 §10 이 막은
+ * "장식성 색 선" 이 된다.
+ *
+ * **`unknown` 은 등급 색이 없다** (§2-3). `METRIC_TINT_TONE` 이 그 칸에 중립 면(`--band`)을
+ * 주는 것과 같은 이유로 중립 선을 준다 — `--metric-unknown-500` 은 **점선 전용**이라 실선
+ * 경계에 쓰지 않는다.
+ */
+export const METRIC_TINT_EDGE_TONE: Record<MetricTone, string> = {
+  critical: 'border-metric-critical-500',
+  high: 'border-metric-high-500',
+  mid: 'border-metric-mid-500',
+  low: 'border-metric-low-500',
+  unknown: 'border-border-strong',
 }
 
 /** 큰 숫자에 쓰는 등급 색. 22px 이상 + weight 900 에만 허용된다 (DESIGN.md §2-3). */
