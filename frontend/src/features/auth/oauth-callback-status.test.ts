@@ -114,11 +114,14 @@ describe('OAuthCallbackStatus', () => {
   })
 
   /*
-    **동의 누락만 목적지가 /signup 이다** (#688). 로그인 화면으로 돌려보내면 그쪽
-    소셜 버튼은 동의를 싣지 않아 같은 실패를 그대로 반복한다 — 인가코드가 1회용이라
-    사용자는 제공자 인가 화면부터 매번 다시 밟게 된다.
+    **동의 누락만 목적지가 다르다** (#688). 로그인 화면으로 돌려보내면 그쪽 소셜 버튼은
+    동의를 싣지 않아 같은 실패를 그대로 반복한다 — 인가코드가 1회용이라 사용자는 제공자
+    인가 화면부터 매번 다시 밟게 된다.
+
+    **그 목적지가 `/signup` 에서 `/signup/social/{provider}` 로 바뀌었다** (#707).
+    제공자를 실어 보내지 않으면 도착한 화면이 버튼을 하나로 좁힐 수 없다.
   */
-  it('MEMBER_010 은 회원가입 화면으로 보내고 서버 사유를 그대로 보여준다', () => {
+  it('MEMBER_010 은 들어온 제공자의 동의 화면으로 보내고 서버 사유를 그대로 보여준다', () => {
     const markup = render('kakao', {
       status: 'failed',
       returnTo: '/',
@@ -130,22 +133,22 @@ describe('OAuthCallbackStatus', () => {
     })
 
     expect(markup).toContain('이용약관과 개인정보 처리방침에 동의해야 가입할 수 있습니다.')
-    expect(markup).toContain('href="/signup"')
+    expect(markup).toContain('href="/signup/social/kakao"')
     expect(markup).toContain(messages.auth.toSignupConsent)
   })
 
   /*
-    원래 가려던 곳을 회원가입 화면까지 들고 간다. 안 들고 가면 `/login?returnTo=/plans`
+    원래 가려던 곳을 동의 화면까지 들고 간다. 안 들고 가면 `/login?returnTo=/plans`
     로 시작한 사용자가 동의 누락으로 여기 온 뒤 가입을 마쳤을 때 목적지를 잃는다.
   */
-  it('복귀 경로가 있으면 회원가입 링크에 실어 보낸다', () => {
+  it('복귀 경로가 있으면 동의 화면 링크에 실어 보낸다', () => {
     const markup = render('kakao', {
       status: 'failed',
       returnTo: '/plans',
       error: domainError(400, 'MEMBER_010', '동의가 필요합니다.'),
     })
 
-    expect(markup).toContain('href="/signup?returnTo=%2Fplans"')
+    expect(markup).toContain('href="/signup/social/kakao?returnTo=%2Fplans"')
   })
 
   it("복귀 경로가 '/' 면 쿼리를 붙이지 않는다", () => {
@@ -155,11 +158,11 @@ describe('OAuthCallbackStatus', () => {
       error: domainError(400, 'MEMBER_010', '동의가 필요합니다.'),
     })
 
-    expect(markup).toContain('href="/signup"')
+    expect(markup).toContain('href="/signup/social/kakao"')
     expect(markup).not.toContain('returnTo')
   })
 
-  it('MEMBER_011 도 같은 곳으로 보낸다', () => {
+  it('MEMBER_011 도 같은 곳으로 보낸다 — 제공자만 갈린다', () => {
     const markup = render('naver', {
       status: 'failed',
       returnTo: '/',
@@ -167,7 +170,23 @@ describe('OAuthCallbackStatus', () => {
     })
 
     expect(markup).toContain('만 14세 이상만 가입할 수 있습니다.')
-    expect(markup).toContain('href="/signup"')
+    expect(markup).toContain('href="/signup/social/naver"')
+  })
+
+  /*
+    경로 세그먼트는 사용자가 조작할 수 있다. 그 값을 그대로 이어 붙이면 **곧바로 404 인
+    주소**로 안내하게 되므로, 제공자를 특정하지 못하면 회원가입 화면의 동의 블록으로
+    떨어진다 (#707). 라벨이 일반 문구로 떨어지는 것과 같은 처리다.
+  */
+  it('모르는 provider 로 동의 누락이 오면 회원가입 화면으로 떨어진다', () => {
+    const markup = render('toString', {
+      status: 'failed',
+      returnTo: '/plans',
+      error: domainError(400, 'MEMBER_010', '동의가 필요합니다.'),
+    })
+
+    expect(markup).toContain('href="/signup?returnTo=%2Fplans"')
+    expect(markup).not.toContain('/signup/social')
   })
 
   it('ApiError 가 아닌 실패도 다음 행동을 준다', () => {

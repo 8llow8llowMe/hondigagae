@@ -54,12 +54,27 @@ export type SocialLoginButtonsProps = {
    *
    * **로그인 화면은 넘기지 않는다.** 그쪽은 이미 가입한 회원의 입구라 동의를 물을
    * 이유가 없다. 신규 사용자가 거기서 눌러 최초 연동이 되면 콜백이 `MEMBER_010` /
-   * `MEMBER_011` 로 거부하고, `OAuthCallbackStatus` 가 회원가입 화면으로 안내한다.
+   * `MEMBER_011` 로 거부하고, `OAuthCallbackStatus` 가 동의 화면으로 안내한다.
    */
   consent?: SignupConsent | undefined
+  /**
+   * 그릴 제공자 목록. 기본은 전부다 — 로그인·회원가입 화면은 넘기지 않는다.
+   *
+   * **소셜 최초 연동 동의 화면만 하나로 좁힌다** (#707). 카카오로 시작해 동의 누락으로
+   * 튕겨 온 사용자에게 네이버 버튼을 함께 보이면, 그것을 누르는 순간 **다른 이메일의
+   * 다른 가입**이 된다 — 사용자는 "방금 카카오로 하던 것" 을 잇는다고 생각한다.
+   *
+   * 목록으로 받는 이유는 "하나만" 이 제공자 수에 달린 우연이기 때문이다. 제공자가
+   * 늘어도 호출부가 원하는 부분집합을 그대로 말할 수 있다.
+   */
+  providers?: readonly OAuthProviderId[]
 }
 
-export function SocialLoginButtons({ returnTo, consent }: SocialLoginButtonsProps) {
+export function SocialLoginButtons({
+  returnTo,
+  consent,
+  providers = OAUTH_PROVIDERS,
+}: SocialLoginButtonsProps) {
   const [error, setError] = useState<string | null>(null)
   // 어느 버튼이 진행 중인지. 두 버튼에 같은 loading 을 걸면 누르지 않은 쪽도 도는 것처럼 보인다
   const [pending, setPending] = useState<string | null>(null)
@@ -106,7 +121,7 @@ export function SocialLoginButtons({ returnTo, consent }: SocialLoginButtonsProp
       {consentBlocked && (
         <p className="text-caption text-fg-muted">{messages.auth.socialConsentRequired}</p>
       )}
-      {OAUTH_PROVIDERS.map((provider) => {
+      {providers.map((provider) => {
         const name = oauthProviderName(provider) ?? provider
         const brand = PROVIDER_BRAND[provider]
         return (
