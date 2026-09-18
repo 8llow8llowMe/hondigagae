@@ -503,6 +503,21 @@
   어느 행에도 붙지 않고 조용히 사라진다.
 - 체감온도 라벨 규칙은 §3-1 표 그대로다 — 항목 행은 **`체감온도`(시각 기준)** 이고 일자 판정은
   **`최고 체감온도`(하루 최대)** 다. 한 일자 카드에 기준이 다른 두 값이 서는 것이 정상이다.
+  | 화면                        | 경로                                         | API                                                                                  | 상태                                                                                                                                                                 |
+  | --------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | 일정 목록                   | `/plans`                                     | `GET /plans` (커서)                                                                  | **구현** (#75)                                                                                                                                                       |
+  | 일정 생성                   | `/plans/new`                                 | `POST /plans`                                                                        | **구현** (#75)                                                                                                                                                       |
+  | 일정 상세 (타임라인 + 판정) | `/plans/[planId]`                            | `GET /plans/{planId}` + `GET /plans/{planId}/weather`                                | **구현** (#80)                                                                                                                                                       |
+  | 일정 수정·삭제              | `/plans/[planId]` 내                         | `PUT` · `DELETE /plans/{planId}`                                                     | **구현** (#80) — 이름·기간·예산·상태. **기간 수정은 #585.** **완료 전이는 #613**                                                                                     |
+  | 일자 항목 편집              | `/plans/[planId]` 내 모드                    | `PUT /plans/{planId}/days/{day}/items` (**일괄 교체**)                               | **구현** (#81)                                                                                                                                                       |
+  | 일정에 장소 담기            | `/plans/[planId]/days/[day]/add` + 실내 대안 | `PUT /plans/{planId}/days/{day}/items` (**같은 일괄 교체**)                          | **구현** (#82) — 새 API 없음. **지도 보기 추가, 기본 보기가 지도**(#370) — 새 API 없음                                                                               |
+  | 하루 재생성                 | `/plans/[planId]/days/[day]/regenerate`      | `POST /ai-plans` (`planId`+`regenerateDay`) → `PUT /plans/{planId}/days/{day}/items` | **구현** (#128) — 새 API 없음. 정본 `docs/features/ai-plan/하루재생성-세부명세.md`                                                                                   |
+  | 일정 날씨 브리핑            | `/plans/[planId]` 내                         | `GET /plans/{planId}/weather`                                                        | **구현** (#80) — 일자 판정으로 통합                                                                                                                                  |
+  | 항목 방문 체크              | `/plans/[planId]` 내 항목 행                 | `PUT /plans/{planId}/items/{planItemId}/visited`                                     | **구현** (#124) — 해제도 같은 API                                                                                                                                    |
+  | 여행 후기                   | `/plans/[planId]` 좌측 레일                  | `GET` · `POST` · `PUT /plans/{planId}/reviews`                                       | **구현** (#615) — **완료 일정만.** 목록 "후기 미작성" 밴드는 `hasReview` 가 없어 넣지 않음                                                                           |
+  | 일정 공유 링크 발급·폐기    | `/plans/[planId]` 관리 메뉴 안 모달          | `GET` · `POST` · `DELETE /plans/{planId}/share-link`                                 | **구현** (#628) — **확정·완료만.** `POST`·`DELETE` 둘 다 멱등                                                                                                        |
+  | 공유된 일정 열람            | `/shared-plans/[token]`                      | `GET /shared-plans/{token}` (**비인증**)                                             | **구현** (#628) — 정본 `docs/features/plan/일정공유-세부명세.md`                                                                                                     |
+  | 일정에 올레 코스 담기       | `/walk-courses/[walkCourseId]` 안의 시트     | `PUT /plans/{planId}/days/{day}/items` (**같은 일괄 교체**, `itemType=WALK`)         | **명세 완료** ([#620](https://github.com/8llow8llowMe/hondigagae/issues/620)) — 새 API 없음. 정본 `docs/features/plan/올레담기-세부명세.md` · 행 렌더는 일정상세 D12 |
 
 **일정 응급 브리핑** — [#125](https://github.com/8llow8llowMe/hondigagae/issues/125) · BE PR #105
 
@@ -576,6 +591,18 @@
   말하려면 여전히 장소 조회가 필요하다. **이것을 항목 보강의 잔재로 보고 지우지 않는다** —
   key 를 `placeKeys.detail` 로 공유해 장소 상세를 보고 온 곳은 요청이 아예 나가지 않는다.
 - 장소 항목은 백엔드가 tour-service Feign으로 존재를 검증한다 → 없는 `placeId` 는 실패한다.
+- **`WALK` 은 검증되지 않는다.** `PlanItemType.PLACE_TARGETS` 에 `WALK` 가 없어(`PlanItemType.java:52`) 저장 전
+  존재 검증에서 빠진다 — **틀린 `walkCourseId` 가 조용히 저장되고** 그 항목은 상세에서 `walkCourse: null` 로
+  온다. `PLAN_004` 가 나지 않으므로 화면이 id 를 가공하지 않는다 (`docs/features/plan/올레담기-세부명세.md` D3-3).
+- **`WALK` 의 `targetId` 는 `walk_course.id` 다.** `place.id` 가 아니므로 **`/places/{id}` 링크를 만들지 않는다** —
+  `plan-item-row.tsx:73-77` 주석과 `lib/plan/detail.test.ts:89` · `lib/plan/day-items.test.ts:206` 이 막고 있다.
+- **일정 항목 응답에 `walkCourse` 요약이 생겼다** (BE `efef555e` 2026-09-17 · #619). `PlanItemDetailItem.walkCourse`
+  = `name`·`courseLabel`·`distanceKm`·`durationText`·`durationMaxMinutes`·`lat`/`lng`·`firstImage`·`fitsActivityLevels`.
+  **`docs/api/openapi/*.json` 스냅샷(2026-09-14)보다 뒤에 들어와 스냅샷에는 없다** — dev 게이트웨이 실측(2026-09-18)으로
+  확인했다. `null` 인 경로가 셋이고(코스 없음 · tour-service 장애 · 수기 정리) **셋 다 행을 지우지 않는다.**
+  `durationMaxMinutes` 의 `null` 은 "제한 없음" 이 아니라 **"원문 파싱 실패"** 다.
+- **공유 링크 응답(`SharedPlanItemItem`)에는 `walkCourse` 가 없다.** 소유자에게는 거리·소요가 보이는 항목이
+  공유로 열면 제목만 남는다 (BE 후속 요청 — `올레담기-세부명세.md` D9-2).
 - **일정의 소유권은 plan-service에 있다.** AI는 제안만 하고 확정은 여기서만 일어난다.
 - **기간을 줄이면 백엔드가 `PLAN_008` 로 거부한다 — 고아 항목은 더 이상 생기지 않는다.** 예전에는 `PlanCommandProcessor.updatePlan` 이 `startDate`/`endDate` 만 바꾸고 `day > totalDays` 가 된 항목을 그대로 둬서 **화면이 기간 수정을 열지 않았다.** BE 가 `99c6a41f` 로 저장 앞에 검사를 넣으면서(`backend/docs/services/plan-service.md`) 그 근거가 사라졌고, **FE 는 #585 로 기간 편집을 열었다.** 화면이 어느 일차에 항목이 있는지 다시 세지 않는다 — 판정을 복제하면 서버 규칙이 바뀔 때 두 곳이 갈린다. 거부 문구는 서버 것을 폼 배너로 그대로 띄운다. 다른 경로로 이미 생긴 기간 밖 항목은 상세 화면이 별도 섹션으로 드러낸다.
 - **기간 상한 30일(`PLAN_009`)은 만들기·수정 두 폼이 `lib/plan/period.ts` 하나로 본다** (#585). 예전에는 어느 쪽도 보지 않아 31일짜리가 서버 왕복 뒤에 막혔다.
