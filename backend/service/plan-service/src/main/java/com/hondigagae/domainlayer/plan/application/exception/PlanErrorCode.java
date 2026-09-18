@@ -28,7 +28,11 @@ public enum PlanErrorCode {
     REVIEW_ITEM_NOT_ELIGIBLE("PLAN_018", "다녀온 장소 항목만 후기에 담을 수 있습니다.", HttpStatus.BAD_REQUEST),
     PLAN_COMPLETED_PET_LOCKED("PLAN_019", "완료된 일정의 동행 반려견은 바꿀 수 없습니다.", HttpStatus.BAD_REQUEST),
     REVIEW_ITEM_DUPLICATED("PLAN_020", "같은 일정 항목을 후기에 두 번 넣을 수 없습니다.", HttpStatus.BAD_REQUEST),
-    PLAN_COPY_PERIOD_MISMATCH("PLAN_021", "복사할 여행 기간의 일수는 원본과 같아야 합니다.", HttpStatus.BAD_REQUEST),
+    // 원본 일수를 문구에 끼운다 (#721). 프론트는 서버 resultMessage 를 그대로 띄우므로,
+    // "같아야 한다" 만 말하고 며칠인지 빼면 사용자는 시행착오로 찾아야 한다.
+    // %d 를 채우는 것은 PlanException(errorCode, args) 오버로드다 — 인자 없이 던지면
+    // 문구에 %d 가 그대로 남으니 이 코드는 반드시 그 생성자로 던진다.
+    PLAN_COPY_PERIOD_MISMATCH("PLAN_021", "복사할 여행 기간은 원본과 같은 %d일이어야 합니다.", HttpStatus.BAD_REQUEST),
     // 공유 링크 (#627). 없음·폐기·삭제된 일정·비공유 상태는 전부 PLAN_023 404 로 같게 답한다 —
     // 어느 쪽인지 알려 주면 토큰을 찍어 보는 쪽에 "이 토큰은 있었다" 를 흘리게 된다.
     // 만료만 PLAN_024 410 으로 가른다. 받는 쪽이 "새 링크를 달라" 고 말할 수 있어야 하기 때문이다.

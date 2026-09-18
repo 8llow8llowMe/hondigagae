@@ -82,15 +82,22 @@ class PlanCopyTest {
     }
 
     @Test
-    @DisplayName("일수가 원본과 다르면 400 PLAN_021 로 거부한다")
+    @DisplayName("일수가 원본과 다르면 400 PLAN_021 로 거부하고 원본 일수를 문구에 담는다")
     void rejectsMismatchedPeriodLength() {
         PlanCommandProcessor processor = processor(new StubPlanRepositoryPort(), new StubPlanItemRepositoryPort(),
             new StubPlanPetRepositoryPort(), new StubPetConditionQueryPort(Set.of(7L)));
 
+        /*
+          메시지까지 보는 이유 — 프론트는 서버 resultMessage 를 그대로 띄운다. 코드만
+          맞으면 통과하는 테스트로 두면, 인자 없이 던지도록 되돌아가도(문구에 %d 가 그대로
+          남는다) 초록이다. 사용자가 며칠로 맞춰야 하는지가 이 한 줄에 걸려 있다 (#721).
+        */
         assertThatThrownBy(() -> processor.copyPlan(
             sourcePlan(3), copyCommand(null, NEW_START, NEW_START.plusDays(1)), List.of(7L), List.of()))
             .isInstanceOf(PlanException.class)
-            .hasFieldOrPropertyWithValue("errorCode", PlanErrorCode.PLAN_COPY_PERIOD_MISMATCH);
+            .hasFieldOrPropertyWithValue("errorCode", PlanErrorCode.PLAN_COPY_PERIOD_MISMATCH)
+            .hasMessageContaining("3일")
+            .hasMessageNotContaining("%d");
     }
 
     @Test
