@@ -13,6 +13,7 @@ import {
   moveEditItem,
   type PlanDayEditItem,
   planDayItemsPayload,
+  setEditStartTime,
   toEditItems,
   toggleRemoved,
 } from '@/lib/plan/day-items'
@@ -97,6 +98,14 @@ export function usePlanDayEdit({
     })
   }, [])
 
+  /**
+   * 시각 입력 변경 (#623 · 명세 G4). **알림을 내지 않는다** — 이동·삭제와 달리 시각은
+   * 입력란 자체가 눈으로 바로 보이는 결과라 `aria-live` 로 다시 말할 것이 없다.
+   */
+  const setStartTime = useCallback((index: number, value: string) => {
+    setItems((current) => setEditStartTime(current, index, value))
+  }, [])
+
   const dirty = hasEditChanges(items, original)
 
   function save(day: number) {
@@ -144,6 +153,7 @@ export function usePlanDayEdit({
     start,
     move,
     toggle,
+    setStartTime,
     save,
   }
 }

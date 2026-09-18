@@ -57,6 +57,14 @@ describe('toPlanDaySaveError', () => {
     expect(toPlanDaySaveError(new ApiError(400, 'PLAN_110', null), COPY).retriable).toBe(false)
   })
 
+  /* PLAN_100 — 시각 본문 파싱 실패 (#623 · 명세 G4). 화면마다 문구를 나누지 않는다 */
+  it('PLAN_100(시각 형식 오류)은 전용 문구를 내고 재시도를 주지 않는다', () => {
+    const error = toPlanDaySaveError(new ApiError(400, 'PLAN_100', null), COPY)
+
+    expect(error.retriable).toBe(false)
+    expect(error.message).toBe(messages.plan.editStartTimeFormatError)
+  })
+
   it('PLAN_900(503, tour-service 연동 실패)은 일시 장애라 재시도한다', () => {
     const error = toPlanDaySaveError(new ApiError(503, 'PLAN_900', null), COPY)
 

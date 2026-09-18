@@ -451,6 +451,28 @@
 | 여행 후기                   | `/plans/[planId]` 좌측 레일                  | `GET` · `POST` · `PUT /plans/{planId}/reviews`                                       | **구현** (#615) — **완료 일정만.** 목록 "후기 미작성" 밴드는 `hasReview` 가 없어 넣지 않음 |
 | 일정 공유 링크 발급·폐기    | `/plans/[planId]` 관리 메뉴 안 모달          | `GET` · `POST` · `DELETE /plans/{planId}/share-link`                                 | **구현** (#628) — **확정·완료만.** `POST`·`DELETE` 둘 다 멱등                              |
 | 공유된 일정 열람            | `/shared-plans/[token]`                      | `GET /shared-plans/{token}` (**비인증**)                                             | **구현** (#628) — 정본 `docs/features/plan/일정공유-세부명세.md`                           |
+| 항목 시작 시각              | `/plans/[planId]` 항목 행 · 편집모드         | `GET /plans/{planId}` · `PUT /plans/{planId}/days/{day}/items`                       | **명세 완료** (#623) — **새 API 없음.** 계약에 이미 있던 필드다                            |
+
+**항목 시작 시각 (`startTime`)** — [#623](https://github.com/8llow8llowMe/hondigagae/issues/623)
+
+- **새 컬럼도 새 API 도 없다.** `PlanItemDetailItem.startTime`(nullable) 로 이미 내려오고
+  `PlanItemRequest.startTime`(선택) 로 이미 저장된다. 화면만 쓰지 않고 있었다.
+- **아트보드를 이탈한다.** 아트보드 01·02 헤더 주석의 "시간 없음" 을 근거로 표시하지 않기로
+  했던 결정(`features/plan/일정상세-세부명세.md` D8-9)을 **D14-2 가 뒤집는다** — 주석은 예시
+  데이터에 시각이 없던 상태를 적은 것이고, 아트보드 이후에 생긴 판정 축(#625 항목 산책 위험도)의
+  입력이라 아트보드가 판단한 적이 없는 값이다. D8 표는 기록으로 남긴다.
+- **없으면 줄을 숨긴다. 지어내지 않는다.** 형식이 어긋난 값도 같다 (`lib/plan/start-time.ts`).
+- **시각으로 재정렬하지 않는다.** 순서 정본은 `sequence` 다. 서버가 순서 역전·중복을 막지 않으므로
+  화면도 경고하지 않는다.
+- **일괄 교체에서 키를 빼는 것이 곧 "지운다"** 다 — `PUT /plans/{planId}`(부분 수정, 키 생략 = 유지)와
+  **반대**다. 되싣기를 빠뜨리면 순서만 바꿔도 그 날 시각이 전부 사라진다
+  (`lib/plan/day-items.ts` · 기존 회귀 테스트 4종 유지).
+- **하루 재생성은 그 날 시각을 지운다.** 초안 계약(`AiPlanScheduleItem`)에 시각 필드가 없어
+  `toDraftItems` 가 실을 값이 없다. 그 일자에 시각이 있을 때만 확인 대화상자가 미리 말한다.
+- **AI 초안은 여전히 시각을 보내지 않는다.** 지어낸 시각으로 #625 가 판정하면 사용자가 정한 적
+  없는 시간의 답이 된다 — 백엔드가 `NO_START_TIME` 에서 "정오를 넣어 판정하지 않는다" 고 못박은 것과 같다.
+- 편집은 `순서 편집` 모드 안이다 (`features/plan/일자편집-세부명세.md` G). 항목 단건 수정 API 가
+  없어 행에서 고치면 저장할 때마다 그 일자 방문 체크가 초기화된다.
 
 **일정 응급 브리핑** — [#125](https://github.com/8llow8llowMe/hondigagae/issues/125) · BE PR #105
 

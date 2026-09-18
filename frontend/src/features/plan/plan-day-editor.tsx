@@ -38,6 +38,7 @@ export function PlanDayEditor({
   onClearFocus,
   onMove,
   onToggleRemoved,
+  onStartTimeChange,
   onSave,
   onCancel,
 }: {
@@ -52,6 +53,8 @@ export function PlanDayEditor({
   /** `moveFocus` 를 넘기지 않으면 포커스가 옮겨진 항목을 따라간다 (버튼·키보드 경로) */
   onMove: (index: number, direction: 'up' | 'down', moveFocus?: boolean) => void
   onToggleRemoved: (index: number) => void
+  /** 시각 입력 변경 — `value` 는 `HH:mm` 또는 `''`(지우기) (#623 · 명세 G4) */
+  onStartTimeChange: (index: number, value: string) => void
   onSave: () => void
   onCancel: () => void
 }) {
@@ -86,6 +89,10 @@ export function PlanDayEditor({
       <p className={cn('text-caption text-fg-muted font-medium', INSET_CLASS.card)}>
         {messages.plan.editHint}
       </p>
+      {/* 시각 편집 안내 — 순서 편집과는 다른 조작이라 한 줄에 욱여넣지 않는다 (#623 · G4) */}
+      <p className={cn('text-caption text-fg-muted mt-1 font-medium', INSET_CLASS.card)}>
+        {messages.plan.editStartTimeHint}
+      </p>
 
       {/*
         순서가 뜻을 갖는 목록이라 ol 이다 (E6). 구분선 규약은 `SurfaceList` 와 같다 — 항목
@@ -112,6 +119,7 @@ export function PlanDayEditor({
             onHandlePointerEnd={drag.onPointerEnd}
             onMove={onMove}
             onToggleRemoved={onToggleRemoved}
+            onStartTimeChange={onStartTimeChange}
           />
         ))}
       </ol>

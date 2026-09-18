@@ -616,6 +616,8 @@ function RegenerateJob({
         */
         applying={applying || placesLoading}
         error={saveError}
+        // 지금 이 날에 시각 있는 항목이 있을 때만 경고한다 (#623 · 명세 D14-6)
+        hasStartTime={currentItems.some((item) => item.startTime !== null)}
       />
     </RegenerateShell>
   )

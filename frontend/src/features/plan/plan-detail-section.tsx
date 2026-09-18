@@ -326,6 +326,7 @@ export function PlanDetailSection({
                   onClearFocus={edit.clearFocus}
                   onMove={edit.move}
                   onToggleRemoved={edit.toggle}
+                  onStartTimeChange={edit.setStartTime}
                   onSave={() => edit.save(group.day)}
                   onCancel={requestCancel}
                 />
