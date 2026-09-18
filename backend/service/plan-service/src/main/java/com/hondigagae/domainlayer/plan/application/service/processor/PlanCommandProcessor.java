@@ -12,7 +12,9 @@ import com.hondigagae.domainlayer.plan.application.port.out.PlanItemRepositoryPo
 import com.hondigagae.domainlayer.plan.application.port.out.PlanPetConditionRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanPetRepositoryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.PlanRepositoryPort;
+import com.hondigagae.domainlayer.plan.application.port.out.PlanWalkCourseQueryPort;
 import com.hondigagae.domainlayer.plan.application.port.out.query.PetConditionQueryResult;
+import com.hondigagae.domainlayer.plan.application.port.out.query.PlanWalkCourseSummaryQueryResult;
 import com.hondigagae.shared.travel.plan.PlanItemType;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
@@ -45,12 +47,13 @@ public class PlanCommandProcessor {
     private final PlanPetRepositoryPort planPetRepositoryPort;
     private final PlanPetConditionRepositoryPort planPetConditionRepositoryPort;
     private final PlaceVerifyQueryPort placeVerifyQueryPort;
+    private final PlanWalkCourseQueryPort planWalkCourseQueryPort;
     private final PetConditionQueryPort petConditionQueryPort;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
 
     /**
-     * DB 쓰기 구간만 트랜잭션으로 묶는다. 반려견 확인({@link #resolvePetIds})과 장소 검증
-     * ({@link #verifyPlaceTargets})은 원격 호출이라 Facade 가 <b>이 메서드에 들어오기 전에</b>
+     * DB 쓰기 구간만 트랜잭션으로 묶는다. 반려견 확인({@link #resolvePetIds})과 타깃 검증
+     * ({@link #verifyItemTargets})은 원격 호출이라 Facade 가 <b>이 메서드에 들어오기 전에</b>
      * 수행한다 — 트랜잭션 안에서 원격 응답을 기다리면 DB 커넥션을 잡은 채 대기하게 된다
      * (architecture-guide §3 의 문서화된 예외).
      */
@@ -87,9 +90,13 @@ public class PlanCommandProcessor {
     /**
      * 지난 일정을 새 {@code DRAFT} 로 복제한다. 준비물·후기·방문 체크는 가져오지 않는다.
      *
-     * <p>장소 검증({@link #verifyPlaceTargets})은 부르지 않는다 — 복제는 이미 저장된 항목을
+     * <p>타깃 검증({@link #verifyItemTargets})은 부르지 않는다 — 복제는 이미 저장된 항목을
      * 옮기는 것이고, delisted 장소는 상세 규칙대로 항목은 남기고 요약만 비운다. 생성 경로처럼
      * 검증하면 delisted 참조가 있는 일정을 복제할 수 없게 된다.
+     *
+     * <p><b>산책 코스도 같다</b> (#715). 저장 시 코스 존재 검증이 생겼지만 복제에는 걸지 않는다 —
+     * 검증 없이 저장됐거나 원천에서 사라진 코스를 참조하는 옛 일정을 복제할 수 없게 되고, 그것은
+     * 사용자가 고칠 수 없는 과거 자료 때문에 새 일정을 못 만드는 일이다.
      *
      * <p>동행 반려견 필터({@link #resolveCopyPetIds})는 원격 호출이라 Facade 가 트랜잭션 밖에서 부른다.
      */
@@ -281,7 +288,7 @@ public class PlanCommandProcessor {
     /**
      * 특정 일차의 항목을 일괄 교체한다. (삭제 후 재삽입)
      *
-     * <p>장소 검증({@link #verifyPlaceTargets})은 원격 호출이라 Facade 가 트랜잭션 밖에서 먼저 한다.
+     * <p>타깃 검증({@link #verifyItemTargets})은 원격 호출이라 Facade 가 트랜잭션 밖에서 먼저 한다.
      */
     @Transactional
     public void replaceDayItems(Plan plan, int day, List<PlanItemCommand> commands) {
@@ -341,16 +348,33 @@ public class PlanCommandProcessor {
     }
 
     /**
+     * 항목이 가리키는 <b>타깃의 존재</b>를 저장 전에 확인한다. 유형마다 아이디 공간이 달라
+     * 장소와 산책 코스를 따로 묻되, <b>종류마다 원격 호출은 한 번</b>이다.
+     *
+     * <p>입구를 하나로 둔다 — 두 검증을 따로 공개하면 새 저장 경로가 한쪽만 부르고도 통과한다.
+     * {@code WALK} 가 장소 검증 판정에서 빠져 {@code targetId} 가 검증 없이 저장되던 것이
+     * 정확히 그 모양이었다 (#715).
+     *
+     * <p>원격 호출이므로 트랜잭션 밖(Facade)에서 부른다.
+     */
+    public void verifyItemTargets(List<PlanItemCommand> commands) {
+        if (CollectionUtils.isEmpty(commands)) {
+            return;
+        }
+        verifyPlaceTargets(commands);
+        verifyWalkCourseTargets(commands);
+    }
+
+    /**
      * 장소를 참조하는 항목들을 <b>한 번의 원격 호출</b>로 검증한다.
      *
      * <p>항목마다 따로 부르면 일정 하루(항목 8개 안팎) 저장에 HTTP 왕복이 8번 생긴다.
      * delisted 장소는 tour-service 가 목록에서 빼고 돌려주므로, 원천에서 사라진 장소를
-     * 새 항목이 참조하는 것도 여기서 함께 막힌다. 원격 호출이므로 트랜잭션 밖(Facade)에서 부른다.
+     * 새 항목이 참조하는 것도 여기서 함께 막힌다.
+     *
+     * <p>{@code targetId} 가 null 인 항목은 묻지 않는다 — 대상 없이 제목만 있는 줄은 담을 수 있다.
      */
-    public void verifyPlaceTargets(List<PlanItemCommand> commands) {
-        if (CollectionUtils.isEmpty(commands)) {
-            return;
-        }
+    private void verifyPlaceTargets(List<PlanItemCommand> commands) {
         Set<Long> targetIds = commands.stream()
             .filter(command -> command.itemType().isPlaceTarget() && command.targetId() != null)
             .map(PlanItemCommand::targetId)
@@ -362,6 +386,41 @@ public class PlanCommandProcessor {
         Set<Long> visibleIds = placeVerifyQueryPort.findVisiblePlaceIds(targetIds);
         if (!visibleIds.containsAll(targetIds)) {
             throw new PlanException(PlanErrorCode.NOT_FOUND_PLAN_PLACE);
+        }
+    }
+
+    /**
+     * {@code WALK} 항목의 {@code targetId} 를 <b>한 번의 원격 호출</b>로 검증한다 (#715).
+     *
+     * <p><b>{@code isPlaceTarget()} 을 넓혀 장소 검증에 태우지 않는다.</b> 그 판정의 뜻은
+     * "{@code targetId} 가 {@code place.id} 인가" 이고, 응급 브리핑({@code PlanEmergencyProcessor})과
+     * 상세 요약({@code PlanQueryProcessor.placeTargetIdOf})이 같은 판정으로 조회 대상을 고른다 —
+     * 넓히면 그 두 경로가 {@code walk_course.id} 를 장소 아이디 공간에서 찾는다. 이름이 흐려지는
+     * 문제가 아니라 동작이 깨진다.
+     *
+     * <p>존재 확인에 <b>요약 조회를 그대로 쓴다.</b> {@link PlanWalkCourseQueryPort#findSummaries}
+     * 가 목록에 없는 아이디를 결과에서 빼므로 아이디 집합 비교로 충분하다. 전용 엔드포인트를 새로
+     * 열면 검증에 필요 없는 본문은 덜어내지만 tour-service 의 내부 API 가 하나 늘고 두 경로가
+     * 같은 표를 각자 묻게 된다 — 한 번 저장에 담기는 코스는 몇 개 수준이고, 같은 API 를 일정
+     * 상세가 이미 매 조회 부른다.
+     *
+     * <p>{@code targetId} 가 null 인 항목은 장소 경로와 같이 묻지 않는다.
+     */
+    private void verifyWalkCourseTargets(List<PlanItemCommand> commands) {
+        List<Long> walkCourseIds = commands.stream()
+            .filter(command -> command.itemType() == PlanItemType.WALK && command.targetId() != null)
+            .map(PlanItemCommand::targetId)
+            .distinct()
+            .toList();
+        if (walkCourseIds.isEmpty()) {
+            return;
+        }
+
+        Set<Long> foundIds = planWalkCourseQueryPort.findSummaries(walkCourseIds).stream()
+            .map(PlanWalkCourseSummaryQueryResult::walkCourseId)
+            .collect(Collectors.toSet());
+        if (!foundIds.containsAll(walkCourseIds)) {
+            throw new PlanException(PlanErrorCode.NOT_FOUND_PLAN_WALK_COURSE);
         }
     }
 

@@ -161,7 +161,8 @@ class PlanPeriodShrinkTest {
     private PlanCommandProcessor processor(StubPlanRepositoryPort plans, StubPlanItemRepositoryPort items) {
         return new PlanCommandProcessor(
             plans, items, new StubPlanPetRepositoryPort(), new StubPlanPetConditionRepositoryPort(),
-            new StubPlaceVerifyQueryPort(), new StubPetConditionQueryPort(), new SnowflakeIdGenerator(1, 1));
+            new StubPlaceVerifyQueryPort(), new StubPlanWalkCourseQueryPort(),
+            new StubPetConditionQueryPort(), new SnowflakeIdGenerator(1, 1));
     }
 
     private static class StubPlanRepositoryPort implements PlanRepositoryPort {

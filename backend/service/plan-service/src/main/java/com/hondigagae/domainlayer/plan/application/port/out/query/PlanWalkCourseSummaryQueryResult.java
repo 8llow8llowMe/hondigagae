@@ -7,9 +7,9 @@ import lombok.Builder;
 /**
  * 일정 항목이 가리키는 산책 코스의 요약 (이슈 #619). tour-service 내부 후보 API 한 번으로 받아 온다.
  *
- * <p>목록에 아예 없는 아이디는 저장 시 검증되지 않은 {@code targetId} 이거나 수기로 정리된 행이다.
- * 그 항목은 <b>요약이 null 인 채로 응답에 남는다</b> — 사용자가 담아 둔 자료라 사라지면 안 된다
- * (장소 요약과 같은 판단이다).
+ * <p>목록에 아예 없는 아이디는 코스 검증(#715)이 생기기 전에 저장된 {@code targetId} 이거나
+ * 수기로 정리된 행이다. 그 항목은 <b>요약이 null 인 채로 응답에 남는다</b> — 사용자가 담아 둔
+ * 자료라 사라지면 안 된다 (장소 요약과 같은 판단이다).
  */
 @Builder
 public record PlanWalkCourseSummaryQueryResult(

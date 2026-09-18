@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.hondigagae.domainlayer.plan.application.command.PlanCreateCommand;
+import com.hondigagae.domainlayer.plan.application.command.PlanItemCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanUpdateCommand;
 import com.hondigagae.domainlayer.plan.application.exception.PlanErrorCode;
 import com.hondigagae.domainlayer.plan.application.exception.PlanException;
@@ -18,6 +19,7 @@ import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
+import com.hondigagae.shared.travel.plan.PlanItemType;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -40,6 +42,9 @@ import org.springframework.data.domain.Slice;
  *   <li><b>지정이 없으면 대표 반려견이다</b> — ai-service 생성과 같은 규칙. 그것도 없으면 만들지 않는다
  *   <li><b>대표 반려견 조회는 지정이 없을 때만 부른다</b> — 매 담기마다 auth-service 를 왕복하지 않는다
  * </ul>
+ *
+ * <p>항목 타깃 검증(#715)도 여기 있다 — 같은 Processor 의 같은 진입점({@code verifyItemTargets})이고,
+ * 원격 포트 스텁이 이미 이 파일에 묶여 있다.
  */
 class PlanCommandProcessorTest {
 
@@ -50,6 +55,8 @@ class PlanCommandProcessorTest {
     private StubPlanPetRepositoryPort planPetRepositoryPort;
     private StubPetConditionQueryPort petConditionQueryPort;
     private StubPlanPetConditionRepositoryPort planPetConditionRepositoryPort;
+    private StubPlaceVerifyQueryPort placeVerifyQueryPort;
+    private StubPlanWalkCourseQueryPort planWalkCourseQueryPort;
     private PlanCommandProcessor processor;
 
     @BeforeEach
@@ -58,10 +65,12 @@ class PlanCommandProcessorTest {
         planPetRepositoryPort = new StubPlanPetRepositoryPort();
         petConditionQueryPort = new StubPetConditionQueryPort();
         planPetConditionRepositoryPort = new StubPlanPetConditionRepositoryPort();
+        placeVerifyQueryPort = new StubPlaceVerifyQueryPort();
+        planWalkCourseQueryPort = new StubPlanWalkCourseQueryPort();
         processor = new PlanCommandProcessor(
             planRepositoryPort, new StubPlanItemRepositoryPort(), planPetRepositoryPort,
-            planPetConditionRepositoryPort, new StubPlaceVerifyQueryPort(), petConditionQueryPort,
-            new SnowflakeIdGenerator(1, 1));
+            planPetConditionRepositoryPort, placeVerifyQueryPort, planWalkCourseQueryPort,
+            petConditionQueryPort, new SnowflakeIdGenerator(1, 1));
     }
 
     private static PlanCreateCommand command(List<Long> petIds) {
@@ -314,6 +323,84 @@ class PlanCommandProcessorTest {
         return PetConditionQueryResult.builder().breed(breed).heatSensitive(heatSensitive).build();
     }
 
+    // ── 항목 타깃 검증 (#715) ──────────────────────────────────────────────
+
+    /**
+     * 유형마다 {@code targetId} 의 아이디 공간이 다르다 — {@code WALK} 는 {@code walk_course.id},
+     * 나머지는 {@code place.id} 다. 고정하는 것은 셋이다.
+     *
+     * <ul>
+     *   <li><b>없는 코스는 거부한다</b> — 그냥 저장하면 제목만 남은 항목이 되고, 상세의 빈 요약은
+     *       "코스 없음" 과 "tour-service 장애" 를 구분해 주지 못한다
+     *   <li><b>원격 호출은 종류마다 한 번이다</b> — 항목마다 부르면 저장 한 번에 왕복이 항목 수만큼 생긴다
+     *   <li><b>{@code targetId} 가 null 이면 묻지 않는다</b> — 장소 경로와 같은 처리다
+     * </ul>
+     */
+    @Test
+    @DisplayName("존재하지 않는 산책 코스를 가리키는 WALK 항목은 400 PLAN_025 로 거부한다")
+    void rejectsWalkItemWithUnknownCourse() {
+        planWalkCourseQueryPort.existingIds.add(20L);
+
+        assertThatThrownBy(() -> processor.verifyItemTargets(List.of(item(1, PlanItemType.WALK, 999L))))
+            .isInstanceOf(PlanException.class)
+            .extracting(exception -> ((PlanException) exception).getErrorCode())
+            .isEqualTo(PlanErrorCode.NOT_FOUND_PLAN_WALK_COURSE);
+    }
+
+    @Test
+    @DisplayName("존재하는 코스를 가리키면 통과한다 — 아이디 목록에서 빠진 것만 거부한다")
+    void acceptsWalkItemWithExistingCourse() {
+        planWalkCourseQueryPort.existingIds.add(20L);
+
+        processor.verifyItemTargets(List.of(item(1, PlanItemType.WALK, 20L)));
+
+        assertThat(planWalkCourseQueryPort.requests).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("장소와 산책 코스가 섞여 있으면 원격 호출은 종류마다 한 번이다 — 항목 수만큼 왕복하지 않는다")
+    void verifiesEachTargetKindWithOneRemoteCall() {
+        planWalkCourseQueryPort.existingIds.addAll(Set.of(20L, 21L));
+
+        processor.verifyItemTargets(List.of(
+            item(1, PlanItemType.PLACE, 10L), item(2, PlanItemType.MEAL, 11L),
+            item(3, PlanItemType.WALK, 20L), item(4, PlanItemType.WALK, 21L),
+            item(5, PlanItemType.MOVE, null)));
+
+        assertThat(placeVerifyQueryPort.requests).hasSize(1);
+        assertThat(placeVerifyQueryPort.requests.get(0)).containsExactlyInAnyOrder(10L, 11L);
+        assertThat(planWalkCourseQueryPort.requests).hasSize(1);
+        assertThat(planWalkCourseQueryPort.requests.get(0)).containsExactlyInAnyOrder(20L, 21L);
+    }
+
+    @Test
+    @DisplayName("WALK 항목이 없으면 코스 조회를 아예 부르지 않는다 — 장소만 담은 저장에 왕복을 늘리지 않는다")
+    void doesNotAskCoursesWithoutWalkItems() {
+        processor.verifyItemTargets(List.of(item(1, PlanItemType.PLACE, 10L)));
+
+        assertThat(planWalkCourseQueryPort.requests).isEmpty();
+    }
+
+    @Test
+    @DisplayName("targetId 가 null 인 WALK 항목은 장소 경로와 같이 묻지 않는다 — 대상 없는 줄은 담을 수 있다")
+    void skipsNullTargetIdsLikePlacePath() {
+        processor.verifyItemTargets(List.of(
+            item(1, PlanItemType.WALK, null), item(2, PlanItemType.PLACE, null)));
+
+        assertThat(planWalkCourseQueryPort.requests).isEmpty();
+        assertThat(placeVerifyQueryPort.requests).isEmpty();
+    }
+
+    private static PlanItemCommand item(int sequence, PlanItemType itemType, Long targetId) {
+        return PlanItemCommand.builder()
+            .day(1)
+            .sequence(sequence)
+            .itemType(itemType)
+            .targetId(targetId)
+            .title("항목 " + sequence)
+            .build();
+    }
+
     // ── 스텁 ───────────────────────────────────────────────────────────────
 
     private static class StubPlanRepositoryPort implements PlanRepositoryPort {
@@ -419,8 +506,12 @@ class PlanCommandProcessorTest {
 
     private static class StubPlaceVerifyQueryPort implements PlaceVerifyQueryPort {
 
+        /** 호출마다 요청 목록을 남긴다 — 코스 검증과 같이 "종류마다 한 번" 을 고정한다. */
+        private final List<List<Long>> requests = new ArrayList<>();
+
         @Override
         public Set<Long> findVisiblePlaceIds(Collection<Long> placeIds) {
+            requests.add(List.copyOf(placeIds));
             return new HashSet<>(placeIds);
         }
     }

@@ -39,6 +39,10 @@ public enum PlanErrorCode {
     SHARE_PLAN_NOT_SHAREABLE("PLAN_022", "확정되거나 완료된 일정만 공유할 수 있습니다.", HttpStatus.BAD_REQUEST),
     SHARE_LINK_NOT_FOUND("PLAN_023", "유효하지 않은 공유 링크입니다.", HttpStatus.NOT_FOUND),
     SHARE_LINK_EXPIRED("PLAN_024", "만료된 공유 링크입니다. 링크를 만든 사람에게 새 링크를 요청해 주세요.", HttpStatus.GONE),
+    // 산책 코스 타깃 검증 (#715). PLAN_004(장소)를 재사용하지 않는다 — 문구가 "장소를 찾을 수
+    // 없습니다" 라 코스에 대해서는 사실이 아니고, 코드가 있는 이유는 클라이언트가 **무엇이**
+    // 잘못됐는지 알기 위해서다. 성격은 PLAN_004 와 같아 프론트는 둘 다 재시도 없는 400 으로 다룬다.
+    NOT_FOUND_PLAN_WALK_COURSE("PLAN_025", "일정 항목의 산책 코스를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST),
     INVALID_REQUEST("PLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
     // 프레임워크 공통 2종은 검증 대역 끝에 둔다 (coding-conventions §8-2). PLAN_115 가 petIds 필드 코드로
     // 쓰이면서 한 칸씩 밀렸고, 준비물 필드 코드가 PLAN_116~123 을 가져가면서 다시 밀었다.
