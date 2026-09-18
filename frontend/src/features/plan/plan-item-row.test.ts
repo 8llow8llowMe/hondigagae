@@ -89,7 +89,13 @@ function renderWithVisit({ visited = false, visit }: { visited?: boolean; visit?
   )
 }
 
-const idleVisit: PlanItemVisit = { pending: false, error: null, onToggle: () => undefined }
+const idleVisit: PlanItemVisit = {
+  pending: false,
+  error: null,
+  onToggle: () => undefined,
+  // 기본은 여행 중·지난 일정이다 — 낱말이 서는 갈래 (#732)
+  compact: false,
+}
 
 describe('PlanItemRow — 방문 체크 토글 (#124)', () => {
   it('visit 를 넘기지 않으면 토글이 없다 — 기간 밖 항목 섹션의 경로다', () => {
@@ -156,6 +162,26 @@ describe('PlanItemRow — 방문 체크 토글 (#124)', () => {
     const visible = markup.match(new RegExp(`>${messages.plan.visitedLabel}<`, 'g')) ?? []
 
     expect(visible).toHaveLength(1)
+  })
+
+  /*
+    **출발 전에는 `다녀옴 표시` 가 D-1 화면에서 가장 많이 반복되는 문자열이었다** (#732 ·
+    진단 665-7). 아무도 다녀오지 않은 일정의 모든 항목에 붙어 있었다. 기능은 그대로 두고
+    글자만 접는다 — 접근 가능한 이름은 양쪽 갈래 모두 그대로다.
+  */
+  it('출발 전 미체크 행은 체크 아이콘만 남는다 — 기능과 이름은 그대로다', () => {
+    const markup = renderWithVisit({ visited: false, visit: { ...idleVisit, compact: true } })
+
+    expect(markup).not.toContain(`${messages.plan.visitToggleLabel}</button>`)
+    expect(markup).toContain(`aria-label="${messages.plan.visitAction}"`)
+    expect(markup).toContain('aria-pressed="false"')
+  })
+
+  /* `다녀옴` 은 상태를 말하는 유일한 낱말이다 — 접으면 색과 아이콘만 남는다 (DESIGN.md §7) */
+  it('출발 전이어도 체크된 행은 낱말을 지킨다', () => {
+    const markup = renderWithVisit({ visited: true, visit: { ...idleVisit, compact: true } })
+
+    expect(markup).toContain(`${messages.plan.visitedLabel}</button>`)
   })
 
   it('저장 중이면 그 행의 토글만 잠기고 aria-busy 가 붙는다', () => {

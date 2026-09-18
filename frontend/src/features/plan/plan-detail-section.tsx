@@ -196,10 +196,15 @@ export function PlanDetailSection({
     시점 축은 `planPhaseOf` 하나다. 개요 배지·일자 배지·준비물 자리가 전부 같은 `PlanPhase`
     에서 나오므로, 여기만 다른 셈을 쓰면 배지는 `D-1` 인데 버튼은 여행이 시작된 것처럼 군다.
   */
-  const statusLayout = planStatusActionLayout(
-    plan.status.code,
-    planPhaseOf(plan.startDate, plan.endDate, today),
-  )
+  const phase = planPhaseOf(plan.startDate, plan.endDate, today)
+  const statusLayout = planStatusActionLayout(plan.status.code, phase)
+
+  /*
+    **아직 떠나지 않은 여행이다** (#732). 항목 행의 `다녀옴 표시` 글자를 접는 데만 쓴다 —
+    D-1 화면에서 가장 많이 반복되는 문자열이 그것이었다. 위 `statusLayout` 과 **같은
+    `PlanPhase`** 에서 나온다.
+  */
+  const beforeDeparture = phase?.kind === 'upcoming'
 
   /*
     **출발이 가까우면 준비물이 일자 위다** (#665 · 진단 PL-3 · 명세 D11-9). `D-1` · `D-0`
@@ -378,6 +383,7 @@ export function PlanDetailSection({
                 pending: visit.pending.has(planItemId),
                 error: visit.failures.get(planItemId) ?? null,
                 onToggle: (next) => visit.toggle(planItemId, next),
+                compact: beforeDeparture,
               }),
             }}
             walkSafety={{
