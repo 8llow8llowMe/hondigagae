@@ -7,25 +7,41 @@ import { Skeleton } from '@/components/skeleton'
 import { oauthNextAction } from '@/features/auth/oauth-error'
 import { type OAuthExchangeState, useOAuthExchange } from '@/features/auth/use-oauth-exchange'
 import { ApiError, classify } from '@/lib/api/error'
-import { oauthProviderName } from '@/lib/auth/oauth-provider'
+import { isOAuthProvider, oauthProviderName } from '@/lib/auth/oauth-provider'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 
 const LOGIN_PATH = '/login'
-/** 가입 동의를 실을 수 있는 유일한 입구 — 소셜 `/authorize` 호출 전이다 (#688) */
+/**
+ * 제공자를 특정하지 못했을 때의 동의 입구 — 회원가입 화면의 동의 블록이다 (#688).
+ *
+ * 평소에는 쓰이지 않는다. 제공자를 알면 전용 화면으로 간다 (#707).
+ */
 const SIGNUP_PATH = '/signup'
+/** 소셜 최초 연동 전용 동의 화면. 들어온 제공자 버튼 하나만 선다 (#707) */
+const SOCIAL_SIGNUP_CONSENT_PATH = '/signup/social'
 /** `takeReturnTo` 가 복귀 경로 없음을 뜻할 때 돌려주는 값 */
 const NO_RETURN_TO = '/'
 
 /**
- * 회원가입 화면으로 보낼 때 **원래 가려던 곳을 함께 넘긴다.** 안 넘기면 동의 누락으로
+ * 동의 화면으로 보낼 때 **원래 가려던 곳을 함께 넘긴다.** 안 넘기면 동의 누락으로
  * 여기 온 사용자가 가입을 마쳤을 때 목적지를 잃는다. 값은 `takeReturnTo` 가 이미
  * `safeReturnTo` 로 거른 것이라 그대로 실어도 외부 주소가 들어가지 않는다.
+ *
+ * **제공자도 함께 넘긴다** (#707). 목적지는 동의만 받고 다시 `/authorize` 를 부르는
+ * 화면이라, 어느 제공자로 시작했는지 모르면 버튼을 하나로 좁힐 수 없다 — 좁히지 못하면
+ * 예전처럼 다른 제공자 버튼이 함께 서고, 그것을 누르는 순간 **다른 이메일의 다른 가입**
+ * 이 된다.
+ *
+ * **모르는 제공자면 `/signup` 으로 떨어진다.** 경로 세그먼트는 사용자가 조작할 수 있고,
+ * 그 값을 그대로 이어 붙이면 곧바로 404 인 주소로 안내하게 된다. 회원가입 화면에도 동의
+ * 블록이 있으므로 길이 길 뿐 막다른 곳은 아니다 — 라벨을 일반 문구로 떨어뜨리는 것과
+ * 같은 처리다.
  */
-function signupPathWith(returnTo: string): string {
-  return returnTo === NO_RETURN_TO
-    ? SIGNUP_PATH
-    : `${SIGNUP_PATH}?returnTo=${encodeURIComponent(returnTo)}`
+function signupConsentPath(provider: string, returnTo: string): string {
+  const base = isOAuthProvider(provider) ? `${SOCIAL_SIGNUP_CONSENT_PATH}/${provider}` : SIGNUP_PATH
+
+  return returnTo === NO_RETURN_TO ? base : `${base}?returnTo=${encodeURIComponent(returnTo)}`
 }
 
 /**
@@ -112,13 +128,18 @@ export function OAuthCallbackStatus({
 
   /*
     **동의 누락만 목적지가 다르다** (#688). 동의는 `/authorize` 를 부르기 **전에만**
-    실을 수 있고(인가코드 1회용), 그 입구가 회원가입 화면의 동의 블록이다. 로그인
-    화면으로 보내면 같은 실패를 그대로 반복한다 — 그쪽 소셜 버튼은 동의를 싣지 않는다.
+    실을 수 있고(인가코드 1회용), 로그인 화면으로 보내면 같은 실패를 그대로 반복한다
+    — 그쪽 소셜 버튼은 동의를 싣지 않는다.
+
+    **그 입구가 회원가입 화면에서 전용 동의 화면으로 바뀌었다** (#707). 회원가입 화면은
+    동의를 실을 수 있는 유일한 자리였을 뿐, 여기서 튕겨 온 사용자에게 맞는 화면이 아니었다
+    — 쓸 일 없는 이메일 폼과 **들어오지 않은 제공자 버튼**까지 함께 보였다.
 
     사유 문구는 여기서도 서버 것(`message`)을 그대로 쓴다. `MEMBER_010` 은 "이용약관과
     개인정보 처리방침에 동의해야", `MEMBER_011` 은 "만 14세 이상만" 이라고 이미 말한다.
   */
-  const destination = action === 'signup-consent' ? signupPathWith(exchange.returnTo) : LOGIN_PATH
+  const destination =
+    action === 'signup-consent' ? signupConsentPath(provider, exchange.returnTo) : LOGIN_PATH
 
   return (
     <EmptyState
