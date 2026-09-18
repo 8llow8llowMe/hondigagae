@@ -1,5 +1,6 @@
-import { z } from 'zod'
+import { z, type ZodType } from 'zod'
 
+import type { SignupConsent, SignupConsentKey } from '@/lib/auth/signup-consent'
 import { EMAIL_PATTERN } from '@/lib/form/email-pattern'
 import { PASSWORD_PATTERN } from '@/lib/form/password-pattern'
 import { messages } from '@/lib/messages'
@@ -71,15 +72,28 @@ export const signupProfileSchema = z.object({
  * `z.literal(true)` 가 아니라 `z.boolean().refine(...)` 인 이유는 **추론 타입**이다.
  * `z.literal(true)` 는 타입이 `true` 라 체크 해제 상태(`false`)를 담을 수 없어 화면
  * 상태 타입으로 쓸 수 없다. 백엔드도 `boolean` 필드에 `@AssertTrue` 를 거는 같은 모양이다.
+ *
+ * **`satisfies Record<SignupConsentKey, …>` 가 이 스키마의 안전장치다.** "셋 다 true" 를
+ * 판정하는 곳이 둘이다 — 소셜 버튼은 `isSignupConsentComplete`(`SIGNUP_CONSENT_KEYS` 순회),
+ * 이메일 가입은 이 스키마다. 키를 손으로 나열해 두면 네 번째 동의 항목이 생겼을 때
+ * **zod 가 여분 키를 조용히 무시해** 소셜만 잠기고 이메일 가입은 미동의로 통과한다
+ * (그리고 서버에서 400 을 맞는다). `satisfies` 는 키가 하나라도 빠지면 컴파일을 깬다.
  */
-export const signupConsentSchema = z.object({
+const signupConsentShape = {
   // MEMBER_115
   termsAgreed: z.boolean().refine((agreed) => agreed, messages.form.termsAgreementRequired),
   // MEMBER_116
   privacyAgreed: z.boolean().refine((agreed) => agreed, messages.form.privacyAgreementRequired),
   // MEMBER_117
   ageOver14Confirmed: z.boolean().refine((confirmed) => confirmed, messages.form.ageOver14Required),
-})
+} satisfies Record<SignupConsentKey, ZodType<boolean>>
+
+/**
+ * **반환 타입을 명시한다.** `satisfies` 가 잡지 못하는 남은 갈래 — 키는 그대로인데 출력
+ * 타입이 갈리는 변경(예: 한 항목만 `z.literal(true)` 로 좁히기) — 을 여기서 막는다.
+ * 검증 결과를 그대로 요청 바디에 실으므로 두 타입이 어긋나면 안 된다.
+ */
+export const signupConsentSchema: ZodType<SignupConsent> = z.object(signupConsentShape)
 
 /**
  * 비밀번호 재설정 2단계 (코드 + 새 비밀번호).
@@ -107,5 +121,9 @@ export type LoginValues = z.infer<typeof loginSchema>
 export type EmailValues = z.infer<typeof emailSchema>
 export type CodeValues = z.infer<typeof codeSchema>
 export type SignupProfileValues = z.infer<typeof signupProfileSchema>
-export type SignupConsentValues = z.infer<typeof signupConsentSchema>
+/*
+  동의 값 타입은 여기서 다시 짓지 않는다. 정본은 `lib/auth/signup-consent.ts` 의
+  `SignupConsent` 이고, 위 `signupConsentSchema` 가 그 타입을 반환 타입으로 못 박고 있다.
+  `z.infer` 로 세 번째 이름을 만들면 항목이 늘 때 어느 쪽이 정본인지 흐려진다.
+*/
 export type PasswordResetValues = z.infer<typeof passwordResetSchema>

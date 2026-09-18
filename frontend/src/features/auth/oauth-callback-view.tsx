@@ -14,6 +14,19 @@ import { messages } from '@/lib/messages'
 const LOGIN_PATH = '/login'
 /** 가입 동의를 실을 수 있는 유일한 입구 — 소셜 `/authorize` 호출 전이다 (#688) */
 const SIGNUP_PATH = '/signup'
+/** `takeReturnTo` 가 복귀 경로 없음을 뜻할 때 돌려주는 값 */
+const NO_RETURN_TO = '/'
+
+/**
+ * 회원가입 화면으로 보낼 때 **원래 가려던 곳을 함께 넘긴다.** 안 넘기면 동의 누락으로
+ * 여기 온 사용자가 가입을 마쳤을 때 목적지를 잃는다. 값은 `takeReturnTo` 가 이미
+ * `safeReturnTo` 로 거른 것이라 그대로 실어도 외부 주소가 들어가지 않는다.
+ */
+function signupPathWith(returnTo: string): string {
+  return returnTo === NO_RETURN_TO
+    ? SIGNUP_PATH
+    : `${SIGNUP_PATH}?returnTo=${encodeURIComponent(returnTo)}`
+}
 
 /**
  * 교환 상태별 화면. **상태를 갖지 않아 node 환경에서 렌더 테스트가 된다**
@@ -105,7 +118,7 @@ export function OAuthCallbackStatus({
     사유 문구는 여기서도 서버 것(`message`)을 그대로 쓴다. `MEMBER_010` 은 "이용약관과
     개인정보 처리방침에 동의해야", `MEMBER_011` 은 "만 14세 이상만" 이라고 이미 말한다.
   */
-  const destination = action === 'signup-consent' ? SIGNUP_PATH : LOGIN_PATH
+  const destination = action === 'signup-consent' ? signupPathWith(exchange.returnTo) : LOGIN_PATH
 
   return (
     <EmptyState
