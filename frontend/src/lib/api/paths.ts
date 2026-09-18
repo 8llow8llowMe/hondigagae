@@ -89,6 +89,22 @@ export const paths = {
     /** 주변 긴급 시설. `lat`/`lng` 가 필수라 쿼리 없이 부르지 않는다 */
     facilities: (query: string) => `/emergencies/facilities?${query}`,
   },
+  walkCourses: {
+    /**
+     * 제주올레 코스 목록 (#618). **커서가 없다** — 코스가 29개뿐이라 전량이 한 번에 온다.
+     *
+     * 파라미터: `petActivityLevel`(`LOW`/`MEDIUM`/`HIGH`) · `maxDistanceKm`(0.1~50) ·
+     * `sort`(`COURSE_NO` 기본 · `DISTANCE_ASC` · `DISTANCE_DESC` · `DURATION_ASC`).
+     * 화면이 쓰는 것은 `petActivityLevel` 과 `sort` 둘뿐이다 (`코스목록-세부명세.md` D0).
+     */
+    list: (query: string) => (query ? `/walk-courses?${query}` : '/walk-courses'),
+    /**
+     * 코스 상세. **없는 id 는 404(`WALKCOURSE_001`)이고 숫자가 아닌 id 는
+     * 400(`WALKCOURSE_113`)** 이다 — `@PathVariable long` 이라 `/places/{placeId}` 와 같은
+     * 모양이다 (dev 실측 2026-09-18).
+     */
+    detail: (walkCourseId: string) => `/walk-courses/${walkCourseId}`,
+  },
   favorites: {
     /** 저장한 장소 목록. 커서가 없다 — 회원당 100곳 상한이라 전량이 온다 */
     places: '/favorites/places',

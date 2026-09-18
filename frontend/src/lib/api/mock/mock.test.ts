@@ -35,10 +35,18 @@ describe('resolveMock — 처리 범위', () => {
 
       `/members/me/profile-image` 를 쓰지 않는다 — mock 이 처리한다 (#79 · #83).
       `/places/nearby` 도 쓸 수 없게 됐다 — 지도(#14)가 붙으며 mock 이 처리한다.
-      산책 코스(두루누비)는 **백엔드에 패키지 자체가 없다** — 화면도 mock 도 없는 것이
-      확실한 경로다 (screen-inventory §6).
+      **산책 코스도 쓸 수 없게 됐다** — 제주올레 코스 화면(#618)이 붙으며 mock 이 처리한다.
+
+      AI 상담사는 **백엔드에 패키지 자체가 없다** — 화면도 mock 도 없는 것이 확실한
+      경로다 (screen-inventory §6). 이 줄이 실패하면 그 컨텍스트가 생긴 것이니,
+      다른 미착수 경로로 옮기기 전에 §6 을 먼저 갱신한다.
     */
-    expect(resolveMock('/walk-courses', 'GET', '', null)).toBeNull()
+    expect(resolveMock('/assistant/conversations', 'GET', '', null)).toBeNull()
+  })
+
+  it('산책 코스는 mock 이 처리한다 (이슈 #618)', () => {
+    // 공개 API 라 토큰 없이도 200 이다 — `/places` 와 같다
+    expect(resolveMock('/walk-courses', 'GET', '', null)?.status).toBe(200)
   })
 
   it('AI 일정은 mock 이 처리한다 (이슈 #84)', () => {

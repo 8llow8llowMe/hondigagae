@@ -20,11 +20,11 @@ import {
   useRegionalWeather,
   useSuitabilities,
   useWalkSafety,
-  useWalkTimes,
 } from '@/features/home/use-home-insight'
-import { WalkTimesSection } from '@/features/home/walk-times-section'
 import { WalkVerdict } from '@/features/home/walk-verdict'
 import { WeatherWarningStrip } from '@/features/home/weather-warning-strip'
+import { useWalkTimes } from '@/features/insight/use-walk-times'
+import { WalkTimesSection } from '@/features/insight/walk-times-section'
 import { useSelectedPetStore } from '@/features/nav/selected-pet-store'
 import { usePetList } from '@/features/pet/use-pet-list'
 import { DEFAULT_RADIUS_METERS } from '@/lib/api/emergency'
@@ -477,6 +477,29 @@ export function HomeView({
               이쪽은 200 응답 안에서 `forecastCoverage: UNAVAILABLE` 로 온다.
             */
               onRetry={() => void walkTimes.refetch()}
+            />
+          </Surface>
+
+          {/*
+            제주올레 코스 진입점 (#618 · 산책 코스 공통명세 S6-1).
+
+            **전역 nav 에 넣지 않았다.** nav 셋(장소 찾기·여행 일정·AI 일정 생성)은 *할 일*
+            축이고 항목을 늘리지 않기로 이미 정해져 있다 (`nav-links.tsx`) — `Banner` 가
+            §0 이 인정한 상시 진입점이다.
+
+            **골든타임 바로 아래다.** "오늘 언제 나가나" 다음에 오는 질문이 "그럼 어디를
+            걷나" 이고, 코스 목록이 답하는 것이 그것이다. 아래 병원 배너와 갈래가 다르다 —
+            저쪽은 "위급하면" 이라 좌측 레일의 끝에 남는다.
+
+            **`leading` 을 주지 않는다.** `Banner` 의 아이콘 자리는 danger 색 고정이라
+            (병원 배너 전용), 산책 코스에 쓰면 상시 진입점이 경보처럼 읽힌다.
+          */}
+          <Surface>
+            <Banner
+              href="/walk-courses"
+              title={messages.walkCourse.bannerTitle}
+              description={messages.walkCourse.bannerDescription}
+              inset="card"
             />
           </Surface>
 

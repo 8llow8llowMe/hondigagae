@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { WalkTimesSection } from '@/features/home/walk-times-section'
+import { WalkTimesSection } from '@/features/insight/walk-times-section'
 import { mockWalkTimes } from '@/lib/api/mock/insight-data'
 import { messages } from '@/lib/messages'
 import type { WalkTimesResponse } from '@/types/insight'

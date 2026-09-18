@@ -3,19 +3,13 @@
 import { useQueries, useQuery } from '@tanstack/react-query'
 
 import { clientFetch } from '@/lib/api/client'
-import {
-  regionalWeatherPath,
-  suitabilityPath,
-  walkSafetyPath,
-  walkTimesPath,
-} from '@/lib/api/insight'
+import { regionalWeatherPath, suitabilityPath, walkSafetyPath } from '@/lib/api/insight'
 import { conditionKey, INSIGHT_QUERY_OPTIONS, insightKeys } from '@/lib/insight/queries'
 import type {
   PetCondition,
   PlaceSuitabilityResponse,
   RegionalWeatherResponse,
   WalkSafetyResponse,
-  WalkTimesResponse,
 } from '@/types/insight'
 
 /**
@@ -35,41 +29,6 @@ export function useWalkSafety(placeId: string | null, condition: PetCondition | 
     queryKey: insightKeys.walkSafety(placeId ?? '', conditionKey(condition)),
     queryFn: () => clientFetch<WalkSafetyResponse>(walkSafetyPath(placeId as string, condition)),
     enabled: placeId !== null,
-    placeholderData: (previous) => previous,
-    ...INSIGHT_QUERY_OPTIONS,
-  })
-}
-
-/**
- * 오늘의 산책 골든타임 (#158 · #180).
- *
- * **좌표가 정해질 때까지 조회하지 않는다.** `getCurrentPosition()` 은 거부·타임아웃에도
- * 제주 중심 좌표를 돌려주므로 결국 값이 오지만, 기다리지 않고 먼저 쏘면 **잘못된 지점의
- * 곡선을 한 번 보여 준 뒤 갈아치우게 된다** — 판정 화면에서 답이 바뀌면 못 믿는다.
- *
- * 반려견을 바꾸면 조건 key 가 갈려 재조회되고, `placeholderData` 로 이전 곡선을 유지한다 —
- * 깜빡이면 바꾼 것이 반영됐는지 알 수 없다 (홈-세부명세 D4-2).
- */
-export function useWalkTimes(
-  position: { lat: number; lng: number } | null,
-  condition: PetCondition | null,
-) {
-  return useQuery({
-    queryKey: insightKeys.walkTimes(
-      position?.lat ?? null,
-      position?.lng ?? null,
-      conditionKey(condition),
-    ),
-    // `enabled` 가 거짓인 동안 실행되지 않는다 — 좌표 단언은 그 뒤에만 닿는다
-    queryFn: () =>
-      clientFetch<WalkTimesResponse>(
-        walkTimesPath(
-          (position as { lat: number; lng: number }).lat,
-          (position as { lat: number; lng: number }).lng,
-          condition,
-        ),
-      ),
-    enabled: position !== null,
     placeholderData: (previous) => previous,
     ...INSIGHT_QUERY_OPTIONS,
   })
