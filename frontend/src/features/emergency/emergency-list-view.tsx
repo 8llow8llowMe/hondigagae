@@ -66,7 +66,7 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
   // 잘린 목록에서 센 개수는 전체가 아니다 — 틀린 개수는 없는 개수보다 나쁘다
   const showCounts = result !== null && countsAreComplete(result)
 
-  const subtitle = emergencyHeadSubtitle(result)
+  const subtitle = emergencyHeadSubtitle(result, board.filters.keyword, board.regionCode)
 
   return (
     <div className="rail-layout rail-layout-filter">
