@@ -474,6 +474,35 @@
 - 편집은 `순서 편집` 모드 안이다 (`features/plan/일자편집-세부명세.md` G). 항목 단건 수정 API 가
   없어 행에서 고치면 저장할 때마다 그 일자 방문 체크가 초기화된다.
   | 일정 복사 | `/plans/[planId]` 관리 메뉴 → 모달 | `POST /plans/{planId}/copy` | **구현** (#617) — 지난·완료 일정만. `일정복사-세부명세.md` |
+  | 항목 산책 위험도 | `/plans/[planId]` 항목 행 | `GET /plans/{planId}/walk-safety` | **명세 완료** (#625) — BE 2026-09-17 `c701b95a`. **2026-09-14 스냅샷에 없다** |
+
+**항목 산책 위험도** — [#625](https://github.com/8llow8llowMe/hondigagae/issues/625) · BE `c701b95a`(2026-09-17) · 명세 `features/plan/일정상세-세부명세.md` D15
+
+- **스냅샷(`docs/api/openapi/plan-service.json`, 2026-09-14)에 이 엔드포인트가 없다.** BE 가
+  사흘 뒤에 들어왔다. **스냅샷을 근거로 "없는 API" 라고 판단하면 틀린다** — `goldenWindowStatus`
+  · `forecastCoverage` 와 같은 전례다 (`features/_index.md` 하단).
+- **선행이 [#623](https://github.com/8llow8llowMe/hondigagae/issues/623) 항목 시각이다.** 서버가 `startTime` 없는 항목을 `NO_START_TIME` 으로 판정 거부한다.
+- **등급 체계가 적합도와 다르다** — `SAFE`/`CAUTION`/`DANGER`/**`UNKNOWN`** 이다
+  (적합도는 `HIGH`/`MEDIUM`/`LOW`/`INSUFFICIENT`). `lib/insight/tone.ts` 의 `walkSafetyTone()`
+  을 그대로 쓴다 — 공용 매퍼로 묶으면 "안전" 이 회색으로 나간다.
+- **시각별 예보 지평이 `오늘 ~ 오늘+4`(5일) 로, 일자 날씨의 11일보다 짧다**
+  (`PlanItemWalkSafetyUnavailableReason.HOURLY_FORECAST_HORIZON_DAYS = 4`). 노면온도를
+  `기온 + 일사(날짜·시각·위도)` 로 추정해야 해서 단기예보만 쓴다. **같은 일정에서 `/weather` 에는
+  판정이 있는데 항목 위험도는 비어 있는 날이 정상이다.** 5일·11일 숫자를 화면에 베끼지 않는다.
+- **판정 못 낸 사유가 코드로 온다** — `PAST_DATE` · `NOT_PLACE_TARGET` · `NO_START_TIME` ·
+  `BEYOND_FORECAST_RANGE` · `LOOKUP_FAILED`. **다섯 중 `LOOKUP_FAILED` 만 일시 장애**다.
+  문장(`unavailableReason`)과 짝으로 오고, **FE 는 문장을 파싱하지도 짓지도 않는다.**
+- **항목 하나가 실패해도 HTTP 200 이다.** tour-service 호출 실패가 예외로 오르지 않는다
+  (`PlanInsightClientAdapter#findWalkSafety`) — 전체 5xx 와 구분해야 한다.
+- **지평 안인데 그 시각 예보가 없으면 등급 `UNKNOWN` + 사유 코드 `null`** 이다. 화면은 그때
+  배지를 세우지 않고 `walkSafetyLevel.description` 문장을 쓴다 — 없는 판정을 회색 배지로도
+  말하지 않는다. (BE 후속 요청: D15-11)
+- **`petConditionApplied` 가 응답에 없다** — 포트 결과에는 있는데 DTO 로 나오지 않아 행에
+  "몽실이 기준" 을 쓸 수 없다 (BE 후속 요청: D15-11).
+- **일괄 교체 후 반드시 무효화한다.** 교체가 `planItemId` 를 전부 새로 발급해 낡은 판정이
+  어느 행에도 붙지 않고 조용히 사라진다.
+- 체감온도 라벨 규칙은 §3-1 표 그대로다 — 항목 행은 **`체감온도`(시각 기준)** 이고 일자 판정은
+  **`최고 체감온도`(하루 최대)** 다. 한 일자 카드에 기준이 다른 두 값이 서는 것이 정상이다.
 
 **일정 응급 브리핑** — [#125](https://github.com/8llow8llowMe/hondigagae/issues/125) · BE PR #105
 
