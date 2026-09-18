@@ -57,8 +57,8 @@
 
 - `POST /api/v1/auth/login` — 일반 로그인
 - `GET /api/v1/auth/{provider}/authorize?termsAgreed=&privacyAgreed=&ageOver14Confirmed=` — 소셜 인가 URL 생성 (state 10분 유효).
-  세 값 모두 선택(기본 false)이며 최초 연동(신규 가입)에서만 쓰인다
-- `GET /api/v1/auth/{provider}/login?code=&state=` — 소셜 로그인
+  세 값 모두 선택(기본 false)이며 최초 연동(신규 가입)에서만 쓰인다. 같은 state 를 `oauthState` HttpOnly 쿠키로도 심는다
+- `GET /api/v1/auth/{provider}/login?code=&state=` — 소셜 로그인. `oauthState` 쿠키가 쿼리 state 와 일치해야 한다 (없거나 다르면 `AUTH_010`)
 - `POST /api/v1/auth/email/send-code`, `POST /api/v1/auth/email/verify-code`
 - `POST /api/v1/auth/password/reset/send-code`, `POST /api/v1/auth/password/reset` — 비밀번호 재설정
 - `GET /api/v1/auth/sessions` — 로그인 기기 목록 (최근 갱신순, current 는 refresh 쿠키로 판별)
@@ -96,6 +96,8 @@
   jjwt 의 `SecurityException` 은 `java.lang.SecurityException` 과 이름이 같아 import 없이 catch 하면 엉뚱한 것을 잡는다 —
   `JwtException` 부모로 받는다.
 - OAuth state, refresh token, 로그아웃 블랙리스트, 이메일 인증코드, 로그인 실패 카운터는 Redis에 저장한다.
+- **OAuth state 는 Redis 에만 두지 않고 `oauthState` HttpOnly 쿠키로도 심어 요청한 브라우저에 묶는다** (#681).
+  콜백은 쿼리 state 와 쿠키 state 가 같을 때만 통과한다 — 아래 "state 는 쿠키로 브라우저에 묶는다" 참고.
 - provider 호출은 서킷 인스턴스(`kakao`, `naver`)로 감싸고, 인가코드 만료 같은 사용자 4xx는
   `OAuthApiCallSupport`가 `AuthException`으로 변환한 뒤 `ignore-exceptions`로 서킷에서 제외한다.
 - 프로필 이미지 업로드(회원·반려견 공통)는 트랜잭션 밖에서 수행한다 — 업로드 → DB 반영 → 이전 파일 삭제(실패 시 방금 올린 파일 회수) 순서다.
@@ -297,15 +299,51 @@ state 에 담을 값이 여러 개가 됐지만 Redis Hash 로 바꾸지 않았�
 것이고, 로그인할 때마다 다시 묻는 것은 동의의 의미를 희석한다. 문서 개정에 따른 재동의가
 필요해지면 로그인 경로가 아니라 별도 흐름으로 다룰 일이다.
 
-### 알려진 한계 — state 는 브라우저에 묶여 있지 않다
+### state 는 쿠키로 브라우저에 묶는다 (#681)
 
-`/authorize` 는 인증 없이 호출할 수 있고 state 는 Redis 에만 있으므로, 인가 URL 을 만든 주체와
-provider 에서 인증하는 주체가 다를 수 있다. 즉 여기 실린 동의는 **인가 URL 발급자의 주장**이지
-provider 로 인증한 본인의 확인이 아니다. 공격자가 동의를 켠 인가 URL 을 피해자에게 클릭시키면
-피해자 이름으로 동의 이력이 남는다.
+`/authorize` 는 인증 없이 호출할 수 있어서, state 를 Redis 에만 두면 인가 URL 을 만든 주체와
+provider 에서 인증하는 주체가 다를 수 있었다. 그러면 여기 실린 동의는 **인가 URL 발급자의
+주장**일 뿐이라, 공격자가 동의를 켠 인가 URL 을 피해자에게 클릭시키면 피해자 이름으로 동의
+이력이 남는다. 보호법 제22조의 "동의를 받았다는 입증"을 하려고 만든 기록을 제3자가 만들 수
+있으면 증거로서의 값이 없다.
 
-막으려면 state 를 HttpOnly 쿠키로 함께 내려 콜백에서 double-submit 검증해야 하는데, 콜백을
-프론트가 받는 구조라 FE 와 함께 설계해야 한다. 별도 이슈로 다룬다.
+그래서 **state 를 쿠키로도 내려보내고, 콜백에서 쿼리 state 와 쿠키 state 가 일치할 때만
+소비한다**(double-submit). 공격자가 발급받은 state 는 피해자 브라우저에 없으므로 콜백이 거부되고,
+동의 위조뿐 아니라 소셜 로그인 CSRF 전반이 함께 막힌다.
+
+| 항목 | 값 |
+|------|-----|
+| 쿠키 이름 | `oauthState` (`OAuthStateCookieProvider` 가 단독 소유) |
+| 속성 | `HttpOnly` · `Secure`(local 프로필만 off) · `SameSite=Strict` · `Path=/api/v1/auth` |
+| 수명 | `OAuthLoginProcessor.STATE_TTL` = 10분 — Redis state 와 **같은 상수를 참조**한다 |
+
+refresh 쿠키와 같은 기준이다. `Secure` 판정은 "https 로 서비스되는가"이고 dev 도 https 라서
+`local` 프로필만 예외다. 경로를 `/api/v1/auth` 로 잡은 것은 `/authorize`(심기)와
+`/{provider}/login`(읽기)이 함께 지나는 가장 좁은 범위이기 때문이다. TTL 상수를 복제하지 않고
+발급하는 쪽 값을 그대로 가져다 쓰는 이유는, 쿠키가 먼저 죽으면 **아직 유효한 state 를 가진 정상
+사용자가 거부**되기 때문이다.
+
+**`SameSite=Strict` 로도 되는 이유** — 이 저장소는 브라우저가 게이트웨이를 직접 부르지 않는다.
+프론트가 provider 콜백을 자기 오리진에서 받고, 게이트웨이 호출은 **BFF 가 서버에서** 한다. 즉 이
+쿠키는 브라우저↔게이트웨이 사이를 직접 오가지 않고 BFF 가 꺼내 자기 세션에 봉인했다가
+되돌려준다 (refresh 토큰과 똑같은 취급 — `frontend/src/lib/auth/refresh-cookie.ts`). 그래서
+크로스사이트 리다이렉트 전송 문제가 애초에 없고 속성을 가장 좁게 둘 수 있다.
+
+**검증 순서는 쿠키 대조 → Redis `consume` 이다.** 뒤집으면 쿠키 불일치로 어차피 거부될 요청이
+멀쩡한 state 를 태워 버려 정상 사용자의 재시도까지 막는다. 비교는 `MessageDigest.isEqual` 로 해
+응답 시간 차이로 state 를 맞춰 볼 표면을 만들지 않는다. 소비 후에는 성공·실패 양쪽에서 쿠키를
+만료시킨다 — 컨트롤러가 유스케이스 호출 **전에** 만료 헤더를 서블릿 응답에 심는 것은 실패 응답이
+예외 핸들러를 타고 나가기 때문이다. `ResponseEntity` 헤더에만 달면 성공 경로에서만 지워진다
+(`OAuthStateCookieFlowTest` 가 이 회귀를 고정한다).
+
+**쿠키 없는 요청은 거부한다.** 사유는 기존 `AUTH_010 INVALID_OAUTH_STATE` 그대로다 — 공격자에게
+"쿠키가 없어서 막혔다"를 알려줄 이유가 없고, 프론트 처리도 이미 있다. 배포 직후 10분(= state TTL)
+동안은 구버전 프론트에서 온 콜백이 여기 걸려 사용자가 인가부터 다시 밟는다. state 저장 형식을
+바꿨을 때와 같은 과도기이고, TTL 이 지나면 사라진다.
+
+**프론트 없이는 완성되지 않는다.** BFF 가 `/authorize` 응답의 `Set-Cookie` 를 세션에 봉인했다가
+콜백 호출에 되실어야 이 검증이 성립한다. 그 전까지 프론트 경로의 소셜 로그인은 전부 `AUTH_010`
+으로 막히므로 **#689 와 함께 배포한다.**
 
 ### 구현 메모 — 동의 이력 생성은 한 곳에서만 한다
 

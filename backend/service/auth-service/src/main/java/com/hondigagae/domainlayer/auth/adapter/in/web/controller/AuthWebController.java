@@ -11,11 +11,13 @@ import com.hondigagae.domainlayer.auth.adapter.in.web.dto.request.AuthPasswordRe
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthGeneralLoginResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthOAuthAuthorizeResponse;
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueResponse;
+import com.hondigagae.domainlayer.auth.adapter.in.web.provider.OAuthStateCookieProvider;
 import com.hondigagae.domainlayer.auth.adapter.in.web.provider.RefreshCookieProvider;
 import com.hondigagae.domainlayer.auth.adapter.in.web.support.ClientIpResolver;
 import com.hondigagae.domainlayer.auth.application.command.AuthGeneralLoginCommand;
 import com.hondigagae.domainlayer.auth.application.command.TokenReissueCommand;
 import com.hondigagae.domainlayer.auth.application.info.AuthCookieResult;
+import com.hondigagae.domainlayer.auth.application.info.OAuthStateCookieResult;
 import com.hondigagae.domainlayer.auth.application.model.OAuthSignupConsent;
 import com.hondigagae.domainlayer.auth.application.port.in.AuthWebUseCase;
 import com.hondigagae.domainlayer.member.domain.enums.OAuthProvider;
@@ -25,6 +27,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
@@ -48,6 +51,7 @@ public class AuthWebController {
 
     private final AuthWebUseCase authWebUseCase;
     private final RefreshCookieProvider refreshCookieProvider;
+    private final OAuthStateCookieProvider oAuthStateCookieProvider;
     private final ClientIpResolver clientIpResolver;
 
     @Operation(
@@ -127,6 +131,8 @@ public class AuthWebController {
             + "이미 가입한 회원의 로그인에는 영향을 주지 않습니다. 빠진 채로 최초 연동을 시도하면 콜백(소셜 로그인)에서 "
             + "문서 동의 누락은 `MEMBER_010`, 만 14세 이상 확인 누락은 `MEMBER_011` 로 거부됩니다 — 프론트가 강조할 체크박스가 달라 코드를 나눴습니다. "
             + "인가코드가 1회용이라 콜백에서 다시 받을 수 없어 이 단계에서 받습니다.\n\n"
+            + "응답에는 같은 state 가 담긴 `oauthState` HttpOnly 쿠키(10분)가 함께 내려갑니다. 소셜 로그인 콜백은 이 쿠키가 쿼리 state 와 "
+            + "일치할 때만 통과하므로, 호출한 쪽은 이 쿠키를 보관했다가 콜백 호출에 함께 실어야 합니다.\n\n"
             + "호출 예: `GET /api/v1/auth/kakao/authorize?termsAgreed=true&privacyAgreed=true&ageOver14Confirmed=true` "
             + "→ 응답의 authorizeUrl 로 브라우저를 이동시킵니다")
     @GetMapping("/{provider}/authorize")
@@ -139,9 +145,12 @@ public class AuthWebController {
         @Parameter(description = "[선택] 만 14세 이상 확인 여부. 신규 가입이 되는 최초 연동에서만 필요하고, 이미 가입한 회원의 로그인에는 쓰이지 않습니다", example = "true")
         @RequestParam(defaultValue = "false") boolean ageOver14Confirmed
     ) {
-        AuthOAuthAuthorizeResponse response = authWebUseCase.generateOAuthAuthorizationUrl(
+        OAuthStateCookieResult<AuthOAuthAuthorizeResponse> result = authWebUseCase.generateOAuthAuthorizationUrl(
             provider, new OAuthSignupConsent(termsAgreed, privacyAgreed, ageOver14Confirmed));
-        return ResponseEntity.ok().body(Response.success(response));
+        // state 를 쿠키로도 심어 이 브라우저에 묶는다 — 콜백이 쿼리 state 와 대조한다.
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, oAuthStateCookieProvider.createStateCookie(result.state()).toString())
+            .body(Response.success(result.response()));
     }
 
     @Operation(summary = "소셜 로그인",
@@ -151,14 +160,26 @@ public class AuthWebController {
             + "자동 회원가입이 일어나는 최초 연동에서 인가 URL 생성 때 문서 동의를 받지 않았다면 `MEMBER_010`, "
             + "만 14세 이상 확인을 받지 않았다면 `MEMBER_011` 로 거부됩니다. "
             + "이미 가입한 회원의 로그인은 동의·확인과 무관하게 통과합니다.\n\n"
+            + "**인가 URL 생성 때 내려준 `oauthState` 쿠키가 함께 실려야 합니다.** 쿼리 state 와 쿠키 state 가 다르거나 쿠키가 없으면 "
+            + "`AUTH_010` 으로 거부합니다 — state 만으로는 인가 URL 을 만든 주체와 인증한 주체가 같다는 보장이 없어, 제3자가 만든 "
+            + "인가 URL 로 남의 이름의 동의 이력이 남을 수 있기 때문입니다. 성공·실패와 무관하게 응답에서 이 쿠키를 만료시킵니다.\n\n"
             + "호출 예: `GET /api/v1/auth/kakao/login?code=<콜백 code>&state=<콜백 state>`")
     @GetMapping("/{provider}/login")
     public ResponseEntity<Response<AuthGeneralLoginResponse>> loginWithOAuthCode(
         @Parameter(description = "[필수] 소셜 로그인 제공자. kakao 카카오 · naver 네이버 (소문자)", required = true, example = "kakao") @PathVariable OAuthProvider provider,
         @Parameter(description = "[필수] provider 가 콜백 URL 로 전달한 인가코드(1회용)", required = true, example = "q1w2e3r4t5y6u7i8o9p0") @RequestParam("code") String code,
-        @Parameter(description = "[필수] 인가 URL 생성 응답에 들어 있던 state. 콜백 URL 의 state 를 그대로 넘깁니다", required = true, example = "3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61") @RequestParam("state") String state
+        @Parameter(description = "[필수] 인가 URL 생성 응답에 들어 있던 state. 콜백 URL 의 state 를 그대로 넘깁니다", required = true,
+            example = "3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61") @RequestParam("state") String state,
+        @Parameter(description = "[필수] 인가 URL 생성 응답의 Set-Cookie 로 심어진 state 쿠키. 쿼리 state 와 같아야 하며, 없으면 AUTH_010")
+        @CookieValue(name = OAuthStateCookieProvider.OAUTH_STATE_COOKIE, required = false) String stateCookie,
+        HttpServletResponse httpServletResponse
     ) {
-        AuthCookieResult<AuthGeneralLoginResponse> result = authWebUseCase.oauthLogin(provider, code, state);
+        // state 는 일회성이라 이 요청에서 쿠키를 지운다. 사용 전에 심어 두는 것은 실패 응답
+        // (AUTH_010 등)도 예외 핸들러를 거쳐 나가기 때문이다 — ResponseEntity 헤더에만 달면
+        // 성공 경로에서만 지워져, 실패한 쿠키가 브라우저에 남는다.
+        httpServletResponse.addHeader(HttpHeaders.SET_COOKIE, oAuthStateCookieProvider.clearStateCookie().toString());
+
+        AuthCookieResult<AuthGeneralLoginResponse> result = authWebUseCase.oauthLogin(provider, code, state, stateCookie);
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, refreshCookieProvider.createRefreshCookie(result.refreshToken()).toString())
             .body(Response.success(result.response()));

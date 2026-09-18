@@ -9,6 +9,7 @@ import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.AuthOAuthAuth
 import com.hondigagae.domainlayer.auth.adapter.in.web.dto.response.TokenReissueResponse;
 import com.hondigagae.domainlayer.auth.application.info.JwtTokenIssueInfo;
 import com.hondigagae.domainlayer.auth.application.info.JwtTokenReissueInfo;
+import com.hondigagae.domainlayer.auth.application.info.OAuthAuthorizationInfo;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -41,9 +42,10 @@ public class AuthPresenter {
             .build();
     }
 
-    public AuthOAuthAuthorizeResponse toOAuthAuthorizeResponse(String authorizationUrl) {
+    /** state 는 응답 바디에 싣지 않는다 — 브라우저에는 쿠키로만 내려가고 URL 안에만 노출된다. */
+    public AuthOAuthAuthorizeResponse toOAuthAuthorizeResponse(OAuthAuthorizationInfo info) {
         return AuthOAuthAuthorizeResponse.builder()
-            .authorizationUrl(authorizationUrl)
+            .authorizationUrl(info.authorizationUrl())
             .build();
     }
 }
