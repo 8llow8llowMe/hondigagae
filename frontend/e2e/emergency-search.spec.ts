@@ -418,3 +418,86 @@ test.describe('긴급 시설 목록 우선 (#639)', () => {
     expect(boxes.filter((bottom) => bottom <= PHONE.height).length).toBeGreaterThanOrEqual(2)
   })
 })
+
+/**
+ * 권역의 URL 직렬화 — 이슈 #674 (세부명세 D3-3).
+ *
+ * ### 왜 e2e 인가
+ *
+ * 이전에는 `regionCode` 가 컴포넌트 state 라 **새로고침 한 번에 고른 기준이 말없이
+ * 사라졌다.** 그 사슬(클릭 → URL → 새로고침 → 다시 읽기)은 실제 내비게이션이 있어야
+ * 재현되므로 node 환경 렌더 테스트로는 볼 수 없다 — `emergency-filters.test.ts` 가
+ * 파싱·직렬화 자체는 이미 잠갔고, 여기서 재는 것은 **그 값이 실제로 화면을 되돌리는가**다.
+ *
+ * **위치 권한은 거부로 고정한다** — 권역 세그먼트가 서는 전제다.
+ *
+ * **지도 재검색이 `regionCode` 를 함께 지우는 갈래는 여기에 없다.** `MOCK_API=true` 인
+ * e2e 환경에서 `/emergency` 의 지도 갈래는 항상 카카오 SDK 폴백으로 떨어져(위 "지도 갈래
+ * 검색 (#584)" 주석) 실제 지도 `bounds`·"이 지역에서 재검색" 버튼에 닿지 못한다 — 그
+ * 버튼은 `emergency-map-view.tsx` 의 진짜 지도 렌더 분기에만 있다. 그 갈래는
+ * `use-emergency-board.ts` 의 `researchAt` 코드로만 고정돼 있다(코드 리뷰 근거 — 이 훅은
+ * `docs/testing-guide.md` §1 규칙대로 순수 함수로 뽑혀 있지 않아 node 환경에서도 잴 수
+ * 없다). 후속으로 `researchAt`/`researchAtRegion` 을 순수 판단 함수로 뽑아내면 그때
+ * node 테스트로 옮길 수 있다.
+ */
+test.describe('권역의 URL 직렬화 (#674)', () => {
+  test.beforeEach(async ({ page }) => {
+    await denyGeolocation(page)
+  })
+
+  test('`?region=SEOGWIPO` 로 직접 들어오면 그 권역으로 열린다', async ({ page }) => {
+    await page.goto('/emergency?region=SEOGWIPO')
+
+    await expect(page.getByRole('main')).toContainText('서귀포 기준')
+    await expect(
+      page.getByRole('button', { name: messages.emergency.regionLabel.SEOGWIPO }),
+    ).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  /** 화이트리스트 폴백 — 잘못된 값은 미선택으로 떨어진다. 첫 권역으로 떨어지지 않는다 */
+  test('잘못된 권역 값은 미선택으로 열린다', async ({ page }) => {
+    await page.goto('/emergency?region=zzz')
+
+    const main = page.getByRole('main')
+    await expect(main).toContainText(messages.emergency.basisJeju)
+    await expect(
+      page.getByRole('button', { name: messages.emergency.regionLabel.SEOGWIPO }),
+    ).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  test('권역 칩을 누르면 URL 에 `region` 이 실린다', async ({ page }) => {
+    await page.goto('/emergency')
+
+    await page.getByRole('button', { name: messages.emergency.regionLabel.SEOGWIPO }).click()
+
+    await expect(page).toHaveURL(/region=SEOGWIPO/)
+  })
+
+  /*
+    **이 이슈의 본 갈래다.** #674 재현 표 2행("새로고침 → 권역 소실")을 그대로 뒤집는다 —
+    클릭 → 새로고침까지 실제 내비게이션을 거친 뒤에도 기준 줄이 같은 문구를 말해야 한다.
+  */
+  test('권역을 고르고 새로고침해도 기준 줄이 그대로다', async ({ page }) => {
+    await page.goto('/emergency')
+
+    await page.getByRole('button', { name: messages.emergency.regionLabel.SEOGWIPO }).click()
+    await expect(page).toHaveURL(/region=SEOGWIPO/)
+
+    await page.reload()
+
+    await expect(page.getByRole('main')).toContainText('서귀포 기준')
+    await expect(
+      page.getByRole('button', { name: messages.emergency.regionLabel.SEOGWIPO }),
+    ).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  /** 같은 칩을 다시 누르면 해제다 (D4) — 되돌리는 길은 이것 하나뿐이다 (`replace` 확정) */
+  test('같은 칩을 다시 누르면 해제되고 URL 에서 `region` 이 빠진다', async ({ page }) => {
+    await page.goto('/emergency?region=SEOGWIPO')
+
+    await page.getByRole('button', { name: messages.emergency.regionLabel.SEOGWIPO }).click()
+
+    await expect(page).not.toHaveURL(/region=/)
+    await expect(page.getByRole('main')).toContainText(messages.emergency.basisJeju)
+  })
+})

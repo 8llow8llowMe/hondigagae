@@ -54,16 +54,23 @@ export function useEmergencyBoard() {
     영역에서 반경을 역산해 넣으면 `radius` 칩이 말하는 값과 실제 조회 반경이 갈린다.
   */
   const [searchCenter, setSearchCenter] = useState<LatLng | null>(null)
-  /*
-    **권역 세그먼트로 고른 기준 지역** (#639). `null` 이면 고르지 않았다.
+  const {
+    filters,
+    radius,
+    /*
+      **권역 세그먼트로 고른 기준 지역** (#639). `null` 이면 고르지 않았다.
 
-    **URL 에 두지 않는다** (세부명세 D3-1 · D8-4). `radius`·`filters` 는 "무엇을 보고 있나"
-    라 링크로 건네는 값이지만, 기준점은 **필터가 아니라 세션 맥락**이다 — 내가 위치를
-    쓸 수 없어 서귀포를 골랐다는 사실은 링크를 받는 사람에게 아무 뜻도 없다.
-    (좌표를 URL 에 두지 않는 이유와 같다 — 이 훅 머리주석의 `position` 설명.)
-  */
-  const [regionCode, setRegionCode] = useState<JejuRegionCode | null>(null)
-  const { filters, radius, setFilters, setRadius, widenRadius } = useEmergencyNav()
+      **URL 이 소유한다** (세부명세 D3-3, #674) — `radius`·`filters` 와 같은 축이다.
+      전에는 컴포넌트 state 였고, 그래서 새로고침 한 번에 고른 권역이 말없이 사라졌다.
+      `useEmergencyNav` 가 `searchParams` 에서 읽고 `router.replace` 로 쓰는 단일
+      출처다 — 이 훅은 읽기만 한다.
+    */
+    regionCode,
+    setFilters,
+    setRadius,
+    widenRadius,
+    setRegionCode,
+  } = useEmergencyNav()
 
   /*
     **누를 때마다 다시 묻는다.** 마운트 때 받은 좌표를 재사용하면 사용자가 이동한 뒤
@@ -75,12 +82,26 @@ export function useEmergencyBoard() {
   const locate = useCallback(() => {
     // "내 위치" 는 옮겨 둔 기준점을 되돌리는 조작이기도 하다 (#396 · #639)
     setSearchCenter(null)
-    setRegionCode(null)
+    if (regionCode !== null) setRegionCode(null)
     void getCurrentPosition().then(setPosition)
-  }, [])
+  }, [regionCode, setRegionCode])
 
-  /** 지도 중심으로 기준점을 옮긴다 — 반경은 그대로다 (#396) */
-  const researchAt = useCallback((center: LatLng) => setSearchCenter(center), [])
+  /**
+   * 지도 중심으로 기준점을 옮긴다 — 반경은 그대로다 (#396).
+   *
+   * **권역도 함께 지운다** (#674). 권역만 URL 에 남아 있으면 `?region=SEOGWIPO` 로
+   * 본 뒤 지도에서 재검색했을 때 URL 의 `region` 이 남아, 새로고침에서 사라진
+   * `searchCenter` 대신 서귀포가 되살아난다 — 사용자가 마지막에 한 행동이 지워지는
+   * 회귀다. `researchAtRegion` 이 이미 대칭으로 `searchCenter` 를 비우고 있으므로
+   * (아래, D3-1) 두 기준점 조작이 서로를 끄는 한 축이 된다.
+   */
+  const researchAt = useCallback(
+    (center: LatLng) => {
+      setSearchCenter(center)
+      if (regionCode !== null) setRegionCode(null)
+    },
+    [regionCode, setRegionCode],
+  )
 
   /**
    * 권역으로 기준점을 옮긴다 — 반경은 그대로다 (#639).
@@ -90,14 +111,24 @@ export function useEmergencyBoard() {
    *
    * `null` 을 주면 해제다 — 같은 칩을 다시 누르면 제주 중심 기준으로 돌아간다.
    */
-  const researchAtRegion = useCallback((code: JejuRegionCode | null) => {
-    setSearchCenter(null)
-    setRegionCode(code)
-  }, [])
+  const researchAtRegion = useCallback(
+    (code: JejuRegionCode | null) => {
+      setSearchCenter(null)
+      setRegionCode(code)
+    },
+    [setRegionCode],
+  )
 
+  /*
+    **마운트에는 `locate()` 를 그대로 부르지 않는다** (#674). `locate()` 는 "내 위치" 버튼의
+    핸들러라 눌렸다는 것 자체가 "권역·재검색 선택을 지우고 되돌아가라" 는 뜻이지만, 마운트는
+    사용자가 아무것도 하지 않은 시점이다. 그대로 부르면 `?region=SEOGWIPO` 로 열린 첫 화면이
+    첫 effect 에서 곧바로 그 권역을 지워버린다 — URL 이 시킨 것을 화면이 스스로 되돌리는
+    꼴이다. 마운트가 필요한 것은 좌표 요청뿐이다.
+  */
   useEffect(() => {
-    locate()
-  }, [locate])
+    void getCurrentPosition().then(setPosition)
+  }, [])
 
   /*
     조회 기준점과 그 기준의 이름. **우선순위는 순수 함수가 갖는다** (`resolve-anchor.ts`,

@@ -108,6 +108,48 @@ describe('parseEmergencyBoardParams', () => {
     expect(parseEmergencyBoardParams(params)).toEqual({
       filters: { ...DEFAULT_FACILITY_FILTERS, open24Only: true },
       radius: DEFAULT_RADIUS_METERS,
+      regionCode: null,
+    })
+  })
+
+  /*
+    권역의 URL 직렬화 — 세부명세 D3-3 (#674). 값은 `JEJU_REGION_CODES` 의 코드
+    그대로다 — `type=ANIMAL_HOSPITAL` 과 대칭이라 대소문자 왕복이 없다.
+  */
+  describe('권역 (#674)', () => {
+    it('허용된 권역 코드를 읽는다', () => {
+      expect(parseEmergencyBoardParams(new URLSearchParams('region=SEOGWIPO')).regionCode).toBe(
+        'SEOGWIPO',
+      )
+    })
+
+    it('키가 없으면 미선택(null)이다', () => {
+      expect(parseEmergencyBoardParams(new URLSearchParams()).regionCode).toBeNull()
+    })
+
+    it('빈 값은 미선택이다', () => {
+      expect(parseEmergencyBoardParams(new URLSearchParams('region=')).regionCode).toBeNull()
+    })
+
+    /*
+      **화이트리스트는 대소문자를 가리지 않고 정확 일치만 본다.** 소문자로 낮춰 받으면
+      대소문자 왕복이라는 새 매핑 레이어가 생긴다 (D3-3 "값을 대문자 코드로 두는 이유").
+    */
+    it('소문자는 미선택으로 떨어뜨린다', () => {
+      expect(
+        parseEmergencyBoardParams(new URLSearchParams('region=seogwipo')).regionCode,
+      ).toBeNull()
+    })
+
+    /** 한라산권은 4권역에 없다 (D8-3) — 있어도 고를 수 없는 권역이라 함정이다 */
+    it('없는 권역 코드는 미선택으로 떨어뜨린다', () => {
+      expect(parseEmergencyBoardParams(new URLSearchParams('region=HALLA')).regionCode).toBeNull()
+    })
+
+    it('배열로 들어오면 첫 값을 쓴다', () => {
+      expect(
+        parseEmergencyBoardParams(new URLSearchParams('region=EAST&region=WEST')).regionCode,
+      ).toBe('EAST')
     })
   })
 })
@@ -121,6 +163,7 @@ describe('toEmergencyBoardQuery', () => {
     const query = toEmergencyBoardQuery({
       filters: { ...DEFAULT_FACILITY_FILTERS, open24Only: true },
       radius: DEFAULT_RADIUS_METERS,
+      regionCode: null,
     })
 
     expect(query).toBe('open24Only=true')
@@ -135,6 +178,7 @@ describe('toEmergencyBoardQuery', () => {
       toEmergencyBoardQuery({
         filters: { ...DEFAULT_FACILITY_FILTERS, openNowOnly: false },
         radius: DEFAULT_RADIUS_METERS,
+        regionCode: null,
       }),
     ).toBe('openNowOnly=false')
     expect(toEmergencyBoardQuery(DEFAULT_EMERGENCY_BOARD_PARAMS)).not.toContain('openNowOnly')
@@ -142,11 +186,19 @@ describe('toEmergencyBoardQuery', () => {
 
   it('기본 반경은 생략하고 넓힌 반경만 싣는다', () => {
     expect(
-      toEmergencyBoardQuery({ filters: DEFAULT_FACILITY_FILTERS, radius: DEFAULT_RADIUS_METERS }),
+      toEmergencyBoardQuery({
+        filters: DEFAULT_FACILITY_FILTERS,
+        radius: DEFAULT_RADIUS_METERS,
+        regionCode: null,
+      }),
     ).toBe('')
-    expect(toEmergencyBoardQuery({ filters: DEFAULT_FACILITY_FILTERS, radius: 40_000 })).toBe(
-      'radius=40000',
-    )
+    expect(
+      toEmergencyBoardQuery({
+        filters: DEFAULT_FACILITY_FILTERS,
+        radius: 40_000,
+        regionCode: null,
+      }),
+    ).toBe('radius=40000')
   })
 
   it('검색어는 값이 있을 때만 키를 넣는다 (#584)', () => {
@@ -154,6 +206,7 @@ describe('toEmergencyBoardQuery', () => {
       toEmergencyBoardQuery({
         filters: { ...DEFAULT_FACILITY_FILTERS, keyword: '한라' },
         radius: DEFAULT_RADIUS_METERS,
+        regionCode: null,
       }),
     ).toBe('keyword=%ED%95%9C%EB%9D%BC')
     expect(toEmergencyBoardQuery(DEFAULT_EMERGENCY_BOARD_PARAMS)).not.toContain('keyword')
@@ -161,8 +214,29 @@ describe('toEmergencyBoardQuery', () => {
 
   it('`view` 를 내보내지 않는다', () => {
     expect(
-      toEmergencyBoardQuery({ filters: DEFAULT_FACILITY_FILTERS, radius: 20_000 }),
+      toEmergencyBoardQuery({
+        filters: DEFAULT_FACILITY_FILTERS,
+        radius: 20_000,
+        regionCode: null,
+      }),
     ).not.toContain('view')
+  })
+
+  /* 권역의 URL 직렬화 — 세부명세 D3-3 (#674) */
+  describe('권역 (#674)', () => {
+    it('미선택이면 `region` 키가 없다', () => {
+      expect(toEmergencyBoardQuery(DEFAULT_EMERGENCY_BOARD_PARAMS)).not.toContain('region')
+    })
+
+    it('고른 권역은 코드 그대로 싣는다 — 대문자, 매핑 없음', () => {
+      expect(
+        toEmergencyBoardQuery({
+          filters: DEFAULT_FACILITY_FILTERS,
+          radius: DEFAULT_RADIUS_METERS,
+          regionCode: 'EAST',
+        }),
+      ).toBe('region=EAST')
+    })
   })
 })
 
@@ -175,32 +249,50 @@ describe('왕복', () => {
     {
       filters: { ...DEFAULT_FACILITY_FILTERS, type: 'ANIMAL_HOSPITAL' },
       radius: 10_000,
+      regionCode: null,
     },
     {
       filters: { ...DEFAULT_FACILITY_FILTERS, open24Only: true, openNowOnly: true },
       radius: 40_000,
+      regionCode: null,
     },
     // 기본 ON 인 축을 끈 왕복 — 생략 규칙이 뒤집히는 자리다 (#654)
     {
       filters: { ...DEFAULT_FACILITY_FILTERS, openNowOnly: false },
       radius: DEFAULT_RADIUS_METERS,
+      regionCode: null,
     },
     {
       filters: { ...DEFAULT_FACILITY_FILTERS, openNowOnly: false, open24Only: true },
       radius: 20_000,
+      regionCode: null,
     },
     {
       filters: { ...DEFAULT_FACILITY_FILTERS, type: 'ANIMAL_PHARMACY', open24Only: true },
       radius: MAX_RADIUS_METERS,
+      regionCode: null,
     },
     // 검색어가 실린 왕복 — 공백을 품은 검색어까지 (#584)
     {
       filters: { ...DEFAULT_FACILITY_FILTERS, keyword: '제주 동물병원' },
       radius: DEFAULT_RADIUS_METERS,
+      regionCode: null,
     },
     {
       filters: { ...DEFAULT_FACILITY_FILTERS, keyword: '한라', open24Only: true },
       radius: 20_000,
+      regionCode: null,
+    },
+    // 권역 왕복 — 네 권역 전부 (#674 D3-3)
+    { filters: DEFAULT_FACILITY_FILTERS, radius: DEFAULT_RADIUS_METERS, regionCode: 'JEJU_CITY' },
+    { filters: DEFAULT_FACILITY_FILTERS, radius: DEFAULT_RADIUS_METERS, regionCode: 'SEOGWIPO' },
+    { filters: DEFAULT_FACILITY_FILTERS, radius: DEFAULT_RADIUS_METERS, regionCode: 'EAST' },
+    { filters: DEFAULT_FACILITY_FILTERS, radius: DEFAULT_RADIUS_METERS, regionCode: 'WEST' },
+    // 권역과 다른 축이 함께 실린 왕복
+    {
+      filters: { ...DEFAULT_FACILITY_FILTERS, type: 'ANIMAL_HOSPITAL', keyword: '서귀포' },
+      radius: 20_000,
+      regionCode: 'SEOGWIPO',
     },
   ]
 
