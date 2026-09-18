@@ -302,6 +302,14 @@ export const planMessages = {
   verdictTocTitle: '일자별 판정',
   /** 목차에서 판정을 못 낸 날. 낮은 등급으로 칠하지 않고 점선 unknown 으로 둔다 */
   verdictTocUnavailable: '판정 없음',
+  /**
+   * 개요 스트립에 다 세우지 못한 일자 수 (#732). `{count}` 치환.
+   *
+   * **감추는 것이 아니라 세어서 말한다** — 여행은 최대 30일이라 전부 세우면 요약이 아니라
+   * 목록이 되고, 아무 말도 없으면 그 일정이 4일짜리로 읽힌다. 판정 자체는 아래 일자
+   * 카드가 그대로 갖는다.
+   */
+  verdictStripMore: '외 {count}일',
   verdictErrorTitle: '이 날 판정을 불러오지 못했어요.',
   /**
    * 지난 날짜라 판정이 없는 날 (#497 · 서버 사유 `PAST_DATE`).

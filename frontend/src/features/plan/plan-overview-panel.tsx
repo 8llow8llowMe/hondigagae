@@ -1,7 +1,7 @@
 import { MetricBadge } from '@/components/metric'
 import { PetAvatar } from '@/components/pet-avatar'
 import { Skeleton } from '@/components/skeleton'
-import { Surface, SurfaceList } from '@/components/surface'
+import { Surface } from '@/components/surface'
 import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { PlanStatusBadge } from '@/features/plan/plan-status-badge'
 import { suitabilityTone } from '@/lib/insight/tone'
@@ -19,12 +19,20 @@ import type { PlanDayWeatherItem, PlanDetail } from '@/types/plan'
  * 모바일에서는 레일이 아니라 화면 맨 위의 개요 블록이다. **DOM 순서가 모바일 기준
  * 그대로여도 두 레이아웃이 성립하므로** `.rail-layout-detail` 변형을 쓰지 않는다 (D1).
  *
- * **세 조각을 돌려준다** (`DESIGN.md §0`, #447 · #553) — 부모 `SurfaceStack` 의 직접
- * 자식이 되어야 카드 간격을 받기 때문에 fragment 다.
+ * **두 조각을 돌려준다** (`DESIGN.md §0`, #447 · #553 · #732) — 부모 `SurfaceStack` 의
+ * 직접 자식이 되어야 카드 간격을 받기 때문에 fragment 다.
  * 1. **제목 줄도 카드다** (#553). 동행 반려견도 여기 든다: "누구와 가는 일정인가" 는
- *    신원의 일부다.
- * 2. **확정 액션** (`action` 슬롯) — 카드가 아니라 바닥 위에 선다.
- * 3. **일자별 판정 목차는 카드다** — 자기 제목이 있고 항목이 여럿인 목록. 데스크톱 전용.
+ *    신원의 일부다. **`D-N` + 일자별 판정 스트립도 이 카드 안이다** (#732).
+ * 2. **확정 액션** (`action` 슬롯) — 카드가 아니라 바닥 위에 선다. 출발 전에는 비기도
+ *    한다 (`planStatusActionLayout`).
+ *
+ * ### 일자별 판정 목차 카드가 사라졌다 (#732)
+ *
+ * 셋째 조각이던 `일자별 판정` 목차는 **`hidden lg:block` 카드**였다 — 모바일 1순위
+ * 제품에서 전체 판정 요약이 데스크톱 전용이라, 모바일 사용자는 일자 카드를 하나씩 열어야
+ * "며칠이 비냐" 를 알 수 있었다. 같은 자료가 이제 개요 카드 안의 한 줄
+ * (`PlanPhaseVerdictStrip`)로 **모든 폭에서** 서고, 앵커 링크도 그대로 남는다.
+ * **두 자리에 두지 않는다** — 데스크톱에서 같은 자료가 두 번 서고 앵커도 일자마다 둘이 된다.
  *
  * ### 제목 줄이 카드가 된 이유 (#553)
  *
@@ -132,13 +140,15 @@ export function PlanOverviewPanel({
                       plan.budget.toLocaleString('ko-KR'),
                     )}`}
               </span>
-              {phaseText !== null && (
-                <>
-                  <span aria-hidden>·</span>
-                  <span className="text-fg font-bold">{phaseText}</span>
-                </>
-              )}
             </p>
+
+            {/*
+              **D-day 가 이 줄로 내려왔다** (#732). 예전에는 바로 위 `총 N일 · 예산` 캡션의
+              마지막 칸이었는데, 시간을 말하는 값이 예산 옆에 붙어 있는 것보다 **그 시간이
+              날마다 어떤지**를 말하는 배지들과 한 줄에 서는 편이 읽힌다. 두 자리에 모두
+              두지 않는다 — 같은 말이 한 카드에 두 번 선다.
+            */}
+            <PlanPhaseVerdictStrip phaseText={phaseText} verdicts={verdicts} />
           </div>
 
           <PlanPetCard companions={companions} pending={petPending} />
@@ -146,8 +156,6 @@ export function PlanOverviewPanel({
       </Surface>
 
       {action}
-
-      <PlanVerdictToc verdicts={verdicts} />
     </>
   )
 }
@@ -194,53 +202,101 @@ function PlanPetRow({ pet }: { pet: Pet }) {
 }
 
 /**
- * 일자별 판정 목차 — **데스크톱 전용**이다 (아트보드 02).
+ * 스트립에 세우는 일자 수의 상한 (#732).
  *
- * 요약을 읽다가 그 날로 뛰는 앵커 링크 목록이고, 판정 색을 유지해 **목차이면서
- * 요약**이다. 각 줄 44px (D6).
+ * **`두 줄` 이 이 값을 정했다.** 390 에서 카드 안 폭은 358px 이고 한 칸(`1일차` +
+ * `적합도 보통` 배지)이 약 132px 이라 줄당 2~3칸이다. 첫 줄은 `D-1` 기둥이 한 자리를
+ * 먹으므로 **넷이 두 줄의 상한**이다.
  *
- * 모바일에서는 숨긴다 — 일자 섹션이 바로 아래에 이어져 목차가 중복이다.
+ * **여행은 최대 30일이다** (`PLAN_PERIOD_MAX_DAYS`) — 전부 세우면 요약이 아니라 목록이
+ * 되고, 모바일에서 개요 카드가 일자 카드보다 길어진다. 넘치는 일자는 개수로만 말하고
+ * 판정 자체는 아래 일자 카드가 그대로 갖는다.
  */
-function PlanVerdictToc({ verdicts }: { verdicts: PlanDayWeatherItem[] }) {
-  if (verdicts.length === 0) return null
+export const PLAN_VERDICT_STRIP_MAX_DAYS = 4
 
-  /*
-    카드다 (#447). 제목은 `Surface` 의 `h2` 고 `nav` 는 그 안이다 — 카드가 곧 목차라 이름을
-    두 번 붙이지 않는다(`nav` 의 `aria-label` 은 목차 자체의 랜드마크 이름). 줄은 카드 안
-    L2 규약 — 위 1px 선으로 제목과 갈리고 사이는 `SurfaceList` 가 긋는다.
-  */
+/**
+ * `D-N` + 일자별 판정 한 줄 (#732 · 진단 665-4).
+ *
+ * ## 데스크톱 전용 목차 카드를 대신한다
+ *
+ * 예전에는 같은 자료가 **`hidden lg:block` 카드**(`일자별 판정` 목차)로만 있었다 —
+ * 모바일 1순위 제품에서 전체 판정 요약이 데스크톱 전용이었고, 모바일 사용자는 일자 카드를
+ * 하나씩 열어야 "며칠이 비냐" 를 알 수 있었다. 스트립은 **모든 폭에서** 서고, 각 칸이
+ * 여전히 그 일자로 뛰는 앵커라 목차의 일도 그대로 한다.
+ *
+ * **두 자리에 두지 않는다.** 카드를 남기고 스트립을 더하면 데스크톱에서 같은 자료가 두 번
+ * 서고, 앵커 링크도 일자마다 둘이 된다.
+ *
+ * ## 무엇을 줄였나
+ *
+ * 세로 목록(줄당 44px · 일자마다 한 줄)을 **가로 한 줄**로 접었다. 접히면서 잃는 것은
+ * 다섯째 일자부터의 배지이고(`PLAN_VERDICT_STRIP_MAX_DAYS`), 얻는 것은 **모바일에서도
+ * 보인다**는 사실이다 — 2박 3일이 이 서비스의 기준 일정이라 대부분의 일정은 전부 선다.
+ *
+ * **축 라벨(`적합도`)을 그대로 둔다.** 짧게 만들자고 떼면 `보통` 이 혼잡도의 `보통` 과
+ * 구분되지 않는다 (#652 · `등급배지-축라벨-세부명세.md` D5). 폭은 상한으로 다스린다.
+ */
+function PlanPhaseVerdictStrip({
+  phaseText,
+  verdicts,
+}: {
+  /** `D-1` · `D-DAY` · `오늘 3일차`. 지난 일정·읽을 수 없는 날짜면 `null` */
+  phaseText: string | null
+  verdicts: PlanDayWeatherItem[]
+}) {
+  if (phaseText === null && verdicts.length === 0) return null
+
+  const shown = verdicts.slice(0, PLAN_VERDICT_STRIP_MAX_DAYS)
+  const hidden = verdicts.length - shown.length
+
   return (
-    <Surface title={messages.plan.verdictTocTitle} className="hidden lg:block">
-      <nav aria-label={messages.plan.verdictTocTitle}>
-        <SurfaceList className="border-border border-t">
-          {verdicts.map((verdict) => (
-            <li key={verdict.day} className={INSET_CLASS.card}>
-              <a
-                href={`#${planDayAnchorId(verdict.day)}`}
-                className="focus-visible:ring-brand-500 flex min-h-11 items-center justify-between gap-2 py-2 focus-visible:ring-2 focus-visible:outline-none"
-              >
-                <span className="text-body-2 text-fg font-medium">
-                  {messages.plan.dayLabel.replace('{day}', String(verdict.day))}
-                </span>
-                {verdict.suitabilityLevel === null ? (
-                  // 판정을 못 낸 날을 낮은 등급으로 칠하지 않는다 — 점선 unknown 이다
-                  <MetricBadge tone="unknown" size="sm" axis="suitability">
-                    {messages.plan.verdictTocUnavailable}
-                  </MetricBadge>
-                ) : (
-                  <MetricBadge
-                    tone={suitabilityTone(verdict.suitabilityLevel.code)}
-                    size="sm"
-                    axis="suitability"
-                  >
-                    {verdict.suitabilityLevel.name}
-                  </MetricBadge>
-                )}
-              </a>
-            </li>
-          ))}
-        </SurfaceList>
-      </nav>
-    </Surface>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      {phaseText !== null && <span className="text-body-2 text-fg font-bold">{phaseText}</span>}
+
+      {shown.length > 0 && (
+        /*
+          목차이므로 `nav` 다 — 카드가 사라지면서 `Surface` 의 `h2` 도 함께 사라졌고,
+          이 묶음의 이름은 이제 `aria-label` 하나가 갖는다.
+        */
+        <nav aria-label={messages.plan.verdictTocTitle}>
+          <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {shown.map((verdict) => (
+              <li key={verdict.day}>
+                {/* 44px 터치 영역 (D6) — 목차 줄이 갖고 있던 값을 칸으로 옮긴다 */}
+                <a
+                  href={`#${planDayAnchorId(verdict.day)}`}
+                  className="focus-visible:ring-brand-500 inline-flex min-h-11 items-center gap-1 focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  <span className="text-caption text-fg font-medium tabular-nums">
+                    {messages.plan.dayLabel.replace('{day}', String(verdict.day))}
+                  </span>
+                  {verdict.suitabilityLevel === null ? (
+                    // 판정을 못 낸 날을 낮은 등급으로 칠하지 않는다 — 점선 unknown 이다
+                    <MetricBadge tone="unknown" size="sm" axis="suitability">
+                      {messages.plan.verdictTocUnavailable}
+                    </MetricBadge>
+                  ) : (
+                    <MetricBadge
+                      tone={suitabilityTone(verdict.suitabilityLevel.code)}
+                      size="sm"
+                      axis="suitability"
+                    >
+                      {verdict.suitabilityLevel.name}
+                    </MetricBadge>
+                  )}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
+
+      {/* 남은 일자를 없는 척하지 않는다 — 판정 자체는 아래 일자 카드가 그대로 갖는다 */}
+      {hidden > 0 && (
+        <span className="text-caption text-fg-muted font-medium tabular-nums">
+          {messages.plan.verdictStripMore.replace('{count}', String(hidden))}
+        </span>
+      )}
+    </div>
   )
 }
