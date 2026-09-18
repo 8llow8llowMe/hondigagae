@@ -15,6 +15,7 @@ import { PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
 import { PlanPackingList } from '@/features/plan/plan-packing-list'
 import { PlanPackingStrip } from '@/features/plan/plan-packing-strip'
 import { PlanReviewList } from '@/features/plan/plan-review-panel'
+import { PlanRouteCard } from '@/features/plan/plan-route-card'
 import { PlanStatusAction } from '@/features/plan/plan-status-action'
 import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
 import { usePlanDayEdit } from '@/features/plan/use-plan-day-edit'
@@ -370,6 +371,15 @@ export function PlanDetailSection({
         있어 0, 데스크톱 2단은 자기 열의 첫 요소라 24 다 (장소 상세 #443 과 같은 처리).
       */}
       <SurfaceStack className="rail-split-main pt-2 md:pt-0 lg:pt-6 lg:pl-3">
+        {/*
+          동선 지도 (#743). **일자 카드 위, 같은 열이다** — 레일이 고정이 아니라(위 주석)
+          지도를 왼쪽에 두면 카드를 읽으며 내려가는 동안 화면에서 사라진다. 지도와 목록은
+          서로를 가리키는 한 쌍이라 떨어지면 대응이 끊긴다.
+
+          **찍을 좌표가 없으면 스스로 `null` 을 낸다** — 여기서 갈래를 만들지 않는다.
+        */}
+        <PlanRouteCard totalDays={plan.totalDays} days={days} />
+
         {days.map((group, index) => (
           <PlanDaySection
             key={group.day}

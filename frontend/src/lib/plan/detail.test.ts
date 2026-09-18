@@ -8,10 +8,11 @@ import {
   hasUnresolvedPlace,
   isPlaceTarget,
   lodgingBasisFor,
+  planItemMapCoord,
   toItemRows,
 } from '@/lib/plan/detail'
 import { planAlternative } from '@/test/fixtures/plan'
-import type { PlanItemDetail, PlanItemPlace } from '@/types/plan'
+import type { PlanItemDetail, PlanItemPlace, PlanItemWalkCourse } from '@/types/plan'
 
 const JEJU_AIRPORT: LatLng = { lat: 33.507, lng: 126.493 }
 const SEONGSAN: LatLng = { lat: 33.458, lng: 126.9425 }
@@ -288,3 +289,75 @@ describe('toItemRows — 거리는 항목이 들고 온 좌표로 잰다 (#115)'
 function meta(code: string) {
   return { code, name: code, description: '' }
 }
+
+/** 좌표만 있는 코스 요약. 나머지는 지도가 보지 않는다 */
+function courseAt(coord: LatLng | null): PlanItemWalkCourse {
+  return {
+    name: null,
+    courseLabel: null,
+    distanceKm: null,
+    durationText: null,
+    durationMaxMinutes: null,
+    lat: coord?.lat ?? null,
+    lng: coord?.lng ?? null,
+    firstImage: null,
+    fitsActivityLevels: [],
+  }
+}
+
+/* 지도는 거리 줄보다 넓게 본다 — 올레 항목도 찍는다 (#743) */
+describe('planItemMapCoord', () => {
+  it('장소 좌표를 쓴다', () => {
+    const coord = planItemMapCoord(item({ day: 1, sequence: 1, place: placeAt(JEJU_AIRPORT) }))
+
+    expect(coord).toEqual(JEJU_AIRPORT)
+  })
+
+  /* `WALK` 의 `place` 는 항상 null 이고 좌표는 코스 시작점에 있다 */
+  it('장소가 없으면 올레 코스 시작점을 쓴다', () => {
+    const coord = planItemMapCoord(
+      item({
+        day: 1,
+        sequence: 1,
+        itemType: { code: 'WALK', name: 'WALK', description: '' },
+        walkCourse: courseAt(SEONGSAN),
+      }),
+    )
+
+    expect(coord).toEqual(SEONGSAN)
+  })
+
+  it('둘 다 없으면 null 이다', () => {
+    expect(planItemMapCoord(item({ day: 1, sequence: 1 }))).toBeNull()
+  })
+
+  /* 코스 29개 중 25개가 좌표 없이 적재돼 있다 (#722) — 흔한 갈래다 */
+  it('코스에 좌표가 없으면 null 이다', () => {
+    const coord = planItemMapCoord(
+      item({
+        day: 1,
+        sequence: 1,
+        itemType: { code: 'WALK', name: 'WALK', description: '' },
+        walkCourse: courseAt(null),
+      }),
+    )
+
+    expect(coord).toBeNull()
+  })
+
+  /* 거리 줄은 `place` 만 본다 — 지도만 넓힌 것이지 규칙을 통째로 바꾼 것이 아니다 */
+  it('올레 항목에는 여전히 거리 줄이 붙지 않는다', () => {
+    const walk = item({
+      day: 1,
+      sequence: 2,
+      itemType: { code: 'WALK', name: 'WALK', description: '' },
+      walkCourse: courseAt(SEONGSAN),
+    })
+    const rows = toItemRows(
+      [item({ day: 1, sequence: 1, place: placeAt(JEJU_AIRPORT) }), walk],
+      null,
+    )
+
+    expect(rows[1]?.distanceMeters).toBeNull()
+  })
+})

@@ -211,3 +211,28 @@ export function toItemRows(
 function coordOf(item: PlanItemDetail): LatLng | null {
   return item.place === null ? null : toLatLng(item.place)
 }
+
+/**
+ * 지도에 찍을 좌표 — **`coordOf` 보다 넓다** (#743).
+ *
+ * 거리 줄은 `place` 만 본다. 올레 항목(`WALK`)의 `place` 는 항상 `null` 이고 좌표는
+ * `walkCourse` 에 코스 **시작점**으로 들어 있는데, 그 한 점으로 잰 거리는 "코스까지의
+ * 거리" 도 "코스를 걸은 거리" 도 아니라 숫자로 말하기 어렵다.
+ *
+ * **지도는 다르다.** 그 시작점을 찍는 것은 "이 코스가 이 근처다" 라는 참말이고, 올레를
+ * 담은 일정에서 그 항목만 지도에 없으면 그것이 결함으로 읽힌다. 그래서 여기서만
+ * `walkCourse` 를 함께 본다.
+ *
+ * 둘이 갈리는 것을 기록으로 남긴다 — 나중에 거리 줄에 `walkCourse` 를 더하려는 사람은
+ * 위 문단의 "숫자로 말하기 어렵다" 를 먼저 풀어야 한다.
+ *
+ * **코스 대부분은 좌표가 없다.** [#722](https://github.com/8llow8llowMe/hondigagae/issues/722)
+ * 가 "29개 중 25개가 좌표 없이 적재돼 있다" 고 적는다 — 결손 고지(`routeOmitted`)가
+ * 장식이 아니라 실제로 자주 걸리는 줄이라는 뜻이다.
+ */
+export function planItemMapCoord(item: PlanItemDetail): LatLng | null {
+  const place = coordOf(item)
+  if (place !== null) return place
+
+  return item.walkCourse === null ? null : toLatLng(item.walkCourse)
+}
