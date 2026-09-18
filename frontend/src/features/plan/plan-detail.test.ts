@@ -7,7 +7,7 @@ import { PlanBriefingBanner } from '@/features/plan/plan-briefing-banner'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
 import { PlanItemRow } from '@/features/plan/plan-item-row'
-import { PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
+import { PLAN_VERDICT_STRIP_MAX_DAYS, PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
 import { LONG_TRIP_THRESHOLD_M } from '@/lib/geo/distance'
 import { messages } from '@/lib/messages'
 import {
@@ -526,6 +526,66 @@ describe('PlanOverviewPanel', () => {
   })
 })
 
+/**
+ * `D-N` + 일자별 판정 한 줄 (#732 · 진단 665-4).
+ *
+ * 데스크톱 전용이던 `일자별 판정` 목차 카드를 대신한다 — 모바일 1순위 제품에서 전체
+ * 판정 요약이 데스크톱에만 있었다.
+ */
+describe('PlanOverviewPanel — 판정 스트립 (#732)', () => {
+  function verdictsOf(days: number) {
+    return Array.from({ length: days }, (_, index) => ({ ...planVerdict, day: index + 1 }))
+  }
+
+  it('D-day 와 일자 배지가 한 줄에 선다', () => {
+    const markup = renderOverview()
+    const dday = markup.indexOf(messages.plan.dday.replace('{days}', '11'))
+    const badge = markup.indexOf('href="#day1"')
+
+    expect(dday).toBeGreaterThan(-1)
+    expect(dday).toBeLessThan(badge)
+  })
+
+  it('D-day 를 예산 줄과 스트립에 겹쳐 두지 않는다 — 한 카드에 같은 말이 두 번 서지 않는다', () => {
+    const markup = renderOverview()
+    const label = messages.plan.dday.replace('{days}', '11')
+
+    expect(markup.split(label)).toHaveLength(2)
+  })
+
+  it('지난 일정은 D-day 자리가 비고 판정만 선다 — D+3 을 지어내지 않는다', () => {
+    const markup = renderOverview({
+      plan: { ...planDetail, startDate: '2026-08-20', endDate: '2026-08-22' },
+    })
+
+    expect(markup).not.toContain('D-')
+    expect(markup).toContain('href="#day1"')
+  })
+
+  /*
+    여행은 최대 30일이다 (`PLAN_PERIOD_MAX_DAYS`) — 전부 세우면 요약이 아니라 목록이 되고,
+    390 에서 개요 카드가 일자 카드보다 길어진다.
+  */
+  it('상한을 넘는 일자는 개수로 말한다 — 없는 척하지 않는다', () => {
+    const markup = renderOverview({ verdicts: verdictsOf(PLAN_VERDICT_STRIP_MAX_DAYS + 3) })
+
+    expect(markup).toContain(`href="#day${PLAN_VERDICT_STRIP_MAX_DAYS}"`)
+    expect(markup).not.toContain(`href="#day${PLAN_VERDICT_STRIP_MAX_DAYS + 1}"`)
+    expect(markup).toContain(messages.plan.verdictStripMore.replace('{count}', '3'))
+  })
+
+  it('상한 안이면 남은 일자를 말하지 않는다', () => {
+    const markup = renderOverview({ verdicts: verdictsOf(PLAN_VERDICT_STRIP_MAX_DAYS) })
+
+    expect(markup).not.toContain('외 ')
+  })
+
+  /* 목차 줄이 갖고 있던 값이다 (D6) — 세로 목록을 가로로 접어도 손가락 크기는 그대로다 */
+  it('각 칸이 44px 터치 영역을 갖는다', () => {
+    expect(renderOverview()).toContain('min-h-11')
+  })
+})
+
 describe('PlanDayVerdict — 기준 반려견 (#176)', () => {
   it('한 마리 일정이면 줄이 없다', () => {
     expect(renderVerdict()).not.toContain('기준이에요')
@@ -584,22 +644,25 @@ describe('3층 표면 (#447)', () => {
     제목만이 아니라 상태 · 기간 · 예산 · D-day · 동행 반려견을 담은 개요라 §0 의 판정 3문에
     셋 다 걸린다. 근거는 `plan-overview-panel.tsx` 머리주석이 정본이다.
   */
-  it('개요와 판정 목차가 각각 카드다 — 목차는 데스크톱 전용', () => {
+  it('개요가 카드 하나다 — 판정은 그 안의 스트립이라 별도 카드가 아니다 (#732)', () => {
     const markup = renderOverview()
     const h1 = markup.indexOf('<h1')
-    const cards = markup.match(SURFACE)
 
     expect(h1).toBeGreaterThan(-1)
-    expect(cards).toHaveLength(2)
+    expect(markup.match(SURFACE)).toHaveLength(1)
     // 개요 카드가 `h1` 을 감싼다 — 카드가 먼저 열려야 한다
     expect(markup.search(SURFACE)).toBeLessThan(h1)
-    // 목차 카드만 `hidden lg:block` 이다 — 개요는 모든 폭에서 보인다
-    const toc = markup.indexOf(messages.plan.verdictTocTitle)
-    expect(markup.slice(0, toc)).toContain('hidden lg:block')
-    expect(markup).toContain(`<h2`)
   })
 
-  it('판정이 없으면 목차 카드를 만들지 않는다 — 개요 카드만 남는다', () => {
+  /* 예전에는 `hidden lg:block` 카드라 모바일에서 전체 판정을 볼 방법이 없었다 (#732) */
+  it('판정 스트립은 폭으로 숨지 않는다 — 모바일이 1순위다', () => {
+    const markup = renderOverview()
+
+    expect(markup).toContain(messages.plan.verdictTocTitle)
+    expect(markup).not.toContain('hidden lg:block')
+  })
+
+  it('판정이 없으면 목차 부분을 만들지 않는다 — 빈 nav 를 세우지 않는다', () => {
     const markup = renderOverview({ verdicts: [] })
 
     expect(markup.match(SURFACE)).toHaveLength(1)
