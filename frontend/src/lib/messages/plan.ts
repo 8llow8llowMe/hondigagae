@@ -321,13 +321,23 @@ export const planMessages = {
   verdictPastDate: '지난 날이라 날씨 판정을 확인할 수 없어요.',
   /** 반려견 특성 조회에 실패해 일반 조건으로 판정한 경우 */
   verdictPetConditionMissing: '반려견 특성을 반영하지 못해 일반 조건으로 판정했어요.',
-  /** `{source}` 치환 — 서버가 준 `forecastSourceName` */
-  verdictMidTermSource: '{source} 기준이라 대략적인 값이에요.',
   /**
-   * 체감온도를 못 받은 날(중기예보 구간)에 대신 세우는 값의 라벨 (#253).
-   * **체감온도를 이 이름으로 부르지 않는다** — 판정의 근거를 잘못 알려 주는 것이다.
+   * 체감온도를 못 받은 날에 큰 숫자 옆에 서는 단서 (#732). **예보 출처를 모를 때의 갈래다**
+   * — 출처를 알면 `verdictFallbackMetric` 이 둘을 함께 말한다.
+   *
+   * **체감온도를 이 이름으로 부르지 않는다** (#253) — 판정의 근거를 잘못 알려 주는 것이다.
+   * 라벨은 `verdictFeelsLikeLabel` 로 고정이고, 그 날 실제로 선 값의 이름은 이 단서가 말한다.
    */
   verdictTemperatureLabel: '최고기온',
+  /**
+   * 큰 숫자 옆 단서 (#732). `{source}` 치환 — 서버가 준 `forecastSourceName`.
+   *
+   * 예전에는 `{source} 기준이라 대략적인 값이에요.` 가 **근거 문단 맨 아래**, 그것이
+   * 설명하는 값에서 가장 먼 자리에 있었다. 나란한 두 일자가 다른 지표를 쓰는 이유를
+   * 말하는 문장인데 그 자리에서는 아무도 둘을 잇지 못했다 — 값 옆으로 올리면서 문장을
+   * 낱말로 줄였다(배지 한 칸).
+   */
+  verdictFallbackMetric: '{source} 최고기온',
   /**
    * 판정 옆 큰 숫자의 기본 라벨 (#253 · [#259](https://github.com/8llow8llowMe/hondigagae/issues/259)).
    * **기온과 습도를 합친 기상청 여름철 체감온도다** (#292 — 예전에는 NOAA 열지수였다).

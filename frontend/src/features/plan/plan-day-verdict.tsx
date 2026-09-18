@@ -1,10 +1,11 @@
 'use client'
 
+import { Badge } from '@/components/badge'
 import { ButtonLink } from '@/components/button'
 import { ErrorState } from '@/components/error-state'
 import { MetricBadge, MetricValue } from '@/components/metric'
 import { ReasonList } from '@/components/reason-list'
-import { displayTemperature } from '@/lib/insight/temperature'
+import { type DisplayTemperature, displayTemperature } from '@/lib/insight/temperature'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import {
@@ -95,8 +96,10 @@ export function PlanDayVerdict({
 
         {/*
           **체감온도가 이 자리의 기본값이다** (#253 · 아트보드 01). 못 받은 날
-          (중기예보 구간)에만 최고기온이 서고, 그때는 라벨이 함께 바뀐다 —
-          고르는 규칙은 `lib/insight/temperature.ts` 하나이고 장소 상세와 공유한다.
+          (중기예보 구간)에만 최고기온이 서고, 값을 고르는 규칙은
+          `lib/insight/temperature.ts` 하나이고 장소 상세와 공유한다.
+
+          **라벨은 고정이고 차이는 값 옆 단서가 말한다** (#732) — 아래 주석 참고.
         */}
         <VerdictTemperatureValue weather={verdict.weather} />
 
@@ -126,11 +129,7 @@ export function PlanDayVerdict({
         }))}
       />
 
-      <PlanVerdictNotes
-        verdict={verdict}
-        petConditionApplied={petConditionApplied}
-        basisPetName={basisPetName}
-      />
+      <PlanVerdictNotes petConditionApplied={petConditionApplied} basisPetName={basisPetName} />
     </div>
   )
 }
@@ -173,65 +172,93 @@ function unavailableSentence(verdict: PlanDayWeatherItem, dayHasItems: boolean):
 }
 
 /**
- * 판정 옆 큰 숫자 — 체감온도, 없으면 최고기온 (#253).
+ * 판정 옆 큰 숫자 — 체감온도, 없으면 최고기온 (#253 · #732).
  *
- * **라벨이 값과 함께 바뀐다.** 둘 다 ℃ 라 라벨이 고정이면 중기예보 구간에서 최고기온을
- * `체감온도` 라고 부르게 되고, 그것은 판정의 근거를 잘못 알려 주는 것이다.
+ * ## 라벨은 `최고 체감온도` 로 고정이다 (#732 · 진단 665-6)
+ *
+ * 예전에는 **라벨이 값과 함께 바뀌었다** — 1일차 `최고 체감온도 27.5℃`, 2일차
+ * `최고기온 24.0℃`. 나란한 두 일자가 다른 지표를 쓰는데 **설명이 한 줄도 없어서**, 값의
+ * 차이가 아니라 화면의 오류로 읽혔다. 유일한 단서(`{source} 기준이라 대략적인 값이에요.`)는
+ * 근거 문단 **맨 아래**, 값에서 가장 먼 자리에 있었다.
+ *
+ * 그래서 **기둥(라벨)을 고정하고 차이를 값 옆에서 말한다.** 이 자리가 무엇을 재는
+ * 자리인지는 날마다 바뀌지 않는다 — 바뀌는 것은 그 날 서버가 줄 수 있는 값의 종류다.
+ *
+ * **그래도 최고기온을 체감온도라고 부르지는 않는다** (#253 이 못박은 것). 단서가 값 바로
+ * 옆에서 `중기예보 최고기온` 이라고 말하므로, 읽는 사람이 숫자를 잘못된 이름으로 가져갈
+ * 자리가 없다 — 라벨은 축의 이름이고 단서는 그 날 실제로 온 값의 이름이다.
  */
 function VerdictTemperatureValue({ weather }: { weather: PlanDayWeatherItem['weather'] }) {
   const temperature = displayTemperature(weather)
   if (temperature === null) return null
 
+  const clue = temperatureClue(weather, temperature)
+
   return (
-    <MetricValue
-      label={
-        temperature.kind === 'feelsLike'
-          ? messages.plan.verdictFeelsLikeLabel
-          : messages.plan.verdictTemperatureLabel
-      }
-      value={temperature.value.toFixed(1)}
-      unit="℃"
-    />
+    <>
+      <MetricValue
+        label={messages.plan.verdictFeelsLikeLabel}
+        value={temperature.value.toFixed(1)}
+        unit="℃"
+      />
+      {clue !== null && (
+        // 등급이 아니라 **출처**라 `MetricBadge` 가 아니다 — 중립 배지다 (DESIGN.md §2-3)
+        <Badge tone="neutral" size="sm">
+          {clue}
+        </Badge>
+      )}
+    </>
   )
+}
+
+/**
+ * 큰 숫자 옆 단서 — 없으면 `null` (#732).
+ *
+ * **두 가지를 말한다.** ① 이 날은 예보 종류가 다르다(`forecastSourceName`, 서버 문구를
+ * 그대로 쓴다) ② 그래서 선 값이 체감온도가 아니다.
+ *
+ * **체감온도가 선 날에는 단서가 없다** — 기본값이라 말할 차이가 없다. 반대로 예보 출처를
+ * 모르는 채 최고기온만 온 날에도 `최고기온` 하나는 말한다: 라벨이 고정이라 그 날 무엇이
+ * 섰는지 말할 자리가 여기뿐이다.
+ */
+function temperatureClue(
+  weather: PlanDayWeatherItem['weather'],
+  temperature: DisplayTemperature,
+): string | null {
+  const source =
+    weather?.forecastSourceCode === MID_TERM_FORECAST_CODE ? weather.forecastSourceName : null
+
+  if (temperature.kind === 'feelsLike') return source
+  if (source === null) return messages.plan.verdictTemperatureLabel
+
+  return messages.plan.verdictFallbackMetric.replace('{source}', source)
 }
 
 /**
  * 판정을 어떻게 읽어야 하는지 알리는 줄들.
  *
- * **정밀도 차이를 감추지 않는다.** 중기예보 구간은 서버 스키마가 스스로 "대략적인 값"
- * 이라고 적어 뒀다 — 그 사실을 화면이 삼키면 사용자는 단기예보와 같은 신뢰로 읽는다.
+ * **예보 출처는 이제 여기 없다** (#732). `{source} 기준이라 대략적인 값이에요.` 는 근거
+ * 문단 맨 아래, 그것이 설명하는 값에서 가장 먼 자리에 있었다 — 나란한 두 일자가 다른
+ * 지표를 쓰는 이유를 말하는 줄인데 그 자리에서는 아무도 그 둘을 잇지 못했다. 단서는 큰
+ * 숫자 바로 옆으로 올라갔다 (`temperatureClue`).
  */
 function PlanVerdictNotes({
-  verdict,
   petConditionApplied,
   basisPetName,
 }: {
-  verdict: PlanDayWeatherItem
   petConditionApplied: boolean
   basisPetName: string | null
 }) {
-  const midTerm =
-    verdict.weather?.forecastSourceCode === MID_TERM_FORECAST_CODE &&
-    verdict.weather.forecastSourceName !== null
-
-  if (!midTerm && petConditionApplied && basisPetName === null) return null
+  if (petConditionApplied && basisPetName === null) return null
 
   return (
     <div className="text-caption text-fg-muted flex flex-col gap-1">
       {/*
-        **기준 반려견을 맨 위에 둔다.** 아래 두 줄은 판정을 어떻게 읽어야 하는지의 단서인데,
+        **기준 반려견을 맨 위에 둔다.** 아래 줄은 판정을 어떻게 읽어야 하는지의 단서인데,
         이 줄은 **누구의 판정인지**라 먼저 와야 나머지가 그 아이 이야기로 읽힌다.
       */}
       {basisPetName !== null && (
         <p>{messages.plan.verdictBasisPet.replace('{name}', basisPetName)}</p>
-      )}
-      {midTerm && (
-        <p>
-          {messages.plan.verdictMidTermSource.replace(
-            '{source}',
-            verdict.weather?.forecastSourceName ?? '',
-          )}
-        </p>
       )}
       {!petConditionApplied && <p>{messages.plan.verdictPetConditionMissing}</p>}
     </div>
