@@ -35,6 +35,15 @@ export type PlanItemVisit = {
   error: PlanDaySaveError | null
   /** 다음 상태를 넘긴다 — 해제도 같은 API 다 (`visited: false`) */
   onToggle: (visited: boolean) => void
+  /**
+   * 아직 떠나지 않은 여행이다 (#732 · 진단 665-7). **`다녀옴 표시` 글자를 접는다** —
+   * 그 화면에서 가장 많이 반복되는 문자열인데, 아무도 다녀오지 않은 일정에서 모든 항목에
+   * 붙어 있었다. 판정은 화면이 하고(`planPhaseOf`) 행은 결과만 받는다.
+   *
+   * **체크된 행은 낱말을 지킨다** — `다녀옴` 은 상태를 말하는 유일한 낱말이라 접으면
+   * 색과 아이콘만 남는다 (DESIGN.md §7). 접는 것은 반복되는 쪽(`다녀옴 표시`)뿐이다.
+   */
+  compact: boolean
 }
 
 /**
@@ -286,42 +295,63 @@ function PlanItemVisitToggle({
   item: PlanItemRowModel['item']
   visit: PlanItemVisit
 }) {
+  /*
+    **출발 전에는 `다녀옴 표시` 글자를 접는다** (#732 · 진단 665-7). D-1 화면에서 가장 많이
+    반복되는 문자열이 그것이었다 — 아무도 다녀오지 않은 일정의 **모든 항목**에 붙어 있었다.
+
+    **체크된 행은 접지 않는다.** `다녀옴` 은 상태를 말하는 유일한 낱말이고, 접으면 그
+    사실이 색(`variant`)과 아이콘으로만 남는다 (DESIGN.md §7). 접는 것은 반복되는 쪽뿐이다.
+
+    **`aria-label` 은 두 갈래 모두 그대로다** — 스크린리더가 듣는 것은 변하지 않고, 보이는
+    글자가 없어지면 WCAG 2.5.3(Label in Name) 은 애초에 걸리지 않는다. #653 이 글자를
+    붙이면서 새로 생긴 제약이라 글자를 거두면 함께 사라진다.
+  */
+  const iconOnly = visit.compact && !item.visited
+
+  const shared = {
+    /*
+      **상태를 `variant` 로 말한다.** `className` 으로 색을 덮지 않는다 —
+      component-guide.md §3 이 금지한다. 표준 집합 안에서 `secondary`(테두리 + 진한
+      글자)와 `ghost`(맨 아이콘)의 차이가 눌린 상태를 그린다.
+    */
+    variant: item.visited ? ('secondary' as const) : ('ghost' as const),
+    size: 'md' as const,
+    'aria-label': item.visited ? messages.plan.visitedAction : messages.plan.visitAction,
+    'aria-pressed': item.visited,
+    loading: visit.pending,
+    leading: <CheckIcon size={20} />,
+    onClick: () => visit.onToggle(!item.visited),
+  }
+
   return (
     // 썸네일 상단에 맞춘다 — 행이 길어져도 토글이 가운데로 흐르지 않는다
     <div className="shrink-0 py-2 lg:py-3">
-      <Button
-        /*
-          **상태를 `variant` 로 말한다.** `className` 으로 색을 덮지 않는다 —
-          component-guide.md §3 이 금지한다. 표준 집합 안에서 `secondary`(테두리 + 진한
-          글자)와 `ghost`(맨 아이콘)의 차이가 눌린 상태를 그린다.
-        */
-        variant={item.visited ? 'secondary' : 'ghost'}
-        size="md"
-        aria-label={item.visited ? messages.plan.visitedAction : messages.plan.visitAction}
-        aria-pressed={item.visited}
-        loading={visit.pending}
-        leading={<CheckIcon size={20} />}
-        onClick={() => visit.onToggle(!item.visited)}
-      >
-        {/*
-          **`iconOnly` 를 벗었다** (#653 · 진단 PL-5). `✓` 하나로는 방문 완료인지 동반
-          확인인지 알 수 없었다 — `aria-label` 과 `aria-pressed` 는 **이미 있었으므로
-          스크린리더는 뜻을 들었고, 눈으로 볼 때만 뜻이 없었다.** 그것도 체크 **전에만**
-          그랬다(체크하면 행에 `다녀옴` 배지가 떴다). 즉 기능을 모르는 사람에게만 안 보였다.
+      {iconOnly ? (
+        <Button {...shared} iconOnly />
+      ) : (
+        <Button {...shared}>
+          {/*
+            **`iconOnly` 를 벗었다** (#653 · 진단 PL-5). `✓` 하나로는 방문 완료인지 동반
+            확인인지 알 수 없었다 — `aria-label` 과 `aria-pressed` 는 **이미 있었으므로
+            스크린리더는 뜻을 들었고, 눈으로 볼 때만 뜻이 없었다.** 그것도 체크 **전에만**
+            그랬다(체크하면 행에 `다녀옴` 배지가 떴다). 즉 기능을 모르는 사람에게만 안 보였다.
 
-          **보이는 글자가 상태에 따라 갈린다.** 체크 전에 `다녀옴` 이라고 적으면 훑는
-          사람에게 그 행이 이미 다녀온 것으로 읽힌다 — 모르는 것보다 **틀리게 아는 것**이
-          나쁘다. 체크 전에는 누르면 일어날 일(`다녀옴 표시`)을, 뒤에는 상태(`다녀옴`)를
-          말한다.
+            **보이는 글자가 상태에 따라 갈린다.** 체크 전에 `다녀옴` 이라고 적으면 훑는
+            사람에게 그 행이 이미 다녀온 것으로 읽힌다 — 모르는 것보다 **틀리게 아는 것**이
+            나쁘다. 체크 전에는 누르면 일어날 일(`다녀옴 표시`)을, 뒤에는 상태(`다녀옴`)를
+            말한다.
 
-          **체크 전 `aria-label` 은 이 글자와 같다** (WCAG 2.5.3 Label in Name). 이름이
-          `다녀옴으로 표시` 이고 글자가 `다녀옴 표시` 면 음성 제어 사용자가 보이는 그대로
-          말했을 때 이 버튼이 잡히지 않는다 — 아이콘만이던 시절에는 보이는 글자가 없어
-          성립하던 규칙이라 **글자를 붙이면서 새로 깨진 것**이다. 체크 뒤는
-          `다녀옴` ⊂ `다녀옴 표시 해제` 라 이미 포함 관계다.
-        */}
-        {item.visited ? messages.plan.visitedLabel : messages.plan.visitToggleLabel}
-      </Button>
+            **체크 전 `aria-label` 은 이 글자와 같다** (WCAG 2.5.3 Label in Name). 이름이
+            `다녀옴으로 표시` 이고 글자가 `다녀옴 표시` 면 음성 제어 사용자가 보이는 그대로
+            말했을 때 이 버튼이 잡히지 않는다 — 아이콘만이던 시절에는 보이는 글자가 없어
+            성립하던 규칙이라 **글자를 붙이면서 새로 깨진 것**이다. 체크 뒤는
+            `다녀옴` ⊂ `다녀옴 표시 해제` 라 이미 포함 관계다.
+
+            **출발 전 미체크 행은 다시 아이콘만이다** (#732) — 위 `iconOnly` 주석 참고.
+          */}
+          {item.visited ? messages.plan.visitedLabel : messages.plan.visitToggleLabel}
+        </Button>
+      )}
     </div>
   )
 }
