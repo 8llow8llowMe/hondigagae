@@ -301,13 +301,31 @@ export const emergencyMessages = {
   regionGroupLabel: '기준 지역',
 
   /**
-   * 카드 부제 (#639). `{total}` · `{openNow}` 치환.
+   * 카드 부제 (#639 · #675). `{region}` · `{total}` · `{openNow}` 치환.
    *
    * **응답 전에는 렌더하지 않는다** — 숫자 없는 부제는 빈 말이다. 받아 온 목록이 잘렸으면
    * (`countsAreComplete === false`) 진료중 수가 전체가 아니므로 그때도 감춘다:
-   * 틀린 개수는 없는 개수보다 나쁘다.
+   * 틀린 개수는 없는 개수보다 나쁘다. `total === 0` 도 감춘다 — 0곳·0곳 짜리 줄은
+   * 정보가 없다 (#675 D16-6).
+   *
+   * `{region}` 은 `emergencyBasisLabel` 과 같은 출처(`regionLabel[regionCode]` ·
+   * 기본값 `subtitleRegionAll`)를 쓴다 — 같은 화면의 두 줄이 "서귀포 기준" /
+   * "제주 18곳" 으로 갈리던 자리다 (#675 D16-1 ②).
    */
-  subtitle: '제주 {total}곳 · 지금 진료중 {openNow}곳',
+  subtitle: '{region} {total}곳 · 지금 진료중 {openNow}곳',
+  /**
+   * 검색 중일 때의 부제 (#675). `{keyword}` · `{total}` · `{openNow}` 치환.
+   *
+   * **지역명을 붙이지 않는다.** 검색 중 가장 강한 조건은 검색어이고, 지역은 바로 옆
+   * 기준 줄(`basisRegion`)이 계속 말한다 (#675 D16-4).
+   *
+   * `{total}` 의 출처가 `subtitle` 과 다르다 — 서버가 `keyword` 를 모르므로(#584) 검색
+   * 결과 수(`narrowByKeyword` 를 통과한 배열의 길이)를 쓴다. 따옴표는
+   * `searchNarrowedTitle`(`‘{keyword}’ 로 찾은 곳이 없어요`)과 같은 `‘ ’` 다.
+   */
+  subtitleKeyword: '‘{keyword}’ {total}곳 · 지금 진료중 {openNow}곳',
+  /** `subtitle` 의 `{region}` 기본 치환값 — 권역을 고르지 않았을 때 (#675) */
+  subtitleRegionAll: '제주',
 
   /** `{provider}` 치환 */
   source: '정보 출처: {provider}. 진료시간은 실제와 다를 수 있어 방문 전 전화로 확인해 주세요.',

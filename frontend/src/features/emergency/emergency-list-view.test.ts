@@ -124,7 +124,9 @@ describe('목록 갈래는 3층 표면이다 (#460)', () => {
 
     // 카드 밖 제목 줄의 형제가 아니라 카드의 슬롯이다
     expect(view).toMatch(/trailing=\{\s*<ViewToggle current="list"/)
-    expect(view).toContain('const subtitle = emergencyHeadSubtitle(result)')
+    expect(view).toContain(
+      'const subtitle = emergencyHeadSubtitle(result, board.filters.keyword, board.regionCode)',
+    )
     expect(view).toMatch(/description=\{[\s\S]{0,200}\{subtitle\}/)
 
     // `lg:` 로 갈리는 둘째 부제가 되돌아오면 여기서 걸린다
