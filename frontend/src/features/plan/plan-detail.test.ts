@@ -724,4 +724,21 @@ describe('PlanBriefingBanner — 날짜 축 하나로만 노출을 가른다 (D1
   it('링크에 날짜 쿼리를 붙이지 않는다', () => {
     expect(renderBriefingBanner('2026-09-13')).not.toContain('date=')
   })
+
+  /*
+    **강조가 시간에 묶여 있다** (#732 · DESIGN.md §0-3). 서 있는 동안이 곧 강조할 동안이라
+    별도 판정 축이 없다 — 병원·약국 배너는 상시라 중립을 지킨다.
+  */
+  it('날짜가 맞는 동안은 brand 테두리 + tint 로 선다', () => {
+    for (const today of ['2026-09-11', '2026-09-13']) {
+      const markup = renderBriefingBanner(today)
+
+      expect(markup).toContain('border-brand-500')
+      expect(markup).toContain('bg-row-selected')
+    }
+  })
+
+  it('강조에 그림자를 쓰지 않는다 — 카드는 눕지 뜨지 않는다 (§6)', () => {
+    expect(renderBriefingBanner('2026-09-11')).not.toContain('shadow')
+  })
 })

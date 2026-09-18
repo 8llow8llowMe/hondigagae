@@ -176,6 +176,16 @@ export function SurfaceStack({
  *
  * **`lg` 전용이다.** 1024 미만에서는 레일이 없고 페이지 스크롤 하나라, 머리를 고정할 열
  * 높이 자체가 없다. 그 아래에서는 평범한 카드로 흐른다.
+ *
+ * ### `tone="brand"` — 지금 눌러야 할 진입점 (이슈 #732, DESIGN.md §0-3)
+ *
+ * **시간이 정한 카드 하나에만 준다.** 상시 진입점은 상시의 무게를 갖는다 — 병원·약국
+ * 배너는 사고가 났을 때 찾는 것이라 중립 카드로 남는다. 반대로 출발 전날의 브리핑은
+ * **그 이틀에만 존재하는** 진입점이라, 같은 chevron 행으로 나란히 서면 어느 쪽이 오늘의
+ * 일인지 화면이 말하지 못한다.
+ *
+ * 값은 `--brand-500` 테두리 + `--row-selected` 면이고 **새 토큰이 아니다** — 이 짝은
+ * `radio-group` · `checkbox-group` 이 "브랜드로 고른 것" 에 이미 쓰는 조합 그대로다.
  */
 export function Surface({
   title,
@@ -186,6 +196,7 @@ export function Surface({
   tools,
   trailing,
   fill = false,
+  tone = 'default',
   children,
   className,
   ...aria
@@ -233,6 +244,13 @@ export function Surface({
    * 그보다 크다고 봤다 (이슈 #556 의 결정 1).
    */
   fill?: boolean
+  /**
+   * 표면의 무게. **머리주석의 `tone="brand"` 절이 정본이다** (#732).
+   *
+   * `brand` 는 **시간이 정한 진입점 하나**에만 준다 — 화면에서 둘 이상이 brand 면을 쓰면
+   * 강조가 배경음이 되어 아무것도 강조하지 않는다.
+   */
+  tone?: 'default' | 'brand'
   children: ReactNode
   className?: string
 }) {
@@ -244,6 +262,7 @@ export function Surface({
       aria-labelledby={titleId}
       className={cn(
         'bg-bg border-border border-y md:rounded-lg md:border',
+        tone === 'brand' && 'border-brand-500 bg-row-selected',
         // 열을 채우고 머리/본문으로 가른다 — `min-h-0` 이 없으면 본문이 트랙 밖으로 자란다
         fill && 'lg:flex lg:min-h-0 lg:flex-1 lg:flex-col',
         className,
