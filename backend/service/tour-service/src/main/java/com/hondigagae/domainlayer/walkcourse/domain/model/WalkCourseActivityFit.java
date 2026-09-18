@@ -16,6 +16,10 @@ import java.util.List;
  *   <li>MEDIUM - 6시간(360분)까지. "일반적인 산책과 관광 일정을 소화한다"</li>
  *   <li>HIGH - 상한 없음. "긴 산책과 활동적인 일정을 선호한다"</li>
  * </ul>
+ *
+ * <p>상한 숫자를 밖에서 읽어야 할 때는 {@link #maxMinutesOf} 를 쓴다 (#718) - 응답이 "적용된
+ * 활동량과 그 상한"을 실어 내리기 때문인데, 화면이 4시간·6시간을 제 상수로 적으면 서버가 상한을
+ * 바꿔도 화면만 옛 숫자를 말한다.
  */
 public final class WalkCourseActivityFit {
 
@@ -26,20 +30,35 @@ public final class WalkCourseActivityFit {
     }
 
     /**
+     * 그 활동량이 걸을 수 있는 소요시간 상한(분). <b>상한 숫자가 나오는 유일한 출입구다</b> -
+     * {@link #fits} 도 이 값으로 판정하므로 상한을 바꾸려면 이 클래스의 상수만 고치면 된다.
+     *
+     * <p>HIGH 는 상한이 없어 null 이다. 활동량 자체가 null(필터 없음)일 때도 null 이라, 호출부는
+     * "상한 없음"과 "필터 없음"을 이 반환값으로 가르지 않는다 - 활동량을 가졌는지로 먼저 가른다.
+     */
+    public static Integer maxMinutesOf(ActivityLevel activityLevel) {
+        if (activityLevel == null) {
+            return null;
+        }
+        return switch (activityLevel) {
+            case LOW -> LOW_MAX_MINUTES;
+            case MEDIUM -> MEDIUM_MAX_MINUTES;
+            case HIGH -> null;
+        };
+    }
+
+    /**
      * 이 소요시간의 코스를 그 활동량의 반려견이 걸을 만한지.
      *
      * <p>소요시간을 모르는 코스(null)는 참이다 - 모르는 것을 나쁜 것으로 판정해 목록에서
      * 지우면 사용자는 그 코스가 있다는 것조차 모른다.
      */
     public static boolean fits(ActivityLevel activityLevel, Integer durationMaxMinutes) {
-        if (activityLevel == null || durationMaxMinutes == null) {
+        if (durationMaxMinutes == null) {
             return true;
         }
-        return switch (activityLevel) {
-            case LOW -> durationMaxMinutes <= LOW_MAX_MINUTES;
-            case MEDIUM -> durationMaxMinutes <= MEDIUM_MAX_MINUTES;
-            case HIGH -> true;
-        };
+        Integer maxMinutes = maxMinutesOf(activityLevel);
+        return maxMinutes == null || durationMaxMinutes <= maxMinutes;
     }
 
     /**
