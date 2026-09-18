@@ -1,9 +1,13 @@
+import type { Metadata } from 'next'
+
 import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { Canvas, SurfaceStack } from '@/components/surface'
 import { AppShell } from '@/features/nav/app-shell'
 import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
+
+export const metadata: Metadata = { title: `${messages.common.notFoundTitle} · 혼디가개` }
 
 /**
  * 전역 404 — **주소가 어느 라우트와도 안 맞을 때다** (#494).

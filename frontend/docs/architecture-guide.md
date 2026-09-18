@@ -294,6 +294,114 @@ title  장소를 찾을 수 없어요            (catch 가 404 문구로 뭉갰
   렌더되지 않아 라우트 안에 두면 테스트할 수 없다 (`testing-guide.md` §1).
   선례: `src/lib/place/detail-title.ts`.
 
+### `not-found.tsx` 는 자기 탭 제목을 스스로 갖는다 ([#676](https://github.com/8llow8llowMe/hondigagae/issues/676))
+
+> **여기에 쓰는 이유.** 404 탭 제목은 화면 하나의 사양이 아니라 `not-found.tsx` **넷에
+> 공통으로 걸리는 규약**이고, 바로 위 #206 절이 이미 "탭 제목은 본문과 같은 말을 쓴다" 를
+> 정하고 있다. 화면 단위 세부명세를 새로 파면 같은 규칙이 네 군데로 흩어진다.
+
+**실측 (2026-09-18, `dev.hondigagae.com`)**
+
+`<title>` 은 스트리밍 뒤에 교체된다 — 아래 `측정` 열의 근거는 각 응답의 **flight 청크**에
+실린 `["$","title","0",{children:…}]` 값이다 (`curl` + `\uXXXX` 디코드).
+
+| 라우트               | 렌더되는 `not-found.tsx`            | 탭 제목                            | 본문 `h1`                    | 측정        | 판정       |
+| -------------------- | ----------------------------------- | ---------------------------------- | ---------------------------- | ----------- | ---------- |
+| `/zzz-no-such-route` | `app/not-found.tsx`                 | **`혼디가개`**                     | `없는 주소예요`              | dev 실측    | **결함**   |
+| `/places/{없는 id}`  | `(main)/places/[placeId]/not-found` | `장소를 찾을 수 없어요 · 혼디가개` | `장소를 찾을 수 없어요`      | dev 실측    | 정상       |
+| `/plans/{없는 id}`   | `(main)/plans/[planId]/not-found`   | **`혼디가개`**                     | `찾을 수 없는 일정이에요`    | 소스 도출\* | **결함**   |
+| `/pets/{없는 id}`    | `(main)/pets/[petId]/not-found`     | **`반려견 정보 수정 · 혼디가개`**  | `존재하지 않는 반려견이에요` | 소스 도출\* | **어긋남** |
+
+\* `/plans` · `/pets` 는 `proxy.ts` 의 `PROTECTED_PATHS` 라 **미로그인 `curl` 이
+`/login?returnTo=` 로 튕겨 실측하지 못했다.** 값은 소스에서 도출했다 —
+`plans/[planId]/page.tsx` 는 `generateMetadata` 도 `export const metadata` 도 없고(주석에
+"제목 하나를 위해 백엔드를 한 번 더 부를 이유가 없다" 로 명시), `pets/[petId]/page.tsx` 는
+정상 화면용 `metadata`(`pet.editTitle`) 하나만 갖는다. 구현 시 로그인 상태에서 확인한다.
+
+**`not-found.tsx` 넷 중 자기 `metadata` 를 가진 것은 0개다.** 지금 맞는 것은 `places` 뿐이고,
+그것도 `page.tsx` 의 `generateMetadata` catch 갈래(#206)가 대신 내주는 것이다.
+
+**`title.template` 은 없다.** 루트 레이아웃(`app/layout.tsx`)의 `title` 은 평문
+`'혼디가개'` 이고 저장소 어디에도 `title.template` 선언이 없다. 접미사는 **각 호출부가
+직접 붙인다** (`` `${...} · 혼디가개` ``, 구분자는 U+00B7 MIDDLE DOT 양옆 한 칸). 세그먼트
+404 와 같은 모양을 내려면 전역 404 도 같은 방식으로 리터럴을 쓴다.
+
+**구현 실측 (2026-09-18, 이 워크트리) — 전제가 절반만 맞았다.**
+
+`metadata` 를 `not-found.tsx` 에 두는 것이 Next 16 에서 실제로 먹는지는 Playwright로
+(dev 서버 + `MOCK_API=true`, 하이드레이션 뒤 `expect(page).toHaveTitle(...)`) 확인했다 —
+**세 파일에 똑같이 두었는데 결과가 갈렸다.**
+
+- **`app/not-found.tsx`(전역) — 먹는다.** 이 라우트는 애초에 매칭되는 `page.tsx` 가 없어
+  Next 가 처음부터 error 모드로 메타데이터를 만든다. 자기 `metadata` 를 그대로 쓴다.
+- **`(main)/plans/[planId]/not-found.tsx` · `(main)/pets/[petId]/not-found.tsx` — 안 먹는다.**
+  두 세그먼트는 `page.tsx` 가 **비동기 조회 뒤 조건부로** `notFound()` 를 던진다. Next 16 은
+  이 경우 `page.tsx`(또는 조상)가 **이미 확정해 둔 메타데이터를 그대로 쓰고, 던져진 뒤에도
+  형제 `not-found.tsx` 의 `metadata` 로 되돌리지 않는다.** `plans/[planId]/page.tsx` 는
+  애초에 metadata 가 없어 루트 레이아웃의 평문 `혼디가개` 그대로 남았고, `pets/[petId]/page.tsx`
+  는 자신의 정상 화면용 정적 `metadata`(`pet.editTitle`) 를 그대로 물고 있어 탭이
+  "반려견 정보 수정" 으로 남았다 — 이 이슈가 처음 적은 "어긋남" 그 자체다.
+  (`next/dist/lib/metadata/resolve-metadata.js` 의 `resolveMetadataItemsImpl` 이 근거다 —
+  `errorConvention` 이 넘어와야 `collectMetadata` 가 `not-found` 모듈을 읽는데, 페이지가
+  이미 성공을 가정하고 도는 첫 렌더 경로에서는 이 값이 아직 없다.)
+
+**규칙 — 구현 위치가 파일마다 갈린다.**
+
+- **경쟁하는 `page.tsx` 가 없는 전역 404 만 `not-found.tsx` 가 `export const metadata` 를
+  갖는다** (`app/not-found.tsx`). 부모의 제목을 물려받게 두지 않는다 — 물려받으면
+  서비스명만 남는다.
+- **`page.tsx` 가 조건부로 `notFound()` 를 던지는 세그먼트(`plans` · `pets`)는 그 `page.tsx`
+  자신의 `generateMetadata` 가 404 제목을 정한다.** `not-found.tsx` 에는 두지 않는다 —
+  죽은 코드가 된다. `places/[placeId]/page.tsx`(#206)와 같은 자리다.
+- **판정 로직은 `generateMetadata` 밖으로 뽑는다.** async server component 는
+  `renderToStaticMarkup` 으로 렌더되지 않아 함수 안에 두면 테스트할 수 없다
+  (`testing-guide.md` §1). 선례 `src/lib/place/detail-title.ts` 를 따라
+  `src/lib/plan/detail-title.ts`(`planDetailNotFoundTitle`) ·
+  `src/lib/pet/detail-title.ts`(`petEditPageTitle`) 로 뽑는다.
+- **백엔드를 두 번 부르지 않는다.** `generateMetadata` 와 페이지 렌더가 같은 요청 안에서
+  쓰는 조회를 `cache()`(React) 로 감싸 하나로 합친다 — `places` 가 이미 쓰는 패턴
+  (`loadPlaceDetail`)을 `plans`(`loadPlanDetail`) · `pets`(`loadPet`)에도 그대로 쓴다.
+- **404 가 아닌 결과(성공·5xx·무응답)는 이 이슈 전과 같게 둔다.** `plans` 는 여전히 제목이
+  없고(부모 상속), `pets` 는 여전히 `pet.editTitle` 이다 — 이 이슈는 **404 탭 제목만** 고친다.
+  성공 시 진짜 제목을 붙이는 것은 범위 밖이다 (`plans/[planId]/page.tsx` 가 원래 `generateMetadata`
+  를 안 두던 이유 — "보호 화면이라 크롤러가 못 들어오고, 제목 하나를 위해 백엔드를 한 번 더
+  부를 이유가 없다" — 는 여기서도 유효하다. 지금은 그 조회를 **다시 하지 않고 재사용**할 뿐이다).
+- **제목 문구는 그 화면의 `h1`(또는 `EmptyState`)과 같은 상수를 쓴다.** 새 문자열을 짓지 않는다.
+- **접미사는 `` ` · 혼디가개` `` 리터럴이다.** `title.template` 이 없으므로 생략하면 그
+  화면만 접미사가 빠진다.
+
+**확정 문구**
+
+| 화면(404)               | 구현 위치                                                    | 결과 문자열                             |
+| ----------------------- | ------------------------------------------------------------ | --------------------------------------- |
+| `app/not-found.tsx`     | `app/not-found.tsx` 의 `export const metadata`               | `없는 주소예요 · 혼디가개`              |
+| `(main)/plans/[planId]` | `page.tsx` 의 `generateMetadata` + `planDetailNotFoundTitle` | `찾을 수 없는 일정이에요 · 혼디가개`    |
+| `(main)/pets/[petId]`   | `page.tsx` 의 `generateMetadata` + `petEditPageTitle`        | `존재하지 않는 반려견이에요 · 혼디가개` |
+
+**범위 — 어긋난 둘을 함께 맞춘다.** `app` · `plans` · `pets` 셋을 고치고, **`places` 는
+손대지 않는다.** 그쪽은 이미 같은 말이 나오고, `not-found.tsx` 에 또 쓰면 400 갈래까지
+가르는 `placeDetailFallbackTitle`(#206) 과 제목의 정본이 둘로 갈린다. 이 비대칭은 의도된
+것이다 — `places` 만 `generateMetadata` 가 **404 와 400 을 구분해야** 해서 라우트 경계가
+아니라 페이지가 제목을 정한다. `plans` · `pets` 도 결국 같은 자리(`page.tsx`)로 모인 것이라
+`places` 와의 비대칭은 "누가 정하는가" 가 아니라 "`not-found.tsx` 자신도 정할 수 있는가" 뿐이다
+— 전역만 그렇다.
+
+**검증**
+
+- **로그인 상태에서만 재현된다.** `app/not-found.tsx` 가 잡는 주소라도 `PROTECTED_PATHS`
+  아래(`/plans/...` 등)면 미로그인은 `/login?returnTo=` 로 먼저 간다. e2e 는 인증
+  `storageState` 로 연다.
+- **`<title>` 을 `curl`·`view-source` 로 판정하지 않는다.** 초기 HTML 의 `<head>` 에는 셸
+  기본값(`혼디가개`)이 들어 있고 진짜 제목은 스트림 뒤쪽 flight 청크로 와서 React 가
+  바꿔 끼운다 — `/places/{없는 id}` 가 원시 HTML 에서는 `혼디가개` 로 보인다.
+  **하이드레이션 뒤에 읽는다** (Playwright `expect(page).toHaveTitle(...)`, `e2e/not-found-title.spec.ts`).
+- 같은 스펙에서 **HTTP 상태가 404 인지** 함께 본다. 위 `loading.tsx` 절의 soft 404 가
+  재발하면 제목만 고쳐도 반쪽이다 (`e2e/resource-status.spec.ts` 가 이미 잡는다).
+
+> **후속 후보 (이번 범위 아님).** 루트 레이아웃에 `title: { default, template: '%s · 혼디가개' }`
+> 를 들이면 접미사 리터럴이 20여 곳에서 사라진다. 전 화면의 metadata 를 한 번에 건드리는
+> 변경이라 404 수정과 섞지 않는다.
+
 ## 8. 데이터 페칭 계층
 
 ```text
