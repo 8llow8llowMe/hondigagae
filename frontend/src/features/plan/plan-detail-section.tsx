@@ -6,6 +6,7 @@ import { Banner } from '@/components/banner'
 import { ConfirmModal } from '@/components/confirm-modal'
 import { EmergencyIcon } from '@/components/icons'
 import { Surface, SurfaceList, SurfaceStack } from '@/components/surface'
+import { PlanBriefingBanner } from '@/features/plan/plan-briefing-banner'
 import { PlanDayEditor } from '@/features/plan/plan-day-editor'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { PlanItemRow } from '@/features/plan/plan-item-row'
@@ -267,6 +268,21 @@ export function PlanDetailSection({
               onAction={status.run}
             />
           }
+        />
+
+        {/*
+          출발 전 여행 브리핑 진입점 (#626 · 명세 D16-1). **개요 카드 바로 아래, 위
+          레일이다** — 아래 레일(준비물·후기·응급 배너)은 모바일에서 일자 카드 뒤라,
+          출발 당일 아침에 여는 사람에게 그날 브리핑이 거기 있으면 늦다.
+
+          **노출은 날짜 축 하나로 가른다** — 배너 컴포넌트가 `pickBriefingDate` 로 판정하고
+          기간 밖이면 스스로 `null` 을 낸다 (`plan-briefing-banner.tsx` 머리주석).
+        */}
+        <PlanBriefingBanner
+          planId={plan.planId}
+          startDate={plan.startDate}
+          endDate={plan.endDate}
+          today={todayDay(today)}
         />
 
         {/*

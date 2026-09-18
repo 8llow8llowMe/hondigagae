@@ -3,6 +3,7 @@ import { paths } from '@/lib/api/paths'
 import type { SliceResponse } from '@/types/api'
 import type { PlanEmergencyResponse } from '@/types/emergency'
 import type {
+  PlanBriefingResponse,
   PlanCopyPayload,
   PlanCreatePayload,
   PlanDayItemsReplacePayload,
@@ -90,6 +91,21 @@ export function planEmergencyPath(planId: string): string {
 
 export function planWeatherPath(planId: string): string {
   return paths.plans.weather(planId)
+}
+
+/**
+ * 출발 전 여행 브리핑 (#626).
+ *
+ * **`date` 가 필수 인자다.** 서버가 기본값을 주지 않고 기간 밖이면 `PLAN_002` 400 이라,
+ * 부를 날짜는 화면이 `pickBriefingDate()` 로 먼저 고른다 — 고를 수 없으면 아예 부르지
+ * 않는다 (`lib/plan/briefing.ts`).
+ */
+export function planBriefingPath(planId: string, date: string): string {
+  return paths.plans.briefing(planId, date)
+}
+
+export function fetchPlanBriefing(planId: string, date: string): Promise<PlanBriefingResponse> {
+  return clientFetch<PlanBriefingResponse>(planBriefingPath(planId, date))
 }
 
 export function fetchPlanDetail(planId: string): Promise<PlanDetail> {

@@ -283,6 +283,137 @@ export type PlanWalkSafetyResponse = {
   items: PlanItemWalkSafetyItem[]
 }
 
+// ─── 출발 전 여행 브리핑 (#626) ──────────────────────────────────────────────
+
+/**
+ * `GET /plans/{planId}/briefing?date=` — **하루치 합본** (#626).
+ *
+ * 근거: plan-service `PlanBriefingResponse` · `PlanBriefingPresenter` **소스 실측**
+ * (2026-09-18). `docs/api/openapi/*.json` 스냅샷(2026-09-14)은 이 API 를 담지 않는다.
+ *
+ * **새 판정이 아니라 기존 판정의 묶음이다** — 서버가 LLM 을 부르지 않는다.
+ * **준비물은 여기 없다**: 서버가 일부러 뺐고(ai-service 가 따로 답한다) 일정 상세 레일에
+ * 이미 있다 (#586).
+ */
+export type PlanBriefingResponse = {
+  planId: string
+  planTitle: string
+  /** 1부터 */
+  day: number
+  /** `YYYY-MM-DD`. 요청한 날짜 그대로다 */
+  date: string
+  /**
+   * 요청한 `date` 가 **서버 시계(`Clock`)의 오늘**인가.
+   *
+   * **`false` 면 `weatherWarning`·`walkTimes` 가 null 이고 각 이유 문장이 채워진다.**
+   * FE 가 고른 날짜를 "오늘" 이라고 단정하지 않고 이 값을 읽는다 — 자정 전후 요청에서
+   * 둘이 갈릴 수 있다 (`lib/plan/briefing.ts` 주석).
+   */
+  today: boolean
+  /** Snowflake 라 문자열이다. `Number()` 를 거치지 않는다 */
+  petIds: string[]
+  /** 판정을 못 냈으면 null */
+  basisPetId: string | null
+  /** false 면 반려견 특성 없이 일반 조건으로 판정한 결과다 */
+  petConditionApplied: boolean
+  schedule: PlanBriefingSchedule
+  /**
+   * 그날 날씨·적합도. **일정 날씨 브리핑의 하루치와 같은 타입이다** —
+   * 프레젠터가 `PlanWeatherPresenter.toDayItem` 을 그대로 쓴다. 타입을 새로 만들면
+   * 두 화면이 갈린다.
+   */
+  weather: PlanDayWeatherItem | null
+  /** 발효 중인 기상특보. **없음과 확인 못 함을 이 필드 하나로 가르지 않는다** (아래) */
+  weatherWarning: PlanBriefingWeatherWarning | null
+  /**
+   * 특보를 **확인하지 못한 이유**의 문장. 서버 javadoc: _"특보는 필드와 이유가 둘 다
+   * null 일 때만 '발효 중인 특보 없음' 이다 — 확인하지 못한 날은 이유가 채워진다."_
+   *
+   * **값이 있으면 "특보 없음" 이 아니다.** 그렇게 쓰면 태풍경보를 조용히 지운다.
+   *
+   * **코드가 아니라 문장뿐이라 화면이 "정상(당일만 확인)" 과 "일시 장애" 를 가를 수 없다** —
+   * 그래서 이 문장에 `다시 시도` 를 달지 않는다. 코드 추가는 BE 후속 요청이다
+   * (여행브리핑-세부명세 D9-2).
+   */
+  weatherWarningUnavailableReason: string | null
+  /** 그날 대표 장소 좌표 기준 산책 골든타임. **좌표가 오는 유일한 자리다** */
+  walkTimes: PlanBriefingWalkTimes | null
+  /** 위 특보 이유와 같은 성질이다 — 문장뿐이라 재시도를 달지 않는다 */
+  walkTimesUnavailableReason: string | null
+}
+
+/** 그날 일정 요약. **좌표가 없다** — 대표 장소 좌표는 `PlanBriefingWalkTimes` 안에만 있다 */
+export type PlanBriefingSchedule = {
+  itemCount: number
+  visitedCount: number
+  /** 항목이 없으면 null. 항목이 하나면 `firstItem === lastItem` 이다 */
+  firstItem: PlanBriefingItemSummary | null
+  lastItem: PlanBriefingItemSummary | null
+  representativePlaceId: string | null
+  representativePlaceTitle: string | null
+}
+
+export type PlanBriefingItemSummary = {
+  planItemId: string
+  /** 0부터 */
+  sequence: number
+  /**
+   * **metadata 가 아니라 enum 값 문자열이다** — `PLACE`/`MEAL`/`LODGING`/`WALK`/`MOVE`.
+   *
+   * 같은 도메인의 `PlanItemDetail.itemType` 은 metadata 객체라 **모양이 다르다.** 한국어를
+   * 쓰려면 FE 매핑 테이블이 필요한데 그것은 금지라(루트 `CLAUDE.md`) **v1 은 유형 라벨을
+   * 아예 그리지 않는다.** 서버 metadata 요청은 BE 후속이다 (명세 D9-1).
+   */
+  itemType: PlanItemTypeCode
+  title: string
+  /** `HH:mm:ss`. 시각을 지정하지 않은 항목은 null */
+  startTime: string | null
+  visited: boolean
+}
+
+export type PlanBriefingWeatherWarning = {
+  type: CodeNameMetadata
+  level: CodeNameMetadata
+  /**
+   * 경보라 야외 추천을 보류해야 하는가. **`level.code` 로 화면이 다시 판정하지 않는다** —
+   * 서버 DTO 가 이 값을 쓰라고 못박는다 (골든타임 `SUPPRESSED_BY_WARNING` 과 같은 축).
+   */
+  recommendationSuppressed: boolean
+  /** `YYYY-MM-DDTHH:mm:ss`. 원천이 주지 않으면 null */
+  effectiveAt: string | null
+}
+
+/**
+ * 그날 산책 골든타임.
+ *
+ * **시간대별 곡선(`hourly`)이 없다** — 서버 javadoc: _"브리핑은 '그날 하나' 를 묶는
+ * 요약이라 곡선을 실으면 응답이 몇 배로 커진다. 곡선이 필요하면 여기 실린 좌표로 tour 를
+ * 직접 부른다."_ 그래서 **이 객체가 null 이면 곡선을 부를 좌표가 아예 없다.**
+ */
+export type PlanBriefingWalkTimes = {
+  /** **응답에서 좌표가 오는 유일한 자리다.** `schedule` 에는 좌표가 없다 */
+  lat: number
+  lng: number
+  /** 기준 시각 */
+  from: string
+  forecastCoverage: CodeNameMetadata | null
+  goldenStart: string | null
+  goldenEnd: string | null
+  goldenLevel: ScoreMetricMetadata | null
+  /**
+   * `AVAILABLE` · `SUPPRESSED_BY_WARNING` · `ALL_HOURS_RISKY` · `NO_FORECAST`.
+   *
+   * **`{code, name, description}` 이고 서버가 한국어를 채워 보낸다** — FE 에 매핑 테이블을
+   * 만들지 않고 `name`·`description` 을 그대로 렌더한다. 코드를 좁혀 타이핑하지 않는 이유도
+   * 같다 (`WalkTimesResponse.goldenWindowStatus` 와 같은 규칙).
+   *
+   * **`goldenStart` 가 null 이라는 이유만으로 "남은 시간이 모두 위험" 이라고 쓰지 않는다** —
+   * 그 문장은 `ALL_HOURS_RISKY` 일 때만 참이다.
+   */
+  goldenWindowStatus: CodeNameMetadata | null
+  petConditionApplied: boolean
+}
+
 // ─── 목록 · 생성 (#75) ────────────────────────────────────────────────────────
 
 /**

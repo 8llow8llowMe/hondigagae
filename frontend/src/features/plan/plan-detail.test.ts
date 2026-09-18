@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
+import { PlanBriefingBanner } from '@/features/plan/plan-briefing-banner'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
 import { PlanItemRow } from '@/features/plan/plan-item-row'
@@ -611,5 +612,53 @@ describe('3층 표면 (#447)', () => {
     const around = markup.slice(Math.max(0, start - 400), start)
 
     expect(around).not.toContain('border-t')
+  })
+})
+
+/*
+  ── 출발 전 여행 브리핑 진입점 (#626 · 일정상세-세부명세 D16-4) ────────────────
+
+  **`PlanDetailSection` 을 직접 렌더하지 않는다.** 그 컴포넌트는 편집·방문·상태 훅
+  (React Query mutation)을 들고 있어 provider 없이 렌더되지 않는다 — 명세가 "표현 전용"
+  이라 적은 것은 사실과 다르다. 배너는 **표현 전용 조각**으로 떼어 두었고
+  (`plan-briefing-banner.tsx`) 그것을 렌더한다.
+*/
+function renderBriefingBanner(today: string) {
+  return renderToStaticMarkup(
+    createElement(PlanBriefingBanner, {
+      planId: planDetail.planId,
+      startDate: planDetail.startDate, // 2026-09-12
+      endDate: planDetail.endDate, // 2026-09-14
+      today,
+    }),
+  )
+}
+
+describe('PlanBriefingBanner — 날짜 축 하나로만 노출을 가른다 (D16-2)', () => {
+  it('출발 하루 전이면 "내일 출발" 로 브리핑을 연다', () => {
+    const markup = renderBriefingBanner('2026-09-11')
+
+    expect(markup).toContain('내일 출발')
+    expect(markup).toContain(`/plans/${planDetail.planId}/briefing`)
+  })
+
+  it('여행 중이면 "오늘의 브리핑" 이다', () => {
+    const markup = renderBriefingBanner('2026-09-13')
+
+    expect(markup).toContain(messages.plan.briefingBannerTodayTitle)
+    expect(markup).toContain('/briefing')
+  })
+
+  it('출발 이틀 전이면 배너를 렌더하지 않는다 — 눌러도 부를 날짜가 없다', () => {
+    expect(renderBriefingBanner('2026-09-10')).not.toContain('/briefing')
+  })
+
+  it('종료 다음 날이면 배너를 렌더하지 않는다', () => {
+    expect(renderBriefingBanner('2026-09-15')).not.toContain('/briefing')
+  })
+
+  /** **URL 에 `?date=` 를 두지 않는다** (브리핑 명세 D8-2) — 열 때마다 화면이 고른다 */
+  it('링크에 날짜 쿼리를 붙이지 않는다', () => {
+    expect(renderBriefingBanner('2026-09-13')).not.toContain('date=')
   })
 })

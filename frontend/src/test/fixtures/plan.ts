@@ -2,6 +2,11 @@ import type { PlanDayAdd, PlanDayVisit, PlanDayWalkSafety } from '@/features/pla
 import type { Pet } from '@/types/pet'
 import type {
   PlanAlternativePlaceItem,
+  PlanBriefingItemSummary,
+  PlanBriefingResponse,
+  PlanBriefingSchedule,
+  PlanBriefingWalkTimes,
+  PlanBriefingWeatherWarning,
   PlanDayWeatherItem,
   PlanDetail,
   PlanItemDetail,
@@ -255,6 +260,112 @@ export function planAlternative(
     lat: 33.3608276172,
     lng: 126.7818122232,
     distanceMeters: 12_400,
+    ...overrides,
+  }
+}
+
+// ─── 출발 전 여행 브리핑 (#626) ──────────────────────────────────────────────
+
+/**
+ * 브리핑 하루치 — **여행 중(`today: true`) 이고 특보가 없는 날**이 기본값이다.
+ *
+ * 세 갈래(특보 없음 / 확인 못 함 / 특보 있음)는 `planBriefing({...})` 로 덮어써 만든다 —
+ * 이 이슈의 회귀 감시가 바로 그 갈래이므로 fixture 가 한 갈래를 기본으로 못박아 둔다.
+ */
+export function planBriefing(overrides: Partial<PlanBriefingResponse> = {}): PlanBriefingResponse {
+  return {
+    planId: planDetail.planId,
+    planTitle: planDetail.title,
+    day: 2,
+    date: '2026-09-13',
+    today: true,
+    petIds: [...planDetail.petIds],
+    basisPetId: planDetail.petId,
+    petConditionApplied: true,
+    schedule: planBriefingSchedule(),
+    weather: planVerdict,
+    weatherWarning: null,
+    weatherWarningUnavailableReason: null,
+    walkTimes: planBriefingWalkTimes(),
+    walkTimesUnavailableReason: null,
+    ...overrides,
+  }
+}
+
+export function planBriefingSchedule(
+  overrides: Partial<PlanBriefingSchedule> = {},
+): PlanBriefingSchedule {
+  return {
+    itemCount: 4,
+    visitedCount: 1,
+    firstItem: planBriefingItem(),
+    lastItem: planBriefingItem({
+      planItemId: 'i-2-3',
+      sequence: 3,
+      itemType: 'LODGING',
+      title: '동문재래시장',
+      startTime: '19:00:00',
+    }),
+    representativePlaceId: '212481712381923328',
+    representativePlaceTitle: '협재해수욕장',
+    ...overrides,
+  }
+}
+
+/**
+ * **`itemType` 이 metadata 가 아니라 enum 문자열이다** — 같은 도메인의 `PlanItemDetail`
+ * 과 모양이 다르다 (명세 D9-1). 화면이 이 값을 그대로 새지 않는지 테스트가 감시한다.
+ */
+export function planBriefingItem(
+  overrides: Partial<PlanBriefingItemSummary> = {},
+): PlanBriefingItemSummary {
+  return {
+    planItemId: 'i-2-0',
+    sequence: 0,
+    itemType: 'PLACE',
+    title: '협재해수욕장',
+    startTime: '10:30:00',
+    visited: false,
+    ...overrides,
+  }
+}
+
+/** 골든타임이 나온 날. 좌표는 **이 객체 안에만** 온다 (`schedule` 에는 없다) */
+export function planBriefingWalkTimes(
+  overrides: Partial<PlanBriefingWalkTimes> = {},
+): PlanBriefingWalkTimes {
+  return {
+    lat: 33.3941,
+    lng: 126.2396,
+    from: '2026-09-13T09:00:00',
+    forecastCoverage: { code: 'AVAILABLE', name: '예보 있음', description: null },
+    goldenStart: '2026-09-13T18:00:00',
+    goldenEnd: '2026-09-13T21:00:00',
+    goldenLevel: {
+      code: 'SAFE',
+      name: '안전',
+      description: '산책하기 좋은 조건입니다.',
+      scoreDescription: null,
+    },
+    goldenWindowStatus: {
+      code: 'AVAILABLE',
+      name: '추천 구간 있음',
+      description: '이 시간대에 산책하기 좋습니다.',
+    },
+    petConditionApplied: true,
+    ...overrides,
+  }
+}
+
+/** 발효 중인 특보 하나 — 배지에 낱말이 들어가는지 보는 갈래다 */
+export function planBriefingWarning(
+  overrides: Partial<PlanBriefingWeatherWarning> = {},
+): PlanBriefingWeatherWarning {
+  return {
+    type: { code: 'TYPHOON', name: '태풍', description: '태풍 특보입니다.' },
+    level: { code: 'WARNING', name: '경보', description: '외출을 미루는 것이 좋습니다.' },
+    recommendationSuppressed: true,
+    effectiveAt: '2026-09-13T07:00:00',
     ...overrides,
   }
 }
