@@ -14,6 +14,7 @@ import {
   nextReviewId,
   nextReviewItemId,
 } from '@/lib/api/mock/store'
+import { todayDay } from '@/lib/date/day'
 import type { ApiResponse, CodeNameMetadata, SliceResponse, ValidationErrorItem } from '@/types/api'
 import type { ScoreMetricMetadata } from '@/types/insight'
 import type {
@@ -22,10 +23,12 @@ import type {
   PlanDetail,
   PlanItemDetail,
   PlanItemPlace,
+  PlanItemWalkSafetyItem,
   PlanPackingListResponse,
   PlanReviewPlaceItem,
   PlanReviewResponse,
   PlanSummaryItem,
+  PlanWalkSafetyResponse,
   PlanWeatherResponse,
 } from '@/types/plan'
 import { NO_PLACE_ITEM_REASON_CODE } from '@/types/plan'
@@ -372,6 +375,18 @@ export function resolvePlanMock(
     return withPlan(memberId, weather[1] ?? '', (plan) => ({
       status: 200,
       payload: ok(toWeather(plan)),
+    }))
+  }
+
+  /*
+    항목 산책 위험도 (#625). **`withPlan` 을 거쳐 같은 소유권 판정을 쓴다** — 남의
+    일정·없는 일정은 404, 숫자가 아닌 planId 는 400 이다 (D15-1).
+  */
+  const walkSafety = /^\/plans\/([^/]+)\/walk-safety$/.exec(path)
+  if (walkSafety !== null && method === 'GET') {
+    return withPlan(memberId, walkSafety[1] ?? '', (plan) => ({
+      status: 200,
+      payload: ok(mockPlanWalkSafety(plan)),
     }))
   }
 
@@ -1120,6 +1135,144 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
     petConditionApplied: true,
     days,
   }
+}
+
+/**
+ * 항목 산책 위험도 (#625). **판정 순서를 백엔드와 같게 지킨다** —
+ * `PAST_DATE` → `NOT_PLACE_TARGET` → `NO_START_TIME` → `BEYOND_FORECAST_RANGE` →
+ * `LOOKUP_FAILED`. 순서가 틀리면 "지난 날짜 + 시각 없음" 항목이 `NO_START_TIME` 으로
+ * 잘못 판정된다(D15-3) — mock 이 화면보다 느슨해지는 자리다.
+ *
+ * **"오늘" 은 실제 시계를 흉내 낸다** (`ai-plan-data.ts` 의 `LocalDate.now()` 흉내와 같은
+ * 판단). 지평 판정이 상대적이라 실행 시점의 진짜 오늘을 기준으로 잡아야 한다.
+ */
+const WALK_SAFETY_HORIZON_DAYS = 4
+
+/**
+ * `LOOKUP_FAILED` 를 결정적으로 재현하는 마커.
+ *
+ * **실제 실패는 tour-service 장애라 `targetId` 존재 여부와 무관하다** — 이미
+ * `KNOWN_PLACE_IDS` 검증을 통과한 장소도 그때그때 조회에 실패할 수 있다. mock 에는
+ * 그런 시간차 장애를 낼 수단이 없으므로, 항목의 `memo` 에 이 마커를 실어 결정적으로
+ * 재현한다 — 화면 코드는 이 값을 모르고, 오직 mock 시나리오 구성용이다.
+ */
+export const WALK_SAFETY_LOOKUP_FAILED_MARKER = '__WALK_SAFETY_LOOKUP_FAILED__'
+
+const WALK_SAFETY_LEVEL: Record<'SAFE' | 'CAUTION' | 'DANGER', ScoreMetricMetadata> = {
+  SAFE: {
+    code: 'SAFE',
+    name: '안전',
+    description: '지금 산책하기 좋은 조건이에요.',
+    scoreDescription: null,
+  },
+  CAUTION: {
+    code: 'CAUTION',
+    name: '주의',
+    description: '무리한 산책은 피해 주세요.',
+    scoreDescription: null,
+  },
+  DANGER: {
+    code: 'DANGER',
+    name: '위험',
+    description: '산책을 피하고 실내에서 쉬게 해 주세요.',
+    scoreDescription: null,
+  },
+}
+
+function mockPlanWalkSafety(plan: MockPlan): PlanWalkSafetyResponse {
+  const today = todayDay(new Date())
+  const horizon = addDays(today, WALK_SAFETY_HORIZON_DAYS)
+  const petIds = petIdsOf(plan)
+
+  const items: PlanItemWalkSafetyItem[] = plan.items.map((item, order) => {
+    const date = addDays(plan.startDate, item.day - 1)
+    const isPlaceTarget = PLACE_TARGET_TYPES.has(item.itemType) && item.targetId !== null
+    const placeId = isPlaceTarget ? item.targetId : null
+    const placeTitle = isPlaceTarget ? (PLACE_BY_ID.get(item.targetId ?? '')?.title ?? null) : null
+
+    const shared = {
+      planItemId: item.planItemId,
+      day: item.day,
+      sequence: item.sequence,
+      date,
+      startTime: item.startTime,
+      title: item.title,
+      placeId,
+      placeTitle,
+      targetDateTime: `${date}T${item.startTime ?? '00:00:00'}`,
+      basisPetId: petIds[0] ?? null,
+      estimatedPavementCelsius: null,
+      feelsLikeCelsius: null,
+      temperature: null,
+      saferWindowStart: null,
+      saferWindowEnd: null,
+    }
+
+    // 순서 1 — 지난 날짜가 가장 먼저다. 무엇을 고쳐도 풀리지 않는 사유라 다른 사유보다 앞선다
+    if (date < today) {
+      return {
+        ...shared,
+        walkSafetyLevel: null,
+        unavailableReasonCode: 'PAST_DATE',
+        unavailableReason: '이미 지난 날짜라 산책 위험도를 판정할 수 없습니다.',
+      }
+    }
+
+    // 순서 2 — 장소를 가리키지 않는 항목 (WALK·MOVE)
+    if (!isPlaceTarget) {
+      return {
+        ...shared,
+        walkSafetyLevel: null,
+        unavailableReasonCode: 'NOT_PLACE_TARGET',
+        unavailableReason: '장소를 가리키는 항목이 아니라 산책 위험도를 판정할 수 없습니다.',
+      }
+    }
+
+    // 순서 3 — 시작 시각이 없다
+    if (item.startTime === null) {
+      return {
+        ...shared,
+        walkSafetyLevel: null,
+        unavailableReasonCode: 'NO_START_TIME',
+        unavailableReason: '시작 시각이 없어 산책 위험도를 판정할 수 없습니다.',
+      }
+    }
+
+    // 순서 4 — 시각별 예보 지평(오늘~오늘+4) 밖. 일자 날씨의 11일과 다르다
+    if (date > horizon) {
+      return {
+        ...shared,
+        walkSafetyLevel: null,
+        unavailableReasonCode: 'BEYOND_FORECAST_RANGE',
+        unavailableReason: `예보는 오늘부터 ${WALK_SAFETY_HORIZON_DAYS + 1}일까지만 제공되어 이 날짜는 아직 판정할 수 없습니다.`,
+      }
+    }
+
+    // 물어봤는데 실패 — tour-service 장애를 결정적으로 재현하는 마커
+    if (item.memo === WALK_SAFETY_LOOKUP_FAILED_MARKER) {
+      return {
+        ...shared,
+        walkSafetyLevel: null,
+        unavailableReasonCode: 'LOOKUP_FAILED',
+        unavailableReason: '산책 위험도를 조회하지 못했습니다.',
+      }
+    }
+
+    const grade = (['SAFE', 'CAUTION', 'DANGER'] as const)[order % 3] as
+      'SAFE' | 'CAUTION' | 'DANGER'
+
+    return {
+      ...shared,
+      walkSafetyLevel: WALK_SAFETY_LEVEL[grade],
+      estimatedPavementCelsius: 30 + (order % 5),
+      feelsLikeCelsius: 27 + (order % 5),
+      temperature: 25 + (order % 5),
+      unavailableReasonCode: null,
+      unavailableReason: null,
+    }
+  })
+
+  return { planId: plan.planId, planTitle: plan.title, petIds, items }
 }
 
 /**

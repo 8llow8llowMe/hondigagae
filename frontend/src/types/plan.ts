@@ -215,6 +215,74 @@ export type PlanWeatherResponse = {
   days: PlanDayWeatherItem[]
 }
 
+/**
+ * `GET /plans/{planId}/walk-safety` 의 항목 하나 (#625).
+ *
+ * 근거: backend plan-service **소스 실측** — `PlanItemWalkSafetyItem.java:18-85` ·
+ * `PlanWalkSafetyProcessor.java:98-139` · `PlanItemWalkSafetyUnavailableReason.java:34-90`.
+ * 상세 판정 순서·화면 지침은 `docs/features/plan/일정상세-세부명세.md` D15-1.
+ *
+ * **적합도(`PlanDayWeatherItem`)와 코드 체계가 다르다** — `walkSafetyLevel.code` 는
+ * `SAFE`/`CAUTION`/`DANGER`/`UNKNOWN` 이다 (D15-2). `lib/insight/tone.ts` 의
+ * `walkSafetyTone()` 을 그대로 쓴다.
+ */
+export type PlanItemWalkSafetyItem = {
+  /** 행을 잇는 키다 — `PlanItemDetail.planItemId` 와 맞춘다. `day`+`sequence` 로 잇지 않는다 */
+  planItemId: string
+  /** 서버가 정렬해 준다. **FE 는 정렬에 쓰지 않는다** — 행 배치는 상세 응답이 소유한다 */
+  day: number
+  sequence: number
+  date: string
+  /** 상세에도 같은 값이 있다 — **행에는 상세 값을 쓴다**, 이 필드로 그리지 않는다 */
+  startTime: string | null
+  title: string
+  /** `NOT_PLACE_TARGET` 일 때만 null. **판정을 못 낸 다른 사유에서는 남는다** */
+  placeId: string | null
+  placeTitle: string | null
+  /** 판정 기준 시각. `체감온도` 라벨의 기준이 이것이다 (일자 판정의 `최고 체감온도`와 다르다) */
+  targetDateTime: string
+  /** 그날 날씨 판정의 기준견과 같다 (서버가 맞춰 준다) */
+  basisPetId: string | null
+  /**
+   * `{code, name, description, scoreDescription}`. **판정을 못 낸 항목은 통째로 null.**
+   *
+   * **`scoreDescription` 은 언제나 null 이다** (`PlanWalkSafetyPresenter.java:53`). 읽지 않는다.
+   */
+  walkSafetyLevel: ScoreMetricMetadata | null
+  /** 추정 노면(아스팔트) 온도. 행에 두지 않는다 (D15-5) */
+  estimatedPavementCelsius: number | null
+  /** 기상청 여름철 체감온도 — 판정 기준값이고 **시각 기준**이다. 항목 행의 `체감온도` 라벨이 이 값이다 */
+  feelsLikeCelsius: number | null
+  /** 행에 두지 않는다 (D15-5) — `estimatedPavementCelsius` 와 짝이다 */
+  temperature: number | null
+  /** 같은 날 더 안전한 시간대. 범위 밖 (D15-12) */
+  saferWindowStart: string | null
+  saferWindowEnd: string | null
+  /**
+   * 판정을 못 낸 사유 다섯 종 중 하나 — 정상이면 null.
+   *
+   * **union 이 아니라 `string` 이다.** 서버가 사유를 늘렸을 때 모르는 코드가 타입 오류가
+   * 되는 것이 아니라, 화면이 서버 문장으로 물러설 수 있어야 한다 (`unavailableReasonCode`
+   * 선례 — `PlanDayWeatherItem`).
+   */
+  unavailableReasonCode: string | null
+  /** 사유 **문장**. 코드와 짝으로 온다. FE 는 이 문장을 파싱하지도 짓지도 않는다 */
+  unavailableReason: string | null
+}
+
+/**
+ * `GET /plans/{planId}/walk-safety` 응답.
+ *
+ * **경로 파라미터만 받는다** — 날짜·시각·반려견을 보내지 않는다. `petIds`·`planTitle` 은
+ * 행에 쓰지 않는다(행의 정본은 상세 응답이다) — 여기서는 신원 확인용으로만 존재한다.
+ */
+export type PlanWalkSafetyResponse = {
+  planId: string
+  planTitle: string
+  petIds: string[]
+  items: PlanItemWalkSafetyItem[]
+}
+
 // ─── 목록 · 생성 (#75) ────────────────────────────────────────────────────────
 
 /**

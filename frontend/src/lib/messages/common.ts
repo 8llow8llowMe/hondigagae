@@ -78,4 +78,10 @@ export const commonMessages = {
   metricAxisSuitability: '적합도',
   /** `home.congestionUnknown` 이 예외적으로 이미 쓰던 접두어다 — 규칙으로 올렸다 */
   metricAxisCongestion: '혼잡도',
+  /**
+   * 일정 항목 행 전용 (#625 · 일정상세-세부명세 D15-10 미결 1). **`-도` 형이 아니다** —
+   * `산책도 주의` 는 말이 되지 않는다. `산책 안전`·`산책 주의`·`산책 위험` 세 값 모두
+   * 문장이 선다.
+   */
+  metricAxisWalkSafety: '산책',
 } as const

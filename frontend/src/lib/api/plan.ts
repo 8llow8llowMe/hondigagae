@@ -16,6 +16,7 @@ import type {
   PlanShareLink,
   PlanSummaryItem,
   PlanUpdatePayload,
+  PlanWalkSafetyResponse,
   PlanWeatherResponse,
 } from '@/types/plan'
 
@@ -97,6 +98,15 @@ export function fetchPlanDetail(planId: string): Promise<PlanDetail> {
 
 export function fetchPlanWeather(planId: string): Promise<PlanWeatherResponse> {
   return clientFetch<PlanWeatherResponse>(planWeatherPath(planId))
+}
+
+/** 항목 산책 위험도 (#625). D14 의 시각 줄에 붙는 판정 — 상세·판정과 별도 조회다 */
+export function planWalkSafetyPath(planId: string): string {
+  return paths.plans.walkSafety(planId)
+}
+
+export function fetchPlanWalkSafety(planId: string): Promise<PlanWalkSafetyResponse> {
+  return clientFetch<PlanWalkSafetyResponse>(planWalkSafetyPath(planId))
 }
 
 export function fetchPlanEmergency(planId: string): Promise<PlanEmergencyResponse> {

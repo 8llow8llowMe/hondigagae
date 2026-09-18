@@ -5,6 +5,8 @@ import { Badge } from '@/components/badge'
 import { Button } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
 import { CheckIcon, ImageIcon } from '@/components/icons'
+import { MetricBadge } from '@/components/metric'
+import { formatCelsius } from '@/lib/format/celsius'
 import { formatDistance } from '@/lib/format/distance'
 import { isLongTrip } from '@/lib/geo/distance'
 import { imageSrc } from '@/lib/image/remote-host'
@@ -13,8 +15,10 @@ import { placeMetaLine } from '@/lib/place/meta'
 import { isPlaceTarget, type PlanItemRowModel } from '@/lib/plan/detail'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import { formatStartTime } from '@/lib/plan/start-time'
+import { itemWalkSafetyView } from '@/lib/plan/walk-safety'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
+import type { PlanItemWalkSafetyItem } from '@/types/plan'
 
 /**
  * 방문 체크에 필요한 것 한 묶음 — 이슈 #124.
@@ -61,6 +65,14 @@ export type PlanItemVisit = {
  * **없으면 줄 자체를 그리지 않는다.** 형식이 어긋난 값도 지어내지 않고 숨긴다 —
  * 정규화는 `lib/plan/start-time.ts` 의 `formatStartTime()` 하나가 전담한다.
  *
+ * **[#625](https://github.com/8llow8llowMe/hondigagae/issues/625) 의 산책 위험도 배지가 이 시각 줄에 붙는다** (명세 D15-5).
+ * `walkSafety` 가 `undefined` 면(아직 안 왔다) 배지·문장 없이 시각만 선다 — 없는 판정을
+ * 빈 배지로도 말하지 않는다. **배지를 세울지는 서버가 이미 가른 결과
+ * (`walkSafetyLevel !== null && code !== 'UNKNOWN'`)를 그대로 따른다** — 이 컴포넌트가
+ * 자기 조건을 다시 만들지 않는다 (D15-3). 체감온도는 배지가 서는 정상 판정에서만 함께
+ * 낸다(D15-7) — `messages.plan.walkSafetyFeelsLikeLabel`(`체감온도`, 시각 기준)이고
+ * `displayTemperature()`(하루 단위 폴백)를 쓰지 않는다.
+ *
 
  * **방문 체크 토글은 링크의 형제다** (#124). 행 전체가 하나의 링크라 그 안에 버튼을 넣을
  * 수 없다 — 중첩 상호작용은 시맨틱이 깨지고 키보드로 어느 쪽이 잡히는지 알 수 없다.
@@ -71,10 +83,17 @@ export type PlanItemVisit = {
 export function PlanItemRow({
   model,
   visit,
+  walkSafety,
 }: {
   model: PlanItemRowModel
   /** 없으면 토글이 렌더되지 않는다 — 기간 밖 항목 섹션이 그 경로다 */
   visit?: PlanItemVisit
+  /**
+   * 이 항목의 산책 위험도 (#625). **`undefined` 는 오류가 아니라 "아직 안 왔다"다** —
+   * 조회 중이거나, 응답에 이 `planItemId` 가 없거나(일괄 교체 직후 한 프레임), 전체
+   * 조회가 404/400 이라 자리를 통째로 숨긴 경우가 전부 이 모양이다 (D15-6 · D15-7).
+   */
+  walkSafety?: PlanItemWalkSafetyItem | undefined
 }) {
   const { item } = model
   const { place } = item
@@ -82,6 +101,9 @@ export function PlanItemRow({
   const meta = placeMetaLine(place?.addr1 ?? null, place?.indoor ?? null)
   // 형식이 어긋나면 null 이다 — 에러도 배지도 내지 않고 줄 자체를 그리지 않는다 (D14-3)
   const startTime = formatStartTime(item.startTime)
+  // walkSafety 가 없으면 view 도 없다 — 시각 줄에 배지·문장 자리를 만들지 않는다
+  const walkSafetyView = walkSafety === undefined ? null : itemWalkSafetyView(walkSafety)
+  const feelsLike = formatCelsius(walkSafety?.feelsLikeCelsius ?? null)
 
   /*
     **`targetId` 가 있다고 링크하지 않는다.** `WALK` 의 `targetId` 는 `walk_course.id`
@@ -128,12 +150,51 @@ export function PlanItemRow({
           제목 위 캡션 한 줄 (D14-3). **제목 줄에 넣지 않는다** — D11-5 가 이미 제목 폭을
           깎았고, 같은 줄에 시각을 얹으면 그 손실이 겹친다. **메타 줄에도 합치지 않는다**
           — 그 줄은 `line-clamp-1` 이라 시각을 앞에 붙이면 주소가 먼저 잘린다.
+
+          **[#625](https://github.com/8llow8llowMe/hondigagae/issues/625) 의 산책 위험도가
+          이 줄에 붙는다** (D15-5). `시각 있음` 이 배지가 설 조건 중 하나라 이 블록
+          자체를 벗어나지 않는다 — 시각이 없으면 위험도 자리도 함께 사라진다.
         */}
         {startTime !== null && (
-          <p className="text-caption text-fg-muted font-medium tabular-nums">
-            <span className="sr-only">{messages.plan.startTimeSrLabel} </span>
-            <time dateTime={startTime}>{startTime}</time>
+          <p className="text-caption text-fg-muted flex flex-wrap items-center gap-x-1 font-medium tabular-nums">
+            <span>
+              <span className="sr-only">{messages.plan.startTimeSrLabel} </span>
+              <time dateTime={startTime}>{startTime}</time>
+            </span>
+
+            {walkSafetyView?.kind === 'badge' && (
+              <>
+                <span aria-hidden="true">·</span>
+                <MetricBadge size="sm" tone={walkSafetyView.tone} axis="walkSafety">
+                  {walkSafetyView.label}
+                </MetricBadge>
+              </>
+            )}
+
+            {/*
+              **체감온도는 배지가 선 정상 판정에만 함께 낸다** (D15-7) — `UNKNOWN` 등급이나
+              사유 문장은 배지 없이 캡션 한 줄로 따로 그린다. `최고 체감온도`(하루 최대)와
+              라벨로 기준을 가른다 — 여기는 `feelsLikeCelsius`(시각 기준) 하나뿐이고
+              폴백이 없다.
+            */}
+            {walkSafetyView?.kind === 'badge' && feelsLike !== null && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>
+                  {messages.plan.walkSafetyFeelsLikeLabel} {feelsLike}℃
+                </span>
+              </>
+            )}
           </p>
+        )}
+
+        {/*
+          사유 문장 — `LOOKUP_FAILED`·모르는 코드·등급 `UNKNOWN` (D15-4 · D15-7). **재시도
+          버튼은 여기 없다** — 다섯 중 `LOOKUP_FAILED` 만 일시 장애고, 그 재시도는 항목
+          단건 API 가 없어 일자 카드에 **하나**만 선다(`PlanDaySection`).
+        */}
+        {(walkSafetyView?.kind === 'sentence' || walkSafetyView?.kind === 'retriable') && (
+          <p className="text-caption text-fg-muted mt-1">{walkSafetyView.text}</p>
         )}
 
         <div className="flex flex-wrap items-center gap-2">

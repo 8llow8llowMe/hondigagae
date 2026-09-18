@@ -9,8 +9,13 @@ import { SurfaceStack } from '@/components/surface'
 import { usePetList } from '@/features/pet/use-pet-list'
 import { PlanDetailSection } from '@/features/plan/plan-detail-section'
 import { useAnchorScroll } from '@/features/plan/use-anchor-scroll'
-import { usePlaceEnrichment, usePlanDetail, usePlanWeather } from '@/features/plan/use-plan-detail'
-import { ApiError } from '@/lib/api/error'
+import {
+  usePlaceEnrichment,
+  usePlanDetail,
+  usePlanWalkSafety,
+  usePlanWeather,
+} from '@/features/plan/use-plan-detail'
+import { ApiError, isRetriable } from '@/lib/api/error'
 import { messages } from '@/lib/messages'
 import { companionPetsOf } from '@/lib/plan/companion-pets'
 import { alternativePlaceIds } from '@/lib/plan/detail'
@@ -23,12 +28,15 @@ import { alternativePlaceIds } from '@/lib/plan/detail'
  *  - 판정 5xx → **일자 섹션 안에만** 인라인 (아트보드 06 ③)
  *  - 반려견 조회 실패 → 카드만 빠진다
  *  - 항목의 `place` 가 비어 옴 → 주소 없이 제목만 남고 행은 유지된다 (#86·#115)
+ *  - 항목 산책 위험도 5xx → **첫 일자 카드 안에만** 인라인 + 재시도. 404/400 은 자리를
+ *    통째로 숨긴다 (#625 · D15-7)
  *
  * 404 는 여기 오지 않는다 — `page.tsx` 가 `notFound()` 로 보낸다.
  */
 export function PlanDetailView({ planId, today }: { planId: string; today: string }) {
   const detail = usePlanDetail(planId)
   const weather = usePlanWeather(planId)
+  const walkSafety = usePlanWalkSafety(planId)
   const pets = usePetList(true)
   // `/plans` 는 proxy.ts `PROTECTED_PATHS` 라 미로그인이 여기 닿지 않는다 (#200)
 
@@ -112,6 +120,14 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
       weather={weather.data}
       weatherFailed={weather.isError}
       onRetryWeather={() => void weather.refetch()}
+      /*
+        **404/400 은 여기서 걸러진다.** `walkSafety.data` 는 성공했을 때만 채워지므로,
+        조회 중이든 404/400 이든 빈 배열이 내려가 자리가 통째로 숨는다 — 둘을 구분해서
+        넘길 이유가 없다 (D15-7).
+      */
+      walkSafetyItems={walkSafety.data?.items ?? []}
+      walkSafetyFailed={walkSafety.isError && isRetriable(walkSafety.error)}
+      onRetryWalkSafety={() => void walkSafety.refetch()}
       today={new Date(today)}
     />
   )

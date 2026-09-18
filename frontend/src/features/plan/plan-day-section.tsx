@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 
 import { Button, ButtonLink } from '@/components/button'
+import { ErrorState } from '@/components/error-state'
 import { Surface, SurfaceList } from '@/components/surface'
 import { PlanDayOverflowMenu } from '@/features/plan/plan-day-overflow-menu'
 import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
@@ -15,7 +16,11 @@ import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { PlaceDetail } from '@/types/place'
-import type { PlanAlternativePlaceItem, PlanDayWeatherItem } from '@/types/plan'
+import type {
+  PlanAlternativePlaceItem,
+  PlanDayWeatherItem,
+  PlanItemWalkSafetyItem,
+} from '@/types/plan'
 
 /**
  * 이 일자에 장소를 담는 데 필요한 것 한 묶음.
@@ -50,6 +55,33 @@ export type PlanDayVisit = {
   visitOf: (planItemId: string) => PlanItemVisit
 }
 
+/**
+ * 이 일자의 항목 산책 위험도 (#625). **판정·상세와 별도 조회**라 호출부가 좁혀서 내려
+ * 준다 — 방문 체크·담기와 같은 판단이다.
+ */
+export type PlanDayWalkSafety = {
+  /** 그 항목의 판정. 없으면 아직 안 왔거나 응답에 없는 것이지 오류가 아니다 (D15-6) */
+  of: (planItemId: string) => PlanItemWalkSafetyItem | undefined
+  /**
+   * `BEYOND_FORECAST_RANGE` 를 이 일자 단위로 접은 문장 — `lib/plan/walk-safety.ts` 의
+   * `dayBeyondForecastReason()` 가 계산한다. 없으면 `null` 이다.
+   */
+  beyondForecastReason: string | null
+  /**
+   * 전체 조회가 5xx·무응답으로 실패했다. **일정 전체에 하나뿐인 사실**이라 호출부가
+   * 한 일자에만 `true` 를 준다 — 여러 일자 카드에 같은 오류·재시도를 중복해 세우지
+   * 않는다(D15-7 "재시도 버튼은 일자마다가 아니라 한 번").
+   */
+  failed: boolean
+  /**
+   * 이 일자에 `LOOKUP_FAILED` 항목이 있다. **문장은 각 행이 이미 보여 준다** — 이 값은
+   * 일자 카드에 재시도 버튼을 하나 세울지만 가른다.
+   */
+  hasLookupFailed: boolean
+  /** `planKeys.walkSafety(planId)` 재조회. 전체 실패·`LOOKUP_FAILED` 재시도가 같은 함수다 */
+  onRetry: () => void
+}
+
 /** 좌측 목차의 앵커 대상. 목차와 제목이 같은 규칙으로 id 를 만들어야 링크가 맞는다 */
 export function planDayAnchorId(day: number): string {
   return `day${day}`
@@ -78,6 +110,7 @@ export function PlanDaySection({
   editor,
   add,
   visit,
+  walkSafety,
   regenerateHref,
 }: {
   day: number
@@ -99,6 +132,8 @@ export function PlanDaySection({
   editor: ReactNode
   add: PlanDayAdd
   visit: PlanDayVisit
+  /** 이 일자의 항목 산책 위험도 (#625) */
+  walkSafety: PlanDayWalkSafety
   /**
    * `다시 만들기` 가 가는 곳 (#128). `장소 추가` 와 같이 모달이 아니라 라우트다.
    *
@@ -178,6 +213,38 @@ export function PlanDaySection({
           */
           dayHasItems={rows.length > 0}
         />
+
+        {/*
+          항목 산책 위험도 — 일자 단위 알림 (#625 · 명세 D15-7).
+
+          **전체 5xx 는 일정 전체에 한 번뿐이다** — 호출부가 한 일자에만 `failed: true` 를
+          준다(D15-7 "재시도 버튼은 일자마다가 아니라 한 번"). `BEYOND_FORECAST_RANGE` 는
+          그 일자 항목이 전부 같은 사유일 때만(`dayBeyondForecastReason()`) 한 줄로 접는다
+          — 서버 판정이 날짜만의 함수라 접어도 잃는 것이 없다. **`LOOKUP_FAILED` 재시도는
+          문장이 아니라 버튼만 낸다** — 서버 문장은 각 행이 이미 보여 준다.
+        */}
+        {walkSafety.failed ? (
+          <ErrorState
+            title={messages.plan.walkSafetyErrorTitle}
+            retryLabel={messages.plan.walkSafetyRetryAction}
+            onRetry={walkSafety.onRetry}
+            inset="card"
+            headingLevel={3}
+            className="px-0 py-4 md:px-0"
+          />
+        ) : walkSafety.beyondForecastReason !== null ? (
+          <p className="text-caption text-fg-muted mt-2 font-medium">
+            {walkSafety.beyondForecastReason}
+          </p>
+        ) : (
+          walkSafety.hasLookupFailed && (
+            <div className="pt-2">
+              <Button variant="secondary" size="sm" onClick={walkSafety.onRetry}>
+                {messages.plan.walkSafetyRetryAction}
+              </Button>
+            </div>
+          )
+        )}
       </div>
 
       {editing ? (
@@ -196,6 +263,7 @@ export function PlanDaySection({
               key={row.item.planItemId}
               model={row}
               visit={visit.visitOf(row.item.planItemId)}
+              walkSafety={walkSafety.of(row.item.planItemId)}
             />
           ))}
         </SurfaceList>

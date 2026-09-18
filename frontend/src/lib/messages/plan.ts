@@ -362,6 +362,23 @@ export const planMessages = {
    */
   startTimeSrLabel: '시작 시각',
 
+  /**
+   * 항목 산책 위험도 (#625 · 명세 D15-5). **시각 기준이다** — 일자 판정의
+   * `verdictFeelsLikeLabel`(`최고 체감온도`, 하루 최대)과 라벨로 기준을 가른다.
+   * `displayTemperature()` 를 쓰지 않는다 — 그 함수는 하루 단위 폴백 규칙이고 여기는
+   * `feelsLikeCelsius` 하나뿐이라 폴백이 없다.
+   */
+  walkSafetyFeelsLikeLabel: '체감온도',
+  /** 전체 조회 5xx·무응답 (D15-7). 항목 하나의 실패(`LOOKUP_FAILED`)와는 다른 자리다 */
+  walkSafetyErrorTitle: '산책 위험도를 불러오지 못했어요.',
+  /**
+   * **`messages.common.retry`(다시 시도)를 쓰지 않는다.** 같은 일자 카드에 판정
+   * 재시도(`PlanDayVerdict`)가 이미 있어, 이름이 갈려야 스크린리더가 둘을 구분한다
+   * (D15-8 · WCAG 접근 가능한 이름). 전체 5xx 재시도와 `LOOKUP_FAILED` 재시도가 같은
+   * 문구를 쓴다 — 둘 다 같은 재조회(`planKeys.walkSafety`)를 부른다.
+   */
+  walkSafetyRetryAction: '산책 위험도 다시 불러오기',
+
   statusConfirmAction: '일정 확정하기',
   statusConfirmError: '확정하지 못했어요. 잠시 후 다시 시도해 주세요.',
   /**

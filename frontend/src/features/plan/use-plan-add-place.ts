@@ -78,6 +78,11 @@ export function usePlanAddPlace({
             queryClient.setQueryData(planKeys.detail(planId), next)
             // 항목이 늘면 그날 기준 장소가 바뀔 수 있다 — 판정을 다시 받는다 (E3)
             void queryClient.invalidateQueries({ queryKey: planKeys.weather(planId) })
+            /*
+              **산책 위험도도 함께 버린다** (#625 · D15-6). 교체가 `planItemId` 를 전부
+              새로 발급하므로 낡은 판정은 어느 행에도 붙지 않고 조용히 사라진다.
+            */
+            void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(planId) })
 
             showToast({
               message: messages.plan.addPlaceToast

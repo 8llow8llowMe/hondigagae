@@ -360,6 +360,8 @@ function useAddPlaceToPlan({
         (next) => {
           queryClient.setQueryData(planKeys.detail(planId), next)
           void queryClient.invalidateQueries({ queryKey: planKeys.weather(planId) })
+          // 산책 위험도도 함께 버린다 — 담기가 planItemId 를 새로 발급한다 (#625 · D15-6)
+          void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(planId) })
           // 목록의 항목 수를 화면이 쓰지는 않지만, 담은 뒤 목록이 낡은 채로 남지 않게 한다
           void queryClient.invalidateQueries({ queryKey: planKeys.list() })
 

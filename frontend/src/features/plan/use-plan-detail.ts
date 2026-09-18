@@ -6,7 +6,8 @@ import { PLACE_QUERY_OPTIONS, placeKeys } from '@/features/place/queries'
 import { PLAN_QUERY_OPTIONS, planKeys } from '@/features/plan/queries'
 import { clientFetch } from '@/lib/api/client'
 import { placeDetailPath } from '@/lib/api/place'
-import { fetchPlanDetail, fetchPlanWeather } from '@/lib/api/plan'
+import { fetchPlanDetail, fetchPlanWalkSafety, fetchPlanWeather } from '@/lib/api/plan'
+import { INSIGHT_QUERY_OPTIONS } from '@/lib/insight/queries'
 import type { PlaceDetail } from '@/types/place'
 
 /**
@@ -38,6 +39,25 @@ export function usePlanWeather(planId: string) {
     queryFn: () => fetchPlanWeather(planId),
     staleTime: PLAN_QUERY_OPTIONS.staleTime,
     gcTime: PLAN_QUERY_OPTIONS.gcTime,
+  })
+}
+
+/**
+ * 항목 산책 위험도 (#625). **상세·판정과 별도 query 다** — D14 의 시각 줄에 붙는
+ * 판정이고, 항목 하나가 실패해도 전체는 200 이라 이 조회 자체는 5xx 로만 실패한다.
+ *
+ * **서버 프리페치를 하지 않는다** — 서버가 `(장소, 시각, 기준견)` 조합마다 tour-service 를
+ * 부르므로 항목이 많은 일정이면 첫 페인트가 그만큼 붙잡힌다 (D15-6).
+ *
+ * **`staleTime` 은 "일정 목록·상세 30초" 가 아니라 "장소 인사이트 5분" 을 따른다**
+ * (api-integration-guide.md §7) — 값의 출처가 tour-service 인사이트이고 기상 예보 갱신
+ * 단위가 1시간이라 그보다 잦은 재조회가 낭비다. `INSIGHT_QUERY_OPTIONS` 를 그대로 쓴다.
+ */
+export function usePlanWalkSafety(planId: string) {
+  return useQuery({
+    queryKey: planKeys.walkSafety(planId),
+    queryFn: () => fetchPlanWalkSafety(planId),
+    ...INSIGHT_QUERY_OPTIONS,
   })
 }
 
