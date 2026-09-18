@@ -4,14 +4,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanItemPlaceItem;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanItemWalkCourseItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.SharedPlanItemItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.SharedPlanResponse;
 import com.hondigagae.domainlayer.plan.application.info.PlanInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemPlaceInfo;
+import com.hondigagae.domainlayer.plan.application.info.PlanItemWalkCourseInfo;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.shared.travel.plan.PlanItemType;
 import java.lang.reflect.RecordComponent;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Arrays;
@@ -50,6 +55,19 @@ class PlanShareLinkPresenterTest {
         assertThat(json).doesNotContain(FORBIDDEN_KEYS);
     }
 
+    /**
+     * 위 검사는 산책 항목이 없는 픽스처만 본다. 코스 요약은 <b>중첩 서브트리</b>라 거기에 금지 키가
+     * 섞여도 위 테스트는 초록이다 — 그물을 그 아래까지 내린다.
+     */
+    @Test
+    @DisplayName("산책 코스 요약 서브트리에도 주인 전용 키가 없다 — 감춤 검사가 중첩 아래에서 끊기지 않는다")
+    void hidesOwnerOnlyFieldsInsideWalkCourseSummary() throws Exception {
+        String json = objectMapper.writeValueAsString(presenter.toSharedPlanResponse(walkPlanInfo()));
+
+        assertThat(json).contains("시흥-광치기");
+        assertThat(json).doesNotContain(FORBIDDEN_KEYS);
+    }
+
     @Test
     @DisplayName("보여 주는 값은 그대로 실린다 — 감추기가 과해 일정이 빈 채로 나가면 공유가 쓸모없다")
     void keepsTheSharedFields() {
@@ -83,16 +101,105 @@ class PlanShareLinkPresenterTest {
     }
 
     @Test
-    @DisplayName("SharedPlanItemItem 의 필드 집합은 정확히 일곱이다 — planItemId·memo·visited 가 없다")
+    @DisplayName("SharedPlanItemItem 의 필드 집합은 정확히 여덟이다 — planItemId·memo·visited 가 없다")
     void sharedPlanItemComponentsArePinned() {
         assertThat(componentNamesOf(SharedPlanItemItem.class)).containsExactlyInAnyOrder(
-            "day", "sequence", "itemType", "targetId", "title", "startTime", "place");
+            "day", "sequence", "itemType", "targetId", "title", "startTime", "place", "walkCourse");
+    }
+
+    /**
+     * 위 고정은 <b>최상위 이름만</b> 본다. 중첩 DTO 는 소유자 상세와 <b>공유하는</b> 타입이라,
+     * 소유자 화면을 위해 거기에 필드를 하나 더하면 {@code from} 이 채우는 순간 토큰만 아는
+     * 제3자에게 그대로 나간다. 그 연결에 그물을 친다 — 깨지면 "남에게 보여도 되는가" 를 다시 묻는다.
+     */
+    @Test
+    @DisplayName("공유 응답이 품는 중첩 DTO 의 필드 집합도 고정한다 — 상세에 필드를 더하면 공개 응답이 따라 넓어진다")
+    void nestedSharedItemComponentsArePinned() {
+        assertThat(componentNamesOf(PlanItemWalkCourseItem.class)).containsExactlyInAnyOrder(
+            "name", "courseLabel", "distanceKm", "durationText", "durationMaxMinutes",
+            "lat", "lng", "firstImage", "fitsActivityLevels");
+        assertThat(componentNamesOf(PlanItemPlaceItem.class)).containsExactlyInAnyOrder(
+            "addr1", "indoor", "firstImage", "lat", "lng");
     }
 
     private static Set<String> componentNamesOf(Class<?> recordType) {
         return Arrays.stream(recordType.getRecordComponents())
             .map(RecordComponent::getName)
             .collect(Collectors.toUnmodifiableSet());
+    }
+
+    @Test
+    @DisplayName("산책 항목은 공유 응답에도 코스 요약을 싣는다 — 주인이 보는 화면과 같은 값이어야 한다")
+    void sharedWalkItemCarriesTheCourseSummary() {
+        SharedPlanItemItem shared = presenter.toSharedPlanResponse(walkPlanInfo()).items().getFirst();
+
+        assertThat(shared.walkCourse()).isNotNull();
+        assertThat(shared.walkCourse().name()).isEqualTo("시흥-광치기");
+        assertThat(shared.walkCourse().courseLabel()).isEqualTo("1코스");
+        assertThat(shared.walkCourse().durationMaxMinutes()).isEqualTo(300);
+        assertThat(shared.walkCourse().fitsActivityLevels()).extracting(CodeNameDescriptionMetadata::code)
+            .containsExactly("MEDIUM");
+    }
+
+    /**
+     * #719 가 고친 증상을 그대로 겨눈다. <b>두 Presenter 의 실제 출력</b>을 대조한다 — 공유 쪽이
+     * 부르는 팩토리와 비교하면 동어반복이라, 누가 {@link PlanPresenter} 에 사본을 되살려 값이
+     * 갈라져도 잡지 못한다.
+     */
+    @Test
+    @DisplayName("공유의 코스 요약은 소유자 상세와 같은 값이다 — 같은 항목을 두 화면이 다르게 설명하지 않는다")
+    void sharedCourseSummaryEqualsTheOwnerDetail() {
+        PlanInfo info = walkPlanInfo();
+
+        assertThat(presenter.toSharedPlanResponse(info).items().getFirst().walkCourse())
+            .isEqualTo(new PlanPresenter().toDetailResponse(info).items().getFirst().walkCourse());
+    }
+
+    @Test
+    @DisplayName("코스 요약이 없으면 객체 통째로 null 이다 — 코스 없음과 조회 실패를 가르지 않는다")
+    void sharedItemWithoutCourseSummaryIsNull() {
+        SharedPlanResponse response = presenter.toSharedPlanResponse(filledPlanInfo());
+
+        assertThat(response.items()).extracting(SharedPlanItemItem::walkCourse).containsOnlyNulls();
+    }
+
+    /** 산책 항목 하나짜리 일정. 코스 요약이 붙는 경로만 보려고 {@link #filledPlanInfo()} 와 나눠 뒀다. */
+    private static PlanInfo walkPlanInfo() {
+        return PlanInfo.builder()
+            .planId(1234567890123456789L)
+            .petId(987654321098765432L)
+            .petIds(List.of(987654321098765432L))
+            .areaCode("39")
+            .title("올레 걷기")
+            .startDate(LocalDate.of(2026, 9, 12))
+            .endDate(LocalDate.of(2026, 9, 12))
+            .status(PlanStatus.CONFIRMED)
+            .totalDays(1)
+            .items(List.of(PlanItemInfo.builder()
+                .planItemId(555555555555555557L)
+                .day(1)
+                .sequence(0)
+                .itemType(PlanItemType.WALK)
+                .targetId(212481712381923329L)
+                .title("1코스 걷기")
+                .visited(false)
+                .walkCourse(PlanItemWalkCourseInfo.builder()
+                    .name("시흥-광치기")
+                    .courseLabel("1코스")
+                    .distanceKm(new BigDecimal("15.1"))
+                    .durationText("4~5시간")
+                    .durationMaxMinutes(300)
+                    .lat(33.4796218839d)
+                    .lng(126.8955024257d)
+                    .firstImage("http://tong.visitkorea.or.kr/cms/resource/2.jpg")
+                    .fitsActivityLevels(List.of(PlanItemWalkCourseInfo.ActivityFit.builder()
+                        .code("MEDIUM")
+                        .name("보통")
+                        .description("일반적인 산책과 관광 일정을 소화합니다.")
+                        .build()))
+                    .build())
+                .build()))
+            .build();
     }
 
     /** 감출 값을 <b>전부 채운</b> 입력이다. 비워 두면 "안 새는 것" 과 "애초에 없는 것" 이 구분되지 않는다. */

@@ -14,6 +14,12 @@ import lombok.Builder;
  *
  * <p>필드를 더하기 전에 {@code PlanShareLinkPresenterTest} 가 고정한 이름 집합을 먼저 본다 —
  * 그 테스트가 깨지는 것이 곧 "이 값을 남에게 보여도 되는가" 를 다시 묻는 자리다.
+ *
+ * <p><b>{@code walkCourse} 를 더할 때 그 질문에 답했다</b> (#719). 빼 둔 셋은 <b>주인만 쓰는
+ * 값</b>이라 뺀 것인데, 코스 요약은 제주올레 공공데이터이고 이미 싣고 있는 {@code place} 와 같은
+ * 성격이다 — 링크를 받은 사람이 "어디를 언제 가는지" 를 아는 데 필요한 값이다. 오히려 빠져 있던
+ * 쪽이 비대칭이었다: 장소 항목은 요약이 실리는데 {@code WALK} 만 제목 한 줄로 남아, 주인이 보는
+ * 화면과 공유받은 사람이 보는 화면이 같은 항목을 다르게 설명했다.
  */
 @Builder
 @Schema(description = "공유된 여행 일정의 항목 DTO (읽기 전용)")
@@ -44,6 +50,13 @@ public record SharedPlanItemItem(
         description = "항목이 가리키는 장소 요약. 장소를 가리키지 않는 항목(WALK·MOVE)이거나 "
             + "원천에서 사라진(delisted) 장소면 null 이다 — 그때도 항목 자체는 응답에 남는다",
         nullable = true)
-    PlanItemPlaceItem place
+    PlanItemPlaceItem place,
+
+    @Schema(
+        description = "항목이 가리키는 산책 코스 요약. 산책 항목이 아니거나 원천에서 사라진 코스면 null 이다 — "
+            + "장소와 같은 규칙이고, 일정 상세(PlanItemDetailItem.walkCourse)와 같은 모양이라 화면이 렌더를 "
+            + "재사용한다. 코스 없음·tour-service 장애를 가르지 않고 셋 다 같은 null 이다",
+        nullable = true)
+    PlanItemWalkCourseItem walkCourse
 ) {
 }
