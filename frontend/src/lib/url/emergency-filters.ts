@@ -1,4 +1,5 @@
 import { DEFAULT_RADIUS_METERS, MAX_RADIUS_METERS } from '@/lib/api/emergency'
+import { JEJU_REGION_CODES, type JejuRegionCode } from '@/lib/geo/jeju-regions'
 import { normalizeKeyword } from '@/lib/url/keyword'
 import {
   DEFAULT_FACILITY_FILTERS,
@@ -49,11 +50,20 @@ export function widen(radius: number): number {
 export type EmergencyBoardParams = {
   filters: FacilityFilters
   radius: number
+  /**
+   * 위치를 쓸 수 없는 사람이 직접 고른 권역 (#639 · 세부명세 D3-3).
+   *
+   * **`null` 이 기본이자 미선택이다.** `radius`·`filters` 와 같은 축으로 URL 이
+   * 소유한다 — 예전에는 컴포넌트 state 였고, 그래서 새로고침 한 번에 고른 권역이
+   * 말없이 사라졌다 (#674).
+   */
+  regionCode: JejuRegionCode | null
 }
 
 export const DEFAULT_EMERGENCY_BOARD_PARAMS: EmergencyBoardParams = {
   filters: DEFAULT_FACILITY_FILTERS,
   radius: DEFAULT_RADIUS_METERS,
+  regionCode: null,
 }
 
 type RawParams = URLSearchParams | Record<string, string | string[] | undefined>
@@ -96,6 +106,21 @@ function readRadius(value: string | null): number {
   return RADIUS_OPTIONS.includes(radius as RadiusOption) ? radius : DEFAULT_RADIUS_METERS
 }
 
+/**
+ * 권역도 **화이트리스트**다 (`readRadius` · `readFacilityType` 와 같은 방식). 정확히
+ * 일치하는 값만 통과시키고 나머지는 전부 `null`(미선택)로 떨어뜨린다 —
+ * 첫 권역(제주시)으로 떨어뜨리면 사용자가 고르지 않은 기준의 거리를 읽게 된다
+ * (세부명세 D3-3).
+ *
+ * **값은 `JEJU_REGION_CODES` 의 코드 그대로다** — 같은 화면의 `type=ANIMAL_HOSPITAL`
+ * 과 대칭이다. 소문자로 낮추면 파싱·직렬화 양쪽에 대소문자 왕복이 붙고, 그 왕복이 이
+ * 모듈의 유일한 매핑 레이어가 된다.
+ */
+function readRegion(value: string | null): JejuRegionCode | null {
+  if (value === null) return null
+  return JEJU_REGION_CODES.includes(value as JejuRegionCode) ? (value as JejuRegionCode) : null
+}
+
 export function parseEmergencyBoardParams(params: RawParams): EmergencyBoardParams {
   return {
     filters: {
@@ -106,11 +131,16 @@ export function parseEmergencyBoardParams(params: RawParams): EmergencyBoardPara
       keyword: normalizeKeyword(read(params, 'keyword')),
     },
     radius: readRadius(read(params, 'radius')),
+    regionCode: readRegion(read(params, 'region')),
   }
 }
 
 /** 화면 URL 용 쿼리 문자열. 기본값은 생략한다 */
-export function toEmergencyBoardQuery({ filters, radius }: EmergencyBoardParams): string {
+export function toEmergencyBoardQuery({
+  filters,
+  radius,
+  regionCode,
+}: EmergencyBoardParams): string {
   const params = new URLSearchParams()
 
   if (filters.type !== null) params.set('type', filters.type)
@@ -127,6 +157,7 @@ export function toEmergencyBoardQuery({ filters, radius }: EmergencyBoardParams)
   }
   if (filters.keyword !== null) params.set('keyword', filters.keyword)
   if (radius !== DEFAULT_RADIUS_METERS) params.set('radius', String(radius))
+  if (regionCode !== null) params.set('region', regionCode)
 
   return params.toString()
 }

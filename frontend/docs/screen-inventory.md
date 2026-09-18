@@ -189,6 +189,10 @@
   기본 화면으로 열렸다** — 새로고침·뒤로가기도 좁힌 조건을 버렸다.
   반경은 URL 에 실리지만 **필터가 아니라 조회 파라미터**라 「초기화」 대상이 아니다
   (`EmergencyBoardParams` 가 반경을 `filters` 밖에 둔다).
+  **권역 세그먼트도 URL 이 소유한다** — `?region=SEOGWIPO`
+  ([#674](https://github.com/8llow8llowMe/hondigagae/issues/674) · 세부명세 D3-3). 그전에는
+  권역만 컴포넌트 state 라 새로고침 한 번에 고른 기준이 말없이 사라졌다. **좌표
+  (`searchCenter` · `position`)는 여전히 URL 에 두지 않는다** — 받는 사람에게 뜻이 없는 값이다.
 - **보기 전환 링크는 조건을 실어야 한다.** `viewModeHref('/emergency', '', …)` 처럼 쿼리를
   비워 두면 목록↔지도 전환이 좁힌 조건을 통째로 버린다. 서버(토글)와 클라이언트(조건 변경)
   **양쪽이 `viewModeHref` 를 거친다**.
