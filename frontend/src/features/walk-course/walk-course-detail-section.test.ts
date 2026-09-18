@@ -30,6 +30,7 @@ function render(overrides: Partial<WalkCourseDetailSectionProps> = {}): string {
     walkTimes: WALK_TIMES,
     walkTimesLoading: false,
     onWalkTimesRetry: vi.fn(),
+    authed: false,
     ...overrides,
   }
 
@@ -78,6 +79,22 @@ describe('WalkCourseDetailSection — 성공', () => {
     expect(render({ course: walkCourseDetail(WALK_COURSE_MIXED_START_END) })).toContain(
       '제주민속촌주차장 입구-남원포구',
     )
+  })
+
+  /**
+   * 담기 진입 (#620). **목록 행이 아니라 상세에만 둔다**
+   * (`올레담기-세부명세.md` D8-1).
+   */
+  it('일정에 담기 버튼이 있다', () => {
+    expect(render({ authed: true })).toContain(messages.plan.addToPlanAction)
+  })
+
+  /** 미로그인은 시트를 열지 않고 로그인으로 보낸다 (D4-1) — 버튼은 그대로 보인다 */
+  it('미로그인이면 담기 버튼이 로그인으로 보낸다', () => {
+    const markup = render({ authed: false })
+
+    expect(markup).toContain(messages.plan.addToPlanAction)
+    expect(markup).toContain('/login?returnTo=')
   })
 })
 

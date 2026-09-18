@@ -221,8 +221,11 @@ export function placeIdsOf(items: PlanItemDetail[]): Set<string> {
  * 전부 되싣고 하나를 더한 목록을 보낸다 — 되싣지 않으면 그 일자가 새 항목 하나만
  * 남기고 비워진다 (E1).
  *
- * `itemType` 은 **`PLACE` 고정**이다. 식사·숙박 구분과 `WALK` 는 이 이슈 밖이다
- * (F3 — `walk_course` 조회 API 가 없다).
+ * `itemType` 은 **`PLACE` 고정**이다. 식사·숙박 구분은 이 이슈 밖이다. **`WALK` 담기는
+ * 이 함수를 쓰지 않는다** — [#382](https://github.com/8llow8llowMe/hondigagae/issues/382)로
+ * `walk_course` 조회 API 가 생겨 더 이상 막힌 것이 아니고, `appendWalkCourseItemPayload`
+ * (아래)가 자매 함수로 따로 있다 — 중복 판정(`placeIdsOf` vs `walkCourseIdsOf`)과 `title`
+ * 조립 규칙이 갈려 인자로 합치지 않았다 (`올레담기-세부명세.md` D3-1).
  *
  * 순서는 **맨 끝**이다. 위치를 고르는 UI 는 두지 않는다 — 순서는 편집모드가 소유한다
  * (F5-3).
@@ -244,6 +247,66 @@ export function appendPlaceItemPayload(
         // 문자열 그대로다 — Snowflake 라 Number() 를 거치면 정밀도를 잃는다 (E1 규칙 1)
         targetId: place.placeId,
         title: place.title.slice(0, ITEM_TITLE_MAX),
+      },
+    ],
+  }
+}
+
+// ─── 산책 코스 담기 (#620) ────────────────────────────────────────────────────
+
+/**
+ * 그 일자에 이미 담긴 **산책 코스** id. `placeIdsOf` 의 자매다.
+ *
+ * **`placeIdsOf` 를 재사용하지 않는다.** 그 함수는 `isPlaceTarget` 으로 `WALK` 를
+ * **일부러 걸러낸다** — 코스를 장소 id 집합으로 재면 값이 우연히 겹치는 장소가 있어도
+ * 없어도 중복이 영원히 잡히지 않는다.
+ *
+ * 반대로 **코스 판정에 `placeIdsOf` 의 결과를 섞지 않는다.** 우연히 값이 겹치는 장소가
+ * 담겨 있으면 담을 수 있는 코스가 잠긴다 — 버튼이 사라져 우회로가 없다. #82 가 겪은
+ * 결함의 거울상이다 (`올레담기-세부명세.md` D3-2).
+ *
+ * 판정은 `itemType.code === 'WALK' && targetId !== null` 이다. **`isPlaceTarget` 의
+ * 부정이 아니다** — `MOVE` 가 그 사이에 있다.
+ */
+export function walkCourseIdsOf(items: PlanItemDetail[]): Set<string> {
+  const ids = new Set<string>()
+  for (const item of items) {
+    if (item.itemType.code === 'WALK' && item.targetId !== null) ids.add(item.targetId)
+  }
+  return ids
+}
+
+/**
+ * 그 일자의 **맨 끝에** 산책 코스 하나를 붙인 일괄 교체 본문. `appendPlaceItemPayload` 의
+ * 자매다 (`올레담기-세부명세.md` D3).
+ *
+ * **`itemType` 이 `WALK` 고정이고 `targetId` 는 `walk_course.id` 다** — `place.id` 와
+ * 다른 네임스페이스다. **서버가 저장 시 이 id 를 검증하지 않는다**
+ * (`verifyPlaceTargets` 가 `PLACE_TARGETS`(`PLACE`·`MEAL`·`LODGING`)만 본다 — D3-3).
+ * 틀린 id 를 실어도 조용히 저장되고 그 항목은 영원히 제목만 남으므로, **여기서 id 를
+ * 지어내거나 가공하지 않는다** — 코스 상세 응답의 `walkCourseId` 를 그대로 받는다.
+ *
+ * `title` 은 호출부가 `{courseLabel} {name}` 을 조립해 넘긴다 (D3 결정 근거 D8-2) —
+ * 요약이 `null` 로 오는 경로가 실재해(D3-3 · tour-service 장애) 그때 남는 것은 `title`
+ * 뿐이다.
+ */
+export function appendWalkCourseItemPayload(
+  items: PlanItemDetail[],
+  day: number,
+  course: { walkCourseId: string; title: string },
+): PlanDayItemsReplacePayload {
+  const existing = items.map((item, index) => toPayloadItem(item, day, index))
+
+  return {
+    items: [
+      ...existing,
+      {
+        day,
+        sequence: existing.length,
+        itemType: 'WALK',
+        // 문자열 그대로다 — Snowflake 라 Number() 를 거치면 정밀도를 잃는다 (E1 규칙 1)
+        targetId: course.walkCourseId,
+        title: course.title.slice(0, ITEM_TITLE_MAX),
       },
     ],
   }

@@ -717,6 +717,25 @@ function createStore(): MockStore {
             visited: false,
           },
           {
+            /*
+              **아는 산책 코스** — `MOCK_WALK_COURSES` 의 `2코스`(`6911167100216303304`)다.
+              좌표·이미지까지 있는 유일한 코스라 상세 응답의 `item.walkCourse` 가 세
+              값(구간명·거리·소요시간)을 모두 채워 오는 갈래를 로컬에서 볼 수 있다
+              (`올레담기-세부명세.md` D7 mock 절). **모르는 targetId 라 `walkCourse: null`
+              로 오는 갈래는 다른 일정(`223456789012000001` 2일차의 `오설록 주변 산책`,
+              `targetId: '777777777777000001'`)이 이미 덮는다.**
+            */
+            planItemId: '323456789012000012',
+            day: 1,
+            sequence: 2,
+            itemType: 'WALK',
+            targetId: '6911167100216303304',
+            title: '2코스 광치기-온평포구',
+            memo: null,
+            startTime: null,
+            visited: false,
+          },
+          {
             planItemId: '323456789012000009',
             day: 2,
             sequence: 0,

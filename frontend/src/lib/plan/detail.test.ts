@@ -30,6 +30,7 @@ function item(overrides: Partial<PlanItemDetail> & { day: number; sequence: numb
     startTime: null,
     visited: false,
     place: null,
+    walkCourse: null,
     ...overrides,
     itemType: overrides.itemType ?? { code: type, name: type, description: '' },
   } satisfies PlanItemDetail

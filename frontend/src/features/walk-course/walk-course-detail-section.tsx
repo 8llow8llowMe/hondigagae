@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { Skeleton } from '@/components/skeleton'
 import { SurfaceStack } from '@/components/surface'
+import { WalkCourseAddAction } from '@/features/walk-course/walk-course-add-action'
 import { WalkCourseGoldenSlot } from '@/features/walk-course/walk-course-golden-slot'
 import {
   WalkCourseSourceLine,
@@ -31,6 +32,8 @@ export type WalkCourseDetailSectionProps = {
   walkTimes: WalkTimesResponse | null
   walkTimesLoading: boolean
   onWalkTimesRetry: () => void
+  /** `일정에 담기` 진입이 미로그인이면 로그인으로 보낸다 (#620 · D4-1) */
+  authed: boolean
 }
 
 /**
@@ -52,6 +55,7 @@ export function WalkCourseDetailSection({
   walkTimes,
   walkTimesLoading,
   onWalkTimesRetry,
+  authed,
 }: WalkCourseDetailSectionProps) {
   if (loading) {
     return (
@@ -134,6 +138,11 @@ export function WalkCourseDetailSection({
       />
 
       <WalkCourseSourceLine course={course} />
+
+      {/* 진입은 상세에만 둔다 — 목록 행은 이미 전체가 링크다 (`올레담기-세부명세.md` D8-1) */}
+      <div className={INSET_CLASS.card}>
+        <WalkCourseAddAction course={course} authed={authed} />
+      </div>
     </SurfaceStack>
   )
 }

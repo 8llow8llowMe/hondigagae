@@ -615,6 +615,44 @@ export type PlanItemPlace = {
   lng: number | null
 }
 
+/**
+ * 일정 항목이 가리키는 산책 코스 요약 (#620 · 이슈 #619 BE).
+ *
+ * 근거: `PlanItemWalkCourseItem` 소스 실측 + dev 게이트웨이 OpenAPI(2026-09-18).
+ * **`docs/api/openapi/*.json` 스냅샷(2026-09-14)보다 뒤에 들어온 필드라 스냅샷에는 없다**
+ * (백엔드 `efef555e`, 2026-09-17).
+ *
+ * **`item.place` 와 완전히 다른 필드다.** 하나가 채워지면 다른 하나는 늘 비어 있다 —
+ * `WALK` 항목의 `place` 는 항상 `null` 이다.
+ */
+export type PlanItemWalkCourse = {
+  /** 구간명. `시흥-광치기` */
+  name: string | null
+  /** 화면이 부르는 이름표. `3코스 (A)` */
+  courseLabel: string | null
+  /** km */
+  distanceKm: number | null
+  /** 소요시간 **원문**. `4~5시간`. 파싱하지 않고 그대로 쓴다 */
+  durationText: string | null
+  /**
+   * 소요시간 상한(분). **`null` 은 "제한 없음" 이 아니라 원문을 파싱하지 못했다는 뜻이다**
+   * (스키마 설명이 명시한다). 화면 숫자로 쓰지 않는다 — `durationText` 원문을 보여 준다
+   * (`올레담기-세부명세.md` D12-4).
+   */
+  durationMaxMinutes: number | null
+  /** 시작점 좌표. TourAPI 매칭에 실패한 코스는 null */
+  lat: number | null
+  lng: number | null
+  firstImage: string | null
+  /**
+   * 이 코스를 걸을 만한 반려견 활동량. **서버 enum metadata 를 그대로 렌더한다.**
+   * `durationMaxMinutes` 가 null 인 코스는 세 값이 다 담기는데, 그것은 "아무 아이나 된다" 가
+   * 아니라 **"소요시간을 모른다"** 는 뜻이다 (스키마 설명). 이번 범위에서는 행에 그리지
+   * 않는다 (D12-6).
+   */
+  fitsActivityLevels: CodeNameMetadata[]
+}
+
 /** 일정 항목. `targetId` 는 이동 항목처럼 대상이 없으면 null 이다 */
 export type PlanItemDetail = {
   planItemId: string
@@ -647,6 +685,13 @@ export type PlanItemDetail = {
    * 않는다** (공통명세 S8).
    */
   place: PlanItemPlace | null
+  /**
+   * 항목이 가리키는 산책 코스 요약 (#620). **`place` 와 같은 모양의 결손을 갖는다** —
+   * 코스를 가리키지 않는 항목, 저장 시 검증되지 않아 조용히 틀린 `targetId` 가 저장된
+   * 경우(`올레담기-세부명세.md` D3-3), tour-service 장애 셋 다 `null` 이다. `?? {}` 로
+   * 덮지 않는다 — 비어 있다는 사실이 렌더 갈래를 정하는 입력이다 (일정상세-세부명세 D12-2).
+   */
+  walkCourse: PlanItemWalkCourse | null
 }
 
 /**

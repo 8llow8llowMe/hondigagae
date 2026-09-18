@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   appendPlaceItemPayload,
+  appendWalkCourseItemPayload,
   hasEditChanges,
   ITEM_TITLE_MAX,
   moveEditItem,
@@ -11,6 +12,7 @@ import {
   survivingItems,
   toEditItems,
   toggleRemoved,
+  walkCourseIdsOf,
 } from '@/lib/plan/day-items'
 import { planItem } from '@/test/fixtures/plan'
 import type { PlanItemDetail } from '@/types/plan'
@@ -345,5 +347,137 @@ describe('appendPlaceItemPayload — 장소 담기 (#82)', () => {
     const move = appendPlaceItemPayload(ITEMS, 2, place).items[2]
 
     expect(move).not.toHaveProperty('targetId')
+  })
+})
+
+describe('walkCourseIdsOf — 같은 일자 중복 담기 판정 (#620)', () => {
+  const WALK_ID = '6911167100216303304'
+
+  const withWalk = [
+    ...ITEMS,
+    planItem({
+      planItemId: 'w',
+      day: 2,
+      sequence: 5,
+      title: '2코스 광치기-온평포구',
+      itemType: { code: 'WALK', name: '산책', description: null },
+      targetId: WALK_ID,
+      place: null,
+    }),
+  ]
+
+  it('그 일자에 담긴 WALK 항목의 targetId(walk_course.id) 를 모은다', () => {
+    expect(walkCourseIdsOf(withWalk).has(WALK_ID)).toBe(true)
+    expect(walkCourseIdsOf(withWalk).size).toBe(1)
+  })
+
+  /*
+    회귀 방지 — 코스 판정에 placeIdsOf 의 결과를 섞지 않는다. 우연히 값이 겹치는 장소가
+    담겨 있으면 담을 수 있는 코스가 잠긴다(#82 가 겪은 결함의 거울상, D3-2).
+  */
+  it('PLACE·MEAL·LODGING 의 targetId 는 담지 않는다 — 네임스페이스가 다르다', () => {
+    const ids = walkCourseIdsOf(ITEMS)
+
+    expect(ids.size).toBe(0)
+    expect(ids.has('212481712381923328')).toBe(false)
+  })
+
+  it('MOVE(targetId: null)는 담지 않는다 — isPlaceTarget 의 부정이 아니다', () => {
+    const move = planItem({
+      planItemId: 'm',
+      day: 2,
+      sequence: 6,
+      title: '이동',
+      itemType: { code: 'MOVE', name: '이동', description: null },
+      targetId: null,
+      place: null,
+    })
+
+    expect(walkCourseIdsOf([move]).size).toBe(0)
+  })
+
+  /* placeIdsOf 쪽 회귀는 day-items.test.ts:206 근처가 이미 지킨다 — 여기서는 반대 방향을 본다 */
+  it('placeIdsOf 는 WALK 를 여전히 세지 않는다', () => {
+    expect(placeIdsOf(withWalk).has(WALK_ID)).toBe(false)
+  })
+})
+
+describe('appendWalkCourseItemPayload — 산책 코스 담기 (#620)', () => {
+  const course = { walkCourseId: '6911167100216303304', title: '2코스 광치기-온평포구' }
+
+  it('기존 항목을 전부 되싣고 새 항목을 맨 끝에 붙인다 — 일괄 교체다', () => {
+    const payload = appendWalkCourseItemPayload(ITEMS, 2, course)
+
+    expect(payload.items).toHaveLength(4)
+    expect(payload.items.at(-1)?.title).toBe(course.title)
+  })
+
+  it('새 항목의 itemType 이 WALK 고정이다', () => {
+    expect(appendWalkCourseItemPayload([], 1, course).items[0]?.itemType).toBe('WALK')
+  })
+
+  it('targetId 가 문자열 그대로다 — Snowflake 는 서버가 검증도 안 해 준다 (D3-3)', () => {
+    const bigId = '6911167100216303304'
+    const added = appendWalkCourseItemPayload([], 1, { walkCourseId: bigId, title: '2코스' })
+      .items[0]
+
+    expect(added?.targetId).toBe(bigId)
+    expect(typeof added?.targetId).toBe('string')
+    expect(JSON.stringify(added)).toContain(`"targetId":"${bigId}"`)
+    // 직렬화한 뒤 다시 숫자로 바꾸면 정밀도를 잃는다는 것 자체가 문자열이어야 하는 이유다
+    expect(String(Number(bigId))).not.toBe(bigId)
+  })
+
+  it('되싣는 항목의 memo · startTime · itemType 이 살아 있다 — 빼먹으면 조용히 지워진다', () => {
+    const first = appendWalkCourseItemPayload(ITEMS, 2, course).items[0]
+
+    expect(first?.memo).toBe('실내라 비가 와도 괜찮아요')
+    expect(first?.startTime).toBe('10:00:00')
+    expect(first?.itemType).toBe('PLACE')
+  })
+
+  /** 이미 담겨 있던 WALK 항목도 PLACE 로 뭉개지지 않는다 */
+  it('기존에 담겨 있던 WALK 항목도 itemType: WALK 로 되실린다', () => {
+    const existingWalk = planItem({
+      planItemId: 'w0',
+      day: 2,
+      sequence: 3,
+      title: '1코스 시흥-광치기',
+      itemType: { code: 'WALK', name: '산책', description: null },
+      targetId: '6911167100216303301',
+      place: null,
+    })
+
+    const payload = appendWalkCourseItemPayload([...ITEMS, existingWalk], 2, course)
+    const reloaded = payload.items.find((item) => item.title === '1코스 시흥-광치기')
+
+    expect(reloaded?.itemType).toBe('WALK')
+    expect(reloaded?.targetId).toBe('6911167100216303301')
+  })
+
+  it('sequence 를 0부터 다시 매기고 새 항목이 마지막 번호를 받는다', () => {
+    const payload = appendWalkCourseItemPayload(ITEMS, 2, course)
+
+    expect(payload.items.map((item) => item.sequence)).toEqual([0, 1, 2, 3])
+  })
+
+  it('day 를 경로값 그대로 싣는다', () => {
+    const payload = appendWalkCourseItemPayload(ITEMS, 3, course)
+
+    expect(payload.items.every((item) => item.day === 3)).toBe(true)
+  })
+
+  it('title 이 100자를 넘으면 잘라서 보낸다 — 서버는 자르지 않고 PLAN_110 을 낸다', () => {
+    const long = 'ㄱ'.repeat(150)
+    const added = appendWalkCourseItemPayload([], 1, {
+      walkCourseId: course.walkCourseId,
+      title: long,
+    }).items[0]
+
+    expect(added?.title).toHaveLength(ITEM_TITLE_MAX)
+  })
+
+  it('빈 일자에 담으면 항목 하나짜리 목록이 된다', () => {
+    expect(appendWalkCourseItemPayload([], 1, course).items).toHaveLength(1)
   })
 })

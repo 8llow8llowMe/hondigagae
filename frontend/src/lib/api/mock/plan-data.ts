@@ -14,6 +14,7 @@ import {
   nextReviewId,
   nextReviewItemId,
 } from '@/lib/api/mock/store'
+import { MOCK_WALK_COURSES } from '@/lib/api/mock/walk-course-data'
 import { todayDay } from '@/lib/date/day'
 import type { ApiResponse, CodeNameMetadata, SliceResponse, ValidationErrorItem } from '@/types/api'
 import type { ScoreMetricMetadata } from '@/types/insight'
@@ -26,6 +27,7 @@ import type {
   PlanItemDetail,
   PlanItemPlace,
   PlanItemTypeCode,
+  PlanItemWalkCourse,
   PlanItemWalkSafetyItem,
   PlanPackingListResponse,
   PlanReviewPlaceItem,
@@ -136,6 +138,14 @@ const KNOWN_PLACE_IDS = new Set(MOCK_PLACES.map((place) => place.placeId))
 /** placeId → 장소. 항목의 `place` 요약을 채울 때 쓴다 (#86) */
 const PLACE_BY_ID = new Map(MOCK_PLACES.map((place) => [place.placeId, place]))
 
+/**
+ * walkCourseId → 코스. 항목의 `walkCourse` 요약을 채울 때 쓴다 (#620).
+ *
+ * **`walk-course-data.ts`(#618) fixture 를 재사용한다.** 값이 갈리면 코스 화면과 일정
+ * 화면이 같은 코스를 다르게 말한다 (`올레담기-세부명세.md` D7 mock 절).
+ */
+const WALK_COURSE_BY_ID = new Map(MOCK_WALK_COURSES.map((course) => [course.walkCourseId, course]))
+
 /** 총 일수(양끝 포함). `Plan.containsDay()` 와 같은 셈이어야 한다 */
 function daysBetween(startDate: string, endDate: string): number {
   const start = Date.parse(`${startDate}T00:00:00Z`)
@@ -208,6 +218,31 @@ function toItemPlace(item: MockPlanItem): PlanItemPlace | null {
   }
 }
 
+/**
+ * 항목의 산책 코스 요약 (#620). **저장 시 `targetId` 를 검증하지 않으므로**
+ * (`올레담기-세부명세.md` D3-3) 모르는 id 가 조용히 저장될 수 있다 — 그때는 `place` 와
+ * 같은 모양으로 `null` 을 낸다. `fitsActivityLevels` 는 이번 범위에서 행에 그리지 않아
+ * 빈 배열로 둔다 (일정상세-세부명세 D12-6).
+ */
+function toItemWalkCourse(item: MockPlanItem): PlanItemWalkCourse | null {
+  if (item.targetId === null || item.itemType !== 'WALK') return null
+
+  const course = WALK_COURSE_BY_ID.get(item.targetId)
+  if (course === undefined) return null
+
+  return {
+    name: course.name,
+    courseLabel: course.courseLabel,
+    distanceKm: course.distanceKm,
+    durationText: course.durationText,
+    durationMaxMinutes: course.durationMaxMinutes,
+    lat: course.lat,
+    lng: course.lng,
+    firstImage: course.firstImage,
+    fitsActivityLevels: [],
+  }
+}
+
 function toItem(item: MockPlanItem): PlanItemDetail {
   return {
     planItemId: item.planItemId,
@@ -224,6 +259,7 @@ function toItem(item: MockPlanItem): PlanItemDetail {
     startTime: item.startTime,
     visited: item.visited,
     place: toItemPlace(item),
+    walkCourse: toItemWalkCourse(item),
   }
 }
 

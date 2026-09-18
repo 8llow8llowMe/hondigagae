@@ -52,6 +52,7 @@ export function WalkCourseDetailView({
       walkTimes={walkTimes.data ?? null}
       walkTimesLoading={position !== null && walkTimes.isPending}
       onWalkTimesRetry={() => void walkTimes.refetch()}
+      authed={authed}
     />
   )
 }
