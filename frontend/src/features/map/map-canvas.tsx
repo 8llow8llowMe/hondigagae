@@ -15,11 +15,19 @@ import {
   clusterMarkerLabel,
   clusterMarkerText,
 } from '@/lib/map/cluster'
+import type { MapRouteSegment } from '@/lib/map/route'
 import { loadKakaoMaps, MapSdkError, type MapSdkFailure } from '@/lib/map/sdk'
 import { framedCamera, framedCenterLat, type MapBounds } from '@/lib/map/viewport'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
-import type { KakaoCustomOverlay, KakaoLatLng, KakaoMap, KakaoMaps } from '@/types/kakao-maps'
+import type {
+  KakaoCustomOverlay,
+  KakaoLatLng,
+  KakaoMap,
+  KakaoMaps,
+  KakaoPolyline,
+  KakaoStrokeStyle,
+} from '@/types/kakao-maps'
 
 /**
  * MapCanvas — SDK 수명주기를 감당하는 유일한 곳.
@@ -62,10 +70,57 @@ export type MapPin = {
   caption?: string | null
   /** 낮춤 표현. 긴급 시설의 약국이 쓴다 — 판정 색이 아니라 톤 낮춤이다 */
   muted?: boolean
+  /**
+   * 동선의 순번(#743). 주면 **이름표 대신 숫자 원**으로 그린다.
+   *
+   * 4~6곳이 1km 안에 몰리는 하루 동선에서 이름표를 다 펴면 서로 덮어 아무것도 못 읽는다
+   * — `/places` 가 이름표를 쓰는 이유(어느 곳인지 눌러봐야 안다)가 여기서는 성립하지
+   * 않는다. **순서가 곧 그 핀의 신원**이고, 이름은 고르면 붙는다.
+   */
+  order?: number
+}
+
+/**
+ * 선 톤별 그리기 값. **색은 하나고 굵기·패턴만 다르다** (`lib/map/route.ts` 주석).
+ *
+ * `dashed` 는 어제 잔 숙소에서 들어오는 구간이라 한 단계 낮춘다 — 오늘의 이동이 아니다.
+ */
+const ROUTE_STROKE: Record<
+  MapRouteSegment['tone'],
+  { weight: number; style: KakaoStrokeStyle; opacity: number }
+> = {
+  default: { weight: 4, style: 'solid', opacity: 0.9 },
+  dashed: { weight: 3, style: 'shortdash', opacity: 0.7 },
+  emphasis: { weight: 7, style: 'solid', opacity: 0.9 },
+}
+
+/**
+ * 선색을 토큰에서 읽는다. **선은 캔버스라 CSS 가 닿지 않는다** — `strokeColor` 는
+ * 계산된 색 문자열이어야 하고 `var(--brand-500)` 을 넘기면 SDK 가 조용히 무시한다.
+ *
+ * 그래서 값을 런타임에 읽어 쓴다. 상수로 박으면 `DESIGN.md` 팔레트가 바뀔 때 여기만
+ * 남는다 — `lib/brand/chrome-colors.ts` 가 meta 태그 속성에서 같은 문제를 겪는다.
+ *
+ * 아래 폴백은 **토큰을 못 읽었을 때만** 쓰인다(스타일시트가 아직 안 붙은 순간). 선이
+ * 통째로 사라지는 것보다 한 톤 어긋난 초록이 낫다.
+ */
+// eslint-disable-next-line no-restricted-syntax -- 위 주석 참고: 캔버스는 CSS 변수를 못 읽는다. `--brand-500` 의 값과 같게 유지한다
+const ROUTE_COLOR_FALLBACK = '#2e9b6b'
+
+function routeColor(): string {
+  if (typeof window === 'undefined') return ROUTE_COLOR_FALLBACK
+
+  const token = window
+    .getComputedStyle(document.documentElement)
+    .getPropertyValue('--brand-500')
+    .trim()
+
+  return token === '' ? ROUTE_COLOR_FALLBACK : token
 }
 
 export function MapCanvas({
   pins,
+  route,
   selectedId,
   onSelect,
   onBoundsChange,
@@ -77,6 +132,13 @@ export function MapCanvas({
   className,
 }: {
   pins: MapPin[]
+  /**
+   * 순서대로 이을 선. 구간마다 하나씩이고 **핀과 따로 그려진다**.
+   *
+   * 모델은 `lib/map/route.ts` 가 만든다 — 여기서는 그리기만 한다 (`cluster.ts` 와 같은
+   * 역할 분담이다).
+   */
+  route?: MapRouteSegment[] | null
   selectedId: string | null
   onSelect: (id: string) => void
   /**
@@ -139,6 +201,13 @@ export function MapCanvas({
   const mapRef = useRef<KakaoMap | null>(null)
   const mapsRef = useRef<KakaoMaps | null>(null)
   const overlaysRef = useRef<KakaoCustomOverlay[]>([])
+  /*
+    **오버레이와 같은 배열에 태우지 않는다.** 핀 effect 는 매번 `overlaysRef` 를 통째로
+    비우고 다시 그리는데(`pins` 는 조회 결과라 자주 새 배열이 된다), 선이 거기 섞여 있으면
+    핀이 갱신될 때마다 선도 함께 지워졌다 그려져 깜빡인다. 정리 책임은 아래 언마운트
+    정리에서 **두 배열 모두** 진다.
+  */
+  const polylinesRef = useRef<KakaoPolyline[]>([])
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading')
   /** 확대 단계 — 묶음 셀 크기가 여기서 갈린다 */
@@ -228,6 +297,10 @@ export function MapCanvas({
       for (const overlay of overlaysRef.current) overlay.setMap(null)
       overlaysRef.current = []
 
+      // 선도 마커와 같은 누수 경로를 갖는다 — 지우지 않으면 지도를 다시 만들 때 남는다
+      for (const polyline of polylinesRef.current) polyline.setMap(null)
+      polylinesRef.current = []
+
       mapRef.current = null
       mapsRef.current = null
     }
@@ -250,7 +323,17 @@ export function MapCanvas({
       return coord === null ? [] : [{ item: pin, coord }]
     })
 
-    const groups = clusterByGrid(positioned, cellSizeFor(level))
+    /*
+      **순번 핀은 묶지 않는다** (#743). 묶음은 "이 구역에 여럿" 을 한 원으로 접는 장치인데,
+      동선에서는 그 여럿의 **순서**가 내용이다. 접는 순간 선은 그대로 남고 핀만 사라져
+      "선이 지나가는데 점이 없는" 지도가 된다.
+
+      하루 동선은 4~6곳이라 묶을 이유도 없다 — 묶음이 푸는 문제(밀집 구간의 겹침)는
+      수백 곳을 한 화면에 그리는 `/places` 의 것이다.
+    */
+    const ordered = pins.some((pin) => pin.order !== undefined)
+
+    const groups = clusterByGrid(positioned, ordered ? 0 : cellSizeFor(level))
     const created: KakaoCustomOverlay[] = []
 
     for (const group of groups) {
@@ -275,8 +358,12 @@ export function MapCanvas({
           핀은 이름표라 아래 끝이 그 자리를 가리킨다(`yAnchor: 1`). 묶음은 원이고
           가리킬 뾰족한 끝이 없어서 **원의 중심**을 좌표에 놓는다(`0.5`) — 1 로 두면
           원이 좌표 위쪽에 통째로 떠서, 이웃한 묶음끼리 가로로 어긋난 것처럼 읽힌다.
+
+          **고르지 않은 순번 핀도 원이라 같은 자리를 쓴다** (#743). 여기서 1 로 두면 선은
+          좌표를 잇는데 원은 그 위에 떠서, 선이 핀 아래를 스쳐 지나가는 것처럼 보인다.
+          고르면 이름표로 바뀌므로 그때는 다시 1 이다.
         */
-        yAnchor: isCluster ? 0.5 : 1,
+        yAnchor: isCluster || (first.order !== undefined && first.id !== selectedId) ? 0.5 : 1,
         /*
           선택 핀(10) > **묶음(2)** > 일반 핀(1).
 
@@ -297,6 +384,47 @@ export function MapCanvas({
 
     overlaysRef.current = created
   }, [pins, selectedId, status, level])
+
+  // ── 동선 선 ──────────────────────────────────────────────────────────────
+  /*
+    **핀 effect 와 합치지 않는다.** 둘은 갱신 주기가 다르다 — 핀은 선택·확대 단계마다
+    다시 그려지고(묶음이 풀리고 맺힌다), 선은 일자가 바뀔 때만 바뀐다. 한 effect 에 두면
+    핀을 건드리는 모든 이유가 선을 다시 그리게 되어, 도로 경로처럼 늦게 오는 좌표를
+    얹을 때(레인 B) 한 프레임씩 깜빡인다.
+
+    **선은 묶지 않는다.** `cluster` 는 핀의 겹침을 푸는 장치인데, 선은 겹쳐도 읽히고
+    묶으면 순서가 사라진다.
+  */
+  useEffect(() => {
+    const map = mapRef.current
+    const maps = mapsRef.current
+    if (map === null || maps === null || status !== 'ready') return
+
+    // 먼저 지운다 — 핀과 같은 이유다. 새로 그린 뒤 지우면 한 프레임 겹친다
+    for (const polyline of polylinesRef.current) polyline.setMap(null)
+    polylinesRef.current = []
+
+    if (route === null || route === undefined) return
+
+    const color = routeColor()
+
+    polylinesRef.current = route.map((segment) => {
+      const stroke = ROUTE_STROKE[segment.tone]
+
+      const polyline = new maps.Polyline({
+        path: segment.path.map((coord) => new maps.LatLng(coord.lat, coord.lng)),
+        strokeWeight: stroke.weight,
+        strokeColor: color,
+        strokeOpacity: stroke.opacity,
+        strokeStyle: stroke.style,
+        // 핀(1) 과 묶음(2) 아래다. 선이 핀을 덮으면 이름표가 잘려 읽히지 않는다
+        zIndex: 0,
+      })
+      polyline.setMap(map)
+
+      return polyline
+    })
+  }, [route, status])
 
   /*
     ── 선택 핀으로 부드럽게 이동 ────────────────────────────────────────────
@@ -449,6 +577,21 @@ export function MapCanvas({
 function pinElement(pin: MapPin, selected: boolean, onClick: () => void): HTMLElement {
   const button = document.createElement('button')
   button.type = 'button'
+
+  /*
+    **순번 핀은 고르기 전까지 숫자 원이다.** 고르면 이름표(`.map-pin-selected`)로 바뀐다 —
+    원 안에 이름이 들어가지 않고, 이름이 필요한 순간은 사용자가 그 핀을 지목한 때뿐이다.
+    보조기기는 두 상태 모두에서 이름을 읽는다 (`aria-label`).
+  */
+  if (pin.order !== undefined && !selected) {
+    button.className = 'map-pin-order'
+    button.textContent = String(pin.order)
+    button.setAttribute('aria-label', `${String(pin.order)}. ${pin.title}`)
+    button.setAttribute('aria-pressed', 'false')
+    button.addEventListener('click', onClick)
+    return button
+  }
+
   button.className = ['map-pin', selected && 'map-pin-selected', pin.muted && 'map-pin-muted']
     .filter(Boolean)
     .join(' ')

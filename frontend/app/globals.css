@@ -849,7 +849,8 @@ body {
 }
 
 .map-pin:focus-visible,
-.map-cluster:focus-visible {
+.map-cluster:focus-visible,
+.map-pin-order:focus-visible {
   outline: 2px solid var(--brand-500);
   outline-offset: 2px;
 }
@@ -873,7 +874,18 @@ body {
   줄인 폭을 도로 내주게 된다. 그래서 **크기와 히트를 분리했다** — 레이아웃 박스는
   32×32 그대로라 겹침 측정값이 흔들리지 않는다.
 */
-.map-cluster {
+/*
+  순번 핀 — 동선 지도의 정류점(#743). **묶음과 같은 원을 쓴다.**
+
+  둘 다 "이 자리에 무엇이 있다" 를 폭 고정 원으로 말하고, 같은 지도 위에서 크기가
+  갈리면 그 차이가 뜻으로 읽힌다. 다른 것은 **누르면 일어나는 일**뿐이라(묶음은 확대,
+  순번은 선택) 그것은 `aria-label` 과 핸들러가 가른다.
+
+  선택된 순번 핀은 이 클래스가 아니라 `.map-pin-selected` 로 바뀐다 — 이름이 붙어야
+  하고, 이름표는 원에 들어가지 않는다.
+*/
+.map-cluster,
+.map-pin-order {
   position: relative;
   display: inline-flex;
   flex-shrink: 0;
@@ -913,7 +925,8 @@ body {
   **모서리를 둥글리지 않는다** — 손가락은 네모난 영역을 더 잘 맞춘다. 원으로 깎으면
   44 를 선언하고 실제로는 그보다 작은 면적을 주게 된다.
 */
-.map-cluster::before {
+.map-cluster::before,
+.map-pin-order::before {
   position: absolute;
   inset: -7px;
   content: '';

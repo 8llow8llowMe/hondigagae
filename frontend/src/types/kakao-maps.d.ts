@@ -29,6 +29,7 @@ export type KakaoMaps = {
   Marker: new (options: KakaoMarkerOptions) => KakaoMarker
   CustomOverlay: new (options: KakaoCustomOverlayOptions) => KakaoCustomOverlay
   MarkerClusterer: new (options: KakaoClustererOptions) => KakaoClusterer
+  Polyline: new (options: KakaoPolylineOptions) => KakaoPolyline
   event: {
     addListener: (target: object, type: string, handler: (...args: never[]) => void) => void
     removeListener: (target: object, type: string, handler: (...args: never[]) => void) => void
@@ -97,6 +98,29 @@ export type KakaoCustomOverlayOptions = {
 export type KakaoCustomOverlay = {
   setMap: (map: KakaoMap | null) => void
   setZIndex: (zIndex: number) => void
+}
+
+/**
+ * 선 패턴. SDK 가 받는 값 중 **우리가 쓰는 둘만** 적는다.
+ *
+ * 모르는 문자열을 넘기면 SDK 는 오류 없이 실선으로 그린다 — 오타가 조용히 통과하므로
+ * 타입으로 막는다.
+ */
+export type KakaoStrokeStyle = 'solid' | 'shortdash'
+
+export type KakaoPolylineOptions = {
+  path: KakaoLatLng[]
+  strokeWeight?: number
+  /** **CSS 변수를 넘길 수 없다.** 선은 캔버스라 계산된 색 문자열이어야 한다 */
+  strokeColor?: string
+  strokeOpacity?: number
+  strokeStyle?: KakaoStrokeStyle
+  zIndex?: number
+}
+
+export type KakaoPolyline = {
+  setMap: (map: KakaoMap | null) => void
+  setPath: (path: KakaoLatLng[]) => void
 }
 
 export type KakaoClustererOptions = {
