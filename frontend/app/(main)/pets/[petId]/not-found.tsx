@@ -29,6 +29,13 @@ import { messages } from '@/lib/messages'
  *
  * **`h1` 은 화면의 이름(`editTitle`)이고 `sr-only` 다.** `EmptyState` 는 `h2` 만 내므로
  * 두지 않으면 문서의 최상위 제목이 `h2` 가 된다.
+ *
+ * **`export const metadata` 를 여기 두지 않는다 — 이슈 #676.** `page.tsx` 가 비동기
+ * 조회 뒤 조건부로 `notFound()` 를 던지는 세그먼트라, Next 16 은 이 파일의 `metadata` 로
+ * 되돌리지 않고 `page.tsx` 가 이미 확정해 둔(정상 화면용) 메타데이터를 그대로 쓴다
+ * (실측, `docs/architecture-guide.md` §7) — 예전엔 그래서 탭이 항상 "반려견 정보 수정"
+ * 이었다. 탭 제목은 `page.tsx` 의 `generateMetadata` 가
+ * `petEditPageTitle`(`src/lib/pet/detail-title.ts`)로 정한다.
  */
 export default function PetNotFound() {
   return (

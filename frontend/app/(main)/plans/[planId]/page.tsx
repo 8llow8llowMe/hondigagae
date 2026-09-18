@@ -1,6 +1,8 @@
+import { cache } from 'react'
 import { notFound } from 'next/navigation'
 
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
+import type { Metadata } from 'next'
 
 import { Canvas } from '@/components/surface'
 import { PlanDetailView } from '@/features/plan/plan-detail-view'
@@ -9,6 +11,7 @@ import { ApiError } from '@/lib/api/error'
 import { planDetailPath } from '@/lib/api/plan'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
+import { planDetailNotFoundTitle } from '@/lib/plan/detail-title'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import type { PlanDetail } from '@/types/plan'
 
@@ -20,11 +23,46 @@ import type { PlanDetail } from '@/types/plan'
  * 200 으로 남는다**(soft 404). `app/(main)/plans/` 에도 `loading.tsx` 가 없어 지금은
  * 그룹을 나눌 필요가 없다 — **생기면 그때 목록을 `(list)` 그룹으로 옮긴다**
  * (docs/architecture-guide.md §7, 장소 상세와 같은 골격).
- *
- * `generateMetadata` 를 두지 않는다 — 보호 화면이라 크롤러가 못 들어오고, 제목 하나를
- * 위해 백엔드를 한 번 더 부를 이유가 없다.
  */
 type Params = Promise<{ planId: string }>
+
+/**
+ * `generateMetadata` 와 페이지 렌더가 같은 요청 안에서 백엔드를 두 번 부르지 않게 한다.
+ * `serverFetch` 는 `cache: 'no-store'` 라 Next 의 fetch 중복 제거가 걸리지 않는다
+ * (`places/[placeId]/page.tsx` 와 같은 패턴).
+ */
+const loadPlanDetail = cache((planId: string, accessToken: string | undefined) =>
+  serverFetch<PlanDetail>(planDetailPath(planId), { accessToken }),
+)
+
+/**
+ * **404 탭 제목만 잡는다 — 이슈 #676.** 예전엔 `generateMetadata` 자체가 없어 404 든
+ * 정상이든 루트 레이아웃의 평문 `혼디가개` 로 떨어졌다("제목 하나를 위해 백엔드를 한 번
+ * 더 부를 이유가 없다"). 그 판단은 유지한다 — 정상·5xx·무응답까지 제목을 새로 짓는
+ * 것은 이 이슈의 범위가 아니고, `planDetailNotFoundTitle` 이 `null` 을 돌려주면
+ * `title` 필드를 아예 넣지 않아 부모 제목을 그대로 물려받는다(#676 전과 동일).
+ *
+ * **`not-found.tsx` 자신의 `metadata` 로는 못 고친다.** 이 페이지가 비동기 조회 뒤
+ * 조건부로 `notFound()` 를 던지는데, Next 16 은 그 경우 이 페이지가 이미 확정해 둔
+ * 메타데이터(여기서는 "없음")를 그대로 쓰고 형제 `not-found.tsx` 의 `metadata` 로
+ * 되돌리지 않는다 — 실측 근거는 `src/lib/plan/detail-title.ts` 머리주석과
+ * `docs/architecture-guide.md` §7.
+ *
+ * **백엔드를 한 번 더 부르지 않는다.** `loadPlanDetail` 이 `cache()` 로 감싸여 있어
+ * 페이지 렌더가 쓰는 것과 같은 호출을 재사용한다(장소 상세와 같은 패턴).
+ */
+export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
+  const { planId } = await params
+  const session = await readSession()
+
+  try {
+    await loadPlanDetail(planId, session?.accessToken)
+    return {}
+  } catch (error) {
+    const title = planDetailNotFoundTitle(error)
+    return title ? { title: `${title} · 혼디가개` } : {}
+  }
+}
 
 export default async function PlanDetailPage({ params }: { params: Params }) {
   const { planId } = await params
@@ -46,10 +84,7 @@ export default async function PlanDetailPage({ params }: { params: Params }) {
   try {
     await queryClient.fetchQuery({
       queryKey: planKeys.detail(planId),
-      queryFn: () =>
-        serverFetch<PlanDetail>(planDetailPath(planId), {
-          accessToken: session?.accessToken,
-        }),
+      queryFn: () => loadPlanDetail(planId, session?.accessToken),
       retry: false,
     })
   } catch (error) {

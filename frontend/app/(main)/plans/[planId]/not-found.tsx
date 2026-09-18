@@ -27,6 +27,12 @@ import { messages } from '@/lib/messages'
  *
  * **`h1` 이 상태 자체를 말한다.** 이 화면의 이름은 응답에서 오는 일정 제목인데 그 일정이
  * 없다. `sr-only` 인 것은 보이는 제목을 `EmptyState` 의 `h2` 가 이미 그리기 때문이다.
+ *
+ * **`export const metadata` 를 여기 두지 않는다 — 이슈 #676.** `page.tsx` 가 비동기
+ * 조회 뒤 조건부로 `notFound()` 를 던지는 세그먼트라, Next 16 은 이 파일의 `metadata` 로
+ * 되돌리지 않고 `page.tsx` 가 이미 확정해 둔 메타데이터를 그대로 쓴다(실측,
+ * `docs/architecture-guide.md` §7). 탭 제목은 `page.tsx` 의 `generateMetadata` 가
+ * `planDetailNotFoundTitle`(`src/lib/plan/detail-title.ts`)로 정한다.
  */
 export default function PlanDetailNotFound() {
   return (
