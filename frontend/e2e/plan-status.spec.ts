@@ -358,3 +358,74 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     })
   }
 })
+
+/**
+ * **일정 복사 진입점** (#617, `일정복사-세부명세.md` D7 · `일정상세-세부명세.md` D17-4).
+ *
+ * 닫힌 `Menu` 는 `null` 을 렌더한다(`menu.tsx`) — `이 일정 복사하기` 항목의 존재·부재는
+ * node 환경 정적 렌더 테스트가 볼 수 없다. 노출 조건 자체(`canCopyPlan`)는
+ * `src/lib/plan/copy.test.ts` 가 단위로 보고, 여기서는 **메뉴를 열어서** 확인한다.
+ */
+test.describe('일정 복사 진입점 (#617)', () => {
+  /** 폼을 거치지 않고 지정한 기간의 일정을 만든다 — 지난/다가오는 갈래를 고정하기 위해서다 */
+  async function createPlanAt(page: Page, startOffset: number, endOffset: number): Promise<string> {
+    return page.evaluate(
+      async ({ startOffset, endOffset }) => {
+        const petList = (await (await fetch('/api/bff/members/me/pets')).json()) as {
+          dataBody: { pets: { petId: string }[] }
+        }
+
+        const day = (offset: number) => {
+          const now = new Date()
+          const target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset)
+          const month = String(target.getMonth() + 1).padStart(2, '0')
+          const date = String(target.getDate()).padStart(2, '0')
+          return `${target.getFullYear()}-${month}-${date}`
+        }
+
+        const response = await fetch('/api/bff/plans', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            areaCode: '39',
+            title: '복사 진입점 확인용 일정',
+            startDate: day(startOffset),
+            endDate: day(endOffset),
+            petId: petList.dataBody.pets[0]?.petId,
+            items: [],
+          }),
+        })
+
+        const created = (await response.json()) as { dataBody: { planId: string } }
+        return created.dataBody.planId
+      },
+      { startOffset, endOffset },
+    )
+  }
+
+  test('지난 일정 메뉴에 이 일정 복사하기가 있고, 눌러 모달이 열린다', async ({ page }) => {
+    await page.goto('/plans')
+    const planId = await createPlanAt(page, -10, -8)
+
+    await page.goto(`/plans/${planId}`)
+
+    await page.getByRole('button', { name: '일정 관리' }).click()
+    const copyItem = page.getByRole('menuitem', { name: '이 일정 복사하기' })
+    await expect(copyItem).toBeVisible()
+
+    await copyItem.click()
+    // `role="dialog"` 다 — 입력 폼이고 되돌릴 수 없는 확인이 아니다(D6)
+    await expect(page.getByRole('dialog', { name: '일정 복사' })).toBeVisible()
+  })
+
+  test('다가오는 초안 메뉴에는 없다 — 아직 다녀오지 않은 일정이다', async ({ page }) => {
+    await page.goto('/plans')
+    const planId = await createPlanAt(page, 7, 9)
+
+    await page.goto(`/plans/${planId}`)
+
+    await page.getByRole('button', { name: '일정 관리' }).click()
+    await expect(page.getByRole('menu')).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: '이 일정 복사하기' })).toHaveCount(0)
+  })
+})
