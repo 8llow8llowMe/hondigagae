@@ -22,6 +22,12 @@ function render(item: WeatherWarningItem | null) {
   return renderToStaticMarkup(createElement(WeatherWarningBadge, { warning: item }))
 }
 
+function renderOnTint(item: WeatherWarningItem) {
+  return renderToStaticMarkup(
+    createElement(WeatherWarningBadge, { warning: item, surface: 'tint' }),
+  )
+}
+
 describe('WeatherWarningBadge', () => {
   it('특보가 없으면 아무것도 그리지 않는다 — 흔한 경우에 빈 자리를 남기지 않는다', () => {
     expect(render(null)).toBe('')
@@ -59,5 +65,39 @@ describe('WeatherWarningBadge', () => {
     }
 
     expect(render(other)).toContain('기타 특보')
+  })
+})
+
+/**
+ * 같은 톤의 tint 면 위에 설 때 (#709).
+ *
+ * 홈 특보 스트립이 `-100` 면을 깔면서, 배지가 **자기와 같은 색** 위에 서게 됐다 —
+ * 대비 1.00:1 이라 배지가 사라지고 글자만 남는다. 면과 채움을 맞바꾼다.
+ */
+describe('WeatherWarningBadge — tint 면 위 (#709)', () => {
+  it('채움을 --bg 로 두고 테두리로 톤을 말한다', () => {
+    const markup = renderOnTint(warning('ADVISORY'))
+
+    expect(markup).toContain('bg-bg')
+    expect(markup).toContain('border-metric-mid-500')
+    // 면과 같은 채움을 쓰면 묻힌다
+    expect(markup).not.toContain('bg-metric-mid-100')
+  })
+
+  it('경보도 같은 방식으로 뒤집힌다', () => {
+    const markup = renderOnTint(warning('WARNING'))
+
+    expect(markup).toContain('border-metric-critical-500')
+    expect(markup).not.toContain('bg-metric-critical-100')
+  })
+
+  /* 글자는 어느 면에서나 `-700` 이다 — 뒤집기가 대비를 깎지 않는다 (contrast.test.ts) */
+  it('글자 색은 -700 그대로다', () => {
+    expect(renderOnTint(warning('ADVISORY'))).toContain('text-metric-mid-700')
+  })
+
+  /* 기본은 그대로다 — 다른 호출부 7곳이 이 갈래를 쓴다 */
+  it('surface 를 주지 않으면 기존 tint 채움이다', () => {
+    expect(render(warning('ADVISORY'))).toContain('bg-metric-mid-100')
   })
 })

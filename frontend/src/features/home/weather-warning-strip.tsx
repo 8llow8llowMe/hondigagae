@@ -1,6 +1,9 @@
+import { METRIC_TINT_EDGE_TONE, METRIC_TINT_TONE } from '@/components/metric'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
+import { weatherWarningTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { WeatherWarningItem } from '@/types/insight'
 
 /**
@@ -36,22 +39,56 @@ import type { WeatherWarningItem } from '@/types/insight'
  *
  * **`role="alert"` 를 주지 않는다.** 페이지 로드 시점에 이미 있는 내용이라 라이브 리전이
  * 아니고, alert 로 두면 스크린리더가 읽던 것을 끊는다.
+ *
+ * ---
+ *
+ * **면을 등급 tint 로 깐다** (#709). 채움이 없던 동안 특보는 아래 본문 카드와 **같은 무게**로
+ * 섰고, 1px 선 하나로는 "이건 다른 층위의 사실" 이라고 말하지 못했다. tint 는 이 시스템에서
+ * 가장 조용한 강조라 §1 의 "데이터 신뢰형 톤" 을 깨지 않는다.
+ *
+ * **면 하나로는 부족해서 셋이 함께 간다** — 아래 셋 중 하나를 빼면 나머지가 무너진다.
+ *
+ * | 무엇                       | 없으면                                                     |
+ * | -------------------------- | ---------------------------------------------------------- |
+ * | tint 면                    | 강조가 없다 (원래 상태)                                    |
+ * | `-500` 하단선              | 바닥(`--bg-sunken`)과 1.01:1 — **밝기로는 면이 안 보인다** |
+ * | 배지 `surface="tint"`      | 면과 배지가 같은 색 1.00:1 — **배지가 사라진다**           |
+ *
+ * 근거 수치는 `METRIC_TINT_EDGE_TONE` · `BADGE_TONE_ON_TINT` 주석이 갖는다.
+ *
+ * **주의보와 경보를 가르는 것은 끝까지 글자다.** 두 tint 는 1.05:1, 두 하단선은 1.18:1 이라
+ * 밝기로 못 가른다 — 단계는 배지의 서버 `level.name` 이 계속 말한다. **면을 깔았다고 색이 새
+ * 정보를 지게 되지는 않는다**(DESIGN.md §2-3 "색만으로 가르지 않는다").
+ *
+ * **세로 강조 바를 대신 쓰지 않는다** — §10 이 "배지·판정 옆의 장식성 세로 바" 를 막는다.
  */
 export function WeatherWarningStrip({ warning }: { warning: WeatherWarningItem | null }) {
   // 특보가 없는 날이 압도적으로 흔하다 — 그때 빈 줄을 남기지 않는다
   if (warning === null) return null
+
+  /*
+    **톤을 여기서 한 번만 고른다.** 면 · 하단선 · 배지가 같은 값을 써야 한다 — 셋이 갈리면
+    "노란 면 위 빨간 배지" 같은 것이 나온다. 매핑은 `lib/insight/tone.ts` 가 소유한다.
+  */
+  const tone = weatherWarningTone(warning.level.code)
 
   return (
     /*
       **바는 전폭, 안쪽만 캡이다** (#376) — `GlobalHeader` 와 같은 구조다.
       `border-b` 는 페이지를 가로지르는 경계라 캡하면 헤더 구분선보다 짧아져 어긋난다.
       안쪽 줄은 `.content-container` 로 본문(`.rail-layout`)과 같은 세로선에 선다.
+
+      **면도 전폭이다.** 안쪽 줄에 칠하면 1920 에서 tint 가 1440 에서 끊기고 그 바깥이 회색
+      바닥으로 남아, 전폭으로 이어지는 `border-b` 와 길이가 어긋난다.
     */
-    <section aria-label={messages.home.warningStripLabel} className="border-border border-b">
+    <section
+      aria-label={messages.home.warningStripLabel}
+      className={cn('border-b', METRIC_TINT_TONE[tone], METRIC_TINT_EDGE_TONE[tone])}
+    >
       <div
         className={`content-container flex flex-wrap items-center gap-x-2 gap-y-1 py-3 ${INSET_CLASS.main}`}
       >
-        <WeatherWarningBadge warning={warning} />
+        <WeatherWarningBadge warning={warning} surface="tint" />
         {warning.level.description !== null && (
           <p className="text-body-2 text-fg break-keep">{warning.level.description}</p>
         )}

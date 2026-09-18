@@ -227,3 +227,76 @@ describe('토큰 대비 — 소개 페이지 표면 (DESIGN.md §0-2, #635)', ()
     expect(contrastRatio(token('--fg-inverse'), token('--brand-700'))).toBeGreaterThanOrEqual(4.5)
   })
 })
+
+/**
+ * 넓게 깔린 tint 면의 경계선 (#709 — `METRIC_TINT_EDGE_TONE`).
+ *
+ * **tint 는 밝기로 바닥과 갈리지 않는다.** 홈 특보 스트립은 `Canvas` 안이라 `--bg-sunken`
+ * 위에 서는데 그 대비가 1.01~1.06:1 이다 — **색상(hue)만 다르다.** 그래서 면과 함께 `-500`
+ * 실선을 두고, **그 선이 명도 채널을 혼자 담당한다.**
+ *
+ * 선은 글자가 아니므로 **비텍스트 3:1** 로 잰다. 두 배경(자기 tint · 바닥) 모두에서 넘어야
+ * 한다 — 선은 두 면의 경계에 놓여 양쪽과 동시에 맞닿는다.
+ */
+describe('토큰 대비 — tint 면의 -500 경계선 (비텍스트 3:1, #709)', () => {
+  const SUNKEN = '--bg-sunken'
+  const tones: [string, string][] = [
+    ['critical', 'CRITICAL'],
+    ['high', 'HIGH'],
+    ['mid', 'MID'],
+    ['low', 'LOW'],
+  ]
+
+  it.each(tones)('-500 선이 자기 tint(%s) 위에서 3:1 이상이다', (tone) => {
+    expect(
+      contrastRatio(token(`--metric-${tone}-500`), token(`--metric-${tone}-100`)),
+    ).toBeGreaterThanOrEqual(3)
+  })
+
+  it.each(tones)('-500 선이 바닥(--bg-sunken) 위에서도 3:1 이상이다 (%s)', (tone) => {
+    expect(contrastRatio(token(`--metric-${tone}-500`), token(SUNKEN))).toBeGreaterThanOrEqual(3)
+  })
+
+  /*
+    **이 단언은 "실패해야 좋은" 값을 잠근다.** tint 가 바닥과 밝기로 갈린다면 `-500` 선을
+    둘 이유가 절반 사라지므로, 값이 바뀌면 그 판단을 다시 하라고 여기서 멈춘다.
+  */
+  it.each([
+    // `contrastRatio` 는 소수 2자리에서 **버린다** — 1.00 은 "1.00 미만이 아니라 딱 1.00대"
+    ['--metric-mid-100', 1],
+    ['--metric-critical-100', 1.05],
+  ])('%s 은 바닥과 밝기로 갈리지 않는다 — 색상만 다르다', (name, expected) => {
+    const ratio = contrastRatio(token(name), token(SUNKEN))
+
+    expect(ratio).toBeLessThan(1.1)
+    expect(ratio).toBe(expected)
+  })
+
+  /*
+    **단계 구분은 색이 못 한다.** 주의보/경보 두 tint 도, 두 선도 밝기로는 갈리지 않는다 —
+    그 일은 배지의 서버 `level.name` 이 글자로 한다 (DESIGN.md §2-3).
+  */
+  it('주의보 tint 와 경보 tint 는 서로 밝기로 갈리지 않는다', () => {
+    expect(contrastRatio(token('--metric-mid-100'), token('--metric-critical-100'))).toBeLessThan(
+      1.1,
+    )
+  })
+})
+
+/**
+ * 같은 톤 tint 면 위에 선 배지 (#709 — `BADGE_TONE_ON_TINT`).
+ *
+ * 뒤집기가 **대비를 깎지 않는다**는 것을 잠근다: 흰 면 위 `-700` 글자가 tint 위 `-700`
+ * 보다 높고, `-500` 테두리는 비텍스트 3:1 을 넘는다.
+ */
+describe('토큰 대비 — tint 면 위에서 뒤집은 배지 (#709)', () => {
+  const tones = ['critical', 'high', 'mid', 'low']
+
+  it.each(tones)('%s: 흰 배지 면 위 -700 글자가 tint 위보다 대비가 높다', (tone) => {
+    const onWhite = contrastRatio(token(`--metric-${tone}-700`), WHITE)
+    const onTint = contrastRatio(token(`--metric-${tone}-700`), token(`--metric-${tone}-100`))
+
+    expect(onWhite).toBeGreaterThanOrEqual(4.5)
+    expect(onWhite).toBeGreaterThan(onTint)
+  })
+})
