@@ -710,6 +710,35 @@ export const planMessages = {
   /** 토스트의 되돌아보기 링크 */
   addToPlanToastAction: '일정 보기',
 
+  // ── 코스 상세에서 일정에 담기 (#620) ───────────────────────────────────
+  // 아트보드는 없다 — `PlaceAddToPlanSheet` 와 같은 시트 모양을 쓴다
+  // (`올레담기-세부명세.md` D0-1). 위의 장소 담기 문구를 최대한 재사용하고, 다른
+  // 부분(1단계 제목·성공 토스트)만 여기 따로 둔다.
+
+  /** 1단계 제목. `addToPlanSheetTitle`("어디에 담을까요?")과 다른 문장이다 (D5) */
+  walkAddToPlanSheetTitle: '어느 일정에 담을까요?',
+  /** `{courseLabel}` · `{name}` · `{distanceKm}` 치환. 시트 머리의 담기 대상 요약 줄 (D1) */
+  walkAddSummaryLine: '{courseLabel} {name} · {distanceKm}',
+  /**
+   * `{course}`(조사 포함) · `{planTitle}` · `{day}` 치환. **일정 제목까지 말한다** —
+   * 장소 담기 토스트(`addPlaceToast`)와 달리 코스 이름표만으로는 어느 일정에 담겼는지
+   * 알 수 없다.
+   */
+  walkAddToast: '{course} {planTitle} {day}일차에 담았어요.',
+  /**
+   * 5xx·무응답. **`addPlaceErrorDescription` 을 재사용하지 않는다** — 분류는
+   * `toPlanDaySaveError` 가 공유하고 문구만 화면이 준다 (D5).
+   */
+  walkAddErrorDescription: '코스를 담지 못했어요. 편집한 내용은 그대로 있어요. 다시 시도해 주세요.',
+  /**
+   * `PLAN_004`. **`addPlaceMissingPlaceError` 를 재사용하지 않는다** — 여기서 담는 것은
+   * 코스인데 실패 원인은 그 일자에 이미 있던 **장소**다. 담기 화면에는 뺄 목록이 없으므로
+   * "일정에서 빼 주세요" 로 할 수 있는 일을 가리킨다. 코스 때문에 나는 실패가 아니다
+   * (서버가 `WALK` `targetId` 를 검증하지 않는다 — D3-3).
+   */
+  walkAddMissingPlaceError:
+    '이 일자에 더 이상 조회되지 않는 장소가 있어 함께 저장할 수 없어요. 일정에서 그 장소를 빼 주세요.',
+
   // ── 항목 방문 체크 (#124) ──────────────────────────────────────────────
 
   /**

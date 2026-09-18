@@ -15,6 +15,7 @@ import { placeMetaLine } from '@/lib/place/meta'
 import { isPlaceTarget, type PlanItemRowModel } from '@/lib/plan/detail'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import { formatStartTime } from '@/lib/plan/start-time'
+import { walkCourseMetaLine } from '@/lib/plan/walk-course-meta'
 import { itemWalkSafetyView } from '@/lib/plan/walk-safety'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -52,6 +53,11 @@ export type PlanItemVisit = {
  * #86 이 항목 요약에도 실어 준다 (#112). **`null` 이면 낱말이 빠진다** — 여기에는 실내
  * 필터가 없어 "실내 여부 미확인" 배지를 둘 자리가 없다. 배지 없이 단정만 피한다
  * (`lib/place/indoor.ts`).
+ *
+ * **`WALK` 항목은 다른 메타 줄을 쓴다** (#620 · 일정상세-세부명세 D12-4). `item.place` 가
+ * 항상 `null` 이라 `walkCourseMetaLine(item.walkCourse)` 가 대신 `{구간명} · {거리}km ·
+ * {소요시간}` 을 만든다. **요약이 오지 않아도(`walkCourse: null`) 오류로 말하지 않는다**
+ * — 줄 자체가 없을 뿐 행은 제목으로 살아남는다 (D12-4-1).
  *
  * **`startTime` 을 제목 위 캡션 한 줄로 표시한다** (#623 · 명세 D14).
  *
@@ -96,9 +102,12 @@ export function PlanItemRow({
   walkSafety?: PlanItemWalkSafetyItem | undefined
 }) {
   const { item } = model
-  const { place } = item
-  const thumbnail = imageSrc(place?.firstImage ?? null)
-  const meta = placeMetaLine(place?.addr1 ?? null, place?.indoor ?? null)
+  const { place, walkCourse } = item
+  // WALK 항목은 place 가 항상 null 이고 PLACE 항목은 walkCourse 가 항상 null 이다 —
+  // 둘 중 온 쪽만 자리를 채운다 (`일정상세-세부명세.md` D12-1)
+  const thumbnail = imageSrc(place?.firstImage ?? walkCourse?.firstImage ?? null)
+  const meta =
+    placeMetaLine(place?.addr1 ?? null, place?.indoor ?? null) ?? walkCourseMetaLine(walkCourse)
   // 형식이 어긋나면 null 이다 — 에러도 배지도 내지 않고 줄 자체를 그리지 않는다 (D14-3)
   const startTime = formatStartTime(item.startTime)
   // walkSafety 가 없으면 view 도 없다 — 시각 줄에 배지·문장 자리를 만들지 않는다

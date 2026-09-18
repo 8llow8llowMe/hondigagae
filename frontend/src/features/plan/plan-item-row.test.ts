@@ -6,7 +6,13 @@ import { describe, expect, it } from 'vitest'
 import { PlanItemRow, type PlanItemVisit } from '@/features/plan/plan-item-row'
 import { messages } from '@/lib/messages'
 import type { PlanItemRowModel } from '@/lib/plan/detail'
-import { planDetail, planItemPlace, planItemWalkSafety } from '@/test/fixtures/plan'
+import {
+  planDetail,
+  planItem,
+  planItemPlace,
+  planItemWalkCourse,
+  planItemWalkSafety,
+} from '@/test/fixtures/plan'
 import type { PlanItemPlace, PlanItemWalkSafetyItem } from '@/types/plan'
 
 /**
@@ -407,5 +413,97 @@ describe('PlanItemRow — 항목 산책 위험도 (#625)', () => {
     expect(markup).toContain('10:30')
     expect(markup).not.toContain(messages.common.metricAxisWalkSafety)
     expect(markup).not.toContain(messages.plan.walkSafetyFeelsLikeLabel)
+  })
+})
+
+/**
+ * `WALK` 항목 행 — 산책 코스 요약 (#620 · 일정상세-세부명세 D12).
+ */
+describe('PlanItemRow — WALK 항목 (#620)', () => {
+  function renderWalk(walkCourse: ReturnType<typeof planItemWalkCourse> | null) {
+    const item = planItem({
+      planItemId: 'w-1',
+      day: 1,
+      sequence: 0,
+      title: '1코스 시흥-광치기',
+      itemType: { code: 'WALK', name: '산책', description: null },
+      targetId: '6911167100216303301',
+      place: null,
+      walkCourse,
+    })
+
+    const model: PlanItemRowModel = { item, distanceMeters: null, distanceKind: null }
+
+    return renderToStaticMarkup(createElement(PlanItemRow, { model }))
+  }
+
+  /*
+    회귀 — WALK 의 targetId 는 walk_course.id 라 /places/{id} 로 보내면 남의 id 로 404 를
+    만든다 (`plan-item-row.tsx` 의 `isPlaceTarget` 판정, D12-3).
+  */
+  it('장소 링크를 만들지 않는다 — /places/ 가 없다', () => {
+    const markup = renderWalk(planItemWalkCourse())
+
+    expect(markup).not.toContain('/places/')
+  })
+
+  /** 이번 범위에서는 코스 화면으로 나가는 링크도 만들지 않는다 (D12-6 12-1) */
+  it('코스 상세 링크도 만들지 않는다 — /walk-courses/ 가 없다', () => {
+    expect(renderWalk(planItemWalkCourse())).not.toContain('/walk-courses/')
+  })
+
+  it('링크(<a) 가 아니라 div 갈래를 탄다', () => {
+    expect(renderWalk(planItemWalkCourse())).not.toContain('<a')
+  })
+
+  it('유형 배지에 서버 itemType.name 을 그대로 쓴다', () => {
+    expect(renderWalk(planItemWalkCourse())).toContain('산책')
+  })
+
+  it('요약이 있으면 구간명 · 거리 · 소요시간이 있다', () => {
+    const markup = renderWalk(planItemWalkCourse())
+
+    expect(markup).toContain('15.1km')
+    expect(markup).toContain('4~5시간')
+  })
+
+  /** 요약이 없어도 오류로 말하지 않는다 — 저장을 막지 않아 사용자가 할 수 있는 일이 없다 (D12-4-1) */
+  it('요약이 없으면 메타 줄이 없고 오류 문구도 없다', () => {
+    const markup = renderWalk(null)
+
+    expect(markup).toContain('1코스 시흥-광치기')
+    expect(markup).not.toContain('조회되지')
+  })
+
+  it('요약이 있고 firstImage 가 있으면 img 가 있다', () => {
+    // 허용 호스트만 next/image 에 넘어간다 (`lib/image/remote-host.ts`) — 실제 코스
+    // fixture(`walk-course-data.ts`)와 같은 호스트를 쓴다
+    const withImage = planItemWalkCourse({
+      firstImage: 'http://tong.visitkorea.or.kr/cms/resource/60/2666460_image2_1.jpg',
+    })
+
+    expect(renderWalk(withImage)).toContain('<img')
+  })
+
+  it('firstImage 가 null 이면 img 가 없다', () => {
+    expect(renderWalk(planItemWalkCourse({ firstImage: null }))).not.toContain('<img')
+  })
+
+  /** 코스를 걷는 길이와 직전 항목까지의 직선거리는 다른 값이다 (D12-5) */
+  it('거리 문구(직선)가 없다 — 코스 좌표로 거리를 재지 않는다', () => {
+    expect(renderWalk(planItemWalkCourse())).not.toContain('직선')
+  })
+
+  /** 같은 행에 PLACE 항목을 넣어도 기존 동작이 그대로다 (회귀) */
+  it('PLACE 항목은 기존 동작 그대로다', () => {
+    const model: PlanItemRowModel = {
+      item: planDetail.items[0]!,
+      distanceMeters: null,
+      distanceKind: null,
+    }
+    const markup = renderToStaticMarkup(createElement(PlanItemRow, { model }))
+
+    expect(markup).toContain(planDetail.items[0]!.title)
+    expect(markup).toContain(`/places/${planDetail.items[0]!.targetId}`)
   })
 })

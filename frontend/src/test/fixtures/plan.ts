@@ -11,6 +11,7 @@ import type {
   PlanDetail,
   PlanItemDetail,
   PlanItemPlace,
+  PlanItemWalkCourse,
   PlanItemWalkSafetyItem,
 } from '@/types/plan'
 
@@ -42,9 +43,34 @@ export function planItemPlace(overrides: Partial<PlanItemPlace> = {}): PlanItemP
 }
 
 /**
+ * 항목의 산책 코스 요약 (#620). `planItem` 의 기본값은 `null` 이다 — 기본 fixture 가
+ * `PLACE` 항목이라 `walkCourse` 는 항상 비어 있는 것이 맞다. `WALK` 항목을 만들 때
+ * `planItem({ ..., itemType: ..., walkCourse: planItemWalkCourse() })` 로 채운다.
+ */
+export function planItemWalkCourse(
+  overrides: Partial<PlanItemWalkCourse> = {},
+): PlanItemWalkCourse {
+  return {
+    name: '시흥-광치기',
+    courseLabel: '1코스',
+    distanceKm: 15.1,
+    durationText: '4~5시간',
+    durationMaxMinutes: 300,
+    lat: null,
+    lng: null,
+    firstImage: null,
+    fitsActivityLevels: [],
+    ...overrides,
+  }
+}
+
+/**
  * **`place` 의 기본값은 요약이 온 상태다.** 오지 않은 상태(`null`)를 검증하려면
  * `planItem({ ..., place: null })` 로 덮어쓴다 — `WALK`·`MOVE`, delisting,
  * tour-service 장애가 전부 그 모양이다.
+ *
+ * **`walkCourse` 의 기본값은 `null` 이다** — 기본 `itemType` 이 `PLACE` 라 코스 요약이
+ * 있을 자리가 아니다. `WALK` 항목을 만들 때 `planItemWalkCourse()` 로 채운다.
  */
 export function planItem(
   overrides: Partial<PlanItemDetail> & { planItemId: string; day: number; sequence: number },
@@ -61,6 +87,7 @@ export function planItem(
      */
     visited: false,
     place: planItemPlace(),
+    walkCourse: null,
     ...overrides,
   }
 }

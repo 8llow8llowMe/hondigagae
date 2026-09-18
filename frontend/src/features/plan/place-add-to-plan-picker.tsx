@@ -16,6 +16,14 @@ export type AddToPlanDayOption = {
   itemCount: number
   /** 이 장소가 그 일자에 이미 담겨 있다 */
   already: boolean
+  /**
+   * 그 옵션을 고를 수 없다 (#620). **`already` 와 다른 축이다** — `PLACE` 담기(#82)는
+   * 같은 곳을 다른 날 또 들르는 일정이 있어 `already` 만 표시하고 잠그지 않는다. `WALK`
+   * 담기는 같은 코스를 같은 일자에 두 번 담는 것을 막는다(`올레담기-세부명세.md` D3-2) —
+   * 그 호출부만 이 값을 켠다. **이 컴포넌트는 대상 종류를 몰라도 된다** — 호출부가
+   * 이미 계산해 넘긴 값을 그대로 그릴 뿐이다. 생략하면(undefined) 잠기지 않는다.
+   */
+  disabled?: boolean
 }
 
 /**
@@ -119,9 +127,13 @@ export function PlaceAddToPlanPicker({
 /**
  * 일자 버튼. **그날 항목 수를 함께 쓴다** — 몰림을 알리기 위해서다 (아트보드 02-A 주석).
  *
- * 이미 담긴 일자는 **잠그지 않고 표시만 한다.** 같은 장소를 다른 날에 또 들르는 일정이
- * 실제로 있고, 잠그면 그 계획을 세울 방법이 없다. 중복 방지는 같은 일자에 대해서만
- * 필요한데 그것은 담기 버튼이 막는다.
+ * **장소 담기(#82)는 이미 담긴 일자를 잠그지 않고 표시만 한다.** 같은 장소를 다른 날에
+ * 또 들르는 일정이 실제로 있고, 잠그면 그 계획을 세울 방법이 없다 — 그래서 이 호출부는
+ * `disabled` 를 주지 않는다.
+ *
+ * **`disabled` 는 호출부가 켠다** (#620). 산책 코스 담기는 같은 코스를 같은 일자에 두 번
+ * 담는 것을 막으므로(`올레담기-세부명세.md` D3-2) `already` 인 옵션에 `disabled: true` 도
+ * 함께 넘긴다 — 이 컴포넌트는 그 차이를 만드는 것이 장소인지 코스인지 모른다.
  */
 function DayButton({
   option,
@@ -143,9 +155,13 @@ function DayButton({
     <button
       type="button"
       onClick={onSelect}
+      disabled={option.disabled}
       aria-pressed={selected}
       className={cn(
         'focus-visible:ring-brand-500 flex min-w-24 flex-col items-start gap-1 rounded-md border px-3 py-2 focus-visible:ring-2 focus-visible:outline-none',
+        // `option.disabled` 가 없는 호출부(PLACE 담기)의 마크업에는 이 클래스도 안 남는다 —
+        // `place-add-to-plan-picker.test.ts` 의 "잠그지 않는다" 회귀가 문자열로 이것까지 본다
+        option.disabled === true && 'disabled:cursor-not-allowed disabled:opacity-60',
         selected ? 'border-brand-700 bg-band' : 'border-border',
       )}
     >
