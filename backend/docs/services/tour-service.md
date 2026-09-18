@@ -34,8 +34,36 @@
   (LOW 4시간·MEDIUM 6시간 이하 — `WalkCourseActivityFit` 이 상한의 단일 출처), 거리 필터·정렬.
   **좌표가 있는 코스는 `/api/v1/insights/walk-times?lat=&lng=` 로 이어진다** — 골든타임을 코스
   시작점에서 그대로 재사용하므로 "오늘 이 코스 언제 걷기 좋은가"에 신규 API 없이 답한다.
-  좌표가 null 인 코스(20·18-2)는 그 동선을 만들지 않는다
-- `GET /api/v1/walk-courses/{walkCourseId}` — 산책 코스 상세
+  좌표가 null 인 코스(20·18-2)는 그 동선을 만들지 않는다.
+  **경로 좌표열(폴리라인)은 내리지 않는다 — 원천에 없다.** CSV 헤더는 여섯이고 좌표 컬럼이 없으며,
+  TourAPI `searchKeyword2` 는 시작점 한 쌍만 준다. 경로를 주는 두루누비는 위 §데이터대로 제주가
+  0개다. 그래서 상세에 지도를 세우지 못한다 — 새 원천 확보가 선행이고 그 조사는
+  [#736](https://github.com/8llow8llowMe/hondigagae/issues/736) 에 있다.
+  **적용된 활동량과 그 상한은 `appliedPetActivityLevel` 로 응답이 실어 내린다** (#718) —
+  `{ level: {code,name,description}, maxDurationMinutes }` 다. 상한의 정본은 `WalkCourseActivityFit`
+  하나(`maxMinutesOf`)라 화면이 4시간·6시간을 제 상수로 적으면 서버가 상한을 바꿔도 화면만 옛 숫자를 말한다.
+  세 가지 null 을 구분한다 — 객체 자체가 null 이면 **활동량으로 거르지 않았다**,
+  객체는 있고 `maxDurationMinutes` 만 null 이면 **HIGH(상한 없음)** 다.
+  **`petActivityLevelApplied: boolean` 은 deprecated 로 남겨 뒀다.** 객체의 null 여부와 같은 사실을
+  말하지만, 화면이 그 값으로 "기준" 줄을 그리고 있어 지금 빼면 줄이 조용히 사라진다. 프론트 CI 는
+  `frontend/**` 경로에서만 돌고 목 테스트는 제 목을 검증하므로 **백엔드 PR 이 초록인 채로 화면만
+  한 줄을 잃는다.** 그래서 새 필드를 먼저 얹고, 화면이 옮겨간 뒤 별도 PR 로 지운다. Presenter 가
+  새 객체에서 유도해 채우므로 공존하는 동안 둘이 어긋날 수 없다.
+  **프론트 목(`frontend/src/lib/api/mock/walk-course-data.ts`)은 `appliedPetActivityLevel` 과
+  `durationMaxMinutes` 를 아직 내지 않는다** — 목이 `durationMaxMinutes` 를 일부러 떨어뜨리고
+  목 테스트가 그 부재를 계약으로 고정하고 있어, 목으로 개발하는 화면은 새 필드를 볼 수 없다.
+  [#735](https://github.com/8llow8llowMe/hondigagae/issues/735) 에서 목까지 함께 옮겨야 이 변경의
+  목적(화면이 4시간·6시간을 제 상수로 적지 않게 한다)이 실제로 달성되고, 그때 deprecated 불리언을 지운다.
+  `level.description` 은 **반려견 성향** 문구(`ActivityLevel` 의 설명)이며 소요시간 상한이 아니다 —
+  내부 API(`/internal/v1/walk-courses/candidates`)가 plan-service 로 내려보내는 값과 같아야 해서,
+  여기에 "4시간 이하" 를 섞지 않고 상한을 별도 숫자 필드로 낸다
+- `GET /api/v1/walk-courses/{walkCourseId}` — 산책 코스 상세.
+  목록 항목과 상세 모두 `durationMaxMinutes`(소요시간 상한, 분)를 싣는다 — **null 은 "제한 없음"이
+  아니라 원문(`durationText`)을 파싱하지 못했다는 뜻이다.** 내부 API·plan-service 의 같은 필드와
+  같은 축의 설명이라 화면은 파싱 실패 시 원문을 보여 준다.
+  상세에는 `fitsActivityLevels`(이 코스를 걸을 만한 활동량의 `{code,name,description}` 목록)를 더한다.
+  plan-service 의 `PlanItemWalkCourseItem.fitsActivityLevels` 와 같은 모양이라 화면이 렌더를 재사용한다.
+  **목록 항목에는 싣지 않는다** — 목록은 이미 활동량으로 걸러 내려가므로 항목마다 반복하면 응답만 부푼다
 - `GET /api/v1/places/nearby?lat=&lng=&radius=&contentType=&petSizeType=&petWeightKg=&keyword=` — 좌표 반경 장소 검색. keyword 는 목록과 같은 이름·주소 부분 일치
 - `GET /api/v1/emergencies/facilities?lat=&lng=&radius=&type=&open24Only=&openNowOnly=&size=` — 긴급 시설 반경 검색.
   `size` 상한은 **250** 이다 — 제주 전역 시설이 213곳이라 반경을 최대로 넓혀도 잘리지 않는다.

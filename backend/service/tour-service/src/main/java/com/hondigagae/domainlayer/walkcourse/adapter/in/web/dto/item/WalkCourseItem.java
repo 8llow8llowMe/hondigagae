@@ -30,6 +30,12 @@ public record WalkCourseItem(
     @Schema(description = "소요시간 원문", example = "4~5시간")
     String durationText,
 
+    @Schema(
+        description = "소요시간 상한(분). **null 은 제한 없음이 아니라 원문을 파싱하지 못했다는 뜻이다** — "
+            + "화면은 durationText 원문을 보여 준다",
+        example = "300", nullable = true)
+    Integer durationMaxMinutes,
+
     @Schema(description = "시종점 원문", example = "시흥리정류장-광치기해변")
     String startEndPoint,
 
