@@ -11,7 +11,16 @@ import { takeReturnTo } from '@/lib/auth/oauth-return-to'
 
 export type OAuthExchangeState =
   /** 진입 자체가 잘못됐다 — 교환을 시도하지 않는다 */
-  { status: 'invalid' } | { status: 'exchanging' } | { status: 'failed'; error: unknown }
+  | { status: 'invalid' }
+  | { status: 'exchanging' }
+  /**
+   * `returnTo` 는 **실패 화면이 이어 갈 목적지**다. 성공 경로만 복귀 경로를 소비하면,
+   * 동의 누락으로 회원가입 화면에 보내진 사용자가 가입을 마쳤을 때 원래 가려던 곳을
+   * 잃는다 (`/login?returnTo=/plans` → 카카오 → 신규 → `/signup` → 가입 → `/`).
+   * 여기서 꺼내 실패 상태에 실어 두면 화면이 sessionStorage 를 읽지 않아도 된다 —
+   * 렌더 중에 읽으면 부수효과이자 하이드레이션 불일치가 된다.
+   */
+  | { status: 'failed'; error: unknown; returnTo: string }
 
 export type UseOAuthExchangeOptions = {
   /** 경로 세그먼트. 사용자가 손으로 바꿀 수 있어 목록과 대조한다 */
@@ -72,7 +81,12 @@ export function useOAuthExchange({
         router.replace(takeReturnTo())
       })
       .catch((error: unknown) => {
-        setResult({ status: 'failed', error })
+        /*
+          실패해도 복귀 경로를 **소비한다.** 이 왕복은 성공이든 실패든 여기서 끝나므로
+          남겨 두면 다음 로그인이 엉뚱한 곳으로 간다 (`takeReturnTo` 의 "왕복 1회용").
+          값은 실패 화면이 이어 가라고 상태에 실어 보낸다.
+        */
+        setResult({ status: 'failed', error, returnTo: takeReturnTo() })
       })
     // 마운트 1회만 실행한다. provider/code/state 는 라우트 파라미터라 이 화면 수명 동안
     // 바뀌지 않고, 의존성에 넣으면 재실행 경로만 열린다

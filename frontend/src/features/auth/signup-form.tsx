@@ -320,23 +320,39 @@ export function SignupForm({ returnTo, consent, onConsentChange }: SignupFormPro
   )
 
   /**
-   * 3단계 제출. **동의를 먼저 본다.**
+   * 3단계 제출. **동의와 프로필을 한 번에 본다.**
    *
    * `profileForm` 값에 동의가 없으므로(`signupConsentSchema` 의 JSDoc) `useForm` 의
    * 검증이 대신해 주지 못한다. 서버에 보내고 400 을 받아 표시해도 결과는 같지만,
    * 켜지 않은 체크박스를 확인하려고 왕복할 이유가 없다 — 클라이언트 검증은 백엔드
    * 제약의 복제본이라는 규칙 그대로다 (form-guide.md §5).
+   *
+   * **동의가 막혔어도 프로필 검증을 함께 돌린다.** 여기서 바로 돌아가 버리면
+   * 비밀번호·이름·닉네임 오류가 그 제출에서는 안 보이고, 체크박스를 켠 뒤 다시 눌러야
+   * 그제서야 나온다. 백엔드는 같은 요청에서 둘 다 돌려주므로 **클라이언트가 서버보다
+   * 정보를 적게 주면 안 된다** — 복제본이라는 규칙이 개수에도 걸린다.
+   *
+   * 포커스는 합친 오류로 한 번만 옮긴다. `errorFieldSelector` 가 문서 순서상 첫 매칭을
+   * 집으므로, 합쳐 넘기는 것만으로 "화면에서 첫 번째로 보이는 오류" 가 된다.
    */
   const handleProfileSubmit = useCallback(() => {
-    const result = validate(signupConsentSchema, consent)
-    if (!result.ok) {
-      setConsentErrors(result.errors)
-      focusFirstError(containerRef.current, result.errors)
+    const consentResult = validate(signupConsentSchema, consent)
+    if (consentResult.ok) {
+      setConsentErrors(NO_FORM_ERRORS)
+      void profileForm.submit()
       return
     }
-    setConsentErrors(NO_FORM_ERRORS)
-    void profileForm.submit()
-  }, [consent, profileForm.submit])
+
+    const profileResult = validate(signupProfileSchema, profileForm.values)
+    const profileErrors = profileResult.ok ? NO_FORM_ERRORS : profileResult.errors
+
+    setConsentErrors(consentResult.errors)
+    profileForm.setErrors(profileErrors)
+    focusFirstError(containerRef.current, {
+      fields: { ...profileErrors.fields, ...consentResult.errors.fields },
+      form: consentResult.errors.form,
+    })
+  }, [consent, profileForm.submit, profileForm.setErrors, profileForm.values])
 
   const emailStepErrors: FormErrors =
     stepBackMessage !== null

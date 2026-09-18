@@ -35,6 +35,7 @@ describe('OAuthCallbackStatus', () => {
   it('AUTH_008 은 서버 문구를 그대로 낸다 — 어느 소셜인지 서버가 말한다', () => {
     const markup = render('naver', {
       status: 'failed',
+      returnTo: '/',
       error: domainError(
         409,
         'AUTH_008',
@@ -51,6 +52,7 @@ describe('OAuthCallbackStatus', () => {
   it('동의가 필요하면 제공자 이름이 든 버튼을 준다', () => {
     const markup = render('kakao', {
       status: 'failed',
+      returnTo: '/',
       error: domainError(400, 'AUTH_009', '소셜 계정의 이메일 제공 동의가 필요합니다.'),
     })
 
@@ -62,6 +64,7 @@ describe('OAuthCallbackStatus', () => {
     // 경로 세그먼트는 사용자가 조작할 수 있다. 이름을 못 찾으면 일반 문구로 떨어진다
     const markup = render('toString', {
       status: 'failed',
+      returnTo: '/',
       error: domainError(400, 'AUTH_009', '소셜 계정의 이메일 제공 동의가 필요합니다.'),
     })
 
@@ -72,6 +75,7 @@ describe('OAuthCallbackStatus', () => {
   it('state 만료(AUTH_010)는 처음부터 다시다', () => {
     const markup = render('kakao', {
       status: 'failed',
+      returnTo: '/',
       error: domainError(
         401,
         'AUTH_010',
@@ -86,6 +90,7 @@ describe('OAuthCallbackStatus', () => {
   it('AUTH_014(502)도 서버 문구가 살아남는다 — 일시 장애 문구로 덮이지 않는다', () => {
     const markup = render('kakao', {
       status: 'failed',
+      returnTo: '/',
       error: domainError(
         502,
         'AUTH_014',
@@ -99,7 +104,11 @@ describe('OAuthCallbackStatus', () => {
   })
 
   it('문구 없는 5xx 는 일시 장애 문구로 떨어진다', () => {
-    const markup = render('kakao', { status: 'failed', error: new ApiError(500, null, null) })
+    const markup = render('kakao', {
+      status: 'failed',
+      error: new ApiError(500, null, null),
+      returnTo: '/',
+    })
 
     expect(markup).toContain(messages.common.temporaryErrorDescription)
   })
@@ -112,6 +121,7 @@ describe('OAuthCallbackStatus', () => {
   it('MEMBER_010 은 회원가입 화면으로 보내고 서버 사유를 그대로 보여준다', () => {
     const markup = render('kakao', {
       status: 'failed',
+      returnTo: '/',
       error: domainError(
         400,
         'MEMBER_010',
@@ -124,9 +134,35 @@ describe('OAuthCallbackStatus', () => {
     expect(markup).toContain(messages.auth.toSignupConsent)
   })
 
+  /*
+    원래 가려던 곳을 회원가입 화면까지 들고 간다. 안 들고 가면 `/login?returnTo=/plans`
+    로 시작한 사용자가 동의 누락으로 여기 온 뒤 가입을 마쳤을 때 목적지를 잃는다.
+  */
+  it('복귀 경로가 있으면 회원가입 링크에 실어 보낸다', () => {
+    const markup = render('kakao', {
+      status: 'failed',
+      returnTo: '/plans',
+      error: domainError(400, 'MEMBER_010', '동의가 필요합니다.'),
+    })
+
+    expect(markup).toContain('href="/signup?returnTo=%2Fplans"')
+  })
+
+  it("복귀 경로가 '/' 면 쿼리를 붙이지 않는다", () => {
+    const markup = render('kakao', {
+      status: 'failed',
+      returnTo: '/',
+      error: domainError(400, 'MEMBER_010', '동의가 필요합니다.'),
+    })
+
+    expect(markup).toContain('href="/signup"')
+    expect(markup).not.toContain('returnTo')
+  })
+
   it('MEMBER_011 도 같은 곳으로 보낸다', () => {
     const markup = render('naver', {
       status: 'failed',
+      returnTo: '/',
       error: domainError(400, 'MEMBER_011', '만 14세 이상만 가입할 수 있습니다.'),
     })
 
@@ -135,7 +171,7 @@ describe('OAuthCallbackStatus', () => {
   })
 
   it('ApiError 가 아닌 실패도 다음 행동을 준다', () => {
-    const markup = render('kakao', { status: 'failed', error: new Error('boom') })
+    const markup = render('kakao', { status: 'failed', error: new Error('boom'), returnTo: '/' })
 
     expect(markup).toContain(messages.auth.oauthFailedTitle)
     expect(markup).toContain('href="/login"')
