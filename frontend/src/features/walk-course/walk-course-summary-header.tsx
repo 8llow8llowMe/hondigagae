@@ -1,15 +1,49 @@
 import Image from 'next/image'
 
 import { formatCourseDistance } from '@/lib/format/distance'
-import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { WalkCourseDetail } from '@/types/walk-course'
 
 /**
+ * 코스 대표 이미지 — **머리에서 갈라 나왔다** ([#730](https://github.com/8llow8llowMe/hondigagae/issues/730)).
+ *
+ * **이미지는 있을 때만 붙는다** (D5). 실측 29개 중 25개가 이 모양이라, 자리를 만들어 두면
+ * 대다수 화면의 첫 화면이 회색 사각형으로 시작한다. `firstImage` 가 있는 4개는 **좌표가
+ * 있는 바로 그 4개**다 (`types/walk-course.ts` — 둘 다 같은 TourAPI 매칭에서 온다).
+ *
+ * **전폭 미디어는 카드가 아니다** (`DESIGN.md` §0) — `Surface` 로 감싸지 않는다.
+ * `alt` 는 빈 문자열이다: 바로 아래 이름표가 글자로 있다.
+ *
+ * **왜 `<header>` 밖으로 나왔나.** 1024 이상에서 이미지를 **좌측 열**에 두고 우측에
+ * 지표·골든타임을 세우려면(#730) 이미지가 머리 텍스트와 **형제**여야 한다. 안에 있으면
+ * 히어로가 16:9 로 본문 폭 전체를 먹어 이 화면의 차별 정보(골든타임)가 접힘선 아래로
+ * 밀린다 — 1280 실측 1400px, 뷰포트의 155% 였다.
+ *
+ * **16:9 는 그 상한이기도 하다.** 390 에서 ≈220px 이라 머리 텍스트와 함께 접힘선 안에 든다.
+ */
+export function WalkCourseHero({ image }: { image: string }) {
+  return (
+    <div className="bg-band relative aspect-video w-full max-w-full overflow-hidden md:rounded-lg">
+      <Image
+        src={image}
+        alt=""
+        fill
+        /* 1024 이상은 두 열이라 히어로가 콘텐츠 폭의 절반이다 */
+        sizes="(min-width: 1024px) 50vw, (min-width: 768px) 720px, 100vw"
+        className="object-cover"
+        priority
+      />
+    </div>
+  )
+}
+
+/**
  * 코스 상세의 머리 — **페이지 머리다. 카드에 담지 않는다**
  * (`DESIGN.md` §0 카드 판정 3문: 페이지 머리(h1)는 카드가 아니다).
+ *
+ * **대표 이미지는 여기 없다** (#730) — `WalkCourseHero` 가 형제로 선다.
  *
  * **`h1` 은 `courseLabel` 이다** (D6). 구간명은 그 아래 `<p>` — `1코스 시흥-광치기` 를
  * 한 `h1` 에 몰면 이름표와 구간명이 한 덩어리로 읽힌다.
@@ -18,30 +52,8 @@ import type { WalkCourseDetail } from '@/types/walk-course'
  * (`docs/testing-guide.md` §1).
  */
 export function WalkCourseSummaryHeader({ course }: { course: WalkCourseDetail }) {
-  const image = imageSrc(course.firstImage)
-
   return (
     <header className="flex flex-col gap-4">
-      {/*
-        **이미지는 있을 때만 붙는다** (D5). 실측 29개 중 25개가 이 모양이라, 자리를
-        만들어 두면 대다수 화면의 첫 화면이 회색 사각형으로 시작한다.
-
-        전폭 미디어는 카드가 아니다 (`DESIGN.md` §0) — `Surface` 로 감싸지 않는다.
-        `alt` 는 빈 문자열이다: 바로 아래 이름표가 글자로 있다.
-      */}
-      {image !== null && (
-        <div className="bg-band relative aspect-video w-full max-w-full overflow-hidden md:rounded-lg">
-          <Image
-            src={image}
-            alt=""
-            fill
-            sizes="(min-width: 768px) 720px, 100vw"
-            className="object-cover"
-            priority
-          />
-        </div>
-      )}
-
       <div className={cn('flex flex-col gap-3', INSET_CLASS.card)}>
         <div className="flex flex-col gap-1">
           {/* `15코스 (B)` 의 괄호가 다음 줄로 떨어지지 않게 한 덩어리로 둔다 (D1) */}
@@ -52,8 +64,14 @@ export function WalkCourseSummaryHeader({ course }: { course: WalkCourseDetail }
         {/*
          **핵심값 둘은 `<dl>` 이다** (D6). 라벨이 글자로 있어야 숫자만 읽히지 않는다.
          **단위는 라벨이 아니라 값에 붙는다** — `15.1km` 가 스크린리더에서도 단위와 함께 읽힌다.
+
+         **고정 2열이다** ([#730](https://github.com/8llow8llowMe/hondigagae/issues/730)).
+         예전에는 `flex-wrap` + `gap-x-8` 이라 열 폭이 **값의 길이를 따라갔다** — `19.0km`
+         옆에 `소요시간` 라벨이 바로 붙어 서서 어느 라벨이 어느 값의 것인지 흐려졌고,
+         코스마다 그 간격이 달라 목록에서 상세로 들어올 때마다 배치가 바뀌었다.
+         `repeat(2, minmax(0,1fr))` 은 값이 길어져도 열이 밀리지 않는다.
          */}
-        <dl className="flex flex-wrap gap-x-8 gap-y-2">
+        <dl className="grid grid-cols-2 gap-x-8 gap-y-2">
           <div className="flex flex-col gap-1">
             <dt className="text-caption text-fg-muted font-medium">
               {messages.walkCourse.distanceLabel}
@@ -66,8 +84,14 @@ export function WalkCourseSummaryHeader({ course }: { course: WalkCourseDetail }
             <dt className="text-caption text-fg-muted font-medium">
               {messages.walkCourse.durationLabel}
             </dt>
-            {/* **원문 문자열이다** (`4~5시간`). 파싱하지 않는다 (공통명세 S3) */}
-            <dd className="text-title-2 text-fg font-semibold">{course.durationText}</dd>
+            {/*
+              **원문 문자열이다** (`4~5시간`). 파싱하지 않는다 (공통명세 S3).
+              **`tabular-nums` 는 원문에도 준다** — `4~5` 도 숫자다 (DESIGN.md §3-3 은
+              "필요한 곳" 이 아니라 규칙이라고 적었다). 옆 칸 거리와 자릿수가 맞아야 한 줄로 읽힌다.
+            */}
+            <dd className="text-title-2 text-fg font-semibold tabular-nums">
+              {course.durationText}
+            </dd>
           </div>
         </dl>
 

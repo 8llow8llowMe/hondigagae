@@ -49,13 +49,15 @@ describe('WalkCourseDetailSection — 성공', () => {
   })
 
   /**
-   * **좌표 없는 코스가 기본 모양이다** (실측 25/29). 골든타임 자리를 만들지 않고 한 줄만 남긴다.
+   * **좌표 없는 코스가 기본 모양이다** (실측 25/29). 그래서 자리를 걷지 않고 **제목을
+   * 유지한 채** 안내 상자를 넣는다 ([#730](https://github.com/8llow8llowMe/hondigagae/issues/730)).
    */
-  it('좌표가 없으면 골든타임 자리가 없고 안내 한 줄이 선다', () => {
+  it('좌표가 없어도 골든타임 자리와 제목이 남고 안내 상자가 선다', () => {
     const markup = render({ course: walkCourseDetail(WALK_COURSE_PLAIN) })
 
-    expect(markup).not.toContain(messages.home.goldenHeading)
+    expect(markup).toContain(messages.home.goldenHeading)
     expect(markup).toContain(messages.walkCourse.noCoordinates)
+    expect(markup).toContain(messages.walkCourse.noCoordinatesCommon)
   })
 
   it('좌표가 있으면 골든타임 자리가 선다', () => {
@@ -67,6 +69,51 @@ describe('WalkCourseDetailSection — 성공', () => {
 
   it('이미지가 없으면 전폭 미디어 자리를 만들지 않는다', () => {
     expect(render({ course: walkCourseDetail(WALK_COURSE_PLAIN) })).not.toContain('<img')
+  })
+
+  /**
+   * **히어로가 없으면 두 열로 가르지 않는다** (#730). 25/29 가 그 갈래라, 빈 좌측 열을
+   * 만들면 이 이슈가 고치려는 증상(절반이 빈 화면)을 데스크톱에서 다시 만든다.
+   */
+  it('히어로가 없으면 1024 이상에서도 1열이다', () => {
+    expect(render({ course: walkCourseDetail(WALK_COURSE_PLAIN) })).not.toContain('lg:grid-cols-2')
+  })
+
+  /** 히어로가 있는 4개는 좌표가 있는 바로 그 4개다 — 우측에 세울 것이 실제로 있다 */
+  it('히어로가 있으면 1024 이상에서 2열로 가른다', () => {
+    const markup = render({ course: walkCourseDetail(WALK_COURSE_WITH_COORDS) })
+
+    expect(markup).toContain('<img')
+    expect(markup).toContain('lg:grid-cols-2')
+  })
+
+  /** 16:9 상한 — 390 에서 ≈220px 이라 머리와 함께 접힘선 안에 든다 (#730) */
+  it('히어로가 16:9 를 넘지 않는다', () => {
+    expect(render({ course: walkCourseDetail(WALK_COURSE_WITH_COORDS) })).toContain('aspect-video')
+  })
+
+  /**
+   * **출처는 CTA 아래다** (#730). 위에 있으면 버튼의 설명처럼 읽힌다 — 이것은 페이지
+   * 데이터의 각주이지 그 버튼이 무엇을 하는지에 대한 말이 아니다.
+   */
+  it('출처 줄이 담기 버튼보다 뒤에 온다', () => {
+    const markup = render({ authed: true })
+
+    expect(markup.indexOf(WALK_COURSE_PROVIDER)).toBeGreaterThan(
+      markup.indexOf(messages.plan.addToPlanAction),
+    )
+  })
+
+  /**
+   * **거리·소요시간은 고정 2열이다** (#730). `flex-wrap` 이던 동안에는 열 폭이 값의
+   * 길이를 따라가 `19.0km` 옆에 `소요시간` 라벨이 바로 붙어 섰다.
+   */
+  it('지표 두 칸이 고정 2열 그리드다', () => {
+    const markup = render()
+    const at = markup.indexOf('<dl')
+
+    expect(at).toBeGreaterThan(-1)
+    expect(markup.slice(at, markup.indexOf('>', at))).toContain('grid-cols-2')
   })
 
   /** `19` 를 `19km` 로 줄이지 않는다 (공통명세 S3) */

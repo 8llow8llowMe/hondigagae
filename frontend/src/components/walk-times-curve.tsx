@@ -1,7 +1,7 @@
 'use client'
 
 import { METRIC_TINT_TONE, METRIC_WORD_TONE } from '@/components/metric'
-import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
+import { type ScrollRail, ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { formatCelsius } from '@/lib/format/celsius'
 import { markGoldenWindow } from '@/lib/insight/golden-window'
 import { walkSafetyTone } from '@/lib/insight/tone'
@@ -44,14 +44,27 @@ export function WalkTimesCurve({
   hourly,
   goldenStart,
   goldenEnd,
+  rail: hoisted,
 }: {
   hourly: readonly HourlyWalkSafetyItem[]
   /** 추천 구간. **호출부 응답의 값이다** — 이 컴포넌트가 다시 판정하지 않는다 */
   goldenStart: string | null
   goldenEnd: string | null
+  /**
+   * 호출부가 스크롤 상태를 들고 있을 때 ([#730](https://github.com/8llow8llowMe/hondigagae/issues/730)).
+   *
+   * **주면 화살표를 여기서 그리지 않는다** — 호출부가 자기 제목 줄에 그린다. 오버레이
+   * 화살표가 칸의 온도 값을 덮는 것이 이 이슈의 제보였고, 그 자리를 벗어나려면 **레일
+   * 바깥**에 서야 하는데 그 바깥이 이 컴포넌트에도 바깥이다.
+   *
+   * **훅을 여기서 조건부로 부르지 않는다** — 안 쓰더라도 `useScrollRail` 은 늘 부른다
+   * (ref 가 비면 측정이 즉시 빠져나가 아무 일도 하지 않는다). 훅 순서는 갈리면 안 된다.
+   */
+  rail?: ScrollRail & { ref: React.RefObject<HTMLUListElement | null> }
 }) {
   // 훅은 early return 보다 위다 — 곡선이 비는 날과 아닌 날의 훅 순서가 달라지면 안 된다
-  const rail = useScrollRail<HTMLUListElement>()
+  const own = useScrollRail<HTMLUListElement>()
+  const rail = hoisted ?? own
 
   /*
     추천 구간 표시 (#312). **문장이 가리키는 시각을 곡선에서도 짚는다** — 위에서
@@ -127,11 +140,14 @@ export function WalkTimesCurve({
           ))}
         </ul>
 
-        <ScrollRailArrows
-          rail={rail}
-          prevLabel={messages.home.goldenCurvePrev}
-          nextLabel={messages.home.goldenCurveNext}
-        />
+        {/* 호출부가 레일을 들고 있으면 화살표도 그쪽 제목 줄에 선다 (#730) */}
+        {hoisted === undefined && (
+          <ScrollRailArrows
+            rail={rail}
+            prevLabel={messages.home.goldenCurvePrev}
+            nextLabel={messages.home.goldenCurveNext}
+          />
+        )}
       </div>
     </div>
   )

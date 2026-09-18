@@ -10,11 +10,13 @@ import { SurfaceStack } from '@/components/surface'
 import { WalkCourseAddAction } from '@/features/walk-course/walk-course-add-action'
 import { WalkCourseGoldenSlot } from '@/features/walk-course/walk-course-golden-slot'
 import {
+  WalkCourseHero,
   WalkCourseSourceLine,
   WalkCourseSummaryHeader,
 } from '@/features/walk-course/walk-course-summary-header'
 import { classify } from '@/lib/api/error'
 import { toMessage } from '@/lib/api/response'
+import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -40,11 +42,15 @@ export type WalkCourseDetailSectionProps = {
  * 코스 상세 본문 — **표시 전용이다.** 조회 상태는 `WalkCourseDetailView` 가 props 로
  * 변환해 넘긴다 (`docs/testing-guide.md` §1).
  *
- * **데스크톱에서도 1열이다** (D1). 우측에 둘 것이 없다 — 좌표가 25/29 null 이라 지도도
- * 골든타임도 못 세운다. 카드 폭만 `content-container` 로 제한한다.
+ * **1024 이상에서만, 그것도 히어로가 있을 때만 2열이다**
+ * ([#730](https://github.com/8llow8llowMe/hondigagae/issues/730)). D1 은 *"우측에 둘 것이
+ * 없다 — 좌표가 25/29 null 이라"* 며 데스크톱에서도 1열로 뒀는데, 그 판단은 **히어로가
+ * 있는 4개**에서 틀렸다: 16:9 히어로가 본문 폭을 다 먹어 이 화면의 차별 정보(골든타임)가
+ * 접힘선 아래로 밀렸다(1280 실측 1400px = 뷰포트의 155%). 히어로와 좌표는 **같은 4개**에만
+ * 있으므로, 2열이 서는 날은 우측에 세울 것이 실제로 있는 날이다. 나머지 25개는 그대로 1열이다.
  *
  * **머리는 카드가 아니다** (`DESIGN.md` §0 카드 판정 3문 — 페이지 머리(h1)는 카드가 아니다).
- * 카드가 되는 것은 골든타임 자리 하나뿐이다.
+ * 카드가 되는 것은 골든타임 자리 하나뿐이고, **좌표가 없어도 그 카드는 남는다** (#730).
  */
 export function WalkCourseDetailSection({
   course,
@@ -122,27 +128,55 @@ export function WalkCourseDetailSection({
 
   if (course === null) return null
 
+  const hero = imageSrc(course.firstImage)
+
   return (
     <SurfaceStack className="content-container">
       <div className={INSET_CLASS.card}>
         <BackLink href="/walk-courses" label={messages.walkCourse.backToList} />
       </div>
 
-      <WalkCourseSummaryHeader course={course} />
+      {/*
+        **1024 이상에서 히어로가 좌측 열로 간다** (#730). 그 아래에서는 예전처럼 한 줄로
+        쌓인다 — `gap` 값이 `SurfaceStack` 의 것과 같아(모바일 8 · 데스크톱 24) 열이
+        갈리든 말든 카드 사이 리듬이 바뀌지 않는다 (DESIGN.md §0).
 
-      <WalkCourseGoldenSlot
-        course={course}
-        walkTimes={walkTimes}
-        loading={walkTimesLoading}
-        onRetry={onWalkTimesRetry}
-      />
+        **히어로가 없으면 두 열로 가르지 않는다.** 그 갈래가 25/29 이고, 빈 좌측 열을
+        만들면 이 이슈가 고치려는 바로 그 증상(절반이 빈 화면)을 데스크톱에서 다시 만든다.
+        `firstImage` 와 좌표는 **같은 4개**에만 있어(`types/walk-course.ts`) 두 열이 서는
+        날은 골든타임도 실제로 서는 날이다.
+      */}
+      <div
+        className={cn(
+          'flex flex-col gap-2 md:gap-6',
+          hero !== null && 'lg:grid lg:grid-cols-2 lg:items-start',
+        )}
+      >
+        {hero !== null && <WalkCourseHero image={hero} />}
 
-      <WalkCourseSourceLine course={course} />
+        <div className="flex flex-col gap-2 md:gap-6">
+          <WalkCourseSummaryHeader course={course} />
+
+          <WalkCourseGoldenSlot
+            course={course}
+            walkTimes={walkTimes}
+            loading={walkTimesLoading}
+            onRetry={onWalkTimesRetry}
+          />
+        </div>
+      </div>
 
       {/* 진입은 상세에만 둔다 — 목록 행은 이미 전체가 링크다 (`올레담기-세부명세.md` D8-1) */}
       <div className={INSET_CLASS.card}>
         <WalkCourseAddAction course={course} authed={authed} />
       </div>
+
+      {/*
+        **출처는 CTA 아래다** (#730). 바로 위에 있던 동안에는 버튼에 딸린 설명처럼 읽혔다 —
+        `제주올레 · 2025-04-28 기준` 은 이 **페이지 데이터**의 출처이지 그 버튼이 무엇을
+        하는지에 대한 말이 아니다. 각주는 문서 끝에 선다.
+      */}
+      <WalkCourseSourceLine course={course} />
     </SurfaceStack>
   )
 }

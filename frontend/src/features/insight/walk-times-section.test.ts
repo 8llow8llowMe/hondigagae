@@ -1,6 +1,9 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { describe, expect, it } from 'vitest'
 
 import { WalkTimesSection } from '@/features/insight/walk-times-section'
@@ -910,5 +913,36 @@ describe('mockWalkTimes — 조건이 없는 조회 (#270)', () => {
     expect(guest.goldenWindowStatus?.code).toBe('AVAILABLE')
     expect(guest.hourly.length).toBeGreaterThan(0)
     expect(render(guest)).toContain('18:00')
+  })
+})
+
+/**
+ * 곡선 화살표가 제목 줄에 선다 — [#730](https://github.com/8llow8llowMe/hondigagae/issues/730).
+ *
+ * **그려진 화살표로 확인할 수 없다.** `useScrollRail` 은 레이아웃을 재서 `fade` 를 정하는데
+ * node 환경에는 레이아웃이 없어 언제나 `none` 이고, 그러면 두 배치 모두 아무것도 안 그린다.
+ * 배치 자체의 계약은 `components/scroll-rail.test.ts` 가 렌더로 본다.
+ *
+ * 여기서 잠그는 것은 **이 섹션이 상태를 들고 곡선에 넘기는가** — 그 연결이 끊기면 화살표가
+ * 다시 곡선 위로 돌아가 온도 값을 덮는다 (이 이슈의 제보).
+ */
+describe('WalkTimesSection — 화살표는 제목 줄이다 (#730)', () => {
+  const source = readFileSync(
+    fileURLToPath(new URL('./walk-times-section.tsx', import.meta.url)),
+    'utf8',
+  )
+
+  it('스크롤 상태를 이 섹션이 들고 곡선에 넘긴다', () => {
+    expect(source).toContain('useScrollRail<HTMLUListElement>()')
+    expect(source).toContain('rail={rail}')
+  })
+
+  it('화살표를 흐름 배치로 그린다 — 곡선 위에 띄우지 않는다', () => {
+    expect(source).toContain('placement="inline"')
+  })
+
+  /** 제목과 화살표가 한 줄이다 — 곡선보다 **위**에 있어야 값을 가리지 않는다 */
+  it('화살표가 곡선보다 앞에 온다', () => {
+    expect(source.indexOf('<ScrollRailArrows')).toBeLessThan(source.indexOf('<WalkTimesCurve'))
   })
 })
