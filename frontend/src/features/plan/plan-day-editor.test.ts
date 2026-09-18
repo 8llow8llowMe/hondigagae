@@ -30,6 +30,7 @@ function render(overrides: Record<string, unknown> = {}) {
       onClearFocus: () => undefined,
       onMove: () => undefined,
       onToggleRemoved: () => undefined,
+      onStartTimeChange: () => undefined,
       onSave: () => undefined,
       onCancel: () => undefined,
       ...overrides,
@@ -120,6 +121,58 @@ describe('PlanDayEditor — 편집 중 화면', () => {
 
     expect(markup).toContain('aria-live="polite"')
     expect(markup).toContain('2번째로 이동했어요')
+  })
+})
+
+/**
+ * 시각 입력 — 이슈 #623 · 명세 G2 · G4 · G7.
+ *
+ * **클릭·입력 이벤트는 단언하지 않는다.** 값이 바뀐 뒤의 결과(정규화 · payload)는
+ * `day-items.test.ts` 의 순수 함수 테스트가 잰다 — 여기서는 렌더 분기만 본다.
+ */
+describe('PlanDayEditor — 시각 입력 (#623)', () => {
+  it('항목 수만큼 시각 입력이 있다', () => {
+    const markup = render()
+    const count = markup.split('type="time"').length - 1
+
+    expect(ITEMS).toHaveLength(2)
+    expect(count).toBe(2)
+  })
+
+  it('접근 가능한 이름에 제목이 들어간다 — 행마다 같은 이름이면 구별되지 않는다', () => {
+    const markup = render()
+    const title = planDetail.items[0]?.title as string
+
+    expect(markup).toContain(
+      `aria-label="${messages.plan.editStartTimeLabel.replace('{title}', title)}"`,
+    )
+  })
+
+  it('시각이 있는 행에만 지우기 버튼이 선다 — 누를 것이 없는 버튼을 세우지 않는다', () => {
+    const withTime = { ...planDetail.items[0]!, startTime: '10:30:00' }
+    const withoutTime = { ...planDetail.items[1]!, startTime: null }
+    const markup = render({ items: toEditItems([withTime, withoutTime]) })
+
+    expect(markup).toContain(
+      `aria-label="${messages.plan.editStartTimeClearLabel.replace('{title}', withTime.title)}"`,
+    )
+    expect(markup).not.toContain(
+      messages.plan.editStartTimeClearLabel.replace('{title}', withoutTime.title),
+    )
+  })
+
+  it('시각 입력이 제목보다 앞이다 — 상세 행과 읽는 순서가 같다', () => {
+    const markup = render()
+    const title = planDetail.items[0]?.title as string
+
+    expect(markup.indexOf('type="time"')).toBeLessThan(markup.indexOf(title))
+  })
+
+  it('머리 안내가 편집기 안에 한 번만 나온다', () => {
+    const markup = render()
+    const count = markup.split(messages.plan.editStartTimeHint).length - 1
+
+    expect(count).toBe(1)
   })
 })
 

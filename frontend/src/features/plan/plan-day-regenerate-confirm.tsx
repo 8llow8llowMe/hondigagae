@@ -18,11 +18,20 @@ export function PlanDayRegenerateConfirm({
   onApply,
   applying,
   error,
+  hasStartTime,
 }: {
   onApply: () => void
   applying: boolean
   /** 되붙이기 실패. `toPlanDaySaveError` 가 분류한 그대로다 */
   error: PlanDaySaveError | null
+  /**
+   * 이 날에 시각이 있는 항목이 **지금** 있는가 (#623 · 명세 D14-6).
+   *
+   * 재생성 초안(`AiPlanScheduleItem`)에는 시각 필드가 아예 없어(G5) 되붙이면 그 날
+   * 시각이 전부 사라진다. **잃을 것이 없는 날에는 경고를 내지 않는다** — 늘 뜨는
+   * 경고는 배경음이 되어 정작 잃을 날에 읽히지 않는다 (D9-2 와 같은 판단).
+   */
+  hasStartTime: boolean
 }) {
   return (
     /*
@@ -40,6 +49,11 @@ export function PlanDayRegenerateConfirm({
       <p className="text-caption text-fg-muted font-medium">
         {messages.plan.regenerateDayVisitReset}
       </p>
+      {hasStartTime && (
+        <p className="text-caption text-fg-muted font-medium">
+          {messages.plan.regenerateDayStartTimeReset}
+        </p>
+      )}
 
       {/*
         `text-danger` 는 이 저장소의 토큰이 아니다 (DESIGN.md §2-6 은 `--danger-100/500/700/900`

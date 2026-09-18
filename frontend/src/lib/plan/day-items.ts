@@ -1,4 +1,5 @@
 import { isPlaceTarget } from '@/lib/plan/detail'
+import { toInputStartTime } from '@/lib/plan/start-time'
 import type { PlanDayItemsReplacePayload, PlanItemDetail, PlanItemPayload } from '@/types/plan'
 
 /**
@@ -18,10 +19,22 @@ export type PlanDayEditItem = {
   item: PlanItemDetail
   /** 저장하면 삭제된다는 표시. 아직 서버 상태는 그대로다 */
   removed: boolean
+  /**
+   * 편집 중인 시작 시각 (#623 · 명세 G3). **`HH:mm` 또는 `''`** —
+   * `<input type="time">` 의 값 그대로다.
+   *
+   * **`item.startTime` 을 직접 고치지 않는다.** `item` 은 서버가 준 것이고, 그것을
+   * 덮어쓰면 "바뀐 것이 있나"(`hasEditChanges`)를 잴 기준이 사라진다.
+   */
+  startTime: string
 }
 
 export function toEditItems(items: PlanItemDetail[]): PlanDayEditItem[] {
-  return items.map((item) => ({ item, removed: false }))
+  return items.map((item) => ({
+    item,
+    removed: false,
+    startTime: toInputStartTime(item.startTime),
+  }))
 }
 
 export type MoveDirection = 'up' | 'down'
@@ -59,17 +72,40 @@ export function toggleRemoved(items: PlanDayEditItem[], index: number): PlanDayE
   )
 }
 
+/** 편집 중인 시각을 바꾼다 (#623 · 명세 G3). `value` 는 `HH:mm` 또는 `''`(지우기) 다 */
+export function setEditStartTime(
+  items: PlanDayEditItem[],
+  index: number,
+  value: string,
+): PlanDayEditItem[] {
+  if (index < 0 || index >= items.length) return items
+
+  return items.map((entry, position) =>
+    position === index ? { ...entry, startTime: value } : entry,
+  )
+}
+
 /**
  * 저장할 것이 있는가.
  *
- * **순서와 삭제 표시 둘 다 본다.** 변경이 없으면 저장 버튼을 잠근다 — 같은 목록을
- * 다시 보내면 `planItemId` 만 전부 새로 발급되고 얻는 것이 없다.
+ * **순서 · 삭제 표시 · 시각 셋 다 본다.** 변경이 없으면 저장 버튼을 잠근다 — 같은 목록을
+ * 다시 보내면 `planItemId` 만 전부 새로 발급되고 얻는 것이 없다. 시각만 고친 편집에서
+ * 저장 버튼이 잠겨 있으면 고친 값을 저장할 방법이 없다 (명세 G3-2).
+ *
+ * **시각은 정규화된 값끼리 비교한다.** 서버 `'10:30:00'` 과 입력 `'10:30'` 은 같은
+ * 값이다 — 원문으로 비교하면 아무것도 안 고쳐도 저장 버튼이 열린다.
  */
 export function hasEditChanges(items: PlanDayEditItem[], original: PlanItemDetail[]): boolean {
   if (items.some((entry) => entry.removed)) return true
   if (items.length !== original.length) return true
 
-  return items.some((entry, index) => entry.item.planItemId !== original[index]?.planItemId)
+  return items.some((entry, index) => {
+    const originalItem = original[index]
+    if (originalItem === undefined) return true
+    if (entry.item.planItemId !== originalItem.planItemId) return true
+
+    return entry.startTime !== toInputStartTime(originalItem.startTime)
+  })
 }
 
 /** 삭제 표시를 뺀, 저장 후 남을 항목들 */
@@ -82,9 +118,9 @@ export function survivingItems(items: PlanDayEditItem[]): PlanItemDetail[] {
  *
  * 지키는 것 넷 (E1):
  * 1. **`targetId` 를 문자열로 싣는다** — Snowflake 정밀도
- * 2. **`memo` · `startTime` · `itemType` 을 되돌려 싣는다** — 일괄 교체라 빼먹으면
- *    순서만 바꿨는데 메모와 시각이 지워진다. 화면이 `startTime` 을 표시하지 않는 것과
- *    보존해야 하는 것은 다른 문제다
+ * 2. **`memo` · `itemType` 을 되돌려 싣는다** — 일괄 교체라 빼먹으면 순서만 바꿨는데
+ *    메모가 지워진다. **`startTime` 은 그대로 되싣지 않는다** — 화면이 이제 시각을
+ *    편집하므로(#623 · 명세 G3) 여기서는 **편집 중인 값**(`entry.startTime`)을 싣는다
  * 3. **`sequence` 를 0부터 다시 매긴다** — 화면의 배열 순서가 정본이다
  * 4. **`day` 를 경로값 그대로 싣는다** — 서버가 덮어쓰지만 `@Min(1)` 이 먼저 돈다
  */
@@ -93,7 +129,9 @@ export function planDayItemsPayload(
   day: number,
 ): PlanDayItemsReplacePayload {
   return {
-    items: survivingItems(items).map((item, index) => toPayloadItem(item, day, index)),
+    items: items
+      .filter((entry) => !entry.removed)
+      .map((entry, index) => toEditedPayloadItem(entry, day, index)),
   }
 }
 
@@ -108,6 +146,36 @@ function toPayloadItem(item: PlanItemDetail, day: number, sequence: number): Pla
     title: item.title,
     ...(item.memo === null ? {} : { memo: item.memo }),
     ...(item.startTime === null ? {} : { startTime: item.startTime }),
+  }
+}
+
+/**
+ * 편집 중인 항목 → 요청 본문 항목. **`toPayloadItem` 과 갈리는 지점이 `startTime`
+ * 하나다** — 나머지(targetId · title · memo · itemType)는 서버가 준 `item` 을 그대로
+ * 되싣지만, 시각만은 사용자가 지금 편집 중인 `entry.startTime` 을 싣는다 (명세 G3).
+ *
+ * **`:00` 을 붙여 `HH:mm:ss` 로 보낸다.** 스키마 `example` 과 mock 픽스처가 그 모양이고,
+ * 서버가 `HH:mm` 도 받는지는 실호출로 확인하지 못했다 — 확실한 쪽으로 보낸다
+ * (`start-time.ts` 주석 · D14-8 미결 1).
+ *
+ * **`''` 는 키를 뺀다 = 지운다.** 일괄 교체에서는 키 생략이 곧 "비운다" 라서(G1),
+ * `PUT /plans/{planId}`(부분 수정, 키 생략 = 유지)와 **반대**다.
+ */
+function toEditedPayloadItem(
+  entry: PlanDayEditItem,
+  day: number,
+  sequence: number,
+): PlanItemPayload {
+  const { item } = entry
+
+  return {
+    day,
+    sequence,
+    itemType: item.itemType.code,
+    ...(item.targetId === null ? {} : { targetId: item.targetId }),
+    title: item.title,
+    ...(item.memo === null ? {} : { memo: item.memo }),
+    ...(entry.startTime === '' ? {} : { startTime: `${entry.startTime}:00` }),
   }
 }
 

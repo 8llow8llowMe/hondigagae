@@ -346,6 +346,31 @@ describe('일자별 항목 일괄 교체 mock', () => {
     expect(first?.startTime).toBe('10:00:00')
   })
 
+  // ── 항목 시작 시각 (#623 · 명세 D14-5 · G7) ─────────────────────────────────
+  it('시각을 실어 교체하면 상세에 그대로 나온다', () => {
+    const items = currentDayItems(1).map((item, index) =>
+      index === 0 ? { ...item, startTime: '10:30:00' } : item,
+    )
+    const after = replace(1, items)?.payload.dataBody as PlanDetail
+    const first = after.items.find((item) => item.day === 1 && item.sequence === 0)
+
+    expect(first?.startTime).toBe('10:30:00')
+  })
+
+  it('키를 빼고 교체하면 startTime 이 null 이 된다 — 일괄 교체라 유지가 아니라 삭제다', () => {
+    // day 1 · sequence 0 은 이미 startTime('10:00:00')이 있는 항목이다 — 위 테스트가
+    // 그 값을 그대로 확인한다. 여기서는 그 키를 빼고 다시 보낸다
+    const items = currentDayItems(1).map((item) => {
+      const clone: Record<string, unknown> = { ...item }
+      delete clone.startTime
+      return clone
+    })
+    const after = replace(1, items)?.payload.dataBody as PlanDetail
+    const first = after.items.find((item) => item.day === 1 && item.sequence === 0)
+
+    expect(first?.startTime).toBe(null)
+  })
+
   it('빈 목록을 보내면 그 일자가 비워진다 — 서버가 허용하는 동작이다', () => {
     const after = replace(1, [])?.payload.dataBody as PlanDetail
 

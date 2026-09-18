@@ -12,6 +12,7 @@ import { messages } from '@/lib/messages'
 import { placeMetaLine } from '@/lib/place/meta'
 import { isPlaceTarget, type PlanItemRowModel } from '@/lib/plan/detail'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
+import { formatStartTime } from '@/lib/plan/start-time'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
@@ -48,9 +49,19 @@ export type PlanItemVisit = {
  * 필터가 없어 "실내 여부 미확인" 배지를 둘 자리가 없다. 배지 없이 단정만 피한다
  * (`lib/place/indoor.ts`).
  *
- * **`startTime` 을 표시하지 않는다** — 아트보드 헤더 주석이 "시간 없음" 으로 못박았다
- * (일정상세-세부명세 D8-9).
+ * **`startTime` 을 제목 위 캡션 한 줄로 표시한다** (#623 · 명세 D14).
  *
+ * **D8-9 를 뒤집는다.** 예전에는 아트보드 헤더 주석 "시간 없음" 을 근거로 표시하지
+ * 않았다. 그 주석은 **아트보드가 그린 예시 일정에 값이 없었다는 사실**을 적은 것이지
+ * 화면에 그리지 말라는 지시가 아니다 — `혼잡도 정보 없음`(D8-7)도 같은 문장이었고
+ * 그쪽은 나중에 BE 미착수로 밝혀졌다. 이제 [#625](https://github.com/8llow8llowMe/hondigagae/issues/625)
+ * 의 항목 산책 위험도가 `startTime` 없는 항목을 판정 거부하므로, 시각이 화면에 없으면
+ * 그 판정 자체가 성립하지 않는다 (아트보드 이후에 생긴 요구).
+ *
+ * **없으면 줄 자체를 그리지 않는다.** 형식이 어긋난 값도 지어내지 않고 숨긴다 —
+ * 정규화는 `lib/plan/start-time.ts` 의 `formatStartTime()` 하나가 전담한다.
+ *
+
  * **방문 체크 토글은 링크의 형제다** (#124). 행 전체가 하나의 링크라 그 안에 버튼을 넣을
  * 수 없다 — 중첩 상호작용은 시맨틱이 깨지고 키보드로 어느 쪽이 잡히는지 알 수 없다.
  * 그래서 링크를 `flex-1` 로 두고 토글을 **후행 44px 열**로 뺀다. 아트보드 01 이 금지한
@@ -69,6 +80,8 @@ export function PlanItemRow({
   const { place } = item
   const thumbnail = imageSrc(place?.firstImage ?? null)
   const meta = placeMetaLine(place?.addr1 ?? null, place?.indoor ?? null)
+  // 형식이 어긋나면 null 이다 — 에러도 배지도 내지 않고 줄 자체를 그리지 않는다 (D14-3)
+  const startTime = formatStartTime(item.startTime)
 
   /*
     **`targetId` 가 있다고 링크하지 않는다.** `WALK` 의 `targetId` 는 `walk_course.id`
@@ -111,6 +124,18 @@ export function PlanItemRow({
       </div>
 
       <div className="min-w-0 flex-1">
+        {/*
+          제목 위 캡션 한 줄 (D14-3). **제목 줄에 넣지 않는다** — D11-5 가 이미 제목 폭을
+          깎았고, 같은 줄에 시각을 얹으면 그 손실이 겹친다. **메타 줄에도 합치지 않는다**
+          — 그 줄은 `line-clamp-1` 이라 시각을 앞에 붙이면 주소가 먼저 잘린다.
+        */}
+        {startTime !== null && (
+          <p className="text-caption text-fg-muted font-medium tabular-nums">
+            <span className="sr-only">{messages.plan.startTimeSrLabel} </span>
+            <time dateTime={startTime}>{startTime}</time>
+          </p>
+        )}
+
         <div className="flex flex-wrap items-center gap-2">
           {/* 공백 없는 긴 한국어 이름(`제주특별자치도립김창열미술관`)이 넘치지 않게
               어절 안에서도 끊을 수 있게 한다 — PlaceRow 와 같은 규칙 */}

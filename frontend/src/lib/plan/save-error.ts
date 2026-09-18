@@ -37,13 +37,21 @@ export type PlanDaySaveCopy = {
  *
  * **4xx 는 전부 재시도를 주지 않는다.** 같은 본문을 다시 보내면 같은 실패다 —
  * `PLAN_004`(사라진 장소) · `PLAN_002`(기간 밖 일자) · `PLAN_001`(404, 지워졌거나 남의 일정) ·
- * `PLAN_114`(경로 형식) · `PLAN_108`~`PLAN_112`(Bean Validation)가 모두 그렇다.
+ * `PLAN_100`(시각 형식 오류, #623) · `PLAN_114`(경로 형식) ·
+ * `PLAN_108`~`PLAN_112`(Bean Validation)가 모두 그렇다.
  * 근거: `PlanErrorCode.java` · `ValidationErrorSupport.java` 소스 실측.
  */
 export function toPlanDaySaveError(cause: unknown, copy: PlanDaySaveCopy): PlanDaySaveError {
   if (cause instanceof ApiError) {
     if (cause.resultCode === 'PLAN_004') {
       return { message: copy.missingPlace, retriable: false }
+    }
+    /*
+      `PLAN_100` — `startTime` 본문 파싱 실패 (명세 G4). 문구를 화면마다 나누지 않는다 —
+      원인이 "시각 형식" 하나뿐이라 편집모드와 담기가 다르게 말할 이유가 없다.
+    */
+    if (cause.resultCode === 'PLAN_100') {
+      return { message: messages.plan.editStartTimeFormatError, retriable: false }
     }
     /*
       `PLAN_002` 는 문구를 나누지 않는다 — 어느 화면에서든 "들고 있는 상세가 낡았다"

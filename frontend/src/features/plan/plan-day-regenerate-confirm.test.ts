@@ -12,6 +12,7 @@ function render(overrides = {}) {
       onApply: () => undefined,
       applying: false,
       error: null,
+      hasStartTime: false,
       ...overrides,
     }),
   )
@@ -53,5 +54,29 @@ describe('PlanDayRegenerateConfirm', () => {
   it('위 구분선을 그리지 않는다 — 바닥이 비교 카드와 가른다', () => {
     // 단어 경계로 본다 — `border-transparent` 같은 다른 유틸리티에 걸리면 오탐이다
     expect(render()).not.toMatch(/\bborder-t\b/)
+  })
+})
+
+/**
+ * 시각 초기화 경고 — 이슈 #623 · 명세 D14-6.
+ *
+ * 재생성 초안에는 시각 필드가 아예 없어 되붙이면 그 날 시각이 전부 사라진다.
+ * **잃을 것이 없는 날에는 경고를 내지 않는다** — D9-2 와 같은 판단이다.
+ */
+describe('PlanDayRegenerateConfirm — 시각 초기화 경고 (#623)', () => {
+  it('시각 있는 항목이 있으면 경고를 낸다', () => {
+    expect(render({ hasStartTime: true })).toContain(messages.plan.regenerateDayStartTimeReset)
+  })
+
+  it('시각 있는 항목이 없으면 경고를 내지 않는다', () => {
+    expect(render({ hasStartTime: false })).not.toContain(messages.plan.regenerateDayStartTimeReset)
+  })
+
+  it('시각 경고도 다녀옴 경고와 함께 확정 버튼보다 앞이다', () => {
+    const markup = render({ hasStartTime: true })
+
+    expect(markup.indexOf(messages.plan.regenerateDayStartTimeReset)).toBeLessThan(
+      markup.indexOf(messages.plan.regenerateDayApply),
+    )
   })
 })

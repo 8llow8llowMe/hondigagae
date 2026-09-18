@@ -200,3 +200,61 @@ describe('PlanItemRow — 방문 체크 토글 (#124)', () => {
     expect(buttonCount(markup)).toBe(1)
   })
 })
+
+/**
+ * 항목 시작 시각 — 이슈 #623 · 명세 D14-2 · D14-3 · D14-7.
+ *
+ * **D8-9 를 뒤집는다.** 아트보드 헤더 주석 "시간 없음" 은 예시 일정에 값이 없었다는
+ * 사실이지 표시 금지가 아니다 — 이탈 근거는 `plan-item-row.tsx` 문서 주석에 있다.
+ */
+function renderWithStartTime(startTime: string | null) {
+  const model: PlanItemRowModel = {
+    item: { ...planDetail.items[0]!, startTime },
+    distanceMeters: null,
+    distanceKind: null,
+  }
+
+  return renderToStaticMarkup(createElement(PlanItemRow, { model }))
+}
+
+describe('PlanItemRow — 시작 시각 (#623)', () => {
+  it('시각이 있으면 정규화된 HH:mm 을 <time> 으로 그린다', () => {
+    const markup = renderWithStartTime('10:30:00')
+
+    // React 서버 렌더 출력은 `dateTime` (camelCase) 그대로다 — 실제 DOM에서는
+    // 브라우저가 `datetime` 으로 정규화한다
+    expect(markup).toContain('<time dateTime="10:30"')
+    expect(markup).toContain(messages.plan.startTimeSrLabel)
+  })
+
+  it('null 이면 시각 줄이 없다 — 지어내지 않는다', () => {
+    const markup = renderWithStartTime(null)
+
+    expect(markup).not.toContain('<time')
+    expect(markup).not.toContain(messages.plan.startTimeSrLabel)
+  })
+
+  it('형식이 어긋난 값도 시각 줄을 그리지 않는다', () => {
+    const markup = renderWithStartTime('오전 10시')
+
+    expect(markup).not.toContain('<time')
+  })
+
+  it('시각 줄이 제목보다 앞이다 — 제목 위 캡션이다', () => {
+    const markup = renderWithStartTime('10:30:00')
+    const title = planDetail.items[0]!.title
+
+    expect(markup.indexOf('10:30')).toBeLessThan(markup.indexOf(title))
+  })
+
+  it('메타 줄을 밀어내지 않는다 — 주소가 여전히 나온다', () => {
+    const model: PlanItemRowModel = {
+      item: { ...planDetail.items[0]!, startTime: '10:30:00', place: planItemPlace() },
+      distanceMeters: null,
+      distanceKind: null,
+    }
+    const markup = renderToStaticMarkup(createElement(PlanItemRow, { model }))
+
+    expect(markup).toContain('제주시 한림읍')
+  })
+})
