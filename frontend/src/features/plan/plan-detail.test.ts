@@ -108,7 +108,8 @@ describe('PlanDayVerdict — 판정을 못 낸 것과 낮은 것을 구분한다
     expect(renderVerdict({ representativePlaceId: null })).not.toContain(messages.plan.walkAction)
   })
 
-  it('MID_TERM 이면 출처를 밝힌다 — 정밀도 차이를 감추지 않는다', () => {
+  /* 출처는 근거 문단 맨 아래가 아니라 **큰 숫자 옆**이다 (#732) — 값과 이어져야 읽힌다 */
+  it('MID_TERM 이면 값 옆에서 출처를 밝힌다 — 정밀도 차이를 감추지 않는다', () => {
     const midTerm = renderVerdict({
       weather: {
         ...planVerdict.weather!,
@@ -116,9 +117,11 @@ describe('PlanDayVerdict — 판정을 못 낸 것과 낮은 것을 구분한다
         forecastSourceName: '중기예보',
       },
     })
+    const value = midTerm.indexOf(messages.plan.verdictFeelsLikeLabel)
 
-    expect(midTerm).toContain('중기예보')
-    expect(renderVerdict()).not.toContain('대략적인 값')
+    expect(midTerm.indexOf('중기예보')).toBeGreaterThan(value)
+    expect(midTerm.indexOf('중기예보')).toBeLessThan(midTerm.indexOf(messages.plan.walkAction))
+    expect(renderVerdict()).not.toContain('중기예보')
   })
 
   it('petConditionApplied 가 false 면 일반 조건 판정임을 알린다', () => {

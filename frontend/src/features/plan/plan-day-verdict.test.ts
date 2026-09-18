@@ -72,15 +72,45 @@ describe('PlanDayVerdict — 판정 옆 큰 숫자 (#253)', () => {
   /*
     중기예보 구간은 체감온도가 **언제나 null** 이다. 그 자리를 비우면 11일 예보의 뒤쪽
     날들이 통째로 숫자를 잃으므로 최고기온을 세우되 **이름을 바꿔 말하지 않는다.**
+
+    **라벨이 아니라 값 옆 단서가 그 이름을 말한다** (#732) — 나란한 두 일자가 다른 라벨을
+    쓰면 값의 차이가 아니라 화면의 오류로 읽혔다.
   */
-  it('체감온도가 없으면 최고기온으로 바꿔 세우고 라벨도 바꾼다', () => {
+  it('체감온도가 없으면 최고기온을 세우되 라벨 기둥은 그대로다', () => {
     const html = render({
-      weather: weather({ maxFeelsLikeTemperature: null, maxTemperature: 24 }),
+      weather: weather({
+        maxFeelsLikeTemperature: null,
+        maxTemperature: 24,
+        forecastSourceCode: 'MID_TERM',
+        forecastSourceName: '중기예보',
+      }),
     })
 
     expect(html).toContain('24.0')
+    expect(html).toContain(messages.plan.verdictFeelsLikeLabel)
+    // 단서가 값 옆에서 무엇이 섰는지 말한다 — 최고기온을 체감온도라고 부르지 않는다
+    expect(html).toContain(messages.plan.verdictFallbackMetric.replace('{source}', '중기예보'))
+  })
+
+  it('예보 출처를 몰라도 무엇이 섰는지는 말한다 — 라벨이 고정이라 여기뿐이다', () => {
+    const html = render({
+      weather: weather({
+        maxFeelsLikeTemperature: null,
+        maxTemperature: 24,
+        forecastSourceCode: 'SHORT_TERM',
+        forecastSourceName: null,
+      }),
+    })
+
     expect(html).toContain(messages.plan.verdictTemperatureLabel)
-    expect(html).not.toContain(messages.plan.verdictFeelsLikeLabel)
+  })
+
+  it('체감온도가 선 날에는 단서를 붙이지 않는다 — 기본값이라 말할 차이가 없다', () => {
+    const html = render({
+      weather: weather({ maxFeelsLikeTemperature: 33.4, forecastSourceCode: 'SHORT_TERM' }),
+    })
+
+    expect(html).not.toContain(messages.plan.verdictTemperatureLabel)
   })
 
   it('예보가 없으면 숫자 자리를 비운다 — 판정 자체는 남는다', () => {
