@@ -715,6 +715,19 @@ describe('PlanBriefingBanner — 날짜 축 하나로만 노출을 가른다 (D1
     expect(markup).toContain('/briefing')
   })
 
+  /*
+    **설명도 같은 축으로 갈린다** (#733). 전날 브리핑에는 특보도 골든타임도 없는데
+    (서버가 당일에만 채운다) 넷을 약속하면 약속과 화면이 어긋난다.
+  */
+  it('전날에는 넷을 약속하지 않는다', () => {
+    const eve = renderBriefingBanner('2026-09-11')
+    const today = renderBriefingBanner('2026-09-13')
+
+    expect(eve).toContain(messages.plan.briefingBannerEveDescription)
+    expect(eve).not.toContain('특보')
+    expect(today).toContain(messages.plan.briefingBannerTodayDescription)
+  })
+
   it('출발 이틀 전이면 배너를 렌더하지 않는다 — 눌러도 부를 날짜가 없다', () => {
     expect(renderBriefingBanner('2026-09-10')).not.toContain('/briefing')
   })

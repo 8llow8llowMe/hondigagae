@@ -13,6 +13,7 @@ import {
   planBriefingSchedule,
   planBriefingWalkTimes,
   planBriefingWarning,
+  planVerdict,
 } from '@/test/fixtures/plan'
 import type { PlanBriefingResponse } from '@/types/plan'
 
@@ -27,6 +28,10 @@ const CURVE_CELL = 'min-width:3.5rem'
 /** 곡선을 아직 안 받은 기본값 — 이 이슈의 갈래는 대부분 곡선과 무관하다 */
 const NO_CURVE: PlanBriefingCurve = { hourly: null, failed: false, onRetry: () => undefined }
 
+/**
+ * **기본 갈래는 `TODAY` 다** — 카드 넷이 그대로 서는 쪽이라 기존 갈래별 검사가 그대로
+ * 성립한다. 전날 갈래는 `renderEve()` 가 따로 그린다 (#733).
+ */
 function render(
   overrides: Partial<PlanBriefingResponse> = {},
   curve: PlanBriefingCurve = NO_CURVE,
@@ -35,8 +40,33 @@ function render(
   return renderToStaticMarkup(
     createElement(PlanBriefingSection, {
       briefing: planBriefing(overrides),
+      kind: 'TODAY',
       basisPetName,
       curve,
+    }),
+  )
+}
+
+/**
+ * 전날 갈래 — **서버가 특보·골든타임을 채우지 않는 날이다.**
+ *
+ * `today === false` 면 두 필드가 null 이고 각 이유 문장이 채워진다 (`types/plan.ts`).
+ * 기본값을 그 모양으로 두어야 화면이 실제로 받는 응답을 그린다.
+ */
+function renderEve(overrides: Partial<PlanBriefingResponse> = {}) {
+  return renderToStaticMarkup(
+    createElement(PlanBriefingSection, {
+      briefing: planBriefing({
+        today: false,
+        weatherWarning: null,
+        weatherWarningUnavailableReason: '기상특보는 출발 당일에만 확인합니다.',
+        walkTimes: null,
+        walkTimesUnavailableReason: '산책 골든타임은 출발 당일에만 확인합니다.',
+        ...overrides,
+      }),
+      kind: 'EVE',
+      basisPetName: null,
+      curve: NO_CURVE,
     }),
   )
 }
@@ -262,7 +292,7 @@ describe('PlanBriefingSection — 그날 일정 (명세 D5-1)', () => {
     expect(markup).toContain('항목 4개 · 다녀온 곳 0개')
   })
 
-  it('항목이 0개면 빈 상태와 담기 링크를 내고 첫/마지막 줄을 내지 않는다', () => {
+  it('항목이 0개면 빈 상태와 담기 링크를 내고 동선을 그리지 않는다', () => {
     const markup = render({
       schedule: planBriefingSchedule({
         itemCount: 0,
@@ -274,21 +304,48 @@ describe('PlanBriefingSection — 그날 일정 (명세 D5-1)', () => {
 
     expect(markup).toContain(messages.plan.briefingScheduleEmptyTitle)
     expect(markup).toContain('/days/2/add')
-    expect(markup).not.toContain('처음')
-    expect(markup).not.toContain('마지막')
+    expect(markup).not.toContain('<ol')
   })
 
-  it('항목이 하나면 마지막 줄을 내지 않는다 — 같은 항목이다', () => {
+  /*
+    ── 동선 흐름 (#733) ────────────────────────────────────────────────────────
+
+    **`처음` · `마지막` 라벨을 값과 한 노드에 두지 않는다.** 예전에는 둘이 같은 굵기·크기·
+    색으로 붙어 `처음 함덕 서우봉 해변` 이 한 문장처럼 읽혔다. 순서는 `ol` 과 점·선이 말한다.
+  */
+  it('처음·마지막 라벨을 글자로 쓰지 않고 ol 로 순서를 남긴다', () => {
+    const markup = render()
+
+    expect(markup).toContain('<ol')
+    expect(markup).not.toContain('처음 ')
+    expect(markup).not.toContain('마지막 ')
+  })
+
+  it('항목이 하나면 마디를 하나만 세운다 — 처음과 마지막이 같은 항목이다', () => {
     const only = planBriefingItem()
     const markup = render({
       schedule: planBriefingSchedule({ itemCount: 1, firstItem: only, lastItem: only }),
     })
 
-    expect(markup).toContain('처음 10:30 협재해수욕장')
-    expect(markup).not.toContain('마지막')
+    expect(markup).toContain('10:30')
+    expect(markup).toContain('협재해수욕장')
+    // 동선 마디의 표식 — 판정 근거 목록의 `li` 와 섞이지 않게 마디 클래스로 센다
+    expect(markup.split('last:pb-0').length - 1).toBe(1)
   })
 
-  it('시각이 없는 항목은 제목만 남기고 콜론 잔재를 남기지 않는다', () => {
+  it('처음과 마지막 사이에 낀 항목 수를 센다 — 거리는 응답에 없다', () => {
+    const markup = render({ schedule: planBriefingSchedule({ itemCount: 4 }) })
+
+    expect(markup).toContain('사이 2곳')
+  })
+
+  it('바로 이어지는 두 항목이면 사이 줄을 내지 않는다', () => {
+    const markup = render({ schedule: planBriefingSchedule({ itemCount: 2 }) })
+
+    expect(markup).not.toContain('사이')
+  })
+
+  it('시각이 없는 항목은 제목만 남기고 자리표시를 만들지 않는다', () => {
     const markup = render({
       schedule: planBriefingSchedule({
         itemCount: 1,
@@ -297,8 +354,10 @@ describe('PlanBriefingSection — 그날 일정 (명세 D5-1)', () => {
       }),
     })
 
-    expect(markup).toContain('처음 협재해수욕장')
-    expect(markup).not.toContain('처음 :')
+    expect(markup).toContain('협재해수욕장')
+    expect(markup).not.toContain('--:--')
+    // 시각이 붙은 마디의 꼴(`10:30 `)이 남지 않는다. `18:00 – 21:00` 은 골든타임 카드다
+    expect(markup).not.toContain('10:30')
   })
 
   /*
@@ -313,16 +372,39 @@ describe('PlanBriefingSection — 그날 일정 (명세 D5-1)', () => {
     expect(markup).not.toContain('PLACE')
   })
 
-  it('대표 장소 id 가 없으면 링크를 만들지 않는다', () => {
-    const linked = render()
-    const plain = render({
-      schedule: planBriefingSchedule({ representativePlaceId: null }),
+  /*
+    **기준 장소는 해당 마디에 태그로 붙는다** (#733). 별도 줄로 세우면 동선 아래에 같은
+    장소 이름이 한 번 더 서서, 마디 둘짜리 카드에 장소 줄이 셋이 된다.
+
+    이을 열쇠가 응답에 없어(항목은 `planItemId`, 기준은 **장소** id) 제목으로 맞춘다 —
+    픽스처의 기준 장소가 첫 마디와 같은 `협재해수욕장` 이다.
+  */
+  it('기준 장소가 처음 마디면 태그로 붙이고 별도 줄을 내지 않는다', () => {
+    const markup = render()
+
+    expect(markup).toContain(messages.plan.briefingScheduleBasisTag)
+    expect(markup).not.toContain('이 날 기준 장소 · 협재해수욕장')
+  })
+
+  it('기준 장소가 처음·마지막 어느 쪽도 아니면 예전처럼 줄로 남는다', () => {
+    const markup = render({
+      schedule: planBriefingSchedule({ representativePlaceTitle: '성산일출봉' }),
     })
 
-    expect(linked).toContain('>이 날 기준 장소 · 협재해수욕장</a>')
+    expect(markup).toContain('>이 날 기준 장소 · 성산일출봉</a>')
+  })
+
+  it('대표 장소 id 가 없으면 링크를 만들지 않는다', () => {
+    const plain = render({
+      schedule: planBriefingSchedule({
+        representativePlaceId: null,
+        representativePlaceTitle: '성산일출봉',
+      }),
+    })
+
     // 링크가 아니라 글자로만 남는다. `/places/` 자체는 날씨 카드의 산책 버튼이 쓴다
-    expect(plain).toContain('이 날 기준 장소 · 협재해수욕장')
-    expect(plain).not.toContain('>이 날 기준 장소 · 협재해수욕장</a>')
+    expect(plain).toContain('이 날 기준 장소 · 성산일출봉')
+    expect(plain).not.toContain('>이 날 기준 장소 · 성산일출봉</a>')
   })
 
   it('그 일차 앵커로 돌아가는 링크를 준다', () => {
@@ -340,6 +422,115 @@ describe('PlanBriefingSection — 날씨와 적합도 (명세 D5-2)', () => {
   it('weather 가 null 이면 자리를 비우지 않고 못 받았다고 말한다', () => {
     expect(render({ weather: null })).toContain(messages.plan.briefingWeatherMissing)
   })
+
+  /*
+    ── 하루 지표 줄 (#733) ─────────────────────────────────────────────────────
+
+    응답에 실려 오는데 화면이 버리고 있던 값들이다. **시간대 라벨을 붙이지 않는다** —
+    전부 하루치 집계라 `아침`·`낮` 으로 옮겨 적으면 응답에 없는 사실을 지어내는 것이 된다.
+  */
+  it('하늘상태·최저기온·강수확률을 세운다 — 판정 카드가 버리던 값이다', () => {
+    const markup = render()
+
+    expect(markup).toContain('맑음')
+    expect(markup).toContain('최저 21.0℃')
+    expect(markup).toContain('강수 10%')
+  })
+
+  it('시간대 라벨을 만들지 않는다 — 응답에 시간대별 값이 없다', () => {
+    const markup = render()
+
+    for (const label of ['아침', '낮', '저녁', '오전', '오후']) {
+      expect(markup).not.toContain(label)
+    }
+  })
+
+  /** 큰 숫자가 이미 최고기온인 날(중기예보)에 같은 값을 두 번 세우지 않는다 */
+  it('체감온도를 못 받은 날에는 최고기온을 지표 줄에서 뺀다', () => {
+    const markup = render({
+      weather: {
+        ...planVerdict,
+        weather: {
+          date: '2026-09-13',
+          forecastSourceCode: 'MID_TERM',
+          forecastSourceName: '중기예보',
+          minTemperature: 21,
+          maxTemperature: 26,
+          maxFeelsLikeTemperature: null,
+          maxPrecipitationProbability: 10,
+          precipitationTypeName: '없음',
+          skyStateName: '흐림',
+          maxWindSpeed: 3.1,
+          maxHumidity: 60,
+        },
+      },
+    })
+
+    expect(markup).toContain('최저 21.0℃')
+    expect(markup).not.toContain('최고 26.0℃')
+  })
+
+  it('날씨 값이 없으면 지표 줄 자체를 내지 않는다', () => {
+    const markup = render({ weather: { ...planVerdict, weather: null } })
+
+    expect(markup).not.toContain('최저')
+    expect(markup).not.toContain('강수')
+  })
+})
+
+/*
+  ── 갈래 (#733) ───────────────────────────────────────────────────────────────
+
+  **전날에는 값이 없는 카드를 그리지 않는다.** 서버가 특보·골든타임을 당일에만 채우므로
+  (`today === false` 면 둘 다 null + 이유 문장) 전날 카드 둘은 안내 한 줄만 담고 있었다.
+
+  갈래는 `pickBriefingDate` 가 이미 돌려주는 `kind` 다 — 새 판정 축을 만들지 않는다.
+*/
+describe('PlanBriefingSection — EVE / TODAY 갈래', () => {
+  it('EVE 는 카드 둘을 접고 각주 한 줄로 내린다', () => {
+    const markup = renderEve()
+
+    // 각주 문장 자체가 `기상특보` 를 담으므로 **제목 꼴**로 센다
+    expect(markup).not.toContain(`>${messages.plan.briefingWarningHeading}<`)
+    expect(markup).not.toContain(`>${messages.plan.briefingWalkHeading}<`)
+    expect(markup).toContain(messages.plan.briefingEveFootnote)
+    expect(markup.split('<h2').length - 1).toBe(2)
+  })
+
+  it('EVE 각주는 실패 톤이 아니다 — 서버의 "확인하지 못했습니다" 문장도 함께 내리지 않는다', () => {
+    const markup = renderEve()
+
+    expect(markup).not.toContain(messages.plan.briefingWarningUnavailableTitle)
+    expect(markup).not.toContain('기상특보는 출발 당일에만 확인합니다.')
+  })
+
+  it('EVE 날씨 카드는 제목으로 갈래를 말한다', () => {
+    expect(renderEve()).toContain(messages.plan.briefingWeatherEveHeading)
+    expect(render()).toContain(messages.plan.briefingWeatherTodayHeading)
+  })
+
+  /*
+    **회귀 감시의 본체.** `kind` 는 FE 시계로 고른 값이라 자정 전후에 서버 응답과 갈릴 수
+    있다 — 그때 값이 실려 왔는데 카드째 접으면 이 화면이 가장 크게 지키는 규칙(태풍경보를
+    조용히 지우지 않는다)을 뒤에서 깨게 된다.
+  */
+  it('EVE 라도 특보가 실려 오면 접지 않는다', () => {
+    const markup = renderEve({
+      weatherWarning: planBriefingWarning(),
+      weatherWarningUnavailableReason: null,
+    })
+
+    expect(markup).toContain(`>${messages.plan.briefingWarningHeading}<`)
+    expect(markup).not.toContain(messages.plan.briefingEveFootnote)
+  })
+
+  it('TODAY 는 카드 넷 그대로다', () => {
+    const markup = render()
+
+    expect(markup).toContain(`>${messages.plan.briefingWarningHeading}<`)
+    expect(markup).toContain(`>${messages.plan.briefingWalkHeading}<`)
+    expect(markup).not.toContain(messages.plan.briefingEveFootnote)
+  })
 })
 
 describe('PlanBriefingSection — 접근성 계약 (명세 D6)', () => {
@@ -348,7 +539,7 @@ describe('PlanBriefingSection — 접근성 계약 (명세 D6)', () => {
 
     for (const heading of [
       messages.plan.briefingScheduleHeading,
-      messages.plan.briefingWeatherHeading,
+      messages.plan.briefingWeatherTodayHeading,
       messages.plan.briefingWarningHeading,
       messages.plan.briefingWalkHeading,
     ]) {
@@ -361,7 +552,7 @@ describe('PlanBriefingSection — 접근성 계약 (명세 D6)', () => {
     const markup = render()
     const order = [
       messages.plan.briefingScheduleHeading,
-      messages.plan.briefingWeatherHeading,
+      messages.plan.briefingWeatherTodayHeading,
       messages.plan.briefingWarningHeading,
       messages.plan.briefingWalkHeading,
     ].map((heading) => markup.indexOf(heading))

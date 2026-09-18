@@ -50,16 +50,25 @@ export function PlanBriefingBanner({
   const target = pickBriefingDate(startDate, endDate, today)
   if (target === null) return null
 
+  const eve = target.kind === 'EVE'
+
   return (
     <Surface tone="brand">
       <Banner
         href={`/plans/${planId}/briefing`}
-        title={
-          target.kind === 'EVE'
-            ? messages.plan.briefingBannerEveTitle
-            : messages.plan.briefingBannerTodayTitle
+        title={eve ? messages.plan.briefingBannerEveTitle : messages.plan.briefingBannerTodayTitle}
+        /*
+          **설명도 같은 축으로 갈린다** (#733). 전날 브리핑에는 특보도 골든타임도 없는데
+          (서버가 당일에만 채운다) `일정 · 날씨 · 특보 · 산책 시간` 넷을 약속하면, 별도
+          라우트까지 만들어 들어간 화면이 **약속의 절반을 빈 카드로** 돌려주게 된다.
+
+          **새 판정 축이 아니다** — 제목을 고르는 값을 그대로 한 번 더 쓴다.
+        */
+        description={
+          eve
+            ? messages.plan.briefingBannerEveDescription
+            : messages.plan.briefingBannerTodayDescription
         }
-        description={messages.plan.briefingBannerDescription}
         /*
           **`leading` 을 주지 않는다.** `Banner` 는 아이콘 자리에 `text-danger-500` 을
           하드코딩한다 — 병원 배너의 붉은 아이콘이 그 자리의 유일한 용례다. 브리핑은
