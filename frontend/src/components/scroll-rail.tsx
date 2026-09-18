@@ -17,8 +17,10 @@ import { cn } from '@/lib/utils/cn'
  * **`scrollbar-none` 과 짝이다.** 스크롤바를 상시 노출하면 활성 밑줄·진행 표시줄로
  * 오독된다 (`app/globals.css`). 그 자리를 이 둘이 대신한다.
  *
- * **화살표는 마우스 환경에만 둔다** (`app/globals.css` `.scroll-rail-arrow`). 터치는
+ * **오버레이 화살표는 마우스 환경에만 둔다** (`app/globals.css` `.scroll-rail-arrow`). 터치는
  * 밀어서 넘기는 것이 자연스럽고, 390px 폭에서 좌우 버튼은 항목 하나씩을 가린다.
+ * **레일 밖에 세우는 `placement="inline"` 은 그 제약이 없다** (#730) — 가릴 칸이 없고
+ * 44×44 라 터치에서도 남는다.
  *
  * 방향 판정(`scrollFadeSide`)과 이동 폭(`pageScrollLeft`)은 `lib/ui/scroll.ts` 의 순수
  * 함수가 갖는다 — 여기서 다시 계산하지 않는다.
@@ -128,10 +130,20 @@ export function ScrollRailArrows({
   rail,
   prevLabel,
   nextLabel,
+  placement = 'overlay',
 }: {
   rail: ScrollRail
   prevLabel: string
   nextLabel: string
+  /**
+   * `overlay`(기본) — 스크롤러 위에 떠서 좌우 끝에 앉는다. `.scroll-rail` 인 부모가 필요하다.
+   *
+   * `inline` — **제목 줄처럼 보통의 흐름에 선다** ([#730](https://github.com/8llow8llowMe/hondigagae/issues/730)).
+   * 골든타임 곡선에서 오버레이 화살표가 **값 위에 불투명하게 앉는 것**이 실측으로 잡혔다
+   * (`elementsFromPoint(346, 702)` → `BUTTON.scroll-rail-arrow` ▸ `SPAN "기온 26.0℃"`).
+   * 레일 밖으로 나오면 가릴 값이 없다.
+   */
+  placement?: 'overlay' | 'inline'
 }) {
   const canPrev = rail.fade === 'left' || rail.fade === 'both'
   const canNext = rail.fade === 'right' || rail.fade === 'both'
@@ -139,12 +151,22 @@ export function ScrollRailArrows({
   return (
     <>
       {canPrev && (
-        <Arrow side="left" label={prevLabel} onClick={() => rail.page('left')}>
+        <Arrow
+          side="left"
+          placement={placement}
+          label={prevLabel}
+          onClick={() => rail.page('left')}
+        >
           <ChevronLeftIcon size={16} />
         </Arrow>
       )}
       {canNext && (
-        <Arrow side="right" label={nextLabel} onClick={() => rail.page('right')}>
+        <Arrow
+          side="right"
+          placement={placement}
+          label={nextLabel}
+          onClick={() => rail.page('right')}
+        >
           <ChevronRightIcon size={16} />
         </Arrow>
       )}
@@ -153,7 +175,9 @@ export function ScrollRailArrows({
 }
 
 /**
- * 원형 테두리 버튼.
+ * 테두리 버튼. 모양이 `placement` 로 갈린다.
+ *
+ * ### `overlay` — 원형 32px
  *
  * **`rounded-full` 을 쓰는 유일한 컨트롤이다.** DESIGN.md §5 의 원형은 사진·아바타 몫이고
  * 칩·버튼은 8이다. 여기서 비켜나는 이유는 이것이 **면 위에 떠 있는 오버레이**이기
@@ -165,14 +189,25 @@ export function ScrollRailArrows({
  *
  * 32px 이라 모바일 최소 터치 영역(44)에 못 미치지만, `.scroll-rail-arrow` 가
  * `pointer: coarse` 에서 이 버튼을 숨기므로 손가락이 닿는 일이 없다.
+ *
+ * ### `inline` — 44×44, 곡률 8 (#730)
+ *
+ * **원형 예외를 가져오지 않는다.** 예외의 근거가 "면 위에 떠 있다" 였는데 이쪽은 제목 줄에
+ * 그냥 서 있는 보통의 아이콘 버튼이다 — §5 의 버튼 값(8)이 그대로 맞는다.
+ *
+ * **`.scroll-rail-arrow` 도 붙이지 않는다.** 그 클래스가 터치에서 숨기는 근거 둘
+ * (*"좌우 버튼이 항목을 하나씩 가린다"* · *"32px 이 44 에 못 미친다"*)이 여기서는 둘 다
+ * 성립하지 않는다 — 레일 밖이라 가릴 칸이 없고 44×44 다 (DESIGN.md §7). 터치에서도 남는다.
  */
 function Arrow({
   side,
+  placement,
   label,
   onClick,
   children,
 }: {
   side: 'left' | 'right'
+  placement: 'overlay' | 'inline'
   label: string
   onClick: () => void
   children: React.ReactNode
@@ -184,8 +219,13 @@ function Arrow({
       aria-label={label}
       title={label}
       className={cn(
-        'scroll-rail-arrow border-border bg-bg text-fg-muted hover:text-fg hover:border-border-strong focus-visible:ring-brand-500 absolute top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full border transition-colors focus-visible:ring-2 focus-visible:outline-none',
-        side === 'left' ? 'left-0' : 'right-0',
+        'border-border bg-bg text-fg-muted hover:text-fg hover:border-border-strong focus-visible:ring-brand-500 flex items-center justify-center border transition-colors focus-visible:ring-2 focus-visible:outline-none',
+        placement === 'overlay'
+          ? cn(
+              'scroll-rail-arrow absolute top-1/2 size-8 -translate-y-1/2 rounded-full',
+              side === 'left' ? 'left-0' : 'right-0',
+            )
+          : 'size-11 rounded-md',
       )}
     >
       {children}
