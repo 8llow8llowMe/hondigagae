@@ -65,7 +65,7 @@ describe('AiPlanDraftPreview — 요약 (아트보드 03)', () => {
   it('기간 · 항목 수 · 예산을 요약한다', () => {
     const html = render()
 
-    expect(html).toContain('2026-09-12')
+    expect(html).toContain('2026년 9월 12일 (토)')
     expect(html).toContain('항목 3개')
     expect(html).toContain('30만원')
   })

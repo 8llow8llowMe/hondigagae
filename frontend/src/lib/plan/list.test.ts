@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatPlanDateRange, isPastPlan, planPhaseOf, weekdayOf } from '@/lib/plan/date'
+import {
+  formatPlanDateRange,
+  formatPlanDay,
+  formatPlanDayWithYear,
+  isPastPlan,
+  planPhaseOf,
+  weekdayOf,
+} from '@/lib/plan/date'
 import {
   countByPet,
   countByStatus,
@@ -54,17 +61,43 @@ describe('날짜 — 타임존에 흔들리지 않는다', () => {
   })
 
   it('같은 해면 종료일의 연도를 반복하지 않는다', () => {
-    expect(formatPlanDateRange('2026-09-12', '2026-09-14')).toBe('2026-09-12 (토) – 09-14 (월)')
+    expect(formatPlanDateRange('2026-09-12', '2026-09-14')).toBe(
+      '2026년 9월 12일 (토) – 9월 14일 (월)',
+    )
   })
 
-  it('해를 넘기면 종료일에도 연도를 쓴다 — 12-30 – 01-02 는 거꾸로 읽힌다', () => {
+  it('해를 넘기면 종료일에도 연도를 쓴다 — 12월 30일 – 1월 2일 은 거꾸로 읽힌다', () => {
     expect(formatPlanDateRange('2026-12-30', '2027-01-02')).toBe(
-      '2026-12-30 (수) – 2027-01-02 (토)',
+      '2026년 12월 30일 (수) – 2027년 1월 2일 (토)',
     )
   })
 
   it('하루짜리 일정은 한 번만 쓴다', () => {
-    expect(formatPlanDateRange('2026-04-11', '2026-04-11')).toBe('2026-04-11 (토)')
+    expect(formatPlanDateRange('2026-04-11', '2026-04-11')).toBe('2026년 4월 11일 (토)')
+  })
+})
+
+/**
+ * 날짜 한 칸의 모양 (#732). **브리핑(#733)이 그대로 가져다 쓴다** — 화면이 각자 자르던
+ * 것을 여기 하나로 모았으므로 값으로 잠근다.
+ */
+describe('formatPlanDay — 일정 날짜 한 칸의 모양은 하나다', () => {
+  it('`9월 19일 (토)` 로 쓴다 — ISO 조각이 아니라 한국어 날짜다', () => {
+    expect(formatPlanDay('2026-09-19')).toBe('9월 19일 (토)')
+  })
+
+  it('앞자리 0 을 버린다 — 자릿수를 맞춰야 하는 표가 아니다', () => {
+    expect(formatPlanDay('2026-01-02')).toBe('1월 2일 (금)')
+  })
+
+  it('연도를 붙이지 않는다 — 그것이 필요한 자리는 따로 있다', () => {
+    expect(formatPlanDayWithYear('2026-01-02')).toBe('2026년 1월 2일 (금)')
+  })
+
+  it('못 읽는 날짜는 null 이다 — 날짜를 지어내지 않는다', () => {
+    expect(formatPlanDay('2026-02-31')).toBeNull()
+    expect(formatPlanDay('오늘')).toBeNull()
+    expect(formatPlanDayWithYear('2026-13-01')).toBeNull()
   })
 })
 

@@ -10,7 +10,7 @@ import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
 import { PlanIndoorAlternatives } from '@/features/plan/plan-indoor-alts'
 import { PlanItemRow, type PlanItemVisit } from '@/features/plan/plan-item-row'
 import { messages } from '@/lib/messages'
-import { weekdayOf } from '@/lib/plan/date'
+import { formatPlanDay } from '@/lib/plan/date'
 import type { PlanItemRowModel } from '@/lib/plan/detail'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -145,7 +145,12 @@ export function PlanDaySection({
   regenerateHref: string | null
 }) {
   const anchorId = planDayAnchorId(day)
-  const weekday = date === null ? null : weekdayOf(date)
+  /*
+    **날짜 모양은 `formatPlanDay` 한 곳이 소유한다** (#732). 예전에는 여기서 `date.slice(5)`
+    로 잘라 `09-19 (토)` 를 만들었는데, 같은 화면의 개요는 `2026-09-19 (토)` 였다 — 한 날을
+    두 모양으로 부르는 셈이라 어느 쪽이 기준인지 화면이 말하지 못했다.
+  */
+  const dayLabel = date === null ? null : formatPlanDay(date)
 
   /*
     **체크된 항목이 있을 때만 초기화 경고를 낸다** (#124). 일괄 교체가 그 날의 체크를
@@ -170,11 +175,8 @@ export function PlanDaySection({
           <h2 id={anchorId} className="text-title-1 text-fg font-bold">
             {messages.plan.dayLabel.replace('{day}', String(day))}
           </h2>
-          {date !== null && (
-            <span className="text-body-2 text-fg-muted font-medium tabular-nums">
-              {date.slice(5)}
-              {weekday === null ? '' : ` (${weekday})`}
-            </span>
+          {dayLabel !== null && (
+            <span className="text-body-2 text-fg-muted font-medium tabular-nums">{dayLabel}</span>
           )}
 
           {/*

@@ -14,28 +14,58 @@ import { parseDay, todayUtc, weekdayOf } from '@/lib/date/day'
 export { weekdayOf }
 
 /**
- * 아트보드 04·05 의 날짜 줄 — `2026-09-12 (토) – 09-14 (월)`.
+ * 일정 화면의 **날짜 한 칸** — `9월 19일 (토)`. 못 읽으면 `null`.
+ *
+ * **이 저장소에서 일정 날짜를 글자로 옮기는 곳은 여기 하나다** (#732). 예전에는 화면마다
+ * 자기 방식으로 잘라 썼다 — 개요가 `2026-09-19 (토)`, 일자 카드가 `09-19 (토)`
+ * (`date.slice(5)` + `weekdayOf`). 나란히 놓으면 **같은 날을 두 모양으로 부르는** 셈이라,
+ * 브리핑([#733](https://github.com/8llow8llowMe/hondigagae/issues/733))이 세 번째 모양을
+ * 만들기 전에 한 곳으로 모은다.
+ *
+ * **ISO 를 그대로 쓰지 않는다.** `09-19` 는 날짜가 아니라 기계 값으로 읽히고, 앞자리가
+ * 월인지 일인지도 글자만으로는 말해 주지 않는다. `9월 19일` 은 그 모호함이 없다.
+ *
+ * **앞자리 0 을 버린다** (`09월` 이 아니라 `9월`) — 자릿수를 맞춰야 하는 표가 아니라
+ * 문장 안의 날짜다.
+ *
+ * **연도가 없다.** 연도를 말해야 하는 자리는 `formatPlanDayWithYear` 를 쓴다.
+ */
+export function formatPlanDay(date: string): string | null {
+  const weekday = weekdayOf(date)
+  if (weekday === null) return null
+
+  // `weekdayOf` 가 형식과 실재하는 날짜까지 확인한 뒤라 잘라 읽어도 안전하다
+  return `${Number(date.slice(5, 7))}월 ${Number(date.slice(8, 10))}일 (${weekday})`
+}
+
+/** `2026년 9월 19일 (토)`. 연도가 정보인 자리(기간 줄의 시작일)가 쓴다 */
+export function formatPlanDayWithYear(date: string): string | null {
+  const label = formatPlanDay(date)
+  return label === null ? null : `${date.slice(0, 4)}년 ${label}`
+}
+
+/**
+ * 아트보드 04·05 의 날짜 줄 — `2026년 9월 12일 (토) – 9월 14일 (월)`.
  *
  * 종료일은 **연도를 반복하지 않는다.** 다만 해를 넘기는 일정은 연도를 다시 쓴다 —
- * `2026-12-30 (수) – 2027-01-02 (토)` 를 `12-30 – 01-02` 로 쓰면 거꾸로 읽힌다.
+ * `2026년 12월 30일 (수) – 2027년 1월 2일 (토)` 에서 뒤 연도를 빼면 거꾸로 읽힌다.
  * 하루짜리 일정은 한 번만 쓴다.
+ *
+ * **연도를 통째로 버리지 않는다** (#732). 날짜 **모양**은 `formatPlanDay` 로 통일하되,
+ * 이 줄은 목록·상세에서 지난 해의 일정까지 가리키므로 연도가 정보다 — 모양을 맞추자고
+ * 있던 사실을 지우지 않는다.
  */
 export function formatPlanDateRange(startDate: string, endDate: string): string {
-  const startLabel = formatDay(startDate)
+  const startLabel = formatPlanDayWithYear(startDate)
   if (startLabel === null) return startDate
 
   if (startDate === endDate) return startLabel
 
-  const endLabel = formatDay(endDate)
+  const sameYear = startDate.slice(0, 4) === endDate.slice(0, 4)
+  const endLabel = sameYear ? formatPlanDay(endDate) : formatPlanDayWithYear(endDate)
   if (endLabel === null) return startLabel
 
-  const sameYear = startDate.slice(0, 4) === endDate.slice(0, 4)
-  return `${startLabel} – ${sameYear ? endLabel.slice(5) : endLabel}`
-}
-
-function formatDay(date: string): string | null {
-  const weekday = weekdayOf(date)
-  return weekday === null ? null : `${date} (${weekday})`
+  return `${startLabel} – ${endLabel}`
 }
 
 /** 일정이 오늘 기준 어디에 있는지. 갈래별 설명은 {@link planPhaseOf} 에 있다. */
