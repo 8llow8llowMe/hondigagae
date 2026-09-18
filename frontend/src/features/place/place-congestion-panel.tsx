@@ -132,51 +132,152 @@ function PanelBody({
     )
   }
 
+  /*
+    **`leastCrowded` 가 null 이면 전부 모르는 날이다** — 그때는 점선의 뜻을 설명하는 대신
+    이 장소에 자료가 없다는 사실을 말한다. 404 가 아니라 빈 상태라 재시도를 달지 않는다:
+    장소는 있고 연결된 관광지 통계가 없는 것이다.
+
+    **본문이 통째로 갈린다** (#670). 예전에는 차트를 그대로 그리고 그 아래에 문구를 붙였는데,
+    기본이 30일이라 점선 트랙 30칸이 카드를 채우고 설명은 그 아래 12px 로 붙어 **먼저 읽히는
+    것이 "깨진 그래프"** 였다. 추천일 줄(`LeastCrowded`)은 어차피 `null` 에서 아무것도 그리지
+    않고, 점선 설명·예측 범위·기간 토글도 이 갈래에는 서지 않는다.
+  */
+  if (data.leastCrowded === null) return <EmptyBody items={data.dailyCongestions} />
+
   const hasUnknown = data.dailyCongestions.some((item) => item.concentrationRate === null)
 
   return (
     <>
       <LeastCrowded item={data.leastCrowded} items={data.dailyCongestions} />
 
-      <Chart
-        items={data.dailyCongestions}
-        pickedDate={data.leastCrowded?.date ?? null}
-        days={days}
-      />
+      <Chart items={data.dailyCongestions} pickedDate={data.leastCrowded.date} days={days} />
 
-      {/*
-        **`leastCrowded` 가 null 이면 전부 모르는 날이다** — 그때는 점선의 뜻을 설명하는
-        대신 이 장소에 자료가 없다는 사실을 말한다. 404 가 아니라 빈 상태라 재시도를 달지
-        않는다: 장소는 있고 연결된 관광지 통계가 없는 것이다.
-      */}
-      {data.leastCrowded === null ? (
-        <div className="flex flex-col gap-1">
-          <p className="text-body-2 text-fg font-semibold">
-            {messages.place.detailCongestionEmptyTitle}
-          </p>
-          <p className="text-caption text-fg-muted">
-            {messages.place.detailCongestionEmptyDescription}
-          </p>
-        </div>
-      ) : (
-        <>
-          {hasUnknown && (
-            <p className="text-caption text-fg-muted">
-              {messages.place.detailCongestionUnknownNote}
-            </p>
-          )}
-          {days === CONGESTION_DAYS.month && (
-            <p className="text-caption text-fg-muted">
-              {messages.place.detailCongestionExtendedNote}
-            </p>
-          )}
-
-          <DaysToggle days={days} onDaysChange={onDaysChange} />
-        </>
+      {hasUnknown && (
+        <p className="text-caption text-fg-muted">{messages.place.detailCongestionUnknownNote}</p>
       )}
+      {days === CONGESTION_DAYS.month && (
+        <p className="text-caption text-fg-muted">{messages.place.detailCongestionExtendedNote}</p>
+      )}
+
+      <DaysToggle days={days} onDaysChange={onDaysChange} />
     </>
   )
 }
+
+/**
+ * 자료가 하나도 없을 때 — **차트를 지우지 않고 덮는다** (#670).
+ *
+ * 지우면 카드에 제목·기간·문구만 남아 **카드가 통째로 사라진 것처럼** 보인다. 남은 칸
+ * 수·트랙 높이·날짜 축이 _"여기는 날짜별 붐빔을 보는 자리"_ 라고 말해 주고, 그래야 문구의
+ * "자료가 아직 없어요" 가 **무엇의 자료인지** 붙는다. 동시에 그 칸들이 읽히면 안 된다 —
+ * 점선 30칸은 "모르는 날 30일" 이라는 뜻을 이미 다 말했다. **보이되 읽히지 않는** 상태다.
+ *
+ * **veil 은 반투명 `--bg` 면 한 겹이다.** 카드 자체가 `bg-bg` 라 이것은 카드 배경색의 알파
+ * 변형일 뿐이고, `DESIGN.md` 밖의 새 색을 만들지 않는다 (`photo-viewer.tsx` 의 `bg-fg/95` 와
+ * 같은 형태). `backdrop-blur` 를 얹지 않는 이유와 `70` 이라는 값의 근거는 아래 상수 주석에
+ * 있다.
+ */
+function EmptyBody({ items }: { items: DailyCongestionItem[] }) {
+  /*
+    **문구 키를 새로 만들지 않는다.** 차트 아래에 있던 두 줄을 그대로 veil 안으로 옮긴 것이고,
+    아래 블록은 없앴다 — 같은 말을 두 번 하지 않는다.
+  */
+  const lines = (
+    <>
+      <p className="text-body-2 text-fg font-semibold break-keep">
+        {messages.place.detailCongestionEmptyTitle}
+      </p>
+      <p className="text-caption text-fg-muted break-keep">
+        {messages.place.detailCongestionEmptyDescription}
+      </p>
+    </>
+  )
+
+  /*
+    **덮을 것이 없는 장소도 있다.** 서버가 날짜 목록 자체를 비워 보내는 갈래가 실제로 있어
+    (`Chart` 의 `items.length === 0` 주석) 그때 `inset-0` veil 을 세우면 높이 0 짜리 상자가
+    되어 문구가 사라진다. 덮개 없이 문구만 세운다.
+  */
+  if (items.length === 0) return <div className="flex flex-col gap-1">{lines}</div>
+
+  return (
+    <div className="relative">
+      {/*
+        **이 갈래에서 차트는 장식이다.**
+
+        - `aria-hidden` — 전부 `UNKNOWN` 인 30일을 그대로 두면 보조기기가 `9월 21일 월요일
+          정보 없음` 을 **30번** 읽는다. 눈으로는 한 덩어리로 지나가는 것이 보조기기에서만
+          30줄이 된다 (`BodySkeleton` 이 칸 수를 숨기는 것과 같은 판단이다)
+        - `overflow-x-auto` 를 주지 않고 `ScrollRailArrows` 도 렌더하지 않는다. veil 은
+          뷰포트에 붙박이인데 그 아래 그림만 미끄러지면 이상하고, 무엇보다 `aria-hidden`
+          안에 초점 받는 것이 남으면 `aria-hidden-focus` 위반이다 — 스크롤 컨테이너는
+          브라우저에 따라 키보드 초점을 받는다
+        - `INSET_BLEED_END_CLASS` 도 붙이지 않는다. 카드 끝까지 여는 이유("잘린 칸이 '더
+          있다' 로 읽혀야 한다")가 **구를 수 없는 면**에는 없고, 인셋에서 자르면 veil 밖으로
+          삐져나오는 칸도 없다
+
+        **`relative` 를 `ul` 자신에게 준다.** 칸마다 붙는 `sr-only` 라벨이 `position: absolute`
+        라, 기준면이 바깥 래퍼면 그 라벨들이 `overflow-hidden` 에 잘리지 않고(컨테이닝 블록이
+        클리퍼 바깥이면 클립이 적용되지 않는다) 정적 위치가 조상의 `scrollWidth` 로 샌다 —
+        30일이면 390 에서 페이지가 통째로 가로로 넘친다 (`Chart` 의 `.scroll-rail` 주석).
+      */}
+      <ul aria-hidden className="relative flex items-end gap-1.5 overflow-hidden">
+        {items.map((item) => (
+          <DayColumn key={item.date} item={item} picked={false} />
+        ))}
+      </ul>
+
+      {/*
+        veil 은 스크롤 콘텐츠가 아니라 **뷰포트**에 `absolute inset-0` 으로 앉는다 — 문구가
+        언제나 카드 가운데에 선다.
+
+        **안에 버튼·링크를 하나도 두지 않는다.** 누를 것이 생기는 순간 사용자는 이것을 고칠
+        수 있는 오류로 읽는다 (404 가 아니라 빈 상태라는 기존 결정).
+
+        `role="status"` 를 쓰지 않는다 — 진입 시점의 정적 콘텐츠지 갱신이 아니다.
+      */}
+      <div
+        className={cn(
+          'absolute inset-0 flex flex-col items-center justify-center gap-1 px-4 text-center',
+          VEIL_FILL,
+        )}
+      >
+        {lines}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 빈 상태 veil 의 면 (#670).
+ *
+ * **알파는 눈으로 고르지 않았다.** 토큰 실측값으로 두 기준을 동시에 만족하는 구간을 구하고
+ * 그 가운데를 잡았다 (`--bg` `#ffffff` · `--fg` `#15181d` · `--fg-muted` `#596069` ·
+ * `--metric-unknown-500` `#a8aeb8` · `--band` `#eef0f3`).
+ *
+ * | 기준                                                  | 결과                     |
+ * | ----------------------------------------------------- | ------------------------ |
+ * | 문구가 **점선 위 최악 픽셀**에서도 4.5:1 이상         | 알파 **54% 이상**        |
+ * | 합성 후 점선이 3:1 **미만** (신호가 아니라 질감)      | 모든 알파 (아래 참고)    |
+ * | 그러면서 점선이 0 은 아니다 — `--band` 대비(1.14) 이상 | 알파 **81% 이하**        |
+ *
+ * 교집합 `[54%, 81%]` 의 가운데는 68 이고, Tailwind 표준 눈금에 맞춰 **70** 을 쓴다.
+ * 그 값에서 `--fg` 14.33:1 · `--fg-muted` 5.12:1 · 점선 1.24:1 이다.
+ *
+ * **둘째 기준은 실측에서 구속력이 없었다.** `--metric-unknown-500` 은 흰 배경에서 이미
+ * 2.23:1 이라 알파 0 에서도 3:1 아래다 — 그래서 위쪽 경계를 "점선이 사라지지 않는다" 로
+ * 잡았고, 그 바닥을 이 디자인 시스템에서 가장 조용한 정식 면(`--band`)의 대비로 두었다.
+ * 임의의 숫자를 새로 만들지 않기 위해서다.
+ *
+ * **`backdrop-blur` 를 얹지 않는다.** 위 구간이 비지 않았으므로 조건이 성립하지 않는다
+ * (세부명세 D8-8). 가리는 대상이 2px 점선이라 알파만으로 질감까지 내려가고, Safari 접두와
+ * 합성 레이어 재샘플링 비용을 이 카드(본문 맨 위 · 진입 직후 스크롤 구간)에 들일 이유가 없다.
+ *
+ * **`--metric-unknown-500` 을 veil 에 쓰지 않는다** (점선 테두리 전용 토큰, `DESIGN.md` §2-3).
+ * **`--bg-sunken` · `--band` 로 덮지 않는다** — 둘 다 "다른 층" 을 뜻하는 면이라 이 카드 안에
+ * 없던 층이 하나 생긴 것처럼 읽힌다.
+ */
+const VEIL_FILL = 'bg-bg/70'
 
 /**
  * 서버가 고른 날. **`null` 이면 아무것도 그리지 않는다.**
