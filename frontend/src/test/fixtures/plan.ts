@@ -1,4 +1,4 @@
-import type { PlanDayAdd, PlanDayVisit } from '@/features/plan/plan-day-section'
+import type { PlanDayAdd, PlanDayVisit, PlanDayWalkSafety } from '@/features/plan/plan-day-section'
 import type { Pet } from '@/types/pet'
 import type {
   PlanAlternativePlaceItem,
@@ -6,6 +6,7 @@ import type {
   PlanDetail,
   PlanItemDetail,
   PlanItemPlace,
+  PlanItemWalkSafetyItem,
 } from '@/types/plan'
 
 /**
@@ -189,6 +190,56 @@ export const planDayAdd: PlanDayAdd = {
  */
 export const planDayVisit: PlanDayVisit = {
   visitOf: () => ({ pending: false, error: null, onToggle: () => undefined }),
+}
+
+/**
+ * 항목 산책 위험도 배선 기본값 (#625) — 아무 판정도 도착하지 않은 상태다.
+ *
+ * `of` 가 항상 `undefined` 를 돌려주므로 배지·문장 없이 시각 줄만 서고, `failed`·
+ * `hasLookupFailed` 가 모두 꺼져 있어 일자 카드에 오류·재시도 자리도 없다 — "조회 중"과
+ * "조용히 숨김" 이 화면에서 같은 모양인 것과 일치한다 (D15-7).
+ */
+export const planDayWalkSafety: PlanDayWalkSafety = {
+  of: () => undefined,
+  beyondForecastReason: null,
+  failed: false,
+  hasLookupFailed: false,
+  onRetry: () => undefined,
+}
+
+/**
+ * 항목 산책 위험도 fixture (#625). **기본값은 정상 판정(`SAFE`)이다** — 못 낸 사유를
+ * 검증하려면 `unavailableReasonCode`·`unavailableReason`·`walkSafetyLevel` 을 함께 덮어쓴다
+ * (셋은 짝이다, D15-1).
+ */
+export function planItemWalkSafety(
+  overrides: Partial<PlanItemWalkSafetyItem> & { planItemId: string },
+): PlanItemWalkSafetyItem {
+  return {
+    day: 1,
+    sequence: 0,
+    date: '2026-09-12',
+    startTime: '10:30',
+    title: '김창열미술관',
+    placeId: '212481712381923328',
+    placeTitle: '제주현대미술관',
+    targetDateTime: '2026-09-12T10:30:00',
+    basisPetId: '123456789012000001',
+    walkSafetyLevel: {
+      code: 'SAFE',
+      name: '안전',
+      description: '지금 산책하기 좋은 조건이에요.',
+      scoreDescription: null,
+    },
+    estimatedPavementCelsius: 30.2,
+    feelsLikeCelsius: 27.5,
+    temperature: 25.4,
+    saferWindowStart: null,
+    saferWindowEnd: null,
+    unavailableReasonCode: null,
+    unavailableReason: null,
+    ...overrides,
+  }
 }
 
 /**

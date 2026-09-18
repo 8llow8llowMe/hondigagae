@@ -155,6 +155,12 @@ export function PlanEditModal({
           그 비용은 조회 한 번이고 반대(틀린 판정을 보여 주는 것)보다 싸다.
         */
         void queryClient.invalidateQueries({ queryKey: planKeys.weather(plan.planId) })
+        /*
+          **산책 위험도도 같이 버린다** (#625 · D15-6). 기간이 바뀌면 일차·날짜가
+          통째로 달라지고, 날짜는 판정 순서의 첫 조건(`PAST_DATE`)과 예보 지평 판정에
+          바로 쓰인다 — 옛 기간으로 낸 판정을 남겨 두면 새 기간의 화면에 붙는다.
+        */
+        void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(plan.planId) })
 
         /*
           **`planKeys.packing` 은 버리지 않는다** (D13-6). 서버는 동행견을 바꿔도 저장된

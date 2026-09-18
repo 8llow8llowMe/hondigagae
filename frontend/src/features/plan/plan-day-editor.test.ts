@@ -11,6 +11,7 @@ import {
   planAlternative,
   planDayAdd,
   planDayVisit,
+  planDayWalkSafety,
   planDetail,
   planVerdict,
 } from '@/test/fixtures/plan'
@@ -228,6 +229,7 @@ describe('PlanDaySection — 편집 진입', () => {
         editor: null,
         add: planDayAdd,
         visit: planDayVisit,
+        walkSafety: planDayWalkSafety,
         regenerateHref: '/plans/1/days/1/regenerate',
         ...overrides,
       }),

@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest'
 import { PlanItemRow, type PlanItemVisit } from '@/features/plan/plan-item-row'
 import { messages } from '@/lib/messages'
 import type { PlanItemRowModel } from '@/lib/plan/detail'
-import { planDetail, planItemPlace } from '@/test/fixtures/plan'
-import type { PlanItemPlace } from '@/types/plan'
+import { planDetail, planItemPlace, planItemWalkSafety } from '@/test/fixtures/plan'
+import type { PlanItemPlace, PlanItemWalkSafetyItem } from '@/types/plan'
 
 /**
  * 일정 항목 행의 메타 줄 — 이슈 #112.
@@ -256,5 +256,156 @@ describe('PlanItemRow — 시작 시각 (#623)', () => {
     const markup = renderToStaticMarkup(createElement(PlanItemRow, { model }))
 
     expect(markup).toContain('제주시 한림읍')
+  })
+})
+
+/**
+ * 항목 산책 위험도 — 이슈 #625 · 명세 D15-5 · D15-9.
+ *
+ * **시각이 있어야 이 자리가 성립한다** (D14-4) — `walkSafety` 를 넘겨도 `startTime` 이
+ * 없으면 줄 자체가 없다. 기본 항목의 `startTime` 은 `null` 이라(fixtures/plan.ts)
+ * 여기서는 매번 `10:30:00` 으로 덮어쓴다.
+ */
+function renderWithWalkSafety(walkSafety: PlanItemWalkSafetyItem | undefined) {
+  const model: PlanItemRowModel = {
+    item: { ...planDetail.items[0]!, startTime: '10:30:00' },
+    distanceMeters: null,
+    distanceKind: null,
+  }
+
+  return renderToStaticMarkup(createElement(PlanItemRow, { model, walkSafety }))
+}
+
+describe('PlanItemRow — 항목 산책 위험도 (#625)', () => {
+  it('정상 등급은 축 라벨과 함께 한 덩어리로 읽힌다 — 산책 주의', () => {
+    const markup = renderWithWalkSafety(
+      planItemWalkSafety({
+        planItemId: 'i-1',
+        walkSafetyLevel: {
+          code: 'CAUTION',
+          name: '주의',
+          description: null,
+          scoreDescription: null,
+        },
+      }),
+    )
+
+    // 라벨은 자기 <span> 이라 태그를 걷어낸 텍스트로 "한 덩어리" 를 확인한다 (metric.test.ts 와 같은 방식)
+    expect(markup.replace(/<[^>]*>/g, '')).toContain('산책 주의')
+  })
+
+  it('정상 등급에는 체감온도가 함께 선다 — 최고 체감온도가 아니다', () => {
+    const markup = renderWithWalkSafety(
+      planItemWalkSafety({ planItemId: 'i-1', feelsLikeCelsius: 33.5 }),
+    )
+
+    expect(markup).toContain(`${messages.plan.walkSafetyFeelsLikeLabel} 33.5℃`)
+    expect(markup).not.toContain(messages.plan.verdictFeelsLikeLabel)
+  })
+
+  it('시각이 없으면 산책도 체감온도도 없다 — 시각 줄 자체가 없다 (D14-3 회귀)', () => {
+    const model: PlanItemRowModel = {
+      item: { ...planDetail.items[0]!, startTime: null },
+      distanceMeters: null,
+      distanceKind: null,
+    }
+    const markup = renderToStaticMarkup(
+      createElement(PlanItemRow, {
+        model,
+        walkSafety: planItemWalkSafety({ planItemId: 'i-1' }),
+      }),
+    )
+
+    expect(markup).not.toContain(messages.common.metricAxisWalkSafety)
+    expect(markup).not.toContain(messages.plan.walkSafetyFeelsLikeLabel)
+  })
+
+  it('PAST_DATE 는 서버 문장이 없다 — 일자 판정이 이미 한 번 말했다', () => {
+    const sentence = '이미 지난 날짜라 산책 위험도를 판정할 수 없습니다.'
+    const markup = renderWithWalkSafety(
+      planItemWalkSafety({
+        planItemId: 'i-1',
+        walkSafetyLevel: null,
+        unavailableReasonCode: 'PAST_DATE',
+        unavailableReason: sentence,
+      }),
+    )
+
+    expect(markup).not.toContain(sentence)
+  })
+
+  it('NOT_PLACE_TARGET 은 서버 문장이 없다 — WALK·MOVE 는 화면이 이미 안다', () => {
+    const sentence = '장소를 가리키는 항목이 아니라 판정할 수 없습니다.'
+    const markup = renderWithWalkSafety(
+      planItemWalkSafety({
+        planItemId: 'i-1',
+        placeId: null,
+        walkSafetyLevel: null,
+        unavailableReasonCode: 'NOT_PLACE_TARGET',
+        unavailableReason: sentence,
+      }),
+    )
+
+    expect(markup).not.toContain(sentence)
+  })
+
+  it('LOOKUP_FAILED 는 서버 문장이 있고 role=alert 가 아니다 — 조회 실패는 폼 오류가 아니다', () => {
+    const sentence = '산책 위험도를 조회하지 못했습니다.'
+    const markup = renderWithWalkSafety(
+      planItemWalkSafety({
+        planItemId: 'i-1',
+        walkSafetyLevel: null,
+        unavailableReasonCode: 'LOOKUP_FAILED',
+        unavailableReason: sentence,
+      }),
+    )
+
+    expect(markup).toContain(sentence)
+    expect(markup).not.toContain('role="alert"')
+  })
+
+  it('등급 UNKNOWN 은 배지 없이 description 문장을 낸다', () => {
+    const description = '이 시각의 예보 자료가 부족해 등급을 매기지 못했습니다.'
+    const markup = renderWithWalkSafety(
+      planItemWalkSafety({
+        planItemId: 'i-1',
+        unavailableReasonCode: null,
+        unavailableReason: null,
+        walkSafetyLevel: {
+          code: 'UNKNOWN',
+          name: '판단 근거 부족',
+          description,
+          scoreDescription: null,
+        },
+      }),
+    )
+
+    expect(markup).not.toContain('bg-metric')
+    expect(markup).toContain(description)
+  })
+
+  it('DANGER 는 critical 톤이고 낱말로도 위험을 말한다 — 색만으로 전달하지 않는다', () => {
+    const markup = renderWithWalkSafety(
+      planItemWalkSafety({
+        planItemId: 'i-1',
+        walkSafetyLevel: {
+          code: 'DANGER',
+          name: '위험',
+          description: null,
+          scoreDescription: null,
+        },
+      }),
+    )
+
+    expect(markup).toContain('metric-critical')
+    expect(markup.replace(/<[^>]*>/g, '')).toContain('산책 위험')
+  })
+
+  it('위험도가 아직 안 왔으면(undefined) 배지도 문장도 없다 — 시각은 그대로다', () => {
+    const markup = renderWithWalkSafety(undefined)
+
+    expect(markup).toContain('10:30')
+    expect(markup).not.toContain(messages.common.metricAxisWalkSafety)
+    expect(markup).not.toContain(messages.plan.walkSafetyFeelsLikeLabel)
   })
 })

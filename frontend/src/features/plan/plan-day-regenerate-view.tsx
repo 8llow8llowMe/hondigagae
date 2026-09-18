@@ -406,6 +406,13 @@ function RegenerateJob({
       */
       queryClient.setQueryData(planKeys.detail(plan.planId), next)
       void queryClient.invalidateQueries({ queryKey: planKeys.weather(plan.planId) })
+      /*
+        **산책 위험도도 함께 버린다** (#625 · D15-6). 재생성은 그 날 시각을 전부 지우므로
+        (`toDraftItems` 가 `startTime` 을 싣지 않는다, D14-9) 남은 판정이 전부
+        `NO_START_TIME` 으로 바뀌어야 하는데, 무효화하지 않으면 지운 시각의 낡은 판정이
+        그대로 남는다.
+      */
+      void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(plan.planId) })
 
       // 끝난 작업을 히스토리에 남기지 않는다 (R8). 바꾼 일자로 앵커 스크롤한다
       router.replace(`/plans/${plan.planId}#${planDayAnchorId(day)}`)

@@ -33,9 +33,14 @@ import {
 } from '@/lib/plan/detail'
 import { isPackingPromoted } from '@/lib/plan/packing-promotion'
 import { isReviewSectionVisible } from '@/lib/plan/review'
+import {
+  dayBeyondForecastReason,
+  dayHasLookupFailed,
+  walkSafetyByItemId,
+} from '@/lib/plan/walk-safety'
 import type { Pet } from '@/types/pet'
 import type { PlaceDetail } from '@/types/place'
-import type { PlanDetail, PlanWeatherResponse } from '@/types/plan'
+import type { PlanDetail, PlanItemWalkSafetyItem, PlanWeatherResponse } from '@/types/plan'
 
 /**
  * 일정 상세 레이아웃 — 좌 레일(개요) + 우 본문(일자 섹션).
@@ -66,6 +71,9 @@ export function PlanDetailSection({
   weather,
   weatherFailed,
   onRetryWeather,
+  walkSafetyItems,
+  walkSafetyFailed,
+  onRetryWalkSafety,
   today,
 }: {
   plan: PlanDetail
@@ -83,9 +91,24 @@ export function PlanDetailSection({
   weather: PlanWeatherResponse | undefined
   weatherFailed: boolean
   onRetryWeather: () => void
+  /**
+   * 항목 산책 위험도 (#625). **아직 안 왔거나(로딩 중) 404/400 이면 빈 배열이다** —
+   * 둘 다 "자리를 통째로 숨긴다" 는 같은 화면 모양이라 호출부가 구분해서 넘기지 않는다
+   * (D15-7).
+   */
+  walkSafetyItems: PlanItemWalkSafetyItem[]
+  /** 전체 조회 5xx·무응답. 404/400 은 여기 오지 않는다 — `walkSafetyItems` 가 빈 채로 온다 */
+  walkSafetyFailed: boolean
+  onRetryWalkSafety: () => void
   today: Date
 }) {
   const { days, outOfRange } = groupItemsByDay(plan.items, plan.totalDays)
+
+  /*
+    **`planItemId` 로 잇는다.** `day`+`sequence` 로 이으면 일괄 교체 직후 한 프레임 동안
+    다른 항목의 판정이 붙는다 (D15-6).
+  */
+  const walkSafetyMap = walkSafetyByItemId(walkSafetyItems)
 
   /**
    * **한 번에 한 일자만 편집한다** — 일괄 교체 단위가 일자다 (E0).
@@ -267,7 +290,7 @@ export function PlanDetailSection({
         있어 0, 데스크톱 2단은 자기 열의 첫 요소라 24 다 (장소 상세 #443 과 같은 처리).
       */}
       <SurfaceStack className="rail-split-main pt-2 md:pt-0 lg:pt-6 lg:pl-3">
-        {days.map((group) => (
+        {days.map((group, index) => (
           <PlanDaySection
             key={group.day}
             day={group.day}
@@ -313,6 +336,26 @@ export function PlanDetailSection({
                 error: visit.failures.get(planItemId) ?? null,
                 onToggle: (next) => visit.toggle(planItemId, next),
               }),
+            }}
+            walkSafety={{
+              of: (planItemId) => walkSafetyMap.get(planItemId),
+              beyondForecastReason: dayBeyondForecastReason(
+                group.items
+                  .map((item) => walkSafetyMap.get(item.planItemId))
+                  .filter((entry): entry is PlanItemWalkSafetyItem => entry !== undefined),
+              ),
+              /*
+                **전체 5xx 는 일정 전체에 한 번뿐이다** — 첫 일자 카드에만 낸다
+                (D15-7 "재시도 버튼은 일자마다가 아니라 한 번"). 나머지 일자는 항목만
+                보여 준다.
+              */
+              failed: walkSafetyFailed && index === 0,
+              hasLookupFailed: dayHasLookupFailed(
+                group.items
+                  .map((item) => walkSafetyMap.get(item.planItemId))
+                  .filter((entry): entry is PlanItemWalkSafetyItem => entry !== undefined),
+              ),
+              onRetry: onRetryWalkSafety,
             }}
             editor={
               editingDay !== group.day ? null : (

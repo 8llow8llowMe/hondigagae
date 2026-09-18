@@ -70,6 +70,10 @@ export function usePlanVisit({ planId }: { planId: string }): PlanVisitState {
               **판정(`planKeys.weather`)은 무효화하지 않는다.** 그날 판정은 첫 장소 항목을
               기준으로 하는데(컨트롤러 설명) 방문 체크는 항목 구성·순서를 바꾸지 않는다.
               담기·순서편집이 판정을 다시 받는 것과 갈리는 지점이다.
+
+              **`planKeys.walkSafety` 도 같은 이유로 무효화하지 않는다** (#625 · D15-6).
+              방문 체크는 `planItemId`·`startTime`·장소를 바꾸지 않으므로 그 항목의
+              산책 위험도 판정도 그대로 유효하다.
             */
             void queryClient.invalidateQueries({ queryKey: planKeys.detail(planId) })
           },

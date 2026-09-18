@@ -29,8 +29,14 @@ export type MetricTone = 'critical' | 'high' | 'mid' | 'low' | 'unknown'
  * 산책 안전(`안전·주의·위험`)·기상특보(`폭염 경보`)·속성 배지(`실내 여부 미확인`)는
  * 충돌 상대가 없거나 문구가 이미 축을 말하므로 **붙이지 않는다**
  * (`docs/features/공통/등급배지-축라벨-세부명세.md` D5 가 호출부 17곳을 전수로 갖는다).
+ *
+ * **`walkSafety` 는 세 번째 예외다** (#625 · 일정상세-세부명세 D15-10 미결 1). 일정 항목
+ * 행에는 `#652`·장소 상세가 기댔던 "바로 위 `지금 산책` 제목" 이 없어서, `10:30 주의
+ * 천지연폭포` 처럼 축 없는 등급어가 시각·장소 이름 사이에 낀다 — 스크린리더가 무엇이
+ * 주의인지 말하지 못한다. **이 호출부(`plan-item-row.tsx`)에만 쓴다** — 제목이 이미 축을
+ * 세운 기존 두 호출부(`about/verdict-specimen.tsx` · 장소 상세)는 그대로 둔다.
  */
-export type MetricAxis = 'suitability' | 'congestion'
+export type MetricAxis = 'suitability' | 'congestion' | 'walkSafety'
 
 /**
  * 축 → 라벨. **어휘 표이지 code→tone 매핑이 아니다** — 이 파일이 code 를 해석하지 않는다는
@@ -39,6 +45,7 @@ export type MetricAxis = 'suitability' | 'congestion'
 const METRIC_AXIS_LABEL: Record<MetricAxis, string> = {
   suitability: messages.common.metricAxisSuitability,
   congestion: messages.common.metricAxisCongestion,
+  walkSafety: messages.common.metricAxisWalkSafety,
 }
 
 /**

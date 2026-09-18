@@ -15,6 +15,11 @@ export const planKeys = {
    */
   weather: (planId: string) => [...planKeys.all, 'weather', planId] as const,
   /**
+   * 항목 산책 위험도 (#625). **상세·판정과 또 나눈다** — 한쪽이 5xx 로 죽어도 다른 쪽은
+   * 살아 있어야 하고(D5), 일괄 교체 뒤 이 절만 무효화할 수 있어야 한다 (D15-6).
+   */
+  walkSafety: (planId: string) => [...planKeys.all, 'walkSafety', planId] as const,
+  /**
    * 응급 브리핑 (#125). **상세·판정과 key 를 또 나눈다** — 별도 화면이고 한쪽이 실패해도
    * 다른 쪽은 살아 있어야 한다.
    */
