@@ -3,8 +3,13 @@
  *
  * **서버가 내려주는 문구는 여기 없다** — `providerName` · `baseDate` · 404 `resultMessage`
  * 는 그대로 렌더한다 (`docs/api-integration-guide.md` §6). 활동량 이름(`낮음`·`보통`)도
- * 여기 없다: 코스 응답에 enum metadata 가 하나도 없어 `pet.activityLevel.name` 에서
- * 가져온다 (공통명세 S3 · S4-1 규칙 6).
+ * 여기 없다: 기준 줄은 응답의 `appliedPetActivityLevel.level.name` 을 쓰고, 세그먼트
+ * 선택지는 등록 폼과 같은 `messages.pet.options.activityLevel` 을 쓴다
+ * (공통명세 S4-1 규칙 6 · `api-integration-guide.md` §6 "서버가 값을 주지 않는 컨트롤").
+ *
+ * **상한 숫자(4시간·6시간)도 여기 없다** (#735). 응답의 `maxDurationMinutes` 를
+ * `formatDuration` 으로 옮겨 적는다 — 화면이 상한을 제 상수로 적으면 서버가 상한을 바꾼 날
+ * 화면만 옛 숫자를 말한다.
  *
  * **제목에는 마침표를 찍지 않고 설명에는 찍는다** — `/places` · `/favorites` 와 같다.
  */
@@ -25,17 +30,17 @@ export const walkCourseMessages = {
   // ── 목록 ──────────────────────────────────────────────────────────────────
   /** `{count}` 치환. `aria-live` 로 알리는 줄이기도 하다 (D6) */
   listCount: '코스 {count}개',
-  activityGroupLabel: '걷는 시간',
   /**
-   * **세그먼트 위에 얹는 보이는 캡션이다** (#734) — `activityGroupLabel` 과는 다른 자리다.
-   * 라디오그룹의 접근 이름은 옵션이 실제로 말하는 값(걷는 시간 상한)을 그대로 두고,
-   * 이 라벨은 그 축이 반려견의 **활동량**에서 온다는 것을 사람 눈에만 보탠다. 두 문구가
-   * 같은 뜻을 두 번 말하므로 이 캡션은 `aria-hidden` 이다.
+   * 활동량 축의 이름. **라디오그룹의 접근 이름이자 세그먼트 위 보이는 캡션이다** (#734).
+   *
+   * 축 이름이 `걷는 시간` 에서 `활동량` 으로 바뀌었다 (#735): 선택지가 상한 시간
+   * (`4시간 이내`)이 아니라 활동량 이름(`낮음`·`보통`)이 되었기 때문이다. 상한은 화면이
+   * 적을 수 없는 서버 값이라, 고른 뒤 **기준 줄**이 응답 값으로 말한다.
+   *
+   * 두 자리가 같은 문구라 캡션은 `aria-hidden` 이다 — 두 번 읽히지 않게 한다.
    */
-  activityFieldLabel: '활동량',
+  activityGroupLabel: '활동량',
   activityAll: '전체',
-  /** `{hours}` 치환 — 숫자는 `lib/walk-course/activity.ts` 가 갖는다 (D5-2) */
-  activityWithin: '{hours}시간 이내',
   sortGroupLabel: '정렬',
   sortCourseNo: '코스 순',
   sortDistanceAsc: '짧은 순',
@@ -43,14 +48,24 @@ export const walkCourseMessages = {
   columnCourseLabel: '코스',
 
   /**
-   * 기준 줄. **`petActivityLevelApplied` 가 참일 때만 그린다** — 로컬 상태가 아니라
+   * 기준 줄. **`appliedPetActivityLevel` 이 있을 때만 그린다** — 로컬 상태가 아니라
    * 응답을 믿는다 (공통명세 S4-1 규칙 5).
    *
-   * `{pet}` · `{level}` · `{hours}` 치환. `{level}` 은 **서버 enum metadata 의 `name`** 이다.
+   * `{pet}` · `{level}` · `{limit}` 치환. `{level}` 은 **서버 enum metadata 의 `name`**,
+   * `{limit}` 은 **서버 `maxDurationMinutes`** 를 옮겨 적은 것이다 (`4시간`).
+   *
+   * **세그먼트가 잃은 숫자를 이 줄이 갖는다** (#735). 컨트롤은 `낮음`·`보통` 만 말할 수
+   * 있고(상한은 응답에만 있다), 그 활동량이 몇 시간인지는 고른 뒤 여기서 드러난다.
    */
-  activityBasis: '{pet} 활동량({level}) 기준으로 {hours}시간 이내 코스만 보여 줘요.',
-  /** 반려견 이름을 모를 때(대표견 조회 실패 뒤 URL 로 들어온 경우)의 기준 줄 */
-  activityBasisWithoutPet: '{hours}시간 이내 코스만 보여 줘요.',
+  activityBasis: '{pet} 활동량({level}) 기준으로 {limit} 이내 코스만 보여 줘요.',
+  /**
+   * 반려견 이름을 붙이지 않는 기준 줄 — 사용자가 세그먼트로 **직접 고른** 경우와, 대표견
+   * 조회가 실패했는데 URL 로 조건을 들고 들어온 경우다. **없는 이름을 지어내지 않는다.**
+   *
+   * 활동량 이름은 남는다 — 그것은 반려견 프로필이 아니라 **응답이 준 값**이라 지어낸 것이
+   * 아니고, 이 줄의 요점(`보통` 이 곧 `6시간`)이 거기 있다.
+   */
+  activityBasisWithoutPet: '활동량({level}) 기준으로 {limit} 이내 코스만 보여 줘요.',
 
   emptyTitle: '조건에 맞는 코스가 없어요',
   emptyDescription: '걷는 시간을 넓혀 보세요.',

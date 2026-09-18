@@ -1,6 +1,11 @@
 import type { MockResult } from '@/lib/api/mock/auth-data'
-import type { ApiResponse } from '@/types/api'
-import type { WalkCourseDetail, WalkCourseList, WalkCourseSummary } from '@/types/walk-course'
+import type { ApiResponse, CodeNameMetadata } from '@/types/api'
+import type {
+  WalkCourseAppliedActivityLevel,
+  WalkCourseDetail,
+  WalkCourseList,
+  WalkCourseSummary,
+} from '@/types/walk-course'
 
 /**
  * 제주올레 산책 코스 mock (#618).
@@ -22,11 +27,11 @@ const PROVIDER_NAME = '제주특별자치도 올레코스현황 · 한국관광�
 const BASE_DATE = '2025-04-28'
 
 /**
- * `durationMaxMinutes` 는 **응답에 없다** — 서버가 필터에만 쓴다 (`WalkCourseActivityFit`).
- * mock 도 같은 자리에 두고 응답에서는 뺀다. 같은 값이 `PlanItemWalkCourseItem` 에는 있는데
- * 코스 목록·상세에는 없는 것이 계약의 실제 모양이고, BE 후속 요청으로 남겼다 (D9-2).
+ * `durationMaxMinutes` 는 **이제 응답에 있다** (#718 · `WalkCourseItem.java:34-36`). 목록·상세
+ * 항목이 그대로 싣는다 — 전에는 서버가 필터에만 써서 mock 이 응답에서 떨어뜨렸고, 그 부재를
+ * 목 테스트가 계약으로 고정하고 있었다 (#735 가 뒤집은 전제).
  */
-type MockWalkCourse = WalkCourseSummary & { durationMaxMinutes: number | null }
+type MockWalkCourse = WalkCourseSummary
 
 /**
  * 여섯 코스로 화면 분기를 전부 덮는다 (`코스목록-세부명세.md` D7 표).
@@ -110,9 +115,35 @@ export const MOCK_WALK_COURSES: MockWalkCourse[] = [
   },
 ]
 
-/** 서버 상한 (`WalkCourseActivityFit.java:22-23`) */
-const ACTIVITY_MAX_MINUTES: Record<string, number> = { LOW: 240, MEDIUM: 360 }
+/**
+ * 서버 상한 (`WalkCourseActivityFit.java:26-27`).
+ *
+ * **이것은 화면의 복제본이 아니라 mock 서버의 값이다.** 화면 쪽 복제본은 #735 에서 걷었고,
+ * 여기 남는 이유는 mock 이 *서버 역할*을 하기 때문이다 — 거르고, 그 상한을 응답에 실어야
+ * 화면이 응답만 보고 기준 줄을 그리는 것을 로컬에서 검증할 수 있다. `HIGH` 는 상한이 없다.
+ */
+const ACTIVITY_MAX_MINUTES: Record<string, number | undefined> = { LOW: 240, MEDIUM: 360 }
 const ACTIVITY_CODES = ['LOW', 'MEDIUM', 'HIGH']
+
+/**
+ * `ActivityLevel` enum metadata (`shared-travel` `ActivityLevel.java:14-16`).
+ *
+ * mock 은 **서버 문구를 그대로** 낸다 — `appliedPetActivityLevel.level` 과
+ * `fitsActivityLevels` 가 이 값으로 나가야 화면이 서버 metadata 를 렌더하는지 검증된다.
+ */
+const ACTIVITY_LEVELS: Record<string, CodeNameMetadata> = {
+  LOW: {
+    code: 'LOW',
+    name: '낮음',
+    description: '짧은 산책을 선호하며 장시간 활동을 힘들어합니다.',
+  },
+  MEDIUM: {
+    code: 'MEDIUM',
+    name: '보통',
+    description: '일반적인 산책과 관광 일정을 소화합니다.',
+  },
+  HIGH: { code: 'HIGH', name: '높음', description: '긴 산책과 활동적인 일정을 선호합니다.' },
+}
 const SORTS = ['COURSE_NO', 'DISTANCE_ASC', 'DISTANCE_DESC', 'DURATION_ASC']
 
 const MIN_DISTANCE_KM = 0.1
@@ -129,14 +160,6 @@ function fail(status: number, resultCode: string, resultMessage: string): MockRe
   }
 }
 
-function toSummary(course: MockWalkCourse): WalkCourseSummary {
-  // `durationMaxMinutes` 는 응답에 없다 — 여기서 떨어뜨리는 것이 계약을 지키는 일이다
-  const { durationMaxMinutes, ...summary } = course
-  void durationMaxMinutes
-
-  return summary
-}
-
 /**
  * `WalkCourseActivityFit.fits` — **소요시간을 모르는 코스는 어느 활동량에서도 걸러지지
  * 않는다.** 모르는 것을 나쁜 것으로 판정하지 않는다는 규칙이고, `HIGH` 는 상한이 없다.
@@ -147,6 +170,34 @@ function fits(course: MockWalkCourse, level: string): boolean {
   if (course.durationMaxMinutes === null) return true
 
   return course.durationMaxMinutes <= max
+}
+
+/**
+ * `WalkCoursePresenter.toAppliedPetActivityLevel` — **활동량을 주지 않은 조회는 객체 자체가
+ * null 이다.** 별도 불리언(`petActivityLevelApplied`)을 함께 내지 않는다: 서버는 한동안
+ * 둘 다 내지만 deprecated 라 곧 사라지고(#718 주석), 화면은 이미 이 객체만 읽는다 (#735).
+ *
+ * `HIGH` 는 상한이 없어 `maxDurationMinutes` 가 `null` 이다 — **객체가 null 인 것과 뜻이
+ * 다르다.** 이 갈래가 mock 에 있어야 화면이 둘을 가르는지 로컬에서 볼 수 있다.
+ */
+function toAppliedActivityLevel(level: string | null): WalkCourseAppliedActivityLevel | null {
+  if (level === null) return null
+
+  const metadata = ACTIVITY_LEVELS[level]
+  if (metadata === undefined) return null
+
+  return { level: metadata, maxDurationMinutes: ACTIVITY_MAX_MINUTES[level] ?? null }
+}
+
+/**
+ * `WalkCourseActivityFit.fittingLevels` — **소요시간을 모르는 코스는 세 값이 다 담긴다.**
+ * 그것은 "아무 아이나 된다" 가 아니라 "모른다" 는 뜻이고, 소비처가 `durationMaxMinutes`
+ * 를 함께 보게 되어 있다.
+ */
+function fittingLevels(course: MockWalkCourse): CodeNameMetadata[] {
+  return ACTIVITY_CODES.filter((code) => fits(course, code))
+    .map((code) => ACTIVITY_LEVELS[code])
+    .filter((level): level is CodeNameMetadata => level !== undefined)
 }
 
 /**
@@ -203,14 +254,14 @@ function list(params: URLSearchParams): MockResult {
   )
 
   /*
-    **`petActivityLevelApplied` 를 파라미터 유무로 계산한다** — presenter 와 같다
-    (`WalkCoursePresenter.java:20`). 결과가 줄었는지로 판정하면 `HIGH` 가 false 가 되어,
+    **`appliedPetActivityLevel` 을 파라미터 유무로 만든다** — presenter 와 같다
+    (`WalkCoursePresenter.java:20,59-67`). 결과가 줄었는지로 판정하면 `HIGH` 가 null 이 되어,
     화면이 서버를 믿는 규칙(S4-1 규칙 5)을 mock 에서 검증할 수 없다.
   */
   const body: WalkCourseList = {
-    courses: sorted(filtered, sort ?? 'COURSE_NO').map(toSummary),
+    courses: sorted(filtered, sort ?? 'COURSE_NO'),
     totalCount: filtered.length,
-    petActivityLevelApplied: level !== null,
+    appliedPetActivityLevel: toAppliedActivityLevel(level),
     providerName: PROVIDER_NAME,
   }
 
@@ -227,8 +278,9 @@ function detail(rawId: string): MockResult {
   if (found === undefined) return fail(404, 'WALKCOURSE_001', '존재하지 않는 산책 코스입니다.')
 
   const body: WalkCourseDetail = {
-    ...toSummary(found),
+    ...found,
     baseDate: BASE_DATE,
+    fitsActivityLevels: fittingLevels(found),
     providerName: PROVIDER_NAME,
   }
 

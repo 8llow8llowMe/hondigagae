@@ -12,7 +12,6 @@ import {
 } from '@/features/walk-course/walk-course-list-section'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
 import type { WalkCourseListParams } from '@/lib/api/walk-course'
-import { ACTIVITY_MAX_HOURS } from '@/lib/walk-course/activity'
 import type { WalkCourseFilters } from '@/types/walk-course'
 
 /**
@@ -25,33 +24,41 @@ import type { WalkCourseFilters } from '@/types/walk-course'
 export function WalkCourseListView({
   filters,
   params,
-  petBasis,
+  petName,
 }: {
   filters: WalkCourseFilters
   params: WalkCourseListParams
   /**
-   * 기준 줄에 이름을 적을 반려견. **URL 이 비어 대표견으로 채운 경우에만** 온다 —
+   * 기준 줄에 적을 반려견 **이름**. **URL 이 비어 대표견으로 채운 경우에만** 온다 —
    * 사용자가 세그먼트로 직접 고른 조건에 반려견 이름을 붙이면 화면이 없는 인과를 말한다
-   * (대표견이 `낮음` 인데 사용자가 `6시간 이내` 를 고른 경우).
+   * (대표견이 `낮음` 인데 사용자가 `보통` 을 고른 경우).
+   *
+   * **활동량 이름은 여기 없다** (#735). 응답이 `appliedPetActivityLevel.level.name` 으로
+   * 내려주므로 반려견 프로필에서 가져올 이유가 사라졌다.
    */
-  petBasis: { name: string; levelName: string } | null
+  petName: string | null
 }) {
   const { apply, showAll } = useWalkCourseNav()
   const query = useWalkCourseList(params)
 
   const data = query.data
   /*
-    **기준 줄은 응답의 `petActivityLevelApplied` 로 그린다** (공통명세 S4-1 규칙 5).
+    **기준 줄은 응답의 `appliedPetActivityLevel` 로 그린다** (공통명세 S4-1 규칙 5).
     로컬 상태로 판정하면 서버가 파라미터를 무시했을 때 화면만 좁혔다고 말한다.
+
+    **상한이 없으면(`maxDurationMinutes === null`) 줄을 만들지 않는다.** 그것은 `HIGH` 를
+    적용한 응답이고, 걸러 낸 코스가 하나도 없어 "…이내 코스만 보여 줘요" 가 거짓이 된다.
+    이 화면은 `HIGH` 를 보내지 않으므로(공통명세 S4-1 규칙 3) 우리 요청으로는 오지 않는
+    갈래지만, **필터 미적용(`null` 객체)과 뜻이 다른 값**이라 응답 모양대로 가른다.
   */
-  const applied = data?.petActivityLevelApplied === true ? params.petActivityLevel : null
+  const applied = data?.appliedPetActivityLevel ?? null
   const basis: WalkCourseBasis | null =
-    applied === null
+    applied === null || applied.maxDurationMinutes === null
       ? null
       : {
-          petName: petBasis?.name ?? null,
-          levelName: petBasis?.levelName ?? null,
-          hours: ACTIVITY_MAX_HOURS[applied],
+          petName,
+          levelName: applied.level.name,
+          maxDurationMinutes: applied.maxDurationMinutes,
         }
 
   return (

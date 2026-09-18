@@ -62,7 +62,11 @@ export default async function WalkCoursesPage({ searchParams }: { searchParams: 
   /*
     **기준 줄에 반려견 이름을 적는 것은 URL 이 비었을 때뿐이다.** 사용자가 세그먼트로
     직접 고른 조건에 이름을 붙이면 화면이 없는 인과를 말한다 — 대표견이 `낮음` 인데
-    `6시간 이내` 를 고른 경우가 그렇다.
+    `보통` 을 고른 경우가 그렇다.
+
+    **활동량 이름과 상한은 여기서 넘기지 않는다** (#735). 목록 응답의
+    `appliedPetActivityLevel` 이 둘 다 내려준다 — 이름은 서버 enum metadata, 상한은
+    서버가 실제로 적용한 값이다.
   */
   const basisPet =
     filters.activity === null && petActivityLevel !== null ? representativePet(pets ?? []) : null
@@ -96,15 +100,7 @@ export default async function WalkCoursesPage({ searchParams }: { searchParams: 
         <h1 className="sr-only">{messages.walkCourse.pageTitle}</h1>
 
         <HydrationBoundary state={dehydrate(queryClient)}>
-          <WalkCourseListView
-            filters={filters}
-            params={params}
-            petBasis={
-              basisPet === null
-                ? null
-                : { name: basisPet.name, levelName: basisPet.activityLevel.name }
-            }
-          />
+          <WalkCourseListView filters={filters} params={params} petName={basisPet?.name ?? null} />
         </HydrationBoundary>
       </SurfaceStack>
     </Canvas>

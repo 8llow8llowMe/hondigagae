@@ -33,7 +33,7 @@ function read(params: RawParams, key: string): string | null {
 
 /**
  * **`HIGH` 를 `ALL` 로 정규화한다.** 결과가 필터 없음과 같은데(실측 29/29) 그대로 보내면
- * `petActivityLevelApplied: true` 가 와서 **화면이 좁히지도 않은 것을 좁혔다고 말한다**
+ * `appliedPetActivityLevel` 이 채워져 **화면이 좁히지도 않은 것을 좁혔다고 말한다**
  * (공통명세 S4-1 규칙 3). 주소에 손으로 적어 넣는 경로가 유일한 입구라 여기서 막는다.
  */
 function readActivity(value: string | null): WalkCourseActivityChoice {
