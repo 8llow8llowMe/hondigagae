@@ -144,6 +144,11 @@ export const paths = {
      */
     reviews: (planId: string) => `/plans/${planId}/reviews`,
     /**
+     * 일정 복사 (#617). 응답이 상세와 같은 `PlanDetailResponse` 다 — 새 타입을 만들지
+     * 않고 `PlanDetail` 을 그대로 쓴다 (`일정복사-세부명세.md` D3-1).
+     */
+    copy: (planId: string) => `/plans/${planId}/copy`,
+    /**
      * 공유 링크 — 소유자 전용 (#627 BE · #628 FE). **한 경로에 세 메서드가 붙는다** —
      * 조회(`GET`) · 발급(`POST`, 본문 없음) · 폐기(`DELETE`).
      *

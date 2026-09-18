@@ -366,6 +366,18 @@ export type PlanUpdatePayload = {
   status?: PlanStatusCode
 }
 
+/**
+ * `POST /plans/{planId}/copy` 요청 (#617). `PlanCopyRequest` 는 `title` 도 받지만
+ * **이 화면은 보내지 않는다** — 서버가 원본 제목 뒤에 ` (복사)` 를 붙인다
+ * (`일정복사-세부명세.md` D3-1 · D8 #2).
+ */
+export type PlanCopyPayload = {
+  /** `yyyy-MM-dd`. 필수(`PLAN_105`) */
+  startDate: string
+  /** `yyyy-MM-dd`. 필수(`PLAN_106`). 일수가 원본과 다르면 서버가 `PLAN_021` 로 거절한다 */
+  endDate: string
+}
+
 /** `POST /plans` · `GET /plans/{planId}` 응답. 목록보다 필드가 많다 */
 export type PlanDetail = {
   planId: string

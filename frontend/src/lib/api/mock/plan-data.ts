@@ -428,6 +428,15 @@ export function resolvePlanMock(
     if (method === 'PUT') return withPlan(memberId, rawId, (plan) => updateReview(plan, body))
   }
 
+  /**
+   * 일정 복사 (#617). **상세 catch-all 보다 앞이다** — `/plans/{id}` 정규식은 슬래시를
+   * 포함한 경로를 잡지 않아 실제로 겹치지는 않지만, 다른 하위 경로들과 같은 자리에 모아 둔다.
+   */
+  const copy = /^\/plans\/([^/]+)\/copy$/.exec(path)
+  if (copy !== null && method === 'POST') {
+    return withPlan(memberId, copy[1] ?? '', (plan) => copyPlanRequest(plan, memberId, body))
+  }
+
   const detail = /^\/plans\/([^/]+)$/.exec(path)
   if (detail !== null) {
     const rawId = detail[1] ?? ''
@@ -559,6 +568,126 @@ function update(plan: MockPlan, body: string | null): MockResult {
   if (typeof parsed.status === 'string') plan.status = parsed.status
 
   return { status: 200, payload: ok(toDetail(plan)) }
+}
+
+/** ` (복사)` 접미. `PlanCommandProcessor.java:376-384` 복제본 (#617) */
+const COPY_TITLE_SUFFIX = ' (복사)'
+
+/** 접미를 붙이고 60자를 넘으면 **원본 쪽을** 잘라 맞춘다 — 접미는 항상 남는다 */
+function withCopyTitleSuffix(title: string): string {
+  const combined = `${title}${COPY_TITLE_SUFFIX}`
+  if (combined.length <= 60) return combined
+  return `${title.slice(0, 60 - COPY_TITLE_SUFFIX.length)}${COPY_TITLE_SUFFIX}`
+}
+
+/**
+ * 일정 복사 — `POST /plans/{planId}/copy` (#617, `일정복사-세부명세.md` D3).
+ *
+ * **백엔드보다 느슨하거나 엄격해서는 안 된다** (D7). 검사 순서도 서버와 같다 — 서식
+ * (`PLAN_105`/`106`/`104`) → 역전(`PLAN_003`) → 상한(`PLAN_009`) → 일수 일치(`PLAN_021`,
+ * 원본과 비교) → 반려견 소유(`PLAN_010`, 지금 소유한 아이만 남기고 없으면 거절).
+ *
+ * **`title` 은 받아도 무시한다** (D0-1 · D3-1) — 이 화면은 애초에 보내지 않지만, mock 이
+ * 실수로 보낸 값을 저장하면 서버와 다른 결과를 낸다.
+ */
+function copyPlanRequest(plan: MockPlan, memberId: string, body: string | null): MockResult {
+  let parsed: Record<string, unknown>
+  try {
+    parsed = body === null ? {} : (JSON.parse(body) as Record<string, unknown>)
+  } catch {
+    return fail(400, 'PLAN_100', '요청 값이 올바르지 않습니다.')
+  }
+
+  const errors: { code: string; field: string; message: string }[] = []
+
+  if (typeof parsed.title === 'string' && parsed.title.trim().length > 60) {
+    errors.push({
+      code: 'PLAN_104',
+      field: 'title',
+      message: '일정 제목은 60자 이하만 가능합니다.',
+    })
+  }
+
+  const startDate = typeof parsed.startDate === 'string' ? parsed.startDate : ''
+  if (!DATE_PATTERN.test(startDate)) {
+    errors.push({ code: 'PLAN_105', field: 'startDate', message: '여행 시작일은 필수입니다.' })
+  }
+
+  const endDate = typeof parsed.endDate === 'string' ? parsed.endDate : ''
+  if (!DATE_PATTERN.test(endDate)) {
+    errors.push({ code: 'PLAN_106', field: 'endDate', message: '여행 종료일은 필수입니다.' })
+  }
+
+  if (errors.length > 0) return failValidation(errors)
+
+  // 역전 → 상한 순서로 본다 — `create()` 의 `validateDateRange` 와 같은 순서
+  if (startDate > endDate) {
+    return fail(400, 'PLAN_003', '여행 시작일은 종료일보다 늦을 수 없습니다.')
+  }
+  if (daysBetween(startDate, endDate) > 30) {
+    return fail(400, 'PLAN_009', '여행 기간은 최대 30일까지 만들 수 있습니다.')
+  }
+
+  /*
+    **그다음 일수 비교다** (D3-2) — 역전·상한 통과 뒤에만 의미가 있다. 여기가 이 API
+    고유의 규칙이라 `create()` 에는 없다.
+  */
+  if (daysBetween(startDate, endDate) !== daysBetween(plan.startDate, plan.endDate)) {
+    return fail(400, 'PLAN_021', '복사할 여행 기간의 일수는 원본과 같아야 합니다.')
+  }
+
+  /*
+    **원본 동행견 중 지금 소유한 아이만 남긴다** (D3-3). 대표 반려견 폴백이 없다 —
+    남는 아이가 없으면 그대로 거절한다(`PLAN_010`).
+  */
+  const store = mockStore()
+  const ownedPetIds = new Set(
+    store.pets.filter((pet) => pet.memberId === memberId && !pet.deleted).map((pet) => pet.petId),
+  )
+  const effectivePetIds = plan.petIds.filter((petId) => ownedPetIds.has(petId))
+  if (effectivePetIds.length === 0) {
+    return fail(400, 'PLAN_010', '동행할 반려견을 지정하거나 대표 반려견을 등록해 주세요.')
+  }
+
+  /*
+    **일자·순서·종류·대상·제목·메모·시작시간은 승계, 방문 체크는 승계되지 않는다**
+    (D3-3) — 새 항목은 서버가 새로 발급하므로 전부 미방문이다.
+  */
+  const items: MockPlanItem[] = plan.items.map((item) => ({
+    planItemId: nextPlanItemId(store),
+    day: item.day,
+    sequence: item.sequence,
+    itemType: item.itemType,
+    targetId: item.targetId,
+    title: item.title,
+    memo: item.memo,
+    startTime: item.startTime,
+    visited: false,
+  }))
+
+  const copied: MockPlan = {
+    planId: nextPlanId(store),
+    memberId,
+    petId: effectivePetIds[0] as string,
+    petIds: effectivePetIds,
+    areaCode: plan.areaCode,
+    sigunguCode: plan.sigunguCode,
+    title: withCopyTitleSuffix(plan.title),
+    startDate,
+    endDate,
+    budget: plan.budget,
+    // 복사본은 항상 초안이다 (D3-1)
+    status: 'DRAFT',
+    items,
+    // 준비물 · 후기는 승계되지 않는다 (D3-3)
+    packingItems: [],
+    packingGeneratedAt: null,
+    review: null,
+    deleted: false,
+  }
+  store.plans.push(copied)
+
+  return { status: 200, payload: ok(toDetail(copied)) }
 }
 
 /**

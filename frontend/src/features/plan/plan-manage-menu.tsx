@@ -10,13 +10,16 @@ import { ConfirmModal } from '@/components/confirm-modal'
 import { FormAlert } from '@/components/form-alert'
 import { MoreIcon } from '@/components/icons'
 import { Menu, MenuAnchor } from '@/components/menu'
+import { PlanCopyModal } from '@/features/plan/plan-copy-modal'
 import { PlanEditModal } from '@/features/plan/plan-edit-modal'
 import { PlanShareModal } from '@/features/plan/plan-share-modal'
 import { planKeys } from '@/features/plan/queries'
 import { ApiError } from '@/lib/api/error'
 import { deletePlan } from '@/lib/api/plan'
+import { dayToLocalNoon } from '@/lib/date/day'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
+import { canCopyPlan } from '@/lib/plan/copy'
 import { isShareablePlan } from '@/lib/plan/share-link'
 import {
   PLAN_STATUS_ACTION_LABELS,
@@ -82,11 +85,20 @@ export function PlanManageMenu({
   const [menuOpen, setMenuOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [copyOpen, setCopyOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   // disabled 반영 전 빠른 연속 클릭을 막는다 (form-guide.md §6)
   const deletingRef = useRef(false)
+
+  /*
+    **지난 OR 완료만** 보인다 (#617, `일정복사-세부명세.md` D4-1 · D17-2). `today` 는
+    문자열로 받아 `Date` 로 되돌린다 — 이 컴포넌트가 `new Date()` 를 새로 부르면 자정
+    근처에서 SSR 과 갈린다(`home-view.tsx` 의 같은 변환과 같은 근거).
+  */
+  const todayDate = dayToLocalNoon(today)
+  const canCopy = todayDate !== null && canCopyPlan(plan, todayDate)
 
   function leave() {
     void queryClient.invalidateQueries({ queryKey: planKeys.list() })
@@ -153,6 +165,23 @@ export function PlanManageMenu({
               },
             },
             /*
+              **`수정` 다음, 역방향 상태 항목보다 위** (#617, D17-1). 복사는 이 일정을
+              바꾸지 않고 새 일정을 만드는 비파괴 동작이라, 이 일정에 손대는 아래 두
+              묶음(상태를 바꾼다 / 지운다)보다 위에 둔다. 선 아래 `danger-900` 자리는
+              `삭제` 혼자 남는다 — 복사는 파괴적이지 않으므로 내려가지 않는다.
+            */
+            ...(canCopy
+              ? [
+                  {
+                    label: messages.plan.copyAction,
+                    onSelect: () => {
+                      setMenuOpen(false)
+                      setCopyOpen(true)
+                    },
+                  },
+                ]
+              : []),
+            /*
               **정방향은 여기 없다.** `확정하기` · `완료하기` 는 개요 아래 전폭 버튼이다
               (`plan-status-action.tsx`). 초안에는 되돌아갈 앞 상태가 없어 이 갈래가 비고,
               그때 메뉴는 예전과 똑같이 `수정 · 삭제` 둘이다.
@@ -205,6 +234,7 @@ export function PlanManageMenu({
       />
 
       <PlanShareModal planId={plan.planId} open={shareOpen} onClose={() => setShareOpen(false)} />
+      <PlanCopyModal plan={plan} today={today} open={copyOpen} onClose={() => setCopyOpen(false)} />
 
       {/*
         **`ConfirmModal` 이 취소 좌측 · 기본 포커스 취소를 보장한다** — 파괴 버튼에 포커스를

@@ -3,6 +3,7 @@ import { paths } from '@/lib/api/paths'
 import type { SliceResponse } from '@/types/api'
 import type { PlanEmergencyResponse } from '@/types/emergency'
 import type {
+  PlanCopyPayload,
   PlanCreatePayload,
   PlanDayItemsReplacePayload,
   PlanDetail,
@@ -117,6 +118,17 @@ export function updatePlan(planId: string, payload: PlanUpdatePayload): Promise<
  */
 export function deletePlan(planId: string): Promise<void> {
   return clientFetchVoid(planDetailPath(planId), { method: 'DELETE' })
+}
+
+/**
+ * 일정 복사 (#617). **응답이 `updatePlan` 과 같은 `PlanDetailResponse` 전체**다 — 새
+ * `planId` 의 상세 그대로라 호출부가 `setQueryData(planKeys.detail(새 planId), …)` 로
+ * 캐시에 바로 심는다. 재조회 없이 새 상세로 이동할 수 있다 (`일정복사-세부명세.md` D3-4).
+ *
+ * **재시도가 없다.** 같은 본문을 자동으로 다시 보내면 같은 기간의 일정이 하나 더 생긴다.
+ */
+export function copyPlan(planId: string, payload: PlanCopyPayload): Promise<PlanDetail> {
+  return clientFetch<PlanDetail>(paths.plans.copy(planId), { method: 'POST', body: payload })
 }
 
 /**

@@ -473,6 +473,7 @@
   없는 시간의 답이 된다 — 백엔드가 `NO_START_TIME` 에서 "정오를 넣어 판정하지 않는다" 고 못박은 것과 같다.
 - 편집은 `순서 편집` 모드 안이다 (`features/plan/일자편집-세부명세.md` G). 항목 단건 수정 API 가
   없어 행에서 고치면 저장할 때마다 그 일자 방문 체크가 초기화된다.
+  | 일정 복사 | `/plans/[planId]` 관리 메뉴 → 모달 | `POST /plans/{planId}/copy` | **구현** (#617) — 지난·완료 일정만. `일정복사-세부명세.md` |
 
 **일정 응급 브리핑** — [#125](https://github.com/8llow8llowMe/hondigagae/issues/125) · BE PR #105
 
