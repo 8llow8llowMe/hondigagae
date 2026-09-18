@@ -12,9 +12,17 @@ import { type ForwardedBody, readForwardedBody, toMockBody } from '@/lib/api/for
 import { isMockEnabled, resolveMock, resolveMockStream } from '@/lib/api/mock'
 import { toEventStream } from '@/lib/api/mock/stream'
 import { gatewayUrl } from '@/lib/api/server'
+import { clearOAuthState, readOAuthState, writeOAuthState } from '@/lib/auth/oauth-state'
+import {
+  extractOAuthState,
+  isOAuthAuthorizePath,
+  isOAuthCallbackPath,
+  toOAuthStateCookiePair,
+} from '@/lib/auth/oauth-state-cookie'
 import { extractRefreshToken, toCookieHeader } from '@/lib/auth/refresh-cookie'
 import { canRetryReissue, isAuthEntryPath, isReissuePath } from '@/lib/auth/reissue'
 import { clearSession, readSession, type Session, writeSession } from '@/lib/auth/session'
+import { joinCookiePairs } from '@/lib/http/set-cookie'
 
 /**
  * 백엔드 프록시 (catch-all).
@@ -26,6 +34,12 @@ import { clearSession, readSession, type Session, writeSession } from '@/lib/aut
  *  2. 응답 body 에서 토큰을 제거해 브라우저 JS 가 절대 보지 못하게 한다
  *  3. 게이트웨이의 refresh 쿠키를 세션에 봉인한다 (SameSite=Strict / Path 제한 때문에
  *     브라우저가 직접 들고 있을 수 없다 — src/lib/auth/refresh-cookie.ts)
+ *  3-1. 소셜 로그인 state 쿠키를 양방향으로 중계한다 (#689 / BE #681 —
+ *     src/lib/auth/oauth-state.ts). refresh 와 달리 **브라우저에 심는다**
+ *  ⚠ 3-1 은 BE #681 과 **짝이다.** 백엔드가 먼저 나가면 구버전 프론트의 콜백에는
+ *     쿠키가 없어 AUTH_010 으로 전부 막힌다. 두 PR 은 함께 머지한다.
+ *     (반대 순서는 안전하다 — 백엔드가 쿠키를 안 주면 봉인할 값이 없고, 콜백에
+ *     쿠키를 안 실어도 아직 검사하지 않아 그대로 동작한다)
  *  4. 401 이면 reissue 를 1회만 시도하고 원 요청을 재시도한다
  *  5. 본문을 형태 그대로 통과시킨다 — JSON 도, `multipart/form-data`(파일 업로드)도
  *     (`@/lib/api/forwarded-body`)
@@ -44,6 +58,21 @@ type GatewayResult = {
   status: number
   payload: unknown
   refreshToken: string | null
+  /** `/authorize` 가 내려준 소셜 state. 없으면 null (백엔드 배포 전 과도기 포함) */
+  oauthState: string | null
+}
+
+/**
+ * 게이트웨이로 되돌려 보낼 쿠키.
+ *
+ * **둘을 한 객체로 묶는다.** `Cookie` 헤더는 하나뿐이라 각자 `headers.Cookie = ...` 를
+ * 쓰면 뒤가 앞을 덮어써 한쪽이 조용히 사라진다. 조립은 아래 한 곳에서만 한다.
+ */
+type GatewayCookies = {
+  /** reissue 전용. 게이트웨이가 쿠키에서 refresh 를 읽는다 */
+  refreshToken?: string | null
+  /** 소셜 콜백 전용. 게이트웨이가 쿼리 state 와 대조한다 (BE #681) */
+  oauthState?: string | null
 }
 
 async function callGateway(
@@ -52,15 +81,28 @@ async function callGateway(
   method: ForwardedMethod,
   body: ForwardedBody | null,
   accessToken: string | null,
-  refreshToken: string | null,
+  cookies: GatewayCookies = {},
 ): Promise<GatewayResult> {
   // 개발용 mock (MOCK_API=true, 프로덕션에서는 항상 비활성).
   // 여기서 처리하면 게이트웨이를 부르지 않는다. 클라이언트는 차이를 모른다.
   if (isMockEnabled()) {
-    const mock = resolveMock(path, method, search, toMockBody(body), accessToken)
+    // state 쿠키도 함께 넘긴다 — mock 이 이 검사를 빼면 실서버에서만 막히는 흐름이 생긴다
+    const mock = resolveMock(
+      path,
+      method,
+      search,
+      toMockBody(body),
+      accessToken,
+      cookies.oauthState ?? null,
+    )
     if (mock !== null) {
       // mock 에도 refresh 토큰을 실어야 세션이 완성되고 401 재발급 흐름이 돈다
-      return { status: mock.status, payload: mock.payload, refreshToken: mock.refreshToken ?? null }
+      return {
+        status: mock.status,
+        payload: mock.payload,
+        refreshToken: mock.refreshToken ?? null,
+        oauthState: mock.oauthState ?? null,
+      }
     }
   }
 
@@ -68,8 +110,12 @@ async function callGateway(
   // multipart 는 boundary 가 이 값 안에 있다. 새로 만들지 말고 원본을 그대로 쓴다
   if (body !== null) headers['Content-Type'] = body.contentType
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`
-  // reissue 는 게이트웨이가 쿠키에서 refresh 를 읽는다
-  if (refreshToken) headers.Cookie = toCookieHeader(refreshToken)
+
+  const cookieHeader = joinCookiePairs([
+    cookies.refreshToken ? toCookieHeader(cookies.refreshToken) : null,
+    cookies.oauthState ? toOAuthStateCookiePair(cookies.oauthState) : null,
+  ])
+  if (cookieHeader !== null) headers.Cookie = cookieHeader
 
   let response: Response
   try {
@@ -87,6 +133,7 @@ async function callGateway(
       status: GATEWAY_UNREACHABLE_STATUS,
       payload: gatewayUnreachablePayload(cause),
       refreshToken: null,
+      oauthState: null,
     }
   }
 
@@ -100,10 +147,13 @@ async function callGateway(
     }
   }
 
+  const setCookies = response.headers.getSetCookie()
+
   return {
     status: response.status,
     payload,
-    refreshToken: extractRefreshToken(response.headers.getSetCookie()),
+    refreshToken: extractRefreshToken(setCookies),
+    oauthState: extractOAuthState(setCookies),
   }
 }
 
@@ -222,14 +272,9 @@ async function handleEventStream(
     // 열어 둔 응답 본문을 버린다 — 재시도 전에 소켓을 돌려준다
     await called.response.body?.cancel().catch(() => undefined)
 
-    const reissued = await callGateway(
-      '/auth/token/reissue',
-      '',
-      'POST',
-      null,
-      null,
-      session.refreshToken,
-    )
+    const reissued = await callGateway('/auth/token/reissue', '', 'POST', null, null, {
+      refreshToken: session.refreshToken,
+    })
     const reissuedTokens = stripTokens(reissued.payload)
 
     if (reissued.status === 200 && reissuedTokens.accessToken !== null) {
@@ -302,14 +347,22 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
   // 재시도가 같은 본문을 다시 보내야 하므로 스트림이 아니라 버퍼로 들고 있는다
   const body = await readForwardedBody(request)
 
-  let result = await callGateway(
-    path,
-    search,
-    method,
-    body,
-    session?.accessToken ?? null,
-    isReissuePath(path) ? (session?.refreshToken ?? null) : null,
-  )
+  /*
+    소셜 로그인 state 쿠키 중계 (#689 / BE #681).
+
+    판정은 `@/lib/auth/oauth-state-cookie` 한 곳에서 한다 — 경로 문자열을 여기저기 박으면
+    심는 쪽과 지우는 쪽이 따로 놀아 절반짜리 상태가 된다.
+
+    콜백에서만 봉인을 푼다. 다른 경로에 실으면 게이트웨이가 쓰지도 않는 값을 매 요청
+    보내게 되고, 그만큼 값이 새어 나갈 표면이 넓어진다.
+  */
+  const isOAuthCallback = isOAuthCallbackPath(path)
+  const oauthState = isOAuthCallback ? await readOAuthState() : null
+
+  let result = await callGateway(path, search, method, body, session?.accessToken ?? null, {
+    refreshToken: isReissuePath(path) ? (session?.refreshToken ?? null) : null,
+    oauthState,
+  })
 
   // 401 → reissue 1회 → 원 요청 재시도.
   // 인증 진입 경로(로그인)의 401 은 로그인 실패라 재발급으로 복구되지 않는다
@@ -320,14 +373,9 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
     !isAuthEntryPath(path) &&
     canRetryReissue(0)
   ) {
-    const reissued = await callGateway(
-      '/auth/token/reissue',
-      '',
-      'POST',
-      null,
-      null,
-      session.refreshToken,
-    )
+    const reissued = await callGateway('/auth/token/reissue', '', 'POST', null, null, {
+      refreshToken: session.refreshToken,
+    })
     const reissuedTokens = stripTokens(reissued.payload)
 
     if (reissued.status === 200 && reissuedTokens.accessToken !== null) {
@@ -338,7 +386,7 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
       }
       await writeSession(next)
 
-      result = await callGateway(path, search, method, body, next.accessToken, null)
+      result = await callGateway(path, search, method, body, next.accessToken)
     } else {
       await clearSession()
     }
@@ -358,6 +406,24 @@ async function handle(request: NextRequest, context: { params: Promise<{ path: s
   // 로그아웃 → 게이트웨이가 refresh 쿠키를 비운다
   if (result.refreshToken === '') {
     await clearSession()
+  }
+
+  /*
+    소셜 state 쿠키의 수명은 여기서 끝난다.
+
+    - `/authorize` 성공 → 게이트웨이가 준 값을 봉인해 **브라우저에** 심는다.
+      값이 비어 오면(백엔드 배포 전 과도기) 심지 않는다 — 빈 쿠키를 만들어 두면
+      콜백이 빈 값을 실어 보내 원인이 "위조" 처럼 보인다.
+    - 콜백 → **성공·실패와 무관하게 지운다.** state 는 1회용이고 게이트웨이도 조회와
+      동시에 버린다. 실패했을 때 남겨 두면 다음 시도가 죽은 값을 들고 간다.
+
+    값은 로그에 남기지 않는다.
+  */
+  if (isOAuthAuthorizePath(path) && result.status === 200 && result.oauthState) {
+    await writeOAuthState(result.oauthState)
+  }
+  if (isOAuthCallback) {
+    await clearOAuthState()
   }
 
   return NextResponse.json(stripped.body, { status: result.status })

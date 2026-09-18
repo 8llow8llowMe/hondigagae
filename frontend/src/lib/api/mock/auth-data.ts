@@ -19,6 +19,11 @@ export type MockResult = {
   payload: ApiResponse<unknown>
   /** 게이트웨이의 Set-Cookie 를 대신한다. 없으면 BFF 세션의 refresh 가 비어 재발급이 안 돈다 */
   refreshToken?: string
+  /**
+   * `/authorize` 가 내려주는 소셜 state 쿠키를 대신한다 (#689 / BE #681).
+   * BFF 가 이 값을 봉인해 브라우저에 심고, 콜백 때 되돌려 준다.
+   */
+  oauthState?: string
 }
 
 /** 개발용 고정 인증코드. 백엔드 예시(A3K7MP2X)와 같은 8자 영숫자 형태다 */
@@ -340,7 +345,12 @@ function oauthProfile(
  * 두 번째는 `AUTH_010` 으로 실패한다** — 화면의 중복 실행 가드를 확인할 수 있는 것이
  * 이 성질이고, 명세가 적어 둔 "code 를 두 번 쓰면 실패" 의 실제 메커니즘이다.
  */
-function oauthLogin(store: MockStore, rawProvider: string, search: string): MockResult {
+function oauthLogin(
+  store: MockStore,
+  rawProvider: string,
+  search: string,
+  cookieState: string | null,
+): MockResult {
   const provider = OAUTH_PROVIDERS.get(rawProvider.toLowerCase())
   if (provider === undefined) {
     /*
@@ -359,6 +369,20 @@ function oauthLogin(store: MockStore, rawProvider: string, search: string): Mock
   const params = searchParams(search)
   const code = params.get('code') ?? ''
   const state = params.get('state') ?? ''
+
+  /*
+    **쿠키 대조를 먼저 한다** (#689 / BE #681). 백엔드는 `/authorize` 때 심은
+    `oauthState` 쿠키와 쿼리 `state` 가 같은지 보고, 없거나 다르면 같은 AUTH_010 을 낸다.
+    mock 이 이 검사를 빼면 BFF 의 쿠키 중계가 끊겨도 로컬에서는 통과해, 실서버에서만
+    소셜 로그인이 막힌다.
+  */
+  if (cookieState === null || cookieState !== state) {
+    return fail(
+      401,
+      'AUTH_010',
+      '유효하지 않은 소셜 로그인 요청입니다. 처음부터 다시 시도해주세요.',
+    )
+  }
 
   // 백엔드 validateState: 공란도 모르는 state 도 같은 AUTH_010 이다
   const storedConsent = store.oauthStates.get(`${provider}:${state}`)
@@ -455,6 +479,8 @@ export function resolveAuthMock(
   method: string,
   search: string,
   body: string | null,
+  /** BFF 가 되돌려 준 소셜 state 쿠키. 콜백에서만 쓴다 (#689) */
+  oauthState: string | null = null,
 ): MockResult | null {
   const store = mockStore()
 
@@ -653,12 +679,14 @@ export function resolveAuthMock(
       payload: ok({
         authorizationUrl: `/oauth/${oauthAuthorize[1] ?? ''}/callback?code=${code}&state=${state}`,
       }),
+      // 백엔드의 `Set-Cookie: oauthState=...` 자리다. BFF 가 봉인해 브라우저에 심는다 (#689)
+      oauthState: state,
     }
   }
 
   const oauthLoginPath = /^\/auth\/([^/]+)\/login$/.exec(path)
   if (oauthLoginPath !== null && method === 'GET') {
-    return oauthLogin(store, oauthLoginPath[1] ?? '', search)
+    return oauthLogin(store, oauthLoginPath[1] ?? '', search, oauthState)
   }
 
   if (path === '/members/signup' && method === 'POST') {

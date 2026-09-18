@@ -27,8 +27,20 @@ function issued(provider: string, search = AGREED_QUERY): { code: string; state:
   return { code: params.get('code') ?? '', state: params.get('state') ?? '' }
 }
 
-function login(provider: string, code: string, state: string) {
-  return resolveMock(`/auth/${provider}/login`, 'GET', `?code=${code}&state=${state}`, null)
+/**
+ * 콜백. `cookieState` 는 BFF 가 봉인을 풀어 되돌려 준 state 쿠키다 (#689).
+ * 기본값이 쿼리 state 인 것은 **중계가 정상일 때의 모양**이라서다 — 중계가 끊긴 경우는
+ * 아래에서 명시적으로 `null` 을 넘겨 확인한다.
+ */
+function login(provider: string, code: string, state: string, cookieState: string | null = state) {
+  return resolveMock(
+    `/auth/${provider}/login`,
+    'GET',
+    `?code=${code}&state=${state}`,
+    null,
+    null,
+    cookieState,
+  )
 }
 
 beforeEach(resetMockStore)
@@ -44,6 +56,14 @@ describe('GET /auth/{provider}/authorize', () => {
     const { state } = issued('kakao')
 
     expect(mockStore().oauthStates.has(`KAKAO:${state}`)).toBe(true)
+  })
+
+  it('state 쿠키를 함께 내려준다 — BFF 가 이 값을 봉인해 브라우저에 심는다 (#689)', () => {
+    const result = authorize('kakao')
+    const body = result?.payload.dataBody as AuthorizeBody
+    const state = new URLSearchParams(body.authorizationUrl.split('?')[1] ?? '').get('state')
+
+    expect(result?.oauthState).toBe(state)
   })
 
   it('모르는 provider 는 400 AUTH_007 이다', () => {
@@ -143,6 +163,29 @@ describe('GET /auth/{provider}/login', () => {
 
     expect(login('kakao', code, '')?.payload.dataHeader.resultCode).toBe('AUTH_010')
     expect(login('kakao', code, 'forged')?.payload.dataHeader.resultCode).toBe('AUTH_010')
+  })
+
+  it('state 쿠키가 없으면 AUTH_010 이다 — BFF 중계가 끊긴 상태다 (#689)', () => {
+    /*
+      **이 테스트가 없으면 프록시의 쿠키 중계가 끊겨도 로컬은 통과한다.** 백엔드는
+      쿠키가 없으면 AUTH_010 으로 거부하므로, 그 조건을 mock 도 같이 들고 있어야
+      "로컬은 되는데 실서버만 막힌다" 가 생기지 않는다.
+    */
+    const { code, state } = issued('kakao')
+
+    const result = login('kakao', code, state, null)
+    expect(result?.status).toBe(401)
+    expect(result?.payload.dataHeader.resultCode).toBe('AUTH_010')
+    // 거부됐으니 state 는 소비되지 않는다 — 다시 시도하면 통과해야 한다
+    expect(login('kakao', code, state)?.status).toBe(200)
+  })
+
+  it('쿠키와 쿼리의 state 가 다르면 AUTH_010 이다 — 다른 브라우저에서 받아온 state 다', () => {
+    const kakao = issued('kakao')
+    const other = issued('kakao')
+
+    const result = login('kakao', kakao.code, kakao.state, other.state)
+    expect(result?.payload.dataHeader.resultCode).toBe('AUTH_010')
   })
 
   it('다른 provider 의 state 는 통하지 않는다', () => {

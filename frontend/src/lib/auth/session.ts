@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 
 import { SESSION_COOKIE_NAME } from '@/lib/auth/cookie-names'
+import { COOKIE_OPTIONS } from '@/lib/auth/cookie-options'
 import { seal, unseal } from '@/lib/auth/session-crypto'
 import { serverEnv } from '@/lib/env.server'
 
@@ -18,13 +19,6 @@ export type Session = {
   refreshToken: string
   memberId: string
 }
-
-const COOKIE_OPTIONS = {
-  httpOnly: true,
-  sameSite: 'lax',
-  path: '/',
-  secure: process.env.NODE_ENV === 'production',
-} as const
 
 export async function readSession(): Promise<Session | null> {
   const store = await cookies()

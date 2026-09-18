@@ -16,15 +16,18 @@ POST /api/v1/auth/login  { email, password }
 
 ```text
 1) GET /api/v1/auth/{provider}/authorize
-     → { authorizationUrl }        ※ 서버 리다이렉트가 아니다
+     → { authorizationUrl } + Set-Cookie: oauthState=...   ※ 서버 리다이렉트가 아니다
 2) 사용자를 authorizationUrl 로 이동
 3) GET /api/v1/auth/{provider}/login?code=&state=
+     → 요청에 Cookie: oauthState=... 가 있어야 한다 (쿼리 state 와 대조)
      → 일반 로그인과 동일한 응답 + Set-Cookie
 ```
 
 `provider`: `kakao`, `naver`
 
 **주의**: 백엔드가 OAuth 리다이렉트를 대신 처리해 주지 않는다. FE(BFF)가 URL을 받아 이동시키고, 콜백 경로에서 `code`/`state` 를 받아 2단계를 호출해야 한다.
+
+`oauthState` 쿠키 중계는 §8 의 "소셜 state 쿠키" 를 따른다.
 
 ### 그 외
 
@@ -132,6 +135,45 @@ reissue 를 호출할 때 `Cookie: refreshToken=...` 헤더로 되돌려준다.
 
 구현: `src/lib/auth/refresh-cookie.ts` (파싱), `src/lib/auth/session.ts` (봉인),
 `app/api/bff/[...path]/route.ts` (주입). 각각 테스트가 있다.
+
+### 소셜 state 쿠키 (#689 / BE #681)
+
+백엔드 `/authorize` 실측 계약.
+
+| 속성     | 값             |
+| -------- | -------------- |
+| name     | `oauthState`   |
+| HttpOnly | `true`         |
+| SameSite | `Strict`       |
+| Path     | `/api/v1/auth` |
+| Secure   | `true`         |
+| Max-Age  | `600` (10분)   |
+
+**refresh 와 목적이 다르다.** refresh 는 로그인이 끝난 뒤의 장기 자격증명이라 BFF가 세션에
+섞어 보관하지만, `oauthState` 는 "인가를 시작한 브라우저와 콜백을 가져온 브라우저가 같은가" 를
+증명하는 1회용 값이다. BFF가 서버 메모리에 들고 있으면 그 보증이 사라진다 — **브라우저에 있어야
+한다.**
+
+게이트웨이 쿠키를 그대로 통과시키지 못하는 이유는 `Path=/api/v1/auth` 다. 브라우저가 보는 경로는
+`/api/bff/auth/...` 라 그 Path 로는 되돌아오지 않는다. 그래서 BFF가 값을 꺼내 **자체 쿠키
+(`hdg_oauth_state`)로 봉인해 브라우저에 심고**, 콜백 호출 때 풀어 `Cookie: oauthState=...` 로
+되돌려준다. 봉인은 세션과 같은 `seal`/`unseal` 이고, 만료는 백엔드와 같은 600초다.
+
+- BFF 쿠키의 `SameSite` 는 **`lax`** 다. 콜백은 제공자 도메인에서 우리 주소로 돌아오는
+  크로스사이트 최상위 이동이라 `strict` 면 그 이동에 실리지 않는다.
+- 콜백이 끝나면 **성공·실패와 무관하게 지운다.** state 는 1회용이고 게이트웨이도 조회와 동시에
+  버린다(Redis `GETDEL`).
+- 쿠키가 없거나 어긋나면 백엔드가 `AUTH_010` 을 낸다. 화면은 이미 "처음부터 다시" 로 안내한다
+  (`src/features/auth/oauth-error.ts`).
+- **값을 로그에 찍지 않는다.**
+
+구현: `src/lib/auth/oauth-state-cookie.ts` (파싱·경로 판정), `src/lib/auth/oauth-state.ts` (봉인),
+`app/api/bff/[...path]/route.ts` (중계). 파싱 규칙은 refresh 와 `src/lib/http/set-cookie.ts` 로 공유한다.
+
+**배포 순서**: BE #681 과 FE #689 는 **함께 나가야 한다.** 백엔드가 먼저 배포되면 구버전 프론트에서
+온 콜백에는 쿠키가 없어 `AUTH_010` 으로 전부 막힌다. 반대 순서(프론트 먼저)는 안전하다 — 백엔드가
+쿠키를 안 주면 봉인할 값이 없어 심지 않고, 콜백에 쿠키를 안 실어도 백엔드가 아직 검사하지 않아
+기존대로 동작한다.
 
 ### BFF의 토큰 차단
 

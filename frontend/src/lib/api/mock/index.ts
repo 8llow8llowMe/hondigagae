@@ -90,9 +90,12 @@ export function resolveMock(
   search: string,
   body: string | null,
   accessToken: string | null = null,
+  /** BFF 가 봉인을 풀어 되돌려 준 소셜 state 쿠키. 콜백에서만 값이 있다 (#689) */
+  oauthState: string | null = null,
 ): MockResult | null {
-  // 소셜 로그인은 GET + 쿼리(code·state)라 search 를 함께 넘긴다
-  const auth = resolveAuthMock(path, method, search, body)
+  // 소셜 로그인은 GET + 쿼리(code·state)라 search 를 함께 넘긴다.
+  // state 쿠키까지 넘겨야 mock 이 백엔드와 같은 조건으로 판정한다 (#689)
+  const auth = resolveAuthMock(path, method, search, body, oauthState)
   if (auth !== null) return auth
 
   /*
