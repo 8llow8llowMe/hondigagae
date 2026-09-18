@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.plan.adapter.in.web.dto.item;
 
 import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
+import com.hondigagae.domainlayer.plan.application.info.PlanItemWalkCourseInfo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.util.List;
@@ -50,4 +51,36 @@ public record PlanItemWalkCourseItem(
         example = "[{\"code\":\"MEDIUM\",\"name\":\"보통\",\"description\":\"일반적인 산책과 관광 일정을 소화합니다.\"}]")
     List<CodeNameDescriptionMetadata> fitsActivityLevels
 ) {
+
+    /**
+     * 요약이 없으면 <b>객체 통째로 null</b> 이다 — 장소({@link PlanItemPlaceItem#from})와 같은 규칙이다.
+     *
+     * <p><b>변환을 여기 둔 이유</b>: 일정 상세({@code PlanPresenter})와 공유 응답
+     * ({@code PlanShareLinkPresenter})이 같은 값을 내려야 한다. 각 Presenter 가 사본을 들면 필드가
+     * 늘 때 한쪽만 비고, 그러면 주인이 보는 화면과 공유받은 사람이 보는 화면이 같은 항목을 다르게
+     * 설명한다 — 그게 이슈 #719 가 고친 증상이다.
+     */
+    public static PlanItemWalkCourseItem from(PlanItemWalkCourseInfo walkCourse) {
+        if (walkCourse == null) {
+            return null;
+        }
+        return PlanItemWalkCourseItem.builder()
+            .name(walkCourse.name())
+            .courseLabel(walkCourse.courseLabel())
+            .distanceKm(walkCourse.distanceKm())
+            .durationText(walkCourse.durationText())
+            .durationMaxMinutes(walkCourse.durationMaxMinutes())
+            .lat(walkCourse.lat())
+            .lng(walkCourse.lng())
+            .firstImage(walkCourse.firstImage())
+            /*
+              raw enum 문자열이 아니라 metadata 객체로 내린다 (coding-conventions §11).
+              같은 응답 안의 itemType 이 이미 metadata 라, 한쪽만 문자열이면 화면이 두 가지
+              해석 코드를 갖게 된다. 표시명·설명은 tour-service 가 실어 준 값 그대로다.
+            */
+            .fitsActivityLevels(walkCourse.fitsActivityLevels().stream()
+                .map(fit -> CodeNameDescriptionMetadata.of(fit.code(), fit.name(), fit.description()))
+                .toList())
+            .build();
+    }
 }

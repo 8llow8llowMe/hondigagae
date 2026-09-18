@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.plan.adapter.in.web.presenter;
 
 import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanItemPlaceItem;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanItemWalkCourseItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.SharedPlanItemItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanShareLinkResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.SharedPlanResponse;
@@ -45,9 +46,11 @@ public class PlanShareLinkPresenter {
     /**
      * {@code planItemId}·{@code memo}·{@code visited} 는 여기서 <b>읽지 않는다</b> — 주인만 쓰는 값이다.
      *
-     * <p>장소 요약과 상태 메타데이터 변환은 소유자 상세와 <b>같은 것을 쓴다</b>
-     * ({@link PlanItemPlaceItem#from}, {@code CodeNameDescribable.toMetadata}). 사본을 두면
-     * 필드가 늘 때 공유 응답만 비게 된다. 이 Presenter 가 따로 갖는 책임은 "무엇을 빼는가" 뿐이다.
+     * <p>장소·산책 코스 요약과 상태 메타데이터 변환은 소유자 상세와 <b>같은 것을 쓴다</b>
+     * ({@link PlanItemPlaceItem#from}, {@link PlanItemWalkCourseItem#from},
+     * {@code CodeNameDescribable.toMetadata}). 사본을 두면 필드가 늘 때 공유 응답만 비게 된다 —
+     * {@code walkCourse} 가 실제로 그렇게 빠져 있었다 (#719). 이 Presenter 가 따로 갖는 책임은
+     * "무엇을 빼는가" 뿐이다.
      */
     private static SharedPlanItemItem toSharedItem(PlanItemInfo info) {
         PlanItemType itemType = info.itemType();
@@ -60,6 +63,9 @@ public class PlanShareLinkPresenter {
             .title(info.title())
             .startTime(info.startTime())
             .place(PlanItemPlaceItem.from(info.place()))
+            // 코스 요약은 제주올레 공공데이터라 감출 값이 아니다. 빠져 있으면 WALK 항목만 제목 한
+            // 줄로 남아, 장소 항목은 요약이 실리는 옆에서 비대칭이 된다.
+            .walkCourse(PlanItemWalkCourseItem.from(info.walkCourse()))
             .build();
     }
 }

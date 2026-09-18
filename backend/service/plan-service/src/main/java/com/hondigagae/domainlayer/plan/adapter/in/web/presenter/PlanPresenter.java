@@ -10,7 +10,6 @@ import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanEmergency
 import com.hondigagae.domainlayer.plan.application.info.PlanEmergencyInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemInfo;
-import com.hondigagae.domainlayer.plan.application.info.PlanItemWalkCourseInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanSummaryInfo;
 import com.hondigagae.shared.travel.plan.PlanItemType;
 import com.hondigagae.persistence.dto.SliceResponse;
@@ -105,33 +104,9 @@ public class PlanPresenter {
             .startTime(info.startTime())
             .visited(info.visited())
             .place(PlanItemPlaceItem.from(info.place()))
-            .walkCourse(toWalkCourseItem(info.walkCourse()))
-            .build();
-    }
-
-    /** 장소와 같다 — 요약이 없으면 객체 통째로 null 이다 */
-    private PlanItemWalkCourseItem toWalkCourseItem(PlanItemWalkCourseInfo walkCourse) {
-        if (walkCourse == null) {
-            return null;
-        }
-        return PlanItemWalkCourseItem.builder()
-            .name(walkCourse.name())
-            .courseLabel(walkCourse.courseLabel())
-            .distanceKm(walkCourse.distanceKm())
-            .durationText(walkCourse.durationText())
-            .durationMaxMinutes(walkCourse.durationMaxMinutes())
-            .lat(walkCourse.lat())
-            .lng(walkCourse.lng())
-            .firstImage(walkCourse.firstImage())
-            /*
-              raw enum 문자열이 아니라 metadata 객체로 내린다 (coding-conventions §11).
-              같은 응답 안의 itemType 이 이미 metadata 라, 한쪽만 문자열이면 화면이 두 가지
-              해석 코드를 갖게 된다. 표시명·설명은 tour-service 가 실어 준 값 그대로다 —
-              기상특보가 같은 방식이다(toWarningItem).
-            */
-            .fitsActivityLevels(walkCourse.fitsActivityLevels().stream()
-                .map(fit -> CodeNameDescriptionMetadata.of(fit.code(), fit.name(), fit.description()))
-                .toList())
+            // 변환은 DTO 의 정적 팩토리에 있다 — 공유 응답(PlanShareLinkPresenter)이 같은 코드를
+            // 써야 두 화면이 같은 항목을 같게 설명한다 (#719).
+            .walkCourse(PlanItemWalkCourseItem.from(info.walkCourse()))
             .build();
     }
 
