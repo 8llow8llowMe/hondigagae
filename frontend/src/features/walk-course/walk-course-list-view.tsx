@@ -69,8 +69,13 @@ export function WalkCourseListView({
         /*
           **도구는 카드 머리다** (#556). 두 축이 나란히 서고, 좁은 폭에서는 접힌다 —
           축이 둘뿐이라 좌측 280 레일을 세우지 않는다 (D1).
+
+          **그룹 간격이 24 다** (#734). 12(`gap-3`)였을 때는 두 세그먼트가 테두리·높이·
+          간격이 전부 같아 **하나의 5칸짜리 라디오**로 읽혔다 — `활동량 6시간 이내` 를
+          고르면 `정렬: 코스 순` 이 풀릴 것처럼 보였다. `FieldGroup` 라벨과 함께 두 축을
+          시각적으로 가른다.
         */
-        <div className="flex flex-col gap-2 md:flex-row md:gap-3">
+        <div className="flex flex-col gap-4 md:flex-row md:gap-6">
           <WalkCourseActivityField
             applied={params.petActivityLevel}
             onChange={(activity) => apply({ ...filters, activity })}
