@@ -124,6 +124,13 @@ export const paths = {
     walkSafety: (planId: string) => `/plans/${planId}/walk-safety`,
     /** 일정 응급 브리핑 (#125). 반경·개수는 서버 고정이라 쿼리가 없다 */
     emergency: (planId: string) => `/plans/${planId}/emergency`,
+    /**
+     * 출발 전 여행 브리핑 (#626). **`date` 는 필수 쿼리 파라미터다**
+     * (`@RequestParam LocalDate date`) — 생략할 수 있는 인자로 두지 않는다.
+     * 기간 밖이면 `PLAN_002` **400** 이라 호출부가 날짜를 먼저 고른다.
+     */
+    briefing: (planId: string, date: string) =>
+      `/plans/${planId}/briefing?${new URLSearchParams({ date }).toString()}`,
     /** 항목 방문 체크 (#124). 해제도 같은 경로다 — 본문의 `visited` 가 방향을 정한다 */
     itemVisited: (planId: string, planItemId: string) =>
       `/plans/${planId}/items/${planItemId}/visited`,

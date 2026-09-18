@@ -19,10 +19,13 @@ import type { ApiResponse, CodeNameMetadata, SliceResponse, ValidationErrorItem 
 import type { ScoreMetricMetadata } from '@/types/insight'
 import type {
   PlanAlternativePlaceItem,
+  PlanBriefingItemSummary,
+  PlanBriefingResponse,
   PlanDayWeatherItem,
   PlanDetail,
   PlanItemDetail,
   PlanItemPlace,
+  PlanItemTypeCode,
   PlanItemWalkSafetyItem,
   PlanPackingListResponse,
   PlanReviewPlaceItem,
@@ -388,6 +391,15 @@ export function resolvePlanMock(
       status: 200,
       payload: ok(mockPlanWalkSafety(plan)),
     }))
+  }
+
+  /*
+    출발 전 여행 브리핑 (#626). **`date` 가 필수 쿼리 파라미터다** — 없으면 400 이고
+    기간 밖이면 `PLAN_002` 400 이다 (`PlanBriefingProcessor.resolveDay`).
+  */
+  const briefing = /^\/plans\/([^/]+)\/briefing$/.exec(path)
+  if (briefing !== null && method === 'GET') {
+    return withPlan(memberId, briefing[1] ?? '', (plan) => toBriefing(plan, search))
   }
 
   /*
@@ -1134,6 +1146,159 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
     // 여러 마리면 "한 마리라도 특성이 반영됐는가" 다 — 마리별 플래그가 아니다 (#152)
     petConditionApplied: true,
     days,
+  }
+}
+
+// ─── 출발 전 여행 브리핑 (#626) ──────────────────────────────────────────────
+
+/**
+ * 특보를 확인하지 못한 이유 — **서버 상수 문장 그대로다** (`PlanBriefingProcessor:69~71`).
+ *
+ * 여기서 바꿔 적으면 화면이 실제로 받는 문장과 다른 것으로 검증하게 된다.
+ */
+const WARNING_REASON_NOT_TODAY = '기상특보는 출발 당일에만 확인합니다.'
+
+/**
+ * 골든타임을 못 낸 이유.
+ *
+ * 좌표가 없는 갈래는 서버 문장을 실측으로 확인했다. **당일이 아닌 갈래의 정확한 서버
+ * 문장은 게이트웨이 미기동으로 확인하지 못했다** — 화면은 이 문장을 파싱하지 않고 그대로
+ * 그리므로 동작에는 영향이 없다.
+ *
+ * TODO(BE): Swagger 가 뜨면 `PlanBriefingProcessor` 의 상수와 대조한다 (#626 명세 D9).
+ */
+const WALK_REASON_NOT_TODAY = '산책 골든타임은 출발 당일에만 확인합니다.'
+const WALK_REASON_NO_COORDINATES = '대표 장소의 좌표가 없어 골든타임을 붙이지 못했습니다.'
+
+/**
+ * 하루치 합본 — `GET /plans/{planId}/briefing?date=`.
+ *
+ * **새 판정이 아니라 기존 판정의 묶음이다.** 날씨는 `toWeather` 가 만든 그 일자를 그대로
+ * 쓴다 — 서버도 같은 변환(`PlanWeatherPresenter.toDayItem`)을 쓰므로 여기서 다른 값을
+ * 만들면 두 화면이 갈린다.
+ *
+ * **특보·골든타임은 `today=true` 일 때만 채워지고, 아니면 이유 문장이 온다.** 이유가 차
+ * 있는 것과 "없음" 은 다른 사실이다 — mock 이 이유를 비우면 화면의 핵심 갈래를 로컬에서
+ * 한 번도 못 본다.
+ */
+function toBriefing(plan: MockPlan, search: string): MockResult {
+  const date = new URLSearchParams(search).get('date')
+
+  /*
+    `@RequestParam LocalDate date` 는 필수라 없으면 스프링이 도메인에 닿기 전에 400 을
+    낸다. **정확한 공통 래퍼 코드는 확인하지 못했다** — 화면은 언제나 날짜를 보내므로
+    급하지 않다 (명세 D9-4). 검증 실패와 같은 `PLAN_100` 을 쓴다.
+  */
+  if (date === null || !DATE_PATTERN.test(date)) {
+    return fail(400, 'PLAN_100', '필수 요청 파라미터 date 가 없거나 형식이 올바르지 않습니다.')
+  }
+
+  const startTime = Date.parse(`${plan.startDate}T00:00:00Z`)
+  const day = Math.round((Date.parse(`${date}T00:00:00Z`) - startTime) / 86_400_000) + 1
+
+  // 기간 밖은 404 가 아니라 **400 `PLAN_002`** 다 (`resolveDay`)
+  if (day < 1 || day > totalDaysOf(plan)) {
+    return fail(400, 'PLAN_002', '여행 일차가 여행 기간을 벗어났습니다.')
+  }
+
+  /*
+    **서버는 자기 `Clock` 으로 오늘을 본다** (`date.equals(LocalDate.now(clock))`).
+    mock 도 요청 시각의 오늘과 비교한다 — FE 가 고른 날짜를 그대로 "오늘" 로 삼으면
+    자정 갈래를 로컬에서 볼 수 없다.
+  */
+  const today = date === todayDay(new Date())
+
+  const weather = toWeather(plan).days[day - 1] ?? null
+  const items = [...plan.items]
+    .filter((item) => item.day === day)
+    .sort((a, b) => a.sequence - b.sequence)
+  const first = items[0] ?? null
+  const last = items.at(-1) ?? null
+
+  // 그날 첫 장소 항목이 판정 기준이다 — `toWeather` 와 같은 규칙이어야 한다
+  const basis = items.find((item) => item.targetId !== null && item.itemType !== 'WALK') ?? null
+  const basisPlace = basis === null ? null : (PLACE_BY_ID.get(basis.targetId ?? '') ?? null)
+
+  return {
+    status: 200,
+    payload: ok({
+      planId: plan.planId,
+      planTitle: plan.title,
+      day,
+      date,
+      today,
+      petIds: petIdsOf(plan),
+      basisPetId: weather?.basisPetId ?? null,
+      petConditionApplied: true,
+      schedule: {
+        itemCount: items.length,
+        visitedCount: items.filter((item) => item.visited).length,
+        firstItem: first === null ? null : toBriefingItem(first),
+        lastItem: last === null ? null : toBriefingItem(last),
+        // **좌표를 여기 싣지 않는다** — 프레젠터가 `walkTimes` 안에만 넣는다 (명세 D3-3)
+        representativePlaceId: basis?.targetId ?? null,
+        representativePlaceTitle: basis?.title ?? null,
+      },
+      weather,
+      weatherWarning: today
+        ? {
+            type: { code: 'HEAT_WAVE', name: '폭염', description: '폭염 특보입니다.' },
+            level: {
+              code: 'ADVISORY',
+              name: '주의보',
+              description: '한낮 야외 활동을 줄이는 것이 좋습니다.',
+            },
+            // 주의보라 보류가 아니다 — 화면이 `level.code` 로 다시 판정하지 않는지 본다
+            recommendationSuppressed: false,
+            effectiveAt: `${date}T11:00:00`,
+          }
+        : null,
+      weatherWarningUnavailableReason: today ? null : WARNING_REASON_NOT_TODAY,
+      walkTimes:
+        today && basisPlace?.lat != null && basisPlace.lng != null
+          ? {
+              lat: basisPlace.lat,
+              lng: basisPlace.lng,
+              from: `${date}T09:00:00`,
+              forecastCoverage: { code: 'AVAILABLE', name: '예보 있음', description: null },
+              goldenStart: `${date}T18:00:00`,
+              goldenEnd: `${date}T21:00:00`,
+              goldenLevel: {
+                code: 'SAFE',
+                name: '안전',
+                description: '산책하기 좋은 조건입니다.',
+                scoreDescription: '등급이 높을수록 산책에 무리가 없습니다.',
+              },
+              goldenWindowStatus: {
+                code: 'AVAILABLE',
+                name: '추천 구간 있음',
+                description: '이 시간대에 산책하기 좋습니다.',
+              },
+              petConditionApplied: true,
+            }
+          : null,
+      walkTimesUnavailableReason: !today
+        ? WALK_REASON_NOT_TODAY
+        : basisPlace?.lat == null || basisPlace.lng == null
+          ? WALK_REASON_NO_COORDINATES
+          : null,
+    } satisfies PlanBriefingResponse),
+  }
+}
+
+function toBriefingItem(item: MockPlanItem): PlanBriefingItemSummary {
+  return {
+    planItemId: item.planItemId,
+    sequence: item.sequence,
+    /*
+      **metadata 가 아니라 enum 문자열이다** — 같은 도메인의 `PlanItemDetail.itemType` 은
+      metadata 객체다 (명세 D9-1). mock 이 모양을 맞추지 않으면 화면이 그 드리프트를
+      로컬에서 한 번도 못 본다.
+    */
+    itemType: item.itemType as PlanItemTypeCode,
+    title: item.title,
+    startTime: item.startTime,
+    visited: item.visited,
   }
 }
 

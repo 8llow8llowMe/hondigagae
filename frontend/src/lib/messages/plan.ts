@@ -866,4 +866,84 @@ export const planMessages = {
   sharedExpiredTitle: '만료된 링크예요',
   sharedExpiredDescription: '링크를 만든 사람에게 새 링크를 요청해 주세요.',
   sharedErrorTitle: '일정을 불러오지 못했어요',
+  // ── 출발 전 여행 브리핑 (#626) ────────────────────────────────────────────
+  briefingHeading: '여행 브리핑',
+  briefingPageTitle: '출발 전 여행 브리핑',
+  briefingBack: '일정으로 돌아가기',
+  /** `{title}` · `{day}` · `{date}` · `{weekday}` 치환 — 값은 전부 **응답**의 것이다 */
+  briefingSubtitle: '{title} · {day}일차 {date} ({weekday})',
+
+  /**
+   * 일정 상세의 진입 배너 (일정상세-세부명세 D16-3). **날짜 축 하나로만 노출을 가른다** —
+   * 상태(`COMPLETED`)를 보지 않는다.
+   */
+  briefingBannerEveTitle: '내일 출발 · 브리핑 보기',
+  briefingBannerTodayTitle: '오늘의 브리핑',
+  briefingBannerDescription: '그날 일정 · 날씨 · 특보 · 산책 시간을 한 번에 봐요',
+
+  /**
+   * 기간 밖 — **요청 자체를 하지 않는다** (`pickBriefingDate` 가 null). 데이터 부재라
+   * `EmptyState` 고 재시도가 없다.
+   */
+  briefingOutOfRangeTitle: '아직 브리핑할 날이 아니에요',
+  briefingOutOfRangeDescription: '출발 하루 전부터 여행 마지막 날까지 볼 수 있어요',
+  briefingOutOfRangeAction: '일정 보기',
+  /**
+   * 브리핑 400(`PLAN_002`). **이 자리에만 400 에 재시도를 단다** — 화면이 기간 안의
+   * 날짜만 보내므로 이 코드는 "그 사이 기간이 수정됐다" 는 뜻이고 다시 열면 풀린다.
+   * 고칠 입력 필드가 없어 `일정 보기` 를 함께 준다.
+   */
+  briefingStaleRangeDescription: '일정 기간이 바뀐 것 같아요. 일정을 다시 열어 주세요',
+  briefingErrorTitle: '브리핑을 불러오지 못했어요',
+
+  briefingScheduleHeading: '그날 일정',
+  /** `{count}` · `{visited}` 치환. **`visited` 가 0 이어도 적는다** — 그 0 이 정보다 */
+  briefingScheduleCounts: '항목 {count}개 · 다녀온 곳 {visited}개',
+  /** `{time}` · `{title}` 치환. 시각이 없는 항목은 `briefingScheduleFirstNoTime` 을 쓴다 */
+  briefingScheduleFirst: '처음 {time} {title}',
+  briefingScheduleFirstNoTime: '처음 {title}',
+  briefingScheduleLast: '마지막 {time} {title}',
+  briefingScheduleLastNoTime: '마지막 {title}',
+  /** `{title}` 치환 — 그날 판정의 기준이 된 장소다 */
+  briefingScheduleBasisPlace: '이 날 기준 장소 · {title}',
+  briefingScheduleOpenDay: '이 날 일정 보기',
+  briefingScheduleEmptyTitle: '이 날에는 담긴 항목이 없어요',
+  briefingScheduleEmptyAction: '일정에 장소 담기',
+
+  briefingWeatherHeading: '날씨와 적합도',
+  /** 프레젠터상 나오지 않아야 하는 조합이다 — 그래도 자리를 비워 두지 않는다 */
+  briefingWeatherMissing: '날씨 판정을 받지 못했어요',
+
+  briefingWarningHeading: '기상특보',
+  /**
+   * **`weatherWarning` 과 이유가 둘 다 null 일 때만 쓴다** (명세 D5-3).
+   *
+   * 이유가 차 있는데 이 문장을 쓰면 **태풍경보를 조용히 지운다** — 서버 javadoc 이 같은
+   * 말을 한다. 갈래를 잠그는 테스트가 `plan-briefing-section.test.ts` 에 있다.
+   */
+  briefingWarningNone: '발효 중인 기상특보가 없어요',
+  /**
+   * 이유가 차 있는 날. **서버 문장을 그대로 아래 붙인다.**
+   *
+   * **`다시 시도` 를 달지 않는다** — 이유가 코드가 아니라 문장이라 "당일에만 확인"(정상)과
+   * "가져오지 못했다"(일시 장애)를 화면이 가를 수 없다. 문장을 파싱하지 않는다.
+   * 고칠 수 없는 것에 버튼을 달면 계속 누른다 (명세 D9-2 가 BE 후속으로 분리했다).
+   */
+  briefingWarningUnavailableTitle: '기상특보를 확인하지 못했어요',
+  /** `{time}` 치환 — `effectiveAt` 의 `HH:mm` 이다. 없으면 이 줄을 빼고 말을 만들지 않는다 */
+  briefingWarningEffectiveAt: '{time} 발효',
+  /** `recommendationSuppressed === true` 일 때만. **`level.code` 로 직접 판정하지 않는다** */
+  briefingWarningSuppressed: '경보가 발효 중이라 야외 일정은 미루는 게 좋아요',
+
+  briefingWalkHeading: '산책하기 좋은 시간',
+  /** `{from}` · `{to}` 치환 — en dash 를 읽지 못하는 스크린리더용 `sr-only` 문장이다 */
+  briefingWalkRangeLabel: '{from}부터 {to}까지',
+  /** `goldenWindowStatus` 가 없는 옛 서버에서 창도 없을 때만 */
+  briefingWalkNone: '추천할 산책 구간이 없어요',
+  /** `walkTimes` 와 이유가 둘 다 비어 온 계약 밖 조합 */
+  briefingWalkUnknown: '산책 시간 판정을 받지 못했어요',
+  briefingCurveErrorTitle: '시간대별 예보를 불러오지 못했어요',
+  /** `{title}` 치환. **"현재 위치 기준" 이라고 쓰지 않는다** — 그날 대표 장소 좌표 기준이다 */
+  briefingWalkBasis: '{title} 기준 · 노면(아스팔트) 온도는 추정치예요',
+  briefingWalkBasisNoPlace: '노면(아스팔트) 온도는 추정치예요',
 } as const

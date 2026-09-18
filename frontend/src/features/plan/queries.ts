@@ -25,6 +25,15 @@ export const planKeys = {
    */
   emergency: (planId: string) => [...planKeys.all, 'emergency', planId] as const,
   /**
+   * 출발 전 여행 브리핑 (#626). **날짜가 key 에 들어간다** — `date` 마다 다른 응답이고
+   * (특보·골든타임은 `today=true` 에서만 온다) 화면이 여는 시점에 따라 날짜가 바뀐다.
+   *
+   * **`staleTime` 은 일정(30초)이 아니라 인사이트(5분)를 쓴다** — 내용이 예보 판정이고
+   * 예보 단위가 1시간이라 일정 본문처럼 mutation 으로 흔들리지 않는다
+   * (`api-integration-guide.md` §7 `장소 인사이트` 행과 같은 근거).
+   */
+  briefing: (planId: string, date: string) => [...planKeys.all, 'briefing', planId, date] as const,
+  /**
    * 저장된 여행 준비물 (#586). **상세와 key 를 나눈다** — 준비물만 실패해도 일정 본문은
    * 그대로 남아야 하고, 체크·추가·삭제 뒤에 그 절만 갱신할 수 있어야 한다.
    *
