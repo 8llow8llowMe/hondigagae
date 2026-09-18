@@ -4,7 +4,6 @@ import type { ReactNode } from 'react'
 
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
-import { ACTIVITY_MAX_HOURS } from '@/lib/walk-course/activity'
 import {
   WALK_COURSE_ACTIVITY_PARAMS,
   type WalkCourseActivityChoice,
@@ -56,11 +55,35 @@ function FieldGroup({ label, children }: { label: string; children: ReactNode })
 }
 
 /**
- * 걷는 시간.
+ * 선택지 라벨 — **활동량 이름이다** (#735).
+ *
+ * 전에는 `4시간 이내`·`6시간 이내` 였고 그 숫자는 서버 상한(`WalkCourseActivityFit` 240·360분)
+ * 의 FE 복제본이었다. 상한은 응답이 **적용된 하나만** 내려주므로(`appliedPetActivityLevel`)
+ * 아직 고르지 않은 칸의 숫자는 화면이 알 길이 없다 — 복제본을 걷으면 이 라벨은 활동량
+ * 이름으로 돌아온다. 그 대신 고른 뒤 **기준 줄**이 서버 상한을 말한다.
+ *
+ * 출처는 **반려견 등록 폼과 같은 목록**이다 (`messages.pet.options.activityLevel`,
+ * `pet/공통명세.md` S6-1). enum 열거 API 가 없어 선택지 라벨만은 FE 가 갖는 자리이고
+ * (`api-integration-guide.md` §6 "서버가 값을 주지 않는 컨트롤"), 표를 새로 만들지 않고
+ * 이미 있는 그 하나를 쓴다 — 두 벌이면 BE 가 문구를 바꾼 날 화면마다 다른 말을 한다.
+ */
+const ACTIVITY_OPTIONS = WALK_COURSE_ACTIVITY_PARAMS.flatMap((code) => {
+  const label = messages.pet.options.activityLevel.find((option) => option.code === code)?.name
+
+  /*
+    라벨을 못 찾은 칸은 **그리지 않는다.** `?? code` 로 떨어뜨리면 화면에 `LOW` 가 나간다 —
+    `/emergency` 유형 칩이 정확히 그렇게 깨졌다 (#205 · `api-integration-guide.md` §6).
+    두 목록 다 FE 상수라 실제로는 비지 않는다.
+  */
+  return label === undefined ? [] : [{ code, label }]
+})
+
+/**
+ * 활동량.
  *
  * **`applied` 를 받는다 — URL 값이 아니다.** URL 이 비어 있으면 서버가 대표견으로 채우므로
- * (공통명세 S4-1), URL 만 보면 **실제로 4시간 이내로 좁혀진 화면에서 아무 칸도 선택돼
- * 있지 않다.** 컨트롤은 화면에 실제로 적용된 것을 가리켜야 한다.
+ * (공통명세 S4-1), URL 만 보면 **실제로 좁혀진 화면에서 아무 칸도 선택돼 있지 않다.**
+ * 컨트롤은 화면에 실제로 적용된 것을 가리켜야 한다.
  *
  * 그래서 `전체` 는 `applied === null` 일 때 선택되고, 누르면 URL 에 **`ALL` 을 명시한다** —
  * 값이 없는 상태로 되돌리면 대표견이 다시 채워 필터를 끌 수가 없다.
@@ -73,23 +96,19 @@ export function WalkCourseActivityField({
   onChange: (next: WalkCourseActivityChoice) => void
 }) {
   return (
-    <FieldGroup label={messages.walkCourse.activityFieldLabel}>
+    <FieldGroup label={messages.walkCourse.activityGroupLabel}>
       <Segment label={messages.walkCourse.activityGroupLabel}>
         <SegmentOption selected={applied === null} onSelect={() => onChange('ALL')}>
           {messages.walkCourse.activityAll}
         </SegmentOption>
-        {WALK_COURSE_ACTIVITY_PARAMS.map((code) => (
+        {ACTIVITY_OPTIONS.map(({ code, label }) => (
           <SegmentOption
             key={code}
             divider
             selected={applied === code}
             onSelect={() => onChange(code)}
           >
-            {/* 상한 숫자는 `lib/walk-course/activity.ts` 한 곳이 갖는다 (D5-2) */}
-            {messages.walkCourse.activityWithin.replace(
-              '{hours}',
-              String(ACTIVITY_MAX_HOURS[code]),
-            )}
+            {label}
           </SegmentOption>
         ))}
       </Segment>

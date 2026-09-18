@@ -51,7 +51,9 @@ describe('WalkCourseListSection — 성공', () => {
 
 describe('WalkCourseListSection — 기준 줄은 응답이 정한다 (S4-1 규칙 5)', () => {
   it('적용됐으면 반려견 이름·활동량 이름·상한을 적는다', () => {
-    const markup = render({ basis: { petName: '몽실이', levelName: '낮음', hours: 4 } })
+    const markup = render({
+      basis: { petName: '몽실이', levelName: '낮음', maxDurationMinutes: 240 },
+    })
 
     expect(markup).toContain('몽실이')
     // 서버 enum metadata 의 name 을 그대로 쓴다 — FE 매핑 테이블이 아니다
@@ -65,12 +67,29 @@ describe('WalkCourseListSection — 기준 줄은 응답이 정한다 (S4-1 규�
     expect(markup).not.toContain('기준으로')
   })
 
-  /** 대표견 조회가 실패했는데 URL 로 조건을 들고 들어온 경우 — 없는 이름을 지어내지 않는다 */
+  /**
+   * **상한 숫자는 응답이 정한다** (#735). 화면이 `240 → 4시간` 을 제 상수로 갖고 있으면
+   * 서버가 상한을 바꿔도 같은 숫자를 그린다 — 다른 값을 넣어 그 복제본이 없음을 잠근다.
+   */
+  it('상한이 바뀌면 문구도 따라간다 — FE 상수가 아니다', () => {
+    const markup = render({
+      basis: { petName: null, levelName: '보통', maxDurationMinutes: 270 },
+    })
+
+    expect(markup).toContain('4시간 30분')
+    expect(markup).not.toContain('6시간')
+  })
+
+  /** 세그먼트로 직접 골랐거나 대표견 조회가 실패한 경우 — 없는 이름을 지어내지 않는다 */
   it('반려견을 모르면 이름 없는 문장으로 떨어진다', () => {
-    const markup = render({ basis: { petName: null, levelName: null, hours: 6 } })
+    const markup = render({
+      basis: { petName: null, levelName: '보통', maxDurationMinutes: 360 },
+    })
 
     expect(markup).toContain('6시간')
-    expect(markup).not.toContain('활동량(')
+    // 활동량 이름은 남는다 — 응답이 준 값이라 지어낸 것이 아니다
+    expect(markup).toContain('활동량(보통)')
+    expect(markup).not.toContain('몽실이')
   })
 })
 
@@ -154,7 +173,7 @@ describe('WalkCourseListSection — 좁힌 결과에 날씨를 볼 코스가 없
   it('필터가 걸렸고 좌표 있는 코스가 하나도 없으면 한 줄로 알린다', () => {
     const markup = render({
       courses: [WALK_COURSE_PLAIN],
-      basis: { petName: '몽실이', levelName: '낮음', hours: 4 },
+      basis: { petName: '몽실이', levelName: '낮음', maxDurationMinutes: 240 },
     })
 
     expect(markup).toContain(messages.walkCourse.noGoldenInScope)
@@ -163,7 +182,7 @@ describe('WalkCourseListSection — 좁힌 결과에 날씨를 볼 코스가 없
   it('좌표 있는 코스가 하나라도 있으면 그 줄을 세우지 않는다', () => {
     const markup = render({
       courses: [WALK_COURSE_PLAIN, WALK_COURSE_WITH_COORDS],
-      basis: { petName: '몽실이', levelName: '낮음', hours: 4 },
+      basis: { petName: '몽실이', levelName: '낮음', maxDurationMinutes: 240 },
     })
 
     expect(markup).not.toContain(messages.walkCourse.noGoldenInScope)

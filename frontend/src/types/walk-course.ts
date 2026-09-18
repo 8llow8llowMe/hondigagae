@@ -1,14 +1,19 @@
 /**
  * 제주올레 산책 코스 — `tour-service` `walkcourse` 컨텍스트 (#618).
  *
- * 근거: `WalkCourseItem` · `WalkCourseListResponse` · `WalkCourseDetailResponse`
- * (backend `origin/develop` `2b0b62a4`) + dev 게이트웨이 실호출(2026-09-18).
- * 계약 상세는 `docs/features/walk-course/공통명세.md` S3.
+ * 근거: `WalkCourseItem` · `AppliedPetActivityLevelItem` · `WalkCourseListResponse` ·
+ * `WalkCourseDetailResponse` (backend `origin/develop` `12f9f069` — #718) + dev 게이트웨이
+ * 실호출(2026-09-18). 계약 상세는 `docs/features/walk-course/공통명세.md` S3.
+ *
+ * **#718 이 상한·소요·적합도를 응답에 실었다.** 그 전까지 화면이 갖고 있던 상한 복제본
+ * (`ACTIVITY_MAX_HOURS` — 4·6시간)은 #735 에서 걷었다. 상한 숫자는 이제 응답만 말한다.
  *
  * **`docs/api/openapi/tour-service.json`(2026-09-14) 을 정본으로 쓰지 않았다.** 스키마로는
  * 필드의 **값 분포**를 알 수 없는데 이 화면의 분기가 그 분포에 걸려 있다 — 29개 중 25개가
  * 좌표 null 이다 (공통명세 S3-1).
  */
+
+import type { CodeNameMetadata } from '@/types/api'
 
 /**
  * 코스 한 줄. 목록과 상세가 같은 필드를 공유한다.
@@ -30,6 +35,15 @@ export type WalkCourseSummary = {
   distanceKm: number
   /** 소요시간 **원문**. `4~5시간` · `1~2시간`. **파싱하지 않는다** */
   durationText: string
+  /**
+   * 소요시간 상한(분). **`null` 은 "제한 없음" 이 아니라 "원문을 파싱하지 못했다" 는 뜻이다**
+   * (`WalkCourseItem.java:34-36`). 그 코스는 어느 활동량에서도 걸러지지 않으므로, 이 값이
+   * 없다고 해서 화면이 "아무 아이나 걸을 수 있다" 로 읽히게 그리지 않는다.
+   *
+   * 화면에 분(minute)으로 그리지 않는다 — 사용자에게 보여 주는 소요시간은 `durationText`
+   * 원문이다 (`lib/plan/walk-course-meta.ts` 와 같은 규칙).
+   */
+  durationMaxMinutes: number | null
   /** 시종점 **원문**. `제주민속촌주차장 입구-남원포구` 처럼 공백과 하이픈이 섞인다 */
   startEndPoint: string
   /**
@@ -48,7 +62,27 @@ export type WalkCourseSummary = {
 }
 
 /**
- * `GET /walk-courses` — `WalkCourseListResponse.java:10-23`.
+ * 목록에 실제로 적용된 활동량과 그 상한 — `AppliedPetActivityLevelItem.java`.
+ *
+ * **세 가지 null 을 가른다** (`tour-service.md` `/api/v1/walk-courses` 절):
+ *
+ * | 응답                                            | 뜻                                  |
+ * | ----------------------------------------------- | ----------------------------------- |
+ * | `appliedPetActivityLevel: null`                 | 활동량으로 거르지 않았다            |
+ * | 객체 있음 · `maxDurationMinutes: 240`           | `LOW` 로 걸렀고 상한이 4시간이다    |
+ * | 객체 있음 · `maxDurationMinutes: null`          | `HIGH` 로 걸렀고 **상한이 없다**    |
+ *
+ * `level.description` 은 **반려견 성향** 문구다("짧은 산책을 선호하며…"). 소요시간 상한이
+ * 아니므로 기준 줄에 상한으로 쓰지 않는다 — 상한은 `maxDurationMinutes` 숫자다.
+ */
+export type WalkCourseAppliedActivityLevel = {
+  level: CodeNameMetadata
+  /** **`null` 은 `HIGH`(상한 없음)다.** 객체 자체가 null 인 것(필터 미적용)과 뜻이 다르다 */
+  maxDurationMinutes: number | null
+}
+
+/**
+ * `GET /walk-courses` — `WalkCourseListResponse.java:11-46`.
  *
  * **커서가 없다.** 코스가 29개뿐이라 전량이 한 번에 온다 — `useInfiniteQuery` 가 아니다.
  */
@@ -56,20 +90,36 @@ export type WalkCourseList = {
   courses: WalkCourseSummary[]
   /** 조건에 맞는 코스 수 */
   totalCount: number
-  /** 서버가 활동량 필터를 실제로 적용했는가. **화면이 스스로 판정하지 않는다** */
-  petActivityLevelApplied: boolean
+  /**
+   * 서버가 실제로 적용한 활동량. **`null` 이면 거르지 않았다** — 화면이 스스로 판정하지
+   * 않는다 (공통명세 S4-1 규칙 5).
+   *
+   * **응답의 `petActivityLevelApplied`(boolean)는 여기 없다.** 서버가 같은 사실을 한동안
+   * 두 곳에서 말하지만(#718 이 deprecated 로 남겨 뒀다) 화면은 한쪽만 읽는다 — 둘이
+   * 어긋나는 날 어느 쪽을 믿을지 정해 두지 않으면 그때 정하게 된다. 서버 쪽 제거는 #735
+   * 머지 뒤 별도 PR 이다.
+   */
+  appliedPetActivityLevel: WalkCourseAppliedActivityLevel | null
   /** 출처 표기. 상수가 아니라 서버가 내려주는 문자열이다 */
   providerName: string
 }
 
 /**
- * `GET /walk-courses/{walkCourseId}` — `WalkCourseDetailResponse.java:9-42`.
+ * `GET /walk-courses/{walkCourseId}` — `WalkCourseDetailResponse.java:11-59`.
  *
  * `baseDate` 는 **문자열이다**(`2025-04-28`). `Date` 로 파싱하면 자정 UTC 로 읽혀 KST
  * 기준 하루 밀린다 (`코스상세-세부명세.md` D4-3).
  */
 export type WalkCourseDetail = WalkCourseSummary & {
   baseDate: string
+  /**
+   * 이 코스를 걸을 만한 활동량 전부 — **상세에만 있다** (목록 항목에는 싣지 않는다).
+   *
+   * **`durationMaxMinutes` 가 null 인 코스는 세 값이 다 담긴다.** 그것은 "아무 아이나
+   * 된다" 가 아니라 **"소요시간을 모른다"** 는 뜻이라, 그리려면 `durationMaxMinutes` 를
+   * 함께 보아야 한다 (`WalkCourseActivityFit.fittingLevels`).
+   */
+  fitsActivityLevels: CodeNameMetadata[]
   providerName: string
 }
 
@@ -77,7 +127,7 @@ export type WalkCourseDetail = WalkCourseSummary & {
  * 서버에 실제로 보내는 활동량 값.
  *
  * **`HIGH` 가 없다.** 결과가 필터 없음과 같은데(실측 29/29) 보내면
- * `petActivityLevelApplied: true` 가 와서 화면이 **좁히지도 않은 것을 좁혔다고 말한다**
+ * `appliedPetActivityLevel` 이 채워져 화면이 **좁히지도 않은 것을 좁혔다고 말한다**
  * (공통명세 S4-1 규칙 3). 대표견이 `HIGH` 면 파라미터 없이 조회한다.
  */
 export const WALK_COURSE_ACTIVITY_PARAMS = ['LOW', 'MEDIUM'] as const

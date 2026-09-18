@@ -831,7 +831,7 @@
 
 | 확인                                        | 결과                                                                                        |
 | ------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `GET /walk-courses`                         | 200 · `courses[]` · `totalCount: 29` · `petActivityLevelApplied` · `providerName`           |
+| `GET /walk-courses`                         | 200 · `courses[]` · `totalCount: 29` · `appliedPetActivityLevel` · `providerName`           |
 | `?petActivityLevel=LOW` / `MEDIUM` / `HIGH` | **6 / 24 / 29개** — `HIGH` 는 필터 없음과 결과가 같다                                       |
 | `?petActivityLevel=low`                     | **400** `WALKCOURSE_113` (enum 대소문자)                                                    |
 | `?maxDistanceKm=99`                         | **400** `WALKCOURSE_101` + `fieldErrors[0].field = maxDistanceKm`                           |
@@ -844,10 +844,14 @@
 **화면 설계에 직결되는 것**
 
 - **활동량 상한은 서버가 갖는다** — `LOW` 4시간(240분) · `MEDIUM` 6시간(360분) · `HIGH` 제한 없음
-  (`WalkCourseActivityFit`). **FE 가 다시 계산하지 않는다.** 소요시간을 모르는 코스는 어느 활동량에서도 걸러지지 않는다.
+  (`WalkCourseActivityFit`). **FE 가 다시 계산하지도, 상수로 적어 두지도 않는다** — 응답의
+  `appliedPetActivityLevel.maxDurationMinutes` 가 적용된 상한을 내려준다(#718 · FE 이관 #735).
+  소요시간을 모르는 코스는 어느 활동량에서도 걸러지지 않는다.
 - **`petActivityLevel` 기본값은 대표견의 활동량이다.** URL(`?activity=`)이 비어 있을 때만 서버 컴포넌트가 채우고,
   미로그인·반려견 없음·펫 조회 실패·`HIGH` 면 **파라미터를 보내지 않는다**. 적용 여부는 응답의
-  `petActivityLevelApplied` 로 판정한다 — 로컬 상태로 판정하지 않는다.
+  `appliedPetActivityLevel`(객체 유무)로 판정한다 — 로컬 상태로 판정하지 않는다. **`null` 셋을 가른다**:
+  객체 자체가 null = 미적용 / `maxDurationMinutes` 만 null = `HIGH`(상한 없음) / 항목의
+  `durationMaxMinutes` null = **원문 파싱 실패**(제한 없음이 아니다).
 - **`lat`/`lng` 가 null 인 코스에는 골든타임 동선을 만들지 않는다** (`WalkCourseItem` 주석이 명시한다).
   요청 자체를 보내지 않고 패널도 세우지 않는다. **`lat ?? 0` 을 쓰면 기니만 앞바다 예보가 200 으로 온다.**
 - **좌표가 있는 코스는 4개뿐이다** (2026-09-18 dev 실측 — 2 · 3(B) · 4 · 15(B)코스). 이슈·스키마 설명은
@@ -857,10 +861,11 @@
 - **`petActivityLevel=LOW` 를 적용하면 좌표 있는 코스가 0개가 된다** (4개 모두 `4~5시간`·`5~6시간`). 활동량 낮은
   아이의 보호자는 골든타임을 한 번도 못 본다 — 결함이 아니라 데이터 분포다.
 - `walkCourseId` 는 응답에서 **문자열**이다(내부는 long · Snowflake). `number` 로 타이핑하면 정밀도가 손상된다.
-- **응답에 enum metadata 가 하나도 없다.** 활동량은 요청 파라미터로만 등장한다 → 활동량 이름은
-  `pet.activityLevel.name`(반려견 프로필)에서 가져온다. BE 후속 요청은 `코스목록-세부명세.md` D9.
-- **`durationText` 는 원문 문자열**(`4~5시간`)이다. 파싱하지 않는다. `durationMaxMinutes` 는 **일정 항목 요약
-  (`PlanItemWalkCourseItem`)에는 있는데 코스 목록·상세에는 없다** — 같은 코스를 두 API 가 다르게 설명한다.
+- **enum metadata 가 #718 로 생겼다** — 목록 `appliedPetActivityLevel.level`, 상세 `fitsActivityLevels[]`.
+  기준 줄의 활동량 이름은 이제 응답에서 온다. **선택지를 그리는 컨트롤만** FE 라벨을 쓴다(등록 폼과 같은 목록) —
+  응답은 _적용된_ 하나만 주기 때문이다 (`api-integration-guide.md` §6 의 인정된 예외).
+- **`durationText` 는 원문 문자열**(`4~5시간`)이다. 파싱하지 않는다. `durationMaxMinutes` 는 **이제 코스 목록·상세
+  항목에도 있다**(#718) — 정렬·비교용이고 사용자에게 분(minute)으로 그리지 않는다.
 - **`startEndPoint` 를 갈라 쓰지 않는다.** `제주민속촌주차장 입구-남원포구` 처럼 공백과 하이픈이 섞여 있다.
 - **`baseDate` 는 문자열이다.** `Date` 로 파싱하면 KST 기준 하루 밀린다.
 

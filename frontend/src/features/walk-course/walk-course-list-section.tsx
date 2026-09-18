@@ -13,6 +13,7 @@ import {
 } from '@/features/walk-course/walk-course-row-skeleton'
 import { classify } from '@/lib/api/error'
 import { toMessage } from '@/lib/api/response'
+import { formatDuration } from '@/lib/format/duration'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -20,19 +21,21 @@ import { hasCoordinates } from '@/lib/walk-course/coordinates'
 import type { WalkCourseSummary } from '@/types/walk-course'
 
 /**
- * 기준 줄에 들어갈 값. **`petActivityLevelApplied` 가 참일 때만 만든다** — 로컬 상태가
- * 아니라 **응답**을 믿는다 (공통명세 S4-1 규칙 5).
+ * 기준 줄에 들어갈 값. **응답의 `appliedPetActivityLevel` 이 있을 때만 만든다** — 로컬
+ * 상태가 아니라 **응답**을 믿는다 (공통명세 S4-1 규칙 5).
  *
- * `levelName` 은 **서버 enum metadata 의 `name`**(`pet.activityLevel.name`)이다. 코스 응답에
- * 활동량 metadata 가 없어 반려견 프로필에서 가져온다 — FE 에 한국어 매핑 테이블을 만들지
- * 않는다는 규칙은 그대로다 (`docs/api-integration-guide.md` §6).
+ * **셋 다 서버 값이다** (#735). `levelName` 은 `appliedPetActivityLevel.level.name`,
+ * `maxDurationMinutes` 는 같은 객체의 상한이다 — 전에는 이름을 반려견 프로필에서 가져오고
+ * 상한은 FE 상수(4·6시간)로 적었다.
  *
- * `hours` 만 FE 숫자다. 그 이유와 한계는 `lib/walk-course/activity.ts` 와 D9-1 에 있다.
+ * `petName` 만 반려견 프로필에서 온다. **URL 이 비어 대표견으로 채운 경우에만** 채워지므로
+ * `null` 일 수 있다 (`walk-course-list-view.tsx`).
  */
 export type WalkCourseBasis = {
   petName: string | null
-  levelName: string | null
-  hours: number
+  levelName: string
+  /** 서버가 적용한 상한(분). **`HIGH`(상한 없음)는 기준 줄 자체를 만들지 않는다** */
+  maxDurationMinutes: number
 }
 
 export type WalkCourseListSectionProps = {
@@ -129,19 +132,22 @@ export function WalkCourseListSection({
 }
 
 /**
- * 기준 줄. 반려견 이름을 모르면 이름 없는 문장으로 떨어진다 — 대표견 조회가 실패했는데
- * 사용자가 `?activity=LOW` 를 손으로 들고 들어온 경우다. **없는 이름을 지어내지 않는다.**
+ * 기준 줄. 반려견 이름을 모르면 이름 없는 문장으로 떨어진다 — 사용자가 세그먼트로 직접
+ * 골랐거나, 대표견 조회가 실패했는데 `?activity=LOW` 를 손으로 들고 들어온 경우다.
+ * **없는 이름을 지어내지 않는다.**
+ *
+ * **상한은 서버 분(minute)을 `formatDuration` 으로 옮겨 적는다** — `240` → `4시간`.
+ * 단위 변환일 뿐이라 서버가 상한을 `270` 으로 바꾸면 화면도 `4시간 30분` 으로 따라간다.
  */
-function basisLine({ petName, levelName, hours }: WalkCourseBasis): string {
-  const withHours = (template: string) => template.replace('{hours}', String(hours))
+function basisLine({ petName, levelName, maxDurationMinutes }: WalkCourseBasis): string {
+  const filled = (template: string) =>
+    template.replace('{limit}', formatDuration(maxDurationMinutes)).replace('{level}', levelName)
 
-  if (petName === null || levelName === null) {
-    return withHours(messages.walkCourse.activityBasisWithoutPet)
+  if (petName === null) {
+    return filled(messages.walkCourse.activityBasisWithoutPet)
   }
 
-  return withHours(messages.walkCourse.activityBasis)
-    .replace('{pet}', petName)
-    .replace('{level}', levelName)
+  return filled(messages.walkCourse.activityBasis).replace('{pet}', petName)
 }
 
 /**

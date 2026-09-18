@@ -52,29 +52,71 @@ describe('산책 코스 mock — 공개 API', () => {
     }
   })
 
-  /** 응답에 없는 필드를 흘리지 않는다 — `durationMaxMinutes` 는 필터 전용이다 (D9-2) */
-  it('durationMaxMinutes 를 응답에 싣지 않는다', () => {
+  /**
+   * **`durationMaxMinutes` 가 응답에 있다** (#718). 전에는 서버가 필터에만 써서 mock 이
+   * 떨어뜨렸고 이 테스트가 그 부재를 계약으로 고정했다 — #735 가 뒤집은 전제다.
+   */
+  it('durationMaxMinutes 를 항목에 싣는다', () => {
     for (const course of body('').courses) {
-      expect(course).not.toHaveProperty('durationMaxMinutes')
+      expect(course).toHaveProperty('durationMaxMinutes')
+    }
+  })
+
+  /**
+   * 상세에만 `fitsActivityLevels` 가 있다 — 목록은 이미 활동량으로 걸러 내려가므로 항목마다
+   * 같은 판정을 반복하면 응답만 부푼다 (`WalkCoursePresenter.toItem` 주석).
+   */
+  it('적합 활동량 목록은 상세에만 있다', () => {
+    const detail = resolveMock('/walk-courses/6911167100216303304', 'GET', '', null)?.payload
+      .dataBody as WalkCourseDetail
+
+    expect(detail.fitsActivityLevels.length).toBeGreaterThan(0)
+    // 서버 enum metadata 를 그대로 낸다 — code 만 내면 화면이 한국어 표를 만들게 된다
+    expect(detail.fitsActivityLevels[0]).toHaveProperty('name')
+
+    for (const course of body('').courses) {
+      expect(course).not.toHaveProperty('fitsActivityLevels')
     }
   })
 })
 
 describe('산책 코스 mock — 활동량 필터 (S4-1)', () => {
   /**
-   * **`petActivityLevelApplied` 는 파라미터 유무로 정한다** (`WalkCoursePresenter.java:20`).
-   * 결과가 줄었는지로 판정하면 `HIGH` 가 false 가 되어, 화면이 응답을 믿는 규칙을
+   * **`appliedPetActivityLevel` 은 파라미터 유무로 정한다** (`WalkCoursePresenter.java:20`).
+   * 결과가 줄었는지로 판정하면 `HIGH` 가 null 이 되어, 화면이 응답을 믿는 규칙을
    * mock 에서 검증할 수 없다.
    */
-  it('파라미터가 없으면 applied 가 거짓이다', () => {
-    expect(body('').petActivityLevelApplied).toBe(false)
+  it('파라미터가 없으면 적용 객체 자체가 null 이다', () => {
+    expect(body('').appliedPetActivityLevel).toBeNull()
   })
 
-  it('LOW 는 4시간 초과 코스를 걸러 내고 applied 가 참이다', () => {
+  /** deprecated 필드는 내지 않는다 — 화면이 새 필드만 읽는다 (#735) */
+  it('petActivityLevelApplied 를 내지 않는다', () => {
+    expect(body('?petActivityLevel=LOW')).not.toHaveProperty('petActivityLevelApplied')
+  })
+
+  it('LOW 는 4시간 초과 코스를 걸러 내고 적용 객체를 준다', () => {
     const result = body('?petActivityLevel=LOW')
 
-    expect(result.petActivityLevelApplied).toBe(true)
+    expect(result.appliedPetActivityLevel?.level.code).toBe('LOW')
     expect(result.courses.length).toBeLessThan(body('').courses.length)
+  })
+
+  /**
+   * **상한을 숫자로 내린다** — 화면이 4시간·6시간을 제 상수로 적지 않게 하려고 #718 이
+   * 실은 값이다 (`WalkCourseActivityFit.maxMinutesOf`).
+   */
+  it('적용된 상한을 분으로 함께 내린다', () => {
+    expect(body('?petActivityLevel=LOW').appliedPetActivityLevel?.maxDurationMinutes).toBe(240)
+    expect(body('?petActivityLevel=MEDIUM').appliedPetActivityLevel?.maxDurationMinutes).toBe(360)
+  })
+
+  /** `level.description` 은 **반려견 성향** 문구다 — 소요시간 상한이 아니다 */
+  it('활동량 metadata 를 서버 문구 그대로 낸다', () => {
+    const level = body('?petActivityLevel=LOW').appliedPetActivityLevel?.level
+
+    expect(level?.name).toBe('낮음')
+    expect(level?.description).toContain('짧은 산책')
   })
 
   it('MEDIUM 은 LOW 보다 넓다', () => {
@@ -84,14 +126,18 @@ describe('산책 코스 mock — 활동량 필터 (S4-1)', () => {
   })
 
   /**
-   * **`HIGH` 는 결과가 필터 없음과 같은데 `applied` 만 참이 된다.** 화면이 이 값을
-   * 보내지 않기로 한 이유가 이것이고, mock 도 서버처럼 답해야 그 판단이 검증된다.
+   * **`HIGH` 는 결과가 필터 없음과 같은데 적용 객체만 선다.** 화면이 이 값을 보내지 않기로
+   * 한 이유가 이것이고, mock 도 서버처럼 답해야 그 판단이 검증된다.
+   *
+   * **`maxDurationMinutes: null` 은 "상한 없음" 이다** — 객체가 통째로 null 인 것(필터
+   * 미적용)과 뜻이 다르다. 화면이 그 둘을 가르는지 로컬에서 볼 수 있어야 한다.
    */
-  it('HIGH 는 결과가 필터 없음과 같은데 applied 만 참이다', () => {
+  it('HIGH 는 결과가 필터 없음과 같은데 적용 객체만 선다', () => {
     const high = body('?petActivityLevel=HIGH')
 
     expect(high.courses.length).toBe(body('').courses.length)
-    expect(high.petActivityLevelApplied).toBe(true)
+    expect(high.appliedPetActivityLevel?.level.code).toBe('HIGH')
+    expect(high.appliedPetActivityLevel?.maxDurationMinutes).toBeNull()
   })
 
   /** 모르는 것을 나쁜 것으로 판정하지 않는다 (`WalkCourseActivityFit.fits`) */

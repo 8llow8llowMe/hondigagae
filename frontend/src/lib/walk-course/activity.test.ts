@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  ACTIVITY_MAX_HOURS,
-  representativePet,
-  resolveActivityParam,
-} from '@/lib/walk-course/activity'
+import { representativePet, resolveActivityParam } from '@/lib/walk-course/activity'
 import type { Pet } from '@/types/pet'
 
 function pet(petId: string, activityCode: string, representative = false): Pet {
@@ -62,7 +58,7 @@ describe('resolveActivityParam — URL 이 비면 대표견으로 채운다', ()
 
   /**
    * **`HIGH` 는 보내지 않는다** (규칙 3). 결과가 필터 없음과 같은데(실측 29/29) 보내면
-   * `petActivityLevelApplied: true` 가 와서 화면이 좁히지도 않은 것을 좁혔다고 말한다.
+   * `appliedPetActivityLevel` 이 채워져 화면이 좁히지도 않은 것을 좁혔다고 말한다.
    */
   it('대표견이 HIGH 면 파라미터를 보내지 않는다', () => {
     expect(resolveActivityParam(null, [pet('1', 'HIGH', true)])).toBeNull()
@@ -102,16 +98,5 @@ describe('representativePet — 대표견, 없으면 첫 아이', () => {
 
   it('목록이 비면 null 이다', () => {
     expect(representativePet([])).toBeNull()
-  })
-})
-
-/**
- * **상한 숫자는 FE 문자열이다** (`코스목록-세부명세.md` D5-2 · D9-1). 응답에 상한도 활동량
- * metadata 도 없어 화면이 `4`·`6` 을 스스로 적는다. 값이 한 곳에 있다는 것만 여기서 잠근다.
- */
-describe('ACTIVITY_MAX_HOURS — 서버 상한의 복제본', () => {
-  it('LOW 는 4시간 · MEDIUM 은 6시간이다 (WalkCourseActivityFit.java:22-23)', () => {
-    expect(ACTIVITY_MAX_HOURS.LOW).toBe(4)
-    expect(ACTIVITY_MAX_HOURS.MEDIUM).toBe(6)
   })
 })

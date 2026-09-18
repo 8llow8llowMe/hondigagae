@@ -16,6 +16,7 @@ export const WALK_COURSE_PLAIN: WalkCourseSummary = {
   name: '시흥-광치기',
   distanceKm: 15.1,
   durationText: '4~5시간',
+  durationMaxMinutes: 300,
   startEndPoint: '시흥리정류장-광치기해변',
   lat: null,
   lng: null,
@@ -29,6 +30,7 @@ export const WALK_COURSE_WITH_COORDS: WalkCourseSummary = {
   name: '광치기-온평포구',
   distanceKm: 15.6,
   durationText: '4~5시간',
+  durationMaxMinutes: 300,
   startEndPoint: '광치기해변-온평포구',
   lat: 33.3866,
   lng: 126.8734,
@@ -43,6 +45,7 @@ export const WALK_COURSE_ROUND_DISTANCE: WalkCourseSummary = {
   name: '조천만세동산-김녕서포구',
   distanceKm: 19,
   durationText: '5~6시간',
+  durationMaxMinutes: 360,
   startEndPoint: '조천만세동산-김녕서포구',
 }
 
@@ -54,11 +57,46 @@ export const WALK_COURSE_MIXED_START_END: WalkCourseSummary = {
   name: '표선-남원',
   distanceKm: 19,
   durationText: '6~7시간',
+  durationMaxMinutes: 420,
   startEndPoint: '제주민속촌주차장 입구-남원포구',
+}
+
+/**
+ * **소요시간 원문을 파싱하지 못한 코스** (#718). `durationMaxMinutes: null` 은 "제한 없음"
+ * 이 아니라 "모른다" 이고, 그래서 어느 활동량에서도 걸러지지 않고 `fitsActivityLevels` 에
+ * 세 값이 다 담긴다 — **그 둘을 함께 보지 않으면 "아무 아이나 된다" 로 읽히는 갈래다.**
+ */
+export const WALK_COURSE_UNKNOWN_DURATION: WalkCourseSummary = {
+  ...WALK_COURSE_PLAIN,
+  walkCourseId: '6911167100216303320',
+  courseLabel: '20코스',
+  name: '김녕-하도',
+  distanceKm: 17.6,
+  durationText: '미정',
+  durationMaxMinutes: null,
 }
 
 export const WALK_COURSE_PROVIDER = '제주특별자치도 올레코스현황 · 한국관광공사 TourAPI'
 
+/** `낮음` 활동량 metadata — 서버 `ActivityLevel.LOW` 문구 그대로다 */
+export const ACTIVITY_LEVEL_LOW = {
+  code: 'LOW',
+  name: '낮음',
+  description: '짧은 산책을 선호하며 장시간 활동을 힘들어합니다.',
+}
+
+/**
+ * 상세 fixture. `fitsActivityLevels` 기본값은 **소요시간을 아는 코스**의 모양이다 —
+ * `WALK_COURSE_PLAIN`(300분)은 `MEDIUM`·`HIGH` 가 걸을 만하고 `LOW` 는 아니다.
+ */
 export function walkCourseDetail(summary: WalkCourseSummary = WALK_COURSE_PLAIN): WalkCourseDetail {
-  return { ...summary, baseDate: '2025-04-28', providerName: WALK_COURSE_PROVIDER }
+  return {
+    ...summary,
+    baseDate: '2025-04-28',
+    fitsActivityLevels: [
+      { code: 'MEDIUM', name: '보통', description: '일반적인 산책과 관광 일정을 소화합니다.' },
+      { code: 'HIGH', name: '높음', description: '긴 산책과 활동적인 일정을 선호합니다.' },
+    ],
+    providerName: WALK_COURSE_PROVIDER,
+  }
 }
