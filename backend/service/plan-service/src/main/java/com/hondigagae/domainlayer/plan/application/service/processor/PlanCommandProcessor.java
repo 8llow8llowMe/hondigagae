@@ -95,10 +95,14 @@ public class PlanCommandProcessor {
      */
     @Transactional
     public Plan copyPlan(Plan source, PlanCopyCommand command, List<Long> petIds, List<PlanItem> sourceItems) {
+        // 기간 자체가 잘못된 경우(역전·상한 초과)를 먼저 거른다 — PLAN_003 · PLAN_009 다.
+        // 일수 비교를 앞에 두면 "3일이어야 합니다" 를 받은 사용자가 그대로 맞춰도 다시
+        // 거절당한다. 프론트가 클라이언트에서 역전·30일 상한을 먼저 막는 것도 이 순서다.
         validateDateRange(command.startDate(), command.endDate());
         int newTotalDays = (int) java.time.temporal.ChronoUnit.DAYS.between(command.startDate(), command.endDate()) + 1;
         if (newTotalDays != source.totalDays()) {
-            throw new PlanException(PlanErrorCode.PLAN_COPY_PERIOD_MISMATCH);
+            // 원본 일수를 문구에 담는다 — 며칠로 맞춰야 하는지 없으면 사용자가 행동할 수 없다
+            throw new PlanException(PlanErrorCode.PLAN_COPY_PERIOD_MISMATCH, source.totalDays());
         }
 
         Plan plan = Plan.builder()
