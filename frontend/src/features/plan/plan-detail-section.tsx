@@ -224,7 +224,7 @@ export function PlanDetailSection({
             관리 진입점은 일정의 신원 옆에 둔다 — `PlanManageMenu` 주석 참고.
             **역방향 상태 변경도 이 메뉴 안이다** (#653).
           */
-          menu={<PlanManageMenu plan={plan} today={todayDay(today)} status={status} />}
+          menu={<PlanManageMenu plan={plan} pets={pets} today={todayDay(today)} status={status} />}
           /*
             **확정 액션이 개요 카드 바로 아래다** (이슈 #553). 예전에는 우측 일자 열의
             **맨 끝**이라, 3일 일정이면 마지막 날 카드까지 굴려야 버튼이 나왔다 — 초안을

@@ -1,10 +1,12 @@
 import { messages } from '@/lib/messages'
 import { planBudgetIssue } from '@/lib/plan/budget'
+import { companionPetsOf } from '@/lib/plan/companion-pets'
 import { planPeriodIssue } from '@/lib/plan/period'
+import type { Pet } from '@/types/pet'
 import type { PlanUpdatePayload } from '@/types/plan'
 
 /**
- * 이름 · 기간 · 예산 수정 폼의 값 변환과 검증. **변환은 이 한 곳에서만 한다**
+ * 이름 · 기간 · 예산 · 동행 반려견 수정 폼의 값 변환과 검증. **변환은 이 한 곳에서만 한다**
  * (form-guide.md §5, `toPlanCreatePayload` 와 같은 규칙).
  */
 
@@ -16,6 +18,47 @@ export type PlanEditValues = {
   endDate: string
   /** 폼에서는 문자열이다. 빈 값이 허용된다 */
   budget: string
+  /**
+   * 체크 순서. **첫 번째가 대표**다 (`plan.pet_id` — `PlanCommandProcessor.java:225`).
+   *
+   * **문자열이다.** 요청 스키마는 `int64` 지만 Snowflake 라 `Number()` 를 거치면 정밀도를
+   * 잃는다 — 응답이 준 문자열을 그대로 싣는다 (`lib/ai-plan/submit.ts` 와 같은 규칙).
+   */
+  petIds: string[]
+}
+
+/**
+ * 폼 밖에서 오는 사실 — 값이 아니라 **맥락**이다.
+ *
+ * 둘 다 필수다. 선택 prop 으로 두면 새 호출부가 빠뜨렸을 때 완료 일정에도 `petIds` 가
+ * 실려 나가는데, 그 실수는 타입 오류 없이 **저장 전체를 `PLAN_019` 로 죽인다.**
+ */
+export type PlanEditContext = {
+  /**
+   * 동행견 그룹이 폼에 있는가. 완료(`COMPLETED`) 일정과 고를 반려견이 없을 때 `false` 다
+   * (명세 D13-2 · D13-3).
+   */
+  petsEditable: boolean
+  /** 모달을 열 때의 선택. **순서까지** 같으면 키를 싣지 않는다 (명세 D13-4) */
+  initialPetIds: readonly string[]
+}
+
+/**
+ * 폼의 초기 선택 — `plan.petIds` 중 **옵션에 있는 것만**, `plan.petIds` 순서 그대로.
+ *
+ * **`companionPetsOf` 를 그대로 쓴다.** 상세의 반려견 카드가 보여 주는 명단과 이 폼의
+ * 초기 체크가 갈리면, 화면에 없던 아이가 저장에 섞이거나 반대로 빠진다.
+ *
+ * 삭제된 아이의 잔여 id 는 여기서 빠지므로 "변경 없음" 판정에서도 빠진다 — 조용한 정리를
+ * 저장에 섞지 않으려는 결정이다 (명세 D13-4 · 미결 2, 정리는 BE 후속 D13-11).
+ */
+export function planEditPetIds(petIds: readonly string[], pets: readonly Pet[]): string[] {
+  return companionPetsOf(petIds, pets).map((pet) => pet.petId)
+}
+
+/** 순서까지 같은가. **첫 번째가 대표라 순서가 값이다** — 순서만 바뀌어도 "바뀜" 이다 */
+function samePetIds(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((petId, index) => petId === b[index])
 }
 
 const TITLE_MAX = 60
@@ -24,7 +67,10 @@ const TITLE_MAX = 60
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 /** 필드명 → 메시지. 서버 `PlanValidationMessage` 와 같은 문구를 쓴다 */
-export function validatePlanEdit(values: PlanEditValues): Record<string, string> {
+export function validatePlanEdit(
+  values: PlanEditValues,
+  context: Pick<PlanEditContext, 'petsEditable'>,
+): Record<string, string> {
   const errors: Record<string, string> = {}
 
   const title = values.title.trim()
@@ -77,6 +123,20 @@ export function validatePlanEdit(values: PlanEditValues): Record<string, string>
       break
   }
 
+  /*
+    **0마리는 화면이 먼저 막는다** (명세 D13-5). 서버는 빈 배열을 `PLAN_010` 으로
+    거절하고 생성과 달리 대표견 폴백이 없다 — 왕복해서 배너로 듣느니 그룹에 붙인다.
+
+    **`petsEditable` 일 때만 본다.** 완료 일정에는 그 필드가 아예 없으므로, 여기서 세면
+    고칠 수 없는 필드 때문에 제목 수정이 막힌다.
+
+    상한(5)은 보지 않는다 — 옵션이 회원의 반려견 전부이고 그 수가 최대 5다. 서버
+    `PLAN_115` 가 2차 방어다.
+  */
+  if (context.petsEditable && values.petIds.length === 0) {
+    errors.petIds = messages.plan.errorPetRequired
+  }
+
   return errors
 }
 
@@ -93,14 +153,40 @@ export function validatePlanEdit(values: PlanEditValues): Record<string, string>
  *
  * **`status` 를 넣지 않는다.** 확정은 별도 동작이고, 여기서 함께 보내면 수정만 하려던
  * 사용자가 상태까지 바꾸게 된다.
+ *
+ * **`petIds` 는 바뀌었을 때만 넣는다 — 기간과 반대 규칙이다** (명세 D13-4). 기간은 한쪽만
+ * 보내면 서버가 옛 값과 섞어 다시 계산하므로 안 바뀌어도 둘 다 보내지만, `petIds` 는
+ * 섞일 값이 없고 같은 목록을 다시 보내면 서버가 `plan_pet` 을 **지웠다 다시 넣는다**
+ * (`PlanCommandProcessor.java:246-247`). 얻는 것이 없는 쓰기다.
  */
-export function toPlanUpdatePayload(values: PlanEditValues): PlanUpdatePayload {
+export function toPlanUpdatePayload(
+  values: PlanEditValues,
+  context: PlanEditContext,
+): PlanUpdatePayload {
   const budget = values.budget.trim()
 
-  return {
+  const payload: PlanUpdatePayload = {
     title: values.title.trim(),
     startDate: values.startDate,
     endDate: values.endDate,
     budget: budget === '' ? 0 : Number(budget),
   }
+
+  /*
+    세 갈래로 키를 **만들지 않는다.** 키가 없으면 서버는 "유지" 로 읽고 소유 검증조차
+    부르지 않는다 (`PlanWebFacade.java:111-112`).
+
+    (1) 폼에 그룹이 없었다 — 완료 일정이거나 고를 반려견이 없다. 완료 일정에서 키가 새면
+        **제목만 고치려던 저장이 `PLAN_019` 로 죽는다.** 컨트롤을 숨기는 것과 별개로
+        여기서 한 번 더 잠근다 (명세 D13-3 · D13-4).
+    (2) 0마리 — 빈 배열은 400 `PLAN_010` 이다. 생성과 달리 대표견 폴백이 없어
+        (`PlanCreateRequest.effectivePetIds()` 와 다른 지점) 저장이 통째로 실패한다.
+        `validatePlanEdit` 이 먼저 막지만 변환도 만들지 않는다.
+    (3) 초기 선택과 같다 — **순서까지** 같을 때만이다. 첫 번째가 대표라 순서가 값이다.
+  */
+  if (!context.petsEditable) return payload
+  if (values.petIds.length === 0) return payload
+  if (samePetIds(values.petIds, context.initialPetIds)) return payload
+
+  return { ...payload, petIds: [...values.petIds] }
 }

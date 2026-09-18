@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/button'
+import { CheckboxGroup } from '@/components/checkbox-group'
 import { Chip, ChipGroup } from '@/components/chip'
 import { DateField } from '@/components/date-field'
 import { Field } from '@/components/field'
@@ -11,7 +12,6 @@ import { Input } from '@/components/input'
 import { Textarea } from '@/components/textarea'
 import { AiPlanDetailsDisclosure } from '@/features/ai-plan/ai-plan-details-disclosure'
 import { AiPlanOptionsSection } from '@/features/ai-plan/ai-plan-options-section'
-import { PetCheckboxGroup } from '@/features/ai-plan/pet-checkbox-group'
 import { SIGUNGU_CODES, SIGUNGU_LABEL } from '@/features/place/filter-labels'
 import { BUDGET_PRESETS_MANWON } from '@/lib/ai-plan/budget'
 import { type DetailsInput, detailsSummary, hasAnyDetail } from '@/lib/ai-plan/details'
@@ -323,7 +323,7 @@ export function AiPlanCreateForm({
         그룹과 안내를 한 상자에 넣어 간격을 직접 준다.
       */}
       <div className="flex flex-col gap-2">
-        <PetCheckboxGroup
+        <CheckboxGroup
           id="petIds"
           label={messages.aiPlan.fieldPet}
           required
@@ -389,7 +389,7 @@ export function AiPlanCreateForm({
             **라벨이 눈에 보여야 한다.** 예산 칩은 바로 아래 `Field`(예산 (선택))가 라벨을
             들고 있어 `ChipGroup` 의 `aria-label` 만으로 충분했지만, 이 축은 칩이 컨트롤의
             전부다 — 라벨이 없으면 접기를 펼쳤을 때 무엇을 고르는 칩인지 알 수 없다.
-            `PetCheckboxGroup` 의 `legend` 와 같은 값이다.
+            `CheckboxGroup` 의 `legend` 와 같은 값이다.
           */}
           <legend className="text-body-2 text-fg mb-1 font-medium">
             {messages.aiPlan.fieldRegion}
