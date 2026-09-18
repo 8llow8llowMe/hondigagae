@@ -1,3 +1,5 @@
+import Link from 'next/link'
+
 import { MetricBadge } from '@/components/metric'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { Skeleton } from '@/components/skeleton'
@@ -7,6 +9,8 @@ import {
   type CongestionDays,
   congestionRateSummary,
   formatCongestionRange,
+  hasCongestionAnswer,
+  isCongestionEmpty,
   splitDay,
 } from '@/lib/insight/congestion'
 import { congestionTone } from '@/lib/insight/tone'
@@ -65,7 +69,17 @@ export function PlaceCongestionPanel({
   days,
   onDaysChange,
 }: PlaceCongestionPanelProps) {
-  const range = data === null ? null : formatCongestionRange(data.fromDate, data.toDate)
+  /*
+    **자료가 0건이면 기간을 제시하지 않는다** (#731). `8.29 – 9.27` 이 남으면 카드가
+    "이 30일치를 재어 봤다" 고 말하는데 본문은 "잰 것이 없다" 고 말해 **말과 화면이
+    어긋난다.** 꼬리표를 통째로 내리는 쪽을 골랐다 — 빈 상태 문구 안으로 기간을 옮기는
+    안도 있었지만, 그러면 문구가 "9.27 까지 자료가 없어요" 가 되어 **날짜 범위가 사실을
+    좁히는 것처럼** 읽힌다. 자료는 그 기간 밖에도 없다.
+  */
+  const range =
+    data === null || isCongestionEmpty(data)
+      ? null
+      : formatCongestionRange(data.fromDate, data.toDate)
 
   return (
     <div className={cn('flex flex-col gap-3 py-4', INSET)}>
@@ -141,8 +155,10 @@ function PanelBody({
     기본이 30일이라 점선 트랙 30칸이 카드를 채우고 설명은 그 아래 12px 로 붙어 **먼저 읽히는
     것이 "깨진 그래프"** 였다. 추천일 줄(`LeastCrowded`)은 어차피 `null` 에서 아무것도 그리지
     않고, 점선 설명·예측 범위·기간 토글도 이 갈래에는 서지 않는다.
+
+    **이제 차트 자체를 그리지 않는다** (#731) — 자세한 근거는 `EmptyBody` 머리주석에 있다.
   */
-  if (data.leastCrowded === null) return <EmptyBody items={data.dailyCongestions} />
+  if (!hasCongestionAnswer(data)) return <EmptyBody />
 
   const hasUnknown = data.dailyCongestions.some((item) => item.concentrationRate === null)
 
@@ -165,167 +181,110 @@ function PanelBody({
 }
 
 /**
- * 자료가 하나도 없을 때 — **차트를 지우지 않고 덮는다** (#670).
+ * 자료가 하나도 없을 때 — **차트를 그리지 않는다** (#731).
  *
- * 지우면 카드에 제목·기간·문구만 남아 **카드가 통째로 사라진 것처럼** 보인다. 남은 칸
- * 수·트랙 높이·날짜 축이 _"여기는 날짜별 붐빔을 보는 자리"_ 라고 말해 주고, 그래야 문구의
- * "자료가 아직 없어요" 가 **무엇의 자료인지** 붙는다. 동시에 그 칸들이 읽히면 안 된다 —
- * 점선 30칸은 "모르는 날 30일" 이라는 뜻을 이미 다 말했다. **보이되 읽히지 않는** 상태다.
+ * #670 은 차트를 남기고 veil 로 덮었다. 근거는 _"남은 칸 수·트랙 높이·날짜 축이 여기는
+ * 날짜별 붐빔을 보는 자리라고 말해 준다"_ 였는데, 390 실측에서 그 자리 설명이 **미완성
+ * 차트**로 읽혔다. #708 이 문구에 불투명 면을 주자 오히려 "무언가를 덮고 있다" 는 인상이
+ * 강해졌다 — 덮개가 또렷할수록 그 아래에 볼 것이 있다는 말이 된다.
  *
- * **veil 은 반투명 `--bg` 면 한 겹이다.** 카드 자체가 `bg-bg` 라 이것은 카드 배경색의 알파
- * 변형일 뿐이고, `DESIGN.md` 밖의 새 색을 만들지 않는다 (`photo-viewer.tsx` 의 `bg-fg/95` 와
- * 같은 형태). `backdrop-blur` 를 얹지 않는 이유와 `70` 이라는 값의 근거는 아래 상수 주석에
- * 있다.
+ * 그리지 않으면 그 갈래의 결함 넷이 한꺼번에 사라진다.
  *
- * **그 위에 문구가 자기 면을 갖는다** (#708 · `EMPTY_CALLOUT`). veil 은 뒤를 **가리는** 일만
- * 하고, 앞에 세운 것이 **하나의 객체**라는 말은 그 상자가 한다 — 두 일을 한 겹에 몰면 둘 다
- * 흐려진다. 두 층이 서로를 붙드는 자리라 **알파와 테두리 색을 따로 고치지 않는다.**
+ *  1. **점선이 예외 표시로 돌아온다.** 정상 갈래에서는 31칸 중 한 칸에만 쓰여 "아직 모르는
+ *     날" 을 또렷이 말한다. 같은 기호를 30칸 전부에 쓰면 신호가 아니라 잡음이고, 사용자는
+ *     로딩이 끝나기를 기다린다
+ *  2. **날짜 축 30개가 사라진다.** "자료가 없다" 고 말하면서 날짜만 정상 갈래와 같은 색으로
+ *     또렷하던 모순이 없어진다 (기간 꼬리표도 같은 이유로 내린다 — `PlaceCongestionPanel`)
+ *  3. **볼 것이 없는데 가로로 구르던 레일이 없어진다** (실측 `scrollWidth` 1254 / 358)
+ *  4. 정상 갈래에 있던 **트랙 채움(`bg-band`)이 없어 빈 상자들이 공중에 뜨던** 것도 함께
+ *
+ * **블록 하나다.** 정상 갈래에서 `LeastCrowded` 요약이 서던 **같은 자리에 같은 개수**로
+ * 선다 — 갈래가 달라도 카드의 골격이 흔들리지 않는다. `aria-hidden` 도, veil 도, 그것을
+ * 앉힐 `relative` 래퍼도 이제 필요 없다: 가릴 것이 없으면 덮개도 없다.
+ *
+ * **`EmptyState` 를 쓰지 않는다.** 그쪽은 화면·섹션 단위의 빈 상태라 자기 인셋과 `py-12`
+ * 와 heading 을 갖는다 — 이 카드는 이미 `h2` 를 그렸고 여기 두 줄은 제목이 아니다.
+ *
+ * **`role="status"` 를 쓰지 않는다** — 진입 시점의 정적 콘텐츠지 갱신이 아니다.
  */
-function EmptyBody({ items }: { items: DailyCongestionItem[] }) {
-  /*
-    **문구 키를 새로 만들지 않는다.** 차트 아래에 있던 두 줄을 그대로 veil 안으로 옮긴 것이고,
-    아래 블록은 없앴다 — 같은 말을 두 번 하지 않는다.
-  */
-  const lines = (
-    <>
+function EmptyBody() {
+  return (
+    <div className={EMPTY_BLOCK}>
+      {/* 문구 키를 새로 만들지 않는다 — #708 이 상자에 담은 두 줄 그대로다 */}
       <p className="text-body-2 text-fg font-semibold break-keep">
         {messages.place.detailCongestionEmptyTitle}
       </p>
       <p className="text-caption text-fg-muted break-keep">
         {messages.place.detailCongestionEmptyDescription}
       </p>
-    </>
-  )
-
-  /*
-    **덮을 것이 없는 장소도 있다.** 서버가 날짜 목록 자체를 비워 보내는 갈래가 실제로 있어
-    (`Chart` 의 `items.length === 0` 주석) 그때 `inset-0` veil 을 세우면 높이 0 짜리 상자가
-    되어 문구가 사라진다. 덮개 없이 문구만 세운다.
-  */
-  if (items.length === 0) return <div className="flex flex-col gap-1">{lines}</div>
-
-  return (
-    <div className="relative">
-      {/*
-        **이 갈래에서 차트는 장식이다.**
-
-        - `aria-hidden` — 전부 `UNKNOWN` 인 30일을 그대로 두면 보조기기가 `9월 21일 월요일
-          정보 없음` 을 **30번** 읽는다. 눈으로는 한 덩어리로 지나가는 것이 보조기기에서만
-          30줄이 된다 (`BodySkeleton` 이 칸 수를 숨기는 것과 같은 판단이다)
-        - `overflow-x-auto` 를 주지 않고 `ScrollRailArrows` 도 렌더하지 않는다. veil 은
-          뷰포트에 붙박이인데 그 아래 그림만 미끄러지면 이상하고, 무엇보다 `aria-hidden`
-          안에 초점 받는 것이 남으면 `aria-hidden-focus` 위반이다 — 스크롤 컨테이너는
-          브라우저에 따라 키보드 초점을 받는다
-        - `INSET_BLEED_END_CLASS` 도 붙이지 않는다. 카드 끝까지 여는 이유("잘린 칸이 '더
-          있다' 로 읽혀야 한다")가 **구를 수 없는 면**에는 없고, 인셋에서 자르면 veil 밖으로
-          삐져나오는 칸도 없다
-
-        **`relative` 를 `ul` 자신에게 준다.** 칸마다 붙는 `sr-only` 라벨이 `position: absolute`
-        라, 기준면이 바깥 래퍼면 그 라벨들이 `overflow-hidden` 에 잘리지 않고(컨테이닝 블록이
-        클리퍼 바깥이면 클립이 적용되지 않는다) 정적 위치가 조상의 `scrollWidth` 로 샌다 —
-        30일이면 390 에서 페이지가 통째로 가로로 넘친다 (`Chart` 의 `.scroll-rail` 주석).
-      */}
-      <ul aria-hidden className="relative flex items-end gap-1.5 overflow-hidden">
-        {items.map((item) => (
-          <DayColumn key={item.date} item={item} picked={false} />
-        ))}
-      </ul>
 
       {/*
-        veil 은 스크롤 콘텐츠가 아니라 **뷰포트**에 `absolute inset-0` 으로 앉는다 — 문구가
-        언제나 카드 가운데에 선다.
+        **이 하나만은 누를 것을 둔다** (#731). #670 은 "누를 것이 생기는 순간 사용자는 이것을
+        고칠 수 있는 오류로 읽는다" 며 버튼·링크를 전부 뺐는데, 그 판단이 겨눈 것은 **재시도**
+        였다 — 눌러도 같은 빈 답이 오는 버튼. 이 링크는 이 카드를 고치려 하지 않고 **다음에
+        갈 곳**으로 보낸다 (`EmptyState.action` 이 "재시도가 아니라 다음 행동" 인 것과 같다).
+        재시도(`messages.common.retry`)는 그대로 이 갈래에 없다.
 
-        **안에 버튼·링크를 하나도 두지 않는다.** 누를 것이 생기는 순간 사용자는 이것을 고칠
-        수 있는 오류로 읽는다 (404 가 아니라 빈 상태라는 기존 결정).
-
-        `role="status"` 를 쓰지 않는다 — 진입 시점의 정적 콘텐츠지 갱신이 아니다.
+        **같은 시군구로 좁히지 못한다.** 장소 상세 응답(`PlaceDetailResponse`)에
+        `sigunguCode` 가 없다 — 목록 항목에만 있고 상세에는 내려오지 않는다
+        (`types/place.ts`). 없는 값을 추측해 `?sigunguCode=` 를 붙이면 링크가 엉뚱한
+        지역을 열므로, **기존 장소 검색 경로(`/places`)를 기본 필터 그대로** 연다.
+        BE 가 상세에 `sigunguCode` 를 주면 그때 `parsePlaceFilters` 의 키로 좁힌다.
       */}
-      <div className={cn('absolute inset-0 flex items-center justify-center px-4', VEIL_FILL)}>
-        <div className={EMPTY_CALLOUT}>{lines}</div>
-      </div>
+      <Link
+        href="/places"
+        // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+        className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center self-start rounded-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
+      >
+        {messages.place.detailCongestionEmptyAction}
+      </Link>
     </div>
   )
 }
 
 /**
- * 빈 상태 문구가 앉는 면 (#708).
+ * 빈 상태 블록 (#708 의 상자를 #731 이 이어받았다).
  *
- * **veil 만으로는 문구에 경계가 없었다.** 글자는 읽혔지만 점선 격자와 같은 평면에 떠 있어
- * "덮개" 가 아니라 **"글자가 겹쳐졌다"** 로 읽힐 여지가 있었다. 면 · 1px 테두리 · 곡률
- * 셋이 그 경계를 만든다 — 문구가 하나의 객체가 되면서 뒤 격자와 층이 갈린다.
+ * **`LeastCrowded` 줄과 같은 면·같은 곡률·같은 여백이다** — 정상 갈래에서 요약이 서던
+ * 자리를 그대로 받으므로, 갈래가 달라도 카드의 골격이 흔들리지 않는다.
  *
- * **꼬리(말풍선)를 달지 않는다.** 꼬리는 _누가 말하는지_ 를 가리키는 부호인데, 여기서 꼬리가
- * 찍는 칸은 30개 중 아무 칸이고 그 칸에는 아무 뜻이 없다 — **가리킬 대상이 없는 지시부호**다.
- * 게다가 가운데 칸을 가려 "이 날짜에 문제가 있다" 로 오독될 여지가 생긴다. 경계를 만드는
- * 일은 면·테두리·곡률이 이미 다 한다.
+ * **채움은 `--band` 다.** #731 은 `--bg-sunken` 을 지정했지만 그 토큰은 **바닥(L0) 전용**
+ * 이고 소유자는 `Canvas` 다 (DESIGN.md §0 · §2-1). `styles/token-usage.test.ts` 가 그것을
+ * 실제로 잠그고 있고, 그 예외 목록은 _"늘리지 않는다"_ 고 못박혀 있다 — 카드 안 아이템이
+ * 회색 바닥색을 직접 칠하면 어느 층이 바닥인지 읽히지 않는다. 카드 안 아이템 채움으로
+ * 이 시스템이 정해 둔 색은 `--band` 하나다.
  *
- * **테두리는 `--border` 가 아니라 `--border-strong` 이다.** 이 상자는 흰 카드 위가 아니라
- * **veil 합성면 위**에 선다 — 점선 칸 위에서 `--border`(`#E3E5EA`)는 합성면(`#E5E7EA`)과
- * **1.02:1** 이라 그 변만 사라진다. `--border-strong` 은 점선 위 1.35 · 칸 사이 1.68 이고,
- * 이 시스템이 흰 배경에서 상시로 쓰는 카드 테두리(1.26)보다 오히려 강하다.
+ * **#708 이 `--band` 를 기각했던 이유는 이 갈래에 더는 해당하지 않는다.** 그때 문제는
+ * *"같은 카드 안에서 `--band` 가 이미 `LeastCrowded` 의 면"* 이라 한 색이 두 뜻을 갖는다는
+ * 것이었는데, 그 상자는 **차트를 덮고 서 있었다.** 지금은 두 블록이 **배타적**이다 —
+ * 한 화면에 같이 서지 않으므로 색이 뜻을 겸하지 않고, 오히려 같은 면이 "여기가 그 자리"
+ * 라고 말한다. 구별은 색이 아니라 **문구**가 한다.
  *
- * **채움을 `--band` 로 하고 테두리를 빼는 안은 기각했다.** 합성면과 1.09:1 이라 가장자리
- * 세기가 배경에 따라 흔들리고(칸 사이 1.14 · 점선 칸 위 1.09) 한 상자의 네 변이 서로 다르게
- * 보인다. 더 나쁜 것은 **같은 카드 안에서 `--band` 가 이미 `LeastCrowded` 줄의 면**이라는
- * 것이다 — 한 색이 "서버가 고른 날" 과 "자료 없음" 두 뜻을 갖는다.
+ * **테두리를 걷었다.** `--border-strong` 은 veil 합성면 위에서 변이 사라지지 않게 고른
+ * 값이었고(#708), 가릴 격자가 없어지면서 그 근거가 사라졌다. 테두리를 남기면 L2 가 L1 의
+ * 채널(면 + 1px 테두리)을 쓰게 되어 두 층이 함께 죽는다 (DESIGN.md §0). `--band`(`#EEF0F3`)
+ * 는 카드 면(`#FFFFFF`)과 1.14:1 이라 채움만으로 선다 — `LeastCrowded` 가 같은 값으로
+ * 테두리 없이 서 있는 것과 같다.
  *
- * **`rounded-md`(8)다.** 카드 안 아이템의 곡률이고 `LeastCrowded` 와 같은 값이다. 12 는 섹션,
- * 16 은 오버레이라 그쪽을 가져오면 "이 곡률을 보면 떠 있는 것" 이라는 신호가 죽는다
- * (DESIGN.md §0). 같은 이유로 **그림자를 얹지 않는다** — 이것은 카드 안에 눕는 면이다.
+ * **가운데 정렬(`text-center`)과 `max-w-xs` 도 걷었다.** 둘 다 veil 한가운데 뜨는 상자의
+ * 사정이었다 — 30일 레일 폭(1254) 때문에 폭을 묶었고, 덮개 가운데라 가운데 정렬이었다.
+ * 좌측 정렬이 이 저장소의 빈 상태 규칙이고(`EmptyState` — _"가운데 정렬 + 큰 제목은 빈
+ * 상태를 사건처럼 보이게 한다"_), 폭은 카드가 준다.
  *
- * **`max-w-xs`(320)로 폭을 묶는다.** 30일 레일은 1254px 이라 상한이 없으면 데스크톱에서
- * 문구가 카드를 가로지르는 한 줄이 되어 상자라는 뜻 자체가 사라진다. 390 에서 카드 안쪽
- * 폭이 326 이라 모바일에서는 사실상 걸리지 않는다.
+ * **그림자를 얹지 않는다** — 카드 안에 눕는 면이다 (DESIGN.md §0 · §6).
  */
-const EMPTY_CALLOUT =
-  'border-border-strong bg-bg flex max-w-xs flex-col gap-1 rounded-md border px-4 py-3 text-center'
+const EMPTY_BLOCK = 'bg-band flex flex-col items-start gap-1 rounded-md p-3'
 
-/**
- * 빈 상태 veil 의 면 (#670).
- *
- * **알파는 눈으로 고르지 않았다.** 토큰 실측값으로 두 기준을 동시에 만족하는 구간을 구하고
- * 그 가운데를 잡았다 (`--bg` `#ffffff` · `--fg` `#15181d` · `--fg-muted` `#596069` ·
- * `--metric-unknown-500` `#a8aeb8` · `--band` `#eef0f3`).
- *
- * | 기준                                                  | 결과                     |
- * | ----------------------------------------------------- | ------------------------ |
- * | 문구가 **점선 위 최악 픽셀**에서도 4.5:1 이상         | 알파 **54% 이상**        |
- * | 합성 후 점선이 3:1 **미만** (신호가 아니라 질감)      | 모든 알파 (아래 참고)    |
- * | 그러면서 점선이 0 은 아니다 — `--band` 대비(1.14) 이상 | 알파 **81% 이하**        |
- *
- * 교집합 `[54%, 81%]` 의 가운데는 68 이고, Tailwind 표준 눈금에 맞춰 **70** 을 쓴다.
- * 그 값에서 `--fg` 14.33:1 · `--fg-muted` 5.12:1 · 점선 1.24:1 이다.
- *
- * **둘째 기준은 실측에서 구속력이 없었다.** `--metric-unknown-500` 은 흰 배경에서 이미
- * 2.23:1 이라 알파 0 에서도 3:1 아래다 — 그래서 위쪽 경계를 "점선이 사라지지 않는다" 로
- * 잡았고, 그 바닥을 이 디자인 시스템에서 가장 조용한 정식 면(`--band`)의 대비로 두었다.
- * 임의의 숫자를 새로 만들지 않기 위해서다.
- *
- * **`backdrop-blur` 를 얹지 않는다.** 위 구간이 비지 않았으므로 조건이 성립하지 않는다
- * (세부명세 D8-8). 가리는 대상이 2px 점선이라 알파만으로 질감까지 내려가고, Safari 접두와
- * 합성 레이어 재샘플링 비용을 이 카드(본문 맨 위 · 진입 직후 스크롤 구간)에 들일 이유가 없다.
- *
- * **`--metric-unknown-500` 을 veil 에 쓰지 않는다** (점선 테두리 전용 토큰, `DESIGN.md` §2-3).
- * **`--bg-sunken` · `--band` 로 덮지 않는다** — 둘 다 "다른 층" 을 뜻하는 면이라 이 카드 안에
- * 없던 층이 하나 생긴 것처럼 읽힌다.
- *
- * ---
- *
- * **70 을 지키는 근거가 갈아탔다** (#708). 문구가 `EMPTY_CALLOUT` 의 불투명 면 위로 올라가면서
- * **위 표의 첫 줄(하한 54%)이 성립할 일이 없어졌다** — 글자는 더 이상 점선 위에 얹히지 않는다.
- * 근거가 사라졌다고 알파를 낮추면 안 된다. **낮출수록 상자 테두리가 점선 위에서 묻히기
- * 때문이다:**
- *
- * | veil 알파 | 합성면     | `--border-strong` 테두리 (점선 칸 위) |
- * | --------- | ---------- | ------------------------------------- |
- * | 45%       | `#CFD2D8`  | **1.11:1** — 변이 사라진다            |
- * | 70%       | `#E5E7EA`  | **1.35:1**                            |
- *
- * 그래서 하한은 그대로 남되 **지키는 대상이 "문구 legibility" 에서 "테두리 legibility" 로**
- * 바뀐다. 상한(81%)은 그대로다 — 점선이 사라지면 "모르는 날 30일" 이라는 뜻을 잃는다.
- * 문구 대비는 덤으로 오른다: `--fg` 14.33 → **17.79** · `--fg-muted` 5.12 → **6.36**.
- */
-const VEIL_FILL = 'bg-bg/70'
+/*
+  **veil(`bg-bg/70`)을 걷었다** (#731).
+
+  #670 이 그 알파를 고른 근거는 전부 "점선 격자를 어느 정도로 가릴 것인가" 였다 — 문구가
+  점선 위에서 읽히는 하한, 점선이 질감으로 남는 상한, 그리고 #708 뒤에는 상자 테두리가
+  합성면 위에서 묻히지 않는 하한. **가릴 격자가 사라졌으므로 그 계산 전체의 전제가 없다.**
+  알파를 새로 고르는 대신 겹 자체를 없앴다.
+
+  되살리려면 먼저 "차트를 왜 다시 그리는가" 에 답해야 한다 — 알파는 그 다음 문제다.
+*/
 
 /**
  * 서버가 고른 날. **`null` 이면 아무것도 그리지 않는다.**
@@ -436,11 +395,17 @@ function Chart({
   days: CongestionDays
 }) {
   /*
-    **훅이 이른 반환보다 위다.** 아래 `items.length === 0` 은 전부 `UNKNOWN` 인 장소에서
-    실제로 걸리는 갈래라, 순서가 뒤집히면 그 장소를 열 때마다 훅 개수가 달라진다.
+    **훅이 이른 반환보다 위다.** 아래 `items.length === 0` 이 걸리는 장소가 생기면 순서가
+    뒤집힌 순간 그 장소를 열 때마다 훅 개수가 달라진다 — 조건부 훅이다.
   */
   const rail = useScrollRail<HTMLUListElement>()
 
+  /*
+    **방어로 남긴다.** 전부 `UNKNOWN` 인 장소(날짜 목록이 빈 갈래 포함)는 이제 `PanelBody`
+    가 위에서 걸러 여기까지 오지 않는다 (#731). 그래도 `leastCrowded` 가 실물인데
+    `dailyCongestions` 가 비어 오는 조합을 타입이 막지 못하므로, 빈 `ul` 과 화살표만 남는
+    카드를 만들지 않는다.
+  */
   if (items.length === 0) return null
 
   const isMonth = days === CONGESTION_DAYS.month

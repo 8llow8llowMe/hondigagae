@@ -1,5 +1,5 @@
 import { parseDay, weekdayOf } from '@/lib/date/day'
-import type { DailyCongestionItem } from '@/types/insight'
+import type { DailyCongestionItem, PlaceCongestionResponse } from '@/types/insight'
 
 /**
  * 기간 혼잡도의 순수 규칙 (#430).
@@ -46,6 +46,43 @@ export type CongestionDays = (typeof CONGESTION_DAYS)[keyof typeof CONGESTION_DA
  * "언제 갈까" 에 멀리까지 답하는 것이고, 화살표와 페이드가 더 있다는 것을 말해 준다.
  */
 export const CONGESTION_DEFAULT_DAYS: CongestionDays = CONGESTION_DAYS.month
+
+/** 아는 날이 하나라도 있는 기간 — 서버가 고른 날이 실물이다 */
+export type CongestionWithAnswer = PlaceCongestionResponse & {
+  leastCrowded: DailyCongestionItem
+}
+
+/**
+ * **답이 있는 기간인가.** `isCongestionEmpty` 의 반대면이고, 타입을 좁히는 쪽이다.
+ *
+ * 화면이 `leastCrowded.date` 를 읽어야 하는데 타입에는 "비지 않았으면 실물" 이라는 관계가
+ * 없다 — 여기서 한 번 좁혀 두면 호출부에 `!` 가 남지 않는다.
+ */
+export function hasCongestionAnswer(data: PlaceCongestionResponse): data is CongestionWithAnswer {
+  return data.leastCrowded !== null
+}
+
+/**
+ * **그릴 것이 하나도 없는 기간인가** (#731).
+ *
+ * `true` 면 화면이 차트(레일 · 막대 · 점선 격자 · 날짜 축)를 **아예 그리지 않고** 빈 상태
+ * 블록 하나만 세운다. 카드 머리의 기간 표기도 이때는 내지 않는다 — 자료 0건인데 기간을
+ * 제시하면 말과 화면이 어긋난다.
+ *
+ * **판정은 `leastCrowded === null` 이다.** 서버가 `UNKNOWN` 을 제외하고 최저 집중률을
+ * 고르므로(`CongestionSnapshot`) 아는 날이 하나도 없을 때만 그 값이 `null` 이 된다 —
+ * `dailyCongestions` 를 FE 가 다시 훑지 않는다.
+ *
+ * **`hasUnknown` 으로 바꾸지 않는다.** 아는 날이 하루라도 있으면 그 날이 답이고, 그쪽에서
+ * 점선은 **여전히 옳은 기호**다: 31칸 중 한 칸만 점선이면 "아직 모르는 날" 이 또렷이 읽힌다.
+ * 같은 기호가 30칸 전부에 깔릴 때만 신호가 잡음이 된다 — 그 경계가 이 함수다.
+ *
+ * 판정을 이 한 곳에 두는 이유는 **머리(기간 표기)와 본문(차트)이 같은 답을 봐야** 하기
+ * 때문이다. 두 군데서 따로 재면 기간만 남은 카드가 생긴다.
+ */
+export function isCongestionEmpty(data: PlaceCongestionResponse): boolean {
+  return !hasCongestionAnswer(data)
+}
 
 /**
  * 집중률 → 막대 높이(%). 트랙 전체가 **집중률 100** 이다.

@@ -142,92 +142,47 @@ describe('PlaceCongestionPanel — 서버가 고른 날', () => {
 })
 
 /**
- * 자료가 하나도 없을 때 차트를 덮는다 (#670).
+ * 자료가 하나도 없을 때 **차트를 그리지 않는다** (#731).
  *
- * 빈 상태 처리는 예전에도 있었는데 **차트가 함께 그려졌다** — 기본이 30일이라 점선 트랙
- * 30칸이 카드를 채우고 설명은 그 아래 12px 로 붙어 먼저 읽히는 것이 "깨진 그래프" 였다.
+ * #670 은 차트를 남기고 veil 로 덮었고, #708 이 그 위 문구에 불투명 면을 줬다. 390 실측에서
+ * 그 조합이 **"아직 안 그려진 차트"** 로 읽혔다 — 점선 30칸 · 정상 갈래와 같은 색의 날짜 축
+ * 30개 · 볼 것이 없는데 살아 있는 가로 스크롤(`scrollWidth` 1254 / `clientWidth` 358).
+ * 그리지 않으면 그 넷이 한꺼번에 사라진다.
  */
-describe('PlaceCongestionPanel — 자료가 없을 때 차트를 덮는다 (#670)', () => {
-  /** veil 은 이 갈래에서 `absolute inset-0` 을 내는 유일한 요소다 */
-  const VEIL_MARKER = 'absolute inset-0'
-
-  /**
-   * veil 을 경계로 마크업을 가른다.
-   *
-   * **매치 실패를 삼키지 않는다** — veil 이 사라지면 `inside` 가 빈 문자열이 되어 그 위에
-   * 쌓은 `not.toContain` 이 전부 공허하게 통과한다 (testing-guide.md §5).
-   */
-  const split = (markup: string) => {
-    const at = markup.indexOf(VEIL_MARKER)
-
-    expect(at).toBeGreaterThan(-1)
-    return { before: markup.slice(0, at), inside: markup.slice(at) }
-  }
-
+describe('PlaceCongestionPanel — 자료가 없으면 차트를 그리지 않는다 (#731)', () => {
   const empty = () => render({ data: congestionAllUnknown })
 
   /*
-    **지우지 않는다.** 남은 칸 수·트랙 높이·날짜 축이 "여기는 날짜별 붐빔을 보는 자리" 라고
-    말해 주고, 그래야 문구의 "자료가 아직 없어요" 가 무엇의 자료인지 붙는다.
+    **레일·막대·점선 격자·날짜 축을 통째로 내지 않는다.** 칸이 하나라도 남으면 그 자리가
+    다시 "덜 그려진 그래프" 가 된다.
   */
-  it('차트를 지우지 않고 그대로 그린다', () => {
+  it('칸도 점선 격자도 남기지 않는다', () => {
     const markup = empty()
 
-    expect(markup).toContain('border-metric-unknown-500')
-    // fixture 는 7일이다 — 칸을 갈래마다 줄이면 스켈레톤(30칸)에서 카드가 출렁인다
-    expect(markup.match(/<li /g)).toHaveLength(7)
+    expect(markup).not.toContain('<li ')
+    expect(markup).not.toContain('border-metric-unknown-500')
+    // 트랙 높이(`TRACK_HEIGHT`)도 함께 사라진다 — 차트를 이루던 것이 하나도 없다
+    expect(markup).not.toContain('h-36')
   })
 
-  it('문구가 차트 아래가 아니라 veil 안에 있다', () => {
-    const { before, inside } = split(empty())
-
-    expect(inside).toContain(messages.place.detailCongestionEmptyTitle)
-    expect(inside).toContain(messages.place.detailCongestionEmptyDescription)
-    // veil 보다 앞(= 덮이는 차트 쪽)에는 문구가 없다
-    expect(before).not.toContain(messages.place.detailCongestionEmptyTitle)
-    expect(before).not.toContain(messages.place.detailCongestionEmptyDescription)
-    // 덮이는 대상이 실제로 veil 앞에 있다
-    expect(before).toContain('border-metric-unknown-500')
-  })
-
-  /* 문구 키를 새로 만들지도, 아래 블록을 남겨 두지도 않았다 — 같은 말을 두 번 하지 않는다 */
-  it('같은 문구를 두 번 내지 않는다', () => {
+  /*
+    **날짜 축이 사라진다.** "자료가 없다" 고 말하면서 날짜만 또렷하던 모순이 이 갈래의
+    결함 중 하나였다. 픽스처 7일의 날짜가 하나도 남지 않았는지 본다.
+  */
+  it('날짜 축을 남기지 않는다', () => {
     const markup = empty()
 
-    expect(markup.split(messages.place.detailCongestionEmptyTitle)).toHaveLength(2)
-    expect(markup.split(messages.place.detailCongestionEmptyDescription)).toHaveLength(2)
+    // `9월 4일 금요일 …` 같은 sr-only 줄도, 축의 `4금` 도 없다
+    expect(markup).not.toContain('9월 4일')
+    expect(markup).not.toContain('정보 없음')
   })
 
   /*
-    이 갈래는 점선의 **뜻**이 아니라 **이 장소에 자료가 없다**는 사실을 말한다. 둘을 같이
-    내면 veil 위아래로 비슷한 말이 겹친다.
+    **볼 것이 없는데 구르지 않는다.** 스크롤 컨테이너와 레일이 만들어지는 수단 자체를 잰다 —
+    화살표(`ScrollRailArrows`)는 스크롤 여지를 잰 뒤에만 그려 서버 렌더에는 정상 갈래에서도
+    나오지 않으므로, 라벨 부재로 재면 언제나 참인 공허한 단언이 된다.
   */
-  it('점선 설명을 겹쳐 내지 않는다', () => {
-    expect(empty()).not.toContain(messages.place.detailCongestionUnknownNote)
-  })
-
-  /*
-    **덮인 차트는 `aria-hidden` 이다.** 전부 `UNKNOWN` 인 날을 그대로 두면 보조기기가
-    `9월 4일 금요일 정보 없음` 을 칸 수만큼 읽는다 — 눈으로는 한 덩어리로 지나가는 것이
-    보조기기에서만 여러 줄이 된다. 문구는 veil 밖(=`aria-hidden` 밖)이라 그대로 읽힌다.
-  */
-  it('덮인 차트에만 aria-hidden 을 건다', () => {
-    const { before, inside } = split(empty())
-
-    expect(before).toContain('aria-hidden')
-    expect(inside).not.toContain('aria-hidden')
-    // 갱신이 아니라 진입 시점의 정적 콘텐츠다
-    expect(inside).not.toContain('role="status"')
-  })
-
-  /*
-    **`aria-hidden` 안에 초점 받는 것을 남기지 않는다** (`aria-hidden-focus`).
-
-    화살표(`ScrollRailArrows`)는 스크롤 여지를 **잰 뒤에만** 그리므로 서버 렌더에서는 정상
-    갈래에서도 나오지 않는다 — 라벨 부재로 재면 언제나 참인 공허한 단언이 된다. 대신 화살표와
-    키보드 초점을 만들어 내는 **수단**을 잰다: 이 갈래에는 스크롤 컨테이너 자체가 없다.
-  */
-  it('덮인 차트를 구르지 않게 한다 — 스크롤 컨테이너도 레일도 없다', () => {
+  it('스크롤 컨테이너도 레일도 만들지 않는다', () => {
     const markup = empty()
 
     expect(markup).not.toContain('overflow-x-auto')
@@ -235,130 +190,194 @@ describe('PlaceCongestionPanel — 자료가 없을 때 차트를 덮는다 (#67
   })
 
   /*
-    404 가 아니라 빈 상태다. **누를 것이 생기는 순간 사용자는 이것을 고칠 수 있는 오류로
-    읽는다** — veil 안에 재시도·버튼·링크를 하나도 두지 않는다.
+    **가릴 것이 없으면 덮개도 없다** — veil(`absolute inset-0` + `bg-bg/70`)과 그것을 앉히던
+    `aria-hidden` 차트가 함께 사라졌다. 이 단언이 깨지면 #670 의 구조가 되돌아온 것이다.
   */
-  it('빈 상태에 누를 것을 하나도 두지 않는다', () => {
+  it('veil 도 aria-hidden 도 남지 않는다', () => {
+    const markup = empty()
+
+    expect(markup).not.toContain('absolute inset-0')
+    expect(markup).not.toContain('bg-bg/70')
+    expect(markup).not.toContain('aria-hidden')
+    // 갱신이 아니라 진입 시점의 정적 콘텐츠다
+    expect(markup).not.toContain('role="status"')
+  })
+
+  /*
+    **자료 0건인데 기간을 제시하지 않는다.** 머리의 `9.1 – 9.7` 이 남으면 카드가 "이 기간을
+    재어 봤다" 고 말하는데 본문은 "잰 것이 없다" 고 말한다.
+  */
+  it('카드 머리의 기간 표기를 내리지만 제목은 남긴다', () => {
+    const markup = empty()
+
+    expect(markup).not.toContain('9.1 – 9.7')
+    expect(markup).toContain(messages.place.detailCongestionTitle)
+  })
+
+  /*
+    이 갈래는 점선의 **뜻**이 아니라 **이 장소에 자료가 없다**는 사실을 말한다. 점선이
+    없어졌으니 그 설명도 설 자리가 없다.
+  */
+  it('점선 설명도 예측 범위도 내지 않는다', () => {
+    const markup = empty()
+
+    expect(markup).not.toContain(messages.place.detailCongestionUnknownNote)
+    expect(markup).not.toContain(messages.place.detailCongestionExtendedNote)
+  })
+
+  /* 문구 키를 새로 만들지도, 같은 말을 두 번 내지도 않는다 */
+  it('빈 상태 문구를 한 번만 낸다', () => {
+    const markup = empty()
+
+    expect(markup.split(messages.place.detailCongestionEmptyTitle)).toHaveLength(2)
+    expect(markup.split(messages.place.detailCongestionEmptyDescription)).toHaveLength(2)
+  })
+
+  /*
+    **재시도는 여전히 없다.** 404 가 아니라 빈 상태이고, 눌러도 같은 빈 답이 온다. 30일도
+    같은 빈 답이라 펼치기도 내밀지 않는다 (#670 의 결정을 그대로 지킨다).
+  */
+  it('재시도도 기간 토글도 두지 않는다', () => {
     const markup = empty()
 
     expect(markup).not.toContain('<button')
-    expect(markup).not.toContain('<a ')
     expect(markup).not.toContain(messages.common.retry)
     expect(markup).not.toContain(messages.place.detailCongestionErrorTitle)
-    // 30일도 같은 빈 답이라 펼치기를 내밀지 않는다 (기존 결정 유지)
     expect(markup).not.toContain(messages.place.detailCongestionExpand)
     expect(markup).not.toContain(messages.place.detailCongestionCollapse)
   })
 
   /*
-    **경계는 `hasUnknown` 이 아니라 `leastCrowded === null` 이다.** 아는 날이 하루라도 있으면
-    그 날이 답이고, 답이 있는 카드를 덮으면 서비스가 할 말을 스스로 가린다.
+    **대안 링크는 기존 장소 검색 경로다.** 상세 응답에 `sigunguCode` 가 없어 같은 시군구로
+    좁힐 수 없으므로 `/places` 를 기본 필터 그대로 연다 — 없는 라우트를 만들지 않는다.
   */
-  it('일부만 모르는 날이면 veil 이 서지 않는다', () => {
-    const markup = render()
+  it('다른 장소로 가는 길을 하나 준다', () => {
+    const markup = empty()
 
-    expect(markup).not.toContain(VEIL_MARKER)
-    expect(markup).not.toContain(messages.place.detailCongestionEmptyTitle)
-    expect(markup).not.toContain(messages.place.detailCongestionEmptyDescription)
-    // 기존 설명과 토글이 그대로다 — 카드가 살아 있다
-    expect(markup).toContain(messages.place.detailCongestionUnknownNote)
-    expect(markup).toContain(messages.place.detailCongestionCollapse)
+    expect(markup).toContain('href="/places"')
+    expect(markup).toContain(messages.place.detailCongestionEmptyAction)
   })
 
-  /* 서버가 날짜 목록 자체를 비워 보내면 덮을 것이 없다 — 높이 0 짜리 veil 을 세우지 않는다 */
-  it('덮을 차트가 없으면 veil 없이 문구만 세운다', () => {
+  /*
+    서버가 날짜 목록 자체를 비워 보내는 갈래도 같은 화면이다 — 예전에는 높이 0 짜리 veil 을
+    피하려 문구만 따로 세우는 갈래가 하나 더 있었는데, 차트를 안 그리면서 그 구분이 없어졌다.
+  */
+  it('날짜 목록이 비어도 같은 블록 하나다', () => {
     const markup = render({ data: { ...congestionAllUnknown, dailyCongestions: [] } })
 
-    expect(markup).not.toContain(VEIL_MARKER)
     expect(markup).toContain(messages.place.detailCongestionEmptyTitle)
     expect(markup).toContain(messages.place.detailCongestionEmptyDescription)
+    expect(markup).toContain('href="/places"')
   })
 })
 
 /**
- * 빈 상태 문구가 자기 면을 갖는다 (#708).
+ * **정상 갈래(일부만 `null`)가 회귀하지 않는다** (#731).
  *
- * veil 만 있던 시절에는 글자가 점선 격자와 **같은 평면**에 떠 있어 "덮개" 가 아니라
- * "글자가 겹쳐졌다" 로 읽힐 여지가 있었다. 면 · 테두리 · 곡률이 그 경계를 만든다.
+ * 이 변경의 가장 위험한 지점이다. 경계는 `hasUnknown` 이 아니라 `leastCrowded === null`
+ * 이고(`isCongestionEmpty`), 아는 날이 하루라도 있으면 그 날이 답이다 — 답이 있는 카드에서
+ * 차트를 지우면 서비스가 할 말을 스스로 가린다. 픽스처 7일 중 `2026-09-04` 하루가
+ * `UNKNOWN` 이라 이 갈래가 실제로 섞인 기간이다.
  */
-describe('PlaceCongestionPanel — 빈 상태 문구가 자기 면을 갖는다 (#708)', () => {
-  const VEIL_MARKER = 'absolute inset-0'
+describe('PlaceCongestionPanel — 일부만 모르는 날은 그대로 둔다 (#731)', () => {
+  it('차트도 점선도 날짜 축도 그대로 선다', () => {
+    const markup = render()
 
-  /**
-   * 상자는 veil **안**에 있다 — veil 뒤쪽 조각만 본다.
-   *
-   * **매치 실패를 삼키지 않는다** (testing-guide.md §5): veil 이 사라지면 `inside` 가 빈
-   * 문자열이 되어 아래 단언이 통째로 공허해진다.
-   */
-  const inside = (markup: string) => {
-    const at = markup.indexOf(VEIL_MARKER)
+    expect(markup.match(/<li /g)).toHaveLength(7)
+    // 그쪽에서 점선은 여전히 옳은 기호다 — 31칸 중 한 칸이 "아직 모르는 날" 을 말한다
+    expect(markup).toContain('border-metric-unknown-500')
+    expect(markup).toContain('9월 4일 금요일 정보 없음')
+    expect(markup).toContain('overflow-x-auto')
+  })
 
+  it('요약·설명·토글과 기간 표기가 살아 있다', () => {
+    const markup = render()
+
+    expect(markup).toContain(messages.place.detailCongestionLeastLabel)
+    expect(markup).toContain(messages.place.detailCongestionUnknownNote)
+    expect(markup).toContain(messages.place.detailCongestionCollapse)
+    expect(markup).toContain('9.1 – 9.7')
+  })
+
+  it('빈 상태 문구와 대안 링크가 새어 들어오지 않는다', () => {
+    const markup = render()
+
+    expect(markup).not.toContain(messages.place.detailCongestionEmptyTitle)
+    expect(markup).not.toContain(messages.place.detailCongestionEmptyDescription)
+    expect(markup).not.toContain(messages.place.detailCongestionEmptyAction)
+    expect(markup).not.toContain('href="/places"')
+  })
+})
+
+/**
+ * 빈 상태 블록 — #708 의 상자를 이어받되 배경만 바꿨다 (#731).
+ *
+ * **정상 갈래의 `LeastCrowded` 요약과 같은 자리·같은 개수**로 선다. 갈래가 달라도 카드의
+ * 골격이 흔들리지 않아야 한다.
+ */
+describe('PlaceCongestionPanel — 빈 상태 블록 (#731)', () => {
+  const empty = () => render({ data: congestionAllUnknown })
+
+  /** 블록은 자기 채움에서 시작한다 — 그 뒤 조각이 블록 안이다 */
+  const block = (markup: string) => {
+    const at = markup.indexOf('bg-band')
+
+    // 매치 실패를 삼키지 않는다 (testing-guide.md §5) — 블록이 사라지면 아래가 공허해진다
     expect(at).toBeGreaterThan(-1)
     return markup.slice(at)
   }
 
-  const empty = () => render({ data: congestionAllUnknown })
+  /*
+    **채움은 `--band` 다.** #731 은 `--bg-sunken` 을 지정했지만 그 토큰은 바닥(L0) 전용이고
+    `styles/token-usage.test.ts` 가 소유자(`Canvas`)를 강제한다 — 카드 안 아이템 채움으로
+    이 시스템이 정해 둔 색은 `--band` 하나다 (DESIGN.md §0 · §2-1).
+  */
+  it('LeastCrowded 와 같은 면·곡률을 쓰고 문구와 링크를 담는다', () => {
+    const markup = block(empty())
 
-  it('문구 두 줄이 한 상자 안에 든다 — 면·테두리·곡률', () => {
-    const markup = inside(empty())
-    const box = markup.slice(markup.indexOf('border-border-strong'))
-
-    // 상자를 이루는 세 채널이 한 요소에 같이 있다
-    expect(box).toContain('bg-bg')
-    expect(box).toContain('rounded-md')
-    // 두 줄이 그 상자 **뒤**에 온다 = 안에 든다
-    expect(box).toContain(messages.place.detailCongestionEmptyTitle)
-    expect(box).toContain(messages.place.detailCongestionEmptyDescription)
+    expect(markup).toContain('rounded-md')
+    // 두 줄과 링크가 그 블록 **뒤**에 온다 = 안에 든다
+    expect(markup).toContain(messages.place.detailCongestionEmptyTitle)
+    expect(markup).toContain(messages.place.detailCongestionEmptyDescription)
+    expect(markup).toContain(messages.place.detailCongestionEmptyAction)
   })
 
   /*
-    **`--border` 가 아니라 `--border-strong` 이다.** 이 상자는 흰 카드가 아니라 veil 합성면
-    위에 선다 — 점선 칸 위에서 `--border` 는 합성면(#E5E7EA)과 1.02:1 이라 그 변이 사라진다.
-    `--border-strong` 은 1.35:1 이고, 이 시스템이 흰 배경에서 상시로 쓰는 카드 테두리(1.26)
-    보다 강하다.
+    **블록 하나다.** 정상 갈래의 요약이 서던 자리를 그대로 받는다 — 문구를 담는 면이 둘
+    이상이면 갈래마다 카드 골격이 달라진다. 이 갈래에는 트랙(`bg-band`)이 없으므로 면의
+    개수를 그대로 셀 수 있다.
   */
-  it('테두리가 --border-strong 이다 — 점선 위에서 묻히지 않는다', () => {
-    const markup = inside(empty())
+  it('면을 하나만 만든다', () => {
+    const markup = empty()
 
-    expect(markup).toContain('border-border-strong')
-    /*
-      `\b` 를 쓰지 않는다 — 하이픈이 단어 경계라 `border-border-strong` 자신이 걸린다.
-      클래스가 끝나는 자리(공백 또는 닫는 따옴표)를 직접 잰다.
-    */
-    expect(markup).not.toMatch(/border-border[\s"]/)
+    expect(markup.match(/bg-band/g)).toHaveLength(1)
   })
 
   /*
-    **꼬리를 달지 않는다.** 꼬리는 "누가 말하는지" 를 가리키는 부호인데 여기서 꼬리가 찍는
-    칸은 30개 중 아무 칸이고 그 칸에는 아무 뜻이 없다. 이 저장소에서 CSS 로 꼬리를 만들면
-    회전한 정사각형이 되므로 그 수단을 잰다.
+    **테두리를 걷었다.** `--border-strong` 은 veil 합성면 위에서 변이 사라지지 않게 고른
+    값이었는데(#708) 가릴 격자가 없어지면서 근거가 사라졌다. 테두리를 남기면 L2 가 L1 의
+    채널(면 + 1px 테두리)을 쓰게 되어 두 층이 함께 죽는다 (DESIGN.md §0).
 
-    **그림자도 없다** — 이것은 카드 안에 눕는 면이다 (DESIGN.md §0 · §10).
+    **그림자도, 말풍선 꼬리도 없다** — 카드 안에 눕는 면이다 (§0 · §6).
   */
-  it('꼬리도 그림자도 만들지 않는다', () => {
-    const markup = inside(empty())
-
-    expect(markup).not.toContain('rotate-45')
-    expect(markup).not.toContain('shadow-')
-  })
-
-  /*
-    **덮을 것이 없으면 상자도 없다.** 그 갈래에는 가릴 격자가 없어 경계를 만들 이유가 없고,
-    상자만 남으면 카드 안에 뜻 없는 네모가 하나 생긴다.
-  */
-  it('덮을 차트가 없으면 상자 없이 문구만 세운다', () => {
-    const markup = render({ data: { ...congestionAllUnknown, dailyCongestions: [] } })
+  it('테두리도 그림자도 꼬리도 만들지 않는다', () => {
+    const markup = empty()
 
     expect(markup).not.toContain('border-border-strong')
-    expect(markup).toContain(messages.place.detailCongestionEmptyTitle)
+    expect(markup).not.toContain('shadow-')
+    expect(markup).not.toContain('rotate-45')
   })
 
   /*
-    30일 레일은 1254px 이라 상한이 없으면 데스크톱에서 문구가 카드를 가로지르는 한 줄이 되어
-    **상자라는 뜻 자체가 사라진다.**
+    **가운데 정렬과 폭 상한을 걷었다.** 둘 다 veil 한가운데 뜨는 상자의 사정이었다 — 이제
+    이 블록은 `LeastCrowded` 와 같은 자리에 눕고, 좌측 정렬이 이 저장소의 빈 상태 규칙이다
+    (`EmptyState`: "가운데 정렬 + 큰 제목은 빈 상태를 사건처럼 보이게 한다").
   */
-  it('상자 폭에 상한이 있다', () => {
-    expect(inside(empty())).toContain('max-w-xs')
+  it('좌측 정렬이고 폭은 카드가 준다', () => {
+    const markup = block(empty())
+
+    expect(markup).not.toContain('text-center')
+    expect(markup).not.toContain('max-w-xs')
   })
 })
 

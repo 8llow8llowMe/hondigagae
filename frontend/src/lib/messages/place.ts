@@ -444,6 +444,15 @@ export const placeMessages = {
    */
   detailCongestionEmptyTitle: '이 장소는 혼잡도 자료가 아직 없어요',
   detailCongestionEmptyDescription: '한산하다는 뜻은 아니에요. 자료가 쌓이면 보여 드려요.',
+  /**
+   * 빈 상태의 다음 행동 (#731). **재시도가 아니라 다른 장소로 가는 길이다** — 이 장소의
+   * 자료는 사용자가 어떻게 해도 생기지 않는다.
+   *
+   * **"같은 지역" 이라 쓰지 않는다.** 장소 상세 응답에 `sigunguCode` 가 없어 같은 시군구로
+   * 좁힐 근거가 화면에 없다(`types/place.ts` 의 `PlaceDetail` 주석). 문구가 약속하는 것과
+   * 링크가 실제로 여는 화면이 갈리면 안 된다.
+   */
+  detailCongestionEmptyAction: '다른 장소 둘러보기',
   /** 조회 실패. 이 카드만 덮는다 — 판정·기본 정보는 그대로 쓸모가 있다 */
   detailCongestionErrorTitle: '혼잡도를 불러오지 못했어요',
 
