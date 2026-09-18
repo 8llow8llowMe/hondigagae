@@ -327,6 +327,58 @@ describe('AI 일정 mock — sigunguCode (#251)', () => {
   })
 })
 
+describe('AI 일정 mock — requestNote (#727)', () => {
+  /*
+    **멱등 키에 들어 있다.** 실제 멱등 키는 `toParams` 해시이고 그 map 에 `requestNote` 가
+    들어 있다 (`AiPlanJobProcessor`). 빼면 mock 이 백엔드보다 느슨해지고, 이 저장소는
+    **요청 메모의 낱말로 시나리오를 고르므로**(`scenarioOf`) 같은 조건으로 시나리오만 바꿔
+    연달아 시험할 때 앞 시나리오의 작업을 그대로 받는다 — #710 에서 실제로 걸렸다.
+  */
+  it('요청 메모가 다르면 다른 작업이다 — 시나리오를 바꿔 연달아 시험할 수 있다', () => {
+    const normal = newJob(VALID)
+    const failing = newJob({ ...VALID, requestNote: '실패' })
+
+    expect(failing).not.toBe(normal)
+  })
+
+  it('낱말만 다른 두 시나리오도 섞이지 않는다', () => {
+    const timeout = newJob({ ...VALID, requestNote: '시간초과' })
+    const partial = newJob({ ...VALID, requestNote: '일부' })
+
+    expect(partial).not.toBe(timeout)
+  })
+
+  it('같은 메모가 진행 중이면 같은 jobId 다 — 멱등은 그대로다', () => {
+    expect(newJob({ ...VALID, requestNote: '실패' })).toBe(
+      newJob({ ...VALID, requestNote: '실패' }),
+    )
+  })
+
+  /*
+    **`sigunguCode` 와 달리 빈 문자열을 접지 않는다.** 접으면 mock 이 백엔드보다 느슨해지고,
+    접을 이유도 없다 — `toAiPlanSubmitPayload` 가 공백만 남은 메모를 **키째로 뺀다**
+    (`lib/ai-plan/submit.ts`). 화면에서 `''` 가 서버에 닿는 경로가 없다.
+  */
+  it('메모를 지우고 다시 제출하면 다른 작업이다', () => {
+    const noted = newJob({ ...VALID, requestNote: '실내 위주로' })
+    const cleared = newJob(VALID)
+
+    expect(cleared).not.toBe(noted)
+  })
+
+  /*
+    **바꾼 메모가 실제로 그 시나리오로 가는지까지 본다.** jobId 만 갈리고 앞 작업의
+    시나리오를 물려받으면 증상이 그대로다.
+  */
+  it('앞 작업이 진행 중이어도 바꾼 메모의 시나리오로 간다', () => {
+    newJob(VALID)
+    const failed = pollTimes(newJob({ ...VALID, requestNote: '실패' }), 3)
+
+    expect(failed.status.code).toBe('FAILED')
+    expect(failed.errorCode).toBe('AIPLAN_012')
+  })
+})
+
 describe('AI 일정 mock — 세부 단계 (#250)', () => {
   it('PENDING 이면 step 이 null 이다 — 아직 시작하지 않았다', () => {
     const first = pollTimes(newJob(), 1)

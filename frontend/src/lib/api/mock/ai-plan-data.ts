@@ -726,6 +726,14 @@ function submit(memberId: string, body: string | null): MockResult {
       job.budget === budget &&
       // 좁힌 지역이 다르면 다른 조건이다 (#251) — 실제 멱등 키의 map 에도 들어 있다
       job.sigunguCode === sigunguCode &&
+      /*
+        **요청 메모도 조건이다** (#727) — 같은 map 에 들어 있다. 빠뜨리면 mock 이 백엔드보다
+        느슨해지고, 이 저장소는 **메모의 낱말로 시나리오를 고르므로**(`scenarioOf`) 조건은
+        그대로 두고 시나리오만 바꿔 연달아 시험할 때 앞 시나리오의 작업을 그대로 받는다.
+        빈 문자열을 접지 않는 것은 `sigunguCode` 와 다른데, `toAiPlanSubmitPayload` 가
+        공백뿐인 메모를 키째로 빼서 `''` 가 서버에 닿지 않기 때문이다.
+      */
+      job.requestNote === requestNote &&
       job.regeneratePlanId === regeneratePlanId &&
       job.regenerateDay === regenerateDay &&
       /*
