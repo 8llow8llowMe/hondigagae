@@ -329,10 +329,16 @@ describe('AiPlanCanceled 의 inset 파라미터화 (#473)', () => {
     `AiPlanProgress` · `AiPlanFailed` 가 이미 가진 모양을 그대로 베낀다.
     **기본값은 형제 둘과 같은 `main` 이다** — 세 표시의 계약을 한 값으로 맞춰 둔다.
   */
+  /*
+    **인셋을 바르는 자리가 골격으로 옮겼다** (#710). 셋이 `AiPlanJobFrame` 을 공유하면서
+    `INSET_CLASS[inset]` 은 `AiPlanJobBlock` 한 곳에만 있다 — 계약(`inset` 을 받아 그대로
+    내려보낸다)은 그대로라 단언하는 대상만 바꾼다.
+  */
   it('inset prop 을 받고 기본값이 main 이다', () => {
     expect(canceled).toContain('inset?: Inset')
     expect(canceled).toContain("inset = 'main'")
-    expect(canceled).toContain('INSET_CLASS[inset]')
+    expect(canceled).toContain('inset={inset}')
+    expect(code('src/features/ai-plan/ai-plan-job-frame.tsx')).toContain('INSET_CLASS[inset]')
   })
 
   it('하드코딩 인셋이 남아 있지 않다', () => {

@@ -26,7 +26,7 @@ import { formatBudget } from '@/lib/ai-plan/budget'
 import { snapshotFromConditions } from '@/lib/ai-plan/conditions'
 import { defaultPlanTitle } from '@/lib/ai-plan/draft-title'
 import { draftToPlanPayload } from '@/lib/ai-plan/draft-to-plan'
-import { isNarrowedRegionFailure } from '@/lib/ai-plan/failure-hint'
+import { isNarrowedRegionFailure, isShortenablePeriodTimeout } from '@/lib/ai-plan/failure-hint'
 import { isJobCanceled, isJobFailed, jobStepProgress } from '@/lib/ai-plan/job'
 import { petNamesLabel } from '@/lib/ai-plan/pet-names'
 import { clearAiPlanRequest, readAiPlanRequest } from '@/lib/ai-plan/request-store'
@@ -63,7 +63,8 @@ function isDelistedFailure(error: unknown): boolean {
  * 이유는 **어느 갈래가 카드를 스스로 그리는지 상태를 아는 쪽만 알기 때문**이다 (#451).
  */
 export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolean }) {
-  const { query, phase, polling, recheck, cancel, canceling, cancelFailed } = useAiPlanJob(jobId)
+  const { query, phase, polling, recheck, cancel, canceling, cancelFailed, elapsedMs } =
+    useAiPlanJob(jobId)
 
   /*
     **조건은 `sessionStorage` 에서 읽는다** (명세 S5 함정 1). 지연 초기화로 한 번만 읽어
@@ -175,6 +176,14 @@ export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolea
           conditionSummary={conditionSummary}
           errorMessage={job?.errorMessage ?? null}
           errorCode={job?.errorCode ?? null}
+          /*
+            **기간은 `snapshot` 에서 온다** (#710). 서버 복원본(#488)에도 날짜가 있으므로
+            다른 기기에서 열어도 단서가 붙는다 — `stored` 만 아는 `pinnedPlaceIds` 와 달리
+            기간은 재제출이 아니라 **읽기**에만 쓰여서 복원본으로 충분하다.
+          */
+          totalDays={
+            snapshot === null ? null : totalDaysBetween(snapshot.startDate, snapshot.endDate)
+          }
         />
       </AiPlanJobShell>
     )
@@ -211,6 +220,12 @@ export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolea
           step={job?.step ?? null}
           stepProgress={jobStepProgress(job)}
           phase={phase}
+          /*
+            **기다리는 동안에도 조건을 보여 준다** (#710). 값은 이미 여기 있었고 실패·취소에만
+            넘기고 있었다 — 정작 "지금 뭘 만들고 있나" 가 가장 궁금한 것은 이 화면이다.
+          */
+          conditionSummary={conditionSummary}
+          elapsedMs={elapsedMs}
           onRecheck={recheck}
           rechecking={query.isFetching}
           /*
@@ -363,6 +378,25 @@ function narrowedRegionHint(
   return messages.aiPlan.failedNarrowedRegion.replace('{region}', region)
 }
 
+/**
+ * 실패 화면에 덧붙일 단서 하나 (#710).
+ *
+ * **둘을 함께 붙이지 않는다.** 실패 코드가 하나이므로 단서도 하나다 — `AIPLAN_012` 는
+ * 지역을, `AIPLAN_006` 은 기간을 가리키고 겹치지 않는다. 그래도 한 줄로 합쳐 두는 이유는
+ * **코드가 늘 때 두 줄이 나란히 서는 것을 여기서 막기 위해서**다: 단서가 둘이면 어느 쪽을
+ * 먼저 해야 하는지가 화면에 없고, 그때는 코드가 아니라 **우선순위**를 정해야 한다.
+ */
+function failureHint(
+  errorCode: string | null,
+  snapshot: AiPlanRequestSnapshot | null,
+  totalDays: number | null,
+): string | null {
+  const region = narrowedRegionHint(errorCode, snapshot)
+  if (region !== null) return region
+
+  return isShortenablePeriodTimeout(errorCode, totalDays) ? messages.aiPlan.failedTimeoutHint : null
+}
+
 /** 실패 화면 — 같은 조건으로 재제출을 담당한다 */
 function AiPlanFailedContainer({
   jobId,
@@ -370,12 +404,14 @@ function AiPlanFailedContainer({
   conditionSummary,
   errorMessage,
   errorCode,
+  totalDays,
 }: {
   jobId: string
   snapshot: AiPlanRequestSnapshot | null
   conditionSummary: string | null
   errorMessage: string | null
   errorCode: string | null
+  totalDays: number | null
 }) {
   const { resubmit, retrying } = useAiPlanResubmit(snapshot)
 
@@ -384,7 +420,7 @@ function AiPlanFailedContainer({
       // 카드 안이다 — 껍데기가 이미 `Surface` 를 그렸다 (§0)
       inset="card"
       errorMessage={errorMessage}
-      hint={narrowedRegionHint(errorCode, snapshot)}
+      hint={failureHint(errorCode, snapshot, totalDays)}
       conditionSummary={conditionSummary}
       onRetry={resubmit}
       retrying={retrying}

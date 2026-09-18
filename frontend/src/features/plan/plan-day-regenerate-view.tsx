@@ -347,7 +347,7 @@ function RegenerateJob({
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { query, phase, polling, recheck } = useAiPlanJob(jobId)
+  const { query, phase, polling, recheck, elapsedMs } = useAiPlanJob(jobId)
 
   /** `PLAN_004` 로 막힌 장소. 초안을 버리지 않고 그 항목만 빼고 다시 담는다 (R6) */
   const [excludedPlaceIds, setExcludedPlaceIds] = useState<ReadonlySet<string>>(EMPTY_SET)
@@ -549,6 +549,14 @@ function RegenerateJob({
           step={job?.step ?? null}
           stepProgress={jobStepProgress(job)}
           phase={phase}
+          /*
+            **경과 시간은 여기서도 그린다** (#710). 같은 작업이고 같은 수십 초라, 화면이
+            멈춘 것처럼 보이는 문제도 똑같이 있다.
+
+            **조건 블록은 넘기지 않는다** — 이 화면의 맥락은 생성 조건이 아니라 **일정과
+            그 일자**이고 `RegenerateShell` 의 머리가 이미 그것을 말한다.
+          */
+          elapsedMs={elapsedMs}
           onRecheck={recheck}
           rechecking={query.isFetching}
           /*

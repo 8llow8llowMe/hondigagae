@@ -58,3 +58,22 @@ describe('AiPlanCanceled — 취소는 실패가 아니다 (#250)', () => {
     expect(html).toContain('10월 1일 ~ 10월 3일 · 두부')
   })
 })
+
+describe('AiPlanCanceled — 진행·실패와 같은 골격 (#710)', () => {
+  const SUMMARY = '2026-09-18 (금) – 09-20 (일) · 몽'
+
+  it('조건 블록이 버튼보다 위에 있다', () => {
+    const html = render({ conditionSummary: SUMMARY })
+
+    expect(html).toContain(messages.aiPlan.jobConditionKeptLabel)
+    expect(html.indexOf(SUMMARY)).toBeLessThan(html.indexOf(messages.aiPlan.canceledRetry))
+  })
+
+  /*
+    **취소는 `errorMessage` 가 비어 온다** — 백엔드가 일부러 비운다. 받아 적을 말이 없으니
+    인용 자리도 없다. 있으면 빈 선 하나가 남아 "사유가 있는데 못 읽었다" 로 보인다.
+  */
+  it('서버 사유 인용 자리를 만들지 않는다', () => {
+    expect(render()).not.toContain('border-l-2')
+  })
+})
