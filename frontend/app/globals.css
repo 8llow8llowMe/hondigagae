@@ -626,6 +626,33 @@ body {
   }
 }
 
+/*
+  올레 코스 목록 행 — **1280 부터 6칸 그리드다** (이슈 #734). 코스 · 거리 · 소요시간 ·
+  시종점 · 썸네일 · chevron. `WalkCourseRow` · `WalkCourseColumnHead`
+  (`features/walk-course/walk-course-row.tsx`) 둘 다 이 클래스를 쓰고, 각 칸은
+  `xl:col-start-N` 으로 자기 자리를 못박는다.
+
+  **`display: grid` 는 여기서 걸지 않는다.** 두 사용처가 `xl:grid`(Tailwind 내장 변형)로
+  직접 건다 — 이 클래스는 트랙 폭만 정한다. `display` 가 `grid` 가 아닐 때는
+  `grid-template-columns` 가 그냥 무시되므로, 1280 미만(플렉스)에서는 이 선언이 아무
+  일도 하지 않는다. `.surface-list-2col` 처럼 `@media` 로 `display` 까지 이 파일에서
+  걸 필요가 없다 — 여기서는 칸마다 반응형 표시(`xl:hidden`/`xl:block`)가 이미 따로
+  있어야 하기 때문에 두 breakpoint 표현을 하나(`xl:`)로 합쳐 둔다.
+
+  **썸네일 칸이 비어도 트랙 폭은 그대로다.** 플렉스였다면 없는 항목만큼 뒤 칸이
+  당겨져 시종점·chevron 의 x 좌표가 행마다 달라졌을 것이다 — 그리드 트랙은 자식
+  유무와 무관하게 컨테이너가 정한 폭 그대로 남는다.
+
+  `minmax(0, 1fr)` — 트랙 바닥을 0 으로 내려 긴 코스명·시종점이 칸을 밀어내지
+  못하게 한다(`.surface-list-2col` 과 같은 이유). 거리(5rem)·소요시간(6rem)은
+  `15.1km`·`4~5시간` 류의 숫자가 줄바꿈 없이 들어가는 최소폭이고, 썸네일(5rem)은
+  행 안 썸네일 박스 자신의 크기(`size-20` = 80px)와 같다. chevron(1.25rem)은
+  아이콘 크기(20px)다.
+*/
+.walk-course-row-grid {
+  grid-template-columns: minmax(0, 1fr) 5rem 6rem minmax(0, 1fr) 5rem 1.25rem;
+}
+
 /* 모바일 하단 안전영역. 홈 인디케이터가 있는 기기에서 탭바가 가려지지 않게 한다 */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom);

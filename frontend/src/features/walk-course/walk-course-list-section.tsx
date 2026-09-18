@@ -6,7 +6,7 @@ import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { Surface, SurfaceList } from '@/components/surface'
-import { WalkCourseRow } from '@/features/walk-course/walk-course-row'
+import { WalkCourseColumnHead, WalkCourseRow } from '@/features/walk-course/walk-course-row'
 import {
   WALK_COURSE_SKELETON_COUNT,
   WalkCourseRowSkeleton,
@@ -242,6 +242,9 @@ function WalkCourseListBody({
           {messages.walkCourse.noGoldenInScope}
         </p>
       )}
+
+      {/* 1280 이상 전용 열 머리 — 행과 같은 그리드를 공유한다 (#734) */}
+      <WalkCourseColumnHead inset={inset} />
 
       {/*
         **`InfiniteScrollSentinel` 이 없다.** 커서가 없고 29개 전량이 한 번에 온다

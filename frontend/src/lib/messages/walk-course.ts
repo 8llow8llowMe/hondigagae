@@ -26,12 +26,21 @@ export const walkCourseMessages = {
   /** `{count}` 치환. `aria-live` 로 알리는 줄이기도 하다 (D6) */
   listCount: '코스 {count}개',
   activityGroupLabel: '걷는 시간',
+  /**
+   * **세그먼트 위에 얹는 보이는 캡션이다** (#734) — `activityGroupLabel` 과는 다른 자리다.
+   * 라디오그룹의 접근 이름은 옵션이 실제로 말하는 값(걷는 시간 상한)을 그대로 두고,
+   * 이 라벨은 그 축이 반려견의 **활동량**에서 온다는 것을 사람 눈에만 보탠다. 두 문구가
+   * 같은 뜻을 두 번 말하므로 이 캡션은 `aria-hidden` 이다.
+   */
+  activityFieldLabel: '활동량',
   activityAll: '전체',
   /** `{hours}` 치환 — 숫자는 `lib/walk-course/activity.ts` 가 갖는다 (D5-2) */
   activityWithin: '{hours}시간 이내',
   sortGroupLabel: '정렬',
   sortCourseNo: '코스 순',
   sortDistanceAsc: '짧은 순',
+  /** 1280 이상 열 머리의 코스 열 라벨 (#734). 거리·소요시간·시종점은 상세와 같은 라벨(아래)을 그대로 쓴다 */
+  columnCourseLabel: '코스',
 
   /**
    * 기준 줄. **`petActivityLevelApplied` 가 참일 때만 그린다** — 로컬 상태가 아니라

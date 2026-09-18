@@ -114,3 +114,27 @@ describe('세그먼트 접근성 계약 (D6)', () => {
     expect(renderActivity(null)).toContain('h-11')
   })
 })
+
+describe('두 축이 서로 다른 컨트롤로 읽힌다 (#734)', () => {
+  /**
+   * **세그먼트 두 벌이 하나의 5칸 라디오로 읽히던 것이 이 이슈의 결함이다.** 정렬을
+   * 옮길 재사용 가능한 값-선택 드롭다운이 저장소에 없어(파일 머리 주석 참고) 세그먼트는
+   * 유지하되, 보이는 라벨로 두 축을 가른다.
+   */
+  it('활동량 세그먼트 위에 보이는 활동량 캡션이 있다', () => {
+    expect(renderActivity(null)).toContain(messages.walkCourse.activityFieldLabel)
+  })
+
+  it('정렬 세그먼트 위에 보이는 정렬 캡션이 있다', () => {
+    expect(renderSort(null)).toContain(messages.walkCourse.sortGroupLabel)
+  })
+
+  /** 라디오그룹의 접근 이름과 겹쳐 두 번 읽히지 않게 시각 전용으로 둔다 */
+  it('보이는 캡션은 aria-hidden 이다 — 접근 이름은 라디오그룹이 이미 말한다', () => {
+    const markup = renderActivity(null)
+    const captionIndex = markup.indexOf(messages.walkCourse.activityFieldLabel)
+    const tagStart = markup.lastIndexOf('<span', captionIndex)
+
+    expect(markup.slice(tagStart, captionIndex)).toContain('aria-hidden')
+  })
+})
