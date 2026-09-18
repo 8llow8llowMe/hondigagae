@@ -275,6 +275,93 @@ describe('PlaceCongestionPanel — 자료가 없을 때 차트를 덮는다 (#67
   })
 })
 
+/**
+ * 빈 상태 문구가 자기 면을 갖는다 (#708).
+ *
+ * veil 만 있던 시절에는 글자가 점선 격자와 **같은 평면**에 떠 있어 "덮개" 가 아니라
+ * "글자가 겹쳐졌다" 로 읽힐 여지가 있었다. 면 · 테두리 · 곡률이 그 경계를 만든다.
+ */
+describe('PlaceCongestionPanel — 빈 상태 문구가 자기 면을 갖는다 (#708)', () => {
+  const VEIL_MARKER = 'absolute inset-0'
+
+  /**
+   * 상자는 veil **안**에 있다 — veil 뒤쪽 조각만 본다.
+   *
+   * **매치 실패를 삼키지 않는다** (testing-guide.md §5): veil 이 사라지면 `inside` 가 빈
+   * 문자열이 되어 아래 단언이 통째로 공허해진다.
+   */
+  const inside = (markup: string) => {
+    const at = markup.indexOf(VEIL_MARKER)
+
+    expect(at).toBeGreaterThan(-1)
+    return markup.slice(at)
+  }
+
+  const empty = () => render({ data: congestionAllUnknown })
+
+  it('문구 두 줄이 한 상자 안에 든다 — 면·테두리·곡률', () => {
+    const markup = inside(empty())
+    const box = markup.slice(markup.indexOf('border-border-strong'))
+
+    // 상자를 이루는 세 채널이 한 요소에 같이 있다
+    expect(box).toContain('bg-bg')
+    expect(box).toContain('rounded-md')
+    // 두 줄이 그 상자 **뒤**에 온다 = 안에 든다
+    expect(box).toContain(messages.place.detailCongestionEmptyTitle)
+    expect(box).toContain(messages.place.detailCongestionEmptyDescription)
+  })
+
+  /*
+    **`--border` 가 아니라 `--border-strong` 이다.** 이 상자는 흰 카드가 아니라 veil 합성면
+    위에 선다 — 점선 칸 위에서 `--border` 는 합성면(#E5E7EA)과 1.02:1 이라 그 변이 사라진다.
+    `--border-strong` 은 1.35:1 이고, 이 시스템이 흰 배경에서 상시로 쓰는 카드 테두리(1.26)
+    보다 강하다.
+  */
+  it('테두리가 --border-strong 이다 — 점선 위에서 묻히지 않는다', () => {
+    const markup = inside(empty())
+
+    expect(markup).toContain('border-border-strong')
+    /*
+      `\b` 를 쓰지 않는다 — 하이픈이 단어 경계라 `border-border-strong` 자신이 걸린다.
+      클래스가 끝나는 자리(공백 또는 닫는 따옴표)를 직접 잰다.
+    */
+    expect(markup).not.toMatch(/border-border[\s"]/)
+  })
+
+  /*
+    **꼬리를 달지 않는다.** 꼬리는 "누가 말하는지" 를 가리키는 부호인데 여기서 꼬리가 찍는
+    칸은 30개 중 아무 칸이고 그 칸에는 아무 뜻이 없다. 이 저장소에서 CSS 로 꼬리를 만들면
+    회전한 정사각형이 되므로 그 수단을 잰다.
+
+    **그림자도 없다** — 이것은 카드 안에 눕는 면이다 (DESIGN.md §0 · §10).
+  */
+  it('꼬리도 그림자도 만들지 않는다', () => {
+    const markup = inside(empty())
+
+    expect(markup).not.toContain('rotate-45')
+    expect(markup).not.toContain('shadow-')
+  })
+
+  /*
+    **덮을 것이 없으면 상자도 없다.** 그 갈래에는 가릴 격자가 없어 경계를 만들 이유가 없고,
+    상자만 남으면 카드 안에 뜻 없는 네모가 하나 생긴다.
+  */
+  it('덮을 차트가 없으면 상자 없이 문구만 세운다', () => {
+    const markup = render({ data: { ...congestionAllUnknown, dailyCongestions: [] } })
+
+    expect(markup).not.toContain('border-border-strong')
+    expect(markup).toContain(messages.place.detailCongestionEmptyTitle)
+  })
+
+  /*
+    30일 레일은 1254px 이라 상한이 없으면 데스크톱에서 문구가 카드를 가로지르는 한 줄이 되어
+    **상자라는 뜻 자체가 사라진다.**
+  */
+  it('상자 폭에 상한이 있다', () => {
+    expect(inside(empty())).toContain('max-w-xs')
+  })
+})
+
 describe('PlaceCongestionPanel — UNKNOWN 날짜', () => {
   /*
     **걸러내지 않는다.** 빠뜨리면 날짜 축에 구멍이 생겨 그 날이 "한산한 날" 로 읽힌다 —
