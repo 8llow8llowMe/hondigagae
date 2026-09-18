@@ -351,6 +351,18 @@ export type PlanUpdatePayload = {
   /** `yyyy-MM-dd`. 시작일과 같거나 이후여야 하고(`PLAN_003`) 기간은 최대 30일(`PLAN_009`) */
   endDate?: string
   budget?: number
+  /**
+   * 동행 반려견 (#622). **보내지 않으면 유지다** — `null` 도 같은 뜻이고, 보내면 목록을
+   * **통째로 교체**하며 `petIds[0]` 이 대표가 된다 (`PlanUpdateRequest.java:63-65`).
+   *
+   * **빈 배열을 보내지 않는다.** 생성(`PlanCreateRequest.effectivePetIds()`)과 달리
+   * 대표견 폴백이 없어 400 `PLAN_010` 이다 — 지우려던 아이가 말없이 돌아오는 것보다
+   * 거절이 낫다는 서버 결정이다. "동행견 없음" 은 표현할 수 없다.
+   *
+   * **`string` 이다.** 스키마는 `int64` 지만 Snowflake 라 숫자로 바꾸면 정밀도를 잃는다.
+   * 최대 5개(`PLAN_115`)이고, 이미 완료된 일정이면 `PLAN_019` 로 거절된다.
+   */
+  petIds?: string[]
   status?: PlanStatusCode
 }
 

@@ -1,18 +1,18 @@
 import { fieldErrorId } from '@/components/field'
 import { cn } from '@/lib/utils/cn'
 
-export type PetCheckboxOption = {
+export type CheckboxOption = {
   value: string
   label: string
   /** 선택의 근거가 되는 보조 설명. 있으면 함께 노출한다 */
   description?: string | null
 }
 
-export type PetCheckboxGroupProps = {
+export type CheckboxGroupProps = {
   /** 오류 요소 id 의 근거이자 checkbox 들의 name 이다 */
   id: string
   label: string
-  options: readonly PetCheckboxOption[]
+  options: readonly CheckboxOption[]
   values: readonly string[]
   onValuesChange: (values: string[]) => void
   error?: string | undefined
@@ -27,8 +27,13 @@ export type PetCheckboxGroupProps = {
  * 44px 터치 영역 · 선택 틴트 · `aria-invalid` 를 fieldset 에만 두는 것까지 같다
  * (component-guide.md §7). 같은 폼 안에서 두 그룹의 오류 표현이 갈리면 안 된다.
  *
- * **`src/components/` 에 두지 않는다.** 사용처가 하나라 §9 가 feature 안에 두라고 정했다.
- * 두 번째 사용처가 생기면 승격하고 `pet` 을 이름에서 뗀다.
+ * **`PetCheckboxGroup` 에서 승격했다** (#622 · 명세 D13-8). AI 조건 폼 하나뿐이던
+ * 사용처에 일정 수정 모달이 더해져 §9 의 "2곳 이상이면 `src/components/` 로 올리고
+ * 도메인 용어(`pet`)를 이름에서 뗀다" 에 걸렸다. **동작은 그대로다** — 이동 · 이름
+ * 변경뿐이고 새 prop(대표 배지 등)을 함께 얹지 않았다.
+ *
+ * **`Checkbox`(단일)와 합치지 않는다.** 그룹 시맨틱(`fieldset`/`legend`/그룹 오류)이
+ * 없는 컴포넌트다.
  *
  * **`RadioGroup` 을 확장하지 않은 이유**: 단일/다중은 `value: T` ↔ `values: T[]` 로 타입이
  * 갈리고 `name` 공유·키보드 이동 규칙이 다르다. optional prop 하나로 겸하게 만들면
@@ -36,7 +41,7 @@ export type PetCheckboxGroupProps = {
  *
  * controlled 전용이다 (component-guide.md §5).
  */
-export function PetCheckboxGroup({
+export function CheckboxGroup({
   id,
   label,
   options,
@@ -45,7 +50,7 @@ export function PetCheckboxGroup({
   error,
   required = false,
   className,
-}: PetCheckboxGroupProps) {
+}: CheckboxGroupProps) {
   const invalid = error !== undefined
 
   function toggle(value: string): void {

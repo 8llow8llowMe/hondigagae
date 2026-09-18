@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
+import { CheckboxGroup } from '@/components/checkbox-group'
 import { fieldErrorId } from '@/components/field'
-import { PetCheckboxGroup } from '@/features/ai-plan/pet-checkbox-group'
 
 const OPTIONS = [
   { value: '1', label: '몽실이', description: '말티즈 · 소형견' },
@@ -13,7 +13,7 @@ const OPTIONS = [
 
 function render(overrides: Record<string, unknown> = {}) {
   return renderToStaticMarkup(
-    createElement(PetCheckboxGroup, {
+    createElement(CheckboxGroup, {
       id: 'petIds',
       label: '함께 갈 반려견',
       options: OPTIONS,
@@ -24,7 +24,7 @@ function render(overrides: Record<string, unknown> = {}) {
   )
 }
 
-describe('PetCheckboxGroup — 여러 마리를 고른다', () => {
+describe('CheckboxGroup — 여러 개를 고른다', () => {
   it('반려견 수만큼 체크박스가 나온다', () => {
     const markup = render()
 

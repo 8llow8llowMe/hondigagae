@@ -42,18 +42,24 @@ describe('validatePlanEdit — 수정 폼도 같은 상한을 본다', () => {
     startDate: '2026-09-12',
     endDate: '2026-09-14',
     budget,
+    // 동행견은 이 파일의 관심이 아니다 — 그룹이 없는 폼으로 본다 (#622)
+    petIds: [],
   })
 
   it('상한을 넘기면 예산 칸에 오류가 붙는다', () => {
-    expect(validatePlanEdit(values('2147483648')).budget).toBe(messages.plan.errorBudgetTooLarge)
+    expect(validatePlanEdit(values('2147483648'), { petsEditable: false }).budget).toBe(
+      messages.plan.errorBudgetTooLarge,
+    )
   })
 
   it('상한 안이면 통과한다', () => {
-    expect(validatePlanEdit(values('2147483647')).budget).toBeUndefined()
-    expect(validatePlanEdit(values('')).budget).toBeUndefined()
+    expect(validatePlanEdit(values('2147483647'), { petsEditable: false }).budget).toBeUndefined()
+    expect(validatePlanEdit(values(''), { petsEditable: false }).budget).toBeUndefined()
   })
 
   it('서식이 틀린 값은 "너무 커요" 가 아니라 서식 오류다', () => {
-    expect(validatePlanEdit(values('abc')).budget).toBe(messages.plan.errorBudgetNegative)
+    expect(validatePlanEdit(values('abc'), { petsEditable: false }).budget).toBe(
+      messages.plan.errorBudgetNegative,
+    )
   })
 })

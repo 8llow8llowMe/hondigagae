@@ -43,32 +43,37 @@ describe('validatePlanEdit — 기간 편집 (#585)', () => {
     startDate,
     endDate,
     budget: '',
+    // 동행견은 이 파일의 관심이 아니다 — 그룹이 없는 폼으로 본다 (#622)
+    petIds: [],
   })
 
   it('정상 기간은 날짜 오류를 내지 않는다', () => {
-    const errors = validatePlanEdit(values('2026-09-12', '2026-09-14'))
+    const errors = validatePlanEdit(values('2026-09-12', '2026-09-14'), { petsEditable: false })
     expect(errors.startDate).toBeUndefined()
     expect(errors.endDate).toBeUndefined()
   })
 
   it('빈 날짜는 각 필드의 "골라 주세요" 다 — 관계 오류로 덮지 않는다', () => {
-    const errors = validatePlanEdit(values('', ''))
+    const errors = validatePlanEdit(values('', ''), { petsEditable: false })
     expect(errors.startDate).toBe(messages.plan.errorStartDateRequired)
     expect(errors.endDate).toBe(messages.plan.errorEndDateRequired)
   })
 
   it('역전은 종료일에 붙는다 — 사용자가 방금 고른 쪽이다', () => {
-    expect(validatePlanEdit(values('2026-09-14', '2026-09-12')).endDate).toBe(
-      messages.plan.errorDateRange,
-    )
+    expect(
+      validatePlanEdit(values('2026-09-14', '2026-09-12'), { petsEditable: false }).endDate,
+    ).toBe(messages.plan.errorDateRange)
   })
 
   it('30일을 넘기면 상한 문구가 종료일에 붙는다', () => {
-    expect(validatePlanEdit(values('2026-09-01', '2026-10-01')).endDate).toBe(
-      messages.plan.errorPeriodTooLong,
-    )
+    expect(
+      validatePlanEdit(values('2026-09-01', '2026-10-01'), { petsEditable: false }).endDate,
+    ).toBe(messages.plan.errorPeriodTooLong)
   })
 })
+
+/** 동행견은 이 파일의 관심이 아니다 — 그룹이 없는 폼이라 `petIds` 키가 실리지 않는다 (#622) */
+const NO_PETS = { petsEditable: false, initialPetIds: [] }
 
 describe('toPlanUpdatePayload — 부분 수정 규약이 날짜에도 그대로다 (#585)', () => {
   /*
@@ -77,24 +82,32 @@ describe('toPlanUpdatePayload — 부분 수정 규약이 날짜에도 그대로
     위해서다. 시작일만 보내면 서버가 새 시작일과 **옛 종료일**로 기간을 다시 계산한다.
   */
   it('바꾸지 않은 기간도 두 날짜가 함께 실린다', () => {
-    const payload = toPlanUpdatePayload({
-      title: '제주 2박 3일',
-      startDate: '2026-09-12',
-      endDate: '2026-09-14',
-      budget: '400000',
-    })
+    const payload = toPlanUpdatePayload(
+      {
+        title: '제주 2박 3일',
+        startDate: '2026-09-12',
+        endDate: '2026-09-14',
+        budget: '400000',
+        petIds: [],
+      },
+      NO_PETS,
+    )
 
     expect(payload.startDate).toBe('2026-09-12')
     expect(payload.endDate).toBe('2026-09-14')
   })
 
   it('한쪽만 실리는 경로가 없다', () => {
-    const payload = toPlanUpdatePayload({
-      title: '제주 2박 3일',
-      startDate: '2026-10-01',
-      endDate: '2026-10-03',
-      budget: '',
-    })
+    const payload = toPlanUpdatePayload(
+      {
+        title: '제주 2박 3일',
+        startDate: '2026-10-01',
+        endDate: '2026-10-03',
+        budget: '',
+        petIds: [],
+      },
+      NO_PETS,
+    )
 
     expect(Object.hasOwn(payload, 'startDate')).toBe(true)
     expect(Object.hasOwn(payload, 'endDate')).toBe(true)
@@ -102,12 +115,16 @@ describe('toPlanUpdatePayload — 부분 수정 규약이 날짜에도 그대로
 
   /** `status` 는 여전히 넣지 않는다 — 확정은 별도 동작이다 */
   it('status 는 실리지 않는다', () => {
-    const payload = toPlanUpdatePayload({
-      title: '제주 2박 3일',
-      startDate: '2026-09-12',
-      endDate: '2026-09-14',
-      budget: '',
-    })
+    const payload = toPlanUpdatePayload(
+      {
+        title: '제주 2박 3일',
+        startDate: '2026-09-12',
+        endDate: '2026-09-14',
+        budget: '',
+        petIds: [],
+      },
+      NO_PETS,
+    )
 
     expect(Object.hasOwn(payload, 'status')).toBe(false)
   })

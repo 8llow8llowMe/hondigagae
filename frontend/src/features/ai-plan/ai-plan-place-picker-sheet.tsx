@@ -383,7 +383,7 @@ function PickerSkeleton() {
  * 것은 **아이템 테두리**라, 채움은 그대로 옮겨도 규칙에 걸리지 않는다.
  * `--band` 로 바꾸지 않는다 — `DESIGN.md §2` 가 `--band` 를 "아이템 채움 · 태그 ·
  * 스켈레톤" 의 **중립** 채움으로, `--row-selected` 를 "선택된 행 tint" 로 갈라
- * 두었고, 이 저장소의 선택 표시 네 곳(`radio-group` · `pet-checkbox-group` ·
+ * 두었고, 이 저장소의 선택 표시 네 곳(`radio-group` · `checkbox-group` ·
  * `place-map-panel` · `emergency-map-panel`)이 전부 후자를 쓴다. 여기만 `--band`
  * 로 가면 같은 뜻에 두 색이 생기고, 중립 채움과도 구분되지 않는다.
  * **체크박스에만 맡기지 않는 이유**는 상한이 10곳이라 고른 것을 한눈에 세어야

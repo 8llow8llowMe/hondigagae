@@ -23,6 +23,7 @@ import {
   type PlanStatusActionSpec,
   reverseStatusActions,
 } from '@/lib/plan/status-action'
+import type { Pet } from '@/types/pet'
 import type { PlanDetail } from '@/types/plan'
 
 /**
@@ -60,10 +61,16 @@ import type { PlanDetail } from '@/types/plan'
  */
 export function PlanManageMenu({
   plan,
+  pets,
   today,
   status,
 }: {
   plan: PlanDetail
+  /**
+   * 수정 모달의 동행견 옵션 (#622). **이 메뉴가 쓰지 않고 그대로 넘긴다** — 목록을 이미
+   * 읽고 있는 `PlanDetailView` 에서 내려오는 경로다(`PlanEditModal` 의 `pets` 주석).
+   */
+  pets: readonly Pet[]
   today: string
   /** `usePlanStatus` 가 돌려주는 것 그대로. 전폭 버튼과 같은 진행·실행을 본다 */
   status: { saving: boolean; run: (action: PlanStatusActionSpec) => void }
@@ -131,7 +138,15 @@ export function PlanManageMenu({
           className="top-full right-0 mt-1"
           items={[
             {
-              label: messages.plan.editAction,
+              /*
+                **문구를 상태로 가른다** (#622 · 명세 D13-3). 메뉴 항목은 안에서 무엇을
+                고칠 수 있는지로 읽힌다 — 완료 일정에는 동행견 그룹이 없으므로(`PLAN_019`)
+                그 상태에서 `동행견` 이 적힌 항목을 열면 #585 의 근거가 반대로 깨진다.
+              */
+              label:
+                plan.status.code === 'COMPLETED'
+                  ? messages.plan.editAction
+                  : messages.plan.editActionWithPets,
               onSelect: () => {
                 setMenuOpen(false)
                 setEditOpen(true)
@@ -181,7 +196,13 @@ export function PlanManageMenu({
         />
       </MenuAnchor>
 
-      <PlanEditModal plan={plan} today={today} open={editOpen} onClose={() => setEditOpen(false)} />
+      <PlanEditModal
+        plan={plan}
+        pets={pets}
+        today={today}
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+      />
 
       <PlanShareModal planId={plan.planId} open={shareOpen} onClose={() => setShareOpen(false)} />
 

@@ -131,7 +131,8 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
       있으므로 위 초안 갈래에서는 이 배열에 없었다.
     */
     await expect(page.getByRole('menuitem')).toHaveText([
-      '이름·기간·예산 수정',
+      // 확정은 완료가 아니다 — 동행견을 고칠 수 있어 문구에 `동행견` 이 붙는다 (#622)
+      '이름·기간·예산·동행견 수정',
       '공유 링크',
       '초안으로 되돌리기',
       '일정 삭제',
@@ -140,6 +141,58 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     await revertItem.click()
 
     await expect(confirmAction).toBeVisible()
+  })
+
+  /*
+    **동행 반려견 수정** (#622 · 명세 D13-9).
+
+    `PlanEditModal` 은 `useQueryClient` 를 써서 `renderToStaticMarkup` 으로 렌더되지 않고
+    (`docs/testing-guide.md` §1) 닫힌 `Menu` 는 `null` 이라, **필드의 유무도 메뉴 문구도
+    여기서만 볼 수 있다.** 순수 로직은 `src/lib/plan/edit.test.ts` 가 따로 잠근다.
+
+    두 상태를 한 흐름에서 본다 — 같은 일정을 완료로 밀어 **같은 자리가 달라지는 것**을
+    보는 것이 요지다. 두 일정을 따로 만들면 "상태가 가른다" 가 아니라 "일정이 다르다" 가
+    된다.
+  */
+  test('완료 전에는 동행견을 고치고, 완료되면 그 자리가 사라진다', async ({ page }) => {
+    await page.goto('/plans')
+    const planId = await createDraftPlan(page)
+
+    await page.goto(`/plans/${planId}`)
+
+    const manageMenu = page.getByRole('button', { name: '일정 관리' })
+    const petsGroup = page.getByRole('group', { name: '동행 반려견' })
+
+    // ── 초안 — 고칠 수 있다 ───────────────────────────────────────────────
+    await manageMenu.click()
+    await page.getByRole('menuitem', { name: '이름·기간·예산·동행견 수정' }).click()
+
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(petsGroup).toBeVisible()
+    /* 대표는 힌트로만 말한다 — 전환 컨트롤은 이번 범위가 아니다 (명세 D13-10 미결 1) */
+    await expect(page.getByText('먼저 고른 아이가 대표예요.')).toBeVisible()
+
+    await page.getByRole('button', { name: '취소' }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
+    // ── 완료로 민다 ───────────────────────────────────────────────────────
+    await page.getByRole('button', { name: '일정 확정하기' }).click()
+    await page.getByRole('button', { name: '여행 완료하기' }).click()
+    await expect(page.getByRole('button', { name: '여행 완료하기' })).toHaveCount(0)
+
+    // ── 완료 — 컨트롤이 없고 문구도 그렇게 말한다 ─────────────────────────
+    await manageMenu.click()
+    /*
+      **메뉴 문구가 상태로 갈린다** (명세 D13-3). `동행견` 이 적힌 항목을 열었는데 그
+      컨트롤이 없으면 "메뉴 항목은 안에서 무엇을 고칠 수 있는지로 읽힌다" 가 깨진다.
+    */
+    await page.getByRole('menuitem', { name: '이름·기간·예산 수정' }).click()
+
+    await expect(page.getByRole('dialog')).toBeVisible()
+    // 서버가 `PLAN_019` 로 거절한다 — 누를 수 있는 컨트롤을 두면 화면이 거짓말을 한다
+    await expect(petsGroup).toHaveCount(0)
+    // 나머지 필드는 그대로 고칠 수 있다 — 사라지는 것은 동행견 하나다
+    await expect(page.getByLabel('일정 이름')).toBeVisible()
   })
 
   /*
