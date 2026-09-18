@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { Badge } from '@/components/badge'
 import { Button } from '@/components/button'
@@ -13,12 +13,12 @@ import { FormAlert } from '@/components/form-alert'
 import { CloseIcon } from '@/components/icons'
 import { Input } from '@/components/input'
 import { Skeleton } from '@/components/skeleton'
-import { PLAN_QUERY_OPTIONS, planKeys } from '@/features/plan/queries'
+import { planKeys } from '@/features/plan/queries'
+import { usePlanPackingList } from '@/features/plan/use-plan-packing'
 import { generatePackingList } from '@/lib/api/ai-plan'
 import {
   addPackingItem,
   deletePackingItem,
-  fetchPackingItems,
   savePackingItems,
   setPackingItemChecked,
 } from '@/lib/api/plan'
@@ -53,18 +53,20 @@ import type { PlanPackingDetailItem, PlanPackingListResponse } from '@/types/pla
  * 갈래 판정(`shouldOfferGeneration` · `hasAiItems`)은 `lib/plan/packing.ts` 가 갖는다 —
  * 훅을 든 컴포넌트는 provider 없이 렌더할 수 없어, 여기 두면 테스트가 갈래를 못 본다.
  */
-export function PlanPackingList({ planId }: { planId: string }) {
+export function PlanPackingList({
+  planId,
+  preview = false,
+}: {
+  planId: string
+  preview?: boolean
+}) {
   const queryClient = useQueryClient()
   const key = planKeys.packing(planId)
 
   /** 체크·삭제 실패 문구. 두 동작 모두 응답이 목록이 아니라 되돌림·재조회로 처리한다 */
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const list = useQuery({
-    queryKey: key,
-    queryFn: () => fetchPackingItems(planId),
-    ...PLAN_QUERY_OPTIONS,
-  })
+  const list = usePlanPackingList(planId)
 
   /** 저장·추가 응답은 **목록 전체**라 다시 조회하지 않는다 (`updatePlan` 과 같은 처리) */
   function apply(next: PlanPackingListResponse) {
@@ -124,6 +126,7 @@ export function PlanPackingList({ planId }: { planId: string }) {
 
   return (
     <PackingListPanel
+      preview={preview}
       list={list.data ?? null}
       loading={list.isPending}
       failed={list.isError}
@@ -141,7 +144,25 @@ export function PlanPackingList({ planId }: { planId: string }) {
   )
 }
 
+/**
+ * 요약 모드에서 직접 보여 주는 항목 수 (#732).
+ *
+ * **다섯이면 "무엇이 들어 있는 목록인지" 가 읽힌다.** 그보다 많으면 승격된 카드가 개요보다
+ * 길어져 그날 이 화면을 연 사람이 브리핑에 닿기 전에 짐 목록을 다 지나야 한다 — 나머지는
+ * `전체 보기` 가 편다.
+ */
+export const PACKING_PREVIEW_MAX_ITEMS = 5
+
 export type PackingListPanelProps = {
+  /**
+   * 요약 모드 (#732). **승격 자리(위 레일)에서만 켠다** — 진행률 한 줄과 항목 몇 개로
+   * 줄이고, 나머지·도구는 `전체 보기` 뒤에 둔다.
+   *
+   * **목록이 비었을 때는 애초에 승격하지 않으므로**(`packingPlacement`) 이 모드에서 빈
+   * 상태를 그릴 일이 없다 — 그래도 갈래를 없애지는 않는다: 카드가 올라간 뒤 마지막 항목을
+   * 지우면 같은 프레임에서 빈 목록이 요약 모드로 그려진다.
+   */
+  preview?: boolean
   /** 저장된 목록. **`null` 은 "비었다" 가 아니라 "아직 못 읽었다"** 다 */
   list: PlanPackingListResponse | null
   loading: boolean
@@ -166,21 +187,8 @@ export type PackingListPanelProps = {
  * 없다. `PlanDetailView` → `PlanDetailSection` 과 같은 나눔이다.
  * (`useState` 는 폼 입력용으로만 쓰고, 그것은 정적 렌더에서도 성립한다.)
  */
-export function PackingListPanel({
-  list,
-  loading,
-  failed,
-  onReload,
-  generating,
-  generateFailed,
-  onGenerate,
-  onToggleChecked,
-  onRemove,
-  onAdd,
-  adding,
-  addError,
-  actionError,
-}: PackingListPanelProps) {
+export function PackingListPanel(props: PackingListPanelProps) {
+  const { list } = props
   return (
     /*
       **카드 안 내용이다** (#447). 카드(`Surface`)와 그 이름(`aria-label`)은 호출부
@@ -219,21 +227,7 @@ export function PackingListPanel({
         )}
       </div>
 
-      <Body
-        list={list}
-        loading={loading}
-        failed={failed}
-        onReload={onReload}
-        generating={generating}
-        generateFailed={generateFailed}
-        onGenerate={onGenerate}
-        onToggleChecked={onToggleChecked}
-        onRemove={onRemove}
-        onAdd={onAdd}
-        adding={adding}
-        addError={addError}
-        actionError={actionError}
-      />
+      <Body {...props} />
     </div>
   )
 }
@@ -330,6 +324,26 @@ function Result(props: PackingListPanelProps & { list: PlanPackingListResponse }
   /** AI 항목이 하나라도 저장돼 있는가. 없으면 이 목록은 사용자가 적은 것뿐이다 */
   const aiBacked = hasAiItems(list)
 
+  /*
+    **요약 모드는 펼칠 수 있다** (#732). 승격된 자리에서 처음 보이는 것은 진행률 한 줄과
+    항목 몇 개뿐이고, `전체 보기` 가 나머지와 도구(재생성 · 직접 추가)를 연다.
+
+    **자리를 옮기지 않고 같은 카드 안에서 편다.** 눌렀을 때 화면 아래 다른 카드로 보내면
+    방금 읽던 목록이 사라진다 — 같은 목록의 나머지를 보는 일이라 이동이 아니다.
+  */
+  const [expanded, setExpanded] = useState(false)
+  if (props.preview === true && !expanded) {
+    return (
+      <PreviewResult
+        list={list}
+        onToggleChecked={onToggleChecked}
+        onRemove={onRemove}
+        actionError={actionError}
+        onExpand={() => setExpanded(true)}
+      />
+    )
+  }
+
   return (
     <div className="flex flex-col gap-3">
       {/*
@@ -395,6 +409,72 @@ function Result(props: PackingListPanelProps & { list: PlanPackingListResponse }
       </div>
 
       <AddSection {...props} categories={packingCategories(list.items)} />
+    </div>
+  )
+}
+
+/**
+ * 요약 모드의 결과 (#732 · 진단 665-3).
+ *
+ * **승격은 내용이 있을 때만 일어난다**(`packingPlacement`). 그렇게 올라온 카드가 해야 할
+ * 일은 *"짐을 얼마나 쌌는가"* 에 답하는 것이지 목록 전체를 펴는 것이 아니다 — 출발 전날
+ * 화면에서 이 카드가 개요보다 길어지면 그날의 다른 과업(브리핑)이 아래로 밀린다.
+ *
+ * 그래서 셋만 남긴다: **진행률 한 줄 · 항목 다섯 · `전체 보기`.**
+ *
+ * **분류 머리를 세우지 않는다.** 다섯 줄을 두세 묶음으로 쪼개면 머리가 항목만큼 많아진다 —
+ * 분류는 전체 보기 뒤의 목록이 갖는다.
+ *
+ * **체크는 여기서도 된다.** 요약이 읽기 전용이면 그날 짐을 싸면서 체크하려고 매번 펴야 한다.
+ */
+function PreviewResult({
+  list,
+  onToggleChecked,
+  onRemove,
+  actionError,
+  onExpand,
+}: {
+  list: PlanPackingListResponse
+  onToggleChecked: PackingListPanelProps['onToggleChecked']
+  onRemove: PackingListPanelProps['onRemove']
+  actionError: string | null
+  onExpand: () => void
+}) {
+  const shown = list.items.slice(0, PACKING_PREVIEW_MAX_ITEMS)
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/*
+        **진행률을 문장으로 쓴다.** 제목 줄 끝의 `3 / 12 챙김` 은 훑는 눈에 걸리라고 둔
+        작은 값이고, 승격된 자리에서는 이 카드가 답하는 질문 자체라 본문 첫 줄이다.
+      */}
+      <p className="text-body-2 text-fg font-semibold tabular-nums">
+        {messages.plan.packingProgress
+          .replace('{total}', String(list.items.length))
+          .replace('{checked}', String(list.checkedCount))}
+      </p>
+
+      <ul className="flex flex-col gap-2">
+        {shown.map((item) => (
+          <PackingRow
+            key={item.packingItemId}
+            item={item}
+            onToggleChecked={onToggleChecked}
+            onRemove={onRemove}
+          />
+        ))}
+      </ul>
+
+      <FormAlert message={actionError} />
+
+      {/*
+        **항목이 다섯 이하여도 남긴다.** 이 버튼이 여는 것은 나머지 항목만이 아니라 도구
+        (재생성 · 직접 추가)이기도 하다 — 다섯 개짜리 목록에서 버튼이 사라지면 승격된 동안
+        준비물을 **더할 방법이 없어진다.**
+      */}
+      <Button variant="ghost" size="sm" onClick={onExpand} className="self-start">
+        {messages.plan.packingExpandAction}
+      </Button>
     </div>
   )
 }

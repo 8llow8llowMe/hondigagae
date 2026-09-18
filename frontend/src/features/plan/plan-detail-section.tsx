@@ -13,10 +13,12 @@ import { PlanItemRow } from '@/features/plan/plan-item-row'
 import { PlanManageMenu } from '@/features/plan/plan-manage-menu'
 import { PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
 import { PlanPackingList } from '@/features/plan/plan-packing-list'
+import { PlanPackingStrip } from '@/features/plan/plan-packing-strip'
 import { PlanReviewList } from '@/features/plan/plan-review-panel'
 import { PlanStatusAction } from '@/features/plan/plan-status-action'
 import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
 import { usePlanDayEdit } from '@/features/plan/use-plan-day-edit'
+import { usePlanPackingList } from '@/features/plan/use-plan-packing'
 import { usePlanStatus } from '@/features/plan/use-plan-status'
 import { usePlanVisit } from '@/features/plan/use-plan-visit'
 import { dayRegenerateBlock } from '@/lib/ai-plan/regenerate'
@@ -32,7 +34,7 @@ import {
   type PlanItemRowModel,
   toItemRows,
 } from '@/lib/plan/detail'
-import { isPackingPromoted } from '@/lib/plan/packing-promotion'
+import { packingPlacement } from '@/lib/plan/packing-promotion'
 import { isReviewSectionVisible } from '@/lib/plan/review'
 import { planStatusActionLayout } from '@/lib/plan/status-action'
 import {
@@ -64,6 +66,14 @@ import type { PlanDetail, PlanItemWalkSafetyItem, PlanWeatherResponse } from '@/
  * - 우 열은 **일자마다 카드 하나** (`PlanDaySection`), 기간 밖 항목도 카드.
  * - 확정 버튼은 **액션이라 카드가 아니다** — 개요 카드 아래, 바닥 위에 선다 (#553).
  */
+/**
+ * 준비물 카드의 앵커 (#732). **빈 갈래의 스트립이 가리키는 곳이다.**
+ *
+ * 문자열을 두 곳에 적지 않는다 — 한쪽만 바꾸면 스트립이 아무 데도 가지 않는 링크가 되고,
+ * 그것은 화면에서 "눌러도 아무 일이 없다" 로만 보인다.
+ */
+export const PLAN_PACKING_ANCHOR_ID = 'plan-packing'
+
 export function PlanDetailSection({
   plan,
   companions,
@@ -210,10 +220,16 @@ export function PlanDetailSection({
     **출발이 가까우면 준비물이 일자 위다** (#665 · 진단 PL-3 · 명세 D11-9). `D-1` · `D-0`
     둘뿐이고 여행 중·지난 일정은 기본 자리를 지킨다 — 짐은 떠나기 전에 싼다.
 
-    **이 화면의 시간 의존은 이 한 줄이 전부다** — 아래 JSX 는 `boolean` 만 본다. 판정을
-    컴포넌트 안에 두지 않는 이유는 `regenerateBlocked` 와 같다.
+    **#665 를 고쳐 잡는다: 내용이 있을 때만 올린다** (#732 · 진단 665-3). 시간만 보고
+    올렸더니 그 자리에 **빈 카드**가 섰다 — 설명 두 문단과 `AI로 준비물 챙기기` 버튼이
+    전부였고, 승격의 보상이 "빈 상태를 더 잘 보이는 자리로 옮긴 것" 이 됐다. 비면 기본
+    자리를 지키고 개요 아래 한 줄 스트립이 유도만 한다.
+
+    **그래서 이 화면이 목록을 구독한다.** 자리를 정하려면 내용을 알아야 한다 — 카드가 아니라
+    `useQuery` 가 둘이고, 같은 query key 라 요청은 하나다 (`use-plan-packing.ts` 머리주석).
   */
-  const packingPromoted = isPackingPromoted(plan, today)
+  const packing = usePlanPackingList(plan.planId)
+  const packingPlace = packingPlacement(plan, today, packing.data ?? null)
 
   /*
     준비물 (#155). **개요를 근거로 만드는 일정 전체의 것이라 좌측 레일이다** — 특정 일자
@@ -222,11 +238,16 @@ export function PlanDetailSection({
     **한 자리에만 선다.** 두 자리에 렌더하고 한쪽을 `hidden` 으로 두지 않는다 —
     스크린리더가 두 번 읽고, `PlanPackingList` 가 `useQuery` 를 들어 **마운트가 둘**이
     된다 (D11-9-3 의 기각 표).
+
+    **`id` 는 빈 갈래의 스트립이 가리키는 곳이다** (#732). `scroll-mt` 는 `sticky` 헤더
+    (`h-14`) 뒤로 제목이 들어가지 않게 한다 — `Surface` 의 `titleId` 가 같은 값을 쓴다.
   */
   const packingCard = (
-    <Surface aria-label={messages.plan.packingHeading}>
-      <PlanPackingList planId={plan.planId} />
-    </Surface>
+    <div id={PLAN_PACKING_ANCHOR_ID} className="scroll-mt-20">
+      <Surface aria-label={messages.plan.packingHeading}>
+        <PlanPackingList planId={plan.planId} preview={packingPlace === 'promoted'} />
+      </Surface>
+    </div>
   )
 
   return (
@@ -327,8 +348,19 @@ export function PlanDetailSection({
           (모바일 8 · `md` 24). 승격해도 정방향 상태 버튼보다는 아래다: 확정·완료 액션은
           `PlanOverviewPanel` 이 `action` 으로 카드 안에 내므로 상태 배지와 그 배지를
           바꾸는 버튼 사이에 이 카드가 끼지 않는다.
+
+          **승격은 담을 것이 있을 때만이다** (#732) — 비면 아래 스트립이 대신 선다.
         */}
-        {packingPromoted && packingCard}
+        {packingPlace === 'promoted' && packingCard}
+
+        {/*
+          **빈 갈래의 한 줄** (#732 · 진단 665-3). 승격 창은 열렸는데 목록이 비었을 때,
+          카드 대신 이 줄이 선다 — 진입점은 남기고 면적은 주지 않는다.
+
+          **브리핑 배너 아래다.** 둘 다 그날의 과업이지만 브리핑은 **읽을 것이 이미 있는**
+          진입점이고 이 줄은 아직 만들지 않은 것을 가리킨다. 강조(brand)를 받은 쪽이 위다.
+        */}
+        {packingPlace === 'strip' && <PlanPackingStrip targetId={PLAN_PACKING_ANCHOR_ID} />}
       </SurfaceStack>
 
       {/*
@@ -443,6 +475,11 @@ export function PlanDetailSection({
         승격 대상이 아니다** — 후기는 다녀온 뒤의 것이고 배너는 상시 진입점이라 둘 다
         D-day 와 무관하다.
 
+        **그 이틀에도 담을 것이 없으면 여기 남는다** (#732 · 진단 665-3). #665 는 시간만
+        보고 올렸는데, 그러면 전날 화면 맨 위에 서는 것이 설명 두 문단과 빈 상태였다 —
+        "그날 찾는 것이 짐 목록" 이라는 근거는 **목록이 있을 때**의 이야기다. 비면 개요
+        아래 한 줄(`PlanPackingStrip`)이 여기로 보내고, 카드는 자기 자리를 지킨다.
+
         **데스크톱에서는 여전히 좌측 레일이다** — `.rail-layout-split` 이 이 블록을 1열 2행에
         놓아 개요 아래로 되돌린다. 모바일 순서만 바뀐다 (globals.css).
 
@@ -453,13 +490,16 @@ export function PlanDetailSection({
       */}
       <SurfaceStack className="rail-split-bottom pt-2 md:pt-0 lg:pr-3">
         {/*
-          준비물의 **기본 자리**다 (#653). 승격 갈래(`D-1` · `D-0`)에서는 위 레일 끝으로
-          옮겨 가 여기서 빠진다 (#665 · D11-9).
+          준비물의 **기본 자리**다 (#653). 승격 갈래(`D-1` · `D-0` **이고 담을 것이 있을
+          때**)에서만 위 레일 끝으로 옮겨 가 여기서 빠진다 (#665 · D11-9 · #732).
+
+          **빈 갈래에서도 여기 있다** (#732) — 위에서 유도하는 스트립이 가리키는 곳이 바로
+          이 카드다. 비었다고 카드를 없애지 않는다: 만드는 버튼이 그 안에 있다.
 
           **`pt-2 md:pt-0` 은 승격 갈래에서도 그대로다** — 이 스택은 두 갈래 모두 일자
           뒤(모바일) · 위 레일 뒤(데스크톱)라 아래 근거가 그대로 성립한다.
         */}
-        {!packingPromoted && packingCard}
+        {packingPlace !== 'promoted' && packingCard}
 
         {/*
           여행 후기 (#615). **완료 일정에만 카드를 연다.** 초안·확정에서 GET 을 치면
