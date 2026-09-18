@@ -114,9 +114,14 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     */
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
 
-    // 확정의 정방향은 `여행 완료하기` 다. 되돌리기는 화면에 버튼으로 서지 않는다
-    await expect(page.getByRole('button', { name: '여행 완료하기' })).toBeVisible()
+    /*
+      **출발 전에는 `여행 완료하기` 도 버튼이 아니다** (#732). 이 일정은 D-7 이라 아직
+      떠나지 않았고, 그날 누를 수 없는 액션이 화면에서 가장 큰 색면을 차지할 이유가 없다 —
+      전폭 버튼 자리가 통째로 빈다. `일정 확정하기` 는 출발 전에도 할 수 있는 일이라
+      그대로 버튼이었다(바로 위에서 눌렀다).
+    */
     await expect(confirmAction).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '여행 완료하기' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '초안으로 되돌리기' })).toHaveCount(0)
 
     // ── 되돌리기 — 메뉴 안에서 ────────────────────────────────────────────
@@ -129,11 +134,14 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
 
       **`공유 링크` 는 역방향 위다** (#628) — 아래로 갈수록 무게가 는다. 확정·완료에만
       있으므로 위 초안 갈래에서는 이 배열에 없었다.
+
+      **`여행 완료하기` 가 역방향보다 위다** (#732) — 진행 방향 그대로의 순서다.
     */
     await expect(page.getByRole('menuitem')).toHaveText([
       // 확정은 완료가 아니다 — 동행견을 고칠 수 있어 문구에 `동행견` 이 붙는다 (#622)
       '이름·기간·예산·동행견 수정',
       '공유 링크',
+      '여행 완료하기',
       '초안으로 되돌리기',
       '일정 삭제',
     ])
@@ -175,10 +183,17 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     await page.getByRole('button', { name: '취소' }).click()
     await expect(page.getByRole('dialog')).toHaveCount(0)
 
-    // ── 완료로 민다 ───────────────────────────────────────────────────────
+    /*
+      ── 완료로 민다 ───────────────────────────────────────────────────────
+
+      **`여행 완료하기` 는 메뉴 안이다** (#732). 이 일정은 아직 출발 전(D-7)이라 그날 누를
+      수 있는 일이 아니고, 그래서 전폭 버튼 자리를 비웠다.
+    */
     await page.getByRole('button', { name: '일정 확정하기' }).click()
-    await page.getByRole('button', { name: '여행 완료하기' }).click()
-    await expect(page.getByRole('button', { name: '여행 완료하기' })).toHaveCount(0)
+    await manageMenu.click()
+    await page.getByRole('menuitem', { name: '여행 완료하기' }).click()
+    // 메뉴는 선택과 동시에 닫힌다 — 상태가 실제로 넘어갔는지는 제목 줄의 배지가 말한다
+    await expect(page.getByText('완료', { exact: true })).toBeVisible()
 
     // ── 완료 — 컨트롤이 없고 문구도 그렇게 말한다 ─────────────────────────
     await manageMenu.click()
@@ -231,15 +246,39 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
     — 개요 카드가 한 줄만 늘어도 깨진다. 순서만 본다.
   */
   /**
-   * 화면에 실제로 읽히는 순서. **`innerText` 는 보이는 것만 준다** — 데스크톱 전용
-   * 목차(`hidden lg:block`)의 `1일차` 가 390 에서 섞여 들지 않는다.
+   * 화면에 실제로 읽히는 세로 순서.
+   *
+   * **`innerText` 의 `indexOf` 를 쓰지 않는다** (#732). 개요 카드의 판정 스트립이 `1일차`
+   * 배지를 **모든 폭에서** 내면서 그 낱말이 화면에 두 번 서게 됐다 — 문자열 위치로 재면
+   * 늘 스트립 쪽이 먼저 걸려 일자 카드의 자리를 못 본다. 역할로 집어 좌표로 잰다.
    */
-  async function readingOrder(page: Page): Promise<string> {
-    await expect(page.getByRole('heading', { name: '1일차' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: '여행 준비물' })).toBeVisible()
-    await expect(page.getByRole('link', { name: /가는 곳 주변 병원·약국/ })).toBeVisible()
+  async function verticalOrder(page: Page) {
+    const day = page.getByRole('heading', { name: '1일차' }).first()
+    const packing = page.getByRole('heading', { name: '여행 준비물' })
+    const banner = page.getByRole('link', { name: /가는 곳 주변 병원·약국/ })
+    for (const target of [day, packing, banner]) {
+      await expect(target).toBeVisible()
+    }
 
-    return page.locator('body').innerText()
+    const y = async (target: typeof day) => {
+      const rect = await target.boundingBox()
+      if (rect === null) throw new Error('레이아웃을 재지 못했다')
+      return rect.y
+    }
+
+    return { day: await y(day), packing: await y(packing), banner: await y(banner) }
+  }
+
+  /**
+   * 준비물을 채운다 (#732).
+   *
+   * **승격은 담을 것이 있을 때만 일어난다** — #665 는 시간만 보고 올려서 빈 카드가 전날
+   * 화면 맨 위에 섰다. 갓 만든 일정의 목록은 비어 있으므로, 승격 갈래를 보려면 먼저
+   * 채워야 한다. 채워지는 순간 카드가 요약 모드로 위 레일로 옮겨 간다.
+   */
+  async function fillPacking(page: Page) {
+    await page.getByRole('button', { name: 'AI로 준비물 챙기기' }).click()
+    await expect(page.getByText(/\d+개 중 \d+개 챙김/)).toBeVisible()
   }
 
   test('모바일에서 일자가 준비물보다 먼저다 — D-7 (기본)', async ({ page }) => {
@@ -249,35 +288,60 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
 
     await page.goto(`/plans/${planId}`)
 
-    const text = await readingOrder(page)
+    const order = await verticalOrder(page)
 
-    expect(text.indexOf('1일차')).toBeLessThan(text.indexOf('여행 준비물'))
+    expect(order.day).toBeLessThan(order.packing)
 
     /* 아래 레일 안의 순서도 약속이다 — 준비물 → (후기) → 배너 */
-    expect(text.indexOf('여행 준비물')).toBeLessThan(text.indexOf('가는 곳 주변 병원·약국'))
+    expect(order.packing).toBeLessThan(order.banner)
   })
 
   /**
-   * **출발이 가까우면 준비물이 일자 위다** (#665 · 진단 PL-3 · 명세 D11-9).
+   * **출발이 가깝고 담을 것이 있으면 준비물이 일자 위다** (#665 승격 · **#732 내용 조건** ·
+   * 명세 D11-9).
    *
    * #653 이 준비물을 일자 뒤로 내린 근거가 _"준비물은 출발 전날 과업"_ 이었는데, **바로 그
-   * 출발 전날에는 뒤집힌다.** 승격 판정 자체(경계 · 자정)는 `packing-promotion.test.ts` 가
-   * 잠그고, 여기가 보는 것은 **그 `boolean` 이 실제 DOM 순서로 나타나는가** 다 —
-   * `PlanDetailSection` 은 React Query 훅을 들어 `renderToStaticMarkup` 으로 볼 수 없다.
+   * 출발 전날에는 뒤집힌다.** 승격 판정 자체(경계 · 자정 · 빈 목록)는
+   * `packing-promotion.test.ts` 가 잠그고, 여기가 보는 것은 **그 판정이 실제 DOM 순서로
+   * 나타나는가** 다 — `PlanDetailSection` 은 React Query 훅을 들어
+   * `renderToStaticMarkup` 으로 볼 수 없다.
    */
-  test('모바일에서 준비물이 일자보다 먼저다 — D-1 (승격)', async ({ page }) => {
+  test('모바일에서 준비물이 일자보다 먼저다 — D-1 · 담을 것이 있을 때 (승격)', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.goto('/plans')
+    const planId = await createDraftPlan(page, 1)
+
+    await page.goto(`/plans/${planId}`)
+    await fillPacking(page)
+
+    const order = await verticalOrder(page)
+
+    expect(order.packing).toBeLessThan(order.day)
+
+    /* **승격이 배너까지 끌어올리지 않는다** — 배너는 상시 진입점이라 D-day 와 무관하다 */
+    expect(order.day).toBeLessThan(order.banner)
+  })
+
+  /**
+   * **비어 있으면 승격하지 않는다** (#732 · 진단 665-3).
+   *
+   * #665 는 시간만 보고 올렸고, 그래서 전날 화면 맨 위에 선 것이 설명 두 문단과 빈
+   * 상태였다 — 승격의 보상이 "빈 상태를 더 잘 보이는 자리로 옮긴 것" 이 됐다. 진입점은
+   * 개요 아래 한 줄이 남기고, 카드는 자기 자리를 지킨다.
+   */
+  test('모바일에서 준비물이 비면 승격 대신 한 줄로 유도한다 — D-1', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto('/plans')
     const planId = await createDraftPlan(page, 1)
 
     await page.goto(`/plans/${planId}`)
 
-    const text = await readingOrder(page)
+    const strip = page.getByRole('link', { name: /준비물이 아직 비어 있어요/ })
+    await expect(strip).toBeVisible()
 
-    expect(text.indexOf('여행 준비물')).toBeLessThan(text.indexOf('1일차'))
+    const order = await verticalOrder(page)
 
-    /* **승격이 배너까지 끌어올리지 않는다** — 배너는 상시 진입점이라 D-day 와 무관하다 */
-    expect(text.indexOf('1일차')).toBeLessThan(text.indexOf('가는 곳 주변 병원·약국'))
+    expect(order.day).toBeLessThan(order.packing)
   })
 
   /**
@@ -307,6 +371,8 @@ test.describe('일정 확정과 되돌리기 (#565)', () => {
       const planId = await createDraftPlan(page, branch.startOffset, 10)
 
       await page.goto(`/plans/${planId}`)
+      // 승격은 담을 것이 있을 때만이다 (#732) — 갈래를 보려면 먼저 채운다
+      if (branch.startOffset === 1) await fillPacking(page)
 
       const title = page.getByRole('heading', { level: 1 })
       const packing = page.getByRole('heading', { name: '여행 준비물' })

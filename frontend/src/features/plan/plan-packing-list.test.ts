@@ -3,7 +3,11 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { PackingListPanel, type PackingListPanelProps } from '@/features/plan/plan-packing-list'
+import {
+  PACKING_PREVIEW_MAX_ITEMS,
+  PackingListPanel,
+  type PackingListPanelProps,
+} from '@/features/plan/plan-packing-list'
 import { messages } from '@/lib/messages'
 import type { CodeNameMetadata } from '@/types/api'
 import type { PlanPackingDetailItem, PlanPackingListResponse } from '@/types/plan'
@@ -333,5 +337,67 @@ describe('PackingListPanel — AI 산출물임을 말한다 (#397)', () => {
     expect(cls).not.toContain('text-caption')
     // 품목 이름(체크박스 라벨)도 body-2 다 — 톤만 다르다
     expect(markup).toContain(`<span class="text-body-2 text-fg">${ITEMS[0]?.name}</span>`)
+  })
+})
+
+/**
+ * 요약 모드 (#732 · 진단 665-3).
+ *
+ * 승격된 자리에서 이 카드가 답해야 하는 것은 *"짐을 얼마나 쌌는가"* 다 — 목록 전체를
+ * 펴면 그날의 다른 과업(브리핑)이 아래로 밀린다.
+ */
+describe('PackingListPanel — 요약 모드 (#732)', () => {
+  const MANY = Array.from({ length: PACKING_PREVIEW_MAX_ITEMS + 2 }, (_, index) =>
+    item({ name: `준비물 ${index}`, sortOrder: index, checked: index < 3 }),
+  )
+
+  it('진행률을 문장 한 줄로 먼저 말한다', () => {
+    const markup = render({ preview: true, list: saved(MANY) })
+
+    expect(markup).toContain(
+      messages.plan.packingProgress
+        .replace('{total}', String(MANY.length))
+        .replace('{checked}', '3'),
+    )
+  })
+
+  it('항목을 다섯까지만 직접 보여 준다', () => {
+    const markup = render({ preview: true, list: saved(MANY) })
+
+    expect(markup).toContain('준비물 0')
+    expect(markup).toContain(`준비물 ${PACKING_PREVIEW_MAX_ITEMS - 1}`)
+    expect(markup).not.toContain(`준비물 ${PACKING_PREVIEW_MAX_ITEMS}`)
+  })
+
+  /* 요약이 읽기 전용이면 짐을 싸면서 체크하려고 매번 펴야 한다 */
+  it('요약에서도 체크할 수 있다', () => {
+    const markup = render({ preview: true, list: saved(MANY) })
+
+    expect(markup).toContain('type="checkbox"')
+  })
+
+  /*
+    **이 버튼이 여는 것은 나머지 항목만이 아니다** — 재생성·직접 추가도 그 뒤에 있다.
+    다섯 개짜리 목록에서 버튼이 사라지면 승격된 동안 준비물을 더할 방법이 없어진다.
+  */
+  it('항목이 다섯 이하여도 전체 보기가 남는다', () => {
+    const markup = render({ preview: true, list: saved(ITEMS) })
+
+    expect(markup).toContain(messages.plan.packingExpandAction)
+  })
+
+  it('접힌 동안에는 도구와 긴 안내를 세우지 않는다 — 카드가 개요보다 길어지지 않게', () => {
+    const markup = render({ preview: true, list: saved(MANY) })
+
+    expect(markup).not.toContain(messages.plan.packingAddAction)
+    expect(markup).not.toContain(messages.plan.packingRegenerateNote)
+  })
+
+  it('요약 모드가 아니면 예전 그대로다 — 분류 머리와 도구가 함께 선다', () => {
+    const markup = render({ list: saved(MANY) })
+
+    expect(markup).toContain(`준비물 ${PACKING_PREVIEW_MAX_ITEMS}`)
+    expect(markup).toContain(messages.plan.packingAddAction)
+    expect(markup).not.toContain(messages.plan.packingExpandAction)
   })
 })
