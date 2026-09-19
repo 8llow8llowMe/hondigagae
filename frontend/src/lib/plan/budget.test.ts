@@ -36,6 +36,9 @@ describe('planBudgetIssue — 예산 판정', () => {
   })
 })
 
+/** 동행견은 이 파일의 관심이 아니다 — 그룹이 없는 폼으로 본다 (#622) */
+const NO_PETS = { petsEditable: false, initialPetIds: [] }
+
 describe('validatePlanEdit — 수정 폼도 같은 상한을 본다', () => {
   const values = (budget: string) => ({
     title: '제주 2박 3일',
@@ -47,19 +50,17 @@ describe('validatePlanEdit — 수정 폼도 같은 상한을 본다', () => {
   })
 
   it('상한을 넘기면 예산 칸에 오류가 붙는다', () => {
-    expect(validatePlanEdit(values('2147483648'), { petsEditable: false }).budget).toBe(
+    expect(validatePlanEdit(values('2147483648'), NO_PETS).budget).toBe(
       messages.plan.errorBudgetTooLarge,
     )
   })
 
   it('상한 안이면 통과한다', () => {
-    expect(validatePlanEdit(values('2147483647'), { petsEditable: false }).budget).toBeUndefined()
-    expect(validatePlanEdit(values(''), { petsEditable: false }).budget).toBeUndefined()
+    expect(validatePlanEdit(values('2147483647'), NO_PETS).budget).toBeUndefined()
+    expect(validatePlanEdit(values(''), NO_PETS).budget).toBeUndefined()
   })
 
   it('서식이 틀린 값은 "너무 커요" 가 아니라 서식 오류다', () => {
-    expect(validatePlanEdit(values('abc'), { petsEditable: false }).budget).toBe(
-      messages.plan.errorBudgetNegative,
-    )
+    expect(validatePlanEdit(values('abc'), NO_PETS).budget).toBe(messages.plan.errorBudgetNegative)
   })
 })

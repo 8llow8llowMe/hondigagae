@@ -19,7 +19,12 @@ import { updatePlan } from '@/lib/api/plan'
 import { apiErrorToFormErrors, NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 import { describePet } from '@/lib/pet/describe'
-import { planEditPetIds, toPlanUpdatePayload, validatePlanEdit } from '@/lib/plan/edit'
+import {
+  planEditPetIds,
+  planEditPetsHint,
+  toPlanUpdatePayload,
+  validatePlanEdit,
+} from '@/lib/plan/edit'
 import type { Pet } from '@/types/pet'
 import type { PlanDetail } from '@/types/plan'
 
@@ -120,9 +125,14 @@ export function PlanEditModal({
   function handleSubmit() {
     if (savingRef.current) return
 
+    /*
+      **`initialPetIds` 를 함께 넘긴다** (#752). 0마리 판정이 "지금 몇 마리인가" 만으로는
+      갈리지 않는다 — 동행견이 전부 삭제돼 0마리로 **열린** 폼은 막지 않고, 있던 것을
+      전부 해제한 폼만 막는다 (`validatePlanEdit` 주석).
+    */
     const validation = validatePlanEdit(
       { title, startDate, endDate, budget, petIds },
-      { petsEditable },
+      { petsEditable, initialPetIds },
     )
     if (Object.keys(validation).length > 0) {
       setErrors({ fields: validation, form: null })
@@ -324,7 +334,15 @@ export function PlanEditModal({
               // `fieldErrorId('planEditPetIds')` 가 오류 id 다 — 오류는 fieldset 에 붙는다
               id="planEditPetIds"
               label={messages.plan.fieldPets}
-              required
+              /*
+                **필수 표시(`*`)를 검증과 같은 조건에 건다** (#752). 동행견이 전부 삭제돼
+                0마리로 열린 폼은 `validatePlanEdit` 이 더 이상 막지 않으므로, 그때도 별을
+                세워 두면 화면이 없는 제약을 있다고 말한다. `CheckboxGroup` 의 `required` 가
+                렌더하는 것은 `legend` 의 별뿐이고 `aria-invalid`·`aria-describedby` 는
+                `error` 가 배선하므로(component-guide.md §7), 이 분기가 접근성 배선을
+                건드리지 않는다.
+              */
+              required={initialPetIds.length > 0}
               options={pets.map((pet) => ({
                 value: pet.petId,
                 label: pet.name,
@@ -337,8 +355,14 @@ export function PlanEditModal({
             {/*
               대표를 **사실로만** 말한다. 대표를 바꾸는 전용 컨트롤은 이번 범위가 아니다
               (D13-10 미결 1 — 라디오는 #174 가 걷어낸 기준 선택 컨트롤의 부활이다).
+
+              **동행견이 전부 삭제돼 0마리로 열린 폼에서는 다른 말을 한다** (#752). 분기는
+              `planEditPetsHint` 가 진다 — 이 컴포넌트는 node 환경에서 렌더되지 않아
+              (`useQueryClient`) 분기를 여기 두면 잠글 수 없다.
             */}
-            <p className="text-caption text-fg-muted">{messages.plan.editPetsHint}</p>
+            <p className="text-caption text-fg-muted">
+              {planEditPetsHint({ petIds }, { initialPetIds })}
+            </p>
           </div>
         )}
 
