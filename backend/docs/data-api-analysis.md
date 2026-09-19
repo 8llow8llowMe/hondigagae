@@ -180,7 +180,10 @@ Base: `https://apis.data.go.kr/B551011/Durunubi`
 
 - `courseList` (코스, 실측): `crsIdx`(코스 ID, "T_CRS_MNG0000005118"), `routeIdx`(소속 길 ID), `crsKorNm`(코스명), `crsDstnc`(거리 km, "14"), `crsTotlRqrmHour`(**분 단위** — 실측 "330"=5.5시간), `crsLevel`(난이도, "2"), `crsCycle`("순환형"/"비순환형" 텍스트), `crsContents`/`crsSummary`(HTML `<br>` 포함), `crsTourInfo`(주변 관광), `travelerinfo`(교통), `sigun`("부산 서구" 형식 — 제주 필터 키), `brdDiv`("DNWW" 걷기/"DNBW" 자전거), `gpxpath`(GPX URL), `createdtime`, `modifiedtime`
 - `routeList` (길, 실측): `routeIdx`, `themeNm`("남파랑길"), `linemsg`(한줄 설명), `themedescs`(HTML 원문), `brdDiv`, `createdtime`, `modifiedtime`
-- GPX URL을 그대로 저장하고, 경로 좌표가 필요할 때 다운로드·파싱한다 (지도 표시용).
+- ~~GPX URL을 그대로 저장하고, 경로 좌표가 필요할 때 다운로드·파싱한다 (지도 표시용).~~
+  **이 원천은 쓰지 않는다.** `gpxpath` 는 경로 좌표열을 주는 유일한 후보였지만 **제주 커버리지가
+  0개**라 올레 코스에는 쓸 수 없다 (#382 · 아래 §9). 위 필드 표는 "왜 안 쓰는지"의 근거로만
+  남긴다 — `walk_course` 구현은 CSV + TourAPI 레포츠(28) 기반이다 (`services/tour-service.md`).
 
 ## 6-1. 기상청 단기예보 (VilageFcstInfoService_2.0) — 실호출 검증됨
 
@@ -353,12 +356,20 @@ area_visitor_stat              지역별 방문자수 (DataLabService)
 ├─ base_ymd, area_code, signgu_code(nullable=광역), tou_div_cd, tou_num
 └─ uk: (base_ymd, area_code, signgu_code, tou_div_cd)
 
-walk_course                    두루누비 코스
+walk_course                    ※ 이 초안은 폐기됐다 (아래 주석 참조)
 ├─ crs_idx UK, route_idx, crs_kor_nm, crs_dstnc, crs_totl_rqrm_hour
 ├─ crs_level, crs_cycle, brd_div, sigun
 ├─ crs_summary, crs_contents, crs_tour_info, traveler_info, gpx_path
 └─ source_created_at, source_modified_at, synced_at
 ```
+
+> **`walk_course` 초안은 구현과 다르다 — 위 모양을 따라가지 말 것.** 두루누비를 원천으로 가정하고
+> 그린 초안인데, 두루누비는 제주가 0개라 배제했다(§6 · §9). 실제 구현은 공공데이터포털 올레코스현황
+> CSV + TourAPI 레포츠(28) 결합이고 컬럼은 `course_key` UK · `course_no` · `variant` ·
+> `course_order` · `name` · `distance_km` · `duration_text` · `duration_max_minutes` ·
+> `start_end_point` · `lat` · `lng` · `content_id` · `first_image` · `base_date` · `synced_at` 이다.
+> **`gpx_path` 는 구현에 없다** — 경로 좌표열을 주는 원천이 없기 때문이다(§9). 정본은
+> `WalkCourseEntity` 와 `services/tour-service.md` 다.
 
 - 날씨(기상청)는 DB 적재 대신 **Redis 격자별 캐시**를 쓴다 (`weather-insight-integration.md` §4). 성향 분석용 이력이 필요해지면 그때 테이블 추가.
 - 제주만 대상으로 하면 areaCode=39 필터로 적재량을 크게 줄일 수 있다 (개발계정 일 1,000건 제한 대응).
@@ -381,3 +392,68 @@ walk_course                    두루누비 코스
 - 서비스 키는 URL 인코딩해서 사용하고, **절대 커밋하지 않는다** (`.env` / 환경변수, 서비스에서는 `@ConfigurationProperties` + Jasypt).
 - 코드 체계 정리: 관광 areaCode(제주=39, 시군구 3/4)는 KorService2·KorPetTourService2 전용, 법정동 코드(제주=50, 50110/50130)는 통계 3종·lDong 필드 공용.
 - 재검증이 필요하면 위 표의 호출 조합을 그대로 사용한다 (공통 파라미터: `MobileOS=ETC&MobileApp=hondigagae&_type=json`).
+
+## 9. 올레 코스 경로 좌표열 원천 조사 (2026-09-19, #736) — **공개 원천에 없다**
+
+**결론: 제주올레 코스의 경로 좌표열(폴리라인)을 주는 공개 원천은 없다. 운영 주체의 공식
+사이트에도 없다.** 그래서 코스 상세에 경로 선을 그리는 지도는 세우지 않는다.
+
+이 절은 다음 사람이 같은 조사를 반복하지 않게 하려고 남긴다. **"아직 안 찾아봤다"가 아니라
+"찾아봤고 없다"** 이다. 새로 뒤지기 전에 아래 네 곳이 이미 닫혔다는 것부터 확인할 것.
+
+### 9-1. 확인한 원천과 결과
+
+| 원천 | 확인 방법 | 결과 |
+|------|-----------|------|
+| 한국관광공사 두루누비 (`gpxpath`) | API 소개문 + 사이트 구조 | **코리아둘레길 전용.** 제주올레 없음 |
+| 전국길관광정보표준데이터 (`coursInfo`) | 표준 출력 항목 명세 | **좌표 필드 자체가 없음.** 주소 + 텍스트 |
+| 제주 공간정보포털 (`gis.jeju.go.kr`) | ArcGIS REST 서비스 전수 열거 | **항공사진·지오프로세싱뿐.** 올레 노선 레이어 없음 |
+| 제주올레 공식 사이트 (`jejuolle.org`) | SPA 번들 전수 분석 | **시작점·종점 2점뿐.** 폴리라인 없음 |
+
+**두루누비** — API 소개문이 "코리아둘레길의 **284개** 코스 상세 GPX"라고 명시한다(2026-02-25
+수정). #382 이 142개 기준으로 "제주 0개"를 실호출 검증했는데 그 뒤 코스가 284개로 늘어 재확인이
+필요했다. 늘어난 것은 코리아둘레길 자체이고 제주올레가 편입된 것이 아니다 — 사이트의 코스 목록
+경로가 `haeparang-course-list.do` · `namparang-course-list.do` · `seohaerang-course-list.do` ·
+`dmz-course-list.do` **넷뿐**이고, 이 넷이 곧 코리아둘레길(해파랑·남파랑·서해랑·DMZ평화의길)이다.
+제주올레 목록 경로는 존재하지 않는다. **건수가 아니라 사이트 구조가 닫혀 있다** — 데이터가 덜
+들어온 것이 아니라 범위 밖이라, 다음에 코스가 더 늘어도 결론은 같다.
+
+**전국길관광정보표준데이터** (`https://api.data.go.kr/openapi/tn_pubr_public_stret_tursm_info_api`)
+— 항목에 `coursInfo`(경로정보)가 있어 후보로 보이지만, 출력 항목 전체가
+`stretNm · stretIntrcn · stretLt · reqreTime · beginSpotNm · beginRdnmadr · beginLnmadr ·
+endSpotNm · endRdnmadr · coursInfo · phoneNumber · institutionNm` 로 **위경도 필드가 하나도 없다.**
+시종점은 **주소**로 오고 `coursInfo` 는 지명을 잇는 **텍스트**다. 올레 CSV 의 `시종점정보`
+(`시흥리정류장-광치기해변`)와 같은 종류이며, 지오코딩해도 2점이지 경로가 아니다.
+
+**제주 공간정보포털** — `https://gis.jeju.go.kr/arcgis/rest/services` 가 열려 있어(ArcGIS 10.91,
+인증 불필요) 폴더를 전수 열거했다. `jjuis`(147) · `jjuisWeb`(33)는 연도별 항공사진 타일,
+`GPserver`(8)는 `ExportWebMap` 계열 지오프로세싱, `Hosted` · `JJGWIMS` 는 0건이다. **벡터 노선
+레이어가 없다.**
+
+**제주올레 공식 사이트** — 코스 상세 화면을 그리는 번들
+(`/assets/Road-BJhBWDdi.js`, 420KB)에 코스별 좌표가 박혀 있는데 그 모양이
+`{start:{lat,lng}, end:{lat,lng}}` 뿐이다. 29개 코스 × 2점 = **위도 출현 58개로 정확히 일치**하고,
+`gpx` · `kml` · `geojson` · `polyline` · `setPath` · `LineString` 문자열이 **전부 0회**, 3점 이상
+연속 좌표 배열도 **0개**다. 즉 **운영 주체조차 경로 선을 그리지 않는다.** 관련 서비스인
+올레트립(`olletrip.com`)은 예약 사이트라 경로 데이터가 없고, 정적 호스트
+(`contents.ollepass.org/static/homepage/trail/`)에도 사진만 있고 gpx/json 은 404 다.
+
+### 9-2. 부산물 — 시작점·종점 좌표 29개 코스 전부 (#722 로 넘김)
+
+경로는 못 찾았지만 **시작점·종점 좌표는 29개 코스 전부가 위 공식 사이트 번들에 있다.** 적재된
+올레 코스 29개 중 좌표가 있는 것이 4개뿐인 #722 에 직접 쓰인다. 사이트 키(`03_A`)와 저장소
+`courseKey`(`3-A`)는 앞자리 0 제거 + `_`→`-` 로 기계적으로 대응한다.
+
+**쓰기 전 조건 둘.** ① 이미 좌표가 있는 4개(2 · 3(B) · 4 · 15(B))를 이 값과 **대조**해야 한다 —
+독립적인 두 원천의 교차검증이고, 어긋나면 나머지 25개도 믿을 수 없다. ② 이 값은 **(사)제주올레라는
+민간 법인의 사이트 자산이지 공공데이터가 아니다.** 1차 원천으로 승격하지 않고 TourAPI 매칭
+실패분의 **보완**으로만 쓴다 (#722 에서 그렇게 정했다).
+
+### 9-3. 다시 뒤진다면
+
+- 위 네 곳은 닫혔다. **같은 곳을 다시 재지 말 것.**
+- 남은 길은 원천을 새로 **만드는** 쪽이다 — (사)제주올레에 데이터 제휴를 문의하거나, GPS 트랙
+  플랫폼(에브리트레일·komoot 등)의 사용자 업로드 트랙을 라이선스 확인 후 쓰는 것. 둘 다
+  기술 문제가 아니라 협의·라이선스 문제다.
+- **경로가 없다고 코스 상세가 못 서는 것은 아니다.** 시작점·종점 2점이 있으면 지도에 구간을
+  표시할 수 있고, 골든타임 동선은 시작점 좌표만으로 이미 붙어 있다.
