@@ -37,6 +37,9 @@ describe('planPeriodIssue — 기간 판정', () => {
   })
 })
 
+/** 동행견은 이 파일의 관심이 아니다 — 그룹이 없는 폼이라 `petIds` 키가 실리지 않는다 (#622) */
+const NO_PETS = { petsEditable: false, initialPetIds: [] }
+
 describe('validatePlanEdit — 기간 편집 (#585)', () => {
   const values = (startDate: string, endDate: string) => ({
     title: '제주 2박 3일',
@@ -48,32 +51,29 @@ describe('validatePlanEdit — 기간 편집 (#585)', () => {
   })
 
   it('정상 기간은 날짜 오류를 내지 않는다', () => {
-    const errors = validatePlanEdit(values('2026-09-12', '2026-09-14'), { petsEditable: false })
+    const errors = validatePlanEdit(values('2026-09-12', '2026-09-14'), NO_PETS)
     expect(errors.startDate).toBeUndefined()
     expect(errors.endDate).toBeUndefined()
   })
 
   it('빈 날짜는 각 필드의 "골라 주세요" 다 — 관계 오류로 덮지 않는다', () => {
-    const errors = validatePlanEdit(values('', ''), { petsEditable: false })
+    const errors = validatePlanEdit(values('', ''), NO_PETS)
     expect(errors.startDate).toBe(messages.plan.errorStartDateRequired)
     expect(errors.endDate).toBe(messages.plan.errorEndDateRequired)
   })
 
   it('역전은 종료일에 붙는다 — 사용자가 방금 고른 쪽이다', () => {
-    expect(
-      validatePlanEdit(values('2026-09-14', '2026-09-12'), { petsEditable: false }).endDate,
-    ).toBe(messages.plan.errorDateRange)
+    expect(validatePlanEdit(values('2026-09-14', '2026-09-12'), NO_PETS).endDate).toBe(
+      messages.plan.errorDateRange,
+    )
   })
 
   it('30일을 넘기면 상한 문구가 종료일에 붙는다', () => {
-    expect(
-      validatePlanEdit(values('2026-09-01', '2026-10-01'), { petsEditable: false }).endDate,
-    ).toBe(messages.plan.errorPeriodTooLong)
+    expect(validatePlanEdit(values('2026-09-01', '2026-10-01'), NO_PETS).endDate).toBe(
+      messages.plan.errorPeriodTooLong,
+    )
   })
 })
-
-/** 동행견은 이 파일의 관심이 아니다 — 그룹이 없는 폼이라 `petIds` 키가 실리지 않는다 (#622) */
-const NO_PETS = { petsEditable: false, initialPetIds: [] }
 
 describe('toPlanUpdatePayload — 부분 수정 규약이 날짜에도 그대로다 (#585)', () => {
   /*

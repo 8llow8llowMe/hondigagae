@@ -69,7 +69,7 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 /** 필드명 → 메시지. 서버 `PlanValidationMessage` 와 같은 문구를 쓴다 */
 export function validatePlanEdit(
   values: PlanEditValues,
-  context: Pick<PlanEditContext, 'petsEditable'>,
+  context: PlanEditContext,
 ): Record<string, string> {
   const errors: Record<string, string> = {}
 
@@ -130,14 +130,47 @@ export function validatePlanEdit(
     **`petsEditable` 일 때만 본다.** 완료 일정에는 그 필드가 아예 없으므로, 여기서 세면
     고칠 수 없는 필드 때문에 제목 수정이 막힌다.
 
+    **초기 선택이 이미 비어 있었으면 보지 않는다** (#752). 동행견이 전부 삭제된 일정은
+    0마리로 열리는데, 다른 반려견이 남아 있으면 `petsEditable` 이 `true` 라 여기에 걸려
+    **제목 · 기간 · 예산조차 저장할 수 없었다.** 0마리는 사용자의 조작이 아니라 **시작
+    상태**이고, 막으면 그 일정은 영영 못 고친다. 서버도 `petIds` 키가 없으면 소유 검증조차
+    부르지 않으므로(`toPlanUpdatePayload` 의 두 번째 갈래) 저장은 그대로 통과한다.
+
+    **초기 선택이 있었는데 전부 해제한 경우는 지금처럼 막는다.** 그건 의도적 조작이고,
+    서버가 빈 배열을 `PLAN_010` 으로 거절한다 — 여기서 통과시키면 왕복해서 배너로 듣는다.
+
     상한(5)은 보지 않는다 — 옵션이 회원의 반려견 전부이고 그 수가 최대 5다. 서버
     `PLAN_115` 가 2차 방어다.
   */
-  if (context.petsEditable && values.petIds.length === 0) {
+  if (context.petsEditable && values.petIds.length === 0 && context.initialPetIds.length > 0) {
     errors.petIds = messages.plan.errorPetRequired
   }
 
   return errors
+}
+
+/**
+ * 동행견 그룹 아래 한 줄 — **상황에 따라 다른 말을 한다** (#752).
+ *
+ * 기본은 대표를 사실로만 말하는 `editPetsHint` 다 (D13-7). 그런데 동행견이 전부 삭제돼
+ * **0마리로 열린 폼**에서는 그 문구만 서 있으면 _"왜 아무것도 안 골라져 있지, 골라야
+ * 저장되나"_ 로 읽힌다 — 검증은 더 이상 막지 않는데 화면이 반대로 말하는 셈이다.
+ *
+ * 그래서 `초기 0마리 + 지금도 0마리` 일 때만 `editPetsClearedHint` 로 갈아 끼운다.
+ * 하나라도 고르는 순간 대표가 생기므로 곧바로 기존 힌트로 돌아온다.
+ *
+ * **모달에서 뽑아 여기 둔다.** `PlanEditModal` 은 `useQueryClient` 를 쓰므로 node 환경에서
+ * 렌더되지 않는다 (`testing-guide.md` §1 한계) — 분기를 순수 함수로 내려야 잠글 수 있다.
+ */
+export function planEditPetsHint(
+  values: Pick<PlanEditValues, 'petIds'>,
+  context: Pick<PlanEditContext, 'initialPetIds'>,
+): string {
+  if (context.initialPetIds.length === 0 && values.petIds.length === 0) {
+    return messages.plan.editPetsClearedHint
+  }
+
+  return messages.plan.editPetsHint
 }
 
 /**
@@ -181,7 +214,10 @@ export function toPlanUpdatePayload(
         여기서 한 번 더 잠근다 (명세 D13-3 · D13-4).
     (2) 0마리 — 빈 배열은 400 `PLAN_010` 이다. 생성과 달리 대표견 폴백이 없어
         (`PlanCreateRequest.effectivePetIds()` 와 다른 지점) 저장이 통째로 실패한다.
-        `validatePlanEdit` 이 먼저 막지만 변환도 만들지 않는다.
+        **이 갈래가 #752 를 실제로 통과시키는 곳이다** — 동행견이 전부 삭제돼 0마리로
+        열린 폼은 검증이 더 이상 막지 않고(`validatePlanEdit`), 여기서 키를 만들지 않아
+        서버가 "유지" 로 읽는다. 초기 선택이 있었는데 전부 해제한 경우는 검증이 먼저
+        막으므로 여기까지 오지 않지만, 변환도 만들지 않는 것은 그대로다.
     (3) 초기 선택과 같다 — **순서까지** 같을 때만이다. 첫 번째가 대표라 순서가 값이다.
   */
   if (!context.petsEditable) return payload
