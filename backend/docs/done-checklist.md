@@ -8,6 +8,10 @@
 - [ ] Swagger 어노테이션과 한국어 설명이 정리됐다
 - [ ] 예외/로그 문구가 서비스 기준과 일관된다
 - [ ] compile/test/check를 통과했다
+  - `./gradlew :service:<svc>:test` 만으로는 재실행이 보장되지 않는다 — Gradle 이 `UP-TO-DATE`
+    또는 `FROM-CACHE` 로 건너뛰면 테스트가 돌지 않은 채 `BUILD SUCCESSFUL` 이 나온다.
+    검증 결과를 보고할 때는 `cleanTest` + `--no-build-cache` 로 실제 실행한 결과를 쓴다
+    (`./gradlew :service:<svc>:cleanTest :service:<svc>:test --no-build-cache`).
 
 ## 2. 계층 체크리스트
 
