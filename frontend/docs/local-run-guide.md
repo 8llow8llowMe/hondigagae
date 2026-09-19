@@ -40,8 +40,50 @@ pnpm dev            # http://localhost:3000
 | `pnpm test:watch`    | Vitest 감시 모드                    |
 | `pnpm test:coverage` | 커버리지 리포트                     |
 | `pnpm verify`        | `lint && typecheck && test`         |
+| `pnpm e2e`           | Playwright (레이아웃·보호 라우트)   |
 
 **커밋 전 게이트**: `pnpm verify && pnpm format:check`
+
+> `verify` 는 **바이너리를 직접 부른다** (`eslint . && tsc --noEmit && vitest run`).
+> 예전에는 `pnpm lint && pnpm typecheck && pnpm test` 였는데 **스크립트 안에서 `pnpm` 을
+> 다시 부르는 구조라**, `pnpm` 이 PATH 에 없는 환경(아래)에서 한 단계도 못 돌았다 (#773).
+> 세 스크립트(`lint`·`typecheck`·`test`)를 고치면 **`verify` 도 같이 고친다** — 지금은
+> 내용이 복사돼 있어 자동으로 따라가지 않는다.
+
+### 3-1. `pnpm` 이 PATH 에 없을 때 (Windows 에서 자주)
+
+`pnpm: command not found` 가 나면 **`corepack` 으로 핀된 버전을 부른다.** `package.json` 의
+`packageManager` 가 버전을 고정하므로 따로 설치하지 않는다.
+
+```bash
+corepack pnpm install --frozen-lockfile
+corepack pnpm verify
+corepack pnpm format:check
+```
+
+`corepack pnpm --version` 이 `packageManager` 값과 같으면 제대로 걸린 것이다.
+
+### 3-2. e2e — 포트를 세션마다 가른다
+
+```bash
+E2E_PORT=5197 corepack pnpm e2e
+```
+
+- **기본 포트는 5175 로 `pnpm dev:alt2` 와 같다.** 워크트리를 나눠 쓰는 병렬 작업에서는
+  **세션마다 다른 포트**를 쓴다.
+- **서버는 playwright 가 직접 띄운다.** 손으로 미리 띄울 필요가 없다 — `webServer.command`
+  가 `node node_modules/next/dist/bin/next` 라 Windows 에서도 뜬다 (#773 이전에는 `./` 표기라
+  `cmd` 에서 죽어서 직접 띄워야 했다).
+- **그 포트가 이미 쓰이고 있으면 시끄럽게 실패한다.** `... is already used` 가 그것이다.
+  포트를 바꾸거나 그 서버를 내린다.
+- 반복 실행이 잦아 **이미 뜬 서버를 재사용하고 싶으면** `E2E_REUSE_SERVER=1` 을 직접 켠다.
+  **기본이 아닌 이유**: 재사용은 그 포트의 서버가 **남의 세션 코드**일 때 조용히 통과한다 —
+  초록불이 내 변경을 증명하지 못한다.
+
+### 3-3. 검증 결과를 보고할 때
+
+**돌린 그대로 적는다.** 위 우회를 썼으면 우회를 썼다고 적는다 — 막혔다고 건너뛰고
+"통과" 라고 적는 것이 이 문서가 막으려는 것이다. 기준 숫자가 크게 다르면 무언가 안 돈 것이다.
 
 ## 4. 백엔드 동시 기동
 
