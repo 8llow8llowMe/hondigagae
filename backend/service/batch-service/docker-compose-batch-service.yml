@@ -90,10 +90,16 @@ x-batch-service-environment: &batch_service_environment
   # 개발계정 쿼터가 일 1,000건이라 함부로 올리지 않는다. 이미지 단계도 상한을 갖는다 (#478).
   # 실제로 성공하는 호출 수는 이 상한이 아니라 그날 남은 예산이 정한다 (place-data-integration.md §10-3).
   PLACE_INTRO_MAX_CALLS_PER_RUN: ${PLACE_INTRO_MAX_CALLS_PER_RUN:-300}
-  # [선택] TourAPI 추가 이미지(detailImage2) 수집의 실행당 호출 상한 (#478). 기본 400.
-  # 17(목록) + 300(운영시간) + 400(이미지) + 276(수동 백필) + 1(올레) = 994 로 일 1,000건 안이다.
-  # 964곳 전량 커버가 3주 순환이다. 운영계정 키를 받으면 이 값만 올린다.
-  PLACE_IMAGE_MAX_CALLS_PER_RUN: ${PLACE_IMAGE_MAX_CALLS_PER_RUN:-400}
+  # [선택] TourAPI 추가 이미지(detailImage2) 수집의 실행당 호출 상한 (#478). 기본 380 (#726 에서 400 → 380).
+  # 24(목록) + 300(운영시간) + 380(이미지) + 276(수동 백필) + 1(올레) = 981 로 일 1,000건 안이다.
+  # lDongRegnCd 로 조회하면서 대상이 약 964곳 → 약 2,100곳이 됐고 목록 콜도 17 → 24 이상으로 늘었다.
+  # 전량 커버는 3주 → 약 6주 순환이다. 운영계정 키를 받으면 이 값만 올린다.
+  PLACE_IMAGE_MAX_CALLS_PER_RUN: ${PLACE_IMAGE_MAX_CALLS_PER_RUN:-380}
+  # [선택] TourAPI 장소 전량 적재의 건수 가드 (#726). 범위를 벗어나면 잡을 실패시킨다.
+  # 기본값은 넓다 — 여행코스(25)가 lDongRegnCd=50 에서 몇 건인지 아직 실측되지 않았다.
+  # 첫 재적재로 실제 건수가 나오면 조인다. min-rows < max-rows 가 아니면 기동에서 죽는다.
+  PLACE_IMPORT_MIN_ROWS: ${PLACE_IMPORT_MIN_ROWS:-1200}
+  PLACE_IMPORT_MAX_ROWS: ${PLACE_IMPORT_MAX_ROWS:-20000}
 
 x-logging: &default-logging
   driver: "json-file"

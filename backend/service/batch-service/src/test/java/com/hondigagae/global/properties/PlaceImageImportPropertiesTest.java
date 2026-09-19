@@ -16,11 +16,13 @@ import org.junit.jupiter.api.Test;
 class PlaceImageImportPropertiesTest {
 
     @Test
-    @DisplayName("값이 없거나 0 이하면 기본 400 으로 접는다")
+    @DisplayName("값이 없거나 0 이하면 기본 380 으로 접는다 — #726 에서 400 → 380 으로 내렸다")
     void foldsMissingOrNonPositiveToDefault() {
-        assertThat(new PlaceImageImportProperties(null).maxCallsPerRun()).isEqualTo(400);
-        assertThat(new PlaceImageImportProperties(0).maxCallsPerRun()).isEqualTo(400);
-        assertThat(new PlaceImageImportProperties(-1).maxCallsPerRun()).isEqualTo(400);
+        // 대상이 약 964곳 → 약 2,100곳이 되며 목록 콜이 17 → 약 24 로 늘어, 400 을 그대로 두면
+        // 같은 날 최악 합이 24 + 300 + 400 + 276 + 1 = 1,001 로 일 한도를 넘는다.
+        assertThat(new PlaceImageImportProperties(null).maxCallsPerRun()).isEqualTo(380);
+        assertThat(new PlaceImageImportProperties(0).maxCallsPerRun()).isEqualTo(380);
+        assertThat(new PlaceImageImportProperties(-1).maxCallsPerRun()).isEqualTo(380);
     }
 
     @Test

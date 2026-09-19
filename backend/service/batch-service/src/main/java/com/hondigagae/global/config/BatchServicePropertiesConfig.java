@@ -6,6 +6,7 @@ import com.hondigagae.global.properties.CultureFacilityProperties;
 import com.hondigagae.global.properties.MfdsPetRestaurantProperties;
 import com.hondigagae.global.properties.OlleCourseProperties;
 import com.hondigagae.global.properties.PlaceImageImportProperties;
+import com.hondigagae.global.properties.PlaceImportVolumeProperties;
 import com.hondigagae.global.properties.PlaceIntroImportProperties;
 import com.hondigagae.global.properties.TourApiProperties;
 import com.hondigagae.global.properties.VworldProperties;
@@ -21,6 +22,7 @@ import org.springframework.context.annotation.Import;
     TourApiProperties.class,
     PlaceIntroImportProperties.class,
     PlaceImageImportProperties.class,
+    PlaceImportVolumeProperties.class,
     CultureFacilityProperties.class,
     MfdsPetRestaurantProperties.class,
     OlleCourseProperties.class,
