@@ -18,6 +18,12 @@ logging:
   level:
     com.netflix.discovery.shared.resolver.aws.ConfigClusterResolver: WARN
 
+# 삭제된 반려견을 일정 동행 목록에서 걷어내는 대사 배치 (#720).
+# 사용자 트래픽이 가장 적은 새벽에 돈다. auth-service 의 청소·파기 배치(04:30 / 04:40 / 05:00)와
+# 시각이 겹치지 않게 04:10 에 둔다 - 같은 시각에 몰리면 auth 내부 API 가 배치끼리 경합한다.
+plan-companion-reconcile:
+  cron: ${PLAN_COMPANION_RECONCILE_CRON:0 10 4 * * *}
+
 # tour-service / auth-service 내부 호출 서킷브레이커.
 # 서킷은 Feign 호출만 감싸 전송 실패(5xx·타임아웃)만 집계하고, 4xx는 호출한 쪽의 요청 문제이므로
 # InternalResponseSupport 안에서 도메인 예외로 변환한 뒤 ignore-exceptions로 제외한다.

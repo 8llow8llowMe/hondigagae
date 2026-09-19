@@ -184,6 +184,32 @@ class PlanPeriodShrinkTest {
         public Slice<Plan> findMyPlans(long memberId, Long petId, long lastPlanId, int size) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public List<Plan> findCompanionEditablePlansWithPet(long memberId, long petId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Plan> findCompanionEditablePlans(long memberId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Long> findMemberIdsWithCompanionEditablePlans(long lastMemberId, int size) {
+            throw new UnsupportedOperationException();
+        }
+
+        /** 동행견 교체는 plan 행을 먼저 잠근다 — 대사 배치와 잠금 순서를 맞추기 위해서다. */
+        @Override
+        public Optional<Plan> findActiveByIdForUpdate(long planId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public int promoteRepresentative(long planId, long petId, long expectedPetId) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     /** 항목 조회 횟수를 센다 — 기간을 건드리지 않은 수정이 헛된 쿼리를 하지 않는지 본다. */
@@ -236,12 +262,22 @@ class PlanPeriodShrinkTest {
         }
 
         @Override
+        public List<PlanPet> findByPlanIdForUpdate(long planId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public List<PlanPet> findByPlanIds(Collection<Long> planIds) {
             throw new UnsupportedOperationException();
         }
 
         @Override
         public void deleteByPlanId(long planId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int deleteByPlanIdAndPetId(long planId, long petId) {
             throw new UnsupportedOperationException();
         }
     }

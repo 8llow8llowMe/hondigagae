@@ -415,6 +415,11 @@ class PlanQueryProcessorTest {
         }
 
         @Override
+        public List<PlanPet> findByPlanIdForUpdate(long planId) {
+            throw new UnsupportedOperationException("조회 경로는 잠그지 않는다");
+        }
+
+        @Override
         public List<PlanPet> findByPlanIds(Collection<Long> planIds) {
             bulkCalls += 1;
             return pets.stream().filter(pet -> planIds.contains(pet.planId())).toList();
@@ -422,6 +427,11 @@ class PlanQueryProcessorTest {
 
         @Override
         public void deleteByPlanId(long planId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int deleteByPlanIdAndPetId(long planId, long petId) {
             throw new UnsupportedOperationException();
         }
     }
@@ -558,6 +568,31 @@ class PlanQueryProcessorTest {
         @Override
         public Slice<Plan> findMyPlans(long memberId, Long petId, long lastPlanId, int size) {
             return new SliceImpl<>(plans);
+        }
+
+        @Override
+        public List<Plan> findCompanionEditablePlansWithPet(long memberId, long petId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Plan> findCompanionEditablePlans(long memberId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Long> findMemberIdsWithCompanionEditablePlans(long lastMemberId, int size) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<Plan> findActiveByIdForUpdate(long planId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int promoteRepresentative(long planId, long petId, long expectedPetId) {
+            throw new UnsupportedOperationException();
         }
     }
 }

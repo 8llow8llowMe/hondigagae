@@ -51,6 +51,8 @@ class PlanCommandProcessorTest {
     private static final long MEMBER_ID = 1L;
     private static final long REPRESENTATIVE_PET_ID = 77L;
 
+    /** 잠금과 DML 의 호출 순번. 대사 배치와 잠금 순서가 같은지 보는 데 쓴다. */
+    private List<String> callOrder;
     private StubPlanRepositoryPort planRepositoryPort;
     private StubPlanPetRepositoryPort planPetRepositoryPort;
     private StubPetConditionQueryPort petConditionQueryPort;
@@ -61,8 +63,9 @@ class PlanCommandProcessorTest {
 
     @BeforeEach
     void setUp() {
-        planRepositoryPort = new StubPlanRepositoryPort();
-        planPetRepositoryPort = new StubPlanPetRepositoryPort();
+        callOrder = new ArrayList<>();
+        planRepositoryPort = new StubPlanRepositoryPort(callOrder);
+        planPetRepositoryPort = new StubPlanPetRepositoryPort(callOrder);
         petConditionQueryPort = new StubPetConditionQueryPort();
         planPetConditionRepositoryPort = new StubPlanPetConditionRepositoryPort();
         placeVerifyQueryPort = new StubPlaceVerifyQueryPort();
@@ -190,6 +193,24 @@ class PlanCommandProcessorTest {
         // 생성 경로의 폴백이 새어 들어오면 사용자가 지우려던 아이가 말없이 돌아온다.
         assertThat(petConditionQueryPort.representativeCalls).isZero();
         assertThat(planPetRepositoryPort.deleteCalls).isZero();
+    }
+
+    @Test
+    @DisplayName("동행견을 바꿀 때 plan 행을 plan_pet 보다 먼저 잠근다 — 대사 배치와 순서가 갈리면 데드락이다")
+    void locksThePlanBeforeTouchingCompanionRows() {
+        updatePets(plan(PlanStatus.DRAFT, 2L), List.of(9L));
+
+        // 배치(PlanPetDetachProcessor)도 plan → plan_pet 순이다. 한쪽을 바꾸면 여기가 먼저 깨진다.
+        assertThat(callOrder).containsExactly("lockPlan", "deletePlanPets");
+    }
+
+    @Test
+    @DisplayName("동행견을 건드리지 않는 수정은 잠그지도 않는다 — 제목만 고치는 요청이 배치와 경합하지 않는다")
+    void doesNotLockWhenCompanionsAreUntouched() {
+        processor.updatePlan(plan(PlanStatus.DRAFT, 2L),
+            PlanUpdateCommand.builder().title("제목만 바꾼다").build(), null, null);
+
+        assertThat(callOrder).isEmpty();
     }
 
     @Test
@@ -405,7 +426,12 @@ class PlanCommandProcessorTest {
 
     private static class StubPlanRepositoryPort implements PlanRepositoryPort {
 
+        private final List<String> callOrder;
         private Plan saved;
+
+        private StubPlanRepositoryPort(List<String> callOrder) {
+            this.callOrder = callOrder;
+        }
 
         @Override
         public Plan save(Plan plan) {
@@ -422,12 +448,44 @@ class PlanCommandProcessorTest {
         public Slice<Plan> findMyPlans(long memberId, Long petId, long lastPlanId, int size) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public List<Plan> findCompanionEditablePlansWithPet(long memberId, long petId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Plan> findCompanionEditablePlans(long memberId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Long> findMemberIdsWithCompanionEditablePlans(long lastMemberId, int size) {
+            throw new UnsupportedOperationException();
+        }
+
+        /** 동행견 교체가 plan 행을 먼저 잠그는지 본다 — 대사 배치와 잠금 순서가 갈리면 데드락이다. */
+        @Override
+        public Optional<Plan> findActiveByIdForUpdate(long planId) {
+            callOrder.add("lockPlan");
+            return Optional.ofNullable(saved).filter(plan -> plan.id() == planId);
+        }
+
+        @Override
+        public int promoteRepresentative(long planId, long petId, long expectedPetId) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static class StubPlanPetRepositoryPort implements PlanPetRepositoryPort {
 
         private final List<PlanPet> saved = new ArrayList<>();
+        private final List<String> callOrder;
         private int deleteCalls;
+
+        private StubPlanPetRepositoryPort(List<String> callOrder) {
+            this.callOrder = callOrder;
+        }
 
         @Override
         public List<PlanPet> saveAll(List<PlanPet> pets) {
@@ -441,14 +499,25 @@ class PlanCommandProcessorTest {
         }
 
         @Override
+        public List<PlanPet> findByPlanIdForUpdate(long planId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public List<PlanPet> findByPlanIds(Collection<Long> planIds) {
             throw new UnsupportedOperationException();
         }
 
         @Override
         public void deleteByPlanId(long planId) {
+            callOrder.add("deletePlanPets");
             deleteCalls++;
             saved.clear();
+        }
+
+        @Override
+        public int deleteByPlanIdAndPetId(long planId, long petId) {
+            throw new UnsupportedOperationException();
         }
     }
 
