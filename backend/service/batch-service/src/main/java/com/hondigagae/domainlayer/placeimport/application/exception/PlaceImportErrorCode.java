@@ -41,7 +41,10 @@ public enum PlaceImportErrorCode {
     CULTURE_SOURCE_CIRCUIT_OPEN("PLACE_IMPORT_021", "공공데이터포털 서킷이 열려 있어 내려받기를 건너뜁니다."),
     // 일일 호출 한도 초과. 서킷이 잡지 못하는 실패다 — 원천은 200 에 오류 본문으로 답하므로
     // 전송은 성공한 것으로 보인다. 남은 대상을 다 돌아도 결과가 같으니 호출 반복을 멈춰야 한다.
-    TOUR_API_QUOTA_EXCEEDED("PLACE_IMPORT_022", "TourAPI 일일 호출 한도를 초과했습니다. (%s)");
+    TOUR_API_QUOTA_EXCEEDED("PLACE_IMPORT_022", "TourAPI 일일 호출 한도를 초과했습니다. (%s)"),
+    // 전량 적재 건수가 기대 범위를 벗어났다 (#726). 하한 미달은 원천 필터가 조용히 어긋난 것이고,
+    // 상한 초과는 지역 필터가 풀려 전국이 들어온 것이다 — 둘 다 성공으로 끝나면 안 된다.
+    IMPORT_VOLUME_OUT_OF_RANGE("PLACE_IMPORT_023", "적재 건수가 기대 범위를 벗어났습니다. (%s)");
 
     /**
      * 한 곳의 실패로 넘기지 않고 스텝을 즉시 끝내야 하는 오류. 셋 다 <b>남은 대상을 다 돌아도
