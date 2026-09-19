@@ -42,7 +42,9 @@ public record PlanItemWalkSafetyItem(
     String placeId,
 
     @Schema(description = "tour-service 가 확인한 장소명. **판정을 못 낸 항목은 물어보지 않았으므로 null 입니다** "
-        + "— 일정에 적힌 이름은 title 로 내려갑니다", example = "협재해수욕장")
+        + "— 일정에 적힌 이름은 title 로 내려갑니다. "
+        + "**단 unavailableReasonCode=NO_FORECAST_AT_TIME 은 물어본 줄이라 값이 남습니다** "
+        + "(targetDateTime · basisPetId · petConditionApplied 도 같습니다)", example = "협재해수욕장")
     String placeTitle,
 
     @Schema(description = "판정 기준 시각", example = "2026-09-13T14:00:00")
@@ -51,7 +53,17 @@ public record PlanItemWalkSafetyItem(
     @Schema(description = "판정 기준 반려견 아이디. 그날 날씨 판정의 basisPetId 와 같다", example = "1234567890123456789")
     String basisPetId,
 
-    @Schema(description = "산책 위험도 등급 metadata. 못 낸 항목은 null")
+    @Schema(description = "이 항목 판정에 기준 반려견(basisPetId)의 특성이 반영됐는지. "
+        + "**판정을 못 낸 항목은 원천에 물어보지 않았으므로 null 입니다** — false(물어봤고 반려견 특성 없이 "
+        + "일반 조건으로 판정함)와 구분됩니다. **falsy 로 뭉뚱그리면 둘이 같아집니다.** "
+        + "**단 unavailableReasonCode=NO_FORECAST_AT_TIME 은 물어본 줄이라 값이 남습니다.** "
+        + "기준 반려견은 날짜별로 갈릴 수 있어 일정 단위가 아니라 항목마다 내립니다", example = "true")
+    Boolean petConditionApplied,
+
+    @Schema(description = "산책 위험도 등급 metadata. 못 낸 항목은 null. "
+        + "**단 unavailableReasonCode=NO_FORECAST_AT_TIME 은 예외로 UNKNOWN 등급이 옵니다** "
+        + "— 그 줄은 tour-service 에 실제로 물어봤고 tour-service 가 UNKNOWN 을 답으로 준 것이라 버릴 이유가 없습니다. "
+        + "**화면 문구는 unavailableReason 을 쓰세요** — 사유 코드가 있는 줄에서 이 등급의 설명을 대신 읽을 필요는 없습니다")
     ScoreMetricMetadata walkSafetyLevel,
 
     @Schema(
@@ -75,7 +87,10 @@ public record PlanItemWalkSafetyItem(
 
     @Schema(description = "판정을 못 낸 사유 코드. 정상이면 null. "
         + "PAST_DATE 지난 날짜 · NOT_PLACE_TARGET 장소 항목 아님 · NO_START_TIME 시각 미지정 · "
-        + "BEYOND_FORECAST_RANGE 시각별 예보 범위(오늘~오늘+4) 밖 · LOOKUP_FAILED 조회 실패",
+        + "BEYOND_FORECAST_RANGE 시각별 예보 범위(오늘~오늘+4) 밖 · "
+        + "NO_FORECAST_AT_TIME 범위 안이지만 그 시각 예보가 없음 · LOOKUP_FAILED 조회 실패. "
+        + "BEYOND_FORECAST_RANGE 는 날짜만으로 정해져 그날 모든 항목이 같지만, "
+        + "NO_FORECAST_AT_TIME 은 같은 날 안에서도 항목마다 갈립니다",
         example = "NO_START_TIME")
     String unavailableReasonCode,
 

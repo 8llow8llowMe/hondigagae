@@ -32,6 +32,9 @@ public class PlanWalkSafetyPresenter {
             .placeTitle(item.placeTitle())
             .targetDateTime(item.targetDateTime())
             .basisPetId(item.basisPetId() == null ? null : String.valueOf(item.basisPetId()))
+            // Wrapper 를 그대로 옮긴다 — 묻지 않은 줄의 null 을 false 로 접으면 하지 않은 판정을
+            // 했다고 말하게 된다.
+            .petConditionApplied(item.petConditionApplied())
             .walkSafetyLevel(toLevelMetadata(item))
             .estimatedPavementCelsius(item.estimatedPavementCelsius())
             .feelsLikeCelsius(item.feelsLikeCelsius())
@@ -50,6 +53,8 @@ public class PlanWalkSafetyPresenter {
         if (item.levelCode() == null) {
             return null;
         }
-        return ScoreMetricMetadata.of(item.levelCode(), item.levelName(), item.levelDescription(), null);
+        // scoreDescription 은 원천(WalkSafetyLevel)이 주는 값을 그대로 옮긴다 (#717).
+        return ScoreMetricMetadata.of(
+            item.levelCode(), item.levelName(), item.levelDescription(), item.levelScoreDescription());
     }
 }
