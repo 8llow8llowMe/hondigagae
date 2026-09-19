@@ -266,6 +266,13 @@ export function PlanDaySection({
               model={row}
               visit={visit.visitOf(row.item.planItemId)}
               walkSafety={walkSafety.of(row.item.planItemId)}
+              /*
+                일자 판정이 반려견 특성을 반영했는지 한 칸 더 내린다 (#717). 행은 이
+                값을 그리지 않고 **자기 항목이 일자와 어긋나는지** 가르는 데만 쓴다 —
+                일자도 반영하지 못한 날에는 `PlanDayVerdict` 가 이미 말하고 있어 행이
+                되풀이하지 않는다 (`plan-item-row.tsx` 의 `showPetConditionNote`).
+              */
+              dayPetConditionApplied={petConditionApplied}
             />
           ))}
         </SurfaceList>

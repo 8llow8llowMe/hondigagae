@@ -476,7 +476,7 @@
 - 편집은 `순서 편집` 모드 안이다 (`features/plan/일자편집-세부명세.md` G). 항목 단건 수정 API 가
   없어 행에서 고치면 저장할 때마다 그 일자 방문 체크가 초기화된다.
   | 일정 복사 | `/plans/[planId]` 관리 메뉴 → 모달 | `POST /plans/{planId}/copy` | **구현** (#617) — 지난·완료 일정만. `일정복사-세부명세.md` |
-  | 항목 산책 위험도 | `/plans/[planId]` 항목 행 | `GET /plans/{planId}/walk-safety` | **명세 완료** (#625) — BE 2026-09-17 `c701b95a`. **2026-09-14 스냅샷에 없다** |
+  | 항목 산책 위험도 | `/plans/[planId]` 항목 행 | `GET /plans/{planId}/walk-safety` | **명세 완료** (#625) — BE 2026-09-17 `c701b95a`. **2026-09-14 스냅샷에 없다**. 계약 확장 #717 반영 (#758) |
 
 **항목 산책 위험도** — [#625](https://github.com/8llow8llowMe/hondigagae/issues/625) · BE `c701b95a`(2026-09-17) · 명세 `features/plan/일정상세-세부명세.md` D15
 

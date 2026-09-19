@@ -533,3 +533,57 @@ describe('PlanItemRow — WALK 항목 (#620)', () => {
     expect(markup).toContain(`/places/${planDetail.items[0]!.targetId}`)
   })
 })
+
+/**
+ * 반려견 특성이 이 항목 판정에만 빠진 경우 (#717 · #758).
+ *
+ * **행은 일자와 어긋날 때만 말한다.** 일자 판정 자리(`PlanDayVerdict`)가 이미 기준을
+ * 말하므로, 항목이 같은 말을 되풀이하면 항목 수만큼 줄이 늘면서 새 정보는 0 이다.
+ * 그래서 그리는 조건이 `항목 false` 가 아니라 **`일자 true && 항목 false`** 다 —
+ * 근거는 `plan-item-row.tsx` 의 `showPetConditionNote` 주석에 있다.
+ */
+function renderWithPetCondition(
+  petConditionApplied: boolean | null,
+  dayPetConditionApplied: boolean,
+) {
+  const model: PlanItemRowModel = {
+    item: { ...planDetail.items[0]!, startTime: '10:30:00' },
+    distanceMeters: null,
+    distanceKind: null,
+  }
+  const walkSafety = planItemWalkSafety({ planItemId: 'i-1', petConditionApplied })
+
+  return renderToStaticMarkup(
+    createElement(PlanItemRow, { model, walkSafety, dayPetConditionApplied }),
+  )
+}
+
+describe('PlanItemRow — 항목만 반려견 특성이 빠진 경우 (#758)', () => {
+  const note = messages.plan.walkSafetyPetConditionMissing
+
+  it('일자는 반영했는데 항목이 아니면 한 줄을 더한다 — 일자 카드가 말할 수 없는 사실이다', () => {
+    expect(renderWithPetCondition(false, true)).toContain(note)
+  })
+
+  it('일자도 반영하지 못한 날은 행이 말하지 않는다 — 일자 판정이 이미 같은 말을 했다', () => {
+    expect(renderWithPetCondition(false, false)).not.toContain(note)
+  })
+
+  it('항목이 반영했으면 말하지 않는다 — 일자와 어긋나지 않는다', () => {
+    expect(renderWithPetCondition(true, true)).not.toContain(note)
+  })
+
+  /** `null` 은 "묻지 않았다"(판정을 못 낸 줄)이고 `false`("물어봤지만 반영 못 함")와 다른 사실이다 */
+  it('항목이 null 이면 말하지 않는다 — 판정 자체가 없는 줄이라 말할 것이 없다', () => {
+    expect(renderWithPetCondition(null, true)).not.toContain(note)
+  })
+
+  /** 배지가 선 정상 판정에서도 어긋남은 따로 생긴다 — 사유 문장과 배타가 아니다 */
+  it('배지가 선 정상 판정에서도 나온다', () => {
+    const markup = renderWithPetCondition(false, true)
+
+    expect(markup).toContain(note)
+    // 기본 픽스처는 SAFE 판정이라 배지가 선다 — 둘이 함께 있는 것이 정상이다
+    expect(markup).toContain('안전')
+  })
+})
