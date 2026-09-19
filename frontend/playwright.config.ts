@@ -62,11 +62,32 @@ export default defineConfig({
   ],
 
   webServer: {
-    // corepack 이 `uv_cwd` 로 죽는 일이 있어 pnpm 을 거치지 않고 바이너리를 직접 부른다
-    command: `./node_modules/.bin/next dev -p ${PORT}`,
+    /*
+      **`node` 로 진입 스크립트를 직접 부른다.** 제약이 둘이라 이 모양이 됐다 (#773).
+
+      1. **pnpm·corepack 을 거치지 않는다.** corepack 이 `uv_cwd` 로 죽는 일이 있다.
+      2. **셸이 경로를 해석하게 두지 않는다.** 전에는 `./node_modules/.bin/next` 였는데,
+         playwright 는 이 명령을 **Windows 에서 `cmd` 로** 띄우므로 `./` 표기가
+         `'.' 은(는) 내부 또는 외부 명령이 아닙니다` 로 죽었다. 그래서 Windows 에서는
+         e2e 가 아예 돌지 않았고, 세션마다 dev 서버를 손으로 띄워 우회하고 있었다.
+
+      `node` 는 어느 OS 에서든 PATH 에 있고, 뒤의 경로는 셸이 아니라 node 가 해석하므로
+      슬래시 표기가 문제되지 않는다. 1번 제약도 그대로 지킨다.
+    */
+    command: `node node_modules/next/dist/bin/next dev -p ${PORT}`,
     url: BASE_URL,
-    // 사람이 쓰는 5174 와 포트를 갈라 둔다 — 남의 세션 서버를 재사용하지 않는다
-    reuseExistingServer: !process.env.CI,
+    /*
+      **기본은 재사용하지 않는다** (#773). `reuseExistingServer` 가 켜져 있으면 그 포트에
+      이미 뜬 서버를 줍는데, 워크트리를 나눠 쓰는 병렬 세션에서는 그것이 **남의 코드를
+      검사하고 통과하는** 길이 된다 — 초록불이 내 변경을 증명하지 못한다.
+
+      끄면 포트가 잡혀 있을 때 **시끄럽게 실패한다.** 조용히 틀린 통과보다 낫다.
+      반복 실행 속도가 필요하면 `E2E_REUSE_SERVER=1` 로 직접 켠다 — 그때는 그 포트의
+      서버가 **내 코드**인지 본인이 책임진다.
+
+      포트 자체는 `E2E_PORT` 로 가른다 (기본 5175 = `dev:alt2`). 세션마다 다른 값을 쓴다.
+    */
+    reuseExistingServer: process.env.E2E_REUSE_SERVER === '1' && !process.env.CI,
     timeout: 120_000,
     env: {
       MOCK_API: 'true',
