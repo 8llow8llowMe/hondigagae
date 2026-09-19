@@ -1341,8 +1341,11 @@ function toBriefingItem(item: MockPlanItem): PlanBriefingItemSummary {
 /**
  * 항목 산책 위험도 (#625). **판정 순서를 백엔드와 같게 지킨다** —
  * `PAST_DATE` → `NOT_PLACE_TARGET` → `NO_START_TIME` → `BEYOND_FORECAST_RANGE` →
- * `LOOKUP_FAILED`. 순서가 틀리면 "지난 날짜 + 시각 없음" 항목이 `NO_START_TIME` 으로
- * 잘못 판정된다(D15-3) — mock 이 화면보다 느슨해지는 자리다.
+ * `LOOKUP_FAILED` → `NO_FORECAST_AT_TIME`. 순서가 틀리면 "지난 날짜 + 시각 없음" 항목이
+ * `NO_START_TIME` 으로 잘못 판정된다(D15-3) — mock 이 화면보다 느슨해지는 자리다.
+ *
+ * **여섯째가 맨 뒤인 것은 우연이 아니다** (#717): 앞 다섯과 달리 tour 에 실제로 물어본
+ * **뒤에** 갈리는 답이라 날짜·항목 유형만으로는 결정되지 않는다.
  *
  * **"오늘" 은 실제 시계를 흉내 낸다** (`ai-plan-data.ts` 의 `LocalDate.now()` 흉내와 같은
  * 판단). 지평 판정이 상대적이라 실행 시점의 진짜 오늘을 기준으로 잡아야 한다.
@@ -1359,24 +1362,41 @@ const WALK_SAFETY_HORIZON_DAYS = 4
  */
 export const WALK_SAFETY_LOOKUP_FAILED_MARKER = '__WALK_SAFETY_LOOKUP_FAILED__'
 
-const WALK_SAFETY_LEVEL: Record<'SAFE' | 'CAUTION' | 'DANGER', ScoreMetricMetadata> = {
+/**
+ * 등급 metadata.
+ *
+ * **`scoreDescription` 을 채운다** (#717). 예전 mock 은 전부 `null` 이었는데, 그것은 값이
+ * 없어서가 아니라 BE 가 Feign DTO 에 칸이 없어 경계에서 버리고 있었기 때문이다 — #717 이
+ * 배선을 이어 이제 실제로 내려온다. 항목 행은 이 문장을 쓰지 않지만(D15-5 — 행은 얇게
+ * 둔다) mock 이 계약보다 가난하면 쓸 자리가 생겼을 때 로컬에서 빈 값만 보게 된다.
+ *
+ * **`UNKNOWN` 이 여기 있다** — `NO_FORECAST_AT_TIME` 항목이 사유 코드와 **함께** 들고 오는
+ * 등급이다 (아래 순서 6).
+ */
+const WALK_SAFETY_LEVEL: Record<'SAFE' | 'CAUTION' | 'DANGER' | 'UNKNOWN', ScoreMetricMetadata> = {
   SAFE: {
     code: 'SAFE',
     name: '안전',
     description: '지금 산책하기 좋은 조건이에요.',
-    scoreDescription: null,
+    scoreDescription: '체감온도와 노면 온도가 모두 안전 범위예요.',
   },
   CAUTION: {
     code: 'CAUTION',
     name: '주의',
     description: '무리한 산책은 피해 주세요.',
-    scoreDescription: null,
+    scoreDescription: '체감온도나 노면 온도가 주의 범위에 들어왔어요.',
   },
   DANGER: {
     code: 'DANGER',
     name: '위험',
     description: '산책을 피하고 실내에서 쉬게 해 주세요.',
-    scoreDescription: null,
+    scoreDescription: '체감온도나 노면 온도가 위험 범위예요.',
+  },
+  UNKNOWN: {
+    code: 'UNKNOWN',
+    name: '판단 근거 부족',
+    description: '이 시각의 예보 자료가 부족해 등급을 매기지 못했어요.',
+    scoreDescription: '판정에 필요한 값이 모이지 않았어요.',
   },
 }
 
@@ -1407,7 +1427,24 @@ function mockPlanWalkSafety(plan: MockPlan): PlanWalkSafetyResponse {
       temperature: null,
       saferWindowStart: null,
       saferWindowEnd: null,
+      /*
+        **판정을 못 낸 줄은 `null` 이다** (#717) — "묻지 않았다" 이지 "반영하지 않았다" 가
+        아니다. 실제로 물어본 갈래(순서 6·정상 판정)만 아래에서 `boolean` 으로 덮어쓴다.
+      */
+      petConditionApplied: null,
     }
+
+    /*
+      **반려견 특성을 반영하지 못한 항목을 결정적으로 만든다** (#717 · `order % 4 === 2`).
+
+      기준견의 조건만 tour 쪽에서 `unknown()` 이면 **일자는 `true` · 항목은 `false`** 가
+      난다(출처가 auth / tour 로 갈린다). mock 의 일자 판정(`toWeather`)은 언제나
+      `petConditionApplied: true` 라 이 항목이 그 어긋남을 그대로 재현한다 — 그래야
+      항목 행의 새 캡션(`walkSafetyPetConditionMissing`)을 로컬에서 볼 수 있다.
+      **`order % 5 === 3`(아래 순서 6)과 주기를 어긋나게 둔 것도 의도다**: 네 항목짜리
+      일정 하나에서 `NO_FORECAST_AT_TIME` 과 `배지 + 특성 미반영` 두 갈래가 같이 나온다.
+    */
+    const petConditionApplied = order % 4 !== 2
 
     // 순서 1 — 지난 날짜가 가장 먼저다. 무엇을 고쳐도 풀리지 않는 사유라 다른 사유보다 앞선다
     if (date < today) {
@@ -1459,11 +1496,33 @@ function mockPlanWalkSafety(plan: MockPlan): PlanWalkSafetyResponse {
       }
     }
 
+    /*
+      순서 6 — 지평 **안인데** 그 시각 예보를 쓸 수 없다 (#717 `NO_FORECAST_AT_TIME`).
+
+      **사유 코드와 `walkSafetyLevel` 이 함께 온다.** 서버가 tour 에 실제로 물어 `UNKNOWN`
+      등급을 받은 줄이라 `placeTitle`·`targetDateTime`·`basisPetId`·`petConditionApplied`
+      도 그대로 남는다 — "사유가 있으면 판정은 통째로 null" 이라는 옛 불변식의 예외이고,
+      **mock 이 그 예외를 재현해야** 화면이 사유 문장을 이기는지 로컬에서 확인할 수 있다.
+
+      **일자 단위로 접히지 않는다** — `order` 로 갈리므로 같은 날 안에서 이 항목과 정상
+      판정 항목이 섞인다. 그것이 `BEYOND_FORECAST_RANGE` 와의 차이 그 자체다.
+    */
+    if (order % 5 === 3) {
+      return {
+        ...shared,
+        petConditionApplied,
+        walkSafetyLevel: WALK_SAFETY_LEVEL.UNKNOWN,
+        unavailableReasonCode: 'NO_FORECAST_AT_TIME',
+        unavailableReason: '이 시각의 예보를 가져오지 못해 산책 위험도를 판정할 수 없습니다.',
+      }
+    }
+
     const grade = (['SAFE', 'CAUTION', 'DANGER'] as const)[order % 3] as
       'SAFE' | 'CAUTION' | 'DANGER'
 
     return {
       ...shared,
+      petConditionApplied,
       walkSafetyLevel: WALK_SAFETY_LEVEL[grade],
       estimatedPavementCelsius: 30 + (order % 5),
       feelsLikeCelsius: 27 + (order % 5),

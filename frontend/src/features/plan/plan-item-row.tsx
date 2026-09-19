@@ -99,6 +99,7 @@ export function PlanItemRow({
   model,
   visit,
   walkSafety,
+  dayPetConditionApplied = false,
 }: {
   model: PlanItemRowModel
   /** 없으면 토글이 렌더되지 않는다 — 기간 밖 항목 섹션이 그 경로다 */
@@ -109,6 +110,18 @@ export function PlanItemRow({
    * 조회가 404/400 이라 자리를 통째로 숨긴 경우가 전부 이 모양이다 (D15-6 · D15-7).
    */
   walkSafety?: PlanItemWalkSafetyItem | undefined
+  /**
+   * 그 **일자** 판정이 반려견 특성을 반영했는가 (#717 · `PlanWeatherResponse`).
+   *
+   * **이 행이 일자 판정과 어긋나는지 가르는 데만 쓴다** — 행이 이 값을 그리지는 않는다.
+   * 기본값은 `false`(=행이 아무 말도 하지 않는다)라 판정을 함께 넘기지 않는 사용처
+   * (기간 밖 항목 섹션)는 그대로 굴러간다.
+   *
+   * **`basisPetName` 은 받지 않는다.** 한 마리 일정이면 이름이 `null` 인데 그때도 일자는
+   * "특성을 반영했다" 를 주장하므로, 어긋남의 기준은 **이름 유무가 아니라
+   * `petConditionApplied` 자체**다. 이름은 일자 카드의 표시 문제다.
+   */
+  dayPetConditionApplied?: boolean
 }) {
   const { item } = model
   const { place, walkCourse } = item
@@ -122,6 +135,27 @@ export function PlanItemRow({
   // walkSafety 가 없으면 view 도 없다 — 시각 줄에 배지·문장 자리를 만들지 않는다
   const walkSafetyView = walkSafety === undefined ? null : itemWalkSafetyView(walkSafety)
   const feelsLike = formatCelsius(walkSafety?.feelsLikeCelsius ?? null)
+  /*
+    **일자의 주장과 이 행의 사실이 어긋날 때만 한 줄을 더한다** (#717).
+
+    - 항목 `true`/`null` → 아무 말도 하지 않는다. `null` 은 "묻지 않았다"(판정을 못 낸
+      줄)이고, `true` 는 일자 카드가 이미 말한 것과 같은 말이다
+    - 일자도 `false` 인 날 → **행은 말하지 않는다.** 그날 판정 자리(`PlanDayVerdict`)가
+      이미 "일반 조건으로 판정했다" 를 한 번 말했고, 항목마다 되풀이하면 항목 수만큼
+      줄이 늘면서 새 정보는 0 이다 (D15-5 가 노면온도·기온을 행에서 뺀 것과 같은 규율)
+    - 일자 `true` + 항목 `false` → **이것만 그린다.** 일자 카드가 말할 수 없는 사실이다
+
+    **어긋남은 실제로 생긴다 — 두 값의 출처가 다르다.** 일자는 auth 특성 조회 결과
+    (`anyMatch(isKnown)`)이고 항목은 tour 의 `petCondition().isSpecified()` 다. 기준견의
+    조건만 `unknown()` 이면 일자 `true` · 항목 `false` 가 난다.
+
+    **장소 상세 패널(`PlaceWalkSafetyPanel` 의 `BasisLine`)과 모양이 반대인 것이 정상이다.**
+    그쪽은 `{name} 기준` 문장을 **자기가 소유**해서 `false` 면 이름을 **빼는 것**(억제)으로
+    거짓이 사라진다. 이 행은 그 문장을 소유하지 않고 일자 카드가 말하므로, 행에서 억제해
+    봐야 **일자의 주장은 그대로 남는다** — 거짓을 지우려면 행이 한 줄을 **명시적으로 더해야**
+    한다. 같은 원칙(화면이 거짓 기준을 주장하지 않는다)을 다른 레이아웃에 적용한 것이다.
+  */
+  const showPetConditionNote = dayPetConditionApplied && walkSafety?.petConditionApplied === false
 
   /*
     **`targetId` 가 있다고 링크하지 않는다.** `WALK` 의 `targetId` 는 `walk_course.id`
@@ -213,6 +247,17 @@ export function PlanItemRow({
         */}
         {(walkSafetyView?.kind === 'sentence' || walkSafetyView?.kind === 'retriable') && (
           <p className="text-caption text-fg-muted mt-1">{walkSafetyView.text}</p>
+        )}
+
+        {/*
+          반려견 특성이 이 항목 판정에만 빠졌다 (#717). **사유 문장과 배타가 아니다** —
+          배지가 선 정상 판정에서도, 사유 문장이 선 줄에서도 어긋남은 따로 생긴다.
+          조건은 위 `showPetConditionNote` 가 소유한다(거기 근거가 있다).
+        */}
+        {showPetConditionNote && (
+          <p className="text-caption text-fg-muted mt-1">
+            {messages.plan.walkSafetyPetConditionMissing}
+          </p>
         )}
 
         <div className="flex flex-wrap items-center gap-2">

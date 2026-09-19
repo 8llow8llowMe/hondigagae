@@ -258,11 +258,18 @@ export function planItemWalkSafety(
     placeTitle: '제주현대미술관',
     targetDateTime: '2026-09-12T10:30:00',
     basisPetId: '123456789012000001',
+    /*
+      기본은 `true` — 정상 판정의 가장 흔한 모양이다 (#717). `false`(물어봤지만 반려견
+      특성 없이 판정) 와 `null`(판정 자체가 없어 묻지 않았다) 은 뜻이 달라 쓰는 쪽이
+      명시한다.
+    */
+    petConditionApplied: true,
     walkSafetyLevel: {
       code: 'SAFE',
       name: '안전',
       description: '지금 산책하기 좋은 조건이에요.',
-      scoreDescription: null,
+      /* #717 이 Feign 경계 배선을 이어 실제로 채워진다 — 행은 쓰지 않지만 계약은 이 모양이다 */
+      scoreDescription: '체감온도와 노면 온도가 모두 안전 범위예요.',
     },
     estimatedPavementCelsius: 30.2,
     feelsLikeCelsius: 27.5,

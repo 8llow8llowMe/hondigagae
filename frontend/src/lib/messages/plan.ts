@@ -412,6 +412,14 @@ export const planMessages = {
    * `feelsLikeCelsius` 하나뿐이라 폴백이 없다.
    */
   walkSafetyFeelsLikeLabel: '체감온도',
+  /**
+   * 일자는 반려견 특성을 반영했다는데 **이 항목만 반영하지 못한** 경우의 한 줄 (#717).
+   *
+   * **일자도 반영하지 못한 날에는 쓰지 않는다** — 그때는 일자 판정(`PlanDayVerdict`)이
+   * 이미 같은 말을 하고 있어 항목마다 반복하면 새 정보 없이 줄만 늘어난다. 이 문구는
+   * 일자의 주장과 행의 사실이 **어긋날 때만** 선다 (`plan-item-row.tsx`).
+   */
+  walkSafetyPetConditionMissing: '이 항목은 반려견 특성 없이 판정했어요.',
   /** 전체 조회 5xx·무응답 (D15-7). 항목 하나의 실패(`LOOKUP_FAILED`)와는 다른 자리다 */
   walkSafetyErrorTitle: '산책 위험도를 불러오지 못했어요.',
   /**
