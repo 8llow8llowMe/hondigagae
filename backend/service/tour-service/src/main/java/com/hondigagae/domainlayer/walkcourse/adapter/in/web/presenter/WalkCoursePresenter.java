@@ -23,10 +23,6 @@ public class WalkCoursePresenter {
             .courses(courses.stream().map(this::toItem).toList())
             .totalCount(courses.size())
             .appliedPetActivityLevel(applied)
-            // deprecated 필드. 같은 입력을 두 번 읽지 않고 위에서 만든 객체에서 그대로 유도한다 —
-            // 각자 계산하면 toAppliedPetActivityLevel 의 null 조건이 바뀌는 날 둘이 갈라진다.
-            // 한동안 공존시키는 이유는 WalkCourseListResponse 의 해당 필드 주석에 있다.
-            .petActivityLevelApplied(applied != null)
             .providerName(PROVIDER_NAME)
             .build();
     }

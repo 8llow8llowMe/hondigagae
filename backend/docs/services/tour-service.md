@@ -44,16 +44,15 @@
   하나(`maxMinutesOf`)라 화면이 4시간·6시간을 제 상수로 적으면 서버가 상한을 바꿔도 화면만 옛 숫자를 말한다.
   세 가지 null 을 구분한다 — 객체 자체가 null 이면 **활동량으로 거르지 않았다**,
   객체는 있고 `maxDurationMinutes` 만 null 이면 **HIGH(상한 없음)** 다.
-  **`petActivityLevelApplied: boolean` 은 deprecated 로 남겨 뒀다.** 객체의 null 여부와 같은 사실을
-  말하지만, 화면이 그 값으로 "기준" 줄을 그리고 있어 지금 빼면 줄이 조용히 사라진다. 프론트 CI 는
-  `frontend/**` 경로에서만 돌고 목 테스트는 제 목을 검증하므로 **백엔드 PR 이 초록인 채로 화면만
-  한 줄을 잃는다.** 그래서 새 필드를 먼저 얹고, 화면이 옮겨간 뒤 별도 PR 로 지운다. Presenter 가
-  새 객체에서 유도해 채우므로 공존하는 동안 둘이 어긋날 수 없다.
-  **프론트 목(`frontend/src/lib/api/mock/walk-course-data.ts`)은 `appliedPetActivityLevel` 과
-  `durationMaxMinutes` 를 아직 내지 않는다** — 목이 `durationMaxMinutes` 를 일부러 떨어뜨리고
-  목 테스트가 그 부재를 계약으로 고정하고 있어, 목으로 개발하는 화면은 새 필드를 볼 수 없다.
-  [#735](https://github.com/8llow8llowMe/hondigagae/issues/735) 에서 목까지 함께 옮겨야 이 변경의
-  목적(화면이 4시간·6시간을 제 상수로 적지 않게 한다)이 실제로 달성되고, 그때 deprecated 불리언을 지운다.
+  **적용 여부를 말하는 것은 이 객체 하나다.** 같은 사실을 말하던 `petActivityLevelApplied: boolean`
+  은 [#747](https://github.com/8llow8llowMe/hondigagae/issues/747) 에서 지웠다 — #718 이 객체로
+  대체하면서 `@Deprecated(forRemoval = true)` 로 한동안 남겨 둔 것이고, 남겨 둔 조건(화면이 그 값으로
+  "기준" 줄을 그린다)은 [#735](https://github.com/8llow8llowMe/hondigagae/issues/735) ·
+  [#746](https://github.com/8llow8llowMe/hondigagae/pull/746) 에서 화면이 새 필드로 옮기며 풀렸다.
+  프론트 목(`frontend/src/lib/api/mock/walk-course-data.ts`)도 같은 PR 에서 `appliedPetActivityLevel`
+  과 `durationMaxMinutes` 를 내도록 옮겼고, 목 테스트가 `petActivityLevelApplied` 의 부재를 계약으로
+  고정한다. 두 곳이 같은 사실을 말하는 상태를 길게 두면 둘이 어긋나는 날 소비처가 어느 쪽을 믿을지
+  그때 정하게 되므로, 화면이 옮긴 직후가 지우기 가장 싼 시점이었다.
   `level.description` 은 **반려견 성향** 문구(`ActivityLevel` 의 설명)이며 소요시간 상한이 아니다 —
   내부 API(`/internal/v1/walk-courses/candidates`)가 plan-service 로 내려보내는 값과 같아야 해서,
   여기에 "4시간 이하" 를 섞지 않고 상한을 별도 숫자 필드로 낸다

@@ -36,21 +36,21 @@ class WalkCoursePresenterTest {
     }
 
     @Test
-    @DisplayName("deprecated 불리언은 새 객체의 유무에서 유도된다 — 공존하는 동안 둘이 어긋날 수 없다")
-    void deprecatedBooleanNeverDisagreesWithTheObject() {
+    @DisplayName("활동량을 준 조회는 어느 값이든 적용 필터 객체가 있다 — 적용 여부를 말하는 것은 이 객체 하나다")
+    void everyActivityLevelLeavesAppliedObjectPresent() {
         for (ActivityLevel level : ActivityLevel.values()) {
             WalkCourseListResponse response = presenter.toListResponse(List.of(course(300)), query(level));
 
-            assertThat(response.petActivityLevelApplied())
-                .isEqualTo(response.appliedPetActivityLevel() != null)
-                .isTrue();
+            assertThat(response.appliedPetActivityLevel()).isNotNull();
         }
+    }
 
-        WalkCourseListResponse none = presenter.toListResponse(List.of(course(300)), query(null));
-
-        assertThat(none.petActivityLevelApplied())
-            .isEqualTo(none.appliedPetActivityLevel() != null)
-            .isFalse();
+    @Test
+    @DisplayName("응답에 deprecated 불리언이 없다 — 같은 사실을 두 곳이 말하면 어긋나는 날 화면이 어느 쪽을 믿을지 정해야 한다")
+    void listResponseHasNoDeprecatedAppliedFlag() {
+        assertThat(WalkCourseListResponse.class.getRecordComponents())
+            .extracting(java.lang.reflect.RecordComponent::getName)
+            .doesNotContain("petActivityLevelApplied");
     }
 
     @Test
