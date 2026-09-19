@@ -34,11 +34,18 @@ const BASE_DATE = '2025-04-28'
 type MockWalkCourse = WalkCourseSummary
 
 /**
- * 여섯 코스로 화면 분기를 전부 덮는다 (`코스목록-세부명세.md` D7 표).
+ * 일곱 코스로 화면 분기를 전부 덮는다 (`코스목록-세부명세.md` D7 표).
  *
  * `2코스` 만 좌표·이미지를 갖는다 — **골든타임 동선이 생기는 유일한 모양**이다.
- * 나머지 다섯이 기본 모양이고, `LOW`(240분)를 걸면 `6코스` 하나만 남아 **좌표 있는 코스가
- * 0개가 되는 상태**(D8-2)가 로컬에서 그대로 재현된다.
+ * 나머지가 기본 모양이고, `LOW`(240분)를 걸면 **좌표 있는 코스가 0개가 되는 상태**(D8-2)가
+ * 로컬에서 그대로 재현된다.
+ *
+ * **`20코스` 는 소요시간을 모르는 갈래다** ([#748](https://github.com/8llow8llowMe/hondigagae/issues/748)).
+ * 없을 때는 여섯 코스가 **전부 `durationMaxMinutes` 를 갖고 있어** 상세의 모르는 갈래
+ * (`activityFitUnknown`)를 로컬에서 한 번도 볼 수 없었다 — 이 저장소가 반복해서 데인
+ * 패턴이다([#671](https://github.com/8llow8llowMe/hondigagae/issues/671) E-1).
+ * 테스트 fixture 의 `WALK_COURSE_UNKNOWN_DURATION` 과 **같은 코스**이되 시종점만 다르다
+ * (그 fixture 는 `WALK_COURSE_PLAIN` 을 스프레드해 1코스의 시종점을 물려받는다 — 아래 주석).
  */
 export const MOCK_WALK_COURSES: MockWalkCourse[] = [
   {
@@ -109,6 +116,30 @@ export const MOCK_WALK_COURSES: MockWalkCourse[] = [
     durationText: '4~5시간',
     durationMaxMinutes: 300,
     startEndPoint: '한림항비양도도항선대합실-고내포구',
+    lat: null,
+    lng: null,
+    firstImage: null,
+  },
+  {
+    /*
+      **소요시간 원문을 파싱하지 못한 코스** (#718 · #748). `durationMaxMinutes: null` 은
+      "제한 없음" 이 아니라 **"모른다"** 라서, `fits` 가 통과시켜 `fittingLevels` 가 세 값을
+      다 내려 준다 — 목을 따로 짜지 않아도 저절로 그 모양이 된다.
+    */
+    walkCourseId: '6911167100216303320',
+    courseLabel: '20코스',
+    name: '김녕-하도',
+    distanceKm: 17.6,
+    durationText: '미정',
+    durationMaxMinutes: null,
+    /*
+      **시종점은 fixture 에서 물려받지 않는다.** 테스트 fixture 의
+      `WALK_COURSE_UNKNOWN_DURATION` 은 `WALK_COURSE_PLAIN` 을 스프레드해 1코스의
+      시종점을 그대로 갖는데, 그것을 여기 옮기면 목록에 **같은 시종점을 가진 코스가
+      둘** 뜬다. 이 파일은 서버 실데이터의 복제본이라고 스스로 규정하므로(머리 주석)
+      복제본이 거짓을 가르치면 안 된다 — 코스 이름(`김녕-하도`)과 맞춘다.
+    */
+    startEndPoint: '김녕서포구-하도해수욕장',
     lat: null,
     lng: null,
     firstImage: null,
