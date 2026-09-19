@@ -100,10 +100,16 @@ public class PlanInsightClientAdapter
     /**
      * 소유 검증용이라 이 어댑터의 다른 메서드와 달리 <b>실패를 삼키지 않는다</b> — support 가
      * 던지는 503(INTERNAL_SERVICE_UNAVAILABLE)을 그대로 올린다. 포트 계약 참고.
+     *
+     * <p><b>404 도 실패로 본다.</b> {@code /internal/v1/pets/conditions} 는 소유한 아이가 하나도
+     * 없어도 빈 목록을 200 으로 답한다. 그래서 여기서의 404 는 "소유한 아이가 없다" 가 아니라
+     * <b>경로가 없다</b>는 뜻이다 — auth-service 가 그 엔드포인트 이전 버전으로 떠 있는 배포
+     * 창이다. 그것을 빈 집합으로 접으면 정상 요청이 소유 위반으로 둔갑해 일정 수정은
+     * {@code PLAN_011}, 복제는 {@code PLAN_010} 으로 거짓 거절된다.
      */
     @Override
     public Set<Long> findOwnedPetIds(long memberId, List<Long> petIds) {
-        List<PetConditionClientResponse> body = internalResponseSupport.requestAndUnwrapOrNull(
+        List<PetConditionClientResponse> body = internalResponseSupport.requestAndUnwrap(
             InternalResponseSupport.AUTH_SERVICE, () -> petConditionClient.getPetConditions(memberId, petIds));
         if (body == null) {
             return Set.of();
