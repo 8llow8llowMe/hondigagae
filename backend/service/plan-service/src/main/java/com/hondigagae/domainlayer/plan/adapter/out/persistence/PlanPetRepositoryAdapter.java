@@ -28,6 +28,11 @@ public class PlanPetRepositoryAdapter implements PlanPetRepositoryPort {
     }
 
     @Override
+    public List<PlanPet> findByPlanIdForUpdate(long planId) {
+        return planMapper.toPetDomainListFromEntityList(planPetRepository.findByPlanIdOrderByIdAscForUpdate(planId));
+    }
+
+    @Override
     public List<PlanPet> findByPlanIds(Collection<Long> planIds) {
         if (planIds.isEmpty()) {
             return List.of();
@@ -38,5 +43,10 @@ public class PlanPetRepositoryAdapter implements PlanPetRepositoryPort {
     @Override
     public void deleteByPlanId(long planId) {
         planPetRepository.deleteByPlanId(planId);
+    }
+
+    @Override
+    public int deleteByPlanIdAndPetId(long planId, long petId) {
+        return planPetRepository.deleteByPlanIdAndPetId(planId, petId);
     }
 }

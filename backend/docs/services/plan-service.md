@@ -420,6 +420,141 @@ CREATE TABLE plan_pet_condition (
 ) COMMENT = '일정 완료 시점의 동행 반려견 특성 스냅샷';
 ```
 
+### 반려견이 삭제되면 — 동행 목록 정리 ([#720](https://github.com/8llow8llowMe/hondigagae/issues/720))
+
+반려견은 auth-service 에서 **소프트 삭제**(`Pet.delete()` → `deleted=true`)되고 일정은 plan-service DB 에 있다.
+스키마가 갈라져 있어 FK 로 강제할 수 없으므로 `plan_pet` 에 죽은 반려견 행이 그대로 남고, 일정 상세 `petIds` 가
+지워진 아이를 계속 내려보냈다.
+
+**`plan_pet` 과 `plan_pet_condition` 은 같은 규칙으로 다루지 않는다.** 정리 대상은 `plan_pet` 뿐이고
+`plan_pet_condition` 은 **건드리지 않는다** — 그 테이블은 "프로필이 삭제된 뒤에도 그때 그 아이가 어땠는지" 를
+남기는 것이 존재 이유라(컬럼 주석에 명시), 같이 지우면 다녀온 기록의 판정 근거가 사라진다.
+
+**규칙 셋 (R1/R2/R3)**
+
+| | 규칙 | 왜 |
+| --- | --- | --- |
+| R1 | 정리 대상은 `status IN (DRAFT, CONFIRMED)` 이고 `deleted = false` 인 일정뿐이다. **완료 일정은 불가침** | 완료된 일정의 동행견은 사용자도 바꿀 수 없다 (`PLAN_019`). 배치가 그 선을 넘으면 손으로는 못 바꾸는 기록을 배치가 말없이 바꾸게 된다 |
+| R2 | 행을 지운 뒤 남은 `plan_pet` 중 **id 가 가장 작은**(= 먼저 저장된) 아이를 `plan.pet_id` 로 올린다 | `plan_pet` 에 순서 컬럼이 없고 Snowflake PK 오름차순이 곧 저장 순서다. auth 의 대표 반려견 승계(`PetCommandProcessor.delete`)와 같은 모양이다. 불변식은 "`plan.pet_id` = `plan_pet` 첫 행" 이고, **행 삭제와 `pet_id` 갱신은 같은 트랜잭션**이다 |
+| R3 | 정리하면 남는 행이 0개가 될 일정이면 **그 아이를 그대로 둔다** (자리 표시자) | `plan.pet_id` 는 NOT NULL 이고 "일정에 최소 한 마리" 는 생성·수정이 `PLAN_010` 으로 지키는 불변식이다. 배치가 뒤에서 깨면 안 된다. 조인 테이블 행이 없는 옛 일정도 같은 이유로 그대로 둔다 |
+
+불변식이 이미 깨진 일정(조인 테이블에 행은 있는데 `plan.pet_id` 가 그 안에 없음)을 만나면 첫 행으로 복구하고
+**warn 로그**를 남긴다 — 복구는 코드가 하지만 어떻게 깨졌는지는 코드가 설명하지 못한다.
+
+**통신은 plan-service 의 대사(reconcile) 배치 하나뿐이다**
+
+`PlanCompanionReconcileScheduler`(`plan/adapter/in/scheduler/`)가 새벽에 돈다.
+cron 은 `plan-companion-reconcile.cron`(기본 `0 10 4 * * *`, 환경변수 `PLAN_COMPANION_RECONCILE_CRON`)이고
+`global/config/SchedulingConfig` 가 `@EnableScheduling` 을 켠다 — auth-service 의 같은 파일과 같은 자리다.
+
+- **auth → plan 푸시는 의도적으로 뺐다.** auth 에 첫 아웃바운드 의존이 생기고 auth ↔ plan 순환이 만들어진다.
+  정리는 하루 늦어도 되는 일이라 **plan 이 물어보는** 한 방향으로 둔다.
+- 처리 순서: 미완료·미삭제 일정을 가진 회원을 커서 페이지로 훑고 → 회원별로 그 일정들의 distinct `petIds` 를 모아
+  `PetConditionQueryPort.findOwnedPetIds(memberId, petIds)` 한 번으로 생존 여부를 묻고 → 빠진 아이마다
+  `PlanPetDetachProcessor.detachPet`. 회원마다 원격 호출 한 번인 것은 auth 의 내부 API 가 `memberId` 단위
+  계약이라 줄일 수 없다 (§9-7 의 "원천 단위가 원래 단건" 에 해당).
+- **트랜잭션은 일정 단위다.** 회차나 반려견 단위로 묶으면 일정 하나가 실패할 때 이미 정리한 일정까지 롤백된다.
+  루프와 같은 클래스에 있으면 `@Transactional` 이 자기 호출이라 프록시를 타지 않으므로 `TransactionTemplate` 을 쓴다.
+- **기존 잔여 행은 이 배치의 첫 회차가 정리한다.** 별도 마이그레이션·`ApplicationRunner`·운영 DML 이 없다.
+
+**동시 실행 안전의 근거는 "멱등" 이 아니라 일정 행 비관 잠금이다**
+
+분산 락이 없으므로 여러 인스턴스가 같은 시각에 돈다. 그런데 **멱등은 근거가 되지 않는다** — 죽은 아이가 둘(A·B)
+실린 일정을 두 실행이 동시에 잡으면 양쪽 모두 `plan_pet = [A, B]` 를 보고 각자 다른 행을 지운다. **서로 다른 행이라
+행 잠금으로 직렬화되지 않는다.** 결과는 0행이고, 그러면 다음 회차가 그 일정을 "조인 테이블이 생기기 전의 옛 일정"
+으로 오인해 **영구히 방치**한다. R3 가 깨지는데 스스로 복구도 못 한다.
+
+그래서 정리 트랜잭션은 일정 행을 **비관 잠금으로 다시 읽는다**(`PlanRepository.findActiveByIdForUpdate`). 같은
+일정을 처리하는 실행끼리 직렬화되어 뒤에 온 쪽이 `[B]` 를 보고 R3 로 남긴다. 잠금 구간에 원격 호출은 없다 —
+auth-service 조회는 이 트랜잭션 바깥에서 이미 끝나 있다. 사용자 조회 경로(`findByIdAndDeletedFalse`)는 잠금 없이
+그대로 둔다.
+
+`plan_pet` 재조회도 **잠금 조회**다(`findByPlanIdOrderByIdAscForUpdate`). 일정 행만 잠가도 직렬화는 되지만, 그
+직렬화는 "locking read 는 read view 를 만들지 않아 뒤따르는 일반 `SELECT` 가 그제서야 read view 를 만들고, 그래서
+앞 트랜잭션의 커밋을 본다" 는 **REPEATABLE READ 의 타이밍 전제**에 걸린다. 누가 트랜잭션 맨 앞에 일반 조회 한 줄만
+넣어도 read view 가 먼저 열려 옛 스냅샷을 읽고 0행 레이스가 조용히 부활한다. 둘 다 잠그면 그 전제가 사라진다.
+
+> **잠금 순서는 `plan` → `plan_pet` 이고, 두 경로 모두 그렇다.** 대사 배치
+> (`PlanPetDetachProcessor.detachFromPlan`)와 사용자 동행견 교체(`PlanCommandProcessor.updatePlan`)가 같은 두
+> 테이블을 건드린다. **순서가 갈리면 데드락이고, 피해자가 되는 쪽은 사용자다**(500). `updatePlan` 의 `save` 는
+> merge 라 UPDATE 를 flush 까지 미루고 `plan_pet` 벌크 DML 은 쿼리 스페이스가 겹치지 않아 auto-flush 도 유발하지
+> 않는다 — 저장만으로는 잠기지 않는다. 그래서 `petIds` 분기 **맨 앞에서 `findActiveByIdForUpdate` 를 명시적으로
+> 부른다**(반환값은 쓰지 않는다). 한쪽 순서를 바꿀 때는 반드시 다른 쪽도 같이 본다.
+
+**다중 인스턴스에서는 회원당 원격 왕복이 인스턴스 수만큼 곱해진다.** 분산 락이 없어 모든 인스턴스가 같은 시각에
+같은 회원 집합을 훑기 때문이다. 정확성은 위 잠금이 지키지만 auth-service 부하는 그만큼 늘어난다 — 인스턴스나
+회원 수가 늘면 ShedLock 류의 분산 락을 별도 이슈로 검토한다.
+
+**대표 승계는 `pet_id` 한 컬럼 DML 이다**
+
+`save` 는 merge 라 모든 updatable 컬럼에 정적 UPDATE 를 낸다(`PlanEntity` 에 `@DynamicUpdate`·`@Version` 이 없다).
+배치가 들고 있는 스냅샷이 조금이라도 낡으면 사용자의 제목·기간 수정을 되돌린다. `promoteRepresentative(planId,
+petId, expectedPetId)` 는 **다른 컬럼을 건드릴 방법 자체가 없어** 그 유실 경로를 구조적으로 없앤다.
+`expectedPetId` 불일치로 0건이 돌아오면 덮어쓰지 않고 warn 만 남긴다 — 그 순간의 사용자 수정이 옳고, 불변식은
+다음 회차가 복구한다. 벌크 DML 이라 `updated_at` 은 갱신되지 않는다(의도한 것이다 — 청소를 "사용자가 일정을
+수정했다" 로 보이게 하지 않는다).
+
+**연속 실패 5회면 회차를 멈춘다 — 빈 목록 200 은 정상 답이다**
+
+정리가 하루 늦는 것은 손해가 아니지만 잘못 떼어낸 동행견은 되돌릴 수 없다. 그래서 **응답을 못 받은 경우**는 멈춘다.
+다만 **회원 하나의 실패로 멈추면 안 된다** — 커서가 매 회차 0부터 시작하므로, 특정 회원에서 결정적으로 실패하면
+매일 같은 자리에서 멈춰 **그 뒤 회원은 영원히 정리되지 않는다**. `InternalResponseSupport` 가 4xx 를 포함한 모든
+`FeignException` 을 503 으로 바꾸기 때문에, 회원 하나의 데이터 문제가 "원천 장애" 처럼 보이기도 쉽다.
+
+- 회원 단위 실패(`PlanException` 이든 `DataAccessException` 이든)는 **warn + skip 하고 계속**한다.
+- **연속** 실패가 5회면 회차를 중단하고 마지막 실패 `memberId` 를 warn 에 남긴다. auth-service 전면 장애는 첫 다섯
+  회원이 연속으로 실패하므로 사실상 즉시 중단된다 — 조기 중단이 필요한 상황은 그대로 잡힌다.
+- 성공이 한 번 끼면 연속 수는 초기화된다. 드문 실패가 하루치로 쌓여 회차를 멈추지 않는다.
+- 반대로 **빈 목록 200 은 그대로 믿는다.** auth 의 조회는 요청 `petIds` 와의 교집합을 내므로 "요청한 아이가 전부
+  삭제됨" 과 "회원이 사라짐" 이 똑같이 빈 목록이다. 그런데 전자가 바로 정리 대상이므로, 여기서 회원을 건너뛰면
+  죽은 아이 둘이 실린 일정이 영구히 남아 #720 증상이 그대로 유지된다. 후자(탈퇴 30일 뒤 파기된 회원의 고아 일정)가
+  정리되는 것은 R3 가 마지막 한 마리를 지키므로 실질 피해가 없다.
+- **회차 요약 로그는 `finally` 에 있다.** 페이지 조회가 던지는 `DataAccessException` 처럼 잡지 않는 예외로 빠져나갈
+  때 요약이 통째로 사라지면, 하필 이상이 생긴 날의 수치를 못 보게 된다.
+- 회차 로그에 남기는 값: `elapsedMs` / `pages` / `members` / `failures` / `remoteCalls` / `aborted` / `detached` /
+  `representativeChanged` / `placeholderKept` / `legacyPlansSkipped`. `placeholderKept`(R3 발동)와
+  `legacyPlansSkipped`(조인 테이블 행이 없어 지울 것 자체가 없던 옛 일정)를 **따로 센다** — 합치면 R3 가 몇 번
+  발동했는지 로그에서 읽을 수 없다. 정리할 것이 없는 회차에도 한 줄은 남긴다. 회원당 원격 왕복 한 번이라는 구조가
+  유지되는지는 "아무 일도 없었던 날" 의 수치가 있어야 보인다.
+
+**API·DB 계약은 그대로다.** `plan.pet_id` 는 여전히 NOT NULL 이고, `petIds: []` 는 허용하지 않으며,
+`PLAN_010` / `PLAN_011` / `PLAN_019` 의 의미도 바뀌지 않는다. 이 작업은 **잔여 행 정리**뿐이다.
+
+**잔여 행 탐지 (읽기 전용)**
+
+dev 는 auth / plan 스키마가 같은 MySQL 인스턴스에 있어 크로스 스키마 SELECT 로 배포 전후 건수를 비교할 수 있다
+(local 은 `hondigagae` 한 스키마를 함께 쓰므로 `<auth_schema>.` 접두어를 지우면 된다).
+**SELECT 만 쓴다 — 운영 DB 에 DML 을 돌리지 않는다.** 정리는 배치가 하고, 여기서 보는 것은 "줄어들고 있는가" 뿐이다.
+
+```sql
+-- 1) 삭제(soft delete)된 반려견을 아직 참조하는 plan_pet 행 — 정리 대상 일정만
+SELECT pp.plan_id, pp.pet_id, p.status
+FROM plan_pet pp
+         JOIN plan p ON p.id = pp.plan_id
+         JOIN <auth_schema>.pet pet ON pet.id = pp.pet_id
+WHERE p.deleted = FALSE
+  AND p.status IN ('DRAFT', 'CONFIRMED')
+  AND pet.deleted = TRUE;
+
+-- 2) 원천에서 행 자체가 사라진 반려견(탈퇴 회원 30일 파기 등)을 참조하는 행
+--    1) 과 같이 정리 대상이다. 일정마다 마지막 한 마리는 R3 로 남으므로 0 으로 수렴하지는 않는다
+SELECT pp.plan_id, pp.pet_id
+FROM plan_pet pp
+         JOIN plan p ON p.id = pp.plan_id
+WHERE p.deleted = FALSE
+  AND p.status IN ('DRAFT', 'CONFIRMED')
+  AND NOT EXISTS (SELECT 1 FROM <auth_schema>.pet pet WHERE pet.id = pp.pet_id);
+
+-- 3) 불변식 점검: plan.pet_id 가 plan_pet 첫 행과 다른 일정 (0건이어야 한다)
+SELECT p.id,
+       p.pet_id,
+       (SELECT first_pet.pet_id FROM plan_pet first_pet WHERE first_pet.plan_id = p.id ORDER BY first_pet.id LIMIT 1) AS expected_pet_id
+FROM plan p
+WHERE p.deleted = FALSE
+  AND EXISTS (SELECT 1 FROM plan_pet pp WHERE pp.plan_id = p.id)
+  AND p.pet_id <> (SELECT first_pet.pet_id FROM plan_pet first_pet WHERE first_pet.plan_id = p.id ORDER BY first_pet.id LIMIT 1);
+```
+
 ### 반려견별 히스토리 (`GET /plans?petId=`)
 
 **한 마리라도 동행이면 히트**다. `plan.pet_id = :petId OR plan.id IN (select plan_id from plan_pet where pet_id = :petId)` —

@@ -253,6 +253,13 @@ public class PlanCommandProcessor {
         Plan saved = planRepositoryPort.save(updated);
 
         if (petIds != null) {
+            // plan 행을 먼저 잠근다. 같은 두 테이블(plan, plan_pet)을 동행견 대사 배치도 건드리는데
+            // 그쪽은 plan → plan_pet 순으로 잠근다. 여기서 plan_pet 을 먼저 만지면 순서가 역전되어
+            // 새벽 배치와 서로를 기다리다 데드락이 나고, 피해자가 되는 쪽은 사용자다(500).
+            // save 만으로는 잠기지 않는다 — merge 는 UPDATE 를 flush 까지 미루고, plan_pet 벌크 DML 은
+            // 쿼리 스페이스가 겹치지 않아 auto-flush 를 유발하지도 않는다. 그래서 명시적으로 잠근다.
+            // (반환값은 쓰지 않는다. 대상 일정은 바로 위에서 이미 확인했다)
+            planRepositoryPort.findActiveByIdForUpdate(saved.id());
             // 삭제가 먼저다. 큐잉되면 같은 (planId, petId) 가 옛 행과 겹쳐 유니크 인덱스 위반으로 죽는다.
             planPetRepositoryPort.deleteByPlanId(saved.id());
             planPetRepositoryPort.saveAll(toPets(saved.id(), petIds));
