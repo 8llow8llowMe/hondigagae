@@ -47,11 +47,25 @@ import org.springframework.context.annotation.ClassPathScanningCandidateComponen
  * 준다 (swagger-annotations-jakarta 2.2.x 에서 실측). 이름은 record component 에서 얻고 어노테이션만
  * accessor 에서 읽는다 — 앞으로 {@code RECORD_COMPONENT} 가 {@code @Target} 에 추가되더라도
  * 그대로 동작하도록 component 를 먼저 본다.
+ *
+ * <p><b>스캔의 전제 둘.</b> 지금은 무해하지만 계약이 그쪽으로 옮겨 가면 검사망이 조용히 비므로 적어 둔다.
+ * <ul>
+ *   <li><b>구체 타입만 잡힌다.</b> {@code ClassPathScanningCandidateComponentProvider} 가
+ *       {@code isIndependent() && isConcrete()} 로 걸러서, 인터페이스 · 추상 클래스 · 비static 내부
+ *       클래스는 include 필터를 전부 통과시켜도 들어오지 않는다. 응답 계약을 sealed interface 로
+ *       표현하기 시작하면 그 타입의 {@code @Schema} 는 대조되지 않는다</li>
+ *   <li><b>{@code @ArraySchema} 로 감싼 것은 보지 않는다.</b> 사유 코드를 배열로 내리면서
+ *       {@code @ArraySchema(schema = @Schema(allowableValues = ...))} 를 쓰면 {@code @Schema} 가
+ *       필드 · accessor 에 직접 붙지 않아 수집되지 않는다. 사유 코드는 record component 에
+ *       {@code @Schema} 를 직접 붙인다</li>
+ * </ul>
  */
 @DisplayName("Swagger allowableValues ↔ 사유 코드 enum 대조")
 class SchemaAllowableValuesContractTest {
 
     private static final String DTO_PACKAGE = "com.hondigagae.domainlayer.plan.adapter.in.web.dto";
+    private static final String ENUM_PACKAGE = "com.hondigagae.domainlayer.plan.domain.enums";
+    private static final String REASON_ENUM_SUFFIX = "UnavailableReason";
 
     /**
      * 대조 대상 등록부. 키는 {@code "SimpleClassName#componentName"}.
@@ -118,6 +132,41 @@ class SchemaAllowableValuesContractTest {
             .isEmpty();
     }
 
+    /**
+     * 위 셋은 <b>사본이 갈라지는 것</b>만 막는다. <b>사본을 아예 만들지 않는 것</b>은 막지 못한다 —
+     * {@code allowableValues} 없이 설명 문장에만 사유를 나열하면 세 테스트의 입력({@link #DECLARED} ·
+     * {@link #REGISTRY})에 아무것도 남기지 않아 전부 초록이다.
+     *
+     * <p>가정이 아니라 <b>이 저장소에서 실제로 일어난 일</b>이다. {@code PlanItemWalkSafetyItem} 이
+     * #756 직전까지 정확히 그 상태였고, 그래서 Swagger 가 그 자리의 허용값을 내주지 못했다.
+     *
+     * <p>그래서 대조를 <b>반대 방향으로도</b> 건다 — 사유 코드 enum 쪽에서 출발해 모두 등록돼 있는지
+     * 본다. 접미사 {@code *UnavailableReason} 을 앵커로 쓰는 이유는, 같은 패키지의 {@code PlanStatus} ·
+     * {@code PackingItemSource} 처럼 <b>String 사유 코드가 아니라 metadata/enum 으로 내려가는</b> enum 은
+     * 애초에 {@code allowableValues} 를 쓰지 않아 오탐이 되기 때문이다.
+     */
+    @Test
+    @DisplayName("사유 코드 enum 은 모두 어딘가의 allowableValues 로 내려간다 — 사본을 안 만드는 것도 막는다")
+    void everyUnavailableReasonEnumMustBeCovered() {
+        Set<Class<?>> registered = Set.copyOf(REGISTRY.values());
+
+        List<String> orphans = scanUnavailableReasonEnums().stream()
+            .filter(enumType -> !registered.contains(enumType))
+            .map(Class::getSimpleName)
+            .sorted()
+            .toList();
+
+        assertThat(orphans)
+            .as("""
+                사유 코드 enum 을 만들었으면 응답 필드에 @Schema(allowableValues = ...) 로 내리고 \
+                이 테스트의 REGISTRY 에 등록하라. 설명 문장에 사유를 나열하는 것만으로는 Swagger 가 \
+                허용값 목록을 만들지 못해, 프론트가 switch 를 세우지 못하고 새 사유가 default 로 떨어진다 \
+                (#756 직전의 PlanItemWalkSafetyItem 이 그 상태였다). \
+                내릴 자리가 없는 enum 이라면 이름을 *UnavailableReason 으로 두지 마라. \
+                어디에도 등록되지 않은 사유 코드 enum: %s""".formatted(orphans))
+            .isEmpty();
+    }
+
     @Test
     @DisplayName("REGISTRY 에 실제로 없는 필드가 남아 있지 않다")
     void registryMustNotPointAtMissingFields() {
@@ -131,6 +180,22 @@ class SchemaAllowableValuesContractTest {
                 등록부만 남았거나, @Schema 에서 allowableValues 가 지워진 것이다. 등록부를 현재 이름으로 고치거나 항목을 지워라. \
                 유령 등록: %s""".formatted(ghosts))
             .isEmpty();
+    }
+
+    /**
+     * 사유 코드 enum 목록. {@link #DTO_PACKAGE} 스캔과 같은 방식이라 같은 전제를 공유한다
+     * (구체 타입만 잡힌다 — enum 은 항상 구체라 문제되지 않는다).
+     */
+    private static List<Class<?>> scanUnavailableReasonEnums() {
+        ClassPathScanningCandidateComponentProvider scanner = new ClassPathScanningCandidateComponentProvider(false);
+        scanner.addIncludeFilter((metadataReader, metadataReaderFactory) -> true);
+
+        // 타입 증인이 필요하다 — Stream<Class<?>>.toList() 는 캡처 때문에 List<Class<CAP>> 로 추론된다.
+        return scanner.findCandidateComponents(ENUM_PACKAGE).stream()
+            .<Class<?>>map(definition -> loadClass(definition.getBeanClassName()))
+            .filter(Class::isEnum)
+            .filter(type -> type.getSimpleName().endsWith(REASON_ENUM_SUFFIX))
+            .toList();
     }
 
     private static Set<String> enumConstantNames(Class<? extends Enum<?>> enumType) {
@@ -184,7 +249,11 @@ class SchemaAllowableValuesContractTest {
         Set<String> previous = declared.put(key, values);
         if (previous != null && !previous.equals(values)) {
             // 단순 이름이 같은 DTO 가 두 하위 패키지에 있으면 키가 겹쳐 한쪽 검사가 조용히 사라진다.
-            throw new IllegalStateException("키가 겹치는 DTO 가 있다. 단순 이름을 구분하라: " + key);
+            // 고칠 것은 DTO 이름이 아니라 이 테스트의 키 생성 방식이다 — 응답 DTO 를 개명하면
+            // Swagger 스키마 이름이 바뀌어 API 계약이 흔들린다.
+            throw new IllegalStateException(
+                "키가 겹치는 DTO 가 있다. 이 테스트의 키 생성(getSimpleName)을 바깥 클래스까지 포함한 이름으로 바꿔라"
+                    + " — DTO 를 개명하지 마라. 겹친 키: " + key + " (기존 값 " + previous + " / 새 값 " + values + ")");
         }
     }
 

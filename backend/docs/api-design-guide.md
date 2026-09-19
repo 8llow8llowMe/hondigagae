@@ -211,7 +211,8 @@ String unavailableReasonCode,
 그래서 사본이 갈라지지 않게 **대조를 테스트로 세운다.** plan-service 의 `SchemaAllowableValuesContractTest` 가 본보기다.
 
 - DTO 패키지를 훑어 `allowableValues` 가 비어 있지 않은 필드를 모으고, 테스트 안의 `REGISTRY`(`"SimpleClassName#componentName"` → enum 클래스)와 대조한다.
-- 실패는 셋으로 갈라 둔다 — **미등록**(`allowableValues` 가 있는데 레지스트리에 없다) · **불일치**(값 집합이 enum 과 다르다) · **유령 등록**(레지스트리에 있는데 실제 필드가 없다).
-- **새 사유 코드 필드를 만들면 `REGISTRY` 에 등록한다.** 등록을 잊으면 미등록 테스트가 실패해 알려 준다.
+- 실패는 넷으로 갈라 둔다 — **미등록**(`allowableValues` 가 있는데 레지스트리에 없다) · **불일치**(값 집합이 enum 과 다르다) · **유령 등록**(레지스트리에 있는데 실제 필드가 없다) · **고아 enum**(`*UnavailableReason` enum 인데 어느 응답에도 `allowableValues` 로 내려가지 않는다).
+- **새 사유 코드 필드를 만들면 `REGISTRY` 에 등록한다.** `allowableValues` 를 붙였는데 등록을 잊으면 미등록이, **`allowableValues` 를 아예 안 붙였으면 고아 enum 이** 실패해 알려 준다. 앞의 셋은 "사본이 갈라지는 것" 을 막고 넷째는 **"사본을 아예 안 만드는 것"** 을 막는다 — `PlanItemWalkSafetyItem` 이 #756 직전까지 그 상태였다.
+- **사유 코드는 record component 에 `@Schema` 를 직접 붙인다.** `@ArraySchema(schema = @Schema(...))` 로 감싸면 대조되지 않는다.
 - **순서는 비교하지 않고 집합으로만 본다.** 나열 순서는 DTO 마다 뜻이 다르다(선언 순서 / 판정 순서). 계약이 말해야 하는 것은 무엇이 허용값인가뿐이다.
 - `@Schema` 는 record component 가 아니라 **accessor 에서 읽는다** — swagger 의 `@Target` 에 `RECORD_COMPONENT` 가 없어 `RecordComponent#getAnnotation` 은 null 을 준다.
