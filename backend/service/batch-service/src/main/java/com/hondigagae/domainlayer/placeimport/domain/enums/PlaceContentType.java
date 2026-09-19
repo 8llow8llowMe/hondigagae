@@ -26,6 +26,18 @@ public enum PlaceContentType {
     private final String code;
     private final String displayName;
 
+    /**
+     * 전량 적재 대상. 축제(15)는 기간 한정 데이터라 뺀다.
+     *
+     * <p><b>{@link #COURSE}(25)는 늘 0건인데도 일부러 남겨 둔 것이다 — 죽은 설정이 아니다.</b>
+     * 제주 여행코스는 원천에 없다({@code areaCode=39}·{@code lDongRegnCd=50} 양쪽 모두
+     * totalCount=0, 2026-09-19 실측). 빼면 콜 하나와 로그 한 줄을 아끼지만, <b>원천에 제주
+     * 여행코스가 생기는 날 아무도 모르게 된다.</b> TourAPI 가 이번에 지역코드를 말없이 바꾼
+     * 것처럼(#726) 원천은 조용히 움직이므로 0건이 영구 사실이라고 볼 근거가 없다.
+     *
+     * <p>남겨 두어도 기존 행이 위험하지 않다 — 0건인 타입은 {@code DelistProcessor} 가 delist
+     * 범위에서 자동으로 뺀다 (#726).
+     */
     public static final List<PlaceContentType> DEFAULT_IMPORT_TARGETS = List.of(
         TOURIST_SPOT, CULTURE, COURSE, LEPORTS, LODGING, SHOPPING, RESTAURANT
     );

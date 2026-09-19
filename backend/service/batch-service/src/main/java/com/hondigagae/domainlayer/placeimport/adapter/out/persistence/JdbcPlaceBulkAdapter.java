@@ -33,6 +33,24 @@ import org.springframework.stereotype.Component;
  * <p><b>반려동물 컬럼 소유권</b>: 관광 API 적재는 pet_available / pet_allowance_type 을 INSERT 기본값만 넣고
  * UPDATE 절에서 건드리지 않는다(별도 마킹 잡의 소유 컬럼이다). 문화정보원 적재는 그 값을 원천 컬럼으로
  * 직접 갖고 있으므로 자기 행에 한해 UPDATE 에서도 갱신한다. 두 원천은 서로 다른 행이라 충돌하지 않는다.
+ *
+ * <p><b>{@code area_code} / {@code sigungu_code} 는 원천 필드가 아니라 적재 범위 키다 (#726).</b>
+ * SQL 만 보면 원천이 준 값을 그대로 넣는 컬럼처럼 읽히지만 그렇지 않다. TourAPI 가 법정동 체계로
+ * 이관하면서 제주 콘텐츠의 {@code areacode}/{@code sigungucode} 를 빈 문자열로 비웠고, 그래서
+ * {@code TourApiPlaceCatalogAdapter.toImportedPlace} 가 <b>원천 값이 비었을 때 요청 scope 의
+ * areaCode 로 스탬프해서</b> 올린다(시군구는 {@code lDongSignguCd} 환산). 여기 들어오는 값은 그
+ * 스탬프를 거친 값이다 — 비워 두거나 원천 그대로 두면 아래 셋이 전부 조용히 어긋난다.
+ *
+ * <ul>
+ *   <li>delist — {@code JdbcPlaceDelistAdapter} 가 {@code (source, area_code)} 로 범위를 자른다.
+ *       비어 있으면 이번 실행이 건드린 행을 stale 로 되짚지 못한다</li>
+ *   <li>중복 병합 — {@code JdbcPlaceMergeAdapter} 가 같은 area_code 안에서만 후보를 찾는다</li>
+ *   <li>공개 조회 — tour-service 의 {@code GET /api/v1/places?areaCode=39} 가 이 값으로 거른다.
+ *       비어 있으면 적재는 성공했는데 화면에 한 건도 보이지 않는다</li>
+ * </ul>
+ *
+ * <p>반대로 {@code ldong_regn_cd}/{@code ldong_signgu_cd} 는 원천 값 그대로다 — 환산의 근거를
+ * 지워 버리면 나중에 매핑이 맞았는지 되짚을 수 없다.
  */
 @Component
 @RequiredArgsConstructor
