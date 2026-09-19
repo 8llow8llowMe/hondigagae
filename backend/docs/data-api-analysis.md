@@ -74,6 +74,37 @@ Base: `https://apis.data.go.kr/B551011/KorService2`
 
 `areaCode`(제주=39), `sigunguCode`, `contentTypeId`, `cat1~3`, `lclsSystm1~3`, `lDongRegnCd`, `lDongSignguCd`, `modifiedtime`, `arrange`(정렬: O제목/Q수정일/R생성일, 대표이미지 있는 것만: A/C/D)
 
+#### 지역 필터는 `lDongRegnCd` 를 쓴다 (#726)
+
+**`areaCode` 로 거르면 안 된다.** TourAPI 가 법정동 체계로 이관하면서 제주 콘텐츠 상당수의
+`areacode` / `sigungucode` 를 **빈 문자열로 비웠다.** 비워진 콘텐츠는 `areaCode=39` 조회에
+잡히지 않는데, 호출은 정상(`resultCode=0000`)이고 `totalCount` 도 그만큼만 내려오므로
+**적재는 조용히 성공으로 끝난다.**
+
+2026-09-18 실측 (`areaBasedList2` `totalCount`):
+
+| contentTypeId | `areaCode=39` | `lDongRegnCd=50` | 누락 |
+|---|---|---|---|
+| 12 관광지 | 293 | 560 | 267 |
+| 14 문화시설 | 33 | 98 | 65 |
+| 15 축제·공연 | 5 | 25 | 20 |
+| 25 여행코스 | 0 | 0 | 0 |
+| 28 레포츠 | 35 | 137 | 102 |
+| 32 숙박 | 54 | 210 | 156 |
+| 38 쇼핑 | 21 | 395 | 374 |
+| 39 음식점 | 439 | 699 | 260 |
+| **합계** | **880** | **2,124** | **1,244 (58.6%)** |
+
+원본 아이템 인용 (`contentid 1839477`): `"areacode": "", "sigungucode": "", "lDongRegnCd": "50", "lDongSignguCd": "130"`.
+
+**여행코스(25)는 지역 키와 무관하게 0건이다** — `areaCode=39` 도 `lDongRegnCd=50` 도 `totalCount=0`.
+원천에 제주 여행코스가 없는 것이지 필터가 어긋난 것이 아니다. 적재 대상
+(`PlaceContentType.DEFAULT_IMPORT_TARGETS`)에는 25 가 들어 있으므로 **매 실행 0건이 정상**이고,
+이 사실이 delist 범위 설계의 근거다 (`services/batch-service.md`, #726).
+
+이관 시점의 공식 공지는 확인하지 못했다. 올레 콘텐츠의 `modifiedtime` 이 2026-09-09~11 에
+몰려 있어 그 무렵 일괄 이관으로 보인다.
+
 ### contentTypeId
 
 `12` 관광지 · `14` 문화시설 · `15` 축제공연행사 · `25` 여행코스 · `28` 레포츠 · `32` 숙박 · `38` 쇼핑 · `39` 음식점
@@ -86,8 +117,8 @@ Base: `https://apis.data.go.kr/B551011/KorService2`
 | `contenttypeid` | 콘텐츠 타입 | enum |
 | `title` | 명칭 | |
 | `addr1`, `addr2` | 주소, 상세주소 | |
-| `areacode`, `sigungucode` | 지역/시군구 코드 | 제주=39 |
-| `lDongRegnCd`, `lDongSignguCd` | 법정동 시도/시군구 코드 | KorService2 신규 |
+| `areacode`, `sigungucode` | 지역/시군구 코드 | 제주=39. **2026-09 이후 빈 값인 콘텐츠가 많다 (#726)** |
+| `lDongRegnCd`, `lDongSignguCd` | 법정동 시도/시군구 코드 | KorService2 신규. **지역 필터는 이쪽을 쓴다 (#726)** |
 | `cat1`, `cat2`, `cat3` | 카테고리 대/중/소 | |
 | `lclsSystm1~3` | 신규 분류체계 대/중/소 | KorService2 신규 |
 | `mapx`, `mapy` | **경도, 위도** | 순서 주의 |
@@ -372,7 +403,11 @@ walk_course                    ※ 이 초안은 폐기됐다 (아래 주석 참
 > `WalkCourseEntity` 와 `services/tour-service.md` 다.
 
 - 날씨(기상청)는 DB 적재 대신 **Redis 격자별 캐시**를 쓴다 (`weather-insight-integration.md` §4). 성향 분석용 이력이 필요해지면 그때 테이블 추가.
-- 제주만 대상으로 하면 areaCode=39 필터로 적재량을 크게 줄일 수 있다 (개발계정 일 1,000건 제한 대응).
+- 제주만 대상으로 하면 지역 필터로 적재량을 크게 줄일 수 있다 (개발계정 일 1,000건 제한 대응).
+  **단 KorService2 에서는 `areaCode=39` 가 아니라 `lDongRegnCd=50` 을 쓴다 (#726)** — 원천이 `areacode` 를
+  비우고 있어 `areaCode` 로 거르면 제주 콘텐츠의 58.6% 가 조용히 빠진다. 위 §2 "지역 필터는
+  `lDongRegnCd` 를 쓴다 (#726)" 가 정본이고, 이 줄의 애초 판단(및 그 시절의 "약 964곳" 추정)은
+  `areaCode` 기준이라 더는 맞지 않는다.
 
 ## 8. 실호출 검증 결과 (2026-08-24 완료)
 
@@ -391,6 +426,8 @@ walk_course                    ※ 이 초안은 폐기됐다 (아래 주석 참
 
 - 서비스 키는 URL 인코딩해서 사용하고, **절대 커밋하지 않는다** (`.env` / 환경변수, 서비스에서는 `@ConfigurationProperties` + Jasypt).
 - 코드 체계 정리: 관광 areaCode(제주=39, 시군구 3/4)는 KorService2·KorPetTourService2 전용, 법정동 코드(제주=50, 50110/50130)는 통계 3종·lDong 필드 공용.
+  **단 KorService2 의 지역 *필터* 는 예외다 — `areaCode` 가 비워지고 있어 `lDongRegnCd` 로 건다 (#726, 위 §2 참고).**
+  관광 areaCode 는 계속 **저장소 안의 적재 범위 키**(`place.area_code`, delist·병합·조회 필터)로 쓴다. 바깥으로 나가는 조회 키와 안에서 쓰는 범위 키가 다르다.
 - 재검증이 필요하면 위 표의 호출 조합을 그대로 사용한다 (공통 파라미터: `MobileOS=ETC&MobileApp=hondigagae&_type=json`).
 - **Durunubi 재검증 (2026-09-19, #736)**: `courseList` 가 140건이고 **제주 0건**이다. 2026-08-24 의
   142건에서 둘 줄었을 뿐 분포는 같다. 포털 소개문의 "284개"는 실응답과 다르니 근거로 쓰지 말 것.

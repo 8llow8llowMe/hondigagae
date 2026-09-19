@@ -316,9 +316,9 @@ uk_area_visitor_stat_stat_level_region_code_base_ymd_tou_div_cd (statLevel, regi
 
 | 대상 | 오퍼레이션 | 주기 | upsert 키 | 비고 |
 |------|-----------|------|-----------|------|
-| place (목록) | KorService2 `areaBasedList2` (areaCode=39, 타입별 페이징) | 주 1회 | (source, source_key) | 제주 전 타입 약 964곳 / 약 17콜. 응답에 없어진 장소는 `delisted_at` 으로 내린다 |
+| place (목록) | KorService2 `areaBasedList2` (**`lDongRegnCd=50`**, 타입별 페이징) | 주 1회 | (source, source_key) | 제주 전 타입 약 2,100곳 / 약 24콜 이상 (#726). 응답에 없어진 장소는 `delisted_at` 으로 내린다 |
 | place_intro (운영시간) | `detailIntro2` — 장소당 1콜 | 주 1회 | place_id | **실행당 상한 300** (`place-intro-import.max-calls-per-run`). 증분 선정 "intro 없는 곳 먼저 → `place_intro.synced_at` 오래된 순 → id" (#361) |
-| place_image (추가 이미지) | `detailImage2` — 장소당 1콜 | 주 1회 | place_id 단위 교체 | **실행당 상한 400** (`place-image-import.max-calls-per-run`). 증분 선정 "한 번도 안 부른 곳 먼저 → `place.image_synced_at` 오래된 순 → id". 전량 커버 3주 순환 (#478) |
+| place_image (추가 이미지) | `detailImage2` — 장소당 1콜 | 주 1회 | place_id 단위 교체 | **실행당 상한 380** (`place-image-import.max-calls-per-run`). 증분 선정 "한 번도 안 부른 곳 먼저 → `place.image_synced_at` 오래된 순 → id". 전량 커버 약 6주 순환 (#478, #726) |
 | pet 마킹 | KorPetTourService2 `areaBasedList2`(areaCode=39) + `detailPetTour2` | 주 1회 | place_id | 제주 관광지 타입 29건 확인 (전 타입 확인 필요) |
 | walk_route/course | Durunubi `routeList`/`courseList` | 월 1회 | route_idx / crs_idx | sigun으로 제주 필터 |
 | stat_spot + congestion | `tatsCnctrRatedList` (areaCd=50 × signguCd 50110/50130) | 일 1회 | spot+base_ymd | 서귀포만 4,284행(30일×143곳) 확인 |
@@ -326,10 +326,17 @@ uk_area_visitor_stat_stat_level_region_code_base_ymd_tou_div_cd (statLevel, regi
 | area_visitor_stat | metco/locgo `RegnVisitrDDList` | 일 1회 (D-4~) | level+region+ymd+tou_div | 전국 응답 → 제주만 필터 |
 
 **개발계정 쿼터 일 1,000건이 이 표의 제약이다.** 장소당 1콜인 두 단계(운영시간·추가 이미지)를
-전량 돌리면 한 번에 1,900콜이라 확실히 넘긴다. 그래서 둘 다 **실행당 상한 + 증분 대상 선정**으로
+전량 돌리면 한 번에 4,000콜이 넘어 확실히 넘긴다. 그래서 둘 다 **실행당 상한 + 증분 대상 선정**으로
 나눠 덮는다 — "며칠 분할" 이 아니라 "몇 주 순환" 이 실제 형태다. 같은 날 최악 합은
-`17(목록) + 300(운영시간) + 400(이미지) + 276(수동 이미지 백필) + 1(올레) = 994` 다
+`24(목록) + 300(운영시간) + 380(이미지) + 276(수동 이미지 백필) + 1(올레) = 981` 다
 (근거: `features/478-incremental-image-import.md`).
+
+**이 숫자는 #726 으로 한 번 바뀌었다.** 지역 필터를 `areaCode` 에서 `lDongRegnCd` 로 옮기면서
+대상이 약 964곳 → 약 2,100곳이 됐고 목록 콜도 17 → 약 24 로 늘어, 이미지 상한을 400 → 380 으로
+내려 합을 예산 안(981)으로 되돌렸다. 목록 콜 24 는 `2,099 ÷ 100 = 23콜 + 여행코스(25) 1콜`이다
+(여행코스는 지역 키와 무관하게 0건이라 페이지 1회만 쓴다). 원천 건수가 늘면 같이 늘므로 첫
+재적재 실측 후 다시 조인다. 왜 `areaCode` 로 거르면 안 되는지는
+[`data-api-analysis.md` §2 "지역 필터는 `lDongRegnCd` 를 쓴다 (#726)"](data-api-analysis.md) 참고.
 
 ## 12. JPA 엔티티 스켈레톤 예시 (place)
 
