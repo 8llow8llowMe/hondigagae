@@ -404,6 +404,21 @@ class PlanWalkSafetyProcessorTest {
         assertThat(only(info).petConditionApplied()).isNull();
     }
 
+    /**
+     * 아래 둘은 <b>일부러 계층을 가로지른다</b> — Processor 테스트인데 Presenter 를 직접 태워
+     * 응답 DTO 까지 단언한다. 이 저장소 관례는 Presenter 검증을 {@code *PresenterTest} 로 분리하는
+     * 것이지만, 여기서 막으려는 결함이 <b>계층 사이에서 값이 사라지는 것</b>이라 나누면 방어가
+     * 사라진다.
+     *
+     * <p>#717 이 고친 버그가 정확히 그 모양이었다 — Feign DTO 에 칸이 없어
+     * {@code @JsonIgnoreProperties(ignoreUnknown = true)} 가 {@code scoreDescription} 을 조용히
+     * 버렸는데, <b>각 계층의 테스트는 전부 초록이었다.</b> 계층마다 자기 입력을 자기가 만들어
+     * 넣으면 배선이 끊긴 것을 아무도 보지 못한다.
+     *
+     * <p><b>그러니 {@code PlanWalkSafetyPresenterTest} 로 옮기지 마라.</b> 옮기는 순간 이 회귀
+     * 방어가 없어진다. 옮기고 싶다면 어댑터 역직렬화부터 응답까지를 덮는 다른 테스트를 먼저
+     * 세워야 한다 (#759).
+     */
     @Test
     @DisplayName("등급 scoreDescription 이 응답까지 내려간다 — Feign DTO 가 받지 않아 조용히 버려지던 값이다 (#717)")
     void levelScoreDescriptionReachesTheResponse() {
