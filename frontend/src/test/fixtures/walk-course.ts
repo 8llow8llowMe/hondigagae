@@ -1,3 +1,4 @@
+import type { CodeNameMetadata } from '@/types/api'
 import type { WalkCourseDetail, WalkCourseSummary } from '@/types/walk-course'
 
 /**
@@ -87,24 +88,66 @@ export const WALK_COURSE_UNKNOWN_DURATION: WalkCourseSummary = {
 export const WALK_COURSE_PROVIDER = '제주특별자치도 올레코스현황 · 한국관광공사 TourAPI'
 
 /** `낮음` 활동량 metadata — 서버 `ActivityLevel.LOW` 문구 그대로다 */
-export const ACTIVITY_LEVEL_LOW = {
+export const ACTIVITY_LEVEL_LOW: CodeNameMetadata = {
   code: 'LOW',
   name: '낮음',
   description: '짧은 산책을 선호하며 장시간 활동을 힘들어합니다.',
 }
 
+/** `보통` 활동량 metadata */
+export const ACTIVITY_LEVEL_MEDIUM: CodeNameMetadata = {
+  code: 'MEDIUM',
+  name: '보통',
+  description: '일반적인 산책과 관광 일정을 소화합니다.',
+}
+
+/** `높음` 활동량 metadata. **상한이 없어 어느 코스에서나 통과한다** */
+export const ACTIVITY_LEVEL_HIGH: CodeNameMetadata = {
+  code: 'HIGH',
+  name: '높음',
+  description: '긴 산책과 활동적인 일정을 선호합니다.',
+}
+
 /**
- * 상세 fixture. `fitsActivityLevels` 기본값은 **소요시간을 아는 코스**의 모양이다 —
- * `WALK_COURSE_PLAIN`(300분)은 `MEDIUM`·`HIGH` 가 걸을 만하고 `LOW` 는 아니다.
+ * 세 값이 다 담긴 모양. **`durationMaxMinutes` 가 `null` 인 코스와 120분짜리 코스가 둘 다
+ * 이렇게 온다** — 그래서 `length` 로는 두 갈래를 가를 수 없다
+ * ([#748](https://github.com/8llow8llowMe/hondigagae/issues/748) · D5-4).
  */
-export function walkCourseDetail(summary: WalkCourseSummary = WALK_COURSE_PLAIN): WalkCourseDetail {
+export const ACTIVITY_LEVELS_ALL: CodeNameMetadata[] = [
+  ACTIVITY_LEVEL_LOW,
+  ACTIVITY_LEVEL_MEDIUM,
+  ACTIVITY_LEVEL_HIGH,
+]
+
+/**
+ * 소요시간을 **아는** 코스의 기본 모양 — `WALK_COURSE_PLAIN`(300분)은 `MEDIUM`·`HIGH` 가
+ * 걸을 만하고 `LOW` 는 아니다.
+ */
+const DEFAULT_FITS_ACTIVITY_LEVELS: CodeNameMetadata[] = [
+  ACTIVITY_LEVEL_MEDIUM,
+  ACTIVITY_LEVEL_HIGH,
+]
+
+/**
+ * 상세 fixture.
+ *
+ * **`fitsActivityLevels` 를 못박지 않는다** (#748). 기본값은 그대로 두되 인자로 열어 둔다 —
+ * 고정돼 있던 동안에는 `walkCourseDetail(WALK_COURSE_UNKNOWN_DURATION)` 이 **계약상
+ * 불가능한 조합**(소요시간을 모르는데 두 값)을 만들어, 상세의 필수 갈래(모르는 갈래 ·
+ * 120분에 세 값)를 테스트로 쓸 수 없었다.
+ *
+ * @param summary 목록 항목. 기본은 좌표·이미지 없는 **기본 모양**이다
+ * @param fitsActivityLevels 서버가 내려준 적합 활동량. **`summary` 와 어긋나지 않게 넘긴다** —
+ *   `durationMaxMinutes: null` 이면 세 값(`ACTIVITY_LEVELS_ALL`)이 서버가 내는 모양이다
+ */
+export function walkCourseDetail(
+  summary: WalkCourseSummary = WALK_COURSE_PLAIN,
+  fitsActivityLevels: CodeNameMetadata[] = DEFAULT_FITS_ACTIVITY_LEVELS,
+): WalkCourseDetail {
   return {
     ...summary,
     baseDate: '2025-04-28',
-    fitsActivityLevels: [
-      { code: 'MEDIUM', name: '보통', description: '일반적인 산책과 관광 일정을 소화합니다.' },
-      { code: 'HIGH', name: '높음', description: '긴 산책과 활동적인 일정을 선호합니다.' },
-    ],
+    fitsActivityLevels,
     providerName: WALK_COURSE_PROVIDER,
   }
 }
