@@ -184,6 +184,8 @@ public class PlanInsightClientAdapter
             .levelCode(body.walkSafetyLevel() == null ? null : body.walkSafetyLevel().code())
             .levelName(body.walkSafetyLevel() == null ? null : body.walkSafetyLevel().name())
             .levelDescription(body.walkSafetyLevel() == null ? null : body.walkSafetyLevel().description())
+            .levelScoreDescription(
+                body.walkSafetyLevel() == null ? null : body.walkSafetyLevel().scoreDescription())
             .estimatedPavementCelsius(body.estimatedPavementCelsius())
             .feelsLikeCelsius(body.feelsLikeCelsius())
             .temperature(body.temperature())

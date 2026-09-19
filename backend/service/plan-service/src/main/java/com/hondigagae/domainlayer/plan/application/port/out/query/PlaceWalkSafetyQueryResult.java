@@ -18,6 +18,8 @@ public record PlaceWalkSafetyQueryResult(
     String levelCode,
     String levelName,
     String levelDescription,
+    // 등급 점수 해석 문장. 원천이 주는 값을 그대로 옮긴다 (#717).
+    String levelScoreDescription,
     // 추정 노면(아스팔트) 온도. 실측이 아니라 tour-service 의 추정치다 — 화면은 기온과 나란히 둔다.
     Double estimatedPavementCelsius,
     Double feelsLikeCelsius,

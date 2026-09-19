@@ -9,6 +9,7 @@ import com.hondigagae.domainlayer.plan.application.port.out.query.PlaceWalkSafet
 import com.hondigagae.domainlayer.plan.domain.enums.PlanItemWalkSafetyUnavailableReason;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
+import com.hondigagae.shared.travel.insight.WalkSafetyLevel;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -52,6 +53,11 @@ import org.springframework.stereotype.Component;
  * <b>지난 날짜가 먼저다</b> — 무엇을 고쳐도 풀리지 않는 사유라, "시각을 넣어 보세요" 를 먼저
  * 말하면 지켜지지 않을 안내가 된다. 그다음이 사용자가 일정에서 고칠 수 있는 둘(장소 아님 ·
  * 시각 없음)이고, 기다리면 풀리는 예보 범위 밖이 마지막이다.
+ *
+ * <p>여기까지는 <b>묻기 전에</b> 갈리는 사유다. 묻고 나서야 갈리는 것이 둘 더 있다 —
+ * {@code LOOKUP_FAILED}(답을 못 받았다)와 {@code NO_FORECAST_AT_TIME}(답은 받았는데 그 시각
+ * 예보가 없어 등급이 {@code UNKNOWN} 이다). 뒤엣것은 <b>지평 안에서도</b> 생기고 같은 날
+ * 안에서도 항목마다 갈린다.
  */
 @Component
 @RequiredArgsConstructor
@@ -185,11 +191,23 @@ public class PlanWalkSafetyProcessor {
             .levelCode(result.levelCode())
             .levelName(result.levelName())
             .levelDescription(result.levelDescription())
+            .levelScoreDescription(result.levelScoreDescription())
             .estimatedPavementCelsius(result.estimatedPavementCelsius())
             .feelsLikeCelsius(result.feelsLikeCelsius())
             .temperature(result.temperature())
             .saferWindowStart(result.saferWindowStart())
             .saferWindowEnd(result.saferWindowEnd())
+            // 여기까지 온 줄은 실제로 물어봤고 답도 받았다. 답을 받지 못한 나머지 사유는
+            // unavailable(...) 팩토리가 이 칸을 비워 둔다 — false 는 "물어봤고 반려견 특성 없이
+            // 일반 조건으로 판정했다" 는 뜻이라, 거기에 넣으면 하지 않은 판정을 했다고 말하게 된다.
+            .petConditionApplied(result.petConditionApplied())
+            // 원천이 그 시각 예보를 못 찾으면 등급 UNKNOWN 으로 200 을 준다 — 판정이 아니라 부재다.
+            // 사유만 얹고 placeTitle·basisPetId·targetDateTime·levelCode 는 그대로 둔다:
+            // unavailable(...) 은 그것들을 버리는데, 그 팩토리는 "묻지 못한" 줄을 위한 것이고
+            // 이 줄은 물어봤고 답을 받았다. levelCode 를 UNKNOWN 그대로 내보내는 이유는
+            // PlanItemWalkSafetyInfo 의 unavailableReason 설명 참고.
+            .unavailableReason(WalkSafetyLevel.UNKNOWN.name().equals(result.levelCode())
+                ? PlanItemWalkSafetyUnavailableReason.NO_FORECAST_AT_TIME : null)
             .build();
     }
 
