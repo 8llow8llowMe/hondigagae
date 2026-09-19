@@ -140,6 +140,17 @@ describe('산책 코스 mock — 활동량 필터 (S4-1)', () => {
     expect(high.appliedPetActivityLevel?.maxDurationMinutes).toBeNull()
   })
 
+  /**
+   * **소요시간을 모르는 코스는 어느 활동량에서도 걸러지지 않는다**
+   * ([#748](https://github.com/8llow8llowMe/hondigagae/issues/748) · `WalkCourseActivityFit.fits`).
+   * 목에 `20코스` 가 없던 동안에는 상세의 모르는 갈래를 로컬에서 한 번도 볼 수 없었다.
+   */
+  it('소요시간을 모르는 코스가 LOW 결과에 남는다', () => {
+    const { courses } = body('?petActivityLevel=LOW')
+
+    expect(courses.some((course) => course.durationMaxMinutes === null)).toBe(true)
+  })
+
   /** 모르는 것을 나쁜 것으로 판정하지 않는다 (`WalkCourseActivityFit.fits`) */
   it('LOW 결과에 좌표 있는 코스가 하나도 없다 — 실데이터 분포 그대로다', () => {
     const { courses } = body('?petActivityLevel=LOW')
@@ -185,6 +196,19 @@ describe('산책 코스 mock — 상세 오류 (D0-1)', () => {
 
     expect(result?.status).toBe(400)
     expect(result?.payload.dataHeader.resultCode).toBe('WALKCOURSE_113')
+  })
+
+  /**
+   * **소요시간을 모르는 코스(20코스)는 세 값을 다 받는다** (#748). 그것이 "아무 아이나
+   * 걷는다" 가 아니라 **"모른다"** 라는 것이 상세 화면의 갈래이고, `length` 로는 그 둘을
+   * 가를 수 없다는 사실을 목이 보여 준다.
+   */
+  it('소요시간을 모르는 코스는 적합 활동량 세 값을 다 준다', () => {
+    const detail = resolveMock('/walk-courses/6911167100216303320', 'GET', '', null)?.payload
+      .dataBody as WalkCourseDetail
+
+    expect(detail.durationMaxMinutes).toBeNull()
+    expect(detail.fitsActivityLevels.map((level) => level.name)).toEqual(['낮음', '보통', '높음'])
   })
 
   it('상세는 baseDate 와 providerName 을 더한다', () => {

@@ -4,6 +4,7 @@ import { formatCourseDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
+import { walkCourseActivityFit } from '@/lib/walk-course/activity-fit'
 import type { WalkCourseDetail } from '@/types/walk-course'
 
 /**
@@ -52,6 +53,16 @@ export function WalkCourseHero({ image }: { image: string }) {
  * (`docs/testing-guide.md` §1).
  */
 export function WalkCourseSummaryHeader({ course }: { course: WalkCourseDetail }) {
+  /*
+    **판정은 `lib/walk-course/activity-fit.ts` 한 곳이 갖는다** (D2 · D5-3). 여기서
+    `durationMaxMinutes` 와 `fitsActivityLevels` 를 다시 조합하지 않는다 — 두 필드를 각자
+    보는 호출부가 생기면 한쪽만 고쳐져 **모르는 코스가 "아무 아이나 걷는다" 로 그려진다.**
+
+    **`authed` · `pet` 을 받지 않는다** (D5-3 ③). 이 화면은 "내 아이에게 맞나" 를 판정하지
+    않으므로 시그니처는 `{ course }` 그대로다 — 여섯 칸이 전부 같은 문장이다.
+  */
+  const activityFit = walkCourseActivityFit(course)
+
   return (
     <header className="flex flex-col gap-4">
       <div className={cn('flex flex-col gap-3', INSET_CLASS.card)}>
@@ -94,6 +105,26 @@ export function WalkCourseSummaryHeader({ course }: { course: WalkCourseDetail }
             </dd>
           </div>
         </dl>
+
+        {/*
+          **걸을 만한 활동량 — 한 줄이다** ([#748](https://github.com/8llow8llowMe/hondigagae/issues/748)).
+
+          **`<dl>` 밖이다** (D5-3 ② · D6). `<dl>` 은 고정 2열이라 셋째 칸이 반 칸을 비운 채
+          걸리고, 값이 낱말 나열이라 `<dd>` 로 읽히면 거리·소요시간과 같은 단일 지표로 들린다.
+
+          **`role="alert"` 을 주지 않는다** (D6). 오류가 아니라 이 코스의 사실이다 — 붙이면
+          스크린리더가 페이지 진입마다 경고로 읽는다. 좌표 없음 안내와 같은 축이다.
+
+          **자리는 `<dl>` 아래, 시종점 위다** (D5-3 ④). 거리·소요시간·활동량은 *이 코스가
+          얼마나 힘든가* 라는 같은 축이고 시종점은 *어디냐* 다.
+        */}
+        {activityFit !== null && (
+          <p className="text-body-2 text-fg-muted break-keep">
+            {activityFit.kind === 'known'
+              ? messages.walkCourse.activityFit.replace('{levels}', activityFit.levels)
+              : messages.walkCourse.activityFitUnknown}
+          </p>
+        )}
 
         {/*
           **`startEndPoint` 를 갈라 쓰지 않는다** (D4-2). `제주민속촌주차장 입구-남원포구`
