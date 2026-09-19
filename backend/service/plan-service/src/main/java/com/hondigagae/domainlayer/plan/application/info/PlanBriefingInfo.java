@@ -1,6 +1,8 @@
 package com.hondigagae.domainlayer.plan.application.info;
 
 import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo.PlanDayWeatherInfo;
+import com.hondigagae.domainlayer.plan.domain.enums.PlanBriefingWalkTimesUnavailableReason;
+import com.hondigagae.domainlayer.plan.domain.enums.PlanBriefingWarningUnavailableReason;
 import com.hondigagae.shared.travel.plan.PlanItemType;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -21,9 +23,14 @@ import lombok.Builder;
  * @param basisPetId 그날 판정의 기준이 된 반려견. 날씨 판정이 고른 아이가 있으면 그 아이,
  *                   없으면 {@code petIds} 의 첫 번째(대표)다 — 골든타임 조회에 이 아이의
  *                   조건이 들어간다
- * @param weatherWarningUnavailableReason 특보를 붙이지 못한 이유. null 이면 정상이며,
+ * @param weatherWarningUnavailableReason 특보를 붙이지 못한 사유. null 이면 정상이며,
  *                                        <b>{@code weatherWarning} 이 null 이고 이 값도 null 이면
- *                                        "발효 중인 특보 없음"</b> 이다
+ *                                        "발효 중인 특보 없음"</b> 이다. 문장은 enum 이 들고 있다 —
+ *                                        Presenter 가 코드({@code name()})와 문장
+ *                                        ({@code getDescription()})을 짝으로 내린다
+ * @param walkTimesUnavailableReason 골든타임을 붙이지 못한 사유. null 이면 정상이다. 특보와 사유
+ *                                   집합이 달라 enum 을 따로 둔다 — 좌표가 없어 못 붙인 날은
+ *                                   골든타임에만 있다
  */
 @Builder
 public record PlanBriefingInfo(
@@ -38,9 +45,9 @@ public record PlanBriefingInfo(
     ScheduleInfo schedule,
     PlanDayWeatherInfo weather,
     WeatherWarningInfo weatherWarning,
-    String weatherWarningUnavailableReason,
+    PlanBriefingWarningUnavailableReason weatherWarningUnavailableReason,
     WalkTimesInfo walkTimes,
-    String walkTimesUnavailableReason
+    PlanBriefingWalkTimesUnavailableReason walkTimesUnavailableReason
 ) {
 
     /**

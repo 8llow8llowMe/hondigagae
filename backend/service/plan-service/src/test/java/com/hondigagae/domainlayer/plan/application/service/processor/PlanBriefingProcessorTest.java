@@ -26,6 +26,8 @@ import com.hondigagae.domainlayer.plan.application.port.out.query.PlaceSuitabili
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlanPlaceSummaryQueryResult;
 import com.hondigagae.domainlayer.plan.application.port.out.query.WalkTimesQueryResult;
 import com.hondigagae.domainlayer.plan.application.port.out.query.WeatherWarningQueryResult;
+import com.hondigagae.domainlayer.plan.domain.enums.PlanBriefingWalkTimesUnavailableReason;
+import com.hondigagae.domainlayer.plan.domain.enums.PlanBriefingWarningUnavailableReason;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
@@ -48,7 +50,9 @@ import org.junit.jupiter.api.Test;
  * <p>고정하는 것은 넷이다.
  * <ul>
  *   <li><b>오늘만</b> — 특보·골든타임은 요청 날짜가 오늘일 때만 tour-service 에 묻는다. 내일 브리핑에는 호출 자체가 없다
- *   <li><b>특보 "확인 못 함" 과 "없음" 을 나눈다</b> — 조회 실패는 이유 문장으로, 정말 없음은 둘 다 null 로
+ *   <li><b>특보 "확인 못 함" 과 "없음" 을 나눈다</b> — 조회 실패는 사유 enum 으로, 정말 없음은 둘 다 null 로
+ *   <li><b>사유가 갈린다</b> — 못 붙인 이유를 {@code NOT_TODAY} / {@code NO_PLACE_ITEM} / {@code NO_PLACE_POINT} /
+ *       {@code LOOKUP_FAILED} 로 가른다. 넷 중 {@code LOOKUP_FAILED} 만 일시 장애라 화면이 재시도 버튼을 붙일 수 있다 (#716)
  *   <li><b>재계산하지 않는다</b> — 골든타임·특보는 받은 값을 그대로 옮기고, 경보 판정(recommendationSuppressed)도 tour 값이다
  *   <li><b>기준 아이</b> — 날씨 판정이 고른 아이(점수가 가장 낮은 아이)의 조건으로 골든타임을 묻는다
  * </ul>
@@ -155,7 +159,7 @@ class PlanBriefingProcessorTest {
     }
 
     @Test
-    @DisplayName("내일 브리핑 — 특보·골든타임은 묻지 않고 이유만 적는다. 일정 요약은 그날 항목만 센다")
+    @DisplayName("내일 브리핑 — 특보·골든타임은 묻지 않고 사유는 NOT_TODAY. 일정 요약은 그날 항목만 센다")
     void tomorrowSkipsTodayOnlySections() {
         givenItems(
             item(1L, 1, 0, PlanItemType.PLACE, PLACE_ID, "오늘 장소", LocalTime.of(9, 0), true),
@@ -185,11 +189,13 @@ class PlanBriefingProcessorTest {
         assertThat(info.basisPetId()).isEqualTo(MONGSIL);
         assertThat(info.petConditionApplied()).isTrue();
 
-        // 오늘이 아니라 특보·골든타임은 호출 자체가 없다
+        // 오늘이 아니라 특보·골든타임은 호출 자체가 없다. 사유는 장애가 아닌 NOT_TODAY 다
         assertThat(info.weatherWarning()).isNull();
-        assertThat(info.weatherWarningUnavailableReason()).contains("당일");
+        assertThat(info.weatherWarningUnavailableReason())
+            .isEqualTo(PlanBriefingWarningUnavailableReason.NOT_TODAY);
         assertThat(info.walkTimes()).isNull();
-        assertThat(info.walkTimesUnavailableReason()).contains("당일");
+        assertThat(info.walkTimesUnavailableReason())
+            .isEqualTo(PlanBriefingWalkTimesUnavailableReason.NOT_TODAY);
         verify(weatherWarningQueryPort, never()).findActiveWarning();
         verify(walkTimesQueryPort, never()).findWalkTimes(anyDouble(), anyDouble(), any());
     }
@@ -232,7 +238,7 @@ class PlanBriefingProcessorTest {
     }
 
     @Test
-    @DisplayName("특보 조회 실패는 '없음' 으로 접지 않는다 — 이유 문장이 채워져 화면이 '확인 못 함' 을 말할 수 있다")
+    @DisplayName("특보 조회 실패는 '없음' 으로 접지 않는다 — LOOKUP_FAILED 라 화면이 '확인 못 함' 과 재시도를 말할 수 있다")
     void warningLookupFailureIsDistinguishedFromNoWarning() {
         givenItems(item(1L, 1, 0, PlanItemType.PLACE, PLACE_ID, "협재해수욕장", null, false));
         when(weatherWarningQueryPort.findActiveWarning())
@@ -242,14 +248,16 @@ class PlanBriefingProcessorTest {
         PlanBriefingInfo info = processor.brief(MEMBER_ID, plan(), List.of(MONGSIL, BORI), TODAY);
 
         assertThat(info.weatherWarning()).isNull();
-        assertThat(info.weatherWarningUnavailableReason()).contains("가져오지 못했습니다");
+        // NOT_TODAY 와 갈려야 화면이 재시도 버튼을 붙일지 판단할 수 있다
+        assertThat(info.weatherWarningUnavailableReason())
+            .isEqualTo(PlanBriefingWarningUnavailableReason.LOOKUP_FAILED);
         // 특보 실패가 나머지 브리핑을 막지 않는다
         assertThat(info.walkTimes()).isNotNull();
         assertThat(info.weather().suitability().score()).isEqualTo(42);
     }
 
     @Test
-    @DisplayName("오늘인데 장소 항목이 없으면 골든타임은 이유만 — 장소 요약·골든타임 조회가 나가지 않는다")
+    @DisplayName("오늘인데 장소 항목이 없으면 골든타임 사유는 NO_PLACE_ITEM — 장소 요약·골든타임 조회가 나가지 않는다")
     void todayWithoutPlaceItemSkipsWalkTimes() {
         givenItems(item(1L, 1, 0, PlanItemType.MOVE, null, "공항 이동", LocalTime.of(8, 0), false));
         when(weatherWarningQueryPort.findActiveWarning()).thenReturn(Optional.empty());
@@ -262,7 +270,9 @@ class PlanBriefingProcessorTest {
         // 날씨 판정이 기준 아이를 못 고르면 대표(첫 번째)가 기준이다
         assertThat(info.basisPetId()).isEqualTo(MONGSIL);
         assertThat(info.walkTimes()).isNull();
-        assertThat(info.walkTimesUnavailableReason()).contains("장소가 지정된 일정 항목이 없어");
+        // 장애가 아니라 일정의 문제다 — 사용자가 장소를 담으면 풀린다
+        assertThat(info.walkTimesUnavailableReason())
+            .isEqualTo(PlanBriefingWalkTimesUnavailableReason.NO_PLACE_ITEM);
         verify(planPlaceLookupPort, never()).findSummaries(anyList());
         verify(walkTimesQueryPort, never()).findWalkTimes(anyDouble(), anyDouble(), any());
         // 특보는 장소와 무관하게 오늘이면 확인한다
@@ -270,7 +280,7 @@ class PlanBriefingProcessorTest {
     }
 
     @Test
-    @DisplayName("대표 장소가 delisted 라 좌표가 없으면 골든타임은 좌표 없음 이유 — 항목은 그대로 남는다")
+    @DisplayName("대표 장소가 delisted 라 좌표가 없으면 골든타임 사유는 NO_PLACE_POINT — 항목은 그대로 남는다")
     void todayWithoutPointSkipsWalkTimes() {
         givenItems(item(1L, 1, 0, PlanItemType.PLACE, PLACE_ID, "사라진 장소", null, false));
         when(planPlaceLookupPort.findSummaries(List.of(PLACE_ID))).thenReturn(List.of());
@@ -281,12 +291,36 @@ class PlanBriefingProcessorTest {
         assertThat(info.schedule().representativePlaceId()).isEqualTo(PLACE_ID);
         assertThat(info.schedule().representativeLat()).isNull();
         assertThat(info.walkTimes()).isNull();
-        assertThat(info.walkTimesUnavailableReason()).contains("좌표가 없어");
+        // 장소는 있는데 좌표가 없는 것이라 NO_PLACE_ITEM 과 갈린다 — 화면이 하는 말이 다르다
+        assertThat(info.walkTimesUnavailableReason())
+            .isEqualTo(PlanBriefingWalkTimesUnavailableReason.NO_PLACE_POINT);
         verify(walkTimesQueryPort, never()).findWalkTimes(anyDouble(), anyDouble(), any());
     }
 
     @Test
-    @DisplayName("골든타임 조회 실패는 빈 값으로 접고 이유를 적는다 — 부가 정보라 브리핑을 막지 않는다")
+    @DisplayName("요약은 왔는데 원천이 좌표를 주지 않은 장소도 NO_PLACE_POINT — 좌표는 null 로 흐르고 0.0 으로 접지 않는다")
+    void todayWithSummaryButNoPointSkipsWalkTimes() {
+        givenItems(item(1L, 1, 0, PlanItemType.PLACE, PLACE_ID, "좌표 없는 장소", null, false));
+        // delisted 라 요약이 아예 안 오는 쪽과 다른 갈래다 — 요약 객체는 손에 있는데 좌표만 null 이다.
+        when(planPlaceLookupPort.findSummaries(List.of(PLACE_ID))).thenReturn(List.of(
+            PlanPlaceSummaryQueryResult.builder().placeId(PLACE_ID).title("좌표 없는 장소").lat(null).lng(null).build()));
+        when(weatherWarningQueryPort.findActiveWarning()).thenReturn(Optional.empty());
+
+        PlanBriefingInfo info = processor.brief(MEMBER_ID, plan(), List.of(MONGSIL, BORI), TODAY);
+
+        // 좌표를 0.0 으로 접으면 적도상의 한 점이 된다 — null 이 null 로 흘러야 한다.
+        assertThat(info.schedule().representativeLat()).isNull();
+        assertThat(info.schedule().representativeLng()).isNull();
+        // 요약이 왔으므로 이름은 남는다 — 좌표만 없는 상태가 delisted 와 구분된다.
+        assertThat(info.schedule().representativePlaceId()).isEqualTo(PLACE_ID);
+        assertThat(info.walkTimes()).isNull();
+        assertThat(info.walkTimesUnavailableReason())
+            .isEqualTo(PlanBriefingWalkTimesUnavailableReason.NO_PLACE_POINT);
+        verify(walkTimesQueryPort, never()).findWalkTimes(anyDouble(), anyDouble(), any());
+    }
+
+    @Test
+    @DisplayName("골든타임 조회 실패는 빈 값으로 접고 사유는 LOOKUP_FAILED — 부가 정보라 브리핑을 막지 않는다")
     void walkTimesLookupFailureLeavesReason() {
         givenItems(item(1L, 1, 0, PlanItemType.PLACE, PLACE_ID, "협재해수욕장", null, false));
         when(weatherWarningQueryPort.findActiveWarning()).thenReturn(Optional.empty());
@@ -295,6 +329,8 @@ class PlanBriefingProcessorTest {
         PlanBriefingInfo info = processor.brief(MEMBER_ID, plan(), List.of(MONGSIL, BORI), TODAY);
 
         assertThat(info.walkTimes()).isNull();
-        assertThat(info.walkTimesUnavailableReason()).contains("가져오지 못했습니다");
+        // 넷 중 이것만 일시 장애다 — 화면이 재시도를 권해도 되는 유일한 사유다
+        assertThat(info.walkTimesUnavailableReason())
+            .isEqualTo(PlanBriefingWalkTimesUnavailableReason.LOOKUP_FAILED);
     }
 }

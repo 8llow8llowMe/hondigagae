@@ -17,7 +17,8 @@ import lombok.Builder;
 @Schema(description = "브리핑 산책 골든타임 DTO")
 public record PlanBriefingWalkTimesItem(
 
-    @Schema(description = "판정 기준 좌표 위도 — 그날 대표 장소의 좌표", example = "33.394162")
+    @Schema(description = "판정 기준 좌표 위도 — 그날 대표 장소의 좌표. schedule.representativeLat 과 같은 값이다 — "
+        + "골든타임이 null 인 날에도 좌표가 필요해 schedule 에도 싣는다", example = "33.394162")
     double lat,
 
     @Schema(description = "판정 기준 좌표 경도", example = "126.239831")
