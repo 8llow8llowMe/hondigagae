@@ -30,9 +30,46 @@ class OlleCourseParserTest {
     }
 
     @Test
+    @DisplayName("변형(A/B)이 대괄호 안으로 옮겨진 새 제목 형식도 같은 키가 된다 (#722)")
+    void bracketVariantTitleYieldsSameKey() {
+        // 원천이 "[제주올레 3코스] ... (A)" 를 "[제주올레 3-A코스] ..." 로 바꿨다.
+        // 옛 정규식은 여기서 매치 자체가 실패해 3-A·3-B·15-A·15-B 좌표가 조용히 빠졌다.
+        assertThat(OlleCourseParser.courseKeyFromTourTitle("[제주올레 3-A코스] 온평-표선 올레")).isEqualTo("3-A");
+        assertThat(OlleCourseParser.courseKeyFromTourTitle("[제주올레 3-B코스] 온평-표선 올레")).isEqualTo("3-B");
+        assertThat(OlleCourseParser.courseKeyFromTourTitle("[제주올레 15-A코스] 한림-고내 올레")).isEqualTo("15-A");
+        assertThat(OlleCourseParser.courseKeyFromTourTitle("[제주올레 15-B코스] 한림-고내 올레")).isEqualTo("15-B");
+    }
+
+    @Test
+    @DisplayName("옛 제목 형식(괄호 접미사)도 계속 받는다 - 원천이 되돌리거나 섞어 줄 수 있다")
+    void legacySuffixVariantTitleStillYieldsKey() {
+        assertThat(OlleCourseParser.courseKeyFromTourTitle("[제주올레 3코스] 온평-표선 올레 (A)")).isEqualTo("3-A");
+        assertThat(OlleCourseParser.courseKeyFromTourTitle("[제주올레 15코스] 한림-고내 올레 (B)")).isEqualTo("15-B");
+    }
+
+    @Test
+    @DisplayName("숫자 부번호를 변형으로 오독하지 않는다 - 18-2 는 18 + 변형 2 가 아니다")
+    void numericSubCourseIsNotReadAsVariant() {
+        assertThat(OlleCourseParser.courseKeyFromTourTitle("[제주올레 1-1코스] 우도 올레")).isEqualTo("1-1");
+        assertThat(OlleCourseParser.courseKeyFromTourTitle("[제주올레 10-1코스] 가파도 올레")).isEqualTo("10-1");
+        assertThat(OlleCourseParser.courseKeyFromTourTitle("[제주올레 18-2코스] 하추자 올레")).isEqualTo("18-2");
+        assertThat(OlleCourseParser
+            .courseKeyFromTourTitle("[제주올레 7-1코스] 서귀포 버스터미널-제주올레 여행자센터 올레")).isEqualTo("7-1");
+    }
+
+    @Test
+    @DisplayName("변형 없는 코스는 코스번호만 키가 된다 - 제목 안의 '제주올레'가 끼어들지 않는다")
+    void plainCourseTitleYieldsCourseNoOnly() {
+        assertThat(OlleCourseParser
+            .courseKeyFromTourTitle("[제주올레 6코스] 쇠소깍-제주올레 여행자센터 올레")).isEqualTo("6");
+        assertThat(OlleCourseParser.courseKeyFromTourTitle("[제주올레 21코스] 하도-종달 올레")).isEqualTo("21");
+    }
+
+    @Test
     @DisplayName("제주올레가 아닌 항목(하영올레)은 키를 내지 않는다 - 다른 길을 올레 코스로 붙이면 안 된다")
     void nonOlleTitleYieldsNull() {
         assertThat(OlleCourseParser.courseKeyFromTourTitle("[하영올레] 1코스")).isNull();
+        assertThat(OlleCourseParser.courseKeyFromTourTitle("제주카약올레")).isNull();
         assertThat(OlleCourseParser.courseKeyFromTourTitle(null)).isNull();
     }
 
