@@ -85,13 +85,18 @@ public record PlanItemWalkSafetyItem(
     @Schema(description = "같은 날 더 안전한 시간대 종료. 없으면 null", example = "21:00:00")
     LocalTime saferWindowEnd,
 
-    @Schema(description = "판정을 못 낸 사유 코드. 정상이면 null. "
-        + "PAST_DATE 지난 날짜 · NOT_PLACE_TARGET 장소 항목 아님 · NO_START_TIME 시각 미지정 · "
-        + "BEYOND_FORECAST_RANGE 시각별 예보 범위(오늘~오늘+4) 밖 · "
-        + "NO_FORECAST_AT_TIME 범위 안이지만 그 시각 예보가 없음 · LOOKUP_FAILED 조회 실패. "
-        + "BEYOND_FORECAST_RANGE 는 날짜만으로 정해져 그날 모든 항목이 같지만, "
-        + "NO_FORECAST_AT_TIME 은 같은 날 안에서도 항목마다 갈립니다",
-        example = "NO_START_TIME")
+    @Schema(
+        description = "판정을 못 낸 사유 코드. 정상이면 null. "
+            + "PAST_DATE 지난 날짜 · NOT_PLACE_TARGET 장소 항목 아님 · NO_START_TIME 시각 미지정 · "
+            + "BEYOND_FORECAST_RANGE 시각별 예보 범위(오늘~오늘+4) 밖 · "
+            + "NO_FORECAST_AT_TIME 범위 안이지만 그 시각 예보가 없음 · LOOKUP_FAILED 조회 실패. "
+            + "BEYOND_FORECAST_RANGE 는 날짜만으로 정해져 그날 모든 항목이 같지만, "
+            + "NO_FORECAST_AT_TIME 은 같은 날 안에서도 항목마다 갈립니다. "
+            + "재시도를 권할지, 문구를 화면 톤으로 바꿀지는 이 코드로 판단한다 — unavailableReason 문장을 파싱하지 않는다",
+        example = "NO_START_TIME",
+        allowableValues = {"NO_START_TIME", "NOT_PLACE_TARGET", "PAST_DATE", "BEYOND_FORECAST_RANGE",
+            "NO_FORECAST_AT_TIME", "LOOKUP_FAILED"},
+        nullable = true)
     String unavailableReasonCode,
 
     @Schema(description = "판정을 못 낸 사유 문장. 정상이면 null",
