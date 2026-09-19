@@ -7,6 +7,7 @@ import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportE
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceCatalogPort;
 import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceCatalogQueryResult;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceContentType;
+import com.hondigagae.domainlayer.placeimport.domain.enums.RegionCodeMapping;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlace;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlaceImage;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlaceIntro;
@@ -38,6 +39,14 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  *   <li>결과 0건이면 items가 객체가 아니라 빈 문자열("")로 온다</li>
  * </ul>
  * 그래서 응답을 raw String으로 받아 JsonNode로 분기 파싱한다.
+ *
+ * <p><b>왜 areaCode 가 아니라 lDongRegnCd 로 조회하는가 (#726).</b> KorService2 가 법정동 체계로
+ * 이관하면서 제주 콘텐츠의 {@code areacode}·{@code sigungucode} 를 빈 문자열로 비웠다
+ * (2026-09-18 실측: {@code "areacode":"", "sigungucode":"", "lDongRegnCd":"50", "lDongSignguCd":"130"}).
+ * 그 상태에서 {@code areaCode=39} 로 조회하면 구 체계가 남아 있는 행만 잡혀 제주 2,124건 중
+ * 880건만 들어오고 1,244건(58.6%)이 조용히 빠진다. 그래서 <b>원천으로 나가는 쿼리 키만</b>
+ * 법정동 시도코드로 옮긴다 — 잡 파라미터와 place 테이블의 적재 범위 키는 계속 관광
+ * areaCode(제주=39)다.
  */
 @Slf4j
 @Component
@@ -65,7 +74,7 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
             if (lacksContentId(item)) {
                 continue;
             }
-            places.add(toImportedPlace(item));
+            places.add(toImportedPlace(item, areaCode));
         }
         return new PlaceCatalogQueryResult(places, pageNo, numOfRows, body.path("totalCount").asInt(0));
     }
@@ -117,7 +126,7 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
             if (lacksContentId(item)) {
                 continue;
             }
-            places.add(toImportedPlace(item));
+            places.add(toImportedPlace(item, areaCode));
         }
         return places;
     }
@@ -135,19 +144,19 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
     }
 
     /** 키워드 검색. 백필 매칭은 상위 소수만 보면 되므로 한 페이지(10)로 자른다. */
-    private URI buildSearchKeywordUri(String keyword, String areaCode) {
+    URI buildSearchKeywordUri(String keyword, String areaCode) {
         String serviceKey = tourApiProperties.serviceKey();
         if (serviceKey == null || serviceKey.isBlank()) {
             throw new PlaceImportException(PlaceImportErrorCode.TOUR_API_SERVICE_KEY_MISSING);
         }
-        String url = "%s/KorService2/searchKeyword2?serviceKey=%s&MobileOS=%s&MobileApp=%s&_type=json&keyword=%s&areaCode=%s&pageNo=1&numOfRows=10&arrange=Q"
+        String url = "%s/KorService2/searchKeyword2?serviceKey=%s&MobileOS=%s&MobileApp=%s&_type=json&keyword=%s&lDongRegnCd=%s&pageNo=1&numOfRows=10&arrange=Q"
             .formatted(
                 tourApiProperties.baseUrl(),
                 URLEncoder.encode(serviceKey, StandardCharsets.UTF_8),
                 tourApiProperties.mobileOs(),
                 tourApiProperties.mobileApp(),
                 URLEncoder.encode(keyword, StandardCharsets.UTF_8),
-                areaCode
+                legalDongRegionCode(areaCode)
             );
         return URI.create(url);
     }
@@ -194,24 +203,39 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
      * serviceKey는 '/'와 '=' 같은 예약 문자를 포함하므로 직접 URL 인코딩해 완성된 URI를 만든다.
      * (UriBuilder에 맡기면 인코딩 정책에 따라 이중 인코딩/미인코딩이 갈릴 수 있다)
      */
-    private URI buildAreaBasedListUri(String areaCode, PlaceContentType contentType, int pageNo, int numOfRows) {
+    URI buildAreaBasedListUri(String areaCode, PlaceContentType contentType, int pageNo, int numOfRows) {
         String serviceKey = tourApiProperties.serviceKey();
         if (serviceKey == null || serviceKey.isBlank()) {
             throw new PlaceImportException(PlaceImportErrorCode.TOUR_API_SERVICE_KEY_MISSING);
         }
 
-        String url = "%s/KorService2/areaBasedList2?serviceKey=%s&MobileOS=%s&MobileApp=%s&_type=json&areaCode=%s&contentTypeId=%s&pageNo=%d&numOfRows=%d&arrange=Q"
+        String url = "%s/KorService2/areaBasedList2?serviceKey=%s&MobileOS=%s&MobileApp=%s&_type=json&lDongRegnCd=%s&contentTypeId=%s&pageNo=%d&numOfRows=%d&arrange=Q"
             .formatted(
                 tourApiProperties.baseUrl(),
                 URLEncoder.encode(serviceKey, StandardCharsets.UTF_8),
                 tourApiProperties.mobileOs(),
                 tourApiProperties.mobileApp(),
-                areaCode,
+                legalDongRegionCode(areaCode),
                 contentType.getCode(),
                 pageNo,
                 numOfRows
             );
         return URI.create(url);
+    }
+
+    /**
+     * 잡이 준 관광 areaCode 를 원천 조회용 법정동 시도코드로 옮긴다.
+     *
+     * <p>모르는 지역이면 <b>즉시 실패</b>시킨다. 여기서 null 을 흘려 지역 파라미터가 빠지면
+     * 원천은 오류가 아니라 전국 목록으로 답한다 — 조용히 전국을 적재하고 delist 까지 도는 것이
+     * 잡이 빨갛게 끝나는 것보다 훨씬 나쁘다.
+     */
+    private String legalDongRegionCode(String areaCode) {
+        String legalDongRegionCode = RegionCodeMapping.toLegalDongRegionCode(areaCode);
+        if (legalDongRegionCode == null) {
+            throw new PlaceImportException(PlaceImportErrorCode.REGION_NOT_SUPPORTED, areaCode);
+        }
+        return legalDongRegionCode;
     }
 
     /**
@@ -302,7 +326,26 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
         return List.of();
     }
 
-    private ImportedPlace toImportedPlace(JsonNode item) {
+    /**
+     * 원천 아이템을 적재 모델로 옮긴다.
+     *
+     * <p>{@code areaCode}·{@code sigunguCode} 는 <b>원천 값을 먼저 쓰고 비었을 때만</b> 채운다.
+     * 구 체계가 남아 있는 행은 원천이 준 값이 정본이고, 이관된 행만 보충이 필요하기 때문이다.
+     *
+     * <p>비었을 때 {@code areaCode} 를 <b>요청 scope 로</b> 메우는 이유 — {@code place.area_code}
+     * 는 단순한 원천 필드가 아니라 <b>적재 범위 키</b>다. delist({@code WHERE source=? AND
+     * area_code=?})·merge 후보 조회·읽기 API 의 지역 필터가 전부 이 값을 본다. 비워 두면 새로
+     * 들어온 행이 그 셋 모두에서 보이지 않아, 적재는 됐는데 사용자에게는 없는 장소가 된다.
+     * {@code CultureFacilityCsvAdapter}·{@code MfdsPetRestaurantXlsxAdapter} 가 이미
+     * {@link RegionCodeMapping} 으로 환산한 scope 값을 넣고 있고, 이 경로만 원천 필드를 그대로
+     * 믿고 있었다 (#726).
+     *
+     * <p>{@code ldongRegnCd}/{@code ldongSignguCd} 는 원천 값 그대로 둔다 — 환산의 근거가 되는
+     * 원본이라 보존해야 나중에 매핑이 틀렸을 때 되짚을 수 있다.
+     */
+    ImportedPlace toImportedPlace(JsonNode item, String scopeAreaCode) {
+        String sourceAreaCode = text(item, "areacode");
+        String sourceSigunguCode = text(item, "sigungucode");
         return ImportedPlace.builder()
             .contentId(item.path("contentid").asLong())
             .contentTypeId(text(item, "contenttypeid"))
@@ -310,8 +353,10 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
             .addr1(text(item, "addr1"))
             .addr2(text(item, "addr2"))
             .zipcode(text(item, "zipcode"))
-            .areaCode(text(item, "areacode"))
-            .sigunguCode(text(item, "sigungucode"))
+            .areaCode(sourceAreaCode != null ? sourceAreaCode : scopeAreaCode)
+            .sigunguCode(sourceSigunguCode != null
+                ? sourceSigunguCode
+                : RegionCodeMapping.toSigunguCodeFromLegalDong(text(item, "lDongSignguCd")))
             .ldongRegnCd(text(item, "lDongRegnCd"))
             .ldongSignguCd(text(item, "lDongSignguCd"))
             .cat1(text(item, "cat1"))
