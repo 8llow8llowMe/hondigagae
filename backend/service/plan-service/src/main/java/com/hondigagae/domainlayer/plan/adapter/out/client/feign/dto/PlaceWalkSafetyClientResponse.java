@@ -25,8 +25,14 @@ public record PlaceWalkSafetyClientResponse(
     boolean petConditionApplied
 ) {
 
+    /**
+     * 등급 metadata. <b>{@code scoreDescription} 까지 받는다</b> — 원천({@code WalkSafetyLevel})은
+     * 네 칸을 모두 채워 보내는데, 여기서 칸을 빼면 {@code ignoreUnknown} 때문에 <b>오류 없이 조용히
+     * 버려진다.</b> 같은 서비스의 적합도 경로({@code PlaceSuitabilityClientResponse}) 는 이미 받고
+     * 있었고, 이 경로만 빠져 있었다 (#717).
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record ScoreMetadataClientResponse(String code, String name, String description) {
+    public record ScoreMetadataClientResponse(String code, String name, String description, String scoreDescription) {
 
     }
 }

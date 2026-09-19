@@ -496,7 +496,46 @@ CREATE TABLE plan_pet_condition (
 | 2 | `NOT_PLACE_TARGET` | 사용자가 일정에서 고칠 수 있다. `WALK` 의 `targetId` 는 `walk_course.id` 라 장소로 조회하면 남의 아이디다 |
 | 3 | `NO_START_TIME` | 사용자가 일정에서 고칠 수 있다. **정오를 넣어 판정하지 않는다** — 없는 시각을 지어내면 사용자가 정하지 않은 시간의 답이 된다 |
 | 4 | `BEYOND_FORECAST_RANGE` | 기다리면 풀린다. 사용자가 먼저 고칠 것이 있으면 그것을 먼저 말한다 |
-| 5 | `LOOKUP_FAILED` | 다섯 중 이것만 일시적 장애다 |
+| 5 | `NO_FORECAST_AT_TIME` | **물어본 뒤에야 안다.** 지평 안인데 그 시각 예보를 쓸 수 없었던 경우다 |
+| 6 | `LOOKUP_FAILED` | plan→tour 호출 자체가 실패했다 |
+
+앞의 넷은 **묻기 전에** 갈리고, 뒤의 둘은 물어본 뒤에 갈린다.
+
+> **`LOOKUP_FAILED` 만 장애라고 단정하지 않는다.** tour-service 는 기상 원천 장애
+> (`WEATHER_UNAVAILABLE`)를 **빈 예보 목록으로 접어 200 을 돌려준다**
+> (`WalkSafetyProcessor.loadForecasts`). 그러면 등급이 `UNKNOWN` 으로 와서 이 경계에서는
+> "그 시각 예보가 정말 없는 것" 과 구분할 수 없고, 둘 다 `NO_FORECAST_AT_TIME` 으로 접힌다.
+> 그래서 이 사유의 문장은 **원인을 단정하지 않고** "쓸 수 없었다" 까지만 말한다 — 장애 중인
+> 사용자에게 "예보는 시각마다 갈린다" 고 하면 영구 사실처럼 읽힌다.
+> 가르려면 tour 응답에 coverage 를 실어 `UNAVAILABLE` 을 장애로 접어야 한다(후속 과제).
+
+**`NO_FORECAST_AT_TIME` 을 `BEYOND_FORECAST_RANGE` 로 합치지 않는다** (이슈 [#717](https://github.com/8llow8llowMe/hondigagae/issues/717)).
+같은 "예보가 없다" 지만 갈리는 시점과 단위가 다르다.
+
+| | `BEYOND_FORECAST_RANGE` | `NO_FORECAST_AT_TIME` |
+|---|---|---|
+| 무엇의 함수인가 | **날짜만** (`byDate`) | 날짜 + **시각** |
+| 언제 갈리는가 | 원격 호출 **전** | 물어보고 답을 받은 **뒤** |
+| 단위 | 그날 모든 항목이 같다 → 화면이 **일자 단위로 접어** 낸다 | **항목마다 갈린다.** 같은 날 새벽 항목은 답을 받고 낮 항목은 못 받는다 |
+| `walkSafetyLevel` | `null` | **`UNKNOWN` 이 남는다** |
+
+- 예보는 시간 단위라 지평 안 날짜여도 그 시각만 비는 일이 있다. 특히 `오늘+4` 는 실측에서
+  자정 한 시각만 오는 날이라(`weather-insight-integration.md` §5-1) 낮 항목이 이 사유로 떨어진다.
+  그래도 날짜로 미리 자르지 않는다 — **날짜만으로 답이 정해지지 않기 때문이다.**
+- 합치면 이미 물어보고 답을 받은 줄에까지 "기다리면 풀립니다" 가 나가고, 화면이 일자 단위로
+  접어 낸 자리에 항목마다 다른 사실이 섞인다.
+- **이 사유만 `walkSafetyLevel` 이 `UNKNOWN` 으로 남는다** — 나머지 다섯은 `null` 이다.
+  tour-service 의 `UNKNOWN` 은 부재가 아니라 **실제 답**이라 버릴 이유가 없고, Swagger 소비자와
+  후속 화면이 쓸 수 있다.
+  - **화면이 깨지는 것을 막으려고 남긴 것은 아니다.** FE 의 `itemWalkSafetyView`
+    (`frontend/src/lib/plan/walk-safety.ts`)는 `unavailableReasonCode` 가 있으면 그 자리에서
+    사유 문장으로 빠져나가므로, 등급을 `null` 로 내렸어도 화면은 같은 `sentence` 갈래로 떨어져
+    깨지지 않았다. 대신 **그 줄에 뜨는 문장이 등급 설명에서 사유 문장으로 바뀐다** — 이 응답에서
+    이 줄만은 순수 추가가 아니라 **표시 문장 교체**다.
+  - 그래서 `Processor.toInfo` 는 `PlanItemWalkSafetyInfo.unavailable(...)` 팩토리를 **쓰지 않고**
+    사유만 얹는다. 그 팩토리는 `placeTitle`·`basisPetId`·`targetDateTime` 을 버리는데, 이 줄은
+    tour-service 에 실제로 물어봤고 장소명도 기준 반려견도 알고 있다. 나머지 다섯은 묻지 못한
+    줄이라 버리는 것이 맞다.
 
 **시각별 예보 지평은 일자 예보와 다르다 — `[오늘, 오늘+4]` 로 5일이다.** 일자 날씨의 11일과
 헷갈리기 가장 쉬운 지점이다. 산책 위험도는 노면온도를 `기온 + 일사(날짜·시각·위도)` 로
@@ -509,8 +548,10 @@ tour-service 는 시각별 예보 목록이 덮는 날짜 밖이면 `OUT_OF_RANG
   이 문단이 같이 움직인다.**
 - 일자 지평(10)을 여기에 그대로 쓰면 **조용히 틀린다.** `오늘+5`\~`오늘+10` 항목이 컷에 걸리지
   않아 전부 tour-service 로 나가고, 돌아오는 것은 등급 `UNKNOWN` 에 온도가 전부 null 인 200 이다.
-  `levelCode` 가 null 이 아니라 `unavailableReasonCode` 는 **null 로 나가고**, 화면은 사유 없는
-  빈 배지만 받는다. 일주일 뒤 여행이 전부 이 꼴이 된다.
+  `NO_FORECAST_AT_TIME` 이 생긴 뒤로는 사유 없는 빈 배지까지 가지는 않지만(#717 이전에는 그랬다),
+  **일주일 뒤 여행의 모든 항목이 쓸모없는 원격 호출을 한 번씩 하고** 기다리면 풀릴 날짜에
+  "이 시각의 예보가 없다" 는 항목별 사유를 받는다. 날짜로 이미 알 수 있는 것을 항목 수만큼
+  물어본 셈이다.
 - 같은 일정에서 `/weather` 에는 판정이 있는데 `/walk-safety` 는 비어 있는 날이 **정상**이다.
   Swagger 설명에도 그렇게 적어 둔다 — 화면이 이것을 장애로 읽지 않게 해야 한다.
 
@@ -521,6 +562,27 @@ tour-service 는 시각별 예보 목록이 덮는 날짜 밖이면 `OUT_OF_RANG
 이유는 `WALK` 의 `targetId` 가 `walk_course.id` 라, 장소로 내보내면 화면이 남의 아이디를 열기
 때문이다. 반대로 `placeTitle` 은 **못 낸 줄에서 항상 비운다** — 그것은 tour-service 가 확인해 준
 이름이고, 일정에 적힌 이름은 `title` 로 이미 내려간다.
+
+**`petConditionApplied` 는 일정 단위가 아니라 항목마다 내린다** (#717). 그 판정에 기준
+반려견(`basisPetId`)의 특성이 반영됐는지를 말한다.
+
+- **기준 반려견이 날짜별로 갈린다.** `basisPetOn` 이 그날 날씨 판정에서 기준을 구하므로 날이
+  다르면 기준 아이가 다르고, tour-service 에 넘기는 조건도 달라져 값이 실제로 갈릴 수 있다.
+  최상위에 하나만 두면 날이 다른 항목에서 틀린다. 같은 DTO 가 이미 `basisPetId` 를 항목마다
+  들고 있어 바로 옆자리다.
+- **판정을 못 낸 줄은 `null` 이다.** 그 다섯(+`NO_FORECAST_AT_TIME` 은 물어봤으므로 값이 있다)은
+  tour-service 에 묻지 않았으므로 **값 자체가 없다.** `false` 는 "물어봤고 반려견 특성 없이 일반
+  조건으로 판정했다" 는 뜻이라, 묻지 않은 줄에 `false` 를 쓰면 하지 않은 판정을 했다고 말하게
+  된다. `Info` 와 응답 DTO 모두 **Wrapper `Boolean`** 이고, `unavailable(...)` 팩토리는 이 칸을
+  설정하지 않는다.
+
+**`walkSafetyLevel.scoreDescription` 은 이제 채워진다** (#717). 전에 `null` 이었던 것은 쓸 일이
+없어서가 아니라 **plan-service 의 Feign DTO 가 그 칸을 받지 않아** `@JsonIgnoreProperties(ignoreUnknown
+= true)` 가 조용히 버리고 있었기 때문이다. 원천(`WalkSafetyLevel`)은 모든 등급이 실제 문장을 갖고
+tour-service 가 네 칸을 전부 채워 보낸다. **같은 서비스의 적합도 경로(`PlaceSuitabilityClientResponse`)
+에는 이미 있던 칸이라, 설계가 아니라 빠뜨린 자국이었다.** Feign DTO → `QueryResult`
+(`levelScoreDescription`) → `Info` → Presenter 까지 한 칸씩 이어 붙였고, 새 원격 호출도 판정
+변경도 없다.
 
 **카카오 특보 알림은 이 절의 범위 밖이다.** 화면이 물을 때 답하는 것과 서버가 먼저 밀어 주는
 것은 다른 기능이라 별도 이슈로 뗀다.

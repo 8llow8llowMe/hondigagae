@@ -3,6 +3,10 @@ package com.hondigagae.domainlayer.plan.application.service.processor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
+import com.hondigagae.common.dto.metadata.ScoreMetricMetadata;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanItemWalkSafetyItem;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanWalkSafetyResponse;
+import com.hondigagae.domainlayer.plan.adapter.in.web.presenter.PlanWalkSafetyPresenter;
 import com.hondigagae.domainlayer.plan.application.info.PlanWalkSafetyInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanWalkSafetyInfo.PlanItemWalkSafetyInfo;
 import com.hondigagae.domainlayer.plan.application.port.out.PetConditionQueryPort;
@@ -17,6 +21,7 @@ import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPetCondition;
+import com.hondigagae.shared.travel.insight.WalkSafetyLevel;
 import com.hondigagae.shared.travel.plan.PlanItemType;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -45,10 +50,13 @@ import org.junit.jupiter.api.Test;
  *       원격 호출이 항목 수만큼 생긴다</li>
  *   <li><b>기준 반려견은 그날 날씨 판정과 같다</b> — 두 화면이 같은 날을 다른 아이 기준으로
  *       말하면 사용자는 어느 쪽을 믿어야 할지 모른다</li>
- *   <li><b>못 낸 이유를 다섯으로 가른다</b> — 뭉뚱그리면 지난 날짜에 "시각을 넣어 보세요" 라는
+ *   <li><b>못 낸 이유를 여섯으로 가른다</b> — 뭉뚱그리면 지난 날짜에 "시각을 넣어 보세요" 라는
  *       지켜지지 않을 안내가 나간다</li>
  *   <li><b>지평은 시각별 예보의 것이다</b> — 일자 날씨의 11일로 가르면 {@code 오늘+5} 이후가
  *       전부 원격으로 나가 사유 없는 빈 판정으로 돌아온다</li>
+ *   <li><b>지평 안에서 그 시각만 빈 것은 다른 사유다</b> ({@code NO_FORECAST_AT_TIME}, #717) —
+ *       날짜만으로 갈리는 {@code BEYOND_FORECAST_RANGE} 와 달리 <b>항목마다</b> 갈리고, 물어본
+ *       줄이라 등급 {@code UNKNOWN} 과 장소·기준 반려견이 함께 남는다</li>
  *   <li><b>못 낸 줄도 장소를 들고 있다</b> — 그래야 화면이 그 줄에서 장소 위험도 API 를 직접 부른다</li>
  * </ul>
  *
@@ -331,6 +339,103 @@ class PlanWalkSafetyProcessorTest {
             .containsExactly(PLACE_ID, null);
     }
 
+    @Test
+    @DisplayName("지평 안인데 그 시각 예보만 없으면 NO_FORECAST_AT_TIME 이다 — 물어본 줄이라 등급·장소·기준 반려견이 함께 남는다")
+    void unknownAnswerBecomesNoForecastAtTime() {
+        placeWalkSafetyQueryPort.level = WalkSafetyLevel.UNKNOWN;
+        planItemRepositoryPort.items = List.of(placeItem(1000L, 1, 0, PLACE_ID, LocalTime.of(14, 0)));
+
+        PlanWalkSafetyInfo info = processor.assess(1L, plan(DAY_1, DAY_1), List.of(MONGSIL));
+
+        assertThat(only(info).unavailableReason())
+            .isEqualTo(PlanItemWalkSafetyUnavailableReason.NO_FORECAST_AT_TIME);
+        // UNKNOWN 은 부재가 아니라 tour-service 가 실제로 답한 값이라 버리지 않는다 — 이 사유만
+        // 사유 코드와 등급이 함께 온다. (화면은 사유 문장을 쓰므로 등급을 버려도 깨지지는 않는다.)
+        assertThat(only(info).levelCode()).isEqualTo(WalkSafetyLevel.UNKNOWN.name());
+        assertThat(only(info).levelDescription()).isEqualTo(WalkSafetyLevel.UNKNOWN.getDescription());
+        // unavailable(...) 팩토리를 타지 않는다 — 그것은 "묻지 못한" 줄이 쓰는 것이라 아래를 버린다.
+        assertThat(only(info).placeTitle()).isEqualTo("협재해수욕장");
+        assertThat(only(info).basisPetId()).isEqualTo(MONGSIL);
+        assertThat(only(info).targetDateTime()).isEqualTo(DAY_1.atTime(14, 0));
+        // 문서가 약속한 예외의 마지막 칸이다 — 물어본 줄이라 null 이 아니다.
+        assertThat(only(info).petConditionApplied()).isTrue();
+    }
+
+    @Test
+    @DisplayName("지평 밖 날짜는 여전히 BEYOND_FORECAST_RANGE 다 — 묻지 않으므로 NO_FORECAST_AT_TIME 과 섞이지 않는다")
+    void beyondForecastRangeDoesNotBecomeNoForecastAtTime() {
+        // 물어봤다면 UNKNOWN 이 돌아올 스텁이다. 그래도 이 줄은 원격까지 가지 않아야 한다 —
+        // 날짜만으로 갈리는 사유라 화면이 일자 단위로 접어 낼 수 있어야 하기 때문이다.
+        placeWalkSafetyQueryPort.level = WalkSafetyLevel.UNKNOWN;
+        planItemRepositoryPort.items = List.of(placeItem(1000L, 6, 0, PLACE_ID, LocalTime.of(14, 0)));
+
+        PlanWalkSafetyInfo info = processor.assess(1L, plan(DAY_1, DAY_1.plusDays(5)), List.of(MONGSIL));
+
+        assertThat(only(info).unavailableReason())
+            .isEqualTo(PlanItemWalkSafetyUnavailableReason.BEYOND_FORECAST_RANGE);
+        assertThat(placeWalkSafetyQueryPort.calls).isZero();
+        assertThat(only(info).levelCode()).isNull();
+    }
+
+    @Test
+    @DisplayName("판정한 항목은 tour 가 준 petConditionApplied 를 그대로 든다 — false 는 '일반 조건으로 판정함' 이다")
+    void assessedItemCarriesPetConditionApplied() {
+        planItemRepositoryPort.items = List.of(placeItem(1000L, 1, 0, PLACE_ID, LocalTime.of(14, 0)));
+
+        placeWalkSafetyQueryPort.petConditionApplied = true;
+        assertThat(only(processor.assess(1L, plan(DAY_1, DAY_1), List.of(MONGSIL))).petConditionApplied())
+            .isTrue();
+
+        placeWalkSafetyQueryPort.petConditionApplied = false;
+        PlanWalkSafetyInfo info = processor.assess(1L, plan(DAY_1, DAY_1), List.of(MONGSIL));
+        assertThat(only(info).unavailableReason()).isNull();
+        assertThat(only(info).petConditionApplied()).isFalse();
+    }
+
+    @Test
+    @DisplayName("판정을 못 낸 항목의 petConditionApplied 는 null 이다 — 묻지 않았으므로 false 가 아니다")
+    void unavailableItemHasNullPetConditionApplied() {
+        planItemRepositoryPort.items = List.of(placeItem(1000L, 1, 0, PLACE_ID, null));
+
+        PlanWalkSafetyInfo info = processor.assess(1L, plan(DAY_1, DAY_1), List.of(MONGSIL));
+
+        assertThat(only(info).unavailableReason()).isEqualTo(PlanItemWalkSafetyUnavailableReason.NO_START_TIME);
+        // false 로 접으면 하지 않은 판정을 "반려견 특성 없이 했다" 고 말하게 된다.
+        assertThat(only(info).petConditionApplied()).isNull();
+    }
+
+    @Test
+    @DisplayName("등급 scoreDescription 이 응답까지 내려간다 — Feign DTO 가 받지 않아 조용히 버려지던 값이다 (#717)")
+    void levelScoreDescriptionReachesTheResponse() {
+        planItemRepositoryPort.items = List.of(placeItem(1000L, 1, 0, PLACE_ID, LocalTime.of(14, 0)));
+
+        PlanWalkSafetyInfo info = processor.assess(1L, plan(DAY_1, DAY_1), List.of(MONGSIL));
+        PlanWalkSafetyResponse response = new PlanWalkSafetyPresenter().toResponse(info);
+
+        PlanItemWalkSafetyItem item = response.items().get(0);
+        ScoreMetricMetadata level = item.walkSafetyLevel();
+        assertThat(level.code()).isEqualTo(WalkSafetyLevel.DANGER.name());
+        // Presenter 가 네 번째 칸을 null 로 두던 자리다. 원천이 주는 문장을 그대로 옮긴다.
+        assertThat(level.scoreDescription()).isEqualTo(WalkSafetyLevel.DANGER.getScoreDescription());
+        assertThat(item.petConditionApplied()).isTrue();
+    }
+
+    @Test
+    @DisplayName("NO_FORECAST_AT_TIME 줄은 응답에서도 사유와 등급을 함께 든다 — 여섯 사유 중 이것만 walkSafetyLevel 이 null 이 아니다")
+    void noForecastAtTimeRowKeepsLevelInTheResponse() {
+        placeWalkSafetyQueryPort.level = WalkSafetyLevel.UNKNOWN;
+        planItemRepositoryPort.items = List.of(placeItem(1000L, 1, 0, PLACE_ID, LocalTime.of(14, 0)));
+
+        PlanWalkSafetyInfo info = processor.assess(1L, plan(DAY_1, DAY_1), List.of(MONGSIL));
+        PlanWalkSafetyResponse response = new PlanWalkSafetyPresenter().toResponse(info);
+
+        PlanItemWalkSafetyItem item = response.items().get(0);
+        assertThat(item.unavailableReasonCode())
+            .isEqualTo(PlanItemWalkSafetyUnavailableReason.NO_FORECAST_AT_TIME.name());
+        assertThat(item.walkSafetyLevel()).isNotNull();
+        assertThat(item.walkSafetyLevel().description()).isEqualTo(WalkSafetyLevel.UNKNOWN.getDescription());
+    }
+
     private static PlanItemWalkSafetyInfo only(PlanWalkSafetyInfo info) {
         assertThat(info.items()).hasSize(1);
         return info.items().get(0);
@@ -374,6 +479,9 @@ class PlanWalkSafetyProcessorTest {
 
         private int calls;
         private boolean unavailable;
+        /** tour-service 가 답한 등급. 실제 enum 을 쓴다 — 문장까지 원천과 같은 값이어야 한다. */
+        private WalkSafetyLevel level = WalkSafetyLevel.DANGER;
+        private boolean petConditionApplied = true;
         private final List<LocalDateTime> askedAt = new ArrayList<>();
         private final List<PetConditionQueryResult> askedWith = new ArrayList<>();
 
@@ -389,10 +497,12 @@ class PlanWalkSafetyProcessorTest {
             }
             return Optional.of(PlaceWalkSafetyQueryResult.builder()
                 .placeId(placeId).placeTitle("협재해수욕장").targetDateTime(targetDateTime)
-                .levelCode("DANGER").levelName("위험").levelDescription("노면이 뜨겁습니다.")
+                .levelCode(level.name()).levelName(level.getDisplayName())
+                .levelDescription(level.getDescription())
+                .levelScoreDescription(level.getScoreDescription())
                 .estimatedPavementCelsius(58.0).feelsLikeCelsius(33.5).temperature(31.0)
                 .saferWindowStart(LocalTime.of(18, 0)).saferWindowEnd(LocalTime.of(21, 0))
-                .petConditionApplied(true)
+                .petConditionApplied(petConditionApplied)
                 .build());
         }
     }
