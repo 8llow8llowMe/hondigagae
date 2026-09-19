@@ -21,6 +21,22 @@
       "description": "일정에 저장된 여행 준비물 조회/저장/추가/체크/삭제 API를 제공합니다."
     },
     {
+      "name": "여행 후기",
+      "description": "여행 후기 조회/작성/수정 API를 제공합니다. 작성·수정은 완료된 일정만 받고, 조회는 일정 상태와 무관합니다."
+    },
+    {
+      "name": "공유된 여행 일정",
+      "description": "공유 링크 토큰으로 일정을 읽는 비인증 API를 제공합니다."
+    },
+    {
+      "name": "여행 일정 공유 링크",
+      "description": "일정을 읽기 전용 링크로 공유하고 폐기하는 API를 제공합니다."
+    },
+    {
+      "name": "일정 산책 위험도",
+      "description": "일정 항목의 시각 기준 산책 위험도 조회 API를 제공합니다."
+    },
+    {
       "name": "여행 일정",
       "description": "여행 일정 생성/조회/수정/삭제와 일자별 항목 편집 API를 제공합니다."
     }
@@ -44,7 +60,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "responses": {
@@ -70,7 +86,7 @@
           "여행 일정"
         ],
         "summary": "여행 일정 수정",
-        "description": "일정 기본 정보를 수정합니다. 전달한 필드만 반영되고 생략한 필드는 기존 값을 유지합니다. 기간을 줄일 때 기존 항목의 일차가 새 기간을 벗어나면 실패합니다.\n\n**필수: planId (경로).** 바디 필드(title·startDate·endDate·budget·status)는 모두 선택입니다.\n\n호출 예\n- 제목만 변경: `PUT /api/v1/plans/1234567890123456789` `{\"title\":\"몽실이와 제주 2박 3일\"}`\n- 확정 처리: `PUT /api/v1/plans/1234567890123456789` `{\"status\":\"CONFIRMED\"}`",
+        "description": "일정 기본 정보를 수정합니다. 전달한 필드만 반영되고 생략한 필드는 기존 값을 유지합니다. 기간을 줄일 때 기존 항목의 일차가 새 기간을 벗어나면 실패합니다. petIds 를 보내면 동행 반려견을 **목록 전체로 교체**합니다(첫 번째가 대표). 생략하면 기존 동행견을 유지하고, 빈 목록은 PLAN_010, 본인 소유가 아닌 아이가 있으면 PLAN_011, 이미 완료된 일정이면 PLAN_019 입니다.\n\n**필수: planId (경로).** 바디 필드(title·startDate·endDate·budget·status·petIds)는 모두 선택입니다.\n\n호출 예\n- 제목만 변경: `PUT /api/v1/plans/1234567890123456789` `{\"title\":\"몽실이와 제주 2박 3일\"}`\n- 확정 처리: `PUT /api/v1/plans/1234567890123456789` `{\"status\":\"CONFIRMED\"}`\n- 동행견 교체: `PUT /api/v1/plans/1234567890123456789` `{\"petIds\":[2,5]}`",
         "operationId": "updatePlan",
         "parameters": [
           {
@@ -82,7 +98,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "requestBody": {
@@ -130,7 +146,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "responses": {
@@ -140,6 +156,142 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ResponseVoid"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/plans/{planId}/reviews": {
+      "get": {
+        "tags": [
+          "여행 후기"
+        ],
+        "summary": "여행 후기 조회",
+        "description": "일정에 작성한 후기를 조회합니다. 본인 소유가 아니면 404로 응답합니다. **일정 상태와 무관하게** 읽을 수 있습니다 — 완료를 확정으로 되돌려도 이미 쓴 후기는 그대로 보입니다. 후기가 없으면 PLAN_015 입니다. 일차를 교체해 사라진 장소 항목도 당시 제목·장소 아이디로 남습니다. 사진·공개 범위는 없습니다.\n\n**필수: planId (경로).**\n\n호출 예\n- `GET /api/v1/plans/1234567890123456789/reviews`",
+        "operationId": "getReview",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "description": "[필수] 일정 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 일정 목록 응답의 planId 를 그대로 씁니다",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456800
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePlanReviewResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "여행 후기"
+        ],
+        "summary": "여행 후기 수정",
+        "description": "이미 작성한 후기를 고칩니다. 후기가 없으면 PLAN_015, 완료가 아니면 PLAN_016 입니다. `items` 는 **전량 교체**입니다 — 빠진 장소 평가는 사라지고, 일차 교체로 항목이 없어도 이미 기억한 planItemId 는 제목·placeId 를 유지한 채 평점·한 줄만 고칩니다.\n\n**필수: planId (경로), 바디 overallRating·items.**\n\n호출 예\n- `PUT /api/v1/plans/1234567890123456789/reviews` `{\"overallRating\":5,\"body\":null,\"items\":[]}`",
+        "operationId": "updateReview",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "description": "[필수] 일정 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 일정 목록 응답의 planId 를 그대로 씁니다",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456800
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanReviewUpsertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePlanReviewResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "여행 후기"
+        ],
+        "summary": "여행 후기 작성",
+        "description": "완료된 일정에 후기를 하나 작성합니다. 이미 있으면 PLAN_017(409) 입니다 — 수정은 PUT 입니다. 장소별 평가는 **다녀온 장소 항목**(PLACE/MEAL/LODGING + visited)만 받을 수 있고, 제목·placeId 는 서버가 그때의 일정 항목에서 기억합니다. 사진·공개 범위·AI 초안은 없습니다.\n\n**필수: planId (경로), 바디 overallRating·items.** body 와 각 comment 는 생략 가능합니다. items 를 빈 목록으로 내면 전체 만족도만 저장합니다.\n\n호출 예\n- `POST /api/v1/plans/1234567890123456789/reviews` `{\"overallRating\":4,\"body\":\"둘째 날이 더웠다.\",\"items\":[{\"planItemId\":1234567890123456790,\"rating\":5,\"comment\":\"그늘이 많았다.\"}]}`",
+        "operationId": "createReview",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "description": "[필수] 일정 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 일정 목록 응답의 planId 를 그대로 씁니다",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456800
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanReviewUpsertRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePlanReviewResponse"
                 }
               }
             }
@@ -170,7 +322,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "responses": {
@@ -208,7 +360,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "requestBody": {
@@ -256,7 +408,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "requestBody": {
@@ -306,7 +458,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           {
             "name": "packingItemId",
@@ -317,7 +469,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456790
+            "example": 1234567890123456800
           }
         ],
         "requestBody": {
@@ -367,7 +519,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           {
             "name": "planItemId",
@@ -378,7 +530,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "requestBody": {
@@ -428,7 +580,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           {
             "name": "day",
@@ -489,7 +641,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           {
             "name": "lastPlanId",
@@ -500,7 +652,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           {
             "name": "size",
@@ -571,6 +723,172 @@
         ]
       }
     },
+    "/api/v1/plans/{planId}/share-link": {
+      "get": {
+        "tags": [
+          "여행 일정 공유 링크"
+        ],
+        "summary": "일정 공유 링크 조회",
+        "description": "현재 유효한 공유 링크를 조회합니다. 한 번도 발급하지 않았거나 이미 폐기·만료됐으면 `PLAN_023` 404 입니다 — 어느 쪽이든 할 일은 새로 발급하는 것으로 같습니다.\n\n**필수: planId (경로).**\n\n호출 예\n- `GET /api/v1/plans/1234567890123456789/share-link`",
+        "operationId": "getShareLink",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "description": "[필수] 일정 아이디. 예시 값은 형식 안내용입니다",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456800
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePlanShareLinkResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "여행 일정 공유 링크"
+        ],
+        "summary": "일정 공유 링크 발급",
+        "description": "일정을 읽기 전용으로 여는 링크를 발급합니다. 공개 조회 주소는 `/api/v1/shared-plans/{token}` 입니다.\n\n**확정(CONFIRMED)·완료(COMPLETED) 일정만** 공유할 수 있습니다 — 초안은 `PLAN_022` 400 입니다. 유효 기간은 발급 시각부터 **30일 고정**이고 요청 바디는 없습니다.\n\n**멱등입니다.** 아직 폐기·만료되지 않은 링크가 있으면 새로 만들지 않고 그 토큰을 그대로 돌려줍니다 — 링크를 바꾸려면 DELETE 로 폐기한 뒤 다시 POST 하세요.\n\n호출 예\n- `POST /api/v1/plans/1234567890123456789/share-link`",
+        "operationId": "issueShareLink",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "description": "[필수] 일정 아이디. Snowflake 라 환경마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 일정 목록 응답의 planId 를 씁니다",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456800
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePlanShareLinkResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "여행 일정 공유 링크"
+        ],
+        "summary": "일정 공유 링크 폐기",
+        "description": "공유 링크를 폐기합니다. 폐기된 링크로 열면 `PLAN_023` 404 가 됩니다.\n\n**멱등입니다.** 폐기할 링크가 없어도 200 으로 답합니다 — 결과 상태(\"공유 중이 아니다\")가 같기 때문입니다.\n\n호출 예\n- `DELETE /api/v1/plans/1234567890123456789/share-link`",
+        "operationId": "revokeShareLink",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "description": "[필수] 일정 아이디. 예시 값은 형식 안내용입니다",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456800
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseVoid"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/plans/{planId}/copy": {
+      "post": {
+        "tags": [
+          "여행 일정"
+        ],
+        "summary": "여행 일정 복제",
+        "description": "지난 일정을 새 DRAFT 일정으로 복제합니다. 항목은 옮기되 방문 체크는 초기화(visited=false)되고, 준비물·후기는 가져오지 않습니다. 동행 반려견은 원본을 따르되 더 이상 소유하지 않은 아이는 빼고, 남은 아이가 없으면 실패합니다.\n\n**필수: planId (경로), 바디 startDate·endDate.** title 은 생략 가능하고, 생략하면 원본 제목 뒤에 \" (복사)\" 를 붙입니다. 새 기간의 일수는 원본과 같아야 합니다.\n\n호출 예\n- `POST /api/v1/plans/1234567890123456789/copy` `{\"startDate\":\"2027-09-12\",\"endDate\":\"2027-09-14\"}`",
+        "operationId": "copyPlan",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "description": "[필수] 복제할 일정 아이디",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456800
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanCopyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePlanDetailResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/api/v1/favorites/places/{placeId}": {
       "get": {
         "tags": [
@@ -589,7 +907,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 212481712381923328
+            "example": 212481712381923330
           }
         ],
         "responses": {
@@ -627,7 +945,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 212481712381923328
+            "example": 212481712381923330
           }
         ],
         "responses": {
@@ -665,7 +983,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 212481712381923328
+            "example": 212481712381923330
           }
         ],
         "responses": {
@@ -687,6 +1005,40 @@
         ]
       }
     },
+    "/api/v1/shared-plans/{token}": {
+      "get": {
+        "tags": [
+          "공유된 여행 일정"
+        ],
+        "summary": "공유된 여행 일정 조회",
+        "description": "공유 링크 토큰으로 일정을 읽기 전용으로 조회합니다. **로그인이 필요 없습니다.**\n\n일정 주인만 쓰는 값(일정 아이디·반려견 아이디·예산·항목 메모·방문 체크)은 내려가지 않습니다.\n\n실패는 둘로 갈립니다 — 없는 토큰·폐기된 링크·삭제된 일정·초안으로 되돌린 일정은 모두 `PLAN_023` 404 로 같게 답하고(어느 쪽인지 알려 주지 않습니다), 만료만 `PLAN_024` 410 입니다. 410 을 받으면 링크를 만든 사람에게 새 링크를 요청하세요.\n\n**필수: token (경로).**\n\n호출 예\n- `GET /api/v1/shared-plans/b3RoZXJfdG9rZW5fZXhhbXBsZV92YWx1ZV8wMTIzNDU2Nzg`",
+        "operationId": "getSharedPlan",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "description": "[필수] 공유 토큰 (URL-safe Base64 43자). 발급 응답의 token 을 그대로 씁니다",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "b3RoZXJfdG9rZW5fZXhhbXBsZV92YWx1ZV8wMTIzNDU2Nzg"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseSharedPlanResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/plans/{planId}/weather": {
       "get": {
         "tags": [
@@ -705,7 +1057,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "responses": {
@@ -715,6 +1067,46 @@
               "*/*": {
                 "schema": {
                   "$ref": "#/components/schemas/ResponsePlanWeatherResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/plans/{planId}/walk-safety": {
+      "get": {
+        "tags": [
+          "일정 산책 위험도"
+        ],
+        "summary": "일정 항목 산책 위험도",
+        "description": "일정 항목마다 **그 항목의 시각 기준으로** 산책 위험도를 판정합니다. 일자 날씨 브리핑(`/weather`)이 \"둘째 날 괜찮아?\" 에 답한다면 이 API 는 \"두 시에 그 해수욕장 걸어도 돼?\" 에 답합니다 — 산책 위험도는 시각에 따라 갈려 일자로 접을 수 없습니다. 판정 규칙(노면온도 추정·체감온도·등급 임계)은 장소 산책 위험도 API 와 **같은 것**을 씁니다. 판정 기준 반려견(basisPetId)은 **그날 날씨 판정의 기준과 같습니다** — 두 화면이 같은 날을 다른 아이 기준으로 말하지 않게 합니다.\n\n판정을 못 낸 항목도 줄은 그대로 내려가고 unavailableReasonCode 와 unavailableReason(문장)이 짝으로 옵니다. 코드는 다섯으로 갈립니다 — PAST_DATE(지난 날짜, 다시 물어도 생기지 않습니다) · NOT_PLACE_TARGET(좌표를 아는 장소 항목이 아님, 예: 올레 코스·이동) · NO_START_TIME(항목에 시각이 없음 — **없는 시각을 정오 등으로 지어내지 않습니다**) · BEYOND_FORECAST_RANGE(시각별 예보 범위 밖, 기다리면 풀립니다) · LOOKUP_FAILED(조회 실패, 다섯 중 이것만 일시적 장애입니다). 재시도 안내는 이 코드로 판단하고 문장을 파싱하지 않습니다.\n\n**시각별 예보가 닿는 범위는 `오늘 ~ 오늘+4`(5일)로, 일자 날씨 브리핑의 11일보다 짧습니다.** 산책 위험도는 노면온도를 시각·일사로 추정해야 해서 시각별 데이터가 있는 단기예보만 쓰고, 중기예보(오늘+4~오늘+10)에는 오전/오후뿐이라 오후 두 시 아스팔트를 계산할 수 없기 때문입니다. 그 밖의 날짜는 원격 호출 없이 BEYOND_FORECAST_RANGE 로 내려갑니다 — 같은 일정이라도 `/weather` 에는 판정이 있는데 여기는 비어 있는 날이 **정상**입니다.\n\n근거 목록·시간대별 판정·특보 상세는 이 응답에 없습니다 — 항목마다 실어 나르면 응답이 항목 수만큼 부풀기 때문입니다. 필요하면 장소 산책 위험도 API(`GET /api/v1/places/{placeId}/walk-safety`)를 직접 부르세요. 판정을 못 낸 줄에도 placeId 는 남습니다(NOT_PLACE_TARGET 제외) — 그래야 그 줄에서 직접 부를 수 있습니다.\n\n**필수: planId (경로).**\n\n호출 예\n- `GET /api/v1/plans/1234567890123456789/walk-safety`",
+        "operationId": "getWalkSafety",
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "description": "[필수] 일정 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 일정 목록 응답의 planId 를 그대로 씁니다",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 1234567890123456800
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponsePlanWalkSafetyResponse"
                 }
               }
             }
@@ -745,7 +1137,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "responses": {
@@ -773,7 +1165,7 @@
           "여행 일정"
         ],
         "summary": "여행 브리핑 (하루치)",
-        "description": "출발 전날·당일에 그날 정보를 한 번에 보여 줍니다 — 그날 일정 요약(항목 수, 첫/마지막 항목, 대표 장소), 날씨·반려견 적합도(일정 날씨 브리핑의 하루치와 같은 판정, 비 예보면 실내 대안 포함), 발효 중인 기상특보, 산책 골든타임을 하나로 묶습니다. 전부 기존 판정을 그대로 중계하는 결정적 조합이고 LLM 을 부르지 않습니다. 준비물은 이 응답에 없습니다 — ai-service 의 준비물 API 를 따로 부르세요.\n\n**기상특보와 골든타임은 요청 날짜가 오늘일 때만 채워집니다** (`today=true`). 골든타임은 '오늘 남은 시간' 기준 판정이라 내일 이후를 물을 수단이 없고, 특보는 발효 중인 것만 존재하기 때문입니다. `today=false` 면 두 필드는 null 이고 `weatherWarningUnavailableReason` · `walkTimesUnavailableReason` 에 이유가 담기니 그대로 안내하세요. 특보는 **필드와 이유가 둘 다 null 일 때만 '특보 없음'** 입니다 — 확인하지 못한 날은 이유가 채워지며, 그때 '특보 없음' 이라고 쓰면 태풍경보를 조용히 지우는 셈입니다. 골든타임은 그날 대표 장소(가장 이른 순서의 장소 항목) 좌표로 판정하며, 시간대별 곡선은 싣지 않습니다 — 곡선이 필요하면 응답의 좌표로 `GET /api/v1/insights/walk-times?lat=&lng=` 를 부르세요. 날짜가 일정 기간을 벗어나면 PLAN_002 로 실패합니다.\n\n**필수: planId (경로), date (쿼리, yyyy-MM-dd).**\n\n호출 예\n- 내일(출발 전날 준비): `GET /api/v1/plans/1234567890123456789/briefing?date=2026-09-13`\n- 오늘(당일 아침): 같은 URL 에 오늘 날짜 — 특보·골든타임이 함께 옵니다",
+        "description": "출발 전날·당일에 그날 정보를 한 번에 보여 줍니다 — 그날 일정 요약(항목 수, 첫/마지막 항목, 대표 장소), 날씨·반려견 적합도(일정 날씨 브리핑의 하루치와 같은 판정, 비 예보면 실내 대안 포함), 발효 중인 기상특보, 산책 골든타임을 하나로 묶습니다. 전부 기존 판정을 그대로 중계하는 결정적 조합이고 LLM 을 부르지 않습니다. 준비물은 이 응답에 없습니다 — ai-service 의 준비물 API 를 따로 부르세요.\n\n**기상특보와 골든타임은 요청 날짜가 오늘일 때만 채워집니다** (`today=true`). 골든타임은 '오늘 남은 시간' 기준 판정이라 내일 이후를 물을 수단이 없고, 특보는 발효 중인 것만 존재하기 때문입니다. `today=false` 면 두 필드는 null 이고 `*UnavailableReasonCode`(사유 코드) 와 `*UnavailableReason`(그 사유의 문장) 에 이유가 짝으로 담기니, 재시도를 권할지는 코드로 판단하고(두 사유 집합 모두 `LOOKUP_FAILED` 만 일시 장애입니다) 문장은 그대로 안내하세요. 특보는 **필드와 이유가 둘 다 null 일 때만 '특보 없음'** 입니다 — 확인하지 못한 날은 이유가 채워지며, 그때 '특보 없음' 이라고 쓰면 태풍경보를 조용히 지우는 셈입니다. 골든타임은 그날 대표 장소(가장 이른 순서의 장소 항목) 좌표로 판정하며, 시간대별 곡선은 싣지 않습니다 — 곡선이 필요하면 `schedule.representativeLat` · `schedule.representativeLng` 로 `GET /api/v1/insights/walk-times?lat=&lng=` 를 부르세요. **이 좌표는 `walkTimes` 가 null 인 날에도 나옵니다.** 날짜가 일정 기간을 벗어나면 PLAN_002, `date` 를 빼면 PLAN_125, `yyyy-MM-dd` 형식이 아니면 PLAN_124 로 실패합니다.\n\n**필수: planId (경로), date (쿼리, yyyy-MM-dd).**\n\n호출 예\n- 내일(출발 전날 준비): `GET /api/v1/plans/1234567890123456789/briefing?date=2026-09-13`\n- 오늘(당일 아침): 같은 URL 에 오늘 날짜 — 특보·골든타임이 함께 옵니다",
         "operationId": "getPlanBriefing",
         "parameters": [
           {
@@ -785,7 +1177,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           {
             "name": "date",
@@ -863,7 +1255,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           {
             "name": "packingItemId",
@@ -874,7 +1266,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456790
+            "example": 1234567890123456800
           }
         ],
         "responses": {
@@ -938,6 +1330,20 @@
               "COMPLETED"
             ],
             "example": "CONFIRMED"
+          },
+          "petIds": {
+            "type": "array",
+            "description": "생략 가능. 동행 반려견 아이디 목록(최대 5마리) — 첫 번째가 대표 반려견이 됩니다. 생략하면 기존 동행견을 유지하고, 보내면 목록 전체를 그대로 교체합니다. 빈 목록은 거절합니다(PLAN_010).",
+            "example": [
+              1,
+              2
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "maxItems": 5,
+            "minItems": 0
           }
         }
       },
@@ -994,12 +1400,12 @@
           "planId": {
             "type": "string",
             "description": "일정 아이디",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "petId": {
             "type": "string",
             "description": "대표 반려견 아이디 — petIds 의 첫 번째와 같다",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "petIds": {
             "type": "array",
@@ -1075,7 +1481,7 @@
           "planItemId": {
             "type": "string",
             "description": "일정 항목 아이디",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "day": {
             "type": "integer",
@@ -1101,7 +1507,7 @@
           "targetId": {
             "type": "string",
             "description": "대상 아이디 (항목 유형에 따라 place.id 또는 walk_course.id). Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로 문자열로 내린다. 이동 항목처럼 대상이 없으면 null 이다",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "title": {
             "type": "string",
@@ -1126,6 +1532,10 @@
           "place": {
             "$ref": "#/components/schemas/PlanItemPlaceItem",
             "description": "항목이 가리키는 장소 요약. 장소를 가리키지 않는 항목(WALK·MOVE)이거나 원천에서 사라진(delisted) 장소면 null 이다 — 그때도 항목 자체는 응답에 남는다"
+          },
+          "walkCourse": {
+            "$ref": "#/components/schemas/PlanItemWalkCourseItem",
+            "description": "항목이 가리키는 산책 코스 요약. 산책(WALK) 항목이 아니거나 코스를 찾지 못하면 null 이다 — 그때도 항목 자체는 응답에 남는다"
           }
         }
       },
@@ -1162,6 +1572,69 @@
           }
         }
       },
+      "PlanItemWalkCourseItem": {
+        "type": "object",
+        "description": "일정 항목의 산책 코스 요약. 산책 항목이 아니거나 원천에서 사라진 코스면 null 이다",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "코스명",
+            "example": "시흥-광치기"
+          },
+          "courseLabel": {
+            "type": "string",
+            "description": "화면이 부르는 이름표. 변형이 있으면 괄호가 붙는다",
+            "example": "3코스 (A)"
+          },
+          "distanceKm": {
+            "type": "number",
+            "description": "거리 (km)",
+            "example": 15.1
+          },
+          "durationText": {
+            "type": "string",
+            "description": "소요시간 원문",
+            "example": "4~5시간"
+          },
+          "durationMaxMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "소요시간 상한(분). **null 은 제한 없음이 아니라 원문을 파싱하지 못했다는 뜻이다** — 화면은 durationText 원문을 보여 준다",
+            "example": 300
+          },
+          "lat": {
+            "type": "number",
+            "format": "double",
+            "description": "시작점 위도. TourAPI 매칭에 실패한 코스는 null",
+            "example": 33.4
+          },
+          "lng": {
+            "type": "number",
+            "format": "double",
+            "description": "시작점 경도",
+            "example": 126.5
+          },
+          "firstImage": {
+            "type": "string",
+            "description": "대표 이미지 URL. 없으면 null",
+            "example": "http://tong.visitkorea.or.kr/cms/resource/1.jpg"
+          },
+          "fitsActivityLevels": {
+            "type": "array",
+            "description": "이 코스를 걸을 만한 반려견 활동량(LOW/MEDIUM/HIGH) 목록. 판정은 tour-service 가 한다. durationMaxMinutes 가 null 인 코스는 세 값이 모두 담기는데, 이는 \"아무 아이나 된다\"가 아니라 \"소요시간을 모른다\"는 뜻이다",
+            "example": [
+              {
+                "code": "MEDIUM",
+                "name": "보통",
+                "description": "일반적인 산책과 관광 일정을 소화합니다."
+              }
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CodeNameDescriptionMetadata"
+            }
+          }
+        }
+      },
       "ResponsePlanDetailResponse": {
         "type": "object",
         "description": "공통 응답 래퍼",
@@ -1194,6 +1667,168 @@
             "type": "string",
             "description": "오류 메시지",
             "example": "닉네임은 10자 이하만 가능합니다."
+          }
+        }
+      },
+      "PlanReviewItemRequest": {
+        "type": "object",
+        "description": "여행 후기 방문 장소 평가 요청 DTO",
+        "properties": {
+          "planItemId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "다녀온 장소 항목 아이디. Snowflake 라 예시 값은 형식 안내용입니다",
+            "example": 1234567890123456800
+          },
+          "rating": {
+            "type": "integer",
+            "format": "int32",
+            "description": "장소 만족도 (1~5)",
+            "example": 5,
+            "maximum": 5,
+            "minimum": 1
+          },
+          "comment": {
+            "type": "string",
+            "description": "생략 가능. 장소 한 줄 후기(200자 이하)",
+            "example": "그늘이 많아 더위에 약한 아이도 괜찮았어요.",
+            "maxLength": 200,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "planItemId",
+          "rating"
+        ]
+      },
+      "PlanReviewUpsertRequest": {
+        "type": "object",
+        "description": "여행 후기 작성·수정 요청 DTO",
+        "properties": {
+          "overallRating": {
+            "type": "integer",
+            "format": "int32",
+            "description": "전체 만족도 (1~5)",
+            "example": 4,
+            "maximum": 5,
+            "minimum": 1
+          },
+          "body": {
+            "type": "string",
+            "description": "생략 가능. 후기 본문(2000자 이하)",
+            "example": "둘째 날이 더위가 심해서 실내 위주로 다녔어요.",
+            "maxLength": 2000,
+            "minLength": 0
+          },
+          "items": {
+            "type": "array",
+            "description": "방문 장소별 평가 (최대 50개). 빈 목록이면 전체 만족도만 저장합니다",
+            "items": {
+              "$ref": "#/components/schemas/PlanReviewItemRequest"
+            },
+            "maxItems": 50,
+            "minItems": 0
+          }
+        },
+        "required": [
+          "items",
+          "overallRating"
+        ]
+      },
+      "PlanReviewPlaceItem": {
+        "type": "object",
+        "description": "여행 후기 방문 장소 평가 DTO",
+        "properties": {
+          "reviewItemId": {
+            "type": "string",
+            "description": "후기 장소 평가 아이디",
+            "example": 1234567890123456800
+          },
+          "planItemId": {
+            "type": "string",
+            "description": "당시 일정 항목 아이디. 일차를 교체해 항목이 사라져도 후기가 기억합니다",
+            "example": 1234567890123456800
+          },
+          "placeId": {
+            "type": "string",
+            "description": "작성 시점의 장소 아이디. 대상 없는 항목이면 null 입니다",
+            "example": 212481712381923330
+          },
+          "title": {
+            "type": "string",
+            "description": "작성 시점의 일정 항목 이름",
+            "example": "천지연폭포"
+          },
+          "rating": {
+            "type": "integer",
+            "format": "int32",
+            "description": "장소 만족도 (1~5)",
+            "example": 5
+          },
+          "comment": {
+            "type": "string",
+            "description": "장소 한 줄 후기. 없으면 null 입니다",
+            "example": "그늘이 많아 더위에 약한 아이도 괜찮았어요."
+          }
+        }
+      },
+      "PlanReviewResponse": {
+        "type": "object",
+        "description": "여행 후기 응답 DTO",
+        "properties": {
+          "reviewId": {
+            "type": "string",
+            "description": "후기 아이디",
+            "example": 1234567890123456800
+          },
+          "planId": {
+            "type": "string",
+            "description": "일정 아이디",
+            "example": 1234567890123456800
+          },
+          "overallRating": {
+            "type": "integer",
+            "format": "int32",
+            "description": "전체 만족도 (1~5)",
+            "example": 4
+          },
+          "body": {
+            "type": "string",
+            "description": "후기 본문. 없으면 null 입니다",
+            "example": "둘째 날이 더위가 심해서 실내 위주로 다녔어요."
+          },
+          "items": {
+            "type": "array",
+            "description": "방문 장소별 평가. 일차를 교체해 사라진 항목도 당시 제목·장소 아이디로 남습니다",
+            "items": {
+              "$ref": "#/components/schemas/PlanReviewPlaceItem"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "작성 시각",
+            "example": "2026-09-15T11:20:00"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "수정 시각",
+            "example": "2026-09-15T11:25:00"
+          }
+        }
+      },
+      "ResponsePlanReviewResponse": {
+        "type": "object",
+        "description": "공통 응답 래퍼",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/PlanReviewResponse",
+            "description": "응답 본문. 실패면 null"
           }
         }
       },
@@ -1253,7 +1888,7 @@
           "packingItemId": {
             "type": "string",
             "description": "준비물 항목 아이디",
-            "example": 1234567890123456790
+            "example": 1234567890123456800
           },
           "category": {
             "type": "string",
@@ -1299,7 +1934,7 @@
           "planId": {
             "type": "string",
             "description": "일정 아이디",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "items": {
             "type": "array",
@@ -1430,7 +2065,7 @@
             "type": "integer",
             "format": "int64",
             "description": "생략 가능. 대상 아이디 — PLACE/MEAL/LODGING 은 place.id(tour-service 에서 존재 검증), WALK 는 walk_course.id, MOVE 는 비워 둡니다. 생략하면 대상 없는 항목으로 저장됩니다. Snowflake 라 예시 값은 형식 안내용",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "title": {
             "type": "string",
@@ -1465,7 +2100,7 @@
             "type": "integer",
             "format": "int64",
             "description": "생략 가능. 대상 반려견 아이디 — petIds 가 있으면 무시되고, 둘 다 생략하면 대표 반려견이 쓰입니다.",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "petIds": {
             "type": "array",
@@ -1532,6 +2167,42 @@
           "title"
         ]
       },
+      "PlanShareLinkResponse": {
+        "type": "object",
+        "description": "일정 공유 링크 응답 DTO (일정 주인만 받는다)",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "description": "일정 아이디",
+            "example": 1234567890123456800
+          },
+          "token": {
+            "type": "string",
+            "description": "공유 토큰. 공개 조회 주소는 `/api/v1/shared-plans/{token}` 이다. 토큰 자체가 열람 권한이므로 로그·분석 도구에 그대로 싣지 않는다",
+            "example": "b3RoZXJfdG9rZW5fZXhhbXBsZV92YWx1ZV8wMTIzNDU2Nzg"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "만료 시각 (발급 시각 + 30일). 지나면 공개 조회가 410 으로 막힌다",
+            "example": "2026-10-17T10:30:00"
+          }
+        }
+      },
+      "ResponsePlanShareLinkResponse": {
+        "type": "object",
+        "description": "공통 응답 래퍼",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/PlanShareLinkResponse",
+            "description": "응답 본문. 실패면 null"
+          }
+        }
+      },
       "PlanPackingItemAddRequest": {
         "type": "object",
         "description": "여행 준비물 직접 추가 요청 DTO",
@@ -1556,6 +2227,154 @@
           "name"
         ]
       },
+      "PlanCopyRequest": {
+        "type": "object",
+        "description": "여행 일정 복제 요청 DTO",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "생략 가능. 새 일정 제목. 생략하면 원본 제목 뒤에 \" (복사)\" 를 붙입니다.",
+            "example": "몽실이와 제주 2박 3일 (복사)",
+            "maxLength": 60,
+            "minLength": 0
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "description": "새 여행 시작일 (yyyy-MM-dd). 일수는 원본과 같아야 합니다.",
+            "example": "2027-09-12"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "description": "새 여행 종료일 (yyyy-MM-dd). 시작일과 같거나 이후여야 하고 일수는 원본과 같아야 합니다.",
+            "example": "2027-09-14"
+          }
+        },
+        "required": [
+          "endDate",
+          "startDate"
+        ]
+      },
+      "ResponseSharedPlanResponse": {
+        "type": "object",
+        "description": "공통 응답 래퍼",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/SharedPlanResponse",
+            "description": "응답 본문. 실패면 null"
+          }
+        }
+      },
+      "SharedPlanItemItem": {
+        "type": "object",
+        "description": "공유된 여행 일정의 항목 DTO (읽기 전용)",
+        "properties": {
+          "day": {
+            "type": "integer",
+            "format": "int32",
+            "description": "일차 (1부터)",
+            "example": 1
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int32",
+            "description": "같은 일차 내 표시 순서",
+            "example": 0
+          },
+          "itemType": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "항목 유형",
+            "example": {
+              "code": "PLACE",
+              "name": "장소",
+              "description": "관광지·카페 등 방문 장소 항목입니다."
+            }
+          },
+          "targetId": {
+            "type": "string",
+            "description": "대상 아이디 (항목 유형에 따라 place.id 또는 walk_course.id). Snowflake 라 문자열로 내리며, 이동 항목처럼 대상이 없으면 null 이다",
+            "example": 212481712381923330
+          },
+          "title": {
+            "type": "string",
+            "description": "항목 이름",
+            "example": "천지연폭포"
+          },
+          "startTime": {
+            "type": "string",
+            "description": "시작 시각",
+            "example": "10:30:00"
+          },
+          "place": {
+            "$ref": "#/components/schemas/PlanItemPlaceItem",
+            "description": "항목이 가리키는 장소 요약. 장소를 가리키지 않는 항목(WALK·MOVE)이거나 원천에서 사라진(delisted) 장소면 null 이다 — 그때도 항목 자체는 응답에 남는다"
+          },
+          "walkCourse": {
+            "$ref": "#/components/schemas/PlanItemWalkCourseItem",
+            "description": "항목이 가리키는 산책 코스 요약. 산책 항목이 아니거나 원천에서 사라진 코스면 null 이다 — 장소와 같은 규칙이고, 일정 상세(PlanItemDetailItem.walkCourse)와 같은 모양이라 화면이 렌더를 재사용한다. 코스 없음·tour-service 장애를 가르지 않고 셋 다 같은 null 이다"
+          }
+        }
+      },
+      "SharedPlanResponse": {
+        "type": "object",
+        "description": "공유된 여행 일정 응답 DTO (읽기 전용, 비인증)",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "일정 제목",
+            "example": "몽실이와 제주 2박 3일"
+          },
+          "areaCode": {
+            "type": "string",
+            "description": "지역 코드",
+            "example": 39
+          },
+          "sigunguCode": {
+            "type": "string",
+            "description": "시군구 코드",
+            "example": 4
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date",
+            "description": "여행 시작일",
+            "example": "2026-09-12"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "description": "여행 종료일",
+            "example": "2026-09-14"
+          },
+          "totalDays": {
+            "type": "integer",
+            "format": "int32",
+            "description": "총 여행 일수",
+            "example": 3
+          },
+          "status": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "일정 상태 (공유되는 것은 확정·완료뿐이다)",
+            "example": {
+              "code": "CONFIRMED",
+              "name": "확정",
+              "description": "여행이 확정된 일정입니다."
+            }
+          },
+          "items": {
+            "type": "array",
+            "description": "일정 항목 목록 (일차·순서 오름차순)",
+            "items": {
+              "$ref": "#/components/schemas/SharedPlanItemItem"
+            }
+          }
+        }
+      },
       "PlanSummaryItem": {
         "type": "object",
         "description": "여행 일정 목록 항목 DTO",
@@ -1563,12 +2382,12 @@
           "planId": {
             "type": "string",
             "description": "일정 아이디",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "petId": {
             "type": "string",
             "description": "대표 반려견 아이디 — petIds 의 첫 번째와 같다",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "petIds": {
             "type": "array",
@@ -1648,7 +2467,7 @@
           "placeId": {
             "type": "string",
             "description": "장소 아이디",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "title": {
             "type": "string",
@@ -1699,13 +2518,13 @@
             "type": "number",
             "format": "double",
             "description": "최저기온(섭씨)",
-            "example": 22.0
+            "example": 22
           },
           "maxTemperature": {
             "type": "number",
             "format": "double",
             "description": "최고기온(섭씨)",
-            "example": 28.0
+            "example": 28
           },
           "maxPrecipitationProbability": {
             "type": "integer",
@@ -1727,7 +2546,7 @@
             "type": "number",
             "format": "double",
             "description": "최대 풍속(m/s)",
-            "example": 5.0
+            "example": 5
           },
           "maxHumidity": {
             "type": "integer",
@@ -1750,7 +2569,7 @@
           "petId": {
             "type": "string",
             "description": "반려견 아이디",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "score": {
             "type": "integer",
@@ -1783,7 +2602,7 @@
           "representativePlaceId": {
             "type": "string",
             "description": "그날 기준이 된 장소 아이디",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "representativePlaceTitle": {
             "type": "string",
@@ -1793,7 +2612,7 @@
           "basisPetId": {
             "type": "string",
             "description": "그날 판정의 기준이 된 반려견 아이디 — 아이별 판정 중 점수가 가장 낮은 아이. score·suitabilityLevel·reasons·indoorAlternatives 는 이 아이 기준이다. 판정을 못 냈으면 null",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "score": {
             "type": "integer",
@@ -1882,7 +2701,7 @@
           "planId": {
             "type": "string",
             "description": "일정 아이디",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "planTitle": {
             "type": "string",
@@ -1963,6 +2782,155 @@
           }
         }
       },
+      "PlanItemWalkSafetyItem": {
+        "type": "object",
+        "description": "일정 항목 산책 위험도 DTO",
+        "properties": {
+          "planItemId": {
+            "type": "string",
+            "description": "일정 항목 아이디",
+            "example": 1234567890123456800
+          },
+          "day": {
+            "type": "integer",
+            "format": "int32",
+            "description": "일차 (1부터)",
+            "example": 2
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "그 일차의 날짜",
+            "example": "2026-09-13"
+          },
+          "sequence": {
+            "type": "integer",
+            "format": "int32",
+            "description": "그 일차 안의 순서 (0부터)",
+            "example": 1
+          },
+          "startTime": {
+            "type": "string",
+            "description": "항목 시작 시각. 없으면 null 이고 위험도도 비어 있다",
+            "example": "14:00:00"
+          },
+          "title": {
+            "type": "string",
+            "description": "항목 이름",
+            "example": "협재해수욕장"
+          },
+          "placeId": {
+            "type": "string",
+            "description": "장소 아이디. 좌표를 아는 장소 항목이 아니면(unavailableReasonCode=NOT_PLACE_TARGET) null 입니다. **판정을 못 낸 줄에도 남습니다** — LOOKUP_FAILED 같은 줄에서 화면이 `GET /api/v1/places/{placeId}/walk-safety` 를 직접 불러 다시 시도할 수 있어야 하기 때문입니다",
+            "example": 212481712381923330
+          },
+          "placeTitle": {
+            "type": "string",
+            "description": "tour-service 가 확인한 장소명. **판정을 못 낸 항목은 물어보지 않았으므로 null 입니다** — 일정에 적힌 이름은 title 로 내려갑니다",
+            "example": "협재해수욕장"
+          },
+          "targetDateTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "판정 기준 시각",
+            "example": "2026-09-13T14:00:00"
+          },
+          "basisPetId": {
+            "type": "string",
+            "description": "판정 기준 반려견 아이디. 그날 날씨 판정의 basisPetId 와 같다",
+            "example": 1234567890123456800
+          },
+          "walkSafetyLevel": {
+            "$ref": "#/components/schemas/ScoreMetricMetadata",
+            "description": "산책 위험도 등급 metadata. 못 낸 항목은 null"
+          },
+          "estimatedPavementCelsius": {
+            "type": "number",
+            "format": "double",
+            "description": "추정 노면(아스팔트) 표면온도(섭씨). 실측이 아니라 tour-service 의 추정치다. **화면 문구에 '노면(아스팔트)' 를 밝히고 temperature(기온)와 나란히 보여 주세요** — 노면온도만 표시하면 사용자가 그것을 기온으로 읽는다",
+            "example": 58
+          },
+          "feelsLikeCelsius": {
+            "type": "number",
+            "format": "double",
+            "description": "기상청 여름철 체감온도(섭씨). 등급 판정의 기준값이다",
+            "example": 33.5
+          },
+          "temperature": {
+            "type": "number",
+            "format": "double",
+            "description": "판정에 쓴 기온(섭씨)",
+            "example": 31
+          },
+          "saferWindowStart": {
+            "type": "string",
+            "description": "같은 날 더 안전한 시간대 시작. 없으면 null",
+            "example": "18:00:00"
+          },
+          "saferWindowEnd": {
+            "type": "string",
+            "description": "같은 날 더 안전한 시간대 종료. 없으면 null",
+            "example": "21:00:00"
+          },
+          "unavailableReasonCode": {
+            "type": "string",
+            "description": "판정을 못 낸 사유 코드. 정상이면 null. PAST_DATE 지난 날짜 · NOT_PLACE_TARGET 장소 항목 아님 · NO_START_TIME 시각 미지정 · BEYOND_FORECAST_RANGE 시각별 예보 범위(오늘~오늘+4) 밖 · LOOKUP_FAILED 조회 실패",
+            "example": "NO_START_TIME"
+          },
+          "unavailableReason": {
+            "type": "string",
+            "description": "판정을 못 낸 사유 문장. 정상이면 null",
+            "example": "이 항목에 시작 시각이 없어 산책 위험도를 낼 수 없습니다. 시각은 시간대마다 판정이 갈립니다."
+          }
+        }
+      },
+      "PlanWalkSafetyResponse": {
+        "type": "object",
+        "description": "일정 항목 산책 위험도 응답 DTO",
+        "properties": {
+          "planId": {
+            "type": "string",
+            "description": "일정 아이디",
+            "example": 1234567890123456800
+          },
+          "planTitle": {
+            "type": "string",
+            "description": "일정 제목",
+            "example": "몽실이와 제주 2박 3일"
+          },
+          "petIds": {
+            "type": "array",
+            "description": "판정에 들어간 동행 반려견 아이디 목록. 항목별 basisPetId 는 이 안의 하나다",
+            "example": [
+              "1234567890123456789"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "items": {
+            "type": "array",
+            "description": "일차·순서대로 정렬된 항목별 판정. 못 낸 항목도 사유와 함께 그대로 들어간다",
+            "items": {
+              "$ref": "#/components/schemas/PlanItemWalkSafetyItem"
+            }
+          }
+        }
+      },
+      "ResponsePlanWalkSafetyResponse": {
+        "type": "object",
+        "description": "공통 응답 래퍼",
+        "properties": {
+          "dataHeader": {
+            "$ref": "#/components/schemas/DataHeader",
+            "description": "응답 헤더"
+          },
+          "dataBody": {
+            "$ref": "#/components/schemas/PlanWalkSafetyResponse",
+            "description": "응답 본문. 실패면 null"
+          }
+        }
+      },
       "DayItem": {
         "type": "object",
         "description": "일자별 응급 브리핑 항목",
@@ -2031,7 +2999,7 @@
           "planId": {
             "type": "string",
             "description": "일정 아이디",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "radiusMeters": {
             "type": "integer",
@@ -2069,12 +3037,12 @@
           "planItemId": {
             "type": "string",
             "description": "일정 항목 아이디",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "placeId": {
             "type": "string",
             "description": "장소 아이디",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "title": {
             "type": "string",
@@ -2097,7 +3065,7 @@
           "planItemId": {
             "type": "string",
             "description": "일정 항목 아이디",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "sequence": {
             "type": "integer",
@@ -2106,9 +3074,13 @@
             "example": 0
           },
           "itemType": {
-            "type": "string",
-            "description": "항목 유형 — PLACE(장소) / MEAL(식사) / LODGING(숙박) / WALK(산책) / MOVE(이동)",
-            "example": "PLACE"
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "항목 유형",
+            "example": {
+              "code": "PLACE",
+              "name": "장소",
+              "description": "관광지·카페 등 방문 장소 항목입니다."
+            }
           },
           "title": {
             "type": "string",
@@ -2134,7 +3106,7 @@
           "planId": {
             "type": "string",
             "description": "일정 아이디",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "planTitle": {
             "type": "string",
@@ -2171,7 +3143,7 @@
           "basisPetId": {
             "type": "string",
             "description": "그날 판정의 기준이 된 반려견 아이디 — 날씨 판정이 고른 아이(점수가 가장 낮은 아이)가 있으면 그 아이, 없으면 대표 반려견. 골든타임도 이 아이의 조건으로 판정된다",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "petConditionApplied": {
             "type": "boolean",
@@ -2190,18 +3162,38 @@
             "$ref": "#/components/schemas/PlanBriefingWeatherWarningItem",
             "description": "발효 중인 기상특보 중 가장 무거운 한 건. 오늘이 아니거나, 특보가 없거나, 확인하지 못했으면 null — weatherWarningUnavailableReason 으로 가른다"
           },
+          "weatherWarningUnavailableReasonCode": {
+            "type": "string",
+            "description": "특보를 붙이지 못한 사유 코드. null 이면 확인을 마친 것이다. NOT_TODAY 오늘이 아님 — 특보는 발효 중인 것만 존재해 내일 이후를 물을 수단이 없다. 정상이라 재시도할 일이 아니다 · LOOKUP_FAILED 조회 실패 — 둘 중 이것만 일시 장애라 재시도를 권할 수 있다. **세 상태(특보 있음 / 특보 없음 / 확인 못 함)를 가르는 규칙은 그대로다** — 이 코드와 weatherWarning 이 둘 다 null 일 때만 '발효 중인 특보 없음' 이다. 재시도를 권할지, 문구를 화면 톤으로 바꿀지는 이 코드로 판단한다 — weatherWarningUnavailableReason 문장을 파싱하지 않는다",
+            "enum": [
+              "NOT_TODAY",
+              "LOOKUP_FAILED"
+            ],
+            "example": "NOT_TODAY"
+          },
           "weatherWarningUnavailableReason": {
             "type": "string",
-            "description": "특보를 붙이지 못한 이유. null 이면 확인을 마친 것이고, weatherWarning 도 null 이면 발효 중인 특보가 없다. 값이 있으면 화면에 그대로 안내한다 — '확인 못 함' 을 '특보 없음' 으로 보이게 하지 않는다",
+            "description": "특보를 붙이지 못한 이유 문장. null 이면 확인을 마친 것이고, weatherWarning 도 null 이면 발효 중인 특보가 없다. 값이 있으면 화면에 그대로 안내한다 — '확인 못 함' 을 '특보 없음' 으로 보이게 하지 않는다. weatherWarningUnavailableReasonCode 와 항상 짝으로 온다",
             "example": "기상특보는 출발 당일에만 확인합니다."
           },
           "walkTimes": {
             "$ref": "#/components/schemas/PlanBriefingWalkTimesItem",
             "description": "오늘의 산책 골든타임 — 그날 대표 장소 좌표 기준. 오늘이 아니거나 붙이지 못했으면 null"
           },
+          "walkTimesUnavailableReasonCode": {
+            "type": "string",
+            "description": "골든타임을 붙이지 못한 사유 코드. null 이면 정상이다. NOT_TODAY 오늘이 아님 — '오늘 남은 시간' 전용 판정이라 내일 이후를 물을 수단이 없다 · NO_PLACE_ITEM 그날 일정에 장소 항목이 없음 — 사용자가 장소를 담으면 풀린다 · NO_PLACE_POINT 대표 장소의 좌표가 없음 — 원천이 좌표를 주지 않거나 delisted 된 장소다 · LOOKUP_FAILED 조회 실패 — 넷 중 이것만 일시 장애다. 재시도를 권할지, 문구를 화면 톤으로 바꿀지는 이 코드로 판단한다 — walkTimesUnavailableReason 문장을 파싱하지 않는다",
+            "enum": [
+              "NOT_TODAY",
+              "NO_PLACE_ITEM",
+              "NO_PLACE_POINT",
+              "LOOKUP_FAILED"
+            ],
+            "example": "NOT_TODAY"
+          },
           "walkTimesUnavailableReason": {
             "type": "string",
-            "description": "골든타임을 붙이지 못한 이유. null 이면 정상이며, 값이 있으면 화면에 그대로 안내한다",
+            "description": "골든타임을 붙이지 못한 이유 문장. null 이면 정상이며, 값이 있으면 화면에 그대로 안내한다. walkTimesUnavailableReasonCode 와 항상 짝으로 온다",
             "example": "산책 골든타임은 출발 당일에만 제공됩니다."
           }
         }
@@ -2233,12 +3225,24 @@
           "representativePlaceId": {
             "type": "string",
             "description": "그날 기준이 된 장소 아이디 — 가장 이른 순서의 장소성 항목. 날씨·골든타임이 이 장소를 기준으로 판정된다. 장소성 항목이 없으면 null",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "representativePlaceTitle": {
             "type": "string",
             "description": "그날 기준이 된 장소명",
             "example": "협재해수욕장"
+          },
+          "representativeLat": {
+            "type": "number",
+            "format": "double",
+            "description": "그날 기준이 된 장소의 위도. **walkTimes 가 null 인 날에도 이 좌표는 나온다** — 골든타임을 못 붙였어도 화면이 지도와 시간대별 곡선(GET /api/v1/insights/walk-times?lat=&lng=)을 부를 수 있어야 하기 때문이다. 원천이 좌표를 주지 않거나 delisted 된 장소면 null 이고, 그때는 walkTimesUnavailableReasonCode 가 NO_PLACE_POINT 다",
+            "example": 33.394162
+          },
+          "representativeLng": {
+            "type": "number",
+            "format": "double",
+            "description": "그날 기준이 된 장소의 경도. representativeLat 과 같은 규칙으로 채워지고 같은 규칙으로 null 이 된다",
+            "example": 126.239831
           }
         }
       },
@@ -2249,7 +3253,7 @@
           "lat": {
             "type": "number",
             "format": "double",
-            "description": "판정 기준 좌표 위도 — 그날 대표 장소의 좌표",
+            "description": "판정 기준 좌표 위도 — 그날 대표 장소의 좌표. schedule.representativeLat 과 같은 값이다 — 골든타임이 null 인 날에도 좌표가 필요해 schedule 에도 싣는다",
             "example": 33.394162
           },
           "lng": {
@@ -2341,7 +3345,7 @@
           "placeId": {
             "type": "string",
             "description": "장소 아이디",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "title": {
             "type": "string",
@@ -2415,7 +3419,7 @@
           "placeId": {
             "type": "string",
             "description": "장소 아이디",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "favorited": {
             "type": "boolean",

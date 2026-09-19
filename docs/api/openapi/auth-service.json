@@ -48,7 +48,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "responses": {
@@ -86,7 +86,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "requestBody": {
@@ -134,7 +134,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "responses": {
@@ -174,7 +174,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "responses": {
@@ -202,7 +202,7 @@
           "회원"
         ],
         "summary": "일반 회원가입",
-        "description": "일반 회원으로 가입합니다. 먼저 이메일 인증코드 발송·검증(`/api/v1/auth/email/*`)을 마쳐야 하고, 검증 후 30분 안에 가입해야 합니다.\n\n인증 불필요. **필수: 요청 바디의 email, password(영문자·숫자·특수문자 포함 8~20자), name(10자 이내), nickname(10자 이내).**\n\n호출 예: `POST /api/v1/members/signup` `{\"email\":\"user@example.com\",\"password\":\"P@ssw0rd!\",\"name\":\"홍길동\",\"nickname\":\"길동짱\"}`",
+        "description": "일반 회원으로 가입합니다. 먼저 이메일 인증코드 발송·검증(`/api/v1/auth/email/*`)을 마쳐야 하고, 검증 후 30분 안에 가입해야 합니다.\n\n인증 불필요. **필수: 요청 바디의 email, password(영문자·숫자·특수문자 포함 8~20자), name(10자 이내), nickname(10자 이내), termsAgreed, privacyAgreed, ageOver14Confirmed(셋 다 true).**\n\n체크박스 셋은 각각 다른 코드로 막힙니다 — 이용약관 `MEMBER_115`, 개인정보 처리방침 `MEMBER_116`, 만 14세 이상 확인 `MEMBER_117`.\n\n호출 예: `POST /api/v1/members/signup` `{\"email\":\"user@example.com\",\"password\":\"P@ssw0rd!\",\"name\":\"홍길동\",\"nickname\":\"길동짱\",\"termsAgreed\":true,\"privacyAgreed\":true,\"ageOver14Confirmed\":true}`",
         "operationId": "generalSignup",
         "requestBody": {
           "content": {
@@ -234,7 +234,7 @@
           "개발용 (운영 미노출)"
         ],
         "summary": "[개발용] 즉시 회원가입 (이메일 인증 생략)",
-        "description": "**dev 전용** — 운영 프로필(prod)에서는 이 API 가 존재하지 않습니다(404).\n\n이메일 인증코드 없이 테스트 계정을 바로 만듭니다.\n\n**이메일 인증 게이트만 건너뜁니다.** 비밀번호 규칙과 이메일 중복(409 `MEMBER_001`)은\n일반 가입과 똑같이 검사합니다 — 검증까지 느슨하게 하면 개발에서만 통과하는 값이 생겨,\n정작 운영에서 막히는 입력을 개발에서 못 잡습니다.\n\n응답의 `email` 과 요청에 쓴 비밀번호로 바로 `POST /api/v1/auth/login` 을 부를 수 있습니다.\n\n운영 프로필에서는 이 API 가 등록되지 않아 404 입니다.\n\n인증 불필요. **필수: 요청 바디의 email, password(영문자·숫자·특수문자 포함 8~20자), name, nickname** — 일반 가입과 같은 바디입니다.\n\n호출 예: `POST /api/v1/members/signup/dev` `{\"email\":\"dev1@example.com\",\"password\":\"P@ssw0rd!\",\"name\":\"홍길동\",\"nickname\":\"길동짱\"}`",
+        "description": "**dev 전용** — 운영 프로필(prod)에서는 이 API 가 존재하지 않습니다(404).\n\n이메일 인증코드 없이 테스트 계정을 바로 만듭니다.\n\n**이메일 인증 게이트만 건너뜁니다.** 비밀번호 규칙과 이메일 중복(409 `MEMBER_001`)은\n일반 가입과 똑같이 검사합니다 — 검증까지 느슨하게 하면 개발에서만 통과하는 값이 생겨,\n정작 운영에서 막히는 입력을 개발에서 못 잡습니다.\n\n응답의 `email` 과 요청에 쓴 비밀번호로 바로 `POST /api/v1/auth/login` 을 부를 수 있습니다.\n\n운영 프로필에서는 이 API 가 등록되지 않아 404 입니다.\n\n인증 불필요. **필수: 요청 바디의 email, password(영문자·숫자·특수문자 포함 8~20자), name, nickname,\ntermsAgreed, privacyAgreed, ageOver14Confirmed(셋 다 true)** — 일반 가입과 같은 바디입니다.\n\n호출 예: `POST /api/v1/members/signup/dev` `{\"email\":\"dev1@example.com\",\"password\":\"P@ssw0rd!\",\"name\":\"홍길동\",\n\"nickname\":\"길동짱\",\"termsAgreed\":true,\"privacyAgreed\":true,\"ageOver14Confirmed\":true}`",
         "operationId": "devSignup",
         "requestBody": {
           "content": {
@@ -438,7 +438,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "requestBody": {
@@ -495,7 +495,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           }
         ],
         "responses": {
@@ -915,7 +915,7 @@
           "인증/인가"
         ],
         "summary": "소셜 로그인",
-        "description": "provider 콜백의 인가코드와 state로 로그인합니다. 미가입 이메일이면 자동 회원가입 후 로그인합니다. 응답은 일반 로그인과 동일합니다(accessToken + refresh 쿠키).\n\n인증 불필요. **필수: provider(경로), code, state.** 둘 다 provider 가 콜백 URL 의 쿼리로 넘겨준 값을 그대로 전달합니다. state 가 인가 URL 생성 때 발급한 값과 다르거나 10분이 지났으면 실패합니다.\n\n호출 예: `GET /api/v1/auth/kakao/login?code=<콜백 code>&state=<콜백 state>`",
+        "description": "provider 콜백의 인가코드와 state로 로그인합니다. 미가입 이메일이면 자동 회원가입 후 로그인합니다. 응답은 일반 로그인과 동일합니다(accessToken + refresh 쿠키).\n\n인증 불필요. **필수: provider(경로), code, state.** 둘 다 provider 가 콜백 URL 의 쿼리로 넘겨준 값을 그대로 전달합니다. state 가 인가 URL 생성 때 발급한 값과 다르거나 10분이 지났으면 실패합니다.\n\n자동 회원가입이 일어나는 최초 연동에서 인가 URL 생성 때 문서 동의를 받지 않았다면 `MEMBER_010`, 만 14세 이상 확인을 받지 않았다면 `MEMBER_011` 로 거부됩니다. 이미 가입한 회원의 로그인은 동의·확인과 무관하게 통과합니다.\n\n**인가 URL 생성 때 내려준 `oauthState` 쿠키가 함께 실려야 합니다.** 쿼리 state 와 쿠키 state 가 다르거나 쿠키가 없으면 `AUTH_010` 으로 거부합니다 — state 만으로는 인가 URL 을 만든 주체와 인증한 주체가 같다는 보장이 없어, 제3자가 만든 인가 URL 로 남의 이름의 동의 이력이 남을 수 있기 때문입니다. 성공·실패와 무관하게 응답에서 이 쿠키를 만료시킵니다.\n\n호출 예: `GET /api/v1/auth/kakao/login?code=<콜백 code>&state=<콜백 state>`",
         "operationId": "loginWithOAuthCode",
         "parameters": [
           {
@@ -951,6 +951,15 @@
               "type": "string"
             },
             "example": "3f2a9c11-0e4b-4a1f-9c3d-0b8e2f7a5d61"
+          },
+          {
+            "name": "oauthState",
+            "in": "cookie",
+            "description": "[필수] 인가 URL 생성 응답의 Set-Cookie 로 심어진 state 쿠키. 쿼리 state 와 같아야 하며, 없으면 AUTH_010",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -973,7 +982,7 @@
           "인증/인가"
         ],
         "summary": "소셜 로그인 인가 URL 생성",
-        "description": "provider(kakao/naver) 인가 페이지 URL을 생성합니다. CSRF 방어용 state가 포함되며 10분간 유효합니다. 프론트는 이 URL로 리다이렉트합니다.\n\n인증 불필요. **필수: provider(경로).**\n\n호출 예: `GET /api/v1/auth/kakao/authorize` → 응답의 authorizeUrl 로 브라우저를 이동시킵니다",
+        "description": "provider(kakao/naver) 인가 페이지 URL을 생성합니다. CSRF 방어용 state가 포함되며 10분간 유효합니다. 프론트는 이 URL로 리다이렉트합니다.\n\n인증 불필요. **필수: provider(경로).** 동의·확인 값(termsAgreed/privacyAgreed/ageOver14Confirmed)은 선택이며 기본 false 입니다.\n\n**신규 가입이면 세 값이 모두 필수입니다.** 이 값들은 state 와 함께 보관됐다가 최초 연동(= 신규 가입) 때만 쓰이고, 이미 가입한 회원의 로그인에는 영향을 주지 않습니다. 빠진 채로 최초 연동을 시도하면 콜백(소셜 로그인)에서 문서 동의 누락은 `MEMBER_010`, 만 14세 이상 확인 누락은 `MEMBER_011` 로 거부됩니다 — 프론트가 강조할 체크박스가 달라 코드를 나눴습니다. 인가코드가 1회용이라 콜백에서 다시 받을 수 없어 이 단계에서 받습니다.\n\n응답에는 같은 state 가 담긴 `oauthState` HttpOnly 쿠키(10분)가 함께 내려갑니다. 소셜 로그인 콜백은 이 쿠키가 쿼리 state 와 일치할 때만 통과하므로, 호출한 쪽은 이 쿠키를 보관했다가 콜백 호출에 함께 실어야 합니다.\n\n호출 예: `GET /api/v1/auth/kakao/authorize?termsAgreed=true&privacyAgreed=true&ageOver14Confirmed=true` → 응답의 authorizeUrl 로 브라우저를 이동시킵니다",
         "operationId": "generateOAuthAuthorizationUrl",
         "parameters": [
           {
@@ -989,6 +998,39 @@
               ]
             },
             "example": "kakao"
+          },
+          {
+            "name": "termsAgreed",
+            "in": "query",
+            "description": "[선택] 이용약관 동의 여부. 신규 가입이 되는 최초 연동에서만 필요하고, 이미 가입한 회원의 로그인에는 쓰이지 않습니다",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": true
+          },
+          {
+            "name": "privacyAgreed",
+            "in": "query",
+            "description": "[선택] 개인정보 처리방침 동의 여부. 신규 가입이 되는 최초 연동에서만 필요하고, 이미 가입한 회원의 로그인에는 쓰이지 않습니다",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": true
+          },
+          {
+            "name": "ageOver14Confirmed",
+            "in": "query",
+            "description": "[선택] 만 14세 이상 확인 여부. 신규 가입이 되는 최초 연동에서만 필요하고, 이미 가입한 회원의 로그인에는 쓰이지 않습니다",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "example": true
           }
         ],
         "responses": {
@@ -1227,7 +1269,7 @@
           "petId": {
             "type": "string",
             "description": "반려견 아이디",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "name": {
             "type": "string",
@@ -1380,13 +1422,31 @@
             "example": "길동짱",
             "maxLength": 10,
             "minLength": 0
+          },
+          "termsAgreed": {
+            "type": "boolean",
+            "description": "이용약관 동의 여부. 필수 동의라 true 가 아니면 가입할 수 없습니다",
+            "example": true
+          },
+          "privacyAgreed": {
+            "type": "boolean",
+            "description": "개인정보 처리방침 동의 여부. 필수 동의라 true 가 아니면 가입할 수 없습니다",
+            "example": true
+          },
+          "ageOver14Confirmed": {
+            "type": "boolean",
+            "description": "만 14세 이상 확인 여부. 필수라 true 가 아니면 가입할 수 없습니다",
+            "example": true
           }
         },
         "required": [
+          "ageOver14Confirmed",
           "email",
           "name",
           "nickname",
-          "password"
+          "password",
+          "privacyAgreed",
+          "termsAgreed"
         ]
       },
       "ResponseVoid": {
@@ -1410,7 +1470,7 @@
           "memberId": {
             "type": "string",
             "description": "생성된 회원 아이디. Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로 문자열로 내린다",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "email": {
             "type": "string",
@@ -1781,7 +1841,7 @@
           "petId": {
             "type": "string",
             "description": "반려견 아이디",
-            "example": 1234567890123456789
+            "example": 1234567890123456800
           },
           "name": {
             "type": "string",
