@@ -575,10 +575,16 @@ tour-service 는 시각별 예보 목록이 덮는 날짜 밖이면 `OUT_OF_RANG
 - **특보·골든타임은 요청 날짜가 오늘일 때만 붙인다** (`today`). 골든타임은 tour 의 `GET /api/v1/insights/walk-times` 가
   "오늘 남은 시간" 전용이라 내일 이후를 물을 수단이 없고, 특보는 tour 의 적합도 판정과 같은 규칙
   (`targetDate == today` 일 때만)을 따른다 — 내일 날짜에 오늘 특보를 붙이면 "내일 태풍" 이라는 없는 예보가 화면에 선다.
-  오늘이 아니면 두 필드는 null 이고 각 `*UnavailableReason` 에 이유가 담긴다.
+  오늘이 아니면 두 필드는 null 이고 각 `*UnavailableReasonCode`(사유 코드)·`*UnavailableReason`(그 사유의 문장)에
+  이유가 **짝으로** 담긴다.
+- **사유는 문장이 아니라 enum 이 소유한다 (#716).** `PlanBriefingWarningUnavailableReason`(`NOT_TODAY`/`LOOKUP_FAILED`) 과
+  `PlanBriefingWalkTimesUnavailableReason`(`NOT_TODAY`/`NO_PLACE_ITEM`/`NO_PLACE_POINT`/`LOOKUP_FAILED`) 둘이고,
+  사유 집합이 달라 합치지 않는다(`PlanDayWeatherUnavailableReason` 과 `PlanItemWalkSafetyUnavailableReason` 을 따로 둔 것과 같다).
+  **정상적으로 낼 수 없는 날과 일시 장애가 갈려야 화면이 재시도 버튼을 붙일 수 있다** — 두 집합 모두 `LOOKUP_FAILED` 만 장애다.
+  문장만 내리면 프론트가 사유별로 다르게 그리려고 문장을 파싱하게 된다 (#497).
 - **특보 "확인 못 함" 과 "없음" 을 나눈다 (필수).** 이 브리핑의 가장 나쁜 실패는 특보가 떠 있는데 화면이 조용한 것이다.
   그래서 `WeatherWarningQueryPort` 만 조회 실패를 `PlanException` 으로 올리고, Processor 가 잡아
-  `weatherWarningUnavailableReason` 에 "가져오지 못했다" 를 담는다. `weatherWarning` 과 이유가 **둘 다 null 일 때만**
+  `weatherWarningUnavailableReason` 에 `LOOKUP_FAILED` 를 담는다. `weatherWarning` 과 이유가 **둘 다 null 일 때만**
   "발효 중인 특보 없음" 이다. 골든타임·날씨는 부가 정보라 기존처럼 빈 값으로 접는다.
   - 한계: tour-service 자체가 KMA 특보 조회 실패를 "없음" 으로 접는다(`WeatherWarningProcessor`). 이 경계에서 가를 수 있는 것은
     plan→tour 호출의 실패까지다.
@@ -589,7 +595,17 @@ tour-service 는 시각별 예보 목록이 덮는 날짜 밖이면 `OUT_OF_RANG
   셋으로 가른다 — 장소 항목 없음 / 좌표 없음(delisted·원천 좌표 없음) / 조회 실패.
 - **시간대별 곡선(`hourly`)은 싣지 않는다.** 브리핑은 요약이고 곡선을 실으면 응답이 몇 배로 커진다. 응답에 판정 좌표를 함께 내리니
   곡선이 필요한 화면은 그 좌표로 tour 의 walk-times 를 직접 부른다.
-- 날짜가 일정 기간 밖이면 `PLAN_002`. `date` 는 필수다 — "출발 전날" 인지 "당일" 인지는 FE 가 안다.
+  - 좌표는 `schedule.representativeLat`/`representativeLng` 에 싣는다 — **`walkTimes` 가 null 인 날에도 나와야** 골든타임을
+    못 붙인 날의 화면도 지도와 곡선을 부를 수 있다. `walkTimes` 안의 `lat`/`lng` 는 같은 값이고, FE 가 이미 읽고 있어 남겨 둔다.
+    좌표를 모르는 날은 `null` 이다(`0.0` 으로 접으면 적도상의 한 점이 된다).
+- **`schedule.firstItem`/`lastItem` 의 `itemType` 은 `{code,name,description}` metadata 다 (#716).** 일정 상세
+  (`PlanItemDetailItem.itemType`)와 같은 모양이다 — 같은 값을 두 API 가 다른 모양으로 내리면 프론트가 한국어 매핑 테이블을
+  따로 만들게 되는데 그것은 금지다 (coding-conventions §11).
+  - **기존 enum 문자열(`"PLACE"`)과 호환되지 않는 파괴적 변경이다.** 브리핑 v1 은 이 값을 렌더하지 않아 화면 회귀는 없지만
+    FE 타입·목 데이터가 옛 계약을 명시해 두고 있다(`frontend/src/types/plan.ts`, `frontend/src/lib/api/mock/plan-data.ts`,
+    `frontend/src/features/plan/plan-briefing-section.tsx`). FE 전환은 #751.
+- 날짜가 일정 기간 밖이면 `PLAN_002`, `date` 누락은 `PLAN_125`, `yyyy-MM-dd` 형식 오류는 `PLAN_124`.
+  `date` 는 필수다 — "출발 전날" 인지 "당일" 인지는 FE 가 안다.
 - 원격 호출 수(하루치라 상한이 낮다): auth 특성 1 + tour 적합도(서로 다른 조건 수, 최대 5) + tour 장소 요약 1 + tour 특보 1 +
   tour 골든타임 1. 오늘이 아니면 뒤의 둘은 나가지 않는다. Facade 에 트랜잭션을 걸지 않는 이유는 날씨 브리핑과 같다.
 

@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.plan.adapter.in.web.dto.item;
 
+import com.hondigagae.common.dto.metadata.CodeNameDescriptionMetadata;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalTime;
 import lombok.Builder;
@@ -14,8 +15,8 @@ public record PlanBriefingItemSummaryItem(
     @Schema(description = "그날 안에서의 순서 (0부터)", example = "0")
     int sequence,
 
-    @Schema(description = "항목 유형 — PLACE(장소) / MEAL(식사) / LODGING(숙박) / WALK(산책) / MOVE(이동)", example = "PLACE")
-    String itemType,
+    @Schema(description = "항목 유형", example = "{\"code\":\"PLACE\",\"name\":\"장소\",\"description\":\"관광지·카페 등 방문 장소 항목입니다.\"}")
+    CodeNameDescriptionMetadata itemType,
 
     @Schema(description = "항목 제목", example = "협재해수욕장")
     String title,

@@ -16,6 +16,8 @@ import com.hondigagae.domainlayer.plan.application.port.out.query.PetConditionQu
 import com.hondigagae.domainlayer.plan.application.port.out.query.PlanPlaceSummaryQueryResult;
 import com.hondigagae.domainlayer.plan.application.port.out.query.WalkTimesQueryResult;
 import com.hondigagae.domainlayer.plan.application.port.out.query.WeatherWarningQueryResult;
+import com.hondigagae.domainlayer.plan.domain.enums.PlanBriefingWalkTimesUnavailableReason;
+import com.hondigagae.domainlayer.plan.domain.enums.PlanBriefingWarningUnavailableReason;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import java.time.Clock;
@@ -42,7 +44,8 @@ import org.springframework.stereotype.Component;
  * <h2>특보·골든타임은 요청 날짜가 오늘일 때만 붙인다</h2>
  *
  * <p><b>골든타임</b>은 tour 의 {@code GET /api/v1/insights/walk-times} 가 "오늘 남은 시간"
- * 전용이라 내일 이후를 물을 수단 자체가 없다. 없는 값을 지어내는 대신 이유를 문장으로 준다.
+ * 전용이라 내일 이후를 물을 수단 자체가 없다. 없는 값을 지어내는 대신 사유를 준다 — 문장이
+ * 아니라 enum 이라, 화면이 "기다리면 풀린다" 와 "재시도해야 한다" 를 갈라 그릴 수 있다 (#716).
  *
  * <p><b>특보</b>는 발효 중인 것만 존재한다. tour 의 적합도 판정도 같은 규칙으로
  * {@code targetDate.equals(LocalDate.now())} 일 때만 특보를 붙인다 — 내일 날짜에 오늘 특보를
@@ -52,8 +55,9 @@ import org.springframework.stereotype.Component;
  *
  * 이 브리핑의 가장 위험한 실패는 <b>특보가 떠 있는데 화면이 조용한 것</b>이다. 그래서
  * {@link WeatherWarningQueryPort} 만 조회 실패를 예외로 올리고, 여기서 잡아
- * {@code weatherWarningUnavailableReason} 에 "가져오지 못했다" 는 문장을 담는다. 특보가 정말
- * 없으면 그 필드는 null 이다 — 두 상태가 응답에서 구분된다.
+ * {@code weatherWarningUnavailableReason} 에
+ * {@link PlanBriefingWarningUnavailableReason#LOOKUP_FAILED} 를 담는다. 특보가 정말 없으면 그
+ * 필드는 null 이다 — 두 상태가 응답에서 구분된다.
  *
  * <h2>원격 호출 수</h2>
  *
@@ -65,16 +69,6 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class PlanBriefingProcessor {
-
-    private static final String WARNING_ONLY_TODAY = "기상특보는 출발 당일에만 확인합니다.";
-    private static final String WARNING_LOOKUP_FAILED =
-        "기상특보 정보를 가져오지 못했습니다. 기상청 발표를 직접 확인해 주세요.";
-    private static final String WALK_TIMES_ONLY_TODAY = "산책 골든타임은 출발 당일에만 제공됩니다.";
-    private static final String WALK_TIMES_NO_PLACE_ITEM =
-        "이 날짜에는 장소가 지정된 일정 항목이 없어 골든타임을 붙이지 못했습니다.";
-    private static final String WALK_TIMES_NO_POINT = "대표 장소의 좌표가 없어 골든타임을 붙이지 못했습니다.";
-    private static final String WALK_TIMES_LOOKUP_FAILED =
-        "산책 골든타임 정보를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.";
 
     private final PlanItemRepositoryPort planItemRepositoryPort;
     private final PlanPlaceLookupPort planPlaceLookupPort;
@@ -172,8 +166,8 @@ public class PlanBriefingProcessor {
     }
 
     /**
-     * 특보 조회. <b>실패를 "없음" 으로 접지 않는다</b> — 예외를 잡아 이유 문장으로 바꾸고,
-     * 특보가 정말 없을 때는 이유를 비운다.
+     * 특보 조회. <b>실패를 "없음" 으로 접지 않는다</b> — 예외를 잡아 사유로 바꾸고,
+     * 특보가 정말 없을 때는 사유를 비운다.
      */
     private Warning loadWarning(Plan plan, LocalDate date) {
         try {
@@ -182,7 +176,7 @@ public class PlanBriefingProcessor {
         } catch (PlanException exception) {
             log.warn("Weather warning lookup failed planId={} date={} errorCode={}",
                 plan.id(), date, exception.getErrorCode().getCode());
-            return new Warning(null, WARNING_LOOKUP_FAILED);
+            return new Warning(null, PlanBriefingWarningUnavailableReason.LOOKUP_FAILED);
         }
     }
 
@@ -194,19 +188,19 @@ public class PlanBriefingProcessor {
         PetConditionQueryResult condition
     ) {
         if (representative.isEmpty()) {
-            return new Golden(null, WALK_TIMES_NO_PLACE_ITEM);
+            return new Golden(null, PlanBriefingWalkTimesUnavailableReason.NO_PLACE_ITEM);
         }
         // delisted 라 요약이 안 왔거나, 남아 있어도 원천이 좌표를 주지 않은 장소가 있다.
         if (representativePlace.isEmpty() || !representativePlace.get().hasPoint()) {
             log.info("Plan briefing skips walk times without point planId={} placeId={}",
                 plan.id(), representative.get().targetId());
-            return new Golden(null, WALK_TIMES_NO_POINT);
+            return new Golden(null, PlanBriefingWalkTimesUnavailableReason.NO_PLACE_POINT);
         }
 
         PlanPlaceSummaryQueryResult place = representativePlace.get();
         return walkTimesQueryPort.findWalkTimes(place.lat(), place.lng(), condition)
             .map(result -> new Golden(toWalkTimesInfo(result), null))
-            .orElseGet(() -> new Golden(null, WALK_TIMES_LOOKUP_FAILED));
+            .orElseGet(() -> new Golden(null, PlanBriefingWalkTimesUnavailableReason.LOOKUP_FAILED));
     }
 
     private ScheduleInfo toScheduleInfo(
@@ -274,19 +268,19 @@ public class PlanBriefingProcessor {
             .build();
     }
 
-    /** 특보 조회 결과와 못 붙인 이유. 둘 다 null 이면 "발효 중인 특보 없음" 이다. */
-    private record Warning(WeatherWarningInfo info, String unavailableReason) {
+    /** 특보 조회 결과와 못 붙인 사유. 둘 다 null 이면 "발효 중인 특보 없음" 이다. */
+    private record Warning(WeatherWarningInfo info, PlanBriefingWarningUnavailableReason unavailableReason) {
 
         static Warning notToday() {
-            return new Warning(null, WARNING_ONLY_TODAY);
+            return new Warning(null, PlanBriefingWarningUnavailableReason.NOT_TODAY);
         }
     }
 
-    /** 골든타임 조회 결과와 못 붙인 이유. */
-    private record Golden(WalkTimesInfo info, String unavailableReason) {
+    /** 골든타임 조회 결과와 못 붙인 사유. */
+    private record Golden(WalkTimesInfo info, PlanBriefingWalkTimesUnavailableReason unavailableReason) {
 
         static Golden notToday() {
-            return new Golden(null, WALK_TIMES_ONLY_TODAY);
+            return new Golden(null, PlanBriefingWalkTimesUnavailableReason.NOT_TODAY);
         }
     }
 }

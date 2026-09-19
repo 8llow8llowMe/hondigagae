@@ -25,6 +25,16 @@ public record PlanBriefingScheduleItem(
     String representativePlaceId,
 
     @Schema(description = "그날 기준이 된 장소명", example = "협재해수욕장", nullable = true)
-    String representativePlaceTitle
+    String representativePlaceTitle,
+
+    @Schema(description = "그날 기준이 된 장소의 위도. **walkTimes 가 null 인 날에도 이 좌표는 나온다** — "
+        + "골든타임을 못 붙였어도 화면이 지도와 시간대별 곡선(GET /api/v1/insights/walk-times?lat=&lng=)을 부를 수 있어야 하기 때문이다. "
+        + "원천이 좌표를 주지 않거나 delisted 된 장소면 null 이고, 그때는 walkTimesUnavailableReasonCode 가 NO_PLACE_POINT 다",
+        example = "33.394162", nullable = true)
+    Double representativeLat,
+
+    @Schema(description = "그날 기준이 된 장소의 경도. representativeLat 과 같은 규칙으로 채워지고 같은 규칙으로 null 이 된다",
+        example = "126.239831", nullable = true)
+    Double representativeLng
 ) {
 }
