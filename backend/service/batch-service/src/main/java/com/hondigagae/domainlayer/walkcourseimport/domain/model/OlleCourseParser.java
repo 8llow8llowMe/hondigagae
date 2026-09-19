@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
  *
  * <ul>
  *   <li>CSV "코스별" = {@code 3코스} → 코스번호 {@code 3}, "코스명" 꼬리 {@code (A)} → 변형</li>
- *   <li>TourAPI title = {@code [제주올레 3코스] 온평-표선 올레 (A)} → 같은 키 {@code 3-A}</li>
+ *   <li>TourAPI title = {@code [제주올레 3-A코스] 온평-표선 올레} → 같은 키 {@code 3-A}</li>
  * </ul>
  */
 public final class OlleCourseParser {
@@ -26,7 +26,15 @@ public final class OlleCourseParser {
 
     private static final Pattern COURSE_NO_PATTERN = Pattern.compile("^([0-9]+(?:-[0-9]+)?)코스$");
     private static final Pattern VARIANT_PATTERN = Pattern.compile("\\(([A-Za-z])\\)\\s*$");
-    private static final Pattern TOUR_TITLE_PATTERN = Pattern.compile("^\\[제주올레\\s*([0-9]+(?:-[0-9]+)?)코스\\]");
+    /**
+     * TourAPI title 의 머리 부분. group(1)=코스번호, group(2)=대괄호 안 변형 문자(없을 수 있다).
+     *
+     * <p>변형 문자 자리를 <b>숫자 부번호 다음</b>에 둬야 {@code 18-2} 가 "18 + 변형 2" 로 잘못 읽히지
+     * 않는다 - {@code [0-9]+(?:-[0-9]+)?} 가 먼저 숫자 부번호를 다 가져가고, 남은 {@code -A} 만
+     * 변형으로 떨어진다.
+     */
+    private static final Pattern TOUR_TITLE_PATTERN =
+        Pattern.compile("^\\[제주올레\\s*([0-9]+(?:-[0-9]+)?)(?:-([A-Za-z]))?코스\\]");
     private static final Pattern DISTANCE_PATTERN = Pattern.compile("([0-9]+(?:\\.[0-9]+)?)\\s*km");
     private static final Pattern DURATION_HOUR_PATTERN = Pattern.compile("([0-9]+)\\s*시간");
 
@@ -92,8 +100,17 @@ public final class OlleCourseParser {
     }
 
     /**
-     * TourAPI title 에서 매칭 키를 뽑는다. "[제주올레 3코스] 온평-표선 올레 (A)" → "3-A".
-     * 제주올레 표기가 아니면(하영올레 등) null 이다 - 다른 길을 올레 코스로 붙이면 안 된다.
+     * TourAPI title 에서 매칭 키를 뽑는다. 제주올레 표기가 아니면(하영올레 등) null 이다 -
+     * 다른 길을 올레 코스로 붙이면 안 된다.
+     *
+     * <p><b>변형(A/B) 표기가 두 형식이라 둘 다 받는다.</b> 원천이 2026-09 무렵 변형 문자를
+     * 괄호 접미사에서 대괄호 안으로 옮겼는데, 되돌리거나 섞어 줄 수 있다. 한쪽만 받으면 그날
+     * 해당 코스의 좌표가 오류 없이 조용히 빠진다.
+     *
+     * <ul>
+     *   <li>새 형식 - {@code [제주올레 3-A코스] 온평-표선 올레} → {@code 3-A}</li>
+     *   <li>옛 형식 - {@code [제주올레 3코스] 온평-표선 올레 (A)} → {@code 3-A}</li>
+     * </ul>
      */
     public static String courseKeyFromTourTitle(String title) {
         if (title == null) {
@@ -103,7 +120,11 @@ public final class OlleCourseParser {
         if (!matcher.find()) {
             return null;
         }
-        return courseKey(matcher.group(1), variantOf(title));
+        String bracketVariant = matcher.group(2);
+        // 대괄호 안에 변형이 있으면 그것이 원천의 판단이다. 없을 때만 옛 형식(괄호 접미사)으로 내려간다.
+        return bracketVariant != null
+            ? courseKey(matcher.group(1), bracketVariant.toUpperCase())
+            : courseKey(matcher.group(1), variantOf(title));
     }
 
     /**
