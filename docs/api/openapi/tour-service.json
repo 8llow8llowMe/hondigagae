@@ -40,13 +40,13 @@
           "산책 코스"
         ],
         "summary": "산책 코스 목록",
-        "description": "제주올레 코스(27개 + A/B 변형) 목록입니다. 기본 정렬은 코스번호 순입니다.\n\npetActivityLevel 을 주면 반려견 활동량으로 거릅니다 — LOW 는 4시간 이하, MEDIUM 은 6시간 이하 코스만 남고 HIGH 는 거르지 않습니다. 활동량 설명(\"장시간 활동을 힘들어합니다\" 등)에서 끌어낸 서비스 정의 기준입니다.\n\n**lat/lng 가 null 인 코스가 있습니다**(원천에 좌표가 없는 20·18-2코스). 좌표가 있는 코스는 `GET /api/v1/insights/walk-times?lat=&lng=` 에 그대로 넣어 \"오늘 이 코스 언제 걷기 좋은가\"(골든타임)를 이어 볼 수 있습니다 — 좌표가 null 이면 그 동선을 만들지 마세요.\n\n호출 예\n- 전체: `GET /api/v1/walk-courses`\n- 활동량 낮은 아이가 걸을 만한 짧은 코스부터: `GET /api/v1/walk-courses?petActivityLevel=LOW&sort=DISTANCE_ASC`",
+        "description": "제주올레 코스(27개 + A/B 변형) 목록입니다. 기본 정렬은 코스번호 순입니다.\n\npetActivityLevel 을 주면 반려견 활동량으로 코스 소요시간을 거릅니다. 활동량 설명(\"장시간 활동을 힘들어합니다\" 등)에서 끌어낸 서비스 정의 기준입니다. **적용된 활동량과 그 상한은 응답의 `appliedPetActivityLevel` 로 내려가므로 화면이 상한 숫자를 따로 적지 마세요** — 활동량으로 거르지 않은 조회에서는 그 객체가 통째로 null 입니다.\n\n**HIGH 는 상한이 없어 아무것도 거르지 않습니다.** 결과는 활동량을 주지 않은 것과 같지만 응답에는 `appliedPetActivityLevel` 이 붙어 화면이 \"좁혔다\"고 말하게 되므로, 거르지 않을 것이면 파라미터를 보내지 마세요.\n\n**lat/lng 가 null 인 코스가 있습니다**(원천에 좌표가 없는 20·18-2코스). 좌표가 있는 코스는 `GET /api/v1/insights/walk-times?lat=&lng=` 에 그대로 넣어 \"오늘 이 코스 언제 걷기 좋은가\"(골든타임)를 이어 볼 수 있습니다 — 좌표가 null 이면 그 동선을 만들지 마세요.\n\n호출 예\n- 전체: `GET /api/v1/walk-courses`\n- 활동량 낮은 아이가 걸을 만한 짧은 코스부터: `GET /api/v1/walk-courses?petActivityLevel=LOW&sort=DISTANCE_ASC`",
         "operationId": "searchWalkCourses",
         "parameters": [
           {
             "name": "petActivityLevel",
             "in": "query",
-            "description": "[선택] 반려견 활동량. 주면 소요시간 상한으로 거릅니다 — LOW 4시간 · MEDIUM 6시간 · HIGH 제한 없음",
+            "description": "[선택] 반려견 활동량. 주면 그 활동량의 소요시간 상한으로 거릅니다. 상한 값은 응답 appliedPetActivityLevel 에 있습니다",
             "required": false,
             "schema": {
               "type": "string",
@@ -65,10 +65,10 @@
             "required": false,
             "schema": {
               "type": "number",
-              "maximum": 50.0,
+              "maximum": 50,
               "minimum": 0.1
             },
-            "example": 12.0
+            "example": 12
           },
           {
             "name": "sort",
@@ -107,7 +107,7 @@
           "산책 코스"
         ],
         "summary": "산책 코스 상세",
-        "description": "목록에서 고른 코스 한 곳의 상세입니다. 목록이 내려주는 walkCourseId 를 그대로 씁니다. lat/lng 의 뜻은 목록과 같습니다 — 좌표가 있으면 골든타임(walk-times)으로 이어집니다.",
+        "description": "목록에서 고른 코스 한 곳의 상세입니다. 목록이 내려주는 walkCourseId 를 그대로 씁니다. lat/lng 의 뜻은 목록과 같습니다 — 좌표가 있으면 골든타임(walk-times)으로 이어집니다.\n\n`fitsActivityLevels` 로 **이 코스를 걸을 만한 반려견 활동량**을 함께 내립니다(목록 필터와 같은 판정 기준). 목록 항목에는 없습니다 — 목록은 이미 활동량으로 걸러 내려가기 때문입니다.",
         "operationId": "getWalkCourseDetail",
         "parameters": [
           {
@@ -119,7 +119,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 212481712381923328
+            "example": 212481712381923330
           }
         ],
         "responses": {
@@ -334,7 +334,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 212481712381923328
+            "example": 212481712381923330
           }
         ],
         "responses": {
@@ -370,7 +370,7 @@
               "format": "int64",
               "minimum": 1
             },
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           {
             "name": "targetDateTime",
@@ -501,7 +501,7 @@
               "format": "int64",
               "minimum": 1
             },
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           {
             "name": "targetDate",
@@ -636,7 +636,7 @@
               "format": "int64",
               "minimum": 1
             },
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           {
             "name": "fromDate",
@@ -1164,7 +1164,7 @@
           {
             "name": "size",
             "in": "query",
-            "description": "[선택, 기본 10] 조회 개수 (1~250). 제주 전역 시설이 214곳이라 250 이면 반경을 최대(50km)로 넓혀도 잘리지 않습니다 — 화면에서 유형·24시간을 좁히며 개수를 함께 보여주려면 한 번에 전량을 받아야 하기 때문입니다",
+            "description": "[선택, 기본 10] 조회 개수 (1~250). 제주 전역 시설이 213곳이라 250 이면 반경을 최대(50km)로 넓혀도 잘리지 않습니다 — 화면에서 유형·24시간을 좁히며 개수를 함께 보여주려면 한 번에 전량을 받아야 하기 때문입니다",
             "required": false,
             "schema": {
               "type": "integer",
@@ -1208,7 +1208,7 @@
               "type": "integer",
               "format": "int64"
             },
-            "example": 4611686018427387904
+            "example": 4611686018427388000
           }
         ],
         "responses": {
@@ -1228,6 +1228,48 @@
   },
   "components": {
     "schemas": {
+      "AppliedPetActivityLevelItem": {
+        "type": "object",
+        "description": "적용된 반려견 활동량 필터 DTO. 활동량 필터를 적용하지 않은 조회에서는 이 객체 자체가 null 이다",
+        "properties": {
+          "level": {
+            "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
+            "description": "적용된 활동량. description 은 반려견 성향 설명이며 소요시간 상한이 아니다 — 상한은 maxDurationMinutes 로 본다",
+            "example": {
+              "code": "LOW",
+              "name": "낮음",
+              "description": "짧은 산책을 선호하며 장시간 활동을 힘들어합니다."
+            }
+          },
+          "maxDurationMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "이 활동량이 걸을 수 있는 코스 소요시간 상한(분). 목록은 이 상한 이하인 코스만 담았다. **HIGH 는 상한이 없어 null 이다** — 객체 전체가 null 인 것(활동량 필터 미적용)과 뜻이 다르다. 상한의 정본은 서버라 화면은 이 값을 그대로 보여 준다",
+            "example": 240
+          }
+        }
+      },
+      "CodeNameDescriptionMetadata": {
+        "type": "object",
+        "description": "코드명 메타데이터 DTO",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "내부 코드 값",
+            "example": "EXAMPLE_CODE"
+          },
+          "name": {
+            "type": "string",
+            "description": "화면 표시 이름",
+            "example": "예시 이름"
+          },
+          "description": {
+            "type": "string",
+            "description": "코드 의미 설명",
+            "example": "코드 의미를 설명하는 문장입니다."
+          }
+        }
+      },
       "DataHeader": {
         "type": "object",
         "description": "공통 응답 헤더",
@@ -1295,7 +1337,7 @@
           "walkCourseId": {
             "type": "string",
             "description": "산책 코스 아이디",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "courseLabel": {
             "type": "string",
@@ -1316,6 +1358,12 @@
             "type": "string",
             "description": "소요시간 원문",
             "example": "4~5시간"
+          },
+          "durationMaxMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "소요시간 상한(분). **null 은 제한 없음이 아니라 원문을 파싱하지 못했다는 뜻이다** — 화면은 durationText 원문을 보여 준다",
+            "example": 300
           },
           "startEndPoint": {
             "type": "string",
@@ -1357,10 +1405,9 @@
             "description": "조건에 맞는 코스 수. 코스는 30개 안팎이라 잘리지 않고 전부 내려간다",
             "example": 29
           },
-          "petActivityLevelApplied": {
-            "type": "boolean",
-            "description": "반려견 활동량 필터가 적용됐는지",
-            "example": true
+          "appliedPetActivityLevel": {
+            "$ref": "#/components/schemas/AppliedPetActivityLevelItem",
+            "description": "적용된 반려견 활동량 필터와 그 소요시간 상한. **활동량으로 거르지 않았으면 이 객체가 통째로 null 이다** — \"적용 안 함\"을 별도 불리언 없이 그 자체로 말한다. 객체가 있는데 maxDurationMinutes 만 null 이면 HIGH(상한 없음)를 적용한 것이라 뜻이 다르다"
           },
           "providerName": {
             "type": "string",
@@ -1390,7 +1437,7 @@
           "walkCourseId": {
             "type": "string",
             "description": "산책 코스 아이디",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "courseLabel": {
             "type": "string",
@@ -1411,6 +1458,12 @@
             "type": "string",
             "description": "소요시간 원문",
             "example": "6~7시간"
+          },
+          "durationMaxMinutes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "소요시간 상한(분). **null 은 제한 없음이 아니라 원문을 파싱하지 못했다는 뜻이다** — 화면은 durationText 원문을 보여 준다",
+            "example": 420
           },
           "startEndPoint": {
             "type": "string",
@@ -1438,31 +1491,24 @@
             "description": "원천 데이터 기준일자",
             "example": "2025-04-28"
           },
+          "fitsActivityLevels": {
+            "type": "array",
+            "description": "이 코스를 걸을 만한 반려견 활동량 목록. 판정 기준은 목록 필터와 같다(WalkCourseActivityFit). durationMaxMinutes 가 null 인 코스는 세 값이 모두 담기는데, 이는 \"아무 아이나 된다\"가 아니라 \"소요시간을 모른다\"는 뜻이다. **목록 항목에는 싣지 않는다** — 목록은 이미 활동량으로 걸러 내려가므로 항목마다 반복하면 응답만 부푼다",
+            "example": [
+              {
+                "code": "MEDIUM",
+                "name": "보통",
+                "description": "일반적인 산책과 관광 일정을 소화합니다."
+              }
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CodeNameDescriptionMetadata"
+            }
+          },
           "providerName": {
             "type": "string",
             "description": "정보 출처",
             "example": "제주특별자치도 올레코스현황 · 한국관광공사 TourAPI"
-          }
-        }
-      },
-      "CodeNameDescriptionMetadata": {
-        "type": "object",
-        "description": "코드명 메타데이터 DTO",
-        "properties": {
-          "code": {
-            "type": "string",
-            "description": "내부 코드 값",
-            "example": "EXAMPLE_CODE"
-          },
-          "name": {
-            "type": "string",
-            "description": "화면 표시 이름",
-            "example": "예시 이름"
-          },
-          "description": {
-            "type": "string",
-            "description": "코드 의미 설명",
-            "example": "코드 의미를 설명하는 문장입니다."
           }
         }
       },
@@ -1473,7 +1519,7 @@
           "placeId": {
             "type": "string",
             "description": "장소 아이디",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "contentType": {
             "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
@@ -1585,7 +1631,7 @@
           "placeId": {
             "type": "string",
             "description": "장소 아이디",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "contentId": {
             "type": "string",
@@ -1909,7 +1955,7 @@
           "placeId": {
             "type": "string",
             "description": "장소 아이디",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "placeTitle": {
             "type": "string",
@@ -1937,7 +1983,7 @@
             "type": "number",
             "format": "double",
             "description": "추정 노면(아스팔트) 표면온도(섭씨). 실측이 아니라 기온에 일사(날짜·시각·위도로 낸 태양 고도)·하늘상태·바람을 반영해 계산한 추정치다. **화면 문구에 '노면(아스팔트)' 를 밝히고 `temperature`(기온)와 나란히 보여 주세요**",
-            "example": 58.0
+            "example": 58
           },
           "feelsLikeCelsius": {
             "type": "number",
@@ -1975,7 +2021,7 @@
             "type": "number",
             "format": "double",
             "description": "판정에 쓴 기온(섭씨)",
-            "example": 31.0
+            "example": 31
           },
           "humidity": {
             "type": "integer",
@@ -2034,7 +2080,7 @@
           "placeId": {
             "type": "string",
             "description": "장소 아이디",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "title": {
             "type": "string",
@@ -2108,13 +2154,13 @@
             "type": "number",
             "format": "double",
             "description": "최저기온(섭씨)",
-            "example": 24.0
+            "example": 24
           },
           "maxTemperature": {
             "type": "number",
             "format": "double",
             "description": "최고기온(섭씨)",
-            "example": 31.0
+            "example": 31
           },
           "maxPrecipitationProbability": {
             "type": "integer",
@@ -2163,7 +2209,7 @@
           "placeId": {
             "type": "string",
             "description": "장소 아이디",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "placeTitle": {
             "type": "string",
@@ -2304,7 +2350,7 @@
           "placeId": {
             "type": "string",
             "description": "장소 아이디. Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로 문자열로 내린다",
-            "example": 212481712381923328
+            "example": 212481712381923330
           },
           "fromDate": {
             "type": "string",
@@ -2418,13 +2464,13 @@
             "type": "number",
             "format": "double",
             "description": "기온(℃). 사람이 보는 그 기온이다. **노면온도와 나란히 보여 주세요** — 노면온도만 두면 사용자가 그것을 기온으로 읽는다",
-            "example": 29.0
+            "example": 29
           },
           "estimatedPavementCelsius": {
             "type": "number",
             "format": "double",
             "description": "추정 노면(아스팔트) 온도(℃). 기온에 일사(날짜·시각·위도로 낸 태양 고도), 하늘상태, 바람을 반영해 계산한 값이며 실측이 아니다. **화면 문구에 '노면(아스팔트)' 를 밝혀 주세요**",
-            "example": 44.0
+            "example": 44
           },
           "precipitationProbability": {
             "type": "integer",
@@ -2532,13 +2578,13 @@
             "type": "number",
             "format": "double",
             "description": "최저기온(℃)",
-            "example": 18.0
+            "example": 18
           },
           "maxTemperature": {
             "type": "number",
             "format": "double",
             "description": "최고기온(℃)",
-            "example": 26.0
+            "example": 26
           },
           "maxFeelsLikeTemperature": {
             "type": "number",
@@ -2619,7 +2665,7 @@
           "facilityId": {
             "type": "string",
             "description": "긴급 시설 아이디. Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로 문자열로 내린다",
-            "example": 4611686018427387904
+            "example": 4611686018427388000
           },
           "facilityType": {
             "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
@@ -2741,7 +2787,7 @@
           "facilityId": {
             "type": "string",
             "description": "긴급 시설 아이디. Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로 문자열로 내린다",
-            "example": 4611686018427387904
+            "example": 4611686018427388000
           },
           "facilityType": {
             "$ref": "#/components/schemas/CodeNameDescriptionMetadata",
