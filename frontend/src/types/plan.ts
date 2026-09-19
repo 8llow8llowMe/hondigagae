@@ -244,9 +244,31 @@ export type PlanItemWalkSafetyItem = {
   /** 그날 날씨 판정의 기준견과 같다 (서버가 맞춰 준다) */
   basisPetId: string | null
   /**
-   * `{code, name, description, scoreDescription}`. **판정을 못 낸 항목은 통째로 null.**
+   * 이 항목 판정에 **기준 반려견 특성이 반영됐는가** (#717).
    *
-   * **`scoreDescription` 은 언제나 null 이다** (`PlanWalkSafetyPresenter.java:53`). 읽지 않는다.
+   * **`null` 과 `false` 는 다른 사실이다.**
+   *  - `null` — **묻지 않았다.** 판정 자체를 못 낸 줄이라 반영도 미반영도 아니다
+   *  - `false` — **물어봤고, 반려견 특성 없이 일반 조건으로 판정했다**
+   *  - `true` — 기준견 특성이 들어갔다
+   *
+   * **일자 판정(`PlanWeatherResponse.petConditionApplied`)과 출처가 다르다** — 저쪽은
+   * auth 특성 조회 결과이고 이쪽은 tour 의 `petCondition().isSpecified()` 다. 그래서
+   * 일자는 `true` 인데 항목만 `false` 인 조합이 실제로 생긴다 (`plan-item-row.tsx`).
+   */
+  petConditionApplied: boolean | null
+  /**
+   * `{code, name, description, scoreDescription}`. **판정을 못 낸 항목은 대체로 null 이지만
+   * `NO_FORECAST_AT_TIME` 은 예외다** (#717) — 서버가 tour 에 실제로 물어 `UNKNOWN` 등급을
+   * 받은 줄이라 사유 코드와 판정이 **함께** 온다.
+   *
+   * **`scoreDescription` 이 이제 채워진다** (#717). 예전 주석은 "언제나 null" 이라고 적었는데
+   * 그것은 쓸 일이 없어서가 아니라 BE 가 Feign DTO 에 칸이 없어 경계에서 버리고 있었기
+   * 때문이고, #717 이 그 배선을 이었다.
+   *
+   * **그래도 항목 행에서는 쓰지 않는다.** 행은 D15-5 로 일부러 얇게 유지했고(노면온도·기온을
+   * 행에서 뺀 것이 같은 규율이다), 이 문장은 **등급당 고정 문장**이라 배지(`name`)가 이미
+   * 말하는 것 위에 줄만 늘린다. **값은 이제 오므로 쓸 자리가 생기면 그때 쓴다** — 장소 상세
+   * 패널이 이미 같은 값을 쓴다.
    */
   walkSafetyLevel: ScoreMetricMetadata | null
   /** 추정 노면(아스팔트) 온도. 행에 두지 않는다 (D15-5) */
@@ -259,11 +281,15 @@ export type PlanItemWalkSafetyItem = {
   saferWindowStart: string | null
   saferWindowEnd: string | null
   /**
-   * 판정을 못 낸 사유 다섯 종 중 하나 — 정상이면 null.
+   * 판정을 못 낸 사유 여섯 종 중 하나 — 정상이면 null.
    *
    * **union 이 아니라 `string` 이다.** 서버가 사유를 늘렸을 때 모르는 코드가 타입 오류가
    * 되는 것이 아니라, 화면이 서버 문장으로 물러설 수 있어야 한다 (`unavailableReasonCode`
-   * 선례 — `PlanDayWeatherItem`).
+   * 선례 — `PlanDayWeatherItem`). #717 이 실제로 여섯째(`NO_FORECAST_AT_TIME`)를 더했고,
+   * 화면은 그 사이 아무것도 고치지 않고도 서버 문장으로 물러서 있었다.
+   *
+   * **`walkSafetyLevel !== null` 과 배타가 아니다** — `NO_FORECAST_AT_TIME` 은 둘 다 온다
+   * (`lib/plan/walk-safety.ts` 의 `NO_FORECAST_AT_TIME_CODE`).
    */
   unavailableReasonCode: string | null
   /** 사유 **문장**. 코드와 짝으로 온다. FE 는 이 문장을 파싱하지도 짓지도 않는다 */
