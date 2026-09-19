@@ -243,6 +243,32 @@ class PlanCopyTest {
         public Slice<Plan> findMyPlans(long memberId, Long petId, long lastPlanId, int size) {
             throw new UnsupportedOperationException();
         }
+
+        @Override
+        public List<Plan> findCompanionEditablePlansWithPet(long memberId, long petId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Plan> findCompanionEditablePlans(long memberId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Long> findMemberIdsWithCompanionEditablePlans(long lastMemberId, int size) {
+            throw new UnsupportedOperationException();
+        }
+
+        /** 복제는 새 일정을 만들 뿐이지만, 수정 경로와 같은 Processor 라 잠금 호출이 지나갈 수 있다. */
+        @Override
+        public Optional<Plan> findActiveByIdForUpdate(long planId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public int promoteRepresentative(long planId, long petId, long expectedPetId) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     private static class StubPlanItemRepositoryPort implements PlanItemRepositoryPort {
@@ -297,12 +323,22 @@ class PlanCopyTest {
         }
 
         @Override
+        public List<PlanPet> findByPlanIdForUpdate(long planId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public List<PlanPet> findByPlanIds(Collection<Long> planIds) {
             throw new UnsupportedOperationException();
         }
 
         @Override
         public void deleteByPlanId(long planId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public int deleteByPlanIdAndPetId(long planId, long petId) {
             throw new UnsupportedOperationException();
         }
     }

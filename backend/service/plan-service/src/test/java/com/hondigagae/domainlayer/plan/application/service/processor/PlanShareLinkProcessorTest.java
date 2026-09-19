@@ -296,5 +296,30 @@ class PlanShareLinkProcessorTest {
         public Slice<Plan> findMyPlans(long memberId, Long petId, long lastPlanId, int size) {
             throw new UnsupportedOperationException("공유 링크 경로는 목록 조회를 쓰지 않는다");
         }
+
+        @Override
+        public List<Plan> findCompanionEditablePlansWithPet(long memberId, long petId) {
+            throw new UnsupportedOperationException("공유 링크 경로는 동행견 정리를 쓰지 않는다");
+        }
+
+        @Override
+        public List<Plan> findCompanionEditablePlans(long memberId) {
+            throw new UnsupportedOperationException("공유 링크 경로는 동행견 정리를 쓰지 않는다");
+        }
+
+        @Override
+        public List<Long> findMemberIdsWithCompanionEditablePlans(long lastMemberId, int size) {
+            throw new UnsupportedOperationException("공유 링크 경로는 동행견 정리를 쓰지 않는다");
+        }
+
+        @Override
+        public Optional<Plan> findActiveByIdForUpdate(long planId) {
+            throw new UnsupportedOperationException("공유 링크 경로는 동행견 정리를 쓰지 않는다");
+        }
+
+        @Override
+        public int promoteRepresentative(long planId, long petId, long expectedPetId) {
+            throw new UnsupportedOperationException("공유 링크 경로는 동행견 정리를 쓰지 않는다");
+        }
     }
 }
