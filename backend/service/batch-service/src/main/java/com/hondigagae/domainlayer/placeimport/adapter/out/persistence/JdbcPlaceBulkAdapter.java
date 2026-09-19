@@ -58,6 +58,25 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
 
     private static final int BATCH_SIZE = 500;
 
+    /**
+     * 관광 API 장소 upsert.
+     *
+     * <p><b>모르는 값은 넣지 않는다.</b> 관광 API 는 실내외를 말해 주지 않으므로 indoor / outdoor 를
+     * INSERT 컬럼 목록에서 아예 빼 NULL 로 둔다 — {@link #MFDS_UPSERT_SQL} 과 같은 규칙이다.
+     * 리터럴 {@code false} 를 박으면 "모른다" 와 "실외다" 가 같은 값이 되고, tour-service 의
+     * {@code PlaceEntity} 가 이 컬럼을 {@code Boolean} wrapper 로 둔 이유("false 로 뭉개면 관광 API
+     * 장소가 전부 실외로 잘못 표시된다")가
+     * 무너진다. 실제로 그 상태였고 결과가 둘이었다 — 비 오는 날 실내 대안에서 관광 API 장소가 전부
+     * 배제되고, 병합의 {@code COALESCE(survivor.indoor, absorbed.indoor)} 가 survivor 값이 절대
+     * NULL 이 아니라 <b>영구 no-op</b> 이 돼 문화정보원이 아는 실내외를 병합할 때마다 버렸다 (#753).
+     *
+     * <p>UPDATE 절에서도 건드리지 않는다. 병합 잡이 다른 원천에서 옮겨 채워 둔 값을 재적재 때마다
+     * 도로 지워 버리면 안 된다.
+     *
+     * <p><b>같은 INSERT 안에 정반대 규칙이 하나 있다</b> — {@code area_code} 는 원천이 비워 보내도
+     * 우리가 채워 넣는다. 그쪽은 사실 데이터가 아니라 <b>적재 범위 키</b>라서 NULL 이면 delist·병합·
+     * 공개 조회가 동시에 눈이 먼다. "사실은 모르면 비우고, 범위 키는 모르면 채운다" 가 두 규칙의 경계다.
+     */
     private static final String UPSERT_SQL = """
         INSERT INTO place (
             id,
@@ -88,8 +107,6 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             tel,
             pet_available,
             pet_allowance_type,
-            indoor,
-            outdoor,
             pet_only,
             allowed_pet_size,
             source_created_at,
@@ -98,7 +115,7 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             created_at,
             updated_at
         ) VALUES (?, 'TOUR_API', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                  false, 'UNKNOWN', false, false, false, 'UNKNOWN', ?, ?, ?, NOW(), NOW())
+                  false, 'UNKNOWN', false, 'UNKNOWN', ?, ?, ?, NOW(), NOW())
         ON DUPLICATE KEY UPDATE
             content_id = VALUES(content_id),
             content_type_id = VALUES(content_type_id),
