@@ -256,3 +256,96 @@ place_import_last_success_timestamp{source="MFDS"}
    `last_success` 경보 등록은 Prometheus rule 작업으로 남아 있다
 
 1~2 가 없으면 데이터가 한 방향으로만 늘어난다. 나머지보다 먼저 해야 한다.
+
+## 8. 잘못 적재된 값을 되돌릴 때 — `indoor` / `outdoor` (#753)
+
+관광 API 적재가 `indoor` / `outdoor` 에 리터럴 `false` 를 박고 있었다. 원천이 실내외를 말해 주지
+않는데 "실외다"로 단정한 것이다. 코드는 고쳤지만(**모르는 값은 INSERT 컬럼에서 뺀다**)
+**이미 적재된 행은 그대로 `false` 로 남아 있다.** 적재 잡이 UPDATE 절에서 이 컬럼을 건드리지
+않으므로(병합이 채운 값을 지우지 않기 위해서다) **재적재해도 저절로 고쳐지지 않는다.**
+
+### 왜 되돌려야 하나
+
+- `place.indoor = false` 인 행은 비 오는 날 실내 대안 조회(`indoor=true` 필터)에서 **근거 없이
+  배제**된다. 실제로 실내인 문화시설·쇼핑도 마찬가지다.
+- 병합의 `COALESCE(survivor.indoor, absorbed.indoor)` 가 survivor 값이 NULL 이 아니라
+  **영구 no-op** 이었다. 되돌려 NULL 로 두어야 문화정보원이 아는 실내외가 비로소 옮겨 온다.
+- AI 일정 생성의 LLM 프롬프트가 이 값을 문장으로 싣는다 — `PlaceCandidate.indoorText()` 는
+  null 을 `"실내외 정보없음"` 으로 내는데, `false` 가 박혀 있어 **모델에게 "실외"라고 말하고**
+  있었다. 되돌리면 모르는 것을 모른다고 말하게 된다.
+
+**소비처는 전부 NULL 의미로 이미 맞춰져 있었다 — 깨진 것은 쓰는 쪽 하나였다.**
+tour-service 조회(`PlaceCustomRepositoryImpl.commonFilters`: *"indoor 가 null 인 장소는 어느 쪽으로도
+잡히지 않는다 — 정보 없음과 실외는 다르다"*), ai-service 프롬프트(위), FE(`lib/place/indoor.ts` —
+*"`false`(야외)로 단정하지도 않는다"*, #112) 가 모두 3항 논리로 쓰고 있다. **그래서 이 수정에
+따라붙는 FE 변경은 없다.** 화면은 지금까지 잘못된 입력을 정직하게 렌더하고 있었을 뿐이다.
+
+### 되돌린 뒤 달라지는 것
+
+| 조회 | 전 | 후 |
+|------|----|----|
+| `indoor=true` (비 오는 날 실내 대안) | TOUR_API 장소 **전부 배제** | 병합이 실내로 채운 장소가 **들어온다** |
+| `indoor=false` | TOUR_API 장소 **전부 포함**(근거 없음) | 실외로 **확인된** 장소만 |
+| 필터 없음 | 변화 없음 | 변화 없음 |
+
+`indoor=false` 결과가 줄어드는 것은 회귀가 아니라 **근거 없는 포함이 빠지는 것**이다.
+
+### 절차
+
+```sql
+-- 1) 영향 범위를 먼저 센다 (읽기 전용)
+SELECT COUNT(*) FROM place
+ WHERE source = 'TOUR_API' AND (indoor IS NOT NULL OR outdoor IS NOT NULL);
+
+-- 1-1) 이미 병합된 쌍이 있는지도 센다 — 3) 이 필요한지를 가른다 (읽기 전용)
+SELECT COUNT(*) FROM place WHERE merged_into_id IS NOT NULL;
+
+-- 2) 되돌린다
+UPDATE place
+   SET indoor = NULL, outdoor = NULL
+ WHERE source = 'TOUR_API';
+
+-- 3) 이미 병합된 쌍의 값을 옮긴다 ★ placeMergeJob 재실행으로는 안 된다 (아래 설명)
+UPDATE place survivor
+  JOIN place absorbed ON absorbed.merged_into_id = survivor.id
+   SET survivor.indoor  = COALESCE(survivor.indoor,  absorbed.indoor),
+       survivor.outdoor = COALESCE(survivor.outdoor, absorbed.outdoor),
+       survivor.updated_at = NOW()
+ WHERE survivor.source = 'TOUR_API';
+
+-- 4) 아직 병합되지 않은 쌍은 placeMergeJob 이 처리한다 (§7-4). 3) 과 함께 돌린다
+```
+
+> ⚠ **3) 을 `placeMergeJob` 재실행으로 대신할 수 없다.** 병합 후보 조회가
+> `merged_into_id IS NULL` 로 거르기 때문에(`JdbcPlaceMergeAdapter.SELECT_CANDIDATES_SQL`)
+> **이미 병합된 문화정보원 행은 다시 후보가 되지 않는다.** 2) 로 survivor 를 NULL 로 되돌려도
+> 잡을 다시 돌리는 것만으로는 값이 옮겨 오지 않는다. 1-1) 이 0이면 3) 은 건너뛰어도 된다.
+>
+> 같은 이유로 **병합은 1회성 복사다** — 나중에 문화정보원 CSV 가 실내외를 정정해도 survivor
+> 에는 반영되지 않는다. 별도 이슈로 다룬다.
+
+- **`source = 'TOUR_API'` 로 반드시 한정한다.** 문화정보원(`CULTURE_PORTAL`) 행은 이 컬럼을
+  원천에서 실제로 받아 오므로 같이 지우면 아는 값을 잃는다.
+- **`#726` 재적재보다 먼저 한다.** 재적재는 약 1,200행을 새로 넣는데, 코드 수정이 먼저 배포돼
+  있으면 새 행은 처음부터 NULL 로 들어온다. 순서가 뒤집히면 잘못된 값이 2배로 늘고 사후
+  UPDATE 범위만 커진다.
+- prod 는 §1 과 같이 **런북으로 사람이 적용**한다. dev 에서 1)·2)·3) 을 돌려 건수와 병합 결과를
+  확인한 뒤 옮긴다.
+
+### 확인
+
+```sql
+-- 되돌린 뒤: TOUR_API 행에 false 가 남아 있으면 안 된다
+SELECT COUNT(*) FROM place WHERE source = 'TOUR_API' AND indoor = false;   -- 0 이어야 한다
+
+-- 병합 뒤: 문화정보원에서 옮겨 온 값이 생겼는지
+SELECT COUNT(*) FROM place WHERE source = 'TOUR_API' AND indoor IS NOT NULL;  -- 0 보다 커야 한다
+```
+
+두 번째 쿼리가 계속 0 이면 **먼저 3) 을 돌렸는지 확인한다.** 잡 재실행만으로는 이미 병합된 쌍의
+값이 옮겨 오지 않는다(위 경고). 3) 까지 돌렸는데도 0 이면 그때 병합 후보가 안 잡히는지를 본다
+(`place-data-integration.md` §4).
+
+> **확인은 SQL 로 한다.** 장소 검색은 Redis 캐시를 TTL 로 갈아타고(기본 300초,
+> `place.search-cache-seconds`) 캐시 키에 `indoor` 가 들어간다. 백필 직후 API 로 보면 최대 5분간
+> 옛 결과가 온다 — 그걸 실패로 오진하지 않는다.
