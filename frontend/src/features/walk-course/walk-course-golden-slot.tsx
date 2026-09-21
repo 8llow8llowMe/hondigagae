@@ -33,9 +33,15 @@ import type { WalkTimesResponse } from '@/types/insight'
  * 확정된 문구로** 갖고 있다(#204 · #262 · #270 이 세 번 고친 자리). 이 화면은 **데이터와
  * `onRetry` 만** 넘긴다 — 복제하면 한쪽만 고쳐져 같은 상태에 다른 문구가 나간다.
  *
- * **`positionFallback` 은 `false` 다.** 그 prop 은 "기기 위치를 못 얻어 제주 중심으로
- * 조회했다" 를 뜻하는데(#180) 여기 좌표는 **코스의 시작점**이라 폴백이 아니다. `true` 를
- * 넘기면 화면이 없는 사실을 말한다. 대신 시작점 기준이라는 것을 캡션 한 줄로 밝힌다 (D8-5).
+ * **기준점은 `course-start` 다** ([#779](https://github.com/8llow8llowMe/hondigagae/issues/779)).
+ *
+ * 전에 이 자리는 `positionFallback={false}` 를 넘기며 *"폴백이 아니니 `false`"* 라고만
+ * 따졌다. **그 `false` 가 화면에 `현재 위치 기준` 을 내보낸다는 것을 놓쳤다** — 조회 좌표는
+ * 사용자 위치가 아니라 코스 시작점이라 그 줄은 통째로 거짓이었다. 게다가 그것을 바로잡으려
+ * 캡션 한 줄을 따로 덧붙여, 한 카드가 기준점을 **두 번, 서로 다르게** 말했다.
+ *
+ * 그래서 **캡션을 여기서 그리지 않는다.** `WalkTimesSection` 이 기준점 한 줄을 이미 갖고
+ * 있고, 이제 그 줄이 시작점을 말할 수 있다 (D8-5 의 사실은 그대로 전달된다).
  */
 export function WalkCourseGoldenSlot({
   course,
@@ -70,14 +76,10 @@ export function WalkCourseGoldenSlot({
       <WalkTimesSection
         data={walkTimes}
         loading={loading}
-        positionFallback={false}
+        basis="course-start"
         onRetry={onRetry}
         retryLabel={messages.walkCourse.goldenRetry}
       />
-
-      <p className={cn('text-caption text-fg-muted pb-4 break-keep', INSET_CLASS.card)}>
-        {messages.walkCourse.goldenBasis}
-      </p>
     </Surface>
   )
 }

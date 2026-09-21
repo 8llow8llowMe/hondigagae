@@ -78,9 +78,15 @@ export const homeMessages = {
    * **위치를 못 얻었을 때 그 사실을 감추지 않는다.** 다만 거부·타임아웃·미지원을 구분해
    * 적지는 않는다 — 이 섹션은 거리를 표시하지 않아 실패 종류가 사용자의 다음 행동을
    * 바꾸지 않는다 (`/emergency` 는 거리를 쓰므로 거기서는 구분한다).
+   *
+   * **셋인 이유** ([#779](https://github.com/8llow8llowMe/hondigagae/issues/779)): 전에는
+   * 둘이었고 `positionFallback` 불린이 골랐다. 그래서 좌표를 **코스 시작점**에서 가져오는
+   * 화면이 "폴백이 아니다" 를 표현하려 `false` 를 넘겼고, 그 `false` 가 `현재 위치 기준` 을
+   * 내보내 없는 사실을 말했다. 기준점이 셋이면 문구도 셋이어야 한다.
    */
   goldenBasisCurrent: '현재 위치 기준',
   goldenBasis: '제주시 기준',
+  goldenBasisCourseStart: '코스 시작점 기준',
   /**
    * 추천 구간이 없는 날. **"그나마 이때가 낫다" 를 쓰지 않는다** — 서버가 일부러 구간을
    * 주지 않는 날이고, 대안을 지어내면 사용자가 그것을 허락으로 읽는다 (`GoldenWalkWindow`).

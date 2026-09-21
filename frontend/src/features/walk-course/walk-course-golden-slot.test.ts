@@ -118,8 +118,8 @@ describe('WalkCourseGoldenSlot — 좌표가 없어도 자리와 제목은 남�
     expect(render(NO_COORDS)).not.toContain('role="alert"')
   })
 
-  it('시작점 기준 캡션은 세우지 않는다 — 기준으로 삼을 시작점이 없다', () => {
-    expect(render(NO_COORDS)).not.toContain(messages.walkCourse.goldenBasis)
+  it('기준 줄을 세우지 않는다 — 기준으로 삼을 시작점이 없다', () => {
+    expect(render(NO_COORDS)).not.toContain(messages.home.goldenBasisCourseStart)
   })
 
   /** 곡선도 재조회도 없다 — 요청 자체가 나가지 않는 갈래다 (공통명세 S4-2) */
@@ -136,20 +136,31 @@ describe('WalkCourseGoldenSlot — 좌표가 있으면 골든타임을 세운다
     expect(render({ lat: 33.4, lng: 126.9 })).toContain(messages.home.goldenHeading)
   })
 
-  /** 코스 전체가 아니라 시작점 기준이라는 사실이다 (D8-5) */
-  it('시작점 기준이라는 캡션을 붙인다', () => {
-    expect(render({ lat: 33.4, lng: 126.9 })).toContain(messages.walkCourse.goldenBasis)
+  /** 코스 전체가 아니라 시작점 기준이라는 사실이다 (D8-5 · #779 에서 ② 로 개정) */
+  it('시작점 기준이라는 것을 밝힌다', () => {
+    expect(render({ lat: 33.4, lng: 126.9 })).toContain(messages.home.goldenBasisCourseStart)
   })
 
   /**
-   * **`positionFallback` 은 `false` 다** (D5-1). 그 prop 은 "기기 위치를 못 얻어 제주
-   * 중심으로 조회했다" 를 뜻하는데(#180) 여기 좌표는 코스의 시작점이라 폴백이 아니다.
+   * #779. **이 자리가 거짓을 말했다.** `positionFallback={false}` 가 "폴백이 아니다" 를
+   * 뜻한다고 읽고 넘겼는데, 그 `false` 가 화면에 `현재 위치 기준` 을 내보냈다. 조회 좌표는
+   * 사용자 위치가 아니라 **코스 시작점**이라 앞줄이 통째로 거짓이었다.
    */
-  it('위치 폴백 문구를 쓰지 않는다 — 좌표는 코스의 시작점이다', () => {
+  it('현재 위치 기준이라고 말하지 않는다 — 좌표는 코스의 시작점이다', () => {
     const markup = render({ lat: 33.4, lng: 126.9 })
 
+    expect(markup).not.toContain(messages.home.goldenBasisCurrent)
     expect(markup).not.toContain(messages.home.goldenBasis)
-    expect(markup).toContain(messages.home.goldenBasisCurrent)
+  })
+
+  /**
+   * #779 의 나머지 절반. 전에는 `WalkTimesSection` 이 한 줄(거짓), 이 컴포넌트가 캡션
+   * 한 줄(참)을 각각 말해 **한 카드가 기준점을 두 번** 말했다. 한 번만 말한다.
+   */
+  it('기준점을 말하는 줄이 하나뿐이다', () => {
+    const markup = render({ lat: 33.4, lng: 126.9 })
+
+    expect(markup.split(messages.home.goldenBasisCourseStart)).toHaveLength(2)
   })
 
   /** 조회 실패는 자리를 통째로 숨긴다 — 홈과 같은 규칙이다 */
