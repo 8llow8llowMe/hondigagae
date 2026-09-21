@@ -15,6 +15,7 @@ import {
   clusterMarkerLabel,
   clusterMarkerText,
 } from '@/lib/map/cluster'
+import { pinContent } from '@/lib/map/pin-content'
 import type { MapRouteSegment } from '@/lib/map/route'
 import { loadKakaoMaps, MapSdkError, type MapSdkFailure } from '@/lib/map/sdk'
 import { MAP_LAYER_Z, markerZIndex } from '@/lib/map/stacking'
@@ -47,6 +48,27 @@ import type {
  *
  * 오버레이 내용을 JSX 가 아니라 DOM API 로 만드는 이유: `CustomOverlay` 는 문자열이나
  * `HTMLElement` 만 받는다. React 트리 밖이므로 **정리 책임이 전부 이 컴포넌트에 있다.**
+ *
+ * ### 갈래가 둘이다 — `onSelect` 를 주는가 (#789)
+ *
+ * 이 컴포넌트를 쓰는 화면은 두 종류다. 목록형(`/places` · `/emergency` · 일정 동선)은
+ * 핀을 골라 목록과 대응시키고, 단일 핀형(`PlaceMiniMap` · `WalkCourseStartMap`)은
+ * **"여기가 어디쯤이냐" 한 가지만 답한다** — 핀이 하나뿐이라 고를 것이 없고, 지도를
+ * 옮겨도 보여 줄 다른 것이 없다.
+ *
+ * 그 둘을 **`onSelect` 의 유무**로 가른다 (판정 1). 명시 prop(`interactive={false}`)이
+ * 말은 더 분명하지만, 그것으로는 `onSelect={() => undefined}` 를 넘길 길이 남는다 —
+ * 실제로 두 화면 다 그렇게 하고 있었고, 그 no-op 이 **눌러도 아무 일 없는 포커서블
+ * 버튼**을 만들었다. 옵셔널로 두면 그 길 자체가 막힌다.
+ *
+ * 미지정이면 한꺼번에 셋이 걸린다 (판정 3 — 지금 갈릴 이유가 없어 묶었다):
+ *  - 핀을 `<button>` 이 아니라 `<div role="img">` 로 그린다 (판정 2)
+ *  - 오버레이를 `clickable: false` 로 둔다
+ *  - `setDraggable(false)` · `setZoomable(false)` — 지도가 세로 스크롤을 가로채지 않는다
+ *
+ * **셋을 가를 조건**: "핀 하나인데 지도는 끌고 싶은" 화면이 생기면 그때 이동/확대를
+ * 별도 prop 으로 뺀다. 핀의 버튼 여부는 그때도 `onSelect` 를 따른다 — 고를 것이 없는데
+ * 버튼인 것과, 끌 수 있는데 못 끄는 것은 서로 다른 문제다.
  */
 
 /**
@@ -141,7 +163,15 @@ export function MapCanvas({
    */
   route?: MapRouteSegment[] | null
   selectedId: string | null
-  onSelect: (id: string) => void
+  /**
+   * 핀을 고르면 알린다. **주지 않으면 "고를 것이 없는 지도" 갈래로 들어간다** (#789) —
+   * 핀이 버튼에서 떨어지고, 지도가 이동·확대를 받지 않는다 (머리주석의 갈래 참고).
+   *
+   * **`() => undefined` 를 넘기지 않는다.** 그것이 정확히 이 prop 을 옵셔널로 만든
+   * 이유다 — 핀 하나뿐인 지도 둘이 그렇게 넘겨서, 키보드로 Tab 이 멈추는데 Enter 를
+   * 눌러도 아무 일이 없고 스크린리더는 **눌린 토글**로 읽는 정류장이 생겼다.
+   */
+  onSelect?: (id: string) => void
   /**
    * 지도가 멈춘 뒤(`idle`) 현재 영역을 알린다. "보이는 곳" 개수와 재검색이 쓴다.
    *
@@ -198,6 +228,16 @@ export function MapCanvas({
   onFailure?: (reason: MapSdkFailure) => void
   className?: string
 }) {
+  /*
+    **고를 것이 있는 지도인가** (#789 · 머리주석의 갈래). 핀의 모양, 오버레이의 클릭
+    수용, 지도의 이동·확대가 전부 이 하나에서 갈린다.
+
+    `onSelect` 의 **참조**가 아니라 **유무**만 본다 — 부모가 인라인 함수를 넘겨도 값은
+    안 바뀐다. 갈래가 뒤집히는 일은 사실상 없지만 렌더마다 다시 세는 값이라
+    의존성 배열에 그대로 실을 수 있다.
+  */
+  const interactive = onSelect !== undefined
+
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<KakaoMap | null>(null)
   const mapsRef = useRef<KakaoMaps | null>(null)
@@ -307,6 +347,29 @@ export function MapCanvas({
     }
   }, [])
 
+  /*
+    ── 지도가 사용자의 손을 받는가 ──────────────────────────────────────────
+
+    **지도를 만드는 effect 안에서 하지 않는다.** 그쪽은 의존성이 비어 있어야 하고
+    (재생성은 사용자가 맞춰 둔 확대·위치를 통째로 날린다), 이 값은 props 에서 온다.
+    여기서 걸면 지도는 그대로 두고 옵션만 바뀐다.
+
+    **끄는 쪽만이 아니라 양쪽을 다 건다.** `true` 는 카카오 기본값이라 목록형 지도에는
+    아무 변화가 없고(#789 의 절반은 "기본값을 바꾸지 않는다" 다), 한 방향만 걸어 두면
+    갈래가 뒤집힐 때 지도가 잠긴 채로 남는다.
+
+    끄는 이유: 단일 핀 지도는 **재조회도 선택도 없어 옮겨서 얻을 것이 없는데**, 코스
+    상세의 176px 띠처럼 아래에 콘텐츠가 더 있는 중간 위치에 앉으면 그 위에서 시작한
+    세로 스와이프를 지도가 먹는다. 전체 보기는 길찾기 딥링크가 맡는다.
+  */
+  useEffect(() => {
+    const map = mapRef.current
+    if (map === null || status !== 'ready') return
+
+    map.setDraggable(interactive)
+    map.setZoomable(interactive)
+  }, [interactive, status])
+
   // ── 오버레이 동기화 ──────────────────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current
@@ -348,7 +411,16 @@ export function MapCanvas({
             map.setLevel(Math.max(1, map.getLevel() - 2))
             map.panTo(new maps.LatLng(group.center.lat, group.center.lng))
           })
-        : pinElement(first, first.id === selectedId, () => selectRef.current(first.id))
+        : /*
+            **`onSelect` 를 안 받았으면 핸들러가 `null` 이고, 그러면 버튼이 아니다**
+            (#789). 여기서 `() => selectRef.current?.(id)` 로 감싸 넘기면 `pinElement`
+            쪽에서는 늘 핸들러가 있는 것으로 보여 갈래가 사라진다.
+          */
+          pinElement(
+            first,
+            first.id === selectedId,
+            interactive ? () => selectRef.current?.(first.id) : null,
+          )
 
       const overlay = new maps.CustomOverlay({
         position: new maps.LatLng(group.center.lat, group.center.lng),
@@ -372,14 +444,22 @@ export function MapCanvas({
           (#671 A-1). 순수 함수로 빼서 `stacking.test.ts` 가 부등식을 잠근다.
         */
         zIndex: markerZIndex({ isCluster, selected: first.id === selectedId }),
-        clickable: true,
+        /*
+          **고를 것이 없는 핀은 클릭을 받지 않는다** (#789). `clickable: true` 인
+          오버레이는 자기 위에서 난 포인터 이벤트를 지도에 넘기지 않는데, 단일 핀
+          지도에서는 그 핀이 **띠의 한가운데**를 차지한다 — 받아 봐야 할 일이 없는 데다,
+          거기서 시작한 세로 스와이프가 페이지에 닿는 길까지 막을 수 있다.
+
+          묶음은 갈래와 무관하게 받는다. 누르면 확대라는 **할 일이 있다.**
+        */
+        clickable: isCluster || interactive,
       })
       overlay.setMap(map)
       created.push(overlay)
     }
 
     overlaysRef.current = created
-  }, [pins, selectedId, status, level])
+  }, [pins, selectedId, status, level, interactive])
 
   // ── 동선 선 ──────────────────────────────────────────────────────────────
   /*
@@ -569,37 +649,40 @@ export function MapCanvas({
 /**
  * 개별 핀. **이름을 쓴다** — 4~12곳 규모라 핀만 찍으면 눌러봐야 안다
  * (아트보드 `혼디가개 긴급 시설` 02).
+ *
+ * **여기는 조립만 한다.** 무엇으로 그릴지(태그·역할·이름·클래스)는 `lib/map/pin-content.ts`
+ * 가 정하고 `pin-content.test.ts` 가 잠근다 — DOM API 로 만드는 이 자리는 `document` 가
+ * 없는 node 환경 테스트에서 볼 수 없어서, 판단만 떼어 냈다.
+ *
+ * `onClick` 이 `null` 이면 **버튼이 아니다** (#789 — 고를 것이 없는 지도). 그 갈래에서는
+ * `type` 도 클릭 리스너도 붙지 않는다.
  */
-function pinElement(pin: MapPin, selected: boolean, onClick: () => void): HTMLElement {
-  const button = document.createElement('button')
-  button.type = 'button'
+function pinElement(pin: MapPin, selected: boolean, onClick: (() => void) | null): HTMLElement {
+  const content = pinContent(pin, { selected, interactive: onClick !== null })
 
-  /*
-    **순번 핀은 고르기 전까지 숫자 원이다.** 고르면 이름표(`.map-pin-selected`)로 바뀐다 —
-    원 안에 이름이 들어가지 않고, 이름이 필요한 순간은 사용자가 그 핀을 지목한 때뿐이다.
-    보조기기는 두 상태 모두에서 이름을 읽는다 (`aria-label`).
-  */
-  if (pin.order !== undefined && !selected) {
-    button.className = 'map-pin-order'
-    button.textContent = String(pin.order)
-    button.setAttribute('aria-label', `${String(pin.order)}. ${pin.title}`)
-    button.setAttribute('aria-pressed', 'false')
-    button.addEventListener('click', onClick)
-    return button
+  const element = document.createElement(content.tag)
+  element.className = content.className
+
+  if (content.role !== null) element.setAttribute('role', content.role)
+  if (content.ariaLabel !== null) element.setAttribute('aria-label', content.ariaLabel)
+  if (content.ariaPressed !== null) {
+    element.setAttribute('aria-pressed', String(content.ariaPressed))
+  }
+  if (content.text !== null) element.textContent = content.text
+
+  if (content.label !== null) {
+    // 이름표는 `span` 안에 둔다 — 말줄임을 거는 자리가 여기다 (`.map-pin > span`)
+    const label = document.createElement('span')
+    label.textContent = content.label
+    element.appendChild(label)
   }
 
-  button.className = ['map-pin', selected && 'map-pin-selected', pin.muted && 'map-pin-muted']
-    .filter(Boolean)
-    .join(' ')
-  button.setAttribute('aria-pressed', String(selected))
+  if (onClick !== null) {
+    ;(element as HTMLButtonElement).type = 'button'
+    element.addEventListener('click', onClick)
+  }
 
-  const label = document.createElement('span')
-  const caption = pin.caption ?? null
-  label.textContent = selected && caption !== null ? `${pin.title} · ${caption}` : pin.title
-  button.appendChild(label)
-
-  button.addEventListener('click', onClick)
-  return button
+  return element
 }
 
 /**

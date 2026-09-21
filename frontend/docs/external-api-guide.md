@@ -123,6 +123,28 @@ navigator.geolocation.getCurrentPosition(onOk, onFail, { timeout: 8000 })
   (`metersPerPixel`)을 FE 가 갖는다 — SDK 는 지도를 만든 뒤에야 `getBounds()` 로 답한다.
   실측으로 고정한 값이라 임의로 바꾸지 않는다 (`viewport.ts` 머리주석).
 
+### 지도 갈래가 둘이다 — `onSelect` 를 주는가 (#789)
+
+`MapCanvas` 를 쓰는 화면은 성격이 두 가지고, **`onSelect` 의 유무가 그 둘을 가른다.**
+
+| 갈래    | 화면                                                  | 핀                            | 오버레이           | 사용자의 이동·확대                           |
+| ------- | ----------------------------------------------------- | ----------------------------- | ------------------ | -------------------------------------------- |
+| 목록형  | `PlaceMapView` · `EmergencyMapView` · `PlanRouteCard` | `<button aria-pressed>`       | `clickable: true`  | 받는다 (카카오 기본값)                       |
+| 단일 핀 | `PlaceMiniMap` · `WalkCourseStartMap`                 | `<div role="img" aria-label>` | `clickable: false` | `setDraggable(false)` · `setZoomable(false)` |
+
+- **`onSelect={() => undefined}` 를 넘기지 않는다.** 그 no-op 이 정확히 이 갈래가 생긴
+  이유다 — 핀이 **눌러도 아무 일 없는 포커서블 버튼**이 되고, 스크린리더는 **눌린 토글**로
+  읽으며, 176px 띠가 화면 한가운데에서 세로 스와이프를 먹었다. 옵셔널 prop 이라 no-op 을
+  넘길 길 자체가 막혀 있고, `map-canvas-consumers.test.ts` 가 다섯 소비처의 배선을 잠근다.
+- **단일 핀 지도의 "전체 보기" 는 길찾기 딥링크가 맡는다.** 지도를 옮겨도 그 화면이 보여
+  줄 다른 것이 없다.
+- 무엇으로 그릴지의 판단은 `lib/map/pin-content.ts` 순수 함수다. DOM 조립은 `document` 가
+  없는 node 환경 테스트에서 볼 수 없어 판단만 떼어 냈다 (`cluster.ts` 와 같은 분할).
+- 쌓임 순서는 `lib/map/stacking.ts` — **묶음 > 선택 핀 > 일반 핀 > 선**. 선택 핀이 묶음
+  위에 서면 32px 원이 통째로 덮여 누를 수 없어진다 (#671 A-1).
+- 이름표의 **보이는 크기는 그대로 두고 누르는 자리만 44** 로 넓힌다 (`.map-pin::before`).
+  원을 키우지 않은 `.map-cluster` 와 같은 처치다 — 키우면 밀집 구간의 겹침이 늘어난다.
+
 ### 검토
 
 지도 코드는 전용 서브에이전트 `fe-map-reviewer` 로 검토한다 (`team-playbook.md`).

@@ -103,7 +103,14 @@ export function PlaceMiniMap({
           pins={pins}
           /* 핀이 하나뿐이라 선택할 것이 없다. 라벨이 붙도록 처음부터 선택 상태로 둔다 */
           selectedId={placeId}
-          onSelect={() => undefined}
+          /*
+            **`onSelect` 를 주지 않는 것이 신호다** (#789). 미지정이면 `MapCanvas` 가
+            핀을 버튼에서 떼고(`<div role="img">`) 지도의 이동·확대를 끈다.
+
+            예전에는 `onSelect={() => undefined}` 였다. 그것이 **눌러도 아무 일 없는
+            포커서블 버튼**과, 아래로 더 읽어야 하는 화면 한가운데에서 **세로 스와이프를
+            먹는 176px 띠**를 만들었다.
+          */
           camera={camera}
           onFailure={setFailure}
           className="h-44 w-full overflow-hidden rounded-md md:h-52"
