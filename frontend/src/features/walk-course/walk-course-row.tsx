@@ -35,15 +35,15 @@ import type { WalkCourseFilters, WalkCourseSummary } from '@/types/walk-course'
  * 한 행만 축이 꺾이는 것으로 보였다. 이제 제목 블록(`min-w-0 flex-1`)이 항상 맨 앞이라,
  * 뒤에 오는 썸네일이 있고 없고는 **제목의 시작 위치에 아무 영향을 주지 않는다.**
  *
- * ### 1280 부터는 6칸 그리드다 (#734)
+ * ### 1024 부터는 6칸 그리드다 (#734 · #797)
  *
- * `xl:`(1280) 부터 이 링크가 `.walk-course-row-grid`(`app/globals.css`)로 그리드가 된다 —
- * 코스 · 거리 · 소요시간 · 시종점 · 썸네일 · chevron 여섯 칸. **각 칸이 `xl:col-start-N`
+ * `lg:`(1024) 부터 이 링크가 `.walk-course-row-grid`(`app/globals.css`)로 그리드가 된다 —
+ * 코스 · 거리 · 소요시간 · 시종점 · 썸네일 · chevron 여섯 칸. **각 칸이 `lg:col-start-N`
  * 으로 자기 자리를 못박는다** — 플렉스였다면 썸네일이 없는 행에서 뒤 칸들이 당겨져
  * 칸마다 폭이 달라졌겠지만, 그리드 트랙은 자식 유무와 무관하게 항상 같은 폭이라
  * 썸네일 없는 행도 그 칸만 비고 시종점·chevron 은 그대로 선다.
  *
- * 1280 미만(모바일·태블릿)은 `xl:hidden` 으로 감춘 텍스트 블록 안에서 거리·소요시간·
+ * 1024 미만(모바일·태블릿)은 `lg:hidden` 으로 감춘 텍스트 블록 안에서 거리·소요시간·
  * 시종점을 이어 말한다 — `PlanRow` 의 상태 배지가 모바일/데스크톱에서 위치만 바꾸는 것과
  * 같은 자리에 같은 값을 두 번 두는 패턴이다. 열 머리는 `WalkCourseColumnHead` 가 그린다.
  */
@@ -88,12 +88,20 @@ export function WalkCourseRow({
         className={cn(
           // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
           'focus-visible:ring-brand-500 flex min-h-11 items-center gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:py-4',
-          // 1280 부터 6칸 그리드 — 그리드 트랙은 `.walk-course-row-grid` 가 정한다
-          'walk-course-row-grid xl:grid xl:items-center xl:gap-5 xl:py-4',
+          /*
+            **1024 부터 6칸 표다** (#797). 트랙은 `.walk-course-row-grid` 가 정한다 —
+            코스 열을 좁히자 1024 에도 6칸이 들어가, 폭마다 칸 수가 갈리지 않는다.
+
+            **`lg:min-h-18`(72px) 이 행 리듬을 고정한다.** 썸네일이 있는 행만 높이가 두
+            배로 튀던 것을 막는다 (1440 실측 `56 · 57 · 113 …`). 이름이 두 줄로 감기는
+            한 행(`7-1코스 …제주올레여행자센터`, 301px)만 80px 이 되는데 8px 차이라
+            훑는 눈에 잡히지 않는다.
+          */
+          'walk-course-row-grid lg:grid lg:min-h-18 lg:items-center lg:gap-5 lg:py-4',
         )}
       >
         {/* 코스 열 — 언제나 첫 칸이라 뒤에 오는 썸네일 유무와 무관하게 위치가 고정이다 */}
-        <div className="min-w-0 flex-1 xl:col-start-1 xl:flex-none">
+        <div className="min-w-0 flex-1 lg:col-start-1 lg:flex-none">
           <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             {/* `3코스 (A)` 의 괄호가 다음 줄로 떨어지지 않게 한 덩어리로 둔다 (D1) */}
             <span className="text-body-1 text-fg font-semibold whitespace-nowrap">
@@ -105,10 +113,10 @@ export function WalkCourseRow({
           </p>
 
           {/*
-            1280 미만 전용 — 거리·소요시간·시종점을 이 블록 안에서 이어 말한다.
-            1280 이상은 각자 자기 열로 나가므로 여기서는 감춘다 (`xl:hidden`).
+            1024 미만 전용 — 거리·소요시간·시종점을 이 블록 안에서 이어 말한다.
+            1024 이상은 셋 다 각자 자기 열로 나가므로 여기서는 감춘다 (`lg:hidden`).
           */}
-          <p className="text-body-2 text-fg-muted mt-1 tabular-nums xl:hidden">
+          <p className="text-body-2 text-fg-muted mt-1 tabular-nums lg:hidden">
             {distance} · {course.durationText}
           </p>
           {/*
@@ -116,18 +124,18 @@ export function WalkCourseRow({
             하이픈이 섞여 있고 시설명 안에도 하이픈이 들어올 수 있어, 갈라 재조립하면
             잘못 갈리는 코스가 생긴다.
           */}
-          <p className="text-caption text-fg-subtle mt-1 break-keep xl:hidden">
+          <p className="text-caption text-fg-subtle mt-1 break-keep lg:hidden">
             {course.startEndPoint}
           </p>
         </div>
 
-        {/* 거리 열 — 1280 이상 전용. 숫자라 오른쪽 정렬 + tabular-nums */}
-        <p className="text-body-2 text-fg-muted hidden text-right tabular-nums xl:col-start-2 xl:block">
+        {/* 거리 열 — 1024 이상 전용. 숫자라 오른쪽 정렬 + tabular-nums */}
+        <p className="text-body-2 text-fg-muted hidden text-right tabular-nums lg:col-start-2 lg:block">
           {distance}
         </p>
 
-        {/* 소요시간 열 — 1280 이상 전용 */}
-        <p className="text-body-2 text-fg-muted hidden text-right tabular-nums xl:col-start-3 xl:block">
+        {/* 소요시간 열 — 1024 이상 전용 */}
+        <p className="text-body-2 text-fg-muted hidden text-right tabular-nums lg:col-start-3 lg:block">
           {course.durationText}
         </p>
 
@@ -138,21 +146,25 @@ export function WalkCourseRow({
         */}
         <p
           title={course.startEndPoint}
-          className="text-caption text-fg-subtle hidden min-w-0 truncate xl:col-start-4 xl:block"
+          className="text-caption text-fg-subtle hidden min-w-0 truncate lg:col-start-4 lg:block"
         >
           {course.startEndPoint}
         </p>
 
         {/*
           썸네일 — **있을 때만 만든다.** 없는 행에 회색 사각형을 두지 않는다(D1-1) — 실측
-          29개 중 25개가 이 경우다. `xl:col-start-5` 로 그리드 자리를 못박아, 이 칸이
+          29개 중 25개가 이 경우다. `lg:col-start-5` 로 그리드 자리를 못박아, 이 칸이
           없어도 시종점(4)·chevron(6) 은 밀리지 않는다.
 
-          `alt` 는 빈 문자열이다 — 바로 옆(1280 미만)이나 같은 행(1280 이상)에 이름표가
+          **표 안에서는 40px 로 줄인다** (#797, `lg:size-10`). 80px 이면 그 행만 높이가 두
+          배가 되어 세로 리듬이 깨진다 — 1024 미만 카드형 목록에서는 썸네일이 행의
+          주인공이라 예전 크기(64/80)를 그대로 둔다.
+
+          `alt` 는 빈 문자열이다 — 바로 옆(1024 미만)이나 같은 행(1024 이상)에 이름표가
           글자로 있다 (D6).
         */}
         {thumbnail !== null && (
-          <div className="bg-band relative size-16 shrink-0 overflow-hidden rounded-md md:size-20 xl:col-start-5">
+          <div className="bg-band relative size-16 shrink-0 overflow-hidden rounded-md md:size-20 lg:col-start-5 lg:size-10">
             <Image
               src={thumbnail}
               alt=""
@@ -167,7 +179,7 @@ export function WalkCourseRow({
         <ChevronRightIcon
           size={20}
           aria-hidden
-          className="text-fg-subtle shrink-0 xl:col-start-6"
+          className="text-fg-subtle shrink-0 lg:col-start-6"
         />
       </Link>
     </li>
@@ -175,7 +187,7 @@ export function WalkCourseRow({
 }
 
 /**
- * 데스크톱(1280~) 전용 열 머리 — 코스 · 거리 · 소요시간 · 시종점.
+ * 데스크톱(1024~) 전용 열 머리 — 코스 · 거리 · 소요시간 · 시종점.
  *
  * **행(`WalkCourseRow`)과 같은 그리드 템플릿(`.walk-course-row-grid`)을 공유한다.**
  * 한쪽만 고치면 라벨이 실제 값 위에서 어긋난다.
@@ -192,20 +204,20 @@ export function WalkCourseColumnHead({ inset = 'card' }: { inset?: Inset }) {
     <div
       aria-hidden
       className={cn(
-        'walk-course-row-grid hidden xl:grid xl:items-center xl:gap-5 xl:pb-2',
+        'walk-course-row-grid hidden lg:grid lg:items-center lg:gap-5 lg:pb-2',
         INSET_CLASS[inset],
       )}
     >
-      <span className="text-caption text-fg-muted font-semibold xl:col-start-1">
+      <span className="text-caption text-fg-muted font-semibold lg:col-start-1">
         {messages.walkCourse.columnCourseLabel}
       </span>
-      <span className="text-caption text-fg-muted text-right font-semibold xl:col-start-2">
+      <span className="text-caption text-fg-muted text-right font-semibold lg:col-start-2">
         {messages.walkCourse.distanceLabel}
       </span>
-      <span className="text-caption text-fg-muted text-right font-semibold xl:col-start-3">
+      <span className="text-caption text-fg-muted text-right font-semibold lg:col-start-3">
         {messages.walkCourse.durationLabel}
       </span>
-      <span className="text-caption text-fg-muted font-semibold xl:col-start-4">
+      <span className="text-caption text-fg-muted font-semibold lg:col-start-4">
         {messages.walkCourse.startEndLabel}
       </span>
     </div>

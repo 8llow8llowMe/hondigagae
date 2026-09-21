@@ -97,14 +97,14 @@ describe('WalkCourseRow — 이미지 (D1-1)', () => {
    * 컨테이너가 정한 폭 그대로 남는다 — 그래서 시종점(4)·chevron(6) 열은 썸네일 유무와
    * 무관하게 항상 같은 칸에 선다.
    */
-  it('썸네일이 없으면 5번째 그리드 칸(xl:col-start-5)을 만들지 않는다', () => {
-    expect(render(WALK_COURSE_PLAIN)).not.toContain('xl:col-start-5')
+  it('썸네일이 없으면 5번째 그리드 칸(lg:col-start-5)을 만들지 않는다', () => {
+    expect(render(WALK_COURSE_PLAIN)).not.toContain('lg:col-start-5')
   })
 
   it('썸네일이 있으면 5번째 그리드 칸에 선다', () => {
     const markup = render(WALK_COURSE_WITH_COORDS)
 
-    expect(markup).toMatch(/class="bg-band relative size-16[^"]*xl:col-start-5[^"]*"/)
+    expect(markup).toMatch(/class="bg-band relative size-16[^"]*lg:col-start-5[^"]*"/)
   })
 })
 
@@ -128,42 +128,43 @@ describe('WalkCourseRow — 목록은 좌표 유무를 말하지 않는다 (D5-1
   })
 })
 
-describe('WalkCourseRow — 1280 이상 열 구성 (#734)', () => {
+describe('WalkCourseRow — 열 구성 (#734 · #797 에서 1024 로 내림)', () => {
   /**
-   * 코스(1) · 거리(2) · 소요시간(3) · 시종점(4) · 썸네일(5) · chevron(6). `xl:col-start-N`
-   * 으로 각 칸이 자기 자리를 못박는다 — 썸네일 유무와 무관하게 나머지 칸이 밀리지 않는
-   * 이유가 이것이다(위 이미지 describe).
+   * 코스(1) · 거리(2) · 소요시간(3) · 시종점(4) · 썸네일(5) · chevron(6).
+   * 각 칸이 `col-start-N` 으로 자기 자리를 못박는다 — 썸네일 유무와 무관하게 나머지
+   * 칸이 밀리지 않는 이유가 이것이다(위 이미지 describe).
    */
   it('코스 · 거리 · 소요시간 · 시종점 · chevron 이 각자 col-start 를 갖는다', () => {
     const markup = render(WALK_COURSE_PLAIN)
 
-    expect(markup).toContain('xl:col-start-1')
-    expect(markup).toContain('xl:col-start-2')
-    expect(markup).toContain('xl:col-start-3')
-    expect(markup).toContain('xl:col-start-4')
-    expect(markup).toContain('xl:col-start-6')
+    expect(markup).toContain('lg:col-start-1')
+    expect(markup).toContain('lg:col-start-2')
+    expect(markup).toContain('lg:col-start-3')
+    expect(markup).toContain('lg:col-start-4')
+    expect(markup).toContain('lg:col-start-6')
   })
 
-  /** 1280 미만 블록(제목 안 요약 줄)과 1280 이상 전용 열이 같은 값을 두 번 들고 있다 */
-  it('거리·소요시간·시종점이 1280 미만용과 1280 이상용으로 각각 그려진다', () => {
+  /** 1024 미만 블록(제목 안 요약 줄)과 1024 이상 전용 열이 같은 값을 두 번 들고 있다 */
+  it('거리·소요시간·시종점이 1024 미만용과 1024 이상용으로 각각 그려진다', () => {
     const markup = render(WALK_COURSE_PLAIN)
 
     expect(markup.match(/15\.1km/g)?.length).toBe(2)
     expect(markup.match(/4~5시간/g)?.length).toBe(2)
-    // 1280 이상 열은 `title` 속성에도 원문을 한 번 더 들고 있어 3회다 — truncate 된
+    // 1024 이상 열은 `title` 속성에도 원문을 한 번 더 들고 있어 3회다 — truncate 된
     // 텍스트를 마우스 호버로 확인할 수 있게 하는 값이지 중복 렌더가 아니다
     expect(markup.match(/시흥리정류장-광치기해변/g)?.length).toBe(3)
   })
 
-  /** 1280 미만 요약 줄은 1280 이상에서 숨는다 — 같은 값이 겹쳐 보이면 안 된다 */
-  it('1280 미만 요약 줄에는 xl:hidden 이 있다', () => {
+  /** 요약 줄은 열이 생기는 폭에서 숨는다 — 같은 값이 겹쳐 보이면 안 된다 */
+  it('요약 줄 둘 다 1024 부터 숨는다', () => {
     const markup = render(WALK_COURSE_PLAIN)
 
-    expect(markup).toMatch(/class="text-body-2 text-fg-muted mt-1 tabular-nums xl:hidden"/)
+    expect(markup).toMatch(/class="text-body-2 text-fg-muted mt-1 tabular-nums lg:hidden"/)
+    expect(markup).toMatch(/class="text-caption text-fg-subtle mt-1 break-keep lg:hidden"/)
   })
 
   /** 표 안에서는 한 줄로 자른다 — 원문을 갈라 재조립하는 것과는 다르다(D4-4) */
-  it('1280 이상 시종점 열은 truncate 이고 title 로 원문을 보존한다', () => {
+  it('1024 이상 시종점 열은 truncate 이고 title 로 원문을 보존한다', () => {
     const markup = render(WALK_COURSE_MIXED_START_END)
 
     expect(markup).toContain('title="제주민속촌주차장 입구-남원포구"')
@@ -171,7 +172,7 @@ describe('WalkCourseRow — 1280 이상 열 구성 (#734)', () => {
   })
 })
 
-describe('WalkCourseColumnHead — 1280 이상 열 머리 (#734)', () => {
+describe('WalkCourseColumnHead — 1024 이상 열 머리 (#734 · #797)', () => {
   it('코스 · 거리 · 소요시간 · 시종점 라벨을 그린다 — 행과 같은 문구다', () => {
     const markup = renderColumnHead()
 
@@ -191,8 +192,67 @@ describe('WalkCourseColumnHead — 1280 이상 열 머리 (#734)', () => {
     expect(renderColumnHead()).toContain('aria-hidden')
   })
 
-  it('1280 미만에서는 숨는다', () => {
-    expect(renderColumnHead()).toContain('hidden xl:grid')
+  it('1024 미만에서는 숨는다', () => {
+    expect(renderColumnHead()).toContain('hidden lg:grid')
+  })
+})
+
+/*
+  #797. **표가 1024 부터 선다.** 예전에는 `xl:`(1280)부터라 1024~1279 가 모바일 레이아웃을
+  1004px 로 늘린 모양이었다 (1100 실측: 행 `display:flex` · 열 머리 `display:none` ·
+  내용이 왼쪽 972px 블록 안에 세 줄).
+
+  **중간 단계는 필요 없었다.** 코스 열을 484 → 256 으로 줄이자 1024(행 폭 928)에서도
+  6칸이 정확히 들어간다 — 칸 수가 폭마다 갈리면 `col-start` 도 갈려야 하고 썸네일·chevron
+  이 breakpoint 마다 다른 자리를 갖게 된다.
+*/
+describe('WalkCourseRow — 1024 부터 표다 (#797)', () => {
+  const markup = render(WALK_COURSE_WITH_COORDS)
+
+  it('행이 1024 부터 그리드가 된다', () => {
+    expect(markup).toContain('lg:grid')
+  })
+
+  it('거리·소요시간이 1024 부터 자기 열로 나간다', () => {
+    expect(markup).toContain('lg:col-start-2')
+    expect(markup).toContain('lg:col-start-3')
+  })
+
+  /** 인라인으로 이어 말하던 줄은 열이 생기는 순간 숨어야 값이 두 번 보이지 않는다 */
+  it('거리·소요시간 인라인 줄이 1024 부터 숨는다', () => {
+    expect(markup).toContain('lg:hidden')
+  })
+
+  /** 시종점도 1024 부터 자기 열이다 — 한 폭에서만 인라인으로 남지 않는다 */
+  it('시종점 · 썸네일 · chevron 이 모두 1024 부터 자기 열이다', () => {
+    expect(markup).toContain('lg:col-start-4')
+    expect(markup).toContain('lg:col-start-5')
+    expect(markup).toContain('lg:col-start-6')
+  })
+
+  /** 칸 수가 폭마다 갈리지 않는다 — `xl:` 자리 지정이 남아 있으면 안 된다 */
+  it('breakpoint 마다 칸 자리가 갈리지 않는다', () => {
+    expect(markup).not.toContain('xl:col-start')
+  })
+})
+
+/*
+  #797. **썸네일이 있는 행만 높이가 두 배로 튀었다** (1440 실측: `56 · 57 · 113 · 57 · 113 …`).
+  목록을 훑을 때 먼저 보이는 것은 세로 튐이다.
+
+  표 안에서는 썸네일을 40px 로 줄이고 행에 최소 높이를 줘 모든 행이 같은 리듬으로 선다.
+  1024 미만(카드형 목록)에서는 예전 크기 그대로다 — 거기서는 썸네일이 행의 주인공이다.
+*/
+describe('WalkCourseRow — 행 높이가 고르다 (#797)', () => {
+  it('표 안 썸네일을 줄인다 — 1024 미만 크기는 그대로다', () => {
+    const markup = render(WALK_COURSE_WITH_COORDS)
+
+    expect(markup).toContain('size-16')
+    expect(markup).toContain('lg:size-10')
+  })
+
+  it('행이 최소 높이를 갖는다 — 썸네일이 없어도 같은 리듬이다', () => {
+    expect(render(WALK_COURSE_PLAIN)).toContain('lg:min-h-18')
   })
 })
 
