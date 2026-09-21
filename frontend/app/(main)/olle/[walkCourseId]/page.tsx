@@ -17,7 +17,7 @@ import { isWalkCourseId } from '@/lib/walk-course/id'
 import type { WalkCourseDetail } from '@/types/walk-course'
 
 /**
- * `/walk-courses/[walkCourseId]` — 코스 상세 (#618).
+ * `/olle/[walkCourseId]` — 코스 상세 (#618 · 이름과 경로는 #810).
  *
  * **공개 화면이다.** `PROTECTED_PATHS` 에 넣지 않는다 (공통명세 S1).
  *
@@ -66,7 +66,7 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
         곳을 적어 둔 것뿐이라 순전한 중복이다 — 공개 SEO 화면이므로(`architecture-guide.md` §9)
         여기서 하나로 모은다.
       */
-      alternates: { canonical: `/walk-courses/${walkCourseId}` },
+      alternates: { canonical: `/olle/${walkCourseId}` },
     }
   } catch {
     // 조회 실패를 메타데이터 단계에서 화면 실패로 만들지 않는다. 판정은 페이지가 한다
@@ -92,7 +92,7 @@ export default async function WalkCourseDetailPage({
     `walkCourseFilterHref` 로 다시 조립한다 — 화이트리스트 밖 값(`?sort=DURATION_ASC`)이나
     손으로 적어 넣은 잡음이 우리 화면의 링크에 실려 나가지 않게 한다.
   */
-  const backHref = walkCourseFilterHref('/walk-courses', parseWalkCourseFilters(await searchParams))
+  const backHref = walkCourseFilterHref('/olle', parseWalkCourseFilters(await searchParams))
 
   /*
     **보내기 전에 가른다** (D0-1). 컨트롤러가 `@PathVariable long` 이라 숫자가 아니면 답이

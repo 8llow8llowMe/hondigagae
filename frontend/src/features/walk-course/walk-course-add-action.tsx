@@ -41,7 +41,7 @@ export function WalkCourseAddAction({
   if (!authed) {
     return (
       <ButtonLink
-        href={toLoginHref(`/walk-courses/${course.walkCourseId}`)}
+        href={toLoginHref(`/olle/${course.walkCourseId}`)}
         size="lg"
         /*
           **컨테이너 폭을 그대로 먹지 않는다** (#781). 1440 에서 1346×48px 이었다 —

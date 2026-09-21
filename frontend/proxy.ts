@@ -24,8 +24,8 @@ const LOGIN_PATH = '/login'
 /** `/places/{placeId}` — 더 깊은 경로(`/places/{id}/…`)는 걸리지 않는다 */
 const PLACE_DETAIL_PATH = /^\/places\/([^/]+)$/
 
-/** `/walk-courses/{walkCourseId}` — 같은 모양이다 (#618) */
-const WALK_COURSE_DETAIL_PATH = /^\/walk-courses\/([^/]+)$/
+/** `/olle/{walkCourseId}` — 같은 모양이다 (#618 · 경로는 #810) */
+const WALK_COURSE_DETAIL_PATH = /^\/olle\/([^/]+)$/
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
@@ -55,9 +55,9 @@ export function proxy(request: NextRequest) {
   }
 
   /*
-    **산책 코스 상세도 같다** (#618 · `코스상세-세부명세.md` D0-1). 컨트롤러가
+    **제주올레 코스 상세도 같다** (#618 · `코스상세-세부명세.md` D0-1). 컨트롤러가
     `@PathVariable long` 이라 숫자가 아닌 id 는 400(`WALKCOURSE_113`)이고, 화면은
-    `walk-courses/[walkCourseId]/page.tsx` 가 `isWalkCourseId` 로 갈라 그린다.
+    `olle/[walkCourseId]/page.tsx` 가 `isWalkCourseId` 로 갈라 그린다.
 
     **공개 경로라 미루면 안 된다** — 크롤러가 잘못된 주소를 200 으로 읽고 모니터링도
     실패를 세지 못한다. 위 장소 판정과 같은 이유·같은 처치(`rewrite` 로 상태만 400)다.
@@ -93,10 +93,10 @@ export const config = {
     */
     '/places/:path*',
     /*
-      **`/walk-courses` 도 공개 경로지만 매처에 있다** — 보호 가드가 아니라 위의 코스 id
+      **`/olle` 도 공개 경로지만 매처에 있다** — 보호 가드가 아니라 위의 코스 id
       형식 판정 때문이다. `PROTECTED_PATHS` 에는 없으므로 로그인을 요구하지 않는다.
     */
-    '/walk-courses/:path*',
+    '/olle/:path*',
     '/mypage/:path*',
     '/pets/:path*',
     '/plans/:path*',

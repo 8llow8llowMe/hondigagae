@@ -88,7 +88,7 @@ export function WalkCourseDetailSection({
   onWalkTimesRetry,
   authed,
   petRegistered,
-  backHref = '/walk-courses',
+  backHref = '/olle',
 }: WalkCourseDetailSectionProps) {
   if (loading) {
     return (
@@ -286,7 +286,7 @@ export function WalkCourseDetailInvalidId({ errorMessage }: { errorMessage?: unk
 }
 
 function BackToList() {
-  return <BackLink href="/walk-courses" label={messages.walkCourse.backToList} />
+  return <BackLink href="/olle" label={messages.walkCourse.backToList} />
 }
 
 /**

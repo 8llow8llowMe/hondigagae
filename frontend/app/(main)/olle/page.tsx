@@ -22,7 +22,7 @@ export const metadata = {
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
 /**
- * `/walk-courses` — 제주올레 코스 목록 (#618).
+ * `/olle` — 제주올레 코스 목록 (#618 · 이름과 경로는 #810).
  *
  * **공개 화면이다.** `proxy.ts` `PROTECTED_PATHS` 에 넣지 않는다 — dev OpenAPI 의 두
  * operation 모두 `security` 키가 없고, `tour-service` 는 `/places` 와 같은 공개 조회

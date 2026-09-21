@@ -47,7 +47,7 @@ describe('WalkCourseDetailSection — 성공', () => {
     expect(markup).toContain('시흥-광치기')
     expect(markup).toContain(WALK_COURSE_PROVIDER)
     expect(markup).toContain(messages.walkCourse.backToList)
-    expect(markup).toContain('/walk-courses')
+    expect(markup).toContain('/olle')
   })
 
   /*
@@ -55,13 +55,13 @@ describe('WalkCourseDetailSection — 성공', () => {
     브라우저 뒤로가기는 필터를 살려 돌아오므로 **화면 안 링크만 사용자를 배신했다.**
   */
   it('돌아가기가 들어온 필터를 그대로 돌려준다', () => {
-    const markup = render({ backHref: '/walk-courses?activity=LOW&sort=DISTANCE_ASC' })
+    const markup = render({ backHref: '/olle?activity=LOW&sort=DISTANCE_ASC' })
 
-    expect(markup).toContain('href="/walk-courses?activity=LOW&amp;sort=DISTANCE_ASC"')
+    expect(markup).toContain('href="/olle?activity=LOW&amp;sort=DISTANCE_ASC"')
   })
 
   it('필터 없이 들어왔으면 목록 주소 그대로다', () => {
-    expect(render()).toContain('href="/walk-courses"')
+    expect(render()).toContain('href="/olle"')
   })
 
   /**
@@ -186,9 +186,9 @@ describe('WalkCourseDetailSection — 404 (공통명세 S5)', () => {
     "여기서 왔다" 고 말하는 셈이 된다.
   */
   it('오류 화면의 돌아가기는 필터를 싣지 않는다', () => {
-    const markup = render({ ...NOT_FOUND, backHref: '/walk-courses?activity=LOW' })
+    const markup = render({ ...NOT_FOUND, backHref: '/olle?activity=LOW' })
 
-    expect(markup).toContain('href="/walk-courses"')
+    expect(markup).toContain('href="/olle"')
     expect(markup).not.toContain('activity=LOW')
   })
 
@@ -271,7 +271,7 @@ describe('WalkCourseDetailSection — 접근성 계약 (D6)', () => {
 
   /** 보조기기에서 목적지가 둘로 들리지 않게 한다 */
   it('404 화면에 코스 목록 링크가 하나뿐이다', () => {
-    expect(render({ errorStatus: 404 }).match(/href="\/walk-courses"/g)).toHaveLength(1)
+    expect(render({ errorStatus: 404 }).match(/href="\/olle"/g)).toHaveLength(1)
   })
 })
 

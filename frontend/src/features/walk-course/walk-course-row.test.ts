@@ -35,7 +35,7 @@ describe('WalkCourseRow — 코스를 고르는 데 쓰는 값 셋', () => {
   })
 
   it('상세로 가는 링크다 — id 를 문자열 그대로 쓴다', () => {
-    expect(render(WALK_COURSE_PLAIN)).toContain('/walk-courses/6911167100216303301')
+    expect(render(WALK_COURSE_PLAIN)).toContain('/olle/6911167100216303301')
   })
 
   /*
@@ -48,15 +48,13 @@ describe('WalkCourseRow — 코스를 고르는 데 쓰는 값 셋', () => {
   it('보고 있는 필터를 상세 링크에 실어 보낸다', () => {
     const markup = render(WALK_COURSE_PLAIN, { activity: 'LOW', sort: 'DISTANCE_ASC' })
 
-    expect(markup).toContain(
-      'href="/walk-courses/6911167100216303301?activity=LOW&amp;sort=DISTANCE_ASC"',
-    )
+    expect(markup).toContain('href="/olle/6911167100216303301?activity=LOW&amp;sort=DISTANCE_ASC"')
   })
 
   it('필터가 기본값이면 쿼리를 붙이지 않는다 — 빈 주소가 기본 상태다', () => {
     const markup = render(WALK_COURSE_PLAIN, { activity: null, sort: null })
 
-    expect(markup).toContain('href="/walk-courses/6911167100216303301"')
+    expect(markup).toContain('href="/olle/6911167100216303301"')
   })
 
   /** `19` 를 `19km` 로 줄이면 같은 열의 `19.1` 과 자릿수가 어긋난다 (공통명세 S3) */

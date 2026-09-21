@@ -15,8 +15,8 @@ import { readSource, stripComments } from '@/test/source'
 const homeView = stripComments(readSource('src/features/home/home-view.tsx'))
 
 describe('진입점은 홈 배너다 (S6-1)', () => {
-  it('홈이 /walk-courses 배너를 그린다', () => {
-    expect(homeView).toContain('href="/walk-courses"')
+  it('홈이 /olle 배너를 그린다', () => {
+    expect(homeView).toContain('href="/olle"')
     expect(homeView).toContain('messages.walkCourse.bannerTitle')
   })
 
@@ -25,9 +25,9 @@ describe('진입점은 홈 배너다 (S6-1)', () => {
    * 이미 정해져 있다 (`nav-links.tsx`). 모바일 탭바는 4개 고정이다.
    */
   it('전역 nav 항목을 늘리지 않는다', () => {
-    expect(DESKTOP_NAV_ITEMS.map((item) => item.href)).not.toContain('/walk-courses')
+    expect(DESKTOP_NAV_ITEMS.map((item) => item.href)).not.toContain('/olle')
     expect(MOBILE_TAB_ITEMS).toHaveLength(4)
-    expect(MOBILE_TAB_ITEMS.map((item) => item.href)).not.toContain('/walk-courses')
+    expect(MOBILE_TAB_ITEMS.map((item) => item.href)).not.toContain('/olle')
   })
 
   /**
@@ -35,13 +35,47 @@ describe('진입점은 홈 배너다 (S6-1)', () => {
    * 상시 진입점이 경보처럼 읽힌다 — 진짜 경보를 구분할 수 없게 된다.
    */
   it('배너에 danger 아이콘을 붙이지 않는다', () => {
-    const banner = /<Banner\s+href="\/walk-courses"[\s\S]*?\/>/.exec(homeView)?.[0] ?? ''
+    const banner = /<Banner\s+href="\/olle"[\s\S]*?\/>/.exec(homeView)?.[0] ?? ''
 
     expect(banner).not.toContain('leading')
   })
 
   it('배너 문구에 코스 개수를 박지 않는다 — 적재(#383)로 바뀐다', () => {
     expect(messages.walkCourse.bannerDescription).not.toMatch(/\d/)
+  })
+
+  /**
+   * **진입과 도착이 같은 이름을 말한다** ([#810](https://github.com/8llow8llowMe/hondigagae/issues/810)).
+   * 배너는 `제주올레 걸어 보기` 인데 도착 화면 제목은 `산책 코스` 였다 — 누른 것과 닿은
+   * 곳의 이름이 달랐다. 데이터가 중앙값 15.7km 종주 코스라 `산책` 은 29개 중 28개에
+   * 대해 틀린 말이기도 하다 (진단 문서 W-2 · §4-1 ①안).
+   */
+  it('배너와 화면이 같은 이름을 부른다 — 둘 다 제주올레다', () => {
+    expect(messages.walkCourse.bannerTitle).toContain('제주올레')
+    expect(messages.walkCourse.pageTitle).toContain('제주올레')
+  })
+
+  /**
+   * **`산책` 이 돌아오는 것을 막는다.** 위 단언은 `제주올레 산책 코스` 여도 통과한다 —
+   * 이 이슈의 근거는 "제주올레라고 말하라" 가 아니라 **"29개 중 28개에 대해 틀린 말인
+   * `산책` 을 쓰지 말라"** 였다 (진단 문서 W-2: 중앙값 15.7km · 23/29 가 5시간 이상).
+   */
+  it('제목이 산책이라고 말하지 않는다', () => {
+    expect(messages.walkCourse.pageTitle).not.toContain('산책')
+  })
+
+  /**
+   * 부제는 **대상어와 시간 축 이름**을 함께 갖는다.
+   *
+   * - 대상어(`제주올레 코스`): 이 상수는 목록 부제 말고 **404 · 400 화면과 상세
+   *   `meta description`** 에도 쓰인다. 제목이 곁에 없는 그 자리에서 대상어가 빠지면
+   *   무엇을 고르라는지 말하지 않는다.
+   * - `걷는 시간`: 시간 축 이름은 진단 문서 §4-2(D-1)가 한 낱말로 통일했다.
+   */
+  it('부제가 무엇을 무슨 기준으로 고르는지 말한다', () => {
+    expect(messages.walkCourse.pageDescription).toContain('제주올레 코스')
+    expect(messages.walkCourse.pageDescription).toContain('걷는 시간')
+    expect(messages.walkCourse.pageDescription).not.toContain('소요시간')
   })
 })
 

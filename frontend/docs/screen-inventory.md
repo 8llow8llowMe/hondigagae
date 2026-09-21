@@ -34,7 +34,7 @@
 | AI 일정 생성  | 구현 (Ollama) | **구현 완료** (§5)             |
 | 장소 인사이트 | 구현          | **가능** (신규 — §3-1)         |
 | 긴급 시설     | 구현          | **가능** (§5-2)                |
-| 산책 코스     | 구현          | **가능** (§5-3 — 명세 #618)    |
+| 제주올레 코스 | 구현          | **가능** (§5-3 — 명세 #618)    |
 | 그 외 전부    | 미착수        | **대기** (§6)                  |
 
 ## 1. 인증 / 회원 — 착수 가능
@@ -519,7 +519,7 @@
   | 여행 후기                   | `/plans/[planId]` 좌측 레일                  | `GET` · `POST` · `PUT /plans/{planId}/reviews`                                       | **구현** (#615) — **완료 일정만.** 목록 "후기 미작성" 밴드는 `hasReview` 가 없어 넣지 않음                                                                           |
   | 일정 공유 링크 발급·폐기    | `/plans/[planId]` 관리 메뉴 안 모달          | `GET` · `POST` · `DELETE /plans/{planId}/share-link`                                 | **구현** (#628) — **확정·완료만.** `POST`·`DELETE` 둘 다 멱등                                                                                                        |
   | 공유된 일정 열람            | `/shared-plans/[token]`                      | `GET /shared-plans/{token}` (**비인증**)                                             | **구현** (#628) — 정본 `docs/features/plan/일정공유-세부명세.md`                                                                                                     |
-  | 일정에 올레 코스 담기       | `/walk-courses/[walkCourseId]` 안의 시트     | `PUT /plans/{planId}/days/{day}/items` (**같은 일괄 교체**, `itemType=WALK`)         | **명세 완료** ([#620](https://github.com/8llow8llowMe/hondigagae/issues/620)) — 새 API 없음. 정본 `docs/features/plan/올레담기-세부명세.md` · 행 렌더는 일정상세 D12 |
+  | 일정에 올레 코스 담기       | `/olle/[walkCourseId]` 안의 시트             | `PUT /plans/{planId}/days/{day}/items` (**같은 일괄 교체**, `itemType=WALK`)         | **명세 완료** ([#620](https://github.com/8llow8llowMe/hondigagae/issues/620)) — 새 API 없음. 정본 `docs/features/plan/올레담기-세부명세.md` · 행 렌더는 일정상세 D12 |
 
 **일정 응급 브리핑** — [#125](https://github.com/8llow8llowMe/hondigagae/issues/125) · BE PR #105
 
@@ -810,12 +810,12 @@
 > 백엔드가 `String` 으로 내린다 — _"Snowflake 라 자바스크립트 Number 의 안전 정수 범위를 넘으므로
 > 문자열로 내린다"_. FE 타입도 `string` 이고 **`number` 로 타이핑하면 정밀도가 손상된다.**
 
-## 5-3. 산책 코스 (제주올레) — 착수 가능
+## 5-3. 제주올레 코스 — 착수 가능
 
-| 화면      | 경로                           | API                                | 상태                                                                                                |
-| --------- | ------------------------------ | ---------------------------------- | --------------------------------------------------------------------------------------------------- |
-| 코스 목록 | `/walk-courses`                | `GET /walk-courses`                | **구현 완료** ([#618](https://github.com/8llow8llowMe/hondigagae/issues/618)) — 커서 없이 29개 전량 |
-| 코스 상세 | `/walk-courses/[walkCourseId]` | `GET /walk-courses/{walkCourseId}` | **구현 완료** (#618) — 좌표가 있으면 `GET /insights/walk-times` 로 골든타임까지 이어진다            |
+| 화면      | 경로                   | API                                | 상태                                                                                                                                                                           |
+| --------- | ---------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 코스 목록 | `/olle`                | `GET /walk-courses`                | **구현 완료** ([#618](https://github.com/8llow8llowMe/hondigagae/issues/618)) — 커서 없이 29개 전량. 이름·경로는 [#810](https://github.com/8llow8llowMe/hondigagae/issues/810) |
+| 코스 상세 | `/olle/[walkCourseId]` | `GET /walk-courses/{walkCourseId}` | **구현 완료** (#618) — 좌표가 있으면 `GET /insights/walk-times` 로 골든타임까지 이어진다                                                                                       |
 
 명세: `docs/features/walk-course/` (`공통명세.md` · `코스목록-세부명세.md` · `코스상세-세부명세.md`).
 
