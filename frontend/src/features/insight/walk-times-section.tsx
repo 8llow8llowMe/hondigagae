@@ -195,8 +195,6 @@ export function WalkTimesSection({
  * 그것은 DESIGN.md §2-3(색만으로 정보를 전달하지 않는다)에 어긋난다.
  */
 function GoldenWindow({ data }: { data: WalkTimesResponse }) {
-  const tone = walkSafetyTone(data.goldenLevel?.code)
-
   /*
     **시작과 끝이 같으면 구간이 아니라 한 시각이다** (#200). 그날 남은 시간대가 한 칸뿐이면
     서버가 둘을 같은 값으로 준다 — dev 22:12 KST 에 `23:00 – 23:00` 으로 관측했다. 대시로
@@ -209,24 +207,38 @@ function GoldenWindow({ data }: { data: WalkTimesResponse }) {
   const single = data.goldenStart === data.goldenEnd
 
   /*
-    **시각도 등급 색을 따른다.** 예전에는 `text-metric-high-700`(초록)이 하드코딩돼 있어,
-    추천 구간의 등급이 `CAUTION` 인 날 **초록 시각 옆에 황갈색 "주의"** 가 섰다 — 한 줄
-    안에서 색 두 개가 다른 말을 했다. 16px 일 때는 덜 보였는데 22px 로 키우면서 드러났다.
-
-    **`-700` 층이다** (`METRIC_WORD_TONE`). `-500` 은 22px 이상 **+ weight 900** 에만
-    허용되는데 이 시각은 700 이고, MID 의 `-500` 은 흰 배경에서 3.85:1 이라 글자로 쓰면
-    대비가 무너진다.
+    **시각에 등급 색을 주지 않는다** ([#671](https://github.com/8llow8llowMe/hondigagae/issues/671) **A-3**).
 
     **등급 배지가 이 줄에서 빠졌다** (#637). `11:00 – 23:00 [주의]` 는 창 **전체**가
     주의라는 말로 읽혔는데 실제로 주의는 창 안의 두 칸이었다 — 배지가 가진 정보는 원래
     "어디가 주의인가" 이고 배지에는 그것을 적을 자리가 없다. 아래 문장이 그 자리다.
+
+    **배지의 글자는 지웠는데 같은 주장을 하던 색이 남아 있었다.** `goldenLevel` 은 창 하나에
+    등급 하나를 붙인 값이라(서버 `GoldenWalkWindow.level` 이 `worseOf` 로 접는다), 22px 굵은
+    시각을 그 색으로 칠하면 **창 전체가 그 등급**이라고 말한다. dev 실측 2026-09-21:
+    창 15:00–23:00 에 주의 한 칸 + 안전 여덟 칸인데 `goldenLevel=CAUTION` 이라 헤드라인이
+    통째로 `metric-mid-700` 이었다. #656 으로 면이 칸마다 갈린 뒤로는 **이 색이 섹션에서
+    유일하게 "창 하나에 등급 하나" 를 말하고 있었다.**
+
+    그래서 색을 **걷는다**(후보 ①). `worst` 로 칠하는 후보 ③ 은 지금과 실질 같고, 분포를
+    헤드라인 밖에서만 말하는 후보 ② 는 이미 아래 문장이 하고 있다. **이 줄이 말하는 것은
+    등급이 아니라 시각**이고, 등급은 바로 아래 문장과 곡선 면이 칸 단위로 말한다 —
+    색이 유일한 채널이 아니어야 한다는 규칙(DESIGN.md §2-3)은 그쪽에서 지켜진다.
+
+    예전 주석이 여기서 `-700` 층을 따진 것은 이 줄이 등급어일 때의 이야기였다. 등급이
+    빠졌으므로 본문 색(`text-fg`)이다 — 바로 위 `h2` 와 같은 토큰이라 카드 안에서
+    제목과 값이 같은 계열로 선다.
+
+    **`goldenLevel` 을 이 섹션이 더는 렌더하지 않는다.** 응답 필드는 그대로 받는다 —
+    곡선 면(#656)도 문장(#637)도 `hourly` 를 근거로 쓰므로 화면에 소비처가 없어진 것이지
+    계약이 바뀐 것이 아니다 (`골든타임-문구-세부명세.md` D9).
 
     **한 시각짜리 창에는 문장도 붙이지 않는다** (#200). 한 칸을 "내내" 라고 말할 수 없고,
     그 칸의 등급은 곡선 셀이 이미 색과 `sr-only` 로 전한다.
   */
   return (
     <div className="flex flex-col gap-1">
-      <p className={cn('text-title-1 font-bold tabular-nums', METRIC_WORD_TONE[tone])}>
+      <p className="text-title-1 text-fg font-bold tabular-nums">
         {single ? (
           messages.home.goldenSingleHour.replace('{time}', hourMinute(data.goldenStart))
         ) : (

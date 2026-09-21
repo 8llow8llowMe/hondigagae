@@ -85,12 +85,8 @@ describe('WalkTimesSection — 추천 구간', () => {
   })
 
   /*
-    **시각과 등급어는 같은 색이어야 한다.** 예전에는 시각 쪽이 `text-metric-high-700`
-    (초록) 하드코딩이라, 추천 구간의 등급이 `CAUTION` 인 날 초록 시각 옆에 황갈색 "주의"
-    가 섰다 — 한 줄 안에서 색 두 개가 서로 다른 말을 했다.
-
-    `CAUTION` 으로 고정해 검사한다. 톤이 갈리는 것을 보려면 **초록이 아닌 등급**이어야
-    한다 — `SAFE` 로 두면 옛 하드코딩도 우연히 통과한다.
+    **창 등급이 `CAUTION` 인 날**을 고정해 검사한다. 톤이 새는 것을 보려면 **초록이 아닌
+    등급**이어야 한다 — `SAFE` 로 두면 어떤 실수도 우연히 통과한다.
   */
   const CAUTION_GOLDEN: WalkTimesResponse = {
     ...GOOD_DAY,
@@ -110,17 +106,61 @@ describe('WalkTimesSection — 추천 구간', () => {
     return /<p class="text-title-1[^>]*>.*?<\/p>/.exec(markup)?.[0] ?? ''
   }
 
-  it('추천 시각이 구간의 등급 색을 쓴다', () => {
+  /*
+    **#671 A-3 — 되돌린 결정이라 반대 방향으로 다시 못박는다.**
+
+    예전에는 이 자리에 `추천 시각이 구간의 등급 색을 쓴다` 가 있었다. 그 근거(한 줄 안에서
+    시각과 등급어가 다른 색이면 안 된다)는 **등급어가 이 줄에 있던 시절**의 것이고, #637 이
+    등급을 아래 문장으로 내보낸 뒤로는 이 줄에 등급이 없다. 남은 것은 `goldenLevel` 색뿐이라
+    **창 전체가 그 등급**이라고 말하는 채널 하나만 남았다.
+
+    `GOOD_DAY` 의 창(18–21시)은 네 칸이 전부 안전인데 `goldenLevel` 만 `CAUTION` 으로
+    바꾼 fixture 다 — 색이 남아 있으면 안전 네 칸 위에 주의색이 얹힌다.
+  */
+  it('헤드라인이 창 전체를 한 등급으로 칠하지 않는다', () => {
     const line = headlineLine(render(CAUTION_GOLDEN))
 
     expect(line).toContain('18:00')
-    expect(line).toContain('text-metric-mid-700')
+    expect(line).not.toContain('text-metric-mid-700')
     expect(line).not.toContain('text-metric-high-700')
+    expect(line).not.toContain('text-metric-critical-700')
   })
 
-  /* `-500` 은 22px + weight 900 전용이다. 이 시각은 700 이라 글자 층(`-700`)을 쓴다 */
+  /** 색을 걷는 것이지 톤을 낮추는 것이 아니다 — 본문 색으로 선다 */
+  it('헤드라인이 본문 색을 쓴다', () => {
+    expect(headlineLine(render(CAUTION_GOLDEN))).toContain('text-fg')
+  })
+
+  /*
+    **창 안 등급이 실제로 섞인 날에도 같다** (#671 E-1 목 갈래). `goldenLevel` 을 손으로
+    바꾼 fixture 가 아니라 서버 규칙대로 만들어진 창이라, 이 단언이 깨지면 실사용 응답에서
+    깨진다는 뜻이다.
+  */
+  it('창 안 등급이 섞인 날에도 헤드라인에 등급 색이 없다', () => {
+    const line = headlineLine(render(MIXED_WINDOW_DAY))
+
+    expect(line).toContain('15:00')
+    expect(line).not.toContain('text-metric-')
+  })
+
+  /* `-500` 은 22px + weight 900 전용이다. 등급 색이 없어졌어도 다시 새지 않게 잠근다 */
   it('추천 시각에 -500 층을 쓰지 않는다', () => {
     expect(render(CAUTION_GOLDEN)).not.toContain('text-metric-mid-500')
+  })
+
+  /*
+    **`goldenLevel` 이 이 섹션의 렌더에서 사라졌다** (A-3). 응답 필드는 그대로 받지만
+    곡선 면(#656)도 문장(#637)도 `hourly` 를 근거로 쓴다 — 소비처가 다시 생기면 "창 하나에
+    등급 하나" 가 조용히 돌아온다. **소스에서 직접 본다**: 렌더 결과로는 잡히지 않는다.
+  */
+  it('goldenLevel 을 렌더에 쓰지 않는다', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('./walk-times-section.tsx', import.meta.url)),
+      'utf8',
+    )
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+    expect(code).not.toContain('goldenLevel')
   })
 
   /*
