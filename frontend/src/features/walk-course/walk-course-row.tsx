@@ -6,8 +6,9 @@ import { formatCourseDistance } from '@/lib/format/distance'
 import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
+import { walkCourseFilterHref } from '@/lib/url/walk-course-filters'
 import { cn } from '@/lib/utils/cn'
-import type { WalkCourseSummary } from '@/types/walk-course'
+import type { WalkCourseFilters, WalkCourseSummary } from '@/types/walk-course'
 
 /**
  * 코스 한 줄 — **L1 카드 안의 L2 항목이다** (`DESIGN.md §0`).
@@ -49,9 +50,17 @@ import type { WalkCourseSummary } from '@/types/walk-course'
 export function WalkCourseRow({
   course,
   inset = 'card',
+  filters,
 }: {
   course: WalkCourseSummary
   inset?: Inset
+  /**
+   * 지금 보고 있는 목록 조건 ([#783](https://github.com/8llow8llowMe/hondigagae/issues/783)).
+   *
+   * **상세 URL 에는 필터가 없어 상세 혼자서는 복원할 근거가 없다.** 목록이 조건을 링크에
+   * 실어 보내야 `코스 목록으로` 가 같은 목록으로 돌아간다. 없으면 쿼리 없이 간다.
+   */
+  filters?: WalkCourseFilters | undefined
 }) {
   const thumbnail = imageSrc(course.firstImage)
   const distance = formatCourseDistance(course.distanceKm)
@@ -59,7 +68,15 @@ export function WalkCourseRow({
   return (
     <li className={INSET_CLASS[inset]}>
       <Link
-        href={`/walk-courses/${course.walkCourseId}`}
+        /*
+          **조립을 `walkCourseFilterHref` 에 맡긴다** (#783). 조건이 바뀐 뒤의 목록 주소를
+          만드는 그 함수와 같은 규칙이라, 기본값 생략 규칙이 한쪽에서만 바뀌지 않는다.
+        */
+        href={
+          filters === undefined
+            ? `/walk-courses/${course.walkCourseId}`
+            : walkCourseFilterHref(`/walk-courses/${course.walkCourseId}`, filters)
+        }
         /*
           **접근 이름은 `{courseLabel} {name}` 이다** (D6). 이름표만이면 `1코스` 가 29개라
           구분되지 않고, 구간명만이면 사용자가 아는 번호가 사라진다.

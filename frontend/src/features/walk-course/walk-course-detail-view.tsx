@@ -30,10 +30,13 @@ import { toCoursePosition } from '@/lib/walk-course/coordinates'
 export function WalkCourseDetailView({
   walkCourseId,
   authed,
+  backHref,
 }: {
   walkCourseId: string
   /** 미로그인에는 `GET /members/me/pets` 를 내지 않는다 (#200 · 공통명세 S1) */
   authed: boolean
+  /** 목록으로 돌아갈 주소 — 라우트가 `searchParams` 에서 만들어 준다 (#783) */
+  backHref?: string | undefined
 }) {
   const query = useWalkCourseDetail(walkCourseId)
   const { pet } = useSelectedPet(authed)
@@ -53,6 +56,7 @@ export function WalkCourseDetailView({
       walkTimesLoading={position !== null && walkTimes.isPending}
       onWalkTimesRetry={() => void walkTimes.refetch()}
       authed={authed}
+      backHref={backHref}
     />
   )
 }

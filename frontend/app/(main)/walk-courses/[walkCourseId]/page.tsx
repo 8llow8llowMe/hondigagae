@@ -12,6 +12,7 @@ import { walkCourseDetailPath } from '@/lib/api/walk-course'
 import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
+import { parseWalkCourseFilters, walkCourseFilterHref } from '@/lib/url/walk-course-filters'
 import { isWalkCourseId } from '@/lib/walk-course/id'
 import type { WalkCourseDetail } from '@/types/walk-course'
 
@@ -29,6 +30,12 @@ import type { WalkCourseDetail } from '@/types/walk-course'
  * 가질 수 없다 — 경계 파일은 왜 없는지를 모른다.
  */
 type Params = Promise<{ walkCourseId: string }>
+
+/**
+ * 목록에서 실어 보낸 조건 ([#783](https://github.com/8llow8llowMe/hondigagae/issues/783)).
+ * 상세는 이 값을 **쓰지 않고 되돌려 주기만 한다** — 조회 파라미터가 아니다.
+ */
+type Search = Promise<Record<string, string | string[] | undefined>>
 
 /**
  * `generateMetadata` 와 페이지 렌더가 같은 요청 안에서 백엔드를 두 번 부르지 않게 한다.
@@ -59,8 +66,25 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   }
 }
 
-export default async function WalkCourseDetailPage({ params }: { params: Params }) {
+export default async function WalkCourseDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Params
+  searchParams: Search
+}) {
   const { walkCourseId } = await params
+
+  /*
+    **되돌려 줄 목록 주소** (#783). 필터로 좁혀 놓고 상세에 들어온 사용자가 `코스 목록으로`
+    를 누르면 전체 29개로 리셋됐다 — 브라우저 뒤로가기는 살아 있었으므로 **화면 안 링크만**
+    사용자를 배신했다.
+
+    **받은 쿼리를 그대로 되비추지 않는다.** `parseWalkCourseFilters` 로 한 번 거르고
+    `walkCourseFilterHref` 로 다시 조립한다 — 화이트리스트 밖 값(`?sort=DURATION_ASC`)이나
+    손으로 적어 넣은 잡음이 우리 화면의 링크에 실려 나가지 않게 한다.
+  */
+  const backHref = walkCourseFilterHref('/walk-courses', parseWalkCourseFilters(await searchParams))
 
   /*
     **보내기 전에 가른다** (D0-1). 컨트롤러가 `@PathVariable long` 이라 숫자가 아니면 답이
@@ -109,7 +133,11 @@ export default async function WalkCourseDetailPage({ params }: { params: Params 
   return (
     <Canvas as="main" id="main-content">
       <HydrationBoundary state={dehydrate(queryClient)}>
-        <WalkCourseDetailView walkCourseId={walkCourseId} authed={session !== null} />
+        <WalkCourseDetailView
+          walkCourseId={walkCourseId}
+          authed={session !== null}
+          backHref={backHref}
+        />
       </HydrationBoundary>
     </Canvas>
   )

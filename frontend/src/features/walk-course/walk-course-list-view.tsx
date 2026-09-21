@@ -66,6 +66,7 @@ export function WalkCourseListView({
       courses={data?.courses ?? []}
       totalCount={data?.totalCount ?? 0}
       basis={basis}
+      filters={filters}
       providerName={data?.providerName ?? null}
       loading={query.isPending}
       errorStatus={toErrorStatus(query.error)}
