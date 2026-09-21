@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { resolveMock } from '@/lib/api/mock'
+import {
+  BRIEFING_WALK_LOOKUP_FAILED_MARKER,
+  BRIEFING_WARNING_LOOKUP_FAILED_MARKER,
+} from '@/lib/api/mock/plan-data'
 import { resetMockStore } from '@/lib/api/mock/store'
 import { todayDay } from '@/lib/date/day'
 import type { PlanBriefingResponse, PlanDetail } from '@/types/plan'
@@ -22,6 +26,50 @@ function briefing(planId: string, date: string): PlanBriefingResponse {
 }
 
 /** 오늘을 포함하는 일정을 만들어 `today=true` 갈래를 연다 */
+/**
+ * 마커를 실은 오늘 일정 — `LOOKUP_FAILED` 갈래 전용 (#751).
+ *
+ * 항목 둘에 마커를 하나씩 실어 **특보만 / 골든타임만 / 둘 다** 를 모두 고를 수 있다.
+ * 기준 항목(sequence 0)은 좌표가 있는 실재 장소 그대로다 — 마커가 좌표를 지우면
+ * `NO_PLACE_POINT` 와 구분되지 않고, 이 갈래의 요점인 좌표 폴백을 볼 수 없다.
+ */
+function createTodayPlanWithMarkers(memos: { walk?: boolean; warning?: boolean }): PlanDetail {
+  const today = todayDay(new Date())
+  const result = resolveMock(
+    '/plans',
+    'POST',
+    '',
+    JSON.stringify({
+      petIds: ['123456789012000001'],
+      areaCode: '39',
+      title: '조회 실패 일정',
+      startDate: today,
+      endDate: today,
+      items: [
+        {
+          day: 1,
+          sequence: 0,
+          itemType: 'PLACE',
+          targetId: PLACE,
+          title: '협재해수욕장',
+          startTime: '10:30:00',
+          ...(memos.walk === true ? { memo: BRIEFING_WALK_LOOKUP_FAILED_MARKER } : {}),
+        },
+        {
+          day: 1,
+          sequence: 1,
+          itemType: 'MOVE',
+          title: '이동',
+          ...(memos.warning === true ? { memo: BRIEFING_WARNING_LOOKUP_FAILED_MARKER } : {}),
+        },
+      ],
+    }),
+    TOKEN,
+  )
+
+  return result?.payload.dataBody as PlanDetail
+}
+
 function createTodayPlan(): PlanDetail {
   const today = todayDay(new Date())
   const result = resolveMock(
@@ -142,6 +190,66 @@ describe('브리핑 mock — 특보·골든타임은 today 가 가른다', () =>
     expect(typeof data.walkTimes?.lat).toBe('number')
     expect(data.schedule.representativeLat).toBe(data.walkTimes?.lat)
     expect(data.schedule.representativeLng).toBe(data.walkTimes?.lng)
+  })
+})
+
+/*
+  ── `LOOKUP_FAILED` 갈래 (#751) ────────────────────────────────────────────
+
+  **넷 중 이 사유만 데이터로 만들 수 없다** — 원격 조회의 시간차 장애라 일정에 그 상태가
+  없다. 마커로 결정적으로 재현한다. 이 갈래를 로컬에서 못 보던 대가가 실제로 있었다:
+  #751 검토에서 여기 걸린 버그 둘이 코드로만 잡혔다.
+*/
+describe('브리핑 mock — LOOKUP_FAILED 마커', () => {
+  beforeEach(resetMockStore)
+
+  it('골든타임 마커는 walkTimes 를 비우고 LOOKUP_FAILED 를 낸다', () => {
+    const plan = createTodayPlanWithMarkers({ walk: true })
+    const data = briefing(plan.planId, todayDay(new Date()))
+
+    expect(data.walkTimes).toBeNull()
+    expect(data.walkTimesUnavailableReasonCode).toBe('LOOKUP_FAILED')
+    expect(data.walkTimesUnavailableReason).toContain('가져오지 못했습니다')
+  })
+
+  /**
+   * **이 갈래의 요점이다.** `LOOKUP_FAILED` 는 대표 장소가 멀쩡한데 조회만 실패한 상태라
+   * 좌표가 남는다 — 그래야 화면이 `schedule` 좌표로 곡선을 부르는 폴백(명세 D9-3)이
+   * 로컬에서 실제로 돈다. 마커가 좌표까지 지우면 `NO_PLACE_POINT` 와 구분되지 않는다.
+   */
+  it('마커가 대표 장소 좌표를 지우지 않는다', () => {
+    const plan = createTodayPlanWithMarkers({ walk: true })
+    const data = briefing(plan.planId, todayDay(new Date()))
+
+    expect(typeof data.schedule.representativeLat).toBe('number')
+    expect(typeof data.schedule.representativeLng).toBe('number')
+  })
+
+  it('특보 마커는 weatherWarning 을 비우고 LOOKUP_FAILED 를 낸다', () => {
+    const plan = createTodayPlanWithMarkers({ warning: true })
+    const data = briefing(plan.planId, todayDay(new Date()))
+
+    expect(data.weatherWarning).toBeNull()
+    expect(data.weatherWarningUnavailableReasonCode).toBe('LOOKUP_FAILED')
+    // 골든타임은 멀쩡하다 — 두 축이 따로 고를 수 있어야 각각을 화면에서 본다
+    expect(data.walkTimesUnavailableReasonCode).toBeNull()
+  })
+
+  /** 게이트웨이 장애는 둘을 함께 때린다 — 재시도 버튼이 둘 서는 갈래다 */
+  it('마커 둘을 함께 실으면 두 사유가 같이 LOOKUP_FAILED 다', () => {
+    const plan = createTodayPlanWithMarkers({ walk: true, warning: true })
+    const data = briefing(plan.planId, todayDay(new Date()))
+
+    expect(data.weatherWarningUnavailableReasonCode).toBe('LOOKUP_FAILED')
+    expect(data.walkTimesUnavailableReasonCode).toBe('LOOKUP_FAILED')
+  })
+
+  /** 오늘이 아니면 서버가 조회 자체를 안 한다 — 마커가 `NOT_TODAY` 를 덮으면 안 된다 */
+  it('오늘이 아닌 날에는 마커가 NOT_TODAY 를 이기지 않는다', () => {
+    const data = briefing(PLAN, '2026-09-13')
+
+    expect(data.walkTimesUnavailableReasonCode).toBe('NOT_TODAY')
+    expect(data.weatherWarningUnavailableReasonCode).toBe('NOT_TODAY')
   })
 })
 
