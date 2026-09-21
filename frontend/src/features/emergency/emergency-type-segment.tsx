@@ -2,6 +2,7 @@
 
 import { labelWithCount } from '@/features/emergency/facility-filters'
 import { messages } from '@/lib/messages'
+import { handleRadioGroupKeyDown, radioTabIndex } from '@/lib/ui/radio-group-keys'
 import { cn } from '@/lib/utils/cn'
 import { FACILITY_TYPE_CODES, type FacilityFilters, type FacilityTypeCode } from '@/types/emergency'
 
@@ -84,6 +85,8 @@ function Option({
       type="button"
       role="radio"
       aria-checked={selected}
+      tabIndex={radioTabIndex(selected)}
+      onKeyDown={handleRadioGroupKeyDown}
       onClick={onSelect}
       className={cn(
         // 44px — 급할 때 누르는 컨트롤이라 최소 터치 영역을 지킨다 (DESIGN.md §7)

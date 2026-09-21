@@ -8,6 +8,7 @@ import { PetAvatar } from '@/components/pet-avatar'
 import { messages } from '@/lib/messages'
 import { describePet } from '@/lib/pet/describe'
 import { INSET_CLASS } from '@/lib/ui/inset'
+import { handleRadioGroupKeyDown, radioTabIndex } from '@/lib/ui/radio-group-keys'
 import { cn } from '@/lib/utils/cn'
 import type { Pet } from '@/types/pet'
 import { PLAN_STATUS_FILTERS, type PlanFilters, type PlanStatusFilter } from '@/types/plan'
@@ -81,6 +82,8 @@ export function PlanStatusTabs({
             type="button"
             role="radio"
             aria-checked={selected}
+            tabIndex={radioTabIndex(selected)}
+            onKeyDown={handleRadioGroupKeyDown}
             onClick={() => onChange({ ...filters, status })}
             className={cn(
               'text-body-2 focus-visible:ring-brand-500 flex h-12 items-center justify-center gap-1 border-b-2 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',

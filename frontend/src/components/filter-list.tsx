@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 
 import { CheckIcon } from '@/components/icons'
+import { handleRadioGroupKeyDown, radioTabIndex } from '@/lib/ui/radio-group-keys'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -154,6 +155,12 @@ function OptionButton({
       type="button"
       role={role}
       aria-checked={selected}
+      /*
+        **라디오만 roving 이다** (#825). 체크박스는 칸마다 탭 스톱이 규약이라 건드리지
+        않는다 — `role` 하나로 갈리므로 두 형태가 같은 몸통을 써도 어긋나지 않는다.
+      */
+      tabIndex={role === 'radio' ? radioTabIndex(selected) : undefined}
+      onKeyDown={role === 'radio' ? handleRadioGroupKeyDown : undefined}
       onClick={onSelect}
       className={cn(
         // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)

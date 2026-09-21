@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 
 import { messages } from '@/lib/messages'
+import { handleRadioGroupKeyDown, radioTabIndex } from '@/lib/ui/radio-group-keys'
 import { cn } from '@/lib/utils/cn'
 import {
   WALK_COURSE_ACTIVITY_PARAMS,
@@ -174,6 +175,8 @@ function SegmentOption({
       type="button"
       role="radio"
       aria-checked={selected}
+      tabIndex={radioTabIndex(selected)}
+      onKeyDown={handleRadioGroupKeyDown}
       onClick={onSelect}
       className={cn(
         // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
