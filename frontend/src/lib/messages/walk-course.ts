@@ -135,6 +135,14 @@ export const walkCourseMessages = {
    */
   startMapHeading: '코스 시작점',
   /**
+   * 상세 브레드크럼 `<nav>` 의 접근 이름. **장소 상세와 같은 문자열을 쓴다**
+   * (`messages.place.detailBreadcrumbLabel`) — 같은 일을 하는 자리가 화면마다 다른
+   * 이름으로 들리면 보조기기 사용자가 둘을 다른 것으로 읽는다.
+   *
+   * `코스 경로` 라고 쓰지 않는다 — 이 화면에서 그 말은 **걷는 경로**로 읽힌다.
+   */
+  detailBreadcrumbLabel: '현재 위치',
+  /**
    * 지도 SDK 를 못 불러왔을 때 제목 아래 한 줄 (#782).
    *
    * **제목이 약속한 것이 화면에 없으면 그 사실을 말한다.** `PlaceMiniMap` 은 제목이 없어

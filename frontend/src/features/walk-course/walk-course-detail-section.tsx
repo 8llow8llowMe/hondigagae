@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { BackLink } from '@/components/back-link'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
+import { ChevronRightIcon } from '@/components/icons'
 import { Skeleton } from '@/components/skeleton'
 import { SurfaceStack } from '@/components/surface'
 import { WalkCourseAddAction } from '@/features/walk-course/walk-course-add-action'
@@ -167,9 +168,7 @@ export function WalkCourseDetailSection({
   */
   return (
     <SurfaceStack className={hero === null ? 'reading-container' : 'content-container'}>
-      <div className={INSET_CLASS.card}>
-        <BackLink href={backHref} label={messages.walkCourse.backToList} />
-      </div>
+      <Breadcrumb href={backHref} course={course} />
 
       {/*
         **1024 이상에서 히어로가 좌측 열로 간다** (#730). 그 아래에서는 예전처럼 한 줄로
@@ -205,18 +204,24 @@ export function WalkCourseDetailSection({
           />
 
           {/*
-            **히어로가 없을 때만 여기 선다** ([#782](https://github.com/8llow8llowMe/hondigagae/issues/782)).
+            **담기는 골든타임 바로 다음이다** — 우측 묶음 **안**이다.
 
-            2열일 때는 좌측 열(사진 아래)이 지도의 자리다 — 위 주석 참조. 히어로가 없으면
-            열이 하나뿐이라 본문 흐름의 끝, 골든타임 **다음**이 된다: 이 화면의 차별 정보는
-            골든타임이고 #730 이 그것을 접힘선 위로 끌어올린 자리라, 지도를 그 위에 두면
-            같은 증상이 되돌아온다. *"어디서 출발하나"* 는 걸을지 정한 다음의 질문이다.
+            처음에는 그리드 자식으로 두고 `lg:col-start-2` 만 줬다. 우측 열에 가긴 했지만
+            우측 묶음이 1·2행을 걸치고 있어 **3행**으로 밀렸고, 그 3행은 좌측(사진 + 지도)이
+            끝나는 높이에서 시작한다 — 골든타임 카드와 버튼 사이에 **빈칸 한 덩어리**가
+            생겼다. 자동 배치에 맡기면 우측이 먼저 끝날수록 그 틈이 커진다.
 
-            **좌표가 없으면 스스로 사라진다.** 여기서 `hasCoordinates` 를 다시 묻지 않는다 —
-            같은 질문을 두 곳에서 하면 한쪽만 고쳐진다 (`lib/walk-course/coordinates.ts`).
-            지금은 히어로와 좌표가 같은 4개지만(#767 이 그 전제를 다시 본다) 그 전제가
-            깨져도 이 갈래가 지도를 잃지 않는다.
+            그래서 자리를 그리드가 아니라 **소속**으로 정한다: `일정에 담기` 는 "오늘 걸을
+            만한가" 를 읽고 내리는 결정이라, 그 답을 주는 골든타임에 붙는 것이 맞다.
+
+            **대가**: 1024 미만에서 담기가 시작점 지도보다 **앞**에 온다. 주 행동이
+            보조 자료보다 먼저 오는 것이라 받아들인다.
+
+            진입은 상세에만 둔다 — 목록 행은 이미 전체가 링크다 (`올레담기-세부명세.md` D8-1).
           */}
+          <div className={INSET_CLASS.card}>
+            <WalkCourseAddAction course={course} authed={authed} />
+          </div>
         </div>
 
         {/*
@@ -237,11 +242,6 @@ export function WalkCourseDetailSection({
           같은 질문을 두 곳에서 하면 한쪽만 고쳐진다 (`lib/walk-course/coordinates.ts`).
         */}
         <WalkCourseStartMap course={course} />
-      </div>
-
-      {/* 진입은 상세에만 둔다 — 목록 행은 이미 전체가 링크다 (`올레담기-세부명세.md` D8-1) */}
-      <div className={INSET_CLASS.card}>
-        <WalkCourseAddAction course={course} authed={authed} />
       </div>
 
       {/*
@@ -276,6 +276,34 @@ export function WalkCourseDetailInvalidId({ errorMessage }: { errorMessage?: unk
 
 function BackToList() {
   return <BackLink href="/walk-courses" label={messages.walkCourse.backToList} />
+}
+
+/**
+ * 돌아가기 + `› {코스}` — 장소 상세 `Breadcrumb` 과 같은 자리다.
+ *
+ * **카드가 아니다** (`DESIGN.md` §0). 머리를 카드로 올리면서 이 줄도 같이 올릴까 물었는데,
+ * 그러면 **내비게이션이 본문과 같은 무게**가 된다 — §0 이 "전부 카드면 전부 같은 무게가
+ * 되어 위계가 다시 사라진다" 로 막아 둔 것이 정확히 그것이다. 대신 링크 하나가 바닥 위에
+ * 허공에 뜨지 않도록 `border-b` 한 줄을 준다 (홈 특보 스트립 · 장소 상세와 같은 모양).
+ *
+ * **크럼을 함께 두는 이유**: 돌아가기만 있으면 이 줄이 "무엇으로부터" 돌아가는지 말하지
+ * 않는다. 크럼은 지금 어디인지를 말하고 돌아가기는 나가는 길이다 — 다른 일이다.
+ *
+ * `content-container` 를 쓰지 않는다 — 이 줄은 `SurfaceStack` 안이라 폭을 이미 물려받는다.
+ */
+function Breadcrumb({ href, course }: { href: string; course: WalkCourseDetail }) {
+  return (
+    <nav
+      aria-label={messages.walkCourse.detailBreadcrumbLabel}
+      className={cn('border-border flex items-center gap-1 border-b pb-2', INSET_CLASS.card)}
+    >
+      <BackLink href={href} label={messages.walkCourse.backToList} />
+      <ChevronRightIcon size={16} aria-hidden className="text-fg-subtle shrink-0" />
+      <span className="text-body-2 text-fg-muted min-w-0 truncate font-medium">
+        {course.courseLabel} {course.name}
+      </span>
+    </nav>
+  )
 }
 
 /**

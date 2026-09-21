@@ -1,5 +1,6 @@
 import Image from 'next/image'
 
+import { Surface } from '@/components/surface'
 import { formatCourseDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -39,11 +40,34 @@ export function WalkCourseHero({ image }: { image: string }) {
   )
 }
 
+/** 머리 카드가 `aria-labelledby` 로 가리키는 `h1` 의 id — 장소 상세 `DETAIL_HEADING_ID` 와 같은 축 */
+export const WALK_COURSE_HEADING_ID = 'walk-course-detail-heading'
+
 /**
- * 코스 상세의 머리 — **페이지 머리다. 카드에 담지 않는다**
- * (`DESIGN.md` §0 카드 판정 3문: 페이지 머리(h1)는 카드가 아니다).
+ * 코스 상세의 머리 — **한 장의 카드다.**
  *
- * **대표 이미지는 여기 없다** (#730) — `WalkCourseHero` 가 형제로 선다.
+ * ### 예전에는 카드가 아니었다
+ *
+ * *"페이지 머리(h1)는 카드가 아니다"*(§0 예외 목록)를 근거로 L0 바닥 위에 직접 놓았다.
+ * 그런데 **이 화면은 그 아래 전부가 흰 카드다** (골든타임 · 시작점 지도). 그래서 화면의
+ * 이름인 제목만 회색 바닥에 얹혀, **페이지에서 가장 중요한 블록이 가장 덜 중요해 보였다.**
+ * 히어로가 있는 갈래에서는 더 심했다 — 좌측은 테두리 있는 사진, 우측은 맨 글씨라 첫 행만
+ * 안 끝난 것처럼 보였다.
+ *
+ * **§0 을 뒤집은 것이 아니라 판정 3문을 다시 물은 것이다.** ① 자기 제목이 있는가 — `h1` 이
+ * 여기 있다. ② 혼자 떼어놔도 말이 되는가 — 이름표·구간명·거리·소요시간·시종점은 그것만으로
+ * "이 코스가 무엇인가" 를 답한다. ③ 담는 항목이 둘 이상인가 — 이름 블록 · `<dl>` · 시종점
+ * 셋이다. 셋 다 "예" 다. §0 의 예외는 **맨 `h1` 한 줄**을 말한다.
+ *
+ * **장소 상세가 같은 증상에 같은 답을 이미 냈다** ([#531](https://github.com/8llow8llowMe/hondigagae/issues/531)) —
+ * `place-detail-section.tsx` 의 갤러리+제목 카드 주석이 정본이다.
+ *
+ * **카드 이름은 `titleId` 로 `h1` 을 가리킨다** — `aria-label` 로 같은 문자열을 다시 적으면
+ * 두 곳이 갈린다 (`Surface` 머리주석).
+ *
+ * **히어로는 이 카드 안에 넣지 않는다.** 1024 이상에서 히어로는 **좌측 열**이고 이 카드는
+ * 우측 열이라(#730), 한 카드로 묶으면 그 2열이 무너진다 — 장소 상세와 갈리는 지점이 여기
+ * 하나다. `WalkCourseHero` 는 계속 형제로 선다 (전폭 미디어라 그쪽은 카드가 아니다).
  *
  * **`h1` 은 `courseLabel` 이다** (D6). 구간명은 그 아래 `<p>` — `1코스 시흥-광치기` 를
  * 한 `h1` 에 몰면 이름표와 구간명이 한 덩어리로 읽힌다.
@@ -53,11 +77,20 @@ export function WalkCourseHero({ image }: { image: string }) {
  */
 export function WalkCourseSummaryHeader({ course }: { course: WalkCourseDetail }) {
   return (
-    <header className="flex flex-col gap-4">
-      <div className={cn('flex flex-col gap-3', INSET_CLASS.card)}>
+    <Surface titleId={WALK_COURSE_HEADING_ID}>
+      {/*
+        카드가 되면서 세로 여백을 여기서 준다 — `Surface` 본문은 패딩을 갖지 않는다
+        (장소 상세 머리 카드와 같은 값: `py-4 md:py-5`).
+      */}
+      <header className={cn('flex flex-col gap-3 py-4 md:py-5', INSET_CLASS.card)}>
         <div className="flex flex-col gap-1">
           {/* `15코스 (B)` 의 괄호가 다음 줄로 떨어지지 않게 한 덩어리로 둔다 (D1) */}
-          <h1 className="text-title-1 text-fg font-bold whitespace-nowrap">{course.courseLabel}</h1>
+          <h1
+            id={WALK_COURSE_HEADING_ID}
+            className="text-title-1 text-fg font-bold whitespace-nowrap"
+          >
+            {course.courseLabel}
+          </h1>
           <p className="text-body-1 text-fg-muted break-keep">{course.name}</p>
         </div>
 
@@ -106,8 +139,8 @@ export function WalkCourseSummaryHeader({ course }: { course: WalkCourseDetail }
           </span>
           <span className="text-body-2 text-fg break-keep">{course.startEndPoint}</span>
         </p>
-      </div>
-    </header>
+      </header>
+    </Surface>
   )
 }
 
