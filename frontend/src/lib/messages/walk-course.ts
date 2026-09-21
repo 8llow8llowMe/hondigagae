@@ -111,10 +111,11 @@ export const walkCourseMessages = {
    */
   noCoordinatesCommon:
     '아직 좌표가 들어오지 않은 코스가 대부분이에요. 좌표가 채워지면 이 자리에 시간대별 판정이 생겨요.',
-  /** ③ 대안 두 개를 여는 줄. 목록의 접근 이름이기도 하다 */
-  noCoordinatesAlternatives: '대신 이렇게 해 볼 수 있어요',
   /**
-   * 대안 ① — 장소 찾기로 보낸다 (`/places`).
+   * 남는 대안 하나 — 장소 찾기로 보낸다 (`/places`).
+   *
+   * **`일정에 담기` 안내는 #780 에서 지웠다.** 그 버튼이 같은 화면 바로 아래에 실물로
+   * 있어 안내가 그것을 또 가리키면 같은 말이 두 번 나갔다.
    *
    * **검색어를 미리 채우지 않는다.** `startEndPoint` 는 `제주민속촌주차장 입구-남원포구`
    * 처럼 공백과 하이픈이 섞인 원문이고 갈라 쓰지 않기로 이미 정했다 (D4-2). 서버
@@ -124,15 +125,6 @@ export const walkCourseMessages = {
   noCoordinatesPlacesAction: '시·종점 근처 장소 보기',
   noCoordinatesPlacesDescription:
     '위 시종점 이름으로 장소를 찾으면 그곳의 오늘 판정을 볼 수 있어요.',
-  /**
-   * 대안 ② — **아래 CTA 를 가리킨다. 버튼을 하나 더 두지 않는다.**
-   *
-   * 같은 이름의 컨트롤이 한 화면에 둘이면 보조기기에서 목적지가 둘로 들린다
-   * (`WalkCourseDetailSection` 의 `DetailShell` 주석과 같은 축).
-   */
-  noCoordinatesPlanAction: '일정에 담고 그날 판정 받기',
-  /** `{action}` 치환 — 아래 버튼의 **보이는 글자**를 그대로 넣는다 */
-  noCoordinatesPlanDescription: '아래 {action}로 담으면 날짜가 생겨 그날의 산책 위험도를 받아요.',
   /** `다시 시도` 만이면 무엇을 다시 하는지 모른다 (D6) */
   goldenRetry: '날씨 다시 불러오기',
 } as const

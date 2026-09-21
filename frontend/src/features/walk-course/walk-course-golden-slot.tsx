@@ -24,6 +24,20 @@ import type { WalkTimesResponse } from '@/types/insight'
  * 그래서 카드와 제목은 좌표 있는 갈래와 **같은 뼈대로** 두고 그 안을 안내 상자가 채운다 —
  * 두 갈래가 다른 화면으로 보이지 않는 것이 이 이슈의 합격 기준이다.
  *
+ * ### 다만 그 상자가 화면의 주인공이 됐다 ([#780](https://github.com/8llow8llowMe/hondigagae/issues/780))
+ *
+ * #730 은 "절반 빈 화면" 을 고치려다 **"절반이 없다는 안내"** 로 채웠다 (375 실측: 본문
+ * 806px 중 안내 408px = 51%, 그 안의 `bg-band` 상자만 250px). 자리를 지키는 것과 자리를
+ * 채우는 것은 다르다 — **이 갈래가 25/29 라 그 과잉이 곧 화면의 기본형이었다.**
+ *
+ * 그래서 **상자는 사실 두 줄만** 담고 대안은 본문 흐름으로 나간다. 접어 두는 안(후보 ①)은
+ * 쓰지 않았다 — 기본 갈래에 "펼쳐야 보이는" 한 겹을 더하는 것은 흔한 갈래를 예외처럼
+ * 다루는 #730 의 원래 실수를 형태만 바꿔 반복한다.
+ *
+ * **`일정에 담기` 는 여기서 말하지 않는다.** 바로 아래에 그 버튼이 실물로 있다. 개정 전에는
+ * *"버튼을 하나 더 만들지 않는다"* 까지만 지켰고 **말이 중복되는 것은 놓쳤다** — 안내가
+ * 가리키는 대상과 그 대상이 한 화면에 나란히 있으면 안내가 아니라 잡음이다.
+ *
  * **`role="alert"` 는 여전히 주지 않는다** (D6). 오류가 아니라 이 코스의 사실이다 —
  * 경고로 읽히면 스크린리더가 페이지 진입마다 그것을 먼저 읽는다.
  *
@@ -84,9 +98,6 @@ export function WalkCourseGoldenSlot({
   )
 }
 
-/** 대안 목록의 접근 이름을 제목 줄에서 가져오는 id */
-const ALTERNATIVES_LABEL_ID = 'walk-course-no-coordinates-alternatives'
-
 /**
  * 좌표가 없는 코스 — 자리와 제목을 유지하고 안내 상자를 넣는다 (#730).
  *
@@ -104,65 +115,47 @@ const ALTERNATIVES_LABEL_ID = 'walk-course-no-coordinates-alternatives'
 function NoCoordinates() {
   return (
     <Surface title={messages.home.goldenHeading}>
-      <div className={cn('pb-4 md:pb-5', INSET_CLASS.card)}>
-        <div className="bg-band flex flex-col gap-2 rounded-md px-4 py-4">
-          {/* ① 왜 없는지 */}
-          <p className="text-body-1 text-fg font-semibold break-keep">
+      <div className={cn('flex flex-col gap-3 pb-4 md:pb-5', INSET_CLASS.card)}>
+        {/*
+          **상자는 사실만 담는다** (#780). (1) 왜 없는지 (2) 얼마나 흔한 일인지 — 둘 다
+          이 코스에 대한 사실이라 한 면 위에 같이 선다. 대안은 사실이 아니라 **다음
+          행동**이라 상자 밖 본문 흐름에 둔다.
+
+          세로 여백을 `py-4` 에서 `py-3` 으로 줄인다 — 줄이 셋에서 둘로 줄었는데 여백이
+          그대로면 상자가 내용보다 크게 남는다.
+        */}
+        <div className="bg-band flex flex-col gap-1 rounded-md px-4 py-3">
+          <p className="text-body-2 text-fg font-semibold break-keep">
             {messages.walkCourse.noCoordinates}
           </p>
 
-          {/* ② 얼마나 흔한 일인지 — 숫자를 적지 않는다 (코스 수는 서버가 센다) */}
-          <p className="text-body-2 text-fg-muted break-keep">
+          {/* 숫자를 적지 않는다 — 코스 수는 서버가 세고 적재(#383)로 바뀐다 */}
+          <p className="text-caption text-fg-muted break-keep">
             {messages.walkCourse.noCoordinatesCommon}
           </p>
+        </div>
 
-          {/*
-            ③ 대안 둘. **목록으로 내보낸다** — 보조기기가 "둘 중 고르는 것" 으로 읽는다.
-            `SurfaceList` 를 쓰지 않는다: 그것은 카드 안 목록의 구분선 규약이고, 여기는
-            상자 안이라 선을 하나 더 그을 자리가 아니다.
-          */}
-          <p id={ALTERNATIVES_LABEL_ID} className="text-caption text-fg-muted mt-2 font-medium">
-            {messages.walkCourse.noCoordinatesAlternatives}
+        {/*
+          남는 대안은 하나뿐이라 **목록으로 감싸지 않는다** (#780). `<ul>` 은 "둘 중
+          고르는 것" 을 보조기기에 알리려고 뒀던 것인데, 고를 것이 하나면 그 문법이
+          거짓이 된다 — 여는 줄(`대신 이렇게 해 볼 수 있어요`)도 함께 사라진다.
+
+          **검색어를 채우지 않는다** — 서버 `keyword` 가 `title`·`addr1` 의 `%LIKE%` 라
+          시종점 원문에서 만든 토막은 대부분 0건으로 떨어진다. 빈 검색 화면이
+          "결과 없음" 보다 낫다.
+
+          44px — 모바일 최소 터치 영역 (DESIGN.md §7).
+        */}
+        <div className="flex flex-col gap-1">
+          <Link
+            href="/places"
+            className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {messages.walkCourse.noCoordinatesPlacesAction}
+          </Link>
+          <p className="text-caption text-fg-muted break-keep">
+            {messages.walkCourse.noCoordinatesPlacesDescription}
           </p>
-
-          <ul aria-labelledby={ALTERNATIVES_LABEL_ID} className="flex flex-col gap-3">
-            <li className="flex flex-col gap-1">
-              {/*
-                **검색어를 채우지 않는다** — 근거는 `noCoordinatesPlacesAction` 의 주석이다.
-                서버 `keyword` 가 `title`·`addr1` 의 `%LIKE%` 라 시종점 원문에서 만든 토막은
-                대부분 0건으로 떨어진다. 빈 검색 화면이 "결과 없음" 보다 낫다.
-
-                44px — 모바일 최소 터치 영역 (DESIGN.md §7). 골든타임 재조회 버튼과 같은 모양이다.
-              */}
-              <Link
-                href="/places"
-                className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
-              >
-                {messages.walkCourse.noCoordinatesPlacesAction}
-              </Link>
-              <p className="text-caption text-fg-muted break-keep">
-                {messages.walkCourse.noCoordinatesPlacesDescription}
-              </p>
-            </li>
-
-            <li className="flex flex-col gap-1">
-              {/*
-                **여기에 버튼을 하나 더 두지 않는다.** 같은 화면 아래에 `일정에 담기` 가 이미
-                있고, 같은 이름의 컨트롤이 둘이면 보조기기에서 목적지가 둘로 들린다
-                (`WalkCourseDetailSection` 의 `DetailShell` 주석과 같은 축). 그래서 이 줄은
-                **그 버튼을 가리키는 글**이고, 버튼의 보이는 글자를 그대로 인용한다.
-              */}
-              <p className="text-body-2 text-fg font-semibold break-keep">
-                {messages.walkCourse.noCoordinatesPlanAction}
-              </p>
-              <p className="text-caption text-fg-muted break-keep">
-                {messages.walkCourse.noCoordinatesPlanDescription.replace(
-                  '{action}',
-                  messages.plan.addToPlanAction,
-                )}
-              </p>
-            </li>
-          </ul>
         </div>
       </div>
     </Surface>
