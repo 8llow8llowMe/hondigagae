@@ -30,6 +30,23 @@ function render(overrides: Partial<WalkCourseListSectionProps> = {}): string {
   return renderToStaticMarkup(createElement(WalkCourseListSection, props))
 }
 
+/*
+  #783. **중간 단계가 prop 을 떨어뜨려도 양끝 테스트는 통과한다.** 행(`walk-course-row`)과
+  상세(`walk-course-detail-section`)는 각자 단언돼 있지만, `WalkCourseListBody` 의
+  `Pick<>` 목록에서 `filters` 가 빠지면 그 사이에서 조용히 사라진다 — 여기서 관통을 잡는다.
+*/
+describe('WalkCourseListSection — 조건을 행까지 흘린다 (#783)', () => {
+  it('행 링크가 지금 보고 있는 조건을 달고 나간다', () => {
+    const markup = render({ filters: { activity: 'LOW', sort: 'DISTANCE_ASC' } })
+
+    expect(markup).toContain('?activity=LOW&amp;sort=DISTANCE_ASC')
+  })
+
+  it('조건을 주지 않으면 쿼리 없이 나간다', () => {
+    expect(render()).not.toContain('?activity=')
+  })
+})
+
 describe('WalkCourseListSection — 성공', () => {
   it('개수와 행을 그린다', () => {
     const markup = render({ courses: [WALK_COURSE_PLAIN], totalCount: 29 })

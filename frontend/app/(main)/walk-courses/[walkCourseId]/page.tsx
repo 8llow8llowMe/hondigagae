@@ -35,7 +35,7 @@ type Params = Promise<{ walkCourseId: string }>
  * 목록에서 실어 보낸 조건 ([#783](https://github.com/8llow8llowMe/hondigagae/issues/783)).
  * 상세는 이 값을 **쓰지 않고 되돌려 주기만 한다** — 조회 파라미터가 아니다.
  */
-type Search = Promise<Record<string, string | string[] | undefined>>
+type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
 /**
  * `generateMetadata` 와 페이지 렌더가 같은 요청 안에서 백엔드를 두 번 부르지 않게 한다.
@@ -59,6 +59,14 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     return {
       title: `${course.courseLabel} ${course.name} · 혼디가개`,
       description: messages.walkCourse.pageDescription,
+      /*
+        **정규 주소를 못박는다** ([#783](https://github.com/8llow8llowMe/hondigagae/issues/783)).
+        목록 행이 되돌림용 쿼리(`?activity=…&sort=…`)를 실어 보내면서 **같은 코스가 조합 수만큼
+        서로 다른 크롤 가능 URL** 이 됐다. 그 쿼리는 이 화면의 조회 파라미터가 아니라 돌아갈
+        곳을 적어 둔 것뿐이라 순전한 중복이다 — 공개 SEO 화면이므로(`architecture-guide.md` §9)
+        여기서 하나로 모은다.
+      */
+      alternates: { canonical: `/walk-courses/${walkCourseId}` },
     }
   } catch {
     // 조회 실패를 메타데이터 단계에서 화면 실패로 만들지 않는다. 판정은 페이지가 한다
@@ -71,7 +79,7 @@ export default async function WalkCourseDetailPage({
   searchParams,
 }: {
   params: Params
-  searchParams: Search
+  searchParams: SearchParams
 }) {
   const { walkCourseId } = await params
 
