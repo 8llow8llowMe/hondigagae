@@ -107,19 +107,44 @@ describe('브리핑 mock — 계약 경계', () => {
    * `MissingServletRequestParameterException` → `PLAN_125`, 형식 오류는
    * `MethodArgumentTypeMismatchException` → `PLAN_124` 다. 예전에는 둘을 `PLAN_100` 하나로
    * 묶고 있었다.
+   *
+   * **문구까지 단언한다** — 코드만 보면 목이 서버와 다른 문장을 내도 초록불이라, #716 의
+   * BE 소스 추정 문구가 dev 실측과 다른 채로 반년을 살아남았다 (#795).
    */
   it('date 가 없으면 400 PLAN_125 다 — @RequestParam 이 필수다', () => {
     const result = call(`/plans/${PLAN}/briefing`)
 
     expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'PLAN_125',
+      resultMessage: '필수 요청 파라미터가 누락되었습니다. (date)',
+      fieldErrors: null,
+    })
+  })
+
+  /** 빈 값도 누락이다 — dev 는 `?date=` 에도 `PLAN_125` 를 낸다 */
+  it('date 가 비어 있어도 400 PLAN_125 다', () => {
+    const result = call(`/plans/${PLAN}/briefing`, 'date=')
+
+    expect(result?.status).toBe(400)
     expect(result?.payload.dataHeader.resultCode).toBe('PLAN_125')
   })
 
-  it('date 형식이 틀리면 400 PLAN_124 로 가른다', () => {
+  /**
+   * **`fieldErrors` 한 건이 실린다.** 항목 `code` 가 헤더와 같은 `PLAN_124` 다 —
+   * `failValidation`(헤더 `PLAN_100` + 항목별 코드) 모양이 아니다 (dev 실측, #795).
+   */
+  it('date 형식이 틀리면 400 PLAN_124 + fieldErrors 한 건이다', () => {
     const result = call(`/plans/${PLAN}/briefing`, 'date=2026-9-12')
 
     expect(result?.status).toBe(400)
-    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_124')
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'PLAN_124',
+      resultMessage: 'date 파라미터 형식이 올바르지 않습니다.',
+      fieldErrors: [
+        { code: 'PLAN_124', field: 'date', message: 'date 파라미터 형식이 올바르지 않습니다.' },
+      ],
+    })
   })
 
   /** **기간 밖은 404 가 아니라 400 `PLAN_002`** 다 (`PlanBriefingProcessor.resolveDay`) */
@@ -143,6 +168,27 @@ describe('브리핑 mock — 계약 경계', () => {
     expect(
       resolveMock(`/plans/${PLAN}/briefing`, 'GET', 'date=2026-09-12', null, null)?.status,
     ).toBe(401)
+  })
+
+  /**
+   * **`date` 바인딩이 인증보다 먼저다** (#795 · 명세 D12-5). 스프링은 `@RequestParam` 을
+   * 인자로 푸는 단계에서 400 을 내고 `@PreAuthorize` 는 그 뒤에 걸린다 — dev 실측
+   * (2026-09-21, 토큰 없는 GET)에서 `date` 누락은 400 `PLAN_125`, 날짜가 온전하면
+   * 401 이다. 목이 401 을 먼저 내면 서버보다 엄격해진다.
+   */
+  it('토큰이 없어도 date 누락이 먼저 400 PLAN_125 로 떨어진다', () => {
+    const result = resolveMock(`/plans/${PLAN}/briefing`, 'GET', '', null, null)
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_125')
+  })
+
+  /** 그보다도 `planId` 형식이 앞이다 — 첫 인자를 먼저 푼다 (같은 실측) */
+  it('planId 형식 오류는 date 누락보다 앞이다', () => {
+    const result = resolveMock('/plans/abc/briefing', 'GET', '', null, null)
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_114')
   })
 
   it('일차를 기간에서 센다', () => {
