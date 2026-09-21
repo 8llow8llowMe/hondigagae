@@ -17,7 +17,7 @@ import type { WalkCourseList } from '@/types/walk-course'
  * 것은 활동량 기본값의 출처(`GET /members/me/pets`)뿐이고 그것은 **서버 컴포넌트가**
  * 조회한다 (공통명세 S1).
  *
- * 서버 프리페치는 `app/(main)/walk-courses/page.tsx` 가 **같은 key** 로 수행한다 —
+ * 서버 프리페치는 `app/(main)/olle/page.tsx` 가 **같은 key** 로 수행한다 —
  * key 가 다르면 프리페치가 버려진다 (`architecture-guide.md` §9).
  */
 export function useWalkCourseList(params: WalkCourseListParams) {

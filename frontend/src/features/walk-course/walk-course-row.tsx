@@ -90,8 +90,8 @@ export function WalkCourseRow({
         */
         href={
           filters === undefined
-            ? `/walk-courses/${course.walkCourseId}`
-            : walkCourseFilterHref(`/walk-courses/${course.walkCourseId}`, filters)
+            ? `/olle/${course.walkCourseId}`
+            : walkCourseFilterHref(`/olle/${course.walkCourseId}`, filters)
         }
         /*
           **접근 이름은 `{courseLabel} {name}` 이다** (D6). 이름표만이면 `1코스` 가 29개라

@@ -86,13 +86,13 @@ describe('round-trip — 읽고 쓴 값이 같다', () => {
 describe('walkCourseFilterHref — 조건을 통째로 다시 싣는다', () => {
   /** 정렬만 바꿨는데 활동량이 떨어지면 목록이 29개로 되돌아간다 (D4) */
   it('정렬만 바꾼 href 가 activity 를 유지한다', () => {
-    const href = walkCourseFilterHref('/walk-courses', { activity: 'LOW', sort: 'DISTANCE_ASC' })
+    const href = walkCourseFilterHref('/olle', { activity: 'LOW', sort: 'DISTANCE_ASC' })
 
     expect(href).toContain('activity=LOW')
     expect(href).toContain('sort=DISTANCE_ASC')
   })
 
   it('기본 상태면 물음표를 붙이지 않는다', () => {
-    expect(walkCourseFilterHref('/walk-courses', DEFAULT_WALK_COURSE_FILTERS)).toBe('/walk-courses')
+    expect(walkCourseFilterHref('/olle', DEFAULT_WALK_COURSE_FILTERS)).toBe('/olle')
   })
 })

@@ -496,7 +496,7 @@ export function HomeView({
           */}
           <Surface>
             <Banner
-              href="/walk-courses"
+              href="/olle"
               title={messages.walkCourse.bannerTitle}
               description={messages.walkCourse.bannerDescription}
               inset="card"

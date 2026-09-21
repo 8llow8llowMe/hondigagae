@@ -474,8 +474,8 @@ describe('PlanItemRow — WALK 항목 (#620)', () => {
   })
 
   /** 이번 범위에서는 코스 화면으로 나가는 링크도 만들지 않는다 (D12-6 12-1) */
-  it('코스 상세 링크도 만들지 않는다 — /walk-courses/ 가 없다', () => {
-    expect(renderWalk(planItemWalkCourse())).not.toContain('/walk-courses/')
+  it('코스 상세 링크도 만들지 않는다 — /olle/ 가 없다', () => {
+    expect(renderWalk(planItemWalkCourse())).not.toContain('/olle/')
   })
 
   it('링크(<a) 가 아니라 div 갈래를 탄다', () => {
