@@ -178,6 +178,19 @@ function SegmentOption({
       className={cn(
         // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
         'text-body-2 flex h-11 min-w-0 flex-1 items-center justify-center px-2 transition-colors',
+        /*
+          **데스크톱에서는 칸이 제 라벨 폭을 갖는다** (#818).
+
+          `flex-1` 은 칸을 **균등 분할**한다. 모바일에서는 세그먼트가 전폭이라 그것이
+          맞지만, `md:` 이상에서는 도구 줄(`md:flex-row`)이 이 그룹에 **콘텐츠 폭만**
+          주므로 좁은 폭을 균등 분할하게 되고 **가장 긴 라벨부터 `truncate` 가 먹는다** —
+          #798 이 `짧은 순`(40px) 을 `거리 짧은 순`(67px) 으로 늘리자 54px 칸에서 넘쳐
+          `거리 짧…` 이 됐다. 오른쪽에 900px 넘는 빈 자리를 두고 잘렸다.
+
+          `md:flex-none` 이 균등 분할을 끄고 `md:px-4` 가 칸 사이 숨을 준다. `truncate` 는
+          그대로 둔다 — 안전망이지 레이아웃 수단이 아니다.
+        */
+        'md:flex-none md:px-4',
         // 테두리가 바깥 한 겹이라 offset 을 주면 [테두리·흰틈·링] 세 겹이 된다
         'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:-outline-offset-2 focus-visible:outline-none',
         divider && 'border-border border-l',
