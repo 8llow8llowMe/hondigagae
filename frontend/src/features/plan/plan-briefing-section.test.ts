@@ -43,6 +43,7 @@ function render(
       kind: 'TODAY',
       basisPetName,
       curve,
+      onRetry: () => undefined,
     }),
   )
 }
@@ -59,14 +60,17 @@ function renderEve(overrides: Partial<PlanBriefingResponse> = {}) {
       briefing: planBriefing({
         today: false,
         weatherWarning: null,
+        weatherWarningUnavailableReasonCode: 'NOT_TODAY',
         weatherWarningUnavailableReason: '기상특보는 출발 당일에만 확인합니다.',
         walkTimes: null,
-        walkTimesUnavailableReason: '산책 골든타임은 출발 당일에만 확인합니다.',
+        walkTimesUnavailableReasonCode: 'NOT_TODAY',
+        walkTimesUnavailableReason: '산책 골든타임은 출발 당일에만 제공됩니다.',
         ...overrides,
       }),
       kind: 'EVE',
       basisPetName: null,
       curve: NO_CURVE,
+      onRetry: () => undefined,
     }),
   )
 }
@@ -164,12 +168,17 @@ describe('PlanBriefingSection — 기상특보의 "없음" 과 "확인 못 함"'
 
 describe('PlanBriefingSection — 산책하기 좋은 시간 (명세 D5-4)', () => {
   /*
-    **좌표가 오는 자리가 `walkTimes` 하나뿐이다.** 이 객체가 null 인 날은 곡선을 부를
-    좌표가 아예 없다 — 상세의 `item.place.lat/lng` 로 메우지 않는다 (명세 D8-1).
+    **`NO_PLACE_POINT` 는 좌표가 없다는 사유 그 자체다** — 곡선을 부를 좌표도 없고 다시
+    시도할 것도 없다. 사유 코드가 생긴 뒤에도 이 갈래의 화면은 그대로다 (#716).
   */
   it('walkTimes 가 null 이면 이유 문장만 내고 곡선도 재시도도 없다', () => {
     const reason = '대표 장소의 좌표가 없어 골든타임을 붙이지 못했습니다.'
-    const markup = render({ walkTimes: null, walkTimesUnavailableReason: reason })
+    const markup = render({
+      walkTimes: null,
+      walkTimesUnavailableReasonCode: 'NO_PLACE_POINT',
+      walkTimesUnavailableReason: reason,
+      schedule: planBriefingSchedule({ representativeLat: null, representativeLng: null }),
+    })
 
     expect(markup).toContain(reason)
     expect(markup).not.toContain(messages.common.retry)
@@ -285,6 +294,143 @@ describe('PlanBriefingSection — 산책하기 좋은 시간 (명세 D5-4)', () 
   })
 })
 
+/*
+  ── 사유 코드로 재시도를 가른다 (#716 · 명세 D9-2) ──────────────────────────
+
+  이유가 문장뿐이던 v1 은 "당일에만"(정상)과 "가져오지 못했다"(일시 장애)를 가를 수 없어
+  **아무 데도 `다시 시도` 를 달지 못했다.** 코드가 오면서 그 제약이 풀렸다 — 다만 풀린
+  것은 `LOOKUP_FAILED` 하나뿐이고, 나머지는 눌러도 같은 응답이라 버튼을 달면 계속 누른다.
+*/
+describe('PlanBriefingSection — 사유 코드와 재시도 (명세 D9-2)', () => {
+  it('특보가 LOOKUP_FAILED 면 다시 시도를 단다', () => {
+    const markup = render({
+      weatherWarning: null,
+      weatherWarningUnavailableReasonCode: 'LOOKUP_FAILED',
+      weatherWarningUnavailableReason: '기상특보 정보를 가져오지 못했습니다.',
+    })
+
+    expect(markup).toContain(messages.common.retry)
+  })
+
+  it('특보가 NOT_TODAY 면 다시 시도를 달지 않는다 — 눌러도 생기지 않는 값이다', () => {
+    const markup = render({
+      weatherWarning: null,
+      weatherWarningUnavailableReasonCode: 'NOT_TODAY',
+      weatherWarningUnavailableReason: '기상특보는 출발 당일에만 확인합니다.',
+    })
+
+    expect(markup).not.toContain(messages.common.retry)
+  })
+
+  /**
+   * **세 상태를 가르는 규칙은 코드가 생긴 뒤에도 그대로다** — 문장과 코드가 **둘 다** null
+   * 일 때만 "특보 없음" 이다. 코드만 보고 접으면 태풍경보를 조용히 지우던 v1 의 실패로
+   * 되돌아간다.
+   */
+  it('코드만 있고 문장이 없어도 "특보 없음" 으로 쓰지 않는다', () => {
+    const markup = render({
+      weatherWarning: null,
+      weatherWarningUnavailableReasonCode: 'LOOKUP_FAILED',
+      weatherWarningUnavailableReason: null,
+    })
+
+    expect(markup).not.toContain(messages.plan.briefingWarningNone)
+    expect(markup).toContain(messages.plan.briefingWarningUnavailableTitle)
+  })
+
+  it('골든타임이 LOOKUP_FAILED 면 다시 시도를 단다', () => {
+    const markup = render({
+      walkTimes: null,
+      walkTimesUnavailableReasonCode: 'LOOKUP_FAILED',
+      walkTimesUnavailableReason: '산책 골든타임 정보를 가져오지 못했습니다.',
+    })
+
+    expect(markup).toContain(messages.common.retry)
+  })
+
+  /*
+    **`NO_PLACE_ITEM` 은 재시도가 아니라 할 일이다.** 서버 enum 이 이 문제를 직접 적어
+    뒀다 — *"정작 사용자가 할 일(장소 담기)은 화면 어디에도 드러나지 않는다."*
+  */
+  it('골든타임이 NO_PLACE_ITEM 이면 재시도 대신 장소 담기로 보낸다', () => {
+    const markup = render({
+      walkTimes: null,
+      walkTimesUnavailableReasonCode: 'NO_PLACE_ITEM',
+      walkTimesUnavailableReason: '이 날짜에는 장소가 지정된 일정 항목이 없어 …',
+    })
+
+    expect(markup).not.toContain(messages.common.retry)
+    expect(markup).toContain(messages.plan.briefingWalkNoPlaceItemAction)
+    expect(markup).toContain(`/plans/${planBriefing().planId}/days/${planBriefing().day}/add`)
+  })
+
+  /** 서버가 코드를 하나 더 내도 화면이 깨지지 않는다 — 모르는 코드는 재시도 없는 쪽이다 */
+  it('모르는 사유 코드에는 재시도를 달지 않는다', () => {
+    const markup = render({
+      walkTimes: null,
+      walkTimesUnavailableReasonCode: 'SOMETHING_NEW',
+      walkTimesUnavailableReason: '새 사유입니다.',
+    })
+
+    expect(markup).not.toContain(messages.common.retry)
+  })
+})
+
+/*
+  ── 좌표 폴백 (#716 · 명세 D9-3) ────────────────────────────────────────────
+
+  좌표가 `schedule` 에도 오면서 **골든타임을 못 붙인 날에도 곡선을 부를 수 있다.** 다만
+  tour 의 곡선은 "오늘 남은 시간" 전용이라 실익이 있는 갈래는 `LOOKUP_FAILED` 하나다 —
+  나머지 셋은 좌표가 없거나(둘) 오늘이 아니다(하나).
+*/
+describe('PlanBriefingSection — 좌표 폴백 (명세 D9-3)', () => {
+  it('골든타임이 없어도 곡선을 받았으면 그린다', () => {
+    const markup = render(
+      {
+        walkTimes: null,
+        walkTimesUnavailableReasonCode: 'LOOKUP_FAILED',
+        walkTimesUnavailableReason: '산책 골든타임 정보를 가져오지 못했습니다.',
+      },
+      { hourly: mockWalkTimes(null).hourly, failed: false, onRetry: () => undefined },
+    )
+
+    expect(markup).toContain(CURVE_CELL)
+  })
+
+  /**
+   * **창·상태의 정본은 브리핑 응답이다** (명세 D3-3). 골든타임이 없는 날에 곡선만 그릴
+   * 때 화면이 창을 지어내면 두 채널이 갈린다 — 곡선은 근거로만 선다.
+   */
+  it('골든타임이 없는 날의 곡선에는 추천 구간을 지어내지 않는다', () => {
+    const markup = render(
+      {
+        walkTimes: null,
+        walkTimesUnavailableReasonCode: 'LOOKUP_FAILED',
+        walkTimesUnavailableReason: '산책 골든타임 정보를 가져오지 못했습니다.',
+      },
+      { hourly: mockWalkTimes(null).hourly, failed: false, onRetry: () => undefined },
+    )
+
+    expect(markup).not.toContain('18:00 – 21:00')
+  })
+
+  /*
+    **지도는 좌표가 있을 때만 선다** — `PlaceMiniMap` 이 좌표 없으면 통째로 사라진다.
+    캔버스는 `ssr: false` 라 서버 렌더에 없고, 길찾기 링크가 그 자리의 표식이다.
+  */
+  it('대표 장소 좌표가 있으면 지도와 길찾기를 그린다', () => {
+    expect(render()).toContain('map.kakao.com/link/to')
+  })
+
+  it('대표 장소 좌표가 없으면 지도 자리를 아예 만들지 않는다', () => {
+    const markup = render({
+      schedule: planBriefingSchedule({ representativeLat: null, representativeLng: null }),
+    })
+
+    expect(markup).not.toContain('map.kakao.com/link/to')
+  })
+})
+
 describe('PlanBriefingSection — 그날 일정 (명세 D5-1)', () => {
   it('항목 수와 다녀온 수를 적는다 — 0 도 정보다', () => {
     const markup = render({ schedule: planBriefingSchedule({ itemCount: 4, visitedCount: 0 }) })
@@ -361,10 +507,17 @@ describe('PlanBriefingSection — 그날 일정 (명세 D5-1)', () => {
   })
 
   /*
-    **유형 라벨을 그리지 않는다** (명세 D9-1). 이 응답에서만 `itemType` 이 metadata 가
-    아니라 enum 문자열이라, 적으려면 FE 에 한국어 매핑 테이블이 필요하다 (루트 `CLAUDE.md`
-    금지). 코드가 화면에 그대로 새지 않는지도 함께 본다.
+    **유형 라벨을 그린다** (#716 · 명세 D9-1). `itemType` 이 metadata 가 되면서 v1 이 라벨을
+    포기했던 이유(FE 한국어 매핑 테이블이 필요하다)가 사라졌다 — 서버 `name` 을 그대로 쓴다.
   */
+  it('itemType 의 name 을 마디마다 그린다', () => {
+    const markup = render()
+
+    // `장소` 는 기준 장소 태그와 겹쳐 표식이 되지 못한다 — 겹치지 않는 쪽으로 센다
+    expect(markup).toContain('숙박')
+  })
+
+  /** 라벨은 `name` 이다 — `code` 가 그대로 새면 FE 가 서버 문구를 안 쓰고 있다는 뜻이다 */
   it('itemType 코드가 화면에 새지 않는다', () => {
     const markup = render()
 

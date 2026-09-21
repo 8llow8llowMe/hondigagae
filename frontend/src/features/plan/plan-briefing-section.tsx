@@ -8,6 +8,7 @@ import { METRIC_WORD_TONE } from '@/components/metric'
 import { Surface } from '@/components/surface'
 import { WalkTimesCurve } from '@/components/walk-times-curve'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
+import { PlaceMiniMap } from '@/features/place/place-mini-map'
 import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
 import { walkSafetyTone } from '@/lib/insight/tone'
@@ -99,6 +100,7 @@ export function PlanBriefingSection({
   kind,
   basisPetName,
   curve,
+  onRetry,
 }: {
   briefing: PlanBriefingResponse
   /**
@@ -109,6 +111,11 @@ export function PlanBriefingSection({
   /** 두 마리 이상 일정에서만 채워진다 — 판정은 `basisPetNameOf()` 가 갖는다 */
   basisPetName: string | null
   curve: PlanBriefingCurve
+  /**
+   * 브리핑 응답 자체를 다시 부른다 — **곡선 재시도(`curve.onRetry`)와 다른 것이다.**
+   * `LOOKUP_FAILED` 는 브리핑이 원격 조회에 실패한 것이라 곡선을 다시 불러도 풀리지 않는다.
+   */
+  onRetry: () => void
 }) {
   const deferred = isDeferredDay(briefing, kind)
 
@@ -165,16 +172,22 @@ export function PlanBriefingSection({
           <Surface title={messages.plan.briefingWarningHeading}>
             <WeatherWarningCard
               warning={briefing.weatherWarning}
+              reasonCode={briefing.weatherWarningUnavailableReasonCode}
               reason={briefing.weatherWarningUnavailableReason}
+              onRetry={onRetry}
             />
           </Surface>
 
           <Surface title={messages.plan.briefingWalkHeading}>
             <WalkTimesCard
+              planId={briefing.planId}
+              day={briefing.day}
               walkTimes={briefing.walkTimes}
+              reasonCode={briefing.walkTimesUnavailableReasonCode}
               reason={briefing.walkTimesUnavailableReason}
               representativePlaceTitle={briefing.schedule.representativePlaceTitle}
               curve={curve}
+              onRetry={onRetry}
             />
           </Surface>
         </>
@@ -302,6 +315,25 @@ function ScheduleCard({
         </p>
       )}
 
+      {/*
+        **대표 장소 지도** (#716 · 명세 D9-3). 좌표가 `schedule` 에 오면서 이 자리가 열렸다 —
+        예전에는 좌표가 `walkTimes` 안에만 있어 골든타임을 못 낸 날에는 지도도 없었다.
+
+        `PlaceMiniMap` 을 그대로 쓴다. 같은 질문("여기가 어디쯤이냐")에 답하는 지도를 이
+        화면만 다시 만들면 두 화면의 축척·폴백이 갈린다. **좌표나 id·제목이 없으면 그
+        컴포넌트가 통째로 사라진다** — 여기서 빈 자리를 만들지 않는다.
+      */}
+      {schedule.representativePlaceId !== null && basisTitle !== null && (
+        <div className="w-full">
+          <PlaceMiniMap
+            placeId={schedule.representativePlaceId}
+            title={basisTitle}
+            lat={schedule.representativeLat}
+            lng={schedule.representativeLng}
+          />
+        </div>
+      )}
+
       <ButtonLink
         href={`/plans/${planId}#${planDayAnchorId(day)}`}
         variant="secondary"
@@ -360,13 +392,24 @@ function FlowNode({
           {item.title}
         </p>
 
-        {basis && (
-          <span className="mt-1 inline-flex">
+        {/*
+          **유형 라벨을 배지로 둔다** (#716 · 명세 D9-1). 제목 줄에 이어 붙이면 `숙박
+          동문재래시장` 이 한 문장처럼 읽힌다 — #733 이 `처음`·`마지막` 을 글자에서 점·선
+          으로 옮긴 것과 같은 이유다. 기준 장소 태그와 같은 줄에 서는 별개의 조각이다.
+
+          **서버 `name` 을 그대로 쓴다** — FE 에 한국어 매핑 테이블을 만들지 않는다.
+        */}
+        <span className="mt-1 flex flex-wrap items-center gap-1">
+          <Badge tone="neutral" size="sm">
+            {item.itemType.name}
+          </Badge>
+
+          {basis && (
             <Badge tone="neutral" size="sm">
               {messages.plan.briefingScheduleBasisTag}
             </Badge>
-          </span>
-        )}
+          )}
+        </span>
 
         {betweenCount > 0 && (
           <p className="text-caption text-fg-muted mt-2 tabular-nums">
@@ -433,15 +476,25 @@ function factText(fact: BriefingDayFact): string {
  */
 function WeatherWarningCard({
   warning,
+  reasonCode,
   reason,
+  onRetry,
 }: {
   warning: PlanBriefingWeatherWarning | null
+  reasonCode: string | null
   reason: string | null
+  onRetry: () => void
 }) {
   if (warning === null) {
+    /*
+      **세 상태를 가르는 규칙은 그대로다** — 문장과 코드가 **둘 다** null 일 때만 "없음"
+      이다. 코드만 보고 접으면 v1 이 피하려던 실패(태풍경보를 조용히 지운다)로 되돌아간다.
+    */
+    const confirmedNone = reason === null && reasonCode === null
+
     return (
       <div className={cn('flex flex-col items-start gap-1 pb-4', INSET_CLASS.card)}>
-        {reason === null ? (
+        {confirmedNone ? (
           <p className="text-body-1 text-fg-muted font-semibold">
             {messages.plan.briefingWarningNone}
           </p>
@@ -456,8 +509,11 @@ function WeatherWarningCard({
             <p className="text-body-2 text-fg-muted font-semibold">
               {messages.plan.briefingWarningUnavailableTitle}
             </p>
-            {/* 서버 문장 그대로 — 화면이 다시 쓰지 않는다 */}
-            <p className="text-body-2 text-fg-muted break-keep">{reason}</p>
+            {/* 서버 문장 그대로 — 화면이 다시 쓰지 않는다. 코드만 온 날은 제목만 남는다 */}
+            {reason !== null && <p className="text-body-2 text-fg-muted break-keep">{reason}</p>}
+
+            {/* **`LOOKUP_FAILED` 에만 단다** — 나머지는 눌러도 생기지 않는 값이다 */}
+            {reasonCode === REASON_LOOKUP_FAILED && <RetryButton onRetry={onRetry} />}
           </>
         )}
       </div>
@@ -503,6 +559,18 @@ function WeatherWarningCard({
 const COVERAGE_UNAVAILABLE = 'UNAVAILABLE'
 
 /**
+ * 특보·골든타임을 못 붙인 사유 중 **일시 장애는 이 하나뿐이다** (#716 · 명세 D9-2).
+ *
+ * 나머지(`NOT_TODAY` · `NO_PLACE_ITEM` · `NO_PLACE_POINT`)는 눌러도 같은 응답이라 버튼을
+ * 달면 계속 누르게 된다. **모르는 코드도 여기 해당하지 않는다** — 서버가 사유를 하나 더
+ * 내면 재시도 없는 쪽으로 떨어지는 것이 안전한 기본값이다.
+ */
+const REASON_LOOKUP_FAILED = 'LOOKUP_FAILED'
+
+/** 재시도가 아니라 **사용자가 할 일**이 있는 사유 — 장소를 담으면 풀린다 */
+const REASON_NO_PLACE_ITEM = 'NO_PLACE_ITEM'
+
+/**
  * 산책하기 좋은 시간 (명세 D5-4).
  *
  * **`walkTimes === null` 이면 곡선을 부를 좌표가 없다.** 프레젠터가 대표 장소 좌표를
@@ -518,22 +586,54 @@ const COVERAGE_UNAVAILABLE = 'UNAVAILABLE'
  * "남은 시간이 모두 위험" 이라고 쓰지 않는다** — 그 문장은 `ALL_HOURS_RISKY` 일 때만 참이다.
  */
 function WalkTimesCard({
+  planId,
+  day,
   walkTimes,
+  reasonCode,
   reason,
   representativePlaceTitle,
   curve,
+  onRetry,
 }: {
+  planId: string
+  day: number
   walkTimes: PlanBriefingWalkTimes | null
+  reasonCode: string | null
   reason: string | null
   representativePlaceTitle: string | null
   curve: PlanBriefingCurve
+  onRetry: () => void
 }) {
   if (walkTimes === null) {
+    /*
+      **판정은 없지만 곡선은 있을 수 있다** (#716 · 명세 D9-3). 좌표가 `schedule` 에도
+      오면서 골든타임 조회만 실패한 날(`LOOKUP_FAILED`)에도 곡선을 받을 수 있게 됐다.
+
+      **창을 넘기지 않는다** — 창·상태의 정본은 브리핑 응답이고 그 응답이 이 날은 판정을
+      내지 못했다. 곡선은 근거로만 서고, 화면이 추천 구간을 지어내지 않는다 (명세 D3-3).
+    */
     return (
-      <div className={cn('flex flex-col items-start gap-1 pb-4', INSET_CLASS.card)}>
+      <div className={cn('flex flex-col items-start gap-3 pb-4', INSET_CLASS.card)}>
         <p className="text-body-2 text-fg-muted break-keep">
           {reason ?? messages.plan.briefingWalkUnknown}
         </p>
+
+        {curve.hourly !== null && (
+          <WalkTimesCurve hourly={curve.hourly} goldenStart={null} goldenEnd={null} />
+        )}
+
+        {/* 넷 중 이것만 일시 장애다 — 브리핑 응답을 다시 부른다 (곡선 재시도가 아니다) */}
+        {reasonCode === REASON_LOOKUP_FAILED && <RetryButton onRetry={onRetry} />}
+
+        {/*
+          **재시도가 아니라 할 일이다.** 그날 장소성 항목이 없어서 못 낸 판정이라 다시
+          부를 것이 없고, 사용자가 장소를 담으면 풀린다 — 서버 enum 이 지목한 자리다.
+        */}
+        {reasonCode === REASON_NO_PLACE_ITEM && (
+          <ButtonLink href={`/plans/${planId}/days/${day}/add`} variant="secondary" size="sm">
+            {messages.plan.briefingWalkNoPlaceItemAction}
+          </ButtonLink>
+        )}
       </div>
     )
   }
@@ -578,7 +678,7 @@ function WalkTimesCard({
       ) : curve.failed ? (
         <div className="flex flex-col items-start gap-1">
           <p className="text-body-2 text-fg-muted">{messages.plan.briefingCurveErrorTitle}</p>
-          <CurveRetry onRetry={curve.onRetry} />
+          <RetryButton onRetry={curve.onRetry} />
         </div>
       ) : null}
 
@@ -588,7 +688,7 @@ function WalkTimesCard({
         곡선 조회가 이미 실패해 버튼이 있으면 두 번 두지 않는다.
       */}
       {coverageBroken && !(curve.hourly === null && curve.failed) && (
-        <CurveRetry onRetry={curve.onRetry} />
+        <RetryButton onRetry={curve.onRetry} />
       )}
 
       <p className="text-caption text-fg-muted font-medium break-keep">
@@ -600,8 +700,13 @@ function WalkTimesCard({
   )
 }
 
-/** 44px — 모바일 최소 터치 영역 (DESIGN.md §7). 홈 `NoForecast` 의 버튼과 같은 모양이다 */
-function CurveRetry({ onRetry }: { onRetry: () => void }) {
+/**
+ * 44px — 모바일 최소 터치 영역 (DESIGN.md §7). 홈 `NoForecast` 의 버튼과 같은 모양이다.
+ *
+ * **곡선 전용이 아니다** (#716) — 브리핑 응답의 `LOOKUP_FAILED` 갈래도 같은 버튼을 쓴다.
+ * 같은 뜻의 버튼이 화면에 두 모양으로 서지 않게 한다.
+ */
+function RetryButton({ onRetry }: { onRetry: () => void }) {
   return (
     <button
       type="button"

@@ -1078,6 +1078,11 @@ export const planMessages = {
   briefingWalkNone: '추천할 산책 구간이 없어요',
   /** `walkTimes` 와 이유가 둘 다 비어 온 계약 밖 조합 */
   briefingWalkUnknown: '산책 시간 판정을 받지 못했어요',
+  /**
+   * `NO_PLACE_ITEM` 갈래의 길 (#716). **재시도가 아니라 할 일이다** — 서버 enum 이
+   * *"정작 사용자가 할 일(장소 담기)은 화면 어디에도 드러나지 않는다"* 고 적어 둔 자리다.
+   */
+  briefingWalkNoPlaceItemAction: '이 날에 장소 담기',
   briefingCurveErrorTitle: '시간대별 예보를 불러오지 못했어요',
   /** `{title}` 치환. **"현재 위치 기준" 이라고 쓰지 않는다** — 그날 대표 장소 좌표 기준이다 */
   briefingWalkBasis: '{title} 기준 · 노면(아스팔트) 온도는 추정치예요',

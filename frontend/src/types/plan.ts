@@ -352,23 +352,48 @@ export type PlanBriefingResponse = {
   /** 발효 중인 기상특보. **없음과 확인 못 함을 이 필드 하나로 가르지 않는다** (아래) */
   weatherWarning: PlanBriefingWeatherWarning | null
   /**
+   * 특보를 붙이지 못한 **사유 코드** (#716 · 명세 D9-2). `null` 이면 확인을 마친 것이다.
+   *
+   * `NOT_TODAY` 정상 — 특보는 발효 중인 것만 존재해 내일 이후를 물을 수단이 없다 ·
+   * `LOOKUP_FAILED` 일시 장애 — **둘 중 이것에만 `다시 시도` 를 단다.**
+   *
+   * **문장(`weatherWarningUnavailableReason`)을 파싱하지 않는다** — 서버 DTO 가 이 코드로
+   * 판단하라고 못박는다. 좁혀 타이핑하지 않는 이유는 metadata 와 같다: 서버가 코드를 하나
+   * 더 내도 화면이 깨지지 않아야 한다 (모르는 코드는 재시도 없는 쪽으로 떨어진다).
+   */
+  weatherWarningUnavailableReasonCode: string | null
+  /**
    * 특보를 **확인하지 못한 이유**의 문장. 서버 javadoc: _"특보는 필드와 이유가 둘 다
    * null 일 때만 '발효 중인 특보 없음' 이다 — 확인하지 못한 날은 이유가 채워진다."_
    *
    * **값이 있으면 "특보 없음" 이 아니다.** 그렇게 쓰면 태풍경보를 조용히 지운다.
    *
-   * **코드가 아니라 문장뿐이라 화면이 "정상(당일만 확인)" 과 "일시 장애" 를 가를 수 없다** —
-   * 그래서 이 문장에 `다시 시도` 를 달지 않는다. 코드 추가는 BE 후속 요청이다
-   * (여행브리핑-세부명세 D9-2).
+   * **세 상태를 가르는 규칙은 코드가 생긴 뒤에도 그대로다** — 이 문장과 위 코드가 **둘 다**
+   * null 일 때만 '발효 중인 특보 없음' 이다. 재시도 여부만 코드가 가른다.
    */
   weatherWarningUnavailableReason: string | null
-  /** 그날 대표 장소 좌표 기준 산책 골든타임. **좌표가 오는 유일한 자리다** */
+  /**
+   * 그날 대표 장소 좌표 기준 산책 골든타임.
+   *
+   * **더 이상 좌표가 오는 유일한 자리가 아니다** (#716). `schedule.representativeLat/Lng`
+   * 가 이 객체와 무관하게 채워진다 — 골든타임을 못 붙인 날에도 화면이 곡선을 부를 수 있다.
+   */
   walkTimes: PlanBriefingWalkTimes | null
-  /** 위 특보 이유와 같은 성질이다 — 문장뿐이라 재시도를 달지 않는다 */
+  /**
+   * 골든타임을 붙이지 못한 **사유 코드** (#716 · 명세 D9-2). `null` 이면 정상이다.
+   *
+   * `NOT_TODAY` 당일 전용 판정 · `NO_PLACE_ITEM` 그날 장소 항목이 없음 ·
+   * `NO_PLACE_POINT` 대표 장소에 좌표가 없음 · `LOOKUP_FAILED` 조회 실패.
+   *
+   * **넷 중 `LOOKUP_FAILED` 만 일시 장애다** — 여기에만 `다시 시도` 를 단다. `NO_PLACE_ITEM`
+   * 은 사용자가 장소를 담으면 풀리므로 재시도가 아니라 **일정 편집으로 가는 길**을 낸다.
+   */
+  walkTimesUnavailableReasonCode: string | null
+  /** 위 특보 이유와 같은 성질이다 — 문장은 그대로 그리고, 재시도 여부는 코드가 가른다 */
   walkTimesUnavailableReason: string | null
 }
 
-/** 그날 일정 요약. **좌표가 없다** — 대표 장소 좌표는 `PlanBriefingWalkTimes` 안에만 있다 */
+/** 그날 일정 요약. **대표 장소 좌표가 여기 온다** (#716 — 예전에는 `walkTimes` 안에만 있었다) */
 export type PlanBriefingSchedule = {
   itemCount: number
   visitedCount: number
@@ -377,6 +402,16 @@ export type PlanBriefingSchedule = {
   lastItem: PlanBriefingItemSummary | null
   representativePlaceId: string | null
   representativePlaceTitle: string | null
+  /**
+   * 대표 장소의 위도. **`walkTimes` 가 null 인 날에도 채워진다** — 골든타임을 못 붙였어도
+   * 화면이 지도와 곡선을 부를 수 있어야 하기 때문이다 (서버 DTO 가 그 이유를 적어 둔다).
+   *
+   * 원천이 좌표를 주지 않거나 delisted 된 장소면 null 이고, 그때
+   * `walkTimesUnavailableReasonCode` 는 `NO_PLACE_POINT` 다.
+   */
+  representativeLat: number | null
+  /** `representativeLat` 과 같은 규칙으로 채워지고 같은 규칙으로 null 이 된다 */
+  representativeLng: number | null
 }
 
 export type PlanBriefingItemSummary = {
@@ -384,13 +419,13 @@ export type PlanBriefingItemSummary = {
   /** 0부터 */
   sequence: number
   /**
-   * **metadata 가 아니라 enum 값 문자열이다** — `PLACE`/`MEAL`/`LODGING`/`WALK`/`MOVE`.
+   * **metadata 다** (#716 — 예전에는 이 응답만 `PLACE` 같은 enum 문자열이었다).
    *
-   * 같은 도메인의 `PlanItemDetail.itemType` 은 metadata 객체라 **모양이 다르다.** 한국어를
-   * 쓰려면 FE 매핑 테이블이 필요한데 그것은 금지라(루트 `CLAUDE.md`) **v1 은 유형 라벨을
-   * 아예 그리지 않는다.** 서버 metadata 요청은 BE 후속이다 (명세 D9-1).
+   * 같은 도메인의 `PlanItemDetail.itemType` 과 이제 모양이 같다. 한국어는 서버가 채워
+   * 보내므로 **`name` 을 그대로 렌더한다** — FE 매핑 테이블을 만들지 않는다 (루트
+   * `CLAUDE.md`). 그래서 v1 이 유형 라벨을 포기했던 이유가 사라졌다 (명세 D9-1).
    */
-  itemType: PlanItemTypeCode
+  itemType: CodeNameMetadata
   title: string
   /** `HH:mm:ss`. 시각을 지정하지 않은 항목은 null */
   startTime: string | null
@@ -414,10 +449,15 @@ export type PlanBriefingWeatherWarning = {
  *
  * **시간대별 곡선(`hourly`)이 없다** — 서버 javadoc: _"브리핑은 '그날 하나' 를 묶는
  * 요약이라 곡선을 실으면 응답이 몇 배로 커진다. 곡선이 필요하면 여기 실린 좌표로 tour 를
- * 직접 부른다."_ 그래서 **이 객체가 null 이면 곡선을 부를 좌표가 아예 없다.**
+ * 직접 부른다."_
+ *
+ * **이 객체가 null 이어도 곡선을 부를 수 있다** (#716) — 좌표는
+ * `schedule.representativeLat/Lng` 에도 온다. 다만 tour 의 곡선은 "오늘 남은 시간" 전용이라
+ * 실제로 부를 값어치가 있는 갈래는 `walkTimesUnavailableReasonCode === 'LOOKUP_FAILED'`
+ * 하나다 (나머지 셋은 좌표가 없거나 오늘이 아니다).
  */
 export type PlanBriefingWalkTimes = {
-  /** **응답에서 좌표가 오는 유일한 자리다.** `schedule` 에는 좌표가 없다 */
+  /** 판정에 쓴 좌표. `schedule.representativeLat/Lng` 와 같은 장소다 (#716 이후) */
   lat: number
   lng: number
   /** 기준 시각 */

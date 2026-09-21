@@ -26,7 +26,6 @@ import type {
   PlanDetail,
   PlanItemDetail,
   PlanItemPlace,
-  PlanItemTypeCode,
   PlanItemWalkCourse,
   PlanItemWalkSafetyItem,
   PlanPackingListResponse,
@@ -188,6 +187,17 @@ const ITEM_TYPE: Record<string, CodeNameMetadata> = {
   MOVE: { code: 'MOVE', name: '이동', description: '이동 구간 항목입니다.' },
 }
 
+/**
+ * 모르는 코드도 `{code,name,description}` 모양은 지킨다 — 화면이 `name` 을 그대로 그리므로
+ * 표에 없는 코드가 와도 빈 칸이 아니라 코드가 보인다.
+ *
+ * **상세와 브리핑이 같은 함수를 쓴다** (#716 으로 브리핑도 metadata 가 됐다). 둘이 따로
+ * 조립하면 같은 항목의 유형이 두 화면에서 갈린다.
+ */
+function itemTypeMetadata(code: string): CodeNameMetadata {
+  return ITEM_TYPE[code] ?? { code, name: code, description: null }
+}
+
 function totalDaysOf(plan: MockPlan): number {
   const start = Date.parse(`${plan.startDate}T00:00:00Z`)
   const end = Date.parse(`${plan.endDate}T00:00:00Z`)
@@ -248,11 +258,7 @@ function toItem(item: MockPlanItem): PlanItemDetail {
     planItemId: item.planItemId,
     day: item.day,
     sequence: item.sequence,
-    itemType: ITEM_TYPE[item.itemType] ?? {
-      code: item.itemType,
-      name: item.itemType,
-      description: null,
-    },
+    itemType: itemTypeMetadata(item.itemType),
     targetId: item.targetId,
     title: item.title,
     memo: item.memo,
@@ -1195,16 +1201,16 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
 const WARNING_REASON_NOT_TODAY = '기상특보는 출발 당일에만 확인합니다.'
 
 /**
- * 골든타임을 못 낸 이유.
+ * 골든타임을 못 낸 이유 — **서버 enum 의 `description` 그대로다**
+ * (`PlanBriefingWalkTimesUnavailableReason`, #716 소스 실측 2026-09-21).
  *
- * 좌표가 없는 갈래는 서버 문장을 실측으로 확인했다. **당일이 아닌 갈래의 정확한 서버
- * 문장은 게이트웨이 미기동으로 확인하지 못했다** — 화면은 이 문장을 파싱하지 않고 그대로
- * 그리므로 동작에는 영향이 없다.
- *
- * TODO(BE): Swagger 가 뜨면 `PlanBriefingProcessor` 의 상수와 대조한다 (#626 명세 D9).
+ * 당일이 아닌 갈래의 문장이 `확인합니다` 로 적혀 있었는데 서버는 `제공됩니다` 다. 화면이
+ * 문장을 파싱하지는 않지만, 목이 서버와 다르면 **로컬에서 본 것이 실제와 다르다.**
  */
-const WALK_REASON_NOT_TODAY = '산책 골든타임은 출발 당일에만 확인합니다.'
-const WALK_REASON_NO_COORDINATES = '대표 장소의 좌표가 없어 골든타임을 붙이지 못했습니다.'
+const WALK_REASON_NOT_TODAY = '산책 골든타임은 출발 당일에만 제공됩니다.'
+const WALK_REASON_NO_PLACE_ITEM =
+  '이 날짜에는 장소가 지정된 일정 항목이 없어 골든타임을 붙이지 못했습니다.'
+const WALK_REASON_NO_PLACE_POINT = '대표 장소의 좌표가 없어 골든타임을 붙이지 못했습니다.'
 
 /**
  * 하루치 합본 — `GET /plans/{planId}/briefing?date=`.
@@ -1221,12 +1227,18 @@ function toBriefing(plan: MockPlan, search: string): MockResult {
   const date = new URLSearchParams(search).get('date')
 
   /*
-    `@RequestParam LocalDate date` 는 필수라 없으면 스프링이 도메인에 닿기 전에 400 을
-    낸다. **정확한 공통 래퍼 코드는 확인하지 못했다** — 화면은 언제나 날짜를 보내므로
-    급하지 않다 (명세 D9-4). 검증 실패와 같은 `PLAN_100` 을 쓴다.
+    `@RequestParam LocalDate date` 는 필수라 없으면 스프링이 도메인에 닿기 전에 400 을 낸다.
+    **서버는 누락과 형식 오류를 가른다** (#716 실측, 명세 D9-4):
+    `MissingServletRequestParameterException` → `PARAMETER_REQUIRED`(`PLAN_125`),
+    `MethodArgumentTypeMismatchException` → `PARAMETER_TYPE_INVALID`(`PLAN_124`).
+    예전에는 둘을 `PLAN_100` 하나로 묶고 있었다.
   */
-  if (date === null || !DATE_PATTERN.test(date)) {
-    return fail(400, 'PLAN_100', '필수 요청 파라미터 date 가 없거나 형식이 올바르지 않습니다.')
+  if (date === null) {
+    return fail(400, 'PLAN_125', '필수 요청 파라미터 date 가 없습니다.')
+  }
+
+  if (!DATE_PATTERN.test(date)) {
+    return fail(400, 'PLAN_124', '요청 파라미터 date 의 형식이 올바르지 않습니다.')
   }
 
   const startTime = Date.parse(`${plan.startDate}T00:00:00Z`)
@@ -1271,9 +1283,14 @@ function toBriefing(plan: MockPlan, search: string): MockResult {
         visitedCount: items.filter((item) => item.visited).length,
         firstItem: first === null ? null : toBriefingItem(first),
         lastItem: last === null ? null : toBriefingItem(last),
-        // **좌표를 여기 싣지 않는다** — 프레젠터가 `walkTimes` 안에만 넣는다 (명세 D3-3)
         representativePlaceId: basis?.targetId ?? null,
         representativePlaceTitle: basis?.title ?? null,
+        /*
+          **`walkTimes` 와 무관하게 싣는다** (#716). 프레젠터가 골든타임을 못 붙인 날에도
+          이 좌표를 채우므로, 목이 비워 두면 화면이 좌표 폴백 갈래를 로컬에서 못 본다.
+        */
+        representativeLat: basisPlace?.lat ?? null,
+        representativeLng: basisPlace?.lng ?? null,
       },
       weather,
       weatherWarning: today
@@ -1289,6 +1306,7 @@ function toBriefing(plan: MockPlan, search: string): MockResult {
             effectiveAt: `${date}T11:00:00`,
           }
         : null,
+      weatherWarningUnavailableReasonCode: today ? null : 'NOT_TODAY',
       weatherWarningUnavailableReason: today ? null : WARNING_REASON_NOT_TODAY,
       walkTimes:
         today && basisPlace?.lat != null && basisPlace.lng != null
@@ -1313,11 +1331,25 @@ function toBriefing(plan: MockPlan, search: string): MockResult {
               petConditionApplied: true,
             }
           : null,
+      /*
+        **사유가 넷이라 갈래도 넷이다** (#716). `basis` 자체가 없으면 그날 장소성 항목이
+        없는 것(`NO_PLACE_ITEM`)이고, 항목은 있는데 좌표가 없으면 `NO_PLACE_POINT` 다 —
+        예전에는 둘을 좌표 하나로 뭉쳐 `NO_PLACE_ITEM` 을 로컬에서 볼 수 없었다.
+      */
+      walkTimesUnavailableReasonCode: !today
+        ? 'NOT_TODAY'
+        : basis === null
+          ? 'NO_PLACE_ITEM'
+          : basisPlace?.lat == null || basisPlace.lng == null
+            ? 'NO_PLACE_POINT'
+            : null,
       walkTimesUnavailableReason: !today
         ? WALK_REASON_NOT_TODAY
-        : basisPlace?.lat == null || basisPlace.lng == null
-          ? WALK_REASON_NO_COORDINATES
-          : null,
+        : basis === null
+          ? WALK_REASON_NO_PLACE_ITEM
+          : basisPlace?.lat == null || basisPlace.lng == null
+            ? WALK_REASON_NO_PLACE_POINT
+            : null,
     } satisfies PlanBriefingResponse),
   }
 }
@@ -1327,11 +1359,11 @@ function toBriefingItem(item: MockPlanItem): PlanBriefingItemSummary {
     planItemId: item.planItemId,
     sequence: item.sequence,
     /*
-      **metadata 가 아니라 enum 문자열이다** — 같은 도메인의 `PlanItemDetail.itemType` 은
-      metadata 객체다 (명세 D9-1). mock 이 모양을 맞추지 않으면 화면이 그 드리프트를
-      로컬에서 한 번도 못 본다.
+      **metadata 다** (#716 · 명세 D9-1) — 같은 도메인의 `PlanItemDetail.itemType` 과 모양이
+      같아졌다. 한국어는 서버가 채우므로 목도 같은 표를 쓴다 (FE 매핑 테이블이 아니라
+      서버 enum 의 복제본이다 — `PlanItemType`).
     */
-    itemType: item.itemType as PlanItemTypeCode,
+    itemType: itemTypeMetadata(item.itemType),
     title: item.title,
     startTime: item.startTime,
     visited: item.visited,
