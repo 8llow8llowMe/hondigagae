@@ -69,6 +69,18 @@ export const walkCourseMessages = {
    * 적을 수 없는 서버 값이라, 고른 뒤 **기준 줄**이 응답 값으로 말한다.
    *
    * 두 자리가 같은 문구라 캡션은 `aria-hidden` 이다 — 두 번 읽히지 않게 한다.
+   *
+   * ### `걷는 시간` 으로 되돌리지 않는다 ([#824](https://github.com/8llow8llowMe/hondigagae/issues/824))
+   *
+   * 진단 §4-2 는 이 축도 `걷는 시간` 으로 통일하라고 적었지만, 그렇게 하면 **축 이름과
+   * 선택지(`낮음`·`보통`)가 어긋난다** — #735 가 피하려던 바로 그 상태다. 선택지를 다시
+   * 시간(`4시간 이내`)으로 되돌리는 안은 **FE 상한 복제본**을 되살린다. 응답은 *적용된*
+   * 상한 하나만 주므로 아직 고르지 않은 칸의 숫자는 FE 가 지어내는 값이 된다.
+   *
+   * **§4-2 의 지적(상한이 가려진다)은 이름이 아니라 기준 줄이 푼다** — 고르고 나면
+   * `activityBasis` 가 서버가 준 상한으로 `{level} 기준으로 {limit}이 넘는 코스는 빼고` 라고
+   * 말한다. 고르기 **전**에 상한을 적지 않는 것은 그 값이 응답에 없기 때문이고, 그것이
+   * #735 의 결정이다.
    */
   activityGroupLabel: '활동량',
   activityAll: '전체',
@@ -124,7 +136,19 @@ export const walkCourseMessages = {
   activityBasisWithoutPet: '활동량({level}) 기준으로 {limit}이 넘는 코스는 빼고 보여 줘요.',
 
   emptyTitle: '조건에 맞는 코스가 없어요',
-  emptyDescription: '걷는 시간을 넓혀 보세요.',
+  /**
+   * **넓히라고 말하는 대상은 필터 축(`활동량`)이다** ([#824](https://github.com/8llow8llowMe/hondigagae/issues/824)).
+   *
+   * 전에는 `걷는 시간을 넓혀 보세요.` 였는데, 화면에 `걷는 시간` 이라는 **컨트롤이 없다** —
+   * 거를 수 있는 축은 `활동량` 하나이고 `걷는 시간` 은 각 코스가 가진 **값**의 이름이다
+   * (`durationLabel`). 같은 낱말이 축과 값 둘을 가리키던 자리라, 값 쪽에 그 이름을 두고
+   * 여기는 축 이름으로 바꿨다.
+   *
+   * 이 문구는 **400 화면의 폴백 설명**으로도 쓰인다(`walk-course-list-section.tsx`) —
+   * 서버가 `resultMessage` 를 주지 않았을 때다. 거기서도 다음 행동(`전체 코스 보기`)과
+   * 이어 읽힌다.
+   */
+  emptyDescription: '활동량 조건을 넓혀 보세요.',
   emptyAction: '전체 코스 보기',
 
   errorTitle: '코스를 불러오지 못했어요',
@@ -138,7 +162,16 @@ export const walkCourseMessages = {
 
   // ── 상세 ──────────────────────────────────────────────────────────────────
   distanceLabel: '거리',
-  durationLabel: '소요시간',
+  /**
+   * **시간 값의 이름은 `걷는 시간` 하나다** ([#824](https://github.com/8llow8llowMe/hondigagae/issues/824)).
+   *
+   * 진단 §4-2(D-1)가 *"시간 축의 이름은 `걷는 시간` 으로 통일한다 — `소요시간` 과 섞어 쓰지
+   * 않는다"* 고 정했고 `pageDescription` 은 그 규칙을 지키고 있었는데, **정작 값에 붙는 이
+   * 라벨이 `소요시간` 이었다.** 목록 열 머리와 상세 `<dl>` 이 이 상수 하나를 공유하므로 두
+   * 화면이 함께 어긋나 있었다. 규칙을 잠그던 테스트가 `pageDescription` 한 문자열만 보고
+   * 있었던 것이 이유다 — 지금은 이 상수까지 함께 본다.
+   */
+  durationLabel: '걷는 시간',
   startEndLabel: '시종점',
   backToList: '코스 목록으로',
   /** `{provider}` · `{date}` 치환 — **둘 다 서버 값이다** */

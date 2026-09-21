@@ -77,6 +77,28 @@ describe('진입점은 홈 배너다 (S6-1)', () => {
     expect(messages.walkCourse.pageDescription).toContain('걷는 시간')
     expect(messages.walkCourse.pageDescription).not.toContain('소요시간')
   })
+
+  /**
+   * **규칙을 한 문자열에만 걸어 두어 나머지가 새어 나갔다**
+   * ([#824](https://github.com/8llow8llowMe/hondigagae/issues/824)). 위 단언은 `pageDescription`
+   * 만 보는데, 정작 값에 붙는 라벨(`durationLabel`)이 `소요시간` 이었다 — 목록 열 머리와
+   * 상세 `<dl>` 이 그 상수를 공유하므로 두 화면이 함께 어긋나 있었다.
+   *
+   * 그래서 **사용자에게 보이는 walk-course 문구 전체**를 훑는다. 새 문구가 `소요시간` 을
+   * 들고 들어오면 여기서 걸린다.
+   */
+  it('사용자에게 보이는 문구 어디에도 소요시간이 없다', () => {
+    const leaked = Object.entries(messages.walkCourse)
+      .filter(([, value]) => typeof value === 'string' && value.includes('소요시간'))
+      .map(([key]) => key)
+
+    expect(leaked, `시간 축 이름이 갈린 문구: ${leaked.join(', ')}`).toEqual([])
+  })
+
+  /** 거를 수 있는 축은 `활동량` 하나다 — 0건 안내가 없는 컨트롤을 가리키지 않게 한다 */
+  it('0건 안내가 필터 축의 이름으로 말한다', () => {
+    expect(messages.walkCourse.emptyDescription).toContain(messages.walkCourse.activityGroupLabel)
+  })
 })
 
 describe('WalkTimesSection 이동 — 홈 마크업은 그대로다 (S6-3)', () => {
