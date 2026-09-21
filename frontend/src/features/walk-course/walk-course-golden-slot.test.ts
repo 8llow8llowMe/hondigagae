@@ -31,6 +31,29 @@ function render(
   )
 }
 
+/**
+ * `bg-band` 상자가 **닫히는** 위치. `<div` 깊이를 세어 찾는다.
+ *
+ * 문자열 탐색으로 "상자 안에 있나" 를 물으면 상자 뒤 마크업까지 같이 걸려 **없는
+ * 포함관계를 있다고 답한다** — 실제로 그렇게 쓴 첫 판이 구현을 고치기 전에도 통과했다.
+ * 이 저장소는 jsdom 없이 문자열을 단언하므로(`testing-guide.md`) 깊이는 직접 센다.
+ */
+function bandBoxEnd(markup: string) {
+  const open = markup.lastIndexOf('<div', markup.indexOf('bg-band'))
+  expect(open).toBeGreaterThan(-1)
+
+  let depth = 0
+  for (let at = open; at < markup.length; at += 1) {
+    if (markup.startsWith('<div', at)) depth += 1
+    else if (markup.startsWith('</div>', at)) {
+      depth -= 1
+      if (depth === 0) return at
+    }
+  }
+
+  throw new Error('bg-band 상자가 닫히지 않았다')
+}
+
 describe('WalkCourseGoldenSlot — 좌표가 없어도 자리와 제목은 남는다 (#730)', () => {
   const NO_COORDS = { lat: null, lng: null }
 
@@ -68,15 +91,42 @@ describe('WalkCourseGoldenSlot — 좌표가 없어도 자리와 제목은 남�
     expect(markup).toContain(messages.walkCourse.noCoordinates)
   })
 
-  /** ① 왜 없는지 ② 얼마나 흔한 일인지 ③ 대안 둘 — 상자가 셋을 담는다 */
-  it('안내 상자가 왜 · 얼마나 흔한지 · 대안 둘을 담는다', () => {
+  /**
+   * **상자는 사실 두 줄만 담는다** ([#780](https://github.com/8llow8llowMe/hondigagae/issues/780)).
+   * ① 왜 없는지 ② 얼마나 흔한 일인지. 대안은 상자 밖 본문 흐름으로 나갔다.
+   */
+  it('안내 상자가 왜 · 얼마나 흔한지를 담는다', () => {
     const markup = render(NO_COORDS)
 
     expect(markup).toContain(messages.walkCourse.noCoordinates)
     expect(markup).toContain(messages.walkCourse.noCoordinatesCommon)
-    expect(markup).toContain(messages.walkCourse.noCoordinatesAlternatives)
-    expect(markup).toContain(messages.walkCourse.noCoordinatesPlacesAction)
-    expect(markup).toContain(messages.walkCourse.noCoordinatesPlanAction)
+  })
+
+  /**
+   * #780. 375 실측에서 이 안내가 본문 806px 중 408px(51%)을 먹었다 — **29개 중 25개가
+   * 보는 기본 갈래**인데 "없다는 안내" 가 화면의 주인공이었다. 상자를 사실 두 줄로 줄이고
+   * 대안 하나를 밖으로 내보내 비중을 내린다.
+   *
+   * `bg-band` 상자가 대안 목록을 **더 이상 감싸지 않는다**는 것을 마크업 순서로 단언한다 —
+   * 링크가 상자 여는 태그보다 뒤에 오더라도 상자 **닫힘 이후**여야 한다.
+   */
+  it('대안을 상자 밖으로 내보낸다 — 상자는 사실만 담는다', () => {
+    const markup = render(NO_COORDS)
+    const link = markup.indexOf('href="/places"')
+
+    expect(link).toBeGreaterThan(-1)
+    expect(link).toBeGreaterThan(bandBoxEnd(markup))
+  })
+
+  /**
+   * **`일정에 담기` 를 여기서 두 번 말하지 않는다** (#780). 바로 아래에 그 버튼이 실물로
+   * 있다 — 안내가 그것을 또 가리키면 같은 화면이 같은 말을 두 번 한다. 개정 전에는
+   * "버튼을 하나 더 만들지 않는다" 까지만 지켰고 **말이 중복되는 것은 놓쳤다.**
+   */
+  it('일정에 담기를 안내에서 다시 말하지 않는다', () => {
+    const markup = render(NO_COORDS)
+
+    expect(markup).not.toContain(messages.plan.addToPlanAction)
   })
 
   /**
@@ -93,7 +143,7 @@ describe('WalkCourseGoldenSlot — 좌표가 없어도 자리와 제목은 남�
   })
 
   /**
-   * **대안 ① 은 장소 찾기로 간다.** 새 API 를 만들지 않고 기존 경로를 쓴다.
+   * **남는 대안은 장소 찾기 하나다.** 새 API 를 만들지 않고 기존 경로를 쓴다.
    *
    * **검색어를 채우지 않는다** — 서버 `keyword` 는 `title`·`addr1` 의 `%LIKE%` 라
    * 시종점 원문에서 만든 토막은 대부분 0건이다. 결과 없음으로 데려가는 대안은 대안이 아니다.
@@ -103,14 +153,11 @@ describe('WalkCourseGoldenSlot — 좌표가 없어도 자리와 제목은 남�
   })
 
   /**
-   * **대안 ② 는 버튼을 하나 더 만들지 않는다.** 같은 화면 아래 `일정에 담기` 와 같은
+   * **안내가 버튼을 하나 더 만들지 않는다.** 같은 화면 아래 `일정에 담기` 와 같은
    * 이름의 컨트롤이 둘이면 보조기기에서 목적지가 둘로 들린다.
    */
-  it('대안 ② 는 아래 CTA 를 가리킬 뿐 버튼을 더 만들지 않는다', () => {
-    const markup = render(NO_COORDS)
-
-    expect(markup).not.toContain('<button')
-    expect(markup).toContain(messages.plan.addToPlanAction)
+  it('안내는 버튼을 더 만들지 않는다', () => {
+    expect(render(NO_COORDS)).not.toContain('<button')
   })
 
   /** 오류가 아니라 이 코스의 사실이다 — 경고로 읽히면 진입마다 먼저 읽힌다 (D6) */
