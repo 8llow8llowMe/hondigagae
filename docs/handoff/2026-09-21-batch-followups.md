@@ -155,10 +155,29 @@ SELECT COUNT(*) FROM place WHERE source='TOUR_API' AND delisted_at IS NULL;
 2. **우회 파일이 저장소 밖에도 있다.** 배포에서는 `BATCH_DATA_DIR` 에 사람이 둔 파일이라 언제 판본인지
    알 수 없다. 포털의 현재 파일명이 `_20260731` 이라 이미 더 낡았을 수 있다.
 
-### C-3. 손대기 전에 확인할 것
+### C-3. 충돌 없음 — 이 작업은 #828 계열이 가져간다 (2026-09-21 조율 완료)
 
-**`walkcourseimport` 패키지는 #816(올레 좌표·경로 적재)과 같은 파일이다.** 담당이 따로 있으니
-먼저 조율한다. 파싱 전략 교체를 #816 안에서 같이 할지, 별도 이슈로 뗄지가 첫 결정이다.
+처음에는 "#816 과 같은 파일이라 충돌한다" 고 들었는데 **확인 결과 겹치는 파일이 하나도 없다.**
+
+| | 건드리는 곳 |
+| --- | --- |
+| #816 (23파일) | `walkcourseimport` 의 `OlleCourseParser` · `CsvAdapter` · `ImportProcessor` · `JdbcWalkCourseBulkAdapter` · 신규 `OlleCourseEndpointResolver` + tour-service |
+| #829 (6파일) | docs 2 + `placeimport` 의 `PlaceImportVolumeProperties` · `application.yml` · compose · test |
+
+**`DataGoKrOlleCourseSourceAdapter` 는 양쪽 어디에도 없다.** 원천 **다운로드**(SourceAdapter)와
+원천 **파싱·적재**(Parser·Processor)가 다른 파일인데 같은 것으로 넘겨짚은 것이었다.
+#816 담당도 같은 판단이고, PR 본문에 "이 PR 이 건드리지 않은 것" 으로 명시해 뒀다고 한다.
+
+**묶어서 가져갈 것 셋** (한 PR 로):
+
+1. 파싱 전략 교체 (C-1 · C-4)
+2. `jsonLdBlocks=%d` 로그 이름 (C-5) — 한 줄이지만 따로 고치면 전략 교체 때 또 손대게 된다
+3. 우회 지표 — 본보기가 이미 있다: `MicrometerPlaceImportMetricsAdapter`
+   (`placeimport/adapter/out/metrics/`). 행 수를 Counter 가 아니라 **Gauge** 로 두고
+   `Tags.of("source", …, "result", …)` 를 붙이는 모양을 그대로 따라간다.
+
+**새 이슈를 팔지 #828 범위를 넓힐지는 정하지 않았다.** 다만 **이미 머지된 #829 에 섞지 않는다** —
+그쪽은 가드 값·문서로 완결돼 있다. 별도 PR 로 간다.
 
 ### C-4. 고칠 때의 후보안
 
