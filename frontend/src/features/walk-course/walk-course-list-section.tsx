@@ -257,7 +257,7 @@ function WalkCourseListBody({
         </p>
       )}
 
-      {/* 1280 이상 전용 열 머리 — 행과 같은 그리드를 공유한다 (#734) */}
+      {/* 1024 이상 전용 열 머리 — 행과 같은 그리드를 공유한다 (#734 · #797) */}
       <WalkCourseColumnHead inset={inset} />
 
       {/*
