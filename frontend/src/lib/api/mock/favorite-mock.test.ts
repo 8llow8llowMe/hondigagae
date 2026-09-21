@@ -92,10 +92,21 @@ describe('즐겨찾기 mock — 저장과 해제는 멱등이다', () => {
 })
 
 describe('즐겨찾기 mock — 오류 계약', () => {
+  /** 문구·`fieldErrors` 까지 본다 — 코드만 보면 목이 다른 문장을 내도 초록불이다 (#813) */
   it('숫자가 아닌 placeId 는 404 가 아니라 400 이다 — @PathVariable long 이라서다', () => {
     const result = add('not-a-number')
     expect(result?.status).toBe(400)
-    expect(result?.payload.dataHeader.resultCode).toBe('FAVORITE_113')
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'FAVORITE_113',
+      resultMessage: 'placeId 파라미터 형식이 올바르지 않습니다.',
+      fieldErrors: [
+        {
+          code: 'FAVORITE_113',
+          field: 'placeId',
+          message: 'placeId 파라미터 형식이 올바르지 않습니다.',
+        },
+      ],
+    })
   })
 
   it('없는 장소는 FAVORITE_001 이다 — 노출 불가 장소는 저장되지 않는다', () => {

@@ -12,6 +12,7 @@ import {
   mockWalkTimes,
 } from '@/lib/api/mock/insight-data'
 import { resolveMemberMock } from '@/lib/api/mock/member-data'
+import { bindPathVariable } from '@/lib/api/mock/path-variable'
 import { resolvePetMock } from '@/lib/api/mock/pet-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import { mockPlaceDetail } from '@/lib/api/mock/place-detail-data'
@@ -185,11 +186,23 @@ export function resolveMock(
     return { status: 200, payload: ok(mockNearbyFacilities(radius)) }
   }
 
-  // 인사이트는 상세보다 먼저 본다 — /places/{id}/suitability 가 상세 정규식에 안 걸리지만
-  // 순서를 명시해 두면 상세 규칙을 넓힐 때 실수하지 않는다
-  const insight = /^\/places\/(\d+)\/(suitability|walk-safety|congestions)$/.exec(path)
+  /*
+    인사이트는 상세보다 먼저 본다 — /places/{id}/suitability 가 상세 정규식에 안 걸리지만
+    순서를 명시해 두면 상세 규칙을 넓힐 때 실수하지 않는다.
+
+    **`placeId` 자리를 `\d+` 로 좁히지 않는다.** 그러면 `/places/abc/suitability` 가 이
+    분기에도 상세 분기(`^/places/([^/]+)$`, 슬래시를 안 받는다)에도 안 걸려 **목을 그냥
+    통과했다** — dev 는 400 `INSIGHT_113` 이다 (#813 실측). 목이 서버보다 느슨하면
+    화면이 그 갈래를 로컬에서 한 번도 못 본다.
+
+    **코드가 `PLACE_113` 이 아니라 `INSIGHT_113` 이다** — 같은 `/places` 접두사지만
+    tour-service 안에서 insight 컨텍스트가 제 `ExceptionHandler` 를 갖는다.
+  */
+  const insight = /^\/places\/([^/]+)\/(suitability|walk-safety|congestions)$/.exec(path)
   if (insight !== null) {
-    const placeId = insight[1] as string
+    const bound = bindPathVariable('INSIGHT_113', 'placeId', insight[1] ?? '')
+    if (typeof bound !== 'string') return bound
+    const placeId = bound
 
     if (insight[2] === 'suitability') return { status: 200, payload: ok(mockSuitability(placeId)) }
 
@@ -215,12 +228,12 @@ export function resolveMock(
     // /places/nearby 는 위에서 이미 처리했다. 여기까지 오면 상세로 오해한 것이다
     if (SUB_RESOURCES.has(rawId)) return null
 
-    // 컨트롤러가 @PathVariable long 이라, 숫자가 아닌 id 는 404 가 아니라 400 이다
-    if (!/^\d+$/.test(rawId)) {
-      return fail(400, 'PLACE_113', '요청 파라미터 형식이 올바르지 않습니다.')
-    }
+    // 컨트롤러가 @PathVariable long 이라, 숫자가 아닌 id 는 404 가 아니라 400 이다.
+    // 모양·문법은 공용 `bindPathVariable` 이 정본이다 (#813)
+    const placeId = bindPathVariable('PLACE_113', 'placeId', rawId)
+    if (typeof placeId !== 'string') return placeId
 
-    return placeDetail(rawId)
+    return placeDetail(placeId)
   }
 
   return null

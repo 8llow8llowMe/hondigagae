@@ -1,4 +1,5 @@
 import type { MockResult } from '@/lib/api/mock/auth-data'
+import { bindPathVariable } from '@/lib/api/mock/path-variable'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import { memberIdOf, mockStore, nextFavoriteId } from '@/lib/api/mock/store'
 import type { ApiResponse } from '@/types/api'
@@ -82,13 +83,15 @@ export function resolveFavoriteMock(
     /*
       **숫자가 아닌 placeId 는 404 가 아니라 400 이다** — 컨트롤러가 `@PathVariable long`
       이라 바인딩 단계에서 걸린다 (장소 상세의 `PLACE_113` 과 같은 상황).
-    */
-    if (!/^\d+$/.test(rawId)) {
-      return fail(400, 'FAVORITE_113', '요청 파라미터 형식이 올바르지 않습니다.')
-    }
 
-    if (method === 'POST') return add(memberId, rawId)
-    if (method === 'DELETE') return remove(memberId, rawId)
+      문구·`fieldErrors`·문법은 도메인을 가리지 않고 같다 — 공용 `bindPathVariable` 이
+      정본이고 여기서는 도메인 코드만 얹는다 (#813).
+    */
+    const placeId = bindPathVariable('FAVORITE_113', 'placeId', rawId)
+    if (typeof placeId !== 'string') return placeId
+
+    if (method === 'POST') return add(memberId, placeId)
+    if (method === 'DELETE') return remove(memberId, placeId)
   }
 
   return null

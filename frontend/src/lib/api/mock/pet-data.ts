@@ -1,4 +1,5 @@
 import type { MockResult } from '@/lib/api/mock/auth-data'
+import { bindPathVariable } from '@/lib/api/mock/path-variable'
 import { memberIdOf, type MockPet, mockStore, nextPetId } from '@/lib/api/mock/store'
 import { MAX_PET_COUNT } from '@/lib/api/pet'
 import type { ApiResponse, ValidationErrorItem } from '@/types/api'
@@ -287,12 +288,12 @@ export function resolvePetMock(
   const rest = path.slice('/members/me/pets/'.length)
   const [petId = '', sub] = rest.split('/')
 
-  // 컨트롤러가 @PathVariable long 이라, 숫자가 아닌 id 는 404 가 아니라 400 이다 — S4-3
-  if (!/^\d+$/.test(petId)) {
-    return fail(400, 'PET_113', '요청 파라미터 형식이 올바르지 않습니다.')
-  }
+  // 컨트롤러가 @PathVariable long 이라, 숫자가 아닌 id 는 404 가 아니라 400 이다 — S4-3.
+  // 모양·문법은 공용 `bindPathVariable` 이 정본이고 여기서는 도메인 코드만 얹는다 (#813)
+  const boundPetId = bindPathVariable('PET_113', 'petId', petId)
+  if (typeof boundPetId !== 'string') return boundPetId
 
-  if (sub !== undefined) return resolvePetSubResource(petId, sub, method, memberId)
+  if (sub !== undefined) return resolvePetSubResource(boundPetId, sub, method, memberId)
 
   const owned = store.pets.find(
     (pet) => pet.petId === petId && pet.memberId === memberId && !pet.deleted,

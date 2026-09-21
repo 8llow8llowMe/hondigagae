@@ -1,4 +1,5 @@
 import type { MockResult } from '@/lib/api/mock/auth-data'
+import { bindPathVariable } from '@/lib/api/mock/path-variable'
 import type { ApiResponse, CodeNameMetadata } from '@/types/api'
 import type {
   WalkCourseAppliedActivityLevel,
@@ -269,12 +270,12 @@ function list(params: URLSearchParams): MockResult {
 }
 
 function detail(rawId: string): MockResult {
-  // 컨트롤러가 `@PathVariable long` 이라 숫자가 아닌 id 는 404 가 아니라 400 이다
-  if (!/^\d+$/.test(rawId)) {
-    return fail(400, 'WALKCOURSE_113', '요청 파라미터 형식이 올바르지 않습니다.')
-  }
+  // 컨트롤러가 `@PathVariable long` 이라 숫자가 아닌 id 는 404 가 아니라 400 이다.
+  // 모양·문법은 공용 `bindPathVariable` 이 정본이다 (#813)
+  const walkCourseId = bindPathVariable('WALKCOURSE_113', 'walkCourseId', rawId)
+  if (typeof walkCourseId !== 'string') return walkCourseId
 
-  const found = MOCK_WALK_COURSES.find((course) => course.walkCourseId === rawId)
+  const found = MOCK_WALK_COURSES.find((course) => course.walkCourseId === walkCourseId)
   if (found === undefined) return fail(404, 'WALKCOURSE_001', '존재하지 않는 산책 코스입니다.')
 
   const body: WalkCourseDetail = {
