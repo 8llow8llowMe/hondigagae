@@ -293,6 +293,10 @@ function GoldenWindowLevels({ data }: { data: WalkTimesResponse }) {
   if (worst === null) return null
 
   const text = runs.length === 1 ? messages.home.goldenAllSafe : mixedLevelsText(runs, worst)
+
+  // 등급어로 말할 수 있는 것이 없는 창 — 위와 같은 이유로 조용히 걷는다 (A-2)
+  if (text === null) return null
+
   const [before = '', after = ''] = text.split(LEVEL_TOKEN)
 
   return (
@@ -313,9 +317,44 @@ function GoldenWindowLevels({ data }: { data: WalkTimesResponse }) {
  * 좋은 구간은 뒤에 덧붙는다 — 좋은 구간부터 말하면 주의가 단서처럼 뒤에 묻힌다.
  *
  * **안전 구간이 없으면 뒤 문장을 붙이지 않는다** — 없는 위안을 만들지 않는다.
+ *
+ * ### 등급어가 덮는 구간만 `{runs}` 에 넣는다 ([#671](https://github.com/8llow8llowMe/hondigagae/issues/671) **A-2**)
+ *
+ * 예전에는 SAFE 아닌 구간을 **전부** `{runs}` 에 몰아넣고 등급어는 `worst.name` 하나만
+ * 썼다. 그러면 창 안에 서로 다른 등급이 둘 이상일 때 문장이 아래 곡선 면과 다른 말을 한다
+ * (`14–16시 · 17시는 … 위험 등급이에요` / 면은 `14–16 위험 · 17 주의`) — #270 의 재발이다.
+ *
+ * **그 조합은 오늘의 계약에서는 오지 않는다.** 서버가 창을 고르는 규칙이 그것을 막는다:
+ *
+ * | 근거 | 내용 |
+ * |---|---|
+ * | `HourlyWalkSafety.isAcceptable()` | `SAFE` 또는 `CAUTION` 인 칸만 참이다 |
+ * | `GoldenWalkWindow.acceptableRuns` | 그 칸만 이어 붙이고 **아닌 칸에서 구간을 끊는다** |
+ * | `WalkTimesPresenter` | `hourly` 와 `goldenStart`/`goldenEnd` 가 **같은 곡선**에서 나온다 |
+ * | `WalkSafetyEvaluator.quickLevel` | `SAFE` 에서 시작해 `CAUTION`/`DANGER` 로만 내려간다 — **`UNKNOWN` 을 내지 않는다** (기온이 없는 행은 곡선에서 빠진다) |
+ *
+ * 즉 **창 안은 `SAFE`·`CAUTION` 두 값뿐**이고, SAFE 아닌 구간은 전부 `CAUTION` 이라
+ * `worst.name` 이 그 전부를 옳게 부른다. dev 실측(2026-09-21 · 창 15:00–23:00)도
+ * `CAUTION` 한 칸 + `SAFE` 여덟 칸이었다.
+ *
+ * **그래서 문장을 등급별 절로 쪼개지 않았다** — 도달하지 않는 상태를 위해 `SENTENCE_MAX_LENGTH`
+ * 예산을 다시 짜면, 실제로 보이는 문장이 오지 않는 경우 때문에 짧아진다. 대신 **등급어가
+ * 덮지 못하는 구간을 문장에서 뺀다**: 계약이 흔들려 다른 등급이 섞여 오더라도 문장이
+ * 그 구간을 **잘못 부르는 대신 말하지 않는다.** 그 구간은 곡선 면과 `sr-only` 가 그대로 말한다.
+ *
+ * `UNKNOWN` 은 `worst` 후보에서 이미 빠져 있고(`describeGoldenWindow`), 여기서도
+ * 등급어를 받지 못한다 — **서버가 매기지 않은 등급을 화면이 단정하지 않는다.**
+ *
+ * @returns 등급어로 말할 것이 없으면 `null` (호출부가 문장을 걷는다)
  */
-function mixedLevelsText(runs: readonly GoldenWindowRun[], worst: GoldenWindowRun): string {
-  const risky = runs.filter((run) => run.code !== SAFE_CODE)
+function mixedLevelsText(runs: readonly GoldenWindowRun[], worst: GoldenWindowRun): string | null {
+  /*
+    `worst` 가 안전인데 구간이 여럿 = 창 안에 **등급이 붙지 않은 칸**이 섞였다는 뜻이다
+    (`UNKNOWN`). 경고할 것이 없고 그 칸을 좋다고 말할 수도 없으므로 문장을 걷는다.
+  */
+  if (worst.code === SAFE_CODE) return null
+
+  const risky = runs.filter((run) => run.code === worst.code)
   const safe = runs.filter((run) => run.code === SAFE_CODE)
 
   const warning = messages.home.goldenCautionRuns

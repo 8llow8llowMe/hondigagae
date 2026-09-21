@@ -239,6 +239,51 @@ describe('describeGoldenWindow', () => {
     expect(result.runs).toEqual([])
     expect(result.worst).toBeNull()
   })
+
+  /*
+    **`UNKNOWN` 은 모르는 코드와 다르다** ([#671](https://github.com/8llow8llowMe/hondigagae/issues/671) **A-2**).
+
+    바로 위 두 테스트가 지키는 것은 *서버가 등급을 하나 더 냈을 때* 그것을 좋은 쪽으로
+    접지 않는 것이다. `UNKNOWN` 은 그 경우가 아니라 **서버가 판단하지 않았다고 말한 값**
+    이라 등급 자리에 올리면 문장이 `노면이 50℃까지 올라 판단 근거 부족 등급이에요` 가 된다.
+
+    백엔드도 같은 태도다 — `WalkSafetyLevel.worseOf` 가 *"UNKNOWN 은 비교 대상이 아니라
+    실제 판정이 있으면 그쪽을 택한다"*.
+  */
+  it('UNKNOWN 은 노면이 더 높아도 worst 가 되지 않는다', () => {
+    const hourly = [
+      walkHour(11, 'CAUTION', '주의', 46),
+      walkHour(12, 'UNKNOWN', '판단 근거 부족', 50),
+    ]
+    const { runs, worst } = describeGoldenWindow(hourly, START, `${DAY}12:00:00`)
+
+    // 구간 자체는 남는다 — 곡선 면이 그 칸을 중립 면으로 그려야 한다 (#656)
+    expect(runs).toHaveLength(2)
+    expect(worst?.code).toBe('CAUTION')
+  })
+
+  it('UNKNOWN 이 DANGER 를 밀어내지 않는다', () => {
+    const hourly = [
+      walkHour(11, 'UNKNOWN', '판단 근거 부족', 59),
+      walkHour(12, 'DANGER', '위험', 58),
+    ]
+    const { worst } = describeGoldenWindow(hourly, START, `${DAY}12:00:00`)
+
+    expect(worst?.code).toBe('DANGER')
+  })
+
+  /* 등급이 붙은 시각이 하나도 없으면 등급을 하나 지어내지 않는다 */
+  it('창 안이 전부 UNKNOWN 이면 worst 가 없다', () => {
+    const hourly = [
+      walkHour(11, 'UNKNOWN', '판단 근거 부족', 32),
+      walkHour(12, 'UNKNOWN', '판단 근거 부족', 33),
+    ]
+    const { runs, worst, allSafe } = describeGoldenWindow(hourly, START, `${DAY}12:00:00`)
+
+    expect(runs).toHaveLength(1)
+    expect(worst).toBeNull()
+    expect(allSafe).toBe(false)
+  })
 })
 
 describe('formatHourRuns', () => {

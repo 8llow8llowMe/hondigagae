@@ -67,7 +67,10 @@ export type GoldenWindowRun = {
 export type GoldenWindowDescription = {
   /** 창 안 시각을 등급별 연속 구간으로 묶은 것. 시각순이다 */
   runs: GoldenWindowRun[]
-  /** 가장 심한 등급의 구간. 창 안 시각이 없으면 `null` */
+  /**
+   * 가장 심한 **등급**의 구간. 창 안 시각이 없거나 **등급이 붙은 시각이 하나도 없으면**
+   * (`UNKNOWN` 뿐) `null` 이다 — 등급이 아닌 것을 등급 자리에 올리지 않는다 (A-2).
+   */
   worst: GoldenWindowRun | null
   /** 창 안이 전부 `SAFE` 인가. 창 안 시각이 없으면 `false` — 모름을 좋음으로 말하지 않는다 */
   allSafe: boolean
@@ -82,11 +85,28 @@ export type GoldenWindowDescription = {
 export const SAFE_CODE = 'SAFE'
 
 /**
+ * 서버 `WalkSafetyLevel.UNKNOWN` — **"판단 근거 부족" 은 등급이 아니라 판단하지 않았다는
+ * 말이다** ([#671](https://github.com/8llow8llowMe/hondigagae/issues/671) **A-2**).
+ *
+ * **모르는 코드와 갈라 둔다.** 아래 `severityOf` 가 모르는 코드를 `CAUTION` 자리에 두는
+ * 것은 *서버가 등급을 하나 더 냈을 때* 그것을 좋은 쪽으로 접지 않으려는 규칙이고, 이
+ * 코드에는 해당하지 않는다 — 서버가 이미 "판단하지 않았다" 고 말한 값이다. 둘을 한
+ * 상수로 묶어 두면 `UNKNOWN` 이 `CAUTION` 과 심각도가 같아져 **노면 온도가 높다는
+ * 이유만으로 `worst` 를 이긴다.**
+ *
+ * 백엔드도 같은 태도다 — `WalkSafetyLevel.worseOf` 가 *"UNKNOWN 은 비교 대상이 아니라
+ * 실제 판정이 있으면 그쪽을 택한다"* 로 적혀 있다.
+ */
+const UNKNOWN_CODE = 'UNKNOWN'
+
+/**
  * 등급 심각도. **서버 코드 셋만 안다** (`SAFE` · `CAUTION` · `DANGER`).
  *
  * 모르는 코드는 `CAUTION` 자리에 둔다 (`UNKNOWN_SEVERITY`) — 서버가 등급을 하나 더 내면
  * 화면은 그 값을 모른 채 렌더해야 하고, 그때 `SAFE` 로 떨어뜨리면 **모르는 것을 좋은
  * 것으로** 말하게 된다 (루트 `CLAUDE.md`).
+ *
+ * **`UNKNOWN` 은 여기 오지 않는다** — `worst` 를 고르기 전에 걸러진다 (`UNKNOWN_CODE`).
  */
 const SEVERITY: Record<string, number> = { SAFE: 0, CAUTION: 1, DANGER: 2 }
 const UNKNOWN_SEVERITY = 1
@@ -156,8 +176,13 @@ export function describeGoldenWindow(
   /*
     **같은 심각도면 노면이 더 높은 구간이 이긴다.** 문장이 적는 온도가 그 구간에서 오므로,
     주의 구간이 둘인 날에 낮은 쪽 온도를 적으면 문장이 실제보다 순해진다.
+
+    **`UNKNOWN` 구간은 후보가 아니다** (A-2). 등급이 아니라 "판단하지 않았다" 이므로
+    이기면 문장이 `노면이 50℃까지 올라 판단 근거 부족 등급이에요` 가 된다 — 서버가
+    매기지 않은 등급을 노면 온도로 단정하는 문장이다.
   */
   const worst = runs.reduce<GoldenWindowRun | null>((best, run) => {
+    if (run.code === UNKNOWN_CODE) return best
     if (best === null) return run
 
     const gap = severityOf(run.code) - severityOf(best.code)
