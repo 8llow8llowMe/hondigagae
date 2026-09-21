@@ -36,6 +36,16 @@ export type WalkCourseDetailSectionProps = {
   onWalkTimesRetry: () => void
   /** `일정에 담기` 진입이 미로그인이면 로그인으로 보낸다 (#620 · D4-1) */
   authed: boolean
+  /**
+   * `코스 목록으로` 가 돌아갈 주소 ([#783](https://github.com/8llow8llowMe/hondigagae/issues/783)).
+   *
+   * **상세 URL 에는 필터가 없다.** 목록 행이 조건을 쿼리로 실어 보내고 라우트가 그것을
+   * 읽어 여기로 넘긴다 — 없으면 목록 첫 화면으로 간다.
+   *
+   * **성공 화면에서만 쓴다.** 오류·404 에서는 사용자가 어느 목록에서 왔는지 화면이
+   * 주장할 근거가 없다 (`BackToList` 는 이 값을 받지 않는다).
+   */
+  backHref?: string | undefined
 }
 
 /**
@@ -62,6 +72,7 @@ export function WalkCourseDetailSection({
   walkTimesLoading,
   onWalkTimesRetry,
   authed,
+  backHref = '/walk-courses',
 }: WalkCourseDetailSectionProps) {
   if (loading) {
     return (
@@ -146,7 +157,7 @@ export function WalkCourseDetailSection({
   return (
     <SurfaceStack className={hero === null ? 'reading-container' : 'content-container'}>
       <div className={INSET_CLASS.card}>
-        <BackLink href="/walk-courses" label={messages.walkCourse.backToList} />
+        <BackLink href={backHref} label={messages.walkCourse.backToList} />
       </div>
 
       {/*

@@ -48,6 +48,20 @@ describe('WalkCourseDetailSection — 성공', () => {
     expect(markup).toContain('/walk-courses')
   })
 
+  /*
+    #783. 필터로 29개를 좁혀 놓고 상세에 들어갔다가 이 링크로 돌아오면 29개로 리셋됐다.
+    브라우저 뒤로가기는 필터를 살려 돌아오므로 **화면 안 링크만 사용자를 배신했다.**
+  */
+  it('돌아가기가 들어온 필터를 그대로 돌려준다', () => {
+    const markup = render({ backHref: '/walk-courses?activity=LOW&sort=DISTANCE_ASC' })
+
+    expect(markup).toContain('href="/walk-courses?activity=LOW&amp;sort=DISTANCE_ASC"')
+  })
+
+  it('필터 없이 들어왔으면 목록 주소 그대로다', () => {
+    expect(render()).toContain('href="/walk-courses"')
+  })
+
   /**
    * **좌표 없는 코스가 기본 모양이다** (실측 25/29). 그래서 자리를 걷지 않고 **제목을
    * 유지한 채** 안내 상자를 넣는다 ([#730](https://github.com/8llow8llowMe/hondigagae/issues/730)).
@@ -162,6 +176,18 @@ describe('WalkCourseDetailSection — 404 (공통명세 S5)', () => {
 
   it('다음 행동으로 코스 목록을 준다', () => {
     expect(render(NOT_FOUND)).toContain(messages.walkCourse.backToList)
+  })
+
+  /*
+    #783. **오류 화면은 필터를 복원하지 않는다.** 코스를 못 받은 자리라 사용자가 어느
+    목록에서 왔는지 화면이 주장할 근거가 없고, 잘못 주장하면 좁혀진 목록으로 보내 놓고
+    "여기서 왔다" 고 말하는 셈이 된다.
+  */
+  it('오류 화면의 돌아가기는 필터를 싣지 않는다', () => {
+    const markup = render({ ...NOT_FOUND, backHref: '/walk-courses?activity=LOW' })
+
+    expect(markup).toContain('href="/walk-courses"')
+    expect(markup).not.toContain('activity=LOW')
   })
 
   /** 코스를 못 받았으니 골든타임 요청도 자리도 없다 */

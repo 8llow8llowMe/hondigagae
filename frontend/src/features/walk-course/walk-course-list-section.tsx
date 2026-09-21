@@ -18,7 +18,7 @@ import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import { hasCoordinates } from '@/lib/walk-course/coordinates'
-import type { WalkCourseSummary } from '@/types/walk-course'
+import type { WalkCourseFilters, WalkCourseSummary } from '@/types/walk-course'
 
 /**
  * 기준 줄에 들어갈 값. **응답의 `appliedPetActivityLevel` 이 있을 때만 만든다** — 로컬
@@ -55,6 +55,11 @@ export type WalkCourseListSectionProps = {
   onShowAll: () => void
   /** 조건 컨트롤. **라우터를 아는 쪽이 만들어 넘긴다** — 이 컴포넌트는 순수하게 남는다 */
   tools?: ReactNode
+  /**
+   * 지금 보고 있는 조건 ([#783](https://github.com/8llow8llowMe/hondigagae/issues/783)).
+   * 행이 상세 링크에 실어 보내면 상세의 `코스 목록으로` 가 같은 목록으로 돌아온다.
+   */
+  filters?: WalkCourseFilters | undefined
 }
 
 /**
@@ -77,6 +82,7 @@ export function WalkCourseListSection({
   onRetry,
   onShowAll,
   tools,
+  filters,
 }: WalkCourseListSectionProps) {
   // 개수는 목록이 실제로 있을 때만 말한다 — 로딩 중에는 아직 모르고 오류에는 셀 수 없다
   const countable = !loading && errorStatus === null
@@ -108,6 +114,7 @@ export function WalkCourseListSection({
         errorStatus={errorStatus}
         errorMessage={errorMessage}
         basisApplied={basis !== null}
+        filters={filters}
         onRetry={onRetry}
         onShowAll={onShowAll}
       />
@@ -162,11 +169,12 @@ function WalkCourseListBody({
   errorStatus,
   errorMessage,
   basisApplied,
+  filters,
   onRetry,
   onShowAll,
 }: Pick<
   WalkCourseListSectionProps,
-  'courses' | 'loading' | 'errorStatus' | 'errorMessage' | 'onRetry' | 'onShowAll'
+  'courses' | 'loading' | 'errorStatus' | 'errorMessage' | 'onRetry' | 'onShowAll' | 'filters'
 > & {
   basisApplied: boolean
 }) {
@@ -258,7 +266,12 @@ function WalkCourseListBody({
       */}
       <SurfaceList>
         {courses.map((course) => (
-          <WalkCourseRow key={course.walkCourseId} course={course} inset={inset} />
+          <WalkCourseRow
+            key={course.walkCourseId}
+            course={course}
+            inset={inset}
+            filters={filters}
+          />
         ))}
       </SurfaceList>
     </>

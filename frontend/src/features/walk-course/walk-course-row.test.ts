@@ -11,10 +11,12 @@ import {
   WALK_COURSE_ROUND_DISTANCE,
   WALK_COURSE_WITH_COORDS,
 } from '@/test/fixtures/walk-course'
-import type { WalkCourseSummary } from '@/types/walk-course'
+import type { WalkCourseFilters, WalkCourseSummary } from '@/types/walk-course'
 
-function render(course: WalkCourseSummary): string {
-  return renderToStaticMarkup(createElement(WalkCourseRow, { course }))
+function render(course: WalkCourseSummary, filters?: WalkCourseFilters): string {
+  return renderToStaticMarkup(
+    createElement(WalkCourseRow, { course, ...(filters === undefined ? {} : { filters }) }),
+  )
 }
 
 function renderColumnHead(): string {
@@ -34,6 +36,27 @@ describe('WalkCourseRow — 코스를 고르는 데 쓰는 값 셋', () => {
 
   it('상세로 가는 링크다 — id 를 문자열 그대로 쓴다', () => {
     expect(render(WALK_COURSE_PLAIN)).toContain('/walk-courses/6911167100216303301')
+  })
+
+  /*
+    #783. **상세 URL 에는 필터가 없어 상세 혼자서는 복원할 근거가 없다.** 목록이 지금
+    보고 있는 조건을 링크에 실어 보내야 `코스 목록으로` 가 같은 목록으로 돌아간다.
+
+    조립은 `walkCourseFilterHref` 가 한다 — 조건이 바뀐 뒤의 주소를 만드는 그 함수와
+    같은 규칙이라, 기본값 생략 규칙이 한쪽에서만 바뀌는 일이 없다.
+  */
+  it('보고 있는 필터를 상세 링크에 실어 보낸다', () => {
+    const markup = render(WALK_COURSE_PLAIN, { activity: 'LOW', sort: 'DISTANCE_ASC' })
+
+    expect(markup).toContain(
+      'href="/walk-courses/6911167100216303301?activity=LOW&amp;sort=DISTANCE_ASC"',
+    )
+  })
+
+  it('필터가 기본값이면 쿼리를 붙이지 않는다 — 빈 주소가 기본 상태다', () => {
+    const markup = render(WALK_COURSE_PLAIN, { activity: null, sort: null })
+
+    expect(markup).toContain('href="/walk-courses/6911167100216303301"')
   })
 
   /** `19` 를 `19km` 로 줄이면 같은 열의 `19.1` 과 자릿수가 어긋난다 (공통명세 S3) */
