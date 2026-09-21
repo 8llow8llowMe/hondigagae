@@ -470,7 +470,7 @@ export function HomeView({
             <WalkTimesSection
               data={walkTimes.data ?? null}
               loading={position === null || walkTimes.isPending}
-              positionFallback={position !== null && position.kind === 'fallback'}
+              basis={position !== null && position.kind === 'fallback' ? 'jeju' : 'current'}
               /*
               **조회는 성공했는데 날씨를 못 받은 경우의 재조회** (#262). 위 주석의 "조회
               실패는 섹션을 숨긴다" 와 다른 갈래다 — 저쪽은 `data === null`(HTTP 실패)이고

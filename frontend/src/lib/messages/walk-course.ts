@@ -133,8 +133,6 @@ export const walkCourseMessages = {
   noCoordinatesPlanAction: '일정에 담고 그날 판정 받기',
   /** `{action}` 치환 — 아래 버튼의 **보이는 글자**를 그대로 넣는다 */
   noCoordinatesPlanDescription: '아래 {action}로 담으면 날짜가 생겨 그날의 산책 위험도를 받아요.',
-  /** 골든타임 카드 아래 캡션. 코스 전체가 아니라 시작점 기준이라는 사실이다 (D8-5) */
-  goldenBasis: '코스 시작점 기준이에요.',
   /** `다시 시도` 만이면 무엇을 다시 하는지 모른다 (D6) */
   goldenRetry: '날씨 다시 불러오기',
 } as const

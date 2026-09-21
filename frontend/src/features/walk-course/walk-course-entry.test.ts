@@ -65,7 +65,7 @@ describe('WalkTimesSection 이동 — 홈 마크업은 그대로다 (S6-3)', () 
 
     expect(usage).toContain('data=')
     expect(usage).toContain('loading=')
-    expect(usage).toContain('positionFallback=')
+    expect(usage).toContain('basis=')
     expect(usage).toContain('onRetry=')
     expect(usage).not.toContain('retryLabel')
   })

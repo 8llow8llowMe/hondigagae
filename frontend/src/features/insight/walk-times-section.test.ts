@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import { WalkTimesSection } from '@/features/insight/walk-times-section'
+import { type WalkTimesBasis, WalkTimesSection } from '@/features/insight/walk-times-section'
 import { mockWalkTimes } from '@/lib/api/mock/insight-data'
 import { messages } from '@/lib/messages'
 import type { WalkTimesResponse } from '@/types/insight'
@@ -14,14 +14,14 @@ import type { WalkTimesResponse } from '@/types/insight'
 function render(
   data: WalkTimesResponse | null,
   loading = false,
-  positionFallback = false,
+  basis: WalkTimesBasis = 'current',
   onRetry?: () => void,
 ) {
   return renderToStaticMarkup(
     createElement(WalkTimesSection, {
       data,
       loading,
-      positionFallback,
+      basis,
       ...(onRetry === undefined ? {} : { onRetry }),
     }),
   )
@@ -400,8 +400,8 @@ describe('WalkTimesSection — 상태', () => {
   })
 
   /*
-    곡선은 좌표에 딸린 값이라 **어디 기준인지 모르면 읽을 수 없다.** 위치를 얻었는지에
-    따라 기준이 달라지므로 둘을 구분해 적는다 (#180).
+    곡선은 좌표에 딸린 값이라 **어디 기준인지 모르면 읽을 수 없다.** 조회에 쓴 좌표가
+    어디서 왔는지에 따라 기준이 달라지므로 갈래마다 다르게 적는다 (#180 · #779).
   */
   it('현재 위치로 조회했으면 그렇게 적는다', () => {
     const markup = render(GOOD_DAY)
@@ -411,10 +411,23 @@ describe('WalkTimesSection — 상태', () => {
   })
 
   it('위치를 못 얻었으면 제주시 기준임을 감추지 않는다', () => {
-    const markup = render(GOOD_DAY, false, true)
+    const markup = render(GOOD_DAY, false, 'jeju')
 
     expect(markup).toContain(messages.home.goldenBasis)
     expect(markup).not.toContain(messages.home.goldenBasisCurrent)
+  })
+
+  /*
+    #779. **불린이던 시절 이 갈래가 표현되지 않았다.** `positionFallback={false}` 는
+    "폴백이 아니다" 를 뜻했는데 화면에는 `현재 위치 기준` 이 나갔다 — 코스 시작점으로
+    조회한 화면이 사용자 위치로 쟀다고 **거짓을 말했다.** 기준점이 셋이므로 타입도 셋이다.
+  */
+  it('코스 시작점으로 조회했으면 현재 위치라고 말하지 않는다', () => {
+    const markup = render(GOOD_DAY, false, 'course-start')
+
+    expect(markup).toContain(messages.home.goldenBasisCourseStart)
+    expect(markup).not.toContain(messages.home.goldenBasisCurrent)
+    expect(markup).not.toContain(messages.home.goldenBasis)
   })
 })
 
@@ -449,8 +462,10 @@ describe('WalkTimesSection — 곡선이 빈 이유 (#262)', () => {
     달면 사용자가 계속 누른다. `404` 에 재시도를 달지 않는 규칙과 같은 축이다.
   */
   it('UNAVAILABLE 에만 재시도를 준다', () => {
-    expect(render(UNAVAILABLE, false, false, () => undefined)).toContain(messages.common.retry)
-    expect(render(DAY_ENDED, false, false, () => undefined)).not.toContain(messages.common.retry)
+    expect(render(UNAVAILABLE, false, 'current', () => undefined)).toContain(messages.common.retry)
+    expect(render(DAY_ENDED, false, 'current', () => undefined)).not.toContain(
+      messages.common.retry,
+    )
   })
 
   it('onRetry 가 없으면 UNAVAILABLE 이어도 버튼을 렌더하지 않는다', () => {

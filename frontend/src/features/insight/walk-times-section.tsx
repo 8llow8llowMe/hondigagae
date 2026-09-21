@@ -14,6 +14,32 @@ import type { CodeNameMetadata } from '@/types/api'
 import type { WalkTimesResponse } from '@/types/insight'
 
 /**
+ * 곡선을 잰 **기준점**. 불린이 아니라 서술인 이유가 이 타입의 전부다
+ * ([#779](https://github.com/8llow8llowMe/hondigagae/issues/779)).
+ *
+ * 전에는 `positionFallback: boolean` 이었다. 두 값으로는 "기기 위치" 와 "제주 중심 폴백"
+ * 밖에 말할 수 없는데, 코스 상세는 **코스 시작점**으로 조회한다 — 어느 쪽도 아니다.
+ * 그 화면은 `false`(= 폴백 아님)를 넘겼고 화면에는 `현재 위치 기준` 이 나갔다.
+ * **표현할 수 없는 상태를 불린에 욱여넣으면 가장 가까운 거짓이 나간다.**
+ *
+ * 기준점이 늘면 여기에 갈래를 더한다 — `BASIS_MESSAGE` 가 빠짐없음을 타입으로 강제한다.
+ * **호출부의 명시는 타입이 아니라 `basis` 가 필수 prop 인 것이 강제한다** — 빠뜨려도
+ * 기본값이 채워지면 이 버그가 "오매핑" 대신 "누락" 으로 되돌아온다.
+ *
+ * **`/emergency` 의 `EmergencyBasis` 와 별개다** (`features/emergency/resolve-anchor.ts`).
+ * 겹치는 낱말이 있지만 같은 문자열이 다른 것을 뜻한다 — 거기서 `'제주시 기준'` 은
+ * 사용자가 **고른 권역**이고 여기서는 **위치를 못 얻은 폴백**이다. 한쪽만 고치지 않는다.
+ */
+export type WalkTimesBasis = 'current' | 'jeju' | 'course-start'
+
+/** 기준점 → 캡션 앞머리. `Record` 라 갈래를 더하면 여기서 컴파일이 멈춘다 */
+const BASIS_MESSAGE: Record<WalkTimesBasis, string> = {
+  current: messages.home.goldenBasisCurrent,
+  jeju: messages.home.goldenBasis,
+  'course-start': messages.home.goldenBasisCourseStart,
+}
+
+/**
  * 오늘의 산책 골든타임 — `GET /insights/walk-times` (#158).
  *
  * **바로 위 산책 위험도와 답하는 질문이 다르다.** 저쪽은 "지금 나가도 되나", 이쪽은
@@ -57,17 +83,17 @@ import type { WalkTimesResponse } from '@/types/insight'
 export function WalkTimesSection({
   data,
   loading = false,
-  positionFallback = false,
+  basis,
   onRetry,
   retryLabel,
 }: {
   data: WalkTimesResponse | null
   loading?: boolean
   /**
-   * 위치를 못 얻어 제주 중심으로 조회했는지 (#180). **그 사실을 감추지 않는다** —
+   * 조회에 쓴 좌표가 **어디서 왔는지** (#180 · #779). **그 사실을 감추지 않는다** —
    * 곡선은 좌표에 딸린 값이라 어디 기준인지 모르면 읽을 수 없다.
    */
-  positionFallback?: boolean
+  basis: WalkTimesBasis
   /**
    * 날씨를 못 받았을 때만 쓰는 재조회 (#262). **없으면 버튼을 렌더하지 않는다** —
    * 누를 수는 있는데 아무 일도 없는 버튼을 두지 않는다.
@@ -162,8 +188,7 @@ export function WalkTimesSection({
         />
 
         <p className="text-caption text-fg-muted font-medium">
-          {positionFallback ? messages.home.goldenBasis : messages.home.goldenBasisCurrent} ·{' '}
-          {messages.home.goldenPavementNote}
+          {BASIS_MESSAGE[basis]} · {messages.home.goldenPavementNote}
         </p>
       </div>
     </section>
