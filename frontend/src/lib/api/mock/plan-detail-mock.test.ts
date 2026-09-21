@@ -108,6 +108,92 @@ describe('일정 상세 mock — 조회', () => {
   })
 })
 
+/**
+ * 경로변수 바인딩 문법 — `NumberUtils.parseNumber` (#809).
+ *
+ * **목이 `/^\d+$/` 로 걸러 서버보다 엄격했다.** `@PathVariable long` 은 부호·공백·앞자리
+ * 0·16진수를 받고, 대신 **범위를 넘으면 거부한다**. 아래 경계는 dev 게이트웨이 실측
+ * 28종(2026-09-21 · 인증 없는 GET)을 그대로 옮긴 것이다 — 401(바인딩 통과)이면 목에서는
+ * 400 이 아니어야 하고, 400 `PLAN_124` 면 목도 같아야 한다.
+ */
+describe('일정 상세 mock — 경로변수 바인딩 문법 (#809)', () => {
+  beforeEach(resetMockStore)
+
+  const code = (raw: string) => call(`/plans/${raw}`, 'GET')?.payload.dataHeader.resultCode
+
+  /**
+   * **8진수가 아니라는 것이 문법을 확정한 증거다.** `Long.decode` 였다면 `08`·`09` 가
+   * 무효여야 하는데 dev 는 둘 다 통과시킨다 — 16진수 접두사가 없어 `Long.valueOf` 로
+   * 가기 때문이다. 이 두 줄이 깨지면 `decodeIntegral` 이 8진수로 샌 것이다.
+   */
+  it.each(['-1', '+1', '007', '08', '09', '0', '-0'])(
+    '`%s` 는 바인딩을 통과한다 — 400 이 아니라 404 다',
+    (raw) => {
+      expect(code(raw)).toBe('PLAN_001')
+    },
+  )
+
+  /** 16진수 접두사는 `Long.decode` 로 간다. `isHexNumber` 는 `-` 만 보고 `+` 는 안 본다 */
+  it.each(['0x10', '0X1F', '#10', '-#10'])('16진수 `%s` 도 통과한다', (raw) => {
+    expect(code(raw)).toBe('PLAN_001')
+  })
+
+  /** `trimAllWhitespace` 는 앞뒤가 아니라 **전부** 지운다 — `'1 2'` 는 `12` 다 */
+  it.each([' 1', '1 ', '\t 1 ', '1 2'])('공백이 섞인 `%s` 도 통과한다', (raw) => {
+    expect(code(raw)).toBe('PLAN_001')
+  })
+
+  it.each(['1.5', '1e3', '0b101', '1,000', '+0x10', '#-10', '--1', '++1', '-+1', 'abc', ' '])(
+    '`%s` 는 바인딩에 실패해 400 PLAN_124 다',
+    (raw) => {
+      expect(code(raw)).toBe('PLAN_124')
+    },
+  )
+
+  /** **범위 초과는 400 이다** — 목이 여기서는 서버보다 느슨했다 */
+  it('long 경계 — MAX 는 통과하고 MAX+1 은 400 이다', () => {
+    expect(code('9223372036854775807')).toBe('PLAN_001')
+    expect(code('9223372036854775808')).toBe('PLAN_124')
+  })
+
+  it('long 경계 — MIN 은 통과하고 MIN-1 은 400 이다', () => {
+    expect(code('-9223372036854775808')).toBe('PLAN_001')
+    expect(code('-9223372036854775809')).toBe('PLAN_124')
+  })
+
+  /**
+   * **정규화한 값으로 조회한다.** 서버는 `' 1'` 을 `1` 로 풀어 1번 일정을 찾는다 —
+   * 목이 원문으로 찾으면 같은 주소가 404 로 갈린다.
+   */
+  it('공백과 앞자리 0 이 섞여도 같은 일정을 찾는다', () => {
+    expect(detailOf(` ${PLAN} `).planId).toBe(PLAN)
+    expect(detailOf(`0${PLAN}`).planId).toBe(PLAN)
+  })
+
+  /**
+   * **`day` 는 `int` 라 경계가 다르다.** 같은 숫자가 `planId` 에서는 통과하고 `day` 에서는
+   * 400 이다 — `long` 범위로 검사하면 이 줄이 깨진다.
+   */
+  it('day 는 int 경계다 — planId 가 받는 2147483648 을 거부한다', () => {
+    expect(code('2147483648')).toBe('PLAN_001')
+
+    const result = call(`/plans/${PLAN}/days/2147483648/items`, 'PUT', { items: [] })
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'PLAN_124',
+      resultMessage: 'day 파라미터 형식이 올바르지 않습니다.',
+    })
+  })
+
+  /** int 안쪽이면 바인딩은 통과하고, 기간 밖이라는 **다른** 판정으로 넘어간다 */
+  it.each(['2147483647', '-2147483648', '-1', '0x10'])(
+    'day `%s` 는 바인딩을 통과해 PLAN_002 로 간다',
+    (raw) => {
+      const result = call(`/plans/${PLAN}/days/${raw}/items`, 'PUT', { items: [] })
+      expect(result?.payload.dataHeader.resultCode).toBe('PLAN_002')
+    },
+  )
+})
+
 describe('일정 상세 mock — 수정 · 삭제', () => {
   beforeEach(resetMockStore)
 

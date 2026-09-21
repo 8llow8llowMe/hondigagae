@@ -73,14 +73,72 @@ function failValidation(errors: ValidationErrorItem[]): MockResult {
   return fail(400, 'PLAN_100', errors[0]?.message ?? '요청 값이 올바르지 않습니다.', errors)
 }
 
+/** `@PathVariable` 의 자바 타입. `day` 만 `int` 고 나머지 id 는 전부 `long` 이다 */
+type JavaIntegral = 'long' | 'int'
+
+const INTEGRAL_RANGE: Record<JavaIntegral, { min: bigint; max: bigint }> = {
+  long: { min: -(2n ** 63n), max: 2n ** 63n - 1n },
+  int: { min: -(2n ** 31n), max: 2n ** 31n - 1n },
+}
+
 /**
- * `@PathVariable` 형식 위반 — 숫자가 아니면 404 가 아니라 400 이다.
+ * 스프링이 경로 문자열을 정수로 푸는 문법 — `NumberUtils.parseNumber` 를 그대로 옮긴다.
+ * 통과하면 **정규화된 10진 문자열**, 아니면 `null`(바인딩 실패)이다.
+ *
+ * ```java
+ * String trimmed = StringUtils.trimAllWhitespace(text);            // 안쪽 공백까지 지운다
+ * return (isHexNumber(trimmed) ? Long.decode(trimmed) : Long.valueOf(trimmed));
+ *
+ * private static boolean isHexNumber(String value) {
+ *     int index = (value.startsWith("-") ? 1 : 0);                 // + 는 보지 않는다
+ *     return (value.startsWith("0x", index) || value.startsWith("0X", index)
+ *          || value.startsWith("#", index));
+ * }
+ * ```
+ *
+ * **8진수가 아니다.** `Long.decode` 라면 `08`·`09` 가 무효여야 하는데 dev 는 둘 다
+ * 통과시킨다 — 16진수 접두사가 없어 `Long.valueOf` 로 가기 때문이다. 이 한 가지가
+ * 문법을 확정한 증거다 (dev 실측 28종, 2026-09-21 · #809).
+ *
+ * **정규화한 값을 돌려주는 이유**: 서버는 `' 1'` 을 `1` 로 풀어 **1번 일정을 찾는다**.
+ * 목이 원문으로 조회하면 같은 주소가 404 로 갈린다.
+ *
+ * 남는 차이 하나: 여기 `\s` 는 자바 `Character.isWhitespace` 와 유니코드 경계가 조금
+ * 다르다(예: ` `). 경로에 그 문자가 오는 일이 없어 쫓지 않는다.
+ */
+function decodeIntegral(rawValue: string, type: JavaIntegral): string | null {
+  // trimAllWhitespace — 앞뒤가 아니라 **전부** 지운다. `'1 2'` 는 `12` 다
+  const compact = rawValue.replace(/\s/g, '')
+  const negative = compact.startsWith('-')
+  const unsigned = negative ? compact.slice(1) : compact
+
+  let parsed: bigint
+  if (/^(?:0[xX]|#)/.test(unsigned)) {
+    // 16진수 접두사가 붙었으면 `Long.decode` 로 간다 — 뒤가 16진수가 아니면 실패다
+    const hex = /^(?:0[xX]|#)([0-9a-fA-F]+)$/.exec(unsigned)
+    if (hex === null) return null
+    parsed = BigInt(`0x${hex[1]}`)
+    if (negative) parsed = -parsed
+  } else {
+    // `Long.valueOf` — 부호 하나에 10진 숫자만. 앞자리 0 은 허용이고 8진수가 아니다
+    if (!/^[+-]?\d+$/.test(compact)) return null
+    parsed = BigInt(compact)
+  }
+
+  const { min, max } = INTEGRAL_RANGE[type]
+  if (parsed < min || parsed > max) return null
+
+  return parsed.toString()
+}
+
+/**
+ * `@PathVariable` 바인딩. 통과하면 **정규화된 값**, 실패하면 400 이다.
  *
  * **한 곳에 모은 이유**: 경로변수가 네 종류(`planId` · `day` · `planItemId` ·
  * `packingItemId`)인데 서버는 넷을 한 자리에서 만든다. 자리마다 따로 쓰면 갈린다.
  * 브리핑은 이 판정을 `withPlan` 밖에서도 쓴다 (`resolvePlanMock` 의 인증 앞 관문, #795).
  *
- * **응답 모양은 dev 게이트웨이 실측이다** (2026-09-21 · 토큰 없는 GET, #803):
+ * **오류 모양은 dev 게이트웨이 실측이다** (2026-09-21 · 토큰 없는 GET, #803):
  *
  * ```text
  * GET /api/v1/plans/abc/briefing → 400
@@ -98,15 +156,15 @@ function failValidation(errors: ValidationErrorItem[]): MockResult {
  * 검증 코드라, 경로 오류에 쓰면 서버가 내지 않는 조합이 된다 (#803).
  *
  * **`failValidation` 을 쓰지 않는다** — 그쪽은 헤더를 `PLAN_100` 으로 고정하는데 서버는
- * 헤더와 항목에 같은 `PLAN_124` 를 싣는다 (`date` 바인딩과 같은 판단, #795).
- *
- * **남은 드리프트 (별건 · #803 본문)**: 판정식 `/^\d+$/` 자체는 서버와 다르다.
- * `@PathVariable long` 은 `-1` 과 앞뒤 공백을 받고(둘 다 dev 는 401, 목은 400 — 목이 더
- * 엄격하다) `long` 범위를 넘는 숫자는 거부한다(dev 400, 목은 통과 — 더 느슨하다).
- * "오류의 모양" 이 아니라 "무엇이 오류인가" 라 파급이 달라 여기서 건드리지 않는다.
+ * 헤더와 항목에 같은 `PLAN_124` 를 싣는다.
  */
-function pathVariableFormatError(field: string, rawValue: string): MockResult | null {
-  if (/^\d+$/.test(rawValue)) return null
+function bindPathVariable(
+  field: string,
+  rawValue: string,
+  type: JavaIntegral = 'long',
+): string | MockResult {
+  const bound = decodeIntegral(rawValue, type)
+  if (bound !== null) return bound
 
   const message = `${field} 파라미터 형식이 올바르지 않습니다.`
   return fail(400, 'PLAN_124', message, [{ code: 'PLAN_124', field, message }])
@@ -440,8 +498,8 @@ export function resolvePlanMock(
   const briefing = /^\/plans\/([^/]+)\/briefing$/.exec(path)
   let briefingDate = ''
   if (briefing !== null && method === 'GET') {
-    const invalidId = pathVariableFormatError('planId', briefing[1] ?? '')
-    if (invalidId !== null) return invalidId
+    const boundId = bindPathVariable('planId', briefing[1] ?? '')
+    if (typeof boundId !== 'string') return boundId
 
     const bound = bindBriefingDate(search)
     if (typeof bound !== 'string') return bound
@@ -600,12 +658,12 @@ function withPlan(
   rawId: string,
   handle: (plan: MockPlan) => MockResult,
 ): MockResult {
-  const invalidId = pathVariableFormatError('planId', rawId)
-  if (invalidId !== null) return invalidId
+  const planId = bindPathVariable('planId', rawId)
+  if (typeof planId !== 'string') return planId
 
   const plan = mockStore().plans.find(
     (candidate) =>
-      candidate.planId === rawId && candidate.memberId === memberId && !candidate.deleted,
+      candidate.planId === planId && candidate.memberId === memberId && !candidate.deleted,
   )
   if (plan === undefined) return fail(404, 'PLAN_001', '존재하지 않는 여행 일정입니다.')
 
@@ -628,8 +686,8 @@ function withPlan(
  */
 function markVisited(plan: MockPlan, rawItemId: string, body: string | null): MockResult {
   // 컨트롤러가 `@PathVariable long` 이라 숫자가 아닌 id 는 404 가 아니라 400 이다
-  const invalidItemId = pathVariableFormatError('planItemId', rawItemId)
-  if (invalidItemId !== null) return invalidItemId
+  const planItemId = bindPathVariable('planItemId', rawItemId)
+  if (typeof planItemId !== 'string') return planItemId
 
   let parsed: Record<string, unknown>
   try {
@@ -645,7 +703,7 @@ function markVisited(plan: MockPlan, rawItemId: string, body: string | null): Mo
     ])
   }
 
-  const item = plan.items.find((candidate) => candidate.planItemId === rawItemId)
+  const item = plan.items.find((candidate) => candidate.planItemId === planItemId)
   // 없는 항목, 또는 **다른 일정의** 항목이면 404 다 (`PLAN_005`)
   if (item === undefined) return fail(404, 'PLAN_005', '존재하지 않는 일정 항목입니다.')
 
@@ -1766,11 +1824,12 @@ const ITEM_TYPE_CODES = new Set(Object.keys(ITEM_TYPE))
  * 장소 검증이 삭제보다 먼저라 `PLAN_004` 로 막히면 기존 항목이 그대로 남는다.
  */
 function replaceDayItems(plan: MockPlan, rawDay: string, body: string | null): MockResult {
-  // 경로의 day 도 @PathVariable int 다. 숫자가 아니면 400 이다
-  const invalidDay = pathVariableFormatError('day', rawDay)
-  if (invalidDay !== null) return invalidDay
+  // 경로의 day 도 @PathVariable 이다. **`long` 이 아니라 `int` 라 경계가 다르다** —
+  // `2147483648` 은 planId 에서는 통과하고 day 에서는 400 이다 (dev 실측, #809)
+  const boundDay = bindPathVariable('day', rawDay, 'int')
+  if (typeof boundDay !== 'string') return boundDay
 
-  const day = Number(rawDay)
+  const day = Number(boundDay)
 
   let parsed: { items?: unknown }
   try {
@@ -2028,9 +2087,9 @@ function addPacking(plan: MockPlan, body: string | null): MockResult {
 }
 
 /** 삭제. **AI 항목과 사용자 항목을 구분하지 않는다** — 둘 다 지울 수 있다 */
-function removePackingItem(plan: MockPlan, packingItemId: string): MockResult {
-  const invalidItemId = pathVariableFormatError('packingItemId', packingItemId)
-  if (invalidItemId !== null) return invalidItemId
+function removePackingItem(plan: MockPlan, rawItemId: string): MockResult {
+  const packingItemId = bindPathVariable('packingItemId', rawItemId)
+  if (typeof packingItemId !== 'string') return packingItemId
 
   const index = plan.packingItems.findIndex((item) => item.packingItemId === packingItemId)
   if (index === -1) return fail(404, 'PLAN_014', '존재하지 않는 준비물 항목입니다.')
@@ -2046,9 +2105,9 @@ function removePackingItem(plan: MockPlan, packingItemId: string): MockResult {
  * 본문 검증은 그 뒤다. dev 실측(#803): 본문 없는 `PUT /plans/1/packing-items/xyz/checked`
  * 는 `PLAN_100` 이 아니라 `PLAN_124` 다.
  */
-function setPackingChecked(plan: MockPlan, packingItemId: string, body: string | null): MockResult {
-  const invalidItemId = pathVariableFormatError('packingItemId', packingItemId)
-  if (invalidItemId !== null) return invalidItemId
+function setPackingChecked(plan: MockPlan, rawItemId: string, body: string | null): MockResult {
+  const packingItemId = bindPathVariable('packingItemId', rawItemId)
+  if (typeof packingItemId !== 'string') return packingItemId
 
   const parsed = parseBody(body)
   if (parsed === null || typeof parsed.checked !== 'boolean') {
