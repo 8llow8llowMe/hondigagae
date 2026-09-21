@@ -2,6 +2,7 @@
 
 import type { ReactNode, Ref } from 'react'
 
+import { handleRadioGroupKeyDown, radioTabIndex } from '@/lib/ui/radio-group-keys'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -53,11 +54,21 @@ export function Chip({
   children,
   className,
 }: ChipProps) {
+  /*
+    **roving `tabindex` 는 배타 칩에만 붙는다** (#825). `aria-pressed` 토글과 시트를 여는
+    칩(`aria-expanded`)은 라디오 그룹이 아니라 각자 탭 스톱이 맞다 — 여기서 갈리는 것이
+    `role` 하나뿐이라 분기도 한 곳에 둔다.
+  */
   const a11y =
     expanded !== undefined
       ? ({ 'aria-expanded': expanded, 'aria-haspopup': 'dialog' } as const)
       : exclusive
-        ? ({ role: 'radio', 'aria-checked': selected } as const)
+        ? ({
+            role: 'radio',
+            'aria-checked': selected,
+            tabIndex: radioTabIndex(selected),
+            onKeyDown: handleRadioGroupKeyDown,
+          } as const)
         : ({ 'aria-pressed': selected } as const)
 
   return (
