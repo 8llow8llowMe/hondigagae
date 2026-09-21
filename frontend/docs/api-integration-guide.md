@@ -121,6 +121,14 @@ export function toMessage(raw: unknown, fallback: string): string {
 - 백엔드는 **타인 리소스 접근도 404** 로 응답한다 (존재 자체 노출 차단). 403을 기대하면 안 된다.
   - 다만 **게이트웨이는 토큰이 없으면 403** 을 준다 (`forbidden`). 이쪽은 래퍼가 없다 — §2-1.
 - `resultCode` 는 `{도메인}_{번호}` 문자열이다. 예: `PET_001`(없는 반려견), `PET_100`(요청 검증), `PET_113`(파라미터 형식). **번호 1xx 대역 = 요청 검증.**
+- **경로변수 형식 오류는 도메인이 달라도 모양이 같다.** 서버가 한 자리에서 만든다
+  (`ValidationErrorSupport.toResponse(MethodArgumentTypeMismatchException, …)`) — 문구가
+  **필드명을 끼워** `"<field> 파라미터 형식이 올바르지 않습니다."` 로 만들어지고, 같은
+  코드·필드·문구가 `fieldErrors` **한 건**에 실린다. 코드만 도메인 것이다
+  (`PLACE_113` · `INSIGHT_113` · `WALKCOURSE_113` · `FAVORITE_113` · `PET_113`, 일정만
+  `PLAN_124`). 받는 값의 문법은 `@PathVariable long`(= `NumberUtils.parseNumber`) 이라
+  부호·공백·앞자리 0·16진수를 받고 **범위를 넘으면 거부한다** — 8진수는 아니다.
+  목 구현과 실측 근거: `src/lib/api/mock/path-variable.ts`, 명세는 일정상세 **D5-1·D5-2**.
 - **404와 5xx의 시각 언어를 다르게 한다.** 데이터 없음에 에러 톤·재시도 버튼을 쓰지 않는다.
 
 ```ts

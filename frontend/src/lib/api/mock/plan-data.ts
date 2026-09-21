@@ -1,5 +1,6 @@
 import type { MockResult } from '@/lib/api/mock/auth-data'
 import { mockPlanEmergency } from '@/lib/api/mock/emergency-data'
+import { bindPathVariable, type JavaIntegral } from '@/lib/api/mock/path-variable'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import {
   memberIdOf,
@@ -73,101 +74,20 @@ function failValidation(errors: ValidationErrorItem[]): MockResult {
   return fail(400, 'PLAN_100', errors[0]?.message ?? '요청 값이 올바르지 않습니다.', errors)
 }
 
-/** `@PathVariable` 의 자바 타입. `day` 만 `int` 고 나머지 id 는 전부 `long` 이다 */
-type JavaIntegral = 'long' | 'int'
-
-const INTEGRAL_RANGE: Record<JavaIntegral, { min: bigint; max: bigint }> = {
-  long: { min: -(2n ** 63n), max: 2n ** 63n - 1n },
-  int: { min: -(2n ** 31n), max: 2n ** 31n - 1n },
-}
-
 /**
- * 스프링이 경로 문자열을 정수로 푸는 문법 — `NumberUtils.parseNumber` 를 그대로 옮긴다.
- * 통과하면 **정규화된 10진 문자열**, 아니면 `null`(바인딩 실패)이다.
+ * 일정 경로변수 바인딩 — 공용 규칙에 도메인 코드만 얹는다.
  *
- * ```java
- * String trimmed = StringUtils.trimAllWhitespace(text);            // 안쪽 공백까지 지운다
- * return (isHexNumber(trimmed) ? Long.decode(trimmed) : Long.valueOf(trimmed));
+ * 일정만 `PLAN_124` 다. `PLAN_1xx` 대역이 먼저 차서 프레임워크 공통 2종이 대역 끝으로
+ * 밀렸기 때문이다 (`backend/docs/coding-conventions.md` §8-2 · `PlanErrorCode:50`).
  *
- * private static boolean isHexNumber(String value) {
- *     int index = (value.startsWith("-") ? 1 : 0);                 // + 는 보지 않는다
- *     return (value.startsWith("0x", index) || value.startsWith("0X", index)
- *          || value.startsWith("#", index));
- * }
- * ```
- *
- * **8진수가 아니다.** `Long.decode` 라면 `08`·`09` 가 무효여야 하는데 dev 는 둘 다
- * 통과시킨다 — 16진수 접두사가 없어 `Long.valueOf` 로 가기 때문이다. 이 한 가지가
- * 문법을 확정한 증거다 (dev 실측 28종, 2026-09-21 · #809).
- *
- * **정규화한 값을 돌려주는 이유**: 서버는 `' 1'` 을 `1` 로 풀어 **1번 일정을 찾는다**.
- * 목이 원문으로 조회하면 같은 주소가 404 로 갈린다.
- *
- * 남는 차이 하나: 여기 `\s` 는 자바 `Character.isWhitespace` 와 유니코드 경계가 조금
- * 다르다(예: ` `). 경로에 그 문자가 오는 일이 없어 쫓지 않는다.
- */
-function decodeIntegral(rawValue: string, type: JavaIntegral): string | null {
-  // trimAllWhitespace — 앞뒤가 아니라 **전부** 지운다. `'1 2'` 는 `12` 다
-  const compact = rawValue.replace(/\s/g, '')
-  const negative = compact.startsWith('-')
-  const unsigned = negative ? compact.slice(1) : compact
-
-  let parsed: bigint
-  if (/^(?:0[xX]|#)/.test(unsigned)) {
-    // 16진수 접두사가 붙었으면 `Long.decode` 로 간다 — 뒤가 16진수가 아니면 실패다
-    const hex = /^(?:0[xX]|#)([0-9a-fA-F]+)$/.exec(unsigned)
-    if (hex === null) return null
-    parsed = BigInt(`0x${hex[1]}`)
-    if (negative) parsed = -parsed
-  } else {
-    // `Long.valueOf` — 부호 하나에 10진 숫자만. 앞자리 0 은 허용이고 8진수가 아니다
-    if (!/^[+-]?\d+$/.test(compact)) return null
-    parsed = BigInt(compact)
-  }
-
-  const { min, max } = INTEGRAL_RANGE[type]
-  if (parsed < min || parsed > max) return null
-
-  return parsed.toString()
-}
-
-/**
- * `@PathVariable` 바인딩. 통과하면 **정규화된 값**, 실패하면 400 이다.
- *
- * **한 곳에 모은 이유**: 경로변수가 네 종류(`planId` · `day` · `planItemId` ·
- * `packingItemId`)인데 서버는 넷을 한 자리에서 만든다. 자리마다 따로 쓰면 갈린다.
  * 브리핑은 이 판정을 `withPlan` 밖에서도 쓴다 (`resolvePlanMock` 의 인증 앞 관문, #795).
- *
- * **오류 모양은 dev 게이트웨이 실측이다** (2026-09-21 · 토큰 없는 GET, #803):
- *
- * ```text
- * GET /api/v1/plans/abc/briefing → 400
- * {"resultCode":"PLAN_124","resultMessage":"planId 파라미터 형식이 올바르지 않습니다.",
- *  "fieldErrors":[{"code":"PLAN_124","field":"planId","message":"planId 파라미터 형식이 …"}]}
- * ```
- *
- * 근거는 `ValidationErrorSupport.toResponse(MethodArgumentTypeMismatchException, defaultCode)`
- * 한 줄이다 — `"%s 파라미터 형식이 올바르지 않습니다.".formatted(exception.getName())` 로
- * **필드명을 끼워 문구를 다시 만들고**, 같은 코드·필드·문구를 `fieldErrors` 한 건에 싣는다.
- * `defaultCode` 는 `PlanErrorCode.PARAMETER_TYPE_INVALID` = `PLAN_124` (`PlanExceptionHandler:47`).
- *
- * **`PLAN_114` 가 아니다.** 예전 목이 쓰던 그 코드는 백엔드에서
- * `PlanValidationMessage.VISITED_REQUIRED`(`방문 여부는 필수입니다.`) — 방문 체크 **본문**
- * 검증 코드라, 경로 오류에 쓰면 서버가 내지 않는 조합이 된다 (#803).
- *
- * **`failValidation` 을 쓰지 않는다** — 그쪽은 헤더를 `PLAN_100` 으로 고정하는데 서버는
- * 헤더와 항목에 같은 `PLAN_124` 를 싣는다.
  */
-function bindPathVariable(
+function bindPlanPathVariable(
   field: string,
   rawValue: string,
   type: JavaIntegral = 'long',
 ): string | MockResult {
-  const bound = decodeIntegral(rawValue, type)
-  if (bound !== null) return bound
-
-  const message = `${field} 파라미터 형식이 올바르지 않습니다.`
-  return fail(400, 'PLAN_124', message, [{ code: 'PLAN_124', field, message }])
+  return bindPathVariable('PLAN_124', field, rawValue, type)
 }
 
 // 토큰이 없거나 유효하지 않은 요청은 도메인에 닿기 전에 security-core 가 막는다 —
@@ -498,7 +418,7 @@ export function resolvePlanMock(
   const briefing = /^\/plans\/([^/]+)\/briefing$/.exec(path)
   let briefingDate = ''
   if (briefing !== null && method === 'GET') {
-    const boundId = bindPathVariable('planId', briefing[1] ?? '')
+    const boundId = bindPlanPathVariable('planId', briefing[1] ?? '')
     if (typeof boundId !== 'string') return boundId
 
     const bound = bindBriefingDate(search)
@@ -658,7 +578,7 @@ function withPlan(
   rawId: string,
   handle: (plan: MockPlan) => MockResult,
 ): MockResult {
-  const planId = bindPathVariable('planId', rawId)
+  const planId = bindPlanPathVariable('planId', rawId)
   if (typeof planId !== 'string') return planId
 
   const plan = mockStore().plans.find(
@@ -686,7 +606,7 @@ function withPlan(
  */
 function markVisited(plan: MockPlan, rawItemId: string, body: string | null): MockResult {
   // 컨트롤러가 `@PathVariable long` 이라 숫자가 아닌 id 는 404 가 아니라 400 이다
-  const planItemId = bindPathVariable('planItemId', rawItemId)
+  const planItemId = bindPlanPathVariable('planItemId', rawItemId)
   if (typeof planItemId !== 'string') return planItemId
 
   let parsed: Record<string, unknown>
@@ -1826,7 +1746,7 @@ const ITEM_TYPE_CODES = new Set(Object.keys(ITEM_TYPE))
 function replaceDayItems(plan: MockPlan, rawDay: string, body: string | null): MockResult {
   // 경로의 day 도 @PathVariable 이다. **`long` 이 아니라 `int` 라 경계가 다르다** —
   // `2147483648` 은 planId 에서는 통과하고 day 에서는 400 이다 (dev 실측, #809)
-  const boundDay = bindPathVariable('day', rawDay, 'int')
+  const boundDay = bindPlanPathVariable('day', rawDay, 'int')
   if (typeof boundDay !== 'string') return boundDay
 
   const day = Number(boundDay)
@@ -2088,7 +2008,7 @@ function addPacking(plan: MockPlan, body: string | null): MockResult {
 
 /** 삭제. **AI 항목과 사용자 항목을 구분하지 않는다** — 둘 다 지울 수 있다 */
 function removePackingItem(plan: MockPlan, rawItemId: string): MockResult {
-  const packingItemId = bindPathVariable('packingItemId', rawItemId)
+  const packingItemId = bindPlanPathVariable('packingItemId', rawItemId)
   if (typeof packingItemId !== 'string') return packingItemId
 
   const index = plan.packingItems.findIndex((item) => item.packingItemId === packingItemId)
@@ -2106,7 +2026,7 @@ function removePackingItem(plan: MockPlan, rawItemId: string): MockResult {
  * 는 `PLAN_100` 이 아니라 `PLAN_124` 다.
  */
 function setPackingChecked(plan: MockPlan, rawItemId: string, body: string | null): MockResult {
-  const packingItemId = bindPathVariable('packingItemId', rawItemId)
+  const packingItemId = bindPlanPathVariable('packingItemId', rawItemId)
   if (typeof packingItemId !== 'string') return packingItemId
 
   const parsed = parseBody(body)

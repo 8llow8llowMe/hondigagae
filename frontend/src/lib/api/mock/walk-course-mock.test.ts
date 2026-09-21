@@ -184,7 +184,17 @@ describe('산책 코스 mock — 상세 오류 (D0-1)', () => {
     const result = resolveMock('/walk-courses/abc', 'GET', '', null)
 
     expect(result?.status).toBe(400)
-    expect(result?.payload.dataHeader.resultCode).toBe('WALKCOURSE_113')
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'WALKCOURSE_113',
+      resultMessage: 'walkCourseId 파라미터 형식이 올바르지 않습니다.',
+      fieldErrors: [
+        {
+          code: 'WALKCOURSE_113',
+          field: 'walkCourseId',
+          message: 'walkCourseId 파라미터 형식이 올바르지 않습니다.',
+        },
+      ],
+    })
   })
 
   it('상세는 baseDate 와 providerName 을 더한다', () => {

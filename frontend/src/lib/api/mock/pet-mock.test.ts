@@ -117,10 +117,24 @@ describe('반려견 mock — 소유권과 경로', () => {
     expect(result?.payload.dataHeader.resultCode).toBe('PET_001')
   })
 
+  /** 문구·`fieldErrors` 까지 본다 — 코드만 보면 목이 다른 문장을 내도 초록불이다 (#813) */
   it('숫자가 아닌 petId 는 404 가 아니라 400 이다 — @PathVariable long', () => {
     const result = call('/members/me/pets/abc', 'GET', null)
 
     expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'PET_113',
+      resultMessage: 'petId 파라미터 형식이 올바르지 않습니다.',
+      fieldErrors: [
+        { code: 'PET_113', field: 'petId', message: 'petId 파라미터 형식이 올바르지 않습니다.' },
+      ],
+    })
+  })
+
+  /** 하위 경로도 같다 — `petId` 를 먼저 푼다 */
+  it('하위 경로의 숫자가 아닌 petId 도 400 PET_113 이다', () => {
+    const result = call('/members/me/pets/abc/representative', 'PUT', null)
+
     expect(result?.payload.dataHeader.resultCode).toBe('PET_113')
   })
 

@@ -164,12 +164,49 @@ describe('resolveMock — 상세', () => {
     expect(result.payload.dataHeader.resultCode).toBe('PLACE_002')
   })
 
+  /** 문구·`fieldErrors` 까지 본다 — 코드만 보면 목이 다른 문장을 내도 초록불이다 (#813) */
   it('숫자가 아닌 placeId 는 404 가 아니라 400 이다 (@PathVariable long)', () => {
     const result = detail('abc')
 
     expect(result.status).toBe(400)
-    expect(result.payload.dataHeader.resultCode).toBe('PLACE_113')
+    expect(result.payload.dataHeader).toMatchObject({
+      resultCode: 'PLACE_113',
+      resultMessage: 'placeId 파라미터 형식이 올바르지 않습니다.',
+      fieldErrors: [
+        {
+          code: 'PLACE_113',
+          field: 'placeId',
+          message: 'placeId 파라미터 형식이 올바르지 않습니다.',
+        },
+      ],
+    })
   })
+
+  /**
+   * **인사이트는 `PLACE_113` 이 아니라 `INSIGHT_113` 이다** — 같은 `/places` 접두사지만
+   * tour-service 안에서 insight 컨텍스트가 제 `ExceptionHandler` 를 갖는다 (dev 실측 #813).
+   *
+   * 고치기 전에는 목의 정규식이 `\d+` 라 이 요청이 **어느 분기에도 안 걸려 그냥 통과**했다.
+   */
+  it.each(['suitability', 'walk-safety', 'congestions'])(
+    '숫자가 아닌 placeId 의 /%s 는 400 INSIGHT_113 이다',
+    (sub) => {
+      const result = resolveMock(`/places/abc/${sub}`, 'GET', '', null)
+
+      expect(result?.status).toBe(400)
+      expect(result?.payload.dataHeader).toMatchObject({
+        resultCode: 'INSIGHT_113',
+        resultMessage: 'placeId 파라미터 형식이 올바르지 않습니다.',
+        fieldErrors: [
+          {
+            code: 'INSIGHT_113',
+            field: 'placeId',
+            message: 'placeId 파라미터 형식이 올바르지 않습니다.',
+          },
+        ],
+      })
+    },
+  )
 
   it('/places/nearby 는 상세로 오해되지 않는다 — 전용 응답을 준다', () => {
     const result = resolveMock('/places/nearby', 'GET', 'lat=33.5&lng=126.5', null)
