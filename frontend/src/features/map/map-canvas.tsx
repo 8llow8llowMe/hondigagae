@@ -17,6 +17,7 @@ import {
 } from '@/lib/map/cluster'
 import type { MapRouteSegment } from '@/lib/map/route'
 import { loadKakaoMaps, MapSdkError, type MapSdkFailure } from '@/lib/map/sdk'
+import { MAP_LAYER_Z, markerZIndex } from '@/lib/map/stacking'
 import { framedCamera, framedCenterLat, type MapBounds } from '@/lib/map/viewport'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
@@ -365,17 +366,12 @@ export function MapCanvas({
         */
         yAnchor: isCluster || (first.order !== undefined && first.id !== selectedId) ? 0.5 : 1,
         /*
-          선택 핀(10) > **묶음(2)** > 일반 핀(1).
-
-          묶음이 일반 핀과 같은 층이면 DOM 삽입 순서가 승패를 가른다. 핀은 이름표라
-          가로로 길고(`.map-pin` `max-width: 180px`) 묶음은 32px 원이라, 핀이 뒤에
-          만들어지면 원이 통째로 덮여 **누를 수 없는 묶음**이 된다 — 알약이었을 때는
-          덮여도 남는 폭이 있었다.
-
-          묶음이 위에 오는 것이 의미상으로도 맞다. 묶음은 "그 아래 여러 곳" 을 대표하고,
-          그것을 눌러야 아래의 개별 핀에 닿을 수 있다.
+          **묶음 > 선택 핀 > 일반 핀.** 순서와 근거는 `lib/map/stacking.ts` 에 있다 —
+          축이 둘 섞인 삼항을 여기 인라인으로 두었던 탓에 *"원이 통째로 덮여 누를 수 없는
+          묶음이 된다"* 는 근거를 적어 두고도 **선택 핀 축만 빠뜨린 채** 살아남았다
+          (#671 A-1). 순수 함수로 빼서 `stacking.test.ts` 가 부등식을 잠근다.
         */
-        zIndex: isCluster ? 2 : first.id === selectedId ? 10 : 1,
+        zIndex: markerZIndex({ isCluster, selected: first.id === selectedId }),
         clickable: true,
       })
       overlay.setMap(map)
@@ -417,8 +413,8 @@ export function MapCanvas({
         strokeColor: color,
         strokeOpacity: stroke.opacity,
         strokeStyle: stroke.style,
-        // 핀(1) 과 묶음(2) 아래다. 선이 핀을 덮으면 이름표가 잘려 읽히지 않는다
-        zIndex: 0,
+        // 모든 마커 아래다. 선이 핀을 덮으면 이름표가 잘려 읽히지 않는다
+        zIndex: MAP_LAYER_Z.route,
       })
       polyline.setMap(map)
 
