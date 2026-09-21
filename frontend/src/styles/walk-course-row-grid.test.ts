@@ -18,9 +18,13 @@ const row = readSourceWithoutComments('src/features/walk-course/walk-course-row.
 const TRACKS = globals.match(/^\.walk-course-row-grid\s*\{[^}]*\}/m)?.[0]
 
 describe('코스 목록 표 — 트랙 (#797)', () => {
+  /**
+   * **썸네일 트랙이 맨 앞이다** ([#767](https://github.com/8llow8llowMe/hondigagae/issues/767)).
+   * 순서까지 한 문자열로 못박는다 — 폭 집합만 세면 자리가 바뀌어도 초록이다.
+   */
   it('여섯 칸을 한 줄로 선언한다 — 폭마다 칸 수가 갈리지 않는다', () => {
     expect(TRACKS).toBeDefined()
-    expect(TRACKS).toContain('16rem 5rem 6rem minmax(0, 1fr) 2.5rem 1.25rem')
+    expect(TRACKS).toContain('2.5rem 16rem 5rem 6rem minmax(0, 1fr) 1.25rem')
   })
 
   /**
@@ -44,6 +48,11 @@ describe('코스 목록 표 — 트랙과 박스가 같은 값이다 (#797)', ()
   it('썸네일 트랙 2.5rem 과 lg:size-10 이 짝이다', () => {
     expect(TRACKS).toContain('2.5rem')
     expect(row).toContain('lg:size-10')
+  })
+
+  /** 썸네일 박스가 첫 칸에 선다 — 트랙 순서와 `col-start` 가 갈리면 사진이 코스 위에 겹친다 */
+  it('썸네일 박스가 lg:col-start-1 이다', () => {
+    expect(row).toMatch(/bg-band relative size-16[^"]*lg:col-start-1/)
   })
 
   /** 72 = 썸네일 40 + `lg:py-4` 16×2. 셋 중 하나를 바꾸면 나머지도 같이 본다 */

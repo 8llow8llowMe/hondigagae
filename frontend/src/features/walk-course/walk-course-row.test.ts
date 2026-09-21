@@ -75,7 +75,11 @@ describe('WalkCourseRow — 코스를 고르는 데 쓰는 값 셋', () => {
 })
 
 describe('WalkCourseRow — 이미지 (D1-1)', () => {
-  /** 실측 29개 중 25개가 이 모양이다. 회색 타일 25개는 정보가 아니라 잡음이다 */
+  /**
+   * **재적재 뒤 dev 실데이터는 29/29 가 이미지를 갖는다** (2026-09-21, [#767](https://github.com/8llow8llowMe/hondigagae/issues/767)).
+   * 그래도 없는 갈래를 지우지 않는다 — 이미지는 계약이 아니라 TourAPI 매칭에서 오는
+   * 데이터라, 원천이 다시 비면 이 행이 돌아온다.
+   */
   it('firstImage 가 null 이면 썸네일 자리를 만들지 않는다', () => {
     expect(render(WALK_COURSE_PLAIN)).not.toContain('<img')
   })
@@ -90,19 +94,41 @@ describe('WalkCourseRow — 이미지 (D1-1)', () => {
   })
 
   /**
-   * **썸네일이 없어도 5번째 그리드 칸의 자리는 그대로다** (#734). 플렉스였다면 없는
-   * 항목만큼 뒤 칸(시종점·chevron)이 당겨졌겠지만, 그리드 트랙은 자식 유무와 무관하게
-   * 컨테이너가 정한 폭 그대로 남는다 — 그래서 시종점(4)·chevron(6) 열은 썸네일 유무와
-   * 무관하게 항상 같은 칸에 선다.
+   * **썸네일이 없어도 첫 그리드 칸의 자리는 그대로다** (#767 에서 5 → 1). 플렉스였다면
+   * 없는 항목만큼 뒤 칸(코스·시종점·chevron)이 당겨졌겠지만, 그리드 트랙은 자식 유무와
+   * 무관하게 컨테이너가 정한 폭 그대로 남는다 — 그래서 코스(2)·chevron(6) 열은 썸네일
+   * 유무와 무관하게 항상 같은 칸에 선다.
+   *
+   * **`not.toContain('lg:col-start-1')` 은 전체 마크업 범위라 위험하다** — 다른 칸이
+   * 실수로 1번을 쓰면 빨간불이 되어야 하므로 그것도 이 단언이 지키는 것이다.
    */
-  it('썸네일이 없으면 5번째 그리드 칸(lg:col-start-5)을 만들지 않는다', () => {
-    expect(render(WALK_COURSE_PLAIN)).not.toContain('lg:col-start-5')
+  it('썸네일이 없으면 첫 그리드 칸(lg:col-start-1)을 만들지 않는다', () => {
+    expect(render(WALK_COURSE_PLAIN)).not.toContain('lg:col-start-1')
   })
 
-  it('썸네일이 있으면 5번째 그리드 칸에 선다', () => {
+  it('썸네일이 있으면 첫 그리드 칸에 선다', () => {
     const markup = render(WALK_COURSE_WITH_COORDS)
 
-    expect(markup).toMatch(/class="bg-band relative size-16[^"]*lg:col-start-5[^"]*"/)
+    expect(markup).toMatch(/class="bg-band relative size-16[^"]*lg:col-start-1[^"]*"/)
+  })
+
+  /**
+   * **사진이 이름 앞에 온다** (#767). 뒤에 두면 1280 에서 시종점 글자 끝과 493px 떨어져
+   * chevron 옆 도장 열로 읽혔다. 마크업 순서로 잰다 — 클래스만 보면 DOM 순서가 바뀌어도
+   * 초록이다.
+   */
+  it('썸네일 마크업이 코스 이름보다 앞에 온다', () => {
+    const markup = render(WALK_COURSE_WITH_COORDS)
+    const thumbnailAt = markup.search(/<div class="bg-band relative size-16/)
+    /*
+      **`aria-label` 이 아니라 눈에 보이는 이름표로 잰다.** 접근 이름은 `<a>` 속성이라
+      언제나 마크업 앞쪽에 있어, 그것으로 재면 썸네일을 어디에 두든 통과한다.
+    */
+    const labelAt = markup.search(/<span class="[^"]*whitespace-nowrap[^"]*">/)
+
+    expect(thumbnailAt).toBeGreaterThanOrEqual(0)
+    expect(labelAt).toBeGreaterThanOrEqual(0)
+    expect(thumbnailAt).toBeLessThan(labelAt)
   })
 })
 
@@ -128,17 +154,17 @@ describe('WalkCourseRow — 목록은 좌표 유무를 말하지 않는다 (D5-1
 
 describe('WalkCourseRow — 열 구성 (#734 · #797 에서 1024 로 내림)', () => {
   /**
-   * 코스(1) · 거리(2) · 소요시간(3) · 시종점(4) · 썸네일(5) · chevron(6).
-   * 각 칸이 `col-start-N` 으로 자기 자리를 못박는다 — 썸네일 유무와 무관하게 나머지
-   * 칸이 밀리지 않는 이유가 이것이다(위 이미지 describe).
+   * 썸네일(1) · 코스(2) · 거리(3) · 소요시간(4) · 시종점(5) · chevron(6) — #767 에서 한
+   * 칸씩 밀렸다. 각 칸이 `col-start-N` 으로 자기 자리를 못박는다 — 썸네일 유무와 무관하게
+   * 나머지 칸이 밀리지 않는 이유가 이것이다(위 이미지 describe).
    */
   it('코스 · 거리 · 소요시간 · 시종점 · chevron 이 각자 col-start 를 갖는다', () => {
     const markup = render(WALK_COURSE_PLAIN)
 
-    expect(markup).toContain('lg:col-start-1')
     expect(markup).toContain('lg:col-start-2')
     expect(markup).toContain('lg:col-start-3')
     expect(markup).toContain('lg:col-start-4')
+    expect(markup).toContain('lg:col-start-5')
     expect(markup).toContain('lg:col-start-6')
   })
 
@@ -210,10 +236,10 @@ describe('WalkCourseRow — 1024 부터 표다 (#797)', () => {
   })
 
   /** 시종점도 1024 부터 자기 열이다 — 한 폭에서만 인라인으로 남지 않는다 */
-  it('시종점 · 썸네일 · chevron 이 모두 1024 부터 자기 열이다', () => {
+  it('썸네일 · 시종점 · chevron 이 모두 1024 부터 자기 열이다', () => {
     const markup = render(WALK_COURSE_WITH_COORDS)
 
-    expect(markup).toContain('lg:col-start-4')
+    expect(markup).toContain('lg:col-start-1')
     expect(markup).toContain('lg:col-start-5')
     expect(markup).toContain('lg:col-start-6')
   })
