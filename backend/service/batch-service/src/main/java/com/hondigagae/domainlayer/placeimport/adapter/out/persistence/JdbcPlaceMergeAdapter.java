@@ -38,6 +38,25 @@ public class JdbcPlaceMergeAdapter implements PlaceMergeCommandPort {
     /**
      * 살아남는 행(survivor)의 빈 칸을 흡수되는 행(absorbed)의 값으로 채운다.
      * COALESCE 로 survivor 값을 우선하므로 이미 채워진 칸은 그대로 둔다.
+     *
+     * <p><b>이것은 1회성 스냅샷이다</b> (#763). 후보 조회가 {@code merged_into_id IS NULL} 로 거르므로
+     * <b>한 번 병합된 쌍은 다시 후보가 되지 않고</b>, 이 UPDATE 도 {@code markMerged} 직전 1회만 돈다.
+     * 그래서 문화정보원 CSV 가 나중에 실내외를 정정해도 흡수된 행만 갱신되고 <b>survivor 는 옛 값을
+     * 계속 들고 있다</b> — COALESCE 라 survivor 가 NULL 일 때만 채워 갱신 경로가 아예 없다.
+     *
+     * <p><b>그래도 현행을 유지한다.</b> 주기적 재동기화는 "원천 정정" 과 "사람이 고친 값" 을 구분할
+     * 수단이 없어 사람 손을 덮을 수 있고, 조회 시 survivor+absorbed 합성은 tour-service 의 모든 조회
+     * 경로에 조인을 하나 더 얹는다. 정정이 실제로 필요해지면 {@code data-refresh-guide.md} §8 의
+     * 일회성 {@code UPDATE JOIN} 이 그 자리를 메운다.
+     *
+     * <p><b>그래서 운영 절차가 이 성질을 반드시 알아야 한다</b> — <i>"병합 잡을 다시 돌린다"</i> 는
+     * 이미 병합된 쌍에 대해 <b>아무 일도 하지 않는다</b>. #753 되돌리기 런북이 그 함정에 걸려
+     * 일회성 {@code UPDATE JOIN} 을 따로 넣어야 했다.
+     *
+     * <p>여기 채우는 컬럼이 각 원천 UPSERT 의 UPDATE 절과 겹치면 <b>재적재가 이 결과를 지운다.</b>
+     * {@code tel} 이 정확히 그랬다 (#763). 사람이 교집합을 기억하지 않도록
+     * {@code JdbcPlaceBulkAdapterSqlTest} 가 두 SQL 을 실제로 대조한다 — 컬럼을 하나 더하면
+     * 그 테스트가 먼저 빨개진다.
      */
     private static final String MERGE_FIELDS_SQL = """
         UPDATE place survivor

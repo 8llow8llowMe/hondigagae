@@ -98,6 +98,91 @@ class JdbcPlaceBulkAdapterSqlTest {
         return insertValuesOf(fieldName).get(index);
     }
 
+    /**
+     * 병합이 채우는 컬럼을 재적재가 지우지 않는지 <b>두 SQL 을 실제로 대조해</b> 고정한다 (#763).
+     *
+     * <p>지금까지 이 교집합은 사람이 기억하는 것이었고, 그래서 놓쳤다 — {@code tel} 은 병합이
+     * {@code COALESCE(survivor.tel, absorbed.tel)} 로 옮겨 놓는데 관광 API 재적재가
+     * {@code tel = VALUES(tel)} 로 무조건 덮어, 원천이 번호를 안 주는 장소에서 <b>다음 적재마다
+     * NULL 로 되돌아갔다.</b> dev 실측(2026-09-21)에서 병합 쌍 54건이 <b>전부</b> 그 상태였다.
+     *
+     * <p><b>{@code indoor} 는 영구 no-op 이었고 {@code tel} 은 주기마다 깜빡였다</b> — 후자가 더
+     * 잡기 어렵다. 병합 직후에는 값이 있으니 그때 확인하면 정상으로 보인다.
+     *
+     * <p>통과하는 모양은 둘이다. <b>원천이 소유하지 않는 컬럼</b>은 UPDATE 절에 아예 없고
+     * ({@code indoor} · {@code outdoor}), <b>소유하는 컬럼</b>은 준 값이 있을 때만 덮는다
+     * ({@code tel}). 그냥 {@code VALUES(col)} 로 쓰면 여기서 걸린다.
+     */
+    @Test
+    @DisplayName("병합이 채우는 컬럼을 관광 API 재적재가 지우지 않는다 — 교집합을 사람이 기억하지 않는다")
+    void reimportNeverWipesColumnsTheMergeFills() {
+        String updateClause = updateClauseOf("UPSERT_SQL");
+
+        List<String> wiped = new ArrayList<>();
+        for (String column : mergeFilledColumns()) {
+            if (!assignsColumn(updateClause, column)) {
+                continue; // UPDATE 절이 손대지 않는다 — 안전하다
+            }
+            if (!updateClause.contains("%s = COALESCE(VALUES(%s), %s)".formatted(column, column, column))) {
+                wiped.add(column);
+            }
+        }
+
+        assertThat(wiped)
+            .as("""
+                병합(JdbcPlaceMergeAdapter.MERGE_FIELDS_SQL)이 채우는 컬럼을 관광 API 재적재가 덮어쓴다. \
+                원천이 소유하지 않는 값이면 UPDATE 절에서 빼고, 소유하는 값이면 \
+                `col = COALESCE(VALUES(col), col)` 로 준 값이 있을 때만 덮어라 (#763). 덮어쓰는 컬럼: %s"""
+                .formatted(wiped))
+            .isEmpty();
+    }
+
+    /**
+     * 병합이 실내외를 <b>실제로 옮기는지</b>를 고정한다 (#753 의 남은 항목).
+     *
+     * <p>{@code COALESCE} 가 영구 no-op 이었다는 사실이 테스트로 드러나지 않았던 것이 #753 의
+     * 문제의식이다. 적재 쪽(위 테스트들)이 survivor 를 NULL 로 두는 것과 <b>병합 쪽이 그 자리를
+     * 흡수 행의 값으로 채우는 것</b>은 서로 다른 절반이라, 한쪽만 잠그면 나머지 절반이 조용히
+     * 사라져도 아무것도 실패하지 않는다.
+     */
+    @Test
+    @DisplayName("병합은 실내외를 흡수되는 행에서 옮긴다 — 적재가 비워 둔 자리를 채우는 쪽이 있어야 한다")
+    void mergeCarriesIndoorAndOutdoorFromAbsorbedRow() {
+        String mergeSql = mergeFieldsSql();
+
+        assertThat(mergeSql).contains("survivor.indoor = COALESCE(survivor.indoor, absorbed.indoor)");
+        assertThat(mergeSql).contains("survivor.outdoor = COALESCE(survivor.outdoor, absorbed.outdoor)");
+    }
+
+    /** {@code survivor.<컬럼> =} 대입만 센다. 기록용 {@code updated_at} 은 데이터가 아니라 뺀다. */
+    private static List<String> mergeFilledColumns() {
+        Matcher matcher = Pattern.compile("survivor\\.(\\w+)\\s*=").matcher(mergeFieldsSql());
+        List<String> columns = new ArrayList<>();
+        while (matcher.find()) {
+            String column = matcher.group(1);
+            if (!column.equals("updated_at") && !columns.contains(column)) {
+                columns.add(column);
+            }
+        }
+        assertThat(columns).as("병합 SQL 에서 컬럼을 하나도 못 읽었다 — SQL 모양이 바뀌었다").isNotEmpty();
+        return columns;
+    }
+
+    /** {@code first_image} 가 {@code first_image2} 에 걸리지 않도록 대입 자리만 본다. */
+    private static boolean assignsColumn(String updateClause, String column) {
+        return Pattern.compile("(^|[\\s,])" + Pattern.quote(column) + "\\s*=").matcher(updateClause).find();
+    }
+
+    private static String mergeFieldsSql() {
+        try {
+            Field field = JdbcPlaceMergeAdapter.class.getDeclaredField("MERGE_FIELDS_SQL");
+            field.setAccessible(true);
+            return (String) field.get(null);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("MERGE_FIELDS_SQL 를 읽지 못했다 — 상수 이름이 바뀌었는지 확인한다", e);
+        }
+    }
+
     /** 테이블 이름은 고정하지 않는다 — {@code place} 말고 {@code place_intro} 도 같은 규칙으로 읽는다. */
     private static final Pattern INSERT_HEAD = Pattern.compile("INSERT INTO\\s+(\\w+)\\s*\\(");
 
