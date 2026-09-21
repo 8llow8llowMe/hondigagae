@@ -182,11 +182,21 @@ function WalkCourseListBody({
 
   if (loading) {
     return (
-      <SurfaceList aria-busy>
-        {Array.from({ length: WALK_COURSE_SKELETON_COUNT }, (_, index) => (
-          <WalkCourseRowSkeleton key={index} inset={inset} />
-        ))}
-      </SurfaceList>
+      <>
+        {/*
+          **로딩 중에도 열 머리를 세운다** (#800). 라벨 넷이 전부 고정 문구라 데이터를
+          기다릴 이유가 없고, 빼 두면 결과가 오는 순간 **한 줄이 새로 끼어들어** 아래
+          전체가 밀린다 — 스켈레톤 골격을 행에 맞춰 놓고도 그 한 줄 때문에 점프가 남는다.
+          `aria-hidden` 이라 보조기기에는 아무것도 더하지 않는다.
+        */}
+        <WalkCourseColumnHead inset={inset} />
+
+        <SurfaceList aria-busy>
+          {Array.from({ length: WALK_COURSE_SKELETON_COUNT }, (_, index) => (
+            <WalkCourseRowSkeleton key={index} inset={inset} />
+          ))}
+        </SurfaceList>
+      </>
     )
   }
 
