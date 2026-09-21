@@ -207,12 +207,16 @@ describe('항목 산책 위험도 mock — 소유권 (#625)', () => {
     )
   })
 
-  it('숫자가 아닌 planId 는 400 PLAN_114 다', () => {
+  it('숫자가 아닌 planId 는 400 PLAN_124 다', () => {
     const result = call('/plans/not-a-number/walk-safety', 'GET')
 
     expect(result?.status).toBe(400)
-    expect((result?.payload as { dataHeader: { resultCode: string } }).dataHeader.resultCode).toBe(
-      'PLAN_114',
-    )
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'PLAN_124',
+      resultMessage: 'planId 파라미터 형식이 올바르지 않습니다.',
+      fieldErrors: [
+        { code: 'PLAN_124', field: 'planId', message: 'planId 파라미터 형식이 올바르지 않습니다.' },
+      ],
+    })
   })
 })

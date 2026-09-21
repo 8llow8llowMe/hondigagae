@@ -38,8 +38,8 @@ describe('toVisitToggleError — 방문 체크 실패 분류 (#124)', () => {
     expect(toVisitToggleError(new ApiError(404, 'PLAN_001', null)).retriable).toBe(false)
   })
 
-  it('PLAN_114(경로 형식) 도 재시도를 주지 않는다', () => {
-    expect(toVisitToggleError(new ApiError(400, 'PLAN_114', null)).retriable).toBe(false)
+  it('PLAN_124(경로 형식) 도 재시도를 주지 않는다', () => {
+    expect(toVisitToggleError(new ApiError(400, 'PLAN_124', null)).retriable).toBe(false)
   })
 
   it('ApiError 가 아닌 실패는 전송 단계 실패로 보고 재시도를 준다', () => {

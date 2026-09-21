@@ -182,6 +182,39 @@ describe('준비물 mock — 삭제 · 챙김 체크', () => {
     expect(result?.payload.dataHeader.resultCode).toBe('PLAN_014')
   })
 
+  /**
+   * **숫자가 아닌 `packingItemId` 는 404 가 아니라 400 이다** — `@PathVariable long` 이라
+   * 바인딩에서 걸린다. 목이 이 판정을 아예 하지 않아 "없는 항목"(404)으로 흘려보내고
+   * 있었다 (dev 실측 2026-09-21, #803).
+   */
+  it('숫자가 아닌 packingItemId 는 404 가 아니라 400 PLAN_124 다', () => {
+    const result = call(`/plans/${PLAN}/packing-items/abc`, 'DELETE')
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'PLAN_124',
+      resultMessage: 'packingItemId 파라미터 형식이 올바르지 않습니다.',
+      fieldErrors: [
+        {
+          code: 'PLAN_124',
+          field: 'packingItemId',
+          message: 'packingItemId 파라미터 형식이 올바르지 않습니다.',
+        },
+      ],
+    })
+  })
+
+  /**
+   * **경로변수 판정이 본문 검증보다 앞이다** — 스프링은 인자를 푸는 단계에서 400 을 내고
+   * 본문 검증은 그 뒤다. 본문이 비어도 `PLAN_120` 이 아니라 `PLAN_124` 여야 한다.
+   */
+  it('체크 경로도 같다 — 본문이 틀려도 packingItemId 형식이 먼저다', () => {
+    const result = call(`/plans/${PLAN}/packing-items/abc/checked`, 'PUT', {})
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_124')
+  })
+
   /** 응답이 `Response<Void>` 라 화면이 캐시를 직접 손본다 — 그 계약을 잠근다 */
   it('체크 응답은 목록이 아니라 Void 다', () => {
     saveAi()

@@ -67,7 +67,7 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
   if (detail.isError) {
     /*
       **400 에는 재시도를 주지 않는다.** 숫자가 아닌 `planId` 는 404 가 아니라
-      400 `PLAN_114` 이고(`@PathVariable long`), 같은 주소를 다시 불러도 같은 400 이다.
+      400 `PLAN_124` 이고(`@PathVariable long`), 같은 주소를 다시 불러도 같은 400 이다.
       `ErrorState` 는 재시도가 필수 prop 이라 중립 톤 `EmptyState` 를 쓴다 (D5).
     */
     if (detail.error instanceof ApiError && detail.error.status === 400) {

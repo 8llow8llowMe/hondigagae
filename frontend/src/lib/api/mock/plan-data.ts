@@ -73,6 +73,45 @@ function failValidation(errors: ValidationErrorItem[]): MockResult {
   return fail(400, 'PLAN_100', errors[0]?.message ?? '요청 값이 올바르지 않습니다.', errors)
 }
 
+/**
+ * `@PathVariable` 형식 위반 — 숫자가 아니면 404 가 아니라 400 이다.
+ *
+ * **한 곳에 모은 이유**: 경로변수가 네 종류(`planId` · `day` · `planItemId` ·
+ * `packingItemId`)인데 서버는 넷을 한 자리에서 만든다. 자리마다 따로 쓰면 갈린다.
+ * 브리핑은 이 판정을 `withPlan` 밖에서도 쓴다 (`resolvePlanMock` 의 인증 앞 관문, #795).
+ *
+ * **응답 모양은 dev 게이트웨이 실측이다** (2026-09-21 · 토큰 없는 GET, #803):
+ *
+ * ```text
+ * GET /api/v1/plans/abc/briefing → 400
+ * {"resultCode":"PLAN_124","resultMessage":"planId 파라미터 형식이 올바르지 않습니다.",
+ *  "fieldErrors":[{"code":"PLAN_124","field":"planId","message":"planId 파라미터 형식이 …"}]}
+ * ```
+ *
+ * 근거는 `ValidationErrorSupport.toResponse(MethodArgumentTypeMismatchException, defaultCode)`
+ * 한 줄이다 — `"%s 파라미터 형식이 올바르지 않습니다.".formatted(exception.getName())` 로
+ * **필드명을 끼워 문구를 다시 만들고**, 같은 코드·필드·문구를 `fieldErrors` 한 건에 싣는다.
+ * `defaultCode` 는 `PlanErrorCode.PARAMETER_TYPE_INVALID` = `PLAN_124` (`PlanExceptionHandler:47`).
+ *
+ * **`PLAN_114` 가 아니다.** 예전 목이 쓰던 그 코드는 백엔드에서
+ * `PlanValidationMessage.VISITED_REQUIRED`(`방문 여부는 필수입니다.`) — 방문 체크 **본문**
+ * 검증 코드라, 경로 오류에 쓰면 서버가 내지 않는 조합이 된다 (#803).
+ *
+ * **`failValidation` 을 쓰지 않는다** — 그쪽은 헤더를 `PLAN_100` 으로 고정하는데 서버는
+ * 헤더와 항목에 같은 `PLAN_124` 를 싣는다 (`date` 바인딩과 같은 판단, #795).
+ *
+ * **남은 드리프트 (별건 · #803 본문)**: 판정식 `/^\d+$/` 자체는 서버와 다르다.
+ * `@PathVariable long` 은 `-1` 과 앞뒤 공백을 받고(둘 다 dev 는 401, 목은 400 — 목이 더
+ * 엄격하다) `long` 범위를 넘는 숫자는 거부한다(dev 400, 목은 통과 — 더 느슨하다).
+ * "오류의 모양" 이 아니라 "무엇이 오류인가" 라 파급이 달라 여기서 건드리지 않는다.
+ */
+function pathVariableFormatError(field: string, rawValue: string): MockResult | null {
+  if (/^\d+$/.test(rawValue)) return null
+
+  const message = `${field} 파라미터 형식이 올바르지 않습니다.`
+  return fail(400, 'PLAN_124', message, [{ code: 'PLAN_124', field, message }])
+}
+
 // 토큰이 없거나 유효하지 않은 요청은 도메인에 닿기 전에 security-core 가 막는다 —
 // `SecurityErrorCode.UNAUTHORIZED`. **`AUTH_011` 이 아니다**: 그것은
 // `OAUTH_PROFILE_REQUIRED` 이고 400 이라, 401 과 짝지으면 서버가 내지 않는 조합이 된다 (#83)
@@ -401,7 +440,7 @@ export function resolvePlanMock(
   const briefing = /^\/plans\/([^/]+)\/briefing$/.exec(path)
   let briefingDate = ''
   if (briefing !== null && method === 'GET') {
-    const invalidId = planIdFormatError(briefing[1] ?? '')
+    const invalidId = pathVariableFormatError('planId', briefing[1] ?? '')
     if (invalidId !== null) return invalidId
 
     const bound = bindBriefingDate(search)
@@ -550,21 +589,6 @@ export function resolvePlanMock(
 }
 
 /**
- * `@PathVariable` 형식 위반. **소유권 판정보다 앞이다** — 서버도 바인딩이 먼저다.
- *
- * 브리핑은 이 판정을 `withPlan` 밖에서도 쓴다 (`resolvePlanMock` 의 인증 앞 관문).
- * 규칙이 한 곳이어야 두 자리가 갈리지 않는다.
- *
- * **dev 는 여기에 `PLAN_124` + `field: "planId"` 를 낸다** (2026-09-21 실측). 목의
- * `PLAN_114` 와 다르지만 그 드리프트는 일정 엔드포인트 전부에 걸려 있어 #795 범위가
- * 아니다 — 별건으로 남긴다.
- */
-function planIdFormatError(rawId: string): MockResult | null {
-  if (/^\d+$/.test(rawId)) return null
-  return fail(400, 'PLAN_114', '요청 파라미터 형식이 올바르지 않습니다.')
-}
-
-/**
  * `planId` 를 판정하고 소유한 일정을 넘긴다.
  *
  * **숫자가 아닌 id 는 404 가 아니라 400 이다** — 컨트롤러가 `@PathVariable long` 이라
@@ -576,7 +600,7 @@ function withPlan(
   rawId: string,
   handle: (plan: MockPlan) => MockResult,
 ): MockResult {
-  const invalidId = planIdFormatError(rawId)
+  const invalidId = pathVariableFormatError('planId', rawId)
   if (invalidId !== null) return invalidId
 
   const plan = mockStore().plans.find(
@@ -604,9 +628,8 @@ function withPlan(
  */
 function markVisited(plan: MockPlan, rawItemId: string, body: string | null): MockResult {
   // 컨트롤러가 `@PathVariable long` 이라 숫자가 아닌 id 는 404 가 아니라 400 이다
-  if (!/^\d+$/.test(rawItemId)) {
-    return fail(400, 'PLAN_114', '요청 파라미터 형식이 올바르지 않습니다.')
-  }
+  const invalidItemId = pathVariableFormatError('planItemId', rawItemId)
+  if (invalidItemId !== null) return invalidItemId
 
   let parsed: Record<string, unknown>
   try {
@@ -1744,9 +1767,9 @@ const ITEM_TYPE_CODES = new Set(Object.keys(ITEM_TYPE))
  */
 function replaceDayItems(plan: MockPlan, rawDay: string, body: string | null): MockResult {
   // 경로의 day 도 @PathVariable int 다. 숫자가 아니면 400 이다
-  if (!/^\d+$/.test(rawDay)) {
-    return fail(400, 'PLAN_114', '요청 파라미터 형식이 올바르지 않습니다.')
-  }
+  const invalidDay = pathVariableFormatError('day', rawDay)
+  if (invalidDay !== null) return invalidDay
+
   const day = Number(rawDay)
 
   let parsed: { items?: unknown }
@@ -2006,6 +2029,9 @@ function addPacking(plan: MockPlan, body: string | null): MockResult {
 
 /** 삭제. **AI 항목과 사용자 항목을 구분하지 않는다** — 둘 다 지울 수 있다 */
 function removePackingItem(plan: MockPlan, packingItemId: string): MockResult {
+  const invalidItemId = pathVariableFormatError('packingItemId', packingItemId)
+  if (invalidItemId !== null) return invalidItemId
+
   const index = plan.packingItems.findIndex((item) => item.packingItemId === packingItemId)
   if (index === -1) return fail(404, 'PLAN_014', '존재하지 않는 준비물 항목입니다.')
 
@@ -2013,8 +2039,17 @@ function removePackingItem(plan: MockPlan, packingItemId: string): MockResult {
   return { status: 200, payload: ok(null) }
 }
 
-/** 챙김 체크. 응답이 `Response<Void>` 다 — 갱신된 목록을 돌려주지 않는다 */
+/**
+ * 챙김 체크. 응답이 `Response<Void>` 다 — 갱신된 목록을 돌려주지 않는다.
+ *
+ * **경로변수 판정이 본문 검증보다 앞이다** — 스프링은 인자를 푸는 단계에서 400 을 내고
+ * 본문 검증은 그 뒤다. dev 실측(#803): 본문 없는 `PUT /plans/1/packing-items/xyz/checked`
+ * 는 `PLAN_100` 이 아니라 `PLAN_124` 다.
+ */
 function setPackingChecked(plan: MockPlan, packingItemId: string, body: string | null): MockResult {
+  const invalidItemId = pathVariableFormatError('packingItemId', packingItemId)
+  if (invalidItemId !== null) return invalidItemId
+
   const parsed = parseBody(body)
   if (parsed === null || typeof parsed.checked !== 'boolean') {
     return failValidation([
