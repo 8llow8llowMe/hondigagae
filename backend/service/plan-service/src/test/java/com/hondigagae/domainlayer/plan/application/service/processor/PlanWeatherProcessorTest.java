@@ -54,6 +54,8 @@ class PlanWeatherProcessorTest {
     private static final LocalDate DAY_1 = LocalDate.of(2026, 9, 12);
     private static final Clock CLOCK = Clock.fixed(DAY_1.atStartOfDay(SEOUL).toInstant(), SEOUL);
 
+    private static final String SCORE_DESCRIPTION = "점수가 높을수록 날씨/동반 조건이 반려견에게 유리합니다.";
+
     private static final PetConditionQueryResult HEAT_SENSITIVE = PetConditionQueryResult.builder()
         .sizeType("SMALL").heatSensitive(true).build();
     private static final PetConditionQueryResult ROBUST = PetConditionQueryResult.builder()
@@ -106,6 +108,26 @@ class PlanWeatherProcessorTest {
         assertThat(day.petSuitabilities()).extracting(PetSuitabilityInfo::score).containsExactly(42, 81);
         assertThat(info.petIds()).containsExactly(MONGSIL, BORI);
         assertThat(info.petConditionApplied()).isTrue();
+    }
+
+    /**
+     * 등급 점수 해석 문장이 out-port 계약에서 application 표현까지 건너오는지 고정한다 (#759).
+     *
+     * <p>adapter 가 옮기지 않으면 어디서도 실패하지 않은 채 {@code null} 로 남는다. 기준
+     * 반려견의 {@code suitability} 와 아이별 요약은 <b>서로 다른 매핑</b>이라 한쪽만 이어지는
+     * 일이 실제로 있었다 — 둘 다 찍는다.
+     */
+    @Test
+    @DisplayName("등급 점수 해석 문장이 기준 반려견·아이별 요약 모두로 건너온다")
+    void levelScoreDescriptionCrossesThePortBoundary() {
+        petConditionQueryPort.conditions = Map.of(MONGSIL, HEAT_SENSITIVE, BORI, ROBUST);
+
+        PlanDayWeatherInfo day = firstDay(processor.brief(1L, plan(), List.of(MONGSIL, BORI)));
+
+        assertThat(day.suitability().levelScoreDescription()).isEqualTo(SCORE_DESCRIPTION);
+        assertThat(day.petSuitabilities())
+            .extracting(PetSuitabilityInfo::levelScoreDescription)
+            .containsOnly(SCORE_DESCRIPTION);
     }
 
     @Test
@@ -372,6 +394,7 @@ class PlanWeatherProcessorTest {
                 .score(score)
                 .levelCode(score == null ? null : score >= 70 ? "HIGH" : "LOW")
                 .levelName(score == null ? null : score >= 70 ? "여행 적합" : "주의")
+                .levelScoreDescription(score == null ? null : SCORE_DESCRIPTION)
                 .reasons(List.of())
                 .indoorAlternatives(List.of())
                 .build());

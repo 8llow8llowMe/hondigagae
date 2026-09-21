@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanDayWeatherItem;
 import com.hondigagae.domainlayer.plan.application.info.PlanDaySuitabilityInfo;
+import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo.PetSuitabilityInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanWeatherInfo.PlanDayWeatherInfo;
 import com.hondigagae.domainlayer.plan.domain.enums.PlanDayWeatherUnavailableReason;
 import java.time.LocalDate;
@@ -22,6 +23,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 class PlanWeatherPresenterTest {
 
     private static final LocalDate DATE = LocalDate.of(2026, 9, 11);
+    private static final String SCORE_DESCRIPTION = "점수가 높을수록 날씨/동반 조건이 반려견에게 유리합니다.";
 
     private final PlanWeatherPresenter presenter = new PlanWeatherPresenter();
 
@@ -68,5 +70,54 @@ class PlanWeatherPresenterTest {
         assertThat(item.unavailableReasonCode()).isNull();
         assertThat(item.unavailableReason()).isNull();
         assertThat(item.score()).isEqualTo(72);
+    }
+
+    /**
+     * 등급 점수 해석 문장이 응답까지 나가는지 고정한다 (#759).
+     *
+     * <p>{@code ScoreMetricMetadata} 는 이 칸을 처음부터 갖고 있었는데 presenter 가 {@code null}
+     * 을 박아 넣고 있었다. 아무것도 실패하지 않으니 "언제나 null 인 필드" 로 보였다 — 기준
+     * 반려견과 아이별 항목 <b>둘 다</b> 같은 자리라 둘 다 찍는다.
+     */
+    @Test
+    @DisplayName("등급 점수 해석 문장이 기준 반려견·아이별 항목 모두에 실린다")
+    void levelScoreDescriptionReachesResponse() {
+        PlanDayWeatherItem item = presenter.toDayItem(PlanDayWeatherInfo.builder()
+            .day(1).date(DATE)
+            .representativePlaceId(100L).representativePlaceTitle("협재해수욕장")
+            .basisPetId(2L)
+            .suitability(PlanDaySuitabilityInfo.builder()
+                .placeId(100L).placeTitle("협재해수욕장").targetDate(DATE)
+                .score(72).levelCode("HIGH").levelName("여행 적합")
+                .levelDescription("반려견과 방문하기 좋은 조건입니다.")
+                .levelScoreDescription(SCORE_DESCRIPTION)
+                .reasons(List.of()).indoorAlternatives(List.of())
+                .build())
+            .petSuitabilities(List.of(PetSuitabilityInfo.builder()
+                .petId(2L).score(72).levelCode("HIGH").levelName("여행 적합")
+                .levelDescription("반려견과 방문하기 좋은 조건입니다.")
+                .levelScoreDescription(SCORE_DESCRIPTION)
+                .build()))
+            .build());
+
+        assertThat(item.suitabilityLevel().scoreDescription()).isEqualTo(SCORE_DESCRIPTION);
+        assertThat(item.petSuitabilities()).singleElement()
+            .satisfies(pet -> assertThat(pet.suitabilityLevel().scoreDescription()).isEqualTo(SCORE_DESCRIPTION));
+    }
+
+    @Test
+    @DisplayName("원천이 해석 문장을 안 주면 null 로 남는다 — 문구를 이쪽에서 지어내지 않는다")
+    void missingScoreDescriptionStaysNull() {
+        PlanDayWeatherItem item = presenter.toDayItem(PlanDayWeatherInfo.builder()
+            .day(1).date(DATE)
+            .suitability(PlanDaySuitabilityInfo.builder()
+                .placeId(100L).targetDate(DATE)
+                .score(40).levelCode("LOW").levelName("주의 필요")
+                .reasons(List.of()).indoorAlternatives(List.of())
+                .build())
+            .petSuitabilities(List.of())
+            .build());
+
+        assertThat(item.suitabilityLevel().scoreDescription()).isNull();
     }
 }

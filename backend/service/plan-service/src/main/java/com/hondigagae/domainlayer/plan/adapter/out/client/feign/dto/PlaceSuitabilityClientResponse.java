@@ -9,6 +9,10 @@ import java.util.List;
  *
  * <p>{@code score} 가 Wrapper 인 것을 그대로 유지한다. 원천이 null 로 주는 것은
  * "판단 근거 없음"이고, 이쪽에서 0 으로 바꾸면 그 뜻이 사라진다.
+ *
+ * <p>등급 metadata 는 {@link ScoreMetadataClientResponse} 를 쓴다 — 산책 위험도·골든타임과
+ * 같은 스키마라 <b>같은 패키지의 한 벌을 공유한다</b>. 여기에 중첩 레코드로 복제해 두었더니
+ * 원천에 칸이 생길 때 한쪽만 고쳐졌다 (#759).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record PlaceSuitabilityClientResponse(
@@ -23,11 +27,6 @@ public record PlaceSuitabilityClientResponse(
     boolean weatherApplied,
     boolean congestionApplied
 ) {
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public record ScoreMetadataClientResponse(String code, String name, String description, String scoreDescription) {
-
-    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record ReasonClientResponse(String code, String name, String description, int scoreDelta) {

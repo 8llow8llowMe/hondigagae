@@ -42,7 +42,8 @@ public class PlanWeatherPresenter {
             // 점수를 못 낸 날은 null 을 그대로 내린다. 0 으로 바꾸면 "최악"으로 읽힌다.
             .score(suitability == null ? null : suitability.score())
             .suitabilityLevel(suitability == null ? null
-                : toLevelMetadata(suitability.levelCode(), suitability.levelName(), suitability.levelDescription()))
+                : toLevelMetadata(suitability.levelCode(), suitability.levelName(),
+                    suitability.levelDescription(), suitability.levelScoreDescription()))
             .reasons(toReasonItems(suitability))
             .weather(toWeatherItem(suitability))
             .indoorAlternatives(toAlternativeItems(suitability))
@@ -62,16 +63,24 @@ public class PlanWeatherPresenter {
             .map(pet -> PlanDayPetSuitabilityItem.builder()
                 .petId(String.valueOf(pet.petId()))
                 .score(pet.score())
-                .suitabilityLevel(toLevelMetadata(pet.levelCode(), pet.levelName(), pet.levelDescription()))
+                .suitabilityLevel(toLevelMetadata(pet.levelCode(), pet.levelName(),
+                    pet.levelDescription(), pet.levelScoreDescription()))
                 .build())
             .toList();
     }
 
-    private ScoreMetricMetadata toLevelMetadata(String levelCode, String levelName, String levelDescription) {
+    /**
+     * 등급 metadata. <b>{@code scoreDescription} 까지 내린다</b> — 원천({@code SuitabilityLevel})이
+     * 네 칸을 모두 채워 보내는데 여기서 {@code null} 로 접고 있었다 (#759). 등급 설명과 달리
+     * 점수를 어떻게 읽어야 하는지를 말하는 문장이라, 화면이 점수 옆에 그대로 쓸 수 있다.
+     */
+    private ScoreMetricMetadata toLevelMetadata(
+        String levelCode, String levelName, String levelDescription, String levelScoreDescription
+    ) {
         if (levelCode == null) {
             return null;
         }
-        return ScoreMetricMetadata.of(levelCode, levelName, levelDescription, null);
+        return ScoreMetricMetadata.of(levelCode, levelName, levelDescription, levelScoreDescription);
     }
 
     private List<PlanWeatherReasonItem> toReasonItems(PlanDaySuitabilityInfo suitability) {

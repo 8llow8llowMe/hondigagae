@@ -11,6 +11,8 @@ import lombok.Builder;
  * 경계다 — QueryResult 는 어댑터 계약이라 Presenter 까지 번지면 tour-service 응답
  * 스키마 변화가 곧바로 화면 조립 코드를 흔든다 (architecture-guide §4).
  * 변환은 {@code PlanWeatherProcessor} 가 한다.
+ *
+ * @param levelScoreDescription 등급 점수 해석 문장. 원천이 주는 값을 그대로 옮긴다 (#759)
  */
 @Builder
 public record PlanDaySuitabilityInfo(
@@ -22,6 +24,7 @@ public record PlanDaySuitabilityInfo(
     String levelCode,
     String levelName,
     String levelDescription,
+    String levelScoreDescription,
     List<ReasonInfo> reasons,
     DailyWeatherInfo weather,
     List<AlternativeInfo> indoorAlternatives,

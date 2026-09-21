@@ -210,6 +210,8 @@ public class PlanInsightClientAdapter
             .levelCode(body.suitabilityLevel() == null ? null : body.suitabilityLevel().code())
             .levelName(body.suitabilityLevel() == null ? null : body.suitabilityLevel().name())
             .levelDescription(body.suitabilityLevel() == null ? null : body.suitabilityLevel().description())
+            .levelScoreDescription(
+                body.suitabilityLevel() == null ? null : body.suitabilityLevel().scoreDescription())
             .reasons(toReasons(body))
             .weather(toWeather(body))
             .indoorAlternatives(toAlternatives(body))
