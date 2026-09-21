@@ -43,7 +43,15 @@ export function WalkCourseAddAction({
       <ButtonLink
         href={toLoginHref(`/walk-courses/${course.walkCourseId}`)}
         size="lg"
-        className="w-full"
+        /*
+          **컨테이너 폭을 그대로 먹지 않는다** (#781). 1440 에서 1346×48px 이었다 —
+          주 버튼이 화면 한 줄을 가로지르면 누르라는 신호가 아니라 띠로 읽힌다.
+
+          `max-w-sm`(384)이고 360 이 아닌 이유: 360 은 Tailwind 스케일 밖이라
+          `max-w-[360px]` 가 되는데 이 저장소의 eslint 가 토큰 밖 arbitrary value 를
+          막는다 (DESIGN.md §2·§4). **모바일에서는 375 < 384 라 여전히 전폭이다.**
+        */
+        className="w-full max-w-sm"
       >
         {label}
       </ButtonLink>
@@ -52,7 +60,7 @@ export function WalkCourseAddAction({
 
   return (
     <>
-      <Button size="lg" className="w-full" onClick={() => setOpen(true)}>
+      <Button size="lg" className="w-full max-w-sm" onClick={() => setOpen(true)}>
         {label}
       </Button>
 

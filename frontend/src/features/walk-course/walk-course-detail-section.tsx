@@ -130,8 +130,21 @@ export function WalkCourseDetailSection({
 
   const hero = imageSrc(course.firstImage)
 
+  /*
+    **캡을 갈래에 따라 고른다** ([#781](https://github.com/8llow8llowMe/hondigagae/issues/781)).
+
+    히어로가 없는 25/29 는 1440 을 그대로 채워 `거리 15.1km` 와 `소요시간 4~5시간` 이
+    689px 떨어져 있었다 — 한 묶음으로 읽혀야 하는 값 둘이 눈으로 이을 수 없는 거리였다.
+    글이 주인공인 단일 열이라 읽는 폭(760)에서 멈춘다.
+
+    **히어로가 있는 4개는 캡하지 않는다.** `lg:grid-cols-2` 로 이미 각 681px 이라 읽는 폭
+    안이고, 760 을 걸면 2열이 무너진다.
+
+    **두 클래스를 겹쳐 달지 않는다** — 같은 특정도라 순서로 이기는 모양이 되어 스타일시트
+    순서가 바뀌면 조용히 뒤집힌다 (`globals.css` 의 `.reading-container` 주석).
+  */
   return (
-    <SurfaceStack className="content-container">
+    <SurfaceStack className={hero === null ? 'reading-container' : 'content-container'}>
       <div className={INSET_CLASS.card}>
         <BackLink href="/walk-courses" label={messages.walkCourse.backToList} />
       </div>

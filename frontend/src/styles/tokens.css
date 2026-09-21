@@ -141,6 +141,8 @@
 
   /* ── 레이아웃 — DESIGN.md §7 */
   --content-max: 1440px;
+  /* 읽는 폭 (#781) — 1440 은 "화면 끝까지 가지 않는다" 는 캡이지 읽는 폭이 아니다 */
+  --reading-max: 760px;
   --header-h: 56px;
   --header-h-search: 64px;
   --tabbar-h: 64px;
