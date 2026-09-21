@@ -1021,6 +1021,10 @@ export const planMessages = {
   /** `{title}` 치환 — 기준 장소가 처음·마지막 **어느 쪽도 아닐 때만** 쓰는 줄이다 */
   briefingScheduleBasisPlace: '이 날 기준 장소 · {title}',
   briefingScheduleOpenDay: '이 날 일정 보기',
+  /** 지도 위 기준 줄 — 핀은 대표 장소 하나뿐이라 "이 날의 경로" 로 읽히지 않게 못박는다 */
+  briefingScheduleMapBasis: '{title} 기준',
+  /** 유형 배지를 스크린리더가 값처럼 읽지 않게 붙이는 라벨 (서버 매핑 테이블이 아니다) */
+  briefingScheduleTypeLabel: '유형',
   briefingScheduleEmptyTitle: '이 날에는 담긴 항목이 없어요',
   briefingScheduleEmptyAction: '일정에 장소 담기',
 
@@ -1083,6 +1087,9 @@ export const planMessages = {
    * *"정작 사용자가 할 일(장소 담기)은 화면 어디에도 드러나지 않는다"* 고 적어 둔 자리다.
    */
   briefingWalkNoPlaceItemAction: '이 날에 장소 담기',
+  /** 같은 사유에 특보 카드도 같은 버튼을 낸다 — 접근 이름으로 대상을 가른다 */
+  briefingWalkRetryLabel: '산책 골든타임 다시 시도',
+  briefingWarningRetryLabel: '기상특보 다시 시도',
   briefingCurveErrorTitle: '시간대별 예보를 불러오지 못했어요',
   /** `{title}` 치환. **"현재 위치 기준" 이라고 쓰지 않는다** — 그날 대표 장소 좌표 기준이다 */
   briefingWalkBasis: '{title} 기준 · 노면(아스팔트) 온도는 추정치예요',

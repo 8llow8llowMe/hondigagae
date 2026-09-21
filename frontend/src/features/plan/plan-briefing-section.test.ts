@@ -25,6 +25,13 @@ import type { PlanBriefingResponse } from '@/types/plan'
  */
 const CURVE_CELL = 'min-width:3.5rem'
 
+/**
+ * 지도 기준 줄 — **줄 전체로 센다.** `협재해수욕장 기준` 은 골든타임 각주
+ * (`… 기준 · 노면(아스팔트) 온도는 추정치예요`)의 앞부분과 겹쳐서, 부분 문자열로는
+ * 지도가 없는데 있다고 읽는다.
+ */
+const MAP_BASIS_LINE = `>${messages.plan.briefingScheduleMapBasis.replace('{title}', '협재해수욕장')}</p>`
+
 /** 곡선을 아직 안 받은 기본값 — 이 이슈의 갈래는 대부분 곡선과 무관하다 */
 const NO_CURVE: PlanBriefingCurve = { hourly: null, failed: false, onRetry: () => undefined }
 
@@ -364,6 +371,55 @@ describe('PlanBriefingSection — 사유 코드와 재시도 (명세 D9-2)', () 
     expect(markup).toContain(`/plans/${planBriefing().planId}/days/${planBriefing().day}/add`)
   })
 
+  /*
+    **곡선 실패는 곡선 재시도로 푼다.** 브리핑 재시도로 대신하면, 재조회가 같은
+    `LOOKUP_FAILED` 를 낼 때 좌표가 같아 `queryKey` 가 같고 에러 상태 곡선 쿼리는 다시
+    돌지 않는다 — 눌러도 곡선이 영원히 오지 않는다.
+  */
+  it('골든타임이 없는 갈래에서 곡선이 실패하면 곡선 오류 문구를 낸다', () => {
+    const markup = render(
+      {
+        walkTimes: null,
+        walkTimesUnavailableReasonCode: 'LOOKUP_FAILED',
+        walkTimesUnavailableReason: '산책 골든타임 정보를 가져오지 못했습니다.',
+      },
+      { hourly: null, failed: true, onRetry: () => undefined },
+    )
+
+    expect(markup).toContain(messages.plan.briefingCurveErrorTitle)
+  })
+
+  /*
+    **항목이 아예 없는 날에는 내지 않는다** — 그날 일정 카드의 `EmptyState` 가 이미 **같은
+    주소로** 보낸다. 라벨만 다른 버튼 둘이 한 화면에 서면 반복은 강조가 아니라 소음이다.
+  */
+  it('항목이 0개면 장소 담기 버튼을 두 번 두지 않는다', () => {
+    const markup = render({
+      schedule: planBriefingSchedule({ itemCount: 0, firstItem: null, lastItem: null }),
+      walkTimes: null,
+      walkTimesUnavailableReasonCode: 'NO_PLACE_ITEM',
+      walkTimesUnavailableReason: '이 날짜에는 장소가 지정된 일정 항목이 없어 …',
+    })
+
+    expect(markup).toContain(messages.plan.briefingScheduleEmptyAction)
+    expect(markup).not.toContain(messages.plan.briefingWalkNoPlaceItemAction)
+  })
+
+  /** 원격 장애는 특보·골든타임을 함께 때린다 — 이름 없는 `다시 시도` 가 둘 서면 안 된다 */
+  it('두 카드가 함께 실패해도 재시도 버튼의 접근 이름이 갈린다', () => {
+    const markup = render({
+      weatherWarning: null,
+      weatherWarningUnavailableReasonCode: 'LOOKUP_FAILED',
+      weatherWarningUnavailableReason: '기상특보 정보를 가져오지 못했습니다.',
+      walkTimes: null,
+      walkTimesUnavailableReasonCode: 'LOOKUP_FAILED',
+      walkTimesUnavailableReason: '산책 골든타임 정보를 가져오지 못했습니다.',
+    })
+
+    expect(markup).toContain(messages.plan.briefingWarningRetryLabel)
+    expect(markup).toContain(messages.plan.briefingWalkRetryLabel)
+  })
+
   /** 서버가 코드를 하나 더 내도 화면이 깨지지 않는다 — 모르는 코드는 재시도 없는 쪽이다 */
   it('모르는 사유 코드에는 재시도를 달지 않는다', () => {
     const markup = render({
@@ -422,12 +478,35 @@ describe('PlanBriefingSection — 좌표 폴백 (명세 D9-3)', () => {
     expect(render()).toContain('map.kakao.com/link/to')
   })
 
+  /*
+    **`map.kakao.com` 부재만으로는 부족하다.** 캔버스는 `ssr: false` 라 서버 렌더에 없어
+    그 단언은 길찾기 링크만 본다 — 빈 래퍼가 남아 `gap-3` 이 두 번 먹어도 통과한다.
+    기준 줄이 지도 자리의 표식이라 그것으로 함께 센다.
+  */
   it('대표 장소 좌표가 없으면 지도 자리를 아예 만들지 않는다', () => {
     const markup = render({
       schedule: planBriefingSchedule({ representativeLat: null, representativeLng: null }),
     })
 
     expect(markup).not.toContain('map.kakao.com/link/to')
+    expect(markup).not.toContain(MAP_BASIS_LINE)
+  })
+
+  /**
+   * **`0` 은 좌표 미상이다** (`lib/geo/coord.ts`). `!= null` 로만 거르면 지도는 사라지는데
+   * 곡선은 기니 만 앞바다를 부르는 모순이 한 화면에 생긴다 — 지도 쪽 관문을 먼저 잠근다.
+   */
+  it('좌표가 0 이면 지도를 그리지 않는다', () => {
+    const markup = render({
+      schedule: planBriefingSchedule({ representativeLat: 0, representativeLng: 0 }),
+    })
+
+    expect(markup).not.toContain('map.kakao.com/link/to')
+  })
+
+  /** 핀이 대표 장소 하나뿐이라 "이 날의 경로" 로 읽히지 않게 기준을 적는다 */
+  it('지도 위에 기준 장소를 적는다', () => {
+    expect(render()).toContain(MAP_BASIS_LINE)
   })
 })
 

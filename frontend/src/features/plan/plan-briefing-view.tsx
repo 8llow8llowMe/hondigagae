@@ -14,10 +14,11 @@ import { clientFetch } from '@/lib/api/client'
 import { ApiError } from '@/lib/api/error'
 import { toPetCondition, walkTimesPath } from '@/lib/api/insight'
 import { fetchPlanBriefing } from '@/lib/api/plan'
+import { toLatLng } from '@/lib/geo/coord'
 import { conditionKey, INSIGHT_QUERY_OPTIONS, insightKeys } from '@/lib/insight/queries'
 import { messages } from '@/lib/messages'
 import { basisPetNameOf } from '@/lib/plan/basis-pet'
-import type { BriefingTarget } from '@/lib/plan/briefing'
+import { BRIEFING_REASON_LOOKUP_FAILED, type BriefingTarget } from '@/lib/plan/briefing'
 import { formatPlanDay } from '@/lib/plan/date'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -63,14 +64,20 @@ export function PlanBriefingView({ planId, target }: { planId: string; target: B
   */
   const walkTimes = data?.walkTimes ?? null
   const schedule = data?.schedule ?? null
-  const curvePoint =
-    walkTimes !== null
-      ? { lat: walkTimes.lat, lng: walkTimes.lng }
-      : data?.walkTimesUnavailableReasonCode === 'LOOKUP_FAILED' &&
-          schedule?.representativeLat != null &&
-          schedule.representativeLng != null
-        ? { lat: schedule.representativeLat, lng: schedule.representativeLng }
-        : null
+
+  /*
+    **`toLatLng` 을 반드시 거친다.** 백엔드는 좌표를 못 구한 장소에 `0` 을 내릴 수 있고
+    (`lib/geo/coord.ts` 머리주석), `!= null` 로만 거르면 `/insights/walk-times?lat=0&lng=0`
+    을 불러 **기니 만 앞바다 예보**를 이 화면의 곡선으로 그린다. 같은 좌표를 받는 지도
+    (`PlaceMiniMap`)는 이 관문을 통과하므로, 관문을 건너뛰면 지도는 사라지고 곡선만 서는
+    모순이 한 화면에 생긴다 — 둘이 같은 관문을 보게 한다.
+  */
+  const fallbackPoint =
+    data?.walkTimesUnavailableReasonCode === BRIEFING_REASON_LOOKUP_FAILED
+      ? toLatLng({ lat: schedule?.representativeLat, lng: schedule?.representativeLng })
+      : null
+
+  const curvePoint = walkTimes !== null ? { lat: walkTimes.lat, lng: walkTimes.lng } : fallbackPoint
 
   /*
     **판정 기준 반려견의 조건으로 곡선을 부른다.** 못 찾으면 `null` 을 보낸다 — 서버가

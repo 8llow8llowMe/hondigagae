@@ -63,3 +63,18 @@ export function pickBriefingDate(
 
   return null
 }
+
+/**
+ * 브리핑이 특보·골든타임을 못 붙인 사유 중 **일시 장애는 이것 하나뿐이다** (#716 · 명세 D9-2).
+ *
+ * 나머지(`NOT_TODAY` · `NO_PLACE_ITEM` · `NO_PLACE_POINT`)는 눌러도 같은 응답이라 재시도를
+ * 달면 계속 누르게 된다. **모르는 코드도 여기 해당하지 않는다.**
+ *
+ * **화면과 조회가 같은 상수를 본다.** 재시도 버튼을 다는 판단(`plan-briefing-section.tsx`)과
+ * 곡선을 부를지의 판단(`plan-briefing-view.tsx`)은 같은 판단의 두 표현이라, 리터럴을 양쪽에
+ * 두면 서버가 코드명을 바꿀 때 한쪽만 고쳐져 둘이 어긋난다.
+ */
+export const BRIEFING_REASON_LOOKUP_FAILED = 'LOOKUP_FAILED'
+
+/** 재시도가 아니라 **사용자가 할 일**이 있는 사유 — 그날 장소를 담으면 풀린다 */
+export const BRIEFING_REASON_NO_PLACE_ITEM = 'NO_PLACE_ITEM'
