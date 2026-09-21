@@ -1199,6 +1199,28 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
  * 여기서 바꿔 적으면 화면이 실제로 받는 문장과 다른 것으로 검증하게 된다.
  */
 const WARNING_REASON_NOT_TODAY = '기상특보는 출발 당일에만 확인합니다.'
+const WARNING_REASON_LOOKUP_FAILED =
+  '기상특보 정보를 가져오지 못했습니다. 기상청 발표를 직접 확인해 주세요.'
+
+/**
+ * 브리핑의 `LOOKUP_FAILED` 를 결정적으로 재현하는 마커 (#751).
+ *
+ * **넷 중 이 사유만 데이터로 만들 수 없다.** `NOT_TODAY` 는 날짜로, `NO_PLACE_ITEM` 은
+ * 장소 항목을 빼서, `NO_PLACE_POINT` 는 좌표 없는 장소로 각각 재현되는데, `LOOKUP_FAILED`
+ * 는 **원격 조회의 시간차 장애**라 일정 데이터에 그 상태가 없다. 그래서 그날 항목의
+ * `memo` 에 마커를 실어 고른다 — `WALK_SAFETY_LOOKUP_FAILED_MARKER` 와 같은 방식이다.
+ *
+ * **이 갈래를 로컬에서 못 보던 대가가 실제로 있었다** — #751 검토에서 이 사유에 걸린 버그
+ * 둘(`toLatLng` 우회 · 곡선 실패 미처리)이 나왔고 둘 다 화면으로는 확인할 수 없었다.
+ *
+ * **둘을 따로 둔다.** 게이트웨이 장애는 특보·골든타임을 함께 때리기 쉬워 두 재시도 버튼이
+ * 한 화면에 서는 갈래도 봐야 하는데, 마커가 하나면 그 조합만 볼 수 있고 각각은 못 본다.
+ * 두 항목에 하나씩 실으면 셋 다 재현된다.
+ *
+ * 화면 코드는 이 값을 모른다 — mock 시나리오 구성용이다.
+ */
+export const BRIEFING_WALK_LOOKUP_FAILED_MARKER = '__BRIEFING_WALK_LOOKUP_FAILED__'
+export const BRIEFING_WARNING_LOOKUP_FAILED_MARKER = '__BRIEFING_WARNING_LOOKUP_FAILED__'
 
 /**
  * 골든타임을 못 낸 이유 — **서버 enum 의 `description` 그대로다**
@@ -1208,6 +1230,8 @@ const WARNING_REASON_NOT_TODAY = '기상특보는 출발 당일에만 확인합�
  * 문장을 파싱하지는 않지만, 목이 서버와 다르면 **로컬에서 본 것이 실제와 다르다.**
  */
 const WALK_REASON_NOT_TODAY = '산책 골든타임은 출발 당일에만 제공됩니다.'
+const WALK_REASON_LOOKUP_FAILED =
+  '산책 골든타임 정보를 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.'
 const WALK_REASON_NO_PLACE_ITEM =
   '이 날짜에는 장소가 지정된 일정 항목이 없어 골든타임을 붙이지 못했습니다.'
 const WALK_REASON_NO_PLACE_POINT = '대표 장소의 좌표가 없어 골든타임을 붙이지 못했습니다.'
@@ -1267,6 +1291,19 @@ function toBriefing(plan: MockPlan, search: string): MockResult {
   const basis = items.find((item) => item.targetId !== null && item.itemType !== 'WALK') ?? null
   const basisPlace = basis === null ? null : (PLACE_BY_ID.get(basis.targetId ?? '') ?? null)
 
+  /*
+    **장애 마커는 `today` 일 때만 이긴다.** 오늘이 아닌 날은 서버가 조회 자체를 하지 않아
+    `NOT_TODAY` 가 나오므로, 마커가 그것을 덮으면 있을 수 없는 응답이 된다.
+
+    **마커가 좌표를 지우지 않는다** — `LOOKUP_FAILED` 는 대표 장소가 멀쩡한데 조회만 실패한
+    상태다. `schedule.representativeLat/Lng` 가 그대로 남아야 화면의 곡선 폴백(명세 D9-3)이
+    로컬에서 실제로 돈다.
+  */
+  const walkLookupFailed =
+    today && items.some((item) => item.memo === BRIEFING_WALK_LOOKUP_FAILED_MARKER)
+  const warningLookupFailed =
+    today && items.some((item) => item.memo === BRIEFING_WARNING_LOOKUP_FAILED_MARKER)
+
   return {
     status: 200,
     payload: ok({
@@ -1293,23 +1330,32 @@ function toBriefing(plan: MockPlan, search: string): MockResult {
         representativeLng: basisPlace?.lng ?? null,
       },
       weather,
-      weatherWarning: today
-        ? {
-            type: { code: 'HEAT_WAVE', name: '폭염', description: '폭염 특보입니다.' },
-            level: {
-              code: 'ADVISORY',
-              name: '주의보',
-              description: '한낮 야외 활동을 줄이는 것이 좋습니다.',
-            },
-            // 주의보라 보류가 아니다 — 화면이 `level.code` 로 다시 판정하지 않는지 본다
-            recommendationSuppressed: false,
-            effectiveAt: `${date}T11:00:00`,
-          }
-        : null,
-      weatherWarningUnavailableReasonCode: today ? null : 'NOT_TODAY',
-      weatherWarningUnavailableReason: today ? null : WARNING_REASON_NOT_TODAY,
+      weatherWarning:
+        today && !warningLookupFailed
+          ? {
+              type: { code: 'HEAT_WAVE', name: '폭염', description: '폭염 특보입니다.' },
+              level: {
+                code: 'ADVISORY',
+                name: '주의보',
+                description: '한낮 야외 활동을 줄이는 것이 좋습니다.',
+              },
+              // 주의보라 보류가 아니다 — 화면이 `level.code` 로 다시 판정하지 않는지 본다
+              recommendationSuppressed: false,
+              effectiveAt: `${date}T11:00:00`,
+            }
+          : null,
+      weatherWarningUnavailableReasonCode: !today
+        ? 'NOT_TODAY'
+        : warningLookupFailed
+          ? 'LOOKUP_FAILED'
+          : null,
+      weatherWarningUnavailableReason: !today
+        ? WARNING_REASON_NOT_TODAY
+        : warningLookupFailed
+          ? WARNING_REASON_LOOKUP_FAILED
+          : null,
       walkTimes:
-        today && basisPlace?.lat != null && basisPlace.lng != null
+        today && !walkLookupFailed && basisPlace?.lat != null && basisPlace.lng != null
           ? {
               lat: basisPlace.lat,
               lng: basisPlace.lng,
@@ -1342,14 +1388,18 @@ function toBriefing(plan: MockPlan, search: string): MockResult {
           ? 'NO_PLACE_ITEM'
           : basisPlace?.lat == null || basisPlace.lng == null
             ? 'NO_PLACE_POINT'
-            : null,
+            : walkLookupFailed
+              ? 'LOOKUP_FAILED'
+              : null,
       walkTimesUnavailableReason: !today
         ? WALK_REASON_NOT_TODAY
         : basis === null
           ? WALK_REASON_NO_PLACE_ITEM
           : basisPlace?.lat == null || basisPlace.lng == null
             ? WALK_REASON_NO_PLACE_POINT
-            : null,
+            : walkLookupFailed
+              ? WALK_REASON_LOOKUP_FAILED
+              : null,
     } satisfies PlanBriefingResponse),
   }
 }
