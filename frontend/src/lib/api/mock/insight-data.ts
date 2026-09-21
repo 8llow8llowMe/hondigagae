@@ -497,10 +497,11 @@ const GOLDEN_STATUS = {
  *
  * | 더위 | 추위 | 소리 | 화면 | 로컬에서 여는 법 |
  * | --- | --- | --- | --- | --- |
- * | — | — | — | `AVAILABLE` — 골든타임 있음 | **반려견 없음**(게스트·미등록) |
+ * | — | — | — | `AVAILABLE` — 창 안이 전부 안전 | **반려견 없음**(게스트·미등록) |
  * | `true` | `false` | `true` | **`SUPPRESSED_BY_WARNING`** — 경보라 보류, 곡선은 남는다 | **몽실이** (기본) |
  * | `true` | `false` | `false` | **`ALL_HOURS_RISKY`** — 경보 없이 전부 위험 | 몽실이의 `소리 민감` 해제 |
- * | `false` | `true` | — | `AVAILABLE` — 골든타임 있음 | **초코** (기본) |
+ * | `false` | `true` | `false` | `AVAILABLE` — 창 안이 전부 안전 | **초코** (기본) |
+ * | `false` | `true` | `true` | **`AVAILABLE` — 창 안 등급이 섞인 날** | 초코에 `소리 민감` 추가 |
  * | `false` | `false` | — | `NO_FORECAST` + **`DAY_ENDED`** (정상) | 초코의 `추위 민감` 해제 |
  * | `true` | `true` | — | `NO_FORECAST` + **`UNAVAILABLE`** (+ 재시도) | 몽실이에 `추위 민감` 추가 |
  *
@@ -556,12 +557,41 @@ export function mockWalkTimes(condition: MockWalkCondition | null): WalkTimesRes
     }
   }
 
+  /**
+   * **창 안 등급이 섞인 날** — [#671](https://github.com/8llow8llowMe/hondigagae/issues/671) **E-1**.
+   *
+   * 기본 곡선의 창(18–21시)은 네 칸이 전부 SAFE 라 **#656 의 시각별 면도 #637 의 혼합
+   * 등급 문장도 로컬에서 볼 수 없었다.** 두 레인이 그때마다 mock 을 임시로 고쳤다
+   * 되돌렸고, **A-2 가 그래서 지금까지 안 잡혔다.** 임시 수정 대신 갈래를 정식으로 둔다.
+   *
+   * **서버 규칙에 맞는 창만 만든다.** `GoldenWalkWindow.acceptableRuns` 는
+   * `HourlyWalkSafety.isAcceptable()`(= `SAFE` 또는 `CAUTION`)인 칸만 이어 붙이므로
+   * **DANGER 칸은 창을 끊는다.** 그래서 14시(DANGER)가 창 앞에 서고 창은 15–21시다 —
+   * 창 안에 DANGER 를 넣은 목은 서버가 절대 주지 않는 응답이 된다.
+   *
+   * **노면이 17시에 내렸다 18시에 오르는 것이 오타가 아니다.** 노면온도 추정은 일사
+   * (`skyState`)에 기온보다 민감해서(`PavementHeat.estimate`) 구름이 들었다 걷히면
+   * 기온이 계속 내려가는 동안에도 노면만 되오른다. **창 안에 주의 구간이 둘 생기는 것이
+   * 이 갈래의 목적**이고, 노면이 단조 감소하면 주의는 앞머리 한 번뿐이라 문장이
+   * `{runs}` 를 이어 붙이는 자리(` · `)를 볼 수 없다.
+   */
+  const MIXED_WINDOW_CURVE: [string, number, number, number | null][] = [
+    ['14:00:00', 31.0, 52.0, 20], // 위험 — 창을 여는 문턱. 창 **밖**이다
+    ['15:00:00', 30.0, 48.0, 20], // 주의 ┐ 창 시작
+    ['16:00:00', 29.5, 44.0, 30], // 주의 ┘
+    ['17:00:00', 29.0, 39.0, 60], // 안전 — 구름
+    ['18:00:00', 28.5, 41.0, 30], // 주의 — 구름이 걷혀 노면만 되오른다
+    ['19:00:00', 27.0, 33.0, 10], // 안전 ┐
+    ['20:00:00', 25.5, 29.0, 0], //  안전 │
+    ['21:00:00', 24.5, 26.0, null], // 안전 ┘ 창 끝
+  ]
+
   /*
     기온 곡선은 실제 여름 제주의 모양을 따른다 — 오후에 정점이고 해가 지며 떨어진다.
     노면온도는 기온보다 크게 높고 **해가 진 뒤 격차가 줄어든다**(일사가 빠지므로).
     숫자를 아무렇게나 두면 화면이 "왜 이 시간이 좋은지" 를 설명하지 못한다.
   */
-  const curve: [string, number, number, number | null][] = [
+  const CLEAR_DAY_CURVE: [string, number, number, number | null][] = [
     ['14:00:00', 31.0, 58.0, 20],
     ['15:00:00', 31.5, 59.0, 20],
     ['16:00:00', 30.0, 54.0, 10],
@@ -571,6 +601,10 @@ export function mockWalkTimes(condition: MockWalkCondition | null): WalkTimesRes
     ['20:00:00', 25.0, 27.0, null],
     ['21:00:00', 24.5, 26.0, null],
   ]
+
+  /** 혼합 등급 갈래는 **더위 민감이 아닌 쪽**에만 붙는다 — 그쪽은 곡선이 전부 위험이다 */
+  const mixedWindow = !heatSensitive && noiseSensitive
+  const curve = mixedWindow ? MIXED_WINDOW_CURVE : CLEAR_DAY_CURVE
 
   const hourly = curve.map(([time, temperature, pavement, precipitation]) => ({
     at: `2026-08-29T${time}`,
@@ -609,6 +643,27 @@ export function mockWalkTimes(condition: MockWalkCondition | null): WalkTimesRes
         ? { weatherWarning: HEAT_WAVE_WARNING }
         : // 경보가 없으니 배지도 없다 — 배지만 남으면 보류인지 판정인지 화면이 흐려진다
           { weatherWarning: null }),
+      petConditionApplied: true,
+    }
+  }
+
+  /*
+    **창 등급은 창 안에서 가장 나쁜 칸이 정한다** — 서버 `GoldenWalkWindow.level` 이
+    `worseOf` 로 접은 값이다. 창 안에 주의가 하나라도 있으면 `CAUTION` 이고, 그래서
+    `goldenLevel` 하나로 헤드라인을 칠하면 **안전 다섯 칸까지 주의색이 된다** (#671 A-3).
+    이 갈래가 그 실패를 로컬에서 보여 주는 자리다.
+  */
+  if (mixedWindow) {
+    return {
+      from: '2026-08-29T13:20:00',
+      hourly,
+      forecastCoverage: COVERAGE.AVAILABLE,
+      goldenWindowStatus: GOLDEN_STATUS.AVAILABLE,
+      // 15:00~21:00 이 SAFE·CAUTION 연속 구간이다 (14시 DANGER 가 앞을 끊는다)
+      goldenStart: '2026-08-29T15:00:00',
+      goldenEnd: '2026-08-29T21:00:00',
+      goldenLevel: WALK_LEVELS.CAUTION as ScoreMetricMetadata,
+      weatherWarning: null,
       petConditionApplied: true,
     }
   }
