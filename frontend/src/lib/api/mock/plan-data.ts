@@ -386,6 +386,29 @@ export function resolvePlanMock(
 ): MockResult | null {
   if (!path.startsWith('/plans')) return null
 
+  /*
+    **브리핑의 `date` 바인딩이 인증보다 먼저다.** 스프링은 `@RequestParam` 을 핸들러 인자로
+    푸는 단계에서 400 을 내고 `@PreAuthorize` 는 그 뒤 메서드 호출에 걸린다 — dev 실측
+    (2026-09-21 · 토큰 없는 GET): `date` 누락은 400 `PLAN_125`, `date=2026-09-21` 은
+    401 `SECURITY_001` 이다. 401 을 먼저 내면 목이 서버보다 엄격해져(파일 머리 규칙) 계약
+    테스트가 서버에 없는 순서를 잠근다.
+
+    **`planId` 형식은 그보다 더 앞이다** — `/plans/abc/briefing` 은 `date` 가 없어도
+    planId 오류로 떨어진다 (같은 실측). 첫 인자를 먼저 풀기 때문이다.
+
+    이 관문은 400 만 낸다 — 데이터는 아래 `withPlan` 을 지난 뒤에만 나간다.
+  */
+  const briefing = /^\/plans\/([^/]+)\/briefing$/.exec(path)
+  let briefingDate = ''
+  if (briefing !== null && method === 'GET') {
+    const invalidId = planIdFormatError(briefing[1] ?? '')
+    if (invalidId !== null) return invalidId
+
+    const bound = bindBriefingDate(search)
+    if (typeof bound !== 'string') return bound
+    briefingDate = bound
+  }
+
   // 모든 일정 엔드포인트가 @PreAuthorize("isAuthenticated()") 다
   const memberId = memberIdOf(accessToken)
   if (memberId === null) return UNAUTHORIZED()
@@ -436,12 +459,12 @@ export function resolvePlanMock(
   }
 
   /*
-    출발 전 여행 브리핑 (#626). **`date` 가 필수 쿼리 파라미터다** — 없으면 400 이고
-    기간 밖이면 `PLAN_002` 400 이다 (`PlanBriefingProcessor.resolveDay`).
+    출발 전 여행 브리핑 (#626). **`date` 는 위쪽 인증 앞 관문이 이미 바인딩했다** — 여기
+    남은 판정은 소유권과 기간이다. 기간 밖은 `PLAN_002` 400 이다
+    (`PlanBriefingProcessor.resolveDay`).
   */
-  const briefing = /^\/plans\/([^/]+)\/briefing$/.exec(path)
   if (briefing !== null && method === 'GET') {
-    return withPlan(memberId, briefing[1] ?? '', (plan) => toBriefing(plan, search))
+    return withPlan(memberId, briefing[1] ?? '', (plan) => toBriefing(plan, briefingDate))
   }
 
   /*
@@ -527,6 +550,21 @@ export function resolvePlanMock(
 }
 
 /**
+ * `@PathVariable` 형식 위반. **소유권 판정보다 앞이다** — 서버도 바인딩이 먼저다.
+ *
+ * 브리핑은 이 판정을 `withPlan` 밖에서도 쓴다 (`resolvePlanMock` 의 인증 앞 관문).
+ * 규칙이 한 곳이어야 두 자리가 갈리지 않는다.
+ *
+ * **dev 는 여기에 `PLAN_124` + `field: "planId"` 를 낸다** (2026-09-21 실측). 목의
+ * `PLAN_114` 와 다르지만 그 드리프트는 일정 엔드포인트 전부에 걸려 있어 #795 범위가
+ * 아니다 — 별건으로 남긴다.
+ */
+function planIdFormatError(rawId: string): MockResult | null {
+  if (/^\d+$/.test(rawId)) return null
+  return fail(400, 'PLAN_114', '요청 파라미터 형식이 올바르지 않습니다.')
+}
+
+/**
  * `planId` 를 판정하고 소유한 일정을 넘긴다.
  *
  * **숫자가 아닌 id 는 404 가 아니라 400 이다** — 컨트롤러가 `@PathVariable long` 이라
@@ -538,9 +576,8 @@ function withPlan(
   rawId: string,
   handle: (plan: MockPlan) => MockResult,
 ): MockResult {
-  if (!/^\d+$/.test(rawId)) {
-    return fail(400, 'PLAN_114', '요청 파라미터 형식이 올바르지 않습니다.')
-  }
+  const invalidId = planIdFormatError(rawId)
+  if (invalidId !== null) return invalidId
 
   const plan = mockStore().plans.find(
     (candidate) =>
@@ -1237,7 +1274,47 @@ const WALK_REASON_NO_PLACE_ITEM =
 const WALK_REASON_NO_PLACE_POINT = '대표 장소의 좌표가 없어 골든타임을 붙이지 못했습니다.'
 
 /**
+ * 브리핑 `date` 바인딩 — 성공하면 날짜 문자열, 실패하면 400 이다.
+ *
+ * `@RequestParam LocalDate date` 는 필수라 없으면 스프링이 도메인에 닿기 전에 400 을 낸다.
+ * **서버는 누락과 형식 오류를 가른다** (#716 BE 소스 실측, 명세 D9-4):
+ * `MissingServletRequestParameterException` → `PARAMETER_REQUIRED`(`PLAN_125`),
+ * `MethodArgumentTypeMismatchException` → `PARAMETER_TYPE_INVALID`(`PLAN_124`).
+ * 예전에는 둘을 `PLAN_100` 하나로 묶고 있었다.
+ *
+ * **문구와 `fieldErrors` 는 dev 게이트웨이 실측이다** (2026-09-21 · 토큰 없는 GET, #795).
+ * #716 때는 게이트웨이가 안 떠 BE 소스로만 읽었고, 그 문구가 실제와 달랐다:
+ *
+ * - `?` 없음 · `?date=` → 400 `PLAN_125` `필수 요청 파라미터가 누락되었습니다. (date)`
+ *   / `fieldErrors: null`
+ * - `?date=2026-9-21` → 400 `PLAN_124` `date 파라미터 형식이 올바르지 않습니다.`
+ *   / `fieldErrors` 한 건 (`field: "date"`)
+ *
+ * **`failValidation` 을 쓰지 않는다.** 그쪽은 헤더 코드를 `PLAN_100` 으로 고정하고 개별
+ * 코드를 항목에만 싣는 모양인데, 서버는 여기서 헤더와 항목에 같은 `PLAN_124` 를 싣는다.
+ * `fail()` 의 4번째 인자를 직접 쓰는 이유다.
+ */
+function bindBriefingDate(search: string): string | MockResult {
+  const date = new URLSearchParams(search).get('date')
+
+  // 빈 값도 누락으로 접는다 — dev 는 `?date=` 에도 `PLAN_125` 를 낸다
+  if (date === null || date === '') {
+    return fail(400, 'PLAN_125', '필수 요청 파라미터가 누락되었습니다. (date)')
+  }
+
+  if (!DATE_PATTERN.test(date)) {
+    const message = 'date 파라미터 형식이 올바르지 않습니다.'
+    return fail(400, 'PLAN_124', message, [{ code: 'PLAN_124', field: 'date', message }])
+  }
+
+  return date
+}
+
+/**
  * 하루치 합본 — `GET /plans/{planId}/briefing?date=`.
+ *
+ * **`date` 는 이미 바인딩을 통과한 값이다** (`bindBriefingDate`) — 누락·형식 오류는 인증
+ * 앞 관문에서 걸러져 여기 닿지 않는다.
  *
  * **새 판정이 아니라 기존 판정의 묶음이다.** 날씨는 `toWeather` 가 만든 그 일자를 그대로
  * 쓴다 — 서버도 같은 변환(`PlanWeatherPresenter.toDayItem`)을 쓰므로 여기서 다른 값을
@@ -1247,24 +1324,7 @@ const WALK_REASON_NO_PLACE_POINT = '대표 장소의 좌표가 없어 골든타�
  * 있는 것과 "없음" 은 다른 사실이다 — mock 이 이유를 비우면 화면의 핵심 갈래를 로컬에서
  * 한 번도 못 본다.
  */
-function toBriefing(plan: MockPlan, search: string): MockResult {
-  const date = new URLSearchParams(search).get('date')
-
-  /*
-    `@RequestParam LocalDate date` 는 필수라 없으면 스프링이 도메인에 닿기 전에 400 을 낸다.
-    **서버는 누락과 형식 오류를 가른다** (#716 실측, 명세 D9-4):
-    `MissingServletRequestParameterException` → `PARAMETER_REQUIRED`(`PLAN_125`),
-    `MethodArgumentTypeMismatchException` → `PARAMETER_TYPE_INVALID`(`PLAN_124`).
-    예전에는 둘을 `PLAN_100` 하나로 묶고 있었다.
-  */
-  if (date === null) {
-    return fail(400, 'PLAN_125', '필수 요청 파라미터 date 가 없습니다.')
-  }
-
-  if (!DATE_PATTERN.test(date)) {
-    return fail(400, 'PLAN_124', '요청 파라미터 date 의 형식이 올바르지 않습니다.')
-  }
-
+function toBriefing(plan: MockPlan, date: string): MockResult {
   const startTime = Date.parse(`${plan.startDate}T00:00:00Z`)
   const day = Math.round((Date.parse(`${date}T00:00:00Z`) - startTime) / 86_400_000) + 1
 
