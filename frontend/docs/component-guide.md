@@ -203,6 +203,36 @@ type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
 | `EmptyState` / `ErrorState` | 제목이 heading 요소여야 한다. **레벨은 담는 곳이 정한다** — `headingLevel` (`styling-guide.md` §3-1)                                        |
 | `InfoTip`                   | hover · focus · click **셋 다** 열고 `Esc`·바깥 클릭이 닫는다. `title` 속성을 쓰지 않는다. `md` 미만은 `BottomSheet` 로 떨어뜨린다          |
 
+### `role="radiogroup"` 은 키보드 규약까지 함께 온다 ([#825](https://github.com/8llow8llowMe/hondigagae/issues/825))
+
+`role="radiogroup"` + `role="radio"` 를 쓰는 순간 WAI-ARIA 가 요구하는 것이 둘 더 있다. 문법만 맞추고
+키보드를 두고 오면 **보조기기에는 라디오라고 말하면서 라디오처럼 움직이지는 않는** 컨트롤이 된다.
+
+| 요구                                                   | 구현                                            |
+| ------------------------------------------------------ | ----------------------------------------------- |
+| 묶음 전체가 **탭 스톱 하나** (roving `tabindex`)       | 각 칸에 `tabIndex={radioTabIndex(selected)}`    |
+| **←/→ ↑/↓** 로 이동, 끝에서 감고 `Home`·`End` 가 양 끝 | 각 칸에 `onKeyDown={handleRadioGroupKeyDown}`   |
+| 이동하면서 **선택도 바뀐다**                           | 위 핸들러가 `focus()` 와 `click()` 을 함께 한다 |
+
+정본은 `lib/ui/radio-group-keys.ts` 다. **둘 다 칸(`<button role="radio">`)에 붙는다** — 묶음은 눌린
+칸에서 `closest('[role="radiogroup"]')` 로 거슬러 찾는다. 컨테이너에 `onKeyDown` 을 걸면
+`jsx-a11y/interactive-supports-focus` 가 "포커스를 받을 수 없는 요소가 키를 듣는다" 로 잡고, APG 의
+참조 구현도 칸에 붙인다. `ref` 를 요구하지 않으므로 이미 `ref` 를 사용처에 내준 묶음
+(`ChipGroup` + `useScrollRail`)에도 그대로 붙고, `tabIndex` 와 자리가 같아 둘 중 하나만 빠뜨리기
+어렵다.
+
+**붙는 곳은 다섯이다** — `FilterList(exclusive)` · `ChipGroup(exclusive)` ·
+`walk-course-filter-fields` · `emergency-type-segment` · `PlanStatusTabs`. 새 배타 묶음을 만들면 여기에
+더한다. 화면마다 "탭 스톱이 정확히 하나" 를 `lib/ui/radio-group-keys.test.ts` 가 잠그므로, 빠뜨리면
+빨간불이 된다.
+
+**다중 축에는 붙이지 않는다.** `role="checkbox"` 와 `aria-pressed` 토글은 칸마다 탭 스톱이 규약이고,
+화살표로 선택이 바뀌면 안 된다. `FilterList`·`ChipGroup` 은 `exclusive` 한 값으로 둘을 가른다.
+
+**폼의 `RadioGroup`(`components/radio-group.tsx`)은 손대지 않는다.** 그쪽은 네이티브
+`<input type="radio">` 라 브라우저가 roving `tabindex` 와 화살표 이동을 이미 준다 — 직접 구현하면
+오히려 어긋난다.
+
 ### 선택 계열은 `Field` 로 감싸지 않는다
 
 `Field` 는 `<label htmlFor>` 로 **단일 입력 요소**를 가리킨다. 선택 계열 둘은 그 전제가 깨진다.
