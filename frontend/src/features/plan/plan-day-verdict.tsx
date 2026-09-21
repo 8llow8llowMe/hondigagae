@@ -135,6 +135,26 @@ export function PlanDayVerdict({
 }
 
 /**
+ * 이 판정이 **그릴 것을 갖고 있지 않은가** (#788).
+ *
+ * 위 컴포넌트가 `null` 을 내는 갈래를 호출부가 **렌더 전에** 묻는 자리다. 담는 쪽이
+ * 카드 하나를 통째로 내주는 화면(브리핑의 `Surface`)에서는 렌더가 끝난 뒤에 알면 이미
+ * 늦다 — 제목만 남은 카드가 서 있다.
+ *
+ * **판정을 여기서 다시 쓰지 않는다.** 무엇을 말할지는 아래 `unavailableSentence` 하나가
+ * 갖고, 이 함수는 그 답이 비었는지만 본다 — 조건(`NO_PLACE_ITEM` 이면서 항목이 없는 날)을
+ * 호출부에 베껴 두면 서버가 사유를 늘릴 때 둘이 갈린다.
+ *
+ * **조회 실패(`failed`)는 보지 않는다.** 그 갈래는 값이 아니라 상태라 호출부가 이미 알고
+ * 있고, 실패한 자리에는 `ErrorState` 가 서므로 빈 카드가 되지 않는다.
+ */
+export function planDayVerdictIsBlank(verdict: PlanDayWeatherItem, dayHasItems: boolean): boolean {
+  if (verdict.score !== null && verdict.suitabilityLevel !== null) return false
+
+  return unavailableSentence(verdict, dayHasItems) === null
+}
+
+/**
  * 판정을 못 낸 날에 무엇을 말할 것인가 — **사유 코드로 가른다** (#497).
  *
  * 서버 문장을 늘 그대로 그리면 빈 일차에서 아래 `이 날은 아직 담은 곳이 없어요.` 와 **같은

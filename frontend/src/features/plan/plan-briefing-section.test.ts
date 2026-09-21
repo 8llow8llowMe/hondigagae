@@ -15,7 +15,7 @@ import {
   planBriefingWarning,
   planVerdict,
 } from '@/test/fixtures/plan'
-import type { PlanBriefingResponse } from '@/types/plan'
+import type { PlanBriefingResponse, PlanDayWeatherItem } from '@/types/plan'
 
 /**
  * 곡선이 그려졌는지 세는 표식 — `HourCell` 의 칸 폭이다.
@@ -762,6 +762,92 @@ describe('PlanBriefingSection — EVE / TODAY 갈래', () => {
     expect(markup).toContain(`>${messages.plan.briefingWarningHeading}<`)
     expect(markup).toContain(`>${messages.plan.briefingWalkHeading}<`)
     expect(markup).not.toContain(messages.plan.briefingEveFootnote)
+  })
+})
+
+/*
+  ── 값이 없는 날씨 카드 (#788 · 명세 D11-1) ─────────────────────────────────
+
+  **오늘 출발인데 그날 항목이 하나도 없는 갈래다.** 서버가 기준 장소를 못 잡아
+  (`NO_PLACE_ITEM`) 판정도 날씨 값도 비우고, 화면의 두 조각(`PlanDayVerdict` ·
+  지표 줄)이 각자 옳게 `null` 을 내 **제목만 남은 카드**가 섰다.
+
+  접는 규칙은 전날 갈래와 같은 것이다 — **값이 실제로 비어 있을 때만 접는다**(D11-2).
+  사유 코드나 날짜로 다시 가르지 않는다.
+*/
+describe('PlanBriefingSection — 값이 없는 날씨 카드 (명세 D11-1)', () => {
+  /** 기준 장소를 못 잡은 날의 판정 — 점수도 날씨 값도 비어 온다 (`mock/plan-data.ts`) */
+  const noPlaceItemVerdict: PlanDayWeatherItem = {
+    ...planVerdict,
+    representativePlaceId: null,
+    representativePlaceTitle: null,
+    basisPetId: null,
+    score: null,
+    suitabilityLevel: null,
+    reasons: [],
+    petSuitabilities: [],
+    weather: null,
+    unavailableReasonCode: 'NO_PLACE_ITEM',
+    unavailableReason: '이 날짜에는 장소가 지정된 일정 항목이 없어 날씨를 붙이지 못했습니다.',
+  }
+
+  /** 항목 0개 — 대표 장소도 좌표도 없다 */
+  const itemlessSchedule = planBriefingSchedule({
+    itemCount: 0,
+    visitedCount: 0,
+    firstItem: null,
+    lastItem: null,
+    representativePlaceId: null,
+    representativePlaceTitle: null,
+    representativeLat: null,
+    representativeLng: null,
+  })
+
+  it('판정도 지표도 없으면 카드를 통째로 접는다 — 제목만 남기지 않는다', () => {
+    const markup = render({ schedule: itemlessSchedule, weather: noPlaceItemVerdict })
+
+    expect(markup).not.toContain(`>${messages.plan.briefingWeatherTodayHeading}<`)
+  })
+
+  /** 빈 카드가 사라져도 길을 잃지 않는다 — 그날 일정 카드가 이유와 다음 걸음을 이미 말한다 */
+  it('접힌 자리를 대신할 안내를 따로 세우지 않는다 — 그날 일정 카드가 이미 말한다', () => {
+    const markup = render({ schedule: itemlessSchedule, weather: noPlaceItemVerdict })
+
+    expect(markup).toContain(messages.plan.briefingScheduleEmptyTitle)
+    expect(markup).not.toContain(messages.plan.briefingWeatherMissing)
+  })
+
+  /*
+    **회귀 감시의 본체.** 산책 항목만 있는 날도 `NO_PLACE_ITEM` 이면서 항목은 있다 —
+    거기서 접으면 판정이 왜 없는지 아무도 말하지 않게 된다 (`unavailableSentence` 주석).
+  */
+  it('같은 사유라도 항목이 있는 날은 접지 않는다 — 그때는 서버 문장이 유일한 설명이다', () => {
+    const markup = render({
+      schedule: planBriefingSchedule({ itemCount: 1, visitedCount: 0, lastItem: null }),
+      weather: noPlaceItemVerdict,
+    })
+
+    expect(markup).toContain(`>${messages.plan.briefingWeatherTodayHeading}<`)
+    expect(markup).toContain('장소가 지정된 일정 항목이 없어')
+  })
+
+  /** 판정을 못 낸 날에도 하루 지표가 오면 카드가 할 말이 있다 */
+  it('판정이 없어도 날씨 값이 오면 접지 않는다 — 지표 줄이 설 자리다', () => {
+    const markup = render({
+      schedule: itemlessSchedule,
+      weather: { ...noPlaceItemVerdict, weather: planVerdict.weather },
+    })
+
+    expect(markup).toContain(`>${messages.plan.briefingWeatherTodayHeading}<`)
+    expect(markup).toContain('최저 21.0℃')
+  })
+
+  /** 응답에 날씨 자리 자체가 없는 것은 다른 갈래다 — 못 받았다고 말한다 (D5-2) */
+  it('weather 가 null 인 갈래는 접지 않는다', () => {
+    const markup = render({ schedule: itemlessSchedule, weather: null })
+
+    expect(markup).toContain(`>${messages.plan.briefingWeatherTodayHeading}<`)
+    expect(markup).toContain(messages.plan.briefingWeatherMissing)
   })
 })
 
