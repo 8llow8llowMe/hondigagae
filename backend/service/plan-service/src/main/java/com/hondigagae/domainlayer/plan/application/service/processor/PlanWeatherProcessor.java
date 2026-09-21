@@ -238,6 +238,7 @@ public class PlanWeatherProcessor {
                 .levelCode(entry.getValue().levelCode())
                 .levelName(entry.getValue().levelName())
                 .levelDescription(entry.getValue().levelDescription())
+                .levelScoreDescription(entry.getValue().levelScoreDescription())
                 .build())
             .toList();
     }
@@ -255,6 +256,7 @@ public class PlanWeatherProcessor {
             .levelCode(result.levelCode())
             .levelName(result.levelName())
             .levelDescription(result.levelDescription())
+            .levelScoreDescription(result.levelScoreDescription())
             .reasons(result.reasons() == null ? java.util.List.of() : result.reasons().stream()
                 .map(reason -> PlanDaySuitabilityInfo.ReasonInfo.builder()
                     .code(reason.code()).name(reason.name())

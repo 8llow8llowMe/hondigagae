@@ -73,7 +73,8 @@ public record PlanWeatherInfo(
         Integer score,
         String levelCode,
         String levelName,
-        String levelDescription
+        String levelDescription,
+        String levelScoreDescription
     ) {
     }
 }

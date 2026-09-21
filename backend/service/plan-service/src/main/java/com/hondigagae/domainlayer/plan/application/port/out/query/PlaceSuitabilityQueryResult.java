@@ -10,6 +10,10 @@ import lombok.Builder;
  * <p>이 서비스는 점수를 <b>다시 계산하지 않는다.</b> 판정 규칙의 소유자는 tour-service 이고,
  * 같은 규칙을 두 곳에서 구현하면 일정 화면과 장소 화면이 같은 날 같은 곳을 다르게 말하게 된다.
  * 여기서는 받아서 옮기기만 한다.
+ *
+ * @param levelScoreDescription 등급 점수 해석 문장. 등급 설명({@code levelDescription})과 다르다 —
+ *                              이쪽은 "점수가 높을수록 …" 처럼 점수를 어떻게 읽어야 하는지를
+ *                              말한다. 원천이 주는 값을 그대로 옮긴다 (#759)
  */
 @Builder
 public record PlaceSuitabilityQueryResult(
@@ -21,6 +25,7 @@ public record PlaceSuitabilityQueryResult(
     String levelCode,
     String levelName,
     String levelDescription,
+    String levelScoreDescription,
     List<ReasonQueryResult> reasons,
     DailyWeatherQueryResult weather,
     List<AlternativeQueryResult> indoorAlternatives,
