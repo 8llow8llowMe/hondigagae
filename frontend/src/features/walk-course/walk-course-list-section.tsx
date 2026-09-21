@@ -93,18 +93,34 @@ export function WalkCourseListSection({
       titleId="walk-course-list-heading"
       title={messages.walkCourse.pageTitle}
       description={
-        countable ? (
-          <div className="flex flex-col gap-1">
-            {/*
-              **조건을 바꾸면 결과 수를 알린다** (D6). 세그먼트는 URL 을 바꾸고 목록이
-              통째로 갈리는데, 보조기기에는 그 변화를 말해 주는 것이 이 줄뿐이다.
-            */}
-            <p aria-live="polite" className="text-body-2 text-fg-muted tabular-nums">
-              {messages.walkCourse.listCount.replace('{count}', String(totalCount))}
-            </p>
-            {basis !== null && <p className="text-caption text-fg-muted">{basisLine(basis)}</p>}
-          </div>
-        ) : undefined
+        <div className="flex flex-col gap-2">
+          {/*
+            **화면이 무엇을 무슨 기준으로 고르는 곳인지 말한다** (#811).
+
+            **조건과 무관한 줄이라 `countable` 을 타지 않는다.** 개수·기준은 셀 수 없을 때
+            사라지는데, 그 갈래에서 슬롯이 통째로 비면 스켈레톤 화면에 제목만 남는다 —
+            처음 들어온 사람이 가장 오래 보는 화면이 그것이다.
+
+            **`aria-live` 를 붙이지 않는다.** 바뀌지 않는 문장이라, 붙이면 조건을 만질
+            때마다 다시 읽히고 정작 알려야 할 결과 수가 그 안에 묻힌다 (D6).
+          */}
+          <p className="text-body-2 text-fg-muted break-keep">
+            {messages.walkCourse.listDescription}
+          </p>
+
+          {countable && (
+            <div className="flex flex-col gap-1">
+              {/*
+                **조건을 바꾸면 결과 수를 알린다** (D6). 세그먼트는 URL 을 바꾸고 목록이
+                통째로 갈리는데, 보조기기에는 그 변화를 말해 주는 것이 이 줄뿐이다.
+              */}
+              <p aria-live="polite" className="text-body-2 text-fg-muted tabular-nums">
+                {messages.walkCourse.listCount.replace('{count}', String(totalCount))}
+              </p>
+              {basis !== null && <p className="text-caption text-fg-muted">{basisLine(basis)}</p>}
+            </div>
+          )}
+        </div>
       }
       tools={tools}
     >

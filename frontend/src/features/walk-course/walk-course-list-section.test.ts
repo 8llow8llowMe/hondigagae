@@ -275,6 +275,60 @@ describe('WalkCourseListSection — 좁힌 결과에 날씨를 볼 코스가 없
   })
 })
 
+/**
+ * 목록이 이것이 제주올레라는 것을 말한다 — 이슈 [#811](https://github.com/8llow8llowMe/hondigagae/issues/811).
+ *
+ * `pageDescription` 은 정의만 돼 있고 **목록 화면에는 렌더되지 않았다.** `Surface` 의
+ * `description` 슬롯을 개수 줄과 기준 줄이 쓰고 있었기 때문이다. 화면이 무엇을 무슨
+ * 기준으로 고르는 곳인지 말해 주는 자리가 목록에 없었다.
+ */
+describe('WalkCourseListSection — 설명 줄 (#811)', () => {
+  it('무엇을 무슨 기준으로 고르는 곳인지 말한다', () => {
+    expect(render()).toContain(messages.walkCourse.listDescription)
+  })
+
+  /**
+   * **조건과 무관한 줄이라 로딩·오류에서도 남는다.** 개수·기준은 셀 수 없을 때 사라지는데
+   * (`countable`), 그 갈래에서 슬롯이 통째로 비면 **스켈레톤 화면에 제목만 남는다** —
+   * 처음 들어온 사람이 가장 오래 보는 화면이 그것이다.
+   */
+  it('로딩 중에도 남는다 — 개수는 사라진다', () => {
+    const markup = render({ loading: true })
+
+    expect(markup).toContain(messages.walkCourse.listDescription)
+    expect(markup).not.toContain('코스 1개')
+  })
+
+  it('오류에서도 남는다', () => {
+    expect(render({ errorStatus: 500 })).toContain(messages.walkCourse.listDescription)
+  })
+
+  /**
+   * **`aria-live` 는 바뀌는 줄에만 붙인다** (D6). 고정 문구에 붙으면 조건을 만질 때마다
+   * 같은 문장이 다시 읽힌다 — 정작 알려야 할 결과 수가 그 안에 묻힌다.
+   */
+  /**
+   * **제목을 되풀이하지 않는다.** 바로 위 `h2` 가 `제주올레 코스` 라고 말하므로 부제까지
+   * 그 말을 하면 같은 자리가 같은 말을 두 번 한다. 대상어가 필요한 자리(404 · 400 ·
+   * `meta description`)는 `pageDescription` 이 따로 맡는다.
+   */
+  it('제목에 있는 말을 되풀이하지 않는다', () => {
+    expect(messages.walkCourse.listDescription).not.toContain(messages.walkCourse.pageTitle)
+    expect(messages.walkCourse.pageDescription).toContain(messages.walkCourse.pageTitle)
+  })
+
+  it('설명 줄은 aria-live 가 아니다', () => {
+    const markup = render()
+    const paragraph =
+      markup.split('<p').find((part) => part.includes(messages.walkCourse.listDescription)) ?? ''
+
+    // 못 찾으면 빈 문자열이라 헛되이 통과한다 — 찾았다는 것부터 단언한다
+    expect(paragraph).not.toBe('')
+    expect(paragraph).not.toContain('aria-live')
+    expect(markup.match(/aria-live/g)).toHaveLength(1)
+  })
+})
+
 describe('WalkCourseListSection — 접근성 계약 (D6)', () => {
   /** 세그먼트가 URL 을 바꾸고 목록이 통째로 갈리는데, 보조기기에는 이 줄이 유일한 신호다 */
   it('결과 수를 aria-live 로 알린다', () => {
