@@ -15,12 +15,12 @@ import type { WalkCourseFilters, WalkCourseSummary } from '@/types/walk-course'
  *
  * ### 사진 카드 그리드가 아니라 텍스트 행이다 (`코스목록-세부명세.md` D1-1)
  *
- * **이미지가 29개 중 4개만 있다** (실측 2026-09-18). 사진 카드를 쓰면 25장이 회색
- * 플레이스홀더이고 화면이 "데이터가 깨졌다" 로 읽힌다. `PlaceRow` 가 이미지 없는 행에도
- * 같은 크기의 타일을 남기는 것과 **반대로** 판단한 자리다 — 저쪽은 소수가 비어 행 높이가
- * 흔들리는 것이 문제이고, 여기는 **다수가 비어** 타일 자체가 잡음이 된다.
+ * **처음 근거는 "29개 중 25개가 회색 플레이스홀더" 였고, 그 근거는 사라졌다** — 재적재 뒤
+ * 29개 전부가 이미지를 갖는다(2026-09-21). **그래도 텍스트 행이다.** 코스를 고르는 축은
+ * **거리 · 소요시간**이고 정렬(`거리 짧은 순`)·열 머리·기준 줄이 전부 그 축 위에 서 있다
+ * (#797 · #811 · #818 · #821). 사진 그리드는 그 비교를 할 수 없다.
  *
- * 코스를 고르는 데 실제로 쓰는 값 셋(**이름표 · 거리 · 소요시간**)은 29개 모두 채워져 있다.
+ * 사진은 축이 아니라 **식별자**로 쓴다 — 행의 첫 칸(아래 #767 절).
  *
  * **자기 테두리를 두르지 않는다** — 구분선은 `SurfaceList` 가 항목 사이에만 긋는다.
  *
@@ -28,20 +28,29 @@ import type { WalkCourseFilters, WalkCourseSummary } from '@/types/walk-course'
  * 25행에 "날씨 정보 없음" 배지를 달면 코스를 고르는 축(거리·소요시간)과 무관한 사실이
  * 화면의 4/5를 덮는다. 그 사실은 필요해지는 자리 — 코스 상세 — 에서 한 줄로 말한다.
  *
- * ### 썸네일이 행 축을 밀지 않는다 (#734)
+ * ### 썸네일은 첫 칸이다 — #734 를 되돌린 자리다 (#767)
  *
- * **썸네일은 언제나 텍스트 다음, chevron 앞이다.** 예전에는 썸네일이 맨 앞이라 있는
- * 행만 제목이 76~92px 오른쪽으로 밀렸다 — 실측 29개 중 25개가 이미지 없는 분포에서는
- * 한 행만 축이 꺾이는 것으로 보였다. 이제 제목 블록(`min-w-0 flex-1`)이 항상 맨 앞이라,
- * 뒤에 오는 썸네일이 있고 없고는 **제목의 시작 위치에 아무 영향을 주지 않는다.**
+ * **#734 는 썸네일을 텍스트 뒤로 보냈다.** 근거는 *"맨 앞에 두면 이미지가 있는 행만 제목이
+ * 76~92px 밀린다"* 였고, 그 걱정은 **29개 중 25개가 이미지가 없던 분포에서만** 성립했다.
+ * 재적재 뒤 **29개 전부가 이미지를 갖는다**(2026-09-21 dev 실호출) — 미는 행이 따로 없다.
+ *
+ * 뒤에 두는 대가가 이제 드러난다. 1280 실측에서 **시종점 글자 끝(x=656)과 썸네일(x=1149)
+ * 사이가 493px** 이라, 29행 전부에 생긴 사진이 행 내용에서 떨어져 나와 chevron 옆 도장
+ * 열로 읽혔다. **사진은 그 행이 무엇인가를 말하는 식별자다** — 올레 코스는 이름
+ * (`시흥-광치기`·`광치기-온평`)만으로 서로 구분되지 않아 더 그렇다. 이름 옆에 세운다.
+ *
+ * `PlaceRow` 와 같은 배치가 된다. 다만 **없는 행에 타일을 남기지 않는 것은 그대로다** —
+ * 저쪽은 소수가 비어 행 높이가 흔들리는 것이 문제이고, 여기는 그리드 트랙이 폭을 잡아
+ * 준다(`app/globals.css`).
  *
  * ### 1024 부터는 6칸 그리드다 (#734 · #797)
  *
  * `lg:`(1024) 부터 이 링크가 `.walk-course-row-grid`(`app/globals.css`)로 그리드가 된다 —
- * 코스 · 거리 · 소요시간 · 시종점 · 썸네일 · chevron 여섯 칸. **각 칸이 `lg:col-start-N`
- * 으로 자기 자리를 못박는다** — 플렉스였다면 썸네일이 없는 행에서 뒤 칸들이 당겨져
- * 칸마다 폭이 달라졌겠지만, 그리드 트랙은 자식 유무와 무관하게 항상 같은 폭이라
- * 썸네일 없는 행도 그 칸만 비고 시종점·chevron 은 그대로 선다.
+ * **썸네일** · 코스 · 거리 · 소요시간 · 시종점 · chevron 여섯 칸 (#767 에서 썸네일이 맨
+ * 앞으로 왔다). **각 칸이 `lg:col-start-N` 으로 자기 자리를 못박는다** — 플렉스였다면
+ * 썸네일이 없는 행에서 뒤 칸들이 당겨져 칸마다 폭이 달라졌겠지만, 그리드 트랙은 자식
+ * 유무와 무관하게 항상 같은 폭이라 썸네일 없는 행도 그 칸만 비고 코스·시종점·chevron 은
+ * 그대로 선다.
  *
  * 1024 미만(모바일·태블릿)은 `lg:hidden` 으로 감춘 텍스트 블록 안에서 거리·소요시간·
  * 시종점을 이어 말한다 — `PlanRow` 의 상태 배지가 모바일/데스크톱에서 위치만 바꾸는 것과
@@ -117,8 +126,41 @@ export function WalkCourseRow({
           'walk-course-row-grid lg:grid lg:min-h-18 lg:items-center lg:gap-5 lg:py-4',
         )}
       >
-        {/* 코스 열 — 언제나 첫 칸이라 뒤에 오는 썸네일 유무와 무관하게 위치가 고정이다 */}
-        <div className="min-w-0 flex-1 lg:col-start-1 lg:flex-none">
+        {/*
+          썸네일 — **첫 칸이다** ([#767](https://github.com/8llow8llowMe/hondigagae/issues/767)).
+          사진은 그 행이 무엇인가를 말하는 식별자라 이름 옆에 선다 (`PlaceRow` 와 같은 배치).
+
+          **여전히 있을 때만 만든다.** 재적재 뒤 29개 전부가 이미지를 갖지만(2026-09-21 dev
+          실측) 그것은 계약이 아니라 데이터다 — 원천(TourAPI 매칭)이 다시 비면 없는 행이
+          돌아온다. `lg:col-start-1` 로 그리드 자리를 못박아, 이 칸이 없어도 코스(2)·
+          시종점(5)·chevron(6) 은 밀리지 않는다.
+
+          **표 안에서는 40px 로 줄인다** (#797, `lg:size-10`). 80px 이면 그 행만 높이가 두
+          배가 되어 세로 리듬이 깨진다 — 1024 미만 카드형 목록에서는 썸네일이 행의
+          주인공이라 예전 크기(64/80)를 그대로 둔다.
+
+          `alt` 는 빈 문자열이다 — 바로 옆(1024 미만)이나 같은 행(1024 이상)에 이름표가
+          글자로 있다 (D6).
+        */}
+        {thumbnail !== null && (
+          <div className="bg-band relative size-16 shrink-0 overflow-hidden rounded-md md:size-20 lg:col-start-1 lg:size-10">
+            <Image
+              src={thumbnail}
+              alt=""
+              fill
+              /*
+                **박스 크기와 같이 간다** (#797). `lg:size-10` 으로 줄였는데 여기가 80px 로
+                남아 있으면 1024 이상에서 필요한 것의 2배(DPR 2 면 면적 4배) 소스를 받는다.
+                예전 `1280px`·`768px` 두 절은 값이 같아 앞 절이 무의미했다.
+              */
+              sizes="(min-width: 1024px) 40px, (min-width: 768px) 80px, 64px"
+              className="object-cover"
+            />
+          </div>
+        )}
+
+        {/* 코스 열 — 썸네일 다음이다. 트랙이 고정이라 썸네일 유무와 무관하게 위치가 같다 */}
+        <div className="min-w-0 flex-1 lg:col-start-2 lg:flex-none">
           <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             {/* `3코스 (A)` 의 괄호가 다음 줄로 떨어지지 않게 한 덩어리로 둔다 (D1) */}
             <span className="text-body-1 text-fg font-semibold whitespace-nowrap">
@@ -147,12 +189,12 @@ export function WalkCourseRow({
         </div>
 
         {/* 거리 열 — 1024 이상 전용. 숫자라 오른쪽 정렬 + tabular-nums */}
-        <p className="text-body-2 text-fg-muted hidden text-right tabular-nums lg:col-start-2 lg:block">
+        <p className="text-body-2 text-fg-muted hidden text-right tabular-nums lg:col-start-3 lg:block">
           {distance}
         </p>
 
         {/* 소요시간 열 — 1024 이상 전용 */}
-        <p className="text-body-2 text-fg-muted hidden text-right tabular-nums lg:col-start-3 lg:block">
+        <p className="text-body-2 text-fg-muted hidden text-right tabular-nums lg:col-start-4 lg:block">
           {course.durationText}
         </p>
 
@@ -163,39 +205,10 @@ export function WalkCourseRow({
         */}
         <p
           title={course.startEndPoint}
-          className="text-caption text-fg-subtle hidden min-w-0 truncate lg:col-start-4 lg:block"
+          className="text-caption text-fg-subtle hidden min-w-0 truncate lg:col-start-5 lg:block"
         >
           {course.startEndPoint}
         </p>
-
-        {/*
-          썸네일 — **있을 때만 만든다.** 없는 행에 회색 사각형을 두지 않는다(D1-1) — 실측
-          29개 중 25개가 이 경우다. `lg:col-start-5` 로 그리드 자리를 못박아, 이 칸이
-          없어도 시종점(4)·chevron(6) 은 밀리지 않는다.
-
-          **표 안에서는 40px 로 줄인다** (#797, `lg:size-10`). 80px 이면 그 행만 높이가 두
-          배가 되어 세로 리듬이 깨진다 — 1024 미만 카드형 목록에서는 썸네일이 행의
-          주인공이라 예전 크기(64/80)를 그대로 둔다.
-
-          `alt` 는 빈 문자열이다 — 바로 옆(1024 미만)이나 같은 행(1024 이상)에 이름표가
-          글자로 있다 (D6).
-        */}
-        {thumbnail !== null && (
-          <div className="bg-band relative size-16 shrink-0 overflow-hidden rounded-md md:size-20 lg:col-start-5 lg:size-10">
-            <Image
-              src={thumbnail}
-              alt=""
-              fill
-              /*
-                **박스 크기와 같이 간다** (#797). `lg:size-10` 으로 줄였는데 여기가 80px 로
-                남아 있으면 1024 이상에서 필요한 것의 2배(DPR 2 면 면적 4배) 소스를 받는다.
-                예전 `1280px`·`768px` 두 절은 값이 같아 앞 절이 무의미했다.
-              */
-              sizes="(min-width: 1024px) 40px, (min-width: 768px) 80px, 64px"
-              className="object-cover"
-            />
-          </div>
-        )}
 
         {/* 눌러서 이동한다는 것을 말하는 유일한 신호다 */}
         <ChevronRightIcon
@@ -218,8 +231,9 @@ export function WalkCourseRow({
  * 행 안의 거리·소요시간·시종점 텍스트가 이미 같은 값을 전부 말한다. 열 머리는 **시각적으로
  * 훑는 사용자**를 위한 장치다.
  *
- * 썸네일·chevron 칸은 라벨이 없다 — 사진 유무를 표로 예고하지 않는다(D5-1 과 같은 이유로
- * "썸네일" 이라는 낱말도 보태지 않는다).
+ * 썸네일(1)·chevron(6) 칸은 라벨이 없다 — 사진 유무를 표로 예고하지 않는다(D5-1 과 같은
+ * 이유로 "썸네일" 이라는 낱말도 보태지 않는다). 첫 칸이 빈 라벨인 것은 표에서 흔한 이미지
+ * 열의 모양이고, 라벨을 붙이면 **고르는 축이 아닌 것이 축으로 보인다.**
  */
 export function WalkCourseColumnHead({ inset = 'card' }: { inset?: Inset }) {
   return (
@@ -230,16 +244,16 @@ export function WalkCourseColumnHead({ inset = 'card' }: { inset?: Inset }) {
         INSET_CLASS[inset],
       )}
     >
-      <span className="text-caption text-fg-muted font-semibold lg:col-start-1">
+      <span className="text-caption text-fg-muted font-semibold lg:col-start-2">
         {messages.walkCourse.columnCourseLabel}
       </span>
-      <span className="text-caption text-fg-muted text-right font-semibold lg:col-start-2">
+      <span className="text-caption text-fg-muted text-right font-semibold lg:col-start-3">
         {messages.walkCourse.distanceLabel}
       </span>
-      <span className="text-caption text-fg-muted text-right font-semibold lg:col-start-3">
+      <span className="text-caption text-fg-muted text-right font-semibold lg:col-start-4">
         {messages.walkCourse.durationLabel}
       </span>
-      <span className="text-caption text-fg-muted font-semibold lg:col-start-4">
+      <span className="text-caption text-fg-muted font-semibold lg:col-start-5">
         {messages.walkCourse.startEndLabel}
       </span>
     </div>
