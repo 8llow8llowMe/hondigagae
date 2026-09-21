@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/skeleton'
 import { SurfaceStack } from '@/components/surface'
 import { WalkCourseAddAction } from '@/features/walk-course/walk-course-add-action'
 import { WalkCourseGoldenSlot } from '@/features/walk-course/walk-course-golden-slot'
+import { WalkCourseStartMap } from '@/features/walk-course/walk-course-start-map'
 import {
   WalkCourseHero,
   WalkCourseSourceLine,
@@ -188,7 +189,12 @@ export function WalkCourseDetailSection({
       >
         {hero !== null && <WalkCourseHero image={hero} />}
 
-        <div className="flex flex-col gap-2 md:gap-6">
+        {/*
+          **우측 묶음이 두 행을 걸친다.** 좌측은 사진(1행)과 지도(2행)로 쌓이고 우측은 그
+          둘에 나란히 선다 — `lg:row-span-2` 가 없으면 지도가 우측 묶음 **아래** 높이에서
+          시작해 사진과 사이가 벌어진다.
+        */}
+        <div className="flex flex-col gap-2 md:gap-6 lg:row-span-2">
           <WalkCourseSummaryHeader course={course} />
 
           <WalkCourseGoldenSlot
@@ -197,7 +203,40 @@ export function WalkCourseDetailSection({
             loading={walkTimesLoading}
             onRetry={onWalkTimesRetry}
           />
+
+          {/*
+            **히어로가 없을 때만 여기 선다** ([#782](https://github.com/8llow8llowMe/hondigagae/issues/782)).
+
+            2열일 때는 좌측 열(사진 아래)이 지도의 자리다 — 위 주석 참조. 히어로가 없으면
+            열이 하나뿐이라 본문 흐름의 끝, 골든타임 **다음**이 된다: 이 화면의 차별 정보는
+            골든타임이고 #730 이 그것을 접힘선 위로 끌어올린 자리라, 지도를 그 위에 두면
+            같은 증상이 되돌아온다. *"어디서 출발하나"* 는 걸을지 정한 다음의 질문이다.
+
+            **좌표가 없으면 스스로 사라진다.** 여기서 `hasCoordinates` 를 다시 묻지 않는다 —
+            같은 질문을 두 곳에서 하면 한쪽만 고쳐진다 (`lib/walk-course/coordinates.ts`).
+            지금은 히어로와 좌표가 같은 4개지만(#767 이 그 전제를 다시 본다) 그 전제가
+            깨져도 이 갈래가 지도를 잃지 않는다.
+          */}
         </div>
+
+        {/*
+          **시작점 지도는 마크업 순서상 마지막이다** ([#782](https://github.com/8llow8llowMe/hondigagae/issues/782)).
+
+          읽는 순서가 그래야 하기 때문이다 — 사진 → 어느 코스인지 → 오늘 걸을 만한지 →
+          **그래서 어디서 출발하나.** 1024 미만에서는 이 순서 그대로 쌓이고, 1024 이상에서는
+          그리드 자동 배치가 이것을 **좌측 열 2행**(사진 아래)으로 보낸다.
+
+          처음에는 사진과 한 `div` 로 묶었다. 데스크톱 그림은 같았지만 **모바일에서 지도가
+          코스 이름보다 먼저 나왔다** — 어느 코스인지 모르는 채로 지도를 먼저 보게 된다.
+
+          **좌측 열에 둔 이유**: 사진 하나만 두었더니 1024 실측에서 좌측이 266px 에서 끝나고
+          우측이 863px 까지 이어져 **사진 아래 597px 이 죽었고**, 그 공백 아래에
+          `일정에 담기` 만 떠 있어 버튼이 어디에도 속하지 않아 보였다.
+
+          **좌표가 없으면 스스로 사라진다.** 여기서 `hasCoordinates` 를 다시 묻지 않는다 —
+          같은 질문을 두 곳에서 하면 한쪽만 고쳐진다 (`lib/walk-course/coordinates.ts`).
+        */}
+        <WalkCourseStartMap course={course} />
       </div>
 
       {/* 진입은 상세에만 둔다 — 목록 행은 이미 전체가 링크다 (`올레담기-세부명세.md` D8-1) */}
