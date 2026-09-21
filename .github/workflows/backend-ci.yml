@@ -63,6 +63,11 @@ jobs:
           key: gradle-deps-${{ runner.os }}-${{ hashFiles('backend/**/*.gradle', 'backend/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: gradle-deps-${{ runner.os }}-
 
+      # `chmod +x gradlew` 를 두지 않는다 — `backend/gradlew` 가 git 에 `100644` 로
+      # 들어가 있던 것이 원인이라 모드를 `100755` 로 고쳤다. Jenkins 는 매 빌드마다
+      # `chmod +x` 로 덮어쓰고 있어서(`Jenkinsfile.backend-common.groovy:740`) 이 결함이
+      # 드러나지 않았다. 여기서 또 chmod 하면 같은 것을 두 번 가리게 된다.
+      #
       # `--no-build-cache` 는 위 캐시 제외와 같은 목적의 이중 안전장치다.
       # `backend/gradle.properties` 가 `org.gradle.caching=true` 를 켜 두므로 명시로 끈다.
       #
