@@ -51,6 +51,18 @@ const ALL_RISKY_DAY = mockWalkTimes({
   coldSensitive: false,
   noiseSensitive: false,
 })
+/**
+ * **창 안 등급이 섞인 날** — 초코에 `소리 민감` 을 더한 조합 ([#671](https://github.com/8llow8llowMe/hondigagae/issues/671) **E-1**).
+ *
+ * 창은 15–21시이고 그 안이 `주의(15–16) · 안전(17) · 주의(18) · 안전(19–21)` 이다.
+ * **손으로 만든 fixture 가 아니라 mock 갈래를 쓴다** — 화면이 로컬에서 볼 수 있는 것과
+ * 테스트가 보는 것이 갈리면 그 갈래는 다시 조용히 썩는다 (E-1 이 고친 바로 그 습관).
+ */
+const MIXED_WINDOW_DAY = mockWalkTimes({
+  heatSensitive: false,
+  coldSensitive: true,
+  noiseSensitive: true,
+})
 /** 곡선이 비었고 **정상**인 날 (그 날짜 예보 시간대가 지났다) */
 const DAY_ENDED = mockWalkTimes({
   heatSensitive: false,
@@ -928,6 +940,63 @@ describe('mockWalkTimes — 조건이 없는 조회 (#270)', () => {
     expect(guest.goldenWindowStatus?.code).toBe('AVAILABLE')
     expect(guest.hourly.length).toBeGreaterThan(0)
     expect(render(guest)).toContain('18:00')
+  })
+})
+
+/*
+  **#671 E-1.** 기본 창(18–21시)이 전부 SAFE 라 #656 의 시각별 면도 #637 의 혼합 등급
+  문장도 로컬에서 볼 수 없었다 — 두 레인이 그때마다 mock 을 임시로 고쳤다 되돌렸고,
+  A-2 가 그래서 지금까지 안 잡혔다. 갈래를 정식으로 두고 **그 갈래의 모양을 여기서 잠근다.**
+*/
+describe('mockWalkTimes — 창 안 등급이 섞인 갈래 (#671 E-1)', () => {
+  /** 창 안 시각별 등급 코드. 창 판정은 화면과 같은 규칙(양끝 포함)을 쓴다 */
+  function windowCodes(data: WalkTimesResponse): string[] {
+    return data.hourly
+      .filter(
+        (hour) => hour.at >= (data.goldenStart as string) && hour.at <= (data.goldenEnd as string),
+      )
+      .map((hour) => hour.walkSafetyLevel.code)
+  }
+
+  it('추천 구간이 있는 날이다 — 판정 자리가 다른 갈래로 새지 않는다', () => {
+    expect(MIXED_WINDOW_DAY.goldenWindowStatus?.code).toBe('AVAILABLE')
+    expect(MIXED_WINDOW_DAY.goldenStart).toBe('2026-08-29T15:00:00')
+    expect(MIXED_WINDOW_DAY.goldenEnd).toBe('2026-08-29T21:00:00')
+  })
+
+  /** 등급 구간이 넷이라 문장이 `{runs}` 를 ` · ` 로 잇는 자리를 실제로 지난다 */
+  it('창 안에 주의와 안전이 번갈아 든다', () => {
+    expect(windowCodes(MIXED_WINDOW_DAY)).toEqual([
+      'CAUTION', // 15시
+      'CAUTION', // 16시
+      'SAFE', //    17시
+      'CAUTION', // 18시
+      'SAFE', //    19시
+      'SAFE', //    20시
+      'SAFE', //    21시
+    ])
+  })
+
+  /*
+    **서버가 줄 수 없는 창을 목이 만들지 않는다.** `GoldenWalkWindow.acceptableRuns` 는
+    `isAcceptable()`(= `SAFE`·`CAUTION`)인 칸만 이어 붙이므로 DANGER 는 창을 끊는다 —
+    목이 창 안에 DANGER 를 넣으면 화면이 오지 않을 응답에 맞춰 만들어진다.
+  */
+  it('창 안에 위험 칸을 넣지 않는다 — DANGER 는 창을 끊는다', () => {
+    expect(windowCodes(MIXED_WINDOW_DAY)).not.toContain('DANGER')
+    // 창 앞의 14시가 그 문턱이다 — 창이 15시에서 시작하는 이유가 화면에 남는다
+    expect(MIXED_WINDOW_DAY.hourly[0]?.walkSafetyLevel.code).toBe('DANGER')
+  })
+
+  /** 창 등급은 창 안 최악이다 (서버 `GoldenWalkWindow.level` 의 `worseOf`) */
+  it('창 등급이 CAUTION 이다 — A-3 의 실패를 로컬에서 볼 수 있는 조건', () => {
+    expect(MIXED_WINDOW_DAY.goldenLevel?.code).toBe('CAUTION')
+  })
+
+  /** 기본 갈래는 그대로다 — 새 갈래가 기존 시나리오를 잡아먹지 않는다 */
+  it('소리 민감을 끄면 예전 기본 갈래 그대로다', () => {
+    expect(GOOD_DAY.goldenStart).toBe('2026-08-29T18:00:00')
+    expect(GOOD_DAY.goldenLevel?.code).toBe('SAFE')
   })
 })
 
