@@ -3,6 +3,8 @@ package com.hondigagae.global.properties;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.hondigagae.domainlayer.placeimport.domain.model.ImportVolumeGuard;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -16,19 +18,38 @@ import org.junit.jupiter.api.Test;
 class PlaceImportVolumePropertiesTest {
 
     @Test
-    @DisplayName("값이 없거나 0 이하면 기본 1,200 ~ 20,000 으로 접는다")
+    @DisplayName("값이 없거나 0 이하면 기본 1,680 ~ 4,200 으로 접는다")
     void foldsMissingOrNonPositiveToDefault() {
         PlaceImportVolumeProperties empty = new PlaceImportVolumeProperties(null, null);
-        assertThat(empty.minRows()).isEqualTo(1_200);
-        assertThat(empty.maxRows()).isEqualTo(20_000);
+        assertThat(empty.minRows()).isEqualTo(1_680);
+        assertThat(empty.maxRows()).isEqualTo(4_200);
 
         PlaceImportVolumeProperties zero = new PlaceImportVolumeProperties(0, -1);
-        assertThat(zero.minRows()).isEqualTo(1_200);
-        assertThat(zero.maxRows()).isEqualTo(20_000);
+        assertThat(zero.minRows()).isEqualTo(1_680);
+        assertThat(zero.maxRows()).isEqualTo(4_200);
     }
 
     @Test
-    @DisplayName("준 값이 있으면 그대로 쓴다 — 첫 재적재로 실제 건수가 나오면 조일 수 있어야 한다")
+    @DisplayName("기본 범위는 실측 2,099 를 통과시키고 20% 감소·2배 증가를 잡는다 (#828)")
+    void defaultRangeMatchesMeasuredVolume() {
+        PlaceImportVolumeProperties defaults = new PlaceImportVolumeProperties(null, null);
+        int min = defaults.minRows();
+        int max = defaults.maxRows();
+
+        // 2026-09-21 첫 재적재 실측. 이 값이 걸리면 가드가 매 실행 잡을 멈춘다.
+        assertThat(ImportVolumeGuard.withinRange(2_099, min, max)).isTrue();
+        // #726 의 결함(제주 2,124 중 880건만 들어오던 상태)은 반드시 걸려야 한다.
+        assertThat(ImportVolumeGuard.withinRange(880, min, max)).isFalse();
+        // 하한 경계 = 실측의 20% 감소선.
+        assertThat(ImportVolumeGuard.withinRange(1_680, min, max)).isTrue();
+        assertThat(ImportVolumeGuard.withinRange(1_679, min, max)).isFalse();
+        // 상한 경계 = 실측의 2배선. 총량이 2~3배로 부푸는 사고를 잡는다.
+        assertThat(ImportVolumeGuard.withinRange(4_200, min, max)).isTrue();
+        assertThat(ImportVolumeGuard.withinRange(4_201, min, max)).isFalse();
+    }
+
+    @Test
+    @DisplayName("준 값이 있으면 그대로 쓴다 — 두 번째 실측이 쌓이면 더 조일 수 있어야 한다")
     void keepsGivenValue() {
         PlaceImportVolumeProperties given = new PlaceImportVolumeProperties(1_900, 3_000);
 

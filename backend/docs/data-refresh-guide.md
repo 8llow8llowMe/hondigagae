@@ -206,6 +206,8 @@ JobParameter 로 넘긴다. 시간대를 트리거가 직접 못박는 이유는
 | 전송이 끊겨 파일이 잘림 | `Content-Length` 와 실제 바이트 수를 대조해 거부. 위와 같이 우회 | 없음 |
 | 스냅샷 테이블 조회 실패 (미생성 등) | "모른다"로 접고 그냥 내려받아 적재. `culture facility snapshot unavailable` WARN | 없음 (30MB 를 한 번 더 받을 뿐) |
 | 포털도 막히고 로컬 우회 파일도 없음 | 잡 실패 (`CULTURE_CSV_NOT_FOUND`) | 없음 |
+| 올레 포털 상세 페이지에서 다운로드 링크를 못 찾음 (`SOURCE_PAGE_INVALID`) | **로컬 우회 파일로 적재**하고 계속. `olle course source fallback=local` WARN + 완료 로그 `fallback=true`. 스냅샷은 남기지 않는다. **문화정보원과 달리 지표는 없다**(아래) | 없음 (데이터가 낡을 뿐) |
+| 올레 포털도 막히고 로컬 우회 파일도 없음 | 잡 실패 (`CSV_NOT_FOUND`) | 없음 |
 
 공통 원칙은 **낡은 데이터가 빈 데이터보다 낫다**는 것이다. 실패 시 기존 값을 지우지 않는다.
 
@@ -222,6 +224,47 @@ JobParameter 로 넘긴다. 시간대를 트리거가 직접 못박는 이유는
 정상 종료로 보이고, 잘린 본문은 1MB 하한도 첫 줄 `시설명` 검사도 통과한다. 그대로 적재하면
 잘린 판본이 스냅샷으로 굳고 **다음 실행부터 같은 `atchFileId` 로 영구 SKIP** 된다. 그래서
 헤더 `Content-Length` 가 있으면 디스크에 쓰인 바이트 수와 정확히 같을 때만 통과시킨다.
+
+### 올레 포털은 이미 구조가 바뀌었다 — 우회가 기본 경로다 (2026-09-21)
+
+2026-09-21 dev 재적재에서 `olleCourseImportJob` 이 포털 파싱에 실패해 **로컬 우회 파일로 돌았다.**
+
+```text
+olle course source fallback=local reason=DataDownload contentUrl 없음 (jsonLdBlocks=0)
+```
+
+**일시적 장애가 아니라 페이지 구조가 바뀐 것이다.** 같은 날 상세 페이지
+(`https://www.data.go.kr/data/15043496/fileData.do`)를 직접 받아 확인했다 — 200 · 약 171KB 로
+**정상 응답이고 데이터셋도 맞는데**(`<title>제주특별자치도_올레코스현황_20260731`),
+
+| 어댑터가 찾는 것 | 지금 페이지 |
+| --- | --- |
+| `<script type="application/ld+json">` 블록 | **0개** |
+| `@type: DataDownload` 노드 | **0개** |
+| `contentUrl` 의 `fileDownload.do` · `atchFileId` | **없다** |
+| 내려받기 트리거 | `onclick="fileDetailObj.fn_fileDataDown('15043496', 'uddi:…', '', '1', '1')"` — **JS 함수 호출**이고 식별자도 `atchFileId` 가 아니라 `uddi:` 로 시작하는 상세 PK 다 |
+
+즉 `DataGoKrOlleCourseSourceAdapter` 의 전략(JSON-LD → `DataDownload.contentUrl` → `atchFileId`)이
+**통째로 낡았다.** 재시도로 낫지 않으므로 지금 상태에서 포털 경로는 매 실행 실패하고 매 실행 우회한다.
+
+**그런데 이 우회는 문화정보원과 달리 지표가 없다.** 위의 "우회가 오래 이어지는 것은 조용한 고장" 이
+그대로 해당하는데, `place_import_rows{result="fallback"}` 같은 카운터가 올레 쪽에는 없다 — 드러나는
+것은 WARN 한 줄과 완료 로그의 `fallback=true` 뿐이다. **우회가 기본이 되어도 대시보드는 조용하다.**
+
+- 우회 파일(`OLLE_COURSE_CSV_PATH`, 기본 `data/olle_course.csv`)은 **저장소에 없다.** 배포 호스트의
+  `BATCH_DATA_DIR` 에 사람이 둔 파일이라, 그것이 언제 판본인지 저장소만 봐서는 알 수 없다.
+- 포털의 현재 파일명이 `..._20260731` 이므로 **우회 파일이 이미 그보다 낡았을 수 있다.** 올레 코스는
+  §1 기준으로 자주 바뀌는 데이터가 아니라 당장 사용자 피해는 없지만, "낡았는지 모르는 상태" 는 남는다.
+- 우회 적재가 스냅샷을 남기지 않는 설계 덕에 **포털 파싱만 고치면 다음 실행이 곧바로 포털로 돌아온다.**
+  되돌리기 위해 지워야 할 상태가 없다.
+
+**고치는 것은 별도 이슈다** (`walkcourseimport` 어댑터의 파싱 전략 교체 + 우회 지표). 이 문서는 그때까지
+**"올레는 우회로 돌고 있다" 가 정상 상태**라는 것을 남긴다 — 모르고 보면 WARN 한 줄을 그냥 지나친다.
+
+> 진단 문구 자체도 오해를 부른다. `jsonLdBlocks=%d` 에 실제로 찍히는 값은 JSON-LD 블록 수가 아니라
+> **찾아낸 `DataDownload` 노드 수**다(`DataGoKrOlleCourseSourceAdapter` 의 `downloads.size()`).
+> 그래서 `jsonLdBlocks=0` 은 "JSON-LD 가 없다" 와 "JSON-LD 는 있는데 `DataDownload` 가 없다" 를
+> 구분해 주지 못한다. 위 어느 쪽인지는 페이지를 직접 받아 봐야 알 수 있었다.
 
 ## 6. 갱신 상태를 드러내기
 
@@ -332,17 +375,39 @@ UPDATE place survivor
 - prod 는 §1 과 같이 **런북으로 사람이 적용**한다. dev 에서 1)·2)·3) 을 돌려 건수와 병합 결과를
   확인한 뒤 옮긴다.
 
-### 확인
+### 확인 — **단계마다 기대값이 다르다**
+
+`indoor = false` 는 이 절차 안에서 **두 가지를 뜻한다.** 적재가 박아 둔 **근거 없는 `false`** 와,
+문화정보원이 실제로 "실외" 라고 말해 3) 이 옮겨 온 **근거 있는 `false`** 는 값이 같고 의미가 다르다.
+그래서 같은 쿼리가 2) 직후에는 0 이어야 하고 3) 뒤에는 0 이 아니어도 정상이다 — **단계를 적지 않은
+확인 쿼리는 성공을 실패로 읽게 만든다** (2026-09-21 dev 재적재에서 실제로 겪었다).
+
+**2) 직후** — 근거 없는 `false` 는 하나도 남으면 안 된다.
 
 ```sql
--- 되돌린 뒤: TOUR_API 행에 false 가 남아 있으면 안 된다
 SELECT COUNT(*) FROM place WHERE source = 'TOUR_API' AND indoor = false;   -- 0 이어야 한다
+```
 
--- 병합 뒤: 문화정보원에서 옮겨 온 값이 생겼는지
+**3) 뒤** — 문화정보원이 "실외" 라고 말한 만큼은 `false` 로 돌아온다. **0 이 정답이 아니다.**
+
+```sql
+-- 얼마나 돌아왔는지 (dev 2026-09-21 실측: 86)
+SELECT COUNT(*) FROM place WHERE source = 'TOUR_API' AND indoor = false;
+
+-- 돌아온 false 가 전부 '근거 있는' 것인지 — 이 쿼리가 0 이어야 한다.
+-- 흡수된 행에 false 가 없는데 survivor 만 false 면 2) 가 덜 돌았거나 그 뒤에 다시 박힌 것이다
+SELECT COUNT(*)
+  FROM place survivor
+ WHERE survivor.source = 'TOUR_API'
+   AND survivor.indoor = false
+   AND NOT EXISTS (SELECT 1 FROM place absorbed
+                    WHERE absorbed.merged_into_id = survivor.id AND absorbed.indoor = false);
+
+-- 병합이 옮겨 온 값이 생겼는지 (실내·실외를 합쳐서 본다)
 SELECT COUNT(*) FROM place WHERE source = 'TOUR_API' AND indoor IS NOT NULL;  -- 0 보다 커야 한다
 ```
 
-두 번째 쿼리가 계속 0 이면 **먼저 3) 을 돌렸는지 확인한다.** 잡 재실행만으로는 이미 병합된 쌍의
+마지막 쿼리가 계속 0 이면 **먼저 3) 을 돌렸는지 확인한다.** 잡 재실행만으로는 이미 병합된 쌍의
 값이 옮겨 오지 않는다(위 경고). 3) 까지 돌렸는데도 0 이면 그때 병합 후보가 안 잡히는지를 본다
 (`place-data-integration.md` §4).
 
