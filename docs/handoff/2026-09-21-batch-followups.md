@@ -127,7 +127,7 @@ SELECT COUNT(*) FROM place WHERE source='TOUR_API' AND delisted_at IS NULL;
 
 ---
 
-## C. 올레 포털 파싱 교체 (#828 후속) — **충돌 주의**
+## C. 올레 포털 파싱 교체 (#828 후속) — **#816 과 충돌 없음, 이쪽이 가져간다**
 
 ### C-1. 확인된 사실 (2026-09-21 페이지 실측)
 
