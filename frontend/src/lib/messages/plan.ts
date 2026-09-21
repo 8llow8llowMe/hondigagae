@@ -306,7 +306,7 @@ export const planMessages = {
   detailNotFoundDescription: '삭제됐거나 주소가 잘못됐어요.',
   detailErrorTitle: '일정을 불러오지 못했어요',
   /**
-   * 숫자가 아닌 `planId` → 400 `PLAN_114`. **재시도를 주지 않는다** — 같은 주소를
+   * 숫자가 아닌 `planId` → 400 `PLAN_124`. **재시도를 주지 않는다** — 같은 주소를
    * 다시 불러도 같은 400 이다 (일정상세-세부명세 D5).
    */
   detailBadRequestTitle: '잘못된 주소예요',
@@ -636,7 +636,7 @@ export const planMessages = {
   editNoChanges: '순서를 바꾸거나 삭제 표시를 해야 저장할 수 있어요.',
 
   /**
-   * 재시도로 풀리지 않는 4xx 일반. `PLAN_001`(지워졌거나 남의 일정) · `PLAN_114` ·
+   * 재시도로 풀리지 않는 4xx 일반. `PLAN_001`(지워졌거나 남의 일정) · `PLAN_124` ·
    * Bean Validation 이 여기 온다 — 전부 "들고 있는 화면이 낡았다" 로 귀결된다.
    */
   saveStaleError: '화면이 최신이 아니에요. 새로고침한 뒤 다시 시도해 주세요.',

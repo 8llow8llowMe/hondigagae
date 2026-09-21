@@ -183,12 +183,23 @@ describe('브리핑 mock — 계약 경계', () => {
     expect(result?.payload.dataHeader.resultCode).toBe('PLAN_125')
   })
 
-  /** 그보다도 `planId` 형식이 앞이다 — 첫 인자를 먼저 푼다 (같은 실측) */
+  /**
+   * 그보다도 `planId` 형식이 앞이다 — 첫 인자를 먼저 푼다 (같은 실측).
+   *
+   * **`PLAN_114` 가 아니라 `PLAN_124` 다** — #795 가 별건으로 남겼던 드리프트를 #803 이
+   * 고쳤다. 모양은 일정상세 명세 D5-1 이 정본이다.
+   */
   it('planId 형식 오류는 date 누락보다 앞이다', () => {
     const result = resolveMock('/plans/abc/briefing', 'GET', '', null, null)
 
     expect(result?.status).toBe(400)
-    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_114')
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'PLAN_124',
+      resultMessage: 'planId 파라미터 형식이 올바르지 않습니다.',
+      fieldErrors: [
+        { code: 'PLAN_124', field: 'planId', message: 'planId 파라미터 형식이 올바르지 않습니다.' },
+      ],
+    })
   })
 
   it('일차를 기간에서 센다', () => {

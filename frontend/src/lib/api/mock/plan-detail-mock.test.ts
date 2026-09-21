@@ -23,11 +23,24 @@ function detailOf(planId: string): PlanDetail {
 describe('일정 상세 mock — 조회', () => {
   beforeEach(resetMockStore)
 
-  it('숫자가 아닌 planId 는 404 가 아니라 400 이다 — @PathVariable long 이다', () => {
+  /**
+   * **문구와 `fieldErrors` 까지 단언한다** — 코드만 보면 목이 서버와 다른 문장을 내도
+   * 초록불이라, `PLAN_114`(실제로는 방문 체크 본문 코드다) 가 오래 살아남았다 (#803).
+   *
+   * dev 실측(2026-09-21): 코드는 `PLAN_124`, 문구는 **경로변수 이름을 끼워** 만들고,
+   * 같은 코드·필드·문구가 `fieldErrors` 한 건에 실린다.
+   */
+  it('숫자가 아닌 planId 는 404 가 아니라 400 PLAN_124 다 — @PathVariable long 이다', () => {
     const result = call('/plans/abc', 'GET')
 
     expect(result?.status).toBe(400)
-    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_114')
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'PLAN_124',
+      resultMessage: 'planId 파라미터 형식이 올바르지 않습니다.',
+      fieldErrors: [
+        { code: 'PLAN_124', field: 'planId', message: 'planId 파라미터 형식이 올바르지 않습니다.' },
+      ],
+    })
   })
 
   it('없는 숫자 planId 는 404 PLAN_001 이다', () => {
@@ -452,11 +465,27 @@ describe('일자별 항목 일괄 교체 mock', () => {
     expect(result?.status).toBe(200)
   })
 
-  it('숫자가 아닌 day 는 400 PLAN_114 다', () => {
+  /** **`field` 가 `planId` 가 아니라 `day` 다** — 서버가 실패한 인자 이름을 그대로 쓴다 */
+  it('숫자가 아닌 day 는 400 PLAN_124 이고 field 가 day 다', () => {
     const result = call(`/plans/${PLAN}/days/abc/items`, 'PUT', { items: [] })
 
     expect(result?.status).toBe(400)
-    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_114')
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'PLAN_124',
+      resultMessage: 'day 파라미터 형식이 올바르지 않습니다.',
+      fieldErrors: [
+        { code: 'PLAN_124', field: 'day', message: 'day 파라미터 형식이 올바르지 않습니다.' },
+      ],
+    })
+  })
+
+  /** 둘 다 틀리면 **첫 인자가 이긴다** — 스프링이 선언 순서로 푼다 (dev 실측, #803) */
+  it('planId 와 day 가 모두 틀리면 planId 오류가 이긴다', () => {
+    const result = call('/plans/abc/days/xyz/items', 'PUT', { items: [] })
+
+    expect(result?.payload.dataHeader.resultMessage).toBe(
+      'planId 파라미터 형식이 올바르지 않습니다.',
+    )
   })
 
   it('남의 일정은 교체할 수 없다', () => {
@@ -534,11 +563,21 @@ describe('일정 상세 mock — 항목 방문 체크 (#124)', () => {
     expect(result?.payload.dataHeader.resultCode).toBe('PLAN_005')
   })
 
-  it('숫자가 아닌 planItemId 는 404 가 아니라 400 PLAN_114 다', () => {
+  it('숫자가 아닌 planItemId 는 404 가 아니라 400 PLAN_124 다', () => {
     const result = visit('abc', true)
 
     expect(result?.status).toBe(400)
-    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_114')
+    expect(result?.payload.dataHeader).toMatchObject({
+      resultCode: 'PLAN_124',
+      resultMessage: 'planItemId 파라미터 형식이 올바르지 않습니다.',
+      fieldErrors: [
+        {
+          code: 'PLAN_124',
+          field: 'planItemId',
+          message: 'planItemId 파라미터 형식이 올바르지 않습니다.',
+        },
+      ],
+    })
   })
 
   it('남의 일정 항목은 404 PLAN_001 이다 — 일정 판정이 먼저다', () => {
