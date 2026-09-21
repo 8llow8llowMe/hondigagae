@@ -941,23 +941,40 @@ describe('mockWalkTimes — 조건이 없는 조회 (#270)', () => {
  * 여기서 잠그는 것은 **이 섹션이 상태를 들고 곡선에 넘기는가** — 그 연결이 끊기면 화살표가
  * 다시 곡선 위로 돌아가 온도 값을 덮는다 (이 이슈의 제보).
  */
-describe('WalkTimesSection — 화살표는 제목 줄이다 (#730)', () => {
+/*
+  **#730 의 결정을 되돌렸다.** 그 이슈는 오버레이 화살표가 오른쪽 끝 칸의 온도 값을 덮는
+  것을 근거로 화살표를 제목 줄로 올렸다. 그 관측은 지금도 맞지만, **표에서 멀어진 버튼이
+  무엇을 미는 컨트롤인지 보이지 않는다**는 쪽이 더 크다고 보아 표 좌우로 되돌린다.
+
+  가려지는 것은 오른쪽 끝 칸 하나이고 fade 마스크가 이미 흐려 둔 자리이며,
+  `.scroll-rail-arrow` 가 `pointer: coarse` 에서 버튼을 숨겨 **터치에서는 아무것도 가리지
+  않는다.** 되돌린 결정이라 옛 단언을 지우지 않고 **반대 방향으로 다시 못박는다** — 다음
+  사람이 #730 만 읽고 되돌리지 않게 한다.
+*/
+describe('WalkTimesSection — 화살표는 표 좌우다 (#730 에서 개정)', () => {
   const source = readFileSync(
     fileURLToPath(new URL('./walk-times-section.tsx', import.meta.url)),
     'utf8',
   )
 
-  it('스크롤 상태를 이 섹션이 들고 곡선에 넘긴다', () => {
-    expect(source).toContain('useScrollRail<HTMLUListElement>()')
-    expect(source).toContain('rail={rail}')
+  it('레일을 들고 있지 않다 — 곡선이 자기 것을 쓴다', () => {
+    expect(source).not.toContain('useScrollRail<HTMLUListElement>()')
+    expect(source).not.toContain('rail={rail}')
   })
 
-  it('화살표를 흐름 배치로 그린다 — 곡선 위에 띄우지 않는다', () => {
-    expect(source).toContain('placement="inline"')
+  it('제목 줄에 화살표를 그리지 않는다', () => {
+    expect(source).not.toContain('<ScrollRailArrows')
+    expect(source).not.toContain('placement="inline"')
   })
 
-  /** 제목과 화살표가 한 줄이다 — 곡선보다 **위**에 있어야 값을 가리지 않는다 */
-  it('화살표가 곡선보다 앞에 온다', () => {
-    expect(source.indexOf('<ScrollRailArrows')).toBeLessThan(source.indexOf('<WalkTimesCurve'))
+  /** 곡선이 `.scroll-rail` 안에 오버레이로 그린다 — 표 좌우에 붙는 자리다 */
+  it('곡선이 화살표를 스스로 그린다', () => {
+    const curve = readFileSync(
+      fileURLToPath(new URL('../../components/walk-times-curve.tsx', import.meta.url)),
+      'utf8',
+    )
+
+    expect(curve).toContain('<ScrollRailArrows')
+    expect(curve).toContain('scroll-rail')
   })
 })
