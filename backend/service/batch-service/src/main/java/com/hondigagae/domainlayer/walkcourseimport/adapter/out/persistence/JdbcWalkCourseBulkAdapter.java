@@ -37,15 +37,19 @@ public class JdbcWalkCourseBulkAdapter implements WalkCourseBulkPort {
             duration_text,
             duration_max_minutes,
             start_end_point,
+            start_point_name,
+            end_point_name,
             lat,
             lng,
+            end_lat,
+            end_lng,
             content_id,
             first_image,
             base_date,
             synced_at,
             created_at,
             updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW())
         ON DUPLICATE KEY UPDATE
             course_no = VALUES(course_no),
             variant = VALUES(variant),
@@ -55,8 +59,12 @@ public class JdbcWalkCourseBulkAdapter implements WalkCourseBulkPort {
             duration_text = VALUES(duration_text),
             duration_max_minutes = VALUES(duration_max_minutes),
             start_end_point = VALUES(start_end_point),
+            start_point_name = VALUES(start_point_name),
+            end_point_name = VALUES(end_point_name),
             lat = VALUES(lat),
             lng = VALUES(lng),
+            end_lat = VALUES(end_lat),
+            end_lng = VALUES(end_lng),
             content_id = VALUES(content_id),
             first_image = VALUES(first_image),
             base_date = VALUES(base_date),
@@ -85,11 +93,15 @@ public class JdbcWalkCourseBulkAdapter implements WalkCourseBulkPort {
                 ps.setString(8, course.durationText());
                 setNullableInt(ps, 9, course.durationMaxMinutes());
                 ps.setString(10, course.startEndPoint());
-                setNullableDouble(ps, 11, course.lat());
-                setNullableDouble(ps, 12, course.lng());
-                setNullableLong(ps, 13, course.contentId());
-                setNullableString(ps, 14, course.firstImage());
-                ps.setString(15, course.baseDate());
+                setNullableString(ps, 11, course.startPointName());
+                setNullableString(ps, 12, course.endPointName());
+                setNullableDouble(ps, 13, course.lat());
+                setNullableDouble(ps, 14, course.lng());
+                setNullableDouble(ps, 15, course.endLat());
+                setNullableDouble(ps, 16, course.endLng());
+                setNullableLong(ps, 17, course.contentId());
+                setNullableString(ps, 18, course.firstImage());
+                ps.setString(19, course.baseDate());
             }
 
             @Override

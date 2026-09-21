@@ -14,8 +14,12 @@ public record WalkCourseQueryResult(
     String durationText,
     Integer durationMaxMinutes,
     String startEndPoint,
+    String startPointName,
+    String endPointName,
     Double lat,
     Double lng,
+    Double endLat,
+    Double endLng,
     String firstImage,
     String baseDate
 ) {

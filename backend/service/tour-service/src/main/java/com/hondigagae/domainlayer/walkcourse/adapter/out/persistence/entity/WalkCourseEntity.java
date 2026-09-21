@@ -25,6 +25,11 @@ import org.hibernate.annotations.Comment;
  *
  * <p>좌표가 null 인 코스가 있다(20·18-2코스는 TourAPI 에 없다). 지어내지 않고 비워 둔다 -
  * 좌표가 있는 코스만 골든타임(walk-times)과 이어진다.
+ *
+ * <p><b>경로 좌표열(폴리라인) 컬럼은 없다.</b> 그것을 주는 공개 원천이 없기 때문이고, 네 곳을
+ * 전수 조사한 근거가 {@code backend/docs/data-api-analysis.md} §9 에 있다 (#736). 대신
+ * {@code endLat}/{@code endLng} 로 <b>시작점과 종점 두 점</b>까지는 준다 - 적재가 인접 코스의
+ * 시작점에서 끌어온 값이다 (#816).
  */
 @Entity
 @Getter
@@ -80,11 +85,25 @@ public class WalkCourseEntity extends BaseEntity {
     @Comment("시종점 원문 (시흥리정류장-광치기해변)")
     private String startEndPoint;
 
+    @Column(length = 50)
+    @Comment("시작 지점명 (시흥리정류장). 시종점 원문을 가른 것이고 표기는 원문 그대로다")
+    private String startPointName;
+
+    @Column(length = 50)
+    @Comment("종점 지점명 (광치기해변). 시종점 원문을 가른 것이고 표기는 원문 그대로다")
+    private String endPointName;
+
     @Comment("시작점 위도 (WGS84). TourAPI 매칭 실패 코스는 null")
     private Double lat;
 
     @Comment("시작점 경도 (WGS84). TourAPI 매칭 실패 코스는 null")
     private Double lng;
+
+    @Comment("종점 위도 (WGS84). 그 지점에서 출발하는 코스가 없어 못 찾은 코스는 null")
+    private Double endLat;
+
+    @Comment("종점 경도 (WGS84). 그 지점에서 출발하는 코스가 없어 못 찾은 코스는 null")
+    private Double endLng;
 
     @Comment("TourAPI contentId. 매칭 실패 코스는 null")
     private Long contentId;

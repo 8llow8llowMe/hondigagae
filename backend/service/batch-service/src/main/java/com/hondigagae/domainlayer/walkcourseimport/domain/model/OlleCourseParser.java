@@ -64,6 +64,59 @@ public final class OlleCourseParser {
         return variant == null || variant.isBlank() ? courseNo : courseNo + "-" + variant;
     }
 
+    /**
+     * "시종점정보"({@code 시흥리정류장-광치기해변})의 시작 지점명. 형식이 아니면 null 이다.
+     *
+     * <p><b>못 읽어도 실패시키지 않는다.</b> 거리·소요시간과 달리 지점명은 코스가 목록에 서는
+     * 조건이 아니고, 원문({@code startEndPoint})은 그대로 보존된다. 여기서 예외를 던지면 표기
+     * 하나 때문에 29건 적재가 통째로 멈춘다.
+     */
+    public static String startPointName(String startEndPoint) {
+        String[] parts = splitStartEndPoint(startEndPoint);
+        return parts == null ? null : parts[0];
+    }
+
+    /** "시종점정보"의 종점 지점명. 형식이 아니면 null 이다. */
+    public static String endPointName(String startEndPoint) {
+        String[] parts = splitStartEndPoint(startEndPoint);
+        return parts == null ? null : parts[1];
+    }
+
+    /**
+     * 지점명 매칭 키. <b>공백만 지운다.</b>
+     *
+     * <p>원천이 같은 곳을 두 표기로 부른다 — {@code 제주민속촌주차장입구}(3코스 종점)와
+     * {@code 제주민속촌주차장 입구}(4코스 시작), {@code 김녕서포구}(20코스 시작)와
+     * {@code 김녕 서포구}(19코스 종점). 접지 않으면 같은 지점이 지도에 두 번 찍힌다.
+     *
+     * <p><b>더 접지는 않는다.</b> 7코스 종점 {@code 월평아왜낭목쉼터} 와 8코스 시작
+     * {@code 월평아왜낭목} 은 같은 들머리로 보이지만 한쪽이 다른 쪽을 <b>포함</b>하는 관계라,
+     * 부분일치로 접으면 "○○포구"류 지명이 줄줄이 엮인다. 접지 않아 7코스 종점 좌표가 비는
+     * 편을 택한다 — 틀린 점을 찍는 것보다 없는 편이 낫다.
+     *
+     * <p>{@code 천진항.하우목동항}(1-1코스, 우도)처럼 점으로 두 이름을 묶은 표기도 그대로 둔다.
+     * 시작과 종점이 같은 문자열이라 이 규칙만으로 서로 매칭된다.
+     */
+    public static String pointNameKey(String pointName) {
+        return pointName == null ? null : pointName.replaceAll("\\s+", "");
+    }
+
+    /**
+     * 구분자 {@code -} 로 시작·종점을 가른다. <b>정확히 두 조각일 때만</b> 읽는다 — 지명 자체에
+     * {@code -} 가 들어오면 어디가 경계인지 알 수 없고, 반으로 잘린 지명을 화면에 내보내는 것보다
+     * 안 내보내는 편이 낫다. 2025-04-28 기준 29건 전부 정확히 두 조각이다.
+     */
+    private static String[] splitStartEndPoint(String startEndPoint) {
+        if (startEndPoint == null || startEndPoint.isBlank()) {
+            return null;
+        }
+        String[] parts = startEndPoint.trim().split("-");
+        if (parts.length != 2 || parts[0].isBlank() || parts[1].isBlank()) {
+            return null;
+        }
+        return new String[] {parts[0].trim(), parts[1].trim()};
+    }
+
     /** 정렬 순서. 본번호*10 + 부번호 - "1"→10, "1-1"→11, "18-2"→182 로 코스번호 순이 유지된다. */
     public static int courseOrder(String courseNo) {
         String[] parts = courseNo.split("-");

@@ -18,8 +18,12 @@ public record WalkCourseInfo(
     String durationText,
     Integer durationMaxMinutes,
     String startEndPoint,
+    String startPointName,
+    String endPointName,
     Double lat,
     Double lng,
+    Double endLat,
+    Double endLng,
     String firstImage,
     String baseDate
 ) {
@@ -35,8 +39,12 @@ public record WalkCourseInfo(
             .durationText(result.durationText())
             .durationMaxMinutes(result.durationMaxMinutes())
             .startEndPoint(result.startEndPoint())
+            .startPointName(result.startPointName())
+            .endPointName(result.endPointName())
             .lat(result.lat())
             .lng(result.lng())
+            .endLat(result.endLat())
+            .endLng(result.endLng())
             .firstImage(result.firstImage())
             .baseDate(result.baseDate())
             .build();

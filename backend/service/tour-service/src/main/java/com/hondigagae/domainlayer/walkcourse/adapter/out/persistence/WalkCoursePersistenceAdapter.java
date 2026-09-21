@@ -50,8 +50,12 @@ public class WalkCoursePersistenceAdapter implements WalkCourseRepositoryPort {
             .durationText(entity.getDurationText())
             .durationMaxMinutes(entity.getDurationMaxMinutes())
             .startEndPoint(entity.getStartEndPoint())
+            .startPointName(entity.getStartPointName())
+            .endPointName(entity.getEndPointName())
             .lat(entity.getLat())
             .lng(entity.getLng())
+            .endLat(entity.getEndLat())
+            .endLng(entity.getEndLng())
             .firstImage(entity.getFirstImage())
             .baseDate(entity.getBaseDate())
             .build();

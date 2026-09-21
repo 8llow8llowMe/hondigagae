@@ -5,6 +5,7 @@ import com.hondigagae.domainlayer.walkcourseimport.application.port.out.OlleCour
 import com.hondigagae.domainlayer.walkcourseimport.application.port.out.WalkCourseBulkPort;
 import com.hondigagae.domainlayer.walkcourseimport.application.port.out.query.OlleCourseCoordinateQueryResult;
 import com.hondigagae.domainlayer.walkcourseimport.domain.model.ImportedWalkCourse;
+import com.hondigagae.domainlayer.walkcourseimport.domain.model.OlleCourseEndpointResolver;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -53,10 +54,21 @@ public class OlleCourseImportProcessor {
                 .toList());
         }
 
-        int upserted = walkCourseBulkPort.upsertAll(merged);
-        log.info("olle course import finished. courses={}, coordinateMatched={}, upserted={}",
-            merged.size(), merged.size() - unmatched, upserted);
-        return merged;
+        // 종점 좌표는 새 원천 없이 인접 코스의 시작점에서 끌어온다 (#816). 시작점 매칭이 끝난 뒤라야 한다.
+        List<ImportedWalkCourse> resolved = OlleCourseEndpointResolver.resolveEndCoordinates(merged);
+        long endUnmatched = resolved.stream().filter(course -> course.endLat() == null).count();
+        if (endUnmatched > 0) {
+            // 그 지점에서 출발하는 코스가 없어 닿지 않는 종점이다 - 원천 결손이 아니라 체이닝의 한계다.
+            log.info("olle courses without end coordinates: {}", resolved.stream()
+                .filter(course -> course.endLat() == null)
+                .map(course -> course.courseKey() + "(" + course.endPointName() + ")")
+                .toList());
+        }
+
+        int upserted = walkCourseBulkPort.upsertAll(resolved);
+        log.info("olle course import finished. courses={}, coordinateMatched={}, endCoordinateMatched={}, upserted={}",
+            resolved.size(), resolved.size() - unmatched, resolved.size() - endUnmatched, upserted);
+        return resolved;
     }
 
     private ImportedWalkCourse merge(ImportedWalkCourse course, OlleCourseCoordinateQueryResult coordinate) {

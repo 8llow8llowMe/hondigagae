@@ -105,6 +105,43 @@ class OlleCourseParserTest {
     }
 
     @Test
+    @DisplayName("시종점 원문에서 두 지점명을 가른다 - 표기는 원문 그대로 둔다")
+    void splitsStartAndEndPointNames() {
+        assertThat(OlleCourseParser.startPointName("시흥리정류장-광치기해변")).isEqualTo("시흥리정류장");
+        assertThat(OlleCourseParser.endPointName("시흥리정류장-광치기해변")).isEqualTo("광치기해변");
+        // 점으로 두 이름을 묶은 표기(우도 1-1코스)도 한 덩어리로 둔다 - 가르면 어느 항인지 알 수 없다
+        assertThat(OlleCourseParser.startPointName("천진항.하우목동항-천진항.하우목동항"))
+            .isEqualTo("천진항.하우목동항");
+        // 공백은 원문 그대로 남는다 - 접는 것은 매칭 키에서만 한다
+        assertThat(OlleCourseParser.endPointName("온평포구-제주민속촌주차장 입구"))
+            .isEqualTo("제주민속촌주차장 입구");
+    }
+
+    @Test
+    @DisplayName("지점명을 못 가르면 null 이다 - 여기서 실패시키면 표기 하나에 29건 적재가 멈춘다")
+    void unparsableStartEndPointYieldsNull() {
+        // 구분자가 없다
+        assertThat(OlleCourseParser.startPointName("시흥리정류장 광치기해변")).isNull();
+        // 지명 자체에 구분자가 들어와 어디가 경계인지 알 수 없다
+        assertThat(OlleCourseParser.endPointName("가-나-다")).isNull();
+        assertThat(OlleCourseParser.startPointName(null)).isNull();
+        assertThat(OlleCourseParser.startPointName("  ")).isNull();
+    }
+
+    @Test
+    @DisplayName("매칭 키는 공백만 지운다 - 같은 곳의 두 표기를 접되 부분일치로 엮지는 않는다")
+    void pointNameKeyFoldsWhitespaceOnly() {
+        // 원천이 같은 곳을 두 표기로 부르는 실제 쌍 둘
+        assertThat(OlleCourseParser.pointNameKey("제주민속촌주차장 입구"))
+            .isEqualTo(OlleCourseParser.pointNameKey("제주민속촌주차장입구"));
+        assertThat(OlleCourseParser.pointNameKey("김녕 서포구"))
+            .isEqualTo(OlleCourseParser.pointNameKey("김녕서포구"));
+        // 한쪽이 다른 쪽을 포함할 뿐인 이름은 접지 않는다
+        assertThat(OlleCourseParser.pointNameKey("월평아왜낭목쉼터"))
+            .isNotEqualTo(OlleCourseParser.pointNameKey("월평아왜낭목"));
+    }
+
+    @Test
     @DisplayName("id 는 코스키에서 결정적으로 나온다 - 재실행이 같은 행에 꽂힌다")
     void idIsDeterministic() {
         assertThat(OlleCourseParser.walkCourseId("3-A")).isEqualTo(OlleCourseParser.walkCourseId("3-A"));
