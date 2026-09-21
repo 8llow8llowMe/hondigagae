@@ -37,12 +37,41 @@ describe('산책 코스 mock — 공개 API', () => {
     expect(result).not.toHaveProperty('hasNext')
   })
 
-  /** 좌표·이미지가 있는 코스가 소수라는 실데이터 분포를 fixture 가 흉내 낸다 (S3-1) */
-  it('좌표 없는 코스가 다수다 — 기본 모양이 그것이다', () => {
+  /**
+   * **좌표·이미지가 있는 코스가 기본이라는 실데이터 분포를 fixture 가 흉내 낸다** (S3-1 ·
+   * [#767](https://github.com/8llow8llowMe/hondigagae/issues/767)). 2026-09-18 에는 정반대를
+   * 단언하던 자리다 — 재적재로 29/29 가 되었다.
+   */
+  it('좌표 있는 코스가 다수다 — 기본 모양이 그것이다', () => {
     const { courses } = body('')
     const withCoords = courses.filter((course) => course.lat !== null && course.lng !== null)
 
-    expect(withCoords.length).toBeLessThan(courses.length - withCoords.length)
+    expect(withCoords.length).toBeGreaterThan(courses.length - withCoords.length)
+  })
+
+  /**
+   * **없는 갈래를 다 지우지는 않는다.** 이미지·좌표는 계약이 아니라 TourAPI 매칭에서 오는
+   * 데이터라 원천이 다시 비면 돌아온다 — 그때 상세 안내 상자(D5-2)와 썸네일 없는 행을
+   * 로컬에서 볼 수 있어야 한다.
+   */
+  it('좌표 없는 코스를 하나는 남긴다', () => {
+    const { courses } = body('')
+
+    expect(courses.filter((course) => course.lat === null)).toHaveLength(1)
+  })
+
+  /**
+   * **좌표 없음과 소요시간 모름은 서로 독립이다.** 한 행에 겹쳐 두면 로컬에서 둘이 묶여
+   * 보이고, "좌표가 없으면 소요시간도 모른다" 로 잘못 읽힌다.
+   */
+  it('좌표 없는 코스와 소요시간 모르는 코스가 다른 행이다', () => {
+    const { courses } = body('')
+    const noCoords = courses.find((course) => course.lat === null)
+    const unknownDuration = courses.find((course) => course.durationMaxMinutes === null)
+
+    expect(noCoords).toBeDefined()
+    expect(unknownDuration).toBeDefined()
+    expect(noCoords?.walkCourseId).not.toBe(unknownDuration?.walkCourseId)
   })
 
   /** 좌표와 이미지는 같은 매칭에서 온다 — 한쪽만 있는 코스가 없어야 분포가 실제와 같다 */
@@ -151,12 +180,17 @@ describe('산책 코스 mock — 활동량 필터 (S4-1)', () => {
     expect(courses.some((course) => course.durationMaxMinutes === null)).toBe(true)
   })
 
-  /** 모르는 것을 나쁜 것으로 판정하지 않는다 (`WalkCourseActivityFit.fits`) */
-  it('LOW 결과에 좌표 있는 코스가 하나도 없다 — 실데이터 분포 그대로다', () => {
+  /**
+   * **뒤집힌 단언이다** ([#767](https://github.com/8llow8llowMe/hondigagae/issues/767)). 재적재
+   * 전에는 `LOW` 를 걸면 좌표 있는 코스가 **하나도** 남지 않아, 활동량이 낮은 아이의
+   * 보호자는 골든타임을 한 번도 볼 수 없었다(D8-2). 실측 29/29 뒤에는 `LOW` 통과 6개가
+   * **전부 좌표를 갖는다** — fixture 도 같은 모양이어야 로컬이 실제와 같은 말을 한다.
+   */
+  it('LOW 결과에 좌표 있는 코스가 남는다 — 실데이터 분포 그대로다', () => {
     const { courses } = body('?petActivityLevel=LOW')
 
     expect(courses.length).toBeGreaterThan(0)
-    expect(courses.every((course) => course.lat === null)).toBe(true)
+    expect(courses.some((course) => course.lat !== null)).toBe(true)
   })
 
   it('소문자는 400 WALKCOURSE_113 이다', () => {

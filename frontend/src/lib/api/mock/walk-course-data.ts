@@ -11,9 +11,14 @@ import type {
 /**
  * 제주올레 산책 코스 mock (#618).
  *
- * **dev 실데이터(2026-09-18)를 옮긴 fixture 다.** 지어낸 값이 아니라 실호출 응답에서
- * 골라 왔고, **분포까지 흉내 낸다** — 좌표·이미지를 가진 코스가 소수다 (공통명세 S3-1).
- * 그것이 화면 분기의 전제라, 전부 좌표를 채워 두면 로컬에서는 **기본 모양을 한 번도 못 본다.**
+ * **dev 실데이터(2026-09-21 재적재 후)를 옮긴 fixture 다.** 지어낸 값이 아니라 실호출
+ * 응답에서 골라 왔고, **분포까지 흉내 낸다** — 이제 좌표·이미지를 **가진 코스가 기본**이다
+ * (실측 29/29, 공통명세 S3-1 · [#767](https://github.com/8llow8llowMe/hondigagae/issues/767)).
+ *
+ * **2026-09-18 판에서는 정반대였다** — 29개 중 4개만 좌표·이미지를 가져 fixture 도 7개 중
+ * 1개만 채웠다. 그 분포를 그대로 두면 로컬 화면이 **실제와 반대 모양**이 된다
+ * ([#671](https://github.com/8llow8llowMe/hondigagae/issues/671) E-1 이 잡아낸 종류의 함정).
+ * 없는 갈래는 `3코스 (A)` 하나로 남겼다 — 원천이 다시 비면 돌아오는 갈래라서다.
  *
  * **백엔드보다 느슨하거나 엄격해서는 안 된다** (`favorite-data.ts` 와 같은 규칙):
  * 없는 id → 404 `WALKCOURSE_001`, 숫자 아닌 id → 400 `WALKCOURSE_113`,
@@ -37,9 +42,10 @@ type MockWalkCourse = WalkCourseSummary
 /**
  * 일곱 코스로 화면 분기를 전부 덮는다 (`코스목록-세부명세.md` D7 표).
  *
- * `2코스` 만 좌표·이미지를 갖는다 — **골든타임 동선이 생기는 유일한 모양**이다.
- * 나머지가 기본 모양이고, `LOW`(240분)를 걸면 **좌표 있는 코스가 0개가 되는 상태**(D8-2)가
- * 로컬에서 그대로 재현된다.
+ * **`3코스 (A)` 만 좌표·이미지가 없다** — 일곱 중 여섯이 골든타임으로 이어진다. `LOW`(240분)
+ * 를 걸면 `6코스`·`10-1코스` 가 남고 **둘 다 좌표가 있어**, 실데이터와 같이 D8-2 안내
+ * (`noGoldenInScope`)가 서지 않는다. 그 안내는 지운 것이 아니라 **데이터가 다시 비면
+ * 돌아오는 갈래**이고, 단위 테스트가 잠그고 있다.
  *
  * **`20코스` 는 소요시간을 모르는 갈래다** ([#748](https://github.com/8llow8llowMe/hondigagae/issues/748)).
  * 없을 때는 여섯 코스가 **전부 `durationMaxMinutes` 를 갖고 있어** 상세의 모르는 갈래
@@ -57,9 +63,9 @@ export const MOCK_WALK_COURSES: MockWalkCourse[] = [
     durationText: '4~5시간',
     durationMaxMinutes: 300,
     startEndPoint: '시흥리정류장-광치기해변',
-    lat: null,
-    lng: null,
-    firstImage: null,
+    lat: 33.4795908312,
+    lng: 126.8954874884,
+    firstImage: 'https://tong.visitkorea.or.kr/cms/resource/82/3550482_image2_1.jpg',
   },
   {
     walkCourseId: '6911167100216303304',
@@ -69,9 +75,9 @@ export const MOCK_WALK_COURSES: MockWalkCourse[] = [
     durationText: '4~5시간',
     durationMaxMinutes: 300,
     startEndPoint: '광치기해변-온평포구',
-    lat: 33.3866,
-    lng: 126.8734,
-    firstImage: 'http://tong.visitkorea.or.kr/cms/resource/60/2666460_image2_1.jpg',
+    lat: 33.4515223271,
+    lng: 126.9233577769,
+    firstImage: 'https://tong.visitkorea.or.kr/cms/resource/02/3550002_image2_1.jpg',
   },
   {
     walkCourseId: '6911167100216303306',
@@ -81,6 +87,16 @@ export const MOCK_WALK_COURSES: MockWalkCourse[] = [
     durationText: '6~7시간',
     durationMaxMinutes: 420,
     startEndPoint: '온평포구-표선해수욕장',
+    /*
+      **좌표·이미지가 없는 갈래를 이 코스 하나에 남긴다** ([#767](https://github.com/8llow8llowMe/hondigagae/issues/767)).
+      재적재 뒤 dev 실데이터에는 **그런 코스가 하나도 없다**(29/29). 그래서 이 행만은
+      실데이터의 복제본이 아니라 **의도적으로 남긴 갈래**다 — 이미지·좌표는 계약이 아니라
+      TourAPI 매칭에서 오는 데이터라 원천이 다시 비면 돌아오고, 그때 상세의 안내 상자
+      (`코스상세-세부명세.md` D5-2)와 썸네일 없는 행을 로컬에서 볼 수 있어야 한다.
+
+      **`20코스`(소요시간 미정)와 다른 행에 둔 것은 일부러다.** 두 갈래를 한 행에 겹치면
+      "좌표가 없으면 소요시간도 모른다" 로 잘못 읽힌다 — 둘은 서로 독립이다.
+    */
     lat: null,
     lng: null,
     firstImage: null,
@@ -93,9 +109,9 @@ export const MOCK_WALK_COURSES: MockWalkCourse[] = [
     durationText: '3~4시간',
     durationMaxMinutes: 240,
     startEndPoint: '쇠소깍다리-제주올레여행자센터',
-    lat: null,
-    lng: null,
-    firstImage: null,
+    lat: 33.2522378511,
+    lng: 126.6233901641,
+    firstImage: 'https://tong.visitkorea.or.kr/cms/resource/33/3550333_image2_1.jpg',
   },
   {
     walkCourseId: '6911167100216303315',
@@ -105,9 +121,9 @@ export const MOCK_WALK_COURSES: MockWalkCourse[] = [
     durationText: '1~2시간',
     durationMaxMinutes: 120,
     startEndPoint: '가파도상동포구-가파도상동포구',
-    lat: null,
-    lng: null,
-    firstImage: null,
+    lat: 33.1742190951,
+    lng: 126.2707885175,
+    firstImage: 'https://tong.visitkorea.or.kr/cms/resource/86/3549886_image2_1.jpg',
   },
   {
     walkCourseId: '6911167100216303322',
@@ -117,9 +133,9 @@ export const MOCK_WALK_COURSES: MockWalkCourse[] = [
     durationText: '4~5시간',
     durationMaxMinutes: 300,
     startEndPoint: '한림항비양도도항선대합실-고내포구',
-    lat: null,
-    lng: null,
-    firstImage: null,
+    lat: 33.4192876866,
+    lng: 126.2625254768,
+    firstImage: 'https://tong.visitkorea.or.kr/cms/resource/85/3554485_image2_1.jpg',
   },
   {
     /*
@@ -141,9 +157,9 @@ export const MOCK_WALK_COURSES: MockWalkCourse[] = [
       복제본이 거짓을 가르치면 안 된다 — 코스 이름(`김녕-하도`)과 맞춘다.
     */
     startEndPoint: '김녕서포구-하도해수욕장',
-    lat: null,
-    lng: null,
-    firstImage: null,
+    lat: 33.557138789,
+    lng: 126.7452021271,
+    firstImage: 'https://tong.visitkorea.or.kr/cms/resource/54/3554454_image2_1.jpg',
   },
 ]
 
