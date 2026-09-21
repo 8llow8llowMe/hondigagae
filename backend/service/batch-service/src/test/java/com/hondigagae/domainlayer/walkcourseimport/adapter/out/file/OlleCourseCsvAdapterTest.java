@@ -51,6 +51,21 @@ class OlleCourseCsvAdapterTest {
         assertThat(variantCourse.startEndPoint()).isEqualTo("온평포구-제주민속촌주차장입구");
     }
 
+    @Test
+    @DisplayName("시종점 원문을 두 지점명으로 갈라 함께 싣는다 - 원문도 그대로 남는다 (#816)")
+    void carriesStartAndEndPointNames() throws IOException {
+        List<ImportedWalkCourse> courses = load(write("names.csv", StandardCharsets.UTF_8));
+
+        ImportedWalkCourse first = courses.get(0);
+        assertThat(first.startPointName()).isEqualTo("시흥리정류장");
+        assertThat(first.endPointName()).isEqualTo("광치기해변");
+        // 원문은 손대지 않는다 - 화면이 한 줄로 보여 주는 값이 따로 있다
+        assertThat(first.startEndPoint()).isEqualTo("시흥리정류장-광치기해변");
+        // 종점 좌표는 적재 프로세서가 채운다 - CSV 만 읽은 단계에서는 비어 있다
+        assertThat(first.endLat()).isNull();
+        assertThat(first.endLng()).isNull();
+    }
+
     private Path write(String fileName, Charset charset) throws IOException {
         Path path = tempDir.resolve(fileName);
         Files.write(path, CSV.getBytes(charset));

@@ -163,6 +163,16 @@ uk_place_image_place_id_serial_num (placeId, serialNum)
 
 ## 5. walk_route / walk_course — 두루누비 (1:N)
 
+> **아래는 초안이고 구현과 다르다 — 이 모양을 따라가지 말 것.** 두루누비를 원천으로 가정하고
+> 그렸는데 두루누비는 제주가 0개라 배제했다(`data-api-analysis.md` §6 · §9). `walk_route` 는
+> 만들지 않았고, `walk_course` 의 실제 원천은 공공데이터포털 올레코스현황 CSV + TourAPI
+> 레포츠(28) 결합이다. **`crs_idx` · `gpx_path` 는 구현에 없다** — 경로 좌표열을 주는 원천이
+> 없기 때문이다. 정본은 `WalkCourseEntity` 와 `services/tour-service.md` 이고, 실제 컬럼은
+> `course_key`(UK) · `course_no` · `variant` · `course_order` · `name` · `distance_km` ·
+> `duration_text` · `duration_max_minutes` · `start_end_point` · `start_point_name` ·
+> `end_point_name` · `lat` · `lng` · `end_lat` · `end_lng` · `content_id` · `first_image` ·
+> `base_date` · `synced_at` 다 (#816 기준).
+
 원천: `Durunubi routeList / courseList` — 실호출 확인 필드. 코스는 `routeIdx`로 길(테마)에 소속된다.
 
 ### walk_route (길/테마)

@@ -80,6 +80,7 @@ public class OlleCourseCsvAdapter implements OlleCourseCatalogPort {
         String variant = OlleCourseParser.variantOf(name);
         String courseKey = OlleCourseParser.courseKey(courseNo, variant);
         String durationText = cells[indices[3]].trim();
+        String startEndPoint = cells[indices[4]].trim();
 
         return ImportedWalkCourse.builder()
             .id(OlleCourseParser.walkCourseId(courseKey))
@@ -91,7 +92,10 @@ public class OlleCourseCsvAdapter implements OlleCourseCatalogPort {
             .distanceKm(OlleCourseParser.distanceKm(cells[indices[2]].trim()))
             .durationText(durationText)
             .durationMaxMinutes(OlleCourseParser.durationMaxMinutes(durationText))
-            .startEndPoint(cells[indices[4]].trim())
+            .startEndPoint(startEndPoint)
+            // 원문은 그대로 두고 두 지점명을 따로 낸다. 못 가르면 null 이고 원문은 남는다 (#816)
+            .startPointName(OlleCourseParser.startPointName(startEndPoint))
+            .endPointName(OlleCourseParser.endPointName(startEndPoint))
             .baseDate(cells[indices[5]].trim())
             .build();
     }
