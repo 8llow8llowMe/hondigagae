@@ -39,6 +39,14 @@ export type WalkCourseDetailSectionProps = {
   /** `일정에 담기` 진입이 미로그인이면 로그인으로 보낸다 (#620 · D4-1) */
   authed: boolean
   /**
+   * 판정의 기준이 될 반려견이 있는가 — 골든타임 카드의 등록 안내를 가른다
+   * ([#777](https://github.com/8llow8llowMe/hondigagae/issues/777) · D8-9).
+   *
+   * **`authed` 와 별개다.** 로그인했는데 0마리인 사용자도 사람 기준 판정을 본다 —
+   * 두 갈래가 같은 안내를 받고 링크만 갈린다.
+   */
+  petRegistered: boolean
+  /**
    * `코스 목록으로` 가 돌아갈 주소 ([#783](https://github.com/8llow8llowMe/hondigagae/issues/783)).
    *
    * **상세 URL 에는 필터가 없다.** 목록 행이 조건을 쿼리로 실어 보내고 라우트가 그것을
@@ -79,6 +87,7 @@ export function WalkCourseDetailSection({
   walkTimesLoading,
   onWalkTimesRetry,
   authed,
+  petRegistered,
   backHref = '/walk-courses',
 }: WalkCourseDetailSectionProps) {
   if (loading) {
@@ -201,6 +210,8 @@ export function WalkCourseDetailSection({
             walkTimes={walkTimes}
             loading={walkTimesLoading}
             onRetry={onWalkTimesRetry}
+            authed={authed}
+            petRegistered={petRegistered}
           />
 
           {/*

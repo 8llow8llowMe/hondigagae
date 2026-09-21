@@ -21,13 +21,25 @@ import type { WalkTimesResponse } from '@/types/insight'
  */
 const WALK_TIMES = mockWalkTimes(null)
 
+/**
+ * **기본은 반려견이 있는 사용자다** (#777). 이 파일의 기존 단언은 전부 *카드 자체*를 보는
+ * 것이라, 등록 안내가 기본으로 붙으면 그 단언들이 안내까지 함께 보게 된다. 안내 갈래는
+ * 아래 전용 describe 가 명시적으로 연다.
+ */
 function render(
   course: { lat: number | null; lng: number | null },
   walkTimes: WalkTimesResponse | null = WALK_TIMES,
   loading = false,
+  guest: { authed: boolean; petRegistered: boolean } = { authed: true, petRegistered: true },
 ): string {
   return renderToStaticMarkup(
-    createElement(WalkCourseGoldenSlot, { course, walkTimes, loading, onRetry: vi.fn() }),
+    createElement(WalkCourseGoldenSlot, {
+      course,
+      walkTimes,
+      loading,
+      onRetry: vi.fn(),
+      ...guest,
+    }),
   )
 }
 
@@ -222,5 +234,102 @@ describe('WalkCourseGoldenSlot — 좌표가 있으면 골든타임을 세운다
 
   it('로딩 중에는 자리를 세운다', () => {
     expect(render({ lat: 33.4, lng: 126.9 }, null, true)).not.toBe('')
+  })
+})
+
+/*
+  [#777](https://github.com/8llow8llowMe/hondigagae/issues/777). 이 카드는 반려견이 없으면
+  **사람 기준**으로 판정하는데, 등록하면 그 판정이 실제로 바뀐다는 사실을 화면이 말하지
+  않았다 — 사용자는 **더 나은 화면이 존재한다는 것 자체를 모른다.**
+
+  붙이는 조건은 선례가 정해 두었다 (#748 결정 ③ · `place-suitability-panel`):
+  **판정이 이미 서 있고, 등록하면 그 자리가 바뀌는 곳**에만 붙인다.
+*/
+describe('WalkCourseGoldenSlot — 반려견 등록 안내 (#777)', () => {
+  const COORDS = { lat: 33.4, lng: 126.9 }
+  const GUEST = { authed: false, petRegistered: false }
+  const NO_PET = { authed: true, petRegistered: false }
+  const WITH_PET = { authed: true, petRegistered: true }
+
+  it('미로그인에는 등록 안내를 보여 준다', () => {
+    const markup = render(COORDS, WALK_TIMES, false, GUEST)
+
+    expect(markup).toContain(messages.home.guestVerdictNotice)
+    expect(markup).toContain(messages.home.registerPet)
+  })
+
+  it('로그인했지만 반려견이 없어도 같은 안내다', () => {
+    const markup = render(COORDS, WALK_TIMES, false, NO_PET)
+
+    expect(markup).toContain(messages.home.guestVerdictNotice)
+  })
+
+  /**
+   * **두 갈래가 같은 말을 한다.** 갈리는 것은 링크가 데려가는 곳 하나뿐이다 — 이 화면은
+   * 미로그인에 안내를 한 겹 더 두지 않기로 이미 정했고(`walk-course-add-action.tsx`),
+   * 여기만 어법을 갈라 두면 한 화면이 게스트를 두 방식으로 대한다.
+   */
+  it('갈리는 것은 링크가 데려가는 곳뿐이다', () => {
+    expect(render(COORDS, WALK_TIMES, false, GUEST)).toContain('href="/login"')
+    expect(render(COORDS, WALK_TIMES, false, NO_PET)).toContain('href="/pets/new"')
+  })
+
+  it('반려견이 있으면 안내를 붙이지 않는다', () => {
+    const markup = render(COORDS, WALK_TIMES, false, WITH_PET)
+
+    expect(markup).not.toContain(messages.home.guestVerdictNotice)
+    // 카드 자체는 그대로다 — 안내만 없는 것이지 갈래가 다른 화면이 아니다
+    expect(markup).toContain(messages.home.goldenHeading)
+  })
+
+  /**
+   * **문구를 이 화면이 새로 쓰지 않는다.** 같은 상황에 화면마다 다른 말을 하지 않는 것이
+   * #204 · #262 · #270 으로 세 번 고친 축이다 — 제목·기준점 줄과 같은 이유로
+   * `messages.home` 의 문장을 그대로 쓴다.
+   */
+  it('홈이 이미 쓰던 문장을 그대로 쓴다', () => {
+    expect(messages.home.guestVerdictNotice).toContain('반려견을 등록하면')
+  })
+
+  /*
+    **지키지 못할 약속을 만들지 않는다.** 곡선이 비면 이 카드는 `예보가 없어요` 를 말하고
+    있고 등록해도 그 자리는 바뀌지 않는다 — 등급은 예보에서 나온다. #748 이 활동량 줄에
+    유도를 붙이지 않은 근거가 그대로 적용된다.
+  */
+  it('예보가 없으면 안내를 붙이지 않는다', () => {
+    const noForecast = { ...WALK_TIMES, hourly: [] }
+    const markup = render(COORDS, noForecast, false, GUEST)
+
+    expect(markup).toContain(messages.home.goldenHeading)
+    expect(markup).not.toContain(messages.home.guestVerdictNotice)
+  })
+
+  it('로딩 중에는 안내를 붙이지 않는다', () => {
+    expect(render(COORDS, null, true, GUEST)).not.toContain(messages.home.guestVerdictNotice)
+  })
+
+  /**
+   * **좌표가 없는 갈래에는 붙이지 않는다** (25/29 가 이 갈래다). 거기서는 요청 자체가
+   * 나가지 않아 **판정이 아예 없고**, 등록해도 그 카드는 한 글자도 바뀌지 않는다 —
+   * 붙이면 안내가 아니라 거짓말이다.
+   */
+  it('좌표가 없는 코스에는 붙이지 않는다', () => {
+    const markup = render({ lat: null, lng: null }, null, false, GUEST)
+
+    expect(markup).toContain(messages.walkCourse.noCoordinates)
+    expect(markup).not.toContain(messages.home.guestVerdictNotice)
+  })
+
+  /**
+   * **버튼을 하나 더 만들지 않는다** — 바로 아래 `일정에 담기` 와 컨트롤이 경쟁하면
+   * 무엇이 주 행동인지 흐려진다. 링크 하나다 (`NoCoordinates` 와 같은 규칙).
+   */
+  it('안내가 버튼을 만들지 않는다', () => {
+    expect(render(COORDS, WALK_TIMES, false, GUEST)).not.toContain('<button')
+  })
+
+  /** 오류가 아니라 이 사용자의 사정이다 — 경고로 읽히면 진입마다 먼저 읽힌다 (D6) */
+  it('안내에 role="alert" 를 주지 않는다', () => {
+    expect(render(COORDS, WALK_TIMES, false, GUEST)).not.toContain('role="alert"')
   })
 })

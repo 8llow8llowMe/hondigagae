@@ -56,17 +56,44 @@ import type { WalkTimesResponse } from '@/types/insight'
  *
  * 그래서 **캡션을 여기서 그리지 않는다.** `WalkTimesSection` 이 기준점 한 줄을 이미 갖고
  * 있고, 이제 그 줄이 시작점을 말할 수 있다 (D8-5 의 사실은 그대로 전달된다).
+ *
+ * ### 반려견이 없으면 등록 안내가 붙는다 ([#777](https://github.com/8llow8llowMe/hondigagae/issues/777))
+ *
+ * 이 카드는 반려견이 없으면 **사람 기준**으로 판정한다. 등록하면 그 판정이 실제로 바뀌는데
+ * (`toPetCondition` → 서버 `PetCondition` → `quickLevel`) 그 사실을 알리는 것이 화면에
+ * 없었다 — 사용자는 **더 나은 화면이 존재한다는 것 자체를 모른다.**
+ *
+ * **안내를 `WalkTimesSection` 에 넣지 않는다.** 홈이 같은 컴포넌트를 쓰고 홈에는 프로필
+ * 카드가 이미 등록을 안내하고 있어, 공용 컴포넌트에 넣으면 홈이 같은 말을 두 번 한다
+ * (#780 이 이 화면에서 고친 바로 그 중복이다). 코스 상세 전용 래퍼인 여기가 자리다.
  */
 export function WalkCourseGoldenSlot({
   course,
   walkTimes,
   loading,
   onRetry,
+  authed,
+  petRegistered,
 }: {
   course: WalkCourseCoordinates
   walkTimes: WalkTimesResponse | null
   loading: boolean
   onRetry: () => void
+  /** 안내 링크가 로그인으로 갈지 반려견 등록으로 갈지 가른다 (#777) */
+  authed: boolean
+  /**
+   * 판정의 기준이 될 반려견이 있는가 — 없으면 등록 안내가 선다 (#777).
+   *
+   * **`walkTimes.petConditionApplied` 를 읽지 않는다.** 그 값은 우리가 보낸 조건이
+   * 실렸는지를 서버가 되돌려 준 것이라 **같은 사실의 메아리**다. 안내가 하는 약속은
+   * "등록하면 바뀐다" 이고 그 약속의 주어는 응답이 아니라 **사용자의 반려견 목록**이다 —
+   * 기준을 응답으로 옮기면 조건이 실렸는데도 아이가 없다고 말하는 갈래가 생긴다.
+   *
+   * **갈래는 셋이 아니라 둘이다.** `nav 미선택` 은 도달하지 않는다 — `resolveSelectedPet`
+   * 이 저장된 id 가 없거나 목록에 없으면 **첫 번째 아이로 떨어지고**, `null` 은 목록이
+   * 빌 때뿐이다. 남는 것은 미로그인과 로그인·0마리이고 **둘은 같은 말을 한다** (아래).
+   */
+  petRegistered: boolean
 }) {
   if (!hasCoordinates(course)) return <NoCoordinates />
 
@@ -94,7 +121,56 @@ export function WalkCourseGoldenSlot({
         onRetry={onRetry}
         retryLabel={messages.walkCourse.goldenRetry}
       />
+
+      {/*
+        **판정이 화면에 서 있을 때만 붙인다** (#777). 곡선이 비면 이 카드는 `예보가 없어요`
+        를 말하고 있고, 그 자리는 **반려견을 등록해도 한 글자도 바뀌지 않는다** — 등급은
+        예보에서 나오므로 예보가 없으면 조건을 실어도 똑같이 없다. #748 이 활동량 줄에
+        유도를 붙이지 않기로 한 근거가 그대로 여기 적용된다: *"지키지 못할 약속"* 을
+        만들지 않는다. 로딩 중에도 같은 이유로 붙이지 않는다.
+      */}
+      {petRegistered || !hasVerdict(walkTimes) ? null : <RegisterPetNotice authed={authed} />}
     </Surface>
+  )
+}
+
+/** 등록이 바꿀 수 있는 판정이 실제로 서 있는가 — 곡선이 있어야 등급이 있다 */
+function hasVerdict(walkTimes: WalkTimesResponse | null): boolean {
+  return walkTimes !== null && walkTimes.hourly.length > 0
+}
+
+/**
+ * 반려견 등록 안내 — [#777](https://github.com/8llow8llowMe/hondigagae/issues/777).
+ *
+ * **문구를 여기서 새로 쓰지 않는다.** `messages.home.guestVerdictNotice` 는 이 저장소가
+ * 이 상황(판정이 서 있고, 등록하면 그 자리가 바뀐다)을 위해 이미 써 둔 문장이다. 같은
+ * 상황에 화면마다 다른 말을 하지 않는 것이 #204 · #262 · #270 으로 세 번 고친 축이고,
+ * 이 파일은 제목도 기준점 줄도 같은 이유로 `messages.home` 을 빌려 쓰고 있다 —
+ * 골든타임 카드의 어휘는 원래 거기 산다.
+ *
+ * **미로그인과 로그인·0마리가 같은 말을 한다.** 갈리는 것은 링크가 데려가는 곳 하나뿐이다.
+ * 이 화면은 미로그인에 안내를 한 겹 더 두지 않기로 이미 정했다 — 바로 아래 `일정에 담기`
+ * 도 같은 이름을 보여 주고 누르면 로그인으로 보낸다 (`walk-course-add-action.tsx`).
+ * 여기만 `가입하고 등록하기` 로 갈라 두면 한 화면이 게스트를 두 어법으로 대한다.
+ *
+ * **상자는 카드 인셋 안에 선다.** 각진 불투명 면이 radius 12 모서리를 덮지 않게 한다
+ * (`DESIGN.md` §0) — 바로 위 `NoCoordinates` 의 상자와 같은 규칙이다.
+ */
+function RegisterPetNotice({ authed }: { authed: boolean }) {
+  return (
+    <div className={cn('pb-4 md:pb-5', INSET_CLASS.card)}>
+      <div className="bg-band flex flex-col items-start gap-1 rounded-md px-4 py-3">
+        <p className="text-body-2 text-fg break-keep">{messages.home.guestVerdictNotice}</p>
+
+        {/* 44px — 모바일 최소 터치 영역 (DESIGN.md §7) */}
+        <Link
+          href={authed ? '/pets/new' : '/login'}
+          className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
+        >
+          {messages.home.registerPet}
+        </Link>
+      </div>
+    </div>
   )
 }
 

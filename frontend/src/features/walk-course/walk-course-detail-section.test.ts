@@ -31,6 +31,8 @@ function render(overrides: Partial<WalkCourseDetailSectionProps> = {}): string {
     walkTimesLoading: false,
     onWalkTimesRetry: vi.fn(),
     authed: false,
+    // 미로그인이 이 fixture 의 기본이다 — 그러면 반려견도 없다 (#777)
+    petRegistered: false,
     ...overrides,
   }
 
@@ -280,5 +282,27 @@ describe('WalkCourseDetailSection — 로딩', () => {
     expect(markup).toContain('aria-busy')
     expect(markup).not.toContain(messages.walkCourse.errorTitle)
     expect(markup).not.toContain(messages.walkCourse.noCoordinates)
+  })
+})
+
+/*
+  [#777](https://github.com/8llow8llowMe/hondigagae/issues/777) 의 **배선**만 본다. 안내의
+  갈래와 문구는 `walk-course-golden-slot.test.ts` 가 본다 — 여기서 잠그는 것은 이 섹션이
+  `petRegistered` 를 골든타임 자리로 **실제로 흘리는가** 다. 상수로 굳으면 안내가 로그인한
+  사용자에게도 붙거나 아무에게도 안 붙는다.
+*/
+describe('WalkCourseDetailSection — 반려견 등록 안내 배선 (#777)', () => {
+  const WITH_COORDS = { course: walkCourseDetail(WALK_COURSE_WITH_COORDS) }
+
+  it('반려견이 없으면 골든타임 자리에 안내가 선다', () => {
+    expect(render({ ...WITH_COORDS, petRegistered: false })).toContain(
+      messages.home.guestVerdictNotice,
+    )
+  })
+
+  it('반려견이 있으면 서지 않는다', () => {
+    expect(render({ ...WITH_COORDS, authed: true, petRegistered: true })).not.toContain(
+      messages.home.guestVerdictNotice,
+    )
   })
 })
