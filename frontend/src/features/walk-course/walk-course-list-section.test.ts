@@ -287,3 +287,38 @@ describe('WalkCourseListSection — 접근성 계약 (D6)', () => {
     expect(markup).toContain('걷는 시간 컨트롤')
   })
 })
+
+/*
+  #800. **로딩과 결과가 같은 골격이어야 전환에서 줄이 튀지 않는다.**
+
+  높이를 문자열로 잴 수는 없으니 **골격을 만드는 클래스와 열 머리 유무**를 잠근다 —
+  1024 실측에서 고치기 전 스켈레톤은 101px, 실제 행은 73px 이었고(6행이면 168px),
+  같은 클래스를 쓰게 한 뒤 둘 다 73px 로 붙었다.
+*/
+describe('WalkCourseListSection — 로딩 골격이 실제 행과 같다 (#800)', () => {
+  const GRID = 'walk-course-row-grid lg:grid lg:min-h-18 lg:items-center lg:gap-5 lg:py-4'
+
+  it('스켈레톤 행이 실제 행과 같은 그리드 클래스를 쓴다', () => {
+    const loading = render({ loading: true })
+    const loaded = render()
+
+    expect(loading).toContain(GRID)
+    expect(loaded).toContain(GRID)
+  })
+
+  /** 열 머리가 결과에만 있으면 전환 순간 한 줄이 새로 끼어들어 아래가 통째로 밀린다 */
+  it('열 머리가 로딩에도 있다', () => {
+    const head = messages.walkCourse.columnCourseLabel
+
+    expect(render({ loading: true })).toContain(head)
+    expect(render()).toContain(head)
+  })
+
+  /** 1024 미만은 3줄 블록 그대로다 — 거기서는 실제 행도 같은 모양이라 건드리지 않았다 */
+  it('1024 미만 뼈대 두 줄은 lg 에서만 감춘다', () => {
+    const loading = render({ loading: true })
+
+    expect(loading).toContain('mt-1 h-5 w-32 lg:hidden')
+    expect(loading).toContain('mt-1 h-4 w-1/2 lg:hidden')
+  })
+})
