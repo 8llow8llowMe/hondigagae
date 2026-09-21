@@ -39,6 +39,9 @@ function render(
  * 이 저장소는 jsdom 없이 문자열을 단언하므로(`testing-guide.md`) 깊이는 직접 센다.
  */
 function bandBoxEnd(markup: string) {
+  // 먼저 상자 자체를 단언한다 — 없으면 아래 `lastIndexOf(…, -1)` 로 흘러가 원인이 가려진다
+  expect(markup).toContain('bg-band')
+
   const open = markup.lastIndexOf('<div', markup.indexOf('bg-band'))
   expect(open).toBeGreaterThan(-1)
 

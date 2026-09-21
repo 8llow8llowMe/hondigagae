@@ -1,8 +1,18 @@
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
+import {
+  WalkCourseDetailSection,
+  type WalkCourseDetailSectionProps,
+} from '@/features/walk-course/walk-course-detail-section'
+import {
+  WALK_COURSE_PLAIN,
+  WALK_COURSE_WITH_COORDS,
+  walkCourseDetail,
+} from '@/test/fixtures/walk-course'
+import { readSourceWithoutComments } from '@/test/source'
 import { readDesignMd, readGlobalsCss, readTokensCss } from '@/test/tokens'
 
 /**
@@ -55,24 +65,61 @@ describe('읽는 폭 — 문서 동기 (#781)', () => {
   })
 })
 
-function repoSource(relative: string): string {
-  return readFileSync(fileURLToPath(new URL(`../../${relative}`, import.meta.url)), 'utf8')
-}
-
 /*
   **히어로가 있는 갈래는 캡하지 않는다.** 그 4개는 `lg:grid-cols-2` 로 이미 각 681px 이라
   읽는 폭 안이고, 거기에 760 을 걸면 2열이 무너진다. 캡은 히어로 없는 25개만의 문제다.
-*/
-describe('읽는 폭 — 코스 상세가 갈래에 따라 캡을 고른다 (#781)', () => {
-  const section = repoSource('src/features/walk-course/walk-course-detail-section.tsx')
 
-  it('히어로 유무로 reading-container 와 content-container 를 고른다', () => {
-    expect(section).toContain('reading-container')
-    expect(section).toContain('content-container')
-    expect(section).toMatch(/hero === null \? 'reading-container' : 'content-container'/)
+  **소스 문자열이 아니라 마크업을 본다.** 이 파일의 첫 판은 소스를 통째로 읽어
+  `toContain('reading-container')` 했는데, 그 낱말이 **바로 위 주석에도 있어** 구현을
+  지워도 통과했다 — `@/test/source` 머리주석이 경고하는 #451 의 함정 그대로다.
+*/
+function renderDetail(overrides: Partial<WalkCourseDetailSectionProps> = {}): string {
+  return renderToStaticMarkup(
+    createElement(WalkCourseDetailSection, {
+      course: walkCourseDetail(WALK_COURSE_PLAIN),
+      loading: false,
+      errorStatus: null,
+      onRetry: vi.fn(),
+      walkTimes: null,
+      walkTimesLoading: false,
+      onWalkTimesRetry: vi.fn(),
+      authed: false,
+      ...overrides,
+    }),
+  )
+}
+
+describe('읽는 폭 — 코스 상세가 갈래에 따라 캡을 고른다 (#781)', () => {
+  it('히어로가 없으면 읽는 폭에서 멈춘다 — 25/29 가 이 갈래다', () => {
+    const markup = renderDetail()
+
+    expect(markup).toContain('reading-container')
+    expect(markup).not.toContain('content-container')
+  })
+
+  it('히어로가 있으면 캡하지 않는다 — 2열이 무너진다', () => {
+    const markup = renderDetail({ course: walkCourseDetail(WALK_COURSE_WITH_COORDS) })
+
+    expect(markup).toContain('content-container')
+    expect(markup).not.toContain('reading-container')
+  })
+
+  it('두 캡을 겹쳐 달지 않는다 — 같은 특정도라 순서로 이긴다', () => {
+    for (const markup of [
+      renderDetail(),
+      renderDetail({ course: walkCourseDetail(WALK_COURSE_WITH_COORDS) }),
+    ]) {
+      const both =
+        /class="[^"]*content-container[^"]*reading-container|class="[^"]*reading-container[^"]*content-container/
+      expect(markup).not.toMatch(both)
+    }
   })
 
   it('Tailwind arbitrary 로 캡하지 않는다 — eslint noComplexArbitrary', () => {
+    const section = readSourceWithoutComments(
+      'src/features/walk-course/walk-course-detail-section.tsx',
+    )
+
     expect(section).not.toContain('max-w-[var(')
   })
 })
@@ -83,15 +130,14 @@ describe('읽는 폭 — 코스 상세가 갈래에 따라 캡을 고른다 (#78
   가 되는데, 이 저장소의 eslint 가 토큰 밖 arbitrary value 를 막는다 (DESIGN.md §2·§4).
 */
 describe('읽는 폭 — 주 버튼 (#781)', () => {
-  const action = repoSource('src/features/walk-course/walk-course-add-action.tsx')
+  /*
+    **주석을 걷고 본다.** 이 파일의 주석이 `max-w-[360px]` 을 왜 안 쓰는지 설명해서,
+    걷지 않으면 "arbitrary 를 쓰지 않는다" 단언이 헛되이 실패한다 (`@/test/source`).
+  */
+  const action = readSourceWithoutComments('src/features/walk-course/walk-course-add-action.tsx')
 
-  it('버튼이 스케일 값으로 폭을 제한한다', () => {
+  it('버튼이 스케일 값으로 폭을 제한한다 — 모바일에서는 여전히 전폭이다', () => {
     expect(action).toContain('w-full max-w-sm')
-    // 주석에서 `max-w-[360px]` 을 왜 안 쓰는지 설명하므로 className 안만 본다
-    expect(action).not.toMatch(/className="[^"]*max-w-\[/)
-  })
-
-  it('모바일에서는 여전히 전폭이다 — w-full 을 버리지 않는다', () => {
-    expect(action).toContain('w-full')
+    expect(action).not.toContain('max-w-[')
   })
 })

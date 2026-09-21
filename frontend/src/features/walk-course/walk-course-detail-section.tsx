@@ -42,8 +42,13 @@ export type WalkCourseDetailSectionProps = {
    * **상세 URL 에는 필터가 없다.** 목록 행이 조건을 쿼리로 실어 보내고 라우트가 그것을
    * 읽어 여기로 넘긴다 — 없으면 목록 첫 화면으로 간다.
    *
-   * **성공 화면에서만 쓴다.** 오류·404 에서는 사용자가 어느 목록에서 왔는지 화면이
-   * 주장할 근거가 없다 (`BackToList` 는 이 값을 받지 않는다).
+   * **오류·404 에서는 쓰지 않는다.** 코스를 못 받은 자리라 사용자가 어느 목록에서 왔는지
+   * 화면이 주장할 근거가 없다 (`BackToList` 는 이 값을 받지 않는다). 로딩은 성공과 같이
+   * 쓴다 — 같은 링크가 누른 시점에 따라 다른 곳으로 가면 안 된다.
+   *
+   * **로그인 왕복은 아직 이 값을 잃는다.** `WalkCourseAddAction` 의 `toLoginHref` 가 경로만
+   * 싣는다 — 미로그인 사용자가 `일정에 담기` 로 로그인하고 돌아오면 쿼리가 사라진다.
+   * 이 이슈의 범위 밖이라 고치지 않고 적어 둔다.
    */
   backHref?: string | undefined
 }
@@ -78,7 +83,12 @@ export function WalkCourseDetailSection({
     return (
       <DetailShell heading={messages.walkCourse.pageTitle}>
         <div className={INSET_CLASS.card}>
-          <BackLink href="/walk-courses" label={messages.walkCourse.backToList} />
+          {/*
+            **로딩도 `backHref` 를 쓴다** (#783). 오류·404 를 제외한 근거는 *"어느 목록에서
+            왔는지 주장할 근거가 없다"* 인데, 로딩에는 그 근거가 성립하지 않는다 — 라우트가
+            이미 값을 갖고 있다. 같은 링크가 **누른 시점에 따라 다른 곳으로 가지 않게** 한다.
+          */}
+          <BackLink href={backHref} label={messages.walkCourse.backToList} />
         </div>
         <DetailSkeleton />
       </DetailShell>
@@ -237,10 +247,18 @@ function BackToList() {
  * **돌아가기를 껍데기가 그리지 않는다.** 빈·오류 상태는 그것을 `action` 으로 이미 갖고
  * 있어, 여기서도 그리면 같은 이름의 링크가 한 화면에 둘이 된다 — 보조기기에서 목적지가
  * 둘로 들린다. 스켈레톤만 자기 것을 따로 세운다.
+ *
+ * **읽는 폭에서 멈춘다** ([#781](https://github.com/8llow8llowMe/hondigagae/issues/781)).
+ * 성공 화면이 갈래에 따라 캡을 고르는 것과 달리 여기서는 고를 수 없다 — 로딩 시점에는
+ * 히어로가 있는지 모르고, 오류·404 에는 애초에 히어로가 없다. **25/29 가 히어로 없는
+ * 갈래이고 오류 문구는 어느 갈래에서도 짧으므로 760 이 맞는 쪽이다.**
+ *
+ * 대가를 적어 둔다: 히어로가 있는 4개는 로딩(760) → 성공(1434)에서 폭이 한 번 넓어진다.
+ * 서버 프리페치가 성공하면 보이지 않고(그 경로가 기본이다), 실패했을 때만 드러난다.
  */
 function DetailShell({ heading, children }: { heading: string; children: ReactNode }) {
   return (
-    <SurfaceStack className="content-container">
+    <SurfaceStack className="reading-container">
       <h1 className="sr-only">{heading}</h1>
       {children}
     </SurfaceStack>

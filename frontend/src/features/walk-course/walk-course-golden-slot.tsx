@@ -129,8 +129,15 @@ function NoCoordinates() {
             {messages.walkCourse.noCoordinates}
           </p>
 
-          {/* 숫자를 적지 않는다 — 코스 수는 서버가 세고 적재(#383)로 바뀐다 */}
-          <p className="text-caption text-fg-muted break-keep">
+          {/*
+            숫자를 적지 않는다 — 코스 수는 서버가 세고 적재(#383)로 바뀐다.
+
+            **`body-2` 를 유지한다.** 높이를 줄이려 `caption`(12px)으로 내렸다가 되돌렸다 —
+            DESIGN.md §3-1 이 본문 기본을 `body-2` 로 두고 `caption` 의 용도를 메타·태그·
+            배지·단위로 한정한다. 설명 문장은 그 목록에 없고, 25/29 가 보는 기본 갈래라
+            영향도 넓다. 높이는 글자 크기가 아니라 `gap`·`py` 로 줄인다.
+          */}
+          <p className="text-body-2 text-fg-muted break-keep">
             {messages.walkCourse.noCoordinatesCommon}
           </p>
         </div>
