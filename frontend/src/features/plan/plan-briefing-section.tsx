@@ -10,7 +10,7 @@ import { WalkTimesCurve } from '@/components/walk-times-curve'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { PlaceMiniMap } from '@/features/place/place-mini-map'
 import { planDayAnchorId } from '@/features/plan/plan-day-section'
-import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
+import { PlanDayVerdict, planDayVerdictIsBlank } from '@/features/plan/plan-day-verdict'
 import { toLatLng } from '@/lib/geo/coord'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
@@ -123,6 +123,7 @@ export function PlanBriefingSection({
   onRetry: () => void
 }) {
   const deferred = isDeferredDay(briefing, kind)
+  const blankWeather = isBlankWeatherCard(briefing)
 
   return (
     <>
@@ -130,42 +131,51 @@ export function PlanBriefingSection({
         <ScheduleCard planId={briefing.planId} day={briefing.day} schedule={briefing.schedule} />
       </Surface>
 
-      <Surface
-        title={
-          kind === 'EVE'
-            ? messages.plan.briefingWeatherEveHeading
-            : messages.plan.briefingWeatherTodayHeading
-        }
-      >
-        <div className={INSET_CLASS.card}>
-          {briefing.weather === null ? (
-            <p className="text-body-2 text-fg-muted py-4">{messages.plan.briefingWeatherMissing}</p>
-          ) : (
-            /*
-              **일정 상세와 같은 컴포넌트다** — 서버가 같은 `PlanDayWeatherItem` 을 주므로
-              (`PlanWeatherPresenter.toDayItem`) 여기서 다른 것을 만들면 두 화면이 갈린다.
+      {/*
+        **담을 것이 없으면 카드를 세우지 않는다** (#788 · 명세 D11-1). 판정과 지표 줄이
+        둘 다 빠지는 날(오늘 출발인데 항목 0개)에 제목만 남은 카드가 섰다 — 두 조각의
+        `null` 은 각자 옳고, 카드 하나를 통째로 내주는 쪽이 여기뿐이라 판정도 여기 있다.
+      */}
+      {!blankWeather && (
+        <Surface
+          title={
+            kind === 'EVE'
+              ? messages.plan.briefingWeatherEveHeading
+              : messages.plan.briefingWeatherTodayHeading
+          }
+        >
+          <div className={INSET_CLASS.card}>
+            {briefing.weather === null ? (
+              <p className="text-body-2 text-fg-muted py-4">
+                {messages.plan.briefingWeatherMissing}
+              </p>
+            ) : (
+              /*
+                **일정 상세와 같은 컴포넌트다** — 서버가 같은 `PlanDayWeatherItem` 을 주므로
+                (`PlanWeatherPresenter.toDayItem`) 여기서 다른 것을 만들면 두 화면이 갈린다.
 
-              `failed={false}` — 이 카드만 따로 실패하는 경로가 없다. 브리핑은 한 응답이라
-              날씨가 안 오면 화면 전체가 오류 갈래로 간다.
+                `failed={false}` — 이 카드만 따로 실패하는 경로가 없다. 브리핑은 한 응답이라
+                날씨가 안 오면 화면 전체가 오류 갈래로 간다.
 
-              **`petConditionApplied` 를 그대로 넘긴다** (명세 D5-2). 일반 조건 판정을
-              알리는 줄은 이 컴포넌트가 이미 갖고 있어서, 화면 아래 같은 줄을 한 번 더
-              두지 않는다 — 응답의 두 자리 중 **최상위 값 하나만** 말한다 (D5-4).
-              `walkTimes.petConditionApplied` 는 읽지 않는다.
-            */
-            <PlanDayVerdict
-              verdict={briefing.weather}
-              petConditionApplied={briefing.petConditionApplied}
-              basisPetName={basisPetName}
-              failed={false}
-              onRetry={() => undefined}
-              dayHasItems={briefing.schedule.itemCount > 0}
-            />
-          )}
+                **`petConditionApplied` 를 그대로 넘긴다** (명세 D5-2). 일반 조건 판정을
+                알리는 줄은 이 컴포넌트가 이미 갖고 있어서, 화면 아래 같은 줄을 한 번 더
+                두지 않는다 — 응답의 두 자리 중 **최상위 값 하나만** 말한다 (D5-4).
+                `walkTimes.petConditionApplied` 는 읽지 않는다.
+              */
+              <PlanDayVerdict
+                verdict={briefing.weather}
+                petConditionApplied={briefing.petConditionApplied}
+                basisPetName={basisPetName}
+                failed={false}
+                onRetry={() => undefined}
+                dayHasItems={briefing.schedule.itemCount > 0}
+              />
+            )}
 
-          <DayFactsRow weather={briefing.weather?.weather ?? null} />
-        </div>
-      </Surface>
+            <DayFactsRow weather={briefing.weather?.weather ?? null} />
+          </div>
+        </Surface>
+      )}
 
       {/*
         **전날에는 이 둘을 그리지 않는다** (#733). 서버가 당일에만 채우는 값이라
@@ -212,6 +222,33 @@ export function PlanBriefingSection({
         </p>
       )}
     </>
+  )
+}
+
+/**
+ * 날씨 카드가 **담을 것이 없는가** (#788).
+ *
+ * 카드 안은 판정(`PlanDayVerdict`)과 하루 지표 줄(`DayFactsRow`) 둘뿐이고, 둘 다 빠지는
+ * 날이 있다 — **오늘 출발인데 그날 항목이 하나도 없는 날**이다. 서버가 기준 장소를 못
+ * 잡아(`NO_PLACE_ITEM`) 점수도 날씨 값도 비우는데, 그때 판정은 "빈 일차 안내가 같은 말을
+ * 이미 한다" 는 이유로(#497) 자리를 만들지 않고 지표 줄은 세울 값이 없다.
+ *
+ * **새 판정 축이 아니라 `isDeferredDay` 와 같은 규칙이다** — 값이 실제로 비어 있을 때만
+ * 접는다(명세 D11-2). 날짜나 사유 코드로 다시 가르지 않으므로, 산책 항목만 있는 날처럼
+ * 같은 사유인데 할 말이 남은 갈래(`unavailableSentence` 주석)는 그대로 선다.
+ *
+ * **접은 자리를 대신하는 안내를 세우지 않는다.** 전날 갈래는 각주 한 줄을 남겼지만
+ * (D11-1) 이 갈래는 그날 일정 카드의 `이 날에는 담긴 항목이 없어요` + 장소 담기가 이미
+ * 이유와 다음 걸음을 말하고 있어, 한 줄을 더 세우면 같은 말이 두 번이 된다.
+ *
+ * **`weather === null` 은 접지 않는다.** 그때는 "못 받았다" 는 줄이 카드를 채운다 (D5-2).
+ */
+function isBlankWeatherCard(briefing: PlanBriefingResponse): boolean {
+  if (briefing.weather === null) return false
+
+  return (
+    planDayVerdictIsBlank(briefing.weather, briefing.schedule.itemCount > 0) &&
+    briefingDayFacts(briefing.weather.weather).length === 0
   )
 }
 
