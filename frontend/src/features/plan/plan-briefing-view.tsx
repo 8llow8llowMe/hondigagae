@@ -48,7 +48,29 @@ export function PlanBriefingView({ planId, target }: { planId: string; target: B
   const pets = usePetList(true)
 
   const data = briefing.data
+
+  /*
+    **곡선을 부를 좌표** (#716 · 명세 D9-3).
+
+    예전에는 `walkTimes.lat/lng` 하나뿐이라 골든타임을 못 낸 날에는 곡선도 없었다. 이제
+    `schedule.representativeLat/Lng` 가 **골든타임과 무관하게** 오므로 판정이 없는 날에도
+    곡선을 근거로 세울 수 있다.
+
+    **그렇다고 아무 날에나 부르지 않는다.** tour 의 `/insights/walk-times` 는 "오늘 남은
+    시간" 전용이라(서버 `PlanBriefingWalkTimesUnavailableReason.NOT_TODAY` 가 그 이유를
+    적어 둔다) 사유 넷 중 실제로 부를 값어치가 있는 것은 `LOOKUP_FAILED` 하나다 —
+    `NOT_TODAY` 는 오늘이 아니고, 나머지 둘은 애초에 좌표가 없다.
+  */
   const walkTimes = data?.walkTimes ?? null
+  const schedule = data?.schedule ?? null
+  const curvePoint =
+    walkTimes !== null
+      ? { lat: walkTimes.lat, lng: walkTimes.lng }
+      : data?.walkTimesUnavailableReasonCode === 'LOOKUP_FAILED' &&
+          schedule?.representativeLat != null &&
+          schedule.representativeLng != null
+        ? { lat: schedule.representativeLat, lng: schedule.representativeLng }
+        : null
 
   /*
     **판정 기준 반려견의 조건으로 곡선을 부른다.** 못 찾으면 `null` 을 보낸다 — 서버가
@@ -58,29 +80,28 @@ export function PlanBriefingView({ planId, target }: { planId: string; target: B
   const condition = toPetCondition(basisPet)
 
   /*
-    **곡선은 좌표가 있을 때만 부른다** (명세 D3-3). 좌표는 `walkTimes` 안에만 오므로
-    `walkTimes === null` 이면 부를 대상이 아예 없다 — 일정 상세의 `item.place.lat/lng` 로
-    메우지 않는다 (명세 D8-1).
+    **곡선은 좌표가 있을 때만 부른다** (명세 D3-3). 어느 좌표를 쓰는지는 `curvePoint` 가
+    갖는다 — 일정 상세의 `item.place.lat/lng` 로 메우지 않는 것은 그대로다 (명세 D8-1).
 
     **key 는 홈·장소 상세와 같은 `insightKeys.walkTimes` 다** — 좌표·조건이 같으면 이미
     받아 둔 곡선을 그대로 쓴다.
   */
   const curve = useQuery({
     queryKey: insightKeys.walkTimes(
-      walkTimes?.lat ?? null,
-      walkTimes?.lng ?? null,
+      curvePoint?.lat ?? null,
+      curvePoint?.lng ?? null,
       conditionKey(condition),
     ),
     // `enabled` 가 거짓인 동안 실행되지 않는다 — 좌표 단언은 그 뒤에만 닿는다
     queryFn: () =>
       clientFetch<WalkTimesResponse>(
         walkTimesPath(
-          (walkTimes as { lat: number; lng: number }).lat,
-          (walkTimes as { lat: number; lng: number }).lng,
+          (curvePoint as { lat: number; lng: number }).lat,
+          (curvePoint as { lat: number; lng: number }).lng,
           condition,
         ),
       ),
-    enabled: walkTimes !== null,
+    enabled: curvePoint !== null,
     ...INSIGHT_QUERY_OPTIONS,
   })
 
@@ -119,6 +140,11 @@ export function PlanBriefingView({ planId, target }: { planId: string; target: B
             failed: curve.isError,
             onRetry: () => void curve.refetch(),
           }}
+          /*
+            **브리핑 응답을 다시 부른다** — `LOOKUP_FAILED` 는 브리핑이 원격 조회에 실패한
+            것이라 곡선만 다시 불러도 특보·골든타임은 비어 있다 (#716 · 명세 D9-2).
+          */
+          onRetry={() => void briefing.refetch()}
         />
       )}
     </>

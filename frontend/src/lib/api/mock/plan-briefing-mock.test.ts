@@ -54,8 +54,24 @@ function createTodayPlan(): PlanDetail {
 describe('브리핑 mock — 계약 경계', () => {
   beforeEach(resetMockStore)
 
-  it('date 가 없으면 400 이다 — @RequestParam 이 필수다', () => {
-    expect(call(`/plans/${PLAN}/briefing`)?.status).toBe(400)
+  /**
+   * **누락과 형식 오류를 서버가 가른다** (#716 실측 · 명세 D9-4). 누락은
+   * `MissingServletRequestParameterException` → `PLAN_125`, 형식 오류는
+   * `MethodArgumentTypeMismatchException` → `PLAN_124` 다. 예전에는 둘을 `PLAN_100` 하나로
+   * 묶고 있었다.
+   */
+  it('date 가 없으면 400 PLAN_125 다 — @RequestParam 이 필수다', () => {
+    const result = call(`/plans/${PLAN}/briefing`)
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_125')
+  })
+
+  it('date 형식이 틀리면 400 PLAN_124 로 가른다', () => {
+    const result = call(`/plans/${PLAN}/briefing`, 'date=2026-9-12')
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_124')
   })
 
   /** **기간 밖은 404 가 아니라 400 `PLAN_002`** 다 (`PlanBriefingProcessor.resolveDay`) */
@@ -115,14 +131,17 @@ describe('브리핑 mock — 특보·골든타임은 today 가 가른다', () =>
     expect(data.walkTimesUnavailableReason).toBeNull()
   })
 
-  /** **좌표가 오는 자리가 `walkTimes` 하나뿐이다** — `schedule` 에는 없다 (명세 D3-3) */
-  it('좌표를 walkTimes 안에만 싣는다', () => {
+  /**
+   * **좌표는 `schedule` 에도 온다** (#716 · 명세 D9-3). 예전에는 `walkTimes` 안이 유일한
+   * 자리라 골든타임을 못 낸 날에는 곡선도 지도도 부를 수 없었다.
+   */
+  it('좌표를 schedule 과 walkTimes 양쪽에 싣고 두 값이 같다', () => {
     const plan = createTodayPlan()
     const data = briefing(plan.planId, todayDay(new Date()))
 
     expect(typeof data.walkTimes?.lat).toBe('number')
-    expect(Object.keys(data.schedule)).not.toContain('representativeLat')
-    expect(Object.keys(data.schedule)).not.toContain('representativeLng')
+    expect(data.schedule.representativeLat).toBe(data.walkTimes?.lat)
+    expect(data.schedule.representativeLng).toBe(data.walkTimes?.lng)
   })
 })
 
@@ -140,14 +159,18 @@ describe('브리핑 mock — 그날 일정 요약', () => {
   })
 
   /**
-   * **`itemType` 이 metadata 가 아니라 enum 문자열이다** — 같은 도메인의
-   * `PlanItemDetail.itemType` 과 모양이 다르다 (명세 D9-1). mock 이 모양을 맞추지 않으면
-   * 화면이 그 드리프트를 로컬에서 한 번도 못 본다.
+   * **`itemType` 이 metadata 다** (#716 · 명세 D9-1) — 같은 도메인의
+   * `PlanItemDetail.itemType` 과 모양이 같아졌다. 한국어는 서버가 채우므로 화면은 `name`
+   * 을 그대로 그린다.
    */
-  it('itemType 을 metadata 로 부풀리지 않는다', () => {
+  it('itemType 을 code·name·description metadata 로 낸다', () => {
     const first = briefing(PLAN, '2026-09-12').schedule.firstItem
 
-    expect(typeof first?.itemType).toBe('string')
+    expect(first?.itemType).toEqual({
+      code: 'PLACE',
+      name: '장소',
+      description: '관광지·카페 등 방문 장소 항목입니다.',
+    })
   })
 
   it('날씨는 일정 날씨 브리핑의 그 일자와 같은 모양이다', () => {

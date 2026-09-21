@@ -320,8 +320,10 @@ export function planBriefing(overrides: Partial<PlanBriefingResponse> = {}): Pla
     schedule: planBriefingSchedule(),
     weather: planVerdict,
     weatherWarning: null,
+    weatherWarningUnavailableReasonCode: null,
     weatherWarningUnavailableReason: null,
     walkTimes: planBriefingWalkTimes(),
+    walkTimesUnavailableReasonCode: null,
     walkTimesUnavailableReason: null,
     ...overrides,
   }
@@ -337,19 +339,25 @@ export function planBriefingSchedule(
     lastItem: planBriefingItem({
       planItemId: 'i-2-3',
       sequence: 3,
-      itemType: 'LODGING',
+      itemType: { code: 'LODGING', name: '숙박', description: '숙소 체크인/숙박 항목입니다.' },
       title: '동문재래시장',
       startTime: '19:00:00',
     }),
     representativePlaceId: '212481712381923328',
     representativePlaceTitle: '협재해수욕장',
+    /*
+      **`walkTimes` 와 무관하게 채워진다** (#716). 좌표를 기본값에 두어야 골든타임이 null 인
+      갈래를 덮어쓸 때도 화면이 실제로 받는 모양(좌표는 있는데 판정이 없는 날)이 선다.
+    */
+    representativeLat: 33.394162,
+    representativeLng: 126.239831,
     ...overrides,
   }
 }
 
 /**
- * **`itemType` 이 metadata 가 아니라 enum 문자열이다** — 같은 도메인의 `PlanItemDetail`
- * 과 모양이 다르다 (명세 D9-1). 화면이 이 값을 그대로 새지 않는지 테스트가 감시한다.
+ * **`itemType` 이 metadata 다** (#716 · 명세 D9-1). 같은 도메인의 `PlanItemDetail` 과 모양이
+ * 같아졌고, 화면은 `name` 을 그대로 렌더한다 — `code` 가 새지 않는지는 테스트가 감시한다.
  */
 export function planBriefingItem(
   overrides: Partial<PlanBriefingItemSummary> = {},
@@ -357,7 +365,7 @@ export function planBriefingItem(
   return {
     planItemId: 'i-2-0',
     sequence: 0,
-    itemType: 'PLACE',
+    itemType: { code: 'PLACE', name: '장소', description: '관광지·카페 등 방문 장소 항목입니다.' },
     title: '협재해수욕장',
     startTime: '10:30:00',
     visited: false,
