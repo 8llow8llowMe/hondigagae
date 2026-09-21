@@ -65,6 +65,14 @@ export const WALK_COURSE_MIXED_START_END: WalkCourseSummary = {
  * **소요시간 원문을 파싱하지 못한 코스** (#718). `durationMaxMinutes: null` 은 "제한 없음"
  * 이 아니라 "모른다" 이고, 그래서 어느 활동량에서도 걸러지지 않고 `fitsActivityLevels` 에
  * 세 값이 다 담긴다 — **그 둘을 함께 보지 않으면 "아무 아이나 된다" 로 읽히는 갈래다.**
+ *
+ * **`durationText: '미정'` 은 서버 값이 아니다** (#776 · 목록명세 D5-3). 백엔드에 그런
+ * 폴백이 없고 `WalkCourseItem.durationText` 는 **파싱에 실패한 원문을 그대로** 내린다 —
+ * 여기 `미정` 은 이 fixture 가 자리를 채우려고 고른 문자열일 뿐이다. **행이 이 낱말로
+ * 미상 갈래를 알려 준다고 읽지 않는다** — 실제 미상 코스는 평범해 보이는 원문을 단다.
+ *
+ * 실물 예시가 없는 이유는 **dev 실측(2026-09-21)에 미상 코스가 0건**이기 때문이다. 재적재
+ * (#722)로 실제 값이 나오면 그 원문으로 바꾼다.
  */
 export const WALK_COURSE_UNKNOWN_DURATION: WalkCourseSummary = {
   ...WALK_COURSE_PLAIN,
