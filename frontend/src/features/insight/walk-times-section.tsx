@@ -1,7 +1,6 @@
 'use client'
 
 import { METRIC_WORD_TONE } from '@/components/metric'
-import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { Skeleton } from '@/components/skeleton'
 import { WalkTimesCurve } from '@/components/walk-times-curve'
 import type { GoldenWindowRun } from '@/lib/insight/golden-window'
@@ -115,7 +114,6 @@ export function WalkTimesSection({
 
     훅은 early return 보다 위다 — 예보가 없는 날과 있는 날의 훅 순서가 갈리면 안 된다.
   */
-  const rail = useScrollRail<HTMLUListElement>()
 
   // 조회 실패는 섹션을 통째로 숨긴다 — 홈의 최소 골격에 이 섹션은 없다 (공통명세 S4-1)
   if (data === null) return loading ? <WalkTimesSkeleton /> : null
@@ -140,26 +138,24 @@ export function WalkTimesSection({
           안 읽힌다 (`walk-verdict.tsx` 머리주석).
         */}
         {/*
-          **화살표가 제목 줄 오른쪽에 선다** (#730). 예전에는 곡선 위에 떠서 오른쪽 끝 칸의
-          **온도 값을 불투명하게 덮었다** (`elementsFromPoint(346, 702)` → `BUTTON` ▸
-          `SPAN "기온 26.0℃"`). 값을 가리는 컨트롤은 그 값이 근거인 화면에서 특히 나쁘다.
+          **화살표는 제목 줄이 아니라 표 좌우에 선다.**
 
-          **갈 수 있는 쪽이 없으면 아무것도 그리지 않는다** (`ScrollRailArrows`) — 그래서
-          줄이 늘 두 덩어리인 것은 아니고, 제목만 있는 날은 예전과 같은 한 줄이다.
+          #730 이 반대로 옮겼던 자리다 — 근거는 오버레이 화살표가 오른쪽 끝 칸의 온도 값을
+          덮는다는 것이었다(`elementsFromPoint(346, 702)` → `BUTTON` ▸ `SPAN "기온 26.0℃"`).
+          **그 사실은 지금도 맞다.** 다만 제목 줄로 올린 뒤 화살표가 **무엇을 미는 컨트롤인지
+          보이지 않는다**는 쪽이 더 크다고 판단해 되돌린다: 표에서 멀어진 버튼은 카드 전체를
+          접는 버튼처럼 읽힌다.
+
+          가려지는 쪽은 **오른쪽 끝 칸 하나**이고 그 칸은 fade 마스크가 이미 흐려 둔 자리다.
+          또 `.scroll-rail-arrow` 가 `pointer: coarse` 에서 이 버튼을 숨기므로 **터치에서는
+          아무것도 가리지 않는다** — 손가락은 밀어서 넘긴다.
+
+          그리는 일은 `WalkTimesCurve` 에 돌려준다: `rail` 을 넘기지 않으면 자기 `.scroll-rail`
+          안에 오버레이로 그린다. 여기서 레일을 들고 있을 이유가 사라졌다.
         */}
-        <div className="flex items-center justify-between gap-4">
-          <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
-            {messages.home.goldenHeading}
-          </h2>
-          <div className="flex shrink-0 items-center gap-2">
-            <ScrollRailArrows
-              rail={rail}
-              placement="inline"
-              prevLabel={messages.home.goldenCurvePrev}
-              nextLabel={messages.home.goldenCurveNext}
-            />
-          </div>
-        </div>
+        <h2 className="text-title-2 text-fg md:text-title-1 font-semibold md:font-bold">
+          {messages.home.goldenHeading}
+        </h2>
 
         {/*
           **서버가 고른 상태를 그대로 따른다** (#270). 예전에는 `hasGolden` → `hasForecast`
@@ -184,7 +180,6 @@ export function WalkTimesSection({
           hourly={data.hourly}
           goldenStart={data.goldenStart}
           goldenEnd={data.goldenEnd}
-          rail={rail}
         />
 
         <p className="text-caption text-fg-muted font-medium">
