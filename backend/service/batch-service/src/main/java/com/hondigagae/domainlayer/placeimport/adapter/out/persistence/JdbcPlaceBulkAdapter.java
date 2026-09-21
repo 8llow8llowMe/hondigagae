@@ -73,6 +73,17 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
      * <p>UPDATE 절에서도 건드리지 않는다. 병합 잡이 다른 원천에서 옮겨 채워 둔 값을 재적재 때마다
      * 도로 지워 버리면 안 된다.
      *
+     * <p><b>{@code tel} 은 같은 위험을 가진 채 남아 있었다</b> (#763). 이 컬럼은 indoor / outdoor 와
+     * 달리 <b>관광 API 가 실제로 소유한다</b> — 줄 때는 이 원천 값이 정본이다. 그래서 컬럼을 빼는
+     * 대신 {@code COALESCE(VALUES(tel), tel)} 로 <b>줄 때만 덮는다.</b> 그냥 {@code VALUES(tel)} 이면
+     * 원천이 번호를 안 주는 장소에서 NULL 이 들어가, 병합이 문화정보원에서 옮겨 온 번호가 다음
+     * {@code placeImportJob} 마다 사라졌다. indoor 가 <b>영구 no-op</b> 이었다면 이쪽은 <b>적재 주기마다
+     * 깜빡여서</b> 더 잡기 어려웠다 — dev 실측(2026-09-21)에서 병합 쌍 54건이 <b>전부</b> 그 상태였다
+     * (흡수된 행에는 번호가 있고 survivor 는 NULL).
+     *
+     * <p>대신 <b>원천이 번호를 지운 것은 따라가지 못한다.</b> 그 경우 옛 번호가 남는다 — 병합이
+     * 옮겨 온 번호와 구분할 수 없어서다. 두 손실 중 이쪽이 작다고 봤다.
+     *
      * <p><b>같은 INSERT 안에 정반대 규칙이 하나 있다</b> — {@code area_code} 는 원천이 비워 보내도
      * 우리가 채워 넣는다. 그쪽은 사실 데이터가 아니라 <b>적재 범위 키</b>라서 NULL 이면 delist·병합·
      * 공개 조회가 동시에 눈이 먼다. "사실은 모르면 비우고, 범위 키는 모르면 채운다" 가 두 규칙의 경계다.
@@ -139,7 +150,7 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
             first_image = VALUES(first_image),
             first_image2 = VALUES(first_image2),
             cpyrht_div_cd = VALUES(cpyrht_div_cd),
-            tel = VALUES(tel),
+            tel = COALESCE(VALUES(tel), tel),
             source_created_at = VALUES(source_created_at),
             source_modified_at = VALUES(source_modified_at),
             synced_at = VALUES(synced_at),

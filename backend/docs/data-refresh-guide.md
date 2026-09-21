@@ -349,3 +349,62 @@ SELECT COUNT(*) FROM place WHERE source = 'TOUR_API' AND indoor IS NOT NULL;  --
 > **확인은 SQL 로 한다.** 장소 검색은 Redis 캐시를 TTL 로 갈아타고(기본 300초,
 > `place.search-cache-seconds`) 캐시 키에 `indoor` 가 들어간다. 백필 직후 API 로 보면 최대 5분간
 > 옛 결과가 온다 — 그걸 실패로 오진하지 않는다.
+
+## 9. 병합이 옮긴 값을 재적재가 지울 때 — `tel` (#763)
+
+§8 의 `indoor` 와 **같은 구조인데 증상이 다르다.** 병합은 survivor(관광 API 행)의 `tel` 이 비었을
+때만 흡수되는 문화정보원 행의 번호를 옮기는데(`COALESCE(survivor.tel, absorbed.tel)`), 관광 API
+재적재가 `tel = VALUES(tel)` 로 무조건 덮고 있었다. **원천이 번호를 안 주는 장소는 그 값이 NULL 이라,
+옮겨 온 번호가 다음 `placeImportJob` 에서 사라진다.**
+
+- `indoor` 는 **영구 no-op** 이었다 — 병합이 한 번도 성공하지 못했다.
+- `tel` 은 **적재 주기마다 깜빡인다** — 병합 직후에는 값이 있으니 그때 확인하면 정상으로 보인다.
+  그래서 더 잡기 어렵다.
+
+**코드는 `tel = COALESCE(VALUES(tel), tel)` 로 고쳤다** — 원천이 줄 때만 덮는다. `indoor` 처럼
+컬럼을 빼지 않은 이유는 **관광 API 가 이 값을 실제로 소유하기 때문**이다. 대신 원천이 번호를
+**지운** 것은 따라가지 못하고 옛 번호가 남는다. 병합이 옮긴 번호와 구분할 수 없어서다.
+
+### 이미 사라진 값은 코드 수정으로 돌아오지 않는다
+
+§8 과 같은 이유다 — 병합 후보 조회가 `merged_into_id IS NULL` 로 걸러 **이미 병합된 쌍은 다시
+후보가 되지 않는다.** `placeMergeJob` 을 다시 돌려도 그 쌍의 `tel` 은 채워지지 않는다.
+
+```sql
+-- 1) 영향 범위를 먼저 센다 (읽기 전용)
+SELECT COUNT(*) AS lost
+  FROM place survivor
+  JOIN place absorbed ON absorbed.merged_into_id = survivor.id
+ WHERE survivor.source = 'TOUR_API'
+   AND survivor.tel IS NULL
+   AND absorbed.tel IS NOT NULL;
+
+-- 2) 옮겨 온 번호를 되살린다 ★ placeMergeJob 재실행으로는 안 된다
+UPDATE place survivor
+  JOIN place absorbed ON absorbed.merged_into_id = survivor.id
+   SET survivor.tel = COALESCE(survivor.tel, absorbed.tel),
+       survivor.updated_at = NOW()
+ WHERE survivor.source = 'TOUR_API';
+```
+
+> **dev 실측 (2026-09-21)**: 병합 쌍 54건 **전부**가 이 상태였다 — 흡수된 행에는 번호가 있고
+> survivor 는 NULL 이다. 즉 이 결함은 가정이 아니라 이미 일어난 일이고, 한 번도 남아 있지 못했다.
+
+**순서는 §8 과 같다** — 코드 수정이 먼저 배포돼 있어야 한다. 아니면 다음 적재가 2) 의 결과를
+다시 지운다.
+
+### 병합은 1회성 스냅샷이다 — 그대로 둔다
+
+`MERGE_FIELDS_SQL` 은 `markMerged` 직전 **1회만** 돌고, 그 뒤로는 후보에서 빠진다. 그래서
+문화정보원 CSV 가 나중에 실내외를 정정해도 **survivor 는 옛 값을 계속 들고 있다.**
+
+주기적 재동기화도, 조회 시 survivor+absorbed 합성도 하지 않기로 했다 — 전자는 "원천 정정" 과
+"사람이 고친 값" 을 구분할 수단이 없어 사람 손을 덮을 수 있고, 후자는 tour-service 의 모든 조회
+경로에 조인을 하나 더 얹는다. **정정이 필요해지면 위와 같은 일회성 `UPDATE JOIN` 이 그 자리를
+메운다.** 이 성질은 `JdbcPlaceMergeAdapter.MERGE_FIELDS_SQL` javadoc 에도 적어 두었다.
+
+### 다음에 같은 결함이 생기지 않게
+
+병합이 채우는 컬럼과 각 원천 UPSERT 의 UPDATE 절이 겹치는지는 **더 이상 사람이 기억하지 않는다** —
+`JdbcPlaceBulkAdapterSqlTest` 가 두 SQL 을 실제로 파싱해 대조한다. 병합에 컬럼을 하나 더하면서
+적재 쪽을 안 보면 그 테스트가 먼저 빨개진다.
