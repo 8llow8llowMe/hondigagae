@@ -5,6 +5,21 @@ on:
     paths:
       - 'frontend/**'
       - '.github/workflows/frontend-ci.yml'
+  # **develop 에서도 돈다 — 캐시 때문이다** (이슈 #830).
+  #
+  # Actions 는 **기본 브랜치 스코프 캐시만 모든 PR 이 상속**한다. `pull_request` 실행이
+  # 저장한 캐시는 `refs/pull/N/merge` 스코프라 그 PR 안에서만 읽힌다. 이 트리거가 없으면
+  # develop 에서 한 번도 돌지 않아 base 스코프 캐시가 **아예 생기지 않고**, PR 마다
+  # pnpm store 와 playwright 브라우저를 처음부터 다시 받는다.
+  #
+  # 겸사겸사 머지된 develop 자체를 검사한다. #282 가 `verify` 실패 상태로 머지돼
+  # develop 이 빨간불이 됐을 때, 그것을 본 체크는 하나도 없었다.
+  push:
+    branches:
+      - develop
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
 
 jobs:
   verify:

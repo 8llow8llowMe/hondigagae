@@ -239,6 +239,9 @@ gh pr edit <번호> --add-assignee @me --add-label frontend-web
 - **Jenkins 의 PR 빌드 결과는 GitHub 체크로 올라오지 않는다.** Jenkins 도 PR 에서
   테스트를 돌지만(`Jenkinsfile.backend-common.groovy`, `RUN_TESTS` 기본 true) 라벨이
   가리키는 **한 모듈만** 본다. PR 화면에서 읽을 수 있는 백엔드 근거는 `backend-ci` 다.
+- **두 워크플로는 `develop` push 에서도 돈다** ([#830](https://github.com/8llow8llowMe/hondigagae/issues/830)).
+  머지된 develop 자체를 검사하는 유일한 장치다 — `pull_request` 는 머지 **전** 트리를 본다.
+  Actions 캐시가 기본 브랜치 스코프에서만 PR 로 상속되는 것도 이 실행이 채운다.
 
 > **셀프 머지를 허용하는 것이지 PR 을 생략하는 것이 아니다.** PR 은 변경 기록이자
 > 되돌리기 단위다. develop 에 직접 커밋하지 않는다.

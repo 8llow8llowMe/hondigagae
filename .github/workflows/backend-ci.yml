@@ -15,6 +15,21 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/backend-ci.yml'
+  # **develop 에서도 돈다 — 캐시 때문이다** (이슈 #830).
+  #
+  # Actions 는 **기본 브랜치 스코프 캐시만 모든 PR 이 상속**한다. `pull_request` 실행이
+  # 저장한 캐시는 `refs/pull/N/merge` 스코프라 그 PR 안에서만 읽힌다. 이 트리거가 없으면
+  # develop 에서 한 번도 돌지 않아 base 스코프 캐시가 **아예 생기지 않고**, 매 PR 이
+  # 항상 콜드 캐시가 된다. 실제로 그랬다 — 캐시 43개가 전부 `refs/pull/*` 였다.
+  #
+  # 겸사겸사 머지된 develop 자체를 검사한다. `pull_request` 는 머지 **전** 트리를 보므로
+  # 머지 후 develop 이 빨간불이 된 것은 아무도 보지 않았다 (#282).
+  push:
+    branches:
+      - develop
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
 
 # 같은 PR 에 새 커밋이 올라오면 이전 실행을 버린다. 백엔드 check 는 분 단위라
 # rebase 를 몇 번 하면 러너에 겹쳐 쌓인다.
