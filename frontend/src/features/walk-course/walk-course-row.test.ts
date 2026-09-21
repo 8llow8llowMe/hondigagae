@@ -248,6 +248,36 @@ describe('WalkCourseRow — 행 높이가 고르다 (#797)', () => {
   })
 })
 
+/*
+  #798. **29행이 전부 링크인데 마우스 신호가 chevron 하나뿐이었다** — 누를 수 있다는 것을
+  알려 주는 것이 없었다.
+
+  **채움을 `<li>` 에 건다.** 인셋(`INSET_CLASS`)이 `<li>` 의 좌우 패딩이라 `<a>` 에 걸면
+  강조가 카드 끝까지 닿지 않고 행 가운데 띠로 뜬다.
+
+  **다만 `<li>` 가 hover 될 때가 아니라 `<a>` 가 hover 될 때다** (`has-[a:hover]`).
+  `<li>` 기준으로 하면 링크 밖 여백에서도 칠해지는데, 거기는 눌러도 아무 일이 없다 —
+  강조는 "여기를 누를 수 있다" 는 말이라 누를 수 없는 자리에 두면 거짓이 된다.
+*/
+describe('WalkCourseRow — 누를 수 있다는 신호 (#798)', () => {
+  it('마우스를 올리면 행이 채움으로 반응한다', () => {
+    expect(render(WALK_COURSE_PLAIN)).toContain('has-[a:hover]:bg-band')
+  })
+
+  /** 강조가 카드 끝까지 닿아야 행 하나로 읽힌다 — 인셋을 쥔 `<li>` 가 그 폭이다 */
+  it('채움을 인셋을 쥔 요소에 건다', () => {
+    const markup = render(WALK_COURSE_PLAIN)
+    const li = markup.slice(0, markup.indexOf('<a'))
+
+    expect(li).toContain('has-[a:hover]:bg-band')
+  })
+
+  /** 키보드 포커스 링은 그대로다 — 둘은 다른 채널이고 서로를 대신하지 않는다 */
+  it('포커스 링을 대신하지 않는다', () => {
+    expect(render(WALK_COURSE_PLAIN)).toContain('focus-visible:ring-brand-500')
+  })
+})
+
 describe('WalkCourseRow — 접근성 계약 (D6)', () => {
   /** 이름표만이면 `1코스` 가 29개라 구분되지 않고, 구간명만이면 사용자가 아는 번호가 사라진다 */
   it('링크의 접근 이름에 이름표와 구간명이 둘 다 들어 있다', () => {

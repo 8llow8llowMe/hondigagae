@@ -66,7 +66,23 @@ export function WalkCourseRow({
   const distance = formatCourseDistance(course.distanceKm)
 
   return (
-    <li className={INSET_CLASS[inset]}>
+    <li
+      /*
+        **누를 수 있다는 신호** ([#798](https://github.com/8llow8llowMe/hondigagae/issues/798)).
+        29행이 전부 링크인데 마우스 신호가 chevron 하나뿐이었다.
+
+        **채움을 `<li>` 에 건다.** 인셋이 `<li>` 의 좌우 패딩이라 `<a>` 에 걸면 강조가
+        카드 끝까지 닿지 않고 행 가운데 띠로 뜬다. 채움(`--band`)은 L2 의 채널이고
+        (DESIGN.md §0) 테두리는 쓸 수 없다 — 목록이 이미 `border-t` 로 행을 가른다.
+
+        **`<li>` hover 가 아니라 `has-[a:hover]` 다.** `<li>` 기준이면 링크 밖 여백에서도
+        칠해지는데 거기는 눌러도 아무 일이 없다 — 강조는 "여기를 누를 수 있다" 는 말이라
+        누를 수 없는 자리에 두면 거짓이 된다.
+
+        **포커스 링을 대신하지 않는다.** 키보드는 `<a>` 의 `focus-visible` 링이 맡는다.
+      */
+      className={cn('has-[a:hover]:bg-band transition-colors', INSET_CLASS[inset])}
+    >
       <Link
         /*
           **조립을 `walkCourseFilterHref` 에 맡긴다** (#783). 조건이 바뀐 뒤의 목록 주소를
