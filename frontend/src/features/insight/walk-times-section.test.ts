@@ -1087,3 +1087,160 @@ describe('WalkTimesSection — 화살표는 표 좌우다 (#730 에서 개정)',
     expect(curve).toContain('scroll-rail')
   })
 })
+
+/*
+  #671 **A-2**. `mixedLevelsText` 가 SAFE 아닌 구간을 전부 `{runs}` 에 몰아넣고 등급어는
+  `worst.name` 하나만 썼다 — 창 안에 서로 다른 등급이 둘 이상이면 문장이 면과 다른 말을
+  한다 (#270 의 재발).
+
+  **그 조합은 오늘의 계약에서 오지 않는다.** 서버가 창을 고르는 규칙이 막는다 —
+  `HourlyWalkSafety.isAcceptable()` 이 `SAFE`·`CAUTION` 에만 참이고
+  `GoldenWalkWindow.acceptableRuns` 가 아닌 칸에서 구간을 끊으며,
+  `WalkSafetyEvaluator.quickLevel` 은 `UNKNOWN` 을 아예 내지 않는다. `hourly` 와
+  `goldenStart`/`goldenEnd` 는 같은 곡선에서 나온다 (`WalkTimesPresenter`).
+  dev 실측(2026-09-21 · 창 15:00–23:00)도 `CAUTION` 한 칸 + `SAFE` 여덟 칸이었다.
+
+  그래서 **문장을 등급별 절로 쪼개지 않는다.** 대신 등급어가 덮지 못하는 구간을 문장에서
+  빼서, 계약이 흔들려도 문장이 **잘못 부르는 대신 말하지 않게** 한다.
+*/
+describe('WalkTimesSection — 창 안 등급이 여럿일 때 (#671 A-2)', () => {
+  const DAY = '2026-08-29T'
+
+  function walkHour(hh: number, code: string, name: string, pavement: number) {
+    return {
+      at: `${DAY}${String(hh).padStart(2, '0')}:00:00`,
+      walkSafetyLevel: { code, name, description: null, scoreDescription: null },
+      temperature: 30,
+      estimatedPavementCelsius: pavement,
+      precipitationProbability: 0,
+    }
+  }
+
+  function withWindow(hours: ReturnType<typeof walkHour>[]): WalkTimesResponse {
+    return {
+      ...GOOD_DAY,
+      hourly: hours,
+      goldenStart: hours[0]?.at ?? null,
+      goldenEnd: hours[hours.length - 1]?.at ?? null,
+    }
+  }
+
+  /*
+    **도달 가능한 모양이 어긋나지 않는 것부터 본다.** E-1 목 갈래는 서버 규칙대로 만든
+    창이라(주의 둘 · 안전 둘, 네 구간) 여기서 문장과 면이 갈리면 실사용에서 갈린다.
+  */
+  it('주의 구간이 둘이어도 문장이 그 둘을 모두 부른다', () => {
+    const markup = render(MIXED_WINDOW_DAY)
+
+    expect(markup).toContain('15–16시 · 18시는 노면이 48℃까지 올라')
+    expect(markup).toContain('주의 등급</span>이에요.')
+    expect(markup).toContain('17시 · 19–21시가 좋아요.')
+  })
+
+  /** 노면은 **그 등급 구간들의** 최고값이다 — 낮은 쪽을 적으면 문장이 실제보다 순해진다 */
+  it('문장이 적는 노면온도가 주의 구간의 최고값이다', () => {
+    expect(render(MIXED_WINDOW_DAY)).not.toContain('41℃까지')
+  })
+
+  /*
+    **계약이 흔들린 경우.** 창 안에 위험과 주의가 함께 오면 예전 문장은 둘을 묶어
+    `14–16시 · 17시는 … 위험 등급이에요` 라고 말했다 — 17시는 주의인데 위험이라 불렸다.
+    지금은 등급어가 덮는 구간만 부른다.
+  */
+  it('창 안에 등급이 둘 이상이면 등급어가 덮는 구간만 부른다', () => {
+    const markup = render(
+      withWindow([
+        walkHour(14, 'DANGER', '위험', 59),
+        walkHour(15, 'DANGER', '위험', 58),
+        walkHour(16, 'CAUTION', '주의', 46),
+        walkHour(17, 'SAFE', '안전', 32),
+        walkHour(18, 'SAFE', '안전', 30),
+      ]),
+    )
+
+    expect(markup).toContain('14–15시는 노면이 59℃까지 올라')
+    expect(markup).toContain('위험 등급</span>이에요.')
+    // 주의였던 16시가 위험으로 불리지 않는다 — 그 칸은 곡선 면과 `sr-only` 가 말한다
+    expect(markup).not.toContain('14–15시 · 16시는')
+    expect(markup).toContain('<span class="sr-only">주의</span>')
+  })
+
+  /*
+    **`UNKNOWN` 은 등급이 아니다.** 서버 `WalkSafetyLevel.UNKNOWN` 은 "판단 근거 부족" 이고
+    `worseOf` 가 *"실제 판정이 있으면 그쪽을 택한다"* 고 적어 둔 값이다. 예전에는 FE 의
+    `severityOf` 가 이 코드를 `CAUTION` 과 같은 심각도로 두어, 노면이 더 높으면
+    `worst` 를 이기고 `노면이 50℃까지 올라 판단 근거 부족 등급이에요` 가 나갔다.
+  */
+  it('UNKNOWN 이 등급어 자리를 차지하지 않는다', () => {
+    const markup = render(
+      withWindow([
+        walkHour(14, 'CAUTION', '주의', 46),
+        walkHour(15, 'UNKNOWN', '판단 근거 부족', 50),
+        walkHour(16, 'SAFE', '안전', 32),
+      ]),
+    )
+
+    expect(markup).toContain('주의 등급</span>이에요.')
+    expect(markup).not.toContain('판단 근거 부족 등급')
+    expect(markup).not.toContain('50℃까지')
+  })
+
+  /** 등급을 모르는 칸을 "좋은 구간" 으로도 말하지 않는다 */
+  it('UNKNOWN 칸을 좋은 구간에 넣지 않는다', () => {
+    const markup = render(
+      withWindow([
+        walkHour(14, 'CAUTION', '주의', 46),
+        walkHour(15, 'UNKNOWN', '판단 근거 부족', 32),
+        walkHour(16, 'SAFE', '안전', 32),
+      ]),
+    )
+
+    expect(markup).toContain('16시가 좋아요.')
+    expect(markup).not.toContain('15–16시가 좋아요.')
+  })
+
+  /*
+    창이 안전과 `UNKNOWN` 뿐이면 경고할 것이 없고 그 칸을 좋다고 말할 수도 없다 —
+    헤드라인만 두고 **조용히** 문장을 걷는다 (창 안 시각이 없는 날과 같은 처리).
+  */
+  it('등급어로 말할 것이 없으면 문장을 걷는다', () => {
+    const markup = render(
+      withWindow([
+        walkHour(14, 'UNKNOWN', '판단 근거 부족', 32),
+        walkHour(15, 'SAFE', '안전', 32),
+        walkHour(16, 'SAFE', '안전', 30),
+      ]),
+    )
+
+    expect(markup).toContain('14:00 – 16:00')
+    expect(markup).not.toContain('등급이에요')
+    expect(markup).not.toContain('좋아요.')
+  })
+
+  /** 창 안이 전부 `UNKNOWN` 이어도 같다 — 등급을 하나 지어내지 않는다 */
+  it('창 안이 전부 UNKNOWN 이면 등급을 말하지 않는다', () => {
+    const markup = render(
+      withWindow([
+        walkHour(14, 'UNKNOWN', '판단 근거 부족', 32),
+        walkHour(15, 'UNKNOWN', '판단 근거 부족', 33),
+      ]),
+    )
+
+    expect(markup).toContain('14:00 – 15:00')
+    expect(markup).not.toContain('등급이에요')
+  })
+
+  /*
+    **모르는 코드는 `UNKNOWN` 과 다르다.** 서버가 등급을 하나 더 내면 그 값은 등급이므로
+    좋은 쪽으로 접지 않고 `CAUTION` 자리에서 판정에 든다 (`severityOf`) — 이 갈래까지
+    지우면 새 등급이 조용히 "안전" 으로 읽힌다.
+  */
+  it('모르는 등급 코드는 그대로 등급으로 다룬다', () => {
+    const markup = render(
+      withWindow([walkHour(14, 'FUTURE_LEVEL', '아주 위험', 55), walkHour(15, 'SAFE', '안전', 32)]),
+    )
+
+    expect(markup).toContain('14시는 노면이 55℃까지 올라')
+    expect(markup).toContain('아주 위험 등급</span>이에요.')
+  })
+})
