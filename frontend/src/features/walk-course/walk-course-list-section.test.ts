@@ -11,6 +11,7 @@ import { messages } from '@/lib/messages'
 import {
   WALK_COURSE_PLAIN,
   WALK_COURSE_PROVIDER,
+  WALK_COURSE_UNKNOWN_DURATION,
   WALK_COURSE_WITH_COORDS,
 } from '@/test/fixtures/walk-course'
 
@@ -107,6 +108,67 @@ describe('WalkCourseListSection — 기준 줄은 응답이 정한다 (S4-1 규�
     // 활동량 이름은 남는다 — 응답이 준 값이라 지어낸 것이 아니다
     expect(markup).toContain('활동량(보통)')
     expect(markup).not.toContain('몽실이')
+  })
+})
+
+/*
+  #776. **기준 줄은 보여 준 코스가 아니라 거른 기준을 말한다** (명세 D5-3).
+
+  서버 `WalkCourseActivityFit.fits` 는 `durationMaxMinutes === null` 을 **어느 활동량에서도
+  걸러내지 않는다** — 모르는 것을 나쁜 것으로 판정해 지우면 사용자는 그 코스가 있다는 것조차
+  모르기 때문이고, 그 규칙은 바꾸지 않는다. 그래서 `LOW`(4시간)로 좁힌 목록에도 **4시간을
+  넘을 수도 있는 코스가 섞여 나온다.**
+
+  **지금 깨진 화면을 잡는 테스트가 아니다.** dev 실측(2026-09-21)은 29개 전부 파싱돼 미상이
+  0건이라, 옛 문장(`4시간 이내 코스만 보여 줘요`)도 오늘은 우연히 참이었다. 적재(#722·#383)가
+  파싱 실패 코스를 하나 들여오는 순간 문구가 조용히 거짓이 되는 것을 여기서 막는다.
+*/
+describe('WalkCourseListSection — 기준 줄이 데이터보다 강하게 말하지 않는다 (#776)', () => {
+  const LOW_BASIS = { petName: '몽실이', levelName: '낮음', maxDurationMinutes: 240 }
+  const MIXED = [WALK_COURSE_PLAIN, WALK_COURSE_UNKNOWN_DURATION]
+
+  it('미상 코스가 섞인 목록에서 "이내 코스만" 이라고 단정하지 않는다', () => {
+    const markup = render({ courses: MIXED, totalCount: 2, basis: LOW_BASIS })
+
+    // 보여 준 코스 **전부**에 대한 단정 — 미상 코스가 하나만 섞여도 거짓이 된다
+    expect(markup).not.toContain('이내 코스만')
+    // 대신 거른 기준을 말한다. 서버는 "넘는다고 아는 것" 만 뺀다 — 미상은 그것이 아니다
+    expect(markup).toContain('4시간이 넘는 코스는 빼고')
+  })
+
+  /**
+   * **판정 ②** — 행에서 미상 갈래를 구분하지 않는다 (D5-3). 코스는 목록에서 사라지지 않고
+   * `durationText` **원문**이 그대로 선다. 행에 새 배지·새 낱말을 만들지 않았다는 잠금이다.
+   */
+  it('미상 코스를 목록에서 지우지도, 행에 새 표시를 달지도 않는다', () => {
+    const markup = render({ courses: MIXED, totalCount: 2, basis: LOW_BASIS })
+
+    expect(markup).toContain(WALK_COURSE_UNKNOWN_DURATION.name)
+    expect(markup).toContain(WALK_COURSE_UNKNOWN_DURATION.durationText)
+  })
+
+  /** 이름이 빠져도 **약속의 세기는 같다** — 갈리면 같은 화면이 두 가지를 약속하게 된다 */
+  it('반려견 이름 없는 갈래도 같은 세기로 말한다', () => {
+    const markup = render({
+      courses: MIXED,
+      totalCount: 2,
+      basis: { ...LOW_BASIS, petName: null },
+    })
+
+    expect(markup).not.toContain('이내 코스만')
+    expect(markup).toContain('4시간이 넘는 코스는 빼고')
+  })
+
+  /**
+   * 미로그인·`전체` 갈래 — **기준 줄 자체가 없다** (공통명세 S4-1 규칙 5). 이 변경의 대상이
+   * 아니라는 것을 잠근다: 약속을 바꾼 것이지 없던 자리에 새 약속을 만든 것이 아니다.
+   */
+  it('기준 줄이 없는 갈래에는 약속 자체가 서지 않는다', () => {
+    const markup = render({ courses: MIXED, totalCount: 2, basis: null })
+
+    expect(markup).not.toContain('넘는 코스는 빼고')
+    expect(markup).not.toContain('이내 코스만')
+    expect(markup).toContain(WALK_COURSE_UNKNOWN_DURATION.name)
   })
 })
 
