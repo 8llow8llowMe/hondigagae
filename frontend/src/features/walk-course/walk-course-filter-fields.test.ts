@@ -104,7 +104,15 @@ describe('WalkCourseSortField — 정렬', () => {
     expect(first).toContain('aria-checked="true"')
   })
 
-  it('짧은 순을 고르면 그 칸이 선택된다', () => {
+  /*
+    #798. **`짧은 순` 만으로는 무엇이 짧은지 말하지 않는다.** 값은 `DISTANCE_ASC` 인데
+    같은 행에 소요시간도 있어 "짧은 시간 순" 으로 읽힐 수 있다.
+  */
+  it('정렬 라벨이 무엇 기준인지 말한다', () => {
+    expect(messages.walkCourse.sortDistanceAsc).toBe('거리 짧은 순')
+  })
+
+  it('거리 짧은 순을 고르면 그 칸이 선택된다', () => {
     const selected = renderSort('DISTANCE_ASC')
       .split('</button>')
       .find((part) => part.includes('aria-checked="true"'))

@@ -43,7 +43,12 @@ export const walkCourseMessages = {
   activityAll: '전체',
   sortGroupLabel: '정렬',
   sortCourseNo: '코스 순',
-  sortDistanceAsc: '짧은 순',
+  /**
+   * **무엇이 짧은지 말한다** ([#798](https://github.com/8llow8llowMe/hondigagae/issues/798)).
+   * 값은 `DISTANCE_ASC` 인데 같은 행에 소요시간도 있어, `짧은 순` 만으로는 "짧은 시간 순"
+   * 으로 읽힌다.
+   */
+  sortDistanceAsc: '거리 짧은 순',
   /** 1024 이상 열 머리의 코스 열 라벨 (#734 · #797). 거리·소요시간·시종점은 상세와 같은 라벨(아래)을 그대로 쓴다 */
   columnCourseLabel: '코스',
 
