@@ -56,6 +56,12 @@ export function WalkCourseDetailView({
       walkTimesLoading={position !== null && walkTimes.isPending}
       onWalkTimesRetry={() => void walkTimes.refetch()}
       authed={authed}
+      /*
+        **판정의 기준이 될 아이가 있는가** ([#777](https://github.com/8llow8llowMe/hondigagae/issues/777)).
+        조회에 조건을 싣는 값과 **같은 `pet`** 을 쓴다 — 안내가 약속하는 변화가 바로 이
+        값이 바뀌는 것이라, 다른 출처를 보면 안내와 판정이 서로 다른 아이를 가리킨다.
+      */
+      petRegistered={pet !== null}
       backHref={backHref}
     />
   )

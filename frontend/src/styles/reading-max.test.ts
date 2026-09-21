@@ -84,6 +84,7 @@ function renderDetail(overrides: Partial<WalkCourseDetailSectionProps> = {}): st
       walkTimesLoading: false,
       onWalkTimesRetry: vi.fn(),
       authed: false,
+      petRegistered: false,
       ...overrides,
     }),
   )
