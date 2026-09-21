@@ -156,7 +156,25 @@ export function WalkCourseSourceLine({ course }: { course: WalkCourseDetail }) {
     .split('{date}')
 
   return (
-    <p className={cn('text-caption text-fg-subtle break-keep', INSET_CLASS.card)}>
+    /*
+      **문서 끝 각주다** — 위에 1px 선을 둔다 (목록 카드의 출처 줄과 같은 처치:
+      `walk-course-list-section.tsx`).
+
+      선을 준 이유: 담기 버튼이 우측 열로 올라가면서(#793) 이 줄만 페이지 맨 아래에
+      전폭으로 남아 **허공에 뜬 글씨**처럼 보였다. 선이 그 자리를 "본문이 끝나고
+      각주가 시작되는 곳" 으로 만든다.
+
+      **버튼 바로 밑에 붙이지 않는다.** `제주올레 · 2025-04-28 기준` 은 이 **페이지
+      데이터**의 출처이지 그 버튼이 무엇을 하는지에 대한 말이 아니다 — 붙이면 버튼에
+      딸린 설명으로 읽힌다 (#730 이 같은 이유로 CTA 위에서 아래로 내렸다). 한쪽 열에
+      속하지 않는 말이라 전폭으로 남는다.
+    */
+    <p
+      className={cn(
+        'border-border text-caption text-fg-subtle border-t py-4 break-keep',
+        INSET_CLASS.card,
+      )}
+    >
       {before}
       <time dateTime={course.baseDate}>{course.baseDate}</time>
       {after}
