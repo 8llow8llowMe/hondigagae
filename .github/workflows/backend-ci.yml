@@ -1,0 +1,127 @@
+name: backend-ci
+
+# **백엔드 PR 에서 테스트를 돌린다** (이슈 #764).
+#
+# 이 워크플로가 생기기 전까지 `backend/**` 만 바꾼 PR 에서 도는 체크는 `label` 하나였다.
+# 초록불이 "테스트가 통과했다" 가 아니라 "라벨이 붙었다" 를 뜻했는데 그렇게 읽히지 않았다.
+#
+# **Jenkins 는 PR 빌드에서 이미 테스트를 돈다** — `Jenkinsfile.backend-common.groovy:742`
+# 가 `RUN_TESTS`(기본 true)일 때 `:{module}:test` 를 실행한다. 다만 그 결과가 GitHub PR
+# 체크로 올라오지 않아 **PR 화면에서는 보이지 않는다.** 그리고 Jenkins 는 라벨이 가리키는
+# **한 모듈만** 돈다. 이 워크플로는 그 둘을 메운다 — 결과를 PR 에 보이게 하고, 전 모듈을 본다.
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+
+# 같은 PR 에 새 커밋이 올라오면 이전 실행을 버린다. 백엔드 check 는 분 단위라
+# rebase 를 몇 번 하면 러너에 겹쳐 쌓인다.
+# (`frontend-ci.yml` 에는 아직 이 블록이 없다 — 거기에도 넣을지는 별도 판단이다.)
+concurrency:
+  group: backend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # **모듈을 좁히지 않고 전 모듈 `check` 를 돈다.**
+  #
+  # `core/common-core` 의 `GeoDistance` 처럼 여러 서비스가 함께 쓰는 코드가 있어
+  # 부분 빌드는 위험하다는 판단이 이미 `Jenkinsfile.backend-common.groovy` 머리말에 있다.
+  # 여기서 경로→모듈 매핑을 또 만들면 `.github/labeler.yml` · `Jenkinsfile-{service}` ·
+  # `settings.gradle` 에 이어 네 번째 사본이 되고, 넷이 어긋나는 날 조용히 덜 돈다.
+  #
+  # 비용도 문제가 되지 않는다 — 이 저장소는 public 이라 Actions 분이 무료다.
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      # 루트 `build.gradle` 의 toolchain 이 Java 21 이다.
+      #
+      # **`cache: gradle` 을 쓰지 않는다.** 그 옵션은 `~/.gradle/caches` 를 통째로 담는데
+      # 거기에 `build-cache-1` 이 들어 있다. 그러면 다음 실행에서 test 태스크가
+      # `FROM-CACHE` 로 건너뛰어져 **테스트가 한 건도 안 돈 채 초록불이 난다** —
+      # `backend/docs/done-checklist.md` §1 이 로컬에서 경고하는 함정이 CI 에서 그대로
+      # 재현된다. 캐시는 아래에서 의존성만 따로 담는다.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # 의존성(`modules-2`)과 wrapper 배포본만 캐시한다. 빌드 산출물·테스트 결과는 담지 않는다.
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/wrapper
+          key: gradle-deps-${{ runner.os }}-${{ hashFiles('backend/**/*.gradle', 'backend/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-deps-${{ runner.os }}-
+
+      # `--no-build-cache` 는 위 캐시 제외와 같은 목적의 이중 안전장치다.
+      # `backend/gradle.properties` 가 `org.gradle.caching=true` 를 켜 두므로 명시로 끈다.
+      #
+      # 로컬과 달리 `cleanTest` 는 필요 없다 — 러너는 매번 새 체크아웃이라 `build/` 가
+      # 없고, `UP-TO-DATE` 로 건너뛸 이전 산출물 자체가 존재하지 않는다. 남는 경로가
+      # 빌드 캐시 하나였고 그것을 위에서 끊었다. **그래도 믿지 않고 다음 단계에서 센다.**
+      - name: Gradle check
+        id: gradle
+        run: ./gradlew check --no-build-cache --stacktrace
+
+      # **초록불이 거짓인지 확인한다.**
+      #
+      # 이 이슈의 출발점이 "돌았다고 믿었는데 안 돌았다" 이므로, 통과 여부와 별개로
+      # **몇 건이 실제로 실행됐는지**를 세어 PR 요약에 남긴다. 통과했는데 0건이면
+      # 그 초록불은 거짓이므로 여기서 떨어뜨린다.
+      - name: 실행된 테스트 건수 집계
+        if: ${{ !cancelled() }}
+        env:
+          GRADLE_OUTCOME: ${{ steps.gradle.outcome }}
+        run: |
+          python3 - <<'PY'
+          import glob, os, sys, xml.etree.ElementTree as ET
+
+          total = failures = errors = skipped = 0
+          modules = {}
+          for path in glob.glob('**/build/test-results/test/*.xml', recursive=True):
+              root = ET.parse(path).getroot()
+              count = int(root.get('tests', 0))
+              total += count
+              failures += int(root.get('failures', 0))
+              errors += int(root.get('errors', 0))
+              skipped += int(root.get('skipped', 0))
+              module = path.replace(os.sep, '/').split('/build/test-results')[0]
+              modules[module] = modules.get(module, 0) + count
+
+          lines = ['| 모듈 | 실행 건수 |', '|------|----------:|']
+          lines += ['| `%s` | %d |' % (m, modules[m]) for m in sorted(modules)]
+          lines.append('| **합계** | **%d** |' % total)
+          lines.append('')
+          lines.append('실패 %d · 오류 %d · 건너뜀 %d' % (failures, errors, skipped))
+
+          summary = '\n'.join(lines)
+          print(summary)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as fp:
+              fp.write('## 백엔드 테스트 실행 결과\n\n' + summary + '\n')
+
+          # check 가 이미 실패했다면 원인은 그쪽이다. 0건을 덧씌워 혼란을 주지 않는다.
+          if total == 0 and os.environ.get('GRADLE_OUTCOME') == 'success':
+              sys.exit('테스트가 한 건도 실행되지 않았는데 check 가 통과했다 — '
+                       '캐시로 건너뛰었을 수 있다. 이 초록불은 믿을 수 없다.')
+          PY
+
+      # `working-directory` 는 액션 입력에 적용되지 않는다 (`frontend-ci.yml` 의 같은 함정).
+      - name: Upload test reports
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: |
+            backend/**/build/reports/tests/test/
+            backend/**/build/test-results/test/
+          retention-days: 7

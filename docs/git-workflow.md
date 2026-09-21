@@ -213,9 +213,32 @@ gh pr edit <번호> --add-assignee @me --add-label frontend-web
 
 | 조건 | |
 |------|---|
-| **CI 통과** | 필수. `frontend-ci` 가 실패하면 머지하지 않는다 |
+| **CI 통과** | 필수. `frontend-ci` · `backend-ci` 가 실패하면 머지하지 않는다 |
 | **완료 체크리스트** | BE `backend/docs/done-checklist.md` / FE `frontend/docs/done-checklist.md` |
 | 리뷰어 승인 | **현재는 선택.** 1인 개발 체제라 셀프 머지를 허용한다 |
+
+#### 초록불이 무엇을 보장하는가
+
+**체크 이름마다 보장 범위가 다르다.** 전부 초록이어도 안 본 것이 있다.
+
+| 체크 | 언제 도는가 | 무엇을 보장하는가 |
+|------|-------------|-------------------|
+| `label` | 모든 PR | **아무것도 검증하지 않는다.** 배포 대상 라벨이 붙었다는 뜻뿐이다 |
+| `frontend-ci / verify` | `frontend/**` 변경 | format · lint · typecheck · 단위 테스트 · 빌드 |
+| `frontend-ci / e2e` | `frontend/**` 변경 | 레이아웃·보호 라우트 (Playwright, 목 API) |
+| `backend-ci / check` | `backend/**` 변경 | **전 모듈** `./gradlew check` — 컴파일 + 테스트 |
+
+> **`backend/**` 만 바꾼 PR 에서 오래도록 도는 체크가 `label` 하나였다** ([#764](https://github.com/8llow8llowMe/hondigagae/issues/764)).
+> 그 초록불은 "테스트가 통과했다" 가 아니라 "라벨이 붙었다" 였는데 그렇게 읽히지 않았다.
+
+- **`backend-ci` 는 13개 모듈 전부를 돈다.** 변경 경로로 좁히지 않는다 — `core/**` 는
+  여러 서비스가 함께 쓰므로 부분 빌드가 위험하다 (`Jenkinsfile.backend-common.groovy` 머리말).
+- **실행된 테스트 건수를 job summary 에 남긴다.** Gradle 이 캐시로 테스트를 건너뛰면
+  한 건도 안 돈 채 `BUILD SUCCESSFUL` 이 나오므로(`backend/docs/done-checklist.md` §1),
+  0건이면 통과했어도 빨간불로 떨어뜨린다. **초록불을 봤으면 건수도 같이 본다.**
+- **Jenkins 의 PR 빌드 결과는 GitHub 체크로 올라오지 않는다.** Jenkins 도 PR 에서
+  테스트를 돌지만(`Jenkinsfile.backend-common.groovy`, `RUN_TESTS` 기본 true) 라벨이
+  가리키는 **한 모듈만** 본다. PR 화면에서 읽을 수 있는 백엔드 근거는 `backend-ci` 다.
 
 > **셀프 머지를 허용하는 것이지 PR 을 생략하는 것이 아니다.** PR 은 변경 기록이자
 > 되돌리기 단위다. develop 에 직접 커밋하지 않는다.
@@ -312,7 +335,7 @@ sh scripts/check-issue-sync.sh 200    # 개수 지정
 
 ## 8. 강제되는 것과 규칙으로만 지키는 것
 
-이 저장소는 **비공개 무료 플랜이라 GitHub 브랜치 보호 규칙을 쓸 수 없다.**
+이 저장소는 오랫동안 **비공개 무료 플랜이라 GitHub 브랜치 보호 규칙을 쓸 수 없었다.**
 
 ```text
 GET /repos/8llow8llowMe/hondigagae/branches/develop/protection
@@ -320,6 +343,11 @@ GET /repos/8llow8llowMe/hondigagae/branches/develop/protection
 ```
 
 **그래도 무료로 강제할 수 있는 것이 있고, 그것부터 걸어 뒀다** ([#286](https://github.com/8llow8llowMe/hondigagae/issues/286)).
+
+> **저장소가 public 으로 바뀌어 위 403 은 더 이상 나지 않는다** (2026-09-21 확인,
+> 같은 호출이 `404 "Branch not protected"` — 즉 **걸 수 있는데 안 걸어 둔 상태**다).
+> 무엇을 required status check 로 지정할지는 [#286](https://github.com/8llow8llowMe/hondigagae/issues/286)
+> 에서 정한다. 정해지기 전까지 아래 8-2 는 그대로 "규칙으로만" 남는다.
 
 ### 8-1. 이미 강제된다
 
@@ -338,7 +366,7 @@ GET /repos/8llow8llowMe/hondigagae/branches/develop/protection
 브랜치 보호가 필요한 것들이다. **공개 전환 또는 플랜 업그레이드가 정해지면** 건다.
 
 - `develop` **직접 푸시 금지** (§1 이 금지하지만 기술적으로는 열려 있다)
-- PR 머지 전 **`verify` 통과 필수** (required status check)
+- PR 머지 전 **`verify` · `backend-ci / check` 통과 필수** (required status check)
 - Jenkins `pr-merge` 도 필수 — Jenkins 는 통과했는데 Actions 만 빨간 경우가 있었다
 
 > **이게 왜 급한지** — [#282](https://github.com/8llow8llowMe/hondigagae/pull/282) 가
@@ -358,6 +386,7 @@ git config core.hooksPath .githooks
 "나는 백엔드 작업이니 프론트 검사는 필요 없다" 는 판단이 정확히 그 사고를 만들었다.
 
 백엔드는 돌리지 않는다 — `./gradlew check` 가 분 단위라 push 훅에 맞지 않다.
+**대신 `backend-ci` 가 PR 에서 본다** (§6). 훅은 프론트 전용으로 남긴다.
 
 일회성으로 건너뛰려면 `SKIP_HOOKS=1 git push`. **머지를 막는 장치가 아니라 실수를 줄이는
 장치다** — 진짜 강제는 8-2 가 열려야 한다.
@@ -382,8 +411,10 @@ PR 올리기 전:
 
 머지할 때:
 
-- [ ] CI 통과 — **`verify` 와 Jenkins 둘 다.** 빨간불로 머지하면 develop 이 오염되고
-      뒤따르는 모든 PR 이 그 실패를 물려받는다 (§8-2)
+- [ ] CI 통과 — **`verify` · `backend-ci` 와 Jenkins 전부.** 빨간불로 머지하면 develop 이
+      오염되고 뒤따르는 모든 PR 이 그 실패를 물려받는다 (§8-2)
+- [ ] **백엔드 PR 이면 `backend-ci` job summary 의 실행 건수를 봤다** — 0건이면 초록불이
+      거짓이다 (§6)
 - [ ] `Issue Number` 가 채워져 있다
 - [ ] **Rebase and merge** 로 머지하고 브랜치를 삭제했다
 
