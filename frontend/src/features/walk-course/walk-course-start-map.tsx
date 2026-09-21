@@ -139,7 +139,13 @@ export function WalkCourseStartMap({ course }: { course: WalkCourseDetail }) {
             pins={pins}
             /* 핀이 하나뿐이라 선택할 것이 없다. 라벨이 붙도록 처음부터 선택 상태로 둔다 */
             selectedId={walkCourseId}
-            onSelect={() => undefined}
+            /*
+              **`onSelect` 를 주지 않는 것이 신호다** (#789 · `PlaceMiniMap` 과 같은 처치).
+              미지정이면 `MapCanvas` 가 핀을 버튼에서 떼고 지도의 이동·확대를 끈다.
+
+              이 카드가 특히 그래야 하는 이유: 176px 띠가 **아래에 콘텐츠가 더 있는 중간
+              위치**라, 그 위에서 시작한 세로 스와이프를 지도가 먹으면 페이지가 멈춘다.
+            */
             camera={camera}
             onFailure={setFailure}
             className="h-44 w-full overflow-hidden rounded-md md:h-52"

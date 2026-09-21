@@ -859,6 +859,7 @@ body {
   적합도 톤(metric-*)을 지도에 전용하면 "안전"과 "선택됨"이 같은 초록으로 겹친다.
 */
 .map-pin {
+  position: relative;
   display: inline-flex;
   align-items: center;
   max-width: 180px;
@@ -871,16 +872,57 @@ body {
   font-weight: 600;
   line-height: 1.3;
   white-space: nowrap;
-  overflow: hidden;
   text-overflow: ellipsis;
   box-shadow: var(--shadow-md);
   cursor: pointer;
   transform: translateY(-6px);
 }
 
+/*
+  **자르는 쪽은 안쪽 `span` 이다.** 예전에는 `.map-pin` 에도 `overflow: hidden` 이 있었는데
+  **아래 히트 영역(`::before`)을 통째로 잘라 먹었다** — 실측: 넘치는 이름의 클리핑은
+  `span` 하나로 이미 똑같이 나고(`scrollWidth > clientWidth`, 말줄임까지), `.map-pin` 쪽
+  `overflow` 는 겹쳐 걸린 값이었다. 그래서 그것만 뗀다.
+*/
 .map-pin > span {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/*
+  **보이는 이름표는 그대로 두고 누르는 자리만 44 로 넓힌다** (`done-checklist.md` 의
+  44px 규칙이 지도 마커를 포함한다 · 이슈 #789). 실측 높이가 `.map-pin` 29.6 ·
+  `.map-pin-selected` 34.9 로 **둘 다 44 미만**이었다.
+
+  이름표 자체를 44 로 키우지 않는 이유는 `.map-cluster` 가 원을 안 키운 것과 같다 —
+  밀집 구간에서 겹침 면적이 그만큼 늘고, 지도는 이름표가 이미 가로로 긴 화면이다.
+
+  **`calc` 로 쓰고 픽셀을 박지 않는다.** `position: absolute` 의 기준은 테두리를 뺀
+  **패딩 박스**라(`.map-cluster::before` 가 `-7px` 인 이유), 상태마다 다른 높이에서
+  역산한 값을 두 벌 적어야 한다. 백분율은 그 패딩 박스 높이를 가리키므로 한 줄이 두
+  상태를 다 덮는다 — 실측 44.0 / 43.98(소수점 반올림).
+
+  **가로는 넓히지 않는다.** 백분율이 이쪽에서는 폭을 가리켜, 84px 이름표에서는 히트
+  영역을 오히려 **좁히는** 양수가 된다. 이름표는 폭이 모자란 적이 없다.
+*/
+.map-pin::before {
+  position: absolute;
+  inset-block: calc((100% - 44px) / 2);
+  inset-inline: 0;
+  content: '';
+}
+
+/*
+  고를 것이 없는 지도의 핀 (#789 — `map-canvas.tsx` 머리주석의 갈래). `<button>` 이 아니라
+  `<div role="img">` 이고 오버레이도 `clickable: false` 라, **누를 수 있다고 말하는 두
+  가지를 뗀다** — 손 모양 커서와 44 히트 영역. 둘 다 여기서는 지킬 약속이 없는 표시다.
+*/
+.map-pin-static {
+  cursor: default;
+}
+
+.map-pin-static::before {
+  content: none;
 }
 
 /* 선택 — 검게 채우고 커진다. 라벨에 거리가 함께 붙는다 */

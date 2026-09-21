@@ -70,6 +70,19 @@ export type KakaoMap = {
   /** 숨겨진 컨테이너에서 만들면 크기가 0 이라 노출 시 호출한다 */
   relayout: () => void
   panTo: (latlng: KakaoLatLng) => void
+  /**
+   * 사용자의 이동(드래그·터치 팬)을 받을지. **기본값은 `true`** 이고, 끄는 것은
+   * 고를 것이 없는 단일 핀 지도뿐이다 (#789 — `map-canvas.tsx` 머리주석의 갈래).
+   *
+   * `panTo` · `setCenter` 같은 **프로그램 이동은 막지 않는다.**
+   */
+  setDraggable: (draggable: boolean) => void
+  /**
+   * 사용자의 확대(휠·더블클릭·핀치)를 받을지. `setDraggable` 과 같은 갈래에서 끈다.
+   *
+   * `setLevel` 은 이것과 무관하게 동작한다 — 카메라를 맞추는 것은 우리 코드다.
+   */
+  setZoomable: (zoomable: boolean) => void
 }
 
 export type KakaoMarkerImage = object
