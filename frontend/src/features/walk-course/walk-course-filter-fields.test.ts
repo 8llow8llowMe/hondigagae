@@ -8,6 +8,7 @@ import {
   WalkCourseSortField,
 } from '@/features/walk-course/walk-course-filter-fields'
 import { messages } from '@/lib/messages'
+import { expectSingleTabStop } from '@/test/radio-group'
 import type { WalkCourseActivityParam, WalkCourseSort } from '@/types/walk-course'
 
 function renderActivity(applied: WalkCourseActivityParam | null): string {
@@ -173,5 +174,25 @@ describe('두 축이 서로 다른 컨트롤로 읽힌다 (#734)', () => {
     )
 
     expect(renderActivity(null)).toMatch(caption)
+  })
+})
+
+/**
+ * 세그먼트의 키보드 계약 — [#825](https://github.com/8llow8llowMe/hondigagae/issues/825).
+ *
+ * 전에는 칸이 전부 탭 스톱이라 **정렬 하나를 지나가려면 Tab 을 다섯 번** 눌러야 했다.
+ * 포커스가 실제로 옮겨 가는지는 `e2e/radio-group-keyboard.spec.ts` 가 잰다.
+ */
+describe('세그먼트 — 묶음 하나가 탭 스톱 하나다 (#825)', () => {
+  it('활동량 — 고른 칸만 탭 스톱이다', () => {
+    expectSingleTabStop(renderActivity(null))
+  })
+
+  it('활동량 — 고른 칸이 바뀌면 탭 스톱도 따라간다', () => {
+    expectSingleTabStop(renderActivity('LOW'))
+  })
+
+  it('정렬 — 고른 칸만 탭 스톱이다', () => {
+    expectSingleTabStop(renderSort(null))
   })
 })
