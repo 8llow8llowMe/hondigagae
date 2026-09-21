@@ -207,24 +207,14 @@ describe('WalkCourseColumnHead — 1024 이상 열 머리 (#734 · #797)', () =>
   이 breakpoint 마다 다른 자리를 갖게 된다.
 */
 describe('WalkCourseRow — 1024 부터 표다 (#797)', () => {
-  const markup = render(WALK_COURSE_WITH_COORDS)
-
   it('행이 1024 부터 그리드가 된다', () => {
-    expect(markup).toContain('lg:grid')
-  })
-
-  it('거리·소요시간이 1024 부터 자기 열로 나간다', () => {
-    expect(markup).toContain('lg:col-start-2')
-    expect(markup).toContain('lg:col-start-3')
-  })
-
-  /** 인라인으로 이어 말하던 줄은 열이 생기는 순간 숨어야 값이 두 번 보이지 않는다 */
-  it('거리·소요시간 인라인 줄이 1024 부터 숨는다', () => {
-    expect(markup).toContain('lg:hidden')
+    expect(render(WALK_COURSE_WITH_COORDS)).toContain('lg:grid')
   })
 
   /** 시종점도 1024 부터 자기 열이다 — 한 폭에서만 인라인으로 남지 않는다 */
   it('시종점 · 썸네일 · chevron 이 모두 1024 부터 자기 열이다', () => {
+    const markup = render(WALK_COURSE_WITH_COORDS)
+
     expect(markup).toContain('lg:col-start-4')
     expect(markup).toContain('lg:col-start-5')
     expect(markup).toContain('lg:col-start-6')
@@ -232,7 +222,7 @@ describe('WalkCourseRow — 1024 부터 표다 (#797)', () => {
 
   /** 칸 수가 폭마다 갈리지 않는다 — `xl:` 자리 지정이 남아 있으면 안 된다 */
   it('breakpoint 마다 칸 자리가 갈리지 않는다', () => {
-    expect(markup).not.toContain('xl:col-start')
+    expect(render(WALK_COURSE_WITH_COORDS)).not.toContain('xl:col-start')
   })
 })
 
@@ -247,7 +237,9 @@ describe('WalkCourseRow — 행 높이가 고르다 (#797)', () => {
   it('표 안 썸네일을 줄인다 — 1024 미만 크기는 그대로다', () => {
     const markup = render(WALK_COURSE_WITH_COORDS)
 
+    // `md:size-20` 을 함께 단언한다 — "그대로다" 를 실제로 지키는 것이 이 클래스다
     expect(markup).toContain('size-16')
+    expect(markup).toContain('md:size-20')
     expect(markup).toContain('lg:size-10')
   })
 

@@ -44,7 +44,7 @@ export const walkCourseMessages = {
   sortGroupLabel: '정렬',
   sortCourseNo: '코스 순',
   sortDistanceAsc: '짧은 순',
-  /** 1280 이상 열 머리의 코스 열 라벨 (#734). 거리·소요시간·시종점은 상세와 같은 라벨(아래)을 그대로 쓴다 */
+  /** 1024 이상 열 머리의 코스 열 라벨 (#734 · #797). 거리·소요시간·시종점은 상세와 같은 라벨(아래)을 그대로 쓴다 */
   columnCourseLabel: '코스',
 
   /**
