@@ -167,6 +167,8 @@ function renderSection(overrides: Partial<WalkCourseDetailSectionProps> = {}): s
     onRetry: vi.fn(),
     walkTimes: WALK_TIMES,
     walkTimesLoading: false,
+    nearbyPlaces: [],
+    nearbyPlacesLoading: false,
     onWalkTimesRetry: vi.fn(),
     authed: false,
     // #777 이 더한 축이다. **반려견 없음**으로 두는 것이 ③ 에 가장 가혹한 입력이라 기본값으로

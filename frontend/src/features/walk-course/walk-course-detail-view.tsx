@@ -2,11 +2,23 @@
 
 import { useWalkTimes } from '@/features/insight/use-walk-times'
 import { useSelectedPet } from '@/features/nav/use-selected-pet'
+import { useNearbyPlaces } from '@/features/place/use-nearby-places'
 import { useWalkCourseDetail } from '@/features/walk-course/use-walk-course-detail'
 import { WalkCourseDetailSection } from '@/features/walk-course/walk-course-detail-section'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { toPetCondition } from '@/lib/api/insight'
+import { DEFAULT_PLACE_FILTERS } from '@/lib/url/place-filters'
 import { toCoursePosition } from '@/lib/walk-course/coordinates'
+
+/**
+ * 시작점 근처 장소를 찾는 반경(m) ([#826](https://github.com/8llow8llowMe/hondigagae/issues/826)).
+ *
+ * **걸어서 닿는 거리다.** 코스를 걸으러 온 사람에게 "근처" 는 차로 가는 거리가 아니다.
+ * 넓히면 건수는 늘지만 시작점과 무관한 곳이 섞여 `시작점 근처` 라는 제목이 거짓이 된다.
+ *
+ * **서버 응답의 `radius` 를 다시 읽지 않는다** — 우리가 보낸 값을 그대로 돌려준다.
+ */
+const NEARBY_RADIUS_METERS = 2000
 
 /**
  * 조회 상태를 presentational 컴포넌트가 쓰는 props 로 변환한다.
@@ -44,6 +56,20 @@ export function WalkCourseDetailView({
   const course = query.data ?? null
   const position = course === null ? null : toCoursePosition(course)
   const walkTimes = useWalkTimes(position, toPetCondition(pet))
+  /*
+    **골든타임과 같은 좌표를 쓴다** — 둘 다 시작점 하나에 걸려 있고, 좌표가 없으면
+    `position === null` 이라 요청 자체가 나가지 않는다 (`enabled`).
+
+    **필터는 기본값이다.** 장소 목록에서 고른 조건은 이 화면의 것이 아니다 — 코스 상세는
+    장소 목록에서 오는 화면이 아니라서 이어받을 조건이 없고, 있지도 않은 조건을 흉내 내면
+    사용자가 좁힌 적 없는 결과를 좁혀서 보여 주게 된다.
+  */
+  const nearby = useNearbyPlaces(
+    position,
+    NEARBY_RADIUS_METERS,
+    DEFAULT_PLACE_FILTERS,
+    position !== null,
+  )
 
   return (
     <WalkCourseDetailSection
@@ -55,6 +81,12 @@ export function WalkCourseDetailView({
       walkTimes={walkTimes.data ?? null}
       walkTimesLoading={position !== null && walkTimes.isPending}
       onWalkTimesRetry={() => void walkTimes.refetch()}
+      /*
+        **실패를 빈 배열로 접는다** (#826). 0건 · 좌표 없음 · 조회 실패에 화면이 같은 답을
+        하므로(섹션을 만들지 않는다) 여기서 셋을 합쳐 넘긴다 — 가르면 화면이 다시 합쳐야 한다.
+      */
+      nearbyPlaces={nearby.data?.places ?? []}
+      nearbyPlacesLoading={position !== null && nearby.isPending}
       authed={authed}
       /*
         **판정의 기준이 될 아이가 있는가** ([#777](https://github.com/8llow8llowMe/hondigagae/issues/777)).

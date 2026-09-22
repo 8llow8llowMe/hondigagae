@@ -29,6 +29,8 @@ function render(overrides: Partial<WalkCourseDetailSectionProps> = {}): string {
     onRetry: vi.fn(),
     walkTimes: WALK_TIMES,
     walkTimesLoading: false,
+    nearbyPlaces: [],
+    nearbyPlacesLoading: false,
     onWalkTimesRetry: vi.fn(),
     authed: false,
     // 미로그인이 이 fixture 의 기본이다 — 그러면 반려견도 없다 (#777)

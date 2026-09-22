@@ -82,6 +82,8 @@ function renderDetail(overrides: Partial<WalkCourseDetailSectionProps> = {}): st
       onRetry: vi.fn(),
       walkTimes: null,
       walkTimesLoading: false,
+      nearbyPlaces: [],
+      nearbyPlacesLoading: false,
       onWalkTimesRetry: vi.fn(),
       authed: false,
       petRegistered: false,
