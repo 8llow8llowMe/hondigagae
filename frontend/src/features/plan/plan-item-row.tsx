@@ -13,6 +13,7 @@ import { imageSrc } from '@/lib/image/remote-host'
 import { messages } from '@/lib/messages'
 import { placeMetaLine } from '@/lib/place/meta'
 import { isPlaceTarget, type PlanItemRowModel } from '@/lib/plan/detail'
+import { planItemIllustration } from '@/lib/plan/illustration'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import { formatStartTime } from '@/lib/plan/start-time'
 import { walkCourseMetaLine } from '@/lib/plan/walk-course-meta'
@@ -128,6 +129,12 @@ export function PlanItemRow({
   // WALK 항목은 place 가 항상 null 이고 PLACE 항목은 walkCourse 가 항상 null 이다 —
   // 둘 중 온 쪽만 자리를 채운다 (`일정상세-세부명세.md` D12-1)
   const thumbnail = imageSrc(place?.firstImage ?? walkCourse?.firstImage ?? null)
+  /*
+    사진이 없으면 **유형** 일러스트로 채운다 (#842). 회색 타일은 유형까지 모를 때만이다 —
+    dev 실측(제주 400건)으로 `firstImage` 가 없는 장소가 70% 라 회색이 예외가 아니라
+    기본이었다. `contentType` 이 아니라 `itemType` 인 근거는 `lib/plan/illustration.ts`.
+  */
+  const illustration = thumbnail === null ? planItemIllustration(item.itemType.code) : null
   const meta =
     placeMetaLine(place?.addr1 ?? null, place?.indoor ?? null) ?? walkCourseMetaLine(walkCourse)
   // 형식이 어긋나면 null 이다 — 에러도 배지도 내지 않고 줄 자체를 그리지 않는다 (D14-3)
@@ -181,6 +188,15 @@ export function PlanItemRow({
             sizes="(min-width: 1024px) 96px, 80px"
             className="object-cover"
           />
+        ) : illustration !== null ? (
+          /*
+            **`next/image` 가 아니라 `<img>` 다** — 저장소 안의 정적 SVG 라 최적화할 것이
+            없고(`unoptimized: true`) 원격 호스트 허용 목록과도 무관하다. **장식이므로
+            `alt=""` 다** — 무엇인지는 제목과 유형 배지가 이미 낱말로 말한다
+            (`place-row.tsx` 가 같은 이유로 같은 모양이다).
+          */
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={illustration} alt="" className="absolute inset-0 size-full object-cover" />
         ) : (
           <span className="text-fg-subtle absolute inset-0 flex items-center justify-center">
             <ImageIcon size={20} />
