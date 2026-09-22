@@ -1,6 +1,6 @@
 # 콘텐츠 최대폭 1440 컨테이너 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** 넓은 화면에서 본문이 무한히 자라지 않도록 `--content-max: 1440px` 컨테이너를 도입하고, 레일 레이아웃·헤더·레일 밖 형제를 같은 세로 경계에 세운다. 지도 화면은 전폭을 유지한다.
 
@@ -36,7 +36,7 @@
 - Consumes: 없음 (첫 작업)
 - Produces: CSS 토큰 `--content-max` (값 `1440px`), CSS 클래스 `.content-container` — Task 2·3 이 이 클래스명을 그대로 쓴다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `frontend/src/styles/content-max.test.ts` 를 새로 만든다.
 
@@ -106,13 +106,13 @@ describe('콘텐츠 컨테이너 — 문서 동기 (#376)', () => {
 })
 ```
 
-- [ ] **Step 2: 테스트를 돌려 실패를 확인한다**
+- **Step 2: 테스트를 돌려 실패를 확인한다**
 
 Run: `cd frontend && npx vitest run src/styles/content-max.test.ts`
 Expected: FAIL — 8건 중 **7건 실패**. `--rail-context 는 400 고정이다` 만 이미 참이라 통과한다.
 나머지는 `--content-max` 미선언, `rule` 이 `undefined`, `99rem` 잔존, DESIGN.md 문자열 미포함으로 깨진다.
 
-- [ ] **Step 3: 토큰을 추가하고 1584 규칙을 지운다**
+- **Step 3: 토큰을 추가하고 1584 규칙을 지운다**
 
 `frontend/src/styles/tokens.css` — 레이아웃 블록 첫 줄에 추가한다.
 
@@ -132,7 +132,7 @@ Expected: FAIL — 8건 중 **7건 실패**. `--rail-context 는 400 고정이�
 }
 ```
 
-- [ ] **Step 4: 캡 규칙을 추가한다**
+- **Step 4: 캡 규칙을 추가한다**
 
 `frontend/app/globals.css` — `/*\n  2단 레일 레이아웃 — DESIGN.md §7-1 · §7-2.` 주석 블록 **바로 앞**(최상위, `@media` 밖)에 넣는다.
 
@@ -161,7 +161,7 @@ Expected: FAIL — 8건 중 **7건 실패**. `--rail-context 는 400 고정이�
 }
 ```
 
-- [ ] **Step 5: 낡은 주석 두 곳을 고친다**
+- **Step 5: 낡은 주석 두 곳을 고친다**
 
 `frontend/app/globals.css` — `.rail-layout` 머리 주석의 마지막 줄.
 
@@ -194,7 +194,7 @@ Expected: FAIL — 8건 중 **7건 실패**. `--rail-context 는 400 고정이�
     디자인 가이드 §4 의 규칙이다 — 라디오 한 줄에 280 이상이 필요하지 않다.
 ```
 
-- [ ] **Step 6: `DESIGN.md` §7 을 고친다**
+- **Step 6: `DESIGN.md` §7 을 고친다**
 
 브레이크포인트 표의 `max` 행.
 
@@ -274,22 +274,22 @@ Expected: FAIL — 8건 중 **7건 실패**. `--rail-context 는 400 고정이�
 `--rail-filter`(280) 로 바꾸는 변형이다 (라디오 한 줄에 280 이상이 필요하지 않다).
 ```
 
-- [ ] **Step 7: 표 정렬을 prettier 에 맡긴다**
+- **Step 7: 표 정렬을 prettier 에 맡긴다**
 
 Run: `cd frontend && npx prettier --write DESIGN.md app/globals.css src/styles/tokens.css`
 Expected: 세 파일 재포맷. 표 파이프가 다시 정렬된다.
 
-- [ ] **Step 8: 테스트를 돌려 통과를 확인한다**
+- **Step 8: 테스트를 돌려 통과를 확인한다**
 
 Run: `cd frontend && npx vitest run src/styles/content-max.test.ts`
 Expected: PASS — 8 passed.
 
-- [ ] **Step 9: 전체 검증**
+- **Step 9: 전체 검증**
 
 Run: `cd frontend && pnpm verify && pnpm format:check`
 Expected: lint · typecheck · test · format 모두 통과. 기존 테스트가 깨지지 않는다.
 
-- [ ] **Step 10: 커밋**
+- **Step 10: 커밋**
 
 ```bash
 cd /Users/seonghoho/Documents/projects/hondigagae-376
@@ -330,7 +330,7 @@ EOF
 
 **왜 바가 아니라 안쪽인가:** `<header>` 자신을 캡하면 `border-b` 가 화면 가운데서 끊긴다. 참조한 당근알바도 바는 전폭이고 안쪽만 캡이다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `frontend/src/styles/content-max.test.ts` 파일 **맨 위**의 import 에 두 줄을 더한다.
 
@@ -372,13 +372,13 @@ describe('콘텐츠 컨테이너 — 헤더 (#376)', () => {
 })
 ```
 
-- [ ] **Step 2: 테스트를 돌려 실패를 확인한다**
+- **Step 2: 테스트를 돌려 실패를 확인한다**
 
 Run: `cd frontend && npx vitest run src/styles/content-max.test.ts`
 Expected: FAIL — 11건 중 **1건 실패** (`안쪽 div 가 content-container 를 쓴다`).
 바에 캡이 없는 것과 arbitrary 를 안 쓰는 것은 이미 참이라 통과한다.
 
-- [ ] **Step 3: 헤더 안쪽 div 에 클래스를 붙인다**
+- **Step 3: 헤더 안쪽 div 에 클래스를 붙인다**
 
 `frontend/src/features/nav/global-header.tsx`
 
@@ -394,7 +394,7 @@ Expected: FAIL — 11건 중 **1건 실패** (`안쪽 div 가 content-container 
       <div className="content-container flex h-full items-center justify-between gap-3 px-4 md:px-10">
 ```
 
-- [ ] **Step 4: 머리 주석의 낡은 문장을 고친다**
+- **Step 4: 머리 주석의 낡은 문장을 고친다**
 
 같은 파일의 JSDoc.
 
@@ -412,17 +412,17 @@ Expected: FAIL — 11건 중 **1건 실패** (`안쪽 div 가 content-container 
  * 본문(`.rail-layout`)과 같은 세로 경계에 선다 (#376).
 ```
 
-- [ ] **Step 5: 테스트를 돌려 통과를 확인한다**
+- **Step 5: 테스트를 돌려 통과를 확인한다**
 
 Run: `cd frontend && npx vitest run src/styles/content-max.test.ts`
 Expected: PASS — 11 passed (Task 1 의 8 + 헤더 3).
 
-- [ ] **Step 6: 전체 검증**
+- **Step 6: 전체 검증**
 
 Run: `cd frontend && pnpm verify && pnpm format:check`
 Expected: 전부 통과.
 
-- [ ] **Step 7: 커밋**
+- **Step 7: 커밋**
 
 ```bash
 cd /Users/seonghoho/Documents/projects/hondigagae-376
@@ -463,7 +463,7 @@ EOF
 | 홈 `WeatherWarningStrip` | `border-b` 를 가진 **페이지 폭 바** | 헤더와 같다 — 바는 전폭, 안쪽만 캡 |
 | 장소 상세 `DelistedNotice` | 테두리 없는 **인셋 블록** | 블록 자체에 캡 |
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `frontend/src/features/home/weather-warning-strip.test.ts` 의 기존 `describe` **아래**에 붙인다.
 이 파일에는 이미 `HEAT_WAVE` 픽스처와 `render(warning)` 헬퍼가 있다 — 그대로 쓴다.
@@ -504,12 +504,12 @@ describe('콘텐츠 컨테이너 — 레일 밖 형제 (#376)', () => {
 })
 ```
 
-- [ ] **Step 2: 테스트를 돌려 실패를 확인한다**
+- **Step 2: 테스트를 돌려 실패를 확인한다**
 
 Run: `cd frontend && npx vitest run src/features/home/weather-warning-strip.test.ts src/styles/content-max.test.ts`
 Expected: FAIL — `안쪽에 content-container 로 캡한 줄이 있다` 와 `장소 상세의 폐업 안내가 컨테이너에 가입한다` 2건 실패.
 
-- [ ] **Step 3: 특보 스트립을 바 / 안쪽으로 나눈다**
+- **Step 3: 특보 스트립을 바 / 안쪽으로 나눈다**
 
 `frontend/src/features/home/weather-warning-strip.tsx`
 
@@ -551,7 +551,7 @@ Expected: FAIL — `안쪽에 content-container 로 캡한 줄이 있다` 와 `�
   )
 ```
 
-- [ ] **Step 4: 폐업 안내에 캡을 붙인다**
+- **Step 4: 폐업 안내에 캡을 붙인다**
 
 `frontend/src/features/place/place-detail-section.tsx`
 
@@ -572,17 +572,17 @@ function DelistedNotice() {
     <div className="content-container px-4 py-3 md:px-10">
 ```
 
-- [ ] **Step 5: 테스트를 돌려 통과를 확인한다**
+- **Step 5: 테스트를 돌려 통과를 확인한다**
 
 Run: `cd frontend && npx vitest run src/features/home/weather-warning-strip.test.ts src/styles/content-max.test.ts`
 Expected: PASS — 두 파일 모두 통과. 기존 특보 스트립 테스트도 그대로 통과해야 한다(마크업 구조만 바뀌고 텍스트·`aria-label` 은 그대로다).
 
-- [ ] **Step 6: 전체 검증**
+- **Step 6: 전체 검증**
 
 Run: `cd frontend && pnpm verify && pnpm format:check`
 Expected: 전부 통과.
 
-- [ ] **Step 7: 커밋**
+- **Step 7: 커밋**
 
 ```bash
 cd /Users/seonghoho/Documents/projects/hondigagae-376
@@ -617,13 +617,13 @@ EOF
 - Consumes: Task 1·2·3 전부
 - Produces: PR
 
-- [ ] **Step 1: dev 서버를 띄운다**
+- **Step 1: dev 서버를 띄운다**
 
 Run (Bash, background): `cd /Users/seonghoho/Documents/projects/hondigagae-376/frontend && pnpm dev:alt`
 
 **포트 5174 를 쓴다.** 3000 은 카카오 지도 키에 도메인이 등록돼 있지 않아 지도가 항상 폴백으로 뜬다. `preview_start` 는 샌드박스에 막히므로 Bash 로 띄운다.
 
-- [ ] **Step 2: 1920 에서 중앙 정렬을 확인한다**
+- **Step 2: 1920 에서 중앙 정렬을 확인한다**
 
 `resize_window` 로 1920×1080 을 잡고 아래를 차례로 연다.
 
@@ -635,7 +635,7 @@ Run (Bash, background): `cd /Users/seonghoho/Documents/projects/hondigagae-376/f
 
 헤더 안쪽 내용도 같은 컨테이너 경계 안에 있어야 한다. **바의 `border-b` 는 화면 끝까지 이어져야 한다.**
 
-- [ ] **Step 3: 지도 두 화면이 전폭인지 확인한다**
+- **Step 3: 지도 두 화면이 전폭인지 확인한다**
 
 | URL | 기대 |
 | --- | --- |
@@ -645,7 +645,7 @@ Run (Bash, background): `cd /Users/seonghoho/Documents/projects/hondigagae-376/f
 없다 — 계획 초안이 메인 워크트리(`feature/fe/370`)를 읽고 두 개로 적었던 것을 바로잡는다.
 #370 의 분기도 `.rail-layout` 없는 bare `<main>` 이라 머지되면 자동으로 전폭이 된다.
 
-- [ ] **Step 4: 1440 에서 변경 전과 같은지 확인한다**
+- **Step 4: 1440 에서 변경 전과 같은지 확인한다**
 
 `resize_window` 1440×900. 아래를 콘솔에서 실행해 우측 본문 폭이 **960** 인지 본다.
 
@@ -661,7 +661,7 @@ JSON.stringify({
 
 Expected: `rail` 1440, `right` 1040, `rightInner` 960.
 
-- [ ] **Step 5: 좁은 폭에서 무변화와 가로 스크롤 0 을 확인한다**
+- **Step 5: 좁은 폭에서 무변화와 가로 스크롤 0 을 확인한다**
 
 1280 · 1024 · 768 · 375 에서 각각 홈과 `/places?view=list` 를 연다. 375 에서는 아래가 반드시 `true` 여야 한다.
 
@@ -671,11 +671,11 @@ document.scrollingElement.scrollWidth === document.scrollingElement.clientWidth
 
 **브라우저 패널이 숨겨져 있으면 rAF·폴링이 멈추고 390 스크린샷이 잘린다.** 계측 전에 패널이 보이는지 확인한다.
 
-- [ ] **Step 6: 결함이 있으면 고치고 Task 1~3 의 검증을 다시 돌린다**
+- **Step 6: 결함이 있으면 고치고 Task 1~3 의 검증을 다시 돌린다**
 
 결함이 없으면 이 단계는 건너뛴다. 고쳤다면 `cd frontend && pnpm verify && pnpm format:check` 를 다시 통과시키고 커밋한다.
 
-- [ ] **Step 7: dev 서버를 내리고 push 한다**
+- **Step 7: dev 서버를 내리고 push 한다**
 
 ```bash
 cd /Users/seonghoho/Documents/projects/hondigagae-376
@@ -683,7 +683,7 @@ git log --oneline origin/develop..HEAD
 git push -u origin refactor/fe/376-content-max-width
 ```
 
-- [ ] **Step 8: PR 을 연다**
+- **Step 8: PR 을 연다**
 
 `pr` 스킬로 본문을 쓴다. 반드시 담을 것:
 

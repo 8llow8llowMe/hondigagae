@@ -1,6 +1,6 @@
 # 서비스 소개 페이지(`/about` 확장) Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** 공개 `/about` 을 8절(히어로 · 질문 3 · 위급 · 데이터 · 알아두실 점 · CTA) 소개 페이지로 다시 짜고, 스크롤 등장 + 예시 1회 재생 모션을 붙인다. 백엔드는 부르지 않는다.
 
@@ -76,7 +76,7 @@
 **Interfaces:**
 - Produces: CSS 토큰 `--intro-band` · `--intro-tint`, Tailwind 유틸리티 `bg-intro-band` · `bg-intro-tint` · `hover:bg-intro-band`; `ButtonVariant` 에 `'inverse' | 'inverseOutline'`; `BrandSymbol({ size?: 24 | 48; tone?: 'default' | 'inverse'; className? })` — `inverse` 는 흰 사각 + `--brand-700` 발바닥(그린 면 위용). `Wordmark({ height?: 20 | 40 })` 는 `currentColor` 라 그대로 쓴다.
 
-- [ ] **Step 1: 대비 테스트를 먼저 쓴다**
+- **Step 1: 대비 테스트를 먼저 쓴다**
 
 `frontend/src/styles/contrast.test.ts` 끝에 추가:
 
@@ -103,12 +103,12 @@ describe('토큰 대비 — 소개 페이지 표면 (DESIGN.md §0-2, #635)', ()
 })
 ```
 
-- [ ] **Step 2: 실패 확인**
+- **Step 2: 실패 확인**
 
 Run (frontend/): `pnpm test src/styles/contrast.test.ts`
 Expected: FAIL — `tokens.css 에 --intro-band 이 없다`
 
-- [ ] **Step 3: 토큰 선언 + 매핑**
+- **Step 3: 토큰 선언 + 매핑**
 
 `frontend/src/styles/tokens.css` — `--brand-700: #1d6646;` 줄 아래에:
 
@@ -129,12 +129,12 @@ Expected: FAIL — `tokens.css 에 --intro-band 이 없다`
   --color-intro-tint: var(--intro-tint);
 ```
 
-- [ ] **Step 4: 통과 확인**
+- **Step 4: 통과 확인**
 
 Run: `pnpm test src/styles/contrast.test.ts`
 Expected: PASS (새 describe 6건 포함)
 
-- [ ] **Step 5: Button 변형 테스트**
+- **Step 5: Button 변형 테스트**
 
 `frontend/src/components/button-inverse.test.ts`:
 
@@ -171,12 +171,12 @@ describe('Button — inverse 변형', () => {
 })
 ```
 
-- [ ] **Step 6: 실패 확인**
+- **Step 6: 실패 확인**
 
 Run: `pnpm test src/components/button-inverse.test.ts`
 Expected: FAIL (typecheck 는 vitest 가 안 하므로 런타임에서 `VARIANT[variant]` 가 `undefined` → 클래스 없음)
 
-- [ ] **Step 7: 변형 추가**
+- **Step 7: 변형 추가**
 
 `frontend/src/components/button.tsx`:
 
@@ -206,12 +206,12 @@ export type ButtonVariant =
     'border border-fg-inverse/55 text-fg-inverse hover:bg-fg-inverse/10 active:bg-fg-inverse/10',
 ```
 
-- [ ] **Step 8: 통과 확인**
+- **Step 8: 통과 확인**
 
 Run: `pnpm test src/components/button-inverse.test.ts src/styles`
 Expected: PASS. `token-usage.test.ts` 도 함께 통과해야 한다(`brand-50/100` 을 쓰지 않았다).
 
-- [ ] **Step 8-1: BrandSymbol `inverse` 톤 테스트**
+- **Step 8-1: BrandSymbol `inverse` 톤 테스트**
 
 `frontend/src/components/brand/symbol.test.ts` 끝에 추가 (파일의 기존 import — `createElement` · `renderToStaticMarkup` · `BrandSymbol` — 를 그대로 쓴다):
 
@@ -234,7 +234,7 @@ describe('BrandSymbol — inverse 톤 (그린 면 위, #635)', () => {
 
 Run: `pnpm test src/components/brand/symbol.test.ts` → Expected: FAIL (`tone` 무시되어 brand-500 이 남는다)
 
-- [ ] **Step 8-2: `tone` prop**
+- **Step 8-2: `tone` prop**
 
 `frontend/src/components/brand/symbol.tsx`:
 
@@ -268,7 +268,7 @@ export function BrandSymbol({
 
 Run: `pnpm test src/components/brand` → Expected: PASS
 
-- [ ] **Step 9: DESIGN.md 갱신**
+- **Step 9: DESIGN.md 갱신**
 
 `frontend/DESIGN.md` — `## 1. 제품 톤` 바로 위에 삽입:
 
@@ -314,7 +314,7 @@ Run: `pnpm test src/components/brand` → Expected: PASS
   근거는 `docs/superpowers/specs/2026-09-15-about-landing-design.md` §6-4.
 ```
 
-- [ ] **Step 10: 커밋**
+- **Step 10: 커밋**
 
 ```bash
 git add frontend/src/styles/tokens.css frontend/app/globals.css frontend/src/styles/contrast.test.ts frontend/src/components/button.tsx frontend/src/components/button-inverse.test.ts frontend/src/components/brand/symbol.tsx frontend/src/components/brand/symbol.test.ts frontend/DESIGN.md
@@ -334,7 +334,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `aboutMessages` 의 키 — `title` `description` `hero` `q1` `q2` `q3` `q4` `data` `notice` `cta` `specimen` `scale` (아래 코드가 정본 형태). 이후 Task 는 `messages.about.hero.heading` 처럼 접근한다.
 
-- [ ] **Step 1: 개수 금지 테스트**
+- **Step 1: 개수 금지 테스트**
 
 `frontend/src/lib/messages/message-tone.test.ts` 끝에:
 
@@ -362,12 +362,12 @@ describe('소개 페이지 문구 — 개수를 적어 두지 않는다', () => 
 
 (import 는 파일 상단 import 블록으로 올린다 — eslint `import/first`.)
 
-- [ ] **Step 2: 실행 — 현재는 통과해야 한다** (기존 about.ts 에 개수가 없다). 이 테스트는 Task 2 의 문구가 원칙을 어기지 않게 잠그는 것이다.
+- **Step 2: 실행 — 현재는 통과해야 한다** (기존 about.ts 에 개수가 없다). 이 테스트는 Task 2 의 문구가 원칙을 어기지 않게 잠그는 것이다.
 
 Run: `pnpm test src/lib/messages`
 Expected: PASS
 
-- [ ] **Step 3: `about.ts` 전체 교체**
+- **Step 3: `about.ts` 전체 교체**
 
 ```ts
 /**
@@ -552,17 +552,17 @@ export const aboutMessages = {
 
 **주의:** `scaleUnit: '곳'` 은 숫자 없이 단위만이라 `\d+\s*곳` 에 걸리지 않는다. `curveAria` 의 `06시부터 08시` 는 `곳` 이 아니다.
 
-- [ ] **Step 4: 통과 확인**
+- **Step 4: 통과 확인**
 
 Run: `pnpm test src/lib/messages`
 Expected: PASS (해요체 · 개수 둘 다)
 
-- [ ] **Step 5: typecheck** — 기존 `about-view.tsx` 가 `messages.about.introTitle` · `intro` · `noticeTitle` 을 참조하므로 **여기서 깨진다.** 예상된 실패다. Task 7 이 고친다. 커밋은 한다(문구만 바뀐 상태를 남긴다).
+- **Step 5: typecheck** — 기존 `about-view.tsx` 가 `messages.about.introTitle` · `intro` · `noticeTitle` 을 참조하므로 **여기서 깨진다.** 예상된 실패다. Task 7 이 고친다. 커밋은 한다(문구만 바뀐 상태를 남긴다).
 
 Run: `pnpm typecheck`
 Expected: FAIL — `about-view.tsx` 3곳. **다른 파일에서 실패하면 멈추고 보고한다.**
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 git add frontend/src/lib/messages/about.ts frontend/src/lib/messages/message-tone.test.ts
@@ -589,7 +589,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   - `Reveal({ delay?: number; className?: string; children: ReactNode })` — 항상 `div` 를 그린다.
   - `REVEAL_HIDDEN_CLASS = 'translate-y-3 opacity-0'` (테스트가 "정적 마크업에 없음" 을 이 상수로 단언한다)
 
-- [ ] **Step 1: 테스트**
+- **Step 1: 테스트**
 
 `frontend/src/features/about/reveal.test.ts`:
 
@@ -644,12 +644,12 @@ describe('useRevealOnce — 규칙', () => {
 })
 ```
 
-- [ ] **Step 2: 실패 확인**
+- **Step 2: 실패 확인**
 
 Run: `pnpm test src/features/about/reveal.test.ts`
 Expected: FAIL — 모듈 없음
 
-- [ ] **Step 3: 훅**
+- **Step 3: 훅**
 
 `frontend/src/features/about/use-reveal-once.ts`:
 
@@ -724,7 +724,7 @@ export function useRevealOnce<T extends Element>(
 }
 ```
 
-- [ ] **Step 4: `Reveal`**
+- **Step 4: `Reveal`**
 
 `frontend/src/features/about/reveal.tsx`:
 
@@ -775,12 +775,12 @@ export function Reveal({
 }
 ```
 
-- [ ] **Step 5: 통과 확인**
+- **Step 5: 통과 확인**
 
 Run: `pnpm test src/features/about/reveal.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 git add frontend/src/features/about/use-reveal-once.ts frontend/src/features/about/reveal.tsx frontend/src/features/about/reveal.test.ts
@@ -813,7 +813,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
   ```
 - Produces (컴포넌트): `VerdictSpecimen()` — props 없음. 내부 `useCountUp(target, play, decimals)`.
 
-- [ ] **Step 1: 테스트 (이 Task 몫)**
+- **Step 1: 테스트 (이 Task 몫)**
 
 `frontend/src/features/about/about-specimens.test.ts`:
 
@@ -866,12 +866,12 @@ describe('VerdictSpecimen — 히어로 판정 카드', () => {
 })
 ```
 
-- [ ] **Step 2: 실패 확인**
+- **Step 2: 실패 확인**
 
 Run: `pnpm test src/features/about/about-specimens.test.ts`
 Expected: FAIL — 모듈 없음
 
-- [ ] **Step 3: 데이터 파일**
+- **Step 3: 데이터 파일**
 
 `frontend/src/features/about/about-specimen-data.ts`:
 
@@ -980,7 +980,7 @@ export const EMERGENCY_ROWS_SPECIMEN = [
 export const SCALE_SPECIMEN = { places: 315, emergency: 214, sources: 5 } as const
 ```
 
-- [ ] **Step 4: `VerdictSpecimen`**
+- **Step 4: `VerdictSpecimen`**
 
 `frontend/src/features/about/verdict-specimen.tsx`:
 
@@ -1128,12 +1128,12 @@ export function VerdictSpecimen() {
 
 **주의 (테스트와의 정합):** `>29<` 는 `aria-hidden` 시각 노드의 `{value.toFixed(0)}` 이 `<span aria-hidden="true" class="">29</span>` 로 렌더될 때 나온다. `cn(false)` 는 빈 문자열을 내므로 `class=""` 가 붙는다 — 테스트는 `>29<` 만 본다. `MetricBadge` 의 `className` 은 **레이아웃/전환 유틸리티만** 넘긴다(외형 덮기 아님).
 
-- [ ] **Step 5: 통과 확인**
+- **Step 5: 통과 확인**
 
 Run: `pnpm test src/features/about/about-specimens.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 git add frontend/src/features/about/about-specimen-data.ts frontend/src/features/about/verdict-specimen.tsx frontend/src/features/about/about-specimens.test.ts
@@ -1153,7 +1153,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `GoldenCurveSpecimen()` — props 없음. 카드(제목 · 부제 · SVG · 범례 · 캡션)까지 그린다.
 
-- [ ] **Step 1: 테스트 추가**
+- **Step 1: 테스트 추가**
 
 ```ts
 import { GoldenCurveSpecimen } from '@/features/about/golden-curve-specimen'
@@ -1187,12 +1187,12 @@ describe('GoldenCurveSpecimen — 골든타임 곡선', () => {
 })
 ```
 
-- [ ] **Step 2: 실패 확인**
+- **Step 2: 실패 확인**
 
 Run: `pnpm test src/features/about/about-specimens.test.ts`
 Expected: FAIL — 모듈 없음
 
-- [ ] **Step 3: 구현**
+- **Step 3: 구현**
 
 `frontend/src/features/about/golden-curve-specimen.tsx`:
 
@@ -1333,12 +1333,12 @@ export function GoldenCurveSpecimen() {
 
 **주의:** `useRevealOnce` 의 제네릭이 `T extends Element` 라 `SVGSVGElement` ref 가 들어간다. React 는 `strokeDashoffset: 0` 을 `stroke-dashoffset:0` 으로 직렬화한다(단위 없음 — 테스트가 이 문자열을 본다).
 
-- [ ] **Step 4: 통과 확인**
+- **Step 4: 통과 확인**
 
 Run: `pnpm test src/features/about/about-specimens.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add frontend/src/features/about/golden-curve-specimen.tsx frontend/src/features/about/about-specimens.test.ts
@@ -1359,7 +1359,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 **Interfaces:**
 - Produces: `CongestionSpecimen()` · `PlanSpecimen()` — props 없음. 둘은 **카드 안 `ex` 블록만** 그린다(카드 제목 · 설명은 Task 7 의 `about-view.tsx` 가 `Surface` 로 감싼다).
 
-- [ ] **Step 1: 테스트 추가**
+- **Step 1: 테스트 추가**
 
 ```ts
 import { CONGESTION_SPECIMEN, PLAN_SPECIMEN } from '@/features/about/about-specimen-data'
@@ -1405,12 +1405,12 @@ describe('PlanSpecimen — AI 일정 일자 탭', () => {
 })
 ```
 
-- [ ] **Step 2: 실패 확인**
+- **Step 2: 실패 확인**
 
 Run: `pnpm test src/features/about/about-specimens.test.ts`
 Expected: FAIL — 모듈 없음
 
-- [ ] **Step 3: `CongestionSpecimen`**
+- **Step 3: `CongestionSpecimen`**
 
 `frontend/src/features/about/congestion-specimen.tsx`:
 
@@ -1488,7 +1488,7 @@ export function CongestionSpecimen() {
 
 **주의:** `transition-[transform,background-color]` 는 Tailwind 의 **property 지정**이고 spacing arbitrary value 가 아니다 — `token-usage.test.ts` 가 보는 것은 `bg|text|border-` 색 리터럴과 spacing 이다. lint 의 arbitrary 금지 규칙이 이것을 잡으면 `transition` (모든 속성) 으로 바꾼다 — 동작은 같다. `text-congestion-best` 는 `--color-congestion-best` 매핑이 있어 유효하다(비텍스트 3:1 만 실측된 색이지만 12px **굵은** 요일 글자 하나이고 라벨 `aria-hidden` — 문장이 따로 `bestDate` 를 읽는다). `gap-1.5`(6) · `h-16`(64) · `mt-1.5`(6) · `mt-3`(12) · `px-0.5`(2) — **`px-0.5` 는 스케일 밖(2px)이다. `px-0.5` 를 지운다.**
 
-- [ ] **Step 4: `PlanSpecimen`**
+- **Step 4: `PlanSpecimen`**
 
 `frontend/src/features/about/plan-specimen.tsx`:
 
@@ -1570,12 +1570,12 @@ export function PlanSpecimen() {
 
 **주의:** 탭 높이 `h-7`(28) 은 스케일 밖처럼 보이지만 spacing 스케일은 **padding/margin/gap** 에 적용된다(token-usage 테스트가 훑는 유틸리티가 그것이다). `px-3`(12) · `py-2`(8) · `gap-1.5`(6) · `gap-3`(12) · `mt-2`(8) 는 스케일 안. `w-11`(44) 은 폭이다.
 
-- [ ] **Step 5: 통과 확인**
+- **Step 5: 통과 확인**
 
 Run: `pnpm test src/features/about`
 Expected: PASS (reveal · specimens 전부)
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 git add frontend/src/features/about/congestion-specimen.tsx frontend/src/features/about/plan-specimen.tsx frontend/src/features/about/about-specimens.test.ts
@@ -1598,7 +1598,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 - Consumes: Task 1~6 전부 — `ButtonLink variant="inverse" | "inverseOutline"`, `messages.about.*`, `Reveal`, `VerdictSpecimen`, `GoldenCurveSpecimen`, `CongestionSpecimen`, `PlanSpecimen`, `*_SPECIMEN` 상수, `MetricBadge`, `Surface`, `INSET_CLASS`.
 - Produces: `IntroBand({ tone: 'plain' | 'tint' | 'brand'; labelledBy: string; className?: string; children })`, `AboutView()`.
 
-- [ ] **Step 1: 테스트 재작성**
+- **Step 1: 테스트 재작성**
 
 `frontend/src/features/about/about-view.test.ts` 전체 교체:
 
@@ -1716,12 +1716,12 @@ describe('AboutView — 자리', () => {
 })
 ```
 
-- [ ] **Step 2: 실패 확인**
+- **Step 2: 실패 확인**
 
 Run: `pnpm test src/features/about/about-view.test.ts`
 Expected: FAIL (기존 뷰에 h1 sr-only · 링크 없음 등)
 
-- [ ] **Step 3: `IntroBand`**
+- **Step 3: `IntroBand`**
 
 `frontend/src/features/about/intro-band.tsx`:
 
@@ -1769,7 +1769,7 @@ export function IntroBand({
 }
 ```
 
-- [ ] **Step 4: `AboutView` 재작성**
+- **Step 4: `AboutView` 재작성**
 
 `frontend/src/features/about/about-view.tsx` 전체 교체:
 
@@ -2244,7 +2244,7 @@ function ScaleTile({ value, label, delay = 0 }: { value: number; label: string; 
 - 링크 다섯 개는 전부 앱 안 라우트라 `MoreLink` 도 `next/link` 의 `Link` 다. 테스트는 `href="…"` 만 본다.
 - 락업 `div` 에 `aria-hidden` 을 둔 이유: `Wordmark` 가 `role="img" aria-label="혼디가개"` 를 갖는데 바로 아래 `h1` 이 화면 제목이라 스크린리더가 "혼디가개" 를 한 번 더 읽을 필요가 없다. 헤더의 락업이 이미 사이트 이름을 말한다.
 
-- [ ] **Step 5: `page.tsx`**
+- **Step 5: `page.tsx`**
 
 `frontend/app/(main)/about/page.tsx`:
 
@@ -2279,17 +2279,17 @@ export default function AboutPage() {
 }
 ```
 
-- [ ] **Step 6: 테스트 · typecheck · lint**
+- **Step 6: 테스트 · typecheck · lint**
 
 Run: `pnpm test src/features/about && pnpm typecheck && pnpm lint`
 Expected: 전부 PASS. `token-usage.test.ts` 도 돌려 본다: `pnpm test src/styles`
 
-- [ ] **Step 7: 전체 테스트**
+- **Step 7: 전체 테스트**
 
 Run: `pnpm test`
 Expected: PASS. `home-about-link.test.ts` · `site-footer.test.ts` 는 건드리지 않았으므로 그대로 통과해야 한다.
 
-- [ ] **Step 8: 커밋**
+- **Step 8: 커밋**
 
 ```bash
 git add frontend/src/features/about/intro-band.tsx frontend/src/features/about/about-view.tsx frontend/src/features/about/about-view.test.ts "frontend/app/(main)/about/page.tsx" frontend/src/features/about/about-specimen-data.ts
@@ -2304,7 +2304,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Files:** 없음(검증만). 문제가 나오면 해당 Task 의 파일을 고치고 그 Task 의 커밋 메시지 형식으로 `fix` 커밋을 낸다.
 
-- [ ] **Step 1: dev 서버**
+- **Step 1: dev 서버**
 
 `preview_start` 는 이 저장소에서 샌드박스에 막힌다(메모리). **Bash 백그라운드**로 띄운다. 5174 는 다른 워크트리가 쓸 수 있으므로 **5175** 를 쓴다(`/about` 은 카카오 지도를 쓰지 않아 도메인 미등록이 무관하다).
 
@@ -2314,7 +2314,7 @@ cd frontend && pnpm dev -p 5175
 
 (run_in_background: true.) 준비되면 `curl -s -o /dev/null -w "%{http_code}" http://localhost:5175/about` 가 `200`.
 
-- [ ] **Step 2: 375 — 가로 스크롤 0 · 숨김 없음**
+- **Step 2: 375 — 가로 스크롤 0 · 숨김 없음**
 
 브라우저 `navigate` → `http://localhost:5175/about`, `resize_window` 375×812, `javascript_tool`:
 
@@ -2326,7 +2326,7 @@ cd frontend && pnpm dev -p 5175
 
 Expected: `sw === cw === 375`, `hidden === 0` **(히어로는 재생 뒤라 0. 아래 절은 아직 `armed` 라 0 이 아닐 수 있다 → 이때는 `document.querySelectorAll('[class*="opacity-0"]')` 이 전부 뷰포트 아래(`getBoundingClientRect().top > innerHeight`)인지 확인한다)**, `h1 === '28px'`.
 
-- [ ] **Step 3: 카운트업 끝 값 고정**
+- **Step 3: 카운트업 끝 값 고정**
 
 로드 1.5초 뒤:
 
@@ -2336,7 +2336,7 @@ Expected: `sw === cw === 375`, `hidden === 0` **(히어로는 재생 뒤라 0. �
 
 Expected: `3` (끝 값 셋이 시각 노드에 있다).
 
-- [ ] **Step 4: 1회 재생 · 등장 · 문서 높이 불변**
+- **Step 4: 1회 재생 · 등장 · 문서 높이 불변**
 
 ```js
 const before = document.documentElement.scrollHeight
@@ -2351,7 +2351,7 @@ Expected: `before === after`, `stillHidden === 0`(끝까지 내렸으니 전부 
 
 **패널이 숨겨지면 rAF · IntersectionObserver 가 멈춘다**(메모리) — 브라우저 패널을 앞에 둔 상태로 잰다. 값이 이상하면 결함이 아니라 계측 함정인지 먼저 의심한다.
 
-- [ ] **Step 5: 1280 — 히어로 2열 · 스크린샷**
+- **Step 5: 1280 — 히어로 2열 · 스크린샷**
 
 `resize_window` 1280×900, 스크린샷(scale 0.6). 히어로가 좌 카피 · 우 예시 카드 2열인지, 그린 밴드가 전폭이고 안쪽 내용이 1152 캡인지 본다:
 
@@ -2362,15 +2362,15 @@ Expected: `before === after`, `stillHidden === 0`(끝까지 내렸으니 전부 
 
 Expected: `band === 1280` 근처(스크롤바 제외), `inner <= 1152`.
 
-- [ ] **Step 6: reduced-motion**
+- **Step 6: reduced-motion**
 
 브라우저 도구로 `prefers-reduced-motion` 을 에뮬레이션할 수 없으면 **코드 경로로 갈음한다**: `useCountUp` 이 `matchMedia('(prefers-reduced-motion: reduce)')` 를 보고 즉시 끝 값을 두는지(Task 4 코드), 전역 규칙이 `app/globals.css` 에 있는지(`pnpm test src/features/home/home-about-link.test.ts` 가 `readGlobalsCss` 로 같은 파일을 읽는다). 결과 보고에 **"에뮬레이션 불가 → 코드 경로 확인"** 이라고 적는다.
 
-- [ ] **Step 7: 콘솔 오류 0**
+- **Step 7: 콘솔 오류 0**
 
 `read_console_messages onlyErrors: true` → 빈 배열. hydration mismatch 경고가 있으면 **끝 상태 초기 렌더 규칙이 깨진 것**이다 — 어떤 컴포넌트가 서버/클라이언트 첫 렌더를 다르게 그리는지 찾아 고친다(`useState` 초기값이 `target` 인지, `phase` 초기값이 `'idle'` 인지).
 
-- [ ] **Step 8: 서버 내리기**
+- **Step 8: 서버 내리기**
 
 `pkill -f "next dev -p 5175"` 또는 해당 백그라운드 태스크 종료. `resize_window preset: desktop`.
 
@@ -2383,7 +2383,7 @@ Expected: `band === 1280` 근처(스크롤바 제외), `inner <= 1152`.
 - Modify: `frontend/docs/features/_index.md` (상태 표에 `about` 행)
 - Modify: `frontend/docs/screen-inventory.md` (§1 표 끝에 행)
 
-- [ ] **Step 1: 세부명세**
+- **Step 1: 세부명세**
 
 `frontend/_DocumentTemplates/_template-세부명세.md` 의 D0~D9 절 구조를 그대로 쓴다. 내용은 설계 명세를 **옮기는 것**이고 창작하지 않는다.
 
@@ -2455,7 +2455,7 @@ Expected: `band === 1280` 근처(스크롤바 제외), `inner <= 1152`.
 - 없음. (D8 ② 를 택하면 `GET /places/count` 류 집계가 필요해지지만 지금은 요청하지 않는다.)
 ```
 
-- [ ] **Step 2: `_index.md` 행**
+- **Step 2: `_index.md` 행**
 
 `brand` 행 아래에:
 
@@ -2463,7 +2463,7 @@ Expected: `band === 1280` 근처(스크롤바 제외), `inner <= 1152`.
 | about    | `소개페이지-세부명세.md`                                                                                        | 구현 완료                                     | 무관                 | `/about` 공개 소개 페이지 (#635). 정본 설계는 루트 `docs/superpowers/specs/2026-09-15-about-landing-design.md`. 백엔드 호출 없음  |
 ```
 
-- [ ] **Step 3: `screen-inventory.md` 행**
+- **Step 3: `screen-inventory.md` 행**
 
 §1 표(`비밀번호 관리` 행) 아래에:
 
@@ -2471,7 +2471,7 @@ Expected: `band === 1280` 근처(스크롤바 제외), `inner <= 1152`.
 | 서비스 소개   | `/about`                            | —(백엔드 호출 없음)                                                          | **구현 완료** — 공개 경로. 8절 소개 + 예시 1회 재생 ([#635](https://github.com/8llow8llowMe/hondigagae/issues/635))              |
 ```
 
-- [ ] **Step 4: 커밋**
+- **Step 4: 커밋**
 
 ```bash
 git add frontend/docs/features/about/소개페이지-세부명세.md frontend/docs/features/_index.md frontend/docs/screen-inventory.md
@@ -2486,25 +2486,25 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 
 **Files:** 없음(검증 · PR).
 
-- [ ] **Step 1: 전체 검증**
+- **Step 1: 전체 검증**
 
 Run (frontend/): `pnpm verify && pnpm format:check`
 Expected: 전부 PASS. `format:check` 가 실패하면 `pnpm format` 뒤 **바뀐 파일이 이 이슈의 파일인지 확인하고 그 파일만** 스테이징해 `[FE] style: prettier` 커밋. 다른 세션의 파일이 잡히면 건드리지 않는다(메모리 — 포맷 실패는 실제 경로에서 확인).
 
-- [ ] **Step 2: 변경 파일 수**
+- **Step 2: 변경 파일 수**
 
 Run: `git diff --stat develop...HEAD | tail -1`
 Expected: 30 파일 이내(문서 · 명세 포함 약 25). 넘으면 PR 본문에 이유를 적는다.
 
-- [ ] **Step 3: 명세 상태 갱신**
+- **Step 3: 명세 상태 갱신**
 
 `docs/superpowers/specs/2026-09-15-about-landing-design.md` 머리 `상태:` 를 `구현 완료 (#635)` 로. 커밋 `[DOCS] docs: 소개 페이지 명세 상태를 구현 완료로 (#635)`.
 
-- [ ] **Step 4: PR 본문 초안**
+- **Step 4: PR 본문 초안**
 
 `pr` 스킬(`.claude/skills/pr`)로 본문을 만든다. `Issue Number` 는 `#635`, 제목 `[FE] feat: /about 을 서비스 소개 페이지로 확장한다 — 질문 3개 구조 + 스크롤 등장·예시 재생`. 본문에 Task 8 의 스크린샷 요약(375 · 1280)과 검증 결과를 적는다.
 
-- [ ] **Step 5: push 와 PR 생성은 사용자 확인 뒤**
+- **Step 5: push 와 PR 생성은 사용자 확인 뒤**
 
 `git push -u origin feature/fe/635-about-landing` 과 `gh pr create --assignee @me --label frontend-web --base develop` 은 **사용자가 "올려" 라고 한 뒤** 실행한다. pre-push 훅이 `format:check` 를 돌린다 — Step 1 에서 이미 통과했어야 한다.
 

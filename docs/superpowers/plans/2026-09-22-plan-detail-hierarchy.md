@@ -1,6 +1,6 @@
 # 일정 상세 정보 계층 재설계 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** 일정 상세(`/plans/[planId]`)의 좌 레일 개요 카드 · 준비물 빈 상태 · 일차 카드에 정보 계층을 주고, 근거를 접는 토글을 저장소 전체에서 걷어낸다.
 
@@ -55,7 +55,7 @@
 - Consumes: 없음
 - Produces: `ReasonList({ reasons, className })` — `reasons: Reason[]`, `className?: string`. **`initialCount` · `moreLabel` · `lessLabel` 은 더 이상 받지 않는다.** `Reason` 타입(`{ description: string; informational?: boolean }`)은 그대로다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/components/reason-list.test.ts` 를 만든다.
 
@@ -112,12 +112,12 @@ describe("ReasonList — 근거를 접지 않는다", () => {
 });
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/components/reason-list.test.ts`
 Expected: FAIL — `펼침·접기 버튼을 그리지 않는다` 가 `<button` 을 찾아 실패한다.
 
-- [ ] **Step 3: 컴포넌트를 순수 목록으로 바꾼다**
+- **Step 3: 컴포넌트를 순수 목록으로 바꾼다**
 
 `src/components/reason-list.tsx` 전체를 아래로 교체한다.
 
@@ -178,14 +178,14 @@ export function ReasonList({
 }
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- **Step 4: 통과를 확인한다**
 
 Run: `pnpm vitest run src/components/reason-list.test.ts`
 Expected: PASS (4 tests)
 
 타입 오류는 여기서 난다 — 호출부가 아직 사라진 prop 을 넘긴다. Task 2 에서 닫는다.
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add src/components/reason-list.tsx src/components/reason-list.test.ts
@@ -207,12 +207,12 @@ git commit -m "[FE] refactor: 근거 목록에서 접기를 걷어낸다 (#840)"
 - Consumes: Task 1 의 `ReasonList({ reasons, className })`
 - Produces: 없음 (호출부 정리)
 
-- [ ] **Step 1: 타입 오류로 대상을 확정한다**
+- **Step 1: 타입 오류로 대상을 확정한다**
 
 Run: `pnpm tsc --noEmit`
 Expected: 세 파일에서 `initialCount` / `moreLabel` / `lessLabel` 이 존재하지 않는 prop 이라는 오류.
 
-- [ ] **Step 2: 세 호출부에서 사라진 prop 을 지운다**
+- **Step 2: 세 호출부에서 사라진 prop 을 지운다**
 
 `place-suitability-panel.tsx` — `initialCount` · `moreLabel` · `lessLabel` 세 줄을 지운다.
 
@@ -235,12 +235,12 @@ Expected: 세 파일에서 `initialCount` / `moreLabel` / `lessLabel` 이 존재
 
 `ai-plan-draft-preview.tsx` — `moreLabel` · `lessLabel` 두 줄을 지운다. 나머지 인자는 그대로 둔다.
 
-- [ ] **Step 3: 타입이 통과하는지 확인한다**
+- **Step 3: 타입이 통과하는지 확인한다**
 
 Run: `pnpm tsc --noEmit`
 Expected: 이 세 파일의 오류가 사라진다. `messages` 쪽 오류는 아직 없다 (Task 5 에서 키를 지운다).
 
-- [ ] **Step 4: 커밋**
+- **Step 4: 커밋**
 
 ```bash
 git add src/features/place/place-suitability-panel.tsx src/features/place/place-walk-safety-panel.tsx src/features/ai-plan/ai-plan-draft-preview.tsx
@@ -264,7 +264,7 @@ git commit -m "[FE] refactor: 근거 목록 호출부에서 접기 인자를 걷
 
 **왜 라벨이 남는가:** `feelsLikeBasis` 는 산식·입력·임계 출처를 담은 130자 문장이다. 버튼만 지우고 문장을 노출하면 **그 문장이 무엇의 근거인지 말하는 것이 사라진다** — 버튼 라벨이 그 일을 하고 있었다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `place-walk-safety-panel.test.ts` 의 기존 `detailFeelsLikeBasisOpen` / `Close` assertion 블록(약 `:200-245`)을 아래로 교체한다.
 
@@ -289,12 +289,12 @@ describe("PlaceWalkSafetyPanel — 체감온도 계산 근거", () => {
 
 `'체감온도는 기온과 습도로 계산합니다'` 는 픽스처(`src/test/fixtures/`)의 `feelsLikeBasis` 값에 맞춘다 — 실제 값을 열어 보고 그 앞부분으로 바꾼다.
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/features/place/place-walk-safety-panel.test.ts`
 Expected: FAIL — `detailFeelsLikeBasisLabel` 이 아직 없다.
 
-- [ ] **Step 3: 문구를 바꾼다**
+- **Step 3: 문구를 바꾼다**
 
 `src/lib/messages/place.ts` 에서 `detailFeelsLikeBasisOpen` · `detailFeelsLikeBasisClose` 두 줄을 지우고 한 줄을 더한다.
 
@@ -306,7 +306,7 @@ Expected: FAIL — `detailFeelsLikeBasisLabel` 이 아직 없다.
   detailFeelsLikeBasisLabel: '체감온도 계산 근거',
 ```
 
-- [ ] **Step 4: `FeelsLikeBasis` 에서 상태와 버튼을 뺀다**
+- **Step 4: `FeelsLikeBasis` 에서 상태와 버튼을 뺀다**
 
 `useState` · `useId` · `<button>` · `hidden={!open}` 을 지운다. 머리주석의 "접어 둔다" 항목을 아래 결정으로 바꾼다.
 
@@ -334,12 +334,12 @@ function FeelsLikeBasis({ data }: { data: WalkSafetyResponse }) {
 
 이하 몸통은 그대로 둔다. **파일 상단의 `useId` import 가 다른 곳에서도 쓰이는지 확인하고**, 안 쓰이면 함께 지운다.
 
-- [ ] **Step 5: 통과를 확인한다**
+- **Step 5: 통과를 확인한다**
 
 Run: `pnpm vitest run src/features/place/place-walk-safety-panel.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 git add src/features/place/place-walk-safety-panel.tsx src/features/place/place-walk-safety-panel.test.ts src/lib/messages/place.ts
@@ -362,7 +362,7 @@ git commit -m "[FE] refactor: 체감온도 계산 근거를 접지 않고 늘 �
 
 `walk-verdict.tsx` 는 `ReasonList` 를 쓰지 않고 **같은 일을 직접 구현**한다 — `visible` 슬라이스 + 펼침 버튼(접기는 없다).
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `walk-verdict.test.ts` 에 더한다.
 
@@ -386,12 +386,12 @@ it("근거가 여러 개여도 전부 선다", () => {
 
 `renderVerdict` 는 이 파일에 이미 있는 헬퍼를 쓴다 — 없으면 다른 테스트의 render 헬퍼 이름에 맞춘다.
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/features/home/walk-verdict.test.ts`
 Expected: FAIL — 넷째 근거가 없고 `aria-expanded` 가 있다.
 
-- [ ] **Step 3: 슬라이스와 버튼을 지운다**
+- **Step 3: 슬라이스와 버튼을 지운다**
 
 해당 내부 컴포넌트에서 `useState` · `expanded` · `visible` · `hidden` · `<button>` · `ChevronDownIcon` 을 지우고 `reasons` 를 그대로 돌린다.
 
@@ -409,12 +409,12 @@ return (
 
 `ChevronDownIcon` import 가 이 파일의 다른 곳에서 쓰이는지 확인하고, 안 쓰이면 함께 지운다. 이 컴포넌트가 `'use client'` 를 요구하던 유일한 상태였는지도 확인한다 — 파일에 다른 훅이 있으면 `'use client'` 는 남긴다.
 
-- [ ] **Step 4: 통과를 확인한다**
+- **Step 4: 통과를 확인한다**
 
 Run: `pnpm vitest run src/features/home/walk-verdict.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add src/features/home/walk-verdict.tsx src/features/home/walk-verdict.test.ts
@@ -435,7 +435,7 @@ git commit -m "[FE] refactor: 홈 판정 근거를 접지 않는다 (#840)"
 - Consumes: 없음
 - Produces: 없음
 
-- [ ] **Step 1: 남은 참조가 없는지 확인한다**
+- **Step 1: 남은 참조가 없는지 확인한다**
 
 Run:
 
@@ -445,21 +445,21 @@ grep -rn "moreReasons\|lessReasons\|reasonsMore\|reasonsLess\|detailFeelsLikeBas
 
 Expected: `src/lib/messages/home.ts` 와 `src/lib/messages/ai-plan.ts` 의 정의 네 줄만 남는다. 다른 곳이 나오면 그 파일을 먼저 정리한다.
 
-- [ ] **Step 2: 네 줄을 지운다**
+- **Step 2: 네 줄을 지운다**
 
 `home.ts` 의 `moreReasons` · `lessReasons`, `ai-plan.ts` 의 `reasonsMore` · `reasonsLess` 를 지운다. `home.ts:458` 의 `morePlaces` 와 `ai-plan.ts` 의 다른 키는 **건드리지 않는다.**
 
-- [ ] **Step 3: 문구 톤 테스트가 도는지 본다**
+- **Step 3: 문구 톤 테스트가 도는지 본다**
 
 Run: `pnpm vitest run src/lib/messages/message-tone.test.ts`
 Expected: PASS
 
-- [ ] **Step 4: 전체 검증**
+- **Step 4: 전체 검증**
 
 Run: `pnpm verify`
 Expected: PASS. `pnpm format:check` 도 돌려 pre-push 훅에서 막히지 않게 한다.
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add src/lib/messages/home.ts src/lib/messages/ai-plan.ts
@@ -474,11 +474,11 @@ git commit -m "[FE] chore: 쓰이지 않는 근거 토글 문구를 지운다 (#
 
 근거를 전부 노출하면 홈 판정과 장소 패널이 길어진다. **서버가 `reasons` 개수에 상한을 두는지는 계약에 없다.**
 
-- [ ] **Step 1: dev 게이트웨이에서 실제 응답을 받는다**
+- **Step 1: dev 게이트웨이에서 실제 응답을 받는다**
 
 장소 적합도 · 산책 위험도 · 일자 판정 세 엔드포인트를 각각 호출해 `reasons.length` 의 최댓값을 센다. dev Swagger 는 **서비스 접두사가 필요하다** — 없으면 404 가 아니라 빈 스펙 200 이 오므로 `paths` 개수를 먼저 센다.
 
-- [ ] **Step 2: 결과를 이슈에 남긴다**
+- **Step 2: 결과를 이슈에 남긴다**
 
 10개를 넘는 응답이 실재하면 [#840](https://github.com/8llow8llowMe/hondigagae/issues/840) 에 코멘트로 적고 **결정을 다시 연다** (그때는 `line-clamp` 또는 개수 상한을 논의한다). 10개 이하면 "실측 N개, 전부 노출 유지" 를 적고 닫는다.
 
@@ -512,7 +512,7 @@ git commit -m "[FE] chore: 쓰이지 않는 근거 토글 문구를 지운다 (#
 - Consumes: 기존 `formatPlanDay(date)` · `formatPlanDateRange(startDate, endDate)`
 - Produces: `formatPlanDateRangeCompact(startDate: string, endDate: string, today: Date): string` — **시작일·종료일이 모두 `today` 의 해**면 연도 없는 형식, 아니면 `formatPlanDateRange` 그대로.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -556,12 +556,12 @@ describe("formatPlanDateRangeCompact — 올해 일정은 연도를 뗀다 (#841
 });
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/lib/plan/date.test.ts`
 Expected: FAIL — `formatPlanDateRangeCompact is not a function`
 
-- [ ] **Step 3: 구현한다**
+- **Step 3: 구현한다**
 
 `src/lib/plan/date.ts` 에 더한다. `formatPlanDateRange` 는 **건드리지 않는다** — 다른 화면이 쓴다.
 
@@ -595,12 +595,12 @@ export function formatPlanDateRangeCompact(
 }
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- **Step 4: 통과를 확인한다**
 
 Run: `pnpm vitest run src/lib/plan/date.test.ts`
 Expected: PASS (4 tests)
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add src/lib/plan/date.ts src/lib/plan/date.test.ts
@@ -623,7 +623,7 @@ git commit -m "[FE] feat: 올해 일정의 날짜 범위에서 연도를 뗀다 
 
 **구조:** 카드 안 `flex flex-col` 에 구획 셋. 사이는 `border-t border-border pt-4` 다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `plan-detail.test.ts` 의 개요 패널 describe 블록에 더한다.
 
@@ -664,12 +664,12 @@ describe("PlanOverviewPanel — 세 구획", () => {
 
 `renderOverview` 헬퍼가 없으면 이 파일의 기존 render 헬퍼 이름·시그니처에 맞춘다. 픽스처의 반려견 이름·견종이 `몽`/`폼스키` 가 아니면 실제 값으로 바꾼다.
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/features/plan/plan-detail.test.ts`
 Expected: FAIL — `2026년` 이 아직 있고 축 라벨이 배지에 붙어 있다.
 
-- [ ] **Step 3: 카드 본문을 세 구획으로 다시 쓴다**
+- **Step 3: 카드 본문을 세 구획으로 다시 쓴다**
 
 `PlanOverviewPanel` 의 `<Surface>` 안을 아래로 바꾼다. 바깥 fragment 와 `{action}` 슬롯은 그대로 둔다.
 
@@ -740,7 +740,7 @@ Expected: FAIL — `2026년` 이 아직 있고 축 라벨이 배지에 붙어 �
 
 `formatPlanDateRange` import 를 `formatPlanDateRangeCompact` 로 바꾸고, 머리주석의 "제목 줄도 카드다" 항목 아래에 세 구획 결정을 적는다.
 
-- [ ] **Step 4: `PlanPhaseVerdictStrip` 을 `PlanVerdictToc` 로 바꾼다**
+- **Step 4: `PlanPhaseVerdictStrip` 을 `PlanVerdictToc` 로 바꾼다**
 
 같은 파일 아래쪽의 `PlanPhaseVerdictStrip` 을 아래로 교체한다. `phaseText` 는 더 이상 받지 않는다 — 구획 2 로 갔다.
 
@@ -838,7 +838,7 @@ function PlanVerdictToc({ verdicts }: { verdicts: PlanDayWeatherItem[] }) {
 
 `ChevronRightIcon` 을 이 저장소가 쓰는 아이콘 소스에서 import 한다 — `walk-verdict.tsx` 의 `ChevronDownIcon` import 줄을 보고 같은 패키지를 쓴다.
 
-- [ ] **Step 5: 동행견 한 줄 갈래를 더한다**
+- **Step 5: 동행견 한 줄 갈래를 더한다**
 
 `PlanPetCard` 를 바꾼다. 여러 마리는 지금 형태 그대로다.
 
@@ -889,12 +889,12 @@ function PlanPetCard({
 }
 ```
 
-- [ ] **Step 6: 통과를 확인한다**
+- **Step 6: 통과를 확인한다**
 
 Run: `pnpm vitest run src/features/plan/plan-detail.test.ts`
 Expected: PASS. 기존 테스트가 옛 마크업(`적합도` 축 라벨, `2026년`)을 assert 하고 있으면 그 assertion 을 새 구조에 맞게 고친다 — **테스트를 지우지 말고 고친다.**
 
-- [ ] **Step 7: 커밋**
+- **Step 7: 커밋**
 
 ```bash
 git add src/features/plan/plan-overview-panel.tsx src/features/plan/plan-detail.test.ts
@@ -917,11 +917,11 @@ git commit -m "[FE] feat: 개요 카드를 신원·상태·목차 세 구획으�
 - Consumes: 없음
 - Produces: `messages.plan.packingIntro` 의 **`{petName}` 치환자**. `Intro` 가 대표 동행견 이름을 받아 치환하고, 못 찾으면 `messages.plan.packingIntroFallbackPet`(`반려견`)으로 떨어진다.
 
-- [ ] **Step 1: 일러스트를 만든다**
+- **Step 1: 일러스트를 만든다**
 
 `public/illustrations/packing-empty.svg` — 기존 `place-*.svg` 를 열어 **뷰박스·stroke 폭·색 지정 방식을 그대로 따른다.** 플랫 라인 여행 가방 1개, 단색이다. 사진인 척하지 않는다.
 
-- [ ] **Step 2: 실패하는 테스트를 쓴다**
+- **Step 2: 실패하는 테스트를 쓴다**
 
 ```ts
 /* 빈 상태가 미완성으로 읽히지 않게 한다 (#841) */
@@ -956,12 +956,12 @@ describe("PackingListPanel — 빈 상태", () => {
 
 `renderPacking` 헬퍼와 `list` 픽스처 모양은 이 파일의 기존 것을 쓴다.
 
-- [ ] **Step 3: 실패를 확인한다**
+- **Step 3: 실패를 확인한다**
 
 Run: `pnpm vitest run src/features/plan/plan-packing-list.test.ts`
 Expected: FAIL
 
-- [ ] **Step 4: 문구를 바꾼다**
+- **Step 4: 문구를 바꾼다**
 
 `src/lib/messages/plan.ts` 의 `packingIntro` 를 교체하고 폴백 낱말을 더한다.
 
@@ -976,7 +976,7 @@ Expected: FAIL
   packingIntroFallbackPet: '반려견',
 ```
 
-- [ ] **Step 5: `Intro` 를 다시 쓴다**
+- **Step 5: `Intro` 를 다시 쓴다**
 
 ```tsx
 /** 아직 만든 적 없다 — `generatedAt` 이 null 인 갈래 하나뿐이다 */
@@ -1040,7 +1040,7 @@ function Intro(props: PackingListPanelProps) {
 
 `PackingListPanelProps` 에 `petName: string | null` 을 더하고, 호출부(`plan-detail-section.tsx:249` 근처의 `<PlanPackingList>`)가 대표 동행견 이름을 내려 주게 한다. **`PlanPackingList` 가 이미 `companions` 를 안 받으면** 호출부에서 `companions[0]?.name ?? null` 로 만들어 넘긴다.
 
-- [ ] **Step 6: `AddSection` 의 접힘 버튼 variant 를 올린다**
+- **Step 6: `AddSection` 의 접힘 버튼 variant 를 올린다**
 
 `:558-564` 의 `!open` 갈래만 바꾼다. 열림 동작은 그대로다.
 
@@ -1060,7 +1060,7 @@ if (!open) {
 }
 ```
 
-- [ ] **Step 7: 저장 안내를 `Result` 로 옮긴다**
+- **Step 7: 저장 안내를 `Result` 로 옮긴다**
 
 `Result` 컴포넌트의 목록 아래에 캡션 한 줄을 더한다.
 
@@ -1073,12 +1073,12 @@ if (!open) {
 </p>;
 ```
 
-- [ ] **Step 8: 통과를 확인한다**
+- **Step 8: 통과를 확인한다**
 
 Run: `pnpm vitest run src/features/plan/plan-packing-list.test.ts`
 Expected: PASS. 기존 테스트가 옛 `packingIntro` 전문을 assert 하면 새 문구로 고친다.
 
-- [ ] **Step 9: 전체 검증 후 커밋**
+- **Step 9: 전체 검증 후 커밋**
 
 Run: `pnpm verify && pnpm format:check`
 
@@ -1093,7 +1093,7 @@ git commit -m "[FE] feat: 준비물 빈 상태에 일러스트와 한 문장을 
 
 **Files:** 없음 (계측)
 
-- [ ] **Step 1: 워크트리 dev 서버를 띄운다**
+- **Step 1: 워크트리 dev 서버를 띄운다**
 
 `.env.local` 을 워크트리로 복사하고 빈 포트로 띄운다(`AUTH_SESSION_SECRET` 이 없으면 500, 심링크 `node_modules` 면 Turbopack FATAL 이라 `--webpack` 을 붙인다).
 
@@ -1101,11 +1101,11 @@ git commit -m "[FE] feat: 준비물 빈 상태에 일러스트와 한 문장을 
 pnpm dev:alt2 -- --webpack
 ```
 
-- [ ] **Step 2: 390 폭에서 좌 레일을 잰다**
+- **Step 2: 390 폭에서 좌 레일을 잰다**
 
 브라우저 패널을 **보이는 상태로** 둔 채(숨기면 rAF·폴링이 멈춘다) 390 으로 리사이즈하고, 3일 일정 상세에서 `AI로 준비물 챙기기` 버튼의 `getBoundingClientRect().top` 을 잰다.
 
-- [ ] **Step 3: 판정한다**
+- **Step 3: 판정한다**
 
 두 번째 스크롤(약 1600px) 안에 들어오면 통과다. 넘으면 [#841](https://github.com/8llow8llowMe/hondigagae/issues/841) 에 실측값을 적고 `PLAN_VERDICT_STRIP_MAX_DAYS` 를 낮출지 논의한다.
 
@@ -1142,7 +1142,7 @@ pnpm dev:alt2 -- --webpack
 - Consumes: 없음
 - Produces: `planItemIllustration(itemTypeCode: string | null): string | null` — 일러스트 경로, 모르는 코드는 `null`.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -1183,16 +1183,16 @@ describe("planItemIllustration — 항목 유형으로 타일을 채운다", () 
 });
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/lib/plan/illustration.test.ts`
 Expected: FAIL — 모듈이 없다.
 
-- [ ] **Step 3: 자산 2종을 만든다**
+- **Step 3: 자산 2종을 만든다**
 
 `public/illustrations/plan-item-walk.svg` · `plan-item-move.svg` — 기존 `place-*.svg` 의 뷰박스·stroke 폭·색 지정을 그대로 따른다. 산책은 발자국 또는 길, 이동은 화살표 계열 한 가지다.
 
-- [ ] **Step 4: 구현한다**
+- **Step 4: 구현한다**
 
 ```ts
 /**
@@ -1231,12 +1231,12 @@ export function planItemIllustration(
 }
 ```
 
-- [ ] **Step 5: 통과를 확인한다**
+- **Step 5: 통과를 확인한다**
 
 Run: `pnpm vitest run src/lib/plan/illustration.test.ts`
 Expected: PASS (3 tests)
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 git add src/lib/plan/illustration.ts src/lib/plan/illustration.test.ts public/illustrations/plan-item-walk.svg public/illustrations/plan-item-move.svg
@@ -1257,7 +1257,7 @@ git commit -m "[FE] feat: 항목 유형으로 타일 일러스트를 고른다 (
 - Consumes: Task 11 의 `planItemIllustration`
 - Produces: 없음
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 ```ts
 /* 회색 타일은 예외여야 한다 (#842) */
@@ -1287,12 +1287,12 @@ describe("PlanItemRow — 썸네일 폴백", () => {
 
 `renderRow` 헬퍼는 이 파일의 기존 것을 쓰고, `itemTypeCode` 를 받도록 넓힌다.
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/features/plan/plan-item-row.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: 폴백을 더한다**
+- **Step 3: 폴백을 더한다**
 
 `:130` 아래에 한 줄을 더하고, 타일 안 갈래를 셋으로 늘린다.
 
@@ -1331,12 +1331,12 @@ const illustration =
 
 `eslint-disable` 주석은 `place-row.tsx:115` 가 같은 자리에서 쓰는 형태를 그대로 따른다 — 그 파일을 열어 확인하고, 없으면 이 줄도 뺀다.
 
-- [ ] **Step 4: 통과를 확인한다**
+- **Step 4: 통과를 확인한다**
 
 Run: `pnpm vitest run src/features/plan/plan-item-row.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add src/features/plan/plan-item-row.tsx src/features/plan/plan-item-row.test.ts
@@ -1357,7 +1357,7 @@ git commit -m "[FE] feat: 사진이 없는 항목 타일을 유형 일러스트�
 - Consumes: `METRIC_TINT_TONE` · `METRIC_TINT_EDGE_TONE` (`components/metric.tsx`), `MetricBadge surface="tint"`
 - Produces: `PlanDayVerdict` 의 prop 은 그대로다. **`이 날 산책` 버튼이 이 컴포넌트를 떠난다** — Task 14 가 `plan-day-section.tsx` 에서 받는다. `representativePlaceId` 를 읽는 책임도 함께 옮긴다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 ```ts
 /* 판정이 자기 영역을 갖는다 (#842) */
@@ -1419,12 +1419,12 @@ describe("PlanDayVerdict — tint 밴드", () => {
 
 `render` 헬퍼는 이 파일에 이미 있다. `suitabilityLevel` 픽스처의 등급이 `high` 가 아니면 톤에 맞춰 문자열을 바꾼다.
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/features/plan/plan-day-verdict.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: 밴드를 만든다**
+- **Step 3: 밴드를 만든다**
 
 `PlanDayVerdict` 의 두 반환 갈래를 아래로 바꾼다. `failed` 갈래는 그대로 둔다.
 
@@ -1520,16 +1520,16 @@ const VERDICT_BAND_CLASS =
 
 `ReasonList` 의 `className` 에 `list-disc pl-5` 를 주면 `<ul>` 에 그대로 붙는다(Task 1 의 시그니처).
 
-- [ ] **Step 4: `이 날 산책` 버튼을 뺀다**
+- **Step 4: `이 날 산책` 버튼을 뺀다**
 
 `VerdictTemperatureValue` 아래에 있던 `ButtonLink` 블록과 `ButtonLink` import 를 지운다. Task 14 가 받는다.
 
-- [ ] **Step 5: 통과를 확인한다**
+- **Step 5: 통과를 확인한다**
 
 Run: `pnpm vitest run src/features/plan/plan-day-verdict.test.ts`
 Expected: PASS. 기존 테스트가 `이 날 산책` 을 이 컴포넌트에서 찾으면 그 assertion 을 Task 14 의 테스트로 옮긴다.
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 git add src/features/plan/plan-day-verdict.tsx src/features/plan/plan-day-verdict.test.ts
@@ -1551,7 +1551,7 @@ git commit -m "[FE] feat: 일자 판정을 등급 tint 밴드로 세운다 (#842
 - Consumes: Task 13 이 비운 자리
 - Produces: `PlanDaySection` 이 `representativePlaceId` 를 `verdict?.representativePlaceId ?? null` 로 읽어 액션 줄에 쓴다. 새 prop 은 없다 — `verdict` 를 이미 받는다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 ```ts
 /* 액션을 한 자리로 모은다 (#842 · #653 의 완결) */
@@ -1576,12 +1576,12 @@ describe("PlanDaySection — 액션 줄", () => {
 
 `messages.plan.addPlaceAction` 은 실제 키 이름으로 바꾼다 — `plan.ts` 에서 `장소 추가` 를 찾아 확인한다.
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/features/plan/plan-day-section.test.ts`
 Expected: FAIL
 
-- [ ] **Step 3: 문구를 바꾼다**
+- **Step 3: 문구를 바꾼다**
 
 ```ts
   /**
@@ -1592,7 +1592,7 @@ Expected: FAIL
   walkAction: '이 날 산책 코스',
 ```
 
-- [ ] **Step 4: 액션 줄에 버튼을 더한다**
+- **Step 4: 액션 줄에 버튼을 더한다**
 
 `plan-day-section.tsx` 의 액션 줄(`{!editing && (<div className={cn('flex flex-wrap items-center gap-2 pt-3 pb-5', INSET_CLASS.card)}>`) 안, `장소 추가`·`순서 편집` 뒤에 더한다.
 
@@ -1621,12 +1621,12 @@ Expected: FAIL
 
 `ButtonLink` 가 이 파일에 이미 import 돼 있다(`:5`).
 
-- [ ] **Step 5: 통과를 확인한다**
+- **Step 5: 통과를 확인한다**
 
 Run: `pnpm vitest run src/features/plan/plan-day-section.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: 전체 검증 후 커밋**
+- **Step 6: 전체 검증 후 커밋**
 
 Run: `pnpm verify && pnpm format:check`
 
@@ -1641,19 +1641,19 @@ git commit -m "[FE] feat: 산책 코스 링크를 일자 액션 줄로 모은다
 
 **Files:** 없음 (계측)
 
-- [ ] **Step 1: 밴드 안 텍스트 크기를 확인한다**
+- **Step 1: 밴드 안 텍스트 크기를 확인한다**
 
 브라우저에서 판정 밴드 안 근거 `<li>` 의 `getComputedStyle().fontSize` 를 잰다. `text-body-2` 가 14px 이상이어야 한다 — 밑돌면 §2-3 의 대비 기준(일반 텍스트 4.5:1)이 대형 텍스트 완화를 못 받는다.
 
-- [ ] **Step 2: 네 등급에서 대비를 잰다**
+- **Step 2: 네 등급에서 대비를 잰다**
 
 `high` · `mid` · `low` · `critical` 각 tint 면 위의 `-700` 텍스트 대비를 잰다. DESIGN.md §2-3 표의 값(7.39 / 5.16 / 6.62 / 4.55)과 맞는지 확인한다. **`critical` 이 4.55 로 가장 빠듯하다** — 여기서 밑돌면 밴드 안 본문 색을 `--fg` 로 되돌린다.
 
-- [ ] **Step 3: `MOVE`·`MEAL` 타일을 눈으로 확인한다**
+- **Step 3: `MOVE`·`MEAL` 타일을 눈으로 확인한다**
 
 스크린샷의 `이동` · `점심 식사` 항목에 타일이 채워지는지 본다.
 
-- [ ] **Step 4: 결과를 이슈에 남긴다**
+- **Step 4: 결과를 이슈에 남긴다**
 
 [#842](https://github.com/8llow8llowMe/hondigagae/issues/842) 에 실측값을 코멘트로 적는다.
 
@@ -1667,23 +1667,23 @@ git commit -m "[FE] feat: 산책 코스 링크를 일자 액션 줄로 모은다
 - Modify: `frontend/docs/features/공통/등급배지-축라벨-세부명세.md`
 - Modify: `frontend/DESIGN.md` (§2-3)
 
-- [ ] **Step 1: 세부명세를 고친다**
+- **Step 1: 세부명세를 고친다**
 
 `일정상세-세부명세.md` 에서 좌 레일 개요 카드 · 준비물 절 · 일차 카드 판정 자리의 서술을 새 구조로 바꾼다. **정본은 코드가 아니라 이 문서다** — 구현과 어긋난 채 남기지 않는다.
 
-- [ ] **Step 2: 축 라벨 예외를 적는다**
+- **Step 2: 축 라벨 예외를 적는다**
 
 `등급배지-축라벨-세부명세.md` 에 "좌 레일 일자 목차는 섹션 라벨이 축을 맡아 배지에 `axis` 를 주지 않는다 (#841)" 를 예외로 더한다.
 
-- [ ] **Step 3: tint 쓰임을 적는다**
+- **Step 3: tint 쓰임을 적는다**
 
 `DESIGN.md` §2-3 의 `METRIC_TINT_TONE` 설명에 일자 판정 밴드를 사용처로 더한다.
 
-- [ ] **Step 4: 표 정렬 함정을 피한다**
+- **Step 4: 표 정렬 함정을 피한다**
 
 prettier 가 마크다운 표를 재정렬한다 — **새 셀의 폭을 기존 컬럼 최대폭 이하로** 맞춰야 한 줄 추가가 50줄 diff 가 되지 않는다. 고친 뒤 `pnpm format:check` 로 확인한다.
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add frontend/docs/features/plan/일정상세-세부명세.md frontend/docs/features/공통/등급배지-축라벨-세부명세.md frontend/DESIGN.md
