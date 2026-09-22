@@ -427,11 +427,14 @@ describe('PlanOverviewPanel', () => {
     expect(markup).toContain('총 3일')
   })
 
-  it('반려견이 있으면 이름과 특성을 함께 낸다', () => {
+  /*
+    #841. 한 마리면 일자 판정의 `basisPetName` 이 `null` 이라 일자 카드가 이름을 부르지
+    않는다 — 두 줄짜리 카드로 세울 이유가 없다. 이름과 특성이 한 줄로 붙는다.
+  */
+  it('동행이 한 마리면 이름과 특성이 한 줄로 붙는다', () => {
     const markup = renderOverview()
 
-    expect(markup).toContain('푸들')
-    expect(markup).toContain('소형견')
+    expect(markup).toContain('</span> \u00b7 \ud478\ub4e4 \uc18c\ud615\uacac')
   })
 
   /*
@@ -487,18 +490,25 @@ describe('PlanOverviewPanel', () => {
   })
 
   /*
-    목차 배지도 적합도 축이다 (#652). 같은 등급어가 혼잡도에도 쓰이므로 화면마다 축을
-    밝히는 규칙이 갈리면 사용자가 배운 것이 깨진다 (등급배지-축라벨-세부명세 D5).
+    #841. 축 라벨을 배지마다 붙이면 한 카드에서 세 번 선다. #652 의 요구("혼잡도의 `보통`
+    과 구분")는 이제 **섹션 머리**(`일자별 판정`)가 충족한다 — 목차는 자기 이름을 갖고,
+    배지는 그 아래라 등급어만 쓴다. **일자 카드의 배지는 그대로 축을 단다** — 거기에는
+    이 섹션 라벨이 없다 (`plan-day-verdict.tsx`).
   */
-  it('목차 배지가 적합도 축임을 말한다', () => {
+  it('목차 배지는 축 라벨을 반복하지 않는다 — 섹션 머리가 그 자리를 갖는다', () => {
     const markup = renderOverview()
-    const axis = messages.common.metricAxisSuitability
 
-    /* 목차 항목 하나로 범위를 좁힌다 — 개요 카드가 같은 낱말을 내면 단언이 공허해진다 */
+    expect(markup).not.toContain(messages.common.metricAxisSuitability)
+    expect(markup).toContain(`>${planVerdict.suitabilityLevel?.name}</span>`)
+  })
+
+  /* 앵커라는 신호가 없어 누르는 것인 줄 몰랐다 (#841). 꺾쇠는 장식이라 이름을 갖지 않는다 */
+  it('목차 줄 안에 앵커임을 알리는 꺾쇠가 선다', () => {
+    const markup = renderOverview()
     const tocItem = markup.slice(markup.indexOf('href="#day1"'), markup.indexOf('</a>'))
 
-    expect(tocItem).toContain(`>${axis} </span>`)
-    expect(tocItem).toContain(`</span>${planVerdict.suitabilityLevel?.name}</span>`)
+    expect(tocItem).toContain('<svg')
+    expect(tocItem).toContain('aria-hidden="true"')
   })
 
   it('판정을 못 낸 날은 목차에서 점선 unknown 이다 — 낮은 등급으로 칠하지 않는다', () => {
@@ -510,37 +520,65 @@ describe('PlanOverviewPanel', () => {
     expect(markup).toContain('border-dashed')
   })
 
-  /* 판정을 못 낸 날도 축은 적합도다 — `판정 없음` 만 서면 무엇의 판정인지 알 수 없다 */
-  it('판정을 못 낸 목차 배지도 적합도 축임을 말한다', () => {
+  /* 판정을 못 낸 배지도 같은 규칙이다 — 무엇의 판정인지는 섹션 머리가 말한다 (#841) */
+  it('판정을 못 낸 목차 배지도 축 라벨 없이 판정 없음만 쓴다', () => {
     const markup = renderOverview({
       verdicts: [{ ...planVerdict, score: null, suitabilityLevel: null }],
     })
     const tocItem = markup.slice(markup.indexOf('href="#day1"'), markup.indexOf('</a>'))
 
-    expect(tocItem).toContain(`>${messages.common.metricAxisSuitability} </span>`)
-    expect(tocItem).toContain(`</span>${messages.plan.verdictTocUnavailable}</span>`)
+    expect(tocItem).not.toContain(messages.common.metricAxisSuitability)
+    expect(tocItem).toContain(`>${messages.plan.verdictTocUnavailable}</span>`)
   })
 
-  it('예산이 없으면 미정으로 말한다 — 0원으로 단정하지 않는다', () => {
-    expect(renderOverview({ plan: { ...planDetail, budget: null } })).toContain(
-      messages.plan.budgetEmpty,
-    )
+  /*
+    #841. 예전에는 `예산 미정` 을 세웠다. 그런데 그것은 사실이 아니라 **빈 상태**이고,
+    액션(예산 입력)으로 이어지지도 않는다 — 빈 상태를 사실처럼 적으면 잡음만 남는다.
+    칸 자체를 세우지 않는다.
+  */
+  it('예산이 없으면 예산 칸이 아예 서지 않는다 — 미정이라고 적지 않는다', () => {
+    const markup = renderOverview({ plan: { ...planDetail, budget: null } })
+
+    expect(markup).not.toContain(messages.plan.budgetEmpty)
+    expect(markup).not.toContain(messages.plan.budgetLabel)
+  })
+
+  it('예산이 있으면 천 단위로 끊어 쓴다', () => {
     expect(renderOverview()).toContain('400,000')
+  })
+
+  /*
+    #841. 일자 카드는 `9월 12일 (토)` 인데 개요만 `2026년 9월 12일 (토)` 이라, 같은 날이
+    한 화면에서 두 형식으로 섰다. 올해 일정에서만 연도를 뗀다.
+  */
+  it('올해 일정이면 날짜 줄에 연도를 쓰지 않는다', () => {
+    expect(renderOverview()).not.toContain('2026\ub144')
+  })
+
+  it('해가 다른 일정은 연도를 그대로 쓴다 — 없으면 언제인지 알 수 없어진다', () => {
+    const markup = renderOverview({
+      plan: { ...planDetail, startDate: '2027-01-02', endDate: '2027-01-04' },
+    })
+
+    expect(markup).toContain('2027\ub144')
   })
 })
 
 /**
- * `D-N` + 일자별 판정 한 줄 (#732 · 진단 665-4).
+ * 일자별 판정 목차 (#732 · #841).
  *
- * 데스크톱 전용이던 `일자별 판정` 목차 카드를 대신한다 — 모바일 1순위 제품에서 전체
- * 판정 요약이 데스크톱에만 있었다.
+ * 데스크톱 전용이던 `일자별 판정` 목차 **카드**를 대신한다 — 모바일 1순위 제품에서 전체
+ * 판정 요약이 데스크톱에만 있었다. #841 에서 가로 한 줄을 다시 세로 목록으로 되돌렸다:
+ * 걷어낼 이유였던 것은 `hidden lg:block` 이었지 세로 레이아웃 자체가 아니었고, 카드를
+ * 만들지 않고 개요 카드 안에 두면 모든 폭에서 선다.
  */
-describe('PlanOverviewPanel — 판정 스트립 (#732)', () => {
+describe('PlanOverviewPanel — 일자별 판정 목차 (#732 · #841)', () => {
   function verdictsOf(days: number) {
     return Array.from({ length: days }, (_, index) => ({ ...planVerdict, day: index + 1 }))
   }
 
-  it('D-day 와 일자 배지가 한 줄에 선다', () => {
+  /* 구획 2(상태)가 구획 3(목차) 위다 — 언제 떠나는지를 먼저 읽고 어느 날이 좋은지를 본다 */
+  it('D-day 가 목차보다 먼저 온다', () => {
     const markup = renderOverview()
     const dday = markup.indexOf(messages.plan.dday.replace('{days}', '11'))
     const badge = markup.indexOf('href="#day1"')
@@ -549,7 +587,7 @@ describe('PlanOverviewPanel — 판정 스트립 (#732)', () => {
     expect(dday).toBeLessThan(badge)
   })
 
-  it('D-day 를 예산 줄과 스트립에 겹쳐 두지 않는다 — 한 카드에 같은 말이 두 번 서지 않는다', () => {
+  it('D-day 를 한 카드에 두 번 세우지 않는다', () => {
     const markup = renderOverview()
     const label = messages.plan.dday.replace('{days}', '11')
 
@@ -583,8 +621,8 @@ describe('PlanOverviewPanel — 판정 스트립 (#732)', () => {
     expect(markup).not.toContain('외 ')
   })
 
-  /* 목차 줄이 갖고 있던 값이다 (D6) — 세로 목록을 가로로 접어도 손가락 크기는 그대로다 */
-  it('각 칸이 44px 터치 영역을 갖는다', () => {
+  /* 세로로 돌아와도 줄당 44px 은 그대로다 (D6) — 목차 줄이 처음부터 갖고 있던 값이다 */
+  it('각 줄이 44px 터치 영역을 갖는다', () => {
     expect(renderOverview()).toContain('min-h-11')
   })
 })
@@ -647,7 +685,7 @@ describe('3층 표면 (#447)', () => {
     제목만이 아니라 상태 · 기간 · 예산 · D-day · 동행 반려견을 담은 개요라 §0 의 판정 3문에
     셋 다 걸린다. 근거는 `plan-overview-panel.tsx` 머리주석이 정본이다.
   */
-  it('개요가 카드 하나다 — 판정은 그 안의 스트립이라 별도 카드가 아니다 (#732)', () => {
+  it('개요가 카드 하나다 — 판정 목차는 그 안의 구획이라 별도 카드가 아니다 (#732 · #841)', () => {
     const markup = renderOverview()
     const h1 = markup.indexOf('<h1')
 
@@ -658,7 +696,7 @@ describe('3층 표면 (#447)', () => {
   })
 
   /* 예전에는 `hidden lg:block` 카드라 모바일에서 전체 판정을 볼 방법이 없었다 (#732) */
-  it('판정 스트립은 폭으로 숨지 않는다 — 모바일이 1순위다', () => {
+  it('판정 목차는 폭으로 숨지 않는다 — 모바일이 1순위다', () => {
     const markup = renderOverview()
 
     expect(markup).toContain(messages.plan.verdictTocTitle)
@@ -672,7 +710,8 @@ describe('3층 표면 (#447)', () => {
     expect(markup).not.toContain(messages.plan.verdictTocTitle)
   })
 
-  it('동행 반려견 줄은 카드 안이라 선을 긋지 않는다', () => {
+  /* 구획 1 안쪽이라 선이 없다 — 경계는 아래 구획선(구획 2 의 `border-t`)이 갖는다 (#841) */
+  it('동행 반려견 줄은 구획 1 안이라 선을 긋지 않는다', () => {
     const markup = renderOverview()
     const start = markup.indexOf('푸들')
     const around = markup.slice(Math.max(0, start - 400), start)
