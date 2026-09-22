@@ -327,9 +327,6 @@ export const aiPlanMessages = {
   previewNotSaved: '아직 저장되지 않았어요',
 
   reasonsTitle: '이렇게 짰어요',
-  /** `%d` 가 남은 개수로 치환된다 — `ReasonList` 규약 */
-  reasonsMore: '근거 %d개 더 보기',
-  reasonsLess: '근거 접기',
 
   /** `{day}` 치환 */
   dayLabel: '{day}일차',

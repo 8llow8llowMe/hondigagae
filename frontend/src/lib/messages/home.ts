@@ -336,8 +336,6 @@ export const homeMessages = {
     congestion: '혼잡도 반영',
     none: null,
   },
-  moreReasons: '근거 {n}개 더 보기',
-  lessReasons: '근거 접기',
   emptyPlacesTitle: '표시할 장소가 없어요',
   emptyPlacesDesc: '장소를 찾아보세요.',
   findPlaces: '장소 찾기',
