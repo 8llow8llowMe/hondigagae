@@ -92,8 +92,6 @@ export const walkCourseMessages = {
    * 으로 읽힌다.
    */
   sortDistanceAsc: '거리 짧은 순',
-  /** 1024 이상 열 머리의 코스 열 라벨 (#734 · #797). 거리·소요시간·시종점은 상세와 같은 라벨(아래)을 그대로 쓴다 */
-  columnCourseLabel: '코스',
 
   /**
    * 기준 줄. **`appliedPetActivityLevel` 이 있을 때만 그린다** — 로컬 상태가 아니라

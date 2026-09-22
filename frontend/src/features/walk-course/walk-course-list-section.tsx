@@ -5,8 +5,8 @@ import type { ReactNode } from 'react'
 import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
-import { Surface, SurfaceList } from '@/components/surface'
-import { WalkCourseColumnHead, WalkCourseRow } from '@/features/walk-course/walk-course-row'
+import { Surface } from '@/components/surface'
+import { WalkCourseCardGrid, WalkCourseRow } from '@/features/walk-course/walk-course-row'
 import {
   WALK_COURSE_SKELETON_COUNT,
   WalkCourseRowSkeleton,
@@ -198,21 +198,16 @@ function WalkCourseListBody({
 
   if (loading) {
     return (
-      <>
-        {/*
-          **로딩 중에도 열 머리를 세운다** (#800). 라벨 넷이 전부 고정 문구라 데이터를
-          기다릴 이유가 없고, 빼 두면 결과가 오는 순간 **한 줄이 새로 끼어들어** 아래
-          전체가 밀린다 — 스켈레톤 골격을 행에 맞춰 놓고도 그 한 줄 때문에 점프가 남는다.
-          `aria-hidden` 이라 보조기기에는 아무것도 더하지 않는다.
-        */}
-        <WalkCourseColumnHead inset={inset} />
-
-        <SurfaceList aria-busy>
-          {Array.from({ length: WALK_COURSE_SKELETON_COUNT }, (_, index) => (
-            <WalkCourseRowSkeleton key={index} inset={inset} />
-          ))}
-        </SurfaceList>
-      </>
+      /*
+        **열 머리가 사라진 자리다** (#837). 표였을 때는 로딩 중에도 열 머리를 세워야
+        결과가 오는 순간 한 줄이 끼어들지 않았는데(#800), 카드 그리드에는 머리가 없다 —
+        스켈레톤과 카드가 같은 골격이면 그것으로 점프가 끝난다.
+      */
+      <WalkCourseCardGrid aria-busy inset={inset}>
+        {Array.from({ length: WALK_COURSE_SKELETON_COUNT }, (_, index) => (
+          <WalkCourseRowSkeleton key={index} />
+        ))}
+      </WalkCourseCardGrid>
     )
   }
 
@@ -283,23 +278,15 @@ function WalkCourseListBody({
         </p>
       )}
 
-      {/* 1024 이상 전용 열 머리 — 행과 같은 그리드를 공유한다 (#734 · #797) */}
-      <WalkCourseColumnHead inset={inset} />
-
       {/*
         **`InfiniteScrollSentinel` 이 없다.** 커서가 없고 29개 전량이 한 번에 온다
         (공통명세 S3) — 목록 끝의 `마지막 장소예요` 줄도 이 화면의 말이 아니다.
       */}
-      <SurfaceList>
+      <WalkCourseCardGrid inset={inset}>
         {courses.map((course) => (
-          <WalkCourseRow
-            key={course.walkCourseId}
-            course={course}
-            inset={inset}
-            filters={filters}
-          />
+          <WalkCourseRow key={course.walkCourseId} course={course} filters={filters} />
         ))}
-      </SurfaceList>
+      </WalkCourseCardGrid>
     </>
   )
 }

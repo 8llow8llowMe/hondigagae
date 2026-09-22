@@ -3,8 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { WalkCourseColumnHead, WalkCourseRow } from '@/features/walk-course/walk-course-row'
-import { messages } from '@/lib/messages'
+import { WalkCourseCardGrid, WalkCourseRow } from '@/features/walk-course/walk-course-row'
 import {
   WALK_COURSE_MIXED_START_END,
   WALK_COURSE_PLAIN,
@@ -19,8 +18,19 @@ function render(course: WalkCourseSummary, filters?: WalkCourseFilters): string 
   )
 }
 
-function renderColumnHead(): string {
-  return renderToStaticMarkup(createElement(WalkCourseColumnHead, {}))
+function renderGrid(): string {
+  return renderToStaticMarkup(
+    createElement(WalkCourseCardGrid, {
+      children: createElement(WalkCourseRow, { course: WALK_COURSE_PLAIN }),
+    }),
+  )
+}
+
+/** 카드의 여는 태그만 잘라 낸다 — 마크업 전체에 건 단언은 다른 요소가 통과시켜 준다 */
+function cardTag(markup: string): string {
+  const start = markup.indexOf('<a')
+
+  return markup.slice(start, markup.indexOf('>', start))
 }
 
 describe('WalkCourseRow — 코스를 고르는 데 쓰는 값 셋', () => {
@@ -74,77 +84,137 @@ describe('WalkCourseRow — 코스를 고르는 데 쓰는 값 셋', () => {
   })
 })
 
+/*
+  #837. 표에서 카드로 되돌아온 자리다. **표의 잔재가 남아 있으면 두 모양이 섞인다** —
+  아래 단언들이 그 경계를 지킨다.
+*/
+describe('WalkCourseRow — 카드 골격 (#837)', () => {
+  it('카드가 자기 테두리와 모서리를 갖는다 — 목록 구분선이 아니다', () => {
+    const tag = cardTag(render(WALK_COURSE_PLAIN))
+
+    expect(tag).toContain('border-border')
+    expect(tag).toContain('rounded-lg')
+  })
+
+  /** 같은 행의 카드 높이를 맞춘다 — 구간명이 두 줄인 카드가 섞여도 아래가 흔들리지 않는다 */
+  it('카드가 자리의 높이를 다 쓴다', () => {
+    expect(cardTag(render(WALK_COURSE_PLAIN))).toContain('h-full')
+  })
+
+  /** 세로로 길면 3열에서 카드가 화면을 넘고, 정사각이면 풍경 사진이 좌우로 잘린다 */
+  it('사진이 16:10 이다', () => {
+    expect(render(WALK_COURSE_WITH_COORDS)).toContain('aspect-16/10')
+  })
+
+  /**
+   * **번호와 구간명이 한 줄이다** (시안 A4). 375 실측에서 29개 전부 한 줄이고(제목 칸
+   * 309px · 최장 302px), 넘치더라도 둘이 같은 `<p>` 안에 있어야 `flex-wrap` 이 구간명을
+   * 통째로 내린다 — 갈라 두면 이름이 중간에서 끊긴다.
+   */
+  it('번호와 구간명이 같은 줄에 선다', () => {
+    const markup = render(WALK_COURSE_PLAIN)
+    const line = markup.slice(markup.indexOf('<p'), markup.indexOf('</p>'))
+
+    expect(line).toContain('1코스')
+    expect(line).toContain('시흥-광치기')
+  })
+
+  /**
+   * **번호는 색과 굵기로 앞선다 — 크기가 아니다.** 앱 타이포 토큰에 15px 이 없어 둘 다
+   * `text-body-1` 이고, 임의 px 를 새로 만드는 대신 두 축으로 가른다.
+   */
+  it('번호가 브랜드색 굵은 글씨다', () => {
+    const markup = render(WALK_COURSE_PLAIN)
+    const labelStart = markup.indexOf('<span')
+    const labelTag = markup.slice(labelStart, markup.indexOf('>', labelStart))
+
+    expect(labelTag).toContain('text-brand-600')
+    expect(labelTag).toContain('font-extrabold')
+  })
+
+  /**
+   * **표의 잔재가 없다.** 6칸 그리드(`.walk-course-row-grid`)와 칸 고정(`lg:col-start-N`),
+   * 1024 미만 전용 블록(`lg:hidden`)은 표의 장치였다 — 카드에는 열이 없다.
+   */
+  it('표 시절의 그리드 장치를 쓰지 않는다', () => {
+    const markup = render(WALK_COURSE_WITH_COORDS)
+
+    expect(markup).not.toContain('walk-course-row-grid')
+    expect(markup).not.toContain('col-start')
+    expect(markup).not.toContain('lg:hidden')
+  })
+
+  /** 카드는 테두리와 채움이 "누를 수 있다" 를 말한다 — 도장 열을 따로 두지 않는다 */
+  it('chevron 을 그리지 않는다', () => {
+    expect(render(WALK_COURSE_PLAIN)).not.toContain('<svg')
+  })
+
+  /** 표에서는 거리·소요시간이 두 열이라 두 번 그렸다. 카드에서는 한 줄 한 번이다 */
+  it('거리·소요시간을 한 번만 그린다', () => {
+    const markup = render(WALK_COURSE_PLAIN)
+
+    expect(markup.split('15.1km')).toHaveLength(2)
+    expect(markup.split('4~5시간')).toHaveLength(2)
+  })
+})
+
 describe('WalkCourseRow — 이미지 (D1-1)', () => {
   /**
    * **재적재 뒤 dev 실데이터는 29/29 가 이미지를 갖는다** (2026-09-21, [#767](https://github.com/8llow8llowMe/hondigagae/issues/767)).
    * 그래도 없는 갈래를 지우지 않는다 — 이미지는 계약이 아니라 TourAPI 매칭에서 오는
-   * 데이터라, 원천이 다시 비면 이 행이 돌아온다.
+   * 데이터라, 원천이 다시 비면 이 카드가 돌아온다. **회색 판을 세우지 않고 글자만 남긴다.**
    */
-  it('firstImage 가 null 이면 썸네일 자리를 만들지 않는다', () => {
-    expect(render(WALK_COURSE_PLAIN)).not.toContain('<img')
+  it('firstImage 가 null 이면 사진 자리를 만들지 않는다', () => {
+    const markup = render(WALK_COURSE_PLAIN)
+
+    expect(markup).not.toContain('<img')
+    expect(markup).not.toContain('aspect-16/10')
   })
 
-  it('firstImage 가 있으면 썸네일을 그린다', () => {
+  it('firstImage 가 있으면 사진을 그린다', () => {
     expect(render(WALK_COURSE_WITH_COORDS)).toContain('<img')
   })
 
-  /** 바로 옆에 이름표가 글자로 있다 (D6) */
-  it('썸네일의 alt 는 빈 문자열이다', () => {
+  /** 바로 아래에 이름표가 글자로 있다 (D6) */
+  it('사진의 alt 는 빈 문자열이다', () => {
     expect(render(WALK_COURSE_WITH_COORDS)).toContain('alt=""')
   })
 
   /**
-   * **썸네일이 없어도 첫 그리드 칸의 자리는 그대로다** (#767 에서 5 → 1). 플렉스였다면
-   * 없는 항목만큼 뒤 칸(코스·시종점·chevron)이 당겨졌겠지만, 그리드 트랙은 자식 유무와
-   * 무관하게 컨테이너가 정한 폭 그대로 남는다 — 그래서 코스(2)·chevron(6) 열은 썸네일
-   * 유무와 무관하게 항상 같은 칸에 선다.
-   *
-   * **`not.toContain('lg:col-start-1')` 은 전체 마크업 범위라 위험하다** — 다른 칸이
-   * 실수로 1번을 쓰면 빨간불이 되어야 하므로 그것도 이 단언이 지키는 것이다.
+   * **사진이 이름 위에 온다** (시안 A4 — 사진 위에 아무것도 얹지 않는다). 마크업 순서로
+   * 잰다 — 클래스만 보면 DOM 순서가 바뀌어도 초록이다.
    */
-  it('썸네일이 없으면 첫 그리드 칸(lg:col-start-1)을 만들지 않는다', () => {
-    expect(render(WALK_COURSE_PLAIN)).not.toContain('lg:col-start-1')
-  })
-
-  it('썸네일이 있으면 첫 그리드 칸에 선다', () => {
+  it('사진 마크업이 코스 이름보다 앞에 온다', () => {
     const markup = render(WALK_COURSE_WITH_COORDS)
-
-    expect(markup).toMatch(/class="bg-band relative size-16[^"]*lg:col-start-1[^"]*"/)
-  })
-
-  /**
-   * **사진이 이름 앞에 온다** (#767). 뒤에 두면 1280 에서 시종점 글자 끝과 493px 떨어져
-   * chevron 옆 도장 열로 읽혔다. 마크업 순서로 잰다 — 클래스만 보면 DOM 순서가 바뀌어도
-   * 초록이다.
-   */
-  it('썸네일 마크업이 코스 이름보다 앞에 온다', () => {
-    const markup = render(WALK_COURSE_WITH_COORDS)
-    const thumbnailAt = markup.search(/<div class="bg-band relative size-16/)
+    const photoAt = markup.search(/<div class="[^"]*aspect-16\/10/)
     /*
       **`aria-label` 이 아니라 눈에 보이는 이름표로 잰다.** 접근 이름은 `<a>` 속성이라
-      언제나 마크업 앞쪽에 있어, 그것으로 재면 썸네일을 어디에 두든 통과한다.
+      언제나 마크업 앞쪽에 있어, 그것으로 재면 사진을 어디에 두든 통과한다.
     */
-    const labelAt = markup.search(/<span class="[^"]*whitespace-nowrap[^"]*">/)
+    const labelAt = markup.search(/<span class="[^"]*font-extrabold[^"]*">/)
 
-    expect(thumbnailAt).toBeGreaterThanOrEqual(0)
+    expect(photoAt).toBeGreaterThanOrEqual(0)
     expect(labelAt).toBeGreaterThanOrEqual(0)
-    expect(thumbnailAt).toBeLessThan(labelAt)
+    expect(photoAt).toBeLessThan(labelAt)
   })
 })
 
 describe('WalkCourseRow — 목록은 좌표 유무를 말하지 않는다 (D5-1)', () => {
   /**
-   * 좌표는 *골든타임을 이어 볼 수 있는가*만 정한다. 25행에 그 사실을 적으면 코스를 고르는
-   * 축과 무관한 정보가 화면의 4/5를 덮는다 — 그 말은 코스 상세가 한 줄로 한다.
+   * 좌표는 *골든타임을 이어 볼 수 있는가*만 정한다. 카드에 그 사실을 적으면 코스를 고르는
+   * 축과 무관한 정보가 화면을 덮는다 — 그 말은 코스 상세가 한 줄로 한다.
+   *
+   * **종점 좌표로 선을 그리지도 않는다** (인계 명세 §2-3). 응답에 경로 좌표열이 없어
+   * 두 점을 이으면 실제 올레길과 다른 직선이 된다.
    */
-  it('좌표가 없는 행에 골든타임·날씨 낱말이 없다', () => {
+  it('좌표가 없는 카드에 골든타임·날씨 낱말이 없다', () => {
     const markup = render(WALK_COURSE_PLAIN)
 
     expect(markup).not.toContain('골든타임')
     expect(markup).not.toContain('날씨')
   })
 
-  it('좌표가 있는 행에도 그 사실을 적지 않는다 — 두 행이 같은 모양이다', () => {
+  it('좌표가 있는 카드에도 그 사실을 적지 않는다 — 두 카드가 같은 모양이다', () => {
     const markup = render(WALK_COURSE_WITH_COORDS)
 
     expect(markup).not.toContain('골든타임')
@@ -152,148 +222,25 @@ describe('WalkCourseRow — 목록은 좌표 유무를 말하지 않는다 (D5-1
   })
 })
 
-describe('WalkCourseRow — 열 구성 (#734 · #797 에서 1024 로 내림)', () => {
-  /**
-   * 썸네일(1) · 코스(2) · 거리(3) · 소요시간(4) · 시종점(5) · chevron(6) — #767 에서 한
-   * 칸씩 밀렸다. 각 칸이 `col-start-N` 으로 자기 자리를 못박는다 — 썸네일 유무와 무관하게
-   * 나머지 칸이 밀리지 않는 이유가 이것이다(위 이미지 describe).
-   */
-  it('코스 · 거리 · 소요시간 · 시종점 · chevron 이 각자 col-start 를 갖는다', () => {
-    const markup = render(WALK_COURSE_PLAIN)
-
-    expect(markup).toContain('lg:col-start-2')
-    expect(markup).toContain('lg:col-start-3')
-    expect(markup).toContain('lg:col-start-4')
-    expect(markup).toContain('lg:col-start-5')
-    expect(markup).toContain('lg:col-start-6')
-  })
-
-  /** 1024 미만 블록(제목 안 요약 줄)과 1024 이상 전용 열이 같은 값을 두 번 들고 있다 */
-  it('거리·소요시간·시종점이 1024 미만용과 1024 이상용으로 각각 그려진다', () => {
-    const markup = render(WALK_COURSE_PLAIN)
-
-    expect(markup.match(/15\.1km/g)?.length).toBe(2)
-    expect(markup.match(/4~5시간/g)?.length).toBe(2)
-    // 1024 이상 열은 `title` 속성에도 원문을 한 번 더 들고 있어 3회다 — truncate 된
-    // 텍스트를 마우스 호버로 확인할 수 있게 하는 값이지 중복 렌더가 아니다
-    expect(markup.match(/시흥리정류장-광치기해변/g)?.length).toBe(3)
-  })
-
-  /** 요약 줄은 열이 생기는 폭에서 숨는다 — 같은 값이 겹쳐 보이면 안 된다 */
-  it('요약 줄 둘 다 1024 부터 숨는다', () => {
-    const markup = render(WALK_COURSE_PLAIN)
-
-    expect(markup).toMatch(/class="text-body-2 text-fg-muted mt-1 tabular-nums lg:hidden"/)
-    expect(markup).toMatch(/class="text-caption text-fg-subtle mt-1 break-keep lg:hidden"/)
-  })
-
-  /** 표 안에서는 한 줄로 자른다 — 원문을 갈라 재조립하는 것과는 다르다(D4-4) */
-  it('1024 이상 시종점 열은 truncate 이고 title 로 원문을 보존한다', () => {
-    const markup = render(WALK_COURSE_MIXED_START_END)
-
-    expect(markup).toContain('title="제주민속촌주차장 입구-남원포구"')
-    expect(markup).toMatch(/class="text-caption text-fg-subtle hidden min-w-0 truncate/)
-  })
-})
-
-describe('WalkCourseColumnHead — 1024 이상 열 머리 (#734 · #797)', () => {
-  it('코스 · 거리 · 소요시간 · 시종점 라벨을 그린다 — 행과 같은 문구다', () => {
-    const markup = renderColumnHead()
-
-    expect(markup).toContain(messages.walkCourse.columnCourseLabel)
-    expect(markup).toContain(messages.walkCourse.distanceLabel)
-    expect(markup).toContain(messages.walkCourse.durationLabel)
-    expect(markup).toContain(messages.walkCourse.startEndLabel)
-  })
-
-  /** 행과 같은 그리드를 공유해야 라벨이 실제 값 위에 선다 */
-  it('행과 같은 그리드 클래스를 쓴다', () => {
-    expect(renderColumnHead()).toContain('walk-course-row-grid')
-  })
-
-  /** 보조기기에는 새 정보가 아니다 — 행 자체가 이미 같은 값을 전부 말한다 */
-  it('보조기기에는 감춘다 — aria-hidden', () => {
-    expect(renderColumnHead()).toContain('aria-hidden')
-  })
-
-  it('1024 미만에서는 숨는다', () => {
-    expect(renderColumnHead()).toContain('hidden lg:grid')
-  })
-})
-
 /*
-  #797. **표가 1024 부터 선다.** 예전에는 `xl:`(1280)부터라 1024~1279 가 모바일 레이아웃을
-  1004px 로 늘린 모양이었다 (1100 실측: 행 `display:flex` · 열 머리 `display:none` ·
-  내용이 왼쪽 972px 블록 안에 세 줄).
+  #798. 29개가 전부 링크인데 마우스 신호가 chevron 하나뿐이었다.
 
-  **중간 단계는 필요 없었다.** 코스 열을 484 → 256 으로 줄이자 1024(행 폭 928)에서도
-  6칸이 정확히 들어간다 — 칸 수가 폭마다 갈리면 `col-start` 도 갈려야 하고 썸네일·chevron
-  이 breakpoint 마다 다른 자리를 갖게 된다.
-*/
-describe('WalkCourseRow — 1024 부터 표다 (#797)', () => {
-  it('행이 1024 부터 그리드가 된다', () => {
-    expect(render(WALK_COURSE_WITH_COORDS)).toContain('lg:grid')
-  })
-
-  /** 시종점도 1024 부터 자기 열이다 — 한 폭에서만 인라인으로 남지 않는다 */
-  it('썸네일 · 시종점 · chevron 이 모두 1024 부터 자기 열이다', () => {
-    const markup = render(WALK_COURSE_WITH_COORDS)
-
-    expect(markup).toContain('lg:col-start-1')
-    expect(markup).toContain('lg:col-start-5')
-    expect(markup).toContain('lg:col-start-6')
-  })
-
-  /** 칸 수가 폭마다 갈리지 않는다 — `xl:` 자리 지정이 남아 있으면 안 된다 */
-  it('breakpoint 마다 칸 자리가 갈리지 않는다', () => {
-    expect(render(WALK_COURSE_WITH_COORDS)).not.toContain('xl:col-start')
-  })
-})
-
-/*
-  #797. **썸네일이 있는 행만 높이가 두 배로 튀었다** (1440 실측: `56 · 57 · 113 · 57 · 113 …`).
-  목록을 훑을 때 먼저 보이는 것은 세로 튐이다.
-
-  표 안에서는 썸네일을 40px 로 줄이고 행에 최소 높이를 줘 모든 행이 같은 리듬으로 선다.
-  1024 미만(카드형 목록)에서는 예전 크기 그대로다 — 거기서는 썸네일이 행의 주인공이다.
-*/
-describe('WalkCourseRow — 행 높이가 고르다 (#797)', () => {
-  it('표 안 썸네일을 줄인다 — 1024 미만 크기는 그대로다', () => {
-    const markup = render(WALK_COURSE_WITH_COORDS)
-
-    // `md:size-20` 을 함께 단언한다 — "그대로다" 를 실제로 지키는 것이 이 클래스다
-    expect(markup).toContain('size-16')
-    expect(markup).toContain('md:size-20')
-    expect(markup).toContain('lg:size-10')
-  })
-
-  it('행이 최소 높이를 갖는다 — 썸네일이 없어도 같은 리듬이다', () => {
-    expect(render(WALK_COURSE_PLAIN)).toContain('lg:min-h-18')
-  })
-})
-
-/*
-  #798. **29행이 전부 링크인데 마우스 신호가 chevron 하나뿐이었다** — 누를 수 있다는 것을
-  알려 주는 것이 없었다.
-
-  **채움을 `<li>` 에 건다.** 인셋(`INSET_CLASS`)이 `<li>` 의 좌우 패딩이라 `<a>` 에 걸면
-  강조가 카드 끝까지 닿지 않고 행 가운데 띠로 뜬다.
-
-  **다만 `<li>` 가 hover 될 때가 아니라 `<a>` 가 hover 될 때다** (`has-[a:hover]`).
-  `<li>` 기준으로 하면 링크 밖 여백에서도 칠해지는데, 거기는 눌러도 아무 일이 없다 —
-  강조는 "여기를 누를 수 있다" 는 말이라 누를 수 없는 자리에 두면 거짓이 된다.
+  **카드에서는 `<a>` 가 곧 카드 전체다.** 표에서 `<li>` 의 `has-[a:hover]` 를 썼던 이유는
+  좌우 인셋이 `<li>` 의 패딩이라 `<a>` 에 걸면 강조가 카드 끝까지 닿지 않아서였는데,
+  인셋이 그리드 컨테이너로 올라가면서 그 이유가 사라졌다 — 누를 수 있는 자리와 칠해지는
+  자리가 정확히 같아진다.
 */
 describe('WalkCourseRow — 누를 수 있다는 신호 (#798)', () => {
-  it('마우스를 올리면 행이 채움으로 반응한다', () => {
-    expect(render(WALK_COURSE_PLAIN)).toContain('has-[a:hover]:bg-band')
+  it('마우스를 올리면 카드가 채움으로 반응한다', () => {
+    expect(cardTag(render(WALK_COURSE_PLAIN))).toContain('hover:bg-band')
   })
 
-  /** 강조가 카드 끝까지 닿아야 행 하나로 읽힌다 — 인셋을 쥔 `<li>` 가 그 폭이다 */
-  it('채움을 인셋을 쥔 요소에 건다', () => {
+  /** 누를 수 없는 여백이 칠해지면 거짓 신호다 — 채움은 링크 자신에게만 건다 */
+  it('채움을 링크 바깥에 걸지 않는다', () => {
     const markup = render(WALK_COURSE_PLAIN)
-    const li = markup.slice(0, markup.indexOf('<a'))
+    const outside = markup.slice(0, markup.indexOf('<a'))
 
-    expect(li).toContain('has-[a:hover]:bg-band')
+    expect(outside).not.toContain('bg-band')
   })
 
   /** 키보드 포커스 링은 그대로다 — 둘은 다른 채널이고 서로를 대신하지 않는다 */
@@ -308,15 +255,46 @@ describe('WalkCourseRow — 접근성 계약 (D6)', () => {
     expect(render(WALK_COURSE_PLAIN)).toContain('aria-label="1코스 시흥-광치기"')
   })
 
-  /** 이름에는 없지만 행 안의 텍스트로는 읽혀야 한다 */
+  /** 이름에는 없지만 카드 안의 텍스트로는 읽혀야 한다 */
   it('거리·소요시간을 aria-hidden 으로 감추지 않는다', () => {
     const markup = render(WALK_COURSE_PLAIN)
 
     expect(markup).not.toMatch(/aria-hidden[^>]*>[^<]*15\.1km/)
   })
 
-  /** 44px — 모바일 최소 터치 영역 (DESIGN.md §7) */
-  it('행 링크가 최소 터치 높이를 갖는다', () => {
-    expect(render(WALK_COURSE_PLAIN)).toContain('min-h-11')
+  /** 44px — 모바일 최소 터치 영역 (DESIGN.md §7). 사진이 없는 카드가 이 값에 걸린다 */
+  it('카드 링크가 최소 터치 높이를 갖는다', () => {
+    expect(cardTag(render(WALK_COURSE_PLAIN))).toContain('min-h-11')
+  })
+})
+
+/*
+  #837. 열 수는 1 / 2(768+) / 3(1280+) 이다 (`코스목록-세부명세.md` D1-1) — 표였을 때
+  1280+ 에서 남던 빈 폭이 열 수로 해소된다.
+*/
+describe('WalkCourseCardGrid — 열 수 (#837)', () => {
+  it('폭에 따라 1 · 2 · 3 열이다', () => {
+    const markup = renderGrid()
+    const tag = markup.slice(0, markup.indexOf('>'))
+
+    expect(tag).toContain('grid-cols-1')
+    expect(tag).toContain('md:grid-cols-2')
+    expect(tag).toContain('xl:grid-cols-3')
+  })
+
+  /** 스크린리더가 개수를 읽는다 — 카드가 됐다고 목록 시맨틱을 잃지 않는다 */
+  it('ul/li 로 내보낸다', () => {
+    const markup = renderGrid()
+
+    expect(markup.startsWith('<ul')).toBe(true)
+    expect(markup).toContain('<li')
+  })
+
+  /** 인셋이 항목이 아니라 컨테이너에 있다 — 카드가 곧 링크가 되는 근거다 */
+  it('좌우 인셋을 컨테이너가 쥔다', () => {
+    const markup = renderGrid()
+    const tag = markup.slice(0, markup.indexOf('>'))
+
+    expect(tag).toContain('px-4')
   })
 })
