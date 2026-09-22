@@ -15,7 +15,7 @@ import type { Pet } from '@/types/pet'
 import type { PlanDayWeatherItem, PlanDetail } from '@/types/plan'
 
 /**
- * 좌 레일 — 제목 · 상태 · 기간 · D-day · 반려견 · 일자별 판정 목차 (아트보드 02).
+ * 좌 레일 — 제목 · 상태 · 기간 · D-day · 반려견 · 일자별 적합도 목차 (아트보드 02).
  *
  * 모바일에서는 레일이 아니라 화면 맨 위의 개요 블록이다. **DOM 순서가 모바일 기준
  * 그대로여도 두 레이아웃이 성립하므로** `.rail-layout-detail` 변형을 쓰지 않는다 (D1).
@@ -23,7 +23,7 @@ import type { PlanDayWeatherItem, PlanDetail } from '@/types/plan'
  * **두 조각을 돌려준다** (`DESIGN.md §0`, #447 · #553 · #732) — 부모 `SurfaceStack` 의
  * 직접 자식이 되어야 카드 간격을 받기 때문에 fragment 다.
  * 1. **제목 줄도 카드다** (#553). 동행 반려견도 여기 든다: "누구와 가는 일정인가" 는
- *    신원의 일부다. **`D-N` + 일자별 판정 목차도 이 카드 안이다** (#732).
+ *    신원의 일부다. **`D-N` + 일자별 적합도 목차도 이 카드 안이다** (#732).
  * 2. **확정 액션** (`action` 슬롯) — 카드가 아니라 바닥 위에 선다. 출발 전에는 비기도
  *    한다 (`planStatusActionLayout`).
  *
