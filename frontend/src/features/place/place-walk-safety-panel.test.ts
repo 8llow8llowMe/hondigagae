@@ -233,11 +233,16 @@ describe('PlaceWalkSafetyPanel — 판정값과 참고값의 위계 (#292)', () 
 
 /* 계산 근거를 접지 않는다 (#840) — 서랍이 사라지고 라벨 + 문장이 늘 선다 */
 describe('PlaceWalkSafetyPanel — 체감온도 계산 근거', () => {
+  /*
+    **근거 문장 자체는 여기서 단언하지 않는다.** `두 근거 문장을 서버 문구 그대로 담는다`
+    가 같은 입력(`render()` 기본값)으로 이미 그것을 증명한다 — 여기 한 줄 더 두면 둘 중
+    하나가 죽어도 아무도 모른다. 이 테스트의 고유한 증명은 **라벨이 서고 여는 버튼이
+    없다**는 것이다.
+  */
   it('근거 문장이 접힘 없이 선다', () => {
     const markup = render()
 
     expect(markup).toContain(messages.place.detailFeelsLikeBasisLabel)
-    expect(markup).toContain('기상청 여름철 체감온도 산식으로 계산했습니다')
     expect(markup).not.toContain('aria-expanded')
   })
 
