@@ -568,15 +568,18 @@ describe('PlanOverviewPanel', () => {
 
   /*
     #841. 축 라벨을 배지마다 붙이면 한 카드에서 세 번 선다. #652 의 요구("혼잡도의 `보통`
-    과 구분")는 이제 **섹션 머리**(`messages.plan.verdictTocTitle`)가 충족한다 — 그 문구가
-    축 이름을 담고 있어야 이 근거가 서므로 **문구를 주석에 박지 않고 상수로 지칭한다.**
-    목차는 자기 이름을 갖고 배지는 그 아래라 등급어만 쓴다. **일자 카드의 배지는 그대로
-    축을 단다** — 거기에는 이 섹션 머리가 없다 (`plan-day-verdict.tsx`).
-  */
-  it('목차 배지는 축 라벨을 반복하지 않는다 — 섹션 머리가 그 자리를 갖는다', () => {
-    const markup = renderOverview({ verdicts: verdictsOf(3) })
+    과 구분")는 **보이는 화면에서는** 섹션 머리(`messages.plan.verdictTocTitle`)가 충족한다 —
+    그 문구가 축 이름을 담고 있어야 이 근거가 서므로 **문구를 주석에 박지 않고 상수로
+    지칭한다.**
 
-    /* 카드 전체에서 `적합도` 가 딱 한 번 — 섹션 머리다. 배지 셋에는 없다 */
+    **`sr-only` 는 세지 않는다** (#848). 줄 단위로 도는 스크린 리더는 섹션 머리를 듣지
+    못하므로 앵커가 축을 `sr-only` 로 따로 갖는데, 그것까지 세면 이 단언이 **보이는 글자**에
+    대해 말하는 것을 멈춘다. 두 채널은 아래 `#848` 단언들이 따로 잠근다.
+  */
+  it('목차 배지는 보이는 축 라벨을 반복하지 않는다 — 섹션 머리가 그 자리를 갖는다', () => {
+    const markup = withoutSrOnly(renderOverview({ verdicts: verdictsOf(3) }))
+
+    /* 보이는 글자에서 `적합도` 가 딱 한 번 — 섹션 머리다. 배지 셋에는 없다 */
     expect(markup.split(messages.common.metricAxisSuitability)).toHaveLength(2)
     expect(markup).toContain(messages.plan.verdictTocTitle)
     expect(markup).toContain(`>${planVerdict.suitabilityLevel?.name}</span>`)
@@ -610,14 +613,19 @@ describe('PlanOverviewPanel', () => {
     expect(markup).toContain('border-dashed')
   })
 
-  /* 판정을 못 낸 배지도 같은 규칙이다 — 무엇의 판정인지는 섹션 머리가 말한다 (#841) */
+  /*
+    판정을 못 낸 배지도 같은 규칙이다 — 무엇의 판정인지는 섹션 머리가 말한다 (#841).
+
+    **범위가 앵커에서 배지로 좁아졌다** (#848). 앵커 안에는 이제 `sr-only` 축이 있으므로
+    "앵커에 축이 없다" 는 더 이상 이 규칙을 말하지 않는다 — 규칙은 **배지가 축을 그리지
+    않는다** 이고, 그 범위에서 재야 뜻이 유지된다.
+  */
   it('판정을 못 낸 목차 배지도 축 라벨 없이 판정 없음만 쓴다', () => {
     const markup = renderOverview({ verdicts: verdictsWithUnjudgedMiddle() })
-    const start = markup.indexOf('href="#day2"')
-    const tocItem = markup.slice(start, markup.indexOf('</a>', start))
+    const badge = tocBadgeTag(markup, messages.plan.verdictTocUnavailable)
 
-    expect(tocItem).not.toContain(messages.common.metricAxisSuitability)
-    expect(tocItem).toContain(`>${messages.plan.verdictTocUnavailable}</span>`)
+    expect(badge).not.toContain(messages.common.metricAxisSuitability)
+    expect(badge).toContain(`>${messages.plan.verdictTocUnavailable}</span>`)
   })
 
   /*
@@ -667,6 +675,55 @@ describe('PlanOverviewPanel', () => {
  */
 function tocAnchors(markup: string): string[] {
   return [...markup.matchAll(/<a [^>]*href="#day\d+"[^>]*>/g)].map((match) => match[0])
+}
+
+/**
+ * `sr-only` 마디를 걷어낸 마크업 (#848).
+ *
+ * **보이는 글자를 세는 단언에 쓴다.** 목차 앵커가 축 이름을 `sr-only` 로 갖게 되면서,
+ * 문자열을 통째로 세는 단언은 "화면에 몇 번 서는가" 가 아니라 "마크업에 몇 번 있는가" 를
+ * 재게 됐다 — 그 둘이 갈리는 순간 단언이 말하던 규칙이 조용히 바뀐다.
+ *
+ * **`class="sr-only"` 로 정확히 일치시킨다** — `not-sr-only` 가 `sr-only` 를 부분
+ * 문자열로 품는 함정이 있다 (`src/test/markup.ts` 의 `classesOf` 주석).
+ */
+function withoutSrOnly(markup: string): string {
+  return markup.replace(/<span class="sr-only">[^<]*<\/span>/g, '')
+}
+
+/**
+ * 목차 한 줄의 앵커 전체 (`<a …>` ~ `</a>`) — 그 줄의 접근성 이름이 나오는 범위다 (#848).
+ */
+function tocRow(markup: string, day: number): string {
+  const start = markup.indexOf(`href="#day${day}"`)
+
+  if (start === -1) throw new Error(`목차 ${day}일차 줄을 찾지 못했다`)
+
+  const open = markup.lastIndexOf('<a ', start)
+
+  return markup.slice(open, markup.indexOf('</a>', start) + 4)
+}
+
+/** 태그를 걷어 그 줄이 낱말로 무엇을 말하는지 본다 — 스크린 리더가 듣는 것에 가깝다 */
+function tocRowText(markup: string, day: number): string {
+  return tocRow(markup, day)
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * 목차 줄의 **배지 여는 태그부터 닫는 태그까지** — 앵커 전체가 아니다 (#848).
+ *
+ * 앵커에는 이제 `sr-only` 축이 함께 들어 있어, 배지에 대해 말하는 단언을 앵커 범위에서
+ * 재면 뜻이 달라진다.
+ */
+function tocBadgeTag(markup: string, label: string): string {
+  const match = new RegExp(`<span class="[^"]*"[^>]*>${label}</span>`).exec(markup)
+
+  if (match === null) throw new Error(`목차 배지를 찾지 못했다: ${label}`)
+
+  return match[0]
 }
 
 describe('PlanOverviewPanel — 일자별 적합도 목차 (#732 · #841)', () => {
@@ -843,6 +900,45 @@ describe('PlanOverviewPanel — 일자별 적합도 목차 (#732 · #841)', () =
     for (const anchor of tocAnchors(renderOverview({ verdicts: verdictsOf(3) }))) {
       expect(anchor).toContain('rounded-md')
     }
+  })
+
+  /*
+    **줄 단위로 도는 경로에서도 축이 들린다** (#848).
+
+    섹션 머리는 `nav aria-labelledby` 로만 배지와 이어져 있고 `aria-labelledby` 는 **랜드마크에
+    진입할 때 한 번** 읽힌다. 링크 목록(NVDA `Insert+F7`)이나 Tab 으로 도는 사용자는 그 이름을
+    듣지 않으므로, 축은 **줄 자신**이 갖고 있어야 한다.
+
+    **낱말로 잰다.** 태그를 걷어낸 문자열이 곧 그 줄이 말하는 것이고, 공백이 빠져 한 낱말로
+    붙는 함정(`1일차적합도보통`)까지 이 단언 하나가 잡는다.
+  */
+  it('목차 줄이 낱말로 일차 · 축 · 등급을 말한다', () => {
+    const markup = renderOverview({ verdicts: verdictsOf(3) })
+
+    expect(tocRowText(markup, 1)).toBe(
+      `${messages.plan.dayLabel.replace('{day}', '1')} ${messages.common.metricAxisSuitability} ${planVerdict.suitabilityLevel?.name}`,
+    )
+  })
+
+  /* 판정을 못 낸 줄도 같다 — 무엇의 판정이 없는지는 그 줄이 말해야 한다 */
+  it('판정 없음 줄에도 축이 붙는다', () => {
+    const markup = renderOverview({ verdicts: verdictsWithUnjudgedMiddle() })
+
+    expect(tocRowText(markup, 2)).toBe(
+      `${messages.plan.dayLabel.replace('{day}', '2')} ${messages.common.metricAxisSuitability} ${messages.plan.verdictTocUnavailable}`,
+    )
+  })
+
+  /*
+    **보이는 글자는 늘지 않는다** (#841 이 뗀 것을 되돌리지 않는다). 축이 배지에 다시
+    그려지면 `적합도` 가 한 카드에서 네 번 선다 — `sr-only` 는 그 자리를 차지하지 않는다.
+  */
+  it('축은 sr-only 로만 는다 — 배지에 보이는 접두어가 돌아오지 않는다', () => {
+    const markup = renderOverview({ verdicts: verdictsOf(3) })
+    const badge = tocBadgeTag(markup, planVerdict.suitabilityLevel?.name ?? '')
+
+    expect(badge).not.toContain(messages.common.metricAxisSuitability)
+    expect(withoutSrOnly(markup).split(messages.common.metricAxisSuitability)).toHaveLength(2)
   })
 })
 
