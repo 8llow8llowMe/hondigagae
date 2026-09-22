@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest'
 
-import { RESEARCH_OFFER_RATIO, shouldOfferResearch } from '@/features/emergency/research-offer'
 import { JEJU_MAP_SEA_RATIO } from '@/lib/geo/coord'
 import { JEJU_QUERY_CENTER } from '@/lib/geo/current-position'
 import { haversineMeters } from '@/lib/geo/distance'
-import { framedCenterLat, type MapBounds } from '@/lib/map/viewport'
+import { RESEARCH_OFFER_RATIO, shouldOfferResearch } from '@/lib/map/research-offer'
+import { boundsRadiusMeters, framedCenterLat, type MapBounds } from '@/lib/map/viewport'
 
 /*
-  **#396.** `/places` 는 지도를 옮기면 스스로 재조회하지만 이 화면은 그러지 않는다 —
-  재조회하면 거리가 지도 중심 기준이 되어 "가까운 순 · 480m" 이 거짓이 되기 때문이다
-  (PR #373). 재조회 시점을 사용자가 쥐되, **권할 때와 아닐 때를 이 함수가 가른다.**
+  **#396.** 두 지도 화면(`/emergency` · `/places`) 모두 지도를 옮겼다고 스스로 재조회하지
+  않는다 — 재조회 시점을 사용자가 쥐되, **권할 때와 아닐 때를 이 함수가 가른다.**
+
+  걷은 이유는 화면마다 다르다: `/emergency` 는 거리가 지도 중심 기준이 되어 "가까운 순 ·
+  480m" 이 거짓이 되고(PR #373), `/places` 는 한 곳을 고르거나 조금 옮길 때마다 목록이
+  통째로 다시 조회돼 방금 보던 결과가 사라진다.
 */
 
 /** 카메라가 지도 중심을 놓은 자리. **조회 기준점이 아니다** — #578 */
@@ -37,7 +40,7 @@ describe('shouldOfferResearch — 권할 때 (#396)', () => {
         bounds: boundsAround(movedNorth(JEJU, 4_000)),
         origin: JEJU,
         radius,
-        selected: false,
+        suppressed: false,
       }),
     ).toBe(true)
   })
@@ -48,7 +51,7 @@ describe('shouldOfferResearch — 권할 때 (#396)', () => {
         bounds: boundsAround(movedNorth(JEJU, 500)),
         origin: JEJU,
         radius: 10_000,
-        selected: false,
+        suppressed: false,
       }),
     ).toBe(false)
   })
@@ -61,8 +64,10 @@ describe('shouldOfferResearch — 권할 때 (#396)', () => {
   it('같은 이동 거리라도 반경이 좁으면 권하고 넓으면 권하지 않는다', () => {
     const bounds = boundsAround(movedNorth(JEJU, 800))
 
-    expect(shouldOfferResearch({ bounds, origin: JEJU, radius: 1_000, selected: false })).toBe(true)
-    expect(shouldOfferResearch({ bounds, origin: JEJU, radius: 40_000, selected: false })).toBe(
+    expect(shouldOfferResearch({ bounds, origin: JEJU, radius: 1_000, suppressed: false })).toBe(
+      true,
+    )
+    expect(shouldOfferResearch({ bounds, origin: JEJU, radius: 40_000, suppressed: false })).toBe(
       false,
     )
   })
@@ -74,10 +79,10 @@ describe('shouldOfferResearch — 권할 때 (#396)', () => {
     const justUnder = boundsAround(movedNorth(JEJU, radius * RESEARCH_OFFER_RATIO - 200))
     const justOver = boundsAround(movedNorth(JEJU, radius * RESEARCH_OFFER_RATIO + 200))
 
-    expect(shouldOfferResearch({ bounds: justUnder, origin: JEJU, radius, selected: false })).toBe(
-      false,
-    )
-    expect(shouldOfferResearch({ bounds: justOver, origin: JEJU, radius, selected: false })).toBe(
+    expect(
+      shouldOfferResearch({ bounds: justUnder, origin: JEJU, radius, suppressed: false }),
+    ).toBe(false)
+    expect(shouldOfferResearch({ bounds: justOver, origin: JEJU, radius, suppressed: false })).toBe(
       true,
     )
   })
@@ -85,31 +90,48 @@ describe('shouldOfferResearch — 권할 때 (#396)', () => {
 
 describe('shouldOfferResearch — 권하지 않을 때 (#396)', () => {
   /*
-    선택은 지도를 도로 단계(`SELECTED_FACILITY_MAP_LEVEL`)까지 확대시키므로 중심이
-    그만큼 옮겨 간다. 그것은 사용자가 "다른 지역을 보겠다" 고 한 것이 아니라 우리가
-    확대한 결과다 — 그 자리에 버튼이 뜨면 고를 때마다 재조회를 권하는 꼴이 된다.
+    `suppressed` 는 **"판정 근거를 아직 못 믿는 동안"** 이다. 우리가 카메라를 옮겨 놓고
+    그 결과를 아직 재지 못한 구간(`/emergency` 의 `boundsStale`)이 그렇다 — 그 어긋남으로
+    판정하면 우리가 확대한 것을 사용자의 이동으로 읽는다.
   */
-  it('시설을 고른 동안에는 권하지 않는다', () => {
+  it('근거를 못 믿는 동안에는 권하지 않는다', () => {
     expect(
       shouldOfferResearch({
         bounds: boundsAround(movedNorth(JEJU, 9_000)),
         origin: JEJU,
         radius: 10_000,
-        selected: true,
+        suppressed: true,
       }),
     ).toBe(false)
   })
 
+  /*
+    **이 자리는 예전에 `selected` 였다.** 그래서 시설을 고른 뒤에는 사용자가 지도를
+    직접 끌어도 버튼이 뜨지 않았고, 옆 동네를 확인하려면 선택부터 풀어야 했다.
+    같은 이동을 `suppressed: false` 로 주면 — 진짜 `idle` 이 와서 `bounds` 를 다시
+    믿을 수 있게 된 순간이다 — 고른 상태와 무관하게 권한다.
+  */
+  it('근거를 되찾으면 고른 상태와 무관하게 권한다 (회귀)', () => {
+    expect(
+      shouldOfferResearch({
+        bounds: boundsAround(movedNorth(JEJU, 9_000)),
+        origin: JEJU,
+        radius: 10_000,
+        suppressed: false,
+      }),
+    ).toBe(true)
+  })
+
   it('첫 idle 전(bounds 없음)이거나 카메라가 아직 놓기 전(origin 없음)이면 권하지 않는다', () => {
     expect(
-      shouldOfferResearch({ bounds: null, origin: JEJU, radius: 10_000, selected: false }),
+      shouldOfferResearch({ bounds: null, origin: JEJU, radius: 10_000, suppressed: false }),
     ).toBe(false)
     expect(
       shouldOfferResearch({
         bounds: boundsAround(JEJU),
         origin: null,
         radius: 10_000,
-        selected: false,
+        suppressed: false,
       }),
     ).toBe(false)
   })
@@ -117,10 +139,72 @@ describe('shouldOfferResearch — 권하지 않을 때 (#396)', () => {
   it('반경이 값이 아니면 권하지 않는다 — 0 으로 나눈 비율에 기대지 않는다', () => {
     const bounds = boundsAround(movedNorth(JEJU, 9_000))
 
-    expect(shouldOfferResearch({ bounds, origin: JEJU, radius: 0, selected: false })).toBe(false)
-    expect(shouldOfferResearch({ bounds, origin: JEJU, radius: Number.NaN, selected: false })).toBe(
-      false,
-    )
+    expect(shouldOfferResearch({ bounds, origin: JEJU, radius: 0, suppressed: false })).toBe(false)
+    expect(
+      shouldOfferResearch({ bounds, origin: JEJU, radius: Number.NaN, suppressed: false }),
+    ).toBe(false)
+  })
+})
+
+/*
+  **확대·축소만으로도 권하는 갈래** — `originScreenRadius`.
+
+  `/places` 는 조회 반경을 화면에서 역산하므로(`boundsRadiusMeters`) 축소가 곧 "더 넓게
+  찾아 줘" 다. 중심이 한 픽셀도 안 움직여도 재조회할 이유가 생긴다.
+
+  `/emergency` 는 반경이 URL 이 소유하는 칩 값이고 재검색이 그 값을 그대로 두므로 이
+  갈래를 켜지 않는다 — 켜면 줌으로 뜬 버튼을 눌러도 조회 범위가 그대로다.
+*/
+describe('shouldOfferResearch — 확대·축소 (#396)', () => {
+  const base = boundsAround(JEJU, 0.02)
+  const screenRadius = boundsRadiusMeters(base)
+
+  it('중심이 그대로여도 화면 반경이 30% 넘게 달라지면 권한다', () => {
+    expect(
+      shouldOfferResearch({
+        bounds: boundsAround(JEJU, 0.01), // 반경 절반 — 50% 변화
+        origin: JEJU,
+        radius: screenRadius,
+        suppressed: false,
+        originScreenRadius: screenRadius,
+      }),
+    ).toBe(true)
+  })
+
+  it('한 뼘 줌은 권하지 않는다 — 중심 이동과 같은 30% 를 쓴다', () => {
+    expect(
+      shouldOfferResearch({
+        bounds: boundsAround(JEJU, 0.0244), // 22% 변화
+        origin: JEJU,
+        radius: screenRadius,
+        suppressed: false,
+        originScreenRadius: screenRadius,
+      }),
+    ).toBe(false)
+  })
+
+  /* 넘기지 않은 화면(`/emergency`)에서는 줌이 판정에 아예 들어오지 않는다 */
+  it('originScreenRadius 를 주지 않으면 줌만으로는 권하지 않는다', () => {
+    expect(
+      shouldOfferResearch({
+        bounds: boundsAround(JEJU, 0.01),
+        origin: JEJU,
+        radius: screenRadius,
+        suppressed: false,
+      }),
+    ).toBe(false)
+  })
+
+  it('화면 반경이 값이 아니면 줌 갈래를 타지 않는다 — 0 으로 나눈 비율에 기대지 않는다', () => {
+    expect(
+      shouldOfferResearch({
+        bounds: boundsAround(JEJU, 0.01),
+        origin: JEJU,
+        radius: screenRadius,
+        suppressed: false,
+        originScreenRadius: 0,
+      }),
+    ).toBe(false)
   })
 })
 
@@ -152,7 +236,7 @@ describe('프레이밍 오프셋을 사용자 이동으로 읽지 않는다 (#57
         bounds: boundsAround(placed),
         origin: placed,
         radius: RADIUS,
-        selected: false,
+        suppressed: false,
       }),
     ).toBe(false)
   })
@@ -173,7 +257,7 @@ describe('프레이밍 오프셋을 사용자 이동으로 읽지 않는다 (#57
         bounds: boundsAround(placed),
         origin: JEJU_QUERY_CENTER,
         radius: RADIUS,
-        selected: false,
+        suppressed: false,
       }),
     ).toBe(true)
   })
@@ -184,7 +268,7 @@ describe('프레이밍 오프셋을 사용자 이동으로 읽지 않는다 (#57
         bounds: boundsAround(movedNorth(placed, RADIUS * RESEARCH_OFFER_RATIO + 200)),
         origin: placed,
         radius: RADIUS,
-        selected: false,
+        suppressed: false,
       }),
     ).toBe(true)
   })

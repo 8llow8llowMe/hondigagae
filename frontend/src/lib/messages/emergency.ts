@@ -92,8 +92,6 @@ export const emergencyMessages = {
    * 이 거짓이 된다"* 였다. 그 우려는 **기준을 말하지 않을 때**만 성립한다.
    */
   basisMap: '지도 중심 기준',
-  /** 지도를 옮겼을 때 뜨는 알약 버튼 (#396) */
-  researchHere: '이 지역에서 재검색',
   basisJeju: '제주 중심 기준',
   /**
    * 권역 세그먼트로 기준점을 옮겼을 때 (#639). `{region}` 치환.
@@ -161,18 +159,6 @@ export const emergencyMessages = {
 
   /** `MapSheet` 의 접근성 이름. **`/places` 와 달라야 한다** */
   sheetLabel: '병원 · 약국 목록',
-
-  /**
-   * 행을 고른 동안의 개수 캡션. `{n}` 치환. `messages.map.visibleCount`
-   * ("지도에 보이는 {n}곳") 대신 선택 중에만 쓴다.
-   *
-   * **"지도에 보이는" 이라고 말하지 않는다.** 행을 고르면 지도가 도로 단위까지
-   * 확대된다(`SELECTED_FACILITY_MAP_LEVEL`). 그 순간 목록이 세는 영역은 선택 **직전**
-   * 에 얼려 둔 범위이지 지금 화면에 보이는 좁은 프레임이 아니다(`emergency-map-view.tsx`
-   * 의 `frozenBounds`) — "보이는" 이라고 하면 화면과 다른 걸 주장하는 거짓말이 된다.
-   * 개수 자체(목록 길이)는 얼려도 진실이므로 숫자는 그대로 두고 **주장만** 뺀다.
-   */
-  selectedCount: '목록 {n}곳',
 
   /**
    * 지도를 반경 밖으로 옮겨 영역 안이 0건일 때.
