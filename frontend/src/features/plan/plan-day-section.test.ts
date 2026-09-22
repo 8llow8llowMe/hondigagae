@@ -148,14 +148,15 @@ describe('PlanDaySection — 버튼 개수 회귀', () => {
   가 없으면 카드가 헤더 뒤로 들어간다 — 그 결함이 실제로 출고됐다.
 
   **값까지 잠근다.** `toContain('scroll-mt')` 로 두면 저장소 공통값인 20 으로 되돌려도
-  통과하는데, 이 `h2` 는 카드 위 테두리에서 `pt-5`(20) 아래라 80 으로는 카드 상단이
-  `md:h-16` 헤더와 12px 밖에 안 벌어진다.
+  통과한다. 이 `h2` 는 카드 위 테두리보다 **30px 아래**라(실측 768 · 2026-09-22) 뛴 뒤
+  카드 상단이 `scroll-mt - 30` 에 선다 — 96 이면 66 이라 `md:h-16`(64) 헤더와 2px 밖에
+  안 벌어졌다. 112 면 82 다.
 */
 describe('PlanDaySection — 앵커가 고정 헤더를 피한다 (#845)', () => {
-  it('일자 제목이 scroll-mt-24 를 갖는다', () => {
+  it('일자 제목이 scroll-mt-28 을 갖는다', () => {
     const markup = renderDaySection()
 
-    expect(markup).toMatch(/<h2 id="day1" class="[^"]*scroll-mt-24/)
+    expect(markup).toMatch(/<h2 id="day1" class="[^"]*scroll-mt-28/)
   })
 })
 
