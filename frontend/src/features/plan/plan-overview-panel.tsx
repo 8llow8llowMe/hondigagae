@@ -259,10 +259,11 @@ function PlanPetRow({ pet }: { pet: Pet }) {
  * 전에 `unjudgedTailTrimmed()` 가 뗀다. 세로 예산이 일곱인 근거는 그대로지만, 일곱 줄을
  * 채우려고 요약하지 않는 줄을 세우지는 않는다.
  *
- * **이름은 이번에 바꾸지 않았다** — 값만 바뀌었다. 다만 개명이 비싸서가 아니다: 지금 이
- * export 를 참조하는 곳은 `plan-detail.test.ts` 하나뿐이라 런타임 소비처가 없다.
+ * **`STRIP` 이던 이름을 `TOC` 로 바꿨다** (#850). #732 가 이 목록을 가로 한 줄(strip)로
+ * 접었을 때 붙은 이름인데 #841 이 세로 목록(`nav` + `ul`)으로 되돌려, 이 값이 세는 것은
+ * 목차 줄 수다. 같은 파일의 `PLAN_VERDICT_TOC_TITLE_ID` 와 접두어가 맞는다.
  */
-export const PLAN_VERDICT_STRIP_MAX_DAYS = 7
+export const PLAN_VERDICT_TOC_MAX_DAYS = 7
 
 /**
  * 꼬리의 연속 `판정 없음` 을 뗀 목록 (#847).
@@ -322,7 +323,7 @@ const PLAN_VERDICT_TOC_TITLE_ID = 'plan-verdict-toc-title'
 function PlanVerdictToc({ verdicts }: { verdicts: PlanDayWeatherItem[] }) {
   if (verdicts.length === 0) return null
 
-  const shown = unjudgedTailTrimmed(verdicts).slice(0, PLAN_VERDICT_STRIP_MAX_DAYS)
+  const shown = unjudgedTailTrimmed(verdicts).slice(0, PLAN_VERDICT_TOC_MAX_DAYS)
   const hidden = verdicts.length - shown.length
 
   /*
