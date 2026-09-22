@@ -255,10 +255,39 @@ function PlanPetRow({ pet }: { pet: Pet }) {
  * 쓴다. **여행은 최대 30일이다** (`PLAN_PERIOD_MAX_DAYS`) — 넘치는 일자는 개수로만
  * 말하고 판정 자체는 아래 일자 카드가 그대로 갖는다.
  *
+ * **이 상한이 세는 것은 판정이 있는 일자다** (#847) — 꼬리의 `판정 없음` 은 줄을 쓰기
+ * 전에 `unjudgedTailTrimmed()` 가 뗀다. 세로 예산이 일곱인 근거는 그대로지만, 일곱 줄을
+ * 채우려고 요약하지 않는 줄을 세우지는 않는다.
+ *
  * **이름은 이번에 바꾸지 않았다** — 값만 바뀌었다. 다만 개명이 비싸서가 아니다: 지금 이
  * export 를 참조하는 곳은 `plan-detail.test.ts` 하나뿐이라 런타임 소비처가 없다.
  */
 export const PLAN_VERDICT_STRIP_MAX_DAYS = 7
+
+/**
+ * 꼬리의 연속 `판정 없음` 을 뗀 목록 (#847).
+ *
+ * ## 왜 꼬리만인가
+ *
+ * 목차는 **"목차이면서 요약"** 이다 (D18-2). 꼬리의 `판정 없음` 은 둘 다 아니다 — 요약할
+ * 판정이 없고, 앵커로 가 봐야 일자 카드도 같은 사유 문장 하나를 낸다. 그 줄들은 `외 N일`
+ * 이 개수로 말하는 편이 짧고 정확하다.
+ *
+ * **앞·중간의 `판정 없음` 은 남긴다.** 거기서는 그것이 **그 날의 사실**이다 — 판정이 난
+ * 날 사이에 낀 하루가 비어 있다는 것은 요약이 말해야 할 내용이고, 떼면 목차가 일자를
+ * 건너뛰어 "2일차는 어디 갔나" 가 된다.
+ *
+ * **날짜로 예보 지평선을 계산하지 않는다.** 지평선은 서버 상수이고 화면이 베껴 쓰지 않는
+ * 것이 정본 규칙이다 (`일정상세-세부명세.md` D15-3). 게다가 `suitabilityLevel === null`
+ * 은 지평선 밖(`BEYOND_FORECAST_RANGE`) 하나가 아니라 `PAST_DATE` · `NO_PLACE_ITEM` 에서도
+ * 온다 — 판정 유무로 세면 사유를 묻지 않고 넷 다 맞는다.
+ */
+function unjudgedTailTrimmed(verdicts: PlanDayWeatherItem[]): PlanDayWeatherItem[] {
+  let end = verdicts.length
+  while (end > 0 && verdicts[end - 1]!.suitabilityLevel === null) end -= 1
+
+  return verdicts.slice(0, end)
+}
 
 /**
  * 목차 섹션 머리의 `id` — `nav aria-labelledby` 가 가리킨다.
@@ -293,8 +322,29 @@ const PLAN_VERDICT_TOC_TITLE_ID = 'plan-verdict-toc-title'
 function PlanVerdictToc({ verdicts }: { verdicts: PlanDayWeatherItem[] }) {
   if (verdicts.length === 0) return null
 
-  const shown = verdicts.slice(0, PLAN_VERDICT_STRIP_MAX_DAYS)
+  const shown = unjudgedTailTrimmed(verdicts).slice(0, PLAN_VERDICT_STRIP_MAX_DAYS)
   const hidden = verdicts.length - shown.length
+
+  /*
+    세울 줄이 하나도 없으면 목차가 아니라 한 문장이다 (#847).
+
+    **`nav` 를 내고 `ul` 만 비우지 않는다** — 링크가 없는 랜드마크는 링크 목록에도 로터에도
+    잡히지 않으면서 이름만 차지한다. 구획 자체는 남긴다: 섹션 머리를 지우면 목차가 조용히
+    사라져 "여기 있던 요약이 어디 갔나" 가 되고, 남기면 **요약할 것이 없다는 사실**을
+    요약이 말한다.
+
+    **`판정 없음` 줄을 일곱 개 세우는 것보다 짧다** — 353px 이 두 줄로 줄어든다 (D18-2).
+  */
+  if (shown.length === 0) {
+    return (
+      <div className="border-border border-t pt-4">
+        <p className="text-caption text-fg-muted mb-1 font-medium">
+          {messages.plan.verdictTocTitle}
+        </p>
+        <p className="text-body-2 text-fg-muted">{messages.plan.verdictTocAllUnavailable}</p>
+      </div>
+    )
+  }
 
   return (
     <nav aria-labelledby={PLAN_VERDICT_TOC_TITLE_ID} className="border-border border-t pt-4">
