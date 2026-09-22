@@ -126,3 +126,61 @@ describe('WalkTimesSection 이동 — 홈 마크업은 그대로다 (S6-3)', () 
     expect(usage).not.toContain('retryLabel')
   })
 })
+
+/*
+  #826. **진입점 하나(홈 배너)는 그대로 두고, 나가는 길을 하나 만들었다.**
+
+  이 화면은 들어오는 길이 배너뿐이고 나가는 길이 `코스 목록으로` 뿐이라 서비스 안에서
+  막다른 길이었다. 전역 nav 에 넣지 않기로 한 S6-1 은 그대로다 — 그 결정이 "코스 화면을
+  고립시킨다" 까지 뜻하지는 않았다.
+*/
+describe('나가는 길 — 시작점 근처 장소 (S6-1 · #826)', () => {
+  const detailSection = stripComments(
+    readSource('src/features/walk-course/walk-course-detail-section.tsx'),
+  )
+  const detailView = stripComments(
+    readSource('src/features/walk-course/walk-course-detail-view.tsx'),
+  )
+
+  it('상세가 근처 장소 섹션을 세운다', () => {
+    expect(detailSection).toContain('<WalkCourseNearbyPlaces')
+  })
+
+  /**
+   * **출처 각주보다 위다.** 각주는 문서 끝이고, 그 아래에 링크를 두면 페이지가 끝난 뒤에
+   * 다시 시작하는 모양이 된다. 마크업 순서로 잰다 — 클래스만 보면 순서가 바뀌어도 초록이다.
+   */
+  it('출처 각주보다 먼저 온다', () => {
+    const nearbyAt = detailSection.indexOf('<WalkCourseNearbyPlaces')
+    const sourceAt = detailSection.indexOf('<WalkCourseSourceLine')
+
+    expect(nearbyAt).toBeGreaterThanOrEqual(0)
+    expect(sourceAt).toBeGreaterThanOrEqual(0)
+    expect(nearbyAt).toBeLessThan(sourceAt)
+  })
+
+  /**
+   * **골든타임과 같은 좌표에 걸린다.** 코스가 가진 좌표는 시작점 하나뿐이라(`endLat` 은
+   * dev 값이 0/29 다) 좌표가 없으면 두 조회가 함께 꺼진다 — 한쪽만 켜지면 화면이 없는
+   * 근거로 말하게 된다.
+   */
+  it('좌표가 없으면 조회하지 않는다', () => {
+    expect(detailView).toContain('position !== null')
+  })
+
+  /**
+   * **전체 보기 링크를 달지 않는다.** `/places` 는 URL 로 지도 중심을 받지 못해
+   * (`lib/url/place-filters.ts` 에 `lat`/`lng` 가 없다) 시작점과 무관한 제주 전체 목록으로
+   * 떨어진다 — 누른 것과 닿는 곳이 어긋난다(#810 이 배너에서 잡은 것과 같은 종류).
+   * `place-filters.ts` 에 좌표 축이 생기면 이 단언을 걷고 링크를 단다.
+   */
+  it('장소 목록 화면으로 보내지 않는다', () => {
+    expect(detailSection).not.toContain('href="/places"')
+  })
+
+  /** 진입점은 여전히 배너 하나다 — 이 이슈가 늘린 것은 *나가는* 길이다 */
+  it('전역 nav 는 그대로다', () => {
+    expect(DESKTOP_NAV_ITEMS.map((item) => item.href)).not.toContain('/olle')
+    expect(MOBILE_TAB_ITEMS).toHaveLength(4)
+  })
+})

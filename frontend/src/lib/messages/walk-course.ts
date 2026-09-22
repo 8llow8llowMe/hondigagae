@@ -264,6 +264,14 @@ export const walkCourseMessages = {
    */
   startMapHeading: '코스 시작점',
   /**
+   * 시작점 근처 장소 카드의 제목 ([#826](https://github.com/8llow8llowMe/hondigagae/issues/826)).
+   *
+   * **`근처 장소` 가 아니라 `시작점 근처` 다.** 코스는 15km 를 걷는 선인데 우리가 아는
+   * 좌표는 시작점 하나뿐이다 — `코스 근처` 라고 쓰면 종점 쪽 장소도 들어 있다고 약속하게
+   * 된다. 경로 좌표열은 계약에 없다 (인계 명세 §2-3).
+   */
+  nearbyPlacesHeading: '시작점 근처 가볼 만한 곳',
+  /**
    * 상세 브레드크럼 `<nav>` 의 접근 이름. **장소 상세와 같은 문자열을 쓴다**
    * (`messages.place.detailBreadcrumbLabel`) — 같은 일을 하는 자리가 화면마다 다른
    * 이름으로 들리면 보조기기 사용자가 둘을 다른 것으로 읽는다.

@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/skeleton'
 import { SurfaceStack } from '@/components/surface'
 import { WalkCourseAddAction } from '@/features/walk-course/walk-course-add-action'
 import { WalkCourseGoldenSlot } from '@/features/walk-course/walk-course-golden-slot'
+import { WalkCourseNearbyPlaces } from '@/features/walk-course/walk-course-nearby-places'
 import { WalkCourseStartMap } from '@/features/walk-course/walk-course-start-map'
 import {
   WalkCourseHero,
@@ -23,6 +24,7 @@ import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { WalkTimesResponse } from '@/types/insight'
+import type { NearbyPlaceItem } from '@/types/place'
 import type { WalkCourseDetail } from '@/types/walk-course'
 
 export type WalkCourseDetailSectionProps = {
@@ -36,6 +38,14 @@ export type WalkCourseDetailSectionProps = {
   walkTimes: WalkTimesResponse | null
   walkTimesLoading: boolean
   onWalkTimesRetry: () => void
+  /**
+   * 시작점 근처 장소 ([#826](https://github.com/8llow8llowMe/hondigagae/issues/826)).
+   *
+   * **0건 · 좌표 없음 · 조회 실패가 모두 빈 배열로 온다.** 호출부가 셋을 가르지 않는 이유는
+   * 화면이 셋에 같은 답(섹션을 만들지 않는다)을 하기 때문이다 — 가르면 여기서 다시 합쳐야 한다.
+   */
+  nearbyPlaces: NearbyPlaceItem[]
+  nearbyPlacesLoading: boolean
   /** `일정에 담기` 진입이 미로그인이면 로그인으로 보낸다 (#620 · D4-1) */
   authed: boolean
   /**
@@ -86,6 +96,8 @@ export function WalkCourseDetailSection({
   walkTimes,
   walkTimesLoading,
   onWalkTimesRetry,
+  nearbyPlaces,
+  nearbyPlacesLoading,
   authed,
   petRegistered,
   backHref = '/olle',
@@ -254,6 +266,18 @@ export function WalkCourseDetailSection({
         */}
         <WalkCourseStartMap course={course} />
       </div>
+
+      {/*
+        **나가는 길이다** ([#826](https://github.com/8llow8llowMe/hondigagae/issues/826)).
+
+        **그리드 밖 전폭이다.** 안에 넣으면 좌측 열(사진·시작점 지도)에 딸린 보조 자료로
+        읽히는데, 이것은 이 페이지를 다 읽은 뒤의 **다음 행동** 제안이다. 모바일에서는
+        어차피 시작점 지도 바로 다음에 온다.
+
+        **출처 각주보다는 위다.** 각주는 문서 끝이고, 그 아래에 링크를 두면 페이지가 끝난
+        뒤에 다시 시작하는 모양이 된다.
+      */}
+      <WalkCourseNearbyPlaces places={nearbyPlaces} loading={nearbyPlacesLoading} />
 
       {/*
         **출처는 CTA 아래다** (#730). 바로 위에 있던 동안에는 버튼에 딸린 설명처럼 읽혔다 —
