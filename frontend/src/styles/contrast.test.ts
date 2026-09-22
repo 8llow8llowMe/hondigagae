@@ -65,6 +65,28 @@ describe('토큰 대비 — tint 배경 위 텍스트는 -700 을 쓴다 (AA 4.5
     expect(text).toBeGreaterThan(mark)
   })
 
+  /**
+   * **밴드 안 본문은 `-700` 이 아니다** (#842).
+   *
+   * 위 단언들은 tint 위 **등급 텍스트**(`-700`)를 본다. 그런데 일자 판정 밴드가 tint 면을
+   * 넓게 깔면서 그 위에 서게 된 글자는 등급어가 아니라 **평범한 본문**이다 — 근거 문장
+   * (`ReasonList` 의 `--fg` / 정보성 `--fg-muted`), 체감온도 라벨(`--fg-muted`), 기준
+   * 반려견 줄(`--fg-muted`). 그 짝은 이 파일에 단언이 없었다.
+   *
+   * **`--fg-muted` 가 기준선이다** — 셋 중 가장 밝고, 정보성 근거가 그 색으로 내려간다.
+   * 실측(2026-09-22): high 5.43 · mid 5.82 · low 5.57 · critical 5.56 · unknown(`--band`)
+   * 5.57. `--fg` 는 같은 면에서 15.20~16.29 라 여유가 크다.
+   */
+  it.each([...cases, ['unknown', '판정 없음'] as [string, string]])(
+    'metric-%s tint 위에서 본문 `--fg-muted` 가 4.5:1 이상이다',
+    (tone) => {
+      const surface = tone === 'unknown' ? token('--band') : token(`--metric-${tone}-100`)
+
+      expect(contrastRatio(token('--fg-muted'), surface)).toBeGreaterThanOrEqual(4.5)
+      expect(contrastRatio(token('--fg'), surface)).toBeGreaterThanOrEqual(4.5)
+    },
+  )
+
   it('AI 표시 텍스트가 accent tint 위에서 4.5:1 이상이다', () => {
     expect(contrastRatio(token('--accent-700'), token('--accent-100'))).toBeGreaterThanOrEqual(4.5)
   })
