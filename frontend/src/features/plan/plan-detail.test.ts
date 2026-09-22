@@ -417,6 +417,11 @@ function renderOverview(overrides = {}) {
   )
 }
 
+/** 일자 `1..days` 판정 목록. 상한·줄 수를 세는 단언이 쓴다 */
+function verdictsOf(days: number) {
+  return Array.from({ length: days }, (_, index) => ({ ...planVerdict, day: index + 1 }))
+}
+
 describe('PlanOverviewPanel', () => {
   it('반려견 조회가 실패하면 카드만 빠지고 나머지는 그대로다', () => {
     const markup = renderOverview({ companions: [] })
@@ -496,10 +501,24 @@ describe('PlanOverviewPanel', () => {
     이 섹션 라벨이 없다 (`plan-day-verdict.tsx`).
   */
   it('목차 배지는 축 라벨을 반복하지 않는다 — 섹션 머리가 그 자리를 갖는다', () => {
+    const markup = renderOverview({ verdicts: verdictsOf(3) })
+
+    /* 카드 전체에서 `적합도` 가 딱 한 번 — 섹션 머리다. 배지 셋에는 없다 */
+    expect(markup.split(messages.common.metricAxisSuitability)).toHaveLength(2)
+    expect(markup).toContain(messages.plan.verdictTocTitle)
+    expect(markup).toContain(`>${planVerdict.suitabilityLevel?.name}</span>`)
+  })
+
+  /*
+    #841. 보이는 제목이 생겼으므로 `nav` 의 이름은 그 문단을 가리킨다 — `aria-label` 을
+    그대로 두면 랜드마크 진입 시 이름으로 한 번 · 문단으로 또 한 번 읽힌다.
+  */
+  it('목차의 이름이 보이는 제목을 가리킨다 — 같은 문구를 두 번 읽지 않는다', () => {
     const markup = renderOverview()
 
-    expect(markup).not.toContain(messages.common.metricAxisSuitability)
-    expect(markup).toContain(`>${planVerdict.suitabilityLevel?.name}</span>`)
+    expect(markup).toContain('aria-labelledby="plan-verdict-toc-title"')
+    expect(markup).toContain('id="plan-verdict-toc-title"')
+    expect(markup).not.toContain(`aria-label="${messages.plan.verdictTocTitle}"`)
   })
 
   /* 앵커라는 신호가 없어 누르는 것인 줄 몰랐다 (#841). 꺾쇠는 장식이라 이름을 갖지 않는다 */
@@ -573,10 +592,6 @@ describe('PlanOverviewPanel', () => {
  * 만들지 않고 개요 카드 안에 두면 모든 폭에서 선다.
  */
 describe('PlanOverviewPanel — 일자별 판정 목차 (#732 · #841)', () => {
-  function verdictsOf(days: number) {
-    return Array.from({ length: days }, (_, index) => ({ ...planVerdict, day: index + 1 }))
-  }
-
   /* 구획 2(상태)가 구획 3(목차) 위다 — 언제 떠나는지를 먼저 읽고 어느 날이 좋은지를 본다 */
   it('D-day 가 목차보다 먼저 온다', () => {
     const markup = renderOverview()
@@ -621,9 +636,14 @@ describe('PlanOverviewPanel — 일자별 판정 목차 (#732 · #841)', () => {
     expect(markup).not.toContain('외 ')
   })
 
-  /* 세로로 돌아와도 줄당 44px 은 그대로다 (D6) — 목차 줄이 처음부터 갖고 있던 값이다 */
-  it('각 줄이 44px 터치 영역을 갖는다', () => {
-    expect(renderOverview()).toContain('min-h-11')
+  /*
+    세로로 돌아와도 줄당 44px 은 그대로다 (D6) — 목차 줄이 처음부터 갖고 있던 값이다.
+    **개수를 센다** — `toContain` 은 어느 한 줄에만 있어도 통과해서 "각 줄" 을 증명하지 못한다.
+  */
+  it('표시되는 모든 줄이 44px 터치 영역을 갖는다', () => {
+    const markup = renderOverview({ verdicts: verdictsOf(3) })
+
+    expect(markup.split('min-h-11')).toHaveLength(3 + 1)
   })
 })
 
