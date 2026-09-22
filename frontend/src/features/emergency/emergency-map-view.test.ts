@@ -3,45 +3,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import {
-  isSelectionStillValid,
-  PositionNotice,
-  visibleCountLabel,
-} from '@/features/emergency/emergency-map-view'
+import { isSelectionStillValid, PositionNotice } from '@/features/emergency/emergency-map-view'
 import type { PositionFailure, PositionResult } from '@/lib/geo/current-position'
 import { messages } from '@/lib/messages'
 import { facility } from '@/test/fixtures/emergency'
-
-describe('visibleCountLabel', () => {
-  it('선택되지 않았을 때는 messages.map.visibleCount 를 쓴다 — "지도에 보이는" 이 참인 상태다', () => {
-    expect(visibleCountLabel(12, false)).toBe(messages.map.visibleCount.replace('{n}', '12'))
-  })
-
-  it('선택 중일 때는 messages.emergency.selectedCount 를 쓴다 — 지도 프레임과 목록이 어긋난 뒤라 "보이는" 이라고 말하지 않는다', () => {
-    expect(visibleCountLabel(12, true)).toBe(messages.emergency.selectedCount.replace('{n}', '12'))
-  })
-
-  it('개수 자체는 선택 여부와 무관하게 그대로 진실이다', () => {
-    const unselected = visibleCountLabel(4, false)
-    const selected = visibleCountLabel(4, true)
-
-    expect(unselected).toContain('4')
-    expect(selected).toContain('4')
-    // 문구가 다르다는 것도 함께 고정한다 — 같으면 B1 회귀다
-    expect(unselected).not.toBe(selected)
-  })
-
-  it('해제됐지만 bounds 가 아직 stale 인 상태도 같은 두 번째 인자로 표현된다 — "지도에 보이는" 을 쓰지 않는다', () => {
-    // `EmergencyMapView` 는 `selectedId !== null || boundsStale` 를 이 함수의
-    // 두 번째 인자로 넘긴다. 이 함수 입장에서는 "선택 중"과 "해제됐지만 stale"을
-    // 구분하지 않는다 — 둘 다 지도 프레임에 대한 주장을 하면 안 되는 상태라
-    // 같은 `true` 로 들어오고, 같은 문구("목록 {n}곳")를 낸다.
-    const deselectedButStale = visibleCountLabel(136, true)
-
-    expect(deselectedButStale).toBe(messages.emergency.selectedCount.replace('{n}', '136'))
-    expect(deselectedButStale).not.toBe(messages.map.visibleCount.replace('{n}', '136'))
-  })
-})
 
 describe('isSelectionStillValid', () => {
   const granted: PositionResult = { kind: 'granted', lat: 33.48, lng: 126.49 }

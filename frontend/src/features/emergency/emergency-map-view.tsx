@@ -25,15 +25,16 @@ import {
   reliefs,
 } from '@/features/emergency/facility-filters'
 import { PositionFallbackHead } from '@/features/emergency/position-fallback-head'
-import { shouldOfferResearch } from '@/features/emergency/research-offer'
 import { useEmergencyBoard } from '@/features/emergency/use-emergency-board'
 import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
 import { formatDistance } from '@/lib/format/distance'
 import { type LatLng, SELECTED_FACILITY_MAP_LEVEL, toLatLng } from '@/lib/geo/coord'
 import type { PositionResult } from '@/lib/geo/current-position'
+import { shouldOfferResearch } from '@/lib/map/research-offer'
 import type { MapSdkFailure } from '@/lib/map/sdk'
 import { boundsCenter, isWithinBounds, type MapBounds } from '@/lib/map/viewport'
+import { visibleCountLabel } from '@/lib/map/visible-count'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -83,28 +84,30 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
   /*
     선택 순간의 `bounds` 를 얼려 둔다 (B1).
 
-    **선택하면 지도가 `SELECTED_FACILITY_MAP_LEVEL`(4)까지 확대된다** — 그런데 그
-    확대는 `setLevel(animate) + panTo` 로 이루어지고, 카카오 SDK 가 이 애니메이션
-    이동에서는 쓸 만한 `idle` 을 내지 않는다(브라우저 실측 — 10초를 기다려도 `onIdle`
-    이 다시 안 온다). 그래서 `bounds` 자체는 지금도 바뀌지 않고 목록이 살아남는다.
+    **선택하면 지도가 `SELECTED_FACILITY_MAP_LEVEL`(4)까지 확대된다** — `setLevel(animate)
+    + panTo` 로. 예전 관찰은 *"카카오 SDK 가 이 애니메이션 이동에서는 쓸 만한 `idle` 을
+    내지 않는다(10초를 기다려도 `onIdle` 이 다시 안 온다)"* 였고, 그래서 `bounds` 가
+    안 바뀌어 목록이 저절로 살아남았다.
 
-    **그 "안 바뀜" 에 기대면 안 된다.** 그것은 SDK 타이밍의 사고이지 우리가 만든
-    규칙이 아니다 — 다음 SDK 버전이 그 애니메이션에서도 `idle` 을 내는 순간, 좁아진
-    레벨 4 영역으로 `bounds` 가 실제로 갱신되고 목록이 4곳 안팎으로 줄어 다음 행을
-    이어 누를 수 없게 된다(반경 10km 에 136곳 — `docs/.../emergency-map-unification-design.md`
-    §4). 그래서 **선택이 살아 있는 동안 쓸 `inBounds` 를 선택 시점의 값으로 명시적으로
-    고정한다.** 수동 드래그는 여전히 `bounds` 를 갱신하고(§5-2), 선택을 풀면
-    `frozenBounds` 도 함께 비운다.
+    **그 "안 바뀜" 에 기대지 말라고 적어 둔 것이 맞았다.** 2026-09-23 브라우저 실측에서
+    **카카오는 이 애니메이션 이동에서도 `idle` 을 낸다** — `bounds` 가 좁아진 레벨 4
+    영역으로 실제로 갱신된다. 그래서 이 상태가 없으면 목록이 4곳 안팎으로 줄어 다음
+    행을 이어 누를 수 없다(반경 10km 에 136곳 —
+    `docs/.../emergency-map-unification-design.md` §4). **선택이 살아 있는 동안 쓸
+    `inBounds` 를 선택 시점의 값으로 명시적으로 고정한다** — 이제는 예방이 아니라
+    실제로 그 일을 막고 있는 코드다. 수동 드래그는 여전히 `bounds` 를 갱신하고(§5-2),
+    선택을 풀면 `frozenBounds` 도 함께 비운다.
   */
   const [frozenBounds, setFrozenBounds] = useState<MapBounds | null>(null)
   /*
     `bounds` 가 지금 실제 지도 프레임과 맞는지 (B1 후속).
 
-    선택 시 `MapCanvas` 가 `setLevel(animate) + panTo` 로 레벨 4 까지 확대하는데,
-    카카오 SDK 는 이 애니메이션 이동에서 `idle` 을 내지 않는다(위 `frozenBounds`
-    설명과 같은 관찰) — 그래서 `bounds` 자체가 그 확대된 프레임을 반영하도록
-    갱신되지 않는다. `frozenBounds` 는 선택이 풀리면 비워지지만, 그렇다고 `bounds`
-    가 갑자기 최신이 되는 것은 아니다: 지도는 여전히 확대된 채로 남아 있고
+    선택 시 `MapCanvas` 가 `setLevel(animate) + panTo` 로 레벨 4 까지 확대한다.
+    그 이동이 `idle` 을 내기까지 **한 박자가 빈다** — 그동안 `bounds` 는 확대 전
+    프레임 그대로다 (예전 관찰은 그 `idle` 이 아예 안 온다는 것이었는데, 2026-09-23
+    실측에서는 온다. 위 `frozenBounds` 설명 참고 — 어느 쪽이든 "아직 못 잰 구간" 이
+    있다는 사실은 같다). `frozenBounds` 는 선택이 풀리면 비워지지만, 그렇다고
+    `bounds` 가 갑자기 최신이 되는 것은 아니다: 지도는 여전히 확대된 채로 남아 있고
     (`MapCanvas` 는 `selectedId` 가 `null` 이 돼도 되돌아가지 않는다 — 그 효과는
     `selectedId === null` 이면 그냥 return 한다), 실제 팬/줌이 일어나 `onIdle` 이
     다시 올 때까지 `bounds` 는 선택 이전 값 그대로다. 그 상태에서 캡션이 "지도에
@@ -394,14 +397,53 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
   const basisLine = emergencyBasisLabel(board.basis, board.regionCode)
 
   /*
+    **고른 시설의 좌표** — 고른 동안 재검색 판정의 기준점이 된다 (바로 아래).
+
+    `visible` 에서 찾는다: 선택이 살아 있는 한 그 행은 `frozenBounds` 덕분에 목록에
+    남아 있고, 사라지면 해제 effect 가 선택을 놓아준다(위 `isSelectionStillValid`).
+    좌표가 없는 시설이면 `null` 이다 — 그런 시설은 핀이 없어 카메라도 움직이지 않으므로
+    기준점을 바꿀 이유가 없다.
+  */
+  const selectedCoord = useMemo(() => {
+    if (selectedId === null) return null
+
+    const entry = visible.find((item) => item.facilityId === selectedId)
+    return entry === undefined ? null : toLatLng(entry)
+  }, [selectedId, visible])
+
+  /*
     조회한 자리에서 충분히 벗어났을 때만 재검색을 권한다 (#396). 판정은
     `shouldOfferResearch` 순수 함수가 갖는다 — 임계값이 반경에 비례한다.
+
+    **고른 동안에는 기준점이 "그 핀" 이다.** 예전에는 `selected: selectedId !== null`
+    로 아예 막았고, 그래서 시설을 고른 뒤에는 **사용자가 지도를 직접 끌어도** 버튼이
+    뜨지 않았다 — 한 곳을 보다가 옆 동네를 확인하려면 선택부터 풀어야 했다.
+
+    그렇다고 `cameraCenter` 로만 재면 반대로 **고르자마자** 버튼이 뜬다: 선택은 지도를
+    `SELECTED_FACILITY_MAP_LEVEL` 까지 확대하며 그 핀으로 옮기는데, 그 이동은 사용자가
+    "다른 지역을 보겠다" 고 한 것이 아니라 우리가 한 일이다 (브라우저 실측 — 카카오는
+    이 애니메이션 이동에서도 `idle` 을 내므로 `bounds` 가 실제로 그 좁은 프레임으로
+    갱신된다. 위 `frozenBounds`·`boundsStale` doc-comment 가 "쓸 만한 `idle` 을 내지
+    않는다" 고 적어 둔 관찰은 **더 이상 기대면 안 되는 것**이 됐다).
+
+    **우리가 옮겨 놓은 자리를 기준으로 삼으면 두 요구가 동시에 만족된다** — 고른 직후에는
+    지도 중심이 곧 그 핀이라 이동량이 0 이라 뜨지 않고, 거기서 사용자가 반경의 30% 를
+    넘게 끌면 고른 상태 그대로 뜬다. `/places` 는 반대로 선택에도 버튼을 띄우는데
+    (사용자 결정), 그 화면은 선택이 목록을 흔들지 않아 "여기를 다시 찾자" 가 늘 참이다.
+
+    `suppressed` 는 그대로 `boundsStale` 이다 — 선택 직후 아직 `idle` 이 오지 않아
+    `bounds` 가 옛 프레임인 구간을 막는다. 위 관찰이 다시 뒤집혀 `idle` 이 아예 오지
+    않게 되어도 이 조합은 그대로 맞는다.
+
+    **확대·축소 갈래(`originScreenRadius`)는 켜지 않는다.** 이 화면의 반경은 URL 이
+    소유하는 칩 값이고 재검색은 그것을 그대로 두므로, 줌으로 뜬 버튼을 눌러도 조회
+    범위가 안 바뀐다 — `/places` 만 그 갈래를 쓴다 (`research-offer.ts`).
   */
   const offerResearch = shouldOfferResearch({
     bounds,
-    origin: cameraCenter,
+    origin: selectedCoord ?? cameraCenter,
     radius: board.radius,
-    selected: selectedId !== null,
+    suppressed: boundsStale,
   })
 
   const body = (
@@ -470,7 +512,7 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
             className="text-body-2 bg-bg text-fg border-border hover:bg-band focus-visible:ring-brand-500 inline-flex h-11 max-w-full items-center gap-2 rounded-full border px-5 font-semibold whitespace-nowrap shadow-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
           >
             <SearchIcon size={16} />
-            {messages.emergency.researchHere}
+            {messages.map.researchHere}
           </button>
         </div>
       )}
@@ -786,25 +828,6 @@ export function PositionNotice({
       )}
     </p>
   )
-}
-
-/**
- * 캡션의 개수 라벨 (B1 + 후속 stale 수정). `hideViewportClaim` 이 `true` 면
- * `messages.map.visibleCount`("지도에 보이는 {n}곳") 대신
- * `messages.emergency.selectedCount`("목록 {n}곳") 를 쓴다.
- *
- * **"지도에 보이는" 이라고 말하면 안 되는 상태가 둘이다** — 선택 중(지도가 확대돼
- * 실제 프레임과 `frozenBounds` 가 어긋난다), 그리고 선택이 풀렸어도 `bounds` 가
- * 아직 그 확대를 못 따라잡은 stale 상태(해제는 지도를 움직이지 않으므로 stale 이
- * 저절로 풀리지 않는다 — `emergency-map-view.tsx` 의 `boundsStale` 설명 참고).
- * 두 상태 모두 "목록 {n}곳" 을 새로 만들지 않고 재사용한다 — 이 문구 자체가 이미
- * "지도 프레임에 대한 주장이 없는 중립적 표현" 이라 두 상태 모두에 그대로 맞는다.
- * 개수 자체(목록 길이)는 두 상태 모두에서 참이라 숫자는 그대로 두고 문구만
- * 바꾼다 — 순수 함수라 `emergency-map-view.test.ts` 가 문자열로 고정한다.
- */
-export function visibleCountLabel(count: number, hideViewportClaim: boolean): string {
-  const template = hideViewportClaim ? messages.emergency.selectedCount : messages.map.visibleCount
-  return template.replace('{n}', String(count))
 }
 
 /**

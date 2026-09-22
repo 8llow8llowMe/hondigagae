@@ -40,6 +40,21 @@ export const mapMessages = {
    */
   visibleCount: '지도에 보이는 {n}곳',
   /**
+   * `{n}` 치환 — **지도 프레임을 주장하지 않는** 중립 개수. `visibleCount` 대신 쓴다.
+   *
+   * **"지도에 보이는" 이라고 말하면 안 되는 상태가 두 화면에 다 있다.**
+   *  - `/emergency`: 행을 고르면 지도가 도로 단위까지 확대되는데(`SELECTED_FACILITY_MAP_LEVEL`)
+   *    목록이 세는 영역은 선택 **직전**에 얼려 둔 범위다 (`emergency-map-view.tsx` 의
+   *    `frozenBounds`·`boundsStale`).
+   *  - `/places`: 목록이 **마지막으로 조회한 영역**을 센다. 지도를 옮겨도 재검색을
+   *    누르기 전까지 목록이 바뀌지 않으므로(#396 의 규칙을 이 화면에도 들였다), 옮긴
+   *    뒤에는 화면과 다른 걸 주장하게 된다.
+   *
+   * 개수 자체(목록 길이)는 어느 쪽에서도 진실이라 숫자는 그대로 두고 **주장만** 뺀다.
+   * 예전에는 `messages.emergency.selectedCount` 였다 — 한 화면 것이 아니게 되어 올렸다.
+   */
+  listCount: '목록 {n}곳',
+  /**
    * `{n}` 치환 — 묶음 마커의 **접근성 이름**이다. 누르면 그 구역으로 확대한다.
    *
    * **눈에 보이는 글자가 아니다** (#655). 마커는 지름 32 원 안에 숫자만 쓰고
@@ -55,6 +70,15 @@ export const mapMessages = {
 
   /** 지도를 현재 위치로 옮긴다. **제주 안일 때만 버튼이 있다** */
   myLocation: '내 위치로 이동',
+
+  /**
+   * 지도를 옮겼을 때 하단 중앙에 뜨는 알약 버튼 (#396).
+   *
+   * **두 지도 화면이 같이 쓴다.** 어느 쪽도 지도를 옮겼다고 스스로 재조회하지 않고
+   * (`lib/map/research-offer.ts` 가 권할 때를 가른다), 재조회는 이 버튼을 눌러야
+   * 일어난다. 예전에는 `messages.emergency.researchHere` 였다.
+   */
+  researchHere: '이 지역에서 재검색',
 
   collapsePanel: '목록 패널 접기',
   expandPanel: '목록 패널 펼치기',
