@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { Badge } from '@/components/badge'
-import { Button } from '@/components/button'
+import { Button, type ButtonVariant } from '@/components/button'
 import { Checkbox } from '@/components/checkbox'
 import { ErrorState } from '@/components/error-state'
 import { Field } from '@/components/field'
@@ -56,15 +56,9 @@ import type { PlanPackingDetailItem, PlanPackingListResponse } from '@/types/pla
 export function PlanPackingList({
   planId,
   preview = false,
-  petName,
 }: {
   planId: string
   preview?: boolean
-  /**
-   * 빈 상태 안내 문장에 들어갈 대표 동행견 이름 (#841). 호출부가 이미 든 `companions` 에서
-   * 만들어 내려 준다 — **여기서 다시 조회하지 않는다.**
-   */
-  petName: string | null
 }) {
   const queryClient = useQueryClient()
   const key = planKeys.packing(planId)
@@ -146,7 +140,6 @@ export function PlanPackingList({
       adding={add.isPending}
       addError={add.isError ? packingAddErrorMessage(add.error) : null}
       actionError={actionError}
-      petName={petName}
     />
   )
 }
@@ -186,13 +179,6 @@ export type PackingListPanelProps = {
   addError: string | null
   /** 체크·삭제 실패 문구 */
   actionError: string | null
-  /**
-   * 빈 상태 안내 문장의 `{petName}` 자리 — 대표 동행견 이름 (#841).
-   *
-   * **`null` 이면 `packingIntroFallbackPet`('반려견')으로 떨어진다.** 동행견 조회가
-   * 실패했거나 아이가 삭제됐을 때라 **이름을 지어내지 않는다.**
-   */
-  petName: string | null
 }
 
 /**
@@ -296,19 +282,19 @@ function Pending() {
 
 /** 아직 만든 적 없다 — `generatedAt` 이 null 인 갈래 하나뿐이다 */
 function Intro(props: PackingListPanelProps) {
-  const { generateFailed, onGenerate, petName } = props
-  const intro = messages.plan.packingIntro.replace(
-    '{petName}',
-    petName ?? messages.plan.packingIntroFallbackPet,
-  )
+  const { generateFailed, onGenerate } = props
 
   /*
     AI 를 부르기 전에도 직접 적어 둘 수 있다 — 그 항목은 생성·재생성에도 남는다.
 
     **생성 실패 갈래에도 선다.** 생성이 막힌 사람에게는 직접 적는 것이 준비물을 남기는
     유일한 길이라, 그 갈래에서 빼면 화면이 할 수 있는 일을 감추는 것이 된다.
+
+    **`secondary` 는 여기서만이다** (#841). 빈 카드에서는 이 버튼이 CTA 와 나란히 선
+    **두 번째 진입점**이라 테두리를 갖는다 — `ghost` 는 맨텍스트로 읽혀 절이 미완성처럼
+    보였다. `Result` 에서는 같은 버튼이 `ghost` 로 남는다(그쪽 근거는 호출부 주석).
   */
-  const addSection = <AddSection {...props} categories={[]} />
+  const addSection = <AddSection {...props} categories={[]} collapsedVariant="secondary" />
 
   return (
     <div className="flex flex-col gap-3">
@@ -332,7 +318,7 @@ function Intro(props: PackingListPanelProps) {
           없다** (#841): 저장 여부가 실제로 궁금해지는 것은 목록이 생긴 뒤라 `Result` 가
           그 자리를 갖는다.
         */}
-        <p className="text-body-2 text-fg text-center break-keep">{intro}</p>
+        <p className="text-body-2 text-fg text-center break-keep">{messages.plan.packingIntro}</p>
       </div>
 
       {/*
@@ -349,11 +335,19 @@ function Intro(props: PackingListPanelProps) {
           {addSection}
         </div>
       ) : (
-        /* 두 진입점이 같은 줄에 나란히 선다 — 크기로만 갈린다 (#841) */
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={onGenerate}>
-            {messages.plan.packingCta}
-          </Button>
+        /*
+          **두 진입점이 같은 줄에 나란히 선다** (#841).
+
+          **CTA 는 `primary` 다.** 빈 카드에서 이것이 그 카드의 주요 액션인데
+          (`DESIGN.md` §2-4 — 주요 액션은 채운 버튼), `직접 추가` 까지 테두리를 갖게 되면서
+          둘의 외형이 똑같아졌다 — 크기(44/32)만으로는 무엇을 먼저 누르는 화면인지 안 읽힌다.
+
+          **행이 `items-center` 를 갖는다.** 높이가 다른 두 버튼(`h-11` · `h-8`)이라
+          정렬을 주지 않으면 작은 쪽이 위로 붙어 12px 어긋난다. 그래서 접힘 버튼의
+          `self-start` 도 이 갈래에서는 넘기지 않는다 — 넘기면 행의 정렬을 이긴다.
+        */
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={onGenerate}>{messages.plan.packingCta}</Button>
           {addSection}
         </div>
       )}
@@ -455,7 +449,17 @@ function Result(props: PackingListPanelProps & { list: PlanPackingListResponse }
         <p className="text-caption text-fg-muted">{messages.plan.packingRegenerateNote}</p>
       </div>
 
-      <AddSection {...props} categories={packingCategories(list.items)} />
+      {/*
+        **여기서는 `ghost` 를 지킨다** (#841). 바로 위가 AI 재생성(`ghost sm`)이라 테두리를
+        주면 직접 추가가 재생성보다 강하게 선다 — 이 목록에서 더 중요한 것은 AI 쪽이다.
+        `flex-col` 부모라 정렬은 버튼이 스스로 갖는다.
+      */}
+      <AddSection
+        {...props}
+        categories={packingCategories(list.items)}
+        collapsedVariant="ghost"
+        collapsedClassName="self-start"
+      />
     </div>
   )
 }
@@ -597,16 +601,36 @@ function AddSection({
   adding,
   addError,
   categories,
-}: PackingListPanelProps & { categories: string[] }) {
+  collapsedVariant,
+  collapsedClassName,
+}: PackingListPanelProps & {
+  categories: string[]
+  /**
+   * 접힘 버튼의 외형 — **호출부가 정한다** (#841).
+   *
+   * 같은 버튼이 두 자리에 서는데 **옆에 선 것이 다르다.** 빈 카드에서는 CTA 와 나란한
+   * 두 번째 진입점이라 테두리가 필요하고, `Result` 에서는 바로 위가 AI 재생성이라
+   * 테두리를 주면 **재생성보다 강하게 선다.** 하나로 고정하면 한쪽이 반드시 틀린다.
+   */
+  collapsedVariant: ButtonVariant
+  /**
+   * 접힘 버튼의 정렬. **부모가 row 인지 column 인지에 따라 갈린다** — row 면 행이
+   * `items-center` 로 정렬을 갖고, column 이면 버튼이 `self-start` 로 스스로 갖는다.
+   */
+  collapsedClassName?: string
+}) {
   const [open, setOpen] = useState(false)
   const [values, setValues] = useState<PackingAddValues>({ category: '', name: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   if (!open) {
     return (
-      // **`ghost` 가 아니라 `secondary` 다** (#841). 테두리도 채움도 없어 CTA 아래 맨텍스트로
-      // 읽히던 것이 원인이었다 — 두 진입점이 같은 줄에 나란히 서야 위계가 보인다
-      <Button variant="secondary" size="sm" onClick={() => setOpen(true)} className="self-start">
+      <Button
+        variant={collapsedVariant}
+        size="sm"
+        onClick={() => setOpen(true)}
+        {...(collapsedClassName === undefined ? {} : { className: collapsedClassName })}
+      >
         {messages.plan.packingAddAction}
       </Button>
     )
