@@ -137,7 +137,7 @@ export const aboutMessages = {
     cards: {
       suitability: {
         title: '여행 적합도',
-        desc: '날씨·동반 조건·혼잡도를 묶어 등급으로 답하고, 근거를 접어 둬요.',
+        desc: '날씨·동반 조건·혼잡도를 묶어 등급으로 답하고, 근거를 함께 보여 줘요.',
       },
       congestion: {
         title: '한산한 날',

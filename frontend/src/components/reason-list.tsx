@@ -15,6 +15,10 @@ import { cn } from '@/lib/utils/cn'
  * 한 줄(약 22px)인데 버튼이 44px**(DESIGN.md §7 최소 터치 영역)이라, 근거가 3개인 흔한
  * 경우 접기가 순손실이었다. 상태가 사라지면서 `'use client'` 도 함께 뗐다 — 이제 서버
  * 컴포넌트에서도 쓸 수 있다.
+ *
+ * **`className` 은 바깥 래퍼가 아니라 이 `ul` 에 직접 붙는다** — 접기를 걷으면서 래퍼
+ * `div` 가 사라졌다. `ul` 이 `flex` 라서 `list-disc pl-5` 만 넘기면 불릿이 그려지지 않는다.
+ * 불릿이 필요하면 `flex` 를 먼저 걷어야 한다.
  */
 
 export type Reason = {
