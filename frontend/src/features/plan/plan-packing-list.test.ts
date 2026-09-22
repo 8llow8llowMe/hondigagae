@@ -58,6 +58,9 @@ function saved(
 /** 아직 만든 적 없다 — `items` 가 비고 `generatedAt` 이 null 인 갈래 */
 const NEVER_GENERATED = saved([], { generatedAt: null })
 
+/** 기본 동행견. `packingIntroFallbackPet`('반려견')과 겹치지 않는 이름이라 폴백과 갈린다 */
+const PET_NAME = '초코'
+
 function render(overrides: Partial<PackingListPanelProps> = {}) {
   const props: PackingListPanelProps = {
     list: NEVER_GENERATED,
@@ -73,17 +76,35 @@ function render(overrides: Partial<PackingListPanelProps> = {}) {
     adding: false,
     addError: null,
     actionError: null,
+    petName: PET_NAME,
     ...overrides,
   }
 
   return renderToStaticMarkup(createElement(PackingListPanel, props))
 }
 
+/**
+ * 화면에 실제로 서는 안내 문장 — `{petName}` 치환까지 마친 것이다 (#841).
+ *
+ * `messages.plan.packingIntro` 를 그대로 단언하면 치환자가 남아 있어 영영 맞지 않는다.
+ */
+function intro(petName: string = PET_NAME) {
+  return messages.plan.packingIntro.replace('{petName}', petName)
+}
+
+/** `text` 를 그리는 버튼의 여는 태그. 외형(variant)을 클래스로 확인할 때 쓴다 */
+function buttonTag(markup: string, text: string) {
+  const at = markup.indexOf(text)
+  expect(at).toBeGreaterThan(-1)
+
+  return markup.slice(markup.lastIndexOf('<button', at), at)
+}
+
 describe('PackingListPanel — 상태 배타성', () => {
   it('만들기 전에는 무엇을 근거로 만드는지 먼저 말한다', () => {
     const markup = render()
 
-    expect(markup).toContain(messages.plan.packingIntro)
+    expect(markup).toContain(intro())
     expect(markup).toContain(messages.plan.packingCta)
   })
 
@@ -122,7 +143,7 @@ describe('PackingListPanel — 상태 배타성', () => {
     const markup = render({ loading: true, list: null })
 
     expect(markup).not.toContain(messages.plan.packingCta)
-    expect(markup).not.toContain(messages.plan.packingIntro)
+    expect(markup).not.toContain(intro())
   })
 })
 
@@ -162,6 +183,55 @@ describe('PackingListPanel — AI 항목이 없을 때', () => {
   /** AI 를 부르기 전에도 직접 적어 둘 수 있어야 한다 */
   it('빈 목록에서도 직접 추가를 열 수 있다', () => {
     expect(render({ list: NEVER_GENERATED })).toContain(messages.plan.packingAddAction)
+  })
+})
+
+/*
+  **빈 상태가 미완성으로 읽히지 않게 한다** (#841).
+
+  읽을 것은 두 문장 63자인데 CTA 는 하나였고, **AI 가 무엇을 골라 주는지 짐작할 단서는
+  0** 이었다 — 사료? 배변봉투? 상비약? 전부 문장으로만 있었다. 단서는 일러스트가 맡고,
+  저장 안내는 목록이 생긴 뒤(`Result`)로 내려간다.
+
+  **결과의 모양을 칩으로 미리 보여 주지 않는다** — 칩 문구가 실제 AI 응답과 어긋나면
+  화면이 하지 않은 약속을 한 것이 된다.
+*/
+describe('PackingListPanel — 빈 상태 (#841)', () => {
+  it('빈 칸을 일러스트가 채운다', () => {
+    expect(render()).toContain('/illustrations/packing-empty.svg')
+  })
+
+  it('안내 문장이 대표 동행견 이름으로 치환된다', () => {
+    const markup = render({ petName: '몽실이' })
+
+    expect(markup).toContain('몽실이의 특성을')
+    expect(markup).not.toContain('{petName}')
+  })
+
+  /** 동행견을 못 찾아도 이름을 지어내지 않는다 */
+  it('동행견이 없으면 반려견으로 떨어진다', () => {
+    expect(render({ petName: null })).toContain(intro(messages.plan.packingIntroFallbackPet))
+  })
+
+  /** 저장 여부가 궁금해지는 것은 목록이 생긴 뒤다 — `Result` 가 그 자리를 갖는다 */
+  it('저장 안내가 빈 상태에 서지 않는다', () => {
+    expect(render()).not.toContain(messages.plan.packingSavedNote)
+  })
+
+  /*
+    `ghost` 는 테두리도 채움도 없어 CTA 아래 **맨텍스트**로 읽혔다 — 절이 아직 만들어지는
+    중인 것처럼 보였다. 두 진입점이 같은 줄에 나란히 서고 크기로만 갈린다.
+  */
+  it('직접 추가가 테두리를 갖는다 — 맨텍스트로 읽히지 않게', () => {
+    expect(buttonTag(render(), messages.plan.packingAddAction)).toContain('border-border-strong')
+  })
+
+  /** 다시 눌렀을 때 무엇이 만들어지는지가 화면에 있어야 한다 */
+  it('생성 실패에도 일러스트와 안내 문장이 남는다', () => {
+    const markup = render({ generateFailed: true })
+
+    expect(markup).toContain('/illustrations/packing-empty.svg')
+    expect(markup).toContain(intro())
   })
 })
 
@@ -245,8 +315,12 @@ describe('PackingListPanel — 저장된다는 사실을 말한다 (#586)', () =
     }
   })
 
-  it('만들기 전에도 결과에서도 저장된다고 말한다', () => {
-    expect(render()).toContain(messages.plan.packingSavedNote)
+  /*
+    **#841 로 자리가 결과 하나로 줄었다.** 빈 상태에서는 저장 여부보다 "무엇을 골라
+    주는가" 가 먼저이고, 저장된다는 사실이 궁금해지는 것은 목록이 생긴 뒤다. 빈 상태에
+    서지 않는다는 것은 `빈 상태` 블록이 잠근다.
+  */
+  it('결과에서 저장된다고 말한다', () => {
     expect(render({ list: saved(ITEMS) })).toContain(messages.plan.packingSavedNote)
   })
 
@@ -283,9 +357,13 @@ describe('PackingListPanel — AI 산출물임을 말한다 (#397)', () => {
     expect(markup).toContain('bg-accent-100')
   })
 
+  /*
+    **#841 이 이 문장을 한 문장으로 줄였지만 주어는 줄이지 않았다.** 주어가 없어 절이
+    부가 기능으로 읽힌 것이 #397 의 원인이었다 — 짧게 만드는 일과 주어를 빼는 일은 다르다.
+  */
   it('만들기 전 안내가 AI 를 주어로 말한다', () => {
     expect(messages.plan.packingIntro).toContain('AI')
-    expect(render()).toContain(messages.plan.packingIntro)
+    expect(render()).toContain(intro())
   })
 
   /*
@@ -293,7 +371,7 @@ describe('PackingListPanel — AI 산출물임을 말한다 (#397)', () => {
     절이 토글처럼 읽힌다 — 그것이 이 이슈의 원인이었다.
   */
   it('만들기 전 안내를 흐리게 두지 않는다', () => {
-    const line = new RegExp(`<p class="([^"]*)">${messages.plan.packingIntro}`).exec(render())?.[1]
+    const line = new RegExp(`<p class="([^"]*)">${intro()}`).exec(render())?.[1]
 
     expect(line).toBeDefined()
     expect(line).toContain('text-body-2')

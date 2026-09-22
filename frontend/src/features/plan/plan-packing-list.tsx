@@ -56,9 +56,15 @@ import type { PlanPackingDetailItem, PlanPackingListResponse } from '@/types/pla
 export function PlanPackingList({
   planId,
   preview = false,
+  petName,
 }: {
   planId: string
   preview?: boolean
+  /**
+   * 빈 상태 안내 문장에 들어갈 대표 동행견 이름 (#841). 호출부가 이미 든 `companions` 에서
+   * 만들어 내려 준다 — **여기서 다시 조회하지 않는다.**
+   */
+  petName: string | null
 }) {
   const queryClient = useQueryClient()
   const key = planKeys.packing(planId)
@@ -140,6 +146,7 @@ export function PlanPackingList({
       adding={add.isPending}
       addError={add.isError ? packingAddErrorMessage(add.error) : null}
       actionError={actionError}
+      petName={petName}
     />
   )
 }
@@ -179,6 +186,13 @@ export type PackingListPanelProps = {
   addError: string | null
   /** 체크·삭제 실패 문구 */
   actionError: string | null
+  /**
+   * 빈 상태 안내 문장의 `{petName}` 자리 — 대표 동행견 이름 (#841).
+   *
+   * **`null` 이면 `packingIntroFallbackPet`('반려견')으로 떨어진다.** 동행견 조회가
+   * 실패했거나 아이가 삭제됐을 때라 **이름을 지어내지 않는다.**
+   */
+  petName: string | null
 }
 
 /**
@@ -282,34 +296,67 @@ function Pending() {
 
 /** 아직 만든 적 없다 — `generatedAt` 이 null 인 갈래 하나뿐이다 */
 function Intro(props: PackingListPanelProps) {
-  const { generateFailed, onGenerate } = props
+  const { generateFailed, onGenerate, petName } = props
+  const intro = messages.plan.packingIntro.replace(
+    '{petName}',
+    petName ?? messages.plan.packingIntroFallbackPet,
+  )
+
+  /*
+    AI 를 부르기 전에도 직접 적어 둘 수 있다 — 그 항목은 생성·재생성에도 남는다.
+
+    **생성 실패 갈래에도 선다.** 생성이 막힌 사람에게는 직접 적는 것이 준비물을 남기는
+    유일한 길이라, 그 갈래에서 빼면 화면이 할 수 있는 일을 감추는 것이 된다.
+  */
+  const addSection = <AddSection {...props} categories={[]} />
+
   return (
     <div className="flex flex-col gap-3">
       {/*
-        **실패해도 안내 문장을 남긴다.** `ErrorState` 만 남기면 다시 눌렀을 때 무엇이
-        만들어지는지 화면에 아무 설명이 없다. `text-fg-muted` 를 쓰지 않는 근거는 #397 —
-        이 문장이 CTA 를 누를지 정하는 유일한 근거다.
+        **빈 칸을 메우는 일러스트다** (#841). 결과의 *모양*을 칩으로 미리 보여 주는 안은
+        기각했다 — 칩 문구가 실제 AI 응답과 어긋나면 화면이 하지 않은 약속을 한 것이 된다
+        (`lib/place/illustration.ts` 가 "우리가 아는 것만 말한다"를 요구한 것과 같은 규율).
+        장식이 아니라 자리 채움이므로 `alt=""` 다.
       */}
-      <p className="text-body-2 text-fg">{messages.plan.packingIntro}</p>
-      {/* 저장된다는 사실이 곧 "다시 눌러도 되는가" 의 답이라 CTA 앞에 둔다 (#586) */}
-      <p className="text-caption text-fg-muted font-medium">{messages.plan.packingSavedNote}</p>
+      <div className="bg-band flex flex-col items-center gap-3 rounded-md px-4 py-6">
+        {/*
+          저장소 안의 정적 SVG 라 `next/image` 로 최적화할 것이 없다 — `PlaceThumbnail` 이
+          카테고리 일러스트를 `<img>` 로 그리는 것과 같은 근거다.
+        */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/illustrations/packing-empty.svg" alt="" width={64} height={56} />
+        {/*
+          **실패해도 안내 문장을 남긴다.** `ErrorState` 만 남기면 다시 눌렀을 때 무엇이
+          만들어지는지 화면에 아무 설명이 없다. `text-fg-muted` 를 쓰지 않는 근거는 #397 —
+          이 문장이 CTA 를 누를지 정하는 유일한 근거다. **`packingSavedNote` 는 여기
+          없다** (#841): 저장 여부가 실제로 궁금해지는 것은 목록이 생긴 뒤라 `Result` 가
+          그 자리를 갖는다.
+        */}
+        <p className="text-body-2 text-fg text-center break-keep">{intro}</p>
+      </div>
 
       {/*
         생성 실패 코드가 `AIPLAN_016` 하나다 — 일정이 없거나 본인 소유가 아니면 같은
         코드라 화면이 두 경우를 구분해 말하지 않는다.
 
         **재시도 버튼을 두 개 두지 않는다** — `ErrorState` 가 이미 하나를 갖고 있다.
+        **일러스트 면과 안내 문장은 실패해도 남는다** — 다시 눌렀을 때 무엇이 만들어지는지가
+        화면에 있어야 한다.
       */}
       {generateFailed ? (
-        <ErrorState inset="card" title={messages.plan.packingErrorTitle} onRetry={onGenerate} />
+        <div className="flex flex-col gap-3">
+          <ErrorState inset="card" title={messages.plan.packingErrorTitle} onRetry={onGenerate} />
+          {addSection}
+        </div>
       ) : (
-        <Button variant="secondary" onClick={onGenerate} className="self-start">
-          {messages.plan.packingCta}
-        </Button>
+        /* 두 진입점이 같은 줄에 나란히 선다 — 크기로만 갈린다 (#841) */
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" onClick={onGenerate}>
+            {messages.plan.packingCta}
+          </Button>
+          {addSection}
+        </div>
       )}
-
-      {/* AI 를 부르기 전에도 직접 적어 둘 수 있다 — 그 항목은 생성·재생성에도 남는다 */}
-      <AddSection {...props} categories={[]} />
     </div>
   )
 }
@@ -557,7 +604,9 @@ function AddSection({
 
   if (!open) {
     return (
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)} className="self-start">
+      // **`ghost` 가 아니라 `secondary` 다** (#841). 테두리도 채움도 없어 CTA 아래 맨텍스트로
+      // 읽히던 것이 원인이었다 — 두 진입점이 같은 줄에 나란히 서야 위계가 보인다
+      <Button variant="secondary" size="sm" onClick={() => setOpen(true)} className="self-start">
         {messages.plan.packingAddAction}
       </Button>
     )
@@ -573,7 +622,12 @@ function AddSection({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    /*
+      **`w-full` 이 필요하다** (#841). 접힘 버튼이 빈 상태에서 CTA 와 같은 `flex flex-wrap`
+      줄에 서게 되면서, 펼친 폼도 그 줄의 flex item 이 된다 — 폭을 주지 않으면 입력 두 칸이
+      콘텐츠 폭으로 쪼그라든다. `flex-col` 부모(`Result`)에서는 stretch 가 기본이라 무해하다.
+    */
+    <div className="flex w-full flex-col gap-3">
       <div className="flex flex-col gap-1">
         <p className="text-body-2 text-fg font-semibold">{messages.plan.packingAddTitle}</p>
         {/* 서버가 `reason` 을 받지 않는 이유를 그대로 옮긴다 — 이유 칸이 없는 것에 대한 답이다 */}

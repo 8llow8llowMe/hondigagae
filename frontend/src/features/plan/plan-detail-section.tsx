@@ -246,7 +246,16 @@ export function PlanDetailSection({
   const packingCard = (
     <div id={PLAN_PACKING_ANCHOR_ID} className="scroll-mt-20">
       <Surface aria-label={messages.plan.packingHeading}>
-        <PlanPackingList planId={plan.planId} preview={packingPlace === 'promoted'} />
+        {/*
+          **대표 동행견은 `companions` 의 첫 아이다** (#841 · `petIds` 순서). 빈 상태 안내
+          문장이 이 이름으로 무엇을 읽고 고르는지 말한다 — 못 찾으면 `null` 로 내려가
+          `packingIntroFallbackPet`('반려견')이 되고, **이름을 지어내지 않는다.**
+        */}
+        <PlanPackingList
+          planId={plan.planId}
+          preview={packingPlace === 'promoted'}
+          petName={companions[0]?.name ?? null}
+        />
       </Surface>
     </div>
   )
