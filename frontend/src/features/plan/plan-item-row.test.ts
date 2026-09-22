@@ -511,8 +511,16 @@ describe('PlanItemRow — WALK 항목 (#620)', () => {
     expect(renderWalk(withImage)).toContain('<img')
   })
 
-  it('firstImage 가 null 이면 img 가 없다', () => {
-    expect(renderWalk(planItemWalkCourse({ firstImage: null }))).not.toContain('<img')
+  /*
+    **`img` 가 없다 → 사진이 없다 로 바뀌었다** (#842). 예전에는 사진이 없으면 타일이
+    회색 아이콘이라 `img` 자체가 사라졌는데, 이제 유형 일러스트가 그 자리를 `img` 로
+    채운다. 잠가야 할 것은 태그 유무가 아니라 **원격 사진을 그리지 않는다**는 쪽이다.
+  */
+  it('firstImage 가 null 이면 원격 사진 대신 WALK 일러스트가 선다', () => {
+    const markup = renderWalk(planItemWalkCourse({ firstImage: null }))
+
+    expect(markup).toContain('/illustrations/plan-item-walk.svg')
+    expect(markup).not.toContain('tong.visitkorea.or.kr')
   })
 
   /** 코스를 걷는 길이와 직전 항목까지의 직선거리는 다른 값이다 (D12-5) */
@@ -585,5 +593,75 @@ describe('PlanItemRow — 항목만 반려견 특성이 빠진 경우 (#758)', (
     expect(markup).toContain(note)
     // 기본 픽스처는 SAFE 판정이라 배지가 선다 — 둘이 함께 있는 것이 정상이다
     expect(markup).toContain('안전')
+  })
+})
+
+/**
+ * 썸네일 폴백 — 사진 → 유형 일러스트 → 회색 타일 (#842).
+ *
+ * **`itemType` 을 갈아 끼우는 헬퍼가 따로 필요하다.** 위쪽 `render(place)` 는 fixture 의
+ * `PLACE` 유형에 고정돼 있어 유형별 갈래를 볼 수 없다.
+ */
+function renderThumbnail({
+  firstImage,
+  itemTypeCode,
+}: {
+  firstImage: string | null
+  itemTypeCode: string
+}) {
+  const model: PlanItemRowModel = {
+    item: {
+      ...planDetail.items[0]!,
+      itemType: { code: itemTypeCode, name: '유형', description: null },
+      place: planItemPlace({ firstImage }),
+    },
+    distanceMeters: null,
+    distanceKind: null,
+  }
+
+  return renderToStaticMarkup(createElement(PlanItemRow, { model }))
+}
+
+/* 회색 타일은 예외여야 한다 — dev 실측으로 이미지 없는 장소가 70% 다 (#842) */
+describe('PlanItemRow — 썸네일 폴백', () => {
+  it('사진이 없으면 항목 유형 일러스트가 선다', () => {
+    const html = renderThumbnail({ firstImage: null, itemTypeCode: 'LODGING' })
+
+    expect(html).toContain('/illustrations/place-lodging.svg')
+  })
+
+  it('WALK · MOVE 도 자기 자산을 갖는다 — 장소 카테고리에 없는 둘이다', () => {
+    expect(renderThumbnail({ firstImage: null, itemTypeCode: 'WALK' })).toContain(
+      '/illustrations/plan-item-walk.svg',
+    )
+    expect(renderThumbnail({ firstImage: null, itemTypeCode: 'MOVE' })).toContain(
+      '/illustrations/plan-item-move.svg',
+    )
+  })
+
+  it('사진이 있으면 사진이 이긴다', () => {
+    const html = renderThumbnail({
+      firstImage: 'https://tong.visitkorea.or.kr/a.jpg',
+      itemTypeCode: 'LODGING',
+    })
+
+    expect(html).not.toContain('/illustrations/')
+  })
+
+  /* 유형을 지어내지 않는다 — 모르는 코드는 예전 그대로 회색 타일이다 */
+  it('모르는 유형은 회색 타일 그대로다', () => {
+    const html = renderThumbnail({ firstImage: null, itemTypeCode: 'SOMETHING_NEW' })
+
+    expect(html).not.toContain('/illustrations/')
+  })
+
+  /*
+    **장식이라 이름을 갖지 않는다.** 무엇인지는 제목과 유형 배지가 이미 낱말로 말한다 —
+    `alt` 를 채우면 같은 사실이 스크린 리더에서 두 번 들린다 (`place-row.tsx` 와 같은 판단).
+  */
+  it('일러스트는 alt 가 비어 있다', () => {
+    const html = renderThumbnail({ firstImage: null, itemTypeCode: 'MEAL' })
+
+    expect(html).toMatch(/<img[^>]*src="\/illustrations\/place-restaurant\.svg"[^>]*alt=""/)
   })
 })
