@@ -306,6 +306,9 @@ describe('WalkVerdict — 등급이 권하는 행동', () => {
 
   근거는 등급이 권하는 행동을 뒷받침하는 문장이라 세 번째부터 덜 중요하지 않다. 한 번 열면
   닫히지 않는 버튼은 그 순간 이후로 아무 일도 하지 않으면서, 첫 화면에서만 문장을 가렸다.
+
+  접기가 사라지자 자체 구현이 남을 이유도 사라져 **공용 `ReasonList` 로 바꿨다** — 그래서
+  근거는 `<p>` 나열이 아니라 `<ul>/<li>` 다.
 */
 describe('WalkVerdict — 근거는 접지 않는다 (#840)', () => {
   it('근거가 셋 이상이어도 전부 서고 여는 버튼이 없다', () => {
@@ -327,7 +330,16 @@ describe('WalkVerdict — 근거는 접지 않는다 (#840)', () => {
       건드리지 않는 펼침이 둘 더 있다 — 모바일 접힘 토글과 체감온도 `InfoTip` 물음표.
       근거 목록은 패널의 마지막 블록이라, 첫 근거부터 끝까지를 잘라 그 안만 본다.
     */
-    const reasonsBlock = markup.slice(markup.indexOf(firstDescription))
+    const reasonsAt = markup.indexOf(firstDescription)
+
+    /*
+      **자르기 전에 찾았는지부터 확인한다.** 못 찾으면 `-1` 이고 `slice(-1)` 은 마지막 한
+      글자를 돌려준다 — 아래 두 부정 단언이 **아무것도 증명하지 않고 통과한다.** 위 for
+      루프가 먼저 깨지긴 하지만 그건 단언 순서에 기댄 우연이지 가드가 아니다.
+    */
+    expect(reasonsAt).toBeGreaterThan(-1)
+
+    const reasonsBlock = markup.slice(reasonsAt)
 
     expect(reasonsBlock).not.toContain('<button')
     // 버튼이 사라지면 그것이 들고 있던 ARIA 도 함께 사라진다 — 컨테이너에 남기지 않는다
