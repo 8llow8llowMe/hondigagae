@@ -380,6 +380,27 @@ function PlanVerdictToc({ verdicts }: { verdicts: PlanDayWeatherItem[] }) {
               </span>
 
               <span className="ml-auto">
+                {/*
+                  **축 이름을 `sr-only` 로 되살린다** (#848). 보이는 화면에서는 섹션
+                  머리(`일자별 적합도`)가 축을 말하지만, 그 머리는 `nav aria-labelledby` 로만
+                  배지와 이어져 있고 **`aria-labelledby` 는 랜드마크에 진입할 때 한 번**
+                  읽힌다. 링크 목록(NVDA `Insert+F7`)이나 Tab 으로 줄 단위로 도는 사용자는
+                  랜드마크 이름을 듣지 않아 `1일차 보통` 만 들었다 — 바로 아래 일자 카드에서는
+                  같은 값이 `적합도 보통` 으로 들리므로, **같은 값이 어디서 듣느냐에 따라
+                  다르게 들렸다** (#652 가 막으려던 것이 그 경로에서 살아났다).
+
+                  **배지가 아니라 앵커가 갖는다.** `MetricBadge` 의 `axis` 는 **보이는**
+                  접두어를 그리므로 되살리려면 `sr-only` 변형이라는 새 공용 API 가 필요하고,
+                  그것은 배지를 쓰는 18곳 전체의 문제가 된다. 여기서 필요한 것은 **이 링크의
+                  이름**이라 링크가 직접 갖는 편이 좁고 정확하다 (`일정상세-세부명세.md`
+                  D18-2 가 "배지가 아니라 `sr-only` 로 붙일 자리" 라고 적어 둔 그대로다).
+
+                  **앞뒤로 공백을 둔다.** 접근성 이름 계산은 인라인 노드를 이어 붙일 때 공백을
+                  넣어 주지 않는다 (`metric.tsx` 의 `axis` 주석이 실측으로 남긴 함정) — 없으면
+                  `1일차적합도보통` 한 낱말이 된다.
+                */}
+                <span className="sr-only">{` ${messages.common.metricAxisSuitability} `}</span>
+
                 {verdict.suitabilityLevel === null ? (
                   // 판정을 못 낸 날을 낮은 등급으로 칠하지 않는다 — 점선 unknown 이다
                   <MetricBadge tone="unknown" size="sm">
