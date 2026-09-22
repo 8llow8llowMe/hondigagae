@@ -172,7 +172,17 @@ export function PlanDaySection({
     <Surface aria-label={messages.plan.dayLabel.replace('{day}', String(day))}>
       <div className={INSET_CLASS.card}>
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 pt-5">
-          <h2 id={anchorId} className="text-title-1 text-fg font-bold">
+          {/*
+            **`scroll-mt` 는 고정 헤더 몫이다** (#845). 헤더가 `sticky top-0 h-14 md:h-16`
+            이라 여백이 없으면 좌 레일 목차에서 뛴 일자가 헤더 뒤로 들어간다.
+
+            **값이 저장소 공통의 `scroll-mt-20`(80) 이 아니라 24(96) 다.** 다른 앵커들은
+            제목이 곧 블록의 위 끝이라 80 이면 되는데, 이 `h2` 는 카드 위 테두리에서
+            `pt-5`(20) 아래다 — 80 을 주면 **카드 상단이 76 에 서서 `md:h-16`(64) 헤더와
+            12px 밖에 안 벌어지고**, 뛴 결과가 "카드 중간에 떨어진" 것처럼 읽힌다. 96 이면
+            카드 상단이 76 이 되어 모바일(56) · 태블릿 이상(64) 양쪽에서 테두리가 보인다.
+          */}
+          <h2 id={anchorId} className="text-title-1 text-fg scroll-mt-24 font-bold">
             {messages.plan.dayLabel.replace('{day}', String(day))}
           </h2>
           {dayLabel !== null && (

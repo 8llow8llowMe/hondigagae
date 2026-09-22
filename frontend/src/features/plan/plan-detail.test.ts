@@ -592,6 +592,14 @@ describe('PlanOverviewPanel', () => {
  * 걷어낼 이유였던 것은 `hidden lg:block` 이었지 세로 레이아웃 자체가 아니었고, 카드를
  * 만들지 않고 개요 카드 안에 두면 모든 폭에서 선다.
  */
+/**
+ * 목차 앵커의 여는 태그만 추린다 — `px-2` · `rounded-md` 는 배지에도 있어 전체 마크업에서
+ * 세면 다른 요소의 클래스에 속아 통과한다 (#845).
+ */
+function tocAnchors(markup: string): string[] {
+  return [...markup.matchAll(/<a [^>]*href="#day\d+"[^>]*>/g)].map((match) => match[0])
+}
+
 describe('PlanOverviewPanel — 일자별 판정 목차 (#732 · #841)', () => {
   /* 구획 2(상태)가 구획 3(목차) 위다 — 언제 떠나는지를 먼저 읽고 어느 날이 좋은지를 본다 */
   it('D-day 가 목차보다 먼저 온다', () => {
@@ -671,6 +679,28 @@ describe('PlanOverviewPanel — 일자별 판정 목차 (#732 · #841)', () => {
   */
   it('목차 상한이 일곱이다', () => {
     expect(PLAN_VERDICT_STRIP_MAX_DAYS).toBe(7)
+  })
+
+  /*
+    **호버 면이 글자보다 넓다** (#845). 인셋 없이 `hover:bg-band` 만 있던 동안에는 회색
+    면이 글자에 딱 붙은 각진 띠였다. `-mx-2 px-2` 는 **면만** 넓히는 짝이라 둘을 함께
+    센다 — `px-2` 만 남으면 글자가 카드 기준선에서 8px 안으로 밀리고, `-mx-2` 만 남으면
+    글자가 카드 밖으로 나간다.
+  */
+  it('목차 줄의 호버 면이 글자 좌우로 8px 씩 넓다', () => {
+    const anchors = tocAnchors(renderOverview({ verdicts: verdictsOf(3) }))
+
+    expect(anchors).toHaveLength(3)
+    for (const anchor of anchors) {
+      expect(anchor).toContain('-mx-2')
+      expect(anchor).toMatch(/\bpx-2\b/)
+    }
+  })
+
+  it('목차 줄의 면과 포커스 링이 모서리를 갖는다', () => {
+    for (const anchor of tocAnchors(renderOverview({ verdicts: verdictsOf(3) }))) {
+      expect(anchor).toContain('rounded-md')
+    }
   })
 })
 
