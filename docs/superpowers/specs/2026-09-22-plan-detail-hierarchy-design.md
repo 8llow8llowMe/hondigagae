@@ -134,8 +134,11 @@ D-3   출발까지 3일                                       ← 상태 (이 �
 `phaseText`(`D-3` · `D-DAY` · `오늘 3일차`)를 `text-title-1` 이상으로 올리고, 오른쪽에
 보조 문구를 붙인다. 날짜 범위는 그 아래 `text-caption` 으로 내린다.
 
-- **`2026년` 을 뗀다.** 일차 카드(`formatPlanDay`)와 형식을 맞춘다. 연도가 필요한 것은
-  해를 넘기는 일정뿐이고, 그때는 종료일 쪽에 연도가 붙는다.
+- **올해 일정이면 연도를 뗀다.** `lib/plan/date.ts` 에
+  `formatPlanDateRangeCompact(startDate, endDate, today)` 를 더한다 — **시작일과 종료일이
+  모두 `today` 의 해**면 `formatPlanDay` 형식(`9월 25일 (금) – 9월 27일 (일)`)이고, 한쪽이라도
+  다른 해면 기존 `formatPlanDateRange` 를 그대로 돌려준다. 내년 일정에서 연도를 떼면 언제인지
+  알 수 없어진다. `formatPlanDateRange` 자체는 건드리지 않는다 — 다른 화면이 쓴다.
 - **`예산 미정` 을 걷는다.** 예산이 있을 때만 `· 예산 30만원` 으로 이 줄에 붙는다.
   `messages.plan.budgetEmpty` 는 이 화면에서 쓰이지 않는다.
 - `phaseText` 가 `null`(지난 일정)이면 이 구획은 날짜 줄만 남는다.
@@ -186,7 +189,9 @@ D-3   출발까지 3일                                       ← 상태 (이 �
 - **`packingSavedNote` 를 빈 상태에서 뺀다.** 그 문장은 생성 결과(`Result`)의 캡션으로
   옮긴다 — 저장 여부가 실제로 궁금해지는 것은 목록이 생긴 뒤다. 메시지 키는 유지한다.
 - **`직접 추가` 를 `Button variant="secondary"` 로 승격**해 CTA 와 같은 줄에 둔다.
-  `AddSection` 의 입력 폼은 그 버튼을 눌렀을 때 열린다(지금은 항상 펼쳐져 있다).
+  `AddSection`(`:548`)은 **이미 접힘 상태를 갖고 있다** — `!open` 이면
+  `Button variant="ghost" size="sm"` 하나를 그린다. 바꾸는 것은 **variant 와 자리**뿐이고
+  열림 동작은 그대로다. `ghost` 가 테두리도 채움도 없어 맨텍스트로 읽히던 것이 원인이다.
 - 생성 실패(`generateFailed`)면 지금처럼 `ErrorState` 가 CTA 자리를 대신하고, 일러스트
   면과 안내 문장은 **남는다** — 다시 눌렀을 때 무엇이 만들어지는지가 화면에 있어야 한다
   (`Intro` 주석의 기존 판단 그대로).
