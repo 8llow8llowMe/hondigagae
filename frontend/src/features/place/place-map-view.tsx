@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 import type { ReactNode } from 'react'
 
 import { EmptyState } from '@/components/empty-state'
-import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
+import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from '@/components/icons'
 import { MapSheet, type SheetStop } from '@/components/map-sheet'
 import { ViewToggle } from '@/components/view-toggle'
 import type { MapPin } from '@/features/map/map-canvas'
@@ -21,6 +21,7 @@ import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
 import { type LatLng, SELECTED_PLACE_MAP_LEVEL, toLatLng } from '@/lib/geo/coord'
 import { getCurrentPosition } from '@/lib/geo/current-position'
+import { shouldOfferResearch } from '@/lib/map/research-offer'
 import type { MapSdkFailure } from '@/lib/map/sdk'
 import {
   boundsCenter,
@@ -29,6 +30,7 @@ import {
   isWithinBounds,
   type MapBounds,
 } from '@/lib/map/viewport'
+import { visibleCountLabel } from '@/lib/map/visible-count'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -51,8 +53,13 @@ const MapCanvas = dynamic(
  * **데이터 출처가 둘이고 갈리는 조건이 명확하다.**
  *  - 처음 들어오면 **목록 캐시를 재사용**한다 (architecture-guide.md §9 "지도 뷰: 별도
  *    조회 금지"). 목록에서 보던 것과 지도에서 보는 것이 달라지면 안 된다.
- *  - 사용자가 **지도를 의미 있게 옮기면** `GET /places/nearby` 로 갈아탄다. 그 순간
- *    목록 캐시는 화면 밖을 말하고 있어 재사용이 오히려 틀리다.
+ *  - 사용자가 **"이 지역에서 재검색" 을 누르면** `GET /places/nearby` 로 갈아탄다.
+ *
+ * **지도를 옮겼다고 스스로 재조회하지 않는다** (#396 의 규칙을 이 화면에도 들였다).
+ * 예전에는 `idle` 마다 나갔고, 그 전제가 **한 곳을 골라 확대하는 조작**에서 깨졌다 —
+ * 확대는 우리가 그 핀으로 옮겨 준 결과인데 그때마다 목록이 다시 조회돼 방금 보던 결과가
+ * 사라졌다. 이제 지도 조작은 버튼을 띄울 뿐이고, 목록도 **조회한 자리**(`searchedBounds`)
+ * 를 세므로 팬·줌·선택 어느 것도 목록을 흔들지 않는다.
  *
  * **지도가 유일한 전달 수단이 아니다** (이슈 #14 완료 조건). SDK 가 실패하면 목록을
  * 그대로 그리고 위에 안내 한 줄을 둔다.
@@ -122,8 +129,27 @@ export function PlaceMapView({
   panelTopInset?: number | undefined
 }) {
   const [bounds, setBounds] = useState<MapBounds | null>(null)
-  /** 지도를 옮겼는지. 처음 `idle` 한 번은 이동이 아니다 */
-  const [movedBounds, setMovedBounds] = useState<MapBounds | null>(null)
+  /*
+    **지금 목록이 대응하는 지도 영역.** 첫 `idle` 에 한 번 놓이고, 그 뒤로 이 값을 옮기는
+    것은 **"이 지역에서 재검색" 버튼뿐**이다 (#396 의 규칙을 이 화면에도 들였다).
+
+    예전에는 `movedBounds` 였고 `idle` 마다 갱신되며 **스스로 재조회**했다. 그래서 한
+    장소를 눌러 확대하거나 화면을 조금만 옮겨도 그 프레임 기준으로 목록을 다시 불러와,
+    방금 보던 결과가 통째로 갈렸다 — 조회를 시킨 적이 없는데 목록이 흔들린다.
+
+    **목록 필터의 기준도 이것이다** (`bounds` 가 아니다). 그래서 지도를 옮기거나 한 곳을
+    골라 확대해도 목록·핀이 그대로 남는다 — `/emergency` 가 선택 순간에만 `frozenBounds`
+    로 얼려 두는 일을, 이 화면은 이 하나로 항상 한다.
+  */
+  const [searchedBounds, setSearchedBounds] = useState<MapBounds | null>(null)
+  /*
+    재검색을 한 번이라도 눌렀는가 — **목록 캐시 ↔ 주변 조회를 가르는 유일한 스위치**다.
+
+    처음에는 목록 캐시를 재사용한다 (architecture-guide.md §9 "지도 뷰: 별도 조회 금지").
+    `searchedBounds` 만으로는 이 둘을 가를 수 없다 — 첫 `idle` 에도 값이 들어오기 때문에
+    그것으로 조회를 켜면 들어오자마자 프리페치한 캐시를 버린다.
+  */
+  const [researched, setResearched] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [sheetStop, setSheetStop] = useState<SheetStop>('mid')
   const [panelOpen, setPanelOpen] = useState(true)
@@ -167,15 +193,18 @@ export function PlaceMapView({
     [listQuery.data],
   )
 
-  const searchCenter = movedBounds === null ? null : boundsCenter(movedBounds)
-  const searchRadius = movedBounds === null ? 0 : boundsRadiusMeters(movedBounds)
+  const searchCenter = searchedBounds === null ? null : boundsCenter(searchedBounds)
+  const searchRadius = searchedBounds === null ? 0 : boundsRadiusMeters(searchedBounds)
   /*
-    **지도를 옮기면 항상 그 지역을 다시 찾는다.** 예전에는 이것을 체크박스로 열어 뒀는데
-    (#240), 켜고 끄는 것이 바꾸는 것은 **데이터 출처**여서 화면만 보고는 무엇이 달라지는지
-    알 수 없었다. 끈 상태에서도 영역 필터는 계속 돌아 화면 밖 장소가 빠지니, 사용자에게는
-    "아무 일도 안 하는 체크박스" 로 보였다. 지도를 옮기는 것이 곧 "여기를 보여 줘" 다.
+    **조회 시점을 사용자가 쥔다** (#396 의 규칙을 이 화면에도 들였다). 예전에는 `idle`
+    마다 자동으로 나갔고(#240 에서 체크박스를 걷으며 "지도를 옮기는 것이 곧 '여기를 보여
+    줘' 다" 로 정리했다), 그 전제가 **한 곳을 골라 확대하는 조작**에서 깨졌다 — 확대는
+    사용자가 "다른 지역을 보겠다" 고 한 것이 아니라 우리가 그 핀으로 옮겨 준 결과인데,
+    그때마다 좁아진 프레임으로 목록이 다시 조회돼 방금 보던 결과가 사라졌다.
+
+    이제 지도 조작은 **버튼을 띄울 뿐**이고, 조회는 누를 때만 나간다.
   */
-  const nearbyQuery = useNearbyPlaces(searchCenter, searchRadius, filters, true)
+  const nearbyQuery = useNearbyPlaces(searchCenter, searchRadius, filters, researched)
 
   const usingNearby = nearbyQuery.data !== undefined
   const places: PlaceSummary[] = useMemo(
@@ -183,17 +212,26 @@ export function PlaceMapView({
     [usingNearby, nearbyQuery.data, listPlaces],
   )
 
-  /** 지도 영역 안에 든 것만 목록에 남긴다 — "지도에 보이는 곳 8" 이 그 뜻이다 */
+  /*
+    **마지막으로 조회한 영역** 안에 든 것만 목록에 남긴다.
+
+    **지금 보고 있는 `bounds` 가 아니다.** 그러면 지도를 옮기거나 한 곳을 골라 확대하는
+    것만으로 목록이 줄어, 재조회를 막아도 "목록이 흔들린다" 는 문제가 그대로 남는다 —
+    `/emergency` 가 선택 순간에 `frozenBounds` 로 얼려 막는 것과 같은 결함이다.
+    이 화면은 조회 자리가 곧 목록의 자리라, 그 하나로 항상 얼려 둔다.
+
+    영역이 옮겨 갔다는 사실은 캡션(`countLine`)과 재검색 버튼이 말한다.
+  */
   const visible = useMemo(() => {
-    if (bounds === null) return places
+    if (searchedBounds === null) return places
 
     return places.filter((place) => {
       const coord = toLatLng(place)
       // 좌표가 없는 곳은 지도가 판단할 수 없다. 숨기지 않고 남긴다 —
       // 목록으로도 같은 정보에 도달할 수 있어야 한다 (이슈 #14 완료 조건)
-      return coord === null || isWithinBounds(bounds, coord)
+      return coord === null || isWithinBounds(searchedBounds, coord)
     })
-  }, [places, bounds])
+  }, [places, searchedBounds])
 
   /*
     **내용이 같으면 같은 Set 으로 취급한다.** `mutedPlaceIds` 는 참조 동등성으로만
@@ -229,13 +267,30 @@ export function PlaceMapView({
   const handleBounds = useCallback((next: MapBounds, userMoved: boolean) => {
     setBounds(next)
 
-    // **첫 영역은 이동이 아니다.** 들어오자마자 주변 검색으로 갈아타면 프리페치한
-    // 목록 캐시를 버리게 되고, 첫 화면이 반경 밖이라 비어 보인다 (실제로 그랬다)
-    if (!userMoved) return
+    /*
+      **첫 영역이 목록의 기준 자리가 된다 — 조회는 하지 않는다.** 들어오자마자 주변
+      검색으로 갈아타면 프리페치한 목록 캐시를 버리게 되고, 첫 화면이 반경 밖이라
+      비어 보인다 (실제로 그랬다). 그래서 `researched` 는 건드리지 않는다.
 
-    // 손가락이 스친 정도는 재조회하지 않는다 — 요청이 폭주하고 목록이 깜빡인다
-    setMovedBounds((previous) => (isSameViewport(previous, next) ? previous : next))
+      그 뒤의 `idle` 은 **`bounds` 만** 옮긴다 — 재검색을 권할지 판단하고 캡션 문구를
+      고르는 데만 쓰인다. `searchedBounds` 를 옮기는 것은 버튼뿐이다.
+    */
+    if (!userMoved) setSearchedBounds(next)
   }, [])
+
+  /**
+   * "이 지역에서 재검색" — 지금 보이는 영역을 조회 자리로 삼는다.
+   *
+   * **`bounds` 를 그대로 커밋한다.** 중심만 옮기고 반경을 두는 `/emergency` 와 다른데,
+   * 그 화면의 반경은 URL 이 소유하는 칩 값이고 이 화면의 반경은 화면에서 역산하기
+   * 때문이다 — 축소해 두고 누른 사람은 "더 넓게 찾아 줘" 라고 한 것이다.
+   */
+  const researchHere = useCallback(() => {
+    if (bounds === null) return
+
+    setSearchedBounds(bounds)
+    setResearched(true)
+  }, [bounds])
 
   // ── SDK 실패 → 목록으로 되돌리고 안내 한 줄 ──────────────────────────────
   if (failure !== null) {
@@ -297,7 +352,35 @@ export function PlaceMapView({
     )
   }
 
-  const countLine = messages.map.visibleCount.replace('{n}', String(visible.length))
+  /*
+    **지도가 조회 자리에서 벗어났으면 "지도에 보이는" 이라고 말하지 않는다.** 목록은
+    `searchedBounds` 를 세는데 화면은 다른 곳을 보고 있어, 그대로 두면 캡션이 화면과
+    다른 것을 주장한다. 개수 자체는 그대로 참이라 숫자는 두고 문구만 바꾼다 —
+    `/emergency` 가 선택·stale 구간에서 쓰는 것과 같은 함수다 (`lib/map/visible-count.ts`).
+
+    `isSameViewport` 는 둘 중 하나가 `null` 이면 `false` 다 — 첫 `idle` 전에는 영역
+    필터가 아예 걸리지 않으므로 그때도 "목록 N곳" 이 맞다.
+  */
+  const countLine = visibleCountLabel(visible.length, !isSameViewport(searchedBounds, bounds))
+  /*
+    조회한 자리에서 충분히 벗어났을 때만 재검색을 권한다 (#396). 판정은
+    `shouldOfferResearch` 순수 함수가 갖는다 — 임계값이 반경에 비례한다.
+
+    **`originScreenRadius` 를 넘긴다.** 이 화면은 조회 반경을 화면에서 역산하므로
+    축소가 곧 "더 넓게 찾아 줘" 다 — 중심이 한 픽셀도 안 움직여도 재조회할 이유가
+    생긴다. 반경이 URL 소유인 `/emergency` 는 이 갈래를 켜지 않는다.
+
+    **`suppressed` 가 늘 `false` 다.** 그 인자는 "우리가 카메라를 옮겨 놓고 그 결과를
+    아직 재지 못한 구간" 을 막는 것인데, 이 화면은 목록이 `searchedBounds` 를 세므로
+    선택-확대가 목록을 흔들지 못한다 — 막을 이유가 없다.
+  */
+  const offerResearch = shouldOfferResearch({
+    bounds,
+    origin: searchCenter,
+    radius: searchRadius,
+    suppressed: false,
+    originScreenRadius: searchRadius,
+  })
   /** 둘 다 있을 때만 그린다 — 헤더가 토글을 갖는 화면은 주지 않는다 */
   const showToggle = listHref !== undefined && mapHref !== undefined
 
@@ -321,6 +404,28 @@ export function PlaceMapView({
         onFailure={setFailure}
         className="h-full w-full"
       />
+
+      {/*
+        **"이 지역에서 재검색" — 지도 하단 중앙** (#396). `/emergency` 와 **같은 문구 ·
+        같은 모양 · 같은 자리**다 (`messages.map.researchHere`) — 두 지도 화면에서 같은
+        일을 하는 컨트롤이 다르게 생기면 안 된다. 근거와 실측은 `emergency-map-view.tsx`
+        의 같은 자리에 있다.
+
+        세로 자리는 `.map-research-offset`(globals.css)이 갖는다 — 모바일 시트 최소
+        단계를 피해야 해서 그 계산이 CSS 에 있다.
+      */}
+      {offerResearch && (
+        <div className="map-research-offset absolute inset-x-0 z-30 flex justify-center px-4">
+          <button
+            type="button"
+            onClick={researchHere}
+            className="text-body-2 bg-bg text-fg border-border hover:bg-band focus-visible:ring-brand-500 inline-flex h-11 max-w-full items-center gap-2 rounded-full border px-5 font-semibold whitespace-nowrap shadow-md transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
+            <SearchIcon size={16} />
+            {messages.map.researchHere}
+          </button>
+        </div>
+      )}
 
       {/*
         ── 지도 우상단 컨트롤 ──────────────────────────────────────────────
