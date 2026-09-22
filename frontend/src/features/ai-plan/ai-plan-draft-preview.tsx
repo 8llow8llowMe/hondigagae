@@ -183,8 +183,6 @@ export function AiPlanDraftPreview({
             </h3>
             <ReasonList
               reasons={draft.reasons.map((reason) => ({ description: reason.description }))}
-              moreLabel={messages.aiPlan.reasonsMore}
-              lessLabel={messages.aiPlan.reasonsLess}
             />
           </section>
         )}

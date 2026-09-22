@@ -170,12 +170,7 @@ export function PlaceWalkSafetyPanel({
         없어 감점과 정보성을 가를 근거가 없다 — 적합도 패널에서 복사해 오면 없는 필드를
         읽고 전부 감점으로 흐려진다.
       */}
-      <ReasonList
-        reasons={data.reasons.map((reason) => ({ description: reason.description }))}
-        initialCount={3}
-        moreLabel={messages.home.moreReasons.replace('{n}', '%d')}
-        lessLabel={messages.home.lessReasons}
-      />
+      <ReasonList reasons={data.reasons.map((reason) => ({ description: reason.description }))} />
 
       <BasisLine data={data} petName={petName} />
 
@@ -227,7 +222,7 @@ function FeelsLikeBasis({ data }: { data: WalkSafetyResponse }) {
         aria-expanded={open}
         aria-controls={bodyId}
         onClick={() => setOpen((prev) => !prev)}
-        // 44px — 모바일 최소 터치 영역 (DESIGN.md §7). `ReasonList` 의 펼침과 같은 모양이다
+        // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
         className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center self-start font-semibold focus-visible:ring-2 focus-visible:outline-none"
       >
         {open ? messages.place.detailFeelsLikeBasisClose : messages.place.detailFeelsLikeBasisOpen}
@@ -236,8 +231,8 @@ function FeelsLikeBasis({ data }: { data: WalkSafetyResponse }) {
       {/*
         **`open && (...)` 이 아니라 `hidden` 이다.** 접힘을 조건부 렌더로 만들면 위 버튼의
         `aria-controls` 가 없는 id 를 가리키고, 그 순간 보조기기에게 이 버튼은 무엇을
-        여는지 알 수 없는 버튼이 된다. `ReasonList` 는 `<ul>` 자체가 늘 있어 같은 문제가
-        없지만 여기는 몸통 전체가 접힘 대상이다. `hidden` 은 a11y 트리에서도 빠진다.
+        여는지 알 수 없는 버튼이 된다. 여기는 몸통 전체가 접힘 대상이라 조건부 렌더면
+        가리킬 몸통 자체가 사라진다. `hidden` 은 a11y 트리에서도 빠진다.
       */}
       <div id={bodyId} hidden={!open} className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
