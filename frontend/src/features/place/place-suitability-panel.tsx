@@ -116,9 +116,6 @@ export function PlaceSuitabilityPanel({
           description: reason.description,
           informational: reason.scoreDelta === 0,
         }))}
-        initialCount={3}
-        moreLabel={messages.home.moreReasons.replace('{n}', '%d')}
-        lessLabel={messages.home.lessReasons}
       />
 
       <p className="text-caption text-fg-muted font-medium tabular-nums">

@@ -1,7 +1,3 @@
-'use client'
-
-import { useId, useState } from 'react'
-
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -12,6 +8,13 @@ import { cn } from '@/lib/utils/cn'
  *
  * **점수 숫자를 노출하지 않고, 문장 앞에 3px 세로 바를 달지 않는다.** 감점은 문장이
  * 말하고 등급은 상단 요약이 말한다. 바를 달면 목록이 색 줄무늬로 읽힌다.
+ *
+ * ### 접기를 걷었다 (#840)
+ *
+ * 예전에는 기본 2~3개만 보이고 나머지를 펼침 버튼 뒤에 뒀다. **접어서 아끼는 것은 문장
+ * 한 줄(약 22px)인데 버튼이 44px**(DESIGN.md §7 최소 터치 영역)이라, 근거가 3개인 흔한
+ * 경우 접기가 순손실이었다. 상태가 사라지면서 `'use client'` 도 함께 뗐다 — 이제 서버
+ * 컴포넌트에서도 쓸 수 있다.
  */
 
 export type Reason = {
@@ -24,70 +27,19 @@ export type Reason = {
   informational?: boolean
 }
 
-export function ReasonList({
-  reasons,
-  /** 기본 노출 개수. 나머지는 펼침 버튼 뒤에 둔다 */
-  initialCount = 2,
-  moreLabel = '근거 %d개 더 보기',
-  lessLabel = '근거 접기',
-  className,
-}: {
-  reasons: Reason[]
-  initialCount?: number
-  /** `%d` 가 남은 개수로 치환된다 */
-  moreLabel?: string
-  lessLabel?: string
-  className?: string
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const listId = useId()
-
+export function ReasonList({ reasons, className }: { reasons: Reason[]; className?: string }) {
   if (reasons.length === 0) return null
 
-  const visible = expanded ? reasons : reasons.slice(0, initialCount)
-  const hiddenCount = reasons.length - visible.length
-
   return (
-    <div className={cn('flex flex-col gap-3', className)}>
-      <ul id={listId} className="flex flex-col gap-2">
-        {visible.map((reason, index) => (
-          <li
-            key={`${index}-${reason.description}`}
-            className={cn(
-              'text-body-2',
-              reason.informational === true ? 'text-fg-muted' : 'text-fg',
-            )}
-          >
-            {reason.description}
-          </li>
-        ))}
-      </ul>
-
-      {hiddenCount > 0 && (
-        <button
-          type="button"
-          aria-expanded={expanded}
-          aria-controls={listId}
-          onClick={() => setExpanded(true)}
-          // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
-          className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center self-start font-semibold focus-visible:ring-2 focus-visible:outline-none"
+    <ul className={cn('flex flex-col gap-2', className)}>
+      {reasons.map((reason, index) => (
+        <li
+          key={`${index}-${reason.description}`}
+          className={cn('text-body-2', reason.informational === true ? 'text-fg-muted' : 'text-fg')}
         >
-          {moreLabel.replace('%d', String(hiddenCount))}
-        </button>
-      )}
-
-      {expanded && reasons.length > initialCount && (
-        <button
-          type="button"
-          aria-expanded={expanded}
-          aria-controls={listId}
-          onClick={() => setExpanded(false)}
-          // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
-          className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center self-start font-semibold focus-visible:ring-2 focus-visible:outline-none"
-        >
-          {lessLabel}
-        </button>
-      )}
-    </div>
+          {reason.description}
+        </li>
+      ))}
+    </ul>
   )
 }
