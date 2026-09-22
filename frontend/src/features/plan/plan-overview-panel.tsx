@@ -1,3 +1,4 @@
+import { ChevronRightIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
 import { PetAvatar } from '@/components/pet-avatar'
 import { Skeleton } from '@/components/skeleton'
@@ -6,7 +7,7 @@ import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { PlanStatusBadge } from '@/features/plan/plan-status-badge'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
-import { formatPlanDateRange, planPhaseOf } from '@/lib/plan/date'
+import { formatPlanDateRangeCompact, planPhaseOf } from '@/lib/plan/date'
 import { planPhaseLabel, planPhaseNote } from '@/lib/plan/phase-text'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -22,17 +23,29 @@ import type { PlanDayWeatherItem, PlanDetail } from '@/types/plan'
  * **두 조각을 돌려준다** (`DESIGN.md §0`, #447 · #553 · #732) — 부모 `SurfaceStack` 의
  * 직접 자식이 되어야 카드 간격을 받기 때문에 fragment 다.
  * 1. **제목 줄도 카드다** (#553). 동행 반려견도 여기 든다: "누구와 가는 일정인가" 는
- *    신원의 일부다. **`D-N` + 일자별 판정 스트립도 이 카드 안이다** (#732).
+ *    신원의 일부다. **`D-N` + 일자별 판정 목차도 이 카드 안이다** (#732).
  * 2. **확정 액션** (`action` 슬롯) — 카드가 아니라 바닥 위에 선다. 출발 전에는 비기도
  *    한다 (`planStatusActionLayout`).
  *
- * ### 일자별 판정 목차 카드가 사라졌다 (#732)
+ * ### 카드 안이 세 구획이다 (#841)
  *
- * 셋째 조각이던 `일자별 판정` 목차는 **`hidden lg:block` 카드**였다 — 모바일 1순위
- * 제품에서 전체 판정 요약이 데스크톱 전용이라, 모바일 사용자는 일자 카드를 하나씩 열어야
- * "며칠이 비냐" 를 알 수 있었다. 같은 자료가 이제 개요 카드 안의 한 줄
- * (`PlanPhaseVerdictStrip`)로 **모든 폭에서** 서고, 앵커 링크도 그대로 남는다.
- * **두 자리에 두지 않는다** — 데스크톱에서 같은 자료가 두 번 서고 앵커도 일자마다 둘이 된다.
+ * 예전에는 일곱 줄이 `gap-2` 로 **균등하게** 쌓여 있었다. 그러면 이 카드가 답해야 하는
+ * 질문(`언제 떠나나`)의 답인 `D-3` 이 네 번째 줄에서 날짜 줄과 같은 무게로 서고, 어느
+ * 줄이 신원이고 어느 줄이 상태인지도 간격만으로는 갈리지 않는다. 그래서 1px 선으로
+ * 구획을 나눈다.
+ *
+ * | 구획 | 담는 것 | 답하는 질문 |
+ * |------|---------|-------------|
+ * | 1 신원 | 상태 배지 · 제목 · 동행견 | 무슨 일정인가 |
+ * | 2 상태 | `D-3` · 기간 · 총 일수 · 예산 | 언제 떠나나 |
+ * | 3 목차 | 일자별 적합도 앵커 | 어느 날이 좋은가 |
+ *
+ * **구획 2 의 머리는 `D-3` 이다.** 날짜 줄은 그 아래 캡션으로 내린다 — 남은 일수를 먼저
+ * 읽고 나서 언제인지를 확인하는 순서지, 그 반대가 아니다.
+ *
+ * **목차 카드를 다시 만들지 않는다.** #732 가 걷어낸 것은 `hidden lg:block` **카드**였지
+ * 세로 레이아웃 자체가 아니었다 — 카드를 만들지 않고 개요 카드 **안**에 1px 선으로
+ * 구획을 만들면 모든 폭에서 서므로 그 결정이 그대로 지켜진다 (`PlanVerdictToc`).
  *
  * ### 제목 줄이 카드가 된 이유 (#553)
  *
@@ -82,7 +95,7 @@ export function PlanOverviewPanel({
 }) {
   /*
     **여기만 `여행 중` 이 아니라 `오늘 4일차` 를 쓴다.** 이 줄은 배지 기둥이 아니라 설명
-    줄이고, 바로 왼쪽에 `총 4일` 이 서 있어 며칠째인지가 붙어야 두 값이 서로를 설명한다.
+    줄이고, 바로 아래에 `총 4일` 이 서 있어 며칠째인지가 붙어야 두 값이 서로를 설명한다.
     목록·홈과 어긋난 말이 아니라 **같은 판정에서 나온 더 자세한 말**이다.
   */
   const phase = planPhaseOf(plan.startDate, plan.endDate, today)
@@ -101,57 +114,68 @@ export function PlanOverviewPanel({
     <>
       {/*
         **카드가 `title` 슬롯을 쓰지 않는다.** 그 슬롯은 `h2` 를 그리는데 여기 제목은
-        페이지의 `h1` 이고, 상태 배지·관리 메뉴가 같은 줄에 선다. `aria-label` 도 주지
+        페이지의 `h1` 이고, 상태 배지·관리 메뉴가 그 위 줄에 선다. `aria-label` 도 주지
         않는다 — 안의 `h1` 이 이미 이 묶음의 이름이라 접근성 이름이 둘이 된다
         (`Surface` 머리주석).
       */}
       <Surface>
-        <div className={cn('flex flex-col gap-5 py-4 md:py-5', INSET_CLASS.card)}>
+        <div className={cn('flex flex-col gap-4 py-4 md:py-5', INSET_CLASS.card)}>
+          {/* ── 구획 1: 신원 — 상태 · 제목 · 동행견 */}
           <div className="flex flex-col gap-2">
-            <div className="flex items-start gap-2">
-              {/*
-            제목은 서버 상한 60자다. 좌측 400 에서 2~3줄이 되므로 keep-all 로 어절을 지킨다.
-
-            **`lg:text-display` 는 저장소의 콘텐츠 화면 `h1` 관례다** (#358) — 일정 목록 ·
-            장소 추가 · 일차 재생성 · 장소 상세가 같은 값이다. 여기만 인증 폼 값
-            (`text-title-1 font-bold`)을 쓰고 있어서, 화면 제목이 우측 `N일차`(22/700)와
-            **모든 폭에서 완전히 같았다.** 그래서 좌측 레일의 준비물도 올릴 자리가 없었다.
-          */}
-              <h1 className="text-title-1 text-fg lg:text-display min-w-0 flex-1 font-bold break-keep lg:font-extrabold">
-                {plan.title}
-              </h1>
-              <PlanStatusBadge status={plan.status} className="mt-1" />
-              {/* 제목 줄 우측 상단 — 아이콘 버튼의 히트 영역이 제목 첫 줄과 맞도록 `-mt-1` */}
-              {menu !== null && <div className="-mt-1">{menu}</div>}
+            {/*
+              **`초안` 배지가 제목 줄을 떠났다** (#841). 제목이 2~3줄로 접힐 때 배지가
+              제목 첫 줄 옆에 붙어 있어 x 위치가 제목 길이를 따라 흔들렸다. eyebrow 줄로
+              올리면 `h1` 이 자기 줄을 온전히 쓴다.
+            */}
+            <div className="flex items-center gap-2">
+              <PlanStatusBadge status={plan.status} />
+              {menu !== null && <div className="ml-auto">{menu}</div>}
             </div>
 
-            <p className="text-body-2 text-fg-muted font-medium tabular-nums">
-              {formatPlanDateRange(plan.startDate, plan.endDate)}
-            </p>
-
-            <p className="text-caption text-fg-muted flex flex-wrap gap-x-2 font-medium tabular-nums">
-              <span>{messages.plan.totalDays.replace('{days}', String(plan.totalDays))}</span>
-              <span aria-hidden>·</span>
-              <span>
-                {plan.budget === null
-                  ? messages.plan.budgetEmpty
-                  : `${messages.plan.budgetLabel} ${messages.plan.budgetAmount.replace(
-                      '{amount}',
-                      plan.budget.toLocaleString('ko-KR'),
-                    )}`}
-              </span>
-            </p>
-
             {/*
-              **D-day 가 이 줄로 내려왔다** (#732). 예전에는 바로 위 `총 N일 · 예산` 캡션의
-              마지막 칸이었는데, 시간을 말하는 값이 예산 옆에 붙어 있는 것보다 **그 시간이
-              날마다 어떤지**를 말하는 배지들과 한 줄에 서는 편이 읽힌다. 두 자리에 모두
-              두지 않는다 — 같은 말이 한 카드에 두 번 선다.
+              제목은 서버 상한 60자다. 좌측 400 에서 2~3줄이 되므로 keep-all 로 어절을 지킨다.
+
+              **`lg:text-display` 는 저장소의 콘텐츠 화면 `h1` 관례다** (#358) — 일정 목록 ·
+              장소 추가 · 일차 재생성 · 장소 상세가 같은 값이다.
             */}
-            <PlanPhaseVerdictStrip phaseText={phaseText} verdicts={verdicts} />
+            <h1 className="text-title-1 text-fg lg:text-display font-bold break-keep lg:font-extrabold">
+              {plan.title}
+            </h1>
+
+            <PlanPetCard companions={companions} pending={petPending} />
           </div>
 
-          <PlanPetCard companions={companions} pending={petPending} />
+          {/* ── 구획 2: 상태 — D-day 가 이 카드의 헤드라인이다 (#841) */}
+          <div className="border-border flex flex-col gap-1 border-t pt-4">
+            {phaseText !== null && (
+              <p className="text-title-1 text-fg font-bold tabular-nums">{phaseText}</p>
+            )}
+
+            <p className="text-caption text-fg-muted flex flex-wrap gap-x-2 font-medium tabular-nums">
+              <span>{formatPlanDateRangeCompact(plan.startDate, plan.endDate, today)}</span>
+              <span aria-hidden>·</span>
+              <span>{messages.plan.totalDays.replace('{days}', String(plan.totalDays))}</span>
+              {/*
+                **예산이 없으면 줄이 아예 없다** (#841). `예산 미정` 은 사실이 아니라 빈
+                상태이고, 액션으로 이어지지 않는 빈 상태를 사실처럼 적으면 잡음만 남는다.
+              */}
+              {plan.budget !== null && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>
+                    {messages.plan.budgetLabel}{' '}
+                    {messages.plan.budgetAmount.replace(
+                      '{amount}',
+                      plan.budget.toLocaleString('ko-KR'),
+                    )}
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+
+          {/* ── 구획 3: 일자별 적합도 목차 */}
+          <PlanVerdictToc verdicts={verdicts} />
         </div>
       </Surface>
 
@@ -161,19 +185,39 @@ export function PlanOverviewPanel({
 }
 
 /**
- * 동행 반려견 카드. **조회 실패는 숨김이다** — 카드만 빠지고 오류를 말하지 않는다 (D5).
+ * 동행 반려견. **조회 실패는 숨김이다** — 카드만 빠지고 오류를 말하지 않는다 (D5).
  *
- * **전원을 한 줄씩 세운다** (#218). 목록 행은 `{대표} 외 N마리` 로 줄이지만 여기는 줄이지
- * 않는다 — 일자 판정이 `verdictBasisPet` 으로 부르는 이름이 **반드시 이 카드 안에 있어야**
- * 사용자가 "그 아이가 누구인지" 를 알 수 있다. 최대 5마리라 길어지지 않는다.
+ * **한 마리면 한 줄이다** (#841). #218 이 전원 나열을 요구한 근거는 "일자 판정이
+ * `verdictBasisPet` 으로 부르는 이름이 반드시 이 카드 안에 있어야 한다" 인데, **한 마리면
+ * `basisPetName` 이 `null` 이라 일자 카드가 이름을 부르지 않는다** (`plan-day-verdict.tsx`
+ * 의 `basisPetName` JSDoc). 그 요구는 여러 마리일 때만 생기므로, 여러 마리는 전원을 한
+ * 줄씩 그대로 세운다 — 최대 5마리라 길어지지 않는다.
  */
 function PlanPetCard({ companions, pending }: { companions: readonly Pet[]; pending: boolean }) {
-  if (pending) return <Skeleton className="h-14 w-full" />
+  if (pending) return <Skeleton className="h-7 w-40" />
   if (companions.length === 0) return null
 
+  if (companions.length === 1) {
+    const pet = companions[0] as Pet
+    const traits = [pet.breed, pet.sizeType.name].filter(
+      (part): part is string => part !== null && part.length > 0,
+    )
+
+    return (
+      <div className="flex items-center gap-2">
+        <PetAvatar name={pet.name} size="md" />
+        {/* 한 줄이라 `·` 로 잇는다 — 특성끼리는 공백이다, 구분자가 두 층이면 어디가 경계인지 갈리지 않는다 */}
+        <p className="text-caption text-fg-muted min-w-0 truncate font-medium">
+          <span className="text-fg font-semibold">{pet.name}</span>
+          {traits.length > 0 && ` · ${traits.join(' ')}`}
+        </p>
+      </div>
+    )
+  }
+
   return (
-    // 카드 안이라 선을 긋지 않는다 — 제목 줄과의 간격(20)이 경계다 (#447 · #553)
-    <div className="flex flex-col gap-3">
+    // 카드 안이라 선을 긋지 않는다 — 구획 1 안쪽이고 경계는 아래 구획선이 갖는다 (#447 · #553)
+    <div className="flex flex-col gap-3 pt-1">
       {companions.map((pet) => (
         <PlanPetRow key={pet.petId} pet={pet} />
       ))}
@@ -202,101 +246,83 @@ function PlanPetRow({ pet }: { pet: Pet }) {
 }
 
 /**
- * 스트립에 세우는 일자 수의 상한 (#732).
+ * 목차에 세우는 일자 수의 상한 (#732 · #841).
  *
- * **`두 줄` 이 이 값을 정했다.** 390 에서 카드 안 폭은 358px 이고 한 칸(`1일차` +
- * `적합도 보통` 배지)이 약 132px 이라 줄당 2~3칸이다. 첫 줄은 `D-1` 기둥이 한 자리를
- * 먹으므로 **넷이 두 줄의 상한**이다.
+ * **세로 목록으로 돌아오면서 4 → 7 이 됐다.** 가로 wrap 이던 동안에는 390 에서 두 줄에
+ * 넷이 상한이었다. 세로는 줄당 44px 이라 일곱이면 308px 이고, 그 이상은 요약이 아니라
+ * 목록이 된다. **여행은 최대 30일이다** (`PLAN_PERIOD_MAX_DAYS`) — 넘치는 일자는 개수로만
+ * 말하고 판정 자체는 아래 일자 카드가 그대로 갖는다.
  *
- * **여행은 최대 30일이다** (`PLAN_PERIOD_MAX_DAYS`) — 전부 세우면 요약이 아니라 목록이
- * 되고, 모바일에서 개요 카드가 일자 카드보다 길어진다. 넘치는 일자는 개수로만 말하고
- * 판정 자체는 아래 일자 카드가 그대로 갖는다.
+ * **이름을 바꾸지 않는다** — 값만 바뀌었고 다른 곳이 이 export 를 참조한다.
  */
-export const PLAN_VERDICT_STRIP_MAX_DAYS = 4
+export const PLAN_VERDICT_STRIP_MAX_DAYS = 7
 
 /**
- * `D-N` + 일자별 판정 한 줄 (#732 · 진단 665-4).
+ * 일자별 적합도 목차 (#732 · #841).
  *
- * ## 데스크톱 전용 목차 카드를 대신한다
+ * ## 세로로 돌아왔다
  *
- * 예전에는 같은 자료가 **`hidden lg:block` 카드**(`일자별 판정` 목차)로만 있었다 —
- * 모바일 1순위 제품에서 전체 판정 요약이 데스크톱 전용이었고, 모바일 사용자는 일자 카드를
- * 하나씩 열어야 "며칠이 비냐" 를 알 수 있었다. 스트립은 **모든 폭에서** 서고, 각 칸이
- * 여전히 그 일자로 뛰는 앵커라 목차의 일도 그대로 한다.
+ * #732 는 데스크톱 전용 목차 **카드**를 걷어내고 가로 한 줄로 접었다. 걷어낼 이유였던 것은
+ * `hidden lg:block` 이었지 **세로 레이아웃 자체가 아니었다** — 카드를 만들지 않고 개요 카드
+ * 안에 두면 모든 폭에서 서므로 그 결정이 지켜진다.
  *
- * **두 자리에 두지 않는다.** 카드를 남기고 스트립을 더하면 데스크톱에서 같은 자료가 두 번
- * 서고, 앵커 링크도 일자마다 둘이 된다.
+ * 가로 wrap 이 잃고 있던 것 셋: ① `D-N` 과 같은 줄이라 wrap 되면 마지막 일자가 고아 행이
+ * 됐고 ② 앵커라는 신호(`›`)가 없어 누르는 것인 줄 몰랐고 ③ 배지마다 축 라벨이 붙어
+ * `적합도` 가 한 카드에서 세 번 섰다.
  *
- * ## 무엇을 줄였나
- *
- * 세로 목록(줄당 44px · 일자마다 한 줄)을 **가로 한 줄**로 접었다. 접히면서 잃는 것은
- * 다섯째 일자부터의 배지이고(`PLAN_VERDICT_STRIP_MAX_DAYS`), 얻는 것은 **모바일에서도
- * 보인다**는 사실이다 — 2박 3일이 이 서비스의 기준 일정이라 대부분의 일정은 전부 선다.
- *
- * **축 라벨(`적합도`)을 그대로 둔다.** 짧게 만들자고 떼면 `보통` 이 혼잡도의 `보통` 과
- * 구분되지 않는다 (#652 · `등급배지-축라벨-세부명세.md` D5). 폭은 상한으로 다스린다.
+ * **축 라벨은 섹션 머리가 한 번만 갖는다.** 그래서 배지에 `axis` 를 주지 않는다 — #652 의
+ * 요구("혼잡도의 `보통` 과 구분")를 섹션 라벨이 충족하고, 스크린리더용 이름은 `nav` 의
+ * `aria-label` 이 계속 갖는다. **일자 카드의 배지는 그대로 `axis` 를 단다** — 거기에는
+ * 이 섹션 라벨이 없다.
  */
-function PlanPhaseVerdictStrip({
-  phaseText,
-  verdicts,
-}: {
-  /** `D-1` · `D-DAY` · `오늘 3일차`. 지난 일정·읽을 수 없는 날짜면 `null` */
-  phaseText: string | null
-  verdicts: PlanDayWeatherItem[]
-}) {
-  if (phaseText === null && verdicts.length === 0) return null
+function PlanVerdictToc({ verdicts }: { verdicts: PlanDayWeatherItem[] }) {
+  if (verdicts.length === 0) return null
 
   const shown = verdicts.slice(0, PLAN_VERDICT_STRIP_MAX_DAYS)
   const hidden = verdicts.length - shown.length
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      {phaseText !== null && <span className="text-body-2 text-fg font-bold">{phaseText}</span>}
+    <nav aria-label={messages.plan.verdictTocTitle} className="border-border border-t pt-4">
+      <p className="text-caption text-fg-muted mb-1 font-medium">{messages.plan.verdictTocTitle}</p>
 
-      {shown.length > 0 && (
-        /*
-          목차이므로 `nav` 다 — 카드가 사라지면서 `Surface` 의 `h2` 도 함께 사라졌고,
-          이 묶음의 이름은 이제 `aria-label` 하나가 갖는다.
-        */
-        <nav aria-label={messages.plan.verdictTocTitle}>
-          <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            {shown.map((verdict) => (
-              <li key={verdict.day}>
-                {/* 44px 터치 영역 (D6) — 목차 줄이 갖고 있던 값을 칸으로 옮긴다 */}
-                <a
-                  href={`#${planDayAnchorId(verdict.day)}`}
-                  className="focus-visible:ring-brand-500 inline-flex min-h-11 items-center gap-1 focus-visible:ring-2 focus-visible:outline-none"
-                >
-                  <span className="text-caption text-fg font-medium tabular-nums">
-                    {messages.plan.dayLabel.replace('{day}', String(verdict.day))}
-                  </span>
-                  {verdict.suitabilityLevel === null ? (
-                    // 판정을 못 낸 날을 낮은 등급으로 칠하지 않는다 — 점선 unknown 이다
-                    <MetricBadge tone="unknown" size="sm" axis="suitability">
-                      {messages.plan.verdictTocUnavailable}
-                    </MetricBadge>
-                  ) : (
-                    <MetricBadge
-                      tone={suitabilityTone(verdict.suitabilityLevel.code)}
-                      size="sm"
-                      axis="suitability"
-                    >
-                      {verdict.suitabilityLevel.name}
-                    </MetricBadge>
-                  )}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      )}
+      {/* 줄 사이 선은 저장소 공통 패턴이다 — `ul` 이 갖고 첫 줄은 받지 않는다 */}
+      <ul className="[&>li+li]:border-border flex flex-col [&>li+li]:border-t">
+        {shown.map((verdict) => (
+          <li key={verdict.day}>
+            {/* 44px 터치 영역 (D6) */}
+            <a
+              href={`#${planDayAnchorId(verdict.day)}`}
+              className="focus-visible:ring-brand-500 hover:bg-band flex min-h-11 items-center gap-2 focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <span className="text-body-2 text-fg font-medium tabular-nums">
+                {messages.plan.dayLabel.replace('{day}', String(verdict.day))}
+              </span>
+
+              <span className="ml-auto">
+                {verdict.suitabilityLevel === null ? (
+                  // 판정을 못 낸 날을 낮은 등급으로 칠하지 않는다 — 점선 unknown 이다
+                  <MetricBadge tone="unknown" size="sm">
+                    {messages.plan.verdictTocUnavailable}
+                  </MetricBadge>
+                ) : (
+                  <MetricBadge tone={suitabilityTone(verdict.suitabilityLevel.code)} size="sm">
+                    {verdict.suitabilityLevel.name}
+                  </MetricBadge>
+                )}
+              </span>
+
+              <ChevronRightIcon size={16} className="text-fg-subtle shrink-0" aria-hidden />
+            </a>
+          </li>
+        ))}
+      </ul>
 
       {/* 남은 일자를 없는 척하지 않는다 — 판정 자체는 아래 일자 카드가 그대로 갖는다 */}
       {hidden > 0 && (
-        <span className="text-caption text-fg-muted font-medium tabular-nums">
+        <p className="text-caption text-fg-muted mt-2 font-medium tabular-nums">
           {messages.plan.verdictStripMore.replace('{count}', String(hidden))}
-        </span>
+        </p>
       )}
-    </div>
+    </nav>
   )
 }
