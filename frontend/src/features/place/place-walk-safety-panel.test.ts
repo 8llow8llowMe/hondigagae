@@ -238,8 +238,12 @@ describe('PlaceWalkSafetyPanel — 체감온도 계산 근거', () => {
     가 같은 입력(`render()` 기본값)으로 이미 그것을 증명한다 — 여기 한 줄 더 두면 둘 중
     하나가 죽어도 아무도 모른다. 이 테스트의 고유한 증명은 **라벨이 서고 여는 버튼이
     없다**는 것이다.
+
+    **라벨이 곧 문단이다.** `FeelsLikeBasis` 는 `feelsLikeBasis === null` 이면 문단 전체를
+    렌더하지 않으므로, 라벨이 있다는 것은 문단이 섰다는 뜻이다 — 그 반대 방향은 아래
+    `feelsLikeBasis 가 없으면 라벨도 서지 않는다` 가 잡는다.
   */
-  it('근거 문장이 접힘 없이 선다', () => {
+  it('근거 문단이 펼침 버튼 없이 선다', () => {
     const markup = render()
 
     expect(markup).toContain(messages.place.detailFeelsLikeBasisLabel)
