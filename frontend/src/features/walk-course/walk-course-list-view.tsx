@@ -12,6 +12,8 @@ import {
 } from '@/features/walk-course/walk-course-list-section'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
 import type { WalkCourseListParams } from '@/lib/api/walk-course'
+import { INSET_CLASS } from '@/lib/ui/inset'
+import { cn } from '@/lib/utils/cn'
 import type { WalkCourseFilters } from '@/types/walk-course'
 
 /**
@@ -83,8 +85,12 @@ export function WalkCourseListView({
           간격이 전부 같아 **하나의 5칸짜리 라디오**로 읽혔다 — `활동량 6시간 이내` 를
           고르면 `정렬: 코스 순` 이 풀릴 것처럼 보였다. `FieldGroup` 라벨과 함께 두 축을
           시각적으로 가른다.
+
+          **자기 인셋을 스스로 든다** (#837). `Surface` 는 `{tools}` 를 그대로 뱉고 슬롯이
+          인셋을 지는 규약인데(`surface.tsx`), 여기만 빠져 있어 `활동량` · `정렬` 라벨이
+          카드 인셋 밖(x=0)에 서고 나머지 콘텐츠(x=16)와 세로선이 갈렸다.
         */
-        <div className="flex flex-col gap-4 md:flex-row md:gap-6">
+        <div className={cn('flex flex-col gap-4 md:flex-row md:gap-6', INSET_CLASS.card)}>
           <WalkCourseActivityField
             applied={params.petActivityLevel}
             onChange={(activity) => apply({ ...filters, activity })}
