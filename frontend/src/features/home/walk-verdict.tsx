@@ -315,34 +315,27 @@ export function WalkVerdict({
   )
 }
 
-/** 기본 2개 + 펼침. 서버 순서를 재정렬하지 않는다 */
+/**
+ * 근거 전부. 서버 순서를 재정렬하지 않는다.
+ *
+ * **접지 않는다** (#840). 예전에는 앞 2개만 세우고 나머지를 `근거 N개 더 보기` 버튼 뒤에
+ * 숨겼다 — 접기가 없어 한 번 누르면 끝나는 일회성 버튼이었다.
+ *
+ * 근거는 위 `walkSafetyLevel.description` 이 권하는 행동을 뒷받침하는 문장이고, 세 번째부터
+ * 덜 중요해지지 않는다. 서버가 넷을 보냈으면 넷 다 판정에 쓰였다는 뜻이다. 첫 화면에서만
+ * 둘을 가리고 그 뒤로는 아무 일도 하지 않던 장치라, 접힘이 벌던 세로 공간보다 "왜 위험한지"
+ * 가 반쯤만 보이던 손해가 컸다.
+ */
 function VerdictReasons({ reasons }: { reasons: { description: string }[] }) {
-  const [expanded, setExpanded] = useState(false)
-
   if (reasons.length === 0) return null
-
-  const visible = expanded ? reasons : reasons.slice(0, 2)
-  const hidden = reasons.length - visible.length
 
   return (
     <div className="flex flex-col gap-2">
-      {visible.map((reason, index) => (
+      {reasons.map((reason, index) => (
         <p key={`${index}-${reason.description}`} className="text-body-2 text-fg">
           {reason.description}
         </p>
       ))}
-
-      {hidden > 0 && (
-        <button
-          type="button"
-          aria-expanded={expanded}
-          onClick={() => setExpanded(true)}
-          className="text-body-2 text-link focus-visible:ring-brand-500 flex min-h-11 items-center gap-1 self-start font-semibold focus-visible:ring-2 focus-visible:outline-none"
-        >
-          {messages.home.moreReasons.replace('{n}', String(hidden))}
-          <ChevronDownIcon size={16} />
-        </button>
-      )}
     </div>
   )
 }
