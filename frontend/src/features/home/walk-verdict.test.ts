@@ -299,3 +299,38 @@ describe('WalkVerdict — 등급이 권하는 행동', () => {
     expect(markup).not.toContain('위험 요인이 하나 이상 확인되었습니다.')
   })
 })
+
+/*
+  #840. 이 섹션은 `ReasonList` 를 쓰지 않고 **같은 일을 직접 구현**했다 — 앞 2개만 세우고
+  나머지는 `근거 N개 더 보기` 버튼 뒤에 숨겼다(접기는 없어 한 번 펼치면 끝이었다).
+
+  근거는 등급이 권하는 행동을 뒷받침하는 문장이라 세 번째부터 덜 중요하지 않다. 한 번 열면
+  닫히지 않는 버튼은 그 순간 이후로 아무 일도 하지 않으면서, 첫 화면에서만 문장을 가렸다.
+*/
+describe('WalkVerdict — 근거는 접지 않는다 (#840)', () => {
+  it('근거가 셋 이상이어도 전부 서고 여는 버튼이 없다', () => {
+    const firstDescription = '근거 하나'
+    const reasons = [
+      { code: 'R1', name: '하나', description: firstDescription },
+      { code: 'R2', name: '둘', description: '근거 둘' },
+      { code: 'R3', name: '셋', description: '근거 셋' },
+      { code: 'R4', name: '넷', description: '근거 넷' },
+    ]
+    const markup = render({ ...walkSafety, reasons })
+
+    for (const reason of reasons) {
+      expect(markup).toContain(reason.description)
+    }
+
+    /*
+      **`markup` 전체에 `aria-expanded` 가 없다고 세지 않는다.** 이 화면에는 이 작업이
+      건드리지 않는 펼침이 둘 더 있다 — 모바일 접힘 토글과 체감온도 `InfoTip` 물음표.
+      근거 목록은 패널의 마지막 블록이라, 첫 근거부터 끝까지를 잘라 그 안만 본다.
+    */
+    const reasonsBlock = markup.slice(markup.indexOf(firstDescription))
+
+    expect(reasonsBlock).not.toContain('<button')
+    // 버튼이 사라지면 그것이 들고 있던 ARIA 도 함께 사라진다 — 컨테이너에 남기지 않는다
+    expect(reasonsBlock).not.toContain('aria-expanded')
+  })
+})
