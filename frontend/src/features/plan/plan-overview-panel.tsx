@@ -306,10 +306,23 @@ function PlanVerdictToc({ verdicts }: { verdicts: PlanDayWeatherItem[] }) {
       <ul className="[&>li+li]:border-border flex flex-col [&>li+li]:border-t">
         {shown.map((verdict) => (
           <li key={verdict.day}>
-            {/* 44px 터치 영역 (D6) */}
+            {/*
+              44px 터치 영역 (D6).
+
+              **면만 넓힌다** (`-mx-2 px-2`, #845). 인셋 없이 `hover:bg-band` 만 주면 회색
+              면이 글자에 딱 붙은 각진 띠로 그려져, 호버할 때마다 카드 안에 경계 없는
+              사각형이 하나 뜬다. 음수 마진으로 상쇄하면 **글자의 세로선은 카드 기준선에
+              그대로 남고 면만 좌우 8px 씩 숨을 쉰다** — 같은 이유로 `rounded-md` 를 줘서
+              면과 포커스 링이 둘 다 모서리를 갖는다.
+
+              **`INSET_BLEED_CLASS.card` 로 카드 끝까지 펴지 않는다.** 그러면 줄 사이
+              구분선도 같이 넓어져, 바로 위 구획 2·3 의 구분선(내용 폭)과 **한 카드 안에서
+              선 폭이 두 가지**가 된다. 홈의 `hover:bg-band` 행(`home-view.tsx`)이 카드
+              끝까지 펴는 것은 그 목록이 카드의 본문 전체라 비교 대상이 없기 때문이다.
+            */}
             <a
               href={`#${planDayAnchorId(verdict.day)}`}
-              className="focus-visible:ring-brand-500 hover:bg-band flex min-h-11 items-center gap-2 focus-visible:ring-2 focus-visible:outline-none"
+              className="focus-visible:ring-brand-500 hover:bg-band -mx-2 flex min-h-11 items-center gap-2 rounded-md px-2 focus-visible:ring-2 focus-visible:outline-none"
             >
               <span className="text-body-2 text-fg font-medium tabular-nums">
                 {messages.plan.dayLabel.replace('{day}', String(verdict.day))}

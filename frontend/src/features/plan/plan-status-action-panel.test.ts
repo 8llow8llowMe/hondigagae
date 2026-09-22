@@ -69,3 +69,18 @@ describe('PlanStatusActionPanel — 정방향 액션만 그린다', () => {
     expect(markup).toContain(messages.plan.statusReopenError)
   })
 })
+
+/*
+  **버튼이 위아래 카드와 같은 폭이다** (#845). 래퍼가 `INSET_CLASS.card` 를 달고 있던
+  동안에는 전폭 버튼이 카드보다 좌우 16(모바일) · 20(데스크톱) 씩 좁아, 레일의 세로
+  경계가 이 한 줄에서만 안으로 꺾였다. 근거는 `PlanStatusActionPanel` 머리주석이다.
+*/
+describe('PlanStatusActionPanel — 카드 폭 (#845)', () => {
+  it('래퍼가 카드 인셋을 달지 않는다', () => {
+    expect(render('DRAFT')).not.toContain('px-4 md:px-5')
+  })
+
+  it('버튼은 그대로 전폭이다 — 인셋을 뗀 것이지 폭을 줄인 것이 아니다', () => {
+    expect(render('DRAFT')).toContain('w-full')
+  })
+})
