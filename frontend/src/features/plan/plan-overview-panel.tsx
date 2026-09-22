@@ -258,6 +258,13 @@ function PlanPetRow({ pet }: { pet: Pet }) {
 export const PLAN_VERDICT_STRIP_MAX_DAYS = 7
 
 /**
+ * 목차 섹션 머리의 `id` — `nav aria-labelledby` 가 가리킨다.
+ *
+ * **고정 문자열이어도 안전하다** — 이 패널은 한 화면에 하나만 선다 (좌 레일의 첫 블록).
+ */
+const PLAN_VERDICT_TOC_TITLE_ID = 'plan-verdict-toc-title'
+
+/**
  * 일자별 적합도 목차 (#732 · #841).
  *
  * ## 세로로 돌아왔다
@@ -271,9 +278,14 @@ export const PLAN_VERDICT_STRIP_MAX_DAYS = 7
  * `적합도` 가 한 카드에서 세 번 섰다.
  *
  * **축 라벨은 섹션 머리가 한 번만 갖는다.** 그래서 배지에 `axis` 를 주지 않는다 — #652 의
- * 요구("혼잡도의 `보통` 과 구분")를 섹션 라벨이 충족하고, 스크린리더용 이름은 `nav` 의
- * `aria-label` 이 계속 갖는다. **일자 카드의 배지는 그대로 `axis` 를 단다** — 거기에는
- * 이 섹션 라벨이 없다.
+ * 요구("혼잡도의 `보통` 과 구분")를 섹션 머리(`일자별 적합도`)가 충족한다. **일자 카드의
+ * 배지는 그대로 `axis` 를 단다** — 거기에는 이 섹션 머리가 없다.
+ *
+ * **`aria-label` 이 아니라 `aria-labelledby` 다.** 예전에는 보이는 제목이 없어서
+ * `aria-label` 이 이 묶음의 유일한 이름이었는데, 같은 문구의 `<p>` 를 세우면 랜드마크에
+ * 진입할 때 이름으로 한 번 · 문단으로 또 한 번 읽힌다. 보이는 글자를 가리키면 **보이는
+ * 글자와 읽히는 글자가 갈릴 자리가 없다** (`등급배지-축라벨-세부명세.md` D6 이 축 접두어에
+ * `aria-hidden` 을 주지 않기로 한 것과 같은 논리다).
  */
 function PlanVerdictToc({ verdicts }: { verdicts: PlanDayWeatherItem[] }) {
   if (verdicts.length === 0) return null
@@ -282,8 +294,10 @@ function PlanVerdictToc({ verdicts }: { verdicts: PlanDayWeatherItem[] }) {
   const hidden = verdicts.length - shown.length
 
   return (
-    <nav aria-label={messages.plan.verdictTocTitle} className="border-border border-t pt-4">
-      <p className="text-caption text-fg-muted mb-1 font-medium">{messages.plan.verdictTocTitle}</p>
+    <nav aria-labelledby={PLAN_VERDICT_TOC_TITLE_ID} className="border-border border-t pt-4">
+      <p id={PLAN_VERDICT_TOC_TITLE_ID} className="text-caption text-fg-muted mb-1 font-medium">
+        {messages.plan.verdictTocTitle}
+      </p>
 
       {/* 줄 사이 선은 저장소 공통 패턴이다 — `ul` 이 갖고 첫 줄은 받지 않는다 */}
       <ul className="[&>li+li]:border-border flex flex-col [&>li+li]:border-t">
