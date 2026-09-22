@@ -1,14 +1,13 @@
 'use client'
 
 /*
-  **hook 이 들어와 `'use client'` 가 필수가 됐다** (architecture-guide.md §4 — hook 하나라도
-  쓰면 파일 최상단). 계산 근거 펼침이 `useState`/`useId` 를 쓴다. 이 파일은 예전에도
-  `onClick`(재시도) 을 달고 있었으나 client 부모만 임포트해 우연히 굴러갔다 — 규칙대로 밝힌다.
+  **재시도 `onClick` 때문에 `'use client'` 가 필수다** (architecture-guide.md §4). 예전에는
+  계산 근거 펼침의 `useState`/`useId` 도 함께 걸려 있었지만 접기를 걷으면서 hook 은 사라졌다
+  (#840) — 그래도 `onClick` 은 남아 있다. 지우면 client 부모만 임포트해 우연히 굴러가던
+  예전 상태로 돌아간다.
 
   **지시문이 첫 줄이어야 한다.** 주석을 위에 두면 번들러에 따라 directive 로 인식되지 않는다.
 */
-
-import { useId, useState } from 'react'
 
 import { BasisFootnote } from '@/components/basis-footnote'
 import { ClockIcon } from '@/components/icons'
@@ -177,9 +176,9 @@ export function PlaceWalkSafetyPanel({
       <SaferWindow data={data} />
 
       {/*
-        **맨 아래다.** 접혀 있어도 44px 한 줄을 차지하므로 위에 두면 `SaferWindow` 의
-        조언(실제로 행동을 바꾸는 유일한 줄)이 그만큼 밀린다. 계산 근거는 이 패널에서
-        가장 깊은 층이고, 접힌 각주는 아래에 산다.
+        **맨 아래다.** 접기를 걷어 내면서 문단이 늘 서게 됐으니 (#840) 위에 두면
+        `SaferWindow` 의 조언(실제로 행동을 바꾸는 유일한 줄)이 130자만큼 밀린다.
+        계산 근거는 이 패널에서 가장 깊은 층이고, 각주는 아래에 산다.
       */}
       <FeelsLikeBasis data={data} />
     </div>
@@ -195,21 +194,19 @@ export function PlaceWalkSafetyPanel({
  * 서버가 계속 내려온다 — 두 사실을 한자리에서 처리한다.
  *
  * 지키는 것:
- * - **접어 둔다.** `feelsLikeBasis` 는 산식·입력·임계 출처를 다 담은 130자 문장이다.
- *   펼쳐 두면 판정과 근거 목록 사이에 회색 벽이 서고, 그러면 아무도 읽지 않는다
+ * - **접지 않는다** (#840). 예전에는 130자 문장이 회색 벽이 되는 것을 접기로 막았지만,
+ *   그 벽은 여는 손이 한 번 더 필요한 대가로 산 것이었다 — 이제 정적 라벨이 문장의
+ *   소속을 말하고 위계는 `text-caption`/`text-body-2` 가 가른다
  * - **참고 열지수를 평면에 세우지 않는다.** hero(판정) · 노면(근거) 로 정리된 자리에
  *   세 번째 온도를 더하면 판정값과 참고값이 같은 위계로 읽힌다 — 그것이 이 변경이
  *   고치려는 오독 그 자체다. 값과 `heatIndexBasis`("판정에는 쓰지 않으며…")를 **붙여
  *   두어** 숫자만 떼어 읽히지 않게 한다
  * - **서버 문장을 다시 쓰지 않는다.** 둘 다 완성형이다 (styling-guide.md §7)
- * - **`feelsLikeBasis` 가 없으면 서랍 자체가 없다.** 펼침 라벨이 `체감온도 계산 근거` 라고
- *   말하므로 체감온도 근거가 없는데 열지수만 담아 열면 라벨이 거짓이 된다. BE 도 두 값이
+ * - **`feelsLikeBasis` 가 없으면 문단 자체가 없다.** 라벨이 `체감온도 계산 근거` 라고
+ *   말하므로 체감온도 근거가 없는데 열지수만 담으면 라벨이 거짓이 된다. BE 도 두 값이
  *   같은 `temperature` 에서 나와 **함께 있거나 함께 없다** (`WalkSafetyPresenter`)
  */
 function FeelsLikeBasis({ data }: { data: WalkSafetyResponse }) {
-  const [open, setOpen] = useState(false)
-  const bodyId = useId()
-
   if (data.feelsLikeBasis === null) return null
 
   const heatIndex = formatCelsius(data.heatIndexCelsius)
@@ -217,24 +214,15 @@ function FeelsLikeBasis({ data }: { data: WalkSafetyResponse }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={bodyId}
-        onClick={() => setOpen((prev) => !prev)}
-        // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
-        className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center self-start font-semibold focus-visible:ring-2 focus-visible:outline-none"
-      >
-        {open ? messages.place.detailFeelsLikeBasisClose : messages.place.detailFeelsLikeBasisOpen}
-      </button>
-
       {/*
-        **`open && (...)` 이 아니라 `hidden` 이다.** 접힘을 조건부 렌더로 만들면 위 버튼의
-        `aria-controls` 가 없는 id 를 가리키고, 그 순간 보조기기에게 이 버튼은 무엇을
-        여는지 알 수 없는 버튼이 된다. 여기는 몸통 전체가 접힘 대상이라 조건부 렌더면
-        가리킬 몸통 자체가 사라진다. `hidden` 은 a11y 트리에서도 빠진다.
+        **버튼이 아니라 라벨이다** (#840). 접기를 걷으면서 `aria-expanded`/`aria-controls`
+        도 함께 사라졌다 — 여는 것이 없으므로 가리킬 몸통도 없다.
       */}
-      <div id={bodyId} hidden={!open} className="flex flex-col gap-3">
+      <p className="text-caption text-fg-muted font-semibold">
+        {messages.place.detailFeelsLikeBasisLabel}
+      </p>
+
+      <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
           <p className="text-body-2 text-fg-muted">{data.feelsLikeBasis}</p>
           {/*

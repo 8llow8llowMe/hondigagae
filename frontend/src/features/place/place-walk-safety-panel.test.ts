@@ -107,9 +107,9 @@ describe('PlaceWalkSafetyPanel — 등급과 수치', () => {
   */
   /*
     **`feelsLikeBasis` 도 같이 비운다.** BE 는 두 값을 같은 `temperature` 에서 내므로 값이
-    없으면 근거 문장도 없다 (`WalkSafetyPresenter`). 근거만 남겨 두면 펼침 라벨
-    (`체감온도 계산 근거 보기`)이 `체감온도` 를 품고 있어 이 단정이 값 때문인지 라벨
-    때문인지 가릴 수 없다.
+    없으면 근거 문장도 없다 (`WalkSafetyPresenter`). 근거만 남겨 두면 근거 라벨
+    (`체감온도 계산 근거`)이 `체감온도` 를 품고 있어 이 단정이 값 때문인지 라벨 때문인지
+    가릴 수 없다.
   */
   it('체감온도가 없으면 라벨도 렌더하지 않는다', () => {
     const markup = render({
@@ -185,27 +185,14 @@ describe('PlaceWalkSafetyPanel — 판정값과 참고값의 위계 (#292)', () 
   })
 
   /*
-    **참고 열지수는 접힌 서랍 안에만 있다.** 평면에 세 번째 온도로 세우면 판정값과 참고값이
-    같은 위계로 읽히고, 그것이 이 변경이 고치려는 오독 그 자체다.
+    **참고 열지수는 계산 근거 문단 안에만 있다.** 평면에 세 번째 온도로 세우면 판정값과
+    참고값이 같은 위계로 읽히고, 그것이 이 변경이 고치려는 오독 그 자체다.
   */
   it('참고 열지수는 판정 라벨이 아니라 `참고` 라벨을 단다', () => {
     const markup = render()
 
     expect(markup).toContain(messages.place.detailHeatIndexReference)
     expect(markup).toContain('40.2')
-  })
-
-  /*
-    **접혀서 시작한다.** `feelsLikeBasis` 는 130자 문장이라 펼쳐 두면 판정과 근거 목록
-    사이에 회색 벽이 선다. `hidden` 이므로 마크업에는 있고 화면에는 없다.
-  */
-  it('계산 근거는 접힌 상태로 시작한다', () => {
-    const markup = render()
-
-    expect(markup).toContain(messages.place.detailFeelsLikeBasisOpen)
-    expect(markup).not.toContain(messages.place.detailFeelsLikeBasisClose)
-    expect(markup).toContain('aria-expanded="false"')
-    expect(markup).toContain('hidden=""')
   })
 
   /*
@@ -220,13 +207,12 @@ describe('PlaceWalkSafetyPanel — 판정값과 참고값의 위계 (#292)', () 
   })
 
   /*
-    **`feelsLikeBasis` 가 없으면 서랍 자체가 없다.** 펼침 라벨이 체감온도 근거라고 말하므로
-    체감온도 근거 없이 열지수만 담아 열면 라벨이 거짓이 된다.
+    **`feelsLikeBasis` 가 없으면 문단 자체가 없다.** 라벨이 체감온도 근거라고 말하므로
+    체감온도 근거 없이 열지수만 담으면 라벨이 거짓이 된다.
   */
-  it('체감온도 근거가 없으면 서랍을 만들지 않는다', () => {
+  it('체감온도 근거가 없으면 참고 열지수도 담지 않는다', () => {
     const markup = render({ data: { ...walkSafety, feelsLikeBasis: null } })
 
-    expect(markup).not.toContain(messages.place.detailFeelsLikeBasisOpen)
     expect(markup).not.toContain(messages.place.detailHeatIndexReference)
   })
 
@@ -239,9 +225,31 @@ describe('PlaceWalkSafetyPanel — 판정값과 참고값의 위계 (#292)', () 
       data: { ...walkSafety, heatIndexCelsius: null, heatIndexBasis: null },
     })
 
-    expect(markup).toContain(messages.place.detailFeelsLikeBasisOpen)
+    expect(markup).toContain(messages.place.detailFeelsLikeBasisLabel)
     expect(markup).toContain('기상청 여름철 체감온도 산식으로 계산했습니다')
     expect(markup).not.toContain(messages.place.detailHeatIndexReference)
+  })
+})
+
+/* 계산 근거를 접지 않는다 (#840) — 서랍이 사라지고 라벨 + 문장이 늘 선다 */
+describe('PlaceWalkSafetyPanel — 체감온도 계산 근거', () => {
+  it('근거 문장이 접힘 없이 선다', () => {
+    const markup = render()
+
+    expect(markup).toContain(messages.place.detailFeelsLikeBasisLabel)
+    expect(markup).toContain('기상청 여름철 체감온도 산식으로 계산했습니다')
+    expect(markup).not.toContain('aria-expanded')
+  })
+
+  /*
+    `render` 헬퍼는 **props** 오버라이드를 받는다. `feelsLikeBasis` 는 `data` 안의 필드라
+    이 파일의 다른 테스트와 같은 모양(`data: { ...walkSafety, … }`)으로 준다 — 헬퍼에
+    응답 필드용 두 번째 인자를 더하면 오버라이드가 두 층으로 갈린다.
+  */
+  it('feelsLikeBasis 가 없으면 라벨도 서지 않는다', () => {
+    const markup = render({ data: { ...walkSafety, feelsLikeBasis: null } })
+
+    expect(markup).not.toContain(messages.place.detailFeelsLikeBasisLabel)
   })
 })
 
