@@ -345,34 +345,48 @@ describe('WalkCourseListSection — 접근성 계약 (D6)', () => {
 /*
   #800. **로딩과 결과가 같은 골격이어야 전환에서 줄이 튀지 않는다.**
 
-  높이를 문자열로 잴 수는 없으니 **골격을 만드는 클래스와 열 머리 유무**를 잠근다 —
-  1024 실측에서 고치기 전 스켈레톤은 101px, 실제 행은 73px 이었고(6행이면 168px),
-  같은 클래스를 쓰게 한 뒤 둘 다 73px 로 붙었다.
+  높이를 문자열로 잴 수는 없으니 **골격을 만드는 클래스**를 잠근다 — 1024 실측에서 고치기
+  전 스켈레톤은 101px, 실제 행은 73px 이었다(6행이면 168px). 카드로 바뀌어도(#837) 규칙은
+  같고, 잠글 클래스만 카드의 것으로 옮겼다.
 */
-describe('WalkCourseListSection — 로딩 골격이 실제 행과 같다 (#800)', () => {
-  const GRID = 'walk-course-row-grid lg:grid lg:min-h-18 lg:items-center lg:gap-5 lg:py-4'
+describe('WalkCourseListSection — 로딩 골격이 실제 카드와 같다 (#800 · #837)', () => {
+  const CARD = 'border-border bg-bg block h-full'
+  const GRID = 'grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5 xl:grid-cols-3'
 
-  it('스켈레톤 행이 실제 행과 같은 그리드 클래스를 쓴다', () => {
-    const loading = render({ loading: true })
-    const loaded = render()
-
-    expect(loading).toContain(GRID)
-    expect(loaded).toContain(GRID)
+  it('스켈레톤이 실제 카드와 같은 상자 클래스를 쓴다', () => {
+    expect(render({ loading: true })).toContain(CARD)
+    expect(render()).toContain(CARD)
   })
 
-  /** 열 머리가 결과에만 있으면 전환 순간 한 줄이 새로 끼어들어 아래가 통째로 밀린다 */
-  it('열 머리가 로딩에도 있다', () => {
-    const head = messages.walkCourse.columnCourseLabel
-
-    expect(render({ loading: true })).toContain(head)
-    expect(render()).toContain(head)
+  it('두 상태가 같은 그리드에 선다 — 열 수가 바뀌면 전환에서 카드가 옮겨 앉는다', () => {
+    expect(render({ loading: true })).toContain(GRID)
+    expect(render()).toContain(GRID)
   })
 
-  /** 1024 미만은 3줄 블록 그대로다 — 거기서는 실제 행도 같은 모양이라 건드리지 않았다 */
-  it('1024 미만 뼈대 두 줄은 lg 에서만 감춘다', () => {
-    const loading = render({ loading: true })
+  /**
+   * **사진 자리를 로딩에도 만든다** (#837 에서 뒤집은 자리). 표 시절에는 29개 중 25개에
+   * 이미지가 없어 자리를 비워 두는 쪽이 맞았는데, 29/29 가 된 지금은 카드에서 가장 큰
+   * 덩어리라 비워 두면 그만큼 점프한다.
+   */
+  it('사진 자리가 로딩에도 있다', () => {
+    /*
+      기본 fixture(`WALK_COURSE_PLAIN`)는 `firstImage` 가 null 이라 결과 쪽 사진은
+      이미지를 가진 fixture 로 잰다 — 그래야 "둘 다 사진 자리를 만든다" 가 성립한다.
+    */
+    expect(render({ loading: true })).toContain('aspect-16/10')
+    expect(render({ courses: [WALK_COURSE_WITH_COORDS] })).toContain('aspect-16/10')
+  })
 
-    expect(loading).toContain('mt-1 h-5 w-32 lg:hidden')
-    expect(loading).toContain('mt-1 h-4 w-1/2 lg:hidden')
+  /**
+   * **열 머리가 사라졌다** (#837). 표였을 때는 결과에만 있으면 전환 순간 한 줄이 끼어들어
+   * 아래가 통째로 밀렸는데(그래서 로딩에도 세웠다), 카드 그리드에는 머리가 없다.
+   *
+   * **`columnCourseLabel`(`코스`)로 재지 않는다** — 그 낱말은 제목(`제주올레 코스`)과
+   * 캡션(`코스 29개`)에도 있어 열 머리가 사라져도 초록이 되는 false-green 이었다.
+   * 열 머리만의 흔적인 그리드 클래스로 잰다.
+   */
+  it('열 머리를 그리지 않는다', () => {
+    expect(render({ loading: true })).not.toContain('walk-course-row-grid')
+    expect(render()).not.toContain('walk-course-row-grid')
   })
 })
