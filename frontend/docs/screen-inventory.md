@@ -597,7 +597,10 @@
   존재 검증에서 빠진다 — **틀린 `walkCourseId` 가 조용히 저장되고** 그 항목은 상세에서 `walkCourse: null` 로
   온다. `PLAN_004` 가 나지 않으므로 화면이 id 를 가공하지 않는다 (`docs/features/plan/올레담기-세부명세.md` D3-3).
 - **`WALK` 의 `targetId` 는 `walk_course.id` 다.** `place.id` 가 아니므로 **`/places/{id}` 링크를 만들지 않는다** —
-  `plan-item-row.tsx:73-77` 주석과 `lib/plan/detail.test.ts:89` · `lib/plan/day-items.test.ts:206` 이 막고 있다.
+  `plan-item-row.tsx` 의 `PlanItemRow` `href` 주석과 `lib/plan/detail.test.ts` 의
+  `it('WALK 는 walk_course.id 라 부르지 않는다 — 남의 id 로 404 를 만든다')` ·
+  `lib/plan/day-items.test.ts` 의 `it('WALK 의 targetId 는 walk_course.id 라 장소로 세지 않는다')` 이
+  막고 있다.
 - **일정 항목 응답에 `walkCourse` 요약이 생겼다** (BE `efef555e` 2026-09-17 · #619). `PlanItemDetailItem.walkCourse`
   = `name`·`courseLabel`·`distanceKm`·`durationText`·`durationMaxMinutes`·`lat`/`lng`·`firstImage`·`fitsActivityLevels`.
   **`docs/api/openapi/*.json` 스냅샷(2026-09-14)보다 뒤에 들어와 스냅샷에는 없다** — dev 게이트웨이 실측(2026-09-18)으로
