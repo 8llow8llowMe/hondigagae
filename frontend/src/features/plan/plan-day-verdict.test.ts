@@ -227,9 +227,9 @@ describe('PlanDayVerdict — 판정 불가 사유마다 말이 다르다 (#497)'
  */
 function verdictBadgeClass(html: string): string {
   const name = planVerdict.suitabilityLevel?.name ?? ''
-  const match = new RegExp(`<span class="([^"]*)"><span class="[^"]*">[^<]*</span>${name}</span>`).exec(
-    html,
-  )
+  const match = new RegExp(
+    `<span class="([^"]*)"><span class="[^"]*">[^<]*</span>${name}</span>`,
+  ).exec(html)
 
   if (match === null) throw new Error('판정 배지를 찾지 못했다')
 
