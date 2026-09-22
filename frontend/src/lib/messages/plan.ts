@@ -398,7 +398,18 @@ export const planMessages = {
    * 기준 값이 나란히 서지 않지만, 화면마다 이름이 갈리면 그 구분 자체가 무너진다.
    */
   verdictFeelsLikeLabel: '최고 체감온도',
-  walkAction: '이 날 산책',
+  /**
+   * 일자 액션 줄의 산책 링크 (#842). **판정 줄에서 내려오면서 목적지를 말하게 했다** —
+   * `이 날 산책` 은 링크가 아니라 행동으로 읽혔다 (#653 의 남은 지적).
+   *
+   * **`산책 코스` 라고 부르지 않는다.** 이슈 #842 본문은 그 문구를 제안했지만, 이 저장소에서
+   * `산책 코스` 는 `walkCourse` · `/walk-courses` 라는 **별개 도메인**이고 이 링크가 가는
+   * 곳은 `/places/{representativePlaceId}` 즉 그 날 **기준 장소의 상세**다. 목적지를
+   * 말하려다 틀린 목적지를 말하게 된다.
+   *
+   * `위험도` 인 이유는 그 화면이 이 축을 소유하기 때문이다 (`place-walk-safety-panel.tsx`).
+   */
+  walkAction: '이 날 산책 위험도',
 
   indoorAlternativesTitle: '비가 오면 갈 만한 실내',
 
