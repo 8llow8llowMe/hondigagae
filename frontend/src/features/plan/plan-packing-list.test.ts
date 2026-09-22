@@ -244,6 +244,17 @@ describe('PackingListPanel — 빈 상태 (#841)', () => {
   })
 
   /*
+    **실패 갈래는 반대다.** 그쪽 래퍼는 `flex-col` 이라 `align-items` 기본값이 `stretch`
+    이고, 버튼이 정렬을 스스로 들지 않으면 **카드 폭 전체로 늘어나** 바로 위
+    `다시 시도`(`md`)보다 넓게 선다 — 더 작은 버튼이 더 넓은 색면을 갖는다.
+  */
+  it('실패 갈래의 직접 추가는 정렬을 스스로 갖는다 — 카드 폭으로 늘어나지 않게', () => {
+    expect(buttonTag(render({ generateFailed: true }), messages.plan.packingAddAction)).toContain(
+      'self-start',
+    )
+  })
+
+  /*
     다시 눌렀을 때 무엇이 만들어지는지가 화면에 있어야 한다. **`직접 추가` 도 남는다** —
     생성이 막힌 사람에게는 직접 적는 것이 준비물을 남기는 유일한 길이라, 이 갈래에서 빼면
     화면이 할 수 있는 일을 감추는 것이 된다.

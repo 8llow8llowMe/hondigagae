@@ -294,7 +294,14 @@ function Intro(props: PackingListPanelProps) {
     **두 번째 진입점**이라 테두리를 갖는다 — `ghost` 는 맨텍스트로 읽혀 절이 미완성처럼
     보였다. `Result` 에서는 같은 버튼이 `ghost` 로 남는다(그쪽 근거는 호출부 주석).
   */
-  const addSection = <AddSection {...props} categories={[]} collapsedVariant="secondary" />
+  const addSection = (collapsedClassName: string | undefined) => (
+    <AddSection
+      {...props}
+      categories={[]}
+      collapsedVariant="secondary"
+      {...(collapsedClassName === undefined ? {} : { collapsedClassName })}
+    />
+  )
 
   return (
     <div className="flex flex-col gap-3">
@@ -330,9 +337,17 @@ function Intro(props: PackingListPanelProps) {
         화면에 있어야 한다.
       */}
       {generateFailed ? (
+        /*
+          **여기서는 접힘 버튼이 `self-start` 를 스스로 든다** — `Result` 와 같은 처리다.
+          이 래퍼는 `flex-col` 이라 `align-items` 기본값이 `stretch` 이고, 주지 않으면
+          `sm` 버튼이 카드 폭 전체로 늘어나 **바로 위 `다시 시도`(`md`)보다 넓게 선다.**
+
+          래퍼에 `items-start` 를 주는 쪽은 택하지 않았다 — `ErrorState` 루트까지 내용
+          폭으로 줄어들어 오류 면이 카드 폭을 잃는다.
+        */
         <div className="flex flex-col gap-3">
           <ErrorState inset="card" title={messages.plan.packingErrorTitle} onRetry={onGenerate} />
-          {addSection}
+          {addSection('self-start')}
         </div>
       ) : (
         /*
@@ -348,7 +363,7 @@ function Intro(props: PackingListPanelProps) {
         */
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={onGenerate}>{messages.plan.packingCta}</Button>
-          {addSection}
+          {addSection(undefined)}
         </div>
       )}
     </div>
