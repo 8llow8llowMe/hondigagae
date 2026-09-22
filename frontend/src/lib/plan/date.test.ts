@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { planItemTimeLabel, totalDaysBetween } from '@/lib/plan/date'
+import {
+  formatPlanDateRange,
+  formatPlanDateRangeCompact,
+  planItemTimeLabel,
+  totalDaysBetween,
+} from '@/lib/plan/date'
 
 describe('totalDaysBetween — 담기 전에는 서버가 totalDays 를 주지 않는다', () => {
   it('양끝을 포함해 센다', () => {
@@ -60,5 +65,36 @@ describe('항목 시작 시각 (planItemTimeLabel)', () => {
   it('모양이 다르면 읽지 않는다', () => {
     expect(planItemTimeLabel('오전 10시')).toBeNull()
     expect(planItemTimeLabel('')).toBeNull()
+  })
+})
+
+const TODAY = new Date('2026-09-22T00:00:00+09:00')
+
+describe('formatPlanDateRangeCompact — 올해 일정은 연도를 뗀다 (#841)', () => {
+  it('올해 일정이면 연도가 없다', () => {
+    expect(formatPlanDateRangeCompact('2026-09-25', '2026-09-27', TODAY)).toBe(
+      '9월 25일 (금) – 9월 27일 (일)',
+    )
+  })
+
+  it('하루짜리도 연도가 없다', () => {
+    expect(formatPlanDateRangeCompact('2026-09-25', '2026-09-25', TODAY)).toBe('9월 25일 (금)')
+  })
+
+  /* 내년 일정에서 연도를 떼면 언제인지 알 수 없어진다 */
+  it('다른 해가 끼면 기존 형식 그대로다', () => {
+    expect(formatPlanDateRangeCompact('2026-12-30', '2027-01-02', TODAY)).toBe(
+      formatPlanDateRange('2026-12-30', '2027-01-02'),
+    )
+    expect(formatPlanDateRangeCompact('2027-03-01', '2027-03-03', TODAY)).toBe(
+      formatPlanDateRange('2027-03-01', '2027-03-03'),
+    )
+  })
+
+  /* 읽을 수 없는 날짜는 기존 함수의 폴백(입력 문자열)을 그대로 쓴다 */
+  it('형식이 깨진 날짜는 기존 함수에 맡긴다', () => {
+    expect(formatPlanDateRangeCompact('깨짐', '2026-09-27', TODAY)).toBe(
+      formatPlanDateRange('깨짐', '2026-09-27'),
+    )
   })
 })
