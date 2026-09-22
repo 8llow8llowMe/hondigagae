@@ -68,6 +68,34 @@ export function formatPlanDateRange(startDate: string, endDate: string): string 
   return `${startLabel} – ${endLabel}`
 }
 
+/**
+ * 개요 카드의 날짜 줄 — `9월 25일 (금) – 9월 27일 (일)` (#841).
+ *
+ * **올해 일정에서만 연도를 뗀다.** 일차 카드(`formatPlanDay`)와 형식을 맞춰 같은 값이 한
+ * 화면에서 두 형식으로 서던 것을 없앤다. 내년 일정에서까지 떼면 언제인지 알 수 없어지므로,
+ * 한쪽이라도 다른 해면 `formatPlanDateRange` 를 그대로 돌려준다.
+ */
+export function formatPlanDateRangeCompact(
+  startDate: string,
+  endDate: string,
+  today: Date,
+): string {
+  const thisYear = String(today.getFullYear())
+  if (startDate.slice(0, 4) !== thisYear || endDate.slice(0, 4) !== thisYear) {
+    return formatPlanDateRange(startDate, endDate)
+  }
+
+  const startLabel = formatPlanDay(startDate)
+  // 읽을 수 없는 날짜는 기존 함수의 폴백에 맡긴다 — 여기서 형식을 또 정하지 않는다
+  if (startLabel === null) return formatPlanDateRange(startDate, endDate)
+  if (startDate === endDate) return startLabel
+
+  const endLabel = formatPlanDay(endDate)
+  if (endLabel === null) return formatPlanDateRange(startDate, endDate)
+
+  return `${startLabel} – ${endLabel}`
+}
+
 /** 일정이 오늘 기준 어디에 있는지. 갈래별 설명은 {@link planPhaseOf} 에 있다. */
 export type PlanPhase =
   { kind: 'upcoming'; days: number } | { kind: 'ongoing'; day: number } | { kind: 'past' }
