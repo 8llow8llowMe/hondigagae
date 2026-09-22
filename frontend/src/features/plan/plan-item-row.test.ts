@@ -665,3 +665,55 @@ describe('PlanItemRow — 썸네일 폴백', () => {
     expect(html).toMatch(/<img[^>]*src="\/illustrations\/place-restaurant\.svg"[^>]*alt=""/)
   })
 })
+
+/**
+ * 순번 칩 (#856).
+ *
+ * **자료가 아니라 순서 표시다** — `aria-hidden` 이고 행 순서는 목록 구조가 이미 말한다.
+ * 그런데 예전에는 `bg-fg`(#15181d) 검정 사각이라, 장식이 화면에서 가장 진한 면을 쓰고
+ * 있었다. #842 의 일러스트 폴백(밝은 파스텔 타일)이 들어오며 더 도드라졌다.
+ */
+describe('PlanItemRow — 순번 칩 (#856)', () => {
+  /*
+    **칩의 여는 태그만 추린다.** 마크업 전체에서 클래스를 세면 썸네일 컨테이너·일러스트가
+    쓰는 같은 문자열(`rounded-md` · `absolute`)에 속아 통과한다.
+  */
+  function chipTag(html: string): string {
+    const match = /<span aria-hidden="true" class="([^"]*)">1<\/span>/.exec(html)
+
+    if (match === null) throw new Error('순번 칩을 찾지 못했다')
+
+    return match[1] ?? ''
+  }
+
+  it('검정 사각이 아니라 흰 원형이다', () => {
+    const chip = chipTag(renderThumbnail({ firstImage: null, itemTypeCode: 'MEAL' }))
+
+    expect(chip).toContain('bg-bg')
+    expect(chip).toContain('rounded-full')
+    expect(chip).not.toContain('bg-fg')
+    expect(chip).not.toContain('rounded-sm')
+  })
+
+  /*
+    **그림자가 아니라 1px 테두리다.** 흰 칩이 밝은 타일 위에 서면 경계가 사라지는데,
+    그림자는 이 저장소에서 떠 있는 것 전용이다 (`token-usage.test.ts` 의 `FLOATING`).
+    순번 칩은 썸네일에 붙어 있지 떠 있지 않다.
+  */
+  it('경계를 테두리로 낸다 — 그림자를 쓰지 않는다', () => {
+    const chip = chipTag(renderThumbnail({ firstImage: null, itemTypeCode: 'MEAL' }))
+
+    expect(chip).toMatch(/\bborder\b/)
+    expect(chip).toContain('border-border-strong')
+    expect(chip).not.toContain('shadow')
+  })
+
+  /* 모양만 바꾼다 — 스페이싱 스케일 밖 값을 새로 들이지 않는다 (DESIGN.md §4) */
+  it('크기와 자리는 그대로다', () => {
+    const chip = chipTag(renderThumbnail({ firstImage: null, itemTypeCode: 'MEAL' }))
+
+    expect(chip).toContain('size-5')
+    expect(chip).toContain('top-1')
+    expect(chip).toContain('left-1')
+  })
+})

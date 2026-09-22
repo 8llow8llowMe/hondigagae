@@ -4,6 +4,7 @@ import Link from 'next/link'
 
 import { Button } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
+import { RainIcon } from '@/components/icons'
 import { formatDistance } from '@/lib/format/distance'
 import { messages } from '@/lib/messages'
 import { shortAddress } from '@/lib/place/address'
@@ -54,12 +55,34 @@ export function PlanIndoorAlternatives({
   if (alternatives.length === 0) return null
 
   return (
-    <div className="border-border border-t py-4">
-      <h4 className="text-caption text-fg-muted font-semibold">
+    /*
+      **면으로 묶는다** (#856). 예전에는 `border-t` 1px 하나로만 갈렸는데 그 선이 **항목 행
+      사이 구분선과 색·굵기가 같아**, 담긴 일정이 아니라 **제안**이라는 사실을 말하는 신호가
+      제목 글자 하나뿐이었다 — 훑으면 "다음 항목" 으로 읽힌다.
+
+      **`--band` 는 L2(아이템 채움)라 3층 표면 규칙 안이다** (DESIGN.md §0). 판정 밴드가
+      카드 안에서 tint 면으로 자기 영역을 갖는 것과 같은 문법이고, 이쪽은 등급이 아니라
+      제안이라 등급 tint 가 아닌 중립 면을 쓴다.
+    */
+    <div className="bg-band mt-4 rounded-md px-4 py-3">
+      <h4 className="text-caption text-fg-muted flex items-center gap-1.5 font-semibold">
+        {/*
+          조건(비)을 낱말보다 먼저 말한다 — 제목이 이미 낱말로 말하므로 장식이다
+          (`Svg` 가 `aria-hidden` 을 이미 준다). **저장소 아이콘 세트의 `RainIcon` 이다** —
+          같은 조건을 홈 날씨 줄이 같은 그림으로 말한다.
+        */}
+        <RainIcon size={14} className="shrink-0" />
         {messages.plan.indoorAlternativesTitle}
       </h4>
 
-      <ul className="mt-2 flex flex-col">
+      {/*
+        **줄 사이 선은 `ul` 이 갖고 첫 줄은 받지 않는다** — 저장소 공통 패턴이다
+        (`plan-overview-panel.tsx` 의 목차와 같다). 면이 블록을 묶고 선이 그 안을 나눈다.
+
+        **선 색이 `--border` 가 아니다.** `--band` 면 위에서 `--border`(#e3e5ea)는 면보다
+        밝아 묻힌다 — 한 단 진한 `--border-strong` 을 쓴다.
+      */}
+      <ul className="[&>li+li]:border-border-strong mt-1 flex flex-col [&>li+li]:border-t">
         {alternatives.map((alternative) => (
           <PlanIndoorAlternativeRow
             key={alternative.placeId}
