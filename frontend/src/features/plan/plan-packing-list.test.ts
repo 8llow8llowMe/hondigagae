@@ -58,9 +58,6 @@ function saved(
 /** 아직 만든 적 없다 — `items` 가 비고 `generatedAt` 이 null 인 갈래 */
 const NEVER_GENERATED = saved([], { generatedAt: null })
 
-/** 기본 동행견. `packingIntroFallbackPet`('반려견')과 겹치지 않는 이름이라 폴백과 갈린다 */
-const PET_NAME = '초코'
-
 function render(overrides: Partial<PackingListPanelProps> = {}) {
   const props: PackingListPanelProps = {
     list: NEVER_GENERATED,
@@ -76,7 +73,6 @@ function render(overrides: Partial<PackingListPanelProps> = {}) {
     adding: false,
     addError: null,
     actionError: null,
-    petName: PET_NAME,
     ...overrides,
   }
 
@@ -84,17 +80,14 @@ function render(overrides: Partial<PackingListPanelProps> = {}) {
 }
 
 /**
- * 화면에 실제로 서는 안내 문장 — `{petName}` 치환까지 마친 것이다 (#841).
+ * `text` 를 라벨로 갖는 버튼의 여는 태그. 외형(variant)을 클래스로 확인할 때 쓴다.
  *
- * `messages.plan.packingIntro` 를 그대로 단언하면 치환자가 남아 있어 영영 맞지 않는다.
+ * **닫는 태그까지 붙여 찾는다.** 글자만 찾으면 **다른 요소의 본문에 걸린다** —
+ * `packingRegenerateNote`('다시 만들어도 **직접 추가**한 것과…')가 `Result` 에서 버튼보다
+ * 먼저 나와서, 그때 돌아오는 것은 바로 위 재생성 버튼의 태그였다(조용히 통과했다).
  */
-function intro(petName: string = PET_NAME) {
-  return messages.plan.packingIntro.replace('{petName}', petName)
-}
-
-/** `text` 를 그리는 버튼의 여는 태그. 외형(variant)을 클래스로 확인할 때 쓴다 */
 function buttonTag(markup: string, text: string) {
-  const at = markup.indexOf(text)
+  const at = markup.indexOf(`>${text}</button>`)
   expect(at).toBeGreaterThan(-1)
 
   return markup.slice(markup.lastIndexOf('<button', at), at)
@@ -104,7 +97,7 @@ describe('PackingListPanel — 상태 배타성', () => {
   it('만들기 전에는 무엇을 근거로 만드는지 먼저 말한다', () => {
     const markup = render()
 
-    expect(markup).toContain(intro())
+    expect(markup).toContain(messages.plan.packingIntro)
     expect(markup).toContain(messages.plan.packingCta)
   })
 
@@ -143,7 +136,7 @@ describe('PackingListPanel — 상태 배타성', () => {
     const markup = render({ loading: true, list: null })
 
     expect(markup).not.toContain(messages.plan.packingCta)
-    expect(markup).not.toContain(intro())
+    expect(markup).not.toContain(messages.plan.packingIntro)
   })
 })
 
@@ -201,16 +194,15 @@ describe('PackingListPanel — 빈 상태 (#841)', () => {
     expect(render()).toContain('/illustrations/packing-empty.svg')
   })
 
-  it('안내 문장이 대표 동행견 이름으로 치환된다', () => {
-    const markup = render({ petName: '몽실이' })
-
-    expect(markup).toContain('몽실이의 특성을')
-    expect(markup).not.toContain('{petName}')
-  })
-
-  /** 동행견을 못 찾아도 이름을 지어내지 않는다 */
-  it('동행견이 없으면 반려견으로 떨어진다', () => {
-    expect(render({ petName: null })).toContain(intro(messages.plan.packingIntroFallbackPet))
+  /*
+    **반려견 이름으로 채우지 않는다.** 대표 아이 이름(`{petName}`)으로 치환하는 안을
+    #841 이 적었다가 걷었다 — #179 로 서버가 **동행 반려견 전체**를 근거로 삼는데 몇
+    마리가 실제로 들어갔는지 응답에 없어서, 한 아이 이름만 말하면 `packingSinglePetNote`
+    ('대표 반려견 기준이에요')가 지워진 이유가 그대로 되살아난다. 치환자가 남아 있으면
+    화면에 `{petName}` 이 그대로 그려지므로 그것도 함께 막는다.
+  */
+  it('안내 문장에 치환자가 남아 있지 않다 — 이름으로 채우지 않기로 했다', () => {
+    expect(messages.plan.packingIntro).not.toContain('{')
   })
 
   /** 저장 여부가 궁금해지는 것은 목록이 생긴 뒤다 — `Result` 가 그 자리를 갖는다 */
@@ -219,19 +211,49 @@ describe('PackingListPanel — 빈 상태 (#841)', () => {
   })
 
   /*
-    `ghost` 는 테두리도 채움도 없어 CTA 아래 **맨텍스트**로 읽혔다 — 절이 아직 만들어지는
-    중인 것처럼 보였다. 두 진입점이 같은 줄에 나란히 서고 크기로만 갈린다.
+    **같은 버튼이 두 자리에서 다른 외형을 갖는다** — 옆에 선 것이 다르기 때문이다.
+    빈 카드에서 `ghost` 는 테두리도 채움도 없어 CTA 아래 **맨텍스트**로 읽혔고, 절이 아직
+    만들어지는 중인 것처럼 보였다. 반대로 `Result` 에서 테두리를 주면 바로 위의 AI 재생성
+    (`ghost sm`)보다 강하게 선다.
   */
-  it('직접 추가가 테두리를 갖는다 — 맨텍스트로 읽히지 않게', () => {
+  it('직접 추가는 빈 상태에서만 테두리를 갖는다 — 결과에서는 재생성을 덮지 않는다', () => {
     expect(buttonTag(render(), messages.plan.packingAddAction)).toContain('border-border-strong')
+    expect(buttonTag(render({ list: saved(ITEMS) }), messages.plan.packingAddAction)).not.toContain(
+      'border-border-strong',
+    )
   })
 
-  /** 다시 눌렀을 때 무엇이 만들어지는지가 화면에 있어야 한다 */
-  it('생성 실패에도 일러스트와 안내 문장이 남는다', () => {
+  /*
+    **빈 카드의 주요 액션은 CTA 다** (`DESIGN.md` §2-4 — 주요 액션은 채운 버튼).
+    `직접 추가` 가 테두리를 갖게 되면서 둘의 외형이 같아졌고, 크기(44/32)만으로는 무엇을
+    먼저 누르는 화면인지 읽히지 않았다.
+  */
+  it('CTA 는 채운 버튼이고 직접 추가는 아니다', () => {
+    const markup = render()
+
+    expect(buttonTag(markup, messages.plan.packingCta)).toContain('bg-brand-600')
+    expect(buttonTag(markup, messages.plan.packingAddAction)).not.toContain('bg-brand-600')
+  })
+
+  /*
+    높이가 다른 두 버튼(`h-11` · `h-8`)이 한 행에 선다. 접힘 버튼이 `self-start` 를 들면
+    행의 `items-center` 를 이겨 작은 쪽이 12px 위로 붙는다 — 이 갈래에서 정렬은 행이 갖는다.
+  */
+  it('빈 상태의 직접 추가는 정렬을 스스로 갖지 않는다', () => {
+    expect(buttonTag(render(), messages.plan.packingAddAction)).not.toContain('self-start')
+  })
+
+  /*
+    다시 눌렀을 때 무엇이 만들어지는지가 화면에 있어야 한다. **`직접 추가` 도 남는다** —
+    생성이 막힌 사람에게는 직접 적는 것이 준비물을 남기는 유일한 길이라, 이 갈래에서 빼면
+    화면이 할 수 있는 일을 감추는 것이 된다.
+  */
+  it('생성 실패에도 일러스트·안내 문장·직접 추가가 남는다', () => {
     const markup = render({ generateFailed: true })
 
     expect(markup).toContain('/illustrations/packing-empty.svg')
-    expect(markup).toContain(intro())
+    expect(markup).toContain(messages.plan.packingIntro)
+    expect(markup).toContain(messages.plan.packingAddAction)
   })
 })
 
@@ -360,10 +382,11 @@ describe('PackingListPanel — AI 산출물임을 말한다 (#397)', () => {
   /*
     **#841 이 이 문장을 한 문장으로 줄였지만 주어는 줄이지 않았다.** 주어가 없어 절이
     부가 기능으로 읽힌 것이 #397 의 원인이었다 — 짧게 만드는 일과 주어를 빼는 일은 다르다.
+    (문장에서 빠진 것은 주어가 아니라 저장 안내이고, 그것은 `Result` 로 옮겨 갔다.)
   */
   it('만들기 전 안내가 AI 를 주어로 말한다', () => {
     expect(messages.plan.packingIntro).toContain('AI')
-    expect(render()).toContain(intro())
+    expect(render()).toContain(messages.plan.packingIntro)
   })
 
   /*
@@ -371,7 +394,7 @@ describe('PackingListPanel — AI 산출물임을 말한다 (#397)', () => {
     절이 토글처럼 읽힌다 — 그것이 이 이슈의 원인이었다.
   */
   it('만들기 전 안내를 흐리게 두지 않는다', () => {
-    const line = new RegExp(`<p class="([^"]*)">${intro()}`).exec(render())?.[1]
+    const line = new RegExp(`<p class="([^"]*)">${messages.plan.packingIntro}`).exec(render())?.[1]
 
     expect(line).toBeDefined()
     expect(line).toContain('text-body-2')
