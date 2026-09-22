@@ -1,6 +1,6 @@
 # AI 일정 생성 반려견 다중 선택 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** AI 일정 생성에서 반려견을 여러 마리 고를 수 있게 하고, 담기 직전에 판정 기준이 될 한 마리를 명시적으로 고르게 한다.
 
@@ -40,7 +40,7 @@
 - Produces: `AiPlanFormValues.petIds: string[]` · `AiPlanSubmitPayload.petIds: string[]` · `messages.aiPlan.errorPetTooMany`
 - Consumes: 없음 (첫 태스크)
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/lib/ai-plan/submit.test.ts` 에서 기존 `petId` 단언을 아래로 **교체**한다. 기존
 `it('아직 보내지 않는 필드가 새어 나가지 않는다 — petIds·planId·regenerateDay', ...)` 도
@@ -94,12 +94,12 @@ it('planId·regenerateDay 는 여전히 새지 않는다 — 아직 미완성이
 })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/lib/ai-plan/submit.test.ts`
 Expected: FAIL — `petIds` 가 `AiPlanFormValues` 에 없어 타입/런타임 모두 어긋난다
 
-- [ ] **Step 3: 타입을 바꾼다**
+- **Step 3: 타입을 바꾼다**
 
 `src/types/ai-plan.ts` — `AiPlanSubmitPayload` 의 `petId: string` 을 지우고:
 
@@ -116,7 +116,7 @@ Expected: FAIL — `petIds` 가 `AiPlanFormValues` 에 없어 타입/런타임 �
 같은 파일의 `AiPlanFormValues` 에서도 `petId: string` → `petIds: string[]`,
 `EMPTY_AI_PLAN_FORM_VALUES` 에서 `petId: ''` → `petIds: []`.
 
-- [ ] **Step 4: 문구를 추가한다**
+- **Step 4: 문구를 추가한다**
 
 `src/lib/messages/ai-plan.ts` 의 `errorPinnedTooMany` 근처에:
 
@@ -125,7 +125,7 @@ Expected: FAIL — `petIds` 가 `AiPlanFormValues` 에 없어 타입/런타임 �
   errorPetTooMany: '반려견은 최대 5마리까지 고를 수 있어요.',
 ```
 
-- [ ] **Step 5: 스키마를 바꾼다**
+- **Step 5: 스키마를 바꾼다**
 
 `src/features/ai-plan/schemas.ts` — `MAX_PET_COUNT` 를 import 하고 `petId` 항목을 교체:
 
@@ -147,7 +147,7 @@ Expected: FAIL — `petIds` 가 `AiPlanFormValues` 에 없어 타입/런타임 �
 
 import 추가: `import { MAX_PET_COUNT } from '@/lib/api/pet'`
 
-- [ ] **Step 6: 제출부를 바꾼다**
+- **Step 6: 제출부를 바꾼다**
 
 `src/lib/ai-plan/submit.ts` — 반환 객체의 `petId: values.petId,` 를 `petIds: values.petIds,` 로 바꾸고, JSDoc 의 두 줄을 교체:
 
@@ -175,12 +175,12 @@ import 추가: `import { MAX_PET_COUNT } from '@/lib/api/pet'`
  * - **`planId`·`regenerateDay` 는 아직 보내지 않는다.** 아트보드와 계약이 어긋나 있다 (#90)
 ```
 
-- [ ] **Step 7: 통과를 확인한다**
+- **Step 7: 통과를 확인한다**
 
 Run: `pnpm vitest run src/lib/ai-plan/submit.test.ts`
 Expected: PASS
 
-- [ ] **Step 8: 커밋**
+- **Step 8: 커밋**
 
 ```bash
 git add src/types/ai-plan.ts src/features/ai-plan/schemas.ts src/lib/ai-plan/submit.ts src/lib/messages/ai-plan.ts src/lib/ai-plan/submit.test.ts
@@ -214,7 +214,7 @@ EOF
 - Consumes: Task 1 의 `AiPlanSubmitPayload.petIds`
 - Produces: `AiPlanRequestSnapshot.pets: { petId: string; name: string }[]`
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/lib/ai-plan/request-store.test.ts` 에 추가한다. 기존 `petId`/`petName` 을 쓰는 테스트는 새 모양으로 고친다.
 
@@ -296,12 +296,12 @@ it('반려견이 하나도 없으면 null 이다 — 담기에 쓸 수 없는 �
 })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/lib/ai-plan/request-store.test.ts`
 Expected: FAIL — `pets` 가 타입에 없고 `toSnapshot` 이 새 모양을 거부한다
 
-- [ ] **Step 3: 타입을 바꾼다**
+- **Step 3: 타입을 바꾼다**
 
 `src/types/ai-plan.ts` 의 `AiPlanRequestSnapshot` 에서 `petId: string` 과 `petName: string` 을 지우고:
 
@@ -319,7 +319,7 @@ pets: {
 ;[]
 ```
 
-- [ ] **Step 4: 승격 로직을 넣는다**
+- **Step 4: 승격 로직을 넣는다**
 
 `src/lib/ai-plan/request-store.ts` 의 `toSnapshot` 에서 `petId` 줄과 반환문을 교체한다:
 
@@ -365,12 +365,12 @@ function toPets(record: Record<string, unknown>): { petId: string; name: string 
 }
 ```
 
-- [ ] **Step 5: 통과를 확인한다**
+- **Step 5: 통과를 확인한다**
 
 Run: `pnpm vitest run src/lib/ai-plan/request-store.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 git add src/types/ai-plan.ts src/lib/ai-plan/request-store.ts src/lib/ai-plan/request-store.test.ts
@@ -401,7 +401,7 @@ EOF
 - Consumes: Task 2 의 `AiPlanRequestSnapshot.pets`
 - Produces: `draftToPlanPayload({ draft, snapshot, basisPetId, title, totalDays, excludedPlaceIds })` — `basisPetId: string` 이 새 필수 옵션이다
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/lib/ai-plan/draft-to-plan.test.ts` — 기존 호출에 `basisPetId` 를 넣고 아래를 추가한다.
 
@@ -443,12 +443,12 @@ it('스냅샷의 다른 아이가 실리지 않는다 — 첫 번째를 기본�
 })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/lib/ai-plan/draft-to-plan.test.ts`
 Expected: FAIL — `basisPetId` 가 옵션 타입에 없다
 
-- [ ] **Step 3: 옵션과 매핑을 바꾼다**
+- **Step 3: 옵션과 매핑을 바꾼다**
 
 `src/lib/ai-plan/draft-to-plan.ts` — `DraftToPlanOptions` 에 추가:
 
@@ -463,12 +463,12 @@ basisPetId: string
 
 반환문의 `petId: snapshot.petId,` → `petId: basisPetId,`, 구조분해에 `basisPetId` 추가.
 
-- [ ] **Step 4: 통과를 확인한다**
+- **Step 4: 통과를 확인한다**
 
 Run: `pnpm vitest run src/lib/ai-plan/draft-to-plan.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add src/lib/ai-plan/draft-to-plan.ts src/lib/ai-plan/draft-to-plan.test.ts
@@ -497,7 +497,7 @@ EOF
 - Consumes: Task 2 의 `pets` 모양
 - Produces: `petNamesLabel(pets: { name: string }[]): string`
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 ```ts
 import { describe, expect, it } from 'vitest'
@@ -542,12 +542,12 @@ describe('이어붙인 이름 + 제목 기본값', () => {
 })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/lib/ai-plan/pet-names.test.ts`
 Expected: FAIL — 모듈이 없다
 
-- [ ] **Step 3: 구현한다**
+- **Step 3: 구현한다**
 
 `src/lib/ai-plan/pet-names.ts`:
 
@@ -572,12 +572,12 @@ export function petNamesLabel(pets: { name: string }[]): string {
 }
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- **Step 4: 통과를 확인한다**
 
 Run: `pnpm vitest run src/lib/ai-plan/pet-names.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add src/lib/ai-plan/pet-names.ts src/lib/ai-plan/pet-names.test.ts
@@ -609,7 +609,7 @@ EOF
 
 **참고:** `src/components/radio-group.tsx` 를 열어 마크업을 그대로 본뜬다 — `<fieldset>` + `<legend>`, `fieldErrorId(id)` 공유, 44px(`min-h-11`), 선택 시 `border-fg bg-row-selected`, `aria-invalid` 는 fieldset 에만. **`src/components/` 에 두지 않는다** (`component-guide.md` §9 — 1곳이면 feature 안).
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 ```ts
 import { createElement } from 'react'
@@ -684,12 +684,12 @@ describe('오류 배선 — RadioGroup 과 같다', () => {
 })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/features/ai-plan/pet-checkbox-group.test.ts`
 Expected: FAIL — 모듈이 없다
 
-- [ ] **Step 3: 구현한다**
+- **Step 3: 구현한다**
 
 `src/components/radio-group.tsx` 를 읽고 그 구조를 본떠 작성한다. 오류 문구 렌더 부분(파일 하단)도 그대로 맞춘다.
 
@@ -815,12 +815,12 @@ export function PetCheckboxGroup({
 > `RadioGroup` 의 실제 오류 문구 마크업(클래스·`role`)이 위와 다르면 **그쪽에 맞춘다.**
 > 두 그룹의 오류 표현이 갈리면 같은 폼에서 두 모양이 보인다.
 
-- [ ] **Step 4: 통과를 확인한다**
+- **Step 4: 통과를 확인한다**
 
 Run: `pnpm vitest run src/features/ai-plan/pet-checkbox-group.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add src/features/ai-plan/pet-checkbox-group.tsx src/features/ai-plan/pet-checkbox-group.test.ts
@@ -853,7 +853,7 @@ EOF
 - Consumes: Task 1 (`petIds`) · Task 2 (`pets`) · Task 5 (`PetCheckboxGroup`)
 - Produces: 없음 (화면 배선)
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/features/ai-plan/ai-plan-create-form.test.ts` 에 추가하고, 기존 `petId` 를 쓰는 렌더 헬퍼를 `petIds: []` 로 고친다.
 
@@ -876,12 +876,12 @@ it('여러 마리가 동시에 선택된 상태로 렌더된다', () => {
 
 > `BASE_VALUES` · `render` 의 실제 이름은 기존 파일을 열어 확인하고 맞춘다.
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/features/ai-plan/ai-plan-create-form.test.ts`
 Expected: FAIL — 아직 `RadioGroup` 이라 `type="radio"` 가 나온다
 
-- [ ] **Step 3: 폼 컨트롤을 바꾼다**
+- **Step 3: 폼 컨트롤을 바꾼다**
 
 `src/features/ai-plan/ai-plan-create-form.tsx` — `RadioGroup` 블록을 교체:
 
@@ -903,7 +903,7 @@ Expected: FAIL — 아직 `RadioGroup` 이라 `type="radio"` 가 나온다
 
 `RadioGroup` import 가 이 파일에서 더 쓰이지 않으면 지운다.
 
-- [ ] **Step 4: 초기값·복원·저장을 바꾼다**
+- **Step 4: 초기값·복원·저장을 바꾼다**
 
 `src/features/ai-plan/ai-plan-create-view.tsx`:
 
@@ -946,17 +946,17 @@ return {
         })),
 ```
 
-- [ ] **Step 5: 통과를 확인한다**
+- **Step 5: 통과를 확인한다**
 
 Run: `pnpm vitest run src/features/ai-plan/`
 Expected: PASS
 
-- [ ] **Step 6: 전체 게이트**
+- **Step 6: 전체 게이트**
 
 Run: `pnpm verify`
 Expected: PASS. 실패하면 남은 `petId` 참조를 `rg "values\.petId\b|snapshot\.petId\b|petName" src/` 로 찾아 고친다.
 
-- [ ] **Step 7: 커밋**
+- **Step 7: 커밋**
 
 ```bash
 git add src/features/ai-plan/ai-plan-create-form.tsx src/features/ai-plan/ai-plan-create-view.tsx src/features/ai-plan/ai-plan-create-form.test.ts
@@ -990,7 +990,7 @@ EOF
 - Consumes: Task 2 (`pets`) · Task 3 (`basisPetId`) · Task 4 (`petNamesLabel`)
 - Produces: `AiPlanCommitPanelProps` 에 `basisOptions: {value,label}[]` · `basisPetId: string` · `onBasisPetIdChange: (petId: string) => void`
 
-- [ ] **Step 1: 문구를 추가한다**
+- **Step 1: 문구를 추가한다**
 
 `src/lib/messages/ai-plan.ts`:
 
@@ -1001,7 +1001,7 @@ EOF
   commitBasisHint: '저장한 뒤 날씨·산책 판정은 고른 아이 기준으로 나와요.',
 ```
 
-- [ ] **Step 2: 실패하는 테스트를 쓴다**
+- **Step 2: 실패하는 테스트를 쓴다**
 
 `src/features/ai-plan/ai-plan-commit-panel.test.ts` — `BASE` 에 아래를 넣고(한 마리 기본) 테스트를 추가한다.
 
@@ -1048,12 +1048,12 @@ describe('판정 기준 선택 — 두 마리 이상일 때만 (#128)', () => {
 })
 ```
 
-- [ ] **Step 3: 실패를 확인한다**
+- **Step 3: 실패를 확인한다**
 
 Run: `pnpm vitest run src/features/ai-plan/ai-plan-commit-panel.test.ts`
 Expected: FAIL — props 가 없다
 
-- [ ] **Step 4: 패널에 컨트롤을 넣는다**
+- **Step 4: 패널에 컨트롤을 넣는다**
 
 `src/features/ai-plan/ai-plan-commit-panel.tsx` — `AiPlanCommitPanelProps` 에 추가:
 
@@ -1091,7 +1091,7 @@ Expected: FAIL — props 가 없다
 
 `RadioGroup` import 를 추가한다.
 
-- [ ] **Step 5: job-view 를 배선한다**
+- **Step 5: job-view 를 배선한다**
 
 `src/features/ai-plan/ai-plan-job-view.tsx`:
 
@@ -1129,17 +1129,17 @@ useEffect(() => {
             onBasisPetIdChange={setBasisPetId}
 ```
 
-- [ ] **Step 6: 통과를 확인한다**
+- **Step 6: 통과를 확인한다**
 
 Run: `pnpm vitest run src/features/ai-plan/`
 Expected: PASS — 기존 `delistedBlocked` 분기 테스트도 함께 통과해야 한다
 
-- [ ] **Step 7: 전체 게이트**
+- **Step 7: 전체 게이트**
 
 Run: `pnpm verify && pnpm format:check`
 Expected: PASS
 
-- [ ] **Step 8: 커밋**
+- **Step 8: 커밋**
 
 ```bash
 git add src/features/ai-plan/ai-plan-commit-panel.tsx src/features/ai-plan/ai-plan-job-view.tsx src/lib/messages/ai-plan.ts src/features/ai-plan/ai-plan-commit-panel.test.ts
@@ -1173,12 +1173,12 @@ EOF
 - Consumes: Task 1–7 전부
 - Produces: 없음
 
-- [ ] **Step 1: mock 이 새 본문을 받는지 확인한다**
+- **Step 1: mock 이 새 본문을 받는지 확인한다**
 
 Run: `rg "petId" src/lib/api/mock/ai-plan-data.ts`
 `petId` 를 읽는 곳이 있으면 `petIds` 로 고친다. 없으면 다음 단계로.
 
-- [ ] **Step 2: 브라우저로 확인한다**
+- **Step 2: 브라우저로 확인한다**
 
 ```bash
 cd frontend && ./node_modules/.bin/next dev -p 5176
@@ -1194,7 +1194,7 @@ cd frontend && ./node_modules/.bin/next dev -p 5176
 5. **한 마리만 고르면** 담기 패널에 기준 라디오가 **없다**
 6. 콘솔에 이 변경으로 생긴 오류가 없다 (HMR 웹소켓 경고는 무관)
 
-- [ ] **Step 3: 옛 스냅샷 승격을 실측한다**
+- **Step 3: 옛 스냅샷 승격을 실측한다**
 
 브라우저 콘솔에서 옛 모양을 심고 그 `jobId` 의 대기 화면을 연다:
 
@@ -1215,17 +1215,17 @@ sessionStorage.setItem(
 
 담기가 막히지 않고 제목 기본값에 `몽실이` 가 들어가면 통과다.
 
-- [ ] **Step 4: 문서를 고친다**
+- **Step 4: 문서를 고친다**
 
 - `공통명세.md` S1 — 계약 표의 반려견 항목을 `petIds`(배열, 최대 5) 로. S2 — 화면 범위에서 다중 반려견을 "구현" 으로. S8 — 미결에서 다중 반려견 항목을 정리하고 **저장이 여전히 단일이라는 사실**을 남긴다.
 - `screen-inventory.md` §5 — "**#84 는 단일 `petId` 만 보낸다**" 를 현재 상태로 고치고, 저장이 단일이라는 제약과 `다견선택-세부명세.md` 링크를 건다.
 
-- [ ] **Step 5: 게이트**
+- **Step 5: 게이트**
 
 Run: `pnpm verify && pnpm format:check`
 Expected: PASS
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 git add -A frontend/
@@ -1237,7 +1237,7 @@ EOF
 )"
 ```
 
-- [ ] **Step 7: PR 과 이슈**
+- **Step 7: PR 과 이슈**
 
 `/pr` 스킬로 본문을 만들고 PR 을 연다 (base `develop`, assignee `@me`).
 **본문에 반드시 적을 것**: 아트보드 이탈(라디오→체크박스)과 그 근거, 저장이 여전히

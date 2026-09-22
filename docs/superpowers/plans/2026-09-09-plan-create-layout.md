@@ -1,6 +1,6 @@
 # 일정 만들기 입력 밀도 · 달력 팝오버 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** 달력이 열릴 때 화면이 밀리지 않게 하고, `/ai-plans/new` 의 기본값 있는 선택 항목을 접어 rest 상태를 가볍게 한다.
 
@@ -30,9 +30,9 @@
 > 계획 작성 시점에 워크트리가 **다른 세션의 `refactor/fe/348-home-heading-scale`** 에 올라가 있어
 > 브랜치를 딸 수 없었다.
 
-- [ ] 이슈 생성 — `[FE] refactor: 일정 만들기 두 화면 입력 밀도 · 달력 팝오버`
-- [ ] 워크트리가 비었는지 확인 (`git status` · `git branch --show-current` 가 `develop`)
-- [ ] `git switch -c refactor/fe/<이슈번호>-plan-create-layout develop`
+- 이슈 생성 — `[FE] refactor: 일정 만들기 두 화면 입력 밀도 · 달력 팝오버`
+- 워크트리가 비었는지 확인 (`git status` · `git branch --show-current` 가 `develop`)
+- `git switch -c refactor/fe/<이슈번호>-plan-create-layout develop`
 
 **워크트리가 아직 다른 세션 것이면 Task 1~5 를 먼저 구현하고 커밋만 미룬다.**
 그 경우 각 Task 의 커밋 스텝은 브랜치가 생긴 뒤 **순서대로 몰아서** 실행한다.
@@ -102,7 +102,7 @@
   - `AnchoredPosition = { top: number; left: number; minWidth: number; placement: 'below' | 'above' }`
   - Task 2 가 `getBoundingClientRect()` 결과를 이 모양으로 넘긴다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/lib/ui/anchored-position.test.ts`:
 
@@ -181,12 +181,12 @@ describe('anchoredPosition — 좌우는 뷰포트 안으로 접는다', () => {
 })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/lib/ui/anchored-position.test.ts`
 Expected: FAIL — `Failed to resolve import "@/lib/ui/anchored-position"`
 
-- [ ] **Step 3: 최소 구현**
+- **Step 3: 최소 구현**
 
 `src/lib/ui/anchored-position.ts`:
 
@@ -247,12 +247,12 @@ export function anchoredPosition(
 }
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- **Step 4: 통과를 확인한다**
 
 Run: `pnpm vitest run src/lib/ui/anchored-position.test.ts`
 Expected: PASS — 7 tests
 
-- [ ] **Step 5: 커밋** (Task 0 완료 후)
+- **Step 5: 커밋** (Task 0 완료 후)
 
 ```bash
 git add src/lib/ui/anchored-position.ts src/lib/ui/anchored-position.test.ts
@@ -271,7 +271,7 @@ git commit -m "[FE] feat: 팝오버 좌표 계산을 순수 함수로 뽑는다"
 - Consumes: `anchoredPosition` (Task 1)
 - Produces: 없음 — `DateField` 의 props 는 **바뀌지 않는다.** 세 사용처가 그대로 돈다.
 
-- [ ] **Step 1: 위치 상태와 측정 effect 를 넣는다**
+- **Step 1: 위치 상태와 측정 effect 를 넣는다**
 
 `src/components/date-field.tsx` 의 import 에 추가:
 
@@ -311,7 +311,7 @@ useLayoutEffect(() => {
 
 `useLayoutEffect` 를 `react` import 에 더한다.
 
-- [ ] **Step 2: 스크롤·리사이즈로 닫는다**
+- **Step 2: 스크롤·리사이즈로 닫는다**
 
 바깥 클릭 effect 아래에 추가:
 
@@ -347,12 +347,12 @@ useEffect(() => {
 }, [open])
 ```
 
-- [ ] **Step 3: `scrollIntoView` 보정을 지운다**
+- **Step 3: `scrollIntoView` 보정을 지운다**
 
 `useEffect(() => { ... panelRef.current?.scrollIntoView({ block: 'nearest' }) ... }, [open])` 블록과
 그 위 주석 전체를 삭제한다. **밀리지 않으므로 보정할 대상이 없다.**
 
-- [ ] **Step 4: 패널을 포털로 옮긴다**
+- **Step 4: 패널을 포털로 옮긴다**
 
 `{open && (...)}` 블록을 아래로 교체한다:
 
@@ -395,7 +395,7 @@ useEffect(() => {
 
 바깥 `<div>` 의 `relative` 는 **유지한다** — 아이콘이 여전히 그 기준으로 붙는다.
 
-- [ ] **Step 5: docstring 을 갱신한다**
+- **Step 5: docstring 을 갱신한다**
 
 `date-field.tsx` 의 *"달력은 오버레이가 아니라 문서 흐름 안에서 펼쳐진다"* 문단을 아래로 교체한다.
 **기존 기각 기록은 지우지 않는다.**
@@ -423,7 +423,7 @@ useEffect(() => {
  * 노드에서도 성립한다 (이슈 #70).
 ```
 
-- [ ] **Step 6: z 스케일을 `DESIGN.md` §7 에 적는다**
+- **Step 6: z 스케일을 `DESIGN.md` §7 에 적는다**
 
 `DESIGN.md` §7 의 레이아웃 토큰 표 아래에 추가:
 
@@ -440,25 +440,25 @@ useEffect(() => {
 증상이 없지만, 모달·시트 안에 넣을 때 이 표를 다시 본다.
 ```
 
-- [ ] **Step 7: 검증**
+- **Step 7: 검증**
 
 Run: `pnpm verify`
 Expected: PASS (기존 테스트 무손상 — `DateField` 의 props 가 안 바뀌었다)
 
-- [ ] **Step 8: 브라우저 실측** — `pnpm dev --port 5174`
+- **Step 8: 브라우저 실측** — `pnpm dev --port 5174`
 
 **세 사용처를 모두 본다. 담기 시트가 핵심 회귀 지점이다.**
 
-- [ ] `/plans/new` 375px — 달력을 열어도 **아래 필드가 밀리지 않는다**
-- [ ] `/ai-plans/new` 375px — 종료일이 화면 하단에 있을 때 **위로 뒤집힌다**
-- [ ] 장소 상세 → 담기 시트 → 일정 만들기 → 날짜 — **달력이 잘리지 않는다**
-- [ ] 담기 시트 **본문을 스크롤**하면 달력이 닫힌다
-- [ ] 페이지를 스크롤하면 달력이 닫힌다
-- [ ] `Esc` · 바깥 클릭으로 닫히고 포커스가 입력으로 돌아온다
-- [ ] 날짜를 눌러도 **폼이 제출되지 않는다** (포털 이벤트는 React 트리로 버블링한다)
-- [ ] 1440px 에서 좌표가 정상
+- `/plans/new` 375px — 달력을 열어도 **아래 필드가 밀리지 않는다**
+- `/ai-plans/new` 375px — 종료일이 화면 하단에 있을 때 **위로 뒤집힌다**
+- 장소 상세 → 담기 시트 → 일정 만들기 → 날짜 — **달력이 잘리지 않는다**
+- 담기 시트 **본문을 스크롤**하면 달력이 닫힌다
+- 페이지를 스크롤하면 달력이 닫힌다
+- `Esc` · 바깥 클릭으로 닫히고 포커스가 입력으로 돌아온다
+- 날짜를 눌러도 **폼이 제출되지 않는다** (포털 이벤트는 React 트리로 버블링한다)
+- 1440px 에서 좌표가 정상
 
-- [ ] **Step 9: 커밋** (Task 0 완료 후)
+- **Step 9: 커밋** (Task 0 완료 후)
 
 ```bash
 git add src/components/date-field.tsx DESIGN.md
@@ -481,7 +481,7 @@ git commit -m "[FE] fix: 달력을 포털 팝오버로 띄워 아래 내용이 �
   - `DetailsInput = { regionLabel: string; budgetManwon: string; preferFavorites: boolean; pinnedCount: number; regionNarrowed: boolean }`
   - Task 5 가 `SIGUNGU_LABEL` 을 풀어서 `regionLabel` 로 넘긴다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/lib/ai-plan/details.test.ts`:
 
@@ -554,12 +554,12 @@ describe('hasAnyDetail — 하나라도 정했으면 펼친 채로 연다', () =
 })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/lib/ai-plan/details.test.ts`
 Expected: FAIL — `Failed to resolve import "@/lib/ai-plan/details"`
 
-- [ ] **Step 3: 최소 구현**
+- **Step 3: 최소 구현**
 
 `src/lib/ai-plan/details.ts`:
 
@@ -627,7 +627,7 @@ export function hasAnyDetail({
 }
 ```
 
-- [ ] **Step 4: 메시지를 추가한다**
+- **Step 4: 메시지를 추가한다**
 
 `src/lib/messages/ai-plan.ts` 에 추가 (기존 `budgetAny` 는 칩 라벨이라 그대로 둔다):
 
@@ -638,12 +638,12 @@ export function hasAnyDetail({
   detailsPinned: '꼭 넣을 곳 {count}',
 ```
 
-- [ ] **Step 5: 통과를 확인한다**
+- **Step 5: 통과를 확인한다**
 
 Run: `pnpm vitest run src/lib/ai-plan/details.test.ts`
 Expected: PASS — 9 tests
 
-- [ ] **Step 6: 커밋** (Task 0 완료 후)
+- **Step 6: 커밋** (Task 0 완료 후)
 
 ```bash
 git add src/lib/ai-plan/details.ts src/lib/ai-plan/details.test.ts src/lib/messages/ai-plan.ts
@@ -662,7 +662,7 @@ git commit -m "[FE] feat: 접기 섹션 요약·펼침 판정을 순수 함수�
 - Consumes: `messages.aiPlan.detailsToggle` (Task 3)
 - Produces: `AiPlanDetailsDisclosure({ open, summary, onToggle, children })` — Task 5 가 쓴다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/features/ai-plan/ai-plan-details-disclosure.test.ts`:
 
@@ -715,12 +715,12 @@ describe('AiPlanDetailsDisclosure — 접힘/펼침', () => {
 })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/features/ai-plan/ai-plan-details-disclosure.test.ts`
 Expected: FAIL — 모듈 해석 실패
 
-- [ ] **Step 3: 최소 구현**
+- **Step 3: 최소 구현**
 
 `src/features/ai-plan/ai-plan-details-disclosure.tsx`:
 
@@ -791,18 +791,18 @@ export function AiPlanDetailsDisclosure({
 }
 ```
 
-- [ ] **Step 4: 아이콘이 있는지 확인한다**
+- **Step 4: 아이콘이 있는지 확인한다**
 
 Run: `grep -n "ChevronDownIcon" src/components/icons/index.ts`
 Expected: export 가 있다. **없으면** `ChevronRightIcon` 을 `rotate-90`/`rotate-270` 으로 쓰고
 위 코드를 그에 맞게 고친다 (새 아이콘을 만들지 않는다).
 
-- [ ] **Step 5: 통과를 확인한다**
+- **Step 5: 통과를 확인한다**
 
 Run: `pnpm vitest run src/features/ai-plan/ai-plan-details-disclosure.test.ts`
 Expected: PASS — 6 tests
 
-- [ ] **Step 6: 커밋** (Task 0 완료 후)
+- **Step 6: 커밋** (Task 0 완료 후)
 
 ```bash
 git add src/features/ai-plan/ai-plan-details-disclosure.tsx src/features/ai-plan/ai-plan-details-disclosure.test.ts
@@ -822,7 +822,7 @@ git commit -m "[FE] feat: AI 조건 입력에 더 자세히 정하기 접기 껍
 - Consumes: `detailsSummary` · `hasAnyDetail` · `DetailsInput` (Task 3), `AiPlanDetailsDisclosure` (Task 4)
 - Produces: 없음 — `AiPlanCreateFormProps` 는 **바뀌지 않는다.** `ai-plan-create-view.tsx` 무손상.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/features/ai-plan/ai-plan-create-form.test.ts` 끝에 추가:
 
@@ -861,12 +861,12 @@ describe('AiPlanCreateForm — 선택 항목을 접는다', () => {
 })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `pnpm vitest run src/features/ai-plan/ai-plan-create-form.test.ts`
 Expected: FAIL — `detailsToggle` 이 마크업에 없다
 
-- [ ] **Step 3: 중복 헤딩을 지운다**
+- **Step 3: 중복 헤딩을 지운다**
 
 `ai-plan-create-form.tsx` 에서 아래 블록을 **통째로 삭제**한다:
 
@@ -887,13 +887,13 @@ Expected: FAIL — `detailsToggle` 이 마크업에 없다
 > `metadata.description` 용으로 `'반려견과 기간만 정하면 AI 가 제주 여행 일정을 짜 드려요.'`
 > 로 바꾼다.
 
-- [ ] **Step 4: 남은 사용처를 확인한다**
+- **Step 4: 남은 사용처를 확인한다**
 
 Run: `grep -rn "aiPlan.createHeading\|aiPlan.createDescription" src app`
 Expected: `app/(main)/ai-plans/new/page.tsx:8` 의 `metadata.description` **한 곳만** 남는다.
 `createHeading` 은 결과가 없어야 한다.
 
-- [ ] **Step 5: 순서를 바꾸고 접기를 배선한다**
+- **Step 5: 순서를 바꾸고 접기를 배선한다**
 
 import 에 추가:
 
@@ -949,7 +949,7 @@ const [detailsOpen, setDetailsOpen] = useState(() => hasAnyDetail(details))
 6. `<FormAlert message={errors.fields.pinnedPlaces ?? null} />`
 7. 제출 버튼 + `createSubmitHint`
 
-- [ ] **Step 6: 오류가 접힌 섹션 안에 숨지 않게 한다**
+- **Step 6: 오류가 접힌 섹션 안에 숨지 않게 한다**
 
 `firstErrorField` 가 접힌 섹션 안의 필드(`budgetManwon` · `pinnedPlaces`)를 가리키면
 **포커스 이동이 아무 일도 하지 않는다** (요소가 마운트돼 있지 않다).
@@ -974,7 +974,7 @@ useEffect(() => {
 
 **이 effect 는 기존 포커스 effect 보다 앞에 선언한다** — 펼쳐진 뒤에 포커스를 찾아야 한다.
 
-- [ ] **Step 7: 테스트를 갱신한다**
+- **Step 7: 테스트를 갱신한다**
 
 기존 테스트 중 **`requiredGroupLabel` · `createHeading` · `createDescription` 을 기대하거나,
 지역/예산 칩이 rest 에 있다고 보는 것**을 고친다.
@@ -982,22 +982,22 @@ useEffect(() => {
 Run: `pnpm vitest run src/features/ai-plan/ai-plan-create-form.test.ts`
 Expected: PASS — 기존 + 신규 5개
 
-- [ ] **Step 8: 전체 검증**
+- **Step 8: 전체 검증**
 
 Run: `pnpm verify && pnpm format:check`
 Expected: PASS
 
-- [ ] **Step 9: 브라우저 실측** — `pnpm dev --port 5174`
+- **Step 9: 브라우저 실측** — `pnpm dev --port 5174`
 
-- [ ] `/ai-plans/new` 375px — rest 상태가 **기간 · 반려견 · 자유요청 · 접힌 줄 · 제출**
-- [ ] 제출 버튼이 **첫 화면에서 보이거나 한 번의 짧은 스크롤 안**에 있다
-- [ ] 접기를 펼쳤다 접어도 값이 유지된다
-- [ ] 접기 안에서 예산을 적었다가 **지워도 섹션이 접히지 않는다**
-- [ ] 예산에 잘못된 값(`3.5`)을 넣고 제출 → **섹션이 펼쳐지고** 오류가 보인다
-- [ ] `?from={jobId}` 로 진입(실패 화면 → 조건 바꾸기) → 접기가 **펼쳐진 채**로 뜬다
-- [ ] 1440px 에서 접힌 줄의 요약이 잘리지 않는다
+- `/ai-plans/new` 375px — rest 상태가 **기간 · 반려견 · 자유요청 · 접힌 줄 · 제출**
+- 제출 버튼이 **첫 화면에서 보이거나 한 번의 짧은 스크롤 안**에 있다
+- 접기를 펼쳤다 접어도 값이 유지된다
+- 접기 안에서 예산을 적었다가 **지워도 섹션이 접히지 않는다**
+- 예산에 잘못된 값(`3.5`)을 넣고 제출 → **섹션이 펼쳐지고** 오류가 보인다
+- `?from={jobId}` 로 진입(실패 화면 → 조건 바꾸기) → 접기가 **펼쳐진 채**로 뜬다
+- 1440px 에서 접힌 줄의 요약이 잘리지 않는다
 
-- [ ] **Step 10: 커밋** (Task 0 완료 후)
+- **Step 10: 커밋** (Task 0 완료 후)
 
 ```bash
 git add src/features/ai-plan/ai-plan-create-form.tsx src/features/ai-plan/ai-plan-create-form.test.ts src/lib/messages/ai-plan.ts
@@ -1011,7 +1011,7 @@ git commit -m "[FE] refactor: AI 조건 입력의 선택 항목을 접고 자유
 **Files:**
 - Modify: `docs/features/ai-plan/공통명세.md`
 
-- [ ] **Step 1: 조건 입력 절을 갱신한다**
+- **Step 1: 조건 입력 절을 갱신한다**
 
 `docs/features/ai-plan/공통명세.md` 의 조건 입력(S0) 절에 아래를 반영한다.
 
@@ -1029,7 +1029,7 @@ git commit -m "[FE] refactor: AI 조건 입력의 선택 항목을 접고 자유
   `docs/superpowers/specs/2026-09-09-plan-create-layout-design.md` §2.
 ```
 
-- [ ] **Step 2: 커밋** (Task 0 완료 후)
+- **Step 2: 커밋** (Task 0 완료 후)
 
 ```bash
 git add docs/features/ai-plan/공통명세.md
@@ -1040,7 +1040,7 @@ git commit -m "[DOCS] docs: AI 조건 입력의 접기 구조를 명세에 반�
 
 ## 마무리
 
-- [ ] `pnpm verify && pnpm format:check` 최종 통과
-- [ ] `git log --oneline develop..HEAD` 로 커밋이 6개 이하인지 확인
-- [ ] PR 본문은 `/pr` 스킬로 작성하고 `Issue Number` 를 채운다
-- [ ] 머지는 **Rebase and merge**
+- `pnpm verify && pnpm format:check` 최종 통과
+- `git log --oneline develop..HEAD` 로 커밋이 6개 이하인지 확인
+- PR 본문은 `/pr` 스킬로 작성하고 `Issue Number` 를 채운다
+- 머지는 **Rebase and merge**

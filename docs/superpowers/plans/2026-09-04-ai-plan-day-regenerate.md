@@ -1,6 +1,6 @@
 # AI 일정 하루 재생성 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** 이미 저장된 일정의 하루만 AI 로 다시 짜고, 그 결과를 확인한 뒤 그 일자에 되붙인다.
 
@@ -72,7 +72,7 @@
 - Consumes: 없음 (첫 태스크)
 - Produces: `AiPlanSubmitPayload` 에 `planId?: string` · `regenerateDay?: number`. Task 2 가 이 두 키를 채운다.
 
-- [ ] **Step 1: 잠금 테스트의 뜻을 바꿔 실패시킨다**
+- **Step 1: 잠금 테스트의 뜻을 바꿔 실패시킨다**
 
 `src/lib/ai-plan/submit.test.ts` 의 기존 테스트(132행)를 **지우지 말고** 아래로 바꾼다.
 
@@ -103,12 +103,12 @@
 import type { AiPlanSubmitPayload } from '@/types/ai-plan'
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `npx vitest run src/lib/ai-plan/submit.test.ts`
 Expected: FAIL — `Object literal may only specify known properties, and 'planId' does not exist in type 'AiPlanSubmitPayload'` (타입 오류로 죽는다)
 
-- [ ] **Step 3: 타입을 연다**
+- **Step 3: 타입을 연다**
 
 `src/types/ai-plan.ts` 의 `AiPlanSubmitPayload` 마지막 필드(`pinnedPlaceIds?`) **뒤에** 더한다.
 
@@ -127,7 +127,7 @@ Expected: FAIL — `Object literal may only specify known properties, and 'planI
   regenerateDay?: number
 ```
 
-- [ ] **Step 4: 주석을 사실에 맞춘다**
+- **Step 4: 주석을 사실에 맞춘다**
 
 `src/lib/ai-plan/submit.ts:29` 의 줄을 바꾼다.
 
@@ -137,12 +137,12 @@ Expected: FAIL — `Object literal may only specify known properties, and 'planI
  *   (하루재생성-세부명세 R3)
 ```
 
-- [ ] **Step 5: 통과를 확인한다**
+- **Step 5: 통과를 확인한다**
 
 Run: `npx vitest run src/lib/ai-plan/submit.test.ts`
 Expected: PASS
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 git add src/types/ai-plan.ts src/lib/ai-plan/submit.ts src/lib/ai-plan/submit.test.ts
@@ -163,7 +163,7 @@ git commit -m "[FE] feat: AI 제출 payload 에 planId·regenerateDay 를 연다
 - Consumes: Task 1 의 `AiPlanSubmitPayload` (`planId` · `regenerateDay`)
 - Produces: `toDayRegeneratePayload(plan: PlanDetail, day: number, requestNote: string): AiPlanSubmitPayload`. Task 7 이 제출할 때 부른다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/lib/ai-plan/regenerate.test.ts` 를 만든다.
 
@@ -255,12 +255,12 @@ describe('toDayRegeneratePayload', () => {
 })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `npx vitest run src/lib/ai-plan/regenerate.test.ts`
 Expected: FAIL — `Failed to resolve import "@/lib/ai-plan/regenerate"`
 
-- [ ] **Step 3: 최소 구현**
+- **Step 3: 최소 구현**
 
 `src/lib/ai-plan/regenerate.ts` 를 만든다.
 
@@ -312,12 +312,12 @@ export function toDayRegeneratePayload(
 }
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- **Step 4: 통과를 확인한다**
 
 Run: `npx vitest run src/lib/ai-plan/regenerate.test.ts`
 Expected: PASS (10 tests)
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add src/lib/ai-plan/regenerate.ts src/lib/ai-plan/regenerate.test.ts
@@ -341,7 +341,7 @@ git commit -m "[FE] feat: 저장된 일정에서 하루 재생성 제출 본문�
   - `toDraftItems(draft: AiPlanDraft, totalDays: number | null, excludedPlaceIds?: ReadonlySet<string>): PlanItemRequest[]` (`draft-to-plan.ts` 에서 export)
   - `toRegeneratedDayItems(draft: AiPlanDraft, day: number, totalDays: number, excludedPlaceIds?: ReadonlySet<string>): PlanItemRequest[] | null` — Task 6·7 이 쓴다. **`null` 은 "그 날을 못 만들었다" 이고 빈 배열과 뜻이 다르다.**
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/lib/ai-plan/regenerate.test.ts` 맨 아래에 더한다. import 도 함께 늘린다.
 
@@ -445,12 +445,12 @@ describe('toRegeneratedDayItems', () => {
 })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `npx vitest run src/lib/ai-plan/regenerate.test.ts`
 Expected: FAIL — `toRegeneratedDayItems is not a function`
 
-- [ ] **Step 3: 매핑 규칙을 export 한다**
+- **Step 3: 매핑 규칙을 export 한다**
 
 `src/lib/ai-plan/draft-to-plan.ts` 의 `function toItems(` 를 아래로 바꾼다. **본문은 그대로 두고 이름과 export 만 바꾼다.**
 
@@ -468,7 +468,7 @@ export function toDraftItems(
 
 같은 파일 안의 호출부(`items: toItems(draft, totalDays ?? null, excludedPlaceIds)`)를 `toDraftItems` 로 바꾼다.
 
-- [ ] **Step 4: `regenerate.ts` 에 함수를 더한다**
+- **Step 4: `regenerate.ts` 에 함수를 더한다**
 
 ```ts
 import { toDraftItems } from '@/lib/ai-plan/draft-to-plan'
@@ -505,12 +505,12 @@ export function toRegeneratedDayItems(
 }
 ```
 
-- [ ] **Step 5: 통과를 확인한다**
+- **Step 5: 통과를 확인한다**
 
 Run: `npx vitest run src/lib/ai-plan/regenerate.test.ts src/lib/ai-plan/draft-to-plan.test.ts`
 Expected: PASS — 두 파일 모두. `draft-to-plan.test.ts` 는 손대지 않았고 이름만 바뀐 함수를 내부에서 쓰므로 그대로 통과해야 한다.
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 git add src/lib/ai-plan/regenerate.ts src/lib/ai-plan/regenerate.test.ts src/lib/ai-plan/draft-to-plan.ts
@@ -531,7 +531,7 @@ git commit -m "[FE] feat: 재생성 초안에서 목표 일자만 뽑는다"
 - Consumes: 없음 (mock 은 서버 흉내다)
 - Produces: `MOCK_API=true` 에서 `planId` + `regenerateDay` 제출이 **그 일자만 다른** 초안을 준다. Task 7 의 브라우저 실렌더가 이것에 기댄다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/lib/api/mock/ai-plan-mock.test.ts` 맨 아래 `describe` 를 더한다. 파일 위쪽의 `submitMock` 헬퍼(20행)를 그대로 쓴다.
 
@@ -570,12 +570,12 @@ describe('하루 재생성 (#128)', () => {
 })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `npx vitest run src/lib/api/mock/ai-plan-mock.test.ts`
 Expected: FAIL — 처음 세 개가 `202` 를 받는다 (mock 이 아직 두 필드를 모른다)
 
-- [ ] **Step 3: mock 에 검증을 더한다**
+- **Step 3: mock 에 검증을 더한다**
 
 `src/lib/api/mock/ai-plan-data.ts` 의 `submit()` 안, `errors` 를 반환하기 **전에** 더한다.
 
@@ -626,7 +626,7 @@ function dayCountOf(plan: { startDate: string; endDate: string }): number {
 
 `MOCK_PLANS` 를 아직 import 하지 않았다면 더한다 — 이 파일이 이미 `packingList` 에서 일정을 찾고 있으므로(251행) 같은 참조를 쓴다.
 
-- [ ] **Step 4: 재생성 초안이 그 날만 다르게 나오게 한다**
+- **Step 4: 재생성 초안이 그 날만 다르게 나오게 한다**
 
 초안은 `draftFor(job)`(`ai-plan-data.ts`)가 만들고 작업 레코드(`MockAiPlanJob`)에서 조건을 읽는다. 그래서 **제출 때 `regenerateDay` 를 레코드에 함께 저장**하고 초안을 만들 때 읽는다.
 
@@ -677,12 +677,12 @@ function regeneratedDayItems(): AiPlanScheduleItem[] {
 
 `MOCK_PLACES` 를 이미 import 하고 있다(초안이 실제 placeId 를 쓴다). 없으면 더한다.
 
-- [ ] **Step 5: 통과를 확인한다**
+- **Step 5: 통과를 확인한다**
 
 Run: `npx vitest run src/lib/api/mock/`
 Expected: PASS — 새 4건과 기존 mock 테스트 전부
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 git add src/lib/api/mock/ai-plan-data.ts src/lib/api/mock/ai-plan-mock.test.ts
@@ -705,7 +705,7 @@ git commit -m "[FE] feat: mock 이 하루 재생성 갈래를 흉내 낸다"
 - Consumes: 없음
 - Produces: `PlanDaySection` 이 `regenerateHref: string` prop 을 받는다. Task 7 의 라우트가 그 링크의 목적지다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/features/plan/plan-detail.test.ts` 의 `PlanDaySection` describe 블록에 더한다. 그 파일의 기존 렌더 헬퍼를 쓴다 (없으면 `PlanOverviewPanel` 쪽 `renderOverview` 와 같은 모양으로 만든다).
 
@@ -729,12 +729,12 @@ git commit -m "[FE] feat: mock 이 하루 재생성 갈래를 흉내 낸다"
   })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `npx vitest run src/features/plan/plan-detail.test.ts`
 Expected: FAIL — `messages.plan.regenerateDayAction` 이 `undefined`
 
-- [ ] **Step 3: 문구를 더한다**
+- **Step 3: 문구를 더한다**
 
 `src/lib/messages/plan.ts` 의 `editDayAction` 근처에 더한다.
 
@@ -767,7 +767,7 @@ Expected: FAIL — `messages.plan.regenerateDayAction` 이 `undefined`
   regenerateDayVisitReset: '이 날 항목이 바뀌면 ‘다녀옴’ 표시가 초기화돼요.',
 ```
 
-- [ ] **Step 4: 진입점을 단다**
+- **Step 4: 진입점을 단다**
 
 `src/features/plan/plan-day-section.tsx` 의 props 에 더한다.
 
@@ -794,12 +794,12 @@ Expected: FAIL — `messages.plan.regenerateDayAction` 이 `undefined`
               regenerateHref={`/plans/${plan.planId}/days/${group.day}/regenerate`}
 ```
 
-- [ ] **Step 5: 통과를 확인한다**
+- **Step 5: 통과를 확인한다**
 
 Run: `npx vitest run src/features/plan/`
 Expected: PASS
 
-- [ ] **Step 6: 세 버튼이 375 에서 어떻게 접히는지 본다**
+- **Step 6: 세 버튼이 375 에서 어떻게 접히는지 본다**
 
 일자 헤더에 버튼이 **둘에서 셋으로** 늘었다. 부모가 `flex-wrap` 이라 접히지만 실제 모습을 확인한다.
 
@@ -809,7 +809,7 @@ cd frontend && nohup node ./node_modules/next/dist/bin/next dev -p 5174 > /tmp/n
 
 브라우저를 `http://localhost:5174/plans/223456789012000001` 로 열고 375 폭에서 1일차 헤더를 본다. 버튼이 두 줄로 접혀도 좋다 — **가로로 넘치지만 않으면 된다.** `main` 하위에 뷰포트를 넘는 요소가 0건인지 확인한다.
 
-- [ ] **Step 7: 커밋**
+- **Step 7: 커밋**
 
 ```bash
 git add src/lib/messages/plan.ts src/features/plan/plan-day-section.tsx src/features/plan/plan-detail-section.tsx src/features/plan/plan-detail.test.ts
@@ -834,7 +834,7 @@ git commit -m "[FE] feat: 일정 상세 일자에 다시 만들기 진입점을 
   - `PlanDayDiff({ current, next }: { current: readonly PlanDayDiffRow[]; next: readonly PlanDayDiffRow[] })` 와 `export type PlanDayDiffRow = { title: string; caption: string | null }`. Task 7 이 `PlanItemDetail` 과 `PlanItemRequest` 를 각각 이 모양으로 옮겨 넘긴다.
   - `PlanDayRegenerateConfirm({ onApply, applying, error }: { onApply: () => void; applying: boolean; error: PlanDaySaveError | null })`. Task 7 이 비교 아래에 놓는다.
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/features/plan/plan-day-diff.test.ts` 를 만든다.
 
@@ -902,12 +902,12 @@ describe('PlanDayDiff', () => {
 })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `npx vitest run src/features/plan/plan-day-diff.test.ts`
 Expected: FAIL — `Failed to resolve import "@/features/plan/plan-day-diff"`
 
-- [ ] **Step 3: 최소 구현**
+- **Step 3: 최소 구현**
 
 `src/features/plan/plan-day-diff.tsx` 를 만든다.
 
@@ -977,12 +977,12 @@ function DiffColumn({ title, rows }: { title: string; rows: readonly PlanDayDiff
 }
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- **Step 4: 통과를 확인한다**
 
 Run: `npx vitest run src/features/plan/plan-day-diff.test.ts`
 Expected: PASS (6 tests)
 
-- [ ] **Step 5: 확정 블록의 실패하는 테스트를 쓴다**
+- **Step 5: 확정 블록의 실패하는 테스트를 쓴다**
 
 명세 R9 가 _"되돌릴 수 없다는 문구와 '다녀옴' 초기화 문구가 확정 버튼 앞에 있다"_ 를 요구한다. **뷰는 훅이 붙어 있어 node 환경에서 렌더할 수 없으므로**(jsdom 없음) 그 블록을 훅 없는 컴포넌트로 뗀다.
 
@@ -1039,12 +1039,12 @@ describe('PlanDayRegenerateConfirm', () => {
 })
 ```
 
-- [ ] **Step 6: 실패를 확인한다**
+- **Step 6: 실패를 확인한다**
 
 Run: `npx vitest run src/features/plan/plan-day-regenerate-confirm.test.ts`
 Expected: FAIL — `Failed to resolve import "@/features/plan/plan-day-regenerate-confirm"`
 
-- [ ] **Step 7: 확정 블록을 만든다**
+- **Step 7: 확정 블록을 만든다**
 
 `src/features/plan/plan-day-regenerate-confirm.tsx` 를 만든다. **훅을 쓰지 않는다** — 상태는 뷰가 들고 이 컴포넌트는 받은 것만 그린다.
 
@@ -1095,12 +1095,12 @@ export function PlanDayRegenerateConfirm({
 
 `text-danger` 가 이 저장소의 오류 색 토큰이 아니면 **다른 오류 표시가 쓰는 클래스를 그대로 가져다 쓴다** (`grep -rn "오류" src/components/error-state.tsx` 로 확인). 색을 새로 정하지 않는다.
 
-- [ ] **Step 8: 통과를 확인한다**
+- **Step 8: 통과를 확인한다**
 
 Run: `npx vitest run src/features/plan/plan-day-diff.test.ts src/features/plan/plan-day-regenerate-confirm.test.ts`
 Expected: PASS (6 + 3 tests)
 
-- [ ] **Step 9: 커밋**
+- **Step 9: 커밋**
 
 ```bash
 git add src/features/plan/plan-day-diff.tsx src/features/plan/plan-day-diff.test.ts src/features/plan/plan-day-regenerate-confirm.tsx src/features/plan/plan-day-regenerate-confirm.test.ts
@@ -1124,7 +1124,7 @@ git commit -m "[FE] feat: 재생성 비교와 확정 블록을 만든다"
 - Consumes: `toDayRegeneratePayload`(T2) · `toRegeneratedDayItems`(T3) · `PlanDayDiff`/`PlanDayDiffRow`(T6) · 문구(T5) · `useAiPlanJob`(기존) · `submitAiPlan`·`replaceDayItems`(기존) · `toPlanDaySaveError`(기존)
 - Produces: 없음 (마지막 태스크)
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/features/plan/plan-day-regenerate.test.ts` 를 만든다. **뷰 전체가 아니라 순수 분기만 문자열로 검증한다** — 이 저장소에는 jsdom 이 없어 클라이언트 훅이 붙은 트리를 통째로 렌더할 수 없다. 그래서 화면이 쓰는 두 변환을 export 해서 잠근다.
 
@@ -1184,12 +1184,12 @@ describe('toNextDiffRows — 새 초안 항목', () => {
 })
 ```
 
-- [ ] **Step 2: 실패를 확인한다**
+- **Step 2: 실패를 확인한다**
 
 Run: `npx vitest run src/features/plan/plan-day-regenerate.test.ts`
 Expected: FAIL — `Failed to resolve import "@/features/plan/plan-day-regenerate-view"`
 
-- [ ] **Step 3: 뷰를 만든다**
+- **Step 3: 뷰를 만든다**
 
 `src/features/plan/plan-day-regenerate-view.tsx` 를 만든다. 세 상태를 순서대로 분기한다.
 
@@ -1235,12 +1235,12 @@ export function toNextDiffRows(items: readonly PlanItemRequest[]): PlanDayDiffRo
 }
 ```
 
-- [ ] **Step 4: 통과를 확인한다**
+- **Step 4: 통과를 확인한다**
 
 Run: `npx vitest run src/features/plan/plan-day-regenerate.test.ts`
 Expected: PASS (4 tests)
 
-- [ ] **Step 5: 라우트를 만든다**
+- **Step 5: 라우트를 만든다**
 
 `app/(main)/plans/[planId]/days/[day]/regenerate/page.tsx` 를 만든다. **같은 폴더의 `add/page.tsx` 를 본으로 삼되 장소 목록 프리페치는 뺀다** — 이 화면은 장소를 고르지 않는다.
 
@@ -1318,7 +1318,7 @@ export default async function PlanDayRegeneratePage({ params }: { params: Params
 
 **새 문구 키를 만들지 않는다.** Task 5 의 `messages.plan.regenerateDayPageTitle`(`{day}일차 다시 만들기`)을 화면 제목과 탭 제목이 함께 쓴다 — 명세 R7 표에 있는 그 키다.
 
-- [ ] **Step 6: 전체 검증**
+- **Step 6: 전체 검증**
 
 ```bash
 pnpm verify
@@ -1336,7 +1336,7 @@ pnpm build
 
 Expected: 빌드 성공. **server/client 경계 오류는 빌드에서만 잡히는 것이 많다.**
 
-- [ ] **Step 7: 브라우저로 흐름을 끝까지 본다**
+- **Step 7: 브라우저로 흐름을 끝까지 본다**
 
 ```bash
 cd frontend && nohup node ./node_modules/next/dist/bin/next dev -p 5174 > /tmp/next-dev.log 2>&1 &
@@ -1353,11 +1353,11 @@ cd frontend && nohup node ./node_modules/next/dist/bin/next dev -p 5174 > /tmp/n
 7. 다른 날은 그대로다 — R4 의 핵심이다
 8. 375 · 768 · 1280 에서 `main` 하위에 뷰포트를 넘는 요소가 0건이다
 
-- [ ] **Step 8: 문서를 갱신한다**
+- **Step 8: 문서를 갱신한다**
 
 `frontend/docs/features/ai-plan/공통명세.md` S2(화면 범위)에 이 화면을 더하고, `frontend/docs/screen-inventory.md` 에 라우트를 더한다. **코드 변경과 문서 변경은 같이 움직인다.**
 
-- [ ] **Step 9: 커밋**
+- **Step 9: 커밋**
 
 ```bash
 git add app src/features/plan src/lib/messages docs
@@ -1368,6 +1368,6 @@ git commit -m "[FE] feat: 일정의 하루를 AI 로 다시 만든다"
 
 ## 마무리
 
-- [ ] `#128` 의 마지막 체크박스를 체크하고 세부명세와 PR 을 잇는다
-- [ ] PR 본문에 **아트보드 03 이탈 근거**(R1)와 **다른 날을 반영하지 않는 이유**(R4)를 적는다 — 리뷰어가 가장 먼저 물을 두 가지다
-- [ ] PR 본문 `Issue Number: #128`
+- `#128` 의 마지막 체크박스를 체크하고 세부명세와 PR 을 잇는다
+- PR 본문에 **아트보드 03 이탈 근거**(R1)와 **다른 날을 반영하지 않는 이유**(R4)를 적는다 — 리뷰어가 가장 먼저 물을 두 가지다
+- PR 본문 `Issue Number: #128`

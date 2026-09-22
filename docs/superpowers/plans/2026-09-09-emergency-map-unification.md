@@ -1,6 +1,6 @@
 # 긴급 시설 화면을 장소 찾기 지도 문법으로 통일 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** `/emergency` 의 지도 보기를 `/places` 지도 보기와 같은 레이아웃·같은 상호작용으로 만들고, 시설 제목·행·핀 어디를 눌러도 지도가 도로 단위로 확대되게 한다.
 
@@ -94,7 +94,7 @@
   - `framedCamera(input: { anchor: LatLng; spanMeters: number; width: number; height: number; seaRatio: number }): { lat: number; lng: number; level: number }`
   - `facility(overrides?: Partial<NearbyFacilityItem>): NearbyFacilityItem` (fixtures)
 
-- [ ] **Step 1: 픽스처를 꺼낸다**
+- **Step 1: 픽스처를 꺼낸다**
 
 `src/test/fixtures/emergency.ts` 를 만든다. 내용은 `src/features/emergency/emergency-section.test.ts` 안의 `facility()` 를 그대로 옮긴 것이다 (Task 7 에서 그 파일이 이것을 import 하도록 바꾼다).
 
@@ -153,7 +153,7 @@ export function facilityResult(
 }
 ```
 
-- [ ] **Step 2: 실패하는 테스트를 쓴다**
+- **Step 2: 실패하는 테스트를 쓴다**
 
 `src/lib/map/viewport.test.ts` 의 import 에 `framedCamera` 와 `levelForSpanMeters` 를 더하고, 파일 끝에 붙인다.
 
@@ -232,12 +232,12 @@ describe('framedCamera', () => {
 })
 ```
 
-- [ ] **Step 3: 테스트가 실패하는 것을 확인한다**
+- **Step 3: 테스트가 실패하는 것을 확인한다**
 
 Run: `pnpm vitest run src/lib/map/viewport.test.ts`
 Expected: FAIL — `levelForSpanMeters is not a function` / `framedCamera is not a function` (import 자체가 깨져 파일 전체가 실패한다)
 
-- [ ] **Step 4: 최소 구현을 쓴다**
+- **Step 4: 최소 구현을 쓴다**
 
 `src/lib/map/viewport.ts` 의 `framedCenterLat` **아래**에 붙인다 (`FALLBACK_HEIGHT_PX` 와 같은 모듈이어야 한다).
 
@@ -305,12 +305,12 @@ export function framedCamera(input: {
 }
 ```
 
-- [ ] **Step 5: 테스트가 통과하는 것을 확인한다**
+- **Step 5: 테스트가 통과하는 것을 확인한다**
 
 Run: `pnpm vitest run src/lib/map/viewport.test.ts`
 Expected: PASS (기존 테스트 포함 전부)
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 git add src/lib/map/viewport.ts src/lib/map/viewport.test.ts src/test/fixtures/emergency.ts
@@ -332,7 +332,7 @@ git commit -m "[FE] feat: 반경에서 지도 첫 카메라를 역산하는 순�
 
 **이 태스크에는 단위 테스트가 없다.** 카카오 SDK 가 있어야 돌고 이 저장소에는 jsdom 이 없다. 계산은 Task 1 이 덮었고, 적용은 Task 10 의 브라우저 실측으로 확인한다. 대신 **`/places` 무회귀**를 `pnpm verify` 와 Task 10 실측으로 지킨다 — 기존 `center` prop 을 남기고 호출부를 건드리지 않는 것이 그 장치다.
 
-- [ ] **Step 1: prop 을 선언한다**
+- **Step 1: prop 을 선언한다**
 
 `src/features/map/map-canvas.tsx` 의 props 목록에서 `center` 바로 아래에 더한다.
 
@@ -353,7 +353,7 @@ git commit -m "[FE] feat: 반경에서 지도 첫 카메라를 역산하는 순�
 
 시그니처의 구조분해에도 `camera,` 를 더한다 (`center,` 옆).
 
-- [ ] **Step 2: import 를 더한다**
+- **Step 2: import 를 더한다**
 
 ```tsx
 import { framedCamera, framedCenterLat, type MapBounds } from '@/lib/map/viewport'
@@ -361,7 +361,7 @@ import { framedCamera, framedCenterLat, type MapBounds } from '@/lib/map/viewpor
 
 (`JEJU_MAP_SEA_RATIO` 는 이미 `@/lib/geo/coord` 에서 import 돼 있다.)
 
-- [ ] **Step 3: 적용 effect 를 더한다**
+- **Step 3: 적용 effect 를 더한다**
 
 기존 "밖에서 중심을 옮길 때 (현재 위치 버튼)" effect **바로 아래**에 붙인다.
 
@@ -400,12 +400,12 @@ import { framedCamera, framedCenterLat, type MapBounds } from '@/lib/map/viewpor
 
 **`status` 를 의존성에 넣는 이유:** SDK 로드가 끝나기 전에 `camera` 가 도착하면 `mapRef.current` 가 아직 `null` 이라 이 effect 가 아무 일도 못 한다. `status` 가 `'ready'` 로 바뀔 때 한 번 더 돌아야 그 카메라가 적용된다.
 
-- [ ] **Step 4: 검증**
+- **Step 4: 검증**
 
 Run: `pnpm typecheck && pnpm test`
 Expected: PASS. `/places` 는 `camera` 를 넘기지 않으므로 `camera === undefined` 로 조기 반환한다 — 동작 무변경
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add src/features/map/map-canvas.tsx
@@ -434,7 +434,7 @@ git commit -m "[FE] feat: MapCanvas 가 기준점과 폭으로 카메라를 확�
   - `labelWithCount(label: string, count: number, show: boolean): string` (`@/features/emergency/facility-filters`)
   - `messages.emergency.sheetLabel` · `.emptyInViewDescription` · `.radiusLabel` · `.radiusGroupLabel`
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/components/map-sheet.test.ts` 를 만든다.
 
@@ -473,12 +473,12 @@ describe('MapSheet', () => {
 })
 ```
 
-- [ ] **Step 2: 테스트가 실패하는 것을 확인한다**
+- **Step 2: 테스트가 실패하는 것을 확인한다**
 
 Run: `pnpm vitest run src/components/map-sheet.test.ts`
 Expected: FAIL — `label` 이 알 수 없는 prop 이라 `aria-label` 에 여전히 `'장소 목록'` 이 박혀 있다 (첫 테스트가 통과할 수도 있으나 두 번째가 실패한다)
 
-- [ ] **Step 3: `MapSheet` 에 `label` 을 더한다**
+- **Step 3: `MapSheet` 에 `label` 을 더한다**
 
 `src/components/map-sheet.tsx`:
 
@@ -497,7 +497,7 @@ props 타입에 더한다.
 
 `messages` import 가 파일 안에서 다른 곳(`collapseSheet` · `expandSheet`)에도 쓰이므로 **import 는 남긴다.**
 
-- [ ] **Step 4: `sheetLabel` 을 옮긴다**
+- **Step 4: `sheetLabel` 을 옮긴다**
 
 `src/lib/messages/map.ts` 에서 아래 한 줄을 **지운다.**
 
@@ -513,7 +513,7 @@ props 타입에 더한다.
         stop={sheetStop}
 ```
 
-- [ ] **Step 5: 긴급 문구를 더한다**
+- **Step 5: 긴급 문구를 더한다**
 
 `src/lib/messages/emergency.ts` 의 `// ── 상태 ───` 절 앞에 붙인다.
 
@@ -540,7 +540,7 @@ props 타입에 더한다.
   radiusSheetTitle: '반경 고르기',
 ```
 
-- [ ] **Step 6: 선택 확대 단계를 더한다**
+- **Step 6: 선택 확대 단계를 더한다**
 
 `src/lib/geo/coord.ts` 의 `SELECTED_PLACE_MAP_LEVEL` **아래**에 붙인다.
 
@@ -560,7 +560,7 @@ props 타입에 더한다.
 export const SELECTED_FACILITY_MAP_LEVEL = 4
 ```
 
-- [ ] **Step 7: `labelWithCount` 를 꺼낸다**
+- **Step 7: `labelWithCount` 를 꺼낸다**
 
 `src/features/emergency/facility-filters.ts` 끝에 붙인다.
 
@@ -577,12 +577,12 @@ export function labelWithCount(label: string, count: number, show: boolean): str
 }
 ```
 
-- [ ] **Step 8: 테스트가 통과하는 것을 확인한다**
+- **Step 8: 테스트가 통과하는 것을 확인한다**
 
 Run: `pnpm vitest run src/components/map-sheet.test.ts && pnpm typecheck`
 Expected: PASS. typecheck 가 `messages.map.sheetLabel` 을 쓰는 곳이 남아 있으면 잡아 준다
 
-- [ ] **Step 9: 커밋**
+- **Step 9: 커밋**
 
 ```bash
 git add src/lib/geo/coord.ts src/lib/messages/emergency.ts src/lib/messages/map.ts src/components/map-sheet.tsx src/components/map-sheet.test.ts src/features/place/place-map-view.tsx src/features/emergency/facility-filters.ts
@@ -607,7 +607,7 @@ git commit -m "[FE] refactor: 지도 시트 이름을 호출부로 올리고 긴
   - `DirectionsLink({ facility }): JSX | null` — 좌표가 없으면 `null`
   - `FacilityRow({ facility, showDistance, last })` — 목록 갈래용. **동작 무변경**
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/features/emergency/facility-row.test.ts`:
 
@@ -700,12 +700,12 @@ describe('FacilityRow', () => {
 })
 ```
 
-- [ ] **Step 2: 테스트가 실패하는 것을 확인한다**
+- **Step 2: 테스트가 실패하는 것을 확인한다**
 
 Run: `pnpm vitest run src/features/emergency/facility-row.test.ts`
 Expected: FAIL — `FacilityRowContent` / `DirectionsLink` 를 export 하지 않는다
 
-- [ ] **Step 3: `facility-row.tsx` 를 재구성한다**
+- **Step 3: `facility-row.tsx` 를 재구성한다**
 
 파일 전체를 아래로 바꾼다. **`FacilityRow` 의 렌더 결과는 이전과 같다** — 내용을 함수로 갈랐을 뿐이다.
 
@@ -915,12 +915,12 @@ export function DirectionsLink({ facility }: { facility: NearbyFacilityItem }) {
 }
 ```
 
-- [ ] **Step 4: 테스트가 통과하는 것을 확인한다**
+- **Step 4: 테스트가 통과하는 것을 확인한다**
 
 Run: `pnpm vitest run src/features/emergency/`
 Expected: PASS — 새 테스트와 기존 `emergency-section.test.ts` 가 함께 통과한다 (`FacilityRow` 의 렌더 결과가 같다)
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add src/features/emergency/facility-row.tsx src/features/emergency/facility-row.test.ts
@@ -939,7 +939,7 @@ git commit -m "[FE] refactor: 시설 행의 내용과 액션을 갈라 선택 �
 - Consumes: `FacilityRowContent` · `CallButton` · `DirectionsLink` (Task 4), `messages.map.noCoordinate`
 - Produces: `EmergencyMapPanel({ facilities, selectedId, onSelect, showDistance })`
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/features/emergency/emergency-map-panel.test.ts`:
 
@@ -1020,12 +1020,12 @@ describe('EmergencyMapPanel', () => {
 })
 ```
 
-- [ ] **Step 2: 테스트가 실패하는 것을 확인한다**
+- **Step 2: 테스트가 실패하는 것을 확인한다**
 
 Run: `pnpm vitest run src/features/emergency/emergency-map-panel.test.ts`
 Expected: FAIL — 모듈이 없다
 
-- [ ] **Step 3: 컴포넌트를 만든다**
+- **Step 3: 컴포넌트를 만든다**
 
 `src/features/emergency/emergency-map-panel.tsx`:
 
@@ -1138,12 +1138,12 @@ export function EmergencyMapPanel({
 }
 ```
 
-- [ ] **Step 4: 테스트가 통과하는 것을 확인한다**
+- **Step 4: 테스트가 통과하는 것을 확인한다**
 
 Run: `pnpm vitest run src/features/emergency/emergency-map-panel.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add src/features/emergency/emergency-map-panel.tsx src/features/emergency/emergency-map-panel.test.ts
@@ -1164,7 +1164,7 @@ git commit -m "[FE] feat: 지도 패널·시트에 들어가는 선택 가능한
   - `RADIUS_OPTIONS: readonly number[]`
   - `EmergencyFilterBar({ facilities, filters, onFiltersChange, radius, onRadiusChange, showCounts })`
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/features/emergency/emergency-filter-bar.test.ts`:
 
@@ -1255,12 +1255,12 @@ describe('EmergencyFilterBar', () => {
 })
 ```
 
-- [ ] **Step 2: 테스트가 실패하는 것을 확인한다**
+- **Step 2: 테스트가 실패하는 것을 확인한다**
 
 Run: `pnpm vitest run src/features/emergency/emergency-filter-bar.test.ts`
 Expected: FAIL — 모듈이 없다
 
-- [ ] **Step 3: 컴포넌트를 만든다**
+- **Step 3: 컴포넌트를 만든다**
 
 `src/features/emergency/emergency-filter-bar.tsx`:
 
@@ -1484,14 +1484,14 @@ export function EmergencyFilterBar({
 }
 ```
 
-- [ ] **Step 4: 테스트가 통과하는 것을 확인한다**
+- **Step 4: 테스트가 통과하는 것을 확인한다**
 
 Run: `pnpm vitest run src/features/emergency/emergency-filter-bar.test.ts`
 Expected: PASS
 
 **실패하면 먼저 확인할 것:** `messages.place.filterTypePrev` · `filterTypeNext` · `resetFilters` · `filterCancel` · `filterApply` 가 실제로 있는지 (`grep -n "filterTypePrev\|resetFilters\|filterCancel\|filterApply" src/lib/messages/place.ts`). 없으면 `messages/emergency.ts` 에 같은 뜻의 문구를 더하고 그것을 쓴다 — **`/places` 문구를 고치지 않는다.**
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add src/features/emergency/emergency-filter-bar.tsx src/features/emergency/emergency-filter-bar.test.ts
@@ -1525,7 +1525,7 @@ git commit -m "[FE] feat: 긴급 시설 지도 보기의 필터 줄과 반경 �
 - Consumes: `labelWithCount` (Task 3), `facility` · `facilityResult` (Task 1)
 - Produces: 없음. **`EmergencySectionProps` 는 바뀌지 않는다** — 이 태스크는 순수 내부 정리다
 
-- [ ] **Step 1: 픽스처를 공유로 바꾼다 (동작 불변 리팩토링)**
+- **Step 1: 픽스처를 공유로 바꾼다 (동작 불변 리팩토링)**
 
 `src/features/emergency/emergency-section.test.ts` 에서 파일 안의 `function facility(...)`
 정의를 **지우고** import 로 바꾼다. 픽스처 기본값이 Task 1 의 것과 같은 값이라 기존
@@ -1538,13 +1538,13 @@ import { facility } from '@/test/fixtures/emergency'
 기존 테스트가 `facilityResult` 로 응답을 만들고 있지 않다면 그대로 둔다. 이 태스크는
 테스트 내용을 바꾸지 않는다.
 
-- [ ] **Step 2: 픽스처 교체만으로 테스트가 통과하는 것을 확인한다**
+- **Step 2: 픽스처 교체만으로 테스트가 통과하는 것을 확인한다**
 
 Run: `pnpm vitest run src/features/emergency/emergency-section.test.ts`
 Expected: PASS — 통과하지 않으면 Task 1 의 픽스처 기본값이 원래 것과 다르다는 뜻이다.
 그때는 **픽스처를 원래 값에 맞추고** (테스트를 고치지 않는다) 다시 돌린다.
 
-- [ ] **Step 3: `withCount` 를 `labelWithCount` 로 갈아탄다**
+- **Step 3: `withCount` 를 `labelWithCount` 로 갈아탄다**
 
 `src/features/emergency/emergency-section.tsx`:
 
@@ -1577,12 +1577,12 @@ import {
 템플릿 문자열 결과는 같다 — `labelWithCount` 쪽이 `@typescript-eslint` 의
 `restrict-template-expressions` 를 만족하는 형태다.
 
-- [ ] **Step 4: 검증**
+- **Step 4: 검증**
 
 Run: `pnpm vitest run src/features/emergency/ && pnpm typecheck && pnpm lint`
 Expected: PASS. 렌더 결과가 바뀌지 않았으므로 기존 assertion 이 전부 통과해야 한다
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 git add src/features/emergency/emergency-section.tsx src/features/emergency/emergency-section.test.ts
@@ -1624,7 +1624,7 @@ git commit -m "[FE] refactor: 시설 칩 개수 라벨 헬퍼를 한 곳으로 �
 > 넘긴다. 화면당 보드는 언제나 하나다. 라우트 페이지는 그대로 `EmergencyListView` 를
 > 쓴다 — 거기가 목록 갈래의 최상위이므로 보드를 만드는 것이 맞다.
 
-- [ ] **Step 1: 상태 훅을 만든다**
+- **Step 1: 상태 훅을 만든다**
 
 `src/features/emergency/use-emergency-board.ts`:
 
@@ -1724,7 +1724,7 @@ export function useEmergencyBoard() {
 }
 ```
 
-- [ ] **Step 2: 목록 갈래를 꺼낸다**
+- **Step 2: 목록 갈래를 꺼낸다**
 
 `src/features/emergency/emergency-list-view.tsx`:
 
@@ -1774,7 +1774,7 @@ export function EmergencyBoardSection({ board }: { board: EmergencyBoard }) {
 }
 ```
 
-- [ ] **Step 3: 지도 갈래를 만든다**
+- **Step 3: 지도 갈래를 만든다**
 
 `src/features/emergency/emergency-map-view.tsx`:
 
@@ -2190,7 +2190,7 @@ function failureMessage(reason: MapSdkFailure): string {
 }
 ```
 
-- [ ] **Step 4: 라우트를 두 갈래로 가른다**
+- **Step 4: 라우트를 두 갈래로 가른다**
 
 `app/(main)/emergency/page.tsx` 를 아래로 바꾼다. **`parseViewMode` 의 기본값은 아직 건드리지 않는다** — 기본 보기는 목록이고 새 화면은 `?view=map` 으로만 온다.
 
@@ -2248,14 +2248,14 @@ export default async function EmergencyPage({ searchParams }: { searchParams: Se
 }
 ```
 
-- [ ] **Step 5: 검증**
+- **Step 5: 검증**
 
 Run: `pnpm verify`
 Expected: PASS
 
 **실패하면 확인할 것:** `MapSheet` 의 `toolbar` prop 이 optional 인지, `EmptyState` 가 `action` prop 을 받는지, `ErrorState` 가 `onRetry` 를 받는지 — 세 컴포넌트 시그니처를 `grep -n "export function EmptyState" -A 12 src/components/empty-state.tsx` 로 확인한다.
 
-- [ ] **Step 6: 브라우저에서 새 화면을 확인한다**
+- **Step 6: 브라우저에서 새 화면을 확인한다**
 
 ```bash
 pnpm dev:alt
@@ -2269,7 +2269,7 @@ pnpm dev:alt
 - **필터 칩을 눌러도 지도가 되돌아가지 않는가** (이전 결함의 회귀 확인)
 - `?view=list` 가 이전 화면과 같은가
 
-- [ ] **Step 7: 커밋**
+- **Step 7: 커밋**
 
 ```bash
 git add src/features/emergency/use-emergency-board.ts src/features/emergency/emergency-map-view.tsx src/features/emergency/emergency-list-view.tsx "app/(main)/emergency/page.tsx"
@@ -2294,7 +2294,7 @@ git commit -m "[FE] feat: 긴급 시설 지도 보기를 전면 지도 + 패널�
 **Interfaces:**
 - Produces: `EMERGENCY_DEFAULT_VIEW: ViewMode` (`@/lib/url/view-mode`)
 
-- [ ] **Step 1: 실패하는 테스트를 쓴다**
+- **Step 1: 실패하는 테스트를 쓴다**
 
 `src/lib/url/view-mode.test.ts` 끝에 붙인다.
 
@@ -2323,12 +2323,12 @@ describe('EMERGENCY_DEFAULT_VIEW', () => {
 
 import 에 `EMERGENCY_DEFAULT_VIEW` 와 `PLACES_DEFAULT_VIEW` 를 더한다.
 
-- [ ] **Step 2: 테스트가 실패하는 것을 확인한다**
+- **Step 2: 테스트가 실패하는 것을 확인한다**
 
 Run: `pnpm vitest run src/lib/url/view-mode.test.ts`
 Expected: FAIL — `EMERGENCY_DEFAULT_VIEW` 를 export 하지 않는다
 
-- [ ] **Step 3: 상수를 더하고 주석을 뒤집는다**
+- **Step 3: 상수를 더하고 주석을 뒤집는다**
 
 `src/lib/url/view-mode.ts` 의 `PLACES_DEFAULT_VIEW` 블록을 아래로 바꾼다.
 
@@ -2352,7 +2352,7 @@ export const PLACES_DEFAULT_VIEW: ViewMode = 'map'
 export const EMERGENCY_DEFAULT_VIEW: ViewMode = 'map'
 ```
 
-- [ ] **Step 4: 라우트가 새 기본값을 쓰게 한다**
+- **Step 4: 라우트가 새 기본값을 쓰게 한다**
 
 `app/(main)/emergency/page.tsx` 에서 세 줄을 바꾼다.
 
@@ -2368,7 +2368,7 @@ import { EMERGENCY_DEFAULT_VIEW, parseViewMode, viewModeHref } from '@/lib/url/v
 
 **`parseViewMode` 와 `viewModeHref` 에 같은 기본값을 넘겨야 한다.** 어긋나면 토글이 가리키는 보기와 페이지가 그리는 보기가 달라져 전환이 먹지 않는다.
 
-- [ ] **Step 5: 구 파일을 지운다**
+- **Step 5: 구 파일을 지운다**
 
 ```bash
 git rm src/features/emergency/emergency-view.tsx \
@@ -2377,7 +2377,7 @@ git rm src/features/emergency/emergency-view.tsx \
        src/features/emergency/facility-selected-card.test.ts
 ```
 
-- [ ] **Step 6: 낡은 CSS 를 지운다**
+- **Step 6: 낡은 CSS 를 지운다**
 
 `app/globals.css` 에서 아래를 **정확히 이 다섯 덩어리** 그대로 지운다 (파일 끝 근처, `.map-panel-width` 아래).
 
@@ -2397,7 +2397,7 @@ git rm src/features/emergency/emergency-view.tsx \
 
 **`.map-canvas-height` 와 `.map-panel-width` 는 남긴다** — 새 화면이 그 둘을 쓴다.
 
-- [ ] **Step 6-1: 죽은 그림자 예외 항목을 걷는다**
+- **Step 6-1: 죽은 그림자 예외 항목을 걷는다**
 
 `src/styles/token-usage.test.ts` 의 `FLOATING` 배열에서 아래 두 줄(주석 + 경로)을 지운다.
 
@@ -2410,7 +2410,7 @@ git rm src/features/emergency/emergency-view.tsx \
 
 **`emergency-map-view.tsx` 항목은 남긴다** — Task 8 이 더한 것이고 그 파일은 실제로 지도 위에 뜬다 (`place-map-view.tsx` 와 같은 근거).
 
-- [ ] **Step 7: 남은 참조가 없는지 확인한다**
+- **Step 7: 남은 참조가 없는지 확인한다**
 
 ```bash
 grep -rn "emergency-map-height\|EmergencyView\|FacilitySelectedCard\|facility-selected-card\|features/emergency/emergency-map'" src app
@@ -2418,12 +2418,12 @@ grep -rn "emergency-map-height\|EmergencyView\|FacilitySelectedCard\|facility-se
 
 Expected: 결과 없음
 
-- [ ] **Step 8: 검증**
+- **Step 8: 검증**
 
 Run: `pnpm verify && pnpm format:check`
 Expected: PASS
 
-- [ ] **Step 9: 커밋**
+- **Step 9: 커밋**
 
 ```bash
 git add src/lib/url/view-mode.ts src/lib/url/view-mode.test.ts "app/(main)/emergency/page.tsx" app/globals.css src/styles/token-usage.test.ts
@@ -2439,7 +2439,7 @@ git commit -m "[FE] refactor: 긴급 시설의 기본 보기를 지도로 바꾸
 - Modify: `frontend/docs/screen-inventory.md`
 - Modify: `frontend/docs/architecture-guide.md`
 
-- [ ] **Step 1: 브라우저 실측 (375)**
+- **Step 1: 브라우저 실측 (375)**
 
 ```bash
 pnpm dev:alt
@@ -2452,19 +2452,19 @@ pnpm dev:alt
 - 핀을 누르면 시트가 중간으로 올라오고 그 행으로 스크롤되는가
 - 반경 칩 → 시트 → 40km 적용 후 지도 구도가 그만큼 넓어지는가
 
-- [ ] **Step 2: 브라우저 실측 (768 · 1280)**
+- **Step 2: 브라우저 실측 (768 · 1280)**
 
 - 768: 시트 유지, 탭바 없음 (`map-sheet-above-tabbar` 가 `bottom: 0`)
 - 1280: 패널 400, 하단 여백이 카카오 축척 막대를 누르지 않는가, 접기 탭이 접고 펼 때 제자리인가
 - 1280 에서 패널을 접었다 펴면 지도가 잘리지 않는가 (`relayout`)
 
-- [ ] **Step 3: 실패 경로 실측**
+- **Step 3: 실패 경로 실측**
 
 - 브라우저 위치 권한을 **거부**하고 새로고침 → 거리가 사라지고 "제주 중심 기준" 이 뜨는가, 카메라가 `/places` 첫 화면과 같은가
 - `?view=list` 가 이전 화면과 같은가
 - 지도를 반경 밖(예: 서귀포 남쪽 바다)으로 끌면 "반경 넓히기" 가 그 자리에 나오는가
 
-- [ ] **Step 4: 문서를 고친다**
+- **Step 4: 문서를 고친다**
 
 **`frontend/docs/features/emergency/공통명세.md`** — E0 의 두 문단을 바꾼다.
 
@@ -2510,19 +2510,19 @@ pnpm dev:alt
 
 §10 에서 `view` 기본값을 설명하며 긴급 시설이 예외라고 적은 대목을 찾아, screen-inventory 와 **같은 취지**로 고친다 (두 화면이 같은 기본값을 쓰고, 안전 근거는 시트 단계와 폴백이 맡는다). 두 문서가 갈리면 다음 사람이 어느 쪽을 믿을지 알 수 없다.
 
-- [ ] **Step 5: 검증**
+- **Step 5: 검증**
 
 Run: `pnpm verify && pnpm format:check`
 Expected: PASS
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 git add docs/features/emergency/공통명세.md docs/screen-inventory.md docs/architecture-guide.md
 git commit -m "[DOCS] docs: 긴급 시설 지도 기본 보기와 재조회 없음 규칙을 문서에 반영한다"
 ```
 
-- [ ] **Step 7: PR 을 만든다**
+- **Step 7: PR 을 만든다**
 
 본문은 `/pr` 스킬로 `.github/PULL_REQUEST_TEMPLATE.md` 를 채우고, 스크래치패드에 쓴 뒤 넘긴다
 (저장소에 커밋하지 않는다). **`Issue Number: #353` 을 반드시 채운다** — 비면 이슈가 자동으로
@@ -2540,7 +2540,7 @@ gh pr create --base develop \
 라벨 `frontend-web` 이 필수다 — Jenkins 가 PR 라벨로 배포 스코프를 정하고 라벨이 없으면
 배포하지 않는다 (fail-closed · `docs/git-workflow.md`).
 
-- [ ] **Step 8: CI 를 확인하고 `Rebase and merge` 로 머지한다**
+- **Step 8: CI 를 확인하고 `Rebase and merge` 로 머지한다**
 
 `Squash` 나 `Create a merge commit` 을 쓰지 않는다 (`docs/git-workflow.md`). 머지 후 브랜치를 삭제하고 워크트리를 정리한다.
 

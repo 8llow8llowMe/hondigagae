@@ -3,7 +3,7 @@
 > 대상: `.rail-layout` 을 쓰는 6개 화면 + `GlobalHeader`
 > 이슈: #376
 > 작성: 2026-09-09
-> 상태: 설계 확정 (구현 계획 미작성)
+> 상태: 설계 확정 · 계획 `docs/superpowers/plans/2026-09-09-content-max-width.md` — 구현 진행 상황은 [#376](https://github.com/8llow8llowMe/hondigagae/issues/376)
 
 **Goal:** 넓은 화면에서 **화면마다 다른 폭 규칙**을 하나로 모은다. 레일 레이아웃과 헤더
 안쪽 내용을 `--content-max: 1440px` 로 캡하고 중앙 정렬한다.

@@ -1,6 +1,6 @@
 # 이용약관·개인정보 처리방침 구현 계획
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** 이용약관과 개인정보 처리방침을 구조화 상수로 작성하고 `/terms` · `/privacy` 정적 페이지로 공개한 뒤, 푸터와 마이페이지에서 도달하게 한다.
 
@@ -62,7 +62,7 @@
 - Consumes: 없음
 - Produces: `Block` · `Article` · `Revision` · `LegalDocument` 타입, `LEGAL_DOCUMENTS: readonly LegalDocument[]`
 
-- [ ] **Step 1: 타입을 쓴다**
+- **Step 1: 타입을 쓴다**
 
 `frontend/src/lib/legal/types.ts`:
 
@@ -118,7 +118,7 @@ export type LegalDocument = {
 }
 ```
 
-- [ ] **Step 2: 실패하는 구조 테스트를 쓴다**
+- **Step 2: 실패하는 구조 테스트를 쓴다**
 
 `frontend/src/lib/legal/legal.test.ts`:
 
@@ -182,12 +182,12 @@ describe('법률 문서 구조 (#610)', () => {
 })
 ```
 
-- [ ] **Step 3: 테스트가 실패하는 것을 확인한다**
+- **Step 3: 테스트가 실패하는 것을 확인한다**
 
 Run: `cd frontend && pnpm vitest run src/lib/legal/legal.test.ts`
 Expected: FAIL — `Failed to resolve import "@/lib/legal"`
 
-- [ ] **Step 4: 빈 배열로 배럴을 만든다**
+- **Step 4: 빈 배열로 배럴을 만든다**
 
 `frontend/src/lib/legal/index.ts`:
 
@@ -201,12 +201,12 @@ import type { LegalDocument } from '@/lib/legal/types'
 export const LEGAL_DOCUMENTS: readonly LegalDocument[] = []
 ```
 
-- [ ] **Step 5: 테스트가 통과하는 것을 확인한다**
+- **Step 5: 테스트가 통과하는 것을 확인한다**
 
 Run: `cd frontend && pnpm vitest run src/lib/legal/legal.test.ts`
 Expected: PASS — 1개 (`검증 대상 목록이 배열이다`). 문서별 단언은 배열이 비어 아직 돌지 않고, Task 2·3 부터 실제로 돈다
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 cd frontend
@@ -227,7 +227,7 @@ git commit -m "[FE] feat: 법률 문서 구조 타입과 무결성 테스트를 
 - Consumes: `LegalDocument` · `Article` · `Block` (Task 1)
 - Produces: `termsOfService: LegalDocument`
 
-- [ ] **Step 1: 약관 본문을 쓴다**
+- **Step 1: 약관 본문을 쓴다**
 
 `frontend/src/lib/legal/terms-of-service.ts`:
 
@@ -489,7 +489,7 @@ export const termsOfService: LegalDocument = {
 }
 ```
 
-- [ ] **Step 2: 배럴에 등록한다**
+- **Step 2: 배럴에 등록한다**
 
 `frontend/src/lib/legal/index.ts` 를 통째로 바꾼다:
 
@@ -504,12 +504,12 @@ import type { LegalDocument } from '@/lib/legal/types'
 export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [termsOfService]
 ```
 
-- [ ] **Step 3: 구조 테스트를 돌린다**
+- **Step 3: 구조 테스트를 돌린다**
 
 Run: `cd frontend && pnpm vitest run src/lib/legal/legal.test.ts`
 Expected: PASS — `이용약관` describe 안에서 조 번호 1~15 연속, 빈 조문 없음, 시행일 형식, 이력에 1.0 이 모두 통과
 
-- [ ] **Step 4: 커밋**
+- **Step 4: 커밋**
 
 ```bash
 cd frontend
@@ -535,7 +535,7 @@ git commit -m "[FE] feat: 이용약관 본문 15개 조를 쓴다 (#610)"
 > 사람이 정하는 값이라 자동으로 채울 수 없고, 비면 Step 1 의 테스트가 실패해
 > 머지되지 않는다.
 
-- [ ] **Step 1: 보호책임자 게이트 테스트를 먼저 쓴다**
+- **Step 1: 보호책임자 게이트 테스트를 먼저 쓴다**
 
 `frontend/src/lib/legal/legal.test.ts` 에 더한다. **`import` 는 파일 머리의 기존 import 들과 같은 자리에 넣고**(경로 알파벳 순서), `describe` 블록만 파일 끝에 붙인다:
 
@@ -563,12 +563,12 @@ describe('개인정보 보호책임자 (#610)', () => {
 })
 ```
 
-- [ ] **Step 2: 테스트가 실패하는 것을 확인한다**
+- **Step 2: 테스트가 실패하는 것을 확인한다**
 
 Run: `cd frontend && pnpm vitest run src/lib/legal/legal.test.ts`
 Expected: FAIL — `Failed to resolve import "@/lib/legal/contact"`
 
-- [ ] **Step 3: 연락처 상수를 만든다**
+- **Step 3: 연락처 상수를 만든다**
 
 `frontend/src/lib/legal/contact.ts`:
 
@@ -594,7 +594,7 @@ export const LEGAL_CONTACT = {
 > `officerName` 은 확정 값이다 — 사용자가 2026-09-15 에 `최성호` 로 지정했다. 값이
 > 비면 테스트가 실패하므로 비운 채로 머지될 수 없다.
 
-- [ ] **Step 4: 처리방침 본문을 쓴다**
+- **Step 4: 처리방침 본문을 쓴다**
 
 `frontend/src/lib/legal/privacy-policy.ts`:
 
@@ -885,7 +885,7 @@ export const privacyPolicy: LegalDocument = {
 }
 ```
 
-- [ ] **Step 5: 법정 기재사항 누락 테스트를 쓴다**
+- **Step 5: 법정 기재사항 누락 테스트를 쓴다**
 
 `frontend/src/lib/legal/legal.test.ts` 에 더한다. Step 1 과 같다 — **`import` 는 파일 머리에**, `REQUIRED_SECTIONS` 상수와 `describe` 는 파일 끝에 붙인다:
 
@@ -929,7 +929,7 @@ describe('개인정보 처리방침 — 법정 기재사항 (#610)', () => {
 })
 ```
 
-- [ ] **Step 6: 배럴에 등록한다**
+- **Step 6: 배럴에 등록한다**
 
 `frontend/src/lib/legal/index.ts` 를 통째로 바꾼다:
 
@@ -945,12 +945,12 @@ import type { LegalDocument } from '@/lib/legal/types'
 export const LEGAL_DOCUMENTS: readonly LegalDocument[] = [termsOfService, privacyPolicy]
 ```
 
-- [ ] **Step 7: 테스트를 돌린다**
+- **Step 7: 테스트를 돌린다**
 
 Run: `cd frontend && pnpm vitest run src/lib/legal/legal.test.ts`
 Expected: PASS — 두 문서의 구조 검증 + 법정 12개 절 + 보호책임자 게이트
 
-- [ ] **Step 8: 커밋**
+- **Step 8: 커밋**
 
 ```bash
 cd frontend
@@ -971,7 +971,7 @@ git commit -m "[FE] feat: 개인정보 처리방침 본문과 법정 기재사�
 - Consumes: 없음
 - Produces: `messages.legal` (`termsTitle` · `termsDescription` · `privacyTitle` · `privacyDescription` · `tocLabel` · `effectiveDateLabel` · `historyLabel` · `articleLabel(no: number): string`), `LEGAL_LINKS: readonly { href: string; label: string }[]`
 
-- [ ] **Step 1: 화면 문구를 쓴다 — 해요체다**
+- **Step 1: 화면 문구를 쓴다 — 해요체다**
 
 `frontend/src/lib/messages/legal.ts`:
 
@@ -1000,7 +1000,7 @@ export const legalMessages = {
 } as const
 ```
 
-- [ ] **Step 2: 배럴에 등록한다**
+- **Step 2: 배럴에 등록한다**
 
 `frontend/src/lib/messages/index.ts` 에 import 한 줄과 항목 한 줄을 더한다. `simple-import-sort` 는 **모듈 경로**로 정렬하므로 `@/lib/messages/home` 줄 **다음**, `@/lib/messages/map` 줄 **앞**이다 (가져오는 이름이 아니라 경로 기준이다):
 
@@ -1014,7 +1014,7 @@ import { legalMessages } from '@/lib/messages/legal'
   legal: legalMessages,
 ```
 
-- [ ] **Step 3: 링크 목록을 만든다**
+- **Step 3: 링크 목록을 만든다**
 
 `frontend/src/lib/legal/links.ts`:
 
@@ -1037,12 +1037,12 @@ export const LEGAL_LINKS = [
 ] as const
 ```
 
-- [ ] **Step 4: 톤 테스트와 타입 검사를 돌린다**
+- **Step 4: 톤 테스트와 타입 검사를 돌린다**
 
 Run: `cd frontend && pnpm vitest run src/lib/messages && pnpm typecheck`
 Expected: PASS — 새 문구에 합쇼체가 없고 타입이 맞는다
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 cd frontend
@@ -1062,7 +1062,7 @@ git commit -m "[FE] feat: 약관 화면 문구와 링크 목록을 둔다 (#610)
 - Consumes: `LegalDocument` · `Block` (Task 1), `termsOfService` (Task 2), `messages.legal` (Task 4), `INSET_CLASS` (`@/lib/ui/inset`), `cn` (`@/lib/utils/cn`)
 - Produces: `LegalDocumentView({ doc }: { doc: LegalDocument })`
 
-- [ ] **Step 1: 실패하는 렌더 테스트를 쓴다**
+- **Step 1: 실패하는 렌더 테스트를 쓴다**
 
 `frontend/src/features/legal/legal-document-view.test.ts`:
 
@@ -1159,12 +1159,12 @@ describe('LegalDocumentView — 핵심 조문이 빠지지 않는다 (#610)', ()
 })
 ```
 
-- [ ] **Step 2: 테스트가 실패하는 것을 확인한다**
+- **Step 2: 테스트가 실패하는 것을 확인한다**
 
 Run: `cd frontend && pnpm vitest run src/features/legal`
 Expected: FAIL — `Failed to resolve import "@/features/legal/legal-document-view"`
 
-- [ ] **Step 3: 렌더러를 쓴다**
+- **Step 3: 렌더러를 쓴다**
 
 `frontend/src/features/legal/legal-document-view.tsx`:
 
@@ -1304,12 +1304,12 @@ export function LegalDocumentView({ doc }: { doc: LegalDocument }) {
 }
 ```
 
-- [ ] **Step 4: 테스트가 통과하는 것을 확인한다**
+- **Step 4: 테스트가 통과하는 것을 확인한다**
 
 Run: `cd frontend && pnpm vitest run src/features/legal`
 Expected: PASS — 12개 단언 전부
 
-- [ ] **Step 5: 커밋**
+- **Step 5: 커밋**
 
 ```bash
 cd frontend
@@ -1329,7 +1329,7 @@ git commit -m "[FE] feat: 약관 문서 공용 렌더러를 둔다 (#610)"
 - Consumes: `LegalDocumentView` (Task 5), `termsOfService` (Task 2), `privacyPolicy` (Task 3), `messages.legal` (Task 4), `Canvas` (`@/components/surface`)
 - Produces: `/terms` · `/privacy` 라우트
 
-- [ ] **Step 1: 약관 라우트를 만든다**
+- **Step 1: 약관 라우트를 만든다**
 
 `frontend/app/(main)/terms/page.tsx`:
 
@@ -1362,7 +1362,7 @@ export default function TermsPage() {
 }
 ```
 
-- [ ] **Step 2: 처리방침 라우트를 만든다**
+- **Step 2: 처리방침 라우트를 만든다**
 
 `frontend/app/(main)/privacy/page.tsx`:
 
@@ -1391,12 +1391,12 @@ export default function PrivacyPage() {
 }
 ```
 
-- [ ] **Step 3: 빌드가 되는지 확인한다**
+- **Step 3: 빌드가 되는지 확인한다**
 
 Run: `cd frontend && pnpm typecheck && pnpm build`
 Expected: PASS — 빌드 출력의 라우트 목록에 `/terms` 와 `/privacy` 가 나온다. **둘 다 동적(`ƒ`)이고 그게 맞다**: `(main)/layout.tsx` 가 `readSession()` → `await cookies()` 를 부르므로 그 그룹 **전체**가 이미 동적이다. 이 두 라우트가 새로 만든 성질이 아니다. 정적으로 만들려면 `(main)` 밖으로 빼야 하는데 그러면 헤더·푸터 셸을 잃고, 푸터는 이 작업이 만드는 진입점 둘 중 하나다
 
-- [ ] **Step 4: 커밋**
+- **Step 4: 커밋**
 
 ```bash
 cd frontend
@@ -1417,7 +1417,7 @@ git commit -m "[FE] feat: /terms · /privacy 라우트를 연다 (#610)"
 - Consumes: `LEGAL_LINKS` (Task 4), `/terms` · `/privacy` 라우트 (Task 6)
 - Produces: 푸터의 약관 링크 블록
 
-- [ ] **Step 1: 푸터 문구에 라벨을 더하고 낡은 주석을 고친다**
+- **Step 1: 푸터 문구에 라벨을 더하고 낡은 주석을 고친다**
 
 `frontend/src/lib/messages/footer.ts` 의 **파일 머리 주석 마지막 문단**을 바꾼다.
 
@@ -1443,7 +1443,7 @@ git commit -m "[FE] feat: /terms · /privacy 라우트를 연다 (#610)"
   legalLabel: '약관',
 ```
 
-- [ ] **Step 2: 실패하는 테스트로 바꾼다**
+- **Step 2: 실패하는 테스트로 바꾼다**
 
 `frontend/src/features/nav/site-footer.test.ts` 에서 아래 블록을 통째로 **교체**한다.
 
@@ -1518,12 +1518,12 @@ import { LEGAL_LINKS } from '@/lib/legal/links'
   })
 ```
 
-- [ ] **Step 3: 테스트가 실패하는 것을 확인한다**
+- **Step 3: 테스트가 실패하는 것을 확인한다**
 
 Run: `cd frontend && pnpm vitest run src/features/nav/site-footer.test.ts`
 Expected: FAIL — `약관·처리방침 링크가 실재 라우트를 가리킨다` 가 `href="/terms"` 를 찾지 못한다
 
-- [ ] **Step 4: 푸터에 링크를 단다**
+- **Step 4: 푸터에 링크를 단다**
 
 `frontend/src/features/nav/site-footer.tsx` 를 세 군데 고친다.
 
@@ -1589,12 +1589,12 @@ import { LEGAL_LINKS } from '@/lib/legal/links'
           <p className="text-caption text-fg-muted font-medium">{messages.footer.disclaimer}</p>
 ```
 
-- [ ] **Step 5: 테스트가 통과하는 것을 확인한다**
+- **Step 5: 테스트가 통과하는 것을 확인한다**
 
 Run: `cd frontend && pnpm vitest run src/features/nav/site-footer.test.ts`
 Expected: PASS — 출처 개수 단언을 포함해 전부
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 cd frontend
@@ -1614,7 +1614,7 @@ git commit -m "[FE] feat: 푸터에 약관·처리방침 링크를 건다 (#610)
 - Consumes: `LEGAL_LINKS` (Task 4), `/terms` · `/privacy` 라우트 (Task 6)
 - Produces: 마이페이지 계정 섹션의 약관 항목 둘
 
-- [ ] **Step 1: 실패하는 테스트로 뒤집는다**
+- **Step 1: 실패하는 테스트로 뒤집는다**
 
 `frontend/src/features/member/my-page.test.ts` 에서 아래 블록을 통째로 **교체**한다.
 
@@ -1669,12 +1669,12 @@ import 를 파일 머리에 더한다:
 import { LEGAL_LINKS } from '@/lib/legal/links'
 ```
 
-- [ ] **Step 2: 테스트가 실패하는 것을 확인한다**
+- **Step 2: 테스트가 실패하는 것을 확인한다**
 
 Run: `cd frontend && pnpm vitest run src/features/member/my-page.test.ts`
 Expected: FAIL — `href="/terms"` 를 찾지 못한다
 
-- [ ] **Step 3: 계정 섹션에 항목을 더한다**
+- **Step 3: 계정 섹션에 항목을 더한다**
 
 `frontend/src/features/member/account-section.tsx` 를 네 군데 고친다.
 
@@ -1787,17 +1787,17 @@ import { LEGAL_LINKS } from '@/lib/legal/links'
       <dl className={cn('border-border flex min-h-14 items-center gap-3 border-t py-3', INSET_CLASS.card)}>
 ```
 
-- [ ] **Step 4: 테스트가 통과하는 것을 확인한다**
+- **Step 4: 테스트가 통과하는 것을 확인한다**
 
 Run: `cd frontend && pnpm vitest run src/features/member/my-page.test.ts`
 Expected: PASS
 
-- [ ] **Step 5: 린트와 타입을 확인한다**
+- **Step 5: 린트와 타입을 확인한다**
 
 Run: `cd frontend && pnpm lint && pnpm typecheck`
 Expected: PASS — `hasItems` 를 걷었으므로 미사용 변수 경고가 남아 있으면 안 된다
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 cd frontend
@@ -1816,7 +1816,7 @@ git commit -m "[FE] feat: 마이페이지에 약관·처리방침 링크를 건�
 - Consumes: `/terms` · `/privacy` 라우트 (Task 6), 푸터 링크 (Task 7)
 - Produces: 없음 (최종 검증)
 
-- [ ] **Step 1: e2e 를 쓴다**
+- **Step 1: e2e 를 쓴다**
 
 `frontend/e2e/legal-documents.spec.ts`:
 
@@ -1889,12 +1889,12 @@ test.describe('약관 문서 — 로그아웃 상태 (#610)', () => {
 > 테스트는 **홈(`/`)** 에서 출발한다. 이 테스트가 "푸터를 못 찾는다" 로 실패하면
 > 출발 화면부터 의심한다.
 
-- [ ] **Step 2: e2e 를 돌린다**
+- **Step 2: e2e 를 돌린다**
 
 Run: `cd frontend && pnpm e2e e2e/legal-documents.spec.ts`
 Expected: PASS — 4개
 
-- [ ] **Step 3: 전체 검증을 돌린다**
+- **Step 3: 전체 검증을 돌린다**
 
 Run: `cd frontend && pnpm verify`
 Expected: PASS — 린트·타입·단위 테스트. **`verify` 에 `format:check` 는 없다** — 포맷은 pre-push 훅이 따로 본다
@@ -1902,7 +1902,7 @@ Expected: PASS — 린트·타입·단위 테스트. **`verify` 에 `format:chec
 > 포맷 실패가 나면 **실제 저장소 경로에서** 확인한다. `/tmp` 복사본은 prettier 설정이
 > 붙지 않아 "원래 그랬다" 로 오진한다. pre-push 훅이 `format:check` 를 돌린다.
 
-- [ ] **Step 4: 커밋**
+- **Step 4: 커밋**
 
 ```bash
 cd frontend
@@ -1910,7 +1910,7 @@ git add e2e/legal-documents.spec.ts
 git commit -m "[FE] test: 로그아웃 상태에서 약관이 열리는지 e2e 로 잰다 (#610)"
 ```
 
-- [ ] **Step 5: 브라우저로 실제 화면을 확인한다**
+- **Step 5: 브라우저로 실제 화면을 확인한다**
 
 FE dev 서버는 Bash 에서 띄운다 (`preview_start` 는 샌드박스에 막힌다).
 
@@ -1930,14 +1930,14 @@ cd frontend && pnpm dev:alt2
 
 > 확인이 끝나면 띄운 서버를 정리한다. **다른 세션의 서버는 건드리지 않는다.**
 
-- [ ] **Step 6: 배포 게이트를 확인한다 — 코드로 잡을 수 없는 것**
+- **Step 6: 배포 게이트를 확인한다 — 코드로 잡을 수 없는 것**
 
-- [ ] `LEGAL_CONTACT.officerName` 이 `최성호` 로 들어갔는가
-- [ ] 시행일 `2026-09-15` 가 실제 공개일 이후인가 — 아니면 두 문서의 `effectiveDate` 와 `history[0].effectiveDate` 를 함께 고친다
-- [ ] #609 확인 결과가 처리방침 제3조의 "탈퇴 회원의 재가입 제한을 위한 정보" 행에 반영되었는가
-- [ ] **사람이 두 문서 전문을 한 번 읽었는가** — 이 초안은 법률 자문이 아니다
+- `LEGAL_CONTACT.officerName` 이 `최성호` 로 들어갔는가
+- 시행일 `2026-09-15` 가 실제 공개일 이후인가 — 아니면 두 문서의 `effectiveDate` 와 `history[0].effectiveDate` 를 함께 고친다
+- #609 확인 결과가 처리방침 제3조의 "탈퇴 회원의 재가입 제한을 위한 정보" 행에 반영되었는가
+- **사람이 두 문서 전문을 한 번 읽었는가** — 이 초안은 법률 자문이 아니다
 
-- [ ] **Step 7: PR 을 연다**
+- **Step 7: PR 을 연다**
 
 `pr` 스킬로 본문을 쓰고, `Issue Number` 에 `#610` 을 채운다. 백엔드 선행 이슈 #607 · #608 · #609 를 본문에 링크해 **동의 수집이 아직 없다는 사실**을 리뷰어가 알게 한다.
 
@@ -1990,7 +1990,7 @@ cd frontend && pnpm dev:alt2
 - Consumes: `LEGAL_LINKS` (Task 4), `SurfaceList`·`Surface` (`@/components/surface`), `ChevronRightIcon` (`@/components/icons`)
 - Produces: 없음 (마지막 진입점)
 
-- [ ] **Step 1: 문구를 더한다**
+- **Step 1: 문구를 더한다**
 
 `frontend/src/lib/messages/about.ts` 의 `noticeTitle` 항목 **다음**에 두 줄을 더한다:
 
@@ -1999,7 +1999,7 @@ cd frontend && pnpm dev:alt2
   legalDescription: '가입 전에도 읽을 수 있어요.',
 ```
 
-- [ ] **Step 2: 실패하는 테스트를 쓴다**
+- **Step 2: 실패하는 테스트를 쓴다**
 
 `frontend/src/features/about/about-view.test.ts` 의 `import` 블록에 한 줄을 더한다 (경로 순서상 `@/features/about/about-view` 다음):
 
@@ -2040,12 +2040,12 @@ describe('AboutView — 모바일의 약관 도달 경로', () => {
 })
 ```
 
-- [ ] **Step 3: 테스트가 실패하는 것을 확인한다**
+- **Step 3: 테스트가 실패하는 것을 확인한다**
 
 Run: `cd frontend && pnpm vitest run src/features/about/about-view.test.ts`
 Expected: FAIL — `href="/terms"` 를 찾지 못한다
 
-- [ ] **Step 4: 카드를 더한다**
+- **Step 4: 카드를 더한다**
 
 `frontend/src/features/about/about-view.tsx` 의 import 블록을 아래로 바꾼다 (패키지 블록이 먼저다):
 
@@ -2096,14 +2096,14 @@ import { cn } from '@/lib/utils/cn'
       </Surface>
 ```
 
-- [ ] **Step 5: 통과를 확인한다**
+- **Step 5: 통과를 확인한다**
 
 Run: `cd frontend && pnpm vitest run src/features/about/about-view.test.ts`
 Expected: PASS
 
 그다음 `pnpm verify` 와 `pnpm format:check` 를 돌린다. 걸리는 파일이 있으면 `pnpm exec prettier --write <경로>`.
 
-- [ ] **Step 6: 커밋**
+- **Step 6: 커밋**
 
 ```bash
 cd frontend
