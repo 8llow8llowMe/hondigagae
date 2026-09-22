@@ -31,13 +31,19 @@ function render(
 }
 
 /* 일정 화면의 등급어도 같은 축 어휘를 쓴다 — 화면마다 갈리면 배운 규칙이 깨진다 (#652) */
-describe('PlanDayVerdict — 판정 배지가 축을 밝힌다 (#652)', () => {
-  it('판정 배지가 적합도 축임을 말한다', () => {
+describe('PlanDayVerdict — 판정이 축을 밝힌다 (#652 · #856)', () => {
+  /*
+    **축 이름이 배지 접두어에서 캡션으로 옮겼다** (#856). 배지를 걷고 등급어를 `MetricWord`
+    로 올리면서 `axis` 접두어가 하던 일을 이 캡션이 맡는다 — 좌 레일 목차가 섹션 머리에
+    맡긴 것과 같은 방식이다. **무엇이 그리든 축은 화면에 남아야 한다**: 떼면 `보통` 이
+    혼잡도의 `보통` 과 구분되지 않는다.
+  */
+  it('판정이 적합도 축임을 말한다', () => {
     const html = render()
     const axis = messages.common.metricAxisSuitability
 
-    expect(html).toContain(`>${axis} </span>`)
-    expect(html).toContain(`</span>${planVerdict.suitabilityLevel?.name}</span>`)
+    expect(html).toContain(`>${axis}</span>`)
+    expect(html).toContain(`>${planVerdict.suitabilityLevel?.name}</span>`)
   })
 
   /* 등급어는 서버 값 그대로다 — 라벨이 어휘를 다시 쓰는 일이 되면 안 된다 */
@@ -45,6 +51,19 @@ describe('PlanDayVerdict — 판정 배지가 축을 밝힌다 (#652)', () => {
     expect(render()).not.toContain(
       `${messages.common.metricAxisSuitability} ${planVerdict.suitabilityLevel?.name}`,
     )
+  })
+
+  /*
+    **등급어와 축 캡션이 다른 줄에 선다** (#856) — 캡션이 위, 등급어가 아래인 한 기둥이다.
+    오른쪽 온도 기둥도 `캡션 + 값` 이라 좌우가 같은 리듬을 갖는다.
+  */
+  it('축 캡션이 등급어보다 앞에 온다', () => {
+    const html = render()
+    const axis = html.indexOf(`>${messages.common.metricAxisSuitability}</span>`)
+    const word = html.indexOf(`>${planVerdict.suitabilityLevel?.name}</span>`)
+
+    expect(axis).toBeGreaterThan(-1)
+    expect(axis).toBeLessThan(word)
   })
 })
 
@@ -225,17 +244,6 @@ describe('PlanDayVerdict — 판정 불가 사유마다 말이 다르다 (#497)'
  * 배지와 밴드가 같은 톤 문자열을 쓰므로 마크업 전체를 `toContain` 으로 보면 어느 쪽이
  * 그것을 냈는지 구분하지 못한다. 구조는 `<span class=배지><span class=축>축 </span>등급어</span>`.
  */
-function verdictBadgeClass(html: string): string {
-  const name = planVerdict.suitabilityLevel?.name ?? ''
-  const match = new RegExp(
-    `<span class="([^"]*)"><span class="[^"]*">[^<]*</span>${name}</span>`,
-  ).exec(html)
-
-  if (match === null) throw new Error('판정 배지를 찾지 못했다')
-
-  return match[1] ?? ''
-}
-
 /**
  * 판정이 자기 영역을 갖는다 (#842).
  *
@@ -260,26 +268,27 @@ describe('PlanDayVerdict — 등급 tint 밴드', () => {
   })
 
   /*
-    같은 톤의 tint 면 위에서 기본 채움(`bg-metric-high-100`)은 배경과 1.00:1 이라 배지가
-    사라진다 — 면과 채움을 맞바꾼다 (`BADGE_TONE_ON_TINT`).
+    **밴드 머리에 배지를 세우지 않는다** (#856). 12px 배지 하나와 22px 큰 숫자가 한 줄에
+    서던 자리다 — 배지는 `MetricBadge` 의 기본 크기를 그대로 쓴 값이라 이 자리를 위해 고른
+    것이 아니었다. 등급어는 `MetricWord`(20/800)로 올라가 오른쪽 온도와 같은 리듬이 된다.
 
-    **배지 태그를 추려서 본다.** 마크업 전체에서 세면 밴드가 쓰는 같은 문자열에 속는다 —
-    바꾸기 전에도 `bg-metric-high-100` 은 마크업에 딱 한 번(배지) 있었다.
+    **등급어 색은 `-700` 층이다** (`METRIC_WORD_TONE`) — tint 면 위 텍스트는 4.5:1 을
+    넘어야 하고 `-500` 은 그 기준 밖이다 (DESIGN.md §2-3).
   */
-  it('밴드 위 배지는 면과 채움을 맞바꾼다', () => {
-    const badge = verdictBadgeClass(render())
+  it('밴드 머리는 배지가 아니라 등급어로 판정을 말한다', () => {
+    const html = render()
+    const name = planVerdict.suitabilityLevel?.name ?? ''
 
-    expect(badge).toContain('bg-bg')
-    expect(badge).not.toContain('bg-metric-high-100')
+    expect(html).toMatch(new RegExp(`class="[^"]*text-metric-high-700[^"]*">${name}</span>`))
+    expect(html).not.toContain('bg-bg border-metric-high-500')
   })
 
   /*
-    **축 라벨은 그대로 둔다.** 좌 레일 목차와 달리 여기는 섹션 라벨이 없어, 떼면 `보통` 이
-    혼잡도의 `보통` 과 구분되지 않는다 (#652). 위쪽 축 단언 둘이 이 계약을 이미 잠그고
-    있고, 이 단언은 tint 로 옮기면서 `axis` 를 잃지 않았다는 것만 확인한다.
+    **등급 색 막대는 `-500` 면이다** (`METRIC_FILL_TONE`) — 글자가 얹히지 않는 비텍스트라
+    3:1 기준이고, 그 층이 tint 면 위에서 눈에 잡히는 유일한 층이다.
   */
-  it('tint 로 옮겨도 축 라벨을 잃지 않는다', () => {
-    expect(render()).toContain(`>${messages.common.metricAxisSuitability} </span>`)
+  it('등급어 옆에 -500 색 막대가 선다', () => {
+    expect(render()).toMatch(/class="[^"]*\bw-1\b[^"]*bg-metric-high-500/)
   })
 
   /*

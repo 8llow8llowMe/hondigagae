@@ -229,6 +229,55 @@ describe('PlanDaySection', () => {
   })
 
   /*
+    **면으로 묶는다** (#856). 예전에는 `border-t` 1px 하나로만 갈렸는데 그 선이 항목 행 사이
+    구분선과 색·굵기가 같아, 담긴 일정이 아니라 **제안**이라는 사실을 말하는 신호가 제목
+    글자 하나뿐이었다 — 훑으면 "다음 항목" 으로 읽힌다.
+
+    **블록의 여는 태그만 추린다.** 마크업 전체에서 `bg-band` 를 세면 다른 요소(호버 면 ·
+    중립 배지)에 속아 통과한다.
+  */
+  it('실내 대안이 면으로 묶인 블록이다 — 선 하나로 갈리지 않는다', () => {
+    const rainy = renderDaySection({
+      verdict: {
+        ...planVerdict,
+        indoorAlternatives: [{ placeId: '212481712381923330', title: '오설록 티뮤지엄 카페' }],
+      },
+    })
+    const block = new RegExp(
+      `<div class="([^"]*)"><h4 class="[^"]*">[^<]*<svg[^>]*>.*?${messages.plan.indoorAlternativesTitle}`,
+    ).exec(rainy)
+
+    expect(block).not.toBeNull()
+    expect(block?.[1]).toContain('bg-band')
+    expect(block?.[1]).toContain('rounded-md')
+  })
+
+  /*
+    **블록 안 항목 사이에 선이 있고 첫 줄은 받지 않는다** — 저장소 공통 패턴
+    (`[&>li+li]:border-t`). 색은 `--band` 면 위에서 `--border` 가 묻혀 한 단 진한
+    `--border-strong` 을 쓴다.
+  */
+  it('실내 대안 항목 사이에 구분선이 선다', () => {
+    const rainy = renderDaySection({
+      verdict: {
+        ...planVerdict,
+        indoorAlternatives: [
+          { placeId: '212481712381923330', title: '오설록 티뮤지엄 카페' },
+          { placeId: '212481712381923328', title: '제주특별자치도립김창열미술관' },
+        ],
+      },
+    })
+
+    /* 제목 뒤 첫 `ul` 이 이 블록의 목록이다 — 앞선 목록(항목 행)에 속지 않는다 */
+    const block = rainy.slice(rainy.indexOf(messages.plan.indoorAlternativesTitle))
+    const list = /<ul class="([^"]*)"/.exec(block)
+
+    expect(list).not.toBeNull()
+    expect(list?.[1]).toContain('li+li]:border-border-strong')
+    expect(list?.[1]).toContain('li+li]:border-t')
+  })
+
+  /*
     **`다시 만들기` 는 이제 `⋯` 안이다** (#653 · 진단 PL-4 · 명세 D11-4). 닫힌 `Menu` 는
     `null` 을 렌더하므로(`menu.tsx:81`) 정적 마크업에서 항목 자체를 볼 수 없다 — **여기서는
     트리거의 존재를, 항목과 링크는 e2e 가 본다** (`e2e/plan-status.spec.ts`).

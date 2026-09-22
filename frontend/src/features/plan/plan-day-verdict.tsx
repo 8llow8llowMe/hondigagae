@@ -3,10 +3,11 @@
 import { Badge } from '@/components/badge'
 import { ErrorState } from '@/components/error-state'
 import {
+  METRIC_FILL_TONE,
   METRIC_TINT_EDGE_TONE,
   METRIC_TINT_TONE,
-  MetricBadge,
   MetricValue,
+  MetricWord,
 } from '@/components/metric'
 import { ReasonList } from '@/components/reason-list'
 import { type DisplayTemperature, displayTemperature } from '@/lib/insight/temperature'
@@ -124,17 +125,45 @@ export function PlanDayVerdict({
       밝기로 갈리지 않아(1.01~1.06:1) 면만으로는 적록색약에게 칠하지 않은 것과 같다.
     */
     <div className={cn(VERDICT_BAND_CLASS, METRIC_TINT_TONE[tone], METRIC_TINT_EDGE_TONE[tone])}>
-      <div className="flex flex-wrap items-center gap-3">
-        {/*
-          **`surface="tint"` 다.** 같은 톤의 tint 면 위에서 기본 채움은 배경과 1.00:1 이라
-          배지가 사라진다 — 면과 채움을 맞바꾼다 (`BADGE_TONE_ON_TINT`).
+      {/*
+        **두 기둥이다** (#856). 예전에는 12px 배지 하나와 22px 큰 숫자가 한 줄에 섰다 —
+        배지는 `MetricBadge` 의 **기본 크기를 그대로 쓴 것**이라 이 자리를 위해 고른 값이
+        아니었고(#842 가 밴드를 만들면서 둘이 처음 한 면 위에 섰다), 결과가 "무엇이 이 날의
+        헤드라인인가" 를 말하지 않는 줄이었다.
 
-          **축 라벨(`axis`)은 그대로 둔다.** 좌 레일 목차와 달리 여기는 섹션 라벨이 없어,
-          떼면 `보통` 이 혼잡도의 `보통` 과 구분되지 않는다 (#652).
+        **`items-start` 다.** 두 기둥의 캡션 줄이 같은 높이에서 시작해야 좌우가 짝으로
+        읽힌다 — `items-center` 면 캡션 유무·줄 수에 따라 두 기둥이 어긋난다.
+      */}
+      <div className="flex flex-wrap items-start gap-3">
+        {/*
+          **배지가 아니라 등급어다** (`MetricWord`, 20/800). 같은 축의 값을 오른쪽 온도는
+          `캡션 + 값` 으로 내는데 왼쪽만 배지였다 — 같은 리듬으로 맞추면 크기를 이 자리에서
+          새로 정할 필요가 없다.
+
+          **축 이름은 캡션이 갖는다.** 배지의 `axis` 접두어가 하던 일이라 #652 의
+          요구(`보통` 이 혼잡도의 `보통` 과 구분된다)는 그대로 지켜진다 — 좌 레일 목차가
+          섹션 머리에 맡긴 것과 같은 방식이고, 여기서는 이 캡션이 그 자리다.
         */}
-        <MetricBadge tone={tone} surface="tint" axis="suitability">
-          {verdict.suitabilityLevel.name}
-        </MetricBadge>
+        <div className="flex flex-col gap-1">
+          <span className="text-caption text-fg-muted font-medium">
+            {messages.common.metricAxisSuitability}
+          </span>
+
+          <span className="flex items-center gap-1.5">
+            {/*
+              등급 색 **면**이라 `-500` 층이고 글자를 얹지 않는다 (`METRIC_FILL_TONE`).
+              **`unknown` 이면 세우지 않는다** — 그 톤에는 칠할 색이 없고, 옅은 면으로
+              칠하면 모르는 날이 "낮은 값" 으로 읽힌다.
+            */}
+            {METRIC_FILL_TONE[tone] !== '' && (
+              <span
+                aria-hidden
+                className={cn('h-5 w-1 shrink-0 rounded-full', METRIC_FILL_TONE[tone])}
+              />
+            )}
+            <MetricWord tone={tone}>{verdict.suitabilityLevel.name}</MetricWord>
+          </span>
+        </div>
 
         {/*
           **체감온도가 이 자리의 기본값이다** (#253 · 아트보드 01). 못 받은 날
@@ -148,7 +177,12 @@ export function PlanDayVerdict({
           맞춘다"로 도구를 판정 아래로 내렸는데 이 버튼만 여기 `ml-auto` 에 남아 액션이
           두 자리로 흩어져 있었다 — 이제 `plan-day-section` 의 액션 줄이 갖는다.
         */}
-        <div className="ml-auto text-right">
+        {/*
+          **`text-right` 가 아니라 `items-end` 다** (#856). `text-right` 는 인라인 텍스트만
+          민다 — 값 줄(`MetricValue` 안의 `span.flex`)은 flex 라 그 규칙이 닿지 않아, 라벨만
+          오른쪽으로 가고 숫자는 컨테이너 왼쪽에 남아 있었다.
+        */}
+        <div className="ml-auto flex flex-col items-end gap-1">
           <VerdictTemperatureValue weather={verdict.weather} />
         </div>
       </div>
@@ -254,13 +288,21 @@ function VerdictTemperatureValue({ weather }: { weather: PlanDayWeatherItem['wea
   return (
     <>
       <MetricValue
+        className="items-end"
         label={messages.plan.verdictFeelsLikeLabel}
         value={temperature.value.toFixed(1)}
         unit="℃"
       />
       {clue !== null && (
-        // 등급이 아니라 **출처**라 `MetricBadge` 가 아니다 — 중립 배지다 (DESIGN.md §2-3)
-        <Badge tone="neutral" size="sm">
+        /*
+          등급이 아니라 **출처**라 `MetricBadge` 가 아니다 — 중립 배지다 (DESIGN.md §2-3).
+
+          **면을 흰색으로 덮는다** (#856). `neutral` 의 채움은 `--band`(#eef0f3)인데 `low`
+          톤의 tint 가 `--metric-low-100` 으로 **같은 값**이라, 주의 필요한 날에는 이 배지가
+          면과 1.00:1 로 붙어 보이지 않았다. 판정 배지가 tint 위에서 `surface="tint"` 로
+          채움을 흰색과 맞바꾸는 것과 같은 처리다 (`BADGE_TONE_ON_TINT`).
+        */
+        <Badge tone="neutral" size="sm" className="bg-bg">
           {clue}
         </Badge>
       )}

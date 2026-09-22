@@ -203,11 +203,28 @@ export function PlanItemRow({
           </span>
         )}
 
-        {/* 순번 칩 — 썸네일 좌상단. 자료가 아니라 순서 표시라 a11y 트리에서 뺀다
-            (행 순서는 목록 구조가 이미 말한다) */}
+        {/*
+          순번 칩 — 썸네일 좌상단. 자료가 아니라 순서 표시라 a11y 트리에서 뺀다
+          (행 순서는 목록 구조가 이미 말한다).
+
+          **흰 원형이다** (#856). 예전에는 `bg-fg`(#15181d) 검정 사각이라, `aria-hidden` 인
+          **장식이 화면에서 가장 진한 면**을 쓰고 있었다 — #842 의 일러스트 폴백이 들어오며
+          밝은 파스텔 타일 위에서 더 도드라졌다.
+
+          **원형은 동선 지도의 핀 번호와 같은 언어다** — 같은 일정의 같은 순서를 두 화면이
+          같은 모양으로 말한다. 썸네일 안에 그대로 두는 것은 행 폭을 뺏지 않기 위해서다
+          (좌측 거터로 빼면 390 에서 제목이 그만큼 깎인다 — D11-5 가 이미 깎았다).
+
+          **그림자가 아니라 1px 테두리다.** 흰 칩이 밝은 타일 위에 서면 경계가 사라지는데,
+          그림자는 이 저장소에서 **떠 있는 것 전용**이다 (`token-usage.test.ts` 의 `FLOATING`
+          목록 · DESIGN.md §0). 순번 칩은 썸네일에 붙어 있지 떠 있지 않다.
+
+          **크기와 자리는 그대로다** (`size-5` · `top-1 left-1`) — 모양과 색만 바꾼다.
+          스페이싱 스케일 밖 값(22px · 6px)을 새로 들이지 않는다 (DESIGN.md §4).
+        */}
         <span
           aria-hidden
-          className="bg-fg text-fg-inverse text-caption absolute top-1 left-1 inline-flex size-5 items-center justify-center rounded-sm font-bold tabular-nums"
+          className="bg-bg text-fg border-border-strong text-caption absolute top-1 left-1 inline-flex size-5 items-center justify-center rounded-full border font-bold tabular-nums"
         >
           {model.item.sequence + 1}
         </span>
