@@ -594,7 +594,7 @@ describe('PlanOverviewPanel', () => {
 })
 
 /**
- * 일자별 판정 목차 (#732 · #841).
+ * 일자별 적합도 목차 (#732 · #841).
  *
  * 데스크톱 전용이던 `일자별 판정` 목차 **카드**를 대신한다 — 모바일 1순위 제품에서 전체
  * 판정 요약이 데스크톱에만 있었다. #841 에서 가로 한 줄을 다시 세로 목록으로 되돌렸다:
@@ -609,7 +609,7 @@ function tocAnchors(markup: string): string[] {
   return [...markup.matchAll(/<a [^>]*href="#day\d+"[^>]*>/g)].map((match) => match[0])
 }
 
-describe('PlanOverviewPanel — 일자별 판정 목차 (#732 · #841)', () => {
+describe('PlanOverviewPanel — 일자별 적합도 목차 (#732 · #841)', () => {
   /* 구획 2(상태)가 구획 3(목차) 위다 — 언제 떠나는지를 먼저 읽고 어느 날이 좋은지를 본다 */
   it('D-day 가 목차보다 먼저 온다', () => {
     const markup = renderOverview()
