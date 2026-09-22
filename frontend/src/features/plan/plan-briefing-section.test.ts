@@ -1,6 +1,9 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { describe, expect, it } from 'vitest'
 
 import type { PlanBriefingCurve } from '@/features/plan/plan-briefing-section'
@@ -201,6 +204,64 @@ describe('PlanBriefingSection — 산책하기 좋은 시간 (명세 D5-4)', () 
   /** en dash 를 "에서" 로 읽지 못하는 보조기기에 낱말로도 준다 (명세 D6) */
   it('시각 범위를 sr-only 낱말로도 말한다', () => {
     expect(render()).toContain('18:00부터 21:00까지')
+  })
+
+  /*
+    **추천 구간 헤드라인 줄** — 시각이 곧 그 줄이다. 카드 제목(`h1`)도 `text-title-1` 을
+    쓰지만 그쪽은 `<h1>` 이라 `<p` 로 시작하는 이 정규식에 걸리지 않는다.
+  */
+  function headlineLine(markup: string): string {
+    return /<p class="text-title-1[^>]*>.*?<\/p>/.exec(markup)?.[0] ?? ''
+  }
+
+  /** 창 전체 등급이 `CAUTION` 인 날 — 접힌 값이라 창 안에는 안전한 칸이 섞여 있다 */
+  const CAUTION_GOLDEN = {
+    walkTimes: planBriefingWalkTimes({
+      goldenLevel: { code: 'CAUTION', name: '주의', description: null, scoreDescription: null },
+    }),
+  }
+
+  /*
+    **#671 A-4 — `walk-times-section` 의 A-3 과 같은 판정이다.**
+
+    #637 이 `11:00 – 23:00 [주의]` 배지를 걷은 이유가 "창 **전체**가 주의" 로 읽히는
+    것이었는데, 배지의 글자만 지우고 **같은 주장을 하던 색이 헤드라인에 남아 있었다.**
+    `goldenLevel` 은 서버가 창 안 등급을 `worseOf` 로 접은 값이라, 22px 굵은 시각을 그
+    색으로 칠하면 창 안 안전한 칸들까지 주의색 아래로 들어간다.
+
+    #656 이후 곡선의 면은 **칸마다** 등급이 갈린다 — 이 색만 홀로 "창 하나에 등급 하나" 를
+    말하고 있었다.
+  */
+  it('헤드라인이 창 전체를 한 등급으로 칠하지 않는다', () => {
+    const line = headlineLine(render(CAUTION_GOLDEN))
+
+    expect(line).toContain('18:00')
+    expect(line).not.toContain('text-metric-')
+  })
+
+  /** 색을 걷는 것이지 톤을 낮추는 것이 아니다 — 카드 제목과 같은 본문 색으로 선다 */
+  it('헤드라인이 본문 색을 쓴다', () => {
+    expect(headlineLine(render(CAUTION_GOLDEN))).toContain('text-fg')
+  })
+
+  /*
+    **`goldenLevel` 이 이 섹션의 렌더에서 사라졌다** (A-4). 응답 필드·타입은 그대로 받는다 —
+    곡선 면(#656)이 `hourly` 를 근거로 칸마다 칠하므로 화면에 소비처가 없어진 것이지 계약이
+    바뀐 것이 아니다. 소비처가 다시 생기면 "창 하나에 등급 하나" 가 조용히 돌아오므로
+    **소스에서 직접 본다**: 렌더 결과로는 잡히지 않는다.
+
+    **브리핑에는 A-3 의 등급 문장(`GoldenWindowLevels`)에 해당하는 자리가 없다.** 브리핑
+    응답에 `hourly` 가 없어서다 (`PlanBriefingWalkTimes` javadoc) — 등급을 칸 단위로 말하는
+    것은 곡선뿐이고, 그 아래 줄은 서버 `goldenWindowStatus.description` 이다.
+  */
+  it('goldenLevel 을 렌더에 쓰지 않는다', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('./plan-briefing-section.tsx', import.meta.url)),
+      'utf8',
+    )
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+    expect(code).not.toContain('goldenLevel')
   })
 
   /*

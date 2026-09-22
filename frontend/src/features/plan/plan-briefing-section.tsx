@@ -4,7 +4,6 @@ import { BackLink } from '@/components/back-link'
 import { Badge } from '@/components/badge'
 import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
-import { METRIC_WORD_TONE } from '@/components/metric'
 import { Surface } from '@/components/surface'
 import { WalkTimesCurve } from '@/components/walk-times-curve'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
@@ -12,7 +11,6 @@ import { PlaceMiniMap } from '@/features/place/place-mini-map'
 import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { PlanDayVerdict, planDayVerdictIsBlank } from '@/features/plan/plan-day-verdict'
 import { toLatLng } from '@/lib/geo/coord'
-import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import {
   BRIEFING_REASON_LOOKUP_FAILED,
@@ -823,6 +821,30 @@ function RetryButton({ onRetry, label }: { onRetry: () => void; label?: string }
  *
  * **en dash 는 스크린리더가 "에서" 로 읽지 못한다** — `sr-only` 로 `{from}부터 {to}까지`
  * 를 함께 둔다 (명세 D6). 시각은 서버 문자열을 그대로 자른다.
+ *
+ * **시각에 등급 색을 주지 않는다**
+ * ([#671](https://github.com/8llow8llowMe/hondigagae/issues/671) **A-4** — 홈
+ * `walk-times-section` 의 A-3 과 같은 판정이다).
+ *
+ * #637 이 `11:00 – 23:00 [주의]` 배지를 걷은 이유는 그것이 창 **전체**가 주의라는 말로
+ * 읽혔기 때문인데, **배지의 글자는 지웠는데 같은 주장을 하던 색이 여기 남아 있었다.**
+ * `goldenLevel` 은 서버 `GoldenWalkWindow.level` 이 창 안 등급을 `worseOf` 로 접은 값이라,
+ * 22px 굵은 시각을 그 색으로 칠하면 창 안의 안전한 칸들까지 주의색 아래로 들어간다.
+ * #656 으로 곡선의 면이 칸마다 갈린 뒤로는 **이 색만 홀로 "창 하나에 등급 하나" 를
+ * 말하고 있었다.**
+ *
+ * **이 줄이 말하는 것은 등급이 아니라 시각**이다. 등급은 아래 곡선이 칸 단위로 말하고,
+ * 색이 유일한 채널이 아니어야 한다는 규칙(DESIGN.md §2-3)도 그쪽에서 지켜진다 —
+ * 곡선 셀은 `sr-only` 로 등급 이름을 남긴다. 등급이 빠졌으므로 본문 색(`text-fg`)이다.
+ *
+ * **A-3 과 다른 점**: 홈에는 창 안 분포를 말하는 문장(`GoldenWindowLevels`)이 색을
+ * 이어받았지만, 브리핑 응답에는 `hourly` 가 없어(`PlanBriefingWalkTimes` 주석) 그런 문장을
+ * 지을 근거가 없다. 아래 줄은 서버 `goldenWindowStatus.description` 이다 — 곡선을 아직
+ * 못 받은 순간에는 등급을 말하는 채널이 화면에 없지만, **틀린 주장을 남겨 두는 것보다
+ * 말하지 않는 쪽**이다.
+ *
+ * **`goldenLevel` 은 응답·타입에서 그대로 받는다.** 화면의 소비처가 없어진 것이지 계약이
+ * 바뀐 것이 아니다 (`plan-briefing-section.test.ts` 가 소스로 잠근다).
  */
 function GoldenWindowLine({
   walkTimes,
@@ -836,12 +858,7 @@ function GoldenWindowLine({
 
   return (
     <div className="flex flex-col gap-1">
-      <p
-        className={cn(
-          'text-title-1 font-bold tabular-nums',
-          METRIC_WORD_TONE[walkSafetyTone(walkTimes.goldenLevel?.code)],
-        )}
-      >
+      <p className="text-title-1 text-fg font-bold tabular-nums">
         <span aria-hidden>
           {from} – {to}
         </span>

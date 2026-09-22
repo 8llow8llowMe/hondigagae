@@ -85,7 +85,9 @@ export function WalkTimesCurve({
     주므로 같은 등급이 이어지는 칸은 tint 가 정확히 맞닿아 한 면이 된다 — 색이 갈리는 자리에만
     경계가 생기고, 그 경계가 곧 "여기서 등급이 바뀐다" 는 정보다.
 
-    `goldenLevel` 은 이제 곡선에서 쓰지 않는다. 헤드라인 시각의 색으로만 남는다.
+    `goldenLevel` 은 이제 **어느 화면도 렌더하지 않는다** (#671 A-3 · A-4). 마지막 소비처였던
+    홈·브리핑의 헤드라인 시각 색까지 걷혔다 — 같은 이유다. 창 하나에 등급 하나를 붙인 값이라
+    창 안의 차이를 말하지 못한다. 응답 필드는 그대로 받는다.
   */
   const marks = markGoldenWindow(hourly, goldenStart, goldenEnd)
 
