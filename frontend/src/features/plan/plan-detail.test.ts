@@ -7,7 +7,7 @@ import { PlanBriefingBanner } from '@/features/plan/plan-briefing-banner'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
 import { PlanItemRow } from '@/features/plan/plan-item-row'
-import { PLAN_VERDICT_STRIP_MAX_DAYS, PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
+import { PLAN_VERDICT_TOC_MAX_DAYS, PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
 import { LONG_TRIP_THRESHOLD_M } from '@/lib/geo/distance'
 import { messages } from '@/lib/messages'
 import {
@@ -652,15 +652,15 @@ describe('PlanOverviewPanel — 일자별 적합도 목차 (#732 · #841)', () =
     390 에서 개요 카드가 일자 카드보다 길어진다.
   */
   it('상한을 넘는 일자는 개수로 말한다 — 없는 척하지 않는다', () => {
-    const markup = renderOverview({ verdicts: verdictsOf(PLAN_VERDICT_STRIP_MAX_DAYS + 3) })
+    const markup = renderOverview({ verdicts: verdictsOf(PLAN_VERDICT_TOC_MAX_DAYS + 3) })
 
-    expect(markup).toContain(`href="#day${PLAN_VERDICT_STRIP_MAX_DAYS}"`)
-    expect(markup).not.toContain(`href="#day${PLAN_VERDICT_STRIP_MAX_DAYS + 1}"`)
+    expect(markup).toContain(`href="#day${PLAN_VERDICT_TOC_MAX_DAYS}"`)
+    expect(markup).not.toContain(`href="#day${PLAN_VERDICT_TOC_MAX_DAYS + 1}"`)
     expect(markup).toContain(messages.plan.verdictStripMore.replace('{count}', '3'))
   })
 
   it('상한 안이면 남은 일자를 말하지 않는다', () => {
-    const markup = renderOverview({ verdicts: verdictsOf(PLAN_VERDICT_STRIP_MAX_DAYS) })
+    const markup = renderOverview({ verdicts: verdictsOf(PLAN_VERDICT_TOC_MAX_DAYS) })
 
     expect(markup).not.toContain('외 ')
   })
@@ -689,7 +689,7 @@ describe('PlanOverviewPanel — 일자별 적합도 목차 (#732 · #841)', () =
   })
 
   /*
-    **상한은 절대값으로 잠근다.** 위 두 단언은 `PLAN_VERDICT_STRIP_MAX_DAYS` 를 import 해
+    **상한은 절대값으로 잠근다.** 위 두 단언은 `PLAN_VERDICT_TOC_MAX_DAYS` 를 import 해
     **상대적으로** 재므로 값을 4 로 되돌려도 그대로 통과한다 — 이 이슈가 올린 값 자체를
     잡는 단언이 하나도 없었다.
 
@@ -698,7 +698,7 @@ describe('PlanOverviewPanel — 일자별 적합도 목차 (#732 · #841)', () =
     목록이 된다.
   */
   it('목차 상한이 일곱이다', () => {
-    expect(PLAN_VERDICT_STRIP_MAX_DAYS).toBe(7)
+    expect(PLAN_VERDICT_TOC_MAX_DAYS).toBe(7)
   })
 
   /*
@@ -707,7 +707,7 @@ describe('PlanOverviewPanel — 일자별 적합도 목차 (#732 · #841)', () =
     `판정 없음` 은 앵커로 가 봐야 일자 카드가 같은 사유 문장 하나를 낼 뿐이라 `외 N일` 이
     개수로 말하는 편이 짧고 정확하다.
 
-    **`PLAN_VERDICT_STRIP_MAX_DAYS` 로 재지 않는다** — 상한과 무관하게 성립하는 규칙이라
+    **`PLAN_VERDICT_TOC_MAX_DAYS` 로 재지 않는다** — 상한과 무관하게 성립하는 규칙이라
     상한 안쪽(넷)에서 잰다. 상한과 함께 재면 둘 중 어느 것이 접었는지 못 가린다.
   */
   it('꼬리의 판정 없음은 줄로 서지 않고 개수로 접힌다', () => {
