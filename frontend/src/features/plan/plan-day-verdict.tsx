@@ -1,19 +1,37 @@
 'use client'
 
 import { Badge } from '@/components/badge'
-import { ButtonLink } from '@/components/button'
 import { ErrorState } from '@/components/error-state'
-import { MetricBadge, MetricValue } from '@/components/metric'
+import {
+  METRIC_TINT_EDGE_TONE,
+  METRIC_TINT_TONE,
+  MetricBadge,
+  MetricValue,
+} from '@/components/metric'
 import { ReasonList } from '@/components/reason-list'
 import { type DisplayTemperature, displayTemperature } from '@/lib/insight/temperature'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
+import { cn } from '@/lib/utils/cn'
 import {
   MID_TERM_FORECAST_CODE,
   NO_PLACE_ITEM_REASON_CODE,
   PAST_DATE_REASON_CODE,
   type PlanDayWeatherItem,
 } from '@/types/plan'
+
+/**
+ * 판정 밴드의 골격 — 색은 `METRIC_TINT_TONE` · `METRIC_TINT_EDGE_TONE` 이 얹는다 (#842).
+ *
+ * **인셋을 스스로 갖는다.** 담는 쪽(`plan-day-section`)이 카드 인셋을 주는 자리 안에
+ * 서지만, 밴드는 그보다 좁게 들어가야 면의 좌우 경계가 보인다. 세로 `my-4` 는 헤더 ·
+ * 항목 목록과 밴드를 떼어 놓는 값이고, 예전 `py-4` 가 하던 일을 대신한다.
+ *
+ * **불릿을 쓰지 않는다.** `ReasonList` 의 `ul` 이 `flex` 라 `list-disc` 가 조용히
+ * 무시되고(`reason-list.tsx` 머리주석), 나머지 네 근거 목록이 전부 평범한 문장 스택이라
+ * 일차 카드만 불릿이면 #840 이 없앤 분기가 되살아난다.
+ */
+const VERDICT_BAND_CLASS = 'my-4 flex flex-col gap-3 rounded-md border px-4 py-3'
 
 /**
  * 한 일자의 판정 — 아트보드 01·02, 실패는 06 ③.
@@ -81,16 +99,40 @@ export function PlanDayVerdict({
     if (sentence === null) return null
 
     return (
-      <div className="flex flex-col gap-3 py-4">
+      /*
+        **판정을 못 낸 날에도 밴드는 선다.** `unknown` 은 등급 색이 아니라 중립 면
+        (`--band`)이라 "낮은 등급으로 칠하는" 일이 되지 않으면서, 이 자리가 그날의 판정
+        영역이라는 사실은 그대로 남는다 — 갈래마다 골격이 달라지면 일자 카드를 훑을 때
+        판정이 있는 날과 없는 날의 모양이 두 가지가 된다.
+      */
+      <div
+        className={cn(VERDICT_BAND_CLASS, METRIC_TINT_TONE.unknown, METRIC_TINT_EDGE_TONE.unknown)}
+      >
         <p className="text-body-2 text-fg-muted">{sentence}</p>
       </div>
     )
   }
 
+  const tone = suitabilityTone(verdict.suitabilityLevel.code)
+
   return (
-    <div className="flex flex-col gap-3 py-4">
+    /*
+      **판정이 자기 영역을 갖는다** (#842). 예전에는 헤더와 같은 인셋 · 같은 바닥이라 근거
+      문장이 "1일차의 설명" 인지 "첫 항목의 설명" 인지 갈리지 않았다.
+
+      **면만 깔지 않는다** — `-500` 실선이 짝이다 (DESIGN.md §2-3 · #709). tint 는 바닥과
+      밝기로 갈리지 않아(1.01~1.06:1) 면만으로는 적록색약에게 칠하지 않은 것과 같다.
+    */
+    <div className={cn(VERDICT_BAND_CLASS, METRIC_TINT_TONE[tone], METRIC_TINT_EDGE_TONE[tone])}>
       <div className="flex flex-wrap items-center gap-3">
-        <MetricBadge tone={suitabilityTone(verdict.suitabilityLevel.code)} axis="suitability">
+        {/*
+          **`surface="tint"` 다.** 같은 톤의 tint 면 위에서 기본 채움은 배경과 1.00:1 이라
+          배지가 사라진다 — 면과 채움을 맞바꾼다 (`BADGE_TONE_ON_TINT`).
+
+          **축 라벨(`axis`)은 그대로 둔다.** 좌 레일 목차와 달리 여기는 섹션 라벨이 없어,
+          떼면 `보통` 이 혼잡도의 `보통` 과 구분되지 않는다 (#652).
+        */}
+        <MetricBadge tone={tone} surface="tint" axis="suitability">
           {verdict.suitabilityLevel.name}
         </MetricBadge>
 
@@ -101,19 +143,14 @@ export function PlanDayVerdict({
 
           **라벨은 고정이고 차이는 값 옆 단서가 말한다** (#732) — 아래 주석 참고.
         */}
-        <VerdictTemperatureValue weather={verdict.weather} />
-
-        {verdict.representativePlaceId !== null && (
-          // 산책 위험도는 장소 상세가 소유한다. 기준 장소가 없으면 부를 대상이 없다
-          <ButtonLink
-            href={`/places/${verdict.representativePlaceId}`}
-            variant="secondary"
-            size="sm"
-            className="ml-auto"
-          >
-            {messages.plan.walkAction}
-          </ButtonLink>
-        )}
+        {/*
+          **`이 날 산책 코스` 가 이 줄을 떠났다** (#842). #653 이 "읽는 순서와 탭 순서를
+          맞춘다"로 도구를 판정 아래로 내렸는데 이 버튼만 여기 `ml-auto` 에 남아 액션이
+          두 자리로 흩어져 있었다 — 이제 `plan-day-section` 의 액션 줄이 갖는다.
+        */}
+        <div className="ml-auto text-right">
+          <VerdictTemperatureValue weather={verdict.weather} />
+        </div>
       </div>
 
       {/*

@@ -103,9 +103,13 @@ describe('PlanDayVerdict — 판정을 못 낸 것과 낮은 것을 구분한다
     expect(markup).toContain('여행 적합')
   })
 
-  it('representativePlaceId 가 null 이면 산책 버튼을 만들지 않는다 — 부를 대상이 없다', () => {
-    expect(renderVerdict()).toContain(messages.plan.walkAction)
-    expect(renderVerdict({ representativePlaceId: null })).not.toContain(messages.plan.walkAction)
+  /*
+    **이 단언은 `plan-day-section.test.ts` 로 옮겼다** (#842). 산책 코스 버튼이 판정 줄을
+    떠나 일자 액션 줄로 갔으므로 `기준 장소가 없으면 버튼이 없다` 는 그쪽이 본다. 여기
+    남기는 것은 **되돌아오지 않는다**는 계약 하나다.
+  */
+  it('산책 버튼이 판정 줄로 돌아오지 않는다', () => {
+    expect(renderVerdict()).not.toContain(messages.plan.walkAction)
   })
 
   /* 출처는 근거 문단 맨 아래가 아니라 **큰 숫자 옆**이다 (#732) — 값과 이어져야 읽힌다 */
@@ -120,7 +124,12 @@ describe('PlanDayVerdict — 판정을 못 낸 것과 낮은 것을 구분한다
     const value = midTerm.indexOf(messages.plan.verdictFeelsLikeLabel)
 
     expect(midTerm.indexOf('중기예보')).toBeGreaterThan(value)
-    expect(midTerm.indexOf('중기예보')).toBeLessThan(midTerm.indexOf(messages.plan.walkAction))
+    /*
+      **뒤 경계가 `이 날 산책` 에서 근거 목록으로 바뀌었다** (#842). 그 버튼이 판정 줄을
+      떠나면서 `indexOf` 가 `-1` 이 되어 이 단언이 늘 통과하는 상태가 됐다 — 출처가 근거
+      문단 맨 아래로 다시 내려가는 것을 막는 것이 이 줄의 일이므로 경계를 `<ul` 로 옮긴다.
+    */
+    expect(midTerm.indexOf('중기예보')).toBeLessThan(midTerm.indexOf('<ul'))
     expect(renderVerdict()).not.toContain('중기예보')
   })
 

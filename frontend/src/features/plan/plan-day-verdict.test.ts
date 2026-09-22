@@ -218,3 +218,117 @@ describe('PlanDayVerdict — 판정 불가 사유마다 말이 다르다 (#497)'
     expect(html).toBe('')
   })
 })
+
+/**
+ * 판정 배지의 **여는 태그 class** 만 추린다 (#842).
+ *
+ * 배지와 밴드가 같은 톤 문자열을 쓰므로 마크업 전체를 `toContain` 으로 보면 어느 쪽이
+ * 그것을 냈는지 구분하지 못한다. 구조는 `<span class=배지><span class=축>축 </span>등급어</span>`.
+ */
+function verdictBadgeClass(html: string): string {
+  const name = planVerdict.suitabilityLevel?.name ?? ''
+  const match = new RegExp(`<span class="([^"]*)"><span class="[^"]*">[^<]*</span>${name}</span>`).exec(
+    html,
+  )
+
+  if (match === null) throw new Error('판정 배지를 찾지 못했다')
+
+  return match[1] ?? ''
+}
+
+/**
+ * 판정이 자기 영역을 갖는다 (#842).
+ *
+ * 예전에는 판정 덩어리가 일자 헤더와 **같은 인셋 · 같은 바닥**이라, 근거 문장이 `1일차` 의
+ * 설명인지 첫 항목의 설명인지 시각적으로 갈리지 않았다.
+ */
+describe('PlanDayVerdict — 등급 tint 밴드', () => {
+  it('등급 tint 면과 -500 실선이 짝으로 선다', () => {
+    const html = render()
+
+    expect(html).toContain('bg-metric-high-100')
+    expect(html).toContain('border-metric-high-500')
+  })
+
+  /*
+    **면만 깔지 않는다** (DESIGN.md §2-3 · #709). tint 는 바닥과 밝기로 갈리지
+    않아(1.01~1.06:1) 면만으로는 적록색약에게 칠하지 않은 것과 같다 — `-500` 실선이 짝이다.
+    선만 빼도 위 단언이 통과하므로 **`border` 유틸리티까지 함께 잠근다.**
+  */
+  it('면에 실선 테두리가 실제로 붙는다', () => {
+    expect(render()).toMatch(/class="[^"]*\bborder\b[^"]*border-metric-high-500/)
+  })
+
+  /*
+    같은 톤의 tint 면 위에서 기본 채움(`bg-metric-high-100`)은 배경과 1.00:1 이라 배지가
+    사라진다 — 면과 채움을 맞바꾼다 (`BADGE_TONE_ON_TINT`).
+
+    **배지 태그를 추려서 본다.** 마크업 전체에서 세면 밴드가 쓰는 같은 문자열에 속는다 —
+    바꾸기 전에도 `bg-metric-high-100` 은 마크업에 딱 한 번(배지) 있었다.
+  */
+  it('밴드 위 배지는 면과 채움을 맞바꾼다', () => {
+    const badge = verdictBadgeClass(render())
+
+    expect(badge).toContain('bg-bg')
+    expect(badge).not.toContain('bg-metric-high-100')
+  })
+
+  /*
+    **축 라벨은 그대로 둔다.** 좌 레일 목차와 달리 여기는 섹션 라벨이 없어, 떼면 `보통` 이
+    혼잡도의 `보통` 과 구분되지 않는다 (#652). 위쪽 축 단언 둘이 이 계약을 이미 잠그고
+    있고, 이 단언은 tint 로 옮기면서 `axis` 를 잃지 않았다는 것만 확인한다.
+  */
+  it('tint 로 옮겨도 축 라벨을 잃지 않는다', () => {
+    expect(render()).toContain(`>${messages.common.metricAxisSuitability} </span>`)
+  })
+
+  /*
+    **근거를 접지 않는다** (#840). 그리고 **불릿을 달지 않는다** — `ReasonList` 의 `ul` 이
+    `flex` 라 `list-disc` 가 조용히 무시되고, 나머지 네 근거 목록이 전부 평범한 문장
+    스택이라 일차 카드만 불릿이면 #840 이 없앤 분기가 되살아난다.
+  */
+  it('근거를 전부 문장 스택으로 세운다 — 접지도 불릿을 달지도 않는다', () => {
+    const html = render()
+
+    expect(html).toContain('<ul')
+    expect(html).not.toContain('aria-expanded')
+    expect(html).not.toContain('list-disc')
+  })
+
+  /* 판정을 못 낸 날을 낮은 등급으로 칠하지 않는다 — 중립 면이라 밴드가 사라지지도 않는다 */
+  it('판정을 못 낸 날은 중립 면에 문장만 든다', () => {
+    const html = render({
+      score: null,
+      suitabilityLevel: null,
+      unavailableReasonCode: 'PAST_DATE',
+    })
+
+    expect(html).toContain('bg-band')
+    expect(html).toContain(messages.plan.verdictPastDate)
+    expect(html).not.toContain('bg-metric-high-100')
+  })
+
+  /* 말할 것이 없으면 자리도 만들지 않는다 — 빈 밴드가 서면 안 된다 */
+  it('할 말이 없는 날은 밴드 자체가 없다', () => {
+    const html = render(
+      { score: null, suitabilityLevel: null, unavailableReasonCode: 'NO_PLACE_ITEM' },
+      { dayHasItems: false },
+    )
+
+    expect(html).toBe('')
+  })
+
+  /* 체감온도는 중립 수치다 — 등급 색을 숫자에 쓰지 않는다 (DESIGN.md §2-3) */
+  it('온도 값에 등급 색을 쓰지 않는다', () => {
+    expect(render()).not.toContain('text-metric-high-500')
+  })
+
+  /*
+    **`이 날 산책` 이 이 컴포넌트를 떠났다** (#842 · Task 14). #653 이 "읽는 순서와 탭
+    순서를 맞춘다"로 도구를 판정 아래로 내렸는데 이 버튼만 판정 줄의 `ml-auto` 에 남아
+    액션이 두 자리로 흩어져 있었다. 받는 쪽 단언은 `plan-day-section.test.ts` 다.
+  */
+  it('산책 코스 버튼을 판정 줄에 두지 않는다', () => {
+    expect(render()).not.toContain(messages.plan.walkAction)
+  })
+})
