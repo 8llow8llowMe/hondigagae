@@ -6,6 +6,7 @@ import { BasisFootnote } from '@/components/basis-footnote'
 import { ChevronDownIcon } from '@/components/icons'
 import { InfoTip } from '@/components/info-tip'
 import { MetricValue, MetricWord } from '@/components/metric'
+import { ReasonList } from '@/components/reason-list'
 import { formatCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
@@ -288,7 +289,16 @@ export function WalkVerdict({
           <p className="text-body-2 text-fg">{data.walkSafetyLevel.description}</p>
         )}
 
-        <VerdictReasons reasons={data.reasons} />
+        {/*
+          **공용 `ReasonList` 다** (#840). 예전에는 여기 자체 구현(`VerdictReasons`)이 있었는데,
+          그것이 존재하던 유일한 이유는 **앞 2개만 보이고 나머지를 펼침 버튼 뒤에 두는 접기**
+          였다. 접기가 사라지자 남은 것은 `ReasonList` 와 글자 하나까지 같은 코드였고,
+          다른 점은 목록 시맨틱 없이 `<div>/<p>` 를 쓴다는 손해뿐이었다.
+
+          저장소의 다른 근거 목록 넷(일정 하루 판정 · 장소 적합도 · 장소 산책 위험도 ·
+          AI 초안)은 모두 이것을 쓴다.
+        */}
+        <ReasonList reasons={data.reasons} />
 
         {/*
           **`saferWindow` 줄을 홈에서 걷었다** (#349). 이 섹션은 "지금 나가도 되나" 만
@@ -312,30 +322,5 @@ export function WalkVerdict({
         */}
       </div>
     </section>
-  )
-}
-
-/**
- * 근거 전부. 서버 순서를 재정렬하지 않는다.
- *
- * **접지 않는다** (#840). 예전에는 앞 2개만 세우고 나머지를 `근거 N개 더 보기` 버튼 뒤에
- * 숨겼다 — 접기가 없어 한 번 누르면 끝나는 일회성 버튼이었다.
- *
- * 근거는 위 `walkSafetyLevel.description` 이 권하는 행동을 뒷받침하는 문장이고, 세 번째부터
- * 덜 중요해지지 않는다. 서버가 넷을 보냈으면 넷 다 판정에 쓰였다는 뜻이다. 첫 화면에서만
- * 둘을 가리고 그 뒤로는 아무 일도 하지 않던 장치라, 접힘이 벌던 세로 공간보다 "왜 위험한지"
- * 가 반쯤만 보이던 손해가 컸다.
- */
-function VerdictReasons({ reasons }: { reasons: { description: string }[] }) {
-  if (reasons.length === 0) return null
-
-  return (
-    <div className="flex flex-col gap-2">
-      {reasons.map((reason, index) => (
-        <p key={`${index}-${reason.description}`} className="text-body-2 text-fg">
-          {reason.description}
-        </p>
-      ))}
-    </div>
   )
 }
