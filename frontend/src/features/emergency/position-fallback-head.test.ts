@@ -39,7 +39,7 @@ describe('PositionFallbackHead — 위치를 못 쓰는 사람에게 주는 손�
 
     expect(markup).toContain(messages.emergency.positionDenied)
     expect(markup).toContain(messages.emergency.locateCta)
-    expect(markup).toContain(messages.emergency.positionDeniedHint)
+    expect(markup).toContain(messages.emergency.regionPickHintDenied)
 
     /* primary 는 하나뿐이다 — 급한 행동이 둘이면 무엇을 누를지 고르게 만든다 */
     expect(markup.match(new RegExp(PRIMARY, 'g'))?.length).toBe(1)
@@ -65,7 +65,37 @@ describe('PositionFallbackHead — 위치를 못 쓰는 사람에게 주는 손�
     expect(markup).toContain(messages.emergency.positionTimeout)
     expect(markup).toContain(messages.emergency.locateCta)
     /* 권한 안내는 `denied` 전용이다 — 타임아웃에 띄우면 엉뚱한 설정을 뒤진다 */
-    expect(markup).not.toContain(messages.emergency.positionDeniedHint)
+    expect(markup).not.toContain(messages.emergency.regionPickHintDenied)
+    expect(markup).toContain(messages.emergency.regionPickHint)
+  })
+
+  /*
+    **힌트는 언제나 한 줄이다** (#671 F-6). 예전에는 거부 갈래에서만 caption 이 두 줄
+    쌓여 목록이 ~28px 밀렸다 — 권한 허용 시 첫 화면에 전화 버튼이 2개인데 거부 시에는
+    1개만 남는 실측이었다. 갈래는 줄 수가 아니라 문구가 진다.
+  */
+  it('거부 갈래에서도 힌트 caption 은 한 줄이다', () => {
+    const markup = render({ reason: 'denied' })
+
+    expect(markup).toContain(messages.emergency.regionPickHintDenied)
+    /* 예전 두 줄짜리 조합이 남아 있지 않다 */
+    expect(markup).not.toContain(messages.emergency.regionPickHint)
+
+    const captions = markup.match(/class="text-caption text-fg-muted break-keep"/g) ?? []
+    expect(captions.length).toBe(1)
+  })
+
+  /*
+    한 줄로 합치면서 **두 사실이 모두 남아야 한다**: ① 브라우저 설정에서 켜야 한다
+    (영구 거부면 버튼을 눌러도 프롬프트가 안 뜬다) ② 안 되면 지역을 고른다 — 세그먼트의
+    `ChipGroup` 라벨은 `aria-label` 이라 화면에 글자가 없어, 이 절이 칩 넷을 가리키는
+    유일한 보이는 글자다.
+  */
+  it('합친 한 줄이 설정 경로와 지역 대안을 모두 말한다', () => {
+    const hint = messages.emergency.regionPickHintDenied
+
+    expect(hint).toContain('설정')
+    expect(hint).toContain('지역')
   })
 
   /*

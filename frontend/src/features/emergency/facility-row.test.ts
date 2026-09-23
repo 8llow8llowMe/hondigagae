@@ -375,6 +375,87 @@ describe('FacilityHours — 오늘 한 줄과 원문 갈래 (#654 E-4)', () => {
       expect(markup).not.toContain('<details')
       expect(markup).toContain('월~금 09:00~19:00')
     })
+
+    /*
+      **배지와 원문이 어긋날 수 있다고 행에서 말한다** (#671 C-5).
+
+      이 갈래가 서는 조건 자체가 "원문에서 읽은 개폐가 서버 `openNow` 와 맞지 않거나
+      아예 읽히지 않았다" 라, **서는 행마다 보기에 자기모순**이다 — `[영업 종료]` 배지
+      아래 `09:30~20:00`(수요일 정오 = 진료 시간 안). dev 실물 135곳 중 15곳이 여기다.
+
+      원문을 걷는 것이 답이 아니다 — 원문을 그대로 보이는 것이 불변식의 몸통이라
+      지우지 않는다. 페이지 바닥 `source` 는 모든 행에 같은 말이라 **이 행이 왜 다른지**
+      는 말하지 못한다. 그래서 한 줄을 더한다.
+    */
+    describe('어긋남 한 줄 (#671 C-5)', () => {
+      it('원문 갈래에 한 줄 신호가 선다', () => {
+        const markup = row(UNREADABLE)
+
+        expect(markup).toContain(LONG)
+        expect(markup).toContain(messages.emergency.hoursRawMismatch)
+      })
+
+      /* 요약이 선 행에는 어긋남이 없다 — 붙이면 없는 모순을 만들어 낸다 */
+      it('요약이 선 행에는 달지 않는다', () => {
+        const markup = row({
+          open24: false,
+          openNow: true,
+          restDate: null,
+          operatingHours: '월~금 09:00~19:00, 토 09:00~13:00',
+        })
+
+        expect(markup).not.toContain(messages.emergency.hoursRawMismatch)
+      })
+
+      /* 시간표가 아예 없는 행도 마찬가지다 — 원문이 없으니 어긋날 것도 없다 */
+      it('시간표가 없는 행에는 달지 않는다', () => {
+        const markup = row({ operatingHours: null, operatingHoursKnown: false })
+
+        expect(markup).not.toContain(messages.emergency.hoursRawMismatch)
+      })
+
+      /*
+        **`openNow === null` 에는 달지 않는다.** 그 행의 배지는 점선 `확인 필요` 라
+        어긋날 **주장이 없고**, 배지가 이미 "모른다" 를 말한다.
+      */
+      it('영업 여부를 모르는 행에는 달지 않는다 — 어긋날 주장이 없다', () => {
+        const markup = row({
+          open24: false,
+          openNow: null,
+          restDate: null,
+          operatingHours: '월~금 09:00~19:00',
+        })
+
+        expect(markup).toContain('월~금 09:00~19:00')
+        expect(markup).toContain(messages.emergency.statusUnknown)
+        expect(markup).not.toContain(messages.emergency.hoursRawMismatch)
+      })
+
+      /* 어느 쪽이 맞는지 고르지 않는다 — 두 값이 어긋나 있다는 것만 말한다 */
+      it('배지 글자도 원문도 다시 쓰지 않는다', () => {
+        const note = messages.emergency.hoursRawMismatch
+
+        expect(note).not.toContain(messages.emergency.statusClosed)
+        expect(note).not.toContain(messages.emergency.statusOpen)
+      })
+
+      /*
+        **지도 패널에서도 같은 말이 선다.** 목록 행과 지도 패널이 같은 `FacilityHours` 를
+        쓰므로, 한쪽만 신호를 달면 같은 시설이 화면마다 다르게 읽힌다.
+      */
+      it('지도 패널 행(FacilityRowContent)에서도 선다', () => {
+        const markup = renderToStaticMarkup(
+          createElement(FacilityRowContent, {
+            facility: facility(UNREADABLE),
+            showDistance: true,
+            now: WED_NOON,
+          }),
+        )
+
+        expect(markup).toContain(LONG)
+        expect(markup).toContain(messages.emergency.hoursRawMismatch)
+      })
+    })
   })
 
   /*

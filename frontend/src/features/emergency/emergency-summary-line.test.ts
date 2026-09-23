@@ -113,21 +113,68 @@ describe('emergencyHeadSubtitle — 카드 부제 (#639 · #675)', () => {
       expect(emergencyHeadSubtitle(null, null, null)).toBeNull()
     })
 
-    /*
-      **잘린 목록에서는 침묵한다.** `totalCount` 자체는 참이지만 옆에 선 진료중 수가
-      받아 온 것만 센 값이라, 한 줄로 묶이면 줄 전체가 거짓말이 된다.
-    */
-    it('목록이 잘렸으면 줄째로 감춘다 — 틀린 개수는 없는 개수보다 나쁘다', () => {
-      const truncated = facilityResult({ totalCount: 136 })
-
-      expect(emergencyHeadSubtitle(truncated, null, null)).toBeNull()
-    })
-
     /* `openNow === null`(영업시간 미등록)은 진료중으로 세지 않는다 */
     it('영업 여부를 모르는 곳은 진료중에 넣지 않는다', () => {
       const result = facilityResult({ facilities: [facility({ openNow: null })] })
 
       expect(emergencyHeadSubtitle(result, null, null)).toBe('제주 1곳 · 지금 진료중 0곳')
+    })
+  })
+
+  /*
+    **잘린 목록 갈래** (#671 F-2). 예전에는 `!countsAreComplete` 한 줄이 부제를 통째로
+    지웠는데, 같은 조건에서 24시간 안내줄은 숫자만 빼고 문장을 남긴다
+    (`open24Note` → `open24NoteUnknown`). 같은 한계를 한쪽은 완전 침묵, 한쪽은 부분
+    표현으로 처리하던 비대칭이었고, 침묵하던 쪽이 하필 "반경 안에 몇 곳이 있나" 를
+    말하는 유일한 고지였다 — 기본 ON 이 목록을 감추는 화면에서 그 줄까지 사라지면
+    사용자는 짧은 목록이 전부라고 읽는다.
+  */
+  describe('잘린 목록 — 셀 수 없는 절만 숫자를 뺀다 (#671 F-2)', () => {
+    it('총계는 확언하고 진료중 수만 뺀다 — 줄째로 사라지지 않는다', () => {
+      const truncated = facilityResult({ totalCount: 136 })
+
+      expect(emergencyHeadSubtitle(truncated, null, null)).toBe(
+        '제주 136곳 · 지금 진료중은 세지 못했어요',
+      )
+    })
+
+    /* `{region}` 출처는 온전한 갈래와 같다 — 두 줄이 갈려 보이던 #675 D16-1 ② 재발 방지 */
+    it('권역을 골랐으면 그 이름으로 말한다', () => {
+      const truncated = facilityResult({ totalCount: 136 })
+
+      expect(emergencyHeadSubtitle(truncated, null, 'SEOGWIPO')).toBe(
+        '서귀포 136곳 · 지금 진료중은 세지 못했어요',
+      )
+    })
+
+    /* 잘려도 받아 온 목록에서 센 수는 말하지 않는다 — 틀린 개수는 없는 개수보다 나쁘다 */
+    it('받아 온 목록에서 센 진료중 수를 흘리지 않는다', () => {
+      const line = emergencyHeadSubtitle(facilityResult({ totalCount: 136 }), null, null)
+
+      expect(line).not.toContain('진료중 1곳')
+    })
+
+    /*
+      **검색 중에는 그대로 감춘다.** 서버가 `keyword` 를 모르므로(#584) `{total}` 조차
+      받아 온 목록에서 센 수라, 남길 참인 절이 하나도 없다 — 그 자리는 0건 본문의
+      `searchTruncatedNote` 가 범위를 밝힌다.
+    */
+    it('검색 중이면 줄째로 감춘다 — 참인 절이 하나도 없다', () => {
+      const truncated = facilityResult({ totalCount: 136 })
+
+      expect(emergencyHeadSubtitle(truncated, '한라', null)).toBeNull()
+    })
+
+    /*
+      **한 곳도 못 받은 잘림도 같은 갈래다.** 서버는 반경 안에 5곳이 있다고 하는데 목록이
+      비어 있다 — 진료중은 0곳이 아니라 **셀 수 없는** 것이다.
+    */
+    it('한 곳도 못 받았어도 총계는 말한다 — 진료중 0곳이라고 하지 않는다', () => {
+      const truncated = facilityResult({ facilities: [], totalCount: 5 })
+
+      expect(emergencyHeadSubtitle(truncated, null, null)).toBe(
+        '제주 5곳 · 지금 진료중은 세지 못했어요',
+      )
     })
   })
 })

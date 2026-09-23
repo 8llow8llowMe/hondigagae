@@ -246,7 +246,7 @@ function FacilityRowBody({
  * | 조건 | 그리는 것 |
  * | --- | --- |
  * | `operatingHoursKnown === false` 또는 원문 `null` | `진료시간이 등록돼 있지 않아요` |
- * | `summarizeTodayHours()` 가 `null` | **원문 그대로** (`line-clamp-2`) — 가드 폴백 |
+ * | `summarizeTodayHours()` 가 `null` | **원문 그대로** (`line-clamp-2`) — 가드 폴백. `openNow` 가 있으면 어긋남 한 줄 (#671 C-5) |
  * | 요약이 섰다 | **오늘 한 줄만.** 원문도 손잡이도 없다 |
  * | 요약이 `24시간` 갈래 | **아무것도 그리지 않는다** — `[24시간]` 배지가 이미 말한다 |
  *
@@ -321,7 +321,31 @@ function FacilityHours({ facility, now }: { facility: NearbyFacilityItem; now: D
           시설마다 제각각이라(`법정공휴일` 항목까지 붙는 곳이 있다) 상한이 없으면 한 행이
           목록의 리듬을 혼자 깬다.
         */
-        <p className="text-body-2 text-fg line-clamp-2 tabular-nums">{facility.operatingHours}</p>
+        <>
+          <p className="text-body-2 text-fg line-clamp-2 tabular-nums">{facility.operatingHours}</p>
+
+          {/*
+            **배지와 원문이 어긋날 수 있다는 것을 그 행에서 말한다** (#671 C-5).
+
+            이 갈래가 서는 조건 자체가 *"원문에서 읽은 개폐가 서버 `openNow` 와 맞지
+            않거나 아예 읽히지 않았다"* 라, **서는 행마다 보기에 자기모순**이다 —
+            `[영업 종료]` 아래 `월~금 09:00~22:00`(수요일 09:52 실측 = 진료 시간 안).
+            dev 실물 135곳 중 15곳이 여기로 떨어진다.
+
+            페이지 바닥 `source` 가 전역으로 덮지만 그것은 모든 행에 같은 말이라 **이
+            15행이 왜 다른지**는 말하지 못한다. 원문을 걷는 것은 답이 아니다 — 원문을
+            그대로 보이는 것이 불변식의 몸통이다 (머리주석). 그래서 **한 줄을 더한다.**
+
+            **`openNow === null` 에는 달지 않는다.** 그 행의 배지는 점선 `확인 필요` 라
+            어긋날 **주장이 없고**, 배지가 이미 "모른다" 를 말하고 있다 — 거기에 "서로
+            달라 보일 수 있어요" 를 붙이면 없는 모순을 만들어 낸다.
+          */}
+          {facility.openNow !== null && (
+            <p className="text-caption text-fg-muted break-keep">
+              {messages.emergency.hoursRawMismatch}
+            </p>
+          )}
+        </>
       ) : (
         /*
           **원문을 함께 그리지 않는다.** 이 한 줄이 그 원문을 읽어 만든 것이고, 오늘에
