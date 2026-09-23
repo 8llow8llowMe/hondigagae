@@ -292,6 +292,8 @@ pnpm test:coverage     # 커버리지 리포트
 
 **E2E 스위트가 아니다.** vitest 가 볼 수 없는 둘만 맡는다.
 
+배포된 dev 를 실제로 부르는 로그인 스모크는 설정부터 따로다 — §13.
+
 ```bash
 cd frontend
 pnpm e2e            # 1회 실행 (서버는 설정이 알아서 띄운다)
@@ -366,3 +368,66 @@ pnpm e2e:report     # 마지막 실행 리포트
 ### 이 방식이 대체한 것
 
 3층 표면 작업(#455) 내내 쓰던 **임시 하네스** — `renderToStaticMarkup` 결과를 `public/__check/*.html` 로 쓰고 dev 서버 CSS 를 링크해 눈으로 재던 방식이다. 커밋 전마다 손으로 지워야 했고 [#67](https://github.com/8llow8llowMe/hondigagae/issues/67) 이 그 한계를 추적했다. **더 쓰지 않는다.**
+
+## 13. Playwright — dev 로그인 스모크 (이슈 #757)
+
+**§12 와 정반대 편이다.** §12 는 `MOCK_API=true` 로 **PR 의 코드**를 재고 dev 를 부르지 않도록 막아 두었다. 이것은 **이미 배포된 dev** 를 실제로 불러 로그인 · BFF 세션 · 실데이터 조회가 서 있는지 본다. 그래서 설정·디렉터리를 가른다 — 한 파일에 섞으면 `pnpm e2e` 가 dev 를 칠 수 있는 길이 생긴다.
+
+| 무엇      | 파일                                                                |
+| --------- | ------------------------------------------------------------------- |
+| 설정      | `playwright.dev-smoke.config.ts` (`webServer` 없음)                 |
+| 스펙      | `e2e-dev-smoke/*.smoke.ts`                                          |
+| 로그인    | `e2e-dev-smoke/login.setup.ts` → `e2e-dev-smoke/.auth/` (gitignore) |
+| 로그아웃  | `e2e-dev-smoke/logout.teardown.ts`                                  |
+| 공용 가드 | `e2e-dev-smoke/fixtures.ts`                                         |
+| CI        | `.github/workflows/frontend-dev-smoke.yml`                          |
+
+### 무엇을 보는가 — 읽기만
+
+로그인 뒤 **내 정보 · 장소 검색 · 긴급시설 검색 · 여행 일정 · 반려견 · 저장한 장소** 여섯 화면을 연다. 화면마다 둘을 본다.
+
+1. **BFF 조회가 성공한다** (`readBff`) — 상태 200 + `dataHeader.success`. SSR 프리페치는 실패를 삼키고 클라이언트가 다시 부르므로 화면만으로는 "0건" 과 "조회 실패" 를 가를 수 없다.
+2. **화면이 그 화면의 오류 상태 없이 열린다** (`openScreen`) — `/login` 으로 튕기지 않고, 로딩 골격이 걷힌 뒤 **그 화면의 오류 제목**과 `다시 시도` 버튼이 없다.
+
+**오류 제목은 화면마다 다르다** — 여섯 화면 모두 `ErrorState` 를 쓰지만 제목은 `messages.member.loadFailedTitle` · `messages.plan.errorTitle` 처럼 도메인 문구다. 공용 문구 하나로 찾으면 어느 화면에도 없는 글자를 찾아 늘 통과한다(검토에서 실제로 잡혔다). 그래서 호출부가 그 화면의 제목을 넘긴다. **`networkidle` 을 기다리지 않는다** — 쿼리 재시도 backoff 사이에 먼저 풀려 오류를 놓치고, 지도 SDK 처럼 요청이 이어지는 화면에서는 끝나지 않는다. 쿼리는 재시도가 끝날 때까지 골격을 그리므로 **골격(`animate-pulse`)이 걷히기**를 기다린다.
+
+**개수는 공공 데이터(장소·긴급시설)만 1건 이상으로 본다.** 일정·반려견·저장 목록은 계정에 따라 0건이 정상이다.
+
+**쓰기는 fixture 가 네트워크에서 끊는다.** dev 출처로 나가는 `GET`·`HEAD` 밖의 요청은 전부 abort 되고, 하나라도 있었으면 그 테스트가 실패한다. 같은 fixture 가 **dev 의 5xx 응답과 브라우저 `pageerror`** 도 모아 실패로 올린다 — 이슈가 기준으로 삼은 실측(2026-09-19)이 "HTTP 200, 서버 5xx·런타임 오류 없음" 이었다. 로그인·로그아웃만 이 가드 밖이다.
+
+### 비밀값 — 무엇이 어디에 남는가
+
+| 값                   | 받는 곳                  | 남지 않게 한 방법                                                                                                                                                                                                                           |
+| -------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 계정 이메일·비밀번호 | CI secret → 환경 변수    | **폼을 채우지 않는다.** playwright 는 `fill` 의 단계 제목에 입력값을 그대로 적는다(`Fill "{value}"`). BFF 로그인을 `request.post` 로 부르면 제목이 메서드·URL 뿐이다. 로그인 프로젝트는 trace·스크린샷을 끈다(요청 본문이 trace 에 담긴다). |
+| 세션 쿠키            | `e2e-dev-smoke/.auth/`   | gitignore · 아티팩트 경로 밖. teardown 이 **로그아웃**해 쿠키를 죽이고 파일을 지운다.                                                                                                                                                       |
+| 실패 trace           | 아티팩트(실패 시만, 3일) | 네트워크 기록에 세션 쿠키가 실린다 — 뺄 방법이 없어 위 로그아웃으로 무효화한다.                                                                                                                                                             |
+
+- **실패 메시지에 응답 본문·쿼리를 싣지 않는다.** 경로 · 상태 · `resultCode` 만 남긴다. 내 정보 응답은 계정의 이메일·이름을 담는다.
+- **실패 스크린샷과 `error-context.md`(페이지 ARIA 스냅샷)에는 화면에 원래 보이는 계정 표시(헤더의 이름, 마이페이지의 이메일)가 담길 수 있다.** 그래서 **스모크 전용 계정**을 쓴다 — 개인 계정을 secret 에 넣지 않는다.
+- 로컬에서 돌릴 때도 값은 셸 환경 변수로만 준다. `.env.*` 나 예시 파일에 실제 값을 적지 않는다.
+
+### 실행
+
+```bash
+cd frontend
+DEV_SMOKE_BASE_URL=https://dev.hondigagae.com \
+DEV_SMOKE_EMAIL='<스모크 계정 이메일>' \
+DEV_SMOKE_PASSWORD='<스모크 계정 비밀번호>' \
+pnpm e2e:dev-smoke
+```
+
+### 언제 · 어디서 도는가
+
+- **CI: `frontend-dev-smoke` 워크플로.** PR·push 에는 걸지 않는다 — PR 의 코드는 아직 dev 에 없으므로 그 결과가 PR 을 말해 주지 못한다.
+- **매일 09:10 KST 한 번** (`schedule`). 밤사이 배치·배포가 깨뜨린 것을 아침에 본다. `schedule` 은 기본 브랜치(`develop`)의 워크플로 파일로만 돈다.
+- **dev 배포 직후 손으로** (`workflow_dispatch`). Jenkins dev 배포(`Jenkinsfile.frontend-common.groovy` · 백엔드 공통)가 끝나면 Actions 탭 `Run workflow` 또는 `gh workflow run frontend-dev-smoke.yml --ref develop`. Jenkins 가 자동으로 부르게 하는 것은 아직 하지 않았다 — GitHub 토큰을 Jenkins 에 새로 넣어야 한다.
+- 실행은 `concurrency` 로 한 번에 하나다. 같은 계정 세션이라 겹치면 한쪽 로그아웃이 다른 쪽을 끊는다.
+
+필요한 저장소 설정은 셋이다. **secret 은 저장소 범위다** — 같은 저장소의 다른 브랜치 워크플로도 읽을 수 있다. 브랜치를 `develop` 으로 묶는 GitHub Environment secret 이 맞는 자리지만, private + Free 저장소라 쓸 수 없다(#286 과 같은 제약). 그래서 **권한이 좁은 스모크 전용 계정**을 쓰는 것으로 피해 범위를 줄인다. 플랜이 바뀌면 `environment:` 로 옮긴다.
+
+| 종류   | 이름                 | 없으면                               |
+| ------ | -------------------- | ------------------------------------ |
+| secret | `DEV_SMOKE_EMAIL`    | 로그인 setup 이 이름을 대고 실패한다 |
+| secret | `DEV_SMOKE_PASSWORD` | 위와 같다                            |
+| 변수   | `DEV_SMOKE_BASE_URL` | `https://dev.hondigagae.com` 을 쓴다 |

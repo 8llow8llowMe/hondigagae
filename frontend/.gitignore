@@ -18,6 +18,10 @@ next-env.d.ts
 /test-results/
 /blob-report/
 /e2e/.auth/
+# dev 스모크 (#757) — 실계정 세션이다. 리포트·trace 도 dev 응답을 담는다.
+/e2e-dev-smoke/.auth/
+/playwright-report-dev-smoke/
+/test-results-dev-smoke/
 /.next-e2e/
 
 # 워크트리 검사용 산출물 (#671 E-2). 워크트리에서 `NEXT_DIST_DIR=.next-check` 로 띄우는
