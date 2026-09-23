@@ -108,10 +108,23 @@ on/off 스위치와 스텁 어댑터는 두지 않는다(2026-09-03 제거). 프
 
 | 대상 | 규모 | 원천 |
 | --- | --- | --- |
-| 장소 마스터 | 약 315곳 | 관광 29 + 문화정보원 228 + 식약처 102 − 중복 |
-| ├ 식음료 | 125곳 | 문화정보원 카페 24 + 식약처 102 (중복 1) |
-| └ 동반 가능 | 문화정보원분 169 / 228 | 나머지 59곳은 "동반 불가"로 표시 |
-| 긴급 시설 | 213곳 | 동물병원 85 + 동물약국 128 (#569 중복 접기 후) |
+| 장소 마스터 (노출) | **2,328곳** | TourAPI 2,099 + 문화정보원 127 + 식약처 102 |
+| ├ TourAPI | 활성 2,099 / 전체 2,117 | 관광지(12) 560 · 문화시설(14) 98 · 레포츠(28) 137 · 숙박(32) 210 · 쇼핑(38) 395 · 음식점(39) 699 (#726 지역코드 이관 뒤) |
+| ├ 문화정보원 | 228 중 101 은 TourAPI 로 병합 | 노출은 127 (`merged_into_id IS NULL`) |
+| └ 식약처 | 102 | 반려동물 동반 음식점 |
+| 동반 가능 여부 | ALLOWED 194 · PARTIALLY 5 · NOT_ALLOWED 30 · **UNKNOWN 2,099** | **TourAPI 장소는 전부 UNKNOWN** 이다 — 동반 정보 적재(#877)와 반영(#886) 전 |
+| 긴급 시설 | 214곳 | 동물병원 + 동물약국 (#569 중복 접기 후) |
+
+> 기준: 2026-09-23 dev DB(`hondigagae_tour_dev`) 읽기 전용 실측 (#885). 다시 잴 때:
+>
+> ```sql
+> SELECT source, COUNT(*) total, SUM(delisted_at IS NULL) active,
+>        SUM(merged_into_id IS NOT NULL) merged,
+>        SUM(delisted_at IS NULL AND merged_into_id IS NULL) visible
+>   FROM place GROUP BY source;
+> SELECT pet_allowance_type, COUNT(*) FROM place
+>  WHERE delisted_at IS NULL AND merged_into_id IS NULL GROUP BY pet_allowance_type;
+> ```
 
 ### 날씨·혼잡도
 
@@ -125,14 +138,15 @@ on/off 스위치와 스텁 어댑터는 두지 않는다(2026-09-03 제거). 프
 둘의 커버리지가 다르다. 날씨는 없고 혼잡도만 있는 날짜가 흔하며, 적합도 응답은
 `weatherApplied` / `congestionApplied` 플래그로 그 차이를 감추지 않는다.
 
-**적재는 아직 한 번도 실행되지 않았다.** 코드와 파서는 실제 원천 데이터로 검증했으나
-MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide.md` 7절 참고.
+**적재는 2026-09-04 부터 dev 에 들어가 있다 — 다만 전부 사람이 손으로 돌린 것이다.** 27회 실행 중 스케줄이
+부른 것은 0회다(#878). 상세 커버리지는 이미지 380 / 2,099 · 운영시간 300 / 2,099 로 실행당 상한 1회분에
+머물러 있다. 운영 절차는 `batch-dev-runbook.md`.
 
 ## 미착수 / 보류
 
 | 기능 | 상태 | 막는 것 |
 | --- | --- | --- |
-| `walkcourse` 적재 배치 | 미착수 | #383. 조회 API 는 #382 로 구현. **원천을 두루누비 → 제주올레로 교체** — 두루누비 걷기 142개는 코리아둘레길 축이라 제주 0개(실호출 검증), TourAPI 여행코스(25)도 제주 0건 |
+| `walkcourse` 적재 배치 | **구현** | `olleCourseImportJob` (#383). 원천은 두루누비가 아니라 제주올레 — 두루누비 걷기 142개는 코리아둘레길 축이라 제주 0개(실호출 검증). 29코스 전부 시작점 좌표·대표 이미지를 갖는다(#722). 종점 좌표는 계약에 있고(#816, 29 중 24) dev 는 올레 재적재 전이라 0 / 29 |
 | 기상특보 연동 | **구현 (조회)** | #156 — 적합도·권역 날씨·산책 안전 응답에 `weatherWarnings`. 카카오 메시지 알림 연계는 후속 |
 | 항목 단위 산책 위험도 | 미착수 | 일정 브리핑은 일자별 대표 장소 한 곳만 조회한다 |
 | 일정 브리핑 체감온도 | **구현** | #88. `weather.maxFeelsLikeTemperature` — tour `DailyWeather` 가 시각별 열지수의 하루 최대를 내고 plan 이 그대로 전달. 중기예보는 null |
@@ -140,11 +154,11 @@ MySQL 에 넣어본 적이 없다. 첫 배포 시 `jenkins-cicd-dev-deploy-guide
 | AI 작업 세부 단계·취소·`sigunguCode` | **구현** | #90. 4단계(`step`/`stepOrder`/`totalSteps`) · `POST /jobs/{jobId}/cancel`(협조적) · `sigunguCode` 후보 좁히기. 일자 재생성은 #77 로 됨 |
 | 다견 일정의 준비물 생성 | 구현 | 동행 반려견 전체 특성을 벌크 조회해 근거로 삼는다. 프롬프트는 합집합 규칙 |
 | 반려견 프로필 매칭 | **구현** | `petSizeType`/`petWeightKg` 필터. 프로필 체중 입력은 FE 몫 |
-| 영업시간 구조화 | **구현 (긴급 시설 + 여행 장소)** | 긴급 시설은 `openNowOnly` + 항목별 `openNow`. 여행 장소는 상세 `intro.openNow`·`open24` — 문화정보원 + TourAPI `detailIntro2`(#361) 두 출처. TourAPI 는 쿼터 때문에 실행당 최대 300곳씩 증분 수집(intro 없는 곳 먼저)이라 전량 커버는 주 1회 기준 약 4주. 같은 잡의 이미지 단계가 남은 예산으로 돌며 한도에서 멈춘다. 목록 필터(`openNowOnly`)는 후속 |
+| 영업시간 구조화 | **구현 (긴급 시설 + 여행 장소)** | 긴급 시설은 `openNowOnly` + 항목별 `openNow`. 여행 장소는 상세 `intro.openNow`·`open24` — 문화정보원 + TourAPI `detailIntro2`(#361) 두 출처. TourAPI 는 쿼터 때문에 실행당 최대 300곳씩 증분 수집(intro 없는 곳 먼저)이라 전량 커버는 2,099곳 기준 약 7회 실행(주 1회면 약 7주). 2026-09-23 현재 300 / 2,099. 같은 잡의 이미지 단계가 남은 예산으로 돌며 한도에서 멈춘다. 목록 필터(`openNowOnly`)는 후속 |
 | 데이터 delisting | **구현** | `delisted_at` 표시 + 급감 가드. `data-refresh-guide.md` 2절 |
 | 배포 파이프라인 | **구현** | #21 — 서비스별 `docker-compose-*.yml` + Jenkins. `deploy-guide.md`·`jenkins-cicd-dev-deploy-guide.md` |
 | 배치 메트릭 | **구현** | `place_import_rows` 게이지 + `place_import_last_success_timestamp` (기동 씨딩 포함). Prometheus 경보 rule 등록은 인프라 후속 |
-| 배치 주기 실행 | **구현 (dev)** | #378 — batch-service 프로세스 안 Quartz. 장소 파이프라인 월 03:00 / 혼잡도 매일 06:00 KST, 실행 중 가드 + `batch_schedule_*` 지표. prod 전환은 dev 관찰 뒤 결정 |
+| 배치 주기 실행 | **구현 — dev 미가동** | #378 — batch-service 프로세스 안 Quartz. 장소 파이프라인 매주 월 03:00 / 혼잡도 매일 06:00 KST, 실행 중 가드 + `batch_schedule_*` 지표. prod 전환은 dev 관찰 뒤 결정. **dev 에서 스케줄은 아직 한 번도 돌지 않았다** — 컨테이너 미기동(#878) |
 
 ### 데이터가 없어 못 하는 것
 
