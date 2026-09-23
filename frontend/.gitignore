@@ -19,3 +19,8 @@ next-env.d.ts
 /blob-report/
 /e2e/.auth/
 /.next-e2e/
+
+# 워크트리 검사용 산출물 (#671 E-2). 워크트리에서 `NEXT_DIST_DIR=.next-check` 로 띄우는
+# 관행이 문서화돼 있는데 ignore 가 없어, #654 레인에서 `pnpm verify` 가 371 errors 로
+# 터졌다 — 전부 이 디렉터리 산출물이었다.
+/.next-check/
