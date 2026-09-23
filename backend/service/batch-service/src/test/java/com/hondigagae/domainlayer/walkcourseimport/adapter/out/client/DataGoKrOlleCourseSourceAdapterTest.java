@@ -163,7 +163,7 @@ class DataGoKrOlleCourseSourceAdapterTest {
         @DisplayName("실제 응답(2026-09-23)에서 atchFileId·fileDetailSn 을 읽어 fileDownload.do 주소를 만든다")
         void buildsDownloadUrlFromRealTicket() throws IOException {
             OlleCourseSourceQueryResult source =
-                DataGoKrOlleCourseSourceAdapter.parseDownloadTicket(resource(TICKET_RESOURCE), BASE_URL);
+                DataGoKrOlleCourseSourceAdapter.parseDownloadTicket(resource(TICKET_RESOURCE), BASE_URL, DATASET_ID);
 
             assertThat(source.fileId()).isEqualTo("FILE_000000007665534");
             assertThat(source.fileDetailSn()).isEqualTo("1");
@@ -176,7 +176,7 @@ class DataGoKrOlleCourseSourceAdapterTest {
         void acceptsNumericFileDetailSn() {
             String json = "{\"status\":true,\"atchFileId\":\"FILE_1\",\"fileDetailSn\":2}";
 
-            assertThat(DataGoKrOlleCourseSourceAdapter.parseDownloadTicket(json, BASE_URL).fileDetailSn()).isEqualTo("2");
+            assertThat(DataGoKrOlleCourseSourceAdapter.parseDownloadTicket(json, BASE_URL, DATASET_ID).fileDetailSn()).isEqualTo("2");
         }
 
         @Test
@@ -184,7 +184,7 @@ class DataGoKrOlleCourseSourceAdapterTest {
         void failsWhenStatusFalse() {
             String json = "{\"status\":false,\"error\":\"파일이 존재하지 않습니다.\"}";
 
-            assertThatThrownBy(() -> DataGoKrOlleCourseSourceAdapter.parseDownloadTicket(json, BASE_URL))
+            assertThatThrownBy(() -> DataGoKrOlleCourseSourceAdapter.parseDownloadTicket(json, BASE_URL, DATASET_ID))
                 .isInstanceOf(WalkCourseImportException.class)
                 .hasMessageContaining("status=false")
                 .hasMessageContaining("파일이 존재하지 않습니다.")
@@ -193,9 +193,22 @@ class DataGoKrOlleCourseSourceAdapterTest {
         }
 
         @Test
+        @DisplayName("티켓의 publicDataPk 가 datasetId 와 다르면 SOURCE_PAGE_INVALID — 남의 파일을 받지 않는다")
+        void failsWhenTicketDatasetDiffers() {
+            String json = "{\"status\":true,\"atchFileId\":\"FILE_9\",\"fileDetailSn\":\"1\","
+                + "\"dataSetFileDetailInfo\":{\"publicDataPk\":\"15099999\"}}";
+
+            assertThatThrownBy(() -> DataGoKrOlleCourseSourceAdapter.parseDownloadTicket(json, BASE_URL, DATASET_ID))
+                .isInstanceOf(WalkCourseImportException.class)
+                .hasMessageContaining("publicDataPk=15099999")
+                .extracting(DataGoKrOlleCourseSourceAdapterTest::errorCodeOf)
+                .isEqualTo(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID);
+        }
+
+        @Test
         @DisplayName("JSON 이 아니면(점검 HTML) SOURCE_PAGE_INVALID")
         void failsWhenNotJson() {
-            assertThatThrownBy(() -> DataGoKrOlleCourseSourceAdapter.parseDownloadTicket("<html>점검</html>", BASE_URL))
+            assertThatThrownBy(() -> DataGoKrOlleCourseSourceAdapter.parseDownloadTicket("<html>점검</html>", BASE_URL, DATASET_ID))
                 .isInstanceOf(WalkCourseImportException.class)
                 .extracting(DataGoKrOlleCourseSourceAdapterTest::errorCodeOf)
                 .isEqualTo(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID);
@@ -206,7 +219,7 @@ class DataGoKrOlleCourseSourceAdapterTest {
         void failsWhenFileIdMissing() {
             String json = "{\"status\":true,\"atchFileId\":\"\",\"fileDetailSn\":\"1\"}";
 
-            assertThatThrownBy(() -> DataGoKrOlleCourseSourceAdapter.parseDownloadTicket(json, BASE_URL))
+            assertThatThrownBy(() -> DataGoKrOlleCourseSourceAdapter.parseDownloadTicket(json, BASE_URL, DATASET_ID))
                 .isInstanceOf(WalkCourseImportException.class)
                 .extracting(DataGoKrOlleCourseSourceAdapterTest::errorCodeOf)
                 .isEqualTo(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID);
@@ -332,6 +345,16 @@ class DataGoKrOlleCourseSourceAdapterTest {
         @DisplayName("포털 원본(CP949)도 첫 줄 코스별로 통과한다")
         void acceptsMs949Csv() throws IOException {
             Path file = write("코스별,코스명,거리\n1코스,시흥-광치기,15.1km\n", Charset.forName("MS949"));
+
+            adapter(1).validate(file, Files.size(file), Files.size(file));
+        }
+
+        @Test
+        @DisplayName("4096바이트 경계가 멀티바이트 글자 중간에 걸려도 첫 줄만 보고 통과한다")
+        void acceptsLargeCsvCutMidCharacter() throws IOException {
+            // 헤더 20바이트 뒤로 3바이트 글자가 이어져 4096 번째 바이트가 글자 중간에 떨어진다
+            Path file = write("코스별,코스명\n" + "가".repeat(2_000) + "\n", StandardCharsets.UTF_8);
+            assertThat((4_096 - "코스별,코스명\n".getBytes(StandardCharsets.UTF_8).length) % 3).isNotZero();
 
             adapter(1).validate(file, Files.size(file), Files.size(file));
         }
