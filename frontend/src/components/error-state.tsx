@@ -56,7 +56,7 @@ export function ErrorState({
     <div className={cn('flex flex-col items-start gap-2 py-12', INSET_CLASS[inset], className)}>
       <Heading className="text-body-1 text-fg font-semibold">{title}</Heading>
       {description !== undefined && <p className="text-body-2 text-fg-muted">{description}</p>}
-      {/* 이 상태에서 화면의 유일한 조작 대상이다. 모바일 터치 영역 44px (DESIGN.md §7) */}
+      {/* 이 상태에서 화면의 **유일한** 조작 대상이라 44 를 준다 — §7 하한이 아니라 그 사실이 근거다 (#883) */}
       <Button variant="secondary" size="md" className="mt-1" onClick={onRetry}>
         {retryLabel}
       </Button>

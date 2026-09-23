@@ -24,7 +24,7 @@ export type CheckboxGroupProps = {
  * 다중 선택 그룹 — 아트보드 01 의 반려견 선택 (#128).
  *
  * **`RadioGroup` 을 그대로 본떴다.** `<fieldset>` + `<legend>` · `fieldErrorId()` 공유 ·
- * 44px 터치 영역 · 선택 틴트 · `aria-invalid` 를 fieldset 에만 두는 것까지 같다
+ * 행 높이 44 · 선택 틴트 · `aria-invalid` 를 fieldset 에만 두는 것까지 같다
  * (component-guide.md §7). 같은 폼 안에서 두 그룹의 오류 표현이 갈리면 안 된다.
  *
  * **`PetCheckboxGroup` 에서 승격했다** (#622 · 명세 D13-8). AI 조건 폼 하나뿐이던
@@ -84,7 +84,7 @@ export function CheckboxGroup({
               key={option.value}
               htmlFor={optionId}
               className={cn(
-                // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+                // 높이 44 — §7 하한이 아니라 이 자리에서 고른 값이다 (#883). 줄이려면 375 에서 재고 줄인다
                 'flex min-h-11 cursor-pointer items-start gap-3 rounded-md border px-3 py-2',
                 /*
                   **`focus-within` 이 아니라 `has-[:focus-visible]` 이다** — `RadioGroup` 과

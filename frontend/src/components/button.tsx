@@ -85,7 +85,7 @@ const VARIANT: Record<ButtonVariant, string> = {
 
 const SIZE: Record<ButtonSize, string> = {
   sm: 'h-8 gap-1 px-3 text-body-2',
-  // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+  // 높이 44 — §7 의 하한이 아니라 **폼 컨트롤 높이**다 (#883). 같은 줄의 입력·버튼이 서로 맞는 값이라 한쪽만 내리면 어긋난다
   md: 'h-11 gap-2 px-4 text-body-1',
   lg: 'h-12 gap-2 px-5 text-body-1',
 }

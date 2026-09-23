@@ -65,7 +65,7 @@ export function Checkbox({
       <label
         htmlFor={id}
         className={cn(
-          // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+          // 높이 44 — §7 하한이 아니라 이 자리에서 고른 값이다 (#883). 줄이려면 375 에서 재고 줄인다
           'flex min-h-11 cursor-pointer gap-3',
           // 설명이 붙으면 두 줄이 되므로 위쪽 정렬이다 — 가운데 정렬은 체크박스가 떠 보인다
           description === undefined ? 'items-center' : 'items-start',

@@ -129,7 +129,7 @@ export function RadioGroup<T extends string>({
               key={option.value}
               htmlFor={optionId}
               className={cn(
-                // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+                // 높이 44 — §7 하한이 아니라 이 자리에서 고른 값이다 (#883). 줄이려면 375 에서 재고 줄인다
                 'flex min-h-11 cursor-pointer rounded-md border px-3 py-2',
                 /*
                   세 칸일 때는 라벨과 설명이 위아래로 쌓인다. 109px 칸에서 `items-start gap-3`

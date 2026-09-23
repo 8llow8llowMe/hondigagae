@@ -163,7 +163,7 @@ function OptionButton({
       onKeyDown={role === 'radio' ? handleRadioGroupKeyDown : undefined}
       onClick={onSelect}
       className={cn(
-        // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+        // 높이 44 — §7 하한이 아니라 이 자리에서 고른 값이다 (#883). 줄이려면 375 에서 재고 줄인다
         'filter-option flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-left transition-colors',
         'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
         selected ? 'bg-band' : 'hover:bg-band',

@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils/cn'
  * **오버레이 화살표는 마우스 환경에만 둔다** (`app/globals.css` `.scroll-rail-arrow`). 터치는
  * 밀어서 넘기는 것이 자연스럽고, 390px 폭에서 좌우 버튼은 항목 하나씩을 가린다.
  * **레일 밖에 세우는 `placement="inline"` 은 그 제약이 없다** (#730) — 가릴 칸이 없고
- * 44×44 라 터치에서도 남는다.
+ * 44×44 라 터치에서도 남는다 (§7 하한이 아니라 이 자리에서 고른 값이다 · #883).
  *
  * 방향 판정(`scrollFadeSide`)과 이동 폭(`pageScrollLeft`)은 `lib/ui/scroll.ts` 의 순수
  * 함수가 갖는다 — 여기서 다시 계산하지 않는다.
@@ -279,7 +279,7 @@ export function ScrollRailArrows({
  * **그림자를 주지 않는다.** 띄우는 일은 옆의 fade 가 이미 한다 (마스크가 아래 내용을
  * 지운 자리에 얹힌다). 둘을 겹치면 계측면이 대시보드처럼 보인다 (DESIGN.md §0).
  *
- * 32px 이라 모바일 최소 터치 영역(44)에 못 미치지만, `.scroll-rail-arrow` 가
+ * 32px 이라 44 에 못 미치지만(그 하한은 #883 으로 지도 타깃만 남았다), `.scroll-rail-arrow` 가
  * `pointer: coarse` 에서 이 버튼을 숨기므로 손가락이 닿는 일이 없다.
  *
  * ### `inline` — 44×44, 곡률 8 (#730)
@@ -289,7 +289,7 @@ export function ScrollRailArrows({
  *
  * **`.scroll-rail-arrow` 도 붙이지 않는다.** 그 클래스가 터치에서 숨기는 근거 둘
  * (*"좌우 버튼이 항목을 하나씩 가린다"* · *"32px 이 44 에 못 미친다"*)이 여기서는 둘 다
- * 성립하지 않는다 — 레일 밖이라 가릴 칸이 없고 44×44 다 (DESIGN.md §7). 터치에서도 남는다.
+ * 성립하지 않는다 — 레일 밖이라 가릴 칸이 없고 44×44 다. 터치에서도 남는다.
  */
 function Arrow({
   side,
