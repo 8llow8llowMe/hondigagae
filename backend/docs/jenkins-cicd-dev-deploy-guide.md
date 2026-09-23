@@ -276,7 +276,8 @@ docker exec hondigagae-batch-service-dev \
 3. **Vault secret 적재** — `kv/hondigagae/backend/dev/env` 에 `backend/.env.example` 채운 값
 4. **nginx conf 적용** — Infra 레포의 `nginx/conf.d/*.hondigagae.conf` 4개.
    HTTPS 블록은 주석 상태로 두고 reload → 인증서 발급 → 주석 해제 후 다시 reload
-5. **배포 호스트 준비** — `backend-1` 에 deploy agent, batch CSV 디렉터리 생성
+5. **배포 호스트 준비** — deploy agent 와 batch CSV 디렉터리를 **dev(main-server) · prod(`backend-1`) 둘 다** 만들고,
+   그 호스트 경로를 각 환경 Vault 의 `BATCH_DATA_DIR` 에 넣는다. dev 를 빠뜨리면 batch 만 배포되지 않는다 (#878)
 6. **멀티브랜치 파이프라인 8개 생성** — 잡 이름은 `hondigagae-{service}` / `hondigagae-frontend-web`
 7. **`service-discovery` 배포** → Eureka UI 확인
 8. **`api-gateway` 배포** → 라우팅 확인
@@ -299,7 +300,17 @@ docker exec hondigagae-batch-service-dev \
 | 포트 바인딩 실패 | BossPickSeoul 6xxx/9xxx 와 충돌. 7xxx/5xxx 확인 |
 | Gradle 데몬 죽음 | `gradle.properties` 의 `-Xmx2g` 가 agent 에 반영됐는지 확인 |
 | 배치만 실패 | `VWORLD_API_KEY` / `TOUR_API_SERVICE_KEY` / `BATCH_DATA_DIR` 누락 |
+| 배포 로그에 `BATCH_DATA_DIR is empty` | Vault 에 `BATCH_DATA_DIR` 이 없거나 비었다. compose 가 `:?` 로 여기서 멈춘다 (#878) |
+| `컨테이너가 기동 직후 안정되지 않았습니다` | 컨테이너가 떴다가 45초 안에 죽었거나 재시작했다. 뒤따르는 `docker logs` 에 원인이 있다. 전에는 첫 `running` 만 보고 초록으로 끝나 재시작 루프가 숨었다 (#878) |
+| 배포는 끝났는데 스케줄 적재가 없다 | 아래 쿼리가 0 이면 스케줄이 한 번도 돌지 않은 것이다. `docker ps -a --filter name=hondigagae-batch-service` 부터 본다 (#878) |
 | API 는 새 필드를 내려주는데 값이 전부 기본값(null/false) | 배치가 채우는 컬럼이다. 배포 뒤 해당 적재 잡을 다시 돌리지 않았다 (§8, #301) |
+
+스케줄 발화 확인 (tour 스키마):
+
+```sql
+-- 스케줄 창(03·05·06시)에 시작한 실행 수. 수동 실행만 있었다면 0 이다
+SELECT COUNT(*) FROM BATCH_JOB_EXECUTION WHERE HOUR(START_TIME) IN (3, 5, 6);
+```
 
 ## 11. 보안 체크리스트
 

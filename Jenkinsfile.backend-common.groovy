@@ -838,6 +838,16 @@ for attempt in \$(seq 1 30); do
   state="\$(docker inspect -f '{{.State.Status}}' ${config.containerNamePrefix}-${ctx.deployEnv} 2>/dev/null || true)"
 
   if [ "\${state}" = "running" ]; then
+    # 첫 running 만 보고 끝내면 Spring 컨텍스트가 기동 중에 죽어도 초록이 되고, 그 뒤로는
+    # restart: unless-stopped 가 재시작 루프로 숨긴다 (#878). 기동이 끝날 만큼 기다린 뒤
+    # 아직 running 이고 재시작이 0회인지까지 본다.
+    sleep 45
+    settled="\$(docker inspect -f '{{.State.Status}} {{.RestartCount}}' ${config.containerNamePrefix}-${ctx.deployEnv} 2>/dev/null || true)"
+    if [ "\${settled}" != "running 0" ]; then
+      echo "컨테이너가 기동 직후 안정되지 않았습니다 (status restartCount = \${settled:-<none>})."
+      docker logs --tail 200 ${config.containerNamePrefix}-${ctx.deployEnv} || true
+      exit 1
+    fi
     docker compose -p "\${COMPOSE_PROJECT}" --env-file .env.runtime -f ${config.composeFile} ps ${config.composeServiceName}-${ctx.deployEnv}
     exit 0
   fi

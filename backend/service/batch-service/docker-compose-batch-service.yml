@@ -131,7 +131,9 @@ services:
       BATCH_SCHEDULE_ENABLED: ${BATCH_SCHEDULE_ENABLED:-true}
     volumes:
       # 포털 실패 시 우회용 CSV. 읽기 전용으로만 붙인다 - 내려받은 파일은 여기에 쓰지 않는다.
-      - ${BATCH_DATA_DIR}:/app/data:ro
+      # 값이 비면 볼륨 스펙이 ':/app/data:ro' 가 돼 compose config 가 원인을 말하지 않는 에러로 죽는다.
+      # `:?` 로 무엇이 빠졌는지를 배포 로그에 직접 찍는다 (#878).
+      - ${BATCH_DATA_DIR:?BATCH_DATA_DIR is empty - set the host CSV dir in Vault kv/hondigagae/backend/<env>/env}:/app/data:ro
     # 컨테이너 메모리 상한. JVM heap 은 Dockerfile 의 MaxRAMPercentage 가 이 값을 기준으로 산정한다.
     deploy:
       resources:
@@ -165,7 +167,9 @@ services:
       BATCH_SCHEDULE_ENABLED: ${BATCH_SCHEDULE_ENABLED:-false}
     volumes:
       # 포털 실패 시 우회용 CSV. 읽기 전용으로만 붙인다 - 내려받은 파일은 여기에 쓰지 않는다.
-      - ${BATCH_DATA_DIR}:/app/data:ro
+      # 값이 비면 볼륨 스펙이 ':/app/data:ro' 가 돼 compose config 가 원인을 말하지 않는 에러로 죽는다.
+      # `:?` 로 무엇이 빠졌는지를 배포 로그에 직접 찍는다 (#878).
+      - ${BATCH_DATA_DIR:?BATCH_DATA_DIR is empty - set the host CSV dir in Vault kv/hondigagae/backend/<env>/env}:/app/data:ro
     deploy:
       resources:
         limits:

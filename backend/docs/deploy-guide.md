@@ -107,7 +107,7 @@ docker exec -i vault vault kv put -mount="kv" hondigagae/backend/dev/env \
 | `JWT_ACCESS_KEY` / `JWT_REFRESH_KEY` | 기동 실패 | 자체 생성 (HS512, 64바이트 이상) |
 | `JASYPT_ENCRYPTOR_KEY` | 파이프라인 빌드 단계에서 중단 | 자체 생성 |
 | `OAUTH_KAKAO_*` | 카카오 로그인 불가 | 카카오 개발자센터 |
-| `BATCH_DATA_DIR` | compose 해석 실패로 배포 중단 | 배포 **호스트** 경로 (agent 컨테이너 안 경로가 아니다). 안의 CSV 는 포털 실패 시 우회용이라 비어 있어도 기동·적재가 된다 (#379) |
+| `BATCH_DATA_DIR` | compose 해석 실패로 배포 중단 (로그에 `BATCH_DATA_DIR is empty`, #878) | 배포 **호스트** 경로 (agent 컨테이너 안 경로가 아니다). 안의 CSV 는 포털 실패 시 우회용이라 비어 있어도 기동·적재가 된다 (#379) |
 | `DB_*`, `*_DB_URL`, `REDIS_*` | 기동 실패 | 인프라 — 아래 "DB 스키마 준비" 절 |
 | `MINIO_*` | 프로필 이미지 업로드 실패 | storage(192.168.0.12) MinIO 에 `hondigagae` 버킷 생성 |
 
