@@ -18,6 +18,8 @@
  * 층이 뒤집힌다 — 쓰는 필드만 구조적으로 적는다 (`MapPin` 이 그대로 대입된다).
  */
 
+import { clusterMarkerLabel, clusterMarkerText } from '@/lib/map/cluster'
+
 /** 이 판단이 쓰는 필드만. `MapPin` 이 구조적으로 대입된다 */
 export type PinContentInput = {
   title: string
@@ -88,6 +90,46 @@ export function pinContent(
       갈래에서만 붙인다 (그쪽은 안쪽 텍스트가 가려져 이것이 유일한 이름이다).
     */
     ariaLabel: interactive ? null : name,
+  }
+}
+
+/**
+ * 묶음 마커 — 이슈 #671 F-5.
+ *
+ * **지름 32 숫자 원형 마커다** (진단 E-1 [P0] · 시안 §3 ①). 누르면 그 구역으로 확대한다.
+ * 라벨 알약("이 지역 42곳")이었을 때는 폭이 글자 수만큼 늘어 390px 밀집 구간에서 서로
+ * 덮었다. 폭을 고정하면 겹침 면적이 줄고, **개수가 늘어도 그 폭이 변하지 않는다.**
+ *
+ * **문구를 지우는 것이 아니라 옮긴다** — 보이는 글자는 숫자뿐이고, "무엇이 몇 곳인지" 는
+ * `aria-label` 이 말한다. 시각 사용자에게는 `.map-cluster::after` 의 겹친 원이 "여럿" 을
+ * 말한다 (#671 C-4 — `aria-label` 만으로는 §1 을 지키지 못한다).
+ *
+ * ### 왜 `pinContent` 와 같은 타입인가
+ *
+ * 이 서술자를 DOM 으로 바르는 자리가 `map-canvas.tsx` 에 **하나뿐이어야** 하기 때문이다.
+ * 이전에는 `clusterElement` 가 따로 있어서 `textContent` 와 `aria-label` 을 직접 꽂았고,
+ * **그 배선은 어느 테스트도 보지 않았다** — 둘을 바꿔 꽂아도 초록이었다 (#671 F-5).
+ * 순수 함수(`clusterMarkerText` · `clusterMarkerLabel`)만 잠겨 있었지 배선은 아니었다.
+ *
+ * 같은 타입으로 맞추면 applier 가 하나로 합쳐지고, 그 applier 가 이미 `pin-content.test.ts`
+ * 로 잠긴 규칙(태그·역할·이름·글자)을 묶음에도 그대로 적용한다.
+ */
+export function clusterContent(count: number): PinContent {
+  return {
+    /** 누르면 그 구역으로 확대한다 — 늘 할 일이 있으므로 늘 버튼이다 */
+    tag: 'button',
+    /** 버튼은 `role` 을 덮어쓰지 않는다. `role="img"` 는 누를 것이 없는 핀의 것이다 (#789) */
+    role: null,
+    className: 'map-cluster',
+    text: clusterMarkerText(count),
+    /** 이름표 `span` 이 없다 — 원 안에 들어가는 것은 숫자뿐이다 */
+    label: null,
+    ariaLabel: clusterMarkerLabel(count),
+    /**
+     * **토글이 아니다.** 핀은 고름/안 고름이 있어 `aria-pressed` 를 말하지만, 묶음을
+     * 누르면 지도가 확대되고 그 묶음은 사라진다 — 눌린 채로 남는 상태가 없다.
+     */
+    ariaPressed: null,
   }
 }
 
