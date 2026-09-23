@@ -101,3 +101,64 @@ describe('EmergencyFilterBar', () => {
     expect(markup).not.toContain(messages.place.resetFilters)
   })
 })
+
+/*
+  #883 — 두 줄이 한 줄이 됐다. 375 실화면에서 1행이 감겨 **세 줄 약 150px** 을 먹었고,
+  그만큼이 시트 최소 단계의 본문에서 빠졌다.
+
+  **마크업 전체에 클래스를 단언하지 않는다** — 어느 칩의 것인지 말하지 못해 false-green 이
+  되기 쉽다. 스크롤러의 여는 태그와 첫 칩의 여는 태그로 범위를 좁힌다.
+*/
+describe('EmergencyFilterBar — 한 줄 가로 스크롤 (#883)', () => {
+  /** `overflow-x-auto` 를 가진 요소의 여는 태그 */
+  function railTag(markup: string) {
+    const at = markup.indexOf('overflow-x-auto')
+    const open = markup.lastIndexOf('<div', at)
+
+    return markup.slice(open, markup.indexOf('>', at) + 1)
+  }
+
+  it('스크롤러가 하나뿐이다 — 축이 두 줄로 갈리지 않는다', () => {
+    const markup = render()
+
+    expect(markup.match(/overflow-x-auto/g)).toHaveLength(1)
+    // 감겨서 줄이 늘어나는 갈래가 남아 있으면 375 에서 다시 세 줄이 된다
+    expect(markup).not.toContain('flex-wrap')
+  })
+
+  it('두 축이 같은 스크롤러 안에 든다 — 이름은 묶음이 계속 갖는다', () => {
+    const markup = render()
+    const rail = markup.indexOf(railTag(markup))
+
+    expect(markup.indexOf('role="group"')).toBeGreaterThan(rail)
+    expect(markup.indexOf('role="radiogroup"')).toBeGreaterThan(rail)
+    expect(markup).toContain(`aria-label="${messages.emergency.narrowGroupLabel}"`)
+    expect(markup).toContain(`aria-label="${messages.emergency.typeGroupLabel}"`)
+  })
+
+  /** 목록 갈래(`EmergencyFilterChips`)가 두 줄로 두는 순서를 한 줄로 편 것이다 (#654 E-3) */
+  it('순서가 목록 갈래와 같다 — 진료중 · 24시간 · 유형 · 반경', () => {
+    const markup = render()
+    const at = (text: string) => markup.indexOf(text)
+
+    expect(at(messages.emergency.openNow)).toBeLessThan(at(messages.emergency.open24))
+    expect(at(messages.emergency.open24)).toBeLessThan(at(messages.emergency.typeAll))
+    expect(at(messages.emergency.typeAll)).toBeLessThan(
+      at(messages.emergency.radiusLabel.replace('{radius}', formatDistance(10_000))),
+    )
+  })
+
+  /*
+    44 하한은 이제 **지도 위 타깃에만** 있다 (`DESIGN.md` §7, #883). 지도 화면의 칩은
+    모바일 36 이고 768 이상에서 44 로 돌아간다 — 폭이 남는 자리에서까지 작아지면 같은
+    컨트롤이 화면마다 다른 크기가 된다.
+  */
+  it('칩이 모바일 36 이고 768 이상에서 44 다', () => {
+    const markup = render()
+    const open = markup.indexOf('<button')
+    const chipTag = markup.slice(open, markup.indexOf('>', open) + 1)
+
+    expect(chipTag).toContain('h-9')
+    expect(chipTag).toContain('md:h-11')
+  })
+})

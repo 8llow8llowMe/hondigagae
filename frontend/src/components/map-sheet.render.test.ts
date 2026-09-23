@@ -35,10 +35,47 @@ describe('MapSheet — 단계가 화면을 바꾼다', () => {
     expect(height(render('mid'))).toBeLessThan(height(render('max')))
   })
 
-  it('최소 단계에서만 탭바 위에 앉는다 — 그 위에서는 탭바 자리를 쓴다', () => {
-    expect(render('min')).toContain('map-sheet-above-tabbar')
-    expect(render('mid')).not.toContain('map-sheet-above-tabbar')
-    expect(render('max')).not.toContain('map-sheet-above-tabbar')
+  /**
+   * #883 이 뒤집은 규칙이다. 예전에는 최소 단계에서만 탭바 위였고 그 위 단계에서는
+   * 시트가 `bottom-0` 으로 탭바를 덮었다 — 시트를 올리는 순간 하단 내비게이션이 통째로
+   * 사라졌다. 세 단계 모두 탭바를 비운다.
+   */
+  it('어느 단계에서도 탭바 자리를 비운다', () => {
+    expect(render('min')).toContain('map-sheet-clears-tabbar')
+    expect(render('mid')).toContain('map-sheet-clears-tabbar')
+    expect(render('max')).toContain('map-sheet-clears-tabbar')
+    // 바닥을 0 으로 내리는 갈래가 남아 있으면 그 단계만 다시 탭바를 덮는다
+    expect(render('mid')).not.toContain('bottom-0')
+    expect(render('max')).not.toContain('bottom-0')
+  })
+
+  /**
+   * **바닥만 올리면 윗변이 함께 올라간다.** 그러면 `/places` 의 상단 컨트롤
+   * (`absolute top-5`)을 시트가 덮는다 — 812 실측으로 `max` 상단이 y=122 → y=58.
+   * 높이에서 탭바 몫을 빼서 윗변을 제자리에 둔다.
+   */
+  it('mid·max 는 높이에서 탭바 몫을 뺀다 — 윗변이 그대로 있어야 한다', () => {
+    expect(render('mid')).toContain('var(--map-sheet-tabbar')
+    expect(render('max')).toContain('var(--map-sheet-tabbar')
+  })
+
+  /**
+   * 최소 단계는 옛 규칙에서도 탭바 위였다 — 여기서 또 빼면 20dvh(812 기기에서 162px)가
+   * 98px 로 줄어, #883 이 늘리려는 바로 그 본문 높이를 깎는다.
+   */
+  it('min 은 빼지 않는다 — 원래 탭바 위였고 높이가 그대로여야 한다', () => {
+    expect(render('min')).not.toContain('var(--map-sheet-tabbar')
+  })
+
+  /**
+   * 층 결정 자체가 이 이슈의 산출물이다 (#883). `z-50`(오버레이)이던 근거는 "탭바 위에
+   * 선다" 하나였고 그 결정을 되받았으므로, 시트는 탭바(`z-40`) 아래 `z-30` 이다.
+   */
+  it('탭바보다 아래 층이다 — z-30 이고 z-50 이 아니다', () => {
+    const markup = render('mid')
+
+    expect(markup).toContain('z-30')
+    expect(markup).not.toContain('z-50')
   })
 
   it('최대 단계에서는 버튼이 접기로 바뀐다 — 같은 버튼이 왕복한다', () => {

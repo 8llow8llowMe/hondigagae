@@ -1044,15 +1044,26 @@ body {
   transform: translate(3px, -3px);
 }
 
-/* 지도 하단 시트의 최소 단계 — 탭바 위에 앉는다.
-   그 위 단계에서는 시트가 탭바 자리를 쓴다 (아트보드 `혼디가개 장소 찾기` 06). */
-.map-sheet-above-tabbar {
-  bottom: var(--tabbar-h);
+/*
+  지도 하단 시트는 **어느 단계에서도 탭바 위에 앉는다** — 이슈 #883.
+
+  아트보드 06 은 최소 단계 위에서 시트가 탭바 자리를 쓰게 했지만, 375 실화면에서 그것은
+  시트를 올리는 순간 하단 내비게이션이 통째로 사라진다는 뜻이었다. **아트보드 결정보다
+  실화면 사용성이 우선한다**(#883 방침).
+
+  `--map-sheet-tabbar` 는 같은 값을 `map-sheet.tsx` 의 높이 계산이 되받아 쓰는 손잡이다 —
+  바닥만 올리고 높이를 그대로 두면 윗변이 함께 올라가 상단 컨트롤을 덮는다. 탭바가 없는
+  768 이상에서 `0px` 이 되는 분기가 여기 있어야 하는 이유가 그것이다.
+*/
+.map-sheet-clears-tabbar {
+  --map-sheet-tabbar: var(--tabbar-h);
+
+  bottom: var(--map-sheet-tabbar);
 }
 
 @media (width >= 48rem) {
-  .map-sheet-above-tabbar {
-    bottom: 0;
+  .map-sheet-clears-tabbar {
+    --map-sheet-tabbar: 0px;
   }
 }
 
@@ -1186,7 +1197,7 @@ body {
   지도 위 "이 지역에서 재검색" 알약의 세로 자리 — 이슈 #396.
 
   **모바일은 하단 시트 최소 단계 위에 앉는다.** 시트 높이는 `map-sheet.tsx` 의
-  `STOP_RATIO.min`(0.2 = 20dvh)이고 최소 단계에서만 탭바 위에 뜬다(`.map-sheet-above-tabbar`).
+  `STOP_RATIO.min`(0.2 = 20dvh)이고 시트는 어느 단계에서도 탭바 위다(`.map-sheet-clears-tabbar`).
   그 둘을 더한 자리에서 8px 띄운다.
 
   **시트를 올리면 알약은 시트 뒤로 들어간다** (시트 `z-50` · 알약 `z-30`). 의도한 동작이다 —
