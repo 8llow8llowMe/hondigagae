@@ -316,9 +316,11 @@ export const METRIC_FILL_TONE: Record<MetricTone, string> = {
  * 그 사실을 **단언으로 잠가 두었다**. 회색 둘을 조금 다른 회색으로 벌려도 같은 자리에
  * 머무를 뿐이고, 새 색을 만드는 값은 더 크다.
  *
- * **가르는 일은 다른 채널이 한다** — `METRIC_TINT_EDGE_TONE` 의 경계선(`low` 는 `-500`
- * 실선으로 자기 면 위 4.23:1)과 밴드 안의 낱말이다. 그래서 이 충돌은 주석이 아니라
- * **`contrast.test.ts` 의 가드**가 지킨다: 두 톤이 **선까지 같아지면** 빨간불이 난다.
+ * **가르는 일은 다른 채널이 한다** — `METRIC_TINT_EDGE_TONE` 의 경계선과 밴드 안의 낱말이다.
+ * 선은 **색만이 아니라 모양으로도 갈린다** (#671 C-6): `low` 는 `-500` 실선(자기 면 위
+ * 4.23:1), `unknown` 은 `--fg-muted` **점선**(5.57:1)이다. 색이 아니라 실선/점선이라
+ * 흑백·색약에서도 남는다. 그래서 이 충돌은 주석이 아니라 **`contrast.test.ts` 의 가드**가
+ * 지킨다: 두 톤이 **선까지 같아지면** 빨간불이 난다.
  */
 export const METRIC_TINT_TONE: Record<MetricTone, string> = {
   critical: 'bg-metric-critical-100',
@@ -345,15 +347,36 @@ export const METRIC_TINT_TONE: Record<MetricTone, string> = {
  * "장식성 색 선" 이 된다.
  *
  * **`unknown` 은 등급 색이 없다** (§2-3). `METRIC_TINT_TONE` 이 그 칸에 중립 면(`--band`)을
- * 주는 것과 같은 이유로 중립 선을 준다 — `--metric-unknown-500` 은 **점선 전용**이라 실선
- * 경계에 쓰지 않는다.
+ * 주는 것과 같은 이유로 중립 선을 준다. **다만 중립이 곧 안 보여도 된다는 뜻은 아니다**
+ * ([#671](https://github.com/8llow8llowMe/hondigagae/issues/671) **C-6**): `--border-strong`
+ * 을 쓰던 동안 이 선은 자기 면 위에서 **1.46:1** 이라 위 세 문단이 나머지 넷에 요구한 3:1 을
+ * 혼자 못 넘었고, 면마저 흰 바닥과 1.10:1 이라 **"판정 못 냄" 밴드가 통째로 보이지 않았다.**
+ *
+ * **`--fg-muted` 다.** 팔레트에서 두 배경 모두 3:1 을 넘는 값이 이것뿐이다 — 자기 면
+ * **5.57:1** · 흰 바닥 6.35 · `--bg-sunken` 5.88. `--fg-subtle` 은 자기 면 **2.92** 로
+ * 0.07 차 미달이고, `--metric-unknown-500` 은 **1.95** 다. 그 토큰은 여기 오지 않는다 —
+ * 여전히 점선 전용 등급색이고(`tokens.css`), 이 자리가 필요로 한 것은 **대비**였다.
+ *
+ * **그리고 `unknown` 만 점선이다.** 실선으로 두면 이 선이 네 등급(3.53~4.52)보다 진해져
+ * **"판정 못 냄" 이 "적합도 낮음" 보다 또렷해진다** — `plan-day-verdict.tsx` 가 둘을 같은
+ * 화면에 나란히 세우는 자리라 그 뒤집힘이 바로 보인다. 점선은 대비를 지키면서 "확정 아님"
+ * 을 **형태로** 말하고, 장소 상세 혼잡도가 이미 쓰는 문법이다(`점선은 아직 모르는 날이에요`).
+ *
+ * **C-3 의 마지막 채널도 이쪽이 두껍다.** `low` 와 `unknown` 은 면이 같아 선이 유일한
+ * 구분인데, 그 구분이 이제 색이 아니라 **실선 vs 점선**이라 흑백·색약에서도 살아남는다.
+ *
+ * **배지의 점선과 색이 다르고, 그것이 맞다.** `BADGE_TONE`·`BADGE_TONE_ON_TINT` 의 `unknown`
+ * 은 `--border-strong` 점선으로 남는다 — 그 안에는 `--fg-muted` 글자가 들어 있어 **선이
+ * 유일한 채널이 아니다.** 이 표가 쓰이는 자리는 면과 선뿐이라(밴드·곡선 칸) 선이 그 몫을
+ * 혼자 진다. 점선의 색을 고를 때 묻는 것은 "무엇이 unknown 인가" 가 아니라 **"이 선이 없으면
+ * 무엇이 남는가" 다.**
  */
 export const METRIC_TINT_EDGE_TONE: Record<MetricTone, string> = {
   critical: 'border-metric-critical-500',
   high: 'border-metric-high-500',
   mid: 'border-metric-mid-500',
   low: 'border-metric-low-500',
-  unknown: 'border-border-strong',
+  unknown: 'border-fg-muted border-dashed',
 }
 
 /** 큰 숫자에 쓰는 등급 색. 22px 이상 + weight 900 에만 허용된다 (DESIGN.md §2-3). */

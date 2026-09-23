@@ -281,6 +281,39 @@ describe('토큰 대비 — tint 면의 -500 경계선 (비텍스트 3:1, #709)'
   })
 
   /*
+    **`unknown` 도 같은 바를 넘어야 한다** (#671 C-6). 이 톤만 `-500` 이 아니라 `--fg-muted`
+    점선인데, 예외인 것은 **색과 모양**이지 대비가 아니다 — `--border-strong` 을 쓰던 동안
+    자기 면 위 1.46:1 이라, 이 describe 가 나머지 넷에 요구한 것을 혼자 못 넘었다. 면(`--band`)
+    마저 흰 바닥과 1.10:1 이라 그동안 "판정 못 냄" 밴드는 통째로 보이지 않았다.
+  */
+  it.each([
+    ['--band', '자기 면'],
+    ['--bg-sunken', '바닥'],
+  ])('unknown 의 선(--fg-muted)이 %s 위에서 3:1 이상이다 (%s)', (surface) => {
+    expect(contrastRatio(token('--fg-muted'), token(surface))).toBeGreaterThanOrEqual(3)
+  })
+
+  it('unknown 의 선이 흰 바닥 위에서도 3:1 이상이다 — 일자 카드가 그 바닥이다', () => {
+    expect(contrastRatio(token('--fg-muted'), WHITE)).toBeGreaterThanOrEqual(3)
+  })
+
+  /*
+    **되돌아가는 것을 막는다.** C-6 이 검토한 나머지 후보는 전부 이 바 아래다 —
+    되돌리려는 사람이 "비슷한 회색인데 뭐가 다른가" 에서 멈추도록 값을 함께 적는다.
+    (`contrastRatio` 는 소수 2자리에서 **버린다** — 위 `--metric-mid-100` 단언과 같다.)
+  */
+  it.each([
+    ['--fg-subtle', 2.92],
+    ['--border-strong', 1.46],
+    ['--metric-unknown-500', 1.95],
+  ])('%s 은 --band 위에서 3:1 에 미달한다 — unknown 선으로 쓰지 않은 이유다', (name, expected) => {
+    const ratio = contrastRatio(token(name), token('--band'))
+
+    expect(ratio).toBeLessThan(3)
+    expect(ratio).toBe(expected)
+  })
+
+  /*
     **이 단언은 "실패해야 좋은" 값을 잠근다.** tint 가 바닥과 밝기로 갈린다면 `-500` 선을
     둘 이유가 절반 사라지므로, 값이 바뀌면 그 판단을 다시 하라고 여기서 멈춘다.
   */
@@ -365,9 +398,22 @@ describe('토큰 대비 — low 와 unknown 은 면이 같다, 선이 가른다 
     expect(METRIC_TINT_EDGE_TONE.unknown).not.toBe(METRIC_TINT_EDGE_TONE.low)
   })
 
-  /* 면이 같으니 `low` 쪽 선만 3:1 을 넘어도 두 밴드는 갈린다 — 한쪽에만 선이 보인다 */
+  /* 공유하는 면 위에서 **양쪽 선이 다** 비텍스트 3:1 을 넘는다 (#671 C-6 이후) */
   it('low 의 선이 공유하는 면 위에서 비텍스트 3:1 을 넘는다', () => {
     expect(contrastRatio(token('--metric-low-500'), token('--band'))).toBeGreaterThanOrEqual(3)
+  })
+
+  /*
+    **마지막 채널이 색에서 모양으로 옮겨 갔다** (#671 C-6). 두 선의 색만 다르던 동안에는
+    `unknown` 쪽이 자기 면 위 1.46:1 이라 **한쪽 선이 사실상 안 보이는 채로** 갈리고 있었다.
+    이제 `low` 는 실선 · `unknown` 은 점선이라, 색을 못 보는 눈에서도 두 밴드가 갈린다.
+  */
+  it('unknown 의 선만 점선이다 — 흑백·색약에서도 남는 채널이다', () => {
+    expect(METRIC_TINT_EDGE_TONE.unknown).toContain('border-dashed')
+
+    for (const tone of ['critical', 'high', 'mid', 'low'] as const) {
+      expect(METRIC_TINT_EDGE_TONE[tone]).not.toContain('border-dashed')
+    }
   })
 })
 
