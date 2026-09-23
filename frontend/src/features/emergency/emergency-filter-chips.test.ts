@@ -252,3 +252,24 @@ describe('EmergencyFilterChips — 축 순서 (#654 E-3)', () => {
     expect(render(ONE)).toContain('role="radiogroup"')
   })
 })
+
+/*
+  #891 2단계 — **잰 화면만 내린다.** 375×812 mock 실측에서 이 화면은 컨트롤 줄이 다섯
+  쌓여 첫 시설 행이 **y=561**(뷰포트의 69%)에서 시작했다. 공개·보호 화면 열여섯 곳 중
+  이 화면 하나만 그랬다 (`/places?view=list` 256 · `/olle` 327 · `/plans` 286).
+
+  **높이만 내렸다.** 검색 입력(폼 컨트롤 높이)과 `내 위치로 가까운 병원 찾기`(화면의 주
+  행동)는 그대로다. 실측 결과 **561 → 537**. 나머지는 구조(줄 수)라 별도 판단이 필요하다.
+
+  **마크업 전체에 클래스를 단언하지 않는다** — 여는 태그로 범위를 좁힌다.
+*/
+describe('EmergencyFilterChips — 모바일 컨트롤 높이 (#891)', () => {
+  it('조건 칩이 모바일 36 이고 768 이상에서 44 다', () => {
+    const markup = render(ONE)
+    const open = markup.indexOf('<button')
+    const tag = markup.slice(open, markup.indexOf('>', open) + 1)
+
+    expect(tag).toContain('h-9')
+    expect(tag).toContain('md:h-11')
+  })
+})

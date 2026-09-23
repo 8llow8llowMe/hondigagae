@@ -90,7 +90,9 @@ function Option({
       onClick={onSelect}
       className={cn(
         // 높이 44 — **급할 때 누르는 컨트롤이라** 크게 잡는다 (§7 하한이 아니라 그 사실이 근거다 · #883)
-        'text-body-2 flex h-11 min-w-0 flex-1 items-center justify-center px-2 transition-colors',
+        // 모바일 36 · 768 이상 44 — `Chip` 의 `size="sm"` 과 같은 축이다 (#891).
+        // 이 화면은 375 에서 컨트롤 줄이 다섯 쌓여 첫 시설 행이 y=561(뷰포트의 69%)이었다
+        'text-body-2 flex h-9 min-w-0 flex-1 items-center justify-center px-2 transition-colors md:h-11',
         // 테두리가 바깥 한 겹이라 offset 을 주면 [테두리·흰틈·링] 세 겹이 된다 (DESIGN.md 포커스 링 표)
         'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:-outline-offset-2 focus-visible:outline-none',
         divider && 'border-border border-l',
