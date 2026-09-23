@@ -7,7 +7,7 @@ import type { ReactNode } from 'react'
 
 import { EmptyState } from '@/components/empty-state'
 import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from '@/components/icons'
-import { MapSheet, type SheetStop } from '@/components/map-sheet'
+import { MAP_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
 import { ViewToggle } from '@/components/view-toggle'
 import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
@@ -112,11 +112,15 @@ export function PlaceMapView({
   /** SDK 실패 폴백의 행. 주지 않으면 상세로 가는 기본 행이다 */
   renderListRow?: PlaceListSectionProps['renderRow'] | undefined
   /**
-   * 모바일 시트를 끝까지 올렸을 때 비워 둘 상단 높이(px). 주지 않으면 기본 상한이다.
+   * 모바일 시트를 끝까지 올렸을 때 비워 둘 상단 높이(px).
    *
    * **헤더가 정상 흐름인 화면(담기, #370)이 자기 헤더 높이를 알려 준다.** 이 컴포넌트는
-   * 위에 무엇이 얹히는지 모르고, 시트 기본 상한(`85dvh`)은 상단 컨트롤이 `absolute` 로
-   * 떠 있는 `/places` 기준이라 그런 화면에서는 헤더를 통째로 덮는다.
+   * 위에 무엇이 얹히는지 모른다.
+   *
+   * **주지 않으면 `MAP_TOP_CONTROLS_INSET`(136)이다** (#901 D2). 예전에는 시트 기본
+   * 상한(`85dvh`)으로 떨어졌는데, 그 값은 **비율**이라 윗변이 기기 높이를 따라가
+   * 짧은 기기일수록 `/places` 자신의 플로팅 컨트롤을 더 덮었다 — 812 에서 2px 여유,
+   * 800 에서 0, **640 에서 24px 덮음**(실측).
    */
   sheetMaxTopInset?: number | undefined
   /**
@@ -643,7 +647,12 @@ export function PlaceMapView({
         */
         toolbar={<PlaceMapFilterBar filters={filters} authed={authed} />}
         header={<p className="text-caption text-fg-muted truncate font-medium">{countLine}</p>}
-        maxTopInset={sheetMaxTopInset}
+        /*
+          **주지 않으면 지도 위 플로팅 컨트롤 기준이다** (#901 D2). 예전 기본값(85dvh)은
+          비율이라 **짧은 기기일수록 검색·보기 전환을 더 덮었다** — 640 실측 24px.
+          `/emergency` 와 같은 값을 쓴다: 두 화면의 상단 컨트롤이 같은 자리·같은 크기다.
+        */
+        maxTopInset={sheetMaxTopInset ?? MAP_TOP_CONTROLS_INSET}
       >
         {visible.length === 0 ? (
           <EmptyState

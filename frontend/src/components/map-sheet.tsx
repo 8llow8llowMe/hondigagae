@@ -35,6 +35,27 @@ const STOP_RATIO: Record<SheetStop, number> = { min: 0.2, mid: 0.45, max: 0.85 }
 /** 이보다 적게 끌면 단계를 바꾸지 않는다 — 스크롤하려다 단계가 바뀌면 목록을 못 읽는다 */
 const DRAG_THRESHOLD_PX = 24
 
+/**
+ * **지도 위 플로팅 컨트롤을 비켜 가는 `maxTopInset`** — 이슈
+ * [#901](https://github.com/8llow8llowMe/hondigagae/issues/901) **D2**.
+ *
+ * 지도 화면 둘(`/places` · `/emergency`)은 검색·보기 전환을 지도 위에 띄운다. 그 바닥은
+ * **고정 px** 다:
+ *
+ * | 폭 | 헤더 | `top-5` | 컨트롤 | 바닥 |
+ * | --- | ---: | ---: | ---: | ---: |
+ * | < 768 | 56 | 20 | 44 | **120** |
+ * | ≥ 768 | 64 | 20 | 44 | **128** |
+ *
+ * 그런데 `STOP_RATIO.max`(85dvh)는 **비율**이라 윗변이 기기 높이를 따라간다 — 812 에서
+ * 2px 차로 비껴가도록 튜닝됐지만 **800 에서 딱 붙고 640 에서 24px 덮는다**(실측). 짧은
+ * 기기일수록 더 덮는 구조다.
+ *
+ * `136` 은 `128 + 8` 이다. 아래 `maxTopInset` 주석이 *"비율은 기기가 작을수록 더 덮는다"*
+ * 고 적어 둔 바로 그 함정을 지도 화면도 px 로 피한다 — 담기 화면이 이미 쓰던 길이다.
+ */
+export const MAP_TOP_CONTROLS_INSET = 136
+
 export function MapSheet({
   label,
   stop,

@@ -7,7 +7,7 @@ import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from '@/components/icons'
-import { MapSheet, type SheetStop } from '@/components/map-sheet'
+import { MAP_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
 import { ViewToggle } from '@/components/view-toggle'
 import { EmergencyFilterBar } from '@/features/emergency/emergency-filter-bar'
 import { EmergencyFilterChips } from '@/features/emergency/emergency-filter-chips'
@@ -670,6 +670,12 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         label={messages.emergency.sheetLabel}
         stop={sheetStop}
         onStopChange={setSheetStop}
+        /*
+          **최대 단계가 지도 위 검색·보기 전환을 덮지 않게 한다** (#901 D2). 비율(85dvh)로
+          두면 윗변이 기기 높이를 따라가 **짧은 기기일수록 더 덮는다** — 640 실측에서 24px
+          덮었다. 값의 유도는 `MAP_TOP_CONTROLS_INSET` 주석에 있다.
+        */
+        maxTopInset={MAP_TOP_CONTROLS_INSET}
         toolbar={toolbar}
         header={caption}
       >
