@@ -153,6 +153,24 @@ Base: `https://apis.data.go.kr/B551011/KorPetTourService2` (**`KorPetTourService
 - `contentid`가 국문 관광정보와 **동일 체계** (실측: 제주 관광지 타입 29건, 국문 관광정보의 contentid와 일치) → 장소 마스터에 그대로 결합 가능.
 - 반려동물 동반 정보가 없는 contentid로 `detailPetTour2` 호출 시 `items=""`(0건) 반환.
 
+### 지역 키와 총량 (2026-09-23 재측정, #877)
+
+**이 서비스도 #726 의 함정이 그대로 있다 — 지역은 `lDongRegnCd` 로 묻는다.**
+
+| 오퍼레이션 | `areaCode=39` | `lDongRegnCd=50` |
+| --- | --- | --- |
+| `areaBasedList2` | 23 | **330** (관광지 44 · 쇼핑 276 · 레포츠 3 · 숙박 2 · 문화 4 · 음식점 1) |
+| `petTourSyncList2` | 31 | **336** (`showflag=1` 330 · `0` 6) |
+
+- `lDongRegnCd=50` 330건 중 307건이 `areacode=""` 로 비어 있다. `areaCode=39` 는 구 체계가 남은 23건만 잡는다(93% 누락).
+  2026-08-24 의 "제주 관광지 타입 29건"도 이 반쪽 집계였다.
+- 동기화 목록은 `showflag` 로 내림을 알려 준다. 목록 API 에는 동반 조건 필드가 없어 상세를 불러야 한다.
+- 상세 표본 29건(타입별 무작위): `acmpyTypeCd` 는 "전구역 동반가능" 16 · "일부구역 동반가능" 13 **두 값뿐**.
+  `acmpyPsblCpam` 은 빈 값 11 · "전 견종 동반 가능" 11 · kg 표기 6 · "소형견 1마리" 1.
+  `acmpyNeedMtr` 은 빈 값 12 · "목줄 착용" 포함 15 · "매너벨트 착용" 2. 가장 긴 필드도 82자(`etcAcmpyInfo`)라
+  `PlacePetInfoEntity` 컬럼 길이(100~500, TEXT) 안이다.
+- 쿼터는 KorService2 와 **따로** 센다(공공데이터포털은 활용신청 API 마다 일 1,000건). 적재 설계는 `data-refresh-guide.md` §10.
+
 ### detailPetTour2 — 반려동물 동반 정보 필드 (실측 예시: 가세오름 1887866)
 
 | 필드 | 설명 | 실측 값 |

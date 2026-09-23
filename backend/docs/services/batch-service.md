@@ -8,12 +8,13 @@
 
 | 잡 | 원천 | 주기(안) | 비고 |
 |-----|------|----------|------|
-| `placeDataPipelineJob` | (자식 잡 5개) | 주 1회 + 수동 | 장소 적재 5단계를 순서대로 잇는 flow job (#377). 수동 실행은 이 한 줄이면 된다 |
+| `placeDataPipelineJob` | (자식 잡 6개) | 주 1회 + 수동 | 장소 적재 6단계를 순서대로 잇는 flow job (#377). 수동 실행은 이 한 줄이면 된다 |
 | `placeImportJob` | 국문 관광정보 GW API (TourAPI) | 주 1회 + 수동 | 관광지/음식점/숙박 마스터 + 운영시간(detailIntro2) + 추가 이미지(detailImage2). 상세 두 단계는 실행당 상한 + 증분 선정 |
 | `cultureFacilityImportJob` | 문화정보원 문화시설 (CSV 파일데이터) | 월 1회 | 문화시설 + 긴급 시설. 포털에서 직접 내려받고 갱신됐을 때만 적재 (#379) |
 | `petRestaurantImportJob` | 식약처 반려동물 동반출입 음식점 (xlsx) | 주 1회 | 좌표는 VWorld 지오코딩으로 채운다 |
 | `placeMergeJob` | (DB) | 적재 뒤 1회 | 원천이 다른 같은 장소를 `merged_into_id` 로 묶는다 (#363) |
 | `placeImageBackfillJob` | TourAPI 키워드 검색 | 적재 뒤 1회 | 이미지 없는 문화정보원·식약처 장소에 대표 이미지를 빌려 채운다 |
+| `petTourImportJob` | 반려동물 동반여행 API (KorPetTourService2) | 파이프라인 마지막 | TourAPI 장소에 동반 조건(`place_pet_info`)을 붙인다 (#877). 동기화 목록 1콜로 대상을 좁히고 교집합에만 상세를 부른다. 쿼터는 KorService2 와 따로다 |
 | `congestionImportJob` | 관광지 집중률 방문자 추이 예측 API | 일 1회 | 30일 rolling. **주기가 달라 파이프라인에 넣지 않는다** |
 | `olleCourseImportJob` | 제주올레 공공 CSV + TourAPI 좌표 | 주 1회 + 수동 | 산책 코스 마스터 (#383). 포털에서 내려받고 갱신됐을 때만 적재 (#441). 장소 파이프라인과 별개다 |
 
@@ -63,7 +64,6 @@
 
 | 잡 | 원천 API | 비고 |
 |-----|----------|------|
-| `PetTourImportJob` | 반려동물 동반여행 API | `contentId` 기준으로 장소 마스터에 결합 |
 | `RelatedPlaceImportJob` | 관광지별 연관 관광지 API | 코스 생성용 연결성 |
 | `WalkCourseImportJob` | 두루누비 API | 산책·레저 코스 |
 | `VisitorStatsJob` | 관광빅데이터 정보 서비스 API | 방문자 수 분석 |
