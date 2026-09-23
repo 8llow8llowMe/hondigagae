@@ -135,7 +135,7 @@ function EmptyPetInfo({ allowance, tel }: { allowance: EnumMetadata | null; tel:
       {tel !== null && (
         <a
           href={`tel:${tel.replace(/[^\d+]/g, '')}`}
-          // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+          // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다)
           className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex min-h-11 items-center rounded-sm font-semibold tabular-nums focus-visible:ring-2 focus-visible:outline-none"
         >
           {messages.place.detailPetInfoEmptyTel.replace('{tel}', tel)}

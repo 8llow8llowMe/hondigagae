@@ -141,7 +141,7 @@ export function FavoritePlaceRow({
                   : messages.favorite.unsaveLabel.replace('{title}', item.title)
             }
             className={cn(
-              // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+              // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다)
               'border-border-strong focus-visible:ring-brand-500 flex size-11 shrink-0 items-center justify-center rounded-md border focus-visible:ring-2 focus-visible:outline-none disabled:opacity-60',
               unsaved ? 'bg-bg' : 'bg-band',
             )}

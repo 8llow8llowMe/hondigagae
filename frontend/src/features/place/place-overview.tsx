@@ -45,7 +45,7 @@ export function PlaceOverview({ text }: { text: string }) {
           aria-expanded={expanded}
           aria-controls={bodyId}
           onClick={() => setExpanded((previous) => !previous)}
-          // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+          // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다)
           className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center self-start font-semibold focus-visible:ring-2 focus-visible:outline-none md:hidden"
         >
           {expanded ? messages.place.detailOverviewLess : messages.place.detailOverviewMore}

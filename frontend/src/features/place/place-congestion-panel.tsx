@@ -137,7 +137,7 @@ function PanelBody({
         <button
           type="button"
           onClick={onRetry}
-          // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+          // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다)
           className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
         >
           {messages.common.retry}
@@ -233,7 +233,7 @@ function EmptyBody() {
       */}
       <Link
         href="/places"
-        // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+        // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다)
         className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center self-start rounded-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
       >
         {messages.place.detailCongestionEmptyAction}
@@ -602,7 +602,7 @@ function DaysToggle({
     <button
       type="button"
       onClick={() => onDaysChange(isMonth ? CONGESTION_DAYS.week : CONGESTION_DAYS.month)}
-      // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+      // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다)
       className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center self-start font-semibold focus-visible:ring-2 focus-visible:outline-none"
     >
       {isMonth ? messages.place.detailCongestionCollapse : messages.place.detailCongestionExpand}

@@ -178,8 +178,8 @@ export function LegalDocumentView({ doc }: { doc: LegalDocument }) {
               {doc.articles.map((article) => (
                 <li key={article.no}>
                   {/*
-                    **모바일 최소 터치 영역 44** (DESIGN.md §7-1) — 손가락이 재는 값이라
-                    모바일 규칙이다.
+                    **모바일에서 행 높이 44** — 손가락이 재는 값이라 모바일에서만 준다
+                    (§7 의 하한이 아니라 이 목록에서 고른 값이다 · #883).
 
                     **`lg` 에서는 걷는다.** 고정된 레일이 뷰포트보다 길면 아래쪽 조문에
                     영영 손이 닿지 않는데, 44 를 열넷에 곱하면 레일이 734px 이라 **가용

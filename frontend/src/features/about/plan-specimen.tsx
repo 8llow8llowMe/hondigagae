@@ -73,8 +73,8 @@ export function PlanSpecimen() {
                 event.preventDefault()
               }}
               /*
-                `min-h-11`(44) 은 모바일 터치 영역이다(DESIGN.md §7) — 예시 안이라도 실제로
-                눌리는 컨트롤이라 손가락에 걸린다. picker sheet 의 탭과 같은 값이다.
+                `min-h-11`(44) 은 예시 안이라도 **실제로 눌리는 컨트롤**이라 손가락에 걸리는
+                값이다 (§7 하한이 아니다 · #883). picker sheet 의 탭과 같은 값이다.
 
                 **`rounded-full` 은 `ScrollRailArrows` 가 이미 낸 예외를 따른다** — DESIGN.md
                 §5 의 원형은 사진·아바타 몫이지만, 이것은 **알약형 세그먼트 컨트롤**이라

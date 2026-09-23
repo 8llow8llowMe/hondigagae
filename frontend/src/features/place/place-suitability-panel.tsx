@@ -66,7 +66,7 @@ export function PlaceSuitabilityPanel({
         <button
           type="button"
           onClick={onRetry}
-          // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+          // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다)
           className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
         >
           {messages.common.retry}
@@ -177,7 +177,7 @@ function GuestBlock({ data, authed }: { data: PlaceSuitabilityResponse; authed: 
         <p className="text-body-2 text-fg">{messages.place.detailGuestCta}</p>
         <Link
           href={authed ? '/pets/new' : '/login'}
-          // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+          // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다)
           className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center rounded-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
         >
           {authed ? messages.place.detailGuestCtaPet : messages.place.detailGuestCtaSignup}
