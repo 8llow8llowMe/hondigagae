@@ -1,4 +1,5 @@
 import type { LatLng } from '@/lib/geo/coord'
+import { metersPerPixel } from '@/lib/map/viewport'
 import { messages } from '@/lib/messages'
 
 /**
@@ -27,18 +28,68 @@ export type ClusterGroup<T> = {
   items: T[]
 }
 
+/** 위도 1도의 남북 거리(m). 제주만 다루므로 상수로 충분하다 (`viewport.ts` 와 같은 값) */
+const METERS_PER_LAT_DEGREE = 111_320
+
+/**
+ * 경도 1도의 동서 거리(m), 제주 기준.
+ *
+ * 격자는 도 단위로 정사각이지만 경도 1도는 위도 1도보다 `cos(위도)` 만큼 짧다 —
+ * 제주(33.4°)에서 가로는 세로의 **0.835 배**다. **먼저 무너지는 축이 가로**이므로
+ * 아래 계산은 전부 이쪽으로 잰다.
+ */
+const METERS_PER_LNG_DEGREE = METERS_PER_LAT_DEGREE * Math.cos((33.4 * Math.PI) / 180)
+
+/**
+ * 인접한 두 묶음의 중심이 화면에서 벌어져 있어야 하는 최소 간격(px).
+ *
+ * **원 지름(32)이 아니라 44 다.** 44 는 DESIGN.md §7 의 최소 터치 영역이고, 묶음이
+ * `::before` 로 실제 갖는 히트박스 폭이다 (`globals.css` 의 `.map-cluster::before`).
+ * 둘이 44 보다 가까우면 **보이는 원은 안 겹쳐도 누르는 자리가 겹친다.**
+ */
+const MIN_CLUSTER_GAP_PX = 44
+
 /**
  * 확대 단계별 격자 크기(위도 기준 도).
  *
- * 카카오 `level` 은 **작을수록 확대**다 (1 이 가장 가깝다). 아트보드는 확대하면 묶음이
- * 풀려 개별 핀이 되기를 기대하므로, 레벨이 커질수록 셀이 커진다.
+ * 카카오 `level` 은 **작을수록 확대**다 (1 이 가장 가깝다). 확대하면 묶음이 풀려 개별
+ * 핀이 되어야 하므로, 레벨이 커질수록 셀이 커진다.
+ *
+ * **셀 크기는 도(度)인데 겹침은 픽셀에서 일어난다** (#671 D-3). 아래 표는 단계마다 고른
+ * 상수였고, 그 값이 화면에서 몇 px 로 보이는지는 재지 않았다. 재 보면 **축소할수록
+ * 간격이 좁아진다** — 셀은 두 단계마다 3배씩 커지는데 픽셀당 미터는 **한 단계마다**
+ * 2배가 되므로 표가 단계를 따라잡지 못한다:
+ *
+ * ```
+ *   level  8 → 34.9px      level 10 → 29.0px
+ *   level 12 → 21.8px      level 13 → 10.9px   (원 하나도 안 들어간다)
+ * ```
+ *
+ * 그래서 마커를 아무리 줄여도 겹치는 구간이 있었다. 묶음 원을 32px 로 줄인 것(#671 D-2)
+ * 으로는 닿지 않는다 — **인접 셀의 중심 간격 자체가 그보다 좁았기** 때문이다.
+ *
+ * **바닥만 올린다. 간격을 44 로 통일하지 않는다.** 통일하면 확대 구간에서 셀이 오히려
+ * 작아져(level 5 는 0.004 → 0.0019) 접히지 않는 이름표 핀이 늘어나는데, 이름표는 폭이
+ * 고정된 원과 달리 **87px 까지 간다**(실측). 고치려던 것보다 나쁜 겹침을 새로 만든다.
+ * 그래서 표는 "이만큼은 접고 싶다" 로 남기고, 물리적으로 겹치는 구간에서만 바닥이 이긴다.
  */
 export function cellSizeFor(level: number): number {
   if (level <= 4) return 0
+
+  return Math.max(intendedCellSize(level), minimumCellSize(level))
+}
+
+/** 단계별로 "이만큼은 접고 싶다" 는 값. 화면 간격을 보장하지는 않는다 */
+function intendedCellSize(level: number): number {
   if (level <= 6) return 0.004
   if (level <= 8) return 0.012
   if (level <= 10) return 0.04
   return 0.12
+}
+
+/** 인접 묶음이 `MIN_CLUSTER_GAP_PX` 만큼 벌어지는 데 필요한 최소 셀 크기 */
+function minimumCellSize(level: number): number {
+  return (MIN_CLUSTER_GAP_PX * metersPerPixel(level)) / METERS_PER_LNG_DEGREE
 }
 
 /**
@@ -51,36 +102,137 @@ export function cellSizeFor(level: number): number {
  * 갈린다.
  */
 export function clusterByGrid<T>(inputs: ClusterInput<T>[], cellSize: number): ClusterGroup<T>[] {
+  return gridBuckets(inputs, cellSize).map(toGroup)
+}
+
+/**
+ * 한 확대 단계에서 화면에 그릴 묶음. **`map-canvas.tsx` 가 쓰는 입구다.**
+ *
+ * `level` 이 `null` 이면 묶지 않는다 — 순번 핀이 섞인 동선 지도가 그 경우다 (#743).
+ *
+ * **격자만으로는 마커가 안 떨어진다** (#671 D-3). 격자는 셀 **경계**를 고르게 놓을 뿐이고,
+ * 묶음이 찍히는 자리는 셀 중앙이 아니라 **구성원 좌표의 평균**이다 (`averageCoord` — 셀
+ * 중앙에 찍으면 바다 한가운데에 묶음이 뜬다). 그래서 인접한 두 셀의 구성원이 각각 공유
+ * 경계에 몰려 있으면 **두 평균점은 얼마든지 가까워진다.**
+ *
+ * 실측이 그것을 보여 줬다 (2026-09-23, `/emergency` 375px): 셀 간격을 44px 이상으로
+ * 올린 뒤에도 화면의 묶음 중심이 **17.0px · 27.2px · 29.2px** 로 붙어 있었다. 원 지름이
+ * 32px 이니 셋 다 실제로 겹친 상태다.
+ *
+ * **그래서 격자 다음에 거리로 한 번 더 합친다.** 셀 크기를 더 키우는 쪽은 답이 아니다 —
+ * 아무리 키워도 경계에 몰린 두 평균점이 붙는 경우는 남고, 키운 만큼 멀쩡한 구역까지
+ * 접힌다. 합치면 "44px 안에 묶음이 둘 있는" 상태 자체가 사라진다.
+ */
+export function clusterForLevel<T>(
+  inputs: ClusterInput<T>[],
+  level: number | null,
+): ClusterGroup<T>[] {
+  if (level === null) return clusterByGrid(inputs, 0)
+
+  const cellSize = cellSizeFor(level)
+
+  /*
+    **충분히 확대했으면 거리로도 합치지 않는다.** 이 단계에서 개별 핀이 정답이라는 것은
+    격자가 아니라 화면의 판단이고(`cellSizeFor`), 거리 병합이 그 뒤에서 다시 접으면
+    "확대하면 풀린다" 가 성립하지 않는다 — 풀 수 있는 단계가 사라진다.
+  */
+  if (cellSize <= 0) return clusterByGrid(inputs, 0)
+
+  return mergeCloseBuckets(gridBuckets(inputs, cellSize), level).map(toGroup)
+}
+
+/** 격자 한 칸에 담긴 것. 합칠 때 입력 순서를 되살리려고 자리(`index`)를 들고 다닌다 */
+type GridBucket<T> = {
+  key: string
+  entries: { index: number; item: T; coord: LatLng }[]
+}
+
+function gridBuckets<T>(inputs: ClusterInput<T>[], cellSize: number): GridBucket<T>[] {
   if (cellSize <= 0) {
     return inputs.map((input, index) => ({
       key: `single-${String(index)}`,
-      center: input.coord,
-      items: [input.item],
+      entries: [{ index, item: input.item, coord: input.coord }],
     }))
   }
 
-  const buckets = new Map<string, { coords: LatLng[]; items: T[] }>()
+  const buckets = new Map<string, GridBucket<T>>()
 
-  for (const input of inputs) {
+  inputs.forEach((input, index) => {
     const row = Math.floor(input.coord.lat / cellSize)
     const col = Math.floor(input.coord.lng / cellSize)
     const key = `${String(row)}:${String(col)}`
+    const entry = { index, item: input.item, coord: input.coord }
 
     const bucket = buckets.get(key)
-    if (bucket === undefined) buckets.set(key, { coords: [input.coord], items: [input.item] })
-    else {
-      bucket.coords.push(input.coord)
-      bucket.items.push(input.item)
-    }
-  }
+    if (bucket === undefined) buckets.set(key, { key, entries: [entry] })
+    else bucket.entries.push(entry)
+  })
 
-  return [...buckets.entries()].map(([key, bucket]) => ({
-    key,
+  return [...buckets.values()]
+}
+
+function toGroup<T>(bucket: GridBucket<T>): ClusterGroup<T> {
+  return {
+    key: bucket.key,
     // 셀 중앙이 아니라 **실제 좌표의 평균**이다. 셀 중앙에 찍으면 바다 한가운데에
     // 묶음이 뜨는 일이 생긴다
-    center: averageCoord(bucket.coords),
-    items: bucket.items,
-  }))
+    center: averageCoord(bucket.entries.map((entry) => entry.coord)),
+    /*
+      **입력 순서로 되돌린다.** 합친 묶음은 격자 칸 순서로 이어 붙으므로, 그대로 두면
+      `items[0]` 이 "서버가 준 거리순 첫 항목" 이 아니게 된다 — 호출부가 그 첫 항목으로
+      선택 상태와 z 순서를 정한다 (`map-canvas.tsx`).
+    */
+    items: [...bucket.entries].sort((a, b) => a.index - b.index).map((entry) => entry.item),
+  }
+}
+
+/**
+ * 중심이 `MIN_CLUSTER_GAP_PX` 보다 가까운 묶음을 하나로 합친다.
+ *
+ * **합칠 때마다 중심이 옮겨지므로 더 이상 합칠 것이 없을 때까지 돈다.** 둘을 합친 평균점이
+ * 세 번째 묶음 쪽으로 끌려가 새로 44px 안에 드는 일이 실제로 생긴다 — 실측의
+ * `21`·`20`·`3` 이 그런 삼각형이었다.
+ */
+function mergeCloseBuckets<T>(buckets: GridBucket<T>[], level: number): GridBucket<T>[] {
+  let current = buckets
+
+  for (;;) {
+    const next: GridBucket<T>[] = []
+    let mergedAny = false
+
+    for (const bucket of current) {
+      const near = next.find(
+        (candidate) =>
+          screenGapPx(bucketCenter(candidate), bucketCenter(bucket), level) < MIN_CLUSTER_GAP_PX,
+      )
+
+      if (near === undefined) {
+        next.push({ key: bucket.key, entries: [...bucket.entries] })
+        continue
+      }
+
+      // 키를 정렬해 이어 붙인다 — 같은 구성이면 어느 쪽을 먼저 만나든 같은 React key 다
+      near.key = [near.key, bucket.key].sort().join('+')
+      near.entries.push(...bucket.entries)
+      mergedAny = true
+    }
+
+    current = next
+    if (!mergedAny) return current
+  }
+}
+
+function bucketCenter<T>(bucket: GridBucket<T>): LatLng {
+  return averageCoord(bucket.entries.map((entry) => entry.coord))
+}
+
+/** 두 좌표가 이 확대 단계의 화면에서 몇 px 떨어져 있는가 */
+function screenGapPx(a: LatLng, b: LatLng, level: number): number {
+  const perPixel = metersPerPixel(level)
+  const x = ((a.lng - b.lng) * METERS_PER_LNG_DEGREE) / perPixel
+  const y = ((a.lat - b.lat) * METERS_PER_LAT_DEGREE) / perPixel
+
+  return Math.hypot(x, y)
 }
 
 /**

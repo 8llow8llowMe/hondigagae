@@ -9,7 +9,7 @@ import {
   type LatLng,
   toLatLng,
 } from '@/lib/geo/coord'
-import { cellSizeFor, clusterByGrid } from '@/lib/map/cluster'
+import { clusterForLevel } from '@/lib/map/cluster'
 import { clusterContent, type PinContent, pinContent } from '@/lib/map/pin-content'
 import type { MapRouteSegment } from '@/lib/map/route'
 import { loadKakaoMaps, MapSdkError, type MapSdkFailure } from '@/lib/map/sdk'
@@ -462,7 +462,7 @@ export function MapCanvas({
     */
     const ordered = pins.some((pin) => pin.order !== undefined)
 
-    const groups = clusterByGrid(positioned, ordered ? 0 : cellSizeFor(level))
+    const groups = clusterForLevel(positioned, ordered ? null : level)
     const created: KakaoCustomOverlay[] = []
 
     for (const group of groups) {
