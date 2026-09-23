@@ -148,7 +148,10 @@ TourAPI 에만 있는 항목(하영올레 등)은 코스가 되지 않는다. �
   제공기관 설명 문구의 따옴표 때문에 JSON 으로 읽히지 않아(2026-09-23) 더 쓰지 않는다 — 실측과
   판단은 `data-refresh-guide.md` §5 "올레 포털", 요청·응답은 `data-api-analysis.md` 10절
 - 우회 여부는 `walk_course_import_rows{source="OLLE",result="fallback"}` 1/0 게이지로 드러난다
-  (`observability-guide.md`). 스냅샷 키는 `atchFileId` 그대로라 배포 뒤 강제 재적재는 없다
+  (`observability-guide.md`). 스냅샷 키는 `atchFileId` 그대로라 기존 스냅샷이 이어진다
+- **우회에서 포털로 돌아온 뒤(#876 배포 직후 포함) 한 번은 `forceImport=true` 로 돌린다.** 우회 적재는
+  스냅샷을 남기지 않아, 포털 파일이 안 바뀌었으면 다음 실행이 건너뛰고 우회 CSV 데이터가 남는다
+  (`data-refresh-guide.md` §5 "올레 포털")
 - `walk_course` 스키마 원천은 tour-service 의 `WalkCourseEntity` 다 — 로컬에서는 tour-service 를
   먼저 한 번 기동해 테이블을 만든다 (place 와 같은 소유 구조)
 - id 는 코스키에서 결정적으로 나와(`OlleCourseParser.walkCourseId`) 재실행이 멱등하다.

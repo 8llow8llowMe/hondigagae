@@ -148,7 +148,9 @@ walk_course_import_rows{source="OLLE", result}   # upserted / fallback
 지표를 따로 둔다. 규칙도 같다 — 마지막 실행 값을 담는 Gauge 이고, `fallback` 은 1/0 플래그이며
 파사드가 **원천이 정해진 모든 실행에서** 쓴다(건너뛴 실행·포털 적재는 0). 포털도 우회 파일도 없어
 잡이 `CSV_NOT_FOUND` 로 실패하면 쓰지 않는다 — 그 실패는 잡 실패로 드러난다(문화정보원과 같다).
-`upserted` 는 적재한 실행에서만 쓴다.
+`upserted` 는 적재한 실행에서만 쓴다. 게이지는 첫 `recordRows` 에서 등록되므로 **재기동하면 다음
+올레 실행(주 1회) 전까지 값이 없다** — 씨딩하지 않는다. 없는 것이 0 으로 보이는 것보다 낫다
+(`place_import_rows` 와 같다).
 
 왜 필요했나. 2026-09-21 부터 포털 페이지 파싱이 깨져 올레 잡이 **매 실행 우회 파일로** 돌았는데,
 드러난 것은 WARN 한 줄(`olle course source fallback=local`)과 완료 로그의 `fallback=true` 뿐이었다
