@@ -99,12 +99,14 @@ export function EmergencyFilterChips({
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         <ChipGroup label={messages.emergency.narrowGroupLabel} className="flex flex-wrap gap-1.5">
           <Chip
+            size="sm"
             selected={filters.openNowOnly}
             onSelect={() => onFiltersChange({ ...filters, openNowOnly: !filters.openNowOnly })}
           >
             {labelWithCount(messages.emergency.openNow, counts.openNow, showCounts)}
           </Chip>
           <Chip
+            size="sm"
             selected={filters.open24Only}
             onSelect={() => onFiltersChange({ ...filters, open24Only: !filters.open24Only })}
           >
@@ -133,7 +135,7 @@ export function EmergencyFilterChips({
           />
         </div>
 
-        <EmergencyRadiusChip radius={radius} onRadiusChange={onRadiusChange} />
+        <EmergencyRadiusChip size="sm" radius={radius} onRadiusChange={onRadiusChange} />
       </div>
 
       {/*

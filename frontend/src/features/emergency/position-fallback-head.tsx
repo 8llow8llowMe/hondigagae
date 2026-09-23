@@ -117,6 +117,7 @@ export function PositionFallbackHead({
         {JEJU_REGION_CODES.map((code) => (
           <Chip
             key={code}
+            size="sm"
             selected={regionCode === code}
             onSelect={() => onRegionChange(regionCode === code ? null : code)}
           >
