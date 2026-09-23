@@ -919,6 +919,12 @@ describe('WalkTimesSection — 곡선 면의 시각별 등급 (#656)', () => {
     **면을 잇는 것은 라운드 없음과 `gap` 없음이다.** 칸 사이를 `gap` 으로 벌리거나 셀에
     모서리를 깎으면 같은 등급이 이어지는 칸 사이에 흰 틈이 생겨 한 면으로 안 읽힌다 (#312).
     칸마다 칠하는 지금은 그것이 더 중요하다 — 틈이 있으면 "등급이 갈리는 자리" 와 구별되지 않는다.
+
+    **"테두리가 하나도 없다" 에서 "같은 등급 사이에만 없다" 로 좁혔다**
+    ([#671](https://github.com/8llow8llowMe/hondigagae/issues/671) **C-1**). 등급이 **바뀌는**
+    자리에는 이제 1px 선이 선다 — 세 tint 의 상대휘도가 서로 1.02~1.05:1 이라 흑백에서 면만으로는
+    등급이 통째로 사라지기 때문이다. 이 테스트가 지키던 규칙(*같은 등급은 한 면으로 이어진다*)은
+    그대로고, 그 규칙을 깨지 않는 방법으로 선을 얹었다는 것이 아래 단언이다.
   */
   it('같은 등급이 이어지는 칸 사이에 경계를 만들지 않는다', () => {
     const markup = render(MIXED_DAY)
@@ -929,8 +935,18 @@ describe('WalkTimesSection — 곡선 면의 시각별 등급 (#656)', () => {
 
     for (const head of cells) {
       expect(head).not.toContain('rounded')
-      expect(head).not.toContain('border')
     }
+
+    // 11 · 12 · 13 안전 / 14 · 15 주의 / 16 · 17 안전 — 선은 등급이 바뀌는 두 자리에만
+    expect(cells.map((head) => head.includes('border-s'))).toEqual([
+      false, // 11시 — 창이 시작하는 칸. 면이 있다/없다가 이미 말한다
+      false, // 12시 ─┐ 같은 등급이 이어진다
+      false, // 13시 ─┘
+      true, //  14시 — 안전 → 주의
+      false, // 15시 — 주의가 이어진다
+      true, //  16시 — 주의 → 안전
+      false, // 17시
+    ])
 
     // 셀을 담는 `<ul>` 에 `gap` 이 없다 — 간격은 셀 안쪽 padding 이 준다
     const list = /<ul [^>]*class="([^"]*)"/.exec(markup)?.[1] ?? ''

@@ -1,6 +1,8 @@
 'use client'
 
-import { METRIC_TINT_TONE, METRIC_WORD_TONE } from '@/components/metric'
+import { useRef } from 'react'
+
+import { METRIC_TINT_EDGE_TONE, METRIC_TINT_TONE, METRIC_WORD_TONE } from '@/components/metric'
 import { type ScrollRail, ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { formatCelsius } from '@/lib/format/celsius'
 import { markGoldenWindow } from '@/lib/insight/golden-window'
@@ -62,8 +64,20 @@ export function WalkTimesCurve({
    */
   rail?: ScrollRail & { ref: React.RefObject<HTMLUListElement | null> }
 }) {
+  /*
+    **추천 구간이 시작하는 칸.** 레일의 초기 위치가 여기로 맞춰진다
+    ([#671](https://github.com/8llow8llowMe/hondigagae/issues/671) **F-1**) — 여태는 언제나
+    `scrollLeft: 0`, 곧 **가장 이른 = 가장 나쁜 시각**에서 시작했다. 창이 없는 날에는
+    아무 칸에도 붙지 않아 예전 그대로다.
+
+    **`hoisted` 를 받은 날에는 옮기지 않는다** — 그때 스크롤러에 붙는 ref 는 호출부의
+    것이고 `own.ref` 는 비어 있어, 훅이 잴 스크롤러가 없다. 지금 두 소비처(홈·브리핑)는
+    모두 레일을 넘기지 않는다.
+  */
+  const goldenStartRef = useRef<HTMLLIElement>(null)
+
   // 훅은 early return 보다 위다 — 곡선이 비는 날과 아닌 날의 훅 순서가 달라지면 안 된다
-  const own = useScrollRail<HTMLUListElement>()
+  const own = useScrollRail<HTMLUListElement>({ focusRef: goldenStartRef })
   const rail = hoisted ?? own
 
   /*
@@ -91,6 +105,45 @@ export function WalkTimesCurve({
   */
   const marks = markGoldenWindow(hourly, goldenStart, goldenEnd)
 
+  const tones = hourly.map((hour) => walkSafetyTone(hour.walkSafetyLevel.code))
+
+  /*
+    **등급이 바뀌는 자리의 1px 구분선** (#671 **C-1**).
+
+    위 주석이 *"색이 갈리는 자리에만 경계가 생기고, 그 경계가 곧 정보다"* 라고 적어 둔 그
+    경계를 **실제로 긋는다.** 여태는 그 경계가 색에만 실려 있었는데, 세 tint 의 상대휘도가
+    `#FDECEC` 0.869 · `#FEF4E0` 0.912 · `#E4F0EA` 0.848 로 **서로 1.02~1.05:1** 이다 —
+    `grayscale(1)` 로 렌더하면 경계 하나 없는 한 덩어리가 되고, 면이 있다/없다(창 안/밖)만
+    살아남고 #656 이 새로 실은 **등급이 통째로 사라진다.** 야외에서 밝은 화면으로 보는
+    서비스다 (DESIGN.md §2-3).
+
+    **선 색 표를 여기서 만들지 않는다** — `METRIC_TINT_EDGE_TONE` 이 이 자리를 위해 이미
+    있다 (#709). 그 표의 머리주석이 *"tint 면이 넓게 깔릴 때 이 선이 유일한 명도 채널"* 이라며
+    `-500` 이 tint 위 3.53~3.97:1 로 비텍스트 3:1 을 넘는 것을 확인해 두었다.
+
+    **같은 등급 칸을 잇는 규칙은 그대로다.** 선은 **이웃과 톤이 다른 칸의 시작 모서리**에만
+    선다 — 같은 등급이 이어지는 칸 사이에는 아무것도 없어 tint 가 예전처럼 맞닿는다.
+    창 안팎의 경계에도 긋지 않는다 (`windowStart` 제외): 거기는 면이 있다/없다가 이미
+    말하는 자리라, 선을 더하면 "등급이 바뀐 자리" 라는 이 선의 뜻이 흐려진다.
+
+    `box-sizing: border-box` 라 `min-width: 3.5rem` 안쪽에서 1px 을 가져간다 — 칸 피치가
+    밀리지 않는다.
+  */
+  const gradeEdges = tones.map((tone, index) => {
+    const mark = marks[index]
+    if (mark === undefined || !mark.inWindow || mark.windowStart) return false
+
+    return tone !== tones[index - 1]
+  })
+
+  /*
+    **중립 면이 섞인 날** (#671 **C-2**). 창 **안**의 `unknown` 칸만 센다 — 창 밖에는 면이
+    없어 회색으로 보일 것이 애초에 없고, 없는 혼동에 캡션을 달면 거의 모든 날에 뜬다.
+  */
+  const hasUnknownInWindow = tones.some(
+    (tone, index) => tone === 'unknown' && marks[index]?.inWindow === true,
+  )
+
   // 판정 자리의 상태 문구가 이미 말했다 — 같은 문장을 두 번 두지 않는다 (#204)
   if (hourly.length === 0) return null
 
@@ -104,53 +157,85 @@ export function WalkTimesCurve({
       미러링해야 한다** — 같은 `gap-1.5`, 같은 `text-caption` 줄, 같은 `h-8` 막대 자리.
       한쪽만 고치면 라벨이 숫자와 어긋난 줄에 선다. 둘을 붙여 둔 이유다.
     */
-    <div className="flex items-start gap-2">
-      <RowLabels />
+    /*
+      **바깥 세로 한 줄은 곡선과 캡션을 묶는다** (#671 C-2). 캡션을 호출부로 올리지 않는다 —
+      같은 곡선을 쓰는 화면이 둘이고(홈 · 출발 전 브리핑), 한쪽에만 달면 #656 이 한쪽만
+      고쳐진 것과 같은 자리가 다시 생긴다.
+    */
+    <div className="flex flex-col gap-2">
+      <div className="flex items-start gap-2">
+        <RowLabels />
+
+        {/*
+          **`scroll-rail` 은 화살표의 기준면이다** (`app/globals.css`). 화살표를 `<ul>` 안에
+          넣으면 마스크가 화살표까지 흐리고 내용과 같이 스크롤돼 제자리에 남지 않는다
+          (`ScrollRailArrows` 주석).
+
+          **`relative` 만 주면 안 된다** — 안쪽 스크롤러의 내용 폭이 조상의 `scrollWidth` 로
+          새어 `main` 이 390 → 630 이 된다. 그 클래스가 `contain: layout` 을 함께 건다.
+
+          **넘침은 오른쪽뿐이다** (`INSET_BLEED_END_CLASS`). 왼쪽에는 라벨 열이 서 있어
+          파고들 자리가 없다.
+        */}
+        <div className="scroll-rail min-w-0 flex-1">
+          <ul
+            ref={rail.ref}
+            onScroll={rail.onScroll}
+            className={cn(
+              /*
+                **칸 사이 간격을 `gap` 이 아니라 셀 안쪽 padding 으로 준다** (#312).
+                `gap` 이면 추천 구간의 tint 면이 칸마다 끊겨 면이 아니라 줄무늬로 읽힌다.
+                padding 은 배경이 함께 칠해지므로 이웃한 칸의 면이 정확히 맞닿는다.
+                간격은 6 → 8 이 된다. 3px 씩 나눠 6 을 유지하려면 스케일 밖 값이 되고
+                (DESIGN.md §4 — arbitrary value 금지), 8 은 스케일 안 값이다.
+              */
+              'flex overflow-x-auto',
+              INSET_BLEED_END_CLASS.card,
+              // 스크롤바 자리는 fade 와 화살표가 대신한다 (`app/globals.css`)
+              'scrollbar-none',
+              rail.fadeClassName,
+            )}
+          >
+            {hourly.map((hour, index) => (
+              <HourCell
+                key={hour.at}
+                hour={hour}
+                inGoldenWindow={marks[index]?.inWindow ?? false}
+                gradeEdge={gradeEdges[index] ?? false}
+                // 창이 시작하는 칸 하나에만 붙는다 — 레일의 초기 위치가 여기로 맞는다 (F-1)
+                ref={marks[index]?.windowStart === true ? goldenStartRef : undefined}
+              />
+            ))}
+          </ul>
+
+          {/* 호출부가 레일을 들고 있으면 화살표도 그쪽 제목 줄에 선다 (#730) */}
+          {hoisted === undefined && (
+            <ScrollRailArrows
+              rail={rail}
+              prevLabel={messages.home.goldenCurvePrev}
+              nextLabel={messages.home.goldenCurveNext}
+            />
+          )}
+        </div>
+      </div>
 
       {/*
-        **`scroll-rail` 은 화살표의 기준면이다** (`app/globals.css`). 화살표를 `<ul>` 안에
-        넣으면 마스크가 화살표까지 흐리고 내용과 같이 스크롤돼 제자리에 남지 않는다
-        (`ScrollRailArrows` 주석).
+        **중립 면이 무엇인지 낱말로 말한다** (#671 C-2). 실측: 초록 18시와 초록 20시 사이에
+        회색 19시가 끼는데 그 19시의 노면(29.0℃)이 18시(33.0℃)보다 **낮다** — 더 시원한
+        칸이 더 나쁜 색처럼 보이니 렌더 고장으로 읽힌다. 여태 `정보 없음` 은 `sr-only` 에만
+        있었다.
 
-        **`relative` 만 주면 안 된다** — 안쪽 스크롤러의 내용 폭이 조상의 `scrollWidth` 로
-        새어 `main` 이 390 → 630 이 된다. 그 클래스가 `contain: layout` 을 함께 건다.
+        **선례는 장소 상세 혼잡도의 `점선은 아직 모르는 날이에요` 다** — 보이는 캡션 한 줄로
+        표기의 뜻을 말하고, 그것을 좋은 값으로 읽지 말라고 한 번 더 못박는다. 그쪽처럼
+        **모르는 칸이 실제로 있는 날에만** 낸다 (`hasUnknownInWindow`).
 
-        **넘침은 오른쪽뿐이다** (`INSET_BLEED_END_CLASS`). 왼쪽에는 라벨 열이 서 있어
-        파고들 자리가 없다.
+        **점선을 되살리지 않았다** — 아래 `HourCell` 주석이 기각해 둔 수단이다.
       */}
-      <div className="scroll-rail min-w-0 flex-1">
-        <ul
-          ref={rail.ref}
-          onScroll={rail.onScroll}
-          className={cn(
-            /*
-              **칸 사이 간격을 `gap` 이 아니라 셀 안쪽 padding 으로 준다** (#312).
-              `gap` 이면 추천 구간의 tint 면이 칸마다 끊겨 면이 아니라 줄무늬로 읽힌다.
-              padding 은 배경이 함께 칠해지므로 이웃한 칸의 면이 정확히 맞닿는다.
-              간격은 6 → 8 이 된다. 3px 씩 나눠 6 을 유지하려면 스케일 밖 값이 되고
-              (DESIGN.md §4 — arbitrary value 금지), 8 은 스케일 안 값이다.
-            */
-            'flex overflow-x-auto',
-            INSET_BLEED_END_CLASS.card,
-            // 스크롤바 자리는 fade 와 화살표가 대신한다 (`app/globals.css`)
-            'scrollbar-none',
-            rail.fadeClassName,
-          )}
-        >
-          {hourly.map((hour, index) => (
-            <HourCell key={hour.at} hour={hour} inGoldenWindow={marks[index]?.inWindow ?? false} />
-          ))}
-        </ul>
-
-        {/* 호출부가 레일을 들고 있으면 화살표도 그쪽 제목 줄에 선다 (#730) */}
-        {hoisted === undefined && (
-          <ScrollRailArrows
-            rail={rail}
-            prevLabel={messages.home.goldenCurvePrev}
-            nextLabel={messages.home.goldenCurveNext}
-          />
-        )}
-      </div>
+      {hasUnknownInWindow && (
+        <p className="text-caption text-fg-muted break-keep">
+          {messages.home.goldenCurveUnknownNote}
+        </p>
+      )}
     </div>
   )
 }
@@ -205,10 +290,21 @@ function RowLabels() {
 function HourCell({
   hour,
   inGoldenWindow,
+  gradeEdge,
+  ref,
 }: {
   hour: HourlyWalkSafetyItem
   /** 이 칸이 서버가 추천한 구간에 드는가 (`markGoldenWindow`) */
   inGoldenWindow: boolean
+  /**
+   * **왼쪽 이웃과 등급이 갈리는가** (#671 C-1). 참이면 시작 모서리에 `-500` 1px 선이 선다 —
+   * tint 셋이 서로 1.02~1.05:1 이라 흑백에서 등급이 통째로 사라지는 것을 막는 채널이다.
+   *
+   * **판정은 호출부가 한다.** 칸 하나는 자기 이웃을 모른다.
+   */
+  gradeEdge: boolean
+  /** 추천 구간이 시작하는 칸에만 붙는다 — 레일의 초기 위치 기준점 (#671 F-1) */
+  ref?: React.Ref<HTMLLIElement> | undefined
 }) {
   const tone = walkSafetyTone(hour.walkSafetyLevel.code)
   const temperature = formatCelsius(hour.temperature)
@@ -216,6 +312,7 @@ function HourCell({
 
   return (
     <li
+      ref={ref}
       className={cn(
         // 두 칸이 맞닿아 8px 이 된다 — 스케일 안 값이다 (DESIGN.md §4: 4 · 6 · 8 …)
         'flex shrink-0 flex-col items-center gap-1.5 px-1 py-1',
@@ -236,11 +333,28 @@ function HourCell({
           모르는 것은 등급 하나뿐이다. 점선 테두리를 칸마다 두르면 **모르는 칸이 이어질 때
           그 사이에 선이 생겨** 바로 아래 규칙과 정면으로 어긋나기도 한다.
 
+          **그 기각이 남긴 빈자리는 낱말이 채운다** (#671 C-2) — 곡선 아래
+          `goldenCurveUnknownNote` 캡션이다. 기호를 바꾸는 대신 채널을 하나 더 얹는다.
+
           라운드를 주지 않는다 — 목록·섹션에 라운드가 없다 (DESIGN.md §0). **여기서는 그것이
           면을 잇는 조건이기도 하다**: 모서리를 깎으면 같은 등급이 이어지는 칸 사이에 흰 틈이
           생겨 한 면으로 안 읽힌다.
         */
         inGoldenWindow && METRIC_TINT_TONE[tone],
+        /*
+          **등급이 바뀌는 자리의 경계선** (#671 C-1 · 판정은 호출부의 `gradeEdges`).
+
+          면 색만으로는 등급이 흑백에서 사라진다 — 세 tint 의 상대휘도가 서로 1.02~1.05:1 이라
+          `grayscale(1)` 에서 한 덩어리가 된다. 이 선은 `-500` 층이라 tint 위 3.53~3.97:1 로
+          비텍스트 3:1 을 넘는다 (`METRIC_TINT_EDGE_TONE` 머리주석 · DESIGN.md §2-3).
+
+          **`border-s` 다.** 경계는 두 칸 **사이**에 하나면 되고, 오른쪽 칸의 시작 모서리에
+          그으면 그 선의 색이 "여기서부터 이 등급" 을 그대로 말한다.
+
+          **면 없이 이 선만 쓰지 않는다** — `gradeEdge` 는 창 안에서만 참이다
+          (`METRIC_TINT_EDGE_TONE` 이 짝으로 쓰라고 못박은 규칙이다).
+        */
+        gradeEdge && cn('border-s', METRIC_TINT_EDGE_TONE[tone]),
       )}
       // 3rem(칸) + 8px(안쪽 여백). 예전 피치(48 + gap 6)보다 칸당 2px 넓다
       style={{ minWidth: '3.5rem' }}
