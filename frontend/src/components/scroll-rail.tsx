@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
-import { pageScrollLeft, type ScrollFade, scrollFadeSide } from '@/lib/ui/scroll'
+import { centerScrollLeft, pageScrollLeft, type ScrollFade, scrollFadeSide } from '@/lib/ui/scroll'
 import { cn } from '@/lib/utils/cn'
 
 /**
@@ -54,11 +54,68 @@ const FADE_CLASS: Record<ScrollFade, string> = {
   both: 'scroll-fade-both',
 }
 
-export function useScrollRail<T extends HTMLElement>(): ScrollRail & {
+/**
+ * **마운트 시 한 번 옮길 `scrollLeft`** — `null` 이면 옮기지 않는다
+ * ([#671](https://github.com/8llow8llowMe/hondigagae/issues/671) **F-1**).
+ *
+ * 레일은 여태 언제나 `scrollLeft: 0` 이라 **가장 이른 = 가장 나쁜 시각**에서 시작했다.
+ * 1280 실측(창 17–21시)에서 보이는 것은 `14·15·16`(면 없음) + `17시`(황갈) + `18시` 21px
+ * 뿐이고 전부 안전인 `19·20·21시` 는 화면 밖이었다. 면이 한 톤이던 때는 문제가 아니었지만,
+ * 칸마다 등급이 실린 뒤로는 **접힘이 사용자가 보는 것을 나쁜 쪽으로 치우치게 한다.**
+ *
+ * **`aligned` 가 빗장이다.** 이 함수가 결정을 갖는 이유가 그것이다 — 한 번 옮긴 뒤에는
+ * 무슨 일이 있어도 `null` 이라, 사용자가 스크롤한 다음 레일이 다시 튀지 않는다. 훅의
+ * 지역 변수로만 두면 규칙을 테스트할 수 없어 여기로 뺐다 (node 환경에는 레이아웃이 없다).
+ *
+ * **폭이 0 이면 아직 옮기지 않는다.** 레이아웃 전에 재면 `centerScrollLeft` 의 clamp 가
+ * 0 을 내는데, 그것으로 빗장을 걸면 **영영 0 에 고정**된다 — 옮길 수 없는 것과 옮기지
+ * 않기로 한 것은 다르다.
+ *
+ * **가운데로 놓는다(`centerScrollLeft`).** 대상을 왼쪽 끝에 붙이면 창 전체가 들어오지만
+ * **창이 시작하는 경계가 화면 밖으로 밀린다** — "면이 있다/없다" 는 등급 색과 달리 흑백에서도
+ * 살아남는 채널이고(#671 C-1), 그 경계가 안 보이면 남은 것은 tint 한 덩어리다. 가운데로
+ * 놓으면 앞선 칸 몇과 좋은 쪽이 함께 선다. 스크롤 셈은 `lib/ui/scroll.ts` 가 갖는다 —
+ * 여기서 다시 계산하지 않는다.
+ */
+export function railAlignScrollLeft(params: {
+  /** 이미 한 번 옮겼는가 */
+  aligned: boolean
+  containerWidth: number
+  scrollWidth: number
+  /** 대상의 **스크롤러 내용 좌표** x. 대상이 없으면 `null` */
+  targetLeft: number | null
+  targetWidth: number
+}): number | null {
+  const { aligned, containerWidth, scrollWidth, targetLeft, targetWidth } = params
+
+  if (aligned) return null
+  if (targetLeft === null) return null
+  if (containerWidth === 0) return null
+
+  return centerScrollLeft({
+    containerWidth,
+    scrollWidth,
+    itemOffsetLeft: targetLeft,
+    itemWidth: targetWidth,
+  })
+}
+
+export function useScrollRail<T extends HTMLElement>(options?: {
+  /**
+   * 마운트 뒤 **한 번만** 이 요소가 보이도록 레일을 옮긴다 (#671 F-1). 주지 않으면 예전처럼
+   * `scrollLeft: 0` 에서 시작한다 — 기존 다섯 호출처의 동작은 한 글자도 바뀌지 않는다.
+   *
+   * **대상이 늦게 서도 된다.** 데이터가 오기 전에는 `current` 가 `null` 이라 아무 일도
+   * 하지 않고, 칸이 선 뒤 렌더에서 옮긴다 (이 훅의 효과에는 의존성 배열이 없다).
+   */
+  focusRef?: React.RefObject<HTMLElement | null>
+}): ScrollRail & {
   ref: React.RefObject<T | null>
 } {
   const ref = useRef<T>(null)
   const [fade, setFade] = useState<ScrollFade>('none')
+  const focusRef = options?.focusRef
+  const aligned = useRef(false)
 
   const measure = useCallback(() => {
     const el = ref.current
@@ -81,6 +138,41 @@ export function useScrollRail<T extends HTMLElement>(): ScrollRail & {
     같은 값이면 `setFade` 가 리렌더를 내지 않으므로 루프가 되지 않는다.
   */
   useEffect(measure)
+
+  /*
+    **초기 위치 (#671 F-1).** `measure` 와 같은 이유로 의존성 배열이 없다 — 대상 칸은
+    데이터가 온 뒤에야 서므로, 마운트 직후 한 번만 보면 `focusRef.current` 가 아직 `null` 이다.
+
+    **결정은 `railAlignScrollLeft` 가 갖는다** (빗장 · 레이아웃 전 가드 · 셈). 여기 남은 것은
+    DOM 을 읽어 넘기고 결과를 쓰는 일뿐이다.
+
+    **`getBoundingClientRect` 차로 잰다.** `offsetLeft` 는 `offsetParent` 기준이라 스크롤러가
+    그 기준이 아닐 때(`.scroll-rail` 이 `position: relative` 다) 값이 미묘하게 어긋난다.
+    두 사각형의 차 + `scrollLeft` 는 배치와 무관하게 **스크롤러 내용 좌표**다.
+
+    **`scrollLeft` 를 직접 넣는다** — `scrollTo({behavior:'smooth'})` 로 하면 첫 화면이
+    움직이는 것으로 보여 사용자가 건드리지 않은 스크롤이 애니메이션으로 읽힌다.
+  */
+  useEffect(() => {
+    const el = ref.current
+    if (el === null) return
+
+    const target = focusRef?.current ?? null
+    const box = target === null ? null : target.getBoundingClientRect()
+    const next = railAlignScrollLeft({
+      aligned: aligned.current,
+      containerWidth: el.clientWidth,
+      scrollWidth: el.scrollWidth,
+      targetLeft: box === null ? null : box.left - el.getBoundingClientRect().left + el.scrollLeft,
+      targetWidth: box === null ? 0 : box.width,
+    })
+    if (next === null) return
+
+    aligned.current = true
+    el.scrollLeft = next
+    // 옮긴 자리에서 fade 를 다시 잰다 — 왼쪽에도 갈 곳이 생겼다
+    measure()
+  })
 
   useEffect(() => {
     const el = ref.current
