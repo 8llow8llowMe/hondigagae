@@ -54,6 +54,19 @@ export function useEmergencyBoard() {
     영역에서 반경을 역산해 넣으면 `radius` 칩이 말하는 값과 실제 조회 반경이 갈린다.
   */
   const [searchCenter, setSearchCenter] = useState<LatLng | null>(null)
+  /*
+    **카메라를 다시 놓는 이유** (#873). `true` 면 확대 단계를 그대로 둔다.
+
+    재검색은 **기준점만 옮기는 조작**이다 — 사용자는 이미 볼 배율을 골라 뒀고, 우리가
+    바꾸는 것은 조회 기준점뿐이다. 그런데 카메라가 늘 `spanMeters`(= 반경 × 2)에서
+    단계를 역산하는 바람에 누를 때마다 **줌이 풀렸다** (실측: level 4 → 8).
+
+    **"재검색 상태인가"(`searchCenter !== null`)로 판정하면 안 된다.** 그러면 재검색한
+    뒤에 반경 칩을 만졌을 때도 계속 유지돼 **"반경 넓히기" 가 화면에 반영되지 않는다.**
+    재는 것은 상태가 아니라 **직전 조작이 무엇이었나**라, 기준점·반경을 바꾸는 조작마다
+    자기 값을 적어 둔다: 재검색만 `true`, 나머지(반경·권역·내 위치)는 `false`.
+  */
+  const [keepZoom, setKeepZoom] = useState(false)
   const {
     filters,
     radius,
@@ -67,10 +80,29 @@ export function useEmergencyBoard() {
     */
     regionCode,
     setFilters,
-    setRadius,
-    widenRadius,
     setRegionCode,
+    setRadius: navSetRadius,
+    widenRadius: navWidenRadius,
   } = useEmergencyNav()
+
+  /*
+    **반경 조작은 확대 단계를 다시 맞춘다** (#873). "반경 넓히기" 나 반경 칩은 *담을
+    범위*를 바꾸는 조작이라, 카메라가 그만큼 다시 담지 않으면 눌러도 화면이 그대로다 —
+    재검색 뒤에 반경을 만지는 경로에서 실제로 그렇게 된다(`keepZoom` 이 켜진 채라서).
+    그래서 nav 의 setter 를 그대로 내보내지 않고 감싼다.
+  */
+  const setRadius = useCallback(
+    (next: number) => {
+      setKeepZoom(false)
+      navSetRadius(next)
+    },
+    [navSetRadius],
+  )
+
+  const widenRadius = useCallback(() => {
+    setKeepZoom(false)
+    navWidenRadius()
+  }, [navWidenRadius])
 
   /*
     **누를 때마다 다시 묻는다.** 마운트 때 받은 좌표를 재사용하면 사용자가 이동한 뒤
@@ -82,6 +114,8 @@ export function useEmergencyBoard() {
   const locate = useCallback(() => {
     // "내 위치" 는 옮겨 둔 기준점을 되돌리는 조작이기도 하다 (#396 · #639)
     setSearchCenter(null)
+    // 다른 자리로 되돌아가는 조작이라 반경만큼 다시 담는다 (#873)
+    setKeepZoom(false)
     if (regionCode !== null) setRegionCode(null)
     void getCurrentPosition().then(setPosition)
   }, [regionCode, setRegionCode])
@@ -98,6 +132,8 @@ export function useEmergencyBoard() {
   const researchAt = useCallback(
     (center: LatLng) => {
       setSearchCenter(center)
+      // **줌은 사용자 것이다** (#873) — 여기서 옮기는 것은 조회 기준점뿐이다
+      setKeepZoom(true)
       if (regionCode !== null) setRegionCode(null)
     },
     [regionCode, setRegionCode],
@@ -114,6 +150,8 @@ export function useEmergencyBoard() {
   const researchAtRegion = useCallback(
     (code: JejuRegionCode | null) => {
       setSearchCenter(null)
+      // 다른 권역으로 건너뛰는 조작이라 그 자리에서 반경만큼 다시 담는다 (#873)
+      setKeepZoom(false)
       setRegionCode(code)
     },
     [setRegionCode],
@@ -178,8 +216,14 @@ export function useEmergencyBoard() {
               타입이 맞지 않는다. 빠지면 `MapCanvas` 가 `JEJU_MAP_SEA_RATIO` 를 쓴다.
             */
             ...(searchCenter === null && regionCode === null ? {} : { anchorRatio: 0.5 }),
+            /*
+              **확대 단계는 직전 조작이 정한다** (#873, 위 `keepZoom` 참고). 재검색은
+              기준점만 옮기므로 사용자가 맞춘 배율을 그대로 두고, 반경·권역·내 위치는
+              다른 범위를 담는 조작이라 반경에서 역산한 단계로 다시 맞춘다.
+            */
+            keepLevel: keepZoom,
           },
-    [anchor?.lat, anchor?.lng, radius, searchCenter === null, regionCode === null],
+    [anchor?.lat, anchor?.lng, radius, searchCenter === null, regionCode === null, keepZoom],
   )
 
   return {

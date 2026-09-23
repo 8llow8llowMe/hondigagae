@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
 
 import {
   JEJU_MAP_ANCHOR,
@@ -82,6 +82,64 @@ const ZOOM_MS = 300
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+/**
+ * **확대하며 그 지점으로 간다** — 핀을 고를 때와 묶음 마커를 누를 때가 같이 쓴다 (#873).
+ *
+ * **둘을 동시에 걸 수 없다.** 같은 변환을 두 애니메이션이 함께 밀면 중간에서 튄다.
+ * 그래서 순서를 둬야 하는데, 순서가 틀어졌을 때 **덜 나쁜 쪽**을 고른다.
+ *
+ * 이동 먼저(`panTo` → `setLevel`)는 위험하다. 이동이 실행되지 않은 채 확대만 걸리면
+ * **옛 중심을 확대**해서 목표가 화면에서 아예 사라진다 (dev 실측: 목록이 "지도에 보이는
+ * 0곳" 이 됐다). 그래서 `anchor` 로 **목표를 화면에 붙여 둔 채** 확대한다 — 뒤따르는
+ * 중심 맞추기가 실행되지 않아도 목표는 화면 안에 남는다. 가운데가 아닐 뿐이다.
+ * 확대 후에는 같은 화면 거리가 좁은 실거리라 `panTo` 도 부드럽게 움직인다
+ * (`panTo` 는 이동 거리가 화면보다 크면 애니메이션 없이 순간 이동한다).
+ *
+ * **묶음 마커가 이 결론을 안 물려받고 있었다** (#873). `setLevel(level - 2)` 를 **옵션
+ * 없이** 부르고 2ms 뒤에 `panTo` 를 걸어서, 확대는 지도 중심 기준으로 즉시 점프하고
+ * (누른 묶음이 커서에서 멀어진다) 곧바로 성격이 다른 애니메이션이 이어졌다. 실측한
+ * 호출이 `setLevel(6) opts: null` → 2ms → `panTo` 였다. 같은 일을 하는 코드가 둘이면
+ * 한쪽만 고쳐진다 — 그래서 사본을 늘리지 않고 이 함수로 합친다.
+ *
+ * **어지럼을 줄여야 하는 사용자에게는 즉시 옮긴다.** `app/globals.css` 의
+ * `prefers-reduced-motion` 규칙은 CSS 애니메이션·전환만 끈다 — 지도의 이동·확대는 SDK 가
+ * JS 로 그리는 것이라 그 규칙이 닿지 않아 여기서 직접 판정해야 한다.
+ *
+ * 되돌려 주는 것은 **뒷정리 함수**다. 확대가 끝나기 전에 언마운트되거나 다음 조작이
+ * 들어오면 예약해 둔 중심 맞추기를 취소해야 한다.
+ */
+function zoomToward(params: {
+  map: KakaoMap
+  target: KakaoLatLng
+  /** 목표 확대 단계. 지금이 이미 그만큼 가까우면 확대 없이 이동만 한다 */
+  level: number
+  /** 예약된 이동 시점에 지도가 아직 살아 있는지 다시 확인할 곳 */
+  mapRef: RefObject<KakaoMap | null>
+}): () => void {
+  const { map, target, level, mapRef } = params
+  const zoomIn = map.getLevel() > level
+
+  if (prefersReducedMotion()) {
+    map.setCenter(target)
+    if (zoomIn) map.setLevel(level)
+    return () => undefined
+  }
+
+  if (!zoomIn) {
+    map.panTo(target)
+    return () => undefined
+  }
+
+  map.setLevel(level, { animate: { duration: ZOOM_MS }, anchor: target })
+
+  const timer = setTimeout(() => {
+    // 지도가 사라졌을 수 있다 (언마운트·SDK 실패) — ref 로 다시 확인한다
+    mapRef.current?.panTo(target)
+  }, ZOOM_MS)
+
+  return () => clearTimeout(timer)
 }
 
 export type MapPin = {
@@ -216,6 +274,18 @@ export function MapCanvas({
      * 하나라, 0.35 면 핀이 이유 없이 위로 치우쳐 보인다 (`PlaceMiniMap`).
      */
     anchorRatio?: number
+    /**
+     * **확대 단계를 건드리지 않는다** (#873). 기본은 `false` — `spanMeters` 에서 역산한
+     * 단계로 맞춘다.
+     *
+     * "이 지역에서 재검색" 처럼 **기준점만 옮기는 조작**이 쓴다. 그 조작에서 사용자는
+     * 이미 자기가 볼 배율을 골라 둔 상태이고, 우리가 옮기는 것은 조회 기준점뿐이다 —
+     * 그런데 단계까지 다시 맞추면 반경 기준으로 **줌이 풀린다** (실측: level 4 → 8).
+     *
+     * **중심 맞추기와 `onCameraApplied` 보고는 그대로 돈다.** 보고를 끊으면 바깥이
+     * "우리가 놓은 자리" 를 갱신하지 못해 재검색 버튼이 사라지지 않는다 (#578).
+     */
+    keepLevel?: boolean
   } | null
   /**
    * 핀을 고르면 이 단계까지 **확대**한다. 주지 않으면 이동만 한다.
@@ -407,9 +477,26 @@ export function MapCanvas({
 
       const content = isCluster
         ? clusterElement(group.items.length, () => {
-            // 묶음을 누르면 그 구역으로 확대한다 (아트보드 05)
-            map.setLevel(Math.max(1, map.getLevel() - 2))
-            map.panTo(new maps.LatLng(group.center.lat, group.center.lng))
+            /*
+              묶음을 누르면 그 구역으로 확대한다 (아트보드 05).
+
+              **핀을 고를 때와 같은 함수를 쓴다** (#873) — 끝 상태도 같다: 누른 자리가
+              화면 중앙에 온다. 예전에는 여기서 `setLevel` 을 옵션 없이 부르고 2ms 뒤에
+              `panTo` 를 걸어, 확대가 **지도 중심** 기준으로 즉시 점프하며 누른 묶음이
+              커서에서 멀어졌다 (`zoomToward` 머리주석에 실측이 있다).
+
+              **두 단계 확대를 유지한다.** 한 단계면 같은 묶음이 다시 묶여 두 번 눌러야
+              풀리는 구역이 생긴다 (`cellSizeFor` 가 단계에 비례한다).
+
+              뒷정리 함수는 버린다 — 이 지도는 클릭 뒤에도 살아 있고, 예약된 이동은
+              `mapRef` 로 생존을 다시 확인한다. 언마운트되면 그쪽에서 걸러진다.
+            */
+            zoomToward({
+              map,
+              target: new maps.LatLng(group.center.lat, group.center.lng),
+              level: Math.max(1, map.getLevel() - 2),
+              mapRef,
+            })
           })
         : /*
             **`onSelect` 를 안 받았으면 핸들러가 `null` 이고, 그러면 버튼이 아니다**
@@ -525,50 +612,10 @@ export function MapCanvas({
     const coord = pin === undefined ? null : toLatLng(pin)
     if (coord === null) return
 
-    const target = new maps.LatLng(coord.lat, coord.lng)
-    const zoomIn = selectedLevel !== undefined && map.getLevel() > selectedLevel
+    // 확대 단계를 안 받았으면 이동만 한다 — `zoomToward` 가 "이미 가깝다" 로 읽게 둔다
+    const level = selectedLevel ?? map.getLevel()
 
-    /*
-      **어지럼을 줄여야 하는 사용자에게는 즉시 이동한다.**
-
-      `app/globals.css` 의 `prefers-reduced-motion` 규칙은 CSS 애니메이션·전환만 끈다.
-      지도의 이동·확대는 SDK 가 JS 로 그리는 것이라 그 규칙이 닿지 않는다 — 여기서
-      직접 판정해야 한다 (`components/scroll-rail.tsx` 는 CSS 가 덮어 주므로 분기가 없다).
-    */
-    if (prefersReducedMotion()) {
-      map.setCenter(target)
-      if (zoomIn) map.setLevel(selectedLevel)
-      return
-    }
-
-    if (!zoomIn) {
-      map.panTo(target)
-      return
-    }
-
-    /*
-      ── 확대(핀 고정) → 중심 맞추기 ─────────────────────────────────────────
-
-      **둘을 동시에 걸 수 없다.** 같은 변환을 두 애니메이션이 함께 밀면 중간에서 튄다.
-      그래서 순서를 둬야 하는데, 순서가 틀어졌을 때 **덜 나쁜 쪽**을 고른다.
-
-      이동 먼저(`panTo` → `setLevel`)는 위험하다. 이동이 실행되지 않은 채 확대만 걸리면
-      **옛 중심을 확대**해서 고른 장소가 화면에서 아예 사라진다 (dev 실측: 목록이
-      "지도에 보이는 0곳" 이 됐다).
-
-      그래서 `anchor` 로 **핀을 화면에 붙여 둔 채** 확대한다. 뒤따르는 중심 맞추기가
-      실행되지 않아도 고른 장소는 화면 안에 남는다 — 가운데가 아닐 뿐이다.
-      확대 후에는 같은 화면 거리가 좁은 실거리라 `panTo` 도 부드럽게 움직인다
-      (`panTo` 는 이동 거리가 화면보다 크면 애니메이션 없이 순간 이동한다).
-    */
-    map.setLevel(selectedLevel, { animate: { duration: ZOOM_MS }, anchor: target })
-
-    const timer = setTimeout(() => {
-      // 지도가 사라졌을 수 있다 (언마운트·SDK 실패) — ref 로 다시 확인한다
-      mapRef.current?.panTo(target)
-    }, ZOOM_MS)
-
-    return () => clearTimeout(timer)
+    return zoomToward({ map, target: new maps.LatLng(coord.lat, coord.lng), level, mapRef })
   }, [selectedId, selectedLevel])
 
   // ── 밖에서 중심을 옮길 때 (현재 위치 버튼) ───────────────────────────────
@@ -605,13 +652,31 @@ export function MapCanvas({
       seaRatio: camera.anchorRatio ?? JEJU_MAP_SEA_RATIO,
     })
 
+    /*
+      **`keepLevel` 이면 지금 단계로 프레이밍한다** (#873). `framedCamera` 가 계산한
+      단계는 버리지만 **위도 폭 환산에는 단계가 필요하므로**(`framedCenterLat`) 지금
+      값을 대신 넣는다 — `next.lat` 을 그대로 쓰면 다른 배율로 잰 오프셋이 걸려 중심이
+      어긋난다. `anchorRatio` 가 0.5 면 어느 단계든 기준점과 같아 차이가 없지만,
+      0.35 갈래에서는 실제로 갈린다.
+    */
+    const level = camera.keepLevel === true ? map.getLevel() : next.level
+    const lat =
+      camera.keepLevel === true
+        ? framedCenterLat(
+            camera.anchor.lat,
+            container.clientHeight,
+            level,
+            camera.anchorRatio ?? JEJU_MAP_SEA_RATIO,
+          )
+        : next.lat
+
     // **단계를 먼저, 중심을 나중에.** 순서가 뒤집히면 옛 중심을 확대한 뒤 옮기게 되어
     // 한 프레임 동안 엉뚱한 곳이 보인다 (선택 핀 확대에서 같은 판단을 했다)
-    map.setLevel(next.level)
-    map.setCenter(new maps.LatLng(next.lat, next.lng))
+    if (camera.keepLevel !== true) map.setLevel(next.level)
+    map.setCenter(new maps.LatLng(lat, next.lng))
 
     // 놓은 자리를 알린다 — 바깥이 "사용자가 옮겼는지" 를 이 자리 기준으로 잰다 (#578)
-    cameraAppliedRef.current?.({ lat: next.lat, lng: next.lng })
+    cameraAppliedRef.current?.({ lat, lng: next.lng })
   }, [camera, status])
 
   // 패널을 접거나 시트를 올리면 컨테이너 폭이 바뀐다 → 되잡지 않으면 지도가 잘린다

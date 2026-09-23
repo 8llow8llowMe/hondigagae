@@ -72,11 +72,50 @@ describe('재검색 판정은 카메라가 놓은 중심과 비교한다 (#578)'
   /*
     놓은 자리를 아는 곳은 `MapCanvas` 뿐이다 — 컨테이너 크기와 확대 단계가 거기에만
     있고, 둘이 있어야 `framedCamera` 가 위도 폭을 환산할 수 있다.
+
+    **보고하는 값은 `setCenter` 에 넣은 값 그 자체여야 한다** (#873). `keepLevel` 갈래가
+    생기면서 실제로 놓는 위도가 `next.lat` 이 아니라 **지금 단계로 다시 환산한 `lat`**
+    이 됐다 — 둘 중 하나만 바뀌면 바깥이 "우리가 놓은 자리" 를 잘못 알고, 조작 0회에서
+    재검색 버튼이 뜨는 #578 이 그대로 재발한다. 그래서 같은 식별자를 쓰는지 잰다.
   */
   it('MapCanvas 는 카메라를 적용한 자리를 그대로 알린다', () => {
-    expect(mapCanvas).toMatch(
-      /cameraAppliedRef\.current\?\.\(\{\s*lat: next\.lat,\s*lng: next\.lng/,
+    const effect = mapCanvas.slice(
+      mapCanvas.indexOf('const next = framedCamera('),
+      mapCanvas.indexOf('}, [camera, status])'),
     )
+
+    expect(effect).toMatch(/map\.setCenter\(new maps\.LatLng\(lat, next\.lng\)\)/)
+    expect(effect).toMatch(/cameraAppliedRef\.current\?\.\(\{ lat, lng: next\.lng \}\)/)
+  })
+
+  /*
+    **재검색은 확대 단계를 건드리지 않는다** (#873). 카메라가 늘 `spanMeters`(= 반경 × 2)
+    에서 단계를 역산하는 바람에, 기준점만 옮기려던 조작이 줌을 풀어 버렸다
+    (실측: level 4 → 8, 중심은 0m 그대로).
+
+    **판정은 "재검색 상태인가" 가 아니라 "직전 조작이 무엇이었나" 다.** 상태로 재면
+    재검색 뒤에 반경 칩을 만졌을 때도 유지돼 "반경 넓히기" 가 화면에 안 먹는다.
+  */
+  it('재검색만 확대 단계를 유지하고 반경·권역·내 위치는 다시 맞춘다', () => {
+    const board = source('src/features/emergency/use-emergency-board.ts')
+
+    expect(board).toContain('keepLevel: keepZoom')
+    // 상태(`searchCenter !== null`)로 판정하면 반경 조작이 먹지 않는다
+    expect(board).not.toMatch(/keepLevel: searchCenter/)
+
+    const keeps = (fn: string) => {
+      const start = board.indexOf(fn)
+      return board.slice(start, board.indexOf('}', board.indexOf('setKeepZoom', start)))
+    }
+    expect(keeps('const researchAt = useCallback')).toContain('setKeepZoom(true)')
+    for (const fn of [
+      'const researchAtRegion = useCallback',
+      'const locate = useCallback',
+      'const setRadius = useCallback',
+      'const widenRadius = useCallback',
+    ]) {
+      expect(keeps(fn)).toContain('setKeepZoom(false)')
+    }
   })
 
   /*
