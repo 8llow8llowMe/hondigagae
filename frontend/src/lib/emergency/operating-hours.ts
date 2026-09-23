@@ -146,14 +146,33 @@ function parseDayChunk(text: string): WeekdayIndex[] | 'skip' | null {
   if (compact === '연중무휴' || compact === '무휴' || compact === '매일' || compact === '365일') {
     return [...WEEK_ORDER]
   }
+
+  return parseWeekdayToken(compact)
+}
+
+/** 요일 한 글자, `요일` 접미사는 있어도 되고 없어도 된다 */
+const DAY = '([월화수목금토일])(?:요일)?'
+/** `월~금` · `토-일` · `월요일~수요일`. 붙임표도 범위다 (`TIMED_SEGMENT` 와 같은 집합) */
+const DAY_RANGE = new RegExp(`^${DAY}[~\\-–]${DAY}$`)
+const DAY_SINGLE = new RegExp(`^${DAY}$`)
+
+/**
+ * 공백을 지운 조각 하나 → 요일들 · `'skip'` · `null`.
+ *
+ * `'skip'` 은 **요일로 옮길 수 없지만 원문을 포기할 이유도 아닌** 조각이다
+ * (`법정공휴일`). 오늘이 공휴일인지 FE 가 알 수 없으므로 그 조각만 버린다.
+ *
+ * **`연중무휴` 계열은 여기 없다.** 같은 글자가 운영시간에서는 "주 7일 영업",
+ * 휴무 문구에서는 "쉬는 날 없음" 으로 **정반대**를 뜻해, 공용 조각 해석기가
+ * 뜻을 하나로 고르면 한쪽이 뒤집힌다. 그 판단은 각 호출부가 먼저 한다.
+ */
+function parseWeekdayToken(compact: string): WeekdayIndex[] | 'skip' | null {
   if (compact === '법정공휴일' || compact === '공휴일' || compact === '국가공휴일') return 'skip'
 
-  const day = '([월화수목금토일])(?:요일)?'
-
-  const range = new RegExp(`^${day}~${day}$`).exec(compact)
+  const range = DAY_RANGE.exec(compact)
   if (range !== null) return expandRange(range[1] ?? '', range[2] ?? '')
 
-  const single = new RegExp(`^${day}$`).exec(compact)
+  const single = DAY_SINGLE.exec(compact)
   if (single !== null) {
     const index = weekdayOf(single[1] ?? '')
     return index === null ? null : [index]
@@ -282,7 +301,43 @@ export function parseWeeklyHours(text: string): WeeklyHours | null {
  *
  * `무휴` 도 **전체 일치**로 좁혔다. `includes('무휴')` 는 `격주 무휴` 를 "휴무 없음" 으로
  * 읽어 같은 계열의 거짓말을 만든다.
+ *
+ * ── **어디까지 넓혔나** (#671 B-4-a)
+ *
+ * dev 실물 135곳 측정에서 폴백 33건 중 **15건이 "요일 시각은 읽혔는데 휴무 문구를 못 읽어"**
+ * 통째로 원문으로 떨어졌다. 요일 시각을 이미 읽은 뒤라 가장 아까운 갈래다. 예전에는
+ * `요일` 접미사가 붙은 단일 요일(`/([월화수목금토일])요일/g`)만 읽었다:
+ *
+ * | 서식 | 예 |
+ * |------|-----|
+ * | 접미사 없는 단축형 | `월,화 휴무` · `월·화 휴무` |
+ * | 요일 범위 | `월~금 휴무` · `토-일 휴무` · `월요일~수요일 휴진` |
+ * | 공휴일 조각 동반 | `일요일, 법정공휴일` — 그 조각만 버린다 |
+ *
+ * **요일 글자를 훑는 대신 조각으로 끊어 읽는다.** 글자만 훑으면 `명절 당일` 의 `일` 이
+ * 일요일이 되고, 범위는 양끝 둘만 읽혀 사이가 통째로 새어 나간다(`월요일~수요일` → `{월,수}`).
+ * 조각 하나라도 모르는 말이면 통째로 `null` 이다 — 모르는 것을 아는 것처럼 요약하는 것보다
+ * 원문을 보여주는 쪽이 맞다.
+ *
+ * **`IRREGULAR_CYCLE` 가드는 그대로다.** 넓히기는 그 문 **뒤**에서만 일어난다.
  */
+/**
+ * **요일도 주기도 아닌 군더더기.** 지워도 뜻이 변하지 않는 말만 넣는다.
+ *
+ * 공백으로 바꾼다 — 붙여 쓴 `일요일휴무` 를 끊으면서도 지운 자리가 글자를 이어 붙여
+ * 없던 요일을 만들지 않게 한다.
+ *
+ * **긴 말이 앞이다.** 짧은 쪽이 먼저 먹으면 남은 꼬리가 요일 글자가 된다 —
+ * `정기휴무일` 에서 `정기휴무` 만 지우면 `일` 하나가 남아 **일요일 휴무**로 읽힌다.
+ *
+ * `휴일` 은 없다 — `공휴일` 과 겹쳐 `법정공휴일` 을 `법정공` 으로 만든다.
+ */
+const REST_NOISE =
+  /정기휴무일|정기휴진일|정기휴무|정기휴진|정기휴일|휴무일|휴진일|휴업일|휴관일|휴무|휴진|휴업|휴관|정기|매주|및/g
+
+/** 조각 구분자. **`~` 와 `-` 는 없다** — 그쪽은 범위 안쪽이다 (`DAY_RANGE`) */
+const REST_SEPARATOR = /[\s,、/·・]+/
+
 export function parseRestDays(restDate: string | null): Set<WeekdayIndex> | null {
   if (restDate === null) return new Set()
 
@@ -295,13 +350,25 @@ export function parseRestDays(restDate: string | null): Set<WeekdayIndex> | null
   if (compact === '연중무휴' || compact === '무휴' || compact === '없음') return new Set()
 
   const days = new Set<WeekdayIndex>()
-  for (const matched of text.matchAll(/([월화수목금토일])요일/g)) {
-    const day = weekdayOf(matched[1] ?? '')
-    if (day === null) return null
-    days.add(day)
+
+  for (const token of text.replace(REST_NOISE, ' ').split(REST_SEPARATOR)) {
+    if (token === '') continue
+
+    const parsed = parseWeekdayToken(token)
+    // 조각 하나라도 모르는 말이면 통째로 포기한다 — 요일 글자만 골라 훑지 않는다
+    if (parsed === null) return null
+    if (parsed === 'skip') continue
+
+    for (const day of parsed) days.add(day)
   }
 
-  // 무슨 말인지 모르겠는 휴무 문구 — 다음 영업일을 약속하지 않는다
+  /*
+    **무슨 말인지 모르겠는 휴무 문구 — 다음 영업일을 약속하지 않는다.**
+
+    `법정공휴일` 만 적힌 곳도 여기로 온다. 빈 집합을 돌려주면 "매주 쉬는 날이 없다" 고
+    **단정**하는 것인데 오늘이 공휴일인지 FE 는 알 수 없다 — 주간시간 쪽의 `'skip'` 은
+    요일을 더하지 않을 뿐이라 정보 중립이지만, 휴무 쪽의 같은 자리는 중립이 아니다.
+  */
   return days.size === 0 ? null : days
 }
 
@@ -370,8 +437,18 @@ function readToday(
     return { kind: 'opensAt', dayOffset: 0, weekday: today, at: todayRange.fromLabel }
   }
 
-  // 오늘이 휴무거나 원문에 오늘이 없으면 다음 영업일까지 건너뛴다 (#654)
-  for (let offset = 1; offset <= 7; offset += 1) {
+  /*
+    오늘이 휴무거나 원문에 오늘이 없으면 다음 영업일까지 건너뛴다 (#654).
+
+    **엿새까지다 — 한 바퀴를 넘지 않는다** (#671 F-3). `offset = 7` 은
+    `(today + 7) % 7 = today` 라 **오늘 요일 이름**을 다음 영업일로 내놓는다:
+    `월 09:00~12:00` 인 곳에서 월요일 15:00 에 서면 `월요일 09:00부터`. 다음 주가
+    맞지만 화면에서는 **오늘 아침**으로 되읽혀, 이미 닫힌 병원 앞으로 보낸다.
+
+    한 바퀴를 돌아 아무 날도 못 찾으면 `closedToday` 다 — 주 하루만 여는 곳에서
+    "오늘은 더 열지 않는다" 는 사실 자체가 사용자가 당장 필요한 정보다.
+  */
+  for (let offset = 1; offset <= 6; offset += 1) {
     const weekday = ((today + offset) % 7) as WeekdayIndex
     if (rest.has(weekday)) continue
 

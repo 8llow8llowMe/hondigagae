@@ -354,3 +354,130 @@ describe('todayHoursLabel — 문구', () => {
     expect(todayHoursLabel({ kind: 'closedToday' })).toBe('오늘은 쉬어요')
   })
 })
+
+/*
+  **휴무 문구 파싱을 넓힌다** (#671 B-4-a).
+
+  dev 실물 135곳 측정에서 폴백 33건 중 **15건이 "요일 시각은 읽혔는데 휴무 문구를 못 읽어"**
+  통째로 원문으로 떨어졌다. 요일 시각을 이미 읽은 뒤라 가장 아까운 갈래다.
+
+  **넓히되 `IRREGULAR_CYCLE` 가드는 그대로 둔다.** 그 가드가 막는 것(`격주 무휴` 를
+  `연중무휴` 로 읽는 것)은 **틀린 요약을 만드는 쪽**이라, 넓히다가 그 문이 열리면
+  B-4 측정이 확인한 "가드 오판 0건" 이 깨진다.
+*/
+describe('parseRestDays — 넓힌 서식 (#671 B-4-a)', () => {
+  /* `월요일` 이 아니라 `월` 로 적는 곳이 많다 — `요일` 접미사를 요구하지 않는다 */
+  it('요일 접미사 없는 단축형을 읽는다', () => {
+    expect(parseRestDays('월,화 휴무')).toEqual(new Set([1, 2]))
+    expect(parseRestDays('월·화 휴무')).toEqual(new Set([1, 2]))
+    expect(parseRestDays('일 휴무')).toEqual(new Set([0]))
+  })
+
+  it('요일 범위를 읽는다 — 물결표와 붙임표 둘 다', () => {
+    expect(parseRestDays('월~금 휴무')).toEqual(new Set([1, 2, 3, 4, 5]))
+    expect(parseRestDays('토-일 휴무')).toEqual(new Set([6, 0]))
+    // `요일` 접미사가 붙은 범위도 범위다 — 예전에는 양끝 두 개만 읽어 사이를 흘렸다
+    expect(parseRestDays('월요일~수요일 휴진')).toEqual(new Set([1, 2, 3]))
+  })
+
+  /*
+    `법정공휴일` 은 요일이 아니라 **날짜 성격**이라 요일 하나로 옮길 수 없다.
+    `parseDayChunk`(주간시간)에는 있던 처리가 여기에는 없어, 요일을 읽고도 통째로
+    포기하고 있었다 — 그 조각만 버리고 나머지 요일은 살린다.
+  */
+  it('법정공휴일 조각은 건너뛰고 나머지 요일을 읽는다', () => {
+    expect(parseRestDays('일요일, 법정공휴일')).toEqual(new Set([0]))
+    expect(parseRestDays('일 공휴일 휴무')).toEqual(new Set([0]))
+  })
+
+  /*
+    **공휴일만 적힌 곳은 그대로 폴백이다.** 여기서 빈 집합을 돌려주면 "매주 쉬는 날이
+    없다" 고 **단정**하는 것인데, 오늘이 공휴일인지 FE 는 알 수 없다. 주간시간 쪽의
+    `'skip'` 은 요일을 더하지 않을 뿐이라 정보 중립이지만, 휴무 쪽의 같은 자리는
+    중립이 아니다 — 모르는 것을 아는 것처럼 말하지 않는다.
+  */
+  it('공휴일만 적힌 문구는 여전히 null — 오늘이 공휴일인지 알 수 없다', () => {
+    expect(parseRestDays('법정공휴일')).toBeNull()
+    expect(parseRestDays('공휴일 휴무')).toBeNull()
+  })
+
+  /* 넓힌 뒤에도 주기 가드가 먼저다 — 넓히기가 `IRREGULAR_CYCLE` 의 문을 열지 않는다 */
+  it('주기 수식어가 붙은 넓힌 서식도 null', () => {
+    expect(parseRestDays('격주 월~금 휴무')).toBeNull()
+    expect(parseRestDays('매월 첫째 월,화 휴무')).toBeNull()
+  })
+
+  /*
+    **군더더기를 지운 자리가 없던 요일을 만들지 않는다.** `정기휴무일` 에서 `정기휴무` 만
+    지우면 `일` 하나가 남아 **일요일 휴무**가 된다 — 긴 말을 먼저 지워야 한다.
+  */
+  it.each(['정기휴무일', '정기휴진일', '휴관일', '휴업일'])(
+    '군더더기 끝의 `일` 을 일요일로 읽지 않는다 — %s',
+    (restDate) => {
+      expect(parseRestDays(restDate)).toBeNull()
+    },
+  )
+
+  /* 넓힐 수 없는 형태는 그대로 폴백이다 — 원문을 보여주는 쪽이 맞다 */
+  it('읽을 수 없는 문구는 여전히 null', () => {
+    expect(parseRestDays('예약제')).toBeNull()
+    expect(parseRestDays('명절 당일')).toBeNull()
+    expect(parseRestDays('월과 화')).toBeNull()
+  })
+})
+
+describe('parseWeeklyHours — 붙임표 범위 (#671 B-4-a)', () => {
+  /* 휴무 쪽과 같은 범위 문법을 쓴다 — `월-금` 도 범위다 */
+  it('붙임표로 적은 요일 범위를 읽는다', () => {
+    const weekly = parseWeeklyHours('월-금 09:00~19:00')
+
+    expect(weekly?.[1]).toMatchObject({ fromLabel: '09:00', toLabel: '19:00' })
+    expect(weekly?.[5]).toMatchObject({ fromLabel: '09:00', toLabel: '19:00' })
+    expect(weekly?.[6]).toBeUndefined()
+  })
+})
+
+/*
+  **다음 영업일 탐색이 한 바퀴를 넘지 않는다** (#671 F-3).
+
+  예전 루프는 `offset <= 7` 이라 `offset = 7` 에서 `weekday = (today + 7) % 7 = today` —
+  **오늘 요일 이름**이 다음 영업일로 나왔다. 주 하루만 여는 곳에서 그날 마감 뒤에 서면
+  `월요일 09:00부터`. 다음 주가 맞지만 화면에서는 **오늘 아침**으로 되읽힌다.
+
+  한 바퀴를 돌아 아무 날도 못 찾으면 `closedToday` 다 — 주 하루만 여는 곳에서
+  "오늘은 더 열지 않는다" 는 사실 자체가 사용자가 당장 필요한 정보다.
+*/
+describe('summarizeTodayHours — 다음 영업일은 엿새까지만 본다 (#671 F-3)', () => {
+  it('주 하루만 여는 곳에서 마감 뒤에 오늘 요일을 다음 영업일로 말하지 않는다', () => {
+    const summary = summarizeTodayHours(
+      facility({
+        open24: false,
+        openNow: false,
+        restDate: null,
+        operatingHours: '월 09:00~12:00',
+      }),
+      // 2026-09-14 는 월요일 — 12:00 마감 뒤인 15:00
+      at(14, 15),
+    )
+
+    expect(summary).toEqual({ kind: 'closedToday' })
+    expect(todayHoursLabel(summary!)).toBe('오늘은 쉬어요')
+  })
+
+  /* 엿새 뒤까지는 그대로 읽는다 — 줄인 것은 일곱째 날뿐이다 */
+  it('엿새 뒤 영업일은 요일로 말한다', () => {
+    const summary = summarizeTodayHours(
+      facility({
+        open24: false,
+        openNow: false,
+        restDate: null,
+        operatingHours: '화 09:00~12:00',
+      }),
+      // 2026-09-16(수) 15:00 → 엿새 뒤 화요일
+      at(16, 15),
+    )
+
+    expect(summary).toEqual({ kind: 'opensAt', dayOffset: 6, weekday: 2, at: '09:00' })
+    expect(todayHoursLabel(summary!)).toBe('화요일 09:00부터')
+  })
+})
