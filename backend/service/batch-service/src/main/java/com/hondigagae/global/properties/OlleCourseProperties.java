@@ -5,9 +5,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * 제주올레 코스 CSV 설정.
  *
- * <p>파일데이터라 인증키가 필요 없다. 공공데이터포털 상세 페이지(data.go.kr/data/15043496)가
- * 서버 렌더링이고 그 안 JSON-LD 에 파일 다운로드 주소가 그대로 들어 있어, <b>배치가 직접
- * 내려받는 것이 기본</b>이다.
+ * <p>파일데이터라 인증키가 필요 없다. 공공데이터포털 상세 페이지(data.go.kr/data/15043496)의
+ * 다운로드 버튼이 부르는 경로를 그대로 따라 할 수 있어, <b>배치가 직접 내려받는 것이 기본</b>이다
+ * ({@code DataGoKrOlleCourseSourceAdapter}).
  *
  * <p>{@code filePath} 는 그 자동 경로가 막혔을 때의 <b>우회용 파일</b>이다. 컨테이너에서 이
  * 경로({@code /app/data})는 읽기 전용으로 붙으므로 내려받은 파일을 여기에 쓸 수 없다 -

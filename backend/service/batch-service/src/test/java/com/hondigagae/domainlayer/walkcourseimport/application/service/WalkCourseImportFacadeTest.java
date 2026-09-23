@@ -9,8 +9,10 @@ import static org.mockito.Mockito.verify;
 import com.hondigagae.domainlayer.walkcourseimport.application.model.OlleCourseSourceDecision;
 import com.hondigagae.domainlayer.walkcourseimport.application.port.in.WalkCourseImportUseCase.OlleCourseImportResult;
 import com.hondigagae.domainlayer.walkcourseimport.application.port.out.OlleCourseSnapshotPort;
+import com.hondigagae.domainlayer.walkcourseimport.application.port.out.WalkCourseImportMetricsPort;
 import com.hondigagae.domainlayer.walkcourseimport.application.service.processor.OlleCourseImportProcessor;
 import com.hondigagae.domainlayer.walkcourseimport.application.service.processor.OlleCourseSourceProcessor;
+import com.hondigagae.domainlayer.walkcourseimport.domain.enums.WalkCourseImportResultType;
 import com.hondigagae.domainlayer.walkcourseimport.domain.model.ImportedWalkCourse;
 import com.hondigagae.domainlayer.walkcourseimport.domain.model.OlleCourseSnapshot;
 import java.math.BigDecimal;
@@ -36,6 +38,9 @@ class WalkCourseImportFacadeTest {
     @Mock
     private OlleCourseSnapshotPort olleCourseSnapshotPort;
 
+    @Mock
+    private WalkCourseImportMetricsPort walkCourseImportMetricsPort;
+
     @InjectMocks
     private WalkCourseImportFacade facade;
 
@@ -51,6 +56,7 @@ class WalkCourseImportFacadeTest {
         assertThat(result.imported()).isZero();
         verify(olleCourseImportProcessor, never()).importCourses(any());
         verify(olleCourseSnapshotPort, never()).record(any());
+        verify(walkCourseImportMetricsPort).recordRows(WalkCourseImportResultType.FALLBACK, 0);
     }
 
     @Test
@@ -72,6 +78,8 @@ class WalkCourseImportFacadeTest {
         assertThat(captor.getValue().importedCount()).isEqualTo(1);
         assertThat(captor.getValue().sourceModifiedMax()).isEqualTo(java.time.LocalDate.of(2025, 4, 28).atStartOfDay());
         verify(olleCourseSourceProcessor).cleanUp(any());
+        verify(walkCourseImportMetricsPort).recordRows(WalkCourseImportResultType.FALLBACK, 0);
+        verify(walkCourseImportMetricsPort).recordRows(WalkCourseImportResultType.UPSERTED, 1);
     }
 
     @Test
@@ -86,6 +94,9 @@ class WalkCourseImportFacadeTest {
         assertThat(result.fallbackUsed()).isTrue();
         verify(olleCourseSnapshotPort, never()).record(any());
         verify(olleCourseSourceProcessor).cleanUp(any());
+        // 우회도 행은 들어온다 - 그래서 1/0 플래그가 따로 있어야 대시보드가 우회를 본다 (#876)
+        verify(walkCourseImportMetricsPort).recordRows(WalkCourseImportResultType.FALLBACK, 1);
+        verify(walkCourseImportMetricsPort).recordRows(WalkCourseImportResultType.UPSERTED, 1);
     }
 
     private static ImportedWalkCourse course(String courseNo, String baseDate) {

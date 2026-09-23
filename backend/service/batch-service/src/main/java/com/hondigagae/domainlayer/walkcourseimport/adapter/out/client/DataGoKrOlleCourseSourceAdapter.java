@@ -22,8 +22,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -33,15 +32,30 @@ import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Flux;
 
 /**
  * 공공데이터포털 제주올레 CSV 원천 어댑터.
  *
- * <p>상세 페이지({@code /data/15043496/fileData.do})가 서버 렌더링이고, 그 안
- * {@code <script type="application/ld+json">} 블록에 schema.org {@code DataDownload} 가
- * 들어 있다. 거기 {@code contentUrl} 이 로그인·인증키 없이 200 으로 CSV 를 주는 주소다.
+ * <p>상세 페이지({@code /data/15043496/fileData.do})의 "다운로드" 버튼이 브라우저에서 하는 일을
+ * 그대로 따라 한다 (2026-09-23 실측, {@code data-api-analysis.md} "제주올레 파일 다운로드 경로").
+ * <ol>
+ *   <li>페이지 HTML 에서 {@code fn_fileDataDown(publicDataPk, publicDataDetailPk, atchFileId,
+ *       fileDetailSn, publicDataHistSn)} 인자를 읽는다. {@code publicDataDetailPk} 는 {@code uddi:} 로
+ *       시작하는 상세 PK 이고, 페이지에 박힌 {@code atchFileId} 인자는 빈 값이다.</li>
+ *   <li>그 인자로 {@code POST /tcs/dss/selectFileDataDownload.do} 를 불러 지금 올라와 있는 파일의
+ *       {@code atchFileId}·{@code fileDetailSn} 을 받는다.</li>
+ *   <li>{@code GET /cmm/cmm/fileDownload.do?atchFileId=…&fileDetailSn=…} 로 CSV 를 받는다.</li>
+ * </ol>
+ *
+ * <p>페이지의 JSON-LD 는 더 읽지 않는다. {@code DataDownload.contentUrl} 이 남아 있기는 하지만
+ * 제공기관이 쓴 {@code description} 에 이스케이프 안 된 따옴표가 들어가 블록 전체가 JSON 으로
+ * 읽히지 않는다 (#876). 제공기관 설명 문구 하나에 원천이 끊기는 경로라 버튼 경로로 갈아탔다.
  *
  * <p>그래도 공개된 오픈 API 가 아니다. 페이지가 바뀌면 끊기므로 실패는
  * {@code SOURCE_PAGE_*} 로 분명히 드러내고, 그때는 로컬 우회 파일로 물러난다.
@@ -56,20 +70,22 @@ public class DataGoKrOlleCourseSourceAdapter implements OlleCourseSourcePort {
 
     public static final String CIRCUIT_NAME = "datagokr";
 
+    static final String DOWNLOAD_TICKET_PATH = "/tcs/dss/selectFileDataDownload.do";
+    static final String FILE_DOWNLOAD_PATH = "/cmm/cmm/fileDownload.do";
+
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    private static final Pattern JSON_LD_PATTERN = Pattern.compile(
-        "<script[^>]*type\\s*=\\s*[\"']application/ld\\+json[\"'][^>]*>(.*?)</script>",
-        Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
-    private static final Pattern ATCH_FILE_ID_PATTERN = Pattern.compile("[?&]atchFileId=([^&#]+)");
-    private static final Pattern FILE_DETAIL_SN_PATTERN = Pattern.compile("[?&]fileDetailSn=([^&#]+)");
+    private static final String QUOTED_ARG = "\\s*['\"]([^'\"]*)['\"]\\s*";
+    /** 다운로드 버튼의 onclick. 인자는 따옴표로 감싼 문자열 다섯 개이고 앞의 넷만 쓴다. */
+    private static final Pattern DOWNLOAD_TRIGGER_PATTERN = Pattern.compile(
+        "fn_fileDataDown\\(" + QUOTED_ARG + "," + QUOTED_ARG + "," + QUOTED_ARG + "," + QUOTED_ARG + ",");
     private static final Pattern FILENAME_EXT_PATTERN =
         Pattern.compile("filename\\*\\s*=\\s*([^']*)'([^']*)'([^;]+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern FILENAME_PATTERN =
         Pattern.compile("filename\\s*=\\s*\"?([^\";]+)\"?", Pattern.CASE_INSENSITIVE);
 
-    private static final String DOWNLOAD_URL_MARKER = "fileDownload.do";
-    private static final String TYPE_DATA_DOWNLOAD = "DataDownload";
+    /** 버튼이 보내는 값 그대로. 파일데이터 유형 코드다. */
+    private static final String FILE_DATA_TYPE_CODE = "PR0051";
     /** 첫 줄에 이 컬럼이 없으면 CSV 가 아니라 오류 페이지를 받은 것이다. */
     static final String CSV_HEADER_MARKER = "코스별";
     private static final String BOM = "\uFEFF";
@@ -83,24 +99,28 @@ public class DataGoKrOlleCourseSourceAdapter implements OlleCourseSourcePort {
     @Override
     public OlleCourseSourceQueryResult resolveLatest() {
         String pageUri = detailPageUri();
-        String html;
-        try {
-            html = circuitBreakerRegistry.circuitBreaker(CIRCUIT_NAME).executeSupplier(() ->
-                openApiWebClient.get()
-                    .uri(pageUri)
-                    .header(HttpHeaders.USER_AGENT, USER_AGENT)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block(Duration.ofMillis(properties.readTimeoutMs()))
-            );
-        } catch (CallNotPermittedException exception) {
-            throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_CIRCUIT_OPEN, exception);
-        } catch (RuntimeException exception) {
-            throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_PAGE_FAILED, exception, pageUri);
-        }
+        String html = fetchText(pageUri, () -> openApiWebClient.get()
+            .uri(pageUri)
+            .header(HttpHeaders.USER_AGENT, USER_AGENT)
+            .retrieve()
+            .bodyToMono(String.class)
+            .block(Duration.ofMillis(properties.readTimeoutMs())));
 
-        OlleCourseSourceQueryResult source = parseSource(html);
-        log.info("olle course source resolved fileId={} fileDetailSn={}", source.fileId(), source.fileDetailSn());
+        DownloadTrigger trigger = parseDownloadTrigger(html, properties.datasetId());
+
+        String ticketUri = properties.baseUrl() + DOWNLOAD_TICKET_PATH;
+        String ticket = fetchText(ticketUri, () -> openApiWebClient.post()
+            .uri(ticketUri)
+            .header(HttpHeaders.REFERER, pageUri)
+            .header(HttpHeaders.USER_AGENT, USER_AGENT)
+            .body(BodyInserters.fromFormData(trigger.toFormData()))
+            .retrieve()
+            .bodyToMono(String.class)
+            .block(Duration.ofMillis(properties.readTimeoutMs())));
+
+        OlleCourseSourceQueryResult source = parseDownloadTicket(ticket, properties.baseUrl());
+        log.info("olle course source resolved publicDataDetailPk={} fileId={} fileDetailSn={}",
+            trigger.publicDataDetailPk(), source.fileId(), source.fileDetailSn());
         return source;
     }
 
@@ -125,6 +145,17 @@ public class DataGoKrOlleCourseSourceAdapter implements OlleCourseSourcePort {
         } catch (IOException | RuntimeException exception) {
             deleteQuietly(tempFile);
             throw new WalkCourseImportException(WalkCourseImportErrorCode.DOWNLOAD_FAILED, exception, source.contentUrl());
+        }
+    }
+
+    /** 페이지·다운로드 티켓처럼 본문을 문자열로 받는 단계. 실패는 {@code SOURCE_PAGE_FAILED} 다. */
+    private String fetchText(String uri, Supplier<String> call) {
+        try {
+            return circuitBreakerRegistry.circuitBreaker(CIRCUIT_NAME).executeSupplier(call);
+        } catch (CallNotPermittedException exception) {
+            throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_CIRCUIT_OPEN, exception);
+        } catch (RuntimeException exception) {
+            throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_PAGE_FAILED, exception, uri);
         }
     }
 
@@ -223,46 +254,72 @@ public class DataGoKrOlleCourseSourceAdapter implements OlleCourseSourcePort {
         return "%s/data/%s/fileData.do".formatted(properties.baseUrl(), properties.datasetId());
     }
 
-    static OlleCourseSourceQueryResult parseSource(String html) {
+    /**
+     * 페이지에서 이 데이터셋의 다운로드 버튼 인자를 읽는다.
+     *
+     * <p>첫 인자(publicDataPk)가 {@code datasetId} 와 같은 호출만 본다. 2026-09-23 페이지에는 호출이
+     * 하나뿐이지만, 관련 데이터셋이나 이력 버튼이 앞에 붙으면 남의 파일을 받아 스냅샷으로 굳힐 수 있다.
+     * 같은 데이터셋 호출이 여럿이면 첫 번째를 쓴다.
+     */
+    static DownloadTrigger parseDownloadTrigger(String html, String datasetId) {
         if (html == null || html.isBlank()) {
             throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID, "빈 페이지");
         }
-
-        List<JsonNode> downloads = new ArrayList<>();
-        Matcher blocks = JSON_LD_PATTERN.matcher(html);
-        while (blocks.find()) {
-            JsonNode tree = readTree(blocks.group(1));
-            if (tree != null) {
-                collectDataDownloads(tree, downloads);
-            }
-        }
-
-        JsonNode chosen = null;
-        for (JsonNode download : downloads) {
-            String contentUrl = text(download, "contentUrl");
-            if (contentUrl == null || !contentUrl.contains(DOWNLOAD_URL_MARKER)) {
+        Matcher matcher = DOWNLOAD_TRIGGER_PATTERN.matcher(html);
+        int calls = 0;
+        while (matcher.find()) {
+            calls++;
+            if (!matcher.group(1).trim().equals(datasetId)) {
                 continue;
             }
-            String encodingFormat = text(download, "encodingFormat");
-            if (encodingFormat != null && encodingFormat.toUpperCase().contains("CSV")) {
-                chosen = download;
-                break;
+            DownloadTrigger trigger = new DownloadTrigger(
+                matcher.group(1).trim(), matcher.group(2).trim(), matcher.group(3).trim(), matcher.group(4).trim());
+            if (trigger.publicDataDetailPk().isEmpty()) {
+                throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID,
+                    "fn_fileDataDown 상세 PK 비어 있음 publicDataPk='%s'".formatted(trigger.publicDataPk()));
             }
-            if (chosen == null) {
-                chosen = download;
-            }
+            return trigger;
         }
-        if (chosen == null) {
+        throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID,
+            "datasetId=%s 의 fn_fileDataDown 호출 없음 (calls=%d pageChars=%d)"
+                .formatted(datasetId, calls, html.length()));
+    }
+
+    /**
+     * {@code selectFileDataDownload.do} 응답에서 지금 올라와 있는 파일을 읽는다.
+     *
+     * <p>응답은 {@code Content-Type: text/html} 이지만 본문은 JSON 이다. 쓰는 것은 최상위
+     * {@code status}·{@code atchFileId}·{@code fileDetailSn} 셋이고, 실패면 {@code status=false}
+     * 와 {@code error} 문구가 온다.
+     */
+    static OlleCourseSourceQueryResult parseDownloadTicket(String json, String baseUrl) {
+        if (json == null || json.isBlank()) {
+            throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID, "다운로드 티켓 빈 응답");
+        }
+        JsonNode tree;
+        try {
+            tree = OBJECT_MAPPER.readTree(json.trim());
+        } catch (JsonProcessingException exception) {
             throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID,
-                "DataDownload contentUrl 없음 (jsonLdBlocks=%d)".formatted(downloads.size()));
+                "다운로드 티켓이 JSON 이 아님 (%s)".formatted(exception.getOriginalMessage()));
+        }
+        if (!tree.path("status").asBoolean(false)) {
+            throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID,
+                "다운로드 티켓 status=false error=%s".formatted(text(tree, "error")));
         }
 
-        String contentUrl = text(chosen, "contentUrl");
-        String fileId = firstGroup(ATCH_FILE_ID_PATTERN, contentUrl);
-        if (fileId == null) {
-            throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID, "atchFileId 없음");
+        String fileId = text(tree, "atchFileId");
+        String fileDetailSn = text(tree, "fileDetailSn");
+        if (fileId == null || fileId.isBlank() || fileDetailSn == null || fileDetailSn.isBlank()) {
+            throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID,
+                "다운로드 티켓에 atchFileId·fileDetailSn 없음");
         }
-        return new OlleCourseSourceQueryResult(fileId, firstGroup(FILE_DETAIL_SN_PATTERN, contentUrl), contentUrl);
+        // 인코딩하지 않는다 - 문자열 URI 는 WebClient 가 템플릿으로 한 번 더 인코딩한다
+        String contentUrl = UriComponentsBuilder.fromUriString(baseUrl + FILE_DOWNLOAD_PATH)
+            .queryParam("atchFileId", fileId)
+            .queryParam("fileDetailSn", fileDetailSn)
+            .toUriString();
+        return new OlleCourseSourceQueryResult(fileId, fileDetailSn, contentUrl);
     }
 
     static String parseFileName(String contentDisposition) {
@@ -287,36 +344,29 @@ public class DataGoKrOlleCourseSourceAdapter implements OlleCourseSourcePort {
         }
     }
 
-    private static void collectDataDownloads(JsonNode node, List<JsonNode> collected) {
-        if (node.isArray()) {
-            node.forEach(child -> collectDataDownloads(child, collected));
-            return;
-        }
-        if (!node.isObject()) {
-            return;
-        }
-        if (TYPE_DATA_DOWNLOAD.equalsIgnoreCase(text(node, "@type"))) {
-            collected.add(node);
-        }
-        node.forEach(child -> collectDataDownloads(child, collected));
-    }
-
-    private static JsonNode readTree(String json) {
-        try {
-            return OBJECT_MAPPER.readTree(json.trim());
-        } catch (JsonProcessingException exception) {
-            log.debug("olle course json-ld block skipped reason={}", exception.getOriginalMessage());
-            return null;
-        }
-    }
-
     private static String text(JsonNode node, String field) {
         JsonNode value = node.get(field);
-        return value == null || !value.isTextual() ? null : value.asText();
+        return value == null || !value.isValueNode() || value.isNull() ? null : value.asText();
     }
 
-    private static String firstGroup(Pattern pattern, String value) {
-        Matcher matcher = pattern.matcher(value);
-        return matcher.find() ? matcher.group(1) : null;
+    /**
+     * 다운로드 버튼 {@code fn_fileDataDown} 의 앞 네 인자.
+     *
+     * @param publicDataPk       데이터셋 번호 ({@code 15043496})
+     * @param publicDataDetailPk {@code uddi:} 로 시작하는 상세 PK
+     * @param atchFileId         페이지에서는 빈 값이다. 버튼이 보내는 그대로 넘긴다
+     * @param fileDetailSn       파일 순번
+     */
+    record DownloadTrigger(String publicDataPk, String publicDataDetailPk, String atchFileId, String fileDetailSn) {
+
+        MultiValueMap<String, String> toFormData() {
+            MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+            form.add("publicDataPk", publicDataPk);
+            form.add("publicDataDetailPk", publicDataDetailPk);
+            form.add("atchFileId", atchFileId);
+            form.add("fileDetailSn", fileDetailSn);
+            form.add("publicDataTyCode", FILE_DATA_TYPE_CODE);
+            return form;
+        }
     }
 }
