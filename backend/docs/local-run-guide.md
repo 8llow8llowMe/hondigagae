@@ -130,8 +130,8 @@ dev 서버(`BACKEND_API_URL=https://api-dev.hondigagae.com`)에 직접 붙는다
 ./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=placeDataPipelineJob areaCode=39 runAt=$(date -Iseconds)"
 ```
 
-자식 잡 5개가 이 순서로 돈다 — `placeImportJob` → `cultureFacilityImportJob` → `petRestaurantImportJob`
-→ `placeMergeJob` → `placeImageBackfillJob`. 하나가 실패해도 뒤 단계는 계속 가고(모두 멱등),
+자식 잡 6개가 이 순서로 돈다 — `placeImportJob` → `cultureFacilityImportJob` → `petRestaurantImportJob`
+→ `placeMergeJob` → `placeImageBackfillJob` → `petTourImportJob`. 하나가 실패해도 뒤 단계는 계속 가고(모두 멱등),
 실패한 자식이 있으면 부모 잡이 FAILED 로 끝난다.
 
 **재시도는 새 `runAt` 으로 한다.** 부모가 FAILED 로 끝났을 때 같은 `runAt` 을 다시 넣으면

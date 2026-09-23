@@ -34,7 +34,7 @@ import org.springframework.transaction.PlatformTransactionManager;
  * </ul>
  *
  * <p>병합은 {@code placeMergeJob} 을 이어 돌린다 (#363).
- * 다섯 잡을 한 번에 돌리려면 {@code placeDataPipelineJob} 을 쓴다 (#377).
+ * 여섯 잡을 한 번에 돌리려면 {@code placeDataPipelineJob} 을 쓴다 (#377).
  */
 @Configuration
 public class CultureFacilityImportJobConfig {

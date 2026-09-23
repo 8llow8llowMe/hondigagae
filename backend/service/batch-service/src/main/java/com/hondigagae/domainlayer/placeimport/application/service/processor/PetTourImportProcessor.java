@@ -80,7 +80,8 @@ public class PetTourImportProcessor {
                 Optional<ImportedPlacePetInfo> petInfo = placeCatalogPort.fetchDetailPetTour(target.contentId());
                 if (petInfo.isEmpty()) {
                     // 목록에는 있는데 상세가 비어 온 곳. 이미 있는 값은 지우지 않고 synced_at 만 민다 —
-                    // 원천이 이번에 말이 없다고 지난 값을 버릴 근거는 없다 (행이 없으면 만들지 않는다).
+                    // 원천이 이번에 말이 없다고 지난 값을 버릴 근거는 없다. 행이 없으면 만들지 않으므로
+                    // 그런 곳은 다음 실행에도 맨 앞에서 다시 불린다 (PetTourImportProperties 의 한계 절).
                     placePetInfoBulkPort.touchSyncedAt(target.placeId());
                     emptyInfo++;
                 } else {

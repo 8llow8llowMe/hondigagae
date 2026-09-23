@@ -13,8 +13,13 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *
  * <p>그래서 기본 상한 350 은 <b>평소에는 걸리지 않는 값</b>이다 — 매 실행 전량을 한 번에 돈다
  * ({@code 1 + 330 = 331 < 1,000}). 상한은 원천이 갑자기 불어났을 때(지역 키가 무시돼 전국 10,152건이
- * 오는 경우 등) 하루 예산을 통째로 먹지 않게 하는 천장이다. 대상 선정이 "행 없는 곳 먼저 →
- * synced_at 오래된 순" 이라 상한에 걸려도 다음 실행이 이어 받는다.
+ * 오는 경우 등) 하루 예산을 통째로 먹지 않게 하는 천장이다. 대상 선정은 "행 없는 곳 먼저 →
+ * synced_at 오래된 순" 이다.
+ *
+ * <p><b>한계: 행이 없고 상세가 비거나 실패하는 곳은 매 실행 다시 부른다.</b> 빈 행을 만들지 않으므로
+ * ({@code PlacePetInfoBulkPort#touchSyncedAt}) 그런 곳은 순환 뒤로 밀리지 않고 늘 맨 앞에 선다.
+ * 교집합이 상한 안인 지금은 무해하지만, 상한을 넘으면 그 수만큼 기존 행 갱신 예산이 줄고, 그런 곳이
+ * 상한 이상이면 기존 행 갱신이 멈춘다. 그때는 시도 시각을 따로 기록하는 장치가 필요하다.
  *
  * @param maxCallsPerRun 실행당 detailPetTour2 최대 호출 수. 래퍼 타입인 이유는
  *                       {@link PlaceIntroImportProperties} 와 같다 — compose 의 {@code ${VAR:-}} 가
