@@ -10,6 +10,41 @@ import org.junit.jupiter.api.Test;
  */
 class PetFieldParserTest {
 
+    /*
+     * 아래 둘은 관광 API(detailPetTour2) 원문이다 — 2026-09-23 제주 표본 29건 실측 (#877).
+     * acmpyTypeCd 는 "전구역 동반가능" 16 · "일부구역 동반가능" 13, 두 값뿐이었다.
+     */
+    @Test
+    @DisplayName("동반 구역은 확인된 두 원문을 옮기고 모르는 문구는 UNKNOWN 이다 (#877)")
+    void parseAllowanceScope() {
+        assertThat(PetFieldParser.parseAllowanceScope("전구역 동반가능")).isEqualTo(PetFieldParser.SCOPE_FULL_AREA);
+        assertThat(PetFieldParser.parseAllowanceScope("일부구역 동반가능")).isEqualTo(PetFieldParser.SCOPE_PARTIAL);
+        assertThat(PetFieldParser.parseAllowanceScope("일부 실외 구역 동반가능")).isEqualTo(PetFieldParser.SCOPE_OUTDOOR_ONLY);
+        assertThat(PetFieldParser.parseAllowanceScope("동반 가능")).isEqualTo(PetFieldParser.SCOPE_UNKNOWN);
+        assertThat(PetFieldParser.parseAllowanceScope(null)).isEqualTo(PetFieldParser.SCOPE_UNKNOWN);
+        assertThat(PetFieldParser.parseAllowanceScope(" ")).isEqualTo(PetFieldParser.SCOPE_UNKNOWN);
+    }
+
+    @Test
+    @DisplayName("목줄은 원천이 말했을 때만 true 다 — false 는 '필요 없음' 이 아니라 '말 없음' 이다 (#877)")
+    void parseLeashRequired() {
+        assertThat(PetFieldParser.parseLeashRequired("목줄 착용")).isTrue();
+        assertThat(PetFieldParser.parseLeashRequired("입마개 착용,목줄 착용")).isTrue();
+        assertThat(PetFieldParser.parseLeashRequired("목줄 착용,이동장(켄넬)사용,기타")).isTrue();
+        assertThat(PetFieldParser.parseLeashRequired("자유이용,매너벨트 착용")).isFalse();
+        assertThat(PetFieldParser.parseLeashRequired(null)).isFalse();
+    }
+
+    @Test
+    @DisplayName("관광 API 크기 원문도 기존 규칙으로 읽힌다 — 새 규칙 없이 재사용한다 (#877)")
+    void parseTourApiPetSizeWithExistingRule() {
+        assertThat(PetFieldParser.parseAllowedPetSize("전 견종 동반 가능")).isEqualTo(PetFieldParser.SIZE_ALL);
+        assertThat(PetFieldParser.parseAllowedPetSize("훈련된 5KG 이하 반려견")).isEqualTo(PetFieldParser.SIZE_SMALL_ONLY);
+        assertThat(PetFieldParser.parseAllowedPetSize("15kg 미만 까지만 가능")).isEqualTo(PetFieldParser.SIZE_SMALL_MEDIUM);
+        assertThat(PetFieldParser.parseAllowedPetSize("소형견 1마리")).isEqualTo(PetFieldParser.SIZE_SMALL_ONLY);
+        assertThat(PetFieldParser.parseAllowedPetSize("")).isEqualTo(PetFieldParser.SIZE_UNKNOWN);
+    }
+
     @Test
     @DisplayName("kg 숫자가 있으면 상한으로 보존한다 — enum 은 10kg 경계로 뭉개는 자리")
     void parseExplicitWeightLimit() {

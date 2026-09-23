@@ -65,9 +65,18 @@ public class QuartzScheduleConfig {
     private static final String PLACE_JOBS_BLOCKED_BY =
         "placeDataPipelineJob,placeImportJob,cultureFacilityImportJob,petRestaurantImportJob,placeMergeJob,placeImageBackfillJob,congestionImportJob";
 
+    /**
+     * 파이프라인만 쓰는 목록 — 위 목록 + 여섯 번째 자식 {@code petTourImportJob}(#877).
+     *
+     * <p>그 잡은 place 가 아니라 place_pet_info 만 쓰므로 혼잡도가 기다릴 이유는 없다. 파이프라인은
+     * 다르다 — 사람이 {@code petTourImportJob} 을 단독으로 돌리는 중에 발화하면 자식이 같은 상세를 한 번 더
+     * 불러 쿼터를 두 배로 쓴다. 그래서 파이프라인 쪽에만 더한다.
+     */
+    private static final String PLACE_PIPELINE_BLOCKED_BY = PLACE_JOBS_BLOCKED_BY + ",petTourImportJob";
+
     @Bean
     public JobDetail placeDataPipelineJobDetail() {
-        return newJobDetail(PLACE_PIPELINE_JOB_NAME, PLACE_JOBS_BLOCKED_BY);
+        return newJobDetail(PLACE_PIPELINE_JOB_NAME, PLACE_PIPELINE_BLOCKED_BY);
     }
 
     @Bean

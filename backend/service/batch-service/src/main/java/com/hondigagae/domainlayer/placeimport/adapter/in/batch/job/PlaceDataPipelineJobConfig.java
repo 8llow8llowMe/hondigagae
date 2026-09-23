@@ -12,13 +12,18 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * 장소 적재 5단계를 하나로 잇는 파이프라인 잡.
+ * 장소 적재 6단계를 하나로 잇는 파이프라인 잡.
  *
  * <p>지금까지 순서는 사람이 지켰다 — 문서에 적힌 다섯 줄을 차례로 치는 방식이라 한 줄을
  * 빠뜨리면 중복이 목록에 남거나(병합 누락) 이미지가 비었다(백필 누락). 순서를 코드로 옮긴다.
  * <pre>
  * placeImportJob → cultureFacilityImportJob → petRestaurantImportJob → placeMergeJob → placeImageBackfillJob
+ *   → petTourImportJob
  * </pre>
+ *
+ * <p>{@code petTourImportJob}(#877)이 맨 뒤인 이유 — TourAPI place 행에 동반 조건을 붙이는 단계라
+ * {@code placeImportJob} 뒤면 어디든 되지만, 쿼터가 KorService2 와 따로라 앞 단계의 예산과 다투지 않고
+ * 나머지 단계의 결과에 기대지도 않는다. 뒤에 두면 앞 다섯 단계의 순서와 설명을 건드리지 않는다.
  *
  * <p>실행 방법:
  * <pre>
@@ -26,7 +31,7 @@ import org.springframework.context.annotation.Configuration;
  * </pre>
  * JobParameters — 자식 잡들이 쓰는 파라미터를 부모에 그대로 준다:
  * <ul>
- *   <li>{@code areaCode} — 관광 지역코드 (기본 39=제주). placeImport·placeMerge·placeImageBackfill 이 읽는다</li>
+ *   <li>{@code areaCode} — 관광 지역코드 (기본 39=제주). placeImport·placeMerge·placeImageBackfill·petTourImport 가 읽는다</li>
  *   <li>{@code sido} — 시도 명칭 (기본 제주특별자치도). cultureFacilityImport 가 읽는다</li>
  *   <li>{@code region} — 원천의 짧은 지역 표기 (기본 제주). petRestaurantImport 가 읽는다</li>
  *   <li>{@code contentTypeIds} — 콤마 구분 contentTypeId 목록 (생략 시 기본 대상 7종)</li>
@@ -40,7 +45,7 @@ import org.springframework.context.annotation.Configuration;
  *
  * <p><b>자식이 실패(FAILED)해도 뒤 단계는 계속 간다</b> ({@code .on("*")} 로 exit status 를 가리지 않고 잇는다.
  * 단, 자식이 STOPPED 로 끝나면 Spring Batch 가 파이프라인 자체를 중단하므로 그 경우는 예외다).
- * 다섯 잡이 모두 멱등이고 실패해도 기존 데이터를 지우지 않으므로, 식약처 원천 하나가 404 라고 해서
+ * 여섯 잡이 모두 멱등이고 실패해도 기존 데이터를 지우지 않으므로, 식약처 원천 하나가 404 라고 해서
  * 병합·이미지 백필까지 멈추면 지난 주 데이터마저 손대지 않은 채로 남는다. <b>지난 주 데이터로 판정하는
  * 편이 아예 멈추는 것보다 낫다</b> — 실패한 원천은 다음 실행에서 따라잡는다.
  *
@@ -67,6 +72,7 @@ public class PlaceDataPipelineJobConfig {
     private static final String PET_RESTAURANT_IMPORT_STEP_NAME = "petRestaurantImportJobStep";
     private static final String PLACE_MERGE_STEP_NAME = "placeMergeJobStep";
     private static final String PLACE_IMAGE_BACKFILL_STEP_NAME = "placeImageBackfillJobStep";
+    private static final String PET_TOUR_IMPORT_STEP_NAME = "petTourImportJobStep";
 
     /** FAILED 를 포함해 어떤 exit status 든 다음 단계로 잇는 전이 패턴(STOPPED 는 Batch 가 먼저 중단한다). */
     private static final String ANY_EXIT_STATUS = "*";
@@ -80,7 +86,8 @@ public class PlaceDataPipelineJobConfig {
         Step cultureFacilityImportJobStep,
         Step petRestaurantImportJobStep,
         Step placeMergeJobStep,
-        Step placeImageBackfillJobStep
+        Step placeImageBackfillJobStep,
+        Step petTourImportJobStep
     ) {
         return new JobBuilder(JOB_NAME, jobRepository)
             // 같은 runAt 재실행은 restart 가 되어 COMPLETED 스텝을 건너뛴다 — 새 runAt 만 허용한다 (클래스 javadoc)
@@ -92,6 +99,7 @@ public class PlaceDataPipelineJobConfig {
             .on(ANY_EXIT_STATUS).to(petRestaurantImportJobStep)
             .on(ANY_EXIT_STATUS).to(placeMergeJobStep)
             .on(ANY_EXIT_STATUS).to(placeImageBackfillJobStep)
+            .on(ANY_EXIT_STATUS).to(petTourImportJobStep)
             .on(ANY_EXIT_STATUS).end()
             .end()
             .build();
@@ -146,6 +154,18 @@ public class PlaceDataPipelineJobConfig {
     ) {
         return new StepBuilder(PLACE_IMAGE_BACKFILL_STEP_NAME, jobRepository)
             .job(placeImageBackfillJob)
+            .launcher(jobLauncher)
+            .build();
+    }
+
+    @Bean
+    public Step petTourImportJobStep(
+        JobRepository jobRepository,
+        JobLauncher jobLauncher,
+        @Qualifier("petTourImportJob") Job petTourImportJob
+    ) {
+        return new StepBuilder(PET_TOUR_IMPORT_STEP_NAME, jobRepository)
+            .job(petTourImportJob)
             .launcher(jobLauncher)
             .build();
     }

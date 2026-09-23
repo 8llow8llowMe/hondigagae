@@ -27,6 +27,12 @@ public final class PetFieldParser {
     public static final String ALLOWANCE_NOT_ALLOWED = "NOT_ALLOWED";
     public static final String ALLOWANCE_UNKNOWN = "UNKNOWN";
 
+    // PetAllowanceScope (place_pet_info.allowance_scope, #877)
+    public static final String SCOPE_FULL_AREA = "FULL_AREA";
+    public static final String SCOPE_PARTIAL = "PARTIAL";
+    public static final String SCOPE_OUTDOOR_ONLY = "OUTDOOR_ONLY";
+    public static final String SCOPE_UNKNOWN = "UNKNOWN";
+
     /** "5kg 이하", "10kg이하", "훈련된 5KG 이하" 등에서 무게를 뽑는다. */
     private static final Pattern WEIGHT = Pattern.compile("(\\d+)\\s*kg", Pattern.CASE_INSENSITIVE);
     /** 소형견만 받는 곳을 가르는 기준(kg). 이 값 이하면 소형 전용으로 본다. */
@@ -104,6 +110,41 @@ public final class PetFieldParser {
             return Integer.parseInt(matcher.group(1));
         }
         return null;
+    }
+
+    /**
+     * 동반 가능 구역 (관광 API {@code acmpyTypeCd} → {@code PetAllowanceScope}, #877).
+     *
+     * <p>{@link #parseAllowanceType} 와 같은 문구를 보지만 답하는 질문이 다르다 — 저쪽은 "동반이
+     * 되는가"(장소 필터), 이쪽은 "어디까지 되는가"(상세 표시)다. 원천 값은 "전구역 동반가능" /
+     * "일부구역 동반가능" 두 가지로 확인됐다. 그 밖의 문구는 추측하지 않고 {@code UNKNOWN} 이다.
+     * "야외"·"실외" 는 "일부" 보다 먼저 본다 — "일부 실외 구역" 은 실외 한정이 더 정확한 답이다.
+     */
+    public static String parseAllowanceScope(String raw) {
+        if (isBlank(raw)) {
+            return SCOPE_UNKNOWN;
+        }
+        String value = raw.replace(" ", "");
+        if (value.contains("야외") || value.contains("실외")) {
+            return SCOPE_OUTDOOR_ONLY;
+        }
+        if (value.contains("일부") || value.contains("부분")) {
+            return SCOPE_PARTIAL;
+        }
+        if (value.contains("전구역") || value.contains("모든구역")) {
+            return SCOPE_FULL_AREA;
+        }
+        return SCOPE_UNKNOWN;
+    }
+
+    /**
+     * 목줄 필요 여부 (관광 API {@code acmpyNeedMtr}, #877).
+     *
+     * <p>원천이 "목줄" 을 말했을 때만 true 다. false 는 "필요 없다" 가 아니라 "원천이 말하지 않았다" 이고,
+     * 화면도 true 일 때만 배지를 그린다 — 모름을 true 로 올리지 않는다.
+     */
+    public static boolean parseLeashRequired(String raw) {
+        return !isBlank(raw) && (raw.contains("목줄") || raw.contains("리드줄"));
     }
 
     /** 문화정보원의 Y/N 플래그. 빈 값은 false 로 본다. */

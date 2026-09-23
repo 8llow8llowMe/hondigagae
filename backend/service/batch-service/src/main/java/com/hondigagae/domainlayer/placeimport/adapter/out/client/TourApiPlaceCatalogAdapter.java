@@ -5,12 +5,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportErrorCode;
 import com.hondigagae.domainlayer.placeimport.application.exception.PlaceImportException;
 import com.hondigagae.domainlayer.placeimport.application.port.out.PlaceCatalogPort;
+import com.hondigagae.domainlayer.placeimport.application.port.out.query.PetTourSyncQueryResult;
 import com.hondigagae.domainlayer.placeimport.application.port.out.query.PlaceCatalogQueryResult;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceContentType;
 import com.hondigagae.domainlayer.placeimport.domain.enums.RegionCodeMapping;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlace;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlaceImage;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlaceIntro;
+import com.hondigagae.domainlayer.placeimport.domain.model.ImportedPlacePetInfo;
+import com.hondigagae.domainlayer.placeimport.domain.model.PetFieldParser;
 import com.hondigagae.global.properties.TourApiProperties;
 import java.math.BigDecimal;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
@@ -24,6 +27,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -47,6 +51,11 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
  * 880건만 들어오고 1,244건(58.6%)이 조용히 빠진다. 그래서 <b>원천으로 나가는 쿼리 키만</b>
  * 법정동 시도코드로 옮긴다 — 잡 파라미터와 place 테이블의 적재 범위 키는 계속 관광
  * areaCode(제주=39)다.
+ *
+ * <p><b>반려동물 동반여행(KorPetTourService2)도 이 어댑터가 부른다 (#877).</b> 같은 제공처(B551011)·
+ * 같은 키·같은 응답 래퍼라 전송·서킷({@code tourapi})·응답 분기를 그대로 쓴다. 쿼터만 다르다 —
+ * 공공데이터포털은 트래픽을 <b>활용신청한 API 마다</b> 따로 세므로 KorService2 의 일 1,000건과
+ * 겹치지 않는다.
  */
 @Slf4j
 @Component
@@ -129,6 +138,124 @@ public class TourApiPlaceCatalogAdapter implements PlaceCatalogPort {
             places.add(toImportedPlace(item, areaCode));
         }
         return places;
+    }
+
+    @Override
+    public PetTourSyncQueryResult fetchPetTourSyncList(String areaCode, int pageNo, int numOfRows) {
+        return toPetTourSyncResult(requestRaw(buildPetTourSyncListUri(areaCode, pageNo, numOfRows)), pageNo, numOfRows);
+    }
+
+    @Override
+    public Optional<ImportedPlacePetInfo> fetchDetailPetTour(long contentId) {
+        return toPlacePetInfo(requestRaw(buildDetailPetTourUri(contentId)));
+    }
+
+    /**
+     * 동기화 목록 응답을 읽는다. 전송과 떼어 둔 이유는 테스트다 — 원천 형태(빈 문자열 items 등)를
+     * HTTP 없이 고정한다.
+     *
+     * <p>contentid 가 없는 행은 버린다 — 결합할 키가 없다. {@code showflag} 는 {@code "0"} 일 때만
+     * 내림으로 본다. 비었는데 내림으로 읽으면 멀쩡한 동반 정보를 지우게 된다.
+     */
+    PetTourSyncQueryResult toPetTourSyncResult(String rawBody, int pageNo, int numOfRows) {
+        JsonNode body = parseAndValidate(rawBody);
+
+        List<PetTourSyncQueryResult.Entry> entries = new ArrayList<>();
+        for (JsonNode item : extractItems(body)) {
+            long contentId = item.path("contentid").asLong(0);
+            if (contentId <= 0) {
+                log.warn("pet tour sync item skipped: contentid missing title={}", item.path("title").asText(""));
+                continue;
+            }
+            boolean shown = !"0".equals(item.path("showflag").asText("").trim());
+            entries.add(new PetTourSyncQueryResult.Entry(contentId, shown));
+        }
+        return new PetTourSyncQueryResult(entries, pageNo, numOfRows, body.path("totalCount").asInt(0));
+    }
+
+    /**
+     * 동반 조건 상세 응답을 읽는다.
+     *
+     * <p>{@code items=""} 는 원천에 동반 정보가 없는 콘텐츠다 (2026-09-23 실측: 1839477) — 호출은
+     * 성공했으니 오류가 아니다. 아이템은 왔는데 아홉 칸이 전부 비어도 같은 상태로 본다. 그 행을
+     * 적재하면 장소 상세가 "동반 정보 있음" 으로 읽히는데 말해 주는 것은 하나도 없다.
+     *
+     * <p>원문 아홉 칸은 손대지 않는다(빈 문자열만 null 로 접는다). NOT NULL 가공 세 칸은
+     * {@link PetFieldParser} 의 기존 규칙으로만 채운다 ({@link ImportedPlacePetInfo} 참고).
+     */
+    Optional<ImportedPlacePetInfo> toPlacePetInfo(String rawBody) {
+        JsonNode body = parseAndValidate(rawBody);
+
+        List<JsonNode> items = extractItems(body);
+        if (items.isEmpty()) {
+            return Optional.empty();
+        }
+        // detailPetTour2 는 콘텐츠당 한 건이다. 혹시 여러 건이 와도 첫 건만 쓴다 (detailIntro2 와 같은 결).
+        JsonNode item = items.get(0);
+        ImportedPlacePetInfo petInfo = ImportedPlacePetInfo.builder()
+            .acmpyTypeCd(text(item, "acmpyTypeCd"))
+            .acmpyPsblCpam(text(item, "acmpyPsblCpam"))
+            .acmpyNeedMtr(text(item, "acmpyNeedMtr"))
+            .etcAcmpyInfo(text(item, "etcAcmpyInfo"))
+            .relaAcdntRiskMtr(text(item, "relaAcdntRiskMtr"))
+            .relaFrnshPrdlst(text(item, "relaFrnshPrdlst"))
+            .relaPosesFclty(text(item, "relaPosesFclty"))
+            .relaPurcPrdlst(text(item, "relaPurcPrdlst"))
+            .relaRntlPrdlst(text(item, "relaRntlPrdlst"))
+            .allowanceScope(PetFieldParser.parseAllowanceScope(text(item, "acmpyTypeCd")))
+            .allowedPetSize(PetFieldParser.parseAllowedPetSize(text(item, "acmpyPsblCpam")))
+            .leashRequired(PetFieldParser.parseLeashRequired(text(item, "acmpyNeedMtr")))
+            .build();
+        return hasAnySourceText(petInfo) ? Optional.of(petInfo) : Optional.empty();
+    }
+
+    private boolean hasAnySourceText(ImportedPlacePetInfo petInfo) {
+        return Stream.of(
+                petInfo.acmpyTypeCd(), petInfo.acmpyPsblCpam(), petInfo.acmpyNeedMtr(), petInfo.etcAcmpyInfo(),
+                petInfo.relaAcdntRiskMtr(), petInfo.relaFrnshPrdlst(), petInfo.relaPosesFclty(),
+                petInfo.relaPurcPrdlst(), petInfo.relaRntlPrdlst())
+            .anyMatch(value -> value != null);
+    }
+
+    /**
+     * 동기화 목록. <b>지역은 lDongRegnCd 로 묻는다</b> — 이 서비스도 KorService2 와 같은 필드 구성이라
+     * #726 의 함정이 그대로 있다. 2026-09-23 실측 {@code areaBasedList2} 는 {@code areaCode=39} 가
+     * 23건, {@code lDongRegnCd=50} 이 330건이다(93% 누락). 동기화 목록도 {@code areaCode=39} 31건,
+     * {@code lDongRegnCd=50} 336건이다.
+     */
+    URI buildPetTourSyncListUri(String areaCode, int pageNo, int numOfRows) {
+        String serviceKey = tourApiProperties.serviceKey();
+        if (serviceKey == null || serviceKey.isBlank()) {
+            throw new PlaceImportException(PlaceImportErrorCode.TOUR_API_SERVICE_KEY_MISSING);
+        }
+        String url = "%s/KorPetTourService2/petTourSyncList2?serviceKey=%s&MobileOS=%s&MobileApp=%s&_type=json&lDongRegnCd=%s&pageNo=%d&numOfRows=%d"
+            .formatted(
+                tourApiProperties.baseUrl(),
+                URLEncoder.encode(serviceKey, StandardCharsets.UTF_8),
+                tourApiProperties.mobileOs(),
+                tourApiProperties.mobileApp(),
+                legalDongRegionCode(areaCode),
+                pageNo,
+                numOfRows
+            );
+        return URI.create(url);
+    }
+
+    /** 동반 조건 상세. 콘텐츠당 한 건이라 한 행(numOfRows=1)만 받는다. 서비스명의 {@code 2} 를 빼면 400 이다. */
+    URI buildDetailPetTourUri(long contentId) {
+        String serviceKey = tourApiProperties.serviceKey();
+        if (serviceKey == null || serviceKey.isBlank()) {
+            throw new PlaceImportException(PlaceImportErrorCode.TOUR_API_SERVICE_KEY_MISSING);
+        }
+        String url = "%s/KorPetTourService2/detailPetTour2?serviceKey=%s&MobileOS=%s&MobileApp=%s&_type=json&contentId=%d&pageNo=1&numOfRows=1"
+            .formatted(
+                tourApiProperties.baseUrl(),
+                URLEncoder.encode(serviceKey, StandardCharsets.UTF_8),
+                tourApiProperties.mobileOs(),
+                tourApiProperties.mobileApp(),
+                contentId
+            );
+        return URI.create(url);
     }
 
     /**

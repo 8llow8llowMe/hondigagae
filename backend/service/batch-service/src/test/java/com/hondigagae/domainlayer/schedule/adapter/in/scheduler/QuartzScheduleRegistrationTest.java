@@ -83,6 +83,19 @@ class QuartzScheduleRegistrationTest {
     }
 
     @Test
+    @DisplayName("파이프라인은 place 잡 목록에 동반 조건 잡까지 본다 — 단독 실행과 겹치면 같은 상세를 두 번 부른다 (#877)")
+    void pipelineAlsoBlocksOnPetTourImport() {
+        contextRunner.run(context -> {
+            var jobDataMap = context.getBean(Scheduler.class)
+                .getJobDetail(JobKey.jobKey("placeDataPipelineJob"))
+                .getJobDataMap();
+            assertThat(jobDataMap.getString(SpringBatchLaunchQuartzJob.BLOCKED_BY_KEY))
+                .isEqualTo("placeDataPipelineJob,placeImportJob,cultureFacilityImportJob,"
+                    + "petRestaurantImportJob,placeMergeJob,placeImageBackfillJob,congestionImportJob,petTourImportJob");
+        });
+    }
+
+    @Test
     @DisplayName("다음 발화는 JVM 시간대가 아니라 Asia/Seoul 기준 월요일 03:00 이다")
     void nextFireTimeFollowsConfiguredTimeZone() {
         contextRunner.run(context -> {

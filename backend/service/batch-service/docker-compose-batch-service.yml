@@ -95,6 +95,9 @@ x-batch-service-environment: &batch_service_environment
   # lDongRegnCd 로 조회하면서 대상이 약 964곳 → 2,099곳이 됐고 목록 콜도 17 → 24 이상으로 늘었다.
   # 전량 커버는 3주 → 약 6주 순환이다. 운영계정 키를 받으면 이 값만 올린다.
   PLACE_IMAGE_MAX_CALLS_PER_RUN: ${PLACE_IMAGE_MAX_CALLS_PER_RUN:-380}
+  # [선택] 반려동물 동반 조건(detailPetTour2) 적재의 실행당 호출 상한 (#877). 기본 350.
+  # 쿼터는 KorService2 와 따로 센다. 제주 동반 정보 336건이라 평소에는 걸리지 않는 천장이다.
+  PET_TOUR_MAX_CALLS_PER_RUN: ${PET_TOUR_MAX_CALLS_PER_RUN:-350}
   # [선택] TourAPI 장소 전량 적재의 건수 가드 (#726, #828 로 조였다). 벗어나면 잡을 실패시킨다.
   # 2026-09-21 첫 재적재 실측 2,099 기준으로, 하한은 20% 감소선(1,680) 상한은 2배선(4,200)이다.
   # 근거는 batch-service.md 재적재 절차. min-rows < max-rows 가 아니면 기동에서 죽는다.

@@ -21,6 +21,7 @@ import org.springframework.transaction.PlatformTransactionManager;
  * 병합을 불러서 아직 다른 원천이 들어오지 않은 중간 상태로 판정했다(#363).
  * <pre>
  * placeImportJob → cultureFacilityImportJob → petRestaurantImportJob → <b>placeMergeJob</b> → placeImageBackfillJob
+ *   → petTourImportJob
  * </pre>
  * 재실행은 멱등이다(이미 병합된 행은 후보에서 빠진다).
  * <pre>

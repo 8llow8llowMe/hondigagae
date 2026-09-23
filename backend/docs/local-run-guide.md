@@ -124,7 +124,7 @@ dev 서버(`BACKEND_API_URL=https://api-dev.hondigagae.com`)에 직접 붙는다
 
 ### 실행 순서 (배치)
 
-장소 적재 5단계는 `placeDataPipelineJob` 한 잡으로 묶여 있다(#377). 한 줄이면 된다.
+장소 적재 6단계는 `placeDataPipelineJob` 한 잡으로 묶여 있다(#377). 한 줄이면 된다.
 
 ```bash
 ./gradlew :service:batch-service:bootRun --args="--spring.batch.job.enabled=true --spring.batch.job.name=placeDataPipelineJob areaCode=39 runAt=$(date -Iseconds)"
@@ -137,7 +137,7 @@ dev 서버(`BACKEND_API_URL=https://api-dev.hondigagae.com`)에 직접 붙는다
 **재시도는 새 `runAt` 으로 한다.** 부모가 FAILED 로 끝났을 때 같은 `runAt` 을 다시 넣으면
 `JobRestartException` 으로 시작 전에 거부된다(`preventRestart`). 같은 값을 허용하면 Spring Batch 가
 restart 로 보고 이미 끝난 스텝을 건너뛰어 실패한 원천만 다시 적재하고 병합·백필은 돌지 않는데, 잡은
-COMPLETED 로 끝나 알 길이 없다. 다섯 잡이 모두 멱등이라 새 `runAt` 으로 전체를 다시 도는 것이 맞다.
+COMPLETED 로 끝나 알 길이 없다. 여섯 잡이 모두 멱등이라 새 `runAt` 으로 전체를 다시 도는 것이 맞다.
 
 옛 방식대로 잡을 하나씩 단독 실행하는 것도 그대로 된다(`--spring.batch.job.name=<잡 이름>`).
 그때는 위 순서를 직접 지켜야 하고, **단독 실행과 파이프라인에 같은 `runAt` 을 쓰지 않는다** — 자식

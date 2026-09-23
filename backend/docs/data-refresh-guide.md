@@ -130,6 +130,7 @@ contentUrl = .../cmm/cmm/fileDownload.do?atchFileId=FILE_000000003214426&fileDet
 | `petRestaurantImportJob` | 등록이 계속 느는 원천이라 가장 자주 갱신할 값어치가 있다 |
 | `placeMergeJob` | 모든 원천이 들어온 상태에서 한 번 판정 (#363) |
 | `placeImageBackfillJob` | 흡수된 행은 대상에서 빠지므로 병합 뒤가 맞다 |
+| `petTourImportJob` | 반려동물 동반 조건(`place_pet_info`). 쿼터가 KorService2 와 따로라 앞 단계와 다투지 않는다. 절차·확인은 §10 (#877) |
 
 순서가 중요하다. **중복 병합은 모든 적재가 끝난 뒤 한 번만 돌아야 한다.** 병합은
 `placeMergeJob` 으로 독립됐다(#363) — 예전처럼 각 적재 파사드가 자기 적재 뒤에 부르면
@@ -473,3 +474,64 @@ UPDATE place survivor
 병합이 채우는 컬럼과 각 원천 UPSERT 의 UPDATE 절이 겹치는지는 **더 이상 사람이 기억하지 않는다** —
 `JdbcPlaceBulkAdapterSqlTest` 가 두 SQL 을 실제로 파싱해 대조한다. 병합에 컬럼을 하나 더하면서
 적재 쪽을 안 보면 그 테스트가 먼저 빨개진다.
+
+## 10. 반려동물 동반 조건 — `petTourImportJob` (#877)
+
+`place_pet_info` 를 채운다. 장소 상세의 `petInfo` 가 이 테이블에서 온다. 파이프라인의 마지막 자식이라
+주 1회 자동으로 돌고, 단독 실행도 된다.
+
+### 무엇을 얼마나 부르나 (2026-09-23 실측)
+
+| 단계 | 호출 | 제주 실측 |
+| --- | --- | --- |
+| `petTourSyncList2` (`lDongRegnCd=50`) | 1콜 (1,000행 한 페이지) | **336건** — 노출(`showflag=1`) 330 · 내림(`0`) 6 |
+| `detailPetTour2` | 노출 ∩ place 마스터, 장소당 1콜 | ≤ 330 (상한 `PET_TOUR_MAX_CALLS_PER_RUN`, 기본 350) |
+
+- **쿼터는 KorService2 와 따로다.** 공공데이터포털은 활용신청한 API 마다 일 1,000건을 센다.
+  `placeImportJob` 의 704 와 겹치지 않으므로 한 실행 `1 + 330 = 331` 콜로 **매 실행 전량을 돈다.**
+  상한 350 은 원천이 갑자기 불어났을 때(전국 10,152건이 오는 경우 등)의 천장이다.
+- **지역은 `lDongRegnCd` 로 묻는다.** `areaCode=39` 로 물으면 목록 23건 · 동기화 31건뿐이다 (#726 과 같은 함정).
+- 2,099곳 전부에 상세를 부르지 않는다. 동반 정보가 없는 곳은 `items=""` 로 오므로(실측 1839477) 부르는 만큼 버린다.
+
+### 무엇을 쓰고 무엇을 지우나
+
+- **원문 아홉 칸은 그대로** 적재한다. NOT NULL 가공 세 칸(`allowance_scope` · `allowed_pet_size` ·
+  `leash_required`)은 `PetFieldParser` 의 기존 규칙으로만 채운다 — 모르면 `UNKNOWN` / `false`.
+- **`place` 행의 `pet_allowance_type` · `allowed_pet_size`(필터·적합도 입력)는 건드리지 않는다.**
+  그쪽 반영은 별도 이슈다.
+- **지우는 것은 원천이 `showflag=0` 으로 내렸다고 말한 contentId 뿐이다.** 목록에 없다는 이유로는
+  지우지 않는다 — 부재는 지역 키 오류나 부분 응답에서도 생긴다. 그래서 건수 가드(`ImportVolumeGuard`)가
+  필요 없다: 목록이 줄면 부르는 수가 줄 뿐 지워지는 행은 없고, 불어나도 place 마스터와의 교집합과 상한이
+  호출 수를 묶는다.
+- 상세가 비어 오거나 실패한 곳은 **이미 행이 있으면** `synced_at` 만 민다. 행이 없으면 만들지 않는다 —
+  빈 행은 장소 상세에 "동반 정보 있음" 으로 읽힌다.
+
+### 단독 실행
+
+```powershell
+java -jar $jar `
+  --spring.main.web-application-type=none `
+  --spring.batch.job.enabled=true `
+  --spring.batch.job.name=petTourImportJob `
+  areaCode=39 runAt=$runAt
+```
+
+완료 로그 한 줄에 전부 있다:
+`pet tour import finished. areaCode=39, syncPages=1, shown=330, withdrawn=6, removed=…, targets=…, upserted=…, emptyInfo=…, failedPlaces=…`.
+`shown - targets` 는 원천에는 있는데 place 마스터에 없는(또는 병합·delisted) contentId 수다.
+
+### 확인 SQL
+
+```sql
+-- 채워진 장소 수 (노출 중인 TourAPI 장소 기준)
+SELECT COUNT(*) pet_info_rows
+  FROM place p JOIN place_pet_info ppi ON ppi.place_id = p.id
+ WHERE p.source = 'TOUR_API' AND p.delisted_at IS NULL AND p.merged_into_id IS NULL;
+
+-- 가공 세 칸의 분포 — UNKNOWN 이 대부분이면 원문 분포가 바뀐 것이다
+SELECT allowance_scope, allowed_pet_size, leash_required, COUNT(*)
+  FROM place_pet_info GROUP BY allowance_scope, allowed_pet_size, leash_required ORDER BY 4 DESC;
+
+-- 마지막 적재 시각
+SELECT MIN(synced_at), MAX(synced_at) FROM place_pet_info;
+```
