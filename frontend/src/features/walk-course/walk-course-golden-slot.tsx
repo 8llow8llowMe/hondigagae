@@ -162,7 +162,7 @@ function RegisterPetNotice({ authed }: { authed: boolean }) {
       <div className="bg-band flex flex-col items-start gap-1 rounded-md px-4 py-3">
         <p className="text-body-2 text-fg break-keep">{messages.home.guestVerdictNotice}</p>
 
-        {/* 44px — 모바일 최소 터치 영역 (DESIGN.md §7) */}
+        {/* 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다) */}
         <Link
           href={authed ? '/pets/new' : '/login'}
           className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
@@ -227,7 +227,7 @@ function NoCoordinates() {
           시종점 원문에서 만든 토막은 대부분 0건으로 떨어진다. 빈 검색 화면이
           "결과 없음" 보다 낫다.
 
-          44px — 모바일 최소 터치 영역 (DESIGN.md §7).
+          높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다).
         */}
         <div className="flex flex-col gap-1">
           <Link

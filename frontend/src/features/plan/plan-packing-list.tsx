@@ -588,7 +588,7 @@ function PackingRow({
             {messages.plan.packingUserBadge}
           </Badge>
         )}
-        {/* icon-only 라 `aria-label` 이 접근 가능한 이름이다 (D6). 44px 최소 터치 영역 */}
+        {/* icon-only 라 `aria-label` 이 접근 가능한 이름이다 (D6). 높이 44 는 이 자리의 선택이다 */}
         <button
           type="button"
           onClick={() => onRemove(item.packingItemId)}

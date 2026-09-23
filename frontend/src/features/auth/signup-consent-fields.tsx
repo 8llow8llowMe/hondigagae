@@ -97,7 +97,7 @@ export function SignupConsentFields({
                 target="_blank"
                 rel="noreferrer"
                 aria-label={messages.auth.consentDocumentLinkLabel(document.title)}
-                // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+                // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다)
                 className="text-caption text-brand-600 inline-flex min-h-11 shrink-0 items-center px-1 underline"
               >
                 {messages.auth.consentDocumentLinkText}
