@@ -244,6 +244,7 @@ batch-service 는 **배포와 적재를 분리**한다. 컨테이너를 띄우�
 "컨테이너가 정해진 시각에 스스로 부른다"가 된 것뿐이다.
 
 적재를 지금 당장 한 번 돌려야 하면(첫 배포 직후, 원천 복구 뒤 따라잡기) 아래처럼 부른다.
+잡별 파라미터·백그라운드 실행·결과 확인까지 이어진 절차는 `batch-dev-runbook.md` 에 있다.
 
 ```bash
 docker exec hondigagae-batch-service-dev \
