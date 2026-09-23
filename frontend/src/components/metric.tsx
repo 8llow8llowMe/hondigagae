@@ -304,9 +304,21 @@ export const METRIC_FILL_TONE: Record<MetricTone, string> = {
  * 모른다는 사실은 같은 자리의 글자(`METRIC_WORD_TONE.unknown` = `--fg-muted`)와 `sr-only` 가
  * 낱말로 말한다 — 색이 유일한 채널이 아니다.
  *
- * `--band` 는 값이 `--metric-low-100` 과 같지만 **이 표를 쓰는 축에는 `low` 가 없다**
- * (`walkSafetyTone` 은 `SAFE`/`CAUTION`/`DANGER` → `high`/`mid`/`critical`). 두 면이 한
- * 화면에서 같이 나올 축이 생기면 그때 갈라야 한다.
+ * **`--band` 는 값이 `--metric-low-100` 과 같다 — 그리고 그 축이 실제로 생겼다**
+ * ([#671](https://github.com/8llow8llowMe/hondigagae/issues/671) C-3). 이 주석은 원래
+ * *"두 면이 한 화면에서 같이 나올 축이 생기면 그때 갈라야 한다"* 고 적어 두었는데,
+ * [#842](https://github.com/8llow8llowMe/hondigagae/issues/842) 의 `plan/plan-day-verdict.tsx`
+ * 가 **같은 컴포넌트 안에서 둘 다 쓴다** — 적합도 `LOW` 일자는 `.low`, `verdict.score` 가
+ * `null` 인 일자는 `.unknown` 이다. 두 밴드의 **면이 1.00:1 로 완전히 같다.**
+ *
+ * **그래도 면을 가르지 않는다.** 이 저장소의 tint 는 애초에 밝기로 갈리지 않는다 —
+ * `--metric-mid-100` 과 `--metric-critical-100` 도 서로 1.1:1 미만이고, `contrast.test.ts` 가
+ * 그 사실을 **단언으로 잠가 두었다**. 회색 둘을 조금 다른 회색으로 벌려도 같은 자리에
+ * 머무를 뿐이고, 새 색을 만드는 값은 더 크다.
+ *
+ * **가르는 일은 다른 채널이 한다** — `METRIC_TINT_EDGE_TONE` 의 경계선(`low` 는 `-500`
+ * 실선으로 자기 면 위 4.23:1)과 밴드 안의 낱말이다. 그래서 이 충돌은 주석이 아니라
+ * **`contrast.test.ts` 의 가드**가 지킨다: 두 톤이 **선까지 같아지면** 빨간불이 난다.
  */
 export const METRIC_TINT_TONE: Record<MetricTone, string> = {
   critical: 'bg-metric-critical-100',

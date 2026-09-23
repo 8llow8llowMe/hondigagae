@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { contrastRatio, parseColorTokens, readTokensCss } from '@/test/tokens'
+import { METRIC_TINT_EDGE_TONE } from '@/components/metric'
+import { contrastRatio, parseColorTokens, readGlobalsCss, readTokensCss } from '@/test/tokens'
 
 const tokens = parseColorTokens(readTokensCss())
 
@@ -302,6 +303,71 @@ describe('토큰 대비 — tint 면의 -500 경계선 (비텍스트 3:1, #709)'
     expect(contrastRatio(token('--metric-mid-100'), token('--metric-critical-100'))).toBeLessThan(
       1.1,
     )
+  })
+})
+
+/**
+ * 지도 위 흰 원 마커의 테두리 (#671 B-2 — `.map-cluster` · `.map-pin-order`).
+ *
+ * **이 원은 다른 테두리와 다르다.** 카카오 타일 위에 서는데 타일은 도로가 흰색, 땅이 밝은
+ * 회베이지라 **흰 원과 바닥이 거의 같은 밝기**다 — 테두리가 경계를 혼자 담당한다.
+ * 선은 글자가 아니므로 **WCAG 1.4.11 비텍스트 3:1** 로 잰다.
+ *
+ * `--border-strong`(1.68:1)으로는 미달이었다. 토큰은 알약 마커 시절 것 그대로였는데
+ * 면적이 3177px² → 804px² 로 1/4 이 되면서 그 재검증이 없었다.
+ */
+describe('토큰 대비 — 지도 마커 테두리 (비텍스트 3:1, #671 B-2)', () => {
+  it('마커 테두리가 자기 채움(--bg) 위에서 3:1 이상이다', () => {
+    expect(contrastRatio(token('--fg-subtle'), token('--bg'))).toBeGreaterThanOrEqual(3)
+  })
+
+  /* 되돌림 방지 — 이 값으로 돌아가면 1.68:1 이라 선이 사실상 사라진다 */
+  it('--border-strong 은 이 자리에 쓸 수 없다 — 3:1 미달이 그 이유다', () => {
+    expect(contrastRatio(token('--border-strong'), token('--bg'))).toBeLessThan(3)
+  })
+
+  /*
+    **값만 재면 가드가 아니다.** 위 둘은 토큰 값의 성질일 뿐이라 `globals.css` 를 되돌려도
+    초록이다. 마커 규칙이 실제로 그 토큰을 쓰는지 **선언에서 직접 본다.**
+  */
+  it('마커 규칙이 실제로 --fg-subtle 을 테두리에 쓴다', () => {
+    const rule = /\.map-cluster,\s*\n\.map-pin-order\s*\{([\s\S]*?)\}/.exec(readGlobalsCss())
+
+    expect(rule).not.toBeNull()
+    expect(rule?.[1]).toContain('border: 1px solid var(--fg-subtle)')
+  })
+})
+
+/**
+ * `low` 와 `unknown` 은 **면이 같다** (#671 C-3).
+ *
+ * `--band` 와 `--metric-low-100` 이 같은 값(`#eef0f3`)이라, 두 톤을 함께 쓰는 축에서는
+ * "적합도 낮음" 밴드와 "판정 못 냄" 밴드의 면이 **1.00:1 로 구별되지 않는다.**
+ * `plan/plan-day-verdict.tsx`(#842)가 그 축이다 — 한 컴포넌트가 둘 다 렌더한다.
+ *
+ * **면을 벌리지 않는 이유**는 바로 위 describe 가 잠근 사실이다 — 이 저장소의 tint 는
+ * 서로 밝기로 갈리지 않는다(`mid` vs `critical` 이 1.1:1 미만). 회색 둘을 조금 다른
+ * 회색으로 벌려도 같은 자리에 머무를 뿐이다.
+ *
+ * **그래서 가르는 일은 경계선과 낱말이 한다.** 이 가드는 그 마지막 채널이 사라지는 것을
+ * 막는다 — 면이 같은 채로 **선까지 같아지면** 두 뜻이 화면에서 완전히 하나가 된다.
+ */
+describe('토큰 대비 — low 와 unknown 은 면이 같다, 선이 가른다 (#671 C-3)', () => {
+  /*
+    **"실패해야 좋은" 값이다** — 위 `--metric-mid-100` 단언과 같은 종류다. 누군가 면을
+    벌리면 여기서 멈추고, 그때 이 describe 와 `metric.tsx` 의 주석을 다시 읽으면 된다.
+  */
+  it('면이 실제로 같은 값이다 — 벌어지면 이 가드를 다시 읽는다', () => {
+    expect(token('--band')).toBe(token('--metric-low-100'))
+  })
+
+  it('두 톤의 경계선은 서로 다르다 — 면이 같으므로 선이 유일한 시각 채널이다', () => {
+    expect(METRIC_TINT_EDGE_TONE.unknown).not.toBe(METRIC_TINT_EDGE_TONE.low)
+  })
+
+  /* 면이 같으니 `low` 쪽 선만 3:1 을 넘어도 두 밴드는 갈린다 — 한쪽에만 선이 보인다 */
+  it('low 의 선이 공유하는 면 위에서 비텍스트 3:1 을 넘는다', () => {
+    expect(contrastRatio(token('--metric-low-500'), token('--band'))).toBeGreaterThanOrEqual(3)
   })
 })
 
