@@ -142,7 +142,8 @@ contentUrl = .../cmm/cmm/fileDownload.do?atchFileId=FILE_000000003214426&fileDet
 
 `olleCourseImportJob`(#383, #441)은 장소 파이프라인에 넣지 않는다. 적재 대상이 `place` 가 아니라
 `walk_course` 테이블이라 병합·delisting 어디에도 걸리지 않는다. 문화정보원과 같이 포털에서
-CSV 를 받고 `atchFileId`+바이트 수로 갱신을 감지한다. 스케줄만 따로 월 05:00 에 둔다.
+CSV 를 받고 `atchFileId`+바이트 수로 갱신을 감지한다 — 다만 주소는 JSON-LD 가 아니라 다운로드 버튼
+경로로 얻는다(5절 "올레 포털", #876). 스케줄만 따로 월 05:00 에 둔다.
 
 ### 스케줄러 — batch-service 프로세스 안 Quartz (#378)
 
@@ -206,7 +207,7 @@ JobParameter 로 넘긴다. 시간대를 트리거가 직접 못박는 이유는
 | 전송이 끊겨 파일이 잘림 | `Content-Length` 와 실제 바이트 수를 대조해 거부. 위와 같이 우회 | 없음 |
 | 스냅샷 테이블 조회 실패 (미생성 등) | "모른다"로 접고 그냥 내려받아 적재. `culture facility snapshot unavailable` WARN | 없음 (30MB 를 한 번 더 받을 뿐) |
 | 포털도 막히고 로컬 우회 파일도 없음 | 잡 실패 (`CULTURE_CSV_NOT_FOUND`) | 없음 |
-| 올레 포털 상세 페이지에서 다운로드 링크를 못 찾음 (`SOURCE_PAGE_INVALID`) | **로컬 우회 파일로 적재**하고 계속. `olle course source fallback=local` WARN + 완료 로그 `fallback=true`. 스냅샷은 남기지 않는다. **문화정보원과 달리 지표는 없다**(아래) | 없음 (데이터가 낡을 뿐) |
+| 올레 포털 페이지·다운로드 티켓·CSV 어느 단계든 실패 (`SOURCE_PAGE_FAILED` 받기 실패 · `SOURCE_PAGE_INVALID` 버튼/티켓 이상 · `SOURCE_CIRCUIT_OPEN` · `DOWNLOAD_*`) | **로컬 우회 파일로 적재**하고 계속. `olle course source fallback=local` WARN + 완료 로그 `fallback=true`. 스냅샷은 남기지 않는다. 지표 `walk_course_import_rows{result="fallback"}` 으로 드러난다 (#876) | 없음 (데이터가 낡을 뿐) |
 | 올레 포털도 막히고 로컬 우회 파일도 없음 | 잡 실패 (`CSV_NOT_FOUND`) | 없음 |
 
 공통 원칙은 **낡은 데이터가 빈 데이터보다 낫다**는 것이다. 실패 시 기존 값을 지우지 않는다.
@@ -225,7 +226,7 @@ JobParameter 로 넘긴다. 시간대를 트리거가 직접 못박는 이유는
 잘린 판본이 스냅샷으로 굳고 **다음 실행부터 같은 `atchFileId` 로 영구 SKIP** 된다. 그래서
 헤더 `Content-Length` 가 있으면 디스크에 쓰인 바이트 수와 정확히 같을 때만 통과시킨다.
 
-### 올레 포털은 이미 구조가 바뀌었다 — 우회가 기본 경로다 (2026-09-21)
+### 올레 포털 — JSON-LD 를 버리고 다운로드 버튼 경로로 갈아탔다 (#876)
 
 2026-09-21 dev 재적재에서 `olleCourseImportJob` 이 포털 파싱에 실패해 **로컬 우회 파일로 돌았다.**
 
@@ -233,38 +234,43 @@ JobParameter 로 넘긴다. 시간대를 트리거가 직접 못박는 이유는
 olle course source fallback=local reason=DataDownload contentUrl 없음 (jsonLdBlocks=0)
 ```
 
-**일시적 장애가 아니라 페이지 구조가 바뀐 것이다.** 같은 날 상세 페이지
-(`https://www.data.go.kr/data/15043496/fileData.do`)를 직접 받아 확인했다 — 200 · 약 171KB 로
-**정상 응답이고 데이터셋도 맞는데**(`<title>제주특별자치도_올레코스현황_20260731`),
+일시적 장애가 아니었다. 옛 어댑터는 상세 페이지의 JSON-LD `DataDownload.contentUrl` 을 읽었는데,
+그 경로가 두 번 연달아 다른 이유로 막혔다.
 
-| 어댑터가 찾는 것 | 지금 페이지 |
-| --- | --- |
-| `<script type="application/ld+json">` 블록 | **0개** |
-| `@type: DataDownload` 노드 | **0개** |
-| `contentUrl` 의 `fileDownload.do` · `atchFileId` | **없다** |
-| 내려받기 트리거 | `onclick="fileDetailObj.fn_fileDataDown('15043496', 'uddi:…', '', '1', '1')"` — **JS 함수 호출**이고 식별자도 `atchFileId` 가 아니라 `uddi:` 로 시작하는 상세 PK 다 |
+| 실측일 | JSON-LD | 옛 어댑터 |
+| --- | --- | --- |
+| 2026-09-21 | 블록 **0개** (`fn_fileDataDown(...)` 버튼만 있음) | `DataDownload` 0개 → 우회 |
+| 2026-09-23 | 블록 1개, `contentUrl` 도 있음. 그런데 **JSON 으로 읽히지 않는다** — 제공기관이 쓴 `description` 에 이스케이프 안 된 따옴표(`""…""`)가 들어 있다 | 블록을 통째로 건너뜀 → `DataDownload` 0개 → 우회 |
 
-즉 `DataGoKrOlleCourseSourceAdapter` 의 전략(JSON-LD → `DataDownload.contentUrl` → `atchFileId`)이
-**통째로 낡았다.** 재시도로 낫지 않으므로 지금 상태에서 포털 경로는 매 실행 실패하고 매 실행 우회한다.
+제공기관 설명 문구 한 줄에 원천이 끊기는 경로라 **버튼이 하는 요청을 그대로 따라 하도록** 바꿨다.
+경로는 브라우저 스크립트(`script_fileDetail.js` · `script_cmmFunction.js`)를 읽고 실제로 불러 확정했다
+(`data-api-analysis.md` 10절).
 
-**그런데 이 우회는 문화정보원과 달리 지표가 없다.** 위의 "우회가 오래 이어지는 것은 조용한 고장" 이
-그대로 해당하는데, `place_import_rows{result="fallback"}` 같은 카운터가 올레 쪽에는 없다 — 드러나는
-것은 WARN 한 줄과 완료 로그의 `fallback=true` 뿐이다. **우회가 기본이 되어도 대시보드는 조용하다.**
+```text
+GET  /data/15043496/fileData.do                  → onclick="fn_fileDataDown('15043496','uddi:…','','1','1')"
+POST /tcs/dss/selectFileDataDownload.do          → {"status":true,"atchFileId":"FILE_…","fileDetailSn":"1",…}
+GET  /cmm/cmm/fileDownload.do?atchFileId=…&fileDetailSn=1 → CSV (CP949)
+```
+
+**스냅샷 키는 바꾸지 않았다 — 여전히 `atchFileId` + 바이트 수다.** 티켓이 돌려주는 `atchFileId`
+(`FILE_000000007665534`)가 09-23 JSON-LD `contentUrl` 에 박힌 값과 같다 — 옛 경로가 뽑던 바로 그
+식별자다. `uddi:` 상세 PK 는 파일 단위가 아니라 데이터셋 상세 단위라 파일이 바뀌어도 같을 수 있어
+비교 키로 부적합하다. 그래서 **배포 뒤 첫 실행이 강제 재적재되지 않는다** — 직전 스냅샷(우회 적재는
+스냅샷을 남기지 않으므로 마지막 포털 적재분)과 같은 파일이면 그대로 건너뛴다.
+
+**우회는 이제 지표로 드러난다.** 파사드가 매 실행 `walk_course_import_rows{source="OLLE",result="fallback"}`
+에 1/0 을 쓴다 (`observability-guide.md`). 문화정보원의 `place_import_rows{result="fallback"}` 과 같은
+모양이지만 따로 둔다 — `place_import_rows` 는 장소 마스터 기준이다.
+
+남는 것.
 
 - 우회 파일(`OLLE_COURSE_CSV_PATH`, 기본 `data/olle_course.csv`)은 **저장소에 없다.** 배포 호스트의
-  `BATCH_DATA_DIR` 에 사람이 둔 파일이라, 그것이 언제 판본인지 저장소만 봐서는 알 수 없다.
-- 포털의 현재 파일명이 `..._20260731` 이므로 **우회 파일이 이미 그보다 낡았을 수 있다.** 올레 코스는
-  §1 기준으로 자주 바뀌는 데이터가 아니라 당장 사용자 피해는 없지만, "낡았는지 모르는 상태" 는 남는다.
-- 우회 적재가 스냅샷을 남기지 않는 설계 덕에 **포털 파싱만 고치면 다음 실행이 곧바로 포털로 돌아온다.**
-  되돌리기 위해 지워야 할 상태가 없다.
-
-**고치는 것은 별도 이슈다** (`walkcourseimport` 어댑터의 파싱 전략 교체 + 우회 지표). 이 문서는 그때까지
-**"올레는 우회로 돌고 있다" 가 정상 상태**라는 것을 남긴다 — 모르고 보면 WARN 한 줄을 그냥 지나친다.
-
-> 진단 문구 자체도 오해를 부른다. `jsonLdBlocks=%d` 에 실제로 찍히는 값은 JSON-LD 블록 수가 아니라
-> **찾아낸 `DataDownload` 노드 수**다(`DataGoKrOlleCourseSourceAdapter` 의 `downloads.size()`).
-> 그래서 `jsonLdBlocks=0` 은 "JSON-LD 가 없다" 와 "JSON-LD 는 있는데 `DataDownload` 가 없다" 를
-> 구분해 주지 못한다. 위 어느 쪽인지는 페이지를 직접 받아 봐야 알 수 있었다.
+  `BATCH_DATA_DIR` 에 사람이 둔 파일이라, 그것이 언제 판본인지 저장소만 봐서는 알 수 없다. 포털
+  경로가 되살아났으니 평소에는 읽히지 않지만, 우회 게이지가 1 이 되면 그 파일이 낡았을 수 있음을 함께 의심한다.
+- `check-limit.json`(다운로드 횟수 제한 → 캡차) 은 부르지 않는다. 주 1회 한 파일이라 제한에 걸릴 일이 없고,
+  걸리면 `fileDownload.do` 가 CSV 가 아닌 것을 줄 텐데 그것은 첫 줄 `코스별` 검사가 거른다(→ 우회).
+- 문화정보원 어댑터(`DataGoKrCultureFacilitySourceAdapter`)는 **아직 JSON-LD 경로다.** 같은 포털이라 같은
+  방식으로 끊길 수 있다. 끊기면 `place_import_rows{source="CULTURE_PORTAL",result="fallback"}` 이 먼저 알려 준다.
 
 ## 6. 갱신 상태를 드러내기
 

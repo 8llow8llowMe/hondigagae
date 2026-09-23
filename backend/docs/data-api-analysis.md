@@ -567,3 +567,40 @@ endSpotNm · endRdnmadr · coursInfo · phoneNumber · institutionNm` 로 **위�
 싣지 않았다. 필요해지면 별건으로 연다.
 
 **경로 좌표열을 다시 찾아 나서기 전에 §9-3 을 읽을 것.** 네 곳은 닫혀 있다.
+
+## 10. 제주올레 파일 다운로드 경로 (2026-09-23, #876) — 실호출 검증됨
+
+공공데이터포털 파일데이터(`/data/15043496/fileData.do`)의 "다운로드" 버튼이 무엇을 부르는지
+**페이지 스크립트를 읽고 같은 요청을 직접 보내** 확정했다. 추측으로 만든 URL 이 아니다.
+
+### 10-1. 근거 — 버튼이 부르는 스크립트
+
+| 단계 | 정의 위치 | 하는 일 |
+|------|-----------|---------|
+| `fileDetailObj.fn_fileDataDown(publicDataPk, publicDataDetailPk, atchFileId, fileDetailSn, publicDataHistSn)` | `/js/biz/datset/script_fileDetail.js` | `fn_cmmnAjax` 로 **`POST /tcs/dss/selectFileDataDownload.do`** (form: 네 인자 + `publicDataTyCode=PR0051`) |
+| `fn_fileDataDownCb(data)` | 같은 파일 | 응답 JSON 의 `status` 가 true 면 `fn_fileDataDownload(atchFileId, fileDetailSn, dataNm)` |
+| `fn_fileDataDownload` | `/js/biz/cmm/cmm/script_cmmFunction.js` | `POST /cmm/cmm/check-limit.json` → `needCaptcha=false` 면 **`/cmm/cmm/fileDownload.do?atchFileId=…&fileDetailSn=…`** |
+
+페이지에 박힌 버튼 인자(09-23): `fn_fileDataDown('15043496', 'uddi:5e0b77df-759d-4378-a74f-bd393051521b', '','1', '1')`
+— 세 번째 `atchFileId` 는 **빈 값**이고, 실제 파일 식별자는 티켓 응답에서 받는다.
+
+### 10-2. 실측 응답 (로그인·인증키 없음)
+
+| 요청 | 응답 |
+|------|------|
+| `POST /tcs/dss/selectFileDataDownload.do` | 200, `Content-Type: text/html;charset=UTF-8` 인데 **본문은 JSON**. 최상위 `status=true` · `atchFileId="FILE_000000007665534"` · `fileDetailSn="1"` + `dataSetFileDetailInfo`(`dataNm="제주특별자치도_올레코스현황_20260731"`, `updtDt="2026-09-10 14:47:34"`) |
+| `POST /cmm/cmm/check-limit.json` | `{"needCaptcha":false}` |
+| `GET /cmm/cmm/fileDownload.do?atchFileId=FILE_000000007665534&fileDetailSn=1` | 200, `application/octet-stream`, `Content-Length: 2259`, `Content-Disposition: attachment; filename="…_20260731.csv"`(파일명은 UTF-8 바이트를 ISO-8859-1 로 실은 것), 본문 **CP949** CSV — 첫 줄 `코스별,코스명,거리,소요시간정보,시종점정보,데이터기준일자` |
+
+픽스처: `batch-service/src/test/resources/walkcourseimport/datagokr-olle-page-20260923.html`(페이지에서
+필요한 부분만), `datagokr-olle-download-ticket-20260923.json`(티켓 응답 최상위 + 상세 일부).
+
+### 10-3. 같은 페이지의 JSON-LD 는 왜 안 쓰나
+
+09-23 페이지에도 `<script type="application/ld+json">` 이 있고 `DataDownload.contentUrl`
+(`…fileDownload.do?atchFileId=FILE_000000007665534&fileDetailSn=1&insertDataPrcus=N`)도 들어 있다.
+그런데 **블록이 JSON 으로 읽히지 않는다** — `description` 값이 `""제주특별자치도 내 …"<br/>"` 처럼
+따옴표를 이스케이프하지 않고 원문을 그대로 넣었다. 제공기관이 설명 문구를 고칠 때마다 되살아났다
+끊겼다 할 경로라 기준으로 삼지 않는다. 09-21 실측에서는 블록 자체가 0개였다(`data-refresh-guide.md` §5).
+
+`atchFileId` 는 두 경로가 **같은 값**을 준다. 그래서 스냅샷 비교 키(`atchFileId` + 바이트 수)를 그대로 둔다.
