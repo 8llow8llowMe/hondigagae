@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { MapSheet, type SheetStop } from '@/components/map-sheet'
+import { MAP_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
 import { messages } from '@/lib/messages'
 
 // 이 파일은 화면과 무관한 범용 동작(단계 전환·모달 아님)만 검증한다 —
@@ -146,5 +146,34 @@ describe('MapSheet — 모달이 아니다', () => {
 
     expect(markup).toContain('지도에 보이는 곳 8')
     expect(markup).toContain('목록 자리')
+  })
+})
+
+/**
+ * #901 **D2** — 지도 화면의 `max` 윗변이 **비율이 아니라 px** 이어야 하는 이유.
+ *
+ * 지도 위 플로팅 컨트롤의 바닥은 고정이다: 헤더(56 / md 64) + `top-5`(20) + 컨트롤(44)
+ * = **120 / 128**. `85dvh` 는 812 기준 2px 여유로 튜닝됐지만 비율이라 **800 에서 딱 붙고
+ * 640 에서 24px 덮었다**(실측).
+ */
+describe('MAP_TOP_CONTROLS_INSET — 지도 위 컨트롤을 비켜 간다 (#901 D2)', () => {
+  /** 헤더 64(md) + top-5 20 + 컨트롤 44 */
+  const CONTROLS_BOTTOM_MD = 128
+
+  it('가장 낮은 폭(md)의 컨트롤 바닥보다 크다 — 여유가 남는다', () => {
+    expect(MAP_TOP_CONTROLS_INSET).toBeGreaterThan(CONTROLS_BOTTOM_MD)
+  })
+
+  /** 너무 키우면 `max` 가 목록을 그만큼 잃는다 — 여유는 한 자릿수 십px 이면 족하다 */
+  it('필요 이상으로 크지 않다 — 여유 16px 이내', () => {
+    expect(MAP_TOP_CONTROLS_INSET - CONTROLS_BOTTOM_MD).toBeLessThanOrEqual(16)
+  })
+
+  it('그 값을 주면 max 가 비율이 아니라 px 로 선다', () => {
+    const markup = render('max', { maxTopInset: MAP_TOP_CONTROLS_INSET })
+
+    expect(markup).toContain('100dvh')
+    expect(markup).toContain(`${String(MAP_TOP_CONTROLS_INSET)}px`)
+    expect(markup).not.toContain('85dvh')
   })
 })

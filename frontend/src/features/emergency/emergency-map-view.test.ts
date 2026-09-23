@@ -185,3 +185,22 @@ describe('EmergencyMapView — 위치 안내의 자리 (#883)', () => {
     expect(block).toContain('pointer-events-auto')
   })
 })
+
+/*
+  #901 D2 — 시트 `max` 가 지도 위 검색·보기 전환을 덮지 않는다. 배치라 소스에서 읽히고,
+  이 화면은 카카오 SDK 때문에 node 환경에서 통째로 렌더할 수 없다(위 describe 참고).
+*/
+describe('EmergencyMapView — 시트 최대 단계의 윗변 (#901 D2)', () => {
+  const source = readFileSync(
+    fileURLToPath(new URL('./emergency-map-view.tsx', import.meta.url)),
+    'utf8',
+  )
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+  it('MapSheet 에 maxTopInset 을 넘긴다 — 기본 85dvh 로 떨어지지 않는다', () => {
+    const open = code.indexOf('<MapSheet')
+    const close = code.indexOf('>', open)
+
+    expect(code.slice(open, close)).toContain('maxTopInset={MAP_TOP_CONTROLS_INSET}')
+  })
+})
