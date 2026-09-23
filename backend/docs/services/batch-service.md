@@ -31,6 +31,10 @@
 | `olleCourseImportJob` | 월 05:00 KST (`0 0 5 ? * MON`) |
 | `congestionImportJob` | 매일 06:00 KST (`0 0 6 * * ?`) |
 
+> **이 표는 컨테이너가 떠 있을 때의 이야기다.** 2026-09-23 dev 를 재 보니 `BATCH_JOB_EXECUTION` 27건이
+> 전부 수동 로컬 실행이고 스케줄 창(03·05·06시) 실행은 **0건**이었다 — dev 에서 스케줄이 한 번도 돌지
+> 않았다 (#878). 스케줄이 실제로 도는지는 `jenkins-cicd-dev-deploy-guide.md` §10 의 확인 쿼리로 본다.
+
 - **스위치**: `batch.schedule.enabled` (`BATCH_SCHEDULE_ENABLED`). dev 기본 true, local·CI·prod 기본 false.
   조건은 `batch.schedule.enabled=true` **그리고** `spring.batch.job.enabled=false` 둘 다라,
   `docker exec` 로 잡 하나만 돌리려 띄운 **수동 JVM 에서는 트리거가 등록되지 않고 스케줄러도
