@@ -89,18 +89,24 @@ export function PositionFallbackHead({
         </Button>
       )}
 
-      <p className="text-caption text-fg-muted break-keep">{messages.emergency.regionPickHint}</p>
-
       {/*
-        **권한 거부에만 한 줄 더.** 버튼을 눌러도 프롬프트가 안 뜰 수 있다는 사실을 말한다 —
-        말하지 않으면 사용자는 버튼을 반복해 누르며 화면이 고장난 것으로 읽는다.
-        `timeout` 에 띄우면 엉뚱한 설정을 뒤지게 한다.
+        **힌트는 언제나 한 줄이다** (#671 F-6). 예전에는 `regionPickHint`(항상) 아래
+        `positionDeniedHint`(거부일 때만)가 쌓여 **거부 갈래에서만 caption 이 두 줄**이었다.
+        둘 다 위계가 같은 caption 이고 하는 말도 "남은 길" 하나라, 갈래마다 문구를 바꾸면
+        될 자리를 줄을 늘려 풀고 있었다.
+
+        실측이 그 한 줄을 비싸게 만든다: 권한 **허용** 시 `지금 진료중` 칩이 y=189 이고 첫
+        화면에 전화 버튼이 2개인데, **거부** 시에는 y=395 로 밀려 전화 버튼이 1개만 남는다.
+        위치를 못 쓰는 사람일수록 목록이 더 급한데 그쪽이 더 밀려나 있었다.
+
+        **`timeout` 에 거부 문구를 띄우지 않는 규칙은 그대로다** — 엉뚱한 설정을 뒤지게
+        한다. 갈래가 줄 수에서 문구로 옮겨 갔을 뿐이다.
       */}
-      {reason === 'denied' && (
-        <p className="text-caption text-fg-muted break-keep">
-          {messages.emergency.positionDeniedHint}
-        </p>
-      )}
+      <p className="text-caption text-fg-muted break-keep">
+        {reason === 'denied'
+          ? messages.emergency.regionPickHintDenied
+          : messages.emergency.regionPickHint}
+      </p>
 
       {/*
         **다중 축 칩(`aria-pressed`)이다 — `exclusive` 가 아니다.** 라디오 그룹은 한 번

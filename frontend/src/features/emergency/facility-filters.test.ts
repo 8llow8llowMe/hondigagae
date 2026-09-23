@@ -4,11 +4,14 @@ import {
   applyFilters,
   countsAreComplete,
   facilityCounts,
+  type FilterRelief,
   matchesKeyword,
   narrowByKeyword,
+  reliefLabel,
   reliefs,
 } from '@/features/emergency/facility-filters'
 import { MAX_SIZE } from '@/lib/api/emergency'
+import { messages } from '@/lib/messages'
 import {
   DEFAULT_FACILITY_FILTERS,
   type FacilityFilters,
@@ -324,5 +327,46 @@ describe('검색어와 다른 축이 함께 걸릴 때', () => {
     })
 
     expect(result.map((r) => r.kind)).toEqual(['type', 'keyword'])
+  })
+})
+
+/**
+ * 완화 버튼 문구 (#671 F-4).
+ *
+ * 0건 화면에서는 이 버튼들이 **부제 바로 아래**에 선다. 그래서 두 줄의 숫자가 같은
+ * 화면에서 읽히고, 한쪽이 범위를 밝히지 않으면 서로 부딪힌다 — `제주 4곳` 옆의
+ * `전체 보기 2곳` 은 "전체가 4곳인가 2곳인가" 를 만든다. 기본 ON(`openNowOnly`)이
+ * 0건을 자주 만들어 이 충돌이 전보다 자주 보인다.
+ */
+describe('reliefLabel — 무엇을 푸는 버튼인지 적는다 (#671 F-4)', () => {
+  function label(kind: FilterRelief['kind'], count: number): string {
+    return reliefLabel({ kind, count, next: DEFAULT_FACILITY_FILTERS })
+  }
+
+  it('유형 갈래가 어느 축을 푸는지 말한다 — "전체" 를 홀로 두지 않는다', () => {
+    expect(label('type', 2)).toBe('시설 유형 전체 보기 2곳')
+  })
+
+  /*
+    **범위가 묶여 있어야 부제와 부딪히지 않는다.** `제주 4곳` 과 나란히 서도 이 버튼의
+    "전체" 가 무엇의 전체인지 글자 안에서 끝난다.
+  */
+  it('"전체" 앞에 축 이름이 붙어 있다', () => {
+    const text = messages.emergency.reliefType
+
+    expect(text.indexOf('시설 유형')).toBeLessThan(text.indexOf('전체'))
+  })
+
+  /* 이웃 갈래와 톤이 같다 — 넷 다 "무엇을 하면 몇 곳" 으로 끝난다 */
+  it('네 갈래가 모두 개수로 끝나고 서로 다른 말을 한다', () => {
+    const labels = [
+      label('openNowOnly', 3),
+      label('open24Only', 3),
+      label('type', 3),
+      label('keyword', 3),
+    ]
+
+    for (const text of labels) expect(text.endsWith('3곳')).toBe(true)
+    expect(new Set(labels).size).toBe(4)
   })
 })
