@@ -56,6 +56,34 @@ const DRAG_THRESHOLD_PX = 24
  */
 export const MAP_TOP_CONTROLS_INSET = 136
 
+/**
+ * 여기서 시작한 제스처는 드래그로 치지 않는다 — 각자 자기 일이 있는 컨트롤이다.
+ *
+ * **묶음(`ChipGroup`)은 넣지 않는다.** 그 안의 칩은 `button` 이라 이미 빠지고, 묶음의
+ * 빈 자리는 손잡이로 쓰는 편이 낫다. (그리고 이 파일이 배타 묶음을 *그리는* 것으로
+ * 오인되면 `radio-group-keys.test.ts` 가 키 핸들러를 요구한다 — 이 파일에는 없는 일이다.)
+ */
+const DRAG_IGNORED_SELECTOR = 'button, a, input, select, textarea'
+
+/**
+ * 이 자리에서 시트 드래그를 시작해도 되는가 ([#901](https://github.com/8llow8llowMe/hondigagae/issues/901) **D3**).
+ *
+ * **잡는 자리를 그래버 한 줄(16px)에서 시트 머리 전체로 넓혔다.** 실기기에서 *"어딜 잡고
+ * 올려야 하는지 모르겠다"* 가 나온 자리다 — 보이는 막대는 36×4 인데 드래그를 받는 띠는
+ * 세로 16px 뿐이었고, 조금만 아래를 잡으면 목록이 스크롤됐다.
+ *
+ * **머리 전체를 받되 컨트롤은 뺀다.** 칩·단계 버튼에서 시작한 제스처까지 드래그로 치면
+ * 필터를 누를 수 없다. 그래서 *영역* 이 아니라 *대상* 으로 가른다 — 컨트롤 사이의 빈
+ * 자리도 전부 손잡이가 된다.
+ *
+ * **목록은 여전히 드래그를 안 받는다** — 그쪽이 먹으면 스크롤이 죽는다(아래 주석).
+ */
+export function shouldStartSheetDrag(target: { closest(selector: string): unknown } | null) {
+  if (target === null) return false
+
+  return target.closest(DRAG_IGNORED_SELECTOR) === null
+}
+
 export function MapSheet({
   label,
   stop,
@@ -101,6 +129,9 @@ export function MapSheet({
   const [dragging, setDragging] = useState(false)
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    // 칩·단계 버튼에서 시작한 제스처는 그 컨트롤의 것이다 (#901 D3)
+    if (!shouldStartSheetDrag(event.target as HTMLElement | null)) return
+
     event.currentTarget.setPointerCapture(event.pointerId)
     setDragging(true)
     setDragOffset(0)
@@ -182,33 +213,54 @@ export function MapSheet({
         className,
       )}
     >
-      {/* 그래버 — 이것만 드래그를 받는다. 목록 전체가 드래그를 먹으면 스크롤이 안 된다 */}
+      {/*
+        **시트 머리 전체가 손잡이다** (#901 D3). 예전에는 그래버 줄(세로 16px)만 드래그를
+        받아 *"어딜 잡고 올려야 하는지"* 가 읽히지 않았다 — 조금 아래를 잡으면 목록이
+        스크롤됐다. 이제 그래버 · 필터 줄 · 개수 줄이 모두 드래그를 받고, **그 안의 컨트롤
+        에서 시작한 제스처만** 빠진다(`shouldStartSheetDrag`).
+
+        **`touch-pan-x` 다.** `touch-none` 으로 덮으면 필터 레일의 가로 스크롤이 죽는다 —
+        가로는 브라우저에 넘기고 세로만 이 핸들러가 받는다. 그래버 줄만 `touch-none` 이라
+        거기서는 가로로 끌어도 단계가 움직인다.
+
+        **목록은 여전히 받지 않는다.** 그쪽이 드래그를 먹으면 스크롤이 죽는다.
+      */}
       <div
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className="flex cursor-grab touch-none justify-center pt-2 pb-1 active:cursor-grabbing"
+        className="cursor-grab touch-pan-x active:cursor-grabbing"
       >
-        <span aria-hidden className="bg-border-strong h-1 w-9 rounded-full" />
-      </div>
+        {/* 그래버 — 보이는 손잡이. 잡을 수 있는 자리는 이 줄보다 넓다(위 주석) */}
+        <div className="flex touch-none justify-center pt-2 pb-1">
+          <span aria-hidden className="bg-border-strong h-1 w-9 rounded-full" />
+        </div>
 
-      {/* 필터 같은 전폭 컨트롤. 최소 단계에서도 남으므로 지도를 보면서 조건을 바꿀 수 있다 */}
-      {toolbar !== undefined && <div className="px-3 pb-2">{toolbar}</div>}
+        {/* 필터 같은 전폭 컨트롤. 최소 단계에서도 남으므로 지도를 보면서 조건을 바꿀 수 있다 */}
+        {toolbar !== undefined && <div className="px-3 pb-2">{toolbar}</div>}
 
-      {/**
-       * 드래그를 못 쓰는 입력(키보드·스위치)을 위한 단계 이동. 아이콘 없이 글자로 둔다 —
-       * 드래그 힌트를 흉내 낸 버튼은 무엇을 하는지 읽히지 않는다
-       */}
-      <div className="flex items-center justify-between gap-2 px-4 pb-2">
-        <div className="min-w-0 flex-1">{header}</div>
-        <button
-          type="button"
-          onClick={() => onStopChange(stop === 'max' ? 'min' : 'max')}
-          className="text-caption text-fg-muted hover:text-fg focus-visible:ring-brand-500 shrink-0 rounded-md px-2 py-2 font-semibold focus-visible:ring-2 focus-visible:outline-none"
-        >
-          {stop === 'max' ? messages.map.collapseSheet : messages.map.expandSheet}
-        </button>
+        {/**
+         * 드래그를 못 쓰는 입력(키보드·스위치)을 위한 단계 이동. 아이콘 없이 글자로 둔다 —
+         * 드래그 힌트를 흉내 낸 버튼은 무엇을 하는지 읽히지 않는다.
+         *
+         * **한 단계씩이 아니라 양 끝을 왕복한다 — 의도다** (#901 D4). 드래그는 `nextStop`
+         * 이 한 번에 한 단계만 움직이는데 이 버튼은 `max ↔ min` 을 건넌다. 두 규칙이 다른
+         * 이유는 **하는 일이 다르기 때문**이다: 드래그는 연속 동작이라 지나친 만큼 되돌릴
+         * 수 있지만, 버튼은 그 연속 동작을 **못 쓰는 입력**의 유일한 길이다. 한 단계씩으로
+         * 바꾸면 `min`(지도를 보는 단계)에 **키보드로 갈 방법이 사라진다** — 버튼 하나로
+         * 세 단계를 왕복시키려면 라벨이 무엇을 할지 말하지 못한다.
+         */}
+        <div className="flex items-center justify-between gap-2 px-4 pb-2">
+          <div className="min-w-0 flex-1">{header}</div>
+          <button
+            type="button"
+            onClick={() => onStopChange(stop === 'max' ? 'min' : 'max')}
+            className="text-caption text-fg-muted hover:text-fg focus-visible:ring-brand-500 shrink-0 rounded-md px-2 py-2 font-semibold focus-visible:ring-2 focus-visible:outline-none"
+          >
+            {stop === 'max' ? messages.map.collapseSheet : messages.map.expandSheet}
+          </button>
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>

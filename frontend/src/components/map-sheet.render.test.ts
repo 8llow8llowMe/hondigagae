@@ -3,7 +3,12 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { MAP_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
+import {
+  MAP_TOP_CONTROLS_INSET,
+  MapSheet,
+  type SheetStop,
+  shouldStartSheetDrag,
+} from '@/components/map-sheet'
 import { messages } from '@/lib/messages'
 
 // 이 파일은 화면과 무관한 범용 동작(단계 전환·모달 아님)만 검증한다 —
@@ -175,5 +180,44 @@ describe('MAP_TOP_CONTROLS_INSET — 지도 위 컨트롤을 비켜 간다 (#901
     expect(markup).toContain('100dvh')
     expect(markup).toContain(`${String(MAP_TOP_CONTROLS_INSET)}px`)
     expect(markup).not.toContain('85dvh')
+  })
+})
+
+/**
+ * #901 **D3** — 잡을 곳이 그래버 한 줄(세로 16px)뿐이라 *"어딜 잡고 올려야 하는지"* 가
+ * 읽히지 않았다. 이제 시트 머리 전체가 받고 **그 안의 컨트롤에서 시작한 제스처만** 빠진다.
+ *
+ * 포인터 핸들러는 마크업에 안 남으므로 **판정 함수**로 잠근다 — 실제 DOM 대신 `closest`
+ * 만 흉내 낸 최소 객체를 넘긴다(이 저장소 테스트는 node 환경이라 레이아웃이 없다).
+ */
+describe('shouldStartSheetDrag — 무엇이 드래그를 시작하는가 (#901 D3)', () => {
+  const at = (hit: string | null) => ({ closest: () => (hit === null ? null : hit) })
+
+  it('컨트롤 밖(빈 자리·글자)에서는 드래그를 시작한다', () => {
+    expect(shouldStartSheetDrag(at(null))).toBe(true)
+  })
+
+  it('버튼·링크·입력에서 시작한 제스처는 그 컨트롤의 것이다', () => {
+    expect(shouldStartSheetDrag(at('button'))).toBe(false)
+  })
+
+  it('대상이 없으면 시작하지 않는다', () => {
+    expect(shouldStartSheetDrag(null)).toBe(false)
+  })
+})
+
+/**
+ * 가로 스크롤 레일(필터 칩)이 머리 안에 있다. `touch-none` 으로 덮으면 **칩을 옆으로
+ * 밀 수 없다** — 세로만 받고 가로는 브라우저에 넘긴다.
+ */
+describe('MapSheet — 머리의 터치 규칙 (#901 D3)', () => {
+  it('머리는 touch-pan-x 다 — 가로 스크롤을 브라우저에 남긴다', () => {
+    expect(render('mid')).toContain('touch-pan-x')
+  })
+
+  it('그래버 줄만 touch-none 이다 — 거기서는 가로로 끌어도 단계가 움직인다', () => {
+    const markup = render('mid')
+
+    expect(markup.match(/touch-none/g)).toHaveLength(1)
   })
 })
