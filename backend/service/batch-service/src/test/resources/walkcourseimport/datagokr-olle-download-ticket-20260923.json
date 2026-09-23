@@ -1,0 +1,15 @@
+{
+  "atchFileId": "FILE_000000007665534",
+  "fileDetailSn": "1",
+  "status": true,
+  "dataSetFileDetailInfo": {
+    "publicDataPk": "15043496",
+    "publicDataDetailPk": "uddi:5e0b77df-759d-4378-a74f-bd393051521b",
+    "publicDataHistSn": 1,
+    "publicDataSj": "제주특별자치도_올레코스현황",
+    "publicDataTyCode": "PR0051",
+    "publicDataTyDetailCode": "DATY03",
+    "dataNm": "제주특별자치도_올레코스현황_20260731",
+    "updtDt": "2026-09-10 14:47:34.000"
+  }
+}

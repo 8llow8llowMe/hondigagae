@@ -3,8 +3,10 @@ package com.hondigagae.domainlayer.walkcourseimport.application.service;
 import com.hondigagae.domainlayer.walkcourseimport.application.model.OlleCourseSourceDecision;
 import com.hondigagae.domainlayer.walkcourseimport.application.port.in.WalkCourseImportUseCase;
 import com.hondigagae.domainlayer.walkcourseimport.application.port.out.OlleCourseSnapshotPort;
+import com.hondigagae.domainlayer.walkcourseimport.application.port.out.WalkCourseImportMetricsPort;
 import com.hondigagae.domainlayer.walkcourseimport.application.service.processor.OlleCourseImportProcessor;
 import com.hondigagae.domainlayer.walkcourseimport.application.service.processor.OlleCourseSourceProcessor;
+import com.hondigagae.domainlayer.walkcourseimport.domain.enums.WalkCourseImportResultType;
 import com.hondigagae.domainlayer.walkcourseimport.domain.model.ImportedWalkCourse;
 import com.hondigagae.domainlayer.walkcourseimport.domain.model.OlleCourseSnapshot;
 import java.time.LocalDate;
@@ -33,10 +35,12 @@ public class WalkCourseImportFacade implements WalkCourseImportUseCase {
     private final OlleCourseSourceProcessor olleCourseSourceProcessor;
     private final OlleCourseImportProcessor olleCourseImportProcessor;
     private final OlleCourseSnapshotPort olleCourseSnapshotPort;
+    private final WalkCourseImportMetricsPort walkCourseImportMetricsPort;
 
     @Override
     public OlleCourseImportResult importOlleCourses(boolean forceImport) {
         OlleCourseSourceDecision decision = olleCourseSourceProcessor.resolve(forceImport);
+        recordFallbackFlag(decision);
         if (decision.kind() == OlleCourseSourceDecision.Kind.SKIP_UNCHANGED) {
             log.info("olle course import skipped unchanged fileId={}", decision.fileId());
             return new OlleCourseImportResult(0, true, decision.fileId(), false);
@@ -45,6 +49,7 @@ public class WalkCourseImportFacade implements WalkCourseImportUseCase {
         try {
             LocalDateTime runStartedAt = LocalDateTime.now();
             List<ImportedWalkCourse> imported = olleCourseImportProcessor.importCourses(decision.csvFile());
+            walkCourseImportMetricsPort.recordRows(WalkCourseImportResultType.UPSERTED, imported.size());
             if (!imported.isEmpty() && !decision.fallback()) {
                 recordSnapshot(decision, imported, runStartedAt);
             }
@@ -52,6 +57,20 @@ public class WalkCourseImportFacade implements WalkCourseImportUseCase {
         } finally {
             olleCourseSourceProcessor.cleanUp(decision);
         }
+    }
+
+    /**
+     * 이번 실행이 우회 원천을 썼는지를 1/0 게이지로 남긴다 (#876).
+     *
+     * <p><b>원천이 정해진 모든 실행에서 부른다</b> — 건너뛴 실행과 포털 적재는 0 이다. 게이지는 마지막
+     * 실행 값만 담으므로 우회 다음에 정상 실행이 오면 0 으로 되돌아야 한다. 원천을 못 정해 잡이
+     * 실패하면 부르지 않는다 — 그 실패는 잡 실패로 드러난다.
+     *
+     * <p>포털 페이지 구조가 바뀌어 매 실행 우회 CSV 로 돌던 동안 WARN 한 줄 말고는 아무것도
+     * 그 상태를 드러내지 않았다 ({@code CultureFacilityImportFacade} 의 #379 와 같은 이유).
+     */
+    private void recordFallbackFlag(OlleCourseSourceDecision decision) {
+        walkCourseImportMetricsPort.recordRows(WalkCourseImportResultType.FALLBACK, decision.fallback() ? 1 : 0);
     }
 
     /**

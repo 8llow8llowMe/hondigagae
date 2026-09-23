@@ -184,8 +184,8 @@ resilience4j:
         minimum-number-of-calls: 3
         # 수 MB xlsx 를 받는 경로라 느린 호출 기준을 완화한다.
         slow-call-duration-threshold: 30s
-      # 공공데이터포털 파일 서버(#379). 상세 페이지 + 30MB CSV 다운로드 둘을 함께 센다.
-      # 잡당 두 번뿐이라 mfds 와 같은 이유로 창을 좁게 잡는다.
+      # 공공데이터포털 파일 서버(#379). 문화정보원(상세 페이지 + 30MB CSV)과 올레(상세 페이지 +
+      # 다운로드 티켓 + CSV, #876)를 함께 센다. 잡당 두세 번뿐이라 mfds 와 같은 이유로 창을 좁게 잡는다.
       datagokr:
         base-config: default
         sliding-window-size: 5
