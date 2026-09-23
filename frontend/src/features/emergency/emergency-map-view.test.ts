@@ -1,6 +1,9 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { describe, expect, it } from 'vitest'
 
 import { isSelectionStillValid, PositionNotice } from '@/features/emergency/emergency-map-view'
@@ -135,5 +138,50 @@ describe('PositionNotice', () => {
     expect(buttonOpen).toBeLessThan(pClose)
     // 이전 구현을 감쌌던 flex 래퍼가 없다 — 있었다면 링크가 별도 줄로 밀려난다
     expect(markup).not.toContain('flex-wrap')
+  })
+})
+
+/*
+  #883 — 위치 안내가 시트 본문에서 지도 위로 올라갔다.
+
+  **소스를 읽어 잠근다.** 이 화면은 카카오 SDK·훅·브라우저 위치를 함께 쓰는 클라이언트
+  컴포넌트라 node 환경에서 통째로 렌더할 수 없다(그래서 이 파일의 다른 테스트도
+  `PositionNotice` 와 순수 함수만 만진다). 자리를 되돌리는 변경은 **배치**라 소스에서
+  읽히고, 그것이 이 이슈가 고친 바로 그 결함이다.
+*/
+describe('EmergencyMapView — 위치 안내의 자리 (#883)', () => {
+  const source = readFileSync(
+    fileURLToPath(new URL('./emergency-map-view.tsx', import.meta.url)),
+    'utf8',
+  )
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+
+  /**
+   * 시트 본문 맨 위에 있던 동안에는 `현재 위치로 다시 찾기` 가 **시트를 올려야** 보였다 —
+   * 위치를 못 받아 거리 기준이 흔들린 그 상태에서, 그것을 되돌리는 손잡이가 한 단계 뒤에
+   * 접혀 있었다.
+   */
+  it('시트 본문에는 목록만 넘긴다 — 안내가 목록 자리를 먹지 않는다', () => {
+    const open = code.indexOf('<MapSheet')
+    const close = code.indexOf('</MapSheet>')
+
+    expect(open).toBeGreaterThan(-1)
+    expect(code.slice(open, close)).not.toContain('PositionNotice')
+  })
+
+  /** 데스크톱 좌측 패널이 같은 안내를 이미 세운다 — 둘 다 그리면 한 화면에 두 번 뜬다 */
+  it('지도 위 안내는 lg 미만에서만 그린다', () => {
+    const at = code.indexOf('PositionNotice reason={board.fallback}')
+    const block = code.slice(Math.max(0, at - 400), at)
+
+    expect(block).toContain('lg:hidden')
+  })
+
+  /** 바깥 플로팅 컨테이너가 `pointer-events-none` 이라 면에서 다시 켜지 않으면 안 눌린다 */
+  it('지도 위 안내 면은 포인터 이벤트를 다시 켠다', () => {
+    const at = code.indexOf('PositionNotice reason={board.fallback}')
+    const block = code.slice(Math.max(0, at - 400), at)
+
+    expect(block).toContain('pointer-events-auto')
   })
 })

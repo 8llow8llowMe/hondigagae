@@ -16,8 +16,17 @@ import {
 /**
  * 지도 보기의 필터 줄 — 패널 머리와 시트 툴바가 같은 것을 쓴다.
  *
- * **`/places` 의 `PlaceMapFilterBar` 와 같은 자리·같은 문법이다.** 1행은 유형 축
- * 가로 스크롤러, 2행은 나머지 축이다.
+ * **한 줄이다** (#883). 375 실화면에서 두 줄 구조가 감겨 **세 줄 약 150px** 을 먹었고,
+ * 그만큼이 시트 최소 단계의 본문에서 빠져 목록이 거의 남지 않았다. 축을 하나의 가로
+ * 스크롤러에 싣고 칩은 모바일에서 36(`Chip size="sm"`)으로 내려간다 — 44 하한은 이제
+ * 지도 위 타깃에만 있다(`DESIGN.md` §7).
+ *
+ * **순서는 목록 갈래와 같다** (#654 E-3): 진료중 · 24시간 · 유형 · 반경. `EmergencyFilterChips`
+ * 가 두 줄로 두는 그 순서를 한 줄로 편 것이고, 같은 축이 두 보기에서 다른 순서로 서면
+ * 보기를 바꿀 때마다 다시 배운다. `초기화` 는 손댄 축이 있을 때만 끝에 붙는다.
+ *
+ * **`/places` 의 `PlaceMapFilterBar` 는 아직 두 줄이다.** 저쪽은 유형이 9종이라 한 줄에
+ * 합치면 뒤쪽 유형이 스크롤 한참 뒤로 밀린다 — 그 판단은 그 파일의 머리주석이 갖는다.
  *
  * **개수는 호출부가 넘긴 배열에서 센다.** 지도 갈래는 **영역 안 · `applyFilters` 전**
  * 배열을 넘긴다 — 캡션이 "지도에 보이는 12곳" 인데 칩이 "병원 120" 이면 두 숫자가
@@ -76,69 +85,83 @@ export function EmergencyFilterBar({
 
   return (
     <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
-      {/* ── 1행: 영업 조건 · 반경 · 초기화 ───────────────────────────────
-          **목록 갈래와 같은 순서다** (#654 E-3). 두 갈래가 같은 축을 다른 순서로
-          늘어놓으면 보기를 전환할 때 사용자가 다시 배워야 한다 — 상태는 이미
-          `useEmergencyBoard` 하나를 공유하고 있다. `지금 진료중` 은 **기본이 켜져 있어**
-          (`DEFAULT_FACILITY_FILTERS`) 여기서도 첫 칩이어야 "왜 마커가 줄었나" 에 답한다 */}
-      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <ChipGroup label={messages.emergency.narrowGroupLabel} className="flex gap-1.5">
-          <Chip
-            selected={filters.openNowOnly}
-            onSelect={() => onFiltersChange({ ...filters, openNowOnly: !filters.openNowOnly })}
-          >
-            {labelWithCount(messages.emergency.openNow, counts.openNow, showCounts)}
-          </Chip>
-          <Chip
-            selected={filters.open24Only}
-            onSelect={() => onFiltersChange({ ...filters, open24Only: !filters.open24Only })}
-          >
-            {labelWithCount(messages.emergency.open24, counts.open24, showCounts)}
-          </Chip>
-        </ChipGroup>
+      {/* ── 한 줄: 진료중 · 24시간 · 유형 · 반경 · 초기화 ──────────────────
+          `.scroll-rail`(globals.css)이 화살표를 앉히는 기준면이고 **스크롤러 자신이
+          flex 컨테이너**다. 바깥 div 를 스크롤러로 삼으면 마지막 칩이 잘린다
+          (`components/scroll-rail.tsx`).
 
-        <EmergencyRadiusChip radius={radius} onRadiusChange={onRadiusChange} />
-
-        {dirty && (
-          <Chip
-            selected={false}
-            onSelect={() => onFiltersChange(DEFAULT_FACILITY_FILTERS)}
-            className="shrink-0"
-          >
-            {messages.place.resetFilters}
-          </Chip>
-        )}
-      </div>
-
-      {/* ── 2행: 유형 ─────────────────────────────────────────────────────
-          `.scroll-rail`(globals.css)이 화살표를 앉히는 기준면이고 **묶음 자신이
-          스크롤러**다. 바깥 div 를 스크롤러로 삼으면 마지막 칩이 잘린다 */}
+          **두 축이 한 스크롤러 안에 든다.** `role` 은 묶음이 갖는 것이라(다중=`group`,
+          택일=`radiogroup`) 한 줄에 실어도 보조기기에서는 여전히 두 축이다 — 스크롤러는
+          레이아웃일 뿐 이름을 갖지 않는다. */}
       <div className="scroll-rail">
-        <ChipGroup
+        <div
           ref={rail.ref}
           onScroll={rail.onScroll}
-          label={messages.emergency.typeGroupLabel}
-          exclusive
-          className={cn('flex scrollbar-none gap-1.5 overflow-x-auto', rail.fadeClassName)}
+          className={cn(
+            'flex min-w-0 scrollbar-none items-center gap-1.5 overflow-x-auto',
+            rail.fadeClassName,
+          )}
         >
-          <Chip
-            exclusive
-            selected={filters.type === null}
-            onSelect={() => onFiltersChange({ ...filters, type: null })}
-          >
-            {labelWithCount(messages.emergency.typeAll, counts.all, showCounts)}
-          </Chip>
-          {FACILITY_TYPE_CODES.map((code) => (
+          <ChipGroup label={messages.emergency.narrowGroupLabel} className="flex shrink-0 gap-1.5">
             <Chip
-              key={code}
-              exclusive
-              selected={filters.type === code}
-              onSelect={() => onFiltersChange({ ...filters, type: code })}
+              size="sm"
+              selected={filters.openNowOnly}
+              onSelect={() => onFiltersChange({ ...filters, openNowOnly: !filters.openNowOnly })}
             >
-              {labelWithCount(messages.emergency.typeByCode[code], counts.byType[code], showCounts)}
+              {labelWithCount(messages.emergency.openNow, counts.openNow, showCounts)}
             </Chip>
-          ))}
-        </ChipGroup>
+            <Chip
+              size="sm"
+              selected={filters.open24Only}
+              onSelect={() => onFiltersChange({ ...filters, open24Only: !filters.open24Only })}
+            >
+              {labelWithCount(messages.emergency.open24, counts.open24, showCounts)}
+            </Chip>
+          </ChipGroup>
+
+          <ChipGroup
+            label={messages.emergency.typeGroupLabel}
+            exclusive
+            className="flex shrink-0 gap-1.5"
+          >
+            <Chip
+              size="sm"
+              exclusive
+              selected={filters.type === null}
+              onSelect={() => onFiltersChange({ ...filters, type: null })}
+            >
+              {labelWithCount(messages.emergency.typeAll, counts.all, showCounts)}
+            </Chip>
+            {FACILITY_TYPE_CODES.map((code) => (
+              <Chip
+                key={code}
+                size="sm"
+                exclusive
+                selected={filters.type === code}
+                onSelect={() => onFiltersChange({ ...filters, type: code })}
+              >
+                {labelWithCount(
+                  messages.emergency.typeByCode[code],
+                  counts.byType[code],
+                  showCounts,
+                )}
+              </Chip>
+            ))}
+          </ChipGroup>
+
+          <EmergencyRadiusChip size="sm" radius={radius} onRadiusChange={onRadiusChange} />
+
+          {dirty && (
+            <Chip
+              size="sm"
+              selected={false}
+              onSelect={() => onFiltersChange(DEFAULT_FACILITY_FILTERS)}
+              className="shrink-0"
+            >
+              {messages.place.resetFilters}
+            </Chip>
+          )}
+        </div>
 
         <ScrollRailArrows
           rail={rail}
@@ -147,12 +170,6 @@ export function EmergencyFilterBar({
         />
       </div>
 
-      {/*
-        백엔드 스키마가 화면에 알리라고 명시한 사실이다. **여기만 켰을 때 뜬다** —
-        목록 갈래(`EmergencyFilterChips` · `NarrowFields`)는 늘 세워 두지만, 이 줄은
-        375 시트 툴바 위에 얹혀 세로가 없다. 캡션 한 줄이 전화 버튼을 화면 밖으로
-        미는 일이 실제로 있었다 (`messages.emergency.positionDenied` 주석).
-      */}
       {filters.open24Only && (
         <p className="text-caption text-fg-muted break-keep">
           {open24Note(counts.open24, showCounts)}

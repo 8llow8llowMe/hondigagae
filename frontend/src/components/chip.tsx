@@ -41,8 +41,24 @@ export type ChipProps = {
    * 스크린리더가 읽는 이름과 화면에 보이는 이름이 갈린다.
    */
   label?: string
+  /**
+   * 높이 축 — 기본 `md`(44)이고 `sm` 은 **모바일에서만 36**(`h-9`)으로 내려간다 (#883).
+   *
+   * **44 하한은 이제 지도 위 타깃에만 있다** (`DESIGN.md` §7). 지도 화면은 칩이 지도와
+   * 시트를 함께 밀어내는 유일한 자리라 — 375 에서 여섯 칩이 44 로 서니 세 줄 약 150px 을
+   * 먹었다 — 거기서만 작게 간다. **768 이상에서는 `md` 와 같다**: 폭이 남는 자리에서 칩만
+   * 작아지면 같은 컨트롤이 화면마다 다른 크기가 된다.
+   *
+   * 나머지 화면의 칩은 아직 `md` 다. 옮기는 것은 화면별 후속이다 (#883 본문).
+   */
+  size?: 'md' | 'sm'
   children: ReactNode
   className?: string
+}
+
+const SIZE_CLASS: Record<NonNullable<ChipProps['size']>, string> = {
+  md: 'h-11 px-3',
+  sm: 'h-9 px-2 md:h-11 md:px-3',
 }
 
 export function Chip({
@@ -51,6 +67,7 @@ export function Chip({
   exclusive = false,
   expanded,
   label,
+  size = 'md',
   children,
   className,
 }: ChipProps) {
@@ -79,8 +96,9 @@ export function Chip({
       title={label}
       onClick={onSelect}
       className={cn(
-        // 모바일 최소 터치 영역 44px (DESIGN.md §7)
-        'text-body-2 inline-flex h-11 items-center gap-1.5 rounded-md border px-3 whitespace-nowrap transition-colors',
+        'text-body-2 inline-flex items-center gap-1.5 rounded-md border whitespace-nowrap transition-colors',
+        // 높이·좌우 여백은 size 가 갖는다 — 44 하한은 지도 위 타깃에만 남았다 (DESIGN.md §7, #883)
+        SIZE_CLASS[size],
         'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
         // **테두리는 선택 여부와 무관하게 항상 있다** — 없으면 칩이 그냥 글자로 보여
         // 누를 수 있다는 것을 알 수 없다 (아트보드 `01 목록 — 모바일`: 미선택도 1px 테두리).

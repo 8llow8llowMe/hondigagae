@@ -565,6 +565,27 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
             {board.inJeju && <MapLocateButton onLocate={board.locate} />}
           </div>
         </div>
+
+        {/*
+          **위치 안내는 지도 위 · 검색 줄 아래다** (#883). 시트 본문 맨 위에 있던 동안에는
+          `현재 위치로 다시 찾기` 를 보려면 **시트를 올려야 했다** — 위치를 못 받아 거리
+          기준이 흔들린 바로 그 상태에서, 그것을 되돌리는 손잡이가 한 단계 뒤에 접혀 있었다.
+          여기로 올리면 시트 본문은 통째로 목록에 돌아간다.
+
+          **`lg:hidden` 이다.** 데스크톱은 좌측 패널이 같은 안내를 검색·필터 아래에 이미
+          세운다(아래) — 둘 다 그리면 같은 문장이 한 화면에 두 번 뜬다.
+
+          바깥 컨테이너가 `pointer-events-none` 이라 **면에 다시 켜 준다** — 안 켜면 안내
+          안의 다시 찾기 버튼이 눌리지 않는다. 지도 타일 위에 뜨는 글이라 면과 테두리를
+          함께 둔다(`.map-research-offset` 알약과 같은 판단).
+        */}
+        {board.fallback !== null && (
+          <div className="content-container px-4 pt-2 md:px-10 lg:hidden">
+            <div className="bg-bg border-border pointer-events-auto max-w-md rounded-lg border px-3 py-2 shadow-md">
+              <PositionNotice reason={board.fallback} onRetry={board.locate} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── 데스크톱: 좌측 400 고정 패널 ─────────────────────────────────── */}
@@ -638,9 +659,12 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
 
       {/* ── 모바일: 하단 시트 3단 ────────────────────────────────────────── */}
       {/*
-        **시트에서는 위치 안내가 캡션 줄 아래에 온다** — 패널과 순서가 다르다.
-        `MapSheet` 에 `header` 위 슬롯이 없고, 그것을 위해 prop 을 더하면 `/places` 도
-        같이 바뀐다. 한 번 읽고 마는 설명이라 스크롤 영역 맨 위가 맞는 자리다.
+        **시트 본문은 목록만 갖는다** (#883). 위치 안내는 지도 위로 올라갔다(위) — 여기
+        맨 위에 있던 동안에는 한 번 읽고 마는 설명이 목록 자리를 먹었고, 그 안의
+        `현재 위치로 다시 찾기` 는 시트를 올려야 보였다.
+
+        개수 줄(`caption`)은 `header` 슬롯이라 **스크롤 영역 밖**이고 최소 단계에서도 남는다
+        (`map-sheet.tsx`) — 본문을 차지하지 않는다.
       */}
       <MapSheet
         label={messages.emergency.sheetLabel}
@@ -649,11 +673,6 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
         toolbar={toolbar}
         header={caption}
       >
-        {board.fallback !== null && (
-          <div className="border-border border-b px-4 py-3">
-            <PositionNotice reason={board.fallback} onRetry={board.locate} />
-          </div>
-        )}
         {body}
       </MapSheet>
     </div>

@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils/cn'
  *  - **배경 덮개가 없다.** 시트가 열려 있어도 지도 이동·확대가 계속 먹는다
  *  - **모달이 아니다.** 포커스를 가두지 않는다 — 지도와 시트를 오가야 한다
  *  - 단계는 **최소 / 중간 / 최대** 3단이고 손을 떼면 가장 가까운 단계로 붙는다(스냅)
- *  - **최소 단계에서만 탭바가 보인다.** 그 위 단계에서는 시트가 탭바 자리를 쓴다
+ *  - **어느 단계에서도 탭바를 덮지 않는다** (#883). 시트 바닥은 언제나 탭바 위다
  *
  * 드래그는 Pointer Events 하나로 처리한다 — 마우스·터치·펜이 같은 코드로 돌고,
  * `setPointerCapture` 가 손가락이 시트 밖으로 나가도 추적을 유지한다.
@@ -121,24 +121,41 @@ export function MapSheet({
     stop === 'max' && maxTopInset > 0
       ? `max(${String(STOP_RATIO.mid * 100)}dvh, 100dvh - ${String(maxTopInset)}px)`
       : `${String(STOP_RATIO[stop] * 100)}dvh`
-  const height = `calc(${base} - ${String(Math.round(dragOffset))}px)`
+
+  /*
+    **탭바 몫을 높이에서 뺀다 — `min` 만 빼지 않는다** (#883).
+
+    시트 바닥은 이제 어느 단계에서도 `--tabbar-h` 위다(`.map-sheet-clears-tabbar`). 바닥만
+    올리고 높이를 그대로 두면 **윗변이 탭바 높이만큼 함께 올라간다** — 812 기기의 `max` 는
+    y=122 에서 y=58 로 올라가 `/places` 의 상단 컨트롤(`absolute top-5`, 아래 `maxTopInset`
+    주석의 "2px 차로 비껴간다")을 덮는다. 빼 두면 **윗변이 지금 자리 그대로**이고 돌려주는
+    것은 바닥 64px 뿐이다.
+
+    `min` 은 예외가 아니라 **이미 탭바 위에 있었다** — 그 단계만 옛 규칙에서도 바닥이
+    `--tabbar-h` 였다. 여기서 또 빼면 최소 단계 본문이 98px 로 줄어, 이 이슈가 늘리려는
+    바로 그 높이를 깎는다.
+
+    `--map-sheet-tabbar` 는 `.map-sheet-clears-tabbar` 가 주는 값이다 — 탭바가 없는
+    768 이상에서 `0px` 이 되어야 하는데, 그 분기는 CSS 미디어 쿼리가 갖는다.
+  */
+  const clearsTabbar = stop === 'min' ? '' : ' - var(--map-sheet-tabbar, 0px)'
+  const height = `calc(${base} - ${String(Math.round(dragOffset))}px${clearsTabbar})`
 
   return (
     <section
       aria-label={label}
       style={{ height }}
       className={cn(
-        // `develop` 의 DESIGN.md z-index 스케일: 모바일 탭바는 "흐름 내 컨트롤에 붙은
-        // 팝오버" 층(z-40)이고, `BottomSheet`/`Modal`/`Toast` 는 그 위 "오버레이" 층(z-50)이다.
-        // 이 시트도 z-40 을 썼던 시절에는 탭바와 같은 층이라 DOM 순서가 승패를 갈랐고,
-        // 탭바가 나중에 그려져 시트의 하단 64px 을 덮었다(min 이 아닌 단계에서 시트가
-        // `bottom-0` 을 쓰기 때문). z-50 으로 올려 이 컴포넌트 헤더 주석의 "그 위 단계에서는
-        // 시트가 탭바 자리를 쓴다" 는 문장을 실제로 성립시킨다. `BottomSheet` 와 같은 층을
-        // 쓰지만 이 시트는 배경 덮개·`aria-modal`·포커스 트랩이 전혀 없다 — 오직 쌓임 순서만
-        // 그쪽과 같아졌을 뿐, 모달이 되지는 않는다.
-        'bg-bg border-border fixed inset-x-0 z-50 flex flex-col rounded-t-xl border-t shadow-lg lg:hidden',
-        // 최소 단계에서만 탭바가 보인다. 그 위에서는 시트가 탭바 자리를 쓴다
-        stop === 'min' ? 'map-sheet-above-tabbar' : 'bottom-0',
+        // **`z-30` 이다 — 탭바(`z-40`) 아래다** (#883). 예전에는 `z-50`(오버레이 층)이었고
+        // 그 근거가 "시트가 탭바 위에 선다" 하나였는데, 그 결정 자체를 되받았다: 탭바는
+        // 어느 단계에서도 보이고 시트에 가리지 않는다. 남은 자리는 DESIGN.md z 스케일의
+        // "sticky 표면 · 지도 위 플로팅 컨트롤"(`z-30`)이고, 실제로 이 시트가 그것이다 —
+        // 배경 덮개도 `aria-modal` 도 포커스 트랩도 없어 `Modal`·`Toast` 와 같은 층에
+        // 있을 이유가 애초에 없었다. 층을 내려도 겹칠 것이 없다: 바닥이 늘 탭바 위라
+        // 탭바와 면이 만나지 않고, 헤더(`z-40`)는 시트 윗변보다 위에 있다.
+        'bg-bg border-border fixed inset-x-0 z-30 flex flex-col rounded-t-xl border-t shadow-lg lg:hidden',
+        // 어느 단계에서도 탭바 자리를 비운다 (위 `clearsTabbar` 주석)
+        'map-sheet-clears-tabbar',
         // 끄는 동안에는 전환을 끈다 — 손가락을 따라오지 못하고 끈적여 보인다
         !dragging && 'transition-[height] duration-200',
         className,

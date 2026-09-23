@@ -29,9 +29,12 @@ import { RADIUS_OPTIONS } from '@/lib/url/emergency-filters'
 export function EmergencyRadiusChip({
   radius,
   onRadiusChange,
+  size,
 }: {
   radius: number
   onRadiusChange: (next: number) => void
+  /** 여는 칩의 높이 축 — 지도 갈래만 `sm`(모바일 36)을 준다 (#883, `Chip` 의 `size`) */
+  size?: 'md' | 'sm'
 }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(radius)
@@ -42,6 +45,7 @@ export function EmergencyRadiusChip({
         // 기본 반경이 아니면 사용자가 손댄 축이다 — tint 로 그 사실만 말한다
         selected={radius !== RADIUS_OPTIONS[0]}
         expanded={open}
+        {...(size === undefined ? {} : { size })}
         onSelect={() => {
           setDraft(radius)
           setOpen(true)
