@@ -127,7 +127,7 @@ export function WalkCourseRow({
         */
         aria-label={`${course.courseLabel} ${course.name}`}
         className={cn(
-          // `min-h-11` 은 44px — 모바일 최소 터치 영역 (DESIGN.md §7). 사진이 없는 카드가 여기 걸린다
+          // `min-h-11` 은 행 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883). 사진이 없는 카드가 여기 걸린다
           'border-border bg-bg block h-full min-h-11 overflow-hidden rounded-lg border transition-colors',
           'hover:bg-band',
           'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',

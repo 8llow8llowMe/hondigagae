@@ -76,7 +76,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="bg-bg-sunken flex min-h-dvh w-full flex-col items-center justify-center gap-8 px-4 py-10">
       <header className="flex justify-center">
         {/*
-          44px — 모바일 최소 터치 영역 (DESIGN.md §7). 헤더 로고 링크와 같은 값이고,
+          높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다). 헤더 로고 링크와 같은 값이고,
           글자 크기가 아니라 히트 영역만 키운다.
 
           **`h-11` 이 아니라 `min-h-11` 이다.** 심볼이 48px 이라 고정 44px 안에서는

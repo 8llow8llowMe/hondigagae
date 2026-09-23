@@ -70,7 +70,7 @@ export default function PlanCreatePage() {
         */}
         <Link
           href="/plans"
-          // 44px — 모바일 최소 터치 영역 (DESIGN.md §7). 텍스트 크기는 그대로 두고
+          // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다). 텍스트 크기는 그대로 두고
           // 히트 영역만 키운다
           className="text-body-2 text-fg-muted inline-flex h-11 items-center justify-center self-center underline"
         >

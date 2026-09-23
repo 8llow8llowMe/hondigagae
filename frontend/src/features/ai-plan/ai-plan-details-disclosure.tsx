@@ -78,7 +78,7 @@ export function AiPlanDetailsDisclosure({
             소비한 뒤 조용히 포커스에 실패한다.
           */
           {...(open ? { 'aria-controls': panelId } : {})}
-          // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+          // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다)
           className="focus-visible:ring-brand-500 -mx-2 flex min-h-11 items-center gap-2 rounded-md px-2 text-left focus-visible:ring-2 focus-visible:outline-none"
         >
           <ChevronDownIcon

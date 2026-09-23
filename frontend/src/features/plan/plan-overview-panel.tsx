@@ -358,7 +358,7 @@ function PlanVerdictToc({ verdicts }: { verdicts: PlanDayWeatherItem[] }) {
         {shown.map((verdict) => (
           <li key={verdict.day}>
             {/*
-              44px 터치 영역 (D6).
+              행 높이 44 (D6) — §7 하한이 아니라 세부명세가 정한 값이다.
 
               **면만 넓힌다** (`-mx-2 px-2`, #845). 인셋 없이 `hover:bg-band` 만 주면 회색
               면이 글자에 딱 붙은 각진 띠로 그려져, 호버할 때마다 카드 안에 경계 없는

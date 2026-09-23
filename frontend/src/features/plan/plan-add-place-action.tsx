@@ -60,7 +60,7 @@ export function planAddPlaceAction(
   return (
     <Button
       variant="secondary"
-      // 이 화면의 주 행동이라 44px 를 준다 — sm(32px)은 최소 터치 영역 미만이다
+      // 이 화면의 주 행동이라 44 를 준다 — sm(32px)은 이 자리에 너무 작다
       size="md"
       loading={pending}
       disabled={disabled && !pending}

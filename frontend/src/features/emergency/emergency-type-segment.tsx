@@ -89,7 +89,7 @@ function Option({
       onKeyDown={handleRadioGroupKeyDown}
       onClick={onSelect}
       className={cn(
-        // 44px — 급할 때 누르는 컨트롤이라 최소 터치 영역을 지킨다 (DESIGN.md §7)
+        // 높이 44 — **급할 때 누르는 컨트롤이라** 크게 잡는다 (§7 하한이 아니라 그 사실이 근거다 · #883)
         'text-body-2 flex h-11 min-w-0 flex-1 items-center justify-center px-2 transition-colors',
         // 테두리가 바깥 한 겹이라 offset 을 주면 [테두리·흰틈·링] 세 겹이 된다 (DESIGN.md 포커스 링 표)
         'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:-outline-offset-2 focus-visible:outline-none',

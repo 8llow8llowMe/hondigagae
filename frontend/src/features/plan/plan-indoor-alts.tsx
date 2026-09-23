@@ -137,7 +137,7 @@ function PlanIndoorAlternativeRow({
 
   return (
     <li className="flex items-center gap-3">
-      {/* min-h-11 — 보강 전이라 주소 줄이 없어도 44px 터치 영역을 잃지 않는다 (DESIGN.md §7) */}
+      {/* min-h-11 — 보강 전이라 주소 줄이 없어도 행이 44 아래로 내려가지 않는다 (§7 하한이 아니다 · #883) */}
       <Link
         href={`/places/${alternative.placeId}`}
         className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 min-h-11 min-w-0 flex-1 py-2 font-medium break-keep focus-visible:ring-2 focus-visible:outline-none"

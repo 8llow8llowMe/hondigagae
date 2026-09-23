@@ -179,7 +179,7 @@ function SegmentOption({
       onKeyDown={handleRadioGroupKeyDown}
       onClick={onSelect}
       className={cn(
-        // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+        // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다)
         'text-body-2 flex h-11 min-w-0 flex-1 items-center justify-center px-2 transition-colors',
         /*
           **데스크톱에서는 칸이 제 라벨 폭을 갖는다** (#818).
