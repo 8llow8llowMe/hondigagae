@@ -32,7 +32,7 @@
 
 > **이 표는 컨테이너가 떠 있을 때의 이야기다.** 2026-09-23 dev 를 재 보니 `BATCH_JOB_EXECUTION` 27건이
 > 전부 수동 로컬 실행이고 스케줄 창(03·05·06시) 실행은 **0건**이었다 — dev 에서 스케줄이 한 번도 돌지
-> 않았다 (#878). 스케줄이 실제로 도는지는 `jenkins-cicd-dev-deploy-guide.md` §10 의 확인 쿼리로 본다.
+> 않았다 (#878). 스케줄이 실제로 도는지는 `../batch-dev-runbook.md` §3 으로 본다.
 
 - **스위치**: `batch.schedule.enabled` (`BATCH_SCHEDULE_ENABLED`). dev 기본 true, local·CI·prod 기본 false.
   조건은 `batch.schedule.enabled=true` **그리고** `spring.batch.job.enabled=false` 둘 다라,

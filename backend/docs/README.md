@@ -32,6 +32,8 @@
   - FE 계정 UX 연동 — 비밀번호 재설정, 일반↔소셜 연결/전환, hasPassword 분기, 에러 표
 - `data-refresh-guide.md`
   - 장소 데이터 최신화 — 소스별 갱신 주기, 사라진 장소 처리, 급감 가드
+- `batch-dev-runbook.md`
+  - dev 서버 batch-service 운영 — 컨테이너 띄우기, 스케줄 확인, `docker exec` 수동 잡 실행, 결과 확인
 - `local-run-guide.md`
   - 로컬 기동 절차, 포트 맵, Swagger 접근, 자주 겪는 문제
 - `deploy-guide.md`
