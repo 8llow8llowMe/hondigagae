@@ -9,13 +9,8 @@ import {
   type LatLng,
   toLatLng,
 } from '@/lib/geo/coord'
-import {
-  cellSizeFor,
-  clusterByGrid,
-  clusterMarkerLabel,
-  clusterMarkerText,
-} from '@/lib/map/cluster'
-import { pinContent } from '@/lib/map/pin-content'
+import { cellSizeFor, clusterByGrid } from '@/lib/map/cluster'
+import { clusterContent, type PinContent, pinContent } from '@/lib/map/pin-content'
 import type { MapRouteSegment } from '@/lib/map/route'
 import { loadKakaoMaps, MapSdkError, type MapSdkFailure } from '@/lib/map/sdk'
 import { MAP_LAYER_Z, markerZIndex } from '@/lib/map/stacking'
@@ -476,7 +471,12 @@ export function MapCanvas({
       if (first === undefined) continue
 
       const content = isCluster
-        ? clusterElement(group.items.length, () => {
+        ? /*
+            **묶음도 `pinElement` 과 같은 applier 를 거친다** (#671 F-5). 예전에는
+            `clusterElement` 가 따로 있어 `textContent` 와 `aria-label` 을 직접 꽂았고,
+            그 배선은 어느 테스트도 보지 않았다.
+          */
+          markerElement(clusterContent(group.items.length), () => {
             /*
               묶음을 누르면 그 구역으로 확대한다 (아트보드 05).
 
@@ -715,16 +715,31 @@ export function MapCanvas({
  * 개별 핀. **이름을 쓴다** — 4~12곳 규모라 핀만 찍으면 눌러봐야 안다
  * (아트보드 `혼디가개 긴급 시설` 02).
  *
- * **여기는 조립만 한다.** 무엇으로 그릴지(태그·역할·이름·클래스)는 `lib/map/pin-content.ts`
- * 가 정하고 `pin-content.test.ts` 가 잠근다 — DOM API 로 만드는 이 자리는 `document` 가
- * 없는 node 환경 테스트에서 볼 수 없어서, 판단만 떼어 냈다.
+ * **판단은 여기 없다.** 무엇으로 그릴지는 `pinContent` 가 정하고 `pin-content.test.ts` 가
+ * 잠근다 — 이 함수는 `interactive` 와 `onClick` 이 **같은 사실을 두 번 말하지 않게** 묶는
+ * 매듭이다. 둘이 어긋나면 `role="img"` 인 요소에 클릭 리스너가 붙는다.
+ */
+function pinElement(pin: MapPin, selected: boolean, onClick: (() => void) | null): HTMLElement {
+  return markerElement(pinContent(pin, { selected, interactive: onClick !== null }), onClick)
+}
+
+/**
+ * `PinContent` 서술자를 DOM 으로 **바르기만 한다** — 핀도 묶음도 이 하나를 거친다.
+ *
+ * ### 왜 하나인가
+ *
+ * 예전에는 묶음이 `clusterElement` 로 따로 조립돼 `textContent` 와 `aria-label` 을 직접
+ * 꽂았고, **그 배선을 보는 테스트가 없었다** — 둘을 바꿔 꽂아도 초록이었다 (#671 F-5).
+ * DOM API 로 만드는 이 자리는 `document` 가 없는 node 환경 테스트에서 볼 수 없으므로
+ * (`docs/testing-guide.md` §1), 잠그는 방법은 **판단을 전부 밖으로 빼고 통로를 하나로
+ * 좁히는 것**뿐이다. 통로가 하나면 `pin-content.test.ts` 가 잠근 규칙이 묶음에도 그대로
+ * 적용되고, 남는 위험("묶음이 이 통로를 안 거침")은 `map-canvas-marker-wiring.test.ts` 의
+ * 소스 그렙이 막는다.
  *
  * `onClick` 이 `null` 이면 **버튼이 아니다** (#789 — 고를 것이 없는 지도). 그 갈래에서는
  * `type` 도 클릭 리스너도 붙지 않는다.
  */
-function pinElement(pin: MapPin, selected: boolean, onClick: (() => void) | null): HTMLElement {
-  const content = pinContent(pin, { selected, interactive: onClick !== null })
-
+function markerElement(content: PinContent, onClick: (() => void) | null): HTMLElement {
   const element = document.createElement(content.tag)
   element.className = content.className
 
@@ -748,28 +763,6 @@ function pinElement(pin: MapPin, selected: boolean, onClick: (() => void) | null
   }
 
   return element
-}
-
-/**
- * 묶음. **지름 32 숫자 원형 마커다** (진단 E-1 [P0] · 시안 §3 ①). 누르면 그 구역으로
- * 확대한다.
- *
- * 라벨 알약("이 지역 42곳")이었을 때는 폭이 글자 수만큼 늘어 390px 밀집 구간에서
- * 알약끼리 서로 덮었다. 폭을 고정하면 겹침 면적이 줄고, **개수가 늘어도 그 폭이
- * 변하지 않는다** — 글자는 `clusterMarkerText` 가 네 글자 안으로 접는다.
- *
- * **문구를 지우는 것이 아니라 옮긴다.** 보조기기는 여전히 "이 지역 42곳" 을 읽는다
- * (`aria-label`). 숫자만 남은 마커는 눈으로는 읽히지만 이름으로는 "42" 가 되어,
- * 무엇이 42인지 알 수 없어진다.
- */
-function clusterElement(count: number, onClick: () => void): HTMLElement {
-  const button = document.createElement('button')
-  button.type = 'button'
-  button.className = 'map-cluster'
-  button.textContent = clusterMarkerText(count)
-  button.setAttribute('aria-label', clusterMarkerLabel(count))
-  button.addEventListener('click', onClick)
-  return button
 }
 
 function toMapBounds(sw: KakaoLatLng, ne: KakaoLatLng): MapBounds {

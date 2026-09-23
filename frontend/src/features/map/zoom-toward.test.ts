@@ -37,7 +37,13 @@ function between(from: string, to: string): string {
 }
 
 const helper = between('function zoomToward(', 'export type MapPin')
-const clusterHandler = () => between('? clusterElement(', 'const overlay = new maps.CustomOverlay(')
+/*
+  **앵커가 `clusterElement(` 에서 옮겨졌다** (#671 F-5). 묶음도 핀과 같은 applier
+  (`markerElement`)를 거치게 되며 그 이름이 사라졌다 — 이 테스트가 재는 것(묶음 핸들러가
+  제 손으로 `setLevel`·`panTo` 를 부르지 않는다)은 그대로다.
+*/
+const clusterHandler = () =>
+  between('markerElement(clusterContent(', 'const overlay = new maps.CustomOverlay(')
 
 describe('zoomToward — 확대와 이동의 순서 (#873)', () => {
   /*

@@ -80,19 +80,26 @@ describe('clusterMarkerText', () => {
     expect(clusterMarkerText(42)).toBe('42')
   })
 
-  it('세 자리도 그대로 쓴다 — 135 는 실제로 나오는 값이다', () => {
-    expect(clusterMarkerText(135)).toBe('135')
-    expect(clusterMarkerText(999)).toBe('999')
+  it('두 자리까지 그대로 쓴다 — 접기 직전이 99 다', () => {
+    expect(clusterMarkerText(98)).toBe('98')
+    expect(clusterMarkerText(99)).toBe('99')
   })
 
-  it('네 자리부터 접는다 — 지름 32 를 넘기느니 접는 쪽이 낫다', () => {
-    expect(clusterMarkerText(1000)).toBe('999+')
-    expect(clusterMarkerText(12345)).toBe('999+')
+  /**
+   * **상한이 `999` 에서 `99` 로 내려왔다** (#671 D-1). 이전 근거는 "네 글자가 안쪽 30px 에
+   * 들어간다" 였는데 30px 은 정사각 패딩 박스라 원에 쓸 수 없는 자였다. 글자가 쓸 수 있는
+   * 폭은 현(弦) 28.69px 이고 네 글자 실측은 29.5px — 넘친다.
+   */
+  it('세 자리부터 접는다 — 원이 늘어나느니 접는다', () => {
+    expect(clusterMarkerText(100)).toBe('99+')
+    expect(clusterMarkerText(135)).toBe('99+')
+    expect(clusterMarkerText(1000)).toBe('99+')
+    expect(clusterMarkerText(12345)).toBe('99+')
   })
 
-  it('어떤 개수든 네 글자를 넘지 않는다 — 원이 늘어나는 유일한 경로를 막는다', () => {
+  it('어떤 개수든 세 글자를 넘지 않는다 — 원이 늘어나는 유일한 경로를 막는다', () => {
     for (const count of [2, 9, 10, 99, 100, 135, 999, 1000, 99999]) {
-      expect(clusterMarkerText(count).length).toBeLessThanOrEqual(4)
+      expect(clusterMarkerText(count).length).toBeLessThanOrEqual(3)
     }
   })
 
@@ -104,9 +111,27 @@ describe('clusterMarkerText', () => {
 })
 
 describe('clusterMarkerLabel', () => {
-  it('보조기기에는 접지 않은 실제 개수를 말한다 — 눈에 보이는 999+ 는 접힌 값이다', () => {
+  it('접히지 않은 개수는 그대로 말한다', () => {
     expect(clusterMarkerLabel(42)).toBe('이 지역 42곳')
-    expect(clusterMarkerLabel(1200)).toBe('이 지역 1200곳')
+    expect(clusterMarkerLabel(99)).toBe('이 지역 99곳')
+  })
+
+  /*
+    **WCAG 2.5.3 (Label in Name)** — 원에 보이는 글자가 접근성 이름 안에 있어야 한다.
+    상한을 세 글자로 내리며 접히는 묶음이 흔해졌으므로(#671 D-1) 여기가 갈리면
+    음성 입력 사용자가 화면에서 읽은 대로 부를 수 없다.
+  */
+  it('접힌 묶음은 이름도 접힌 글자를 쓴다 — 보이는 것과 갈리지 않는다', () => {
+    expect(clusterMarkerLabel(100)).toBe('이 지역 99+곳')
+    expect(clusterMarkerLabel(135)).toBe('이 지역 99+곳')
+    expect(clusterMarkerLabel(1200)).toBe('이 지역 99+곳')
+  })
+
+  /* 구조 불변식 — 경계 밖까지 훑어 둘이 갈릴 자리가 없다는 것을 잠근다 */
+  it('어떤 개수에서도 이름이 보이는 글자를 담는다', () => {
+    for (const count of [0, 1, 9, 42, 98, 99, 100, 101, 999, 1000, 12345]) {
+      expect(clusterMarkerLabel(count)).toContain(clusterMarkerText(count))
+    }
   })
 
   it('문구는 messages 정본에서 온다', () => {
