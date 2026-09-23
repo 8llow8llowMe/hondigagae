@@ -118,7 +118,7 @@ public class DataGoKrOlleCourseSourceAdapter implements OlleCourseSourcePort {
             .bodyToMono(String.class)
             .block(Duration.ofMillis(properties.readTimeoutMs())));
 
-        OlleCourseSourceQueryResult source = parseDownloadTicket(ticket, properties.baseUrl());
+        OlleCourseSourceQueryResult source = parseDownloadTicket(ticket, properties.baseUrl(), properties.datasetId());
         log.info("olle course source resolved publicDataDetailPk={} fileId={} fileDetailSn={}",
             trigger.publicDataDetailPk(), source.fileId(), source.fileDetailSn());
         return source;
@@ -208,10 +208,30 @@ public class DataGoKrOlleCourseSourceAdapter implements OlleCourseSourcePort {
         }
     }
 
+    /**
+     * 첫 줄만 떼어 두 인코딩으로 본다.
+     *
+     * <p>엄격 디코딩(REPORT)이라 멀티바이트 글자 중간에서 자르면 정상 CSV 도 거부된다. 그래서 고정
+     * 길이가 아니라 첫 {@code \n} 바이트에서 자른다 — {@code 0x0A} 는 UTF-8 에서도 MS949 에서도
+     * 멀티바이트 글자 안에 나오지 않는다. 첫 줄이 {@value #HEADER_PROBE_BYTES} 바이트를 넘으면
+     * 헤더가 아니라고 본다.
+     */
     static boolean headerLooksLikeCsv(Path tempFile) throws IOException {
-        byte[] bytes = Files.readAllBytes(tempFile);
-        byte[] probe = bytes.length > HEADER_PROBE_BYTES ? java.util.Arrays.copyOf(bytes, HEADER_PROBE_BYTES) : bytes;
+        byte[] probe = firstLineBytes(tempFile);
         return firstLineContains(probe, StandardCharsets.UTF_8) || firstLineContains(probe, Charset.forName("MS949"));
+    }
+
+    private static byte[] firstLineBytes(Path tempFile) throws IOException {
+        byte[] head;
+        try (java.io.InputStream in = Files.newInputStream(tempFile)) {
+            head = in.readNBytes(HEADER_PROBE_BYTES);
+        }
+        for (int i = 0; i < head.length; i++) {
+            if (head[i] == '\n') {
+                return java.util.Arrays.copyOf(head, i);
+            }
+        }
+        return head;
     }
 
     private static boolean firstLineContains(byte[] bytes, Charset charset) {
@@ -291,8 +311,11 @@ public class DataGoKrOlleCourseSourceAdapter implements OlleCourseSourcePort {
      * <p>응답은 {@code Content-Type: text/html} 이지만 본문은 JSON 이다. 쓰는 것은 최상위
      * {@code status}·{@code atchFileId}·{@code fileDetailSn} 셋이고, 실패면 {@code status=false}
      * 와 {@code error} 문구가 온다.
+     *
+     * <p>{@code dataSetFileDetailInfo.publicDataPk} 가 있으면 {@code datasetId} 와 대조한다 — 페이지에서
+     * 버튼을 고를 때와 같은 방어다. 남의 파일이 스냅샷으로 굳으면 다음 실행부터 조용히 SKIP 된다.
      */
-    static OlleCourseSourceQueryResult parseDownloadTicket(String json, String baseUrl) {
+    static OlleCourseSourceQueryResult parseDownloadTicket(String json, String baseUrl, String datasetId) {
         if (json == null || json.isBlank()) {
             throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID, "다운로드 티켓 빈 응답");
         }
@@ -307,6 +330,11 @@ public class DataGoKrOlleCourseSourceAdapter implements OlleCourseSourcePort {
             throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID,
                 "다운로드 티켓 status=false error=%s".formatted(text(tree, "error")));
         }
+        String ticketDatasetId = text(tree.path("dataSetFileDetailInfo"), "publicDataPk");
+        if (ticketDatasetId != null && !ticketDatasetId.isBlank() && !ticketDatasetId.trim().equals(datasetId)) {
+            throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID,
+                "다운로드 티켓 publicDataPk=%s 가 datasetId=%s 와 다름".formatted(ticketDatasetId, datasetId));
+        }
 
         String fileId = text(tree, "atchFileId");
         String fileDetailSn = text(tree, "fileDetailSn");
@@ -314,10 +342,13 @@ public class DataGoKrOlleCourseSourceAdapter implements OlleCourseSourcePort {
             throw new WalkCourseImportException(WalkCourseImportErrorCode.SOURCE_PAGE_INVALID,
                 "다운로드 티켓에 atchFileId·fileDetailSn 없음");
         }
-        // 인코딩하지 않는다 - 문자열 URI 는 WebClient 가 템플릿으로 한 번 더 인코딩한다
+        // 인코딩하지 않은 문자열로 만든다. UriComponentsBuilder.toUriString() 은 encode 까지 하므로
+        // build().toUriString() 을 쓴다 - 문자열 URI 는 openApiWebClient 의 DefaultUriBuilderFactory 가
+        // 보낼 때 한 번 인코딩한다. 여기서도 하면 두 번이 된다.
         String contentUrl = UriComponentsBuilder.fromUriString(baseUrl + FILE_DOWNLOAD_PATH)
             .queryParam("atchFileId", fileId)
             .queryParam("fileDetailSn", fileDetailSn)
+            .build()
             .toUriString();
         return new OlleCourseSourceQueryResult(fileId, fileDetailSn, contentUrl);
     }
