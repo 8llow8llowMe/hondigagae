@@ -30,7 +30,6 @@ public final class PetFieldParser {
     // PetAllowanceScope (place_pet_info.allowance_scope, #877)
     public static final String SCOPE_FULL_AREA = "FULL_AREA";
     public static final String SCOPE_PARTIAL = "PARTIAL";
-    public static final String SCOPE_OUTDOOR_ONLY = "OUTDOOR_ONLY";
     public static final String SCOPE_UNKNOWN = "UNKNOWN";
 
     /** "5kg 이하", "10kg이하", "훈련된 5KG 이하" 등에서 무게를 뽑는다. */
@@ -116,23 +115,23 @@ public final class PetFieldParser {
      * 동반 가능 구역 (관광 API {@code acmpyTypeCd} → {@code PetAllowanceScope}, #877).
      *
      * <p>{@link #parseAllowanceType} 와 같은 문구를 보지만 답하는 질문이 다르다 — 저쪽은 "동반이
-     * 되는가"(장소 필터), 이쪽은 "어디까지 되는가"(상세 표시)다. 원천 값은 "전구역 동반가능" /
-     * "일부구역 동반가능" 두 가지로 확인됐다. 그 밖의 문구는 추측하지 않고 {@code UNKNOWN} 이다.
-     * "야외"·"실외" 는 "일부" 보다 먼저 본다 — "일부 실외 구역" 은 실외 한정이 더 정확한 답이다.
+     * 되는가"(장소 필터), 이쪽은 "어디까지 되는가"(상세 표시)다.
+     *
+     * <p><b>실측된 두 원문만 옮긴다.</b> 2026-09-23 제주 표본 29건의 값은 "전구역 동반가능" 16 ·
+     * "일부구역 동반가능" 13 뿐이었다. 그 밖의 문구(예: "전구역 동반가능(야외 포함)")는 추측하지 않고
+     * {@code UNKNOWN} 이다 — {@code OUTDOOR_ONLY} 는 원천에서 본 적이 없어 이 규칙이 내지 않는다.
+     * 규칙을 넓히는 것은 가공 규칙 별도 이슈의 몫이다. 공백 차이("전 구역")만 흡수한다.
      */
     public static String parseAllowanceScope(String raw) {
         if (isBlank(raw)) {
             return SCOPE_UNKNOWN;
         }
         String value = raw.replace(" ", "");
-        if (value.contains("야외") || value.contains("실외")) {
-            return SCOPE_OUTDOOR_ONLY;
-        }
-        if (value.contains("일부") || value.contains("부분")) {
-            return SCOPE_PARTIAL;
-        }
-        if (value.contains("전구역") || value.contains("모든구역")) {
+        if (value.equals("전구역동반가능")) {
             return SCOPE_FULL_AREA;
+        }
+        if (value.equals("일부구역동반가능")) {
+            return SCOPE_PARTIAL;
         }
         return SCOPE_UNKNOWN;
     }

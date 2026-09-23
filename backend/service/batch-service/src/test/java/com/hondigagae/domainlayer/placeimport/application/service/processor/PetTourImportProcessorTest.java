@@ -101,6 +101,22 @@ class PetTourImportProcessorTest {
     }
 
     @Test
+    @DisplayName("동기화 목록은 20페이지에서 멈춘다 — totalCount 가 이상한 날 목록 호출만으로 예산을 태우지 않는다")
+    void stopsAtSyncPageCap() {
+        when(placeCatalogPort.fetchPetTourSyncList(eq(JEJU), anyInt(), anyInt()))
+            .thenAnswer(invocation -> {
+                int pageNo = invocation.getArgument(1);
+                return new PetTourSyncQueryResult(List.of(new Entry(pageNo, true)), pageNo, 1, Integer.MAX_VALUE);
+            });
+        when(placePetInfoBulkPort.findTourApiTargets(anyCollection(), anyInt())).thenReturn(List.of());
+
+        processor.importPetTourInfos(JEJU);
+
+        verify(placeCatalogPort, times(PetTourImportProcessor.MAX_SYNC_PAGES))
+            .fetchPetTourSyncList(eq(JEJU), anyInt(), anyInt());
+    }
+
+    @Test
     @DisplayName("동기화 목록이 실패하면 아무것도 쓰지 않고 실패한다 — 대상 없이 지울 것도 부를 것도 정할 수 없다")
     void syncFailureWritesNothing() {
         when(placeCatalogPort.fetchPetTourSyncList(eq(JEJU), anyInt(), anyInt()))

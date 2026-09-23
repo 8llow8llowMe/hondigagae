@@ -15,11 +15,14 @@ class PetFieldParserTest {
      * acmpyTypeCd 는 "전구역 동반가능" 16 · "일부구역 동반가능" 13, 두 값뿐이었다.
      */
     @Test
-    @DisplayName("동반 구역은 확인된 두 원문을 옮기고 모르는 문구는 UNKNOWN 이다 (#877)")
+    @DisplayName("동반 구역은 실측된 두 원문만 옮기고 그 밖의 문구는 추측하지 않고 UNKNOWN 이다 (#877)")
     void parseAllowanceScope() {
         assertThat(PetFieldParser.parseAllowanceScope("전구역 동반가능")).isEqualTo(PetFieldParser.SCOPE_FULL_AREA);
         assertThat(PetFieldParser.parseAllowanceScope("일부구역 동반가능")).isEqualTo(PetFieldParser.SCOPE_PARTIAL);
-        assertThat(PetFieldParser.parseAllowanceScope("일부 실외 구역 동반가능")).isEqualTo(PetFieldParser.SCOPE_OUTDOOR_ONLY);
+        assertThat(PetFieldParser.parseAllowanceScope("전 구역 동반가능")).isEqualTo(PetFieldParser.SCOPE_FULL_AREA);
+        // 야외와 전구역이 함께 나오는 문구를 한쪽으로 좁히지 않는다
+        assertThat(PetFieldParser.parseAllowanceScope("전구역 동반가능(야외 포함)")).isEqualTo(PetFieldParser.SCOPE_UNKNOWN);
+        assertThat(PetFieldParser.parseAllowanceScope("일부 실외 구역 동반가능")).isEqualTo(PetFieldParser.SCOPE_UNKNOWN);
         assertThat(PetFieldParser.parseAllowanceScope("동반 가능")).isEqualTo(PetFieldParser.SCOPE_UNKNOWN);
         assertThat(PetFieldParser.parseAllowanceScope(null)).isEqualTo(PetFieldParser.SCOPE_UNKNOWN);
         assertThat(PetFieldParser.parseAllowanceScope(" ")).isEqualTo(PetFieldParser.SCOPE_UNKNOWN);
