@@ -255,8 +255,21 @@ GET  /cmm/cmm/fileDownload.do?atchFileId=…&fileDetailSn=1 → CSV (CP949)
 **스냅샷 키는 바꾸지 않았다 — 여전히 `atchFileId` + 바이트 수다.** 티켓이 돌려주는 `atchFileId`
 (`FILE_000000007665534`)가 09-23 JSON-LD `contentUrl` 에 박힌 값과 같다 — 옛 경로가 뽑던 바로 그
 식별자다. `uddi:` 상세 PK 는 파일 단위가 아니라 데이터셋 상세 단위라 파일이 바뀌어도 같을 수 있어
-비교 키로 부적합하다. 그래서 **배포 뒤 첫 실행이 강제 재적재되지 않는다** — 직전 스냅샷(우회 적재는
-스냅샷을 남기지 않으므로 마지막 포털 적재분)과 같은 파일이면 그대로 건너뛴다.
+비교 키로 부적합하다. 키가 이어지므로 기존 스냅샷(우회 적재는 스냅샷을 남기지 않으므로 **마지막 포털
+적재분**)이 그대로 비교 기준으로 쓰인다.
+
+**그래서 배포 직후 한 번은 `forceImport=true` 로 돌린다 (운영 절차).** 우회로 돌던 동안 DB 에 들어간
+것은 우회 CSV 인데, 스냅샷은 그 전 포털 적재분을 가리킨다. 포털 파일이 그때와 같으면 배포 뒤 첫
+실행은 `sameFileAs` 로 **곧바로 건너뛰고**(완료 로그 `skipped=true`), 우회 CSV 가 포털 판본보다
+낡았다면 DB 는 포털이 살아난 뒤에도 낡은 값에 머문다 — 조용히.
+
+```bash
+--spring.batch.job.enabled=true --spring.batch.job.name=olleCourseImportJob forceImport=true runAt=<ISO 시각>
+```
+
+같은 틈은 앞으로도 생긴다 — 포털 → 우회 → 포털로 돌아온 날, 파일이 안 바뀌었으면 우회 데이터가
+남는다. 근본 해결(우회 적재 뒤 스냅샷을 무효화하는 표시)은 후속 과제다. 그때까지는 우회 게이지가
+1 에서 0 으로 돌아온 뒤 한 번 `forceImport=true` 로 돌리는 것을 절차로 둔다.
 
 **우회는 이제 지표로 드러난다.** 파사드가 매 실행 `walk_course_import_rows{source="OLLE",result="fallback"}`
 에 1/0 을 쓴다 (`observability-guide.md`). 문화정보원의 `place_import_rows{result="fallback"}` 과 같은
