@@ -757,7 +757,7 @@ function TelLink({ tel }: { tel: string }) {
   return (
     <a
       href={`tel:${tel.replace(/[^\d+]/g, '')}`}
-      // 44px — 모바일 최소 터치 영역 (DESIGN.md §7). 상세에서 전화는 주요 행동이라
+      // 높이 44 — **상세에서 전화가 주요 행동이라** 준다 (§7 하한이 아니다 · #883).
       // 문장 속 인라인 링크가 아니라 독립 타깃으로 다룬다
       className="text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex min-h-11 items-center rounded-sm font-semibold tabular-nums focus-visible:ring-2 focus-visible:outline-none"
     >

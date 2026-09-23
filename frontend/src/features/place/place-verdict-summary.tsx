@@ -79,7 +79,7 @@ export function PlaceVerdictSummary({
  * 읽히면 무엇의 답인지 알 수 없다.
  */
 function SummaryRow({ line }: { line: VerdictSummaryLine }) {
-  /* 44px — 모바일 최소 터치 영역 (DESIGN.md §7) */
+  /* 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다) */
   const row = 'flex min-h-11 items-center gap-3 py-2'
   const label = (
     <span className="text-caption text-fg-muted w-20 shrink-0 font-semibold">{line.label}</span>
