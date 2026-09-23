@@ -1,0 +1,78 @@
+name: frontend-dev-smoke
+
+# **배포된 dev 를 실제로 부르는 읽기 전용 스모크** (이슈 #757).
+#
+# `frontend-ci.yml` 의 e2e 와 다른 것을 본다. 저쪽은 `MOCK_API=true` 로 PR 의 코드를 재고,
+# 이쪽은 **이미 배포된 dev** 의 로그인 · BFF 세션 · 실데이터 조회가 서 있는지 잰다.
+# 그래서 PR · push 에 걸지 않는다 — PR 의 코드는 아직 dev 에 없다.
+#
+# 언제 도는가 (`frontend/docs/testing-guide.md §13` 이 정본)
+#   - 매일 09:10 KST 한 번. 밤사이 배치·배포가 무엇을 깨뜨렸는지 아침에 본다.
+#   - **dev 배포 직후 손으로** — Jenkins dev 배포가 끝나면 Actions 탭의 `Run workflow` 또는
+#     `gh workflow run frontend-dev-smoke.yml --ref develop`.
+on:
+  schedule:
+    - cron: '10 0 * * *'
+  workflow_dispatch:
+
+# 같은 계정 세션을 쓴다 — 두 실행이 겹치면 한쪽 로그아웃이 다른 쪽 세션을 끊는다
+concurrency:
+  group: frontend-dev-smoke
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      # 주소는 비밀이 아니다(`docs/` 에 이미 적혀 있다). 바꿀 일이 생기면 저장소 변수로 덮는다
+      DEV_SMOKE_BASE_URL: ${{ vars.DEV_SMOKE_BASE_URL || 'https://dev.hondigagae.com' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+
+      - run: pnpm exec playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+      - run: pnpm exec playwright install-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+
+      # 계정은 이 단계에만 준다. secret 이 비어 있으면 `e2e-dev-smoke/env.ts` 가 이름만 대고 죽는다
+      - run: pnpm e2e:dev-smoke
+        env:
+          DEV_SMOKE_EMAIL: ${{ secrets.DEV_SMOKE_EMAIL }}
+          DEV_SMOKE_PASSWORD: ${{ secrets.DEV_SMOKE_PASSWORD }}
+
+      # **실패했을 때만 올린다.** trace 는 세션 쿠키가 실린 네트워크 기록을 담는다 — 로그아웃
+      # teardown 이 그 쿠키를 죽이지만, 올리는 양 자체를 줄인다. `.auth/` 는 경로에 없다.
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        with:
+          name: dev-smoke-evidence
+          path: |
+            frontend/playwright-report-dev-smoke/
+            frontend/test-results-dev-smoke/
+          retention-days: 3
