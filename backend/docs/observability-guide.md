@@ -103,6 +103,7 @@ place_import_last_success_timestamp{source}  # 소스별 마지막 성공 시각
 | `place_import_rows{result="geocode_failed"} > 10` | 경고 | VWorld 응답 이상 또는 주소 형식 변화 |
 | `place_import_rows{result="delisted"} > 30` | **심각** | 원천 이상 의심. 급감 가드가 놓쳤을 수 있다 |
 | `place_import_rows{source="CULTURE_PORTAL",result="fallback"} == 1` | 경고 | 포털 자동 다운로드가 실패해 우회 파일로 적재 중. 스크레이퍼·포털 확인 |
+| `walk_course_import_rows{source="OLLE",result="fallback"} == 1` | 경고 | 올레 포털 다운로드가 실패해 우회 파일로 적재 중 (#876). 아래 "걷기 코스 지표" |
 
 마지막 항목이 왜 필요한가. 우회 적재도 행이 들어오므로 `last_success` 가 갱신되고, 그러면
 포털 스크레이핑이 몇 주째 끊겨 매주 같은 로컬 파일을 다시 넣고 있어도 신선도 경보가 침묵한다.
@@ -135,6 +136,24 @@ delisted 항목도 중요하다. delisting 은 잘못 돌면 데이터를 통째
   재기동 후 첫 실행 전까지는 값이 없다 — 없는 것이 0 으로 보이는 것보다 낫다.
 - 긴급 시설·이미지 잡·혼잡도 잡은 이 지표에 넣지 않는다. `place_import_rows` 는
   장소 마스터 기준이고, 긴급 시설은 급감 가드 + 경고 로그가 별도로 지킨다.
+
+**걷기 코스 지표** (#876, batch-service `walkcourseimport` 도메인, `WalkCourseImportMetricsPort` +
+`MicrometerWalkCourseImportMetricsAdapter`)
+
+```
+walk_course_import_rows{source="OLLE", result}   # upserted / fallback
+```
+
+올레 코스는 장소가 아니라 `place_import_rows` 에 넣지 않고 같은 모양(Gauge + `source`·`result` 태그)의
+지표를 따로 둔다. 규칙도 같다 — 마지막 실행 값을 담는 Gauge 이고, `fallback` 은 1/0 플래그이며
+파사드가 **원천이 정해진 모든 실행에서** 쓴다(건너뛴 실행·포털 적재는 0). 포털도 우회 파일도 없어
+잡이 `CSV_NOT_FOUND` 로 실패하면 쓰지 않는다 — 그 실패는 잡 실패로 드러난다(문화정보원과 같다).
+`upserted` 는 적재한 실행에서만 쓴다.
+
+왜 필요했나. 2026-09-21 부터 포털 페이지 파싱이 깨져 올레 잡이 **매 실행 우회 파일로** 돌았는데,
+드러난 것은 WARN 한 줄(`olle course source fallback=local`)과 완료 로그의 `fallback=true` 뿐이었다
+(`data-refresh-guide.md` §5 "올레 포털"). `last_success` 는 두지 않는다 — 올레 잡의 "안 돈다" 는
+스케줄 발화 지표(`batch_schedule_last_fire_timestamp{job="olleCourseImportJob"}`)가 이미 본다.
 
 ### 스케줄 발화 지표 (#378)
 

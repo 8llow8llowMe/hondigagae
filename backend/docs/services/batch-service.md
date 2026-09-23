@@ -143,10 +143,12 @@ TourAPI 에만 있는 항목(하영올레 등)은 코스가 되지 않는다. �
 - 포털이 막히면 `OLLE_COURSE_CSV_PATH`(기본 `data/olle_course.csv`) 우회 파일로 물러난다.
   **원본이 CP949 라도 어댑터가 판별해 읽는다** — UTF-8 엄격 디코딩 실패 시 MS949 로 되읽는다
 - 우회 적재는 스냅샷을 남기지 않는다. 남기면 다음 실행이 포털을 보지 않고 건너뛴다
-- **2026-09-21 기준 포털 경로는 이미 깨져 있다.** 상세 페이지에서 JSON-LD 가 사라져 어댑터가
-  다운로드 링크를 못 찾고 **매 실행 우회로 돈다**(`fallback=true`). 문화정보원과 달리 우회 지표가
-  없어 대시보드는 조용하다 — 페이지 실측과 판단은 `data-refresh-guide.md` §5
-  "올레 포털은 이미 구조가 바뀌었다". 파싱 전략 교체는 별도 이슈다
+- **다운로드 주소는 상세 페이지 버튼 경로로 얻는다** (#876). `fn_fileDataDown(...)` 인자 →
+  `POST /tcs/dss/selectFileDataDownload.do` → `fileDownload.do?atchFileId=…`. 페이지의 JSON-LD 는
+  제공기관 설명 문구의 따옴표 때문에 JSON 으로 읽히지 않아(2026-09-23) 더 쓰지 않는다 — 실측과
+  판단은 `data-refresh-guide.md` §5 "올레 포털", 요청·응답은 `data-api-analysis.md` 10절
+- 우회 여부는 `walk_course_import_rows{source="OLLE",result="fallback"}` 1/0 게이지로 드러난다
+  (`observability-guide.md`). 스냅샷 키는 `atchFileId` 그대로라 배포 뒤 강제 재적재는 없다
 - `walk_course` 스키마 원천은 tour-service 의 `WalkCourseEntity` 다 — 로컬에서는 tour-service 를
   먼저 한 번 기동해 테이블을 만든다 (place 와 같은 소유 구조)
 - id 는 코스키에서 결정적으로 나와(`OlleCourseParser.walkCourseId`) 재실행이 멱등하다.
