@@ -241,6 +241,26 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
     [visible, board.showDistance],
   )
 
+  /*
+    **고른 시설의 좌표** — 고른 동안 재검색 판정의 기준점이 된다 (`offerResearch`, 아래).
+
+    `visible` 에서 찾는다: 선택이 살아 있는 한 그 행은 `frozenBounds` 덕분에 목록에
+    남아 있고, 사라지면 해제 effect 가 선택을 놓아준다(위 `isSelectionStillValid`).
+    좌표가 없는 시설이면 `null` 이다 — 그런 시설은 핀이 없어 카메라도 움직이지 않으므로
+    기준점을 바꿀 이유가 없다.
+
+    **쓰는 자리가 아니라 여기서 만든다.** 아래 `if (failure !== null)` 이 조기 반환이라,
+    그 뒤에 두면 SDK 가 실패하는 순간 훅 개수가 줄어 React 가 터진다 — 폴백 목록이
+    통째로 안 그려진다. e2e 가 잡았다 (`emergency-search.spec.ts` 의 지도 갈래 검색 2건:
+    `MOCK_API=true` 라 카카오 키가 없어 **항상** 이 갈래로 온다).
+  */
+  const selectedCoord = useMemo(() => {
+    if (selectedId === null) return null
+
+    const entry = visible.find((item) => item.facilityId === selectedId)
+    return entry === undefined ? null : toLatLng(entry)
+  }, [selectedId, visible])
+
   const handleBounds = useCallback((next: MapBounds) => {
     // **`userMoved` 를 쓰지 않는다.** 재조회가 없으니 첫 `idle` 과 사용자 이동을
     // 가를 이유가 없다 — 어느 쪽이든 "지금 보이는 영역" 이 답이다
@@ -395,21 +415,6 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
     두면 한쪽만 고쳐져 같은 화면의 두 보기가 다른 기준을 주장한다.
   */
   const basisLine = emergencyBasisLabel(board.basis, board.regionCode)
-
-  /*
-    **고른 시설의 좌표** — 고른 동안 재검색 판정의 기준점이 된다 (바로 아래).
-
-    `visible` 에서 찾는다: 선택이 살아 있는 한 그 행은 `frozenBounds` 덕분에 목록에
-    남아 있고, 사라지면 해제 effect 가 선택을 놓아준다(위 `isSelectionStillValid`).
-    좌표가 없는 시설이면 `null` 이다 — 그런 시설은 핀이 없어 카메라도 움직이지 않으므로
-    기준점을 바꿀 이유가 없다.
-  */
-  const selectedCoord = useMemo(() => {
-    if (selectedId === null) return null
-
-    const entry = visible.find((item) => item.facilityId === selectedId)
-    return entry === undefined ? null : toLatLng(entry)
-  }, [selectedId, visible])
 
   /*
     조회한 자리에서 충분히 벗어났을 때만 재검색을 권한다 (#396). 판정은
