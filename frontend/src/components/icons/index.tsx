@@ -306,9 +306,9 @@ export function CloseIcon(props: IconProps) {
 /**
  * 물음표 원 — `InfoTip` 트리거 (#313).
  *
- * **원을 아이콘 안에 그린다.** 버튼 쪽 `rounded-full` 배경으로 대신하면 44px 터치 영역과
- * 원의 크기가 같아져(§7) 화면에서 22px 짜리 회색 동그라미가 된다 — 원은 16px 로 두고
- * 터치 영역은 그 바깥 여백이 맡는다.
+ * **원을 아이콘 안에 그린다.** 버튼 쪽 `rounded-full` 배경으로 대신하면 44 짜리 누르는 자리와
+ * 원의 크기가 같아져 화면에서 22px 짜리 회색 동그라미가 된다 — 원은 16px 로 두고
+ * 누르는 자리는 그 바깥 여백이 맡는다 (`InfoTip` 의 `p-3` · `-m-3`).
  */
 export function HelpIcon(props: IconProps) {
   return (

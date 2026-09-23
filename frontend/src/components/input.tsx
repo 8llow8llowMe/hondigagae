@@ -50,8 +50,9 @@ export type InputProps = NativeProps & {
    * 두면 그것이 곧 `component-guide.md` §3 이 막는 padding 덮어쓰기다 — `suffix` 와 같은 이유다.
    *
    * 44px 짜리 `iconOnly` 버튼(`size="md"`)을 넣는 것을 전제로 오른쪽을 비운다. 입력란
-   * 높이(`h-11`)와 같아서 버튼이 입력란을 꽉 채우고, 최소 터치 영역(DESIGN.md §7)이
-   * 그대로 지켜진다.
+   * 높이(`h-11`)와 **같아서** 버튼이 입력란을 꽉 채운다 — 이 44 는 §7 의 터치 하한이 아니라
+   * (#883 이 그 하한을 지도 타깃으로 좁혔다) **둘을 같은 줄에 세우는 값**이다. 한쪽만
+   * 내리면 버튼이 입력란 안에서 뜬다.
    */
   action?: ReactNode
   /** 레이아웃 유틸리티만 허용한다 */
@@ -80,7 +81,7 @@ export function Input({
       aria-invalid={invalid ? true : undefined}
       aria-describedby={invalid ? fieldErrorId(id) : undefined}
       className={cn(
-        // 44px — 모바일 최소 터치 영역 (DESIGN.md §7)
+        // 높이 44 — §7 의 하한이 아니라 **폼 컨트롤 높이**다 (#883). 같은 줄의 입력·버튼이 서로 맞는 값이라 한쪽만 내리면 어긋난다
         'text-body-1 h-11 w-full rounded-md border px-3',
         /*
           **배경을 명시한다** (#531). 예전에는 투명이라 담는 면의 색을 그대로 입었다 —
