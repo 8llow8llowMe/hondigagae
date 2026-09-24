@@ -21,6 +21,7 @@ import { IntroBand } from '@/features/about/intro-band'
 import { PlacesSpecimen } from '@/features/about/places-specimen'
 import { PlanSpecimen } from '@/features/about/plan-specimen'
 import { Reveal } from '@/features/about/reveal'
+import { ScrollStage, ScrollStagePoint } from '@/features/about/scroll-stage'
 import { Tag } from '@/features/about/tag'
 import { VerdictSpecimen } from '@/features/about/verdict-specimen'
 import { LEGAL_LINKS } from '@/lib/legal/links'
@@ -32,7 +33,13 @@ import { cn } from '@/lib/utils/cn'
  * 서비스 소개 — `/about` (#611 → #635).
  *
  * **서버 컴포넌트다.** 세션도 프리페치도 없고 백엔드를 부르지 않는다. 클라이언트 경계는
- * `Reveal` 과 예시 4개뿐이다 (명세 §6-4).
+ * `Reveal` · `ScrollStage`(+ `ScrollStagePoint`) · 예시 4개다 (명세 §6-4 · 2026-09-25 §9-1).
+ *
+ * **질문 1 · 질문 2 · 위급 절은 스크롤 무대다** (#914, 명세 2026-09-25 §3). 왼쪽 항목이 화면
+ * 가운데에 올 때마다 오른쪽 예시가 그 항목이 말하는 상태가 된다. 질문 3 은 하위 카드 넷이
+ * 한 항목씩이라 무대로 만들 항목 목록이 없고, 데이터 절은 심사자 몫이라 훑기가 우선이다.
+ * 무대 안 예시는 `Reveal` 로 감싸지 않는다 — 무대가 등장을 대신하고, 둘이 겹치면 단계 0 이
+ * 두 번 숨는다.
  *
  * 절은 보호자의 **질문 순서**다: 데려가도 돼요? → 지금 나가도 돼요? → 오늘 어디 가요? →
  * 위급하면? → 무엇을 보고 판단하나요. 앞은 보호자, 마지막은 심사자 몫이다 (명세 §2 · §4).
@@ -111,45 +118,45 @@ export function AboutView() {
       </IntroBand>
 
       {/* ── 2. 데려가도 돼요? ── */}
-      <IntroBand
-        tone="plain"
-        labelledBy="about-q1-heading"
-        className="lg:grid lg:grid-cols-12 lg:gap-10"
-      >
-        <QuestionCopy
-          id="about-q1-heading"
-          className="lg:col-span-5"
-          kicker={about.q1.kicker}
-          heading={about.q1.heading}
-          lead={about.q1.lead}
-          points={about.q1.points}
-          href="/places"
-          link={about.q1.link}
+      <IntroBand tone="plain" labelledBy="about-q1-heading">
+        <ScrollStage
+          count={about.q1.points.length}
+          {...STAGE_GRID}
+          copy={
+            <QuestionCopy
+              id="about-q1-heading"
+              kicker={about.q1.kicker}
+              heading={about.q1.heading}
+              lead={about.q1.lead}
+              points={about.q1.points}
+              staged
+              href="/places"
+              link={about.q1.link}
+            />
+          }
+          visual={<PlacesSpecimen />}
         />
-        <Reveal className="mt-6 lg:col-span-7 lg:mt-0">
-          <PlacesSpecimen />
-        </Reveal>
       </IntroBand>
 
       {/* ── 3. 지금 나가도 돼요? ── */}
-      <IntroBand
-        tone="tint"
-        labelledBy="about-q2-heading"
-        className="lg:grid lg:grid-cols-12 lg:gap-10"
-      >
-        <QuestionCopy
-          id="about-q2-heading"
-          className="lg:col-span-5"
-          kicker={about.q2.kicker}
-          heading={about.q2.heading}
-          lead={about.q2.lead}
-          points={about.q2.points}
-          href="/"
-          link={about.q2.link}
+      <IntroBand tone="tint" labelledBy="about-q2-heading">
+        <ScrollStage
+          count={about.q2.points.length}
+          {...STAGE_GRID}
+          copy={
+            <QuestionCopy
+              id="about-q2-heading"
+              kicker={about.q2.kicker}
+              heading={about.q2.heading}
+              lead={about.q2.lead}
+              points={about.q2.points}
+              staged
+              href="/"
+              link={about.q2.link}
+            />
+          }
+          visual={<GoldenCurveSpecimen />}
         />
-        <Reveal className="mt-6 lg:col-span-7 lg:mt-0">
-          <GoldenCurveSpecimen />
-        </Reveal>
       </IntroBand>
 
       {/* ── 4. 오늘 어디 가요? ── */}
@@ -227,24 +234,24 @@ export function AboutView() {
       </IntroBand>
 
       {/* ── 5. 위급하면? ── */}
-      <IntroBand
-        tone="tint"
-        labelledBy="about-q4-heading"
-        className="lg:grid lg:grid-cols-12 lg:gap-10"
-      >
-        <QuestionCopy
-          id="about-q4-heading"
-          className="lg:col-span-5"
-          kicker={about.q4.kicker}
-          heading={about.q4.heading}
-          lead={about.q4.lead}
-          points={about.q4.points}
-          href="/emergency"
-          link={about.q4.link}
+      <IntroBand tone="tint" labelledBy="about-q4-heading">
+        <ScrollStage
+          count={about.q4.points.length}
+          {...STAGE_GRID}
+          copy={
+            <QuestionCopy
+              id="about-q4-heading"
+              kicker={about.q4.kicker}
+              heading={about.q4.heading}
+              lead={about.q4.lead}
+              points={about.q4.points}
+              staged
+              href="/emergency"
+              link={about.q4.link}
+            />
+          }
+          visual={<EmergencySpecimen />}
         />
-        <Reveal className="mt-6 lg:col-span-7 lg:mt-0">
-          <EmergencySpecimen />
-        </Reveal>
       </IntroBand>
 
       {/* ── 6. 무엇을 보고 판단하나요 (+ 7. 알아두실 점) ── */}
@@ -390,7 +397,23 @@ export function AboutView() {
   )
 }
 
-/** 절 머리 — 표지어 · h2 · 리드 · (항목 · 링크). `points` 항목마다 `Reveal` 로 60ms 씩 등장 */
+/**
+ * 무대 절의 12열 배치 — 카피 5 : 예시 7 (머리 주석의 "2단 배치는 12열 그리드" 그대로).
+ * sticky · 항목 높이는 `app/globals.css` 의 `.about-stage-*` 가 준다.
+ */
+const STAGE_GRID = {
+  className: 'lg:grid lg:grid-cols-12 lg:gap-10',
+  copyClassName: 'lg:col-span-5',
+  visualClassName: 'mt-6 lg:col-span-7 lg:mt-0',
+} as const
+
+/**
+ * 절 머리 — 표지어 · h2 · 리드 · (항목 · 링크).
+ *
+ * 항목은 두 모양이다. 무대 절(`staged`)은 `ScrollStagePoint` 로 그려 무대가 켜고 끄고,
+ * 무대가 아닌 절은 항목마다 `Reveal` 로 60ms 씩 등장한다. 문장 · 아이콘은 어느 쪽이든 이
+ * 서버 컴포넌트가 그린다.
+ */
 function QuestionCopy({
   id,
   className,
@@ -398,6 +421,7 @@ function QuestionCopy({
   heading,
   lead,
   points,
+  staged = false,
   href,
   link,
 }: {
@@ -407,6 +431,8 @@ function QuestionCopy({
   heading: string
   lead: string
   points?: readonly string[]
+  /** 스크롤 무대 안의 절이다 (#914) */
+  staged?: boolean
   href?: string
   link?: string
 }) {
@@ -422,19 +448,19 @@ function QuestionCopy({
       <p className="text-body-1 text-fg-muted mt-2 max-w-2xl font-normal break-keep">{lead}</p>
       {points !== undefined && (
         <ul className="mt-5 grid gap-3">
-          {points.map((point, index) => (
-            <li key={point}>
-              <Reveal delay={index * 60} className="flex items-start gap-3">
-                <span
-                  aria-hidden
-                  className="bg-intro-tint text-brand-700 grid size-7 shrink-0 place-items-center rounded-md"
-                >
-                  <span className="bg-brand-700 size-1.5 rounded-full" />
-                </span>
-                <p className="text-body-2 text-fg pt-1 break-keep">{point}</p>
-              </Reveal>
-            </li>
-          ))}
+          {points.map((point, index) =>
+            staged ? (
+              <ScrollStagePoint key={point} index={index + 1} className="flex items-start gap-3">
+                <PointBody>{point}</PointBody>
+              </ScrollStagePoint>
+            ) : (
+              <li key={point}>
+                <Reveal delay={index * 60} className="flex items-start gap-3">
+                  <PointBody>{point}</PointBody>
+                </Reveal>
+              </li>
+            ),
+          )}
         </ul>
       )}
       {href !== undefined && link !== undefined && (
@@ -443,6 +469,24 @@ function QuestionCopy({
         </MoreLink>
       )}
     </div>
+  )
+}
+
+/**
+ * 항목 하나의 몸 — 표지 칸 + 문장. 표지 칸의 `about-stage-mark` 는 무대가 켠 항목을 채우는
+ * 선택자 훅이다(`globals.css`). 무대 밖에서는 아무 효과가 없다.
+ */
+function PointBody({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <span
+        aria-hidden
+        className="about-stage-mark bg-intro-tint text-brand-700 grid size-7 shrink-0 place-items-center rounded-md"
+      >
+        <span className="bg-brand-700 size-1.5 rounded-full" />
+      </span>
+      <p className="text-body-2 text-fg pt-1 break-keep">{children}</p>
+    </>
   )
 }
 

@@ -130,6 +130,65 @@ describe('AboutView — 8절 (#635)', () => {
   })
 })
 
+describe('AboutView — 스크롤 무대 (#914)', () => {
+  /** 절 하나의 마크업 — `aria-labelledby` 로 여는 section 부터 다음 section 전까지 */
+  const section = (headingId: string) => {
+    const start = markup.indexOf(`aria-labelledby="${headingId}"`)
+    const next = markup.indexOf('<section', start + 1)
+    return markup.slice(start, next === -1 ? undefined : next)
+  }
+  const stageOpen = (html: string) => html.match(/<div class="about-stage[ "][^>]*>/g) ?? []
+
+  it('질문 1 · 질문 2 · 위급 절이 무대다 — 정확히 세 개', () => {
+    expect(stageOpen(markup)).toHaveLength(3)
+    for (const id of ['about-q1-heading', 'about-q2-heading', 'about-q4-heading']) {
+      expect(stageOpen(section(id)), id).toHaveLength(1)
+    }
+  })
+
+  it('질문 3 · 데이터 절은 무대가 아니다', () => {
+    for (const id of ['about-q3-heading', 'about-data-heading']) {
+      expect(stageOpen(section(id)), id).toHaveLength(0)
+    }
+  })
+
+  it('무대의 항목 수가 절의 항목 문장 수와 같다', () => {
+    const cases = [
+      ['about-q1-heading', messages.about.q1.points],
+      ['about-q2-heading', messages.about.q2.points],
+      ['about-q4-heading', messages.about.q4.points],
+    ] as const
+    for (const [id, points] of cases) {
+      const items = section(id).match(/<li class="[^"]*about-stage-point[^"]*"/g) ?? []
+      expect(items, id).toHaveLength(points.length)
+      // 마크업은 작은따옴표를 `&#x27;` 로 이스케이프한다
+      for (const point of points) expect(section(id)).toContain(point.replaceAll("'", '&#x27;'))
+    }
+  })
+
+  it('정적 렌더의 무대는 마지막 단계다 — 플래그가 항목 수만큼 있고 is-live 가 없다', () => {
+    const cases = [
+      ['about-q1-heading', messages.about.q1.points.length],
+      ['about-q2-heading', messages.about.q2.points.length],
+      ['about-q4-heading', messages.about.q4.points.length],
+    ] as const
+    for (const [id, count] of cases) {
+      const open = stageOpen(section(id))[0] ?? ''
+      expect(open, id).toContain(`is-step-${count}`)
+      expect(open, id).toContain(`is-current-${count}`)
+      expect(open, id).not.toContain('is-live')
+    }
+  })
+
+  it('무대 안 예시는 Reveal 로 감싸지 않는다 — 두 모션이 겹치면 단계 0 이 두 번 숨는다', () => {
+    const source = readSourceWithoutComments('src/features/about/about-view.tsx')
+    for (const specimen of ['PlacesSpecimen', 'GoldenCurveSpecimen', 'EmergencySpecimen']) {
+      expect(source).toContain(`visual={<${specimen} />}`)
+      expect(source).not.toMatch(new RegExp(`<Reveal[^>]*>\\s*<${specimen}`))
+    }
+  })
+})
+
 describe('AboutView — 자리', () => {
   it('카드 안쪽 인셋을 INSET_CLASS.card 로 참조한다', () => {
     const source = readSourceWithoutComments('src/features/about/about-view.tsx')
