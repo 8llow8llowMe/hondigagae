@@ -5,7 +5,7 @@ import { AiPlanCreateView } from '@/features/ai-plan/ai-plan-create-view'
 import { messages } from '@/lib/messages'
 
 export const metadata: Metadata = {
-  title: messages.aiPlan.createTitle,
+  title: `${messages.aiPlan.createTitle} · 혼디가개`,
   description: messages.aiPlan.createDescription,
 }
 

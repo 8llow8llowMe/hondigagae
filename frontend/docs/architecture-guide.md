@@ -361,22 +361,23 @@ title  장소를 찾을 수 없어요            (catch 가 404 문구로 뭉갰
 - **백엔드를 두 번 부르지 않는다.** `generateMetadata` 와 페이지 렌더가 같은 요청 안에서
   쓰는 조회를 `cache()`(React) 로 감싸 하나로 합친다 — `places` 가 이미 쓰는 패턴
   (`loadPlaceDetail`)을 `plans`(`loadPlanDetail`) · `pets`(`loadPet`)에도 그대로 쓴다.
-- **404 가 아닌 결과(성공·5xx·무응답)는 이 이슈 전과 같게 둔다.** `plans` 는 여전히 제목이
-  없고(부모 상속), `pets` 는 여전히 `pet.editTitle` 이다 — 이 이슈는 **404 탭 제목만** 고친다.
-  성공 시 진짜 제목을 붙이는 것은 범위 밖이다 (`plans/[planId]/page.tsx` 가 원래 `generateMetadata`
-  를 안 두던 이유 — "보호 화면이라 크롤러가 못 들어오고, 제목 하나를 위해 백엔드를 한 번 더
-  부를 이유가 없다" — 는 여기서도 유효하다. 지금은 그 조회를 **다시 하지 않고 재사용**할 뿐이다).
+- **404 가 아닌 결과(성공·5xx·무응답)는 이 이슈 전과 같게 둔다.** `pets` 는 여전히
+  `pet.editTitle` 이다 — 이 이슈는 **404 탭 제목만** 고친다. **`plans` 는 후속(#905 R5)에서
+  갈렸다** — `planDetailTitle` 이 404 는 `detailNotFoundTitle`, **그 밖(성공·5xx·무응답)은
+  전부 `messages.plan.pageTitle`(`여행 일정`)** 을 낸다. 일정 이름은 프라이버시 때문에 싣지
+  않는다(`src/lib/plan/detail-title.ts` 머리주석). `pets` 는 이 갈래를 아직 안 탔다.
 - **제목 문구는 그 화면의 `h1`(또는 `EmptyState`)과 같은 상수를 쓴다.** 새 문자열을 짓지 않는다.
 - **접미사는 `` ` · 혼디가개` `` 리터럴이다.** `title.template` 이 없으므로 생략하면 그
   화면만 접미사가 빠진다.
 
 **확정 문구**
 
-| 화면(404)               | 구현 위치                                                    | 결과 문자열                             |
-| ----------------------- | ------------------------------------------------------------ | --------------------------------------- |
-| `app/not-found.tsx`     | `app/not-found.tsx` 의 `export const metadata`               | `없는 주소예요 · 혼디가개`              |
-| `(main)/plans/[planId]` | `page.tsx` 의 `generateMetadata` + `planDetailNotFoundTitle` | `찾을 수 없는 일정이에요 · 혼디가개`    |
-| `(main)/pets/[petId]`   | `page.tsx` 의 `generateMetadata` + `petEditPageTitle`        | `존재하지 않는 반려견이에요 · 혼디가개` |
+| 화면                                                      | 구현 위치                                                    | 결과 문자열                             |
+| --------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------- |
+| `app/not-found.tsx`(전역 404)                             | `app/not-found.tsx` 의 `export const metadata`               | `없는 주소예요 · 혼디가개`              |
+| `(main)/plans/[planId]`(404)                              | `page.tsx` 의 `generateMetadata` + `planDetailNotFoundTitle` | `찾을 수 없는 일정이에요 · 혼디가개`    |
+| `(main)/plans/[planId]`(그 밖 — 성공·5xx·무응답, #905 R5) | `page.tsx` 의 `generateMetadata` + `planDetailTitle`         | `여행 일정 · 혼디가개`                  |
+| `(main)/pets/[petId]`(404)                                | `page.tsx` 의 `generateMetadata` + `petEditPageTitle`        | `존재하지 않는 반려견이에요 · 혼디가개` |
 
 **범위 — 어긋난 둘을 함께 맞춘다.** `app` · `plans` · `pets` 셋을 고치고, **`places` 는
 손대지 않는다.** 그쪽은 이미 같은 말이 나오고, `not-found.tsx` 에 또 쓰면 400 갈래까지
