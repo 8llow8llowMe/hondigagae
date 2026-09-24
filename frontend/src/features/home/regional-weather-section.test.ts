@@ -66,6 +66,79 @@ describe('RegionalWeatherSection — 추천', () => {
   })
 })
 
+/*
+  **#905 R2 — 추천이 없는 이유를 한 줄 말한다.** `regionNone` 한 줄만 있으면 바로 아래 표에
+  점수 배지가 그대로 서 있어 "점수는 있는데 추천할 곳이 없다" 는 모순처럼 읽혔다.
+*/
+describe('RegionalWeatherSection — 추천 없음 사유 (#905 R2)', () => {
+  /** 어느 권역도 예보를 못 받은 날 — 서버가 추천을 비우는 첫째 경우다 */
+  const NO_FORECAST_DAY: RegionalWeatherResponse = {
+    ...BAD_DAY,
+    weatherWarning: null,
+    // 예보를 못 받은 권역은 점수뿐 아니라 날씨 값도 전부 null 이다 (`RegionWeatherItem` 주석)
+    regions: BAD_DAY.regions.map((region) => ({
+      ...region,
+      weatherScore: null,
+      temperature: null,
+      humidity: null,
+      skyState: null,
+      precipitationType: null,
+    })),
+  }
+
+  it('경보로 추천이 빈 날은 경보를 사유로 든다', () => {
+    const markup = render(BAD_DAY)
+
+    expect(markup).toContain(messages.home.regionNoneWarning)
+    expect(markup).not.toContain(messages.home.regionNoneForecast)
+  })
+
+  it('예보를 못 받아 추천이 빈 날은 예보를 사유로 든다', () => {
+    const markup = render(NO_FORECAST_DAY)
+
+    expect(markup).toContain(messages.home.regionNoneForecast)
+    expect(markup).not.toContain(messages.home.regionNoneWarning)
+  })
+
+  /*
+    주의보가 떠 있는데 예보까지 못 받은 날. 추천이 빈 이유는 예보이고, `weatherWarning` 이
+    null 이 아니라는 것만 보고 "경보가 발효 중" 이라고 말하면 거짓이 된다.
+  */
+  it('특보가 있어도 점수 있는 권역이 없으면 예보를 사유로 든다', () => {
+    const warning = BAD_DAY.weatherWarning
+    if (warning === null) throw new Error('mock 경보 날에 특보가 있어야 한다')
+
+    const markup = render({
+      ...NO_FORECAST_DAY,
+      weatherWarning: {
+        ...warning,
+        level: { code: 'ADVISORY', name: '주의보', description: '주의가 필요한 단계입니다.' },
+      },
+    })
+
+    expect(markup).toContain(messages.home.regionNoneForecast)
+    expect(markup).not.toContain(messages.home.regionNoneWarning)
+  })
+
+  it('사유는 추천 없음 문장 바로 아래 보조 글줄이다', () => {
+    const markup = render(BAD_DAY)
+    const none = markup.indexOf(messages.home.regionNone)
+    const reason = markup.indexOf(
+      `<p class="text-body-2 text-fg-muted">${messages.home.regionNoneWarning}`,
+    )
+
+    expect(none).toBeGreaterThan(-1)
+    expect(reason).toBeGreaterThan(none)
+  })
+
+  it('추천이 있는 날에는 사유를 내지 않는다', () => {
+    const markup = render(GOOD_DAY)
+
+    expect(markup).not.toContain(messages.home.regionNoneWarning)
+    expect(markup).not.toContain(messages.home.regionNoneForecast)
+  })
+})
+
 describe('RegionalWeatherSection — 비교표', () => {
   it('다섯 권역을 모두 남긴다', () => {
     const markup = render(GOOD_DAY)
@@ -315,8 +388,15 @@ describe('RegionalWeatherSection — 상태', () => {
     표시를 겸했다. 페이지 최상단 `WeatherWarningStrip` 하나로 모으면서 여기서 걷었다 —
     세 섹션의 `weatherWarning` 은 백엔드 단일 지점에서 온 같은 값이라 갈릴 수 없다.
   */
+  /*
+    **낱말 `경보` 로 잡지 않는다** (#905 R2). 추천 없음 사유가 "기상특보 경보가 발효 중" 이라고
+    말하게 되면서 그 낱말은 이 섹션에 정당하게 선다. 배지가 쓰던 것은 특보 **종류** 이름이다.
+  */
   it('특보가 있어도 배지를 그리지 않는다', () => {
-    expect(render(BAD_DAY)).not.toContain('경보')
+    const warning = BAD_DAY.weatherWarning
+
+    expect(warning).not.toBeNull()
+    expect(render(BAD_DAY)).not.toContain(warning?.type.name as string)
   })
 })
 

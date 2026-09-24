@@ -25,6 +25,7 @@ import { WalkVerdict } from '@/features/home/walk-verdict'
 import { WeatherWarningStrip } from '@/features/home/weather-warning-strip'
 import { useWalkTimes } from '@/features/insight/use-walk-times'
 import { WalkTimesSection } from '@/features/insight/walk-times-section'
+import { toLoginHref } from '@/features/nav/menu-items'
 import { useSelectedPetStore } from '@/features/nav/selected-pet-store'
 import { usePetList } from '@/features/pet/use-pet-list'
 import { DEFAULT_RADIUS_METERS } from '@/lib/api/emergency'
@@ -61,6 +62,9 @@ const INDOOR_ALTERNATIVE_COUNT = 3
 /** 다가오는 일정은 한 건만 — 나머지는 `/plans` 가 센다 */
 const UPCOMING_PLAN_COUNT = 1
 
+/** AI 일정 생성 — 보호 경로라 게스트는 `toLoginHref` 로 감싼다 (#905 R1) */
+const AI_PLAN_HREF = '/ai-plans/new'
+
 /**
  * 홈 — 아트보드 `01 홈`(모바일 390) / `02 홈`(데스크톱 1440).
  *
@@ -87,6 +91,11 @@ const UPCOMING_PLAN_COUNT = 1
  * (헤더 64 를 뺀 936px)를 넘겨 무력화됐고, 그 사이 우측은 520px 이 비어 있었다. 기준은
  * 축이다 — **시간축**("지금 나가도 되나" → "언제 나가나")은 좌측, **공간축**("어느 권역"
  * → "어느 장소" → "비 오면 어느 실내")은 우측이다. 권역이 우측으로 옮겨 갔다.
+ *
+ * **예산은 특보 날에 이미 넘는다** (#905 실측, 1440×1000 · mock): 좌측 레일이 로그인
+ * 1220px · 게스트 1032px 이다 — 경보 문단과 골든타임 곡선이 늘어난 데다 올레·AI 배너가
+ * 더해졌다. 그날 `lg:sticky` 는 무력화되고 레일은 그냥 흐른다. 평일(특보 없음)은 예산
+ * 안이다. 배너를 더 얹을 때는 이 수치를 다시 잰다.
  *
  * 모바일은 한 컬럼이고 P1 → P2 → P3 순서로 카드가 쌓인다. 카드 사이 8px 로 바닥이
  * 비치는데, 그 값이 2a 의 `Band` 와 같아 모바일 인상은 거의 그대로다.
@@ -269,6 +278,8 @@ export function HomeView({
   const unscored = visible.filter((data) => data.score === null)
 
   const remaining = Math.max(0, places.length - visible.length)
+  /** 모바일 버튼·데스크톱 링크가 같은 문장을 쓴다 — 남은 수가 아니라 전체 수다 (#905 R7) */
+  const allPlacesLabel = messages.home.allPlaces.replace('{n}', String(places.length))
 
   /*
     카드 전부에 똑같이 붙는 문장은 장소별 근거가 아니라 **이 화면의 전제**다 (#304).
@@ -477,6 +488,30 @@ export function HomeView({
               이쪽은 200 응답 안에서 `forecastCoverage: UNAVAILABLE` 로 온다.
             */
               onRetry={() => void walkTimes.refetch()}
+            />
+          </Surface>
+
+          {/*
+            AI 일정 생성 진입점 (#905 R1). 모바일 탭에는 AI 항목이 없어서, 이 배너가 없으면
+            모바일 방문자가 AI 여행 설계에 닿는 길이 `/plans` 안의 시트뿐이었다.
+
+            **골든타임 바로 아래, 올레 배너 위다.** "오늘 언제 나가나" 다음에 "그럼 일정을
+            짜 볼까" 가 온다 — 코스(어디를 걷나)보다 한 단 넓은 질문이다.
+
+            **게스트에게도 보인다.** 진입점을 숨기지 않고 `toLoginHref` 로 로그인을
+            거치게 한다 — 전역 nav 가 보호 항목을 다루는 방식과 같다 (`menu-items.ts`).
+            `authed` 는 `app/(main)/page.tsx` 가 `readSession()` 으로 정해 넘긴 값이다.
+
+            **`leading` 을 주지 않는다.** 아래 올레 배너와 같은 이유다 — `Banner` 의 아이콘
+            자리는 danger 색 고정이다. nav 의 `AI` 배지는 컴포넌트가 아니라 `nav-links.tsx`
+            안의 인라인 조각이고 `Banner.title` 은 문자열이라, 제목의 `AI` 낱말이 그 뜻을 진다.
+          */}
+          <Surface>
+            <Banner
+              href={authed ? AI_PLAN_HREF : toLoginHref(AI_PLAN_HREF)}
+              title={messages.home.aiPlanBannerTitle}
+              description={messages.home.aiPlanBannerDescription}
+              inset="card"
             />
           </Surface>
 
@@ -707,19 +742,27 @@ export function HomeView({
 
                 {remaining > 0 && (
                   <div className="border-border border-t px-4 py-3 md:px-5 md:py-4">
-                    {/* 모바일은 테두리 버튼, 데스크톱은 텍스트 링크 (아트보드) */}
+                    {/*
+                      모바일은 테두리 버튼, 데스크톱은 텍스트 링크 (아트보드).
+
+                      **두 폭이 같은 문장이다** (#905 R7). 예전에는 모바일이 남은 수(`17곳 더
+                      보기`), 데스크톱이 전체 수(`20곳 전체 보기`)라 같은 `/places` 링크가 폭마다
+                      다른 수를 말했다. 꺾쇠는 텍스트 링크에만 붙는다 — 버튼은 외형이 이미 누를
+                      수 있다고 말한다.
+                    */}
                     <ButtonLink
                       href="/places"
                       variant="secondary"
                       className="flex w-full tabular-nums md:hidden"
                     >
-                      {messages.home.morePlaces.replace('{n}', String(remaining))}
+                      {allPlacesLabel}
                     </ButtonLink>
                     <Link
                       href="/places"
-                      className="text-body-1 text-link focus-visible:ring-brand-500 hidden min-h-11 items-center font-semibold tabular-nums focus-visible:ring-2 focus-visible:outline-none md:flex"
+                      className="text-body-1 text-link focus-visible:ring-brand-500 hidden min-h-11 items-center gap-1 font-semibold tabular-nums focus-visible:ring-2 focus-visible:outline-none md:flex"
                     >
-                      {messages.home.allPlaces.replace('{n}', String(places.length))}
+                      {allPlacesLabel}
+                      <span aria-hidden>›</span>
                     </Link>
                   </div>
                 )}
@@ -749,7 +792,10 @@ export function HomeView({
               }
               trailing={
                 plans.length > 0 ? (
-                  <Link href="/plans" className="text-body-2 text-link font-semibold">
+                  <Link
+                    href="/plans"
+                    className="text-body-2 text-link focus-visible:ring-brand-500 inline-flex min-h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                  >
                     {messages.home.allPlans}
                   </Link>
                 ) : undefined
