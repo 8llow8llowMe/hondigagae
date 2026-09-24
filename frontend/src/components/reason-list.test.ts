@@ -56,6 +56,39 @@ describe('ReasonList — 근거를 접지 않는다', () => {
     expect(items[1]).toContain('text-fg-muted')
   })
 
+  /*
+    **글머리 목록이다** (#905 R9). 같은 무게의 문단이 줄지어 서면 항목 경계가 안 보인다 —
+    작은 점과 들여쓰기로 가른다. 점은 `bg-current` 라 정보성 항목에서는 글자와 함께 흐려진다.
+  */
+  it('항목마다 점 마커와 들여쓰기를 둔다 — 정보성 항목도 같다', () => {
+    const html = render([
+      { description: '감점 근거' },
+      { description: '정보 근거', informational: true },
+    ])
+
+    const items = html.match(/<li[^>]*>/g) ?? []
+
+    expect(items).toHaveLength(2)
+
+    for (const item of items) {
+      const classes = (/class="([^"]*)"/.exec(item)?.[1] ?? '').replaceAll('&#x27;', "'").split(' ')
+
+      for (const cls of [
+        'relative',
+        'pl-4',
+        'before:absolute',
+        'before:left-0',
+        'before:top-2',
+        'before:size-1.5',
+        'before:rounded-full',
+        'before:bg-current',
+        "before:content-['']",
+      ]) {
+        expect(classes).toContain(cls)
+      }
+    }
+  })
+
   it('근거가 없으면 아무것도 그리지 않는다', () => {
     expect(render([])).toBe('')
   })
