@@ -30,6 +30,16 @@ export const commonMessages = {
   notFoundHomeAction: '홈으로',
   notFoundPlacesAction: '장소 찾기',
 
+  /*
+    오프라인 (#912). **서버 장애와 다른 말을 한다** — 원인이 서버가 아니라 내 연결이라는 것을
+    알아야 재시도 대신 이동(전파가 잡히는 곳으로)을 택한다. 여행 중 산간·해안에서 잦다.
+    "자동으로 이어져요" 는 사실이다: React Query 가 끊긴 동안 조회를 멈췄다가
+    (`networkMode: 'online'`) 연결되면 다시 부른다(`refetchOnReconnect`).
+  */
+  offlineBanner: '인터넷 연결이 끊겼어요. 다시 연결되면 자동으로 이어져요.',
+  offlineTitle: '인터넷에 연결되어 있지 않아요',
+  offlineDescription: '연결되면 다시 시도할 수 있어요. 전파가 잡히는 곳으로 옮겨 보세요.',
+
   /**
    * **사용자가 한 일을 서비스가 대신 서술하지 않는다.** "확인했어요" 는 사용자의 행동이고,
    * 목록 끝에 붙는 이 줄이 말할 수 있는 것은 목록의 상태뿐이다 (디자인 리뷰 #15).

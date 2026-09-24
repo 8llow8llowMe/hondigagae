@@ -1,6 +1,9 @@
+'use client'
+
 import type { ReactNode } from 'react'
 
 import { Button } from '@/components/button'
+import { useOnline } from '@/lib/hooks/use-online'
 import { messages } from '@/lib/messages'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -51,7 +54,20 @@ export type ErrorStateProps = {
  * 제목을 붉게 칠하지 않는다. 표면은 흰색으로 두고 danger 는 아이콘에만 쓴다 —
  * 배경·제목까지 붉히면 일시 장애가 경보처럼 읽힌다.
  */
-export function ErrorState({
+export function ErrorState(props: ErrorStateProps) {
+  return <ErrorStateView {...props} offline={!useOnline()} />
+}
+
+/**
+ * 표시만 — `offline` 을 밖에서 받는다. node 환경에서 두 갈래를 모두 렌더해 재려고 뽑았다
+ * (`testing-guide.md` §1 — 훅은 서버 스냅샷(온라인)으로만 렌더된다).
+ *
+ * **오프라인이면 원인을 바꿔 말하고 재시도를 걷는다** (#912). 끊긴 채 다시 눌러도 같은
+ * 실패이고, "잠시 문제가 생겼어요" 는 서버 탓으로 읽혀 사용자가 제자리에서 버튼만 누른다.
+ * 연결이 돌아오면 `useOnline` 이 바뀌어 원래 제목·버튼이 다시 선다 — React Query 조회는
+ * 그 순간 스스로 다시 돈다(`refetchOnReconnect`). `action`(셸 없는 경계의 홈으로)은 남긴다.
+ */
+export function ErrorStateView({
   title,
   description,
   onRetry,
@@ -60,20 +76,31 @@ export function ErrorState({
   headingLevel = 2,
   action,
   className,
-}: ErrorStateProps) {
+  offline,
+}: ErrorStateProps & { offline: boolean }) {
   const Heading = `h${headingLevel}` as const
 
   return (
     <div className={cn('flex flex-col items-start gap-2 py-12', INSET_CLASS[inset], className)}>
-      <Heading className="text-body-1 text-fg font-semibold">{title}</Heading>
-      {description !== undefined && <p className="text-body-2 text-fg-muted">{description}</p>}
-      {/* 이 상태에서 화면의 **주된** 조작 대상이라 44 를 준다 — §7 하한이 아니라 그 사실이 근거다 (#883). `action` 은 셸 없는 경계만 쓴다 */}
-      <div className="mt-1 flex flex-wrap gap-2">
-        <Button variant="secondary" size="md" onClick={onRetry}>
-          {retryLabel}
-        </Button>
-        {action}
-      </div>
+      <Heading className="text-body-1 text-fg font-semibold">
+        {offline ? messages.common.offlineTitle : title}
+      </Heading>
+      {offline ? (
+        <p className="text-body-2 text-fg-muted">{messages.common.offlineDescription}</p>
+      ) : (
+        description !== undefined && <p className="text-body-2 text-fg-muted">{description}</p>
+      )}
+      {(!offline || action !== undefined) && (
+        <div className="mt-1 flex flex-wrap gap-2">
+          {/* 이 상태에서 화면의 **주된** 조작 대상이라 44 를 준다 — §7 하한이 아니라 그 사실이 근거다 (#883). `action` 은 셸 없는 경계만 쓴다 */}
+          {!offline && (
+            <Button variant="secondary" size="md" onClick={onRetry}>
+              {retryLabel}
+            </Button>
+          )}
+          {action}
+        </div>
+      )}
     </div>
   )
 }
