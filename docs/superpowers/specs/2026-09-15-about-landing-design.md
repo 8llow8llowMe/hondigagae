@@ -4,6 +4,7 @@
 > 이슈: [#635](https://github.com/8llow8llowMe/hondigagae/issues/635)
 > 작성: 2026-09-15 (모션 §6-4 같은 날 추가)
 > 상태: **구현 완료** (#635, 2026-09-15) — 계획 `docs/superpowers/plans/2026-09-15-about-landing.md`, 세부명세 `frontend/docs/features/about/소개페이지-세부명세.md`
+> 개정: §6-4(모션) · §9(이미지 없음)는 `2026-09-25-about-interactive-design.md` 가 개정했다 (#914~#917).
 > 목업: `frontend/docs/features/about/소개페이지-목업.html` (정적 HTML 1장, 브라우저로 연다)
 
 **Goal:** 로그인 없이 열리는 `/about` 을 **서비스 소개 페이지**로 확장한다. 첫 방문 보호자가
