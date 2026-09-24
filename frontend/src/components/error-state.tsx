@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 import { Button } from '@/components/button'
 import { messages } from '@/lib/messages'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
@@ -29,6 +31,14 @@ export type ErrorStateProps = {
    * 기본값·유도하지 않는 이유·크기를 그대로 두는 이유는 `EmptyState` 쪽 주석이 정본이다.
    */
   headingLevel?: 2 | 3
+  /**
+   * 재시도 옆에 서는 두 번째 출구 — **셸이 없는 경계만 쓴다** (#907).
+   *
+   * `app/error.tsx` · `app/global-error.tsx` 는 `AppShell` 밖이라 헤더로 돌아갈 길이 없어
+   * "홈으로" 를 여기 둔다. 셸 안의 상태(세그먼트 경계 · 섹션 오류)는 헤더가 이미 그 일을
+   * 하므로 넘기지 않는다 — 출구가 둘이면 재시도가 덜 눌린다.
+   */
+  action?: ReactNode
   className?: string
 }
 
@@ -48,6 +58,7 @@ export function ErrorState({
   retryLabel = messages.common.retry,
   inset = 'main',
   headingLevel = 2,
+  action,
   className,
 }: ErrorStateProps) {
   const Heading = `h${headingLevel}` as const
@@ -56,10 +67,13 @@ export function ErrorState({
     <div className={cn('flex flex-col items-start gap-2 py-12', INSET_CLASS[inset], className)}>
       <Heading className="text-body-1 text-fg font-semibold">{title}</Heading>
       {description !== undefined && <p className="text-body-2 text-fg-muted">{description}</p>}
-      {/* 이 상태에서 화면의 **유일한** 조작 대상이라 44 를 준다 — §7 하한이 아니라 그 사실이 근거다 (#883) */}
-      <Button variant="secondary" size="md" className="mt-1" onClick={onRetry}>
-        {retryLabel}
-      </Button>
+      {/* 이 상태에서 화면의 **주된** 조작 대상이라 44 를 준다 — §7 하한이 아니라 그 사실이 근거다 (#883). `action` 은 셸 없는 경계만 쓴다 */}
+      <div className="mt-1 flex flex-wrap gap-2">
+        <Button variant="secondary" size="md" onClick={onRetry}>
+          {retryLabel}
+        </Button>
+        {action}
+      </div>
     </div>
   )
 }

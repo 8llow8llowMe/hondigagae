@@ -20,9 +20,9 @@ import type { PlanDetail } from '@/types/plan'
  *
  * `loading.tsx` 는 Suspense 경계를 만들고, 경계가 있으면 응답이 먼저 스트리밍되기
  * 시작한다. 그 뒤에 `notFound()` 를 던지면 not-found UI 는 나오지만 **HTTP 상태가
- * 200 으로 남는다**(soft 404). `app/(main)/plans/` 에도 `loading.tsx` 가 없어 지금은
- * 그룹을 나눌 필요가 없다 — **생기면 그때 목록을 `(list)` 그룹으로 옮긴다**
- * (docs/architecture-guide.md §7, 장소 상세와 같은 골격).
+ * 200 으로 남는다**(soft 404). 목록의 `loading.tsx` 는 **`plans/(list)/` 그룹 안**에 있어
+ * 이 세그먼트를 감싸지 않는다 (#907 — 그 전에는 `plans/` 에도 없어 그룹이 필요 없었다).
+ * 장소(`places/(list)`) · 반려견(`pets/(list)`) 과 같은 골격이다 (docs/architecture-guide.md §7).
  */
 type Params = Promise<{ planId: string }>
 

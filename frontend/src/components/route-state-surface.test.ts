@@ -318,17 +318,38 @@ type LoadingFile = {
    * `/places` 는 2단이라 폭·캡이 `Canvas` 의 grid 에 있다 — 어느 쪽이든 **정상 화면과
    * 같은 클래스를 같은 자리에** 건다. 어긋나면 로딩이 끝나는 순간 카드가 옆으로 뛴다.
    */
-  layout: { on: 'Canvas' | 'SurfaceStack'; className: string }
+  layout: { on: 'Canvas' | 'SurfaceStack' | 'div'; className: string }
   /** 그 배치의 출처가 되는 정상 화면 */
   layoutSource: string
 }
 
 /** 실화면의 카드를 흉내 내므로 **정상 화면과 같은 카드를 그린다** */
 const LOADING_FILES: LoadingFile[] = [
+  /*
+    **홈 · 일정 목록 · 올레 목록 · 병원·약국 넷이 #907 로 들어왔다.** 홈은 `(home)`, 일정·올레
+    목록은 `(list)` 그룹 안이다 — `loading.tsx` 는 하위 세그먼트까지 감싸므로 `notFound()`
+    를 던지는 상세의 조상에 둘 수 없다 (`architecture-guide.md` §7). 홈과 병원·약국은 grid 가
+    `Canvas` 가 아니라 안쪽 요소에 있어 그 요소를 짝으로 잠근다.
+  */
+  {
+    path: 'app/(main)/(home)/loading.tsx',
+    layout: { on: 'SurfaceStack', className: 'lg:sticky lg:top-16 lg:self-start lg:pr-3' },
+    layoutSource: 'src/features/home/home-view.tsx',
+  },
+  {
+    path: 'app/(main)/emergency/loading.tsx',
+    layout: { on: 'div', className: 'rail-layout rail-layout-filter' },
+    layoutSource: 'src/features/emergency/emergency-list-view.tsx',
+  },
   {
     path: 'app/(main)/favorites/loading.tsx',
     layout: { on: 'SurfaceStack', className: 'content-container' },
     layoutSource: 'app/(main)/favorites/page.tsx',
+  },
+  {
+    path: 'app/(main)/olle/(list)/loading.tsx',
+    layout: { on: 'SurfaceStack', className: 'content-container' },
+    layoutSource: 'app/(main)/olle/(list)/page.tsx',
   },
   {
     path: 'app/(main)/mypage/(root)/loading.tsx',
@@ -344,6 +365,11 @@ const LOADING_FILES: LoadingFile[] = [
     path: 'app/(main)/places/(list)/loading.tsx',
     layout: { on: 'Canvas', className: 'rail-layout rail-layout-filter' },
     layoutSource: 'app/(main)/places/(list)/page.tsx',
+  },
+  {
+    path: 'app/(main)/plans/(list)/loading.tsx',
+    layout: { on: 'Canvas', className: 'rail-layout rail-layout-filter' },
+    layoutSource: 'app/(main)/plans/(list)/page.tsx',
   },
 ]
 
@@ -600,7 +626,7 @@ describe('상태 파일의 폭이 그 세그먼트의 정상 화면과 같다 (#
 })
 
 /**
- * **로딩 폴백 넷은 실화면의 카드를 흉내 낸다.**
+ * **로딩 폴백 여덟은 실화면의 카드를 흉내 낸다.**
  *
  * `places/(list)/loading.tsx` 만 `as="main"` · `h1` · `INSET_CLASS` · 가로 배치 넷 다
  * 빠져 있었다 (#475 에서 맞췄다). 가로 배치가 어긋나면 로딩이 끝나는 순간 카드가 옆으로
@@ -629,7 +655,7 @@ describe('로딩 폴백은 실화면과 같은 층·같은 자리로 그린다 (
       const opening =
         layout.on === 'Canvas'
           ? `<Canvas as="main" id="main-content" className="${layout.className}">`
-          : `<SurfaceStack className="${layout.className}">`
+          : `<${layout.on} className="${layout.className}">`
 
       expect(code(path)).toContain(opening)
       expect(code(layoutSource)).toContain(opening)
