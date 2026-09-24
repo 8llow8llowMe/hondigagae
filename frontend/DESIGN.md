@@ -1051,6 +1051,11 @@ className = 'text-title-2 text-fg md:text-title-1 font-semibold md:font-bold'
   `animation: none` 으로 지우면 `animation-fill-mode` 로 끝 상태를 잡던 요소가 시작
   상태로 되돌아간다.
 - **AI 일정 생성 대기**는 수초~수십초다. 무한 스피너 대신 진행 단계 표시를 쓴다.
+- **소개 페이지 스크롤 무대** (`/about`, #914): 질문 1 · 2 · 위급 절의 예시가 항목 순서대로
+  바뀐다. **1회 재생이 아니라 스크롤 위치의 함수다** — 되돌리면 되돌아간다. 새 길이는 없다
+  (전환 200 · 색 150, 위치 점 울림 1회만 곡선 그리기 길이 800 을 다시 쓴다). 로드 직후 첫
+  맞춤은 전환 없이 적용한다. 감속 모션이면 마지막 단계에 고정한다. 근거는
+  `docs/superpowers/specs/2026-09-25-about-interactive-design.md` §3.
 - **소개 페이지 예시 재생** (`/about`, #635): 숫자 카운트업 **600ms** · 곡선 그리기 **800ms**.
   화면에 들어올 때 **1회** 재생하고 끝 상태에 머문다. 다른 화면은 이 길이를 쓰지 않는다.
   근거는 `docs/superpowers/specs/2026-09-15-about-landing-design.md` §6-4.
