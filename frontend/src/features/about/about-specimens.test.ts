@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest'
 
 import {
   CONGESTION_SPECIMEN,
+  EMERGENCY_ENTRY_SPECIMEN,
   EMERGENCY_ROWS_SPECIMEN,
+  PLACE_ROWS_SPECIMEN,
   PLAN_SPECIMEN,
   VERDICT_SPECIMEN,
 } from '@/features/about/about-specimen-data'
@@ -14,6 +16,7 @@ import { EmergencySpecimen } from '@/features/about/emergency-specimen'
 import { GoldenCurveSpecimen } from '@/features/about/golden-curve-specimen'
 import { PlacesSpecimen } from '@/features/about/places-specimen'
 import { PlanSpecimen } from '@/features/about/plan-specimen'
+import { ScrollStage } from '@/features/about/scroll-stage'
 import { VerdictSpecimen } from '@/features/about/verdict-specimen'
 import { messages } from '@/lib/messages'
 import { readSourceWithoutComments } from '@/test/source'
@@ -95,6 +98,36 @@ describe('GoldenCurveSpecimen — 골든타임 곡선', () => {
   it('예시는 그림이라 y축 눈금을 두지 않는다', () => {
     expect(markup).not.toContain('50℃')
   })
+
+  it('판정 배지가 산책 축의 위험이다 — 단계 2 가 가리키는 그림 (#914)', () => {
+    const badge = markup.match(
+      /<span class="[^"]*bg-metric-critical-100[^"]*">[\s\S]*?<\/span><\/span>/,
+    )?.[0]
+    expect(badge).toBeDefined()
+    expect(badge).toContain(messages.common.metricAxisWalkSafety)
+    expect(badge).toContain(messages.about.specimen.verdictGrade)
+  })
+
+  it('기상특보 띠는 metric-mid 이고 정적 렌더에 보인다 — 단계 4 가 가리키는 그림 (#914)', () => {
+    const strip = markup.match(
+      new RegExp(`<p class="([^"]*)"[^>]*>${messages.about.specimen.curveAlert}<`),
+    )
+    expect(strip?.[1]).toContain('bg-metric-mid-100')
+    expect(strip?.[1]).not.toContain('opacity-0')
+  })
+
+  it('무대 안에서도 정적 렌더는 전부 보인다 — 무대의 첫 단계는 마지막 단계다', () => {
+    const staged = renderToStaticMarkup(
+      createElement(ScrollStage, {
+        count: 4,
+        copy: null,
+        visual: createElement(GoldenCurveSpecimen),
+      }),
+    )
+    expect(staged).not.toContain('opacity-0')
+    expect(staged).toContain('stroke-dashoffset:0')
+    expect(staged).toContain(messages.about.specimen.curveAlert)
+  })
 })
 
 describe('CongestionSpecimen — 한산한 날 막대', () => {
@@ -162,6 +195,27 @@ describe('PlacesSpecimen — 내 반려견 기준 필터 예시', () => {
     expect(markup).toContain(messages.about.specimen.filterIndoor)
     expect(markup).toContain(messages.about.specimen.filterOpen)
   })
+
+  it('무대 훅 — 칩 셋 · 행 셋 · 정보 없음 행 하나 (#914)', () => {
+    expect(markup.match(/<span class="[^"]*\babout-stage-chip\b/g)).toHaveLength(3)
+    expect(markup.match(/<li class="[^"]*\babout-stage-row\b/g)).toHaveLength(3)
+    expect(markup.match(/<li class="[^"]*\babout-stage-row-unknown\b/g)).toHaveLength(1)
+  })
+
+  it('실내·실외 태그와 운영 중 태그만 단계 3 강조 대상이다 (#914)', () => {
+    const live = [
+      ...markup.matchAll(/<span class="[^"]*\babout-stage-tag-live\b[^"]*">([^<]*)</g),
+    ].map((match) => match[1])
+    const expected = PLACE_ROWS_SPECIMEN.flatMap((row) => [
+      row.setting,
+      ...('open' in row ? [messages.about.specimen.filterOpen] : []),
+    ])
+    expect(live.sort()).toEqual([...expected].sort())
+  })
+
+  it('무대 훅 클래스를 붙여도 정적 렌더의 태그 톤 클래스가 그대로다', () => {
+    expect(markup).toMatch(/border-metric-unknown-500[^"]*about-stage-tag-unknown/)
+  })
 })
 
 describe('EmergencySpecimen — 가까운 병원·약국 예시', () => {
@@ -176,6 +230,25 @@ describe('EmergencySpecimen — 가까운 병원·약국 예시', () => {
 
   it('예시 캡션이 있다 — 실제 거리로 읽히지 않게', () => {
     expect(markup).toContain(messages.about.specimen.emergencyNote)
+  })
+
+  it('DOM 순서가 거리순이다 — 단계 0 의 뒤섞임은 transform 뿐이다 (#914)', () => {
+    const positions = EMERGENCY_ROWS_SPECIMEN.map((row) => markup.indexOf(row.name))
+    const distances = EMERGENCY_ROWS_SPECIMEN.map((row) => Number.parseFloat(row.distance))
+    expect([...distances].sort((a, b) => a - b)).toEqual(distances)
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions)
+  })
+
+  it('위치 점은 aria-hidden 장식이다', () => {
+    expect(markup).toMatch(/<span aria-hidden="true" class="about-stage-locate[ "]/)
+  })
+
+  it('일정 안 진입 행이 있고 링크가 아니다 — 예시 안에 실제 라우트를 심지 않는다 (#914)', () => {
+    const entry = markup.match(/<div class="about-stage-entry[^"]*">[\s\S]*?<\/div>/)?.[0]
+    expect(entry).toBeDefined()
+    expect(entry).toContain(EMERGENCY_ENTRY_SPECIMEN.day)
+    expect(entry).toContain(messages.about.specimen.emergencyEntry)
+    expect(entry).not.toContain('<a ')
   })
 })
 

@@ -2,7 +2,9 @@
 
 import { type CSSProperties, useRef } from 'react'
 
+import { MetricBadge } from '@/components/metric'
 import { GOLDEN_CURVE_SPECIMEN, VERDICT_SPECIMEN } from '@/features/about/about-specimen-data'
+import { useStageStep } from '@/features/about/scroll-stage'
 import { useRevealOnce } from '@/features/about/use-reveal-once'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -42,11 +44,31 @@ const DRAW_MS = 800
  * **`viewBox` 배율이 타입 스케일을 우회한다.** `w-full` 만 두면 md 이상에서 폭이 2배 가까이
  * 늘며 12px 글자가 24px, 2.5px 선이 5px 로 같이 커진다. `max-w-md` 로 렌더 폭을 묶고, 선은
  * `vectorEffect="non-scaling-stroke"` 로 배율과 무관하게 지정한 굵기를 유지한다.
+ *
+ * **두 경로로 그린다** (#914, 명세 2026-09-25 §3-2).
+ *
+ * - 스크롤 무대 안(`useStageStep()` 이 값을 줌): 단계 1 에 선이 그려지고, 단계 2 에 봉우리
+ *   라벨과 판정 배지, 단계 3 에 추천 구간 면, 단계 4 에 기상특보 띠가 선다. 단계를 되돌리면
+ *   되돌아간다. 선 그리기는 단계 0 → 1 로 들어갈 때마다 다시 재생된다(`armed` 계약 그대로 —
+ *   단계 0 동안 transition 을 끈다).
+ * - 무대 밖(`null`): 지금까지처럼 화면에 들어올 때 한 번 스스로 재생한다.
+ *
+ * 어느 경로든 **정적 렌더는 전부 보인다** — 무대의 첫 렌더 단계는 마지막 단계다.
+ *
+ * **판정 배지는 단계 2 에서 처음 나타나고 그 뒤로 색이 바뀌지 않는다.** 단계 0 · 1 에서는
+ * 자리를 투명하게 비운다 — 다른 등급 색을 거치지 않는다(선행 명세 §6-4 "등급 색은 끝에서만").
  */
 export function GoldenCurveSpecimen() {
   const ref = useRef<SVGSVGElement>(null)
   const phase = useRevealOnce(ref, true)
-  const drawing = phase === 'armed'
+  const stage = useStageStep()
+  const drawing = stage === null ? phase === 'armed' : stage.step < 1
+  /** 봉우리 · 배지 · 추천 구간 · 특보가 숨는 조건. 무대 밖에서는 선이 다 그려진 뒤에 뜬다 */
+  const hiddenUntil = (step: number) => (stage === null ? drawing : stage.step < step)
+  /** 무대 밖에서만 선 그리기 뒤로 미룬다 — 무대 안에서는 단계가 곧 순서다 */
+  const afterDraw = (extraMs = 0) => ({
+    transitionDelay: drawing || stage !== null ? '0ms' : `${DRAW_MS + extraMs}ms`,
+  })
   const copy = messages.about.specimen
   const data = GOLDEN_CURVE_SPECIMEN
 
@@ -59,7 +81,22 @@ export function GoldenCurveSpecimen() {
   return (
     <div className="bg-bg border-border -mx-4 border-y md:mx-0 md:rounded-lg md:border">
       <div className={cn('pt-4', INSET_CLASS.card)}>
-        <p className="text-title-2 text-fg font-semibold">{copy.curveTitle}</p>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-title-2 text-fg font-semibold">{copy.curveTitle}</p>
+          <span
+            className={cn(
+              'shrink-0',
+              hiddenUntil(2)
+                ? 'opacity-0 transition-none'
+                : 'transition-opacity duration-150 ease-out',
+            )}
+            style={afterDraw()}
+          >
+            <MetricBadge tone="critical" axis="walkSafety">
+              {copy.verdictGrade}
+            </MetricBadge>
+          </span>
+        </div>
         <p className="text-caption text-fg-muted mt-1 font-medium">
           {copy.curveSub.replace('{window}', VERDICT_SPECIMEN.window)}
         </p>
@@ -79,11 +116,11 @@ export function GoldenCurveSpecimen() {
             height={118}
             rx={4}
             className={
-              drawing
+              hiddenUntil(3)
                 ? 'fill-metric-high-100 opacity-0 transition-none'
                 : 'fill-metric-high-100 transition-opacity duration-200 ease-out'
             }
-            style={{ transitionDelay: drawing ? '0ms' : `${DRAW_MS}ms` }}
+            style={afterDraw()}
           />
           {/* stroke-width 는 상속되지만 vector-effect 는 상속되지 않아 선마다 붙인다 */}
           <g className="stroke-border" strokeWidth={1}>
@@ -134,9 +171,11 @@ export function GoldenCurveSpecimen() {
           />
           <g
             className={
-              drawing ? 'opacity-0 transition-none' : 'transition-opacity duration-150 ease-out'
+              hiddenUntil(2)
+                ? 'opacity-0 transition-none'
+                : 'transition-opacity duration-150 ease-out'
             }
-            style={{ transitionDelay: drawing ? '0ms' : `${DRAW_MS}ms` }}
+            style={afterDraw()}
           >
             <circle cx={data.peak.x} cy={data.peak.y} r={4} className="fill-metric-critical-500" />
             <text
@@ -162,6 +201,18 @@ export function GoldenCurveSpecimen() {
             {copy.curveLegendWindow}
           </li>
         </ul>
+        {/* 기상특보 띠 — 특보는 판정과 같은 축의 데이터라 등급 색 자리다 (#914) */}
+        <p
+          className={cn(
+            'bg-metric-mid-100 text-metric-mid-700 text-caption mt-3 rounded-md px-3 py-2 font-semibold',
+            hiddenUntil(4)
+              ? 'opacity-0 transition-none'
+              : 'transition-opacity duration-200 ease-out',
+          )}
+          style={afterDraw(200)}
+        >
+          {copy.curveAlert}
+        </p>
         <p className="text-caption text-fg-muted mt-3 font-medium">{copy.curveNote}</p>
       </div>
     </div>

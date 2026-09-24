@@ -24,9 +24,24 @@ const TONE: Record<AboutTagTone, string> = {
  * 끌고 다니게 된다. 쓰는 곳이 `places-specimen` · `emergency-specimen` 둘뿐이라
  * `features/about` 안에 둔다.
  */
-export function Tag({ tone, children }: { tone: AboutTagTone; children: ReactNode }) {
+export function Tag({
+  tone,
+  className,
+  children,
+}: {
+  tone: AboutTagTone
+  /** 스크롤 무대 선택자 훅(`about-stage-*`)만 받는다 — 외형을 덮지 않는다 (#914) */
+  className?: string
+  children: ReactNode
+}) {
   return (
-    <span className={cn('text-caption inline-flex h-5 items-center rounded-sm px-2', TONE[tone])}>
+    <span
+      className={cn(
+        'text-caption inline-flex h-5 items-center rounded-sm px-2',
+        TONE[tone],
+        className,
+      )}
+    >
       {children}
     </span>
   )
