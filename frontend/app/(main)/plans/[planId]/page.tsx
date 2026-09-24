@@ -11,7 +11,7 @@ import { ApiError } from '@/lib/api/error'
 import { planDetailPath } from '@/lib/api/plan'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
-import { planDetailNotFoundTitle } from '@/lib/plan/detail-title'
+import { planDetailTitle } from '@/lib/plan/detail-title'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import type { PlanDetail } from '@/types/plan'
 
@@ -36,11 +36,10 @@ const loadPlanDetail = cache((planId: string, accessToken: string | undefined) =
 )
 
 /**
- * **404 탭 제목만 잡는다 — 이슈 #676.** 예전엔 `generateMetadata` 자체가 없어 404 든
- * 정상이든 루트 레이아웃의 평문 `혼디가개` 로 떨어졌다("제목 하나를 위해 백엔드를 한 번
- * 더 부를 이유가 없다"). 그 판단은 유지한다 — 정상·5xx·무응답까지 제목을 새로 짓는
- * 것은 이 이슈의 범위가 아니고, `planDetailNotFoundTitle` 이 `null` 을 돌려주면
- * `title` 필드를 아예 넣지 않아 부모 제목을 그대로 물려받는다(#676 전과 동일).
+ * **탭 제목은 404 `찾을 수 없는 일정이에요` 와 그 밖 전부 `여행 일정` 둘이다** — 404 는
+ * #676, 나머지는 #905 R5. 일정 이름은 싣지 않는다(프라이버시 근거는
+ * `src/lib/plan/detail-title.ts` 머리주석). 5xx·무응답도 목록 제목으로 떨어진다 —
+ * `architecture-guide.md` §7 의 #206 규칙이고 장소 상세와 같다.
  *
  * **`not-found.tsx` 자신의 `metadata` 로는 못 고친다.** 이 페이지가 비동기 조회 뒤
  * 조건부로 `notFound()` 를 던지는데, Next 16 은 그 경우 이 페이지가 이미 확정해 둔
@@ -55,13 +54,14 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const { planId } = await params
   const session = await readSession()
 
+  let error: unknown = null
   try {
     await loadPlanDetail(planId, session?.accessToken)
-    return {}
-  } catch (error) {
-    const title = planDetailNotFoundTitle(error)
-    return title ? { title: `${title} · 혼디가개` } : {}
+  } catch (caught) {
+    error = caught
   }
+
+  return { title: `${planDetailTitle(error)} · 혼디가개` }
 }
 
 export default async function PlanDetailPage({ params }: { params: Params }) {
