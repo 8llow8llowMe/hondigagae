@@ -63,3 +63,40 @@ describe('ChipGroup(다중) — 토글 칩은 roving 이 아니다', () => {
     expect(markup).not.toContain('tabindex')
   })
 })
+
+/**
+ * `sm` 칩의 누르는 자리 — 이슈 #905 R3.
+ *
+ * **보이는 높이는 모바일 36 그대로다** (#883). 투명한 `::before` 가 모바일에서만 위아래
+ * 6px 씩 나가 실측 46 을 만들고, 768 이상에서는 칩 자체가 44 라 되돌린다.
+ */
+describe('Chip — sm 의 누르는 자리 (#905 R3)', () => {
+  function chipTag(size: 'sm' | 'md'): string {
+    const markup = renderToStaticMarkup(
+      createElement(Chip, { selected: false, onSelect: vi.fn(), size, children: '24시간' }),
+    )
+    return /<button[^>]*>/.exec(markup)?.[0] ?? ''
+  }
+
+  it('sm 은 모바일 h-9 를 두고 세로 6px 씩 히트 영역을 넓힌다', () => {
+    const classes = (/class="([^"]*)"/.exec(chipTag('sm'))?.[1] ?? '')
+      .replaceAll('&#x27;', "'")
+      .split(' ')
+
+    for (const cls of [
+      'h-9',
+      'relative',
+      'before:absolute',
+      'before:inset-x-0',
+      'before:-inset-y-1.5',
+      'md:before:inset-y-0',
+      "before:content-['']",
+    ]) {
+      expect(classes).toContain(cls)
+    }
+  })
+
+  it('md 는 이미 44 라 손대지 않는다', () => {
+    expect(chipTag('md')).not.toContain('before:')
+  })
+})

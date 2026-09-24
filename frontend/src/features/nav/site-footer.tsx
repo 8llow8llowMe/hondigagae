@@ -82,12 +82,16 @@ export function SiteFooter() {
             위해서다.
           */}
           <nav aria-label={messages.footer.legalLabel}>
-            <ul className="flex flex-wrap gap-x-4 gap-y-1">
+            {/*
+              링크마다 높이 44 를 준다 (#905 R4) — 아래 `/about` 과 같은 방식이다. 줄바꿈이
+              나도 링크 자신이 44 라 줄 사이를 더 벌리지 않는다(`gap-y-0`).
+            */}
+            <ul className="flex flex-wrap gap-x-4 gap-y-0">
               {LEGAL_LINKS.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-caption text-fg-muted hover:text-fg focus-visible:ring-brand-500 font-medium focus-visible:ring-2 focus-visible:outline-none"
+                    className="text-caption text-fg-muted hover:text-fg focus-visible:ring-brand-500 inline-flex min-h-11 items-center font-medium focus-visible:ring-2 focus-visible:outline-none"
                   >
                     {link.label}
                   </Link>

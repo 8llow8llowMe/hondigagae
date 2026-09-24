@@ -58,7 +58,14 @@ export type ChipProps = {
 
 const SIZE_CLASS: Record<NonNullable<ChipProps['size']>, string> = {
   md: 'h-11 px-3',
-  sm: 'h-9 px-2 md:h-11 md:px-3',
+  /*
+    보이는 높이는 #883 결정대로 모바일 36 이다 — 누르는 자리만 투명한 `::before` 로 위아래
+    6px 씩 넓혀 실측 46 을 만들고(기준 상자가 패딩 상자라 테두리 1px 씩 줄어 4px 로는 42 였다),
+    칩이 44 가 되는 768 이상에서는 되돌린다 (#905 R3). **`overflow-x-auto` 레일 안에서는
+    레일이 `py-1.5 -my-1.5` 로 띠만큼 자리를 줘야 한다** — 가로 스크롤러는 세로도 잘라서,
+    자리가 없으면 띠가 레일 안 세로 스크롤 5px 로 변해 눌리지도 않는다(리뷰 실측).
+  */
+  sm: "relative h-9 px-2 before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] md:h-11 md:px-3 md:before:inset-y-0",
 }
 
 export function Chip({

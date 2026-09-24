@@ -115,7 +115,11 @@ export function PlaceMapFilterBar({
           onScroll={rail.onScroll}
           label={messages.place.filterContentTypeLabel}
           exclusive
-          className={cn('flex scrollbar-none gap-1.5 overflow-x-auto', rail.fadeClassName)}
+          // `py-1.5 -my-1.5`: 칩의 히트 띠가 `overflow-x-auto` 에 잘리지 않게 (#905 R3 · emergency-filter-bar 와 같다)
+          className={cn(
+            '-my-1.5 flex scrollbar-none gap-1.5 overflow-x-auto py-1.5',
+            rail.fadeClassName,
+          )}
         >
           <Chip
             exclusive
