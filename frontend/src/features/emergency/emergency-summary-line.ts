@@ -9,7 +9,7 @@ import type { NearbyFacilityResult } from '@/types/emergency'
  *
  * **예전에는 `emergencySummaryLine`(조건 한 줄, #419)이 여기 있었다.** 데스크톱 전용
  * 둘째 부제였는데, 1280 실측에서 `10.0km` 홀로 서서 무슨 값인지 읽히지 않아 걷었다
- * (#639) — 반경은 좌측 필터 레일의 선택값과 목록 위 요약 줄(`가까운 순 · 반경 10.0km`)이
+ * (#639) — 반경은 좌측 필터 레일의 선택값과 목록 위 요약 줄(`가까운 순 · 반경 10km`)이
  * 이미 말한다. `/places` 의 `filterSummaryLine` 은 그대로 남아 있다.
  *
  * 순수 함수라 node 환경에서 그대로 테스트한다 (docs/testing-guide.md §1).

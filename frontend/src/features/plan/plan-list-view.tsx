@@ -170,15 +170,19 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
                 <Button className="hidden lg:inline-flex" onClick={() => setCreating(true)}>
                   {messages.plan.createAction}
                 </Button>
-                {/* 모바일은 44×44 아이콘 버튼 — 라벨이 보이지 않아 aria-label 로 준다 */}
+                {/*
+                  모바일은 아이콘 전용 `+` 대신 텍스트 버튼이다 (#905 R6). 라벨 없는
+                  아이콘 버튼은 스크린리더 밖에서 의미가 읽히지 않아 `sm` 크기로 줄여도
+                  글자를 남긴다 — 동작(시트 열기)은 그대로고, 라벨이 보이므로 `aria-label` 은 뺐다.
+                */}
                 <Button
-                  variant="ghost"
-                  iconOnly
-                  aria-label={messages.plan.createActionLabel}
-                  leading={<PlusIcon size={24} />}
+                  size="sm"
+                  leading={<PlusIcon size={16} />}
                   className="lg:hidden"
                   onClick={() => setCreating(true)}
-                />
+                >
+                  {messages.plan.createActionShort}
+                </Button>
               </>
             ) : undefined
           }
