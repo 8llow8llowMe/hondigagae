@@ -98,7 +98,9 @@ export function EmergencyFilterBar({
           ref={rail.ref}
           onScroll={rail.onScroll}
           className={cn(
-            'flex min-w-0 scrollbar-none items-center gap-1.5 overflow-x-auto',
+            // `py-1.5 -my-1.5`: `overflow-x-auto` 는 세로도 잘라 칩의 히트 띠(`Chip` sm)가 레일 안에서
+            // 세로 스크롤을 만든다 — 띠만큼 안쪽 여백을 주고 바깥 여백으로 되돌린다 (#905 R3)
+            '-my-1.5 flex min-w-0 scrollbar-none items-center gap-1.5 overflow-x-auto py-1.5',
             rail.fadeClassName,
           )}
         >

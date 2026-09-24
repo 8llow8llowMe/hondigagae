@@ -83,15 +83,34 @@ const VARIANT: Record<ButtonVariant, string> = {
     'border border-fg-inverse/55 text-fg-inverse hover:bg-fg-inverse/10 active:bg-fg-inverse/10',
 }
 
+/*
+  **`sm` 은 보이는 높이 32 를 두고 누르는 자리만 44 로 넓힌다** (#905 R3). 투명한
+  `::before` 가 위아래로 8px 씩 나간다. 기준 상자가 패딩 상자라 테두리 있는 variant
+  (`secondary` · `dangerOutline` · `inverseOutline`)는 1px 씩 줄어 46, 테두리 없는 variant 는
+  48 이다 — 6px 로 두면 42 라 44 에 못 미쳤다(#905 Playwright 실측). 일정 상세·긴급 화면의 `sm` 이 촘촘히 서는
+  자리라 시각 크기를 올리면 밀도가 무너진다 — 그래서 보이는 것은 그대로다.
+
+  `::before` 는 버튼 자신의 의사요소라 눌러도 이 버튼이 받는다. 위치를 잡지 않은 자식
+  (`leading` 아이콘·글자) 위에 그려지지만 투명하고, 자식을 누르든 띠를 누르든 눌림은 이
+  버튼으로 온다. **이웃 요소를 덮는다** — 띠는 positioned 라 DOM 순서와 무관하게 positioned
+  가 아닌 이웃(글줄 등)보다 위에 그려지고, 위아래 7px 안의 글자를 누르면 이 버튼이 받는다.
+  두 `sm` 이 세로로 7px 미만 간격이면 겹치는 띠는 뒤에 그려진 쪽이 받는다 — 세로로 촘촘히
+  쌓는 자리(`gap-1`)에는 `sm` 을 두 개 잇달아 두지 않는다.
+  사용처가 배치로 `absolute` 등을 주면 `cn()` 이 `relative` 를 걷고, 그것도 기준 상자라
+  히트 영역은 그대로다.
+*/
+const SM_HIT_AREA =
+  "relative before:absolute before:inset-x-0 before:-inset-y-2 before:content-['']"
+
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-8 gap-1 px-3 text-body-2',
+  sm: `h-8 gap-1 px-3 text-body-2 ${SM_HIT_AREA}`,
   // 높이 44 — §7 의 하한이 아니라 **폼 컨트롤 높이**다 (#883). 같은 줄의 입력·버튼이 서로 맞는 값이라 한쪽만 내리면 어긋난다
   md: 'h-11 gap-2 px-4 text-body-1',
   lg: 'h-12 gap-2 px-5 text-body-1',
 }
 
 const ICON_ONLY_SIZE: Record<ButtonSize, string> = {
-  sm: 'h-8 w-8 p-0',
+  sm: `h-8 w-8 p-0 ${SM_HIT_AREA}`,
   md: 'h-11 w-11 p-0',
   lg: 'h-12 w-12 p-0',
 }

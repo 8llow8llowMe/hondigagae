@@ -128,7 +128,8 @@ export function PlaceFilterChips({
           onScroll={rail.onScroll}
           label={messages.place.filterTitle}
           className={cn(
-            'flex scrollbar-none gap-1.5 overflow-x-auto',
+            // `py-1.5 -my-1.5`: 칩의 히트 띠가 `overflow-x-auto` 에 잘리지 않게 (#905 R3)
+            '-my-1.5 flex scrollbar-none gap-1.5 overflow-x-auto py-1.5',
             INSET_BLEED_CLASS.card,
             rail.fadeClassName,
           )}

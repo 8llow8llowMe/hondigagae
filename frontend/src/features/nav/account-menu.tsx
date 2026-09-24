@@ -82,7 +82,7 @@ export function AccountMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
-        className="bg-band text-fg-muted focus-visible:ring-brand-500 flex size-9 items-center justify-center rounded-full focus-visible:ring-2 focus-visible:outline-none"
+        className="bg-band text-fg-muted focus-visible:ring-brand-500 flex size-11 items-center justify-center rounded-full focus-visible:ring-2 focus-visible:outline-none"
       >
         <MyPageIcon size={20} />
       </button>

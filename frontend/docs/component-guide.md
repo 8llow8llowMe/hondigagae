@@ -72,7 +72,7 @@ const VARIANT: Record<ButtonVariant, string> = {
 }
 
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-8 px-3 text-body-2',
+  sm: 'h-8 px-3 text-body-2', // 시각 32 — 실제 히트 영역은 `::before` 로 위아래 8px 씩 넓힌다 (#905 R3)
   md: 'h-11 px-4 text-body-1', // 폼 컨트롤 높이 44 — Input 과 같은 줄에 선다 (#883)
   lg: 'h-12 px-5 text-body-1',
 }
@@ -96,6 +96,13 @@ const SIZE: Record<ButtonSize, string> = {
 - **내릴 때도 기본값을 바꾸지 않는다.** `Button` 은 이미 `sm`(32) · `md`(44) · `lg`(48) 을
   갖고 있고 `Chip` 은 `size` 를 갖는다 — **호출부가 고르는 축**이 이미 있다. 기본값을 내리면
   한 커밋이 전 화면을 바꾸고 되돌릴 때도 전 화면이 함께 움직인다.
+- **시각 크기를 줄여도 누르는 자리는 줄이지 않는다** (#905 R3). `Button` `sm`(시각 32)은
+  `::before` 로 위아래 8px 씩, `Chip` `sm`(모바일 시각 36)은 6px 씩 히트 영역을 넓힌다 —
+  기준 상자가 패딩 상자라 1px 테두리만큼 줄어 실측은 버튼 46~48 · 칩 46 이다. `#883` 이 정한
+  시각 크기는 그대로 두고 접근성 하한만 의사요소로 되찾는다.
+- **`overflow-x-auto` 스크롤 레일 안의 칩은 레일이 세로 여백을 줘야 잘리지 않는다.** 칩의
+  히트 영역이 `::before` 로 카드 밖까지 나가는데, 레일 자신이 세로로 꽉 차 있으면(`py-0`)
+  그 의사요소가 `overflow` 에 잘려 위아래 절반이 눌리지 않는다.
 
 ## 3. `className` 정책 (중요)
 

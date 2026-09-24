@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it, vi } from 'vitest'
 
+import { openingTags, readSourceWithoutComments } from '@/test/source'
+
 // 자식(`NavLinks` · `PetSwitcherSlot`)이 라우터·React Query 를 요구한다. 헤더 셸만 본다
 vi.mock('next/navigation', () => ({ usePathname: () => '/' }))
 vi.mock('@/features/nav/pet-switcher-slot', () => ({ PetSwitcherSlot: () => null }))
@@ -47,5 +49,23 @@ describe('GlobalHeader — 모바일 로그인 링크', () => {
     const markup = render(true)
 
     expect(markup).not.toContain('href="/login"')
+  })
+})
+
+/*
+  **계정 메뉴 트리거의 누르는 자리 44** (#905 R3). `AccountMenu` 는 라우터·상태를 요구해
+  여기서 렌더하지 않고(위 `vi.mock`) 소스의 트리거 태그를 본다. 헤더가 `md:h-16`(64) 이고
+  트리거는 `hidden md:block` 이라 44 가 헤더 안에 든다.
+*/
+describe('AccountMenu — 트리거 크기 (#905 R3)', () => {
+  it('트리거가 size-11 이다 — size-9(36) 로 돌아가지 않는다', () => {
+    const source = readSourceWithoutComments('src/features/nav/account-menu.tsx')
+    const trigger = openingTags(source, /<button\b/g).find((tag) =>
+      tag.includes('aria-haspopup="menu"'),
+    )
+
+    expect(trigger).toBeDefined()
+    expect(trigger).toContain('size-11')
+    expect(trigger).not.toContain('size-9')
   })
 })

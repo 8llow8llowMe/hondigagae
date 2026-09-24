@@ -74,6 +74,24 @@ describe('SiteFooter — 내용 (#399)', () => {
     ])
   })
 
+  /*
+    **누르는 자리 44** (#905 R3·R4). 글자만의 링크는 줄 높이(약 14px)만큼만 눌린다 —
+    같은 푸터의 `/about` 과 같은 방식으로 높이를 준다. 여는 태그를 하나씩 떼어 본다
+    (`/about` 이 이미 `h-11` 이라 마크업 전체에서 찾으면 통과해 버린다).
+  */
+  it('약관 링크 둘이 44px 탭 영역을 갖는다', () => {
+    for (const link of LEGAL_LINKS) {
+      const tag = [...markup.matchAll(/<a [^>]*>/g)]
+        .map((match) => match[0])
+        .find((open) => open.includes(`href="${link.href}"`))
+      const classes = (/class="([^"]*)"/.exec(tag ?? '')?.[1] ?? '').split(' ')
+
+      expect(classes).toContain('inline-flex')
+      expect(classes).toContain('min-h-11')
+      expect(classes).toContain('items-center')
+    }
+  })
+
   it('약관 링크 묶음에 랜드마크 이름을 준다', () => {
     expect(markup).toContain(`aria-label="${messages.footer.legalLabel}"`)
   })
