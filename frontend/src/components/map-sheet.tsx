@@ -208,6 +208,8 @@ export function MapSheet({
         'bg-bg border-border fixed inset-x-0 z-30 flex flex-col rounded-t-xl border-t shadow-lg lg:hidden',
         // 어느 단계에서도 탭바 자리를 비운다 (위 `clearsTabbar` 주석)
         'map-sheet-clears-tabbar',
+        // 내용 기반 하한 — 머리 + 목록 한 줄 몫 아래로는 안 줄어든다 (아래 목록 주석, #901 D1)
+        'min-h-min',
         // 끄는 동안에는 전환을 끈다 — 손가락을 따라오지 못하고 끈적여 보인다
         !dragging && 'transition-[height] duration-200',
         className,
@@ -263,7 +265,30 @@ export function MapSheet({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
+      {/*
+        **최소 단계에도 목록이 한 줄은 보인다 — 시트의 계약이다** (#901 D1).
+
+        단계 높이는 **비율**(`STOP_RATIO`)인데 머리는 **고정 px** 라, 기기가 짧을수록 목록이
+        사라졌다. 360×640 실측으로 `/places` 는 머리가 160 인데 `min` 이 20dvh = 128 이라
+        **목록 0행**이었다(개수 줄까지 잘렸다). 칩을 한 줄 레일로 합치는 안은 #883 이 유형
+        9종 때문에 보류한 판단이라 되받지 않고, 시트 쪽에 하한을 건다:
+
+         - 시트가 `min-h-min` — 제 min-content 아래로 줄지 않는다. 비율 높이는 그대로 두고
+           그보다 작아질 때만 이 하한이 이긴다. **JS 로 머리를 재지 않으므로 SSR 마크업과
+           첫 화면이 같다**(로드 뒤 한 번 튀는 일이 없다)
+         - 목록이 그 min-content 에 **`min-h-12`(48px)만** 보탠다 — 첫 행의 배지 줄과 제목
+           첫머리가 보여 "여기 목록이 있다" 가 읽히는 높이다. 한 행을 통째로(`/places` 카드
+           125px) 요구하면 640 에서 `min` 이 `mid`(224)를 넘어 단계가 뒤집힌다
+         - **`contain-size` 가 목록의 내용 높이를 min-content 에서 뺀다.** 없으면 스크롤
+           컨테이너의 내용(목록 전체)을 min-content 로 치는 엔진에서 시트가 목록 길이만큼
+           커진다. Chrome 은 없어도 48 로 셌지만 엔진 해석에 기대지 않는다
+
+        하한은 **세 단계 모두**에 걸린다 — 가로 모드처럼 아주 짧은 화면에서 `mid` 까지 머리보다
+        작아지면 단계끼리 같은 높이로 붙을 뿐 뒤집히지는 않는다.
+      */}
+      <div className="min-h-12 flex-1 overflow-y-auto overscroll-contain contain-size">
+        {children}
+      </div>
     </section>
   )
 }
