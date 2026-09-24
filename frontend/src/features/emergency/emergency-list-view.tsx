@@ -165,17 +165,32 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
                 머리(고정 영역)라 목록을 굴려도 남는다. 예전 `PositionNotice` 는 본문
                 맨 위였고 스크롤 한 번이면 사라졌다.
               */}
-              <PositionFallbackHead
-                reason={board.fallback}
-                regionCode={board.regionCode}
-                onRegionChange={board.researchAtRegion}
-                onLocate={board.locate}
-              />
-              <EmergencySearchField
-                filters={board.filters}
-                onFiltersChange={board.setFilters}
-                className={cn('pt-3', INSET_CLASS.card)}
-              />
+              {/*
+                **폴백이 서면 검색이 그 블록 안으로 들어간다** (#910). lg 에서 권역 칩과 검색이
+                한 줄에 서려면 같은 grid 안에 있어야 한다. 폴백이 없으면(`granted`) 예전처럼
+                혼자 선다 — `PositionFallbackHead` 는 그때 아무것도 그리지 않는다.
+              */}
+              {board.fallback !== null ? (
+                <PositionFallbackHead
+                  reason={board.fallback}
+                  regionCode={board.regionCode}
+                  onRegionChange={board.researchAtRegion}
+                  onLocate={board.locate}
+                  layout="wide"
+                  search={
+                    <EmergencySearchField
+                      filters={board.filters}
+                      onFiltersChange={board.setFilters}
+                    />
+                  }
+                />
+              ) : (
+                <EmergencySearchField
+                  filters={board.filters}
+                  onFiltersChange={board.setFilters}
+                  className={cn('pt-3', INSET_CLASS.card)}
+                />
+              )}
               <EmergencyFilterChips
                 filters={board.filters}
                 onFiltersChange={board.setFilters}

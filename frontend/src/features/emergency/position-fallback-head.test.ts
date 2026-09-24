@@ -140,3 +140,66 @@ describe('PositionFallbackHead — 위치를 못 쓰는 사람에게 주는 손�
     expect(button).toContain('w-full')
   })
 })
+
+/*
+  **#910 — 목록 화면 데스크톱은 두 줄이다.** 안내 · 전폭 CTA · 힌트 · 권역 칩 · 검색 5단이
+  첫 행을 밀었다. `layout="wide"` 가 lg 에서만 grid 자리를 바꾸고, 기본값(`stack`)은 지도
+  화면의 400px 패널을 위해 폭과 무관하게 쌓는다 — `lg:` 는 뷰포트 기준이라서다.
+*/
+describe('PositionFallbackHead — 데스크톱 두 줄 (#910)', () => {
+  const SEARCH = createElement('form', { role: 'search', 'data-probe': 'search' })
+
+  /* 블록 루트의 여는 태그만 본다 — 마크업 전체를 훑으면 자식의 lg: 클래스에 속는다 */
+  function rootTag(markup: string): string {
+    return markup.slice(0, markup.indexOf('>') + 1)
+  }
+
+  it('기본(stack)은 lg 에서도 grid 가 아니다 — 지도 패널 400px 안에서 갈라지면 안 된다', () => {
+    const markup = render()
+
+    expect(rootTag(markup)).not.toContain('lg:grid')
+    expect(markup).not.toContain('lg:col-start-2')
+  })
+
+  it('wide 는 lg 에서 [안내 · 힌트 | 버튼] 과 [칩 | 검색] 두 줄이다', () => {
+    const markup = render({ layout: 'wide', search: SEARCH })
+
+    expect(rootTag(markup)).toContain('lg:grid lg:grid-cols-[1fr_auto]')
+
+    // 버튼은 우측 열에서 두 행에 걸치고 전폭을 벗는다
+    const button = markup.slice(markup.lastIndexOf('<button', markup.indexOf(PRIMARY)))
+    expect(button.slice(0, button.indexOf('>'))).toContain('lg:col-start-2 lg:row-span-2')
+    expect(button.slice(0, button.indexOf('>'))).toContain('lg:w-auto')
+
+    // 칩 줄과 검색이 같은 flex 행이다
+    const row = markup.slice(markup.indexOf('lg:col-span-2'))
+    expect(row).toContain('lg:flex-row')
+    expect(row.indexOf(messages.emergency.regionGroupLabel)).toBeLessThan(
+      row.indexOf('data-probe="search"'),
+    )
+  })
+
+  it('wide 여도 모바일 순서는 그대로다 — 안내 → 버튼 → 힌트 → 칩 → 검색 (#353)', () => {
+    const markup = render({ layout: 'wide', search: SEARCH })
+    const at = (probe: string) => markup.indexOf(probe)
+
+    const order = [
+      at('role="status"'),
+      at(PRIMARY),
+      at(messages.emergency.regionPickHintDenied),
+      at(messages.emergency.regionGroupLabel),
+      at('data-probe="search"'),
+    ]
+    expect(order.every((index) => index > -1)).toBe(true)
+    expect([...order].sort((a, b) => a - b)).toEqual(order)
+  })
+
+  it('검색이 들어오면 블록의 pb-3 을 걷고 검색 위 24 를 준다 — 예전 pb-3 + pt-3 과 같다', () => {
+    const withSearch = render({ layout: 'wide', search: SEARCH })
+    const without = render()
+
+    expect(rootTag(withSearch)).not.toMatch(/\bpb-3\b/)
+    expect(rootTag(without)).toMatch(/\bpb-3\b/)
+    expect(withSearch).toMatch(/<div class="mt-6[^"]*"><form[^>]*data-probe="search"/)
+  })
+})
