@@ -67,9 +67,16 @@ describe('PlanDayVerdict — 근거의 정보성/감점을 구분한다 (#148)',
     const info = renderVerdict({ reasons: [INFO] })
     const penalty = renderVerdict({ reasons: [PENALTY] })
 
-    expect(info).toContain(`class="text-body-2 text-fg-muted"`)
-    expect(penalty).not.toContain(`class="text-body-2 text-fg-muted"`)
-    expect(penalty).toContain(`class="text-body-2 text-fg"`)
+    /*
+      **근거 `li` 의 클래스만 떼어 본다.** #905 R9 에서 글머리 점 클래스가 붙어 `class="…"`
+      통문자열이 순서·구성에 기대게 됐다 — 증명할 것은 톤 하나다.
+    */
+    const liClasses = (markup: string): string[] =>
+      (/<li class="([^"]*)"/.exec(markup)?.[1] ?? '').split(' ')
+
+    expect(liClasses(info)).toContain('text-fg-muted')
+    expect(liClasses(penalty)).not.toContain('text-fg-muted')
+    expect(liClasses(penalty)).toContain('text-fg')
   })
 
   it('서버가 준 순서를 바꾸지 않는다 — 영향이 큰 순서로 온다', () => {
