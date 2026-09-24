@@ -185,10 +185,27 @@ describe('목록 갈래는 3층 표면이다 (#460)', () => {
     expect(search).toBeGreaterThan(tools)
     expect(chips).toBeGreaterThan(search)
 
-    const tag = view.slice(search, view.indexOf('/>', search))
-    expect(tag).not.toContain('lg:hidden')
+    /*
+      **검색 폼이 두 갈래다** (#910). 위치 폴백이 서면 그 블록의 `search` 슬롯 안(lg 에서
+      권역 칩과 한 줄), 폴백이 없으면 혼자 선다. 둘 다 `lg:hidden` 이 아니어야 한다.
+    */
+    const tags = [...view.matchAll(/<EmergencySearchField\b/g)].map((match) =>
+      view.slice(match.index, view.indexOf('/>', match.index)),
+    )
+    expect(tags).toHaveLength(2)
+    for (const tag of tags) {
+      expect(tag).not.toContain('lg:hidden')
+    }
+
     // 카드 머리는 좌우 여백 밖이라 도구가 인셋을 스스로 든다 (`Surface` 머리주석)
-    expect(tag).toContain('INSET_CLASS.card')
+    const standalone = tags.find((tag) => tag.includes('className='))
+    expect(standalone).toContain('INSET_CLASS.card')
+
+    // 폴백 블록 안의 검색은 인셋을 들지 않는다 — 블록이 `inset`(기본 card)으로 이미 준다
+    const head = view.slice(view.indexOf('<PositionFallbackHead'), view.indexOf(') : ('))
+    expect(head).toContain('layout="wide"')
+    expect(head).toMatch(/search=\{\s*<EmergencySearchField\b/)
+    expect(tags.filter((tag) => !tag.includes('className='))).toHaveLength(1)
   })
 
   /* 반경 축이 모바일에도 올라왔다 (#537) — 데스크톱 레일만 갖고 있던 손잡이다 */
