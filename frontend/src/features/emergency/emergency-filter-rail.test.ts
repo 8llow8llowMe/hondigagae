@@ -32,7 +32,7 @@ describe('EmergencyFilterRail — 데스크톱 필터 레일 (#419)', () => {
 
     expect(markup).toContain('시설 유형')
     expect(markup).toContain('영업 조건')
-    expect(markup).toContain('10.0km')
+    expect(markup).toContain('10km')
   })
 
   /* `/places` 레일과 같은 규칙 — 걸린 필터가 없으면 누를 수 없는 버튼을 남기지 않는다 */
@@ -57,7 +57,7 @@ describe('EmergencyFilterRail — 데스크톱 필터 레일 (#419)', () => {
   it('반경만 기본값과 달라도 초기화를 내지 않는다', () => {
     const markup = render(DEFAULT_FACILITY_FILTERS, 40000)
 
-    expect(markup).toContain('40.0km')
+    expect(markup).toContain('40km')
     expect(markup).not.toContain('초기화')
   })
 

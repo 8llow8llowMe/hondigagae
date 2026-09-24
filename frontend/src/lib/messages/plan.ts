@@ -231,8 +231,12 @@ export const planMessages = {
   // ── 만들기 ─────────────────────────────────────────────────────────────
 
   createAction: '새 일정 만들기',
-  /** 모바일 헤더의 아이콘 버튼 — 라벨이 보이지 않아 `aria-label` 로 준다 */
-  createActionLabel: '새 일정 만들기',
+  /**
+   * 모바일 헤더의 텍스트 버튼 (#905 R6). 예전에는 라벨 없는 아이콘 버튼이라
+   * `aria-label` 로 이 문구를 대신 줬는데, 지금은 버튼에 글자가 그대로 보이므로
+   * `aria-label` 이 따로 필요 없다 — 좁은 머리 폭에 맞춘 축약형이다.
+   */
+  createActionShort: '새 일정',
   createTitle: '일정 만들기',
   createDescription: '빈 일정을 만들고 장소는 나중에 담아요.',
   createSubmit: '만들기',

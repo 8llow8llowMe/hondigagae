@@ -136,7 +136,7 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
 
             **조건 줄(`emergencySummaryLine`)은 걷었다.** 데스크톱 전용 둘째 줄이었는데
             1280 실측에서 `10.0km` 홀로 서서 무슨 값인지 읽히지 않았다 — 반경은 좌측
-            레일의 선택값과 목록 위 요약 줄(`가까운 순 · 반경 10.0km`)이 이미 말한다.
+            레일의 선택값과 목록 위 요약 줄(`가까운 순 · 반경 10km`)이 이미 말한다.
           */
           description={
             subtitle === null ? undefined : (
