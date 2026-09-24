@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   MAP_TOP_CONTROLS_INSET,
   MapSheet,
+  SHEET_STOPS,
   type SheetStop,
   shouldStartSheetDrag,
 } from '@/components/map-sheet'
@@ -219,5 +220,44 @@ describe('MapSheet — 머리의 터치 규칙 (#901 D3)', () => {
     const markup = render('mid')
 
     expect(markup.match(/touch-none/g)).toHaveLength(1)
+  })
+})
+
+/**
+ * #901 **D1** — 단계 높이는 비율인데 머리는 고정 px 라, 360×640 에서 `/places` 의 `min`
+ * 본문이 **0px**(목록 0행)이었다. 시트가 제 min-content 아래로 줄지 않게 하고, 목록이 그
+ * min-content 에 한 줄 몫(48px)만 보태게 해서 막는다.
+ *
+ * 레이아웃이 없는 환경이라 **여는 태그의 클래스**로 잠근다. 마크업 전체에서 찾으면 다른
+ * 요소의 클래스가 대신 초록을 낸다 — 시트는 `<section`, 목록은 children 바로 앞 `<div`.
+ */
+describe('MapSheet — 최소 단계에도 목록이 한 줄은 남는다 (#901 D1)', () => {
+  // 부분 문자열로 찾으면 `min-h-min` 이 `min-h-minx` 에도 맞는다 — **클래스 토큰**으로 가른다
+  const classesOf = (markup: string, pattern: RegExp) =>
+    (/class="([^"]*)"/.exec(pattern.exec(markup)?.[0] ?? '')?.[1] ?? '').split(/\s+/)
+  const sheetTag = (stop: SheetStop) => classesOf(render(stop), /<section[^>]*>/)
+  const listTag = (stop: SheetStop) => classesOf(render(stop), /<div[^>]*>(?=<p>목록 자리)/)
+
+  it('시트는 제 min-content 아래로 줄지 않는다 — 세 단계 모두', () => {
+    for (const stop of SHEET_STOPS) expect(sheetTag(stop)).toContain('min-h-min')
+  })
+
+  it('목록은 min-content 에 한 줄 몫(48px)을 보탠다 — 0 으로 접히지 않는다', () => {
+    const tag = listTag('min')
+
+    expect(tag).toContain('min-h-12')
+    expect(tag).not.toContain('min-h-0')
+  })
+
+  /**
+   * 없으면 목록 **전체** 높이를 min-content 로 치는 엔진에서 시트가 목록 길이만큼 커진다 —
+   * 하한이 "머리 + 한 줄" 이 아니라 "머리 + 목록 전부" 가 된다.
+   */
+  it('목록의 내용 높이는 하한에 들어가지 않는다 — contain-size', () => {
+    expect(listTag('min')).toContain('contain-size')
+  })
+
+  it('목록은 여전히 스스로 스크롤한다', () => {
+    expect(listTag('max')).toContain('overflow-y-auto')
   })
 })
