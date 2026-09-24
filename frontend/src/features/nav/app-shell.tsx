@@ -1,5 +1,6 @@
 import { GlobalHeader } from '@/features/nav/global-header'
 import { MobileTabBar } from '@/features/nav/mobile-tab-bar'
+import { OfflineBanner } from '@/features/nav/offline-banner'
 import { SiteFooter } from '@/features/nav/site-footer'
 
 /**
@@ -57,6 +58,8 @@ export function AppShell({ authed, children }: { authed: boolean; children: Reac
       */}
       <div className="flex min-h-dvh flex-col">
         <GlobalHeader authed={authed} />
+        {/* 끊기면 헤더 아래 띠 한 줄 (#912) — 온라인이면 높이 0 인 라이브 영역만 남는다 */}
+        <OfflineBanner />
 
         {/*
           남는 높이를 먹고 자식(`Canvas`)에게 넘긴다 — `Canvas` 가 `flex-1` 로 받는다.

@@ -200,6 +200,23 @@ multipart 가 아니면 `Content-Type` 을 `application/json` 으로 고정한�
 | `app/error.tsx`       | 그룹 레이아웃·`(auth)` 예외   | 셸 없음 — 브랜드 락업 + 다시 시도 + 홈으로             |
 | `global-error.tsx`    | root layout 예외              | 최후 폴백. `html`/`body` 를 직접 그린다                |
 
+### 오프라인은 5xx 가 아니다 ([#912](https://github.com/8llow8llowMe/hondigagae/issues/912))
+
+끊김은 서버 장애와 **원인이 다르다** — 사용자가 할 일이 재시도가 아니라 이동(전파가 잡히는 곳)이다.
+여행 중 산간·해안에서 잦아서 같은 문구로 뭉개지 않는다.
+
+| 자리            | 동작                                                                                           |
+| --------------- | ---------------------------------------------------------------------------------------------- |
+| `OfflineBanner` | `AppShell` 헤더 바로 아래 sticky 반전 띠 한 줄. 온라인이면 높이 0 인 `role="status"` 만 남는다 |
+| `ErrorState`    | 오프라인이면 제목·설명을 연결 안내로 바꾸고 **다시 시도를 걷는다**. `action` 은 남긴다         |
+| React Query     | 기본값 그대로 — 끊긴 동안 조회를 멈추고(`networkMode: 'online'`) 연결되면 다시 부른다          |
+
+- 판정은 `src/lib/hooks/use-online.ts` 하나다(`useSyncExternalStore`, 서버 스냅샷 `true`). SSR 에서
+  `window`·`navigator` 를 건드리지 않는다.
+- **`navigator.onLine === true` 는 "인터넷이 된다" 가 아니다.** 오프라인을 단정할 때만 쓰고, 온라인인데
+  응답이 없으면 여전히 5xx 갈래가 말한다.
+- 띠는 경보색(`--metric-*` 등급 · danger)을 쓰지 않는다 — 판정·장애처럼 읽힌다.
+
 ### 판정 규칙
 
 **백엔드 404를 `not-found.tsx` 로 보낼지 `EmptyState` 로 보낼지는 "경로가 가리키는 리소스가 없는가"로 정한다.**
