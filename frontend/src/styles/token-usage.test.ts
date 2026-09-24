@@ -281,9 +281,18 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0 · 3a)', () => {
       헤더가 없는 여기서는 회색 바닥이 화면 끝에서 56px 못 미쳐 끊긴다. 소유자를 옮기는
       것이 아니라 **`Canvas` 를 쓸 수 없는 화면이 자기 바탕을 칠하는** 같은 예외다.
 
-      **이 목록도 늘리지 않는다** — `(auth)` 는 레이아웃 하나가 그룹 넷을 전부 덮는다.
+      **`(auth)` 안에서는 늘리지 않는다** — 레이아웃 하나가 그룹 넷을 전부 덮는다.
     */
-    const AUTH_GROUND = ['app/(auth)/layout.tsx']
+    const AUTH_GROUND = [
+      'app/(auth)/layout.tsx',
+      /*
+        루트 오류 경계 둘도 `AppShell` 밖이다 (#907). `app/error.tsx` 는 그룹 레이아웃이,
+        `app/global-error.tsx` 는 루트 레이아웃이 죽었을 때 그려지므로 헤더가 없고, 같은
+        이유로 `Canvas` 를 쓸 수 없어 `(auth)` 셸과 같은 골격으로 자기 바탕을 칠한다.
+      */
+      'app/error.tsx',
+      'app/global-error.tsx',
+    ]
 
     const allowed = new Set([OWNER, ...MAP_GROUND, ...AUTH_GROUND])
     const found = FILES.filter(({ path }) => !allowed.has(path.replace(/\\/g, '/'))).flatMap(

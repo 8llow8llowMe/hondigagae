@@ -334,7 +334,7 @@ pnpm e2e:report     # 마지막 실행 리포트
 
 ### 계산 스타일은 `locator.evaluate()` 로 읽지 않는다 (#581)
 
-`loading.tsx` 가 있는 라우트(`/mypage` · `/pets` · `/favorites` · `/places`)는 **Suspense 경계**를 만들고, 폴백이 풀리는 순간 React 가 서브트리를 **통째로 교체**한다. 이 저장소의 폴백은 레이아웃 점프를 막으려고 **실화면과 같은 층·같은 랜드마크를 일부러 그린다**(#475) — 그래서 로케이터가 폴백 쪽에 먼저 붙고, 그 직후 노드가 detach 된다.
+`loading.tsx` 가 있는 라우트(`/` · `/plans` · `/olle` · `/emergency` · `/mypage` · `/pets` · `/favorites` · `/places`)는 **Suspense 경계**를 만들고, 폴백이 풀리는 순간 React 가 서브트리를 **통째로 교체**한다. 이 저장소의 폴백은 레이아웃 점프를 막으려고 **실화면과 같은 층·같은 랜드마크를 일부러 그린다**(#475) — 그래서 로케이터가 폴백 쪽에 먼저 붙고, 그 직후 노드가 detach 된다.
 
 `locator.evaluate()` 는 **attach 를 한 번만 기다리고 재해소하지 않는다.** 떨어져 나간 노드에서 `getComputedStyle` 을 부르면 모든 속성이 **빈 문자열**이라 단언이 `Received: ""` 로 깨진다. CI 는 `retries: 1` 이라 이것이 오래 가려져 있었다.
 

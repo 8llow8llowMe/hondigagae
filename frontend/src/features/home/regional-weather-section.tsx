@@ -488,8 +488,11 @@ function levelOf(score: number): string {
 /**
  * **스켈레톤도 같은 표면을 쓴다** (#428). 로딩과 완료가 다른 표면을 쓰면 데이터가
  * 도착하는 순간 카드가 생겼다 사라진 것처럼 보인다.
+ *
+ * **홈 `loading.tsx` 도 이것을 그린다** (#907) — 권역 비교는 클라이언트가 조회하므로
+ * 폴백이 풀린 직후에도 이 골격이 서 있다. 두 벌로 두면 그 순간 카드 높이가 갈린다.
  */
-function RegionalWeatherSkeleton() {
+export function RegionalWeatherSkeleton() {
   return (
     <Surface>
       <div aria-hidden className="flex flex-col gap-3 px-4 py-4 md:px-5 md:py-5">

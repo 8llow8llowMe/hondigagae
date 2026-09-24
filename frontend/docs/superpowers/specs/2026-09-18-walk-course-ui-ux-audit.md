@@ -223,7 +223,7 @@ chevron     x=1369 폭  20px
 
 ### W-15. 같은 제목이 두 번 읽힌다 · P3 — **이 화면만의 결함이 아니다 (#798 에서 정정)**
 
-`h1`(sr-only `산책 코스`) + `h2`(보이는 `산책 코스`) 가 연속이다 — **#810 이후 두 곳 모두 `제주올레 코스` 이고, 두 번 읽히는 구조 자체는 그대로다** — [`olle/page.tsx:96`](<../../../app/(main)/olle/page.tsx>) + `Surface title`. 스크린리더에 같은 문자열이 두 번 나간다.
+`h1`(sr-only `산책 코스`) + `h2`(보이는 `산책 코스`) 가 연속이다 — **#810 이후 두 곳 모두 `제주올레 코스` 이고, 두 번 읽히는 구조 자체는 그대로다** — [`olle/(list)/page.tsx:96`](<../../../app/(main)/olle/(list)/page.tsx>) + `Surface title`. 스크린리더에 같은 문자열이 두 번 나간다.
 
 > **저장소 전체의 의도된 패턴이다.** `/pets` · `/places`([#439](https://github.com/8llow8llowMe/hondigagae/issues/439)) · `/walk-courses` 가 모두 같은 모양이고,
 > `app/(main)/pets/(list)/page.tsx` 에 근거 주석이 있다 — _"보이는 제목은 카드의 `h2` 다(§0 '섹션 제목은 섹션

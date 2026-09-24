@@ -510,8 +510,11 @@ function NoForecast({
  * 더 그렸다. 그 8px 밴드는 지운 2a `Band` 의 출력과 문자 그대로 같고, **카드 안 마지막
  * 자식이라 각진 불투명 면이 radius 12 모서리를 덮는다** (`DESIGN.md §0`). 3a 에서 묶음
  * 경계는 카드 경계와 `SurfaceStack` 간격이 맡는다.
+ *
+ * **홈 `loading.tsx` 도 이것을 그린다** (#907) — 폴백이 풀리면 이 자리에 이 골격이 다시
+ * 서므로(골든타임은 클라이언트가 조회한다) 두 골격이 한 벌이어야 점프가 없다.
  */
-function WalkTimesSkeleton() {
+export function WalkTimesSkeleton() {
   return (
     <section aria-hidden className="border-border border-t">
       <div className={cn('flex flex-col gap-3 py-4 md:py-5', INSET_CLASS.card)}>

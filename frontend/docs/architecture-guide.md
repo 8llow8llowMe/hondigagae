@@ -195,8 +195,10 @@ multipart 가 아니면 `Content-Type` 을 `application/json` 으로 고정한�
 | `not-found.tsx`       | `notFound()` 호출 시          | **리소스 자체가 없음** (없는 `planId`, 없는 `placeId`) |
 | `EmptyState` 컴포넌트 | 섹션 내부                     | **페이지는 유효하고 결과만 0건** (필터 결과 없음)      |
 | `ErrorState` 컴포넌트 | 섹션 내부                     | 부분 일시 장애 (5xx). 재시도 버튼                      |
-| `error.tsx`           | 세그먼트 렌더 예외            | 예상 못 한 예외. `reset()` 을 재시도 버튼에 연결       |
-| `global-error.tsx`    | root layout 예외              | 최후 폴백                                              |
+| `error.tsx`           | 세그먼트 렌더 예외            | 예상 못 한 예외. `retry()` 를 재시도 버튼에 연결       |
+| `(main)/error.tsx`    | 자기 경계가 없는 세그먼트     | 그룹 공통 폴백. 셸(헤더·탭바·푸터)이 남는다            |
+| `app/error.tsx`       | 그룹 레이아웃·`(auth)` 예외   | 셸 없음 — 브랜드 락업 + 다시 시도 + 홈으로             |
+| `global-error.tsx`    | root layout 예외              | 최후 폴백. `html`/`body` 를 직접 그린다                |
 
 ### 판정 규칙
 
@@ -213,7 +215,20 @@ GET /places?... → 404                           →  EmptyState
 
 - 백엔드는 **타인 리소스도 404** 로 응답한다 (`api-integration-guide.md` §3). 상세 조회의 404는 `notFound()` 로 보낸다.
 - **`error.tsx` 는 5xx 톤을 쓴다.** 데이터 부재가 여기로 흘러오면 안 된다. `not-found.tsx` 와 `EmptyState` 는 중립 톤이다 (`DESIGN.md` §2).
-- `error.tsx` 는 반드시 client component다. `reset` prop을 재시도 버튼에 연결한다.
+- `error.tsx` 는 반드시 client component다. 재시도 버튼에는 **`retry`** 를 연결한다 (#907). `reset` 은 경계의 오류 상태만 지우고 이미 받은 RSC 응답으로 다시 그려, 서버 컴포넌트의 예외는 그대로 다시 터진다. `retry` 는 `router.refresh()` 로 다시 받아 온 뒤 그린다 (Next 16.3 stable, `next/dist/client/components/error-boundary.js`). **#907 이전의 세그먼트 경계 열둘은 아직 `reset` 이다** — #918 에서 옮기고, 그때 `route-state-surface.test.ts` 의 `onRetry={reset}` 단언도 함께 바꾼다.
+- **오류 경계는 그것을 둔 세그먼트의 레이아웃 안에서 그려지고, 같은 세그먼트의 레이아웃은 감싸지 않는다.** 그래서 층이 셋이다 ([#907](https://github.com/8llow8llowMe/hondigagae/issues/907)):
+
+  | 죽은 것                                                               | 잡는 경계               | 남는 것                                                   |
+  | --------------------------------------------------------------------- | ----------------------- | --------------------------------------------------------- |
+  | 세그먼트 페이지·뷰 (자기 `error.tsx` 가 있음)                         | 그 세그먼트 `error.tsx` | 셸 + 그 화면의 카드 판정                                  |
+  | 세그먼트 페이지·뷰 (자기 `error.tsx` 가 없음)                         | `(main)/error.tsx`      | 셸. 카드는 없다 — 따라갈 정상 화면이 하나가 아니다        |
+  | `(main)/layout.tsx` · `(auth)` 레이아웃·페이지 · 전역 `not-found.tsx` | `app/error.tsx`         | 루트 레이아웃(폰트·`QueryProvider`). 셸은 없다            |
+  | `app/layout.tsx`                                                      | `app/global-error.tsx`  | 아무것도 — 폴백이 `html`/`body`·전역 CSS 를 스스로 갖는다 |
+
+  **`app/error.tsx` 와 `global-error.tsx` 는 `AppShell` 을 그리지 않는다.** 클라이언트 경계는 세션을 읽을 수 없어 `authed` 를 모르고, 모르는 채 `false` 로 그리면 로그인한 사용자에게 로그아웃된 헤더가 뜬다 — 전역 404 가 거부한 그 모양이다. 대신 `(auth)` 셸과 같은 골격(브랜드 락업 + 회색 바닥 위 카드)이고, 셸이 없으므로 **홈으로 가는 버튼**을 `ErrorState` 의 `action` 슬롯에 둔다. 셸 안의 경계는 헤더가 그 일을 하므로 두지 않는다.
+  `(auth)` 그룹에는 `error.tsx` 가 없어 인증 화면의 페이지 예외도 `app/error.tsx` 로 온다 — 그 그룹은 원래 nav 를 두지 않으므로(전역nav-세부명세 D0) 셸 없는 모양이 제자리다.
+  **`global-error.tsx` 도 개발 모드에서 뜬다** (Next 15.2 부터, 오류 오버레이와 함께). 루트 레이아웃이 없어 `metadata` 가 조립되지 않으므로 탭 제목은 React `<title>` 로 직접 준다.
+
 - `loading.tsx` 를 두면 세그먼트 전체가 대체된다. 부분 로딩이 필요한 화면은 `loading.tsx` 대신 섹션별 `Suspense` + `Skeleton` 을 쓴다.
 
 ### `loading.tsx` 는 자식 세그먼트까지 감싼다 (soft 404 주의)
@@ -246,9 +261,15 @@ GET /places?... → 404                           →  EmptyState
 - **`notFound()` 를 쓰는 세그먼트의 조상에 `loading.tsx` 를 두지 않는다.**
 - 형제 라우트에만 `loading.tsx` 가 필요하면 **route group 으로 스코프를 좁힌다.**
   `places/loading.tsx` → `places/(list)/loading.tsx` 로 옮기면 `places/[placeId]` 는 감싸지지 않는다.
-  URL 은 그대로다.
+  URL 은 그대로다. 같은 처방을 받은 곳 ([#907](https://github.com/8llow8llowMe/hondigagae/issues/907)):
+  - **홈은 `(main)/(home)/`** 이다. `(main)/loading.tsx` 는 그룹 전체 — `plans/[planId]` 까지 — 를 감싼다.
+  - **일정 목록은 `plans/(list)/`** 이다. `plans/[planId]` 가 `notFound()` 를 던진다.
+  - **올레 목록은 `olle/(list)/`** 이다. 상세가 `notFound()` 를 부르지는 않지만 상세로 가는 동안 목록 골격이 서는 것을 막는다 — 상세는 자기 골격을 따로 갖는다.
+  - `emergency/` 는 자식 세그먼트가 없어 그대로 둔다.
 - 그 대가로 상세 화면은 최초 진입 스켈레톤이 없다. 서버 프리페치가 `retry: false` 라 실패해도 즉시
-  넘어가므로 체감 지연이 작고, **상태 코드 정확성을 우선한다.**
+  넘어가므로 체감 지연이 작고, **상태 코드 정확성을 우선한다.** `plans/[planId]/loading.tsx` 를
+  #907 이 만들지 않은 것도 이 규칙이다 — 그 세그먼트 자신의 `loading.tsx` 도 자기 `page.tsx` 의
+  `notFound()` 를 soft 404 로 만든다.
 
 - **AI 일정 생성 대기는 `loading.tsx` 가 아니다.** 폴링 중 상태이므로 화면 안에서 진행 표시를 렌더한다 (`api-integration-guide.md` §5).
 

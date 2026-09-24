@@ -15,6 +15,7 @@ import { IndoorAlternativesSection } from '@/features/home/indoor-alternatives-s
 import { PlaceInsightRow } from '@/features/home/place-insight-row'
 import { ProfileCard } from '@/features/home/profile-card'
 import { RegionalWeatherSection } from '@/features/home/regional-weather-section'
+import { SuitabilityListSkeleton } from '@/features/home/suitability-list-skeleton'
 import { UpcomingPlanRow } from '@/features/home/upcoming-plan-row'
 import {
   useRegionalWeather,
@@ -500,7 +501,7 @@ export function HomeView({
 
             **게스트에게도 보인다.** 진입점을 숨기지 않고 `toLoginHref` 로 로그인을
             거치게 한다 — 전역 nav 가 보호 항목을 다루는 방식과 같다 (`menu-items.ts`).
-            `authed` 는 `app/(main)/page.tsx` 가 `readSession()` 으로 정해 넘긴 값이다.
+            `authed` 는 `app/(main)/(home)/page.tsx` 가 `readSession()` 으로 정해 넘긴 값이다.
 
             **`leading` 을 주지 않는다.** 아래 올레 배너와 같은 이유다 — `Banner` 의 아이콘
             자리는 danger 색 고정이다. nav 의 `AI` 배지는 컴포넌트가 아니라 `nav-links.tsx`
@@ -660,18 +661,7 @@ export function HomeView({
               그으면 머리말에서 떨어져 나온다.
             */}
             {pending && visible.length === 0 ? (
-              <SurfaceList>
-                {Array.from({ length: 2 }, (_, index) => (
-                  <li key={index} className="flex gap-3 px-4 py-3 md:px-5">
-                    <Skeleton variant="thumbnail" className="size-20 shrink-0 md:size-24" />
-                    <div className="min-w-0 flex-1">
-                      <Skeleton className="h-6 w-2/3" />
-                      <Skeleton className="mt-2 h-4 w-1/2" />
-                      <Skeleton className="mt-2 h-7 w-20" />
-                    </div>
-                  </li>
-                ))}
-              </SurfaceList>
+              <SuitabilityListSkeleton />
             ) : allFailed ? (
               <ErrorState
                 headingLevel={3}

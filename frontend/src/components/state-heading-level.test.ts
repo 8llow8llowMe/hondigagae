@@ -283,11 +283,12 @@ describe('BottomSheet 안 상태 — 시트 제목도 h2 다', () => {
 })
 
 /**
- * 라우트 상태 파일 열둘 — `route-state-surface.test.ts` 가 잡아 둔 카드 판정과 **같은 표**다.
+ * 라우트 상태 파일 열다섯 — `route-state-surface.test.ts` 가 잡아 둔 카드 판정과 **같은 표**에
+ * #907 의 카드 없는 경계 셋을 더한 것이다.
  *
  * 제목 있는 카드는 넷이고, `aria-label` 만 있는 넷과 카드가 없는 넷은 `h2` 로 남는다.
  * (#531 로 `places/(list)` 가 앞에서 뒤로 옮겨 왔다 — 다섯에서 넷이 됐다.)
- * 열둘을 모두 적는 이유는 **빠뜨림을 잡기 위해서다** — 넷만 적으면 새 세그먼트가
+ * 열다섯을 모두 적는 이유는 **빠뜨림을 잡기 위해서다** — 넷만 적으면 새 세그먼트가
  * 생겼을 때 아무 단언도 깨지지 않는다.
  */
 const ROUTE_STATE_FILES = [
@@ -304,6 +305,14 @@ const ROUTE_STATE_FILES = [
   { path: 'app/(main)/places/[placeId]/not-found.tsx', level: 2 },
   { path: 'app/(main)/plans/[planId]/error.tsx', level: 2 },
   { path: 'app/(main)/plans/[planId]/not-found.tsx', level: 2 },
+  /*
+    **카드 없는 경계 셋이 #907 로 들어왔다.** `(main)/error.tsx` 는 열 남짓의 화면을 덮어
+    따라갈 카드가 없고, 루트 둘(`app/error.tsx` · `global-error.tsx`)은 셸 밖이라 카드가
+    곧 화면이다 — 셋 다 제목 있는 `Surface` 가 없으므로 `h2` 로 남는다.
+  */
+  { path: 'app/(main)/error.tsx', level: 2 },
+  { path: 'app/error.tsx', level: 2 },
+  { path: 'app/global-error.tsx', level: 2 },
 ] as const
 
 describe('라우트 상태 파일 — 카드가 h2 를 가질 때만 내린다', () => {
