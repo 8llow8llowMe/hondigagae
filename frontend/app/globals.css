@@ -523,6 +523,27 @@ body {
   }
 
   /*
+    장소 상세 — **우측 본문이 세 블록이다** (#909). 모바일에서 판정을 갤러리·제목 바로 뒤로
+    올리려면 판정 레일이 DOM 상 우측 블록 **사이**에 와야 한다: 갤러리·제목 → 판정 →
+    혼잡도·기본 정보 → 본문. 데스크톱은 레일이 1~3행에 걸치고 우측 셋이 2열에 차례로 선다
+    (열이 정해진 아이템은 자동 배치가 그 열의 다음 빈 행에 놓는다).
+
+    **`grid-template-rows` 를 준다.** 레일이 셋에 걸친 채 우측보다 길면 초과분이 세 행에
+    나뉘어 우측 블록 **사이**가 벌어진다. `max-content max-content minmax(0, 1fr)` 이면
+    초과분이 마지막 행으로만 간다 — `.rail-layout-split` 과 같은 처방이다.
+
+    **공용 `.rail-layout-detail` 을 바꾸지 않고 변형으로 둔다.** 법률 문서 화면이 같은
+    규칙을 두 블록(`span 2`)으로 쓴다.
+  */
+  .rail-layout-detail-head {
+    grid-template-rows: max-content max-content minmax(0, 1fr);
+  }
+
+  .rail-layout-detail-head > .rail-detail-aside {
+    grid-row: 1 / span 3;
+  }
+
+  /*
     일정 상세 변형 — **레일이 본문 앞뒤 둘로 갈린다** (이슈 #653 · 일정상세-세부명세 D11-3).
 
     장소 상세(`.rail-layout-detail`)와 문제 모양이 다르다. 거기는 레일이 **한 덩어리**로

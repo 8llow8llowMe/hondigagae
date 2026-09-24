@@ -493,61 +493,78 @@ describe('원천에서 사라진 장소 — 안내를 먼저 보여 준다 (#146
 })
 
 /*
-  기본 정보의 **자리**를 고정한다.
-
-  좌측 레일에 있던 동안에는 주소·전화·운영시간이 판정 아래로 밀려 있었다 — 상세에 들어온
-  사람이 제일 먼저 묻는 "여기 어디고 몇 시까지 하냐" 가 판정보다 뒤였던 것이다.
-  **판정보다 앞**이라는 것이 이 묶음이 지키는 것이다.
+  모바일 섹션 순서를 고정한다 — **DOM 순서 = 모바일 순서**다.
 
   **DOM 순서 하나로 두 폭을 만든다.** 데스크톱은 grid 가 판정을 좌측 열로 보내지만
-  (`.rail-layout-detail`), 모바일은 이 순서 그대로 쌓인다. 그래서 여기서 순서가 뒤집히면
-  모바일이 곧바로 회귀한다 — 트리를 폭마다 나누면 스크린리더가 같은 내용을 두 번 읽는다.
+  (`.rail-layout-detail-head`), 모바일은 이 순서 그대로 쌓인다. 그래서 여기서 순서가
+  뒤집히면 모바일이 곧바로 회귀한다 — 트리를 폭마다 나누면 스크린리더가 같은 내용을 두 번 읽는다.
 
-  **#603 이 혼잡도를 제목과 기본 정보 사이로 들여보냈다.** 전체 순서는
-  갤러리 → 제목 → 기간 혼잡도 → 기본 정보 → 판정 → 본문이 된다. 혼잡도도 "언제 올까" 라
-  위치를 묻기 전 질문이므로, 기본 정보가 판정보다 앞이라는 규칙은 그대로다.
+  **#909 가 판정을 갤러리·제목 바로 뒤로 올렸다.** 예전 순서는 갤러리 → 제목 → 혼잡도 →
+  기본 정보 → 판정 → 본문이라 판정이 390 에서 다섯 번째 섹션이었고, 데스크톱(좌측 레일 첫
+  자리)과 위계가 갈렸다. 지금은 갤러리 → 제목 → 판정 → 혼잡도 → 기본 정보 → 본문이다.
 */
-describe('PlaceDetailSection — 기본 정보의 자리', () => {
-  it('제목 다음, 판정보다 먼저 온다', () => {
+describe('PlaceDetailSection — 모바일 섹션 순서 (#909)', () => {
+  function positions() {
     const markup = render()
+    return {
+      title: markup.indexOf(placeDetail.title),
+      // 판정 패널의 첫 줄 — `{name}에게 적합해요` (`place-suitability-panel.tsx`)
+      verdict: markup.indexOf(messages.place.detailSuitabilitySpeaker.replace('{name}', '몽실이')),
+      congestion: markup.indexOf(messages.place.detailCongestionTitle),
+      basic: markup.indexOf(messages.place.detailSectionBasic),
+      pet: markup.indexOf(messages.place.detailSectionPet),
+    }
+  }
 
-    const title = markup.indexOf(placeDetail.title)
-    const basic = markup.indexOf(messages.place.detailSectionBasic)
-    // 판정 패널의 첫 줄 — `{name}에게 적합해요` (`place-suitability-panel.tsx`)
-    const verdict = markup.indexOf(
-      messages.place.detailSuitabilitySpeaker.replace('{name}', '몽실이'),
-    )
-
-    expect(title).toBeGreaterThanOrEqual(0)
-    expect(verdict).toBeGreaterThanOrEqual(0)
-    expect(basic).toBeGreaterThan(title)
-    expect(basic).toBeLessThan(verdict)
+  it('모든 표지를 찾는다 — 못 찾으면 -1 이라 아래 비교가 아무것도 증명하지 못한다', () => {
+    for (const [name, at] of Object.entries(positions())) {
+      expect(at, name).toBeGreaterThanOrEqual(0)
+    }
   })
 
-  it('본문 절(반려견 동반 정보)보다는 앞이다 — 순서가 갤러리 → 제목 → 혼잡도 → 기본 정보 → 판정 → 본문이다', () => {
-    const markup = render()
+  it('판정이 제목 바로 다음, 혼잡도보다 먼저 온다', () => {
+    const { title, verdict, congestion } = positions()
 
-    expect(markup.indexOf(messages.place.detailSectionBasic)).toBeLessThan(
-      markup.indexOf(messages.place.detailSectionPet),
-    )
+    expect(verdict).toBeGreaterThan(title)
+    expect(verdict).toBeLessThan(congestion)
   })
 
   /*
-    **혼잡도가 기본 정보보다 앞이다** (#603) — 좌측 판정 레일에서 우측 본문 열의 제목
-    아래로 옮겨 온 자리다.
-
-    문자열 위치로 잠그는 이유는 위 묶음과 같다: 데스크톱 배치는 grid 가 하지만 모바일은
-    이 DOM 순서 그대로 쌓이므로, 여기서 뒤집히면 390 이 곧바로 회귀한다.
+    **혼잡도가 기본 정보보다 앞이다** (#603) — "지금"(판정) → "언제"(혼잡도) → "어디·몇 시"
+    (기본 정보) 순이다.
   */
-  it('기간 혼잡도가 제목과 기본 정보 사이에 선다', () => {
+  it('혼잡도가 판정과 기본 정보 사이에 선다', () => {
+    const { verdict, congestion, basic } = positions()
+
+    expect(congestion).toBeGreaterThan(verdict)
+    expect(congestion).toBeLessThan(basic)
+  })
+
+  it('기본 정보가 본문 절(반려견 동반 정보)보다 앞이다', () => {
+    const { basic, pet } = positions()
+
+    expect(basic).toBeLessThan(pet)
+  })
+
+  /*
+    **판정 레일이 우측 블록 사이에 있어야 grid 가 세 행으로 나눈다.** 레일이 앞이나 끝으로
+    가면 데스크톱에서 우측 블록이 행을 잘못 잡는다 — 클래스 순서로 잠근다.
+  */
+  it('스택이 본문 · 레일 · 본문 · 본문 순이고 세 행 변형을 쓴다', () => {
     const markup = render()
 
-    const title = markup.indexOf(placeDetail.title)
-    const congestionTitle = markup.indexOf(messages.place.detailCongestionTitle)
-    const basic = markup.indexOf(messages.place.detailSectionBasic)
-
-    expect(congestionTitle).toBeGreaterThan(title)
-    expect(congestionTitle).toBeLessThan(basic)
+    expect(markup).toContain('rail-layout rail-layout-detail rail-layout-detail-head')
+    const stacks = [
+      ...markup.matchAll(
+        /class="flex flex-col gap-2 md:gap-6 md:p-6 (rail-detail-(?:main|aside))/g,
+      ),
+    ].map((match) => match[1])
+    expect(stacks).toEqual([
+      'rail-detail-main',
+      'rail-detail-aside',
+      'rail-detail-main',
+      'rail-detail-main',
+    ])
   })
 
   it('좌표가 있으면 기본 정보 안에 길찾기가 함께 선다 (#14)', () => {

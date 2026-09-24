@@ -82,8 +82,8 @@ const DETAIL_HEADING_ID = 'place-detail-heading'
  * 우 1fr = 갤러리 + 제목 + 기본 정보 + 본문.
  *
  * **3층 표면이다** (`DESIGN.md §0`, 이슈 #443). `main` 이 L0 바닥(`Canvas`, 페이지가 건다),
- * 세 개의 `SurfaceStack` 이 그 위에 L1 카드를 쌓는다 — 우측 열이 DOM 상 두 블록이라 스택도
- * 둘이고, 좌측 레일이 하나다. **열 구분선은 걷었다** — 카드 사이·열 사이로 바닥이 비쳐
+ * 네 개의 `SurfaceStack` 이 그 위에 L1 카드를 쌓는다 — 우측 열이 DOM 상 세 블록(갤러리·제목 ·
+ * 혼잡도·기본 정보 · 본문)이라 스택도 셋이고, 좌측 레일이 하나다 (#909). **열 구분선은 걷었다** — 카드 사이·열 사이로 바닥이 비쳐
  * L0 이 그 일을 한다 (홈 #428 · 장소 목록 #439 와 같은 이유).
  *
  * **카드 판정 3문을 절마다 적용한 결과:**
@@ -96,12 +96,14 @@ const DETAIL_HEADING_ID = 'place-detail-heading'
  *   다. 하단 바를 카드 밖 L0 에 두면 테두리 없는 흰 띠가 되고, 자기 카드로 만들면 §0 이
  *   금지한 "액션 바 카드" 가 된다.
  *
- * **기본 정보는 레일이 아니라 제목 바로 아래다.** 레일에 있던 동안에는 주소·전화·운영시간이
- * 판정 아래로 밀려, 상세에 들어온 사람이 제일 먼저 묻는 "여기 어디고 몇 시까지 하냐" 가
- * 판정보다 뒤에 있었다. 레일에는 **판정만** 남는다 — 한 가지 성격의 것만 든다.
+ * **기본 정보는 레일이 아니라 우측 본문이다.** 레일에 있던 동안에는 데스크톱에서 주소·전화·
+ * 운영시간이 판정 아래로 밀려 있었다. 레일에는 **판정만** 남는다 — 한 가지 성격의 것만 든다.
  *
- * DOM 순서는 **모바일 기준**이다 (갤러리 → 제목 → 기본 정보 → 판정 → 본문). 데스크톱 배치는
- * `.rail-layout-detail` 의 grid 배치가 바꾼다 — 트리를 폭마다 둘로 나누면 같은 내용이 두 번
+ * DOM 순서는 **모바일 기준**이다 (갤러리·제목 → 판정 → 혼잡도 → 기본 정보 → 본문, #909).
+ * **모바일에서 판정이 기본 정보보다 앞이다.** 예전에는 반대였고 판정은 다섯 번째 섹션이었다 —
+ * 데스크톱은 판정이 좌측 레일 첫 자리라 폭마다 위계가 달랐다. "여기 어디고 몇 시까지" 는
+ * 판정 카드 한 장 뒤로 가지만, 제목 아래 메타 줄과 요약 행이 그 앞에서 먼저 말한다.
+ * 데스크톱 배치는 `.rail-layout-detail(-head)` 의 grid 배치가 바꾼다 — 트리를 폭마다 둘로 나누면 같은 내용이 두 번
  * 렌더돼 스크린리더가 중복해 읽는다. 자세한 이유는 `app/globals.css` 에 적어 뒀다.
  *
  * 4개 상태를 **배타적으로** 렌더한다. props 로만 데이터를 받는 presentational 컴포넌트다
@@ -198,7 +200,7 @@ export function PlaceDetailSection({
       */}
       {place.delisted && <DelistedNotice />}
 
-      <div className="rail-layout rail-layout-detail">
+      <div className="rail-layout rail-layout-detail rail-layout-detail-head">
         {/*
           우측 열이 **DOM 상 먼저**다 — 모바일에서 갤러리·제목이 판정보다 위에 와야 한다.
           데스크톱에서만 grid 배치가 이것을 2열로 보낸다. `SurfaceStack` 자체가 grid 의
@@ -336,7 +338,55 @@ export function PlaceDetailSection({
               <PlaceVerdictSummary place={place} walkSafety={walkSafety} congestion={congestion} />
             </div>
           </Surface>
+        </SurfaceStack>
 
+        {/*
+          좌: 판정 카드. 데스크톱에서만 sticky 다 — `rail-sticky` 가 레일이 뷰포트보다
+          길어도 바닥에 닿게 자기 스크롤을 준다 (장소 찾기 레일에서 잘렸던 전례가 있다).
+
+          **위 여백** — 모바일은 앞 스택과 8(카드 간격), 태블릿 한 컬럼은 앞 스택의 아래
+          24 가 이미 있어 0, 데스크톱은 자기 열의 첫 요소라 24 다.
+
+          **DOM 상 갤러리·제목 카드 바로 뒤다** (#909). 모바일에서 판정(적합도 · 산책 위험도)이
+          요약 행 다음, 혼잡도·기본 정보보다 **앞**에 서게 하려는 자리다 — 예전에는 기본 정보와
+          지도까지 지난 다섯 번째 섹션이라, 이 서비스의 차별점이 첫 화면 밖에 있었다.
+          데스크톱에서는 grid 가 이 스택을 좌측 열 1~3행으로 보내므로 배치가 바뀌지 않는다
+          (`app/globals.css` 의 `.rail-layout-detail-head`).
+        */}
+        <SurfaceStack className="rail-detail-aside rail-sticky pt-2 md:pt-0 lg:pt-6 lg:pr-3">
+          {/*
+            **`title` 이 아니라 `aria-label` 이다.** 두 패널이 라벨·등급어·점수를 한 줄에
+            스스로 그려 `title` 슬롯(제목 + 부제 + 우측 액션)에 맞지 않는다 — 홈 판정 카드와
+            같은 사정이다. 그래서 카드 위에 선이 없고, 첫 패널의 위 여백이 카드 위 여백이다.
+          */}
+          <Surface aria-label={messages.place.detailVerdictCardLabel}>
+            <PlaceSuitabilityPanel {...suitability} />
+
+            {/*
+              산책 위험도 (#197). **적합도 바로 아래, 하단 바 위**에 둔다 — 둘 다 판정이라
+              한 묶음으로 읽혀야 하고, 하단 바(담기·저장)가 사이에 끼면 판정이 두 군데로
+              갈린다. 아트보드 03 의 `판정 → 하단 바` 순서는 그대로다.
+
+              **1px 선으로만 나눈다** — L2 구분선(§0). 카드를 둘로 쪼개면 "오늘은 적합 /
+              지금은 위험" 이 같은 장소의 두 축이라는 것이 사라진다.
+            */}
+            <div className="border-border border-t" />
+            <PlaceWalkSafetyPanel {...walkSafety} />
+
+            {/*
+              데스크톱 하단 바 — 판정 카드의 끝 (아트보드 03). 인셋은 카드 값이고 배경은
+              카드가 소유한다 (`PlaceDetailActionBar` 의 `inset` 주석).
+            */}
+            <PlaceDetailActionBar {...actions} inset="card" className="hidden lg:block" />
+          </Surface>
+        </SurfaceStack>
+
+        {/*
+          우: 혼잡도 + 기본 정보. **판정 레일 뒤에서 스택을 새로 연다** (#909) — 모바일 순서가
+          갤러리·제목 → 판정 → 혼잡도 → 기본 정보가 되고, 데스크톱은 grid 가 이 스택을 2열
+          2행에 놓아 예전과 같은 자리에 선다. 위 여백은 본문 스택(아래)과 같은 규칙이다.
+        */}
+        <SurfaceStack className="rail-detail-main pt-2 md:pt-0 lg:pl-3">
           {/*
             ── 기간 혼잡도 (#430) — **제목 바로 아래, 기본 정보 위**다 (#603)
 
@@ -353,10 +403,11 @@ export function PlaceDetailSection({
             경계가 흐려진다. 접힌 서랍으로도 넣지 않는다 — 차별점이 기본 상태에서 안 보인다.
             제목은 패널이 스스로 `h2` 로 그리고 카드는 `titleId` 로 그것을 가리킨다.
 
-            **모바일 순서도 함께 바뀐다 — 그것이 의도다.** 이 화면은 DOM 하나로 두 폭을
-            만들고(`app/globals.css` 의 `.rail-layout-detail`), 트리를 폭마다 나누면
-            스크린리더가 같은 내용을 두 번 읽는다. 그래서 390 에서도 혼잡도가 판정보다
-            **위**에 선다: 갤러리+제목 → 혼잡도 → 기본 정보+지도 → 판정 → 본문.
+            **모바일에서는 판정 다음이다** (#909). 이 화면은 DOM 하나로 두 폭을 만들고
+            (`app/globals.css` 의 `.rail-layout-detail`), 트리를 폭마다 나누면 스크린리더가
+            같은 내용을 두 번 읽는다. 390 순서: 갤러리+제목 → 판정 → 혼잡도 → 기본 정보+지도 →
+            본문. #603 때는 혼잡도가 판정보다 위였다 — 판정이 기본 정보 뒤 다섯 번째였기
+            때문이고, 판정이 올라오면서 "지금"(판정) → "언제"(혼잡도) 순서가 된다.
           */}
           <Surface titleId={CONGESTION_HEADING_ID}>
             <PlaceCongestionPanel {...congestion} />
@@ -365,11 +416,13 @@ export function PlaceDetailSection({
           {/*
             ── 기본 정보 ─────────────────────────────────────────────────────
 
-            **좌측 레일이 아니라 제목 쪽이다.** 레일에 있던 동안에는 주소·전화·운영시간이
-            판정(적합도·산책 위험도) 아래로 밀려 있었다 — 상세에 들어온 사람이 제일 먼저 묻는
-            "여기 어디고 몇 시까지 하냐" 가 판정보다 뒤에 있었던 것이다. **판정보다 앞이라는
-            것이 이 자리의 요점이고**, 그 앞에 혼잡도 한 장이 끼는 것(#603)은 그것을 깨지
-            않는다 — 혼잡도도 "언제 올까" 라 위치를 묻기 전 질문이다.
+            **좌측 레일이 아니라 우측 본문이다.** 레일에 있던 동안에는 데스크톱에서
+            주소·전화·운영시간이 판정 아래로 밀려 있었다. 데스크톱은 지금 판정(좌) 옆에 선다.
+
+            **모바일에서는 판정 뒤다 — #909 가 뒤집었다.** 예전 규칙은 "기본 정보가 판정보다
+            앞" 이었는데, 그 결과 판정이 390 에서 다섯 번째 섹션이 되어 데스크톱(좌측 레일 첫
+            자리)과 위계가 갈렸다. 판정은 이 서비스가 존재하는 이유라(세부명세 D1-1) 위계를
+            데스크톱에 맞춘다. 위치 질문은 제목 아래 메타 줄이 먼저 답한다.
 
             **폭마다 나누지 않는다.** DOM 하나를 옮겨 모바일 순서도 같이 바뀐다 — 트리를
             둘로 나누면 같은 내용이 두 번 렌더돼 스크린리더가 중복해 읽는다
@@ -419,41 +472,6 @@ export function PlaceDetailSection({
               lng={place.lng}
             />
           </DetailCard>
-        </SurfaceStack>
-
-        {/*
-          좌: 판정 카드. 데스크톱에서만 sticky 다 — `rail-sticky` 가 레일이 뷰포트보다
-          길어도 바닥에 닿게 자기 스크롤을 준다 (장소 찾기 레일에서 잘렸던 전례가 있다).
-
-          **위 여백** — 모바일은 앞 스택과 8(카드 간격), 태블릿 한 컬럼은 앞 스택의 아래
-          24 가 이미 있어 0, 데스크톱은 자기 열의 첫 요소라 24 다.
-        */}
-        <SurfaceStack className="rail-detail-aside rail-sticky pt-2 md:pt-0 lg:pt-6 lg:pr-3">
-          {/*
-            **`title` 이 아니라 `aria-label` 이다.** 두 패널이 라벨·등급어·점수를 한 줄에
-            스스로 그려 `title` 슬롯(제목 + 부제 + 우측 액션)에 맞지 않는다 — 홈 판정 카드와
-            같은 사정이다. 그래서 카드 위에 선이 없고, 첫 패널의 위 여백이 카드 위 여백이다.
-          */}
-          <Surface aria-label={messages.place.detailVerdictCardLabel}>
-            <PlaceSuitabilityPanel {...suitability} />
-
-            {/*
-              산책 위험도 (#197). **적합도 바로 아래, 하단 바 위**에 둔다 — 둘 다 판정이라
-              한 묶음으로 읽혀야 하고, 하단 바(담기·저장)가 사이에 끼면 판정이 두 군데로
-              갈린다. 아트보드 03 의 `판정 → 하단 바` 순서는 그대로다.
-
-              **1px 선으로만 나눈다** — L2 구분선(§0). 카드를 둘로 쪼개면 "오늘은 적합 /
-              지금은 위험" 이 같은 장소의 두 축이라는 것이 사라진다.
-            */}
-            <div className="border-border border-t" />
-            <PlaceWalkSafetyPanel {...walkSafety} />
-
-            {/*
-              데스크톱 하단 바 — 판정 카드의 끝 (아트보드 03). 인셋은 카드 값이고 배경은
-              카드가 소유한다 (`PlaceDetailActionBar` 의 `inset` 주석).
-            */}
-            <PlaceDetailActionBar {...actions} inset="card" className="hidden lg:block" />
-          </Surface>
         </SurfaceStack>
 
         {/*

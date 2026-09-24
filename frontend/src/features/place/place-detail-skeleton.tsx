@@ -45,6 +45,16 @@ export function PlaceDetailSkeleton() {
           </div>
         </div>
 
+        {/* 판정 — 문장 + 점수. 모바일은 제목 바로 뒤다 (#909 — 실화면의 DOM 순서와 같다) */}
+        <SkeletonCard>
+          <div className="flex items-end justify-between gap-3">
+            <Skeleton variant="text" className="h-7 w-40" />
+            <Skeleton variant="text" className="h-9 w-16" />
+          </div>
+          <Skeleton variant="text" className="h-5 w-full" />
+          <Skeleton variant="text" className="h-5 w-3/4" />
+        </SkeletonCard>
+
         {/* 기본 정보 — 제목 + 값 줄 + 작은 지도 + 길찾기 */}
         <SkeletonCard>
           <Skeleton variant="text" className="h-7 w-28" />
@@ -54,16 +64,6 @@ export function PlaceDetailSkeleton() {
           {/* `PlaceMiniMap` 과 같은 높이다 — 값이 갈리면 지도가 붙는 순간 아래가 밀린다 */}
           <Skeleton variant="card" className="h-44 w-full md:h-52" />
           <Skeleton variant="card" className="h-11 w-full" />
-        </SkeletonCard>
-
-        {/* 판정 — 문장 + 점수 */}
-        <SkeletonCard>
-          <div className="flex items-end justify-between gap-3">
-            <Skeleton variant="text" className="h-7 w-40" />
-            <Skeleton variant="text" className="h-9 w-16" />
-          </div>
-          <Skeleton variant="text" className="h-5 w-full" />
-          <Skeleton variant="text" className="h-5 w-3/4" />
         </SkeletonCard>
 
         {Array.from({ length: 3 }, (_, index) => (
