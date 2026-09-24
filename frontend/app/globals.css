@@ -785,6 +785,201 @@ body {
 }
 
 /*
+  소개 페이지 스크롤 무대 — `/about` 하나에만 쓴다 (#914, 명세
+  `docs/superpowers/specs/2026-09-25-about-interactive-design.md` §3).
+
+  **이름 클래스인 이유**: 단계는 `ScrollStage` 가 래퍼에 붙이는 플래그(`is-step-N` 누적 ·
+  `is-current-N` · `is-live`)이고, 장소 · 긴급 예시는 서버 컴포넌트라 prop 을 받을 수 없다.
+  Tailwind 대괄호 변형은 eslint `noComplexArbitrary` 가 막는다 (`surface-list-2col` 선례).
+
+  **규칙 둘.**
+  - 드러냄은 `:not(.is-step-N)` 으로 "아직 안 온 단계" 를 숨긴다. 플래그가 전부 붙은 정적
+    렌더는 아무것도 숨기지 않는다 — **끝 상태가 CSS 기본값이다.**
+  - 강조는 `.is-live.is-current-N` 에서만 칠한다. 정적 렌더와 감속 모션에는 `is-live` 가
+    없어 마지막 단계의 강조가 눌어붙지 않는다.
+
+  움직이는 속성은 `opacity` · `transform` · 색(배경 · 테두리)뿐이다 — 문서 높이를 바꾸면 스크롤
+  위치로 재는 단계가 연쇄로 어긋난다. 길이는 DESIGN.md §8 의 200(변형) · 150(색)이고, 위치 점
+  울림만 곡선 그리기 길이 800 을 다시 쓴다(1회).
+
+  **첫 맞춤은 전환 없이** — 마운트 직후 두 프레임 동안 `is-settling` 이 붙는다. 화면 안에 걸린
+  무대가 끝 상태에서 실제 위치로 되감길 때 그 되감기가 "지우기" 로 재생되지 않게 한다.
+*/
+.about-stage.is-settling,
+.about-stage.is-settling *,
+.about-stage.is-settling *::before,
+.about-stage.is-settling *::after {
+  transition: none;
+}
+
+.about-stage-point {
+  transition: opacity 200ms ease-out;
+}
+
+.about-stage.is-live .about-stage-point:not(.is-on) {
+  opacity: 0.45;
+}
+
+.about-stage-mark,
+.about-stage-mark > span {
+  transition: background-color 150ms ease-out;
+}
+
+.about-stage.is-live .about-stage-point.is-on .about-stage-mark {
+  background-color: var(--brand-700);
+}
+
+.about-stage.is-live .about-stage-point.is-on .about-stage-mark > span {
+  background-color: var(--fg-inverse);
+}
+
+@media (width >= 64rem) {
+  /* 항목 하나가 한 호흡 — 스크롤 한 번에 단계 하나 */
+  .about-stage-point {
+    min-block-size: 58vh;
+    align-items: center;
+  }
+
+  .about-stage.is-live .about-stage-point:not(.is-on) {
+    opacity: 0.3;
+  }
+
+  .about-stage-visual {
+    position: sticky;
+    inset-block-start: calc(var(--header-h) + 1.5rem);
+    align-self: start;
+  }
+}
+
+/* ── 질문 1 · 장소 ── */
+.about-stage-chip,
+.about-stage-row,
+.about-stage-tag {
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out;
+}
+
+.about-stage:not(.is-step-1) .about-stage-chip {
+  opacity: 0;
+  transform: translateY(0.375rem);
+}
+
+.about-stage:not(.is-step-1) .about-stage-row {
+  opacity: 0.35;
+}
+
+/*
+  정보 없음 행 강조 — 면은 `::before` 가 갖는다. 행에 배경을 주면 좌우 인셋 밖으로 뻗을 수
+  없고, 음수 여백으로 넓히면 행 구분선도 같이 늘어난다. `isolation` 이 없으면 `z-index: -1`
+  이 카드 면 뒤로 가라앉아 보이지 않는다.
+*/
+.about-stage-row-unknown {
+  position: relative;
+  isolation: isolate;
+}
+
+.about-stage-row-unknown::before {
+  content: '';
+  position: absolute;
+  inset: 0.25rem -0.5rem;
+  z-index: -1;
+  border-radius: var(--radius-md);
+  background-color: var(--row-selected);
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+
+.about-stage.is-live.is-current-2 .about-stage-row-unknown::before {
+  opacity: 1;
+}
+
+.about-stage-tag-unknown {
+  transition:
+    border-color 150ms ease-out,
+    opacity 200ms ease-out;
+}
+
+.about-stage.is-live.is-current-2 .about-stage-tag-unknown {
+  border-color: var(--brand-500);
+}
+
+/*
+  단계 3 은 대상(실내 · 실외 · 운영 중)을 칠하지 않고 **나머지 태그를 흐린다.** 누를 수 없는
+  태그에 2px 브랜드 테두리를 두르면 포커스 링(`ring-brand-500`)과 같은 모양이 된다.
+*/
+.about-stage.is-live.is-current-3 .about-stage-tag,
+.about-stage.is-live.is-current-3 .about-stage-tag-unknown {
+  opacity: 0.35;
+}
+
+/* ── 위급하면? · 긴급 ── */
+.about-stage-locate,
+.about-stage-erow,
+.about-stage-dist,
+.about-stage-open,
+.about-stage-entry {
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out;
+}
+
+.about-stage-locate {
+  position: relative;
+}
+
+/* 위치 점이 한 번 울린다 — 단계 1 에 들어올 때마다 1회, 반복 없음 */
+.about-stage-locate::after {
+  content: '';
+  position: absolute;
+  inset: -0.375rem;
+  border: 2px solid var(--brand-500);
+  border-radius: var(--radius-full);
+  opacity: 0;
+}
+
+.about-stage.is-live.is-step-1 .about-stage-locate::after {
+  animation: about-stage-ping 800ms ease-out 1;
+}
+
+@keyframes about-stage-ping {
+  from {
+    opacity: 0.8;
+    transform: scale(0.4);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+}
+
+.about-stage:not(.is-step-1) .about-stage-locate,
+.about-stage:not(.is-step-1) .about-stage-dist,
+.about-stage:not(.is-step-2) .about-stage-open {
+  opacity: 0;
+}
+
+/*
+  거리순 정렬 — **DOM 순서는 처음부터 거리순**이다(스크린리더가 읽는 순서가 끝 상태).
+  단계 0 에서만 두 행이 `transform` 으로 자리를 바꿔 서 있다가 단계 1 에서 돌아온다.
+  둘째 행만 위 구분선(`border-t`)이 있어 1px 높고, 자리를 바꾸는 동안 그 구분선이 목록
+  맨 위로 따라 올라간다. 단계 0 은 머무는 상태가 아니라 지나가는 상태라 그대로 둔다.
+*/
+.about-stage:not(.is-step-1) .about-stage-erow:first-child {
+  transform: translateY(100%);
+}
+
+.about-stage:not(.is-step-1) .about-stage-erow:nth-child(2) {
+  transform: translateY(-100%);
+}
+
+.about-stage:not(.is-step-3) .about-stage-entry {
+  opacity: 0;
+  transform: translateY(0.375rem);
+}
+
+/*
   모션 민감 사용자를 존중한다 — DESIGN.md §8 · styling-guide.md §6 (이슈 #15).
 
   **애니메이션을 지우는 것이 아니라 한 프레임으로 줄인다.** `animation: none` 으로 지우면
