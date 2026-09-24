@@ -103,6 +103,14 @@ export const aboutMessages = {
     emergencyTitle: '가까운 동물병원·약국',
     emergencySub: '현재 위치 기준 · 거리순',
     emergencyNote: '화면 예시예요. 시설 이름과 거리는 실제와 달라요.',
+    /** 일정 상세의 진입 행 그림 (#914) — 일자는 `EMERGENCY_ENTRY_SPECIMEN` */
+    emergencyEntry: '가는 곳 주변 병원·약국',
+    /**
+     * 곡선 예시의 기상특보 띠 (#914). 질문 2 항목 4("기상특보가 발효되면 그것부터 알려요")가
+     * 가리킬 그림이 곡선 카드에 없어 새로 둔다. 특보는 판정과 같은 축의 데이터라
+     * `metric-mid` 색이다 (명세 2026-09-25 §3-2).
+     */
+    curveAlert: '폭염주의보 발효 중 · 이것부터 알려요',
   },
 
   q1: {

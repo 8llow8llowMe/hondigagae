@@ -17,13 +17,19 @@ export const VERDICT_SPECIMEN = {
   window: '06:00–08:00',
 } as const
 
+/**
+ * `setting` 을 `tags` 와 따로 두는 이유 (#914): 스크롤 무대 단계 3 이 "실내인지, 지금 운영
+ * 중인지" 를 가리키며 **실내 · 실외 태그만** 강조한다. 태그 문자열로 골라내면 뷰에 `'실외'`
+ * 리터럴을 박아야 한다. 렌더 순서(조건 → 실내·실외 → 운영 중)는 그대로다.
+ */
 export const PLACE_ROWS_SPECIMEN = [
-  { name: '사계 해안 산책로', tags: ['소형·중형 동반 가능', '실외'], open: true },
-  { name: '애월 북카페', tags: ['10kg 이하', '실내'], open: true },
-  { name: '저지 예술인마을', tags: ['실외'], unknown: true },
+  { name: '사계 해안 산책로', tags: ['소형·중형 동반 가능'], setting: '실외', open: true },
+  { name: '애월 북카페', tags: ['10kg 이하'], setting: '실내', open: true },
+  { name: '저지 예술인마을', tags: [], setting: '실외', unknown: true },
 ] as const satisfies readonly {
   name: string
   tags: readonly string[]
+  setting: string
   open?: true
   unknown?: true
 }[]
@@ -105,6 +111,12 @@ export const WEATHER_SPECIMEN = [
 ] as const
 
 export const INDOOR_SPECIMEN = ['애월 북카페 · 1.2km', '실내 놀이터 · 3.4km'] as const
+
+/**
+ * 긴급 예시 아래 "일정 안 진입 행" 의 일자 (#914). 위급 절 항목 3("여행 일정 안에서도 한 번에
+ * 들어가요")이 가리킬 그림이다 — 문장은 `messages.about.specimen.emergencyEntry`.
+ */
+export const EMERGENCY_ENTRY_SPECIMEN = { day: '2일차' } as const
 
 export const EMERGENCY_ROWS_SPECIMEN = [
   { name: '제주 24시 동물의료센터', status: '진료중', kind: '동물병원', distance: '1.8km' },
