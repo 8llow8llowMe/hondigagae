@@ -388,16 +388,32 @@ function PlanItemVisitToggle({
 
   const shared = {
     /*
-      **상태를 `variant` 로 말한다.** `className` 으로 색을 덮지 않는다 —
-      component-guide.md §3 이 금지한다. 표준 집합 안에서 `secondary`(테두리 + 진한
-      글자)와 `ghost`(맨 아이콘)의 차이가 눌린 상태를 그린다.
+      **누를 행동은 버튼처럼, 상태는 표시처럼 보인다** (#911). 예전에는 반대였다 —
+      다녀온 행이 `secondary`(테두리) `✓ 다녀옴`, 안 간 행이 `ghost`(회색 글자) `✓ 다녀옴
+      표시` 여서, 같은 날 안에서 **상태가 버튼으로, 행동이 회색 라벨로** 읽혔다. 사용성
+      검토(#905 §1 25번)는 그것을 "숙박은 비활성" 으로 오독했다 — 비활성 갈래는 애초에 없다.
+
+      - 안 간 행(글자 있음): `secondary` + **체크 없이** `다녀옴 표시`. 체크가 붙어 있으면
+        아직 안 한 일이 이미 한 일처럼 보인다.
+      - 다녀온 행: `ghost` + 브랜드색 체크 + `다녀옴`. 누르면 해제되는 토글 그대로다
+        (`aria-pressed` · `aria-label` 은 바뀌지 않는다). 행 전체가 `opacity-60` 으로
+        물러나는 것과 같은 방향이다 — 끝난 일은 조용하다.
+      - 출발 전 아이콘 전용(안 간 행, #732)은 `ghost` 체크 아이콘 그대로다. 반복을 줄이려는
+        결정이고, 글자가 없어 라벨로 오독될 여지도 없다.
+
+      **색은 `variant` 와 아이콘으로만 말한다.** `Button` 의 `className` 으로 덮지 않는다
+      (component-guide.md §3). 체크의 브랜드색은 아이콘 자신의 색이다.
     */
-    variant: item.visited ? ('secondary' as const) : ('ghost' as const),
+    variant: item.visited || iconOnly ? ('ghost' as const) : ('secondary' as const),
     size: 'md' as const,
     'aria-label': item.visited ? messages.plan.visitedAction : messages.plan.visitAction,
     'aria-pressed': item.visited,
     loading: visit.pending,
-    leading: <CheckIcon size={20} />,
+    leading: item.visited ? (
+      <CheckIcon size={20} className="text-brand-600" />
+    ) : iconOnly ? (
+      <CheckIcon size={20} />
+    ) : undefined,
     onClick: () => visit.onToggle(!item.visited),
   }
 

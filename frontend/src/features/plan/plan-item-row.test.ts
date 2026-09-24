@@ -157,6 +157,43 @@ describe('PlanItemRow — 방문 체크 토글 (#124)', () => {
   })
 
   /* 같은 사실을 배지와 버튼이 두 번 말하지 않는다 — 배지를 걷은 근거 */
+  /*
+    **누를 행동은 버튼처럼, 상태는 표시처럼 보인다** (#911). 예전에는 다녀온 행이 테두리
+    버튼, 안 간 행이 회색 글자라 같은 날 안에서 상태가 버튼으로 · 행동이 비활성 라벨로
+    읽혔다. 토글 버튼의 **여는 태그만** 잘라 본다 — 행 전체를 훑으면 다른 칩의 테두리에 속는다.
+  */
+  function toggleTag(markup: string): string {
+    const at = markup.indexOf('aria-pressed=')
+    const start = markup.lastIndexOf('<button', at)
+    return markup.slice(start, markup.indexOf('</button>', at))
+  }
+
+  it('안 간 행은 테두리 버튼이고 체크가 없다 — 아직 안 한 일이 한 일처럼 보이지 않는다', () => {
+    const tag = toggleTag(renderWithVisit({ visited: false, visit: idleVisit }))
+
+    expect(tag).toContain('border-border-strong')
+    expect(tag).not.toContain('<svg')
+    expect(tag).toContain(messages.plan.visitToggleLabel)
+  })
+
+  it('다녀온 행은 테두리 없는 표시다 — 브랜드색 체크 + 다녀옴', () => {
+    const tag = toggleTag(renderWithVisit({ visited: true, visit: idleVisit }))
+
+    expect(tag).not.toContain('border-border-strong')
+    expect(tag).toMatch(/<svg[^>]*class="[^"]*text-brand-600/)
+    expect(tag).toContain(`>${messages.plan.visitedLabel}`)
+  })
+
+  it('출발 전 아이콘 전용은 테두리 없는 체크 아이콘 그대로다 (#732)', () => {
+    const tag = toggleTag(
+      renderWithVisit({ visited: false, visit: { ...idleVisit, compact: true } }),
+    )
+
+    expect(tag).not.toContain('border-border-strong')
+    expect(tag).toContain('<svg')
+    expect(tag).not.toContain('text-brand-600')
+  })
+
   it('체크된 행에서 다녀옴이 한 번만 보인다', () => {
     const markup = renderWithVisit({ visited: true, visit: idleVisit })
     const visible = markup.match(new RegExp(`>${messages.plan.visitedLabel}<`, 'g')) ?? []
