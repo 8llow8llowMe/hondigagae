@@ -191,6 +191,25 @@ export function RegionalWeatherSection({
 }
 
 /**
+ * 추천이 없는 날의 사유 (#905 R2).
+ *
+ * **판정을 다시 하지 않는다.** 서버가 추천을 비우는 경우는 둘뿐이고(`RegionalWeatherResponse`
+ * 주석) 응답에 이미 드러난 사실로 어느 쪽인지 가른다 — 경보 여부를 `level.code` 로 다시 세우지
+ * 않는다 (백엔드 #357: 소비 측이 `WARNING` 비교를 다시 쓰면 규칙이 두 곳으로 갈라진다).
+ *
+ * **특보가 있어도 점수 있는 권역이 하나도 없으면 예보 쪽이다.** 주의보가 떠 있는 날 예보까지
+ * 못 받았다면 추천이 빈 이유는 예보이고, 그때 "경보가 발효 중" 이라고 말하면 거짓이 된다.
+ * 점수 있는 권역이 있는데도 추천이 비었다면 남는 이유는 경보뿐이다.
+ */
+function noneReason(data: RegionalWeatherResponse): string {
+  const anyScored = data.regions.some((region) => region.weatherScore !== null)
+
+  return data.weatherWarning !== null && anyScored
+    ? messages.home.regionNoneWarning
+    : messages.home.regionNoneForecast
+}
+
+/**
  * 추천 권역.
  *
  * **없는 날에 "그나마 여기" 를 쓰지 않는다.** 특보 경보이거나 어느 권역도 예보를 못 받은
@@ -207,7 +226,16 @@ function Recommendation({ data }: { data: RegionalWeatherResponse }) {
       **여기서는 동점을 세지 않는다.** 서버가 추천을 내지 않은 날이라, 점수가 같은 권역을
       찾아 "어디든 좋아요" 라고 말하면 서버가 막아 둔 문을 화면이 다시 여는 것이 된다.
     */
-    return <p className="text-body-1 text-fg-muted font-semibold">{messages.home.regionNone}</p>
+    return (
+      <div className="flex flex-col gap-1">
+        <p className="text-body-1 text-fg-muted font-semibold">{messages.home.regionNone}</p>
+        {/*
+          **사유를 한 줄 붙인다** (#905 R2). 한 줄만 두면 바로 아래 표의 점수 배지와
+          모순처럼 읽혔다 — "점수는 86인데 추천할 곳이 없다고?".
+        */}
+        <p className="text-body-2 text-fg-muted">{noneReason(data)}</p>
+      </div>
+    )
   }
 
   const tied = findTiedTop(data.regions, data.recommendedRegion)
