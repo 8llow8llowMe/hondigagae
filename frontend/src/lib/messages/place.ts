@@ -112,7 +112,6 @@ export const placeMessages = {
   /** 5xx·무응답 */
   detailErrorTitle: '장소 정보를 불러오지 못했어요',
 
-  detailSectionOverview: '장소 소개',
   detailSectionIntro: '이용 안내',
   detailSectionPet: '반려견 동반 정보',
   detailSectionImages: '사진',
@@ -328,8 +327,9 @@ export const placeMessages = {
 
   // ── 장소 상세 · 본문 ────────────────────────────────────────────────────
 
-  detailSectionBasic: '기본 정보',
-  /** 모바일은 소개를 접는다 — 세로 공간이 없다 */
+  /** 기본 정보 + 이용 안내 + 지도를 한 카드로 묶은 절 (#935) */
+  detailSectionVisit: '방문 정보',
+  /** 소개가 길면 접는다 — 모바일 네 줄, 데스크톱 세 줄 */
   detailOverviewMore: '더 보기',
   detailOverviewLess: '접기',
 
