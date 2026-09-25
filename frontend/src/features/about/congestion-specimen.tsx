@@ -50,7 +50,18 @@ export function CongestionSpecimen() {
 
   return (
     <div ref={ref}>
-      <div role="group" aria-label={copy.congestionAria} className="flex h-16 items-end gap-1.5">
+      {/*
+        머리 · 요약 · 캡션 (#940). 막대 높이도 64 → 128 로 키웠다 — 질문 3 이 예시 하나를 크게
+        보이는 자리가 되며 네 예시 중 이것만 반 높이였다.
+      */}
+      <div className="mb-4">
+        <p className="text-caption text-fg-muted font-medium">
+          {copy.congestionRange.replace('{range}', CONGESTION_SPECIMEN.range)}
+        </p>
+        <p className="text-caption text-fg-muted mt-2 font-semibold">{copy.congestionBestLabel}</p>
+        <p className="text-title-2 text-congestion-best font-semibold">{bestDate}</p>
+      </div>
+      <div role="group" aria-label={copy.congestionAria} className="flex h-32 items-end gap-1.5">
         {heights.map((height, index) => {
           const best = index === bestIndex
           const date = CONGESTION_SPECIMEN.dates[index] ?? ''
@@ -131,9 +142,11 @@ export function CongestionSpecimen() {
           </span>
         ))}
       </div>
-      <p className="text-caption text-fg-muted mt-3 font-medium">
+      <p className="text-body-2 text-fg mt-4 break-keep">
         {copy.congestionBest.replace('{date}', bestDate)}
       </p>
+      <p className="text-body-2 text-fg-muted mt-1 break-keep">{copy.congestionWeekend}</p>
+      <p className="text-caption text-fg-muted mt-3 font-medium">{copy.congestionNote}</p>
     </div>
   )
 }

@@ -80,6 +80,8 @@ export const CONGESTION_SPECIMEN = {
   labels: ['월', '화', '수', '목', '금', '토', '일'],
   bestIndex: 3,
   bestDate: '9월 18일(목)',
+  /** 예시 머리의 기간 (#940) — `dates` 의 처음과 끝이다 */
+  range: '9월 15일–21일',
   /** 막대 툴팁의 날짜 (#916). `bestDate` 는 `dates[bestIndex]` 와 같아야 한다 — 테스트가 잠근다 */
   dates: [
     '9월 15일(월)',
@@ -198,15 +200,38 @@ export const PLAN_SPECIMEN = [
  * 등급어(`여행 적합` — 서버 `name` 그대로)와 근거 문장은 `messages.about.specimen` 이다 —
  * 해요체 감시가 그쪽을 본다. 축(`적합도`)은 배지가 붙인다 (#652).
  */
-export const SUITABILITY_SPECIMEN = { place: '협재 해수욕장' } as const
+export const SUITABILITY_SPECIMEN = {
+  place: '협재 해수욕장',
+  /** `CONGESTION_SPECIMEN.bestDate` 와 같은 날 — 적합도 · 한산한 날 두 예시가 같은 장면이다 */
+  date: '9월 18일(목)',
+  pet: '소형견 7kg',
+  feelsLike: '27℃',
+  rain: '10%',
+  /** 서버 `CongestionLevel` 이름 그대로 */
+  congestion: '한산',
+} as const
 
+/** `rain` 은 강수 확률(%) — 실제 브리핑의 `maxPrecipitationProbability` 자리다 (#940) */
 export const WEATHER_SPECIMEN = [
-  { day: '1일차', icon: '☀️', temp: '27℃' },
-  { day: '2일차', icon: '🌧️', temp: '23℃' },
-  { day: '3일차', icon: '⛅', temp: '26℃' },
+  { day: '1일차', icon: '☀️', temp: '27℃', rain: 10, rainy: false },
+  { day: '2일차', icon: '🌧️', temp: '23℃', rain: 80, rainy: true },
+  { day: '3일차', icon: '⛅', temp: '26℃', rain: 20, rainy: false },
 ] as const
 
-export const INDOOR_SPECIMEN = ['애월 북카페 · 1.2km', '실내 놀이터 · 3.4km'] as const
+/**
+ * 비 오는 날 실내 대안 (#940) — 실제 응답 `AlternativePlaceItem` 의 모양(이름 · 거리 · 동반 형태 ·
+ * 동반 크기)이다. 동반 형태는 `PetAllowanceType`, 크기는 `AllowedPetSize` 의 서버 `name` 그대로다.
+ */
+export const INDOOR_SPECIMEN = [
+  { title: '애월 북카페', distance: '1.2km', allowance: '동반 가능', size: '소형견만 가능' },
+  {
+    title: '제주현대미술관',
+    distance: '2.3km',
+    allowance: '부분 동반 가능',
+    size: '소형견만 가능',
+  },
+  { title: '실내 놀이터', distance: '3.4km', allowance: '동반 가능', size: '전 견종 가능' },
+] as const
 
 /**
  * 긴급 예시 아래 "일정 안 진입 행" 의 일자 (#914). 위급 절 항목 3("여행 일정 안에서도 한 번에
@@ -224,4 +249,15 @@ export const EMERGENCY_ROWS_SPECIMEN = [
  * 공개 API 가 총 개수를 주지 않아(커서 슬라이스) 화면이 실시간으로 셀 수 없다 — 기준 시점
  * 캡션(`messages.about.data.scaleNote`)이 그것을 밝힌다.
  */
-export const SCALE_SPECIMEN = { places: 315, emergency: 214, sources: 5 } as const
+export const SCALE_SPECIMEN = {
+  places: 315,
+  emergency: 214,
+  sources: 5,
+  /**
+   * 장소 315 의 구성 (#940) — README "관광 29 + 문화정보원 228 + 식약처 102 − 중복 ≈ 315".
+   * 합(359)이 315 보다 큰 만큼이 겹치는 곳이다. 순서는 `messages.about.data.placesSegments`.
+   */
+  placesBreakdown: [29, 228, 102],
+  /** 타일마다 이어지는 출처 — `messages.footer.sources` 의 자리(0 TourAPI · 1 문화정보원 · 2 식약처 · 3 기상청 · 4 카카오맵) */
+  sourceIndexes: { places: [0, 1, 2], emergency: [1], sources: [0, 1, 2, 3, 4] },
+} as const

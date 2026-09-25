@@ -36,11 +36,17 @@ describe('AboutView — 출처 표기 (#611 의 존재 이유를 잃지 않는�
   })
 
   it('출처·면책·공모전 문구를 messages.footer 에서 읽는다 — 다시 적지 않는다', () => {
-    const source = readSourceWithoutComments('src/features/about/about-view.tsx')
-    expect(source).toContain('messages.footer.sources')
-    expect(source).toContain('messages.footer.disclaimer')
-    expect(source).toContain('messages.footer.contest')
-    for (const literal of messages.footer.sources) expect(source).not.toContain(`'${literal}'`)
+    const view = readSourceWithoutComments('src/features/about/about-view.tsx')
+    // 출처 목록은 #940 부터 데이터 절의 규모 · 출처 컴포넌트가 그린다
+    const scale = readSourceWithoutComments('src/features/about/data-scale.tsx')
+    expect(scale).toContain('messages.footer.sources')
+    expect(scale).toContain('messages.footer.sourcesLabel')
+    expect(view).toContain('messages.footer.disclaimer')
+    expect(view).toContain('messages.footer.contest')
+    for (const literal of messages.footer.sources) {
+      expect(view).not.toContain(`'${literal}'`)
+      expect(scale).not.toContain(`'${literal}'`)
+    }
   })
 })
 
@@ -365,13 +371,23 @@ describe('AboutView — 질문 3 목록 + 예시 하나 (#940)', () => {
     expect(q3).toContain(messages.about.specimen.suitabilityGrade)
     expect(q3).toContain(`aria-label="${messages.about.specimen.congestionAria}"`)
     expect(q3).toContain(messages.about.specimen.planRegenerate)
-    expect(q3).toContain(messages.about.specimen.indoorTitle)
+    expect(q3).toContain(messages.about.specimen.suitabilityNote)
+    expect(q3).toContain(messages.about.specimen.congestionNote)
+    expect(q3).toContain(messages.about.specimen.indoorNote)
   })
 
-  it('1024 이상에서 절이 헤더 아래 한 화면을 채운다 (about-q3-fill)', () => {
-    expect(q3).toMatch(
-      /^aria-labelledby="about-q3-heading"[^>]*><div class="[^"]*\babout-q3-fill\b/,
+  it('트랙(about-tour) 안에 sticky 한 화면(about-tour-sticky)이 있고 항목 수를 CSS 로 넘긴다', () => {
+    expect(q3).toContain(
+      `<div class="about-tour" style="--about-tour-count:${Object.keys(cards).length}"><div class="about-tour-sticky">`,
     )
+  })
+
+  it('밴드 위아래 여백을 1024 이상에서 걷는다 — 트랙이 절 높이를 정한다', () => {
+    expect(q3).toMatch(/^aria-labelledby="about-q3-heading"[^>]*><div class="[^"]*\blg:py-0\b/)
+  })
+
+  it('예시 카드가 about-tab-card 다 — 1024 이상 최소 높이로 넷의 높이를 맞춘다', () => {
+    expect(q3).toMatch(/<section class="[^"]*\babout-tab-card\b/)
   })
 })
 
@@ -390,6 +406,115 @@ describe('AboutView — 자리', () => {
     expect(markup).toContain('bg-intro-band')
     expect(markup).toContain('bg-brand-700')
     expect(markup).not.toMatch(/\bbg-brand-(50|100)\b/)
+  })
+})
+
+describe('소개 문구 — 낱말 규칙 (#940 사용자 검토)', () => {
+  /** `messages.about` 의 값 문자열 전부 — 키가 아니라 화면에 나가는 말만 */
+  const strings = (value: unknown): string[] =>
+    typeof value === 'string'
+      ? [value]
+      : Array.isArray(value)
+        ? value.flatMap(strings)
+        : value !== null && typeof value === 'object'
+          ? Object.values(value).flatMap(strings)
+          : []
+  const copy = strings(messages.about)
+
+  it.each([
+    ['판정', '심판받는 느낌이다 — 이름은 "오늘 상태", 문장은 "알려 줘요 · 안내해요"'],
+    ['갈리', '"다른 · 나뉘는" 으로 쓴다'],
+    ['거르', '장소를 거르지 않고 안내한다'],
+    ['걸러', '장소를 거르지 않고 안내한다'],
+    ['원천', '"데이터 · 출처" 로 쓴다'],
+    ['서버가', '사용자에게는 "AI 로 생성해요" 처럼 하는 일을 말한다'],
+  ])('"%s" 를 쓰지 않는다 — %s', (word) => {
+    expect(copy.length).toBeGreaterThan(50)
+    for (const text of copy) expect(text, text).not.toContain(word)
+  })
+
+  it('화면 마크업에도 없다 — 속성(aria-label 등)과 문구 밖에서 들어온 낱말까지', () => {
+    for (const word of ['판정', '갈리', '거르', '걸러', '원천', '서버가']) {
+      expect(markup).not.toContain(word)
+    }
+  })
+})
+
+describe('AboutView — 히어로 (#940)', () => {
+  const hero = band('about-hero-heading')
+
+  it('제목이 "반려견과 함께하는 제주 여행" 이고 작은 표지어 줄이 없다', () => {
+    expect(messages.about.hero.heading).toBe('반려견과 함께하는 제주 여행')
+    expect(hero).not.toMatch(/<p class="text-caption[^"]*tracking-wide/)
+    expect(Object.keys(messages.about.hero)).not.toContain('eyebrow')
+  })
+
+  it('설명 문단이 없다 — 한 줄과 같은 말을 되풀이했다', () => {
+    expect(Object.keys(messages.about.hero)).not.toContain('sub')
+    expect(hero).not.toMatch(/<p class="text-body-1[^"]*opacity-90/)
+  })
+
+  it('제목 아래 한 줄이 쉼표 없이 선다 — "~, ~해요" 구조가 어색했다', () => {
+    const [first, second] = messages.about.hero.lead
+    expect(messages.about.hero.lead.join(' ')).not.toContain(',')
+    expect(hero.indexOf(first)).toBeGreaterThan(hero.indexOf('id="about-hero-heading"'))
+    expect(hero.indexOf(second)).toBeGreaterThan(hero.indexOf(first))
+  })
+
+  it('768 이상에서만 두 토막 사이에서 줄을 바꾼다 — 그 미만은 공백 하나로 이어 흐른다', () => {
+    const [first, second] = messages.about.hero.lead
+    expect(hero).toContain(`${first} <br aria-hidden="true" class="hidden md:inline"/>${second}`)
+  })
+})
+
+describe('AboutView — 데이터 절 (#940)', () => {
+  const data = band('about-data-heading')
+
+  it('한 화면을 채운다 (about-screen-fill)', () => {
+    expect(data).toMatch(
+      /^aria-labelledby="about-data-heading"[^>]*><div class="[^"]*\babout-screen-fill\b/,
+    )
+  })
+
+  it('규모 타일 셋이 라디오 묶음이고 정적 렌더는 장소가 골라져 있다 — 고른 것만 탭 순서에', () => {
+    expect(data).toContain(`role="radiogroup" aria-label="${messages.about.data.scaleGroupLabel}"`)
+    const tiles =
+      data.match(
+        /<button type="button" role="radio" aria-checked="(true|false)" tabindex="(-?\d)"/g,
+      ) ?? []
+    expect(tiles).toEqual([
+      '<button type="button" role="radio" aria-checked="true" tabindex="0"',
+      '<button type="button" role="radio" aria-checked="false" tabindex="-1"',
+      '<button type="button" role="radio" aria-checked="false" tabindex="-1"',
+    ])
+  })
+
+  it('장소를 고르면 구성 막대의 조각이 원천별 개수와 같다 — 합이 315 보다 큰 만큼이 겹치는 곳', () => {
+    for (const count of SCALE_SPECIMEN.placesBreakdown) expect(data).toContain(`>${count}<`)
+    const sum = SCALE_SPECIMEN.placesBreakdown.reduce((total, count) => total + count, 0)
+    expect(sum).toBeGreaterThan(SCALE_SPECIMEN.places)
+    expect(messages.about.data.placesSegments).toHaveLength(SCALE_SPECIMEN.placesBreakdown.length)
+  })
+
+  it('출처 쓰임은 푸터 출처와 같은 순서 · 같은 길이이고, 고른 숫자의 출처만 강조된다', () => {
+    expect(messages.about.data.sourceUses).toHaveLength(messages.footer.sources.length)
+    const chips = [...data.matchAll(/<li class="([^"]*)"><span[^>]*>([^<]+)<\/span>/g)].filter(
+      (match) => (messages.footer.sources as readonly string[]).includes(match[2] ?? ''),
+    )
+    expect(chips).toHaveLength(messages.footer.sources.length)
+    const linked = chips.filter((match) => match[1]?.includes('border-brand-500')).map((m) => m[2])
+    expect(linked).toEqual(
+      SCALE_SPECIMEN.sourceIndexes.places.map((index) => messages.footer.sources[index]),
+    )
+  })
+
+  it('약관이 알아두실 점 바로 뒤에 선다', () => {
+    const notice = data.indexOf('id="about-notice-heading"')
+    const legal = data.indexOf('id="about-legal-heading"')
+    expect(notice).toBeGreaterThan(0)
+    expect(legal).toBeGreaterThan(notice)
+    // 사이에 다른 카드 제목이 없다 — 약관 제목 하나만
+    expect(data.slice(notice, legal).match(/<h2/g)).toHaveLength(1)
   })
 })
 

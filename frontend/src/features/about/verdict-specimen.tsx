@@ -24,8 +24,9 @@ function Metric({
   hot?: boolean
 }) {
   return (
-    <div className="bg-band rounded-md px-3 py-2">
-      <p className="text-caption text-fg-muted font-medium">{label}</p>
+    <div className="bg-band rounded-md px-2 py-2 xl:px-3">
+      {/* 한 줄 (#940) — 세 칸 중 한 칸(1024 에서 안쪽 80px)에 서도록 라벨을 줄이고 1280 전까지 여백을 8 로 둔다 */}
+      <p className="text-caption text-fg-muted font-medium whitespace-nowrap">{label}</p>
       <p className="text-title-1 text-fg mt-1 font-black tabular-nums">
         {/* 스크린리더는 최종값만 — 카운트업 중간값은 시각 노드에만 */}
         <span className="sr-only">{final.toFixed(decimals)}℃</span>

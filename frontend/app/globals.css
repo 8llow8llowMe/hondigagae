@@ -1380,12 +1380,17 @@ body {
   - `.about-tab-panel` — 고른 패널만 선다. 나머지는 `display: none` 이라 숨은 패널 안 버튼은
     포커스를 받지 않고, 고른 패널은 200 동안 떠오른다(DESIGN.md §8). **패널을 한 칸에 겹치지
     않는다** — 처음 안은 겹쳐서 카드 높이를 가장 긴 패널(AI 일정)에 묶었는데, 짧은 패널(여행
-    적합도)에서 카드 아래 절반이 비었다(1280×800 실측). 카드는 1024 이상에서 왼쪽 열(머리 · 목록 ·
-    링크)과 세로 가운데에 서고(`lg:self-center`) 가장 긴 패널도 왼쪽 열보다 짧아, 높이가 바뀌어도
-    절 높이는 그대로다.
-  - `.about-q3-fill` — 1024 이상에서 절이 헤더 아래 한 화면을 채우고 내용을 세로 가운데에
-    세운다. 무대 둘을 지나 이 절에 오면 한 화면이 딱 이 절이라 "멈춰서 눌러 보는 곳" 이 된다.
-    `min` 이라 창이 낮으면 잘리지 않고 늘어난다. 히어로(`.about-hero-fill`)와 같은 높이 식이다.
+    적합도)에서 카드 아래 절반이 비었다(1280×800 실측). 높이는 아래 `.about-tab-card` 최소
+    높이가 맞추고, 짧은 예시는 내용을 채웠다(#940 2차).
+  - `.about-tour` · `.about-tour-sticky` — 1024 이상 · 감속 모션이 아니면 **스크롤이 목록을 한
+    항목씩 넘긴다.** 트랙 높이 = 한 화면(`100dvh − 헤더`) + 항목 수 × 35vh 이고, 안쪽이 헤더 아래
+    한 화면에 붙어(sticky) 있는 동안 `FeatureTabs` 가 트랙 윗변으로 고른 항목을 잰다. 미디어
+    쿼리는 컴포넌트의 `TOUR_MEDIA` 와 같은 문자열이다 — 트랙이 길어지는 조건과 재는 조건이 갈리면
+    안 된다. 감속 모션이면 트랙이 길어지지 않고 한 화면을 채우기만 한다(누르기로 고른다).
+  - `.about-tab-card` — 1024 이상에서 예시 카드 최소 높이. 넷의 내용 높이가 달라 넘길 때마다
+    카드가 늘었다 줄었다 했다 — 가장 긴 예시(AI 일정)에 맞춘다.
+  - `.about-screen-fill` — 데이터 절(#940)이 헤더 아래 한 화면을 채우고 가운데 선다. `min` 이라
+    창이 낮으면 늘어난다. 히어로(`.about-hero-fill`)와 같은 높이 식이다.
 
   감속 모션은 위 전역 규칙이 전환을 한 프레임으로 줄인다 — 이 블록이 그 뒤에 있어도
   `!important` 라 진다.
@@ -1406,11 +1411,43 @@ body {
 }
 
 @media (width >= 64rem) {
-  .about-q3-fill {
+  .about-tab-card {
+    min-block-size: 25rem;
+  }
+
+  /*
+    목록 쪽(머리 · 탭 · 링크)은 고른 탭의 설명 줄 수에 따라 416 ↔ 438 로 달라져, 가운데 선
+    덩어리가 항목마다 11px 튀었다(#940 검토, 1280×800). 덩어리 높이를 그보다 크게 묶는다.
+  */
+  .about-tour-grid {
+    min-block-size: 28rem;
+  }
+}
+
+.about-tour {
+  --about-tour-step: 35vh;
+}
+
+@media (width >= 64rem) {
+  /* 감속 모션에서도 한 화면을 채우고 가운데 선다 — 넘기기만 없다 */
+  .about-tour-sticky,
+  .about-screen-fill {
     display: flex;
     flex-direction: column;
     justify-content: center;
     min-block-size: calc(100dvh - var(--header-h));
+  }
+}
+
+@media (min-width: 64rem) and (prefers-reduced-motion: no-preference) {
+  .about-tour {
+    block-size: calc(100dvh - var(--header-h) + var(--about-tour-count) * var(--about-tour-step));
+  }
+
+  .about-tour-sticky {
+    position: sticky;
+    inset-block-start: var(--header-h);
+    block-size: calc(100dvh - var(--header-h));
   }
 }
 
