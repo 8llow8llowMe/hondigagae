@@ -178,11 +178,12 @@ describe('globals.css 소개 페이지 무대 블록', () => {
   const css = readGlobalsCss()
   /* 블록을 여는 주석의 `/*` 부터 자른다 — 중간부터 자르면 주석이 걷히지 않아 `#914` 가 색으로 읽힌다 */
   const start = css.lastIndexOf('/*', css.indexOf('소개 페이지 스크롤 무대'))
-  const end = css.indexOf('모션 민감 사용자를 존중한다')
+  // 다음 블록(캐릭터, #917)이 끝 — 캐릭터 블록은 자기 테스트(`about-character.test.ts`)가 본다
+  const end = css.lastIndexOf('/*', css.indexOf('소개 페이지 캐릭터'))
   const block = css.slice(start, end).replace(/\/\*[\s\S]*?\*\//g, '')
   const selectors = [...block.matchAll(/([^{}]+)\{/g)].map((match) => (match[1] ?? '').trim())
 
-  it('블록이 감속 모션 블록 위에 있다', () => {
+  it('블록이 캐릭터 블록(과 감속 모션 블록) 위에 있다', () => {
     expect(start).toBeGreaterThan(0)
     expect(end).toBeGreaterThan(start)
   })

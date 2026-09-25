@@ -8,6 +8,7 @@ import { ButtonLink } from '@/components/button'
 import { ChevronRightIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
 import { Surface, SurfaceList } from '@/components/surface'
+import { CtaDog, HeroDog } from '@/features/about/about-character'
 import {
   INDOOR_SPECIMEN,
   SCALE_SPECIMEN,
@@ -39,6 +40,10 @@ import { cn } from '@/lib/utils/cn'
  *
  * **서버 컴포넌트다.** 세션도 프리페치도 없고 백엔드를 부르지 않는다. 클라이언트 경계는
  * `Reveal` · `ScrollStage`(+ `ScrollStagePoint`) · 예시 4개다 (명세 §6-4 · 2026-09-25 §9-1).
+ *
+ * **캐릭터는 세 자리에만 선다** (#917, 명세 2026-09-25 §6) — 히어로(올려다보기) · 질문 2 곡선
+ * 카드 윗변(단계 · 핸들에 따른 자세) · 마무리(정면 앉기). 질문 1 · 질문 3 · 위급 · 데이터에는
+ * 두지 않는다 — 그 절의 문장과 묶이지 않는다. 늘 카드 **밖**에 서고 등급 색을 칠하지 않는다.
  *
  * **질문 1 · 질문 2 · 위급 절은 스크롤 무대다** (#914, 명세 2026-09-25 §3). 왼쪽 항목이 화면
  * 가운데에 올 때마다 오른쪽 예시가 그 항목이 말하는 상태가 된다. 질문 3 은 하위 카드 넷이
@@ -135,10 +140,15 @@ export function AboutView() {
           </div>
           <ScrollCue href={`#${SECTION_ID.q1}`}>{about.hero.scrollCue}</ScrollCue>
         </div>
-        {/* 예시는 자기 열을 갖는다 — `VerdictSpecimen` 이 grid 아이템이면 열 폭을 알 수 없다 */}
-        <div className="lg:col-span-5">
-          <HeroParallax>
+        {/*
+          예시는 자기 열을 갖는다 — `VerdictSpecimen` 이 grid 아이템이면 열 폭을 알 수 없다.
+          캐릭터(#917)는 카드와 같은 패럴랙스 래퍼 안에서 카드 밖 왼쪽 아래에 선다. 1024 미만은
+          카드 아래에 앉을 자리(`.about-hero-dog-room`)를 연다.
+        */}
+        <div className="about-hero-dog-room lg:col-span-5">
+          <HeroParallax className="relative">
             <VerdictSpecimen />
+            <HeroDog />
           </HeroParallax>
         </div>
       </IntroBand>
@@ -169,6 +179,8 @@ export function AboutView() {
         <ScrollStage
           count={about.q2.points.length}
           {...STAGE_GRID}
+          copyClassName={cn(STAGE_GRID.copyClassName, 'about-pose-tail')}
+          visualClassName={cn(STAGE_GRID.visualClassName, 'about-pose-room')}
           copy={
             <QuestionCopy
               id="about-q2-heading"
@@ -399,9 +411,17 @@ export function AboutView() {
         </Reveal>
       </IntroBand>
 
-      {/* ── 8. 마무리 CTA ── */}
-      <IntroBand tone="brand" labelledBy="about-cta-heading" className="grid gap-5">
-        <div>
+      {/*
+        ── 8. 마무리 CTA ──
+        1024 이상은 히어로와 같은 7:5 — 오른쪽 열에 캐릭터가 정면으로 앉아 절 끝선에 발을 댄다
+        (#917, 명세 2026-09-25 §6-2). 그 미만은 버튼 아래 오른쪽이다.
+      */}
+      <IntroBand
+        tone="brand"
+        labelledBy="about-cta-heading"
+        className="grid gap-5 lg:grid-cols-12 lg:gap-x-16"
+      >
+        <div className="lg:col-span-7">
           <h2
             id="about-cta-heading"
             className="text-title-1 lg:text-display font-bold break-keep lg:font-extrabold"
@@ -410,7 +430,7 @@ export function AboutView() {
           </h2>
           <p className="text-body-1 mt-2 font-normal break-keep opacity-90">{about.cta.sub}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 lg:col-span-7">
           <ButtonLink href="/" variant="inverse">
             {about.cta.primary}
           </ButtonLink>
@@ -418,6 +438,7 @@ export function AboutView() {
             {about.cta.secondary}
           </ButtonLink>
         </div>
+        <CtaDog className="lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1" />
       </IntroBand>
     </>
   )

@@ -9,6 +9,7 @@ import {
   HOURLY_GRADE_EDGES,
   VERDICT_SPECIMEN,
 } from '@/features/about/about-specimen-data'
+import { CurvePose, poseForGrade, poseForStep } from '@/features/about/curve-pose'
 import { useStageStep } from '@/features/about/scroll-stage'
 import { useRevealOnce } from '@/features/about/use-reveal-once'
 import { walkSafetyTone } from '@/lib/insight/tone'
@@ -34,9 +35,14 @@ export function hourlyGrade(pavement: number): HourlyGradeCode {
   return 'SAFE'
 }
 
+/** 24점 표의 한 시각. 표 밖이면 12시(판정 카드와 같은 값) */
+function hourlyPoint(hour: number) {
+  return GOLDEN_CURVE_HOURLY[hour] ?? GOLDEN_CURVE_HOURLY[12]
+}
+
 /** 핸들이 가리키는 시각의 읽기 문장 — 화면 줄과 `aria-valuetext` 가 같이 쓴다 */
 function hourlyText(hour: number): string {
-  const point = GOLDEN_CURVE_HOURLY[hour] ?? GOLDEN_CURVE_HOURLY[12]
+  const point = hourlyPoint(hour)
   return messages.about.specimen.curveReadout
     .replace('{time}', `${String(hour).padStart(2, '0')}:00`)
     .replace('{temperature}', String(point.temperature))
@@ -101,6 +107,10 @@ function yOnPath(path: SVGPathElement, x: number): number {
  *
  * 어느 경로든 **정적 렌더는 전부 보인다** — 무대의 첫 렌더 단계는 마지막 단계다.
  *
+ * **카드 윗변 위에 캐릭터가 선다** (#917, 명세 2026-09-25 §6-3 — `CurvePose`). 자세는 무대 단계와
+ * 시각 핸들 판정 중 **마지막 사건**이 고르고, 정적 렌더는 앞발(+ 열기 선)이다. 자세 자리의 위
+ * 여백은 이 카드를 감싼 무대 예시 열(`.about-pose-room`)이 준다.
+ *
  * **판정 배지는 단계 2 에서 처음 나타나고 그 뒤로 색이 바뀌지 않는다.** 단계 0 · 1 에서는
  * 자리를 투명하게 비운다 — 다른 등급 색을 거치지 않는다(선행 명세 §6-4 "등급 색은 끝에서만").
  */
@@ -110,8 +120,24 @@ export function GoldenCurveSpecimen() {
   const scrubId = useId()
   /** 시각 핸들 — 만지기 전(`null`)에는 점 · 읽기 줄을 그리지 않는다 (#916) */
   const [scrub, setScrub] = useState<{ hour: number; y: number } | null>(null)
+  /**
+   * 핸들을 만진 순간의 무대 단계 (#917, 명세 §6-3). `undefined` 는 만진 적이 없거나 그 뒤 단계가
+   * 바뀌었다는 뜻이다 — 단계가 바뀌면 렌더 중에 걷는다(**마지막 사건이 이긴다**). 적어 둔
+   * 단계와 비교만 하면 2 → 3 → 2 로 돌아왔을 때 지난 핸들 판정이 되살아난다. 판정은 따로 두지
+   * 않고 `scrub.hour` 에서 구한다.
+   */
+  const [touchedAt, setTouchedAt] = useState<number | null | undefined>(undefined)
   const phase = useRevealOnce(ref, true)
   const stage = useStageStep()
+  if (touchedAt !== undefined && stage !== null && touchedAt !== stage.step) {
+    setTouchedAt(undefined)
+  }
+  const pose =
+    touchedAt !== undefined && scrub !== null
+      ? poseForGrade(hourlyGrade(hourlyPoint(scrub.hour).pavement))
+      : stage === null
+        ? 'hot'
+        : poseForStep(stage.step)
   const drawing = stage === null ? phase === 'armed' : stage.step < 1
   /** 봉우리 · 배지 · 추천 구간 · 특보가 숨는 조건. 무대 밖에서는 선이 다 그려진 뒤에 뜬다 */
   const hiddenUntil = (step: number) => (stage === null ? drawing : stage.step < step)
@@ -129,7 +155,8 @@ export function GoldenCurveSpecimen() {
   }
 
   return (
-    <div className="bg-bg border-border -mx-4 border-y md:mx-0 md:rounded-lg md:border">
+    <div className="bg-bg border-border relative -mx-4 border-y md:mx-0 md:rounded-lg md:border">
+      <CurvePose pose={pose} />
       <div className={cn('pt-4', INSET_CLASS.card)}>
         <div className="flex items-start justify-between gap-3">
           <p className="text-title-2 text-fg font-semibold">{copy.curveTitle}</p>
@@ -283,6 +310,7 @@ export function GoldenCurveSpecimen() {
             const hour = Number(event.currentTarget.value)
             const path = pavementRef.current
             setScrub({ hour, y: path === null ? data.peak.y : yOnPath(path, hourX(hour)) })
+            setTouchedAt(stage?.step ?? null)
           }}
           className="accent-brand-600 mx-auto block h-11 w-full max-w-md"
         />
@@ -323,7 +351,7 @@ export function GoldenCurveSpecimen() {
 
 /** 핸들이 가리키는 시각의 읽기 줄(눈 몫) — 기온 · 노면 · 등급 배지 */
 function HourlyReadout({ hour }: { hour: number }) {
-  const point = GOLDEN_CURVE_HOURLY[hour] ?? GOLDEN_CURVE_HOURLY[12]
+  const point = hourlyPoint(hour)
   const code = hourlyGrade(point.pavement)
 
   return (
