@@ -6,7 +6,7 @@ import { MyPageIcon } from '@/components/icons'
 import { cn } from '@/lib/utils/cn'
 
 /**
- * 회원 프로필 아바타. 64px 원형.
+ * 회원 프로필 아바타. 64px 원형 (마이페이지) · 32px 원형 (전역 헤더 계정 메뉴).
  *
  * **원형은 사진·아바타에만 허용된 곡선이다** (DESIGN.md §5). 사진이 없는 것은 오류가
  * 아니라 정상 상태라 빈 원형을 남기지 않고 사람 아이콘을 둔다 — `PetAvatar` 가 이니셜을
@@ -26,7 +26,23 @@ import { cn } from '@/lib/utils/cn'
  * 호스트가 죽었거나 파일이 지워진 경우가 실제로 생긴다 — 그때 사람 아이콘으로 떨어지는
  * 편이 낫다. 사진 없는 상태와 같은 모습이라 사용자가 이해할 수 있다.
  */
-export function ProfileAvatar({ url, className }: { url: string | null; className?: string }) {
+const SIZE = {
+  /** 마이페이지 프로필 줄 · 수정 모달 */
+  md: { box: 'size-16', px: 64, icon: 28 },
+  /** 전역 헤더 계정 메뉴 트리거 (44 버튼 안) */
+  sm: { box: 'size-8', px: 32, icon: 20 },
+} as const
+
+export function ProfileAvatar({
+  url,
+  size = 'md',
+  className,
+}: {
+  url: string | null
+  size?: keyof typeof SIZE
+  className?: string
+}) {
+  const { box, px, icon } = SIZE[size]
   const [failed, setFailed] = useState(false)
 
   // URL 이 바뀌면 실패 기록을 지운다. 안 그러면 한 번 깨진 뒤 새 사진을 올려도
@@ -35,7 +51,7 @@ export function ProfileAvatar({ url, className }: { url: string | null; classNam
     setFailed(false)
   }, [url])
 
-  const shape = cn('size-16 shrink-0 rounded-full', className)
+  const shape = cn(box, 'shrink-0 rounded-full', className)
 
   if (url === null || url.length === 0 || failed) {
     return (
@@ -43,7 +59,7 @@ export function ProfileAvatar({ url, className }: { url: string | null; classNam
         aria-hidden
         className={cn('bg-band text-fg-muted flex items-center justify-center', shape)}
       >
-        <MyPageIcon size={28} />
+        <MyPageIcon size={icon} />
       </span>
     )
   }
@@ -53,8 +69,8 @@ export function ProfileAvatar({ url, className }: { url: string | null; classNam
     <img
       src={url}
       alt=""
-      width={64}
-      height={64}
+      width={px}
+      height={px}
       onError={() => setFailed(true)}
       className={cn('bg-band object-cover', shape)}
     />

@@ -205,7 +205,7 @@ function PlanPetCard({ companions, pending }: { companions: readonly Pet[]; pend
 
     return (
       <div className="flex items-center gap-2">
-        <PetAvatar name={pet.name} size="md" />
+        <PetAvatar name={pet.name} url={pet.profileImageUrl} size="md" />
         {/* 한 줄이라 `·` 로 잇는다 — 특성끼리는 공백이다, 구분자가 두 층이면 어디가 경계인지 갈리지 않는다 */}
         <p className="text-caption text-fg-muted min-w-0 truncate font-medium">
           <span className="text-fg font-semibold">{pet.name}</span>
@@ -232,7 +232,7 @@ function PlanPetRow({ pet }: { pet: Pet }) {
 
   return (
     <div className="flex items-center gap-3">
-      <PetAvatar name={pet.name} size="lg" />
+      <PetAvatar name={pet.name} url={pet.profileImageUrl} size="lg" />
       <div className="min-w-0">
         <p className="text-body-1 text-fg font-semibold break-keep">{pet.name}</p>
         {traits.length > 0 && (

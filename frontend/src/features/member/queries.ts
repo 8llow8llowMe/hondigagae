@@ -7,6 +7,18 @@ import { isRetriable } from '@/lib/api/error'
 export const memberKeys = {
   all: ['member'] as const,
   me: () => [...memberKeys.all, 'me'] as const,
+  /**
+   * **전역 헤더 전용 사본** — 같은 `/members/me` 를 다른 key 로 든다.
+   *
+   * 헤더는 레이아웃에 살아 페이지보다 먼저 렌더되고, 페이지 본문은 Suspense 로 늦게 흘러
+   * 들어온다. 헤더가 `me()` 를 쓰면 페이지의 `HydrationBoundary` 보다 먼저 그 key 를 캐시에
+   * 만들어 버리고, 그러면 경계는 프리페치 결과를 **effect 뒤로 미룬다** — 서버는 `/mypage` 를
+   * 데이터로, 클라이언트는 스켈레톤으로 그려 하이드레이션이 깨졌다(실측). key 를 가르면 서로의
+   * 캐시 수명을 건드리지 않는다.
+   *
+   * 값을 바꾸는 쪽은 둘 다 갱신한다 — `use-my-info.ts` 의 `setMyInfo` · `replaceMyInfo`.
+   */
+  header: () => [...memberKeys.all, 'header'] as const,
 }
 
 /**

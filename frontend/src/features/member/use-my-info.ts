@@ -1,19 +1,58 @@
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { MEMBER_QUERY_OPTIONS, memberKeys } from '@/features/member/queries'
 import { fetchMyInfo, removeProfileImage, updateMyInfo, uploadProfileImage } from '@/lib/api/member'
 import type { MemberMyInfo, MemberUpdatePayload, ProfileImageUploadResult } from '@/types/member'
 
+const myInfoQuery = {
+  queryKey: memberKeys.me(),
+  queryFn: fetchMyInfo,
+  staleTime: MEMBER_QUERY_OPTIONS.staleTime,
+  gcTime: MEMBER_QUERY_OPTIONS.gcTime,
+  retry: MEMBER_QUERY_OPTIONS.retry,
+}
+
 export function useMyInfo() {
-  return useQuery({
-    queryKey: memberKeys.me(),
-    queryFn: fetchMyInfo,
-    staleTime: MEMBER_QUERY_OPTIONS.staleTime,
-    gcTime: MEMBER_QUERY_OPTIONS.gcTime,
-    retry: MEMBER_QUERY_OPTIONS.retry,
-  })
+  return useQuery(myInfoQuery)
+}
+
+/**
+ * 전역 헤더의 내 정보 — **`memberKeys.header` 를 쓴다** (그 key 의 주석: 하이드레이션 불일치).
+ *
+ * 사진 · 닉네임이 바뀌면 `setMyInfo` · `replaceMyInfo` 가 이 사본도 함께 갈아끼우므로
+ * 마이페이지에서 올린 사진이 새로고침 없이 헤더에 뜬다. 로그인 상태에서만 부른다 —
+ * 미로그인에 401 을 내지 않는다.
+ */
+export function useHeaderMyInfo() {
+  return useQuery({ ...myInfoQuery, queryKey: memberKeys.header() })
+}
+
+/**
+ * 내 정보 **부분** 갱신 — **두 사본(`me` · `header`)을 함께** 바꾼다.
+ *
+ * 한쪽만 바꾸면 마이페이지에서 사진을 올려도 헤더는 `staleTime`(5분) 동안 옛 사진을 든다.
+ * 비어 있는 사본은 건너뛴다 — 부분 갱신은 기존 값이 있을 때만 성립한다.
+ */
+export function setMyInfo(
+  queryClient: QueryClient,
+  update: (current: MemberMyInfo) => MemberMyInfo,
+): boolean {
+  let updated = false
+  for (const queryKey of [memberKeys.me(), memberKeys.header()]) {
+    const current = queryClient.getQueryData<MemberMyInfo>(queryKey)
+    if (current === undefined) continue
+    queryClient.setQueryData<MemberMyInfo>(queryKey, update(current))
+    updated = true
+  }
+  return updated
+}
+
+/** 응답이 회원 정보 **전체**일 때 — 비어 있는 사본에도 그대로 넣는다 */
+export function replaceMyInfo(queryClient: QueryClient, member: MemberMyInfo) {
+  queryClient.setQueryData(memberKeys.me(), member)
+  queryClient.setQueryData(memberKeys.header(), member)
 }
 
 /**
@@ -28,7 +67,7 @@ export function useUpdateMyInfo() {
   return useMutation({
     mutationFn: (payload: MemberUpdatePayload) => updateMyInfo(payload),
     onSuccess: (member: MemberMyInfo) => {
-      queryClient.setQueryData(memberKeys.me(), member)
+      replaceMyInfo(queryClient, member)
     },
   })
 }
@@ -48,15 +87,13 @@ export function useUploadProfileImage() {
   return useMutation({
     mutationFn: (file: File) => uploadProfileImage(file),
     onSuccess: (result: ProfileImageUploadResult) => {
-      const current = queryClient.getQueryData<MemberMyInfo>(memberKeys.me())
-      if (current === undefined) {
-        void queryClient.invalidateQueries({ queryKey: memberKeys.me() })
-        return
-      }
-      queryClient.setQueryData<MemberMyInfo>(memberKeys.me(), {
+      const updated = setMyInfo(queryClient, (current) => ({
         ...current,
         profileImageUrl: result.profileImageUrl,
-      })
+      }))
+      if (!updated) {
+        void queryClient.invalidateQueries({ queryKey: memberKeys.all })
+      }
     },
   })
 }
@@ -68,7 +105,7 @@ export function useRemoveProfileImage() {
   return useMutation({
     mutationFn: () => removeProfileImage(),
     onSuccess: (member: MemberMyInfo) => {
-      queryClient.setQueryData(memberKeys.me(), member)
+      replaceMyInfo(queryClient, member)
     },
   })
 }

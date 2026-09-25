@@ -58,7 +58,7 @@ export function MyPetsRow({
             <PlusIcon size={20} />
           </span>
         ) : (
-          <PetAvatar name={pets[0].name} size="xl" />
+          <PetAvatar name={pets[0].name} url={pets[0].profileImageUrl} size="xl" />
         )}
 
         {/* `h3` 는 flow content 라 `span` 안에 들 수 없다 — `PetRow` 와 같이 `div` 다 */}
