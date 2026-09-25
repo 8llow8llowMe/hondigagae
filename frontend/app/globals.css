@@ -785,6 +785,54 @@ body {
 }
 
 /*
+  소개 페이지 첫 화면 리듬 — `/about` 하나에만 쓴다 (#915, 명세
+  `docs/superpowers/specs/2026-09-25-about-interactive-design.md` §4).
+
+  - `.about-split-word` — 히어로 제목 어절 등장. 지연은 컴포넌트가 인라인으로 60ms 씩 준다.
+    **시작 상태는 keyframes 의 `from` 이다** — 정적 마크업에 숨김 클래스가 없고, 감속 모션은
+    아래 전역 규칙이 한 프레임으로 줄여 끝 상태로 선다. `both` 라 지연 동안에도 `from` 에 선다.
+  - `.about-hero-fill` — 1024 이상에서 히어로가 첫 화면(헤더 아래)을 채운다. `.page-canvas` 와
+    같은 식이다.
+  - `.about-anchor` — 절 내비 · 스크롤 힌트가 가리키는 절. 헤더 높이만큼 스크롤 여백을 둔다.
+  - `.about-progress` — 1024 미만 헤더 바로 아래 진행선. `top: var(--header-h)` 를 Tailwind 로
+    쓰면 arbitrary 라 여기 둔다. `scaleX` 는 컴포넌트가 스크롤마다 준다. 헤더(`z-40`)보다 아래다.
+*/
+@keyframes about-word-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.875rem);
+  }
+}
+
+.about-split-word {
+  display: inline-block;
+  animation: about-word-in 200ms ease-out both;
+}
+
+/* 절 앵커 — 끈끈한 헤더 밑으로 절 머리가 들어가지 않게. `처음` 이 `scrollY = 0` 이 된다 */
+.about-anchor {
+  scroll-margin-top: var(--header-h);
+}
+
+@media (width >= 64rem) {
+  .about-hero-fill {
+    min-block-size: calc(100dvh - var(--header-h));
+  }
+}
+
+.about-progress {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-start: var(--header-h);
+  z-index: 30;
+  block-size: 2px;
+  background-color: var(--brand-500);
+  transform: scaleX(0);
+  transform-origin: left;
+  pointer-events: none;
+}
+
+/*
   소개 페이지 스크롤 무대 — `/about` 하나에만 쓴다 (#914, 명세
   `docs/superpowers/specs/2026-09-25-about-interactive-design.md` §3).
 
@@ -1001,6 +1049,11 @@ body {
     transition-duration: 0.01ms !important;
     /* 소개 페이지 예시가 인라인 transitionDelay 800/820ms 를 쓴다 — 지연을 안 끄면 끝 상태가 늦게 뜬다 (#635) */
     transition-delay: 0s !important;
+    /*
+      소개 페이지 제목 어절이 인라인 animationDelay 0–420ms 를 쓰고 `both` 로 채운다 (#915).
+      길이만 줄이면 지연 동안 `from`(투명)에 머물러 어절이 60ms 간격으로 하나씩 튀어나온다.
+    */
+    animation-delay: 0s !important;
     scroll-behavior: auto !important;
   }
 }

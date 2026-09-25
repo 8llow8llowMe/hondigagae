@@ -26,18 +26,25 @@ const TONE: Record<IntroBandTone, string> = {
  * 그린 밴드(`brand`)의 글자는 `--fg-inverse`(6.91:1). 안의 링크·버튼은 `inverse` 변형을 쓴다.
  */
 export function IntroBand({
+  id,
   tone,
   labelledBy,
   className,
   children,
 }: {
+  /** 절 내비 · 스크롤 힌트의 앵커 (#915). 주면 헤더 높이만큼 스크롤 여백(`.about-anchor`)이 붙는다 */
+  id?: string
   tone: IntroBandTone
   labelledBy: string
   className?: string
   children: ReactNode
 }) {
   return (
-    <section aria-labelledby={labelledBy} className={cn('w-full', TONE[tone])}>
+    <section
+      id={id}
+      aria-labelledby={labelledBy}
+      className={cn('w-full', id !== undefined && 'about-anchor', TONE[tone])}
+    >
       <div
         className={cn('mx-auto w-full max-w-6xl px-4 py-10 md:px-6 md:py-16 lg:px-10', className)}
       >

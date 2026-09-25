@@ -17,11 +17,16 @@ import {
 import { CongestionSpecimen } from '@/features/about/congestion-specimen'
 import { EmergencySpecimen } from '@/features/about/emergency-specimen'
 import { GoldenCurveSpecimen } from '@/features/about/golden-curve-specimen'
+import { HeroParallax, ScrollCue } from '@/features/about/hero-parallax'
 import { IntroBand } from '@/features/about/intro-band'
 import { PlacesSpecimen } from '@/features/about/places-specimen'
 import { PlanSpecimen } from '@/features/about/plan-specimen'
 import { Reveal } from '@/features/about/reveal'
+import { ScaleCount } from '@/features/about/scale-count'
+import { ScrollProgressBar } from '@/features/about/scroll-progress-bar'
 import { ScrollStage, ScrollStagePoint } from '@/features/about/scroll-stage'
+import { SectionNav } from '@/features/about/section-nav'
+import { SplitHeading } from '@/features/about/split-heading'
 import { Tag } from '@/features/about/tag'
 import { VerdictSpecimen } from '@/features/about/verdict-specimen'
 import { LEGAL_LINKS } from '@/lib/legal/links'
@@ -69,11 +74,30 @@ export function AboutView() {
 
   return (
     <>
+      {/*
+        첫 화면 리듬 (#915) — 진행선(1024 미만) · 절 내비(1280 이상)는 고정 요소라 어느 밴드에도
+        속하지 않는다. 절 내비 라벨은 각 절의 제목(h2)을 그대로 읽는다 — 표지어(`질문 1` ·
+        `그리고`)는 링크 이름으로 가는 곳을 말하지 못한다(WCAG 2.4.4).
+      */}
+      <ScrollProgressBar />
+      <SectionNav
+        label={about.nav.label}
+        items={[
+          { id: SECTION_ID.hero, label: about.nav.top },
+          { id: SECTION_ID.q1, label: about.q1.heading },
+          { id: SECTION_ID.q2, label: about.q2.heading },
+          { id: SECTION_ID.q3, label: about.q3.heading },
+          { id: SECTION_ID.q4, label: about.q4.heading },
+          { id: SECTION_ID.data, label: about.data.heading },
+        ]}
+      />
+
       {/* ── 1. 히어로 ── */}
       <IntroBand
+        id={SECTION_ID.hero}
         tone="brand"
         labelledBy="about-hero-heading"
-        className="grid gap-8 lg:grid-cols-12 lg:items-center lg:gap-16"
+        className="about-hero-fill grid gap-8 lg:grid-cols-12 lg:items-center lg:gap-16"
       >
         <div className="lg:col-span-7">
           {/*
@@ -93,12 +117,11 @@ export function AboutView() {
             <span aria-hidden className="bg-fg-inverse inline-block size-1.5 rounded-full" />
             {about.hero.eyebrow}
           </p>
-          <h1
+          <SplitHeading
             id="about-hero-heading"
+            text={about.hero.heading}
             className="text-display md:text-page mt-3 font-extrabold break-keep"
-          >
-            {about.hero.heading}
-          </h1>
+          />
           <p className="text-body-1 mt-4 max-w-2xl font-normal break-keep opacity-90">
             {about.hero.sub}
           </p>
@@ -110,15 +133,18 @@ export function AboutView() {
               {about.hero.ctaSecondary}
             </ButtonLink>
           </div>
+          <ScrollCue href={`#${SECTION_ID.q1}`}>{about.hero.scrollCue}</ScrollCue>
         </div>
         {/* 예시는 자기 열을 갖는다 — `VerdictSpecimen` 이 grid 아이템이면 열 폭을 알 수 없다 */}
         <div className="lg:col-span-5">
-          <VerdictSpecimen />
+          <HeroParallax>
+            <VerdictSpecimen />
+          </HeroParallax>
         </div>
       </IntroBand>
 
       {/* ── 2. 데려가도 돼요? ── */}
-      <IntroBand tone="plain" labelledBy="about-q1-heading">
+      <IntroBand tone="plain" id={SECTION_ID.q1} labelledBy="about-q1-heading">
         <ScrollStage
           count={about.q1.points.length}
           {...STAGE_GRID}
@@ -139,7 +165,7 @@ export function AboutView() {
       </IntroBand>
 
       {/* ── 3. 지금 나가도 돼요? ── */}
-      <IntroBand tone="tint" labelledBy="about-q2-heading">
+      <IntroBand tone="tint" id={SECTION_ID.q2} labelledBy="about-q2-heading">
         <ScrollStage
           count={about.q2.points.length}
           {...STAGE_GRID}
@@ -160,7 +186,7 @@ export function AboutView() {
       </IntroBand>
 
       {/* ── 4. 오늘 어디 가요? ── */}
-      <IntroBand tone="plain" labelledBy="about-q3-heading">
+      <IntroBand tone="plain" id={SECTION_ID.q3} labelledBy="about-q3-heading">
         <QuestionCopy
           id="about-q3-heading"
           kicker={about.q3.kicker}
@@ -234,7 +260,7 @@ export function AboutView() {
       </IntroBand>
 
       {/* ── 5. 위급하면? ── */}
-      <IntroBand tone="tint" labelledBy="about-q4-heading">
+      <IntroBand tone="tint" id={SECTION_ID.q4} labelledBy="about-q4-heading">
         <ScrollStage
           count={about.q4.points.length}
           {...STAGE_GRID}
@@ -255,7 +281,7 @@ export function AboutView() {
       </IntroBand>
 
       {/* ── 6. 무엇을 보고 판단하나요 (+ 7. 알아두실 점) ── */}
-      <IntroBand tone="plain" labelledBy="about-data-heading">
+      <IntroBand tone="plain" id={SECTION_ID.data} labelledBy="about-data-heading">
         <QuestionCopy
           id="about-data-heading"
           kicker={about.data.kicker}
@@ -396,6 +422,19 @@ export function AboutView() {
     </>
   )
 }
+
+/**
+ * 절 앵커 id — 절 내비 · 스크롤 힌트가 가리킨다 (#915). 제목 id(`about-*-heading`)와 따로
+ * 두는 이유: 앵커로 이동하면 절 **맨 위**가 와야 하는데 제목 id 로 가면 표지어가 잘린다.
+ */
+const SECTION_ID = {
+  hero: 'about-hero',
+  q1: 'about-q1',
+  q2: 'about-q2',
+  q3: 'about-q3',
+  q4: 'about-q4',
+  data: 'about-data',
+} as const
 
 /**
  * 무대 절의 12열 배치 — 카피 5 : 예시 7 (머리 주석의 "2단 배치는 12열 그리드" 그대로).
@@ -546,7 +585,7 @@ function ScaleTile({ value, label, delay = 0 }: { value: number; label: string; 
   return (
     <Reveal delay={delay} className="bg-intro-tint rounded-lg p-4">
       <p className="text-display md:text-page text-fg font-black tabular-nums">
-        {value}
+        <ScaleCount value={value} />
         {/* 단위는 2px 이 아니라 스케일 안의 4(`ml-1`)로 띄운다 — DESIGN.md §4 */}
         <span className="text-body-2 text-fg-muted ml-1 font-semibold">
           {messages.about.data.scaleUnit}
