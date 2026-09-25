@@ -111,6 +111,7 @@
 | 규모 타일 · 아이콘 배경 | `--intro-tint`                                                                                       | 혼잡 막대 `--congestion-*` · 영업 상태 `--status-open-*` 그대로 |
 | 히어로 락업             | `(auth)` 셸 크기(심볼 48 · 워드마크 40×148), 심볼은 `tone="inverse"`(흰 사각 + `--brand-700` 발바닥) | 헤더 24px 은 그대로. 심볼을 등급 색으로 칠하지 않는다           |
 | 그린 면 위 버튼         | `Button` 변형 `inverse` · `inverseOutline`                                                           | `className` 으로 외형을 덮지 않는다                             |
+| 캐릭터 일러스트         | 히어로 · 질문 2 · 마무리 세 자리, 카드 밖(카드 윗변 · 절 끝선에 발을 댄다) (#917)                    | 등급 색을 칠하지 않는다 · 반복 없음 · 다른 화면은 쓰지 않는다   |
 
 **토큰 둘은 새 색이 아니다.** `--intro-band #F0F7F3` = `--row-selected`,
 `--intro-tint #E4F0EA` = `--metric-high-100`. 값이 같아도 이름을 분리하는 것은 §2-3 #598
@@ -122,7 +123,13 @@
 
 **그림자는 여기서도 없다.** 그린 면 위의 흰 카드는 그림자 없이 충분히 갈린다.
 
-정본: `docs/superpowers/specs/2026-09-15-about-landing-design.md` §6.
+**캐릭터는 장식이 아니라 그 절의 문장을 연기한다** (#917). 히어로는 판정 카드를 올려다보고,
+질문 2 는 곡선 카드 윗변 위에서 단계 · 시각 핸들에 따라 목줄 산책 · 서기 · 앞발(+ 열기 선)로
+바뀌고, 마무리는 정면으로 앉는다. 개 몸은 늘 크림색이고 빨강은 열기 선에만, 초록은 귀 · 코 ·
+목줄에만 있다. 에셋은 `public/illustrations/about/*.png` — SVG 벡터화는 후속이다.
+
+정본: `docs/superpowers/specs/2026-09-15-about-landing-design.md` §6 ·
+`docs/superpowers/specs/2026-09-25-about-interactive-design.md` §6(캐릭터).
 
 ### 0-3. `Surface tone="brand"` — 시간이 정한 진입점 (2026-09-18, #732)
 
