@@ -212,6 +212,169 @@ describe('AboutView — 스크롤 무대 (#914)', () => {
   })
 })
 
+/**
+ * 절 하나 — 다음 **절 밴드**(`<section id="about-…`) 전까지. 그냥 `<section` 으로 끊으면 예시 카드
+ * (`Surface` 도 `section` 이다)에서 잘린다.
+ */
+const band = (headingId: string) => {
+  const start = markup.indexOf(`aria-labelledby="${headingId}"`)
+  const next = markup.indexOf('<section id="about-', start + 1)
+  return markup.slice(start, next === -1 ? undefined : next)
+}
+
+describe('AboutView — 무대 항목 · 맥락 줄 · 바로가기 (#940)', () => {
+  const section = band
+  const staged = [
+    ['about-q1-heading', messages.about.q1],
+    ['about-q2-heading', messages.about.q2],
+    ['about-q4-heading', messages.about.q4],
+  ] as const
+
+  it('항목 문장은 행 제목 등급이다 — 14px · 400 이 58vh 칸 안에서 각주처럼 읽혔다', () => {
+    const texts = markup.match(/<p class="about-stage-text [^"]*"/g) ?? []
+    expect(texts.length).toBe(10)
+    for (const text of texts) {
+      const cls = text.split('"')[1]?.split(' ') ?? []
+      expect(cls).toEqual(
+        expect.arrayContaining(['text-body-1', 'lg:text-title-2', 'font-semibold']),
+      )
+      expect(cls).not.toContain('text-body-2')
+    }
+  })
+
+  it('번호 칸의 기본 모양은 켜진 모양(채움)이다 — 정적 렌더 · 감속 모션이 끝 상태를 본다', () => {
+    const marks = markup.match(/<span aria-hidden="true" class="about-stage-mark [^"]*"/g) ?? []
+    expect(marks.length).toBe(10)
+    for (const mark of marks) {
+      const cls = mark.split('class="')[1]?.replace('"', '').split(' ') ?? []
+      expect(cls).toEqual(expect.arrayContaining(['bg-brand-700', 'text-fg-inverse']))
+      // body-2 의 weight 는 400 · 600 뿐이다 (DESIGN §3-1)
+      expect(cls).toContain('font-semibold')
+      expect(cls).not.toContain('font-bold')
+    }
+  })
+
+  it('번호 칸이 항목 번호를 적는다 — 오른쪽 예시의 몇 번째 상태인지 (목록은 ol)', () => {
+    for (const [id, copy] of staged) {
+      const marks = [...section(id).matchAll(/class="about-stage-mark [^"]*">(\d+)</g)].map(
+        (match) => Number(match[1]),
+      )
+      expect(marks, id).toEqual(copy.points.map((_, index) => index + 1))
+      expect(section(id), id).toMatch(
+        /<ol class="mt-5 grid gap-3"><li class="[^"]*about-stage-point/,
+      )
+    }
+  })
+
+  it('맥락 줄이 무대마다 하나다 — 표지어 · 제목은 aria-hidden, 바로가기는 절 링크', () => {
+    expect(markup.match(/<div class="about-stage-context">/g)).toHaveLength(staged.length)
+    for (const [id, copy] of staged) {
+      const contexts = [
+        ...section(id).matchAll(/<div class="about-stage-context">([\s\S]*?)<\/a><\/div>/g),
+      ]
+      expect(contexts, id).toHaveLength(1)
+      const html = contexts[0]?.[1] ?? ''
+      expect(html).toMatch(/<p aria-hidden="true" class="about-stage-context-title /)
+      expect(html).toContain(`<span class="text-link">${copy.kicker}</span> · ${copy.heading}`)
+      expect(html).toContain(copy.link)
+    }
+  })
+
+  it('무대 절의 항목 아래 바로가기는 1024 이상에서 숨는다 — 같은 링크가 두 번 읽히지 않는다', () => {
+    for (const [id, copy] of staged) {
+      const links = [...section(id).matchAll(/<a class="([^"]*)" href="[^"]*">([^<]*)/g)].filter(
+        (match) => match[2]?.trim() === copy.link,
+      )
+      expect(links, id).toHaveLength(2)
+      const bottom = links.filter((match) => match[1]?.split(' ').includes('lg:hidden'))
+      expect(bottom, id).toHaveLength(1)
+    }
+  })
+
+  it('바로가기는 문장과 같은 등급(text-body-1)이다 — 설명보다 작지 않다', () => {
+    const links = markup.match(/<a class="text-body-1 text-link [^"]*min-h-11[^"]*"/g) ?? []
+    // 무대 셋 × 2(맥락 줄 · 항목 아래) + 질문 3 하나
+    expect(links.length).toBe(7)
+    expect(markup).not.toMatch(/<a class="text-body-2 text-link /)
+  })
+
+  it('질문 2 는 캐릭터 자리(about-pose-room)가 예시 덩어리에 붙는다 — 카피 열 꼬리는 없다', () => {
+    expect(section('about-q2-heading')).toMatch(/<div class="about-stage-frame about-pose-room">/)
+    expect(markup).not.toContain('about-pose-tail')
+  })
+})
+
+describe('AboutView — 질문 3 목록 + 예시 하나 (#940)', () => {
+  const q3 = band('about-q3-heading')
+  /* 이 절의 탭 목록만 — AI 일정 예시가 자기 일자 탭 목록(`PlanSpecimen`)을 따로 갖는다 */
+  const listStart = q3.indexOf(`role="tablist" aria-label="${messages.about.q3.tablistLabel}"`)
+  const tablist = q3.slice(listStart, q3.indexOf('</button></div>', listStart) + '</button>'.length)
+  const panels = q3.match(/<div role="tabpanel"[^>]*class="about-tab-panel[^>]*>/g) ?? []
+  const cards = messages.about.q3.cards
+  const titles = [cards.suitability, cards.congestion, cards.aiPlan, cards.indoor].map(
+    (card) => card.title,
+  )
+
+  it('탭 목록 하나에 탭 넷 · 패널 넷이다', () => {
+    expect(listStart).toBeGreaterThan(0)
+    expect(tablist.match(/role="tab"/g)).toHaveLength(4)
+    expect(panels).toHaveLength(4)
+  })
+
+  it('정적 렌더는 첫 항목이 골라져 있다 — 고른 탭만 탭 순서에 선다', () => {
+    const tabs = tablist.match(/<button [^>]*role="tab"[^>]*>/g) ?? []
+    expect(tabs.map((tab) => tab.includes('aria-selected="true"'))).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ])
+    expect(tabs.map((tab) => tab.match(/tabindex="(-?\d)"/)?.[1])).toEqual(['0', '-1', '-1', '-1'])
+    expect(panels.map((panel) => /\bis-selected\b/.test(panel))).toEqual([
+      true,
+      false,
+      false,
+      false,
+    ])
+  })
+
+  it('탭과 패널이 서로를 가리킨다', () => {
+    const tabs = [
+      ...tablist.matchAll(/id="([^"]+)" aria-selected="[^"]+" aria-controls="([^"]+)"/g),
+    ]
+    expect(tabs).toHaveLength(4)
+    for (const [, tabId, panelId] of tabs) {
+      expect(q3).toContain(`id="${panelId}" aria-labelledby="${tabId}"`)
+    }
+  })
+
+  it('탭 이름은 제목이다 — 설명은 aria-hidden 이고 패널 머리가 읽는다', () => {
+    /* 버튼마다 본다 — 절 전체로 보면 패널 머리의 같은 제목에 속아 통과한다 */
+    const buttons = tablist.match(/<button [^>]*role="tab"[^>]*>[\s\S]*?<\/button>/g) ?? []
+    expect(buttons).toHaveLength(titles.length)
+    buttons.forEach((button, index) => {
+      const label = button.replace(/<span aria-hidden="true"[^>]*>[^<]*<\/span>/g, '')
+      expect(label.replace(/<[^>]+>/g, ''), titles[index]).toContain(titles[index] ?? '')
+    })
+    const descs = q3.match(/<span aria-hidden="true" class="text-body-2 text-fg-muted mt-1 hidden/g)
+    expect(descs).toHaveLength(4)
+    expect(q3.match(/<div class="pt-4 lg:sr-only/g)).toHaveLength(4)
+  })
+
+  it('네 예시의 내용이 처음부터 DOM 에 있다 — 숨은 패널도 렌더된다', () => {
+    expect(q3).toContain(messages.about.specimen.suitabilityGrade)
+    expect(q3).toContain(`aria-label="${messages.about.specimen.congestionAria}"`)
+    expect(q3).toContain(messages.about.specimen.planRegenerate)
+    expect(q3).toContain(messages.about.specimen.indoorTitle)
+  })
+
+  it('1024 이상에서 절이 헤더 아래 한 화면을 채운다 (about-q3-fill)', () => {
+    expect(q3).toMatch(
+      /^aria-labelledby="about-q3-heading"[^>]*><div class="[^"]*\babout-q3-fill\b/,
+    )
+  })
+})
+
 describe('AboutView — 자리', () => {
   it('카드 안쪽 인셋을 INSET_CLASS.card 로 참조한다', () => {
     const source = readSourceWithoutComments('src/features/about/about-view.tsx')

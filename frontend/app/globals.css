@@ -879,25 +879,62 @@ body {
   transition: none;
 }
 
+/*
+  항목 — 단계 번호 칸 · 문장 (#940). 1024 이상에서는 번호끼리 선으로 잇는다.
+
+  **기본 모양이 끝 상태다** — 번호 칸은 채워져 있고(컴포넌트 유틸리티) 선도 브랜드색이다. 정적
+  렌더 · 감속 모션 · JS 실패는 전부 켜진 모양을 본다. 재기가 걸리면(`is-live`) 셋으로 갈린다:
+  지금 항목은 채운 칸 그대로, 지나온 항목은 브랜드 테두리 칸(`is-past`), 아직 안 온 항목은 회색
+  테두리 칸(`:not(.is-on)`). 지금 항목을 고리 그림자로 두르던 처음 안은 연녹 밴드 위에서 대비
+  1.08:1 로 사라졌고 그림자를 뜨지 않은 것에 쓰게 됐다(DESIGN.md §6) — 채움 · 테두리만으로 가른다.
+
+  **흐림은 불투명도가 아니라 글자색이다.** 예전에는 꺼진 항목에 `opacity: .3` 을 곱해 얇은 14px
+  문장의 대비가 약 2:1 까지 떨어졌다. 읽는 문장이라 `--fg-muted` 까지만 낮춘다 — `--fg-subtle` 은
+  읽는 텍스트에 쓰지 않는다(DESIGN.md §2-2, 연녹 밴드 위 3.07:1).
+  **1024 미만은 흐리지 않는다** — 예시가 옆이 아니라 아래에 있어서 흐린 문장이 가리킬 그림이 없다.
+*/
 .about-stage-point {
-  transition: opacity 200ms ease-out;
+  position: relative;
 }
 
-.about-stage.is-live .about-stage-point:not(.is-on) {
-  opacity: 0.45;
+.about-stage-mark {
+  position: relative;
+  z-index: 1;
+  transition:
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    color 150ms ease-out;
 }
 
-.about-stage-mark,
-.about-stage-mark > span {
-  transition: background-color 150ms ease-out;
+.about-stage-text {
+  transition: color 150ms ease-out;
 }
 
-.about-stage.is-live .about-stage-point.is-on .about-stage-mark {
-  background-color: var(--brand-700);
+.about-stage.is-live .about-stage-point.is-past .about-stage-mark {
+  background-color: var(--bg);
+  color: var(--brand-700);
 }
 
-.about-stage.is-live .about-stage-point.is-on .about-stage-mark > span {
-  background-color: var(--fg-inverse);
+.about-stage.is-live .about-stage-point:not(.is-on) .about-stage-mark {
+  border-color: var(--border-strong);
+  background-color: var(--bg);
+  color: var(--fg-muted);
+}
+
+/* 맥락 줄 — 1024 이상만. 제목은 절 제목이 헤더 밑으로 사라진 뒤에 드러난다 */
+.about-stage-context {
+  display: none;
+}
+
+.about-stage-context-title {
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out;
+}
+
+.about-stage.is-live:not(.is-heading-gone) .about-stage-context-title {
+  opacity: 0;
+  transform: translateY(0.25rem);
 }
 
 @media (width >= 64rem) {
@@ -907,14 +944,74 @@ body {
     align-items: center;
   }
 
-  .about-stage.is-live .about-stage-point:not(.is-on) {
-    opacity: 0.3;
+  .about-stage.is-live .about-stage-point:not(.is-on) .about-stage-text {
+    color: var(--fg-muted);
   }
 
+  /* 번호를 잇는 선 — 이 번호 칸 가운데에서 다음 번호 칸 가운데까지(항목 사이 틈 `gap-3` 포함) */
+  .about-stage-point:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    inset-inline-start: calc(1rem - 1px);
+    inset-block-start: 50%;
+    inline-size: 2px;
+    block-size: calc(100% + 0.75rem);
+    background-color: var(--brand-700);
+    transition: background-color 150ms ease-out;
+  }
+
+  /* 지나오지 않은 구간(지금 항목부터 아래)은 회색 — 재기가 걸렸을 때만 */
+  .about-stage.is-live .about-stage-point:not(.is-past)::after {
+    background-color: var(--border);
+  }
+
+  /*
+    꼬리 여백 — 마지막 항목의 중심이 기준선에 닿는 바로 그 순간 무대 끝이 화면 바닥에 닿게 한다.
+    기준선에서 화면 바닥까지는 틀 높이의 절반(50dvh − 헤더/2)이고, 마지막 항목 중심 아래에는
+    이미 칸의 절반(29vh)이 있다. 그 차이만큼 더한다. 그래서 마지막 항목이 켜진 다음 스크롤부터
+    문장과 예시가 함께 올라간다 — 예전에는 켜진 뒤 화면의 20% 를 더 내려야 예시가 풀렸다.
+  */
+  .about-stage-copy {
+    padding-block-end: calc(50dvh - 29vh - var(--header-h) / 2);
+  }
+
+  /*
+    예시 열 — 헤더 아래 화면 높이의 sticky 틀. 예시 덩어리(`.about-stage-frame`)는 그 안에서
+    세로 가운데에 선다. `justify-content: center` 가 아니라 auto 여백인 이유: 창이 덩어리보다
+    낮으면 위가 잘리지 않고 아래로 넘친다(캐릭터 머리가 헤더 밑으로 들어가지 않는다).
+  */
   .about-stage-visual {
     position: sticky;
-    inset-block-start: calc(var(--header-h) + 1.5rem);
+    inset-block-start: var(--header-h);
     align-self: start;
+    display: flex;
+    flex-direction: column;
+    block-size: calc(100dvh - var(--header-h));
+  }
+
+  /*
+    덩어리 폭은 560 까지 — 7열(1280 에서 약 610)을 카드가 다 채우면 행 사이가 휑하다. 위 여백
+    52 는 맥락 줄(44 + 틈 8) 자리이고, **아래에도 같은 52 를 둔다** — 덩어리가 가운데 서면 카드
+    중심이 곧 틀 중심 = 기준선이 된다(질문 1 · 위급). 질문 2 는 캐릭터 자리(`.about-pose-room`)가
+    위 여백을 덮고 아래 여백을 걷어, 개 + 카드 덩어리의 중심이 기준선에 온다(캐릭터 블록).
+  */
+  .about-stage-frame {
+    inline-size: 100%;
+    max-inline-size: 35rem;
+    margin: auto;
+    padding-block: 3.25rem;
+  }
+
+  .about-stage-context {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    column-gap: 1rem;
+    padding-block-end: 0.5rem;
   }
 }
 
@@ -1085,7 +1182,7 @@ body {
     카드 **아래** 왼쪽에 앉는다(카드 모서리에 겹치면 캡션 · 이유 줄을 가린다) —
     `.about-hero-dog-room` 이 그 자리를 연다. 개 높이 = 폭 × 836/691.
   - `.about-pose*` — 질문 2 자세 스택. 폭 변수 `--about-pose-w` 하나로 세 장 · 열기 선 · 위
-    여백(`-room`, 예시 열) · 아래 여백(`-tail`, 카피 열)이 같이 움직인다. 높이 .87W 는 가장
+    여백(`-room`, 무대 예시 덩어리 `.about-stage-frame`)이 같이 움직인다. 높이 .87W 는 가장
     높은 장(산책)의 비율이다.
   - `.about-cta-dog` — 마무리. 1024 이상 그리드 자리는 컴포넌트가 준다(`lg:col-start-8` 등).
 */
@@ -1124,8 +1221,7 @@ body {
   }
 }
 
-.about-pose-room,
-.about-pose-tail {
+.about-pose-room {
   --about-pose-w: 9.375rem;
 }
 
@@ -1134,18 +1230,37 @@ body {
 }
 
 @media (width >= 64rem) {
-  .about-pose-room,
-  .about-pose-tail {
+  /* 개 + 카드가 한 덩어리라 무대 틀의 아래 여백(맥락 줄 짝)을 걷는다 — 덩어리 중심이 기준선에 온다 */
+  .about-pose-room {
     --about-pose-w: 12.25rem;
+
+    padding-block-end: 0;
   }
 
   /*
-    무대의 sticky 예시는 그리드 끝에서 밀려 올라간다. 자세 자리만큼 예시가 길어지면 마지막
-    단계(앞발 · 특보)에서 그만큼 일찍 밀려 개 머리가 헤더 밑으로 들어간다(1280×800 실측 62px).
-    카피 열 끝에 같은 높이를 더해 카드가 #917 이전과 똑같이 오래 붙어 있게 한다.
+    자세 자리 안의 맥락 줄 (#940) — 캐릭터는 카드 윗변 오른쪽에 서므로 맥락 줄은 그 왼쪽에
+    제목 · 바로가기를 두 줄로 쌓는다. 오른쪽 여백 = 캐릭터 폭 + 캐릭터 오른쪽 인셋(1.25rem) + 틈.
+
+    예전의 카피 열 꼬리(`.about-pose-tail`)는 지웠다. sticky 틀이 헤더 아래 화면 높이가 되며
+    예시 높이와 상관없이 무대 끝에서 풀리고, 덩어리가 틀 안 가운데라 개 머리가 헤더 밑으로
+    들어가지 않는다.
   */
-  .about-pose-tail {
-    padding-block-end: calc(var(--about-pose-w) * 0.87);
+  .about-pose-room .about-stage-context {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-end;
+    padding-inline-end: calc(var(--about-pose-w) + 2.25rem);
+  }
+}
+
+/*
+  낮은 창의 자세 자리 (#940) — 곡선 카드 덩어리(자세 자리 170 + 카드 483)가 약 653 이라, 헤더를
+  뺀 화면이 그보다 낮으면(1024×700 실측 636) 고정된 동안 카드 아래 캡션이 17px 잘린다. 창 높이
+  720 미만에서는 모바일 크기(9.375rem → 자리 130)로 줄여 덩어리를 약 613 으로 맞춘다.
+*/
+@media (width >= 64rem) and (height < 45rem) {
+  .about-pose-room {
+    --about-pose-w: 9.375rem;
   }
 }
 
@@ -1255,6 +1370,47 @@ body {
     */
     animation-delay: 0s !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/*
+  소개 페이지 질문 3 — 네 항목 목록 + 예시 하나 (#940, `features/about/feature-tabs.tsx` ·
+  명세 `docs/superpowers/specs/2026-09-25-about-interactive-design.md` §3-5).
+
+  - `.about-tab-panel` — 고른 패널만 선다. 나머지는 `display: none` 이라 숨은 패널 안 버튼은
+    포커스를 받지 않고, 고른 패널은 200 동안 떠오른다(DESIGN.md §8). **패널을 한 칸에 겹치지
+    않는다** — 처음 안은 겹쳐서 카드 높이를 가장 긴 패널(AI 일정)에 묶었는데, 짧은 패널(여행
+    적합도)에서 카드 아래 절반이 비었다(1280×800 실측). 카드는 1024 이상에서 왼쪽 열(머리 · 목록 ·
+    링크)과 세로 가운데에 서고(`lg:self-center`) 가장 긴 패널도 왼쪽 열보다 짧아, 높이가 바뀌어도
+    절 높이는 그대로다.
+  - `.about-q3-fill` — 1024 이상에서 절이 헤더 아래 한 화면을 채우고 내용을 세로 가운데에
+    세운다. 무대 둘을 지나 이 절에 오면 한 화면이 딱 이 절이라 "멈춰서 눌러 보는 곳" 이 된다.
+    `min` 이라 창이 낮으면 잘리지 않고 늘어난다. 히어로(`.about-hero-fill`)와 같은 높이 식이다.
+
+  감속 모션은 위 전역 규칙이 전환을 한 프레임으로 줄인다 — 이 블록이 그 뒤에 있어도
+  `!important` 라 진다.
+*/
+@keyframes about-tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.375rem);
+  }
+}
+
+.about-tab-panel:not(.is-selected) {
+  display: none;
+}
+
+.about-tab-panel.is-selected {
+  animation: about-tab-in 200ms ease-out both;
+}
+
+@media (width >= 64rem) {
+  .about-q3-fill {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-block-size: calc(100dvh - var(--header-h));
   }
 }
 

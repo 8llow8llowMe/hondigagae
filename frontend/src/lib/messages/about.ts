@@ -177,6 +177,8 @@ export const aboutMessages = {
     kicker: '질문 3',
     heading: '오늘 어디 가요?',
     lead: '점수만 주지 않아요. 왜 그런지 이유를 함께 보여 줘요.',
+    /** 네 항목 목록의 이름 (#940) — 탭 목록은 화면에 제목이 없어 스크린리더가 이 이름으로 부른다 */
+    tablistLabel: '기능 예시 네 가지',
     cards: {
       suitability: {
         title: '여행 적합도',
