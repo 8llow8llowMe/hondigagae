@@ -19,6 +19,12 @@
 
 **`type` 을 외형 prop으로 쓰지 않는 이유**: `<button type="submit">` 과 충돌한다.
 
+**`character` 는 `leading` / `trailing` 의 예외다** (#939). `EmptyState` · `Banner` 가 받는 캐릭터
+prop 은 `ReactNode` 슬롯이 아니라 **자세 유니온**(`StateCharacterPose`)이다 — 아무 그림이나 넣는
+칸을 열면 DESIGN.md §0-5 의 허용 자리 · 자세 제한이 호출부마다 풀린다. `Banner.leading` 을 쓰지
+않는 이유는 그 칸이 `text-danger-500` 을 두른 위급 아이콘 자리라서다 — 캐릭터가 들어가면 상시
+진입점이 병원 배너와 같은 모양이 된다.
+
 ## 2. variant / size 표준 집합
 
 **새 값을 임의로 추가하지 않는다.** 추가는 `DESIGN.md` 갱신과 함께 한다.
@@ -353,12 +359,13 @@ function resolveTone() { ... }
 | 컴포넌트     | prop                                                  | 재시도 버튼   |
 | ------------ | ----------------------------------------------------- | ------------- |
 | `Skeleton`   | `count?`, `variant?: 'text' \| 'card' \| 'thumbnail'` | —             |
-| `EmptyState` | `title`, `description?`, `action?`                    | **슬롯 없음** |
+| `EmptyState` | `title`, `description?`, `action?`, `character?`      | **슬롯 없음** |
 | `ErrorState` | `title`, `description?`, `onRetry` (**필수**)         | 필수          |
 
 - `EmptyState` 에 `onRetry` prop을 추가하자는 요청은 거절한다. 404에 재시도 버튼을 붙이는 경로가 열린다 (`api-integration-guide.md` §3).
 - `ErrorState` 의 `onRetry` 는 **필수 prop**이다. optional로 두면 빠진다.
 - `EmptyState.action` 은 재시도가 아니라 **다음 행동**이다 (예: "다른 지역 선택하기").
+- `EmptyState.character` 는 DESIGN.md §0-5 표의 자리만 넘긴다 — `src/components/character.test.ts` 가 호출부를 목록과 대조한다. 필터 결과 0건에는 넘기지 않는다.
 
 ## 11. 체크리스트
 
