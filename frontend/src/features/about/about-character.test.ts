@@ -126,16 +126,71 @@ describe('자세 표 (명세 §6-3)', () => {
   })
 })
 
-describe('에셋 표', () => {
-  /** PNG 는 8바이트 서명 뒤 IHDR 청크의 폭 · 높이(빅엔디언 4바이트씩)로 시작한다 */
-  const pngSize = (src: string) => {
-    const bytes = readFileSync(path.join(process.cwd(), 'public', src))
-    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) }
-  }
+describe('에셋 (#930 — SVG)', () => {
+  const read = (src: string) => readFileSync(path.join(process.cwd(), 'public', src), 'utf8')
+  const colors = (svg: string) =>
+    new Set(svg.match(/#[0-9a-f]{6}\b/gi)?.map((hex) => hex.toLowerCase()))
 
-  it('width/height 가 실제 파일 치수와 같다', () => {
+  /**
+   * 기존 일러스트(`public/illustrations/*.svg`)에 이미 있는 값 · 토큰 값만 쓴다 — 새 색을 만들지
+   * 않는다. 크림 `#f2e6c9` · 황갈 `#d4b487` 은 일러스트 값, 초록 `#1d6646` = `--brand-700`,
+   * 눈 `#15181d` = `--fg`, 열기 선 `#d54040` = 곡선의 노면 선(`--metric-critical-500`).
+   */
+  const DOG_COLORS = ['#f2e6c9', '#d4b487', '#1d6646', '#15181d']
+  const HEAT = '#d54040'
+
+  it('width/height 가 파일의 viewBox 와 같다', () => {
     for (const [name, asset] of Object.entries(CHARACTER)) {
-      expect(pngSize(asset.src), name).toEqual({ width: asset.width, height: asset.height })
+      expect(asset.src, name).toMatch(/\.svg$/)
+      const viewBox = read(asset.src).match(/viewBox="0 0 (\d+) (\d+)"/)
+      expect(viewBox, name).not.toBeNull()
+      expect({ width: Number(viewBox?.[1]), height: Number(viewBox?.[2]) }, name).toEqual({
+        width: asset.width,
+        height: asset.height,
+      })
+    }
+  })
+
+  it('개 몸은 네 색뿐이고 등급 색(열기 선 빨강)이 없다 — 색 6가지 이하', () => {
+    for (const [name, asset] of Object.entries(CHARACTER)) {
+      if (name === 'heatLines') continue
+      const used = colors(read(asset.src))
+      expect(
+        [...used].every((hex) => DOG_COLORS.includes(hex)),
+        `${name}: ${[...used].join(' ')}`,
+      ).toBe(true)
+      expect(used.has(HEAT), name).toBe(false)
+    }
+  })
+
+  it('개 도형은 전부 허용 색으로 칠한다 — fill 이 빠진 path(기본 검정)가 없다', () => {
+    for (const [name, asset] of Object.entries(CHARACTER)) {
+      if (name === 'heatLines') continue
+      const paths = read(asset.src).match(/<path [^>]*>/g) ?? []
+      expect(paths.length, name).toBeGreaterThan(0)
+      for (const tag of paths) {
+        expect(DOG_COLORS.includes(tag.match(/fill="(#[0-9a-f]{6})"/)?.[1] ?? ''), name).toBe(true)
+      }
+    }
+  })
+
+  it('빨강은 열기 선에만 있다', () => {
+    expect([...colors(read(CHARACTER.heatLines.src))]).toEqual([HEAT])
+  })
+
+  it('외곽선 · 그라디언트가 없다 — 선은 열기 선의 모양 자체뿐이다', () => {
+    for (const [name, asset] of Object.entries(CHARACTER)) {
+      const svg = read(asset.src)
+      expect(svg, name).not.toMatch(/Gradient/)
+      if (name !== 'heatLines') expect(svg, name).not.toMatch(/stroke=/)
+    }
+  })
+
+  it('기존 일러스트와 같은 그레인을 한 겹 얹는다', () => {
+    for (const [name, asset] of Object.entries(CHARACTER)) {
+      const svg = read(asset.src)
+      expect(svg, name).toContain('<feTurbulence type="fractalNoise"')
+      expect(svg, name).toMatch(/<use href="#[a-z]+" filter="url\(#g-[a-z]+\)" opacity="0\.7"\/>/)
     }
   })
 })

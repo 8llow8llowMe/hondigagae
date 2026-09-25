@@ -18,7 +18,11 @@ import { readSourceWithoutComments } from '@/test/source'
  * (`testing-guide.md` §1).
  */
 const markup = renderToStaticMarkup(createElement(AboutView))
-const hrefs = [...markup.matchAll(/href="([^"]*)"/g)].map((match) => match[1])
+/**
+ * 링크(`<a>`)의 `href` 만 — React 19 가 즉시 로드 이미지(히어로 캐릭터)에 붙이는
+ * `<link rel="preload" href>` 는 링크가 아니다(실제 HTML 에서는 `head` 로 올라간다).
+ */
+const hrefs = [...markup.matchAll(/<a [^>]*href="([^"]*)"/g)].map((match) => match[1])
 
 describe('AboutView — 출처 표기 (#611 의 존재 이유를 잃지 않는다)', () => {
   it('데이터 출처를 남긴다 — 푸터와 같은 다섯 곳', () => {
