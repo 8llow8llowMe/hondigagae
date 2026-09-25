@@ -1,4 +1,4 @@
-import { CharacterImage } from '@/features/about/about-character'
+import { CharacterImage } from '@/components/character'
 import type { HourlyGradeCode } from '@/features/about/golden-curve-specimen'
 
 export type CurvePoseName = 'leash' | 'stand' | 'hot'

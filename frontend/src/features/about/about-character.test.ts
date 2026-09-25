@@ -6,7 +6,7 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { CHARACTER } from '@/features/about/about-character'
+import { CHARACTER } from '@/components/character'
 import { AboutView } from '@/features/about/about-view'
 import { poseForGrade, poseForStep } from '@/features/about/curve-pose'
 import { REVEAL_HIDDEN_CLASS } from '@/features/about/reveal'
