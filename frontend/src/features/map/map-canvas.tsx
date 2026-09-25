@@ -200,6 +200,7 @@ export function MapCanvas({
   selectedId,
   onSelect,
   onBoundsChange,
+  onUserMove,
   onCameraApplied,
   center,
   camera,
@@ -233,6 +234,19 @@ export function MapCanvas({
    * 버리고 주변 검색으로 갈아탄다 (architecture-guide.md §9 "지도 뷰: 별도 조회 금지").
    */
   onBoundsChange?: (bounds: MapBounds, userMoved: boolean) => void
+  /**
+   * **사용자가 지도를 직접 옮기기 시작했다** (#933) — 끌기·휠·두 손가락·더블클릭 확대.
+   *
+   * `onBoundsChange` 의 `userMoved` 로는 이것을 알 수 없다: 그 값은 첫 `idle` 이후
+   * **전부** `true` 라, 핀을 고를 때 우리가 건 확대·이동(`zoomToward`)이 낸 `idle` 도
+   * 사용자의 이동으로 센다. `idle` 이 오는 시점도 SDK 가 정해 이동 거리마다 다르다
+   * (실측: 300ms ~ 1.3s) — 시간으로 가를 수도 없다. 그래서 **입력 쪽에서 잡는다.**
+   * 카카오 `dragstart` 는 사용자의 끌기에서만 나고, 확대 입력은 컨테이너의 DOM 이벤트로
+   * 받는다(카카오 `zoom_start` 는 우리의 `setLevel` 에서도 난다).
+   *
+   * 이동이 **끝난** 영역은 여전히 뒤따르는 `onBoundsChange` 가 알린다.
+   */
+  onUserMove?: () => void
   /**
    * **카메라가 지도 중심을 어디에 놓았는지** 알린다 — 이슈 #578.
    *
@@ -327,9 +341,11 @@ export function MapCanvas({
   const boundsRef = useRef(onBoundsChange)
   const failureRef = useRef(onFailure)
   const cameraAppliedRef = useRef(onCameraApplied)
+  const userMoveRef = useRef(onUserMove)
   useEffect(() => {
     selectRef.current = onSelect
     boundsRef.current = onBoundsChange
+    userMoveRef.current = onUserMove
     failureRef.current = onFailure
     cameraAppliedRef.current = onCameraApplied
   })
@@ -678,6 +694,32 @@ export function MapCanvas({
     // 놓은 자리를 알린다 — 바깥이 "사용자가 옮겼는지" 를 이 자리 기준으로 잰다 (#578)
     cameraAppliedRef.current?.({ lat, lng: next.lng })
   }, [camera, status])
+
+  // ── 사용자의 직접 이동 (`onUserMove` 머리주석) ────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current
+    const maps = mapsRef.current
+    const container = containerRef.current
+    if (status !== 'ready' || map === null || maps === null || container === null) return
+
+    const notify = () => userMoveRef.current?.()
+    // 한 손가락 터치는 끌기라 `dragstart` 가 잡는다 — 여기서는 두 손가락(핀치)만 센다
+    const onTouchStart = (event: TouchEvent) => {
+      if (event.touches.length >= 2) notify()
+    }
+
+    maps.event.addListener(map, 'dragstart', notify)
+    container.addEventListener('wheel', notify, { passive: true })
+    container.addEventListener('dblclick', notify)
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+
+    return () => {
+      maps.event.removeListener(map, 'dragstart', notify)
+      container.removeEventListener('wheel', notify)
+      container.removeEventListener('dblclick', notify)
+      container.removeEventListener('touchstart', onTouchStart)
+    }
+  }, [status])
 
   // 패널을 접거나 시트를 올리면 컨테이너 폭이 바뀐다 → 되잡지 않으면 지도가 잘린다
   const relayout = useCallback(() => mapRef.current?.relayout(), [])
