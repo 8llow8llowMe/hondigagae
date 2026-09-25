@@ -31,7 +31,7 @@ import { messages } from '@/lib/messages'
  * 소유자를 검사하므로 그 허용 목록에 이 파일을 근거와 함께 올렸다 — `(auth)/layout.tsx`
  * 와 같은 "`Canvas` 를 쓸 수 없는 화면" 예외다.
  *
- * **출구가 둘이다.** 다시 시도(`reset`)와 홈으로. 셸이 없어 헤더로 갈 수 없으므로
+ * **출구가 둘이다.** 다시 시도(`retry`)와 홈으로. 셸이 없어 헤더로 갈 수 없으므로
  * `(main)/error.tsx` 와 달리 홈 버튼을 둔다 — 락업 링크도 홈이지만 "다음에 무엇을 할 수
  * 있나" 는 버튼이 말해야 한다. 문구는 전역 404 와 같은 `notFoundHomeAction`(`홈으로`)이다.
  *
@@ -42,7 +42,7 @@ import { messages } from '@/lib/messages'
  * RSC 응답으로 다시 그려, 서버 컴포넌트에서 난 예외는 그대로 또 터진다. `retry` 는
  * `router.refresh()` 로 다시 받아 온 뒤 그린다 (`next/dist/client/components/error-boundary.js`,
  * Next 16.3 에서 stable). 이 경계가 잡는 것은 대부분 서버 쪽(`readSession` 등)이다.
- * 기존 세그먼트 경계 열둘은 아직 `reset` 이다 — #918 에서 옮긴다.
+ * 세그먼트 경계 열둘도 #918 에서 같이 `retry` 로 옮겼다.
  */
 export default function RootError({ retry }: { error: Error; retry: () => void }) {
   return (

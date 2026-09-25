@@ -31,7 +31,7 @@ import { messages } from '@/lib/messages'
  * **`h1` 은 화면의 이름이고 `sr-only` 다** — `loading.tsx` 와 같은 키·같은 방식이다.
  * 없으면 문서의 최상위 제목이 상태 컴포넌트의 `h2` 가 된다.
  */
-export default function FavoritesError({ reset }: { error: Error; reset: () => void }) {
+export default function FavoritesError({ retry }: { error: Error; retry: () => void }) {
   return (
     <Canvas as="main" id="main-content">
       <SurfaceStack className="content-container">
@@ -43,7 +43,7 @@ export default function FavoritesError({ reset }: { error: Error; reset: () => v
             description={messages.favorite.loadFailedDescription}
             inset="card"
             headingLevel={3}
-            onRetry={reset}
+            onRetry={retry}
           />
         </Surface>
       </SurfaceStack>

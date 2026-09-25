@@ -33,7 +33,7 @@ import { messages } from '@/lib/messages'
  * **`h1` 은 화면의 이름(`editTitle`)이고 `sr-only` 다.** 상태 컴포넌트는 `h2` 만 내므로
  * 두지 않으면 문서의 최상위 제목이 `h2` 가 된다 (#451 · #473 과 같은 이유).
  */
-export default function PetEditError({ reset }: { error: Error; reset: () => void }) {
+export default function PetEditError({ retry }: { error: Error; retry: () => void }) {
   return (
     <Canvas as="main" id="main-content">
       <SurfaceStack className="mx-auto w-full max-w-2xl">
@@ -44,7 +44,7 @@ export default function PetEditError({ reset }: { error: Error; reset: () => voi
             title={messages.pet.loadFailedTitle}
             description={messages.pet.loadFailedDescription}
             inset="card"
-            onRetry={reset}
+            onRetry={retry}
           />
         </Surface>
       </SurfaceStack>

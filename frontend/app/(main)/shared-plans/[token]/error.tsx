@@ -15,7 +15,7 @@ import { messages } from '@/lib/messages'
  * 정본이다. 정상 화면(`SharedPlanSection`)이 카드를 쓰지만 상태는 L0 위에 바로 서는
  * 축을 따른다.
  */
-export default function SharedPlanError({ reset }: { error: Error; reset: () => void }) {
+export default function SharedPlanError({ retry }: { error: Error; retry: () => void }) {
   return (
     <Canvas as="main" id="main-content">
       <SurfaceStack className="content-container">
@@ -25,7 +25,7 @@ export default function SharedPlanError({ reset }: { error: Error; reset: () => 
           title={messages.plan.sharedErrorTitle}
           description={messages.common.temporaryErrorDescription}
           inset="card"
-          onRetry={reset}
+          onRetry={retry}
         />
       </SurfaceStack>
     </Canvas>

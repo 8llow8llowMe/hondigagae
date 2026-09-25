@@ -27,7 +27,7 @@ import { messages } from '@/lib/messages'
  *
  * **`h1` 은 화면의 이름이고 `sr-only` 다** — 정상 화면과 같은 키·같은 방식이다.
  */
-export default function WithdrawError({ reset }: { error: Error; reset: () => void }) {
+export default function WithdrawError({ retry }: { error: Error; retry: () => void }) {
   return (
     <Canvas as="main" id="main-content">
       <SurfaceStack className="mx-auto w-full max-w-2xl">
@@ -39,7 +39,7 @@ export default function WithdrawError({ reset }: { error: Error; reset: () => vo
             description={messages.member.loadFailedDescription}
             inset="card"
             headingLevel={3}
-            onRetry={reset}
+            onRetry={retry}
           />
         </Surface>
       </SurfaceStack>

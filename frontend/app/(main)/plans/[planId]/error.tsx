@@ -30,7 +30,7 @@ import { messages } from '@/lib/messages'
  * 보이는 제목을 `ErrorState` 의 `h2` 가 이미 그리기 때문이고, `h1` 이 아예 없으면 문서의
  * 최상위 제목이 그 `h2` 가 된다 (#451 · #473 과 같은 이유).
  */
-export default function PlanDetailError({ reset }: { error: Error; reset: () => void }) {
+export default function PlanDetailError({ retry }: { error: Error; retry: () => void }) {
   return (
     <Canvas as="main" id="main-content">
       <SurfaceStack className="content-container">
@@ -40,7 +40,7 @@ export default function PlanDetailError({ reset }: { error: Error; reset: () => 
           title={messages.plan.detailErrorTitle}
           description={messages.common.temporaryErrorDescription}
           inset="card"
-          onRetry={reset}
+          onRetry={retry}
         />
       </SurfaceStack>
     </Canvas>

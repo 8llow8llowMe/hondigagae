@@ -37,7 +37,7 @@ import { messages } from '@/lib/messages'
  *
  * **`h1` 은 화면의 이름이고 `sr-only` 다** — `(root)/loading.tsx` 와 같은 키·같은 방식이다.
  */
-export default function MyPageError({ reset }: { error: Error; reset: () => void }) {
+export default function MyPageError({ retry }: { error: Error; retry: () => void }) {
   return (
     <Canvas as="main" id="main-content">
       <SurfaceStack className="mx-auto w-full max-w-screen-md">
@@ -49,7 +49,7 @@ export default function MyPageError({ reset }: { error: Error; reset: () => void
             description={messages.member.loadFailedDescription}
             inset="card"
             headingLevel={3}
-            onRetry={reset}
+            onRetry={retry}
           />
         </Surface>
       </SurfaceStack>
