@@ -52,7 +52,7 @@ describe('petInfoLines — 값이 없는 줄은 만들지 않는다', () => {
     expect(lines).toHaveLength(2)
   })
 
-  it('원천 표기(chkPet)는 참고 값이라 맨 뒤에 붙는다', () => {
+  it('원문 표기(chkPet)는 참고 값이라 맨 뒤에 붙는다', () => {
     const lines = petInfoLines(petInfo, '애완동물 동반 가능')
 
     expect(lines.at(-1)?.label).toBe(messages.place.detailPetSourceText)
