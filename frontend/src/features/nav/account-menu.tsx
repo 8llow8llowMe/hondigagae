@@ -82,9 +82,17 @@ export function AccountMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((prev) => !prev)}
-        className="bg-band text-fg-muted focus-visible:ring-brand-500 flex size-11 items-center justify-center rounded-full focus-visible:ring-2 focus-visible:outline-none"
+        /*
+          **lg 이상에서는 `내 정보` 글자를 붙인다** (#913). 원형 아이콘만으로는 계정 메뉴라는
+          것이 옆 응급 아이콘과 같은 무게로 읽혔다. 폭만 늘리고(`lg:w-auto`) 높이 44 는
+          그대로다. 사용자 이름 첫 글자를 쓰지 않는 것은 이 컴포넌트가 회원 정보를 조회하지
+          않기 때문이다 — 헤더 한 칸을 위해 모든 화면에 조회를 하나 늘리지 않는다.
+          `aria-label`(`내 정보 메뉴 열기`)이 보이는 글자를 포함한다(WCAG 2.5.3).
+        */
+        className="bg-band text-fg-muted focus-visible:ring-brand-500 flex size-11 items-center justify-center gap-2 rounded-full focus-visible:ring-2 focus-visible:outline-none lg:w-auto lg:pr-4 lg:pl-3"
       >
         <MyPageIcon size={20} />
+        <span className="text-body-2 text-fg hidden font-semibold lg:inline">내 정보</span>
       </button>
 
       <Menu

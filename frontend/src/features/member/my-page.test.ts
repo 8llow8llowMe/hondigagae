@@ -129,6 +129,22 @@ describe('MyPageSections — 상태별 화면 (D5)', () => {
     expect(markup).toMatch(/<a[^>]*href="\/mypage\/withdraw"/)
   })
 
+  /*
+    **로그아웃은 버튼처럼 보인다** (#913 — #466 의 맨 글자를 뒤집었다). 아래 `회원탈퇴`
+    링크와 모양이 같아 둘 다 안내 문구처럼 읽혔다. `ghost` 는 글자가 `fg-muted` 라 더
+    약해지므로 테두리가 있는 가장 낮은 변형(`secondary`)이다. danger 계열은 쓰지 않는다.
+  */
+  it('로그아웃이 secondary 버튼이고 danger 색이 아니다', () => {
+    const markup = render()
+    const at = markup.indexOf('>로그아웃</button>')
+    const button = markup.slice(markup.lastIndexOf('<button', at), at)
+
+    expect(at).toBeGreaterThan(-1)
+    expect(button).toContain('border-border-strong')
+    expect(button).toContain('h-11')
+    expect(button).not.toMatch(/danger/)
+  })
+
   it('반려견 행은 이동이라 a 다', () => {
     expect(render()).toMatch(/<a[^>]*href="\/pets"/)
   })

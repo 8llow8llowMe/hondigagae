@@ -69,3 +69,23 @@ describe('두 축은 서로를 기준으로 센다 (아트보드 04 주석)', ()
     expect(counts.get('choco')).toBeUndefined()
   })
 })
+
+/*
+  **일정이 하나도 없으면 모바일 좁히기 도구를 세우지 않는다** (#913). 빈 계정 390 에서
+  `전체 0 · 초안 0 · 확정 0 · 완료 0` 이 빈 상태 위에 섰다. `PlanListView` 는 훅을 부르는
+  client component 라 렌더할 수 없어 소스로 조건의 **자리**를 잠근다 — 조건이 `countable`
+  을 빼면 첫 페이지가 오는 순간 탭 줄이 끼어든다.
+*/
+describe('PlanListView — 0건이면 모바일 탭을 숨긴다 (#913)', () => {
+  it('모바일 탭 묶음이 countable && 0건 조건 안에 있다', async () => {
+    const { readSourceWithoutComments } = await import('@/test/source')
+    const view = readSourceWithoutComments('src/features/plan/plan-list-view.tsx')
+    const guard = view.indexOf('{!(countable && allPlans.length === 0) && (')
+    const tabs = view.indexOf('<div className="lg:hidden">')
+
+    expect(guard).toBeGreaterThan(-1)
+    expect(tabs).toBeGreaterThan(guard)
+    // 가드와 탭 묶음 사이에 다른 요소가 끼지 않는다
+    expect(view.slice(guard, tabs)).not.toMatch(/<[A-Za-z]/)
+  })
+})

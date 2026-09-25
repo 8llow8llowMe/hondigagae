@@ -3,7 +3,7 @@
 import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
-import { Button } from '@/components/button'
+import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { Surface, SurfaceList } from '@/components/surface'
@@ -177,9 +177,12 @@ function FavoriteListBody({
         title={messages.favorite.emptyTitle}
         description={messages.favorite.emptyDescription}
         action={
-          <Link href="/places">
-            <Button variant="primary">{messages.favorite.emptyAction}</Button>
-          </Link>
+          /*
+            **`ButtonLink` 하나다** (#913). 예전에는 `<Link>` 안에 `<Button>` 을 넣어
+            `<a><button>` 이 됐다 — 대화형 요소 안의 대화형 요소라 HTML 로도 틀리고, 키보드
+            탭이 같은 행동에서 두 번 서며 스크린리더가 링크와 버튼을 따로 읽었다.
+          */
+          <ButtonLink href="/places">{messages.favorite.emptyAction}</ButtonLink>
         }
       />
     )

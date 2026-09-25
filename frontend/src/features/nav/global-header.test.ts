@@ -69,3 +69,33 @@ describe('AccountMenu — 트리거 크기 (#905 R3)', () => {
     expect(trigger).not.toContain('size-9')
   })
 })
+
+/*
+  **lg 이상에서 아이콘에 글자를 붙인다** (#913). 아이콘 하나로는 "병원·약국" · "내 정보" 가
+  처음 온 사람에게 읽히지 않았다. 1024 미만은 아이콘 그대로다.
+*/
+describe('GlobalHeader — lg 글자 라벨 (#913)', () => {
+  it('응급 링크가 lg 에서 보이는 글자를 갖고, 그 글자가 aria-label 과 같다', () => {
+    const markup = render(false)
+    const start = markup.indexOf('href="/emergency"')
+    const link = markup.slice(markup.lastIndexOf('<a', start), markup.indexOf('</a>', start))
+
+    expect(link).toContain('aria-label="병원 · 약국"')
+    expect(link).toMatch(/<span class="[^"]*hidden[^"]*lg:inline[^"]*">병원 · 약국<\/span>/)
+    // 글자는 붉게 칠하지 않는다 — 아이콘만 danger 다
+    expect(link).toMatch(/<span class="[^"]*text-fg[\s"]/)
+    // 44 높이는 그대로, 폭은 글자만큼 자란다
+    expect(link).toContain('h-11 min-w-11')
+  })
+
+  it('계정 트리거가 lg 에서 내 정보 글자를 갖고 폭만 늘린다', () => {
+    const source = readSourceWithoutComments('src/features/nav/account-menu.tsx')
+    const at = source.indexOf('aria-haspopup="menu"')
+    const trigger = source.slice(source.lastIndexOf('<button', at), source.indexOf('</button>', at))
+
+    expect(trigger).toContain('size-11')
+    expect(trigger).toContain('lg:w-auto')
+    expect(trigger).toMatch(/<span className="[^"]*hidden[^"]*lg:inline[^"]*">내 정보<\/span>/)
+    expect(trigger).toContain('aria-label="내 정보 메뉴 열기"')
+  })
+})
