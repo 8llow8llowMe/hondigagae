@@ -88,6 +88,16 @@ export const aboutMessages = {
      */
     curveLegendWindow: '추천 구간 · 색은 시각별 등급',
     curveNote: '화면 예시예요. 곡선은 기상청 시간별 예보로 매일 새로 계산해요.',
+    /** 곡선 시각 핸들 (#916) */
+    curveScrubLabel: '시각을 옮겨 보면 그때의 노면 온도를 읽어 줘요',
+    /** `{time}` · `{temperature}` · `{pavement}` 치환 */
+    curveReadout: '{time} · 기온 {temperature}℃ · 노면 {pavement}℃',
+    /**
+     * 산책 판정 등급어 — shared `WalkSafetyLevel` 의 서버 `name` 그대로다(키도 서버 code).
+     * 예시 표에 붙이는 라벨이라 서버를 부르지 않을 뿐, 실화면과 다른 낱말을 쓰지 않는다.
+     * 톤은 여기서 정하지 않는다 — `walkSafetyTone(code)` 이 실화면과 같은 톤을 준다.
+     */
+    walkGrades: { SAFE: '안전', CAUTION: '주의', DANGER: '위험' },
 
     /**
      * **서버 `name` 그대로다.** 예전에는 `적합도 높음` 이었는데 실제 적합도 `HIGH` 의
@@ -101,12 +111,25 @@ export const aboutMessages = {
     ] as const,
 
     congestionAria: '일주일 혼잡도 막대 예시. 목요일이 가장 한산해요.',
+    /** 막대 툴팁 · 버튼 이름 (#916) — `{date}` · `{level}` 치환, 가장 한산한 날은 `congestionBarBest` */
+    congestionBar: '{date} · {level}',
+    congestionBarBest: '{date} · 가장 한산',
     /** `{date}` 치환 */
     congestionBest: '{date}이 가장 한산할 것으로 보여요',
 
     planTablistLabel: '예시 일정의 일자',
     planRegenerate: '하루만 다시 짜기',
     planAiTag: 'AI 제안',
+    /** 다시 짜기 시연의 진행 단계 (#916) — DESIGN.md §8 "무한 스피너 대신 진행 단계" */
+    planRegenerateSteps: [
+      '장소 후보를 고르고 있어요',
+      '동선을 맞추고 있어요',
+      '준비물을 붙이고 있어요',
+    ] as const,
+    planRegenerateNote: '화면 예시예요. 실제로는 서버가 다시 짜요.',
+    /** 다시 짜기가 끝났을 때 live 영역에 남기는 문장 (#916 검토) — `{day}` 치환(`N일차`) */
+    planRegenerated: '{day}를 다시 짰어요',
+    planRestored: '{day}를 처음 안으로 되돌렸어요',
 
     weatherAria: '3일 날씨 브리핑 예시. 2일차에 비가 와요.',
     indoorTitle: '비가 오면 갈 만한 실내',

@@ -1,16 +1,62 @@
 'use client'
 
-import { type CSSProperties, useRef } from 'react'
+import { type CSSProperties, useId, useRef, useState } from 'react'
 
 import { MetricBadge } from '@/components/metric'
-import { GOLDEN_CURVE_SPECIMEN, VERDICT_SPECIMEN } from '@/features/about/about-specimen-data'
+import {
+  GOLDEN_CURVE_HOURLY,
+  GOLDEN_CURVE_SPECIMEN,
+  HOURLY_GRADE_EDGES,
+  VERDICT_SPECIMEN,
+} from '@/features/about/about-specimen-data'
 import { useStageStep } from '@/features/about/scroll-stage'
 import { useRevealOnce } from '@/features/about/use-reveal-once'
+import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
 const DRAW_MS = 800
+
+/** 가로축 — x 12 가 00시이고 시간당 15px (`GOLDEN_CURVE_SPECIMEN` 주석과 같다) */
+const hourX = (hour: number) => 12 + hour * 15
+
+export type HourlyGradeCode = 'SAFE' | 'CAUTION' | 'DANGER'
+
+/**
+ * 24점 표 → 서버 판정 code (#916). 경계는 서버 기본값과 같다(`HOURLY_GRADE_EDGES` — 42 이상
+ * 주의, 52 이상 위험). 낱말은 `messages.about.specimen.walkGrades[code]`, 톤은
+ * `walkSafetyTone(code)` — 실화면과 같은 표를 쓴다.
+ */
+export function hourlyGrade(pavement: number): HourlyGradeCode {
+  if (pavement >= HOURLY_GRADE_EDGES.danger) return 'DANGER'
+  if (pavement >= HOURLY_GRADE_EDGES.caution) return 'CAUTION'
+  return 'SAFE'
+}
+
+/** 핸들이 가리키는 시각의 읽기 문장 — 화면 줄과 `aria-valuetext` 가 같이 쓴다 */
+function hourlyText(hour: number): string {
+  const point = GOLDEN_CURVE_HOURLY[hour] ?? GOLDEN_CURVE_HOURLY[12]
+  return messages.about.specimen.curveReadout
+    .replace('{time}', `${String(hour).padStart(2, '0')}:00`)
+    .replace('{temperature}', String(point.temperature))
+    .replace('{pavement}', point.pavement.toFixed(1))
+}
+
+/**
+ * 노면 path 위에서 x 에 해당하는 y — 길이를 반으로 가르며 찾는다. `getPointAtLength` 는
+ * `pathLength` 속성과 무관한 사용자 단위라, 같은 단위인 `getTotalLength` 와 짝을 맞춘다.
+ */
+function yOnPath(path: SVGPathElement, x: number): number {
+  let low = 0
+  let high = path.getTotalLength()
+  for (let i = 0; i < 24; i += 1) {
+    const middle = (low + high) / 2
+    if (path.getPointAtLength(middle).x < x) low = middle
+    else high = middle
+  }
+  return path.getPointAtLength(low).y
+}
 
 /**
  * 골든타임 곡선 예시 (#635, 명세 §5-3 · §6-4).
@@ -60,6 +106,10 @@ const DRAW_MS = 800
  */
 export function GoldenCurveSpecimen() {
   const ref = useRef<SVGSVGElement>(null)
+  const pavementRef = useRef<SVGPathElement>(null)
+  const scrubId = useId()
+  /** 시각 핸들 — 만지기 전(`null`)에는 점 · 읽기 줄을 그리지 않는다 (#916) */
+  const [scrub, setScrub] = useState<{ hour: number; y: number } | null>(null)
   const phase = useRevealOnce(ref, true)
   const stage = useStageStep()
   const drawing = stage === null ? phase === 'armed' : stage.step < 1
@@ -159,7 +209,29 @@ export function GoldenCurveSpecimen() {
             className="stroke-fg-muted"
             style={lineStyle}
           />
+          {/* 무대 단계 0 에서는 선이 아직 없다 — 선 위에 서는 점도 그리지 않는다 */}
+          {scrub !== null && !drawing && (
+            <g aria-hidden>
+              <line
+                x1={hourX(scrub.hour)}
+                y1={8}
+                x2={hourX(scrub.hour)}
+                y2={126}
+                strokeDasharray="3 3"
+                vectorEffect="non-scaling-stroke"
+                className="stroke-border-strong"
+              />
+              <circle
+                cx={hourX(scrub.hour)}
+                cy={scrub.y}
+                r={5}
+                strokeWidth={2}
+                className="fill-metric-critical-500 stroke-bg"
+              />
+            </g>
+          )}
           <path
+            ref={pavementRef}
             d={data.pavementPath}
             pathLength={1}
             fill="none"
@@ -187,6 +259,36 @@ export function GoldenCurveSpecimen() {
             </text>
           </g>
         </svg>
+        {/*
+          시각 핸들 (#916, 명세 2026-09-25 §5). 값은 24점 예시 표이고 계산식이 없다. 만지기
+          전에는 읽기 줄을 비워 둔다 — 카드 제목 옆 배지가 이미 위험을 말한다(같은 사실을 두 번
+          말하지 않는다).
+
+          **읽기는 `aria-valuetext` 하나로 한다** (#916 검토). 포커스된 range 는 값이 바뀔 때마다
+          스크린리더가 스스로 값을 읽으므로, 읽기 줄에 `aria-live` 를 더하면 두 번 읽히고 드래그하면
+          시각 수만큼 쌓인다. 화면 줄은 눈 몫이라 `aria-hidden` 이다.
+        */}
+        <label htmlFor={scrubId} className="text-caption text-fg-muted mt-3 block font-medium">
+          {copy.curveScrubLabel}
+        </label>
+        <input
+          id={scrubId}
+          type="range"
+          min={0}
+          max={GOLDEN_CURVE_HOURLY.length - 1}
+          step={1}
+          defaultValue={12}
+          aria-valuetext={hourlyText(scrub?.hour ?? 12)}
+          onChange={(event) => {
+            const hour = Number(event.currentTarget.value)
+            const path = pavementRef.current
+            setScrub({ hour, y: path === null ? data.peak.y : yOnPath(path, hourX(hour)) })
+          }}
+          className="accent-brand-600 mx-auto block h-11 w-full max-w-md"
+        />
+        <p aria-hidden className="text-body-2 text-fg flex min-h-6 items-center gap-2">
+          {scrub !== null && <HourlyReadout hour={scrub.hour} />}
+        </p>
         <ul className="text-caption text-fg-muted mt-2 flex flex-wrap gap-x-4 gap-y-1.5 font-medium">
           <li className="flex items-center gap-1.5">
             <span aria-hidden className="bg-fg-muted inline-block h-1 w-3 rounded-sm" />
@@ -216,5 +318,20 @@ export function GoldenCurveSpecimen() {
         <p className="text-caption text-fg-muted mt-3 font-medium">{copy.curveNote}</p>
       </div>
     </div>
+  )
+}
+
+/** 핸들이 가리키는 시각의 읽기 줄(눈 몫) — 기온 · 노면 · 등급 배지 */
+function HourlyReadout({ hour }: { hour: number }) {
+  const point = GOLDEN_CURVE_HOURLY[hour] ?? GOLDEN_CURVE_HOURLY[12]
+  const code = hourlyGrade(point.pavement)
+
+  return (
+    <>
+      <span className="tabular-nums">{hourlyText(hour)}</span>
+      <MetricBadge tone={walkSafetyTone(code)} axis="walkSafety">
+        {messages.about.specimen.walkGrades[code]}
+      </MetricBadge>
+    </>
   )
 }

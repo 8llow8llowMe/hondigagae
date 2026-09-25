@@ -220,6 +220,14 @@ describe('globals.css 소개 페이지 무대 블록', () => {
     expect(block).not.toContain('!important')
   })
 
+  it('단계 0 의 칩은 누를 수도 포커스할 수도 없다 — 투명하기만 하면 켠 줄 모르는 필터가 생긴다 (#916)', () => {
+    const rule =
+      block.match(/\.about-stage:not\(\.is-step-1\) \.about-stage-chip \{([^}]*)\}/)?.[1] ?? ''
+    expect(rule).toContain('visibility: hidden;')
+    expect(rule).toContain('pointer-events: none;')
+    expect(rule).toMatch(/visibility 0s 200ms/)
+  })
+
   it('첫 맞춤(is-settling) 동안 무대 안 전환을 전부 끈다', () => {
     expect(block).toMatch(/\.about-stage\.is-settling \*,[\s\S]*?\{\s*transition: none;/)
   })

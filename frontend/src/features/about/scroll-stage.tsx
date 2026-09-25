@@ -46,8 +46,9 @@ export function stageClassName(step: number, live: boolean, settling = false): s
  * 오른쪽 열(`visual`)의 예시가 그 단계 모양이 된다. 1024 이상에서 오른쪽 열은 sticky 다
  * (`globals.css` `.about-stage-visual`).
  *
- * **예시에 단계가 가는 길은 둘이다.** 서버 예시(장소 · 긴급)는 prop 을 받을 수 없어 이
- * 래퍼의 클래스로, 클라이언트 예시(곡선)는 `useStageStep()` 컨텍스트로 받는다.
+ * **예시에 단계가 가는 길은 둘이다.** 장소 · 긴급 예시는 이 래퍼의 클래스로(긴급은 서버
+ * 컴포넌트라 prop 을 받을 수 없고, 장소는 #916 에서 클라이언트가 됐지만 같은 CSS 를 쓴다),
+ * 곡선 예시는 `useStageStep()` 컨텍스트로 받는다.
  *
  * **`copy` · `visual` 은 서버에서 렌더된 노드다.** 이 컴포넌트는 감싸기만 하고 문장을 갖지
  * 않는다 — 절 본문은 서버 컴포넌트로 남는다 (명세 2026-09-25 §9-1).
