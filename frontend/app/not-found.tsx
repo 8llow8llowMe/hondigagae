@@ -53,6 +53,7 @@ export default async function GlobalNotFound() {
 
           <EmptyState
             title={messages.common.notFoundTitle}
+            character="sitLookup"
             description={messages.common.notFoundDescription}
             inset="card"
             action={

@@ -227,6 +227,7 @@ function NoPlans({ hasPets, firstPetName }: { hasPets: boolean; firstPetName: st
         headingLevel={3}
         inset="card"
         title={messages.plan.noPetTitle}
+        character="sitFront"
         description={messages.plan.noPetDescription}
         action={<ButtonLink href="/pets/new">{messages.plan.noPetAction}</ButtonLink>}
       />
@@ -238,6 +239,7 @@ function NoPlans({ hasPets, firstPetName }: { hasPets: boolean; firstPetName: st
       headingLevel={3}
       inset="card"
       title={messages.plan.emptyTitle}
+      character="leash"
       description={
         firstPetName === null
           ? messages.plan.emptyDescription

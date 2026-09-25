@@ -271,3 +271,34 @@ describe('AiPlanProgress — 조건 블록 (#710)', () => {
     expect(render()).not.toContain(messages.aiPlan.jobConditionLabel)
   })
 })
+
+describe('AiPlanProgress — 캐릭터 (#939)', () => {
+  const wrapper = (html: string) => html.match(/<span [^>]*data-character="[^"]*"[^>]*>/g) ?? []
+
+  it('생성 중에는 목줄 산책 한 마리가 선다', () => {
+    const tags = wrapper(render())
+    expect(tags).toHaveLength(1)
+    expect(tags[0]).toContain('data-character="leash"')
+    expect(tags[0]).toContain('aria-hidden="true"')
+  })
+
+  /* 블록 `py-5` 만큼 내려 발을 구분선에 댄다 — 개가 아래 여백을 써서 블록이 자라지 않는다 */
+  it('발을 블록 아래 구분선에 댄다', () => {
+    expect(wrapper(render())[0]).toMatch(/-mb-5/)
+  })
+
+  /* 1초마다 낭독되지 않게 경과 시간을 뺀 것과 같은 이유 — 낭독 영역에 그림을 들이지 않는다 */
+  it('낭독 영역(role=status) 밖이다', () => {
+    const html = render({ stepProgress: { order: 2, total: 4 } })
+    const start = html.indexOf('role="status"')
+    // 낭독 영역이 사라지면 `slice(-1)` 이 마지막 한 글자가 되어 아래 단언이 헛되이 통과한다
+    expect(start).toBeGreaterThan(-1)
+    const status = html.slice(start)
+    const statusEnd = status.indexOf('</div>')
+    expect(status.slice(0, statusEnd)).not.toContain('data-character')
+  })
+
+  it('상한 초과 갈래에는 없다 — 기다림이 아니라 직접 확인이다', () => {
+    expect(wrapper(render({ phase: 'exceeded' }))).toHaveLength(0)
+  })
+})

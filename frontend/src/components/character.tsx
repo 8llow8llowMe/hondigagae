@@ -30,6 +30,7 @@ export type CharacterName = keyof typeof CHARACTER
 /**
  * 캐릭터 한 장 — `alt=""` 다. 내용을 더하지 않는 그림이라 스크린리더가 건너뛴다(소개 명세 §8).
  * **감싸는 요소가 `aria-hidden` 을 갖는다** — 이 컴포넌트를 쓰는 쪽의 몫이다.
+ * `/about` 밖에서는 `StateCharacter` 를 쓴다 — 그쪽이 래퍼까지 들고 있다.
  *
  * 크기는 CSS 가 준다. `width`/`height` 속성은 비율과 레이아웃 자리 잡기에만 쓴다.
  */
@@ -55,5 +56,66 @@ export function CharacterImage({
       draggable={false}
       className={cn('block h-auto select-none', className)}
     />
+  )
+}
+
+/**
+ * `/about` 밖에서 서는 자세 (#939, DESIGN.md §0-5).
+ *
+ * **앞발(`hot`) · 열기 선은 없다.** 둘은 소개 페이지 질문 2 가 "노면이 뜨겁다(위험)" 를
+ * 연기하는 자세다. 다른 화면에서 쓰면 캐릭터가 판정 등급을 대신 말하게 된다 — 심볼을 등급
+ * 색으로 칠하지 않는 것(`docs/hondi_img/README.md`)과 같은 이유로 타입에서 막는다.
+ */
+export type StateCharacterPose = 'sitLookup' | 'sitFront' | 'stand' | 'leash'
+
+/**
+ * 높이로 크기를 맞춘다 — **폭이 아니다.** 앉은 정면(`sitFront` 231×416)과 산책(`leash`
+ * 440×408)은 비율이 두 배 가까이 달라, 폭을 맞추면 정면 개만 두 배 크게 선다. 앉은 개와 선
+ * 개의 키는 비슷하므로 높이가 같으면 같은 개로 읽힌다.
+ *
+ * - `md` — 빈 화면 · 대기 화면. 72 → 768 이상 88. 여백이 아니라 오브젝트 크기라 DESIGN.md §4
+ *   간격 스케일의 대상이 아니다(아이콘 · 썸네일과 같다)
+ * - `sm` — 배너 한 줄(72px) 안. 48
+ */
+const STATE_CHARACTER_SIZE = {
+  md: 'h-18 md:h-22',
+  sm: 'h-12',
+} as const
+
+/**
+ * 빈 화면 · 대기 화면의 캐릭터 한 마리 (#939).
+ *
+ * **자리는 목록으로 정해져 있다** (DESIGN.md §0-5) — `character.test.ts` 가 이 컴포넌트를
+ * 부르는 파일을 허용 목록과 대조한다. 새 자리에 쓰려면 규칙부터 고친다.
+ *
+ * - 스크린리더에 없다 — 래퍼가 `aria-hidden`, 그림은 `alt=""`
+ * - 반복 애니메이션이 없다 — 정지 그림만으로 문장이 통해야 한다(움직임 줄이기 사용자 포함)
+ * - `pointer-events-none` — 옆 버튼의 히트 영역을 가리지 않는다
+ * - `w-max` — 폭은 그림이 높이에서 얻는다. 없으면 `absolute` 로 카드 바깥(`start-full`)에 둘 때
+ *   남은 폭이 0 이라 shrink-to-fit 이 0 이 되어 개가 사라진다(인증 셸 1280 실측)
+ *
+ * `className` 은 **레이아웃 유틸리티만** 받는다 (component-guide.md §3).
+ */
+export function StateCharacter({
+  pose,
+  size = 'md',
+  className,
+}: {
+  pose: StateCharacterPose
+  size?: keyof typeof STATE_CHARACTER_SIZE
+  className?: string
+}) {
+  return (
+    <span
+      aria-hidden
+      data-character={pose}
+      className={cn(
+        'pointer-events-none block w-max shrink-0',
+        STATE_CHARACTER_SIZE[size],
+        className,
+      )}
+    >
+      <CharacterImage name={pose} className="h-full w-auto" />
+    </span>
   )
 }

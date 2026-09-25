@@ -531,10 +531,16 @@ export function HomeView({
             (병원 배너 전용), 산책 코스에 쓰면 상시 진입점이 경보처럼 읽힌다.
           */}
           <Surface>
+            {/*
+              **홈에서 캐릭터는 여기 한 마리다** (#939, DESIGN.md §0-5). 목줄 산책이 "걸어 보기" 를
+              연기한다. 판정 · 골든타임 · 맞는 곳은 데이터 자리라 들이지 않는다 — 특히 위험 판정
+              옆의 앞발 자세는 캐릭터가 등급을 대신 말하는 것이 된다.
+            */}
             <Banner
               href="/olle"
               title={messages.walkCourse.bannerTitle}
               description={messages.walkCourse.bannerDescription}
+              character="leash"
               inset="card"
             />
           </Surface>

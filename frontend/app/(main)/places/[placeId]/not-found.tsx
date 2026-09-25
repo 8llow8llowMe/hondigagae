@@ -35,6 +35,7 @@ export default function PlaceDetailNotFound() {
 
         <EmptyState
           title={messages.place.detailNotFoundTitle}
+          character="sitLookup"
           description={messages.place.detailNotFoundDescription}
           inset="card"
           action={<PlaceBackLink />}

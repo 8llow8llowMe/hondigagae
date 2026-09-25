@@ -145,6 +145,7 @@ function PetListBody({ pets, totalCount, loading, errorStatus, onRetry }: PetLis
         inset={inset}
         headingLevel={3}
         title={messages.pet.emptyTitle}
+        character="sitFront"
         description={messages.pet.emptyDescription}
         action={<ButtonLink href="/pets/new">{messages.pet.register}</ButtonLink>}
       />

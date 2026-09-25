@@ -32,6 +32,7 @@ export function SharedPlanExpired() {
 
       <EmptyState
         title={messages.plan.sharedExpiredTitle}
+        character="sitLookup"
         description={messages.plan.sharedExpiredDescription}
         inset="card"
         action={

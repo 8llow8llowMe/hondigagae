@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 
+import { AuthCardDog } from '@/features/auth/auth-card-dog'
 import { LoggedInNotice } from '@/features/auth/logged-in-notice'
 import { LoginForm } from '@/features/auth/login-form'
 import { SignupDoneNotice } from '@/features/auth/signup-done-notice'
@@ -25,6 +26,7 @@ export default async function LoginPage({
 
   return (
     <div className="flex flex-col gap-4">
+      <AuthCardDog />
       <SignupDoneNotice signedUp={signedUp} />
       {/* 비밀번호 변경·소셜 전용 전환·탈퇴로 세션이 끊긴 경우 그 이유를 알린다 */}
       <ReauthNotice reauth={reauth} />

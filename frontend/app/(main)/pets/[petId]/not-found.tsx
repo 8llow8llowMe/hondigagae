@@ -46,6 +46,7 @@ export default function PetNotFound() {
         <Surface aria-label={messages.pet.editTitle}>
           <EmptyState
             title={messages.pet.notFoundTitle}
+            character="sitLookup"
             description={messages.pet.notFoundDescription}
             inset="card"
             /* `<Link>` 안에 `<Button>` 을 넣지 않는다 — 탭 정지가 둘이 되고 Space 가 안쪽

@@ -87,6 +87,7 @@ export function AiPlanCreateView({
           inset="card"
           headingLevel={3}
           title={messages.aiPlan.noPetTitle}
+          character="sitFront"
           description={messages.aiPlan.noPetDescription}
           action={<ButtonLink href="/pets/new">{messages.aiPlan.noPetAction}</ButtonLink>}
         />
