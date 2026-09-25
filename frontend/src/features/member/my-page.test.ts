@@ -45,6 +45,17 @@ function pet(overrides: Partial<Pet> = {}): Pet {
   }
 }
 
+/**
+ * 글자가 `label` 인 `<button>` 의 여는 태그부터 닫는 태그까지. **여는 태그로 범위를 좁힌다** —
+ * 마크업 전체에 클래스를 단언하면 다른 요소의 클래스로 초록이 된다. 없으면 빈 문자열.
+ */
+function actionButton(markup: string, label: string): string {
+  const at = markup.indexOf(`>${label}</span></button>`)
+  if (at === -1) return ''
+  const start = markup.lastIndexOf('<button', at)
+  return markup.slice(start, markup.indexOf('</button>', at) + '</button>'.length)
+}
+
 function render(overrides: Partial<MyPageSectionsProps> = {}) {
   return renderToStaticMarkup(
     createElement(MyPageSections, {
@@ -58,6 +69,7 @@ function render(overrides: Partial<MyPageSectionsProps> = {}) {
       favoritesLoading: false,
       onRetry: () => undefined,
       onLogout: () => undefined,
+      onWithdraw: () => undefined,
       onEditProfile: () => undefined,
       ...overrides,
     }),
@@ -68,8 +80,22 @@ describe('MyPageSections — 상태별 화면 (D5)', () => {
   it('회원 정보를 렌더한다', () => {
     const markup = render()
 
-    expect(markup).toContain('김제주')
+    expect(markup).toContain('제주댕댕')
     expect(markup).toContain('demo@hondigagae.dev')
+  })
+
+  /*
+    **이름이 아니라 닉네임이다.** 이 화면에서 고칠 수 있는 것이 닉네임뿐이라, 이름을 적으면
+    닉네임을 바꿔도 이 줄이 그대로여서 저장이 안 된 것처럼 읽혔다.
+  */
+  it('프로필 줄은 이름이 아니라 닉네임을 쓴다', () => {
+    expect(render()).not.toContain('김제주')
+  })
+
+  it('닉네임이 비어 있으면 이름으로 떨어진다 — 빈 줄을 남기지 않는다', () => {
+    const markup = render({ member: member({ nickname: '  ' }) })
+
+    expect(markup).toContain('김제주')
   })
 
   it('5xx 는 ErrorState 이고 재시도 버튼이 있다', () => {
@@ -85,7 +111,7 @@ describe('MyPageSections — 상태별 화면 (D5)', () => {
 
     expect(markup).not.toContain(messages.member.myPets)
     // 회원 정보와 계정 섹션은 그대로 보인다
-    expect(markup).toContain('김제주')
+    expect(markup).toContain('제주댕댕')
     expect(markup).toContain(messages.member.accountSection)
     expect(markup).toContain(messages.member.logout)
   })
@@ -121,28 +147,35 @@ describe('MyPageSections — 상태별 화면 (D5)', () => {
     expect(markup).toContain(url)
   })
 
-  /** 이동 항목은 `<a>`, 동작 항목은 `<button>` — 모양이 같아도 역할이 다르다 (D6) */
-  it('로그아웃은 button, 회원탈퇴는 a 다', () => {
+  /*
+    **둘 다 동작이라 `<button>` 이다** (D6). 탈퇴는 `/mypage/withdraw` 로 가는 링크였는데,
+    이제 이 화면 위에 확인 모달을 연다 — 라우트 이동이 없다.
+  */
+  it('로그아웃 · 회원탈퇴가 모두 button 이고 탈퇴 라우트로 가지 않는다', () => {
     const markup = render()
 
-    expect(markup).toMatch(/<button[^>]*>로그아웃<\/button>/)
-    expect(markup).toMatch(/<a[^>]*href="\/mypage\/withdraw"/)
+    expect(actionButton(markup, messages.member.logout)).not.toBe('')
+    expect(actionButton(markup, messages.member.withdraw)).not.toBe('')
+    expect(markup).not.toContain('/mypage/withdraw')
   })
 
   /*
-    **로그아웃은 버튼처럼 보인다** (#913 — #466 의 맨 글자를 뒤집었다). 아래 `회원탈퇴`
-    링크와 모양이 같아 둘 다 안내 문구처럼 읽혔다. `ghost` 는 글자가 `fg-muted` 라 더
-    약해지므로 테두리가 있는 가장 낮은 변형(`secondary`)이다. danger 계열은 쓰지 않는다.
+    **회원탈퇴만 붉은 글자다.** 되돌릴 수 없는 유일한 행이라 한눈에 갈려야 한다. 로그아웃은
+    되돌릴 수 있어 중립 글자 — 둘이 같은 경고색이면 무게가 같아진다.
   */
-  it('로그아웃이 secondary 버튼이고 danger 색이 아니다', () => {
+  it('회원탈퇴는 danger 글자색, 로그아웃은 아니다', () => {
     const markup = render()
-    const at = markup.indexOf('>로그아웃</button>')
-    const button = markup.slice(markup.lastIndexOf('<button', at), at)
 
-    expect(at).toBeGreaterThan(-1)
-    expect(button).toContain('border-border-strong')
-    expect(button).toContain('h-11')
-    expect(button).not.toMatch(/danger/)
+    expect(actionButton(markup, messages.member.withdraw)).toContain('text-danger-700')
+    expect(actionButton(markup, messages.member.logout)).not.toMatch(/danger/)
+  })
+
+  /** 이동이 아니라 동작이라 꺾쇠가 없다 — 꺾쇠는 "다른 화면으로 간다" 는 신호다 */
+  it('동작 행에는 꺾쇠가 없다', () => {
+    const markup = render()
+
+    expect(actionButton(markup, messages.member.logout)).not.toContain('<svg')
+    expect(actionButton(markup, messages.member.withdraw)).not.toContain('<svg')
   })
 
   it('반려견 행은 이동이라 a 다', () => {
@@ -157,7 +190,14 @@ describe('MyPageSections — 상태별 화면 (D5)', () => {
 
 describe('AccountSection — 계정 상태 3종이 다르게 그려진다 (D5)', () => {
   function account(state: Parameters<typeof AccountSection>[0]['state'], provider: string | null) {
-    return renderToStaticMarkup(createElement(AccountSection, { state, provider }))
+    return renderToStaticMarkup(
+      createElement(AccountSection, {
+        state,
+        provider,
+        onLogout: () => undefined,
+        onWithdraw: () => undefined,
+      }),
+    )
   }
 
   it('일반 계정은 비밀번호 변경만 있고 연결 표시가 없다', () => {
@@ -328,13 +368,27 @@ describe('MyPageSections — 3층 표면 (#466)', () => {
     expect(markup).toContain('[&amp;&gt;li+li]:border-t')
   })
 
-  /** 액션은 카드가 아니다 (§0 판정에서 "액션 바" 가 빠진다) */
-  it('로그아웃·회원탈퇴는 마지막 카드 밖에 있다', () => {
+  /*
+    **로그아웃·회원탈퇴는 `계정` 카드의 마지막 두 행이다.** 카드 밖 L0 에 버튼 하나와 링크
+    하나로 떠 있을 때는 어느 묶음에도 속하지 않은 것처럼 보였다 — `버전` 행 아래에 같은 행
+    모양으로 선다.
+  */
+  it('로그아웃·회원탈퇴는 계정 카드 안, 버전 행 아래에 있다', () => {
     const markup = render()
-    const lastCardEnd = markup.lastIndexOf('</section>')
+    const accountCard = markup.slice(
+      markup.lastIndexOf('<section'),
+      markup.lastIndexOf('</section>'),
+    )
+    const version = accountCard.indexOf(messages.member.version)
 
-    expect(markup.indexOf(messages.member.logout)).toBeGreaterThan(lastCardEnd)
-    expect(markup.indexOf(messages.member.withdraw)).toBeGreaterThan(lastCardEnd)
+    expect(accountCard).toContain(messages.member.accountSection)
+    expect(version).toBeGreaterThan(-1)
+    expect(accountCard.indexOf(`>${messages.member.logout}<`)).toBeGreaterThan(version)
+    expect(accountCard.indexOf(`>${messages.member.withdraw}<`)).toBeGreaterThan(
+      accountCard.indexOf(`>${messages.member.logout}<`),
+    )
+    // 카드 밖에는 아무것도 남지 않는다
+    expect(markup.slice(markup.lastIndexOf('</section>'))).not.toContain(messages.member.logout)
   })
 
   /** 소셜 연결·비밀번호 유무가 전부 회원 정보에서 온다 — 값 없이 그리면 단정이 된다 (D5) */
@@ -366,7 +420,7 @@ describe('MyPageSections — 3층 표면 (#466)', () => {
       const markup = render(state)
 
       expect(markup).not.toContain(messages.member.logout)
-      expect(markup).not.toMatch(/href="\/mypage\/withdraw"/)
+      expect(markup).not.toContain(`>${messages.member.withdraw}<`)
     }
   })
 
@@ -383,7 +437,14 @@ describe('MyPageSections — 3층 표면 (#466)', () => {
 
 describe('AccountSection — 카드 안 내용만 낸다 (#466)', () => {
   function account(state: Parameters<typeof AccountSection>[0]['state'], provider: string | null) {
-    return renderToStaticMarkup(createElement(AccountSection, { state, provider }))
+    return renderToStaticMarkup(
+      createElement(AccountSection, {
+        state,
+        provider,
+        onLogout: () => undefined,
+        onWithdraw: () => undefined,
+      }),
+    )
   }
 
   /** 카드는 `MyPageSections` 가 그린다 — 여기서 또 그리면 카드 여백이 두 번 낀다 (§3-1) */
