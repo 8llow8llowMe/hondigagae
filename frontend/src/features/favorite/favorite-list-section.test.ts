@@ -52,6 +52,20 @@ describe('FavoriteListSection — 상태 배타성 (명세 D5)', () => {
     expect(markup).toContain('href="/places"')
   })
 
+  /*
+    **링크 안에 버튼을 넣지 않는다** (#913). 예전 `<Link><Button/></Link>` 는 `<a><button>` 이라
+    같은 행동에 탭 정지가 둘이었고 스크린리더가 링크·버튼을 따로 읽었다.
+  */
+  it('빈 목록의 CTA 는 링크 하나다 — a 안에 button 이 없다', () => {
+    const markup = render({ places: [], totalCount: 0 })
+    const at = markup.indexOf(messages.favorite.emptyAction)
+    const anchor = markup.slice(markup.lastIndexOf('<a', at), markup.indexOf('</a>', at))
+
+    expect(at).toBeGreaterThan(-1)
+    expect(anchor).toContain('href="/places"')
+    expect(anchor).not.toContain('<button')
+  })
+
   it('5xx 는 재시도 버튼과 함께 낸다 — 저장이 남아 있다고 말한다', () => {
     const markup = render({ errorStatus: 500 })
 

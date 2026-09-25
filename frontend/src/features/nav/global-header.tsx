@@ -115,13 +115,23 @@ export function GlobalHeader({ authed }: { authed: boolean }) {
             </Link>
           )}
 
-          {/* 상시 진입점. 아이콘만 danger 색이고 배경을 채우지 않는다 */}
+          {/*
+            상시 진입점. 아이콘만 danger 색이고 배경을 채우지 않는다.
+
+            **lg 이상에서는 글자를 붙인다** (#913). 아이콘 하나로는 "병원·약국" 이라는 것이
+            처음 온 사람에게 읽히지 않았다 — 구급상자 모양이 약국인지 응급실인지 설정인지
+            갈린다. 자리가 남는 폭에서만 붙이고, 1024 미만은 아이콘 그대로다(헤더 한 줄에
+            nav 가 없어 폭은 남지만 탭바가 같은 일을 한다). 글자는 `text-fg` 다 — 붉은
+            글자는 경보로 읽힌다. `aria-label` 은 보이는 글자와 같은 문자열이라 음성 제어가
+            보이는 그대로 부를 수 있다(WCAG 2.5.3).
+          */}
           <Link
             href="/emergency"
             aria-label="병원 · 약국"
-            className="text-danger-700 hover:bg-band focus-visible:ring-brand-500 inline-flex size-11 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
+            className="text-danger-700 hover:bg-band focus-visible:ring-brand-500 inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-md focus-visible:ring-2 focus-visible:outline-none lg:px-3"
           >
             <EmergencyIcon size={24} />
+            <span className="text-body-2 text-fg hidden font-semibold lg:inline">병원 · 약국</span>
           </Link>
 
           {authed ? (

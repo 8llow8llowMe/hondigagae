@@ -204,10 +204,19 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
             제목 줄 **옆** 열이라 이 순서 문제가 애초에 없고, 그래서 `lg:hidden` 로 정확히
             갈린다.
           */}
-          <div className="lg:hidden">
-            <PlanStatusTabs filters={filters} onChange={apply} statusCounts={statusCounts} />
-            <PlanPetChips filters={filters} onChange={apply} pets={pets} />
-          </div>
+          {/*
+            **일정이 하나도 없으면 좁히는 도구를 세우지 않는다** (#913). 빈 계정 390 실측에서
+            `전체 0 · 초안 0 · 확정 0 · 완료 0` 탭 줄이 빈 상태 위에 섰다 — 좁힐 것이 없는
+            화면에서 가장 먼저 읽히는 것이 0 네 개였다. 목록을 다 받은 뒤(`countable`)에만
+            판정한다: 받는 중에 숨기면 첫 페이지가 오는 순간 탭 줄이 끼어든다.
+            데스크톱 레일은 열 자리를 지키는 2단 grid 의 일부라 이 판정에 넣지 않는다.
+          */}
+          {!(countable && allPlans.length === 0) && (
+            <div className="lg:hidden">
+              <PlanStatusTabs filters={filters} onChange={apply} statusCounts={statusCounts} />
+              <PlanPetChips filters={filters} onChange={apply} pets={pets} />
+            </div>
+          )}
 
           {section}
         </Surface>

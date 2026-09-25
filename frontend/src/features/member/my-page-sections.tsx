@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { Button } from '@/components/button'
 import { ErrorState } from '@/components/error-state'
 import { Skeleton } from '@/components/skeleton'
 import { Surface, SurfaceList } from '@/components/surface'
@@ -220,13 +221,24 @@ export function MyPageSections({
       */}
       {!loading && !failed && (
         <div className={cn('flex flex-col items-start py-2', INSET_CLASS.card)}>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="text-body-1 text-fg focus-visible:ring-brand-500 flex min-h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
-          >
+          {/*
+            **텍스트가 아니라 `secondary` 버튼이다** (#913 — #466 의 텍스트 결정을 뒤집는다).
+            #466 은 아트보드 01 대로 "위험한 액션은 약하게" 를 16/600 맨 글자로 풀었는데,
+            사용성 검토(#905 §6)에서 **누르는 것인지 읽히지 않았다** — 바로 아래 `회원탈퇴`
+            (링크)와 모양이 같아 둘 다 안내 문구처럼 보였다. 약하게는 색이 아니라 **위치**
+            (맨 마지막 · 카드 밖)와 **무게**(primary 가 아니다)로 지킨다.
+
+            이슈는 `ghost` 를 적었지만 쓰지 않는다: `ghost` 는 글자가 `fg-muted` 라 지금의
+            진한 16/600 보다 **더 약해진다** — 고치려는 것이 "액션 인지가 약하다" 이다.
+            테두리가 있는 가장 낮은 변형이 `secondary` 다. danger 계열도 쓰지 않는다(아래
+            머리주석 — 실수를 막는 것은 색이 아니라 위치와 확인 단계다).
+
+            `mb-2` 는 아래 `회원탈퇴` 링크와의 간격이다 — 버튼 테두리와 링크 글자가 붙으면
+            한 덩어리로 읽힌다.
+          */}
+          <Button variant="secondary" onClick={onLogout} className="mb-2">
             {messages.member.logout}
-          </button>
+          </Button>
 
           <Link
             href="/mypage/withdraw"
