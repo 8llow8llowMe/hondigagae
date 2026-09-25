@@ -22,8 +22,7 @@ import type { Pet } from '@/types/pet'
  * 숨기지 않는다 — 숨어 있으면 사용자가 왜 값이 바뀌었는지 모른다.
  *
  * 사진 96(모바일) / 112(데스크톱) **원형**. 원형은 사진·아바타에만 허용된 곡선이다.
- * 폴백 순서는 업로드 → 견종 일러스트 → **이니셜 원형**인데, 백엔드에 사진 필드가 없어
- * 지금은 이니셜뿐이다. **빈 원형을 남기지 않는다.**
+ * 폴백 순서는 업로드 사진 → **이니셜 원형**이다 (`PetAvatar`). **빈 원형을 남기지 않는다.**
  *
  * 표시 항목은 이름 + 견종·크기·나이 + **특성 태그 2개까지**. 3개 이상은 `+n`.
  */
@@ -108,7 +107,7 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
           'px-4 md:px-5',
         )}
       >
-        <PetAvatar size="hero" name={selected.name} />
+        <PetAvatar size="hero" name={selected.name} url={selected.profileImageUrl} />
 
         <span className="min-w-0 flex-1">
           <span ref={nameRef} className="flex items-center gap-1">
@@ -146,7 +145,7 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
               }}
               className="hover:bg-band focus-visible:bg-band flex h-11 w-full items-center gap-2 px-4 text-left focus-visible:outline-none"
             >
-              <PetAvatar name={pet.name} />
+              <PetAvatar name={pet.name} url={pet.profileImageUrl} />
               <span className="text-body-2 text-fg min-w-0 truncate font-medium">
                 {pet.name}
                 <span className="text-fg-muted"> · {firstTrait(pet)}</span>

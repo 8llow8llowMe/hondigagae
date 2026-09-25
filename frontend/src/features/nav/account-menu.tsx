@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation'
 
 import { useQueryClient } from '@tanstack/react-query'
 
-import { MyPageIcon } from '@/components/icons'
 import { Menu, MenuAnchor, type MenuItem } from '@/components/menu'
+import { ProfileAvatar } from '@/features/member/profile-avatar'
+import { useHeaderMyInfo } from '@/features/member/use-my-info'
 import { ACCOUNT_MENU_ITEMS } from '@/features/nav/menu-items'
 import { logout } from '@/lib/api/auth'
 import { messages } from '@/lib/messages'
@@ -32,6 +33,17 @@ export function AccountMenu() {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
+
+  /*
+    **프로필 사진을 트리거에 싣는다.** 마이페이지에서 사진을 올리거나 지우면
+    `use-my-info.ts` 가 헤더 사본까지 갈아끼워 새로고침 없이 바뀐다. 로그인 상태에서만 이
+    컴포넌트가 서므로 (`global-header.tsx` 의 `authed`) 미로그인에 401 을 내지 않는다.
+
+    **`useMyInfo` 가 아니라 헤더 전용 사본이다** — 레이아웃이 페이지의 key 를 먼저 만들면
+    `/mypage` 서버 프리페치가 무력해져 하이드레이션이 깨진다 (`memberKeys.header` 주석).
+    첫 렌더 · 조회 전 · 실패 · 사진 없음은 모두 사람 아이콘이다.
+  */
+  const { data: member } = useHeaderMyInfo()
 
   /**
    * **`/logout` 라우트가 아니다.** 링크로 두었더니 그런 화면이 없어 404 가 떴다 —
@@ -85,13 +97,15 @@ export function AccountMenu() {
         /*
           **lg 이상에서는 `내 정보` 글자를 붙인다** (#913). 원형 아이콘만으로는 계정 메뉴라는
           것이 옆 응급 아이콘과 같은 무게로 읽혔다. 폭만 늘리고(`lg:w-auto`) 높이 44 는
-          그대로다. 사용자 이름 첫 글자를 쓰지 않는 것은 이 컴포넌트가 회원 정보를 조회하지
-          않기 때문이다 — 헤더 한 칸을 위해 모든 화면에 조회를 하나 늘리지 않는다.
+          그대로다. 원형 안은 프로필 사진(32)이고, 없으면 사람 아이콘이다 — 이니셜을 쓰지
+          않는 이유는 `ProfileAvatar` 주석(반려견 아바타와 헷갈린다).
+          `lg:pl-1.5` 는 32 원형을 44 알약 안 세로 가운데와 같은 6px 로 띄운다 — 아이콘만
+          있을 때도 20 아이콘이 32 원형 가운데라 글자까지의 거리가 예전 `pl-3` 과 같다.
           `aria-label`(`내 정보 메뉴 열기`)이 보이는 글자를 포함한다(WCAG 2.5.3).
         */
-        className="bg-band text-fg-muted focus-visible:ring-brand-500 flex size-11 items-center justify-center gap-2 rounded-full focus-visible:ring-2 focus-visible:outline-none lg:w-auto lg:pr-4 lg:pl-3"
+        className="bg-band text-fg-muted focus-visible:ring-brand-500 flex size-11 items-center justify-center gap-2 rounded-full focus-visible:ring-2 focus-visible:outline-none lg:w-auto lg:pr-4 lg:pl-1.5"
       >
-        <MyPageIcon size={20} />
+        <ProfileAvatar url={member?.profileImageUrl ?? null} size="sm" />
         <span className="text-body-2 text-fg hidden font-semibold lg:inline">내 정보</span>
       </button>
 
