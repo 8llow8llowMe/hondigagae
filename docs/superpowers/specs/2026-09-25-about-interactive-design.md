@@ -6,7 +6,7 @@
 > [#916](https://github.com/8llow8llowMe/hondigagae/issues/916) 만져 보는 예시 ·
 > [#917](https://github.com/8llow8llowMe/hondigagae/issues/917) 캐릭터
 > 작성: 2026-09-25
-> 상태: **설계 확정 · 구현 전** — 계획 `docs/superpowers/plans/2026-09-25-about-interactive.md`
+> 상태: **구현 완료** (#914 · #915 · #916 · #917, 2026-09-25) — 계획 `docs/superpowers/plans/2026-09-25-about-interactive.md`, 세부명세 `frontend/docs/features/about/소개페이지-세부명세.md`
 > 선행 명세: `docs/superpowers/specs/2026-09-15-about-landing-design.md` (#635). **이 문서가 그 명세의 §6-4(모션) · §9(이미지 없음)를 개정한다.** 두 문서가 갈리면 이 문서가 이긴다. 나머지(절 구성 · 문구 · 표면 예외 · 접근성)는 선행 명세 그대로다.
 > 시안: 인터랙티브 데모(사용자 검토용 비공개 아티팩트, 2026-09-25 v5). 데모는 방향을 보는 독립 HTML 이지 구현 코드가 아니다.
 
@@ -312,7 +312,7 @@ useCountUp(target: number, play: boolean): number
 
 ## 12. 후속 · 미결
 
-- **캐릭터 SVG 벡터화.** PNG 로 먼저 싣는다. 벡터화 도구로 옮기고 색을 토큰 값에 맞춘 뒤 기존 일러스트와 같은 그레인 필터를 얹는다. 별도 이슈.
+- **캐릭터 SVG 벡터화.** PNG 로 먼저 싣는다. 벡터화 도구로 옮기고 색을 토큰 값에 맞춘 뒤 기존 일러스트와 같은 그레인 필터를 얹는다. 별도 이슈 [#930](https://github.com/8llow8llowMe/hondigagae/issues/930).
 - **다시 짜기 시연.** "가짜 AI" 로 읽힌다는 판단이 나오면 이 줄만 걷는다. 나머지 C 는 독립이다.
 - **D 모바일 고정 무대.** 채택하지 않았다. 모바일 체류 시간 데이터가 생기면 다시 본다.
 - **`animation-timeline`.** Firefox 지원 뒤 패럴랙스 · 진행선을 CSS(`animation-timeline: scroll()`)로 바꿀 수 있다. 그때 `useScrollFrame` 소비자 둘이 빠진다.
