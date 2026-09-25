@@ -287,29 +287,31 @@ test.describe('카드 안 상태 제목 — #456①', () => {
 })
 
 /**
- * **L0 위 블록은 카드 안 글줄과 같은 세로선에 선다** (`lib/ui/inset.ts` 의 `card` 주석, #451).
+ * **계정 카드의 동작 행은 이동 행과 같은 세로선에 선다** (#944).
  *
- * `md` 이상에서 카드 테두리 1px 만큼 남는 어긋남은 의도된 것이다 — `Surface` 가
- * `md:border` 를 써서 padding box 가 border box 보다 1px 안쪽인데, L0 블록에는 상쇄할
- * 테두리가 없다. 모바일(`border-y`)은 정확히 맞는다. **그 1px 이 20px 로 벌어지는 것을
- * 잡는 것이 이 테스트의 목적이다** (인셋을 `card` 가 아니라 `main` 으로 주면 그렇게 된다).
+ * 로그아웃 · 회원탈퇴는 예전(#451 · #913)에 카드 밖 L0 에 서서 "카드 테두리 1px 만큼만
+ * 어긋난다" 를 쟀다. #944 에서 `계정` 카드의 마지막 두 행이 되었으므로, 이제는 같은 카드
+ * 안 `비밀번호 변경`(이동 행, `<a>`)과 **글줄이 정확히 같은 x** 여야 한다 — 동작 행
+ * (`<button>`)이 인셋을 따로 들고 있어 한쪽만 바뀌면 계단이 생긴다.
  */
-test.describe('L0 위 블록의 세로 기준선 — /mypage', () => {
+test.describe('계정 카드 동작 행의 세로 기준선 — /mypage', () => {
   for (const [name, size] of Object.entries(VIEWPORTS)) {
     test(`${name}`, async ({ page }) => {
       await page.setViewportSize(size)
       await page.goto('/mypage')
 
-      const cardText = page.getByRole('heading', { name: '계정', exact: true })
-      const l0Action = page.getByRole('button', { name: '로그아웃', exact: true })
+      const card = page.locator('section[aria-labelledby="account-heading"]')
+      const moveRow = card.getByText('비밀번호 변경', { exact: true })
+      const logout = card.getByRole('button', { name: '로그아웃', exact: true }).locator('span')
+      const withdraw = card.getByRole('button', { name: '회원탈퇴', exact: true }).locator('span')
 
-      await expect(cardText).toBeVisible()
-      await expect(l0Action).toBeVisible()
+      await expect(moveRow).toBeVisible()
+      await expect(logout).toBeVisible()
+      await expect(withdraw).toBeVisible()
 
-      const drift = (await leftEdge(cardText)) - (await leftEdge(l0Action))
-
-      expect(drift).toBeLessThanOrEqual(size.width < 768 ? 0 : 1)
-      expect(drift).toBeGreaterThanOrEqual(0)
+      const x = await leftEdge(moveRow)
+      expect(await leftEdge(logout)).toBe(x)
+      expect(await leftEdge(withdraw)).toBe(x)
     })
   }
 })
@@ -921,11 +923,21 @@ test.describe('잘못된 placeId — 요청을 보내지 않는다 (#496)', () =
   /** 목 저장소의 첫 장소 (`place-data.ts` 의 `ID_BASE`). 18자리 Snowflake 다 */
   const FIRST_MOCK_PLACE_ID = '212481712381923329'
 
+  /*
+    **전역 헤더의 내 정보 조회는 세지 않는다** (#944). 헤더 `내 정보` 버튼이 프로필 사진을 싣느라
+    로그인 상태면 **어느 화면에서나** `/members/me` 를 한 번 부른다 — 이 화면의 placeId 와
+    무관하다. 이 테스트가 막는 것은 잘못된 id 로 장소 · 판정 요청이 나가는 것이라, 그 한
+    경로만 정확히 뺀다(접두사가 아니다 — `/members/me/pets` 등이 새면 여전히 잡힌다).
+  */
+  const GLOBAL_HEADER_CALL = '/api/bff/members/me'
+
   test('BFF 로 나가는 요청이 0건이다', async ({ page }) => {
     const calls: string[] = []
     page.on('request', (request) => {
       const { pathname } = new URL(request.url())
-      if (pathname.startsWith('/api/bff/')) calls.push(pathname)
+      if (pathname.startsWith('/api/bff/') && pathname !== GLOBAL_HEADER_CALL) {
+        calls.push(pathname)
+      }
     })
 
     await page.goto(BAD)

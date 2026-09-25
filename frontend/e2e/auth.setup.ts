@@ -18,6 +18,8 @@ export const MOCK_ACCOUNT = {
   email: 'demo@hondigagae.dev',
   password: 'password123!',
   name: '김제주',
+  /** 마이페이지 프로필 줄이 보이는 이름이다 — 이름이 아니라 닉네임을 쓴다 (#944) */
+  nickname: '제주댕댕',
 } as const
 
 setup('일반 계정으로 로그인해 세션을 저장한다', async ({ page }) => {
@@ -35,9 +37,9 @@ setup('일반 계정으로 로그인해 세션을 저장한다', async ({ page }
     스펙을 `/login` 으로 보낸다 — 실패 지점이 여기서 멀어진다.
   */
   await expect(page).toHaveURL(/\/mypage$/)
-  // 이름은 제목이 아니라 프로필 줄의 텍스트다 (`my-profile-section.tsx`).
+  // 닉네임은 제목이 아니라 프로필 줄의 텍스트다 (`my-profile-section.tsx`, #944 부터 이름 대신).
   // 이 값이 보인다는 것은 세션 쿠키와 목 응답이 **둘 다** 성립했다는 뜻이다.
-  await expect(page.getByText(MOCK_ACCOUNT.name, { exact: true })).toBeVisible()
+  await expect(page.getByText(MOCK_ACCOUNT.nickname, { exact: true })).toBeVisible()
 
   await page.context().storageState({ path: STATE_PATH })
 })
