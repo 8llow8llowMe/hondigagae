@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
+import { messages } from '@/lib/messages'
 import { aboutMessages } from '@/lib/messages/about'
 import { homeMessages } from '@/lib/messages/home'
 
@@ -92,5 +93,40 @@ describe('소개 페이지 문구 — 개수를 적어 두지 않는다', () => 
 
   it('aboutMessages 어디에도 "N곳" 이 없다', () => {
     expect(leaves(aboutMessages).filter((text) => /\d+\s*곳/.test(text))).toEqual([])
+  })
+})
+
+/**
+ * **낱말 규칙 — `판정` 을 쓰지 않는다** (#942, #940 사용자 검토).
+ *
+ * "심판받는 느낌이라 와닿지 않는다" 는 검토였다. 이름으로 쓸 때는 `오늘 상태`(일정의 날짜별
+ * 값은 이미 쓰던 `적합도`), 문장 안에서는 `알려 줘요` · `안내해요` 로 푼다. 장소를 `거른다`,
+ * 조건이 `갈린다` 도 같이 걷었다 — `안내해요` · `다른` 으로 쓴다.
+ *
+ * 소개 페이지가 먼저 바꿨고(`about-view.test.ts` "낱말 규칙"), 여기는 **모든 메시지 파일**을
+ * 덮는다. 주석은 문구가 아니라 보지 않는다 — 값 문자열과 문구 함수의 본문만 훑는다. 코드
+ * 식별자(`verdict` 등)와 서버가 내려주는 문장은 이 규칙 밖이다.
+ */
+describe('낱말 규칙 — 판정 · 거르다 · 갈리다를 쓰지 않는다 (#942)', () => {
+  function copyOf(value: unknown): string[] {
+    if (typeof value === 'string') return [value]
+    if (typeof value === 'function') return [value.toString()]
+    if (Array.isArray(value)) return value.flatMap(copyOf)
+    if (value !== null && typeof value === 'object') return Object.values(value).flatMap(copyOf)
+    return []
+  }
+  const copy = copyOf(messages)
+
+  it.each([
+    ['판정', '이름은 "오늘 상태" · "적합도", 문장은 "알려 줘요 · 안내해요"'],
+    ['거르', '장소를 거르지 않고 안내한다'],
+    ['거른', '장소를 거르지 않고 안내한다'],
+    ['걸러', '장소를 거르지 않고 안내한다'],
+    ['갈리', '"다른" 으로 쓴다'],
+    ['갈린', '"다른" 으로 쓴다'],
+  ])('화면 문구에 없다: "%s" — %s', (word) => {
+    // 훑을 대상이 비면 이 단언은 무엇이든 통과한다
+    expect(copy.length).toBeGreaterThan(500)
+    expect(copy.filter((text) => text.includes(word))).toEqual([])
   })
 })

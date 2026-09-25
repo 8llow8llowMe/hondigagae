@@ -78,7 +78,7 @@ describe('토큰 대비 — tint 배경 위 텍스트는 -700 을 쓴다 (AA 4.5
    * 실측(2026-09-22): high 5.43 · mid 5.82 · low 5.57 · critical 5.56 · unknown(`--band`)
    * 5.57. `--fg` 는 같은 면에서 15.20~16.29 라 여유가 크다.
    */
-  it.each([...cases, ['unknown', '판정 없음'] as [string, string]])(
+  it.each([...cases, ['unknown', '정보 없음'] as [string, string]])(
     'metric-%s tint 위에서 본문 `--fg-muted` 가 4.5:1 이상이다',
     (tone) => {
       const surface = tone === 'unknown' ? token('--band') : token(`--metric-${tone}-100`)

@@ -12,7 +12,7 @@ function render(overrides: Record<string, unknown> = {}) {
       onClose: () => undefined,
       onConfirm: () => undefined,
       title: '초코를 삭제할까요?',
-      description: '판정 기준이 사라져요. 되돌릴 수 없어요.',
+      description: '오늘 상태를 알려 줄 때 쓰던 기준이 사라져요. 되돌릴 수 없어요.',
       confirmLabel: '삭제하기',
       ...overrides,
     }),

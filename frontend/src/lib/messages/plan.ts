@@ -354,7 +354,7 @@ export const planMessages = {
    */
   verdictTocTitle: '일자별 적합도',
   /** 목차에서 판정을 못 낸 날. 낮은 등급으로 칠하지 않고 점선 unknown 으로 둔다 */
-  verdictTocUnavailable: '판정 없음',
+  verdictTocUnavailable: '정보 없음',
   /**
    * 세울 줄이 하나도 남지 않았을 때 목차를 대신하는 한 문장 (#847).
    *
@@ -365,7 +365,7 @@ export const planMessages = {
    * 카드가 각자 말하는 것을 목차가 하나로 뭉뚱그리면 틀린 날이 생긴다 (#717 이
    * `dayBeyondForecastReason` 에 세운 것과 같은 규칙이다).
    */
-  verdictTocAllUnavailable: '판정이 있는 날이 없어요.',
+  verdictTocAllUnavailable: '적합도를 확인할 수 있는 날이 없어요.',
   /**
    * 개요 스트립에 다 세우지 못한 일자 수 (#732). `{count}` 치환.
    *
@@ -374,7 +374,7 @@ export const planMessages = {
    * 카드가 그대로 갖는다.
    */
   verdictStripMore: '외 {count}일',
-  verdictErrorTitle: '이 날 판정을 불러오지 못했어요.',
+  verdictErrorTitle: '이 날 적합도를 불러오지 못했어요.',
   /**
    * 지난 날짜라 판정이 없는 날 (#497 · 서버 사유 `PAST_DATE`).
    *
@@ -382,9 +382,9 @@ export const planMessages = {
    * 합쇼체라 한 화면 안에서 말투가 갈린다 (`DESIGN.md` 문구 톤). **재시도를 권하지 않는
    * 문장이어야 한다** — 예보는 소급되지 않아 다시 물어도 생기지 않는다.
    */
-  verdictPastDate: '지난 날이라 날씨 판정을 확인할 수 없어요.',
+  verdictPastDate: '지난 날이라 날씨와 적합도를 확인할 수 없어요.',
   /** 반려견 특성 조회에 실패해 일반 조건으로 판정한 경우 */
-  verdictPetConditionMissing: '반려견 특성을 반영하지 못해 일반 조건으로 판정했어요.',
+  verdictPetConditionMissing: '반려견 특성을 반영하지 못해 일반 조건으로 알려 줘요.',
   /**
    * 체감온도를 못 받은 날에 큰 숫자 옆에 서는 단서 (#732). **예보 출처를 모를 때의 갈래다**
    * — 출처를 알면 `verdictFallbackMetric` 이 둘을 함께 말한다.
@@ -469,7 +469,7 @@ export const planMessages = {
    * 이미 같은 말을 하고 있어 항목마다 반복하면 새 정보 없이 줄만 늘어난다. 이 문구는
    * 일자의 주장과 행의 사실이 **어긋날 때만** 선다 (`plan-item-row.tsx`).
    */
-  walkSafetyPetConditionMissing: '이 항목은 반려견 특성 없이 판정했어요.',
+  walkSafetyPetConditionMissing: '이 항목은 반려견 특성 없이 안내해요.',
   /** 전체 조회 5xx·무응답 (D15-7). 항목 하나의 실패(`LOOKUP_FAILED`)와는 다른 자리다 */
   walkSafetyErrorTitle: '산책 위험도를 불러오지 못했어요.',
   /**
@@ -561,13 +561,13 @@ export const planMessages = {
    * (`PlanCommandProcessor.java:199-201`) 달라지는 것은 **다음 조회부터**다. 화면이 그
    * 계산을 복제하지 않고 다시 읽기만 하니, 바뀔 수 있다는 사실만 알린다.
    */
-  editPetsSaved: '동행견을 바꿨어요. 일자 판정과 준비물 근거가 달라질 수 있어요.',
+  editPetsSaved: '동행견을 바꿨어요. 일자별 적합도와 준비물 근거가 달라질 수 있어요.',
   editError: '수정하지 못했어요. 잠시 후 다시 시도해 주세요.',
 
   deleteAction: '일정 삭제',
   /** `{title}` 치환 */
   deleteConfirmTitle: '{title} 일정을 삭제할까요?',
-  deleteConfirmDescription: '담은 장소와 일자별 판정이 함께 사라져요. 되돌릴 수 없어요.',
+  deleteConfirmDescription: '담은 장소와 일자별 적합도가 함께 사라져요. 되돌릴 수 없어요.',
   deleteError: '삭제하지 못했어요. 잠시 후 다시 시도해 주세요.',
 
   // ── 일정 복사 (#617) ────────────────────────────────────────────────────
@@ -1088,7 +1088,7 @@ export const planMessages = {
   briefingWeatherEveHeading: '내일 날씨와 적합도',
   briefingWeatherTodayHeading: '오늘 날씨와 적합도',
   /** 프레젠터상 나오지 않아야 하는 조합이다 — 그래도 자리를 비워 두지 않는다 */
-  briefingWeatherMissing: '날씨 판정을 받지 못했어요',
+  briefingWeatherMissing: '날씨와 적합도를 받지 못했어요',
   /**
    * 하루 지표 줄 — `{value}` 치환 (#733).
    *
@@ -1131,7 +1131,7 @@ export const planMessages = {
   /** `goldenWindowStatus` 가 없는 옛 서버에서 창도 없을 때만 */
   briefingWalkNone: '추천할 산책 구간이 없어요',
   /** `walkTimes` 와 이유가 둘 다 비어 온 계약 밖 조합 */
-  briefingWalkUnknown: '산책 시간 판정을 받지 못했어요',
+  briefingWalkUnknown: '산책 시간 정보를 받지 못했어요',
   /**
    * `NO_PLACE_ITEM` 갈래의 길 (#716). **재시도가 아니라 할 일이다** — 서버 enum 이
    * *"정작 사용자가 할 일(장소 담기)은 화면 어디에도 드러나지 않는다"* 고 적어 둔 자리다.
