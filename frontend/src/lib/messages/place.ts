@@ -152,7 +152,7 @@ export const placeMessages = {
   detailPetPurchase: '구매 가능 품목',
   detailPetRental: '대여 가능 품목',
   /** intro.chkPet — DTO 주석이 "판단은 petInfo 우선" 이라 참고 값으로만 둔다 */
-  detailPetSourceText: '원천 표기',
+  detailPetSourceText: '원문 표기',
 
   // ── 장소 상세 · 적합도 패널 (아트보드 `혼디가개 장소 상세` 01·03·04) ──────────
 
