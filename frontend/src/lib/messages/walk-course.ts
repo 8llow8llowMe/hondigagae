@@ -239,7 +239,7 @@ export const walkCourseMessages = {
    * **자기가 뭘 잘못 누른 것이 아니라는 사실**이다.
    */
   noCoordinatesCommon:
-    '아직 좌표가 들어오지 않은 코스가 대부분이에요. 좌표가 채워지면 이 자리에 시간대별 판정이 생겨요.',
+    '아직 좌표가 들어오지 않은 코스가 대부분이에요. 좌표가 채워지면 이 자리에서 시간대별 상태를 알려 줘요.',
   /**
    * 남는 대안 하나 — 장소 찾기로 보낸다 (`/places`).
    *
@@ -253,7 +253,7 @@ export const walkCourseMessages = {
    */
   noCoordinatesPlacesAction: '시·종점 근처 장소 보기',
   noCoordinatesPlacesDescription:
-    '위 시종점 이름으로 장소를 찾으면 그곳의 오늘 판정을 볼 수 있어요.',
+    '위 시종점 이름으로 장소를 찾으면 그곳의 오늘 상태를 볼 수 있어요.',
   /** `다시 시도` 만이면 무엇을 다시 하는지 모른다 (D6) */
   goldenRetry: '날씨 다시 불러오기',
   /**

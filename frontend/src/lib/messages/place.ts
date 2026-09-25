@@ -85,7 +85,7 @@ export const placeMessages = {
    * **받침 판정 기준은 괄호 안이다** — 근거는 `withParenthesizedParticle` 주석.
    */
   filterPetSizeLabelFor: '{nameWithSize} 들어갈 수 있는 곳만',
-  filterPetSizeHint: '선택한 반려견 기준으로 걸러요. 반려견을 바꾸면 결과도 바뀝니다.',
+  filterPetSizeHint: '선택한 반려견 기준으로 안내해요. 반려견을 바꾸면 결과도 바뀌어요.',
   /**
    * 체중을 아는 아이면 그 기준까지 쓴다는 것을 밝힌다 — `{weight}` 치환.
    * **판정 근거를 감추지 않는다.** 왜 어떤 곳이 사라졌는지 말할 수 있어야 한다.
@@ -421,7 +421,7 @@ export const placeMessages = {
    * 30일 보기의 각주. **기본 상태에서 보인다** (#603) — 30일이 기본이 되면서, 이 카드가
    * 적합도보다 멀리 본다는 것이 첫 화면에서 바로 읽힌다.
    */
-  detailCongestionExtendedNote: '혼잡도 예측은 30일까지 있어요. 날씨 판정은 11일까지예요.',
+  detailCongestionExtendedNote: '혼잡도 예측은 30일까지 있어요. 적합도는 11일까지예요.',
   /**
    * 기간 토글. **이름은 전환 방향이고 기본값이 아니다** — 기본이 30일이라 첫 화면에 서는
    * 것은 `Collapse`(`7일만 보기`) 쪽이다.

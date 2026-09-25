@@ -68,7 +68,6 @@ export const homeMessages = {
    * 홈에 돌아왔을 때 기준이 바뀌면서 이 줄이 사라진다. 화면이 실제로 그렇게 움직인다.
    */
   basisDefaultNote: '제주시 대표 지점이에요. 장소를 보면 그곳 기준으로 바뀌어요',
-  reasonsLink: '판정 근거 보기',
 
   // ── 오늘의 산책 골든타임 (#158) ────────────────────────────────────────────
   goldenHeading: '오늘 산책하기 좋은 시간',
@@ -217,7 +216,7 @@ export const homeMessages = {
    * (루트 `CLAUDE.md`, `regional-weather-section.tsx` `RegionRow`).
    */
   goldenNoForecast: '오늘 남은 예보가 없어요',
-  goldenNoForecastDesc: '남은 시간대 예보가 없어 오늘 판정을 만들 수 없어요.',
+  goldenNoForecastDesc: '남은 시간대 예보가 없어 오늘 상태를 알려 줄 수 없어요.',
 
   // ── 제주 권역 날씨 비교 (#158) ─────────────────────────────────────────────
   regionHeading: '오늘 나가기 좋은 권역',
@@ -255,7 +254,7 @@ export const homeMessages = {
    */
   regionNoneWarning:
     '기상특보 경보가 발효 중이라 권역을 추천하지 않아요. 아래 비교는 참고용이에요.',
-  regionNoneForecast: '오늘 예보를 받지 못해 권역을 판정할 수 없어요.',
+  regionNoneForecast: '오늘 예보를 받지 못해 권역을 추천할 수 없어요.',
   /**
    * 점수의 뜻과 만점 (#638). **`regionScoreNote`('날씨만 본 점수예요')를 되살렸다.**
    *
@@ -458,7 +457,7 @@ export const homeMessages = {
   scoreUnavailable: '판단 근거 부족',
   indoorHeading: '비 올 때 갈 만한 실내',
   /** 미로그인 안내 */
-  guestVerdictNotice: '반려견을 등록하면 우리 아이 기준으로 판정해요',
+  guestVerdictNotice: '반려견을 등록하면 우리 아이 기준으로 알려 줘요',
   registerPet: '반려견 등록',
   /**
    * 프로필 태그는 짧은 표기를 쓴다 — 아트보드 `01 홈 · P1`.
@@ -479,7 +478,7 @@ export const homeMessages = {
    * (`traitHeat`). 무엇이 반영되는지가 예로 보여야 등록할 이유가 된다.
    */
   guestProfileTitle: '우리 아이 기준으로 보려면',
-  guestProfileDesc: '크기·더위 민감도까지 넣은 판정을 볼 수 있어요',
+  guestProfileDesc: '크기·더위 민감도까지 반영한 오늘 상태를 볼 수 있어요',
   /**
    * 섹션 푸터. **여기도 "맞는 곳" 을 쓰지 않는다** — 제목이 약속을 거뒀는데 푸터가
    * 그대로면 같은 섹션이 두 가지 말을 한다 (`suitabilityHeading`).
@@ -502,5 +501,5 @@ export const homeMessages = {
   /** 메타 줄 · 태그의 실내/야외 표기 */
   indoor: '실내',
   outdoor: '야외',
-  verdictErrorTitle: '오늘 판정을 불러오지 못했어요.',
+  verdictErrorTitle: '오늘 상태를 불러오지 못했어요.',
 } as const

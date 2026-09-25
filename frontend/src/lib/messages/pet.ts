@@ -52,7 +52,7 @@ export const petMessages = {
    * 셀 수 없는 것을 숫자로 적으면 그 문장이 거짓이 된다.
    */
   deleteConfirmTitle: '{name} 삭제할까요?',
-  deleteConfirmDescription: '판정 기준이 사라져요. 되돌릴 수 없어요.',
+  deleteConfirmDescription: '오늘 상태를 알려 줄 때 쓰던 기준이 사라져요. 되돌릴 수 없어요.',
   deleteDialogLabel: '반려견 삭제',
   cancel: '취소',
   backToList: '목록으로',
@@ -106,7 +106,7 @@ export const petMessages = {
   hints: {
     birthYm: '숫자만 입력해도 2017-05 형식으로 맞춰져요',
     /** 값이 어디에 쓰이는지 말한다 — 그래야 모르면 비워도 되는 것이 전달된다 */
-    weightKg: '입장 체중 제한이 있는 곳을 걸러 줄 때 써요. 적으면 크기가 저절로 맞춰져요',
+    weightKg: '입장 체중 제한이 있는 곳을 안내할 때 써요. 적으면 크기가 저절로 맞춰져요',
   },
 
   // 검증 — PetValidationMessage 복제본
@@ -153,7 +153,7 @@ export const petMessages = {
    * 체중까지 필수처럼 보이면 모르는 사람이 대충 적는다 — 그 값이 장소 필터 판정에
    * 그대로 쓰인다.
    */
-  weightHelp: '모르면 비워 두세요. 입장 체중 제한이 있는 곳을 걸러 줄 때 써요.',
+  weightHelp: '모르면 비워 두세요. 입장 체중 제한이 있는 곳을 안내할 때 써요.',
 
   /**
    * 사진·대표 카드의 제목·부제 (#464). 3층 표면으로 옮기며 이 블록이 **자기 카드**가

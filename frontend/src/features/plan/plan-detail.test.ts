@@ -490,8 +490,8 @@ function verdictsOf(days: number) {
 /**
  * 가운데 하루만 판정을 못 낸 사흘 (#847).
  *
- * **꼬리가 아니라 가운데다.** 꼬리의 `판정 없음` 은 이제 줄로 서지 않고 `외 N일` 에
- * 흡수되므로, 판정 없음 **배지**를 보는 단언은 앞뒤가 판정으로 막힌 날을 써야 한다.
+ * **꼬리가 아니라 가운데다.** 꼬리의 `정보 없음` 은 이제 줄로 서지 않고 `외 N일` 에
+ * 흡수되므로, 정보 없음 **배지**를 보는 단언은 앞뒤가 판정으로 막힌 날을 써야 한다.
  */
 function verdictsWithUnjudgedMiddle() {
   return [
@@ -627,7 +627,7 @@ describe('PlanOverviewPanel', () => {
     "앵커에 축이 없다" 는 더 이상 이 규칙을 말하지 않는다 — 규칙은 **배지가 축을 그리지
     않는다** 이고, 그 범위에서 재야 뜻이 유지된다.
   */
-  it('판정을 못 낸 목차 배지도 축 라벨 없이 판정 없음만 쓴다', () => {
+  it('판정을 못 낸 목차 배지도 축 라벨 없이 정보 없음만 쓴다', () => {
     const markup = renderOverview({ verdicts: verdictsWithUnjudgedMiddle() })
     const badge = tocBadgeTag(markup, messages.plan.verdictTocUnavailable)
 
@@ -817,13 +817,13 @@ describe('PlanOverviewPanel — 일자별 적합도 목차 (#732 · #841)', () =
   /*
     **상한이 세는 것은 판정이 있는 일자다** (#847). 일곱이라는 값은 세로 예산에서 나왔지만
     (줄당 44px), 일곱 줄을 채우려고 요약하지 않는 줄을 세우지는 않는다 — 꼬리의
-    `판정 없음` 은 앵커로 가 봐야 일자 카드가 같은 사유 문장 하나를 낼 뿐이라 `외 N일` 이
+    `정보 없음` 은 앵커로 가 봐야 일자 카드가 같은 사유 문장 하나를 낼 뿐이라 `외 N일` 이
     개수로 말하는 편이 짧고 정확하다.
 
     **`PLAN_VERDICT_TOC_MAX_DAYS` 로 재지 않는다** — 상한과 무관하게 성립하는 규칙이라
     상한 안쪽(넷)에서 잰다. 상한과 함께 재면 둘 중 어느 것이 접었는지 못 가린다.
   */
-  it('꼬리의 판정 없음은 줄로 서지 않고 개수로 접힌다', () => {
+  it('꼬리의 정보 없음은 줄로 서지 않고 개수로 접힌다', () => {
     const markup = renderOverview({
       verdicts: [
         ...verdictsOf(2),
@@ -839,10 +839,10 @@ describe('PlanOverviewPanel — 일자별 적합도 목차 (#732 · #841)', () =
   })
 
   /*
-    **앞·중간은 떼지 않는다.** 거기서 `판정 없음` 은 그 날의 사실이고, 떼면 목차가 일자를
+    **앞·중간은 떼지 않는다.** 거기서 `정보 없음` 은 그 날의 사실이고, 떼면 목차가 일자를
     건너뛰어(1 · 3일차) "2일차는 어디 갔나" 가 된다.
   */
-  it('가운데 판정 없음은 그대로 선다 — 목차가 일자를 건너뛰지 않는다', () => {
+  it('가운데 정보 없음은 그대로 선다 — 목차가 일자를 건너뛰지 않는다', () => {
     const markup = renderOverview({ verdicts: verdictsWithUnjudgedMiddle() })
 
     expect(tocAnchors(markup)).toHaveLength(3)
@@ -852,13 +852,13 @@ describe('PlanOverviewPanel — 일자별 적합도 목차 (#732 · #841)', () =
 
   /*
     **요약할 것이 없으면 목차가 아니라 한 문장이다** (#847). 예보 지평선보다 먼 일정 ·
-    지난 일정 · 장소를 안 담은 일정이 여기로 떨어진다 — 예전에는 `판정 없음` 일곱 줄이
+    지난 일정 · 장소를 안 담은 일정이 여기로 떨어진다 — 예전에는 `정보 없음` 일곱 줄이
     353px 를 쓰면서 아무것도 요약하지 않았다 (D18-2).
 
     **`nav` 가 없는 것까지 잰다.** 링크 없는 랜드마크는 링크 목록에도 로터에도 잡히지
     않으면서 이름만 차지한다 (#848 이 보는 경로와 같다).
   */
-  it('전부 판정 없음이면 목차가 한 문장으로 접힌다', () => {
+  it('전부 정보 없음이면 목차가 한 문장으로 접힌다', () => {
     const markup = renderOverview({
       verdicts: verdictsOf(7).map((verdict) => ({
         ...verdict,
@@ -928,7 +928,7 @@ describe('PlanOverviewPanel — 일자별 적합도 목차 (#732 · #841)', () =
   })
 
   /* 판정을 못 낸 줄도 같다 — 무엇의 판정이 없는지는 그 줄이 말해야 한다 */
-  it('판정 없음 줄에도 축이 붙는다', () => {
+  it('정보 없음 줄에도 축이 붙는다', () => {
     const markup = renderOverview({ verdicts: verdictsWithUnjudgedMiddle() })
 
     expect(tocRowText(markup, 2)).toBe(
