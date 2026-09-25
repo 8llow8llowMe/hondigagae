@@ -17,6 +17,7 @@ import {
 } from '@/features/about/about-specimen-data'
 import { CongestionSpecimen } from '@/features/about/congestion-specimen'
 import { EmergencySpecimen } from '@/features/about/emergency-specimen'
+import { FeatureTabs } from '@/features/about/feature-tabs'
 import { GoldenCurveSpecimen } from '@/features/about/golden-curve-specimen'
 import { HeroParallax, ScrollCue } from '@/features/about/hero-parallax'
 import { IntroBand } from '@/features/about/intro-band'
@@ -39,17 +40,22 @@ import { cn } from '@/lib/utils/cn'
  * 서비스 소개 — `/about` (#611 → #635).
  *
  * **서버 컴포넌트다.** 세션도 프리페치도 없고 백엔드를 부르지 않는다. 클라이언트 경계는
- * `Reveal` · `ScrollStage`(+ `ScrollStagePoint`) · 예시 4개다 (명세 §6-4 · 2026-09-25 §9-1).
+ * `Reveal` · `ScrollStage`(+ `ScrollStagePoint`) · `FeatureTabs`(#940) · 예시 4개다 (명세 §6-4 ·
+ * 2026-09-25 §9-1).
  *
  * **캐릭터는 세 자리에만 선다** (#917, 명세 2026-09-25 §6) — 히어로(올려다보기) · 질문 2 곡선
  * 카드 윗변(단계 · 핸들에 따른 자세) · 마무리(정면 앉기). 질문 1 · 질문 3 · 위급 · 데이터에는
  * 두지 않는다 — 그 절의 문장과 묶이지 않는다. 늘 카드 **밖**에 서고 등급 색을 칠하지 않는다.
  *
  * **질문 1 · 질문 2 · 위급 절은 스크롤 무대다** (#914, 명세 2026-09-25 §3). 왼쪽 항목이 화면
- * 가운데에 올 때마다 오른쪽 예시가 그 항목이 말하는 상태가 된다. 질문 3 은 하위 카드 넷이
- * 한 항목씩이라 무대로 만들 항목 목록이 없고, 데이터 절은 심사자 몫이라 훑기가 우선이다.
+ * 가운데에 올 때마다 오른쪽 예시가 그 항목이 말하는 상태가 된다. 고정 예시 위에는 맥락 줄
+ * (`표지어 · 제목` + 바로가기)이 붙는다(#940). 데이터 절은 심사자 몫이라 훑기가 우선이다.
  * 무대 안 예시는 `Reveal` 로 감싸지 않는다 — 무대가 등장을 대신하고, 둘이 겹치면 단계 0 이
  * 두 번 숨는다.
+ *
+ * **질문 3 은 무대가 아니라 목록 + 예시 하나다** (#940, `FeatureTabs`). 네 항목이 저마다
+ * 인터랙션을 가진 예시라 스크롤로 넘기면 예시 안 조작과 부딪히고, 무대가 네 번 이어지면
+ * 단조롭다. 1024 이상에서 절이 헤더 아래 한 화면을 채워 "멈춰서 눌러 보는 곳" 이 된다.
  *
  * 절은 보호자의 **질문 순서**다: 데려가도 돼요? → 지금 나가도 돼요? → 오늘 어디 가요? →
  * 위급하면? → 무엇을 보고 판단하나요. 앞은 보호자, 마지막은 심사자 몫이다 (명세 §2 · §4).
@@ -171,6 +177,14 @@ export function AboutView() {
             />
           }
           visual={<PlacesSpecimen />}
+          context={
+            <StageContextRow
+              kicker={about.q1.kicker}
+              heading={about.q1.heading}
+              href="/places"
+              link={about.q1.link}
+            />
+          }
         />
       </IntroBand>
 
@@ -179,8 +193,7 @@ export function AboutView() {
         <ScrollStage
           count={about.q2.points.length}
           {...STAGE_GRID}
-          copyClassName={cn(STAGE_GRID.copyClassName, 'about-pose-tail')}
-          visualClassName={cn(STAGE_GRID.visualClassName, 'about-pose-room')}
+          frameClassName="about-pose-room"
           copy={
             <QuestionCopy
               id="about-q2-heading"
@@ -194,81 +207,113 @@ export function AboutView() {
             />
           }
           visual={<GoldenCurveSpecimen />}
+          context={
+            <StageContextRow
+              kicker={about.q2.kicker}
+              heading={about.q2.heading}
+              href="/"
+              link={about.q2.link}
+            />
+          }
         />
       </IntroBand>
 
-      {/* ── 4. 오늘 어디 가요? ── */}
-      <IntroBand tone="plain" id={SECTION_ID.q3} labelledBy="about-q3-heading">
-        <QuestionCopy
-          id="about-q3-heading"
-          kicker={about.q3.kicker}
-          heading={about.q3.heading}
-          lead={about.q3.lead}
-        />
-        <div className="mt-6 grid gap-2 md:grid-cols-2 md:gap-6">
-          <Reveal>
-            <FeatureCard
-              title={about.q3.cards.suitability.title}
-              desc={about.q3.cards.suitability.desc}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-body-1 text-fg">{SUITABILITY_SPECIMEN.place}</p>
-                <MetricBadge tone="high" axis="suitability">
-                  {about.specimen.suitabilityGrade}
-                </MetricBadge>
-              </div>
-              <ul className="mt-3 grid gap-2">
-                {about.specimen.suitabilityReasons.map((reason) => (
-                  <li key={reason} className="text-body-2 text-fg flex gap-2">
-                    <span aria-hidden className="bg-fg-muted mt-2 size-1.5 shrink-0 rounded-full" />
-                    {reason}
-                  </li>
-                ))}
-              </ul>
-            </FeatureCard>
-          </Reveal>
-          <Reveal delay={60}>
-            <FeatureCard
-              title={about.q3.cards.congestion.title}
-              desc={about.q3.cards.congestion.desc}
-            >
-              <CongestionSpecimen />
-            </FeatureCard>
-          </Reveal>
-          <Reveal delay={120}>
-            <FeatureCard
-              title={about.q3.cards.aiPlan.title}
-              tag={about.specimen.planAiTag}
-              desc={about.q3.cards.aiPlan.desc}
-            >
-              <PlanSpecimen />
-            </FeatureCard>
-          </Reveal>
-          <Reveal delay={180}>
-            <FeatureCard title={about.q3.cards.indoor.title} desc={about.q3.cards.indoor.desc}>
-              <div role="img" aria-label={about.specimen.weatherAria} className="flex gap-2">
-                {WEATHER_SPECIMEN.map((day) => (
-                  <div key={day.day} className="bg-band flex-1 rounded-md p-2 text-center">
-                    <p className="text-caption text-fg-muted font-semibold">{day.day}</p>
-                    <p className="text-title-2 leading-7">{day.icon}</p>
-                    <p className="text-caption text-fg font-semibold">{day.temp}</p>
-                  </div>
-                ))}
-              </div>
-              <p className="text-body-2 text-fg mt-3 font-semibold">{about.specimen.indoorTitle}</p>
-              <div className="mt-1 flex flex-wrap gap-1.5">
-                {INDOOR_SPECIMEN.map((item) => (
-                  <Tag key={item} tone="neutral">
-                    {item}
-                  </Tag>
-                ))}
-              </div>
-            </FeatureCard>
-          </Reveal>
+      {/*
+        ── 4. 오늘 어디 가요? ── 목록 + 예시 하나 (#940). 1024 이상은 카피 5 : 예시 7 에 예시가
+        세 행(머리 · 목록 · 링크)에 걸친다. 그 미만은 머리 → 칩 → 예시 → 링크로 쌓인다.
+      */}
+      <IntroBand
+        tone="plain"
+        id={SECTION_ID.q3}
+        labelledBy="about-q3-heading"
+        className="about-q3-fill"
+      >
+        <div className="grid lg:grid-cols-12 lg:items-start lg:gap-x-10">
+          <QuestionCopy
+            id="about-q3-heading"
+            className="lg:col-span-5"
+            kicker={about.q3.kicker}
+            heading={about.q3.heading}
+            lead={about.q3.lead}
+          />
+          <FeatureTabs
+            label={about.q3.tablistLabel}
+            listClassName="mt-4 lg:col-span-5 lg:mt-6"
+            panelClassName="mt-4 lg:col-span-7 lg:col-start-6 lg:row-span-3 lg:row-start-1 lg:mt-0 lg:w-full lg:max-w-140 lg:self-center lg:justify-self-center"
+            items={[
+              {
+                key: 'suitability',
+                title: about.q3.cards.suitability.title,
+                desc: about.q3.cards.suitability.desc,
+                panel: (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-body-1 text-fg">{SUITABILITY_SPECIMEN.place}</p>
+                      <MetricBadge tone="high" axis="suitability">
+                        {about.specimen.suitabilityGrade}
+                      </MetricBadge>
+                    </div>
+                    <ul className="mt-3 grid gap-2">
+                      {about.specimen.suitabilityReasons.map((reason) => (
+                        <li key={reason} className="text-body-2 text-fg flex gap-2">
+                          <span
+                            aria-hidden
+                            className="bg-fg-muted mt-2 size-1.5 shrink-0 rounded-full"
+                          />
+                          {reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ),
+              },
+              {
+                key: 'congestion',
+                title: about.q3.cards.congestion.title,
+                desc: about.q3.cards.congestion.desc,
+                panel: <CongestionSpecimen />,
+              },
+              {
+                key: 'aiPlan',
+                title: about.q3.cards.aiPlan.title,
+                tag: about.specimen.planAiTag,
+                desc: about.q3.cards.aiPlan.desc,
+                panel: <PlanSpecimen />,
+              },
+              {
+                key: 'indoor',
+                title: about.q3.cards.indoor.title,
+                desc: about.q3.cards.indoor.desc,
+                panel: (
+                  <>
+                    <div role="img" aria-label={about.specimen.weatherAria} className="flex gap-2">
+                      {WEATHER_SPECIMEN.map((day) => (
+                        <div key={day.day} className="bg-band flex-1 rounded-md p-2 text-center">
+                          <p className="text-caption text-fg-muted font-semibold">{day.day}</p>
+                          <p className="text-title-2 leading-7">{day.icon}</p>
+                          <p className="text-caption text-fg font-semibold">{day.temp}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-body-2 text-fg mt-3 font-semibold">
+                      {about.specimen.indoorTitle}
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {INDOOR_SPECIMEN.map((item) => (
+                        <Tag key={item} tone="neutral">
+                          {item}
+                        </Tag>
+                      ))}
+                    </div>
+                  </>
+                ),
+              },
+            ]}
+          />
+          <MoreLink href="/ai-plans/new" className="mt-4 justify-self-start lg:col-span-5 lg:mt-3">
+            {about.q3.link}
+          </MoreLink>
         </div>
-        <MoreLink href="/ai-plans/new" className="mt-6">
-          {about.q3.link}
-        </MoreLink>
       </IntroBand>
 
       {/* ── 5. 위급하면? ── */}
@@ -289,6 +334,14 @@ export function AboutView() {
             />
           }
           visual={<EmergencySpecimen />}
+          context={
+            <StageContextRow
+              kicker={about.q4.kicker}
+              heading={about.q4.heading}
+              href="/emergency"
+              link={about.q4.link}
+            />
+          }
         />
       </IntroBand>
 
@@ -507,24 +560,28 @@ function QuestionCopy({
       </h2>
       <p className="text-body-1 text-fg-muted mt-2 max-w-2xl font-normal break-keep">{lead}</p>
       {points !== undefined && (
-        <ul className="mt-5 grid gap-3">
+        <ol className="mt-5 grid gap-3">
           {points.map((point, index) =>
             staged ? (
               <ScrollStagePoint key={point} index={index + 1} className="flex items-start gap-3">
-                <PointBody>{point}</PointBody>
+                <PointBody index={index + 1}>{point}</PointBody>
               </ScrollStagePoint>
             ) : (
               <li key={point}>
                 <Reveal delay={index * 60} className="flex items-start gap-3">
-                  <PointBody>{point}</PointBody>
+                  <PointBody index={index + 1}>{point}</PointBody>
                 </Reveal>
               </li>
             ),
           )}
-        </ul>
+        </ol>
       )}
+      {/*
+        무대 절의 바로가기는 1024 이상에서 고정 카드 위 맥락 줄로 올라간다(#940) — 여기 남기면
+        마지막 항목(58vh 칸 가운데)보다 화면의 30% 아래에 혼자 떠 있고 무대를 끝까지 내려야 보였다.
+      */}
       {href !== undefined && link !== undefined && (
-        <MoreLink href={href} className="mt-3">
+        <MoreLink href={href} className={cn('mt-3', staged && 'lg:hidden')}>
           {link}
         </MoreLink>
       )}
@@ -533,24 +590,64 @@ function QuestionCopy({
 }
 
 /**
- * 항목 하나의 몸 — 표지 칸 + 문장. 표지 칸의 `about-stage-mark` 는 무대가 켠 항목을 채우는
- * 선택자 훅이다(`globals.css`). 무대 밖에서는 아무 효과가 없다.
+ * 항목 하나의 몸 — 단계 번호 칸 + 문장 (#940).
+ *
+ * **문장은 행 제목 등급이다**(`text-body-1` → `lg:text-title-2`, 600 — DESIGN.md §3-1). 예전의
+ * 14px · 400 은 58vh 칸 안에서 각주처럼 읽혔다. 번호는 오른쪽 예시의 몇 번째 상태인지를
+ * 말한다 — 예전의 점은 그것을 말하지 못했다. **번호 칸의 기본 모양은 켜진 모양(채움)이다** —
+ * 정적 렌더 · 감속 모션이 끝 상태를 본다. 지나온 · 아직 안 온 모양은 `is-live` 아래에서
+ * `globals.css` 가 칠한다(`about-stage-*` 선택자 훅). 무대 밖에서는 아무 효과가 없다.
  */
-function PointBody({ children }: { children: ReactNode }) {
+function PointBody({ index, children }: { index: number; children: ReactNode }) {
   return (
     <>
       <span
         aria-hidden
-        className="about-stage-mark bg-intro-tint text-brand-700 grid size-7 shrink-0 place-items-center rounded-md"
+        className="about-stage-mark bg-brand-700 border-brand-700 text-fg-inverse text-body-2 grid size-8 shrink-0 place-items-center rounded-full border-2 font-semibold tabular-nums"
       >
-        <span className="bg-brand-700 size-1.5 rounded-full" />
+        {index}
       </span>
-      <p className="text-body-2 text-fg pt-1 break-keep">{children}</p>
+      <p className="about-stage-text text-body-1 lg:text-title-2 text-fg pt-1 font-semibold break-keep lg:pt-0">
+        {children}
+      </p>
     </>
   )
 }
 
-/** 인라인 액션 링크 — `--link`, 터치 영역 44 */
+/**
+ * 고정 카드 위 맥락 줄 (#940, 1024 이상). 절 제목은 항목 2 부터 화면 밖이라 예시만 남는다 —
+ * 표지어 · 제목을 카드 위에 한 줄로 남기고, 이 절에서 실제 기능으로 가는 바로가기를 붙여 둔다.
+ *
+ * **제목은 `aria-hidden` 이다** — 같은 절의 `h2` 를 되풀이한 것이다. 절 제목이 헤더 밑으로
+ * 사라진 뒤에만 드러난다(`is-heading-gone`, `globals.css`). 바로가기는 1024 이상에서 이것
+ * 하나다 — 항목 아래 것은 `lg:hidden` 이라 같은 링크가 두 번 읽히지 않는다.
+ */
+function StageContextRow({
+  kicker,
+  heading,
+  href,
+  link,
+}: {
+  kicker: string
+  heading: string
+  href: string
+  link: string
+}) {
+  return (
+    <>
+      <p aria-hidden className="about-stage-context-title text-body-2 text-fg-muted font-semibold">
+        <span className="text-link">{kicker}</span> · {heading}
+      </p>
+      <MoreLink href={href}>{link}</MoreLink>
+    </>
+  )
+}
+
+/**
+ * 절 바로가기 — `--link`, 터치 영역 44. **문장 속 인라인 링크가 아니라 절의 액션이라
+ * `text-body-1`(600)이다** (#940, DESIGN.md §3-1 예외 줄). 14px 일 때는 18px 항목 문장보다 작아
+ * 위계가 뒤집혔다.
+ */
 function MoreLink({
   href,
   className,
@@ -564,40 +661,12 @@ function MoreLink({
     <Link
       href={href}
       className={cn(
-        'text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex min-h-11 items-center gap-1 font-semibold focus-visible:ring-2 focus-visible:outline-none',
+        'text-body-1 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex min-h-11 items-center gap-1 font-semibold focus-visible:ring-2 focus-visible:outline-none',
         className,
       )}
     >
       {children} <span aria-hidden>→</span>
     </Link>
-  )
-}
-
-/** 질문 3 의 하위 카드 — 제목(h3) · 설명 · 예시 블록. `Surface` 는 h2 를 그리므로 여기서는 제목 없이 쓰고 h3 를 직접 둔다 */
-function FeatureCard({
-  title,
-  tag,
-  desc,
-  children,
-}: {
-  title: string
-  tag?: string
-  desc: string
-  children: ReactNode
-}) {
-  return (
-    <Surface className="-mx-4 h-full md:mx-0">
-      <div className={cn('pt-4 pb-4', INSET_CLASS.card)}>
-        <h3 className="text-title-2 text-fg font-semibold">
-          {title}
-          {tag !== undefined && (
-            <span className="text-caption text-fg-muted ml-1.5 font-semibold">· {tag}</span>
-          )}
-        </h3>
-        <p className="text-body-2 text-fg-muted mt-1 break-keep">{desc}</p>
-        <div className="border-border mt-4 border-t pt-3">{children}</div>
-      </div>
-    </Surface>
   )
 }
 
