@@ -1053,6 +1053,163 @@ body {
 }
 
 /*
+  소개 페이지 캐릭터 — `/about` 세 자리에만 쓴다 (#917, 명세
+  `docs/superpowers/specs/2026-09-25-about-interactive-design.md` §6).
+
+  **카드 밖에 선다.** 카드 윗변이나 절 끝선에 발을 댄다 — 카드 안에 넣지 않는다(§6-1).
+  절 끝선에 발을 대는 음수 아래 여백은 `IntroBand` 의 아래 패딩(`py-10` · `md:py-16`)과 같은
+  값이다. 패딩을 바꾸면 여기도 같이 바꾼다.
+
+  **색 · 그림자 · duration 을 새로 두지 않는다.** 등장은 `about-word-in`(200), 자세 전환은
+  색 · 투명도 150, 열기 선은 변형 200 이다(DESIGN.md §8). 반복 애니메이션은 없다.
+
+  - `.about-hero-dog` — 히어로. 판정 카드와 같은 패럴랙스 래퍼 기준 `absolute`. 1024 미만은
+    카드 **아래** 왼쪽에 앉는다(카드 모서리에 겹치면 캡션 · 이유 줄을 가린다) —
+    `.about-hero-dog-room` 이 그 자리를 연다. 개 높이 = 폭 × 418/346.
+  - `.about-pose*` — 질문 2 자세 스택. 폭 변수 `--about-pose-w` 하나로 세 장 · 열기 선 · 위
+    여백(`-room`, 예시 열) · 아래 여백(`-tail`, 카피 열)이 같이 움직인다. 높이 .87W 는 가장
+    높은 장(산책)의 비율이다.
+  - `.about-cta-dog` — 마무리. 1024 이상 그리드 자리는 컴포넌트가 준다(`lg:col-start-8` 등).
+*/
+.about-hero-dog {
+  position: absolute;
+  inset-inline-start: 0.5rem;
+  inset-block-start: 100%;
+  inline-size: 6rem;
+  pointer-events: none;
+  animation: about-word-in 200ms ease-out 500ms both;
+}
+
+.about-hero-dog-room {
+  padding-block-end: 4.75rem;
+}
+
+@media (width >= 48rem) {
+  .about-hero-dog-room {
+    padding-block-end: 3.25rem;
+  }
+}
+
+@media (width >= 64rem) {
+  .about-hero-dog {
+    /*
+      카드 글자(안쪽 21px)에 닿지 않는 가장 가까운 자리 — 가슴(폭의 .91)이 카드 테두리 안쪽
+      16px 까지, 코(.99)는 수치 칸과 이유 줄 사이 빈 띠에 온다. 시안의 -104 는 캡션 첫 글자를 가렸다.
+    */
+    inset-inline-start: -7.5rem;
+    inset-block: auto -1.75rem;
+    inline-size: 9.375rem;
+  }
+
+  .about-hero-dog-room {
+    padding-block-end: 0;
+  }
+}
+
+.about-pose-room,
+.about-pose-tail {
+  --about-pose-w: 9.375rem;
+}
+
+.about-pose-room {
+  padding-block-start: calc(var(--about-pose-w) * 0.87);
+}
+
+@media (width >= 64rem) {
+  .about-pose-room,
+  .about-pose-tail {
+    --about-pose-w: 12.25rem;
+  }
+
+  /*
+    무대의 sticky 예시는 그리드 끝에서 밀려 올라간다. 자세 자리만큼 예시가 길어지면 마지막
+    단계(앞발 · 특보)에서 그만큼 일찍 밀려 개 머리가 헤더 밑으로 들어간다(1280×800 실측 62px).
+    카피 열 끝에 같은 높이를 더해 카드가 #917 이전과 똑같이 오래 붙어 있게 한다.
+  */
+  .about-pose-tail {
+    padding-block-end: calc(var(--about-pose-w) * 0.87);
+  }
+}
+
+.about-pose {
+  position: absolute;
+  inset-inline-end: 1.25rem;
+  inset-block-end: 100%;
+  inline-size: var(--about-pose-w);
+  block-size: calc(var(--about-pose-w) * 0.87);
+  pointer-events: none;
+}
+
+.about-pose-layer {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-end: -1px;
+  opacity: 0;
+  transition: opacity 150ms ease-out;
+}
+
+.about-pose-leash {
+  inline-size: calc(var(--about-pose-w) * 0.936);
+}
+
+.about-pose-stand {
+  inline-size: calc(var(--about-pose-w) * 0.904);
+}
+
+.about-pose-hot {
+  inline-size: calc(var(--about-pose-w) * 0.981);
+}
+
+/* 열기 선 — 들린 앞발 아래. 앞발일 때만 올라온다 */
+.about-pose-heat {
+  inset-inline-end: calc(var(--about-pose-w) * 0.25);
+  inset-block-end: 0;
+  inline-size: calc(var(--about-pose-w) * 0.12);
+  transform: translateY(0.375rem);
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out;
+}
+
+.about-pose[data-pose='leash'] .about-pose-leash,
+.about-pose[data-pose='stand'] .about-pose-stand,
+.about-pose[data-pose='hot'] .about-pose-hot,
+.about-pose[data-pose='hot'] .about-pose-heat {
+  opacity: 1;
+  transform: none;
+}
+
+.about-cta-dog {
+  position: relative;
+  justify-self: end;
+  inline-size: 6rem;
+  margin-block: -0.5rem -2.5rem;
+  margin-inline-end: 0.75rem;
+  pointer-events: none;
+}
+
+@media (width >= 40rem) {
+  .about-cta-dog {
+    inline-size: 7.5rem;
+  }
+}
+
+@media (width >= 48rem) {
+  .about-cta-dog {
+    margin-block-end: -4rem;
+  }
+}
+
+@media (width >= 64rem) {
+  .about-cta-dog {
+    align-self: end;
+    justify-self: center;
+    inline-size: 8.5rem;
+    margin: 0 0 -4rem;
+  }
+}
+
+/*
   모션 민감 사용자를 존중한다 — DESIGN.md §8 · styling-guide.md §6 (이슈 #15).
 
   **애니메이션을 지우는 것이 아니라 한 프레임으로 줄인다.** `animation: none` 으로 지우면

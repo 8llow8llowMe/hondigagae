@@ -20,7 +20,14 @@ export const SCROLL_CUE_HIDE_AFTER = 40
  * 상태가 아니라 ref 로 `transform` 을 직접 고친다 — 스크롤 한 프레임마다 다시 그리지 않게.
  * 정적 렌더에는 `transform` 이 없다.
  */
-export function HeroParallax({ children }: { children: ReactNode }) {
+export function HeroParallax({
+  className,
+  children,
+}: {
+  /** 레이아웃 유틸리티만 — 캐릭터(#917)가 이 래퍼 기준으로 `absolute` 로 선다 */
+  className?: string
+  children: ReactNode
+}) {
   const ref = useRef<HTMLDivElement>(null)
 
   useScrollFrame(() => {
@@ -35,7 +42,11 @@ export function HeroParallax({ children }: { children: ReactNode }) {
     node.style.transform = `translate3d(0, ${-shift}px, 0)`
   })
 
-  return <div ref={ref}>{children}</div>
+  return (
+    <div ref={ref} className={className}>
+      {children}
+    </div>
+  )
 }
 
 /**
