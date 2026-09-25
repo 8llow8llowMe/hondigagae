@@ -116,15 +116,24 @@
 | --- | --- | --- |
 | 제목 어절 등장 | `h1` 을 어절(공백) 단위 `span` 으로 나누고 60ms 씩 지연해 200ms 로 올라온다 | 서버 컴포넌트 `SplitHeading` + `globals.css` `@keyframes`. **JS 없음** |
 | 첫 화면 높이 | 1024 이상에서 히어로가 `100dvh - --header-h` 를 채운다 | `globals.css` 이름 클래스 `about-hero-fill` — `app/globals.css` 가 이미 같은 식(`calc(100dvh - var(--header-h))`)을 쓴다 |
-| 카드 패럴랙스 | 1024 이상에서 판정 카드가 스크롤의 0.12배로 거슬러 올라간다(최대 108px) | `useScrollProgress` — passive scroll + rAF 한 번 |
-| 스크롤 힌트 | 히어로 하단에 "내려가며 질문 다섯 개에 답해요" 한 줄, 스크롤 40px 이후 사라진다. 반복하지 않는다 | 같은 훅 |
-| 절 내비 | 1280 이상 왼쪽 고정: 처음 · 질문 1 · 질문 2 · 질문 3 · 그리고 · 데이터. 현재 절이 강조되고 누르면 이동한다 | 클라이언트 `SectionNav` + `useActiveSection`(`rootMargin: '-40% 0px -55% 0px'`) |
-| 모바일 진행선 | 1024 미만에서 헤더 바로 아래 2px `--brand-500` 선이 문서 진행률만큼 찬다 | 같은 `useScrollProgress`. `transform: scaleX` 만 쓴다 |
+| 카드 패럴랙스 | 1024 이상에서 판정 카드가 스크롤의 0.12배로 거슬러 올라간다(최대 108px) | `HeroParallax` + `useScrollFrame` — 상태가 아니라 ref 로 `transform` 을 고친다 |
+| 스크롤 힌트 | 1024 이상 히어로 카피 아래 "내려가며 질문 다섯 개에 답해요" 한 줄, 질문 1 절로 가는 앵커. 스크롤 40px 이후 사라지고 맨 위로 돌아오면 다시 선다. 반복 애니메이션은 없다 | `ScrollCue` + `useScrollFrame`. 사라진 동안 `tabIndex=-1` · `aria-hidden` |
+| 절 내비 | 1280 이상 왼쪽 고정: 처음 · 데려가도 돼요? · 지금 나가도 돼요? · 오늘 어디 가요? · 위급하면? · 무엇을 보고 판단하나요. 현재 절이 강조되고 누르면 이동한다. **1280–1535 는 점만, 1536 이상은 라벨까지** | `SectionNav` + `useScrollFrame` · `stepAt`(기준선 뷰포트 40%) |
+| 모바일 진행선 | 1024 미만에서 헤더 바로 아래 2px `--brand-500` 선이 문서 진행률만큼 찬다 | `ScrollProgressBar` + `useScrollFrame`. `transform: scaleX` 만 쓴다 · 위치는 `globals.css` `.about-progress` |
 | 규모 카운트업 | 315 · 214 · 5 가 화면에 들어올 때 600ms 로 한 번 센다 | `verdict-specimen.tsx` 의 `useCountUp` 을 `use-count-up.ts` 로 빼서 공유 |
 
-- **어절 등장은 스크린리더에 한 문장으로 읽혀야 한다.** `h1` 에 `aria-label` 로 원문을 두고 조각 `span` 은 `aria-hidden` 이다.
+- **어절 등장은 스크린리더에 한 문장으로 읽혀야 한다.** 원문은 `h1` 안 `sr-only` 텍스트로, 조각 `span` 은 `aria-hidden` 이다. `aria-label` 로 두지 않는 이유는 브라우저 번역이 `aria-label` 을 옮기지 않아서다(판정 카드 · 규모 숫자와 같은 계약).
+- **감속 모션이면 어절이 한꺼번에 끝 상태로 선다.** 전역 감속 규칙이 `animation-delay` 도 0 으로 끈다 — 길이만 줄이면 `both` 채우기 때문에 지연 동안 투명하게 머물러 어절이 60ms 간격으로 하나씩 튀어나왔다(#915 검토, Playwright `reducedMotion` 재현).
 - **절 내비는 랜드마크를 늘리지 않는다.** `nav` 가 아니라 `div` + 링크 목록이다 — 셸의 랜드마크(`header` · `nav`×2 · `main` · `footer`)만 둔다는 선행 명세 §8 을 지킨다. 링크는 `aria-current="true"` 로 현재 절을 알린다.
 - 진행선 · 패럴랙스 · 절 내비는 **장식**이라 감속 모션이면 멈춘다(진행선은 남되 전환 없음).
+- **절 내비 라벨은 각 절의 제목(`q1.heading` …)을 그대로 읽는다** — 같은 절을 두 이름으로 부르지 않게. 처음 안은 표지어(`질문 1` · `그리고`)였는데, 1280–1535 에서는 라벨이 링크의 유일한 이름이라 `그리고` 가 가는 곳을 말하지 못했다(WCAG 2.4.4, #915 검토). 새 문구는 `nav.top`(처음) · `nav.label`(목록 이름) 둘뿐이다.
+- **절 내비는 자기 면(흰 면 + 1px 테두리)을 갖는다.** 고정이라 그린 밴드(히어로 · 마무리) 위도 지나가는데, 면이 없으면 회색 점이 그린 위에서 사라진다. 그림자는 없다.
+- **1280 에서 라벨을 숨기는 이유:** 콘텐츠 왼쪽 끝이 104px(좌우 여백 64 + 밴드 안쪽 40)이라 라벨까지 두면 본문에 닿는다. 점만일 때 레일 오른쪽 끝은 약 68px 이다. 링크 이름은 `sr-only` 라벨이 준다.
+- **절 내비는 본문(`main`)이 끝나면 숨는다**(`opacity` 0 · `inert`). 푸터 글자는 왼쪽 40px 에서 시작해 1280×800 · 1366×768 · 1536×864 에서 맨 아래까지 내리면 흰 면이 푸터 문구를 가렸다(#915 검토 재현).
+- **절 앵커는 헤더 높이만큼 스크롤 여백(`scroll-margin-top: var(--header-h)`)을 둔다** — 없으면 `처음` 이 `scrollY = 64` 에 멈춰 스크롤 힌트가 다시 서지 않고, 다른 절도 표지어가 헤더 경계에 붙는다.
+- **규모 숫자는 셀 준비 중에 0 을 보인다.** 타일 등장은 타일 윗변이, 세기는 숫자가 선을 지날 때 시작해 약 17px 동안 끝 값(315)이 먼저 보였다가 44 로 떨어져 다시 셌다(#915 검토 재현).
+
+**구현 중 개정 (#915).** 계획은 `useScrollProgress`(y · 진행률 상태) · `useActiveSection`(`IntersectionObserver`) 두 훅이었다. 둘 다 **`useScrollFrame` 하나**로 바꿨다 — 스크롤 무대(§3-4)가 관측 사건으로는 빠른 스크롤의 위치를 놓쳐 스크롤마다 재기로 옮긴 것과 같은 이유이고, 패럴랙스 · 진행선은 상태를 두면 스크롤 한 프레임마다 다시 그리게 된다. 현재 절은 스크롤 무대의 `stepAt` 을 그대로 쓴다.
 
 ---
 
@@ -228,7 +237,7 @@
 | --- | --- | --- |
 | `ScrollStage` | #914 | 무대 래퍼. `useActiveStep` → 단계 플래그 클래스 + 컨텍스트 |
 | `ScrollStagePoint` | #914 | 항목 하나. 관측 대상 등록 · 켜짐 클래스 |
-| `HeroParallax` | #915 | 판정 카드 래퍼 · 스크롤 힌트 |
+| `HeroParallax` · `ScrollCue` | #915 | 판정 카드 패럴랙스 · 스크롤 힌트 (`hero-parallax.tsx`) |
 | `SectionNav` | #915 | 절 내비 |
 | `ScrollProgressBar` | #915 | 모바일 진행선 |
 | `ScaleCount` | #915 | 규모 타일 숫자 |
@@ -248,11 +257,12 @@ useActiveStep(count: number): {
   register: (index: number) => (node: Element | null) => void
 }
 
-// 요소의 뷰포트 통과율 0..1 과 문서 스크롤 y. rAF 스로틀, passive.
-useScrollProgress(): { y: number; doc: number }
+// 윗변들 → 단계. 무대와 절 내비가 같이 쓴다. null 은 건너뛰되 번호는 원래 자리로 센다.
+stepAt(tops: readonly (number | null)[], line: number): number
 
-// 절 id 목록 중 현재 절.
-useActiveSection(ids: readonly string[]): string | null
+// 스크롤 · 리사이즈마다 한 프레임에 한 번 onFrame (마운트 때 한 번 먼저). passive + rAF.
+// 패럴랙스 · 스크롤 힌트 · 진행선 · 절 내비가 쓴다 (#915 개정 — 계획의 두 훅을 대신한다).
+useScrollFrame(onFrame: () => void): void
 
 // 기존 verdict-specimen 의 것을 옮긴다. 시그니처 그대로.
 useCountUp(target: number, play: boolean): number
@@ -302,4 +312,4 @@ useCountUp(target: number, play: boolean): number
 - **캐릭터 SVG 벡터화.** PNG 로 먼저 싣는다. 벡터화 도구로 옮기고 색을 토큰 값에 맞춘 뒤 기존 일러스트와 같은 그레인 필터를 얹는다. 별도 이슈.
 - **다시 짜기 시연.** "가짜 AI" 로 읽힌다는 판단이 나오면 이 줄만 걷는다. 나머지 C 는 독립이다.
 - **D 모바일 고정 무대.** 채택하지 않았다. 모바일 체류 시간 데이터가 생기면 다시 본다.
-- **`animation-timeline`.** Firefox 지원 뒤 `useScrollProgress` 내부를 CSS 로 바꿀 수 있다. 훅 시그니처는 그대로 둔다.
+- **`animation-timeline`.** Firefox 지원 뒤 패럴랙스 · 진행선을 CSS(`animation-timeline: scroll()`)로 바꿀 수 있다. 그때 `useScrollFrame` 소비자 둘이 빠진다.
