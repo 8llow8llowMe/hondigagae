@@ -196,11 +196,14 @@ describe('PlaceDetailSection — 에러 분기', () => {
 })
 
 describe('PlaceDetailSection — nullable 섹션은 숨긴다', () => {
-  it('intro / images / overview 가 없으면 해당 섹션이 렌더되지 않는다', () => {
+  it('intro / images / overview 가 없으면 해당 묶음이 렌더되지 않는다', () => {
     const markup = render({ place: placeDetailWithoutOptionalSections })
 
     expect(markup).not.toContain(messages.place.detailSectionIntro)
-    expect(markup).not.toContain(messages.place.detailSectionOverview)
+    // 소개는 제목 카드 안 문단이라 절 이름이 없다 — 본문 자체가 없는지로 본다
+    expect(placeDetailWithoutOptionalSections.overview).toBeNull()
+    expect(render()).toContain('제주 자연을 그대로 살린 공간이다.')
+    expect(markup).not.toContain('제주 자연을 그대로 살린 공간이다.')
   })
 
   it('petInfo 가 없어도 반려견 동반 정보 섹션은 숨기지 않는다 (아트보드 04-①)', () => {
@@ -477,7 +480,7 @@ describe('원천에서 사라진 장소 — 안내를 먼저 보여 준다 (#146
     const markup = render({ place: placeDetailDelisted })
 
     expect(markup).toContain(placeDetailDelisted.title)
-    expect(markup).toContain(messages.place.detailSectionBasic)
+    expect(markup).toContain(messages.place.detailSectionVisit)
   })
 
   it('평소에는 안내가 없다', () => {
@@ -499,20 +502,19 @@ describe('원천에서 사라진 장소 — 안내를 먼저 보여 준다 (#146
   (`.rail-layout-detail-head`), 모바일은 이 순서 그대로 쌓인다. 그래서 여기서 순서가
   뒤집히면 모바일이 곧바로 회귀한다 — 트리를 폭마다 나누면 스크린리더가 같은 내용을 두 번 읽는다.
 
-  **#909 가 판정을 갤러리·제목 바로 뒤로 올렸다.** 예전 순서는 갤러리 → 제목 → 혼잡도 →
-  기본 정보 → 판정 → 본문이라 판정이 390 에서 다섯 번째 섹션이었고, 데스크톱(좌측 레일 첫
-  자리)과 위계가 갈렸다. 지금은 갤러리 → 제목 → 판정 → 혼잡도 → 기본 정보 → 본문이다.
+  **#909 가 판정을 갤러리·제목 바로 뒤로 올렸고**, 제안 A(#935)가 반려견 동반을 제목
+  카드 안으로 올렸다. 지금은 갤러리 → 제목 → 반려견 동반 → 판정 → 혼잡도 → 방문 정보다.
 */
-describe('PlaceDetailSection — 모바일 섹션 순서 (#909)', () => {
+describe('PlaceDetailSection — 모바일 섹션 순서 (#909 · 제안 A)', () => {
   function positions() {
     const markup = render()
     return {
       title: markup.indexOf(placeDetail.title),
+      pet: markup.indexOf(messages.place.detailSectionPet),
       // 판정 패널의 첫 줄 — `{name}에게 적합해요` (`place-suitability-panel.tsx`)
       verdict: markup.indexOf(messages.place.detailSuitabilitySpeaker.replace('{name}', '몽실이')),
       congestion: markup.indexOf(messages.place.detailCongestionTitle),
-      basic: markup.indexOf(messages.place.detailSectionBasic),
-      pet: markup.indexOf(messages.place.detailSectionPet),
+      visit: markup.indexOf(messages.place.detailSectionVisit),
     }
   }
 
@@ -522,35 +524,36 @@ describe('PlaceDetailSection — 모바일 섹션 순서 (#909)', () => {
     }
   })
 
-  it('판정이 제목 바로 다음, 혼잡도보다 먼저 온다', () => {
-    const { title, verdict, congestion } = positions()
+  /* "데려가도 되나" 가 이 서비스의 첫 질문이다 — 예전에는 다섯 번째 카드였다 */
+  it('반려견 동반이 제목 다음, 판정보다 먼저 온다', () => {
+    const { title, pet, verdict } = positions()
 
-    expect(verdict).toBeGreaterThan(title)
+    expect(pet).toBeGreaterThan(title)
+    expect(pet).toBeLessThan(verdict)
+  })
+
+  it('판정이 혼잡도보다 먼저 온다', () => {
+    const { verdict, congestion } = positions()
+
     expect(verdict).toBeLessThan(congestion)
   })
 
   /*
-    **혼잡도가 기본 정보보다 앞이다** (#603) — "지금"(판정) → "언제"(혼잡도) → "어디·몇 시"
-    (기본 정보) 순이다.
+    **혼잡도가 방문 정보보다 앞이다** (#603) — "지금"(판정) → "언제"(혼잡도) → "가려면"
+    (방문 정보) 순이다.
   */
-  it('혼잡도가 판정과 기본 정보 사이에 선다', () => {
-    const { verdict, congestion, basic } = positions()
+  it('혼잡도가 판정과 방문 정보 사이에 선다', () => {
+    const { verdict, congestion, visit } = positions()
 
     expect(congestion).toBeGreaterThan(verdict)
-    expect(congestion).toBeLessThan(basic)
-  })
-
-  it('기본 정보가 본문 절(반려견 동반 정보)보다 앞이다', () => {
-    const { basic, pet } = positions()
-
-    expect(basic).toBeLessThan(pet)
+    expect(congestion).toBeLessThan(visit)
   })
 
   /*
-    **판정 레일이 우측 블록 사이에 있어야 grid 가 세 행으로 나눈다.** 레일이 앞이나 끝으로
+    **판정 레일이 우측 블록 사이에 있어야 grid 가 두 행으로 나눈다.** 레일이 앞이나 끝으로
     가면 데스크톱에서 우측 블록이 행을 잘못 잡는다 — 클래스 순서로 잠근다.
   */
-  it('스택이 본문 · 레일 · 본문 · 본문 순이고 세 행 변형을 쓴다', () => {
+  it('스택이 본문 · 레일 · 본문 순이고 행 변형을 쓴다', () => {
     const markup = render()
 
     expect(markup).toContain('rail-layout rail-layout-detail rail-layout-detail-head')
@@ -559,21 +562,91 @@ describe('PlaceDetailSection — 모바일 섹션 순서 (#909)', () => {
         /class="flex flex-col gap-2 md:gap-6 md:p-6 (rail-detail-(?:main|aside))/g,
       ),
     ].map((match) => match[1])
-    expect(stacks).toEqual([
-      'rail-detail-main',
-      'rail-detail-aside',
-      'rail-detail-main',
-      'rail-detail-main',
-    ])
+    expect(stacks).toEqual(['rail-detail-main', 'rail-detail-aside', 'rail-detail-main'])
   })
 
-  it('좌표가 있으면 기본 정보 안에 길찾기가 함께 선다 (#14)', () => {
+  it('좌표가 있으면 방문 정보 안에 길찾기가 함께 선다 (#14)', () => {
     const markup = render()
 
     expect(markup).toContain(messages.map.directions)
-    expect(markup.indexOf(messages.place.detailSectionBasic)).toBeLessThan(
+    expect(markup.indexOf(messages.place.detailSectionVisit)).toBeLessThan(
       markup.indexOf(messages.map.directions),
     )
+  })
+
+  /* 좌표가 없으면 지도가 스스로 사라진다 — 열을 나눠 두면 오른쪽이 빈 열로 남는다 */
+  it('좌표가 있을 때만 방문 정보를 두 열로 나눈다', () => {
+    const split = 'place-visit-split'
+
+    expect(render()).toContain(split)
+    const markup = render({ place: { ...placeDetail, lat: null, lng: null } })
+    expect(markup).not.toContain(split)
+    expect(markup).not.toContain(messages.map.directions)
+  })
+})
+
+/*
+  방문 정보 = 기본 정보 + 이용 안내 (#935 · 제안 A). 운영시간과 휴무일이 한 목록에
+  서고, 같은 번호가 전화·문의처로 두 번 서지 않는다.
+*/
+describe('PlaceDetailSection — 방문 정보', () => {
+  it('휴무일은 운영시간과 같은 목록, 이용 안내 묶음보다 앞이다', () => {
+    const markup = render({
+      place: { ...placeDetail, intro: { ...placeDetail.intro!, restDate: '매주 월요일' } },
+    })
+    const useTime = markup.indexOf(messages.place.detailUseTime)
+    const restDate = markup.indexOf(messages.place.detailRestDate)
+
+    expect(useTime).toBeGreaterThan(-1)
+    expect(restDate).toBeGreaterThan(useTime)
+    const intro = markup.indexOf(messages.place.detailSectionIntro)
+    if (intro > -1) expect(restDate).toBeLessThan(intro)
+  })
+
+  it('문의처가 전화와 같은 번호면 한 번만 선다', () => {
+    const markup = render({
+      place: {
+        ...placeDetail,
+        tel: '064-772-3701',
+        intro: { ...placeDetail.intro!, infoCenter: '064)772-3701' },
+      },
+    })
+
+    expect(markup).not.toContain(messages.place.detailInfoCenter)
+  })
+
+  it('문의처에 번호 말고 더 적혀 있으면 남긴다', () => {
+    const markup = render({
+      place: {
+        ...placeDetail,
+        tel: '064-772-3701',
+        intro: { ...placeDetail.intro!, infoCenter: '관리사무소 064-772-3701' },
+      },
+    })
+
+    expect(markup).toContain(messages.place.detailInfoCenter)
+    expect(markup).toContain('관리사무소 064-772-3701')
+  })
+
+  /* 휴무일만 있고 편의 항목이 비면 제목만 남은 빈 묶음이 된다 */
+  it('편의 항목이 전부 비면 이용 안내 묶음을 만들지 않는다 — 휴무일은 위로 올라갔다', () => {
+    const markup = render({
+      place: {
+        ...placeDetail,
+        tel: '064-772-3701',
+        intro: {
+          ...placeDetail.intro!,
+          restDate: '연중무휴',
+          parking: null,
+          chkBabyCarriage: null,
+          chkCreditCard: null,
+          infoCenter: '064-772-3701',
+        },
+      },
+    })
+
+    expect(markup).toContain('연중무휴')
+    expect(markup).not.toContain(messages.place.detailSectionIntro)
   })
 })
 
@@ -682,19 +755,33 @@ describe('3층 표면 (#443) — 절마다 카드 판정', () => {
     "오늘 가도 되나 → 지금 걷기 안전한가 → 그러면 담을까" 이고, 이쪽은 다른 시간 축
     ("이번 주엔 언제")이다.
   */
-  it('머리 · 기본 정보 · 동반 정보 · 소개 · 이용 안내 · 판정 · 기간 혼잡도가 각각 카드라 일곱이다', () => {
+  /*
+    **일곱에서 넷이 됐다** (#935 · 제안 A). 반려견 동반·장소 소개가 머리 카드 안으로,
+    이용 안내가 방문 정보(옛 기본 정보) 안으로 들어갔다 — "무엇이고 데려가도 되나" ·
+    "지금" · "언제" · "가려면" 네 이야기에 카드 넷이다.
+  */
+  it('머리(+소개·동반) · 판정 · 기간 혼잡도 · 방문 정보가 각각 카드라 넷이다', () => {
     const markup = render()
 
-    expect(markup.match(SURFACE)).toHaveLength(7)
-    for (const title of [
-      messages.place.detailSectionBasic,
-      messages.place.detailSectionPet,
-      messages.place.detailSectionOverview,
-      messages.place.detailSectionIntro,
-    ]) {
-      // 제목이 카드 안의 h2 다 — 카드 밖 h2 는 없다
+    expect(markup.match(SURFACE)).toHaveLength(4)
+    // 방문 정보는 카드 제목, 동반 정보는 머리 카드 안 절 제목 — 둘 다 h2 다
+    for (const title of [messages.place.detailSectionVisit, messages.place.detailSectionPet]) {
       expect(markup).toMatch(new RegExp(`<h2[^>]*>${title}</h2>`))
     }
+    // 이용 안내는 방문 정보 안 묶음이라 한 단계 아래(h3)다
+    expect(markup).toMatch(new RegExp(`<h3[^>]*>${messages.place.detailSectionIntro}</h3>`))
+  })
+
+  it('반려견 동반은 머리 카드 안이다 — 첫 카드가 닫히기 전에 선다', () => {
+    const markup = render()
+    const first = markup.search(SURFACE)
+    const firstEnd = markup.indexOf('</section>', markup.indexOf(messages.place.detailSectionPet))
+    const pet = markup.indexOf(messages.place.detailSectionPet)
+    // 머리 카드 안의 동반 절은 자기 `section` 이다 — 그것이 닫힌 뒤 머리 카드가 닫힌다
+    const headEnd = markup.indexOf('</section>', firstEnd + 1)
+
+    expect(pet).toBeGreaterThan(first)
+    expect(markup.indexOf(messages.place.detailVerdictCardLabel)).toBeGreaterThan(headEnd)
   })
 
   /*

@@ -11,6 +11,7 @@
 
 import { BasisFootnote } from '@/components/basis-footnote'
 import { ClockIcon } from '@/components/icons'
+import { InfoTip } from '@/components/info-tip'
 import { MetricValue, MetricWord } from '@/components/metric'
 import { ReasonList } from '@/components/reason-list'
 import { Skeleton } from '@/components/skeleton'
@@ -130,7 +131,27 @@ export function PlaceWalkSafetyPanel({
         */}
         {feelsLike !== null && (
           <MetricValue
-            label={messages.place.detailFeelsLike}
+            label={
+              data.feelsLikeBasis === null ? (
+                messages.place.detailFeelsLike
+              ) : (
+                /*
+                  **계산 근거와 참고 열지수는 물음표 뒤로 들어간다** (#935).
+                  #840 이 접기를 걷어 두 문단(≈230자)이 패널에 늘 섰는데, 그 탓에 레일이
+                  한 화면을 넘겨 길어졌다. 행동을 바꾸는 줄(`SaferWindow`)이 아니라 "이 숫자가
+                  무슨 척도인가" 를 답하는 층이라, 홈 hero 와 같은 `InfoTip` 으로 둔다 —
+                  **같은 값의 근거를 두 화면이 같은 자리·같은 그릇으로 연다.**
+
+                  `null` 이면 물음표를 두지 않는다 — 눌러도 빈 말풍선이 뜬다 (홈과 같은 규칙).
+                */
+                <span className="inline-flex items-center gap-1">
+                  {messages.place.detailFeelsLike}
+                  <InfoTip label={messages.place.detailFeelsLikeBasisLabel}>
+                    <FeelsLikeBasisContent data={data} />
+                  </InfoTip>
+                </span>
+              )
+            }
             value={feelsLike}
             unit={messages.place.detailTemperatureUnit}
             tone={tone}
@@ -174,19 +195,12 @@ export function PlaceWalkSafetyPanel({
       <BasisLine data={data} petName={petName} />
 
       <SaferWindow data={data} />
-
-      {/*
-        **맨 아래다.** 접기를 걷어 내면서 문단이 늘 서게 됐으니 (#840) 위에 두면
-        `SaferWindow` 의 조언(실제로 행동을 바꾸는 유일한 줄)이 130자만큼 밀린다.
-        계산 근거는 이 패널에서 가장 깊은 층이고, 각주는 아래에 산다.
-      */}
-      <FeelsLikeBasis data={data} />
     </div>
   )
 }
 
 /**
- * 체감온도 계산 근거 + 참고 열지수 (#292).
+ * 체감온도 계산 근거 + 참고 열지수 (#292) — hero 라벨 옆 `InfoTip` 의 내용이다.
  *
  * **이 자리가 생긴 이유.** BE `46f35e4` 가 판정 기준을 NOAA 열지수에서 기상청 여름철
  * 체감온도로 바꾸고 열지수를 참고값으로 내렸다. 노면온도는 라벨이 스스로 `추정` 이라고
@@ -194,60 +208,51 @@ export function PlaceWalkSafetyPanel({
  * 서버가 계속 내려온다 — 두 사실을 한자리에서 처리한다.
  *
  * 지키는 것:
- * - **접지 않는다** (#840). 예전에는 130자 문장이 회색 벽이 되는 것을 접기로 막았지만,
- *   그 벽은 여는 손이 한 번 더 필요한 대가로 산 것이었다 — 이제 정적 라벨이 문장의
- *   소속을 말하고 위계는 `text-caption`/`text-body-2` 가 가른다
- * - **참고 열지수를 평면에 세우지 않는다.** hero(판정) · 노면(근거) 로 정리된 자리에
- *   세 번째 온도를 더하면 판정값과 참고값이 같은 위계로 읽힌다 — 그것이 이 변경이
- *   고치려는 오독 그 자체다. 값과 `heatIndexBasis`("판정에는 쓰지 않으며…")를 **붙여
- *   두어** 숫자만 떼어 읽히지 않게 한다
+ * - **패널 평면에 세우지 않는다** (#935). #840 은 접기를 걷어 문단을 늘 세웠지만
+ *   두 문단이 레일을 한 화면 넘게 늘였다. 여는 손이 한 번 더 드는 대가보다 레일 길이가
+ *   더 컸다 — 그래서 서랍이 아니라 **말풍선**으로 되돌린다. 홈 hero 와 같은 그릇이다
+ * - **참고 열지수도 여기 안에만 산다.** hero(판정) · 노면(근거) 로 정리된 평면에 세 번째
+ *   온도를 더하면 판정값과 참고값이 같은 위계로 읽힌다. 값과 `heatIndexBasis`("판정에는
+ *   쓰지 않으며…")를 **붙여 두어** 숫자만 떼어 읽히지 않게 한다
  * - **서버 문장을 다시 쓰지 않는다.** 둘 다 완성형이다 (styling-guide.md §7)
- * - **`feelsLikeBasis` 가 없으면 문단 자체가 없다.** 라벨이 `체감온도 계산 근거` 라고
- *   말하므로 체감온도 근거가 없는데 열지수만 담으면 라벨이 거짓이 된다. BE 도 두 값이
- *   같은 `temperature` 에서 나와 **함께 있거나 함께 없다** (`WalkSafetyPresenter`)
+ * - **`feelsLikeBasis` 가 없으면 부르지 않는다** (호출부가 물음표째 뺀다). 이름이
+ *   `체감온도 계산 근거` 라서 체감온도 근거 없이 열지수만 담으면 이름이 거짓이 된다. BE 도
+ *   두 값이 같은 `temperature` 에서 나와 **함께 있거나 함께 없다** (`WalkSafetyPresenter`)
+ *
+ * **내보내는 이유.** `InfoTip` 은 열렸을 때만 내용을 그려 정적 마크업에 안 나온다 —
+ * 내용의 규칙은 이 컴포넌트를 직접 그려 고정한다 (`place-walk-safety-panel.test.ts`).
  */
-function FeelsLikeBasis({ data }: { data: WalkSafetyResponse }) {
+export function FeelsLikeBasisContent({ data }: { data: WalkSafetyResponse }) {
   if (data.feelsLikeBasis === null) return null
 
   const heatIndex = formatCelsius(data.heatIndexCelsius)
   const hasHeatIndex = heatIndex !== null && data.heatIndexBasis !== null
 
   return (
-    <div className="flex flex-col gap-2">
-      {/*
-        **버튼이 아니라 라벨이다** (#840). 접기를 걷으면서 `aria-expanded`/`aria-controls`
-        도 함께 사라졌다 — 여는 것이 없으므로 가리킬 몸통도 없다.
-      */}
-      <p className="text-caption text-fg-muted font-semibold">
-        {messages.place.detailFeelsLikeBasisLabel}
-      </p>
+    // 말풍선·시트가 글자 크기·색을 이미 준다(`text-body-2 text-fg`) — 여기서는 위계만 가른다
+    <span className="flex flex-col gap-3">
+      <span className="flex flex-col gap-1">
+        <span>{data.feelsLikeBasis}</span>
+        {/*
+          출처와 계산 입력 (#317). **홈과 같은 조각을 쓴다** — 같은 두 값을 두 화면이
+          다르게 적으면 사용자는 서로 다른 사실로 읽는다. **위 문장에 붙여 둔다**(`gap-1`) —
+          습도는 그 문장이 말하는 입력의 실제 수치다.
+        */}
+        <BasisFootnote humidity={data.humidity} providerName={data.weatherProviderName} />
+      </span>
 
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1">
-          <p className="text-body-2 text-fg-muted">{data.feelsLikeBasis}</p>
-          {/*
-            출처와 계산 입력 (#317). **홈과 같은 조각을 쓴다** — 같은 두 값을 두 화면이
-            다르게 적으면 사용자는 서로 다른 사실로 읽는다.
-
-            **위 문장에 붙여 둔다** (`gap-1`). 습도는 그 문장이 말하는 입력의 실제
-            수치라, 떨어뜨리면 무엇의 습도인지 알 수 없는 단독 값이 된다.
-          */}
-          <BasisFootnote humidity={data.humidity} providerName={data.weatherProviderName} />
-        </div>
-
-        {hasHeatIndex && (
-          <div className="flex flex-col gap-1">
-            {/* 중립 톤이다 — 판정에 쓰이지 않는 값에 등급 색을 주면 두 번째 판정으로 읽힌다 */}
-            <MetricValue
-              label={messages.place.detailHeatIndexReference}
-              value={heatIndex}
-              unit={messages.place.detailTemperatureUnit}
-            />
-            <p className="text-body-2 text-fg-muted">{data.heatIndexBasis}</p>
-          </div>
-        )}
-      </div>
-    </div>
+      {hasHeatIndex && (
+        <span className="border-border flex flex-col gap-1 border-t pt-3">
+          {/* 중립 톤이다 — 판정에 쓰이지 않는 값에 등급 색을 주면 두 번째 판정으로 읽힌다 */}
+          <MetricValue
+            label={messages.place.detailHeatIndexReference}
+            value={heatIndex}
+            unit={messages.place.detailTemperatureUnit}
+          />
+          <span className="text-fg-muted">{data.heatIndexBasis}</span>
+        </span>
+      )}
+    </span>
   )
 }
 

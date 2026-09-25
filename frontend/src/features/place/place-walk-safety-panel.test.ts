@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import {
+  FeelsLikeBasisContent,
   PlaceWalkSafetyPanel,
   type PlaceWalkSafetyPanelProps,
 } from '@/features/place/place-walk-safety-panel'
@@ -21,6 +22,11 @@ function render(overrides: Partial<PlaceWalkSafetyPanelProps> = {}) {
   }
 
   return renderToStaticMarkup(createElement(PlaceWalkSafetyPanel, props))
+}
+
+/** 물음표 뒤 내용 — `InfoTip` 은 열렸을 때만 그려 패널 마크업에는 안 나온다 */
+function renderBasis(data = walkSafety) {
+  return renderToStaticMarkup(createElement(FeelsLikeBasisContent, { data }))
 }
 
 describe('PlaceWalkSafetyPanel — 상태 배타성', () => {
@@ -180,16 +186,21 @@ describe('PlaceWalkSafetyPanel — 판정값과 참고값의 위계 (#292)', () 
     const markup = render()
 
     expect(markup).toContain('33.0')
-    // hero 라벨 바로 뒤에 판정값이 온다 — 참고값이 그 자리를 차지하지 않는다
-    expect(markup.indexOf('33.0')).toBeLessThan(markup.indexOf('40.2'))
   })
 
   /*
-    **참고 열지수는 계산 근거 문단 안에만 있다.** 평면에 세 번째 온도로 세우면 판정값과
-    참고값이 같은 위계로 읽히고, 그것이 이 변경이 고치려는 오독 그 자체다.
+    **참고 열지수는 패널 평면에 없다.** 세 번째 온도로 세우면 판정값과 참고값이 같은
+    위계로 읽히고, 그것이 #292 가 고치려는 오독 그 자체다. 물음표 뒤에만 산다.
   */
-  it('참고 열지수는 판정 라벨이 아니라 `참고` 라벨을 단다', () => {
+  it('참고 열지수는 패널 평면에 서지 않는다', () => {
     const markup = render()
+
+    expect(markup).not.toContain('40.2')
+    expect(markup).not.toContain(messages.place.detailHeatIndexReference)
+  })
+
+  it('참고 열지수는 물음표 뒤에서 `참고` 라벨을 단다', () => {
+    const markup = renderBasis()
 
     expect(markup).toContain(messages.place.detailHeatIndexReference)
     expect(markup).toContain('40.2')
@@ -200,20 +211,18 @@ describe('PlaceWalkSafetyPanel — 판정값과 참고값의 위계 (#292)', () 
     않으며" 를 말한다** — 숫자만 떼어 읽히지 않게 하는 것이 이 문장의 역할이다.
   */
   it('두 근거 문장을 서버 문구 그대로 담는다', () => {
-    const markup = render()
+    const markup = renderBasis()
 
     expect(markup).toContain('기상청 여름철 체감온도 산식으로 계산했습니다')
     expect(markup).toContain('판정에는 쓰지 않으며')
   })
 
   /*
-    **`feelsLikeBasis` 가 없으면 문단 자체가 없다.** 라벨이 체감온도 근거라고 말하므로
-    체감온도 근거 없이 열지수만 담으면 라벨이 거짓이 된다.
+    **`feelsLikeBasis` 가 없으면 내용 자체가 없다.** 이름이 체감온도 근거라고 말하므로
+    체감온도 근거 없이 열지수만 담으면 이름이 거짓이 된다.
   */
   it('체감온도 근거가 없으면 참고 열지수도 담지 않는다', () => {
-    const markup = render({ data: { ...walkSafety, feelsLikeBasis: null } })
-
-    expect(markup).not.toContain(messages.place.detailHeatIndexReference)
+    expect(renderBasis({ ...walkSafety, feelsLikeBasis: null })).toBe('')
   })
 
   /*
@@ -221,44 +230,39 @@ describe('PlaceWalkSafetyPanel — 판정값과 참고값의 위계 (#292)', () 
     근거를 감출 이유가 되지 않는다.
   */
   it('열지수가 없어도 체감온도 근거는 남는다', () => {
-    const markup = render({
-      data: { ...walkSafety, heatIndexCelsius: null, heatIndexBasis: null },
-    })
+    const markup = renderBasis({ ...walkSafety, heatIndexCelsius: null, heatIndexBasis: null })
 
-    expect(markup).toContain(messages.place.detailFeelsLikeBasisLabel)
     expect(markup).toContain('기상청 여름철 체감온도 산식으로 계산했습니다')
     expect(markup).not.toContain(messages.place.detailHeatIndexReference)
   })
 })
 
-/* 계산 근거를 접지 않는다 (#840) — 서랍이 사라지고 라벨 + 문장이 늘 선다 */
+/*
+  계산 근거는 hero 라벨 옆 물음표 뒤로 들어간다 (#935). #840 이 문단을 평면에 늘
+  세웠더니 레일이 한 화면을 넘게 길어졌다 — 홈 hero 와 같은 `InfoTip` 으로 되돌린다.
+*/
 describe('PlaceWalkSafetyPanel — 체감온도 계산 근거', () => {
   /*
-    **근거 문장 자체는 여기서 단언하지 않는다.** `두 근거 문장을 서버 문구 그대로 담는다`
-    가 같은 입력(`render()` 기본값)으로 이미 그것을 증명한다 — 여기 한 줄 더 두면 둘 중
-    하나가 죽어도 아무도 모른다. 이 테스트의 고유한 증명은 **라벨이 서고 여는 버튼이
-    없다**는 것이다.
-
-    **라벨이 곧 문단이다.** `FeelsLikeBasis` 는 `feelsLikeBasis === null` 이면 문단 전체를
-    렌더하지 않으므로, 라벨이 있다는 것은 문단이 섰다는 뜻이다 — 그 반대 방향은 아래
-    `feelsLikeBasis 가 없으면 라벨도 서지 않는다` 가 잡는다.
+    **문장은 평면에 없고 물음표만 선다.** 물음표의 이름(`aria-label`)이 곧 근거의 이름이다 —
+    아이콘만 있는 버튼이라 이것이 없으면 스크린리더에 이름이 없다.
   */
-  it('근거 문단이 펼침 버튼 없이 선다', () => {
+  it('근거 문장 대신 이름 달린 물음표가 선다', () => {
     const markup = render()
 
-    expect(markup).toContain(messages.place.detailFeelsLikeBasisLabel)
-    expect(markup).not.toContain('aria-expanded')
+    expect(markup).toContain(`aria-label="${messages.place.detailFeelsLikeBasisLabel}"`)
+    expect(markup).not.toContain('기상청 여름철 체감온도 산식으로 계산했습니다')
   })
 
   /*
     `render` 헬퍼는 **props** 오버라이드를 받는다. `feelsLikeBasis` 는 `data` 안의 필드라
-    이 파일의 다른 테스트와 같은 모양(`data: { ...walkSafety, … }`)으로 준다 — 헬퍼에
-    응답 필드용 두 번째 인자를 더하면 오버라이드가 두 층으로 갈린다.
+    이 파일의 다른 테스트와 같은 모양(`data: { ...walkSafety, … }`)으로 준다.
   */
-  it('feelsLikeBasis 가 없으면 라벨도 서지 않는다', () => {
+  it('feelsLikeBasis 가 없으면 물음표를 두지 않는다', () => {
     const markup = render({ data: { ...walkSafety, feelsLikeBasis: null } })
 
     expect(markup).not.toContain(messages.place.detailFeelsLikeBasisLabel)
+    // 라벨은 남는다 — 값이 있으니 무엇의 값인지는 여전히 말해야 한다
+    expect(markup).toContain(`>${messages.place.detailFeelsLike}</span>`)
   })
 })
 

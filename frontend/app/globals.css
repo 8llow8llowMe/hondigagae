@@ -523,24 +523,26 @@ body {
   }
 
   /*
-    장소 상세 — **우측 본문이 세 블록이다** (#909). 모바일에서 판정을 갤러리·제목 바로 뒤로
-    올리려면 판정 레일이 DOM 상 우측 블록 **사이**에 와야 한다: 갤러리·제목 → 판정 →
-    혼잡도·기본 정보 → 본문. 데스크톱은 레일이 1~3행에 걸치고 우측 셋이 2열에 차례로 선다
-    (열이 정해진 아이템은 자동 배치가 그 열의 다음 빈 행에 놓는다).
+    장소 상세 — **우측 본문이 두 블록이다** (#909 · #935 제안 A). 모바일에서 판정을
+    갤러리·제목 바로 뒤로 올리려면 판정 레일이 DOM 상 우측 블록 **사이**에 와야 한다:
+    갤러리·제목(+소개·반려견 동반) → 판정 → 혼잡도·방문 정보. 데스크톱은 레일이 1~2행에
+    걸치고 우측 둘이 2열에 차례로 선다 (열이 정해진 아이템은 자동 배치가 그 열의 다음 빈
+    행에 놓는다). #909 때는 본문 블록이 하나 더 있어 세 행이었다 — 반려견 동반·소개가 제목
+    카드로, 이용 안내가 방문 정보로 들어가며 그 블록이 사라졌다.
 
-    **`grid-template-rows` 를 준다.** 레일이 셋에 걸친 채 우측보다 길면 초과분이 세 행에
-    나뉘어 우측 블록 **사이**가 벌어진다. `max-content max-content minmax(0, 1fr)` 이면
-    초과분이 마지막 행으로만 간다 — `.rail-layout-split` 과 같은 처방이다.
+    **`grid-template-rows` 를 준다.** 레일이 둘에 걸친 채 우측보다 길면 초과분이 두 행에
+    나뉘어 우측 블록 **사이**가 벌어진다. `max-content minmax(0, 1fr)` 이면 초과분이 마지막
+    행으로만 간다 — `.rail-layout-split` 과 같은 처방이다.
 
-    **공용 `.rail-layout-detail` 을 바꾸지 않고 변형으로 둔다.** 법률 문서 화면이 같은
-    규칙을 두 블록(`span 2`)으로 쓴다.
+    **공용 `.rail-layout-detail` 을 바꾸지 않고 변형으로 둔다.** 법률 문서 화면이 공용 규칙
+    (`span 2`)을 행 크기 없이 쓴다 — 이 화면은 행 크기가 필요하다.
   */
   .rail-layout-detail-head {
-    grid-template-rows: max-content max-content minmax(0, 1fr);
+    grid-template-rows: max-content minmax(0, 1fr);
   }
 
   .rail-layout-detail-head > .rail-detail-aside {
-    grid-row: 1 / span 3;
+    grid-row: 1 / span 2;
   }
 
   /*
@@ -643,6 +645,22 @@ body {
   늘리지 않는다 — 근거("1440 에서 행이 1360까지 늘어나 이름과 해제 버튼이 이어지지 않는다")는
   1280 에서도 그대로 성립한다 (`features/favorite/저장한장소-세부명세.md` D1).
 */
+/*
+  장소 상세 방문 정보 — 목록(좌) · 지도(우) (#935 · 제안 A).
+
+  **`xl`(1280) 부터다.** 1024~1279 는 좌측 400 레일을 뺀 우측이 좁아 두 열이면 값이 어절마다
+  끊긴다 — `PlacePetInfoSection` 의 2열과 같은 브레이크포인트다. 768~1023 은 한 컬럼 페이지라
+  `md:grid-cols-2` 가 맡는다(호출부). 목록이 조금 넓다(1.15) — 주소·운영시간 원문이 길다.
+
+  `minmax(0, …)` — 트랙 바닥을 0 으로 내려 긴 홈페이지 주소가 칸을 밀어내지 못하게 한다.
+  괄호가 든 arbitrary 는 eslint 가 막아 여기로 온다 (`.surface-list-2col` 과 같은 경로).
+*/
+@media (width >= 80rem) {
+  .place-visit-split {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  }
+}
+
 @media (width >= 80rem) {
   .surface-list-2col {
     display: grid;

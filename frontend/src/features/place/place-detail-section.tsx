@@ -33,6 +33,7 @@ import {
 } from '@/features/place/place-walk-safety-panel'
 import { classify } from '@/lib/api/error'
 import { toMessage } from '@/lib/api/response'
+import { toLatLng } from '@/lib/geo/coord'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { shortAddress } from '@/lib/place/address'
@@ -79,18 +80,21 @@ const DETAIL_HEADING_ID = 'place-detail-heading'
  * 장소 상세 — 아트보드 `혼디가개 장소 상세` 01(모바일 390) · 03(데스크톱 1440) · 04(상태).
  *
  * **데스크톱은 2단이다.** 좌 `--rail-context`(400) sticky = 판정 두 개 + 하단 바,
- * 우 1fr = 갤러리 + 제목 + 기본 정보 + 본문.
+ * 우 1fr = 갤러리 + 제목(+소개·반려견 동반) + 혼잡도 + 방문 정보.
  *
  * **3층 표면이다** (`DESIGN.md §0`, 이슈 #443). `main` 이 L0 바닥(`Canvas`, 페이지가 건다),
- * 네 개의 `SurfaceStack` 이 그 위에 L1 카드를 쌓는다 — 우측 열이 DOM 상 세 블록(갤러리·제목 ·
- * 혼잡도·기본 정보 · 본문)이라 스택도 셋이고, 좌측 레일이 하나다 (#909). **열 구분선은 걷었다** — 카드 사이·열 사이로 바닥이 비쳐
+ * 세 개의 `SurfaceStack` 이 그 위에 L1 카드를 쌓는다 — 우측 열이 DOM 상 두 블록(갤러리·제목 ·
+ * 혼잡도·방문 정보)이라 스택도 둘이고, 좌측 레일이 하나다 (#909 · #935 제안 A). **열 구분선은 걷었다** — 카드 사이·열 사이로 바닥이 비쳐
  * L0 이 그 일을 한다 (홈 #428 · 장소 목록 #439 와 같은 이유).
  *
  * **카드 판정 3문을 절마다 적용한 결과:**
  * - 브레드크럼 · 폐업 안내 · 갤러리 · 제목 줄 — **카드가 아니다.** 페이지 머리 · 전폭 미디어 ·
  *   알림 스트립은 §0 이 카드 밖으로 못박은 것들이다. 바닥 위에 직접 놓는다.
- * - 기본 정보 · 반려견 동반 정보 · 장소 소개 · 이용 안내 — 각각 **카드**(`DetailCard`).
- *   제목이 카드 안으로 들어간다.
+ * - 갤러리 · 제목 · 장소 소개 · 반려견 동반 정보 — **한 카드**. "이 장소가 무엇이고 데려가도
+ *   되나" 가 한 이야기다. 동반 정보는 카드 안 1px 선 아래 절이다 (#935 제안 A — 예전에는
+ *   다섯 번째 카드였다).
+ * - 방문 정보(기본 정보 + 이용 안내 + 지도) — **한 카드**(`DetailCard`). "가려면 무엇을 알아야
+ *   하나" 를 답한다. 운영시간과 휴무일이 두 카드에 갈라져 있던 것을 묶었다.
  * - 적합도 + 산책 위험도 + (데스크톱) 하단 바 — **한 카드**. 같은 화자가 이어 말한다:
  *   "오늘 가도 되나 → 지금 걷기 안전한가 → 그러면 담을까". §0 의 "카드 경계는 이야기 단위"
  *   다. 하단 바를 카드 밖 L0 에 두면 테두리 없는 흰 띠가 되고, 자기 카드로 만들면 §0 이
@@ -99,7 +103,7 @@ const DETAIL_HEADING_ID = 'place-detail-heading'
  * **기본 정보는 레일이 아니라 우측 본문이다.** 레일에 있던 동안에는 데스크톱에서 주소·전화·
  * 운영시간이 판정 아래로 밀려 있었다. 레일에는 **판정만** 남는다 — 한 가지 성격의 것만 든다.
  *
- * DOM 순서는 **모바일 기준**이다 (갤러리·제목 → 판정 → 혼잡도 → 기본 정보 → 본문, #909).
+ * DOM 순서는 **모바일 기준**이다 (갤러리·제목·소개·동반 → 판정 → 혼잡도 → 방문 정보, #909).
  * **모바일에서 판정이 기본 정보보다 앞이다.** 예전에는 반대였고 판정은 다섯 번째 섹션이었다 —
  * 데스크톱은 판정이 좌측 레일 첫 자리라 폭마다 위계가 달랐다. "여기 어디고 몇 시까지" 는
  * 판정 카드 한 장 뒤로 가지만, 제목 아래 메타 줄과 요약 행이 그 앞에서 먼저 말한다.
@@ -112,7 +116,7 @@ const DETAIL_HEADING_ID = 'place-detail-heading'
  * **404 의 정상 경로는 여기가 아니다.** 서버 컴포넌트가 `notFound()` 로 보낸다.
  * 여기서 404 를 다루는 것은 클라이언트 재조회에서 리소스가 사라진 경우다.
  *
- * "지도 보기"·"길찾기"는 기본 정보 절 끝의 `PlaceMiniMap` 이 맡는다
+ * "지도 보기"·"길찾기"는 방문 정보 카드의 `PlaceMiniMap` 이 맡는다 (`xl` 부터 오른쪽 열)
  * ([#14](https://github.com/8llow8llowMe/hondigagae/issues/14) 로 미뤄 뒀던 자리다).
  *
  * 아트보드에 있으나 **여전히 구현하지 않은 것**: 메타의 거리(상세는 기준점이 없다) ·
@@ -185,6 +189,8 @@ export function PlaceDetailSection({
   const copyright = copyrightLabel(place.cpyrhtDivCd)
   const suitabilityBadge = suitability.data?.suitabilityLevel ?? null
   const sourceLine = infoSourceLine(place, copyright)
+  // 좌표가 없으면 `PlaceMiniMap` 이 스스로 사라진다 — 그때는 방문 정보를 두 열로 나누지 않는다
+  const hasMap = toLatLng({ lat: place.lat, lng: place.lng }) !== null
 
   return (
     <article>
@@ -336,6 +342,52 @@ export function PlaceDetailSection({
                 컴포넌트 머리 주석에 있다.
               */}
               <PlaceVerdictSummary place={place} walkSafety={walkSafety} congestion={congestion} />
+
+              {/*
+                ── 장소 소개 (#935 · 제안 A) — **제목 카드 안, 제목 바로 뒤**
+
+                따로 카드였을 때는 원천 개요가 `박물관` 한 단어뿐인 장소에서 제목·낱말 하나짜리
+                카드가 섰다. 개요는 "이 장소가 무엇인가" 의 연장이라 이름과 한 이야기다(§0).
+                길면 `PlaceOverview` 가 접는다 — 전문이 아래 반려견 동반을 화면 밖으로 밀지 않게.
+                제목이 없는 이유: 바로 위가 `h1` 이다. 절 이름을 달면 이름 → 절 이름 → 한 줄이 된다.
+              */}
+              {overview !== null && (
+                <div className={INSET_CLASS.card}>
+                  <PlaceOverview text={overview} />
+                </div>
+              )}
+
+              {/*
+                ── 반려견 동반 정보 (#935 · 제안 A) — **제목 카드 안으로 올린다**
+
+                예전에는 기본 정보·지도 아래 **다섯 번째 카드**였다. 이 서비스의 첫 질문
+                ("데려가도 되나")이 1440 에서 스크롤 두 번 아래에 있었다. 같은 카드에 두는
+                근거는 판정 요약 3줄과 같다 — 사진·이름·동반 조건은 함께 "이 장소가 무엇인가" 를
+                답한다. 카드 안 절이라 1px 선으로 가른다(카드 사이 간격이 아니다).
+
+                **앵커는 이 `h2` 다** (`VERDICT_ANCHOR.pet`, #650). 요약 줄이 여기로 뛴다 —
+                `scroll-mt-20` 이 없으면 sticky 헤더 뒤로 들어간다(`Surface` 제목과 같은 값).
+              */}
+              <section
+                aria-labelledby={VERDICT_ANCHOR.pet}
+                className={cn('border-border flex flex-col gap-3 border-t pt-5', INSET_CLASS.card)}
+              >
+                <h2
+                  id={VERDICT_ANCHOR.pet}
+                  className="text-body-1 text-fg scroll-mt-20 font-semibold break-keep"
+                >
+                  {messages.place.detailSectionPet}
+                </h2>
+                <PlacePetInfoSection
+                  petInfo={place.petInfo}
+                  allowance={place.petAllowanceType}
+                  sourceText={place.intro?.chkPet ?? null}
+                  tel={place.tel}
+                  petName={petName}
+                  petSizeCode={petSizeCode}
+                  petSizeName={petSizeName}
+                />
+              </section>
             </div>
           </Surface>
         </SurfaceStack>
@@ -348,9 +400,9 @@ export function PlaceDetailSection({
           24 가 이미 있어 0, 데스크톱은 자기 열의 첫 요소라 24 다.
 
           **DOM 상 갤러리·제목 카드 바로 뒤다** (#909). 모바일에서 판정(적합도 · 산책 위험도)이
-          요약 행 다음, 혼잡도·기본 정보보다 **앞**에 서게 하려는 자리다 — 예전에는 기본 정보와
+          요약 행 다음, 혼잡도·방문 정보보다 **앞**에 서게 하려는 자리다 — 예전에는 기본 정보와
           지도까지 지난 다섯 번째 섹션이라, 이 서비스의 차별점이 첫 화면 밖에 있었다.
-          데스크톱에서는 grid 가 이 스택을 좌측 열 1~3행으로 보내므로 배치가 바뀌지 않는다
+          데스크톱에서는 grid 가 이 스택을 좌측 열 1~2행으로 보내므로 배치가 바뀌지 않는다
           (`app/globals.css` 의 `.rail-layout-detail-head`).
         */}
         <SurfaceStack className="rail-detail-aside rail-sticky pt-2 md:pt-0 lg:pt-6 lg:pr-3">
@@ -382,13 +434,14 @@ export function PlaceDetailSection({
         </SurfaceStack>
 
         {/*
-          우: 혼잡도 + 기본 정보. **판정 레일 뒤에서 스택을 새로 연다** (#909) — 모바일 순서가
-          갤러리·제목 → 판정 → 혼잡도 → 기본 정보가 되고, 데스크톱은 grid 가 이 스택을 2열
-          2행에 놓아 예전과 같은 자리에 선다. 위 여백은 본문 스택(아래)과 같은 규칙이다.
+          우: 혼잡도 + 방문 정보 + 정보 출처. **판정 레일 뒤에서 스택을 새로 연다** (#909) — 모바일
+          순서가 갤러리·제목(+소개·반려견 동반) → 판정 → 혼잡도 → 방문 정보가 되고, 데스크톱은
+          grid 가 이 스택을 2열 2행에 놓아 제목 카드 바로 아래에 선다. 위 여백은 모바일 8(카드
+          간격), 그 위로는 0 — 앞 스택의 아래 24 가 카드 간격이다.
         */}
         <SurfaceStack className="rail-detail-main pt-2 md:pt-0 lg:pl-3">
           {/*
-            ── 기간 혼잡도 (#430) — **제목 바로 아래, 기본 정보 위**다 (#603)
+            ── 기간 혼잡도 (#430) — **제목 바로 아래, 방문 정보 위**다 (#603)
 
             **좌측 판정 레일에 있었다.** 거기서는 "오늘 이 개에게 적합한가"(적합도) ·
             "지금 걷기 안전한가"(산책 위험도) 아래에 붙어, 세 판정이 한 기둥에 쌓였다.
@@ -405,8 +458,8 @@ export function PlaceDetailSection({
 
             **모바일에서는 판정 다음이다** (#909). 이 화면은 DOM 하나로 두 폭을 만들고
             (`app/globals.css` 의 `.rail-layout-detail`), 트리를 폭마다 나누면 스크린리더가
-            같은 내용을 두 번 읽는다. 390 순서: 갤러리+제목 → 판정 → 혼잡도 → 기본 정보+지도 →
-            본문. #603 때는 혼잡도가 판정보다 위였다 — 판정이 기본 정보 뒤 다섯 번째였기
+            같은 내용을 두 번 읽는다. 390 순서: 갤러리+제목 → 판정 → 혼잡도 → 방문 정보(+지도).
+            #603 때는 혼잡도가 판정보다 위였다 — 판정이 기본 정보 뒤 다섯 번째였기
             때문이고, 판정이 올라오면서 "지금"(판정) → "언제"(혼잡도) 순서가 된다.
           */}
           <Surface titleId={CONGESTION_HEADING_ID}>
@@ -414,113 +467,102 @@ export function PlaceDetailSection({
           </Surface>
 
           {/*
-            ── 기본 정보 ─────────────────────────────────────────────────────
+            ── 방문 정보 (#935 · 제안 A) = 기본 정보 + 이용 안내 + 지도
 
-            **좌측 레일이 아니라 우측 본문이다.** 레일에 있던 동안에는 데스크톱에서
-            주소·전화·운영시간이 판정 아래로 밀려 있었다. 데스크톱은 지금 판정(좌) 옆에 선다.
+            **"가려면 무엇을 알아야 하나" 를 한 카드가 답한다.** 예전에는 기본 정보(주소·전화·
+            운영시간)와 이용 안내(휴무·주차·유모차)가 반려견 동반·장소 소개를 사이에 두고 갈라져
+            있었다 — 운영시간과 휴무일이 두 카드에 떨어져 있었고, 같은 번호가 전화·문의처로
+            두 번 섰다. 순서는 "언제 여나(운영·휴무) → 연락(전화·홈페이지) → 어디(주소·분류)"
+            이고, 편의 항목은 선 아래 `이용 안내` 로 모은다.
 
-            **모바일에서는 판정 뒤다 — #909 가 뒤집었다.** 예전 규칙은 "기본 정보가 판정보다
-            앞" 이었는데, 그 결과 판정이 390 에서 다섯 번째 섹션이 되어 데스크톱(좌측 레일 첫
-            자리)과 위계가 갈렸다. 판정은 이 서비스가 존재하는 이유라(세부명세 D1-1) 위계를
-            데스크톱에 맞춘다. 위치 질문은 제목 아래 메타 줄이 먼저 답한다.
+            **지도는 `xl` 부터 오른쪽 열이다.** 1024~1279 는 좌측 400 레일을 뺀 우측이 좁아
+            두 열이면 값이 어절마다 끊긴다 — `PlacePetInfoSection` 의 2열과 같은 브레이크포인트
+            (`md:2 → lg:1 → xl:2`)다. 좌표가 없으면 `PlaceMiniMap` 이 스스로 사라지므로 **열을
+            나누지 않는다** — 나눠 두면 오른쪽이 빈 열로 남는다. SDK 실패는 지도만 사라지고
+            길찾기는 남아(`PlaceMiniMap` 머리주석) 열이 비지 않는다.
 
-            **폭마다 나누지 않는다.** DOM 하나를 옮겨 모바일 순서도 같이 바뀐다 — 트리를
-            둘로 나누면 같은 내용이 두 번 렌더돼 스크린리더가 중복해 읽는다
+            **지도는 `dl` 밖이다** (#14) — `dl > div > dt+dd` 짝 구조 안에 끼우면 목록이 깨진다.
+
+            **한 트리다.** 폭마다 둘로 그리면 스크린리더가 같은 내용을 두 번 읽는다
             (`app/globals.css` 의 `.rail-layout-detail` 주석과 같은 규칙).
           */}
-          <DetailCard title={messages.place.detailSectionBasic}>
-            <dl className="flex flex-col gap-3">
-              <InfoRow label={messages.place.detailAddress} value={fullAddress(place)} />
-              {/* 원천이 준 분류. `contentType`(문화시설)로는 카페·펜션이 갈리지 않는다 (#112) */}
-              <InfoRow label={messages.place.detailSourceCategory} value={place.sourceCategory} />
-              <InfoRow label={messages.place.detailTel} value={place.tel}>
-                {place.tel !== null && <TelLink tel={place.tel} />}
-              </InfoRow>
-              {/*
-                영업 상태는 **운영시간 원문 위**에 선다 (#294 · 세부명세 D5). 별도 행으로
-                떼면 판정값과 원문이 같은 크기로 서서 어느 쪽이 답인지 흐려진다.
+          <DetailCard title={messages.place.detailSectionVisit}>
+            <div
+              className={cn(
+                'grid grid-cols-1 gap-5',
+                hasMap && 'place-visit-split md:grid-cols-2 md:gap-8 lg:grid-cols-1',
+              )}
+            >
+              <div className="flex flex-col gap-4">
+                <dl className="flex flex-col gap-3">
+                  {/*
+                    영업 상태는 **운영시간 원문 위**에 선다 (#294 · 세부명세 D5). 별도 행으로
+                    떼면 판정값과 원문이 같은 크기로 서서 어느 쪽이 답인지 흐려진다.
+                    `useTime` 이 없으면 행 자체가 사라지는 동작을 그대로 둔다 — 근거 없이
+                    판정만 오는 갈래는 계약상 없다 (`types/place.ts` 의 `openNow` 주석).
+                  */}
+                  <InfoRow
+                    label={messages.place.detailUseTime}
+                    value={place.intro?.useTime ?? null}
+                  >
+                    <PlaceOpenStatus
+                      open24={place.intro?.open24 ?? null}
+                      openNow={place.intro?.openNow ?? null}
+                      useTime={place.intro?.useTime ?? null}
+                    />
+                  </InfoRow>
+                  <InfoRow
+                    label={messages.place.detailRestDate}
+                    value={place.intro?.restDate ?? null}
+                  />
+                  <InfoRow label={messages.place.detailTel} value={place.tel}>
+                    {place.tel !== null && <TelLink tel={place.tel} />}
+                  </InfoRow>
+                  <InfoRow label={messages.place.detailHomepage} value={homepage?.label ?? null}>
+                    {homepage !== null && (
+                      <HomepageLink href={homepage.href} label={homepage.label} />
+                    )}
+                  </InfoRow>
+                  <InfoRow label={messages.place.detailAddress} value={fullAddress(place)} />
+                  {/* 원천이 준 분류. `contentType`(문화시설)로는 카페·펜션이 갈리지 않는다 (#112) */}
+                  <InfoRow
+                    label={messages.place.detailSourceCategory}
+                    value={place.sourceCategory}
+                  />
+                </dl>
 
-                `useTime` 이 없으면 행 자체가 사라지는 동작을 그대로 둔다 — 근거 없이
-                판정만 오는 갈래는 계약상 없다 (`types/place.ts` 의 `openNow` 주석).
-              */}
-              <InfoRow label={messages.place.detailUseTime} value={place.intro?.useTime ?? null}>
-                <PlaceOpenStatus
-                  open24={place.intro?.open24 ?? null}
-                  openNow={place.intro?.openNow ?? null}
-                  useTime={place.intro?.useTime ?? null}
-                />
-              </InfoRow>
-              <InfoRow label={messages.place.detailHomepage} value={homepage?.label ?? null}>
-                {homepage !== null && <HomepageLink href={homepage.href} label={homepage.label} />}
-              </InfoRow>
-            </dl>
+                {hasUseGuideValue(place.intro, place.tel) && (
+                  <div className="border-border flex flex-col gap-3 border-t pt-4">
+                    <h3 className="text-caption text-fg-muted font-semibold">
+                      {messages.place.detailSectionIntro}
+                    </h3>
+                    <dl className="flex flex-col gap-3">
+                      <InfoRow label={messages.place.detailParking} value={place.intro.parking} />
+                      <InfoRow
+                        label={messages.place.detailBabyCarriage}
+                        value={place.intro.chkBabyCarriage}
+                      />
+                      <InfoRow
+                        label={messages.place.detailCreditCard}
+                        value={place.intro.chkCreditCard}
+                      />
+                      <InfoRow
+                        label={messages.place.detailInfoCenter}
+                        value={distinctInfoCenter(place.intro.infoCenter, place.tel)}
+                      />
+                    </dl>
+                  </div>
+                )}
+              </div>
 
-            {/*
-              지도는 **`dl` 밖, 절의 끝**이다 (#14).
-
-              행 사이에 끼우지 않는다 — `InfoRow` 가 이미 `dl > div > dt+dd` 구조라 그 안에
-              지도 div 를 하나 더 끼우면 목록의 짝 구조가 깨지고, `dd` 안에 넣으면 라벨
-              80 + 간격 12 만큼 들여써져 375 에서 지도 폭이 251px 로 쪼그라든다.
-
-              절의 끝에 두면 카드 안 폭을 쓰고, 위의 주소가 글자로 말한 것을 그림으로 한 번 더
-              말하는 순서가 된다. 좌표가 없거나 SDK 가 실패하면 스스로 사라진다.
-            */}
-            <PlaceMiniMap
-              placeId={place.placeId}
-              title={place.title}
-              lat={place.lat}
-              lng={place.lng}
-            />
+              <PlaceMiniMap
+                placeId={place.placeId}
+                title={place.title}
+                lat={place.lat}
+                lng={place.lng}
+              />
+            </div>
           </DetailCard>
-        </SurfaceStack>
-
-        {/*
-          우측 열 아래쪽 — 본문. 위 블록과 같은 열(grid column 2)에 이어 선다.
-          위 여백은 모바일 8, 그 위로는 0 — 앞 스택의 아래 24 가 카드 간격이다.
-        */}
-        <SurfaceStack className="rail-detail-main pt-2 md:pt-0 lg:pl-3">
-          <DetailCard title={messages.place.detailSectionPet} titleId={VERDICT_ANCHOR.pet}>
-            <PlacePetInfoSection
-              petInfo={place.petInfo}
-              allowance={place.petAllowanceType}
-              sourceText={place.intro?.chkPet ?? null}
-              tel={place.tel}
-              petName={petName}
-              petSizeCode={petSizeCode}
-              petSizeName={petSizeName}
-            />
-          </DetailCard>
-
-          {/*
-            nullable 은 에러가 아니라 숨김이다.
-
-            **개요는 카드다.** 판정 3문 ③("항목이 둘 이상")을 글자대로 읽으면 한 문단은 못
-            넘지만, ③ 의 취지는 배지·버튼 하나를 카드로 감싸는 것을 막는 데 있다. 개요는
-            원천이 준 **본문 블록**이고 자기 제목이 있고 혼자 떼어놔도 말이 된다.
-          */}
-          {overview !== null && (
-            <DetailCard title={messages.place.detailSectionOverview}>
-              <PlaceOverview text={overview} />
-            </DetailCard>
-          )}
-
-          {hasUseGuideValue(place.intro) && (
-            <DetailCard title={messages.place.detailSectionIntro}>
-              <dl className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-x-8 lg:grid-cols-1 xl:grid-cols-2">
-                <InfoRow label={messages.place.detailRestDate} value={place.intro.restDate} />
-                <InfoRow label={messages.place.detailParking} value={place.intro.parking} />
-                <InfoRow
-                  label={messages.place.detailBabyCarriage}
-                  value={place.intro.chkBabyCarriage}
-                />
-                <InfoRow
-                  label={messages.place.detailCreditCard}
-                  value={place.intro.chkCreditCard}
-                />
-                <InfoRow label={messages.place.detailInfoCenter} value={place.intro.infoCenter} />
-              </dl>
-            </DetailCard>
-          )}
 
           {/*
             사진 출처는 갤러리 바로 아래, 정보 출처는 본문 끝 (DESIGN.md §7-3).
@@ -802,7 +844,7 @@ function HomepageLink({ href, label }: { href: string; label: string }) {
 /**
  * 제목 아래 메타 줄 — `제주시 한경면 · 문화시설 · 야외`.
  *
- * **전체 주소를 쓰지 않는다.** 그것은 기본 정보의 몫이고, 여기는 "어디쯤인지" 만 말한다.
+ * **전체 주소를 쓰지 않는다.** 그것은 방문 정보의 몫이고, 여기는 "어디쯤인지" 만 말한다.
  * 아트보드의 `2.3km` 는 넣지 않는다 — 상세는 어디서부터 잰 거리인지 기준이 없다.
  *
  * **`indoor` 가 null 이면 낱말이 빠진다** (`indoorLabel`). 그 경우는 속성 배지 줄의
@@ -843,19 +885,34 @@ function fullAddress(place: PlaceDetail): string | null {
 }
 
 /**
- * 이용 안내 섹션을 만들지 판단한다.
+ * 방문 정보 안 `이용 안내` 묶음을 만들지 판단한다.
  *
- * **`useTime` 은 보지 않는다** — 운영시간은 기본 정보로 옮겼다. 그것만 있고 나머지가 비면
- * 이용 안내는 빈 섹션이 된다.
+ * **`useTime` · `restDate` 는 보지 않는다** — 둘은 선 위 목록(운영·휴무)으로 올라갔다. 그것만
+ * 있고 나머지가 비면 제목만 남은 빈 묶음이 된다. 문의처도 전화와 같으면 세지 않는다
+ * (`distinctInfoCenter`).
  */
-function hasUseGuideValue(intro: PlaceIntro | null): intro is PlaceIntro {
+function hasUseGuideValue(intro: PlaceIntro | null, tel: string | null): intro is PlaceIntro {
   if (intro === null) return false
 
   return [
-    intro.restDate,
     intro.parking,
     intro.chkBabyCarriage,
     intro.chkCreditCard,
-    intro.infoCenter,
+    distinctInfoCenter(intro.infoCenter, tel),
   ].some((value) => toPlainText(value) !== null)
+}
+
+/**
+ * 문의처가 전화와 **같은 번호**면 뺀다 — 같은 번호가 한 카드에 두 번 선다.
+ *
+ * 숫자만 비교한다 (`064-772-3701` 과 `064)772-3701` 은 같은 번호다). 문의처에 번호 말고도
+ * 무언가 적혀 있으면(`관리사무소 064-…`) 숫자열이 같아도 정보가 더 있으니 남긴다.
+ */
+function distinctInfoCenter(infoCenter: string | null, tel: string | null): string | null {
+  const text = toPlainText(infoCenter)
+  if (text === null || tel === null) return text
+
+  const digits = (value: string) => value.replace(/\D/g, '')
+  const onlyNumber = /^[\d\s()+-]+$/.test(text)
+  return onlyNumber && digits(text) === digits(tel) ? null : text
 }
