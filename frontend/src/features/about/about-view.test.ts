@@ -62,7 +62,8 @@ describe('AboutView — 8절 (#635)', () => {
 
   it('링크는 전부 실제 라우트다 — 갈 곳 있는 링크만', () => {
     // `/terms` · `/privacy` 는 약관 절이 `LEGAL_LINKS` 에서 읽는다 (#610)
-    expect(new Set(hrefs)).toEqual(
+    const routes = hrefs.filter((href) => href !== undefined && !href.startsWith('#'))
+    expect(new Set(routes)).toEqual(
       new Set([
         '/',
         '/places',
@@ -72,6 +73,14 @@ describe('AboutView — 8절 (#635)', () => {
         ...LEGAL_LINKS.map((link) => link.href),
       ]),
     )
+  })
+
+  it('앵커 링크는 이 화면에 실제로 있는 절을 가리킨다 — 절 내비 · 스크롤 힌트 (#915)', () => {
+    const anchors = hrefs.filter((href): href is string => href?.startsWith('#') === true)
+    expect(anchors.length).toBeGreaterThan(0)
+    for (const anchor of anchors) {
+      expect(markup, anchor).toMatch(new RegExp(`<section id="${anchor.slice(1)}"`))
+    }
   })
 
   it('최종값이 처음부터 DOM 에 있다', () => {
@@ -113,10 +122,20 @@ describe('AboutView — 8절 (#635)', () => {
 
       타일은 `>315<span …>곳</span>` 으로 그리므로 `>315<` 가 정확히 한 번 나온다.
     */
-    const textOccurrences = (value: number) => markup.match(new RegExp(`>${value}<`, 'g'))?.length
+    /*
+      **스크린리더용 최종값(`sr-only`)은 빼고 센다** (#915). 규모 숫자가 카운트업하면서
+      판정 카드와 같은 계약(최종값 `sr-only` + 세는 중간값 `aria-hidden`)을 따르게 됐다 —
+      같은 값이 두 노드에 있지만 눈과 귀에 각각 한 번이라 같은 사실을 두 번 말한 것이 아니다.
+    */
+    const visible = markup.replace(/<span class="sr-only">[^<]*<\/span>/g, '')
+    const textOccurrences = (value: number) => visible.match(new RegExp(`>${value}<`, 'g'))?.length
+    const spokenOccurrences = (value: number) =>
+      markup.match(new RegExp(`<span class="sr-only">${value}</span>`, 'g'))?.length
 
     expect(textOccurrences(SCALE_SPECIMEN.places)).toBe(1)
     expect(textOccurrences(SCALE_SPECIMEN.emergency)).toBe(1)
+    expect(spokenOccurrences(SCALE_SPECIMEN.places)).toBe(1)
+    expect(spokenOccurrences(SCALE_SPECIMEN.emergency)).toBe(1)
     expect(markup).toContain(messages.about.data.scaleNote)
   })
 
