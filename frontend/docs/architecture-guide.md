@@ -232,7 +232,7 @@ GET /places?... → 404                           →  EmptyState
 
 - 백엔드는 **타인 리소스도 404** 로 응답한다 (`api-integration-guide.md` §3). 상세 조회의 404는 `notFound()` 로 보낸다.
 - **`error.tsx` 는 5xx 톤을 쓴다.** 데이터 부재가 여기로 흘러오면 안 된다. `not-found.tsx` 와 `EmptyState` 는 중립 톤이다 (`DESIGN.md` §2).
-- `error.tsx` 는 반드시 client component다. 재시도 버튼에는 **`retry`** 를 연결한다 (#907). `reset` 은 경계의 오류 상태만 지우고 이미 받은 RSC 응답으로 다시 그려, 서버 컴포넌트의 예외는 그대로 다시 터진다. `retry` 는 `router.refresh()` 로 다시 받아 온 뒤 그린다 (Next 16.3 stable, `next/dist/client/components/error-boundary.js`). **#907 이전의 세그먼트 경계 열둘은 아직 `reset` 이다** — #918 에서 옮기고, 그때 `route-state-surface.test.ts` 의 `onRetry={reset}` 단언도 함께 바꾼다.
+- `error.tsx` 는 반드시 client component다. 재시도 버튼에는 **`retry`** 를 연결한다 (#907). `reset` 은 경계의 오류 상태만 지우고 이미 받은 RSC 응답으로 다시 그려, 서버 컴포넌트의 예외는 그대로 다시 터진다. `retry` 는 `router.refresh()` 로 다시 받아 온 뒤 그린다 (Next 16.3 stable, `next/dist/client/components/error-boundary.js`). 세그먼트 경계 열둘도 #918 에서 옮겼고, `route-state-surface.test.ts` 가 `app/` 의 오류 경계 **전부**를 훑어 `onRetry={retry}` 와 `reset` 부재를 잠근다 — 새 경계도 등록 없이 걸린다.
 - **오류 경계는 그것을 둔 세그먼트의 레이아웃 안에서 그려지고, 같은 세그먼트의 레이아웃은 감싸지 않는다.** 그래서 층이 셋이다 ([#907](https://github.com/8llow8llowMe/hondigagae/issues/907)):
 
   | 죽은 것                                                               | 잡는 경계               | 남는 것                                                   |
