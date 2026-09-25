@@ -52,8 +52,15 @@ export function PlaceFilterRail({
         )}
       </div>
 
-      <PetAllowanceField filters={filters} onChange={apply} />
-      <PetSizeField filters={filters} onChange={apply} pet={pet} />
+      {/*
+        **첫 축은 제목 줄 선에서 띄운다** (#934). 제목 아래 선(#553, `.filter-rail-title`)이 생긴 뒤로
+        첫 축만 축 제목이 없어 첫 행이 그 선에 0px 로 붙어 있었다. 다른 축은 선 아래에
+        제목(`pt-4`)이 여백을 만든다 — 여기는 제목이 없으니 축 끝 여백(`mt-3`)과 같은 12 를 둔다.
+      */}
+      <div className="pt-3">
+        <PetAllowanceField filters={filters} onChange={apply} />
+        <PetSizeField filters={filters} onChange={apply} pet={pet} />
+      </div>
 
       <div className="border-border mt-3 border-t">
         <FilterListHeading>{messages.place.filterRegionLabel}</FilterListHeading>
