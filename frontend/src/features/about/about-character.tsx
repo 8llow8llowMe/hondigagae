@@ -4,22 +4,23 @@ import { Reveal } from '@/features/about/reveal'
 import { cn } from '@/lib/utils/cn'
 
 /**
- * 소개 페이지 캐릭터 에셋 표 (#917, 명세 2026-09-25 §6-4).
+ * 소개 페이지 캐릭터 에셋 표 (#917 → #930, 명세 2026-09-25 §6-4).
  *
- * **치수는 실제 PNG 와 같다** — `about-character.test.ts` 가 IHDR 를 읽어 잠근다. 표를 고치지
- * 않고 파일만 바꾸면 테스트가 먼저 깨진다.
+ * **SVG 다** (#930). 시안 PNG 를 색마다 나눠 딴 평면 도형이고, 색은 기존 일러스트
+ * (`public/illustrations/*.svg`)의 값을 그대로 쓰며 같은 `feTurbulence` 그레인을 한 겹 얹는다.
+ * `width`/`height` 는 각 파일의 `viewBox` 와 같다 — `about-character.test.ts` 가 잠근다. 표를
+ * 고치지 않고 파일만 바꾸면 테스트가 먼저 깨진다.
  *
- * `next.config.ts` 가 이미지 최적화를 끈다(`unoptimized`) — 원본이 그대로 나간다. 그래서
- * 올려다보기(원본 691×836)는 최대 표시 폭 150 의 2배 남짓으로 줄여 실었다. 나머지는 원본
- * 그대로가 이미 표시 폭의 2배 안팎이다.
+ * 세 자세(산책 · 서기 · 앞발)는 같은 축척이라 `viewBox` 폭 비율이 곧 `globals.css` 의 폭 비율
+ * (.936 · .904 · .981)이다. 다시 딸 때 축척을 바꾸면 그 비율도 같이 바꾼다.
  */
 export const CHARACTER = {
-  sitLookup: { src: '/illustrations/about/dog-sit-lookup.png', width: 346, height: 418 },
-  leash: { src: '/illustrations/about/dog-leash.png', width: 440, height: 408 },
-  stand: { src: '/illustrations/about/dog-stand.png', width: 425, height: 413 },
-  hot: { src: '/illustrations/about/dog-hot.png', width: 461, height: 340 },
-  heatLines: { src: '/illustrations/about/heat-lines.png', width: 119, height: 131 },
-  sitFront: { src: '/illustrations/about/dog-sit-front.png', width: 231, height: 416 },
+  sitLookup: { src: '/illustrations/about/dog-sit-lookup.svg', width: 691, height: 836 },
+  leash: { src: '/illustrations/about/dog-leash.svg', width: 440, height: 408 },
+  stand: { src: '/illustrations/about/dog-stand.svg', width: 425, height: 413 },
+  hot: { src: '/illustrations/about/dog-hot.svg', width: 461, height: 340 },
+  heatLines: { src: '/illustrations/about/heat-lines.svg', width: 119, height: 131 },
+  sitFront: { src: '/illustrations/about/dog-sit-front.svg', width: 231, height: 416 },
 } as const
 
 export type CharacterName = keyof typeof CHARACTER

@@ -33,7 +33,10 @@ function readIllustration(name: string): string {
   return readFileSync(`${ILLUSTRATIONS_DIR}/${name}`, 'utf8')
 }
 
-const FILES = readdirSync(ILLUSTRATIONS_DIR).filter((name) => name.endsWith('.svg'))
+/* 하위 폴더(소개 페이지 캐릭터 `about/`, #930)까지 본다 — 이름은 폴더 기준 상대 경로 */
+const FILES = readdirSync(ILLUSTRATIONS_DIR, { recursive: true, encoding: 'utf8' }).filter((name) =>
+  name.endsWith('.svg'),
+)
 
 /** `<!--` 와 `-->` 사이의 본문만 모은다 — 바깥의 경로·속성에는 이 규칙이 없다 */
 function commentBodies(svg: string): string[] {
