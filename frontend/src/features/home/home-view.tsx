@@ -802,9 +802,13 @@ export function HomeView({
                 다음 행동이 다르다 — 앞은 만들라는 유도이고 뒤는 목록으로 보내는 안내다.
                 넷 다 지난 계정에 "아직 일정이 없어요" 라고 말하면 사용자는 자기 일정이
                 사라졌다고 읽는다.
+
+                **목록 위에 1px 선을 긋는다** — 위 `오늘 갈 만한 곳` 목록과 같은 처리다(#530).
+                `SurfaceList` 는 항목 사이에만 선을 그어, 제목 줄과 첫 일정 행이 한 덩어리로
+                붙어 보였다. 빈 상태에는 긋지 않는다 — 행이 아니라 카드가 통째로 하는 말이다.
               */}
               {upcomingPlans.length > 0 ? (
-                <SurfaceList>
+                <SurfaceList className="border-border border-t">
                   {upcomingPlans.map((plan) => (
                     <UpcomingPlanRow key={plan.planId} plan={plan} today={today as Date} />
                   ))}

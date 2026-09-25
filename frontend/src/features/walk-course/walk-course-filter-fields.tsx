@@ -42,12 +42,18 @@ import {
  */
 function FieldGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
+    /*
+      **768 이상에서는 라벨이 세그먼트 왼쪽, 같은 줄이다.** 위에 얹으면 머리 안에 12px 캡션
+      줄이 한 층 더 생겨 제목 설명 · 캡션 · 세그먼트가 좁은 간격으로 겹겹이 쌓였고, 캡션이
+      바로 위 설명 글줄에 붙어 어느 쪽 말인지 흐렸다. 옆에 두면 `활동량 [전체|낮음|보통]` 이
+      한 덩어리로 읽힌다. 모바일은 세그먼트가 전폭이라 옆에 둘 자리가 없어 위에 남는다.
+    */
+    <div className="flex min-w-0 flex-col gap-1.5 md:flex-row md:items-center md:gap-3">
       {/*
         라디오그룹의 접근 이름(`Segment` 의 `aria-label`)이 이미 축을 말하므로, 이
         캡션은 시각 전용이다 — 겹쳐 읽히지 않게 `aria-hidden` 을 단다.
       */}
-      <span aria-hidden className="text-caption text-fg-muted font-semibold">
+      <span aria-hidden className="text-caption text-fg-muted shrink-0 font-semibold">
         {label}
       </span>
       {children}
