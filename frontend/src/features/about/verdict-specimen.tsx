@@ -1,50 +1,14 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef } from 'react'
 
 import { MetricBadge } from '@/components/metric'
 import { VERDICT_SPECIMEN } from '@/features/about/about-specimen-data'
+import { useCountUp } from '@/features/about/use-count-up'
 import { useRevealOnce } from '@/features/about/use-reveal-once'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
-
-const COUNT_UP_MS = 600
-
-/**
- * 0 → target 카운트업 (#635, 명세 §6-4). `play` 가 참이 되는 순간 시작하고 600ms 뒤 **반드시
- * 끝 값으로 고정**한다 — 브라우저 패널이 숨겨지면 rAF 가 멈춰 중간값에 머무는 함정이 있다.
- * `prefers-reduced-motion` 이면 즉시 끝 값 — JS 가 그리는 값이라 전역 CSS 규칙이 못 덮는다.
- * 처음 값은 **target 이다** (정적 렌더 = 끝 상태).
- */
-function useCountUp(target: number, play: boolean): number {
-  const [value, setValue] = useState(target)
-
-  useEffect(() => {
-    if (!play) return
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setValue(target)
-      return
-    }
-    const start = performance.now()
-    let frame = 0
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - start) / COUNT_UP_MS)
-      const eased = 1 - (1 - t) ** 3
-      setValue(Math.round(target * eased * 10) / 10)
-      if (t < 1) frame = requestAnimationFrame(tick)
-    }
-    setValue(0)
-    frame = requestAnimationFrame(tick)
-    const settle = window.setTimeout(() => setValue(target), COUNT_UP_MS + 50)
-    return () => {
-      cancelAnimationFrame(frame)
-      window.clearTimeout(settle)
-    }
-  }, [target, play])
-
-  return value
-}
 
 function Metric({
   label,
