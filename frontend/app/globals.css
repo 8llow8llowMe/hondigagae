@@ -837,7 +837,8 @@ body {
   `docs/superpowers/specs/2026-09-25-about-interactive-design.md` §3).
 
   **이름 클래스인 이유**: 단계는 `ScrollStage` 가 래퍼에 붙이는 플래그(`is-step-N` 누적 ·
-  `is-current-N` · `is-live`)이고, 장소 · 긴급 예시는 서버 컴포넌트라 prop 을 받을 수 없다.
+  `is-current-N` · `is-live`)이고, 긴급 예시는 서버 컴포넌트라 prop 을 받을 수 없다(장소 예시는
+  #916 에서 클라이언트가 됐지만 같은 이름 클래스를 쓴다).
   Tailwind 대괄호 변형은 eslint `noComplexArbitrary` 가 막는다 (`surface-list-2col` 선례).
 
   **규칙 둘.**
@@ -900,7 +901,20 @@ body {
 }
 
 /* ── 질문 1 · 장소 ── */
-.about-stage-chip,
+/*
+  칩은 #916 부터 누르는 토글이라 색 전환(150)을 여기서 준다 — 층 없는 이 규칙이 유틸리티의
+  `transition-colors` 를 이긴다. `visibility` 는 드러날 때 곧바로, 숨을 때 200 뒤에 바뀐다.
+*/
+.about-stage-chip {
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out,
+    background-color 150ms ease-out,
+    color 150ms ease-out,
+    border-color 150ms ease-out,
+    visibility 0s;
+}
+
 .about-stage-row,
 .about-stage-tag {
   transition:
@@ -908,9 +922,20 @@ body {
     transform 200ms ease-out;
 }
 
+/*
+  단계 0 의 칩은 **누를 수도 포커스할 수도 없다** (#916 검토). 투명하기만 하면 클릭 · 탭 이동을
+  받아, 사용자가 켠 줄 모르는 필터가 단계 1 에서 이미 적용된 채 나타났다(행은 이 단계에서
+  `.35` 로 덮여 반응도 보이지 않는다). `visibility` 는 페이드가 끝난 뒤(200) 숨긴다.
+*/
 .about-stage:not(.is-step-1) .about-stage-chip {
   opacity: 0;
   transform: translateY(0.375rem);
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out,
+    visibility 0s 200ms;
 }
 
 .about-stage:not(.is-step-1) .about-stage-row {

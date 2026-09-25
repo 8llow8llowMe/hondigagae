@@ -23,13 +23,21 @@ export const VERDICT_SPECIMEN = {
  * 리터럴을 박아야 한다. 렌더 순서(조건 → 실내·실외 → 운영 중)는 그대로다.
  */
 export const PLACE_ROWS_SPECIMEN = [
-  { name: '사계 해안 산책로', tags: ['소형·중형 동반 가능'], setting: '실외', open: true },
-  { name: '애월 북카페', tags: ['10kg 이하'], setting: '실내', open: true },
-  { name: '저지 예술인마을', tags: [], setting: '실외', unknown: true },
+  {
+    name: '사계 해안 산책로',
+    tags: ['소형·중형 동반 가능'],
+    setting: '실외',
+    indoor: false,
+    open: true,
+  },
+  { name: '애월 북카페', tags: ['10kg 이하'], setting: '실내', indoor: true, open: true },
+  { name: '저지 예술인마을', tags: [], setting: '실외', indoor: false, unknown: true },
 ] as const satisfies readonly {
   name: string
   tags: readonly string[]
   setting: string
+  /** 필터 칩 `실내` 가 거르는 값 (#916) — 라벨(`setting`) 문자열을 비교하지 않게 따로 둔다 */
+  indoor: boolean
   open?: true
   unknown?: true
 }[]
@@ -42,10 +50,16 @@ export const PLACE_ROWS_SPECIMEN = [
  * 되어, 추천 구간 면이 어느 시각을 덮는지 눈으로 읽을 수 없게 된다.
  */
 export const GOLDEN_CURVE_SPECIMEN = {
+  /*
+    **12시에서 접선이 수평이다** (#916 검토). 12시로 들어가는 조절점 y 를 12시 값과 같게 둬야
+    다음 `S` 가 반사하는 조절점도 수평이 된다 — 예전(`S 150 32, 192 18`)에는 반사점이 (234,4)라
+    선이 12시를 넘어 13시 반께 더 높이 올라가, 시각 핸들의 점이 봉우리 표식보다 높은데 값은
+    낮게 읽혔다. 끝은 23시(x 357)까지 간다 — 시각 핸들이 0–23시를 다 가리킨다.
+  */
   temperaturePath:
-    'M12 96 C 40 100, 60 104, 87 100 S 140 74, 192 60 S 260 70, 300 88 S 330 98, 348 100',
+    'M12 96 C 40 100, 60 104, 87 100 S 140 60, 192 60 S 260 70, 300 88 S 340 99, 357 101',
   pavementPath:
-    'M12 106 C 40 110, 60 112, 87 96 S 150 32, 192 18 S 260 36, 300 76 S 330 96, 348 104',
+    'M12 106 C 40 110, 60 112, 87 96 S 150 18, 192 18 S 260 36, 300 76 S 340 100, 357 106',
   /** 06:00 = 12 + 6×15. 폭 30 은 2시간이라 면이 06–08 시를 덮는다 — 카드 문구와 같은 구간 */
   windowX: 102,
   windowWidth: 30,
@@ -66,7 +80,89 @@ export const CONGESTION_SPECIMEN = {
   labels: ['월', '화', '수', '목', '금', '토', '일'],
   bestIndex: 3,
   bestDate: '9월 18일(목)',
+  /** 막대 툴팁의 날짜 (#916). `bestDate` 는 `dates[bestIndex]` 와 같아야 한다 — 테스트가 잠근다 */
+  dates: [
+    '9월 15일(월)',
+    '9월 16일(화)',
+    '9월 17일(수)',
+    '9월 18일(목)',
+    '9월 19일(금)',
+    '9월 20일(토)',
+    '9월 21일(일)',
+  ],
+  /**
+   * 막대 툴팁의 수준 (#916) — tour-service `CongestionLevel` 의 서버 `name` 어휘 그대로다
+   * (`한산` · `보통` · `혼잡`). 예시 값이라 서버를 부르지 않을 뿐, 실화면과 다른 낱말을 쓰지 않는다.
+   */
+  levels: ['보통', '한산', '한산', '한산', '보통', '혼잡', '혼잡'],
 } as const
+
+/**
+ * 곡선 시각 핸들이 읽는 24점 표 (#916, 명세 2026-09-25 §5). **계산식이 아니라 예시 값이다** —
+ * 노면 추정식은 서버 것이라 FE 가 흉내 내지 않는다(선행 명세 §6-4 가 기온 슬라이더를 기각한
+ * 이유). 곡선 path 와 같은 장면이라 두 가지를 지킨다: 추천 구간(06–08시)은 안전, 12시 봉우리는
+ * 판정 카드의 노면 값(56.0)이다 — 테스트가 잠근다.
+ */
+export const GOLDEN_CURVE_HOURLY = [
+  { temperature: 22, pavement: 21 },
+  { temperature: 22, pavement: 20 },
+  { temperature: 21, pavement: 20 },
+  { temperature: 21, pavement: 19 },
+  { temperature: 21, pavement: 19 },
+  { temperature: 22, pavement: 20 },
+  { temperature: 23, pavement: 22 },
+  { temperature: 24, pavement: 26 },
+  { temperature: 26, pavement: 32 },
+  { temperature: 27, pavement: 38 },
+  { temperature: 28, pavement: 44 },
+  { temperature: 29, pavement: 50 },
+  { temperature: 29, pavement: VERDICT_SPECIMEN.pavement },
+  { temperature: 29, pavement: 55 },
+  { temperature: 28, pavement: 52 },
+  { temperature: 27, pavement: 47 },
+  { temperature: 26, pavement: 41 },
+  { temperature: 25, pavement: 35 },
+  { temperature: 24, pavement: 30 },
+  { temperature: 24, pavement: 27 },
+  { temperature: 23, pavement: 25 },
+  { temperature: 23, pavement: 24 },
+  { temperature: 22, pavement: 23 },
+  { temperature: 22, pavement: 22 },
+] as const
+
+/**
+ * 24점 표에 붙이는 등급 경계 (#916). **서버 기본값과 같다** — tour-service
+ * `WalkSafetyEvaluator`(노면 42 이상 주의 · 52 이상 위험, `INSIGHT_PAVEMENT_*` 기본값). 예시가
+ * 서버 어휘(`안전 · 주의 · 위험`)와 `MetricBadge` 를 그대로 쓰므로, 경계가 다르면 보는 사람이
+ * "이 서비스는 52℃ 를 주의로 본다" 를 배운다(#916 검토 — 처음 안은 40 · 52 초과였다).
+ * 계산식을 흉내 내는 것이 아니라 예시 표에 서버와 같은 선을 긋는 것이다.
+ */
+export const HOURLY_GRADE_EDGES = {
+  caution: 42,
+  danger: VERDICT_SPECIMEN.pavementThreshold,
+} as const
+
+/**
+ * `하루만 다시 짜기` 시연의 대체 세트 (#916) — 일자마다 하나. **같은 파일의 고정값이다.**
+ * 서버를 부르지 않고, 예시 캡션(`planRegenerateNote`)이 그것을 밝힌다.
+ */
+export const PLAN_ALT_SPECIMEN = [
+  [
+    { time: '09:30', title: '한담 해안 산책로', meta: '실외 · 소형·중형 동반 가능' },
+    { time: '12:00', title: '동반 가능 브런치', meta: '실내 · 10kg 이하' },
+    { time: '15:30', title: '실내 놀이터', meta: '실내 · 비 오는 날 대안' },
+  ],
+  [
+    { time: '10:30', title: '반려견 동반 카페', meta: '실내 · 비 예보' },
+    { time: '13:30', title: '동반 가능 식당', meta: '실내 · 전 크기' },
+    { time: '16:30', title: '숲길 짧은 산책', meta: '실외 · 비 그친 뒤' },
+  ],
+  [
+    { time: '08:00', title: '이호테우 해변 산책', meta: '실외 · 이른 시간' },
+    { time: '11:00', title: '반려견 동반 식당', meta: '실내 · 10kg 이하' },
+    { time: '13:30', title: '공항 근처 카페', meta: '실내 · 출발 전' },
+  ],
+] as const
 
 export const PLAN_SPECIMEN = [
   {
