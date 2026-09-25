@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { Button } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
+import { Skeleton } from '@/components/skeleton'
 import { Surface } from '@/components/surface'
 import { WalkCourseCardGrid, WalkCourseRow } from '@/features/walk-course/walk-course-row'
 import {
@@ -93,37 +94,56 @@ export function WalkCourseListSection({
       titleId="walk-course-list-heading"
       title={messages.walkCourse.pageTitle}
       description={
-        <div className="flex flex-col gap-2">
-          {/*
-            **화면이 무엇을 무슨 기준으로 고르는 곳인지 말한다** (#811).
+        /*
+          **화면이 무엇을 무슨 기준으로 고르는 곳인지 말한다** (#811).
 
-            **조건과 무관한 줄이라 `countable` 을 타지 않는다.** 개수·기준은 셀 수 없을 때
-            사라지는데, 그 갈래에서 슬롯이 통째로 비면 스켈레톤 화면에 제목만 남는다 —
-            처음 들어온 사람이 가장 오래 보는 화면이 그것이다.
+          **조건과 무관한 줄이라 `countable` 을 타지 않는다.** 스켈레톤 화면에서도 제목 아래
+          이 줄은 남는다 — 처음 들어온 사람이 가장 오래 보는 화면이 그것이다.
 
-            **`aria-live` 를 붙이지 않는다.** 바뀌지 않는 문장이라, 붙이면 조건을 만질
-            때마다 다시 읽히고 정작 알려야 할 결과 수가 그 안에 묻힌다 (D6).
-          */}
-          <p className="text-body-2 text-fg-muted break-keep">
-            {messages.walkCourse.listDescription}
-          </p>
-
-          {countable && (
-            <div className="flex flex-col gap-1">
-              {/*
-                **조건을 바꾸면 결과 수를 알린다** (D6). 세그먼트는 URL 을 바꾸고 목록이
-                통째로 갈리는데, 보조기기에는 그 변화를 말해 주는 것이 이 줄뿐이다.
-              */}
-              <p aria-live="polite" className="text-body-2 text-fg-muted tabular-nums">
-                {messages.walkCourse.listCount.replace('{count}', String(totalCount))}
-              </p>
-              {basis !== null && <p className="text-caption text-fg-muted">{basisLine(basis)}</p>}
-            </div>
-          )}
-        </div>
+          **`aria-live` 를 붙이지 않는다.** 바뀌지 않는 문장이라, 붙이면 조건을 만질
+          때마다 다시 읽히고 정작 알려야 할 결과 수가 그 안에 묻힌다 (D6).
+        */
+        <p className="text-body-2 text-fg-muted break-keep">
+          {messages.walkCourse.listDescription}
+        </p>
       }
       tools={tools}
     >
+      {/*
+        **결과 줄 — 머리(제목 · 설명 · 조건)와 결과(그리드)를 가르는 자리.**
+
+        예전에는 `코스 29개` · 기준 줄이 제목 설명 바로 아래, 필터 **위**에 끼어 있었다. 머리
+        안에 설명 → 개수 → 필터 라벨 → 필터가 같은 인셋 · 비슷한 크기로 네 층 쌓여 무엇이
+        제목이고 무엇이 결과인지 갈리지 않았고, 필터와 그리드 사이에는 선도 없었다. 개수는
+        **조건의 결과**라 조건 아래 · 결과 위에 선다 — `/places` 목록 머리와 같은 순서다.
+
+        **위에 1px 선을 긋는다.** 머리와 본문의 경계다 (`오늘 갈 만한 곳` 목록 #530 과 같다).
+
+        **줄 자체는 늘 있다.** `aria-live` 영역은 DOM 에 남아 있어야 바뀐 내용을 읽는다 —
+        조건부로 붙였다 떼면 조건을 바꾼 직후 첫 결과를 놓치는 보조기기가 있다. 로딩 중에는
+        같은 높이의 스켈레톤이라 결과가 오는 순간 그리드가 밀리지 않는다(#800). 오류에는 셀
+        것이 없어 선만 남는다.
+      */}
+      <div
+        className={cn(
+          'border-border flex flex-wrap items-baseline gap-x-3 gap-y-1 border-t',
+          (countable || loading) && 'pt-4 pb-3',
+          INSET_CLASS.card,
+        )}
+      >
+        {loading && <Skeleton className="h-5 w-20" />}
+        {/*
+          **조건을 바꾸면 결과 수를 알린다** (D6). 세그먼트는 URL 을 바꾸고 목록이
+          통째로 갈리는데, 보조기기에는 그 변화를 말해 주는 것이 이 줄뿐이다.
+        */}
+        <p aria-live="polite" className="text-body-2 text-fg font-semibold tabular-nums">
+          {countable && messages.walkCourse.listCount.replace('{count}', String(totalCount))}
+        </p>
+        {countable && basis !== null && (
+          <p className="text-caption text-fg-muted break-keep">{basisLine(basis)}</p>
+        )}
+      </div>
+
       <WalkCourseListBody
         courses={courses}
         loading={loading}

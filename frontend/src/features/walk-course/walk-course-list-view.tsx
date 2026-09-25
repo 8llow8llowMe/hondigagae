@@ -81,16 +81,19 @@ export function WalkCourseListView({
           **도구는 카드 머리다** (#556). 두 축이 나란히 서고, 좁은 폭에서는 접힌다 —
           축이 둘뿐이라 좌측 280 레일을 세우지 않는다 (D1).
 
-          **그룹 간격이 24 다** (#734). 12(`gap-3`)였을 때는 두 세그먼트가 테두리·높이·
-          간격이 전부 같아 **하나의 5칸짜리 라디오**로 읽혔다 — `활동량 6시간 이내` 를
-          고르면 `정렬: 코스 순` 이 풀릴 것처럼 보였다. `FieldGroup` 라벨과 함께 두 축을
-          시각적으로 가른다.
+          **그룹 간격이 32 다** (#734 에서 24, 라벨이 옆으로 오면서 32). 12(`gap-3`)였을 때는
+          두 세그먼트가 테두리·높이·간격이 전부 같아 **하나의 5칸짜리 라디오**로 읽혔다 —
+          `활동량 6시간 이내` 를 고르면 `정렬: 코스 순` 이 풀릴 것처럼 보였다. 라벨이 세그먼트
+          왼쪽(12)에 서면 그룹 사이가 그보다 확실히 넓어야 두 축이 갈린다.
+
+          **설명과 도구 사이 16** (`mt-4`). 예전에는 붙어 있어 설명 줄 · 개수 줄 · 라벨이 한
+          덩어리로 쌓였다 — 개수는 이제 결과 줄(`WalkCourseListSection`)이 갖는다.
 
           **자기 인셋을 스스로 든다** (#837). `Surface` 는 `{tools}` 를 그대로 뱉고 슬롯이
           인셋을 지는 규약인데(`surface.tsx`), 여기만 빠져 있어 `활동량` · `정렬` 라벨이
           카드 인셋 밖(x=0)에 서고 나머지 콘텐츠(x=16)와 세로선이 갈렸다.
         */
-        <div className={cn('flex flex-col gap-4 md:flex-row md:gap-6', INSET_CLASS.card)}>
+        <div className={cn('mt-4 flex flex-col gap-4 md:flex-row md:gap-8', INSET_CLASS.card)}>
           <WalkCourseActivityField
             applied={params.petActivityLevel}
             onChange={(activity) => apply({ ...filters, activity })}

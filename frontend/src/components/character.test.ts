@@ -200,7 +200,20 @@ describe('Banner — character 슬롯', () => {
     const html = renderToStaticMarkup(createElement(Banner, { ...base, character: 'leash' }))
     expect(wrapper(html)).toMatch(/-mb-4/)
     expect(wrapper(html)).toMatch(/self-end/)
-    expect(wrapper(html)).toMatch(/\bh-12\b/)
+    expect(wrapper(html)).toMatch(/\bh-16\b/)
+  })
+
+  /*
+    **캐릭터가 서면 꺾쇠가 없다.** 둘이 나란히 서면 레일 폭(362)에서 설명 줄이 꺾쇠 몫만큼
+    밀려 두 줄로 접혔다. 캐릭터가 없는 배너(병원 · AI)는 꺾쇠가 이동의 유일한 신호라 남는다.
+  */
+  it('캐릭터가 서면 꺾쇠를 그리지 않고, 없으면 그린다', () => {
+    const withCharacter = renderToStaticMarkup(
+      createElement(Banner, { ...base, character: 'leash' }),
+    )
+    const without = renderToStaticMarkup(createElement(Banner, base))
+    expect(withCharacter).not.toContain('<svg')
+    expect(without).toContain('<svg')
   })
 
   it('넘기지 않으면 그림이 없다', () => {

@@ -24,8 +24,8 @@ import { cn } from '@/lib/utils/cn'
  * **모든 상태에서 남는다.** 오류·빈 화면에서도 제거하지 않는다 — 위급할 때 필요한
  * 진입점이 데이터 사정으로 사라지면 안 된다.
  *
- * 아트보드(`혼디가개 홈·내비게이션.dc.html`) 실측에 맞춘다 — 우측 꺾쇠가 있고, 설명은
- * 12/500 muted 이며, **위아래 테두리를 스스로 긋지 않는다.** 묶음의 경계는 담는 쪽이
+ * 아트보드(`혼디가개 홈·내비게이션.dc.html`) 실측에 맞춘다 — 우측 꺾쇠가 있고(캐릭터가 서는
+ * 배너는 꺾쇠 대신 캐릭터), 설명은 12/500 muted 이며, **위아래 테두리를 스스로 긋지 않는다.** 묶음의 경계는 담는 쪽이
  * 맡는다 — 3a 에서는 카드 경계와 `SurfaceStack` 간격이다 (DESIGN.md §0). 예전에는
  * `border-y` 를 하드코딩해 2a 의 8px 밴드와 선이 겹쳤다.
  */
@@ -49,9 +49,14 @@ export function Banner({
   /** 아이콘. 여기에만 danger 색을 쓴다 */
   leading?: ReactNode
   /**
-   * 꺾쇠 앞에 서는 캐릭터 (#939, DESIGN.md §0-5). **`leading` 과 따로 둔다** — 그 칸은 danger
+   * 오른쪽 끝에 서는 캐릭터 (#939, DESIGN.md §0-5). **`leading` 과 따로 둔다** — 그 칸은 danger
    * 아이콘 자리라 `text-danger-500` 을 두르고, 위급 진입점의 신호다. 캐릭터가 그 칸을 쓰면
    * 상시 진입점이 병원 배너와 같은 모양이 된다. 허용 자리 목록 밖에서는 넘기지 않는다.
+   *
+   * **캐릭터가 서면 꺾쇠를 뺀다.** 둘이 나란히 서면 오른쪽 끝에 장식이 둘이라 어수선하고,
+   * 레일 폭(362)에서 설명 줄이 꺾쇠 몫(32)만큼 밀려 두 줄로 접혔다(1024 · 1920 실측: 글 폭
+   * 226 대 설명 228). 배너 한 줄 전체가 링크라 누를 자리는 그대로이고, 꺾쇠 몫은 캐릭터를
+   * 키우는 데 쓴다(48 → 64).
    */
   character?: StateCharacterPose
   inset?: Inset
@@ -79,15 +84,16 @@ export function Banner({
         )}
       </span>
       {/*
-        **발을 카드 아랫선에 댄다** (`self-end -mb-4` = 링크의 `py-4`). 배너 한 줄이 72px 이라 48px
-        개가 위 여백 24 를 남기고 선다 — 줄 높이는 그대로다. 소개 페이지 캐릭터가 절 끝선에 발을
-        대는 것과 같은 규칙이다(DESIGN.md §0-2).
+        **발을 카드 아랫선에 댄다** (`self-end -mb-4` = 링크의 `py-4`). 64px 개가 배너를 80 으로
+        늘리지만 두 줄이던 글이 한 줄씩이 되어 글 덩어리 높이는 오히려 준다. 소개 페이지 캐릭터가
+        절 끝선에 발을 대는 것과 같은 규칙이다(DESIGN.md §0-2).
       */}
-      {character !== undefined && (
+      {character !== undefined ? (
         <StateCharacter pose={character} size="sm" className="-mb-4 self-end" />
+      ) : (
+        // 캐릭터가 없는 배너에서는 눌러서 이동한다는 것을 말하는 유일한 신호다
+        <ChevronRightIcon size={20} aria-hidden className="text-fg-subtle shrink-0" />
       )}
-      {/* 눌러서 이동한다는 것을 말하는 유일한 신호다 */}
-      <ChevronRightIcon size={20} aria-hidden className="text-fg-subtle shrink-0" />
     </Link>
   )
 }

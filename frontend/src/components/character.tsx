@@ -75,11 +75,12 @@ export type StateCharacterPose = 'sitLookup' | 'sitFront' | 'stand' | 'leash'
  *
  * - `md` — 빈 화면 · 대기 화면. 72 → 768 이상 88. 여백이 아니라 오브젝트 크기라 DESIGN.md §4
  *   간격 스케일의 대상이 아니다(아이콘 · 썸네일과 같다)
- * - `sm` — 배너 한 줄(72px) 안. 48
+ * - `sm` — 배너 안. 64. **꺾쇠를 뺀 자리를 캐릭터가 쓴다** (`Banner` 의 `character` 주석) —
+ *   48 이던 때는 꺾쇠(20 + 간격 12)와 나란히 서서 설명 줄이 2px 차이로 두 줄로 넘어갔다
  */
 const STATE_CHARACTER_SIZE = {
   md: 'h-18 md:h-22',
-  sm: 'h-12',
+  sm: 'h-16',
 } as const
 
 /**
