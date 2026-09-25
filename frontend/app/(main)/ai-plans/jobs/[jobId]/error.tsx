@@ -35,7 +35,7 @@ import { messages } from '@/lib/messages'
  * (#451 · #473 이 같은 이유로 `h1` 을 세웠다). 보이는 제목은 상태가 이미 그리므로
  * `sr-only` 다 — `loading.tsx` 넷과 같은 방식이다.
  */
-export default function AiPlanJobError({ reset }: { error: Error; reset: () => void }) {
+export default function AiPlanJobError({ retry }: { error: Error; retry: () => void }) {
   return (
     <Canvas as="main" id="main-content">
       <SurfaceStack className="mx-auto w-full max-w-screen-md">
@@ -46,7 +46,7 @@ export default function AiPlanJobError({ reset }: { error: Error; reset: () => v
             title={messages.aiPlan.jobErrorTitle}
             description={messages.common.temporaryErrorDescription}
             inset="card"
-            onRetry={reset}
+            onRetry={retry}
           />
         </Surface>
       </SurfaceStack>

@@ -2,7 +2,7 @@
  * 라우트 상태 파일(`error.tsx` · `not-found.tsx` · `loading.tsx`)의 표면 계약 —
  * 이슈 #475 (#455 로드맵 12번).
  *
- * **소스를 문자열로 읽는다.** `error.tsx` 는 `reset` 콜백을 받는 클라이언트 경계고
+ * **소스를 문자열로 읽는다.** `error.tsx` 는 `retry` 콜백을 받는 클라이언트 경계고
  * `not-found.tsx` · `loading.tsx` 는 Next 가 세그먼트에 꽂는 규약 파일이라, node 환경에서
  * 라우트로서 렌더할 방법이 없다 (`testing-guide.md` §1). 여기서 지키려는 것도 렌더 결과가
  * 아니라 **표면 계약**이다 — 무엇이 바닥이고 무엇이 카드이며 인셋과 폭이 어느 값인가.
@@ -53,9 +53,14 @@
  * `src/components/main-layout-surface.test.ts` 가 잠근다. 열둘 중 어느 파일도 높이를
  * 스스로 정하지 않으므로 이 파일은 그대로다.
  */
+import { readdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
 import { describe, expect, it } from 'vitest'
 
 import { openingTags, readSource, readSourceWithoutComments as code } from '@/test/source'
+
+const APP_DIR = fileURLToPath(new URL('../../app', import.meta.url))
 
 function escapeRegExp(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -437,15 +442,34 @@ describe('라우트 상태 파일이 3층 표면 위에 선다 (#475)', () => {
     },
   )
 
-  it.each(STATE_FILES.filter((file) => file.path.endsWith('error.tsx')))(
-    '$path — 재시도가 reset 을 부른다',
-    ({ path }) => {
-      const source = code(path)
+  /*
+    **재시도는 `reset` 이 아니라 `retry` 다** (#918). `reset` 은 경계의 오류 상태만 지우고
+    이미 받은 RSC 응답으로 다시 그려, `page.tsx` 의 서버 조회에서 난 예외가 그대로 또
+    터진다 — 버튼이 사실상 아무 일도 하지 않았다. `retry` 는 `router.refresh()` 뒤 그린다.
 
-      expect(source).toContain("'use client'")
-      expect(source).toContain('onRetry={reset}')
-    },
-  )
+    이 표는 `STATE_FILES` 가 아니라 **`app/` 을 훑어** 만든다. `STATE_FILES` 는 폭·카드를
+    정상 화면과 짝지을 수 있는 경계만 담아 `shared-plans/[token]` 과 #907 의 루트 경계
+    셋이 빠져 있다 — 새 경계가 `reset` 으로 태어나도 거기서는 안 걸린다.
+  */
+  const ERROR_BOUNDARIES = (readdirSync(APP_DIR, { recursive: true }) as string[])
+    .filter((entry) => /(?:^|\/)(?:global-)?error\.tsx$/.test(entry))
+    .map((entry) => `app/${entry}`)
+    .sort()
+
+  it('오류 경계를 빠짐없이 찾았다 — 세그먼트 열둘 + 루트 셋', () => {
+    expect(ERROR_BOUNDARIES).toHaveLength(15)
+    for (const { path } of STATE_FILES.filter((file) => file.path.endsWith('error.tsx'))) {
+      expect(ERROR_BOUNDARIES).toContain(path)
+    }
+  })
+
+  it.each(ERROR_BOUNDARIES)('%s — 재시도가 retry 를 부른다', (path) => {
+    const source = code(path)
+
+    expect(source).toContain("'use client'")
+    expect(source).toContain('onRetry={retry}')
+    expect(source).not.toContain('reset')
+  })
 })
 
 /*

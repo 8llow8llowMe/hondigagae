@@ -44,7 +44,7 @@ import { messages } from '@/lib/messages'
  *
  * **`h1` 은 화면의 이름이고 `sr-only` 다** — 목록·지도 두 갈래와 같은 키·같은 방식이다.
  */
-export default function PlacesError({ reset }: { error: Error; reset: () => void }) {
+export default function PlacesError({ retry }: { error: Error; retry: () => void }) {
   return (
     <Canvas as="main" id="main-content">
       <SurfaceStack className="content-container">
@@ -57,7 +57,7 @@ export default function PlacesError({ reset }: { error: Error; reset: () => void
             inset="card"
             /* 카드가 `h2` 를 되찾았으므로 상태 제목이 한 단 내려간다 (#456① · #556) */
             headingLevel={3}
-            onRetry={reset}
+            onRetry={retry}
           />
         </Surface>
       </SurfaceStack>

@@ -34,7 +34,7 @@ import { messages } from '@/lib/messages'
  * 두 번 들리는 거래는 #453 · #473 이 이미 받아들였다 — `h1` 이 없으면 문서의 최상위
  * 제목이 `h2` 가 된다.
  */
-export default function PlaceDetailError({ reset }: { error: Error; reset: () => void }) {
+export default function PlaceDetailError({ retry }: { error: Error; retry: () => void }) {
   return (
     <Canvas as="main" id="main-content">
       <SurfaceStack className="content-container">
@@ -44,7 +44,7 @@ export default function PlaceDetailError({ reset }: { error: Error; reset: () =>
           title={messages.place.detailErrorTitle}
           description={messages.common.temporaryErrorDescription}
           inset="card"
-          onRetry={reset}
+          onRetry={retry}
         />
       </SurfaceStack>
     </Canvas>

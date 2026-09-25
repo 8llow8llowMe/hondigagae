@@ -31,7 +31,7 @@ import { messages } from '@/lib/messages'
  * 방식으로 쓴다 — 보이는 제목은 카드의 `h2` 가 그리고, `h1` 이 없으면 문서의 최상위
  * 제목이 그 `h2` 가 된다.
  */
-export default function AiPlanNewError({ reset }: { error: Error; reset: () => void }) {
+export default function AiPlanNewError({ retry }: { error: Error; retry: () => void }) {
   return (
     <Canvas as="main" id="main-content">
       <SurfaceStack className="mx-auto w-full max-w-2xl">
@@ -43,7 +43,7 @@ export default function AiPlanNewError({ reset }: { error: Error; reset: () => v
             description={messages.common.temporaryErrorDescription}
             inset="card"
             headingLevel={3}
-            onRetry={reset}
+            onRetry={retry}
           />
         </Surface>
       </SurfaceStack>

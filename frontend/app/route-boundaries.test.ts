@@ -23,9 +23,11 @@ import GlobalError from './global-error'
  * **배선만** 소스로 잠근다 (`onRetry={retry}`).
  *
  * **표면 계약은 나눠 잠근다.** 로딩 넷의 가로 배치는 `route-state-surface.test.ts` 의
- * `LOADING_FILES` 가, 경계 셋의 제목 레벨은 `state-heading-level.test.ts` 가 본다. 경계 셋은
- * `STATE_FILES` 에 넣지 않았다 — 그 표는 `onRetry={reset}` 을 단언하는데 새 경계는 `retry` 라서다.
- * 그래서 `(main)/error.tsx` 의 바닥·폭·인셋은 **여기서** 잠근다.
+ * `LOADING_FILES` 가, 경계 셋의 제목 레벨은 `state-heading-level.test.ts` 가, `retry` 배선은
+ * `route-state-surface.test.ts` 의 전수 단언이 함께 본다 (#918). 경계 셋은 `STATE_FILES` 에
+ * 넣지 않았다 — 그 표는 경계의 폭·카드를 **자기 세그먼트의 정상 화면**과 짝지어 잠그는데,
+ * 루트 경계에는 짝지을 정상 화면이 없다. 그래서 `(main)/error.tsx` 의 바닥·폭·인셋은
+ * **여기서** 잠근다.
  */
 const RETRY = messages.common.retry
 const HOME = messages.common.notFoundHomeAction
