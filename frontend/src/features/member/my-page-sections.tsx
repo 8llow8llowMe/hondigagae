@@ -1,6 +1,3 @@
-import Link from 'next/link'
-
-import { Button } from '@/components/button'
 import { ErrorState } from '@/components/error-state'
 import { Skeleton } from '@/components/skeleton'
 import { Surface, SurfaceList } from '@/components/surface'
@@ -36,6 +33,8 @@ export type MyPageSectionsProps = {
   favoritesLoading: boolean
   onRetry: () => void
   onLogout: () => void
+  /** 탈퇴 확인 모달을 연다 — 라우트 이동이 아니다 (`WithdrawModal`) */
+  onWithdraw: () => void
   onEditProfile: () => void
 }
 
@@ -49,7 +48,7 @@ export type MyPageSectionsProps = {
  * | 카드 | 담는 것 | 이야기 |
  * | ---- | ------- | ------ |
  * | `내 정보` (`lead`) | 프로필 · 내 반려견 · 저장한 장소 | **내 것** |
- * | `계정` | 소셜 연결 · 비밀번호 · 버전 | **설정** |
+ * | `계정` | 소셜 연결 · 비밀번호 · 약관 · 버전 · 로그아웃 · 회원탈퇴 | **설정** |
  *
  * 2a 의 밴드 경계는 셋이었다. **프로필을 따로 떼지 않는다** — 혼자서는 자기 제목이 없고
  * 담는 항목도 하나라 카드 판정 ①③ 에 걸린다. 홈이 프로필·판정·골든타임을 카드 하나에
@@ -63,8 +62,10 @@ export type MyPageSectionsProps = {
  * 그대로 서 있고 몸통만 갈린다 — 제목까지 스켈레톤으로 지우면 조회가 끝나는 순간 카드
  * 높이와 경계가 함께 뛴다.
  *
- * **로그아웃·회원탈퇴는 카드가 아니다** — 액션은 카드 판정에서 빠진다(§0). L0 바닥 위에
- * 그대로 선다 (반려견 삭제 #464 · 일정 만들기 취소 #453 과 같은 자리).
+ * **로그아웃·회원탈퇴는 `계정` 카드의 마지막 두 행이다.** 예전에는 카드 밖 L0 바닥에
+ * `secondary` 버튼 + 글자 링크로 섰는데(#913), 버튼 하나와 링크 하나가 카드 아래 떠 있어
+ * 어느 묶음에도 속하지 않은 것처럼 보였다. `버전` 행과 같은 행 모양으로 카드 안에 넣으면
+ * "계정에 대한 일" 로 함께 읽힌다 — `AccountSection` 머리주석.
  */
 export function MyPageSections({
   member,
@@ -77,6 +78,7 @@ export function MyPageSections({
   favoritesLoading,
   onRetry,
   onLogout,
+  onWithdraw,
   onEditProfile,
 }: MyPageSectionsProps) {
   /*
@@ -190,63 +192,14 @@ export function MyPageSections({
               <Skeleton className="h-14 w-full" />
             </div>
           ) : (
-            <AccountSection state={toAccountState(member)} provider={member.provider} />
+            <AccountSection
+              state={toAccountState(member)}
+              provider={member.provider}
+              onLogout={onLogout}
+              onWithdraw={onWithdraw}
+            />
           )}
         </Surface>
-      )}
-
-      {/*
-        위험한 액션은 마지막에, 약하게 — 아트보드 01 주석.
-        로그아웃 16/600, 회원탈퇴 14/500 `--fg-muted`. **둘 다 danger 색을 쓰지 않는다**:
-        실수를 막는 건 색이 아니라 위치와 확인 단계다.
-
-        로그아웃은 **동작**이라 `<button>`, 회원탈퇴는 **이동**이라 `<a>` 다.
-        모양이 비슷해도 역할이 다르다 (D6).
-
-        **L0 바닥 위다** — 액션은 카드가 아니다(§0). 왼쪽 정렬은 아트보드 01 그대로
-        두되 인셋을 `main`(16/40)이 아니라 **`card`(16/20)로 잡는다**: L0 위에 있어도
-        축은 바로 위 카드 안 글줄과 같아야 `로그아웃` 의 첫 글자가 `비밀번호 변경` 과
-        같은 세로선에 선다 (`lib/ui/inset.ts` 의 `card` 주석, #451). `main` 을
-        쓰면 데스크톱에서 20px 계단이 생긴다.
-
-        **정확히는 1px 왼쪽에 선다** (768에서 44 대 45, 1920에서 620 대 621 — 실측).
-        `Surface` 가 `md:border` 를 쓰므로 카드의 padding box 가 border box 보다 1px
-        안쪽인데 L0 블록에는 상쇄할 테두리가 없다. 모바일은 `border-y` 라 정확히 맞는다.
-        눈으로 보이지 않아 그대로 둔다 — 다음 사람이 다시 재지 않게 적어 둔다.
-
-        **로딩·오류에서는 내지 않는다.** 2a 는 두 상태에서 early return 이라 이 블록이
-        아예 없었다 — 층을 옮기며 조건 밖으로 새어 나가면, 라우트 스켈레톤
-        (`loading.tsx`, 액션 없음)에서 클라이언트 로딩으로 넘어가는 순간 버튼 둘이
-        튀어나온다. 리팩토링이라 동작을 그대로 둔다.
-      */}
-      {!loading && !failed && (
-        <div className={cn('flex flex-col items-start py-2', INSET_CLASS.card)}>
-          {/*
-            **텍스트가 아니라 `secondary` 버튼이다** (#913 — #466 의 텍스트 결정을 뒤집는다).
-            #466 은 아트보드 01 대로 "위험한 액션은 약하게" 를 16/600 맨 글자로 풀었는데,
-            사용성 검토(#905 §6)에서 **누르는 것인지 읽히지 않았다** — 바로 아래 `회원탈퇴`
-            (링크)와 모양이 같아 둘 다 안내 문구처럼 보였다. 약하게는 색이 아니라 **위치**
-            (맨 마지막 · 카드 밖)와 **무게**(primary 가 아니다)로 지킨다.
-
-            이슈는 `ghost` 를 적었지만 쓰지 않는다: `ghost` 는 글자가 `fg-muted` 라 지금의
-            진한 16/600 보다 **더 약해진다** — 고치려는 것이 "액션 인지가 약하다" 이다.
-            테두리가 있는 가장 낮은 변형이 `secondary` 다. danger 계열도 쓰지 않는다(아래
-            머리주석 — 실수를 막는 것은 색이 아니라 위치와 확인 단계다).
-
-            `mb-2` 는 아래 `회원탈퇴` 링크와의 간격이다 — 버튼 테두리와 링크 글자가 붙으면
-            한 덩어리로 읽힌다.
-          */}
-          <Button variant="secondary" onClick={onLogout} className="mb-2">
-            {messages.member.logout}
-          </Button>
-
-          <Link
-            href="/mypage/withdraw"
-            className="text-body-2 text-fg-muted focus-visible:ring-brand-500 flex min-h-11 items-center font-medium focus-visible:ring-2 focus-visible:outline-none"
-          >
-            {messages.member.withdraw}
-          </Link>
-        </div>
       )}
     </>
   )

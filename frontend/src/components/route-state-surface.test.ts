@@ -50,7 +50,7 @@
  * 판단해라" 를 요구한 것에 대한 답이 이 문단이다.)
  *
  * **#456③ 이 그 규칙을 `app/(main)/layout.tsx` 한 곳에 놓았다** —
- * `src/components/main-layout-surface.test.ts` 가 잠근다. 열둘 중 어느 파일도 높이를
+ * `src/components/main-layout-surface.test.ts` 가 잠근다. 상태 파일 중 어느 것도 높이를
  * 스스로 정하지 않으므로 이 파일은 그대로다.
  */
 import { readdirSync } from 'node:fs'
@@ -118,7 +118,7 @@ type StateFile = {
   /**
    * 이 경계의 `h1` 이 쓰는 `messages` 키 — **정상 화면의 `h1` 과 같아야 하는 경우에만** 준다.
    *
-   * 아홉이 그렇다. 나머지 다섯은 정상 화면 쪽 `page.tsx` 에 `h1` 이 없어 비교 대상이
+   * 여덟이 그렇다. 나머지 다섯은 정상 화면 쪽 `page.tsx` 에 `h1` 이 없어 비교 대상이
    * 없다: 상세 넷(`places/[placeId]` · `plans/[planId]`)은 경계가 **오류 전용 이름**
    * (`detailErrorTitle` · `detailNotFoundTitle`)을 쓰고, AI 작업 상태는 `h1` 을
    * 뷰 컴포넌트가 그린다. 그쪽은 화면 이름을 물려받는 계약이 아니다.
@@ -190,12 +190,12 @@ const STATE_FILES: StateFile[] = [
     },
   },
   /*
-    **마이페이지 세그먼트는 경계가 셋이다** (#481). 예전에는 위 하나가 셋을 덮었는데
-    폭도 `h1` 도 루트 기준이라, 두 폼 화면에서 예외가 뜨면 글줄이 768 로 넓어지고
-    문서의 이름이 `내 정보` 로 바뀌었다. 셋을 **각자 자기 정상 화면과 쌍으로** 잠근다.
+    **마이페이지 세그먼트는 경계가 둘이다** (#481). 예전에는 위 하나가 전부를 덮었는데
+    폭도 `h1` 도 루트 기준이라, 폼 화면에서 예외가 뜨면 글줄이 768 로 넓어지고
+    문서의 이름이 `내 정보` 로 바뀌었다. 둘을 **각자 자기 정상 화면과 쌍으로** 잠근다.
+    (탈퇴는 라우트가 아니라 `/mypage` 위의 확인 모달이 되어 경계가 사라졌다.)
 
-    **둘의 카드 이름표가 갈리는 것이 의도다.** 탈퇴는 `WithdrawView` 가 제목 있는 카드를
-    그리므로 같은 키를 쓰고, 비밀번호는 `PasswordView` 의 **오류 갈래**가 이름 없는
+    **비밀번호 경계는 이름 없는 카드다.** `PasswordView` 의 **오류 갈래**가 이름 없는
     `<Surface>` 다 — 성공 갈래 제목(`setup ? passwordSetup : passwordChange`)이 응답을
     봐야 정해지는데 경계에는 그 응답이 없다. 정상 화면이 오류에서 제목을 뺀 이유가
     그것이고 경계도 같은 자리에 선다.
@@ -215,18 +215,6 @@ const STATE_FILES: StateFile[] = [
       probes: [],
       nameless: true,
       source: 'src/features/member/password-view.tsx',
-    },
-  },
-  {
-    path: 'app/(main)/mypage/withdraw/error.tsx',
-    heading: 'messages.member.withdrawTitle',
-    width: 'mx-auto w-full max-w-2xl',
-    state: 'ErrorState',
-    widthSource: { path: 'app/(main)/mypage/withdraw/page.tsx', contains: 'max-w-2xl' },
-    card: {
-      kind: 'card',
-      probes: ['lead', 'title={messages.member.withdrawTitle}'],
-      source: 'src/features/member/withdraw-view.tsx',
     },
   },
   {
@@ -456,8 +444,8 @@ describe('라우트 상태 파일이 3층 표면 위에 선다 (#475)', () => {
     .map((entry) => `app/${entry}`)
     .sort()
 
-  it('오류 경계를 빠짐없이 찾았다 — 세그먼트 열둘 + 루트 셋', () => {
-    expect(ERROR_BOUNDARIES).toHaveLength(15)
+  it('오류 경계를 빠짐없이 찾았다 — 세그먼트 열하나 + 루트 셋', () => {
+    expect(ERROR_BOUNDARIES).toHaveLength(14)
     for (const { path } of STATE_FILES.filter((file) => file.path.endsWith('error.tsx'))) {
       expect(ERROR_BOUNDARIES).toContain(path)
     }
@@ -480,14 +468,14 @@ describe('라우트 상태 파일이 3층 표면 위에 선다 (#475)', () => {
   **폭보다 먼저** 전해진다. 폭만 잠근 단언은 그 증상을 못 잡는다 — 뮤테이션으로 확인했다
   (`h1` 키를 루트 값으로 되돌려도 122개가 전부 초록이었다).
 
-  아홉만 본다. 나머지 다섯은 정상 화면 `page.tsx` 에 `h1` 이 없어 비교 대상이 없다.
+  여덟만 본다. 나머지 다섯은 정상 화면 `page.tsx` 에 `h1` 이 없어 비교 대상이 없다.
 */
 describe('h1 이 정상 화면의 이름과 같다 (#481)', () => {
   const NAMED = STATE_FILES.filter((entry) => entry.heading !== undefined)
 
   // 표가 줄면 단언도 조용히 줄어든다 — 개수를 박아 그것을 막는다
-  it('아홉이 이 계약을 갖는다', () => {
-    expect(NAMED).toHaveLength(9)
+  it('여덟이 이 계약을 갖는다', () => {
+    expect(NAMED).toHaveLength(8)
   })
 
   it.each(NAMED)(

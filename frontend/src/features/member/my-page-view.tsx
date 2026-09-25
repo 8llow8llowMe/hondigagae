@@ -8,13 +8,14 @@ import { MyPageSections } from '@/features/member/my-page-sections'
 import { MyProfileEditModal } from '@/features/member/my-profile-edit-modal'
 import { useMyInfo } from '@/features/member/use-my-info'
 import { useSessionExit } from '@/features/member/use-session-exit'
+import { WithdrawModal } from '@/features/member/withdraw-modal'
 import { usePetList } from '@/features/pet/use-pet-list'
 import { logout } from '@/lib/api/auth'
 import { toErrorStatus } from '@/lib/api/error'
 import { messages } from '@/lib/messages'
 
 /**
- * `/mypage` — 조회 상태를 `MyPageSections` 의 props 로 변환하고 로그아웃을 배선한다.
+ * `/mypage` — 조회 상태를 `MyPageSections` 의 props 로 변환하고 로그아웃 · 탈퇴 확인을 배선한다.
  *
  * **두 조회의 실패를 합치지 않는다.** 반려견 조회가 실패해도 회원 정보는 그대로
  * 그려야 한다 (D5) — 그래서 `pets` 를 `null`(실패)과 `[]`(0마리)로 구분해 넘긴다.
@@ -29,6 +30,7 @@ export function MyPageView() {
   const [logoutOpen, setLogoutOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [withdrawOpen, setWithdrawOpen] = useState(false)
 
   async function handleLogout() {
     if (loggingOut) return
@@ -58,6 +60,7 @@ export function MyPageView() {
         favoritesLoading={favoritesQuery.isPending}
         onRetry={() => void query.refetch()}
         onLogout={() => setLogoutOpen(true)}
+        onWithdraw={() => setWithdrawOpen(true)}
         onEditProfile={() => setEditOpen(true)}
       />
 
@@ -79,6 +82,9 @@ export function MyPageView() {
         confirmLabel={messages.member.logout}
         confirmLoading={loggingOut}
       />
+
+      {/* 탈퇴는 라우트 이동이 아니라 이 화면 위의 확인이다 (`WithdrawModal` 머리주석) */}
+      <WithdrawModal open={withdrawOpen} onClose={() => setWithdrawOpen(false)} />
     </>
   )
 }

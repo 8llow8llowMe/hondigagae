@@ -6,7 +6,12 @@ import { cn } from '@/lib/utils/cn'
 import type { MemberMyInfo } from '@/types/member'
 
 /**
- * 아바타 · 이름 · 이메일 — 아트보드 01 첫 블록.
+ * 아바타 · 닉네임 · 이메일 — 아트보드 01 첫 블록.
+ *
+ * **이름이 아니라 닉네임이다.** 이 화면에서 고칠 수 있는 것이 닉네임 하나뿐인데(`수정` 모달),
+ * 여기에 이름을 적으면 닉네임을 바꿔도 이 줄이 그대로라 저장이 안 된 것처럼 읽힌다. 서비스
+ * 안에서 나를 부르는 이름도 닉네임이다. 닉네임이 비어 있는 계정(가입 경로에 따라 생길 수
+ * 있다)만 이름으로 떨어진다 — 빈 줄을 남기지 않는다.
  *
  * **L1 카드 안의 첫 블록이다** (`DESIGN.md §0`, 이슈 #466). 혼자서는 카드가 되지 못한다
  * — 자기 제목이 없고 담는 항목도 하나라 카드 판정 ①③ 에 걸린다. 홈이 프로필·판정·
@@ -23,7 +28,7 @@ export function MyProfileSection({
   member,
   trailing,
 }: {
-  member: Pick<MemberMyInfo, 'name' | 'email' | 'profileImageUrl'>
+  member: Pick<MemberMyInfo, 'name' | 'nickname' | 'email' | 'profileImageUrl'>
   trailing?: ReactNode
 }) {
   return (
@@ -32,11 +37,15 @@ export function MyProfileSection({
       <ProfileAvatar url={member.profileImageUrl} />
 
       <span className="min-w-0 flex-1">
-        <span className="text-title-2 text-fg block font-bold">{member.name}</span>
+        <span className="text-title-2 text-fg block font-bold">{displayName(member)}</span>
         <span className="text-body-2 text-fg-muted block truncate">{member.email}</span>
       </span>
 
       {trailing}
     </div>
   )
+}
+
+function displayName({ nickname, name }: Pick<MemberMyInfo, 'name' | 'nickname'>): string {
+  return nickname.trim().length > 0 ? nickname : name
 }
