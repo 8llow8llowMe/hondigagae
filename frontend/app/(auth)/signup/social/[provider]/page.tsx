@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 
 import type { Metadata } from 'next'
 
+import { AuthCardDog } from '@/features/auth/auth-card-dog'
 import { LoggedInNotice } from '@/features/auth/logged-in-notice'
 import { SocialSignupConsentScreen } from '@/features/auth/social-signup-consent-screen'
 import { isOAuthProvider } from '@/lib/auth/oauth-provider'
@@ -56,5 +57,10 @@ export default async function SocialSignupConsentPage({
 
   if (session !== null) return <LoggedInNotice returnTo={target} />
 
-  return <SocialSignupConsentScreen provider={provider} returnTo={target} />
+  return (
+    <>
+      <AuthCardDog />
+      <SocialSignupConsentScreen provider={provider} returnTo={target} />
+    </>
+  )
 }

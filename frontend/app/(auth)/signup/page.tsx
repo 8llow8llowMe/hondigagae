@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 
+import { AuthCardDog } from '@/features/auth/auth-card-dog'
 import { LoggedInNotice } from '@/features/auth/logged-in-notice'
 import { SignupScreen } from '@/features/auth/signup-screen'
 import { readSession } from '@/lib/auth/session'
@@ -29,5 +30,10 @@ export default async function SignupPage({
     컴포넌트 하나(`SignupScreen`)로 묶었다 — 서버 컴포넌트인 이 페이지는 상태를 들 수
     없다 (#688).
   */
-  return <SignupScreen returnTo={target} />
+  return (
+    <>
+      <AuthCardDog />
+      <SignupScreen returnTo={target} />
+    </>
+  )
 }

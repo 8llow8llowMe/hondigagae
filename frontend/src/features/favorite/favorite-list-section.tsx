@@ -175,6 +175,7 @@ function FavoriteListBody({
         inset={inset}
         headingLevel={3}
         title={messages.favorite.emptyTitle}
+        character="stand"
         description={messages.favorite.emptyDescription}
         action={
           /*

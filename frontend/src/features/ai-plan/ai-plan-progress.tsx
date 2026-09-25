@@ -1,4 +1,5 @@
 import { Button } from '@/components/button'
+import { StateCharacter } from '@/components/character'
 import {
   AiPlanJobBlock,
   AiPlanJobCondition,
@@ -169,6 +170,18 @@ export function AiPlanProgress({
     <AiPlanJobFrame>
       <AiPlanJobBlock inset={inset}>
         {/*
+          **목줄 산책이 "지금 가는 중" 을 연기한다** (#939, DESIGN.md §0-5). 최대 80초를 기다리는
+          화면이다. 글 묶음 오른쪽에 서고 **발을 블록 아래 구분선에 댄다**(`-mb-5` = 블록의
+          `py-5`) — 개가 아래 여백을 쓰므로 블록 높이가 늘지 않는다. #710 이 스켈레톤을 걷은
+          이유가 "`그만두기` 를 접힘 아래로 민다" 였으니 그 자리를 다시 먹지 않는다.
+
+          **정지 그림이다.** 움직임 줄이기 사용자에게도 같은 문장이어야 하고, 진행 신호는
+          단계 눈금 · 경과 시간(관측값)이 맡는다 — 개가 걷는 속도가 진행률처럼 읽히면 안 된다.
+          상한 초과 갈래에는 두지 않는다: 그 화면은 "기다림" 이 아니라 "직접 확인" 이다.
+        */}
+        <div className="flex w-full items-end gap-6">
+          <div className="flex min-w-0 flex-col items-start gap-2">
+            {/*
           `aria-live="polite"` — 진행 문구가 바뀌는 것을 스크린리더가 알아야 한다.
           `role="status"` 를 쓰면 대기 중 내용이 바뀔 때마다 읽히는 것이 자연스럽다.
 
@@ -179,46 +192,51 @@ export function AiPlanProgress({
           스크린리더가 **매 초 낭독한다** — 화면을 못 보는 사용자에게는 진행 안내가 아니라
           소음이 되고, 그 사이 진짜로 바뀐 단계 이름이 묻힌다.
         */}
-        <div role="status" aria-live="polite" className="flex flex-col items-start gap-1">
-          <h2 className="text-title-2 text-fg font-semibold">{messages.aiPlan.jobProgressTitle}</h2>
+            <div role="status" aria-live="polite" className="flex flex-col items-start gap-1">
+              <h2 className="text-title-2 text-fg font-semibold">
+                {messages.aiPlan.jobProgressTitle}
+              </h2>
 
-          {/*
+              {/*
             **`PENDING` 이면 이 줄 자체가 없다.** 서버가 `stepOrder` 를 null 로 주므로
             (아직 시작하지 않았다는 뜻) 0 이나 1 로 채우면 시작한 것으로 그리게 된다.
           */}
-          {stepProgress !== null && (
-            <p className="text-body-2 text-fg flex items-center gap-2 font-medium">
-              <StepTicks progress={stepProgress} />
-              {/*
+              {stepProgress !== null && (
+                <p className="text-body-2 text-fg flex items-center gap-2 font-medium">
+                  <StepTicks progress={stepProgress} />
+                  {/*
                 **숫자와 단계 이름을 한 요소에 담는다.** 둘로 나누면 flex 의 `gap-2` 가
                 가운뎃점 앞에도 붙어 `4 / 4단계  · 일정 구성` 처럼 한 칸이 더 벌어진다 —
                 `gap` 은 눈금과 글줄 사이에만 있어야 한다.
               */}
-              <span className="tabular-nums">
-                {messages.aiPlan.jobStepProgress
-                  .replace('{order}', String(stepProgress.order))
-                  .replace('{total}', String(stepProgress.total))}
-                {step !== null && ` · ${step.name}`}
-              </span>
-            </p>
-          )}
+                  <span className="tabular-nums">
+                    {messages.aiPlan.jobStepProgress
+                      .replace('{order}', String(stepProgress.order))
+                      .replace('{total}', String(stepProgress.total))}
+                    {step !== null && ` · ${step.name}`}
+                  </span>
+                </p>
+              )}
 
-          {/* 서버 문구를 그대로 쓴다 — FE 가 다시 쓰지 않는다 (styling-guide.md §7) */}
-          <p className="text-body-2 text-fg-muted">{description}</p>
-          {phase === 'slow' && (
-            <p className="text-body-2 text-fg font-medium">{messages.aiPlan.jobSlowNotice}</p>
-          )}
-        </div>
+              {/* 서버 문구를 그대로 쓴다 — FE 가 다시 쓰지 않는다 (styling-guide.md §7) */}
+              <p className="text-body-2 text-fg-muted">{description}</p>
+              {phase === 'slow' && (
+                <p className="text-body-2 text-fg font-medium">{messages.aiPlan.jobSlowNotice}</p>
+              )}
+            </div>
 
-        {/*
+            {/*
           **낭독 영역 밖이다.** 위 주석 참고 — 1초마다 바뀌는 값이고, 눈으로 보는 사람에게만
           쓸모가 있다.
         */}
-        {elapsed !== null && (
-          <p aria-hidden className="text-caption text-fg-muted tabular-nums">
-            {messages.aiPlan.jobElapsed.replace('{elapsed}', elapsed)}
-          </p>
-        )}
+            {elapsed !== null && (
+              <p aria-hidden className="text-caption text-fg-muted tabular-nums">
+                {messages.aiPlan.jobElapsed.replace('{elapsed}', elapsed)}
+              </p>
+            )}
+          </div>
+          <StateCharacter pose="leash" className="-mb-5" />
+        </div>
       </AiPlanJobBlock>
 
       <AiPlanJobCondition

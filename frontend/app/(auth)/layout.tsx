@@ -104,7 +104,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         좌우 인셋은 카드 규약(`px-4 md:px-5`)을 따른다. 390px 에서 카드 안 내용 폭은
         326px 이다 — 전폭이던 358px 에서 32px 을 내주고 경계를 얻는다.
       */}
-      <main className="bg-bg border-border w-full max-w-sm rounded-lg border px-4 py-6 md:px-5">
+      <main className="bg-bg border-border relative w-full max-w-sm rounded-lg border px-4 py-6 md:px-5">
+        {/*
+          `relative` 는 폼 화면의 캐릭터(`AuthCardDog`, #939)가 카드 옆에 서는 기준 상자다. 캐릭터를
+          여기 두지 않는 이유는 그 컴포넌트 머리주석 — 같은 그룹의 OAuth 콜백은 상태 화면이다.
+        */}
         {children}
       </main>
     </div>

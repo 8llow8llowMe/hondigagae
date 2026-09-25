@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import type { ReactNode } from 'react'
 
+import { StateCharacter, type StateCharacterPose } from '@/components/character'
 import { ChevronRightIcon } from '@/components/icons'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -34,6 +35,7 @@ export function Banner({
   description,
   href,
   leading,
+  character,
   /**
    * 좌우 여백. **레일(24)과 본문(40)은 1024 이상에서만 다르다** — 그 아래에서는 레일이
    * 레일이 아니라 한 컬럼의 한 블록이라 본문 인셋을 따른다 (장소 상세에서 겪은 것과 같다).
@@ -46,6 +48,12 @@ export function Banner({
   href: string
   /** 아이콘. 여기에만 danger 색을 쓴다 */
   leading?: ReactNode
+  /**
+   * 꺾쇠 앞에 서는 캐릭터 (#939, DESIGN.md §0-5). **`leading` 과 따로 둔다** — 그 칸은 danger
+   * 아이콘 자리라 `text-danger-500` 을 두르고, 위급 진입점의 신호다. 캐릭터가 그 칸을 쓰면
+   * 상시 진입점이 병원 배너와 같은 모양이 된다. 허용 자리 목록 밖에서는 넘기지 않는다.
+   */
+  character?: StateCharacterPose
   inset?: Inset
   className?: string
 }) {
@@ -70,6 +78,14 @@ export function Banner({
           <span className="text-caption text-fg-muted font-medium tabular-nums">{description}</span>
         )}
       </span>
+      {/*
+        **발을 카드 아랫선에 댄다** (`self-end -mb-4` = 링크의 `py-4`). 배너 한 줄이 72px 이라 48px
+        개가 위 여백 24 를 남기고 선다 — 줄 높이는 그대로다. 소개 페이지 캐릭터가 절 끝선에 발을
+        대는 것과 같은 규칙이다(DESIGN.md §0-2).
+      */}
+      {character !== undefined && (
+        <StateCharacter pose={character} size="sm" className="-mb-4 self-end" />
+      )}
       {/* 눌러서 이동한다는 것을 말하는 유일한 신호다 */}
       <ChevronRightIcon size={20} aria-hidden className="text-fg-subtle shrink-0" />
     </Link>

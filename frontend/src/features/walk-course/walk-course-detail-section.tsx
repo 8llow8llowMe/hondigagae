@@ -136,6 +136,7 @@ export function WalkCourseDetailSection({
           <EmptyState
             inset="card"
             title={toMessage(errorMessage, messages.walkCourse.detailNotFoundTitle)}
+            character="sitLookup"
             description={messages.walkCourse.pageDescription}
             action={<BackToList />}
           />

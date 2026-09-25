@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 
+import { AuthCardDog } from '@/features/auth/auth-card-dog'
 import { PasswordResetView } from '@/features/auth/password-reset-view'
 import { messages } from '@/lib/messages'
 
@@ -12,5 +13,10 @@ export const metadata: Metadata = { title: `${messages.auth.resetTitle} · 혼�
  * `searchParams` 를 읽지 않는다. 이메일을 URL 에 싣지 않기 때문이다 (D3).
  */
 export default function PasswordResetPage() {
-  return <PasswordResetView />
+  return (
+    <>
+      <AuthCardDog />
+      <PasswordResetView />
+    </>
+  )
 }

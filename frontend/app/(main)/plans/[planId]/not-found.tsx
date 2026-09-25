@@ -42,6 +42,7 @@ export default function PlanDetailNotFound() {
 
         <EmptyState
           title={messages.plan.detailNotFoundTitle}
+          character="sitLookup"
           description={messages.plan.detailNotFoundDescription}
           inset="card"
           action={

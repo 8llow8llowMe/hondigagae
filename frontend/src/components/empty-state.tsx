@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 
+import { StateCharacter, type StateCharacterPose } from '@/components/character'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
@@ -31,6 +32,14 @@ export type EmptyStateProps = {
    * `text-body-1` 이라 더 줄일 것이 없다 — 바뀌는 것은 문서 개요뿐이다.
    */
   headingLevel?: 2 | 3
+  /**
+   * 글 묶음 옆에 앉는 캐릭터 (#939, DESIGN.md §0-5). **허용 자리 목록에 있는 호출부만 넘긴다**
+   * — `character.test.ts` 가 목록 밖의 사용을 잡는다.
+   *
+   * 필터 결과 0건처럼 "조건을 바꾸면 되는" 빈 상태에는 넘기지 않는다. 캐릭터는 처음 오는
+   * 사람 · 길을 잃은 사람에게 서는 것이지, 조작의 결과에 서는 것이 아니다.
+   */
+  character?: StateCharacterPose
   className?: string
 }
 
@@ -52,16 +61,39 @@ export function EmptyState({
   action,
   inset = 'main',
   headingLevel = 2,
+  character,
   className,
 }: EmptyStateProps) {
   const Heading = `h${headingLevel}` as const
 
-  return (
-    <div className={cn('flex flex-col items-start gap-2 py-12', INSET_CLASS[inset], className)}>
+  const body = (
+    <>
       {/* 중립 톤 — danger 를 쓰지 않는다 (DESIGN.md §2) */}
       <Heading className="text-body-1 text-fg font-semibold">{title}</Heading>
       {description !== undefined && <p className="text-body-2 text-fg-muted">{description}</p>}
       {action !== undefined && <div className="mt-2">{action}</div>}
+    </>
+  )
+
+  if (character === undefined) {
+    return (
+      <div className={cn('flex flex-col items-start gap-2 py-12', INSET_CLASS[inset], className)}>
+        {body}
+      </div>
+    )
+  }
+
+  /*
+    **캐릭터가 있어도 좌측 정렬은 그대로다** (#939). 개는 글 묶음 **오른쪽**에 서고 발을 글 묶음
+    아랫선(`items-end`)에 맞춘다 — 가운데로 모으면 빈 상태가 사건처럼 보인다(위 주석).
+
+    **`justify-between` 을 쓰지 않는다.** 전폭 카드(1440 캡)에서 개가 오른쪽 끝으로 가면 글과
+    수백 px 떨어져 무엇을 연기하는지 끊긴다. 글 바로 옆(`gap-6`)이다.
+  */
+  return (
+    <div className={cn('flex items-end gap-6 py-12', INSET_CLASS[inset], className)}>
+      <div className="flex min-w-0 flex-col items-start gap-2">{body}</div>
+      <StateCharacter pose={character} />
     </div>
   )
 }

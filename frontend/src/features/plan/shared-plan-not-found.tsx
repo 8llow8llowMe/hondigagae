@@ -28,6 +28,7 @@ export function SharedPlanNotFound() {
 
       <EmptyState
         title={messages.plan.sharedNotFoundTitle}
+        character="sitLookup"
         description={messages.plan.sharedNotFoundDescription}
         inset="card"
         action={

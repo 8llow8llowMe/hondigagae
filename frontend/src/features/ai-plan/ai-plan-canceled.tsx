@@ -1,4 +1,5 @@
 import { Button, ButtonLink } from '@/components/button'
+import { StateCharacter } from '@/components/character'
 import {
   AiPlanJobBlock,
   AiPlanJobCondition,
@@ -52,8 +53,19 @@ export function AiPlanCanceled({
   return (
     <AiPlanJobFrame>
       <AiPlanJobBlock inset={inset}>
-        <h2 className="text-title-2 text-fg font-semibold">{messages.aiPlan.canceledTitle}</h2>
-        <p className="text-body-2 text-fg-muted">{messages.aiPlan.canceledDescription}</p>
+        {/*
+          **서서 기다린다** (#939, DESIGN.md §0-5) — 멈췄지만 조건은 그대로 있고 다시 넣을 수
+          있다는 문장이다. 진행 화면의 목줄 산책과 같은 자리 · 같은 규칙(발을 구분선에 댄다)이다.
+          **실패(`AiPlanFailed`)에는 두지 않는다** — 조건 문제일 수 있는 실패에 귀여운 그림이
+          서면 사용자가 겪은 일을 가볍게 만든다.
+        */}
+        <div className="flex w-full items-end gap-6">
+          <div className="flex min-w-0 flex-col items-start gap-2">
+            <h2 className="text-title-2 text-fg font-semibold">{messages.aiPlan.canceledTitle}</h2>
+            <p className="text-body-2 text-fg-muted">{messages.aiPlan.canceledDescription}</p>
+          </div>
+          <StateCharacter pose="stand" className="-mb-5" />
+        </div>
       </AiPlanJobBlock>
 
       <AiPlanJobCondition
