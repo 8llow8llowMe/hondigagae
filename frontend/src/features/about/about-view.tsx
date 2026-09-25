@@ -6,17 +6,12 @@ import { BrandSymbol } from '@/components/brand/symbol'
 import { Wordmark } from '@/components/brand/wordmark'
 import { ButtonLink } from '@/components/button'
 import { ChevronRightIcon } from '@/components/icons'
-import { MetricBadge } from '@/components/metric'
 import { Surface, SurfaceList } from '@/components/surface'
 import { CtaDog, HeroDog } from '@/features/about/about-character'
-import {
-  INDOOR_SPECIMEN,
-  SCALE_SPECIMEN,
-  SUITABILITY_SPECIMEN,
-  WEATHER_SPECIMEN,
-} from '@/features/about/about-specimen-data'
 import { CongestionSpecimen } from '@/features/about/congestion-specimen'
+import { DataScale } from '@/features/about/data-scale'
 import { EmergencySpecimen } from '@/features/about/emergency-specimen'
+import { IndoorSpecimen, SuitabilitySpecimen } from '@/features/about/feature-specimens'
 import { FeatureTabs } from '@/features/about/feature-tabs'
 import { GoldenCurveSpecimen } from '@/features/about/golden-curve-specimen'
 import { HeroParallax, ScrollCue } from '@/features/about/hero-parallax'
@@ -24,12 +19,10 @@ import { IntroBand } from '@/features/about/intro-band'
 import { PlacesSpecimen } from '@/features/about/places-specimen'
 import { PlanSpecimen } from '@/features/about/plan-specimen'
 import { Reveal } from '@/features/about/reveal'
-import { ScaleCount } from '@/features/about/scale-count'
 import { ScrollProgressBar } from '@/features/about/scroll-progress-bar'
 import { ScrollStage, ScrollStagePoint } from '@/features/about/scroll-stage'
 import { SectionNav } from '@/features/about/section-nav'
 import { SplitHeading } from '@/features/about/split-heading'
-import { Tag } from '@/features/about/tag'
 import { VerdictSpecimen } from '@/features/about/verdict-specimen'
 import { LEGAL_LINKS } from '@/lib/legal/links'
 import { messages } from '@/lib/messages'
@@ -124,17 +117,20 @@ export function AboutView() {
             <BrandSymbol size={48} tone="inverse" />
             <Wordmark height={40} />
           </div>
-          <p className="text-caption flex items-center gap-2 font-semibold tracking-wide">
-            <span aria-hidden className="bg-fg-inverse inline-block size-1.5 rounded-full" />
-            {about.hero.eyebrow}
-          </p>
+          {/*
+            제목 → 한 줄 (#940). 예전의 12px 표지어는 제목으로 올라왔다 — 작은 글자 한 줄이
+            로고와 제목 사이에서 셋째 위계를 만들었다. 한 줄은 제목 아래 `title-2 → lg:title-1` 이다.
+            **설명 문단은 두지 않는다** — 한 줄과 같은 말을 되풀이했고, 공공데이터 · 일정 · 가입
+            없이는 아래 절(데이터 · 질문 3 · 마무리)이 말한다. 첫 화면에서 시선이 머물 곳을 줄였다.
+          */}
           <SplitHeading
             id="about-hero-heading"
             text={about.hero.heading}
-            className="text-display md:text-page mt-3 font-extrabold break-keep"
+            className="text-display md:text-page font-extrabold break-keep"
           />
-          <p className="text-body-1 mt-4 max-w-2xl font-normal break-keep opacity-90">
-            {about.hero.sub}
+          <p className="text-title-2 lg:text-title-1 mt-3 max-w-2xl font-semibold break-keep lg:font-bold">
+            {about.hero.lead[0]} <br aria-hidden className="hidden md:inline" />
+            {about.hero.lead[1]}
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
             <ButtonLink href="/" variant="inverse">
@@ -219,101 +215,49 @@ export function AboutView() {
       </IntroBand>
 
       {/*
-        ── 4. 오늘 어디 가요? ── 목록 + 예시 하나 (#940). 1024 이상은 카피 5 : 예시 7 에 예시가
-        세 행(머리 · 목록 · 링크)에 걸친다. 그 미만은 머리 → 칩 → 예시 → 링크로 쌓인다.
+        ── 4. 오늘 어디 가요? ── 목록 + 예시 하나 (#940). 1024 이상은 스크롤이 목록을 한 항목씩
+        넘긴다 — 트랙이 절 높이를 정하므로 밴드 위아래 여백을 걷는다(`lg:py-0`).
       */}
-      <IntroBand
-        tone="plain"
-        id={SECTION_ID.q3}
-        labelledBy="about-q3-heading"
-        className="about-q3-fill"
-      >
-        <div className="grid lg:grid-cols-12 lg:items-start lg:gap-x-10">
-          <QuestionCopy
-            id="about-q3-heading"
-            className="lg:col-span-5"
-            kicker={about.q3.kicker}
-            heading={about.q3.heading}
-            lead={about.q3.lead}
-          />
-          <FeatureTabs
-            label={about.q3.tablistLabel}
-            listClassName="mt-4 lg:col-span-5 lg:mt-6"
-            panelClassName="mt-4 lg:col-span-7 lg:col-start-6 lg:row-span-3 lg:row-start-1 lg:mt-0 lg:w-full lg:max-w-140 lg:self-center lg:justify-self-center"
-            items={[
-              {
-                key: 'suitability',
-                title: about.q3.cards.suitability.title,
-                desc: about.q3.cards.suitability.desc,
-                panel: (
-                  <>
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-body-1 text-fg">{SUITABILITY_SPECIMEN.place}</p>
-                      <MetricBadge tone="high" axis="suitability">
-                        {about.specimen.suitabilityGrade}
-                      </MetricBadge>
-                    </div>
-                    <ul className="mt-3 grid gap-2">
-                      {about.specimen.suitabilityReasons.map((reason) => (
-                        <li key={reason} className="text-body-2 text-fg flex gap-2">
-                          <span
-                            aria-hidden
-                            className="bg-fg-muted mt-2 size-1.5 shrink-0 rounded-full"
-                          />
-                          {reason}
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                ),
-              },
-              {
-                key: 'congestion',
-                title: about.q3.cards.congestion.title,
-                desc: about.q3.cards.congestion.desc,
-                panel: <CongestionSpecimen />,
-              },
-              {
-                key: 'aiPlan',
-                title: about.q3.cards.aiPlan.title,
-                tag: about.specimen.planAiTag,
-                desc: about.q3.cards.aiPlan.desc,
-                panel: <PlanSpecimen />,
-              },
-              {
-                key: 'indoor',
-                title: about.q3.cards.indoor.title,
-                desc: about.q3.cards.indoor.desc,
-                panel: (
-                  <>
-                    <div role="img" aria-label={about.specimen.weatherAria} className="flex gap-2">
-                      {WEATHER_SPECIMEN.map((day) => (
-                        <div key={day.day} className="bg-band flex-1 rounded-md p-2 text-center">
-                          <p className="text-caption text-fg-muted font-semibold">{day.day}</p>
-                          <p className="text-title-2 leading-7">{day.icon}</p>
-                          <p className="text-caption text-fg font-semibold">{day.temp}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-body-2 text-fg mt-3 font-semibold">
-                      {about.specimen.indoorTitle}
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {INDOOR_SPECIMEN.map((item) => (
-                        <Tag key={item} tone="neutral">
-                          {item}
-                        </Tag>
-                      ))}
-                    </div>
-                  </>
-                ),
-              },
-            ]}
-          />
-          <MoreLink href="/ai-plans/new" className="mt-4 justify-self-start lg:col-span-5 lg:mt-3">
-            {about.q3.link}
-          </MoreLink>
-        </div>
+      <IntroBand tone="plain" id={SECTION_ID.q3} labelledBy="about-q3-heading" className="lg:py-0">
+        <FeatureTabs
+          label={about.q3.tablistLabel}
+          head={
+            <QuestionCopy
+              id="about-q3-heading"
+              kicker={about.q3.kicker}
+              heading={about.q3.heading}
+              lead={about.q3.lead}
+            />
+          }
+          link={<MoreLink href="/ai-plans/new">{about.q3.link}</MoreLink>}
+          items={[
+            {
+              key: 'suitability',
+              title: about.q3.cards.suitability.title,
+              desc: about.q3.cards.suitability.desc,
+              panel: <SuitabilitySpecimen />,
+            },
+            {
+              key: 'congestion',
+              title: about.q3.cards.congestion.title,
+              desc: about.q3.cards.congestion.desc,
+              panel: <CongestionSpecimen />,
+            },
+            {
+              key: 'aiPlan',
+              title: about.q3.cards.aiPlan.title,
+              tag: about.specimen.planAiTag,
+              desc: about.q3.cards.aiPlan.desc,
+              panel: <PlanSpecimen />,
+            },
+            {
+              key: 'indoor',
+              title: about.q3.cards.indoor.title,
+              desc: about.q3.cards.indoor.desc,
+              panel: <IndoorSpecimen />,
+            },
+          ]}
+        />
       </IntroBand>
 
       {/* ── 5. 위급하면? ── */}
@@ -345,123 +289,109 @@ export function AboutView() {
         />
       </IntroBand>
 
-      {/* ── 6. 무엇을 보고 판단하나요 (+ 7. 알아두실 점) ── */}
-      <IntroBand tone="plain" id={SECTION_ID.data} labelledBy="about-data-heading">
-        <QuestionCopy
-          id="about-data-heading"
-          kicker={about.data.kicker}
-          heading={about.data.heading}
-          lead={about.data.lead}
-        />
-        <div className="mt-6 grid grid-cols-3 gap-2 md:gap-6">
-          <ScaleTile value={SCALE_SPECIMEN.places} label={about.data.scaleLabels.places} />
-          <ScaleTile
-            value={SCALE_SPECIMEN.emergency}
-            label={about.data.scaleLabels.emergency}
-            delay={60}
-          />
-          <ScaleTile
-            value={SCALE_SPECIMEN.sources}
-            label={about.data.scaleLabels.sources}
-            delay={120}
-          />
-        </div>
-        <p className="text-caption text-fg-muted mt-2 font-medium">{about.data.scaleNote}</p>
-        <ol className="mt-6 grid gap-2 md:grid-cols-2">
-          {about.data.rules.map((rule, index) => (
-            <li key={rule}>
-              <Reveal delay={index * 60}>
-                <div className="bg-bg border-border flex items-start gap-3 rounded-lg border px-4 py-3">
-                  <span
-                    aria-hidden
-                    className="bg-fg text-fg-inverse text-caption grid size-6 shrink-0 place-items-center rounded-full font-bold"
-                  >
-                    {index + 1}
-                  </span>
-                  <p className="text-body-2 text-fg font-medium">{rule}</p>
+      {/*
+        ── 6. 무엇을 보고 판단하나요 (+ 7. 알아두실 점 · 약관) ── (#940)
+        1024 이상은 한 화면(`.about-screen-fill`)에 카피 7 : 안내 5 로 선다. 왼쪽은 규모 타일을
+        누르면 구성과 출처가 따라 바뀌는 `DataScale`, 오른쪽은 약속 · 알아두실 점 · 약관을 쌓는다.
+        그 미만은 왼쪽 → 오른쪽 순서로 쌓인다.
+      */}
+      <IntroBand
+        tone="plain"
+        id={SECTION_ID.data}
+        labelledBy="about-data-heading"
+        className="about-screen-fill"
+      >
+        <div className="grid gap-y-6 lg:grid-cols-12 lg:items-center lg:gap-x-10">
+          <div className="lg:col-span-7">
+            <QuestionCopy
+              id="about-data-heading"
+              kicker={about.data.kicker}
+              heading={about.data.heading}
+              lead={about.data.lead}
+            />
+            <div className="mt-6">
+              <DataScale />
+            </div>
+          </div>
+          <div className="grid gap-2 md:gap-4 lg:col-span-5">
+            <Reveal>
+              <Surface
+                titleId="about-rules-heading"
+                title={about.data.rulesTitle}
+                className="-mx-4 md:mx-0"
+              >
+                <ol className={cn('pb-3', INSET_CLASS.card)}>
+                  {about.data.rules.map((rule, index) => (
+                    <li
+                      key={rule}
+                      className={cn(
+                        'flex items-start gap-3 py-2',
+                        index > 0 && 'border-border border-t',
+                      )}
+                    >
+                      <span
+                        aria-hidden
+                        className="bg-fg text-fg-inverse text-caption grid size-5 shrink-0 place-items-center rounded-full font-semibold"
+                      >
+                        {index + 1}
+                      </span>
+                      <p className="text-body-2 text-fg font-medium break-keep">{rule}</p>
+                    </li>
+                  ))}
+                </ol>
+              </Surface>
+            </Reveal>
+            <Reveal delay={60}>
+              <Surface
+                titleId="about-notice-heading"
+                title={about.notice.title}
+                className="-mx-4 md:mx-0"
+              >
+                <div className={cn('flex flex-col gap-2 pb-5', INSET_CLASS.card)}>
+                  <p className="text-body-2 text-fg-muted">{messages.footer.disclaimer}</p>
+                  <p className="text-caption text-fg-muted font-medium">
+                    {messages.footer.contest}
+                  </p>
                 </div>
-              </Reveal>
-            </li>
-          ))}
-        </ol>
-        <div className="mt-6 grid gap-2 md:grid-cols-2 md:gap-6">
-          <Reveal>
-            <Surface
-              titleId="about-sources-heading"
-              title={messages.footer.sourcesLabel}
-              description={
-                <p className="text-caption text-fg-muted font-medium">
-                  {about.data.sourcesDescription}
-                </p>
-              }
-              className="-mx-4 md:mx-0"
-            >
-              <ul className={cn('pb-3', INSET_CLASS.card)}>
-                {messages.footer.sources.map((source, index) => (
-                  <li
-                    key={source}
-                    className={cn(
-                      'text-body-2 text-fg flex items-center gap-2 py-2 font-semibold',
-                      index > 0 && 'border-border border-t',
-                    )}
-                  >
-                    <span aria-hidden className="bg-brand-500 size-2 shrink-0 rounded-sm" />
-                    {source}
-                  </li>
-                ))}
-              </ul>
-              <p className={cn('text-caption text-fg-muted pb-5 font-medium', INSET_CLASS.card)}>
-                {about.data.architecture}
-              </p>
-            </Surface>
-          </Reveal>
-          <Reveal delay={60}>
-            <Surface
-              titleId="about-notice-heading"
-              title={about.notice.title}
-              className="-mx-4 md:mx-0"
-            >
-              <div className={cn('flex flex-col gap-2 pb-5', INSET_CLASS.card)}>
-                <p className="text-body-2 text-fg-muted">{messages.footer.disclaimer}</p>
-                <p className="text-caption text-fg-subtle font-medium">{messages.footer.contest}</p>
-              </div>
-            </Surface>
-          </Reveal>
+              </Surface>
+            </Reveal>
+            {/*
+              **약관 행은 소개 페이지가 돼도 남는다** (#610). 푸터가 감춰지는 768 미만에서
+              마이페이지는 로그인이 필요하고 `(auth)` 그룹에는 푸터가 없어, 이 화면이 빠지면
+              **가입 전 모바일 방문자가 약관을 읽을 수단이 사라진다.** 출처가 여기 있는 이유와
+              같은 축이라 같은 밴드에 둔다 — #940 부터 알아두실 점 바로 아래다.
+
+              **이동 항목이라 `SurfaceList` 다** — 마이페이지 계정 섹션(`account-section.tsx`) ·
+              푸터와 같은 모양을 쓴다. 같은 역할의 행이 화면마다 다르게 생기지 않게 한다.
+            */}
+            <Reveal delay={120}>
+              <Surface
+                titleId="about-legal-heading"
+                title={about.legal.title}
+                description={
+                  <p className="text-caption text-fg-muted font-medium">
+                    {about.legal.description}
+                  </p>
+                }
+                className="-mx-4 md:mx-0"
+              >
+                <SurfaceList>
+                  {LEGAL_LINKS.map((link) => (
+                    <li key={link.href} className={INSET_CLASS.card}>
+                      <Link
+                        href={link.href}
+                        className="focus-visible:ring-brand-500 flex min-h-12 items-center gap-3 py-2 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
+                      >
+                        <span className="text-body-1 text-fg flex-1">{link.label}</span>
+                        <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
+                      </Link>
+                    </li>
+                  ))}
+                </SurfaceList>
+              </Surface>
+            </Reveal>
+          </div>
         </div>
-
-        {/*
-          **약관 행은 소개 페이지가 돼도 남는다** (#610). 푸터가 감춰지는 768 미만에서
-          마이페이지는 로그인이 필요하고 `(auth)` 그룹에는 푸터가 없어, 이 화면이 빠지면
-          **가입 전 모바일 방문자가 약관을 읽을 수단이 사라진다.** 출처가 여기 있는 이유와
-          같은 축이라 같은 밴드에 둔다.
-
-          **이동 항목이라 `SurfaceList` 다** — 마이페이지 계정 섹션(`account-section.tsx`) ·
-          푸터와 같은 모양을 쓴다. 같은 역할의 행이 화면마다 다르게 생기지 않게 한다.
-        */}
-        <Reveal delay={120}>
-          <Surface
-            titleId="about-legal-heading"
-            title={about.legal.title}
-            description={
-              <p className="text-caption text-fg-muted font-medium">{about.legal.description}</p>
-            }
-            className="-mx-4 mt-2 md:mx-0"
-          >
-            <SurfaceList>
-              {LEGAL_LINKS.map((link) => (
-                <li key={link.href} className={INSET_CLASS.card}>
-                  <Link
-                    href={link.href}
-                    className="focus-visible:ring-brand-500 flex min-h-14 items-center gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none"
-                  >
-                    <span className="text-body-1 text-fg flex-1">{link.label}</span>
-                    <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
-                  </Link>
-                </li>
-              ))}
-            </SurfaceList>
-          </Surface>
-        </Reveal>
       </IntroBand>
 
       {/*
@@ -667,21 +597,5 @@ function MoreLink({
     >
       {children} <span aria-hidden>→</span>
     </Link>
-  )
-}
-
-/** 규모 타일 — 중립 수치라 `--fg` 다. 등급 색을 쓰지 않는다 (§2-3) */
-function ScaleTile({ value, label, delay = 0 }: { value: number; label: string; delay?: number }) {
-  return (
-    <Reveal delay={delay} className="bg-intro-tint rounded-lg p-4">
-      <p className="text-display md:text-page text-fg font-black tabular-nums">
-        <ScaleCount value={value} />
-        {/* 단위는 2px 이 아니라 스케일 안의 4(`ml-1`)로 띄운다 — DESIGN.md §4 */}
-        <span className="text-body-2 text-fg-muted ml-1 font-semibold">
-          {messages.about.data.scaleUnit}
-        </span>
-      </p>
-      <p className="text-caption text-fg-muted mt-1 font-semibold break-keep">{label}</p>
-    </Reveal>
   )
 }
