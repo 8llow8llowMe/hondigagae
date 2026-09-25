@@ -86,5 +86,5 @@
   테마가 생기면 `favicon.svg`에 `prefers-color-scheme` 분기를 넣을지 결정 필요
 - 견종 일러스트 폴백(가이드 ProfileCard 절)과 심볼의 관계. 같은 손이 그린 것으로
   보여야 하므로 일러스트 작업 시 이 발바닥의 곡률을 기준으로 삼을 것
-  - 소개 페이지 캐릭터가 첫 사례다(#917, `public/illustrations/about/`, DESIGN.md §0-2).
-    지금은 PNG 이고 벡터화(색 토큰 맞춤 + 기존 일러스트의 그레인)는 후속이다
+  - 소개 페이지 캐릭터가 첫 사례다(#917 → SVG #930, `public/illustrations/about/`,
+    DESIGN.md §0-2). 기존 일러스트와 같은 평면 도형 + 그레인이다. 보이는 발바닥의 발가락은 3개
