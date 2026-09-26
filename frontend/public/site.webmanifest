@@ -1,7 +1,7 @@
 {
   "name": "혼디가개",
   "short_name": "혼디가개",
-  "description": "제주 반려견 동반 여행 — 날씨와 노면 온도로 오늘 산책을 판정합니다",
+  "description": "동반 가능한 장소부터 오늘 산책하기 좋은 시간까지 한 번에 확인해요",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",
