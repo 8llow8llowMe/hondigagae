@@ -392,6 +392,13 @@ export const homeMessages = {
    */
   aiPlanBannerTitle: 'AI로 일정 짜기',
   aiPlanBannerDescription: '반려견과 기간만 정하면 하루 단위 초안을 만들어 드려요',
+  /**
+   * 비로그인 첫 방문자의 서비스 소개 카드 (#950). **무엇이 있는지만** 말한다 — 소개 페이지가
+   * 답하는 두 질문(무엇을 보고 알려 주나 · 데이터가 어디서 오나)이다. 마케팅 톤(§1)을 열지 않는다.
+   */
+  aboutIntroTitle: '혼디가개가 처음이라면',
+  aboutIntroDescription: '무엇을 보고 알려 주는지와 데이터 출처를 모았어요',
+  aboutIntroDismiss: '서비스 소개 안내 닫기',
   emergencyTitle: '주변 동물병원 찾기',
   /**
    * **개수를 단정하지 않는다** (#206).

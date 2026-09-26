@@ -11,6 +11,7 @@ import { EmergencyIcon } from '@/components/icons'
 import { Skeleton } from '@/components/skeleton'
 import { Canvas, Surface, SurfaceList, SurfaceStack } from '@/components/surface'
 import { useNearbyFacilities } from '@/features/emergency/use-nearby-facilities'
+import { AboutIntroCard } from '@/features/home/about-intro-card'
 import { IndoorAlternativesSection } from '@/features/home/indoor-alternatives-section'
 import { PlaceInsightRow } from '@/features/home/place-insight-row'
 import { ProfileCard } from '@/features/home/profile-card'
@@ -106,12 +107,19 @@ const AI_PLAN_HREF = '/ai-plans/new'
  */
 export function HomeView({
   authed,
+  showAboutIntro,
   places,
   plans,
   todayIso,
   todayLabel,
 }: {
   authed: boolean
+  /**
+   * 서비스 소개 카드를 세우는가 (#950). **서버가 정한다** — 비로그인 + `hd_about_seen` 쿠키
+   * 없음. 브라우저는 뒤로 가기(캐시된 페이로드)에서만 쿠키로 한 번 더 막는다
+   * (`about-intro-card.tsx`).
+   */
+  showAboutIntro: boolean
   places: PlaceSummary[]
   plans: PlanSummaryItem[]
   /**
@@ -491,6 +499,16 @@ export function HomeView({
               onRetry={() => void walkTimes.refetch()}
             />
           </Surface>
+
+          {/*
+            서비스 소개 카드 (#950). **첫 카드 아래다 — 위가 아니다.** 홈은 설명 없이 오늘
+            상태부터 보여 준다(소개 명세 2026-09-15 §1-1). 오늘 상태를 본 다음에 "이게 뭘 보고
+            하는 말이지" 가 오고, 그 답이 `/about` 이다.
+
+            비로그인 · 소개를 본 적 없음일 때만 선다. 닫거나 `/about` 을 한 번 열면 쿠키가 남아
+            다음부터 서지 않는다 — 그 뒤 모바일의 통로는 맨 아래 `/about` 링크다(지우지 않는다).
+          */}
+          {showAboutIntro && <AboutIntroCard />}
 
           {/*
             AI 일정 생성 진입점 (#905 R1). 모바일 탭에는 AI 항목이 없어서, 이 배너가 없으면
