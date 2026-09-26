@@ -1,6 +1,9 @@
+import { cookies } from 'next/headers'
+
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 
 import { HomeView } from '@/features/home/home-view'
+import { ABOUT_SEEN_COOKIE, hasSeenAbout } from '@/lib/about/seen-cookie'
 import { paths } from '@/lib/api/paths'
 import { placeListPath } from '@/lib/api/place'
 import { serverFetch } from '@/lib/api/server'
@@ -62,10 +65,18 @@ export default async function HomePage() {
   */
   const todayIso = todayDay(new Date())
 
+  /*
+    **소개 카드는 서버가 정한다** (#950). 비로그인이고 소개를 본 적이 없을 때만 선다 —
+    쿠키를 여기서 읽으므로 카드가 첫 그림부터 제자리에 있고, 마운트 뒤에 끼어들며 아래
+    배너를 밀지 않는다 (`lib/about/seen-cookie.ts`).
+  */
+  const seenAbout = hasSeenAbout((await cookies()).get(ABOUT_SEEN_COOKIE)?.value)
+
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <HomeView
         authed={authed}
+        showAboutIntro={!authed && !seenAbout}
         places={places?.contents ?? []}
         plans={plans?.contents ?? []}
         todayIso={todayIso}
