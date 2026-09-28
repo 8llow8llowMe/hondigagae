@@ -3,7 +3,7 @@
 > 대상: `frontend/src/features/about/**` · `frontend/app/globals.css`(소개 페이지 블록) · `frontend/docs/features/about/소개페이지-세부명세.md`
 > 이슈: [#965](https://github.com/8llow8llowMe/hondigagae/issues/965) (명세 · 구현 · 테스트를 한 이슈에 묶는다)
 > 작성: 2026-09-28
-> 상태: **명세 작성** (구현 전)
+> 상태: **구현 완료** (#965, 2026-09-28) — 세부명세 `frontend/docs/features/about/소개페이지-세부명세.md`
 > 선행 명세: `docs/superpowers/specs/2026-09-25-about-interactive-design.md` (#914 · #915 · #940). **이 문서가 그 명세의 §3-4(트리거) · §3-5(칸 58vh · 꼬리 여백 · 데이터 절 한 화면) · §4(진행선 폭 구간)를 개정한다.** 두 문서가 갈리면 이 문서가 이긴다. 나머지(절 구성 · 문구 · 캐릭터 · 질문 3 트랙 · 접근성)는 선행 명세 그대로다.
 > 짝 이슈(진입 경로, 이 문서 범위 밖): [#963](https://github.com/8llow8llowMe/hondigagae/issues/963) 홈 소개 카드 데스크톱 배치 · [#964](https://github.com/8llow8llowMe/hondigagae/issues/964) 비로그인 헤더 `서비스 소개` 링크
 
