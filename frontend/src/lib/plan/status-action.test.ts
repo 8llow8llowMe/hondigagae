@@ -73,27 +73,54 @@ describe('방향 — 전폭 버튼과 메뉴를 가른다', () => {
 })
 
 /**
- * 시점 축 (#732 · 진단 665-1). `direction` 이 첫 번째 축이고 이것이 두 번째다 —
+ * 시점 축 (#732 · 진단 665-1 → #971). `direction` 이 첫 번째 축이고 이것이 두 번째다 —
  * 출발 전날 화면에서 가장 큰 색면이 `여행 완료하기` 였다.
+ *
+ * **#971 로 선이 서버 가드와 같아졌다.** 시작일 전 완료는 서버가 `PLAN_026` 400 으로
+ * 거절하므로 버튼에도 메뉴에도 없고, 서버가 허용하는 출발 당일부터 진입점이 생긴다.
  *
  * `today` 는 로컬 정오다 (`packing-promotion.test.ts` 와 같은 이유).
  */
-describe('planStatusActionLayout — 아직 이를 수 없는 정방향은 메뉴로 내려간다', () => {
+describe('planStatusActionLayout — 시작일 전 완료는 없고, 출발 당일은 메뉴다', () => {
   const TODAY = new Date(2026, 8, 18, 12) // 2026-09-18
 
   function layout(statusCode: string, startDate: string, endDate: string) {
     return planStatusActionLayout(statusCode, planPhaseOf(startDate, endDate, TODAY))
   }
 
-  it('출발 전날(D-1)의 `여행 완료하기` 는 버튼이 아니라 메뉴다', () => {
+  function kindsOf(statusCode: string, startDate: string, endDate: string) {
+    const { button, menu } = layout(statusCode, startDate, endDate)
+    return [...(button === undefined ? [] : [button]), ...menu].map((action) => action.kind)
+  }
+
+  it('출발 전날(D-1)의 `여행 완료하기` 는 버튼에도 메뉴에도 없다 — 서버가 PLAN_026 으로 거절한다', () => {
     const upcoming = layout('CONFIRMED', '2026-09-19', '2026-09-21')
 
     expect(upcoming.button).toBeUndefined()
-    expect(upcoming.menu.map((action) => action.kind)).toEqual(['complete', 'revert-draft'])
+    expect(upcoming.menu.map((action) => action.kind)).toEqual(['revert-draft'])
   })
 
-  it('출발 당일(D-DAY)도 아직 마친 여행이 아니다 — planPhaseOf 가 upcoming 에 남긴다', () => {
-    expect(layout('CONFIRMED', '2026-09-18', '2026-09-20').button).toBeUndefined()
+  /* #971 실측 — D-9 일정을 메뉴에서 완료할 수 있었다 */
+  it('더 먼 출발 전(D-9)에도 `여행 완료하기` 가 어디에도 없다', () => {
+    expect(kindsOf('CONFIRMED', '2026-09-27', '2026-09-29')).toEqual(['revert-draft'])
+  })
+
+  /*
+    서버는 시작일 당일부터 허용한다 — 당일치기는 그날 끝에 완료한다. `planPhaseOf` 는
+    D-DAY 를 아직 upcoming 에 두므로 버튼으로 올리지 않고 메뉴에 둔다.
+  */
+  it('출발 당일(D-DAY)의 `여행 완료하기` 는 메뉴다 — 버튼이 아니다', () => {
+    const today = layout('CONFIRMED', '2026-09-18', '2026-09-20')
+
+    expect(today.button).toBeUndefined()
+    expect(today.menu.map((action) => action.kind)).toEqual(['complete', 'revert-draft'])
+  })
+
+  it('당일치기의 출발 당일에도 메뉴에서 완료할 수 있다', () => {
+    const dayTrip = layout('CONFIRMED', '2026-09-18', '2026-09-18')
+
+    expect(dayTrip.button).toBeUndefined()
+    expect(dayTrip.menu.map((action) => action.kind)).toEqual(['complete', 'revert-draft'])
   })
 
   it('여행 중이면 버튼으로 돌아온다', () => {
@@ -127,24 +154,35 @@ describe('planStatusActionLayout — 아직 이를 수 없는 정방향은 메�
     expect(upcoming.menu.map((action) => action.kind)).toEqual(['reopen'])
   })
 
-  it('날짜를 못 읽으면 있던 진입점을 감추지 않는다', () => {
-    expect(planStatusActionLayout('CONFIRMED', null).button?.kind).toBe('complete')
+  /* 최종 판정은 서버가 한다 — 근거 없이 진입점을 감추지 않는다 */
+  it('날짜를 못 읽으면 있던 진입점을 감추지 않는다 — 버튼이다', () => {
+    const unknown = planStatusActionLayout('CONFIRMED', null)
+
+    expect(unknown.button?.kind).toBe('complete')
+    expect(unknown.menu.map((action) => action.kind)).toEqual(['revert-draft'])
   })
 
-  /* 버튼과 메뉴를 합치면 원래 목록이다 — 두 곳에 서거나 사라지는 액션이 없어야 한다 */
-  it('어느 시점에서도 액션이 사라지거나 겹치지 않는다', () => {
+  /*
+    버튼과 메뉴를 합치면 원래 목록이다 — 두 곳에 서는 액션은 없어야 하고, 빠지는 것은
+    **시작일 전(D-1 이전)의 `여행 완료하기` 하나뿐**이어야 한다 (#971 — 서버가 거절한다).
+    그 밖의 것이 빠지면 진입점이 근거 없이 사라진 것이다.
+  */
+  it('어느 시점에서도 액션이 겹치지 않고, 시작일 전 완료만 의도적으로 빠진다', () => {
     for (const code of ['DRAFT', 'CONFIRMED', 'COMPLETED', 'ARCHIVED']) {
-      for (const [start, end] of [
-        ['2026-09-19', '2026-09-21'],
-        ['2026-09-17', '2026-09-20'],
-        ['2026-09-10', '2026-09-12'],
+      for (const [start, end, beforeStart] of [
+        ['2026-09-27', '2026-09-29', true], // D-9
+        ['2026-09-19', '2026-09-21', true], // D-1
+        ['2026-09-18', '2026-09-20', false], // D-DAY
+        ['2026-09-17', '2026-09-20', false], // 여행 중
+        ['2026-09-10', '2026-09-12', false], // 지난 일정
       ] as const) {
-        const { button, menu } = layout(code, start, end)
-        const all = [...(button === undefined ? [] : [button]), ...menu]
+        const kinds = kindsOf(code, start, end)
+        const expected = planStatusActions(code)
+          .map((action) => action.kind)
+          .filter((kind) => !(beforeStart && kind === 'complete'))
 
-        expect([...all].sort((a, b) => a.kind.localeCompare(b.kind))).toEqual(
-          [...planStatusActions(code)].sort((a, b) => a.kind.localeCompare(b.kind)),
-        )
+        expect(new Set(kinds).size).toBe(kinds.length)
+        expect([...kinds].sort()).toEqual([...expected].sort())
       }
     }
   })

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { resolveMock } from '@/lib/api/mock'
 import { resetMockStore } from '@/lib/api/mock/store'
+import { toDayString, todayUtc } from '@/lib/date/day'
 import type { PlanDetail, PlanWeatherResponse } from '@/types/plan'
 
 const TOKEN = 'mock-access-900000000000000001'
@@ -213,6 +214,55 @@ describe('일정 상세 mock — 수정 · 삭제', () => {
 
     expect(after.status.code).toBe('COMPLETED')
     expect(after.status.name).toBe('완료')
+  })
+
+  /*
+    **여행 전 상태 가드** (#971). 서버가 시작일 전 완료를 `PLAN_026` 400 으로 거절한다 —
+    mock 이 받아 주면 화면이 로컬에서 서버와 다른 답을 낸다. 시작일 당일부터 허용한다.
+  */
+  describe('시작일 전 완료는 400 PLAN_026 이다', () => {
+    /** 오늘 기준 `offset` 일 뒤에 시작하는 1일 일정을 만든다 */
+    function createPlanStartingIn(offset: number): string {
+      const start = toDayString(todayUtc(new Date()) + offset * 86_400_000)
+      const created = call('/plans', 'POST', {
+        petIds: ['123456789012000001'],
+        areaCode: '39',
+        title: '가드 확인용 일정',
+        startDate: start,
+        endDate: start,
+        items: [],
+      })?.payload.dataBody as PlanDetail
+      return created.planId
+    }
+
+    it('내일 시작하는 일정은 완료할 수 없다 — 서버 문구 그대로다', () => {
+      const planId = createPlanStartingIn(1)
+      const result = call(`/plans/${planId}`, 'PUT', { status: 'COMPLETED' })
+
+      expect(result?.status).toBe(400)
+      expect(result?.payload.dataHeader).toMatchObject({
+        success: false,
+        resultCode: 'PLAN_026',
+        resultMessage: '여행 시작일 전에는 여행을 완료할 수 없습니다.',
+      })
+      // 거절했으면 상태도 그대로다
+      expect(detailOf(planId).status.code).toBe('DRAFT')
+    })
+
+    it('출발 당일에는 완료할 수 있다 — 당일치기가 있다', () => {
+      const planId = createPlanStartingIn(0)
+      const after = call(`/plans/${planId}`, 'PUT', { status: 'COMPLETED' })?.payload
+        .dataBody as PlanDetail
+
+      expect(after.status.code).toBe('COMPLETED')
+    })
+
+    it('시작 전 일정의 다른 상태 전이는 막지 않는다', () => {
+      const planId = createPlanStartingIn(9)
+
+      expect(call(`/plans/${planId}`, 'PUT', { status: 'CONFIRMED' })?.status).toBe(200)
+      expect(call(`/plans/${planId}`, 'PUT', { status: 'DRAFT' })?.status).toBe(200)
+    })
   })
 
   it('budget 0 은 유효하다 — 예산을 비우는 유일한 방법이다', () => {
