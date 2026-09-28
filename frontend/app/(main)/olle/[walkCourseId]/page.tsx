@@ -34,8 +34,9 @@ import type { WalkCourseDetail } from '@/types/walk-course'
  * `notFound()` + 전용 `not-found.tsx` 로 옮기면 상태는 404 가 되지만, 그 경계는 D5 가 확정한
  * 서버 문구를 그릴 수 없어 FE 상수로 바꿔야 한다 — 확정 문구를 뒤집는 일이라 명세 결정이
  * 먼저다. 대신 **soft 200 이 남기던 두 해악을 메타데이터로 줄였다**: 탭 제목이 본문 `h1` 과
- * 같은 `없는 코스예요` 를 말하고(`walkCourseDetailFallbackTitle`), 404 는 `noindex` 라
- * 크롤러가 없는 코스를 정상 페이지로 색인하지 않는다(`walkCourseDetailFallbackMetadata`).
+ * 같은 `없는 코스예요` 를 말하고(`walkCourseDetailFallbackTitle`), 404 와 400(범위 밖
+ * 숫자 id — proxy 를 통과해 200 으로 나간다)은 `noindex` 라 크롤러가 정상 페이지로 색인하지
+ * 않는다(`walkCourseDetailFallbackMetadata`).
  */
 type Params = Promise<{ walkCourseId: string }>
 
