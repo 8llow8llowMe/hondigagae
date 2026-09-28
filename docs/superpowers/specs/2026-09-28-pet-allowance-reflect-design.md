@@ -100,6 +100,11 @@ tour-service · plan-service · ai-service 코드 변경(읽는 쪽은 이미 �
 예전 병합이 채우던 `allowed_pet_size`(흡수 행 값, survivor 가 UNKNOWN 일 때만)는 이 규칙의 한 경우였다 —
 재계산이 같은 근거에 반려동물 API 근거를 더하므로 병합 쪽 쓰기는 걷었다(§2-1).
 
+### 2-3-1. `pet_available` — 동반 구분을 따른다
+
+재계산은 `pet_available` 도 같이 쓴다. 결과 동반 구분이 ALLOWED · PARTIALLY_ALLOWED 면 true, NOT_ALLOWED · UNKNOWN 이면 false.
+바뀐 행 판정에도 이 칸을 넣는다. 세 칸 모두 TourAPI 재적재(UPDATE 절)와 병합이 쓰지 않는다.
+
 ### 2-4. 로그 · 검증
 
 - 재계산 스텝은 완료 로그 한 줄에 **재계산 뒤 대상 전체의 값별 분포**와 **이번에 바뀐 행 수**를 남긴다 —
@@ -116,6 +121,7 @@ tour-service · plan-service · ai-service 코드 변경(읽는 쪽은 이미 �
 | 적합도 | 381곳(ALLOWED + PARTIAL)의 UNKNOWN 감점이 사라진다. NOT_ALLOWED 29곳은 배제 판정 |
 | 목록 필터(`petAllowanceType` 등치) | ALLOWED · PARTIALLY · NOT_ALLOWED 필터에 TourAPI 가 잡힌다 |
 | 크기 필터(`petSizeType`) | 제한이 확인된 곳만 빠진다 — UNKNOWN 은 기존대로 통과 |
+| 실내 대안 조회(`petAvailable`, tour-service `PlaceProfileRepository`) | 재계산이 `pet_available` 도 같이 쓴다(ALLOWED · PARTIALLY_ALLOWED → true, 그 밖 false). TourAPI 행은 적재가 false 리터럴로만 넣어 동반이 확인된 곳도 실내 대안에서 빠지고 상세에 `petAvailable=false` 와 `ALLOWED` 가 함께 나갔다 — 381곳이 대안 후보가 된다 |
 
 ## 4. 운영
 

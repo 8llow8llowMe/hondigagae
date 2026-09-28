@@ -529,6 +529,9 @@ UPDATE place survivor
 경로에 조인을 하나 더 얹는다. **정정이 필요해지면 위와 같은 일회성 `UPDATE JOIN` 이 그 자리를
 메운다.** 이 성질은 `JdbcPlaceMergeAdapter.MERGE_FIELDS_SQL` javadoc 에도 적어 두었다.
 
+**동반 가능 여부 · 크기 제한 · `pet_available` 은 예외다** — 병합이 옮기지 않고, §10 재계산 스텝이 흡수 행을 근거로
+매 실행 다시 계산한다(#886). 원천 값만의 함수라 사람이 고친 값을 덮을 걱정이 없는 칸이다.
+
 ### 다음에 같은 결함이 생기지 않게
 
 병합이 채우는 컬럼과 각 원천 UPSERT 의 UPDATE 절이 겹치는지는 **더 이상 사람이 기억하지 않는다** —
@@ -537,7 +540,7 @@ UPDATE place survivor
 
 ## 10. 반려동물 동반 조건 — `petTourImportJob` (#877 · #886)
 
-`place_pet_info` 를 채우고, 이어서 TourAPI 장소의 `place.pet_allowance_type` · `allowed_pet_size` 를 다시 계산한다.
+`place_pet_info` 를 채우고, 이어서 TourAPI 장소의 `place.pet_allowance_type` · `allowed_pet_size` · `pet_available` 을 다시 계산한다.
 장소 상세의 `petInfo` 가 이 테이블에서 오고, 목록 필터 · 적합도 · AI 후보가 place 의 두 칸을 본다.
 파이프라인의 마지막 자식이라 주 1회 자동으로 돌고, 단독 실행도 된다.
 
@@ -566,7 +569,7 @@ UPDATE place survivor
 - 상세가 비어 오거나 실패한 곳은 **이미 행이 있으면** `synced_at` 만 민다. 행이 없으면 만들지 않는다 —
   빈 행은 장소 상세에 "동반 정보 있음" 으로 읽힌다.
 
-### place 의 동반 가능 여부 · 크기 제한 — 재계산 스텝 (#886)
+### place 의 동반 가능 여부 · 크기 제한 · `pet_available` — 재계산 스텝 (#886)
 
 `petTourImportJob` 은 적재 스텝 뒤에, `placeMergeJob` 은 병합 스텝 뒤에 **같은 스텝** `placePetAllowanceReflectStep`
 을 돈다. 파이프라인에서는 두 번 돌지만(병합 → … → 반려동물) 근거 읽기 한 번 + 바뀐 행만 갱신이라 싸고,
@@ -578,10 +581,13 @@ UPDATE place survivor
   이 행으로 **흡수된 행**(`merged_into_id = 이 행`, delisted 아닌 것)의 값. UNKNOWN 은 근거가 아니다.
 - **결과는 가장 제한적인 값** — NOT_ALLOWED > PARTIALLY_ALLOWED > ALLOWED, SMALL_ONLY > SMALL_MEDIUM > ALL.
   근거가 없으면 UNKNOWN. `place_pet_info` 가 없는 곳을 NOT_ALLOWED 로 만들지 않는다.
+- **`pet_available` 은 결과 동반 구분을 따른다** — ALLOWED · PARTIALLY_ALLOWED 면 true, NOT_ALLOWED · UNKNOWN 이면 false.
+  TourAPI 적재가 이 칸을 INSERT 리터럴 false 로만 넣어서, 비 오는 날 실내 대안(`petAvailable = true`)이 동반이 확인된
+  TourAPI 장소를 고르지 못하고 상세에 `petAvailable=false` 와 `ALLOWED` 가 함께 나가던 것을 맞춘다.
 - **매 실행 처음부터 다시 계산한다.** 입력이 같으면 두 번째 실행은 0행을 갱신하고, 동반 정보가 지워지거나 흡수 행이
   delist 되면 값이 UNKNOWN 쪽으로 돌아간다. 급변 가드는 없다 — 입력이 이미 가드를 거친 두 테이블이다.
-- **재적재 · 재병합이 결과를 지우지 않는다.** TourAPI upsert 는 두 칸을 INSERT 리터럴로만 쓰고 UPDATE 절에 두지 않으며,
-  병합은 두 칸을 옮기지 않는다(`JdbcPlaceBulkAdapterSqlTest` 가 둘 다 고정). 병합이 예전에 하던
+- **재적재 · 재병합이 결과를 지우지 않는다.** TourAPI upsert 는 세 칸을 INSERT 리터럴로만 쓰고 UPDATE 절에 두지 않으며,
+  병합은 세 칸을 옮기지 않는다(`JdbcPlaceBulkAdapterSqlTest` 가 둘 다 고정). 병합이 예전에 하던
   `allowed_pet_size` 채우기(survivor 가 UNKNOWN 일 때만)는 재계산이 흡수 행을 근거로 쓰므로 걷었다.
 
 완료 로그(재계산 뒤 대상 전체의 분포와 이번에 바뀐 행 수):
@@ -620,10 +626,10 @@ SELECT allowance_scope, allowed_pet_size, leash_required, COUNT(*)
 SELECT MIN(synced_at), MAX(synced_at) FROM place_pet_info;
 
 -- 재계산 결과 — TourAPI 노출 행의 동반 가능 여부 · 크기 제한 분포 (#886). 완료 로그의 분포와 같아야 한다
-SELECT pet_allowance_type, allowed_pet_size, COUNT(*)
+SELECT pet_allowance_type, allowed_pet_size, pet_available, COUNT(*)
   FROM place
  WHERE source = 'TOUR_API' AND merged_into_id IS NULL AND delisted_at IS NULL
- GROUP BY pet_allowance_type, allowed_pet_size ORDER BY 3 DESC;
+ GROUP BY pet_allowance_type, allowed_pet_size, pet_available ORDER BY 4 DESC;
 
 -- 근거가 있는데 UNKNOWN 으로 남은 행 — 0 이어야 한다 (재계산이 안 돌았거나 규칙이 어긋난 것이다)
 SELECT COUNT(*) unreflected

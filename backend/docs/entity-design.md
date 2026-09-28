@@ -142,7 +142,8 @@ uk_place_pet_info_place_id (placeId)
 
 - 가공값은 `place.pet_allowance_type` · `allowed_pet_size` 의 근거가 된다 (조회 필터는 place 단독으로 처리 가능하게).
   이 테이블을 쓸 때 place 를 같이 UPDATE 하지 않고, 적재 뒤 **재계산 스텝** `placePetAllowanceReflectStep`(#886)이
-  TourAPI 노출 행 전부를 두 근거 — 이 테이블과 병합으로 흡수된 행 — 에서 매 실행 다시 계산해 덮는다.
+  TourAPI 노출 행 전부의 **세 칸** — `pet_allowance_type` · `allowed_pet_size` · `pet_available` — 을 두 근거(이 테이블과
+  병합으로 흡수된 행)에서 매 실행 다시 계산해 덮는다. `pet_available` 은 동반 구분이 ALLOWED · PARTIALLY_ALLOWED 면 true.
   `allowance_scope` FULL_AREA → ALLOWED, PARTIAL · OUTDOOR_ONLY → PARTIALLY_ALLOWED, UNKNOWN 은 근거 아님.
   근거가 여럿이면 **가장 제한적인 값**(NOT_ALLOWED > PARTIALLY_ALLOWED > ALLOWED, SMALL_ONLY > SMALL_MEDIUM > ALL),
   근거가 없으면 UNKNOWN — 이 테이블에 행이 없다는 것을 NOT_ALLOWED 로 읽지 않는다. 규칙 정본은 batch `PetAllowancePolicy`,
