@@ -1,3 +1,4 @@
+import { formatGroupedDigits } from '@/lib/form/grouped-digits'
 import { messages } from '@/lib/messages'
 
 /**
@@ -33,7 +34,8 @@ export function detailsSummary({
     regionLabel,
     budgetManwon === ''
       ? messages.aiPlan.detailsBudgetAny
-      : `${budgetManwon}${messages.aiPlan.fieldBudgetUnit}`,
+      : // 입력칸(`AmountInput`)과 같은 표기다 — 칸에는 1,500 인데 요약이 1500 이면 어긋난다 (#986)
+        `${formatGroupedDigits(budgetManwon)}${messages.aiPlan.fieldBudgetUnit}`,
   ]
 
   // 옵션은 **켠 것만** 붙인다. 끈 것까지 쓰면 줄이 길어지고 기본 상태가 시끄러워진다
