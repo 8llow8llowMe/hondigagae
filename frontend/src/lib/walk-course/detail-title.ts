@@ -35,7 +35,7 @@ export function walkCourseDetailFallbackTitle(error: unknown): string {
 }
 
 /**
- * 조회 실패 갈래의 메타데이터 전체 — 제목 + (404 에서만) `noindex`.
+ * 조회 실패 갈래의 메타데이터 전체 — 제목 + (404 · 400 에서만) `noindex`.
  *
  * **404 에 `noindex` 를 거는 이유.** 이 화면은 없는 코스에도 **200** 을 낸다(soft 200). 본문
  * 404 가 서버 `resultMessage` 를 그려야 하는데 `not-found.tsx` 는 그 값을 받을 수 없어
@@ -43,11 +43,19 @@ export function walkCourseDetailFallbackTitle(error: unknown): string {
  * `코스상세-세부명세.md` D5-6). 공개 SEO 화면이라(canonical 을 못박는다) 크롤러가 없는 코스를
  * 정상 페이지로 색인할 수 있는데, 상태를 못 바꾸는 대신 **색인 신호**로 그것을 막는다.
  *
- * **5xx 에는 걸지 않는다.** 다음 크롤에서 살아날 수 있는 실패다 — 한 번의 장애가 멀쩡한
- * 코스를 색인에서 빼면 안 된다. 400 은 `proxy.ts` 가 상태를 이미 400 으로 맞춘다.
+ * **400 도 같다.** 여기 오는 400 은 `proxy.ts` 의 숫자 판정을 **통과한** id 를 서버가 거절한
+ * 경우뿐이다 — `/olle/99999999999999999999` 처럼 모양은 숫자인데 `long` 범위를 넘는 주소.
+ * 형식이 틀린 id(`/olle/abc`)는 proxy 가 상태를 400 으로 맞추고 이 조회까지 오지도 않지만,
+ * 범위 밖 숫자는 proxy 가 가르지 못해 **200 으로 나간다**(MOCK_API 실측). 같은 요청은 같은
+ * 400 이라 색인될 이유가 없다.
+ *
+ * **5xx·무응답에는 걸지 않는다.** 다음 크롤에서 살아날 수 있는 실패다 — 한 번의 장애가
+ * 멀쩡한 코스를 색인에서 빼면 안 된다.
  */
 export function walkCourseDetailFallbackMetadata(error: unknown): Metadata {
   const title = `${walkCourseDetailFallbackTitle(error)} · 혼디가개`
+  const status = toErrorStatus(error)
+  const settled = status !== null && ['not-found', 'validation'].includes(classify(status))
 
-  return toErrorStatus(error) === 404 ? { title, robots: { index: false } } : { title }
+  return settled ? { title, robots: { index: false } } : { title }
 }

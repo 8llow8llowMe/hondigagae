@@ -73,15 +73,27 @@ describe('walkCourseDetailFallbackMetadata', () => {
   })
 
   /*
-    **일시 장애에는 noindex 를 걸지 않는다.** 5xx 는 다음 크롤에서 살아날 수 있는 실패다 —
-    한 번의 장애가 멀쩡한 코스를 색인에서 빼면 안 된다. 400 은 `proxy.ts` 가 상태를 이미 400 으로
-    맞춰 크롤러가 스스로 거른다.
+    **400 도 색인하지 않는다.** 이 catch 에 오는 400 은 `proxy.ts` 의 숫자 판정을 **통과한** id 를
+    서버가 거절한 경우뿐이다 — `/olle/99999999999999999999` 처럼 모양은 숫자인데 `long` 범위를
+    넘는 주소. proxy 가 상태를 400 으로 바꾸지 못해 **200 으로 나간다**(MOCK_API 5185 실측).
+    같은 요청은 몇 번을 다시 물어도 같은 400 이라 색인될 이유가 없다.
   */
-  it('400·5xx·무응답에는 robots 를 싣지 않는다', () => {
+  it('400(proxy 를 통과한 범위 밖 숫자 id) 도 noindex 다', () => {
+    const metadata = walkCourseDetailFallbackMetadata(new ApiError(400, 'WALKCOURSE_113', null))
+
+    expect(metadata.title).toBe(`${messages.common.validationErrorTitle} · 혼디가개`)
+    expect(metadata.robots).toEqual({ index: false })
+  })
+
+  /*
+    **일시 장애에는 noindex 를 걸지 않는다.** 5xx 는 다음 크롤에서 살아날 수 있는 실패다 —
+    한 번의 장애가 멀쩡한 코스를 색인에서 빼면 안 된다.
+  */
+  it('5xx·무응답·ApiError 아님에는 robots 를 싣지 않는다', () => {
     for (const error of [
-      new ApiError(400, 'WALKCOURSE_113', null),
       new ApiError(503, null, null),
       new ApiError(0, null, null),
+      new TypeError('boom'),
     ]) {
       expect(walkCourseDetailFallbackMetadata(error)).not.toHaveProperty('robots')
     }
