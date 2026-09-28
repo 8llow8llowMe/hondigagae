@@ -14,7 +14,7 @@ import { clusterContent, type PinContent, pinContent } from '@/lib/map/pin-conte
 import type { MapRouteSegment } from '@/lib/map/route'
 import { loadKakaoMaps, MapSdkError, type MapSdkFailure } from '@/lib/map/sdk'
 import { MAP_LAYER_Z, markerZIndex } from '@/lib/map/stacking'
-import { framedCamera, framedCenterLat, type MapBounds } from '@/lib/map/viewport'
+import { framedCamera, framedCenterLat, type MapBounds, type SpanBox } from '@/lib/map/viewport'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
 import type {
@@ -274,7 +274,11 @@ export function MapCanvas({
    */
   camera?: {
     anchor: LatLng
-    spanMeters: number
+    /**
+     * 담을 폭(m). 원이면 **지름** 숫자, 여러 점을 담는 사각형이면 두 변(`SpanBox`) —
+     * 사각형이어야 축마다 맞춘다 (`framedCamera`, #982)
+     */
+    spanMeters: number | SpanBox
     /**
      * 기준점이 화면 위쪽 몇 할 지점에 올지. 생략하면 `JEJU_MAP_SEA_RATIO`(0.35) —
      * 제주 전체를 담는 화면에서 위쪽을 바다로 여는 값이다.

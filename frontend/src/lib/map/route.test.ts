@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { LONG_TRIP_THRESHOLD_M } from '@/lib/geo/distance'
 import { routeCamera, type RouteItemInput, toRouteModel, toRouteSegments } from '@/lib/map/route'
+import { framedCamera, metersPerPixel } from '@/lib/map/viewport'
 
 /** 제주 서부 — 협재 부근. 서로 2km 안쪽이라 긴 이동이 아니다 */
 const HYEOPJAE = { lat: 33.394, lng: 126.2396 }
@@ -220,7 +221,8 @@ describe('routeCamera', () => {
   it('정류점이 하나여도 폭이 0 이 되지 않는다', () => {
     const camera = routeCamera([{ id: 'a', order: 1, title: 'a', coord: HYEOPJAE }])
 
-    expect(camera?.spanMeters).toBeGreaterThan(0)
+    expect(camera?.spanMeters.widthMeters).toBeGreaterThan(0)
+    expect(camera?.spanMeters.heightMeters).toBeGreaterThan(0)
   })
 
   it('멀리 떨어진 정류점일수록 담는 폭이 넓다', () => {
@@ -231,6 +233,93 @@ describe('routeCamera', () => {
       toRouteModel({ items: [item('a', HYEOPJAE), item('b', SEONGSAN)], lodgingBasis: null }).stops,
     )
 
-    expect(far?.spanMeters).toBeGreaterThan(near?.spanMeters ?? 0)
+    expect(far?.spanMeters.widthMeters).toBeGreaterThan(near?.spanMeters.widthMeters ?? 0)
   })
+
+  /*
+    **두 축을 따로 넘긴다** (#982). 긴 변 하나로 접으면 `framedCamera` 가 그것을 컨테이너의
+    **짧은 변**에 맞추는데, 동선 칸은 가로로 넓고 제주 동선은 대개 동서로 길다 — 긴 쪽끼리가
+    아니라 긴 쪽을 짧은 쪽에 맞추게 되어 한두 단계 멀어졌다.
+  */
+  it('동서 폭과 남북 폭을 따로 준다', () => {
+    const camera = routeCamera(ISSUE_DAY_STOPS)
+
+    expect(camera?.spanMeters.widthMeters).toBeCloseTo(72_453, -1)
+    expect(camera?.spanMeters.heightMeters).toBeCloseTo(18_156, -1)
+  })
+})
+
+/*
+  #982 재현 — 1일차 세 곳(직선 합계 74.6km, 1 · 2번 사이 9.0km).
+
+  좌표는 공개 좌표이고 두 구간 합이 이슈의 74.6km 와 맞는다(8.97 + 65.67).
+  컨테이너는 실측 크기다(`viewport.test.ts` 의 #982 주석). 고치기 전에는 두 크기 모두
+  단계 12 였고, 그 배율에서 세 곳은 888 폭 중 142px 에 몰리고 1 · 2번 핀(지름 32px)의
+  중심이 18px 떨어져 겹쳤다 — 카카오 5174 실측과 같다.
+*/
+const SUWOLBONG = { lat: 33.2958, lng: 126.1631 }
+const SPIRITED_GARDEN = { lat: 33.3217, lng: 126.2545 }
+const SEONGSAN_ILCHULBONG = { lat: 33.4589, lng: 126.9425 }
+
+const ISSUE_DAY_STOPS = toRouteModel({
+  items: [
+    item('suwolbong', SUWOLBONG),
+    item('garden', SPIRITED_GARDEN),
+    item('seongsan', SEONGSAN_ILCHULBONG),
+  ],
+  lodgingBasis: null,
+}).stops
+
+/** 순번 핀 반지름(px) — `.map-pin-order` 32×32 */
+const ORDER_PIN_RADIUS_PX = 16
+
+describe('routeCamera × framedCamera — #982', () => {
+  const cases = [
+    { name: '데스크톱 1366 (888×256)', width: 888, height: 256, level: 10 },
+    { name: '모바일 390 (358×224)', width: 358, height: 224, level: 11 },
+  ] as const
+
+  for (const size of cases) {
+    const frame = routeCamera(ISSUE_DAY_STOPS)
+    if (frame === null) throw new Error('정류점이 있는데 카메라가 없다')
+
+    const camera = framedCamera({
+      anchor: frame.anchor,
+      spanMeters: frame.spanMeters,
+      width: size.width,
+      height: size.height,
+      seaRatio: 0.5,
+    })
+
+    /** 화면 좌표(px). 중심이 컨테이너 가운데다 */
+    const toPixel = (coord: { lat: number; lng: number }) => {
+      const mpp = metersPerPixel(camera.level)
+      const cos = Math.cos((camera.lat * Math.PI) / 180)
+      return {
+        x: size.width / 2 + ((coord.lng - camera.lng) * 111_320 * cos) / mpp,
+        y: size.height / 2 - ((coord.lat - camera.lat) * 111_320) / mpp,
+      }
+    }
+
+    it(`${size.name} — 카카오 setBounds 와 같은 단계 ${String(size.level)} 이다`, () => {
+      expect(camera.level).toBe(size.level)
+    })
+
+    it(`${size.name} — 세 핀이 원째로 칸 안에 든다`, () => {
+      for (const stop of ISSUE_DAY_STOPS) {
+        const { x, y } = toPixel(stop.coord)
+        expect(x).toBeGreaterThanOrEqual(ORDER_PIN_RADIUS_PX)
+        expect(x).toBeLessThanOrEqual(size.width - ORDER_PIN_RADIUS_PX)
+        expect(y).toBeGreaterThanOrEqual(ORDER_PIN_RADIUS_PX)
+        expect(y).toBeLessThanOrEqual(size.height - ORDER_PIN_RADIUS_PX)
+      }
+    })
+
+    it(`${size.name} — 1 · 2번 핀(9.0km)이 겹치지 않는다`, () => {
+      const a = toPixel(SUWOLBONG)
+      const b = toPixel(SPIRITED_GARDEN)
+
+      expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(ORDER_PIN_RADIUS_PX * 2)
+    })
+  }
 })
