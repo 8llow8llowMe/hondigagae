@@ -56,19 +56,47 @@
 | `TOUR_API_SERVICE_KEY` · `VWORLD_API_KEY` | — | 기동은 되고 해당 잡만 실패 |
 
 `BATCH_DATA_DIR` 안의 CSV(`pet_culture.csv`, `olle_course.csv`)는 **포털이 막혔을 때의 우회용**이다.
-디렉터리만 있으면 기동·적재가 된다.
+디렉터리만 있으면 기동·적재가 된다. 평소에는 포털에서 임시 디렉터리로 내려받으므로 이 디렉터리를 읽지 않는다.
+
+**`BATCH_DATA_DIR` 은 main-server 호스트 경로다** — Jenkins agent 컨테이너 안 경로가 아니다.
+compose 는 agent(`backend-dev-agent`) 안에서 돌지만 바인드 마운트는 `/var/run/docker.sock` 너머의
+호스트 데몬이 해석한다. 그래서 디렉터리도 호스트에 만든다.
+
+```bash
+# main-server 호스트에서 (계정 8llow8llowme 기준)
+mkdir -p /home/8llow8llowme/deploy/hondigagae/backend/data
+# Vault: BATCH_DATA_DIR=/home/8llow8llowme/deploy/hondigagae/backend/data
+```
+
+**우회 CSV 는 저장소에 없다** — `.gitignore` 가 `backend/data/` 를 뺀다(문화정보원 원천이 30MB 다).
+넣으려면 손으로 복사한다. 원천은 공공데이터포털 `data/15111389`(문화정보원) · `data/15043496`(올레)이고,
+기본 경로(`/app/data/…`)가 잡으려면 **파일 이름이 정확히 `pet_culture.csv` · `olle_course.csv`** 여야 한다.
+
+```bash
+# 개발 PC 의 backend/ 에서
+scp data/pet_culture.csv data/olle_course.csv \
+  8llow8llowme@<main-server>:/home/8llow8llowme/deploy/hondigagae/backend/data/
+```
+
+컨테이너는 이 디렉터리를 읽기 전용(`:ro`)으로 붙인다. 파일을 바꿔 넣은 뒤 재시작할 필요는 없다 — 다음 우회 때 읽는다.
 
 ### 2-2. 서버에서 직접 (Jenkins 를 못 쓸 때)
 
-Jenkins 가 한 번이라도 배포에 성공했다면 배포 디렉터리에 `app.jar` · `.env.runtime` · compose 파일이 남아 있다.
+떠 있는 컨테이너를 재시작만 할 때는 호스트에서 바로 한다.
 
 ```bash
-cd ~/deploy/hondigagae/backend/service/batch-service
-
-# 떠 있는 컨테이너 재시작만
 docker restart hondigagae-batch-service-dev
+```
 
-# compose 로 다시 올리기 (Jenkins 와 같은 프로젝트명을 써야 다른 프로젝트 컨테이너를 건드리지 않는다)
+compose 로 다시 올려야 하면 **agent 컨테이너 안**으로 들어간다. Jenkins 배포 디렉터리
+(`app.jar` · `.env.runtime` · compose 파일)는 호스트가 아니라 agent 의 `$HOME`(`/home/jenkins`) 아래에 있다 —
+호스트의 `~/deploy` 에는 없다. Jenkins 가 한 번이라도 배포에 성공했어야 이 디렉터리가 생긴다.
+
+```bash
+docker exec -it backend-dev-agent sh
+cd /home/jenkins/deploy/hondigagae/backend/service/batch-service
+
+# Jenkins 와 같은 프로젝트명을 써야 다른 프로젝트 컨테이너를 건드리지 않는다
 docker compose -p hondigagae-batch-service --env-file .env.runtime \
   -f docker-compose-batch-service.yml up -d --build batch-service-dev
 ```
