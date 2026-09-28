@@ -92,7 +92,9 @@
   `import_source_snapshot` 의 직전 행과 비교해 같으면 적재를 통째로 건너뛴다. 건너뛴 실행도
   `last_success` 를 갱신한다 — 원천을 확인해 최신임을 안 것이라 성공이다.
   **`/app/data` 는 이제 우회용이다.** 읽기 전용 볼륨이라 내려받은 파일을 거기에 쓸 수 없고,
-  포털이 막혔을 때만 그 파일로 물러난다(그때는 스냅샷을 남기지 않는다).
+  포털이 막혔을 때만 그 파일로 물러난다. 그때는 포털 스냅샷 대신 **우회 행**(`file_id='LOCAL_FALLBACK'`)을
+  남겨, 포털이 되살아난 첫 실행이 파일이 그대로여도 다시 적재한다 (#887, `data-refresh-guide.md` §5
+  "우회 적재가 남기는 것"). 판정 규칙은 올레와 함께 `SourceFileSnapshotRule` 하나를 쓴다.
   스냅샷 DDL 은 `resources/db/import-source-snapshot-mysql.sql` 하나가 정본이고 prod 는 런북 적용이다.
 - **적재 범위와 병합 범위는 한 값에서 나와야 한다.** 지역 코드를 상수로 박으면 다른 시도로
   잡을 돌렸을 때 그 지역을 적재해 놓고 제주만 병합하는 조용한 어긋남이 난다.
@@ -158,16 +160,18 @@ TourAPI 에만 있는 항목(하영올레 등)은 코스가 되지 않는다. �
   받지도 적재하지도 않는다. `forceImport=true` 면 같은 파일도 다시 적재한다
 - 포털이 막히면 `OLLE_COURSE_CSV_PATH`(기본 `data/olle_course.csv`) 우회 파일로 물러난다.
   **원본이 CP949 라도 어댑터가 판별해 읽는다** — UTF-8 엄격 디코딩 실패 시 MS949 로 되읽는다
-- 우회 적재는 스냅샷을 남기지 않는다. 남기면 다음 실행이 포털을 보지 않고 건너뛴다
+- 우회 적재는 포털 스냅샷 대신 **우회 행**(`file_id='LOCAL_FALLBACK'`)을 남긴다 (#887). 우회 파일을 포털 판본처럼
+  남기면 다음 실행이 포털을 보지 않고 건너뛰고, 아무것도 남기지 않으면 포털 복귀 첫 실행이 마지막 포털 적재분과
+  같은 파일로 보고 건너뛴다. 직전 행이 우회 행이면 같은 파일이어도 적재한다 — 규칙은 문화정보원과 같은
+  `SourceFileSnapshotRule`
 - **다운로드 주소는 상세 페이지 버튼 경로로 얻는다** (#876). `fn_fileDataDown(...)` 인자 →
   `POST /tcs/dss/selectFileDataDownload.do` → `fileDownload.do?atchFileId=…`. 페이지의 JSON-LD 는
   제공기관 설명 문구의 따옴표 때문에 JSON 으로 읽히지 않아(2026-09-23) 더 쓰지 않는다 — 실측과
   판단은 `data-refresh-guide.md` §5 "올레 포털", 요청·응답은 `data-api-analysis.md` 10절
 - 우회 여부는 `walk_course_import_rows{source="OLLE",result="fallback"}` 1/0 게이지로 드러난다
   (`observability-guide.md`). 스냅샷 키는 `atchFileId` 그대로라 기존 스냅샷이 이어진다
-- **우회에서 포털로 돌아온 뒤(#876 배포 직후 포함) 한 번은 `forceImport=true` 로 돌린다.** 우회 적재는
-  스냅샷을 남기지 않아, 포털 파일이 안 바뀌었으면 다음 실행이 건너뛰고 우회 CSV 데이터가 남는다
-  (`data-refresh-guide.md` §5 "올레 포털")
+- 우회에서 포털로 돌아온 뒤 `forceImport=true` 를 따로 돌릴 필요는 없다 (#887 이전에는 운영 절차였다).
+  예외는 #887 배포 전에 우회로 적재된 환경과, 우회 적재가 도중에 실패한 경우다 (`data-refresh-guide.md` §5)
 - `walk_course` 스키마 원천은 tour-service 의 `WalkCourseEntity` 다 — 로컬에서는 tour-service 를
   먼저 한 번 기동해 테이블을 만든다 (place 와 같은 소유 구조)
 - id 는 코스키에서 결정적으로 나와(`OlleCourseParser.walkCourseId`) 재실행이 멱등하다.
