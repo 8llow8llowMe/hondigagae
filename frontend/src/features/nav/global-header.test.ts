@@ -5,15 +5,27 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { openingTags, readSourceWithoutComments } from '@/test/source'
 
-// 자식(`NavLinks` · `PetSwitcherSlot`)이 라우터·React Query 를 요구한다. 헤더 셸만 본다
-vi.mock('next/navigation', () => ({ usePathname: () => '/' }))
+// 자식(`NavLinks` · `PetSwitcherSlot`)이 라우터·React Query 를 요구한다. 헤더 셸만 본다.
+// 경로는 활성 판정(`HeaderAboutLink`) 때문에 바꿀 수 있게 둔다
+const pathname = { current: '/' }
+vi.mock('next/navigation', () => ({ usePathname: () => pathname.current }))
 vi.mock('@/features/nav/pet-switcher-slot', () => ({ PetSwitcherSlot: () => null }))
 vi.mock('@/features/nav/account-menu', () => ({ AccountMenu: () => null }))
 
 const { GlobalHeader } = await import('@/features/nav/global-header')
 
-function render(authed: boolean) {
+function render(authed: boolean, path = '/') {
+  pathname.current = path
   return renderToStaticMarkup(createElement(GlobalHeader, { authed }))
+}
+
+/** 마크업에서 조건에 맞는 첫 `<a>` 여는 태그. 속성 순서는 렌더러가 정해 가정하지 않는다 */
+function openAnchor(markup: string, match: (open: string) => boolean) {
+  return [...markup.matchAll(/<a [^>]*>/g)].map((m) => m[0]).find(match)
+}
+
+function classList(open: string | undefined) {
+  return new Set(/class="([^"]*)"/.exec(open ?? '')?.[1]?.split(/\s+/) ?? [])
 }
 
 /*
@@ -97,5 +109,64 @@ describe('GlobalHeader — lg 글자 라벨 (#913)', () => {
     expect(trigger).toContain('lg:w-auto')
     expect(trigger).toMatch(/<span className="[^"]*hidden[^"]*lg:inline[^"]*">내 정보<\/span>/)
     expect(trigger).toContain('aria-label="내 정보 메뉴 열기"')
+  })
+})
+
+/*
+  **1024 이상 · 비로그인 헤더의 `서비스 소개`** (#964 · 전역nav-세부명세 D4-5). 홈 소개 카드는
+  닫거나 `/about` 을 한 번 열면 다시 서지 않아, 그 뒤 데스크톱에서 `/about` 으로 가는 길이
+  푸터 하나뿐이었다.
+*/
+describe('GlobalHeader — 서비스 소개 링크 (#964)', () => {
+  const isAbout = (open: string) => open.includes('href="/about"')
+
+  it('비로그인이면 서비스 소개 링크가 선다 — 라벨은 messages.about.title 이다', () => {
+    const markup = render(false)
+
+    expect(markup).toMatch(/<a [^>]*href="\/about"[^>]*>서비스 소개<\/a>/)
+  })
+
+  it('로그인하면 서지 않는다 — 푸터가 남는다', () => {
+    expect(render(true)).not.toContain('href="/about"')
+  })
+
+  it('1024 미만에서는 숨는다 — hidden 이고 lg 에서만 선다', () => {
+    const classes = classList(openAnchor(render(false), isAbout))
+
+    expect(classes.has('hidden')).toBe(true)
+    expect(classes.has('lg:inline-flex')).toBe(true)
+    // 768–1023 에서 서면 헤더 여유(27px)를 넘는다
+    expect(classes.has('md:inline-flex')).toBe(false)
+    expect(classes.has('inline-flex')).toBe(false)
+  })
+
+  it('로그인 왼쪽에 선다 — 응급 링크 뒤, 데스크톱 로그인 앞', () => {
+    const markup = render(false)
+    const about = markup.indexOf('href="/about"')
+
+    expect(about).toBeGreaterThan(markup.indexOf('href="/emergency"'))
+    expect(about).toBeLessThan(markup.lastIndexOf('href="/login"'))
+  })
+
+  it('같은 줄 로그인과 같은 외형이다 — 표시 클래스만 다르고 누르는 자리 44 다', () => {
+    const markup = render(false)
+    const about = classList(openAnchor(markup, isAbout))
+    const login = classList(
+      openAnchor(markup, (open) => open.includes('href="/login"') && !open.includes('md:hidden')),
+    )
+
+    expect(about.has('h-11')).toBe(true)
+    about.delete('hidden')
+    about.delete('lg:inline-flex')
+    login.delete('inline-flex')
+    expect([...about].sort()).toEqual([...login].sort())
+  })
+
+  it('/about 에서는 aria-current="page" 가 붙는다', () => {
+    expect(openAnchor(render(false, '/about'), isAbout)).toContain('aria-current="page"')
+  })
+
+  it('다른 화면에서는 aria-current 가 없다', () => {
+    expect(openAnchor(render(false, '/places'), isAbout)).not.toContain('aria-current')
   })
 })
