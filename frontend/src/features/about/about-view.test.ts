@@ -477,6 +477,12 @@ describe('AboutView — 데이터 절 (#940)', () => {
     expect(markup).not.toContain('about-screen-fill')
   })
 
+  it('두 열을 위로 붙인다 (#965) — 가운데 정렬이면 짧은 왼쪽 열의 표지어가 높이 차의 절반만큼 늦게 선다', () => {
+    const grid = data.match(/<div class="(grid gap-y-6 lg:grid-cols-12[^"]*)"/)?.[1] ?? ''
+    expect(grid.split(' ')).toContain('lg:items-start')
+    expect(grid.split(' ')).not.toContain('lg:items-center')
+  })
+
   it('규모 타일 셋이 라디오 묶음이고 정적 렌더는 장소가 골라져 있다 — 고른 것만 탭 순서에', () => {
     expect(data).toContain(`role="radiogroup" aria-label="${messages.about.data.scaleGroupLabel}"`)
     const tiles =

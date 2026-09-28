@@ -295,9 +295,12 @@ export function AboutView() {
         내려가 질문 4 → 이 절 사이만 약 90px 더 비었다. 그 자리 아래로 마무리가 비친다. 왼쪽은 규모 타일을
         누르면 구성과 출처가 따라 바뀌는 `DataScale`, 오른쪽은 약속 · 알아두실 점 · 약관을 쌓는다.
         그 미만은 왼쪽 → 오른쪽 순서로 쌓인다.
+
+        **두 열은 위로 붙인다(`lg:items-start`, #965).** 오른쪽 열이 더 길어서 가운데 정렬이면 표지어가
+        있는 왼쪽 열이 높이 차의 절반(1440 29 · 1024 51)만큼 내려가, 다른 절보다 머리가 늦게 섰다.
       */}
       <IntroBand tone="plain" id={SECTION_ID.data} labelledBy="about-data-heading">
-        <div className="grid gap-y-6 lg:grid-cols-12 lg:items-center lg:gap-x-10">
+        <div className="grid gap-y-6 lg:grid-cols-12 lg:items-start lg:gap-x-10">
           <div className="lg:col-span-7">
             <QuestionCopy
               id="about-data-heading"
