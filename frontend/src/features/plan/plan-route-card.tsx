@@ -14,6 +14,8 @@ import {
   routeCamera,
   routeCameraKey,
   type RouteItemInput,
+  type RouteSelection,
+  selectedIdForDay,
   toRouteModel,
   toRouteSegments,
 } from '@/lib/map/route'
@@ -59,7 +61,7 @@ export function PlanRouteCard({
 }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selection, setSelection] = useState<RouteSelection>(null)
   const [failure, setFailure] = useState<MapSdkFailure | null>(null)
 
   /*
@@ -70,6 +72,9 @@ export function PlanRouteCard({
     링크를 연 것이고, 그때 카드를 비우는 것보다 첫날을 보여 주는 편이 낫다.
   */
   const selectedDay = clampDay(searchParams.get('day'), totalDays)
+
+  // 일자를 바꾸면 선택이 풀린다 — 다른 일자에서 고른 핀은 여기 없다 (`selectedIdForDay`)
+  const selectedId = selectedIdForDay(selection, selectedDay)
 
   const group = days.find((candidate) => candidate.day === selectedDay)
 
@@ -177,7 +182,7 @@ export function PlanRouteCard({
           pins={pins}
           route={route}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={(id) => setSelection({ day: selectedDay, id })}
           camera={camera}
           onFailure={setFailure}
           className="h-56 w-full overflow-hidden rounded-md md:h-64"

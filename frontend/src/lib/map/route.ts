@@ -239,3 +239,18 @@ export function routeCameraKey(day: number, stops: readonly RouteStop[]): string
     ...stops.map((stop) => `${stop.id}@${String(stop.coord.lat)},${String(stop.coord.lng)}`),
   ].join('|')
 }
+
+/** 동선 카드의 핀 선택. **어느 일자에서 골랐는지를 함께 든다** (`selectedIdForDay`) */
+export type RouteSelection = { day: number; id: string } | null
+
+/**
+ * 지금 일자에서 유효한 선택 (#982 리뷰 M-1).
+ *
+ * **일자를 바꾸면 선택이 풀린다.** 선택을 id 하나로만 들면 일자 칩을 눌러도 남아, 새
+ * 일자 카메라가 선택 상태로 맞춰진다 — 고른 핀은 이름표로 커져 가장자리 핀이면 칸 밖으로
+ * 잘린다. effect 로 지우지 않고 **렌더에서 파생한다** — 지우는 effect 는 한 프레임 늦어
+ * 그 사이 카메라가 이미 선택 상태로 놓인다.
+ */
+export function selectedIdForDay(selection: RouteSelection, day: number): string | null {
+  return selection !== null && selection.day === day ? selection.id : null
+}
