@@ -203,19 +203,15 @@ JobParameter 로 넘긴다. 시간대를 트리거가 직접 못박는 이유는
 | 식약처 경로 404 | 잡 실패, 기존 데이터 유지, delisting 없음 | 없음 (데이터가 낡을 뿐) |
 | VWorld 키 만료 | 잡 실패 (`GEOCODING_KEY_MISSING`) | 없음 |
 | 일부 주소 지오코딩 실패 | 그 행만 제외하고 계속. 건수·업소명 로그 | 몇 곳이 빠짐 |
-| 문화정보원 포털 페이지/다운로드 실패 | **로컬 우회 파일로 적재**하고 계속. `culture facility source fallback=local` WARN. 스냅샷은 남기지 않는다. 지표 `result=fallback` 으로 드러난다 | 없음 |
+| 문화정보원 포털 페이지/다운로드 실패 | **로컬 우회 파일로 적재**하고 계속. `culture facility source fallback=local` WARN. 스냅샷에는 **우회 행**(`file_id='LOCAL_FALLBACK'`)을 남긴다 — 포털이 되살아난 첫 실행이 반드시 다시 적재한다 (#887). 지표 `result=fallback` 으로 드러난다 | 없음 |
 | 받은 파일이 CSV 가 아님 (점검 안내 HTML 등) | 위와 같음 (`CULTURE_DOWNLOAD_INVALID` → 우회) | 없음 |
 | 전송이 끊겨 파일이 잘림 | `Content-Length` 와 실제 바이트 수를 대조해 거부. 위와 같이 우회 | 없음 |
 | 스냅샷 테이블 조회 실패 (미생성 등) | "모른다"로 접고 그냥 내려받아 적재. `culture facility snapshot unavailable` WARN | 없음 (30MB 를 한 번 더 받을 뿐) |
 | 포털도 막히고 로컬 우회 파일도 없음 | 잡 실패 (`CULTURE_CSV_NOT_FOUND`) | 없음 |
-| 올레 포털 페이지·다운로드 티켓·CSV 어느 단계든 실패 (`SOURCE_PAGE_FAILED` 받기 실패 · `SOURCE_PAGE_INVALID` 버튼/티켓 이상 · `SOURCE_CIRCUIT_OPEN` · `DOWNLOAD_*`) | **로컬 우회 파일로 적재**하고 계속. `olle course source fallback=local` WARN + 완료 로그 `fallback=true`. 스냅샷은 남기지 않는다. 지표 `walk_course_import_rows{result="fallback"}` 으로 드러난다 (#876) | 없음 (데이터가 낡을 뿐) |
+| 올레 포털 페이지·다운로드 티켓·CSV 어느 단계든 실패 (`SOURCE_PAGE_FAILED` 받기 실패 · `SOURCE_PAGE_INVALID` 버튼/티켓 이상 · `SOURCE_CIRCUIT_OPEN` · `DOWNLOAD_*`) | **로컬 우회 파일로 적재**하고 계속. `olle course source fallback=local` WARN + 완료 로그 `fallback=true`. 스냅샷에는 **우회 행**을 남긴다 (#887). 지표 `walk_course_import_rows{result="fallback"}` 으로 드러난다 (#876) | 없음 (데이터가 낡을 뿐) |
 | 올레 포털도 막히고 로컬 우회 파일도 없음 | 잡 실패 (`CSV_NOT_FOUND`) | 없음 |
 
 공통 원칙은 **낡은 데이터가 빈 데이터보다 낫다**는 것이다. 실패 시 기존 값을 지우지 않는다.
-
-문화정보원 우회 적재가 **스냅샷을 남기지 않는 이유**도 같은 결이다. 우회 파일이 포털에 지금
-올라와 있는 것과 같다는 보장이 없으므로, 남기면 다음 실행이 포털을 보지 않고 건너뛴다 —
-포털이 되살아나도 낡은 파일에 머무는 것이 가장 나쁜 결말이다.
 
 **다만 우회가 오래 이어지는 것은 조용한 고장이다.** 우회 적재도 행이 들어오니
 `last_success` 는 갱신되고, 그러면 스크레이핑이 몇 주째 끊겨 있어도 신선도 경보가 침묵한다.
@@ -226,6 +222,52 @@ JobParameter 로 넘긴다. 시간대를 트리거가 직접 못박는 이유는
 정상 종료로 보이고, 잘린 본문은 1MB 하한도 첫 줄 `시설명` 검사도 통과한다. 그대로 적재하면
 잘린 판본이 스냅샷으로 굳고 **다음 실행부터 같은 `atchFileId` 로 영구 SKIP** 된다. 그래서
 헤더 `Content-Length` 가 있으면 디스크에 쓰인 바이트 수와 정확히 같을 때만 통과시킨다.
+
+### 우회 적재가 남기는 것 — 우회 행 (#887)
+
+우회 적재는 **포털 스냅샷이 아니라 우회 행을 남긴다.** 문화정보원·올레 둘 다 같다. 판정 규칙은
+`SourceFileSnapshotRule` 한 곳에 있고 두 잡이 같이 쓴다.
+
+| 컬럼 | 우회 행의 값 |
+| --- | --- |
+| `file_id` | `LOCAL_FALLBACK` (포털 `atchFileId` 는 `FILE_…` 형식이라 겹치지 않는다) |
+| `content_length` | `0` (포털에서 받은 바이트가 없다. 컬럼이 `NOT NULL` 이라 0 을 쓴다) |
+| `file_name` | 우회 파일 이름 (`pet_culture.csv` · `olle_course.csv`) |
+| `source_modified_max` · `imported_count` · `run_started_at` | 포털 행과 같은 뜻 — 적재한 행에서 낸다 |
+
+**직전 행이 우회 행이면 어떤 포털 파일과도 "같은 파일" 이 아니다.** 그래서 포털이 되살아난 첫 실행은
+파일이 그대로여도 받아서 적재하고(`… previous import was fallback. reimporting portal file` INFO), 그 적재가
+남긴 포털 행부터 다시 건너뛰기가 돈다.
+
+| 직전 행 | 이번 실행 | 결과 |
+| --- | --- | --- |
+| 포털 (`FILE_A`) | 포털 `FILE_A` | 건너뜀 (`skipped=true`) |
+| 포털 (`FILE_A`) | 포털 막힘 | 우회 적재 → 우회 행 |
+| 우회 행 | 포털 `FILE_A` (그대로) | **적재** → 포털 행 `FILE_A` |
+| 우회 행 | 포털 막힘 | 우회 적재 → 우회 행 |
+
+왜 이렇게 됐나. 예전에는 우회 적재가 **아무 행도 남기지 않았다.** 우회 파일이 포털에 지금 올라와 있는
+것과 같다는 보장이 없으니 포털 판본처럼 기록하면 안 된다는 판단은 맞았는데, 그러면 스냅샷이
+**마지막 포털 적재분**을 가리킨다. 포털이 되살아나고 파일이 그때와 같으면 복귀 첫 실행이 `sameFileAs`
+로 곧바로 건너뛰어 DB 에 우회 파일의 값이 남았다 — 우회 파일이 포털 판본보다 낡았으면 제공기관이 새 파일을
+올릴 때까지, 로그는 `skipped=true` 라 조용히. 그 틈을 "복귀 때 `forceImport=true` 1회" 라는 운영 절차로
+덮었는데, 사람이 기억해야 하는 절차라 코드로 없앴다. **이제 복귀 뒤 `forceImport` 는 필요 없다.**
+
+스키마는 바꾸지 않았다 — 기존 컬럼에 마커 값을 싣는다. prod DDL 이 런북 적용이라 컬럼을 늘리는 비용이 크다.
+
+남는 틈. 우회 적재가 **도중에 실패하면**(행 일부만 upsert 된 채 예외) 우회 행이 남지 않는다 — 스냅샷은
+마지막 포털 적재분을 가리킨 채 DB 일부만 우회 값으로 바뀌었을 수 있다. 이 경우는 잡 실패로 드러난다.
+그 뒤 첫 포털 실행이 `skipped=true` 로 끝났다면 그 잡만 `forceImport=true` 로 한 번 돌린다.
+
+확인 쿼리 — 최신 행이 `LOCAL_FALLBACK` 이면 지금 DB 에는 우회 파일 값이 들어 있고, 다음 포털 실행이 다시 적재한다.
+
+```sql
+SELECT source, area_code, file_id, file_name, content_length, source_modified_max, imported_count, created_at
+  FROM import_source_snapshot
+ WHERE source IN ('CULTURE_PORTAL', 'OLLE_COURSE')
+ ORDER BY created_at DESC, id DESC
+ LIMIT 10;
+```
 
 ### 올레 포털 — JSON-LD 를 버리고 다운로드 버튼 경로로 갈아탔다 (#876)
 
@@ -256,21 +298,16 @@ GET  /cmm/cmm/fileDownload.do?atchFileId=…&fileDetailSn=1 → CSV (CP949)
 **스냅샷 키는 바꾸지 않았다 — 여전히 `atchFileId` + 바이트 수다.** 티켓이 돌려주는 `atchFileId`
 (`FILE_000000007665534`)가 09-23 JSON-LD `contentUrl` 에 박힌 값과 같다 — 옛 경로가 뽑던 바로 그
 식별자다. `uddi:` 상세 PK 는 파일 단위가 아니라 데이터셋 상세 단위라 파일이 바뀌어도 같을 수 있어
-비교 키로 부적합하다. 키가 이어지므로 기존 스냅샷(우회 적재는 스냅샷을 남기지 않으므로 **마지막 포털
-적재분**)이 그대로 비교 기준으로 쓰인다.
+비교 키로 부적합하다. 키가 이어지므로 기존 스냅샷이 그대로 비교 기준으로 쓰인다.
 
-**그래서 배포 직후 한 번은 `forceImport=true` 로 돌린다 (운영 절차).** 우회로 돌던 동안 DB 에 들어간
-것은 우회 CSV 인데, 스냅샷은 그 전 포털 적재분을 가리킨다. 포털 파일이 그때와 같으면 배포 뒤 첫
-실행은 `sameFileAs` 로 **곧바로 건너뛰고**(완료 로그 `skipped=true`), 우회 CSV 가 포털 판본보다
-낡았다면 DB 는 포털이 살아난 뒤에도 낡은 값에 머문다 — 조용히.
+#876 배포 때는 우회로 돌던 동안 스냅샷이 **마지막 포털 적재분**을 가리키고 있어(그때는 우회 적재가 행을
+남기지 않았다) 배포 직후 `forceImport=true` 1회를 운영 절차로 두었다. 포털 → 우회 → 포털로 돌아온 날
+파일이 안 바뀌었으면 우회 데이터가 남는 같은 틈이 앞으로도 생길 수 있었는데, **#887 에서 우회 행으로 닫았다**
+(위 "우회 적재가 남기는 것"). 이제 복귀 뒤 `forceImport` 절차는 없다.
 
-```bash
---spring.batch.job.enabled=true --spring.batch.job.name=olleCourseImportJob forceImport=true runAt=<ISO 시각>
-```
-
-같은 틈은 앞으로도 생긴다 — 포털 → 우회 → 포털로 돌아온 날, 파일이 안 바뀌었으면 우회 데이터가
-남는다. 근본 해결(우회 적재 뒤 스냅샷을 무효화하는 표시)은 후속 과제다. 그때까지는 우회 게이지가
-1 에서 0 으로 돌아온 뒤 한 번 `forceImport=true` 로 돌리는 것을 절차로 둔다.
+단, #887 배포 **전에** 우회로 적재된 환경은 우회 행이 없다 — 그 상태에서 포털이 살아나면 옛 동작대로
+건너뛴다. 배포 전 마지막 실행의 완료 로그가 `fallback=true` 였다면(게이지는 재기동하면 사라지므로 로그로 본다)
+그 잡만 한 번 `forceImport=true` 로 돌린다. 배포 뒤 우회가 한 번이라도 돌면 우회 행이 남아 이 절차는 필요 없어진다.
 
 **우회는 이제 지표로 드러난다.** 파사드가 매 실행 `walk_course_import_rows{source="OLLE",result="fallback"}`
 에 1/0 을 쓴다 (`observability-guide.md`). 문화정보원의 `place_import_rows{result="fallback"}` 과 같은

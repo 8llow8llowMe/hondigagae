@@ -232,7 +232,9 @@ JOB=placeDataPipelineJob PARAMS="areaCode=39"
 | `congestionImportJob` | `congestionImportJob done. fetched=…, upserted=…, linked=…, unmatched=…` |
 | `olleCourseImportJob` | `olleCourseImportJob done. imported=… skippedUnchanged=… fallback=…` |
 
-`fallback=true` 는 포털이 막혀 우회 CSV 로 적재했다는 뜻이다 (`data-refresh-guide.md` §5).
+`fallback=true` 는 포털이 막혀 우회 CSV 로 적재했다는 뜻이다 (`data-refresh-guide.md` §5). 그 실행은 스냅샷에
+우회 행(`file_id='LOCAL_FALLBACK'`)을 남기므로, 포털이 되살아난 다음 실행은 파일이 그대로여도 다시 적재한다 —
+복귀 뒤 `forceImport=true` 를 따로 돌리지 않는다 (#887).
 `PLACE_IMPORT_023` 은 장소 총량이 기대 범위(1,680 ~ 4,200)를 벗어나 멈춘 것이다 (`services/batch-service.md`).
 
 ```sql
