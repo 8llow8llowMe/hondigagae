@@ -15,7 +15,8 @@ import lombok.Builder;
  *                       임의로 고쳐 부르지 않기 위해서다 (#816)
  * @param endPointName   종점 지점명. 같은 규칙이다
  * @param endLat         종점 위도. {@code OlleCourseEndpointResolver} 가 인접 코스의 시작점에서
- *                       끌어온다. 그 지점에서 출발하는 코스가 없으면 null 이다 — 지어내지 않는다
+ *                       끌어오고, 닿지 않으면 사람이 확인한 {@code OlleCourseEndpointOverrides} 값을 쓴다.
+ *                       그래도 없으면 null 이다 — 지어내지 않는다
  * @param endLng         종점 경도. 같은 규칙이다
  */
 @Builder(toBuilder = true)
