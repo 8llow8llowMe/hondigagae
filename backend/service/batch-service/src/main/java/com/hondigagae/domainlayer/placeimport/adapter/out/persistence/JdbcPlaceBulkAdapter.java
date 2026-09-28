@@ -257,8 +257,8 @@ public class JdbcPlaceBulkAdapter implements PlaceBulkPort {
      * allowed_pet_size 는 UNKNOWN 으로 넣는다. 이 원천은 "동반 가능하다"는 사실만 알려줄 뿐
      * 실내인지 크기 제한이 있는지는 말해 주지 않는다.
      *
-     * <p>UPDATE 절에서 indoor / outdoor / allowed_pet_size 를 건드리지 않는 것도 같은 이유다 —
-     * 병합 잡이 다른 원천에서 옮겨 채워 둔 값을 재실행 때마다 도로 지워 버리면 안 된다.
+     * <p>UPDATE 절에서 indoor / outdoor / allowed_pet_size 를 건드리지 않는 것도 같은 이유다 — 원천에 없는 값이다.
+     * 식약처 행은 병합의 흡수 대상도 survivor 도 아니고, 병합은 더는 allowed_pet_size 를 옮기지 않는다(#886).
      */
     private static final String MFDS_UPSERT_SQL = """
         INSERT INTO place (

@@ -155,19 +155,20 @@ class JdbcPlaceBulkAdapterSqlTest {
     }
 
     /**
-     * 동반 가능 여부 · 크기 제한의 TourAPI 행 소유자는 재계산 스텝 하나다 (#886).
+     * 동반 가능 여부 · 크기 제한 · {@code pet_available} 의 TourAPI 행 소유자는 재계산 스텝 하나다 (#886).
      *
      * <p>재적재가 UPDATE 절에서 두 칸을 덮으면 재계산 결과가 매주 {@code 'UNKNOWN'} 으로 깜빡이고(#763 의 {@code tel} 과 같은
      * 모양), 병합이 다시 두 칸을 옮기기 시작하면 규칙이 다른 두 쓰기(survivor 우선 ↔ 가장 제한적인 쪽)가 한 칸에 겹친다.
      */
     @Test
-    @DisplayName("동반 가능 여부 · 크기 제한은 관광 API 재적재도 병합도 쓰지 않는다 — 재계산 스텝만 쓴다")
+    @DisplayName("동반 가능 여부 · 크기 제한 · pet_available 은 관광 API 재적재도 병합도 쓰지 않는다 — 재계산 스텝만 쓴다")
     void onlyTheReflectStepWritesPetAllowanceOfTourApiRows() {
         String updateClause = updateClauseOf("UPSERT_SQL");
 
         assertThat(assignsColumn(updateClause, "pet_allowance_type")).isFalse();
         assertThat(assignsColumn(updateClause, "allowed_pet_size")).isFalse();
-        assertThat(mergeFilledColumns()).doesNotContain("pet_allowance_type", "allowed_pet_size");
+        assertThat(assignsColumn(updateClause, "pet_available")).isFalse();
+        assertThat(mergeFilledColumns()).doesNotContain("pet_allowance_type", "allowed_pet_size", "pet_available");
     }
 
     /** {@code survivor.<컬럼> =} 대입만 센다. 기록용 {@code updated_at} 은 데이터가 아니라 뺀다. */

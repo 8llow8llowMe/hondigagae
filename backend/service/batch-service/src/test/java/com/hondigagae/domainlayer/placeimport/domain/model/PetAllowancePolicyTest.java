@@ -86,6 +86,13 @@ class PetAllowancePolicyTest {
         assertThat(PetAllowancePolicy.parseSize("TINY")).isEqualTo(AllowedPetSize.UNKNOWN);
     }
 
+    @ParameterizedTest(name = "{0} → pet_available {1}")
+    @CsvSource({"ALLOWED, true", "PARTIALLY_ALLOWED, true", "NOT_ALLOWED, false", "UNKNOWN, false"})
+    @DisplayName("pet_available 은 동반 구분을 따른다 — 확인된 가능(전체 · 일부)만 true")
+    void derivesPetAvailableFromAllowance(PetAllowanceType allowance, boolean expected) {
+        assertThat(PetAllowancePolicy.petAvailableOf(allowance)).isEqualTo(expected);
+    }
+
     private static List<String> split(String csv) {
         return csv.isBlank() ? List.of() : Arrays.asList(csv.split(","));
     }

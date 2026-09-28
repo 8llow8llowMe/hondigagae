@@ -21,6 +21,9 @@ import org.springframework.stereotype.Component;
  * 부분일치는 300m 이내만 병합하고, 이름이 겹치지 않으면 좌표가 가까워도 병합하지 않는다.
  *
  * <p>관광 API 행을 살린다. 이미지·개요·동반 정보 9필드를 갖고 있어 정보량이 많다.
+ *
+ * <p><b>survivor = TOUR_API, 흡수 = CULTURE_PORTAL 조합을 바꾸면 동반 가능 여부 재계산(#886)의 대상도 바꿔야 한다.</b>
+ * {@code JdbcPlacePetAllowanceAdapter} 는 흡수 행을 근거로 TourAPI survivor 만 다시 계산한다.
  */
 @Slf4j
 @Component

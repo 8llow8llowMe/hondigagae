@@ -16,7 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 /**
- * TourAPI 노출 장소의 동반 가능 여부 · 크기 제한을 근거에서 다시 계산한다 (#886).
+ * TourAPI 노출 장소의 동반 가능 여부 · 크기 제한 · {@code pet_available} 을 근거에서 다시 계산한다 (#886).
  *
  * <p>근거 읽기 한 번 → 규칙({@link PetAllowancePolicy}) → <b>값이 바뀐 행만</b> 갱신. 결과를 통째로 다시 계산하므로
  * {@code place_pet_info} 가 지워지거나 흡수 행이 delist 되면 다음 실행에서 값이 돌아간다.
@@ -45,7 +45,7 @@ public class PlacePetAllowanceReflectProcessor {
             if (reflected.size().hasRestriction()) {
                 sizeRestricted++;
             }
-            if (!reflected.allowance().name().equals(evidence.currentAllowance()) || !reflected.size().name().equals(evidence.currentSize())) {
+            if (isChanged(reflected, evidence)) {
                 changes.add(reflected);
             }
         }
@@ -56,6 +56,12 @@ public class PlacePetAllowanceReflectProcessor {
             outcome.targets(), outcome.changed(), outcome.countOf(PetAllowanceType.ALLOWED), outcome.countOf(PetAllowanceType.PARTIALLY_ALLOWED),
             outcome.countOf(PetAllowanceType.NOT_ALLOWED), outcome.countOf(PetAllowanceType.UNKNOWN), outcome.sizeRestricted());
         return outcome;
+    }
+
+    private static boolean isChanged(ReflectedPetAllowance reflected, PlacePetAllowanceEvidenceQueryResult evidence) {
+        return !reflected.allowance().name().equals(evidence.currentAllowance())
+            || !reflected.size().name().equals(evidence.currentSize())
+            || reflected.petAvailable() != evidence.currentPetAvailable();
     }
 
     private ReflectedPetAllowance reflect(PlacePetAllowanceEvidenceQueryResult evidence) {
