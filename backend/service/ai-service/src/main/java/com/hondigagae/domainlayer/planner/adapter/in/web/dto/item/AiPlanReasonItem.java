@@ -7,7 +7,7 @@ import lombok.Builder;
 @Schema(description = "AI 추천 이유 항목 DTO (XAI — api-design-guide §9)")
 public record AiPlanReasonItem(
 
-    @Schema(description = "이유 코드. PET_ALLOWED 반려견 동반 가능 · WEATHER_OK 날씨 양호 · LOW_CONGESTION 한산 · INDOOR_ALTERNATIVE 실내 대안 · SHORT_DISTANCE 짧은 이동 · REST_SLOT 휴식 시간 확보", example = "PET_ALLOWED")
+    @Schema(description = "이유 코드. PET_ALLOWED 반려견 동반 가능 · WEATHER_OK 날씨 양호 · INDOOR_ALTERNATIVE 실내 대안 · REST_SLOT 휴식 시간 확보. 거리·혼잡도는 모델이 확인할 수 없어 내지 않습니다", example = "PET_ALLOWED")
     String code,
 
     @Schema(description = "이유 이름 (화면 표시용 짧은 문구)", example = "반려견 동반 가능")

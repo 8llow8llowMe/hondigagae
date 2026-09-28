@@ -63,8 +63,8 @@ public record LlmPlanDraftResponse(
     public record LlmPlanReason(
 
         @JsonPropertyDescription(
-            "근거 코드. PET_ALLOWED, WEATHER_OK, LOW_CONGESTION, INDOOR_ALTERNATIVE, "
-                + "SHORT_DISTANCE, REST_SLOT 중에서 고른다.")
+            "근거 코드. PET_ALLOWED, WEATHER_OK, INDOOR_ALTERNATIVE, REST_SLOT 중에서 고른다. "
+                + "거리·혼잡도는 입력에 없으므로 근거로 쓰지 않는다.")
         String code,
 
         @JsonPropertyDescription("근거 이름. 화면에 그대로 보여 줄 짧은 한국어 표현.")

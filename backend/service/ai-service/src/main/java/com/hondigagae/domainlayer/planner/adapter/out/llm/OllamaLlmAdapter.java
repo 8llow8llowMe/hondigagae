@@ -5,6 +5,7 @@ import com.hondigagae.domainlayer.planner.adapter.out.llm.dto.LlmPlanDraftRespon
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
+import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
 import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
@@ -19,6 +20,8 @@ import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.net.SocketTimeoutException;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -127,7 +130,35 @@ public class OllamaLlmAdapter implements AiLlmPort {
 
         ChatResponse response = request(query);
         LlmPlanDraftResponse draft = extractDraft(response);
-        return toDomain(draft, candidates);
+        AiPlanDraft domain = toDomain(draft, candidates);
+        // 후보 대조(아이디 · 이름 · 종류) 다음이 사실 대조다. 종류가 맞춰진 뒤라야 숙박을 가를 수 있다 (#975).
+        return new AiPlanDraftFactGuard(indexById(candidates), aiPlanPromptFactory.resolveDayCount(query),
+            maxTemperatureByDay(query)).apply(domain);
+    }
+
+    private Map<Long, PlaceCandidate> indexById(List<PlaceCandidate> candidates) {
+        return candidates.stream()
+            .collect(Collectors.toMap(PlaceCandidate::placeId, Function.identity(), (left, right) -> left));
+    }
+
+    /**
+     * 일차 → 그날 최고기온. 전망이 없거나 최고기온을 모르는 날은 담지 않는다 — "모른다" 를 "덥지 않다" 와
+     * 섞지 않고, 둘 다 "더위를 말할 근거가 없다" 로 같게 다룬다.
+     */
+    private Map<Integer, Double> maxTemperatureByDay(AiPlanGenerationQuery query) {
+        LocalDate start;
+        try {
+            start = LocalDate.parse(query.startDate());
+        } catch (RuntimeException exception) {
+            return Map.of();
+        }
+        Map<Integer, Double> byDay = new LinkedHashMap<>();
+        for (DayWeatherOutlook outlook : query.safeWeatherOutlook()) {
+            if (outlook.date() != null && outlook.maxTemperature() != null) {
+                byDay.put((int) ChronoUnit.DAYS.between(start, outlook.date()) + 1, outlook.maxTemperature());
+            }
+        }
+        return byDay;
     }
 
     @Override
@@ -450,8 +481,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
      * <b>틀린 아이디가 조용히 저장된다.</b> {@link #resolveItemType} 이 그것을 맞춘다.
      */
     private AiPlanDraft toDomain(LlmPlanDraftResponse draft, List<PlaceCandidate> candidates) {
-        Map<Long, PlaceCandidate> candidateById = candidates.stream()
-            .collect(Collectors.toMap(PlaceCandidate::placeId, Function.identity(), (left, right) -> left));
+        Map<Long, PlaceCandidate> candidateById = indexById(candidates);
         Set<Long> knownIds = candidateById.keySet();
 
         // 조사 교정이 쓸 이름. 후보 밖 장소는 우리가 아는 이름이 아니라 손대지 않는다.
@@ -463,7 +493,8 @@ public class OllamaLlmAdapter implements AiLlmPort {
         /*
          * 일자 간 장소 중복 감지 (#570). 1일차·2일차가 둘 다 `애월한담공원` 으로 시작한 적이 있다.
          * **숙소는 세지 않는다** — 같은 곳에 이어 묵는 것이 정상이고, 그건 결과 항목의
-         * `itemType == LODGING` 으로만 갈린다 (후보 데이터에는 분류 코드가 없다).
+         * `itemType == LODGING` 으로 갈린다. 그 값은 resolveItemType 이 후보의 contentTypeName(숙박)으로
+         * 먼저 맞춰 둔다 (#975).
          */
         Map<Long, Set<Integer>> nonLodgingPlaceDays = new LinkedHashMap<>();
 
@@ -574,6 +605,28 @@ public class OllamaLlmAdapter implements AiLlmPort {
      */
     private PlanItemType resolveItemType(String code, PlaceCandidate matched) {
         Optional<PlanItemType> parsed = PlanItemType.from(code);
+        /*
+          숙박 유형은 모델 말보다 후보 데이터를 믿는다 (#975). 콘도를 PLACE 로 적어 "해안가 산책" 자리에
+          넣은 적이 있다. 종류가 LODGING 이어야 마지막 날 숙박 규칙과 일자 간 중복 예외가 이 항목을 알아본다.
+          숙소에서 먹는 MEAL(조식)은 그대로 둔다 — 식사 자리지 묵는 자리가 아니다.
+          반대로 숙박이 아닌 곳을 LODGING 으로 적으면 음식점은 식사로, 그 밖은 장소 방문으로 되돌린다.
+        */
+        if (matched != null) {
+            boolean lodgingPlace = AiPlanDraftFactGuard.LODGING_CONTENT_TYPE.equals(matched.contentTypeName());
+            PlanItemType claimed = parsed.orElse(null);
+            if (lodgingPlace && claimed != PlanItemType.LODGING && claimed != PlanItemType.MEAL) {
+                log.warn("LLM put a lodging place on a non-lodging item type itemType={} placeId={} correcting to {}",
+                    code, matched.placeId(), PlanItemType.LODGING);
+                return PlanItemType.LODGING;
+            }
+            if (!lodgingPlace && claimed == PlanItemType.LODGING) {
+                PlanItemType corrected = AiPlanDraftFactGuard.RESTAURANT_CONTENT_TYPE.equals(matched.contentTypeName())
+                    ? PlanItemType.MEAL : DEFAULT_ITEM_TYPE;
+                log.warn("LLM put a non-lodging place on LODGING placeId={} contentType={} correcting to {}",
+                    matched.placeId(), matched.contentTypeName(), corrected);
+                return corrected;
+            }
+        }
         if (parsed.isEmpty()) {
             log.warn("LLM returned an unknown item type itemType={} falling back to {}", code, DEFAULT_ITEM_TYPE);
             return DEFAULT_ITEM_TYPE;
