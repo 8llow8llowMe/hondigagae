@@ -5,6 +5,7 @@ import {
   routeCamera,
   routeCameraKey,
   type RouteItemInput,
+  selectedIdForDay,
   toRouteModel,
   toRouteSegments,
 } from '@/lib/map/route'
@@ -383,5 +384,26 @@ describe('routeCameraKey', () => {
     }).stops
 
     expect(routeCameraKey(1, retitled)).toBe(routeCameraKey(1, stopsOf()))
+  })
+})
+
+/*
+  #982 리뷰 M-1 — **일자를 바꾸면 선택이 풀린다.**
+
+  선택은 그 일자의 핀을 가리킨다. 남겨 두면 새 일자 카메라가 선택 상태로 맞춰지는데,
+  고른 핀은 이름표(최대 180px)로 커져 가장자리 핀이면 칸 밖으로 잘린다 — 모바일
+  358px 칸에서 1번 핀 중심은 x≈37 이다.
+*/
+describe('selectedIdForDay', () => {
+  it('그 일자에서 고른 핀이면 그대로다', () => {
+    expect(selectedIdForDay({ day: 2, id: 'a' }, 2)).toBe('a')
+  })
+
+  it('다른 일자에서 고른 핀이면 풀린다', () => {
+    expect(selectedIdForDay({ day: 1, id: 'a' }, 2)).toBeNull()
+  })
+
+  it('고른 적이 없으면 없다', () => {
+    expect(selectedIdForDay(null, 1)).toBeNull()
   })
 })
