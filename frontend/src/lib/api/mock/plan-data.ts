@@ -670,6 +670,21 @@ function update(plan: MockPlan, body: string | null): MockResult {
 
   if (errors.length > 0) return failValidation(errors)
 
+  /*
+    **여행 전 상태 가드** (#971 · `PlanCommandProcessor.validateStartedBeforeCompletion`).
+    오늘이 시작일보다 앞이면 완료로 **넘어갈** 수 없다 — 시작일 당일부터 허용한다(당일치기).
+    이미 완료인 일정에 `COMPLETED` 를 다시 보내는 것은 전이가 아니라 막지 않는다(`completesNow`).
+    "오늘" 은 이 mock 의 관례대로 `todayDay(new Date())` 다 (브리핑 `today` 판정과 같다).
+    완료 일정의 시작일 이동 갈래는 mock `update` 가 기간 수정을 받지 않아 옮기지 않았다.
+  */
+  if (
+    parsed.status === 'COMPLETED' &&
+    plan.status !== 'COMPLETED' &&
+    todayDay(new Date()) < plan.startDate
+  ) {
+    return fail(400, 'PLAN_026', '여행 시작일 전에는 여행을 완료할 수 없습니다.')
+  }
+
   if (typeof parsed.title === 'string') plan.title = parsed.title.trim()
   if (typeof parsed.budget === 'number') plan.budget = parsed.budget
   if (typeof parsed.status === 'string') plan.status = parsed.status

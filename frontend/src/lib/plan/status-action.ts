@@ -17,10 +17,11 @@ export type PlanStatusActionKind = 'confirm' | 'complete' | 'revert-draft' | 're
  * **자리를 가르는 축이다.** `forward` 는 그 상태에서 사용자가 할 **다음 일**이라 개요 아래
  * 전폭 버튼으로 남고, `reverse` 는 `⋯` 메뉴로 내려간다.
  *
- * **"드물다" 나 "위험하다" 로 가르지 않았다.** 상태 전이는 넷 다 되돌릴 수 있고(그래서
- * 확인 대화상자가 없다 — `plan-status-action.tsx`), 백엔드에 전이 가드도 없다. 가를 수
- * 있는 것은 **방향**뿐이다 — 390 실측에서 완료 일정의 유일한 전폭 버튼이
- * `확정으로 되돌리기` 였다(top 252). 다녀온 일정이 가장 세게 미는 것이 되돌리기일 이유가 없다.
+ * **"드물다" 나 "위험하다" 로 가르지 않았다.** 상태 전이는 넷 다 되돌릴 수 있다(그래서
+ * 확인 대화상자가 없다 — `plan-status-action.tsx`). 백엔드의 전이 가드는 **시점** 하나뿐이고
+ * (#971 — 시작일 전 `COMPLETED` 는 `PLAN_026` 400, 아래 `planStatusActionLayout`), 방향과는
+ * 무관하다. 자리를 가를 수 있는 것은 **방향**이다 — 390 실측에서 완료 일정의 유일한 전폭
+ * 버튼이 `확정으로 되돌리기` 였다(top 252). 다녀온 일정이 가장 세게 미는 것이 되돌리기일 이유가 없다.
  */
 export type PlanStatusActionDirection = 'forward' | 'reverse'
 
@@ -64,12 +65,26 @@ export function reverseStatusActions(statusCode: string): PlanStatusActionSpec[]
 }
 
 /**
- * 정방향 액션이 **오늘 할 만한 일인가** (#732 · 진단 665-1).
+ * 정방향 액션이 오늘 **어디에** 서는가 (#732 · 진단 665-1 → #971).
+ *
+ * - `button` — 오늘 할 일이다. 개요 아래 전폭 버튼.
+ * - `menu` — 오늘 할 수는 있지만 화면의 가장 큰 색면일 일은 아니다. `⋯` 메뉴.
+ * - `hidden` — **서버가 거절할 일이다.** 어디에도 두지 않는다.
  *
  * `direction` 은 자리를 가르는 **첫 번째** 축이고, 이것이 두 번째다. 방향만 보면
  * `여행 완료하기` 는 확정 일정의 "다음 일" 이라 개요 아래 전폭 버튼인데, **출발 전날에
  * 그 버튼을 누를 사람은 없다.** 390 실측에서 D-1 화면의 유일한 filled 버튼이자 가장 큰
  * 색면이 `여행 완료하기` 였고, 그날 이 화면을 연 사람이 찾는 것(브리핑·준비물)보다 위였다.
+ *
+ * **시작일 전(`upcoming` · `days >= 1`)에는 메뉴에도 없다** (#971). #732 는 이 날의 완료를
+ * 메뉴로 내리기만 해서 D-9 일정도 메뉴에서 완료할 수 있었다. 이제 백엔드가 **서비스 기준
+ * 오늘(KST)이 시작일보다 앞이면 `PLAN_026` 400** 으로 거절한다 — 이 판정은 **서버 가드
+ * `PLAN_026` 과 같은 선**이다. 서버가 거절할 액션을 보여 주고 눌러서 배우게 하지 않는다
+ * (초안 공유를 `PLAN_022` 때문에 메뉴에서 뺀 것과 같은 이유 — `plan-manage-menu.tsx`).
+ *
+ * **출발 당일(`upcoming` · `days === 0`)은 메뉴다.** 서버는 시작일 당일부터 허용한다 —
+ * 당일치기는 그날 끝에 완료한다. `planPhaseOf` 는 D-DAY 를 아직 `upcoming` 에 두므로,
+ * 떠나는 날 아침의 가장 큰 색면이 `여행 완료하기` 가 되지 않게 버튼으로는 올리지 않는다.
  *
  * **`확정하기` 는 내리지 않는다.** 출발 전날의 초안은 확정할 수 있고, 그것이 정확히 그날
  * 할 일이다 — 이 판정이 가르는 것은 "정방향이냐" 가 아니라 **"아직 이를 수 없는 일이냐"**
@@ -78,26 +93,36 @@ export function reverseStatusActions(statusCode: string): PlanStatusActionSpec[]
  *
  * **판정 축은 `planPhaseOf` 하나다.** 같은 화면의 D-day 배지·일자 배지·준비물 자리가 모두
  * 그 `PlanPhase` 에서 나온다 — 여기만 다른 셈을 쓰면 배지는 `D-1` 인데 버튼은 여행이
- * 시작된 것처럼 구는 날이 생긴다 (`packing-promotion.ts` 머리주석과 같은 이유).
+ * 시작된 것처럼 구는 날이 생긴다 (`packing-promotion.ts` 머리주석과 같은 이유). 화면의
+ * `today` 는 서버가 정하므로 서버 가드의 KST 오늘과 같은 날을 본다.
  *
  * **날짜를 못 읽으면(`null`) 버튼으로 둔다** — 있던 진입점을 근거 없이 감추지 않는다.
+ * 최종 판정은 서버가 한다.
  */
-function isForwardActionDue(kind: PlanStatusActionKind, phase: PlanPhase | null): boolean {
-  // 아직 떠나지 않은 여행을 마친 것으로 말할 수 없다. 나머지 정방향은 시점을 가리지 않는다
-  return kind === 'complete' ? phase?.kind !== 'upcoming' : true
+function forwardActionPlacement(
+  kind: PlanStatusActionKind,
+  phase: PlanPhase | null,
+): 'button' | 'menu' | 'hidden' {
+  // 나머지 정방향(`확정하기`)은 시점을 가리지 않는다
+  if (kind !== 'complete' || phase?.kind !== 'upcoming') return 'button'
+  // 시작일 전 완료는 서버가 `PLAN_026` 으로 거절한다 — 당일부터 허용
+  return phase.days >= 1 ? 'hidden' : 'menu'
 }
 
 /** 상태 전이 액션이 각각 어디에 서는가 (#732) */
 export type PlanStatusActionLayout = {
   /** 개요 카드 아래 전폭 버튼. 없으면 그 자리가 통째로 빈다 */
   button: PlanStatusActionSpec | undefined
-  /** `⋯` 메뉴 항목 — 아직 이를 수 없는 정방향이 먼저, 역방향이 그 뒤다 */
+  /** `⋯` 메뉴 항목 — 버튼으로 올리지 않은 정방향(출발 당일의 완료)이 먼저, 역방향이 그 뒤다 */
   menu: PlanStatusActionSpec[]
 }
 
 /**
- * 상태 전이 액션의 자리 (#732). **한 번만 셈하고 두 진입점이 그 결과를 나눠 받는다** —
+ * 상태 전이 액션의 자리 (#732 · #971). **한 번만 셈하고 두 진입점이 그 결과를 나눠 받는다** —
  * 버튼 쪽과 메뉴 쪽이 각자 판정하면 같은 액션이 둘 다에 서거나 어느 쪽에도 없는 날이 생긴다.
+ *
+ * **어느 쪽에도 없는 것이 의도인 경우는 하나다** — 시작일 전(D-1 이전)의 `여행 완료하기`.
+ * 서버가 `PLAN_026` 으로 거절하는 액션이라 진입점을 두지 않는다 (`forwardActionPlacement`).
  */
 export function planStatusActionLayout(
   statusCode: string,
@@ -107,7 +132,10 @@ export function planStatusActionLayout(
   const forward = forwardStatusAction(statusCode)
 
   if (forward === undefined) return { button: undefined, menu: reverse }
-  if (isForwardActionDue(forward.kind, phase)) return { button: forward, menu: reverse }
+
+  const placement = forwardActionPlacement(forward.kind, phase)
+  if (placement === 'button') return { button: forward, menu: reverse }
+  if (placement === 'hidden') return { button: undefined, menu: reverse }
 
   /*
     **메뉴 맨 위가 아니라 상태 묶음 안이다** — 호출부(`plan-manage-menu.tsx`)가 수정·복사·
