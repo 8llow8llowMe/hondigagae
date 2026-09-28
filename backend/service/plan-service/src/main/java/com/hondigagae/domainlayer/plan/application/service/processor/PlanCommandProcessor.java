@@ -22,6 +22,7 @@ import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPetCondition;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +51,8 @@ public class PlanCommandProcessor {
     private final PlanWalkCourseQueryPort planWalkCourseQueryPort;
     private final PetConditionQueryPort petConditionQueryPort;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
+    /** 여행 전 상태 가드의 "오늘". 시스템 시각을 직접 읽으면 판정이 테스트에서 날짜에 따라 흔들린다. */
+    private final Clock clock;
 
     /**
      * DB 쓰기 구간만 트랜잭션으로 묶는다. 반려견 확인({@link #resolvePetIds})과 타깃 검증
@@ -245,6 +248,7 @@ public class PlanCommandProcessor {
             .budget(command.budget() != null ? command.budget() : plan.budget())
             .status(command.status() != null ? command.status() : plan.status())
             .build();
+        validateStartedBeforeCompletion(plan, updated, command);
 
         // 기간을 줄이면 범위 밖 일차의 항목이 고아가 된다 — 조용히 남기면 상세와 날씨 브리핑이 어긋나므로
         // 사용자가 항목을 먼저 정리하도록 거부한다. 자동 삭제는 사용자의 기록을 말없이 지우는 일이라 하지 않는다.
@@ -284,6 +288,33 @@ public class PlanCommandProcessor {
      */
     public static boolean completesNow(Plan plan, PlanUpdateCommand command) {
         return command.status() == PlanStatus.COMPLETED && plan.status() != PlanStatus.COMPLETED;
+    }
+
+    /**
+     * 여행 전 상태 가드 (#971). 서비스 기준 오늘이 시작일보다 앞이면 완료 상태가 될 수 없다 —
+     * 떠나지 않은 여행을 다녀온 기록으로 남기지 않는다. 판정은 {@link Plan#hasStarted} 하나로 한다.
+     *
+     * <ul>
+     *   <li>이번 요청으로 완료하는데 (수정 결과 기준) 시작 전이면 막는다
+     *   <li>이미 완료된 일정의 <b>시작일을 옮겨</b> 시작 전이 되는 것도 막는다 — 완료 뒤 날짜를 미래로
+     *       밀면 같은 결과("안 간 여행의 완료")에 우회로로 닿는다
+     *   <li>시작일을 건드리지 않는 수정(제목 등)은 막지 않는다. 가드 이전에 만들어진, 시작 전인데 완료된
+     *       일정이 남아 있어도 그 일정의 제목 수정까지 깨지면 안 된다
+     *   <li>이미 완료된 일정에 {@code COMPLETED} 를 다시 보내는 것은 전이가 아니라({@link #completesNow})
+     *       첫 번째 조건에 걸리지 않는다
+     * </ul>
+     */
+    private void validateStartedBeforeCompletion(Plan plan, Plan updated, PlanUpdateCommand command) {
+        LocalDate today = LocalDate.now(clock);
+        if (updated.hasStarted(today)) {
+            return;
+        }
+        boolean movesCompletedPlanStart = plan.status() == PlanStatus.COMPLETED
+            && updated.status() == PlanStatus.COMPLETED
+            && !updated.startDate().equals(plan.startDate());
+        if (completesNow(plan, command) || movesCompletedPlanStart) {
+            throw new PlanException(PlanErrorCode.PLAN_NOT_STARTED_COMPLETE);
+        }
     }
 
     private List<PlanPetCondition> toPetConditions(long planId, Map<Long, PetConditionQueryResult> conditions) {

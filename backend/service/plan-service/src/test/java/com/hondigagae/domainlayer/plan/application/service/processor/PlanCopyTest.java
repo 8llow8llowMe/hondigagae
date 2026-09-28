@@ -18,7 +18,9 @@ import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import com.hondigagae.shared.travel.plan.PlanItemType;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -41,6 +43,10 @@ class PlanCopyTest {
     private static final long SOURCE_PLAN_ID = 100L;
     private static final LocalDate SOURCE_START = LocalDate.of(2026, 9, 12);
     private static final LocalDate NEW_START = LocalDate.of(2027, 5, 1);
+
+    /** 서비스 기준 "오늘". 픽스처 여행(2026-09-12~14)이 이미 시작된 뒤로 고정해 여행 전 가드(#971)에 걸리지 않게 한다. */
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+    private static final Clock CLOCK = Clock.fixed(LocalDate.of(2026, 9, 28).atStartOfDay(SEOUL).toInstant(), SEOUL);
 
     @Test
     @DisplayName("항목과 동행 반려견을 복사하고 visited 는 false 로 초기화한다")
@@ -237,7 +243,7 @@ class PlanCopyTest {
     ) {
         return new PlanCommandProcessor(
             plans, items, pets, new StubPlanPetConditionRepositoryPort(),
-            new StubPlaceVerifyQueryPort(), walkCoursePort, petPort, new SnowflakeIdGenerator(1, 1));
+            new StubPlaceVerifyQueryPort(), walkCoursePort, petPort, new SnowflakeIdGenerator(1, 1), CLOCK);
     }
 
     private static class StubPlanRepositoryPort implements PlanRepositoryPort {

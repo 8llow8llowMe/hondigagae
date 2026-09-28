@@ -43,6 +43,9 @@ public enum PlanErrorCode {
     // 없습니다" 라 코스에 대해서는 사실이 아니고, 코드가 있는 이유는 클라이언트가 **무엇이**
     // 잘못됐는지 알기 위해서다. 성격은 PLAN_004 와 같아 프론트는 둘 다 재시도 없는 400 으로 다룬다.
     NOT_FOUND_PLAN_WALK_COURSE("PLAN_025", "일정 항목의 산책 코스를 찾을 수 없습니다.", HttpStatus.BAD_REQUEST),
+    // 여행 전 상태 가드 (#971). 떠나지 않은 여행을 다녀온 기록으로 남기지 않는다. 시작일 당일부터는
+    // 허용한다 — 당일치기 여행이 있다. 완료된 일정의 시작일을 미래로 옮기는 것도 같은 코드로 막는다.
+    PLAN_NOT_STARTED_COMPLETE("PLAN_026", "여행 시작일 전에는 여행을 완료할 수 없습니다.", HttpStatus.BAD_REQUEST),
     INVALID_REQUEST("PLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
     // 프레임워크 공통 2종은 검증 대역 끝에 둔다 (coding-conventions §8-2). PLAN_115 가 petIds 필드 코드로
     // 쓰이면서 한 칸씩 밀렸고, 준비물 필드 코드가 PLAN_116~123 을 가져가면서 다시 밀었다.
