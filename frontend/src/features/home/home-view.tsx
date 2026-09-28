@@ -131,6 +131,19 @@ export function HomeView({
   todayLabel: string
 }) {
   const [recentPlaceId, setRecentPlaceId] = useState<string | null>(null)
+
+  /*
+    서비스 소개 카드의 닫기 (#963). **두 사본이 이 상태 하나를 나눠 쓴다** — 카드는 폭마다 한
+    자리씩 두 벌이고(아래 `AboutIntroCard` 두 곳) 보이는 쪽만 그린다. 사본마다 상태를 가지면 한쪽
+    × 가 다른 쪽을 치우지 못해, 닫은 뒤 창을 1024 너머로 바꾸는 순간 숨었던 사본이 선다.
+
+    **쿠키를 구독하게 하지 않고 여기로 올렸다.** `markAboutSeen` 이 알림을 쏘고 카드가 구독하는
+    안도 되지만, 그러면 모듈 스코프 구독자 목록이 생기고 쿠키를 못 쓰는 브라우저에서는 닫히지
+    않는다. 상태 하나 · 콜백 하나가 더 적다. 뒤로 가기는 여전히 카드가 쿠키로 막는다.
+  */
+  const [aboutIntroDismissed, setAboutIntroDismissed] = useState(false)
+  const aboutIntroShown = showAboutIntro && !aboutIntroDismissed
+  const dismissAboutIntro = () => setAboutIntroDismissed(true)
   const storedPetId = useSelectedPetStore((state) => state.selectedPetId)
   const restore = useSelectedPetStore((state) => state.restore)
 
@@ -507,8 +520,22 @@ export function HomeView({
 
             비로그인 · 소개를 본 적 없음일 때만 선다. 닫거나 `/about` 을 한 번 열면 쿠키가 남아
             다음부터 서지 않는다 — 그 뒤 모바일의 통로는 맨 아래 `/about` 링크다(지우지 않는다).
+
+            **두 자리 중 1024 미만의 자리다** (#963) — 이상에서는 `lg:hidden` 으로 빠지고 우측
+            권역 카드 아래의 사본이 선다. 좌측 첫 카드가 약 720px 이라 이 자리는 1024×768 ·
+            1280×800 첫 화면 밖이었다.
+
+            **한 벌로 두 자리를 만들지 않은 이유** — 1024 미만에서 두 스택을 `display: contents`
+            로 풀고 `order` 로 당기는 안을 구현했다가 걷었다. 카드의 DOM 순서가 권역 뒤로 가서
+            키보드 · 스크린리더가 보이는 순서와 다르게 닿고(WCAG 1.3.2 · 2.4.3), 1024 미만 홈 전체
+            간격이 바뀌었다. `matchMedia` 로 한 자리만 그리는 안은 서버가 폭을 몰라 하이드레이션
+            뒤 카드가 옮겨 목록이 밀린다. **숨은 사본은 `display: none` 이라 탭 순서와 접근성
+            트리에서 빠진다** — 두 번 읽히지도 서지도 않는다. 대가는 서버 HTML 의 마크업 한 벌과
+            위의 공유 닫기 상태다.
           */}
-          {showAboutIntro && <AboutIntroCard />}
+          {aboutIntroShown && (
+            <AboutIntroCard className="lg:hidden" onDismiss={dismissAboutIntro} />
+          )}
 
           {/*
             AI 일정 생성 진입점 (#905 R1). 모바일 탭에는 AI 항목이 없어서, 이 배너가 없으면
@@ -612,6 +639,18 @@ export function HomeView({
             data={regionalWeather.data ?? null}
             loading={regionalWeather.isPending}
           />
+
+          {/*
+            서비스 소개 카드의 **1024 이상 자리** (#963) — 권역 카드 아래, `오늘 갈 만한 곳` 위.
+            권역도 오늘 상태라 "오늘 상태를 본 다음" 은 그대로이고, 권역 bottom 이 약 355 라
+            1024×768 에서도 첫 화면 안이다. 1024 미만은 좌측 레일의 사본이 서고 이쪽은
+            `display: none` 이다 — 근거는 그쪽 주석.
+
+            × 뒤 초점은 다음 형제(`오늘 갈 만한 곳`)로 간다 (`about-intro-card.tsx`).
+          */}
+          {aboutIntroShown && (
+            <AboutIntroCard className="hidden lg:block" onDismiss={dismissAboutIntro} />
+          )}
 
           <Surface
             lead
