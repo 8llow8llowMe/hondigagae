@@ -1,9 +1,13 @@
 'use client'
 
-import type { FormEvent } from 'react'
+import type { FocusEvent, FormEvent } from 'react'
 
 import { Input, type InputProps } from '@/components/input'
-import { editGroupedDigits, formatGroupedDigits } from '@/lib/form/grouped-digits'
+import {
+  editGroupedDigits,
+  formatGroupedDigits,
+  normalizeGroupedDigits,
+} from '@/lib/form/grouped-digits'
 
 /**
  * `Input` 에서 **이 컴포넌트가 정하는 것**을 뺀다.
@@ -37,8 +41,15 @@ export type AmountInputProps = Omit<
  * `onInput` 인 이유는 **`InputEvent.inputType` 이 필요해서다.** 쉼표만 지운 백스페이스를
  * "그 앞 숫자를 지웠다" 로 읽으려면 백스페이스인지 Delete 인지 알아야 한다. `Input` 의
  * `onValueChange` 는 문자열만 넘기므로 여기서는 쓰지 않는다.
+ *
+ * ### 포커스를 떠날 때 앞자리 0 을 정리한다
+ *
+ * 지우기로 생긴 앞자리 0 은 입력 중에 떼지 않는다 — `3|00,000` 에서 3 을 지우고 5 를 치면
+ * `500,000` 이어야 해서다(`grouped-digits.ts`). 그 사이 `00,000` 이 보이는 것은 편집 중인
+ * 상태로 두고, 떠날 때 `0` 으로 접는다. `Number()` 로 읽은 값은 같아 스키마 · 전송 값이
+ * 달라지지 않는다 — 포커스를 떠나지 않고 Enter 로 제출해도 결과가 같다.
  */
-export function AmountInput({ value, onValueChange, ...rest }: AmountInputProps) {
+export function AmountInput({ value, onValueChange, onBlur, ...rest }: AmountInputProps) {
   function handleInput(event: FormEvent<HTMLInputElement>) {
     const input = event.currentTarget
     const next = editGroupedDigits({
@@ -53,12 +64,19 @@ export function AmountInput({ value, onValueChange, ...rest }: AmountInputProps)
     if (next.digits !== value) onValueChange(next.digits)
   }
 
+  function handleBlur(event: FocusEvent<HTMLInputElement>) {
+    const normalized = normalizeGroupedDigits(value)
+    if (normalized !== value) onValueChange(normalized)
+    onBlur?.(event)
+  }
+
   return (
     <Input
       {...rest}
       value={formatGroupedDigits(value)}
       onValueChange={ignoreRawValue}
       onInput={handleInput}
+      onBlur={handleBlur}
       inputMode="numeric"
     />
   )

@@ -45,7 +45,11 @@ export function formatGroupedDigits(value: string): string {
  *
  * - `previousDigits` — 이 입력 전의 폼 값. 쉼표만 지워진 편집을 알아보는 데 쓴다
  * - `inputType` — `InputEvent.inputType`. 모르면 `null` 이고, 그때는 쉼표만 지운 편집을
- *   되살린다 (어느 쪽 숫자를 지울지 추측하지 않는다)
+ *   되살리고 앞자리 0 도 떼지 않는다 (추측으로 숫자를 지우지 않는다)
+ *
+ * **정수만 받는다.** 붙여넣기(`insertFromPaste` · `insertFromDrop`)의 소수부는 버리고, 직접 친
+ * `.` 은 여느 글자처럼 무시한다. 천 단위 구분이 `.` 인 로케일 표기(`300.000`)는 이 서비스
+ * 대상이 아니라 소수로 읽는다.
  */
 export function editGroupedDigits({
   raw,
@@ -58,8 +62,11 @@ export function editGroupedDigits({
   previousDigits: string
   inputType: string | null
 }): GroupedDigitsEdit {
-  let digits = extractDigits(raw)
-  let before = extractDigits(raw.slice(0, caret)).length
+  const pasted = inputType === 'insertFromPaste' || inputType === 'insertFromDrop'
+  const input = pasted ? dropPastedFraction(raw, caret) : { raw, caret }
+
+  let digits = extractDigits(input.raw)
+  let before = extractDigits(input.raw.slice(0, input.caret)).length
 
   /*
     쉼표만 지워진 편집 — 숫자는 그대로인데 지우기였다. 그대로 두면 다시 그릴 때 쉼표가
@@ -67,24 +74,60 @@ export function editGroupedDigits({
     지운 것으로 읽는다: 백스페이스는 앞, Delete 는 뒤.
   */
   if (digits === previousDigits) {
-    if (inputType === 'deleteContentBackward' && before > 0) {
+    // 단어 · 줄 단위 지우기(`deleteWordBackward` 등)도 쉼표만 지웠으면 같은 규칙이다
+    if (inputType !== null && /^delete.*Backward$/.test(inputType) && before > 0) {
       digits = digits.slice(0, before - 1) + digits.slice(before)
       before -= 1
-    } else if (inputType === 'deleteContentForward' && before < digits.length) {
+    } else if (
+      inputType !== null &&
+      /^delete.*Forward$/.test(inputType) &&
+      before < digits.length
+    ) {
       digits = digits.slice(0, before) + digits.slice(before + 1)
     }
   }
 
-  // 앞자리 0 은 뗀다 — `0` 하나만은 값("예산 0원")이라 남긴다
-  const leadingZeros = digits.length - digits.replace(/^0+/, '').length
-  const removed = Math.min(leadingZeros, digits.length - 1)
-  if (removed > 0) {
-    digits = digits.slice(removed)
-    before = Math.max(0, before - removed)
+  /*
+    앞자리 0 은 **치는 편집에서만** 뗀다. 지우기로 생긴 앞자리 0 은 사용자가 지우지 않은 숫자라
+    남긴다 — `3|00,000` 에서 3 을 지우고 5 를 치면 `500,000` 이어야 한다(떼면 `0` → `50`).
+    남은 `00,000` 은 포커스를 떠날 때 `normalizeGroupedDigits` 가 정리한다. 두 경우 모두
+    `Number()` 로 읽은 값은 같다.
+  */
+  if (inputType?.startsWith('insert') === true) {
+    const removed = leadingZerosToDrop(digits)
+    if (removed > 0) {
+      digits = digits.slice(removed)
+      before = Math.max(0, before - removed)
+    }
   }
 
   const display = formatGroupedDigits(digits)
   return { digits, display, caret: caretAfterDigits(display, before) }
+}
+
+/**
+ * 포커스를 떠날 때의 정리 — 지우기로 남은 앞자리 0 을 뗀다(`00000` → `0`, `000500` → `500`).
+ * `0` 하나만은 값("예산 0원")이라 남기고, 빈 값은 빈 값이다. `Number()` 로 읽은 값은 바뀌지 않는다.
+ */
+export function normalizeGroupedDigits(digits: string): string {
+  return digits.slice(leadingZerosToDrop(digits))
+}
+
+/** 뗄 앞자리 0 의 개수 — 전부 0 이면 하나를 남긴다 */
+function leadingZerosToDrop(digits: string): number {
+  const leadingZeros = digits.length - digits.replace(/^0+/, '').length
+  return Math.min(leadingZeros, Math.max(0, digits.length - 1))
+}
+
+/**
+ * 붙여 넣은 글자의 소수부를 버린다. **입력란의 표기에는 `.` 이 없으므로** 첫 `.` 은 방금 붙여 넣은
+ * 글자 안에 있고, 붙여 넣은 글자는 커서에서 끝난다 — 그래서 `.` 부터 커서까지만 자른다. 커서 뒤의
+ * 원래 숫자는 남는다(`1|,000` 에 `2.5` → `12,000`).
+ */
+function dropPastedFraction(raw: string, caret: number): { raw: string; caret: number } {
+  const dot = raw.search(/[.．]/)
+  if (dot === -1 || dot >= caret) return { raw, caret }
+  return { raw: raw.slice(0, dot) + raw.slice(caret), caret: dot }
 }
 
 /**
