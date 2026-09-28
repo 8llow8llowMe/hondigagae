@@ -6,6 +6,8 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -37,6 +39,10 @@ public final class OlleCourseParser {
         Pattern.compile("^\\[제주올레\\s*([0-9]+(?:-[0-9]+)?)(?:-([A-Za-z]))?코스\\]");
     private static final Pattern DISTANCE_PATTERN = Pattern.compile("([0-9]+(?:\\.[0-9]+)?)\\s*km");
     private static final Pattern DURATION_HOUR_PATTERN = Pattern.compile("([0-9]+)\\s*시간");
+    /** 경유지 나열 형식의 구분자 {@code ·}(U+00B7). {@code split} 에 넘기므로 정규식 리터럴로 둔다. */
+    private static final String WAYPOINT_SEPARATOR = Pattern.quote("·");
+    /** 경유지 나열로 읽는 최소 조각 수. 두 조각은 복합 지점명일 수 있어 읽지 않는다 ({@link #splitStartEndPoint}). */
+    private static final int MIN_WAYPOINT_PIECES = 3;
 
     private OlleCourseParser() {
     }
@@ -89,10 +95,11 @@ public final class OlleCourseParser {
      * {@code 제주민속촌주차장 입구}(4코스 시작), {@code 김녕서포구}(20코스 시작)와
      * {@code 김녕 서포구}(19코스 종점). 접지 않으면 같은 지점이 지도에 두 번 찍힌다.
      *
-     * <p><b>더 접지는 않는다.</b> 7코스 종점 {@code 월평아왜낭목쉼터} 와 8코스 시작
+     * <p><b>더 접지는 않는다.</b> 2025-04-28 판 7코스 종점 {@code 월평아왜낭목쉼터} 와 8코스 시작
      * {@code 월평아왜낭목} 은 같은 들머리로 보이지만 한쪽이 다른 쪽을 <b>포함</b>하는 관계라,
      * 부분일치로 접으면 "○○포구"류 지명이 줄줄이 엮인다. 접지 않아 7코스 종점 좌표가 비는
-     * 편을 택한다 — 틀린 점을 찍는 것보다 없는 편이 낫다.
+     * 편을 택한다 — 틀린 점을 찍는 것보다 없는 편이 낫다. 사람이 같은 곳이라고 확인한 짝만
+     * {@code OlleCourseEndpointOverrides} 의 별칭으로 하나씩 적는다.
      *
      * <p>{@code 천진항.하우목동항}(1-1코스, 우도)처럼 점으로 두 이름을 묶은 표기도 그대로 둔다.
      * 시작과 종점이 같은 문자열이라 이 규칙만으로 서로 매칭된다.
@@ -104,17 +111,41 @@ public final class OlleCourseParser {
     /**
      * 구분자 {@code -} 로 시작·종점을 가른다. <b>정확히 두 조각일 때만</b> 읽는다 — 지명 자체에
      * {@code -} 가 들어오면 어디가 경계인지 알 수 없고, 반으로 잘린 지명을 화면에 내보내는 것보다
-     * 안 내보내는 편이 낫다. 2025-04-28 기준 29건 전부 정확히 두 조각이다.
+     * 안 내보내는 편이 낫다. 2025-04-28 판은 29건 전부 정확히 두 조각이다.
+     *
+     * <p><b>경유지 나열 형식.</b> 2026-07-31 판 18-2코스는
+     * {@code 신양항·졸복산·대왕산황금길·묵리슈퍼·추자교·추자면사무소} 처럼 {@code -} 없이 지나는
+     * 곳을 {@code ·} 로 늘어놓는다. {@code -} 가 아예 없고 {@code ·} 로 나눈 비어 있지 않은 조각이
+     * <b>셋 이상</b>일 때만 이 형식으로 보고 첫 조각을 시작, 마지막 조각을 종점으로 읽는다.
+     *
+     * <p>두 조각은 읽지 않는다 — {@code 천진항·하우목동항}(1-1코스) 처럼 {@code ·} 두 조각은 "이
+     * 항 또는 저 항" 을 뜻하는 한 지점의 복합 표기로 쓰이고, 이 표기는 {@code -} 형식 안에서만
+     * 나온다. {@code -} 없이 두 조각만 오면 "시작·종점" 인지 "한 지점의 두 이름" 인지 가를 수 없다.
      */
     private static String[] splitStartEndPoint(String startEndPoint) {
         if (startEndPoint == null || startEndPoint.isBlank()) {
             return null;
         }
-        String[] parts = startEndPoint.trim().split("-");
+        String trimmed = startEndPoint.trim();
+        if (!trimmed.contains("-")) {
+            return splitWaypointList(trimmed);
+        }
+        String[] parts = trimmed.split("-");
         if (parts.length != 2 || parts[0].isBlank() || parts[1].isBlank()) {
             return null;
         }
         return new String[] {parts[0].trim(), parts[1].trim()};
+    }
+
+    private static String[] splitWaypointList(String waypoints) {
+        List<String> pieces = Arrays.stream(waypoints.split(WAYPOINT_SEPARATOR))
+            .map(String::trim)
+            .filter(piece -> !piece.isEmpty())
+            .toList();
+        if (pieces.size() < MIN_WAYPOINT_PIECES) {
+            return null;
+        }
+        return new String[] {pieces.get(0), pieces.get(pieces.size() - 1)};
     }
 
     /** 정렬 순서. 본번호*10 + 부번호 - "1"→10, "1-1"→11, "18-2"→182 로 코스번호 순이 유지된다. */

@@ -129,6 +129,37 @@ class OlleCourseParserTest {
     }
 
     @Test
+    @DisplayName("- 없이 · 로 경유지를 셋 이상 나열하면 첫 조각이 시작, 마지막 조각이 종점이다 - 2026-07-31 18-2코스 표기")
+    void waypointListYieldsFirstAndLast() {
+        String waypoints = "신양항·졸복산·대왕산황금길·묵리슈퍼·추자교·추자면사무소";
+
+        assertThat(OlleCourseParser.startPointName(waypoints)).isEqualTo("신양항");
+        assertThat(OlleCourseParser.endPointName(waypoints)).isEqualTo("추자면사무소");
+        // 조각 둘레 공백과 빈 조각은 세지 않는다
+        assertThat(OlleCourseParser.endPointName(" 가 · 나 ·· 다 ")).isEqualTo("다");
+    }
+
+    @Test
+    @DisplayName("- 없이 · 로 두 조각만 있으면 null 이다 - '또는' 을 뜻하는 복합 지점명일 수 있어 시종점으로 단정하지 않는다")
+    void twoPieceMiddleDotWithoutHyphenYieldsNull() {
+        assertThat(OlleCourseParser.startPointName("천진항·하우목동항")).isNull();
+        assertThat(OlleCourseParser.endPointName("천진항·하우목동항")).isNull();
+        // 빈 조각을 빼면 둘뿐인 경우도 마찬가지다
+        assertThat(OlleCourseParser.endPointName("천진항··하우목동항")).isNull();
+    }
+
+    @Test
+    @DisplayName("- 형식 안의 · 는 지점명의 일부다 - 경유지 나열 규칙은 - 가 없을 때만 쓴다")
+    void middleDotInsideHyphenFormatStaysInPointName() {
+        String circular = "상추자항·신양항CU편의점-상추자항·신양항CU편의점";
+
+        assertThat(OlleCourseParser.startPointName(circular)).isEqualTo("상추자항·신양항CU편의점");
+        assertThat(OlleCourseParser.endPointName(circular)).isEqualTo("상추자항·신양항CU편의점");
+        // - 가 셋 이상으로 가르면 · 가 있어도 경유지 나열로 읽지 않는다
+        assertThat(OlleCourseParser.endPointName("가·나·다-라-마")).isNull();
+    }
+
+    @Test
     @DisplayName("매칭 키는 공백만 지운다 - 같은 곳의 두 표기를 접되 부분일치로 엮지는 않는다")
     void pointNameKeyFoldsWhitespaceOnly() {
         // 원천이 같은 곳을 두 표기로 부르는 실제 쌍 둘
