@@ -66,7 +66,7 @@ public final class OlleCourseEndpointResolver {
      *
      * <p>순환 코스(1-1 우도)는 시작과 종점의 지점명이 같아 <b>자기 시작점</b>이 종점이 된다.
      * 두 점이 같아지지만 그것은 사실이다 — <b>두 점 사이 거리가 0 이라고 코스 길이가 0 인 것이
-     * 아니다.</b> 거리는 {@code distanceKm}(11.3km)가 따로 말한다.
+     * 아니다.</b> 거리는 {@code distanceKm}(2025-04-28 판 11.3km, 2026-07-31 판 11.5km)가 따로 말한다.
      */
     public static List<ImportedWalkCourse> resolveEndCoordinates(List<ImportedWalkCourse> courses) {
         return resolveEndCoordinates(courses, OlleCourseEndpointOverrides.defaults());

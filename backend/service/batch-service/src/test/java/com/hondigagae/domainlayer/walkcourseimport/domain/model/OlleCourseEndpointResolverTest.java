@@ -165,7 +165,7 @@ class OlleCourseEndpointResolverTest {
             course("20", 200, "김녕서포구", "종달바당", 33.557138789d, 126.7452021271d),
             course("21", 210, "종달바당", "시흥초등학교", 33.5000d, 126.9000d)));
 
-        // 종달바당에서 출발하는 코스가 있으면 수기 좌표(33.4963...)가 아니라 그 시작점을 받는다
+        // 종달바당에서 출발하는 코스가 있으면 수기 좌표(33.4888...)가 아니라 그 시작점을 받는다
         assertThat(byKey(resolved).get("20").endLat()).isEqualTo(33.5000d);
     }
 
@@ -176,15 +176,15 @@ class OlleCourseEndpointResolverTest {
             course("21", 210, "제주해녀박물관", "종달바당", 33.5235962997d, 126.8633977782d, new BigDecimal("11.1"))));
 
         ImportedWalkCourse last = byKey(resolved).get("21");
-        assertThat(last.endLat()).isEqualTo(33.4963286013d);
-        assertThat(last.endLng()).isEqualTo(126.9097146979d);
+        assertThat(last.endLat()).isEqualTo(33.488836d);
+        assertThat(last.endLng()).isEqualTo(126.905312d);
     }
 
     @Test
     @DisplayName("수기 좌표가 시작점에서 코스 길이보다 멀면 버린다 - 걸어서 닿는 거리보다 먼 종점은 없다")
     void manualEndPointFartherThanCourseLengthIsRejected() {
         List<ImportedWalkCourse> resolved = withDefaults(List.of(
-            // 시작점에서 종달바당 수기 좌표까지 직선 약 5km 인데 코스 길이를 1km 로 줬다
+            // 시작점에서 종달바당 수기 좌표까지 직선 약 5.5km 인데 코스 길이를 1km 로 줬다
             course("21", 210, "제주해녀박물관", "종달바당", 33.5235962997d, 126.8633977782d, new BigDecimal("1.0"))));
 
         assertThat(byKey(resolved).get("21").endLat()).isNull();
@@ -237,7 +237,7 @@ class OlleCourseEndpointResolverTest {
         List<ImportedWalkCourse> resolved = withDefaults(List.of(
             course("21", 210, "제주해녀박물관", "종달 바당", 33.5235962997d, 126.8633977782d, new BigDecimal("11.1"))));
 
-        assertThat(byKey(resolved).get("21").endLat()).isEqualTo(33.4963286013d);
+        assertThat(byKey(resolved).get("21").endLat()).isEqualTo(33.488836d);
     }
 
     @Test

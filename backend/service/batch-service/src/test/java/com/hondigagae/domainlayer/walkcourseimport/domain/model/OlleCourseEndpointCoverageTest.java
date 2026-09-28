@@ -61,6 +61,7 @@ class OlleCourseEndpointCoverageTest {
 
     /**
      * 코스별 시작점 좌표 {lat, lng}. <b>출처: dev walk_course 2026-09-28</b> — 2026-07-31 판 재적재 뒤의 시작점 좌표다.
+     * 그 적재는 #960 전 코드(순수 체이닝)였고 dev 종점은 <b>23 / 29</b> 였다 — 아래 {@code none()} 기대값과 같다.
      *
      * <p>가짜 좌표가 아닌 이유 — 수기 종점은 "시작점에서 코스 길이 안" 일 때만 채택되므로, 실좌표로 재야
      * 29/29 가 프로덕션에서도 나온다는 말이 된다.
@@ -169,7 +170,7 @@ class OlleCourseEndpointCoverageTest {
     }
 
     @Test
-    @DisplayName("2026-07-31 판 - 별칭 두 쌍은 다음 코스 시작점을, 수기 네 곳은 확인한 좌표를 준다")
+    @DisplayName("2026-07-31 판 - 별칭 두 쌍은 다음 코스 시작점을, 수기 네 곳은 공식 사이트 종점 좌표를 준다")
     void overridesFillTheSixGapsIn20260731() throws IOException {
         List<ImportedWalkCourse> resolved =
             OlleCourseEndpointResolver.resolveEndCoordinates(withDevStartPoints(), OlleCourseEndpointOverrides.defaults());
@@ -178,10 +179,11 @@ class OlleCourseEndpointCoverageTest {
         assertThat(endCoordinateOf(resolved, "9")).isEqualTo(startCoordinateOf(resolved, "10"));
         // 10코스 종점 모슬포항하모체육공원 → 11코스 시작 하모체육공원
         assertThat(endCoordinateOf(resolved, "10")).isEqualTo(startCoordinateOf(resolved, "11"));
-        assertThat(endCoordinateOf(resolved, "10-1")).isEqualTo("33.165826,126.273188");
-        assertThat(endCoordinateOf(resolved, "14-1")).isEqualTo("33.3059240323,126.2894922148");
-        assertThat(endCoordinateOf(resolved, "21")).isEqualTo("33.4963286013,126.9097146979");
-        assertThat(endCoordinateOf(resolved, "18-2")).isEqualTo("33.963665,126.296061");
+        // 수기 네 곳은 (사)제주올레 공식 사이트 번들의 end 좌표다 (OlleCourseEndpointOverrides.DEFAULTS 주석)
+        assertThat(endCoordinateOf(resolved, "10-1")).isEqualTo("33.16720166243613,126.27430971711874");
+        assertThat(endCoordinateOf(resolved, "14-1")).isEqualTo("33.306983979418874,126.2879329919815");
+        assertThat(endCoordinateOf(resolved, "21")).isEqualTo("33.488836,126.905312");
+        assertThat(endCoordinateOf(resolved, "18-2")).isEqualTo("33.9634785,126.2960908");
     }
 
     @Test
