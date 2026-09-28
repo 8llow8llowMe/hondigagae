@@ -385,18 +385,21 @@ class OllamaLlmAdapterTest {
     @Test
     @DisplayName("준비물 이유에 새어 든 프롬프트 표기 [N일차] 를 걷어낸다 — 그 문장이 화면의 본문이다 (#233)")
     void cleansPromptMarkersLeakedIntoPackingReasons() {
+        // 목록 안의 조건부 품목이어야 서버 규칙(#976)을 지나 이유가 화면까지 간다.
         stubResponse("""
             {"items":[
-              {"category":"날씨 대비","name":"가벼운 방수 재킷","reason":"[4일차] 2026-09-12 흐림, 강수확률 40%로 비가 올 가능성이 있으므로 가볍게 대비"},
-              {"category":"반려견 케어","name":"햇빛 차단 선글라스","reason":"[1일차]~[3일차] 구름많음으로 햇빛이 강할 수 있어 반려견 눈 보호 필요"}]}
+              {"category":"반려견 케어","name":"물티슈","reason":"[4일차] 2026-09-12 해변 일정 뒤 발을 닦아요."},
+              {"category":"이동 중","name":"이동장","reason":"[1일차]~[3일차] 차로 옮겨 다녀요."}]}
             """);
 
         PackingList packing = adapter.generatePackingList(PackingChecklistQuery.builder()
             .startDate("2026-09-09").endDate("2026-09-12").build());
 
-        assertThat(packing.items()).extracting(PackingList.PackingItem::reason).containsExactly(
-            "4일차 2026-09-12 흐림, 강수확률 40%로 비가 올 가능성이 있으므로 가볍게 대비",
-            "1~3일차 구름많음으로 햇빛이 강할 수 있어 반려견 눈 보호 필요");
+        assertThat(packing.items())
+            .filteredOn(item -> item.name().equals("물티슈") || item.name().equals("이동장"))
+            .extracting(PackingList.PackingItem::reason).containsExactly(
+                "4일차 2026-09-12 해변 일정 뒤 발을 닦아요.",
+                "1~3일차 차로 옮겨 다녀요.");
     }
 
     @Test

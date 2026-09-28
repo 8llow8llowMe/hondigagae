@@ -30,7 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PlanPackingProcessor {
 
-    /** 일정당 준비물 상한. AI 가 8~15개를 내므로 사용자가 30개 넘게 덧붙이는 경우를 위한 방어다. */
+    /** 일정당 준비물 상한. AI 목록이 많아야 20개 안팎(서버 기본 · 날씨 품목 + 모델 8개 이하)이라 사용자가 30개 넘게 덧붙이는 경우를 위한 방어다. */
     private static final int MAX_PACKING_ITEMS = 50;
 
     /**
