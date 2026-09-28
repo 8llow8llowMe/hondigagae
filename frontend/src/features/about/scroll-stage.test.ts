@@ -7,7 +7,12 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { ScrollStage, ScrollStagePoint, stageClassName } from '@/features/about/scroll-stage'
-import { activeStepLine, stepAt } from '@/features/about/use-active-step'
+import {
+  activeStepLine,
+  STAGE_ENTRY_LINE,
+  stageStep,
+  stepAt,
+} from '@/features/about/use-active-step'
 import { readSourceWithoutComments } from '@/test/source'
 import { readGlobalsCss } from '@/test/tokens'
 
@@ -107,6 +112,41 @@ describe('stepAt — 중심들 → 단계 (명세 2026-09-25 §3-4 · #940)', ()
   })
 })
 
+describe('stageStep — 진입선을 넘으면 단계는 최소 1 (명세 2026-09-28 §2-1 · #965)', () => {
+  /*
+    **1440×900 에서 절 제목이 화면 가운데일 때 단계 0 이었다** — 첫 항목 중심이 기준선에 오기
+    전까지 칩이 숨고 행이 흐려, 카드가 로딩 중처럼 보였다(D1). 첫 항목 **윗변**이 진입선(화면
+    바닥 위 20%)을 넘으면 최소 1 이다. 2 부터는 `stepAt` 그대로.
+    기준선 450 · 진입선 720 · 항목 셋(칸 높이 약 400)의 윗변 [firstTop] 과 중심 [centers].
+  */
+  const line = 450
+  const entryLine = 720
+  it.each([
+    ['무대가 아직 화면 아래 — 첫 항목 윗변이 진입선 아래', [1000, 1400, 1800], 800, 0],
+    ['첫 항목 윗변이 진입선에 막 닿았다', [920, 1320, 1720], 720, 1],
+    ['진입선은 넘었지만 첫 항목 중심은 아직 기준선 아래', [700, 1100, 1500], 500, 1],
+    ['기준선 뒤는 stepAt 그대로 — 둘째 중심이 기준선을 지났다', [-100, 300, 700], -300, 2],
+    ['무대를 지나왔다 — 마지막 번호', [-2000, -1600, -1200], -2200, 3],
+  ] as const)('%s', (_, centers, firstTop, expected) => {
+    expect(stageStep(centers, firstTop, line, entryLine)).toBe(expected)
+  })
+
+  it('되감기 — 윗변이 진입선 아래로 내려가면 0 으로 돌아간다', () => {
+    expect(stageStep([920, 1320, 1720], 720, line, entryLine)).toBe(1)
+    expect(stageStep([921, 1321, 1721], 721, line, entryLine)).toBe(0)
+  })
+
+  it('firstTop 이 null(첫 항목이 등록 안 됨)이면 stepAt 과 같다', () => {
+    for (const centers of [
+      [null, 1100, 1500],
+      [null, 300, 900],
+      [null, -300, -100],
+    ] as const) {
+      expect(stageStep(centers, null, line, entryLine)).toBe(stepAt(centers, line))
+    }
+  })
+})
+
 describe('ScrollStage — 정적 렌더는 마지막 단계다', () => {
   const markup = renderStage(3)
   const open = stageOpenTag(markup)
@@ -189,8 +229,16 @@ describe('useActiveStep — 소스 가드', () => {
     expect(source).toContain("getPropertyValue('--header-h')")
   })
 
-  it('항목의 윗변이 아니라 중심을 잰다 (#940) — 58vh 칸의 가운데 문장이 기준선에서 켜진다', () => {
+  it('항목의 윗변이 아니라 중심을 잰다 (#940) — 44vh 칸의 가운데 문장이 기준선에서 켜진다', () => {
     expect(source).toContain('rect.top + rect.height / 2')
+  })
+
+  it('첫 항목 윗변과 진입선(창 높이 × 0.8)을 함께 넘겨 stageStep 으로 센다 (#965)', () => {
+    expect(STAGE_ENTRY_LINE).toBe(0.8)
+    expect(source).toContain('window.innerHeight * STAGE_ENTRY_LINE')
+    expect(source).toMatch(/list\[0\][^\n]*getBoundingClientRect\(\)\.top/)
+    expect(source).toMatch(/setStep\(\s*stageStep\(/)
+    expect(source).not.toMatch(/setStep\(\s*stepAt\(/)
   })
 
   it('헤더 높이 토큰은 px 이다 — parseFloat 로 읽는 전제 (#940)', () => {
@@ -326,12 +374,15 @@ describe('globals.css 소개 페이지 무대 블록', () => {
     expect(block).toMatch(/\.about-stage-frame \{[^}]*margin: auto;/)
   })
 
-  it('꼬리 여백이 항목 칸 높이의 절반과 짝이다 — 마지막 항목이 켜지는 순간 예시가 풀린다 (#940)', () => {
+  it('꼬리 여백이 항목 칸 높이의 절반과 짝이다 — 마지막 항목이 켜지는 순간 예시가 풀린다 (#940 · #965)', () => {
     const point = block.match(/\.about-stage-point \{\s*min-block-size: (\d+)vh;/)?.[1]
-    expect(point).toBe('58')
-    expect(block).toMatch(
-      /\.about-stage-copy \{\s*padding-block-end: calc\(50dvh - 29vh - var\(--header-h\) \/ 2\);/,
-    )
+    const tail = block.match(
+      /\.about-stage-copy \{\s*padding-block-end: calc\(50dvh - (\d+)vh - var\(--header-h\) \/ 2\);/,
+    )?.[1]
+    // 칸 44vh (#965, 58 에서 줄였다) · 꼬리는 그 절반 — 하나만 바꾸면 무대 끝이 화면 바닥에서 어긋난다
+    expect(point).toBe('44')
+    expect(tail).toBe('22')
+    expect(Number(tail) * 2).toBe(Number(point))
   })
 
   it('항목 흐림도 is-live 아래에서만 — 정적 렌더의 항목은 흐리지 않다', () => {

@@ -5,8 +5,10 @@ import { useRef } from 'react'
 import { useScrollFrame } from '@/features/about/use-scroll-frame'
 
 /**
- * 모바일 진행선 (#915, 명세 2026-09-25 §4) — 1024 미만에서 헤더 바로 아래 2px 선이 문서
- * 진행률만큼 찬다. 1024 이상은 절 내비가 그 몫을 한다.
+ * 1280 미만 진행선 (#915, 명세 2026-09-25 §4 · #965 개정) — 1280 미만에서 헤더 바로 아래 2px 선이
+ * 문서 진행률만큼 찬다. 1280 이상은 절 내비가 그 몫을 한다 — 두 표시가 한 화면에 동시에 서지
+ * 않는다. 처음에는 1024 미만(`lg:hidden`)이라 1024–1279 에 위치 표시가 하나도 없었다(명세
+ * 2026-09-28 D4).
  *
  * 위치 · 높이 · 색은 `app/globals.css` `.about-progress` 다(`top: var(--header-h)` 는
  * Tailwind 로 쓰면 arbitrary 라). `transform: scaleX` 만 바꾼다 — 레이아웃을 움직이지 않는다.
@@ -23,5 +25,5 @@ export function ScrollProgressBar() {
     node.style.transform = `scaleX(${progress})`
   })
 
-  return <div ref={ref} aria-hidden className="about-progress lg:hidden" />
+  return <div ref={ref} aria-hidden className="about-progress xl:hidden" />
 }

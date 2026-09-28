@@ -812,8 +812,15 @@ body {
   - `.about-hero-fill` — 1024 이상에서 히어로가 첫 화면(헤더 아래)을 채운다. `.page-canvas` 와
     같은 식이다.
   - `.about-anchor` — 절 내비 · 스크롤 힌트가 가리키는 절. 헤더 높이만큼 스크롤 여백을 둔다.
-  - `.about-progress` — 1024 미만 헤더 바로 아래 진행선. `top: var(--header-h)` 를 Tailwind 로
-    쓰면 arbitrary 라 여기 둔다. `scaleX` 는 컴포넌트가 스크롤마다 준다. 헤더(`z-40`)보다 아래다.
+  - `.about-progress` — 1280 미만 헤더 바로 아래 진행선(#965, 처음에는 1024 미만 — 1024–1279 에
+    위치 표시가 하나도 없었다). 1280 이상은 절 내비가 그 몫을 한다. `top: var(--header-h)` 를
+    Tailwind 로 쓰면 arbitrary 라 여기 둔다. `scaleX` 는 컴포넌트가 스크롤마다 준다. 헤더(`z-40`)보다
+    아래다.
+  - `.about-nav-label` — 절 내비 라벨. 1536 이상은 점 옆에 늘 서고, 1280–1535 는 점 오른쪽에 뜨는
+    칩이라 평소 투명하고 링크를 가리키거나(hover) 키보드 초점(`focus-visible`)이 오면 드러난다
+    (#965). **같은 span 하나다** — 칩을 따로 복제하면 스크린리더가 이름을 두 번 읽는다. 투명해도
+    링크 이름으로 남는다. 절 내비 자신의 쌓임 맥락(`z-30`) 안에서 뜨므로 새 z 값이 없다. 가리키는
+    동안만 본문 왼쪽 끝(1280 에서 104px)을 넘어 겹친다. 1280 미만은 내비째 `display: none` 이다.
 */
 @keyframes about-word-in {
   from {
@@ -848,6 +855,28 @@ body {
   transform: scaleX(0);
   transform-origin: left;
   pointer-events: none;
+}
+
+@media (width >= 80rem) and (width < 96rem) {
+  .about-nav-label {
+    position: absolute;
+    inset-inline-start: calc(100% + 0.75rem);
+    inset-block-start: 50%;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background-color: var(--bg);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%);
+    transition: opacity 150ms ease-out;
+  }
+
+  a:hover > .about-nav-label,
+  a:focus-visible > .about-nav-label {
+    opacity: 1;
+  }
 }
 
 /*
@@ -938,9 +967,13 @@ body {
 }
 
 @media (width >= 64rem) {
-  /* 항목 하나가 한 호흡 — 스크롤 한 번에 단계 하나 */
+  /*
+    항목 하나가 한 호흡 — 스크롤 한 번에 단계 하나. 44vh 는 휠 서너 칸(1440×900 에서 396px)이다
+    (#965, 58vh 에서 줄였다 — 단계 사이 카드가 멈춰 있는 시간이 길어 지루했다). 아래 꼬리 여백의
+    22vh 가 이 값의 절반이다 — 둘은 짝이다.
+  */
   .about-stage-point {
-    min-block-size: 58vh;
+    min-block-size: 44vh;
     align-items: center;
   }
 
@@ -968,11 +1001,11 @@ body {
   /*
     꼬리 여백 — 마지막 항목의 중심이 기준선에 닿는 바로 그 순간 무대 끝이 화면 바닥에 닿게 한다.
     기준선에서 화면 바닥까지는 틀 높이의 절반(50dvh − 헤더/2)이고, 마지막 항목 중심 아래에는
-    이미 칸의 절반(29vh)이 있다. 그 차이만큼 더한다. 그래서 마지막 항목이 켜진 다음 스크롤부터
+    이미 칸의 절반(22vh, 칸 44vh 의 절반)이 있다. 그 차이만큼 더한다. 그래서 마지막 항목이 켜진 다음 스크롤부터
     문장과 예시가 함께 올라간다 — 예전에는 켜진 뒤 화면의 20% 를 더 내려야 예시가 풀렸다.
   */
   .about-stage-copy {
-    padding-block-end: calc(50dvh - 29vh - var(--header-h) / 2);
+    padding-block-end: calc(50dvh - 22vh - var(--header-h) / 2);
   }
 
   /*
@@ -1389,8 +1422,6 @@ body {
     안 된다. 감속 모션이면 트랙이 길어지지 않고 한 화면을 채우기만 한다(누르기로 고른다).
   - `.about-tab-card` — 1024 이상에서 예시 카드 최소 높이. 넷의 내용 높이가 달라 넘길 때마다
     카드가 늘었다 줄었다 했다 — 가장 긴 예시(AI 일정)에 맞춘다.
-  - `.about-screen-fill` — 데이터 절(#940)이 헤더 아래 한 화면을 채우고 가운데 선다. `min` 이라
-    창이 낮으면 늘어난다. 히어로(`.about-hero-fill`)와 같은 높이 식이다.
 
   감속 모션은 위 전역 규칙이 전환을 한 프레임으로 줄인다 — 이 블록이 그 뒤에 있어도
   `!important` 라 진다.
@@ -1430,8 +1461,7 @@ body {
 
 @media (width >= 64rem) {
   /* 감속 모션에서도 한 화면을 채우고 가운데 선다 — 넘기기만 없다 */
-  .about-tour-sticky,
-  .about-screen-fill {
+  .about-tour-sticky {
     display: flex;
     flex-direction: column;
     justify-content: center;
