@@ -184,6 +184,13 @@ describe('AiPlanCreateForm — 예산은 칩 + 직접 입력', () => {
       'inputMode="numeric"',
     )
   })
+
+  // 이슈 #986 — 만원 단위라 쉼표가 붙는 일은 드물지만 일정 예산과 같은 입력칸을 쓴다
+  it('예산 칸도 천 단위 쉼표로 보인다', () => {
+    expect(
+      render({ values: { ...EMPTY_AI_PLAN_FORM_VALUES, ...OPEN_BY_REGION, budgetManwon: '1500' } }),
+    ).toContain('value="1,500"')
+  })
 })
 
 describe('AiPlanCreateForm — 기대를 미리 맞춘다', () => {

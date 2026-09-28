@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import { AmountInput } from '@/components/amount-input'
 import { Button } from '@/components/button'
 import { CheckboxGroup } from '@/components/checkbox-group'
 import { Chip, ChipGroup } from '@/components/chip'
 import { DateField } from '@/components/date-field'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
-import { Input } from '@/components/input'
 import { Textarea } from '@/components/textarea'
 import { AiPlanDetailsDisclosure } from '@/features/ai-plan/ai-plan-details-disclosure'
 import { AiPlanOptionsSection } from '@/features/ai-plan/ai-plan-options-section'
@@ -472,11 +472,12 @@ export function AiPlanCreateForm({
             error={errors.fields.budgetManwon}
           >
             <div className="flex items-center gap-2">
-              <Input
+              {/*
+                일정 예산과 같은 입력칸이다 (#986). 만원 단위라 쉼표가 붙는 일은 드물지만,
+                숫자 외 글자를 버리는 규칙(`30만원` 붙여넣기 → `30`)은 여기서 더 쓸모가 있다
+              */}
+              <AmountInput
                 id="budgetManwon"
-                // text 다 — number 는 휠 스크롤로 값이 바뀌고 빈 값과 잘못된 값을
-                // 구분하지 못한다. 숫자 키패드는 inputMode 가 연다
-                inputMode="numeric"
                 value={values.budgetManwon}
                 onValueChange={(budgetManwon) => onValueChange('budgetManwon', budgetManwon)}
                 invalid={errors.fields.budgetManwon !== undefined}

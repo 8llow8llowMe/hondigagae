@@ -100,6 +100,11 @@ describe('만들기 폼 — 화면', () => {
     expect(html).not.toContain('type="number"')
   })
 
+  // 이슈 #986 — 폼 값은 숫자만이고 쉼표는 입력란의 표기다 (`AmountInput`)
+  it('예산은 천 단위 쉼표로 보인다 — 자릿수를 세지 않아도 읽힌다', () => {
+    expect(render({ values: values({ budget: '300000' }) })).toContain('value="300,000"')
+  })
+
   it('라디오 그룹이 그룹 이름을 id 와 name 둘 다로 노출한다 — 포커스 이동이 닿는 조건', () => {
     /*
       **#538 에서 `RadioGroup` 이 `<fieldset>` 에 `id` 와 `tabIndex={-1}` 을 갖게 됐다.**
