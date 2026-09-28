@@ -53,14 +53,14 @@ import lombok.RequiredArgsConstructor;
 public enum PlanItemWalkSafetyUnavailableReason implements CodeNameDescribable {
 
     NO_START_TIME("시각 미지정",
-        "이 항목에 시작 시각이 없어 산책 위험도를 낼 수 없습니다. 시각은 시간대마다 판정이 갈립니다."),
+        "이 항목에 시작 시각이 없어 산책 위험도를 낼 수 없습니다. 산책 위험도는 시간대마다 다릅니다."),
     NOT_PLACE_TARGET("장소 항목 아님",
         "좌표를 아는 장소 항목이 아니어서 산책 위험도를 붙이지 못했습니다."),
     PAST_DATE("지난 날짜",
         "이미 지난 날짜라 예보가 남아 있지 않습니다. 이 항목의 산책 위험도는 확인할 수 없습니다."),
     BEYOND_FORECAST_RANGE("예보 범위 밖",
-        "산책 위험도는 시각별 예보로만 판정할 수 있고, 그 예보는 오늘부터 5일까지입니다. "
-            + "이 날짜는 아직 판정할 수 없습니다."),
+        "산책 위험도는 시각별 예보로만 안내할 수 있고, 그 예보는 오늘부터 5일까지입니다. "
+            + "이 날짜는 아직 알려 드릴 수 없습니다."),
     /**
      * <b>문장이 원인을 단정하지 않는다.</b> 이 사유로 접히는 원천 상태가 둘이다 — 그 시각 예보가
      * 정말 없는 것과, tour-service 가 기상 원천 장애({@code WEATHER_UNAVAILABLE})를 빈 예보 목록으로
