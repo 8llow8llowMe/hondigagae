@@ -11,6 +11,7 @@ import {
   levelForSpanMeters,
   type MapBounds,
   metersPerPixel,
+  shouldRefit,
 } from '@/lib/map/viewport'
 
 /** 협재 일대. 제주는 위도 33 / 경도 126 이다 */
@@ -363,5 +364,40 @@ describe('framedCamera — 사각형', () => {
     })
 
     expect(camera.level).toBe(levelForSpanMeters(20_000, 256))
+  })
+})
+
+/*
+  #982 리뷰 M-2 — 칸 크기가 바뀌었을 때 다시 맞출지.
+
+  `MapCanvas` 의 관찰자가 이것만 묻는다. 판정을 소스 문자열로 잠그면 줄 순서만 바뀌어도
+  깨지고 정작 수치 경계는 못 본다 — 그래서 순수 함수로 뺐다.
+*/
+describe('shouldRefit', () => {
+  const fitted = { width: 888, height: 256 }
+
+  it('크기가 그대로면 다시 맞추지 않는다 — observe 직후 첫 알림이 이것이다', () => {
+    expect(shouldRefit({ fitted, next: { width: 888, height: 256 }, moved: false })).toBe(false)
+  })
+
+  it('폭이 바뀌면 다시 맞춘다 — 1366 → 1024', () => {
+    expect(shouldRefit({ fitted, next: { width: 640, height: 256 }, moved: false })).toBe(true)
+  })
+
+  it('높이가 바뀌면 다시 맞춘다 — md 경계를 넘어 h-64 → h-56', () => {
+    expect(shouldRefit({ fitted, next: { width: 888, height: 224 }, moved: false })).toBe(true)
+  })
+
+  it('사용자가 옮겼으면 크기가 바뀌어도 다시 맞추지 않는다', () => {
+    expect(shouldRefit({ fitted, next: { width: 640, height: 256 }, moved: true })).toBe(false)
+  })
+
+  /*
+    탭 · 시트 뒤로 숨으면 0 이 된다. 그때 맞추면 대체 크기로 계산한 엉뚱한 틀이 놓이고,
+    다시 보일 때 크기가 또 바뀌어 한 번 더 맞춘다 — 보일 때 한 번이면 된다.
+  */
+  it('칸이 숨어 크기가 0 이면 다시 맞추지 않는다', () => {
+    expect(shouldRefit({ fitted, next: { width: 0, height: 256 }, moved: false })).toBe(false)
+    expect(shouldRefit({ fitted, next: { width: 888, height: 0 }, moved: false })).toBe(false)
   })
 })

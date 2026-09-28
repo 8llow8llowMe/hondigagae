@@ -14,7 +14,13 @@ import { clusterContent, type PinContent, pinContent } from '@/lib/map/pin-conte
 import type { MapRouteSegment } from '@/lib/map/route'
 import { loadKakaoMaps, MapSdkError, type MapSdkFailure } from '@/lib/map/sdk'
 import { MAP_LAYER_Z, markerZIndex } from '@/lib/map/stacking'
-import { framedCamera, framedCenterLat, type MapBounds, type SpanBox } from '@/lib/map/viewport'
+import {
+  framedCamera,
+  framedCenterLat,
+  type MapBounds,
+  shouldRefit,
+  type SpanBox,
+} from '@/lib/map/viewport'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
 import type {
@@ -524,7 +530,11 @@ export function MapCanvas({
 
               뒷정리 함수는 버린다 — 이 지도는 클릭 뒤에도 살아 있고, 예약된 이동은
               `mapRef` 로 생존을 다시 확인한다. 언마운트되면 그쪽에서 걸러진다.
+
+              **옮김으로 센다** (`refitOnResize`) — 사용자가 누른 확대라, 뒤이은 크기
+              변화가 그 구역을 버리고 처음 틀로 되돌리면 안 된다.
             */
+            movedSinceCameraRef.current = true
             zoomToward({
               map,
               target: new maps.LatLng(group.center.lat, group.center.lng),
@@ -726,26 +736,38 @@ export function MapCanvas({
     if (camera.refitOnResize !== true) return
 
     /*
-      **`observe` 직후의 첫 알림은 크기가 그대로라 건너뛴다** — 방금 맞춘 틀을 한 번 더
-      놓으면 `onCameraApplied` 가 이유 없이 두 번 불린다.
+      판정은 `shouldRefit` 이 한다 — 옮겼으면 · 크기가 그대로면(`observe` 직후 첫 알림) ·
+      칸이 숨었으면 맞추지 않는다.
+
+      **한 프레임에 한 번만 맞춘다.** 창을 끄는 동안 관찰자는 매 프레임 불리는데, 그때마다
+      단계·중심을 놓으면 지도가 끌리는 내내 떨린다. 마지막 크기만 보면 된다.
 
       **`relayout()` 을 여기서 직접 먼저 부른다.** 아래 `relayout` effect 의 관찰자도 같은
       컨테이너를 보지만, 관찰자는 만들어진 순서로 불리고 이 effect 는 카메라가 바뀔 때마다
       관찰자를 새로 만든다 — 일자를 한 번 바꾸면 그쪽이 먼저 불린다는 보장이 사라진다.
       SDK 가 옛 크기를 든 채 단계·중심을 놓으면 새 크기에서 중심이 어긋난다.
     */
-    const observer = new ResizeObserver(() => {
-      if (movedSinceCameraRef.current) return
-      if (container.clientWidth === fitted.width && container.clientHeight === fitted.height) {
-        return
-      }
+    let frame: number | null = null
 
-      map.relayout()
-      apply()
+    const observer = new ResizeObserver(() => {
+      if (frame !== null) return
+
+      frame = window.requestAnimationFrame(() => {
+        frame = null
+
+        const next = { width: container.clientWidth, height: container.clientHeight }
+        if (!shouldRefit({ fitted, next, moved: movedSinceCameraRef.current })) return
+
+        map.relayout()
+        apply()
+      })
     })
     observer.observe(container)
 
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      if (frame !== null) window.cancelAnimationFrame(frame)
+    }
   }, [camera, status])
 
   // ── 사용자의 직접 이동 (`onUserMove` 머리주석) ────────────────────────────
