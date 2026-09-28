@@ -308,7 +308,9 @@ describe('routeCamera × framedCamera — #982', () => {
       }
     }
 
-    it(`${size.name} — 카카오 setBounds 와 같은 단계 ${String(size.level)} 이다`, () => {
+    // 기대값 10 · 11 의 근거는 5174 카카오 `setBounds` 실측이다(명세 D4). 이 테스트는 그것을
+    // 부르지 않는다 — `metersPerPixel` 투영식으로 우리 계산을 잰다
+    it(`${size.name} — 축별로 맞춘 단계가 ${String(size.level)} 이다`, () => {
       expect(camera.level).toBe(size.level)
     })
 
