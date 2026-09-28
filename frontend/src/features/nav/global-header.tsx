@@ -5,6 +5,7 @@ import { Wordmark } from '@/components/brand/wordmark'
 import { ButtonLink } from '@/components/button'
 import { EmergencyIcon } from '@/components/icons'
 import { AccountMenu } from '@/features/nav/account-menu'
+import { HeaderAboutLink } from '@/features/nav/header-about-link'
 import { NavLinks } from '@/features/nav/nav-links'
 import { PetSwitcherSlot } from '@/features/nav/pet-switcher-slot'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -138,6 +139,14 @@ export function GlobalHeader({ authed }: { authed: boolean }) {
             <AccountMenu />
           ) : (
             <div className="hidden items-center gap-1 md:flex">
+              {/*
+                **nav 밖 안내 링크** (#964 · 전역nav-세부명세 D4-5). 홈 소개 카드는 닫거나
+                `/about` 을 한 번 열면 다시 서지 않아, 그 뒤 데스크톱에서 소개로 가는 길이
+                푸터 하나뿐이었다. nav(`DESKTOP_NAV_ITEMS`)는 전부 "할 일" 이라 넣지 않고
+                `로그인` 왼쪽에 둔다. **1024 이상만**이다 — 768 의 헤더 여유는 27px 이다.
+                비로그인 갈래 안이라 로그인하면 서지 않는다.
+              */}
+              <HeaderAboutLink />
               <ButtonLink href="/login" variant="ghost">
                 {LOGIN_LABEL}
               </ButtonLink>

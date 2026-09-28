@@ -8,6 +8,7 @@ const pathname = { current: '/' }
 vi.mock('next/navigation', () => ({ usePathname: () => pathname.current }))
 
 const { NavLinks } = await import('@/features/nav/nav-links')
+const { DESKTOP_NAV_ITEMS } = await import('@/features/nav/menu-items')
 const { MobileTabBar } = await import('@/features/nav/mobile-tab-bar')
 
 function renderNav(authed: boolean, path = '/') {
@@ -53,6 +54,12 @@ describe('NavLinks — 미로그인 데스크톱 (명세 D7 #1)', () => {
     expect(markup).toContain('href="/plans"')
     expect(markup).toContain('href="/ai-plans/new"')
     expect(markup).not.toContain('returnTo')
+  })
+
+  it('서비스 소개를 nav 에 두지 않는다 — 소개는 할 일이 아니라 안내다 (#964)', () => {
+    // 헤더 오른쪽 묶음의 "nav 밖 안내 링크" 가 맡는다 (`HeaderAboutLink`)
+    expect(DESKTOP_NAV_ITEMS.some((item) => item.href === '/about')).toBe(false)
+    expect(renderNav(false, '/about')).not.toContain('href="/about"')
   })
 
   it('내 반려견을 nav 에 두지 않는다 — 그것은 "내 설정" 이라 계정 팝오버가 맡는다', () => {

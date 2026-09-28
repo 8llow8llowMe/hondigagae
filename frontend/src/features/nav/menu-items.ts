@@ -1,3 +1,5 @@
+import { messages } from '@/lib/messages'
+
 /**
  * 메뉴 구성 — 전역nav-세부명세 D4-1.
  *
@@ -32,6 +34,23 @@ export const DESKTOP_NAV_ITEMS: NavItem[] = [
   { href: '/plans', label: '여행 일정', protected: true },
   { href: '/ai-plans/new', label: 'AI 일정 생성', protected: true, ai: true },
 ]
+
+/**
+ * **nav 밖 안내 링크** — 전역nav-세부명세 D4-5 (#964).
+ *
+ * `DESKTOP_NAV_ITEMS` 는 전부 "할 일" 이다. `서비스 소개` 는 할 일이 아니라 **이 서비스가
+ * 무엇인지의 안내**라 그 목록에 넣지 않는다 — 넣으면 nav 의 기준이 "할 일" 에서 "갈 수 있는
+ * 곳" 으로 흐려지고, 그 기준으로는 약관·문의까지 줄을 선다.
+ *
+ * 그래서 이 갈래는 **nav 옆이 아니라 헤더 오른쪽 묶음, `로그인` 왼쪽**에 선다
+ * (`HeaderAboutLink`). 조건은 둘이다.
+ *  - **비로그인만** — 이미 쓰는 사람에게 헤더 자리를 계속 쓸 이유가 없고, 푸터 링크가 남는다
+ *  - **1024 이상만** — 768 의 헤더 여유가 27px 이라 들어가지 않는다. 모바일은 헤더가
+ *    로고 · 로그인 · 응급 셋이고 탭바는 4칸 고정이다(D4-1). 홈 카드가 첫 화면에 보인다
+ *
+ * 이 갈래에 항목을 더하려면 D4-5 의 폭 실측(1024 에서 남는 자리)부터 다시 잰다.
+ */
+export const HEADER_ABOUT_LINK = { href: '/about', label: messages.about.title } as const
 
 /**
  * 우측 아바타 팝오버 — 아트보드 03-B.

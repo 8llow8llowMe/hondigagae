@@ -191,6 +191,12 @@ type LinkBaseProps = {
   trailing?: ReactNode
   /** 레이아웃 유틸리티만 허용한다. 색·radius·shadow·padding 덮어쓰기 금지 (component-guide.md §3) */
   className?: string
+  /**
+   * 지금 화면을 가리키는 링크의 표시 (#964). **`'page'` 하나만 받는다** — 헤더의
+   * `서비스 소개` 가 `/about` 에서 쓴다. 활성 판정은 부르는 쪽(client)이 `isActiveNav` 로
+   * 하고, 이 컴포넌트는 서버에서도 렌더되므로 경로를 읽지 않는다. 기본은 없음.
+   */
+  'aria-current'?: 'page' | undefined
 }
 
 /**
@@ -214,6 +220,7 @@ export function ButtonLink(props: ButtonLinkProps) {
     <Link
       href={href}
       aria-label={props.iconOnly === true ? props['aria-label'] : undefined}
+      aria-current={props['aria-current']}
       className={cn(
         'inline-flex items-center justify-center rounded-md font-semibold transition-colors',
         'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
