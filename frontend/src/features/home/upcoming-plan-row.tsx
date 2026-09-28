@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 import { ChevronRightIcon } from '@/components/icons'
-import { planPhaseOf } from '@/lib/plan/date'
+import { formatPlanDateRange, planPhaseOf } from '@/lib/plan/date'
 import { planPhaseLabel, planPhaseNote } from '@/lib/plan/phase-text'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import type { PlanSummaryItem } from '@/types/plan'
@@ -42,7 +42,12 @@ export function UpcomingPlanRow({ plan, today }: { plan: PlanSummaryItem; today:
             {plan.title}
           </span>
           <span className="text-caption text-fg-muted mt-1 block font-medium tabular-nums">
-            {plan.startDate} – {plan.endDate.slice(5)}
+            {/*
+              기간은 **목록 행과 같은 함수로** 쓴다 (#998). 예전에는 이 줄만 ISO 를 잘라
+              `2026-09-12 – 09-14` 로 썼다. `formatPlanDateRangeCompact` 는 개요 카드에서만 쓰는
+              예외다(#841). 그곳에는 같은 화면에 일자 카드가 있지만, 홈에는 없다.
+            */}
+            {formatPlanDateRange(plan.startDate, plan.endDate)}
             <span className="md:hidden"> · {plan.status.name}</span>
             {/*
               데스크톱은 기둥의 말을 날짜 줄에도 되풀이한다(원래 ` · D-16`). 여행 중이면

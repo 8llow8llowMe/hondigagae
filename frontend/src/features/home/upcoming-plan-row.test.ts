@@ -50,6 +50,33 @@ describe('홈의 다가오는 일정 행', () => {
   })
 
   /*
+    #998. 예전에는 `{startDate} – {endDate.slice(5)}` 로 `2026-09-12 – 09-14` 를 썼다 —
+    목록 행(`plan-row`)은 같은 일정을 `2026년 9월 12일 (토) – 9월 14일 (월)` 로 부른다.
+    **목록 행과 같은 함수(`formatPlanDateRange`)** 라 올해 일정에도 연도가 선다.
+  */
+  describe('날짜 줄은 목록 행과 같은 기간 모양이다 (#998)', () => {
+    it('올해 일정도 시작일에 연도를 쓰고 요일을 붙인다', () => {
+      const markup = render()
+
+      expect(markup).toContain('2026년 9월 12일 (토) – 9월 14일 (월)')
+      expect(markup).not.toContain('2026-09-12')
+    })
+
+    it('해를 넘기는 일정은 종료일에도 연도를 다시 쓴다', () => {
+      expect(render({ startDate: '2026-12-30', endDate: '2027-01-02' })).toContain(
+        '2026년 12월 30일 (수) – 2027년 1월 2일 (토)',
+      )
+    })
+
+    it('하루짜리 일정은 날짜를 한 번만 쓴다', () => {
+      const markup = render({ startDate: '2026-10-03', endDate: '2026-10-03' })
+
+      expect(markup).toContain('2026년 10월 3일 (토)')
+      expect(markup).not.toContain(' – ')
+    })
+  })
+
+  /*
     모바일 날짜 줄은 상태명(`초안`)이 쓰고 있어 덧말을 넣지 않는다. 되풀이 자리는 전부
     `hidden md:inline` 안에 있어야 한다 — 이 단언이 그 래핑을 잠근다.
   */
