@@ -20,7 +20,9 @@ import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import com.hondigagae.shared.travel.plan.PlanItemType;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -50,6 +52,11 @@ class PlanCommandProcessorTest {
 
     private static final long MEMBER_ID = 1L;
     private static final long REPRESENTATIVE_PET_ID = 77L;
+    /** 픽스처 여행(2026-09-12~14)의 시작일. 여행 전 가드(#971) 테스트가 "오늘" 을 이 날 기준으로 옮긴다. */
+    private static final LocalDate TRIP_START = LocalDate.of(2026, 9, 12);
+    /** 서비스 기준 "오늘". 픽스처 여행(2026-09-12~14)이 이미 시작된 뒤로 고정해 여행 전 가드(#971)에 걸리지 않게 한다. */
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+    private static final Clock CLOCK = Clock.fixed(LocalDate.of(2026, 9, 28).atStartOfDay(SEOUL).toInstant(), SEOUL);
 
     /** 잠금과 DML 의 호출 순번. 대사 배치와 잠금 순서가 같은지 보는 데 쓴다. */
     private List<String> callOrder;
@@ -73,7 +80,7 @@ class PlanCommandProcessorTest {
         processor = new PlanCommandProcessor(
             planRepositoryPort, new StubPlanItemRepositoryPort(), planPetRepositoryPort,
             planPetConditionRepositoryPort, placeVerifyQueryPort, planWalkCourseQueryPort,
-            petConditionQueryPort, new SnowflakeIdGenerator(1, 1));
+            petConditionQueryPort, new SnowflakeIdGenerator(1, 1), CLOCK);
     }
 
     private static PlanCreateCommand command(List<Long> petIds) {
@@ -259,6 +266,78 @@ class PlanCommandProcessorTest {
 
         assertThat(updated.status()).isEqualTo(PlanStatus.COMPLETED);
         assertThat(updated.petId()).isEqualTo(9L);
+    }
+
+    @Test
+    @DisplayName("여행 전날 확정 일정을 완료하면 PLAN_026 으로 거부한다 — 떠나지 않은 여행을 다녀온 기록으로 남기지 않는다")
+    void rejectsCompletingBeforeStart() {
+        PlanCommandProcessor dayBefore = processorAt(TRIP_START.minusDays(1));
+
+        assertThatThrownBy(() -> dayBefore.updatePlan(plan(PlanStatus.CONFIRMED, 2L),
+            PlanUpdateCommand.builder().status(PlanStatus.COMPLETED).build(), null, Map.of()))
+            .isInstanceOf(PlanException.class)
+            .extracting(exception -> ((PlanException) exception).getErrorCode())
+            .isEqualTo(PlanErrorCode.PLAN_NOT_STARTED_COMPLETE);
+        assertThat(planRepositoryPort.saved).isNull();
+    }
+
+    @Test
+    @DisplayName("시작일 당일에는 완료할 수 있다 — 당일치기 여행은 떠난 그날 끝난다")
+    void allowsCompletingOnStartDay() {
+        Plan updated = processorAt(TRIP_START).updatePlan(plan(PlanStatus.CONFIRMED, 2L),
+            PlanUpdateCommand.builder().status(PlanStatus.COMPLETED).build(), null, null);
+
+        assertThat(updated.status()).isEqualTo(PlanStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("이미 지난 일정은 완료할 수 있다 — 기록용으로 만든 과거 일정도 시작일이 지났다")
+    void allowsCompletingPastPlan() {
+        Plan updated = processorAt(TRIP_START.plusMonths(1)).updatePlan(plan(PlanStatus.DRAFT, 2L),
+            PlanUpdateCommand.builder().status(PlanStatus.COMPLETED).build(), null, null);
+
+        assertThat(updated.status()).isEqualTo(PlanStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("완료된 일정의 시작일을 미래로 옮기면 PLAN_026 으로 거부한다 — 날짜를 밀어 안 간 여행의 완료를 만드는 우회로다")
+    void rejectsMovingCompletedPlanStartToFuture() {
+        PlanCommandProcessor onStartDay = processorAt(TRIP_START);
+
+        assertThatThrownBy(() -> onStartDay.updatePlan(plan(PlanStatus.COMPLETED, 2L),
+            PlanUpdateCommand.builder().startDate(TRIP_START.plusDays(1)).build(), null, null))
+            .isInstanceOf(PlanException.class)
+            .extracting(exception -> ((PlanException) exception).getErrorCode())
+            .isEqualTo(PlanErrorCode.PLAN_NOT_STARTED_COMPLETE);
+        assertThat(planRepositoryPort.saved).isNull();
+    }
+
+    @Test
+    @DisplayName("시작 전인 완료 일정도 시작일을 건드리지 않는 수정은 받는다 — 가드 이전 데이터의 제목 수정까지 깨지면 안 된다")
+    void allowsTitleEditOnCompletedPlanNotYetStarted() {
+        Plan updated = processorAt(TRIP_START.minusDays(3)).updatePlan(plan(PlanStatus.COMPLETED, 2L),
+            PlanUpdateCommand.builder().title("다녀온 제주").build(), null, null);
+
+        assertThat(updated.title()).isEqualTo("다녀온 제주");
+        assertThat(updated.status()).isEqualTo(PlanStatus.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("이미 완료된 일정에 완료를 다시 보내는 것은 전이가 아니라 날짜와 무관하게 받는다")
+    void allowsResendingCompletedRegardlessOfDate() {
+        Plan updated = processorAt(TRIP_START.minusDays(3)).updatePlan(plan(PlanStatus.COMPLETED, 2L),
+            PlanUpdateCommand.builder().status(PlanStatus.COMPLETED).build(), null, null);
+
+        assertThat(updated.status()).isEqualTo(PlanStatus.COMPLETED);
+    }
+
+    /** 같은 스텁을 쓰되 "오늘" 만 {@code today} 로 옮긴 Processor. */
+    private PlanCommandProcessor processorAt(LocalDate today) {
+        return new PlanCommandProcessor(
+            planRepositoryPort, new StubPlanItemRepositoryPort(), planPetRepositoryPort,
+            planPetConditionRepositoryPort, placeVerifyQueryPort, planWalkCourseQueryPort,
+            petConditionQueryPort, new SnowflakeIdGenerator(1, 1),
+            Clock.fixed(today.atStartOfDay(SEOUL).toInstant(), SEOUL));
     }
 
     private static Plan plan(PlanStatus status, long petId) {

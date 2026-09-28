@@ -19,7 +19,9 @@ import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import com.hondigagae.shared.travel.plan.PlanItemType;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -46,6 +48,10 @@ class PlanPeriodShrinkTest {
 
     private static final long PLAN_ID = 100L;
     private static final LocalDate START = LocalDate.of(2026, 9, 12);
+
+    /** 서비스 기준 "오늘". 픽스처 여행(2026-09-12~14)이 이미 시작된 뒤로 고정해 여행 전 가드(#971)에 걸리지 않게 한다. */
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+    private static final Clock CLOCK = Clock.fixed(LocalDate.of(2026, 9, 28).atStartOfDay(SEOUL).toInstant(), SEOUL);
 
     @Test
     @DisplayName("기간을 줄여 범위 밖 항목이 남으면 400 PLAN_008 로 거부한다")
@@ -162,7 +168,7 @@ class PlanPeriodShrinkTest {
         return new PlanCommandProcessor(
             plans, items, new StubPlanPetRepositoryPort(), new StubPlanPetConditionRepositoryPort(),
             new StubPlaceVerifyQueryPort(), new StubPlanWalkCourseQueryPort(),
-            new StubPetConditionQueryPort(), new SnowflakeIdGenerator(1, 1));
+            new StubPetConditionQueryPort(), new SnowflakeIdGenerator(1, 1), CLOCK);
     }
 
     private static class StubPlanRepositoryPort implements PlanRepositoryPort {
