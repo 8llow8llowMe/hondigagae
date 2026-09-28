@@ -53,6 +53,11 @@ public class PlanRepositoryAdapter implements PlanRepositoryPort {
     }
 
     @Override
+    public List<Plan> findPlansWithPet(long memberId, long petId) {
+        return planRepository.findPlansWithPet(memberId, petId).stream().map(planMapper::toDomainFromEntity).toList();
+    }
+
+    @Override
     public List<Plan> findCompanionEditablePlans(long memberId) {
         return planRepository.findCompanionEditablePlans(memberId, PlanStatus.companionEditableStatuses())
             .stream().map(planMapper::toDomainFromEntity).toList();

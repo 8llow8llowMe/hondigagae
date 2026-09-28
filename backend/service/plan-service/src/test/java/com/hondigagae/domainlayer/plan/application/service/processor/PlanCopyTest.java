@@ -274,6 +274,11 @@ class PlanCopyTest {
         }
 
         @Override
+        public List<Plan> findPlansWithPet(long memberId, long petId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public List<Plan> findCompanionEditablePlans(long memberId) {
             throw new UnsupportedOperationException();
         }

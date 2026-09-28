@@ -66,6 +66,24 @@ public interface PlanRepository extends JpaRepository<PlanEntity, Long> {
         """)
     List<PlanEntity> findCompanionEditablePlansWithPet(Long memberId, Long petId, Collection<PlanStatus> statuses);
 
+    /**
+     * 반려견 삭제 확인창 집계 입력 (#972) — 한 회원의 미삭제 일정 중 이 반려견을 실은 것 전부, <b>상태 무관</b>.
+     *
+     * <p>{@link #findCompanionEditablePlansWithPet} 과 같은 "한 마리라도 동행이면 히트" 술어에서
+     * {@code status in} 만 뺐다. 확인창은 "완료된 일정 N 개는 기록으로 남는다" 까지 보여 줘야 해서
+     * 완료 일정도 함께 읽고, 상태 분리는 애플리케이션이 한다. 두 술어가 갈라지면 확인창이 말한
+     * 수와 실제로 정리되는 수가 달라지므로, 한쪽을 고칠 때는 다른 쪽도 같이 본다.
+     */
+    @Query("""
+        select p from PlanEntity p
+        where p.memberId = :memberId
+          and p.deleted = false
+          and (p.petId = :petId
+               or p.id in (select pp.planId from PlanPetEntity pp where pp.petId = :petId))
+        order by p.id asc
+        """)
+    List<PlanEntity> findPlansWithPet(Long memberId, Long petId);
+
     /** 한 회원의 정리 대상 일정 전부. 어떤 반려견이 실려 있는지 모아 한 번에 생존 여부를 묻기 위한 입력이다. */
     @Query("""
         select p from PlanEntity p

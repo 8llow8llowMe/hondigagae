@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.plan.application.port.in;
 
 import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanAiCommitResponse;
+import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanCompanionReconcileResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanOutlineResponse;
 
 /**
@@ -18,4 +19,13 @@ public interface PlanInternalUseCase {
      * 담은 적 없음·삭제됨·남의 것은 전부 {@code planId = null} 이고 예외가 아니다.
      */
     PlanAiCommitResponse getAiCommit(long memberId, String jobId);
+
+    /**
+     * 회원 한 명의 동행 반려견을 지금 원천(auth-service)과 대사한다 (#972).
+     *
+     * <p>auth-service 가 반려견 삭제를 커밋한 직후 부르는 <b>트리거</b>다. "이 petId 를 떼라" 는 사실을
+     * 받지 않는다 — plan 이 auth 에 살아 있는 아이를 다시 묻고 없는 아이만 뗀다. 그래서 호출한 쪽의
+     * 버그로 살아 있는 반려견이 일정에서 빠질 수 없고, 결과는 새벽 대사 배치가 같은 회원을 돌린 것과 같다.
+     */
+    PlanCompanionReconcileResponse reconcileCompanions(long memberId);
 }

@@ -5,8 +5,10 @@ import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanItemDetailIte
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanItemPlaceItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanItemWalkCourseItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanSummaryItem;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanCompanionSummaryResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanDetailResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanEmergencyResponse;
+import com.hondigagae.domainlayer.plan.application.info.PlanCompanionSummaryInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanEmergencyInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemInfo;
@@ -44,6 +46,15 @@ public class PlanPresenter {
 
     public SliceResponse<PlanSummaryItem> toSliceResponse(Slice<PlanSummaryInfo> slice) {
         return SliceResponse.of(slice.map(this::toSummaryItem));
+    }
+
+    public PlanCompanionSummaryResponse toCompanionSummaryResponse(PlanCompanionSummaryInfo info) {
+        return PlanCompanionSummaryResponse.builder()
+            .petId(String.valueOf(info.petId()))
+            .editablePlanCount(info.editablePlanCount())
+            .soleCompanionPlanCount(info.soleCompanionPlanCount())
+            .completedPlanCount(info.completedPlanCount())
+            .build();
     }
 
     private PlanSummaryItem toSummaryItem(PlanSummaryInfo info) {

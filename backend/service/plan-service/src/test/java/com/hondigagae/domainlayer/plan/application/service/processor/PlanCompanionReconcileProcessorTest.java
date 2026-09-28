@@ -262,6 +262,11 @@ class PlanCompanionReconcileProcessorTest {
         }
 
         @Override
+        public List<Plan> findPlansWithPet(long memberId, long petId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public List<Plan> findCompanionEditablePlans(long memberId) {
             return plans.values().stream()
                 .filter(plan -> plan.memberId() == memberId)

@@ -1,11 +1,13 @@
 package com.hondigagae.domainlayer.plan.adapter.in.internal.presenter;
 
 import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanAiCommitResponse;
+import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanCompanionReconcileResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanOutlineResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanOutlineResponse.DayOutline;
 import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanOutlineResponse.ItemOutline;
 import com.hondigagae.domainlayer.plan.application.info.PlanInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemInfo;
+import com.hondigagae.domainlayer.plan.application.model.PlanCompanionReconcileCounts;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +17,15 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class PlanInternalPresenter {
+
+    /** 결과를 설명하는 세 값만 내보낸다 — 옛 일정 건너뜀·원격 왕복 수는 plan 내부의 관측 지표다. */
+    public PlanCompanionReconcileResponse toReconcileResponse(PlanCompanionReconcileCounts counts) {
+        return PlanCompanionReconcileResponse.builder()
+            .detached(counts.detached())
+            .representativeChanged(counts.representativeChanged())
+            .placeholderKept(counts.placeholderKept())
+            .build();
+    }
 
     /** 일차 오름차순, 일차 안에서는 sequence 순으로 정리해 넘긴다 — 프롬프트에 그대로 실리는 순서다. */
     public PlanOutlineResponse toOutlineResponse(PlanInfo info) {
