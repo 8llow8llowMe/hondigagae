@@ -188,6 +188,12 @@ FLUSH PRIVILEGES;
 5. batch-service          (웹 트래픽 없음, 마지막)
 ```
 
+**auth-service 도 plan-service 를 부른다 (#972).** 반려견 삭제 직후 동행 목록 대사 트리거
+(`POST /internal/v1/plans/companions/reconcile`) 때문이다. 그래서 auth compose 가 `PLAN_SERVICE_APP_NAME` 과
+`INTERNAL_CLIENT_*_TIMEOUT_MS` 를 넘긴다 — 키는 게이트웨이·ai 가 이미 쓰는 것이라 Vault 에 새로 넣을 것은 없다
+(환경당 secret 하나). 위 순서대로 auth 가 plan 보다 먼저 올라가 잠시 엔드포인트가 없어도(404) 삭제는 성공하고,
+그 몫은 plan 의 04:10 대사 배치가 잇는다 — 배포 순서를 바꿀 필요는 없다.
+
 `batch-service` 는 기동 시 잡을 자동 실행하지 않는다(`spring.batch.job.enabled=false`).
 단, **dev 는 프로세스 안 Quartz 스케줄이 정해진 시각에 파이프라인을 부른다**(#378 — 장소 월 03:00,
 올레 월 05:00, 혼잡도 매일 06:00 KST). 기동 직후 적재가 필요하면 그 시각을 기다리지 말고 직접 부른다 —
