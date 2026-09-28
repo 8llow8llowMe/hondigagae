@@ -139,6 +139,37 @@ class WalkSafetyEvaluatorTest {
             assertThat(codesOf(pug)).contains(WalkSafetyReasonCode.BRACHYCEPHALIC);
         }
 
+        /*
+          #977 — 정방폭포 사례. 기온 27℃ 는 반려견 기준(28℃) 아래지만 습해서 체감이 28℃ 를 넘는다.
+          적합도가 체감으로 "더위에 약한 아이에게 부담" 이라 하는 날에 산책이 "안전" 이라 하면
+          한 화면이 반대로 말한다. 체감이 폭염특보 척도(33℃) 아래라 일반 반려견은 여전히 안전이다.
+        */
+        @Test
+        @DisplayName("기온은 28도 아래여도 체감이 28도를 넘으면 더위 민감견은 주의다 - 적합도와 같은 기준")
+        void heatSensitiveUsesFeelsLikeAgainstPetThreshold() {
+            WeatherForecast humid = forecast(27.0d, 95, SkyState.OVERCAST, 20);
+            double feelsLike = FeelsLikeTemperature.of(27.0d, 95).celsius();
+            assertThat(feelsLike).isGreaterThanOrEqualTo(28.0d).isLessThan(33.0d);
+
+            WalkSafetyAssessment normal = evaluate(humid, PetCondition.unspecified(), 20);
+            WalkSafetyAssessment sensitive = evaluate(humid, PetCondition.builder().heatSensitive(true).build(), 20);
+
+            assertThat(normal.level()).isEqualTo(WalkSafetyLevel.SAFE);
+            assertThat(sensitive.level()).isEqualTo(WalkSafetyLevel.CAUTION);
+            assertThat(codesOf(sensitive)).contains(WalkSafetyReasonCode.HEAT_SENSITIVE);
+        }
+
+        @Test
+        @DisplayName("기온도 체감도 28도 아래면 더위 민감견도 더위 근거를 받지 않는다")
+        void heatSensitiveStaysSafeBelowPetThreshold() {
+            WeatherForecast mild = forecast(25.0d, 50, SkyState.OVERCAST, 20);
+
+            WalkSafetyAssessment sensitive = evaluate(mild, PetCondition.builder().heatSensitive(true).build(), 20);
+
+            assertThat(sensitive.level()).isEqualTo(WalkSafetyLevel.SAFE);
+            assertThat(codesOf(sensitive)).doesNotContain(WalkSafetyReasonCode.HEAT_SENSITIVE);
+        }
+
         @Test
         @DisplayName("견종 표기가 달라도 잡아낸다")
         void matchesBreedNameVariants() {
