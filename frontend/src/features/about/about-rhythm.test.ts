@@ -230,6 +230,20 @@ describe('globals.css 첫 화면 리듬 블록', () => {
     expect(block).toMatch(/\.about-progress \{[^}]*z-index: 30;/)
   })
 
+  it('1280–1535 절 내비 라벨은 평소 투명 · 누르지 않고, 초점이면 드러나며 가리킴은 hover 기기만이다 (#965)', () => {
+    const range = '@media (width >= 80rem) and (width < 96rem)'
+    expect(block).toMatch(
+      /@media \(width >= 80rem\) and \(width < 96rem\) \{\s*\.about-nav-label \{[^}]*opacity: 0;[^}]*pointer-events: none;/,
+    )
+    expect(block).toContain(`${range} {`)
+    expect(block).toMatch(/a:focus-visible > \.about-nav-label \{\s*opacity: 1;/)
+    expect(block).toMatch(
+      /@media \(width >= 80rem\) and \(width < 96rem\) and \(hover: hover\) \{\s*a:hover > \.about-nav-label \{\s*opacity: 1;/,
+    )
+    // hover 는 (hover: hover) 블록 밖에 없다 — 터치 기기에서 탭 뒤 칩이 남지 않게
+    expect(block.match(/a:hover > \.about-nav-label/g)).toHaveLength(1)
+  })
+
   it('색은 토큰만 · 새 길이 없음', () => {
     expect(block).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
     for (const [, ms] of block.matchAll(/(\d+)ms/g)) expect(['150', '200']).toContain(ms)
