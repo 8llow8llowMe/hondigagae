@@ -15,7 +15,7 @@
 
 | 잡 | 언제 (KST) | 하는 일 |
 | --- | --- | --- |
-| `placeDataPipelineJob` | **매주 월요일** 03:00 | 장소 적재 자식 잡을 순서대로 (목록·운영시간·이미지 → 문화정보원 → 식약처 → 병합 → 이미지 백필) |
+| `placeDataPipelineJob` | **매주 월요일** 03:00 | 장소 적재 자식 잡을 순서대로 (목록·운영시간·이미지 → 문화정보원 → 식약처 → 병합 → 이미지 백필 → 반려동물 동반 정보) |
 | `olleCourseImportJob` | **매주 월요일** 05:00 | 제주올레 코스 |
 | `congestionImportJob` | 매일 06:00 | 혼잡도 30일 rolling 예측 |
 
@@ -31,8 +31,9 @@
 
 - **잡 스토어가 메모리다.** 컨테이너가 내려가 있던 동안 지나간 발화는 **되살리지 않는다.** 재기동하면
   트리거가 새로 등록되고 다음 주기부터 돈다. 놓친 적재는 §4 로 손으로 돌린다.
-- **겹치면 스케줄이 양보한다.** 장소를 건드리는 잡(파이프라인·자식 다섯·혼잡도)이 돌고 있으면
-  이번 발화를 건너뛴다(`schedule fire skipped` WARN). 6시간 넘은 STARTED 는 죽은 JVM 잔재로 보고 무시한다.
+- **겹치면 스케줄이 양보한다.** 장소 파이프라인은 자식 잡 여섯과 혼잡도 잡이 돌고 있으면
+  발화를 건너뛴다(`schedule fire skipped` WARN). 혼잡도 스케줄은 `place_pet_info` 만 쓰는
+  `petTourImportJob` 을 기다리지 않는다. 6시간 넘은 STARTED 는 죽은 JVM 잔재로 보고 무시한다.
 - **prod 는 기본 꺼짐**(`:-false`)이다. 이 문서는 dev 기준이다.
 
 > 2026-09-23 기준 dev 에서 스케줄은 **한 번도 돌지 않았다** — 컨테이너가 떠 있지 않았다 (#878).
@@ -151,12 +152,13 @@ docker exec hondigagae-batch-service-dev tail -f /tmp/manual-${JOB}.log
 
 | 잡 | 파라미터 (전부 선택, 기본값) | 언제 |
 | --- | --- | --- |
-| `placeDataPipelineJob` | `areaCode=39` `sido=제주특별자치도` `region=제주` `contentTypeIds` `forceImport` | 장소 전체를 한 번에. 세 지역값은 서로 같은 지역이어야 한다(검증기가 막는다) |
+| `placeDataPipelineJob` | `areaCode=39` `sido=제주특별자치도` `region=제주` `contentTypeIds` `forceImport` | 장소 전체와 반려동물 동반 정보를 한 번에. 세 지역값은 서로 같은 지역이어야 한다(검증기가 막는다) |
 | `placeImportJob` | `areaCode=39` `contentTypeIds=12,39` (없으면 7종 전량) | 목록 + 운영시간 + 이미지. **상세 커버리지 따라잡기는 이 잡을 하루 한 번씩** |
 | `cultureFacilityImportJob` | `sido=제주특별자치도` `forceImport=true` | 문화시설·긴급 시설. 포털 파일이 같으면 건너뛴다 — 강제하려면 `forceImport=true` |
 | `petRestaurantImportJob` | `region=제주` | 식약처 반려동물 동반 음식점 |
 | `placeMergeJob` | `areaCode=39` | 원천이 다른 같은 장소 묶기. 적재 뒤에 |
 | `placeImageBackfillJob` | `areaCode=39` | 이미지 없는 장소에 대표 이미지 빌려 오기. 병합 뒤에 |
+| `petTourImportJob` | `areaCode=39` | TourAPI 장소와 일치하는 반려동물 동반 정보 적재. 장소 파이프라인 마지막 단계 |
 | `congestionImportJob` | `numOfRows=1000` | 혼잡도. 장소 적재 뒤에 돌아야 연결된다 |
 | `olleCourseImportJob` | `forceImport=true` | 올레. 포털 파일이 같으면 건너뛴다 |
 
@@ -198,6 +200,7 @@ JOB=placeDataPipelineJob PARAMS="areaCode=39"
 | `petRestaurantImportJob` | `petRestaurantImportJob done. region=…, imported=…` |
 | `placeMergeJob` | `place merge step finished. areaCode=…, merged=…` |
 | `placeImageBackfillJob` | `place image backfill step finished. areaCode=…, backfilled=…` |
+| `petTourImportJob` | `petTourImportJob done. areaCode=…, upserted=…` |
 | `congestionImportJob` | `congestionImportJob done. fetched=…, upserted=…, linked=…, unmatched=…` |
 | `olleCourseImportJob` | `olleCourseImportJob done. imported=… skippedUnchanged=… fallback=…` |
 
