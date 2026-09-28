@@ -146,7 +146,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
             logParseFailure("준비물", response, text, exception);
             throw new AiPlanException(AiPlanErrorCode.LLM_RESPONSE_INVALID, exception);
         }
-        List<PackingList.PackingItem> items = packing.items() == null ? List.of()
+        List<PackingList.PackingItem> modelItems = packing.items() == null ? List.of()
             : packing.items().stream()
                 .filter(item -> item.name() != null && !item.name().isBlank())
                 .map(item -> PackingList.PackingItem.builder()
@@ -156,7 +156,8 @@ public class OllamaLlmAdapter implements AiLlmPort {
                     .reason(LlmTextCleaner.clean(item.reason()))
                     .build())
                 .toList();
-        return PackingList.builder().items(items).build();
+        // 기본 품목 · 날씨 품목은 서버가 정하고, 모델 품목은 목록 안의 조건부 품목만 받는다 (#976).
+        return PackingList.builder().items(new PackingListRules(query).apply(modelItems)).build();
     }
 
     private ChatResponse request(AiPlanGenerationQuery query) {
