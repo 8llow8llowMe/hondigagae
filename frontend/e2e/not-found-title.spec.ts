@@ -40,4 +40,19 @@ test.describe('404 탭 제목 (#676)', () => {
     // 문서의 최상위 제목도 같은 말을 한다 — 예전엔 `반려견 정보 수정` 이었다 (#980)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(messages.pet.notFoundTitle)
   })
+
+  /*
+    **상태는 200 이다 — 의도다** (`코스상세-세부명세.md` D5-6, #980). 본문이 서버 `resultMessage`
+    를 그려야 해서 `notFound()` 를 부르지 않는다. 그 대신 탭이 본문 `h1` 과 같은 말을 하고
+    `noindex` 가 붙는지를 본다 — 예전 탭은 `제주올레 코스` 였다.
+  */
+  test('올레 코스 상세 404 — 없는 코스예요 · 혼디가개 + noindex', async ({ page }) => {
+    await page.goto('/olle/1234567890123456789')
+
+    await expect(page).toHaveTitle(`${messages.walkCourse.detailNotFoundTitle} · 혼디가개`)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+      messages.walkCourse.detailNotFoundTitle,
+    )
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex')
+  })
 })
