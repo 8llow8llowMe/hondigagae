@@ -89,6 +89,27 @@ describe('공유 열람 — 정상', () => {
     expect(html).not.toContain('10:30:00')
   })
 
+  /*
+    **일자 머리의 날짜는 `formatPlanDay` 모양이다** (#981). 이 화면만 `date.slice(5)` + 요일로
+    `09-12 (토)` 를 조립하고 있었다 — 소유자 상세는 #732 에서 `9월 12일 (토)` 로 모였다.
+
+    **머리 줄에 붙여서 본다.** 기간 줄(`2026년 9월 12일 (토) – 9월 14일 (월)`)이 첫날과
+    마지막 날을 이미 같은 모양으로 쓰므로, 문자열이 어딘가에 있는지만 보면 고치기 전에도
+    통과한다.
+  */
+  it('일자 머리의 날짜를 "9월 12일 (토)" 모양으로 쓴다 — ISO 를 잘라 쓰지 않는다', () => {
+    const html = renderShared()
+    const dayHeading = (day: number, label: string) =>
+      new RegExp(
+        `${messages.plan.dayLabel.replace('{day}', String(day))}</h2><span[^>]*>${label.replace(/[()]/g, '\\$&')}</span>`,
+      )
+
+    expect(html).toMatch(dayHeading(1, '9월 12일 (토)'))
+    expect(html).toMatch(dayHeading(2, '9월 13일 (일)'))
+    expect(html).toMatch(dayHeading(3, '9월 14일 (월)'))
+    expect(html).not.toMatch(/\d{2}-\d{2} \(/)
+  })
+
   it('장소 요약이 없는 항목도 행이 남는다', () => {
     expect(renderShared()).toContain('버스로 이동')
   })
