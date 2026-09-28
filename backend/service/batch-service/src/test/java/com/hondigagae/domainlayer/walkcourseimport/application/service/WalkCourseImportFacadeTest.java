@@ -1,8 +1,10 @@
 package com.hondigagae.domainlayer.walkcourseimport.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -26,6 +28,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 @ExtendWith(MockitoExtension.class)
 class WalkCourseImportFacadeTest {
@@ -118,6 +121,22 @@ class WalkCourseImportFacadeTest {
         facade.importOlleCourses(false);
 
         verify(olleCourseSnapshotPort, never()).record(any());
+    }
+
+    @Test
+    @DisplayName("우회 행 기록이 실패하면 예외를 그대로 올리고 우회 파일 정리 경로는 탄다 — 삼키지 않는다")
+    void fallbackRowWriteFailurePropagates() {
+        Path local = Path.of("data/olle_course.csv");
+        OlleCourseSourceDecision decision = OlleCourseSourceDecision.fallback(local);
+        given(olleCourseSourceProcessor.resolve(false)).willReturn(decision);
+        given(olleCourseImportProcessor.importCourses(local)).willReturn(List.of(course("1", "2025-04-28")));
+        willThrow(new DataAccessResourceFailureException("import_source_snapshot 없음"))
+            .given(olleCourseSnapshotPort).record(any());
+
+        // 우회 행이 없으면 포털 복귀 첫 실행이 건너뛴다. WARN 으로 접으면 그 사실이 묻힌다 (#887).
+        assertThatThrownBy(() -> facade.importOlleCourses(false))
+            .isInstanceOf(DataAccessResourceFailureException.class);
+        verify(olleCourseSourceProcessor).cleanUp(decision);
     }
 
     private static ImportedWalkCourse course(String courseNo, String baseDate) {
