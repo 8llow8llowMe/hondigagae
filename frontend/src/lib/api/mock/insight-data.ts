@@ -422,10 +422,10 @@ export function mockWalkSafety(placeId: string, heatSensitive: boolean): WalkSaf
     */
     feelsLikeCelsius: 33.0,
     feelsLikeBasis:
-      '기상청 여름철 체감온도 산식으로 계산했습니다. 판정 시각의 기온과 상대습도로 습구온도(Stull, 2011 근사식)를 구해 산출하며, 폭염특보 기준(주의보 33℃·경보 35℃)과 같은 척도입니다. 습도가 없는 시각은 기온을 그대로 씁니다.',
+      '기상청 여름철 체감온도 산식으로 계산했습니다. 기준 시각의 기온과 상대습도로 습구온도(Stull, 2011 근사식)를 구해 산출하며, 폭염특보 기준(주의보 33℃·경보 35℃)과 같은 척도입니다. 습도가 없는 시각은 기온을 그대로 씁니다.',
     heatIndexCelsius: 40.2,
     heatIndexBasis:
-      '미국 NOAA 열지수(Rothfusz 회귀식 섭씨판)로 계산한 참고값입니다. 판정에는 쓰지 않으며, 고온다습에서 기상청 체감온도보다 높게 나오는 별도 지표입니다.',
+      '미국 NOAA 열지수(Rothfusz 회귀식 섭씨판)로 계산한 참고값입니다. 산책 위험도 계산에는 쓰지 않으며, 고온다습에서 기상청 체감온도보다 높게 나오는 별도 지표입니다.',
     saferWindowStart: '18:00:00',
     saferWindowEnd: '21:00:00',
     temperature: 31.0,
@@ -482,8 +482,8 @@ const GOLDEN_STATUS = {
   },
   NO_FORECAST: {
     code: 'NO_FORECAST',
-    name: '판정할 예보 없음',
-    description: '오늘 남은 시각의 예보가 없어 추천 여부를 판정하지 않았습니다.',
+    name: '예보 없음',
+    description: '오늘 남은 시각의 예보가 없어 추천 여부를 알려 드리지 못했습니다.',
   },
 } as const
 

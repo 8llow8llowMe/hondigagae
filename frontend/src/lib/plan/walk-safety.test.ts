@@ -82,7 +82,8 @@ describe('itemWalkSafetyView()', () => {
       startTime: null,
       walkSafetyLevel: null,
       unavailableReasonCode: 'NO_START_TIME',
-      unavailableReason: '시작 시각이 없어 판정할 수 없습니다.',
+      unavailableReason:
+        '이 항목에 시작 시각이 없어 산책 위험도를 낼 수 없습니다. 산책 위험도는 시간대마다 다릅니다.',
     })
 
     expect(itemWalkSafetyView(item)).toEqual({ kind: 'hidden' })

@@ -390,7 +390,8 @@ describe('PlanItemRow — 항목 산책 위험도 (#625)', () => {
   })
 
   it('PAST_DATE 는 서버 문장이 없다 — 일자 판정이 이미 한 번 말했다', () => {
-    const sentence = '이미 지난 날짜라 산책 위험도를 판정할 수 없습니다.'
+    const sentence =
+      '이미 지난 날짜라 예보가 남아 있지 않습니다. 이 항목의 산책 위험도는 확인할 수 없습니다.'
     const markup = renderWithWalkSafety(
       planItemWalkSafety({
         planItemId: 'i-1',
@@ -404,7 +405,7 @@ describe('PlanItemRow — 항목 산책 위험도 (#625)', () => {
   })
 
   it('NOT_PLACE_TARGET 은 서버 문장이 없다 — WALK·MOVE 는 화면이 이미 안다', () => {
-    const sentence = '장소를 가리키는 항목이 아니라 판정할 수 없습니다.'
+    const sentence = '좌표를 아는 장소 항목이 아니어서 산책 위험도를 붙이지 못했습니다.'
     const markup = renderWithWalkSafety(
       planItemWalkSafety({
         planItemId: 'i-1',

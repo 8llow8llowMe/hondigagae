@@ -272,7 +272,7 @@
 | `feelsLikeCelsius`         | `Double`                 | **판정 기준값.** `체감온도` 라벨 + 단위 ℃ (#259). **시각 기준**이다                              |
 | `feelsLikeBasis`           | `String \| null`         | 산식·입력·임계 출처를 담은 완성형 문장. **접힌 서랍에 둔다** (#292)                              |
 | `heatIndexCelsius`         | `Double`                 | **참고값 — 판정에 쓰이지 않는다** (#292). 평면에 세우지 않고 서랍 안에서 `참고 열지수` 로 부른다 |
-| `heatIndexBasis`           | `String \| null`         | "판정에는 쓰지 않으며…" 를 말하는 문장. **값과 붙여 둔다** (#292)                                |
+| `heatIndexBasis`           | `String \| null`         | "산책 위험도 계산에는 쓰지 않으며…" 를 말하는 문장. **값과 붙여 둔다** (#292)                    |
 | `saferWindowStart/End`     | `LocalTime \| null`      | **없으면 null** → "더 안전한 시간대" 를 숨긴다                                                   |
 
 - **`*Basis` 는 대응 값이 null 이면 같이 null 이다** (BE `WalkSafetyPresenter`). 둘 다 같은

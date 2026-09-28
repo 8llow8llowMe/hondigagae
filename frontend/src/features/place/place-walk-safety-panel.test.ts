@@ -207,14 +207,14 @@ describe('PlaceWalkSafetyPanel — 판정값과 참고값의 위계 (#292)', () 
   })
 
   /*
-    서버 문장을 그대로 렌더한다 (styling-guide.md §7). **열지수 쪽 문장이 "판정에는 쓰지
+    서버 문장을 그대로 렌더한다 (styling-guide.md §7). **열지수 쪽 문장이 "산책 위험도 계산에는 쓰지
     않으며" 를 말한다** — 숫자만 떼어 읽히지 않게 하는 것이 이 문장의 역할이다.
   */
   it('두 근거 문장을 서버 문구 그대로 담는다', () => {
     const markup = renderBasis()
 
     expect(markup).toContain('기상청 여름철 체감온도 산식으로 계산했습니다')
-    expect(markup).toContain('판정에는 쓰지 않으며')
+    expect(markup).toContain('산책 위험도 계산에는 쓰지 않으며')
   })
 
   /*

@@ -1113,7 +1113,7 @@ function toWeather(plan: MockPlan): PlanWeatherResponse {
           : {
               unavailableReasonCode: 'BEYOND_FORECAST_RANGE',
               unavailableReason:
-                '예보는 오늘부터 11일까지만 제공되어 이 날짜는 아직 판정할 수 없습니다.',
+                '예보는 오늘부터 11일까지만 제공되어 이 날짜는 아직 알려 드릴 수 없습니다.',
             }),
       }
     }
@@ -1595,7 +1595,8 @@ function mockPlanWalkSafety(plan: MockPlan): PlanWalkSafetyResponse {
         ...shared,
         walkSafetyLevel: null,
         unavailableReasonCode: 'PAST_DATE',
-        unavailableReason: '이미 지난 날짜라 산책 위험도를 판정할 수 없습니다.',
+        unavailableReason:
+          '이미 지난 날짜라 예보가 남아 있지 않습니다. 이 항목의 산책 위험도는 확인할 수 없습니다.',
       }
     }
 
@@ -1605,7 +1606,7 @@ function mockPlanWalkSafety(plan: MockPlan): PlanWalkSafetyResponse {
         ...shared,
         walkSafetyLevel: null,
         unavailableReasonCode: 'NOT_PLACE_TARGET',
-        unavailableReason: '장소를 가리키는 항목이 아니라 산책 위험도를 판정할 수 없습니다.',
+        unavailableReason: '좌표를 아는 장소 항목이 아니어서 산책 위험도를 붙이지 못했습니다.',
       }
     }
 
@@ -1615,7 +1616,8 @@ function mockPlanWalkSafety(plan: MockPlan): PlanWalkSafetyResponse {
         ...shared,
         walkSafetyLevel: null,
         unavailableReasonCode: 'NO_START_TIME',
-        unavailableReason: '시작 시각이 없어 산책 위험도를 판정할 수 없습니다.',
+        unavailableReason:
+          '이 항목에 시작 시각이 없어 산책 위험도를 낼 수 없습니다. 산책 위험도는 시간대마다 다릅니다.',
       }
     }
 
@@ -1625,7 +1627,7 @@ function mockPlanWalkSafety(plan: MockPlan): PlanWalkSafetyResponse {
         ...shared,
         walkSafetyLevel: null,
         unavailableReasonCode: 'BEYOND_FORECAST_RANGE',
-        unavailableReason: `예보는 오늘부터 ${WALK_SAFETY_HORIZON_DAYS + 1}일까지만 제공되어 이 날짜는 아직 판정할 수 없습니다.`,
+        unavailableReason: `산책 위험도는 시각별 예보로만 안내할 수 있고, 그 예보는 오늘부터 ${WALK_SAFETY_HORIZON_DAYS + 1}일까지입니다. 이 날짜는 아직 알려 드릴 수 없습니다.`,
       }
     }
 
@@ -1656,7 +1658,7 @@ function mockPlanWalkSafety(plan: MockPlan): PlanWalkSafetyResponse {
         petConditionApplied,
         walkSafetyLevel: WALK_SAFETY_LEVEL.UNKNOWN,
         unavailableReasonCode: 'NO_FORECAST_AT_TIME',
-        unavailableReason: '이 시각의 예보를 가져오지 못해 산책 위험도를 판정할 수 없습니다.',
+        unavailableReason: '이 시각의 예보를 쓸 수 없어 산책 위험도를 내지 못했습니다.',
       }
     }
 

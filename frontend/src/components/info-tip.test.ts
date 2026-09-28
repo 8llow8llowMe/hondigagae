@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import { InfoTip } from '@/components/info-tip'
 
 const BASIS =
-  '기상청 여름철 체감온도 산식으로 계산했습니다. 판정 시각의 기온과 상대습도로 습구온도를 구해 산출합니다.'
+  '기상청 여름철 체감온도 산식으로 계산했습니다. 기준 시각의 기온과 상대습도로 습구온도를 구해 산출합니다.'
 
 function render() {
   return renderToStaticMarkup(createElement(InfoTip, { label: '체감온도 근거', children: BASIS }))
