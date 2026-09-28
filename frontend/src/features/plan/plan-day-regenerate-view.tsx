@@ -27,6 +27,7 @@ import { usePlanDetail } from '@/features/plan/use-plan-detail'
 import { isJobFailed, jobStepProgress } from '@/lib/ai-plan/job'
 import {
   dayRegenerateBlock,
+  regenerateDayLoss,
   toDayRegeneratePayload,
   toRegeneratedDayItems,
 } from '@/lib/ai-plan/regenerate'
@@ -619,7 +620,7 @@ function RegenerateJob({
       <PlanDayDiff current={toDiffRows(currentItems)} next={toNextDiffRows(nextItems)} />
 
       {/*
-        경고 두 줄과 저장 실패 표시는 확정 블록이 갖는다 — 훅이 붙은 이 뷰 안에 두면
+        경고와 저장 실패 표시는 확정 블록이 갖는다 — 훅이 붙은 이 뷰 안에 두면
         node 환경 렌더 테스트가 닿지 않아 검증에서 빠진다.
       */}
       <PlanDayRegenerateConfirm
@@ -631,8 +632,11 @@ function RegenerateJob({
         */
         applying={applying || placesLoading}
         error={saveError}
-        // 지금 이 날에 시각 있는 항목이 있을 때만 경고한다 (#623 · 명세 D14-6)
-        hasStartTime={currentItems.some((item) => item.startTime !== null)}
+        /*
+          지금 이 날에 **잃을 것이 있을 때만** 경고한다 — 항목(#984) · 다녀옴 표시(#984) ·
+          시각(#623 · 명세 D14-6). 셋을 같은 목록에서 한 번에 뽑는다
+        */
+        {...regenerateDayLoss(currentItems)}
       />
     </RegenerateShell>
   )

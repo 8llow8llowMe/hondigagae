@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   dayRegenerateBlock,
+  regenerateDayLoss,
   toDayRegeneratePayload,
   toRegeneratedDayItems,
 } from '@/lib/ai-plan/regenerate'
+import { planItem } from '@/test/fixtures/plan'
 import type { AiPlanDraft } from '@/types/ai-plan'
 import type { PlanDetail } from '@/types/plan'
 
@@ -223,5 +225,46 @@ describe('dayRegenerateBlock', () => {
   /* 날짜를 못 읽으면 막지 않는다 — `isPastPlan` 과 같은 판단이다 */
   it('날짜 형식이 아니면 막지 않는다', () => {
     expect(dayRegenerateBlock({ startDate: '2026/09/12', totalDays: 3 }, TODAY)).toBeNull()
+  })
+})
+
+/*
+  #984. 확정 블록의 경고는 **그 날 지금 잃을 것이 있을 때만** 선다 (R5 · D9-2 · D14-6 과
+  같은 규칙). 세 사실을 같은 항목 목록에서 한 번에 뽑아, 호출부가 조합을 따로 짓지 않게 한다.
+*/
+describe('regenerateDayLoss (#984)', () => {
+  it('빈 날에는 잃을 것이 없다', () => {
+    expect(regenerateDayLoss([])).toEqual({
+      hasItems: false,
+      hasVisited: false,
+      hasStartTime: false,
+    })
+  })
+
+  it('항목만 있고 다녀옴·시각이 없으면 항목만 잃는다', () => {
+    expect(regenerateDayLoss([planItem({ planItemId: '1', day: 1, sequence: 0 })])).toEqual({
+      hasItems: true,
+      hasVisited: false,
+      hasStartTime: false,
+    })
+  })
+
+  it('다녀옴 표시가 하나라도 있으면 다녀옴을 잃는다', () => {
+    const loss = regenerateDayLoss([
+      planItem({ planItemId: '1', day: 1, sequence: 0 }),
+      planItem({ planItemId: '2', day: 1, sequence: 1, visited: true }),
+    ])
+
+    expect(loss.hasItems).toBe(true)
+    expect(loss.hasVisited).toBe(true)
+  })
+
+  it('시각 있는 항목이 하나라도 있으면 시각을 잃는다 (#623)', () => {
+    const loss = regenerateDayLoss([
+      planItem({ planItemId: '1', day: 1, sequence: 0, startTime: '10:30:00' }),
+    ])
+
+    expect(loss.hasStartTime).toBe(true)
+    expect(loss.hasVisited).toBe(false)
   })
 })

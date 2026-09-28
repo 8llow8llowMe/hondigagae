@@ -1,7 +1,7 @@
 import { toDraftItems } from '@/lib/ai-plan/draft-to-plan'
 import { isDayBefore, todayDay } from '@/lib/date/day'
 import type { AiPlanDraft, AiPlanSubmitPayload } from '@/types/ai-plan'
-import type { PlanDetail, PlanItemRequest } from '@/types/plan'
+import type { PlanDetail, PlanItemDetail, PlanItemRequest } from '@/types/plan'
 
 /**
  * 하루 재생성 (#128 · 하루재생성-세부명세).
@@ -115,4 +115,29 @@ export function dayRegenerateBlock(
   if (plan.totalDays > AI_PLAN_MAX_TRIP_DAYS) return 'TRIP_DAYS_EXCEEDED'
 
   return null
+}
+
+/** 되붙이면 그 날 **지금** 잃는 것 (#984 · R5). 확정 블록의 경고가 이것을 그대로 받는다 */
+export type RegenerateDayLoss = {
+  /** 지금 항목이 하나라도 있다 — 없으면 "되돌릴 수 없다" 고 말할 것이 없다 */
+  hasItems: boolean
+  /** '다녀옴' 표시가 하나라도 있다 (D9-2) */
+  hasVisited: boolean
+  /** 시각 있는 항목이 하나라도 있다 (#623 · D14-6) */
+  hasStartTime: boolean
+}
+
+/**
+ * 그 날 지금 항목 → 잃는 것 (#984).
+ *
+ * **잃을 것이 없는 경고는 내지 않는다** — 늘 뜨는 경고는 배경음이 되어 정작 잃을 날에
+ * 읽히지 않는다 (D9-2 · D14-6 과 같은 판단). 세 사실을 **같은 목록에서 한 번에** 뽑으므로
+ * "항목은 없는데 다녀옴은 있다" 같은 있을 수 없는 조합이 생기지 않는다.
+ */
+export function regenerateDayLoss(items: readonly PlanItemDetail[]): RegenerateDayLoss {
+  return {
+    hasItems: items.length > 0,
+    hasVisited: items.some((item) => item.visited),
+    hasStartTime: items.some((item) => item.startTime !== null),
+  }
 }

@@ -18,12 +18,23 @@ export function PlanDayRegenerateConfirm({
   onApply,
   applying,
   error,
+  hasItems,
+  hasVisited,
   hasStartTime,
 }: {
   onApply: () => void
   applying: boolean
   /** 되붙이기 실패. `toPlanDaySaveError` 가 분류한 그대로다 */
   error: PlanDaySaveError | null
+  /**
+   * 이 날에 항목이 **지금** 하나라도 있는가 (#984 · 명세 R5).
+   *
+   * 빈 날은 잃을 것이 없다 — "사라지고 되돌릴 수 없어요" 는 화면 위의 `아직 담은 곳이
+   * 없어요` 와 서로 다른 말을 한다. 값은 `regenerateDayLoss` 가 뽑는다.
+   */
+  hasItems: boolean
+  /** 이 날에 '다녀옴' 표시가 **지금** 하나라도 있는가 (#984 · D9-2 와 같은 규칙) */
+  hasVisited: boolean
   /**
    * 이 날에 시각이 있는 항목이 **지금** 있는가 (#623 · 명세 D14-6).
    *
@@ -45,10 +56,16 @@ export function PlanDayRegenerateConfirm({
       인셋은 카드 안 글줄과 같은 축이다 — 버튼이 위 카드의 첫 글자와 세로선을 맞춘다.
     */
     <div className={cn('flex flex-col items-start gap-2 pb-4 md:pb-0', INSET_CLASS.card)}>
-      <p className="text-body-2 text-fg font-semibold">{messages.plan.regenerateDayIrreversible}</p>
-      <p className="text-caption text-fg-muted font-medium">
-        {messages.plan.regenerateDayVisitReset}
-      </p>
+      {hasItems && (
+        <p className="text-body-2 text-fg font-semibold">
+          {messages.plan.regenerateDayIrreversible}
+        </p>
+      )}
+      {hasVisited && (
+        <p className="text-caption text-fg-muted font-medium">
+          {messages.plan.regenerateDayVisitReset}
+        </p>
+      )}
       {hasStartTime && (
         <p className="text-caption text-fg-muted font-medium">
           {messages.plan.regenerateDayStartTimeReset}
@@ -63,7 +80,16 @@ export function PlanDayRegenerateConfirm({
       */}
       {error !== null && <FormAlert className="w-full" message={error.message} />}
 
-      <Button className="mt-2" onClick={onApply} loading={applying}>
+      {/*
+        **위 여백은 앞에 선 것이 있을 때만 준다** (#984). `mt-2` 는 경고 묶음과 액션을 가르는
+        값이라, 빈 날처럼 앞이 비면 스택 간격 위에 8px 이 더 얹혀 버튼만 떠 보인다.
+        `first:mt-0` 대신 조건으로 둔 것은 문자열 렌더 테스트가 닿게 하려는 것이다.
+      */}
+      <Button
+        className={cn((hasItems || hasVisited || hasStartTime || error !== null) && 'mt-2')}
+        onClick={onApply}
+        loading={applying}
+      >
         {messages.plan.regenerateDayApply}
       </Button>
     </div>
