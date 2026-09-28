@@ -174,12 +174,22 @@ public final class WalkSafetyEvaluator {
         return value >= thresholds.feelsLikeDangerCelsius() ? WalkSafetyLevel.DANGER : WalkSafetyLevel.CAUTION;
     }
 
+    /**
+     * 반려견 개별 조건(단두종 · 더위 민감).
+     *
+     * <p><b>반려견 기준 임계(28℃)는 기온과 체감온도 중 큰 값에 건다</b> — 적합도
+     * ({@link SuitabilityEvaluator} 고온 규칙)와 같은 기준이다 (#977). 기온만 보면 기온 27℃ ·
+     * 체감 29℃ 에서 적합도는 "더위에 약한 아이에게 부담" 이라 하고 산책은 "안전" 이라 해,
+     * 한 화면이 같은 체감온도를 두고 반대로 말한다. 기상청 폭염특보 척도(33/35)는 모든
+     * 반려견에 거는 체감온도 규칙({@code assessFeelsLike})에만 쓴다.
+     */
     private static WalkSafetyLevel assessPetSensitivity(
         PetCondition pet, double airTemperature, FeelsLikeTemperature feelsLike,
         SuitabilityThresholds thresholds, List<WalkSafetyReason> reasons
     ) {
+        double petHeat = Math.max(airTemperature, feelsLike.celsius());
         if (feelsLike.celsius() < thresholds.feelsLikeCautionCelsius()
-            && airTemperature < thresholds.hotTemperature()) {
+            && petHeat < thresholds.hotTemperature()) {
             return WalkSafetyLevel.SAFE;
         }
 
