@@ -26,6 +26,11 @@ describe('detailsSummary — 접힌 줄이 무엇이 정해졌는지 말한다',
     expect(summary).toBe('서귀포시 · 30만원')
   })
 
+  // #986 — 입력칸(`AmountInput`)과 같은 표기로 읽어 준다. 칸에는 1,500 인데 요약이 1500 이면 어긋난다
+  it('예산은 입력칸과 같이 천 단위 쉼표로 쓴다', () => {
+    expect(detailsSummary({ ...EMPTY, budgetManwon: '1500' })).toBe('제주 전체 · 1,500만원')
+  })
+
   it('켠 옵션만 뒤에 덧붙인다', () => {
     const summary = detailsSummary({
       ...EMPTY,
