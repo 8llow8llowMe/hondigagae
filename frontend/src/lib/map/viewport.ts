@@ -251,3 +251,26 @@ export function framedCamera(input: {
     level,
   }
 }
+
+/** 컨테이너 크기(px) */
+type ContainerSize = { width: number; height: number }
+
+/**
+ * 칸 크기가 바뀌었을 때 카메라를 **다시 맞출지** (#982, `MapCanvas` 의 `refitOnResize`).
+ *
+ * - 사용자가 옮겼으면(`moved`) 맞추지 않는다 — 그때 화면은 우리 틀이 아니라 사용자의 것이다
+ * - 크기가 그대로면 맞추지 않는다 — `observe` 직후 첫 알림이 늘 이것이고, 같은 틀을 한 번
+ *   더 놓으면 `onCameraApplied` 가 이유 없이 두 번 불린다
+ * - 새 크기에 0 인 변이 있으면 맞추지 않는다 — 칸이 탭·시트 뒤로 숨은 것이다. 그때 맞추면
+ *   대체 크기로 잰 엉뚱한 틀이 놓이고, 다시 보일 때 크기가 또 바뀌어 그때 맞추면 된다
+ */
+export function shouldRefit(input: {
+  fitted: ContainerSize
+  next: ContainerSize
+  moved: boolean
+}): boolean {
+  if (input.moved) return false
+  if (input.next.width <= 0 || input.next.height <= 0) return false
+
+  return input.next.width !== input.fitted.width || input.next.height !== input.fitted.height
+}
