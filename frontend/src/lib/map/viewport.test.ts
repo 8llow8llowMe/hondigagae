@@ -283,11 +283,11 @@ describe('framedCamera', () => {
 describe('levelForBoxMeters', () => {
   const ISSUE_BOX = { widthMeters: 72_453, heightMeters: 18_156 }
 
-  it('데스크톱 동선 칸(888×256)에서 카카오 setBounds 와 같은 10 이다', () => {
+  it('데스크톱 동선 칸(888×256)에서 10 이다', () => {
     expect(levelForBoxMeters(ISSUE_BOX, 888, 256)).toBe(10)
   })
 
-  it('모바일 동선 칸(358×224)에서 카카오 setBounds 와 같은 11 이다', () => {
+  it('모바일 동선 칸(358×224)에서 11 이다', () => {
     expect(levelForBoxMeters(ISSUE_BOX, 358, 224)).toBe(11)
   })
 
