@@ -5,6 +5,7 @@ import { messages } from '@/lib/messages'
 import { petEditPageTitle } from '@/lib/pet/detail-title'
 import { placeDetailFallbackTitle } from '@/lib/place/detail-title'
 import { planDetailTitle } from '@/lib/plan/detail-title'
+import { walkCourseDetailFallbackTitle } from '@/lib/walk-course/detail-title'
 import { readSourceWithoutComments as code } from '@/test/source'
 
 /**
@@ -61,6 +62,17 @@ const PAIRS: Pair[] = [
     heading: messages.pet.notFoundTitle,
     tab: petEditPageTitle(notFound('PET_001')),
   },
+  /*
+    **경계 파일이 없는 자리.** 올레 상세는 `notFound()` 를 부르지 않고(soft 200 — 본문이 서버
+    `resultMessage` 를 그려야 한다, `page.tsx` 머리주석) 화면 안에서 404 를 그린다. 그 갈래의
+    `h1` 은 `DetailShell` 의 `heading` 이다. 탭은 예전에 `제주올레 코스` 였다 (#980).
+  */
+  {
+    path: 'src/features/walk-course/walk-course-detail-section.tsx',
+    probe: '<DetailShell heading={messages.walkCourse.detailNotFoundTitle}>',
+    heading: messages.walkCourse.detailNotFoundTitle,
+    tab: walkCourseDetailFallbackTitle(notFound('WALKCOURSE_001')),
+  },
 ]
 
 describe('없는 대상 화면 — h1 과 탭 제목이 같은 말을 한다 (#980)', () => {
@@ -70,5 +82,29 @@ describe('없는 대상 화면 — h1 과 탭 제목이 같은 말을 한다 (#9
     expect(source).toContain(probe)
     expect(source.match(/<h1\b/g)).toHaveLength(1)
     expect(heading).toBe(tab)
+  })
+})
+
+/*
+  **판정 함수를 실제로 부르는가.** 위 표는 함수가 고르는 값을 보지만, `generateMetadata` 가 그
+  함수를 쓰지 않으면 아무 의미가 없다 — 올레 상세가 정확히 그랬다(catch 가 목록 제목을 직접
+  냈다). async server component 라 부를 수 없어 소스로 잠근다.
+*/
+const METADATA_CALLS: Array<{ page: string; call: string }> = [
+  { page: 'app/(main)/places/[placeId]/page.tsx', call: 'placeDetailFallbackTitle(error)' },
+  { page: 'app/(main)/plans/[planId]/page.tsx', call: 'planDetailTitle(error)' },
+  { page: 'app/(main)/pets/[petId]/page.tsx', call: 'petEditPageTitle(error)' },
+  {
+    page: 'app/(main)/olle/[walkCourseId]/page.tsx',
+    call: 'return walkCourseDetailFallbackMetadata(error)',
+  },
+]
+
+describe('generateMetadata 가 판정 함수로 제목을 정한다 (#980)', () => {
+  it.each(METADATA_CALLS)('$page', ({ page, call }) => {
+    const source = code(page)
+
+    expect(source).toContain('export async function generateMetadata')
+    expect(source).toContain(call)
   })
 })

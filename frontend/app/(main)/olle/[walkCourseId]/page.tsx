@@ -13,6 +13,7 @@ import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import { parseWalkCourseFilters, walkCourseFilterHref } from '@/lib/url/walk-course-filters'
+import { walkCourseDetailFallbackMetadata } from '@/lib/walk-course/detail-title'
 import { isWalkCourseId } from '@/lib/walk-course/id'
 import type { WalkCourseDetail } from '@/types/walk-course'
 
@@ -28,6 +29,13 @@ import type { WalkCourseDetail } from '@/types/walk-course'
  * **`notFound()` 를 부르지 않는다.** 404 화면이 **서버 `resultMessage` 를 그대로 노출하고**
  * `코스 목록으로` 를 주어야 하는데(`코스상세-세부명세.md` D5), `not-found.tsx` 는 그 문구를
  * 가질 수 없다 — 경계 파일은 왜 없는지를 모른다.
+ *
+ * **#980 이 이 결정을 다시 봤고 유지했다** (`코스상세-세부명세.md` D5-6). 장소·일정·반려견처럼
+ * `notFound()` + 전용 `not-found.tsx` 로 옮기면 상태는 404 가 되지만, 그 경계는 D5 가 확정한
+ * 서버 문구를 그릴 수 없어 FE 상수로 바꿔야 한다 — 확정 문구를 뒤집는 일이라 명세 결정이
+ * 먼저다. 대신 **soft 200 이 남기던 두 해악을 메타데이터로 줄였다**: 탭 제목이 본문 `h1` 과
+ * 같은 `없는 코스예요` 를 말하고(`walkCourseDetailFallbackTitle`), 404 는 `noindex` 라
+ * 크롤러가 없는 코스를 정상 페이지로 색인하지 않는다(`walkCourseDetailFallbackMetadata`).
  */
 type Params = Promise<{ walkCourseId: string }>
 
@@ -68,9 +76,13 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
       */
       alternates: { canonical: `/olle/${walkCourseId}` },
     }
-  } catch {
-    // 조회 실패를 메타데이터 단계에서 화면 실패로 만들지 않는다. 판정은 페이지가 한다
-    return { title: `${messages.walkCourse.pageTitle} · 혼디가개` }
+  } catch (error) {
+    /*
+      조회 실패를 메타데이터 단계에서 화면 실패로 만들지 않는다. **다만 제목은 본문과 같은
+      판정을 쓴다** (#980, `architecture-guide.md` §7 #206) — 예전 `catch {}` 는 404 도
+      목록 제목으로 뭉개서 탭이 `제주올레 코스` 로 남았다.
+    */
+    return walkCourseDetailFallbackMetadata(error)
   }
 }
 
