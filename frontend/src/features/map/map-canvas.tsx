@@ -299,6 +299,18 @@ export function MapCanvas({
      * "우리가 놓은 자리" 를 갱신하지 못해 재검색 버튼이 사라지지 않는다 (#578).
      */
     keepLevel?: boolean
+    /**
+     * **컨테이너 크기가 바뀌면 다시 맞춘다** (#982). 기본은 `false`.
+     *
+     * 사각형 카메라는 컨테이너 **폭**으로 단계를 정하므로, 창을 줄이거나 기기를 돌리면
+     * 처음 맞춘 단계가 새 폭에서 틀린다 (동선 카드). 원 카메라는 짧은 변만 보고, 그
+     * 화면들(`/emergency` 등)은 시트·패널이 크기를 자주 바꿔 되잡으면 사용자의 화면이
+     * 튄다 — 그래서 켜는 쪽이 고른다.
+     *
+     * **사용자가 지도를 옮겼거나 핀을 골랐으면 되잡지 않는다.** 그때 화면은 우리가 맞춘
+     * 틀이 아니라 사용자가 보고 있는 곳이다.
+     */
+    refitOnResize?: boolean
   } | null
   /**
    * 핀을 고르면 이 단계까지 **확대**한다. 주지 않으면 이동만 한다.
@@ -346,6 +358,8 @@ export function MapCanvas({
   const failureRef = useRef(onFailure)
   const cameraAppliedRef = useRef(onCameraApplied)
   const userMoveRef = useRef(onUserMove)
+  /** 마지막 카메라 뒤에 사용자가 지도를 옮겼거나 핀을 골랐는가 (`refitOnResize`) */
+  const movedSinceCameraRef = useRef(false)
   useEffect(() => {
     selectRef.current = onSelect
     boundsRef.current = onBoundsChange
@@ -634,6 +648,7 @@ export function MapCanvas({
 
     // 확대 단계를 안 받았으면 이동만 한다 — `zoomToward` 가 "이미 가깝다" 로 읽게 둔다
     const level = selectedLevel ?? map.getLevel()
+    movedSinceCameraRef.current = true
 
     return zoomToward({ map, target: new maps.LatLng(coord.lat, coord.lng), level, mapRef })
   }, [selectedId, selectedLevel])
@@ -664,39 +679,73 @@ export function MapCanvas({
     if (map === null || maps === null || container === null) return
     if (camera === null || camera === undefined) return
 
-    const next = framedCamera({
-      anchor: camera.anchor,
-      spanMeters: camera.spanMeters,
-      width: container.clientWidth,
-      height: container.clientHeight,
-      seaRatio: camera.anchorRatio ?? JEJU_MAP_SEA_RATIO,
-    })
+    /** 마지막으로 맞춘 컨테이너 크기 — 되잡기가 "정말 바뀌었나" 를 이것으로 잰다 */
+    let fitted = { width: -1, height: -1 }
+
+    const apply = () => {
+      fitted = { width: container.clientWidth, height: container.clientHeight }
+
+      const next = framedCamera({
+        anchor: camera.anchor,
+        spanMeters: camera.spanMeters,
+        width: fitted.width,
+        height: fitted.height,
+        seaRatio: camera.anchorRatio ?? JEJU_MAP_SEA_RATIO,
+      })
+
+      /*
+        **`keepLevel` 이면 지금 단계로 프레이밍한다** (#873). `framedCamera` 가 계산한
+        단계는 버리지만 **위도 폭 환산에는 단계가 필요하므로**(`framedCenterLat`) 지금
+        값을 대신 넣는다 — `next.lat` 을 그대로 쓰면 다른 배율로 잰 오프셋이 걸려 중심이
+        어긋난다. `anchorRatio` 가 0.5 면 어느 단계든 기준점과 같아 차이가 없지만,
+        0.35 갈래에서는 실제로 갈린다.
+      */
+      const level = camera.keepLevel === true ? map.getLevel() : next.level
+      const lat =
+        camera.keepLevel === true
+          ? framedCenterLat(
+              camera.anchor.lat,
+              fitted.height,
+              level,
+              camera.anchorRatio ?? JEJU_MAP_SEA_RATIO,
+            )
+          : next.lat
+
+      // **단계를 먼저, 중심을 나중에.** 순서가 뒤집히면 옛 중심을 확대한 뒤 옮기게 되어
+      // 한 프레임 동안 엉뚱한 곳이 보인다 (선택 핀 확대에서 같은 판단을 했다)
+      if (camera.keepLevel !== true) map.setLevel(next.level)
+      map.setCenter(new maps.LatLng(lat, next.lng))
+
+      // 놓은 자리를 알린다 — 바깥이 "사용자가 옮겼는지" 를 이 자리 기준으로 잰다 (#578)
+      cameraAppliedRef.current?.({ lat, lng: next.lng })
+    }
+
+    movedSinceCameraRef.current = false
+    apply()
+
+    if (camera.refitOnResize !== true) return
 
     /*
-      **`keepLevel` 이면 지금 단계로 프레이밍한다** (#873). `framedCamera` 가 계산한
-      단계는 버리지만 **위도 폭 환산에는 단계가 필요하므로**(`framedCenterLat`) 지금
-      값을 대신 넣는다 — `next.lat` 을 그대로 쓰면 다른 배율로 잰 오프셋이 걸려 중심이
-      어긋난다. `anchorRatio` 가 0.5 면 어느 단계든 기준점과 같아 차이가 없지만,
-      0.35 갈래에서는 실제로 갈린다.
+      **`observe` 직후의 첫 알림은 크기가 그대로라 건너뛴다** — 방금 맞춘 틀을 한 번 더
+      놓으면 `onCameraApplied` 가 이유 없이 두 번 불린다.
+
+      **`relayout()` 을 여기서 직접 먼저 부른다.** 아래 `relayout` effect 의 관찰자도 같은
+      컨테이너를 보지만, 관찰자는 만들어진 순서로 불리고 이 effect 는 카메라가 바뀔 때마다
+      관찰자를 새로 만든다 — 일자를 한 번 바꾸면 그쪽이 먼저 불린다는 보장이 사라진다.
+      SDK 가 옛 크기를 든 채 단계·중심을 놓으면 새 크기에서 중심이 어긋난다.
     */
-    const level = camera.keepLevel === true ? map.getLevel() : next.level
-    const lat =
-      camera.keepLevel === true
-        ? framedCenterLat(
-            camera.anchor.lat,
-            container.clientHeight,
-            level,
-            camera.anchorRatio ?? JEJU_MAP_SEA_RATIO,
-          )
-        : next.lat
+    const observer = new ResizeObserver(() => {
+      if (movedSinceCameraRef.current) return
+      if (container.clientWidth === fitted.width && container.clientHeight === fitted.height) {
+        return
+      }
 
-    // **단계를 먼저, 중심을 나중에.** 순서가 뒤집히면 옛 중심을 확대한 뒤 옮기게 되어
-    // 한 프레임 동안 엉뚱한 곳이 보인다 (선택 핀 확대에서 같은 판단을 했다)
-    if (camera.keepLevel !== true) map.setLevel(next.level)
-    map.setCenter(new maps.LatLng(lat, next.lng))
+      map.relayout()
+      apply()
+    })
+    observer.observe(container)
 
-    // 놓은 자리를 알린다 — 바깥이 "사용자가 옮겼는지" 를 이 자리 기준으로 잰다 (#578)
-    cameraAppliedRef.current?.({ lat, lng: next.lng })
+    return () => observer.disconnect()
   }, [camera, status])
 
   // ── 사용자의 직접 이동 (`onUserMove` 머리주석) ────────────────────────────
@@ -706,7 +755,10 @@ export function MapCanvas({
     const container = containerRef.current
     if (status !== 'ready' || map === null || maps === null || container === null) return
 
-    const notify = () => userMoveRef.current?.()
+    const notify = () => {
+      movedSinceCameraRef.current = true
+      userMoveRef.current?.()
+    }
     // 한 손가락 터치는 끌기라 `dragstart` 가 잡는다 — 여기서는 두 손가락(핀치)만 센다
     const onTouchStart = (event: TouchEvent) => {
       if (event.touches.length >= 2) notify()
