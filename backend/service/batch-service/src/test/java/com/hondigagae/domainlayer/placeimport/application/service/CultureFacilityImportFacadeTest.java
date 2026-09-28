@@ -37,6 +37,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 
 /**
  * 오케스트레이션 순서와 <b>지표를 남기는 자리</b>를 고정한다 (#379).
@@ -171,6 +172,34 @@ class CultureFacilityImportFacadeTest {
         // 데이터는 들어왔으니 신선도는 갱신된다 — 그래서 우회는 이 게이지로만 드러난다.
         verify(placeImportMetricsPort).recordLastSuccess(eq(PlaceSourceType.CULTURE_PORTAL), any(Instant.class));
         verify(placeImportMetricsPort).recordRows(PlaceSourceType.CULTURE_PORTAL, PlaceImportResultType.FALLBACK, 1);
+    }
+
+    @Test
+    @DisplayName("우회 적재가 0 건이면 우회 행도 남기지 않는다")
+    void emptyFallbackRecordsNothing() {
+        givenDecision(CultureFacilitySourceDecision.fallback(LOCAL_FILE));
+        given(cultureFacilityImportProcessor.importFacilities(LOCAL_FILE, SIDO))
+            .willReturn(new CultureFacilityImportOutcome(0, null));
+
+        facade().importFacilities(SIDO, false);
+
+        verify(importSourceSnapshotPort, never()).record(any());
+    }
+
+    @Test
+    @DisplayName("우회 행 기록이 실패하면 예외를 그대로 올리고 정리 경로는 탄다 — 삼키지 않는다")
+    void fallbackRowWriteFailurePropagates() {
+        CultureFacilitySourceDecision decision = CultureFacilitySourceDecision.fallback(LOCAL_FILE);
+        givenDecision(decision);
+        given(cultureFacilityImportProcessor.importFacilities(LOCAL_FILE, SIDO))
+            .willReturn(new CultureFacilityImportOutcome(228, null));
+        willThrow(new DataAccessResourceFailureException("import_source_snapshot 없음"))
+            .given(importSourceSnapshotPort).record(any());
+
+        // 우회 행이 없으면 포털 복귀 첫 실행이 건너뛴다. WARN 으로 접으면 그 사실이 묻힌다 (#887).
+        assertThatThrownBy(() -> facade().importFacilities(SIDO, false))
+            .isInstanceOf(DataAccessResourceFailureException.class);
+        verify(cultureFacilitySourceProcessor).cleanUp(decision);
     }
 
     @Test
