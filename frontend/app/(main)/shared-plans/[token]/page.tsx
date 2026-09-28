@@ -33,7 +33,6 @@ import type { SharedPlan } from '@/types/plan'
 type Params = Promise<{ token: string }>
 
 /**
-/**
  * `generateMetadata` 와 페이지 렌더가 같은 요청 안에서 백엔드를 두 번 부르지 않게 한다.
  * `serverFetch` 는 `cache: 'no-store'` 라 Next 의 fetch 중복 제거가 걸리지 않는다
  * (`places/[placeId]/page.tsx` 와 같은 패턴).
