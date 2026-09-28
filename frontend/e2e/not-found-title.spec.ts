@@ -37,5 +37,7 @@ test.describe('404 탭 제목 (#676)', () => {
     await page.goto('/pets/999999')
 
     await expect(page).toHaveTitle(`${messages.pet.notFoundTitle} · 혼디가개`)
+    // 문서의 최상위 제목도 같은 말을 한다 — 예전엔 `반려견 정보 수정` 이었다 (#980)
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(messages.pet.notFoundTitle)
   })
 })

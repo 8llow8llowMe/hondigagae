@@ -45,7 +45,10 @@ test.describe('없는 리소스의 상태 코드 (#563)', () => {
   */
   test('없는 반려견은 404 다 — 목록의 loading.tsx 가 상세를 감싸지 않는다', async ({ page }) => {
     expect(await statusOf(page, '/pets/999999')).toBe(404)
-    await expect(page.getByText('존재하지 않는 반려견이에요')).toBeVisible()
+    // `h1` 이 `sr-only` 로 같은 문장을 쓴다 (#980) — 보이는 쪽인 상태 제목만 잡는다
+    await expect(
+      page.getByRole('heading', { name: '존재하지 않는 반려견이에요', level: 2 }),
+    ).toBeVisible()
   })
 
   /*
