@@ -417,10 +417,12 @@ title  장소를 찾을 수 없어요            (catch 가 404 문구로 뭉갰
 | `(main)/plans/[planId]`(그 밖 — 성공·5xx·무응답, #905 R5) | `page.tsx` 의 `generateMetadata` + `planDetailTitle`         | `여행 일정 · 혼디가개`                  |
 | `(main)/pets/[petId]`(404)                                | `page.tsx` 의 `generateMetadata` + `petEditPageTitle`        | `존재하지 않는 반려견이에요 · 혼디가개` |
 
-**#980 이 남은 두 화면을 같은 규칙에 넣었다.** 둘 다 `not-found.tsx` 없이 `page.tsx` 의
-`generateMetadata` 가 판정 함수로 정한다.
+**#980 이 남은 두 화면을 같은 규칙에 넣었다.** 둘 다 `not-found.tsx` 의 `metadata` 가 아니라
+`page.tsx` 의 `generateMetadata` 가 판정 함수로 정한다 — 올레 상세는 `not-found.tsx` 자체가 없고,
+공유 페이지는 `shared-plans/[token]/not-found.tsx` 가 본문만 그린다.
 
-- `/olle/{없는 id}` — `없는 코스예요 · 혼디가개` + `noindex` (`walkCourseDetailFallbackMetadata`).
+- `/olle/{없는 id}` — `없는 코스예요 · 혼디가개` + `noindex` (`walkCourseDetailFallbackMetadata`,
+  proxy 를 통과한 범위 밖 숫자 id 의 400 도 `noindex`).
   **상태는 200 으로 남는다** — 본문이 서버 `resultMessage` 를 그려야 해서 `notFound()` 를
   부르지 않는다. 근거와 다시 열 조건은 `코스상세-세부명세.md` D5-6.
 - `/shared-plans/{무효 토큰}` — 404 `유효하지 않은 링크예요` · 410 `만료된 링크예요`
