@@ -117,6 +117,8 @@ idx_place_indoor_pet_available (indoor, petAvailable) ← 실내 대안 추천�
 
 `merged_into_id`가 채워진 행은 조회에서 제외한다. 물리 삭제하지 않는 이유는 원천 재적재 시 되살아나기 때문이다.
 
+비 오는 날 실내 대안(`PlaceProfileRepository.findIndoorWithinBox`)은 `indoor = true` · `petAvailable = true` 에 더해 **숙박(`32`) · 여행코스(`25`)를 뺀다** (#978). 숙박은 투숙객이 아니면 들어갈 수 없고 여행코스는 들어갈 장소가 아니라, 실내로 적혀 있어도 대안이 되지 못한다. 유형 조건은 `idx_place_indoor_pet_available` 로 좁힌 행 위의 잔여 필터라 인덱스를 새로 두지 않는다.
+
 ## 4. 중복 판정 규칙
 
 실측(문화정보원 여행용 171곳 × 관광 API 29곳)으로 검증한 결과다.

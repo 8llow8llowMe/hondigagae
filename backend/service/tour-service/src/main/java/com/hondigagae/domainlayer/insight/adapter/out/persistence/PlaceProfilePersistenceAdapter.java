@@ -40,7 +40,8 @@ public class PlaceProfilePersistenceAdapter implements PlaceProfileQueryPort {
                 BigDecimal.valueOf(criteria.lat() + latDelta),
                 BigDecimal.valueOf(criteria.lng() - lngDelta),
                 BigDecimal.valueOf(criteria.lng() + lngDelta),
-                criteria.excludePlaceId()
+                criteria.excludePlaceId(),
+                PlaceProfileRepository.NON_ENTERABLE_CONTENT_TYPE_IDS
             ).stream()
             // 사각 범위를 정확한 원형 반경으로 다듬고 가까운 순으로 자른다
             // (place-data-integration.md §9-2 와 같은 방식).
