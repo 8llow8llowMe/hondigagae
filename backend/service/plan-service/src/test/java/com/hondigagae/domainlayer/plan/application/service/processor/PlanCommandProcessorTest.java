@@ -115,6 +115,29 @@ class PlanCommandProcessorTest {
         assertThat(planPetRepositoryPort.saved.get(0).petId()).isEqualTo(saved.petId());
     }
 
+    /*
+     * 정책 고정 (#973). 직접 만들기는 지난 여행을 기록으로 받는다 — "오늘 이후" 제약은 예보가 있어야
+     * 짤 수 있는 AI 생성(AIPLAN_017)에만 있다. 이 테스트가 깨지면 FE 만들기·수정·복사 폼의 날짜 정책과
+     * frontend/docs/features/plan/공통명세.md S9 「날짜 정책」을 함께 바꿔야 한다.
+     */
+    @Test
+    @DisplayName("지난 날짜로도 만든다 — 다녀온 여행을 기록하는 일정이다")
+    void acceptsPastDatesAsRecord() {
+        PlanCreateCommand past = PlanCreateCommand.builder()
+            .petIds(List.of(2L))
+            .areaCode("39")
+            .title("몽실이와 다녀온 제주")
+            .startDate(LocalDate.of(2020, 5, 1))
+            .endDate(LocalDate.of(2020, 5, 3))
+            .items(List.of())
+            .build();
+
+        Plan saved = processor.createPlan(MEMBER_ID, past, processor.resolvePetIds(MEMBER_ID, past.petIds()));
+
+        assertThat(saved.startDate()).isEqualTo(LocalDate.of(2020, 5, 1));
+        assertThat(saved.endDate()).isEqualTo(LocalDate.of(2020, 5, 3));
+    }
+
     @Test
     @DisplayName("한 마리 지정도 조인 테이블에 남긴다 — 한 마리 일정과 여러 마리 일정을 같은 경로로 읽는다")
     void singlePetIsAlsoStoredInJoinTable() {
