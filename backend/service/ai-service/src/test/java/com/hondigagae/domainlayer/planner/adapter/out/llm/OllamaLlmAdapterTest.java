@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
+import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
 import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanDraft;
@@ -22,6 +23,7 @@ import java.net.SocketTimeoutException;
 import org.slf4j.LoggerFactory;
 import com.hondigagae.shared.travel.plan.PlanItemType;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -168,11 +170,11 @@ class OllamaLlmAdapterTest {
         stubResponse("""
             {"days":[{"day":1,"items":[
               {"itemType":"MEAL","placeId":100,"title":"점심","note":""},
-              {"itemType":"LODGING","placeId":100,"title":"숙소","note":""}]}],
+              {"itemType":"LODGING","placeId":200,"title":"숙소","note":""}]}],
              "reasons":[]}
             """);
 
-        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "오설록")));
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "오설록"), lodging(200L, "숙소")));
 
         assertThat(draft.days().get(0).items()).extracting(AiPlanDraft.AiPlanDraftItem::itemType)
             .containsExactly(PlanItemType.MEAL, PlanItemType.LODGING);
@@ -466,7 +468,7 @@ class OllamaLlmAdapterTest {
              "reasons":[]}
             """);
 
-        adapter.generatePlanDraft(query(candidate(100L, "제주 애월코스트34")));
+        adapter.generatePlanDraft(query(lodging(100L, "제주 애월코스트34")));
 
         assertThat(appender.list).noneMatch(event ->
             event.getFormattedMessage().contains("same place on multiple days"));
@@ -556,6 +558,92 @@ class OllamaLlmAdapterTest {
             .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage(text))), metadata));
     }
 
+    /*
+     * #975 의 dev 실측을 그대로 옮긴 고정 입력이다 (2026-10-07 ~ 10-08, 16~23℃). 모델은 요약에 이동 거리를
+     * 지어 적었고, 2일차에도 숙박을 넣었고, 콘도를 PLACE 로 적어 해안 산책 장소라고 설명했다.
+     */
+    @Test
+    @DisplayName("dev 실측 초안 — 마지막 날 숙박 0건, 거리 · 더위 근거 제거, 콘도는 숙박으로 바로잡힌다 (#975)")
+    void correctsDevDraftAgainstServerFacts() {
+        stubResponse("""
+            {"days":[
+              {"day":1,"items":[
+                {"itemType":"PLACE","placeId":300,"title":"함덕해수욕장","note":"오전에 바다를 보며 걸어요."},
+                {"itemType":"LODGING","placeId":200,"title":"휘닉스아일랜드콘도","note":"반려견과 쉬어요."}]},
+              {"day":2,"items":[
+                {"itemType":"PLACE","placeId":200,"title":"휘닉스아일랜드콘도","note":"해안가에서 가벼운 산책을 할 수 있는 실외 장소예요."},
+                {"itemType":"MEAL","placeId":400,"title":"N109","note":"실내 카페에서 쉬어요."},
+                {"itemType":"LODGING","placeId":200,"title":"휘닉스아일랜드콘도","note":"숙소로 돌아가요."}]}],
+             "reasons":[
+               {"code":"SHORT_DISTANCE","name":"짧은 이동","description":"각 일정 간 이동 거리가 짧아 반려견이 덜 지쳐요."},
+               {"code":"WEATHER_OK","name":"쾌적한 날씨","description":"맑은 날이에요. 한낮의 더위를 피할 수 있어요."},
+               {"code":"PET_ALLOWED","name":"동반 가능","description":"모든 장소가 반려견 동반 가능이에요."}]}
+            """);
+        AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
+            .areaCode("39")
+            .startDate("2026-10-07")
+            .endDate("2026-10-08")
+            .weatherOutlook(List.of(
+                mildDay(LocalDate.of(2026, 10, 7)), mildDay(LocalDate.of(2026, 10, 8))))
+            .placeCandidates(List.of(
+                new PlaceCandidate(300L, "함덕해수욕장", "관광지", "제주시 조천읍", "동반 가능", null, null, false, "해수욕장", 33.54, 126.67),
+                lodging(200L, "휘닉스아일랜드콘도"),
+                new PlaceCandidate(400L, "N109", "음식점", "제주시 구좌읍", "동반 가능", null, null, true, "카페", 33.55, 126.75)))
+            .build();
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query);
+
+        List<AiPlanDraft.AiPlanDraftItem> lastDay = draft.days().get(1).items();
+        assertThat(lastDay).extracting(AiPlanDraft.AiPlanDraftItem::itemType).doesNotContain(PlanItemType.LODGING);
+        assertThat(lastDay).extracting(AiPlanDraft.AiPlanDraftItem::title).containsExactly("N109");
+        assertThat(draft.days().get(0).items()).extracting(AiPlanDraft.AiPlanDraftItem::itemType)
+            .containsExactly(PlanItemType.PLACE, PlanItemType.LODGING);
+        assertThat(draft.reasons()).extracting(AiPlanDraft.AiPlanDraftReason::code)
+            .containsExactly("WEATHER_OK", "PET_ALLOWED");
+        assertThat(draft.reasons().get(0).description()).isEqualTo("맑은 날이에요.");
+    }
+
+    @Test
+    @DisplayName("숙박이 아닌 곳의 LODGING 은 되돌린다 — 음식점은 식사, 그 밖은 장소 (#975)")
+    void correctsLodgingOnNonLodgingPlaces() {
+        ListAppender<ILoggingEvent> appender = attachAppender();
+        stubResponse("""
+            {"days":[{"day":1,"items":[
+              {"itemType":"LODGING","placeId":100,"title":"오설록","note":""},
+              {"itemType":"LODGING","placeId":400,"title":"N109","note":""}]},
+              {"day":2,"items":[]}],
+             "reasons":[]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(candidate(100L, "오설록"),
+            new PlaceCandidate(400L, "N109", "음식점", "제주시 구좌읍", "동반 가능", null, null, true, "카페", 33.55, 126.75)));
+
+        assertThat(draft.days().get(0).items()).extracting(AiPlanDraft.AiPlanDraftItem::itemType)
+            .containsExactly(PlanItemType.PLACE, PlanItemType.MEAL);
+        assertThat(appender.list).anyMatch(event ->
+            event.getFormattedMessage().contains("non-lodging place on LODGING"));
+    }
+
+    @Test
+    @DisplayName("숙소에서 먹는 MEAL 은 식사로 남는다 — 마지막 날이어도 빠지지 않는다 (#975)")
+    void keepsMealAtLodgingOnLastDay() {
+        stubResponse("""
+            {"days":[{"day":1,"items":[]},
+              {"day":2,"items":[{"itemType":"MEAL","placeId":200,"title":"숙소 조식","note":""}]}],
+             "reasons":[]}
+            """);
+
+        AiPlanDraft draft = adapter.generatePlanDraft(query(lodging(200L, "휘닉스아일랜드콘도")));
+
+        assertThat(draft.days().get(1).items()).extracting(AiPlanDraft.AiPlanDraftItem::itemType)
+            .containsExactly(PlanItemType.MEAL);
+    }
+
+    private DayWeatherOutlook mildDay(LocalDate date) {
+        return DayWeatherOutlook.builder().date(date).skyStateName("맑음")
+            .maxPrecipitationProbability(10).minTemperature(16.0).maxTemperature(23.0).build();
+    }
+
     private void stubResponse(String text) {
         when(ollamaChatModel.call(any(Prompt.class)))
             .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage(text)))));
@@ -572,5 +660,9 @@ class OllamaLlmAdapterTest {
 
     private PlaceCandidate candidate(long placeId, String title) {
         return new PlaceCandidate(placeId, title, "관광지", "제주특별자치도", "동반 가능", null, null, true, "여행지", 33.5, 126.5);
+    }
+
+    private PlaceCandidate lodging(long placeId, String title) {
+        return new PlaceCandidate(placeId, title, "숙박", "제주특별자치도", "동반 가능", null, null, true, "펜션", 33.5, 126.5);
     }
 }
