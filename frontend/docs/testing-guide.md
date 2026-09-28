@@ -357,6 +357,10 @@ pnpm e2e:report     # 마지막 실행 리포트
 
 `.github/workflows/frontend-ci.yml` 의 **별도 `e2e` job** 이다. `pnpm verify`(= lint · typecheck · test) 안에 넣지 않는다 — 브라우저 내려받기와 서버 기동이 붙어 시간이 늘고, 직렬로 묶으면 lint 한 줄 때문에 레이아웃 결과를 못 보게 된다.
 
+**3 샤드로 나눠 돈다** ([#1004](https://github.com/8llow8llowMe/hondigagae/issues/1004)). 테스트가 36개(#467) → 285개로 늘며 `pnpm e2e` 한 단계가 262초, 잡 전체가 약 5분으로 `verify`(약 2.5분)의 두 배가 돼 PR 대기 시간을 정했다. 샤드마다 `pnpm e2e --shard=i/3` 를 돌고, 로그인 `setup` 프로젝트는 샤드마다 먼저 돈다. 체크 이름은 `e2e (1)` · `e2e (2)` · `e2e (3)`, 리포트 아티팩트는 `playwright-report-<샤드>` 다. 로컬은 샤드 없이 `pnpm e2e` 그대로다.
+
+**문서만 바뀐 PR 에서는 돌지 않는다** — `frontend/docs/**` · `frontend/**/*.md` 만 바뀌면 `changes` 잡이 `docs` 로 판정한다 (`DESIGN.md` 는 예외, `tooling-guide.md` §10). develop push 는 늘 전부 돈다 — base 스코프 캐시를 만드는 목적이다 ([#830](https://github.com/8llow8llowMe/hondigagae/issues/830)).
+
 **`continue-on-error` 는 걷었다** ([#587](https://github.com/8llow8llowMe/hondigagae/issues/587)). 연속 24회 무결로 선행 조건을 채웠다. **e2e 가 깨지면 워크플로가 빨간불이 된다.**
 
 **아직 required status check 는 아니다.** 저장소가 private + Free 라 브랜치 보호 API 가 403 이고, public 전환이냐 플랜 업그레이드냐를 고르는 결정이 남아 있다 ([#286](https://github.com/8llow8llowMe/hondigagae/issues/286)). 그때까지 **머지 버튼 자체는 막히지 않는다** — 빨간불을 보고도 머지하지 않는 것은 사람의 몫이다.

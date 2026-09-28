@@ -397,7 +397,13 @@ jobs:
 - `paths` 필터로 백엔드 PR에서는 돌지 않게 한다.
 - `--frozen-lockfile` 로 lockfile 불일치를 잡는다.
 - `pnpm build` 를 넣는 이유: **server/client 경계 오류는 빌드에서만 잡히는 것이 많다** (`architecture-guide.md` §4).
-- 백엔드 CI는 아직 없다. 필요하면 같은 형태로 별도 워크플로를 추가한다.
+- 위 yaml 은 뼈대다. 실제 워크플로에는 앞단의 `changes` 잡과 `e2e` 잡(3 샤드)이 더 있다 — `testing-guide.md` §12 "CI".
+- **문서만 바뀐 PR 은 `format:check` 만 돈다** ([#1004](https://github.com/8llow8llowMe/hondigagae/issues/1004)).
+  `frontend/docs/**` 와 그 밖의 `frontend/**/*.md` 만 바뀌면 `verify` 의 lint · typecheck · test · build 와
+  `e2e` 를 건너뛴다. **`frontend/DESIGN.md` 는 예외로 전부 돈다** — `src/test/tokens.ts` 가 그 파일을 읽는다.
+  판정은 `scripts/classify-frontend-changes.sh` 한 곳이고 pre-push 훅도 같이 쓴다. 테스트가 읽는 문서를 새로
+  만들면 그 스크립트의 `code` 목록에 더한다.
+- 백엔드는 `backend-ci` 워크플로가 따로 본다 (`docs/git-workflow.md` §6).
 
 ## 11. 디자인 토큰 코드 바인딩
 
