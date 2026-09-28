@@ -17,6 +17,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
+    // 반려견 삭제 직후 plan-service 에 동행 목록 대사를 요청한다 (#972) — 이 서비스의 첫 서비스 간 호출이다.
+    implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
     implementation 'org.springframework.cloud:spring-cloud-starter-circuitbreaker-resilience4j'
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
     implementation 'org.springframework.cloud:spring-cloud-starter-config'
@@ -26,4 +28,7 @@ dependencies {
     implementation 'org.mapstruct:mapstruct:1.6.3'
     annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
     annotationProcessor 'org.projectlombok:lombok-mapstruct-binding:0.2.0'
+
+    // 컨텍스트 로딩 게이트(AuthServiceApplicationTests)가 실제 DB 없이 JPA 매핑까지 조립해 본다.
+    testRuntimeOnly 'com.h2database:h2'
 }

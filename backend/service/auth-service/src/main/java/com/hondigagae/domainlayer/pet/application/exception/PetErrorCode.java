@@ -15,6 +15,9 @@ public enum PetErrorCode {
     // 30kg 소형견이 저장되면 적합도 판정이 "소형견만 가능" 장소를 동반 가능으로 읽는다 (#364).
     WEIGHT_SIZE_MISMATCH("PET_004", "체중과 크기 구분이 맞지 않습니다. 소형견 10kg 미만 · 중형견 10~25kg 미만 · 대형견 25kg 이상 기준으로 선택해 주세요.",
         HttpStatus.BAD_REQUEST),
+    // plan-service 내부 호출 실패 (#972). 지금은 삭제 트리거 어댑터 안에서만 쓰이고 응답으로 나가지 않는다 —
+    // 트리거 실패는 삭제를 막지 않고 04:10 배치가 이어받는다.
+    INTERNAL_SERVICE_UNAVAILABLE("PET_005", "연결된 내부 서비스를 일시적으로 사용할 수 없습니다.", HttpStatus.SERVICE_UNAVAILABLE),
 
     // 요청 검증(Bean Validation) 대역 — 1xx. 필드별 코드는 PetValidationMessage가 단일 기준점이다.
     INVALID_REQUEST("PET_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),

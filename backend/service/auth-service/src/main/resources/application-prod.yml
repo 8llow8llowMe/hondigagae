@@ -125,3 +125,9 @@ legal:
 member:
   withdrawn-email:
     pepper: ${WITHDRAWN_EMAIL_PEPPER}
+
+# 내부 호출 대상(lb://). Eureka 등록명에 -dev/-prod 접미사가 붙어 Feign name 을 env 로 받는다 (#972).
+feign-client:
+  target-services:
+    # 없으면 @FeignClient 기본값 "plan-service" 로 떨어져 등록명(-dev/-prod 접미사)을 못 찾는다.
+    plan-service: ${PLAN_SERVICE_APP_NAME}
