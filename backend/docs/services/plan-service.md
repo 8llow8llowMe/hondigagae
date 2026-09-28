@@ -27,6 +27,8 @@
 - `GET|POST|PUT /api/v1/plans/{planId}/reviews` — 일정당 후기 하나. 작성·수정은 완료된 일정만, 조회는 상태와 무관. 사진은 없음
 - `GET|POST|DELETE /api/v1/plans/{planId}/share-link` — 읽기 전용 공유 링크 발급·조회·폐기 (인증)
 - `GET /api/v1/shared-plans/{token}` — 공유 링크로 일정 열기 (**비인증**)
+- `GET /api/v1/plans/companions/{petId}` — 반려견 삭제 확인창용 동행 일정 집계 (인증, #972).
+  `{ petId, editablePlanCount, soleCompanionPlanCount, completedPlanCount }` — 아래 "반려견이 삭제되면" 절 참고
 
 ## 구현 주의점
 
@@ -515,14 +517,44 @@ CREATE TABLE plan_pet_condition (
 불변식이 이미 깨진 일정(조인 테이블에 행은 있는데 `plan.pet_id` 가 그 안에 없음)을 만나면 첫 행으로 복구하고
 **warn 로그**를 남긴다 — 복구는 코드가 하지만 어떻게 깨졌는지는 코드가 설명하지 못한다.
 
-**통신은 plan-service 의 대사(reconcile) 배치 하나뿐이다**
+**진입점은 둘이고 같은 `reconcileMember` 를 쓴다 — 삭제 트리거(즉시) + 새벽 배치(안전망) ([#972](https://github.com/8llow8llowMe/hondigagae/issues/972))**
+
+| 진입점 | 언제 | 실패하면 |
+| --- | --- | --- |
+| 삭제 트리거 `POST /internal/v1/plans/companions/reconcile?memberId=` | auth-service 가 반려견 소프트 삭제를 **커밋한 직후** 동기로 부른다 | auth 는 warn 로그만 남기고 삭제는 성공한다(200). 그 몫은 배치가 잇는다 |
+| `PlanCompanionReconcileScheduler` | 매일 04:10 | 회원 단위로 건너뛰고, 연속 5회면 회차 중단 (아래) |
+
+- **트리거는 "이 petId 를 떼라" 가 아니라 "이 회원을 지금 대사하라" 다.** 바디가 없고, plan 은 배치와 똑같이
+  auth 에 살아 있는 아이를 되묻고(`GET /internal/v1/pets/conditions`) 없는 아이만 뗀다. 그래서 호출자 버그나 임의의
+  memberId 로 두드려도 살아 있는 반려견이 일정에서 빠지지 않는다 — 결과는 새벽 배치가 그 회원을 돌린 것과 같다.
+- **트리거 파사드(`PlanInternalFacade.reconcileCompanions`)에는 `@Transactional` 이 없다.** 안에 auth 원격 조회가 있어
+  커넥션을 잡은 채 기다리게 되고, 트랜잭션은 배치와 같이 `PlanPetDetachProcessor` 가 일정 단위로 연다
+  (`PlanInternalFacadeTransactionTest` 가 고정). auth 조회 실패(`PLAN_900` 503)는 삼키지 않고 올린다 — 응답을 못 받은
+  것을 "전부 삭제됨" 으로 읽으면 안 되고, 호출한 auth 는 실패로 기록한 뒤 배치에 넘긴다.
+- **트리거·배치·사용자 수정이 같은 일정을 동시에 만나도 안전하다.** 아래 "일정 행 비관 잠금" 이 셋을 직렬화한다.
+  연속 삭제(한 회원이 두 마리를 연달아 지움)면 트리거가 같은 회원에 두 번 들어오는데 역시 같은 잠금으로 직렬화된다.
+- 응답은 `{ detached, representativeChanged, placeholderKept }` 다. auth 는 이 값으로 아무것도 결정하지 않고
+  로그에만 남긴다 — 배치 로그와 같은 눈금으로 "트리거가 실제로 무엇을 뗐는가" 를 읽기 위해서다.
+
+**#720 의 "auth → plan 푸시는 의도적으로 뺐다" 를 되돌렸다 (#972).** #720 은 auth 에 첫 아웃바운드 의존이 생기고
+auth ↔ plan 순환이 만들어진다는 이유로, 정리는 하루 늦어도 된다며 plan 이 물어보는 한 방향만 두었다. 그런데
+사용자 쪽에서 보면 "반려견을 지웠는데 일정 상세에 그 아이가 그대로 보인다" 는 **하루 동안의 버그**였다. 대가로 받아들인 것:
+
+- auth 에 첫 아웃바운드 의존(Feign, 서킷 `plan-service`)이 생겼고 호출이 **user → auth → plan → auth** 로 중첩된다.
+  plan 이 느리면 삭제 응답이 최대 connect 2s + read 5s 늦어진다. p99 가 문제가 되면 auth 쪽을 전용 executor 의
+  `@Async` 로 옮긴다(후속 후보).
+- 이 서비스의 **첫 변경형 내부 API** 인데 앱 레벨 내부 인증이 없다. `/internal/v1` 은 게이트웨이 라우트가 없다는 것이
+  유일한 보호 장치다. 트리거 의미라 두드려도 결과가 배치와 같다는 것으로 버티고, 공유 시크릿 헤더는 내부 엔드포인트
+  전체를 횡단하는 변경이라 별도 이슈로 둔다.
+
+**새벽 배치**
 
 `PlanCompanionReconcileScheduler`(`plan/adapter/in/scheduler/`)가 새벽에 돈다.
 cron 은 `plan-companion-reconcile.cron`(기본 `0 10 4 * * *`, 환경변수 `PLAN_COMPANION_RECONCILE_CRON`)이고
 `global/config/SchedulingConfig` 가 `@EnableScheduling` 을 켠다 — auth-service 의 같은 파일과 같은 자리다.
+트리거가 생긴 뒤에도 배치를 남기는 이유는 둘이다 — 트리거가 실패한 삭제(plan 다운·서킷 오픈·타임아웃·배포 순서가
+어긋나 경로가 없는 404)와 트리거 도입 전에 이미 남아 있던 행.
 
-- **auth → plan 푸시는 의도적으로 뺐다.** auth 에 첫 아웃바운드 의존이 생기고 auth ↔ plan 순환이 만들어진다.
-  정리는 하루 늦어도 되는 일이라 **plan 이 물어보는** 한 방향으로 둔다.
 - 처리 순서: 미완료·미삭제 일정을 가진 회원을 커서 페이지로 훑고 → 회원별로 그 일정들의 distinct `petIds` 를 모아
   `PetConditionQueryPort.findOwnedPetIds(memberId, petIds)` 한 번으로 생존 여부를 묻고 → 빠진 아이마다
   `PlanPetDetachProcessor.detachPet`. 회원마다 원격 호출 한 번인 것은 auth 의 내부 API 가 `memberId` 단위
@@ -676,6 +708,28 @@ petId, expectedPetId)` 는 **다른 컬럼을 건드릴 방법 자체가 없어*
 
 **API·DB 계약은 그대로다.** `plan.pet_id` 는 여전히 NOT NULL 이고, `petIds: []` 는 허용하지 않으며,
 `PLAN_010` / `PLAN_011` / `PLAN_019` 의 의미도 바뀌지 않는다. 이 작업은 **잔여 행 정리**뿐이다.
+
+**삭제 확인창 집계 — `GET /api/v1/plans/companions/{petId}` (#972)**
+
+반려견 삭제 확인창이 삭제 요청 **전에** 읽는다. memberId 는 JWT 에서 오고, 타인·없는 petId 는 `member_id = 나`
+조건에 걸려 404 가 아니라 **세 값이 모두 0** 이다(존재 여부를 따로 알려 주지 않는다).
+
+| 필드 | 뜻 | 정리 규칙과의 대응 |
+| --- | --- | --- |
+| `editablePlanCount` | 초안·확정·미삭제 일정 중 이 아이가 동행(대표 컬럼 OR `plan_pet`)인 일정 수 | R1 의 대상 |
+| `soleCompanionPlanCount` | 그중 동행 목록(`Plan.resolvePetIds`)이 이 아이 한 마리뿐인 일정 수. 조인 테이블 행이 없는 옛 일정의 대표도 든다 | R3 로 남는 일정 |
+| `completedPlanCount` | 완료 일정 중 이 아이가 동행인 일정 수 | R1 의 불가침 — 기록으로 남는다 |
+
+- 동행 판정 술어는 정리 쿼리(`findCompanionEditablePlansWithPet`)와 같고 `status in` 만 뺐다(`PlanRepository.findPlansWithPet`).
+  상태 분리는 `PlanStatus.isCompanionEditable()` 하나로 한다. 확인창이 말한 수와 실제 정리 결과가 갈라지지 않게 하려는 것이다.
+- 조회는 일정 목록 1회 + 편집 가능 일정의 `plan_pet` `in` 절 1회다 (§9-7, `PlanCompanionSummaryTest` 가 고정).
+- 게이트웨이는 기존 `/api/v1/plans/**` 라우트로 닿는다. 리터럴 `companions` 가 `/{planId}` 보다 구체적이라 Spring 매핑이 겹치지 않는다.
+
+**R3 로 남은 일정의 FE 표시 규칙.** 단독 동행 일정은 삭제 뒤에도 `petIds` 에 **죽은 petId 가 그대로** 남는다(의도).
+화면은 `petIds ∩ 내 반려견 목록` 이 비면 "동행 반려견 없음" 으로 보여 준다 — 서버가 그 id 를 걸러 내려보내지 않는다.
+
+**후속 후보 (이번에 하지 않은 것)** — R3 자리 표시자 대신 `plan.pet_id` nullable 화, 대표 반려견으로 자동 대체,
+트리거의 `@Async` 전환, 내부 API 공유 시크릿 인증.
 
 **잔여 행 탐지 (읽기 전용)**
 
@@ -1024,6 +1078,12 @@ tour-service 가 네 칸을 전부 채워 보낸다. **같은 서비스의 적�
 - 일차별 항목의 제목·유형·placeId 만 내보낸다. 메모·시간대 같은 개인 기록은 경계를 넘기지 않는다.
 - `petId`(대표)와 `petIds`(동행 전체)를 함께 내보낸다. ai-service 의 준비물 생성은 아직 `petId` 만 읽는다 — 다견 준비물은 ai 쪽 후속이다.
 - 내부 호출이라도 memberId 로 소유권을 다시 확인한다 — 남의 planId 로는 404.
+
+`POST /internal/v1/plans/companions/reconcile?memberId=` — auth-service 의 반려견 삭제 직후 동행 목록 대사 **트리거** (#972).
+
+- 바디 없음. "무엇을 떼라" 가 아니라 "이 회원을 지금 대사하라" 다 — 04:10 배치와 같은 `reconcileMember` 를 돈다.
+- 응답 `Response<{ detached, representativeChanged, placeholderKept }>` 200. auth 조회 실패면 `PLAN_900 INTERNAL_SERVICE_UNAVAILABLE` 503.
+- 이 서비스의 첫 **변경형** 내부 API 다. 앱 레벨 내부 인증은 없다 — 위 "반려견이 삭제되면" 절의 위험 참고.
 
 이 서비스가 **부르는** 내부 API (tour-service, 전부 벌크 1회 호출이다):
 

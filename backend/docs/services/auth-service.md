@@ -85,6 +85,10 @@
 - `PUT /api/v1/members/me/pets/{petId}/representative` — 대표 반려견 지정. 회원당 하나만 유지되며,
   첫 등록 반려견이 자동 대표가 되고 대표견 삭제 시 가장 먼저 등록한 남은 반려견이 승계한다.
 - 프로필에 체중(`weightKg`, 0.1~99.9kg)을 받는다 — 장소의 입장 체중 제한 판정과 AI 프롬프트에 쓰인다. 미입력 허용.
+- `DELETE /api/v1/members/me/pets/{petId}` — 소프트 삭제(`deleted=true`) + 대표 승계를 **커밋한 뒤** plan-service 에
+  동행 목록 대사를 요청한다 (#972, 아래 "이 서비스가 부르는 내부 API"). 요청이 실패해도 응답은 그대로 `Response<Void>` 200 이고,
+  못 한 정리는 plan-service 의 04:10 배치가 잇는다. 삭제 확인창의 "영향받는 일정 수" 는 이 서비스가 아니라
+  plan-service `GET /api/v1/plans/companions/{petId}` 가 준다 — 일정의 원천이 plan 이다.
 
 ## 구현 주의점
 
@@ -126,6 +130,29 @@
 - 응답에 **이름과 생년월을 넣지 않는다.** 날씨 적합도와 산책 위험도 판정에 필요 없고,
   서비스 경계를 넘는 개인정보는 최소로 유지한다. 견종은 단두종 판정에 실제로 쓰여 예외로 넘긴다.
 - 웹 응답(`PetResponse`)과 다른 DTO 를 쓰는 이유가 이것이다 — 내보내는 범위가 다르다.
+
+### 이 서비스가 부르는 내부 API (#972 — 첫 아웃바운드 호출)
+
+`POST /internal/v1/plans/companions/reconcile?memberId=` (plan-service) — 반려견 삭제 직후 동행 목록 대사 트리거.
+
+- **"이 petId 를 떼라" 가 아니라 "이 회원을 지금 대사하라" 다.** plan 이 이 서비스의 `GET /internal/v1/pets/conditions` 로
+  살아 있는 아이를 되묻고 없는 아이만 뗀다. 그래서 호출은 **삭제 커밋 뒤**여야 한다 — 커밋 전이면 plan 이 방금 지운 아이를
+  살아 있다고 읽어 아무것도 떼지 않고, 반대로 plan 이 뗀 뒤 여기서 롤백되면 살아 있는 아이가 일정에서 사라진다.
+- 그래서 `PetWebFacade.deletePet` 에는 `@Transactional` 이 없다. DB 구간(소프트 삭제 + 대표 승계 save)은
+  `PetCommandProcessor.delete` 가 스스로 트랜잭션을 열고 닫고, 파사드는 그 뒤에 포트(`PlanCompanionCommandPort`)를 부른다
+  (`PetWebFacadeTest` 가 호출 순서와 두 메서드의 트랜잭션 어노테이션을 고정).
+- **실패는 삭제를 막지 않는다.** `PlanCompanionClientAdapter` 가 서킷 오픈·타임아웃·5xx·404(엔드포인트가 없는 옛 버전의 plan)를
+  전부 warn 로그로 삼킨다. 404 도 실패로 보는 이유는 대상이 항상 200 으로 답하는 엔드포인트라 404 가 "경로 없음" 이기 때문이다.
+- 서킷 인스턴스 `plan-service`(`base-config: default`). 서킷은 Feign 호출만 감싸고 `PetInternalResponseSupport` 가
+  `CallNotPermittedException`·`FeignException` 을 `PET_005 INTERNAL_SERVICE_UNAVAILABLE`(503)로 바꾼다 — 이 코드는 어댑터
+  안에서만 쓰이고 응답으로 나가지 않는다. 4xx(`FeignClientException`)와 `PetException` 은 `ignore-exceptions` 로 집계에서 뺀다.
+- Feign `name` 은 `${feign-client.target-services.plan-service:plan-service}` 이고 dev/prod 는 `PLAN_SERVICE_APP_NAME` 으로 받는다
+  (compose 가 넘긴다). 타임아웃은 connect 2s / read 5s(`INTERNAL_CLIENT_*_TIMEOUT_MS`).
+- **`@Async` 로 빼지 않았다.** 삭제가 드문 조작이라 최대 7초 지연을 감당할 만하고, 같은 요청 스레드가 로그 상관관계와
+  실패 관측에 낫다. 호출이 user → auth → plan → auth 로 중첩된다는 것이 알고 받아들인 비용이다 — p99 가 문제가 되면 전용
+  executor 로 옮긴다.
+- 이 호출로 auth → plan 의존이 생겨 plan → auth(반려견 특성 조회)와 **양방향**이 됐다. 기동 순서 의존은 없다 —
+  Feign 은 호출 시점에 대상을 찾는다.
 
 ## 다중 기기 로그인 세션
 

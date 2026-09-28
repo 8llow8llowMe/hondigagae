@@ -16,6 +16,9 @@
   - `POST /api/v1/members/signup`, `GET|PATCH /api/v1/members/me`
   - `POST|DELETE /api/v1/members/me/profile-image`, `POST /api/v1/members/me/password`, `POST /api/v1/members/me/withdraw`
   - `GET|POST /api/v1/members/me/pets`, `GET|PUT|DELETE /api/v1/members/me/pets/{petId}`
+- **첫 아웃바운드 서비스 간 호출** (#972): 반려견 삭제를 커밋한 뒤 plan-service `POST /internal/v1/plans/companions/reconcile`
+  를 Feign 으로 부른다(서킷 `plan-service`). best-effort 라 실패해도 삭제는 성공하고 plan 의 04:10 대사 배치가 잇는다.
+  세부는 `services/auth-service.md` "이 서비스가 부르는 내부 API".
 - 상태: 구현. 원본의 북마크(관심 상권)는 도메인이 달라 제외했다.
 
 ## Tour Service
@@ -58,6 +61,8 @@
 - 날씨 브리핑은 적합도를 **다시 계산하지 않고** tour-service 결과를 그대로 옮긴다. 같은 규칙을
   두 곳에서 구현하면 일정 화면과 장소 화면이 같은 날 같은 곳을 다르게 말하게 된다.
   반려견 특성은 auth-service 내부 API(`/internal/v1/pets/conditions`, 벌크)에서 받는다.
+- 반려견이 삭제되면 동행 목록에서 떼어낸다 — auth 의 삭제 트리거(`POST /internal/v1/plans/companions/reconcile`)가 즉시,
+  04:10 대사 배치가 안전망으로 같은 로직을 돈다. 삭제 확인창용 집계는 `GET /api/v1/plans/companions/{petId}` (#972).
 - 상태: 구현 (plan 컨텍스트, 후기 v1 포함). **미착수**: 후기 사진·공개, 일정 공유
 
 ## AI Service

@@ -163,7 +163,7 @@ yml 목록(`infra.redis.sentinels`)도 계속 받지만 로컬용 탈출구다 �
 - `POST|DELETE /api/v1/members/me/profile-image`, `POST /api/v1/members/me/password`
 - `GET|POST|PUT|DELETE /api/v1/members/me/pets` — 반려견 프로필 (품종, 크기, 민감도, 활동 성향)
 
-**특수 의존**: `core:security-core`의 `auth/` 패키지 (JWT 발급 전용), `core:redis-core` (토큰/OAuth state/이메일 인증/로그인 잠금), `core:storage-core` (프로필 이미지)
+**특수 의존**: `core:security-core`의 `auth/` 패키지 (JWT 발급 전용), `core:redis-core` (토큰/OAuth state/이메일 인증/로그인 잠금), `core:storage-core` (프로필 이미지), plan-service Feign 호출 (반려견 삭제 직후 동행 목록 대사 트리거, 내부 경로, #972 — 이 서비스의 유일한 서비스 간 호출)
 
 ---
 
