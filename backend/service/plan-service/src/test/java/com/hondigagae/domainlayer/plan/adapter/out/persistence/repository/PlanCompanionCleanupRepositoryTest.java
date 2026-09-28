@@ -90,6 +90,33 @@ class PlanCompanionCleanupRepositoryTest {
     }
 
     @Test
+    @DisplayName("확인창 집계 입력은 상태를 가리지 않는다 — 완료 일정도 나오고, 삭제·남의 일정은 빠진다 (#972)")
+    void findsEveryLivePlanCarryingThePetRegardlessOfStatus() {
+        savePlan(901L, MEMBER_ID, MONGSIL, PlanStatus.DRAFT, false);
+        savePlanPets(901L, MONGSIL, BORI);                                  // 두 번째 반려견 - 조인 테이블로 히트
+        savePlan(902L, MEMBER_ID, BORI, PlanStatus.CONFIRMED, false);       // 옛 일정 - 대표 컬럼으로 히트
+        savePlan(903L, MEMBER_ID, BORI, PlanStatus.COMPLETED, false);       // 완료 - 집계에는 나온다
+        savePlanPets(903L, BORI);
+        savePlan(904L, MEMBER_ID, BORI, PlanStatus.DRAFT, true);            // 삭제됨
+        savePlan(905L, OTHER_MEMBER_ID, BORI, PlanStatus.DRAFT, false);     // 남의 일정
+        savePlan(906L, MEMBER_ID, MONGSIL, PlanStatus.DRAFT, false);        // 이 아이가 없는 일정
+        savePlanPets(906L, MONGSIL);
+
+        List<PlanEntity> found = planRepository.findPlansWithPet(MEMBER_ID, BORI);
+
+        assertThat(found).extracting(PlanEntity::getId).containsExactly(901L, 902L, 903L);
+    }
+
+    @Test
+    @DisplayName("확인창 집계 입력도 대표 컬럼과 조인 테이블이 겹칠 때 일정을 한 번만 낸다")
+    void plansWithPetDoesNotDuplicateWhenBothSourcesMatch() {
+        savePlan(901L, MEMBER_ID, MONGSIL, PlanStatus.COMPLETED, false);
+        savePlanPets(901L, MONGSIL, BORI);
+
+        assertThat(planRepository.findPlansWithPet(MEMBER_ID, MONGSIL)).hasSize(1);
+    }
+
+    @Test
     @DisplayName("회원의 정리 대상 일정 전부 — 완료·삭제·남의 일정은 빠지고 id 오름차순이다")
     void findsEveryEditablePlanOfTheMember() {
         savePlan(903L, MEMBER_ID, MONGSIL, PlanStatus.CONFIRMED, false);

@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.plan.application.service;
 
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanSummaryItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanBriefingResponse;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanCompanionSummaryResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanDetailResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanEmergencyResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanWeatherResponse;
@@ -104,6 +105,12 @@ public class PlanWebFacade implements PlanWebUseCase {
     public SliceResponse<PlanSummaryItem> getMyPlans(long memberId, Long petId, Long lastPlanId, int size) {
         Slice<PlanSummaryInfo> slice = planQueryProcessor.getMyPlans(memberId, petId, lastPlanId, size);
         return planPresenter.toSliceResponse(slice);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PlanCompanionSummaryResponse getCompanionSummary(long memberId, long petId) {
+        return planPresenter.toCompanionSummaryResponse(planQueryProcessor.getCompanionSummary(memberId, petId));
     }
 
     @Override

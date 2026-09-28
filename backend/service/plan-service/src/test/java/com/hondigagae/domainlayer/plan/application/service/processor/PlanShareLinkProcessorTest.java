@@ -308,6 +308,11 @@ class PlanShareLinkProcessorTest {
         }
 
         @Override
+        public List<Plan> findPlansWithPet(long memberId, long petId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public List<Plan> findCompanionEditablePlans(long memberId) {
             throw new UnsupportedOperationException("공유 링크 경로는 동행견 정리를 쓰지 않는다");
         }

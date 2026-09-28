@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.plan.application.service.processor;
 
 import com.hondigagae.domainlayer.plan.application.exception.PlanErrorCode;
 import com.hondigagae.domainlayer.plan.application.exception.PlanException;
+import com.hondigagae.domainlayer.plan.application.info.PlanCompanionSummaryInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemInfo;
 import com.hondigagae.domainlayer.plan.application.info.PlanItemPlaceInfo;
@@ -255,6 +256,41 @@ public class PlanQueryProcessor {
             .collect(Collectors.groupingBy(PlanPet::planId));
 
         return plans.map(plan -> toSummaryInfo(plan, plan.resolvePetIds(petsByPlanId.get(plan.id()))));
+    }
+
+    /**
+     * 반려견 삭제 확인창 집계 (#972) — 이 아이를 지우면 어느 일정이 어떻게 바뀌는가.
+     *
+     * <p><b>정리 규칙과 같은 선을 쓴다</b>({@code PlanPetDetachProcessor}). 편집 가능 여부는
+     * {@link com.hondigagae.domainlayer.plan.domain.enums.PlanStatus#isCompanionEditable()} 하나로 가르고,
+     * "유일한 동행" 은 R3 가 발동하는 조건 — 동행 목록({@link Plan#resolvePetIds})이 이 아이 한 마리뿐인
+     * 일정 — 과 같다. 조인 테이블 행이 없는 옛 일정도 대표 한 마리가 곧 목록이라 여기에 든다.
+     * 확인창이 말한 것과 실제 정리 결과가 어긋나면 사용자는 확인창을 믿지 않게 된다.
+     *
+     * <p>조회는 일정 목록 한 번 + 조인 테이블 {@code in} 절 한 번이다 (§9-7). 타인의 petId 는
+     * {@code member_id} 조건에 걸려 자연히 0 으로 나온다 — 존재 여부를 따로 알려 주지 않는다.
+     */
+    public PlanCompanionSummaryInfo getCompanionSummary(long memberId, long petId) {
+        List<Plan> plans = planRepositoryPort.findPlansWithPet(memberId, petId);
+        List<Plan> editablePlans = plans.stream().filter(plan -> plan.status().isCompanionEditable()).toList();
+        int completedPlanCount = plans.size() - editablePlans.size();
+
+        int soleCompanionPlanCount = 0;
+        if (!editablePlans.isEmpty()) {
+            Map<Long, List<PlanPet>> petsByPlanId = planPetRepositoryPort
+                .findByPlanIds(editablePlans.stream().map(Plan::id).toList()).stream()
+                .collect(Collectors.groupingBy(PlanPet::planId));
+            soleCompanionPlanCount = (int) editablePlans.stream()
+                .filter(plan -> List.of(petId).equals(plan.resolvePetIds(petsByPlanId.get(plan.id()))))
+                .count();
+        }
+
+        return PlanCompanionSummaryInfo.builder()
+            .petId(petId)
+            .editablePlanCount(editablePlans.size())
+            .soleCompanionPlanCount(soleCompanionPlanCount)
+            .completedPlanCount(completedPlanCount)
+            .build();
     }
 
     private PlanItemInfo toItemInfo(

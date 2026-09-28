@@ -12,10 +12,13 @@ import org.springframework.stereotype.Component;
  * 삭제된 반려견을 일정 동행 목록에서 걷어내는 대사(reconcile) 배치 (#720).
  *
  * <p>반려견은 auth-service 에서 소프트 삭제되고 일정은 plan-service DB 에 있다. 스키마가 갈라져
- * FK 가 없으므로 삭제된 아이의 {@code plan_pet} 행이 그대로 남는다. auth 가 plan 을 부르는 푸시
- * 대신 <b>plan 이 주기적으로 물어보는</b> 한 방향을 택했다 — auth 에 첫 아웃바운드 의존과
- * auth ↔ plan 순환을 만들지 않기 위해서다. 정리 규칙 자체는
- * {@code PlanPetDetachProcessor} 에 있다.
+ * FK 가 없으므로 삭제된 아이의 {@code plan_pet} 행이 그대로 남는다.
+ *
+ * <p><b>이 배치는 안전망이다 (#972).</b> 즉시 정리는 auth-service 가 반려견 삭제를 커밋한 직후
+ * 내부 트리거({@code POST /internal/v1/plans/companions/reconcile})로 한다. 트리거는 best-effort 라
+ * plan 다운·서킷 오픈·타임아웃이면 건너뛰고, 그 몫을 이 배치가 이어받는다. 두 진입점은 <b>같은</b>
+ * {@code PlanCompanionReconcileProcessor.reconcileMember} 를 쓰고, 일정 행 비관 잠금이 트리거·배치·
+ * 사용자 수정을 직렬화한다. 정리 규칙 자체는 {@code PlanPetDetachProcessor} 에 있다.
  *
  * <p><b>기존 잔여 행도 이 배치가 정리한다.</b> 첫 회차가 이미 남아 있던 행을 함께 걷으므로
  * 배포 전후에 운영 DB 로 DML 을 돌릴 필요가 없다.

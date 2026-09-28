@@ -12,12 +12,22 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * 회원 한 명의 동행 반려견을 원천(auth-service)과 대사한다 (#720).
+ * 회원 한 명의 동행 반려견을 원천(auth-service)과 대사한다 (#720, #972).
  *
- * <p><b>왜 푸시가 아니라 대사인가</b> — auth-service 가 반려견 삭제 시 plan-service 를 부르게
- * 하면 auth 에 첫 아웃바운드 의존이 생기고 auth ↔ plan 순환이 만들어진다. 정리는 하루 늦어도
- * 되는 일이라 <b>plan 이 물어보는</b> 한 방향으로 둔다. 기존 잔여 행도 이 배치의 첫 회차가
- * 함께 정리하므로 별도 마이그레이션 DML 이 없다.
+ * <p><b>진입점이 둘이고 둘 다 이 메서드를 쓴다.</b>
+ * <ul>
+ *   <li><b>삭제 트리거(즉시)</b> — auth-service 가 반려견 삭제를 커밋한 직후
+ *       {@code POST /internal/v1/plans/companions/reconcile} 로 부른다 (#972)</li>
+ *   <li><b>새벽 배치(안전망)</b> — {@code PlanCompanionReconcileScheduler} 가 04:10 에 회원 전체를 훑는다.
+ *       트리거가 실패했거나(plan 다운·서킷 오픈·타임아웃) 트리거 도입 전에 남은 행을 걷는다</li>
+ * </ul>
+ * 트리거도 "이 petId 를 떼라" 가 아니라 "이 회원을 지금 대사하라" 다 — 살아 있는 아이를 원천에 다시
+ * 묻고 없는 아이만 떼므로 호출자 버그로 멀쩡한 동행견이 빠지지 않는다. #720 은 "하루 늦어도 된다" 며
+ * auth → plan 푸시를 뺐지만, 삭제 직후 일정 상세에 지운 아이가 그대로 보이는 것이 사용자에게는 버그였다
+ * (#972). 그 대가로 auth 에 첫 아웃바운드 의존(auth → plan → auth 중첩 호출)이 생겼다.
+ *
+ * <p><b>트리거·배치·사용자 수정이 동시에 같은 일정을 만나도 안전하다.</b> 일정 단위 트랜잭션 안의
+ * 재조회가 일정 행을 비관 잠금으로 잡아({@code PlanPetDetachProcessor}) 셋을 직렬화한다.
  *
  * <p><b>회원마다 원격 호출 한 번은 줄이지 않는다.</b> auth 의 벌크 내부 API 가 {@code memberId}
  * 단위 계약({@code GET /internal/v1/pets/conditions?memberId=&petIds=})이라 회원을 가로질러

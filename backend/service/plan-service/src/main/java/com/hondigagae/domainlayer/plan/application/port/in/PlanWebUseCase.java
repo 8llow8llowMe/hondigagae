@@ -2,6 +2,7 @@ package com.hondigagae.domainlayer.plan.application.port.in;
 
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.item.PlanSummaryItem;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanBriefingResponse;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanCompanionSummaryResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanDetailResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanEmergencyResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanWeatherResponse;
@@ -20,6 +21,12 @@ public interface PlanWebUseCase {
     PlanDetailResponse copyPlan(long memberId, long planId, PlanCopyCommand command);
 
     SliceResponse<PlanSummaryItem> getMyPlans(long memberId, Long petId, Long lastPlanId, int size);
+
+    /**
+     * 반려견 삭제 확인창용 집계 (#972) — 이 반려견이 동행한 내 일정이 삭제로 어떻게 바뀌는가.
+     * 타인의 반려견이면 전부 0 이다(존재 여부를 따로 알려 주지 않는다).
+     */
+    PlanCompanionSummaryResponse getCompanionSummary(long memberId, long petId);
 
     PlanDetailResponse getPlan(long memberId, long planId);
 

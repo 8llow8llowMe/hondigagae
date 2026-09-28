@@ -28,6 +28,14 @@ public interface PlanRepositoryPort {
      */
     List<Plan> findCompanionEditablePlansWithPet(long memberId, long petId);
 
+    /**
+     * 반려견 삭제 확인창 집계 입력 (#972) — 한 회원의 <b>미삭제</b> 일정 중 이 반려견을 실은 것 전부.
+     *
+     * <p>상태를 가리지 않는다 — 완료 일정도 나온다. 동행 판정 술어는
+     * {@link #findCompanionEditablePlansWithPet} 과 같다(대표 컬럼 OR 조인 테이블).
+     */
+    List<Plan> findPlansWithPet(long memberId, long petId);
+
     /** 한 회원의 미완료·미삭제 일정 전부. 어떤 반려견이 실려 있는지 모으기 위한 입력이다. */
     List<Plan> findCompanionEditablePlans(long memberId);
 
