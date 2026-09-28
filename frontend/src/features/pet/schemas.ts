@@ -35,7 +35,7 @@ export const petFormSchema = z
     name: z.string().trim().min(1, messages.pet.nameRequired).max(20, messages.pet.nameLength),
     // PET_103 — 선택 입력이라 빈 값을 허용한다
     breed: z.string().trim().max(50, messages.pet.breedLength),
-    // PET_104
+    // PET_104 — 규칙만 같다. 문구는 서버 것을 따르지 않는다 (#999, messages.pet.birthYmFormat)
     birthYm: optionalBirthYm,
     // PET_105 — RadioGroup 이 값을 고정하므로 실질적으로는 2차 방어다
     sizeType: z.enum(PET_SIZE_CODES, { message: messages.pet.sizeTypeRequired }),
