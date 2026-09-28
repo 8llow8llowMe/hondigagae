@@ -30,6 +30,8 @@ public final class PetFieldParser {
     // PetAllowanceScope (place_pet_info.allowance_scope, #877)
     public static final String SCOPE_FULL_AREA = "FULL_AREA";
     public static final String SCOPE_PARTIAL = "PARTIAL";
+    /** 이 파서가 내지는 않는다(원천에서 본 적이 없다). 동반 가능 여부 재계산(#886)이 읽으므로 이름을 여기 한곳에 둔다. */
+    public static final String SCOPE_OUTDOOR_ONLY = "OUTDOOR_ONLY";
     public static final String SCOPE_UNKNOWN = "UNKNOWN";
 
     /** "5kg 이하", "10kg이하", "훈련된 5KG 이하" 등에서 무게를 뽑는다. */

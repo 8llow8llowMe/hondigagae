@@ -36,6 +36,7 @@ class JdbcPlacePetAllowanceAdapterTest {
                 title VARCHAR(200) NOT NULL,
                 pet_allowance_type VARCHAR(20) NOT NULL DEFAULT 'UNKNOWN',
                 allowed_pet_size VARCHAR(20) NOT NULL DEFAULT 'UNKNOWN',
+                pet_available BOOLEAN NOT NULL DEFAULT FALSE,
                 merged_into_id BIGINT NULL,
                 delisted_at DATETIME(6) NULL,
                 updated_at DATETIME(6) NULL
@@ -85,6 +86,12 @@ class JdbcPlacePetAllowanceAdapterTest {
         assertThat(valuesOf(5L)).isEqualTo("UNKNOWN/UNKNOWN");
         assertThat(valuesOf(6L)).isEqualTo("UNKNOWN/UNKNOWN");
         assertThat(valuesOf(7L)).isEqualTo("PARTIALLY_ALLOWED/SMALL_ONLY");
+        // pet_available 은 동반 구분을 따른다 — ALLOWED · PARTIALLY_ALLOWED 만 true
+        assertThat(petAvailableOf(1L)).isTrue();
+        assertThat(petAvailableOf(2L)).isFalse();
+        assertThat(petAvailableOf(3L)).isTrue();
+        assertThat(petAvailableOf(6L)).isFalse();
+        assertThat(petAvailableOf(7L)).isTrue();
         // 흡수 행이 여럿이어도 대상은 한 번만 센다
         assertThat(outcome.targets()).isEqualTo(7);
         assertThat(outcome.changed()).isEqualTo(5);
@@ -122,6 +129,7 @@ class JdbcPlacePetAllowanceAdapterTest {
 
         processor.reflectPetAllowances();
         assertThat(valuesOf(1L)).isEqualTo("ALLOWED/SMALL_ONLY");
+        assertThat(petAvailableOf(1L)).isTrue();
         assertThat(valuesOf(2L)).isEqualTo("NOT_ALLOWED/SMALL_MEDIUM");
 
         assertThat(processor.reflectPetAllowances().changed()).isZero();
@@ -132,6 +140,7 @@ class JdbcPlacePetAllowanceAdapterTest {
 
         assertThat(valuesOf(1L)).isEqualTo("UNKNOWN/UNKNOWN");
         assertThat(valuesOf(2L)).isEqualTo("UNKNOWN/UNKNOWN");
+        assertThat(petAvailableOf(1L)).isFalse();
         assertThat(reverted.changed()).isEqualTo(2);
     }
 
@@ -158,5 +167,9 @@ class JdbcPlacePetAllowanceAdapterTest {
     private String valuesOf(long placeId) {
         return jdbcTemplate.queryForObject("SELECT CONCAT(pet_allowance_type, '/', allowed_pet_size) FROM place WHERE id = ?",
             String.class, placeId);
+    }
+
+    private boolean petAvailableOf(long placeId) {
+        return Boolean.TRUE.equals(jdbcTemplate.queryForObject("SELECT pet_available FROM place WHERE id = ?", Boolean.class, placeId));
     }
 }

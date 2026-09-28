@@ -14,11 +14,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * TourAPI 장소의 동반 가능 여부 · 크기 제한 재계산 어댑터 (#886).
+ * TourAPI 장소의 동반 가능 여부 · 크기 제한 · {@code pet_available} 재계산 어댑터 (#886).
  *
- * <p><b>이 두 컬럼의 TourAPI 행 소유자는 이 어댑터다.</b> TourAPI 적재({@code JdbcPlaceBulkAdapter.UPSERT_SQL})는 INSERT
- * 리터럴 {@code 'UNKNOWN'} 만 넣고 UPDATE 절에 두 컬럼을 두지 않으며, 병합은 두 컬럼을 옮기지 않는다
+ * <p><b>이 세 컬럼의 TourAPI 행 소유자는 이 어댑터다.</b> TourAPI 적재({@code JdbcPlaceBulkAdapter.UPSERT_SQL})는 INSERT
+ * 리터럴({@code 'UNKNOWN'} · {@code false})만 넣고 UPDATE 절에 세 컬럼을 두지 않으며, 병합은 세 컬럼을 옮기지 않는다
  * ({@code JdbcPlaceBulkAdapterSqlTest} 가 둘 다 고정한다). 그래서 재적재 · 재병합이 여기서 채운 값을 지우지 않는다.
+ *
+ * <p><b>대상이 TourAPI 노출 행뿐인 것은 병합의 전제에 기댄다</b> — {@code PlaceMergeProcessor} 는 survivor 를 TOUR_API,
+ * 흡수 대상을 CULTURE_PORTAL 로 고정한다. 병합 조합이 넓어지면(예: 식약처 흡수, 문화정보원 survivor) 흡수 행을 받은
+ * 다른 원천의 survivor 도 근거를 가지게 되므로 이 대상 조건도 함께 넓혀야 한다.
  *
  * <p>SQL 은 MySQL 과 H2(MODE=MySQL) 양쪽에서 도는 모양만 쓴다 — 이유는 {@code PlacePetAllowanceReflectProcessor}.
  */
@@ -36,6 +40,7 @@ public class JdbcPlacePetAllowanceAdapter implements PlacePetAllowanceCommandPor
         SELECT p.id,
                p.pet_allowance_type,
                p.allowed_pet_size,
+               p.pet_available,
                ppi.allowance_scope AS pet_info_scope,
                ppi.allowed_pet_size AS pet_info_size,
                absorbed.pet_allowance_type AS absorbed_allowance,
@@ -54,6 +59,7 @@ public class JdbcPlacePetAllowanceAdapter implements PlacePetAllowanceCommandPor
         UPDATE place
            SET pet_allowance_type = ?,
                allowed_pet_size = ?,
+               pet_available = ?,
                updated_at = NOW()
          WHERE id = ?
            AND source = 'TOUR_API'
@@ -76,7 +82,8 @@ public class JdbcPlacePetAllowanceAdapter implements PlacePetAllowanceCommandPor
                 ReflectedPetAllowance reflection = reflections.get(i);
                 ps.setString(1, reflection.allowance().name());
                 ps.setString(2, reflection.size().name());
-                ps.setLong(3, reflection.placeId());
+                ps.setBoolean(3, reflection.petAvailable());
+                ps.setLong(4, reflection.placeId());
             }
 
             @Override
@@ -102,7 +109,7 @@ public class JdbcPlacePetAllowanceAdapter implements PlacePetAllowanceCommandPor
                     evidences.add(current.toQueryResult());
                 }
                 current = new PlaceRows(placeId, rs.getString("pet_allowance_type"), rs.getString("allowed_pet_size"),
-                    rs.getString("pet_info_scope"), rs.getString("pet_info_size"));
+                    rs.getBoolean("pet_available"), rs.getString("pet_info_scope"), rs.getString("pet_info_size"));
             }
             current.addAbsorbed(rs.getString("absorbed_allowance"), rs.getString("absorbed_size"));
         }
@@ -118,15 +125,19 @@ public class JdbcPlacePetAllowanceAdapter implements PlacePetAllowanceCommandPor
         private final long placeId;
         private final String currentAllowance;
         private final String currentSize;
+        private final boolean currentPetAvailable;
         private final String petInfoScope;
         private final String petInfoSize;
         private final List<String> absorbedAllowances = new ArrayList<>();
         private final List<String> absorbedSizes = new ArrayList<>();
 
-        private PlaceRows(long placeId, String currentAllowance, String currentSize, String petInfoScope, String petInfoSize) {
+        private PlaceRows(
+            long placeId, String currentAllowance, String currentSize, boolean currentPetAvailable, String petInfoScope, String petInfoSize
+        ) {
             this.placeId = placeId;
             this.currentAllowance = currentAllowance;
             this.currentSize = currentSize;
+            this.currentPetAvailable = currentPetAvailable;
             this.petInfoScope = petInfoScope;
             this.petInfoSize = petInfoSize;
         }
@@ -142,8 +153,8 @@ public class JdbcPlacePetAllowanceAdapter implements PlacePetAllowanceCommandPor
         }
 
         private PlacePetAllowanceEvidenceQueryResult toQueryResult() {
-            return new PlacePetAllowanceEvidenceQueryResult(placeId, currentAllowance, currentSize, petInfoScope, petInfoSize,
-                absorbedAllowances, absorbedSizes);
+            return new PlacePetAllowanceEvidenceQueryResult(placeId, currentAllowance, currentSize, currentPetAvailable,
+                petInfoScope, petInfoSize, absorbedAllowances, absorbedSizes);
         }
     }
 }
