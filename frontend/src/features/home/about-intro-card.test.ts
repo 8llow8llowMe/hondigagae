@@ -9,7 +9,7 @@ import { readSourceWithoutComments as source } from '@/test/source'
 
 /** 비로그인 홈의 서비스 소개 카드 (#950) */
 describe('AboutIntroCard', () => {
-  const markup = renderToStaticMarkup(createElement(AboutIntroCard))
+  const markup = renderToStaticMarkup(createElement(AboutIntroCard, { onDismiss: () => {} }))
 
   it('/about 으로 간다', () => {
     expect(markup).toContain('href="/about"')
@@ -60,15 +60,39 @@ describe('AboutIntroCard', () => {
 
   /* 닫으면 다음 방문에도 서지 않아야 한다 — 화면에서 치우기만 하면 새로고침에 되살아난다 */
   it('× 는 쿠키를 쓰고 치운다', () => {
-    expect(dismissHandler()).toMatch(/markAboutSeen\(\)\s*setDismissed\(true\)/)
+    expect(dismissHandler()).toMatch(/markAboutSeen\(\)\s*onDismiss\(\)/)
   })
 
-  /* 누른 버튼이 사라지면 초점이 body 로 떨어진다 — 다음 카드(AI 배너)의 링크로 넘긴다 */
+  /*
+    **닫기 상태는 부르는 쪽이 갖는다** (#963). 홈은 폭마다 사본을 하나씩 두고 보이는 쪽만 그린다
+    — 카드가 제 상태를 가지면 한쪽 × 가 다른 쪽을 치우지 못해, 닫은 뒤 창을 1024 너머로 바꾸면
+    숨었던 사본이 선다.
+  */
+  it('닫기 상태를 스스로 갖지 않는다 — onDismiss 로 올린다', () => {
+    const card = source('src/features/home/about-intro-card.tsx')
+
+    expect(card).not.toContain('useState')
+    expect(card).not.toContain('setDismissed')
+  })
+
+  /*
+    누른 버튼이 사라지면 초점이 body 로 떨어진다 — 이 사본의 다음 카드로 넘긴다. 두 자리 모두
+    다음 형제가 곧 다음 카드다: 좌(1024 미만) → AI 배너, 우(1024 이상) → `오늘 갈 만한 곳`.
+  */
   it('닫으면 초점을 다음 카드로 넘긴다', () => {
     const handler = dismissHandler()
 
     expect(handler).toContain("?.nextElementSibling?.querySelector<HTMLElement>('a, button')")
-    expect(handler).toMatch(/setDismissed\(true\)\s*next\?\.focus\(\)/)
+    expect(handler).toMatch(/onDismiss\(\)\s*next\?\.focus\(\)/)
+  })
+
+  /* 자리는 부르는 쪽이 정한다 — 받은 표시 클래스를 자기 `Surface` 에 그대로 붙인다 */
+  it('className 을 Surface 에 붙인다', () => {
+    const placed = renderToStaticMarkup(
+      createElement(AboutIntroCard, { className: 'hidden lg:block', onDismiss: () => {} }),
+    )
+
+    expect(/<section[^>]*>/.exec(placed)?.[0] ?? '').toMatch(/class="[^"]*\bhidden lg:block\b/)
   })
 
   /*
@@ -80,7 +104,7 @@ describe('AboutIntroCard', () => {
 
     expect(card).toContain('() => hasSeenAboutIn(document.cookie)')
     expect(card).toMatch(/hasSeenAboutIn\(document\.cookie\),\s*\(\) => false,?\s*\)/)
-    expect(card).toContain('if (dismissed || seen) return null')
+    expect(card).toContain('if (seen) return null')
   })
 
   /* 서버 스냅숏이 false 라 서버 렌더에서는 카드가 선다 — 위의 markup 이 그 증거다 */
