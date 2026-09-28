@@ -61,3 +61,33 @@ test.describe('홈 첫 방문 — 대표 지점 판정 (390)', () => {
     await expect(register).toHaveAttribute('href', '/pets/new')
   })
 })
+
+/*
+  **서비스 소개 카드는 폭마다 한 장 · 첫 화면 안** (#963). 카드는 두 자리(좌 `lg:hidden` ·
+  우 `hidden lg:block`)에 그려지고 CSS 가 하나만 보인다 — 문자열 단언은 두 사본을 다 "있다" 고
+  답하므로 실제 가시성은 여기서 잰다. `getByRole` 은 `display: none` 을 빼므로 개수 1 이 곧
+  "보이는 사본 하나 · 숨은 사본은 접근성 트리에 없음" 이다.
+*/
+for (const viewport of [
+  VIEWPORTS.mobile,
+  { width: 1024, height: 768 },
+  { width: 1280, height: 800 },
+]) {
+  test.describe(`홈 첫 방문 — 서비스 소개 카드 (${viewport.width}×${viewport.height})`, () => {
+    test.use({ storageState: { cookies: [], origins: [] }, viewport })
+
+    test('소개 카드 링크가 하나만 보이고 스크롤 없이 첫 화면 안에 있다', async ({ page }) => {
+      await page.goto('/')
+      await page.waitForLoadState('networkidle')
+
+      const intro = page
+        .getByRole('main')
+        .getByRole('link', { name: new RegExp(messages.home.aboutIntroTitle) })
+
+      await expect(intro).toHaveCount(1)
+      await expect(intro).toHaveAttribute('href', '/about')
+      await expect(intro).toBeInViewport({ ratio: 1 })
+      expect(await page.evaluate(() => window.scrollY)).toBe(0)
+    })
+  })
+}

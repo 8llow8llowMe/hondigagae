@@ -3,7 +3,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { RegionalWeatherSection } from '@/features/home/regional-weather-section'
+import {
+  RegionalWeatherSection,
+  RegionalWeatherSkeleton,
+} from '@/features/home/regional-weather-section'
 import { mockRegionalWeather } from '@/lib/api/mock/insight-data'
 import { messages } from '@/lib/messages'
 import type { RegionalWeatherResponse } from '@/types/insight'
@@ -493,5 +496,14 @@ describe('RegionalWeatherSection — 최저기온 (#352)', () => {
     })
 
     expect(markup).not.toContain('<span class="flex flex-col items-start">')
+  })
+})
+
+describe('RegionalWeatherSkeleton — 높이 (#963)', () => {
+  it('마지막 칸이 h-40 이다 — 1024 이상에서 바로 아래 소개 카드가 데이터 도착 때 밀리지 않게', () => {
+    // 실측(2026-09-28): 실화면 267(768+) · 277(375). h-24 이던 골격 206 · 198 은 카드를 61px 밀었다
+    const markup = renderToStaticMarkup(createElement(RegionalWeatherSkeleton))
+    expect(markup).toContain('h-40 w-full')
+    expect(markup).not.toContain('h-24')
   })
 })

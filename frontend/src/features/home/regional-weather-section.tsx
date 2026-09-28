@@ -491,6 +491,11 @@ function levelOf(score: number): string {
  *
  * **홈 `loading.tsx` 도 이것을 그린다** (#907) — 권역 비교는 클라이언트가 조회하므로
  * 폴백이 풀린 직후에도 이 골격이 서 있다. 두 벌로 두면 그 순간 카드 높이가 갈린다.
+ *
+ * **높이를 실화면에 맞춘다** (#963). 1024 이상에서 홈 소개 카드가 이 섹션 바로 아래 첫 화면
+ * 안에 서므로, 골격과 실화면의 높이 차가 곧 그 카드의 밀림이다. 마지막 칸이 `h-24` 이던 동안
+ * 골격 206 · 실화면 267(768 이상, 375 는 198 · 277)이라 데이터가 오면 카드가 61px 내려갔다.
+ * `h-40` 으로 270 · 262 — 밀림 −3 · 15.
  */
 export function RegionalWeatherSkeleton() {
   return (
@@ -498,7 +503,7 @@ export function RegionalWeatherSkeleton() {
       <div aria-hidden className="flex flex-col gap-3 px-4 py-4 md:px-5 md:py-5">
         <Skeleton className="h-5 w-36" />
         <Skeleton className="h-6 w-52" />
-        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-40 w-full" />
       </div>
     </Surface>
   )
