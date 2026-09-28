@@ -134,11 +134,26 @@ export function PlanCreateForm({
         **종료일이 비어 있을 때만 연다.** 이미 잡은 일정의 시작일만 하루 미루는 것은 흔한
         조작인데, 그때도 달력이 튀어나오면 참견이 된다.
       */}
+      {/*
+        **시작일에 `min={today}` 를 걸지 않는다 — 지난 여행도 기록으로 만든다** (#973).
+        서버도 생성·수정·복사 모두 과거 날짜를 받는다 (`PlanCommandProcessor.validateDateRange`
+        "과거 날짜는 기록용으로 허용한다"). 오늘 이후만 받는 것은 **예보가 있어야 짤 수 있는**
+        AI 생성(`AIPLAN_017`)뿐이다.
+
+        대신 **지난 날짜를 고른 순간 무엇이 달라지는지 말한다.** 지난 날은 예보가 없어 날씨·
+        적합도가 비고, 상세가 그 자리를 "지난 날이라 확인할 수 없어요" 로 채운다 — 만든 뒤에
+        처음 알게 하지 않는다.
+      */}
       <div className="flex flex-col gap-5 sm:flex-row sm:gap-4">
         <Field
           id="startDate"
           label={messages.plan.fieldStartDate}
           required
+          hint={
+            values.startDate !== '' && values.startDate < today
+              ? messages.plan.pastStartDateHint
+              : undefined
+          }
           error={errors.fields.startDate}
           className="flex-1"
         >

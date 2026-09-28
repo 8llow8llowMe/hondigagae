@@ -94,6 +94,21 @@ describe('만들기 폼 — 화면', () => {
     expect(html).toContain('2026년 9월 14일 (월)')
   })
 
+  /* 지난 날짜는 막지 않는다 — 서버도 기록용으로 받는다. 대신 무엇이 비는지 말한다 (#973) */
+  it('지난 시작일을 고르면 기록용이라 날씨·적합도가 없다고 말한다', () => {
+    const html = render({ values: values({ startDate: '2026-08-30', endDate: '2026-08-31' }) })
+
+    expect(html).toContain(messages.plan.pastStartDateHint)
+  })
+
+  it('오늘 · 미래 시작일에는 그 안내가 없다', () => {
+    expect(
+      render({ values: values({ startDate: '2026-09-02', endDate: '2026-09-03' }) }),
+    ).not.toContain(messages.plan.pastStartDateHint)
+    expect(render({ values: values() })).not.toContain(messages.plan.pastStartDateHint)
+    expect(render()).not.toContain(messages.plan.pastStartDateHint)
+  })
+
   it('예산은 number 가 아니다 — 휠 스크롤로 값이 바뀌면 안 된다', () => {
     const html = render()
     expect(html).toContain('inputMode="numeric"')

@@ -257,9 +257,9 @@ export function PlanEditModal({
           **시작일에 `max` 를 걸지 않는다.** 걸면 기간을 통째로 뒤로 옮기려는 사람이 종료일
           부터 고쳐야 하고, 그 순서를 화면이 알려 줄 방법이 없다 (`plan-create-form.tsx`).
 
-          **`min={today}` 도 걸지 않는다.** 만들기와 달리 이미 시작한 일정·지난 일정을
-          고치는 경우가 있고, 서버도 수정에는 "오늘 이후" 제약을 두지 않는다
-          (`PlanUpdateRequest` — 그 제약은 AI 생성의 `AIPLAN_017` 뿐이다).
+          **`min={today}` 도 걸지 않는다.** 만들기와 같다 — 이미 시작한 일정·지난 일정을
+          고치는 경우가 있고, 서버도 생성·수정에 "오늘 이후" 제약을 두지 않는다 (지난 여행은
+          기록으로 받는다 · #973). 그 제약은 AI 생성의 `AIPLAN_017` 뿐이다.
         */}
         <div className="flex flex-col gap-4 sm:flex-row">
           <Field
