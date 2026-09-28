@@ -207,6 +207,7 @@ JobParameter 로 넘긴다. 시간대를 트리거가 직접 못박는 이유는
 | 받은 파일이 CSV 가 아님 (점검 안내 HTML 등) | 위와 같음 (`CULTURE_DOWNLOAD_INVALID` → 우회) | 없음 |
 | 전송이 끊겨 파일이 잘림 | `Content-Length` 와 실제 바이트 수를 대조해 거부. 위와 같이 우회 | 없음 |
 | 스냅샷 테이블 조회 실패 (미생성 등) | "모른다"로 접고 그냥 내려받아 적재. `culture facility snapshot unavailable` WARN | 없음 (30MB 를 한 번 더 받을 뿐) |
+| 스냅샷 기록 실패 (테이블 없음 등) | 적재는 끝났지만 기록 INSERT 가 예외를 올려 **잡이 FAILED** 다 (삼키지 않는다). 우회였다면 우회 행이 없으므로, 포털 복귀 첫 실행이 `skipped=true` 로 끝나면 그 잡만 `forceImport=true` 1회 | 없음 (적재된 값은 남는다) |
 | 포털도 막히고 로컬 우회 파일도 없음 | 잡 실패 (`CULTURE_CSV_NOT_FOUND`) | 없음 |
 | 올레 포털 페이지·다운로드 티켓·CSV 어느 단계든 실패 (`SOURCE_PAGE_FAILED` 받기 실패 · `SOURCE_PAGE_INVALID` 버튼/티켓 이상 · `SOURCE_CIRCUIT_OPEN` · `DOWNLOAD_*`) | **로컬 우회 파일로 적재**하고 계속. `olle course source fallback=local` WARN + 완료 로그 `fallback=true`. 스냅샷에는 **우회 행**을 남긴다 (#887). 지표 `walk_course_import_rows{result="fallback"}` 으로 드러난다 (#876) | 없음 (데이터가 낡을 뿐) |
 | 올레 포털도 막히고 로컬 우회 파일도 없음 | 잡 실패 (`CSV_NOT_FOUND`) | 없음 |
@@ -258,6 +259,9 @@ JobParameter 로 넘긴다. 시간대를 트리거가 직접 못박는 이유는
 남는 틈. 우회 적재가 **도중에 실패하면**(행 일부만 upsert 된 채 예외) 우회 행이 남지 않는다 — 스냅샷은
 마지막 포털 적재분을 가리킨 채 DB 일부만 우회 값으로 바뀌었을 수 있다. 이 경우는 잡 실패로 드러난다.
 그 뒤 첫 포털 실행이 `skipped=true` 로 끝났다면 그 잡만 `forceImport=true` 로 한 번 돌린다.
+우회 적재는 끝났는데 **우회 행 기록 INSERT 가 실패한 경우**(테이블 없음·DB 순단)도 같다 — 잡은 FAILED 로 드러나고
+우회 행은 없으니 같은 절차를 따른다. 또 문화정보원 우회 파일에서 **장소가 0건이고 긴급 시설만 적재되면** 우회 행을
+남기지 않는다(`imported > 0` 일 때만 기록). 우회 파일이 장소 없이 동물병원·약국만 담을 일은 드물어 그대로 둔다.
 
 확인 쿼리 — 최신 행이 `LOCAL_FALLBACK` 이면 지금 DB 에는 우회 파일 값이 들어 있고, 다음 포털 실행이 다시 적재한다.
 
