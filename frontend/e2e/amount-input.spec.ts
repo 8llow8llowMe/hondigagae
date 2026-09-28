@@ -66,12 +66,74 @@ test.describe('예산 입력 천 단위 쉼표 (#986)', () => {
     await expect(budget).toHaveValue('')
   })
 
+  /*
+    **첫 자리를 지워도 남은 자릿수가 살아 있다** (#986 리뷰 HIGH). 예전에는 지우기로 생긴 앞자리
+    0 까지 떼어 `3|00,000` → 3 지우기 → `0` 이 됐고, 5 를 치면 `50` 이었다.
+  */
+  test('만들기 폼 — 첫 자리를 지우고 다시 치면 500,000 이다', async ({ page }) => {
+    await page.goto('/plans/new')
+    const budget = page.locator('#budget')
+
+    // 3|00,000 → 백스페이스 → 5
+    await budget.pressSequentially('300000')
+    await placeCaret(page, budget, 1)
+    await page.keyboard.press('Backspace')
+    await expect(budget).toHaveValue('00,000')
+    expect(await caretOf(budget)).toBe(0)
+    await page.keyboard.type('5')
+    await expect(budget).toHaveValue('500,000')
+    expect(await caretOf(budget)).toBe(1)
+
+    // 3,|000 쉼표 뒤 백스페이스 → 3 이 지워진다 → 7
+    await budget.fill('')
+    await budget.pressSequentially('3000')
+    await placeCaret(page, budget, 2)
+    await page.keyboard.press('Backspace')
+    await expect(budget).toHaveValue('000')
+    await page.keyboard.type('7')
+    await expect(budget).toHaveValue('7,000')
+
+    // |300,000 에서 Delete → 5
+    await budget.fill('')
+    await budget.pressSequentially('300000')
+    await placeCaret(page, budget, 0)
+    await page.keyboard.press('Delete')
+    await expect(budget).toHaveValue('00,000')
+    await page.keyboard.type('5')
+    await expect(budget).toHaveValue('500,000')
+  })
+
+  test('만들기 폼 — 지우고 남은 앞자리 0 은 포커스를 떠날 때 정리된다', async ({ page }) => {
+    await page.goto('/plans/new')
+    const budget = page.locator('#budget')
+
+    await budget.pressSequentially('300000')
+    await placeCaret(page, budget, 1)
+    await page.keyboard.press('Backspace')
+    await expect(budget).toHaveValue('00,000')
+
+    await budget.blur()
+    await expect(budget).toHaveValue('0')
+  })
+
+  test('만들기 폼 — 직접 친 소수점은 무시한다', async ({ page }) => {
+    await page.goto('/plans/new')
+    const budget = page.locator('#budget')
+
+    await budget.pressSequentially('300000')
+    await placeCaret(page, budget, 2)
+    await page.keyboard.type('.')
+    await expect(budget).toHaveValue('300,000')
+    expect(await caretOf(budget)).toBe(2)
+  })
+
   test('만들기 폼 — 붙여넣기는 숫자만 남긴다', async ({ page, context }) => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])
     await page.goto('/plans/new')
     const budget = page.locator('#budget')
 
-    for (const pasted of ['300,000원', '300000']) {
+    // 소수부는 버린다 — `300,000.00` 이 `30,000,000` 이 되면 값이 조용히 100배다 (#986 리뷰)
+    for (const pasted of ['300,000원', '300000', '300,000.00']) {
       await budget.fill('')
       await page.evaluate((text) => navigator.clipboard.writeText(text), pasted)
       await budget.focus()
@@ -123,7 +185,8 @@ test.describe('예산 입력 천 단위 쉼표 (#986)', () => {
     expect(body.budget).toBe(1200000)
   })
 
-  test('AI 일정 폼 — 같은 입력칸이다', async ({ page }) => {
+  test('AI 일정 폼 — 같은 입력칸이다', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write'])
     await page.goto('/ai-plans/new')
     await page.getByRole('button', { name: /더 자세히 정할게요/ }).click()
 
@@ -131,5 +194,12 @@ test.describe('예산 입력 천 단위 쉼표 (#986)', () => {
     await budget.pressSequentially('1500')
     await expect(budget).toHaveValue('1,500')
     expect(await caretOf(budget)).toBe(5)
+
+    // 만원 단위에서 `1.5` 가 `15` 가 되면 10배다 — 소수부를 버려 `1` 이다 (#986 리뷰)
+    await budget.fill('')
+    await page.evaluate(() => navigator.clipboard.writeText('1.5'))
+    await budget.focus()
+    await page.keyboard.press('ControlOrMeta+v')
+    await expect(budget).toHaveValue('1')
   })
 })
