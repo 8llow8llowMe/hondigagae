@@ -49,7 +49,7 @@ public record WalkTimesResponse(
     @Schema(
         description = "골든타임을 준 이유/안 준 이유 metadata. `AVAILABLE`(구간 있음) / "
             + "`SUPPRESSED_BY_WARNING`(특보 경보로 보류 — **곡선에 안전 시각이 남아 있어도 이 값이다**) / "
-            + "`ALL_HOURS_RISKY`(남은 시각이 전부 위험) / `NO_FORECAST`(판정할 예보 없음). "
+            + "`ALL_HOURS_RISKY`(남은 시각이 전부 위험) / `NO_FORECAST`(예보 없음). "
             + "**`goldenStart` 가 null 이라는 이유만으로 '남은 시간이 모두 위험'이라고 쓰지 마세요** — "
             + "그 문구는 `ALL_HOURS_RISKY` 일 때만 참입니다")
     CodeNameDescriptionMetadata goldenWindowStatus,
