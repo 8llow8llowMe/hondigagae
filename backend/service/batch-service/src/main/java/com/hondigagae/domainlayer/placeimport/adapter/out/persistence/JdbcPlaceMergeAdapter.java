@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
  * 제주 실측에서 병합 대상 11곳 전부가 크기 제한 정보를, 2곳이 실내 정보를 잃었다.
  * 그래서 살아남는 행의 빈 칸에 한해 흡수되는 행의 값을 채운 뒤에 병합 표시를 한다.
  * 이미 값이 있는 칸은 건드리지 않는다 — 관광 API 값이 더 정확하다고 보기 때문이다.
+ * 동반 가능 여부 · 크기 제한은 예외로, 병합 뒤 재계산 스텝이 흡수 행을 근거로 채운다(#886, {@code MERGE_FIELDS_SQL} 주석).
  */
 @Component
 @RequiredArgsConstructor
@@ -57,6 +58,13 @@ public class JdbcPlaceMergeAdapter implements PlaceMergeCommandPort {
      * {@code tel} 이 정확히 그랬다 (#763). 사람이 교집합을 기억하지 않도록
      * {@code JdbcPlaceBulkAdapterSqlTest} 가 두 SQL 을 실제로 대조한다 — 컬럼을 하나 더하면
      * 그 테스트가 먼저 빨개진다.
+     *
+     * <p><b>{@code pet_allowance_type} · {@code allowed_pet_size} 는 여기서 옮기지 않는다</b> (#886). 예전에는
+     * {@code allowed_pet_size} 만 survivor 가 UNKNOWN 일 때 흡수 행 값으로 채웠고 {@code pet_allowance_type} 은 아예
+     * 옮기지 않아, 문화정보원이 "동반 불가" 로 확인한 곳이 흡수되며 UNKNOWN 이 됐다. 이제 두 컬럼은 병합 뒤에 도는
+     * {@code placePetAllowanceReflectStep}({@code JdbcPlacePetAllowanceAdapter})이 흡수 행과 {@code place_pet_info}
+     * 를 근거로 <b>매 실행 다시 계산한다</b> — 1회성 스냅샷이 아니라 근거가 바뀌면 따라간다. 규칙이 다른 두 쓰기
+     * (여기는 survivor 우선, 재계산은 가장 제한적인 쪽)가 한 컬럼에 겹치지 않게 여기서는 뺐다.
      */
     private static final String MERGE_FIELDS_SQL = """
         UPDATE place survivor
@@ -70,11 +78,6 @@ public class JdbcPlaceMergeAdapter implements PlaceMergeCommandPort {
                survivor.tel = COALESCE(survivor.tel, absorbed.tel),
                survivor.overview = COALESCE(survivor.overview, absorbed.overview),
                survivor.pet_only = (survivor.pet_only OR absorbed.pet_only),
-               -- 크기 제한은 UNKNOWN 이 '모름'이라 빈 값과 같게 취급한다
-               survivor.allowed_pet_size = CASE
-                   WHEN survivor.allowed_pet_size = 'UNKNOWN' THEN absorbed.allowed_pet_size
-                   ELSE survivor.allowed_pet_size
-               END,
                survivor.updated_at = NOW()
          WHERE survivor.id = ?
         """;

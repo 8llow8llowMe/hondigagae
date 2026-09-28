@@ -14,6 +14,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 /**
  * 반려동물 동반 조건 적재 잡 (#877). place_pet_info 를 채운다.
  *
+ * <p>적재 뒤에 {@code placePetAllowanceReflectStep}(#886)이 이어 돌아 TourAPI place 행의 {@code pet_allowance_type} ·
+ * {@code allowed_pet_size} 를 다시 계산한다. 적재 스텝이 실패하면 재계산은 돌지 않고 지난 값이 남는다.
+ *
  * <p>실행 방법:
  * <pre>
  * java -jar batch.jar --spring.batch.job.enabled=true --spring.batch.job.name=petTourImportJob areaCode=39 runAt=&lt;ISO 시각&gt;
@@ -38,9 +41,11 @@ public class PetTourImportJobConfig {
     private static final String STEP_NAME = "petTourImportStep";
 
     @Bean
-    public Job petTourImportJob(JobRepository jobRepository, Step petTourImportStep) {
+    public Job petTourImportJob(JobRepository jobRepository, Step petTourImportStep, Step placePetAllowanceReflectStep) {
         return new JobBuilder(JOB_NAME, jobRepository)
             .start(petTourImportStep)
+            // place_pet_info 가 바뀐 직후 place 의 동반 가능 여부 · 크기 제한을 다시 계산한다 (#886, PlacePetAllowanceReflectStepConfig)
+            .next(placePetAllowanceReflectStep)
             .build();
     }
 
