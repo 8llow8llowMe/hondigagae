@@ -15,6 +15,7 @@ import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceImportResultType
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
 import com.hondigagae.domainlayer.placeimport.domain.enums.RegionCodeMapping;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportSourceSnapshot;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
@@ -118,21 +119,31 @@ public class CultureFacilityImportFacade implements CultureFacilityImportUseCase
     /**
      * 다음 실행이 비교할 기준을 남긴다.
      *
-     * <p><b>우회 적재는 남기지 않는다.</b> 우회 파일이 포털에 지금 올라와 있는 것과 같다는 보장이
-     * 없다. 남기면 다음 실행이 포털을 보지 않고 건너뛰어, 포털이 되살아나도 낡은 파일에 머문다.
+     * <p><b>우회 적재는 우회 행을 남긴다</b> (#887). 우회 파일이 포털에 지금 올라와 있는 것과 같다는
+     * 보장이 없으므로, 그 파일을 포털 판본처럼 기록하면 다음 실행이 포털을 보지 않고 건너뛴다. 그렇다고
+     * 아무것도 남기지 않으면 스냅샷이 <b>마지막 포털 적재분</b>을 가리켜, 포털이 되살아났을 때 파일이
+     * 그대로면 복귀 첫 실행이 건너뛰고 DB 에 우회 파일 값이 남는다. 우회 행은 어떤 포털 파일과도 같지
+     * 않아({@code SourceFileSnapshotRule}) 복귀 첫 실행은 반드시 다시 적재한다.
      *
-     * <p>그 반대로 여기까지 온 결정은 반드시 포털에서 받은 것이므로 {@code contentLength} 가 있다
+     * <p>포털 결정은 반드시 포털에서 받은 것이므로 {@code contentLength} 가 있다
      * ({@code CultureFacilitySourceDecision.importFrom} 이 받은 바이트 수와 함께 만든다).
      */
     private void recordSnapshot(
         CultureFacilitySourceDecision decision, String areaCode, CultureFacilityImportOutcome outcome, LocalDateTime runStartedAt
     ) {
         if (decision.fallback()) {
+            importSourceSnapshotPort.record(ImportSourceSnapshot.fallback(PlaceSourceType.CULTURE_PORTAL, areaCode,
+                fileName(decision.csvFile()), outcome.sourceModifiedMax(), outcome.imported(), runStartedAt));
             return;
         }
         importSourceSnapshotPort.record(new ImportSourceSnapshot(
             PlaceSourceType.CULTURE_PORTAL, areaCode, decision.fileId(), decision.fileName(),
             decision.contentLength(), outcome.sourceModifiedMax(), outcome.imported(), runStartedAt));
+    }
+
+    private static String fileName(Path file) {
+        Path name = file == null ? null : file.getFileName();
+        return name == null ? null : name.toString();
     }
 
     /**

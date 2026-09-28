@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.hondigagae.domainlayer.placeimport.application.port.out.ImportSourceSnapshotPort;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportSourceSnapshot;
+import com.hondigagae.domainlayer.placeimport.domain.model.SourceFileSnapshotRule;
 import com.hondigagae.domainlayer.walkcourseimport.application.port.out.OlleCourseSnapshotPort;
 import com.hondigagae.domainlayer.walkcourseimport.domain.model.OlleCourseSnapshot;
 import java.time.LocalDateTime;
@@ -92,5 +93,31 @@ class BatchServiceApplicationTests {
         Optional<ImportSourceSnapshot> culture =
             importSourceSnapshotPort.findLatest(PlaceSourceType.CULTURE_PORTAL, "39");
         assertThat(culture.map(ImportSourceSnapshot::fileId).orElse(null)).isNotEqualTo("FILE_000000001111111");
+    }
+
+    /**
+     * 우회 행이 실제 스키마에 들어가고, 되읽은 행이 여전히 우회 행으로 판정되는지 본다 (#887).
+     *
+     * <p>마커는 {@code file_id VARCHAR(64) NOT NULL} · {@code content_length NOT NULL} 에 기대고 있다.
+     * 스키마를 바꾸지 않은 설계라 이 두 제약에 맞는지가 곧 설계의 전제다.
+     */
+    @Test
+    void roundTripsFallbackRowsForBothSources() {
+        LocalDateTime runStartedAt = LocalDateTime.of(2026, 9, 28, 3, 0);
+        olleCourseSnapshotPort.record(OlleCourseSnapshot.fallback("olle_course.csv", null, 29, runStartedAt));
+        importSourceSnapshotPort.record(ImportSourceSnapshot.fallback(PlaceSourceType.CULTURE_PORTAL, "39",
+            "pet_culture.csv", null, 228, runStartedAt));
+
+        assertThat(olleCourseSnapshotPort.findLatest()).hasValueSatisfying(snapshot -> {
+            assertThat(snapshot.isFallback()).isTrue();
+            assertThat(snapshot.fileName()).isEqualTo("olle_course.csv");
+            assertThat(snapshot.sameFileAs(SourceFileSnapshotRule.FALLBACK_FILE_ID, null)).isFalse();
+            assertThat(snapshot.sameFileAs("FILE_000000001111111", null)).isFalse();
+        });
+        assertThat(importSourceSnapshotPort.findLatest(PlaceSourceType.CULTURE_PORTAL, "39")).hasValueSatisfying(snapshot -> {
+            assertThat(snapshot.isFallback()).isTrue();
+            assertThat(snapshot.contentLength()).isZero();
+            assertThat(snapshot.sameFileAs("FILE_000000003214426", null)).isFalse();
+        });
     }
 }

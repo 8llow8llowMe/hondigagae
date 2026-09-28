@@ -26,7 +26,8 @@ import org.springframework.stereotype.Component;
  * 한 번 더 부를 이유가 없다.
  *
  * <p>건너뛰기 판정은 두 단계다. 먼저 상세 페이지에서 {@code atchFileId} 만 확인해 같으면
- * 받기 전에 끝낸다. 받은 뒤에는 바이트 수까지 맞춰 한 번 더 본다.
+ * 받기 전에 끝낸다. 받은 뒤에는 바이트 수까지 맞춰 한 번 더 본다. 직전 행이 우회 적재 행이면
+ * 두 판정 모두 "다른 파일" 이다 — 포털이 되살아난 첫 실행은 파일이 그대로여도 적재한다 (#887).
  *
  * <p>실패하면 로컬 우회 파일로 물러난다. 낡은 데이터가 빈 데이터보다 낫다
  * ({@code data-refresh-guide.md} 5절). 우회 파일마저 없으면 그때 실패한다.
@@ -49,6 +50,10 @@ public class OlleCourseSourceProcessor {
         try {
             OlleCourseSourceQueryResult source = olleCourseSourcePort.resolveLatest();
             Optional<OlleCourseSnapshot> latest = findLatestQuietly();
+            // 직전이 우회 적재면 아래 두 판정이 언제나 "다른 파일" 로 나온다 (#887). 다시 받는 이유를 로그로 남긴다.
+            if (latest.filter(OlleCourseSnapshot::isFallback).isPresent()) {
+                log.info("olle course previous import was fallback. reimporting portal file fileId={}", source.fileId());
+            }
 
             if (!forceImport && latest.filter(snapshot -> snapshot.sameFileAs(source.fileId(), null)).isPresent()) {
                 return OlleCourseSourceDecision.skipUnchanged(source.fileId());

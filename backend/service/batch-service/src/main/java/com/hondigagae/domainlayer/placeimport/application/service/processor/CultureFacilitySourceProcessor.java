@@ -27,7 +27,8 @@ import org.springframework.stereotype.Component;
  * 주 1회 파이프라인이 매번 30MB 를 받아 7만 행을 다시 파싱하고 있었다.
  *
  * <p><b>건너뛰기 판정은 두 단계다.</b> 먼저 상세 페이지에서 {@code atchFileId} 만 확인해 같으면
- * 30MB 를 받기 전에 끝낸다. 받은 뒤에는 바이트 수까지 맞춰 한 번 더 본다.
+ * 30MB 를 받기 전에 끝낸다. 받은 뒤에는 바이트 수까지 맞춰 한 번 더 본다. 직전 행이 우회 적재 행이면
+ * 두 판정 모두 "다른 파일" 이다 — 포털이 되살아난 첫 실행은 파일이 그대로여도 적재한다 (#887).
  *
  * <p><b>실패하면 로컬 우회 파일로 물러난다.</b> 포털 페이지 개편·다운로드 실패·받은 파일이
  * CSV 가 아님 — 어느 쪽이든 잡을 죽이는 대신 예전 경로로 적재한다. 낡은 데이터가 빈 데이터보다
@@ -55,6 +56,11 @@ public class CultureFacilitySourceProcessor {
         try {
             CultureFacilitySourceQueryResult source = cultureFacilitySourcePort.resolveLatest();
             Optional<ImportSourceSnapshot> latest = findLatestQuietly(areaCode);
+            // 직전이 우회 적재면 아래 두 판정이 언제나 "다른 파일" 로 나온다 (#887). 다시 받는 이유를 로그로 남긴다.
+            if (latest.filter(ImportSourceSnapshot::isFallback).isPresent()) {
+                log.info("culture facility previous import was fallback. reimporting portal file areaCode={} fileId={}",
+                    areaCode, source.fileId());
+            }
 
             // 1단계: 크기를 모르는 시점이라 파일 식별자만 본다. 여기서 걸리면 30MB 를 받지 않는다.
             if (!forceImport && latest.filter(snapshot -> snapshot.sameFileAs(source.fileId(), null)).isPresent()) {

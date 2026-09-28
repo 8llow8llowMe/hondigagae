@@ -39,4 +39,16 @@ class ImportSourceSnapshotTest {
         assertThat(snapshot().sameFileAs("FILE_000000009999999", RECORDED_LENGTH)).isFalse();
         assertThat(snapshot().sameFileAs(null, null)).isFalse();
     }
+
+    @Test
+    @DisplayName("우회 행은 어떤 포털 파일과도 같은 파일이 아니다 (#887)")
+    void fallbackRowNeverMatchesPortalFile() {
+        ImportSourceSnapshot fallback = ImportSourceSnapshot.fallback(PlaceSourceType.CULTURE_PORTAL, "39",
+            "pet_culture.csv", null, 228, LocalDateTime.of(2026, 9, 28, 3, 0));
+
+        assertThat(fallback.isFallback()).isTrue();
+        assertThat(snapshot().isFallback()).isFalse();
+        assertThat(fallback.sameFileAs("FILE_000000003214426", null)).isFalse();
+        assertThat(fallback.sameFileAs("FILE_000000003214426", RECORDED_LENGTH)).isFalse();
+    }
 }
