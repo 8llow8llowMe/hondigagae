@@ -192,9 +192,9 @@ type LinkBaseProps = {
   /** 레이아웃 유틸리티만 허용한다. 색·radius·shadow·padding 덮어쓰기 금지 (component-guide.md §3) */
   className?: string
   /**
-   * 지금 화면을 가리키는 링크의 표시 (#964). **`'page'` 하나만 받는다** — 헤더의
-   * `서비스 소개` 가 `/about` 에서 쓴다. 활성 판정은 부르는 쪽(client)이 `isActiveNav` 로
-   * 하고, 이 컴포넌트는 서버에서도 렌더되므로 경로를 읽지 않는다. 기본은 없음.
+   * 지금 화면을 가리키는 링크의 표시 (#964). **`'page'` 하나만 받는다.** 활성 판정은
+   * 부르는 쪽(client)이 하고, 이 컴포넌트는 서버에서도 렌더되므로 경로를 읽지 않는다.
+   * 모양은 바꾸지 않는다 — 시각 활성 표시가 필요하면 variant 가 소유한다. 기본은 없음.
    */
   'aria-current'?: 'page' | undefined
 }
