@@ -22,7 +22,33 @@ on:
       - '.github/workflows/frontend-ci.yml'
 
 jobs:
+  # 무엇이 바뀌었는지 먼저 가른다 (#1004). `frontend/` 에서 `.md` 만 바뀐 PR 은 `verify` 가
+  # `format:check` 만 돌고 `e2e` 는 건너뛴다 — 명세 한 줄 고친 PR 이 e2e 285개를 기다리던 자리다.
+  #
+  # **판정 기준은 `scripts/classify-frontend-changes.sh` 한 곳에 있다** — pre-push 훅과 같이 쓴다.
+  # develop push 는 늘 `code` 다: base 스코프 캐시를 만들고(#830) 머지된 develop 을 검사하는
+  # 목적이라 건너뛰면 안 된다. 판정이 실패하면 `code` 로 본다 — 모르는 것을 "안 바뀌었다" 로 읽지 않는다.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      kind: ${{ steps.classify.outputs.kind }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: classify
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          kind=code
+          if [ "$EVENT_NAME" = "pull_request" ] && git fetch --quiet --depth=1 origin "$BASE_SHA"; then
+            # PR 체크아웃은 base 위에 PR 을 얹은 머지 커밋이라, base 와의 차이가 곧 PR 의 변경이다
+            kind=$(git -c core.quotepath=off diff --name-only "$BASE_SHA" HEAD | sh scripts/classify-frontend-changes.sh) || kind=code
+          fi
+          echo "kind=$kind" | tee -a "$GITHUB_OUTPUT"
+
   verify:
+    needs: changes
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,14 +70,19 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # 문서만 바뀐 PR 도 포맷 검사는 돈다 — `.md` 도 prettier 대상이다 (#282)
       - run: pnpm format:check
       - run: pnpm lint
+        if: needs.changes.outputs.kind == 'code'
       - run: pnpm typecheck
+        if: needs.changes.outputs.kind == 'code'
       - run: pnpm test
+        if: needs.changes.outputs.kind == 'code'
 
       # server/client 경계 오류는 빌드에서만 잡히는 것이 많다
       # (docs/architecture-guide.md §4)
       - run: pnpm build
+        if: needs.changes.outputs.kind == 'code'
         env:
           BACKEND_API_URL: http://localhost:8000
           AUTH_SESSION_SECRET: ci-placeholder-secret-at-least-32-characters
@@ -69,8 +100,22 @@ jobs:
   #
   # `verify` 에 의존시키지 않는다 — 둘은 서로 다른 것을 보고, 직렬로 묶으면
   # lint 한 줄 때문에 레이아웃 결과를 못 보게 된다.
+  #
+  # **3 샤드로 나눠 돈다** (#1004). 테스트가 36개(#467) → 285개로 늘며 `pnpm e2e` 한 단계가
+  # 262초가 됐고, 잡 전체(약 5분)가 `verify`(약 2.5분)의 두 배로 PR 대기 시간을 정했다.
+  # 샤드마다 셋업(약 40초)이 붙어 러너 사용 시간은 조금 늘지만 대기 시간은 `verify` 수준이 된다.
+  # `setup` 프로젝트(로그인)는 샤드마다 돈다 — playwright 가 의존 프로젝트를 샤드 안에서 먼저 돌린다.
+  #
+  # 체크 이름은 `e2e (1)` · `e2e (2)` · `e2e (3)` 이다. required check 로 걸 때(#286) 이 이름을 쓴다.
   e2e:
+    needs: changes
+    if: needs.changes.outputs.kind == 'code'
     runs-on: ubuntu-latest
+    strategy:
+      # 한 샤드가 깨져도 나머지 결과는 끝까지 본다 — 어느 spec 이 깨졌는지 한 번에 알아야 한다
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     defaults:
       run:
         working-directory: frontend
@@ -104,11 +149,11 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
 
       # 백엔드가 필요 없다 — playwright.config.ts 의 webServer 가 MOCK_API=true 로 띄운다
-      - run: pnpm e2e
+      - run: pnpm e2e --shard=${{ matrix.shard }}/3
 
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: frontend/playwright-report/
           retention-days: 7

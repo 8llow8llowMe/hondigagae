@@ -53,17 +53,27 @@ while read -r _local_ref local_sha _remote_ref remote_sha; do
     break
   fi
 
-  changed="$changed$(git diff --name-only "$base" "$local_sha" -- 'frontend/' || true)
+  changed="$changed$(git -c core.quotepath=off diff --name-only "$base" "$local_sha" -- 'frontend/' || true)
 "
 done
 
-if [ -z "$(printf '%s' "$changed" | tr -d '[:space:]')" ]; then
+# CI 의 `changes` 잡과 **같은 판정**을 쓴다 (#1004) — 기준은 스크립트 한 곳에 있다.
+# `.md` 만 바뀌었으면 `format:check` 만 돈다. 문서 한 줄에 `verify` 전체(수 분)를 기다리지 않는다
+kind=$(printf '%s' "$changed" | sh "$repo_root/scripts/classify-frontend-changes.sh")
+
+if [ "$kind" = none ]; then
+  exit 0
+fi
+
+cd "$repo_root/frontend"
+
+if [ "$kind" = docs ]; then
+  echo "pre-push: frontend/ 에서 문서(.md)만 바뀌어 format:check 만 돌린다 (건너뛰려면 SKIP_HOOKS=1)"
+  pnpm format:check
   exit 0
 fi
 
 echo "pre-push: frontend/ 변경이 있어 검사를 돌린다 (건너뛰려면 SKIP_HOOKS=1)"
-
-cd "$repo_root/frontend"
 
 # CI(`.github/workflows/frontend-ci.yml`)와 **같은 순서**다. format 을 먼저 두는 이유는
 # 가장 빠르고, #282 가 걸린 자리가 정확히 여기이기 때문이다

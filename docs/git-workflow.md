@@ -94,7 +94,8 @@ git checkout -b feature/fe/12-place-detail
 
 **커밋 전에 항상 `git status --short` 로 내 것이 아닌 변경이 있는지 먼저 본다.**
 
-`.githooks/pre-push` 는 **작업 트리 기준**으로 `pnpm format:check && pnpm verify` 를 돈다.
+`.githooks/pre-push` 는 **작업 트리 기준**으로 `pnpm format:check && pnpm verify` 를 돈다
+(push 에 `frontend/` 문서만 담겼으면 `format:check` 만 — §8-3).
 그래서 남의 미완성 파일 하나로 내 push 가 막힌다. 훅을 끄지 말고 푸시할 커밋만 담긴
 워크트리에서 민다.
 
@@ -224,8 +225,8 @@ gh pr edit <번호> --add-assignee @me --add-label frontend-web
 | 체크 | 언제 도는가 | 무엇을 보장하는가 |
 |------|-------------|-------------------|
 | `label` | 모든 PR | **아무것도 검증하지 않는다.** 배포 대상 라벨이 붙었다는 뜻뿐이다 |
-| `frontend-ci / verify` | `frontend/**` 변경 | format · lint · typecheck · 단위 테스트 · 빌드 |
-| `frontend-ci / e2e` | `frontend/**` 변경 | 레이아웃·보호 라우트 (Playwright, 목 API) |
+| `frontend-ci / verify` | `frontend/**` 변경 | format · lint · typecheck · 단위 테스트 · 빌드. **문서만 바뀌면 format 만** (#1004) |
+| `frontend-ci / e2e (1~3)` | `frontend/**` 코드 변경 | 레이아웃·보호 라우트 (Playwright, 목 API). 3 샤드. **문서만 바뀌면 건너뛴다** |
 | `backend-ci / check` | `backend/**` 변경 | **전 모듈** `./gradlew check` — 컴파일 + 테스트 |
 
 > **`backend/**` 만 바꾼 PR 에서 오래도록 도는 체크가 `label` 하나였다** ([#764](https://github.com/8llow8llowMe/hondigagae/issues/764)).
@@ -387,6 +388,11 @@ git config core.hooksPath .githooks
 **`frontend/` 가 한 줄이라도 바뀐 push 에서 `format:check` + `verify` 를 돌린다.**
 작업 영역과 무관하다 — #282 는 백엔드 PR 이었고 프론트 문서 하나를 함께 고쳤다.
 "나는 백엔드 작업이니 프론트 검사는 필요 없다" 는 판단이 정확히 그 사고를 만들었다.
+
+**문서만 바뀐 push 는 `format:check` 만 돈다** ([#1004](https://github.com/8llow8llowMe/hondigagae/issues/1004)).
+#282 가 걸린 자리가 바로 그 포맷 검사라 문서에서도 빠지지 않는다. `frontend/docs/**` 와 그 밖의
+`frontend/**/*.md` 가 문서이고, 테스트가 읽는 `frontend/DESIGN.md` 는 코드로 본다. 판정은 CI 의 `changes`
+잡과 같은 `scripts/classify-frontend-changes.sh` 다.
 
 백엔드는 돌리지 않는다 — `./gradlew check` 가 분 단위라 push 훅에 맞지 않다.
 **대신 `backend-ci` 가 PR 에서 본다** (§6). 훅은 프론트 전용으로 남긴다.
