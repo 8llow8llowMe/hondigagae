@@ -53,7 +53,8 @@ function buttonCount(markup: string): number {
 
 describe('PlanDaySection — 항목 산책 위험도 (#625)', () => {
   it('BEYOND_FORECAST_RANGE 는 일자에 문장이 한 번만 나온다 — 항목 수와 무관하다', () => {
-    const sentence = '예보는 오늘부터 5일까지만 제공되어 이 날짜는 아직 판정할 수 없습니다.'
+    const sentence =
+      '산책 위험도는 시각별 예보로만 안내할 수 있고, 그 예보는 오늘부터 5일까지입니다. 이 날짜는 아직 알려 드릴 수 없습니다.'
     const rows = [
       { item: planDetail.items[0]!, distanceMeters: null, distanceKind: null },
       { item: planDetail.items[1]!, distanceMeters: null, distanceKind: null },
