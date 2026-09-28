@@ -320,6 +320,8 @@ pnpm e2e:report     # 마지막 실행 리포트
 
 **둘을 가르는 기준은 "몇 곳에서 같은 것을 보는가" 다.** 한 화면에서만 재면 그 화면의 배치를 잠그는 것이고(§12 가 막는 것), **같은 계약을 그 컴포넌트의 모든 사용처에서** 재면 컴포넌트의 계약을 잠그는 것이다. 그래서 `back-link-title-row.spec.ts` 는 `titleRow` 를 쓰는 **네 자리를 전부** 본다 — 한 곳만 봤을 때 실제로 데스크톱 회귀(링크 상자가 줄 전체 폭이 됨)를 놓쳤다.
 
+**입력 컴포넌트의 커서 계약도 같은 기준으로 여기 둔다** (#986, `amount-input.spec.ts`). 커서를 몇 번째 칸에 둘지는 순수 함수(`lib/form/grouped-digits.test.ts`)가 잠그지만, 그 값이 **실제 커서가 되는지**는 입력 이벤트가 있어야 보인다 — `setSelectionRange` 를 지운 뮤테이션에서 순수 테스트는 초록이고 이 스펙만 빨갛다. 그래서 `AmountInput` 의 **세 사용처를 전부** 보되, 화면 배치는 재지 않는다.
+
 ### 왜 백엔드가 필요 없나
 
 `playwright.config.ts` 의 `webServer` 가 **`MOCK_API=true`** 로 dev 서버를 띄운다. 이 플래그는 **BFF 프록시와 `serverFetch`(SSR 프리페치) 양쪽**을 덮으므로(`app/api/bff/[...path]/route.ts` · `src/lib/api/server.ts`), `page.route()` 로 브라우저 요청만 가로채는 방식과 달리 **서버 렌더까지 같은 fixture** 를 본다. `BACKEND_API_URL` 은 닿을 수 없는 주소로 덮어써 둔다 — 실수로 dev 게이트웨이를 때리는 경로를 원천에서 없앤다.
