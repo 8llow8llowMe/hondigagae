@@ -375,6 +375,23 @@ describe('petFormSchema', () => {
     if (!result.ok) expect(result.errors.fields.birthYm).toBe(messages.pet.birthYmFormat)
   })
 
+  /*
+    #999. 서버 PET_104 문구("생년월은 yyyy-MM 형식이어야 합니다.")를 베껴 두었더니 개발자용
+    패턴 표기가 입력칸 밑에 그대로 떴다. 입력 안내(hints.birthYm)가 이미 예시로 말하므로
+    오류도 같은 예시로 말한다.
+  */
+  it('형식 오류는 입력 안내와 같은 예시로 말한다 — 날짜 패턴 표기를 쓰지 않는다 (#999)', () => {
+    const result = check({ birthYm: '2020-13' })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    const message = result.errors.fields.birthYm
+    expect(message).toBe('생년월은 2017-05처럼 적어 주세요.')
+    expect(message).not.toMatch(/[yY]{4}|[mM]{2}/)
+    // 오류와 안내가 다른 예시를 들면 사용자가 두 형식을 비교하게 된다
+    expect(messages.pet.hints.birthYm).toContain('2017-05')
+  })
+
   it('한 자리 월은 거부한다 — 백엔드 정규식과 같다', () => {
     expect(check({ birthYm: '2020-3' }).ok).toBe(false)
   })
