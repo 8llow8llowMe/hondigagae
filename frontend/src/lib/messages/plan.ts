@@ -259,6 +259,8 @@ export const planMessages = {
   /** 달력을 눌러 고르는 자리라 서식이 아니라 **행동**을 적는다 */
   datePlaceholder: '날짜 선택',
   fieldStartDate: '시작일',
+  /** 지난 날짜로 만들 때만 시작일 아래에 선다 (#973). 막지 않고, 무엇이 비는지만 말한다 */
+  pastStartDateHint: '지난 날짜예요. 다녀온 여행의 기록으로 만들어져 날씨·적합도는 볼 수 없어요.',
   fieldEndDate: '종료일',
   fieldBudget: '예산 (선택)',
   fieldBudgetHint: '원 단위로 적어요. 나중에 바꿀 수 있어요.',
