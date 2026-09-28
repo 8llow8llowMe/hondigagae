@@ -50,3 +50,23 @@ describe('aiPlanFormSchema — 예산(만원)', () => {
     expect(result.errors.fields.budgetManwon).toBe(messages.aiPlan.errorBudgetTooLarge)
   })
 })
+
+/**
+ * **#974.** 반려견을 안 고르고 제출하면 "반려견 식별자는 양수여야 합니다." 가 떴다 — 서버
+ * `AIPLAN_105`(`petId` 의 `@Positive`) 문구를 FE 메시지로 베껴 둔 것이었다. 이 검증은 서버의
+ * 그 규칙과 **다른 규칙**이다: 서버는 반려견을 선택으로 받고, 0마리를 막는 것은 화면이다.
+ * 그래서 복제본이 아니라 무엇을 하면 되는지 말하는 문구로 잠근다.
+ */
+describe('aiPlanFormSchema — 반려견', () => {
+  it('0마리면 무엇을 하면 되는지 말하는 문구로 막는다', () => {
+    const result = validate(aiPlanFormSchema, values({ petIds: [] }))
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.errors.fields.petIds).toBe('함께 갈 반려견을 골라 주세요.')
+    expect(result.errors.fields.petIds).toBe(messages.aiPlan.errorPetRequired)
+  })
+
+  it('서버 검증 문구(개발자용 낱말)를 화면에 내지 않는다', () => {
+    expect(messages.aiPlan.errorPetRequired).not.toMatch(/식별자|양수/)
+  })
+})
