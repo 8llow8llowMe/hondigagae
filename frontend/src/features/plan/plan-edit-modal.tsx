@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
+import { AmountInput } from '@/components/amount-input'
 import { Button } from '@/components/button'
 import { CheckboxGroup } from '@/components/checkbox-group'
 import { DateField } from '@/components/date-field'
@@ -373,12 +374,12 @@ export function PlanEditModal({
           hint={messages.plan.editBudgetHint}
           {...(errors.fields.budget === undefined ? {} : { error: errors.fields.budget })}
         >
-          <Input
+          {/* 만들기 폼과 같은 입력칸이다 — 쉼표는 표기, `budget` 은 숫자만 (#986) */}
+          <AmountInput
             id="plan-edit-budget"
             value={budget}
             onValueChange={setBudget}
             invalid={errors.fields.budget !== undefined}
-            inputMode="numeric"
           />
         </Field>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import { AmountInput } from '@/components/amount-input'
 import { Button } from '@/components/button'
 import { DateField } from '@/components/date-field'
 import { Field } from '@/components/field'
@@ -226,11 +227,9 @@ export function PlanCreateForm({
         hint={messages.plan.fieldBudgetHint}
         error={errors.fields.budget}
       >
-        <Input
+        {/* 입력란에는 `300,000`, 폼 값은 숫자만이다. 숫자 키패드도 `AmountInput` 이 연다 (#986) */}
+        <AmountInput
           id="budget"
-          // text 다 — number 는 휠 스크롤로 값이 바뀌고 빈 값과 잘못된 값을 구분하지 못한다.
-          // 숫자 키패드는 inputMode 가 연다
-          inputMode="numeric"
           value={values.budget}
           onValueChange={(budget) => onValueChange('budget', budget)}
           invalid={errors.fields.budget !== undefined}

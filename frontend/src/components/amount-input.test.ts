@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import { AmountInput, type AmountInputProps } from '@/components/amount-input'
 import { fieldErrorId } from '@/components/field'
+import { readSourceWithoutComments } from '@/test/source'
 
 /**
  * `AmountInput` 의 마크업 계약 — 이슈 #986. 입력 · 붙여넣기 · 지우기 · 커서는
@@ -48,5 +49,22 @@ describe('AmountInput', () => {
 
   it('단위 표기(suffix)를 넘기면 Input 이 그린다', () => {
     expect(render({ value: '30', suffix: '만원' })).toContain('만원')
+  })
+})
+
+/*
+  **사용처를 소스로 잠근다.** 수정 모달(`PlanEditModal`)은 `useQueryClient` 를 들어 node 환경에서
+  렌더되지 않는다 — 만들기 폼 · AI 폼은 각자의 렌더 테스트가 `value="300,000"` 을 본다.
+  범용 `Input` 으로 되돌아가면 쉼표가 다시 사라진다 (#986 의 원래 결함).
+*/
+describe('AmountInput — 예산 입력칸 사용처', () => {
+  it.each([
+    ['src/features/plan/plan-create-form.tsx', 'budget'],
+    ['src/features/plan/plan-edit-modal.tsx', 'plan-edit-budget'],
+    ['src/features/ai-plan/ai-plan-create-form.tsx', 'budgetManwon'],
+  ])('%s 의 #%s 는 AmountInput 이다', (file, id) => {
+    const source = readSourceWithoutComments(file)
+    expect(source).toMatch(new RegExp(`<AmountInput\\s+id="${id}"`))
+    expect(source).not.toMatch(new RegExp(`<Input\\s+id="${id}"`))
   })
 })
