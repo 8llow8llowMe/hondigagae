@@ -68,7 +68,8 @@ public class QuartzScheduleConfig {
     /**
      * 파이프라인만 쓰는 목록 — 위 목록 + 여섯 번째 자식 {@code petTourImportJob}(#877).
      *
-     * <p>그 잡은 place 가 아니라 place_pet_info 만 쓰므로 혼잡도가 기다릴 이유는 없다. 파이프라인은
+     * <p>그 잡은 place_pet_info 를 쓰고 place 에는 {@code pet_allowance_type} · {@code allowed_pet_size} 두 칸만 다시
+     * 계산해 덮는다(#886). 혼잡도는 place 를 이름으로 잇기만 하고 그 두 칸을 읽지 않으므로 기다릴 이유가 없다. 파이프라인은
      * 다르다 — 사람이 {@code petTourImportJob} 을 단독으로 돌리는 중에 발화하면 자식이 같은 상세를 한 번 더
      * 불러 쿼터를 두 배로 쓴다. 그래서 파이프라인 쪽에만 더한다.
      */

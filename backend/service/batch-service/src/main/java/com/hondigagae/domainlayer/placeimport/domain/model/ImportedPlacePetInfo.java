@@ -15,7 +15,7 @@ import lombok.Builder;
  * {@code place_pet_info} 가 NOT NULL 로 요구하는 가공값이다. 새 규칙을 만들지 않고
  * {@link PetFieldParser} 에 이미 있는 규칙으로만 채운다 — 모르면 {@code UNKNOWN}/{@code false} 다.
  * {@code place} 행의 필터·적합도 컬럼({@code pet_allowance_type}·{@code allowed_pet_size})은
- * 이 모델이 건드리지 않는다. 규칙을 넓혀 그쪽까지 잇는 것은 별도 이슈다.
+ * 이 모델이 건드리지 않는다. 적재 뒤 재계산 스텝이 이 행의 가공값을 근거로 채운다(#886, {@code PetAllowancePolicy}).
  *
  * @param allowanceScope tour-service {@code PetAllowanceScope} enum 이름
  * @param allowedPetSize tour-service {@code AllowedPetSize} enum 이름

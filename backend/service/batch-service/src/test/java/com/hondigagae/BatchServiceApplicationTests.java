@@ -8,10 +8,12 @@ import com.hondigagae.domainlayer.placeimport.domain.model.ImportSourceSnapshot;
 import com.hondigagae.domainlayer.walkcourseimport.application.port.out.OlleCourseSnapshotPort;
 import com.hondigagae.domainlayer.walkcourseimport.domain.model.OlleCourseSnapshot;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.batch.core.Job;
+import org.springframework.batch.core.step.StepLocator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -44,6 +46,22 @@ class BatchServiceApplicationTests {
         assertThat(jobs).extracting(Job::getName).containsExactlyInAnyOrder(
             "placeDataPipelineJob", "placeImportJob", "cultureFacilityImportJob", "petRestaurantImportJob",
             "placeMergeJob", "placeImageBackfillJob", "petTourImportJob", "congestionImportJob", "olleCourseImportJob");
+    }
+
+    /**
+     * 동반 가능 여부 재계산(#886)은 한 스텝 정의를 두 잡이 마지막 단계로 붙인다. 한쪽에서 빠지면 그 잡만 단독으로
+     * 돌렸을 때 반영되지 않는데, 컴파일도 컨텍스트 로딩도 그 누락을 잡지 못한다.
+     */
+    @Test
+    void petAllowanceReflectStepFollowsPetTourImportAndMerge() {
+        assertThat(stepNamesOf("petTourImportJob")).containsExactly("petTourImportStep", "placePetAllowanceReflectStep");
+        assertThat(stepNamesOf("placeMergeJob")).containsExactly("placeMergeStep", "placePetAllowanceReflectStep");
+    }
+
+    private Collection<String> stepNamesOf(String jobName) {
+        Job job = jobs.stream().filter(candidate -> candidate.getName().equals(jobName)).findFirst().orElseThrow();
+        assertThat(job).isInstanceOf(StepLocator.class);
+        return ((StepLocator) job).getStepNames();
     }
 
     /**

@@ -31,8 +31,9 @@ import org.springframework.stereotype.Component;
  * <p><b>고유 키</b>: {@code (source, source_key)}. 원천이 둘 이상이라 content_id 만으로는 식별할 수 없다.
  *
  * <p><b>반려동물 컬럼 소유권</b>: 관광 API 적재는 pet_available / pet_allowance_type 을 INSERT 기본값만 넣고
- * UPDATE 절에서 건드리지 않는다(별도 마킹 잡의 소유 컬럼이다). 문화정보원 적재는 그 값을 원천 컬럼으로
- * 직접 갖고 있으므로 자기 행에 한해 UPDATE 에서도 갱신한다. 두 원천은 서로 다른 행이라 충돌하지 않는다.
+ * UPDATE 절에서 건드리지 않는다(pet_allowance_type · allowed_pet_size 는 재계산 스텝
+ * {@code JdbcPlacePetAllowanceAdapter}(#886)의 소유 컬럼이다 — 재적재가 그 결과를 지우면 안 된다).
+ * 문화정보원 적재는 그 값을 원천 컬럼으로 직접 갖고 있으므로 자기 행에 한해 UPDATE 에서도 갱신한다. 두 원천은 서로 다른 행이라 충돌하지 않는다.
  *
  * <p><b>{@code area_code} / {@code sigungu_code} 는 원천 필드가 아니라 적재 범위 키다 (#726).</b>
  * SQL 만 보면 원천이 준 값을 그대로 넣는 컬럼처럼 읽히지만 그렇지 않다. TourAPI 가 법정동 체계로
