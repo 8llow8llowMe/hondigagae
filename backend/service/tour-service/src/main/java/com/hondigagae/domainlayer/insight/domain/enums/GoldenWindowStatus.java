@@ -33,7 +33,7 @@ public enum GoldenWindowStatus implements CodeNameDescribable {
     SUPPRESSED_BY_WARNING("특보로 추천 보류",
         "기상특보 경보가 발효 중이라 시간대가 좋아도 추천하지 않습니다. 시간대 곡선은 근거로 그대로 제공됩니다."),
     ALL_HOURS_RISKY("남은 시간 모두 위험", "오늘 남은 시각이 전부 위험 등급이라 추천할 구간이 없습니다."),
-    NO_FORECAST("판정할 예보 없음", "오늘 남은 시각의 예보가 없어 추천 여부를 판정하지 않았습니다.");
+    NO_FORECAST("예보 없음", "오늘 남은 시각의 예보가 없어 추천 여부를 알려 드리지 못했습니다.");
 
     private final String displayName;
     private final String description;

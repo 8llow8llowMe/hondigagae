@@ -144,7 +144,7 @@ public final class SuitabilityEvaluator {
             return;
         }
         reasons.add(SuitabilityReason.informational(SuitabilityReasonCode.MID_TERM_FORECAST,
-            "3일 이후 중기예보로 판정했습니다. 오전/오후 단위라 대략적이고 습도와 바람은 반영되지 않았습니다."));
+            "3일 이후 중기예보를 바탕으로 안내했습니다. 오전/오후 단위라 대략적이고 습도와 바람은 반영되지 않았습니다."));
     }
 
     private static int applyPetAllowance(SuitabilityInput input, List<SuitabilityReason> reasons) {
