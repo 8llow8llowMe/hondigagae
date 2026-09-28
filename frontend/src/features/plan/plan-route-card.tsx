@@ -98,8 +98,14 @@ export function PlanRouteCard({
 
   const camera = useMemo(() => {
     const frame = routeCamera(model.stops)
-    // 주인공이 여럿인 지도라 정중앙이다 — 기본 0.35 는 제주 전체를 담는 화면의 값이다
-    return frame === null ? null : { ...frame, anchorRatio: 0.5 }
+    /*
+      주인공이 여럿인 지도라 정중앙이다 — 기본 0.35 는 제주 전체를 담는 화면의 값이다.
+
+      **크기가 바뀌면 다시 맞춘다** (#982). 단계를 칸의 **폭**으로 정하므로(`SpanBox`) 창을
+      줄이거나 기기를 돌리면 처음 맞춘 단계가 틀린다. 사용자가 지도를 만졌으면 되잡지
+      않는다(`MapCanvas` 의 `refitOnResize`).
+    */
+    return frame === null ? null : { ...frame, anchorRatio: 0.5, refitOnResize: true }
   }, [model.stops])
 
   const pins: MapPin[] = useMemo(
