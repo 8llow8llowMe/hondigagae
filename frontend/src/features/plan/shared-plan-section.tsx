@@ -3,7 +3,7 @@ import { Surface, SurfaceList, SurfaceStack } from '@/components/surface'
 import { PlanStatusBadge } from '@/features/plan/plan-status-badge'
 import { SharedPlanItemRow } from '@/features/plan/shared-plan-item-row'
 import { messages } from '@/lib/messages'
-import { addPlanDays, formatPlanDateRange, weekdayOf } from '@/lib/plan/date'
+import { addPlanDays, formatPlanDateRange, formatPlanDay } from '@/lib/plan/date'
 import { groupItemsByDay } from '@/lib/plan/detail'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import type { SharedPlan } from '@/types/plan'
@@ -56,7 +56,12 @@ export function SharedPlanSection({ plan }: { plan: SharedPlan }) {
 
       {days.map((group) => {
         const date = addPlanDays(plan.startDate, group.day - 1)
-        const weekday = date === null ? null : weekdayOf(date)
+        /*
+          **날짜 모양은 `formatPlanDay` 한 곳이 소유한다** (#732 · #981). 예전에는 여기서
+          `date.slice(5)` + 요일로 `09-12 (토)` 를 조립했다 — 소유자 상세(`plan-day-section`)가
+          #732 에서 `9월 12일 (토)` 로 모일 때 이 화면만 빠졌다.
+        */
+        const dayLabel = date === null ? null : formatPlanDay(date)
 
         return (
           <Surface
@@ -68,10 +73,9 @@ export function SharedPlanSection({ plan }: { plan: SharedPlan }) {
                 <h2 className="text-title-1 text-fg font-bold">
                   {messages.plan.dayLabel.replace('{day}', String(group.day))}
                 </h2>
-                {date !== null && (
+                {dayLabel !== null && (
                   <span className="text-body-2 text-fg-muted font-medium tabular-nums">
-                    {date.slice(5)}
-                    {weekday === null ? '' : ` (${weekday})`}
+                    {dayLabel}
                   </span>
                 )}
               </div>
