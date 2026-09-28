@@ -6,6 +6,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import com.hondigagae.domainlayer.placeimport.domain.model.SourceFileSnapshotRule;
 import com.hondigagae.domainlayer.walkcourseimport.application.model.OlleCourseSourceDecision;
 import com.hondigagae.domainlayer.walkcourseimport.application.port.in.WalkCourseImportUseCase.OlleCourseImportResult;
 import com.hondigagae.domainlayer.walkcourseimport.application.port.out.OlleCourseSnapshotPort;
@@ -83,8 +84,8 @@ class WalkCourseImportFacadeTest {
     }
 
     @Test
-    @DisplayName("우회 적재는 스냅샷을 남기지 않는다")
-    void fallbackDoesNotRecordSnapshot() {
+    @DisplayName("우회 적재는 포털 스냅샷 대신 우회 행을 남긴다 (#887)")
+    void fallbackRecordsFallbackRow() {
         Path local = Path.of("data/olle_course.csv");
         given(olleCourseSourceProcessor.resolve(false)).willReturn(OlleCourseSourceDecision.fallback(local));
         given(olleCourseImportProcessor.importCourses(local)).willReturn(List.of(course("1", "2025-04-28")));
@@ -92,11 +93,31 @@ class WalkCourseImportFacadeTest {
         OlleCourseImportResult result = facade.importOlleCourses(false);
 
         assertThat(result.fallbackUsed()).isTrue();
-        verify(olleCourseSnapshotPort, never()).record(any());
+        // 아무것도 남기지 않으면 포털 복귀 첫 실행이 마지막 포털 적재분과 같은 파일로 보고 건너뛴다.
+        ArgumentCaptor<OlleCourseSnapshot> captor = ArgumentCaptor.forClass(OlleCourseSnapshot.class);
+        verify(olleCourseSnapshotPort).record(captor.capture());
+        assertThat(captor.getValue().isFallback()).isTrue();
+        assertThat(captor.getValue().fileId()).isEqualTo(SourceFileSnapshotRule.FALLBACK_FILE_ID);
+        assertThat(captor.getValue().fileName()).isEqualTo("olle_course.csv");
+        assertThat(captor.getValue().contentLength()).isZero();
+        assertThat(captor.getValue().importedCount()).isEqualTo(1);
+        assertThat(captor.getValue().sourceModifiedMax()).isEqualTo(java.time.LocalDate.of(2025, 4, 28).atStartOfDay());
         verify(olleCourseSourceProcessor).cleanUp(any());
         // 우회도 행은 들어온다 - 그래서 1/0 플래그가 따로 있어야 대시보드가 우회를 본다 (#876)
         verify(walkCourseImportMetricsPort).recordRows(WalkCourseImportResultType.FALLBACK, 1);
         verify(walkCourseImportMetricsPort).recordRows(WalkCourseImportResultType.UPSERTED, 1);
+    }
+
+    @Test
+    @DisplayName("우회 적재가 0 건이면 우회 행도 남기지 않는다")
+    void emptyFallbackRecordsNothing() {
+        Path local = Path.of("data/olle_course.csv");
+        given(olleCourseSourceProcessor.resolve(false)).willReturn(OlleCourseSourceDecision.fallback(local));
+        given(olleCourseImportProcessor.importCourses(local)).willReturn(List.of());
+
+        facade.importOlleCourses(false);
+
+        verify(olleCourseSnapshotPort, never()).record(any());
     }
 
     private static ImportedWalkCourse course(String courseNo, String baseDate) {

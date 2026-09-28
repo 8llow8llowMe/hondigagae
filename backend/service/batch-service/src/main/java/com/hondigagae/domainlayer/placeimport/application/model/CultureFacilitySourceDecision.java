@@ -10,8 +10,9 @@ import java.nio.file.Path;
  * fallback=true).
  *
  * <p>{@code fallback} 을 결과에 남기는 이유가 둘이다. 우회 파일은 <b>지우면 안 되고</b>(다음
- * 실행이 쓸 마지막 보루다), 우회 적재는 <b>스냅샷을 남기지 않는다</b> - 남기면 다음 실행이
- * 포털을 다시 보지 않고 건너뛴다.
+ * 실행이 쓸 마지막 보루다), 우회 적재는 <b>포털 스냅샷 대신 우회 행을 남긴다</b> - 우회 파일을
+ * 포털 판본처럼 남기면 다음 실행이 포털을 다시 보지 않고 건너뛰고, 아무것도 남기지 않으면 포털 복귀
+ * 첫 실행이 마지막 포털 적재분과 같은 파일로 보고 건너뛴다 (#887, {@code SourceFileSnapshotRule}).
  *
  * @param kind          적재할지 건너뛸지
  * @param csvFile       읽을 CSV. {@code SKIP_UNCHANGED} 면 null

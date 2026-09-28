@@ -26,6 +26,7 @@ import com.hondigagae.domainlayer.placeimport.application.service.processor.Emer
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceImportResultType;
 import com.hondigagae.domainlayer.placeimport.domain.enums.PlaceSourceType;
 import com.hondigagae.domainlayer.placeimport.domain.model.ImportSourceSnapshot;
+import com.hondigagae.domainlayer.placeimport.domain.model.SourceFileSnapshotRule;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -41,7 +42,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
  * 오케스트레이션 순서와 <b>지표를 남기는 자리</b>를 고정한다 (#379).
  *
  * <p>여기서 지키는 것 둘. 건너뛴 실행은 적재도 delist 도 부르지 않으면서 신선도는 갱신하고,
- * 우회 적재는 스냅샷을 남기지 않으면서 {@code result=fallback} 게이지로 드러난다 — 우회는
+ * 우회 적재는 포털 스냅샷 대신 우회 행을 남기면서 {@code result=fallback} 게이지로 드러난다 — 우회는
  * {@code last_success} 를 갱신해 버리므로 그 게이지가 유일한 드러남이다.
  */
 @ExtendWith(MockitoExtension.class)
@@ -145,8 +146,8 @@ class CultureFacilityImportFacadeTest {
     }
 
     @Test
-    @DisplayName("우회 적재는 스냅샷을 남기지 않고 fallback 게이지 1 로 드러난다 — last_success 는 갱신된다")
-    void fallbackImportRecordsGaugeButNoSnapshot() {
+    @DisplayName("우회 적재는 우회 행을 남기고 fallback 게이지 1 로 드러난다 — last_success 는 갱신된다 (#887)")
+    void fallbackImportRecordsGaugeAndFallbackRow() {
         givenDecision(CultureFacilitySourceDecision.fallback(LOCAL_FILE));
         given(cultureFacilityImportProcessor.importFacilities(LOCAL_FILE, SIDO))
             .willReturn(new CultureFacilityImportOutcome(228, null));
@@ -157,8 +158,16 @@ class CultureFacilityImportFacadeTest {
         assertThat(result.fallbackUsed()).isTrue();
         assertThat(result.fileId()).isNull();
 
-        // 남기면 다음 실행이 포털을 보지 않고 건너뛰어, 포털이 되살아나도 낡은 파일에 머문다.
-        verify(importSourceSnapshotPort, never()).record(any());
+        // 포털 행으로 남기면 다음 실행이 포털을 보지 않고 건너뛰고, 아무것도 남기지 않으면 포털 복귀 첫 실행이
+        // 마지막 포털 적재분과 같은 파일로 보고 건너뛴다. 우회 행은 어떤 포털 파일과도 같지 않다.
+        ArgumentCaptor<ImportSourceSnapshot> snapshot = ArgumentCaptor.forClass(ImportSourceSnapshot.class);
+        verify(importSourceSnapshotPort).record(snapshot.capture());
+        assertThat(snapshot.getValue().isFallback()).isTrue();
+        assertThat(snapshot.getValue().fileId()).isEqualTo(SourceFileSnapshotRule.FALLBACK_FILE_ID);
+        assertThat(snapshot.getValue().fileName()).isEqualTo("pet_culture.csv");
+        assertThat(snapshot.getValue().contentLength()).isZero();
+        assertThat(snapshot.getValue().areaCode()).isEqualTo(AREA_CODE);
+        assertThat(snapshot.getValue().importedCount()).isEqualTo(228);
         // 데이터는 들어왔으니 신선도는 갱신된다 — 그래서 우회는 이 게이지로만 드러난다.
         verify(placeImportMetricsPort).recordLastSuccess(eq(PlaceSourceType.CULTURE_PORTAL), any(Instant.class));
         verify(placeImportMetricsPort).recordRows(PlaceSourceType.CULTURE_PORTAL, PlaceImportResultType.FALLBACK, 1);

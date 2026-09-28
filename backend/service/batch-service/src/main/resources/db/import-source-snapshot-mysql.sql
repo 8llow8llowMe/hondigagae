@@ -6,6 +6,10 @@
 -- append-only 이력이다. UPDATE 하지 않고 실행마다 한 행을 넣으며, 최신은 created_at DESC LIMIT 1 이다.
 -- 갱신 이력이 남아 있어야 "언제부터 파일이 안 바뀌었나"를 사람이 되짚을 수 있다.
 --
+-- 우회 행 (#887): 포털이 막혀 로컬 우회 파일로 적재에 성공한 실행은 file_id='LOCAL_FALLBACK',
+-- content_length=0 인 행을 남긴다. 직전 행이 우회 행이면 다음 포털 실행은 파일이 그대로여도 적재한다
+-- (SourceFileSnapshotRule). 스키마는 바뀌지 않았다 — 기존 컬럼에 마커 값을 싣는다.
+--
 -- 적용:
 --   local·dev·test = spring.sql.init 이 기동 시 실행한다 (application-{local,dev,test}.yml).
 --   prod           = spring.sql.init.mode=never 다. 이 파일이 prod 런북의 정본이다
