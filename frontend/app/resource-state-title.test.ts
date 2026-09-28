@@ -5,6 +5,7 @@ import { messages } from '@/lib/messages'
 import { petEditPageTitle } from '@/lib/pet/detail-title'
 import { placeDetailFallbackTitle } from '@/lib/place/detail-title'
 import { planDetailTitle } from '@/lib/plan/detail-title'
+import { sharedPlanPageTitle } from '@/lib/plan/shared-plan-title'
 import { walkCourseDetailFallbackTitle } from '@/lib/walk-course/detail-title'
 import { readSourceWithoutComments as code } from '@/test/source'
 
@@ -73,6 +74,22 @@ const PAIRS: Pair[] = [
     heading: messages.walkCourse.detailNotFoundTitle,
     tab: walkCourseDetailFallbackTitle(notFound('WALKCOURSE_001')),
   },
+  /*
+    **공유 링크** (#980). 탭이 정적 `공유된 여행 일정` 이라 무효·만료에서도 그 말을 했다. 본문은
+    경계(`not-found.tsx`)와 화면(410) 양쪽 모두 `features/plan` 의 컴포넌트가 갖는다.
+  */
+  {
+    path: 'src/features/plan/shared-plan-not-found.tsx',
+    probe: '<h1 className="sr-only">{messages.plan.sharedNotFoundTitle}</h1>',
+    heading: messages.plan.sharedNotFoundTitle,
+    tab: sharedPlanPageTitle(notFound('PLAN_023')),
+  },
+  {
+    path: 'src/features/plan/shared-plan-expired.tsx',
+    probe: '<h1 className="sr-only">{messages.plan.sharedExpiredTitle}</h1>',
+    heading: messages.plan.sharedExpiredTitle,
+    tab: sharedPlanPageTitle(new ApiError(410, 'PLAN_024', null)),
+  },
 ]
 
 describe('없는 대상 화면 — h1 과 탭 제목이 같은 말을 한다 (#980)', () => {
@@ -98,6 +115,7 @@ const METADATA_CALLS: Array<{ page: string; call: string }> = [
     page: 'app/(main)/olle/[walkCourseId]/page.tsx',
     call: 'return walkCourseDetailFallbackMetadata(error)',
   },
+  { page: 'app/(main)/shared-plans/[token]/page.tsx', call: 'sharedPlanPageTitle(error)' },
 ]
 
 describe('generateMetadata 가 판정 함수로 제목을 정한다 (#980)', () => {
@@ -106,5 +124,40 @@ describe('generateMetadata 가 판정 함수로 제목을 정한다 (#980)', () 
 
     expect(source).toContain('export async function generateMetadata')
     expect(source).toContain(call)
+  })
+})
+
+/*
+  **공유 페이지 — 제목을 조회 결과로 가르되 일정 내용은 싣지 않는다** (#980,
+  `일정공유-세부명세.md` 보안 메모). 정적 `metadata` 를 `generateMetadata` 로 바꾸면서 새로 생기는
+  위험 둘을 잠근다: ① 조회한 일정 값이 제목에 흘러들어 가는 것 ② `noindex` 가 한 갈래에서라도
+  빠지는 것 — 이 페이지의 유일한 색인 방어다.
+*/
+describe('공유 페이지 generateMetadata (#980)', () => {
+  const source = code('app/(main)/shared-plans/[token]/page.tsx')
+  const start = source.indexOf('export async function generateMetadata')
+  const end = source.indexOf('export default')
+  const metadataFn = source.slice(start, end)
+
+  it('정적 metadata 를 두지 않는다 — 조회 결과를 보고 제목을 가른다', () => {
+    expect(source).not.toContain('export const metadata')
+    expect(start).toBeGreaterThan(-1)
+    expect(end).toBeGreaterThan(start)
+  })
+
+  it('조회 결과를 받아 두지 않는다 — 넘길 값이 없으니 제목에 일정이 실릴 수 없다', () => {
+    expect(metadataFn).toMatch(/await loadSharedPlan\(token\)\s*\n/)
+    expect(metadataFn).not.toMatch(/=\s*await loadSharedPlan/)
+  })
+
+  it('모든 갈래가 noindex 다 — robots 가 한 자리에만 있다', () => {
+    expect(metadataFn.match(/robots/g)).toHaveLength(1)
+    expect(source).toContain('robots: { index: false, follow: false }')
+  })
+
+  it('페이지와 같은 cache() 조회를 쓴다 — 백엔드를 두 번 부르지 않는다', () => {
+    expect(source).toContain('const loadSharedPlan = cache(')
+    expect(source.slice(end)).toContain('await loadSharedPlan(token)')
+    expect(source.slice(end)).not.toContain('serverFetch')
   })
 })
