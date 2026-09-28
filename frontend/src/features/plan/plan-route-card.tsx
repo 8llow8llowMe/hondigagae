@@ -10,7 +10,13 @@ import { Surface } from '@/components/surface'
 import type { MapPin } from '@/features/map/map-canvas'
 import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { formatDistance } from '@/lib/format/distance'
-import { routeCamera, type RouteItemInput, toRouteModel, toRouteSegments } from '@/lib/map/route'
+import {
+  routeCamera,
+  routeCameraKey,
+  type RouteItemInput,
+  toRouteModel,
+  toRouteSegments,
+} from '@/lib/map/route'
 import type { MapSdkFailure } from '@/lib/map/sdk'
 import { messages } from '@/lib/messages'
 import { lodgingBasisFor, type PlanDayGroup, planItemMapCoord } from '@/lib/plan/detail'
@@ -68,9 +74,12 @@ export function PlanRouteCard({
   const group = days.find((candidate) => candidate.day === selectedDay)
 
   /*
-    **좌표 추출을 `useMemo` 안에서 한다.** 밖에서 만든 배열은 매 렌더 새 참조라
-    아래 카메라 `useMemo` 가 매번 다시 돌고, 그러면 사용자가 맞춰 둔 확대가 계속
-    되돌아간다 (`PlaceMiniMap` 이 같은 함정을 같은 방법으로 막는다).
+    **좌표 추출을 `useMemo` 안에서 한다.** 렌더 중에 만든 배열은 매번 새 참조라 핀 ·
+    선을 그리는 effect 가 이유 없이 다시 돈다.
+
+    **이 memo 만으로는 카메라를 지키지 못한다** (#982 리뷰 H-1). `days` 가 부모
+    (`plan-detail-section`)에서 렌더마다 `groupItemsByDay` 로 새로 만들어져 이 memo 도
+    매번 다시 돈다 — 그래서 카메라는 아래에서 **값 서명**에 따로 건다.
   */
   const model = useMemo(() => {
     const items: RouteItemInput[] = (group?.items ?? []).map((item) => ({
@@ -96,6 +105,17 @@ export function PlanRouteCard({
     })
   }, [group, days, selectedDay])
 
+  /*
+    **카메라 memo 는 배열이 아니라 값 서명에 건다** (#982 리뷰 H-1). `model.stops` 는 위
+    이유로 렌더마다 새 참조라, 거기 걸면 날씨 · 위험도 쿼리가 늦게 도착하거나 일자 편집에
+    들어갈 때마다 새 카메라가 된다. `MapCanvas` 는 새 카메라를 새 틀로 읽어 "사용자가
+    옮겼다" 표시를 지우고 다시 맞추므로, **끌어 둔 지도가 그날 사각형으로 되돌아간다.**
+
+    서명은 일자와 정류점의 `id` · 좌표뿐이다 (`routeCameraKey`) — 카메라가 읽는 값이 그것뿐이라
+    서명이 같으면 `routeCamera` 결과도 같다. 그래서 의존성에서 `model.stops` 를 뺀다.
+  */
+  const cameraKey = routeCameraKey(selectedDay, model.stops)
+
   const camera = useMemo(() => {
     const frame = routeCamera(model.stops)
     /*
@@ -106,7 +126,8 @@ export function PlanRouteCard({
       않는다(`MapCanvas` 의 `refitOnResize`).
     */
     return frame === null ? null : { ...frame, anchorRatio: 0.5, refitOnResize: true }
-  }, [model.stops])
+    // 서명이 `model.stops` 의 카메라 입력을 전부 담는다 (위 주석)
+  }, [cameraKey])
 
   const pins: MapPin[] = useMemo(
     () =>
