@@ -417,6 +417,17 @@ title  장소를 찾을 수 없어요            (catch 가 404 문구로 뭉갰
 | `(main)/plans/[planId]`(그 밖 — 성공·5xx·무응답, #905 R5) | `page.tsx` 의 `generateMetadata` + `planDetailTitle`         | `여행 일정 · 혼디가개`                  |
 | `(main)/pets/[petId]`(404)                                | `page.tsx` 의 `generateMetadata` + `petEditPageTitle`        | `존재하지 않는 반려견이에요 · 혼디가개` |
 
+**#980 이 남은 두 화면을 같은 규칙에 넣었다.** 둘 다 `not-found.tsx` 없이 `page.tsx` 의
+`generateMetadata` 가 판정 함수로 정한다.
+
+- `/olle/{없는 id}` — `없는 코스예요 · 혼디가개` + `noindex` (`walkCourseDetailFallbackMetadata`).
+  **상태는 200 으로 남는다** — 본문이 서버 `resultMessage` 를 그려야 해서 `notFound()` 를
+  부르지 않는다. 근거와 다시 열 조건은 `코스상세-세부명세.md` D5-6.
+- `/shared-plans/{무효 토큰}` — 404 `유효하지 않은 링크예요` · 410 `만료된 링크예요`
+  (`sharedPlanPageTitle`). 유효한 링크는 고정 제목이고 일정 내용을 싣지 않는다 (`일정공유-세부명세.md` D8-4).
+- **경계의 `h1` 도 탭 제목과 같은 상수다** — `app/resource-state-title.test.ts` 가 화면마다 짝을
+  잠근다. `pets/[petId]/not-found.tsx` 의 `h1` 이 화면 이름(`editTitle`)이던 것을 이때 고쳤다.
+
 **범위 — 어긋난 둘을 함께 맞춘다.** `app` · `plans` · `pets` 셋을 고치고, **`places` 는
 손대지 않는다.** 그쪽은 이미 같은 말이 나오고, `not-found.tsx` 에 또 쓰면 400 갈래까지
 가르는 `placeDetailFallbackTitle`(#206) 과 제목의 정본이 둘로 갈린다. 이 비대칭은 의도된
