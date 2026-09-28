@@ -47,7 +47,8 @@
   있고 경로 선을 그리지 않는다.** 네 원천의 확인 방법과 근거는
   `data-api-analysis.md` §9 에 있다 — **다시 뒤지기 전에 그 절을 먼저 읽을 것.**
   그래서 상세에 경로 선 지도는 세우지 않는다. 시작점 좌표만으로 붙는 골든타임 동선은 그대로다.
-  **대신 종점 좌표까지는 준다 — 코드 기준 29개 전부다(2026-07-31 판, dev 는 재적재 뒤 확인)**
+  **대신 종점 좌표까지는 준다 — 코드 기준 29개 전부다(2026-07-31 판. dev 는 2026-09-28 23개, #960 배포 뒤
+  `olleCourseImportJob forceImport=true` 재적재로 29개)**
   ([#816](https://github.com/8llow8llowMe/hondigagae/issues/816), [#960](https://github.com/8llow8llowMe/hondigagae/issues/960)).
   목록·상세 둘 다 `startPointName` · `endPointName` · `endLat` · `endLng` 를 싣는다. 새 원천을
   붙인 것이 아니라 **인접 코스의 시작점**에서 끌어온 값이다 — 올레는 한 코스의 종점이 다음 코스의
@@ -56,7 +57,7 @@
   좌표**로 채운다(`OlleCourseEndpointOverrides`). 이 값은 지점명이 정확히 같을 때만 쓰여, 원천이 이름을 바꾸면
   그 코스의 종점은 다시 null 이 된다 — **종점 null 은 여전히 정상 값이다.**
   **순환 코스 1-1(우도)은 시작점과 종점이 같은 값이고, 두 점이 겹친다고 코스 길이가 0 인 것이
-  아니다**(11.3km). 두 점 사이 직선은 실제 걷는 길이 아니므로 화면이 경로로 그리면 안 된다.
+  아니다**(2025-04-28 판 11.3km, 2026-07-31 판 11.5km). 두 점 사이 직선은 실제 걷는 길이 아니므로 화면이 경로로 그리면 안 된다.
   **적용된 활동량과 그 상한은 `appliedPetActivityLevel` 로 응답이 실어 내린다** (#718) —
   `{ level: {code,name,description}, maxDurationMinutes }` 다. 상한의 정본은 `WalkCourseActivityFit`
   하나(`maxMinutesOf`)라 화면이 4시간·6시간을 제 상수로 적으면 서버가 상한을 바꿔도 화면만 옛 숫자를 말한다.
