@@ -12,6 +12,9 @@ function render(overrides = {}) {
       onApply: () => undefined,
       applying: false,
       error: null,
+      // 기본은 **잃을 것이 있는 날**이다 — 항목과 다녀옴 표시가 있다 (#984)
+      hasItems: true,
+      hasVisited: true,
       hasStartTime: false,
       ...overrides,
     }),
@@ -78,5 +81,60 @@ describe('PlanDayRegenerateConfirm — 시각 초기화 경고 (#623)', () => {
     expect(markup.indexOf(messages.plan.regenerateDayStartTimeReset)).toBeLessThan(
       markup.indexOf(messages.plan.regenerateDayApply),
     )
+  })
+})
+
+/**
+ * 잃을 것이 없는 경고를 걷는다 — 이슈 #984 · 명세 R5.
+ *
+ * 시각 경고(#623)가 세운 규칙을 앞의 두 줄에도 적용한다. 빈 날에 "되돌릴 수 없어요" 를
+ * 띄우면 화면 위의 `아직 담은 곳이 없어요` 와 서로 다른 말을 하고, 늘 뜨는 경고는 배경음이
+ * 되어 정작 잃을 날에 읽히지 않는다 (D9-2 와 같은 판단).
+ */
+describe('PlanDayRegenerateConfirm — 잃을 것이 있을 때만 경고한다 (#984)', () => {
+  const EMPTY_DAY = { hasItems: false, hasVisited: false, hasStartTime: false }
+
+  it('빈 날에는 경고를 하나도 내지 않는다', () => {
+    const markup = render(EMPTY_DAY)
+
+    expect(markup).not.toContain(messages.plan.regenerateDayIrreversible)
+    expect(markup).not.toContain(messages.plan.regenerateDayVisitReset)
+    expect(markup).not.toContain(messages.plan.regenerateDayStartTimeReset)
+  })
+
+  it('빈 날에도 확정 버튼은 남는다', () => {
+    expect(render(EMPTY_DAY)).toContain(messages.plan.regenerateDayApply)
+  })
+
+  /*
+    버튼의 위 여백(`mt-2`)은 **경고 묶음과 액션을 가르는 값**이다. 앞에 아무것도 없으면
+    스택의 간격 위에 8px 이 더 얹혀 다른 액션 블록(`PlanStatusAction`)과 높이가 어긋난다.
+  */
+  it('앞에 선 것이 없으면 버튼이 위 여백을 갖지 않는다', () => {
+    expect(render(EMPTY_DAY)).not.toMatch(/\bmt-2\b/)
+  })
+
+  it('저장 실패만 있어도 버튼이 실패 문구와 떨어진다', () => {
+    expect(
+      render({ ...EMPTY_DAY, error: { message: '사라진 장소가 있어요.', retriable: true } }),
+    ).toMatch(/\bmt-2\b/)
+  })
+
+  it('다녀옴 표시가 없는 날은 되돌릴 수 없음만 말한다', () => {
+    const markup = render({ hasItems: true, hasVisited: false })
+
+    expect(markup).toContain(messages.plan.regenerateDayIrreversible)
+    expect(markup).not.toContain(messages.plan.regenerateDayVisitReset)
+    expect(markup).toMatch(/\bmt-2\b/)
+  })
+
+  it('항목과 다녀옴 표시가 둘 다 있는 날은 두 경고를 확정 버튼 앞에 낸다', () => {
+    const markup = render({ hasItems: true, hasVisited: true })
+    const apply = markup.indexOf(messages.plan.regenerateDayApply)
+
+    expect(markup.indexOf(messages.plan.regenerateDayIrreversible)).toBeGreaterThanOrEqual(0)
+    expect(markup.indexOf(messages.plan.regenerateDayIrreversible)).toBeLessThan(apply)
+    expect(markup.indexOf(messages.plan.regenerateDayVisitReset)).toBeGreaterThanOrEqual(0)
+    expect(markup.indexOf(messages.plan.regenerateDayVisitReset)).toBeLessThan(apply)
   })
 })
