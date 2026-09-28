@@ -74,8 +74,22 @@ describe('SectionNav — 절 내비', () => {
     expect(root.split(' ')).toEqual(expect.arrayContaining(['hidden', 'xl:block', 'fixed']))
   })
 
-  it('라벨은 1536 전까지 sr-only 다 — 1280 에서 본문에 닿지 않게', () => {
-    expect(markup.match(/<span class="sr-only 2xl:not-sr-only">/g)).toHaveLength(items.length)
+  it('라벨은 링크마다 span 하나다 — 1280–1535 의 띄우는 칩도 같은 span 이라 이름을 두 번 읽지 않는다 (#965)', () => {
+    const links = [...markup.matchAll(/<a [^>]*>([\s\S]*?)<\/a>/g)].map((match) => match[1] ?? '')
+    expect(links).toHaveLength(items.length)
+    links.forEach((link, index) => {
+      expect(link.match(/<span class="about-nav-label">/g)).toHaveLength(1)
+      // 보이는 글자는 라벨 하나뿐 — 복제된 칩이 없다
+      expect(link.replace(/<[^>]+>/g, '')).toBe(items[index]?.label)
+    })
+    // 예전 sr-only 라벨은 걷혔다 — 1280–1535 에서 칩이 opacity 로 숨고 이름은 남는다
+    expect(markup).not.toContain('sr-only')
+  })
+
+  it('링크가 칩의 기준(relative)이다 — 칩은 점 오른쪽에 absolute 로 뜬다 (#965)', () => {
+    for (const link of markup.match(/<a [^>]*>/g) ?? []) {
+      expect(link.match(/class="([^"]*)"/)?.[1]?.split(' ')).toContain('relative')
+    }
   })
 
   it('정적 렌더에는 현재 절이 없다 — 재기 전에 거짓 강조를 하지 않는다', () => {
@@ -87,8 +101,8 @@ describe('SectionNav — 절 내비', () => {
   })
 
   it('화면의 내비는 여섯 절이고 라벨은 각 절의 제목이다 — 표지어는 가는 곳을 말하지 못한다', () => {
-    // sr-only 라벨 span 은 내비에만 있다 — 잘라 내지 않고 전부 센다(일곱 번째가 끼면 실패)
-    const labels = [...view.matchAll(/<span class="sr-only 2xl:not-sr-only">([^<]*)</g)].map(
+    // 라벨 span 은 내비에만 있다 — 잘라 내지 않고 전부 센다(일곱 번째가 끼면 실패)
+    const labels = [...view.matchAll(/<span class="about-nav-label">([^<]*)</g)].map(
       (match) => match[1],
     )
     expect(labels).toEqual([
@@ -127,9 +141,9 @@ describe('ScrollCue · HeroParallax · ScrollProgressBar', () => {
     expect(markup).toBe('<div><p>카드</p></div>')
   })
 
-  it('진행선은 aria-hidden 장식이고 1024 이상에서는 없다', () => {
+  it('진행선은 aria-hidden 장식이고 1280 이상에서는 없다 — 절 내비가 서는 폭에서 바통을 넘긴다 (#965)', () => {
     const markup = renderToStaticMarkup(createElement(ScrollProgressBar))
-    expect(markup).toBe('<div aria-hidden="true" class="about-progress lg:hidden"></div>')
+    expect(markup).toBe('<div aria-hidden="true" class="about-progress xl:hidden"></div>')
   })
 
   it('스크롤 힌트 단독 렌더도 숨김 없이 선다', () => {

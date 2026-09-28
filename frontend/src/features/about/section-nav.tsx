@@ -17,8 +17,10 @@ export type SectionNavItem = { id: string; label: string }
  * - **랜드마크를 늘리지 않는다.** `nav` 가 아니라 `div` + 목록이다 — 셸의 랜드마크만 둔다는
  *   선행 명세 §8. 목록은 `aria-label` 로 이름을 갖는다.
  * - **1280–1535 는 점만, 1536 이상은 라벨까지 보인다.** 1280 에서 콘텐츠 왼쪽 끝이 104px
- *   (좌우 여백 64 + 밴드 안쪽 40)이라 라벨까지 두면 본문에 닿는다. 점만일 때도 링크 이름은
- *   `sr-only` 라벨이 준다.
+ *   (좌우 여백 64 + 밴드 안쪽 40)이라 라벨까지 두면 본문에 닿는다. 1280–1535 에서는 라벨이 점
+ *   오른쪽에 뜨는 칩이고, 링크를 가리키거나 키보드 초점이 오면 드러난다(#965 — 점만 보고 절을
+ *   골라야 했다). 평소에는 투명할 뿐 링크 이름으로 남는다. **라벨 span 은 하나다** — 보이는 칩을
+ *   따로 두면 스크린리더가 이름을 두 번 읽는다. 모양 · 폭 구간은 `globals.css` `.about-nav-label`.
  * - **자기 면(흰 면 + 1px 테두리)을 갖는다.** 고정이라 그린 밴드(히어로 · 마무리) 위도 지나가는데,
  *   면이 없으면 회색 점과 글자가 그린 위에서 사라진다. 그림자는 두지 않는다(DESIGN.md §6).
  * - 현재 절은 `aria-current="true"` 와 채운 점. 현재 절 계산은 스무 절도 안 되는 윗변 비교라
@@ -68,7 +70,7 @@ export function SectionNav({ label, items }: { label: string; items: readonly Se
                 href={`#${item.id}`}
                 aria-current={current ? 'true' : undefined}
                 className={cn(
-                  'text-caption flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md font-semibold 2xl:justify-start 2xl:px-3',
+                  'text-caption relative flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md font-semibold 2xl:justify-start 2xl:px-3',
                   'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:outline-none',
                   current ? 'text-fg' : 'text-fg-muted hover:text-fg',
                 )}
@@ -80,7 +82,7 @@ export function SectionNav({ label, items }: { label: string; items: readonly Se
                     current ? 'bg-brand-500' : 'bg-border-strong',
                   )}
                 />
-                <span className="sr-only 2xl:not-sr-only">{item.label}</span>
+                <span className="about-nav-label">{item.label}</span>
               </a>
             </li>
           )

@@ -291,16 +291,12 @@ export function AboutView() {
 
       {/*
         ── 6. 무엇을 보고 판단하나요 (+ 7. 알아두실 점 · 약관) ── (#940)
-        1024 이상은 한 화면(`.about-screen-fill`)에 카피 7 : 안내 5 로 선다. 왼쪽은 규모 타일을
+        1024 이상은 카피 7 : 안내 5 로 선다. 한 화면을 채우지 않는다(#965) — 채우면 내용이 가운데로
+        내려가 질문 4 → 이 절 사이만 약 90px 더 비었다. 그 자리 아래로 마무리가 비친다. 왼쪽은 규모 타일을
         누르면 구성과 출처가 따라 바뀌는 `DataScale`, 오른쪽은 약속 · 알아두실 점 · 약관을 쌓는다.
         그 미만은 왼쪽 → 오른쪽 순서로 쌓인다.
       */}
-      <IntroBand
-        tone="plain"
-        id={SECTION_ID.data}
-        labelledBy="about-data-heading"
-        className="about-screen-fill"
-      >
+      <IntroBand tone="plain" id={SECTION_ID.data} labelledBy="about-data-heading">
         <div className="grid gap-y-6 lg:grid-cols-12 lg:items-center lg:gap-x-10">
           <div className="lg:col-span-7">
             <QuestionCopy
@@ -508,7 +504,7 @@ function QuestionCopy({
       )}
       {/*
         무대 절의 바로가기는 1024 이상에서 고정 카드 위 맥락 줄로 올라간다(#940) — 여기 남기면
-        마지막 항목(58vh 칸 가운데)보다 화면의 30% 아래에 혼자 떠 있고 무대를 끝까지 내려야 보였다.
+        마지막 항목(44vh 칸 가운데)보다 화면의 30% 아래에 혼자 떠 있고 무대를 끝까지 내려야 보였다.
       */}
       {href !== undefined && link !== undefined && (
         <MoreLink href={href} className={cn('mt-3', staged && 'lg:hidden')}>
@@ -523,7 +519,7 @@ function QuestionCopy({
  * 항목 하나의 몸 — 단계 번호 칸 + 문장 (#940).
  *
  * **문장은 행 제목 등급이다**(`text-body-1` → `lg:text-title-2`, 600 — DESIGN.md §3-1). 예전의
- * 14px · 400 은 58vh 칸 안에서 각주처럼 읽혔다. 번호는 오른쪽 예시의 몇 번째 상태인지를
+ * 14px · 400 은 58vh 칸(지금 44vh, #965) 안에서 각주처럼 읽혔다. 번호는 오른쪽 예시의 몇 번째 상태인지를
  * 말한다 — 예전의 점은 그것을 말하지 못했다. **번호 칸의 기본 모양은 켜진 모양(채움)이다** —
  * 정적 렌더 · 감속 모션이 끝 상태를 본다. 지나온 · 아직 안 온 모양은 `is-live` 아래에서
  * `globals.css` 가 칠한다(`about-stage-*` 선택자 훅). 무대 밖에서는 아무 효과가 없다.

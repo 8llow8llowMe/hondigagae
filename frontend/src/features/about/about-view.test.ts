@@ -236,7 +236,7 @@ describe('AboutView — 무대 항목 · 맥락 줄 · 바로가기 (#940)', () 
     ['about-q4-heading', messages.about.q4],
   ] as const
 
-  it('항목 문장은 행 제목 등급이다 — 14px · 400 이 58vh 칸 안에서 각주처럼 읽혔다', () => {
+  it('항목 문장은 행 제목 등급이다 — 14px · 400 이 58vh 칸(지금 44vh, #965) 안에서 각주처럼 읽혔다', () => {
     const texts = markup.match(/<p class="about-stage-text [^"]*"/g) ?? []
     expect(texts.length).toBe(10)
     for (const text of texts) {
@@ -470,10 +470,11 @@ describe('AboutView — 히어로 (#940)', () => {
 describe('AboutView — 데이터 절 (#940)', () => {
   const data = band('about-data-heading')
 
-  it('한 화면을 채운다 (about-screen-fill)', () => {
-    expect(data).toMatch(
-      /^aria-labelledby="about-data-heading"[^>]*><div class="[^"]*\babout-screen-fill\b/,
-    )
+  it('한 화면을 채우지 않는다 (#965) — 내용이 가운데로 내려가 질문 4 → 데이터 띠만 90px 더 비었다', () => {
+    const open = data.match(/^aria-labelledby="about-data-heading"[^>]*>/)?.[0] ?? ''
+    expect(open).not.toBe('')
+    expect(data).not.toContain('about-screen-fill')
+    expect(markup).not.toContain('about-screen-fill')
   })
 
   it('규모 타일 셋이 라디오 묶음이고 정적 렌더는 장소가 골라져 있다 — 고른 것만 탭 순서에', () => {
