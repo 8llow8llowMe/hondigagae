@@ -1,5 +1,6 @@
 import type { LatLng } from '@/lib/geo/coord'
 import { haversineMeters, isLongTrip } from '@/lib/geo/distance'
+import type { SpanBox } from '@/lib/map/viewport'
 
 /**
  * 동선 모델 — 항목 배열을 **핀과 선**으로 옮긴다.
@@ -169,14 +170,6 @@ const METERS_PER_DEGREE = 111_320
 const SINGLE_STOP_SPAN_METERS = 1200
 
 /**
- * 정류점을 다 담는 폭. 가장자리 핀의 이름표가 잘리지 않도록 여유를 준다.
- *
- * 1.0 이면 양 끝 핀이 화면 경계에 정확히 걸리는데, 핀은 이름표가 있어 좌표보다 가로로
- * 넓다 (`.map-pin` `max-width: 180px`).
- */
-const SPAN_PADDING = 1.4
-
-/**
  * 정류점을 담는 카메라. `MapCanvas` 의 `camera` prop 에 그대로 넘긴다.
  *
  * **호출부는 반드시 `useMemo` 로 감싼다.** 렌더 중에 새 객체를 만들면 참조가 매번 바뀌어
@@ -185,7 +178,7 @@ const SPAN_PADDING = 1.4
  */
 export function routeCamera(
   stops: readonly RouteStop[],
-): { anchor: LatLng; spanMeters: number } | null {
+): { anchor: LatLng; spanMeters: SpanBox } | null {
   const first = stops[0]
   if (first === undefined) return null
 
@@ -207,14 +200,23 @@ export function routeCamera(
   const lngMeters = (maxLng - minLng) * METERS_PER_DEGREE * Math.cos((anchor.lat * Math.PI) / 180)
 
   /*
-    **긴 변을 담는다.** `framedCamera` 가 컨테이너의 **짧은 변** 기준으로 단계를 역산하므로
-    (`levelForSpanMeters`), 여기서 짧은 변을 넘기면 긴 쪽이 화면 밖으로 나간다.
+    **두 변을 따로 넘긴다** (#982). 예전에는 긴 변 하나(× 1.4)로 접었는데, `framedCamera`
+    는 숫자를 원의 지름으로 보고 컨테이너의 **짧은 변**에 맞춘다. 동선 칸은 가로로 넓고
+    (1366 에서 888×256) 제주 동선은 대개 동서로 길어, 동서 72km 를 **높이 256px** 에 맞추는
+    바람에 한두 단계 멀어졌다. 사각형으로 넘기면 동서는 가로에, 남북은 세로에 맞는다.
+
+    여백은 여기서 곱하지 않는다 — 가장자리에 걸리는 것은 픽셀 크기의 핀이라
+    `levelForBoxMeters` 가 픽셀로 뺀다.
 
     정류점이 하나면 두 변이 모두 0 이라 최솟값으로 떨어진다 — 0 을 그대로 넘기면 SDK 가
-    최대 배율로 확대해 아무것도 보이지 않는다.
+    최대 배율로 확대해 아무것도 보이지 않는다. **두 축에 모두 건다** — 수백 m 떨어진
+    두 곳이 건물 하나 크기로 확대되는 것도 같은 문제다.
   */
   return {
     anchor,
-    spanMeters: Math.max(Math.max(latMeters, lngMeters) * SPAN_PADDING, SINGLE_STOP_SPAN_METERS),
+    spanMeters: {
+      widthMeters: Math.max(lngMeters, SINGLE_STOP_SPAN_METERS),
+      heightMeters: Math.max(latMeters, SINGLE_STOP_SPAN_METERS),
+    },
   }
 }

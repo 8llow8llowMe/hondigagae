@@ -166,25 +166,84 @@ export function levelForSpanMeters(meters: number, pixels: number): number {
 }
 
 /**
+ * 담고 싶은 **사각형**의 동서(가로) · 남북(세로) 폭(m).
+ *
+ * 여러 점을 담는 지도(동선 카드)가 쓴다. 원(지름 하나)으로 접으면 긴 변을 컨테이너의
+ * **짧은 변**에 맞추게 되는데, 동선 칸은 가로로 넓고 제주 동선은 대개 동서로 길다 —
+ * 긴 쪽을 짧은 쪽에 맞춰 한두 단계 멀어졌다 (#982).
+ */
+export type SpanBox = {
+  widthMeters: number
+  heightMeters: number
+}
+
+/**
+ * 사각형을 담을 때 네 변에 두는 여백(px).
+ *
+ * **비율이 아니라 픽셀이다.** 가장자리에 걸리는 것은 핀이고 핀은 화면에서 크기가 정해져
+ * 있다 — 순번 핀은 지름 32px 원이라 좌표에서 16px 을 차지하고, 그만큼을 더 띄운다.
+ * 비율(× 1.4)로 주면 먼 동선일수록 여백만 커져 72km 동선에 29km 를 더했고, 그것만으로
+ * 모바일에서 한 단계를 잃었다 (#982). 카카오 `setBounds` 도 여백을 픽셀로 받는다.
+ */
+const BOX_PADDING_PX = 32
+
+/**
+ * `box` 가 양쪽 `BOX_PADDING_PX` 를 뺀 컨테이너 안에 들어오는 **가장 확대된 단계.**
+ *
+ * **축마다 따로 맞추고 더 축소된 쪽을 쓴다.** 동서 폭은 가로에, 남북 폭은 세로에 대야
+ * 한다 — 둘을 섞으면 넓은 컨테이너의 가로가 버려진다.
+ *
+ * 폭이 0 인 축(같은 위도의 두 곳)은 단계를 정하지 않는다. `levelForSpanMeters` 는 0 에
+ * 최대 축소를 주는데, 그 축이 `max` 를 이겨 다른 축을 무시하게 된다. 두 축이 모두 0 이면
+ * 그 함수와 같이 최대 축소다.
+ *
+ * 크기가 0 인 축은 `levelForSpanMeters` 의 대체 크기를 그대로 탄다 — 0 에서 여백을 빼면
+ * 음수라, 대체값 판정이 먼저다.
+ */
+export function levelForBoxMeters(box: SpanBox, width: number, height: number): number {
+  const usable = (pixels: number) =>
+    Number.isFinite(pixels) && pixels > 0 ? Math.max(1, pixels - BOX_PADDING_PX * 2) : 0
+
+  const levels: number[] = []
+  if (Number.isFinite(box.widthMeters) && box.widthMeters > 0) {
+    levels.push(levelForSpanMeters(box.widthMeters, usable(width)))
+  }
+  if (Number.isFinite(box.heightMeters) && box.heightMeters > 0) {
+    levels.push(levelForSpanMeters(box.heightMeters, usable(height)))
+  }
+
+  return levels.length === 0 ? MAX_MAP_LEVEL : Math.max(...levels)
+}
+
+/**
  * 기준점과 담고 싶은 폭으로 **첫 카메라(중심 + 확대 단계)** 를 만든다.
  *
  * `framedCenterLat` 과 `levelForSpanMeters` 를 한 번에 묶는다 — 두 함수를 호출부가
  * 따로 부르면 **level 을 두 번 정하게 되고**(하나는 확대용, 하나는 위도 폭 환산용)
  * 둘이 어긋나면 구도가 조용히 틀어진다.
  *
- * **짧은 변으로 단계를 정한다.** 긴 변에 맞추면 짧은 변에서 잘려 조회 범위의 일부가
- * 화면 밖에 남는다.
+ * **숫자(원의 지름)는 짧은 변으로 단계를 정한다.** 원은 어느 방향으로든 같은 폭이라
+ * 긴 변에 맞추면 짧은 변에서 잘려 조회 범위의 일부가 화면 밖에 남는다.
+ *
+ * **사각형(`SpanBox`)은 축마다 맞춘다** (`levelForBoxMeters`) — 담을 것의 모양을 아는
+ * 호출부(동선 카드)가 넘긴다.
  */
 export function framedCamera(input: {
   anchor: LatLng
-  /** 화면에 담고 싶은 폭(m). 반경이면 **지름**을 넘긴다 */
-  spanMeters: number
+  /**
+   * 화면에 담고 싶은 폭(m). 반경이면 **지름**을 넘긴다. 여러 점을 담으면 그 사각형의
+   * 두 변을 `SpanBox` 로 넘긴다
+   */
+  spanMeters: number | SpanBox
   width: number
   height: number
   /** 기준점이 화면 위쪽 몇 할 지점에 올지. 0.5 면 정중앙 */
   seaRatio: number
 }): { lat: number; lng: number; level: number } {
-  const level = levelForSpanMeters(input.spanMeters, Math.min(input.width, input.height))
+  const level =
+    typeof input.spanMeters === 'number'
+      ? levelForSpanMeters(input.spanMeters, Math.min(input.width, input.height))
+      : levelForBoxMeters(input.spanMeters, input.width, input.height)
 
   return {
     lat: framedCenterLat(input.anchor.lat, input.height, level, input.seaRatio),

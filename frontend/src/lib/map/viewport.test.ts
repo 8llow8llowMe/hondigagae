@@ -7,6 +7,7 @@ import {
   framedCenterLat,
   isSameViewport,
   isWithinBounds,
+  levelForBoxMeters,
   levelForSpanMeters,
   type MapBounds,
   metersPerPixel,
@@ -263,5 +264,104 @@ describe('framedCamera', () => {
     })
 
     expect(camera.lat).toBe(framedCenterLat(anchor.lat, 700, camera.level, 0.35))
+  })
+})
+
+/*
+  #982 — 동선 카드가 그날 장소에 맞춰 확대되지 않았다.
+
+  수치는 이슈의 1일차 세 곳(수월봉 · 생각하는 정원 · 성산일출봉)을 담는 사각형이다 —
+  동서 72,453m · 남북 18,156m (`route.test.ts` 가 같은 좌표에서 이 값을 낸다).
+  컨테이너는 실측이다 (2026-09-28, MOCK_API 5186 에서 `/plans/{id}` 의 지도 칸):
+  1366 데스크톱 **888×256**, 390 모바일 **358×224**.
+
+  기대 단계는 카카오 자신이 답했다 — 5174 에서 같은 크기의 컨테이너에 `setBounds` 를
+  걸면 888×256 은 **10**, 358×224 는 **11** 이다. 고치기 전 코드는 둘 다 **12** 였다
+  (긴 변 72km × 1.4 를 **짧은 변(높이)** 에 맞췄다).
+*/
+describe('levelForBoxMeters', () => {
+  const ISSUE_BOX = { widthMeters: 72_453, heightMeters: 18_156 }
+
+  it('데스크톱 동선 칸(888×256)에서 카카오 setBounds 와 같은 10 이다', () => {
+    expect(levelForBoxMeters(ISSUE_BOX, 888, 256)).toBe(10)
+  })
+
+  it('모바일 동선 칸(358×224)에서 카카오 setBounds 와 같은 11 이다', () => {
+    expect(levelForBoxMeters(ISSUE_BOX, 358, 224)).toBe(11)
+  })
+
+  /*
+    **가로 폭을 쓴다.** 동서로 긴 사각형은 넓은 컨테이너에서 더 가까이 담긴다 — 높이만
+    보면 888 과 358 이 같은 단계가 된다(고치기 전 증상).
+  */
+  it('같은 높이라도 가로가 넓으면 더 확대된다', () => {
+    expect(levelForBoxMeters(ISSUE_BOX, 888, 224)).toBeLessThan(
+      levelForBoxMeters(ISSUE_BOX, 358, 224),
+    )
+  })
+
+  /* 남북으로 긴 사각형은 높이가 정한다 — 축을 서로 바꿔 끼우지 않는다 */
+  it('남북으로 긴 사각형은 높이가 단계를 정한다', () => {
+    const tall = { widthMeters: 1_000, heightMeters: 30_000 }
+
+    expect(levelForBoxMeters(tall, 888, 256)).toBe(levelForSpanMeters(30_000, 256 - 64))
+  })
+
+  /*
+    **여백은 픽셀이다** (양쪽 32px). 순번 핀은 지름 32px 원이라 좌표에서 16px 을 차지하고,
+    그만큼을 더 띄운다. 비율 여백(× 1.4)은 먼 동선일수록 여백만 커져 한 단계를 통째로
+    잃었다 — 72km 에 29km 를 더했다.
+  */
+  it('양쪽 32px 을 뺀 폭에 담는다 — 경계는 담기는 쪽이다', () => {
+    // 294px(358 - 64) × 256 m/px(11) = 75,264m — 이보다 넓으면 한 단계 물러난다
+    expect(levelForBoxMeters({ widthMeters: 75_264, heightMeters: 0 }, 358, 224)).toBe(11)
+    expect(levelForBoxMeters({ widthMeters: 75_265, heightMeters: 0 }, 358, 224)).toBe(12)
+  })
+
+  /* 두 곳이 같은 위도면 남북 폭이 0 이다 — 그 축이 최대 축소(14)로 끌어내리면 안 된다 */
+  it('폭이 0 인 축은 단계를 정하지 않는다', () => {
+    expect(levelForBoxMeters({ widthMeters: 20_000, heightMeters: 0 }, 888, 256)).toBe(
+      levelForSpanMeters(20_000, 888 - 64),
+    )
+  })
+
+  it('두 축이 모두 0 이면 levelForSpanMeters 와 같이 최대 축소다', () => {
+    expect(levelForBoxMeters({ widthMeters: 0, heightMeters: 0 }, 888, 256)).toBe(14)
+  })
+
+  /* 탭·시트 뒤에서 만들어지면 clientWidth/Height 가 0 이다 — 최대 축소로 떨어지지 않는다 */
+  it('컨테이너 크기가 0 이면 대체 크기로 계산한다', () => {
+    expect(levelForBoxMeters(ISSUE_BOX, 0, 0)).toBeLessThan(14)
+  })
+})
+
+describe('framedCamera — 사각형', () => {
+  const anchor = { lat: 33.37735, lng: 126.5528 }
+
+  it('사각형을 받으면 축마다 맞춘 단계를 쓴다', () => {
+    const camera = framedCamera({
+      anchor,
+      spanMeters: { widthMeters: 72_453, heightMeters: 18_156 },
+      width: 888,
+      height: 256,
+      seaRatio: 0.5,
+    })
+
+    expect(camera.level).toBe(10)
+    expect(camera.lat).toBeCloseTo(anchor.lat, 10)
+    expect(camera.lng).toBe(anchor.lng)
+  })
+
+  /* 원(지름)은 지금과 같다 — 긴급 시설 · 장소 미니맵 · 올레 시작점 지도가 쓴다 */
+  it('숫자(지름)는 여전히 짧은 변으로 정한다', () => {
+    const camera = framedCamera({
+      anchor,
+      spanMeters: 20_000,
+      width: 888,
+      height: 256,
+      seaRatio: 0.5,
+    })
+
+    expect(camera.level).toBe(levelForSpanMeters(20_000, 256))
   })
 })
