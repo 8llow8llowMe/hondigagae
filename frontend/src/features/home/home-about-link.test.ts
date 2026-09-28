@@ -128,7 +128,8 @@ describe('홈 → /about 소개 카드 (#950)', () => {
     expect(stacks).toEqual(['lg:sticky lg:top-16 lg:self-start lg:pr-3', 'lg:pl-3'])
     // `border-*` 에 속지 않게 앞 글자를 본다
     expect(HOME).not.toMatch(/(?<![\w-])-?order-(?:first|last|none|\d)/)
-    expect(HOME).not.toMatch(/\bcontents\b/)
+    // `display: contents` 유틸리티만 막는다 — `SliceResponse.contents` 같은 필드명에 걸리지 않게 className 안만 본다
+    expect(HOME).not.toMatch(/className=\{?["'`][^"'`]*(?<![\w-])(?:\w+:)*contents\b/)
   })
 
   /*
