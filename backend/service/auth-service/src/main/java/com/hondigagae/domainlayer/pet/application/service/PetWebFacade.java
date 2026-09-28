@@ -8,6 +8,7 @@ import com.hondigagae.domainlayer.pet.application.command.PetSaveCommand;
 import com.hondigagae.domainlayer.pet.application.info.PetInfo;
 import com.hondigagae.domainlayer.pet.application.info.PetProfileImageChangeResult;
 import com.hondigagae.domainlayer.pet.application.port.in.PetWebUseCase;
+import com.hondigagae.domainlayer.pet.application.port.out.PlanCompanionCommandPort;
 import com.hondigagae.domainlayer.pet.application.service.processor.PetCommandProcessor;
 import com.hondigagae.domainlayer.pet.application.service.processor.PetQueryProcessor;
 import com.hondigagae.storage.client.ObjectStorageClient;
@@ -27,6 +28,7 @@ public class PetWebFacade implements PetWebUseCase {
     private final PetCommandProcessor petCommandProcessor;
     private final PetPresenter petPresenter;
     private final ObjectStorageClient objectStorageClient;
+    private final PlanCompanionCommandPort planCompanionCommandPort;
 
     @Override
     @Transactional(readOnly = true)
@@ -56,10 +58,23 @@ public class PetWebFacade implements PetWebUseCase {
         return petPresenter.toPetResponse(petInfo);
     }
 
+    /**
+     * 반려견 삭제 → (커밋) → plan-service 에 동행 목록 대사 요청 (#972).
+     *
+     * <p><b>이 메서드에 {@code @Transactional} 을 붙이지 않는다.</b> 대사 요청은 원격 호출이라 트랜잭션 안에서
+     * 부르면 DB 커넥션을 잡은 채 plan 응답을 기다린다. 더 큰 이유는 <b>순서</b>다 — plan 은 요청을 받으면
+     * auth 에 "살아 있는 반려견" 을 되묻는데, 삭제가 아직 커밋되지 않았으면 방금 지운 아이가 살아 있다고
+     * 답해 아무것도 떼지 않는다. 반대로 plan 이 뗀 뒤 auth 가 롤백되면 살아 있는 아이가 일정에서 사라진다.
+     * 그래서 DB 구간은 {@link PetCommandProcessor#delete} 가 스스로 트랜잭션을 열고 닫으며, 요청은 그 커밋 뒤에 간다.
+     *
+     * <p><b>{@code @Async} 로 빼지 않았다.</b> 반려견 삭제는 드문 조작이라 응답 지연(최대 connect 2s + read 5s)이
+     * 감당할 만하고, 같은 요청 스레드에서 도는 편이 로그 상관관계와 실패 관측이 쉽다. p99 가 문제가 되면
+     * 그때 전용 executor 로 옮긴다. 어느 쪽이든 실패는 삭제를 막지 않는다 — 포트가 던지지 않는다.
+     */
     @Override
-    @Transactional
     public void deletePet(long memberId, long petId) {
         petCommandProcessor.delete(memberId, petId);
+        planCompanionCommandPort.reconcileCompanions(memberId, petId);
     }
 
     @Override

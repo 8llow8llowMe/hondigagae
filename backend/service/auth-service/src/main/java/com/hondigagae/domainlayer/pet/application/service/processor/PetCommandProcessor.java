@@ -83,6 +83,9 @@ public class PetCommandProcessor {
         return new PetProfileImageChangeResult(PetInfo.from(updated), previousObjectKey);
     }
 
+    // 파사드가 plan-service 호출을 트랜잭션 밖(커밋 뒤)에 두므로 DB 구간(소프트 삭제 + 대표 승계 save)은 여기서 경계를 연다 (#972).
+    // 두 save 가 한 트랜잭션이어야 "대표 없음" 상태가 커밋되지 않는다.
+    @Transactional
     public void delete(long memberId, long petId) {
         Pet pet = petQueryProcessor.getOwnedPet(memberId, petId);
         petRepositoryPort.save(pet.delete());

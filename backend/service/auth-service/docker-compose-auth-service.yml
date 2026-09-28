@@ -81,6 +81,13 @@ x-auth-service-environment: &auth_service_environment
   SNOWFLAKE_DATACENTER_ID: ${SNOWFLAKE_DATACENTER_ID}
   # 서비스마다 다른 값을 준다. 겹치면 같은 ID 가 두 번 나온다.
   SNOWFLAKE_WORKER_ID: ${SNOWFLAKE_WORKER_ID}
+  # 내부 호출 대상(lb://). Eureka 등록명에 -dev/-prod 접미사가 붙어 Feign name 을 env 로 받는다.
+  #   plan-service: 반려견 삭제 직후 동행 목록 대사 트리거(/internal/v1/plans/companions/reconcile, #972)
+  # 빠지면 Feign 이 리터럴 "${PLAN_SERVICE_APP_NAME}" 을 호스트명으로 삼아
+  # "Service id not legal hostname" 으로 기동에 실패한다 (plan-service 의 dev 배포에서 실제 발생).
+  PLAN_SERVICE_APP_NAME: ${PLAN_SERVICE_APP_NAME}
+  INTERNAL_CLIENT_CONNECT_TIMEOUT_MS: ${INTERNAL_CLIENT_CONNECT_TIMEOUT_MS:-2000}
+  INTERNAL_CLIENT_READ_TIMEOUT_MS: ${INTERNAL_CLIENT_READ_TIMEOUT_MS:-5000}
 
 x-logging: &default-logging
   driver: "json-file"
