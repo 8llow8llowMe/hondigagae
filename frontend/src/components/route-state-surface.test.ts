@@ -440,6 +440,8 @@ describe('라우트 상태 파일이 3층 표면 위에 선다 (#475)', () => {
     셋이 빠져 있다 — 새 경계가 `reset` 으로 태어나도 거기서는 안 걸린다.
   */
   const ERROR_BOUNDARIES = (readdirSync(APP_DIR, { recursive: true }) as string[])
+    // 윈도에서는 `readdirSync` 가 `\\` 로 돌려준다 — 정규식과 `STATE_FILES` 의 `/` 로 맞춘다 (#967)
+    .map((entry) => entry.replaceAll('\\', '/'))
     .filter((entry) => /(?:^|\/)(?:global-)?error\.tsx$/.test(entry))
     .map((entry) => `app/${entry}`)
     .sort()
