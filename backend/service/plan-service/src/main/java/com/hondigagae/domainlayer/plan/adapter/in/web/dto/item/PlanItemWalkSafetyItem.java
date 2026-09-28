@@ -100,7 +100,7 @@ public record PlanItemWalkSafetyItem(
     String unavailableReasonCode,
 
     @Schema(description = "판정을 못 낸 사유 문장. 정상이면 null",
-        example = "이 항목에 시작 시각이 없어 산책 위험도를 낼 수 없습니다. 시각은 시간대마다 판정이 갈립니다.")
+        example = "이 항목에 시작 시각이 없어 산책 위험도를 낼 수 없습니다. 산책 위험도는 시간대마다 다릅니다.")
     String unavailableReason
 ) {
 }
