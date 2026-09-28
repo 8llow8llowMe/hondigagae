@@ -470,7 +470,7 @@ describe('AboutView — 히어로 (#940)', () => {
 describe('AboutView — 데이터 절 (#940)', () => {
   const data = band('about-data-heading')
 
-  it('한 화면을 채우지 않는다 (#965) — 내용이 가운데로 내려가 질문 4 → 데이터 띠만 90px 더 비었다', () => {
+  it('한 화면을 채우지 않는다 (#965) — 내용이 가운데로 내려가 질문 4 → 데이터 띠만 65px 더 비었다', () => {
     const open = data.match(/^aria-labelledby="about-data-heading"[^>]*>/)?.[0] ?? ''
     expect(open).not.toBe('')
     expect(data).not.toContain('about-screen-fill')

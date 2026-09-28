@@ -873,8 +873,17 @@ body {
     transition: opacity 150ms ease-out;
   }
 
-  a:hover > .about-nav-label,
   a:focus-visible > .about-nav-label {
+    opacity: 1;
+  }
+}
+
+/*
+  가리킴으로 드러내는 것은 hover 가 되는 기기에서만 — 1366 가로 태블릿처럼 이 폭의 터치 기기는
+  탭한 뒤 `:hover` 가 남아 다른 곳을 누를 때까지 칩이 본문 위에 떠 있다. 키보드 초점은 그대로다.
+*/
+@media (width >= 80rem) and (width < 96rem) and (hover: hover) {
+  a:hover > .about-nav-label {
     opacity: 1;
   }
 }
