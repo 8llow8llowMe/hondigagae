@@ -137,6 +137,10 @@ idx_place_indoor_pet_available (indoor, petAvailable) ← 실내 대안 추천�
   그래서 완전일치 규칙의 반경을 1km로 넉넉히 잡았다.
 - 병합 시 **관광 API 행을 살리고** 문화정보원 행에 `merged_into_id`를 채운다.
   관광 API가 이미지·개요·동반 정보 9필드를 갖고 있어 정보량이 많다.
+- **병합은 `pet_allowance_type` · `allowed_pet_size` 를 옮기지 않는다.** 예전에는 `pet_allowance_type` 을 버려서
+  문화정보원이 "동반 불가" 로 확인한 29곳이 TourAPI 로 흡수되며 UNKNOWN 이 됐다(2026-09-28 dev). 이제 병합 뒤에 도는
+  재계산 스텝(#886)이 **흡수된 행을 근거로** 살아남은 행의 두 칸을 다시 계산한다 — `place_pet_info` 와 함께 보고
+  가장 제한적인 값을 쓴다(`data-refresh-guide.md` §10).
 - 판정 상수(병합 1,000m·300m, 이미지 백필 500m)의 정본은 `PlaceIdentityPolicy` 한곳이다(#363) —
   값을 조정할 때 병합과 백필 중 한쪽만 바뀌는 어긋남을 막는다.
 - 이미지 백필 반경 500m 가 병합 1,000m 보다 좁은 이유는 틀렸을 때 값이 다르기 때문이다 —

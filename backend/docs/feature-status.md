@@ -97,7 +97,7 @@ on/off 스위치와 스텁 어댑터는 두지 않는다(2026-09-03 제거). 프
 | `placeImageBackfillJob` | 문화정보원·식약처 장소의 대표 이미지 백필 (TourAPI 검색, 제목+좌표 검증) | 구현 |
 | `cultureFacilityImportJob` | 문화정보원 문화시설 + 긴급 시설 | 구현 |
 | `petRestaurantImportJob` | 식약처 음식점 + VWorld 지오코딩 | 구현 |
-| `placeMergeJob` | 원천이 다른 같은 장소 병합 (`merged_into_id`). 적재 잡들 뒤에 한 번 | 구현 |
+| `placeMergeJob` | 원천이 다른 같은 장소 병합 (`merged_into_id`). 적재 잡들 뒤에 한 번. 병합 뒤 동반 가능 여부 재계산(#886) | 구현 |
 | `congestionImportJob` | 관광지 집중률 예측 + 명칭 매칭 | 구현 |
 
 `congestionImportJob` 은 **`placeImportJob` 이후에 돌려야 한다.** 장소가 비어 있으면
@@ -112,7 +112,7 @@ on/off 스위치와 스텁 어댑터는 두지 않는다(2026-09-03 제거). 프
 | ├ TourAPI | 활성 2,099 / 전체 2,117 | 관광지(12) 560 · 문화시설(14) 98 · 레포츠(28) 137 · 숙박(32) 210 · 쇼핑(38) 395 · 음식점(39) 699 (#726 지역코드 이관 뒤) |
 | ├ 문화정보원 | 228 중 101 은 TourAPI 로 병합 | 노출은 127 (`merged_into_id IS NULL`) |
 | └ 식약처 | 102 | 반려동물 동반 음식점 |
-| 동반 가능 여부 | ALLOWED 194 · PARTIALLY 5 · NOT_ALLOWED 30 · **UNKNOWN 2,099** | **TourAPI 장소는 전부 UNKNOWN** 이다 — 동반 정보 적재(#877)와 반영(#886) 전 |
+| 동반 가능 여부 | ALLOWED 194 · PARTIALLY 5 · NOT_ALLOWED 30 · **UNKNOWN 2,099** | 실측 시점에는 **TourAPI 장소가 전부 UNKNOWN** 이었다. #886 이 재계산 스텝을 넣어 코드로는 반영된다 — `place_pet_info` 와 흡수 행에서 가장 제한적인 값. 2026-09-28 모의로 TourAPI 노출 2,095곳이 ALLOWED 342 · PARTIALLY 39 · NOT_ALLOWED 29 · UNKNOWN 1,685 가 된다. **dev 는 배포 뒤 `petTourImportJob` 한 번으로 반영되고, 그때 다시 잰다** |
 | 긴급 시설 | 214곳 | 동물병원 + 동물약국 (#569 중복 접기 후) |
 
 > 기준: 2026-09-23 dev DB(`hondigagae_tour_dev`) 읽기 전용 실측 (#885). 다시 잴 때:

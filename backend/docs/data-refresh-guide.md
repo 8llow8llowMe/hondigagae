@@ -494,10 +494,11 @@ UPDATE place survivor
 `JdbcPlaceBulkAdapterSqlTest` 가 두 SQL 을 실제로 파싱해 대조한다. 병합에 컬럼을 하나 더하면서
 적재 쪽을 안 보면 그 테스트가 먼저 빨개진다.
 
-## 10. 반려동물 동반 조건 — `petTourImportJob` (#877)
+## 10. 반려동물 동반 조건 — `petTourImportJob` (#877 · #886)
 
-`place_pet_info` 를 채운다. 장소 상세의 `petInfo` 가 이 테이블에서 온다. 파이프라인의 마지막 자식이라
-주 1회 자동으로 돌고, 단독 실행도 된다.
+`place_pet_info` 를 채우고, 이어서 TourAPI 장소의 `place.pet_allowance_type` · `allowed_pet_size` 를 다시 계산한다.
+장소 상세의 `petInfo` 가 이 테이블에서 오고, 목록 필터 · 적합도 · AI 후보가 place 의 두 칸을 본다.
+파이프라인의 마지막 자식이라 주 1회 자동으로 돌고, 단독 실행도 된다.
 
 ### 무엇을 얼마나 부르나 (2026-09-23 실측)
 
@@ -516,14 +517,37 @@ UPDATE place survivor
 
 - **원문 아홉 칸은 그대로** 적재한다. NOT NULL 가공 세 칸(`allowance_scope` · `allowed_pet_size` ·
   `leash_required`)은 `PetFieldParser` 의 기존 규칙으로만 채운다 — 모르면 `UNKNOWN` / `false`.
-- **`place` 행의 `pet_allowance_type` · `allowed_pet_size`(필터·적합도 입력)는 건드리지 않는다.**
-  그쪽 반영은 별도 이슈다.
+- 적재 스텝은 `place` 행을 건드리지 않는다. `place` 의 두 칸은 아래 재계산 스텝이 쓴다.
 - **지우는 것은 원천이 `showflag=0` 으로 내렸다고 말한 contentId 뿐이다.** 목록에 없다는 이유로는
   지우지 않는다 — 부재는 지역 키 오류나 부분 응답에서도 생긴다. 그래서 건수 가드(`ImportVolumeGuard`)가
   필요 없다: 목록이 줄면 부르는 수가 줄 뿐 지워지는 행은 없고, 불어나도 place 마스터와의 교집합과 상한이
   호출 수를 묶는다.
 - 상세가 비어 오거나 실패한 곳은 **이미 행이 있으면** `synced_at` 만 민다. 행이 없으면 만들지 않는다 —
   빈 행은 장소 상세에 "동반 정보 있음" 으로 읽힌다.
+
+### place 의 동반 가능 여부 · 크기 제한 — 재계산 스텝 (#886)
+
+`petTourImportJob` 은 적재 스텝 뒤에, `placeMergeJob` 은 병합 스텝 뒤에 **같은 스텝** `placePetAllowanceReflectStep`
+을 돈다. 파이프라인에서는 두 번 돌지만(병합 → … → 반려동물) 근거 읽기 한 번 + 바뀐 행만 갱신이라 싸고,
+둘 중 한 잡만 손으로 돌려도 반영된다.
+
+- **대상은 TourAPI 노출 행뿐이다** (`source='TOUR_API' AND merged_into_id IS NULL AND delisted_at IS NULL`).
+  문화정보원 · 식약처 노출 행은 자기 적재가 두 칸을 소유한다 — 건드리지 않는다.
+- **근거 둘** — `place_pet_info`(`allowance_scope` FULL_AREA → ALLOWED, PARTIAL · OUTDOOR_ONLY → PARTIALLY_ALLOWED)와
+  이 행으로 **흡수된 행**(`merged_into_id = 이 행`, delisted 아닌 것)의 값. UNKNOWN 은 근거가 아니다.
+- **결과는 가장 제한적인 값** — NOT_ALLOWED > PARTIALLY_ALLOWED > ALLOWED, SMALL_ONLY > SMALL_MEDIUM > ALL.
+  근거가 없으면 UNKNOWN. `place_pet_info` 가 없는 곳을 NOT_ALLOWED 로 만들지 않는다.
+- **매 실행 처음부터 다시 계산한다.** 입력이 같으면 두 번째 실행은 0행을 갱신하고, 동반 정보가 지워지거나 흡수 행이
+  delist 되면 값이 UNKNOWN 쪽으로 돌아간다. 급변 가드는 없다 — 입력이 이미 가드를 거친 두 테이블이다.
+- **재적재 · 재병합이 결과를 지우지 않는다.** TourAPI upsert 는 두 칸을 INSERT 리터럴로만 쓰고 UPDATE 절에 두지 않으며,
+  병합은 두 칸을 옮기지 않는다(`JdbcPlaceBulkAdapterSqlTest` 가 둘 다 고정). 병합이 예전에 하던
+  `allowed_pet_size` 채우기(survivor 가 UNKNOWN 일 때만)는 재계산이 흡수 행을 근거로 쓰므로 걷었다.
+
+완료 로그(재계산 뒤 대상 전체의 분포와 이번에 바뀐 행 수):
+`pet allowance reflected. targets=…, changed=…, ALLOWED=…, PARTIALLY_ALLOWED=…, NOT_ALLOWED=…, UNKNOWN=…, sizeRestricted=…`.
+
+2026-09-28 dev 모의(설계 명세 §1, 같은 규칙의 SQL)로는 ALLOWED 342 · PARTIALLY_ALLOWED 39 · NOT_ALLOWED 29 ·
+UNKNOWN 1,685 가 나와야 한다. 모의는 흡수 행의 `delisted_at` 을 거르지 않았으므로 실제 값이 조금 작을 수 있다.
 
 ### 단독 실행
 
@@ -553,4 +577,16 @@ SELECT allowance_scope, allowed_pet_size, leash_required, COUNT(*)
 
 -- 마지막 적재 시각
 SELECT MIN(synced_at), MAX(synced_at) FROM place_pet_info;
+
+-- 재계산 결과 — TourAPI 노출 행의 동반 가능 여부 · 크기 제한 분포 (#886). 완료 로그의 분포와 같아야 한다
+SELECT pet_allowance_type, allowed_pet_size, COUNT(*)
+  FROM place
+ WHERE source = 'TOUR_API' AND merged_into_id IS NULL AND delisted_at IS NULL
+ GROUP BY pet_allowance_type, allowed_pet_size ORDER BY 3 DESC;
+
+-- 근거가 있는데 UNKNOWN 으로 남은 행 — 0 이어야 한다 (재계산이 안 돌았거나 규칙이 어긋난 것이다)
+SELECT COUNT(*) unreflected
+  FROM place p JOIN place_pet_info ppi ON ppi.place_id = p.id
+ WHERE p.source = 'TOUR_API' AND p.merged_into_id IS NULL AND p.delisted_at IS NULL
+   AND ppi.allowance_scope <> 'UNKNOWN' AND p.pet_allowance_type = 'UNKNOWN';
 ```
