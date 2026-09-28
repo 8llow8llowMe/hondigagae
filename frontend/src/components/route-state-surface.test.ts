@@ -118,10 +118,15 @@ type StateFile = {
   /**
    * 이 경계의 `h1` 이 쓰는 `messages` 키 — **정상 화면의 `h1` 과 같아야 하는 경우에만** 준다.
    *
-   * 여덟이 그렇다. 나머지 다섯은 정상 화면 쪽 `page.tsx` 에 `h1` 이 없어 비교 대상이
-   * 없다: 상세 넷(`places/[placeId]` · `plans/[planId]`)은 경계가 **오류 전용 이름**
+   * 일곱이 그렇다. 나머지 여섯 중 다섯은 정상 화면 쪽 `page.tsx` 에 `h1` 이 없어 비교
+   * 대상이 없다: 상세 넷(`places/[placeId]` · `plans/[planId]`)은 경계가 **오류 전용 이름**
    * (`detailErrorTitle` · `detailNotFoundTitle`)을 쓰고, AI 작업 상태는 `h1` 을
    * 뷰 컴포넌트가 그린다. 그쪽은 화면 이름을 물려받는 계약이 아니다.
+   *
+   * **`pets/[petId]/not-found.tsx` 는 비교 대상이 있는데도 주지 않는다** (#980). 이 계약은
+   * 화면이 살아 있다가 예외로 죽은 `error.tsx` 의 것이다(#481) — 없는 반려견에는 수정할
+   * 화면이 없고, 탭은 #676 부터 상태(`notFoundTitle`)를 말한다. 그 짝은
+   * `app/resource-state-title.test.ts` 가 잠근다.
    *
    * **#481 이 이 필드를 요구했다.** 마이페이지 경계 하나가 셋을 덮던 시절, 폼 화면에서
    * 예외가 뜨면 문서 최상위 제목이 `내 정보` 로 바뀌었다 — 폭보다 이쪽이 더 나쁘다.
@@ -245,7 +250,6 @@ const STATE_FILES: StateFile[] = [
   },
   {
     path: 'app/(main)/pets/[petId]/not-found.tsx',
-    heading: 'messages.pet.editTitle',
     width: 'mx-auto w-full max-w-2xl',
     state: 'EmptyState',
     widthSource: { path: 'app/(main)/pets/[petId]/page.tsx', contains: 'max-w-2xl' },
@@ -470,14 +474,15 @@ describe('라우트 상태 파일이 3층 표면 위에 선다 (#475)', () => {
   **폭보다 먼저** 전해진다. 폭만 잠근 단언은 그 증상을 못 잡는다 — 뮤테이션으로 확인했다
   (`h1` 키를 루트 값으로 되돌려도 122개가 전부 초록이었다).
 
-  여덟만 본다. 나머지 다섯은 정상 화면 `page.tsx` 에 `h1` 이 없어 비교 대상이 없다.
+  일곱만 본다. 나머지 다섯은 정상 화면 `page.tsx` 에 `h1` 이 없어 비교 대상이 없고,
+  반려견 404 경계는 화면 이름이 아니라 상태를 말한다 (#980 — `heading` 필드 주석).
 */
 describe('h1 이 정상 화면의 이름과 같다 (#481)', () => {
   const NAMED = STATE_FILES.filter((entry) => entry.heading !== undefined)
 
   // 표가 줄면 단언도 조용히 줄어든다 — 개수를 박아 그것을 막는다
-  it('여덟이 이 계약을 갖는다', () => {
-    expect(NAMED).toHaveLength(8)
+  it('일곱이 이 계약을 갖는다', () => {
+    expect(NAMED).toHaveLength(7)
   })
 
   it.each(NAMED)(
