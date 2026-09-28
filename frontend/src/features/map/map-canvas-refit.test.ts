@@ -34,6 +34,17 @@ function cameraEffect(): string {
 }
 
 describe('MapCanvas — 크기가 바뀌면 다시 맞춘다 (#982)', () => {
+  /*
+    리뷰 H-1 — 카메라 memo 를 정류점 배열 참조에 걸면 부모가 다시 그릴 때마다 새 카메라가
+    되어 사용자가 끌어 둔 지도가 되돌아간다. 값 서명(`routeCameraKey`)에 건다.
+  */
+  it('동선 카드는 카메라 memo 를 값 서명에 건다', () => {
+    const card = readSourceWithoutComments('src/features/plan/plan-route-card.tsx')
+
+    expect(card).toContain('routeCameraKey(selectedDay, model.stops)')
+    expect(card).toContain('}, [cameraKey])')
+  })
+
   it('동선 카드가 되잡기를 켠다', () => {
     const card = readSourceWithoutComments('src/features/plan/plan-route-card.tsx')
 

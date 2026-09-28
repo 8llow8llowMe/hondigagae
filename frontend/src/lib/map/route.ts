@@ -220,3 +220,22 @@ export function routeCamera(
     },
   }
 }
+
+/**
+ * 카메라를 다시 만들지 판정하는 **값 서명** (#982 리뷰 H-1).
+ *
+ * 호출부는 `routeCamera` 의 memo 를 정류점 배열이 아니라 이 문자열에 건다. 상세 화면은
+ * 렌더마다 `groupItemsByDay` 로 새 배열을 만들어 참조가 늘 바뀌는데, 참조에 걸면 날씨 ·
+ * 위험도 쿼리가 늦게 도착하거나 일자 편집에 들어갈 때마다 새 카메라가 되고 — `MapCanvas` 가
+ * 새 카메라를 새 틀로 읽어 **사용자가 끌어 둔 지도를 그날 사각형으로 되돌린다.**
+ *
+ * **카메라가 읽는 값만 넣는다** — 일자와 정류점마다 `id` · 좌표. 제목은 이름표 문구일 뿐이라
+ * 넣지 않는다(고쳐도 지도가 움직이면 안 된다). `id` 는 같은 자리에 다른 항목이 들어온
+ * 경우를 가른다 — 그것은 사용자가 일정을 고친 것이라 새 틀이 맞다.
+ */
+export function routeCameraKey(day: number, stops: readonly RouteStop[]): string {
+  return [
+    String(day),
+    ...stops.map((stop) => `${stop.id}@${String(stop.coord.lat)},${String(stop.coord.lng)}`),
+  ].join('|')
+}

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
 import { LONG_TRIP_THRESHOLD_M } from '@/lib/geo/distance'
-import { routeCamera, type RouteItemInput, toRouteModel, toRouteSegments } from '@/lib/map/route'
+import {
+  routeCamera,
+  routeCameraKey,
+  type RouteItemInput,
+  toRouteModel,
+  toRouteSegments,
+} from '@/lib/map/route'
 import { framedCamera, metersPerPixel } from '@/lib/map/viewport'
 
 /** 제주 서부 — 협재 부근. 서로 2km 안쪽이라 긴 이동이 아니다 */
@@ -322,4 +328,60 @@ describe('routeCamera × framedCamera — #982', () => {
       expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThanOrEqual(ORDER_PIN_RADIUS_PX * 2)
     })
   }
+})
+
+/*
+  #982 리뷰 H-1 — **값이 같으면 카메라가 같아야 한다.**
+
+  `plan-detail-section` 은 렌더마다 `groupItemsByDay` 로 새 배열을 만든다. 카메라 memo 를
+  배열 참조에 걸면 날씨 · 위험도 쿼리가 늦게 도착하거나 일자 편집에 들어갈 때마다 새 카메라가
+  되어, 사용자가 끌어 둔 지도가 그날 사각형으로 되돌아간다. 그래서 memo 를 **값 서명**에
+  건다 — 서명이 같으면 같은 카메라 객체가 유지된다.
+*/
+describe('routeCameraKey', () => {
+  const stopsOf = () =>
+    toRouteModel({
+      items: [item('a', HYEOPJAE), item('b', OSULLOC)],
+      lodgingBasis: null,
+    }).stops
+
+  it('새로 만든 같은 값의 배열이면 서명이 같다', () => {
+    const first = stopsOf()
+    const second = stopsOf()
+
+    expect(second).not.toBe(first)
+    expect(routeCameraKey(1, second)).toBe(routeCameraKey(1, first))
+  })
+
+  it('일자가 다르면 서명이 다르다', () => {
+    expect(routeCameraKey(2, stopsOf())).not.toBe(routeCameraKey(1, stopsOf()))
+  })
+
+  it('좌표가 바뀌면 서명이 다르다', () => {
+    const moved = toRouteModel({
+      items: [item('a', HYEOPJAE), item('b', SEONGSAN)],
+      lodgingBasis: null,
+    }).stops
+
+    expect(routeCameraKey(1, moved)).not.toBe(routeCameraKey(1, stopsOf()))
+  })
+
+  it('항목이 바뀌면 좌표가 같아도 서명이 다르다', () => {
+    const renamed = toRouteModel({
+      items: [item('x', HYEOPJAE), item('b', OSULLOC)],
+      lodgingBasis: null,
+    }).stops
+
+    expect(routeCameraKey(1, renamed)).not.toBe(routeCameraKey(1, stopsOf()))
+  })
+
+  /* 이름표 문구는 카메라와 무관하다 — 제목만 고쳐도 지도가 되돌아가면 안 된다 */
+  it('제목만 바뀌면 서명이 같다', () => {
+    const retitled = toRouteModel({
+      items: [{ ...item('a', HYEOPJAE), title: '새 이름' }, item('b', OSULLOC)],
+      lodgingBasis: null,
+    }).stops
+
+    expect(routeCameraKey(1, retitled)).toBe(routeCameraKey(1, stopsOf()))
+  })
 })
