@@ -19,11 +19,11 @@
  * 쓰는 매핑 테이블은 이 저장소가 금지한다 (api-integration-guide §6).
  */
 const BY_ITEM_TYPE: Record<string, string> = {
-  PLACE: '/illustrations/place-tourist_spot.svg',
-  MEAL: '/illustrations/place-restaurant.svg',
-  LODGING: '/illustrations/place-lodging.svg',
-  WALK: '/illustrations/plan-item-walk.svg',
-  MOVE: '/illustrations/plan-item-move.svg',
+  PLACE: '/illustrations/place-tourist_spot.webp',
+  MEAL: '/illustrations/place-restaurant.webp',
+  LODGING: '/illustrations/place-lodging.webp',
+  WALK: '/illustrations/plan-item-walk.webp',
+  MOVE: '/illustrations/plan-item-move.webp',
 }
 
 /** 그릴 일러스트의 경로. 없으면 `null` — 호출부가 회색 타일로 떨어뜨린다 */

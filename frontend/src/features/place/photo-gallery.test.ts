@@ -120,7 +120,7 @@ describe('PhotoGallery — 사진이 없을 때 (DESIGN.md §7-3)', () => {
   it('카테고리 일러스트로 자리를 채운다', () => {
     const markup = render(0, 'CULTURE')
 
-    expect(markup).toContain('/illustrations/place-culture.svg')
+    expect(markup).toContain('/illustrations/place-culture.webp')
     // 고정 높이는 사진이 있을 때와 같다 — 자리의 크기가 흔들리면 안 된다
     expect(markup).toContain('--gallery-h-mobile')
     expect(markup).toContain('--gallery-h-desktop')

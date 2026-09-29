@@ -105,7 +105,7 @@ describe('PlaceRow — nullable 처리', () => {
   it('firstImage 가 null 이면 카테고리 일러스트로 같은 크기의 타일을 채운다', () => {
     const markup = render({ ...placeSummary, firstImage: null })
 
-    expect(markup).toContain('/illustrations/place-tourist_spot.svg')
+    expect(markup).toContain('/illustrations/place-tourist_spot.webp')
     // 장식이므로 이름을 읽히지 않는다 — 카테고리는 배지가 낱말로 말한다
     expect(markup).toContain('alt=""')
     expect(markup).toContain('size-20')
@@ -127,7 +127,7 @@ describe('PlaceRow — nullable 처리', () => {
     })
 
     expect(markup).not.toContain('not-allowed.invalid')
-    expect(markup).toContain('/illustrations/place-tourist_spot.svg')
+    expect(markup).toContain('/illustrations/place-tourist_spot.webp')
     expect(markup).toContain('size-20')
   })
 

@@ -430,7 +430,7 @@ describe('PlaceDetailSection — 외부 원문 처리', () => {
     // fixture 의 contentType 은 CULTURE — 일러스트 자산이 있는 코드다
     const markup = render({ place: { ...placeDetail, images: [], firstImage: null } })
 
-    expect(markup).toContain('/illustrations/place-culture.svg')
+    expect(markup).toContain('/illustrations/place-culture.webp')
     // 없애려던 것은 자리가 아니라 **회색 벽**이었다. 그것은 여전히 그리지 않는다
     expect(markup).not.toContain(messages.place.noImage)
     // 일러스트는 한국관광공사가 준 사진이 아니다 — 사진 출처를 달지 않는다

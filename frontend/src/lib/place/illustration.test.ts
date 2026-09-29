@@ -12,10 +12,10 @@ describe('placeIllustration — 아는 것(카테고리)만 그린다', () => {
     장소의 실제 모습)이 아니라 아는 것(카테고리)만 말한다.
   */
   it('제주 데이터에 등장하는 4종에 자산을 준다', () => {
-    expect(placeIllustration('RESTAURANT')).toBe('/illustrations/place-restaurant.svg')
-    expect(placeIllustration('LODGING')).toBe('/illustrations/place-lodging.svg')
-    expect(placeIllustration('CULTURE')).toBe('/illustrations/place-culture.svg')
-    expect(placeIllustration('TOURIST_SPOT')).toBe('/illustrations/place-tourist_spot.svg')
+    expect(placeIllustration('RESTAURANT')).toBe('/illustrations/place-restaurant.webp')
+    expect(placeIllustration('LODGING')).toBe('/illustrations/place-lodging.webp')
+    expect(placeIllustration('CULTURE')).toBe('/illustrations/place-culture.webp')
+    expect(placeIllustration('TOURIST_SPOT')).toBe('/illustrations/place-tourist_spot.webp')
   })
 
   /**

@@ -606,7 +606,7 @@ describe('PlanItemRow — WALK 항목 (#620)', () => {
   it('firstImage 가 null 이면 원격 사진 대신 WALK 일러스트가 선다', () => {
     const markup = renderWalk(planItemWalkCourse({ firstImage: null }))
 
-    expect(markup).toContain('/illustrations/plan-item-walk.svg')
+    expect(markup).toContain('/illustrations/plan-item-walk.webp')
     expect(markup).not.toContain('tong.visitkorea.or.kr')
   })
 
@@ -714,15 +714,15 @@ describe('PlanItemRow — 썸네일 폴백', () => {
   it('사진이 없으면 항목 유형 일러스트가 선다', () => {
     const html = renderThumbnail({ firstImage: null, itemTypeCode: 'LODGING' })
 
-    expect(html).toContain('/illustrations/place-lodging.svg')
+    expect(html).toContain('/illustrations/place-lodging.webp')
   })
 
   it('WALK · MOVE 도 자기 자산을 갖는다 — 장소 카테고리에 없는 둘이다', () => {
     expect(renderThumbnail({ firstImage: null, itemTypeCode: 'WALK' })).toContain(
-      '/illustrations/plan-item-walk.svg',
+      '/illustrations/plan-item-walk.webp',
     )
     expect(renderThumbnail({ firstImage: null, itemTypeCode: 'MOVE' })).toContain(
-      '/illustrations/plan-item-move.svg',
+      '/illustrations/plan-item-move.webp',
     )
   })
 
@@ -749,7 +749,7 @@ describe('PlanItemRow — 썸네일 폴백', () => {
   it('일러스트는 alt 가 비어 있다', () => {
     const html = renderThumbnail({ firstImage: null, itemTypeCode: 'MEAL' })
 
-    expect(html).toMatch(/<img[^>]*src="\/illustrations\/place-restaurant\.svg"[^>]*alt=""/)
+    expect(html).toMatch(/<img[^>]*src="\/illustrations\/place-restaurant\.webp"[^>]*alt=""/)
   })
 })
 
