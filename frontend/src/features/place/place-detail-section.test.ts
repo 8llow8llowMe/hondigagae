@@ -843,6 +843,18 @@ describe('3층 표면 (#443) — 절마다 카드 판정', () => {
     const markup = render({ loading: true, place: null })
 
     expect(markup).not.toContain('bg-band h-2')
-    expect((markup.match(SURFACE) ?? []).length).toBeGreaterThanOrEqual(5)
+    /*
+      **카드 수가 완료 화면과 같다** (#1037 후속) — 제목 카드 · 판정 레일 · 혼잡도 · 방문 정보.
+      예전 한 열 골격은 카드가 여섯 장이라, 데이터가 오는 순간 장수와 열이 함께 바뀌었다.
+    */
+    expect((markup.match(SURFACE) ?? []).length).toBe((render().match(SURFACE) ?? []).length)
+  })
+
+  it('로딩 스켈레톤도 완료 화면과 같은 2단 grid 다', () => {
+    const markup = render({ loading: true, place: null })
+
+    expect(markup).toContain('rail-layout rail-layout-detail rail-layout-detail-head')
+    expect(markup.match(/rail-detail-main/g)).toHaveLength(2)
+    expect(markup).toContain('rail-detail-aside')
   })
 })
