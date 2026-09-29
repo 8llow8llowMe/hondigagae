@@ -79,7 +79,8 @@ public class OlleCourseCsvAdapter implements OlleCourseCatalogPort {
         String name = cells[indices[1]].trim();
         String variant = OlleCourseParser.variantOf(name);
         String courseKey = OlleCourseParser.courseKey(courseNo, variant);
-        String durationText = cells[indices[3]].trim();
+        // 18-2 만 "3-4시간" 인 원천을 "3~4시간" 한 모양으로 맞춘다. 분 계산은 전후가 같다 (#987)
+        String durationText = OlleCourseParser.durationText(cells[indices[3]]);
         String startEndPoint = cells[indices[4]].trim();
 
         return ImportedWalkCourse.builder()
