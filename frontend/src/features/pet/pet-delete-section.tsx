@@ -80,13 +80,20 @@ export function PetDeleteConfirm({
         description={
           /*
             **일정 문장을 설명 안에 둔다.** `alertdialog` 의 `aria-describedby` 가 이 자리를
-            가리켜, 열리는 순간 "일정 2개에서 빠져요" 까지 읽힌다 — 본문 슬롯에 두면 제목과
-            "되돌릴 수 없어요" 만 읽히고 영향 범위는 탐색해야 들린다.
+            가리킨다 — 본문 슬롯에 두면 제목과 "되돌릴 수 없어요" 만 읽히고 영향 범위는 탐색해야
+            들린다.
+
+            **그래도 집계 문장은 `role="status"` 로 따로 알린다.** 집계는 확인창을 여는 렌더에서야
+            받기 시작해(`enabled: confirming`) 캐시가 없는 첫 열림의 설명은 늘 `받는 중` 이다.
+            `aria-describedby` 는 열릴 때 한 번 읽힐 뿐 live region 이 아니라, 응답이 와서 문장이
+            바뀌어도 알리지 않는다 — 없으면 영향 범위를 끝내 듣지 못한다.
 
             바뀌는 것(일정) 먼저, 되돌릴 수 없다는 경고가 맨 끝이다.
           */
           <div className="flex flex-col gap-2">
-            <CompanionLines companions={companions} />
+            <div role="status" className="flex flex-col gap-2">
+              <CompanionLines companions={companions} />
+            </div>
             <p>{messages.pet.deleteConfirmDescription}</p>
           </div>
         }

@@ -129,6 +129,25 @@ describe('PetDeleteConfirm — 동행 일정 (#1042)', () => {
     expect(described).toContain('되돌릴 수 없어요')
   })
 
+  /*
+    집계는 확인창을 여는 렌더에서야 받기 시작해 첫 열림의 설명은 늘 `받는 중` 이다.
+    `aria-describedby` 는 live region 이 아니라 응답이 와서 문장이 바뀌어도 알리지 않는다 —
+    집계 문장만 `role="status"` 안에 둔다. 경고 문장까지 넣으면 바뀔 때마다 되풀이된다.
+  */
+  it('집계 문장이 status 영역 안에 있고 경고 문장은 밖이다 — 받은 뒤에 알린다', () => {
+    const markup = render({
+      confirming: true,
+      companions: { state: 'ready', summary: petCompanionSummary },
+    })
+    const status = /role="status"[^>]*>([\s\S]*?)<\/div>/.exec(markup)?.[1] ?? ''
+
+    expect(status).toContain('일정 2개에서 빠져요')
+    expect(status).not.toContain('되돌릴 수 없어요')
+    expect(render({ confirming: true, companions: { state: 'loading' } })).toMatch(
+      new RegExp(`role="status"[^>]*><p>${messages.pet.deleteCompanionLoading}`),
+    )
+  })
+
   it('되돌릴 수 없다는 경고가 일정 문장 뒤에 온다', () => {
     const markup = render({
       confirming: true,

@@ -88,6 +88,7 @@
 | 반려견 사진 | `POST`·`DELETE /members/me/pets/{petId}/profile-image` | `pet-photo-section.tsx`. multipart — 회원 프로필 사진(#79)과 같은 통과 경로                        |
 | 체중        | `PetSaveRequest.weightKg`                              | `pet-form.tsx`. `0.1~99.9` 소수점 1자리이고 **`GET /places` 의 `petWeightKg` 필터가 이 값을 쓴다** |
 | 대표견      | `PUT /members/me/pets/{petId}/representative`          | `pet-photo-section.tsx`. **AI 일정과 담기가 지정이 없을 때 이 값을 기본으로 쓴다**                 |
+| 삭제 영향   | `GET /plans/companions/{petId}`                        | `pet-delete-section.tsx`. 삭제 확인창의 연결된 일정 수 (#1042)                                     |
 
 주의: 등록 상한이 있다 (`PET_002 PET_LIMIT_EXCEEDED`, HTTP 400). 타인 반려견 조회는 **404** 다.
 

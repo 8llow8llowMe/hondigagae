@@ -597,13 +597,6 @@ export function resolvePlanMock(
   return null
 }
 
-/**
- * `planId` 를 판정하고 소유한 일정을 넘긴다.
- *
- * **숫자가 아닌 id 는 404 가 아니라 400 이다** — 컨트롤러가 `@PathVariable long` 이라
- * 바인딩 단계에서 걸린다 (장소 상세의 `PLACE_113` 과 같은 상황).
- * **남의 일정도 404 다** — 컨트롤러 설명이 존재 여부를 흘리지 않겠다고 명시했다.
- */
 /** 동행 목록을 바꿀 수 있는 상태 — 백엔드 `PlanStatus.companionEditableStatuses()` 복제본 */
 const COMPANION_EDITABLE_STATUSES = new Set(['DRAFT', 'CONFIRMED'])
 
@@ -657,6 +650,13 @@ export function reconcileDeletedPet(memberId: string, petId: string): void {
   }
 }
 
+/**
+ * `planId` 를 판정하고 소유한 일정을 넘긴다.
+ *
+ * **숫자가 아닌 id 는 404 가 아니라 400 이다** — 컨트롤러가 `@PathVariable long` 이라
+ * 바인딩 단계에서 걸린다 (장소 상세의 `PLACE_113` 과 같은 상황).
+ * **남의 일정도 404 다** — 컨트롤러 설명이 존재 여부를 흘리지 않겠다고 명시했다.
+ */
 function withPlan(
   memberId: string,
   rawId: string,
