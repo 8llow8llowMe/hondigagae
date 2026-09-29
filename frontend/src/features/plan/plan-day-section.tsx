@@ -276,12 +276,18 @@ export function PlanDaySection({
             className="px-0 py-4 md:px-0"
           />
         ) : walkSafety.beyondForecastReason !== null ? (
-          <p className="text-caption text-fg-muted mt-2 font-medium">
+          <p className="text-caption text-fg-muted mt-2 pb-4 font-medium">
             {walkSafety.beyondForecastReason}
           </p>
         ) : (
           walkSafety.hasLookupFailed && (
-            <div className="pt-2">
+            /*
+              **위는 margin, 아래는 padding 이다.** 이 줄이 헤더 블록의 마지막이라 아래에 아무것도
+              없으면 버튼이 항목 목록의 위 1px 선에 붙는다(예전 `pt-2` 만 있을 때 0px). 위쪽
+              `mt-2` 는 판정 밴드의 `my-4` 와 겹쳐(블록 margin 상쇄) 16 이 되고, 밴드가 없는
+              날에는 헤더에서 8 만 뗀다 — 버튼 위아래가 밴드와 같은 16 으로 선다.
+            */
+            <div className="mt-2 pb-4">
               <Button variant="secondary" size="sm" onClick={walkSafety.onRetry}>
                 {messages.plan.walkSafetyRetryAction}
               </Button>
