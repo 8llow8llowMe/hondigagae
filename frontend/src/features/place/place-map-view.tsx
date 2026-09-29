@@ -8,12 +8,14 @@ import type { ReactNode } from 'react'
 import { EmptyState } from '@/components/empty-state'
 import { ChevronLeftIcon, ChevronRightIcon, SearchIcon } from '@/components/icons'
 import { MAP_TOP_CONTROLS_INSET, MapSheet, type SheetStop } from '@/components/map-sheet'
+import { Skeleton } from '@/components/skeleton'
 import { ViewToggle } from '@/components/view-toggle'
 import type { MapPin } from '@/features/map/map-canvas'
 import { MapLocateButton } from '@/features/map/map-locate-button'
 import { PlaceListSection, type PlaceListSectionProps } from '@/features/place/place-list-section'
 import { PlaceMapFilterBar } from '@/features/place/place-map-filter-bar'
 import { PlaceMapPanel } from '@/features/place/place-map-panel'
+import { PlaceMapRowsSkeleton } from '@/features/place/place-map-skeleton'
 import { PlaceSearchField } from '@/features/place/place-search-field'
 import { useNearbyPlaces } from '@/features/place/use-nearby-places'
 import { usePlaceList } from '@/features/place/use-place-list'
@@ -239,6 +241,13 @@ export function PlaceMapView({
   const nearbyQuery = useNearbyPlaces(searchCenter, searchRadius, filters, researched)
 
   const usingNearby = nearbyQuery.data !== undefined
+  /*
+    **목록이 아직 없으면 "비어 있다" 가 아니라 "기다린다" 다.** 프리페치가 실패해 클라이언트가
+    처음 받는 동안 `visible` 은 `[]` 라, 예전에는 패널·시트가 `이 지역에는 표시할 곳이 없어요`
+    와 `목록 0곳` 을 먼저 말했다가 행으로 바뀌었다. 그 동안은 로딩 폴백과 같은 행 골격을 둔다
+    (`PlaceMapRowsSkeleton`).
+  */
+  const listPending = !usingNearby && listQuery.isPending
   const places: PlaceSummary[] = useMemo(
     () => (usingNearby ? (nearbyQuery.data?.places.map((entry) => entry.place) ?? []) : listPlaces),
     [usingNearby, nearbyQuery.data, listPlaces],
@@ -670,11 +679,13 @@ export function PlaceMapView({
             </div>
 
             <p className="text-caption text-fg-muted border-border bg-bg-sunken border-b px-4 py-2 font-medium">
-              {countLine}
+              {listPending ? <Skeleton className="h-4.5 w-20" /> : countLine}
             </p>
 
             <div className="min-h-0 flex-1 overflow-y-auto">
-              {visible.length === 0 ? (
+              {listPending ? (
+                <PlaceMapRowsSkeleton />
+              ) : visible.length === 0 ? (
                 <EmptyState
                   title={messages.map.emptyInView}
                   description={messages.map.emptyInViewDescription}
@@ -725,7 +736,13 @@ export function PlaceMapView({
           지도에서 조건을 좁히려면 목록으로 되돌아가야 했다.
         */
         toolbar={<PlaceMapFilterBar filters={filters} authed={authed} />}
-        header={<p className="text-caption text-fg-muted truncate font-medium">{countLine}</p>}
+        header={
+          listPending ? (
+            <Skeleton className="h-4.5 w-20" />
+          ) : (
+            <p className="text-caption text-fg-muted truncate font-medium">{countLine}</p>
+          )
+        }
         /*
           **주지 않으면 지도 위 플로팅 컨트롤 기준이다** (#901 D2). 예전 기본값(85dvh)은
           비율이라 **짧은 기기일수록 검색·보기 전환을 더 덮었다** — 640 실측 24px.
@@ -733,7 +750,9 @@ export function PlaceMapView({
         */
         maxTopInset={sheetMaxTopInset ?? MAP_TOP_CONTROLS_INSET}
       >
-        {visible.length === 0 ? (
+        {listPending ? (
+          <PlaceMapRowsSkeleton />
+        ) : visible.length === 0 ? (
           <EmptyState
             title={messages.map.emptyInView}
             description={messages.map.emptyInViewDescription}

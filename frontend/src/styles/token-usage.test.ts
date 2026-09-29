@@ -224,6 +224,8 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0 · 3a)', () => {
       // 구조다. 지도와 같은 평면에 두면 어디까지가 패널인지 읽히지 않는다.
       'src/components/map-sheet.tsx',
       'src/features/place/place-map-view.tsx',
+      // 그 지도 보기의 로딩 골격 — 같은 좌측 패널을 같은 자리에 세운다 (`/places` loading)
+      'src/features/place/place-map-skeleton.tsx',
       // 긴급 시설 지도 보기 — `place-map-view.tsx` 와 같은 구조다(#353) - 지도가
       // 바탕이고 좌측 패널·접기 탭이 그 위에 뜬다
       'src/features/emergency/emergency-map-view.tsx',
@@ -272,6 +274,8 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0 · 3a)', () => {
       // 목록 위 캡션 줄 · 패널 행 hover — 지도 위 표면이라 흰색이 바탕이 아니다
       'src/features/place/place-map-view.tsx',
       'src/features/place/place-map-panel.tsx',
+      // 위 지도 보기의 로딩 골격 — 새 화면이 아니라 같은 화면의 대기 모양이다
+      'src/features/place/place-map-skeleton.tsx',
       'src/features/emergency/emergency-map-view.tsx',
     ]
 

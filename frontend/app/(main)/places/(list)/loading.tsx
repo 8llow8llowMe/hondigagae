@@ -1,12 +1,28 @@
 import { Skeleton } from '@/components/skeleton'
 import { Canvas, Surface, SurfaceList, SurfaceStack } from '@/components/surface'
+import { PlaceMapSkeleton } from '@/features/place/place-map-skeleton'
 import { PlaceRowSkeleton } from '@/features/place/place-row-skeleton'
+import { PlaceViewLoading } from '@/features/place/place-view-loading'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
 /**
  * 최초 진입 로딩. 섹션 내부 재조회 로딩은 `PlaceListSection` 이 담당한다.
+ *
+ * ### 도착할 보기의 골격을 그린다
+ *
+ * **이 화면의 기본 보기는 지도다** (`PLACES_DEFAULT_VIEW`). 예전에는 이 파일이 목록 골격
+ * 하나만 그려, 탭바·헤더로 `/places` 에 들어오는 거의 모든 진입에서 **목록이 섰다가 지도로
+ * 바뀌었다.** `loading.tsx` 는 `searchParams` 를 받지 못하므로(Next 규약) 보기 판정은
+ * client component(`PlaceViewLoading`)가 `useSearchParams()` 로 하고, 두 골격은 여기서
+ * 만들어 넘긴다.
+ *
+ * - **지도** — `page.tsx` 의 지도 갈래와 같은 `main` + `sr-only h1` 에 `PlaceMapSkeleton`.
+ *   지도 갈래는 `Canvas` · 레일 2단을 쓰지 않는다 (`page.tsx` 주석)
+ * - **목록** — 아래 절들이 설명하는 카드 하나
+ *
+ * ### 목록 골격
  *
  * **실화면과 같은 층으로 그린다** (`DESIGN.md §0`) — L0 바닥 위에 L1 카드 하나다.
  * 예전에는 `max-w-screen-md` 흰 페이지에 스켈레톤을 늘어놓아, 로딩이 끝나는 순간
@@ -39,6 +55,19 @@ import { cn } from '@/lib/utils/cn'
  * 군데만 어긋난다 (`lib/ui/inset.ts`, #386).
  */
 export default function PlacesLoading() {
+  return <PlaceViewLoading list={<PlaceListLoading />} map={<PlaceMapLoading />} />
+}
+
+function PlaceMapLoading() {
+  return (
+    <main id="main-content">
+      <h1 className="sr-only">{messages.place.pageTitle}</h1>
+      <PlaceMapSkeleton />
+    </main>
+  )
+}
+
+function PlaceListLoading() {
   return (
     <Canvas as="main" id="main-content" className="rail-layout rail-layout-filter">
       {/* 레일의 자리만 잡는다 — 내용은 위 주석 참고 */}
