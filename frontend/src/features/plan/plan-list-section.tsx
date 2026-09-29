@@ -5,10 +5,11 @@ import { SurfaceList } from '@/components/surface'
 import { PlanListSkeleton } from '@/features/plan/plan-list-skeleton'
 import { PlanRow } from '@/features/plan/plan-row'
 import { messages } from '@/lib/messages'
-import { companionNamesOf } from '@/lib/plan/companion-pets'
+import { companionPetsOf } from '@/lib/plan/companion-pets'
 import { groupPlans } from '@/lib/plan/list'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
+import type { Pet } from '@/types/pet'
 import type { PlanSummaryItem } from '@/types/plan'
 
 /**
@@ -28,7 +29,8 @@ export type PlanListSectionProps = {
   plans: PlanSummaryItem[]
   /** 좁히기 전 전체 개수. `hasNext` 면 셀 수 없어 null 이다 */
   totalCount: number | null
-  petNames: Map<string, string>
+  /** 내 반려견 전체. 행마다 `petIds` 로 동행을 찾는다 — 이름과 사진을 함께 쓴다 */
+  pets: readonly Pet[]
   today: Date
   loading: boolean
   errorStatus: number | null
@@ -46,7 +48,7 @@ export type PlanListSectionProps = {
 export function PlanListSection({
   plans,
   totalCount,
-  petNames,
+  pets,
   today,
   loading,
   errorStatus,
@@ -98,19 +100,14 @@ export function PlanListSection({
         묶음이 각각 앞·뒤를 맡으므로 시간순으로도 이 자리가 맞다.
       */}
       {ongoing.length > 0 && (
-        <PlanGroup
-          title={messages.plan.sectionOngoing}
-          plans={ongoing}
-          petNames={petNames}
-          today={today}
-        />
+        <PlanGroup title={messages.plan.sectionOngoing} plans={ongoing} pets={pets} today={today} />
       )}
 
       {upcoming.length > 0 && (
         <PlanGroup
           title={messages.plan.sectionUpcoming}
           plans={upcoming}
-          petNames={petNames}
+          pets={pets}
           today={today}
           divided={ongoing.length > 0}
         />
@@ -127,7 +124,7 @@ export function PlanListSection({
         <PlanGroup
           title={messages.plan.sectionPast}
           plans={past}
-          petNames={petNames}
+          pets={pets}
           today={today}
           divided={ongoing.length > 0 || upcoming.length > 0}
         />
@@ -151,13 +148,13 @@ export function PlanListSection({
 function PlanGroup({
   title,
   plans,
-  petNames,
+  pets,
   today,
   divided = false,
 }: {
   title: string
   plans: PlanSummaryItem[]
-  petNames: Map<string, string>
+  pets: readonly Pet[]
   today: Date
   /** 앞 묶음이 있으면 위에 1px 선을 긋는다 */
   divided?: boolean
@@ -173,7 +170,7 @@ function PlanGroup({
             key={plan.planId}
             plan={plan}
             /* 대표(`plan.petId`)가 아니라 동행 전체다 (#218) */
-            petNames={companionNamesOf(plan.petIds, petNames)}
+            companions={companionPetsOf(plan.petIds, pets)}
             today={today}
           />
         ))}

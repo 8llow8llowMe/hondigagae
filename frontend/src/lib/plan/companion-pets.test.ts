@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { companionLabel, companionNamesOf, companionPetsOf } from '@/lib/plan/companion-pets'
+import { companionLabel, companionPetsOf } from '@/lib/plan/companion-pets'
 import type { Pet } from '@/types/pet'
 
 function pet(petId: string, name: string): Pet {
@@ -46,21 +46,6 @@ describe('companionPetsOf', () => {
 
   it('하나도 못 찾으면 빈 배열이다', () => {
     expect(companionPetsOf(['8', '9'], [MONGSIL])).toEqual([])
-  })
-})
-
-describe('companionNamesOf', () => {
-  const NAMES = new Map([
-    ['1', '몽실이'],
-    ['2', '초코'],
-  ])
-
-  it('petIds 순서로 이름을 준다', () => {
-    expect(companionNamesOf(['2', '1'], NAMES)).toEqual(['초코', '몽실이'])
-  })
-
-  it('맵에 없는 id 는 조용히 뺀다', () => {
-    expect(companionNamesOf(['1', '9'], NAMES)).toEqual(['몽실이'])
   })
 })
 

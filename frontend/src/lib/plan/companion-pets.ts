@@ -26,17 +26,6 @@ export function companionPetsOf(petIds: readonly string[], pets: readonly Pet[])
   })
 }
 
-/** 같은 규칙의 이름 판. 목록 화면은 `Pet` 전체가 아니라 이름 맵만 들고 있다 */
-export function companionNamesOf(
-  petIds: readonly string[],
-  petNames: ReadonlyMap<string, string>,
-): string[] {
-  return petIds.flatMap((petId) => {
-    const name = petNames.get(petId)
-    return name === undefined ? [] : [name]
-  })
-}
-
 /**
  * 목록 행에 쓰는 한 줄. 한 마리면 이름, 두 마리부터는 `{대표} 외 {n-1}마리`.
  *

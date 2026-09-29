@@ -44,7 +44,6 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
   const hasNext = pages === undefined ? false : hasMore(pages)
 
   const pets = petsQuery.data?.pets ?? []
-  const petNames = useMemo(() => new Map(pets.map((pet) => [pet.petId, pet.name] as const)), [pets])
 
   /**
    * **아직 다 받지 않았으면 개수를 말하지 않는다** (공통명세 S3).
@@ -76,7 +75,7 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
     <PlanListSection
       plans={visible}
       totalCount={countable ? allPlans.length : null}
-      petNames={petNames}
+      pets={pets}
       today={today}
       loading={plansQuery.isPending}
       errorStatus={toErrorStatus(plansQuery.error)}
