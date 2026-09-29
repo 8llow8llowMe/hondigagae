@@ -761,10 +761,15 @@ export const planMessages = {
   addMoveFieldLabel: '이름',
   /** **예시다, 기본값이 아니다.** 입력은 빈 채로 열린다 (H2) */
   addMovePlaceholder: '예: 차로 이동, 카페에서 쉬기',
+  /**
+   * 비운 채 추가하면 쓰는 제목 (#1026). **AI 일정이 같은 자리에 쓰는 제목과 맞춘다** — 서버가
+   * `@NotBlank` 라 빈 제목은 보낼 수 없고, 막는 대신 채운다. 서버로 가는 값이다.
+   */
+  addMoveDefaultTitle: '이동 및 휴식',
+  /** 필수 표시 대신 비웠을 때 무엇이 되는지 말한다 (#1026) */
+  addMoveFieldHint: '비워 두면 이동 및 휴식으로 추가돼요.',
   /** 결과를 라벨에 쓴다 (디자인 가이드 §5-2) */
   addMoveSubmit: '추가하기',
-  /** 서버 `@NotBlank`(`PLAN_109`)의 복제. 공백만 있어도 여기 걸린다 */
-  addMoveTitleRequired: '이름을 입력해 주세요.',
   /** 서버 `@Size(max = 100)`(`PLAN_110`)의 복제 */
   addMoveTitleTooLong: '이름은 100자 이하로 입력해 주세요.',
   /** `{title}`(조사 포함) · `{day}` 치환. 성공만 토스트로 말한다 */

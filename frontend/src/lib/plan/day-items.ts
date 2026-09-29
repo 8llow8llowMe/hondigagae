@@ -348,7 +348,8 @@ export function appendMoveItemPayload(
         day,
         sequence: existing.length,
         itemType: 'MOVE',
-        title: move.title.trim().slice(0, ITEM_TITLE_MAX),
+        // 비우면 기본 제목이다 (#1026) — 서버 `@NotBlank` 라 빈 값은 보낼 수 없다
+        title: (move.title.trim() || messages.plan.addMoveDefaultTitle).slice(0, ITEM_TITLE_MAX),
       },
     ],
   }
@@ -357,15 +358,14 @@ export function appendMoveItemPayload(
 /**
  * 이동·휴식 제목 검증. 통과하면 `null`, 아니면 필드에 붙일 문구.
  *
- * 서버 `PlanItemRequest.title` 의 `@NotBlank`(`PLAN_109`) · `@Size(max = 100)`(`PLAN_110`)
- * 복제본이다 (`form-guide.md` §5). **공백만 있는 값도 막는다** — `@NotBlank` 가 그렇다.
+ * 서버 `PlanItemRequest.title` 의 `@Size(max = 100)`(`PLAN_110`) 복제본이다
+ * (`form-guide.md` §5). **빈 값·공백만은 막지 않는다** (#1026) — `appendMoveItemPayload` 가
+ * 기본 제목(`이동 및 휴식`)으로 채워 서버 `@NotBlank` 에 닿지 않는다.
  *
  * **길이는 걷어낸 값으로 잰다.** 보내는 것이 걷어낸 값이라(`appendMoveItemPayload`) 앞뒤
  * 공백 때문에 101자가 된 입력을 막으면 서버가 받을 값을 화면이 거절하게 된다.
  */
 export function validateMoveTitle(value: string): string | null {
-  const title = value.trim()
-  if (title.length === 0) return messages.plan.addMoveTitleRequired
-  if (title.length > ITEM_TITLE_MAX) return messages.plan.addMoveTitleTooLong
+  if (value.trim().length > ITEM_TITLE_MAX) return messages.plan.addMoveTitleTooLong
   return null
 }

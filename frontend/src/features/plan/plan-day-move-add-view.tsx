@@ -92,7 +92,7 @@ export function PlanDayMoveAddView({
         <Field
           id={PLAN_MOVE_TITLE_INPUT_ID}
           label={messages.plan.addMoveFieldLabel}
-          required
+          hint={messages.plan.addMoveFieldHint}
           {...(fieldError === null ? {} : { error: fieldError })}
         >
           <Input

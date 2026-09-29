@@ -486,6 +486,23 @@ describe('appendWalkCourseItemPayload — 산책 코스 담기 (#620)', () => {
 })
 
 describe('appendMoveItemPayload — 이동·휴식 직접 추가 (#1014)', () => {
+  /*
+    **비우면 `이동 및 휴식` 이다** (#1026). AI 일정이 만드는 같은 자리의 제목과 맞춘다 —
+    서버 `@NotBlank` 라 빈 제목은 보낼 수 없고, 막는 대신 채운다.
+  */
+  it('빈 제목은 기본 제목으로 보낸다', () => {
+    expect(appendMoveItemPayload([], 1, { title: '' }).items[0]?.title).toBe(
+      messages.plan.addMoveDefaultTitle,
+    )
+    expect(messages.plan.addMoveDefaultTitle).toBe('이동 및 휴식')
+  })
+
+  it('공백만 있는 제목도 기본 제목으로 보낸다', () => {
+    expect(appendMoveItemPayload([], 1, { title: '   ' }).items[0]?.title).toBe(
+      messages.plan.addMoveDefaultTitle,
+    )
+  })
+
   it('기존 항목을 전부 되싣고 새 항목을 맨 끝에 붙인다 — 일괄 교체다', () => {
     const payload = appendMoveItemPayload(ITEMS, 2, { title: '카페에서 쉬기' })
 
@@ -557,12 +574,13 @@ describe('appendMoveItemPayload — 이동·휴식 직접 추가 (#1014)', () =>
 })
 
 describe('validateMoveTitle — 이동·휴식 제목 검증 (#1014)', () => {
-  it('빈 문자열은 필수 오류다', () => {
-    expect(validateMoveTitle('')).toBe(messages.plan.addMoveTitleRequired)
+  /* 비우면 기본 제목으로 만든다 (#1026) — 막지 않는다. 기본값은 `appendMoveItemPayload` 가 채운다 */
+  it('빈 문자열은 통과한다 — 기본 제목으로 만든다', () => {
+    expect(validateMoveTitle('')).toBeNull()
   })
 
-  it('공백만 있어도 필수 오류다 — 서버 @NotBlank 와 같다', () => {
-    expect(validateMoveTitle('   ')).toBe(messages.plan.addMoveTitleRequired)
+  it('공백만 있어도 통과한다 — 걷으면 빈 값이다', () => {
+    expect(validateMoveTitle('   ')).toBeNull()
   })
 
   it('100자는 통과한다', () => {

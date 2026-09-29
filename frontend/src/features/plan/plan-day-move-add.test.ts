@@ -161,26 +161,29 @@ describe('PlanDayMoveAddView — 모달 (#1014)', () => {
     expect(renderView()).toContain(`maxLength="${ITEM_TITLE_MAX}"`)
   })
 
-  it('라벨이 입력에 붙고 필수 표시가 있다', () => {
+  /* 비우면 기본 제목으로 만든다 (#1026) — 필수가 아니므로 필수 표시를 달지 않고, 비웠을 때 무엇이 되는지 안내한다 */
+  it('라벨이 입력에 붙고 필수 표시 대신 기본 제목 안내가 있다', () => {
     const markup = renderView()
 
     expect(markup).toContain(`for="plan-move-add-title"`)
     expect(markup).toContain(`id="plan-move-add-title"`)
     expect(markup).toContain(messages.plan.addMoveFieldLabel)
-    expect(markup).toContain('text-danger-500 ml-1')
+    expect(markup).not.toContain('text-danger-500 ml-1')
+    expect(markup).toContain(messages.plan.addMoveFieldHint)
+    expect(messages.plan.addMoveFieldHint).toContain(messages.plan.addMoveDefaultTitle)
   })
 
   it('필드 오류가 없으면 aria-invalid 가 없다', () => {
     const markup = renderView()
 
     expect(markup).not.toContain('aria-invalid')
-    expect(markup).not.toContain(messages.plan.addMoveTitleRequired)
+    expect(markup).not.toContain(messages.plan.addMoveTitleTooLong)
   })
 
   it('필드 오류가 있으면 문구와 aria-invalid · aria-describedby 가 붙는다', () => {
-    const markup = renderView({ fieldError: messages.plan.addMoveTitleRequired })
+    const markup = renderView({ fieldError: messages.plan.addMoveTitleTooLong })
 
-    expect(markup).toContain(messages.plan.addMoveTitleRequired)
+    expect(markup).toContain(messages.plan.addMoveTitleTooLong)
     expect(markup).toContain('aria-invalid="true"')
     expect(markup).toContain('aria-describedby="plan-move-add-title-error"')
   })
