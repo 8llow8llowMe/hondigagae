@@ -45,6 +45,10 @@ public record PlanDetailResponse(
     int totalDays,
 
     @Schema(description = "일정 항목 목록 (일차·순서 오름차순)")
-    List<PlanItemDetailItem> items
+    List<PlanItemDetailItem> items,
+
+    @Schema(description = "이 일정을 만든 AI 일정 생성 작업 아이디(jobId, UUID). AI 초안을 담은 일정에만 있고 "
+        + "직접 만든 일정·복제본은 null 입니다.", example = "3f2b8c1e-5d4a-4e6b-9c7d-1a2b3c4d5e6f", nullable = true)
+    String sourceAiJobId
 ) {
 }

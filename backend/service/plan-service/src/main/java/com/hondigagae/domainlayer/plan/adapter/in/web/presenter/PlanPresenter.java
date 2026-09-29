@@ -38,6 +38,7 @@ public class PlanPresenter {
             .status(info.status().toMetadata())
             .totalDays(info.totalDays())
             .items(items)
+            .sourceAiJobId(info.sourceAiJobId())
             .build();
     }
 

@@ -74,6 +74,10 @@ public class PlanCommandProcessor {
             .budget(command.budget())
             .status(PlanStatus.DRAFT)
             .deleted(false)
+            // AI 초안 담기 멱등 키 (#970). 같은 (memberId, sourceAiJobId) 가 이미 있으면 유니크 위반으로
+            // 커밋이 실패하고, Facade 가 그것을 받아 먼저 담긴 일정을 돌려준다 — 여기서 잡지 않는다
+            // (트랜잭션이 rollback-only 가 된 뒤라 이 메서드 안에서는 재조회 결과를 돌려줄 수 없다).
+            .sourceAiJobId(command.sourceAiJobId())
             .build();
 
         Plan saved = planRepositoryPort.save(plan);
@@ -124,6 +128,8 @@ public class PlanCommandProcessor {
             .budget(source.budget())
             .status(PlanStatus.DRAFT)
             .deleted(false)
+            // 출처(sourceAiJobId)는 복사하지 않는다 (#970). 복제본은 AI 작업을 담은 결과가 아니고,
+            // 복사하면 원본과 같은 멱등 키가 되어 유니크 위반으로 복제 자체가 실패한다.
             .build();
 
         Plan saved = planRepositoryPort.save(plan);

@@ -69,6 +69,19 @@ class PlanCopyTest {
     }
 
     @Test
+    @DisplayName("AI 초안을 담은 일정을 복제해도 출처(sourceAiJobId)는 따라오지 않는다 (#970)")
+    void doesNotCopySourceAiJobId() {
+        PlanCommandProcessor processor = processor(new StubPlanRepositoryPort(), new StubPlanItemRepositoryPort(),
+            new StubPlanPetRepositoryPort(), new StubPetConditionQueryPort(Set.of(2L)));
+        Plan aiCommitted = sourcePlan(3).toBuilder().sourceAiJobId("3f2b8c1e-5d4a-4e6b-9c7d-1a2b3c4d5e6f").build();
+
+        Plan copied = processor.copyPlan(aiCommitted, copyCommand(null, NEW_START), List.of(2L), List.of());
+
+        // 복사하면 원본과 같은 멱등 키가 되어 유니크 위반으로 복제가 실패하고, 잡 조회도 복제본을 "담은 일정" 으로 오인한다.
+        assertThat(copied.sourceAiJobId()).isNull();
+    }
+
+    @Test
     @DisplayName("요청 제목이 있으면 접미사 대신 그 제목을 쓴다")
     void usesRequestedTitle() {
         StubPlanItemRepositoryPort items = new StubPlanItemRepositoryPort();
@@ -232,6 +245,11 @@ class PlanCopyTest {
         @Override
         public Plan save(Plan plan) {
             return plan;
+        }
+
+        @Override
+        public Optional<Plan> findActiveBySourceAiJobId(long memberId, String sourceAiJobId) {
+            throw new UnsupportedOperationException();
         }
 
         @Override

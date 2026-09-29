@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.plan.adapter.in.internal.presenter;
 
+import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanAiCommitResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanOutlineResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanOutlineResponse.DayOutline;
 import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanOutlineResponse.ItemOutline;
@@ -38,6 +39,13 @@ public class PlanInternalPresenter {
             .endDate(info.endDate() == null ? null : info.endDate().toString())
             .areaCode(info.areaCode())
             .days(days)
+            .build();
+    }
+
+    /** @param planId 담은 일정. 없으면 {@code null} 그대로 싣는다 — 404 가 아니다 ({@link PlanAiCommitResponse}) */
+    public PlanAiCommitResponse toAiCommitResponse(Long planId) {
+        return PlanAiCommitResponse.builder()
+            .planId(planId)
             .build();
     }
 

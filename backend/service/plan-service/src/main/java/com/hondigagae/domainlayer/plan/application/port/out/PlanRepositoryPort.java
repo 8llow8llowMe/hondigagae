@@ -11,6 +11,12 @@ public interface PlanRepositoryPort {
 
     Optional<Plan> findActiveById(long planId);
 
+    /**
+     * 이 회원이 이 AI 일정 생성 작업을 담아 만든 <b>살아 있는</b> 일정 (#970). 담은 적이 없거나 삭제했으면 비어 있다.
+     * 소유 조건이 조회 조건에 들어 있다 — 남의 memberId 로는 찾을 수 없다.
+     */
+    Optional<Plan> findActiveBySourceAiJobId(long memberId, String sourceAiJobId);
+
     /** petId 가 null 이 아니면 그 반려견이 동행한 일정만 — 여러 마리 중 한 마리로 들어 있어도 히트다 (반려견별 여행 히스토리). */
     Slice<Plan> findMyPlans(long memberId, Long petId, long lastPlanId, int size);
 

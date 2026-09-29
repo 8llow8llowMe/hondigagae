@@ -29,7 +29,9 @@ import com.hondigagae.persistence.dto.SliceResponse;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,12 +55,38 @@ public class PlanWebFacade implements PlanWebUseCase {
      * 상대 응답을 기다리게 되고, tour 의 지연이 plan CRUD 전체의 커넥션 풀 고갈로 번진다
      * (architecture-guide §3 의 문서화된 예외 — 날씨·응급 브리핑과 같은 결정).
      * DB 쓰기 구간은 {@link PlanCommandProcessor} 의 메서드 단위 트랜잭션이 묶는다.
+     *
+     * <p><b>AI 초안 담기는 멱등이다 (#970).</b> {@code sourceAiJobId} 가 오면 두 겹으로 막는다.
+     * <ol>
+     *   <li>빠른 경로 — 이미 담긴 작업이면 원격 검증(반려견·타깃)을 건너뛰고 그 일정을 돌려준다.
+     *       두 번째 요청의 제목·항목은 반영하지 않는다. 다시 누른 담기는 "새로 저장" 이 아니라 "이미 담긴 것 열기" 다.</li>
+     *   <li>경쟁 — 두 요청이 모두 1을 통과하면 유니크 {@code uk_plan_member_id_source_ai_job_id} 가 뒤의 커밋을
+     *       막는다. 그 {@link DataIntegrityViolationException} 을 <b>여기서</b> 받아 먼저 담긴 일정을 돌려준다.
+     *       Processor 안에서 잡으면 트랜잭션이 이미 rollback-only 라 커밋에서 다시 터진다.</li>
+     * </ol>
+     * 재조회가 비면(키가 아닌 다른 제약 위반) 원래 예외를 그대로 던진다 — 멱등이 다른 결함을 삼키지 않게 한다.
      */
     @Override
     public PlanDetailResponse createPlan(long memberId, PlanCreateCommand command) {
+        String sourceAiJobId = command.sourceAiJobId();
+        if (sourceAiJobId != null) {
+            Optional<Plan> committed = planQueryProcessor.findAiCommittedPlan(memberId, sourceAiJobId);
+            if (committed.isPresent()) {
+                return planPresenter.toDetailResponse(planQueryProcessor.getPlanDetailInfo(committed.get()));
+            }
+        }
+
         List<Long> petIds = planCommandProcessor.resolvePetIds(memberId, command.petIds());
         planCommandProcessor.verifyItemTargets(command.items());
-        Plan plan = planCommandProcessor.createPlan(memberId, command, petIds);
+        Plan plan;
+        try {
+            plan = planCommandProcessor.createPlan(memberId, command, petIds);
+        } catch (DataIntegrityViolationException conflict) {
+            if (sourceAiJobId == null) {
+                throw conflict;
+            }
+            plan = planQueryProcessor.findAiCommittedPlan(memberId, sourceAiJobId).orElseThrow(() -> conflict);
+        }
         return planPresenter.toDetailResponse(planQueryProcessor.getPlanDetailInfo(plan));
     }
 

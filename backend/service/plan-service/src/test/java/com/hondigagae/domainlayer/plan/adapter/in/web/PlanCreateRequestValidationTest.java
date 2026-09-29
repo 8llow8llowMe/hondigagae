@@ -79,6 +79,35 @@ class PlanCreateRequestValidationTest {
         assertThat(validator.validate(request(null))).isEmpty();
     }
 
+    @Test
+    @DisplayName("sourceAiJobId 는 생략할 수 있고, ai-service jobId 모양(UUID)이면 통과한다 (#970)")
+    void acceptsMissingOrUuidSourceAiJobId() {
+        // 생략이 일반 생성이다 — 멱등 키는 AI 초안을 담을 때만 온다.
+        assertThat(validator.validate(requestWithJob(null))).isEmpty();
+        assertThat(validator.validate(requestWithJob("3f2b8c1e-5d4a-4e6b-9c7d-1a2b3c4d5e6f"))).isEmpty();
+        assertThat(validator.validate(requestWithJob("3F2B8C1E-5D4A-4E6B-9C7D-1A2B3C4D5E6F"))).isEmpty();
+    }
+
+    @Test
+    @DisplayName("UUID 가 아니거나 36자를 넘는 sourceAiJobId 는 PLAN_135 로 막힌다")
+    void rejectsMalformedSourceAiJobId() {
+        assertThat(messagesOf(validator.validate(requestWithJob("not-a-uuid"))))
+            .isNotEmpty().allMatch(message -> message.startsWith("PLAN_135:"));
+        assertThat(messagesOf(validator.validate(requestWithJob(""))))
+            .isNotEmpty().allMatch(message -> message.startsWith("PLAN_135:"));
+        // 37자 — 컬럼(VARCHAR(36))에 닿기 전에 400 으로 끊는다. 저장에서 잘리면 500 이다.
+        assertThat(messagesOf(validator.validate(requestWithJob("3f2b8c1e-5d4a-4e6b-9c7d-1a2b3c4d5e6f0"))))
+            .isNotEmpty().allMatch(message -> message.startsWith("PLAN_135:"));
+    }
+
+    @Test
+    @DisplayName("sourceAiJobId 는 명령으로 그대로 넘어간다")
+    void carriesSourceAiJobIdToCommand() {
+        assertThat(requestWithJob("3f2b8c1e-5d4a-4e6b-9c7d-1a2b3c4d5e6f").toCommand().sourceAiJobId())
+            .isEqualTo("3f2b8c1e-5d4a-4e6b-9c7d-1a2b3c4d5e6f");
+        assertThat(requestWithJob(null).toCommand().sourceAiJobId()).isNull();
+    }
+
     private static List<String> messagesOf(Set<ConstraintViolation<PlanCreateRequest>> violations) {
         return violations.stream().map(ConstraintViolation::getMessage).toList();
     }
@@ -86,6 +115,12 @@ class PlanCreateRequestValidationTest {
     private PlanCreateRequest request(List<Long> petIds) {
         return new PlanCreateRequest(
             null, petIds, "39", "4", "제주 2박 3일",
-            LocalDate.of(2026, 9, 12), LocalDate.of(2026, 9, 14), null, null);
+            LocalDate.of(2026, 9, 12), LocalDate.of(2026, 9, 14), null, null, null);
+    }
+
+    private PlanCreateRequest requestWithJob(String sourceAiJobId) {
+        return new PlanCreateRequest(
+            null, null, "39", "4", "제주 2박 3일",
+            LocalDate.of(2026, 9, 12), LocalDate.of(2026, 9, 14), null, null, sourceAiJobId);
     }
 }
