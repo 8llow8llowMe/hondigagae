@@ -48,11 +48,31 @@ export const petMessages = {
    * 삭제 확인 — 아트보드 `혼디가개 마이페이지·내 반려견.dc.html` 의 `aria-modal` 다이얼로그.
    * `{name}` 은 목적격 조사를 붙여 치환한다 (`withObjectParticle`).
    *
-   * **아트보드의 "일정 1개는 그대로 남지만" 은 쓰지 않는다** — 일정 개수를 주는 API 가 없다.
-   * 셀 수 없는 것을 숫자로 적으면 그 문장이 거짓이 된다.
+   * 일정 개수는 **서버가 센 값으로만** 말한다 (#1042, `GET /plans/companions/{petId}`).
+   * 그 API 가 생기기 전에는 아트보드의 "일정 1개는 그대로 남지만" 을 쓰지 않았다 — 셀 수
+   * 없는 것을 숫자로 적으면 그 문장이 거짓이 된다. 조합 규칙은 `lib/pet/delete-companions.ts`.
    */
   deleteConfirmTitle: '{name} 삭제할까요?',
   deleteConfirmDescription: '오늘 상태를 알려 줄 때 쓰던 기준이 사라져요. 되돌릴 수 없어요.',
+  /** 미완료(초안·확정) 일정 중 이 아이가 동행하는 수 — `editablePlanCount` */
+  deleteCompanionEditable: '이 아이가 동행하는 일정 {count}개에서 빠져요.',
+  /** 그중 이 아이만 동행하는 수 — `soleCompanionPlanCount`. 일정은 지워지지 않는다 */
+  deleteCompanionSoleSome: '그중 {count}개는 동행 반려견이 없는 일정으로 남아요.',
+  /**
+   * 전부가 이 아이만 동행하는 일정일 때. "그중 2개는" 이 앞 문장의 수를 되풀이하므로
+   * 수 대신 사용자가 먼저 물을 것(일정이 지워지는가)을 말한다
+   */
+  deleteCompanionSoleAll: '일정은 지워지지 않고 동행 반려견이 없는 일정으로 남아요.',
+  /** 완료 일정 중 동행한 수 — `completedPlanCount`. 서버가 손대지 않는다 */
+  deleteCompanionCompleted: '다녀온 일정 {count}개의 기록은 그대로 남아요.',
+  /** 집계를 받는 중. **삭제 버튼은 막지 않는다** (`pet-delete-section.tsx`) */
+  deleteCompanionLoading: '연결된 일정을 확인하고 있어요.',
+  /**
+   * 집계 조회 실패. **수 없이도 참인 문장만 쓴다** — 무슨 일이 일어나는지는 수와 상관없이
+   * 같다(다견 일정에서는 빠지고, 이 아이만 가던 일정과 다녀온 일정은 남는다)
+   */
+  deleteCompanionFailed:
+    '연결된 일정 수를 확인하지 못했어요. 삭제하면 이 아이는 동행하던 일정에서 빠지고, 일정과 다녀온 기록은 남아요.',
   deleteDialogLabel: '반려견 삭제',
   cancel: '취소',
   backToList: '목록으로',
