@@ -9,12 +9,11 @@ import com.hondigagae.domainlayer.placeimport.application.port.out.CultureFacili
 import com.hondigagae.domainlayer.placeimport.application.port.out.query.CultureFacilityCsvFileQueryResult;
 import com.hondigagae.domainlayer.placeimport.application.port.out.query.CultureFacilitySourceQueryResult;
 import com.hondigagae.global.properties.CultureFacilityProperties;
+import com.hondigagae.global.support.ContentDispositionFileName;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.net.URLDecoder;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -68,10 +67,6 @@ public class DataGoKrCultureFacilitySourceAdapter implements CultureFacilitySour
         Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     private static final Pattern ATCH_FILE_ID_PATTERN = Pattern.compile("[?&]atchFileId=([^&#]+)");
     private static final Pattern FILE_DETAIL_SN_PATTERN = Pattern.compile("[?&]fileDetailSn=([^&#]+)");
-    private static final Pattern FILENAME_EXT_PATTERN =
-        Pattern.compile("filename\\*\\s*=\\s*([^']*)'([^']*)'([^;]+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern FILENAME_PATTERN =
-        Pattern.compile("filename\\s*=\\s*\"?([^\";]+)\"?", Pattern.CASE_INSENSITIVE);
 
     private static final String DOWNLOAD_URL_MARKER = "fileDownload.do";
     private static final String TYPE_DATA_DOWNLOAD = "DataDownload";
@@ -119,7 +114,7 @@ public class DataGoKrCultureFacilitySourceAdapter implements CultureFacilitySour
             long contentLength = Files.size(tempFile);
             validate(tempFile, contentLength, declaredContentLength(responseHeaders));
 
-            String fileName = parseFileName(responseHeaders.getFirst(HttpHeaders.CONTENT_DISPOSITION));
+            String fileName = ContentDispositionFileName.parse(responseHeaders.getFirst(HttpHeaders.CONTENT_DISPOSITION));
             log.info("culture facility csv downloaded fileId={} fileName={} bytes={} path={}",
                 source.fileId(), fileName, contentLength, tempFile);
             return new CultureFacilityCsvFileQueryResult(tempFile, fileName, contentLength);
@@ -271,38 +266,6 @@ public class DataGoKrCultureFacilitySourceAdapter implements CultureFacilitySour
             throw new PlaceImportException(PlaceImportErrorCode.CULTURE_SOURCE_PAGE_INVALID, "atchFileId 없음");
         }
         return new CultureFacilitySourceQueryResult(fileId, firstGroup(FILE_DETAIL_SN_PATTERN, contentUrl), contentUrl);
-    }
-
-    /**
-     * {@code Content-Disposition} 의 파일명. RFC 5987 {@code filename*} 을 우선한다.
-     *
-     * <p>사람이 어느 판본인지 알아보는 값일 뿐이라 <b>못 읽어도 실패시키지 않는다</b> - null 로
-     * 기록하고 넘어간다. 갱신 판정은 {@code atchFileId} 와 바이트 수가 한다.
-     *
-     * <p>퍼센트 디코딩은 {@code filename*} 에만 건다. plain {@code filename} 은 인코딩을 선언하지
-     * 않는 값이라, 이름에 {@code %} 가 들어간 파일을 디코딩하면 없던 글자로 바꿔 버린다.
-     */
-    static String parseFileName(String contentDisposition) {
-        if (contentDisposition == null || contentDisposition.isBlank()) {
-            return null;
-        }
-        Matcher extended = FILENAME_EXT_PATTERN.matcher(contentDisposition);
-        if (extended.find()) {
-            String charsetName = extended.group(1).isBlank() ? StandardCharsets.UTF_8.name() : extended.group(1).trim();
-            String raw = extended.group(3).trim().replace("\"", "");
-            return decodeQuietly(raw, charsetName);
-        }
-        Matcher plain = FILENAME_PATTERN.matcher(contentDisposition);
-        return plain.find() ? plain.group(1).trim() : null;
-    }
-
-    private static String decodeQuietly(String raw, String charsetName) {
-        try {
-            return URLDecoder.decode(raw, Charset.forName(charsetName));
-        } catch (RuntimeException exception) {
-            // 잘못된 퍼센트 인코딩이나 모르는 charset. 파일명은 기록용이라 원문 그대로 둔다.
-            return raw;
-        }
     }
 
     private static void collectDataDownloads(JsonNode node, List<JsonNode> collected) {

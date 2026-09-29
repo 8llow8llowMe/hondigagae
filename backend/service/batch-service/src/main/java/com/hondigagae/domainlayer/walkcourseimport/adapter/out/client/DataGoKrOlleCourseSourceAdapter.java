@@ -9,10 +9,10 @@ import com.hondigagae.domainlayer.walkcourseimport.application.port.out.OlleCour
 import com.hondigagae.domainlayer.walkcourseimport.application.port.out.query.OlleCourseCsvFileQueryResult;
 import com.hondigagae.domainlayer.walkcourseimport.application.port.out.query.OlleCourseSourceQueryResult;
 import com.hondigagae.global.properties.OlleCourseProperties;
+import com.hondigagae.global.support.ContentDispositionFileName;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import java.io.IOException;
-import java.net.URLDecoder;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetDecoder;
@@ -79,10 +79,6 @@ public class DataGoKrOlleCourseSourceAdapter implements OlleCourseSourcePort {
     /** 다운로드 버튼의 onclick. 인자는 따옴표로 감싼 문자열 다섯 개이고 앞의 넷만 쓴다. */
     private static final Pattern DOWNLOAD_TRIGGER_PATTERN = Pattern.compile(
         "fn_fileDataDown\\(" + QUOTED_ARG + "," + QUOTED_ARG + "," + QUOTED_ARG + "," + QUOTED_ARG + ",");
-    private static final Pattern FILENAME_EXT_PATTERN =
-        Pattern.compile("filename\\*\\s*=\\s*([^']*)'([^']*)'([^;]+)", Pattern.CASE_INSENSITIVE);
-    private static final Pattern FILENAME_PATTERN =
-        Pattern.compile("filename\\s*=\\s*\"?([^\";]+)\"?", Pattern.CASE_INSENSITIVE);
 
     /** 버튼이 보내는 값 그대로. 파일데이터 유형 코드다. */
     private static final String FILE_DATA_TYPE_CODE = "PR0051";
@@ -132,7 +128,7 @@ public class DataGoKrOlleCourseSourceAdapter implements OlleCourseSourcePort {
             long contentLength = Files.size(tempFile);
             validate(tempFile, contentLength, declaredContentLength(responseHeaders));
 
-            String fileName = parseFileName(responseHeaders.getFirst(HttpHeaders.CONTENT_DISPOSITION));
+            String fileName = ContentDispositionFileName.parse(responseHeaders.getFirst(HttpHeaders.CONTENT_DISPOSITION));
             log.info("olle course csv downloaded fileId={} fileName={} bytes={} path={}",
                 source.fileId(), fileName, contentLength, tempFile);
             return new OlleCourseCsvFileQueryResult(tempFile, fileName, contentLength);
@@ -351,28 +347,6 @@ public class DataGoKrOlleCourseSourceAdapter implements OlleCourseSourcePort {
             .build()
             .toUriString();
         return new OlleCourseSourceQueryResult(fileId, fileDetailSn, contentUrl);
-    }
-
-    static String parseFileName(String contentDisposition) {
-        if (contentDisposition == null || contentDisposition.isBlank()) {
-            return null;
-        }
-        Matcher extended = FILENAME_EXT_PATTERN.matcher(contentDisposition);
-        if (extended.find()) {
-            String charsetName = extended.group(1).isBlank() ? StandardCharsets.UTF_8.name() : extended.group(1).trim();
-            String raw = extended.group(3).trim().replace("\"", "");
-            return decodeQuietly(raw, charsetName);
-        }
-        Matcher plain = FILENAME_PATTERN.matcher(contentDisposition);
-        return plain.find() ? plain.group(1).trim() : null;
-    }
-
-    private static String decodeQuietly(String raw, String charsetName) {
-        try {
-            return URLDecoder.decode(raw, Charset.forName(charsetName));
-        } catch (RuntimeException exception) {
-            return raw;
-        }
     }
 
     private static String text(JsonNode node, String field) {
