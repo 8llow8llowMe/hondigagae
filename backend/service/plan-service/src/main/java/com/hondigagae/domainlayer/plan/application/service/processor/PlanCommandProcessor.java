@@ -471,12 +471,20 @@ public class PlanCommandProcessor {
     /**
      * 방문 체크. 소유권은 일정 기준으로 보고, 항목이 그 일정의 것인지 다시 확인한다 —
      * planItemId 만 믿으면 남의 일정 항목을 내 planId 로 체크할 수 있다.
+     *
+     * <p>여행 시작일 전(서비스 기준 오늘)에는 다녀옴으로 <b>표시</b>할 수 없다 — {@code PLAN_027} (#983).
+     * 판정은 {@link Plan#hasStarted} 하나로 한다(당일 포함, 일정 상태는 보지 않는다). <b>해제는 언제나 받는다</b> —
+     * 가드 이전에 찍힌 표시나 일정을 미래로 옮긴 뒤 남은 표시를 사용자가 풀 수 있어야 한다.
+     * 소유 확인이 가드보다 먼저다 — 남의 항목에는 날짜와 무관하게 {@code PLAN_005} 로 답한다.
      */
     @Transactional
     public PlanItem markItemVisited(Plan plan, long planItemId, boolean visited) {
         PlanItem item = planItemRepositoryPort.findById(planItemId)
             .filter(found -> found.planId() == plan.id())
             .orElseThrow(() -> new PlanException(PlanErrorCode.NOT_FOUND_PLAN_ITEM));
+        if (visited && !plan.hasStarted(LocalDate.now(clock))) {
+            throw new PlanException(PlanErrorCode.PLAN_NOT_STARTED_VISIT);
+        }
         return planItemRepositoryPort.save(item.withVisited(visited));
     }
 
