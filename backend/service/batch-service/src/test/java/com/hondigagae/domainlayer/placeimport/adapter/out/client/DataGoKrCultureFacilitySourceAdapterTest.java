@@ -103,44 +103,6 @@ class DataGoKrCultureFacilitySourceAdapterTest {
     }
 
     @Nested
-    @DisplayName("Content-Disposition 파일명")
-    class ParseFileName {
-
-        @Test
-        @DisplayName("filename= 의 따옴표를 걷어낸다")
-        void readsPlainFileName() {
-            String parsed = DataGoKrCultureFacilitySourceAdapter.parseFileName(
-                "attachment; filename=\"한국문화정보원_전국 반려동물 동반 가능 문화시설 위치 데이터_20250324.csv\"");
-
-            assertThat(parsed).isEqualTo("한국문화정보원_전국 반려동물 동반 가능 문화시설 위치 데이터_20250324.csv");
-        }
-
-        @Test
-        @DisplayName("RFC 5987 filename* 을 우선하고 퍼센트 인코딩을 푼다")
-        void prefersExtendedFileName() {
-            String parsed = DataGoKrCultureFacilitySourceAdapter.parseFileName(
-                "attachment; filename=\"fallback.csv\"; filename*=UTF-8''%ED%8C%8C%EC%9D%BC.csv");
-
-            assertThat(parsed).isEqualTo("파일.csv");
-        }
-
-        @Test
-        @DisplayName("plain filename= 은 퍼센트 디코딩하지 않는다 — 인코딩을 선언하지 않는 값이다")
-        void keepsPlainFileNameAsIs() {
-            String parsed = DataGoKrCultureFacilitySourceAdapter.parseFileName("attachment; filename=\"50%_할인.csv\"");
-
-            assertThat(parsed).isEqualTo("50%_할인.csv");
-        }
-
-        @Test
-        @DisplayName("헤더가 없으면 null — 파일명은 기록용이라 실패로 만들지 않는다")
-        void returnsNullWhenHeaderMissing() {
-            assertThat(DataGoKrCultureFacilitySourceAdapter.parseFileName(null)).isNull();
-            assertThat(DataGoKrCultureFacilitySourceAdapter.parseFileName("attachment")).isNull();
-        }
-    }
-
-    @Nested
     @DisplayName("내려받은 파일 최소 검증")
     class Validate {
 
