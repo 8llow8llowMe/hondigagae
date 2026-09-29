@@ -162,60 +162,32 @@ describe('PlanDaySection — 앵커가 고정 헤더를 피한다 (#845)', () =>
 })
 
 /**
- * 액션을 한 자리로 모은다 (#842 · #653 의 완결).
+ * 액션 줄 (#842 · #1016).
  *
- * #653 이 "읽는 순서와 탭 순서를 맞춘다"로 도구를 판정 아래로 내렸는데, 산책 링크만
- * 판정 줄의 `ml-auto` 에 남아 액션이 두 자리로 흩어져 있었다.
+ * **`이 날 산책 위험도` 를 걷었다** (#1016). 그 링크가 가는 장소 상세의 산책 위험도는 날짜를
+ * 받지 않는 **"지금" 기준**(`/places/{id}/walk-safety`)이라, 일자 카드에서 누르면 여행 날의
+ * 판정으로 읽혔다. 날짜 기준 판정은 이 카드의 판정 밴드와 항목 줄의 산책 위험도(#625)에 있다.
  */
-describe('PlanDaySection — 액션 줄 (#842)', () => {
-  it('산책 위험도 버튼이 액션 줄에 있다 — 판정 밴드보다 뒤다', () => {
-    const markup = renderDaySection({ verdict: planVerdict })
+describe('PlanDaySection — 액션 줄 (#842 · #1016)', () => {
+  /** 액션 줄 — `장소 추가` 가 여는 `div` 하나 */
+  function actionRowOf(markup: string): string {
+    const start = markup.lastIndexOf('<div', markup.indexOf(messages.plan.addPlaceAction))
+    return markup.slice(start, markup.indexOf('</div>', start))
+  }
 
-    expect(markup).toContain(messages.plan.walkAction)
-    expect(markup.indexOf(messages.plan.walkAction)).toBeGreaterThan(
-      markup.indexOf(messages.plan.addPlaceAction),
-    )
+  it('기준 장소가 있어도 산책 위험도 링크가 없다 — 액션은 장소 추가 · 순서 편집 둘이다', () => {
+    const row = actionRowOf(renderDaySection({ verdict: planVerdict }))
+
+    expect(row).toContain(messages.plan.addPlaceAction)
+    expect(row).toContain(messages.plan.editDayAction)
+    expect(row).not.toContain('산책 위험도')
+    expect(row).not.toContain(`href="/places/${planVerdict.representativePlaceId}"`)
+    expect(row.match(/<(a|button) /g)).toHaveLength(2)
   })
 
-  /* 산책 위험도는 장소 상세가 소유한다 — 기준 장소가 없으면 부를 대상이 없다 */
-  it('기준 장소가 없으면 버튼이 없다', () => {
-    const markup = renderDaySection({
-      verdict: { ...planVerdict, representativePlaceId: null },
-    })
+  it('판정이 아직 안 온 날도 같은 두 액션이다', () => {
+    const row = actionRowOf(renderDaySection({ verdict: undefined }))
 
-    expect(markup).not.toContain(messages.plan.walkAction)
-  })
-
-  it('판정이 아직 안 온 날에도 버튼이 없다', () => {
-    expect(renderDaySection({ verdict: undefined })).not.toContain(messages.plan.walkAction)
-  })
-
-  /* 편집 중에는 액션 줄 전체가 감춰진다 — 순서를 정리하는 중에 다른 조작을 섞지 않는다 */
-  it('편집 중에는 버튼이 없다', () => {
-    const markup = renderDaySection({ verdict: planVerdict, editing: true })
-
-    expect(markup).not.toContain(messages.plan.walkAction)
-  })
-
-  /*
-    **라벨이 목적지를 말한다** (#653 의 남은 지적). `이 날 산책` 은 링크가 아니라 행동으로
-    읽혔다. **`산책 코스` 라고 부르지 않는다** — 이 저장소에서 그 낱말은 `walkCourse` ·
-    `/walk-courses` 라는 별개 도메인이고, 이 링크가 가는 곳은 장소 상세다.
-  */
-  it('라벨이 산책 코스 도메인과 겹치지 않는다', () => {
-    expect(messages.plan.walkAction).not.toContain('산책 코스')
-  })
-
-  /*
-    **버튼 태그를 추려서 본다.** 같은 화면의 항목 행도 `/places/…` 로 링크하므로 마크업
-    전체를 `toContain` 으로 보면 버튼이 없어도 통과한다 — 실제로 그렇게 통과했다.
-  */
-  it('링크가 기준 장소 상세로 간다', () => {
-    const markup = renderDaySection({ verdict: planVerdict })
-    const link = new RegExp(`<a [^>]*href="[^"]*"[^>]*>${messages.plan.walkAction}</a>`).exec(
-      markup,
-    )
-
-    expect(link?.[0]).toContain(`href="/places/${planVerdict.representativePlaceId}"`)
+    expect(row.match(/<(a|button) /g)).toHaveLength(2)
   })
 })

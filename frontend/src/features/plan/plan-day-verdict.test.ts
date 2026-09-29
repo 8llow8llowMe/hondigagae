@@ -333,11 +333,44 @@ describe('PlanDayVerdict — 등급 tint 밴드', () => {
   })
 
   /*
-    **`이 날 산책` 이 이 컴포넌트를 떠났다** (#842 · Task 14). #653 이 "읽는 순서와 탭
-    순서를 맞춘다"로 도구를 판정 아래로 내렸는데 이 버튼만 판정 줄의 `ml-auto` 에 남아
-    액션이 두 자리로 흩어져 있었다. 받는 쪽 단언은 `plan-day-section.test.ts` 다.
+    **정보성을 경고 아래 보조 묶음으로 내린다** (#1016). 이 밴드는 일정 상세에서 항목 목록
+    위에 서서 근거 다섯이 같은 22px 줄을 차지하면 첫 항목이 접힘 아래로 밀렸다. 서버 문장 ·
+    접지 않음(#840) · 각 묶음의 서버 순서는 그대로다.
   */
-  it('산책 코스 버튼을 판정 줄에 두지 않는다', () => {
-    expect(render()).not.toContain(messages.plan.walkAction)
+  it('정보성 근거를 경고 아래 caption 묶음으로 모은다 — 순서와 문장은 서버 그대로다', () => {
+    const reason = (code: string, scoreDelta: number) => ({
+      code,
+      name: code,
+      description: `${code} 문장입니다.`,
+      scoreDelta,
+    })
+    const html = render({
+      reasons: [
+        reason('INFO_A', 0),
+        reason('HEAT', -15),
+        reason('INFO_B', 0),
+        reason('WIND', -5),
+        reason('INFO_C', 0),
+      ],
+    })
+
+    const lists = [...html.matchAll(/<ul class="([^"]*)">(.*?)<\/ul>/g)].map((match) => ({
+      classes: (match[1] ?? '').split(' '),
+      items: [...(match[2] ?? '').matchAll(/<li class="([^"]*)">([^<]*)<\/li>/g)].map((li) => ({
+        classes: (li[1] ?? '').split(' '),
+        text: li[2],
+      })),
+    }))
+
+    expect(lists.map((list) => list.items.map((item) => item.text))).toEqual([
+      ['HEAT 문장입니다.', 'WIND 문장입니다.'],
+      ['INFO_A 문장입니다.', 'INFO_B 문장입니다.', 'INFO_C 문장입니다.'],
+    ])
+    for (const item of lists[0]?.items ?? []) expect(item.classes).toContain('text-body-2')
+    for (const item of lists[1]?.items ?? []) {
+      expect(item.classes).toContain('text-caption')
+      expect(item.classes).toContain('text-fg-muted')
+    }
+    expect(lists[1]?.classes).toContain('gap-1')
   })
 })

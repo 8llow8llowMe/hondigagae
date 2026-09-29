@@ -163,9 +163,17 @@ export function PlanRouteCard({
     .replace('{n}', String(model.stops.length))
 
   return (
-    <Surface title={messages.map.routeHeading}>
-      <div className={cn('flex flex-col gap-3 pb-5', INSET_CLASS.card)}>
-        {totalDays > 1 && (
+    /*
+      **제목과 일자 탭이 한 줄이다** (#1016). 예전에는 제목 줄 아래에 탭 줄이 따로 서서 카드가
+      426px 이었고, 일자 헤더 · 판정 밴드까지 더하면 1910×919 에서 첫 항목이 접힘 아래였다.
+      탭은 `trailing` 이고 `trailingWrap` 이라 넘치면 제목 아래로 떨어져 스스로 줄바꿈한다 —
+      여행은 최대 30일이라 탭 개수는 데이터가 정한다. 44px 은 `DayChip` 이 그대로 갖는다.
+    */
+    <Surface
+      title={messages.map.routeHeading}
+      trailingWrap
+      trailing={
+        totalDays > 1 ? (
           <ChipGroup label={messages.map.routeDayAxis} exclusive className="flex flex-wrap gap-2">
             {days.map((candidate) => (
               <DayChip
@@ -176,8 +184,10 @@ export function PlanRouteCard({
               />
             ))}
           </ChipGroup>
-        )}
-
+        ) : undefined
+      }
+    >
+      <div className={cn('flex flex-col gap-3 pb-5', INSET_CLASS.card)}>
         <MapCanvas
           pins={pins}
           route={route}
