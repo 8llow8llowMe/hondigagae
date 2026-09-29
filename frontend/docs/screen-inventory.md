@@ -454,7 +454,7 @@
 | 여행 후기                   | `/plans/[planId]` 좌측 레일                  | `GET` · `POST` · `PUT /plans/{planId}/reviews`                                       | **구현** (#615) — **완료 일정만.** 목록 "후기 미작성" 밴드는 `hasReview` 가 없어 넣지 않음 |
 | 일정 공유 링크 발급·폐기    | `/plans/[planId]` 관리 메뉴 안 모달          | `GET` · `POST` · `DELETE /plans/{planId}/share-link`                                 | **구현** (#628) — **확정·완료만.** `POST`·`DELETE` 둘 다 멱등                              |
 | 공유된 일정 열람            | `/shared-plans/[token]`                      | `GET /shared-plans/{token}` (**비인증**)                                             | **구현** (#628) — 정본 `docs/features/plan/일정공유-세부명세.md`                           |
-| 항목 시작 시각              | `/plans/[planId]` 항목 행 · 편집모드         | `GET /plans/{planId}` · `PUT /plans/{planId}/days/{day}/items`                       | **명세 완료** (#623) — **새 API 없음.** 계약에 이미 있던 필드다                            |
+| 항목 시작 시각              | `/plans/[planId]` 항목 행 시간 칩            | `PUT /plans/{planId}/items/{planItemId}/start-time` (**단건**)                       | **구현** (#1028 · #1053) — BE #1030. 체크·`planItemId` 가 남는다                           |
 
 **항목 시작 시각 (`startTime`)** — [#623](https://github.com/8llow8llowMe/hondigagae/issues/623)
 
@@ -474,8 +474,11 @@
   `toDraftItems` 가 실을 값이 없다. 그 일자에 시각이 있을 때만 확인 대화상자가 미리 말한다.
 - **AI 초안은 여전히 시각을 보내지 않는다.** 지어낸 시각으로 #625 가 판정하면 사용자가 정한 적
   없는 시간의 답이 된다 — 백엔드가 `NO_START_TIME` 에서 "정오를 넣어 판정하지 않는다" 고 못박은 것과 같다.
-- 편집은 `순서 편집` 모드 안이다 (`features/plan/일자편집-세부명세.md` G). 항목 단건 수정 API 가
-  없어 행에서 고치면 저장할 때마다 그 일자 방문 체크가 초기화된다.
+- ~~편집은 `순서 편집` 모드 안이다. 항목 단건 수정 API 가 없어 행에서 고치면 저장할 때마다 그 일자
+  방문 체크가 초기화된다.~~ **#1028 · #1053 으로 바뀌었다** — 입력은 항목 행의 시간 칩이고, 저장은
+  **단건 API `PUT /plans/{planId}/items/{planItemId}/start-time`**(BE #1030 · PR #1052)다. 행을 제자리에서
+  고쳐 **시각은 단건 API 라 방문 체크가 초기화되지 않는다.** 순서 편집 · 장소 담기 · 하루 다시 만들기는
+  여전히 일괄 교체다 (`features/plan/일자편집-세부명세.md` G · `일정상세-세부명세.md` D9-2).
   | 일정 복사 | `/plans/[planId]` 관리 메뉴 → 모달 | `POST /plans/{planId}/copy` | **구현** (#617) — 지난·완료 일정만. `일정복사-세부명세.md` |
   | 항목 산책 위험도 | `/plans/[planId]` 항목 행 | `GET /plans/{planId}/walk-safety` | **명세 완료** (#625) — BE 2026-09-17 `c701b95a`. **2026-09-14 스냅샷에 없다**. 계약 확장 #717 반영 (#758) |
 
