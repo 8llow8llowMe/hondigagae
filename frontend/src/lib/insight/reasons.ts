@@ -26,6 +26,30 @@ export function splitReasons(reasons: SuitabilityReasonItem[]): {
 }
 
 /**
+ * 근거를 **정보성 표시**로 나눈다 — 일정 일자 판정의 보조 묶음 (#1016).
+ *
+ * `splitReasons` 와 축은 같지만 읽는 필드가 다르다. 그쪽은 응답의 `scoreDelta` 를 보고,
+ * 이쪽은 `ReasonList` 가 받는 `informational` 을 본다 — 정보성 판정은 호출부가 이미 끝냈고
+ * (`plan-day-verdict.tsx` 가 `scoreDelta === 0` 으로 가른다) 목록은 그 결과만 안다.
+ *
+ * **두 묶음 모두 서버 순서를 유지한다.** 비정보성끼리 · 정보성끼리의 상대 순서가 그대로다 —
+ * 바뀌는 것은 정보성이 비정보성 **뒤로** 모인다는 것 하나뿐이다. 문장도 고치지 않는다.
+ */
+export function partitionInformational<T extends { informational?: boolean }>(
+  reasons: readonly T[],
+): { primary: T[]; informational: T[] } {
+  const primary: T[] = []
+  const informational: T[] = []
+
+  for (const reason of reasons) {
+    if (reason.informational === true) informational.push(reason)
+    else primary.push(reason)
+  }
+
+  return { primary, informational }
+}
+
+/**
  * 판정 기준이 될 장소를 고른다 — 공통명세 S5-1 (선택지 A 채택).
  *
  * 최근 본 장소 → 다가오는 일정의 첫 장소 → **대표 지점** → `null`.

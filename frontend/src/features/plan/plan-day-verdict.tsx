@@ -173,11 +173,6 @@ export function PlanDayVerdict({
           **라벨은 고정이고 차이는 값 옆 단서가 말한다** (#732) — 아래 주석 참고.
         */}
         {/*
-          **`이 날 산책 코스` 가 이 줄을 떠났다** (#842). #653 이 "읽는 순서와 탭 순서를
-          맞춘다"로 도구를 판정 아래로 내렸는데 이 버튼만 여기 `ml-auto` 에 남아 액션이
-          두 자리로 흩어져 있었다 — 이제 `plan-day-section` 의 액션 줄이 갖는다.
-        */}
-        {/*
           **`text-right` 가 아니라 `items-end` 다** (#856). `text-right` 는 인라인 텍스트만
           민다 — 값 줄(`MetricValue` 안의 `span.flex`)은 flex 라 그 규칙이 닿지 않아, 라벨만
           오른쪽으로 가고 숫자는 컨테이너 왼쪽에 남아 있었다.
@@ -192,8 +187,16 @@ export function PlanDayVerdict({
         정보성(`scoreDelta === 0`)만 한 단계 흐리게 내린다. **장소 적합도 패널과 같은
         처리다** (`place-suitability-panel.tsx`) — 같은 모양의 근거를 두 화면이 다르게
         보여 주고 있었다 (#148).
+
+        **정보성은 경고 아래 보조 묶음으로 내린다** (#1016, `grouped`). 이 밴드는 일정 상세에서
+        항목 목록 **위**에 서서, 근거 다섯(경고 2 · 정보성 3)이 같은 22px 줄을 차지하면 1910×919
+        에서 첫 항목이 접힘 아래였다. 문장 · 접지 않음(#840) · 각 묶음의 서버 순서는 그대로다.
+        장소 적합도 패널은 켜지 않는다 — 근거가 그 섹션의 본문이라 밀어낼 아래 목록이 없다
+        (`reason-list.tsx` 머리주석). 브리핑도 이 컴포넌트를 쓰므로 같은 모양이 된다 — 같은
+        `PlanDayWeatherItem` 을 두 화면이 다르게 그리지 않는다는 위 원칙 그대로다.
       */}
       <ReasonList
+        informationalLayout="grouped"
         reasons={verdict.reasons.map((reason) => ({
           description: reason.description,
           informational: reason.scoreDelta === 0,

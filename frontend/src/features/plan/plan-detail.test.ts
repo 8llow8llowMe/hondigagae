@@ -110,15 +110,6 @@ describe('PlanDayVerdict — 판정을 못 낸 것과 낮은 것을 구분한다
     expect(markup).toContain('여행 적합')
   })
 
-  /*
-    **이 단언은 `plan-day-section.test.ts` 로 옮겼다** (#842). 산책 코스 버튼이 판정 줄을
-    떠나 일자 액션 줄로 갔으므로 `기준 장소가 없으면 버튼이 없다` 는 그쪽이 본다. 여기
-    남기는 것은 **되돌아오지 않는다**는 계약 하나다.
-  */
-  it('산책 버튼이 판정 줄로 돌아오지 않는다', () => {
-    expect(renderVerdict()).not.toContain(messages.plan.walkAction)
-  })
-
   /* 출처는 근거 문단 맨 아래가 아니라 **큰 숫자 옆**이다 (#732) — 값과 이어져야 읽힌다 */
   it('MID_TERM 이면 값 옆에서 출처를 밝힌다 — 정밀도 차이를 감추지 않는다', () => {
     const midTerm = renderVerdict({

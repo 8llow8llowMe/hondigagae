@@ -327,26 +327,12 @@ export function PlanDaySection({
           )}
 
           {/*
-            **판정 줄에서 내려왔다** (#842). #653 이 "읽는 순서와 탭 순서를 맞춘다"로 도구를
-            판정 아래로 내렸는데 이 버튼만 판정 줄의 `ml-auto` 에 남아 액션이 두 자리로
-            흩어져 있었다.
-
-            **오른쪽 끝에 선다** (`ml-auto`). 왼쪽 둘은 이 일자를 **고치는** 도구고 이것은
-            **다른 화면으로 나가는** 링크라, 같은 줄에 서되 무리는 갈려야 한다.
-
-            산책 위험도는 장소 상세가 소유하므로 기준 장소가 없으면 부를 대상이 없다 —
-            그때는 버튼도 없다.
+            **`이 날 산책 위험도` 가 여기 있었다** (#842 → #1016 에서 걷음). 그 링크는 기준
+            장소의 상세로 갔는데, 그 화면의 산책 위험도는 날짜를 받지 않는 **"지금" 기준**
+            (`/places/{id}/walk-safety`)이라 일자 카드에서 누르면 **여행 날의 판정으로 읽혔다.**
+            날짜 기준 판정은 이미 이 카드에 있다 — 위 판정 밴드와 항목 줄의 산책 위험도(#625).
+            날짜를 받는 산책 위험도 API 가 생기면 그때 이 자리를 다시 본다.
           */}
-          {verdict?.representativePlaceId != null && (
-            <ButtonLink
-              href={`/places/${verdict.representativePlaceId}`}
-              variant="secondary"
-              size="sm"
-              className="ml-auto"
-            >
-              {messages.plan.walkAction}
-            </ButtonLink>
-          )}
         </div>
       )}
 

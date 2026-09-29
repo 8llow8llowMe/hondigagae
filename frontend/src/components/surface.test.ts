@@ -150,6 +150,41 @@ describe('L1 Surface — 섹션', () => {
       '전체 보기',
     )
   })
+
+  /*
+    **`trailingWrap` — 길이가 데이터로 정해지는 trailing** (#1016). 일정 상세 동선 카드가
+    일자 탭(최대 30일)을 제목 줄 오른쪽에 둔다. 기본 `shrink-0` 덩어리면 390 에서 넘친다.
+  */
+  describe('trailingWrap', () => {
+    /** 제목 줄 = `h2` 를 품은 가장 가까운 flex 컨테이너, trailing 래퍼 = 그 마지막 자식 */
+    function titleRowOf(markup: string) {
+      const row = /<div class="([^"]*justify-between[^"]*)"><div class="min-w-0"><h2/.exec(markup)
+      const wrapper = /<\/h2><\/div><div class="([^"]*)"><a /.exec(markup)
+
+      return {
+        row: (row?.[1] ?? '').split(' '),
+        wrapper: (wrapper?.[1] ?? '').split(' '),
+      }
+    }
+
+    const trailing = createElement('a', { href: '#' }, '1일차')
+
+    it('기본은 예전 그대로다 — 한 줄에 고정되고 trailing 이 줄지 않는다', () => {
+      const { row, wrapper } = titleRowOf(render({ trailing }))
+
+      expect(row).toEqual(['flex', 'items-start', 'justify-between', 'gap-4'])
+      expect(wrapper).toEqual(['shrink-0'])
+    })
+
+    it('켜면 제목 줄이 접히고 trailing 이 줄어들 수 있다 — 넘치면 다음 줄로 떨어진다', () => {
+      const { row, wrapper } = titleRowOf(render({ trailing, trailingWrap: true }))
+
+      expect(row).toContain('flex-wrap')
+      expect(row).toContain('items-center')
+      expect(row).not.toContain('items-start')
+      expect(wrapper).toEqual(['min-w-0'])
+    })
+  })
 })
 
 describe('L2 SurfaceList — 카드 안 목록', () => {

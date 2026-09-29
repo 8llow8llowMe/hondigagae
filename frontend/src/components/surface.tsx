@@ -195,6 +195,7 @@ export function Surface({
   leading,
   tools,
   trailing,
+  trailingWrap = false,
   fill = false,
   tone = 'default',
   children,
@@ -237,6 +238,20 @@ export function Surface({
   tools?: ReactNode
   /** 제목 우측 액션 (예: "전체 보기" · 보기 토글 · `새 일정 만들기`) */
   trailing?: ReactNode
+  /**
+   * `trailing` 이 제목 줄에 다 들어가지 않으면 **다음 줄로 떨어져 제 폭 안에서 접힌다** (#1016).
+   *
+   * 기본 `trailing` 은 `shrink-0` 한 덩어리라, 길이가 데이터로 정해지는 것(일정 상세 동선 카드의
+   * 일자 탭 — 여행은 최대 30일이다)을 넣으면 390 에서 카드 밖으로 넘친다. 켜면 제목 줄이
+   * `flex-wrap` 이 되고 `trailing` 이 줄어들 수 있어(`min-w-0`), 안의 묶음이 스스로 줄바꿈한다.
+   * 한 줄에 서는 동안은 제목과 `trailing` 을 **세로 가운데**로 맞춘다 — 44px 탭 옆에서
+   * `items-start` 면 제목이 탭 윗변에 붙는다.
+   *
+   * **기본값이 `false` 인 이유.** 나머지 사용처의 `trailing` 은 짧은 버튼 하나라 넘칠 일이 없고,
+   * 켜면 긴 제목에서 **제목이 접히는 대신 버튼이 아래로 떨어지는** 쪽으로 동작이 바뀐다
+   * (`component-guide.md §9` — 새 prop 은 기존 동작을 유지하는 기본값).
+   */
+  trailingWrap?: boolean
   /**
    * 열 높이를 다 쓰고 **본문만 구른다** (#556). 머리주석의 `fill` 절이 정본이다.
    *
@@ -318,6 +333,7 @@ export function Surface({
                     description={description}
                     lead={lead}
                     trailing={trailing}
+                    trailingWrap={trailingWrap}
                   />
                 </div>
               </div>
@@ -330,6 +346,7 @@ export function Surface({
                 description={description}
                 lead={lead}
                 trailing={trailing}
+                trailingWrap={trailingWrap}
               />
             )}
           </div>
@@ -369,17 +386,25 @@ function HeadTitleRow({
   description,
   lead,
   trailing,
+  trailingWrap,
 }: {
   title: ReactNode
   titleId?: string | undefined
   description?: ReactNode
   lead?: boolean | undefined
   trailing?: ReactNode
+  trailingWrap: boolean
 }) {
   if (title === undefined) return null
 
   return (
-    <div className="flex items-start justify-between gap-4">
+    <div
+      className={
+        trailingWrap
+          ? 'flex flex-wrap items-center justify-between gap-x-4 gap-y-3'
+          : 'flex items-start justify-between gap-4'
+      }
+    >
       <div className="min-w-0">
         {/*
           **`titleId` 가 있으면 `scroll-mt` 도 같이 온다** (#650). `titleId` 는 바깥에서
@@ -400,7 +425,9 @@ function HeadTitleRow({
         </h2>
         {description !== undefined && <div className="mt-1">{description}</div>}
       </div>
-      {trailing !== undefined && <div className="shrink-0">{trailing}</div>}
+      {trailing !== undefined && (
+        <div className={trailingWrap ? 'min-w-0' : 'shrink-0'}>{trailing}</div>
+      )}
     </div>
   )
 }

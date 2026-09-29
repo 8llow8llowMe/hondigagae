@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   appliedFactorsOf,
+  partitionInformational,
   pickTopPlaces,
   resolveBasisPlaceId,
   splitReasons,
@@ -34,6 +35,51 @@ describe('splitReasons', () => {
 
   it('빈 배열을 넣으면 양쪽 다 빈 배열이다', () => {
     expect(splitReasons([])).toEqual({ penalties: [], informational: [] })
+  })
+})
+
+/*
+  **일정 일자 판정의 보조 묶음이 이것을 쓴다** (#1016). `splitReasons` 와 달리 `scoreDelta` 가
+  아니라 `ReasonList` 가 받는 `informational` 표시를 읽는다 — 호출부가 이미 그 판정을 끝냈다.
+*/
+describe('partitionInformational', () => {
+  const item = (description: string, informational?: boolean) =>
+    informational === undefined ? { description } : { description, informational }
+
+  it('정보성과 나머지를 나눈다', () => {
+    const { primary, informational } = partitionInformational([
+      item('경고 A'),
+      item('정보 A', true),
+      item('경고 B', false),
+    ])
+
+    expect(primary.map((r) => r.description)).toEqual(['경고 A', '경고 B'])
+    expect(informational.map((r) => r.description)).toEqual(['정보 A'])
+  })
+
+  it('두 묶음 모두 서버 순서를 유지한다 — 섞여 와도 상대 순서가 그대로다', () => {
+    const { primary, informational } = partitionInformational([
+      item('정보 1', true),
+      item('경고 1'),
+      item('정보 2', true),
+      item('경고 2'),
+      item('정보 3', true),
+    ])
+
+    expect(primary.map((r) => r.description)).toEqual(['경고 1', '경고 2'])
+    expect(informational.map((r) => r.description)).toEqual(['정보 1', '정보 2', '정보 3'])
+  })
+
+  it('문장을 고치지 않고 같은 객체를 돌려준다', () => {
+    const reasons = [item('경고', false), item('정보', true)]
+    const { primary, informational } = partitionInformational(reasons)
+
+    expect(primary[0]).toBe(reasons[0])
+    expect(informational[0]).toBe(reasons[1])
+  })
+
+  it('빈 목록이면 두 묶음 다 비어 있다', () => {
+    expect(partitionInformational([])).toEqual({ primary: [], informational: [] })
   })
 })
 

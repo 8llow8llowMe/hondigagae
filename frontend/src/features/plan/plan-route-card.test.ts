@@ -217,3 +217,37 @@ describe('PlanRouteCard — 일자 칩', () => {
     expect(html).toContain('?day=2#')
   })
 })
+
+/*
+  **제목과 일자 탭이 한 줄이다** (#1016). 예전에는 탭 줄이 제목 아래 따로 서서 카드가 426px
+  이었고 1910×919 에서 첫 항목이 접힘 아래였다. 넘치면 제목 아래로 떨어지는 것은 `Surface` 의
+  `trailingWrap` 이 맡는다 (`surface.test.ts`).
+*/
+describe('PlanRouteCard — 제목 줄 (#1016)', () => {
+  const TWO_DAYS: PlanDayGroup<PlanItemDetail>[] = [
+    { day: 1, items: [item(1, { place: placeAt(HYEOPJAE) })] },
+    { day: 2, items: [item(1, { day: 2, place: placeAt(OSULLOC) })] },
+  ]
+
+  it('제목은 여행 동선이다', () => {
+    expect(messages.map.routeHeading).toBe('여행 동선')
+    expect(render(TWO_DAYS)).toContain(`>${messages.map.routeHeading}</h2>`)
+  })
+
+  it('일자 탭이 제목과 같은 줄(접히는 제목 줄)의 오른쪽에 선다', () => {
+    const html = render(TWO_DAYS)
+    const row =
+      /<div class="([^"]*)"><div class="min-w-0"><h2[^>]*>[^<]*<\/h2><\/div><div class="min-w-0"><div role="radiogroup"/.exec(
+        html,
+      )
+
+    expect(row?.[1]?.split(' ')).toContain('flex-wrap')
+  })
+
+  it('탭은 44px 터치 높이를 그대로 갖는다', () => {
+    const chips = render(TWO_DAYS).match(/<a [^>]*role="radio"[^>]*>/g) ?? []
+
+    expect(chips).toHaveLength(2)
+    for (const chip of chips) expect(chip).toMatch(/class="[^"]*\bh-11\b/)
+  })
+})
