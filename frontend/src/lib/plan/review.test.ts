@@ -3,15 +3,15 @@ import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/lib/api/error'
 import {
   isPlaceItemType,
-  isReviewMissing,
   isReviewSectionVisible,
   mergeReviewFormPlaces,
   reviewablePlaceItems,
+  reviewPanelStatus,
   toReviewUpsertPayload,
   validateReviewForm,
 } from '@/lib/plan/review'
 import { planItem } from '@/test/fixtures/plan'
-import { REVIEW_BODY_MAX, REVIEW_COMMENT_MAX, REVIEW_NOT_FOUND_CODE } from '@/types/plan'
+import { REVIEW_BODY_MAX, REVIEW_COMMENT_MAX } from '@/types/plan'
 
 function typeMeta(code: string) {
   return { code, name: code, description: null }
@@ -36,15 +36,67 @@ describe('isPlaceItemType', () => {
   })
 })
 
-describe('isReviewMissing', () => {
-  it('404 + PLAN_015 만 빈 상태다 — 같은 404 라도 다른 코드는 아니다', () => {
+/**
+ * 후기 절의 갈래 (#979).
+ *
+ * **"아직 안 썼다" 는 오류가 아니라 성공 + `null` 이다.** 서버가 404 `PLAN_015` 대신
+ * 200 + `dataBody: null` 로 답한다. 같은 404 라도 `PLAN_001`(일정 없음)은 빈 상태가
+ * 아니다 — 쓰기 CTA 를 주면 없는 일정에 후기를 쓰게 된다.
+ */
+describe('reviewPanelStatus', () => {
+  const review = {
+    reviewId: '1',
+    planId: '2',
+    overallRating: 4,
+    body: null,
+    items: [],
+    createdAt: '2026-09-01T10:00:00',
+    updatedAt: '2026-09-01T10:00:00',
+  }
+
+  it('조회 중이면 loading 이다', () => {
+    expect(reviewPanelStatus({ isPending: true, error: null, data: undefined })).toBe('loading')
+  })
+
+  it('성공 + null 은 missing 이다 — 쓰기 CTA 갈래', () => {
+    expect(reviewPanelStatus({ isPending: false, error: null, data: null })).toBe('missing')
+  })
+
+  it('후기가 있으면 ready 다', () => {
+    expect(reviewPanelStatus({ isPending: false, error: null, data: review })).toBe('ready')
+  })
+
+  it('5xx · 무응답은 failed 다 — 재시도 갈래', () => {
     expect(
-      isReviewMissing(new ApiError(404, REVIEW_NOT_FOUND_CODE, '작성한 여행 후기가 없습니다.')),
-    ).toBe(true)
-    expect(isReviewMissing(new ApiError(404, 'PLAN_001', '존재하지 않는 여행 일정입니다.'))).toBe(
-      false,
-    )
-    expect(isReviewMissing(new ApiError(500, null, null))).toBe(false)
+      reviewPanelStatus({
+        isPending: false,
+        error: new ApiError(503, null, null),
+        data: undefined,
+      }),
+    ).toBe('failed')
+    expect(
+      reviewPanelStatus({ isPending: false, error: new TypeError('x'), data: undefined }),
+    ).toBe('failed')
+  })
+
+  it('404 PLAN_001 은 missing 이 아니라 blocked 다 — 서버 문구만 보인다', () => {
+    expect(
+      reviewPanelStatus({
+        isPending: false,
+        error: new ApiError(404, 'PLAN_001', '존재하지 않는 여행 일정입니다.'),
+        data: undefined,
+      }),
+    ).toBe('blocked')
+  })
+
+  it('재조회가 실패해도 이전 성공 값보다 오류가 앞선다', () => {
+    expect(
+      reviewPanelStatus({
+        isPending: false,
+        error: new ApiError(404, 'PLAN_001', '존재하지 않는 여행 일정입니다.'),
+        data: null,
+      }),
+    ).toBe('blocked')
   })
 })
 

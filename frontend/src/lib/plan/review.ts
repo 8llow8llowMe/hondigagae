@@ -1,10 +1,14 @@
-import { ApiError } from '@/lib/api/error'
-import type { PlanItemDetail, PlanReviewPlaceItem, PlanReviewUpsertPayload } from '@/types/plan'
+import { ApiError, isRetriable } from '@/lib/api/error'
+import type {
+  PlanItemDetail,
+  PlanReviewPlaceItem,
+  PlanReviewResponse,
+  PlanReviewUpsertPayload,
+} from '@/types/plan'
 import {
   REVIEW_BODY_MAX,
   REVIEW_COMMENT_MAX,
   REVIEW_ITEMS_MAX,
-  REVIEW_NOT_FOUND_CODE,
   REVIEW_PLACE_ITEM_TYPES,
   REVIEW_RATING_MAX,
   REVIEW_RATING_MIN,
@@ -27,16 +31,29 @@ export function isPlaceItemType(code: string): boolean {
   return PLACE_TYPES.has(code)
 }
 
+/** 후기 절의 다섯 갈래. `PlanReviewPanel` 이 이 값 하나로 그린다 */
+export type ReviewPanelStatus = 'loading' | 'missing' | 'ready' | 'failed' | 'blocked'
+
 /**
- * GET 404 + `PLAN_015`. **재시도 버튼이 없는 갈래다.**
+ * 후기 조회 결과를 절의 갈래로 바꾼다 (#979).
  *
- * 같은 404 라도 `PLAN_001`(없는·남의 일정)은 상세가 이미 가른다. 후기 절이 보는
- * "아직 안 썼다" 는 이 코드 하나다.
+ * **"아직 안 썼다" 는 성공 + `null` 이다** — 서버가 200 + `dataBody: null` 로 답한다
+ * (예전에는 404 `PLAN_015` 였다). 그래서 `missing` 은 오류가 아니라 데이터로 가른다.
+ * 오류는 전부 오류다: 5xx · 무응답은 재시도(`failed`), 그 밖(404 `PLAN_001` 등)은 서버
+ * 문구만(`blocked`). **404 를 빈 상태로 접지 않는다** — 없는 일정에 쓰기 CTA 를 주게 된다.
+ *
+ * 오류가 이전 성공 값보다 앞선다. 재조회가 실패하면 캐시된 값이 남아 있어도 실패를 보인다.
  */
-export function isReviewMissing(error: unknown): boolean {
-  return (
-    error instanceof ApiError && error.status === 404 && error.resultCode === REVIEW_NOT_FOUND_CODE
-  )
+export function reviewPanelStatus(query: {
+  isPending: boolean
+  error: unknown
+  data: PlanReviewResponse | null | undefined
+}): ReviewPanelStatus {
+  if (query.isPending) return 'loading'
+  if (query.error !== null && query.error !== undefined) {
+    return isRetriable(query.error) ? 'failed' : 'blocked'
+  }
+  return query.data === null ? 'missing' : 'ready'
 }
 
 /** 작성·수정 폼의 장소 한 줄. 평점을 고르지 않으면 요청 `items` 에서 빠진다 */

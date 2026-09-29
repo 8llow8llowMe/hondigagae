@@ -10,10 +10,14 @@ import { FormAlert } from '@/components/form-alert'
 import { Modal } from '@/components/modal'
 import { Skeleton } from '@/components/skeleton'
 import { PLAN_QUERY_OPTIONS, planKeys } from '@/features/plan/queries'
-import { ApiError } from '@/lib/api/error'
 import { fetchPlanShareLink, issuePlanShareLink, revokePlanShareLink } from '@/lib/api/plan'
 import { messages } from '@/lib/messages'
-import { shareExpiryLabel, shareUrlOf } from '@/lib/plan/share-link'
+import {
+  shareExpiryLabel,
+  shareLoadErrorMessage,
+  shareUrlOf,
+  shouldRetryShareLinkQuery,
+} from '@/lib/plan/share-link'
 import type { PlanShareLink } from '@/types/plan'
 
 /** 복사됨 표시를 되돌리기까지 */
@@ -26,9 +30,10 @@ const COPIED_RESET_MS = 2000
  * `plan.status.code` 로 항목을 가르는 자리이기 때문이다 — 초안에는 항목 자체가 없다.
  * 그래서 이 컴포넌트는 `PLAN_022`(공유 불가) 갈래를 정상 흐름으로 다루지 않는다.
  *
- * **`GET` 의 404 는 오류가 아니다.** "한 번도 발급하지 않았거나 이미 폐기·만료됐다" 는
- * 뜻이고 어느 쪽이든 할 일은 같다 — 새로 만드는 것이다. `null` 로 접어 빈 상태를 그린다.
- * 이 갈래를 오류로 그리면 **처음 공유하는 사람이 전부 오류 화면을 본다.**
+ * **`GET` 의 `null` 은 오류가 아니다.** "한 번도 발급하지 않았거나 이미 폐기·만료됐다" 는
+ * 뜻이고 어느 쪽이든 할 일은 같다 — 새로 만드는 것이다. 서버가 200 + `dataBody: null` 로
+ * 답하고(#979) 빈 상태를 그린다. 이 갈래를 오류로 그리면 **처음 공유하는 사람이 전부 오류
+ * 화면을 본다.** 반대로 404(`PLAN_001`, 일정 없음)는 이제 오류 갈래다.
  *
  * **폐기에 확인 대화상자를 붙인다.** 되돌릴 수 없다 — 다시 발급하면 **다른 토큰**이
  * 나오고 이미 보낸 링크는 죽는다. 삭제와 같은 무게다.
@@ -62,18 +67,16 @@ export function PlanShareModal({
 
   const {
     data: link,
+    error,
     isPending,
     isError,
   } = useQuery({
     queryKey: planKeys.shareLink(planId),
-    queryFn: () =>
-      fetchPlanShareLink(planId).catch((error: unknown) => {
-        // 404 는 "아직 공유 중이 아니다" 다 — 오류 갈래로 보내지 않는다
-        if (error instanceof ApiError && error.kind === 'not-found') return null
-        throw error
-      }),
+    // 공유 중이 아니면 `null` 이다 (#979) — 404 를 잡아 접지 않는다. 일정이 없는 PLAN_001 은 오류다
+    queryFn: () => fetchPlanShareLink(planId),
     ...PLAN_QUERY_OPTIONS,
-    retry: 1,
+    // §7 "retry 1" 을 오류 종류를 보존한 채 — 5xx·무응답만 한 번 (`shouldRetryShareLinkQuery`)
+    retry: shouldRetryShareLinkQuery,
     enabled: open,
   })
 
@@ -147,6 +150,7 @@ export function PlanShareModal({
       >
         <PlanShareContent
           state={isPending ? 'loading' : isError ? 'error' : link ? 'shared' : 'idle'}
+          errorMessage={shareLoadErrorMessage(error)}
           url={url}
           expiry={expiry}
           issuing={issue.isPending}
@@ -180,6 +184,8 @@ export type PlanShareState = 'loading' | 'error' | 'idle' | 'shared'
 
 export type PlanShareContentProps = {
   state: PlanShareState
+  /** `error` 갈래의 문구. 5xx 는 일시 장애 문구, 404 `PLAN_001` 등은 서버 문구다 */
+  errorMessage: string
   /** 공유 중인데 `null` 이면 아직 `origin` 을 못 읽은 첫 렌더다 — 복사를 잠근다 */
   url: string | null
   expiry: string | null
@@ -201,6 +207,7 @@ export type PlanShareContentProps = {
  */
 export function PlanShareContent({
   state,
+  errorMessage,
   url,
   expiry,
   issuing,
@@ -211,7 +218,7 @@ export function PlanShareContent({
   onRevoke,
 }: PlanShareContentProps) {
   if (state === 'loading') return <Skeleton className="h-24 w-full" />
-  if (state === 'error') return <FormAlert message={messages.plan.shareLoadError} />
+  if (state === 'error') return <FormAlert message={errorMessage} />
 
   if (state === 'idle') {
     return (

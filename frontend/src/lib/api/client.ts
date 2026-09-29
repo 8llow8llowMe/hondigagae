@@ -1,5 +1,5 @@
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
-import { unwrap, unwrapVoid } from '@/lib/api/response'
+import { unwrap, unwrapNullable, unwrapVoid } from '@/lib/api/response'
 import type { ApiResponse } from '@/types/api'
 
 /**
@@ -42,7 +42,7 @@ export type FormRequestOptions = {
   signal?: AbortSignal
 }
 
-/** 전송만 담당한다. 래퍼 판별은 호출부(clientFetch / clientFetchVoid)가 한다 */
+/** 전송만 담당한다. 래퍼 판별은 호출부(clientFetch / clientFetchNullable / clientFetchVoid)가 한다 */
 async function request(
   path: string,
   options: RequestOptions,
@@ -78,6 +78,22 @@ async function request(
 export async function clientFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { payload, status } = await request(path, options)
   return unwrap(payload as ApiResponse<T>, status)
+}
+
+/**
+ * 선택적 하위 리소스 조회용 (#979). **200 + `dataBody: null` 을 `null` 로 돌려준다.**
+ *
+ * "아직 없음" 이 정상 상태인 GET 만 쓴다 — 공유 링크 · 후기. 실패 판별은 `clientFetch` 와
+ * 같아서 일정이 없는 `PLAN_001` 404 는 그대로 `ApiError` 다 (`unwrapNullable`).
+ *
+ * 서버 쪽(`serverFetch`) 대응은 두지 않는다. 두 GET 은 클라이언트 컴포넌트에서만 부른다.
+ */
+export async function clientFetchNullable<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T | null> {
+  const { payload, status } = await request(path, options)
+  return unwrapNullable(payload as ApiResponse<T>, status)
 }
 
 /**

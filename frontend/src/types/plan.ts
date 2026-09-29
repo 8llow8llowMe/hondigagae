@@ -980,7 +980,10 @@ export type PlanReviewItemPayload = {
   comment: string | null
 }
 
-/** 후기가 없다 (`PlanErrorCode.REVIEW_NOT_FOUND`) */
+/**
+ * 수정할 후기가 없다 (`PlanErrorCode.REVIEW_NOT_FOUND`) — **`PUT` 에서만 온다.** 조회 `GET` 은
+ * 후기가 없으면 200 + `dataBody: null` 이다 (#979).
+ */
 export const REVIEW_NOT_FOUND_CODE = 'PLAN_015'
 
 /** 완료가 아닌 일정에 후기를 읽거나 쓴다 (`PlanErrorCode.REVIEW_PLAN_NOT_COMPLETED`) */
@@ -1074,7 +1077,11 @@ export type SharedPlanItem = {
 /** 공유할 수 없는 상태다 — 초안 (`PlanErrorCode.SHARE_PLAN_NOT_SHAREABLE`) */
 export const SHARE_PLAN_NOT_SHAREABLE_CODE = 'PLAN_022'
 
-/** 없거나 폐기된 링크 (`PlanErrorCode.SHARE_LINK_NOT_FOUND`) */
+/**
+ * 없거나 폐기된 링크 (`PlanErrorCode.SHARE_LINK_NOT_FOUND`) — **공개 열람
+ * `GET /shared-plans/{token}` 에서만 온다.** 소유자 `GET /plans/{planId}/share-link` 는
+ * 링크가 없으면 200 + `dataBody: null` 이다 (#979).
+ */
 export const SHARE_LINK_NOT_FOUND_CODE = 'PLAN_023'
 
 /** 만료된 링크 (`PlanErrorCode.SHARE_LINK_EXPIRED`) — 404 가 아니라 410 이다 */

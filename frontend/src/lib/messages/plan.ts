@@ -991,7 +991,7 @@ export const planMessages = {
   reviewHeading: '여행 후기',
   /**
    * 완료했는데 아직 안 쓴 상태. **재시도가 아니라 다음 행동** 이다 —
-   * 404 `PLAN_015` 는 데이터 부재다.
+   * 조회가 200 + `dataBody: null` 로 답한 데이터 부재다 (#979).
    */
   reviewEmptyTitle: '아직 후기가 없어요',
   reviewEmptyDescription: '다녀온 여행이 어땠는지 남겨 두면 다음에 일정을 고를 때 도움이 돼요.',
@@ -1033,6 +1033,11 @@ export const planMessages = {
   shareIssueAction: '링크 만들기',
   shareIssueError: '링크를 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
   shareLoadError: '공유 링크를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+  /**
+   * 서버 문구가 없는 4xx(래퍼 없는 게이트웨이 404·403 등)의 폴백 (#979). **재시도를 권하지
+   * 않는다** — 다시 불러도 결과가 같다. 5xx·무응답은 위 `shareLoadError` 다.
+   */
+  shareLoadFailed: '공유 링크를 불러오지 못했어요.',
   shareLinkFieldLabel: '공유 링크 주소',
   shareCopyAction: '복사',
   shareCopiedLabel: '복사됨',

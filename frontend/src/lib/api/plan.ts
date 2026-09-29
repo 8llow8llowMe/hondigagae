@@ -1,4 +1,4 @@
-import { clientFetch, clientFetchVoid } from '@/lib/api/client'
+import { clientFetch, clientFetchNullable, clientFetchVoid } from '@/lib/api/client'
 import { paths } from '@/lib/api/paths'
 import type { SliceResponse } from '@/types/api'
 import type { PlanEmergencyResponse } from '@/types/emergency'
@@ -275,15 +275,14 @@ export function setPackingItemChecked(
 // ─── 여행 후기 (#614 BE · #615 FE) ───────────────────────────────────────────
 
 /**
- * 내 후기 조회.
+ * 내 후기 조회. **후기를 아직 쓰지 않았으면 `null` 이다** — 서버가 404 가 아니라
+ * 200 + `dataBody: null` 로 답한다 (#979). 호출부는 `null` 을 빈 상태(쓰기 CTA)로 그린다.
  *
- * **완료 일정에서만 부른다.** 초안·확정은 `PLAN_016`(400) 이고, 후기가 없으면
- * `PLAN_015`(404) 다. 404 는 데이터 부재라 재시도 버튼이 없다.
- *
- * 응답이 있으면 `setQueryData` 로 캐시에 두고, 없으면 빈 상태(쓰기 CTA)로 간다.
+ * 일정이 없거나 남의 것이면 `PLAN_001`(404) 로 **던진다** — null 과 섞지 않는다.
+ * 화면은 완료 일정에서만 이 절을 그린다.
  */
-export function fetchPlanReview(planId: string): Promise<PlanReviewResponse> {
-  return clientFetch<PlanReviewResponse>(paths.plans.reviews(planId))
+export function fetchPlanReview(planId: string): Promise<PlanReviewResponse | null> {
+  return clientFetchNullable<PlanReviewResponse>(paths.plans.reviews(planId))
 }
 
 /**
@@ -319,14 +318,15 @@ export function updatePlanReview(
 // ─── 공유 링크 (#628) ─────────────────────────────────────────────────────────
 
 /**
- * 현재 유효한 공유 링크.
+ * 현재 유효한 공유 링크. **없으면 `null` 이다** — "한 번도 발급하지 않았거나 이미
+ * 폐기·만료됐다" 를 서버가 200 + `dataBody: null` 로 답한다 (#979). 어느 쪽이든 할 일은
+ * 같다 — 새로 발급하는 것이다. 호출부는 `null` 을 "아직 공유 중이 아니다" 로 그린다.
  *
- * **404(`PLAN_023`)는 오류가 아니다.** "한 번도 발급하지 않았거나 이미 폐기·만료됐다"
- * 는 뜻이고 어느 쪽이든 할 일은 같다 — 새로 발급하는 것이다. 호출부는 404 를 잡아
- * `null`("아직 공유 중이 아니다")로 접고 빈 상태를 그린다.
+ * 일정이 없거나 남의 것이면 `PLAN_001`(404) 로 **던진다.** 예전에는 호출부가 404 를
+ * 통째로 `null` 로 접어 이 갈래까지 "공유 중이 아님" 으로 보였다.
  */
-export function fetchPlanShareLink(planId: string): Promise<PlanShareLink> {
-  return clientFetch<PlanShareLink>(paths.plans.shareLink(planId))
+export function fetchPlanShareLink(planId: string): Promise<PlanShareLink | null> {
+  return clientFetchNullable<PlanShareLink>(paths.plans.shareLink(planId))
 }
 
 /**

@@ -10,12 +10,13 @@ import { messages } from '@/lib/messages'
  * 발급 모달 본문의 네 갈래 (#628).
  *
  * **가장 중요한 것은 `idle` 이 오류가 아니라는 것**이다. 서버는 "한 번도 발급하지
- * 않았다" 를 `PLAN_023` 404 로 답하는데, 그것을 오류 갈래로 그리면 **처음 공유하는
- * 사람이 전부 오류 화면을 본다.**
+ * 않았다" 를 200 + `dataBody: null` 로 답하는데(#979 — 예전에는 `PLAN_023` 404), 그것을
+ * 오류 갈래로 그리면 **처음 공유하는 사람이 전부 오류 화면을 본다.**
  */
 function render(overrides: Partial<PlanShareContentProps> = {}): string {
   const props: PlanShareContentProps = {
     state: 'idle',
+    errorMessage: messages.plan.shareLoadError,
     url: null,
     expiry: null,
     issuing: false,
@@ -99,6 +100,18 @@ describe('공유 모달 — 불러오기 실패', () => {
     const html = render({ state: 'error' })
 
     expect(html).toContain(messages.plan.shareLoadError)
+    expect(html).not.toContain(messages.plan.shareIssueAction)
+  })
+
+  /*
+    일정이 없는 404 `PLAN_001` 은 이제 오류 갈래로 온다(#979). "링크 만들기" 를 그리면
+    없는 일정에 발급을 시도하게 되고, 일시 장애 문구를 쓰면 재시도할 것이 없는데 권한다.
+  */
+  it('404 는 서버 문구를 그대로 보이고 링크 만들기를 그리지 않는다', () => {
+    const html = render({ state: 'error', errorMessage: '존재하지 않는 여행 일정입니다.' })
+
+    expect(html).toContain('존재하지 않는 여행 일정입니다.')
+    expect(html).not.toContain(messages.plan.shareLoadError)
     expect(html).not.toContain(messages.plan.shareIssueAction)
   })
 })

@@ -53,7 +53,7 @@ describe('PlanReviewPanel — 완료가 아닌 일정 진입점은 호출부가 
   })
 })
 
-describe('PlanReviewPanel — 404 는 빈 상태다', () => {
+describe('PlanReviewPanel — 후기가 없으면(200 + null, #979) 빈 상태다', () => {
   it('후기가 없으면 쓰기 CTA 를 주고 재시도 버튼을 달지 않는다', () => {
     const markup = render({ status: 'missing', mode: 'view' })
 
@@ -103,6 +103,19 @@ describe('PlanReviewPanel — 조회 실패', () => {
     expect(markup).toContain('완료된 일정만 후기를 쓰거나 볼 수 있습니다.')
     expect(markup).not.toContain(messages.common.retry)
     expect(markup).not.toContain(messages.plan.reviewWriteAction)
+  })
+
+  /*
+    404 는 이제 "아직 안 썼다" 가 아니다(#979) — 일정이 없거나 남의 것(`PLAN_001`)이다.
+    빈 상태로 접어 쓰기 CTA 를 주면 없는 일정에 후기를 쓰게 된다.
+  */
+  it('404 PLAN_001 은 빈 상태가 아니다 — 서버 문구만, 쓰기 CTA · 재시도 없음', () => {
+    const markup = render({ status: 'blocked', errorMessage: '존재하지 않는 여행 일정입니다.' })
+
+    expect(markup).toContain('존재하지 않는 여행 일정입니다.')
+    expect(markup).not.toContain(messages.plan.reviewEmptyTitle)
+    expect(markup).not.toContain(messages.plan.reviewWriteAction)
+    expect(markup).not.toContain(messages.common.retry)
   })
 })
 

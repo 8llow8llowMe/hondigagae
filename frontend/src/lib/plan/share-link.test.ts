@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { isShareablePlan, shareExpiryLabel, shareUrlOf } from '@/lib/plan/share-link'
+import { ApiError } from '@/lib/api/error'
+import { messages } from '@/lib/messages'
+import {
+  isShareablePlan,
+  shareExpiryLabel,
+  shareLoadErrorMessage,
+  shareUrlOf,
+  shouldRetryShareLinkQuery,
+} from '@/lib/plan/share-link'
 
 /**
  * 공유 링크의 순수 규칙을 잠근다 (#628).
@@ -92,5 +100,60 @@ describe('만료 안내 (shareExpiryLabel)', () => {
   it('날짜를 못 읽으면 아무 말도 하지 않는다 — 틀린 날짜는 없는 날짜보다 나쁘다', () => {
     expect(shareExpiryLabel('어제', now)).toBeNull()
     expect(shareExpiryLabel('', now)).toBeNull()
+  })
+})
+
+/**
+ * 발급 모달의 조회 실패 문구 (#979).
+ *
+ * "공유 중이 아님" 은 이제 200 + null 이라 여기 오지 않는다. 대신 **404 `PLAN_001`(일정
+ * 없음)이 오류 갈래로 들어온다** — 예전에는 404 를 통째로 null 로 접어 가려졌다. 404 에
+ * "잠시 후 다시 시도해 주세요" 를 말하면 재시도할 것이 없는데 재시도를 권하게 된다.
+ */
+describe('발급 모달 조회 실패 문구 (shareLoadErrorMessage)', () => {
+  it('5xx 는 일시 장애 문구다', () => {
+    expect(shareLoadErrorMessage(new ApiError(503, null, null))).toBe(messages.plan.shareLoadError)
+  })
+
+  it('무응답도 일시 장애 문구다', () => {
+    expect(shareLoadErrorMessage(new TypeError('Failed to fetch'))).toBe(
+      messages.plan.shareLoadError,
+    )
+  })
+
+  it('404 PLAN_001 은 서버 문구를 그대로 쓴다', () => {
+    expect(
+      shareLoadErrorMessage(new ApiError(404, 'PLAN_001', '존재하지 않는 여행 일정입니다.')),
+    ).toBe('존재하지 않는 여행 일정입니다.')
+  })
+
+  /* 래퍼 없는 게이트웨이 404·403 — 재시도를 권하지 않는 폴백이어야 한다 */
+  it('서버 문구가 없는 4xx 는 재시도를 권하지 않는 폴백 문구다', () => {
+    for (const status of [404, 403]) {
+      const message = shareLoadErrorMessage(new ApiError(status, null, null))
+      expect(message).toBe(messages.plan.shareLoadFailed)
+      expect(message).not.toContain('다시 시도')
+    }
+  })
+})
+
+/**
+ * 발급 모달 조회의 재시도 (#979). §7 일정 행의 "retry 1" 을 **오류 종류를 보존한 채**
+ * 구현한다 — 숫자 `retry: 1` 은 404 `PLAN_001` 까지 한 번 더 부른다.
+ */
+describe('발급 모달 조회 재시도 (shouldRetryShareLinkQuery)', () => {
+  it('404 PLAN_001 은 재시도하지 않는다', () => {
+    expect(
+      shouldRetryShareLinkQuery(0, new ApiError(404, 'PLAN_001', '존재하지 않는 여행 일정입니다.')),
+    ).toBe(false)
+  })
+
+  it('503 은 첫 실패에만 한 번 재시도한다', () => {
+    expect(shouldRetryShareLinkQuery(0, new ApiError(503, null, null))).toBe(true)
+    expect(shouldRetryShareLinkQuery(1, new ApiError(503, null, null))).toBe(false)
+  })
+
+  it('무응답은 첫 실패에 재시도한다', () => {
+    expect(shouldRetryShareLinkQuery(0, new TypeError('Failed to fetch'))).toBe(true)
   })
 })

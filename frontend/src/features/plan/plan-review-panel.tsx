@@ -12,14 +12,14 @@ import { FormAlert } from '@/components/form-alert'
 import { Skeleton } from '@/components/skeleton'
 import { Textarea } from '@/components/textarea'
 import { PLAN_QUERY_OPTIONS, planKeys } from '@/features/plan/queries'
-import { shouldOfferRetry } from '@/lib/api/error'
 import { createPlanReview, fetchPlanReview, updatePlanReview } from '@/lib/api/plan'
 import { messages } from '@/lib/messages'
 import {
-  isReviewMissing,
   mergeReviewFormPlaces,
   reviewablePlaceItems,
   type ReviewFieldErrors,
+  type ReviewPanelStatus,
+  reviewPanelStatus,
   type ReviewPlaceDraft,
   reviewSubmitErrorMessage,
   toReviewUpsertPayload,
@@ -42,7 +42,8 @@ const RATING_SCORES = Array.from(
 
 /**
  * 여행 후기 (#615). **완료 일정에서만 마운트한다** — 초안·확정은 호출부가 절 자체를
- * 그리지 않는다. GET 은 상세와 key 가 달라 후기 404 가 본문을 덮지 않는다.
+ * 그리지 않는다. GET 은 상세와 key 가 달라 후기 조회 실패가 본문을 덮지 않는다.
+ * 후기가 없으면 GET 이 200 + `null` 이다 (#979).
  */
 export function PlanReviewList({ plan }: { plan: PlanDetail }) {
   const queryClient = useQueryClient()
@@ -76,15 +77,8 @@ export function PlanReviewList({ plan }: { plan: PlanDetail }) {
       setSubmitError(reviewSubmitErrorMessage(error, messages.plan.reviewSaveError)),
   })
 
-  const missing = isReviewMissing(query.error)
-  const retryable = query.isError && !missing && shouldOfferRetry(query.error)
-  const blocked = query.isError && !missing && !retryable
-
-  let status: PlanReviewPanelProps['status'] = 'ready'
-  if (query.isPending) status = 'loading'
-  else if (missing) status = 'missing'
-  else if (retryable) status = 'failed'
-  else if (blocked) status = 'blocked'
+  // 후기가 없으면 `data === null` 이다 (#979) — 404 로 오지 않는다
+  const status = reviewPanelStatus(query)
 
   const review = query.data ?? null
   const places =
@@ -125,7 +119,7 @@ export function PlanReviewList({ plan }: { plan: PlanDetail }) {
 }
 
 export type PlanReviewPanelProps = {
-  status: 'loading' | 'missing' | 'ready' | 'failed' | 'blocked'
+  status: ReviewPanelStatus
   review: PlanReviewResponse | null
   places: ReviewPlaceDraft[]
   mode: 'view' | 'write'
@@ -183,8 +177,8 @@ function Body(props: PlanReviewPanelProps) {
   if (status === 'loading') return <PanelSkeleton />
 
   /*
-    일시 장애만 재시도. 404 `PLAN_015` 는 아래 missing 으로 가고,
-    PLAN_016 같은 4xx 는 서버 문구만 보여 준다.
+    일시 장애만 재시도. "아직 안 썼다" 는 오류가 아니라 성공 + null 이라 아래 missing 으로
+    가고(#979), 404 `PLAN_001` 같은 그 밖의 실패는 서버 문구만 보여 준다.
   */
   if (status === 'failed') {
     return (
