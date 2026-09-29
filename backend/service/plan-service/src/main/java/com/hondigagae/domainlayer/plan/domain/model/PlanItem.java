@@ -21,4 +21,9 @@ public record PlanItem(
     public PlanItem withVisited(boolean visited) {
         return toBuilder().visited(visited).build();
     }
+
+    /** 시작 시각만 바꾼다. null 이면 비운다. 아이디 · 방문 체크 · 순서는 그대로다 (#1030). */
+    public PlanItem withStartTime(LocalTime startTime) {
+        return toBuilder().startTime(startTime).build();
+    }
 }

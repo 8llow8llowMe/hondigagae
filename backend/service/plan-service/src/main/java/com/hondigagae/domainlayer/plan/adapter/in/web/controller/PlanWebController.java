@@ -6,6 +6,7 @@ import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanCopyReques
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanCreateRequest;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanDayItemsReplaceRequest;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanUpdateRequest;
+import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanItemStartTimeRequest;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.request.PlanItemVisitedRequest;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanBriefingResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.web.dto.response.PlanDetailResponse;
@@ -246,6 +247,30 @@ public class PlanWebController {
         @Valid @RequestBody PlanItemVisitedRequest request
     ) {
         planWebUseCase.markItemVisited(loginActive.memberId(), planId, planItemId, request.visited());
+        return ResponseEntity.ok().body(Response.success());
+    }
+
+    @Operation(summary = "일정 항목 시작 시각 수정",
+        description = "항목 하나의 시작 시각만 고칩니다. 일자별 항목 일괄 교체와 달리 **항목을 그 자리에서 고치므로 "
+            + "planItemId 와 방문 체크(visited)가 그대로 남습니다.** 순서(sequence)·이름·메모 등 다른 필드는 바뀌지 않습니다. "
+            + "startTime 을 null 로 보내거나 필드를 빼면(`{}`) 시각을 비웁니다. 바디 자체는 필수라 비워 보내면 400 입니다. "
+            + "순서와 시각이 어긋나도 막지 않습니다(일괄 교체와 같음). "
+            + "내 일정이 아니면 PLAN_001, 이 일정의 항목이 아니면 PLAN_005 입니다.\n\n"
+            + "**필수: planId, planItemId (경로), JSON 바디.** 바디의 startTime 필드는 선택입니다.\n\n"
+            + "호출 예\n"
+            + "- 10시 30분으로: `PUT /api/v1/plans/1234567890123456789/items/1234567890123456789/start-time` `{\"startTime\":\"10:30:00\"}`\n"
+            + "- 시각 비우기: 같은 URL 에 `{\"startTime\":null}`",
+        security = {@SecurityRequirement(name = "bearerAuth")})
+    @PutMapping("/{planId}/items/{planItemId}/start-time")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Response<Void>> changeItemStartTime(
+        @AuthenticationPrincipal MemberLoginActive loginActive,
+        @Parameter(description = "[필수] 일정 아이디. Snowflake 숫자라 환경(dev/prod)마다 다르고 예시 값은 형식 안내용입니다. 실제 값은 일정 목록 응답의 planId 를 그대로 씁니다", required = true, example = "1234567890123456789") @PathVariable long planId,
+        @Parameter(description = "[필수] 일정 항목 아이디. Snowflake 라 환경마다 다르고 예시 값은 형식 안내용입니다. "
+            + "실제 값은 일정 상세 응답 items 의 planItemId 를 씁니다", required = true, example = "1234567890123456789") @PathVariable long planItemId,
+        @Valid @RequestBody PlanItemStartTimeRequest request
+    ) {
+        planWebUseCase.changeItemStartTime(loginActive.memberId(), planId, planItemId, request.startTime());
         return ResponseEntity.ok().body(Response.success());
     }
 

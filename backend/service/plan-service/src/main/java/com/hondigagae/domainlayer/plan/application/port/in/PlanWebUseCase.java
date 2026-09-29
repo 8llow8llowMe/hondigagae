@@ -12,6 +12,7 @@ import com.hondigagae.domainlayer.plan.application.command.PlanItemCommand;
 import com.hondigagae.domainlayer.plan.application.command.PlanUpdateCommand;
 import com.hondigagae.persistence.dto.SliceResponse;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 public interface PlanWebUseCase {
@@ -37,6 +38,9 @@ public interface PlanWebUseCase {
     PlanDetailResponse replaceDayItems(long memberId, long planId, int day, List<PlanItemCommand> commands);
 
     void markItemVisited(long memberId, long planId, long planItemId, boolean visited);
+
+    /** 항목 하나의 시작 시각을 바꾼다. 방문 체크와 항목 아이디는 보존된다. null 이면 비운다 (#1030). */
+    void changeItemStartTime(long memberId, long planId, long planItemId, LocalTime startTime);
 
     PlanEmergencyResponse getPlanEmergencyBriefing(long memberId, long planId);
 
