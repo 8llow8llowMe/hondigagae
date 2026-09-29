@@ -346,9 +346,14 @@ mutation 후 무효화 대상을 **명세와 코드 양쪽에 명시한다.**
 | **항목 방문 체크**           | `planKeys.detail(planId)` (**판정은 무효화하지 않는다** — 아래)                      |
 | 반려견 등록/수정/삭제        | `petKeys.all`                                                                        |
 | 프로필 수정 / 이미지 변경    | `memberKeys.me()`                                                                    |
-| **AI 일정 → 일정 확정 저장** | `planKeys.all` (ai job은 무효화하지 않는다 — 완료된 작업이다)                        |
+| **AI 일정 → 일정 확정 저장** | `planKeys.all` + `aiPlanKeys.job(jobId)` (작업이 담은 일정을 싣는다 — #1041, 아래)   |
 | **여행 후기 작성·수정**      | `planKeys.review(planId)` (목록에는 `hasReview` 가 없어 목록 key 를 건드리지 않는다) |
 
+- **AI 작업도 담기 · 일정 삭제 뒤에 갱신한다** (#1041). 작업 조회가 `committedPlanId`(담은 일정)를
+  실으면서 "완료된 작업이라 무효화하지 않는다" 가 틀리게 됐다. 담기는 `aiPlanKeys.job(jobId)` 를
+  무효화하고, 일정 삭제는 `PlanDetail.sourceAiJobId` 가 있으면 그 작업 캐시를 **제거**한다
+  (그 화면이 떠 있지 않다). 값을 `setQueryData` 로 지어 넣지 않는다 — 정본은 plan-service 다
+  (`features/ai-plan/공통명세.md` S5-1).
 - **낙관적 업데이트(optimistic update)는 기본으로 쓰지 않는다.** 백엔드 검증(장소 존재 여부 Feign 확인, 반려견 등록 상한)이 실패할 수 있어 롤백이 잦다. 필요한 화면에서만 명세에 근거를 적고 쓴다.
 - 일자 항목은 **일괄 교체**라 부분 무효화가 의미 없다. `planKeys.detail(planId)` 전체를 무효화한다.
 - **방문 체크는 판정(`planKeys.weather`)을 무효화하지 않는다.** 그날 판정은 **첫 장소 항목** 기준인데

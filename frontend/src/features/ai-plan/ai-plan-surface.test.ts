@@ -246,10 +246,12 @@ describe('/ai-plans/jobs/[jobId] — 여섯 상태가 한 카드에 든다 (#473
   /*
     404 · 조회 오류 · 대기 · 작업 실패 · 취소 · 빈 초안. 완료만 `bare` 로 빠진다
     (초안 개요·일자 카드를 스스로 그리고 담기 패널은 카드 밖 L0 이다).
+
+    완료는 셋이다 — 이미 담음(#1041) · 조건 상실 · 담기.
   */
-  it('여섯 상태가 껍데기를 거치고 완료 둘만 bare 다', () => {
+  it('여섯 상태가 껍데기를 거치고 완료 셋만 bare 다', () => {
     expect(jobView.match(/<AiPlanJobShell>/g)).toHaveLength(6)
-    expect(jobView.match(/<AiPlanJobShell bare>/g)).toHaveLength(2)
+    expect(jobView.match(/<AiPlanJobShell bare>/g)).toHaveLength(3)
   })
 
   /*
@@ -309,6 +311,17 @@ describe('완료 — 담기 패널은 카드 밖 L0 다 (#473)', () => {
     3a 에서는 카드 사이 틈으로 비치는 L0 이 그 일을 하고, 선을 남기면 마지막 일자 카드의
     테두리와 나란히 두 줄로 읽힌다.
   */
+  /* 이미 담은 작업(#1041)도 담기 패널이 서던 자리에 같은 배치로 선다 */
+  it('이미 담은 패널도 미리보기와 나란히 스택의 직접 자식이다', () => {
+    const bareBlock = jobView.slice(
+      jobView.indexOf('<AiPlanJobShell bare>'),
+      jobView.indexOf('</AiPlanJobShell>', jobView.indexOf('<AiPlanJobShell bare>')),
+    )
+
+    expect(bareBlock).toContain('<AiPlanDraftPreview')
+    expect(bareBlock).toContain('<AiPlanCommittedPanel')
+  })
+
   it('담기 패널이 카드도 구분선도 갖지 않고 인셋만 카드 축이다', () => {
     expect(commitPanel).not.toMatch(/<Surface[\s/>]/)
     expect(commitPanel).not.toContain('border-t')

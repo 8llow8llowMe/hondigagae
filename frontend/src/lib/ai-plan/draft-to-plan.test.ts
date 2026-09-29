@@ -17,6 +17,9 @@ function draft(days: AiPlanDraft['days']): AiPlanDraft {
   return aiPlanDraft(days)
 }
 
+/** 담는 작업의 `jobId` — 백엔드 `UUID.randomUUID()` 모양 */
+const JOB_ID = '8a64f9c0-2f1e-4c1a-9c3e-000000000001'
+
 function payload(
   days: AiPlanDraft['days'],
   extra: { excludedPlaceIds?: Set<string>; totalDays?: number; sigunguCode?: string } = {},
@@ -24,6 +27,7 @@ function payload(
   const { sigunguCode, ...options } = extra
 
   return draftToPlanPayload({
+    jobId: JOB_ID,
     draft: draft(days),
     snapshot: sigunguCode === undefined ? snapshot : { ...snapshot, sigunguCode },
     title: '몽실이와 제주 2박 3일',
@@ -45,12 +49,24 @@ describe('draftToPlanPayload — 일정 본문은 입력 조건에서 온다', (
 
   it('예산이 없으면 키 자체를 뺀다', () => {
     const result = draftToPlanPayload({
+      jobId: JOB_ID,
       draft: draft([{ day: 1, items: [item()] }]),
       snapshot: { ...snapshot, budget: null },
       title: '제주 2박 3일',
     })
 
     expect('budget' in result).toBe(false)
+  })
+})
+
+describe('draftToPlanPayload — 담기 멱등 키 (#1041)', () => {
+  /*
+    **같은 초안을 두 번 담아도 일정이 하나다.** 서버가 `sourceAiJobId` 로 먼저 담긴 일정을 찾아
+    200 으로 돌려준다(plan-service "AI 초안 담기 멱등"). 싣지 않으면 다시 누름·새로고침 뒤
+    재시도·다른 기기에서 담기가 전부 새 일정을 만든다.
+  */
+  it('작업의 jobId 를 가공하지 않고 sourceAiJobId 로 싣는다', () => {
+    expect(payload([{ day: 1, items: [item()] }]).sourceAiJobId).toBe(JOB_ID)
   })
 })
 
@@ -288,6 +304,7 @@ describe('draftToPlanPayload — 판정 기준 반려견 (#128 · 명세 D4)', (
   */
   it('동반한 아이를 전부 싣고 순서를 지킨다', () => {
     const result = draftToPlanPayload({
+      jobId: JOB_ID,
       draft: draft([{ day: 1, items: [item()] }]),
       snapshot: twoPets,
       title: '제주 2박 3일',
@@ -303,6 +320,7 @@ describe('draftToPlanPayload — 판정 기준 반려견 (#128 · 명세 D4)', (
   */
   it('무시될 petId 를 함께 보내지 않는다', () => {
     const result = draftToPlanPayload({
+      jobId: JOB_ID,
       draft: draft([{ day: 1, items: [item()] }]),
       snapshot: twoPets,
       title: '제주 2박 3일',

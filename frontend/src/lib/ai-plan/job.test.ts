@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  committedPlanIdOf,
   isJobCanceled,
   isJobCompleted,
   isJobFailed,
@@ -211,5 +212,38 @@ describe('JOB_STREAM_SAFETY_POLL_MS', () => {
   /** 백엔드 하트비트(25초)보다 길어야 정상 구독을 불필요하게 두드리지 않는다 */
   it('백엔드 하트비트 주기보다 길다', () => {
     expect(JOB_STREAM_SAFETY_POLL_MS).toBeGreaterThanOrEqual(25_000)
+  })
+})
+
+describe('committedPlanIdOf — 이미 담은 작업 (#1041)', () => {
+  const COMPLETED = { status: 'COMPLETED' }
+
+  it('완료된 작업이 담은 일정 아이디를 싣고 오면 그대로 돌려준다', () => {
+    expect(committedPlanIdOf({ ...COMPLETED, committedPlanId: '223456789012000009' })).toBe(
+      '223456789012000009',
+    )
+  })
+
+  /** 담기 전 · 담은 일정을 지운 뒤 · plan-service 조회 실패 — 셋 다 null 로 온다 */
+  it('null 이면 담기 전이다', () => {
+    expect(committedPlanIdOf({ ...COMPLETED, committedPlanId: null })).toBeNull()
+  })
+
+  /*
+    **필드를 모르는 서버가 붙어 있을 수 있다.** SSE 프레임은 `parseJobEvent` 가 모양을
+    검사하지 않고 통과시키므로 `undefined` 가 온다 — `/plans/undefined` 로 보내면 안 된다.
+  */
+  it('필드가 없거나 문자열이 아니면 담기 전으로 본다', () => {
+    expect(committedPlanIdOf(COMPLETED)).toBeNull()
+    expect(committedPlanIdOf({ ...COMPLETED, committedPlanId: 223456789012000009 })).toBeNull()
+    expect(committedPlanIdOf({ ...COMPLETED, committedPlanId: '' })).toBeNull()
+    expect(committedPlanIdOf(null)).toBeNull()
+  })
+
+  /** 계약상 완료에서만 채워진다. 초안이 없는 상태에서 "이미 담았다" 고 말하지 않는다 */
+  it('완료가 아니면 값이 있어도 담기 전으로 본다', () => {
+    expect(
+      committedPlanIdOf({ status: 'RUNNING', committedPlanId: '223456789012000009' }),
+    ).toBeNull()
   })
 })

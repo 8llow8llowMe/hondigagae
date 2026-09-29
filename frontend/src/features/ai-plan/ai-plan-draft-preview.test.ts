@@ -48,6 +48,7 @@ function render(overrides: Partial<AiPlanDraftPreviewProps> = {}) {
     coords: EMPTY_COORDS,
     delistedPlaceIds: EMPTY_SET,
     excludedPlaceIds: EMPTY_SET,
+    committed: false,
     ...overrides,
   }
 
@@ -83,6 +84,14 @@ describe('AiPlanDraftPreview — 요약 (아트보드 03)', () => {
 
   it('저장 전임을 반복해 말한다 — 담기가 곧 저장이다', () => {
     expect(render()).toContain(messages.aiPlan.previewNotSaved)
+  })
+
+  /** 담은 뒤 돌아온 화면이 "아직 저장되지 않았어요" 라고 하면 사용자는 다시 담는다 (#1041) */
+  it('이미 담은 초안이면 저장 전이라고 말하지 않는다', () => {
+    const html = render({ committed: true })
+
+    expect(html).toContain(messages.aiPlan.previewCommitted)
+    expect(html).not.toContain(messages.aiPlan.previewNotSaved)
   })
 })
 

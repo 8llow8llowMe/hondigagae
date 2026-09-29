@@ -93,6 +93,26 @@ export function jobStepProgress(
   return { order, total }
 }
 
+/**
+ * 이 작업의 초안을 이미 담은 일정 아이디 (#1041 · 백엔드 #970). **없으면 null — 담기 전이다.**
+ *
+ * 서버는 `COMPLETED` 이고 담은 적이 있을 때만 채운다. 담기 전 · **담은 일정을 지운 뒤** ·
+ * plan-service 조회 실패는 전부 null 이라 화면이 가를 수 없고, 가를 필요도 없다 — 담기의
+ * 멱등 키가 plan-service 에 있어 셋 중 어느 경우에 다시 담아도 일정이 겹치지 않는다.
+ *
+ * **값의 모양을 믿지 않는다.** SSE 프레임은 `parseJobEvent` 가 모양을 검사하지 않고
+ * 통과시키므로 필드를 모르는 서버가 붙으면 `undefined` 가 온다 — 그대로 쓰면 링크가
+ * `/plans/undefined` 가 된다 (`jobStepProgress` 와 같은 방어).
+ */
+export function committedPlanIdOf(
+  job: { status: StatusLike; committedPlanId?: unknown } | null | undefined,
+): string | null {
+  if (!isJobCompleted(job)) return null
+
+  const planId = job?.committedPlanId
+  return typeof planId === 'string' && planId !== '' ? planId : null
+}
+
 /** 폴링 간격(ms) — 아트보드 02 */
 export const JOB_POLL_INTERVAL_MS = 2000
 

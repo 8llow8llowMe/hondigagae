@@ -330,6 +330,11 @@ export const aiPlanMessages = {
   /** `{budget}` 치환 */
   previewBudget: '예산 {budget} 내',
   previewNotSaved: '아직 저장되지 않았어요',
+  /**
+   * 이미 담은 작업 (#1041). `previewNotSaved` 자리에 선다 — 서버가 `committedPlanId` 를 싣고
+   * 오면 "아직 저장되지 않았어요" 는 거짓이다.
+   */
+  previewCommitted: '내 일정에 담은 초안이에요',
 
   reasonsTitle: '이렇게 짰어요',
 
@@ -357,6 +362,16 @@ export const aiPlanMessages = {
   commitAgain: '전체 다시 만들기',
   commitDiscard: '버리기',
   commitHint: '담으면 초안으로 저장돼요. 저장한 뒤에 순서와 항목을 고칠 수 있어요.',
+
+  /**
+   * 이미 담은 작업 — 담기 버튼 대신 선다 (#1041 · 백엔드 #970).
+   *
+   * **"다시 담기" 를 주지 않는다.** 서버가 담기를 멱등으로 받아 눌러도 같은 일정이 열릴 뿐이라,
+   * 버튼이 "새로 저장" 처럼 읽히면 거짓말이 된다. 담은 일정을 지우면 서버가 값을 비워
+   * 담기 전 화면으로 돌아간다.
+   */
+  committedAction: '이미 담은 일정 보기',
+  committedHint: '순서와 항목은 담은 일정에서 고칠 수 있어요.',
 
   discardConfirmTitle: '초안을 버릴까요?',
   discardConfirmDescription: '담지 않은 초안은 다시 볼 수 없어요.',

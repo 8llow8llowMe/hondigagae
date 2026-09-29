@@ -24,6 +24,11 @@ function isPlanItemType(value: string): value is PlanItemTypeCode {
 }
 
 export type DraftToPlanOptions = {
+  /**
+   * 담는 작업의 `jobId`. **`sourceAiJobId` 로 그대로 싣는다** — 담기 멱등 키다 (#1041).
+   * 같은 작업을 다시 담으면 서버가 먼저 담긴 일정을 200 으로 돌려준다.
+   */
+  jobId: string
   draft: AiPlanDraft
   snapshot: AiPlanRequestSnapshot
   title: string
@@ -62,6 +67,7 @@ export type DraftToPlanOptions = {
  * 전체가 400** 이 되므로, 보낼 수 없는 항목은 담기 전에 걸러낸다.
  */
 export function draftToPlanPayload({
+  jobId,
   draft,
   snapshot,
   title,
@@ -92,6 +98,12 @@ export function draftToPlanPayload({
     endDate: snapshot.endDate,
     ...(snapshot.budget === null ? {} : { budget: snapshot.budget }),
     items: toDraftItems(draft, totalDays ?? null, excludedPlaceIds),
+    /*
+      **담기 멱등 키** (#1041 · 백엔드 #970). 이것이 없으면 다시 누름 · 새로고침 뒤 재시도 ·
+      다른 기기에서 담기가 전부 새 일정을 만든다. `jobId` 는 서버가 준 UUID 그대로라
+      가공하지 않는다 — 형식이 어긋나면 `PLAN_135` 400 이다.
+    */
+    sourceAiJobId: jobId,
   }
 }
 

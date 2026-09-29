@@ -39,6 +39,11 @@ export type AiPlanDraftPreviewProps = {
   delistedPlaceIds: ReadonlySet<string>
   /** 담기에서 빼기로 표시한 `placeId` */
   excludedPlaceIds: ReadonlySet<string>
+  /**
+   * 이 초안을 이미 담았는가 (#1041). 서버가 작업에 `committedPlanId` 를 실어 올 때만 참이다 —
+   * 그때 "아직 저장되지 않았어요" 는 거짓이라 문구를 바꾼다.
+   */
+  committed: boolean
 }
 
 /**
@@ -77,6 +82,7 @@ export function AiPlanDraftPreview({
   coords,
   delistedPlaceIds,
   excludedPlaceIds,
+  committed,
 }: AiPlanDraftPreviewProps) {
   const itemCount = draftItemCount(draft)
   const budgetLabel = formatBudget(budget)
@@ -149,8 +155,14 @@ export function AiPlanDraftPreview({
 
           <p className="text-caption text-fg-muted tabular-nums">{summary}</p>
 
-          {/* 저장 시점을 반복해 말한다 — 아트보드 03 주석 */}
-          <p className="text-caption text-fg-subtle">{messages.aiPlan.previewNotSaved}</p>
+          {/*
+            저장 시점을 반복해 말한다 — 아트보드 03 주석. **이미 담은 초안이면 그 사실을
+            말한다** (#1041) — 담은 뒤 돌아온 화면이 "아직 저장되지 않았어요" 라고 하면
+            사용자는 다시 담는다.
+          */}
+          <p className="text-caption text-fg-subtle">
+            {committed ? messages.aiPlan.previewCommitted : messages.aiPlan.previewNotSaved}
+          </p>
         </header>
 
         {/*

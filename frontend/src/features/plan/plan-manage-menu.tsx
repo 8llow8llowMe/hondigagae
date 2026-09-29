@@ -10,6 +10,7 @@ import { ConfirmModal } from '@/components/confirm-modal'
 import { FormAlert } from '@/components/form-alert'
 import { MoreIcon } from '@/components/icons'
 import { Menu, MenuAnchor } from '@/components/menu'
+import { aiPlanKeys } from '@/features/ai-plan/queries'
 import { PlanCopyModal } from '@/features/plan/plan-copy-modal'
 import { PlanEditModal } from '@/features/plan/plan-edit-modal'
 import { PlanShareModal } from '@/features/plan/plan-share-modal'
@@ -107,6 +108,16 @@ export function PlanManageMenu({
   function leave() {
     void queryClient.invalidateQueries({ queryKey: planKeys.list() })
     queryClient.removeQueries({ queryKey: planKeys.detail(plan.planId) })
+    /*
+      **이 일정을 담은 AI 작업의 캐시도 버린다** (#1041). 삭제가 서버의 담기 멱등 키를
+      비워 작업 조회의 `committedPlanId` 가 null 로 돌아가는데, 캐시(`gcTime` 1분)가 남아
+      있으면 그 사이 돌아간 작업 화면이 **지운 일정으로 가는 "이미 담은 일정 보기"** 를
+      먼저 그린다. 무효화가 아니라 제거인 이유는 지금 그 화면이 떠 있지 않아서다 — 남은
+      값이 틀렸다는 것을 이미 안다.
+    */
+    if (plan.sourceAiJobId !== null) {
+      queryClient.removeQueries({ queryKey: aiPlanKeys.job(plan.sourceAiJobId) })
+    }
     router.replace('/plans')
   }
 

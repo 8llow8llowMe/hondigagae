@@ -165,3 +165,45 @@ export function AiPlanCommitPanel({
     </form>
   )
 }
+
+export type AiPlanCommittedPanelProps = {
+  /** 작업의 `committedPlanId` — 이 초안을 이미 담은 일정 */
+  planId: string
+  /** `전체 다시 만들기` 목적지. 담기 패널과 같은 값이다 */
+  againHref: string
+}
+
+/**
+ * 이미 담은 작업 — 담기 패널이 서던 자리 (#1041 · 백엔드 #970).
+ *
+ * 잡 조회가 `committedPlanId` 를 싣고 오면 담기 대신 **그 일정으로 보낸다.** 담은 뒤
+ * 뒤로 가기 · 새로고침 · 알림 링크로 돌아온 화면이 담기 버튼을 그대로 보여 주면 사용자는
+ * 다시 담는다 — 서버가 멱등이라 일정이 겹치지는 않지만 "또 저장했다" 고 믿게 된다.
+ *
+ * **담기 패널의 컨트롤을 걷는다.** 제목 입력은 다시 담아도 반영되지 않고(서버가 먼저 담긴
+ * 일정을 그대로 돌려준다), `버리기` 는 이미 일정이 된 초안에 대해 거짓말이다 — 지울 것은
+ * 담은 일정이고 그 삭제는 일정 화면에 있다. `전체 다시 만들기` 는 새 작업이라 남긴다.
+ *
+ * **담은 일정을 지우면 서버가 값을 비운다** — 그때는 이 패널이 아니라 담기 패널로 돌아가고,
+ * 다시 담으면 새 일정이 생긴다. 그것이 의도된 동작이다.
+ *
+ * 폼이 아니다 — 제출할 것이 없다. 배치(인셋 · 아래 여백)는 담기 패널과 같은 축이다.
+ */
+export function AiPlanCommittedPanel({ planId, againHref }: AiPlanCommittedPanelProps) {
+  return (
+    <div className={cn('flex flex-col gap-4 pb-4 md:pb-0', INSET_CLASS.card)}>
+      <div className="flex flex-col gap-2">
+        <ButtonLink href={`/plans/${planId}`} size="lg">
+          {messages.aiPlan.committedAction}
+        </ButtonLink>
+        <p className="text-caption text-fg-muted">{messages.aiPlan.committedHint}</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <ButtonLink href={againHref} variant="secondary">
+          {messages.aiPlan.commitAgain}
+        </ButtonLink>
+      </div>
+    </div>
+  )
+}
