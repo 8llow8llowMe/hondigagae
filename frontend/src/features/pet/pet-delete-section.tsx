@@ -8,15 +8,26 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/button'
 import { ConfirmModal } from '@/components/confirm-modal'
 import { FormAlert } from '@/components/form-alert'
-import { PET_INVALIDATE_KEY } from '@/features/pet/queries'
+import { invalidateAfterPetDeleted } from '@/features/pet/pet-delete-invalidation'
+import { usePetCompanionSummary } from '@/features/pet/use-pet-companion-summary'
 import { ApiError } from '@/lib/api/error'
 import { deletePet } from '@/lib/api/pet'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
+import { petDeleteCompanionLines } from '@/lib/pet/delete-companions'
 import { withObjectParticle } from '@/lib/text/korean'
+import type { PlanCompanionSummary } from '@/types/plan'
+
+/**
+ * 확인창의 동행 일정 집계 상태 (#1042). **셋 중 어느 것이든 삭제 버튼은 열려 있다** —
+ * `PetDeleteSection` 머리주석.
+ */
+export type PetDeleteCompanions =
+  { state: 'loading' } | { state: 'failed' } | { state: 'ready'; summary: PlanCompanionSummary }
 
 export type PetDeleteConfirmProps = {
   petName: string
+  companions: PetDeleteCompanions
   confirming: boolean
   deleting: boolean
   errorMessage: string | null
@@ -41,6 +52,7 @@ export type PetDeleteConfirmProps = {
  */
 export function PetDeleteConfirm({
   petName,
+  companions,
   confirming,
   deleting,
   errorMessage,
@@ -65,7 +77,19 @@ export function PetDeleteConfirm({
         onClose={onCancel}
         onConfirm={onConfirm}
         title={messages.pet.deleteConfirmTitle.replace('{name}', withObjectParticle(petName))}
-        description={messages.pet.deleteConfirmDescription}
+        description={
+          /*
+            **일정 문장을 설명 안에 둔다.** `alertdialog` 의 `aria-describedby` 가 이 자리를
+            가리켜, 열리는 순간 "일정 2개에서 빠져요" 까지 읽힌다 — 본문 슬롯에 두면 제목과
+            "되돌릴 수 없어요" 만 읽히고 영향 범위는 탐색해야 들린다.
+
+            바뀌는 것(일정) 먼저, 되돌릴 수 없다는 경고가 맨 끝이다.
+          */
+          <div className="flex flex-col gap-2">
+            <CompanionLines companions={companions} />
+            <p>{messages.pet.deleteConfirmDescription}</p>
+          </div>
+        }
         confirmLabel={messages.pet.delete}
         cancelLabel={messages.pet.cancel}
         confirmLoading={deleting}
@@ -78,11 +102,33 @@ export function PetDeleteConfirm({
   )
 }
 
+/** 집계 문장. 0 인 수는 문장을 내지 않는다 (`petDeleteCompanionLines`) */
+function CompanionLines({ companions }: { companions: PetDeleteCompanions }) {
+  if (companions.state === 'loading') return <p>{messages.pet.deleteCompanionLoading}</p>
+  if (companions.state === 'failed') return <p>{messages.pet.deleteCompanionFailed}</p>
+
+  return petDeleteCompanionLines(companions.summary).map((line) => <p key={line}>{line}</p>)
+}
+
+/**
+ * 삭제 흐름 — 확인창 · 동행 일정 집계 · 삭제 요청 · 무효화.
+ *
+ * **집계를 못 받아도 삭제를 막지 않는다** (#1042). 집계는 판단을 돕는 정보이지 삭제의
+ * 전제가 아니다 — 서버는 집계와 상관없이 같은 규칙으로 일정을 정리한다(다견 일정에서 떼고,
+ * 이 아이만 가던 일정과 다녀온 일정은 남긴다). plan-service 가 잠시 죽었다고 반려견을 못
+ * 지우게 하면 다른 서비스의 장애가 이 화면의 기능을 빼앗는다. 그래서 받는 중에도, 실패해도
+ * 버튼은 열어 두고 수 없이도 참인 문장(`deleteCompanionFailed`)으로 대신한다.
+ *
+ * 실패 문장에 재시도 버튼을 달지 않는다 — 확인창을 닫았다 다시 열면 `enabled` 가 다시 켜지며
+ * 실패한(데이터 없는) 쿼리를 새로 받는다. 확인창 안에 버튼을 하나 더 세우면 파괴 버튼 옆에
+ * 누를 것이 늘어난다.
+ */
 export function PetDeleteSection({ petId, petName }: { petId: string; petName: string }) {
   const router = useRouter()
   const queryClient = useQueryClient()
 
   const [confirming, setConfirming] = useState(false)
+  const summary = usePetCompanionSummary(petId, confirming)
   const [deleting, setDeleting] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   // disabled 반영 전 빠른 연속 클릭을 막는다 (form-guide.md §6)
@@ -94,15 +140,21 @@ export function PetDeleteSection({ petId, petName }: { petId: string; petName: s
     setDeleting(true)
     setErrorMessage(null)
 
+    /*
+      **`petKeys.all` 을 그대로 무효화하지 않는다** (#1042). 이 화면이 아직 지운 아이의 상세를
+      관찰하고 있어 즉시 다시 받고, 그것이 삭제 직후의 404 였다. 무엇을 받고 무엇을 받지
+      않는지는 `invalidateAfterPetDeleted` 머리주석의 표가 정본이다.
+    */
     void deletePet(petId)
       .then(() => {
-        void queryClient.invalidateQueries({ queryKey: PET_INVALIDATE_KEY })
+        void invalidateAfterPetDeleted(queryClient, petId)
         router.replace('/pets')
       })
       .catch((error: unknown) => {
-        // 이미 지워진 것이면 목적은 달성됐다 — 목록으로 보낸다 (수정-세부명세 D4-2)
+        // 이미 지워진 것이면 목적은 달성됐다 — 목록으로 보낸다 (수정-세부명세 D4-2).
+        // 무효화도 성공 갈래와 같다 — 여기서도 지운 아이의 상세를 다시 받으면 404 다
         if (error instanceof ApiError && error.status === 404) {
-          void queryClient.invalidateQueries({ queryKey: PET_INVALIDATE_KEY })
+          void invalidateAfterPetDeleted(queryClient, petId)
           router.replace('/pets')
           return
         }
@@ -118,6 +170,13 @@ export function PetDeleteSection({ petId, petName }: { petId: string; petName: s
   return (
     <PetDeleteConfirm
       petName={petName}
+      companions={
+        summary.data !== undefined
+          ? { state: 'ready', summary: summary.data }
+          : summary.isError
+            ? { state: 'failed' }
+            : { state: 'loading' }
+      }
       confirming={confirming}
       deleting={deleting}
       errorMessage={errorMessage}

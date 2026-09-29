@@ -344,7 +344,8 @@ mutation 후 무효화 대상을 **명세와 코드 양쪽에 명시한다.**
 | 일정 생성/수정/삭제          | `planKeys.all`                                                                       |
 | 일자 항목 교체               | `planKeys.detail(planId)`                                                            |
 | **항목 방문 체크**           | `planKeys.detail(planId)` (**판정은 무효화하지 않는다** — 아래)                      |
-| 반려견 등록/수정/삭제        | `petKeys.all`                                                                        |
+| 반려견 등록/수정             | `petKeys.all`                                                                        |
+| **반려견 삭제**              | `petKeys.all` + `planKeys.all` (지운 아이 상세·집계는 재조회 제외 — 아래)            |
 | 프로필 수정 / 이미지 변경    | `memberKeys.me()`                                                                    |
 | **AI 일정 → 일정 확정 저장** | `planKeys.all` + `aiPlanKeys.job(jobId)` (작업이 담은 일정을 싣는다 — #1041, 아래)   |
 | **여행 후기 작성·수정**      | `planKeys.review(planId)` (목록에는 `hasReview` 가 없어 목록 key 를 건드리지 않는다) |
@@ -360,6 +361,13 @@ mutation 후 무효화 대상을 **명세와 코드 양쪽에 명시한다.**
   방문 체크는 항목 구성·순서를 바꾸지 않는다. 담기·순서편집이 판정을 다시 받는 것과 갈리는 지점이다.
   응답이 `Response<Void>` 라 `setQueryData` 로 갈아끼울 수 없어 **무효화가 유일한 갱신 경로**다
   (`docs/features/plan/일정상세-세부명세.md` D9-5).
+- **반려견 삭제는 일정까지 무효화하고, 지운 아이의 key 는 다시 받지 않는다** (#1042). 삭제 응답이 온
+  시점에 plan-service 가 다견 일정의 `petIds` 에서 그 아이를 이미 뗐다 — 일정 캐시를 두면 30초 동안
+  지운 아이가 일정에 남아 보인다. 반대로 `petKeys.all` 을 그대로 무효화하면 **아직 화면이 관찰 중인
+  지운 아이의 상세를 즉시 다시 받아 404** 가 난다(삭제 직후 404 의 근본원인). 지운 아이의 상세와
+  동행 집계(`planKeys.companions(petId)`)는 `refetchType: 'none'` 으로 낡음 표시만 한다.
+  `removeQueries` 는 답이 아니다 — 관찰자가 붙은 채 빼면 다음 렌더가 같은 key 를 새로 만들어 곧바로
+  받는다. 정본은 `src/features/pet/pet-delete-invalidation.ts`.
 
 ## 8. 타입 규칙
 
