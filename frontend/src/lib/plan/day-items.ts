@@ -1,3 +1,4 @@
+import { messages } from '@/lib/messages'
 import { isPlaceTarget } from '@/lib/plan/detail'
 import { toInputStartTime } from '@/lib/plan/start-time'
 import type { PlanDayItemsReplacePayload, PlanItemDetail, PlanItemPayload } from '@/types/plan'
@@ -310,4 +311,61 @@ export function appendWalkCourseItemPayload(
       },
     ],
   }
+}
+
+// ─── 이동·휴식 직접 추가 (#1014) ──────────────────────────────────────────────
+
+/**
+ * 그 일자의 **맨 끝에** 이동·휴식(`MOVE`) 항목 하나를 붙인 일괄 교체 본문.
+ * `appendPlaceItemPayload` 의 자매다 (`일자편집-세부명세.md` H1).
+ *
+ * **새 API 가 없다.** 담기와 같은 `PUT …/days/{day}/items` 라 기존 항목을 전부 되싣고
+ * 하나를 더한다 — 되싣지 않으면 그 일자가 새 항목 하나만 남기고 비워진다 (E1).
+ *
+ * **`targetId` 키를 넣지 않는다.** 서버 계약이 "`MOVE` 는 비워 둡니다" 이고
+ * (`PlanItemRequest.targetId`), 장소 검증은 `targetId` 가 없는 항목을 묻지 않는다
+ * (`PlanCommandProcessor.verifyPlaceTargets`). `null` 을 실어도 뜻은 같지만 되싣는 쪽
+ * (`toPayloadItem`)이 키를 빼므로 **한 본문 안에서 두 모양을 섞지 않는다.**
+ *
+ * **`title` 은 앞뒤 공백을 걷고 100자로 자른다.** 사용자가 쓴 글이라 넘치면 잘라 보내지
+ * 않고 모달이 먼저 막는다(`validateMoveTitle`) — 여기서 자르는 것은 그 검증을 거치지 않은
+ * 호출에 대한 2차 방어다. 서버는 자르지 않고 `PLAN_110` 을 낸다.
+ *
+ * 순서는 **맨 끝**이다. 위치를 고르는 UI 는 두지 않는다 — 순서는 편집모드가 소유한다
+ * (F5-3 과 같은 판단).
+ */
+export function appendMoveItemPayload(
+  items: PlanItemDetail[],
+  day: number,
+  move: { title: string },
+): PlanDayItemsReplacePayload {
+  const existing = items.map((item, index) => toPayloadItem(item, day, index))
+
+  return {
+    items: [
+      ...existing,
+      {
+        day,
+        sequence: existing.length,
+        itemType: 'MOVE',
+        title: move.title.trim().slice(0, ITEM_TITLE_MAX),
+      },
+    ],
+  }
+}
+
+/**
+ * 이동·휴식 제목 검증. 통과하면 `null`, 아니면 필드에 붙일 문구.
+ *
+ * 서버 `PlanItemRequest.title` 의 `@NotBlank`(`PLAN_109`) · `@Size(max = 100)`(`PLAN_110`)
+ * 복제본이다 (`form-guide.md` §5). **공백만 있는 값도 막는다** — `@NotBlank` 가 그렇다.
+ *
+ * **길이는 걷어낸 값으로 잰다.** 보내는 것이 걷어낸 값이라(`appendMoveItemPayload`) 앞뒤
+ * 공백 때문에 101자가 된 입력을 막으면 서버가 받을 값을 화면이 거절하게 된다.
+ */
+export function validateMoveTitle(value: string): string | null {
+  const title = value.trim()
+  if (title.length === 0) return messages.plan.addMoveTitleRequired
+  if (title.length > ITEM_TITLE_MAX) return messages.plan.addMoveTitleTooLong
+  return null
 }
