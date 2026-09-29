@@ -95,6 +95,8 @@ const idleVisit: PlanItemVisit = {
   onToggle: () => undefined,
   // 기본은 여행 중·지난 일정이다 — 낱말이 서는 갈래 (#732)
   compact: false,
+  // 기본은 표시할 수 있는 날이다 — 시작일 전 갈래(#983)는 테스트가 따로 끈다
+  canMark: true,
 }
 
 describe('PlanItemRow — 방문 체크 토글 (#124)', () => {
@@ -219,6 +221,53 @@ describe('PlanItemRow — 방문 체크 토글 (#124)', () => {
     const markup = renderWithVisit({ visited: true, visit: { ...idleVisit, compact: true } })
 
     expect(markup).toContain(`${messages.plan.visitedLabel}</button>`)
+  })
+
+  /*
+    **시작일 전(D-1 이전)에는 다녀옴으로 새로 표시할 수 없다** (#983). 서버가 `visited: true` 를
+    `PLAN_027` 400 으로 거절한다 — 거절할 토글을 두지 않는다. **해제는 언제나 받으므로** 이미
+    체크된 행(옛 데이터·기간 이동)은 체크 상태와 해제 토글을 그대로 보여 준다.
+  */
+  const beforeStartVisit: PlanItemVisit = { ...idleVisit, compact: true, canMark: false }
+
+  it('출발 전날(D-1)의 미체크 행에는 토글이 없다 — 서버가 PLAN_027 로 거절한다', () => {
+    const markup = renderWithVisit({ visited: false, visit: beforeStartVisit })
+
+    expect(markup).not.toContain('<button')
+    expect(markup).not.toContain('aria-pressed')
+    expect(markup).not.toContain(messages.plan.visitAction)
+    // 행 자체는 그대로다
+    expect(markup).toContain(planDetail.items[0]!.title)
+  })
+
+  it('출발 전날이어도 체크된 행은 해제 토글이 선다 — 해제는 언제나 받는다', () => {
+    const markup = renderWithVisit({ visited: true, visit: beforeStartVisit })
+
+    expect(markup).toContain('aria-pressed="true"')
+    expect(markup).toContain(`aria-label="${messages.plan.visitedAction}"`)
+    expect(markup).toContain(`${messages.plan.visitedLabel}</button>`)
+  })
+
+  it('출발 당일(D-DAY)의 미체크 행은 체크 아이콘 토글이다 — #732 의 접기 그대로다', () => {
+    const markup = renderWithVisit({
+      visited: false,
+      visit: { ...idleVisit, compact: true, canMark: true },
+    })
+
+    expect(markup).toContain('aria-pressed="false"')
+    expect(markup).toContain(`aria-label="${messages.plan.visitAction}"`)
+    expect(markup).not.toContain(`${messages.plan.visitToggleLabel}</button>`)
+  })
+
+  it('토글이 없어도 이 행의 실패 문구는 남는다 — 서버 PLAN_027 문구를 그대로 보여 준다', () => {
+    const message = '여행 시작일 전에는 다녀옴으로 표시할 수 없습니다.'
+    const markup = renderWithVisit({
+      visited: false,
+      visit: { ...beforeStartVisit, error: { message, retriable: false } },
+    })
+
+    expect(markup).toContain('role="alert"')
+    expect(markup).toContain(message)
   })
 
   it('저장 중이면 그 행의 토글만 잠기고 aria-busy 가 붙는다', () => {

@@ -54,3 +54,27 @@ describe('toVisitToggleError — 방문 체크 실패 분류 (#124)', () => {
     expect(error.message).not.toContain('존재하지 않는')
   })
 })
+
+/**
+ * 시작일 전 다녀옴 표시 — 이슈 #983.
+ *
+ * 화면은 D-1 이전의 미체크 행에서 토글을 걷지만(`canMarkVisited`), 날짜를 못 읽었거나
+ * 화면의 오늘과 서버의 오늘이 어긋난 날에는 서버가 `PLAN_027` 400 으로 거절할 수 있다.
+ * **그때 "일정이 바뀌었어요, 새로고침" 이라고 말하면 틀린 진단이다** — 새로고침해도 같은
+ * 실패다. 서버 문구가 사실을 말하므로 그대로 띄운다 (#971 의 `PLAN_026` 과 같은 판단).
+ */
+describe('toVisitToggleError — 시작일 전 표시 PLAN_027 (#983)', () => {
+  const MESSAGE = '여행 시작일 전에는 다녀옴으로 표시할 수 없습니다.'
+
+  it('서버 문구를 그대로 띄우고 재시도를 주지 않는다', () => {
+    const error = toVisitToggleError(new ApiError(400, 'PLAN_027', MESSAGE))
+
+    expect(error).toEqual({ message: MESSAGE, retriable: false })
+  })
+
+  it('문구가 비면 화면 문구로 물러난다 — 빈 알림도, 틀린 새로고침 안내도 띄우지 않는다', () => {
+    const error = toVisitToggleError(new ApiError(400, 'PLAN_027', ''))
+
+    expect(error).toEqual({ message: messages.plan.visitNotStartedError, retriable: false })
+  })
+})

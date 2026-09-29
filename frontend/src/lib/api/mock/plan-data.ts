@@ -627,6 +627,16 @@ function markVisited(plan: MockPlan, rawItemId: string, body: string | null): Mo
   // 없는 항목, 또는 **다른 일정의** 항목이면 404 다 (`PLAN_005`)
   if (item === undefined) return fail(404, 'PLAN_005', '존재하지 않는 일정 항목입니다.')
 
+  /*
+    **여행 전 표시 가드** (#983 · `PlanCommandProcessor.markItemVisited`). 오늘이 시작일보다
+    앞이면 다녀옴으로 **표시**할 수 없다 — 시작일 당일부터 허용하고, 일정 상태는 보지 않는다.
+    **해제(`visited: false`)는 언제나 받는다.** 소유·항목 확인이 가드보다 먼저다(남의 항목은
+    날짜와 무관하게 `PLAN_005`). "오늘" 은 #971 완료 가드와 같은 `todayDay(new Date())` 다.
+  */
+  if (parsed.visited && todayDay(new Date()) < plan.startDate) {
+    return fail(400, 'PLAN_027', '여행 시작일 전에는 다녀옴으로 표시할 수 없습니다.')
+  }
+
   item.visited = parsed.visited
   return { status: 200, payload: ok(null) }
 }
