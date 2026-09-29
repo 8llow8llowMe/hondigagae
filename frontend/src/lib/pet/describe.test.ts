@@ -36,7 +36,7 @@ describe('petAgeText — 나이 단위는 한 곳에서만 정한다', () => {
   */
   it('나이를 살 단위로 쓴다', () => {
     expect(petAgeText(6)).toBe('6살')
-    expect(petAgeText(0)).toBe('0살')
+    expect(petAgeText(0)).toBe('1살 미만')
   })
 
   it('나이를 모르면 null 이다 — 호출부가 그 줄을 빼도록', () => {
