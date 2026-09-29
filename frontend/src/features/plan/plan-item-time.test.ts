@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { PlanDaySection } from '@/features/plan/plan-day-section'
-import { PlanItemRow } from '@/features/plan/plan-item-row'
+import { PlanItemRow, timeChipFocusKey } from '@/features/plan/plan-item-row'
 import { PlanItemTimeView, type PlanItemTimeViewProps } from '@/features/plan/plan-item-time-view'
 import { messages } from '@/lib/messages'
 import type { PlanItemRowModel } from '@/lib/plan/detail'
@@ -36,7 +36,7 @@ function renderRow(item: PlanItemDetail, withTime = true, walkSafety?: unknown) 
   return renderToStaticMarkup(
     createElement(PlanItemRow, {
       model,
-      ...(withTime ? { time: { onOpen: () => undefined } } : {}),
+      ...(withTime ? { time: { onOpen: () => undefined, focusKey: timeChipFocusKey(2, 1) } } : {}),
       ...(walkSafety === undefined ? {} : { walkSafety: walkSafety as never }),
     }),
   )
@@ -49,6 +49,18 @@ function anchorOf(markup: string): string {
 }
 
 describe('PlanItemRow — 시간 칩 (#1028)', () => {
+  /*
+    **저장 뒤 초점이 돌아올 표식** (#1028 검토). 일괄 교체가 `planItemId` 를 새로 발급해 모달을
+    연 칩이 언마운트되므로, 같은 **일자 · 순서** 의 새 칩을 이 표식으로 찾아 초점을 돌린다.
+  */
+  it('칩이 일자 · 순서 표식을 단다 — 저장 뒤 초점이 같은 자리로 돌아온다', () => {
+    expect(timeChipFocusKey(2, 1)).toBe('2:1')
+    expect(renderRow({ ...PLACE_ITEM, startTime: null })).toContain('data-plan-time-chip="2:1"')
+    expect(renderRow({ ...PLACE_ITEM, startTime: '10:30:00' })).toContain(
+      'data-plan-time-chip="2:1"',
+    )
+  })
+
   it('시각이 없으면 시간 등록하기 칩이 선다 — 이름에 제목이 들어간다', () => {
     const markup = renderRow({ ...PLACE_ITEM, startTime: null })
 

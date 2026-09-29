@@ -66,6 +66,19 @@ export type PlanItemVisit = {
 export type PlanItemTime = {
   /** 전자시계 모달을 연다. 저장·잠금은 호출부가 소유한다 */
   onOpen: () => void
+  /** 저장 뒤 초점을 돌려받을 표식 — `timeChipFocusKey(day, index)` */
+  focusKey: string
+}
+
+/**
+ * 시간 칩의 **일자 · 순서** 표식 (#1028 검토). `data-plan-time-chip` 에 실린다.
+ *
+ * **`planItemId` 로 가리키지 않는다.** 시각 저장도 일괄 교체라 id 가 전부 새로 발급되고, 모달을
+ * 연 칩은 언마운트된다 — `useOverlay` 의 복귀 초점이 떨어진 노드를 가리켜 초점이 `body` 로
+ * 떨어졌다. 순서는 시각 저장으로 바뀌지 않으므로 같은 자리의 새 칩을 이것으로 찾는다.
+ */
+export function timeChipFocusKey(day: number, index: number): string {
+  return `${day}:${index}`
 }
 
 /**
@@ -316,7 +329,12 @@ export function PlanItemRow({
             받는다. 띠만큼 떼어 두 자리가 겹치지 않게 한다.
           */
           <div className="text-caption text-fg-muted mb-2 flex flex-wrap items-center gap-x-1 gap-y-1 font-medium tabular-nums">
-            <PlanItemTimeChip title={item.title} startTime={startTime} onOpen={time.onOpen} />
+            <PlanItemTimeChip
+              title={item.title}
+              startTime={startTime}
+              onOpen={time.onOpen}
+              focusKey={time.focusKey}
+            />
             {startTime !== null && walkSafetyInline}
           </div>
         ) : (
@@ -543,11 +561,13 @@ function PlanItemTimeChip({
   title,
   startTime,
   onOpen,
+  focusKey,
 }: {
   title: string
   /** `formatStartTime()` 을 거친 `HH:mm`. 없거나 형식이 어긋나면 `null` */
   startTime: string | null
   onOpen: () => void
+  focusKey: string
 }) {
   if (startTime === null) {
     return (
@@ -555,6 +575,7 @@ function PlanItemTimeChip({
         variant="ghost"
         size="sm"
         aria-haspopup="dialog"
+        data-plan-time-chip={focusKey}
         aria-label={messages.plan.itemTimeAddLabel.replace('{title}', title)}
         leading={<ClockIcon size={16} />}
         onClick={onOpen}
@@ -570,6 +591,7 @@ function PlanItemTimeChip({
       variant="secondary"
       size="sm"
       aria-haspopup="dialog"
+      data-plan-time-chip={focusKey}
       aria-label={messages.plan.itemTimeEditLabel
         .replace('{title}', title)
         .replace('{time}', startTime)}
