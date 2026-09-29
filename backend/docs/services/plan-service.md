@@ -1032,6 +1032,14 @@ tour-service 가 네 칸을 전부 채워 보낸다. **같은 서비스의 적�
 
 - `PUT /api/v1/plans/{planId}/items/{planItemId}/visited` — 항목 방문 체크. 일차 항목을
   교체(delete+insert)하면 새 항목이라 그 날의 체크는 초기화된다.
+- `PUT /api/v1/plans/{planId}/items/{planItemId}/start-time` — 항목 하나의 시작 시각만 고친다 (#1030).
+  `{"startTime":"10:30:00"}`, 비우려면 `{"startTime":null}` 이나 `{}` (바디 자체는 필수라 없으면 400). **행을 제자리에서 고치므로 `planItemId` 와
+  `visited` 가 남는다** — 시각 하나 때문에 일괄 교체를 부르면 그날의 체크가 모두 풀리던 우회가 필요 없다.
+  - `PATCH /items/{planItemId}` 가 아니라 필드별 하위 리소스 `PUT` 이다. 같은 결의 `…/visited` ·
+    준비물 `…/checked` 와 맞추고, PATCH 의 "필드 없음" 과 "null 로 비움" 을 가르는 규칙을 만들지 않으려는 것이다.
+    메모도 단건으로 고칠 일이 생기면 `…/memo` 로 따로 둔다.
+  - 순서(`sequence`)와 시각이 어긋나도 막지 않는다 — 일괄 교체도 요구하지 않는다.
+  - 내 일정이 아니면 `PLAN_001`, 이 일정의 항목이 아니면(다른 일정의 항목 포함) `PLAN_005`.
 - `GET /api/v1/plans/{planId}/emergency` — 일자별 방문 장소마다 가까운 동물병원·동물약국
   (반경 10km, 최대 3곳). 같은 장소는 한 번만 검색하고, 좌표가 없는 장소는 건너뛴다 — 원천에서
   사라진(delisted) 장소는 요약 자체가 오지 않고, 남아 있어도 원천이 좌표를 주지 않은 장소가 있다.
