@@ -9,9 +9,13 @@ import type { Pet } from '@/types/pet'
  * (`DESIGN.md` §1) 아래 주석이 세 자리에서 `4살` 을 정본 예시로 들고 있다.
  *
  * 모르면 **빈 문자열이 아니라 `null`** 이다. 호출부가 그 줄을 빼도록 한다.
+ *
+ * **0 은 `1살 미만` 이다** (#1022). 서버는 나이를 정수로 주므로 첫 돌 전 강아지가
+ * `0살` 로 보였다 — 틀린 값은 아니지만 "나이를 모른다" 로도 읽힌다.
  */
 export function petAgeText(age: number | null): string | null {
-  return age === null ? null : `${age}살`
+  if (age === null) return null
+  return age === 0 ? '1살 미만' : `${age}살`
 }
 
 /**
