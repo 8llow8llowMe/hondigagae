@@ -169,15 +169,47 @@ test.describe('지도 보기 검색 (#596)', () => {
 
     await expect(page).not.toHaveURL(/keyword=/)
   })
+})
+
+/**
+ * 담기 화면의 검색 — 이슈 #1012.
+ *
+ * `/places` 와 같은 `PlaceSearchField` 가 목록·지도 두 갈래에 선다. 잴 것은 **경로**다 —
+ * 검색은 `usePlaceFilterNav` 로 `router.replace` 하는데, 그 경로가 `usePathname()` 이 아니라
+ * `/places` 였다면 담기 화면에서 검색하는 순간 담기 문맥(어느 일정의 몇째 날)을 잃는다.
+ */
+test.describe('담기 화면 검색 (#1012)', () => {
+  const PLAN_ADD = '/plans/223456789012000001/days/1/add'
+  const onPlanAdd = (search: string) => new RegExp(`${PLAN_ADD.replace(/\//g, '\\/')}\\?${search}`)
+
+  test('목록 갈래에서 제출하면 담기 경로에 keyword 가 실리고 보기가 남는다', async ({ page }) => {
+    await page.goto(`${PLAN_ADD}?view=list`)
+
+    // 행이 선 뒤에 친다 — 하이드레이션 전에는 핸들러가 없다 (위 `검색 버튼으로도` 와 같다)
+    await expect(page.locator('#plan-add-place-list').getByRole('listitem').first()).toBeVisible()
+
+    const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' })
+    await box.fill(KEYWORD)
+    await box.press('Enter')
+
+    await expect(page).toHaveURL(onPlanAdd(`keyword=${encodeURIComponent(KEYWORD)}&view=list`))
+  })
 
   /*
-    **담기 화면은 켜지 않는다** — 그 화면은 목록 갈래에도 검색이 없어서, 지도에만 켜면
-    같은 화면의 두 보기가 다른 도구를 갖는다 (`PlaceMapView` 의 `searchable` 주석).
+    `MOCK_API=true` 라 지도는 SDK 실패 폴백이다 (위 #596 절 머리 주석). 폴백의 검색이 곧
+    이 갈래의 검색이다 — 머리 아래·패널 자리는 소스 단언이 잠근다.
   */
-  test('담기 화면 지도에는 검색이 없다', async ({ page }) => {
-    await page.goto('/plans/223456789012000001/days/1/add')
+  test('지도 갈래에서도 검색이 서고, 비우고 제출하면 담기 경로만 남는다', async ({ page }) => {
+    await page.goto(`${PLAN_ADD}?keyword=${encodeURIComponent(KEYWORD)}`)
 
     await mapFallbackReady(page)
-    await expect(page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' })).toHaveCount(0)
+
+    const box = page.getByRole('searchbox', { name: '장소 이름·주소로 찾기' }).first()
+    await expect(box).toHaveValue(KEYWORD)
+
+    await box.fill('')
+    await box.press('Enter')
+
+    await expect(page).toHaveURL(new RegExp(`${PLAN_ADD.replace(/\//g, '\\/')}$`))
   })
 })

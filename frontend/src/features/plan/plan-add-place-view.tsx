@@ -13,6 +13,7 @@ import { ViewToggle } from '@/components/view-toggle'
 import { PlaceFilterChips } from '@/features/place/place-filter-chips'
 import { PlaceListSection } from '@/features/place/place-list-section'
 import { PlaceMapView } from '@/features/place/place-map-view'
+import { PlaceSearchField } from '@/features/place/place-search-field'
 import { usePlaceList } from '@/features/place/use-place-list'
 import { planAddPlaceAction, planAddPlaceNotice } from '@/features/plan/plan-add-place-action'
 import { PlanAddPlaceRow } from '@/features/plan/plan-add-place-row'
@@ -41,8 +42,16 @@ import type { PlaceFilters, PlaceSummary } from '@/types/place'
  * 실측 189 → 84 가 됐고, 부제도 지도에서는 빼기 때문이다 — 담을 일자는 제목이 이미 말하고,
  * 지도 위 카드는 작을수록 좋다. 140 은 그 84 에 여유 약 56 을 더한 값이다: 시트를 끝까지
  * 올려도 머리와 지도 한 줄이 남아야 시트가 "페이지" 가 아니라 "지도 위에 얹힌 것" 으로 읽힌다.
+ *
+ * **140 → 248 로 늘었다** (#1012). 머리 아래에 검색(44 + 사이 8)이 붙었고, 이 값은 폭에
+ * 따라 갈리지 않는 px 하나라 **1024 미만 중 머리가 가장 높은 폭**에 맞춘다 — 768 은 뒤로가기가
+ * 제목 위로 올라가(`md:block`) 카드가 104 가 된다. 실측(뷰포트 기준 바닥): 375 는 카드 130 ·
+ * 검색 182, **768 은 카드 188 · 검색 240.** 240 에 `MAP_TOP_CONTROLS_INSET` 과 같은 여유 8 을
+ * 더해 248 이다. 예전 140 은 375 만 보고 정해 768 에서 카드 아래 48px 를 시트가 덮고 있었다
+ * (머리가 문서 순서상 뒤라 위에 그려져 가려지지는 않았다). 375 에서는 검색 아래 지도 띠
+ * 66px 가 남는다 — 위 "지도 한 줄" 의 몫이다.
  */
-const SHEET_MAX_TOP_INSET = 140
+const SHEET_MAX_TOP_INSET = 248
 
 /**
  * 떠 있는 머리 아래로 좌측 패널을 밀어 내리는 높이(px) — 이슈 #556.
@@ -51,8 +60,8 @@ const SHEET_MAX_TOP_INSET = 140
  * 사이 4 + 제목 26)이므로 바닥이 124 다. 카드 사이 12 를 더해 136.
  *
  * 카드 폭이 400 으로 못박혀 있어(`lg:w-100`) 제목이 접히지 않는다 — 그래서 이 높이가
- * 일자 번호와 무관하게 일정하다. `PlaceMapView` 는 위에 무엇이 얹히는지 모르므로 이
- * 화면이 알려 준다.
+ * 일자 번호와 무관하게 일정하다. `PlaceMapView` 는 머리의 **자리**는 갖지만(#1012 `head`)
+ * 그 안에 무엇이 얼마나 높게 서는지는 모르므로 이 화면이 알려 준다.
  */
 const PANEL_TOP_INSET = 136
 
@@ -228,8 +237,8 @@ export function PlanAddPlaceView({
         지도가 받았다 — 1920 실측으로 지도가 y≈180 에서 시작했고, 390 에서는 지도 띠가
         머리와 시트 사이 310px 뿐이었다. 머리가 지도 위로 뜨면서 그 자리를 돌려받는다.
 
-        이 `div` 는 이제 **떠 있는 머리의 기준면**이다. 높이는 `map-canvas-height` 가 잡고
-        `PlaceMapView` 는 `fill` 로 그것을 그대로 채운다.
+        높이는 `map-canvas-height` 가 잡고 `PlaceMapView` 는 `fill` 로 그것을 그대로 채운다.
+        떠 있는 머리의 기준면은 #1012 부터 `PlaceMapView` 의 루트다 (`head` 로 넘긴다).
       */
       <div className="map-canvas-height relative">
         <div className="h-full">
@@ -237,6 +246,44 @@ export function PlanAddPlaceView({
             filters={filters}
             authed
             fill
+            /*
+              **검색을 켠다** (#1012) — 목록 갈래 머리에 선 `PlaceSearchField` 와 같은 축(`?keyword=`)
+              이다. 1024 미만은 아래 머리 바로 밑, 이상은 패널 맨 위에 선다 (`PlaceMapView` 의
+              `head` 주석). 이동은 `usePlaceFilterNav` 가 **현재 경로**로 하므로 제출해도
+              `/places` 로 튀지 않는다.
+            */
+            searchable
+            /*
+              **머리를 지도에게 맡긴다** (#1012). 예전에는 이 트리가 `absolute` 로 띄웠는데, 그러면
+              모바일 검색이 설 자리(머리 아래)를 지도가 알 수 없고 SDK 실패 폴백에서 머리가
+              목록을 덮는다. 자리는 `PlaceMapView` 가, 내용은 여기가 그린다.
+            */
+            head={
+              /*
+                **곡률은 16(`rounded-xl`)이다.** 옆 패널과 같은 값이고 §5 가 "떠 있는 것" 에 준
+                값이다 — L1 카드의 12 를 쓰면 지도 위에 누운 것처럼 보인다.
+
+                **폭은 `lg:w-100`(400) 이고 `.map-panel-width` 와 같은 값이다.** 그 클래스를
+                `lg:` 로 쓸 수 없다 — Tailwind 가 소유하지 않는 이름이라 variant 를 만들지
+                못하고, 붙여도 조용히 폭이 안 걸린다 (실측: 400 이어야 할 카드가 152 였다).
+                1024 미만은 폭을 잡지 않는다 — 거기서는 좌우 여백이 폭을 만든다.
+              */
+              <div className="bg-bg border-border pointer-events-auto rounded-xl border p-3 shadow-lg lg:w-100">
+                {/*
+                  **모바일은 뒤로가기가 제목 왼쪽 같은 줄이다** (#539) — 목록 갈래의 카드 머리와
+                  같은 규약이라 두 보기가 같은 모양으로 읽힌다. `md` 이상은 제목 위로 돌아간다.
+
+                  **부제를 두지 않는다.** 담을 일자는 제목이 이미 말하고, 390 에서 부제는 두 줄이
+                  되어 지도 위 카드를 그만큼 키운다 — 목록 갈래는 그대로 부제를 갖는다.
+                */}
+                <div className="flex flex-wrap items-start gap-x-1 md:block">
+                  <BackLink href={backHref} label={messages.plan.addPlaceBack} variant="titleRow" />
+                  <h1 className="text-title-2 text-fg min-w-0 flex-1 font-bold break-keep md:mt-2 md:flex-none">
+                    {messages.plan.addPlaceTitle.replace('{day}', String(day))}
+                  </h1>
+                </div>
+              </div>
+            }
             /*
               **토글을 지도에게 맡긴다** (#556). 머리가 들고 있을 때는 뷰포트 오른쪽 끝
               (1920 실측 1880)에 섰는데, 목록 갈래의 토글은 1440 열 안(1627)이라 보기를
@@ -279,51 +326,6 @@ export function PlanAddPlaceView({
             )}
           />
         </div>
-
-        {/*
-          ── 떠 있는 머리 — 좌측 패널과 **같은 기둥**이다 (#556)
-
-          **1440 열이 아니라 패널 기둥(`left-4`)에 붙인다.** 열에 맞추면 폭에 따라 그림이
-          갈린다 — 1440 이하에서는 `content-container` 가 전폭이라 결국 패널 위(x≈40)에
-          겹치고, 1920 에서는 x=561 이라 패널(16~416)과 145px 떨어져 **지도 한복판에 카드가
-          혼자 뜬다.** 기둥에 붙이면 1024~1920 어디서나 같은 그림이다.
-
-          목록 갈래와 제목이 x 561 → 28 로 튀지만, 그것은 **지금도 그렇다**(40) — 지도 보기가
-          `.rail-layout` 의 1440 캡에 가입하지 않는 화면이기 때문이다 (DESIGN.md §7-1).
-          누르는 것(토글)은 두 갈래가 같은 자리에 서고, 읽는 것(제목)만 패널을 따라간다.
-
-          **접히는 패널 안에 넣지 않는다.** `일정으로 돌아가기` 는 이 화면의 유일한 퇴로라
-          패널을 접는 순간 나갈 길이 사라진다.
-
-          **곡률은 16(`rounded-xl`)이다.** 옆 패널과 같은 값이고 §5 가 "떠 있는 것" 에 준
-          값이다 — L1 카드의 12 를 쓰면 지도 위에 누운 것처럼 보인다.
-
-          모바일은 오른쪽에 떠 있는 토글 자리를 비운다(`end-32`). `pointer-events-none` 은
-          바깥 줄이 지도를 가로막지 않게 하는 것이고, 누르는 카드만 되살린다.
-        */}
-        <div className="pointer-events-none absolute start-4 end-32 top-5 z-30 lg:end-auto lg:top-6">
-          {/*
-            **폭은 `lg:w-100`(400) 이고 `.map-panel-width` 와 같은 값이다.** 그 클래스를
-            `lg:` 로 쓸 수 없다 — Tailwind 가 소유하지 않는 이름이라 variant 를 만들지
-            못하고, 붙여도 조용히 폭이 안 걸린다 (실측: 400 이어야 할 카드가 152 였다).
-            1024 미만은 폭을 잡지 않는다 — 거기서는 좌우 여백이 폭을 만든다.
-          */}
-          <div className="bg-bg border-border pointer-events-auto rounded-xl border p-3 shadow-lg lg:w-100">
-            {/*
-              **모바일은 뒤로가기가 제목 왼쪽 같은 줄이다** (#539) — 목록 갈래의 카드 머리와
-              같은 규약이라 두 보기가 같은 모양으로 읽힌다. `md` 이상은 제목 위로 돌아간다.
-
-              **부제를 두지 않는다.** 담을 일자는 제목이 이미 말하고, 390 에서 부제는 두 줄이
-              되어 지도 위 카드를 그만큼 키운다 — 목록 갈래는 그대로 부제를 갖는다.
-            */}
-            <div className="flex flex-wrap items-start gap-x-1 md:block">
-              <BackLink href={backHref} label={messages.plan.addPlaceBack} variant="titleRow" />
-              <h1 className="text-title-2 text-fg min-w-0 flex-1 font-bold break-keep md:mt-2 md:flex-none">
-                {messages.plan.addPlaceTitle.replace('{day}', String(day))}
-              </h1>
-            </div>
-          </div>
-        </div>
       </div>
     )
   }
@@ -337,9 +339,19 @@ export function PlanAddPlaceView({
       mapHref={mapHref}
       view={view}
       tools={
-        /* 데스크톱은 좌측 레일이 같은 일을 한다 (페이지가 렌더) */
+        /*
+          **`/places` 목록 머리와 같은 순서·같은 모양이다** (#1012) — 검색이 칩 위다. 검색어는
+          목록을 좁히는 **범위**이고 칩은 그 안의 축이다. 검색은 모든 폭에서 이 자리이고,
+          칩만 `lg:hidden` 이다 — 데스크톱은 좌측 레일이 칩의 일을 한다 (페이지가 렌더).
+
+          제출은 `usePlaceFilterNav` 가 **현재 경로**(`usePathname`)에 `?keyword=` 를 얹어
+          `replace` 한다 — 이 화면에서 검색해도 `/places` 로 튀지 않는다.
+        */
         /* `/plans` 는 proxy.ts `PROTECTED_PATHS` 라 미로그인이 여기 닿지 않는다 (#200) */
-        <PlaceFilterChips filters={filters} authed className="lg:hidden" />
+        <>
+          <PlaceSearchField filters={filters} />
+          <PlaceFilterChips filters={filters} authed className="lg:hidden" />
+        </>
       }
     >
       <PlaceListSection
@@ -393,8 +405,8 @@ export function PlanAddPlaceView({
  *
  * **카드를 여기서 그린다.** 상태마다 `Surface` 를 반복하면 로딩·오류·빈 결과 중 하나만
  * 빠뜨려도 카드가 생겼다 사라진다 — 상태에 따라 표면이 바뀌면 안 된다 (#440 판단).
- * 그래서 `children` 은 항상 카드 안이고, **카드 밖에 서야 하는 필터 칩만 `tools` 로
- * 따로 받는다** — 칩은 목록을 좁히는 도구이고 카드는 그 결과를 담는다 (#439 · #440).
+ * 그래서 `children` 은 항상 카드 안이고, **목록을 좁히는 도구(검색 · 필터 칩)만 `tools` 로
+ * 따로 받는다** — 도구는 목록을 좁히고 카드 본문은 그 결과를 담는다 (#439 · #440 · #1012).
  *
  * **머리가 카드 안으로 들어갔다** (#556). 뒤로가기 · 제목 · 부제 · 보기 토글 · 필터 칩이
  * 전부 `Surface` 의 머리 슬롯으로 가고, 카드는 `fill` 로 열 높이를 다 쓰며 **본문만 구른다.**
@@ -426,7 +438,7 @@ function PlanAddPlaceShell({
   listHref: string
   mapHref: string
   view: ViewMode
-  /** 머리 안, 제목 줄 **아래**에 서는 도구 (모바일 필터 칩). 없으면 그 줄 자체가 없다 */
+  /** 머리 안, 제목 줄 **아래**에 서는 도구 (검색 + 모바일 필터 칩, #1012). 없으면 그 줄 자체가 없다 */
   tools?: ReactNode
   children: ReactNode
 }) {
