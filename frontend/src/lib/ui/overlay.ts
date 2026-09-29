@@ -1,6 +1,6 @@
 'use client'
 
-import { type RefObject, useEffect } from 'react'
+import { type RefObject, useEffect, useRef } from 'react'
 
 /** 초점을 받을 수 있는 것들. 첫 초점과 Tab 순환이 같은 목록을 본다 */
 const FOCUSABLE_SELECTOR =
@@ -94,6 +94,23 @@ export function useOverlay({
    */
   restoreFocusPreventScroll?: boolean
 }): void {
+  /*
+    **`onClose` 는 최신 참조로 읽고 effect 의존성에 두지 않는다** (#1026).
+
+    의존성에 두면 호출부가 인라인 콜백을 넘길 때마다 — 렌더마다 새 함수다 — effect 가 다시
+    돈다. cleanup 은 초점을 트리거로 돌려놓고 setup 은 다시 패널 안 첫 요소로 넣으므로,
+    **입력칸이 든 오버레이에서는 키 하나마다 초점이 빠졌다 돌아온다.** 그 이동이 IME 조합을
+    매번 확정시켜 한글이 `ㅊ차찰차로차로` 처럼 자모로 쌓였다 (`이동·휴식 추가` 모달, 목 서버
+    계측: 키마다 `blur:INPUT → focus:BUTTON → focus:INPUT`).
+
+    닫기는 **무엇을 부를지**만 바뀌는 값이지 오버레이를 다시 세울 이유가 아니다. 키 핸들러가
+    호출 시점에 ref 를 읽으므로 가장 최근 `onClose` 가 불린다.
+  */
+  const onCloseRef = useRef(onClose)
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
+
   useEffect(() => {
     if (!open) return
 
@@ -107,7 +124,7 @@ export function useOverlay({
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         event.stopPropagation()
-        onClose()
+        onCloseRef.current()
       }
     }
 
@@ -154,7 +171,6 @@ export function useOverlay({
     }
   }, [
     open,
-    onClose,
     containerRef,
     triggerRef,
     initialFocusRef,
