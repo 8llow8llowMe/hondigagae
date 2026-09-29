@@ -131,12 +131,7 @@ export function PlanPetChips({
             selected={selected}
             onSelect={() => onChange({ ...filters, petIds: togglePet(filters.petIds, pet.petId) })}
           >
-            <PetAvatar
-              name={pet.name}
-              url={pet.profileImageUrl}
-              muted={!selected}
-              className="-ml-1"
-            />
+            <PetAvatar url={pet.profileImageUrl} muted={!selected} className="-ml-1" />
             {pet.name}
           </Chip>
         )
@@ -212,7 +207,7 @@ export function PlanFilterRail({
                 <CountLine
                   label={pet.name}
                   count={petCounts === null ? null : (petCounts.get(pet.petId) ?? 0)}
-                  leading={<PetAvatar name={pet.name} url={pet.profileImageUrl} size="md" />}
+                  leading={<PetAvatar url={pet.profileImageUrl} size="md" />}
                 />
               </FilterCheck>
             ))}

@@ -6,30 +6,26 @@ import { describe, expect, it } from 'vitest'
 import { PET_AVATAR_DEFAULT, PetAvatar, type PetAvatarSize } from '@/components/pet-avatar'
 
 function render(size: PetAvatarSize, url: string | null = null) {
-  return renderToStaticMarkup(createElement(PetAvatar, { name: '몽실이', url, size }))
+  return renderToStaticMarkup(createElement(PetAvatar, { url, size }))
 }
 
-describe('PetAvatar — 사진이 없을 때 (#1022)', () => {
+describe('PetAvatar — 사진이 없을 때 (#1022 · #1047)', () => {
   /*
-    **40 이상은 기본 그림이다.** 홈 프로필 · 마이페이지 행처럼 원이 큰 자리에서 이니셜 한 글자는
-    빈 자리처럼 읽혔다. 폴백 순서의 가운데 단계(견종 일러스트)를 한 장의 그림이 맡는다.
+    **크기와 상관없이 기본 그림이다** (#1047). #1022 는 24~32 칩에 이니셜을 남겼는데, 같은 아이가
+    한 화면에서 크기에 따라 그림과 글자 두 모양으로 보였다. 이름은 칩 옆에 늘 글자로 있다.
   */
-  it.each(['xl', 'hero'] as const)('%s 는 기본 그림을 그린다', (size) => {
+  it.each(['sm', 'md', 'lg', 'xl', 'hero'] as const)('%s 는 기본 그림을 그린다', (size) => {
     const markup = render(size)
 
     expect(markup).toContain(PET_AVATAR_DEFAULT.src)
-    expect(markup).not.toContain('몽')
+    expect(markup).not.toContain('<span')
   })
 
-  /*
-    **24~32 칩은 이니셜 그대로다.** 크림색 개가 회색 원 안에서 24 로 줄면 형체가 뭉개진다 —
-    칩은 옆에 이름이 늘 붙어 있다.
-  */
-  it.each(['sm', 'md', 'lg'] as const)('%s 는 이니셜을 그린다', (size) => {
-    const markup = render(size)
+  it('선택되지 않은 기본 그림은 사진과 같이 흐리게 물러난다', () => {
+    const markup = renderToStaticMarkup(createElement(PetAvatar, { size: 'sm', muted: true }))
 
-    expect(markup).toContain('몽')
-    expect(markup).not.toContain(PET_AVATAR_DEFAULT.src)
+    expect(markup).toContain(PET_AVATAR_DEFAULT.src)
+    expect(markup).toContain('grayscale')
   })
 
   it('기본 그림도 스크린리더에 없다 — 이름이 옆에 글자로 있다', () => {

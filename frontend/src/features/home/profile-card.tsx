@@ -111,7 +111,7 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
           'px-4 md:px-5',
         )}
       >
-        <PetAvatar size="hero" name={selected.name} url={selected.profileImageUrl} />
+        <PetAvatar size="hero" url={selected.profileImageUrl} />
 
         <span className="min-w-0 flex-1">
           <span ref={nameRef} className="flex items-center gap-1">
@@ -149,7 +149,7 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
               }}
               className="hover:bg-band focus-visible:bg-band flex h-11 w-full items-center gap-2 px-4 text-left focus-visible:outline-none"
             >
-              <PetAvatar name={pet.name} url={pet.profileImageUrl} />
+              <PetAvatar url={pet.profileImageUrl} />
               <span className="text-body-2 text-fg min-w-0 truncate font-medium">
                 {pet.name}
                 <span className="text-fg-muted"> · {firstTrait(pet)}</span>
