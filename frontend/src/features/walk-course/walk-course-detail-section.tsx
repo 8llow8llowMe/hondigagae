@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { ChevronRightIcon } from '@/components/icons'
 import { Skeleton } from '@/components/skeleton'
-import { SurfaceStack } from '@/components/surface'
+import { Surface, SurfaceStack } from '@/components/surface'
 import { WalkCourseAddAction } from '@/features/walk-course/walk-course-add-action'
 import { WalkCourseGoldenSlot } from '@/features/walk-course/walk-course-golden-slot'
 import { WalkCourseNearbyPlaces } from '@/features/walk-course/walk-course-nearby-places'
@@ -103,17 +103,31 @@ export function WalkCourseDetailSection({
   backHref = '/olle',
 }: WalkCourseDetailSectionProps) {
   if (loading) {
+    /*
+      **완료 화면과 같은 폭 · 같은 2열이다** (#1037 후속). 예전에는 `DetailShell`(760 한 열)
+      이었다 — "29개 중 25개가 히어로 없는 갈래" 라는 실측이 근거였는데, 2026-09-29 dev 에서는
+      **29/29 가 사진과 좌표를 갖는다.** 그래서 로딩이 끝나는 순간 폭이 760 → 1434 로 넓어지며
+      카드가 두 열로 갈라졌다. 오류·404 는 히어로가 없으므로 읽는 폭(`wide` 없음) 그대로다.
+    */
     return (
-      <DetailShell heading={messages.walkCourse.pageTitle}>
-        <div className={INSET_CLASS.card}>
+      <DetailShell heading={messages.walkCourse.pageTitle} wide>
+        {/* 브레드크럼 — `Breadcrumb` 과 같은 줄. 코스 이름 자리만 비운다 */}
+        <nav
+          aria-label={messages.walkCourse.detailBreadcrumbLabel}
+          className={cn('border-border flex items-center gap-1 border-b pb-2', INSET_CLASS.card)}
+        >
           {/*
             **로딩도 `backHref` 를 쓴다** (#783). 오류·404 를 제외한 근거는 *"어느 목록에서
             왔는지 주장할 근거가 없다"* 인데, 로딩에는 그 근거가 성립하지 않는다 — 라우트가
             이미 값을 갖고 있다. 같은 링크가 **누른 시점에 따라 다른 곳으로 가지 않게** 한다.
           */}
           <BackLink href={backHref} label={messages.walkCourse.backToList} />
-        </div>
+          <ChevronRightIcon size={16} aria-hidden className="text-fg-subtle shrink-0" />
+          <Skeleton className="h-4 w-32" />
+        </nav>
         <DetailSkeleton />
+        {/* 주변 장소는 자기 로딩 갈래를 그대로 쓴다 — 같은 카드 · 같은 행 골격 */}
+        <WalkCourseNearbyPlaces places={[]} loading />
       </DetailShell>
     )
   }
@@ -352,33 +366,102 @@ function Breadcrumb({ href, course }: { href: string; course: WalkCourseDetail }
  * 둘로 들린다. 스켈레톤만 자기 것을 따로 세운다.
  *
  * **읽는 폭에서 멈춘다** ([#781](https://github.com/8llow8llowMe/hondigagae/issues/781)).
- * 성공 화면이 갈래에 따라 캡을 고르는 것과 달리 여기서는 고를 수 없다 — 로딩 시점에는
- * 히어로가 있는지 모르고, 오류·404 에는 애초에 히어로가 없다. **25/29 가 히어로 없는
- * 갈래이고 오류 문구는 어느 갈래에서도 짧으므로 760 이 맞는 쪽이다.**
- *
- * 대가를 적어 둔다: 히어로가 있는 4개는 로딩(760) → 성공(1434)에서 폭이 한 번 넓어진다.
- * 서버 프리페치가 성공하면 보이지 않고(그 경로가 기본이다), 실패했을 때만 드러난다.
+ * 오류·404 에는 히어로가 없고 문구가 짧아 760 이 맞는 쪽이다. **로딩은 `wide` 로 넓힌다** —
+ * 완료 화면이 늘 2열(29/29 가 사진을 갖는다)이라 같은 폭으로 그린다 (위 로딩 갈래).
  */
-function DetailShell({ heading, children }: { heading: string; children: ReactNode }) {
+function DetailShell({
+  heading,
+  wide = false,
+  children,
+}: {
+  heading: string
+  /** 완료 화면과 같은 폭(`content-container`) — 로딩 갈래만 쓴다 */
+  wide?: boolean
+  children: ReactNode
+}) {
   return (
-    <SurfaceStack className="reading-container">
+    <SurfaceStack className={wide ? 'content-container' : 'reading-container'}>
       <h1 className="sr-only">{heading}</h1>
       {children}
     </SurfaceStack>
   )
 }
 
-/** 머리 + 정보 스켈레톤 (D5). 실제 머리와 같은 골격이라 응답이 와도 줄이 튀지 않는다 */
+/** 글줄 한 칸 — 칸은 실제 줄 높이(`box`), 막대만 가늘게(`bar`) 세워 위아래 줄과 붙지 않게 한다 */
+function Line({ box, bar }: { box: string; bar: string }) {
+  return (
+    <div className={cn('flex items-center', box)}>
+      <Skeleton className={bar} />
+    </div>
+  )
+}
+
+/**
+ * 코스 상세의 대기 모양 — 완료 화면의 2열 grid 와 **같은 클래스 · 같은 카드**다.
+ *
+ * 치수는 실측이다 (`/olle/6844072848938676555`, 390 · 1280, 2026-09-29):
+ * 히어로 16:9 · 요약 머리 250(제목 줄 58 · 거리/소요 48 · 설명 22 · 시종점 44) ·
+ * 골든타임 373 · 담기 48 · 시작점 지도(지도 176/208 + 길찾기 44). 골든타임은 비로그인
+ * 갈래(아래 안내 띠 94)의 높이다 — 로그인 상태마다 달라 한 벌로 잡는다.
+ */
 function DetailSkeleton() {
   return (
-    <div className={cn('flex flex-col gap-3', INSET_CLASS.card)} aria-busy>
-      <Skeleton className="h-8 w-32" />
-      <Skeleton className="h-6 w-2/3" />
-      <div className="mt-2 flex gap-8">
-        <Skeleton className="h-10 w-24" />
-        <Skeleton className="h-10 w-24" />
+    <div aria-busy className="flex flex-col gap-2 md:gap-6 lg:grid lg:grid-cols-2 lg:items-start">
+      {/* 히어로 — `WalkCourseHero` 와 같은 비율 · 모서리 */}
+      <Skeleton variant="card" className="aspect-video h-auto rounded-none md:rounded-lg" />
+
+      <div className="flex flex-col gap-2 md:gap-6 lg:row-span-2">
+        <Surface>
+          <div aria-hidden className={cn('flex flex-col gap-3 py-4 md:py-5', INSET_CLASS.card)}>
+            <div className="flex flex-col gap-1">
+              <div className="flex h-7.5 items-center">
+                <Skeleton className="h-6 w-28" />
+              </div>
+              <div className="flex h-6 items-center">
+                <Skeleton className="h-4.5 w-44" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+              {Array.from({ length: 2 }, (_, index) => (
+                <div key={index} className="flex flex-col gap-1">
+                  <Line box="h-4.5" bar="h-3.5 w-12" />
+                  <Line box="h-6.5" bar="h-5 w-20" />
+                </div>
+              ))}
+            </div>
+            <Line box="h-5.5" bar="h-4 w-3/4" />
+            <div className="flex flex-col gap-1">
+              <Line box="h-4.5" bar="h-3.5 w-16" />
+              <Line box="h-5.5" bar="h-4 w-1/2" />
+            </div>
+          </div>
+        </Surface>
+
+        <Surface>
+          <div aria-hidden className={cn('flex flex-col gap-3 py-4 md:py-5', INSET_CLASS.card)}>
+            <Line box="h-7.5" bar="h-6 w-40" />
+            <Skeleton className="h-14.5 w-full" />
+            <Skeleton className="h-18.5 w-full" />
+            <Line box="h-4.5" bar="h-3.5 w-48" />
+          </div>
+          <div aria-hidden className={cn('pb-4 md:pb-5', INSET_CLASS.card)}>
+            <Skeleton className="h-23.5 w-full rounded-md" />
+          </div>
+        </Surface>
+
+        {/* `일정에 담기` 자리 */}
+        <div aria-hidden className={INSET_CLASS.card}>
+          <Skeleton className="h-12 w-full rounded-md" />
+        </div>
       </div>
-      <Skeleton className="h-5 w-1/2" />
+
+      {/* 시작점 지도 — 제목은 고정 문구라 실제로 그린다 */}
+      <Surface title={messages.walkCourse.startMapHeading}>
+        <div aria-hidden className={cn('flex flex-col gap-2 pb-4 md:pb-5', INSET_CLASS.card)}>
+          <Skeleton variant="card" className="h-44 rounded-md md:h-52" />
+          <Skeleton className="h-11 w-full rounded-md" />
+        </div>
+      </Surface>
     </div>
   )
 }
