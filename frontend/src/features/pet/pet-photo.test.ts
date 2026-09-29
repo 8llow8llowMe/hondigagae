@@ -3,32 +3,35 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
+import { PET_AVATAR_DEFAULT } from '@/components/pet-avatar'
 import { PetPhoto } from '@/features/pet/pet-photo'
 
 function render(url: string | null) {
-  return renderToStaticMarkup(createElement(PetPhoto, { name: '몽실이', url }))
+  return renderToStaticMarkup(createElement(PetPhoto, { url }))
 }
 
 describe('PetPhoto', () => {
-  it('사진이 없으면 이름 첫 글자로 떨어진다 — 빈 원형을 남기지 않는다', () => {
-    const markup = render(null)
-
-    expect(markup).toContain('몽')
-    expect(markup).not.toContain('<img')
+  /*
+    **이니셜이 아니라 기본 그림이다** (#1022). 이 컴포넌트의 크기(48 · 80)는 모두 그림이 읽히는
+    40 이상이다. SVG 라 `next/image` 가 최적화 경로로 감싸지 않고 그대로 싣는다.
+  */
+  it('사진이 없으면 기본 그림으로 떨어진다 — 빈 원형을 남기지 않는다', () => {
+    expect(render(null)).toContain(PET_AVATAR_DEFAULT.src)
   })
 
   it('빈 문자열도 없는 것으로 본다', () => {
-    expect(render('')).not.toContain('<img')
+    expect(render('')).toContain(PET_AVATAR_DEFAULT.src)
   })
 
   it('사진이 있으면 그린다', () => {
     const markup = render('https://storage.example.com/pets/1.jpg')
 
-    expect(markup).toContain('<img')
     expect(markup).toContain('https://storage.example.com/pets/1.jpg')
+    expect(markup).not.toContain(PET_AVATAR_DEFAULT.src)
   })
 
   it('alt 를 비운다 — 이름이 항상 옆에 글자로 있어 두 번 읽힌다', () => {
+    expect(render(null)).toContain('alt=""')
     expect(render('https://storage.example.com/pets/1.jpg')).toContain('alt=""')
   })
 

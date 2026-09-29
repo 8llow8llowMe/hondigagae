@@ -42,7 +42,7 @@ export function PetRow({ pet, inset = 'card' }: { pet: Pet; inset?: Inset }) {
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <div className="flex items-center gap-3">
             {/* 원형은 사진·아바타에만 허용된 곡선이다 (DESIGN.md §5) */}
-            <PetPhoto name={pet.name} url={pet.profileImageUrl} />
+            <PetPhoto url={pet.profileImageUrl} />
 
             <div className="flex min-w-0 flex-col">
               <div className="flex items-center gap-1.5">

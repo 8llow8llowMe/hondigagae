@@ -59,7 +59,7 @@ export function PetPhotoSection({ pet }: { pet: Pet }) {
   return (
     <div className={cn('flex flex-col gap-3 pt-2 pb-5', INSET_CLASS.card)}>
       <div className="flex items-center gap-4">
-        <PetPhoto name={pet.name} url={pet.profileImageUrl} size={80} />
+        <PetPhoto url={pet.profileImageUrl} size={80} />
 
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
