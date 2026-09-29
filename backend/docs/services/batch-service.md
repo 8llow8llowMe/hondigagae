@@ -69,8 +69,9 @@
 | 잡 | 원천 API | 비고 |
 |-----|----------|------|
 | `RelatedPlaceImportJob` | 관광지별 연관 관광지 API | 코스 생성용 연결성 |
-| `WalkCourseImportJob` | 두루누비 API | 산책·레저 코스 |
 | `VisitorStatsJob` | 관광빅데이터 정보 서비스 API | 방문자 수 분석 |
+
+두루누비 걷기 코스는 제주가 0건이라 계획에서 뺐다 — 산책 코스는 `olleCourseImportJob` 이 적재한다 (아래 올레 절).
 
 ## 구현 주의점
 
@@ -96,6 +97,11 @@
   남겨, 포털이 되살아난 첫 실행이 파일이 그대로여도 다시 적재한다 (#887, `data-refresh-guide.md` §5
   "우회 적재가 남기는 것"). 판정 규칙은 올레와 함께 `SourceFileSnapshotRule` 하나를 쓴다.
   스냅샷 DDL 은 `resources/db/import-source-snapshot-mysql.sql` 하나가 정본이고 prod 는 런북 적용이다.
+- **스냅샷 `file_name` 은 `global.support.ContentDispositionFileName` 하나가 읽는다** (#888, 문화정보원·올레 공용).
+  포털은 `filename*` 없이 plain `filename="…"` 에 UTF-8 바이트를 싣고 HTTP 클라이언트는 헤더를 ISO-8859-1 로 읽어
+  `ì ì£¼…` 로 깨진다. `filename*` 이 있으면 그것을 우선하고, plain 은 모든 글자가 U+00FF 이하이고 그 바이트가
+  UTF-8 로 엄격 디코딩될 때만 되읽는다 — 진짜 latin1 이름·이미 올바른 유니코드는 그대로. 판정은 `file_id`·`content_length`
+  만 보므로 #888 이전의 깨진 행은 표시만 깨져 있다 (`data-refresh-guide.md` §5).
 - **적재 범위와 병합 범위는 한 값에서 나와야 한다.** 지역 코드를 상수로 박으면 다른 시도로
   잡을 돌렸을 때 그 지역을 적재해 놓고 제주만 병합하는 조용한 어긋남이 난다.
   시도 명칭 → 관광 지역코드 변환은 `RegionCodeMapping` 한곳에 있고, 매핑에 없는 지역이면

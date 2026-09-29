@@ -274,6 +274,20 @@ SELECT source, area_code, file_id, file_name, content_length, source_modified_ma
  LIMIT 10;
 ```
 
+### 스냅샷 `file_name` — 포털 헤더의 UTF-8 바이트를 되읽는다 (#888)
+
+포털(`fileDownload.do`)은 `filename*` 없이 plain `filename="…"` 에 **UTF-8 바이트를 그대로** 싣는다(2026-09-29
+응답 헤더 원문 hex `…66696c656e616d653d22 eca09ceca3bced8ab9…` = `filename="제주특…`). HTTP 클라이언트는 헤더를
+ISO-8859-1 로 읽으므로 바이트 하나가 글자 하나가 되어 `ì ì£¼í¹ë³…` 로 저장됐다. 문화정보원·올레 둘 다다.
+
+규칙은 `ContentDispositionFileName` 한 곳이다(batch-service `global.support`, 두 어댑터 공용). `filename*`(RFC 5987)이
+있으면 그것을 우선하고, plain `filename` 은 **모든 글자가 U+00FF 이하이고 그 latin1 바이트가 UTF-8 로 엄격 디코딩될 때만**
+UTF-8 로 되읽는다. 아니면 받은 그대로 둔다 — 진짜 latin1 이름(`café`)이나 이미 올바른 유니코드 이름을 망치지 않는다.
+
+**#888 이전 행은 표시만 깨져 있고 판정에 영향이 없다 — 재적재는 필요 없다.** `import_source_snapshot` 은 append-only
+라 옛 행은 깨진 채 남지만, "같은 파일인가" 판정(`SourceFileSnapshotRule.sameFile`)은 `file_id`·`content_length` 만 본다.
+`file_name` 은 사람이 판본을 알아보는 기록용이다. 다음 포털 적재가 남기는 행부터 이름이 바로 나온다.
+
 ### 올레 포털 — JSON-LD 를 버리고 다운로드 버튼 경로로 갈아탔다 (#876)
 
 2026-09-21 dev 재적재에서 `olleCourseImportJob` 이 포털 파싱에 실패해 **로컬 우회 파일로 돌았다.**
