@@ -1,6 +1,7 @@
 package com.hondigagae.domainlayer.plan.application.info;
 
 import com.hondigagae.domainlayer.plan.domain.enums.PlanDayWeatherUnavailableReason;
+import com.hondigagae.domainlayer.plan.domain.model.PlanItem;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.Builder;
@@ -27,6 +28,10 @@ public record PlanWeatherInfo(
     /**
      * 하루치 브리핑.
      *
+     * @param representativePlaceId 그날 판정을 가른 장소 — 그날 장소 전체 중 (장소, 반려견) 점수가 가장 낮은
+     *                              조합의 장소다 (#1045). 판정을 못 낸 날은 순서가 가장 앞선 장소, 장소가 없으면 null
+     * @param representativePlanItemId {@code representativePlaceId} 를 가리키는 그날의 일정 항목. 같은 장소를 두 번
+     *                                 담아도 항목은 하나로 정해진다(순서가 앞선 쪽). 화면이 제목 대조 없이 항목을 잇는다
      * @param basisPetId 그날 판정의 기준이 된 반려견 — 아이별 판정 중 <b>점수가 가장 낮은</b> 아이다.
      *                   장소 항목이 없거나 조회에 실패하면 null
      * @param suitability {@code basisPetId} 기준 적합도. 장소 항목이 없거나 조회에 실패하면 null
@@ -40,6 +45,7 @@ public record PlanWeatherInfo(
         LocalDate date,
         Long representativePlaceId,
         String representativePlaceTitle,
+        Long representativePlanItemId,
         Long basisPetId,
         PlanDaySuitabilityInfo suitability,
         List<PetSuitabilityInfo> petSuitabilities,
@@ -62,6 +68,17 @@ public record PlanWeatherInfo(
             return PlanDayWeatherInfo.builder()
                 .day(day).date(date)
                 .representativePlaceId(placeId).representativePlaceTitle(placeTitle)
+                .petSuitabilities(List.of()).unavailableReason(reason).build();
+        }
+
+        /** 대표 장소의 일정 항목까지 아는 채로 못 낸 날. 항목 아이디도 함께 내린다 (#1045). */
+        public static PlanDayWeatherInfo unavailable(
+            int day, LocalDate date, PlanItem place, PlanDayWeatherUnavailableReason reason
+        ) {
+            return PlanDayWeatherInfo.builder()
+                .day(day).date(date)
+                .representativePlaceId(place.targetId()).representativePlaceTitle(place.title())
+                .representativePlanItemId(place.id())
                 .petSuitabilities(List.of()).unavailableReason(reason).build();
         }
     }

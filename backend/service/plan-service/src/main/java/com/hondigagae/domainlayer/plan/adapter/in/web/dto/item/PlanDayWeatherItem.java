@@ -16,11 +16,20 @@ public record PlanDayWeatherItem(
     @Schema(description = "해당 일자", example = "2026-09-13")
     LocalDate date,
 
-    @Schema(description = "그날 기준이 된 장소 아이디", example = "212481712381923328", nullable = true)
+    @Schema(description = "그날 판정을 가른 장소 아이디 — 그날 장소성 항목 전체를 (장소 × 반려견)으로 판정해 "
+        + "점수가 가장 낮은 조합의 장소다. 한 곳이라도 힘든 날이면 그날은 힘든 날이다. "
+        + "score·suitabilityLevel·reasons·indoorAlternatives 는 이 장소 기준이다. "
+        + "판정을 못 낸 날(지난 날짜·예보 범위 밖·조회 실패)은 순서가 가장 앞선 장소, 장소 항목이 없으면 null",
+        example = "212481712381923328", nullable = true)
     String representativePlaceId,
 
-    @Schema(description = "그날 기준이 된 장소명", example = "협재해수욕장", nullable = true)
+    @Schema(description = "그날 판정을 가른 장소명 (representativePlaceId 의 장소)", example = "협재해수욕장", nullable = true)
     String representativePlaceTitle,
+
+    @Schema(description = "representativePlaceId 를 가리키는 그날의 일정 항목 아이디. 같은 장소를 두 번 담았으면 순서가 앞선 항목. "
+        + "화면이 제목 대조 없이 판정 장소를 일정 항목에 잇는 데 쓴다. representativePlaceId 가 null 이면 null",
+        example = "312481712381923328", nullable = true)
+    String representativePlanItemId,
 
     @Schema(description = "그날 판정의 기준이 된 반려견 아이디 — 아이별 판정 중 점수가 가장 낮은 아이. "
         + "score·suitabilityLevel·reasons·indoorAlternatives 는 이 아이 기준이다. 판정을 못 냈으면 null",

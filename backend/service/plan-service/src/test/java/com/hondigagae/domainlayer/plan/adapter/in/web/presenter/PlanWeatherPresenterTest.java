@@ -72,6 +72,22 @@ class PlanWeatherPresenterTest {
         assertThat(item.score()).isEqualTo(72);
     }
 
+    @Test
+    @DisplayName("판정 장소의 일정 항목 아이디는 문자열로 나가고, 없으면 null 이다 (#1045)")
+    void representativePlanItemIdIsString() {
+        PlanDayWeatherItem withItem = presenter.toDayItem(PlanDayWeatherInfo.builder()
+            .day(1).date(DATE)
+            .representativePlaceId(100L).representativePlaceTitle("협재해수욕장")
+            .representativePlanItemId(312481712381923328L)
+            .petSuitabilities(List.of())
+            .build());
+        PlanDayWeatherItem withoutItem = presenter.toDayItem(
+            PlanDayWeatherInfo.unavailable(1, DATE, PlanDayWeatherUnavailableReason.NO_PLACE_ITEM));
+
+        assertThat(withItem.representativePlanItemId()).isEqualTo("312481712381923328");
+        assertThat(withoutItem.representativePlanItemId()).isNull();
+    }
+
     /**
      * 등급 점수 해석 문장이 응답까지 나가는지 고정한다 (#759).
      *
