@@ -67,6 +67,34 @@ describe('PlanDayVerdict — 판정이 축을 밝힌다 (#652 · #856)', () => {
   })
 })
 
+/*
+  일자 판정은 그날 순서가 가장 앞선 장소 하나의 판정이다 (`pickRepresentative`). 이름을 밝히지
+  않으면 그 장소의 사정(`소형견만 가능` · 추가 요금)이 하루 전체의 판정으로 읽힌다.
+*/
+describe('PlanDayVerdict — 기준 장소를 밝힌다', () => {
+  it('판정을 낸 장소 이름을 축 캡션 옆에 붙인다', () => {
+    const html = render({ representativePlaceTitle: '포시즌펜션' })
+
+    expect(html).toContain(messages.plan.verdictBasisPlace.replace('{title}', '포시즌펜션'))
+  })
+
+  it('기준 장소가 축 캡션보다 뒤, 등급어보다 앞에 온다 — 근거를 읽기 전에 안다', () => {
+    const html = render({ representativePlaceTitle: '포시즌펜션' })
+    const axis = html.indexOf(`>${messages.common.metricAxisSuitability}</span>`)
+    const place = html.indexOf('포시즌펜션')
+    const word = html.indexOf(`>${planVerdict.suitabilityLevel?.name}</span>`)
+
+    expect(axis).toBeLessThan(place)
+    expect(place).toBeLessThan(word)
+  })
+
+  it('기준 장소가 없으면 축 캡션만 선다 — 빈 `기준` 을 남기지 않는다', () => {
+    const html = render({ representativePlaceTitle: null })
+
+    expect(html).not.toContain(messages.plan.verdictBasisPlace.replace('{title}', ''))
+  })
+})
+
 describe('PlanDayVerdict — 판정 옆 큰 숫자 (#253)', () => {
   it('체감온도를 그 이름으로 보여 준다', () => {
     const html = render({ weather: weather({ maxFeelsLikeTemperature: 33.4 }) })
