@@ -138,7 +138,7 @@ describe('PhotoGallery — 사진이 없을 때 (DESIGN.md §7-3)', () => {
 
   it('자산이 없는 카테고리는 회색 타일로 떨어뜨리지 않고 렌더하지 않는다', () => {
     // 없애려던 회색 벽이 그대로 돌아온다
-    expect(render(0, 'SHOPPING')).toBe('')
+    expect(render(0, 'NEW_CODE_FROM_SERVER')).toBe('')
   })
 
   it('사진이 한 장이라도 있으면 일러스트를 쓰지 않는다', () => {

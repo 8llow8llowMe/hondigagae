@@ -19,13 +19,18 @@ describe('placeIllustration — 아는 것(카테고리)만 그린다', () => {
   })
 
   /**
-   * 자산이 없는 코드는 **회색 타일로 떨어진다.** 스펙의 나머지 4종
-   * (`FESTIVAL`/`COURSE`/`LEPORTS`/`SHOPPING`)은 제주 데이터에 아직 없다 —
-   * 자산을 넣으면 여기 한 줄만 늘려 붙는다.
+   * 나머지 4종은 제주 데이터에 거의 나오지 않지만 스펙에 있다 — 나오는 순간 회색 타일이
+   * 되지 않도록 미리 그려 둔다.
    */
+  it('나머지 4종에도 자산을 준다 — 스펙의 8종을 전부 덮는다', () => {
+    expect(placeIllustration('FESTIVAL')).toBe('/illustrations/place-festival.webp')
+    expect(placeIllustration('COURSE')).toBe('/illustrations/place-course.webp')
+    expect(placeIllustration('LEPORTS')).toBe('/illustrations/place-leports.webp')
+    expect(placeIllustration('SHOPPING')).toBe('/illustrations/place-shopping.webp')
+  })
+
+  /** 회색 타일은 이제 **서버가 새로 보낸 모르는 코드**의 몫이다 */
   it('자산이 없는 코드는 null 이다 — 없는 카테고리를 지어내지 않는다', () => {
-    expect(placeIllustration('FESTIVAL')).toBe(null)
-    expect(placeIllustration('SHOPPING')).toBe(null)
     expect(placeIllustration('NEW_CODE_FROM_SERVER')).toBe(null)
   })
 

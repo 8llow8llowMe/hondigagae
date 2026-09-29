@@ -135,7 +135,7 @@ describe('PlaceRow — nullable 처리', () => {
     const markup = render({
       ...placeSummary,
       firstImage: null,
-      contentType: { code: 'FESTIVAL', name: '축제·공연', description: null },
+      contentType: { code: 'NEW_CODE_FROM_SERVER', name: '새 분류', description: null },
     })
 
     expect(markup).toContain(messages.place.noImage)
