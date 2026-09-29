@@ -642,12 +642,11 @@ export const planMessages = {
   regenerateDayTooLong: '10일이 넘는 일정은 AI 로 다시 만들 수 없어요.',
 
   /** 편집 중 상단 안내. 낙관적 업데이트를 하지 않는다는 것을 화면이 말한다 */
-  editHint: '번호를 끌어 순서를 바꿀 수 있어요. 저장하기 전까지는 아무것도 바뀌지 않아요.',
+  editHint:
+    '카드를 끌거나 화살표로 순서를 바꿀 수 있어요. 저장하기 전까지는 아무것도 바뀌지 않아요.',
   /** 거리 자리를 대신한다 — 순서를 옮길 때마다 숫자가 흔들리면 신뢰가 깨진다 */
   editDistanceNote: '이동 거리는 저장 후 다시 계산돼요',
 
-  /** 손잡이 `title` — 마우스·터치에서 끌 수 있다는 것을 알린다 */
-  editDragHandle: '끌어서 순서 바꾸기',
   editMoveUp: '위로 이동',
   editMoveDown: '아래로 이동',
   editRemove: '삭제',
