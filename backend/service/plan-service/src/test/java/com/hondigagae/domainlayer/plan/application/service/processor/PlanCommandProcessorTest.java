@@ -25,6 +25,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +67,7 @@ class PlanCommandProcessorTest {
     private StubPlanPetConditionRepositoryPort planPetConditionRepositoryPort;
     private StubPlaceVerifyQueryPort placeVerifyQueryPort;
     private StubPlanWalkCourseQueryPort planWalkCourseQueryPort;
+    private StubPlanItemRepositoryPort planItemRepositoryPort;
     private PlanCommandProcessor processor;
 
     @BeforeEach
@@ -77,8 +79,9 @@ class PlanCommandProcessorTest {
         planPetConditionRepositoryPort = new StubPlanPetConditionRepositoryPort();
         placeVerifyQueryPort = new StubPlaceVerifyQueryPort();
         planWalkCourseQueryPort = new StubPlanWalkCourseQueryPort();
+        planItemRepositoryPort = new StubPlanItemRepositoryPort();
         processor = new PlanCommandProcessor(
-            planRepositoryPort, new StubPlanItemRepositoryPort(), planPetRepositoryPort,
+            planRepositoryPort, planItemRepositoryPort, planPetRepositoryPort,
             planPetConditionRepositoryPort, placeVerifyQueryPort, planWalkCourseQueryPort,
             petConditionQueryPort, new SnowflakeIdGenerator(1, 1), CLOCK);
     }
@@ -331,10 +334,85 @@ class PlanCommandProcessorTest {
         assertThat(updated.status()).isEqualTo(PlanStatus.COMPLETED);
     }
 
+    // ── 다녀옴 표시 가드 (#983) ────────────────────────────────────────
+
+    @Test
+    @DisplayName("여행 전날 다녀옴으로 표시하면 PLAN_027 로 거부한다 — 떠나지 않은 여행에 다녀온 기록을 남기지 않는다")
+    void rejectsMarkingVisitedBeforeStart() {
+        PlanItem item = storedItem(false);
+
+        assertThatThrownBy(() -> processorAt(TRIP_START.minusDays(1)).markItemVisited(plan(PlanStatus.CONFIRMED, 2L), item.id(), true))
+            .isInstanceOf(PlanException.class)
+            .extracting(exception -> ((PlanException) exception).getErrorCode())
+            .isEqualTo(PlanErrorCode.PLAN_NOT_STARTED_VISIT);
+        assertThat(planItemRepositoryPort.saved).isNull();
+    }
+
+    @Test
+    @DisplayName("시작 전이라도 다녀옴 해제는 받는다 — 가드 이전 표시나 일정을 미래로 옮긴 뒤 남은 표시를 풀 수 있어야 한다")
+    void allowsUnmarkingVisitedBeforeStart() {
+        PlanItem item = storedItem(true);
+
+        PlanItem updated = processorAt(TRIP_START.minusDays(3)).markItemVisited(plan(PlanStatus.CONFIRMED, 2L), item.id(), false);
+
+        assertThat(updated.visited()).isFalse();
+        assertThat(planItemRepositoryPort.saved).isEqualTo(updated);
+    }
+
+    @Test
+    @DisplayName("시작일 당일에는 다녀옴으로 표시할 수 있다 — 여행은 그날 시작된다")
+    void allowsMarkingVisitedOnStartDay() {
+        PlanItem item = storedItem(false);
+
+        PlanItem updated = processorAt(TRIP_START).markItemVisited(plan(PlanStatus.CONFIRMED, 2L), item.id(), true);
+
+        assertThat(updated.visited()).isTrue();
+        assertThat(planItemRepositoryPort.saved).isEqualTo(updated);
+    }
+
+    @Test
+    @DisplayName("이미 지난 일정은 다녀옴으로 표시할 수 있다 — 일정 상태와 무관하게 날짜 하나로 가른다")
+    void allowsMarkingVisitedOnPastPlan() {
+        PlanItem item = storedItem(false);
+
+        PlanItem updated = processorAt(TRIP_START.plusMonths(1)).markItemVisited(plan(PlanStatus.DRAFT, 2L), item.id(), true);
+
+        assertThat(updated.visited()).isTrue();
+    }
+
+    @Test
+    @DisplayName("남의 일정 항목은 시작 전이어도 PLAN_005 다 — 소유 확인이 날짜 가드보다 먼저다")
+    void rejectsForeignItemWithNotFoundBeforeStartGuard() {
+        PlanItem foreign = storedItem(false).toBuilder().id(902L).planId(999L).build();
+        planItemRepositoryPort.stored.put(foreign.id(), foreign);
+
+        assertThatThrownBy(() -> processorAt(TRIP_START.minusDays(1)).markItemVisited(plan(PlanStatus.CONFIRMED, 2L), foreign.id(), true))
+            .isInstanceOf(PlanException.class)
+            .extracting(exception -> ((PlanException) exception).getErrorCode())
+            .isEqualTo(PlanErrorCode.NOT_FOUND_PLAN_ITEM);
+        assertThat(planItemRepositoryPort.saved).isNull();
+    }
+
+    /** 픽스처 일정(id 500)의 1일차 항목을 스텁에 심는다. */
+    private PlanItem storedItem(boolean visited) {
+        PlanItem item = PlanItem.builder()
+            .id(901L)
+            .planId(500L)
+            .day(1)
+            .sequence(0)
+            .itemType(PlanItemType.PLACE)
+            .targetId(10L)
+            .title("천지연폭포")
+            .visited(visited)
+            .build();
+        planItemRepositoryPort.stored.put(item.id(), item);
+        return item;
+    }
+
     /** 같은 스텁을 쓰되 "오늘" 만 {@code today} 로 옮긴 Processor. */
     private PlanCommandProcessor processorAt(LocalDate today) {
         return new PlanCommandProcessor(
-            planRepositoryPort, new StubPlanItemRepositoryPort(), planPetRepositoryPort,
+            planRepositoryPort, planItemRepositoryPort, planPetRepositoryPort,
             planPetConditionRepositoryPort, placeVerifyQueryPort, planWalkCourseQueryPort,
             petConditionQueryPort, new SnowflakeIdGenerator(1, 1),
             Clock.fixed(today.atStartOfDay(SEOUL).toInstant(), SEOUL));
@@ -641,14 +719,20 @@ class PlanCommandProcessorTest {
             return List.of();
         }
 
+        /** 방문 체크(#983) 테스트가 심어 두는 항목. */
+        private final Map<Long, PlanItem> stored = new HashMap<>();
+        /** {@code save} 로 들어온 마지막 항목. 거부된 요청이 저장까지 가지 않았는지 보는 데 쓴다. */
+        private PlanItem saved;
+
         @Override
         public Optional<PlanItem> findById(long planItemId) {
-            throw new UnsupportedOperationException();
+            return Optional.ofNullable(stored.get(planItemId));
         }
 
         @Override
         public PlanItem save(PlanItem item) {
-            throw new UnsupportedOperationException();
+            saved = item;
+            return item;
         }
 
         @Override

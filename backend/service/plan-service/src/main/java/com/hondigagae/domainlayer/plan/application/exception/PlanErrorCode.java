@@ -46,6 +46,9 @@ public enum PlanErrorCode {
     // 여행 전 상태 가드 (#971). 떠나지 않은 여행을 다녀온 기록으로 남기지 않는다. 시작일 당일부터는
     // 허용한다 — 당일치기 여행이 있다. 완료된 일정의 시작일을 미래로 옮기는 것도 같은 코드로 막는다.
     PLAN_NOT_STARTED_COMPLETE("PLAN_026", "여행 시작일 전에는 여행을 완료할 수 없습니다.", HttpStatus.BAD_REQUEST),
+    // 다녀옴 표시 가드 (#983). PLAN_026 과 같은 선 — 판정은 Plan.hasStarted 하나, 당일부터 허용, 일정 상태는 보지 않는다.
+    // 해제(visited=false)는 막지 않는다 — 가드 이전에 찍힌 표시나 일정을 미래로 옮긴 뒤 남은 표시를 풀 수 있어야 한다.
+    PLAN_NOT_STARTED_VISIT("PLAN_027", "여행 시작일 전에는 다녀옴으로 표시할 수 없습니다.", HttpStatus.BAD_REQUEST),
     INVALID_REQUEST("PLAN_100", "요청 값이 올바르지 않습니다.", HttpStatus.BAD_REQUEST),
     // 프레임워크 공통 2종은 검증 대역 끝에 둔다 (coding-conventions §8-2). PLAN_115 가 petIds 필드 코드로
     // 쓰이면서 한 칸씩 밀렸고, 준비물 필드 코드가 PLAN_116~123 을 가져가면서 다시 밀었다.
