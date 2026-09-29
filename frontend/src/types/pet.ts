@@ -33,7 +33,7 @@ export type Pet = {
   activityLevel: EnumMetadata
   walkPreferred: boolean
   sociality: EnumMetadata
-  /** MinIO 에 저장된 프로필 사진. 없으면 `null` → 이름 첫 글자 아바타로 떨어진다 */
+  /** MinIO 에 저장된 프로필 사진. 없으면 `null` → 기본 그림(`PET_AVATAR_DEFAULT`)으로 떨어진다 */
   profileImageUrl: string | null
   /**
    * 대표 반려견. **회원당 하나만 유지된다** — 지정하면 기존 대표가 자동 해제된다.
