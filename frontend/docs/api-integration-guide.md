@@ -344,6 +344,7 @@ mutation 후 무효화 대상을 **명세와 코드 양쪽에 명시한다.**
 | 일정 생성/수정/삭제          | `planKeys.all`                                                                       |
 | 일자 항목 교체               | `planKeys.detail(planId)`                                                            |
 | **항목 방문 체크**           | `planKeys.detail(planId)` (**판정은 무효화하지 않는다** — 아래)                      |
+| **항목 시작 시각** (#1053)   | `planKeys.detail(planId)` + `planKeys.walkSafety(planId)` (판정 제외 — 아래)         |
 | 반려견 등록/수정             | `petKeys.all`                                                                        |
 | **반려견 삭제**              | `petKeys.all` + `planKeys.all` (지운 아이 상세·집계는 재조회 제외 — 아래)            |
 | 프로필 수정 / 이미지 변경    | `memberKeys.me()`                                                                    |
@@ -361,6 +362,10 @@ mutation 후 무효화 대상을 **명세와 코드 양쪽에 명시한다.**
   방문 체크는 항목 구성·순서를 바꾸지 않는다. 담기·순서편집이 판정을 다시 받는 것과 갈리는 지점이다.
   응답이 `Response<Void>` 라 `setQueryData` 로 갈아끼울 수 없어 **무효화가 유일한 갱신 경로**다
   (`docs/features/plan/일정상세-세부명세.md` D9-5).
+- **항목 시작 시각(단건 `PUT …/items/{planItemId}/start-time`)도 같은 결이다** (#1053). 응답이
+  `Response<Void>` 라 무효화로만 이어받고, 판정은 시각을 읽지 않아 두지만 **산책 위험도는 시각이
+  직접 입력이라 무효화한다.** 모달은 상세 재조회를 기다린 뒤 닫는다 — 먼저 닫으면 토스트 아래 칩이
+  옛 시각을 보인다 (`docs/features/plan/일자편집-세부명세.md` G4).
 - **반려견 삭제는 일정까지 무효화하고, 지운 아이의 key 는 다시 받지 않는다** (#1042). 삭제 응답이 온
   시점에 plan-service 가 다견 일정의 `petIds` 에서 그 아이를 이미 뗐다 — 일정 캐시를 두면 30초 동안
   지운 아이가 일정에 남아 보인다. 반대로 `petKeys.all` 을 그대로 무효화하면 **아직 화면이 관찰 중인
