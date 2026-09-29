@@ -127,8 +127,12 @@ export function PlanEditableItemRow({
             덮으므로 막으면 목록 위에서 화면을 올릴 수 없다. 끌기가 시작된 터치의 스크롤은
             `touch-action` 이 아니라 `useDragReorder` 의 `touchmove` 리스너가 막는다 —
             브라우저는 손가락이 닿는 순간의 값만 읽는다. `none` 은 그 뒤의 새 터치를 위해 건다.
+
+            **두 손가락 확대는 남긴다** (`pinch-zoom`, #1029 검토). `pan-y` 만 두면 카드가 화면
+            대부분을 덮어 목록 위에서 확대가 막힌다 — 저시력 사용자에게 회귀다. 두 번째 손가락은
+            `onPointerDown` 이 받지 않으므로 끌기와 부딪히지 않는다.
           */
-          dragging ? 'cursor-grabbing touch-none' : 'cursor-grab touch-pan-y',
+          dragging ? 'cursor-grabbing touch-none' : 'cursor-grab touch-pan-y touch-pinch-zoom',
         ],
       )}
       onPointerDown={draggable ? (event) => onDragPointerDown(index, event) : undefined}

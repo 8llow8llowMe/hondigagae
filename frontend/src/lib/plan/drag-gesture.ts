@@ -40,7 +40,12 @@ export type DragGesture =
   | { phase: 'active'; input: DragInput; pointerId: number }
 
 export type DragGestureEvent =
-  | { type: 'move'; x: number; y: number }
+  /**
+   * `buttons` 는 `PointerEvent.buttons`. **마우스에서 `0` 이면 놓친 놓기다** (#1029 검토) —
+   * 끄는 도중 창 밖으로 나가 `pointerup` 을 받지 못하면 버튼 없이 움직여도 세션이 남았다.
+   * 모르면 생략한다(눌린 것으로 본다).
+   */
+  | { type: 'move'; x: number; y: number; buttons?: number }
   /** 터치 길게 누르기 타이머가 찼다 */
   | { type: 'hold' }
   /** 놓았거나 브라우저가 취소했다 (`pointerup` · `pointercancel`) */
@@ -58,9 +63,13 @@ export function beginDragGesture(down: {
   button: number
   x: number
   y: number
+  /** `PointerEvent.ctrlKey`. 모르면 생략 */
+  ctrlKey?: boolean
 }): DragGesture | null {
   // 왼쪽 버튼·터치·펜 접촉만(`button === 0`). 오른쪽 클릭은 컨텍스트 메뉴와 엉킨다
   if (down.button !== 0) return null
+  // mac 의 Ctrl+클릭은 `button=0` 인 오른쪽 클릭이다 — 받으면 누름 중이라 메뉴를 막게 된다
+  if (down.pointerType === 'mouse' && down.ctrlKey === true) return null
 
   return {
     phase: 'pending',
@@ -81,6 +90,8 @@ export function advanceDragGesture(
   event: DragGestureEvent,
 ): DragGesture | null {
   if (event.type === 'end') return null
+  // 놓친 놓기 — 마우스 버튼이 이미 떨어져 있다. 터치는 기기마다 값이 달라 보지 않는다
+  if (event.type === 'move' && gesture.input === 'mouse' && event.buttons === 0) return null
   if (gesture.phase === 'active') return gesture
 
   if (event.type === 'hold') {

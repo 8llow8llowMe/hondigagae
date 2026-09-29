@@ -197,6 +197,7 @@ export function useDragReorder({
       button: event.button,
       x: event.clientX,
       y: event.clientY,
+      ctrlKey: event.ctrlKey,
     })
     if (gesture === null) return
 
@@ -217,17 +218,31 @@ export function useDragReorder({
     function handleMove(moveEvent: PointerEvent) {
       if (moveEvent.pointerId !== pointerId) return
       pointerYRef.current = moveEvent.clientY
-      advanceRef.current({ type: 'move', x: moveEvent.clientX, y: moveEvent.clientY })
+      advanceRef.current({
+        type: 'move',
+        x: moveEvent.clientX,
+        y: moveEvent.clientY,
+        buttons: moveEvent.buttons,
+      })
       applyMoveRef.current(moveEvent.clientY)
     }
     function handleEnd(endEvent: PointerEvent) {
       if (endEvent.pointerId !== pointerId) return
       advanceRef.current({ type: 'end' })
     }
+    /*
+      **화면이 가려지면 끝낸다** (#1029 검토). 앱 전환·OS 알림으로 `pointerup` · `pointercancel`
+      이 오지 않으면 세션이 남고, 터치 대기 중이었다면 0.3초 타이머가 보이지 않는 화면에서
+      끌기를 시작한다. 마우스의 놓친 놓기는 `buttons === 0` 이 따로 잡는다 (`advanceDragGesture`).
+    */
+    function handleHidden() {
+      if (document.visibilityState === 'hidden') advanceRef.current({ type: 'end' })
+    }
 
     window.addEventListener('pointermove', handleMove)
     window.addEventListener('pointerup', handleEnd)
     window.addEventListener('pointercancel', handleEnd)
+    document.addEventListener('visibilitychange', handleHidden)
 
     // 마우스에는 타이머가 없다 — `advanceDragGesture` 가 `hold` 를 무시하지만 걸 이유도 없다
     const timer =
@@ -244,6 +259,7 @@ export function useDragReorder({
         window.removeEventListener('pointermove', handleMove)
         window.removeEventListener('pointerup', handleEnd)
         window.removeEventListener('pointercancel', handleEnd)
+        document.removeEventListener('visibilitychange', handleHidden)
         if (card.hasPointerCapture(pointerId)) card.releasePointerCapture(pointerId)
         sessionRef.current = null
         setDragging(null)

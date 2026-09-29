@@ -161,6 +161,8 @@ describe('PlanDayEditor — 카드 끌기 (#1029)', () => {
     const [first] = cards(render())
 
     expect(first).toContain('touch-pan-y')
+    // 두 손가락 확대를 막지 않는다 — 카드가 화면 대부분을 덮는다 (#1029 검토)
+    expect(first).toContain('touch-pinch-zoom')
     expect(first).not.toContain('touch-none')
     expect(first).toContain('cursor-grab')
   })

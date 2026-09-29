@@ -44,6 +44,11 @@ describe('beginDragGesture — 누름을 받는가', () => {
   it('오른쪽 클릭은 받지 않는다 — 컨텍스트 메뉴와 엉킨다', () => {
     expect(beginDragGesture({ ...MOUSE_DOWN, button: 2 })).toBeNull()
   })
+
+  /* mac 의 Ctrl+클릭은 `button=0` 인 컨텍스트 메뉴다 — 받으면 세션이 열려 메뉴를 막는다 (#1029 검토) */
+  it('마우스 Ctrl+클릭은 받지 않는다 — mac 의 오른쪽 클릭이다', () => {
+    expect(beginDragGesture({ ...MOUSE_DOWN, ctrlKey: true })).toBeNull()
+  })
 })
 
 describe('advanceDragGesture — 마우스', () => {
@@ -113,6 +118,27 @@ describe('advanceDragGesture — 터치', () => {
     const active = advanceDragGesture(begin(TOUCH_DOWN), { type: 'hold' })
 
     expect(advanceDragGesture(active!, { type: 'move', x: 100, y: 900 })).toEqual(active)
+  })
+})
+
+/*
+  **버튼이 눌리지 않은 채 움직이면 끝이다** (#1029 검토). 끄는 도중 Alt+Tab · OS 알림으로
+  `pointerup` 을 놓치면 세션이 남아, 돌아와서 버튼 없이 움직이기만 해도 카드가 따라왔다.
+*/
+describe('advanceDragGesture — 놓친 놓기', () => {
+  it('마우스가 버튼 없이 움직이면 대기든 끌기든 끝난다', () => {
+    const pending = begin(MOUSE_DOWN)
+    const active = advanceDragGesture(pending, { type: 'move', x: 200, y: 200, buttons: 1 })!
+
+    expect(active).toMatchObject({ phase: 'active' })
+    expect(advanceDragGesture(pending, { type: 'move', x: 101, y: 200, buttons: 0 })).toBeNull()
+    expect(advanceDragGesture(active, { type: 'move', x: 300, y: 200, buttons: 0 })).toBeNull()
+  })
+
+  it('터치는 buttons 로 가르지 않는다 — 닿아 있는 동안의 값이 기기마다 다르다', () => {
+    const active = advanceDragGesture(begin(TOUCH_DOWN), { type: 'hold' })!
+
+    expect(advanceDragGesture(active, { type: 'move', x: 100, y: 260, buttons: 0 })).toBe(active)
   })
 })
 
