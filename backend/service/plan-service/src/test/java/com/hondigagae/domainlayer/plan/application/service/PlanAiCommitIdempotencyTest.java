@@ -31,7 +31,9 @@ import com.hondigagae.domainlayer.plan.domain.enums.PlanStatus;
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import com.hondigagae.shared.travel.plan.PlanItemType;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +64,12 @@ class PlanAiCommitIdempotencyTest {
     private static final long PET_ID = 7L;
     private static final long PLACE_ID = 100L;
     private static final String JOB_ID = "3f2b8c1e-5d4a-4e6b-9c7d-1a2b3c4d5e6f";
+    /**
+     * 여행 전 상태 가드(#971 · #983)가 읽는 "오늘". 이 테스트는 담기만 보므로 가드에 걸리지 않게 픽스처 기간
+     * (2026-09-12~14)이 지난 날로 고정한다 — 시스템 시각을 쓰면 결과가 실행 날짜에 따라 흔들린다.
+     */
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
+    private static final Clock CLOCK = Clock.fixed(LocalDate.of(2026, 9, 28).atStartOfDay(SEOUL).toInstant(), SEOUL);
 
     private FakePlanRepositoryPort plans;
     private PetConditionQueryPort petConditionQueryPort;
@@ -85,7 +93,7 @@ class PlanAiCommitIdempotencyTest {
         SnowflakeIdGenerator idGenerator = new SnowflakeIdGenerator(1, 1);
         PlanCommandProcessor commandProcessor = new PlanCommandProcessor(
             plans, items, pets, mock(PlanPetConditionRepositoryPort.class),
-            placeVerifyQueryPort, planWalkCourseQueryPort, petConditionQueryPort, idGenerator);
+            placeVerifyQueryPort, planWalkCourseQueryPort, petConditionQueryPort, idGenerator, CLOCK);
         PlanQueryProcessor queryProcessor = new PlanQueryProcessor(
             plans, items, pets, mock(PlanPlaceLookupPort.class), planWalkCourseQueryPort);
         // 날씨·응급·브리핑은 이 유스케이스가 부르지 않는다.
