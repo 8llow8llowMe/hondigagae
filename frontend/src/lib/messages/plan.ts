@@ -643,11 +643,6 @@ export const planMessages = {
 
   /** 편집 중 상단 안내. 낙관적 업데이트를 하지 않는다는 것을 화면이 말한다 */
   editHint: '번호를 끌어 순서를 바꿀 수 있어요. 저장하기 전까지는 아무것도 바뀌지 않아요.',
-  /**
-   * 시각 입력 위 안내 (#623 · 명세 G4). **`editHint` 와 다른 줄이다** — 순서 편집과
-   * 시각 편집은 다른 조작이라 한 문장에 욱여넣으면 어느 쪽 이야기인지 갈린다.
-   */
-  editStartTimeHint: '시작 시각은 선택이에요. 비우면 상세에 표시하지 않아요.',
   /** 거리 자리를 대신한다 — 순서를 옮길 때마다 숫자가 흔들리면 신뢰가 깨진다 */
   editDistanceNote: '이동 거리는 저장 후 다시 계산돼요',
 
@@ -659,17 +654,6 @@ export const planMessages = {
   editRestore: '복구',
   /** 취소선(시각)과 함께 간다 — 색·선만으로 알리지 않는다 */
   editRemoveMark: '저장하면 삭제돼요',
-
-  /**
-   * 시각 입력 접근 가능 이름 (#623 · 명세 G4). `{title}` 치환.
-   *
-   * **행마다 보이는 라벨을 달지 않는다.** 한 일자에 항목이 여럿이라 `시작 시각` 이
-   * 여러 번 서므로 이름은 `aria-label` 이 지고, `{title}` 을 넣어 구별한다 — 담기
-   * 버튼(`{title} 담기`, F6)과 같은 규칙이다.
-   */
-  editStartTimeLabel: '{title} 시작 시각',
-  /** 지우기 버튼 접근 가능 이름. `{title}` 치환 */
-  editStartTimeClearLabel: '{title} 시작 시각 지우기',
 
   editSave: '저장',
   // 취소 문구는 `editCancel`(이름·예산 수정에서 쓰는 것)을 그대로 쓴다
@@ -692,7 +676,7 @@ export const planMessages = {
     '이 곳은 더 이상 조회되지 않아 함께 저장할 수 없어요. 목록에서 빼면 저장할 수 있어요.',
   /**
    * `PLAN_100` — 시각 본문 파싱 실패 (#623 · 명세 G4). **재시도를 주지 않는다** — 같은
-   * 본문을 다시 보내면 같은 400 이다. 네이티브 `<input type="time">` 만 쓰면 이 경로에
+   * 본문을 다시 보내면 같은 400 이다. 전자시계 입력(#1028)은 `HH:mm:ss` 만 만들어 이 경로에
    * 닿지 않는다고 보지만(G8 미결 2), 서버는 계약상 이 오류를 낼 수 있다.
    */
   editStartTimeFormatError: '시각 형식이 올바르지 않아요. 다시 입력해 주세요.',
@@ -747,6 +731,50 @@ export const planMessages = {
    */
   addPlaceMissingPlaceError:
     '이 일자에 더 이상 조회되지 않는 장소가 있어 담을 수 없어요. 일정에서 그 항목을 먼저 빼 주세요.',
+
+  // ── 항목 시작 시각 (#1028) ───────────────────────────────────────────
+  // `일자편집-세부명세.md` G절. 시각은 순서 편집이 아니라 **일정 목록의 칩**에서 고친다.
+
+  /** 시각이 없는 행의 칩. 누르면 전자시계 모달이 열린다 */
+  itemTimeAddAction: '시간 등록하기',
+  /**
+   * 칩의 접근 가능한 이름. `{title}` 치환. **보이는 글자(`시간 등록하기`)를 그대로 품는다**
+   * (WCAG 2.5.3) — 한 화면에 같은 칩이 항목 수만큼 서서 제목으로 구별한다.
+   */
+  itemTimeAddLabel: '{title} 시간 등록하기',
+  /** 시각이 있는 행의 칩. `{title}` · `{time}`(`HH:mm`) 치환 — 보이는 `10:30` 을 품는다 */
+  itemTimeEditLabel: '{title} 시작 시각 {time}, 고치기',
+  /** 모달 제목. `{title}` 치환 — 어느 항목의 시각인지 밝힌다 */
+  itemTimeModalTitle: '{title} 시작 시각',
+  itemTimeModalDescription: '▲▼나 방향키로 바꾸거나 숫자를 바로 입력해요.',
+  /** 두 칸의 이름 — `spinbutton` 의 `aria-label` */
+  itemTimeHourLabel: '시',
+  itemTimeMinuteLabel: '분',
+  /** `aria-valuetext`. `{value}` 치환 — 숫자만 읽히면 시인지 분인지 모른다 */
+  itemTimeHourValueText: '{value}시',
+  itemTimeMinuteValueText: '{value}분',
+  /** ▲▼ 버튼 이름. `{unit}` 에 `시`/`분` */
+  itemTimeIncrease: '{unit} 올리기',
+  itemTimeDecrease: '{unit} 내리기',
+  itemTimeSave: '저장',
+  /** 시각이 있을 때만 선다 */
+  itemTimeClear: '시간 지우기',
+  /**
+   * 그 일자에 **체크된 항목이 있을 때만** 모달 안에 낸다 (#1028 · 명세 G2 · D9-2). 저장이
+   * 일괄 교체라 그 날 체크가 초기화된다 — 확인창을 한 번 더 두지 않고 이 한 줄로 알린다.
+   */
+  itemTimeVisitResetWarning: '저장하면 이 날의 ‘다녀옴’ 표시가 초기화돼요.',
+  /** `{title}` 치환. 성공만 토스트로 말한다 */
+  itemTimeSavedToast: '{title} 시작 시각을 저장했어요',
+  itemTimeClearedToast: '{title} 시작 시각을 지웠어요',
+  /** 5xx·무응답. 모달은 열린 채 입력이 남는다 — 같은 버튼으로 다시 보낸다 */
+  itemTimeErrorDescription: '시각을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.',
+  /**
+   * `PLAN_004`. **시각 때문에 나는 실패가 아니다** — 일괄 교체가 그 일자의 장소를 되싣다가
+   * 원천에서 사라진 장소에 걸린다 (`addMoveMissingPlaceError` 와 같은 판단).
+   */
+  itemTimeMissingPlaceError:
+    '이 일자에 더 이상 조회되지 않는 장소가 있어 시각을 저장할 수 없어요. 일정에서 그 장소를 빼 주세요.',
 
   // ── 이동·휴식 직접 추가 (#1014) ──────────────────────────────────────
   // `일자편집-세부명세.md` H절. 같은 일괄 교체 저장이지만 **장소를 고르지 않고 제목을

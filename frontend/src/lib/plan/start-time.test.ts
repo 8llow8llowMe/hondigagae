@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatStartTime, toInputStartTime } from '@/lib/plan/start-time'
+import { formatStartTime } from '@/lib/plan/start-time'
 
 /**
  * 시각 정규화 — 명세 D14-3 · D14-7 · D14-8 미결 1.
@@ -41,23 +41,5 @@ describe('formatStartTime', () => {
 
   it('범위 밖 시각은 통과시키지 않는다', () => {
     expect(formatStartTime('24:00:00')).toBe(null)
-  })
-})
-
-/**
- * 편집 입력 초기값 — `<input type="time">` 은 빈 문자열로 "값 없음" 을 표현한다
- * (일자편집-세부명세 G3).
- */
-describe('toInputStartTime', () => {
-  it('저장된 시각을 HH:mm 입력값으로 바꾼다', () => {
-    expect(toInputStartTime('10:30:00')).toBe('10:30')
-  })
-
-  it('null 은 빈 문자열이다', () => {
-    expect(toInputStartTime(null)).toBe('')
-  })
-
-  it('형식이 어긋난 값도 빈 문자열이다 — 지어내지 않는다', () => {
-    expect(toInputStartTime('오전 10시')).toBe('')
   })
 })

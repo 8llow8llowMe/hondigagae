@@ -10,7 +10,7 @@ import {
   moveEditItem,
   placeIdsOf,
   planDayItemsPayload,
-  setEditStartTime,
+  setItemStartTimePayload,
   survivingItems,
   toEditItems,
   toggleRemoved,
@@ -99,32 +99,13 @@ describe('toggleRemoved', () => {
 })
 
 /**
- * 편집 중인 시각 (#623 · 명세 G3). `item.startTime` 을 직접 고치지 않고 별도 필드로
- * 든다 — `item` 은 서버가 준 것이고, 덮어쓰면 `hasEditChanges` 가 잴 기준이 사라진다.
+ * **편집모드는 이제 시각을 고치지 않는다** (#1028 · 명세 G0). 시각은 일정 목록의 칩이
+ * 소유하고, 편집 상태에는 시각 필드가 없다 — 저장은 서버가 준 원문을 그대로 되싣는다.
  */
-describe('toEditItems — 편집 시각 초기값', () => {
-  it('서버 값을 HH:mm 입력값으로 정규화한다', () => {
-    expect(toEditItems(ITEMS)[0]?.startTime).toBe('10:00')
-  })
-
-  it('null 은 빈 문자열이다', () => {
-    expect(toEditItems(ITEMS)[1]?.startTime).toBe('')
-  })
-})
-
-describe('setEditStartTime', () => {
-  it('그 항목의 편집 시각만 바꾼다', () => {
-    const next = setEditStartTime(toEditItems(ITEMS), 1, '14:00')
-
-    expect(next[1]?.startTime).toBe('14:00')
-    expect(next[0]?.startTime).toBe('10:00')
-  })
-
-  it('범위 밖 index 는 배열을 그대로 둔다', () => {
-    const items = toEditItems(ITEMS)
-
-    expect(setEditStartTime(items, -1, '14:00')).toBe(items)
-    expect(setEditStartTime(items, 9, '14:00')).toBe(items)
+describe('toEditItems — 시각을 들지 않는다 (#1028)', () => {
+  it('편집 항목에 편집용 시각 필드가 없다 — 되싣는 값은 item.startTime 원문이다', () => {
+    expect(toEditItems(ITEMS)[0]).not.toHaveProperty('startTime')
+    expect(toEditItems(ITEMS)[0]?.item.startTime).toBe('10:00:00')
   })
 })
 
@@ -145,21 +126,6 @@ describe('hasEditChanges — 변경이 없으면 저장을 잠근다', () => {
     const back = moveEditItem(moveEditItem(toEditItems(ITEMS), 0, 'down'), 1, 'up')
 
     expect(hasEditChanges(back, ITEMS)).toBe(false)
-  })
-
-  // ── 시각 (#623 · 명세 G3-2) ────────────────────────────────────────────
-  it('시각만 바꿔도 true 다 — 저장 버튼이 잠겨 있으면 고친 값을 저장할 방법이 없다', () => {
-    expect(hasEditChanges(setEditStartTime(toEditItems(ITEMS), 1, '14:00'), ITEMS)).toBe(true)
-  })
-
-  it('HH:mm:ss ↔ HH:mm 정규화 차이는 변경으로 읽지 않는다', () => {
-    // ITEMS[0] 은 서버가 '10:00:00' 을 주고, toEditItems 가 '10:00' 으로 초기화한다 —
-    // 원문으로 비교하면 아무것도 안 고쳐도 저장 버튼이 열린다
-    expect(hasEditChanges(toEditItems(ITEMS), ITEMS)).toBe(false)
-  })
-
-  it('시각을 비우면 true 다', () => {
-    expect(hasEditChanges(setEditStartTime(toEditItems(ITEMS), 0, ''), ITEMS)).toBe(true)
   })
 })
 
@@ -194,19 +160,20 @@ describe('planDayItemsPayload', () => {
     expect(move).not.toHaveProperty('targetId')
   })
 
-  // ── 편집한 시각을 싣는다 (#623 · 명세 G3-3) ───────────────────────────────
-  it('편집한 시각에 :00 을 붙여 HH:mm:ss 로 보낸다', () => {
-    const edited = setEditStartTime(toEditItems(ITEMS), 1, '14:00')
-    const second = planDayItemsPayload(edited, 2).items[1]
+  // ── 편집 저장이 시각을 지우지 않는다 (#1028) ───────────────────────────────
+  it('순서를 바꿔 저장해도 기존 startTime 이 그 항목을 따라 그대로 되실린다', () => {
+    const moved = moveEditItem(toEditItems(ITEMS), 0, 'down')
+    const payload = planDayItemsPayload(moved, 2)
 
-    expect(second?.startTime).toBe('14:00:00')
+    expect(payload.items[1]?.title).toBe('미술관')
+    expect(payload.items[1]?.startTime).toBe('10:00:00')
+    expect(payload.items[0]).not.toHaveProperty('startTime')
   })
 
-  it('시각을 비우면 키를 뺀다 — 일괄 교체라 빈 값이 곧 지운다', () => {
-    const cleared = setEditStartTime(toEditItems(ITEMS), 0, '')
-    const first = planDayItemsPayload(cleared, 2).items[0]
+  it('다른 항목을 삭제 표시해 저장해도 남는 항목의 startTime 은 그대로다', () => {
+    const removed = toggleRemoved(toEditItems(ITEMS), 1)
 
-    expect(first).not.toHaveProperty('startTime')
+    expect(planDayItemsPayload(removed, 2).items[0]?.startTime).toBe('10:00:00')
   })
 
   it('삭제 표시된 항목은 시각도 함께 빠진다', () => {
@@ -581,5 +548,56 @@ describe('validateMoveTitle — 이동·휴식 제목 검증 (#1014)', () => {
 
   it('보통 제목은 통과한다', () => {
     expect(validateMoveTitle('차로 이동')).toBeNull()
+  })
+})
+
+/**
+ * 일정 목록에서 항목 하나의 시작 시각을 바꾼다 (#1028 · 명세 G2).
+ *
+ * **항목 단건 수정 API 가 없다** — 같은 일괄 교체라 그 항목의 `startTime` 만 바꾸고
+ * 나머지는 전부 되싣는다. 되싣지 않으면 그 일자가 한 항목만 남기고 비워진다 (E1).
+ */
+describe('setItemStartTimePayload — 항목 시각 하나만 바꾼 일괄 교체 (#1028)', () => {
+  it('고른 항목의 startTime 만 바뀐다', () => {
+    const payload = setItemStartTimePayload(ITEMS, 2, 'b', '14:30:00')
+
+    expect(payload?.items.map((entry) => entry.startTime)).toEqual([
+      '10:00:00',
+      '14:30:00',
+      undefined,
+    ])
+  })
+
+  it('null 이면 그 항목의 키를 뺀다 — 일괄 교체에서 키 생략이 곧 지운다 (G1)', () => {
+    const payload = setItemStartTimePayload(ITEMS, 2, 'a', null)
+
+    expect(payload?.items[0]).not.toHaveProperty('startTime')
+  })
+
+  it('나머지 항목의 targetId · memo · itemType · 순서를 되싣는다', () => {
+    const payload = setItemStartTimePayload(ITEMS, 2, 'b', '14:30:00')
+    const [first, , third] = payload?.items ?? []
+
+    expect(first?.targetId).toBe(BIG_ID)
+    expect(first?.memo).toBe('실내라 비가 와도 괜찮아요')
+    expect(third?.itemType).toBe('MOVE')
+    expect(third).not.toHaveProperty('targetId')
+    expect(payload?.items.map((entry) => entry.sequence)).toEqual([0, 1, 2])
+    expect(payload?.items.every((entry) => entry.day === 2)).toBe(true)
+  })
+
+  it('바뀌는 항목의 제목 · 대상도 그대로다 — 시각 말고는 건드리지 않는다', () => {
+    const second = setItemStartTimePayload(ITEMS, 2, 'b', '14:30:00')?.items[1]
+
+    expect(second?.title).toBe('시장')
+    expect(second?.targetId).toBe('212481712381923334')
+  })
+
+  it('항목 수가 그대로다 — 하나도 빠지거나 늘지 않는다', () => {
+    expect(setItemStartTimePayload(ITEMS, 2, 'c', '18:00:00')?.items).toHaveLength(3)
+  })
+
+  it('그 일자에 없는 항목이면 null 이다 — 보낼 것이 없다', () => {
+    expect(setItemStartTimePayload(ITEMS, 2, 'zzz', '10:00:00')).toBeNull()
   })
 })

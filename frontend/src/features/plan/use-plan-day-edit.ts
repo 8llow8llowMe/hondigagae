@@ -13,7 +13,6 @@ import {
   moveEditItem,
   type PlanDayEditItem,
   planDayItemsPayload,
-  setEditStartTime,
   toEditItems,
   toggleRemoved,
 } from '@/lib/plan/day-items'
@@ -98,14 +97,6 @@ export function usePlanDayEdit({
     })
   }, [])
 
-  /**
-   * 시각 입력 변경 (#623 · 명세 G4). **알림을 내지 않는다** — 이동·삭제와 달리 시각은
-   * 입력란 자체가 눈으로 바로 보이는 결과라 `aria-live` 로 다시 말할 것이 없다.
-   */
-  const setStartTime = useCallback((index: number, value: string) => {
-    setItems((current) => setEditStartTime(current, index, value))
-  }, [])
-
   const dirty = hasEditChanges(items, original)
 
   function save(day: number) {
@@ -123,9 +114,9 @@ export function usePlanDayEdit({
         */
         void queryClient.invalidateQueries({ queryKey: planKeys.weather(planId) })
         /*
-          **산책 위험도도 함께 버린다** (#625 · D15-6). 순서 편집·시각 수정 둘 다 판정
-          입력(기준 장소·`startTime`)을 바꿀 수 있고, 저장은 `planItemId` 를 전부 새로
-          발급하므로 무효화하지 않으면 낡은 판정이 어느 행에도 붙지 않고 사라진다.
+          **산책 위험도도 함께 버린다** (#625 · D15-6). 순서 편집은 판정 입력(기준 장소)을
+          바꿀 수 있고, 저장은 `planItemId` 를 전부 새로 발급하므로 무효화하지 않으면 낡은
+          판정이 어느 행에도 붙지 않고 사라진다.
         */
         void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(planId) })
         // 저장하면 planItemId 가 전부 새로 발급된다 — 편집 상태를 통째로 버린다 (E1 규칙 3)
@@ -159,7 +150,6 @@ export function usePlanDayEdit({
     start,
     move,
     toggle,
-    setStartTime,
     save,
   }
 }
