@@ -39,21 +39,39 @@ describe('홈 날짜 줄 — 카드 안 (#530)', () => {
 
   /*
     **폭 분기가 없다.** 예전에는 `verdictShown && 'md:hidden'` 이라 데스크톱만 판정에
-    날짜를 넘겼다. 이제 `WalkVerdict` 가 두 폭 모두 자기 자리에 그리므로, 이 자리는
-    **판정이 없을 때만** 선다 — 폭이 아니라 상태가 가른다.
+    날짜를 넘겼다. 이제 `WalkVerdict` 가 두 폭 모두 자기 자리에 그리므로, 카드 맨 위
+    자리는 **판정 자리가 없을 때만** 선다 — 폭이 아니라 상태가 가른다.
   */
   it('날짜 자리를 폭으로 가르지 않는다', () => {
     expect(HOME).not.toContain("verdictShown && 'md:hidden'")
-    expect(HOME).toContain('{!verdictShown && (')
+    expect(HOME).toContain('{!verdictSlotShown && (')
+  })
+})
+
+/*
+  **로딩 화면과 완료 화면의 날짜가 같은 자리다.** 예전에는 판정 **데이터**가 와야
+  날짜가 판정으로 넘어가서(`walkSafety.data !== undefined`), 대기 중에는 카드 맨 위
+  (프로필 위)에 섰다가 판정이 오는 순간 프로필 아래로 내려앉았다. 이제 판정 자리가 서는
+  세 갈래(대기 · 오류 · 판정)가 모두 자기 맨 위에 날짜를 그린다.
+*/
+describe('홈 날짜 줄 — 대기 중에도 판정 자리 (로딩 일치)', () => {
+  it('카드 맨 위 자리는 판정 자리 자체가 없을 때만이다', () => {
+    expect(HOME).toContain('const verdictSlotShown = basisPlaceId !== null')
+    expect(HOME).not.toContain('const verdictShown')
   })
 
-  /*
-    **판정이 없는 상태에도 날짜가 남는다** — 첫 방문자 · 404 로 기준을 버린 직후 ·
-    조회 실패 · 로딩. `verdictShown` 이 `data !== undefined` 까지 보는 이유다:
-    스켈레톤·오류에는 판정 줄 자체가 없어 날짜를 맡길 수 없다.
-  */
-  it('판정 데이터가 실제로 왔을 때만 날짜를 판정에 넘긴다', () => {
-    expect(HOME).toContain('walkSafety.data !== undefined')
+  it('대기 골격이 날짜를 받는다 — loading.tsx 와 같은 컴포넌트다', () => {
+    expect(HOME).toContain('<WalkVerdictSkeleton todayLabel={todayLabel} />')
+    expect(source('app/(main)/(home)/loading.tsx')).toContain(
+      '<WalkVerdictSkeleton todayLabel={null} />',
+    )
+  })
+
+  it('오류 갈래도 판정 자리 맨 위에 날짜를 그린다', () => {
+    const error = HOME.indexOf('{walkSafety.isError && (')
+    const retry = HOME.indexOf('<ErrorState', error)
+
+    expect(HOME.slice(error, retry)).toContain('{todayLabel}')
   })
 })
 
