@@ -486,7 +486,7 @@ function renderOverview(overrides = {}) {
   return renderToStaticMarkup(
     createElement(PlanOverviewPanel, {
       plan: planDetail,
-      companions: [pet],
+      companions: { kind: 'listed', pets: [pet], deletedCount: 0 },
       petPending: false,
       today: TODAY,
       verdicts: [planVerdict],
@@ -516,7 +516,7 @@ function verdictsWithUnjudgedMiddle() {
 
 describe('PlanOverviewPanel', () => {
   it('반려견 조회가 실패하면 카드만 빠지고 나머지는 그대로다', () => {
-    const markup = renderOverview({ companions: [] })
+    const markup = renderOverview({ companions: { kind: 'unknown' } })
 
     // 일정 제목에도 '몽실이' 가 들어 있다 — 카드 고유 정보(품종)로 판정한다
     expect(markup).not.toContain('푸들')
@@ -539,13 +539,57 @@ describe('PlanOverviewPanel', () => {
     어디에도 없게 된다 — 같은 화면이 두 사실을 동시에 말한다.
   */
   it('동행이 두 마리면 둘 다 세운다 — 기준 아이 이름이 카드 안에 있어야 한다', () => {
-    const markup = renderOverview({ companions: [pet, secondPet] })
+    const markup = renderOverview({
+      companions: { kind: 'listed', pets: [pet, secondPet], deletedCount: 0 },
+    })
 
     expect(markup).toContain('몽실이')
     expect(markup).toContain('초코')
     // 카드 고유 정보(품종)로 판정한다 — 이름은 일정 제목에도 들어 있다
     expect(markup).toContain('푸들')
     expect(markup).toContain('리트리버')
+  })
+
+  it('반려견 조회가 실패하면 동행 반려견이 없다고 단정하지 않는다 (#1042)', () => {
+    expect(renderOverview({ companions: { kind: 'unknown' } })).not.toContain(
+      messages.plan.companionNone,
+    )
+  })
+
+  /*
+    #1042. 그 아이만 동행하던 미완료 일정은 반려견을 지워도 남는다. 카드를 통째로 빼면
+    "누구와 가는 일정인가" 를 말할 자리가 사라져, 조회 실패와 구분되지 않는다.
+  */
+  it('미완료 일정의 동행이 비었으면 "동행 반려견 없음" 을 세운다', () => {
+    const markup = renderOverview({ companions: { kind: 'none' } })
+
+    expect(markup).toContain(messages.plan.companionNone)
+    expect(markup).not.toContain('푸들')
+  })
+
+  /*
+    #1042. 완료 일정은 기록이라 지운 아이도 동행 목록에 남는다. 남은 아이만 세우면 둘이 다녀온
+    일정이 혼자 다녀온 것처럼 읽힌다.
+  */
+  it('완료 일정의 지운 아이를 "삭제된 반려견" 으로 함께 세운다', () => {
+    const markup = renderOverview({ companions: { kind: 'listed', pets: [pet], deletedCount: 1 } })
+
+    expect(markup).toContain('푸들')
+    expect(markup).toContain(messages.plan.companionDeleted)
+  })
+
+  it('완료 일정의 동행이 전부 지워졌으면 "삭제된 반려견" 한 줄이다', () => {
+    const markup = renderOverview({ companions: { kind: 'listed', pets: [], deletedCount: 1 } })
+
+    expect(markup).toContain(messages.plan.companionDeleted)
+    expect(markup).not.toContain(messages.plan.companionNone)
+  })
+
+  it('지운 아이가 여럿이어도 한 줄에 수로 말한다', () => {
+    const markup = renderOverview({ companions: { kind: 'listed', pets: [pet], deletedCount: 2 } })
+
+    expect(markup).toContain('삭제된 반려견 2마리')
+    expect(markup.split(messages.plan.companionDeleted)).toHaveLength(2)
   })
 
   it('상태 배지는 서버 name 을 그대로 쓴다', () => {

@@ -7,6 +7,7 @@ import { planDayAnchorId } from '@/features/plan/plan-day-section'
 import { PlanStatusBadge } from '@/features/plan/plan-status-badge'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
+import { deletedCompanionLabel, type PlanCompanions } from '@/lib/plan/companion-pets'
 import { formatPlanDateRangeCompact, planPhaseOf } from '@/lib/plan/date'
 import { planPhaseLabel, planPhaseNote } from '@/lib/plan/phase-text'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -70,9 +71,11 @@ export function PlanOverviewPanel({
   action = null,
 }: {
   plan: PlanDetail
-  /** 조회 실패·삭제된 반려견이면 `null` — **카드만 빠지고 화면은 그대로다** (D5) */
-  /** 동행 반려견, `petIds` 순서 (#218). 못 찾은 아이는 빠진다 */
-  companions: readonly Pet[]
+  /**
+   * 동행 반려견, `petIds` 순서 (#218). 반려견 조회가 실패했으면 `unknown` 이라 **카드만 빠지고
+   * 화면은 그대로다** (D5). 동행 없음 · 삭제된 반려견은 `planCompanionsOf` 가 가른다 (#1042)
+   */
+  companions: PlanCompanions
   petPending: boolean
   today: Date
   /** 판정. 아직 없거나 실패했으면 빈 배열 — 목차 자체를 렌더하지 않는다 */
@@ -201,12 +204,29 @@ export function PlanOverviewPanel({
  * 의 `basisPetName` JSDoc). 그 요구는 여러 마리일 때만 생기므로, 여러 마리는 전원을 한
  * 줄씩 그대로 세운다 — 최대 5마리라 길어지지 않는다.
  */
-function PlanPetCard({ companions, pending }: { companions: readonly Pet[]; pending: boolean }) {
+function PlanPetCard({ companions, pending }: { companions: PlanCompanions; pending: boolean }) {
   if (pending) return <Skeleton className="h-7 w-40" />
-  if (companions.length === 0) return null
+  if (companions.kind === 'unknown') return null
 
-  if (companions.length === 1) {
-    const pet = companions[0] as Pet
+  /*
+    **"동행 반려견 없음" 은 카드를 빼지 않고 한 줄로 말한다** (#1042). 빼면 조회 실패(`unknown`)와
+    화면이 같아져, 그 아이만 동행하던 일정이 반려견 삭제 뒤 남았다는 사실이 보이지 않는다.
+    아바타는 세우지 않는다 — 없는 아이를 그리는 원형이 된다.
+  */
+  if (companions.kind === 'none') {
+    return <p className="text-caption text-fg-muted font-medium">{messages.plan.companionNone}</p>
+  }
+
+  const { pets } = companions
+  const deletedLabel = deletedCompanionLabel(companions.deletedCount)
+
+  // 다녀온 아이가 전부 지워진 완료 일정 — 한 마리 줄과 같은 자리에 글자만 선다
+  if (pets.length === 0) {
+    return <p className="text-caption text-fg-muted font-medium">{deletedLabel}</p>
+  }
+
+  if (pets.length === 1 && deletedLabel === null) {
+    const pet = pets[0] as Pet
     const traits = [pet.breed, pet.sizeType.name].filter(
       (part): part is string => part !== null && part.length > 0,
     )
@@ -226,9 +246,16 @@ function PlanPetCard({ companions, pending }: { companions: readonly Pet[]; pend
   return (
     // 카드 안이라 선을 긋지 않는다 — 구획 1 안쪽이고 경계는 아래 구획선이 갖는다 (#447 · #553)
     <div className="flex flex-col gap-3 pt-1">
-      {companions.map((pet) => (
+      {pets.map((pet) => (
         <PlanPetRow key={pet.petId} pet={pet} />
       ))}
+      {/*
+        **지운 아이는 수로 한 줄이다** (#1042). 아이마다 줄을 세우면 이름도 특성도 없는 같은 줄이
+        되풀이된다. 아바타도 세우지 않는다 — 사진도 이름도 없는 아이를 그리는 원형이 된다.
+      */}
+      {deletedLabel !== null && (
+        <p className="text-caption text-fg-muted font-medium">{deletedLabel}</p>
+      )}
     </div>
   )
 }

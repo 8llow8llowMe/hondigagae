@@ -5,7 +5,7 @@ import { SurfaceList } from '@/components/surface'
 import { PlanListSkeleton } from '@/features/plan/plan-list-skeleton'
 import { PlanRow } from '@/features/plan/plan-row'
 import { messages } from '@/lib/messages'
-import { companionPetsOf } from '@/lib/plan/companion-pets'
+import { planCompanionsOf } from '@/lib/plan/companion-pets'
 import { groupPlans } from '@/lib/plan/list'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -29,8 +29,13 @@ export type PlanListSectionProps = {
   plans: PlanSummaryItem[]
   /** 좁히기 전 전체 개수. `hasNext` 면 셀 수 없어 null 이다 */
   totalCount: number | null
-  /** 내 반려견 전체. 행마다 `petIds` 로 동행을 찾는다 — 이름과 사진을 함께 쓴다 */
-  pets: readonly Pet[]
+  /**
+   * 내 반려견 전체. 행마다 `petIds` 로 동행을 찾는다 — 이름과 사진을 함께 쓴다.
+   *
+   * **`null` 은 "모른다"** (조회 중 · 실패)이고 빈 배열은 "하나도 없다" 다 (#1042). 둘을
+   * 가르지 않으면 반려견 조회가 실패한 순간 모든 행이 "동행 반려견 없음" 을 말한다.
+   */
+  pets: readonly Pet[] | null
   today: Date
   loading: boolean
   errorStatus: number | null
@@ -154,7 +159,7 @@ function PlanGroup({
 }: {
   title: string
   plans: PlanSummaryItem[]
-  pets: readonly Pet[]
+  pets: readonly Pet[] | null
   today: Date
   /** 앞 묶음이 있으면 위에 1px 선을 긋는다 */
   divided?: boolean
@@ -169,8 +174,11 @@ function PlanGroup({
           <PlanRow
             key={plan.planId}
             plan={plan}
-            /* 대표(`plan.petId`)가 아니라 동행 전체다 (#218) */
-            companions={companionPetsOf(plan.petIds, pets)}
+            /*
+              대표(`plan.petId`)가 아니라 동행 전체다 (#218). 지운 아이 · 동행 없음까지
+              말하는 표시 규칙은 `planCompanionsOf` 가 갖는다 (#1042)
+            */
+            companions={planCompanionsOf(plan.petIds, pets, plan.status.code)}
             today={today}
           />
         ))}
