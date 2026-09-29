@@ -12,8 +12,8 @@ function render(url: string | null) {
 
 describe('PetPhoto', () => {
   /*
-    **이니셜이 아니라 기본 그림이다** (#1022). 이 컴포넌트의 크기(48 · 80)는 모두 그림이 읽히는
-    40 이상이다. SVG 라 `next/image` 가 최적화 경로로 감싸지 않고 그대로 싣는다.
+    **이니셜이 아니라 기본 그림이다** (#1022 · #1047) — 크기와 상관없이 `PetAvatar` 와 같다.
+    SVG 라 `next/image` 가 최적화 경로로 감싸지 않고 그대로 싣는다.
   */
   it('사진이 없으면 기본 그림으로 떨어진다 — 빈 원형을 남기지 않는다', () => {
     expect(render(null)).toContain(PET_AVATAR_DEFAULT.src)
