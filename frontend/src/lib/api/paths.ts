@@ -140,6 +140,12 @@ export const paths = {
     itemVisited: (planId: string, planItemId: string) =>
       `/plans/${planId}/items/${planItemId}/visited`,
     /**
+     * 항목 시작 시각 (#1053 · BE #1030). 비우기도 같은 경로다 — 본문 `startTime: null`.
+     * **행을 제자리에서 고친다** — 일괄 교체와 달리 `planItemId` · `visited` 가 남는다
+     */
+    itemStartTime: (planId: string, planItemId: string) =>
+      `/plans/${planId}/items/${planItemId}/start-time`,
+    /**
      * 저장된 여행 준비물 (#398 BE · #586 FE). **한 경로에 세 메서드가 붙는다** —
      * 조회(`GET`) · AI 결과 저장(`PUT`, AI 항목만 교체) · 직접 추가(`POST`).
      *

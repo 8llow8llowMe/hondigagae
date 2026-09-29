@@ -217,6 +217,31 @@ export function markItemVisited(
   })
 }
 
+// ─── 항목 시작 시각 (#1053) ───────────────────────────────────────────────────
+
+/**
+ * 항목 하나의 시작 시각만 고친다 (`PlanWebController.changeItemStartTime`, BE #1030).
+ * **비우기도 같은 API 다** — `startTime: null` 을 보낸다.
+ *
+ * **본문을 늘 싣는다.** 바디가 없으면 서버가 `PLAN_100` 400 을 낸다 — `{}` 도 비우기지만
+ * 뜻이 드러나게 `null` 을 명시한다.
+ *
+ * 응답이 `Response<Void>` 라 `markItemVisited` 와 같은 이유로 **`clientFetchVoid`** 다.
+ * 갱신된 상세를 돌려주지 않으므로 호출부는 `planKeys.detail(planId)` 무효화로 이어받는다.
+ *
+ * @param startTime `HH:mm:ss`(`toServerStartTime`). `null` 이면 지운다
+ */
+export function changeItemStartTime(
+  planId: string,
+  planItemId: string,
+  startTime: string | null,
+): Promise<void> {
+  return clientFetchVoid(paths.plans.itemStartTime(planId, planItemId), {
+    method: 'PUT',
+    body: { startTime },
+  })
+}
+
 // ─── 여행 준비물 저장 (#586) ─────────────────────────────────────────────────
 
 /**
