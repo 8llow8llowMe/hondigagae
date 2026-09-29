@@ -158,6 +158,11 @@ class PlanCompanionSummaryTest {
         }
 
         @Override
+        public Optional<Plan> findActiveBySourceAiJobId(long memberId, String sourceAiJobId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Plan save(Plan plan) {
             throw new UnsupportedOperationException();
         }
