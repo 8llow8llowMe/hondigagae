@@ -104,6 +104,11 @@ public class AiPlanWebController {
             + "초안을 일정으로 담으려면 이 값들이 필요한데, 브라우저에 보관해 두면 다른 기기·시크릿창에서 "
             + "작업 주소를 열었을 때 담기가 막힙니다. 화면은 이 블록으로 조건을 복원하면 됩니다. "
             + "`petIds` 는 Snowflake 라 문자열 배열이고, 제출 때 생략한 값은 null 입니다.\n\n"
+            + "**`committedPlanId` 는 이 초안을 이미 담은 일정 아이디(문자열)입니다.** COMPLETED 이고 담은 적이 있을 때만 "
+            + "채워지고, 담기 전·담은 일정을 삭제한 뒤·그 외 상태에서는 null 입니다. 값이 있으면 화면은 담기 버튼 대신 "
+            + "그 일정으로 가는 링크를 보여 주면 됩니다. 담긴 사실의 정본은 plan-service 라 조회 때마다 물어 오며, "
+            + "그 조회가 실패해도 이 API 는 실패하지 않고 null 을 싣습니다 — 그때 다시 담아도 plan-service 가 같은 "
+            + "작업(sourceAiJobId)을 알아보고 기존 일정을 돌려주므로 일정이 두 개 생기지 않습니다.\n\n"
             + "호출 예: `GET /api/v1/ai-plans/jobs/8a64f9c0-2f1e-4c1a-9c3e-9f2b6a7d1e00`",
         security = {@SecurityRequirement(name = "bearerAuth")})
     @GetMapping("/jobs/{jobId}")
@@ -143,6 +148,7 @@ public class AiPlanWebController {
             비동기 일정 생성 작업의 상태 변경을 Server-Sent Events 로 스트리밍합니다.
             이벤트 data 는 작업 상태 조회 응답의 dataBody 와 동일한 JSON 입니다. 본인이 제출한 작업만 구독할 수 있습니다.
             폴링 응답과 같은 모양이라 `conditions`(제출 때 쓴 생성 조건)도 매 이벤트에 함께 실립니다 — 구독만으로 화면이 조건을 복원할 수 있습니다.
+            `committedPlanId`(이미 담은 일정 아이디)도 폴링과 같은 규칙으로 실립니다 — COMPLETED 이고 담은 적이 있을 때만 채워지고 그 외에는 null 입니다.
 
             수신 주기: 이벤트는 주기적으로 오지 않고 상태가 바뀔 때만 전송됩니다.
             일반적으로 구독 즉시 현재 상태 스냅샷 1회 -> RUNNING 전이 1회 -> COMPLETED/FAILED 1회, 총 2~3회 수신 후

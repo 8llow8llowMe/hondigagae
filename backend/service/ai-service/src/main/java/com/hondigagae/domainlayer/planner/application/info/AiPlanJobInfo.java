@@ -14,6 +14,9 @@ public record AiPlanJobInfo(
     // 초안을 담으려면 조건이 필요한데, 그것만 별도 조회로 가져올 수단이 없다 (#488).
     AiPlanConditionsInfo conditions,
     AiPlanDraftInfo planDraft,
+    // 이 작업의 초안을 담아 만든 일정 (#970). COMPLETED 이고 담은 적이 있을 때만 채운다.
+    // 정본은 plan-service 라 잡에 저장하지 않고 조회 때마다 물어 온다. 못 물으면 null 이다.
+    Long committedPlanId,
     String errorCode,
     String errorMessage
 ) {
