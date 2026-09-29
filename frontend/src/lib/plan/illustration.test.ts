@@ -6,11 +6,11 @@ import { PLAN_ITEM_TYPES } from '@/types/plan'
 /* 회색 타일이 예외가 아니라 기본이었다 — 이미지 없는 장소가 70% 다 (#842) */
 describe('planItemIllustration — 항목 유형으로 타일을 채운다', () => {
   it('다섯 유형이 모두 일러스트를 갖는다', () => {
-    expect(planItemIllustration('LODGING')).toBe('/illustrations/place-lodging.svg')
-    expect(planItemIllustration('MEAL')).toBe('/illustrations/place-restaurant.svg')
-    expect(planItemIllustration('PLACE')).toBe('/illustrations/place-tourist_spot.svg')
-    expect(planItemIllustration('WALK')).toBe('/illustrations/plan-item-walk.svg')
-    expect(planItemIllustration('MOVE')).toBe('/illustrations/plan-item-move.svg')
+    expect(planItemIllustration('LODGING')).toBe('/illustrations/place-lodging.webp')
+    expect(planItemIllustration('MEAL')).toBe('/illustrations/place-restaurant.webp')
+    expect(planItemIllustration('PLACE')).toBe('/illustrations/place-tourist_spot.webp')
+    expect(planItemIllustration('WALK')).toBe('/illustrations/plan-item-walk.webp')
+    expect(planItemIllustration('MOVE')).toBe('/illustrations/plan-item-move.webp')
   })
 
   /*
