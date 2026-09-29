@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { resolveMock } from '@/lib/api/mock'
-import { resetMockStore } from '@/lib/api/mock/store'
+import { mockStore, resetMockStore } from '@/lib/api/mock/store'
 import { toDayString, todayUtc } from '@/lib/date/day'
 import type { PlanDetail, PlanWeatherResponse } from '@/types/plan'
 
@@ -757,5 +757,55 @@ describe('일정 상세 mock — 항목 방문 체크 (#124)', () => {
     call(`/plans/${PLAN}/days/1/items`, 'PUT', { items: [] })
 
     expect(visit(VISITED_ITEM, true)?.status).toBe(404)
+  })
+
+  /*
+    **여행 전 표시 가드** (#983). 서버가 시작일 전 `visited: true` 를 `PLAN_027` 400 으로
+    거절한다 — mock 이 받아 주면 화면이 로컬에서 서버와 다른 답을 낸다. 시작일 당일부터
+    허용하고, **해제는 언제나 받는다.** 시드 일정(09-12 ~ 09-14)의 기간을 옮겨 본다 —
+    "기간을 미래로 옮긴 뒤 남은 표시" 가 해제 갈래의 실제 경로다.
+  */
+  describe('시작일 전 다녀옴 표시는 400 PLAN_027 이다', () => {
+    /** 시드 일정의 시작일을 오늘 기준 `offset` 일 뒤로 옮긴다 */
+    function moveStartTo(offset: number) {
+      const plan = mockStore().plans.find((candidate) => candidate.planId === PLAN)!
+      const start = toDayString(todayUtc(new Date()) + offset * 86_400_000)
+      plan.startDate = start
+      plan.endDate = toDayString(todayUtc(new Date()) + (offset + 2) * 86_400_000)
+    }
+
+    it('내일 시작하는 일정의 항목은 표시할 수 없다 — 서버 문구 그대로다', () => {
+      moveStartTo(1)
+      const result = visit(UNVISITED_ITEM, true)
+
+      expect(result?.status).toBe(400)
+      expect(result?.payload.dataHeader).toMatchObject({
+        success: false,
+        resultCode: 'PLAN_027',
+        resultMessage: '여행 시작일 전에는 다녀옴으로 표시할 수 없습니다.',
+      })
+      // 거절했으면 체크도 그대로다
+      expect(itemOf(PLAN, UNVISITED_ITEM)?.visited).toBe(false)
+    })
+
+    it('시작 전이어도 해제는 받는다 — 옛 표시를 풀 수 있어야 한다', () => {
+      moveStartTo(9)
+
+      expect(visit(VISITED_ITEM, false)?.status).toBe(200)
+      expect(itemOf(PLAN, VISITED_ITEM)?.visited).toBe(false)
+    })
+
+    it('출발 당일부터는 표시할 수 있다', () => {
+      moveStartTo(0)
+
+      expect(visit(UNVISITED_ITEM, true)?.status).toBe(200)
+      expect(itemOf(PLAN, UNVISITED_ITEM)?.visited).toBe(true)
+    })
+
+    it('소유 확인이 가드보다 먼저다 — 남의 항목은 날짜와 무관하게 404 PLAN_005 다', () => {
+      moveStartTo(9)
+
+      expect(visit('323456789012999999', true)?.payload.dataHeader.resultCode).toBe('PLAN_005')
+    })
   })
 })

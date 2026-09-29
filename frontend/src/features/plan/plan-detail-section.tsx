@@ -38,6 +38,7 @@ import {
 import { packingPlacement } from '@/lib/plan/packing-promotion'
 import { isReviewSectionVisible } from '@/lib/plan/review'
 import { planStatusActionLayout } from '@/lib/plan/status-action'
+import { canMarkVisited } from '@/lib/plan/visit-toggle'
 import {
   dayBeyondForecastReason,
   dayHasLookupFailed,
@@ -216,6 +217,13 @@ export function PlanDetailSection({
     `PlanPhase`** 에서 나온다.
   */
   const beforeDeparture = phase?.kind === 'upcoming'
+
+  /*
+    **오늘 다녀옴으로 새로 표시할 수 있는가** (#983). 시작일 전(D-1 이전)이면 서버가 `visited:
+    true` 를 `PLAN_027` 400 으로 거절한다 — 미체크 행의 토글을 걷고, 체크된 행의 해제만 남긴다.
+    위 `statusLayout`(#971 · `PLAN_026`)과 **같은 `PlanPhase`** 에서 한 번만 셈한다.
+  */
+  const canMark = canMarkVisited(phase)
 
   /*
     **출발이 가까우면 준비물이 일자 위다** (#665 · 진단 PL-3 · 명세 D11-9). `D-1` · `D-0`
@@ -427,6 +435,7 @@ export function PlanDetailSection({
                 error: visit.failures.get(planItemId) ?? null,
                 onToggle: (next) => visit.toggle(planItemId, next),
                 compact: beforeDeparture,
+                canMark,
               }),
             }}
             walkSafety={{

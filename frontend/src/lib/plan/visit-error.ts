@@ -1,4 +1,5 @@
 import { ApiError } from '@/lib/api/error'
+import { toMessage } from '@/lib/api/response'
 import { messages } from '@/lib/messages'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 
@@ -26,6 +27,20 @@ export function toVisitToggleError(cause: unknown): PlanDaySaveError {
     특히 `PLAN_005` 는 **일괄 교체가 항목을 새로 발급한 뒤** 낡은 `planItemId` 로 부른
     경우라, 다시 눌러도 영영 실패한다. 여기에 재시도 버튼을 주면 안 된다.
   */
+  /*
+    **시작일 전 표시(`PLAN_027`, #983)만은 서버 문구를 그대로 띄운다.** 들고 있는 상세가
+    낡은 것이 아니라 **날짜가 아직 이른 것**이라, 아래 "새로고침" 안내는 틀린 진단이다 —
+    다시 불러와도 같은 실패다. 화면은 D-1 이전 미체크 행의 토글을 걷지만(`canMarkVisited`),
+    날짜를 못 읽은 날이나 화면의 오늘과 서버의 오늘(KST)이 어긋난 날에는 이 경로로 온다.
+    재시도는 주지 않는다 — 같은 날 다시 눌러도 같은 거절이다.
+  */
+  if (cause instanceof ApiError && cause.resultCode === 'PLAN_027') {
+    return {
+      message: toMessage(cause.rawMessage, messages.plan.visitNotStartedError),
+      retriable: false,
+    }
+  }
+
   if (cause instanceof ApiError && cause.kind !== 'temporary') {
     return { message: messages.plan.visitStaleError, retriable: false }
   }

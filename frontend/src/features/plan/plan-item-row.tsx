@@ -16,6 +16,7 @@ import { isPlaceTarget, type PlanItemRowModel } from '@/lib/plan/detail'
 import { planItemIllustration } from '@/lib/plan/illustration'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import { formatStartTime } from '@/lib/plan/start-time'
+import { visitToggleForm } from '@/lib/plan/visit-toggle'
 import { walkCourseMetaLine } from '@/lib/plan/walk-course-meta'
 import { itemWalkSafetyView } from '@/lib/plan/walk-safety'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -45,6 +46,14 @@ export type PlanItemVisit = {
    * 색과 아이콘만 남는다 (DESIGN.md §7). 접는 것은 반복되는 쪽(`다녀옴 표시`)뿐이다.
    */
   compact: boolean
+  /**
+   * 오늘 **다녀옴으로 새로 표시**할 수 있다 (#983 · `canMarkVisited`). 시작일 전(D-1 이전)이면
+   * `false` 다 — 서버가 `visited: true` 를 `PLAN_027` 400 으로 거절한다.
+   *
+   * **`false` 여도 체크된 행의 해제 토글은 남는다** — 해제는 서버가 언제나 받는다. 사라지는
+   * 것은 미체크 행의 토글뿐이다 (`visitToggleForm`).
+   */
+  canMark: boolean
 }
 
 /**
@@ -341,7 +350,13 @@ export function PlanItemRow({
           </Link>
         )}
 
-        {visit !== undefined && <PlanItemVisitToggle item={item} visit={visit} />}
+        {/*
+          **시작일 전의 미체크 행에는 토글이 없다** (#983) — 서버가 `PLAN_027` 로 거절할 일이다.
+          후행 44px 열도 함께 비어 제목이 그만큼 넓어진다. 판정은 `visitToggleForm` 하나다.
+        */}
+        {visit !== undefined && visitToggleForm(item.visited, visit) !== 'hidden' && (
+          <PlanItemVisitToggle item={item} visit={visit} />
+        )}
       </div>
 
       {/*
@@ -383,8 +398,11 @@ function PlanItemVisitToggle({
     **`aria-label` 은 두 갈래 모두 그대로다** — 스크린리더가 듣는 것은 변하지 않고, 보이는
     글자가 없어지면 WCAG 2.5.3(Label in Name) 은 애초에 걸리지 않는다. #653 이 글자를
     붙이면서 새로 생긴 제약이라 글자를 거두면 함께 사라진다.
+
+    **#983 이후 D-1 이전의 미체크 행에는 이 토글이 아예 서지 않는다** (서버 `PLAN_027`) —
+    그래서 접힌 아이콘이 실제로 보이는 날은 출발 당일이다. 판정은 `visitToggleForm` 하나다.
   */
-  const iconOnly = visit.compact && !item.visited
+  const iconOnly = visitToggleForm(item.visited, visit) === 'icon'
 
   const shared = {
     /*
@@ -399,7 +417,8 @@ function PlanItemVisitToggle({
         (`aria-pressed` · `aria-label` 은 바뀌지 않는다). 행 전체가 `opacity-60` 으로
         물러나는 것과 같은 방향이다 — 끝난 일은 조용하다.
       - 출발 전 아이콘 전용(안 간 행, #732)은 `ghost` 체크 아이콘 그대로다. 반복을 줄이려는
-        결정이고, 글자가 없어 라벨로 오독될 여지도 없다.
+        결정이고, 글자가 없어 라벨로 오독될 여지도 없다. #983 이후 이 갈래는 **출발 당일**
+        에만 선다 — 그 전날까지 안 간 행은 토글 자체가 없다(서버 `PLAN_027`).
 
       **색은 `variant` 와 아이콘으로만 말한다.** `Button` 의 `className` 으로 덮지 않는다
       (component-guide.md §3). 체크의 브랜드색은 아이콘 자신의 색이다.

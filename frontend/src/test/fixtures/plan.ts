@@ -221,8 +221,14 @@ export const planDayAdd: PlanDayAdd = {
  * `{ visitOf: () => ({ pending: false, error: {...}, onToggle: () => undefined }) }`
  */
 export const planDayVisit: PlanDayVisit = {
-  // `compact: false` 가 기본이다 — 출발 전 갈래는 테스트가 따로 켠다 (#732)
-  visitOf: () => ({ pending: false, error: null, onToggle: () => undefined, compact: false }),
+  // `compact: false` · `canMark: true` 가 기본이다 — 출발 전 갈래(#732 · #983)는 테스트가 따로 켠다
+  visitOf: () => ({
+    pending: false,
+    error: null,
+    onToggle: () => undefined,
+    compact: false,
+    canMark: true,
+  }),
 }
 
 /**
