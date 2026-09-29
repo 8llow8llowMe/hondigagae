@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
+import { PlaceMapSkeleton } from '@/features/place/place-map-skeleton'
 import { messages } from '@/lib/messages'
 import { readSourceWithoutComments as code } from '@/test/source'
 
@@ -191,5 +192,65 @@ describe('로딩 골격 넷 — 폴백 중에도 랜드마크와 이름이 선�
 
   it('홈 — 권역 카드는 응답 전이라 제목이 없다 (실화면 골격과 같다)', () => {
     expect(render(HomeLoading)).not.toContain(messages.home.regionHeading)
+  })
+})
+
+/*
+  **로딩 화면이 완료 화면과 같은 자리에 선다** — 폴백이 풀리는 순간 요소가 자리를 옮기거나
+  다른 보기가 서던 곳들. 치수는 각 골격 머리주석의 실측이 정본이고, 여기서는 **자리와
+  짝**만 잠근다.
+*/
+describe('로딩 골격 — 완료 화면과 같은 자리', () => {
+  /*
+    `/places` 의 기본 보기는 지도다. 예전 골격은 목록 하나라 거의 모든 진입에서 목록이
+    섰다가 지도로 바뀌었다. `loading.tsx` 는 `searchParams` 를 못 받으므로 client 쪽이
+    `page.tsx` 와 **같은 판정**으로 고른다.
+  */
+  it('장소 — 도착할 보기의 골격을 고른다 (기본 지도)', () => {
+    const loading = code('app/(main)/places/(list)/loading.tsx')
+    const picker = code('src/features/place/place-view-loading.tsx')
+    const page = code('app/(main)/places/(list)/page.tsx')
+
+    expect(loading).toContain(
+      '<PlaceViewLoading list={<PlaceListLoading />} map={<PlaceMapLoading />} />',
+    )
+    expect(picker).toContain('parseViewMode(useSearchParams(), PLACES_DEFAULT_VIEW)')
+    expect(page).toContain('parseViewMode(resolved, PLACES_DEFAULT_VIEW)')
+    // 지도 갈래는 `Canvas` · 레일 2단이 아니라 민짜 `main` 이다 — 실화면과 같다
+    expect(loading).toContain('<main id="main-content">')
+    expect(page).toContain('<main id="main-content">')
+  })
+
+  it('장소 지도 골격 — 실화면과 같은 높이·패널·시트', () => {
+    const markup = renderToStaticMarkup(createElement(PlaceMapSkeleton))
+
+    expect(markup).toContain('map-canvas-height')
+    expect(markup).toContain('map-panel-width')
+    expect(markup).toContain('aria-label="장소 목록"')
+  })
+
+  it('장소 지도 — 목록 대기 중에는 빈 상태가 아니라 같은 행 골격이다', () => {
+    const view = code('src/features/place/place-map-view.tsx')
+
+    expect(view).toContain('const listPending = !usingNearby && listQuery.isPending')
+    expect(view.match(/<PlaceMapRowsSkeleton \/>/g)).toHaveLength(2)
+  })
+
+  /*
+    #944 가 결과 수 줄을 필터 아래 본문 첫 줄로 옮겼는데 골격은 필터 위에 남아 있었다.
+    도구 줄의 클래스도 실화면(`mt-4 … md:gap-8`)과 같아야 768 이상에서 라벨이 옆으로 선다.
+  */
+  it('올레 목록 — 결과 수 줄은 필터 아래이고 도구 줄은 실화면과 같은 클래스다', () => {
+    const markup = render(WalkCoursesLoading)
+    const tools = "cn('mt-4 flex flex-col gap-4 md:flex-row md:gap-8', INSET_CLASS.card)"
+
+    expect(markup.indexOf('md:gap-8')).toBeLessThan(markup.indexOf('border-t pt-4 pb-3'))
+    expect(code('app/(main)/olle/(list)/loading.tsx')).toContain(tools)
+    expect(code('src/features/walk-course/walk-course-list-view.tsx')).toContain(tools)
+  })
+
+  it('마이페이지 — 폴백과 섹션 로딩 갈래가 같은 골격을 쓴다', () => {
+    expect(code('app/(main)/mypage/(root)/loading.tsx')).toContain('<MyPageProfileSkeleton />')
+    expect(code('src/features/member/my-page-sections.tsx')).toContain('<MyPageProfileSkeleton />')
   })
 })

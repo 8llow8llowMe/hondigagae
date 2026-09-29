@@ -1,5 +1,6 @@
 import { Skeleton } from '@/components/skeleton'
 import { Canvas, Surface, SurfaceStack } from '@/components/surface'
+import { MyPageProfileSkeleton } from '@/features/member/my-page-sections'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -15,7 +16,8 @@ import { cn } from '@/lib/utils/cn'
  *
  * **3층 표면이다** (#466). 바닥·쌓기·카드 둘이 실화면과 같아야 한다 — 층이 다르면
  * 조회가 끝나는 순간 배경색과 카드 경계가 함께 뒤집힌다. `MyPageSections` 의 로딩
- * 분기와 같은 모양을 쓴다 (제목 줄은 서 있고 몸통만 스켈레톤).
+ * 분기와 **같은 컴포넌트**(`MyPageProfileSkeleton`)를 쓴다 (제목 줄은 서 있고 몸통만
+ * 스켈레톤) — 두 벌이면 폴백이 풀리는 순간 카드 높이가 갈린다.
  */
 export default function MyPageLoading() {
   return (
@@ -24,11 +26,7 @@ export default function MyPageLoading() {
         <h1 className="sr-only">{messages.member.myPageTitle}</h1>
 
         <Surface lead title={messages.member.myPageTitle} aria-busy>
-          <div aria-hidden className={cn('flex flex-col gap-3 pb-5', INSET_CLASS.card)}>
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-14 w-full" />
-            <Skeleton className="h-14 w-full" />
-          </div>
+          <MyPageProfileSkeleton />
         </Surface>
 
         <Surface title={messages.member.accountSection} aria-busy>

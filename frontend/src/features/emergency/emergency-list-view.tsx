@@ -1,5 +1,6 @@
 'use client'
 
+import { Skeleton } from '@/components/skeleton'
 import { SkipLink } from '@/components/skip-link'
 import { Surface, SurfaceStack } from '@/components/surface'
 import { ViewToggle } from '@/components/view-toggle'
@@ -67,6 +68,7 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
   const showCounts = result !== null && countsAreComplete(result)
 
   const subtitle = emergencyHeadSubtitle(result, board.filters.keyword, board.regionCode)
+  const headLoading = board.position === null || board.query.isPending
 
   return (
     <div className="rail-layout rail-layout-filter">
@@ -137,9 +139,16 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
             **조건 줄(`emergencySummaryLine`)은 걷었다.** 데스크톱 전용 둘째 줄이었는데
             1280 실측에서 `10.0km` 홀로 서서 무슨 값인지 읽히지 않았다 — 반경은 좌측
             레일의 선택값과 목록 위 요약 줄(`가까운 순 · 반경 10km`)이 이미 말한다.
+
+            **응답 전에는 자리를 잡는다.** 로딩 폴백(`emergency/loading.tsx`)이 이 줄의
+            골격을 세우는데, 여기서 비우면 폴백이 풀린 직후 머리가 한 줄 줄었다가 응답이
+            오면 다시 늘어 목록이 두 번 튄다. 잘린 목록·검색 중처럼 **응답을 받고도**
+            `null` 인 갈래만 줄을 비운다.
           */
           description={
-            subtitle === null ? undefined : (
+            headLoading ? (
+              <Skeleton className="h-4.5 w-40" />
+            ) : subtitle === null ? undefined : (
               <p className="text-caption text-fg-muted font-medium tabular-nums">{subtitle}</p>
             )
           }
