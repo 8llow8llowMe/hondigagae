@@ -28,6 +28,8 @@ export type KakaoMaps = {
   Map: new (container: HTMLElement, options: KakaoMapOptions) => KakaoMap
   Marker: new (options: KakaoMarkerOptions) => KakaoMarker
   CustomOverlay: new (options: KakaoCustomOverlayOptions) => KakaoCustomOverlay
+  /** 직접 그리는 오버레이의 바탕 — `lib/map/always-drawn-overlay.ts` 만 쓴다 (#1015) */
+  AbstractOverlay: new () => KakaoAbstractOverlay
   MarkerClusterer: new (options: KakaoClustererOptions) => KakaoClusterer
   Polyline: new (options: KakaoPolylineOptions) => KakaoPolyline
   event: {
@@ -111,6 +113,23 @@ export type KakaoCustomOverlayOptions = {
 export type KakaoCustomOverlay = {
   setMap: (map: KakaoMap | null) => void
   setZIndex: (zIndex: number) => void
+}
+
+/**
+ * `AbstractOverlay` — 그리기를 우리가 맡는 오버레이 (#1015).
+ *
+ * SDK 가 `setMap(map)` 에서 `onAdd` → `draw`, 지도가 움직일 때마다 `draw`,
+ * `setMap(null)` 에서 `onRemove` 를 부른다. **세 훅은 우리가 채운다** — 그래서 선택적이다.
+ */
+export type KakaoAbstractOverlay = {
+  setMap: (map: KakaoMap | null) => void
+  getPanels: () => { overlayLayer: HTMLElement }
+  getProjection: () => {
+    containerPointFromCoords: (latlng: KakaoLatLng) => { x: number; y: number }
+  }
+  onAdd?: () => void
+  draw?: () => void
+  onRemove?: () => void
 }
 
 /**

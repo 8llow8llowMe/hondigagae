@@ -9,6 +9,7 @@ import {
   type LatLng,
   toLatLng,
 } from '@/lib/geo/coord'
+import { createAlwaysDrawnOverlay } from '@/lib/map/always-drawn-overlay'
 import { clusterForLevel } from '@/lib/map/cluster'
 import { clusterContent, type PinContent, pinContent } from '@/lib/map/pin-content'
 import type { MapRouteSegment } from '@/lib/map/route'
@@ -553,7 +554,7 @@ export function MapCanvas({
             interactive ? () => selectRef.current?.(first.id) : null,
           )
 
-      const overlay = new maps.CustomOverlay({
+      const options = {
         position: new maps.LatLng(group.center.lat, group.center.lng),
         content,
         /*
@@ -584,7 +585,17 @@ export function MapCanvas({
           묶음은 갈래와 무관하게 받는다. 누르면 확대라는 **할 일이 있다.**
         */
         clickable: isCluster || interactive,
-      })
+      }
+      /*
+        **순번 핀은 화면 밖에서도 그려 둔다** (#1015). `CustomOverlay` 는 보이는 영역 밖의
+        오버레이를 떼어 두고 지도가 멈춘 뒤에야 붙여서, 처음 화면 밖에 있던 순번이 끄는
+        동안 내내 보이지 않았다 — 동선에서는 그 순번이 내용이다. 핀 수가 적어(하루 4~6곳)
+        늘 그려 둬도 비용이 없다. 수백 곳을 그리는 `/places` 는 SDK 의 떼어 두기가 이득이라
+        그대로 둔다 (근거와 실측은 `lib/map/always-drawn-overlay.ts` 머리주석).
+      */
+      const overlay = ordered
+        ? createAlwaysDrawnOverlay(maps, options)
+        : new maps.CustomOverlay(options)
       overlay.setMap(map)
       created.push(overlay)
     }
