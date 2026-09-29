@@ -127,7 +127,9 @@ describe('목록 갈래는 3층 표면이다 (#460)', () => {
     expect(view).toContain(
       'const subtitle = emergencyHeadSubtitle(result, board.filters.keyword, board.regionCode)',
     )
-    expect(view).toMatch(/description=\{[\s\S]{0,200}\{subtitle\}/)
+    // 응답 전 갈래가 앞에 골격 한 줄을 세운다 — 그만큼 거리를 준다
+    expect(view).toMatch(/description=\{[\s\S]{0,300}\{subtitle\}/)
+    expect(view).toMatch(/description=\{\s*headLoading \? \(\s*<Skeleton/)
 
     // `lg:` 로 갈리는 둘째 부제가 되돌아오면 여기서 걸린다
     expect(listView).not.toContain('emergencySummaryLine')

@@ -102,11 +102,7 @@ export function MyPageSections({
         aria-busy={loading || undefined}
       >
         {loading ? (
-          <div aria-hidden className={cn('flex flex-col gap-3 pb-5', INSET_CLASS.card)}>
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-14 w-full" />
-            <Skeleton className="h-14 w-full" />
-          </div>
+          <MyPageProfileSkeleton />
         ) : failed || member === null ? (
           <ErrorState
             inset="card"
@@ -146,18 +142,14 @@ export function MyPageSections({
             */}
             <SurfaceList className="border-border border-t">
               {petsLoading ? (
-                <li aria-hidden className={INSET_CLASS.card}>
-                  <Skeleton className="my-3 h-14" />
-                </li>
+                <MyPageRowSkeleton />
               ) : (
                 // 조회 실패면 이 항목만 빠지고 나머지는 그대로 보인다 (D5)
                 pets !== null && <MyPetsRow pets={pets} totalCount={petsTotalCount} />
               )}
 
               {favoritesLoading ? (
-                <li aria-hidden className={INSET_CLASS.card}>
-                  <Skeleton className="my-3 h-14" />
-                </li>
+                <MyPageRowSkeleton />
               ) : (
                 <MyFavoritesRow totalCount={favoritesTotalCount} />
               )}
@@ -202,5 +194,55 @@ export function MyPageSections({
         </Surface>
       )}
     </>
+  )
+}
+
+/**
+ * 프로필 카드 몸통의 대기 모양 — `MyPageSections` 의 로딩 갈래와 `mypage/(root)/loading.tsx`
+ * 가 **같은 것을 쓴다.**
+ *
+ * **실화면과 같은 블록 셋이다** — 프로필 줄(`MyProfileSection`: `pt-2 pb-5` + 아바타 64) ·
+ * `border-t` · 행 둘(`MyPetsRow` · `MyFavoritesRow`: `min-h-14 py-3` + 아이콘 40 + 두 줄 = 70).
+ * 예전에는 막대 셋(`h-16` · `h-14` × 2, `gap-3 pb-5`)이라 합이 220 이었고 실화면은 234 여서,
+ * 조회가 끝나는 순간 아래 계정 카드가 14px 내려앉았다.
+ */
+export function MyPageProfileSkeleton() {
+  return (
+    <>
+      <div aria-hidden className={cn('flex items-center gap-3 pt-2 pb-5', INSET_CLASS.card)}>
+        <Skeleton className="size-16 shrink-0 rounded-full" />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex h-6.5 items-center">
+            <Skeleton className="h-5 w-24" />
+          </div>
+          <div className="flex h-5.5 items-center">
+            <Skeleton className="h-4 w-44" />
+          </div>
+        </div>
+      </div>
+      <SurfaceList className="border-border border-t">
+        <MyPageRowSkeleton />
+        <MyPageRowSkeleton />
+      </SurfaceList>
+    </>
+  )
+}
+
+/** `MyPetsRow` · `MyFavoritesRow` 한 행(70)과 같은 칸 */
+function MyPageRowSkeleton() {
+  return (
+    <li aria-hidden className={INSET_CLASS.card}>
+      <div className="flex min-h-14 items-center gap-3 py-3">
+        <Skeleton className="size-10 shrink-0 rounded-full" />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex h-6 items-center">
+            <Skeleton className="h-4.5 w-24" />
+          </div>
+          <div className="flex h-5.5 items-center">
+            <Skeleton className="h-4 w-36" />
+          </div>
+        </div>
+      </div>
+    </li>
   )
 }
