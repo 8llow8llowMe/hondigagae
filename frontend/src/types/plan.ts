@@ -557,6 +557,15 @@ export type PlanCreatePayload = {
    * (`src/lib/ai-plan/draft-to-plan.ts`).
    */
   items?: PlanItemRequest[]
+  /**
+   * 생략 가능. 담는 AI 작업의 `jobId`(UUID) — **담기 멱등 키**다 (#1041 · 백엔드 #970).
+   * 형식이 틀리면 `PLAN_135` 400.
+   *
+   * **AI 초안 담기만 싣는다.** 같은 작업을 이미 담았으면 서버가 새 일정을 만들지 않고 먼저
+   * 담긴 일정을 **200** 으로 돌려준다(409 아님) — 이번 요청의 제목·항목은 반영되지 않는다.
+   * 직접 만들기는 보내지 않는다.
+   */
+  sourceAiJobId?: string
 }
 
 /** 백엔드 `PlanItemType` — 요청의 `itemType` 은 **이 다섯 중 하나여야 한다** */
@@ -659,6 +668,11 @@ export type PlanDetail = {
   status: CodeNameMetadata
   totalDays: number
   items: PlanItemDetail[]
+  /**
+   * 이 일정을 만든 AI 작업의 `jobId` (#1041 · 백엔드 #970). **AI 초안을 담은 일정에만
+   * 있고** 직접 만든 일정 · 복제본은 null 이다. 목록 · 공유 응답에는 없다.
+   */
+  sourceAiJobId: string | null
 }
 
 /**

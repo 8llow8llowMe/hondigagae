@@ -128,6 +128,12 @@ export type MockPlan = {
    * 장소 평가는 스냅샷이라 일정 항목이 사라져도 후기 행은 남는다.
    */
   review: MockPlanReview | null
+  /**
+   * 이 일정을 만든 AI 작업의 `jobId` — **담기 멱등 키**다 (#1041 · 백엔드 #970).
+   * 직접 만든 일정 · 복제본은 null 이고, **삭제가 비운다**(`Plan.markDeleted`) — 남기면 그
+   * 작업을 영영 다시 담을 수 없다. 작업 조회의 `committedPlanId` 도 이 값으로 찾는다.
+   */
+  sourceAiJobId: string | null
   deleted: boolean
 }
 
@@ -577,6 +583,7 @@ function createStore(): MockStore {
         packingItems: [],
         packingGeneratedAt: null,
         review: null,
+        sourceAiJobId: null,
         deleted: false,
         /*
           3일 일정. **거리 규칙 4종을 한 fixture 에서 전부 드러낸다.**
@@ -692,6 +699,7 @@ function createStore(): MockStore {
         packingItems: [],
         packingGeneratedAt: null,
         review: null,
+        sourceAiJobId: null,
         deleted: false,
         /*
           2일 일정인데 **3일차 항목이 남아 있다.** 기간을 줄여도 서버가 항목을 정리하지
@@ -807,6 +815,7 @@ function createStore(): MockStore {
         packingItems: [],
         packingGeneratedAt: null,
         review: null,
+        sourceAiJobId: null,
         deleted: false,
       },
       {
@@ -825,6 +834,7 @@ function createStore(): MockStore {
         packingItems: [],
         packingGeneratedAt: null,
         review: null,
+        sourceAiJobId: null,
         deleted: false,
       },
       {
@@ -844,6 +854,7 @@ function createStore(): MockStore {
         packingItems: [],
         packingGeneratedAt: null,
         review: null,
+        sourceAiJobId: null,
         deleted: false,
       },
     ],
@@ -899,6 +910,8 @@ function isCurrentShape(store: MockStore | undefined): store is MockStore {
     store.members.every((member) => 'provider' in member) &&
     // 일정 항목이 뒤에 추가됐다. HMR 로 살아남은 낡은 스토어는 버린다 (#59 와 같은 사고)
     store.plans.every((plan) => Array.isArray(plan.items) && 'review' in plan) &&
+    // 담기 멱등 키가 뒤에 추가됐다 (#1041). 없으면 조회가 `undefined` 를 내려 계약이 깨진다
+    store.plans.every((plan) => 'sourceAiJobId' in plan) &&
     typeof store.nextReviewSeq === 'number' &&
     // AI 작업 목록도 같은 이유로 본다
     Array.isArray(store.aiPlanJobs) &&
@@ -921,6 +934,21 @@ export function mockStore(): MockStore {
 /** 테스트에서 상태를 초기화한다 */
 export function resetMockStore(): void {
   ;(globalThis as GlobalWithStore)[STORE_KEY] = createStore()
+}
+
+/**
+ * 이 작업을 이미 담은 일정 (#1041). **삭제된 일정은 찾지 않는다** — 백엔드 조회도
+ * `deleted = false` 를 함께 건다. 키는 회원 네임스페이스라 남의 일정에 닿지 않는다.
+ *
+ * 일정 생성(`plan-data.ts`)의 멱등 판정과 작업 조회의 `committedPlanId`(`ai-plan-data.ts`)가
+ * 함께 쓴다 — 담긴 사실의 정본은 일정 쪽이다 (ai-service.md "잡에 저장하지 않는다").
+ */
+export function findAiCommittedPlan(memberId: string, jobId: string): MockPlan | null {
+  return (
+    mockStore().plans.find(
+      (plan) => plan.memberId === memberId && plan.sourceAiJobId === jobId && !plan.deleted,
+    ) ?? null
+  )
 }
 
 /**

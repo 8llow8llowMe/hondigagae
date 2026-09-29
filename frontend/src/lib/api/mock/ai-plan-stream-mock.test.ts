@@ -213,6 +213,32 @@ describe('resolveMockStream — 프레임 순서', () => {
     const body = (polled?.payload as ApiResponse<AiPlanJob>).dataBody!
     expect(typeof body.status === 'string' ? body.status : body.status.code).toBe('COMPLETED')
   })
+
+  /** 조회와 이벤트가 같은 본문이다 — 담은 일정도 같은 규칙으로 실린다 (#1041) */
+  it('담은 작업을 다시 구독하면 스냅샷에 committedPlanId 가 실린다', () => {
+    const jobId = newJob()
+    stream(jobId)
+
+    const committed = resolveMock(
+      '/plans',
+      'POST',
+      '',
+      JSON.stringify({
+        petIds: [VALID.petId],
+        areaCode: '39',
+        title: '몽실이와 제주 2박 3일',
+        startDate: VALID.startDate,
+        endDate: VALID.endDate,
+        sourceAiJobId: jobId,
+      }),
+      TOKEN,
+    )
+    const planId = (committed?.payload as ApiResponse<{ planId: string }>).dataBody!.planId
+
+    const again = stream(jobId)
+    if (again?.kind !== 'stream') throw new Error('스트림이 아니다')
+    expect((again.frames[0]?.data as AiPlanJob).committedPlanId).toBe(planId)
+  })
 })
 
 describe('SSE 와이어 형식', () => {

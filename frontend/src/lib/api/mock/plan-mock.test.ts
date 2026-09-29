@@ -318,3 +318,55 @@ describe('일정 mock — 도메인 검증도 백엔드와 같이 돈다', () =>
     expect(code(result)).toBe('PLAN_100')
   })
 })
+
+describe('일정 mock — AI 초안 담기 멱등 (#1041 · 백엔드 #970)', () => {
+  const JOB_ID = '8a64f9c0-2f1e-4c1a-9c3e-000000000001'
+
+  function detailOf(result: ReturnType<typeof create>): PlanDetail {
+    return (result?.payload as ApiResponse<PlanDetail>).dataBody!
+  }
+
+  function remove(planId: string) {
+    return resolveMock(`/plans/${planId}`, 'DELETE', '', null, TOKEN)
+  }
+
+  it('담은 일정은 상세에 sourceAiJobId 를 싣고, 직접 만든 일정은 null 이다', () => {
+    expect(detailOf(create({ ...VALID, sourceAiJobId: JOB_ID })).sourceAiJobId).toBe(JOB_ID)
+    expect(detailOf(create(VALID)).sourceAiJobId).toBeNull()
+  })
+
+  /*
+    **409 가 아니라 200 + 먼저 담긴 일정이다.** 두 번째 요청의 제목은 반영하지 않는다 —
+    다시 누른 담기는 "새로 저장" 이 아니라 "이미 담긴 것 열기" 다 (plan-service.md).
+  */
+  it('같은 작업을 다시 담으면 새 일정을 만들지 않고 먼저 담긴 일정을 200 으로 돌려준다', () => {
+    const first = detailOf(create({ ...VALID, sourceAiJobId: JOB_ID }))
+    const again = create({ ...VALID, title: '고친 제목', sourceAiJobId: JOB_ID })
+
+    expect(again?.status).toBe(200)
+    expect(detailOf(again).planId).toBe(first.planId)
+    expect(detailOf(again).title).toBe(VALID.title)
+    expect(slice(list('')).contents.filter((plan) => plan.title === '고친 제목')).toHaveLength(0)
+  })
+
+  it('UUID 모양이 아니면 PLAN_135 필드 오류다', () => {
+    const result = create({ ...VALID, sourceAiJobId: 'job-1' })
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.fieldErrors?.[0]).toMatchObject({
+      code: 'PLAN_135',
+      field: 'sourceAiJobId',
+    })
+  })
+
+  /** 삭제가 키를 비운다 — 남기면 그 작업을 영영 다시 담을 수 없다 */
+  it('담은 일정을 지운 뒤 다시 담으면 새 일정이 생긴다', () => {
+    const first = detailOf(create({ ...VALID, sourceAiJobId: JOB_ID }))
+    remove(first.planId)
+
+    const again = detailOf(create({ ...VALID, sourceAiJobId: JOB_ID }))
+
+    expect(again.planId).not.toBe(first.planId)
+    expect(again.sourceAiJobId).toBe(JOB_ID)
+  })
+})

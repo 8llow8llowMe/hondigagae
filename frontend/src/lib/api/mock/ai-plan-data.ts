@@ -1,7 +1,13 @@
 import { JOB_STREAM_EVENT } from '@/lib/ai-plan/job-stream'
 import type { MockResult } from '@/lib/api/mock/auth-data'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
-import { memberIdOf, type MockAiPlanJob, mockStore, nextAiPlanJobId } from '@/lib/api/mock/store'
+import {
+  findAiCommittedPlan,
+  memberIdOf,
+  type MockAiPlanJob,
+  mockStore,
+  nextAiPlanJobId,
+} from '@/lib/api/mock/store'
 import type { MockStreamFrame } from '@/lib/api/mock/stream'
 import type {
   AiPlanDayItem,
@@ -842,6 +848,7 @@ function jobBody(
       ...steps,
       conditions,
       planDraft: null,
+      committedPlanId: null,
       errorCode: timedOut ? 'AIPLAN_006' : 'AIPLAN_012',
       errorMessage: timedOut
         ? 'AI 일정 생성이 제한 시간을 넘겼습니다.'
@@ -856,6 +863,7 @@ function jobBody(
       ...steps,
       conditions,
       planDraft: null,
+      committedPlanId: null,
       /*
         **취소도 여기로 온다 — `errorCode` 를 채우지 않는다.** 채우면 화면이
         "실패했습니다" 를 띄우고, 실패와 취소를 가른 이 계약의 요점이 무너진다.
@@ -871,6 +879,12 @@ function jobBody(
     ...steps,
     conditions,
     planDraft: draftFor(job),
+    /*
+      **조회 때마다 일정 쪽에 묻는다** (#1041 · ai-service.md "담은 일정을 함께 내린다").
+      작업에 적어 두지 않는다 — 적어 두면 담은 일정을 지워도 작업이 모른다. 완료에서만
+      묻는 것도 백엔드와 같다: 초안이 없으면 담을 것도 없다.
+    */
+    committedPlanId: findAiCommittedPlan(job.memberId, job.jobId)?.planId ?? null,
     errorCode: null,
     errorMessage: null,
   }

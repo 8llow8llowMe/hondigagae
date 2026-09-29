@@ -20,6 +20,7 @@ function job(code: string): AiPlanJob {
     errorMessage: null,
     // 이 파일이 보는 것은 상태 전이라 조건은 쓰이지 않는다 (#498)
     conditions: null,
+    committedPlanId: null,
   }
 }
 
