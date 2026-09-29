@@ -15,6 +15,21 @@
 - Controller 반환은 `ResponseEntity<Response<T>>`로 통일한다.
 - 중첩 응답은 `Response`, `Item`, `Presenter` 조합으로 구성한다.
 - 내부용 `Info`를 외부 응답 타입으로 직접 노출하지 않는다.
+- **성공 응답의 `dataBody` 는 `null` 일 수 있다.** `Response.success(null)` 은 `common-core` 가 허용하는 정상 응답이다.
+
+### 2-0. 부재는 언제 200 + `dataBody: null` 이고 언제 404 인가 (이슈 [#979](https://github.com/8llow8llowMe/hondigagae/issues/979))
+
+- **선택적 하위 리소스(부모당 0~1개)의 부재는 200 + `dataBody: null`** 이다. "아직 없음" 은 오류가 아니라 정상 상태다.
+  예: `GET /api/v1/plans/{planId}/share-link`(공유 중이 아님), `GET /api/v1/plans/{planId}/reviews`(아직 안 씀).
+  404 로 답하면 화면을 열 때마다 브라우저 콘솔에 "Failed to load resource" 가 찍히고, 클라이언트가 404 를 "없음" 으로
+  접으면서 **일정 자체가 없는 404 까지 같이 삼킨다.**
+- **id 로 지정한 리소스 자체의 부재·타인 리소스는 404** 다 — 위 예에서도 일정이 없거나 남의 것이면 `PLAN_001` 404 다.
+  Facade 첫 줄의 소유 확인이 하위 리소스 조회보다 먼저 선다.
+- **존재 노출을 막아야 하는 곳은 404 를 유지한다.** 공개 토큰 조회(`GET /api/v1/shared-plans/{token}`)가 그렇다 —
+  없음·폐기·비공유를 같은 `PLAN_023` 404 로 답해야 토큰을 찍어 보는 쪽에 "있었다" 를 흘리지 않는다.
+- **수정할 대상이 있어야 하는 쓰기는 404 를 유지한다.** `PUT /plans/{planId}/reviews` 의 `PLAN_015` 가 그렇다.
+- 구현 모양: Processor 는 `Optional<Info>` 를 돌려주고, Facade 가 `.map(presenter::toX).orElse(null)` 로 푼다.
+  `*WebUseCase` 의 반환 javadoc 에 **null 일 수 있음**을 적고, `@Operation` description 에 "없으면 200 + `dataBody: null`" 을 쓴다.
 
 ### 2-1. 오류 봉투 계약 — `resultMessage` 는 항상 문자열이다 (이슈 [#491](https://github.com/8llow8llowMe/hondigagae/issues/491))
 
