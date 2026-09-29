@@ -137,6 +137,17 @@ TourAPI 에만 있는 항목(하영올레 등)은 코스가 되지 않는다. �
 기준 코드상 29/29 이고 근거는 `data-api-analysis.md` §9-4. 원천 파일이 같으므로 #960 배포 뒤
 `forceImport=true` 로 1회 재적재한다(`batch-dev-runbook.md` §4-3).
 
+**소요시간 표기는 적재할 때 `N~M시간` 한 모양으로 맞춘다** (#987, `OlleCourseParser.durationText`). 2026-07-31 판은
+28행이 `3~4시간` 인데 18-2코스 하나만 `3-4시간` 이라 목록에 두 모양이 섞여 나갔다. 숫자 사이의 범위 기호(`-` ·
+전각 `－` · en/em dash · 물결 변형)만 `~` 로 바꾸고 그 밖의 글자는 건드리지 않는다. `durationMaxMinutes` 는 `시간`
+바로 앞 숫자만 읽어 **정규화 전후 값이 같다**(둘 다 240분) — 활동량 판정은 바뀌지 않는다.
+원천 파일이 같아 월요일 스케줄은 이 변경을 반영하지 않고 건너뛴다. 배포 뒤 `olleCourseImportJob forceImport=true` 를
+1회 돌리고 아래로 확인한다 — 2026-09-29 dev 는 `18-2 | 3-4시간` 한 줄이 나온다(재적재 뒤 0 행).
+
+```sql
+SELECT course_key, duration_text FROM walk_course WHERE duration_text NOT REGEXP '^[0-9]+~[0-9]+시간$';
+```
+
 ### 원천이 한 번에 두 계약을 조용히 바꿨다 (#722)
 
 29개 중 25개가 좌표 없이 적재돼 있었다. **원천에 없어서가 아니라 적재 쪽 결함 둘이 곱해진
