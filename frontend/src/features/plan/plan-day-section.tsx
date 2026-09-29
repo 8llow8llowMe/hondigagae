@@ -43,6 +43,12 @@ export type PlanDayAdd = {
   /** **이 일자에서** 난 실패만. 좁히지 않으면 안 누른 일자에도 오류가 남는다 */
   error: PlanDaySaveError | null
   onAdd: (alternative: PlanAlternativePlaceItem) => void
+  /**
+   * `이동·휴식 추가` 모달을 연다 (#1014 · `일자편집-세부명세.md` H2). **이 묶음에 둔다** —
+   * 같은 일괄 교체 저장이라 `busy` 잠금을 함께 받아야 하고, 모달은 화면에 하나뿐이라
+   * 호출부가 어느 일자인지만 기억하면 된다.
+   */
+  onAddMove: () => void
 }
 
 /**
@@ -325,6 +331,18 @@ export function PlanDaySection({
               {messages.plan.editDayAction}
             </Button>
           )}
+
+          {/*
+            **`순서 편집` 오른쪽이다** (#1014 · H2). 이 일자를 **고치는** 도구라 왼쪽 무리에
+            선다. `장소 추가` 와 같이 **빈 일자에도 남는다** — 이동·휴식은 장소가 없어도
+            넣을 수 있고, 항목 수를 볼 이유가 없다.
+
+            라우트가 아니라 모달이다 — 고를 목록이 없고 제목 하나만 받는다 (`장소 추가` 가
+            라우트인 이유(F2)가 여기에는 없다).
+          */}
+          <Button variant="secondary" size="sm" aria-haspopup="dialog" onClick={add.onAddMove}>
+            {messages.plan.addMoveAction}
+          </Button>
 
           {/*
             **`이 날 산책 위험도` 가 여기 있었다** (#842 → #1016 에서 걷음). 그 링크는 기준

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import { messages } from '@/lib/messages'
 import {
+  appendMoveItemPayload,
   appendPlaceItemPayload,
   appendWalkCourseItemPayload,
   hasEditChanges,
@@ -12,6 +14,7 @@ import {
   survivingItems,
   toEditItems,
   toggleRemoved,
+  validateMoveTitle,
   walkCourseIdsOf,
 } from '@/lib/plan/day-items'
 import { planItem } from '@/test/fixtures/plan'
@@ -479,5 +482,104 @@ describe('appendWalkCourseItemPayload — 산책 코스 담기 (#620)', () => {
 
   it('빈 일자에 담으면 항목 하나짜리 목록이 된다', () => {
     expect(appendWalkCourseItemPayload([], 1, course).items).toHaveLength(1)
+  })
+})
+
+describe('appendMoveItemPayload — 이동·휴식 직접 추가 (#1014)', () => {
+  it('기존 항목을 전부 되싣고 새 항목을 맨 끝에 붙인다 — 일괄 교체다', () => {
+    const payload = appendMoveItemPayload(ITEMS, 2, { title: '카페에서 쉬기' })
+
+    expect(payload.items).toHaveLength(4)
+    expect(payload.items.map((item) => item.title)).toEqual([
+      '미술관',
+      '시장',
+      '이동',
+      '카페에서 쉬기',
+    ])
+  })
+
+  it('새 항목의 itemType 이 MOVE 고정이다', () => {
+    expect(appendMoveItemPayload([], 1, { title: '차로 이동' }).items[0]?.itemType).toBe('MOVE')
+  })
+
+  it('새 항목에 targetId 키가 없다 — MOVE 는 대상이 없다 (PlanItemRequest.targetId)', () => {
+    const added = appendMoveItemPayload(ITEMS, 2, { title: '차로 이동' }).items.at(-1)
+
+    expect(added).not.toHaveProperty('targetId')
+    expect(JSON.stringify(added)).not.toContain('targetId')
+  })
+
+  it('memo · startTime 을 싣지 않는다 — 제목만 받는다', () => {
+    const added = appendMoveItemPayload([], 1, { title: '차로 이동' }).items[0]
+
+    expect(added).toEqual({ day: 1, sequence: 0, itemType: 'MOVE', title: '차로 이동' })
+  })
+
+  it('되싣는 항목의 targetId · memo · startTime · itemType 이 살아 있다', () => {
+    const [first, , third] = appendMoveItemPayload(ITEMS, 2, { title: '쉬기' }).items
+
+    expect(first?.targetId).toBe(BIG_ID)
+    expect(first?.memo).toBe('실내라 비가 와도 괜찮아요')
+    expect(first?.startTime).toBe('10:00:00')
+    expect(first?.itemType).toBe('PLACE')
+    // 이미 있던 MOVE 도 MOVE 로, targetId 없이 되실린다
+    expect(third?.itemType).toBe('MOVE')
+    expect(third).not.toHaveProperty('targetId')
+  })
+
+  it('sequence 를 0부터 다시 매기고 새 항목이 마지막 번호를 받는다', () => {
+    const payload = appendMoveItemPayload(ITEMS, 2, { title: '쉬기' })
+
+    expect(payload.items.map((item) => item.sequence)).toEqual([0, 1, 2, 3])
+  })
+
+  it('day 를 경로값 그대로 싣는다', () => {
+    const payload = appendMoveItemPayload(ITEMS, 3, { title: '쉬기' })
+
+    expect(payload.items.every((item) => item.day === 3)).toBe(true)
+  })
+
+  it('앞뒤 공백을 걷어 보낸다', () => {
+    expect(appendMoveItemPayload([], 1, { title: '  차로 이동  ' }).items[0]?.title).toBe(
+      '차로 이동',
+    )
+  })
+
+  it('title 이 100자를 넘으면 잘라서 보낸다 — 서버는 자르지 않고 PLAN_110 을 낸다', () => {
+    const added = appendMoveItemPayload([], 1, { title: 'ㄱ'.repeat(150) }).items[0]
+
+    expect(added?.title).toHaveLength(ITEM_TITLE_MAX)
+  })
+
+  it('빈 일자에 붙이면 항목 하나짜리 목록이 된다', () => {
+    expect(appendMoveItemPayload([], 1, { title: '쉬기' }).items).toHaveLength(1)
+  })
+})
+
+describe('validateMoveTitle — 이동·휴식 제목 검증 (#1014)', () => {
+  it('빈 문자열은 필수 오류다', () => {
+    expect(validateMoveTitle('')).toBe(messages.plan.addMoveTitleRequired)
+  })
+
+  it('공백만 있어도 필수 오류다 — 서버 @NotBlank 와 같다', () => {
+    expect(validateMoveTitle('   ')).toBe(messages.plan.addMoveTitleRequired)
+  })
+
+  it('100자는 통과한다', () => {
+    expect(validateMoveTitle('ㄱ'.repeat(ITEM_TITLE_MAX))).toBeNull()
+  })
+
+  it('101자는 길이 오류다 — 자르지 않고 막는다 (사용자가 쓴 글이다)', () => {
+    expect(validateMoveTitle('ㄱ'.repeat(ITEM_TITLE_MAX + 1))).toBe(
+      messages.plan.addMoveTitleTooLong,
+    )
+  })
+
+  it('앞뒤 공백은 길이에 세지 않는다', () => {
+    expect(validateMoveTitle(` ${'ㄱ'.repeat(ITEM_TITLE_MAX)} `)).toBeNull()
+  })
+
+  it('보통 제목은 통과한다', () => {
+    expect(validateMoveTitle('차로 이동')).toBeNull()
   })
 })

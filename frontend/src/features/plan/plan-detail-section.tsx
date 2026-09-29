@@ -8,6 +8,7 @@ import { EmergencyIcon } from '@/components/icons'
 import { Surface, SurfaceList, SurfaceStack } from '@/components/surface'
 import { PlanBriefingBanner } from '@/features/plan/plan-briefing-banner'
 import { PlanDayEditor } from '@/features/plan/plan-day-editor'
+import { PlanDayMoveAddModal } from '@/features/plan/plan-day-move-add-modal'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { PlanItemRow } from '@/features/plan/plan-item-row'
 import { PlanManageMenu } from '@/features/plan/plan-manage-menu'
@@ -17,6 +18,7 @@ import { PlanPackingStrip } from '@/features/plan/plan-packing-strip'
 import { PlanReviewList } from '@/features/plan/plan-review-panel'
 import { PlanRouteCard } from '@/features/plan/plan-route-card'
 import { PlanStatusAction } from '@/features/plan/plan-status-action'
+import { usePlanAddMove } from '@/features/plan/use-plan-add-move'
 import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
 import { usePlanDayEdit } from '@/features/plan/use-plan-day-edit'
 import { usePlanPackingList } from '@/features/plan/use-plan-packing'
@@ -142,6 +144,23 @@ export function PlanDetailSection({
     후처리(캐시 갱신 · 판정 무효화 · 토스트)가 갈리면 안 된다 (F0).
   */
   const addPlace = usePlanAddPlace({ planId: plan.planId })
+
+  /*
+    이동·휴식 추가 (#1014 · `일자편집-세부명세.md` H3). **모달은 화면에 하나다** — 어느
+    일자에 붙일지만 여기서 기억한다. 저장이 성공하면 닫는다.
+  */
+  const [moveDay, setMoveDay] = useState<number | null>(null)
+  const addMove = usePlanAddMove({ planId: plan.planId, onAdded: () => setMoveDay(null) })
+  /*
+    **같은 일괄 교체 계열의 잠금 하나.** 실내 대안 담기와 이동·휴식 추가가 동시에 나가면
+    같은 일자에서 나중 응답이 앞선 것을 덮어 한쪽이 사라진다 (F6 "담기 중 다른 담기").
+  */
+  const dayItemsBusy = addPlace.adding || addMove.adding
+
+  function openMoveAdd(day: number) {
+    addMove.clearFailure()
+    setMoveDay(day)
+  }
 
   /*
     방문 체크 (#124). **담기·편집과 달리 항목별로 동시에 진행할 수 있다** — 일괄 교체가
@@ -419,7 +438,7 @@ export function PlanDetailSection({
                   같은 장소가 두 일자의 대안일 때 두 행이 함께 스피너를 낸다.
                 */
               pendingPlaceId: addPlace.pending?.day === group.day ? addPlace.pending.placeId : null,
-              busy: addPlace.adding,
+              busy: dayItemsBusy,
               error: addPlace.failure?.target.day === group.day ? addPlace.failure.error : null,
               onAdd: (alternative) =>
                 addPlace.add({
@@ -428,6 +447,7 @@ export function PlanDetailSection({
                   dayItems: group.items,
                   place: alternative,
                 }),
+              onAddMove: () => openMoveAdd(group.day),
             }}
             visit={{
               visitOf: (planItemId) => ({
@@ -549,6 +569,34 @@ export function PlanDetailSection({
           />
         </Surface>
       </SurfaceStack>
+
+      <PlanDayMoveAddModal
+        open={moveDay !== null}
+        day={moveDay ?? 1}
+        saving={addMove.adding}
+        // 이 모달 자신의 저장은 `saving` 이 말한다. 여기는 **다른** 담기가 도는 중인지다
+        blocked={addPlace.adding}
+        formError={
+          moveDay !== null && addMove.failure?.day === moveDay
+            ? addMove.failure.error.message
+            : null
+        }
+        onSubmit={(title) => {
+          if (moveDay === null) return
+          const group = days[moveDay - 1]
+          // 기간이 줄어 일자가 사라졌다 — 보낼 곳이 없다. 모달만 닫는다
+          if (group === undefined) {
+            setMoveDay(null)
+            return
+          }
+          // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
+          addMove.add({ day: moveDay, dayItems: group.items, title })
+        }}
+        onClose={() => {
+          setMoveDay(null)
+          addMove.clearFailure()
+        }}
+      />
 
       {/*
         편집한 것을 말없이 버리지 않는다 (E4). 되돌릴 수 없는 확인이라 `ConfirmModal`

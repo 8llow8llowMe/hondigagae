@@ -212,6 +212,7 @@ export const planDayAdd: PlanDayAdd = {
   busy: false,
   error: null,
   onAdd: () => undefined,
+  onAddMove: () => undefined,
 }
 
 /**
