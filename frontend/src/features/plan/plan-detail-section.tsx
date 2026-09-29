@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import { Banner } from '@/components/banner'
 import { ConfirmModal } from '@/components/confirm-modal'
@@ -10,7 +10,7 @@ import { PlanBriefingBanner } from '@/features/plan/plan-briefing-banner'
 import { PlanDayEditor } from '@/features/plan/plan-day-editor'
 import { PlanDayMoveAddModal } from '@/features/plan/plan-day-move-add-modal'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
-import { PlanItemRow } from '@/features/plan/plan-item-row'
+import { PlanItemRow, timeChipFocusKey } from '@/features/plan/plan-item-row'
 import { PlanItemTimeModal } from '@/features/plan/plan-item-time-modal'
 import { PlanManageMenu } from '@/features/plan/plan-manage-menu'
 import { PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
@@ -164,10 +164,27 @@ export function PlanDetailSection({
     (`PlanItemTimeModal` 머리주석).
   */
   const [timeTarget, setTimeTarget] = useState<{ day: number; planItemId: string } | null>(null)
-  const closeTimeModal = useCallback(() => setTimeTarget(null), [])
+  /*
+    **저장 뒤 초점을 돌려줄 칩** (#1028 검토). 일괄 교체가 `planItemId` 를 새로 발급해 모달을 연
+    칩이 언마운트되므로, `useOverlay` 의 복귀 초점은 떨어진 노드를 가리켜 `body` 로 빠진다.
+    저장을 보낼 때 **일자 · 순서** 를 적어 두고, 닫은 다음 프레임에 같은 자리의 새 칩을 잡는다.
+    한 프레임 미루는 것은 `useOverlay` cleanup 의 복귀 시도(떨어진 노드)가 먼저 지나가게 하려는 것이다.
+  */
+  const timeFocusKeyRef = useRef<string | null>(null)
+  const closeTimeModal = useCallback(() => {
+    setTimeTarget(null)
+    const key = timeFocusKeyRef.current
+    timeFocusKeyRef.current = null
+    if (key === null) return
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>(`[data-plan-time-chip="${key}"]`)?.focus()
+    })
+  }, [])
   const itemTime = usePlanItemTime({ planId: plan.planId, onSaved: closeTimeModal })
   const { clearFailure: clearTimeFailure } = itemTime
   const dismissTimeModal = useCallback(() => {
+    // 저장하지 않고 닫는다 — 칩이 그대로라 `useOverlay` 의 복귀 초점이 맞는다
+    timeFocusKeyRef.current = null
     setTimeTarget(null)
     clearTimeFailure()
   }, [clearTimeFailure])
@@ -656,6 +673,10 @@ export function PlanDetailSection({
         blocked={addPlace.adding || addMove.adding}
         onSave={(startTime) => {
           if (timeTarget === null || timeGroup === undefined || timeItem === undefined) return
+          timeFocusKeyRef.current = timeChipFocusKey(
+            timeTarget.day,
+            timeGroup.items.findIndex((item) => item.planItemId === timeItem.planItemId),
+          )
           // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
           itemTime.save({
             day: timeTarget.day,

@@ -8,7 +8,7 @@ import { Surface, SurfaceList } from '@/components/surface'
 import { PlanDayOverflowMenu } from '@/features/plan/plan-day-overflow-menu'
 import { PlanDayVerdict } from '@/features/plan/plan-day-verdict'
 import { PlanIndoorAlternatives } from '@/features/plan/plan-indoor-alts'
-import { PlanItemRow, type PlanItemVisit } from '@/features/plan/plan-item-row'
+import { PlanItemRow, type PlanItemVisit, timeChipFocusKey } from '@/features/plan/plan-item-row'
 import { messages } from '@/lib/messages'
 import { formatPlanDay } from '@/lib/plan/date'
 import type { PlanItemRowModel } from '@/lib/plan/detail'
@@ -297,7 +297,7 @@ export function PlanDaySection({
         </p>
       ) : (
         <SurfaceList className="border-border border-t">
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <PlanItemRow
               key={row.item.planItemId}
               model={row}
@@ -310,7 +310,10 @@ export function PlanDaySection({
                 되풀이하지 않는다 (`plan-item-row.tsx` 의 `showPetConditionNote`).
               */
               dayPetConditionApplied={petConditionApplied}
-              time={{ onOpen: () => itemTime.onOpen(row.item.planItemId) }}
+              time={{
+                onOpen: () => itemTime.onOpen(row.item.planItemId),
+                focusKey: timeChipFocusKey(day, index),
+              }}
             />
           ))}
         </SurfaceList>
