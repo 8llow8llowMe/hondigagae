@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 
 import { useQueryClient } from '@tanstack/react-query'
 
+import { enterSession } from '@/features/auth/enter-session'
 import { oauthLogin } from '@/lib/api/auth'
 import { isOAuthProvider } from '@/lib/auth/oauth-provider'
 import { takeReturnTo } from '@/lib/auth/oauth-return-to'
@@ -71,14 +72,12 @@ export function useOAuthExchange({
 
     void oauthLogin(provider, code, state)
       .then(() => {
-        // 이전 사용자 캐시가 남으면 다른 계정의 데이터가 보인다 — login-form.tsx 와 같은 처리
-        queryClient.clear()
         /*
-          **`replace` 다.** `push` 면 뒤로가기로 이 주소(`?code=&state=`)에 돌아오는데,
-          그때 code·state 는 이미 소모돼 실패 화면만 보게 된다. replace 는 성공과 동시에
-          주소에서 두 값을 지우는 역할도 겸한다 (정본 D3-2).
+          **`replace` 다** (`enterSession`). `push` 면 뒤로가기로 이 주소(`?code=&state=`)에
+          돌아오는데, 그때 code·state 는 이미 소모돼 실패 화면만 보게 된다. replace 는 성공과
+          동시에 주소에서 두 값을 지우는 역할도 겸한다 (정본 D3-2).
         */
-        router.replace(takeReturnTo())
+        enterSession({ queryClient, router }, takeReturnTo())
       })
       .catch((error: unknown) => {
         /*

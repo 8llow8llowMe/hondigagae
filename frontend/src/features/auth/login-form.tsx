@@ -12,6 +12,7 @@ import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
 import { EyeIcon, EyeOffIcon } from '@/components/icons'
 import { Input } from '@/components/input'
+import { enterSession } from '@/features/auth/enter-session'
 import { loginSchema, type LoginValues } from '@/features/auth/schemas'
 import { login, type LoginResult } from '@/lib/api/auth'
 import { ApiError, classify, NO_RESPONSE_STATUS } from '@/lib/api/error'
@@ -171,12 +172,7 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
         throw error
       }
     },
-    onSuccess: () => {
-      // 이전 사용자 캐시가 남으면 다른 계정의 데이터가 보인다
-      queryClient.clear()
-      // push 를 쓰면 뒤로가기로 로그인 화면에 돌아온다
-      router.replace(returnTo)
-    },
+    onSuccess: () => enterSession({ queryClient, router }, returnTo),
   })
 
   // submitCount 만 의존한다. errors 를 넣으면 입력 중 setValue 가
