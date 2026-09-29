@@ -56,8 +56,13 @@ async function titles(list: Locator): Promise<string[]> {
 }
 
 /** 카드의 들린 모양 — 끄는 중에만 붙는다 */
-async function lifted(list: Locator): Promise<number> {
-  return list.locator(':scope > li.shadow-md').count()
+/**
+ * 들린 카드. **숫자가 아니라 로케이터로 돌려 `toHaveCount` 로 기다린다** (#1029 검토) —
+ * 창 리스너 안의 `setState` 는 이벤트 우선순위상 한 틱 늦게 반영될 수 있어, 한 번 읽고
+ * 판정하면 CI 가 붐빌 때 흔들린다. 0.3초 문턱 뒤의 들림은 특히 그렇다.
+ */
+function lifted(list: Locator): Locator {
+  return list.locator(':scope > li.shadow-md')
 }
 
 async function center(locator: Locator): Promise<{ x: number; y: number }> {
@@ -85,17 +90,17 @@ test.describe('순서 편집 — 마우스로 카드를 끈다 (#1029)', () => {
     await page.mouse.down()
     // 문턱(5px) 아래로만 움직이면 아직 끌기가 아니다 — 클릭과 헷갈리지 않는다
     await page.mouse.move(from.x, from.y + 3)
-    expect(await lifted(list)).toBe(0)
+    await expect(lifted(list)).toHaveCount(0)
 
     await page.mouse.move(to.x, to.y + 12, { steps: 12 })
-    expect(await lifted(list)).toBe(1)
+    await expect(lifted(list)).toHaveCount(1)
     // 들린 모양 — 그림자와 살짝 확대 (움직임 줄이기 설정이 아닐 때)
     await expect(list.locator(':scope > li.shadow-md')).not.toHaveCSS('scale', 'none')
     await shot(page, 'mouse-dragging')
     await page.mouse.up()
 
     await expect.poll(() => titles(list)).toEqual([before[1], before[0], before[2]])
-    expect(await lifted(list)).toBe(0)
+    await expect(lifted(list)).toHaveCount(0)
   })
 
   test('움직임 줄이기 설정에서는 키우지 않고 그림자만 남긴다', async ({ page }) => {
@@ -107,7 +112,7 @@ test.describe('순서 편집 — 마우스로 카드를 끈다 (#1029)', () => {
     await page.mouse.move(from.x, from.y)
     await page.mouse.down()
     await page.mouse.move(from.x, from.y + 8, { steps: 4 })
-    expect(await lifted(list)).toBe(1)
+    await expect(lifted(list)).toHaveCount(1)
 
     const lift = list.locator(':scope > li.shadow-md')
     await expect(lift).toHaveCSS('scale', 'none')
@@ -126,7 +131,7 @@ test.describe('순서 편집 — 마우스로 카드를 끈다 (#1029)', () => {
     await page.mouse.move(start.x, start.y)
     await page.mouse.down()
     await page.mouse.move(start.x, below.y, { steps: 12 })
-    expect(await lifted(list)).toBe(0)
+    await expect(lifted(list)).toHaveCount(0)
     await page.mouse.up()
 
     expect(await titles(list)).toEqual(before)
@@ -139,7 +144,7 @@ test.describe('순서 편집 — 마우스로 카드를 끈다 (#1029)', () => {
     await list.locator(':scope > li').nth(0).getByRole('button', { name: '아래로 이동' }).click()
 
     await expect.poll(() => titles(list)).toEqual([before[1], before[0], before[2]])
-    expect(await lifted(list)).toBe(0)
+    await expect(lifted(list)).toHaveCount(0)
   })
 })
 
@@ -196,7 +201,7 @@ test.describe('순서 편집 — 터치로 카드를 끈다 (#1029)', () => {
 
     await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(scrollBefore + 50)
     expect(await titles(list)).toEqual(before)
-    expect(await lifted(list)).toBe(0)
+    await expect(lifted(list)).toHaveCount(0)
     await shot(page, 'touch-swipe-scrolled')
   })
 
@@ -214,9 +219,9 @@ test.describe('순서 편집 — 터치로 카드를 끈다 (#1029)', () => {
     await finger.start(from.x, from.y)
     // 0.3초 전에는 아직 들리지 않는다
     await page.waitForTimeout(150)
-    expect(await lifted(list)).toBe(0)
+    await expect(lifted(list)).toHaveCount(0)
     await page.waitForTimeout(250)
-    expect(await lifted(list)).toBe(1)
+    await expect(lifted(list)).toHaveCount(1)
 
     await finger.moveTo(from, { x: to.x, y: to.y + 12 })
     await shot(page, 'touch-dragging')
@@ -227,7 +232,7 @@ test.describe('순서 편집 — 터치로 카드를 끈다 (#1029)', () => {
     await finger.end()
 
     await expect.poll(() => titles(list)).toEqual([before[1], before[0], before[2]])
-    expect(await lifted(list)).toBe(0)
+    await expect(lifted(list)).toHaveCount(0)
     // 끄는 동안 막은 스크롤이 새지 않았다 (자동 스크롤 구역 밖이다)
     expect(Math.abs((await page.evaluate(() => window.scrollY)) - scrollBefore)).toBeLessThan(2)
   })
