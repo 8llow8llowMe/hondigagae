@@ -142,6 +142,26 @@ describe('PlanDayVerdict — 판정을 못 낸 것과 낮은 것을 구분한다
   it('판정이 아직 없으면 아무것도 렌더하지 않는다 — 빈 등급을 만들지 않는다', () => {
     expect(renderVerdict(null)).toBe('')
   })
+
+  /*
+    **처음 받는 중이면 자리를 비우지 않는다** — 비우면 판정이 오는 순간 일자마다 밴드가
+    끼어들며 그날의 항목이 통째로 밀린다. 골격은 밴드와 같은 칸(`my-4` · 테두리 ·
+    `px-4 py-3`)이고 등급어를 지어내지 않는다.
+  */
+  it('처음 받는 중이면 판정 밴드 모양의 골격이 선다', () => {
+    const markup = renderVerdict(null, { pending: true })
+
+    expect(markup).toContain('animate-pulse')
+    expect(markup).toMatch(/class="[^"]*my-4[^"]*rounded-md[^"]*border[^"]*px-4 py-3/)
+    expect(markup).not.toContain(messages.common.metricAxisSuitability)
+  })
+
+  it('판정이 왔으면 pending 이어도 골격이 아니라 판정이다', () => {
+    const markup = renderVerdict({}, { pending: true })
+
+    expect(markup).not.toContain('animate-pulse')
+    expect(markup).toContain(messages.common.metricAxisSuitability)
+  })
 })
 
 function renderDaySection(overrides = {}) {
@@ -1110,5 +1130,27 @@ describe('PlanBriefingBanner — 날짜 축 하나로만 노출을 가른다 (D1
 
   it('강조에 그림자를 쓰지 않는다 — 카드는 눕지 뜨지 않는다 (§6)', () => {
     expect(renderBriefingBanner('2026-09-11')).not.toContain('shadow')
+  })
+})
+
+/*
+  **목차도 판정을 기다리는 동안 자리를 잡는다.** 1024 미만에서는 개요 카드가 본문 위라,
+  비워 두면 판정이 오는 순간 이 구획이 끼어들며 화면 전체가 밀린다.
+*/
+describe('일자별 적합도 목차 — 판정 대기 골격', () => {
+  it('판정이 없고 대기 중이면 제목과 골격 행이 선다', () => {
+    const markup = renderOverview({ verdicts: [], verdictsPending: true })
+
+    expect(markup).toContain(messages.plan.verdictTocTitle)
+    expect(markup).toContain('animate-pulse')
+    expect(markup.match(/min-h-11/g)).toHaveLength(
+      Math.min(planDetail.totalDays, PLAN_VERDICT_TOC_MAX_DAYS),
+    )
+  })
+
+  it('대기가 아니면 예전처럼 목차를 세우지 않는다', () => {
+    const markup = renderOverview({ verdicts: [], verdictsPending: false })
+
+    expect(markup).not.toContain(messages.plan.verdictTocTitle)
   })
 })

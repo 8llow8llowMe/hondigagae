@@ -120,6 +120,7 @@ export function PlanDaySection({
   petConditionApplied,
   basisPetName,
   verdictFailed,
+  verdictPending = false,
   onRetryVerdict,
   editing,
   onStartEdit,
@@ -141,6 +142,8 @@ export function PlanDaySection({
   /** 이 일자 판정의 기준 반려견 이름 (#176). 한 마리 일정이면 null */
   basisPetName: string | null
   verdictFailed: boolean
+  /** 판정을 처음 받는 중인가 — `PlanDayVerdict` 의 `pending` */
+  verdictPending?: boolean
   onRetryVerdict: () => void
   /** 이 일자가 편집 중이다. **한 번에 한 일자만 연다** — 일괄 교체 단위가 일자다 (E0) */
   editing: boolean
@@ -244,6 +247,7 @@ export function PlanDaySection({
           petConditionApplied={petConditionApplied}
           basisPetName={basisPetName}
           failed={verdictFailed}
+          pending={verdictPending}
           onRetry={onRetryVerdict}
           /*
             **아래 빈 일차 안내와 같은 말을 두 번 하지 않게 한다** (#497). 항목이 없는 날은
