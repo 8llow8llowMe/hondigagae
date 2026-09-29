@@ -1,8 +1,4 @@
-import type {
-  KakaoCustomOverlay,
-  KakaoCustomOverlayOptions,
-  KakaoMaps,
-} from '@/types/kakao-maps'
+import type { KakaoCustomOverlay, KakaoCustomOverlayOptions, KakaoMaps } from '@/types/kakao-maps'
 
 /**
  * **화면 밖에 있어도 늘 그려 두는 오버레이** — 이슈 [#1015](https://github.com/8llow8llowMe/hondigagae/issues/1015).
@@ -54,7 +50,8 @@ export function createAlwaysDrawnOverlay(
 
   if (clickable) {
     for (const type of PRESS_EVENTS) {
-      wrapper.addEventListener(type, (event) => event.stopPropagation())
+      // 막기만 하고 기본 동작은 건드리지 않는다 — passive 로 걸어 스크롤을 붙잡지 않는다
+      wrapper.addEventListener(type, (event) => event.stopPropagation(), { passive: true })
     }
   }
 
@@ -62,7 +59,13 @@ export function createAlwaysDrawnOverlay(
     overlay.getPanels().overlayLayer.appendChild(wrapper)
   }
   overlay.draw = () => {
-    const point = overlay.getProjection().containerPointFromCoords(position)
+    /*
+      **`pointFromCoords` 다 — `containerPointFromCoords` 가 아니다.** 래퍼가 붙는
+      `overlayLayer` 는 끌기와 함께 움직이는 패널이라 좌표도 패널 기준이어야 한다. 컨테이너
+      기준을 쓰면 처음에는 둘이 같아 맞아 보이다가, 끌기·`panTo` 로 패널이 밀린 뒤 다시
+      그릴 때 **밀린 만큼 어긋난다** (dev 실측 100~150px, `CustomOverlay` 는 그대로).
+    */
+    const point = overlay.getProjection().pointFromCoords(position)
     wrapper.style.left = `${point.x}px`
     wrapper.style.top = `${point.y}px`
   }
@@ -81,6 +84,10 @@ export function createAlwaysDrawnOverlay(
 /**
  * 지도가 끌기를 시작하는 누름. `click` 은 막지 않는다 — 막으면 핀 버튼이 죽는다.
  * 끌기는 누름에서 시작하므로 여기서 끊으면 된다.
+ *
+ * **`CustomOverlay({ clickable: true })` 와 같은 결과다** (dev 실측 · 2026-09-29): 핀에서
+ * 시작한 끌기(pointer + mouse 순서)는 지도를 옮기지 않고, 핀 더블클릭은 **둘 다** 지도를
+ * 확대한다. `dblclick` · `pointerdown` 까지 막으면 확대가 사라져 오히려 달라진다.
  */
 const PRESS_EVENTS = ['mousedown', 'touchstart'] as const
 

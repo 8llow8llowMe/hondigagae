@@ -19,7 +19,10 @@ type FakeElement = {
   ownerDocument: { createElement: () => FakeElement }
   appendChild: (child: FakeElement) => void
   remove: () => void
-  addEventListener: (type: string, handler: (event: { stopPropagation: () => void }) => void) => void
+  addEventListener: (
+    type: string,
+    handler: (event: { stopPropagation: () => void }) => void,
+  ) => void
 }
 
 function fakeElement(): FakeElement {
@@ -57,8 +60,13 @@ function fakeMaps(layer: FakeElement, point: { x: number; y: number }) {
       return { overlayLayer: layer as unknown as HTMLElement }
     }
 
+    /*
+      **`pointFromCoords` 만 준다** — 패널(`overlayLayer`) 기준 좌표다. 컨테이너 기준인
+      `containerPointFromCoords` 는 끌기·`panTo` 로 패널이 밀린 뒤 그만큼 어긋난다
+      (실측 100~150px, 명세 D13-2). 그쪽을 부르면 여기서 `undefined` 로 터진다.
+    */
     getProjection() {
-      return { containerPointFromCoords: () => point }
+      return { pointFromCoords: () => point }
     }
 
     setMap(map: object | null) {
@@ -100,7 +108,7 @@ describe('createAlwaysDrawnOverlay — SDK 의 세 훅', () => {
     expect(layer.children[0]?.children[0]).toBe(content)
   })
 
-  it('그릴 때 좌표를 컨테이너 픽셀로 바꿔 left/top 에 놓는다', () => {
+  it('그릴 때 좌표를 패널 픽셀로 바꿔 left/top 에 놓는다', () => {
     const { layer, overlay } = setup()
 
     overlay.setMap(MAP)

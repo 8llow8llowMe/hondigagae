@@ -125,7 +125,8 @@ export type KakaoAbstractOverlay = {
   setMap: (map: KakaoMap | null) => void
   getPanels: () => { overlayLayer: HTMLElement }
   getProjection: () => {
-    containerPointFromCoords: (latlng: KakaoLatLng) => { x: number; y: number }
+    /** **패널(`overlayLayer`) 기준** 픽셀. 컨테이너 기준(`containerPointFromCoords`)과 다르다 */
+    pointFromCoords: (latlng: KakaoLatLng) => { x: number; y: number }
   }
   onAdd?: () => void
   draw?: () => void
