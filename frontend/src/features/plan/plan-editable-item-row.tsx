@@ -1,6 +1,11 @@
 'use client'
 
-import type { KeyboardEvent, PointerEvent as ReactPointerEvent, Ref } from 'react'
+import type {
+  KeyboardEvent,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  Ref,
+} from 'react'
 
 import { Badge } from '@/components/badge'
 import { Button } from '@/components/button'
@@ -24,13 +29,14 @@ import { cn } from '@/lib/utils/cn'
  * 이미 네이티브 `button` 이다. 행에 `tabIndex` + `onKeyDown` 을 얹으면 역할 없는 요소가
  * 상호작용을 갖게 되어 스크린리더가 무엇을 눌러야 하는지 말하지 못한다.
  *
- * **순번 배지가 드래그 손잡이다** (`useDragReorder`). 손잡이를 따로 두면 좁은 화면에서
- * 제목이 들어갈 폭이 사라진다 — 순번은 이미 "몇 번째인가" 를 말하는 자리라, 그것을
- * 잡아 위치를 바꾸는 것이 뜻으로도 맞다.
+ * **카드 전체가 드래그 손잡이다** (#1029 · `useDragReorder`). 전에는 순번 배지만 잡을 수
+ * 있었는데, 폭 24px 의 번호를 정확히 짚어야 해서 모바일에서 끌기를 찾지도, 잡지도 못했다.
+ * 버튼 위에서 시작한 누름은 끌기가 아니다 — 판정은 `lib/plan/drag-gesture.ts`.
  *
- * 손잡이는 **마우스·터치 전용 보조 경로**라 `aria-hidden` 이다. 순서 정보는 `<ol>` 이,
- * 키보드 경로는 이동 버튼과 `Alt+↑/↓` 가 이미 갖고 있다 — 포커스 가능한 컨트롤을 하나 더
- * 늘리면 같은 일을 하는 탭 정지가 행마다 셋이 된다.
+ * 끌기는 **마우스·터치 전용 보조 경로**라 카드에 역할·`tabIndex`·`aria-*` 를 더하지 않는다.
+ * 순서 정보는 `<ol>` 이, 키보드 경로는 이동 버튼과 `Alt+↑/↓` 가 이미 갖고 있다 — 카드를
+ * 포커스 가능하게 만들면 같은 일을 하는 탭 정지가 행마다 하나 더 는다. 순번 배지는 그대로
+ * `aria-hidden` 이다 (`<ol>` 이 이미 순번을 읽는다).
  */
 export function PlanEditableItemRow({
   entry,
@@ -43,9 +49,8 @@ export function PlanEditableItemRow({
   onToggleRemoved,
   rowRef,
   dragging = false,
-  onHandlePointerDown,
-  onHandlePointerMove,
-  onHandlePointerEnd,
+  onDragPointerDown,
+  onDragContextMenu,
 }: {
   entry: PlanDayEditItem
   index: number
@@ -70,12 +75,14 @@ export function PlanEditableItemRow({
   rowRef?: Ref<HTMLDivElement>
   /** 지금 끌고 있는 행인가. 손 아래에 있는 것이 무엇인지 보이게 한다 */
   dragging?: boolean
-  onHandlePointerDown?: (index: number, event: ReactPointerEvent<HTMLElement>) => void
-  onHandlePointerMove?: (event: ReactPointerEvent<HTMLElement>) => void
-  onHandlePointerEnd?: (event: ReactPointerEvent<HTMLElement>) => void
+  /** 카드 어디든 누르면 부른다. 없으면 끌 수 없는 행이다 */
+  onDragPointerDown?: (index: number, event: ReactPointerEvent<HTMLElement>) => void
+  /** 길게 누르는 동안 뜨는 메뉴를 막는다 */
+  onDragContextMenu?: (event: ReactMouseEvent<HTMLElement>) => void
 }) {
   const first = index === 0
   const bottom = index === total - 1
+  const draggable = onDragPointerDown !== undefined
 
   /**
    * `Alt+↑/↓` 가 **주 경로**다 (E6). 이동 버튼에 포커스가 있는 채로 눌러 연속 이동한다.
@@ -96,28 +103,42 @@ export function PlanEditableItemRow({
       /*
         카드 안의 L2 항목 — 인셋은 카드 값, 구분선은 목록(`ol`)이 사이에만 긋는다 (#447).
 
-        끌고 있는 행을 띄운다. **`--shadow-md` 는 "실제로 떠 있는 것" 에만 허용되는데
-        DESIGN.md §6 이 그 목록에 `드래그 중인 항목` 을 명시한다.** 배경(`bg-bg`)도 그때만
-        갖는다 — 떠 있는 행이 아래 행을 가려야 한다. `relative z-10` 이 없으면 그림자가
-        아래 행에 가린다.
+        끌고 있는 행을 **들린 모양**으로 띄운다 (#1029). **`--shadow-md` 는 "실제로 떠 있는
+        것" 에만 허용되는데 DESIGN.md §6 이 그 목록에 `드래그 중인 항목` 을 명시한다.**
+        배경(`bg-bg`)도 그때만 갖는다 — 떠 있는 행이 아래 행을 가려야 한다. `relative z-10`
+        (§7 z 스케일 "드래그 중인 일정 행") 이 없으면 그림자가 아래 행에 가린다.
+
+        **살짝 키우는 것은 `motion-safe` 에서만** 한다 — 변형을 줄여 달라는 사람에게는 그림자만
+        남긴다. 전환 시간은 §8 의 변형 값(200ms ease-out)이고, 감속 설정에서는 전역 규칙이
+        한 프레임으로 줄인다.
       */
-      className={cn(INSET_CLASS.card, dragging && 'bg-bg relative z-10 shadow-md')}
+      className={cn(
+        INSET_CLASS.card,
+        'transition-[scale,box-shadow] duration-200 ease-out',
+        dragging && 'bg-bg relative z-10 shadow-md motion-safe:scale-101',
+        draggable && [
+          /*
+            길게 누르는 동안 글자 선택 · iOS 콜아웃이 뜨면 끌기가 그것으로 바뀐다. 카드 안의
+            글자는 순서 편집에서 고르거나 복사할 대상이 아니다.
+          */
+          'select-none [-webkit-touch-callout:none]',
+          /*
+            **끌기 전에는 세로 스크롤을 브라우저에 넘긴다** (`pan-y`) — 카드가 화면 대부분을
+            덮으므로 막으면 목록 위에서 화면을 올릴 수 없다. 끌기가 시작된 터치의 스크롤은
+            `touch-action` 이 아니라 `useDragReorder` 의 `touchmove` 리스너가 막는다 —
+            브라우저는 손가락이 닿는 순간의 값만 읽는다. `none` 은 그 뒤의 새 터치를 위해 건다.
+          */
+          dragging ? 'cursor-grabbing touch-none' : 'cursor-grab touch-pan-y',
+        ],
+      )}
+      onPointerDown={draggable ? (event) => onDragPointerDown(index, event) : undefined}
+      onContextMenu={onDragContextMenu}
     >
-      {/* 끄는 동안 글자가 선택되면 드래그가 텍스트 선택으로 바뀐다 */}
-      <div ref={rowRef} className={cn('flex items-center gap-3 py-2', dragging && 'select-none')}>
+      <div ref={rowRef} className="flex items-center gap-3 py-2">
+        {/* 순번은 `<ol>` 이 이미 읽는다 — 화면에만 보이는 표시다 */}
         <span
           aria-hidden
-          title={messages.plan.editDragHandle}
-          onPointerDown={(event) => onHandlePointerDown?.(index, event)}
-          onPointerMove={onHandlePointerMove}
-          onPointerUp={onHandlePointerEnd}
-          onPointerCancel={onHandlePointerEnd}
-          className={cn(
-            'bg-band text-fg-muted text-caption flex w-6 shrink-0 items-center justify-center self-stretch rounded-sm font-bold tabular-nums',
-            // 터치에서 드래그가 스크롤로 먹히지 않게 한다
-            'touch-none',
-            onHandlePointerDown === undefined ? '' : dragging ? 'cursor-grabbing' : 'cursor-grab',
-          )}
+          className="bg-band text-fg-muted text-caption flex w-6 shrink-0 items-center justify-center self-stretch rounded-sm font-bold tabular-nums"
         >
           {index + 1}
         </span>

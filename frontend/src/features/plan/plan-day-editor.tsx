@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils/cn'
  * 한 곳(`moveEditItem`)에만 있다.
  *  - `Alt+↑/↓` — 키보드 주 경로 (E6)
  *  - 이동 버튼 — 같은 일을 눌러서
- *  - **순번을 잡아 끌기** — 마우스·터치 (`useDragReorder`)
+ *  - **카드를 잡아 끌기** — 마우스는 몇 px 움직여서, 터치는 0.3초 길게 눌러서 (`useDragReorder`, #1029)
  *
  * **드래그 라이브러리는 여전히 넣지 않았다** (E8-1). 필요한 것이 세로 한 줄 목록의
  * 스왑뿐이라 Pointer Events 로 직접 처리한다 — 이유는 `use-drag-reorder.ts` 주석에 있다.
@@ -91,7 +91,7 @@ export function PlanDayEditor({
         순서가 뜻을 갖는 목록이라 ol 이다 (E6). 구분선 규약은 `SurfaceList` 와 같다 — 항목
         사이에만 긋는다 (#447). `SurfaceList` 는 `ul` 이라 여기서는 같은 규칙을 `ol` 에 건다.
       */}
-      <ol className="[&>li+li]:border-border mt-2 [&>li+li]:border-t">
+      <ol ref={drag.registerList} className="[&>li+li]:border-border mt-2 [&>li+li]:border-t">
         {items.map((entry, index) => (
           <PlanEditableItemRow
             key={entry.item.planItemId}
@@ -107,9 +107,8 @@ export function PlanDayEditor({
             }}
             rowRef={drag.registerRow(index)}
             dragging={drag.dragging === index}
-            onHandlePointerDown={drag.onPointerDown}
-            onHandlePointerMove={drag.onPointerMove}
-            onHandlePointerEnd={drag.onPointerEnd}
+            onDragPointerDown={drag.onPointerDown}
+            onDragContextMenu={drag.onContextMenu}
             onMove={onMove}
             onToggleRemoved={onToggleRemoved}
           />

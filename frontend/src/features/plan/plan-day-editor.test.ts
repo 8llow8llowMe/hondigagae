@@ -140,6 +140,58 @@ describe('PlanDayEditor — 시각 입력이 없다 (#1028)', () => {
   })
 })
 
+/**
+ * **카드 전체가 손잡이다** (#1029 · 명세 E4). 누름을 끌기로 바꾸는 판정은
+ * `lib/plan/drag-gesture.test.ts` 가, 실제 끌기·스크롤은 `e2e/plan-edit-drag.spec.ts` 가 잰다.
+ * 여기서는 그 판정이 기대는 마크업만 본다.
+ */
+describe('PlanDayEditor — 카드 끌기 (#1029)', () => {
+  function cards(markup: string): string[] {
+    return markup.match(/<li class="[^"]*"/g) ?? []
+  }
+
+  it('안내 문구가 카드를 끈다고 말한다 — 번호만 잡던 때의 문구가 아니다', () => {
+    const markup = render()
+
+    expect(markup).toContain('카드를 끌거나 화살표로 순서를 바꿀 수 있어요.')
+    expect(markup).not.toContain('번호를 끌어')
+  })
+
+  it('끌기 전 카드는 세로 스크롤을 브라우저에 넘긴다 — 목록 위에서도 화면이 올라가야 한다', () => {
+    const [first] = cards(render())
+
+    expect(first).toContain('touch-pan-y')
+    expect(first).not.toContain('touch-none')
+    expect(first).toContain('cursor-grab')
+  })
+
+  it('길게 누르는 동안 글자 선택 · iOS 콜아웃이 뜨지 않게 한다', () => {
+    const [first] = cards(render())
+
+    expect(first).toContain('select-none')
+    expect(first).toContain('[-webkit-touch-callout:none]')
+  })
+
+  it('끌기 전에는 들린 모양이 아니다 — 그림자·z 는 끄는 카드에만', () => {
+    for (const card of cards(render())) {
+      expect(card).not.toContain('shadow-md')
+      expect(card).not.toContain('z-10')
+    }
+  })
+
+  it('카드에 역할 · tabIndex 를 더하지 않는다 — 키보드 경로는 이동 버튼이다', () => {
+    const markup = render()
+
+    expect(markup).not.toMatch(/<li[^>]*(role|tabindex)=/)
+    // 순번은 `<ol>` 이 읽는다 — 화면용 번호는 스크린리더에서 숨긴다
+    expect(markup).toContain('aria-hidden="true"')
+  })
+
+  it('번호 손잡이의 title 이 사라졌다 — 카드 전체가 손잡이다', () => {
+    expect(render()).not.toContain('끌어서 순서 바꾸기')
+  })
+})
+
 describe('PlanDayEditor — 저장 실패', () => {
   it('5xx 는 다시 시도할 수 있다고 말하고 편집 내용이 남아 있음을 알린다', () => {
     const markup = render({
