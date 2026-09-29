@@ -77,7 +77,7 @@ export function PlanRow({
         {lead !== undefined && companion !== null && (
           <span className="hidden shrink-0 items-center gap-2 lg:flex">
             {/* 아바타는 대표 하나다 — 5마리까지 늘어나면 행의 폭이 터진다. 수는 글자가 말한다 */}
-            <PetAvatar name={lead.name} url={lead.profileImageUrl} size="lg" />
+            <PetAvatar url={lead.profileImageUrl} size="lg" />
             <span className="text-body-2 text-fg-muted font-medium">{companion}</span>
           </span>
         )}
