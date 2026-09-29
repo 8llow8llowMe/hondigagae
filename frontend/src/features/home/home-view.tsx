@@ -8,7 +8,6 @@ import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { EmergencyIcon } from '@/components/icons'
-import { Skeleton } from '@/components/skeleton'
 import { Canvas, Surface, SurfaceList, SurfaceStack } from '@/components/surface'
 import { useNearbyFacilities } from '@/features/emergency/use-nearby-facilities'
 import { AboutIntroCard } from '@/features/home/about-intro-card'
@@ -24,6 +23,7 @@ import {
   useWalkSafety,
 } from '@/features/home/use-home-insight'
 import { WalkVerdict } from '@/features/home/walk-verdict'
+import { WalkVerdictSkeleton } from '@/features/home/walk-verdict-skeleton'
 import { WeatherWarningStrip } from '@/features/home/weather-warning-strip'
 import { useWalkTimes } from '@/features/insight/use-walk-times'
 import { WalkTimesSection } from '@/features/insight/walk-times-section'
@@ -326,14 +326,20 @@ export function HomeView({
     일정이 "다가오는 일정" 으로 뜬다 (`pickUpcomingPlans`).
   */
   /*
-    날짜 줄의 자리를 가른다 (#428 · #530). **판정 패널이 실제로 서는 날에만** 그쪽이
-    날짜를 맡는다 — 스켈레톤·오류 상태에는 판정 줄 자체가 없어 날짜가 사라진다.
+    날짜 줄의 자리를 가른다 (#428 · #530). **판정 자리가 서는 동안에는** 그쪽이 날짜를
+    맡는다 — 대기(`WalkVerdictSkeleton`) · 오류 · 판정 세 갈래가 모두 같은 자리(프로필
+    아래 판정 블록 맨 위)에 날짜를 그린다.
+
+    **대기 중에도 판정 자리다.** 예전에는 `walkSafety.data !== undefined` 까지 봐서, 판정이
+    오기 전에는 날짜가 카드 맨 위(프로필 위)에 섰다가 판정이 오는 순간 프로필 아래로
+    내려앉았다 — 로딩 화면과 완료 화면이 날짜 위치로 갈렸다. 이제 날짜는 처음부터 도착할
+    자리에 선다. 카드 맨 위는 판정 자리 자체가 없을 때(대표 지점마저 404)만 쓴다.
 
     **폭 분기가 없다** (#530). 예전에는 이 조건이 `md:hidden` 과 곱해져 데스크톱만
     판정에 날짜를 넘기고 모바일은 카드 밖에 남겼다 — 같은 줄이 폭에 따라 다른 물건이
     됐다. 이제 `WalkVerdict` 가 두 폭 모두 자기 자리에 날짜를 그린다.
   */
-  const verdictShown = basisPlaceId !== null && walkSafety.data !== undefined
+  const verdictSlotShown = basisPlaceId !== null
 
   const today = dayToLocalNoon(todayIso)
   const upcomingPlans = today === null ? [] : pickUpcomingPlans(plans, today, UPCOMING_PLAN_COUNT)
@@ -404,14 +410,15 @@ export function HomeView({
               판정 패널로 들였고 모바일은 바닥 위에 남겨, 같은 줄이 폭에 따라 다른 물건이
               됐다.
 
-              **판정이 서는 날은 그리지 않는다.** 그때는 `WalkVerdict` 가 `오늘 산책 {등급}`
-              바로 위에 같은 caption 으로 날짜를 그린다 — **두 폭 모두 거기다.** 여기에도
-              두면 한 카드가 같은 날짜를 두 번 말한다.
+              **판정 자리가 서면 그리지 않는다.** 그때는 판정 블록이 `오늘 산책 {등급}`
+              바로 위에 같은 caption 으로 날짜를 그린다 — **두 폭 모두, 대기·오류·판정
+              세 갈래 모두 거기다.** 여기에도 두면 한 카드가 같은 날짜를 두 번 말하고,
+              대기에서만 여기 두면 판정이 오는 순간 날짜가 프로필 아래로 내려앉는다.
 
-              **판정이 없을 때만 이 자리다** (기준 장소 없음 · 조회 실패 · 로딩). 첫
-              방문자가 날짜를 잃지 않으면서, 잃지 않는 자리가 **카드 밖이 아니다.**
+              **판정 자리가 없을 때만 이 자리다** (대표 지점마저 404). 날짜를 잃지 않으면서,
+              잃지 않는 자리가 **카드 밖이 아니다.**
             */}
-            {!verdictShown && (
+            {!verdictSlotShown && (
               <p
                 className={cn(
                   'text-caption text-fg-muted pt-4 font-medium tabular-nums',
@@ -436,19 +443,28 @@ export function HomeView({
               <>
                 {walkSafety.isPending && (
                   /*
+                    **판정과 같은 칸이다** — 날짜까지 판정이 설 자리에 미리 세운다. 홈
+                    `loading.tsx` 도 같은 골격을 쓴다 (`walk-verdict-skeleton.tsx`).
+
                     **카드 안이라 `rail` 이 아니라 `card` 다** (#485). 이 카드는 레일에
                     서지만 인셋 축은 `Surface` 안쪽이라 형제(`ProfileCard` · `WalkVerdict`)가
                     전부 `px-4 md:px-5` 를 쓴다. 여기만 `rail`(md 40) 이면 **로딩(40) →
                     오류(40) → 성공(20)** 으로 재시도를 누르는 동안 글자가 좌우로 움직인다
                     — `ErrorState` 의 `inset` JSDoc 이 적어 둔 바로 그 자리다.
                   */
-                  <div className={cn('border-border border-t py-4', INSET_CLASS.card)}>
-                    <Skeleton className="h-7 w-40" />
-                    <Skeleton className="mt-2 h-5 w-56" />
-                  </div>
+                  <WalkVerdictSkeleton todayLabel={todayLabel} />
                 )}
                 {walkSafety.isError && (
                   <div className="border-border border-t">
+                    {/* 날짜는 오류에서도 판정 자리 맨 위다 — 재시도가 대기로 돌아가도 날짜가 움직이지 않는다 */}
+                    <p
+                      className={cn(
+                        'text-caption text-fg-muted pt-4 font-medium tabular-nums',
+                        INSET_CLASS.card,
+                      )}
+                    >
+                      {todayLabel}
+                    </p>
                     {/*
                       **여기만 `h2` 로 남는다** (#456①). 이 카드(311행 `<Surface>`)는 제목도
                       `aria-label` 도 없어 위에 `h2` 가 없다 — 한 단 내리면 페이지 `h1` 과

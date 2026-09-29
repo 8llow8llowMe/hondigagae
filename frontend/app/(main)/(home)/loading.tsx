@@ -2,6 +2,7 @@ import { Skeleton } from '@/components/skeleton'
 import { Canvas, Surface, SurfaceStack } from '@/components/surface'
 import { RegionalWeatherSkeleton } from '@/features/home/regional-weather-section'
 import { SuitabilityListSkeleton } from '@/features/home/suitability-list-skeleton'
+import { WalkVerdictSkeleton } from '@/features/home/walk-verdict-skeleton'
 import { WalkTimesSkeleton } from '@/features/insight/walk-times-section'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -23,19 +24,19 @@ import { cn } from '@/lib/utils/cn'
  * 폴백이 풀리면 서버가 그린 `HomeView` 로 바뀌는데, **그 순간 판정·골든타임·권역·적합도는
  * 전부 클라이언트에서 아직 대기 중**이다(기준 장소·반려견이 브라우저 `localStorage` 에
  * 있어 서버가 key 를 모른다 — `page.tsx` 머리주석). 그래서 이 골격은 완성된 홈이 아니라
- * **그 대기 모양**을 그린다. 셋은 실화면의 골격을 **그대로 임포트한다** — 두 벌로 두면
+ * **그 대기 모양**을 그린다. 넷은 실화면의 골격을 **그대로 임포트한다** — 두 벌로 두면
  * 폴백이 풀리는 순간 카드 높이가 갈린다:
  *
  * - 골든타임 — `WalkTimesSkeleton`
  * - 권역 비교 — `RegionalWeatherSkeleton` (제목 없는 카드다. 제목은 응답과 함께 선다)
  * - 맞는 곳 목록 — `SuitabilityListSkeleton` (한 열 두 행)
  *
- * 판정 자리는 `HomeView` 의 `walkSafety.isPending` 골격과 같은 값(`h-7 w-40` + `h-5 w-56`)
- * 이다. 짧은 인라인 골격이라 파일로 뽑지 않았다.
+ * - 판정 — `WalkVerdictSkeleton` (`HomeView` 의 `walkSafety.isPending` 과 같은 것)
  *
- * **날짜 줄은 선다.** 판정이 오기 전(`verdictShown` 이 거짓)에는 판정 카드 맨 위에
- * `todayLabel` 캡션이 서고, 판정이 오면 그 안으로 들어간다. 폴백이 풀린 직후는 앞쪽이다.
- * 날짜는 서버가 정하는 값이라(`page.tsx`) 여기서 지어내지 않고 자리만 잡는다.
+ * **날짜 줄은 판정 자리에 선다** — 프로필 **아래**다. 판정이 오면 날짜는 `WalkVerdict` 의
+ * 등급 줄 바로 위 caption 이 되므로, 대기 중에도 그 자리에 세운다. 예전에는 카드 맨 위
+ * (프로필 위)에 섰다가 판정이 오는 순간 아래로 내려앉았다. 날짜는 서버가 정하는 값이라
+ * (`page.tsx`) 여기서 지어내지 않고 자리만 잡는다(`todayLabel={null}`).
  *
  * **프로필은 "로그인 + 반려견" 모양이다.** 실화면은 세 갈래(게스트 `py-4` + 버튼 · 로그인
  * 반려견 없음 · 로그인 반려견 있음 `py-10` + hero 아바타)인데 `loading.tsx` 는 세션을
@@ -57,11 +58,6 @@ export default function HomeLoading() {
       <div className="rail-layout">
         <SurfaceStack className="lg:sticky lg:top-16 lg:self-start lg:pr-3">
           <Surface aria-busy>
-            {/* 날짜 줄 — `text-caption` 한 줄(18) */}
-            <div aria-hidden className={cn('pt-4', INSET_CLASS.card)}>
-              <Skeleton className="h-4.5 w-44" />
-            </div>
-
             {/* 프로필 — `ProfileCard` 의 로그인 + 반려견 갈래(`py-10` · hero 아바타) */}
             <div aria-hidden className={cn('flex items-center gap-4 py-10', INSET_CLASS.card)}>
               <Skeleton className="size-24 shrink-0 rounded-full md:size-28" />
@@ -72,19 +68,22 @@ export default function HomeLoading() {
               </div>
             </div>
 
-            {/* 판정 — `HomeView` 의 `walkSafety.isPending` 골격과 같은 값 */}
-            <div aria-hidden className={cn('border-border border-t py-4', INSET_CLASS.card)}>
-              <Skeleton className="h-7 w-40" />
-              <Skeleton className="mt-2 h-5 w-56" />
-            </div>
+            {/* 판정 — 날짜 자리를 함께 잡는다 (위 머리주석) */}
+            <WalkVerdictSkeleton todayLabel={null} />
 
             <WalkTimesSkeleton />
           </Surface>
 
-          {/* 배너 셋(AI 일정 · 제주올레 · 병원·약국) — `Banner` 는 `py-4` + 간격 없는 제목·설명 두 줄 */}
+          {/*
+            배너 셋(AI 일정 · 제주올레 · 병원·약국) — `Banner` 는 `py-4` + 간격 없는 제목·설명 두 줄.
+            **제주올레만 80 이다** — 캐릭터(64, `-mb-4`)가 글 덩어리보다 커서 몸이 48 로 선다.
+          */}
           {Array.from({ length: 3 }, (_, index) => (
             <Surface key={index} aria-busy>
-              <div aria-hidden className={cn('flex flex-col py-4', INSET_CLASS.card)}>
+              <div
+                aria-hidden
+                className={cn('flex flex-col py-4', index === 1 && 'min-h-20', INSET_CLASS.card)}
+              >
                 <Skeleton className="h-6 w-40" />
                 <Skeleton className="h-4.5 w-56" />
               </div>
