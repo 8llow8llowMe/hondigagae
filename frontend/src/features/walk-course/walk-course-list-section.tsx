@@ -131,7 +131,8 @@ export function WalkCourseListSection({
           INSET_CLASS.card,
         )}
       >
-        {loading && <Skeleton className="h-5 w-20" />}
+        {/* 높이는 결과 줄(`text-body-2` 22)과 같다 — 20 이면 결과가 오는 순간 그리드가 2px 밀린다 */}
+        {loading && <Skeleton className="h-5.5 w-20" />}
         {/*
           **조건을 바꾸면 결과 수를 알린다** (D6). 세그먼트는 URL 을 바꾸고 목록이
           통째로 갈리는데, 보조기기에는 그 변화를 말해 주는 것이 이 줄뿐이다.

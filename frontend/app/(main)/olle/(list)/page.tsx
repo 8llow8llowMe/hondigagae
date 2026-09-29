@@ -28,10 +28,10 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>
  * operation 모두 `security` 키가 없고, `tour-service` 는 `/places` 와 같은 공개 조회
  * 서비스다 (공통명세 S1).
  *
- * **`loading.tsx` 를 두지 않는다.** 이 세그먼트 아래 상세(`[walkCourseId]`)가 있고,
- * Suspense 경계가 생기면 응답이 먼저 스트리밍돼 상태 코드를 바꿀 수 없다
- * (`architecture-guide.md` §7 — 장소 목록이 `(list)` 그룹으로 간 이유). 대신 서버
- * 프리페치가 첫 화면을 채우고, 실패하면 클라이언트가 상태를 그린다.
+ * **`loading.tsx` 는 `(list)` 그룹 안에만 둔다** (#907). `olle/loading.tsx` 로 두면
+ * 상세(`[walkCourseId]`)까지 Suspense 로 감싸 응답이 먼저 스트리밍되고, 상태 코드를 바꿀
+ * 수 없다 (`architecture-guide.md` §7 — 장소 목록이 `(list)` 그룹으로 간 이유). 폴백이
+ * 풀린 뒤에는 서버 프리페치가 첫 화면을 채우고, 실패하면 클라이언트가 상태를 그린다.
  */
 export default async function WalkCoursesPage({ searchParams }: { searchParams: SearchParams }) {
   const resolved = await searchParams
