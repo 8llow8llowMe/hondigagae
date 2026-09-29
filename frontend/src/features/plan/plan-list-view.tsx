@@ -75,7 +75,8 @@ export function PlanListView({ filters, today }: { filters: PlanFilters; today: 
     <PlanListSection
       plans={visible}
       totalCount={countable ? allPlans.length : null}
-      pets={pets}
+      // 받기 전 · 실패는 `null` 이다 — 빈 배열로 넘기면 모든 행이 "동행 반려견 없음" 이 된다 (#1042)
+      pets={petsQuery.data?.pets ?? null}
       today={today}
       loading={plansQuery.isPending}
       errorStatus={toErrorStatus(plansQuery.error)}

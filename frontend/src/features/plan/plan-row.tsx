@@ -3,11 +3,10 @@ import Link from 'next/link'
 import { ChevronRightIcon } from '@/components/icons'
 import { PetAvatar } from '@/components/pet-avatar'
 import { PlanStatusBadge } from '@/features/plan/plan-status-badge'
-import { companionLabel } from '@/lib/plan/companion-pets'
+import { planCompanionLabel, type PlanCompanions } from '@/lib/plan/companion-pets'
 import { formatPlanDateRange, planPhaseOf } from '@/lib/plan/date'
 import { planPhaseLabel, planPhaseNote } from '@/lib/plan/phase-text'
 import { INSET_CLASS } from '@/lib/ui/inset'
-import type { Pet } from '@/types/pet'
 import type { PlanSummaryItem } from '@/types/plan'
 
 /**
@@ -38,16 +37,19 @@ export function PlanRow({
    * **이름만이 아니라 `Pet` 이다** — 아바타가 사진을 그려야 한다. 이름만 받던 때에는 사진을
    * 올린 아이도 이 행에서만 이니셜로 떴다 (필터 레일은 같은 아이를 사진으로 그렸다).
    *
-   * 조회가 실패했거나 전부 삭제됐으면 빈 배열이다. **행을 숨기지 않는다** (공통명세 S8).
+   * **무엇을 말할지는 `planCompanionsOf` 가 정한다** (#1042) — 반려견 조회가 실패했으면
+   * `unknown` 이라 이 자리만 빠지고, 미완료 일정의 동행이 비었으면 "동행 반려견 없음",
+   * 완료 일정의 지운 아이는 "삭제된 반려견" 으로 센다. **행을 숨기지 않는다** (공통명세 S8).
    */
-  companions: readonly Pet[]
+  companions: PlanCompanions
   today: Date
 }) {
   const phase = planPhaseOf(plan.startDate, plan.endDate, today)
   const phaseLabel = planPhaseLabel(phase)
   const phaseNote = planPhaseNote(phase)
-  const lead = companions[0]
-  const companion = companionLabel(companions.map((pet) => pet.name))
+  // 아바타는 이름을 부를 아이가 있을 때만 선다 — "동행 반려견 없음" 옆의 원형은 없는 아이를 그린다
+  const lead = companions.kind === 'listed' ? companions.pets[0] : undefined
+  const companion = planCompanionLabel(companions)
 
   return (
     <li className={INSET_CLASS.card}>
@@ -74,10 +76,10 @@ export function PlanRow({
           <PlanStatusBadge status={plan.status} className="lg:hidden" />
         </span>
 
-        {lead !== undefined && companion !== null && (
+        {companion !== null && (
           <span className="hidden shrink-0 items-center gap-2 lg:flex">
             {/* 아바타는 대표 하나다 — 5마리까지 늘어나면 행의 폭이 터진다. 수는 글자가 말한다 */}
-            <PetAvatar url={lead.profileImageUrl} size="lg" />
+            {lead !== undefined && <PetAvatar url={lead.profileImageUrl} size="lg" />}
             <span className="text-body-2 text-fg-muted font-medium">{companion}</span>
           </span>
         )}

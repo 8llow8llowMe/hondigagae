@@ -32,6 +32,7 @@ import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { messages } from '@/lib/messages'
 import { basisPetNameOf } from '@/lib/plan/basis-pet'
 import { initialClockTime, toClockTime } from '@/lib/plan/clock-time'
+import type { PlanCompanions } from '@/lib/plan/companion-pets'
 import { addPlanDays, planPhaseOf } from '@/lib/plan/date'
 import { placeIdsOf } from '@/lib/plan/day-items'
 import {
@@ -97,9 +98,11 @@ export function PlanDetailSection({
   today,
 }: {
   plan: PlanDetail
-  /** 개요 카드가 쓰는 대표 반려견. 조회 실패·삭제면 null 이고 카드만 빠진다 */
-  /** 이 일정의 동행 반려견, `petIds` 순서 (#218). 못 찾은 아이는 빠진다 */
-  companions: readonly Pet[]
+  /**
+   * 이 일정의 동행 반려견, `petIds` 순서 (#218). 조회 실패면 `unknown` 이고 카드만 빠진다.
+   * 동행 없음 · 삭제된 반려견은 `planCompanionsOf` 가 가른다 (#1042)
+   */
+  companions: PlanCompanions
   /**
    * 회원의 반려견 전체 (#176). **일자 판정의 기준 아이 이름을 찾는 데만 쓴다** —
    * 이 일정에 없는 아이가 섞여 있어도 `basisPetId` 로만 조회하므로 문제가 없다.

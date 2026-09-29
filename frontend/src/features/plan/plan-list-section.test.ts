@@ -174,8 +174,56 @@ describe('일정 목록 — 상태 화면', () => {
 
 describe('일정 행', () => {
   it('반려견 조회가 실패해도 행을 숨기지 않는다', () => {
-    const html = render({ pets: [] })
+    const html = render({ pets: null })
     expect(html).toContain('몽실이와 제주 2박 3일')
+  })
+
+  /*
+    #1042. 조회 실패는 "모른다" 다 — 여기서 "동행 반려견 없음" 을 말하면 반려견 서비스의
+    일시 장애가 일정의 사실처럼 읽힌다.
+  */
+  it('반려견 조회가 실패하면 동행 반려견이 없다고 단정하지 않는다', () => {
+    expect(render({ pets: null })).not.toContain(messages.plan.companionNone)
+  })
+
+  /*
+    #1042. 그 아이만 동행하던 미완료 일정은 반려견을 지워도 남고, 서버가 지운 petId 를 자리
+    표시자로 둔다 (`PLAN_010`). id 를 이름으로 세우지 않고 사실을 말한다.
+  */
+  it('미완료 일정의 동행이 목록에 하나도 없으면 "동행 반려견 없음" 이다', () => {
+    const html = render({ plans: [plan({ petIds: ['123456789012000009'] })], pets: [MONGSIL] })
+    expect(html).toContain(messages.plan.companionNone)
+  })
+
+  /*
+    #1042. 완료 일정은 기록이라 서버가 동행 목록을 손대지 않는다 — 지운 아이를 빼 버리면
+    둘이 다녀온 일정이 혼자 다녀온 것처럼 읽힌다.
+  */
+  it('완료 일정에서 지운 아이도 수에 넣는다', () => {
+    const html = render({
+      plans: [
+        plan({
+          petIds: ['123456789012000001', '123456789012000009'],
+          status: { code: 'COMPLETED', name: '완료', description: null },
+        }),
+      ],
+      pets: [MONGSIL],
+    })
+    expect(html).toContain('몽실이 외 1마리')
+  })
+
+  it('완료 일정의 동행이 전부 지워졌으면 "삭제된 반려견" 이다', () => {
+    const html = render({
+      plans: [
+        plan({
+          petIds: ['123456789012000009'],
+          status: { code: 'COMPLETED', name: '완료', description: null },
+        }),
+      ],
+      pets: [MONGSIL],
+    })
+    expect(html).toContain(messages.plan.companionDeleted)
+    expect(html).not.toContain(messages.plan.companionNone)
   })
 
   /*

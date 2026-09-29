@@ -17,7 +17,7 @@ import {
 } from '@/features/plan/use-plan-detail'
 import { ApiError, isRetriable } from '@/lib/api/error'
 import { messages } from '@/lib/messages'
-import { companionPetsOf } from '@/lib/plan/companion-pets'
+import { planCompanionsOf } from '@/lib/plan/companion-pets'
 import { alternativePlaceIds } from '@/lib/plan/detail'
 
 /**
@@ -106,9 +106,15 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
     두 마리 일정이 한 마리로 보이는데, 같은 화면의 일자 판정은 `basisPetNameOf` 로
     "함께 가는 아이 중" 을 말한다 — 그때 부르는 이름이 화면 어디에도 없게 된다.
 
-    조회 실패·삭제된 반려견이면 그만큼 빠지고, 전부 빠지면 카드만 사라진다 (D5).
+    **반려견 목록을 받기 전 · 실패면 `null` 을 넘긴다** (#1042) — 그러면 카드만 사라진다 (D5).
+    빈 배열로 넘기면 조회 실패가 "동행 반려견 없음" 으로 읽힌다. 받았으면 미완료 일정의 빈
+    교집합은 "동행 반려견 없음", 완료 일정의 지운 아이는 "삭제된 반려견" 이다.
   */
-  const companions = companionPetsOf(detail.data.petIds, pets.data?.pets ?? [])
+  const companions = planCompanionsOf(
+    detail.data.petIds,
+    pets.data?.pets ?? null,
+    detail.data.status.code,
+  )
 
   return (
     <PlanDetailSection
