@@ -39,7 +39,6 @@ export function PlanItemTimeModal({
   title,
   initial,
   hasTime,
-  visitResetWarning,
   formError,
   saving,
   blocked,
@@ -54,7 +53,6 @@ export function PlanItemTimeModal({
    */
   initial: ClockTime
   hasTime: boolean
-  visitResetWarning: boolean
   formError: string | null
   saving: boolean
   blocked: boolean
@@ -174,7 +172,6 @@ export function PlanItemTimeModal({
       hour={hour}
       minute={minute}
       hasTime={hasTime}
-      visitResetWarning={visitResetWarning}
       formError={formError}
       saving={saving}
       blocked={blocked}

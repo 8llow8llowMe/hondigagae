@@ -46,14 +46,12 @@ export type PlanItemTimeViewProps = {
   minute: number
   /** 저장된 시각이 있다 — `시간 지우기` 가 선다 */
   hasTime: boolean
-  /** 그 일자에 `다녀옴` 체크가 있다 — 저장하면 초기화된다는 한 줄을 낸다 (D9-2) */
-  visitResetWarning: boolean
-  /** `toPlanDaySaveError()` 가 분류한 문구 그대로. 없으면 `null` */
+  /** `toItemStartTimeError()` 가 분류한 문구 그대로. 없으면 `null` */
   formError: string | null
   saving: boolean
   /**
-   * **다른 일괄 교체(담기 · 이동 추가)가 진행 중이다.** 두 요청이 겹치면 나중 응답이 앞선
-   * 것을 덮어 한쪽이 사라진다 — 그동안 저장 · 지우기를 잠근다 (F6).
+   * **일괄 교체(담기 · 이동 추가)가 진행 중이다.** 교체가 누른 시점의 시각을 되싣으므로 겹치면
+   * 방금 고친 시각을 옛 값으로 덮거나 `planItemId` 가 바뀐다 — 그동안 저장 · 지우기를 잠근다 (F6).
    */
   blocked: boolean
   onStep: (field: ClockField, direction: 1 | -1) => void
@@ -79,7 +77,6 @@ export function PlanItemTimeView({
   hour,
   minute,
   hasTime,
-  visitResetWarning,
   formError,
   saving,
   blocked,
@@ -100,19 +97,10 @@ export function PlanItemTimeView({
       onClose={onClose}
       title={messages.plan.itemTimeModalTitle.replace('{title}', title)}
       /*
-        **경고를 설명 자리에 둔다.** 설명은 `aria-describedby` 로 묶여 모달이 열릴 때 함께
-        읽힌다 — 저장 버튼 근처에 따로 두면 스크린리더 사용자는 저장한 뒤에야 듣는다.
+        **초기화 경고가 없다** (#1053). 저장이 단건 API 라 그 날의 `다녀옴` 체크가 남는다 —
+        #1028 의 일괄 교체 시절에는 체크된 날에만 이 자리에 한 줄을 더 냈다.
       */
-      description={
-        <>
-          <p>{messages.plan.itemTimeModalDescription}</p>
-          {visitResetWarning && (
-            <p className="text-metric-low-700 mt-1 font-medium">
-              {messages.plan.itemTimeVisitResetWarning}
-            </p>
-          )}
-        </>
-      }
+      description={messages.plan.itemTimeModalDescription}
       initialFocusRef={hourRef}
       size="sm"
       footer={

@@ -781,22 +781,19 @@ export const planMessages = {
   itemTimeSave: '저장',
   /** 시각이 있을 때만 선다 */
   itemTimeClear: '시간 지우기',
-  /**
-   * 그 일자에 **체크된 항목이 있을 때만** 모달 안에 낸다 (#1028 · 명세 G2 · D9-2). 저장이
-   * 일괄 교체라 그 날 체크가 초기화된다 — 확인창을 한 번 더 두지 않고 이 한 줄로 알린다.
-   */
-  itemTimeVisitResetWarning: '저장하면 이 날의 ‘다녀옴’ 표시가 초기화돼요.',
+  /*
+    초기화 경고(`itemTimeVisitResetWarning`)는 #1053 에서 걷었다 — 저장이 단건 API 라 그 날의
+    `다녀옴` 체크가 남는다 (명세 G4 · D9-2).
+  */
   /** `{title}` 치환. 성공만 토스트로 말한다 */
   itemTimeSavedToast: '{title} 시작 시각을 저장했어요',
   itemTimeClearedToast: '{title} 시작 시각을 지웠어요',
   /** 5xx·무응답. 모달은 열린 채 입력이 남는다 — 같은 버튼으로 다시 보낸다 */
   itemTimeErrorDescription: '시각을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.',
-  /**
-   * `PLAN_004`. **시각 때문에 나는 실패가 아니다** — 일괄 교체가 그 일자의 장소를 되싣다가
-   * 원천에서 사라진 장소에 걸린다 (`addMoveMissingPlaceError` 와 같은 판단).
-   */
-  itemTimeMissingPlaceError:
-    '이 일자에 더 이상 조회되지 않는 장소가 있어 시각을 저장할 수 없어요. 일정에서 그 장소를 빼 주세요.',
+  /*
+    `PLAN_004`(사라진 장소) 문구(`itemTimeMissingPlaceError`)도 #1053 에서 걷었다 — 단건 API 는
+    그 일자의 장소를 되싣지 않아 그 실패가 나지 않는다.
+  */
 
   // ── 이동·휴식 직접 추가 (#1014) ──────────────────────────────────────
   // `일자편집-세부명세.md` H절. 같은 일괄 교체 저장이지만 **장소를 고르지 않고 제목을

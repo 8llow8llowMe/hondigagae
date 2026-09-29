@@ -10,7 +10,6 @@ import {
   moveEditItem,
   placeIdsOf,
   planDayItemsPayload,
-  setItemStartTimePayload,
   survivingItems,
   toEditItems,
   toggleRemoved,
@@ -566,56 +565,5 @@ describe('validateMoveTitle — 이동·휴식 제목 검증 (#1014)', () => {
 
   it('보통 제목은 통과한다', () => {
     expect(validateMoveTitle('차로 이동')).toBeNull()
-  })
-})
-
-/**
- * 일정 목록에서 항목 하나의 시작 시각을 바꾼다 (#1028 · 명세 G2).
- *
- * **항목 단건 수정 API 가 없다** — 같은 일괄 교체라 그 항목의 `startTime` 만 바꾸고
- * 나머지는 전부 되싣는다. 되싣지 않으면 그 일자가 한 항목만 남기고 비워진다 (E1).
- */
-describe('setItemStartTimePayload — 항목 시각 하나만 바꾼 일괄 교체 (#1028)', () => {
-  it('고른 항목의 startTime 만 바뀐다', () => {
-    const payload = setItemStartTimePayload(ITEMS, 2, 'b', '14:30:00')
-
-    expect(payload?.items.map((entry) => entry.startTime)).toEqual([
-      '10:00:00',
-      '14:30:00',
-      undefined,
-    ])
-  })
-
-  it('null 이면 그 항목의 키를 뺀다 — 일괄 교체에서 키 생략이 곧 지운다 (G1)', () => {
-    const payload = setItemStartTimePayload(ITEMS, 2, 'a', null)
-
-    expect(payload?.items[0]).not.toHaveProperty('startTime')
-  })
-
-  it('나머지 항목의 targetId · memo · itemType · 순서를 되싣는다', () => {
-    const payload = setItemStartTimePayload(ITEMS, 2, 'b', '14:30:00')
-    const [first, , third] = payload?.items ?? []
-
-    expect(first?.targetId).toBe(BIG_ID)
-    expect(first?.memo).toBe('실내라 비가 와도 괜찮아요')
-    expect(third?.itemType).toBe('MOVE')
-    expect(third).not.toHaveProperty('targetId')
-    expect(payload?.items.map((entry) => entry.sequence)).toEqual([0, 1, 2])
-    expect(payload?.items.every((entry) => entry.day === 2)).toBe(true)
-  })
-
-  it('바뀌는 항목의 제목 · 대상도 그대로다 — 시각 말고는 건드리지 않는다', () => {
-    const second = setItemStartTimePayload(ITEMS, 2, 'b', '14:30:00')?.items[1]
-
-    expect(second?.title).toBe('시장')
-    expect(second?.targetId).toBe('212481712381923334')
-  })
-
-  it('항목 수가 그대로다 — 하나도 빠지거나 늘지 않는다', () => {
-    expect(setItemStartTimePayload(ITEMS, 2, 'c', '18:00:00')?.items).toHaveLength(3)
-  })
-
-  it('그 일자에 없는 항목이면 null 이다 — 보낼 것이 없다', () => {
-    expect(setItemStartTimePayload(ITEMS, 2, 'zzz', '10:00:00')).toBeNull()
   })
 })

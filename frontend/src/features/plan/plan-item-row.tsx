@@ -60,7 +60,9 @@ export type PlanItemVisit = {
  * 시간 칩에 필요한 것 — 이슈 #1028 · `일자편집-세부명세.md` G2.
  *
  * **optional 이다.** 넘기지 않으면 칩 대신 예전 시각 캡션(D14-3)이 선다 — 기간 밖 고아 항목
- * 섹션이 그 경로다. 어느 일자에도 속하지 않는 항목은 일자 일괄 교체로 저장할 곳이 없다.
+ * 섹션이 그 경로다. 어느 일자에도 속하지 않는 항목이라 칩을 세우지 않는다 — #1028 에서는 일자
+ * 일괄 교체로 저장할 곳이 없었고, 단건 API(#1053)가 생긴 뒤에도 그 결정(`일정상세-세부명세.md`
+ * D14 "5번의 보충")을 그대로 둔다.
  * 공유 보기(`SharedPlanItemRow`)와 순서 편집(`PlanEditableItemRow`)은 이 컴포넌트가 아니다.
  */
 export type PlanItemTime = {
@@ -73,9 +75,10 @@ export type PlanItemTime = {
 /**
  * 시간 칩의 **일자 · 순서** 표식 (#1028 검토). `data-plan-time-chip` 에 실린다.
  *
- * **`planItemId` 로 가리키지 않는다.** 시각 저장도 일괄 교체라 id 가 전부 새로 발급되고, 모달을
- * 연 칩은 언마운트된다 — `useOverlay` 의 복귀 초점이 떨어진 노드를 가리켜 초점이 `body` 로
- * 떨어졌다. 순서는 시각 저장으로 바뀌지 않으므로 같은 자리의 새 칩을 이것으로 찾는다.
+ * **`planItemId` 로 가리키지 않는다.** #1028 에서는 시각 저장도 일괄 교체라 id 가 전부 새로
+ * 발급되고 모달을 연 칩이 언마운트돼, `useOverlay` 의 복귀 초점이 `body` 로 떨어졌다. #1053 의
+ * 단건 API 는 id 를 지키지만 표식은 그대로 둔다 — 그 사이 다른 일괄 교체가 id 를 바꿔도 같은
+ * 자리의 칩을 찾는다. 순서는 시각 저장으로 바뀌지 않는다.
  */
 export function timeChipFocusKey(day: number, index: number): string {
   return `${day}:${index}`

@@ -118,35 +118,10 @@ function toPayloadItem(item: PlanItemDetail, day: number, sequence: number): Pla
   }
 }
 
-// ─── 항목 시작 시각 (#1028) ───────────────────────────────────────────────────
-
-/**
- * 그 일자의 항목 **하나의** 시작 시각만 바꾼 일괄 교체 본문 (`일자편집-세부명세.md` G2).
- *
- * **항목 단건 수정 API 가 없다.** 쓰기 경로가 `PUT …/days/{day}/items` 하나뿐이라, 고르지
- * 않은 항목을 전부 `toPayloadItem` 으로 되싣고 고른 항목의 `startTime` 만 갈아 끼운다 —
- * 되싣지 않으면 그 일자가 한 항목만 남기고 비워진다 (E1).
- *
- * @param startTime 서버 형식 `HH:mm:ss`(`toServerStartTime`). **`null` 이면 키를 뺀다 =
- *   지운다** — 일괄 교체에서는 키 생략이 곧 비우기다(G1). `PUT /plans/{planId}`(부분 수정,
- *   키 생략 = 유지)와 반대다.
- * @returns 그 일자에 `planItemId` 가 없으면 `null` — 낡은 상세로 누른 것이라 보낼 것이 없다.
- *   지어낸 목록을 보내지 않는다.
- */
-export function setItemStartTimePayload(
-  items: PlanItemDetail[],
-  day: number,
-  planItemId: string,
-  startTime: string | null,
-): PlanDayItemsReplacePayload | null {
-  if (!items.some((item) => item.planItemId === planItemId)) return null
-
-  return {
-    items: items.map((item, index) =>
-      toPayloadItem(item.planItemId === planItemId ? { ...item, startTime } : item, day, index),
-    ),
-  }
-}
+/*
+  항목 하나의 시작 시각만 바꾸는 일괄 교체 본문(`setItemStartTimePayload`, #1028)은 #1053 에서
+  걷었다 — 시각 저장이 단건 API(`changeItemStartTime`)로 옮겨 가 이 파일이 만들 본문이 없다.
+*/
 
 // ─── 장소 담기 (#82) ──────────────────────────────────────────────────────────
 
