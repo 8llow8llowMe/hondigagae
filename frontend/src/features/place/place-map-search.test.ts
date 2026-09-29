@@ -81,12 +81,18 @@ describe('지도 보기의 검색 자리 (#596)', () => {
   })
 
   /*
-    **세 자리가 한 문서에 동시에 있다** — 오버레이와 패널은 CSS 로만 갈리고, 폴백은
+    **자리들이 한 문서에 동시에 있다** — 오버레이(또는 머리 아래)와 패널은 CSS 로만 갈리고, 폴백은
     배타적이지만 같은 파일이다. 같은 `id` 가 둘이면 `htmlFor` 가 어느 입력을 가리키는지
     문서가 정하지 못하고, 보조기기가 라벨 없는 입력을 보게 된다.
   */
-  it('세 자리의 입력 id 가 모두 다르다', () => {
-    const ids = ['place-keyword-map', 'place-keyword-panel', 'place-keyword-fallback']
+  it('네 자리의 입력 id 가 모두 다르다', () => {
+    // `place-keyword-head` 는 떠 있는 머리 아래 자리다 (#1012)
+    const ids = [
+      'place-keyword-map',
+      'place-keyword-panel',
+      'place-keyword-fallback',
+      'place-keyword-head',
+    ]
 
     for (const id of ids) expect(mapView).toContain(`id="${id}"`)
     expect(new Set(ids).size).toBe(ids.length)
@@ -96,11 +102,12 @@ describe('지도 보기의 검색 자리 (#596)', () => {
 /*
   **`searchable` 은 화면이 켠다** — 기본은 끔이다.
 
-  담기 화면(#370)은 `PlaceMapView` 를 같이 쓰지만 **목록 갈래에도 검색이 없다.** 지도에만
-  켜면 같은 화면의 두 보기가 다른 도구를 갖는다 — 그 화면에 검색을 들일지는 별개 판단이라
-  이 이슈에서 슬쩍 결정하지 않는다.
+  #596 때는 담기 화면(#370)이 **목록 갈래에도 검색이 없어서** 켜지 않았다 — 지도에만 켜면
+  같은 화면의 두 보기가 다른 도구를 갖는다. #1012 가 두 갈래에 함께 들였으므로 이제 켠다.
+  원칙(두 보기가 같은 도구를 갖는다)은 그대로라, 목록 갈래 쪽은 `plan-add-place-map.test.ts`
+  가 함께 잠근다.
 */
-describe('searchable 은 /places 만 켠다', () => {
+describe('searchable 은 화면이 켠다', () => {
   it('기본값이 꺼짐이다', () => {
     expect(mapView).toMatch(/searchable = false/)
   })
@@ -114,12 +121,67 @@ describe('searchable 은 /places 만 켠다', () => {
     expect(tag).toContain('searchable')
   })
 
-  it('담기 화면은 켜지 않는다', () => {
+  it('담기 화면도 켠다 (#1012)', () => {
     const tag = addPlaceView.slice(
       addPlaceView.indexOf('<PlaceMapView'),
-      addPlaceView.indexOf('/>', addPlaceView.indexOf('<PlaceMapView')),
+      addPlaceView.indexOf('head={', addPlaceView.indexOf('<PlaceMapView')),
     )
 
-    expect(tag).not.toContain('searchable')
+    expect(tag).toMatch(/\bsearchable\b/)
+  })
+})
+
+/*
+  **떠 있는 머리가 있으면 1024 미만 검색이 그 아래로 간다** — 이슈 #1012.
+
+  토글 왼쪽 오버레이 자리는 담기 화면의 머리 카드(`end-32`) 밑이다. 거기 그리면 검색이
+  **보이지 않는 채로 포커스를 받는다.** 그래서 머리가 있으면 오버레이 자리를 비우고, 머리와
+  같은 기둥에 세운다.
+*/
+describe('머리가 있는 화면의 검색 자리 (#1012)', () => {
+  const headColumn = mapView.slice(mapView.indexOf('{head !== undefined && (\n        <div'))
+
+  it('오버레이 검색은 머리가 없을 때만 그린다', () => {
+    expect(overlay).toContain('searchable && head === undefined && (')
+  })
+
+  it('머리 기둥이 패널 기둥(start-4)에 붙고 머리 다음에 검색이 선다', () => {
+    expect(headColumn).toMatch(/absolute start-4 end-32 top-5 z-30[^"]*lg:end-auto lg:top-6/)
+
+    const head = headColumn.indexOf('{head}')
+    const search = headColumn.indexOf('<PlaceSearchField')
+    expect(head).toBeGreaterThan(-1)
+    expect(search).toBeGreaterThan(head)
+
+    const tag = headColumn.slice(search, headColumn.indexOf('/>', search))
+    // 패널 맨 위가 1024 이상을 맡는다 — 둘 다 그리면 데스크톱에 검색창이 둘이 된다
+    expect(tag).toContain('lg:hidden')
+    expect(tag).toContain('compact')
+    expect(tag).toContain('id="place-keyword-head"')
+    // 머리 카드와 폭을 맞춘다 — 한 기둥의 두 표면 오른쪽 끝이 어긋나지 않게
+    expect(tag).not.toContain('max-w-md')
+  })
+
+  /* 시트·오버레이와 같은 z-30 이라 문서 순서가 쌓임을 정한다 — 시트 위에 남아야 한다 */
+  it('머리 기둥은 시트보다 뒤에 온다', () => {
+    expect(mapView.indexOf('{head !== undefined && (\n        <div')).toBeGreaterThan(
+      mapView.indexOf('</MapSheet>'),
+    )
+  })
+
+  /*
+    **폴백에서는 머리가 정상 흐름이다.** 지도가 없으니 띄울 바탕이 없고, `absolute` 로 두면
+    안내 줄과 첫 행을 덮는다 (#1012 이전 375·1440 실측).
+  */
+  it('SDK 실패 폴백은 머리를 안내 줄보다 먼저, 흐름 안에 세운다', () => {
+    const head = fallback.indexOf('{head !== undefined && <div')
+    const notice = fallback.indexOf('role="status"')
+
+    expect(head).toBeGreaterThan(-1)
+    expect(notice).toBeGreaterThan(head)
+
+    const wrapper = fallback.slice(head, fallback.indexOf('{head}', head))
+    expect(wrapper).not.toContain('absolute')
+    expect(wrapper).toContain('INSET_CLASS.main')
   })
 })

@@ -7,7 +7,7 @@ import { PlaceMapPanel } from '@/features/place/place-map-panel'
 import { planAddPlaceAction, planAddPlaceNotice } from '@/features/plan/plan-add-place-action'
 import { messages } from '@/lib/messages'
 import { placeSummary, placeWithoutCoordinate } from '@/test/fixtures/place'
-import { readSource } from '@/test/source'
+import { readSource, readSourceWithoutComments } from '@/test/source'
 
 /** 명세: docs/features/plan/담기지도-세부명세.md (이슈 #370) */
 
@@ -159,10 +159,15 @@ describe('지도 갈래의 떠 있는 머리 (#556)', () => {
 
   /*
     **패널과 같은 기둥·같은 곡률이다.** 1440 열에 맞추면 폭에 따라 "패널 위" 와 "지도
-    한복판" 으로 그림이 갈린다 (`plan-add-place-view` 머리 카드 주석).
+    한복판" 으로 그림이 갈린다 (`place-map-view` 머리 기둥 주석).
+
+    **기둥은 #1012 부터 `PlaceMapView` 가 그린다** — 이 화면은 카드를 `head` 로 넘긴다.
+    기둥 자리(`start-4 … lg:end-auto`)는 `place-map-search.test.ts` 가 잠근다.
   */
-  it('좌측 패널 기둥에 붙고 패널과 같은 곡률을 쓴다', () => {
-    expect(mapBranch).toMatch(/start-4[^"]*lg:end-auto/)
+  it('머리 카드를 PlaceMapView 의 head 로 넘기고 패널과 같은 곡률을 쓴다', () => {
+    expect(mapBranch).toContain('head={')
+    // 자리를 스스로 띄우지 않는다 — 띄우면 폴백에서 목록을 덮고 모바일 검색 자리가 사라진다
+    expect(mapBranch).not.toMatch(/className="[^"]*\babsolute\b/)
     expect(mapBranch).toContain('rounded-xl')
     // 폭 400 은 `.map-panel-width`(globals.css)와 같은 값이다 — 그 클래스는 `lg:` variant 를
     // 만들 수 없어 Tailwind 유틸리티로 쓴다 (`plan-add-place-view` 주석)
@@ -190,5 +195,51 @@ describe('지도 갈래의 떠 있는 머리 (#556)', () => {
   /* 부제는 목록에만 둔다 — 지도 위 카드는 작을수록 좋다 */
   it('떠 있는 머리에 부제를 두지 않는다', () => {
     expect(mapBranch).not.toContain('addPlaceSubtitle')
+  })
+})
+
+/**
+ * 담기 화면의 검색 — 이슈 #1012.
+ *
+ * `/places` 와 같은 `PlaceSearchField` 가 **두 갈래에 함께** 선다. 한쪽만 두면 같은 화면의
+ * 두 보기가 다른 도구를 갖는다 (#596 이 지도에만 켜지 않은 근거). 제출 뒤 경로 유지는
+ * `use-place-filter-nav.test.ts` 가, 실제 사슬은 `e2e/place-search.spec.ts` 가 잰다.
+ */
+describe('담기 화면의 검색 자리 (#1012)', () => {
+  const code = readSourceWithoutComments('src/features/plan/plan-add-place-view.tsx')
+  const listPage = readSourceWithoutComments('app/(main)/places/(list)/page.tsx')
+
+  /** `tools={` 부터 그 prop 을 닫는 `}` 까지 — 프래그먼트 하나라 `</>` 로 끊는다 */
+  function toolsOf(source: string): string {
+    const start = source.indexOf('tools={')
+    return source.slice(start, source.indexOf('</>', start))
+  }
+
+  it('목록 갈래 머리 도구에 검색이 칩보다 먼저 선다 — /places 목록과 같은 순서다', () => {
+    const tools = toolsOf(code)
+    const search = tools.indexOf('<PlaceSearchField filters={filters} />')
+    const chips = tools.indexOf('<PlaceFilterChips')
+
+    expect(search).toBeGreaterThan(-1)
+    expect(chips).toBeGreaterThan(search)
+    // 칩만 1024 미만이다 — 검색은 모든 폭에서 이 자리다
+    expect(tools.slice(chips)).toContain('lg:hidden')
+  })
+
+  it('/places 목록 머리와 같은 모양이다 — 검색에 따로 준 속성이 없다', () => {
+    const tools = toolsOf(listPage)
+
+    expect(tools).toContain('<PlaceSearchField filters={filters} />')
+    expect(toolsOf(code)).toContain('<PlaceSearchField filters={filters} />')
+  })
+
+  it('지도 갈래가 PlaceMapView 에 searchable 을 켠다', () => {
+    const mapStart = code.indexOf("if (view === 'map')")
+    const tag = code.slice(
+      code.indexOf('<PlaceMapView', mapStart),
+      code.indexOf('head={', mapStart),
+    )
+
+    expect(tag).toMatch(/\bsearchable\b/)
   })
 })
