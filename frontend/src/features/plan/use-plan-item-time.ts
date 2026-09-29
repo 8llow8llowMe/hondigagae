@@ -13,6 +13,12 @@ import type { PlanDaySaveError } from '@/lib/plan/save-error'
 import type { PlanItemDetail } from '@/types/plan'
 
 /**
+ * 저장 뒤 상세 재조회를 기다리는 상한 (ms). 보통의 재조회는 이 안에 끝나 칩이 새 시각으로
+ * 바뀐 뒤 닫히고, 재시도 · 오프라인으로 늘어지면 이만큼만 잠근다 (아래 성공 갈래 주석).
+ */
+const DETAIL_REFETCH_WAIT_MS = 1500
+
+/**
  * 일정 목록에서 항목 하나의 시작 시각을 저장한다 — 이슈 #1028 · #1053 ·
  * `일자편집-세부명세.md` G3 · G4.
  *
@@ -89,6 +95,11 @@ export function usePlanItemTime({
               **재조회를 기다린 뒤 닫는다.** 먼저 닫으면 "저장했어요" 토스트 아래 칩이 한동안
               옛 시각을 보여 준다. 그동안 `saving` 이 남아 저장 · 닫기가 잠긴다. 재조회가
               실패해도 `invalidateQueries` 는 던지지 않는다 — 저장은 됐으므로 그대로 닫는다.
+
+              **다만 오래 기다리지 않는다** (`DETAIL_REFETCH_WAIT_MS`). 재조회가 5xx 면 전역
+              retry 가 끝날 때까지(1초 · 2초 backoff) 잠기고, 저장 직후 오프라인이 되면 재조회가
+              재연결 전까지 멈춰 **저장은 됐는데 모달을 닫을 방법이 없어진다.** 상한을 넘기면
+              재조회는 뒤에서 계속 돌게 두고 닫는다 — 그 사이 칩이 잠깐 옛 시각인 것은 감수한다.
             */
             // 바뀐 시각이 곧 그 항목의 판정 입력이다 (D15-6). 따로 받는 절이라 기다리지 않는다
             void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(planId) })
@@ -97,7 +108,10 @@ export function usePlanItemTime({
               항목)로 계산되고 시각을 읽지 않는다(`PlanWeatherProcessor` 실측) — 방문 체크와
               같은 판단이다. 일괄 교체 시절에는 교체라서 무효화했다.
             */
-            await queryClient.invalidateQueries({ queryKey: planKeys.detail(planId) })
+            await Promise.race([
+              queryClient.invalidateQueries({ queryKey: planKeys.detail(planId) }),
+              new Promise<void>((resolve) => setTimeout(resolve, DETAIL_REFETCH_WAIT_MS)),
+            ])
 
             showToast({
               message: (startTime === null
