@@ -87,16 +87,21 @@ describe('수정 — 카드 둘 (#464)', () => {
     한 장으로 합쳐진 것이다.
   */
   it('카드가 둘이다 — 사진·대표와 정보 수정', () => {
-    /* 제목을 가진 카드는 둘이고, 나머지 셋은 로딩 두 장 + 오류 한 장이다(아래 단언) */
-    expect(editView.match(/<Surface[\s/>]/g)).toHaveLength(5)
+    /*
+      제목을 가진 카드는 둘이고(`PhotoCard` · `FormCard` — 로딩 갈래도 같은 둘을 쓴다),
+      나머지 하나는 오류 한 장이다(아래 단언)
+    */
+    expect(editView.match(/<Surface[\s/>]/g)).toHaveLength(3)
     expect(editView.match(/title=\{messages\.pet\./g)).toHaveLength(2)
     expect(editView).toContain('title={messages.pet.photoSectionTitle}')
     expect(editView).toContain('title={messages.pet.editFormTitle}')
   })
 
   it('로딩·오류도 카드 안이다 — 카드가 생겼다 사라지지 않는다', () => {
-    // 로딩 두 장 + 오류 한 장 + 사진 카드 + 폼 카드 중, 제목 없는 갈래는 aria-label 을 쓴다
-    expect(editView.match(/<Surface aria-label=/g)).toHaveLength(3)
+    // 제목 없는 갈래(오류)만 aria-label 을 쓴다 — 로딩은 실화면과 같은 제목 카드다
+    expect(editView.match(/<Surface aria-label=/g)).toHaveLength(1)
+    expect(editView.match(/<PhotoCard busy>/g)).toHaveLength(1)
+    expect(editView.match(/<FormCard busy>/g)).toHaveLength(1)
     expect(editView).toMatch(/<ErrorState\s+inset="card"/)
   })
 
@@ -114,8 +119,8 @@ describe('수정 — 카드 둘 (#464)', () => {
   })
 
   it('삭제와 목록으로 는 카드 밖 한 묶음이다', () => {
-    // 카드 안에 들어가면 `Surface` 닫힘 뒤가 아니라 그 사이에 오게 된다
-    const afterCards = editView.slice(editView.lastIndexOf('</Surface>'))
+    // 카드 안에 들어가면 폼 카드 닫힘 뒤가 아니라 그 사이에 오게 된다
+    const afterCards = editView.slice(editView.lastIndexOf('</FormCard>'))
 
     expect(afterCards).toContain('<PetDeleteSection')
     expect(afterCards).toContain('href="/pets"')
