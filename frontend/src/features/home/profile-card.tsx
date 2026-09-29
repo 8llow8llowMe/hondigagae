@@ -21,8 +21,8 @@ import type { Pet } from '@/types/pet'
  * **프로필 블록 전체가 반려견 스위처다.** 판정의 기준을 바꾸는 컨트롤이라 화면 밖에
  * 숨기지 않는다 — 숨어 있으면 사용자가 왜 값이 바뀌었는지 모른다.
  *
- * 사진 96(모바일) / 112(데스크톱) **원형**. 원형은 사진·아바타에만 허용된 곡선이다.
- * 폴백 순서는 업로드 사진 → **이니셜 원형**이다 (`PetAvatar`). **빈 원형을 남기지 않는다.**
+ * 사진 80(모바일) / 96(데스크톱) **원형**. 원형은 사진·아바타에만 허용된 곡선이다.
+ * 폴백 순서는 업로드 사진 → **기본 그림**이다 (`PetAvatar`, #1022). **빈 원형을 남기지 않는다.**
  *
  * 표시 항목은 이름 + 견종·크기·나이 + **특성 태그 2개까지**. 3개 이상은 `+n`.
  */
@@ -94,6 +94,10 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
         **32 → 40 으로 올렸다** (#428). 예전 근거는 "위아래가 각각 날짜 줄·판정 줄과
         맞닿아 있어서" 였는데, 3a 에서 **날짜 줄이 판정 카드로 옮겨 가** 위쪽이 카드
         경계가 됐다. 위가 여백이 아니라 선이 되면 같은 32 라도 더 조여 보인다.
+
+        **다시 32 다** (#1022). 아바타가 112 → 96 으로 한 단 내려가 원과 카드 경계의 비례가
+        돌아왔고, 이 블록이 판정보다 높던 것(약 190px)을 여기서 함께 줄인다 — 카드의 답은
+        판정이고 프로필은 "누구 기준인가" 를 말하는 화자다.
       */}
       <button
         ref={triggerRef}
@@ -102,7 +106,7 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
         aria-haspopup="menu"
         onClick={() => setOpen((prev) => !prev)}
         className={cn(
-          'focus-visible:ring-brand-500 flex w-full items-center gap-4 py-10 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
+          'focus-visible:ring-brand-500 flex w-full items-center gap-4 py-8 text-left focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none',
           // 카드 안 인셋 (#428)
           'px-4 md:px-5',
         )}
