@@ -1,3 +1,5 @@
+import { ApiError, isRetriable } from '@/lib/api/error'
+import { toMessage } from '@/lib/api/response'
 import { parseDay, todayUtc } from '@/lib/date/day'
 import { messages } from '@/lib/messages'
 import { SHAREABLE_PLAN_STATUSES } from '@/types/plan'
@@ -63,4 +65,34 @@ export function shareExpiryLabel(expiresAt: string, today: Date): string | null 
   const label = `${date.getUTCFullYear()}년 ${date.getUTCMonth() + 1}월 ${date.getUTCDate()}일`
 
   return messages.plan.shareExpiryOn.replace('{date}', label)
+}
+
+/**
+ * 발급 모달이 링크를 못 불러왔을 때의 문구 (#979).
+ *
+ * **"공유 중이 아님" 은 여기 오지 않는다** — 서버가 200 + `dataBody: null` 로 답한다.
+ * 대신 일정이 없는 404 `PLAN_001` 이 들어온다(다른 탭에서 지운 경우). 예전 호출부는 404 를
+ * 통째로 `null` 로 접어 이것을 "공유 중이 아님" 으로 보였다.
+ *
+ * 5xx · 무응답만 "잠시 후 다시 시도" 를 말한다. 그 밖의 실패는 **서버 문구를 그대로**
+ * 쓴다 — 404 에 재시도를 권하지 않는다 (`api-integration-guide.md` §3).
+ */
+export function shareLoadErrorMessage(error: unknown): string {
+  if (isRetriable(error) || !(error instanceof ApiError)) return messages.plan.shareLoadError
+  // 서버 문구가 없는 4xx(래퍼 없는 게이트웨이 404·403)도 재시도를 권하지 않는다
+  return toMessage(error.rawMessage, messages.plan.shareLoadFailed)
+}
+
+/** 발급 모달 조회의 최대 재시도 횟수 — `api-integration-guide.md` §7 일정 행 */
+const SHARE_LINK_QUERY_MAX_RETRY = 1
+
+/**
+ * 발급 모달 조회의 React Query `retry` (#979).
+ *
+ * §7 일정 행의 "retry 1" 을 **오류 종류를 보존한 채** 구현한다. 숫자 `retry: 1` 은 전역
+ * error-aware retry 를 덮어써 404 `PLAN_001` · 400 `PLAN_022` 까지 한 번 더 부른다
+ * (`features/pet/queries.ts` 와 같은 이유). 5xx · 무응답만 한 번 재시도한다.
+ */
+export function shouldRetryShareLinkQuery(failureCount: number, error: unknown): boolean {
+  return isRetriable(error) && failureCount < SHARE_LINK_QUERY_MAX_RETRY
 }

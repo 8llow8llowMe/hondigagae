@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { ApiError } from '@/lib/api/error'
-import { toMessage, unwrap, unwrapVoid } from '@/lib/api/response'
+import { toMessage, unwrap, unwrapNullable, unwrapVoid } from '@/lib/api/response'
 import { fail, gatewayError, ok } from '@/test/api'
 
 describe('unwrap', () => {
@@ -25,6 +25,47 @@ describe('unwrap', () => {
       expect(error).toBeInstanceOf(ApiError)
       expect((error as ApiError).status).toBe(404)
       expect((error as ApiError).resultCode).toBe('PET_001')
+    }
+  })
+})
+
+/**
+ * 선택적 하위 리소스 조회 (#979).
+ *
+ * **`dataBody: null` 이 성공이다.** 공유 링크 · 후기 GET 은 "아직 없음" 을 404 가 아니라
+ * 200 + null 로 답한다. `unwrap()` 처럼 null 을 실패로 보면 정상 상태가 오류 화면이 된다.
+ * 반대로 **실패 판별은 `unwrap()` 과 같아야 한다** — 일정이 없는 `PLAN_001` 404 까지
+ * null 로 접으면 예전 `.catch(not-found → null)` 과 같은 구멍이 다시 열린다.
+ */
+describe('unwrapNullable', () => {
+  it('성공 응답에서 dataBody 를 꺼낸다', () => {
+    expect(unwrapNullable(ok({ token: 'abc' }), 200)).toEqual({ token: 'abc' })
+  })
+
+  it('success 이고 dataBody 가 null 이면 null 을 돌려준다 — 실패가 아니다', () => {
+    expect(unwrapNullable(ok(null), 200)).toBeNull()
+  })
+
+  it('success 가 false 면 status 와 resultCode 를 보존한 ApiError 를 던진다', () => {
+    try {
+      unwrapNullable(fail('PLAN_001', '존재하지 않는 여행 일정입니다.'), 404)
+      expect.unreachable('던져야 한다')
+    } catch (thrown) {
+      expect(thrown).toBeInstanceOf(ApiError)
+      expect((thrown as ApiError).status).toBe(404)
+      expect((thrown as ApiError).resultCode).toBe('PLAN_001')
+      expect((thrown as ApiError).kind).toBe('not-found')
+    }
+  })
+
+  it('공통 래퍼가 아닌 본문은 상태코드만 살린 ApiError 로 던진다', () => {
+    try {
+      unwrapNullable(gatewayError(503, 'Service Unavailable'), 503)
+      expect.unreachable('던져야 한다')
+    } catch (thrown) {
+      expect(thrown).toBeInstanceOf(ApiError)
+      expect((thrown as ApiError).kind).toBe('temporary')
+      expect((thrown as ApiError).resultCode).toBeNull()
     }
   })
 })

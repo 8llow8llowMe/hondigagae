@@ -57,6 +57,28 @@ export function unwrap<T>(response: ApiResponse<T>, status: number): T {
 }
 
 /**
+ * **`dataBody: null` 도 성공으로 받는** 판정 (#979).
+ *
+ * 선택적 하위 리소스(일정당 0~1개)는 "아직 없음" 을 404 가 아니라 **200 + `dataBody: null`**
+ * 로 답한다 — `GET /plans/{planId}/share-link`(공유 중이 아님) · `GET /plans/{planId}/reviews`
+ * (아직 안 씀). 규칙 정본은 `backend/docs/api-design-guide.md` §2-0.
+ *
+ * `unwrap()` 을 고치지 않고 따로 두는 이유: 나머지 엔드포인트에서 성공 + null 은 계약
+ * 위반이고, `unwrap()` 이 그것을 실패로 잡아 화면이 non-null 을 믿을 수 있게 한다.
+ * 실패 판별(래퍼 모양 · `success`)은 `unwrap()` 과 **같다** — 404 `PLAN_001` 을 null 로
+ * 접지 않는다.
+ */
+export function unwrapNullable<T>(response: ApiResponse<T>, status: number): T | null {
+  if (!hasEnvelope(response)) throw envelopeMissing(status)
+
+  const { success, resultCode, resultMessage, fieldErrors } = response.dataHeader
+  if (!success) throw new ApiError(status, resultCode, resultMessage, fieldErrors ?? null)
+
+  // 키가 빠진 본문도 `undefined` 가 아니라 `null` 로 — 호출부가 `=== null` 하나로 가른다
+  return response.dataBody ?? null
+}
+
+/**
  * `dataBody` 가 없는 성공 응답을 판정한다.
  *
  * signup / logout / email 인증 계열은 `dataBody: null` 로 성공한다

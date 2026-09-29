@@ -2092,10 +2092,15 @@ function requireCompleted(plan: MockPlan): MockResult | null {
   return null
 }
 
+/**
+ * 후기가 없으면 **200 + `dataBody: null`** 이다 (#979 — `PlanReviewWebFacade.getReview`).
+ * `PLAN_015` 404 는 수정 PUT 에만 남는다. 일정이 없거나 남의 것이면 `withPlan` 이 먼저
+ * `PLAN_001` 404 로 막는다.
+ */
 function getReview(plan: MockPlan): MockResult {
   const blocked = requireCompleted(plan)
   if (blocked !== null) return blocked
-  if (plan.review === null) return fail(404, 'PLAN_015', '작성한 여행 후기가 없습니다.')
+  if (plan.review === null) return { status: 200, payload: ok(null) }
   return { status: 200, payload: ok(toReview(plan.planId, plan.review)) }
 }
 

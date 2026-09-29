@@ -2,13 +2,15 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { resolveMock } from '@/lib/api/mock'
 import { resetMockStore } from '@/lib/api/mock/store'
+import type { ApiResponse } from '@/types/api'
 import type { PlanReviewResponse } from '@/types/plan'
 
 /**
  * 여행 후기 mock (#614 계약 복제).
  *
  * **mock 이 백엔드보다 느슨하거나 엄격해서는 안 된다.** 화면이 갈리는 규칙만 잠근다 —
- * 완료가 아니면 PLAN_016, 없으면 PLAN_015, 중복 POST 는 PLAN_017, 장소가 아니면 PLAN_018.
+ * 완료가 아니면 PLAN_016, 조회에 없으면 200 + null(#979) · 수정에 없으면 PLAN_015,
+ * 중복 POST 는 PLAN_017, 장소가 아니면 PLAN_018.
  */
 
 const TOKEN = 'mock-access-900000000000000001'
@@ -29,13 +31,17 @@ function payload(overallRating = 4, items: unknown[] = []) {
 describe('후기 mock — 조회', () => {
   beforeEach(resetMockStore)
 
-  it('완료 일정에 후기가 없으면 404 PLAN_015 다', () => {
+  /*
+    "아직 안 썼다" 는 오류가 아니다 (#979). 404 로 답하면 후기 절을 열 때마다 브라우저
+    콘솔에 "Failed to load resource" 가 찍힌다.
+  */
+  it('완료 일정에 후기가 없으면 200 + dataBody null 이다', () => {
     const result = call(`/plans/${COMPLETED}/reviews`, 'GET')
+    const body = result?.payload as ApiResponse<PlanReviewResponse>
 
-    expect(result?.status).toBe(404)
-    expect((result?.payload as { dataHeader: { resultCode: string } }).dataHeader.resultCode).toBe(
-      'PLAN_015',
-    )
+    expect(result?.status).toBe(200)
+    expect(body.dataHeader.success).toBe(true)
+    expect(body.dataBody).toBeNull()
   })
 
   it('초안 일정은 400 PLAN_016 이다 — GET 도 같다', () => {
