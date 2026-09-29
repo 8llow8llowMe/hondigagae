@@ -46,7 +46,8 @@ contentUrl = .../cmm/cmm/fileDownload.do?atchFileId=FILE_000000003214426&fileDet
 최신임을 안 것이므로 성공이다. 갱신하지 않으면 파일이 몇 달 안 바뀌는 정상 상황에서 14일 경보가
 울리고, 아무 문제 없이 울리는 경보는 곧 무시당한다 (`observability-guide.md`).
 
-파서를 고쳐 같은 파일을 다시 적재해야 하면 `forceImport=true` 를 준다.
+파서를 고쳐 같은 파일을 다시 적재해야 하면 `forceImport=true` 를 준다. 올레도 같다 — 예: #960(종점 좌표) ·
+#987(소요시간 표기 정규화)은 코드만 바뀌고 포털 파일은 그대로라, 배포 뒤 `olleCourseImportJob forceImport=true` 를 1회 돌린다.
 
 ```bash
 --spring.batch.job.name=cultureFacilityImportJob sido=제주특별자치도 forceImport=true runAt=<ISO 시각>
