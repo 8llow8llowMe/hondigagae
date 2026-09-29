@@ -22,6 +22,7 @@ import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import com.hondigagae.shared.travel.plan.PlanItemType;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -413,6 +414,48 @@ class PlanCommandProcessorTest {
             .isInstanceOf(PlanException.class)
             .extracting(exception -> ((PlanException) exception).getErrorCode())
             .isEqualTo(PlanErrorCode.NOT_FOUND_PLAN_ITEM);
+        assertThat(planItemRepositoryPort.saved).isNull();
+    }
+
+    // ── 시작 시각 단건 수정 (#1030) ────────────────────────────────────
+
+    @Test
+    @DisplayName("시작 시각만 바꾸고 아이디 · 방문 체크 · 순서 · 이름은 그대로 둔다 — 일괄 교체가 잃던 값이다")
+    void changesStartTimeKeepingIdentityAndVisit() {
+        PlanItem item = storedItem(true).toBuilder().memo("그늘 많음").build();
+        planItemRepositoryPort.stored.put(item.id(), item);
+
+        PlanItem updated = processor.changeItemStartTime(plan(PlanStatus.CONFIRMED, 2L), item.id(), LocalTime.of(10, 30));
+
+        assertThat(updated.startTime()).isEqualTo(LocalTime.of(10, 30));
+        assertThat(updated).usingRecursiveComparison().ignoringFields("startTime").isEqualTo(item);
+        assertThat(planItemRepositoryPort.saved).isEqualTo(updated);
+    }
+
+    @Test
+    @DisplayName("null 이면 시각을 비운다")
+    void clearsStartTimeWithNull() {
+        PlanItem item = storedItem(false).toBuilder().startTime(LocalTime.of(9, 0)).build();
+        planItemRepositoryPort.stored.put(item.id(), item);
+
+        PlanItem updated = processor.changeItemStartTime(plan(PlanStatus.DRAFT, 2L), item.id(), null);
+
+        assertThat(updated.startTime()).isNull();
+        assertThat(updated.id()).isEqualTo(item.id());
+    }
+
+    @Test
+    @DisplayName("다른 일정의 항목 · 없는 항목은 PLAN_005 이고 아무것도 저장하지 않는다")
+    void rejectsForeignOrMissingItemForStartTime() {
+        PlanItem foreign = storedItem(false).toBuilder().id(902L).planId(999L).build();
+        planItemRepositoryPort.stored.put(foreign.id(), foreign);
+
+        for (long planItemId : new long[] {foreign.id(), 12345L}) {
+            assertThatThrownBy(() -> processor.changeItemStartTime(plan(PlanStatus.CONFIRMED, 2L), planItemId, LocalTime.NOON))
+                .isInstanceOf(PlanException.class)
+                .extracting(exception -> ((PlanException) exception).getErrorCode())
+                .isEqualTo(PlanErrorCode.NOT_FOUND_PLAN_ITEM);
+        }
         assertThat(planItemRepositoryPort.saved).isNull();
     }
 

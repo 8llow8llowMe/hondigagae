@@ -24,6 +24,7 @@ import com.hondigagae.domainlayer.plan.domain.model.PlanPetCondition;
 import com.hondigagae.persistence.util.SnowflakeIdGenerator;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -479,13 +480,35 @@ public class PlanCommandProcessor {
      */
     @Transactional
     public PlanItem markItemVisited(Plan plan, long planItemId, boolean visited) {
-        PlanItem item = planItemRepositoryPort.findById(planItemId)
-            .filter(found -> found.planId() == plan.id())
-            .orElseThrow(() -> new PlanException(PlanErrorCode.NOT_FOUND_PLAN_ITEM));
+        PlanItem item = getItemOf(plan, planItemId);
         if (visited && !plan.hasStarted(LocalDate.now(clock))) {
             throw new PlanException(PlanErrorCode.PLAN_NOT_STARTED_VISIT);
         }
         return planItemRepositoryPort.save(item.withVisited(visited));
+    }
+
+    /**
+     * 항목 하나의 시작 시각만 바꾼다 (#1030).
+     *
+     * <p>일자 일괄 교체({@link #replaceDayItems})는 삭제 후 재삽입이라 그날의 방문 체크가 모두 풀리고
+     * {@code planItemId} 가 새로 발급된다. 시각 하나 고치자고 그 값을 잃을 이유가 없어 행을 제자리에서 고친다 —
+     * 아이디 · 방문 체크 · 순서가 그대로 남는다.
+     *
+     * <p>순서({@code sequence})와 시각이 어긋나도 막지 않는다. 일괄 교체도 둘을 맞추라고 요구하지 않는다.
+     *
+     * @param startTime null 이면 시각을 비운다
+     */
+    @Transactional
+    public PlanItem changeItemStartTime(Plan plan, long planItemId, LocalTime startTime) {
+        PlanItem item = getItemOf(plan, planItemId);
+        return planItemRepositoryPort.save(item.withStartTime(startTime));
+    }
+
+    /** 이 일정의 항목. 없거나 다른 일정의 항목이면 같은 404 다 — 남의 항목이 있다는 사실도 알리지 않는다. */
+    private PlanItem getItemOf(Plan plan, long planItemId) {
+        return planItemRepositoryPort.findById(planItemId)
+            .filter(found -> found.planId() == plan.id())
+            .orElseThrow(() -> new PlanException(PlanErrorCode.NOT_FOUND_PLAN_ITEM));
     }
 
     private String resolveCopyTitle(String requestedTitle, String sourceTitle) {

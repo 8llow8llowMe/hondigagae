@@ -28,6 +28,7 @@ import com.hondigagae.domainlayer.plan.application.service.processor.PlanWeather
 import com.hondigagae.domainlayer.plan.domain.model.Plan;
 import com.hondigagae.persistence.dto.SliceResponse;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -118,6 +119,13 @@ public class PlanWebFacade implements PlanWebUseCase {
     public void markItemVisited(long memberId, long planId, long planItemId, boolean visited) {
         Plan plan = planQueryProcessor.getOwnedPlan(memberId, planId);
         planCommandProcessor.markItemVisited(plan, planItemId, visited);
+    }
+
+    @Override
+    @Transactional
+    public void changeItemStartTime(long memberId, long planId, long planItemId, LocalTime startTime) {
+        Plan plan = planQueryProcessor.getOwnedPlan(memberId, planId);
+        planCommandProcessor.changeItemStartTime(plan, planItemId, startTime);
     }
 
     /**
