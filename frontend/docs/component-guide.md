@@ -209,7 +209,7 @@ type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
 
 ### 도메인 표시 조각도 `src/components/` 에 둔다
 
-`PetAvatar`(반려견 이니셜 원형)는 홈과 일정 목록이 함께 쓴다. feature 폴더에 두면
+`PetAvatar`(반려견 원형 아바타)는 홈과 일정 목록이 함께 쓴다. feature 폴더에 두면
 `features/plan` 이 `features/home` 을 임포트하게 되어 경계가 무너진다 — `metric.tsx`
 (등급 표시)가 같은 자리에 있는 이유와 같다.
 
