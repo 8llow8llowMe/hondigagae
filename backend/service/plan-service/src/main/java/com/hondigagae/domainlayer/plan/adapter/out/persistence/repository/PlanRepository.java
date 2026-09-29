@@ -17,6 +17,13 @@ public interface PlanRepository extends JpaRepository<PlanEntity, Long> {
 
     Optional<PlanEntity> findByIdAndDeletedFalse(Long id);
 
+    /**
+     * AI 초안 담기 멱등 조회 (#970). {@code uk_plan_member_id_source_ai_job_id} 가 한 회원·한 작업에 행을
+     * 하나로 묶으므로 결과는 최대 하나다. 삭제된 일정은 키를 비우지만 {@code deleted = false} 도 함께 건다 —
+     * 키를 비우기 전 행이 남아 있어도 삭제된 일정을 "이미 담았다" 로 돌려주지 않는다.
+     */
+    Optional<PlanEntity> findByMemberIdAndSourceAiJobIdAndDeletedFalse(Long memberId, String sourceAiJobId);
+
     Slice<PlanEntity> findByMemberIdAndDeletedFalseAndIdLessThanOrderByIdDesc(Long memberId, Long lastPlanId, Pageable pageable);
 
     /**

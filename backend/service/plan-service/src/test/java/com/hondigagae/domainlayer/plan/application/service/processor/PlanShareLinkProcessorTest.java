@@ -288,6 +288,11 @@ class PlanShareLinkProcessorTest {
         }
 
         @Override
+        public Optional<Plan> findActiveBySourceAiJobId(long memberId, String sourceAiJobId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Optional<Plan> findActiveById(long planId) {
             return Optional.ofNullable(plan).filter(found -> found.id() == planId);
         }

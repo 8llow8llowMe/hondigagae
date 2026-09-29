@@ -440,6 +440,11 @@ class PlanCommandProcessorTest {
         }
 
         @Override
+        public Optional<Plan> findActiveBySourceAiJobId(long memberId, String sourceAiJobId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Optional<Plan> findActiveById(long planId) {
             throw new UnsupportedOperationException();
         }

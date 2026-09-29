@@ -36,6 +36,8 @@ public final class PlanValidationMessage {
     public static final String REVIEW_ITEM_RATING_REQUIRED = "PLAN_132:장소 만족도는 필수입니다.";
     public static final String REVIEW_ITEM_RATING_RANGE_INVALID = "PLAN_133:장소 만족도는 1 이상 5 이하여야 합니다.";
     public static final String REVIEW_ITEM_COMMENT_LENGTH_INVALID = "PLAN_134:장소 한 줄 후기는 200자 이하만 가능합니다.";
+    // AI 초안 담기 멱등 키(#970). 길이 초과와 형식 위반을 한 코드로 둔다 — 둘 다 "ai-service 가 준 jobId 가 아니다" 이다.
+    public static final String SOURCE_AI_JOB_ID_INVALID = "PLAN_135:AI 일정 작업 식별자 형식이 올바르지 않습니다.";
 
     private PlanValidationMessage() {
     }

@@ -30,6 +30,12 @@ public class PlanRepositoryAdapter implements PlanRepositoryPort {
     }
 
     @Override
+    public Optional<Plan> findActiveBySourceAiJobId(long memberId, String sourceAiJobId) {
+        return planRepository.findByMemberIdAndSourceAiJobIdAndDeletedFalse(memberId, sourceAiJobId)
+            .map(planMapper::toDomainFromEntity);
+    }
+
+    @Override
     public Slice<Plan> findMyPlans(long memberId, Long petId, long lastPlanId, int size) {
         if (petId == null) {
             return planRepository.findByMemberIdAndDeletedFalseAndIdLessThanOrderByIdDesc(

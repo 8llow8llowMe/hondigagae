@@ -380,6 +380,11 @@ class PlanPetDetachProcessorTest {
         }
 
         @Override
+        public Optional<Plan> findActiveBySourceAiJobId(long memberId, String sourceAiJobId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Optional<Plan> findActiveById(long planId) {
             unlockedReloads++;
             return Optional.ofNullable(plans.get(planId)).filter(plan -> !plan.deleted());

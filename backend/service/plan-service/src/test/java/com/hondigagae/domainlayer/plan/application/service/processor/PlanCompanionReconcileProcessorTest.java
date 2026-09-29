@@ -224,6 +224,11 @@ class PlanCompanionReconcileProcessorTest {
         }
 
         @Override
+        public Optional<Plan> findActiveBySourceAiJobId(long memberId, String sourceAiJobId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public Optional<Plan> findActiveById(long planId) {
             throw new UnsupportedOperationException("정리 경로는 잠금 조회를 쓴다");
         }

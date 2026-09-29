@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
@@ -61,8 +62,19 @@ public record PlanCreateRequest(
 
     @Schema(description = "생략 가능. 일정 항목 목록. 생략하면 항목 없는 일정으로 생성되고, 보낼 때는 각 항목의 day 가 필수입니다.")
     @Valid
-    List<PlanItemRequest> items
+    List<PlanItemRequest> items,
+
+    @Schema(description = "생략 가능. AI 일정 생성 작업 아이디(POST /ai-plans 가 준 jobId, UUID). AI 초안을 담을 때만 보냅니다. "
+        + "같은 작업을 이미 담았으면 새 일정을 만들지 않고 그 일정을 200 으로 돌려주며, 이번 요청의 제목·항목은 반영하지 않습니다. "
+        + "담은 일정을 삭제한 뒤 다시 담으면 새 일정이 생깁니다.", example = "3f2b8c1e-5d4a-4e6b-9c7d-1a2b3c4d5e6f")
+    @Size(max = 36, message = PlanValidationMessage.SOURCE_AI_JOB_ID_INVALID)
+    // @Pattern 은 null 을 검사하지 않는다 — 생략(일반 생성)은 그대로 통과한다.
+    @Pattern(regexp = UUID_PATTERN, message = PlanValidationMessage.SOURCE_AI_JOB_ID_INVALID)
+    String sourceAiJobId
 ) {
+
+    /** ai-service 가 {@code UUID.randomUUID().toString()} 으로 만든 jobId 모양. */
+    private static final String UUID_PATTERN = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
 
     public PlanCreateCommand toCommand() {
         List<PlanItemCommand> itemCommands = items == null ? List.of()
@@ -77,6 +89,7 @@ public record PlanCreateRequest(
             .endDate(endDate)
             .budget(budget)
             .items(itemCommands)
+            .sourceAiJobId(sourceAiJobId)
             .build();
     }
 

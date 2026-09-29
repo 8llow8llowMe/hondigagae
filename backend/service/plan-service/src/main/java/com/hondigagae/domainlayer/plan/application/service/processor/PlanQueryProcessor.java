@@ -20,6 +20,7 @@ import com.hondigagae.domainlayer.plan.domain.model.PlanPet;
 import com.hondigagae.shared.travel.plan.PlanItemType;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -47,6 +48,18 @@ public class PlanQueryProcessor {
         return planRepositoryPort.findActiveById(planId)
             .filter(plan -> plan.isOwnedBy(memberId))
             .orElseThrow(() -> new PlanException(PlanErrorCode.NOT_FOUND_PLAN));
+    }
+
+    /**
+     * 이 회원이 이 AI 일정 생성 작업을 담아 만든 살아 있는 일정 (#970).
+     *
+     * <p>담기 멱등(웹 생성)과 잡 조회의 {@code committedPlanId}(내부 API)가 <b>같은 판정</b>을 쓴다 —
+     * 두 경로가 따로 물으면 "담기는 이미 담았다며 기존 일정을 주는데 잡 화면은 담기 전" 같은 어긋남이 생긴다.
+     * jobId 의 실재·소유는 검증하지 않는다(plan → ai 호출은 순환이다). 조회가 memberId 를 조건으로 거므로
+     * 남의 jobId 를 넣어도 자기 네임스페이스에서만 찾는다.
+     */
+    public Optional<Plan> findAiCommittedPlan(long memberId, String sourceAiJobId) {
+        return planRepositoryPort.findActiveBySourceAiJobId(memberId, sourceAiJobId);
     }
 
     /**
@@ -225,6 +238,7 @@ public class PlanQueryProcessor {
             .status(plan.status())
             .totalDays(plan.totalDays())
             .items(items)
+            .sourceAiJobId(plan.sourceAiJobId())
             .build();
     }
 

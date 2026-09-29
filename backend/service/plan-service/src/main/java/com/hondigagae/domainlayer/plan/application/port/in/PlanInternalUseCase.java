@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.plan.application.port.in;
 
+import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanAiCommitResponse;
 import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanOutlineResponse;
 
 /**
@@ -11,4 +12,10 @@ import com.hondigagae.domainlayer.plan.adapter.in.internal.dto.PlanOutlineRespon
 public interface PlanInternalUseCase {
 
     PlanOutlineResponse getPlanOutline(long memberId, long planId);
+
+    /**
+     * 이 회원이 이 AI 일정 생성 작업을 담아 만든 일정 (#970). ai-service 의 잡 조회가 {@code committedPlanId} 로 싣는다.
+     * 담은 적 없음·삭제됨·남의 것은 전부 {@code planId = null} 이고 예외가 아니다.
+     */
+    PlanAiCommitResponse getAiCommit(long memberId, String jobId);
 }

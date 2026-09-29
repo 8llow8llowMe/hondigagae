@@ -54,10 +54,15 @@ public class PlanWebController {
             + "둘 다 없으면 대표 반려견을 씁니다 — AI 일정 생성(POST /ai-plans)과 같은 규칙입니다.\n\n"
             + "**필수: 요청 바디의 areaCode, title, startDate, endDate.** petId·petIds·sigunguCode·budget·items 는 생략 가능하고, "
             + "여행 기간(startDate~endDate)은 최대 30일입니다. items 를 보낼 때는 각 항목의 day·itemType·title 이 필수입니다.\n\n"
+            + "**AI 초안 담기는 멱등입니다.** sourceAiJobId(POST /ai-plans 가 준 jobId)를 함께 보내면, 같은 작업을 이미 담은 경우 "
+            + "새 일정을 만들지 않고 **200 으로 먼저 담긴 일정**을 돌려줍니다(409 아님). 이때 이번 요청의 제목·항목·반려견은 반영하지 않습니다. "
+            + "동시에 두 번 눌러도 일정은 하나입니다. 담은 일정을 삭제한 뒤 다시 담으면 새 일정이 생깁니다. "
+            + "sourceAiJobId 는 UUID 형식이어야 하며(PLAN_135), 작업의 실재·소유는 확인하지 않고 본인 일정 안에서만 찾습니다.\n\n"
             + "호출 예\n"
             + "- 최소 바디(대표 반려견, 항목 없음): `POST /api/v1/plans` "
             + "`{\"areaCode\":\"39\",\"title\":\"몽실이와 제주 2박 3일\",\"startDate\":\"2026-09-12\",\"endDate\":\"2026-09-14\"}`\n"
-            + "- 반려견 두 마리 지정: 위 바디에 `\"petIds\":[1234567890123456789,1234567890123456790]` 추가",
+            + "- 반려견 두 마리 지정: 위 바디에 `\"petIds\":[1234567890123456789,1234567890123456790]` 추가\n"
+            + "- AI 초안 담기: 위 바디에 `\"sourceAiJobId\":\"3f2b8c1e-5d4a-4e6b-9c7d-1a2b3c4d5e6f\"` 와 items 추가",
         security = {@SecurityRequirement(name = "bearerAuth")})
     @PostMapping
     @PreAuthorize("isAuthenticated()")
