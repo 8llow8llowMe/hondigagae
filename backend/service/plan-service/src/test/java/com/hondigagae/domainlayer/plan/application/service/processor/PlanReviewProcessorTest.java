@@ -27,6 +27,8 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /**
@@ -87,29 +89,37 @@ class PlanReviewProcessorTest {
     void getReviewSurvivesReopen() {
         processor.createReview(completedPlan(), command(4, List.of(itemCommand(PLACE_ITEM_ID, 5, "그늘이 많았다."))));
 
-        PlanReviewInfo reopened = processor.getReview(plan(PlanStatus.CONFIRMED));
+        PlanReviewInfo reopened = processor.findReview(plan(PlanStatus.CONFIRMED)).orElseThrow();
 
         assertThat(reopened.overallRating()).isEqualTo(4);
         assertThat(reopened.items()).hasSize(1);
     }
 
-    @Test
-    @DisplayName("초안·확정에서 후기가 없으면 PLAN_015 다 — 조회를 막는 것은 상태가 아니라 후기의 존재다")
-    void getReviewWithoutRowIsNotFoundRegardlessOfStatus() {
-        assertThatThrownBy(() -> processor.getReview(plan(PlanStatus.DRAFT)))
-            .isInstanceOf(PlanException.class)
-            .extracting(ex -> ((PlanException) ex).getErrorCode())
-            .isEqualTo(PlanErrorCode.REVIEW_NOT_FOUND);
-        assertThatThrownBy(() -> processor.getReview(plan(PlanStatus.CONFIRMED)))
-            .isInstanceOf(PlanException.class)
-            .extracting(ex -> ((PlanException) ex).getErrorCode())
-            .isEqualTo(PlanErrorCode.REVIEW_NOT_FOUND);
+    @ParameterizedTest
+    @EnumSource(PlanStatus.class)
+    @DisplayName("후기가 없으면 조회는 상태와 무관하게 empty 다 — \"아직 안 씀\" 은 오류가 아니다 (#979)")
+    void findReviewWithoutRowIsEmptyRegardlessOfStatus(PlanStatus status) {
+        assertThat(processor.findReview(plan(status))).isEmpty();
     }
 
     @Test
-    @DisplayName("완료 일정에 후기가 없으면 조회는 404 다 — 빈 후기와 없는 후기를 나누지 않는다")
-    void getReviewWithoutRowIsNotFound() {
-        assertThatThrownBy(() -> processor.getReview(completedPlan()))
+    @DisplayName("후기를 쓰면 조회가 그 후기를 돌려준다")
+    void findReviewReturnsWrittenReview() {
+        processor.createReview(completedPlan(), command(4, List.of(itemCommand(PLACE_ITEM_ID, 5, "그늘이 많았다."))));
+
+        assertThat(processor.findReview(completedPlan()))
+            .get()
+            .satisfies(review -> {
+                assertThat(review.planId()).isEqualTo(PLAN_ID);
+                assertThat(review.overallRating()).isEqualTo(4);
+                assertThat(review.items()).hasSize(1);
+            });
+    }
+
+    @Test
+    @DisplayName("고칠 후기가 없으면 PUT 은 여전히 PLAN_015 404 다 — 조회만 empty 로 바뀌었다 (#979)")
+    void updateWithoutRowIsStillNotFound() {
+        assertThatThrownBy(() -> processor.updateReview(completedPlan(), command(4, List.of())))
             .isInstanceOf(PlanException.class)
             .extracting(ex -> ((PlanException) ex).getErrorCode())
             .isEqualTo(PlanErrorCode.REVIEW_NOT_FOUND);

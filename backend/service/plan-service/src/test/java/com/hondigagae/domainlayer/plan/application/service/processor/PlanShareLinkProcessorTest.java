@@ -180,17 +180,28 @@ class PlanShareLinkProcessorTest {
     }
 
     @Test
-    @DisplayName("소유자 조회는 유효한 링크가 없으면 PLAN_023 404 다")
-    void ownerLookupWithoutValidLinkIsNotFound() {
+    @DisplayName("소유자 조회는 유효한 링크가 없으면 empty 이고, 발급하면 그 링크다 (#979)")
+    void ownerLookupWithoutValidLinkIsEmpty() {
         Plan plan = plan(PlanStatus.CONFIRMED);
 
-        assertThatThrownBy(() -> processor.getActiveLink(plan))
-            .isInstanceOf(PlanException.class)
-            .extracting(exception -> ((PlanException) exception).getErrorCode())
-            .isEqualTo(PlanErrorCode.SHARE_LINK_NOT_FOUND);
+        assertThat(processor.findActiveLink(plan)).isEmpty();
 
         PlanShareLinkInfo issued = processor.issue(plan);
-        assertThat(processor.getActiveLink(plan).token()).isEqualTo(issued.token());
+        assertThat(processor.findActiveLink(plan)).get().extracting(PlanShareLinkInfo::token).isEqualTo(issued.token());
+    }
+
+    @Test
+    @DisplayName("폐기·만료된 링크는 소유자 조회에서 없음과 같게 empty 다 — 셋을 가르지 않는다 (#979)")
+    void ownerLookupTreatsRevokedAndExpiredAsEmpty() {
+        Plan plan = plan(PlanStatus.CONFIRMED);
+
+        processor.issue(plan);
+        processor.revoke(plan.id());
+        assertThat(processor.findActiveLink(plan)).isEmpty();
+
+        processor.issue(plan);
+        clock.advance(Duration.ofDays(31));
+        assertThat(processor.findActiveLink(plan)).isEmpty();
     }
 
     private void assertErrorCode(String token, PlanErrorCode expected) {

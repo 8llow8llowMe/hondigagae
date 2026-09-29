@@ -33,9 +33,9 @@ public class PlanReviewWebController {
     private final PlanReviewWebUseCase planReviewWebUseCase;
 
     @Operation(summary = "여행 후기 조회",
-        description = "일정에 작성한 후기를 조회합니다. 본인 소유가 아니면 404로 응답합니다. "
+        description = "일정에 작성한 후기를 조회합니다. 일정이 없거나 본인 소유가 아니면 `PLAN_001` 404로 응답합니다. "
             + "**일정 상태와 무관하게** 읽을 수 있습니다 — 완료를 확정으로 되돌려도 이미 쓴 후기는 그대로 보입니다. "
-            + "후기가 없으면 PLAN_015 입니다. "
+            + "후기를 아직 쓰지 않았으면 **200 + `dataBody: null`** 입니다 — 오류가 아니라 정상 상태입니다(수정 PUT 만 `PLAN_015` 404). "
             + "일차를 교체해 사라진 장소 항목도 당시 제목·장소 아이디로 남습니다. 사진·공개 범위는 없습니다.\n\n"
             + "**필수: planId (경로).**\n\n"
             + "호출 예\n"

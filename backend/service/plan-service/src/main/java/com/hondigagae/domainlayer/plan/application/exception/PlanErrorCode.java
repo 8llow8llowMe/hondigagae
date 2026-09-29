@@ -22,6 +22,7 @@ public enum PlanErrorCode {
     PACKING_ITEM_NAME_DUPLICATED("PLAN_012", "이미 같은 이름의 준비물이 있습니다.", HttpStatus.CONFLICT),
     PACKING_ITEM_LIMIT_EXCEEDED("PLAN_013", "준비물은 일정당 최대 50개까지 저장할 수 있습니다.", HttpStatus.BAD_REQUEST),
     NOT_FOUND_PACKING_ITEM("PLAN_014", "존재하지 않는 준비물 항목입니다.", HttpStatus.NOT_FOUND),
+    // 수정(PUT)할 후기가 없을 때만 던진다. 조회(GET)의 "아직 안 씀" 은 200 + dataBody null 이다 (#979).
     REVIEW_NOT_FOUND("PLAN_015", "작성한 여행 후기가 없습니다.", HttpStatus.NOT_FOUND),
     REVIEW_PLAN_NOT_COMPLETED("PLAN_016", "완료된 일정만 후기를 쓰거나 볼 수 있습니다.", HttpStatus.BAD_REQUEST),
     REVIEW_ALREADY_EXISTS("PLAN_017", "이미 이 일정의 후기를 작성했습니다.", HttpStatus.CONFLICT),
@@ -36,6 +37,7 @@ public enum PlanErrorCode {
     // 공유 링크 (#627). 없음·폐기·삭제된 일정·비공유 상태는 전부 PLAN_023 404 로 같게 답한다 —
     // 어느 쪽인지 알려 주면 토큰을 찍어 보는 쪽에 "이 토큰은 있었다" 를 흘리게 된다.
     // 만료만 PLAN_024 410 으로 가른다. 받는 쪽이 "새 링크를 달라" 고 말할 수 있어야 하기 때문이다.
+    // PLAN_023 은 공개 토큰 조회 전용이다 — 소유자의 링크 조회는 유효한 링크가 없으면 200 + dataBody null 이다 (#979).
     SHARE_PLAN_NOT_SHAREABLE("PLAN_022", "확정되거나 완료된 일정만 공유할 수 있습니다.", HttpStatus.BAD_REQUEST),
     SHARE_LINK_NOT_FOUND("PLAN_023", "유효하지 않은 공유 링크입니다.", HttpStatus.NOT_FOUND),
     SHARE_LINK_EXPIRED("PLAN_024", "만료된 공유 링크입니다. 링크를 만든 사람에게 새 링크를 요청해 주세요.", HttpStatus.GONE),

@@ -20,6 +20,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -52,11 +53,14 @@ public class PlanReviewProcessor {
      * 다시 완료해야 글을 본다. 되돌리기는 상태를 바꾸는 것이지 기록을 지우는 것이 아니다.
      *
      * <p>쓰기(POST/PUT)만 완료를 문으로 둔다 — 다녀오기 전에 평가를 받지 않는다.
+     *
+     * <p>후기가 없으면 <b>empty</b> 다 (#979). 후기는 일정당 0~1개인 선택적 하위 리소스라 "아직 안 씀" 은
+     * 정상 상태이고, 오류로 던지면 후기 패널을 열 때마다 브라우저 콘솔에 404 가 찍힌다. 고칠 대상이
+     * 있어야 하는 {@link #updateReview} 만 계속 {@code PLAN_015} 404 로 막는다.
      */
-    public PlanReviewInfo getReview(Plan plan) {
-        PlanReview review = planReviewRepositoryPort.findByPlanId(plan.id())
-            .orElseThrow(() -> new PlanException(PlanErrorCode.REVIEW_NOT_FOUND));
-        return toInfo(review, planReviewItemRepositoryPort.findByReviewId(review.id()));
+    public Optional<PlanReviewInfo> findReview(Plan plan) {
+        return planReviewRepositoryPort.findByPlanId(plan.id())
+            .map(review -> toInfo(review, planReviewItemRepositoryPort.findByReviewId(review.id())));
     }
 
     /**
