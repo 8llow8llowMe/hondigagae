@@ -290,6 +290,29 @@ GET /places?... → 404                           →  EmptyState
 
 - **AI 일정 생성 대기는 `loading.tsx` 가 아니다.** 폴링 중 상태이므로 화면 안에서 진행 표시를 렌더한다 (`api-integration-guide.md` §5).
 
+### 로딩 골격은 완료 화면과 같은 자리에 선다
+
+폴백이 풀리는 순간(또는 뷰 안 `isPending` 이 끝나는 순간) **요소가 자리를 옮기거나, 다른 보기가 서거나,
+없던 블록이 끼어들면 안 된다.** 글자가 골격 자리에 채워지는 것만 정상이다. 2026-09-29 전수 점검에서 걸린
+모양이 넷이고, 각각이 규칙이 됐다.
+
+- **도착할 보기의 골격을 그린다.** `loading.tsx` 는 `searchParams` 를 받지 못하지만 client component 의
+  `useSearchParams()` 는 전환의 목적지 URL 을 준다. 보기가 URL 로 갈리는 화면은 두 골격을 서버 쪽에서
+  만들어 client 선택자에 넘긴다 — `/places`(기본 지도)의 `PlaceViewLoading`. 판정은 `page.tsx` 와 **같은
+  `parseViewMode(…, 기본값)`** 이어야 한다.
+- **폴백과 뷰 안 대기 갈래는 같은 컴포넌트를 쓴다** — `WalkVerdictSkeleton`(홈 판정) ·
+  `MyPageProfileSkeleton` · `PlaceMapRowsSkeleton`. 두 벌이면 폴백이 풀리는 순간 높이가 갈린다.
+- **대기 중에 자리를 `null` 로 비우지 않는다.** 응답이 오면 늘 서는 줄·블록(일정 상세의 일자 판정 밴드와
+  목차, 병원·약국의 개수 부제, 지도 패널의 목록)은 같은 칸의 골격으로 먼저 세운다. 조건은 `isPending` 이
+  아니라 **`isLoading`** 을 쓴다 — 꺼진 조회는 영원히 pending 이라 골격이 걷히지 않는다.
+- **실화면을 옮기면 골격도 옮긴다.** 올레 목록은 #944 가 결과 수 줄을 필터 아래로 옮겼는데 골격이 따라가지
+  않아 로딩 때만 필터 위에 섰다. 한 번에 고칠 수 없으면 짝 테스트(`app/route-boundaries.test.ts`
+  "완료 화면과 같은 자리")에 자리를 잠근다.
+
+**치수는 실측이 정본이다.** 골격 머리주석에 390 · 1280 실측값을 적는다. 폴백만 따로 보려면 임시 라우트에서
+`loading.tsx` 의 default export 를 렌더해 좌표를 재고, **커밋 전에 지운다.** 브라우저 패널이 숨겨져 있으면
+스트리밍된 본문이 `div[hidden]` 에 남아 폴백이 풀리지 않는다 — `window.$RV(window.$RB)` 로 수동으로 드러낸다.
+
 ### 404 가 아닌 상태 코드는 `proxy.ts` 가 낸다 ([#563](https://github.com/8llow8llowMe/hondigagae/issues/563))
 
 `notFound()` 는 **404 하나만** 낼 수 있고, server component 에는 상태 코드를 정하는 다른
