@@ -41,9 +41,11 @@ const helper = between('function zoomToward(', 'export type MapPin')
   **앵커가 `clusterElement(` 에서 옮겨졌다** (#671 F-5). 묶음도 핀과 같은 applier
   (`markerElement`)를 거치게 되며 그 이름이 사라졌다 — 이 테스트가 재는 것(묶음 핸들러가
   제 손으로 `setLevel`·`panTo` 를 부르지 않는다)은 그대로다.
+
+  **끝 앵커도 옮겨졌다** (#1015). 순번 핀이 `CustomOverlay` 대신 `AbstractOverlay` 로 그려질
+  수 있게 되며 옵션을 먼저 모으는 `const options = {` 가 생성자 호출 자리에 섰다.
 */
-const clusterHandler = () =>
-  between('markerElement(clusterContent(', 'const overlay = new maps.CustomOverlay(')
+const clusterHandler = () => between('markerElement(clusterContent(', 'const options = {')
 
 describe('zoomToward — 확대와 이동의 순서 (#873)', () => {
   /*
