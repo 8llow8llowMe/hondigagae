@@ -19,12 +19,14 @@ public record PlanBriefingScheduleItem(
     @Schema(description = "순서상 마지막 항목. 항목이 없으면 null. 항목이 하나면 firstItem 과 같다", nullable = true)
     PlanBriefingItemSummaryItem lastItem,
 
-    @Schema(description = "그날 기준이 된 장소 아이디 — 가장 이른 순서의 장소성 항목. "
-        + "날씨·골든타임이 이 장소를 기준으로 판정된다. 장소성 항목이 없으면 null",
+    @Schema(description = "그날 좌표 기준이 된 장소 아이디 — 가장 이른 순서의 장소성 항목. "
+        + "골든타임(walkTimes)과 representativeLat/Lng 가 이 장소 기준이다. "
+        + "**일자 적합도를 가른 장소(weather.representativePlaceId)와 다를 수 있다** — 적합도는 그날 장소 전체 중 "
+        + "가장 힘든 곳으로 내고(#1045), 골든타임은 좌표 기준 곡선이라 첫 장소를 쓴다. 장소성 항목이 없으면 null",
         example = "212481712381923328", nullable = true)
     String representativePlaceId,
 
-    @Schema(description = "그날 기준이 된 장소명", example = "협재해수욕장", nullable = true)
+    @Schema(description = "그날 좌표 기준이 된 장소명 (representativePlaceId 의 장소)", example = "협재해수욕장", nullable = true)
     String representativePlaceTitle,
 
     @Schema(description = "그날 기준이 된 장소의 위도. **walkTimes 가 null 인 날에도 이 좌표는 나온다** — "

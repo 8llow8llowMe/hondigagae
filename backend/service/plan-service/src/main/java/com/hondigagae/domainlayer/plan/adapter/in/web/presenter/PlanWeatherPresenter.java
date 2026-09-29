@@ -38,6 +38,8 @@ public class PlanWeatherPresenter {
             .representativePlaceId(day.representativePlaceId() == null
                 ? null : String.valueOf(day.representativePlaceId()))
             .representativePlaceTitle(day.representativePlaceTitle())
+            .representativePlanItemId(day.representativePlanItemId() == null
+                ? null : String.valueOf(day.representativePlanItemId()))
             .basisPetId(day.basisPetId() == null ? null : String.valueOf(day.basisPetId()))
             // 점수를 못 낸 날은 null 을 그대로 내린다. 0 으로 바꾸면 "최악"으로 읽힌다.
             .score(suitability == null ? null : suitability.score())

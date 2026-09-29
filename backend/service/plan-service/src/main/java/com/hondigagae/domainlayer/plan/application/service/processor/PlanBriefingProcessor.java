@@ -61,8 +61,8 @@ import org.springframework.stereotype.Component;
  *
  * <h2>원격 호출 수</h2>
  *
- * 하루치라 상한이 낮다 — auth 반려견 특성 1 + tour 적합도(서로 다른 조건 수, 최대 5)
- * + tour 장소 요약 1 + tour 특보 1 + tour 골든타임 1. 대표 장소가 없으면 장소 요약·골든타임이
+ * 하루치라 상한이 낮다 — auth 반려견 특성 1 + tour 적합도(그날 장소 수 최대 8 × 서로 다른 조건 수
+ * 최대 5, #1045) + tour 장소 요약 1 + tour 특보 1 + tour 골든타임 1. 대표 장소가 없으면 장소 요약·골든타임이
  * 빠지고, 오늘이 아니면 특보·골든타임 호출은 아예 나가지 않는다.
  */
 @Slf4j
@@ -97,7 +97,8 @@ public class PlanBriefingProcessor {
         Map<Long, PetConditionQueryResult> conditions = planWeatherProcessor.loadConditions(memberId, plan, petIds);
         PlanDayWeatherInfo weather = planWeatherProcessor.briefDay(plan, day, dayItems, conditions);
 
-        // 대표 장소는 날씨 판정과 같은 것을 쓴다. 다르면 한 화면에 서로 다른 장소가 기준으로 선다.
+        // 골든타임 · 대표 좌표는 그날 첫 장소 기준이다. 일자 적합도를 가른 장소(weather.representativePlaceId)와
+        // 다를 수 있다 — 적합도는 그날 장소 전체 중 가장 힘든 곳으로 내고, 골든타임은 한 지점의 곡선이다 (#1045).
         Optional<PlanItem> representative = PlanWeatherProcessor.pickRepresentative(dayItems);
         Optional<PlanPlaceSummaryQueryResult> representativePlace = findSummary(representative);
 

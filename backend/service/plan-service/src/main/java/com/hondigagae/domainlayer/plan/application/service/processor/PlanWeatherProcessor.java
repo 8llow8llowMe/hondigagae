@@ -32,9 +32,15 @@ import org.springframework.stereotype.Component;
 /**
  * 일정 날씨 브리핑 산출.
  *
- * <p><b>일자마다 대표 장소 한 곳만 조회한다.</b> 항목마다 부르면 3박 4일 일정에 열 번 넘는
- * 원격 호출이 생기고, 그만큼 타임아웃 위험이 커진다. 하루 안의 항목들은 대개 같은 격자에
- * 들어가 날씨가 거의 같으므로, 대표 한 곳이면 "그날 우산 필요한가"에 답이 된다.
+ * <p><b>그날 장소 전체를 판정하고, 가장 힘든 곳이 그날을 정한다</b> (#1045). 예전에는 순서가 가장
+ * 앞선 장소 한 곳만 물었다 — 날씨만 보면 하루 안의 장소는 대개 같은 격자라 충분했지만, 적합도
+ * 근거의 대부분은 <b>장소의 사정</b>(크기 제한 · 동반 요금 · 혼잡)이다. 첫 장소의 근거가 "N일차" 아래
+ * 그날 전체의 판정으로 읽혔고, 둘째 장소가 대형견 입장 불가여도 드러나지 않았다.
+ * 기준 반려견과 같은 원칙이다 — 한 곳이라도 힘든 날이면 그날은 힘든 날이다.
+ *
+ * <p>호출 수는 일수 × 그날 장소 수(같은 장소는 한 번, 최대 {@value #MAX_PLACES_PER_DAY}) × 서로 다른
+ * 조건 수(최대 5)다. 날짜로 답이 정해지는 날(지난 날짜 · 예보 범위 밖)은 묻지 않으므로 실제로
+ * 부르는 날은 오늘부터 11일 이내뿐이다.
  *
  * <p><b>여러 마리면 아이별로 따로 판정하고, 점수가 가장 낮은 아이를 그날의 기준으로 삼는다.</b>
  * 조건을 하나로 합쳐(더위 민감 OR 추위 민감, 크기는 최대) 한 번만 부르면 호출은 줄지만
@@ -46,8 +52,8 @@ import org.springframework.stereotype.Component;
  * <p>항목 단위 판정이 필요해지는 순간은 <b>산책 위험도</b>다. 그것은 시각에 따라 갈리므로
  * 같은 방식으로 접을 수 없고, 별도 조회로 다뤄야 한다.
  *
- * <p>좌표 없는 항목(이동 등)은 대표에서 제외한다. {@code targetId} 가 있는 장소성 항목만
- * 대표가 될 수 있다.
+ * <p>좌표 없는 항목(이동 등)은 판정에서 제외한다. {@code targetId} 가 있는 장소성 항목만
+ * 판정 대상이 된다.
  *
  * <p><b>못 낸 이유를 넷으로 가른다</b> ({@link PlanDayWeatherUnavailableReason}). 지난 날짜에
  * "잠시 후 다시 시도해 주세요" 라고 하면 지켜지지 않을 안내가 되고, 실제 예보 장애와도
@@ -61,6 +67,9 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class PlanWeatherProcessor {
+
+    /** 하루 판정 대상 장소 수 상한. 하루 동선이 이보다 긴 일정은 드물고, 호출 수가 장소 수에 비례해 는다. */
+    static final int MAX_PLACES_PER_DAY = 8;
 
     private final PlanItemRepositoryPort planItemRepositoryPort;
     private final PetConditionQueryPort petConditionQueryPort;
@@ -150,7 +159,7 @@ public class PlanWeatherProcessor {
      * 하루치 브리핑.
      *
      * <p><b>여행 브리핑이 하루치만 재사용한다 — 복사하지 않고 같은 판정 경로를 쓰기 위해
-     * 공개했다.</b> 대표 장소 선정·아이별 판정·기준 반려견 선택이 전부 이 안에 있어, 사본을
+     * 공개했다.</b> 판정 장소 선정·아이별 판정·기준 반려견 선택이 전부 이 안에 있어, 사본을
      * 두면 일정 화면과 브리핑 화면이 같은 날을 다르게 말하게 된다.
      *
      * @param items 그날({@code day})의 항목만. 걸러내기는 호출부가 한다
@@ -159,42 +168,93 @@ public class PlanWeatherProcessor {
         Plan plan, int day, List<PlanItem> items, Map<Long, PetConditionQueryResult> conditions
     ) {
         LocalDate date = plan.startDate().plusDays(day - 1L);
-        Optional<PlanItem> representative = pickRepresentative(items);
+        List<PlanItem> places = placesToJudge(items);
+        Optional<PlanItem> first = places.stream().findFirst();
 
         // 날짜만으로 정해지는 사유가 먼저다 — 장소를 담아도 tour-service 가 멀쩡해도 달라지지 않는다.
-        // 대표 장소는 알아낸 뒤라 그대로 실어 보낸다.
+        // 판정을 가를 장소가 없으니 순서가 가장 앞선 장소를 그대로 실어 보낸다.
         Optional<PlanDayWeatherUnavailableReason> byDate =
             PlanDayWeatherUnavailableReason.byDate(date, LocalDate.now(clock));
         if (byDate.isPresent()) {
-            return PlanDayWeatherInfo.unavailable(day, date,
-                representative.map(PlanItem::targetId).orElse(null),
-                representative.map(PlanItem::title).orElse(null),
-                byDate.get());
+            return first
+                .map(place -> PlanDayWeatherInfo.unavailable(day, date, place, byDate.get()))
+                .orElseGet(() -> PlanDayWeatherInfo.unavailable(day, date, byDate.get()));
         }
 
-        if (representative.isEmpty()) {
+        if (first.isEmpty()) {
             return PlanDayWeatherInfo.unavailable(day, date, PlanDayWeatherUnavailableReason.NO_PLACE_ITEM);
         }
 
-        PlanItem item = representative.get();
-        Map<Long, PlaceSuitabilityQueryResult> resultsByPetId = judgeEachPet(item.targetId(), date, conditions);
-        Optional<Long> basisPetId = pickBasisPet(resultsByPetId);
-        if (basisPetId.isEmpty()) {
+        // 장소마다 아이별로 판정한다. 조회에 실패한 장소는 빠지고 남은 장소로 판정한다 — 반려견 축과 같은 규칙이다.
+        List<Judgement> judgements = new ArrayList<>();
+        for (PlanItem place : places) {
+            judgeEachPet(place.targetId(), date, conditions)
+                .forEach((petId, result) -> judgements.add(new Judgement(place, petId, result)));
+        }
+        if (judgements.isEmpty()) {
             // 여기까지 왔으면 예보가 닿는 날짜다 — 남은 설명은 조회 실패뿐이고, 그것만 재시도가 의미 있다.
-            log.warn("Plan weather lookup failed planId={} day={} placeId={}", plan.id(), day, item.targetId());
-            return PlanDayWeatherInfo.unavailable(day, date, item.targetId(), item.title(),
-                PlanDayWeatherUnavailableReason.LOOKUP_FAILED);
+            log.warn("Plan weather lookup failed planId={} day={} places={}", plan.id(), day, places.size());
+            return PlanDayWeatherInfo.unavailable(day, date, first.get(), PlanDayWeatherUnavailableReason.LOOKUP_FAILED);
         }
 
+        Judgement decisive = pickDecisive(judgements);
         return PlanDayWeatherInfo.builder()
             .day(day)
             .date(date)
-            .representativePlaceId(item.targetId())
-            .representativePlaceTitle(item.title())
-            .basisPetId(basisPetId.get())
-            .suitability(toSuitabilityInfo(resultsByPetId.get(basisPetId.get())))
-            .petSuitabilities(toPetSuitabilities(resultsByPetId))
+            .representativePlaceId(decisive.place().targetId())
+            .representativePlaceTitle(decisive.place().title())
+            .representativePlanItemId(decisive.place().id())
+            .basisPetId(decisive.petId())
+            .suitability(toSuitabilityInfo(decisive.result()))
+            .petSuitabilities(toPetSuitabilities(conditions, judgements))
             .build();
+    }
+
+    /**
+     * 그날 판정할 장소 — 장소성 항목을 순서대로, <b>같은 장소는 한 번만</b>, 최대 {@value #MAX_PLACES_PER_DAY}곳.
+     *
+     * <p>같은 장소를 두 번 담아도(점심·저녁) 판정은 같으므로 다시 묻지 않는다. 항목은 순서가 앞선 쪽이 남는다.
+     * 장소성의 판정은 {@link #pickRepresentative} 와 같은 {@link #isJudgeablePlace} 를 쓴다.
+     */
+    private static List<PlanItem> placesToJudge(List<PlanItem> items) {
+        Map<Long, PlanItem> byPlaceId = new LinkedHashMap<>();
+        items.stream()
+            .filter(PlanWeatherProcessor::isJudgeablePlace)
+            .sorted(Comparator.comparingInt(PlanItem::sequence))
+            .forEach(item -> byPlaceId.putIfAbsent(item.targetId(), item));
+        return byPlaceId.values().stream().limit(MAX_PLACES_PER_DAY).toList();
+    }
+
+    /** (장소, 반려견) 한 조합의 판정. */
+    private record Judgement(PlanItem place, long petId, PlaceSuitabilityQueryResult result) {
+    }
+
+    /**
+     * 그날을 정하는 조합 — 점수가 가장 낮은 (장소, 반려견). 동점이면 순서가 앞선 장소 · 앞선 아이다.
+     * 점수가 없는(판단 근거 없음) 결과만 있으면 첫 조합을 두어 날씨·이유는 보여 준다.
+     */
+    private static Judgement pickDecisive(List<Judgement> judgements) {
+        return judgements.stream()
+            .filter(judgement -> judgement.result().score() != null)
+            .min(Comparator.comparingInt(judgement -> judgement.result().score()))
+            .orElse(judgements.get(0));
+    }
+
+    /**
+     * 아이별 요약 — 아이마다 <b>그날 가장 힘든 장소</b>의 판정이다. 기준 반려견의 요약은 그날 판정과 같다.
+     * 어느 장소에서도 판정을 못 받은 아이는 빠진다 (예전 규칙 그대로).
+     */
+    private List<PetSuitabilityInfo> toPetSuitabilities(
+        Map<Long, PetConditionQueryResult> conditions, List<Judgement> judgements
+    ) {
+        Map<Long, PlaceSuitabilityQueryResult> worstByPet = new LinkedHashMap<>();
+        for (Long petId : conditions.keySet()) {
+            List<Judgement> ofPet = judgements.stream().filter(judgement -> judgement.petId() == petId).toList();
+            if (!ofPet.isEmpty()) {
+                worstByPet.put(petId, pickDecisive(ofPet).result());
+            }
+        }
+        return toPetSuitabilities(worstByPet);
     }
 
     /**
@@ -213,21 +273,6 @@ public class PlanWeatherProcessor {
             result.ifPresent(found -> results.put(petId, found));
         });
         return results;
-    }
-
-    /**
-     * 그날의 기준 반려견 — 점수가 가장 낮은 아이. 한 마리라도 힘든 날이면 그날은 힘든 날이다.
-     * 점수가 없는(판단 근거 없음) 결과만 있으면 첫 번째 아이를 기준으로 두어 날씨·이유는 보여 준다.
-     */
-    private Optional<Long> pickBasisPet(Map<Long, PlaceSuitabilityQueryResult> resultsByPetId) {
-        if (resultsByPetId.isEmpty()) {
-            return Optional.empty();
-        }
-        return resultsByPetId.entrySet().stream()
-            .filter(entry -> entry.getValue().score() != null)
-            .min(Comparator.comparingInt(entry -> entry.getValue().score()))
-            .map(Map.Entry::getKey)
-            .or(() -> resultsByPetId.keySet().stream().findFirst());
     }
 
     private List<PetSuitabilityInfo> toPetSuitabilities(Map<Long, PlaceSuitabilityQueryResult> resultsByPetId) {
@@ -290,23 +335,25 @@ public class PlanWeatherProcessor {
     }
 
     /**
-     * 그날의 대표 장소.
+     * 그날의 <b>좌표 기준</b> 장소 — 가장 이른 순서의 장소성 항목.
      *
-     * <p>가장 이른 순서의 장소성 항목을 쓴다. 하루의 첫 목적지가 그날 동선의 기준점이고,
-     * 사용자도 보통 그곳을 떠올린다.
+     * <p><b>일자 적합도의 대표가 아니다</b> (#1045). 적합도는 {@link #briefDay} 가 그날 장소 전체 중
+     * 가장 힘든 곳으로 낸다. 이 값은 여행 브리핑의 골든타임 곡선 · 대표 좌표처럼 한 지점이 필요한
+     * 자리에 쓴다 — 하루의 첫 목적지가 그날 동선의 기준점이다.
      *
      * <p>"장소성" 의 판정은 {@link PlanItemType#isPlaceTarget()} 이 갖는다. {@code MOVE} 만 빼면
      * {@code WALK} 가 통과하는데, 그 {@code targetId} 는 {@code walk_course.id} 라 장소 적합도를
      * 조회하면 남의 아이디로 없는 장소를 찾는다 (#89). 상세·긴급 시설 조회와 같은 집합을 써야 한다.
      *
-     * <p><b>여행 브리핑이 골든타임 좌표를 구할 때 재사용한다 — 복사하지 않고 같은 판정 경로를
-     * 쓰기 위해 공개했다.</b> 브리핑의 "대표 장소" 와 날씨의 "대표 장소" 가 다르면 한 화면에
-     * 서로 다른 장소가 기준으로 서게 된다. 상태를 쓰지 않으므로 static 이다.
+     * <p>여행 브리핑이 골든타임 좌표를 구할 때 재사용한다. 상태를 쓰지 않으므로 static 이다.
      */
     public static Optional<PlanItem> pickRepresentative(List<PlanItem> items) {
         return items.stream()
-            .filter(item -> item.targetId() != null)
-            .filter(item -> item.itemType().isPlaceTarget())
+            .filter(PlanWeatherProcessor::isJudgeablePlace)
             .min(Comparator.comparingInt(PlanItem::sequence));
+    }
+
+    private static boolean isJudgeablePlace(PlanItem item) {
+        return item.targetId() != null && item.itemType().isPlaceTarget();
     }
 }
