@@ -3,12 +3,15 @@ package com.hondigagae.domainlayer.planner.application.service.worker;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanErrorCode;
 import com.hondigagae.domainlayer.planner.application.exception.AiPlanException;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
+import com.hondigagae.domainlayer.planner.application.model.AiPlanJobMode;
+import com.hondigagae.domainlayer.planner.application.model.AiPlanStepOutcome;
 import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobEventPort;
+import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobMetricsPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobStorePort;
 import com.hondigagae.domainlayer.planner.application.port.out.FavoritePlaceIdsQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.PetConditionQueryPort;
@@ -50,6 +53,7 @@ public class AiPlanWorker {
     private final FavoritePlaceIdsQueryPort favoritePlaceIdsQueryPort;
     private final WeatherOutlookQueryPort weatherOutlookQueryPort;
     private final AiLlmProperties aiLlmProperties;
+    private final AiPlanJobMetricsPort aiPlanJobMetricsPort;
 
     @Async("aiPlanTaskExecutor")
     public void runJob(String jobId) {
@@ -86,7 +90,9 @@ public class AiPlanWorker {
          * 네 단계가 모두 기록된다는 것은 코드로 확인됐다 — 남은 가설은 "2·3단계가 너무 짧다" 이고
          * 그것을 가릴 증거가 없었다. 여기서 재면 표현을 손대야 하는지 아닌지를 말할 수 있다.
          */
-        StepTimer stepTimer = new StepTimer(jobId);
+        StepTimer stepTimer = new StepTimer(jobId, modeOf(running), aiPlanJobMetricsPort);
+        // 마지막 단계가 닫히는 방식. 경로마다 정하고, 정하지 못한 채 빠져나가면(종결 저장 자체의 예외 등) 실패다.
+        AiPlanStepOutcome lastStepOutcome = AiPlanStepOutcome.FAILED;
         try {
             AiPlanGenerationQuery query =
                 toQuery(running, step -> current.set(advanceTo(current.get(), step, stepTimer)));
@@ -104,9 +110,11 @@ public class AiPlanWorker {
                 log.info("AI plan job already terminal, discarding draft jobId={} status={}",
                     running.jobId(), completed.status());
             }
+            lastStepOutcome = AiPlanStepOutcome.ofTerminal(completed.status());
         } catch (JobCanceledException canceled) {
-            log.info("AI plan job already terminal, stopping before step={} jobId={}",
-                canceled.stoppedBefore, running.jobId());
+            log.info("AI plan job already terminal, stopping before step={} jobId={} status={}",
+                canceled.stoppedBefore, running.jobId(), canceled.terminalStatus);
+            lastStepOutcome = AiPlanStepOutcome.ofTerminal(canceled.terminalStatus);
         } catch (AiPlanException domainException) {
             log.error("AI plan job failed jobId={} memberId={} step={} errorCode={} cause={}",
                 running.jobId(), running.memberId(), current.get().step(),
@@ -127,7 +135,7 @@ public class AiPlanWorker {
              * 마지막 단계의 소요시간이 통째로 비는데, 하필 그게 "왜 오래 걸렸나" 를 가장 알고 싶은
              * 실행이다. `finish()` 는 이미 닫힌 뒤 다시 불려도 안전하다.
              */
-            stepTimer.finish();
+            stepTimer.finish(lastStepOutcome);
             aiPlanJobStorePort.releaseIdempotencyKey(running.memberId(), running.requestHash(), running.jobId());
             // 종결(완료/실패/취소) 저장은 위 모든 경로에서 finally 이전에 끝난다. 여기서 한 번만 알린다.
             aiPlanJobEventPort.publishJobUpdated(running.jobId());
@@ -151,19 +159,25 @@ public class AiPlanWorker {
     private AiPlanJob advanceTo(AiPlanJob job, AiPlanJobStep step, StepTimer stepTimer) {
         AiPlanJob latest = aiPlanJobStorePort.findById(job.jobId()).orElse(job);
         if (latest.status().isTerminal()) {
-            throw new JobCanceledException(step);
+            throw new JobCanceledException(step, latest.status());
         }
         AiPlanJob advanced = aiPlanJobStorePort.save(latest.atStep(step));
         if (advanced.status().isTerminal()) {
-            throw new JobCanceledException(step);
+            throw new JobCanceledException(step, advanced.status());
         }
         aiPlanJobEventPort.publishJobUpdated(job.jobId());
         stepTimer.enter(step);
         return advanced;
     }
 
+    /** 전체 생성인지 하루 재생성인지. 단계 길이가 달라 지표를 이 구분으로 나눈다 (#985). */
+    private AiPlanJobMode modeOf(AiPlanJob job) {
+        Map<String, String> params = job.requestParams();
+        return AiPlanJobMode.of(params == null ? null : parseNullableInt(params.get("regenerateDay")));
+    }
+
     /**
-     * 단계별 소요시간을 남긴다 (#570).
+     * 단계별 소요시간을 남긴다 (#570, #985). <b>로그와 지표를 여기 한곳에서 쓴다.</b>
      *
      * <p><b>화면 동작을 바꾸지 않는다.</b> 지금 아는 것은 "사용자가 2·3단계를 못 봤다" 뿐이고,
      * 그것이 진행이 누락된 것인지 단계가 짧은 것인지는 갈리지 않았다. 짧은 것이라면 진행 막대는
@@ -171,37 +185,53 @@ public class AiPlanWorker {
      * {@link AiPlanJobStep} 머리주석이 "화면이 단계를 지어내면 거짓 진행률이 된다" 고 못박아 뒀다.
      * 그래서 <b>먼저 재기만 한다.</b>
      *
+     * <p>한 단계는 다음 단계에 들어갈 때 {@code completed} 로 닫히고, 마지막으로 들어간 단계는
+     * {@link #finish} 가 잡이 끝난 방식({@link AiPlanStepOutcome})으로 닫는다. 로그 한 줄이 한 잡을
+     * 추적하고(jobId), 지표는 그것을 {@code step}·{@code mode}·{@code outcome} 으로만 모은다.
+     *
      * <p>스레드 하나가 한 잡을 처음부터 끝까지 도므로 동기화하지 않는다.
      */
     private static final class StepTimer {
 
         private final String jobId;
+        private final AiPlanJobMode mode;
+        private final AiPlanJobMetricsPort metricsPort;
         private AiPlanJobStep enteredStep;
         private long enteredAtNanos;
 
-        private StepTimer(String jobId) {
+        private StepTimer(String jobId, AiPlanJobMode mode, AiPlanJobMetricsPort metricsPort) {
             this.jobId = jobId;
+            this.mode = mode;
+            this.metricsPort = metricsPort;
         }
 
         private void enter(AiPlanJobStep step) {
-            logEnteredStep();
+            closeEnteredStep(AiPlanStepOutcome.COMPLETED);
             enteredStep = step;
             enteredAtNanos = System.nanoTime();
         }
 
         /** 마지막 단계(DRAFTING)는 다음 전이가 없어 여기서 닫는다. */
-        private void finish() {
-            logEnteredStep();
+        private void finish(AiPlanStepOutcome outcome) {
+            closeEnteredStep(outcome);
             enteredStep = null;
         }
 
-        private void logEnteredStep() {
+        private void closeEnteredStep(AiPlanStepOutcome outcome) {
             if (enteredStep == null) {
                 return;
             }
-            log.info("AI plan job step done jobId={} step={} order={}/{} elapsedMs={}",
-                jobId, enteredStep, enteredStep.order(), AiPlanJobStep.total(),
-                Duration.ofNanos(System.nanoTime() - enteredAtNanos).toMillis());
+            Duration elapsed = Duration.ofNanos(System.nanoTime() - enteredAtNanos);
+            log.info("AI plan job step done jobId={} step={} order={}/{} mode={} outcome={} elapsedMs={}",
+                jobId, enteredStep, enteredStep.order(), AiPlanJobStep.total(), mode.tagValue(), outcome.tagValue(),
+                elapsed.toMillis());
+            try {
+                metricsPort.recordStep(enteredStep, mode, outcome, elapsed);
+            } catch (RuntimeException exception) {
+                // 지표는 관측일 뿐이다. 기록 실패로 잡을 실패시키거나 finally 의 정리를 건너뛰면 안 된다.
+                log.warn("AI plan job step metric record failed jobId={} step={} reason={}",
+                    jobId, enteredStep, exception.getMessage());
+            }
         }
     }
 
@@ -209,11 +239,14 @@ public class AiPlanWorker {
     private static final class JobCanceledException extends RuntimeException {
 
         private final transient AiPlanJobStep stoppedBefore;
+        /** 워커를 세운 종결 상태. 막 끝낸 단계를 어떤 방식으로 닫을지가 여기서 갈린다. */
+        private final transient AiPlanJobStatus terminalStatus;
 
-        private JobCanceledException(AiPlanJobStep stoppedBefore) {
+        private JobCanceledException(AiPlanJobStep stoppedBefore, AiPlanJobStatus terminalStatus) {
             // 흐름 제어용이라 스택트레이스를 만들지 않는다.
             super(null, null, false, false);
             this.stoppedBefore = stoppedBefore;
+            this.terminalStatus = terminalStatus;
         }
     }
 
