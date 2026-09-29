@@ -1,15 +1,18 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 
+import { PET_AVATAR_DEFAULT } from '@/components/pet-avatar'
 import { cn } from '@/lib/utils/cn'
 
 /**
- * 반려견 프로필 사진. 없으면 이름 첫 글자로 떨어진다.
+ * 반려견 프로필 사진. 없으면 **기본 그림**(`PET_AVATAR_DEFAULT`)으로 떨어진다.
  *
- * 폴백 순서는 **업로드 → 이니셜**이다 (목록-세부명세 D8-1 의 "업로드 → 견종 일러스트 →
- * 이니셜" 중 가운데 단계는 자료가 없어 건너뛴다). 사진이 없는 것은 오류가 아니라 정상
- * 상태라 **빈 원형을 남기지 않는다.**
+ * 폴백 순서는 목록-세부명세 D8-1 의 "업로드 → 견종 일러스트 → 이니셜" 이다. 견종별 그림은
+ * 자료가 없어 **한 장의 기본 그림**이 가운데 단계를 맡는다 (#1022) — 이 컴포넌트의 크기
+ * (48 · 80)는 모두 그림이 읽히는 40 이상이라 이니셜까지 내려가지 않는다. 사진이 없는 것은
+ * 오류가 아니라 정상 상태라 **빈 원형을 남기지 않는다.**
  *
  * ### `next/image` 가 아니라 `<img>` 인 이유
  *
@@ -20,16 +23,14 @@ import { cn } from '@/lib/utils/cn'
  * ### 로드 실패 폴백
  *
  * URL 은 저장돼 있는데 파일이 지워졌거나 호스트가 죽은 경우가 실제로 생긴다. `<img>` 는
- * 그때 **깨진 이미지 아이콘**을 그리므로, 이니셜로 떨어뜨린다 — 사진 없는 상태와 같은
+ * 그때 **깨진 이미지 아이콘**을 그리므로, 기본 그림으로 떨어뜨린다 — 사진 없는 상태와 같은
  * 모습이라 사용자가 이해할 수 있다.
  */
 export function PetPhoto({
-  name,
   url,
   size = 48,
   className,
 }: {
-  name: string
   url: string | null
   /** 원형 지름(px). 레이아웃이 흔들리지 않게 사진과 폴백이 같은 크기를 쓴다 */
   size?: 48 | 80
@@ -47,16 +48,15 @@ export function PetPhoto({
 
   if (url === null || url.length === 0 || failed) {
     return (
-      <span
+      <Image
+        src={PET_AVATAR_DEFAULT.src}
+        width={PET_AVATAR_DEFAULT.width}
+        height={PET_AVATAR_DEFAULT.height}
+        alt=""
         aria-hidden
-        className={cn(
-          'bg-band text-fg flex items-center justify-center font-bold',
-          size === 48 ? 'text-title-2' : 'text-avatar',
-          shape,
-        )}
-      >
-        {name.slice(0, 1)}
-      </span>
+        draggable={false}
+        className={cn('bg-band select-none', shape)}
+      />
     )
   }
 

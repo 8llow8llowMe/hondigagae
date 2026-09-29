@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
+import { PET_AVATAR_DEFAULT } from '@/components/pet-avatar'
 import { AccountSection } from '@/features/member/account-section'
 import { MyPageSections, type MyPageSectionsProps } from '@/features/member/my-page-sections'
 import { LEGAL_LINKS } from '@/lib/legal/links'
@@ -136,7 +137,16 @@ describe('MyPageSections — 상태별 화면 (D5)', () => {
   it('프로필 이미지가 없으면 img 대신 이니셜 자리(아이콘)를 그린다 — 빈 원형을 남기지 않는다', () => {
     const markup = render({ member: member({ profileImageUrl: null }) })
 
-    expect(markup).not.toContain('<img')
+    /*
+      **반려견 행의 기본 그림은 세지 않는다** (#1022). 같은 화면의 `내 반려견` 행이 사진 없는
+      반려견에게 기본 그림(`<img>`)을 그리므로, 마크업 전체에서 `<img` 를 찾으면 회원 아바타와
+      무관하게 깨진다.
+    */
+    const images = (markup.match(/<img [^>]*>/g) ?? []).filter(
+      (tag) => !tag.includes(PET_AVATAR_DEFAULT.src),
+    )
+
+    expect(images).toEqual([])
     expect(markup).toContain('<svg')
   })
 
