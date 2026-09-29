@@ -4,6 +4,7 @@ import { resolveMock } from '@/lib/api/mock'
 import { resetMockStore } from '@/lib/api/mock/store'
 import type { AiPlanJob, AiPlanSubmitResult } from '@/types/ai-plan'
 import type { ApiResponse } from '@/types/api'
+import type { PlanDetail } from '@/types/plan'
 
 /** 데모 계정(`900000000000000001`)의 토큰. `auth-data.ts` 가 이 형식을 발급한다 */
 const TOKEN = 'mock-access-900000000000000001'
@@ -218,6 +219,60 @@ describe('AI 일정 mock — 상태 전이', () => {
 
     expect(running.status.name).not.toBe('')
     expect(running.status.description).not.toBeNull()
+  })
+})
+
+/**
+ * 작업 조회가 **담은 일정을 함께 내리는가** (#1041 · 백엔드 #970).
+ *
+ * 담긴 사실의 정본은 일정 쪽이다 — mock 도 작업에 적어 두지 않고 조회 때마다 일정 저장소에서
+ * `sourceAiJobId` 로 찾는다 (ai-service.md "잡에 저장하지 않는다"). 그래야 담은 일정을 지우면
+ * 작업 쪽이 따로 손대지 않아도 null 로 돌아간다.
+ */
+describe('AI 일정 mock — 담은 일정 (#1041)', () => {
+  function commit(jobId: string) {
+    const result = resolveMock(
+      '/plans',
+      'POST',
+      '',
+      JSON.stringify({
+        petIds: ['123456789012000001'],
+        areaCode: '39',
+        title: '몽실이와 제주 2박 3일',
+        startDate: VALID.startDate,
+        endDate: VALID.endDate,
+        sourceAiJobId: jobId,
+      }),
+      TOKEN,
+    )
+    return (result?.payload as ApiResponse<PlanDetail>).dataBody!.planId
+  }
+
+  it('담기 전 완료 작업은 committedPlanId 가 null 이다', () => {
+    expect(pollTimes(newJob(), 3).committedPlanId).toBeNull()
+  })
+
+  it('담으면 조회가 그 일정 아이디를 싣는다', () => {
+    const jobId = newJob()
+    pollTimes(jobId, 3)
+    const planId = commit(jobId)
+
+    expect(status(job(jobId)).committedPlanId).toBe(planId)
+  })
+
+  it('담은 일정을 지우면 다시 null 이다 — 담기 전 화면으로 돌아간다', () => {
+    const jobId = newJob()
+    pollTimes(jobId, 3)
+    const planId = commit(jobId)
+    resolveMock(`/plans/${planId}`, 'DELETE', '', null, TOKEN)
+
+    expect(status(job(jobId)).committedPlanId).toBeNull()
+  })
+
+  /** 완료가 아니면 초안이 없어 담을 것도 없다 — 서버도 묻지 않는다 */
+  it('진행 중에는 언제나 null 이다', () => {
+    expect(pollTimes(newJob(), 1).committedPlanId).toBeNull()
+    expect(pollTimes(newJob(), 2).committedPlanId).toBeNull()
   })
 })
 

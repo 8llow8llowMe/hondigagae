@@ -24,6 +24,7 @@ function plan(overrides: Partial<PlanDetail> = {}): PlanDetail {
     status: { code: 'DRAFT', name: '초안', description: null },
     totalDays: 3,
     items: [],
+    sourceAiJobId: null,
     ...overrides,
   }
 }

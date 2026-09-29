@@ -3,6 +3,7 @@ import { mockPlanEmergency } from '@/lib/api/mock/emergency-data'
 import { bindPathVariable, type JavaIntegral } from '@/lib/api/mock/path-variable'
 import { MOCK_PLACES } from '@/lib/api/mock/place-data'
 import {
+  findAiCommittedPlan,
   memberIdOf,
   type MockPackingItem,
   type MockPlan,
@@ -114,6 +115,12 @@ const MAX_PLAN_PETS = 5
 
 /** `@Positive` — 0 과 음수를 거른다. 앞자리 0 도 Snowflake 가 아니다 */
 const POSITIVE_ID_PATTERN = /^[1-9]\d*$/
+
+/**
+ * `sourceAiJobId` 의 `@Pattern` — ai-service 가 `UUID.randomUUID()` 로 만든 jobId 모양이다
+ * (#1041 · 백엔드 `PlanCreateRequest.UUID_PATTERN` 복제본). 어긋나면 `PLAN_135`.
+ */
+const UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/
 
 /**
  * 반려견 아이디는 서버가 `Long` 으로 읽는다. FE 는 정밀도 때문에 문자열로 실어 보내므로
@@ -302,6 +309,8 @@ function toDetail(plan: MockPlan): PlanDetail {
     items: [...plan.items]
       .sort((a, b) => (a.day === b.day ? a.sequence - b.sequence : a.day - b.day))
       .map(toItem),
+    // 상세에만 싣는다 — 목록(`PlanSummaryItem`)·공유 응답에는 없다 (#1041)
+    sourceAiJobId: plan.sourceAiJobId,
   }
 }
 
@@ -558,6 +567,11 @@ export function resolvePlanMock(
       return withPlan(memberId, rawId, (plan) => {
         // 백엔드는 소프트 삭제다 — 행이 남고 조회에서만 빠진다
         plan.deleted = true
+        /*
+          **담기 멱등 키를 비운다** (#1041 · `Plan.markDeleted`). 남기면 그 작업을 영영 다시
+          담을 수 없다 — 지운 뒤 다시 담으면 새 일정이 생기는 것이 의도된 동작이다.
+        */
+        plan.sourceAiJobId = null
         return { status: 200, payload: ok(null) }
       })
     }
@@ -815,6 +829,11 @@ function copyPlanRequest(plan: MockPlan, memberId: string, body: string | null):
     packingItems: [],
     packingGeneratedAt: null,
     review: null,
+    /*
+      **출처를 복사하지 않는다** (#1041). 복제본은 AI 작업을 담은 결과가 아니고, 복사하면
+      원본과 같은 키가 되어 백엔드에서는 복제가 유니크에 막힌다.
+    */
+    sourceAiJobId: null,
     deleted: false,
   }
   store.plans.push(copied)
@@ -924,7 +943,31 @@ function create(memberId: string, body: string | null): MockResult {
     errors.push({ code: 'PLAN_107', field: 'budget', message: '예산은 0 이상이어야 합니다.' })
   }
 
+  /*
+    담기 멱등 키 (#1041). **생략(직접 만들기)은 그대로 통과한다** — `@Pattern` 은 null 을
+    검사하지 않는다. 문자열이 아닌 값은 Jackson 이 먼저 깨므로 여기서는 문자열만 본다.
+  */
+  const sourceAiJobId = typeof parsed.sourceAiJobId === 'string' ? parsed.sourceAiJobId : null
+  if (sourceAiJobId !== null && !UUID_PATTERN.test(sourceAiJobId)) {
+    errors.push({
+      code: 'PLAN_135',
+      field: 'sourceAiJobId',
+      message: 'AI 일정 작업 식별자 형식이 올바르지 않습니다.',
+    })
+  }
+
   if (errors.length > 0) return failValidation(errors)
+
+  /*
+    **이미 담긴 작업이면 200 + 먼저 담긴 일정이다** (#1041 · `PlanWebFacade.createPlan` 의
+    빠른 경로). 409 가 아니다 — 다시 누른 담기는 "새로 저장" 이 아니라 "이미 담긴 것 열기"
+    라 **이번 요청의 제목·항목·반려견은 반영하지 않는다.** 백엔드도 반려견 확정·항목 검증
+    앞에서 돌려주므로 아래 도메인 검증을 타지 않는다.
+  */
+  if (sourceAiJobId !== null) {
+    const committed = findAiCommittedPlan(memberId, sourceAiJobId)
+    if (committed !== null) return { status: 200, payload: ok(toDetail(committed)) }
+  }
 
   /*
     **날짜 역전은 필드 오류가 아니라 도메인 예외다** — `PLAN_003` 400 이고 Bean
@@ -1017,6 +1060,7 @@ function create(memberId: string, body: string | null): MockResult {
     packingItems: [],
     packingGeneratedAt: null,
     review: null,
+    sourceAiJobId,
     deleted: false,
   }
   store.plans.push(plan)

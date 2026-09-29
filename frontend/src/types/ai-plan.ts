@@ -216,6 +216,15 @@ export type AiPlanJob = {
    * 생기지 않지만, 스키마가 nullable 로 적혀 있다.
    */
   conditions: AiPlanJobConditions | null
+  /**
+   * 이 작업의 초안을 이미 담은 일정 아이디 (#1041 · 백엔드 #970, Snowflake 문자열).
+   * 조회와 SSE 이벤트가 같은 규칙으로 싣는다.
+   *
+   * **`COMPLETED` 이고 담은 적이 있을 때만 채워진다.** 담기 전 · 담은 일정을 삭제한 뒤 ·
+   * plan-service 조회 실패는 null 이다. 화면은 값이 있으면 담기 대신 그 일정으로 보낸다.
+   * 읽기는 `lib/ai-plan/job.ts` 의 `committedPlanIdOf()` 하나가 한다.
+   */
+  committedPlanId: string | null
 }
 
 /**

@@ -120,6 +120,8 @@ export const planDetail: PlanDetail = {
       targetId: '212481712381923331',
     }),
   ],
+  // 직접 만든 일정이다 — AI 초안을 담은 일정만 jobId 를 갖는다 (#1041)
+  sourceAiJobId: null,
 }
 
 /** 판정이 정상으로 온 일자 */
