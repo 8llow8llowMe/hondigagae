@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { useQueryClient } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 
 import { ErrorState } from '@/components/error-state'
 import { Skeleton } from '@/components/skeleton'
@@ -43,34 +44,42 @@ export function PetEditView({ petId }: { petId: string }) {
 
   /*
     로딩·오류도 **카드 안**이다 — 카드가 생겼다 사라지지 않아야 화면이 뒤집히지 않는다
-    (긴급 브리핑 #461 과 같은 처리). 제목이 아직 없으므로 `aria-label` 로 이름을 준다.
+    (긴급 브리핑 #461 과 같은 처리).
   */
   if (query.isPending) {
     /*
       **카드 수까지 같게 그린다.** 한 장으로 두면 로드되는 순간 1 → 2 로 늘어나 화면이
       한 번 뒤집힌다 — "카드가 생겼다 사라지지 않는다" 는 층 수까지 포함한다.
+
+      **카드 머리도 같다** — 제목·부제가 고정 문구라 대기 중에도 그대로 선다
+      (`PhotoCard` · `FormCard`). 예전에는 머리 없는 카드였다가 로드되는 순간 머리만큼
+      본문이 내려앉았다.
     */
     return (
       <>
-        <Surface aria-label={messages.pet.photoSectionTitle} aria-busy>
-          <div className={cn('flex flex-col gap-3 pt-2 pb-5', INSET_CLASS.card)}>
+        <PhotoCard busy>
+          {/* `PetPhotoSection` 과 같은 칸 — 사진 80 + [버튼 줄 · 안내], 대표 줄 · 안내 */}
+          <div aria-hidden className={cn('flex flex-col gap-3 pt-2 pb-5', INSET_CLASS.card)}>
             <div className="flex items-center gap-4">
-              {/* 실화면의 `PetPhoto size={80}` 자리 */}
               <Skeleton className="size-20 shrink-0 rounded-full" />
-              <Skeleton variant="text" className="h-11 w-28" />
+              <div className="flex min-w-0 flex-1 flex-col gap-2">
+                <Skeleton className="h-11 w-40 rounded-md" />
+                <Skeleton className="h-3.5 w-48" />
+              </div>
             </div>
-            <Skeleton variant="text" className="h-5 w-2/3" />
+            <Skeleton className="h-11 w-28 rounded-md" />
+            <Skeleton className="h-3.5 w-56" />
           </div>
-        </Surface>
+        </PhotoCard>
 
-        <Surface aria-label={messages.pet.editFormTitle} aria-busy>
-          <div className={cn('flex flex-col gap-3 pt-2 pb-5', INSET_CLASS.card)}>
+        <FormCard busy>
+          <div aria-hidden className={cn('flex flex-col gap-3 pt-2 pb-5', INSET_CLASS.card)}>
             <Skeleton variant="text" className="h-6 w-24" />
             <Skeleton variant="text" className="h-11 w-full" />
             <Skeleton variant="text" className="h-11 w-full" />
             <Skeleton variant="text" className="h-11 w-full" />
           </div>
-        </Surface>
+        </FormCard>
       </>
     )
   }
@@ -100,21 +109,12 @@ export function PetEditView({ petId }: { petId: string }) {
 
   return (
     <>
-      {/*
-        사진·대표가 먼저다 — 누구의 화면인지부터 말한다. 부제가 이 카드를 폼과 가르는
-        이유를 그대로 적는다("저장 버튼과 상관없이 바로 반영돼요").
-      */}
-      <Surface
-        titleId="pet-photo-heading"
-        title={messages.pet.photoSectionTitle}
-        description={
-          <p className="text-body-2 text-fg-muted">{messages.pet.photoSectionDescription}</p>
-        }
-      >
+      {/* 사진·대표가 먼저다 — 누구의 화면인지부터 말한다 */}
+      <PhotoCard>
         <PetPhotoSection pet={pet} />
-      </Surface>
+      </PhotoCard>
 
-      <Surface lead titleId="pet-edit-heading" title={messages.pet.editFormTitle}>
+      <FormCard>
         {/* 폼은 카드 안이라 인셋이 16/20 이다 — 페이지 인셋 40 을 쓰면 두 번 밀린다 (§0) */}
         <div className={cn('pt-2 pb-5', INSET_CLASS.card)}>
           <PetForm
@@ -129,7 +129,7 @@ export function PetEditView({ petId }: { petId: string }) {
             }}
           />
         </div>
-      </Surface>
+      </FormCard>
 
       {/*
         **카드 밖 액션 둘을 한 묶음으로 감싼다.** 낱개로 두면 `SurfaceStack` 간격(모바일 8 /
@@ -149,5 +149,39 @@ export function PetEditView({ petId }: { petId: string }) {
         </Link>
       </div>
     </>
+  )
+}
+
+/**
+ * 사진·대표 카드. 부제가 이 카드를 폼과 가르는 이유를 그대로 적는다("저장 버튼과 상관없이
+ * 바로 반영돼요"). **대기 갈래도 이것을 쓴다** — 머리가 한 벌이어야 로드되는 순간 본문이
+ * 제자리에 선다.
+ */
+function PhotoCard({ busy = false, children }: { busy?: boolean; children: ReactNode }) {
+  return (
+    <Surface
+      titleId="pet-photo-heading"
+      title={messages.pet.photoSectionTitle}
+      description={
+        <p className="text-body-2 text-fg-muted">{messages.pet.photoSectionDescription}</p>
+      }
+      aria-busy={busy || undefined}
+    >
+      {children}
+    </Surface>
+  )
+}
+
+/** 정보 수정 카드 — 화면의 주인공이라 `lead` 다 (머리주석). 대기 갈래도 이것을 쓴다 */
+function FormCard({ busy = false, children }: { busy?: boolean; children: ReactNode }) {
+  return (
+    <Surface
+      lead
+      titleId="pet-edit-heading"
+      title={messages.pet.editFormTitle}
+      aria-busy={busy || undefined}
+    >
+      {children}
+    </Surface>
   )
 }
