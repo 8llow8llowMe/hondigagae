@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AiPlanCommitPanel,
   type AiPlanCommitPanelProps,
+  AiPlanCommittedPanel,
 } from '@/features/ai-plan/ai-plan-commit-panel'
 import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
@@ -133,5 +134,43 @@ describe('AiPlanCommitPanel — 뺄 항목을 짚지 못하면 CTA 를 주지 �
 describe('담기 패널 — 반려견 선택이 없다 (#174)', () => {
   it('반려견 라디오를 렌더하지 않는다', () => {
     expect(render()).not.toContain('type="radio"')
+  })
+})
+
+describe('AiPlanCommittedPanel — 이미 담은 작업 (#1041)', () => {
+  function renderCommitted() {
+    return renderToStaticMarkup(
+      createElement(AiPlanCommittedPanel, {
+        planId: '223456789012000009',
+        againHref: '/ai-plans/new?from=job-1',
+      }),
+    )
+  }
+
+  it('담기 대신 담은 일정으로 보낸다', () => {
+    const html = renderCommitted()
+
+    expect(html).toContain(messages.aiPlan.committedAction)
+    expect(html).toContain('href="/plans/223456789012000009"')
+  })
+
+  /*
+    **다시 담기를 주지 않는다.** 서버가 멱등이라 눌러도 같은 일정이 열릴 뿐인데, 버튼이
+    남아 있으면 "또 저장했다" 로 읽힌다. 다시 담아도 반영되지 않는 제목 입력도 걷는다.
+  */
+  it('담기 버튼 · 제목 입력 · 버리기를 그리지 않는다', () => {
+    const html = renderCommitted()
+
+    expect(html).not.toContain(messages.aiPlan.commitSubmit)
+    expect(html).not.toContain(messages.aiPlan.commitFieldTitle)
+    expect(html).not.toContain(messages.aiPlan.commitDiscard)
+    expect(html).not.toContain('<form')
+  })
+
+  it('전체 다시 만들기는 남긴다 — 새 작업이다', () => {
+    const html = renderCommitted()
+
+    expect(html).toContain(messages.aiPlan.commitAgain)
+    expect(html).toContain('href="/ai-plans/new?from=job-1"')
   })
 })

@@ -11,10 +11,11 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { Surface, SurfaceStack } from '@/components/surface'
 import { AiPlanCanceled } from '@/features/ai-plan/ai-plan-canceled'
-import { AiPlanCommitPanel } from '@/features/ai-plan/ai-plan-commit-panel'
+import { AiPlanCommitPanel, AiPlanCommittedPanel } from '@/features/ai-plan/ai-plan-commit-panel'
 import { AiPlanDraftPreview } from '@/features/ai-plan/ai-plan-draft-preview'
 import { AiPlanFailed } from '@/features/ai-plan/ai-plan-failed'
 import { AiPlanProgress } from '@/features/ai-plan/ai-plan-progress'
+import { aiPlanKeys } from '@/features/ai-plan/queries'
 import { aiPlanCommitSchema } from '@/features/ai-plan/schemas'
 import { useAiPlanJob } from '@/features/ai-plan/use-ai-plan-job'
 import { useAiPlanResubmit } from '@/features/ai-plan/use-ai-plan-resubmit'
@@ -27,7 +28,7 @@ import { snapshotFromConditions } from '@/lib/ai-plan/conditions'
 import { defaultPlanTitle } from '@/lib/ai-plan/draft-title'
 import { draftToPlanPayload } from '@/lib/ai-plan/draft-to-plan'
 import { isNarrowedRegionFailure, isShortenablePeriodTimeout } from '@/lib/ai-plan/failure-hint'
-import { isJobCanceled, isJobFailed, jobStepProgress } from '@/lib/ai-plan/job'
+import { committedPlanIdOf, isJobCanceled, isJobFailed, jobStepProgress } from '@/lib/ai-plan/job'
 import { petNamesLabel } from '@/lib/ai-plan/pet-names'
 import { clearAiPlanRequest, readAiPlanRequest } from '@/lib/ai-plan/request-store'
 import { ApiError } from '@/lib/api/error'
@@ -56,7 +57,8 @@ function isDelistedFailure(error: unknown): boolean {
  *  3. `PENDING`/`RUNNING`(+ 상한) → 진행 표시 + 그만두기
  *  4. `FAILED` (**HTTP 200**) → `AiPlanFailed`
  *  5. `CANCELED` (#250) → `AiPlanCanceled` — **실패와 갈라 놓는다**
- *  6. `COMPLETED` → 미리보기 + 담기
+ *  6. `COMPLETED` → 미리보기 + 담기. **이미 담은 작업(`committedPlanId`)이면 담기 대신
+ *     그 일정으로 보낸다** (#1041)
  *
  * **여섯 갈래가 전부 `AiPlanJobShell` 을 거친다** (`DESIGN.md §0`, #473) — 머리(`h1`)와
  * 카드 하나. 완료만 `bare` 로 빠져 자기 카드들을 그린다. 껍데기를 씌우는 자리가 여기인
@@ -256,6 +258,54 @@ export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolea
     )
   }
 
+  /*
+    **이미 담은 작업이면 담기 대신 그 일정으로 보낸다** (#1041 · 백엔드 #970). 담은 뒤
+    뒤로 가기 · 새로고침 · 알림 링크로 돌아오면 여기로 온다.
+
+    **조건 판정보다 앞이다.** 담을 때 조건 보관본을 지우므로(`clearAiPlanRequest`) 서버
+    복원본까지 비면 조건 분기가 "조건을 다시 알려 주세요" 를 띄우는데, 이미 담은 초안에는
+    조건이 필요 없다 — 갈 곳은 담은 일정 하나다.
+
+    **담은 일정을 지우면 서버가 null 로 되돌린다** — 그때는 아래 담기 화면으로 떨어지고,
+    다시 담으면 새 일정이 생긴다.
+  */
+  const committedPlanId = committedPlanIdOf(job)
+  if (committedPlanId !== null) {
+    const totalDays =
+      snapshot === null ? null : totalDaysBetween(snapshot.startDate, snapshot.endDate)
+
+    return (
+      <AiPlanJobShell bare>
+        <AiPlanDraftPreview
+          draft={draft}
+          /*
+            **담은 일정의 제목을 모른다** — 잡 조회에는 아이디만 온다. 담을 때와 같은 기본
+            제목을 쓰고, 조건조차 없으면 `미리보기` 로 둔다. 고친 제목은 담은 일정에 있다.
+          */
+          title={
+            snapshot === null
+              ? messages.aiPlan.previewTitle
+              : defaultPlanTitle(petNamesLabel(snapshot.pets), totalDays ?? draft.days.length)
+          }
+          startDate={snapshot?.startDate ?? ''}
+          endDate={snapshot?.endDate ?? ''}
+          budget={snapshot?.budget ?? null}
+          totalDays={totalDays}
+          metaLines={metaLines}
+          coords={coords}
+          delistedPlaceIds={delistedPlaceIds}
+          excludedPlaceIds={EMPTY_SET}
+          committed
+        />
+
+        <AiPlanCommittedPanel
+          planId={committedPlanId}
+          againHref={`/ai-plans/new?from=${encodeURIComponent(jobId)}`}
+        />
+      </AiPlanJobShell>
+    )
+  }
+
   if (snapshot === null) {
     /*
       **조건을 잃으면 담기를 막는다** (명세 S5 함정 1). 초안을 보여 주되 담을 수 없다고
@@ -274,6 +324,7 @@ export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolea
           coords={coords}
           delistedPlaceIds={delistedPlaceIds}
           excludedPlaceIds={EMPTY_SET}
+          committed={false}
         />
 
         {/*
@@ -508,6 +559,7 @@ function AiPlanCommitContainer({
       try {
         return await createPlan(
           draftToPlanPayload({
+            jobId,
             draft,
             snapshot,
             title: values.title.trim(),
@@ -527,6 +579,13 @@ function AiPlanCommitContainer({
       */
       clearAiPlanRequest(jobId)
       void queryClient.invalidateQueries({ queryKey: planKeys.all })
+      /*
+        **작업도 무효화한다** (#1041). 담으면 작업의 `committedPlanId` 가 바뀐다 — 예전에는
+        "완료된 작업이라 무효화하지 않는다" 였지만 이제 작업 조회가 담은 일정을 싣는다.
+        그대로 두면 `gcTime`(1분) 안에 돌아온 화면이 캐시의 null 로 담기 버튼을 먼저 그린다.
+        값을 지어 넣지 않고(`setQueryData`) 서버에 다시 묻는다 — 정본은 plan-service 다.
+      */
+      void queryClient.invalidateQueries({ queryKey: aiPlanKeys.job(jobId) })
 
       /*
         **방금 담은 일정으로 보낸다.** 목록이 아니다 — 담기의 결과를 바로 확인해야
@@ -563,6 +622,7 @@ function AiPlanCommitContainer({
         coords={coords}
         delistedPlaceIds={delistedPlaceIds}
         excludedPlaceIds={excludedPlaceIds}
+        committed={false}
       />
 
       <AiPlanCommitPanel
