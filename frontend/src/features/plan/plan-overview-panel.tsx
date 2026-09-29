@@ -65,6 +65,7 @@ export function PlanOverviewPanel({
   petPending,
   today,
   verdicts,
+  verdictsPending = false,
   menu = null,
   action = null,
 }: {
@@ -76,6 +77,8 @@ export function PlanOverviewPanel({
   today: Date
   /** 판정. 아직 없거나 실패했으면 빈 배열 — 목차 자체를 렌더하지 않는다 */
   verdicts: PlanDayWeatherItem[]
+  /** 판정을 처음 받는 중인가 — 참이면 목차가 비지 않고 골격으로 선다 */
+  verdictsPending?: boolean
   /**
    * 일정 관리 진입점(`PlanManageMenu`). **주입으로 받는다** — 이 패널은 'use client' 가
    * 없는 표시 전용이고, 메뉴는 상태·라우팅·삭제 요청을 갖는 클라이언트 컴포넌트다.
@@ -175,7 +178,12 @@ export function PlanOverviewPanel({
           </div>
 
           {/* ── 구획 3: 일자별 적합도 목차 */}
-          <PlanVerdictToc verdicts={verdicts} />
+          <PlanVerdictToc
+            verdicts={verdicts}
+            pendingRows={
+              verdictsPending ? Math.min(plan.totalDays, PLAN_VERDICT_TOC_MAX_DAYS) : null
+            }
+          />
         </div>
       </Surface>
 
@@ -320,8 +328,38 @@ const PLAN_VERDICT_TOC_TITLE_ID = 'plan-verdict-toc-title'
  * 글자와 읽히는 글자가 갈릴 자리가 없다** (`등급배지-축라벨-세부명세.md` D6 이 축 접두어에
  * `aria-hidden` 을 주지 않기로 한 것과 같은 논리다).
  */
-function PlanVerdictToc({ verdicts }: { verdicts: PlanDayWeatherItem[] }) {
-  if (verdicts.length === 0) return null
+function PlanVerdictToc({
+  verdicts,
+  pendingRows,
+}: {
+  verdicts: PlanDayWeatherItem[]
+  /**
+   * 판정을 기다리는 중이면 세울 골격 행 수, 아니면 `null`. **비우지 않는다** — 비우면 판정이
+   * 오는 순간 이 구획이 끼어들고, 1024 미만에서는 개요 카드가 본문 위라 화면 전체가 밀린다.
+   * 행 수는 일정 일수(최대 `PLAN_VERDICT_TOC_MAX_DAYS`)다 — 판정 없는 꼬리를 걷어 내는 것은
+   * 응답을 봐야 알 수 있어 그만큼은 줄어들 수 있다.
+   */
+  pendingRows: number | null
+}) {
+  if (verdicts.length === 0) {
+    if (pendingRows === null) return null
+
+    return (
+      <div aria-busy className="border-border border-t pt-4">
+        <p className="text-caption text-fg-muted mb-1 font-medium">
+          {messages.plan.verdictTocTitle}
+        </p>
+        <ul aria-hidden className="[&>li+li]:border-border flex flex-col [&>li+li]:border-t">
+          {Array.from({ length: pendingRows }, (_, index) => (
+            <li key={index} className="flex min-h-11 items-center gap-2">
+              <Skeleton className="h-4 w-12" />
+              <Skeleton className="ml-auto h-6 w-12 rounded-full" />
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
 
   const shown = unjudgedTailTrimmed(verdicts).slice(0, PLAN_VERDICT_TOC_MAX_DAYS)
   const hidden = verdicts.length - shown.length

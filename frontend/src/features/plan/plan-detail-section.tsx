@@ -89,6 +89,7 @@ export function PlanDetailSection({
   places,
   weather,
   weatherFailed,
+  weatherLoading,
   onRetryWeather,
   walkSafetyItems,
   walkSafetyFailed,
@@ -109,6 +110,11 @@ export function PlanDetailSection({
   places: Map<string, PlaceDetail>
   weather: PlanWeatherResponse | undefined
   weatherFailed: boolean
+  /**
+   * 판정을 **처음 받는 중**인가. 참이면 판정 자리(일자 밴드 · 개요 목차)가 비지 않고 골격으로
+   * 선다 — 예전에는 `null` 이라 판정이 오는 순간 일자마다 밴드가 끼어들며 아래가 밀렸다.
+   */
+  weatherLoading: boolean
   onRetryWeather: () => void
   /**
    * 항목 산책 위험도 (#625). **아직 안 왔거나(로딩 중) 404/400 이면 빈 배열이다** —
@@ -365,6 +371,7 @@ export function PlanDetailSection({
           petPending={petPending}
           today={today}
           verdicts={weather?.days ?? []}
+          verdictsPending={weatherLoading}
           /*
             관리 진입점은 일정의 신원 옆에 둔다 — `PlanManageMenu` 주석 참고.
             **역방향 상태 변경도 이 메뉴 안이다** (#653). 출발 전에는 `여행 완료하기` 도
@@ -477,6 +484,7 @@ export function PlanDetailSection({
               petNames,
             )}
             verdictFailed={weatherFailed}
+            verdictPending={weatherLoading}
             onRetryVerdict={onRetryWeather}
             editing={editingDay === group.day}
             onStartEdit={() => requestEditor(group.day)}

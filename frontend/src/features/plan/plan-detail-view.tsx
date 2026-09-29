@@ -119,6 +119,8 @@ export function PlanDetailView({ planId, today }: { planId: string; today: strin
       places={places}
       weather={weather.data}
       weatherFailed={weather.isError}
+      /* `isLoading` 이지 `isPending` 이 아니다 — 꺼진 조회는 영원히 pending 이라 골격이 안 걷힌다 */
+      weatherLoading={weather.isLoading}
       onRetryWeather={() => void weather.refetch()}
       /*
         **404/400 은 여기서 걸러진다.** `walkSafety.data` 는 성공했을 때만 채워지므로,

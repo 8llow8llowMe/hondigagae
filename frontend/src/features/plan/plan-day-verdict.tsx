@@ -10,6 +10,7 @@ import {
   MetricWord,
 } from '@/components/metric'
 import { ReasonList } from '@/components/reason-list'
+import { PlanDayVerdictSkeleton } from '@/features/plan/plan-detail-skeleton'
 import { type DisplayTemperature, displayTemperature } from '@/lib/insight/temperature'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
@@ -49,6 +50,7 @@ export function PlanDayVerdict({
   petConditionApplied,
   basisPetName,
   failed,
+  pending = false,
   onRetry,
   dayHasItems,
 }: {
@@ -63,6 +65,8 @@ export function PlanDayVerdict({
   basisPetName: string | null
   /** 판정 조회가 5xx 로 실패했다 */
   failed: boolean
+  /** 판정을 처음 받는 중인가 — 참이면 `verdict` 가 없어도 골격이 선다 */
+  pending?: boolean
   onRetry: () => void
   /**
    * 그날 일정에 항목이 하나라도 있는가 (#497). **`NO_PLACE_ITEM` 을 감출지 가르는 데만
@@ -90,7 +94,12 @@ export function PlanDayVerdict({
     )
   }
 
-  if (verdict === undefined) return null
+  /*
+    **처음 받는 중이면 자리를 비우지 않는다.** 비우면 판정이 오는 순간 밴드가 끼어들어 그날의
+    항목이 통째로 밀린다 — 같은 칸의 골격을 먼저 세운다. 받았는데 이 일자가 없으면(`pending`
+    거짓) 예전처럼 자리를 만들지 않는다.
+  */
+  if (verdict === undefined) return pending ? <PlanDayVerdictSkeleton /> : null
 
   if (verdict.score === null || verdict.suitabilityLevel === null) {
     // 등급 배지를 만들지 않는다. 무엇을 말할지는 사유 코드가 정한다
