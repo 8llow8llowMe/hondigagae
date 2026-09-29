@@ -58,6 +58,13 @@ export const planKeys = {
    * **상세 응답에 공유 여부가 없어** 상세 key 를 건드릴 일이 없다 (후기와 같은 판단).
    */
   shareLink: (planId: string) => [...planKeys.all, 'share-link', planId] as const,
+  /**
+   * 반려견 기준 동행 일정 집계 (#1042) — 반려견 삭제 확인창이 읽는다.
+   *
+   * **일정 key 아래에 둔다.** 원천이 plan-service 이고 값이 일정 구성에 딸린다 — 일정을
+   * 만들거나 동행견을 바꾸면(`planKeys.all` 무효화) 이 집계도 함께 낡아야 맞다.
+   */
+  companions: (petId: string) => [...planKeys.all, 'companions', petId] as const,
 }
 
 /** api-integration-guide.md §7 표준값 — 일정 목록·상세는 30초 / 10분 (mutation 빈번) */

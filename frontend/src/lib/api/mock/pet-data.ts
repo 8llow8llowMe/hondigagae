@@ -1,5 +1,6 @@
 import type { MockResult } from '@/lib/api/mock/auth-data'
 import { bindPathVariable } from '@/lib/api/mock/path-variable'
+import { reconcileDeletedPet } from '@/lib/api/mock/plan-data'
 import { memberIdOf, type MockPet, mockStore, nextPetId } from '@/lib/api/mock/store'
 import { MAX_PET_COUNT } from '@/lib/api/pet'
 import type { ApiResponse, ValidationErrorItem } from '@/types/api'
@@ -420,6 +421,21 @@ function update(target: MockPet, raw: unknown): MockResult {
 function remove(target: MockPet): MockResult {
   // 소프트 삭제다. 일정이 참조하고 있어 행을 지우지 않는다
   target.deleted = true
+
+  /*
+    대표견을 지웠으면 **먼저 등록한 남은 아이**를 대표로 올린다 — `PetCommandProcessor.delete`
+    ("대표 없음" 상태를 만들지 않는다). 저장 순서는 시드 · `nextPetId` 가 붙인 배열 순서다.
+  */
+  if (target.representative) {
+    target.representative = false
+    const next = mockStore().pets.find(
+      (pet) => pet.memberId === target.memberId && !pet.deleted && pet.petId !== target.petId,
+    )
+    if (next !== undefined) next.representative = true
+  }
+
+  // 응답 전에 일정 동행을 정리한다 — auth 가 커밋 직후 plan-service 트리거를 동기로 부른다 (#972)
+  reconcileDeletedPet(target.memberId, target.petId)
 
   return { status: 200, payload: ok(null) }
 }
