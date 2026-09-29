@@ -3,6 +3,8 @@ package com.hondigagae.domainlayer.planner.application.service.worker;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.domainlayer.planner.application.model.AiPlanGenerationQuery;
+import com.hondigagae.domainlayer.planner.application.model.AiPlanJobMode;
+import com.hondigagae.domainlayer.planner.application.model.AiPlanStepOutcome;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanJobSubscription;
 import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
 import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
@@ -10,6 +12,7 @@ import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.domainlayer.planner.application.port.out.AiLlmPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobEventPort;
+import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobMetricsPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobStorePort;
 import com.hondigagae.domainlayer.planner.application.port.out.FavoritePlaceIdsQueryPort;
 import com.hondigagae.domainlayer.planner.application.port.out.PetConditionQueryPort;
@@ -23,6 +26,7 @@ import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStatus;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStep;
 import com.hondigagae.domainlayer.planner.domain.model.PackingList;
 import com.hondigagae.global.properties.AiLlmProperties;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -54,6 +58,8 @@ class AiPlanWorkerStepTest {
 
     private static final String JOB_ID = "job-1";
     private static final long MEMBER_ID = 7L;
+
+    private final RecordingMetrics metrics = new RecordingMetrics();
 
     @Test
     @DisplayName("단계를 선언 순서대로 밟고 화면에 알린다")
@@ -150,6 +156,97 @@ class AiPlanWorkerStepTest {
         assertThat(candidates.requestedSigunguCode).isNull();
     }
 
+    // 단계별 소요 지표 (#985) ────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("성공한 잡은 네 단계를 모두 completed 로 닫는다")
+    void recordsEveryStepAsCompletedOnSuccess() {
+        worker(new FakeJobStore(pendingJob(null)), new FakeJobEvents(), new RecordingLlm()).runJob(JOB_ID);
+
+        assertThat(metrics.recorded).containsExactly(
+            new RecordedStep(AiPlanJobStep.CONDITIONS, AiPlanJobMode.FULL, AiPlanStepOutcome.COMPLETED),
+            new RecordedStep(AiPlanJobStep.CANDIDATES, AiPlanJobMode.FULL, AiPlanStepOutcome.COMPLETED),
+            new RecordedStep(AiPlanJobStep.WEATHER, AiPlanJobMode.FULL, AiPlanStepOutcome.COMPLETED),
+            new RecordedStep(AiPlanJobStep.DRAFTING, AiPlanJobMode.FULL, AiPlanStepOutcome.COMPLETED));
+        assertThat(metrics.elapsed).allSatisfy(elapsed -> assertThat(elapsed.isNegative()).isFalse());
+    }
+
+    @Test
+    @DisplayName("AI 호출이 실패하면 DRAFTING 을 failed 로 닫는다 — 앞 단계는 completed 다")
+    void recordsTheFailingStepAsFailed() {
+        RecordingLlm llm = new RecordingLlm();
+        llm.failing = true;
+
+        worker(new FakeJobStore(pendingJob(null)), new FakeJobEvents(), llm).runJob(JOB_ID);
+
+        assertThat(metrics.recorded).hasSize(AiPlanJobStep.total());
+        assertThat(metrics.recorded.getLast())
+            .isEqualTo(new RecordedStep(AiPlanJobStep.DRAFTING, AiPlanJobMode.FULL, AiPlanStepOutcome.FAILED));
+        assertThat(metrics.recorded.subList(0, 3)).extracting(RecordedStep::outcome).containsOnly(AiPlanStepOutcome.COMPLETED);
+    }
+
+    @Test
+    @DisplayName("단계 경계에서 취소를 보면 막 끝낸 단계를 canceled 로 닫고, 들어가지 않은 단계는 남기지 않는다")
+    void recordsTheLastStepAsCanceledWhenStoppedAtBoundary() {
+        FakeJobStore store = new FakeJobStore(pendingJob(null));
+        store.cancelBefore = AiPlanJobStep.CANDIDATES;
+
+        worker(store, new FakeJobEvents(), new RecordingLlm()).runJob(JOB_ID);
+
+        assertThat(metrics.recorded).containsExactly(
+            new RecordedStep(AiPlanJobStep.CONDITIONS, AiPlanJobMode.FULL, AiPlanStepOutcome.CANCELED));
+    }
+
+    @Test
+    @DisplayName("생성 도중 취소돼 초안을 버리면 DRAFTING 을 canceled 로 닫는다")
+    void recordsDraftingAsCanceledWhenDraftIsDiscarded() {
+        FakeJobStore store = new FakeJobStore(pendingJob(null));
+        RecordingLlm llm = new RecordingLlm();
+        llm.onCall = () -> store.forceStatus(AiPlanJobStatus.CANCELED);
+
+        worker(store, new FakeJobEvents(), llm).runJob(JOB_ID);
+
+        assertThat(metrics.recorded.getLast())
+            .isEqualTo(new RecordedStep(AiPlanJobStep.DRAFTING, AiPlanJobMode.FULL, AiPlanStepOutcome.CANCELED));
+    }
+
+    @Test
+    @DisplayName("생성 도중 타임아웃 판정(FAILED)되면 DRAFTING 을 failed 로 닫는다 — 취소와 섞지 않는다")
+    void recordsDraftingAsFailedWhenTimedOutDuringGeneration() {
+        FakeJobStore store = new FakeJobStore(pendingJob(null));
+        RecordingLlm llm = new RecordingLlm();
+        llm.onCall = () -> store.forceStatus(AiPlanJobStatus.FAILED);
+
+        worker(store, new FakeJobEvents(), llm).runJob(JOB_ID);
+
+        assertThat(metrics.recorded.getLast())
+            .isEqualTo(new RecordedStep(AiPlanJobStep.DRAFTING, AiPlanJobMode.FULL, AiPlanStepOutcome.FAILED));
+    }
+
+    @Test
+    @DisplayName("하루 재생성은 mode=regenerate 로 남는다")
+    void tagsRegenerationAsRegenerateMode() {
+        AiPlanJob regenerate = pendingJob(null);
+        regenerate.requestParams().put("planId", "55");
+        regenerate.requestParams().put("regenerateDay", "2");
+
+        worker(new FakeJobStore(regenerate), new FakeJobEvents(), new RecordingLlm()).runJob(JOB_ID);
+
+        assertThat(metrics.recorded).hasSize(AiPlanJobStep.total())
+            .extracting(RecordedStep::mode).containsOnly(AiPlanJobMode.REGENERATE);
+    }
+
+    @Test
+    @DisplayName("지표 기록이 실패해도 잡은 완료된다 — 관측이 결과를 바꾸지 않는다")
+    void completesEvenWhenMetricRecordingFails() {
+        metrics.failing = true;
+        FakeJobStore store = new FakeJobStore(pendingJob(null));
+
+        worker(store, new FakeJobEvents(), new RecordingLlm()).runJob(JOB_ID);
+
+        assertThat(store.current().status()).isEqualTo(AiPlanJobStatus.COMPLETED);
+    }
+
     // 픽스처 ──────────────────────────────────────────────────────────────
 
     private AiPlanWorker worker(FakeJobStore store, FakeJobEvents events, RecordingLlm llm) {
@@ -162,7 +259,7 @@ class AiPlanWorkerStepTest {
         return new AiPlanWorker(
             store, events, llm, candidates,
             new StubPetConditions(), new StubPlanOutlines(), new StubFavorites(), new StubWeather(),
-            new AiLlmProperties(null, null, null, null, null, null, null, null, null, null, null));
+            new AiLlmProperties(null, null, null, null, null, null, null, null, null, null, null), metrics);
     }
 
     private static AiPlanJob pendingJob(String sigunguCode) {
@@ -335,7 +432,7 @@ class AiPlanWorkerStepTest {
 
         @Override
         public Optional<PlanOutline> findOutline(long memberId, long planId) {
-            throw new UnsupportedOperationException();
+            return Optional.of(PlanOutline.builder().planId(planId).areaCode("39").days(List.of()).build());
         }
     }
 
@@ -352,6 +449,25 @@ class AiPlanWorkerStepTest {
         @Override
         public List<DayWeatherOutlook> findDailyOutlook(String areaCode) {
             return List.of();
+        }
+    }
+
+    private record RecordedStep(AiPlanJobStep step, AiPlanJobMode mode, AiPlanStepOutcome outcome) {
+    }
+
+    private static final class RecordingMetrics implements AiPlanJobMetricsPort {
+
+        private final List<RecordedStep> recorded = new ArrayList<>();
+        private final List<Duration> elapsed = new ArrayList<>();
+        private boolean failing;
+
+        @Override
+        public void recordStep(AiPlanJobStep step, AiPlanJobMode mode, AiPlanStepOutcome outcome, Duration stepElapsed) {
+            if (failing) {
+                throw new IllegalStateException("registry down");
+            }
+            recorded.add(new RecordedStep(step, mode, outcome));
+            elapsed.add(stepElapsed);
         }
     }
 }
