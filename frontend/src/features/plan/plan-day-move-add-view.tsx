@@ -60,16 +60,18 @@ export function PlanDayMoveAddView({
   onSubmit,
   inputRef,
 }: PlanDayMoveAddViewProps) {
+  const close = guardClose(saving, onClose)
+
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={close}
       title={messages.plan.addMoveTitle.replace('{day}', String(day))}
       description={messages.plan.addMoveDescription}
       size="md"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={close} disabled={saving}>
             {messages.plan.editCancel}
           </Button>
           <Button type="submit" form={FORM_ID} loading={saving} disabled={blocked}>
@@ -113,4 +115,20 @@ export function PlanDayMoveAddView({
       </form>
     </Modal>
   )
+}
+
+/**
+ * **저장 중에는 닫지 않는다** (#1014 검토). `Modal` 의 Esc · 바깥 누름 · 닫기 버튼과 취소가
+ * 모두 이 함수를 거친다.
+ *
+ * 닫을 수 있으면 두 가지가 깨진다. ① 응답 전에 같은 일자의 `순서 편집` 이 **낡은 목록으로**
+ * 열리고, 그대로 저장하면 방금 넣은 항목이 일괄 교체로 지워진다. ② 닫은 뒤 도착한 실패는
+ * 그릴 곳이 없어 사용자가 저장이 안 된 것을 모른다. 저장은 짧고(PUT 한 번), 끝나면 성공은
+ * 모달을 닫고 실패는 모달 안에 문구를 띄우므로 기다리게 해도 막히는 길이 없다.
+ */
+export function guardClose(saving: boolean, onClose: () => void): () => void {
+  return () => {
+    if (saving) return
+    onClose()
+  }
 }

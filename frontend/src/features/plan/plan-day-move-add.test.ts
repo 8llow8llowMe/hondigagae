@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import {
+  guardClose,
   PlanDayMoveAddView,
   type PlanDayMoveAddViewProps,
 } from '@/features/plan/plan-day-move-add-view'
@@ -124,6 +125,12 @@ function renderView(overrides: Partial<PlanDayMoveAddViewProps> = {}) {
 }
 
 /** 제출 버튼의 여는 태그 */
+function cancelTag(markup: string): string | undefined {
+  return new RegExp(`<button [^>]*>(?:(?!</button>).)*${messages.plan.editCancel}`).exec(
+    markup,
+  )?.[0]
+}
+
 function submitTag(markup: string): string | undefined {
   return new RegExp(`<button [^>]*>(?:(?!</button>).)*${messages.plan.addMoveSubmit}`).exec(
     markup,
@@ -209,5 +216,33 @@ describe('PlanDayMoveAddView — 모달 (#1014)', () => {
 
   it('평소에는 제출이 잠겨 있지 않다 — 빈 값도 누르면 검증 문구가 뜬다', () => {
     expect(submitTag(renderView())).not.toContain('disabled=""')
+  })
+})
+
+/*
+  **저장 중에는 닫히지 않는다** (#1014 검토). 닫을 수 있으면 응답 전에 `순서 편집` 이 낡은 목록으로
+  열리고, 그대로 저장하면 방금 넣은 항목이 지워진다. 닫은 뒤 난 실패도 그릴 곳이 없다.
+*/
+describe('PlanDayMoveAddView — 저장 중 닫기', () => {
+  it('저장 중이면 취소가 잠긴다', () => {
+    expect(cancelTag(renderView({ saving: true }))).toContain('disabled=""')
+  })
+
+  it('평소에는 취소가 잠겨 있지 않다', () => {
+    expect(cancelTag(renderView())).not.toContain('disabled=""')
+  })
+
+  it('저장 중이면 Esc·바깥 누름·닫기 버튼이 닫지 않는다', () => {
+    let closed = 0
+    guardClose(true, () => (closed += 1))()
+
+    expect(closed).toBe(0)
+  })
+
+  it('저장 중이 아니면 그대로 닫는다', () => {
+    let closed = 0
+    guardClose(false, () => (closed += 1))()
+
+    expect(closed).toBe(1)
   })
 })
