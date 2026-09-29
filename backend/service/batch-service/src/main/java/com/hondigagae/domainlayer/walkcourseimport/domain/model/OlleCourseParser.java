@@ -39,6 +39,9 @@ public final class OlleCourseParser {
         Pattern.compile("^\\[제주올레\\s*([0-9]+(?:-[0-9]+)?)(?:-([A-Za-z]))?코스\\]");
     private static final Pattern DISTANCE_PATTERN = Pattern.compile("([0-9]+(?:\\.[0-9]+)?)\\s*km");
     private static final Pattern DURATION_HOUR_PATTERN = Pattern.compile("([0-9]+)\\s*시간");
+    // 숫자 사이의 범위 기호: - ~ 전각 － ～, 물결 〜, en dash, em dash (#987)
+    private static final Pattern DURATION_RANGE_PATTERN =
+        Pattern.compile("([0-9])\\s*[-~\\uFF0D\\uFF5E\\u301C\\u2013\\u2014]\\s*([0-9])");
     /** 경유지 나열 형식의 구분자 {@code ·}(U+00B7). {@code split} 에 넘기므로 정규식 리터럴로 둔다. */
     private static final String WAYPOINT_SEPARATOR = Pattern.quote("·");
     /** 경유지 나열로 읽는 최소 조각 수. 두 조각은 복합 지점명일 수 있어 읽지 않는다 ({@link #splitStartEndPoint}). */
@@ -166,9 +169,27 @@ public final class OlleCourseParser {
     }
 
     /**
+     * 화면에 그대로 나가는 소요시간 표기를 한 모양으로 맞춘다 — 숫자 사이의 범위 기호를 {@code ~} 로 (#987).
+     *
+     * <p>원천 2026-07-31 판은 28행이 {@code 3~4시간} 인데 18-2코스 하나만 {@code 3-4시간} 이다. 목록에 두 모양이
+     * 섞여 나간다. <b>숫자와 숫자 사이의 범위 기호만</b> 바꾼다 — {@code -} 외에 전각 {@code －} · en/em dash ·
+     * 물결 변형({@code 〜} {@code ～})도 같은 뜻이라 함께 접는다. 기호 앞뒤 공백도 걷는다({@code 3 - 4시간}).
+     * 숫자 사이가 아닌 곳(예: 설명 문구)은 건드리지 않는다.
+     *
+     * <p>{@link #durationMaxMinutes} 는 {@code 시간} 바로 앞 숫자만 읽으므로 정규화 전후 값이 같다 —
+     * {@code 3-4시간} 도 {@code 3~4시간} 도 240분이다.
+     */
+    public static String durationText(String rawDuration) {
+        if (rawDuration == null) {
+            return null;
+        }
+        return DURATION_RANGE_PATTERN.matcher(rawDuration.trim()).replaceAll("$1~$2");
+    }
+
+    /**
      * "4~5시간" → 300(분). 활동량 상한 비교에 쓰는 값이라 <b>큰 쪽</b>을 잡는다 - 작은 쪽으로
      * 잡으면 "장시간 활동을 힘들어하는" 아이에게 상한 근처 코스가 통과된다. 시간 표기를 못
-     * 찾으면 null 로 남긴다 - 원문(durationText)은 따로 보존된다.
+     * 찾으면 null 로 남긴다 - 표기(durationText)는 따로 저장된다.
      */
     public static Integer durationMaxMinutes(String rawDuration) {
         if (rawDuration == null) {

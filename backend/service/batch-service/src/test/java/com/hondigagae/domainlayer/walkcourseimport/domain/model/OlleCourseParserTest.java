@@ -96,6 +96,34 @@ class OlleCourseParserTest {
     }
 
     @Test
+    @DisplayName("소요시간 범위 기호를 ~ 로 맞춘다 - 18-2코스 '3-4시간' 이 다른 코스와 같은 모양이 된다 (#987)")
+    void normalizesDurationRangeToTilde() {
+        // 2026-07-31 판 원천에서 18-2 하나만 하이픈이다
+        assertThat(OlleCourseParser.durationText("3-4시간")).isEqualTo("3~4시간");
+        assertThat(OlleCourseParser.durationText("3~4시간")).isEqualTo("3~4시간");
+        assertThat(OlleCourseParser.durationText(" 3 - 4시간 ")).isEqualTo("3~4시간");
+        // 같은 뜻의 다른 기호: 전각 하이픈 · en dash · em dash · 물결 변형
+        assertThat(OlleCourseParser.durationText("3－4시간")).isEqualTo("3~4시간");
+        assertThat(OlleCourseParser.durationText("3–4시간")).isEqualTo("3~4시간");
+        assertThat(OlleCourseParser.durationText("3—4시간")).isEqualTo("3~4시간");
+        assertThat(OlleCourseParser.durationText("3〜4시간")).isEqualTo("3~4시간");
+        assertThat(OlleCourseParser.durationText("3～4시간")).isEqualTo("3~4시간");
+        // 숫자 사이가 아니면 건드리지 않는다
+        assertThat(OlleCourseParser.durationText("측정불가")).isEqualTo("측정불가");
+        assertThat(OlleCourseParser.durationText("약 4시간 - 우회로 포함")).isEqualTo("약 4시간 - 우회로 포함");
+        assertThat(OlleCourseParser.durationText(null)).isNull();
+    }
+
+    @Test
+    @DisplayName("정규화 전후의 소요시간(분)이 같다 - 표기만 바꾸고 활동량 판정은 그대로다 (#987)")
+    void normalizingDurationKeepsMaxMinutes() {
+        assertThat(OlleCourseParser.durationMaxMinutes("3-4시간")).isEqualTo(240);
+        assertThat(OlleCourseParser.durationMaxMinutes(OlleCourseParser.durationText("3-4시간"))).isEqualTo(240);
+        assertThat(OlleCourseParser.durationMaxMinutes("6~8시간"))
+            .isEqualTo(OlleCourseParser.durationMaxMinutes(OlleCourseParser.durationText("6-8시간")));
+    }
+
+    @Test
     @DisplayName("규격을 벗어난 행은 조용히 건너뛰지 않고 실패시킨다")
     void invalidRowFails() {
         assertThatThrownBy(() -> OlleCourseParser.courseNo("첫번째코스"))

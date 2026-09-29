@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.hondigagae.domainlayer.walkcourseimport.domain.model.ImportedWalkCourse;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -27,6 +29,8 @@ class OlleCourseCsvAdapterTest {
         1코스,시흥-광치기,15.1km,4~5시간,시흥리정류장-광치기해변,2025-04-28
         3코스,온평-표선(A),20.9km,6~7시간,온평포구-제주민속촌주차장입구,2025-04-28
         """;
+
+    private static final String CURRENT_SOURCE = "/walkcourseimport/olle-course-20260731.csv";
 
     @TempDir
     Path tempDir;
@@ -64,6 +68,24 @@ class OlleCourseCsvAdapterTest {
         // 종점 좌표는 적재 프로세서가 채운다 - CSV 만 읽은 단계에서는 비어 있다
         assertThat(first.endLat()).isNull();
         assertThat(first.endLng()).isNull();
+    }
+
+    @Test
+    @DisplayName("2026-07-31 원천 29행의 소요시간이 전부 N~M시간 한 모양이다 - 18-2 의 '3-4시간' 도 맞춘다 (#987)")
+    void allDurationsInTheCurrentSourceShareOneShape() throws IOException {
+        Path csv = tempDir.resolve("olle-course-20260731.csv");
+        try (InputStream source = Objects.requireNonNull(
+            getClass().getResourceAsStream(CURRENT_SOURCE), CURRENT_SOURCE)) {
+            Files.write(csv, source.readAllBytes());
+        }
+
+        List<ImportedWalkCourse> courses = load(csv);
+
+        assertThat(courses).hasSize(29);
+        assertThat(courses).extracting(ImportedWalkCourse::durationText).allMatch(text -> text.matches("\\d+~\\d+시간"));
+        ImportedWalkCourse chujaB = courses.stream().filter(c -> c.courseKey().equals("18-2")).findFirst().orElseThrow();
+        assertThat(chujaB.durationText()).isEqualTo("3~4시간");
+        assertThat(chujaB.durationMaxMinutes()).isEqualTo(240);
     }
 
     private Path write(String fileName, Charset charset) throws IOException {
