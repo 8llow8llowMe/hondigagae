@@ -101,7 +101,11 @@ export function typeClockDigit(field: ClockField, buffer: string, digit: number)
   return { value: digit, buffer: '', complete: true }
 }
 
-export type ClockInput = { kind: 'digit'; digit: number } | { kind: 'clear' }
+export type ClockInput =
+  | { kind: 'digit'; digit: number }
+  | { kind: 'clear' }
+  /** 한 번에 여러 글자 — 붙여넣기 · 끌어 놓기 · 자동완성. `parsePastedClock` 이 읽는다 */
+  | { kind: 'paste'; text: string }
 
 /**
  * 입력칸 `onChange` 에서 방금 친 것을 읽는다.
@@ -131,12 +135,50 @@ export function readClockInput({
 }): ClockInput | null {
   if (inputType !== null) {
     if (inputType.startsWith('delete')) return { kind: 'clear' }
-    return lastDigit(data ?? raw)
+    /*
+      **여러 글자는 한 글자로 읽지 않는다** (#1028 검토). 마지막 숫자만 보면 시 칸에 붙여넣은
+      `14` 가 `04`, `10:30` 이 `0` 이 됐다 — 사용자가 넣은 값과 다른 값이 조용히 선다.
+    */
+    const text = data ?? raw
+    if (inputType === 'insertFromPaste' || inputType === 'insertFromDrop' || text.length > 1) {
+      return { kind: 'paste', text }
+    }
+    return lastDigit(text)
   }
 
   if (raw === '') return { kind: 'clear' }
   const at = caret === null || caret < 1 ? raw.length - 1 : caret - 1
   return lastDigit(raw.charAt(at))
+}
+
+/**
+ * 붙여넣은 글 → 바꿀 칸들. 못 읽으면 `null` 이고 **아무것도 바꾸지 않는다** — 반쯤 맞는 값을
+ * 지어 세우면 사용자가 넣은 것과 다른 시각이 조용히 저장된다.
+ *
+ * - `HH:MM` 꼴(`10:30` · `9.05` · `14시 20분`)이면 **칸과 무관하게** 시·분을 함께 채운다 —
+ *   어느 칸에 붙여넣었든 사용자가 준 것은 시각 하나다
+ * - 숫자만 세·네 자리(`930` · `1030`)면 뒤 두 자리가 분이다
+ * - 숫자만 한두 자리면 그 칸의 값이다
+ */
+export function parsePastedClock(field: ClockField, text: string): Partial<ClockTime> | null {
+  const pair = /(\d{1,2})\s*[:.시]\s*(\d{1,2})/.exec(text)
+  if (pair !== null) return clockOrNull(Number(pair[1]), Number(pair[2]))
+
+  const digits = text.replace(/\D/g, '')
+  if (digits.length === 3 || digits.length === 4) {
+    return clockOrNull(Number(digits.slice(0, -2)), Number(digits.slice(-2)))
+  }
+  if (digits.length === 1 || digits.length === 2) {
+    const value = Number(digits)
+    if (value > CLOCK_MAX[field]) return null
+    return field === 'hour' ? { hour: value } : { minute: value }
+  }
+  return null
+}
+
+function clockOrNull(hour: number, minute: number): ClockTime | null {
+  if (hour > CLOCK_MAX.hour || minute > CLOCK_MAX.minute) return null
+  return { hour, minute }
 }
 
 function lastDigit(text: string): ClockInput | null {
