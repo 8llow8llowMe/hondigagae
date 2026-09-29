@@ -120,6 +120,14 @@ export function toMessage(raw: unknown, fallback: string): string {
 
 - 백엔드는 **타인 리소스 접근도 404** 로 응답한다 (존재 자체 노출 차단). 403을 기대하면 안 된다.
   - 다만 **게이트웨이는 토큰이 없으면 403** 을 준다 (`forbidden`). 이쪽은 래퍼가 없다 — §2-1.
+- **예외 — 선택적 하위 리소스(부모당 0~1개)의 "아직 없음" 은 404 가 아니라 200 + `dataBody: null` 이다** (#979).
+  `GET /plans/{planId}/share-link`(공유 중이 아님) · `GET /plans/{planId}/reviews`(아직 안 씀) 둘이다.
+  이 호출은 `clientFetchNullable` 로 받고(`unwrapNullable` — `null` 을 값으로 돌려준다) **`null` 을 빈 상태로**
+  그린다. `unwrap()` 은 성공 + null 을 계약 위반으로 던지므로 여기 쓰면 정상 상태가 오류 화면이 된다.
+  - 이 호출에서 404 는 **일정 자체가 없거나 남의 것(`PLAN_001`)** 이다. 404 를 `.catch` 로 `null` 에 접지
+    않는다 — 예전 공유 모달이 그렇게 해서 `PLAN_001` 까지 "공유 중이 아님" 으로 보였다.
+  - 공개 토큰 조회(`GET /shared-plans/{token}`)는 존재 노출을 막으려 404 `PLAN_023` · 410 `PLAN_024` 를 유지하고,
+    수정 `PUT /plans/{planId}/reviews` 의 `PLAN_015` 404 도 그대로다. 규칙 정본은 `backend/docs/api-design-guide.md` §2-0.
 - `resultCode` 는 `{도메인}_{번호}` 문자열이다. 예: `PET_001`(없는 반려견), `PET_100`(요청 검증), `PET_113`(파라미터 형식). **번호 1xx 대역 = 요청 검증.**
 - **경로변수 형식 오류는 도메인이 달라도 모양이 같다.** 서버가 한 자리에서 만든다
   (`ValidationErrorSupport.toResponse(MethodArgumentTypeMismatchException, …)`) — 문구가
