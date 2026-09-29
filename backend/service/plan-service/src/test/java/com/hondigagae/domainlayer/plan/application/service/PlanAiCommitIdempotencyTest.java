@@ -98,7 +98,8 @@ class PlanAiCommitIdempotencyTest {
             plans, items, pets, mock(PlanPlaceLookupPort.class), planWalkCourseQueryPort);
         // 날씨·응급·브리핑은 이 유스케이스가 부르지 않는다.
         facade = new PlanWebFacade(queryProcessor, commandProcessor, null, null, null, new PlanPresenter(), null, null);
-        internalFacade = new PlanInternalFacade(queryProcessor, new PlanInternalPresenter());
+        // 동행 대사 트리거(#972)는 이 유스케이스가 부르지 않는다.
+        internalFacade = new PlanInternalFacade(queryProcessor, null, new PlanInternalPresenter());
     }
 
     @Test
@@ -282,6 +283,11 @@ class PlanAiCommitIdempotencyTest {
 
         @Override
         public List<Plan> findCompanionEditablePlansWithPet(long memberId, long petId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<Plan> findPlansWithPet(long memberId, long petId) {
             throw new UnsupportedOperationException();
         }
 
