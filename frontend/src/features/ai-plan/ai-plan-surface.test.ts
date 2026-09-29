@@ -306,11 +306,6 @@ describe('완료 — 담기 패널은 카드 밖 L0 다 (#473)', () => {
     expect(bareBlock).toContain('<ConfirmModal')
   })
 
-  /*
-    **액션이라 카드가 아니다** (§0 판정에서 "액션 바" 가 빠진다). 위 구분선도 걷는다 —
-    3a 에서는 카드 사이 틈으로 비치는 L0 이 그 일을 하고, 선을 남기면 마지막 일자 카드의
-    테두리와 나란히 두 줄로 읽힌다.
-  */
   /* 이미 담은 작업(#1041)도 담기 패널이 서던 자리에 같은 배치로 선다 */
   it('이미 담은 패널도 미리보기와 나란히 스택의 직접 자식이다', () => {
     const bareBlock = jobView.slice(
@@ -322,6 +317,25 @@ describe('완료 — 담기 패널은 카드 밖 L0 다 (#473)', () => {
     expect(bareBlock).toContain('<AiPlanCommittedPanel')
   })
 
+  /*
+    **이미 담은 작업 판정은 조건 판정보다 앞이다** (#1041). 담을 때 조건 보관본
+    (sessionStorage)을 지우므로, 순서가 뒤집히면 담은 작업을 다시 연 사람이 "조건을 다시
+    알려 주세요" 로 빠진다 — 이미 일정이 된 초안에는 조건이 필요 없다.
+  */
+  it('이미 담은 작업 판정이 조건 판정보다 앞이다', () => {
+    const committed = jobView.indexOf('committedPlanIdOf(job)')
+    const snapshotGate = jobView.indexOf('if (snapshot === null)')
+
+    expect(committed).toBeGreaterThan(-1)
+    expect(snapshotGate).toBeGreaterThan(-1)
+    expect(committed).toBeLessThan(snapshotGate)
+  })
+
+  /*
+    **액션이라 카드가 아니다** (§0 판정에서 "액션 바" 가 빠진다). 위 구분선도 걷는다 —
+    3a 에서는 카드 사이 틈으로 비치는 L0 이 그 일을 하고, 선을 남기면 마지막 일자 카드의
+    테두리와 나란히 두 줄로 읽힌다.
+  */
   it('담기 패널이 카드도 구분선도 갖지 않고 인셋만 카드 축이다', () => {
     expect(commitPanel).not.toMatch(/<Surface[\s/>]/)
     expect(commitPanel).not.toContain('border-t')
