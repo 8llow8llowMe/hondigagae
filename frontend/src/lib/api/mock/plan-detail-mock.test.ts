@@ -809,3 +809,121 @@ describe('일정 상세 mock — 항목 방문 체크 (#124)', () => {
     })
   })
 })
+
+/**
+ * 항목 시작 시각 단건 수정 — 이슈 #1053 (BE #1030 · PR #1052).
+ *
+ * **계약의 핵심은 첫 케이스다**: 행을 제자리에서 고치므로 `planItemId` 와 `visited` 가 남는다.
+ * mock 이 일괄 교체처럼 새로 발급하면 화면이 "체크가 남는다" 는 사실을 로컬에서 검증할 수 없다.
+ */
+describe('일정 상세 mock — 항목 시작 시각 (#1053)', () => {
+  beforeEach(resetMockStore)
+
+  /** 1일차 첫 항목. 시드에서 `visited: true` · `10:00:00` 으로 시작한다 */
+  const VISITED_ITEM = '323456789012000001'
+  /** 1일차 두 번째 항목. 시드에서 `visited: true` 다 */
+  const NEIGHBOR_ITEM = '323456789012000002'
+
+  function setTime(planItemId: string, body: unknown, planId = PLAN) {
+    return call(`/plans/${planId}/items/${planItemId}/start-time`, 'PUT', body)
+  }
+
+  function itemOf(planItemId: string) {
+    return detailOf(PLAN).items.find((item) => item.planItemId === planItemId)
+  }
+
+  it('시각만 바뀐다 — planItemId · visited · 순서 · 이름 · 메모가 남는다', () => {
+    const before = itemOf(VISITED_ITEM)!
+    expect(before.visited).toBe(true)
+
+    expect(setTime(VISITED_ITEM, { startTime: '14:30:00' })?.status).toBe(200)
+
+    expect(itemOf(VISITED_ITEM)).toEqual({ ...before, startTime: '14:30:00' })
+  })
+
+  it('옆 항목의 체크도 그대로다 — 일괄 교체와 갈리는 지점이다', () => {
+    setTime(VISITED_ITEM, { startTime: '14:30:00' })
+
+    expect(itemOf(NEIGHBOR_ITEM)?.visited).toBe(true)
+  })
+
+  it('응답이 Response<Void> 다 — dataBody 가 null 이다', () => {
+    const result = setTime(VISITED_ITEM, { startTime: '14:30:00' })
+
+    expect(result?.payload.dataHeader.success).toBe(true)
+    expect(result?.payload.dataBody).toBeNull()
+  })
+
+  it('HH:mm 도 받는다 — 초가 붙어 저장된다', () => {
+    expect(setTime(VISITED_ITEM, { startTime: '09:05' })?.status).toBe(200)
+    expect(itemOf(VISITED_ITEM)?.startTime).toBe('09:05:00')
+  })
+
+  it('startTime: null 은 시각을 비운다 — 체크는 남는다', () => {
+    expect(setTime(VISITED_ITEM, { startTime: null })?.status).toBe(200)
+    expect(itemOf(VISITED_ITEM)?.startTime).toBeNull()
+    expect(itemOf(VISITED_ITEM)?.visited).toBe(true)
+  })
+
+  it('빈 객체 {} 도 시각을 비운다 — 필드는 선택이다', () => {
+    expect(setTime(VISITED_ITEM, {})?.status).toBe(200)
+    expect(itemOf(VISITED_ITEM)?.startTime).toBeNull()
+  })
+
+  it('바디가 없으면 400 PLAN_100 이다 — 바디 자체는 필수다', () => {
+    const result = setTime(VISITED_ITEM, null)
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_100')
+    expect(itemOf(VISITED_ITEM)?.startTime).toBe('10:00:00')
+  })
+
+  it('형식이 어긋난 시각은 400 PLAN_100 이다 — 아무것도 바꾸지 않는다', () => {
+    for (const startTime of ['25:00:00', '10시', 1030]) {
+      const result = setTime(VISITED_ITEM, { startTime })
+
+      expect(result?.status).toBe(400)
+      expect(result?.payload.dataHeader.resultCode).toBe('PLAN_100')
+    }
+    expect(itemOf(VISITED_ITEM)?.startTime).toBe('10:00:00')
+  })
+
+  it('없는 항목은 404 PLAN_005 다', () => {
+    const result = setTime('323456789012999999', { startTime: '10:30:00' })
+
+    expect(result?.status).toBe(404)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_005')
+  })
+
+  it('다른 일정의 항목을 내 planId 로 고칠 수 없다 — 404 PLAN_005 다', () => {
+    const result = setTime(VISITED_ITEM, { startTime: '10:30:00' }, ORPHAN_PLAN)
+
+    expect(result?.status).toBe(404)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_005')
+  })
+
+  it('남의 일정은 404 PLAN_001 이다 — 일정 판정이 먼저다', () => {
+    const result = setTime(VISITED_ITEM, { startTime: '10:30:00' }, OTHERS)
+
+    expect(result?.status).toBe(404)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_001')
+  })
+
+  it('숫자가 아닌 planItemId 는 400 PLAN_124 다', () => {
+    const result = setTime('abc', { startTime: '10:30:00' })
+
+    expect(result?.status).toBe(400)
+    expect(result?.payload.dataHeader.resultCode).toBe('PLAN_124')
+  })
+
+  it('토큰이 없으면 401 이다', () => {
+    const result = call(
+      `/plans/${PLAN}/items/${VISITED_ITEM}/start-time`,
+      'PUT',
+      { startTime: '10:30:00' },
+      null,
+    )
+
+    expect(result?.status).toBe(401)
+  })
+})

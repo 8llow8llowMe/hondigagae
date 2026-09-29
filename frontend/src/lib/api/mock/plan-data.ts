@@ -481,6 +481,14 @@ export function resolvePlanMock(
     )
   }
 
+  // 항목 시작 시각 (#1053 · BE #1030). 방문 체크와 같은 하위 리소스 `PUT` 이고 같은 자리다
+  const itemStartTime = /^\/plans\/([^/]+)\/items\/([^/]+)\/start-time$/.exec(path)
+  if (itemStartTime !== null && method === 'PUT') {
+    return withPlan(memberId, itemStartTime[1] ?? '', (plan) =>
+      changeStartTime(plan, itemStartTime[2] ?? '', body),
+    )
+  }
+
   const weather = /^\/plans\/([^/]+)\/weather$/.exec(path)
   if (weather !== null && method === 'GET') {
     return withPlan(memberId, weather[1] ?? '', (plan) => ({
@@ -722,6 +730,59 @@ function markVisited(plan: MockPlan, rawItemId: string, body: string | null): Mo
   }
 
   item.visited = parsed.visited
+  return { status: 200, payload: ok(null) }
+}
+
+/** `LocalTime` 이 받는 `HH:mm` · `HH:mm:ss` (Jackson ISO_LOCAL_TIME 중 화면이 보내는 두 모양) */
+const START_TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/
+
+/**
+ * 항목 시작 시각 — `PUT /plans/{planId}/items/{planItemId}/start-time` (#1053 · BE #1030).
+ *
+ * 근거: `PlanWebController.changeItemStartTime` · `PlanItemStartTimeRequest` ·
+ * `PlanItem.withStartTime` **소스 실측** (PR #1052).
+ *
+ * **행을 제자리에서 고친다** — `planItemId` · `visited` · 순서 · 이름 · 메모가 남는다. 일괄 교체
+ * (`replaceDayItems`)처럼 새로 발급하면 화면이 "체크가 남는다" 를 로컬에서 검증할 수 없다.
+ *
+ * - **바디 자체는 필수다** — 없으면 `HttpMessageNotReadableException` → `PLAN_100` 400.
+ * - `{"startTime":null}` 과 `{}` 는 둘 다 비운다 (`@NotNull` 이 없다).
+ * - 형식이 어긋나면 역직렬화 실패라 같은 `PLAN_100` 이다.
+ * - 소유 확인(`withPlan`, `PLAN_001`) 뒤에 항목을 확인한다 — 다른 일정의 항목도 `PLAN_005` 다.
+ * - 응답은 `Response<Void>` 다 (`…/visited` 와 같다).
+ */
+function changeStartTime(plan: MockPlan, rawItemId: string, body: string | null): MockResult {
+  // 컨트롤러가 `@PathVariable long` 이라 숫자가 아닌 id 는 404 가 아니라 400 이다
+  const planItemId = bindPlanPathVariable('planItemId', rawItemId)
+  if (typeof planItemId !== 'string') return planItemId
+
+  if (body === null) return fail(400, 'PLAN_100', '요청 값이 올바르지 않습니다.')
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(body)
+  } catch {
+    return fail(400, 'PLAN_100', '요청 값이 올바르지 않습니다.')
+  }
+  // `null` · 숫자 · 배열 본문은 레코드로 역직렬화되지 않는다
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return fail(400, 'PLAN_100', '요청 값이 올바르지 않습니다.')
+  }
+
+  const raw = (parsed as Record<string, unknown>).startTime
+  let startTime: string | null = null
+  if (raw !== undefined && raw !== null) {
+    const match = typeof raw === 'string' ? START_TIME_PATTERN.exec(raw) : null
+    if (match === null) return fail(400, 'PLAN_100', '요청 값이 올바르지 않습니다.')
+    // 서버는 `LocalTime` 으로 들고 `HH:mm:ss` 로 내보낸다 — 초가 없으면 `:00` 이 붙는다
+    startTime = `${match[1]}:${match[2]}:${match[3] ?? '00'}`
+  }
+
+  const item = plan.items.find((candidate) => candidate.planItemId === planItemId)
+  // 없는 항목, 또는 **다른 일정의** 항목이면 404 다 (`PLAN_005`)
+  if (item === undefined) return fail(404, 'PLAN_005', '존재하지 않는 일정 항목입니다.')
+
+  item.startTime = startTime
   return { status: 200, payload: ok(null) }
 }
 
