@@ -20,7 +20,7 @@
 
 ## 주요 API (계획)
 
-- `GET|POST /api/v1/plans`
+- `GET|POST /api/v1/plans` — POST 는 `sourceAiJobId` 를 실으면 **AI 초안 담기 멱등**이다 (아래 "AI 초안 담기 멱등" 절, #970)
 - `GET|PUT|DELETE /api/v1/plans/{planId}`
 - `POST /api/v1/plans/{planId}/copy` — 지난 일정을 새 DRAFT 로 복제
 - `PUT /api/v1/plans/{planId}/days/{day}/items` — 일자 단위 항목 일괄 편집
@@ -143,6 +143,56 @@
     조회한다. 코스는 `PlanItemType.WALK` 를 직접 보는 별도 검증으로 확인한다.
 - `PlanItem`의 다중 대상 FK는 `@Comment`에 분기 기준을 명시한다 (`coding-conventions.md` §9-4).
 - 후기 사진 업로드가 필요해지면 `storage-core` 모듈 추가를 검토한다 (`modules.md`). v1 은 만족도·본문·장소별 한 줄만 저장한다.
+
+## AI 초안 담기 멱등 (`plan.source_ai_job_id`)
+
+([#970](https://github.com/8llow8llowMe/hondigagae/issues/970)) 같은 AI 초안을 두 번 담으면(다시 누름·새로고침 뒤 재시도·다른 기기)
+일정이 두 개 생겼다. **담기 멱등 키는 저장하는 이 서비스가 가진다.**
+
+- `POST /api/v1/plans` 에 선택 필드 `sourceAiJobId`(ai-service jobId, UUID). 형식이 틀리면 `PLAN_135` 400.
+- **이미 담긴 작업이면 200 + 먼저 담긴 일정의 `PlanDetailResponse`** 다(409 아님). 두 번째 요청의 제목·항목·반려견은 반영하지 않는다 —
+  다시 누른 담기는 "새로 저장" 이 아니라 "이미 담긴 것 열기" 다. Swagger 에도 적었다.
+- **jobId 의 실재·소유는 검증하지 않는다.** plan → ai 호출은 순환이다(ai 가 이미 plan 을 부른다). 잘못된 값은 자기 memberId 네임스페이스의
+  키 하나를 쓸 뿐이다 — 조회·유니크 모두 `(member_id, source_ai_job_id)` 라 남의 일정에 닿지 않는다.
+- 상세 응답 `PlanDetailResponse.sourceAiJobId`(nullable). 목록(`PlanSummaryItem`)·공유 응답(`SharedPlanResponse`)에는 싣지 않는다.
+- 담긴 사실의 정본은 이 서비스다. ai-service 의 잡 조회는 내부 API `GET /internal/v1/plans/ai-commits/{jobId}` 로 묻는다 (아래 "서비스 간 내부 API").
+
+**동시성 — 두 겹**
+
+1. 빠른 경로: `PlanWebFacade.createPlan`(트랜잭션 없음)이 키가 있으면 먼저 `findAiCommittedPlan` 을 부르고, 있으면
+   **원격 검증(반려견 소유·항목 타깃)을 건너뛰고** 그 일정을 돌려준다.
+2. 경쟁: 두 요청이 모두 1을 지나면 유니크 `uk_plan_member_id_source_ai_job_id` 가 뒤의 커밋을 막는다. `PlanCommandProcessor.createPlan`
+   (`@Transactional`)이 던진 `DataIntegrityViolationException` 을 **Facade 가** 받아 재조회하고, 있으면 그 일정을 돌려준다.
+   **Processor 안에서 잡지 않는다** — 이미 rollback-only 라 커밋에서 다시 터진다. 재조회가 비거나(다른 제약 위반) 키가 없는 요청이면
+   원래 예외를 그대로 던진다 — 멱등이 다른 결함을 삼키지 않게 한다.
+   - `save` 는 merge 라 INSERT 가 **커밋 때** 나간다. 그 경로의 위반도 `DataIntegrityViolationException` 으로 번역되는 것을
+     `PlanSourceAiJobIdRepositoryTest` 가 테스트 트랜잭션 없이 커밋해 고정한다.
+- 유니크 대신 "조회 후 삽입" 만 두면 동시 요청이 둘 다 조회를 통과한다. Redis 잡에 담긴 일정을 적는 방식은 TTL 24h 에 사라지고,
+  Redis·MySQL 두 저장소의 커밋이 갈라져 고아 일정이 생긴다 (#970 에서 기각).
+
+**삭제·복제**
+
+- **삭제(soft delete)가 키를 비운다** (`Plan.markDeleted`). 유니크는 삭제된 행에도 걸리므로, 남기면 그 작업을 영영 다시 담을 수 없다.
+  삭제 뒤 잡 조회는 `committedPlanId: null`(담기 전 화면)이고, 다시 담으면 새 일정이 생긴다.
+- 조회 조건도 `deleted = false` 를 함께 건다 — 키를 비우기 전 행이 있어도 삭제된 일정을 "이미 담았다" 로 돌려주지 않는다.
+- **복제(`copyPlan`)는 출처를 복사하지 않는다.** 복제본은 AI 작업을 담은 결과가 아니고, 복사하면 원본과 같은 키가 되어 복제가 유니크에 막힌다.
+- 수정(`updatePlan`)은 `toBuilder` 라 키를 그대로 둔다.
+
+**마이그레이션**
+
+- local/dev(`ddl-auto: update`) — 기동 시 컬럼과 유니크가 만들어진다. 옛 행은 `NULL` 이라 그대로 둔다.
+- prod(`ddl-auto: none`) — 배포 전에 아래를 적용한다. Flyway 는 없다.
+
+```sql
+ALTER TABLE plan
+    ADD COLUMN source_ai_job_id VARCHAR(36) NULL
+        COMMENT 'AI 일정 생성 작업 아이디 (ai-service jobId, UUID). 담기 멱등 키 — 같은 작업을 다시 담으면 이 값으로 기존 일정을 찾는다. 삭제(soft delete) 때 비운다',
+    ADD UNIQUE KEY uk_plan_member_id_source_ai_job_id (member_id, source_ai_job_id);
+```
+
+- **검증 공백**: "유니크 인덱스에서 NULL 은 서로 다르다" 는 MySQL 의미론은 H2 슬라이스로 **증명되지 않는다**(H2 도 같게 굴어 테스트는 초록이다).
+  dev 반영 뒤 `SHOW INDEX FROM plan WHERE Key_name='uk_plan_member_id_source_ai_job_id'` 로 인덱스가 `Non_unique = 0` 으로 만들어졌는지,
+  키 없는 일정이 여럿인 회원의 새 일정 생성이 막히지 않는지 확인할 것.
 
 ## 여행 후기 v1 (`plan_review`)
 
@@ -940,7 +990,12 @@ tour-service 가 네 칸을 전부 채워 보낸다. **같은 서비스의 적�
 ## 서비스 간 내부 API
 
 `GET /internal/v1/plans/{planId}/outline?memberId=` — ai-service 의 하루 재생성용 일정 개요.
+`GET /internal/v1/plans/ai-commits/{jobId}?memberId=` — ai-service 잡 조회(폴링·SSE)의 `committedPlanId` 용. 이 작업을 담은 일정 아이디 (#970).
 `GET /internal/v1/favorites/place-ids?memberId=` — ai-service 의 즐겨찾기 우선 반영용 아이디 목록.
+
+- `ai-commits` 는 **없어도 200** 이다 — `Response<{planId}>` 의 `planId` 가 담은 적 없음·삭제됨·남의 것일 때 전부 `null`.
+  outline 처럼 404 로 가르지 않는다. 잡 조회는 이 값 없이도 성립해야 하고, 가르면 남의 jobId 가 담겼는지를 알려 주게 된다.
+  담기 멱등과 **같은 조회**(`PlanQueryProcessor.findAiCommittedPlan`)를 쓴다.
 
 - 일차별 항목의 제목·유형·placeId 만 내보낸다. 메모·시간대 같은 개인 기록은 경계를 넘기지 않는다.
 - `petId`(대표)와 `petIds`(동행 전체)를 함께 내보낸다. ai-service 의 준비물 생성은 아직 `petId` 만 읽는다 — 다견 준비물은 ai 쪽 후속이다.
