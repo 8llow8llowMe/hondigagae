@@ -584,6 +584,11 @@ function AiPlanCommitContainer({
         "완료된 작업이라 무효화하지 않는다" 였지만 이제 작업 조회가 담은 일정을 싣는다.
         그대로 두면 `gcTime`(1분) 안에 돌아온 화면이 캐시의 null 로 담기 버튼을 먼저 그린다.
         값을 지어 넣지 않고(`setQueryData`) 서버에 다시 묻는다 — 정본은 plan-service 다.
+
+        **이동 전 깜빡임은 감수한다.** 다시 받은 응답이 아래 `router.replace` 보다 먼저 오면
+        담기 폼 → 이미 담은 패널 → 일정 상세로 한 번 더 바뀔 수 있다. 내용은 사실이라 해가
+        없고, `refetchType: 'none'` 으로 막으면 돌아온 첫 화면이 낡은 값을 그리는 원래 문제로
+        돌아간다.
       */
       void queryClient.invalidateQueries({ queryKey: aiPlanKeys.job(jobId) })
 
