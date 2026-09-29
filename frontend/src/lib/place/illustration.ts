@@ -10,6 +10,7 @@
  * **사진인 척하지 않는다.** 플랫 일러스트라 사진과 한눈에 구분되고, 우리가 모르는 것
  * (그 장소의 실제 모습)이 아니라 **아는 것(카테고리)** 만 말한다. 그래서 자산이 없는
  * 코드에는 아무것도 주지 않고 회색 타일로 떨어뜨린다 — 카테고리를 지어내지 않는다.
+ * 지금은 스펙의 8종이 모두 자산을 가지므로, 회색 타일은 **서버가 새로 보낸 모르는 코드**의 몫이다.
  *
  * **SVG 가 아니라 WebP 다** (2026-09-29). 풍경 도형이던 SVG 를 캐릭터 그림체의 정물(반려견
  * 물건 한두 개)로 다시 그렸고, 디테일이 늘어 벡터로 다시 따지 않았다. 그레인은 SVG 의
@@ -26,6 +27,10 @@ const BY_CONTENT_TYPE: Record<string, string> = {
   LODGING: '/illustrations/place-lodging.webp',
   CULTURE: '/illustrations/place-culture.webp',
   TOURIST_SPOT: '/illustrations/place-tourist_spot.webp',
+  FESTIVAL: '/illustrations/place-festival.webp',
+  COURSE: '/illustrations/place-course.webp',
+  LEPORTS: '/illustrations/place-leports.webp',
+  SHOPPING: '/illustrations/place-shopping.webp',
 }
 
 /** 그릴 일러스트의 경로. 없으면 `null` — 호출부가 회색 타일로 떨어뜨린다 */
