@@ -285,6 +285,20 @@ describe('WalkCourseDetailSection — 로딩', () => {
     expect(markup).not.toContain(messages.walkCourse.errorTitle)
     expect(markup).not.toContain(messages.walkCourse.noCoordinates)
   })
+
+  /*
+    **완료 화면과 같은 폭 · 같은 2열이다** (#1037 후속). 29/29 가 사진을 가져 완료 화면은
+    언제나 2열인데, 예전 골격은 760 한 열이라 로딩이 끝나는 순간 폭이 넓어지며 카드가 갈라졌다.
+  */
+  it('완료 화면과 같은 폭 · 같은 2열 grid 다', () => {
+    const markup = render({ course: null, loading: true })
+
+    expect(markup).toContain('content-container')
+    expect(markup).not.toContain('reading-container')
+    expect(markup).toContain('lg:grid lg:grid-cols-2 lg:items-start')
+    expect(markup).toContain(messages.walkCourse.startMapHeading)
+    expect(markup).toContain(messages.walkCourse.nearbyPlacesHeading)
+  })
 })
 
 /*
