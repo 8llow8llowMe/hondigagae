@@ -174,10 +174,14 @@ export function PlanDetailSection({
   */
   const [timeTarget, setTimeTarget] = useState<{ day: number; planItemId: string } | null>(null)
   /*
-    **저장 뒤 초점을 돌려줄 칩** (#1028 검토). 일괄 교체가 `planItemId` 를 새로 발급해 모달을 연
-    칩이 언마운트되므로, `useOverlay` 의 복귀 초점은 떨어진 노드를 가리켜 `body` 로 빠진다.
-    저장을 보낼 때 **일자 · 순서** 를 적어 두고, 닫은 다음 프레임에 같은 자리의 새 칩을 잡는다.
-    한 프레임 미루는 것은 `useOverlay` cleanup 의 복귀 시도(떨어진 노드)가 먼저 지나가게 하려는 것이다.
+    **저장 뒤 초점을 돌려줄 칩** (#1028 검토). #1028 의 일괄 교체는 `planItemId` 를 새로 발급해
+    모달을 연 칩이 언마운트됐고, `useOverlay` 의 복귀 초점이 떨어진 노드를 가리켜 `body` 로 빠졌다.
+    저장을 보낼 때 **일자 · 순서** 를 적어 두고, 닫은 다음 프레임에 같은 자리의 칩을 잡는다.
+    한 프레임 미루는 것은 `useOverlay` cleanup 의 복귀 시도가 먼저 지나가게 하려는 것이다.
+
+    **#1053 의 단건 API 는 `planItemId` 를 지켜 칩이 대개 그대로지만 이 표식을 걷지 않는다** —
+    복귀가 칩 노드의 정체성에 기대지 않게 두는 편이 싸다. 그 사이 다른 탭 · 다른 일괄 교체가
+    항목을 새로 발급해도 같은 자리로 돌아온다.
   */
   const timeFocusKeyRef = useRef<string | null>(null)
   const closeTimeModal = useCallback(() => {
@@ -199,9 +203,14 @@ export function PlanDetailSection({
   }, [clearTimeFailure])
 
   /*
-    **같은 일괄 교체 계열의 잠금 하나.** 실내 대안 담기 · 이동·휴식 추가 · 항목 시각 저장이
-    동시에 나가면 같은 일자에서 나중 응답이 앞선 것을 덮어 한쪽이 사라진다 (F6 "담기 중 다른
-    담기"). 셋 다 `PUT …/days/{day}/items` 다.
+    **일자 항목을 건드리는 저장의 잠금 하나.** 실내 대안 담기 · 이동·휴식 추가가 동시에 나가면
+    같은 일자에서 나중 응답이 앞선 것을 덮어 한쪽이 사라진다 (F6 "담기 중 다른 담기") — 둘 다
+    `PUT …/days/{day}/items` 다.
+
+    **항목 시각 저장은 #1053 부터 단건 API 지만 이 잠금에 남는다.** 일괄 교체는 누른 시점의 상세로
+    그 일자의 시각까지 되싣는다 — 시각 저장과 겹치면 교체가 방금 고친 시각을 옛 값으로 덮거나,
+    교체가 먼저 끝나 `planItemId` 가 바뀌어 시각 저장이 `PLAN_005` 가 된다. 방문 체크는 되싣는
+    값이 아니라 교체가 어차피 초기화하므로(D9-2) 이 잠금 밖이다.
   */
   const dayItemsBusy = addPlace.adding || addMove.adding || itemTime.saving
 
@@ -670,11 +679,6 @@ export function PlanDetailSection({
         title={timeItem?.title ?? ''}
         initial={initialClockTime(timeGroup?.items ?? [], timeItem?.planItemId ?? '')}
         hasTime={toClockTime(timeItem?.startTime ?? null) !== null}
-        /*
-          **그 일자에 체크가 있을 때만 경고한다** (D9-2). 일괄 교체라 그 날 체크가 초기화된다 —
-          잃을 것이 없는 날에도 띄우면 경고가 배경음이 된다.
-        */
-        visitResetWarning={timeGroup?.items.some((item) => item.visited) ?? false}
         formError={
           timeItem !== undefined && itemTime.failure?.planItemId === timeItem.planItemId
             ? itemTime.failure.error.message
@@ -688,9 +692,8 @@ export function PlanDetailSection({
             timeTarget.day,
             timeGroup.items.findIndex((item) => item.planItemId === timeItem.planItemId),
           )
-          // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
+          // 단건 API 다 (#1053) — 그 항목의 시각만 보낸다. 일자 항목은 낡은 상세 판정에만 쓴다
           itemTime.save({
-            day: timeTarget.day,
             dayItems: timeGroup.items,
             planItemId: timeItem.planItemId,
             startTime,

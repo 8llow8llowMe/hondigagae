@@ -24,7 +24,8 @@ import type { PlanItemDetail } from '@/types/plan'
  * 항목 시간 칩 · 전자시계 모달 — 이슈 #1028 · `일자편집-세부명세.md` G2 · G7.
  *
  * **렌더 분기만 본다.** 증감 · 순환 · 두 자리 입력 · 서버 형식은 `lib/plan/clock-time.test.ts`
- * 가, 저장 본문은 `lib/plan/day-items.test.ts` 의 `setItemStartTimePayload` 가 잠근다.
+ * 가, 저장(단건 API, #1053)이 체크를 지키는 것은 `lib/api/mock/plan-detail-mock.test.ts` 가,
+ * 실패 분류는 `lib/plan/item-time-error.test.ts` 가 잠근다.
  */
 
 const PLACE_ITEM = planDetail.items[0]!
@@ -50,8 +51,9 @@ function anchorOf(markup: string): string {
 
 describe('PlanItemRow — 시간 칩 (#1028)', () => {
   /*
-    **저장 뒤 초점이 돌아올 표식** (#1028 검토). 일괄 교체가 `planItemId` 를 새로 발급해 모달을
-    연 칩이 언마운트되므로, 같은 **일자 · 순서** 의 새 칩을 이 표식으로 찾아 초점을 돌린다.
+    **저장 뒤 초점이 돌아올 표식** (#1028 검토). 복귀를 칩 노드의 정체성에 기대지 않고 같은
+    **일자 · 순서** 의 칩을 이 표식으로 찾는다 — #1053 의 단건 API 는 `planItemId` 를 지키지만,
+    그 사이 다른 일괄 교체가 항목을 새로 발급해도 같은 자리로 돌아온다.
   */
   it('칩이 일자 · 순서 표식을 단다 — 저장 뒤 초점이 같은 자리로 돌아온다', () => {
     expect(timeChipFocusKey(2, 1)).toBe('2:1')
@@ -197,7 +199,6 @@ function renderView(overrides: Partial<PlanItemTimeViewProps> = {}) {
     hour: 10,
     minute: 5,
     hasTime: false,
-    visitResetWarning: false,
     formError: null,
     saving: false,
     blocked: false,
@@ -287,25 +288,26 @@ describe('PlanItemTimeView — 전자시계 모달 (#1028)', () => {
     expect(markup).toContain(`>${messages.plan.itemTimeSave}</button>`)
   })
 
-  it('체크된 항목이 있는 날에만 초기화 경고를 낸다 (D9-2)', () => {
-    expect(renderView({ visitResetWarning: true })).toContain(
-      messages.plan.itemTimeVisitResetWarning,
-    )
-    expect(renderView({ visitResetWarning: false })).not.toContain(
-      messages.plan.itemTimeVisitResetWarning,
-    )
+  /*
+    **체크가 남는다** (#1053 · D9-2). 저장이 단건 API 라 그 날의 `다녀옴` 이 풀리지 않는다 —
+    #1028 의 초기화 경고를 걷었다. 체크가 있는 날인지 모달이 알 길 자체를 없앴으므로(prop 제거)
+    어느 날이든 설명은 조작 안내 한 줄뿐이다. 실제로 체크가 남는지는 mock 테스트가 잰다.
+  */
+  it('초기화 경고가 없다 — 설명은 조작 안내 한 줄이다', () => {
+    const markup = renderView()
+
+    expect(markup).not.toContain('초기화')
+    expect(markup).not.toContain('다녀옴')
+    expect(markup).toContain(messages.plan.itemTimeModalDescription)
   })
 
-  it('경고는 설명 자리에 있다 — 열 때 aria-describedby 로 함께 읽힌다', () => {
-    const markup = renderView({ visitResetWarning: true })
+  it('설명은 aria-describedby 로 열 때 함께 읽힌다', () => {
+    const markup = renderView()
     const describedBy = /aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? ''
     const start = markup.indexOf(`id="${describedBy}"`)
 
     expect(describedBy).not.toBe('')
-    expect(markup.indexOf(messages.plan.itemTimeVisitResetWarning)).toBeGreaterThan(start)
-    expect(markup.indexOf(messages.plan.itemTimeVisitResetWarning)).toBeLessThan(
-      markup.indexOf('plan-item-time-hour'),
-    )
+    expect(markup.indexOf(messages.plan.itemTimeModalDescription)).toBeGreaterThan(start)
   })
 
   it('저장 실패는 모달 안에 role=alert 로 남는다', () => {
