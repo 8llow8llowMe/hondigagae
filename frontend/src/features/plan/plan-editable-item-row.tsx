@@ -4,8 +4,7 @@ import type { KeyboardEvent, PointerEvent as ReactPointerEvent, Ref } from 'reac
 
 import { Badge } from '@/components/badge'
 import { Button } from '@/components/button'
-import { ChevronDownIcon, CloseIcon } from '@/components/icons'
-import { Input } from '@/components/input'
+import { ChevronDownIcon } from '@/components/icons'
 import { messages } from '@/lib/messages'
 import type { MoveDirection, PlanDayEditItem } from '@/lib/plan/day-items'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -42,7 +41,6 @@ export function PlanEditableItemRow({
   downRef,
   onMove,
   onToggleRemoved,
-  onStartTimeChange,
   rowRef,
   dragging = false,
   onHandlePointerDown,
@@ -62,8 +60,6 @@ export function PlanEditableItemRow({
   downRef: (node: HTMLButtonElement | null) => void
   onMove: (index: number, direction: MoveDirection) => void
   onToggleRemoved: (index: number) => void
-  /** 시각 입력 변경 — `value` 는 `HH:mm` 또는 `''`(지우기) (#623 · 명세 G2) */
-  onStartTimeChange: (index: number, value: string) => void
   /**
    * 이웃 행의 중간선을 재려면 실제 노드가 필요하다 — `useDragReorder` 가 붙인다.
    *
@@ -127,38 +123,11 @@ export function PlanEditableItemRow({
         </span>
 
         {/*
-          시각 입력 (#623 · 명세 G2). 손잡이 바로 뒤, 제목 앞이다 — 상세 행의 시각
-          줄(D14-3)과 읽는 순서가 같아서 편집에 들어갔다 나올 때 값이 자리를 옮기지 않는다.
-
-          **네이티브 `<input type="time">` 을 쓴다** — `DateField` 가 아니다. 시각은 막을
-          범위도, 두 값의 관계도 없어 `DateField` 가 네이티브를 거부한 근거 넷 중 둘이
-          해당하지 않는다. 남은 둘의 값보다 시간 피커를 새로 만드는 비용이 크다.
+          **시각 입력이 여기 있었다** (#623 → #1028 에서 걷음 · 명세 G0). 시각은 이제 일정
+          목록의 칩이 고친다 — 계획적인 사용자만 넣으면 되는 값을 순서 편집 행마다 44px
+          입력으로 세워 두니, 순서를 바꾸러 들어온 사람에게 행이 두 배로 무거웠다. 저장은
+          서버가 준 원문을 그대로 되싣는다 (`planDayItemsPayload`).
         */}
-        <Input
-          id={`day-edit-start-time-${entry.item.planItemId}`}
-          type="time"
-          value={entry.startTime}
-          onValueChange={(value) => onStartTimeChange(index, value)}
-          aria-label={messages.plan.editStartTimeLabel.replace('{title}', entry.item.title)}
-          className="w-32 shrink-0"
-          action={
-            // 값이 있을 때만 선다 — 누를 것이 없는 버튼을 세우지 않는다
-            entry.startTime === '' ? undefined : (
-              <Button
-                variant="ghost"
-                size="md"
-                iconOnly
-                aria-label={messages.plan.editStartTimeClearLabel.replace(
-                  '{title}',
-                  entry.item.title,
-                )}
-                leading={<CloseIcon size={18} />}
-                onClick={() => onStartTimeChange(index, '')}
-              />
-            )
-          }
-        />
-
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span

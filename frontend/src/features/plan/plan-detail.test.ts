@@ -13,6 +13,7 @@ import { messages } from '@/lib/messages'
 import {
   pet,
   planDayAdd,
+  planDayItemTime,
   planDayVisit,
   planDayWalkSafety,
   planDetail,
@@ -161,6 +162,7 @@ function renderDaySection(overrides = {}) {
       add: planDayAdd,
       visit: planDayVisit,
       walkSafety: planDayWalkSafety,
+      itemTime: planDayItemTime,
       regenerateHref: '/plans/1/days/1/regenerate',
       ...overrides,
     }),

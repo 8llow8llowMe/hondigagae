@@ -88,6 +88,16 @@ export type PlanDayWalkSafety = {
   onRetry: () => void
 }
 
+/**
+ * 이 일자의 시간 칩 한 묶음 — 이슈 #1028 · `일자편집-세부명세.md` G2.
+ *
+ * **모달은 화면에 하나다** — 호출부가 어느 항목인지만 기억한다. 저장은 같은 일자 일괄 교체라
+ * 잠금(담기 · 이동 추가와 공유)도 호출부가 든다.
+ */
+export type PlanDayItemTime = {
+  onOpen: (planItemId: string) => void
+}
+
 /** 좌측 목차의 앵커 대상. 목차와 제목이 같은 규칙으로 id 를 만들어야 링크가 맞는다 */
 export function planDayAnchorId(day: number): string {
   return `day${day}`
@@ -117,6 +127,7 @@ export function PlanDaySection({
   add,
   visit,
   walkSafety,
+  itemTime,
   regenerateHref,
 }: {
   day: number
@@ -140,6 +151,11 @@ export function PlanDaySection({
   visit: PlanDayVisit
   /** 이 일자의 항목 산책 위험도 (#625) */
   walkSafety: PlanDayWalkSafety
+  /**
+   * 항목 시간 칩 (#1028). **편집 중에는 행 자체가 편집기로 바뀌어 칩이 없다** — 순서 편집은
+   * 더 이상 시각을 고치지 않는다 (명세 G0).
+   */
+  itemTime: PlanDayItemTime
   /**
    * `다시 만들기` 가 가는 곳 (#128). `장소 추가` 와 같이 모달이 아니라 라우트다.
    *
@@ -294,6 +310,7 @@ export function PlanDaySection({
                 되풀이하지 않는다 (`plan-item-row.tsx` 의 `showPetConditionNote`).
               */
               dayPetConditionApplied={petConditionApplied}
+              time={{ onOpen: () => itemTime.onOpen(row.item.planItemId) }}
             />
           ))}
         </SurfaceList>

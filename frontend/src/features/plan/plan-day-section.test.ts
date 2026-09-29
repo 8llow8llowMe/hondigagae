@@ -7,6 +7,7 @@ import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { messages } from '@/lib/messages'
 import {
   planDayAdd,
+  planDayItemTime,
   planDayVisit,
   planDayWalkSafety,
   planDetail,
@@ -40,6 +41,7 @@ function renderDaySection(overrides = {}) {
       add: planDayAdd,
       visit: planDayVisit,
       walkSafety: planDayWalkSafety,
+      itemTime: planDayItemTime,
       regenerateHref: null,
       ...overrides,
     }),

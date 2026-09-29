@@ -1,4 +1,9 @@
-import type { PlanDayAdd, PlanDayVisit, PlanDayWalkSafety } from '@/features/plan/plan-day-section'
+import type {
+  PlanDayAdd,
+  PlanDayItemTime,
+  PlanDayVisit,
+  PlanDayWalkSafety,
+} from '@/features/plan/plan-day-section'
 import type { Pet } from '@/types/pet'
 import type {
   PlanAlternativePlaceItem,
@@ -245,6 +250,11 @@ export const planDayWalkSafety: PlanDayWalkSafety = {
   failed: false,
   hasLookupFailed: false,
   onRetry: () => undefined,
+}
+
+/** 시간 칩 배선 기본값 (#1028) — 누르면 아무 일도 없다 */
+export const planDayItemTime: PlanDayItemTime = {
+  onOpen: () => undefined,
 }
 
 /**

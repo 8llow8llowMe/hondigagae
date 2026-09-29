@@ -39,13 +39,3 @@ export function formatStartTime(value: string | null): string | null {
 
   return `${match[1]}:${match[2]}`
 }
-
-/**
- * 서버 원문 → 편집 입력 초기값.
- *
- * `<input type="time">` 은 빈 문자열로 "값 없음" 을 표현하므로 `formatStartTime` 의
- * `null` 을 `''` 로 옮긴다 (일자편집-세부명세 G3).
- */
-export function toInputStartTime(value: string | null): string {
-  return formatStartTime(value) ?? ''
-}

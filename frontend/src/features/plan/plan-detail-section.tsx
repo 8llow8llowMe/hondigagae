@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 
 import { Banner } from '@/components/banner'
 import { ConfirmModal } from '@/components/confirm-modal'
@@ -11,6 +11,7 @@ import { PlanDayEditor } from '@/features/plan/plan-day-editor'
 import { PlanDayMoveAddModal } from '@/features/plan/plan-day-move-add-modal'
 import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { PlanItemRow } from '@/features/plan/plan-item-row'
+import { PlanItemTimeModal } from '@/features/plan/plan-item-time-modal'
 import { PlanManageMenu } from '@/features/plan/plan-manage-menu'
 import { PlanOverviewPanel } from '@/features/plan/plan-overview-panel'
 import { PlanPackingList } from '@/features/plan/plan-packing-list'
@@ -21,6 +22,7 @@ import { PlanStatusAction } from '@/features/plan/plan-status-action'
 import { usePlanAddMove } from '@/features/plan/use-plan-add-move'
 import { usePlanAddPlace } from '@/features/plan/use-plan-add-place'
 import { usePlanDayEdit } from '@/features/plan/use-plan-day-edit'
+import { usePlanItemTime } from '@/features/plan/use-plan-item-time'
 import { usePlanPackingList } from '@/features/plan/use-plan-packing'
 import { usePlanStatus } from '@/features/plan/use-plan-status'
 import { usePlanVisit } from '@/features/plan/use-plan-visit'
@@ -29,6 +31,7 @@ import { todayDay } from '@/lib/date/day'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { messages } from '@/lib/messages'
 import { basisPetNameOf } from '@/lib/plan/basis-pet'
+import { initialClockTime, toClockTime } from '@/lib/plan/clock-time'
 import { addPlanDays, planPhaseOf } from '@/lib/plan/date'
 import { placeIdsOf } from '@/lib/plan/day-items'
 import {
@@ -151,11 +154,45 @@ export function PlanDetailSection({
   */
   const [moveDay, setMoveDay] = useState<number | null>(null)
   const addMove = usePlanAddMove({ planId: plan.planId, onAdded: () => setMoveDay(null) })
+
   /*
-    **같은 일괄 교체 계열의 잠금 하나.** 실내 대안 담기와 이동·휴식 추가가 동시에 나가면
-    같은 일자에서 나중 응답이 앞선 것을 덮어 한쪽이 사라진다 (F6 "담기 중 다른 담기").
+    항목 시작 시각 (#1028 · `일자편집-세부명세.md` G2). **모달은 화면에 하나다** — 어느
+    일자의 어느 항목인지만 기억한다. 저장이 성공하면 닫는다.
+
+    **닫기 함수를 `useCallback` 으로 고정한다.** 모달의 `useOverlay` 가 그 함수를 effect
+    의존성으로 들어, 렌더마다 새 함수가 오면 저장 시작·끝마다 초점이 모달 밖으로 튄다
+    (`PlanItemTimeModal` 머리주석).
   */
-  const dayItemsBusy = addPlace.adding || addMove.adding
+  const [timeTarget, setTimeTarget] = useState<{ day: number; planItemId: string } | null>(null)
+  const closeTimeModal = useCallback(() => setTimeTarget(null), [])
+  const itemTime = usePlanItemTime({ planId: plan.planId, onSaved: closeTimeModal })
+  const { clearFailure: clearTimeFailure } = itemTime
+  const dismissTimeModal = useCallback(() => {
+    setTimeTarget(null)
+    clearTimeFailure()
+  }, [clearTimeFailure])
+
+  /*
+    **같은 일괄 교체 계열의 잠금 하나.** 실내 대안 담기 · 이동·휴식 추가 · 항목 시각 저장이
+    동시에 나가면 같은 일자에서 나중 응답이 앞선 것을 덮어 한쪽이 사라진다 (F6 "담기 중 다른
+    담기"). 셋 다 `PUT …/days/{day}/items` 다.
+  */
+  const dayItemsBusy = addPlace.adding || addMove.adding || itemTime.saving
+
+  function openItemTime(day: number, planItemId: string) {
+    itemTime.clearFailure()
+    setTimeTarget({ day, planItemId })
+  }
+
+  /*
+    모달이 가리키는 그 일자 · 항목. **상세가 바뀌어 항목이 사라졌으면 모달을 열지 않는다** —
+    기간이 줄었거나 다른 탭에서 일괄 교체가 일어나 `planItemId` 가 새로 발급된 경우다.
+  */
+  const timeGroup = timeTarget === null ? undefined : days[timeTarget.day - 1]
+  const timeItem =
+    timeTarget === null
+      ? undefined
+      : timeGroup?.items.find((item) => item.planItemId === timeTarget.planItemId)
 
   function openMoveAdd(day: number) {
     addMove.clearFailure()
@@ -458,6 +495,7 @@ export function PlanDetailSection({
                 canMark,
               }),
             }}
+            itemTime={{ onOpen: (planItemId) => openItemTime(group.day, planItemId) }}
             walkSafety={{
               of: (planItemId) => walkSafetyMap.get(planItemId),
               beyondForecastReason: dayBeyondForecastReason(
@@ -490,7 +528,6 @@ export function PlanDetailSection({
                   onClearFocus={edit.clearFocus}
                   onMove={edit.move}
                   onToggleRemoved={edit.toggle}
-                  onStartTimeChange={edit.setStartTime}
                   onSave={() => edit.save(group.day)}
                   onCancel={requestCancel}
                 />
@@ -574,8 +611,8 @@ export function PlanDetailSection({
         open={moveDay !== null}
         day={moveDay ?? 1}
         saving={addMove.adding}
-        // 이 모달 자신의 저장은 `saving` 이 말한다. 여기는 **다른** 담기가 도는 중인지다
-        blocked={addPlace.adding}
+        // 이 모달 자신의 저장은 `saving` 이 말한다. 여기는 **다른** 일괄 교체가 도는 중인지다
+        blocked={addPlace.adding || itemTime.saving}
         formError={
           moveDay !== null && addMove.failure?.day === moveDay
             ? addMove.failure.error.message
@@ -596,6 +633,38 @@ export function PlanDetailSection({
           setMoveDay(null)
           addMove.clearFailure()
         }}
+      />
+
+      <PlanItemTimeModal
+        // 여는 항목마다 새로 마운트한다 — 입력이 그 항목 값에서 시작한다 (모달 주석)
+        key={timeItem?.planItemId ?? 'closed'}
+        open={timeItem !== undefined}
+        title={timeItem?.title ?? ''}
+        initial={initialClockTime(timeGroup?.items ?? [], timeItem?.planItemId ?? '')}
+        hasTime={toClockTime(timeItem?.startTime ?? null) !== null}
+        /*
+          **그 일자에 체크가 있을 때만 경고한다** (D9-2). 일괄 교체라 그 날 체크가 초기화된다 —
+          잃을 것이 없는 날에도 띄우면 경고가 배경음이 된다.
+        */
+        visitResetWarning={timeGroup?.items.some((item) => item.visited) ?? false}
+        formError={
+          timeItem !== undefined && itemTime.failure?.planItemId === timeItem.planItemId
+            ? itemTime.failure.error.message
+            : null
+        }
+        saving={itemTime.saving}
+        blocked={addPlace.adding || addMove.adding}
+        onSave={(startTime) => {
+          if (timeTarget === null || timeGroup === undefined || timeItem === undefined) return
+          // **그 일자의 현재 항목 전부**를 되싣는다 — 일괄 교체다 (E1)
+          itemTime.save({
+            day: timeTarget.day,
+            dayItems: timeGroup.items,
+            planItemId: timeItem.planItemId,
+            startTime,
+          })
+        }}
+        onClose={dismissTimeModal}
       />
 
       {/*

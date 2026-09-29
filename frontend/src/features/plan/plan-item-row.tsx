@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Badge } from '@/components/badge'
 import { Button } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
-import { CheckIcon, ImageIcon } from '@/components/icons'
+import { CheckIcon, ClockIcon, ImageIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
 import { formatCelsius } from '@/lib/format/celsius'
 import { formatDistance } from '@/lib/format/distance'
@@ -57,6 +57,18 @@ export type PlanItemVisit = {
 }
 
 /**
+ * 시간 칩에 필요한 것 — 이슈 #1028 · `일자편집-세부명세.md` G2.
+ *
+ * **optional 이다.** 넘기지 않으면 칩 대신 예전 시각 캡션(D14-3)이 선다 — 기간 밖 고아 항목
+ * 섹션이 그 경로다. 어느 일자에도 속하지 않는 항목은 일자 일괄 교체로 저장할 곳이 없다.
+ * 공유 보기(`SharedPlanItemRow`)와 순서 편집(`PlanEditableItemRow`)은 이 컴포넌트가 아니다.
+ */
+export type PlanItemTime = {
+  /** 전자시계 모달을 연다. 저장·잠금은 호출부가 소유한다 */
+  onOpen: () => void
+}
+
+/**
  * 일정 항목 행 — 아트보드 `혼디가개 여행 일정.dc.html` 01·02.
  *
  * **2열이다** (썸네일 · 텍스트). 순번 원 + 썸네일 + 텍스트로 3열을 만들면 390 에서
@@ -90,6 +102,16 @@ export type PlanItemVisit = {
  * **없으면 줄 자체를 그리지 않는다.** 형식이 어긋난 값도 지어내지 않고 숨긴다 —
  * 정규화는 `lib/plan/start-time.ts` 의 `formatStartTime()` 하나가 전담한다.
  *
+ * **`time` 을 넘기면 그 줄이 곧 시간 칩이다** (#1028 · 명세 D14-3 · G2). 시각이 있으면
+ * `10:30` 칩(누르면 고친다), 없으면 `시간 등록하기` 칩이 **같은 자리**(제목 위)에 선다 —
+ * 시각 캡션과 칩을 따로 두면 한 행에 `10:30` 이 두 번 서고, #625 배지가 어느 쪽에 붙는지
+ * 갈린다. 산책 위험도 배지는 칩 오른쪽에 그대로 붙는다.
+ *
+ * **칩이 링크 밖이라 링크를 "늘린 링크" 로 바꿨다.** 예전에는 행 전체가 `<a>` 였는데 그 안에
+ * 버튼을 넣을 수 없다(D6 · 중첩 상호작용). 이제 `<a>` 는 제목을 감싸고 `::after` 가 행 면
+ * 전체를 덮어 **누르는 자리는 그대로 행 전체**다. 칩만 `z-10` 으로 그 위에 선다. 덤으로
+ * 링크의 이름이 행 전체 글(시각·주소·거리)이 아니라 **제목**이 된다.
+ *
  * **[#625](https://github.com/8llow8llowMe/hondigagae/issues/625) 의 산책 위험도 배지가 이 시각 줄에 붙는다** (명세 D15-5).
  * `walkSafety` 가 `undefined` 면(아직 안 왔다) 배지·문장 없이 시각만 선다 — 없는 판정을
  * 빈 배지로도 말하지 않는다. **배지를 세울지는 서버가 이미 가른 결과
@@ -110,10 +132,13 @@ export function PlanItemRow({
   visit,
   walkSafety,
   dayPetConditionApplied = false,
+  time,
 }: {
   model: PlanItemRowModel
   /** 없으면 토글이 렌더되지 않는다 — 기간 밖 항목 섹션이 그 경로다 */
   visit?: PlanItemVisit
+  /** 없으면 칩 대신 시각 캡션이다 — 기간 밖 항목 섹션이 그 경로다 (#1028) */
+  time?: PlanItemTime
   /**
    * 이 항목의 산책 위험도 (#625). **`undefined` 는 오류가 아니라 "아직 안 왔다"다** —
    * 조회 중이거나, 응답에 이 `planItemId` 가 없거나(일괄 교체 직후 한 프레임), 전체
@@ -178,6 +203,38 @@ export function PlanItemRow({
     라 `/places/{id}` 로 보내면 남의 id 로 404 를 만든다 — 보강 대상과 같은 판정을 쓴다.
   */
   const href = isPlaceTarget(item) ? `/places/${item.targetId as string}` : null
+
+  /*
+    **산책 위험도 · 체감온도 조각** (D15-5). 시각 캡션과 시간 칩 줄(#1028) 두 갈래가 같은
+    조각을 붙인다 — 복제하면 한쪽만 고쳐졌을 때 두 화면이 다른 판정을 말한다.
+  */
+  const walkSafetyInline = (
+    <>
+      {walkSafetyView?.kind === 'badge' && (
+        <>
+          <span aria-hidden="true">·</span>
+          <MetricBadge size="sm" tone={walkSafetyView.tone} axis="walkSafety">
+            {walkSafetyView.label}
+          </MetricBadge>
+        </>
+      )}
+
+      {/*
+        **체감온도는 배지가 선 정상 판정에만 함께 낸다** (D15-7) — `UNKNOWN` 등급이나
+        사유 문장은 배지 없이 캡션 한 줄로 따로 그린다. `최고 체감온도`(하루 최대)와
+        라벨로 기준을 가른다 — 여기는 `feelsLikeCelsius`(시각 기준) 하나뿐이고
+        폴백이 없다.
+      */}
+      {walkSafetyView?.kind === 'badge' && feelsLike !== null && (
+        <>
+          <span aria-hidden="true">·</span>
+          <span>
+            {messages.plan.walkSafetyFeelsLikeLabel} {feelsLike}℃
+          </span>
+        </>
+      )}
+    </>
+  )
 
   const body = (
     <>
@@ -249,37 +306,29 @@ export function PlanItemRow({
           이 줄에 붙는다** (D15-5). `시각 있음` 이 배지가 설 조건 중 하나라 이 블록
           자체를 벗어나지 않는다 — 시각이 없으면 위험도 자리도 함께 사라진다.
         */}
-        {startTime !== null && (
-          <p className="text-caption text-fg-muted flex flex-wrap items-center gap-x-1 font-medium tabular-nums">
-            <span>
-              <span className="sr-only">{messages.plan.startTimeSrLabel} </span>
-              <time dateTime={startTime}>{startTime}</time>
-            </span>
+        {time !== undefined ? (
+          /*
+            **시간 칩 줄** (#1028). 칩이 늘린 링크(`::after`) 위에 서야 눌리므로 `z-10`
+            (DESIGN.md z 스케일 "형제 요소 위로 띄우는 로컬 레이어")이다.
 
-            {walkSafetyView?.kind === 'badge' && (
-              <>
-                <span aria-hidden="true">·</span>
-                <MetricBadge size="sm" tone={walkSafetyView.tone} axis="walkSafety">
-                  {walkSafetyView.label}
-                </MetricBadge>
-              </>
-            )}
-
-            {/*
-              **체감온도는 배지가 선 정상 판정에만 함께 낸다** (D15-7) — `UNKNOWN` 등급이나
-              사유 문장은 배지 없이 캡션 한 줄로 따로 그린다. `최고 체감온도`(하루 최대)와
-              라벨로 기준을 가른다 — 여기는 `feelsLikeCelsius`(시각 기준) 하나뿐이고
-              폴백이 없다.
-            */}
-            {walkSafetyView?.kind === 'badge' && feelsLike !== null && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span>
-                  {messages.plan.walkSafetyFeelsLikeLabel} {feelsLike}℃
-                </span>
-              </>
-            )}
-          </p>
+            **`mb-2` 는 칩의 누르는 띠 몫이다.** `Button` `sm` 은 보이는 32 위아래로 투명한
+            띠를 8px 씩 낸다 — 제목과 붙어 있으면 제목 윗부분을 누를 때 링크가 아니라 칩이
+            받는다. 띠만큼 떼어 두 자리가 겹치지 않게 한다.
+          */
+          <div className="text-caption text-fg-muted mb-2 flex flex-wrap items-center gap-x-1 gap-y-1 font-medium tabular-nums">
+            <PlanItemTimeChip title={item.title} startTime={startTime} onOpen={time.onOpen} />
+            {startTime !== null && walkSafetyInline}
+          </div>
+        ) : (
+          startTime !== null && (
+            <p className="text-caption text-fg-muted flex flex-wrap items-center gap-x-1 font-medium tabular-nums">
+              <span>
+                <span className="sr-only">{messages.plan.startTimeSrLabel} </span>
+                <time dateTime={startTime}>{startTime}</time>
+              </span>
+              {walkSafetyInline}
+            </p>
+          )
         )}
 
         {/*
@@ -311,7 +360,21 @@ export function PlanItemRow({
               item.visited ? 'text-fg-muted' : 'text-fg',
             )}
           >
-            {item.title}
+            {href === null ? (
+              item.title
+            ) : (
+              /*
+                **늘린 링크** (#1028). `::after` 가 위치 기준(행 면, `relative`)을 통째로 덮어
+                행 어디를 눌러도 이 링크다 — 예전 "행 전체가 하나의 링크"(D6)와 누르는 자리가
+                같다. 초점 링도 `::after` 에 그려 예전처럼 행 면을 두른다.
+              */
+              <Link
+                href={href}
+                className="focus-visible:after:ring-brand-500 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-2"
+              >
+                {item.title}
+              </Link>
+            )}
           </h4>
           {/* `장소` 는 기본값이라 라벨이 잡음이다. 성격이 다른 유형만 알린다 */}
           {item.itemType.code !== 'PLACE' && <Badge size="sm">{item.itemType.name}</Badge>}
@@ -337,18 +400,13 @@ export function PlanItemRow({
   return (
     <li className={INSET_CLASS.card}>
       <div className="flex items-start">
-        {href === null ? (
-          <div className="flex min-w-0 flex-1 items-start gap-3 py-3 lg:gap-5 lg:py-4">{body}</div>
-        ) : (
-          // 링크 안에 링크를 넣지 않는다 — 행 전체가 하나의 링크다 (D6).
-          // 방문 토글은 이 링크의 **형제**라 중첩되지 않는다 (#124)
-          <Link
-            href={href}
-            className="focus-visible:ring-brand-500 flex min-w-0 flex-1 items-start gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none lg:gap-5 lg:py-4"
-          >
-            {body}
-          </Link>
-        )}
+        {/*
+          링크는 제목 안에 있고 `::after` 가 이 면을 덮는다 (#1028 · 늘린 링크). `relative` 가
+          그 기준이다. 방문 토글은 이 면의 **형제**라 덮이지 않는다 (#124).
+        */}
+        <div className="relative flex min-w-0 flex-1 items-start gap-3 py-3 lg:gap-5 lg:py-4">
+          {body}
+        </div>
 
         {/*
           **시작일 전의 미체크 행에는 토글이 없다** (#983) — 서버가 `PLAN_027` 로 거절할 일이다.
@@ -466,6 +524,61 @@ function PlanItemVisitToggle({
         </Button>
       )}
     </div>
+  )
+}
+
+/**
+ * 시간 칩 — 이슈 #1028 · `일자편집-세부명세.md` G2.
+ *
+ * - **시각이 없으면 `ghost`** — `시간 등록하기` 는 계획적인 사람만 쓰는 선택 행동이라 행마다
+ *   테두리 버튼으로 세우면 제목보다 먼저 읽힌다. 글자색이 `fg-muted` 라 캡션 톤에 머문다.
+ *   `-ml-3` 은 `ghost` 의 좌우 여백(12)만큼 당겨 시계 아이콘을 제목 첫 글자에 맞춘다.
+ * - **시각이 있으면 `secondary`** — 테두리가 "값이 들어 있고 누르면 고친다" 를 말한다.
+ *   `<time datetime>` 은 그대로 남는다 (D14-3).
+ *
+ * **이름에 제목을 넣는다.** 한 화면에 같은 칩이 항목 수만큼 선다 — 담기 버튼(`{title} 담기`)과
+ * 같은 규칙이다. 보이는 글자(`시간 등록하기` · `10:30`)를 이름이 품는다 (WCAG 2.5.3).
+ */
+function PlanItemTimeChip({
+  title,
+  startTime,
+  onOpen,
+}: {
+  title: string
+  /** `formatStartTime()` 을 거친 `HH:mm`. 없거나 형식이 어긋나면 `null` */
+  startTime: string | null
+  onOpen: () => void
+}) {
+  if (startTime === null) {
+    return (
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-haspopup="dialog"
+        aria-label={messages.plan.itemTimeAddLabel.replace('{title}', title)}
+        leading={<ClockIcon size={16} />}
+        onClick={onOpen}
+        className="z-10 -ml-3"
+      >
+        {messages.plan.itemTimeAddAction}
+      </Button>
+    )
+  }
+
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      aria-haspopup="dialog"
+      aria-label={messages.plan.itemTimeEditLabel
+        .replace('{title}', title)
+        .replace('{time}', startTime)}
+      leading={<ClockIcon size={16} />}
+      onClick={onOpen}
+      className="z-10 tabular-nums"
+    >
+      <time dateTime={startTime}>{startTime}</time>
+    </Button>
   )
 }
 

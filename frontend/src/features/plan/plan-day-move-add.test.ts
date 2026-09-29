@@ -11,7 +11,13 @@ import {
 import { PlanDaySection } from '@/features/plan/plan-day-section'
 import { messages } from '@/lib/messages'
 import { ITEM_TITLE_MAX } from '@/lib/plan/day-items'
-import { planDayAdd, planDayVisit, planDayWalkSafety, planDetail } from '@/test/fixtures/plan'
+import {
+  planDayAdd,
+  planDayItemTime,
+  planDayVisit,
+  planDayWalkSafety,
+  planDetail,
+} from '@/test/fixtures/plan'
 import type { PlaceDetail } from '@/types/place'
 
 /**
@@ -42,6 +48,7 @@ function renderDaySection(overrides = {}) {
       add: planDayAdd,
       visit: planDayVisit,
       walkSafety: planDayWalkSafety,
+      itemTime: planDayItemTime,
       regenerateHref: null,
       ...overrides,
     }),

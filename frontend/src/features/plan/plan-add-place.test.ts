@@ -12,6 +12,7 @@ import { placeDetail, placeSummary } from '@/test/fixtures/place'
 import {
   planAlternative,
   planDayAdd,
+  planDayItemTime,
   planDayVisit,
   planDayWalkSafety,
   planDetail,
@@ -189,6 +190,7 @@ describe('PlanDaySection — 장소 추가 진입', () => {
         add: planDayAdd,
         visit: planDayVisit,
         walkSafety: planDayWalkSafety,
+        itemTime: planDayItemTime,
         regenerateHref: '/plans/1/days/1/regenerate',
         ...overrides,
       }),
