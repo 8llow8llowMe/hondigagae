@@ -153,6 +153,13 @@ export function PlaceMapView({
    */
   panelTopInset?: number | undefined
 }) {
+  /*
+    **`undefined` 만이 아니라 `null`·`false` 도 "머리 없음" 이다** (#1012 검토). 호출부가
+    `head={조건 && …}` 로 넘기면 `false` 가 오는데, `!== undefined` 로 가르면 빈 래퍼가 그려지고
+    오버레이 검색도 꺼진다.
+  */
+  const hasHead = head !== undefined && head !== null && head !== false
+
   const [bounds, setBounds] = useState<MapBounds | null>(null)
   /*
     **지금 목록이 대응하는 지도 영역.** 첫 `idle` 에 한 번 놓이고, 그 뒤로 이 값을 옮기는
@@ -333,7 +340,7 @@ export function PlaceMapView({
           `absolute` 로 두면 안내 줄과 첫 행을 덮는다(실측: 375 에서 첫 행 사진 위, 1440 에서
           안내 줄 전체). 인셋은 아래 안내 줄·목록과 같은 `main` 이다.
         */}
-        {head !== undefined && <div className={cn('pt-5 pb-3', INSET_CLASS.main)}>{head}</div>}
+        {hasHead && <div className={cn('pt-5 pb-3', INSET_CLASS.main)}>{head}</div>}
 
         {/* 안내 한 줄 — 배너(링크형)가 아니다. 갈 곳이 없고 알릴 사실만 있다 */}
         <p
@@ -460,6 +467,47 @@ export function PlaceMapView({
       )}
 
       {/*
+        ── 떠 있는 머리 — 좌측 패널과 **같은 기둥**이다 (#556, #1012 에서 호출부에서 옮겨 왔다)
+
+        **1440 열이 아니라 패널 기둥(`left-4`)에 붙인다.** 열에 맞추면 폭에 따라 그림이
+        갈린다 — 1440 이하에서는 `content-container` 가 전폭이라 결국 패널 위(x≈40)에
+        겹치고, 1920 에서는 x=561 이라 패널(16~416)과 145px 떨어져 지도 한복판에 카드가
+        혼자 뜬다. 기둥에 붙이면 1024~1920 어디서나 같은 그림이다.
+
+        **접히는 패널 안에 넣지 않는다.** 담기 화면의 `일정으로 돌아가기` 는 유일한 퇴로라
+        패널을 접는 순간 나갈 길이 사라진다.
+
+        모바일은 오른쪽 토글 자리를 비운다(`end-32`). `pointer-events-none` 은 바깥 기둥이
+        지도를 가로막지 않게 하는 것이고, 누르는 것만 되살린다.
+
+        **우상단 컨트롤보다 앞에 둔다** (#1012 검토). 모바일에서 화면 맨 위에 보이는 것이
+        머리와 검색인데, 예전처럼 맨 뒤에 두면 키보드로는 토글 → 내 위치 → 시트 행 수십 개를
+        지나야 닿았다 (WCAG 2.4.3). `/places` 의 오버레이 검색이 토글보다 앞인 것과 같은 순서다.
+        예전에 맨 뒤였던 이유는 같은 `z-30` 인 시트를 끝까지 올려도 머리가 위에 남게 하려는
+        것이었는데, **이제 시트가 머리에 닿지 않는다** — `sheetMaxTopInset` 이 머리+검색 바닥에
+        여유를 더한 값이다. 그래서 순서가 쌓임을 정하지 않는다.
+
+        **1024 미만은 검색이 머리 바로 아래다** (#1012). 토글 왼쪽 자리가 머리 카드 밑이라
+        거기 두면 보이지 않는 입력이 된다. 1024 이상은 패널 맨 위가 같은 일을 하므로
+        `lg:hidden` 이다 — `/places` 의 오버레이 검색과 같은 갈림이다. 폭은 머리 카드와
+        같게 둔다(`max-w-md` 를 걸지 않는다): 한 기둥에 선 두 표면의 오른쪽 끝이 어긋나면
+        따로 떠 있는 것으로 읽힌다.
+      */}
+      {hasHead && (
+        <div className="pointer-events-none absolute start-4 end-32 top-5 z-30 flex flex-col gap-2 lg:end-auto lg:top-6">
+          {head}
+          {searchable && (
+            <PlaceSearchField
+              filters={filters}
+              compact
+              id="place-keyword-head"
+              className="pointer-events-auto min-w-0 lg:hidden"
+            />
+          )}
+        </div>
+      )}
+
+      {/*
         ── 지도 우상단 컨트롤 ──────────────────────────────────────────────
 
         **여백이 목록 보기의 헤더와 정확히 같다.** 목록은 `px-4 pt-5 md:px-10 lg:pt-6`
@@ -498,7 +546,7 @@ export function PlaceMapView({
             **머리가 있으면 여기 두지 않는다** (#1012). 그 자리가 머리 카드 밑이다 — 아래
             머리 기둥이 대신 그린다.
           */}
-          {searchable && head === undefined && (
+          {searchable && !hasHead && (
             <PlaceSearchField
               filters={filters}
               compact
@@ -700,43 +748,6 @@ export function PlaceMapView({
           />
         )}
       </MapSheet>
-
-      {/*
-        ── 떠 있는 머리 — 좌측 패널과 **같은 기둥**이다 (#556, #1012 에서 호출부에서 옮겨 왔다)
-
-        **1440 열이 아니라 패널 기둥(`left-4`)에 붙인다.** 열에 맞추면 폭에 따라 그림이
-        갈린다 — 1440 이하에서는 `content-container` 가 전폭이라 결국 패널 위(x≈40)에
-        겹치고, 1920 에서는 x=561 이라 패널(16~416)과 145px 떨어져 지도 한복판에 카드가
-        혼자 뜬다. 기둥에 붙이면 1024~1920 어디서나 같은 그림이다.
-
-        **접히는 패널 안에 넣지 않는다.** 담기 화면의 `일정으로 돌아가기` 는 유일한 퇴로라
-        패널을 접는 순간 나갈 길이 사라진다.
-
-        모바일은 오른쪽 토글 자리를 비운다(`end-32`). `pointer-events-none` 은 바깥 기둥이
-        지도를 가로막지 않게 하는 것이고, 누르는 것만 되살린다.
-
-        **맨 뒤에 둔다.** 시트·오버레이와 같은 `z-30` 이라 문서 순서가 쌓임을 정한다 —
-        시트를 끝까지 올려도 머리가 그 위에 남아야 한다 (`sheetMaxTopInset` 이 그 높이다).
-
-        **1024 미만은 검색이 머리 바로 아래다** (#1012). 토글 왼쪽 자리가 머리 카드 밑이라
-        거기 두면 보이지 않는 입력이 된다. 1024 이상은 패널 맨 위가 같은 일을 하므로
-        `lg:hidden` 이다 — `/places` 의 오버레이 검색과 같은 갈림이다. 폭은 머리 카드와
-        같게 둔다(`max-w-md` 를 걸지 않는다): 한 기둥에 선 두 표면의 오른쪽 끝이 어긋나면
-        따로 떠 있는 것으로 읽힌다.
-      */}
-      {head !== undefined && (
-        <div className="pointer-events-none absolute start-4 end-32 top-5 z-30 flex flex-col gap-2 lg:end-auto lg:top-6">
-          {head}
-          {searchable && (
-            <PlaceSearchField
-              filters={filters}
-              compact
-              id="place-keyword-head"
-              className="pointer-events-auto min-w-0 lg:hidden"
-            />
-          )}
-        </div>
-      )}
     </div>
   )
 }

@@ -139,10 +139,10 @@ describe('searchable 은 화면이 켠다', () => {
   같은 기둥에 세운다.
 */
 describe('머리가 있는 화면의 검색 자리 (#1012)', () => {
-  const headColumn = mapView.slice(mapView.indexOf('{head !== undefined && (\n        <div'))
+  const headColumn = mapView.slice(mapView.indexOf('{hasHead && (\n        <div'))
 
   it('오버레이 검색은 머리가 없을 때만 그린다', () => {
-    expect(overlay).toContain('searchable && head === undefined && (')
+    expect(overlay).toContain('searchable && !hasHead && (')
   })
 
   it('머리 기둥이 패널 기둥(start-4)에 붙고 머리 다음에 검색이 선다', () => {
@@ -162,10 +162,23 @@ describe('머리가 있는 화면의 검색 자리 (#1012)', () => {
     expect(tag).not.toContain('max-w-md')
   })
 
-  /* 시트·오버레이와 같은 z-30 이라 문서 순서가 쌓임을 정한다 — 시트 위에 남아야 한다 */
-  it('머리 기둥은 시트보다 뒤에 온다', () => {
-    expect(mapView.indexOf('{head !== undefined && (\n        <div')).toBeGreaterThan(
-      mapView.indexOf('</MapSheet>'),
+  /*
+    **키보드 순서가 화면 순서와 같아야 한다** (#1012 검토 · WCAG 2.4.3). 모바일에서 맨 위에
+    보이는 머리·검색이 문서 맨 뒤에 있으면 토글 → 내 위치 → 시트 행 수십 개를 지나야 닿는다.
+    `/places` 의 오버레이 검색이 토글보다 앞인 것과 같은 순서다. 시트가 머리에 닿지 않으므로
+    (`sheetMaxTopInset`) 순서가 쌓임을 정하지 않는다.
+  */
+  it('머리 기둥은 우상단 컨트롤·시트보다 앞에 온다', () => {
+    const column = mapView.indexOf('{hasHead && (\n        <div')
+
+    expect(column).toBeGreaterThan(-1)
+    expect(column).toBeLessThan(mapView.indexOf('<ViewToggle'))
+    expect(column).toBeLessThan(mapView.indexOf('<MapSheet'))
+  })
+
+  it('null·false 도 머리 없음으로 가른다 — `head={조건 && …}` 가 빈 래퍼를 만들지 않게', () => {
+    expect(mapView).toContain(
+      'const hasHead = head !== undefined && head !== null && head !== false',
     )
   })
 
@@ -174,7 +187,7 @@ describe('머리가 있는 화면의 검색 자리 (#1012)', () => {
     안내 줄과 첫 행을 덮는다 (#1012 이전 375·1440 실측).
   */
   it('SDK 실패 폴백은 머리를 안내 줄보다 먼저, 흐름 안에 세운다', () => {
-    const head = fallback.indexOf('{head !== undefined && <div')
+    const head = fallback.indexOf('{hasHead && <div')
     const notice = fallback.indexOf('role="status"')
 
     expect(head).toBeGreaterThan(-1)
