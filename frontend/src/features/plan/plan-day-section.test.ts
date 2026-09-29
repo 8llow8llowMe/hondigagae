@@ -168,26 +168,27 @@ describe('PlanDaySection — 앵커가 고정 헤더를 피한다 (#845)', () =>
  * 받지 않는 **"지금" 기준**(`/places/{id}/walk-safety`)이라, 일자 카드에서 누르면 여행 날의
  * 판정으로 읽혔다. 날짜 기준 판정은 이 카드의 판정 밴드와 항목 줄의 산책 위험도(#625)에 있다.
  */
-describe('PlanDaySection — 액션 줄 (#842 · #1016)', () => {
+describe('PlanDaySection — 액션 줄 (#842 · #1016 · #1014)', () => {
   /** 액션 줄 — `장소 추가` 가 여는 `div` 하나 */
   function actionRowOf(markup: string): string {
     const start = markup.lastIndexOf('<div', markup.indexOf(messages.plan.addPlaceAction))
     return markup.slice(start, markup.indexOf('</div>', start))
   }
 
-  it('기준 장소가 있어도 산책 위험도 링크가 없다 — 액션은 장소 추가 · 순서 편집 둘이다', () => {
+  it('기준 장소가 있어도 산책 위험도 링크가 없다 — 액션은 장소 추가 · 순서 편집 · 이동·휴식 추가 셋이다', () => {
     const row = actionRowOf(renderDaySection({ verdict: planVerdict }))
 
     expect(row).toContain(messages.plan.addPlaceAction)
     expect(row).toContain(messages.plan.editDayAction)
+    expect(row).toContain(messages.plan.addMoveAction)
     expect(row).not.toContain('산책 위험도')
     expect(row).not.toContain(`href="/places/${planVerdict.representativePlaceId}"`)
-    expect(row.match(/<(a|button) /g)).toHaveLength(2)
+    expect(row.match(/<(a|button) /g)).toHaveLength(3)
   })
 
-  it('판정이 아직 안 온 날도 같은 두 액션이다', () => {
+  it('판정이 아직 안 온 날도 같은 세 액션이다', () => {
     const row = actionRowOf(renderDaySection({ verdict: undefined }))
 
-    expect(row.match(/<(a|button) /g)).toHaveLength(2)
+    expect(row.match(/<(a|button) /g)).toHaveLength(3)
   })
 })
