@@ -5,6 +5,7 @@ import {
   clockKeyValue,
   formatClockPart,
   initialClockTime,
+  parsePastedClock,
   readClockInput,
   stepClock,
   toClockTime,
@@ -120,10 +121,18 @@ describe('readClockInput — 입력칸 onChange 에서 방금 친 것 읽기', (
     expect(readClockInput({ inputType: 'insertText', data: 'a', raw: '10a', caret: 3 })).toBeNull()
   })
 
-  it('여러 글자를 한 번에 넣으면(붙여넣기) 마지막 숫자를 읽는다', () => {
+  /* 마지막 숫자 하나만 읽으면 `14` 가 `04` 가 되고 `10:30` 이 `0` 이 됐다 (#1028 검토) */
+  it('붙여넣기는 글 전체를 넘긴다 — 한 글자로 읽지 않는다', () => {
     expect(
-      readClockInput({ inputType: 'insertFromPaste', data: '1030', raw: '1030', caret: 4 }),
-    ).toEqual({ kind: 'digit', digit: 0 })
+      readClockInput({ inputType: 'insertFromPaste', data: '10:30', raw: '10:30', caret: 5 }),
+    ).toEqual({ kind: 'paste', text: '10:30' })
+  })
+
+  it('insertText 라도 여러 글자가 한 번에 들어오면 붙여넣기로 본다 (자동완성·음성 입력)', () => {
+    expect(readClockInput({ inputType: 'insertText', data: '14', raw: '14', caret: 2 })).toEqual({
+      kind: 'paste',
+      text: '14',
+    })
   })
 
   it('inputType 을 모르면 커서 바로 앞 글자를 읽는다', () => {
@@ -208,5 +217,32 @@ describe('initialClockTime — 모달을 열 때의 값', () => {
     ]
 
     expect(initialClockTime(broken, 'c')).toEqual({ hour: 8, minute: 0 })
+  })
+})
+
+describe('parsePastedClock — 붙여넣은 글을 시각으로 (#1028 검토)', () => {
+  it('`HH:MM` 이면 칸과 무관하게 시·분을 함께 채운다', () => {
+    expect(parsePastedClock('hour', '10:30')).toEqual({ hour: 10, minute: 30 })
+    expect(parsePastedClock('minute', ' 9:05 ')).toEqual({ hour: 9, minute: 5 })
+    expect(parsePastedClock('hour', '14시 20분')).toEqual({ hour: 14, minute: 20 })
+  })
+
+  it('숫자 네 자리·세 자리는 뒤 두 자리가 분이다', () => {
+    expect(parsePastedClock('hour', '1030')).toEqual({ hour: 10, minute: 30 })
+    expect(parsePastedClock('hour', '930')).toEqual({ hour: 9, minute: 30 })
+  })
+
+  it('숫자 한두 자리는 그 칸의 값이다', () => {
+    expect(parsePastedClock('hour', '14')).toEqual({ hour: 14 })
+    expect(parsePastedClock('minute', '7')).toEqual({ minute: 7 })
+  })
+
+  it('범위를 넘거나 숫자가 없으면 아무것도 바꾸지 않는다', () => {
+    expect(parsePastedClock('hour', '25')).toBeNull()
+    expect(parsePastedClock('minute', '75')).toBeNull()
+    expect(parsePastedClock('hour', '24:00')).toBeNull()
+    expect(parsePastedClock('hour', '12:60')).toBeNull()
+    expect(parsePastedClock('hour', 'abc')).toBeNull()
+    expect(parsePastedClock('hour', '12345')).toBeNull()
   })
 })

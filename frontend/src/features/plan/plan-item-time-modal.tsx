@@ -14,6 +14,7 @@ import {
   type ClockField,
   clockKeyValue,
   type ClockTime,
+  parsePastedClock,
   readClockInput,
   stepClock,
   toServerStartTime,
@@ -128,6 +129,16 @@ export function PlanItemTimeModal({
     if (input.kind === 'clear') {
       bufferRef.current = null
       set(field, 0)
+      return
+    }
+
+    if (input.kind === 'paste') {
+      bufferRef.current = null
+      const pasted = parsePastedClock(field, input.text)
+      // 못 읽으면 그대로 둔다 — 제어 입력이라 React 가 두 자리 표시로 되돌린다
+      if (pasted === null) return
+      if (pasted.hour !== undefined) setHour(pasted.hour)
+      if (pasted.minute !== undefined) setMinute(pasted.minute)
       return
     }
 
