@@ -13,6 +13,7 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.Period;
 import java.util.Base64;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -75,15 +76,19 @@ public class PlanShareLinkProcessor {
     }
 
     /**
-     * 소유자가 보는 현재 링크. 유효한 링크가 없으면(한 번도 안 만들었거나 폐기·만료됐으면)
-     * {@code PLAN_023} 404 다 — 소유자 경로에는 토큰이 없어 "만료" 와 "없음" 을 가를 입력 자체가
-     * 없고, 어느 쪽이든 할 일은 "새로 발급" 으로 같다.
+     * 소유자가 보는 현재 링크. 유효한 링크가 없으면(한 번도 안 만들었거나 폐기·만료됐으면) <b>empty</b> 다 —
+     * 소유자 경로에는 토큰이 없어 "만료" 와 "없음" 을 가를 입력 자체가 없고, 어느 쪽이든 할 일은
+     * "새로 발급" 으로 같다.
+     *
+     * <p><b>오류로 던지지 않는다</b> (#979). 링크는 일정당 0~1개인 선택적 하위 리소스라 "아직 없음" 은
+     * 정상 상태다 — 404 로 답하면 공유 모달을 열 때마다 브라우저 콘솔에 실패가 찍힌다. 일정 자체의
+     * 부재·타인 일정은 이 앞의 {@code getOwnedPlan} 이 {@code PLAN_001} 404 로 먼저 막는다.
+     * 공개 조회({@link #resolveSharedPlan})는 존재 노출을 막아야 해 계속 {@code PLAN_023} 404 다.
      */
     @Transactional(readOnly = true)
-    public PlanShareLinkInfo getActiveLink(Plan plan) {
+    public Optional<PlanShareLinkInfo> findActiveLink(Plan plan) {
         return planShareLinkRepositoryPort.findValidByPlanId(plan.id(), LocalDateTime.now(clock))
-            .map(PlanShareLinkProcessor::toInfo)
-            .orElseThrow(() -> new PlanException(PlanErrorCode.SHARE_LINK_NOT_FOUND));
+            .map(PlanShareLinkProcessor::toInfo);
     }
 
     /**

@@ -14,6 +14,13 @@ public interface PlanShareLinkWebUseCase {
     /** 공유 링크 발급. 유효한 링크가 이미 있으면 그것을 그대로 돌려준다 (멱등). */
     PlanShareLinkResponse issueShareLink(long memberId, long planId);
 
+    /**
+     * 소유자가 보는 현재 유효한 링크.
+     *
+     * @return 유효한 링크. <b>한 번도 발급하지 않았거나 폐기·만료됐으면 {@code null}</b> 이다 — 오류가 아니라
+     *         "공유 중이 아님" 이라는 정상 상태라 200 + {@code dataBody} null 로 나간다 (#979).
+     *         일정이 없거나 남의 것이면 {@code PLAN_001} 404 를 던진다
+     */
     PlanShareLinkResponse getShareLink(long memberId, long planId);
 
     /** 공유 링크 폐기. 닫을 링크가 없어도 성공이다 (멱등). */

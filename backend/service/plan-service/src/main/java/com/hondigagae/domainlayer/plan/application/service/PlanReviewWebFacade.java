@@ -29,11 +29,17 @@ public class PlanReviewWebFacade implements PlanReviewWebUseCase {
     private final PlanReviewProcessor planReviewProcessor;
     private final PlanReviewPresenter planReviewPresenter;
 
+    /**
+     * 후기가 없으면 {@code null} 을 돌려준다 — 컨트롤러가 그대로 {@code dataBody} null 인 200 으로 싣는다 (#979).
+     * 소유 확인이 먼저라 일정이 없거나 남의 것이면 여기서 {@code PLAN_001} 404 로 끝난다.
+     */
     @Override
     @Transactional(readOnly = true)
     public PlanReviewResponse getReview(long memberId, long planId) {
         Plan plan = planQueryProcessor.getOwnedPlan(memberId, planId);
-        return planReviewPresenter.toResponse(planReviewProcessor.getReview(plan));
+        return planReviewProcessor.findReview(plan)
+            .map(planReviewPresenter::toResponse)
+            .orElse(null);
     }
 
     @Override

@@ -30,11 +30,17 @@ public class PlanShareLinkWebFacade implements PlanShareLinkWebUseCase {
         return planShareLinkPresenter.toShareLinkResponse(planShareLinkProcessor.issue(plan));
     }
 
+    /**
+     * 유효한 링크가 없으면 {@code null} 을 돌려준다 — 컨트롤러가 그대로 {@code dataBody} null 인 200 으로 싣는다 (#979).
+     * 소유 확인이 먼저라 일정이 없거나 남의 것이면 여기서 {@code PLAN_001} 404 로 끝난다.
+     */
     @Override
     @Transactional(readOnly = true)
     public PlanShareLinkResponse getShareLink(long memberId, long planId) {
         Plan plan = planQueryProcessor.getOwnedPlan(memberId, planId);
-        return planShareLinkPresenter.toShareLinkResponse(planShareLinkProcessor.getActiveLink(plan));
+        return planShareLinkProcessor.findActiveLink(plan)
+            .map(planShareLinkPresenter::toShareLinkResponse)
+            .orElse(null);
     }
 
     @Override
