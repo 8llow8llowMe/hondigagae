@@ -5,7 +5,31 @@ import { describe, expect, it } from 'vitest'
 
 import { PlanListSection, type PlanListSectionProps } from '@/features/plan/plan-list-section'
 import { messages } from '@/lib/messages'
+import type { Pet } from '@/types/pet'
 import type { PlanStatusCode, PlanSummaryItem } from '@/types/plan'
+
+function pet(petId: string, name: string, profileImageUrl: string | null = null): Pet {
+  return {
+    petId,
+    name,
+    breed: '말티즈',
+    birthYm: '2017-05',
+    age: 9,
+    sizeType: { code: 'SMALL', name: '소형견', description: null },
+    weightKg: 3.5,
+    heatSensitive: false,
+    coldSensitive: false,
+    noiseSensitive: false,
+    activityLevel: { code: 'MEDIUM', name: '활동량 보통', description: null },
+    walkPreferred: true,
+    sociality: { code: 'HIGH', name: '사회성 높음', description: null },
+    profileImageUrl,
+    representative: false,
+  }
+}
+
+const MONGSIL = pet('123456789012000001', '몽실이')
+const CHOCO = pet('123456789012000002', '초코')
 
 const STATUS_NAMES: Record<PlanStatusCode, string> = {
   DRAFT: '초안',
@@ -34,7 +58,7 @@ function render(overrides: Partial<PlanListSectionProps> = {}) {
   const props: PlanListSectionProps = {
     plans: [plan()],
     totalCount: 1,
-    petNames: new Map([['123456789012000001', '몽실이']]),
+    pets: [MONGSIL],
     today: TODAY,
     loading: false,
     errorStatus: null,
@@ -150,7 +174,7 @@ describe('일정 목록 — 상태 화면', () => {
 
 describe('일정 행', () => {
   it('반려견 조회가 실패해도 행을 숨기지 않는다', () => {
-    const html = render({ petNames: new Map() })
+    const html = render({ pets: [] })
     expect(html).toContain('몽실이와 제주 2박 3일')
   })
 
@@ -161,10 +185,7 @@ describe('일정 행', () => {
   it('동행이 두 마리면 수를 드러낸다', () => {
     const html = render({
       plans: [plan({ petIds: ['123456789012000001', '123456789012000002'] })],
-      petNames: new Map([
-        ['123456789012000001', '몽실이'],
-        ['123456789012000002', '초코'],
-      ]),
+      pets: [MONGSIL, CHOCO],
     })
     expect(html).toContain('몽실이 외 1마리')
   })
@@ -177,16 +198,27 @@ describe('일정 행', () => {
   })
 
   /*
-    그 아이만 조회에 실패하면 `petNames` 에서 빠진다 (`types/plan.ts:122`). 남은 이름으로
+    그 아이만 조회에 실패하면 `pets` 에서 빠진다 (`types/plan.ts:122`). 남은 이름으로
     말하고, id 나 "알 수 없음" 을 세우지 않는다.
   */
   it('두 마리 중 하나를 못 찾으면 남은 한 마리로 말한다', () => {
     const html = render({
       plans: [plan({ petIds: ['123456789012000001', '123456789012000002'] })],
-      petNames: new Map([['123456789012000001', '몽실이']]),
+      pets: [MONGSIL],
     })
     expect(html).not.toMatch(/외\s*\d+마리/)
     expect(html).toContain('몽실이')
+  })
+
+  /*
+    행이 이름만 받던 때에는 사진을 올린 아이도 이 행에서만 이니셜로 떴다 — 같은 화면의
+    필터 레일은 같은 아이를 사진으로 그렸다.
+  */
+  it('대표 반려견의 사진을 아바타로 그린다', () => {
+    const html = render({
+      pets: [pet('123456789012000001', '몽실이', 'https://storage.example.com/pets/1.jpg')],
+    })
+    expect(html).toContain('https://storage.example.com/pets/1.jpg')
   })
 
   it('D-day 는 오늘 기준으로 센다', () => {
