@@ -153,9 +153,27 @@ export function PlanDayVerdict({
           요구(`보통` 이 혼잡도의 `보통` 과 구분된다)는 그대로 지켜진다 — 좌 레일 목차가
           섹션 머리에 맡긴 것과 같은 방식이고, 여기서는 이 캡션이 그 자리다.
         */}
-        <div className="flex flex-col gap-1">
-          <span className="text-caption text-fg-muted font-medium">
-            {messages.common.metricAxisSuitability}
+        <div className="flex min-w-0 flex-col gap-1">
+          {/*
+            **기준 장소를 축 이름 옆에 밝힌다.** 일자 판정은 그날 첫 장소 하나의 판정이라
+            (`messages.plan.verdictBasisPlace` 주석) 아래 근거가 그 장소 이야기인데, 밴드가
+            "N일차" 머리 바로 아래 서서 하루 전체의 판정으로 읽혔다.
+
+            **맨 아래 단서 줄(`PlanVerdictNotes`)이 아니라 여기다.** 근거를 읽기 **전에** 알아야
+            하는 사실이다 — 기준 반려견 줄이 "누구의 판정인지" 를 맨 위에 두는 것과 같은 판단이다.
+            축 이름은 자기 `span` 을 그대로 갖는다 (위 #652 · #856 테스트가 그 모양을 잠근다).
+          */}
+          <span className="text-caption text-fg-muted flex flex-wrap gap-x-1 font-medium">
+            <span>{messages.common.metricAxisSuitability}</span>
+            {verdict.representativePlaceTitle !== null && (
+              <span className="break-keep">
+                {'· '}
+                {messages.plan.verdictBasisPlace.replace(
+                  '{title}',
+                  verdict.representativePlaceTitle,
+                )}
+              </span>
+            )}
           </span>
 
           <span className="flex items-center gap-1.5">
