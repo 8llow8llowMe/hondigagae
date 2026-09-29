@@ -10,6 +10,7 @@ import com.hondigagae.domainlayer.planner.application.info.AiPlanSubmissionInfo;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanJobSubscription;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobEventPort;
 import com.hondigagae.domainlayer.planner.application.port.out.AiPlanJobStorePort;
+import com.hondigagae.domainlayer.planner.application.port.out.PlanAiCommitQueryPort;
 import com.hondigagae.domainlayer.planner.application.service.worker.AiPlanWorker;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJob;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStatus;
@@ -48,6 +49,7 @@ public class AiPlanJobProcessor {
     private final AiPlanJobEventPort aiPlanJobEventPort;
     private final AiPlanWorker aiPlanWorker;
     private final AiPlanJobProperties aiPlanJobProperties;
+    private final PlanAiCommitQueryPort planAiCommitQueryPort;
 
     public AiPlanSubmissionInfo submitPlan(long memberId, AiPlanCreateCommand command) {
         if (command.startDate().isAfter(command.endDate())) {
@@ -111,11 +113,27 @@ public class AiPlanJobProcessor {
             throw new AiPlanException(AiPlanErrorCode.JOB_NOT_FOUND);
         }
 
-        return toInfo(expireIfStuck(job));
+        AiPlanJob current = expireIfStuck(job);
+        return toInfo(current, findCommittedPlanId(current));
+    }
+
+    /**
+     * 이 잡의 초안을 담아 만든 일정 (#970). 담긴 사실의 정본은 plan-service 라 조회 때마다 묻는다.
+     *
+     * <p><b>COMPLETED 일 때만 묻는다.</b> 초안이 없는 상태에서는 담을 것도 없으므로 대기·실행 중 폴링과
+     * SSE 이벤트마다 원격 호출이 붙지 않게 한다. 소유권 검증 뒤에만 불리므로 남의 jobId 로는 plan-service
+     * 까지 가지 않는다 ({@code AiPlanJobConditionsExposureTest} 와 같은 노출 순서 원칙). 포트가 관용이라
+     * plan-service 가 흔들려도 여기서 조회가 실패하지 않는다.
+     */
+    private Long findCommittedPlanId(AiPlanJob job) {
+        if (job.status() != AiPlanJobStatus.COMPLETED) {
+            return null;
+        }
+        return planAiCommitQueryPort.findCommittedPlanId(job.memberId(), job.jobId()).orElse(null);
     }
 
     /** 잡 하나를 응답용 Info 로. 조회와 취소가 같은 모양을 돌려주도록 한곳에 둔다. */
-    private AiPlanJobInfo toInfo(AiPlanJob job) {
+    private AiPlanJobInfo toInfo(AiPlanJob job, Long committedPlanId) {
         return AiPlanJobInfo.builder()
             .jobId(job.jobId())
             .status(job.status())
@@ -125,6 +143,7 @@ public class AiPlanJobProcessor {
             // 그것만 따로 물어볼 수단이 없다 (#488).
             .conditions(AiPlanConditionsInfo.from(job.requestParams()))
             .planDraft(job.status() == AiPlanJobStatus.COMPLETED ? AiPlanDraftInfo.from(job.planDraft()) : null)
+            .committedPlanId(committedPlanId)
             .errorCode(job.errorCode())
             .errorMessage(job.errorMessage())
             .build();
@@ -150,8 +169,9 @@ public class AiPlanJobProcessor {
         if (job.memberId() == null || !job.memberId().equals(memberId)) {
             throw new AiPlanException(AiPlanErrorCode.JOB_NOT_FOUND);
         }
+        // 취소 응답은 COMPLETED 가 될 수 없으므로(완료는 409) 담은 일정을 묻지 않는다.
         if (job.status() == AiPlanJobStatus.CANCELED) {
-            return toInfo(job);
+            return toInfo(job, null);
         }
         if (!job.status().isCancelable()) {
             throw new AiPlanException(AiPlanErrorCode.JOB_NOT_CANCELABLE);
@@ -167,7 +187,7 @@ public class AiPlanJobProcessor {
         aiPlanJobEventPort.publishJobUpdated(jobId);
         log.info("AI plan job canceled by member jobId={} memberId={} statusBefore={} step={}",
             jobId, memberId, job.status(), job.step());
-        return toInfo(canceled);
+        return toInfo(canceled, null);
     }
 
     private AiPlanJob expireIfStuck(AiPlanJob job) {

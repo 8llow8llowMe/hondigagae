@@ -131,9 +131,14 @@ class AiPlanJobCancelTest {
 
     // 픽스처 ──────────────────────────────────────────────────────────────
 
-    /** 워커는 취소 경로에서 쓰이지 않으므로 넘기지 않는다 — 필요해지면 컴파일이 알려 준다. */
+    /**
+     * 워커는 취소 경로에서 쓰이지 않으므로 넘기지 않는다 — 필요해지면 NPE 가 알려 준다.
+     * 취소 응답은 COMPLETED 가 될 수 없어 담은 일정도 묻지 않는다 (#970). 물으면 여기서 깨진다.
+     */
     private AiPlanJobProcessor processor(FakeStore store, FakeEvents events) {
-        return new AiPlanJobProcessor(store, events, null, new AiPlanJobProperties(0, 0, 0));
+        return new AiPlanJobProcessor(store, events, null, new AiPlanJobProperties(0, 0, 0), (memberId, jobId) -> {
+            throw new AssertionError("cancel must not look up committed plan");
+        });
     }
 
     private static AiPlanJob job(AiPlanJobStatus status, AiPlanJobStep step) {

@@ -43,6 +43,8 @@ public class AiPlanPresenter {
             .totalSteps(AiPlanJobStep.total())
             .conditions(toConditionsResponse(info.conditions()))
             .planDraft(toDraftResponse(info.planDraft()))
+            // Snowflake 라 문자열로 내린다 (coding-conventions §7-1). 폴링과 SSE 가 모두 여기를 지난다.
+            .committedPlanId(info.committedPlanId() == null ? null : String.valueOf(info.committedPlanId()))
             .errorCode(info.errorCode())
             .errorMessage(info.errorMessage())
             .build();

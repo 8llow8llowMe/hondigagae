@@ -53,7 +53,10 @@ class AiPlanJobConditionsExposureTest {
     /** 조회 경로는 워커·이벤트를 쓰지 않는다. 필요해지면 NPE 가 알려 준다. */
     private AiPlanJobProcessor processor(FakeStore store) {
         // 타임아웃을 넉넉히 둬 expireIfStuck 이 끼어들지 않게 한다 — 여기서 볼 것은 소유권이다.
-        return new AiPlanJobProcessor(store, null, null, new AiPlanJobProperties(600, 600, 600));
+        // 대기·실행 중 잡이라 담은 일정(#970)은 묻지 않는다. 물으면 여기서 깨진다.
+        return new AiPlanJobProcessor(store, null, null, new AiPlanJobProperties(600, 600, 600), (memberId, jobId) -> {
+            throw new AssertionError("non-completed job must not look up committed plan");
+        });
     }
 
     private static AiPlanJob jobWithConditions() {

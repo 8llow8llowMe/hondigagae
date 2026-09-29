@@ -1,0 +1,35 @@
+# 컨텍스트 로딩 테스트 전용 프로파일.
+# 목적은 "빈 정의가 서로 충돌하지 않고 컨텍스트가 뜨는가" 하나다. 외부 의존은 전부 끊는다.
+#   - Eureka / Config Server: 비활성. 등록·조회를 시도하면 CI 에서 네트워크로 죽는다.
+#   - Redis: 접속 정보만 둔다. Lettuce 는 첫 명령 때 연결하고, 리스너 컨테이너는 구독이 생길 때 연결한다.
+#   - Ollama: 어댑터는 첫 호출 때 연결하므로 주소만 있으면 된다.
+#   - Feign 클라이언트는 프록시만 만들어지고 호출하지 않으므로 대상 서비스가 없어도 된다.
+server:
+  port: 0
+
+spring:
+  cloud:
+    config:
+      enabled: false
+    discovery:
+      enabled: false
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+infra:
+  redis:
+    mode: standalone
+    host: localhost
+    port: 6379
+    password:
+    key-prefix: hondigagae:context-test
+
+app:
+  security:
+    jwt:
+      resource:
+        access-key: context-test-only-jwt-access-key-0123456789abcdef0123456789abcdef0123456789abcdef

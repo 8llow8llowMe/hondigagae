@@ -39,6 +39,12 @@ public record AiPlanJobStatusResponse(
     @Schema(description = "생성된 일정 초안. status=COMPLETED 일 때만 채워지고 그 외에는 null", nullable = true)
     AiPlanDraftResponse planDraft,
 
+    @Schema(description = "이 작업의 초안을 이미 담은 일정 아이디(Snowflake, 문자열). COMPLETED 이고 담은 적이 있을 때만 채워지고 "
+        + "그 외(대기·실행·실패·취소, 담기 전, 담은 일정을 삭제한 뒤)는 null. "
+        + "plan-service 조회에 실패해도 null — 그때 담기를 눌러도 새 일정은 생기지 않는다(멱등 키는 plan-service 에 있다)",
+        example = "1234567890123456789", nullable = true)
+    String committedPlanId,
+
     @Schema(description = "실패 사유 코드. status=FAILED 일 때만 채워지고 그 외에는 null", example = "AIPLAN_005", nullable = true)
     String errorCode,
 
