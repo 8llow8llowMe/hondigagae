@@ -4,6 +4,7 @@ import type { SliceResponse } from '@/types/api'
 import type { PlanEmergencyResponse } from '@/types/emergency'
 import type {
   PlanBriefingResponse,
+  PlanCompanionSummary,
   PlanCopyPayload,
   PlanCreatePayload,
   PlanDayItemsReplacePayload,
@@ -91,6 +92,20 @@ export function planEmergencyPath(planId: string): string {
 
 export function planWeatherPath(planId: string): string {
   return paths.plans.weather(planId)
+}
+
+// ─── 반려견 기준 동행 일정 집계 (#1042) ──────────────────────────────────────
+
+export function planCompanionSummaryPath(petId: string): string {
+  return paths.plans.companions(petId)
+}
+
+/**
+ * 반려견 삭제 확인창이 **삭제 전에** 읽는다. 남의 · 없는 petId 도 404 가 아니라 0 / 0 / 0 이다
+ * (`PlanCompanionSummary` 주석) — 이 조회가 404 로 떨어지는 갈래는 없다.
+ */
+export function fetchPlanCompanionSummary(petId: string): Promise<PlanCompanionSummary> {
+  return clientFetch<PlanCompanionSummary>(planCompanionSummaryPath(petId))
 }
 
 /**

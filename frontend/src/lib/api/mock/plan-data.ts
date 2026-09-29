@@ -24,6 +24,7 @@ import type {
   PlanAlternativePlaceItem,
   PlanBriefingItemSummary,
   PlanBriefingResponse,
+  PlanCompanionSummary,
   PlanDayWeatherItem,
   PlanDetail,
   PlanItemDetail,
@@ -435,9 +436,25 @@ export function resolvePlanMock(
     briefingDate = bound
   }
 
+  /*
+    반려견 기준 동행 일정 집계 (#1042). **경로 변수가 planId 가 아니라 petId 다** — `withPlan` 을
+    타지 않는다. 바인딩이 인증보다 앞인 것은 위 브리핑과 같은 이유다(인자를 먼저 푼다).
+  */
+  const companions = /^\/plans\/companions\/([^/]+)$/.exec(path)
+  let companionPetId = ''
+  if (companions !== null && method === 'GET') {
+    const bound = bindPlanPathVariable('petId', companions[1] ?? '')
+    if (typeof bound !== 'string') return bound
+    companionPetId = bound
+  }
+
   // 모든 일정 엔드포인트가 @PreAuthorize("isAuthenticated()") 다
   const memberId = memberIdOf(accessToken)
   if (memberId === null) return UNAUTHORIZED()
+
+  if (companions !== null && method === 'GET') {
+    return { status: 200, payload: ok(companionSummary(memberId, companionPetId)) }
+  }
 
   if (path === '/plans') {
     if (method === 'GET') return list(memberId, search)
@@ -587,6 +604,59 @@ export function resolvePlanMock(
  * 바인딩 단계에서 걸린다 (장소 상세의 `PLACE_113` 과 같은 상황).
  * **남의 일정도 404 다** — 컨트롤러 설명이 존재 여부를 흘리지 않겠다고 명시했다.
  */
+/** 동행 목록을 바꿀 수 있는 상태 — 백엔드 `PlanStatus.companionEditableStatuses()` 복제본 */
+const COMPANION_EDITABLE_STATUSES = new Set(['DRAFT', 'CONFIRMED'])
+
+/**
+ * 반려견 기준 동행 일정 집계 — `GET /plans/companions/{petId}` (#1042).
+ *
+ * 근거: `PlanQueryProcessor.getCompanionSummary` · `PlanRepository.findPlansWithPet` 소스 실측.
+ * 미삭제 일정 중 이 아이를 실은 것 전부를 상태 무관으로 읽고, 미완료 / 완료를 가른다.
+ * **남의 · 없는 petId 도 404 가 아니다** — 걸리는 일정이 없으니 0 / 0 / 0 이다.
+ */
+function companionSummary(memberId: string, petId: string): PlanCompanionSummary {
+  const plans = mockStore().plans.filter(
+    (plan) => plan.memberId === memberId && !plan.deleted && plan.petIds.includes(petId),
+  )
+  const editable = plans.filter((plan) => COMPANION_EDITABLE_STATUSES.has(plan.status))
+
+  return {
+    petId,
+    editablePlanCount: editable.length,
+    soleCompanionPlanCount: editable.filter(
+      (plan) => plan.petIds.length === 1 && plan.petIds[0] === petId,
+    ).length,
+    completedPlanCount: plans.length - editable.length,
+  }
+}
+
+/**
+ * 반려견 삭제 직후의 동행 정리 (#1042) — auth 가 삭제를 커밋한 직후 plan-service 에 거는
+ * 대사 트리거(`POST /internal/v1/plans/companions/reconcile`)를 흉내 낸다. 반려견 mock 의
+ * 삭제가 부른다 — 실서버도 삭제 **응답 전에** 동기로 끝난다.
+ *
+ * 규칙 정본: `backend/docs/services/plan-service.md` "반려견이 삭제되면".
+ *  - R1 미완료(초안·확정) · 미삭제 일정만 — **완료 일정은 불가침**
+ *  - R2 뗀 뒤 남은 첫 아이(저장 순서)를 대표(`petId`)로 올린다
+ *  - R3 떼면 0마리가 되는 일정은 **그대로 둔다** — 지운 id 가 자리 표시자로 남는다
+ *
+ * 실서버는 "이 회원을 대사하라" 라서 auth 에 살아 있는 아이를 되묻고 죽은 아이를 전부 뗀다.
+ * 목은 방금 지운 한 마리만 뗀다 — 목에서는 다른 죽은 아이가 다견 일정에 남는 경로가 없다.
+ */
+export function reconcileDeletedPet(memberId: string, petId: string): void {
+  for (const plan of mockStore().plans) {
+    if (plan.memberId !== memberId || plan.deleted) continue
+    if (!COMPANION_EDITABLE_STATUSES.has(plan.status)) continue
+    if (!plan.petIds.includes(petId)) continue
+
+    const remaining = plan.petIds.filter((id) => id !== petId)
+    if (remaining.length === 0) continue
+
+    plan.petIds = remaining
+    plan.petId = remaining[0] as string
+  }
+}
+
 function withPlan(
   memberId: string,
   rawId: string,

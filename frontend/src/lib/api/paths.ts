@@ -118,6 +118,11 @@ export const paths = {
     dayItems: (planId: string, day: number) => `/plans/${planId}/days/${day}/items`,
     weather: (planId: string) => `/plans/${planId}/weather`,
     /**
+     * 반려견 기준 동행 일정 집계 (#1042) — 반려견 삭제 확인창이 읽는다. **경로 변수가 planId 가
+     * 아니라 petId 다.** 세그먼트가 둘이라 상세(`/plans/{planId}`)와 겹치지 않는다.
+     */
+    companions: (petId: string) => `/plans/companions/${petId}`,
+    /**
      * 항목 산책 위험도 (#625). **경로 파라미터만이다** — 날짜·시각·반려견을 쿼리로
      * 보내지 않는다.
      */

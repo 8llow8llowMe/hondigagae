@@ -12,6 +12,7 @@ import type {
   PlanBriefingSchedule,
   PlanBriefingWalkTimes,
   PlanBriefingWeatherWarning,
+  PlanCompanionSummary,
   PlanDayWeatherItem,
   PlanDetail,
   PlanItemDetail,
@@ -430,4 +431,21 @@ export function planBriefingWarning(
     effectiveAt: '2026-09-13T07:00:00',
     ...overrides,
   }
+}
+
+/**
+ * 반려견 삭제 확인창용 동행 일정 집계 (#1042) — `GET /plans/companions/{petId}`.
+ *
+ * 근거: plan-service `PlanCompanionWebController` · `PlanCompanionSummaryResponse` 소스 실측
+ * (origin/develop, 2026-09-29). 삭제 흐름에서만 부르므로 Swagger 스키마 예시 모양으로 손으로
+ * 만들었다 — `petId` 는 문자열이다.
+ *
+ * **세 수가 전부 0 이 아니다** — 세 문장이 다 서는 갈래가 기본이어야 0 을 거르는 규칙이
+ * 기본 경로에서 드러난다.
+ */
+export const petCompanionSummary: PlanCompanionSummary = {
+  petId: '123456789012000002',
+  editablePlanCount: 2,
+  soleCompanionPlanCount: 1,
+  completedPlanCount: 3,
 }

@@ -1108,3 +1108,26 @@ export const SHARE_LINK_EXPIRED_CODE = 'PLAN_024'
  * 링크도 막힌다.
  */
 export const SHAREABLE_PLAN_STATUSES = ['CONFIRMED', 'COMPLETED'] as const
+
+/**
+ * 반려견 기준 동행 일정 집계 (#1042) — `GET /plans/companions/{petId}`.
+ *
+ * 근거: plan-service `PlanCompanionWebController` · `PlanCompanionSummaryResponse` ·
+ * `PlanQueryProcessor.getCompanionSummary` 소스 실측 (origin/develop, 2026-09-29).
+ *
+ * **남의 · 없는 petId 도 404 가 아니다** — 세 값이 모두 0 인 200 이다. 숫자가 아닌 petId 만
+ * `@PathVariable long` 바인딩에서 400 이 된다.
+ */
+export type PlanCompanionSummary = {
+  /** 집계한 반려견. **문자열이다** (Snowflake) */
+  petId: string
+  /**
+   * 초안 · 확정 일정 중 이 아이가 동행하는 수. 삭제하면 이 일정들의 동행 목록에서 빠진다 —
+   * 아래 `soleCompanionPlanCount` 에 든 일정만 지운 id 가 자리 표시자로 남는다
+   */
+  editablePlanCount: number
+  /** `editablePlanCount` 중 이 아이 한 마리만 동행하는 수. 일정은 지워지지 않는다 */
+  soleCompanionPlanCount: number
+  /** 완료 일정 중 동행한 수. 다녀온 기록이라 삭제해도 바뀌지 않는다 */
+  completedPlanCount: number
+}
