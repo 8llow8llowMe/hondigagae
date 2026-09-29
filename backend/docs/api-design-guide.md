@@ -167,6 +167,10 @@ LLM 호출 등 응답이 길어지는 작업(AI 여행 플래너 일정 생성, 
 - **상태 저장** — Redis Hash / String + TTL 24h. JPA 가 없는 서비스는 Redis 로 충분, 장기 audit 필요 시 DB 추가
 - **idempotency 키** — `{prefix}:{domain}:job:idempotency:{memberId}:{requestHash}` 패턴. requestHash 는 `SHA256(jobType | param1=v1 | ...)` 앞 32자
 - **에러** — Exception → ErrorCode 매핑은 동기 endpoint 와 동일 패턴 사용, 단 작업 실패는 200 OK + `status=FAILED` + `errorCode/errorMessage` 로 응답 (HTTP 5xx 가 아님)
+- **잡 결과를 다른 서비스에 저장하는 "담기"** — 저장하는 서비스가 jobId 를 멱등 키로 받고(`(member_id, job_id)` 유니크 + 이미 있으면 200 으로 기존 자원),
+  잡 조회는 그 서비스에 물어 결과 식별자를 싣는다 (이슈 [#970](https://github.com/8llow8llowMe/hondigagae/issues/970), AI 초안 → `POST /api/v1/plans` `sourceAiJobId`).
+  잡(Redis)에 "담았다" 를 적지 않는다 — TTL 에 사라지고, 종결 잡은 덮어쓰지 않으며, 두 저장소의 커밋이 갈라져 고아 자원이 생긴다.
+  저장한 자원을 지우면 키도 비워 다시 담을 수 있게 한다 (`services/plan-service.md` "AI 초안 담기 멱등").
 
 ## 8. AI 대화형 API 설계
 

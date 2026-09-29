@@ -59,7 +59,7 @@
 
 | 메서드 | 경로 |
 | --- | --- |
-| POST·GET | `/api/v1/plans` | 생성은 `petIds`(최대 5, 첫 번째 = 대표) — ai-plans 와 같은 우선순위. `petId` 필터 = 반려견별 히스토리(한 마리라도 동행이면 히트) |
+| POST·GET | `/api/v1/plans` | 생성은 `petIds`(최대 5, 첫 번째 = 대표) — ai-plans 와 같은 우선순위. `sourceAiJobId` 를 실으면 AI 초안 담기 멱등(이미 담았으면 200 + 기존 일정, #970). `petId` 필터 = 반려견별 히스토리(한 마리라도 동행이면 히트) |
 | GET·PUT·DELETE | `/api/v1/plans/{planId}` | 항목마다 장소 요약(주소·실내·대표 이미지·좌표) 포함. `petIds` 동행 목록 |
 | PUT | `/api/v1/plans/{planId}/days/{day}/items` |
 | GET | `/api/v1/plans/{planId}/weather` | 일자별 날씨 브리핑 + 비 오는 날 실내 대안. 여러 마리는 아이별 판정 → 가장 낮은 아이 기준(`basisPetId`·`petSuitabilities`) |

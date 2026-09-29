@@ -44,7 +44,8 @@
 - 컨텍스트: `plan`
 - 특징: write 중심 서비스, 도메인 중심 write 흐름. **일정의 소유권은 이 서비스에 있다** — ai-service 는 제안만 하고 저장·확정은 여기서만 일어난다. 장소 항목은 tour-service Feign 조회로 존재를 검증한다(서킷브레이커 `tour-service`).
 - 구현 API
-  - `POST /api/v1/plans`, `GET /api/v1/plans` (커서 기반)
+  - `POST /api/v1/plans`, `GET /api/v1/plans` (커서 기반). POST 는 `sourceAiJobId` 로 AI 초안 담기 멱등 (#970)
+  - `GET /internal/v1/plans/ai-commits/{jobId}` (내부 전용 — ai 잡 조회의 `committedPlanId`)
   - `GET|PUT|DELETE /api/v1/plans/{planId}`
   - `PUT /api/v1/plans/{planId}/days/{day}/items` (일자 항목 일괄 교체)
   - `GET /api/v1/plans/{planId}/weather` (일자별 날씨 브리핑 + 비 오는 날 실내 대안)

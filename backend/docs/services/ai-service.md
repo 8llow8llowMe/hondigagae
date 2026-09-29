@@ -38,8 +38,10 @@ LLM 기반 AI 기능 전담. 선정된 AI 기능의 LLM 호출·프롬프트·�
     강수확률 60%↑ 실내 위주, 최고기온 31℃↑ 야외는 아침·저녁 배치 지시. 커버리지 밖/조회 실패는 절 생략
 - `POST /api/v1/ai-plans/packing-list/{planId}` — 반려견 여행 준비물 목록 생성 (동기, 수십 초 가능).
   일정 개요(필수)·반려견 특성·날씨 전망(관용)을 근거로 항목마다 이 여행 데이터 기반의 이유를 붙인다. 저장하지 않는 제안이다
-- `GET /api/v1/ai-plans/jobs/{jobId}` — 폴링. 상태·초안과 함께 제출 때 쓴 생성 조건(`conditions`)을 내린다
-- `GET /api/v1/ai-plans/jobs/{jobId}/stream` — SSE. 이벤트 페이로드가 폴링 응답과 같아 `conditions` 도 함께 온다
+- `GET /api/v1/ai-plans/jobs/{jobId}` — 폴링. 상태·초안과 함께 제출 때 쓴 생성 조건(`conditions`)과,
+  완료된 작업이면 그 초안을 이미 담은 일정(`committedPlanId`, plan-service 에 물어 온다)을 내린다
+- `GET /api/v1/ai-plans/jobs/{jobId}/stream` — SSE. 이벤트 페이로드가 폴링 응답과 같아 `conditions` ·
+  `committedPlanId` 도 함께 온다
 - `POST /api/v1/ai-plans/jobs/{jobId}/cancel` — 작업 취소. 이미 취소된 잡은 200(멱등),
   완료·실패한 잡은 409(AIPLAN_019)
 - `POST /api/v1/ai-plans/{planId}/revisions` — 자연어 일정 수정 ("카페 말고 다른 곳")
@@ -75,6 +77,8 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
   GPU 와 워커 스레드만 점유한다 — 실패 처리는 서킷 + 잡 상태로 일원화한다.
 - 서킷 인스턴스 `llm` 단일 인스턴스, `slow-call-duration-threshold` 완화 (`coding-conventions.md` §10).
 - **일정을 소유하지 않는다** — 생성 결과는 제안(draft)이며, 저장·확정의 원천은 plan-service다.
+  **담긴 사실의 정본도 plan-service 다** — 담기 멱등 키(`plan.source_ai_job_id`)를 plan 이 쥐고,
+  잡 조회는 그쪽에 물어 `committedPlanId` 를 싣는다 (#970, 아래 "담은 일정을 함께 내린다").
 - **환각은 사후 검증보다 후보를 먼저 주는 방식으로 막는다.** tour-service 에서 동반 가능으로
   확인된 장소 목록을 받아 프롬프트에 싫고 "이 안에서만 고르라"고 한다. 검증은 틀린 답을
   걸러낼 뿐이지만 후보를 주는 방식은 애초에 틀릴 자리를 없앨다.
@@ -246,6 +250,38 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
 그 넷도 쓰므로(`frontend/src/types/ai-plan.ts` 의 `AiPlanRequestSnapshot`), 그쪽 복원은 여전히
 프론트 저장소에 기댄다 — 다른 브라우저에서는 "꼭 넣을 장소" 와 "저장한 장소 우선" 이 조용히
 초기화된다. 넓힐지는 계약 변경이라 #488 범위 밖으로 두고 여기 남긴다.
+
+### 담은 일정을 함께 내린다 (`committedPlanId`) (필수)
+
+작업 조회·SSE 응답에 `committedPlanId` 를 싣는다 — 이 작업의 초안을 이미 담아 만든 일정 아이디
+([#970](https://github.com/8llow8llowMe/hondigagae/issues/970)). 화면은 값이 있으면 담기 버튼 대신
+그 일정으로 가는 링크를 보여 준다. 담기 멱등은 plan-service 가 맡는다(`POST /api/v1/plans` 의
+`sourceAiJobId`, `plan-service.md` "AI 초안 담기 멱등") — 이 값은 그 결과를 **보여 주는** 쪽이다.
+
+- **잡에 저장하지 않는다.** `AiPlanJob`(Redis 모양)·`AiPlanJobStorePort` 는 그대로다. 잡에 적어 두면
+  TTL 24h 와 함께 사라지고, 담은 일정을 지워도 잡은 모른다. 조회 때마다
+  `PlanAiCommitQueryPort` → `PlanAiCommitClientAdapter` → plan-service
+  `GET /internal/v1/plans/ai-commits/{jobId}?memberId=` 로 묻는다.
+- **COMPLETED 에서만 묻는다.** 초안이 없으면 담을 것도 없다 — 대기·실행·실패·취소 상태의 폴링과
+  이벤트마다 원격 호출이 붙지 않게 한다. 취소 응답(`cancelJob`)은 COMPLETED 가 될 수 없어 묻지 않고 null 이다.
+- **소유권 검증 뒤에만 묻는다.** 남의 `jobId` 는 지금처럼 404 `AIPLAN_002` 이고 plan-service 까지
+  가지 않는다(조건 노출과 같은 순서 원칙). plan 쪽도 `memberId` 로 한 번 더 거른다.
+- **관용이다 — 못 물으면 null.** 같은 plan-service 를 부르는 `PlanOutlineClientAdapter` 는 503 을
+  올리지만(재생성의 필수 입력), 이 어댑터는 서킷 오픈·5xx·타임아웃은 warn 로그와 함께, 404 는 로그 없이 비운다.
+  던지면 plan-service 한 번 흔들림에 초안 조회가 503 이 되고, SSE 는 구독 콜백이 예외를 삼켜 종결
+  이벤트를 못 보낸다. null 일 때 다시 담아도 plan-service 의 멱등 키가 기존 일정을 돌려주므로
+  일정이 두 개 생기지 않는다.
+- **담은 일정을 삭제하면 null 로 돌아간다.** plan 이 삭제 때 멱등 키를 비우므로 잡 화면은 담기 전
+  모양이 되고, 다시 담으면 새 일정이 생긴다.
+- **폴링과 SSE 가 같은 모양이다.** 둘 다 `AiPlanPresenter#toJobStatusResponse` 를 지나며, Snowflake 라
+  문자열로 내린다(`coding-conventions.md` §7-1).
+- **SSE 는 종결 이벤트마다 Feign 1회가 Redis pub/sub 리스너 스레드에서 돈다.** 구독 콜백이
+  `getJobInfo` 를 다시 부르기 때문이다(하트비트의 종결 재확인은 같은 호출을 하트비트 스케줄러 스레드에서
+  한다). 읽기 타임아웃(기본 5초)이 그 스레드를 붙잡는 상한이고, 서킷이 열리면 호출 없이 바로 null 이다.
+  구독 하나가 받는 종결 이벤트는 한 번이라 호출도 구독당 한 번이다.
+- 테스트: `AiPlanJobCommittedPlanTest`(상태·소유권·관용), `AiPlanJobCommittedPlanPresenterTest`(문자열),
+  `PlanAiCommitClientAdapterTest`(예외 접기), `AiServiceApplicationTests`(plan-service 를 부르는 두 Feign
+  클라이언트의 `contextId` 충돌 게이트).
 
 ### 취소는 협조적이다 (필수)
 
