@@ -17,7 +17,7 @@ import { ReasonList } from '@/components/reason-list'
 import { Skeleton } from '@/components/skeleton'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { VERDICT_ANCHOR } from '@/features/place/place-verdict-summary-lines'
-import { formatCelsius } from '@/lib/format/celsius'
+import { formatStandaloneCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -92,9 +92,12 @@ export function PlaceWalkSafetyPanel({
   /*
     **`heatIndexCelsius` 가 아니라 `feelsLikeCelsius` 다** (#292 · BE `46f35e4`). 열지수는
     판정에서 내려와 참고값이 됐다 — 아래 `FeelsLikeBasis` 안에서만 산다.
+
+    **둘 다 혼자 서는 값이다** (#1067) — hero 와 그 아래 한 줄이라 자릿수를 맞댈 이웃이
+    없다. 정수면 `.0` 을 뗀다(`33.0℃` → `33℃`). 시간대 표는 `formatCelsius` 를 그대로 쓴다.
   */
-  const feelsLike = formatCelsius(data.feelsLikeCelsius)
-  const pavement = formatCelsius(data.estimatedPavementCelsius)
+  const feelsLike = formatStandaloneCelsius(data.feelsLikeCelsius)
+  const pavement = formatStandaloneCelsius(data.estimatedPavementCelsius)
 
   return (
     <div className={cn('flex flex-col gap-3 py-4', INSET)}>
@@ -225,7 +228,8 @@ export function PlaceWalkSafetyPanel({
 export function FeelsLikeBasisContent({ data }: { data: WalkSafetyResponse }) {
   if (data.feelsLikeBasis === null) return null
 
-  const heatIndex = formatCelsius(data.heatIndexCelsius)
+  // 말풍선 안 한 값이라 혼자 서는 값이다 — 같은 패널 hero 체감온도와 같은 표기를 쓴다 (#1067)
+  const heatIndex = formatStandaloneCelsius(data.heatIndexCelsius)
   const hasHeatIndex = heatIndex !== null && data.heatIndexBasis !== null
 
   return (

@@ -186,8 +186,36 @@ describe('PlaceSuitabilityPanel — 반려견이 없으면 판정을 말하지 �
     })
 
     expect(markup).toContain(messages.place.detailMaxTemperature)
-    expect(markup).toContain('31.0')
+    // 큰 숫자는 혼자 서는 값이라 정수면 `.0` 을 뗀다 (#1067)
+    expect(bigNumbers(markup)).toContain(String(weather.maxTemperature))
     expect(markup).not.toContain(messages.place.detailFeelsLikeTemperature)
+  })
+
+  /*
+    #1067 — **큰 숫자는 혼자 서는 값, 받치는 줄은 맞대 읽는 쌍이다.** 큰 숫자만 정수면 `.0` 을
+    떼고, 최고·최저 한 쌍은 `formatCelsius` 처럼 소수 1자리를 유지한다 — 둘을 한 줄에서
+    맞대 하루의 폭을 읽는 자리라 자릿수가 흔들리면 안 된다.
+  */
+  it('큰 숫자는 정수면 소수점을 떼고, 받치는 최고·최저는 1자리를 유지한다', () => {
+    const weather = suitability.weather
+    if (weather === null) throw new Error('fixture 에 예보가 있어야 한다')
+
+    const markup = render({
+      petName: null,
+      data: {
+        ...suitability,
+        weather: {
+          ...weather,
+          maxFeelsLikeTemperature: 33,
+          maxTemperature: 31,
+          minTemperature: 24,
+        },
+      },
+    })
+
+    expect(bigNumbers(markup)[0]).toBe('33')
+    expect(markup).toContain(`${messages.place.detailSupportingMaxTemperature} 31.0℃`)
+    expect(markup).toContain(`${messages.place.detailSupportingMinTemperature} 24.0℃`)
   })
 
   it('미로그인이면 로그인으로, 로그인했으면 반려견 등록으로 보낸다', () => {

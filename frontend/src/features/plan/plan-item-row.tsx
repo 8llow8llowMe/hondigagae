@@ -6,7 +6,7 @@ import { Button } from '@/components/button'
 import { FormAlert } from '@/components/form-alert'
 import { CheckIcon, ClockIcon, ImageIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
-import { formatCelsius } from '@/lib/format/celsius'
+import { formatStandaloneCelsius } from '@/lib/format/celsius'
 import { formatDistance } from '@/lib/format/distance'
 import { isLongTrip } from '@/lib/geo/distance'
 import { imageSrc } from '@/lib/image/remote-host'
@@ -191,7 +191,11 @@ export function PlanItemRow({
   const startTime = formatStartTime(item.startTime)
   // walkSafety 가 없으면 view 도 없다 — 시각 줄에 배지·문장 자리를 만들지 않는다
   const walkSafetyView = walkSafety === undefined ? null : itemWalkSafetyView(walkSafety)
-  const feelsLike = formatCelsius(walkSafety?.feelsLikeCelsius ?? null)
+  /*
+    **혼자 서는 값이다** (#1067). 항목마다 한 줄이지만 시각·배지 뒤에 이어 붙어 칸이
+    맞춰지지 않는다 — 자릿수를 맞대 비교하는 열이 아니다. 정수면 `.0` 을 뗀다.
+  */
+  const feelsLike = formatStandaloneCelsius(walkSafety?.feelsLikeCelsius ?? null)
   /*
     **일자의 주장과 이 행의 사실이 어긋날 때만 한 줄을 더한다** (#717).
 

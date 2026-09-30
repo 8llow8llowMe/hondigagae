@@ -11,6 +11,7 @@ import {
 } from '@/components/metric'
 import { ReasonList } from '@/components/reason-list'
 import { PlanDayVerdictSkeleton } from '@/features/plan/plan-detail-skeleton'
+import { formatStandaloneCelsius } from '@/lib/format/celsius'
 import { type DisplayTemperature, displayTemperature } from '@/lib/insight/temperature'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
@@ -314,13 +315,21 @@ function VerdictTemperatureValue({ weather }: { weather: PlanDayWeatherItem['wea
   if (temperature === null) return null
 
   const clue = temperatureClue(weather, temperature)
+  /*
+    **혼자 서는 값이다** (#1067) — 일자 카드마다 판정 옆에 하나씩 서고, 카드 사이에 칸을
+    맞춘 열이 없다. 정수면 `.0` 을 뗀다(`24.0℃` → `24℃`, `27.5℃` 는 그대로).
+    `null` 은 `displayTemperature` 가 이미 걸렀다 — 여기서 걸리는 것은 `NaN` 같은 비정상 값뿐이고,
+    그때 `NaN℃` 를 그리지 않고 자리를 비운다.
+  */
+  const value = formatStandaloneCelsius(temperature.value)
+  if (value === null) return null
 
   return (
     <>
       <MetricValue
         className="items-end"
         label={messages.plan.verdictFeelsLikeLabel}
-        value={temperature.value.toFixed(1)}
+        value={value}
         unit="℃"
       />
       {clue !== null && (
