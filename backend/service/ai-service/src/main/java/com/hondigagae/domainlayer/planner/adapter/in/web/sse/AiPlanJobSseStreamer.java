@@ -1,5 +1,6 @@
 package com.hondigagae.domainlayer.planner.adapter.in.web.sse;
 
+import com.hondigagae.domainlayer.planner.adapter.in.web.dto.response.AiPlanJobStatusResponse;
 import com.hondigagae.domainlayer.planner.adapter.in.web.presenter.AiPlanPresenter;
 import com.hondigagae.domainlayer.planner.application.info.AiPlanJobInfo;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanJobSubscription;
@@ -51,8 +52,10 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  *   <li><b>이미 보낸 순위보다 큰 프레임만 보낸다.</b> 같은 순위는 같은 내용이라 다시 보내지 않는다</li>
  *   <li><b>종결은 단계와 관계없이 항상 보낸다</b> — 가장 높은 순위다. 실패는 앞 단계에서도 날 수 있다.
  *       빠지는 경우는 이미 종결을 보낸 뒤뿐이고, 그때 스트림은 닫힌다</li>
- *   <li>순위 비교·갱신·전송은 emitter 잠금 안에서 한 번에 한다. 나눠 하면 두 스레드가 같이 통과한 뒤
+ *   <li>순위 비교·전송·갱신은 emitter 잠금 안에서 한 번에 한다. 나눠 하면 두 스레드가 같이 통과한 뒤
  *       전송 순서가 뒤집힌다</li>
+ *   <li><b>순위는 전송에 성공한 뒤에만 올린다.</b> 응답 변환이나 전송이 실패하면 연결을 닫는다 — 클라이언트는
+ *       폴링으로 넘어간다</li>
  * </ul>
  */
 @Slf4j
@@ -187,7 +190,8 @@ public class AiPlanJobSseStreamer {
         private void forward(AiPlanJobInfo info) {
             Delivery delivery = sendIfAhead(info);
             if (delivery == Delivery.FAILED) {
-                cleanup();
+                // 자원만 풀고 emitter 를 열어 두면 아무것도 오지 않는 연결이 타임아웃까지 남는다. 닫는다.
+                closeStream();
                 return;
             }
             if (delivery == Delivery.SENT && info.status().isTerminal()) {
@@ -204,17 +208,26 @@ public class AiPlanJobSseStreamer {
                 if (rank <= lastSentRank) {
                     return Delivery.SKIPPED;
                 }
-                lastSentRank = rank;
+                AiPlanJobStatusResponse response;
                 try {
-                    emitter.send(SseEmitter.event()
-                        .name(EVENT_NAME)
-                        .data(aiPlanPresenter.toJobStatusResponse(info), MediaType.APPLICATION_JSON));
-                    return Delivery.SENT;
+                    response = aiPlanPresenter.toJobStatusResponse(info);
+                } catch (RuntimeException exception) {
+                    // 응답을 못 만들면 이 연결로는 이 상태를 전할 수 없다. 닫아서 클라이언트가 폴링으로 넘어가게 한다.
+                    log.warn("AI 일정 SSE 프레임 변환에 실패해 연결을 닫습니다. jobId={} status={} reason={}",
+                        info.jobId(), info.status(), exception.getMessage());
+                    return Delivery.FAILED;
+                }
+                try {
+                    emitter.send(SseEmitter.event().name(EVENT_NAME).data(response, MediaType.APPLICATION_JSON));
                 } catch (IOException | IllegalStateException exception) {
                     // 클라이언트가 먼저 연결을 끊은 경우가 대부분이라 경고로 남기지 않는다.
                     log.debug("AI 일정 SSE 전송에 실패했습니다. jobId={} reason={}", info.jobId(), exception.getMessage());
                     return Delivery.FAILED;
                 }
+                // 보낸 뒤에만 올린다. 먼저 올리면 변환·전송에 실패한 종결 프레임을 이후 재확인이 "이미 보냄" 으로 걸러
+                // 연결이 닫히지 않은 채 emitter 타임아웃까지 남는다.
+                lastSentRank = rank;
+                return Delivery.SENT;
             }
         }
 
