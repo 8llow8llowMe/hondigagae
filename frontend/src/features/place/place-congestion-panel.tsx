@@ -113,7 +113,8 @@ export function PlaceCongestionPanel({
             버튼이 생겼다 사라지면 제목 줄이 흔들린다.
           */}
           {charted && (
-            <InfoTip label={messages.place.detailCongestionRangeTipLabel}>
+            // 제목 바로 뒤라 카드의 왼쪽이다 — 기본(왼쪽으로 펴기)이면 카드 밖으로 나간다
+            <InfoTip label={messages.place.detailCongestionRangeTipLabel} align="start">
               {messages.place.detailCongestionExtendedNote}
             </InfoTip>
           )}

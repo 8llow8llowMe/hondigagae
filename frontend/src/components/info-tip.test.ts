@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { InfoTip } from '@/components/info-tip'
+import { INFO_TIP_ALIGN_CLASS, InfoTip } from '@/components/info-tip'
 
 const BASIS =
   '기상청 여름철 체감온도 산식으로 계산했습니다. 기준 시각의 기온과 상대습도로 습구온도를 구해 산출합니다.'
@@ -50,5 +50,20 @@ describe('InfoTip', () => {
   /* 좁은 화면은 팝오버가 아니라 시트다 — 100자 넘는 문장이 390px 말풍선에 안 들어간다 */
   it('좁은 화면 갈래에서는 팝오버를 만들지 않는다', () => {
     expect(render()).not.toContain('role="tooltip"')
+  })
+})
+
+/*
+  #1066 — 라벨·제목 바로 뒤에 붙는 자리에서는 왼쪽으로 펴면 말풍선이 화면 밖으로 나간다
+  (768 실측 `x = -44`). 팝오버는 `md` 이상에서만 그려져 서버 렌더로는 못 보므로 맞춤 규칙을
+  표로 잠근다. 실제 위치는 브라우저 실측(PR 검증 내역)이 본다.
+*/
+describe('InfoTip — 팝오버 맞춤 (#1066)', () => {
+  it('기본(end)은 오른쪽 끝을 맞춰 왼쪽으로 편다 — 기존 사용처가 그대로다', () => {
+    expect(INFO_TIP_ALIGN_CLASS.end).toBe('right-0')
+  })
+
+  it('start 는 왼쪽 끝을 맞춰 오른쪽으로 편다', () => {
+    expect(INFO_TIP_ALIGN_CLASS.start).toBe('left-0')
   })
 })
