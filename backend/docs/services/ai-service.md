@@ -182,7 +182,18 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
   다를 수 있어 저장소 밖 브로드캐스트가 필요하다. 메시지에 상태를 싣지 않고 수신 시 저장소를
   다시 읽는다(발행-저장 순서 역전, 스키마 드리프트 방지).
 - 이벤트는 best-effort 다. 유실돼도 25초 하트비트(3회에 1번 상태 재확인)와 폴링 폴백이
-  종결을 보장한다. 하트비트의 재확인은 멈춘 잡의 타임아웃 처리(expireIfStuck)도 겸한다.
+  종결을 보장한다. 하트비트의 재확인은 멈춘 잡의 타임아웃 처리(expireIfStuck)도 겸하고,
+  **종결만이 아니라 놓친 단계 전이도 전달한다** (#985 — 전에는 종결만 보내 흘린 단계 이벤트를
+  다음 이벤트까지 복구하지 못했다).
+- **순서: 소유권 확인 → 구독 → 스냅샷 재조회 → 전송** (#985, `AiPlanJobSseStreamer`). 남의 jobId 는
+  첫 조회에서 404 `AIPLAN_002` 로 끝나 SSE 시작 전 JSON 봉투로 나가고 구독도 걸리지 않는다. 구독 뒤에
+  다시 읽어야 첫 조회와 구독 사이에 발행된 전이(구독 전이라 아무도 못 받는다)가 잡힌다. 재조회가 실패하면
+  첫 조회 결과로 대신한다.
+- **단조 가드 — 뒤처진 프레임은 보내지 않는다.** 스냅샷 전송·구독 콜백·하트비트가 서로 다른 스레드에서
+  각자 읽고 보내므로, 먼저 읽은 옛 상태가 나중에 보내져 마지막 프레임이 될 수 있었다. 연결마다 보낸 프레임의
+  진행 순위(PENDING < RUNNING 단계 전 < `stepOrder` 1..n < 종결)를 들고 **그보다 큰 프레임만 보낸다.**
+  같은 순위는 다시 보내지 않고, **종결은 단계와 관계없이 항상 보낸다**(가장 높은 순위, 이미 종결을 보낸 뒤만
+  제외). 비교·갱신·전송은 emitter 잠금 안에서 한 번에 한다. 테스트: `AiPlanJobSseStreamerTest`.
 - 브라우저 기본 EventSource 는 Authorization 헤더를 못 실으므로 fetch 기반 SSE 클라이언트를
   쓴다. 연결이 끊기면 `GET /jobs/{jobId}` 폴링으로 폴백한다. (BossPickSeoul 동일 구조)
 
@@ -204,9 +215,37 @@ Controller → Facade → *JobProcessor → *Worker(@Async("aiPlanTaskExecutor")
   네 단계가 모두 저장·발행된다는 것은 코드로 확인됐고 FE 폴링도 2초다
   (`lib/ai-plan/job.ts` `JOB_POLL_INTERVAL_MS`; SSE 구독 중에는 즉시 push). 남은 가설은
   **2·3단계가 HTTP 조회 한두 번이라 수 초 만에 끝난다**는 것이다.
-  `AiPlanWorker.StepTimer` 가 단계별 소요시간을 로그로 남긴다 — **먼저 재기만 하고 화면은
+  `AiPlanWorker.StepTimer` 가 단계별 소요시간을 로그와 지표로 남긴다 — **먼저 재기만 하고 화면은
   손대지 않는다.** 정말 짧은 것이라면 진행 막대는 정직한 것이고, 균등한 4등분처럼 보이게
   만드는 쪽이 오히려 거짓 진행률이다 (#570).
+- **단계별 소요는 지표다** (#985). Timer `ai.plan.job.step`(Prometheus `ai_plan_job_step_seconds_*`),
+  태그 `step` · `mode`(`full`/`regenerate`) · `outcome`(`completed`/`failed`/`canceled`). jobId 등 잡을 가리키는
+  값은 태그에 두지 않는다. 로그 `AI plan job step done` 에도 `mode` · `outcome` 이 실린다. 이름·태그·PromQL 은
+  `observability-guide.md` "AI 일정 잡 지표".
+- 하루 재생성에서 3/4(WEATHER)에 수십 초 머문다는 보고(#985)는 WEATHER 가 tour 조회 한 번(상한 약 7초)이라
+  단계 길이로는 설명되지 않는다. 서버 쪽 원인은 위 SSE 순서 버그였고, 화면 쪽(진행 상태 순서 역전 · 30초 안전
+  폴링)은 프론트 이슈로 따로 다룬다.
+
+### 현재 단계 시작 시각 `stepStartedAt` (#985)
+
+작업 조회·SSE 응답에 `stepStartedAt: string | null` 을 싣는다 — **현재 단계에 들어간 서버 시각**이다.
+대기 화면이 "이 단계에서 n초째" 를 그릴 때 쓴다. **지어낸 진행률이 아니다** — 단계가 얼마나 남았는지는 말하지 않는다.
+
+- 형식은 ISO-8601 **오프셋 포함**, 서비스 기준 시간대 `Asia/Seoul`, 밀리초까지 (`2026-09-30T14:03:12.345+09:00`).
+  밀리초가 0 이면 소수부가 빠진다. 오프셋이 있어 화면이 기기 시간대와 무관하게 뺄셈할 수 있다.
+  변환은 `AiPlanPresenter` 한곳이라 폴링과 SSE 가 같다.
+- **RUNNING 이고 단계가 있을 때만 채운다.** PENDING 은 단계가 없어 null, 종결(COMPLETED · FAILED · CANCELED)도
+  null 이다 — 저장소에는 마지막 단계 시각이 남지만 더 흐르는 시간이 없는데 내리면 끝난 작업 위에 경과 시간이
+  계속 늘어난다. 실패 지점은 `step` 이 이미 말한다.
+- 저장은 `AiPlanJob.stepStartedAt`(`atStep(step, now)` 가 단계와 함께 적는다). 워커의 전이 저장 시각이라
+  `StepTimer` 가 재는 구간보다 Redis 저장·발행 한 번만큼 앞선다.
+- **옛 저장 데이터와 호환된다.** 필드가 생기기 전에 저장된 잡은 null 로 읽힌다 — 배포 때 돌던 잡은 다음 단계
+  전이 전까지 null 일 수 있다. 테스트: `AiPlanJobJsonCompatibilityTest`, `AiPlanJobStepStartedAtTest`,
+  `AiPlanJobStepStartedAtPresenterTest`.
+
+**후속 후보 (#985 범위 밖).** DRAFTING 안의 진행을 알리려면 LLM 스트리밍으로 `draftProgress` 를 내리는 방법이
+있고, 하루 재생성의 DRAFTING 을 줄이려면 재생성 프롬프트가 목표 일자만 출력하게 좁히는 방법이 있다. 둘 다
+지표(단계별 p95 · DRAFTING 비중)를 먼저 본 뒤 판단한다.
 
 ### 생성 조건을 함께 내린다 (필수)
 
