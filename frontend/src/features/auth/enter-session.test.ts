@@ -7,24 +7,28 @@ function fakes() {
   return {
     calls,
     queryClient: { clear: () => void calls.push('clear') },
-    router: {
-      replace: (href: string) => void calls.push(`replace:${href}`),
-      refresh: () => void calls.push('refresh'),
-    },
+    location: { replace: (href: string) => void calls.push(`location.replace:${href}`) },
   }
 }
 
 describe('enterSession', () => {
   /*
-    **`refresh` 는 헤더를 새 세션으로 다시 그리게 하는 방어다** (#1013). 헤더의 `authed` 는
-    `(main)` 레이아웃(서버 컴포넌트)이 정하고, `queryClient.clear()` 는 서버 컴포넌트를
-    다시 그리지 않는다. 이 줄이 빠지면 로그아웃(`replace` + `refresh`)과 짝이 깨진다.
+    **문서 전체를 새로 받는 이동이다 — `router.replace` 가 아니다** (#1075).
+
+    Next 라우터의 route cache 는 URL → 라우트 트리를 기억하고, 비로그인 때 `/pets/new` 로
+    클라이언트 이동했다가 proxy 가 `/login?returnTo=…` 로 보낸 기록을 **`/pets/new` 의 트리 =
+    로그인 화면** 으로 남긴다. 그 뒤 `router.replace('/pets/new')` 는 요청 없이 캐시를 써서
+    로그인 화면에 머물고, `router.refresh()` 가 그 자리를 새 쿠키로 다시 그려
+    `LoggedInNotice` 가 뜬다. `refresh` 는 segment cache 만 비우고 route cache 는 그대로
+    둔다(`next/dist/client/components/router-reducer/reducers/refresh-reducer.js`).
+
+    이 줄이 `router.replace` 로 돌아가면 증상이 되살아난다.
   */
-  it('캐시를 비우고 복귀 경로로 옮긴 뒤 서버 컴포넌트를 다시 받는다', () => {
-    const { calls, queryClient, router } = fakes()
+  it('캐시를 비우고 복귀 경로를 문서째 새로 받는다', () => {
+    const { calls, queryClient, location } = fakes()
 
-    enterSession({ queryClient, router }, '/plans')
+    enterSession({ queryClient, location }, '/plans')
 
-    expect(calls).toEqual(['clear', 'replace:/plans', 'refresh'])
+    expect(calls).toEqual(['clear', 'location.replace:/plans'])
   })
 })

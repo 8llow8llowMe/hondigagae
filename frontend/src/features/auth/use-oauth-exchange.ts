@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -50,7 +49,6 @@ export function useOAuthExchange({
   code,
   state,
 }: UseOAuthExchangeOptions): OAuthExchangeState {
-  const router = useRouter()
   const queryClient = useQueryClient()
   const startedRef = useRef(false)
 
@@ -77,7 +75,7 @@ export function useOAuthExchange({
           돌아오는데, 그때 code·state 는 이미 소모돼 실패 화면만 보게 된다. replace 는 성공과
           동시에 주소에서 두 값을 지우는 역할도 겸한다 (정본 D3-2).
         */
-        enterSession({ queryClient, router }, takeReturnTo())
+        enterSession({ queryClient, location: globalThis.location }, takeReturnTo())
       })
       .catch((error: unknown) => {
         /*
