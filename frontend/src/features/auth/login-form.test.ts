@@ -3,7 +3,12 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { LoginFormFields, type LoginFormFieldsProps } from '@/features/auth/login-form'
+import {
+  LoginDivider,
+  LoginFormFields,
+  type LoginFormFieldsProps,
+  LoginSignupPrompt,
+} from '@/features/auth/login-form'
 import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 
@@ -14,8 +19,12 @@ function render(overrides: Partial<LoginFormFieldsProps> = {}) {
     errorStatus: null,
     submitting: false,
     showPassword: false,
+    remember: false,
+    capsLock: false,
     onValueChange: () => undefined,
     onTogglePassword: () => undefined,
+    onRememberChange: () => undefined,
+    onCapsLockChange: () => undefined,
     onSubmit: () => undefined,
     onRetry: () => undefined,
     ...overrides,
@@ -104,5 +113,66 @@ describe('LoginFormFields', () => {
     expect(markup).toContain('너무 많은 시도가 있었어요. 잠시 후 다시 이용해 주세요.')
     expect(markup).not.toContain(messages.common.retry)
     expect(markup).not.toContain(messages.common.temporaryErrorTitle)
+  })
+
+  it('비밀번호 아래 한 줄이 기억하기 → 비밀번호 찾기 → 로그인 버튼 순서다 (#1081)', () => {
+    const markup = render()
+
+    const password = markup.indexOf('id="password"')
+    const remember = markup.indexOf(messages.auth.rememberEmail)
+    const forgot = markup.indexOf(messages.auth.forgotPassword)
+    const submit = markup.indexOf('type="submit"')
+
+    expect(password).toBeGreaterThan(-1)
+    expect(remember).toBeGreaterThan(password)
+    expect(forgot).toBeGreaterThan(remember)
+    expect(submit).toBeGreaterThan(forgot)
+    expect(markup).toContain('href="/password/reset"')
+  })
+
+  it('이메일 기억하기는 체크박스이고 기본은 꺼져 있다', () => {
+    const markup = render()
+
+    expect(markup).toMatch(/<input type="checkbox" id="remember-email"(?![^>]*checked)[^>]*>/)
+    expect(markup).not.toContain(messages.auth.rememberEmailCaption)
+  })
+
+  it('켜면 체크되고 공용 기기 캡션이 뜬다', () => {
+    const markup = render({ remember: true })
+
+    expect(markup).toMatch(/<input type="checkbox" id="remember-email"[^>]*checked=""/)
+    expect(markup).toContain(messages.auth.rememberEmailCaption)
+  })
+
+  it('Caps Lock 이 켜져 있으면 비밀번호 칸에 안내를 띄운다', () => {
+    expect(render({ capsLock: false })).not.toContain(messages.auth.capsLockOn)
+    expect(render({ capsLock: true })).toContain(messages.auth.capsLockOn)
+  })
+
+  it('모바일 키보드 엔터 자리가 이메일은 next · 비밀번호는 done 이다', () => {
+    const markup = render()
+
+    expect(markup).toMatch(/id="email"[^>]*enterKeyHint="next"/)
+    expect(markup).toMatch(/id="password"[^>]*enterKeyHint="done"/)
+  })
+})
+
+describe('LoginDivider', () => {
+  it('"또는" 만 읽히고 선은 숨긴다', () => {
+    const markup = renderToStaticMarkup(createElement(LoginDivider))
+
+    expect(markup).toContain(messages.auth.loginDivider)
+    expect(markup.match(/aria-hidden="true"/g)).toHaveLength(2)
+  })
+})
+
+describe('LoginSignupPrompt', () => {
+  it('안내 문구와 returnTo 를 문 회원가입 링크를 렌더한다', () => {
+    const markup = renderToStaticMarkup(createElement(LoginSignupPrompt, { returnTo: '/plans/1' }))
+
+    expect(markup).toContain(messages.auth.signupPrompt)
+    expect(markup).toContain('href="/signup?returnTo=%2Fplans%2F1"')
+    expect(markup).toContain(messages.auth.toSignup)
+    expect(markup).toContain('min-h-11')
   })
 })
