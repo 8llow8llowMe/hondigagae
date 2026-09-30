@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
+import { invalidatePlanBriefing } from '@/features/plan/plan-briefing-invalidation'
 import { planKeys } from '@/features/plan/queries'
 import { markItemVisited } from '@/lib/api/plan'
 import type { PlanDaySaveError } from '@/lib/plan/save-error'
@@ -76,6 +77,11 @@ export function usePlanVisit({ planId }: { planId: string }): PlanVisitState {
               산책 위험도 판정도 그대로 유효하다.
             */
             void queryClient.invalidateQueries({ queryKey: planKeys.detail(planId) })
+            /*
+              **브리핑은 버린다** (#1055) — 판정과 갈리는 지점이다. 브리핑의 `visitedCount` 와
+              첫/마지막 항목의 `visited` 가 방문 여부를 그대로 싣는다.
+            */
+            void invalidatePlanBriefing(queryClient, planId)
           },
           (cause: unknown) =>
             setFailures((current) => new Map(current).set(planItemId, toVisitToggleError(cause))),

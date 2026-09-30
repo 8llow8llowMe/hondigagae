@@ -14,6 +14,7 @@ import { PetForm } from '@/features/pet/pet-form'
 import { PetPhotoSection } from '@/features/pet/pet-photo-section'
 import { PET_INVALIDATE_KEY } from '@/features/pet/queries'
 import { usePetDetail } from '@/features/pet/use-pet-detail'
+import { invalidateAllPlanBriefings } from '@/features/plan/plan-briefing-invalidation'
 import { classify, toErrorStatus } from '@/lib/api/error'
 import { updatePet } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
@@ -125,6 +126,8 @@ export function PetEditView({ petId }: { petId: string }) {
             onSave={(payload) => updatePet(pet.petId, payload)}
             onSaved={() => {
               void queryClient.invalidateQueries({ queryKey: PET_INVALIDATE_KEY })
+              // 진행 중인 일정의 브리핑은 이 아이의 특성으로 판정한다 (#1055)
+              void invalidateAllPlanBriefings(queryClient)
               router.replace('/pets')
             }}
           />

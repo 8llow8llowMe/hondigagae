@@ -19,6 +19,7 @@ import { AiPlanFailed } from '@/features/ai-plan/ai-plan-failed'
 import { AiPlanProgress } from '@/features/ai-plan/ai-plan-progress'
 import { useAiPlanJob } from '@/features/ai-plan/use-ai-plan-job'
 import { useDraftPlaces } from '@/features/ai-plan/use-draft-places'
+import { invalidatePlanBriefing } from '@/features/plan/plan-briefing-invalidation'
 import { PlanDayDiff, type PlanDayDiffRow } from '@/features/plan/plan-day-diff'
 import { PlanDayRegenerateConfirm } from '@/features/plan/plan-day-regenerate-confirm'
 import { planDayAnchorId } from '@/features/plan/plan-day-section'
@@ -414,6 +415,8 @@ function RegenerateJob({
         그대로 남는다.
       */
       void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(plan.planId) })
+      // 그날 항목이 통째로 바뀌고 시각도 지워진다 — 브리핑의 일정 요약이 전부 낡는다 (#1055)
+      void invalidatePlanBriefing(queryClient, plan.planId)
 
       // 끝난 작업을 히스토리에 남기지 않는다 (R8). 바꾼 일자로 앵커 스크롤한다
       router.replace(`/plans/${plan.planId}#${planDayAnchorId(day)}`)

@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
+import { invalidatePlanBriefing } from '@/features/plan/plan-briefing-invalidation'
 import { planKeys } from '@/features/plan/queries'
 import { replaceDayItems } from '@/lib/api/plan'
 import { messages } from '@/lib/messages'
@@ -119,6 +120,8 @@ export function usePlanDayEdit({
           판정이 어느 행에도 붙지 않고 사라진다.
         */
         void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(planId) })
+        // 순서가 바뀌면 브리핑의 첫/마지막 항목 · 대표 장소가 바뀐다 (#1055)
+        void invalidatePlanBriefing(queryClient, planId)
         // 저장하면 planItemId 가 전부 새로 발급된다 — 편집 상태를 통째로 버린다 (E1 규칙 3)
         setItems([])
         setOriginal([])

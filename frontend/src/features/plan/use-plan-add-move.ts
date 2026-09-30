@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { useToast } from '@/components/toast'
+import { invalidatePlanBriefing } from '@/features/plan/plan-briefing-invalidation'
 import { planKeys } from '@/features/plan/queries'
 import { replaceDayItems } from '@/lib/api/plan'
 import { messages } from '@/lib/messages'
@@ -79,6 +80,8 @@ export function usePlanAddMove({
             void queryClient.invalidateQueries({ queryKey: planKeys.weather(planId) })
             // 교체가 planItemId 를 전부 새로 발급한다 — 낡은 판정은 어느 행에도 안 붙는다 (D15-6)
             void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(planId) })
+            // 이동도 브리핑의 항목 수 · 첫/마지막 항목에 든다 (#1055)
+            void invalidatePlanBriefing(queryClient, planId)
 
             showToast({
               message: messages.plan.addMoveToast

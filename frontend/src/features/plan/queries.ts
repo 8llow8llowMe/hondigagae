@@ -29,10 +29,17 @@ export const planKeys = {
    * (특보·골든타임은 `today=true` 에서만 온다) 화면이 여는 시점에 따라 날짜가 바뀐다.
    *
    * **`staleTime` 은 일정(30초)이 아니라 인사이트(5분)를 쓴다** — 내용이 예보 판정이고
-   * 예보 단위가 1시간이라 일정 본문처럼 mutation 으로 흔들리지 않는다
-   * (`api-integration-guide.md` §7 `장소 인사이트` 행과 같은 근거).
+   * 예보 단위가 1시간이다 (`api-integration-guide.md` §7 `장소 인사이트` 행과 같은 근거).
+   *
+   * **다만 `schedule`(첫/마지막 항목 시각 · 방문 수 · 대표 장소)은 예보가 아니라 그날 항목
+   * 그대로다** (`PlanBriefingProcessor.toScheduleInfo`). 5분을 믿고 두면 일정을 고친 뒤 옛
+   * 시각이 보인다 — 일정 쓰기가 `invalidatePlanBriefing` 으로 버린다 (#1055).
    */
-  briefing: (planId: string, date: string) => [...planKeys.all, 'briefing', planId, date] as const,
+  briefing: (planId: string, date: string) => [...planKeys.briefings(planId), date] as const,
+  /** 한 일정의 브리핑 전부 — 날짜를 가리지 않고 버릴 때의 prefix (#1055) */
+  briefings: (planId: string) => [...planKeys.briefingAll(), planId] as const,
+  /** 모든 일정의 브리핑 — 반려견 특성을 고쳤을 때의 prefix (#1055) */
+  briefingAll: () => [...planKeys.all, 'briefing'] as const,
   /**
    * 저장된 여행 준비물 (#586). **상세와 key 를 나눈다** — 준비물만 실패해도 일정 본문은
    * 그대로 남아야 하고, 체크·추가·삭제 뒤에 그 절만 갱신할 수 있어야 한다.

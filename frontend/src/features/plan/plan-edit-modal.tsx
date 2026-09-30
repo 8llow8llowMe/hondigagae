@@ -14,6 +14,7 @@ import { Input } from '@/components/input'
 import { Modal } from '@/components/modal'
 import { useToast } from '@/components/toast'
 import { petKeys } from '@/features/pet/queries'
+import { invalidatePlanBriefing } from '@/features/plan/plan-briefing-invalidation'
 import { planKeys } from '@/features/plan/queries'
 import { ApiError } from '@/lib/api/error'
 import { updatePlan } from '@/lib/api/plan'
@@ -172,6 +173,11 @@ export function PlanEditModal({
           바로 쓰인다 — 옛 기간으로 낸 판정을 남겨 두면 새 기간의 화면에 붙는다.
         */
         void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(plan.planId) })
+        /*
+          **브리핑도 버린다** (#1055). 기간이 바뀌면 같은 날짜가 다른 일차가 되고(서버
+          `resolveDay`), 제목(부제)과 동행견(기준 아이 · 특성)도 브리핑에 그대로 실린다.
+        */
+        void invalidatePlanBriefing(queryClient, plan.planId)
 
         /*
           **`planKeys.packing` 은 버리지 않는다** (D13-6). 서버는 동행견을 바꿔도 저장된

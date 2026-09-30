@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { useToast } from '@/components/toast'
+import { invalidatePlanBriefing } from '@/features/plan/plan-briefing-invalidation'
 import { planKeys } from '@/features/plan/queries'
 import { replaceDayItems } from '@/lib/api/plan'
 import { messages } from '@/lib/messages'
@@ -83,6 +84,8 @@ export function usePlanAddPlace({
               새로 발급하므로 낡은 판정은 어느 행에도 붙지 않고 조용히 사라진다.
             */
             void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(planId) })
+            // 항목 수 · 마지막 항목 · 대표 장소가 바뀐다 (#1055)
+            void invalidatePlanBriefing(queryClient, planId)
 
             showToast({
               message: messages.plan.addPlaceToast

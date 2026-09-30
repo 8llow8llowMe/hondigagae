@@ -16,6 +16,7 @@ import {
   type AddToPlanDayOption,
   PlaceAddToPlanPicker,
 } from '@/features/plan/place-add-to-plan-picker'
+import { invalidatePlanBriefing } from '@/features/plan/plan-briefing-invalidation'
 import { PlanCreateForm } from '@/features/plan/plan-create-form'
 import { PlanListSkeleton } from '@/features/plan/plan-list-skeleton'
 import { planKeys } from '@/features/plan/queries'
@@ -362,6 +363,8 @@ function useAddPlaceToPlan({
           void queryClient.invalidateQueries({ queryKey: planKeys.weather(planId) })
           // 산책 위험도도 함께 버린다 — 담기가 planItemId 를 새로 발급한다 (#625 · D15-6)
           void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(planId) })
+          // 항목 수 · 마지막 항목 · 대표 장소가 바뀐다 (#1055)
+          void invalidatePlanBriefing(queryClient, planId)
           // 목록의 항목 수를 화면이 쓰지는 않지만, 담은 뒤 목록이 낡은 채로 남지 않게 한다
           void queryClient.invalidateQueries({ queryKey: planKeys.list() })
 

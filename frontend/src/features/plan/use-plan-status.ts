@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
 
+import { invalidatePlanBriefing } from '@/features/plan/plan-briefing-invalidation'
 import { planKeys } from '@/features/plan/queries'
 import { updatePlan } from '@/lib/api/plan'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
@@ -30,7 +31,7 @@ const ACTION_ERRORS: Record<PlanStatusActionKind, string> = {
  *
  * **`{ status }` 하나만 보낸다.** `PUT` 은 부분 수정이라 제목·기간을 함께 실으면 화면이
  * 들고 있던 낡은 값으로 덮어쓸 위험이 생긴다 (`PlanCommandProcessor.updatePlan`).
- * 응답이 `PlanDetailResponse` 전체라 `setQueryData` 로 갈아끼우고 목록만 무효화한다.
+ * 응답이 `PlanDetailResponse` 전체라 `setQueryData` 로 갈아끼우고 목록 · 브리핑만 무효화한다.
  */
 export function usePlanStatus(planId: string) {
   const queryClient = useQueryClient()
@@ -49,6 +50,12 @@ export function usePlanStatus(planId: string) {
       .then((next) => {
         queryClient.setQueryData(planKeys.detail(planId), next)
         void queryClient.invalidateQueries({ queryKey: planKeys.list() })
+        /*
+          **브리핑은 버린다** (#1055). 서버가 반려견 특성을 상태에 따라 읽는다 — 완료 일정은
+          완료 시점 스냅샷, 진행 중은 지금 프로필이다(`PlanWeatherProcessor.loadConditions`, #629).
+          완료를 되돌리면 브리핑의 기준이 바뀐다.
+        */
+        void invalidatePlanBriefing(queryClient, planId)
       })
       .catch((error: unknown) => {
         setErrorMessage(apiErrorToFormErrors(error, ACTION_ERRORS[action.kind]).form)
