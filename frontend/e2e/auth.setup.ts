@@ -23,7 +23,7 @@ export const MOCK_ACCOUNT = {
 } as const
 
 setup('일반 계정으로 로그인해 세션을 저장한다', async ({ page }) => {
-  // `returnTo` 를 달고 들어간다 — 폼이 성공하면 `router.replace(returnTo)` 로 곧장 간다
+  // `returnTo` 를 달고 들어간다 — 폼이 성공하면 `location.replace(returnTo)` 로 곧장 간다
   // (`login-form.tsx`). 로그인 뒤 따로 `goto` 하면 replace 전에 질러 경합이 난다.
   await page.goto('/login?returnTo=%2Fmypage')
 

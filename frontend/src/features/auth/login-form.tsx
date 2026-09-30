@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -145,7 +144,6 @@ export function LoginFormFields({
 }
 
 export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initialEmail: string }) {
-  const router = useRouter()
   const queryClient = useQueryClient()
   const [showPassword, setShowPassword] = useState(false)
 
@@ -172,7 +170,8 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
         throw error
       }
     },
-    onSuccess: () => enterSession({ queryClient, router }, returnTo),
+    // 이동은 문서째 새로 받는다 — 라우터 캐시의 비로그인 응답을 버리려고다 (#1075, `enterSession`)
+    onSuccess: () => enterSession({ queryClient, location: globalThis.location }, returnTo),
   })
 
   // submitCount 만 의존한다. errors 를 넣으면 입력 중 setValue 가
