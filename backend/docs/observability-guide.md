@@ -206,12 +206,18 @@ ai_plan_job_step_seconds_{count,sum,max,bucket}{step, mode, outcome}
 - **`outcome` 규칙.** 다음 단계로 넘어갔거나 초안을 저장했으면 `completed`, 워커 예외나 타임아웃 판정이면
   `failed`, 사용자 취소면 `canceled` 다. 취소는 단계 경계에서 발견되므로 그때는 **막 끝낸 단계**가 `canceled`
   로 닫히고, 들어가지 않은 단계는 기록되지 않는다. 단계 길이의 정상 분포는 `outcome="completed"` 만 본다.
+- 타임아웃도 단계 경계에서 발견되면 막 끝낸 단계가 `failed` 로 닫힌다 — 단계 소요 분석은 `completed` 만 본다.
 - **잡을 가리키는 값은 태그에 없다.** jobId·memberId·areaCode 를 넣으면 잡마다 시계열이 생긴다. 조합은
   4 × 2 × 3 = 24 개로 닫혀 있다. 한 잡을 따라가는 것은 로그다 —
   `AI plan job step done jobId= step= order= mode= outcome= elapsedMs=`.
 - **재는 구간은 워커가 단계에 들어간 뒤부터 다음 전이까지다.** PENDING 대기(큐)는 들어가지 않는다 —
   그것은 `executor_*{name="aiPlanTaskExecutor"}` 가 본다.
-- 히스토그램 버킷을 연다. 범위는 10ms ~ RUNNING 타임아웃(`ai.plan.job.running-timeout-seconds`, 기본 300초).
+- **버킷은 손으로 정한 10개다** — `0.1` · `0.5` · `1` · `2` · `5` · `10` · `30` · `60` · `120` · `300` 초(+ `+Inf`).
+  기본 퍼센타일 히스토그램은 버킷이 수십 개라 24 조합과 곱하면 시계열이 천 단위가 된다. 이 목록이면
+  `_bucket` 이 조합당 11개(최대 264개)다. 위 끝은 RUNNING 타임아웃 기본값(`ai.plan.job.running-timeout-seconds`,
+  300초)이다 — 그보다 긴 단계는 타임아웃 판정이 먼저 끝낸다. 목록은 `MicrometerAiPlanJobMetricsAdapter.BUCKETS` 가 정본이다.
+- p95 는 이 버킷 사이를 선형 보간한 값이다. 버킷 안에서의 위치는 추정이라, 예컨대 DRAFTING p95 가 `30`~`60` 사이면
+  "30초대 후반" 정도로 읽는다. 더 촘촘히 봐야 할 구간이 생기면 경계를 더한다.
 - **구현 방식**: ai-service `planner` 도메인, `AiPlanJobMetricsPort` + `MicrometerAiPlanJobMetricsAdapter`.
   기록은 `AiPlanWorker.StepTimer` 한곳에서 로그와 함께 하고, 기록 실패는 잡 결과를 바꾸지 않는다(warn 로그).
   잡이 돌아야 시계열이 생기므로 재기동 직후에는 값이 없다.
