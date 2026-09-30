@@ -408,6 +408,11 @@ function useAddWalkCourseToPlan({
         (next) => {
           queryClient.setQueryData(planKeys.detail(planId), next)
           void queryClient.invalidateQueries({ queryKey: planKeys.weather(planId) })
+          /*
+            **산책 위험도도 버린다** (D15-6). 일괄 교체가 그날 항목의 `planItemId` 를 전부 새로
+            발급해, 캐시의 판정이 어느 행에도 붙지 않는다 — 다른 담기 경로 다섯과 같다.
+          */
+          void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(planId) })
           // 코스도 브리핑의 항목 수 · 첫/마지막 항목에 든다 (#1055)
           void invalidatePlanBriefing(queryClient, planId)
           void queryClient.invalidateQueries({ queryKey: planKeys.list() })

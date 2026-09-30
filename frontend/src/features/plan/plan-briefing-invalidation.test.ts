@@ -141,25 +141,63 @@ describe('일정 쓰기 뒤 브리핑 무효화 (#1055)', () => {
 /*
   **경로가 늘어도 빠지지 않게 쓰기 API 기준으로 훑는다.** 호출처를 이름으로 나열하면 새 담기
   경로가 생겼을 때 이 목록도 같이 빠진다. 기존 일정의 항목·기간·동행견·상태를 바꾸는 API 를
-  부르는 파일은 모두 브리핑을 무효화해야 한다.
+  쓰는 파일은 모두 브리핑을 무효화해야 한다.
+
+  **호출이 아니라 import 로 가른다.** `이름(` 으로 찾으면 별칭 import(`as replace`)와 참조
+  전달(`onSave={updatePlan}`)이 조용히 빠진다. API 모듈에서 그 이름을 가져오는 파일이면 쓰는
+  파일이다.
 
   빠진 것: `createPlan`·`copyPlan`(새 planId 라 캐시가 없다), `deletePlan`(브리핑 라우트가
   상세 404 가드에서 먼저 떨어진다).
-*/
-const PLAN_WRITE_CALL = /\b(?:replaceDayItems|markItemVisited|changeItemStartTime|updatePlan)\(/
 
-function featureSources(): string[] {
-  const root = fileURLToPath(new URL('../', import.meta.url))
-  return readdirSync(root, { recursive: true })
-    .map(String)
-    .filter((file) => /\.tsx?$/.test(file) && !file.endsWith('.test.ts'))
-    .map((file) => `src/features/${file.split('\\').join('/')}`)
+  **한계 — 파일 단위다.** 한 파일에 쓰기 지점이 둘이고 하나만 무효화해도 통과한다. 지금은
+  대상 파일마다 쓰기 지점이 하나다.
+*/
+const PLAN_WRITE_API = ['replaceDayItems', 'markItemVisited', 'changeItemStartTime', 'updatePlan']
+const PET_WRITE_API = ['updatePet']
+
+/** `import { a, b as c } from '<module>'` 의 중괄호 안 이름들 (여러 줄 · 별칭 포함) */
+function importedNames(source: string, module: string): string[] {
+  const pattern = new RegExp(
+    `import\\s*(?:type\\s*)?\\{([^}]*)\\}\\s*from\\s*'${module.replace(/[/@]/g, '\\$&')}'`,
+    'g',
+  )
+  return [...source.matchAll(pattern)].flatMap((match) =>
+    (match[1] ?? '')
+      .split(',')
+      .map(
+        (entry) =>
+          entry
+            .trim()
+            .split(/\s+as\s+/)[0]
+            ?.trim() ?? '',
+      )
+      .filter(Boolean),
+  )
+}
+
+/** 훑기 범위 — `src/` 와 라우트(`app/`). API 모듈 자신과 테스트는 뺀다 */
+function appSources(): string[] {
+  return ['src', 'app'].flatMap((dir) => {
+    const root = fileURLToPath(new URL(`../../../${dir}/`, import.meta.url))
+    return readdirSync(root, { recursive: true })
+      .map((file) => `${dir}/${String(file).split('\\').join('/')}`)
+      .filter(
+        (file) =>
+          /\.tsx?$/.test(file) && !/\.test\.tsx?$/.test(file) && !file.startsWith('src/lib/api/'),
+      )
+  })
+}
+
+function writersOf(module: string, api: readonly string[]): string[] {
+  return appSources().filter((file) =>
+    importedNames(readSourceWithoutComments(file), module).some((name) => api.includes(name)),
+  )
 }
 
 describe('일정 쓰기 호출처가 브리핑을 무효화한다 (#1055)', () => {
-  const writers = featureSources().filter((file) =>
-    PLAN_WRITE_CALL.test(readSourceWithoutComments(file)),
-  )
+  const writers = writersOf('@/lib/api/plan', PLAN_WRITE_API)
+  const petWriters = writersOf('@/lib/api/pet', PET_WRITE_API)
 
   it('훑기가 비지 않았다 — 알려진 쓰기 경로가 모두 잡힌다', () => {
     expect(writers).toEqual(
@@ -182,9 +220,20 @@ describe('일정 쓰기 호출처가 브리핑을 무효화한다 (#1055)', () =
     expect(readSourceWithoutComments(file)).toMatch(/\binvalidatePlanBriefing\(/)
   })
 
-  it('반려견 수정이 모든 일정의 브리핑을 무효화한다', () => {
-    expect(readSourceWithoutComments('src/features/pet/pet-edit-view.tsx')).toMatch(
-      /\binvalidateAllPlanBriefings\(/,
-    )
+  it('반려견 수정 훑기가 비지 않았다', () => {
+    expect(petWriters).toEqual(expect.arrayContaining(['src/features/pet/pet-edit-view.tsx']))
+  })
+
+  it.each(petWriters)('%s 가 모든 일정의 브리핑을 무효화한다', (file) => {
+    expect(readSourceWithoutComments(file)).toMatch(/\binvalidateAllPlanBriefings\(/)
+  })
+
+  it('import 판정이 별칭 · 여러 줄 import 를 잡는다', () => {
+    expect(
+      importedNames(
+        "import {\n  fetchPlan,\n  replaceDayItems as replace,\n} from '@/lib/api/plan'",
+        '@/lib/api/plan',
+      ),
+    ).toEqual(['fetchPlan', 'replaceDayItems'])
   })
 })
