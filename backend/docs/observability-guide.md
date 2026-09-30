@@ -187,6 +187,54 @@ batch_schedule_last_fire_timestamp{job}      # 잡별 마지막 발화 시각(ep
 `MicrometerScheduleMetricsAdapter`. 스케줄이 꺼진 환경(local·CI·prod 기본)에서는 발화가 없어
 지표도 나오지 않는다.
 
+## AI 일정 잡 지표 (#985)
+
+AI 일정 생성은 비동기 잡이라 `http_server_requests` 에는 제출(202)과 폴링만 잡히고 **생성에 실제로
+걸린 시간은 드러나지 않는다.** 대기 화면이 한 단계에 오래 머문다는 보고에 "그 단계가 원래 긴가" 로
+답하려면 단계 단위로 재야 한다.
+
+```
+ai_plan_job_step_seconds_{count,sum,max,bucket}{step, mode, outcome}
+```
+
+| 태그 | 값 | 뜻 |
+| --- | --- | --- |
+| `step` | `CONDITIONS` / `CANDIDATES` / `WEATHER` / `DRAFTING` | `AiPlanJobStep` 이름. 응답의 `step.code` 와 같다 |
+| `mode` | `full` / `regenerate` | 전체 생성 / 하루 재생성(`regenerateDay` 가 있는 잡) |
+| `outcome` | `completed` / `failed` / `canceled` | 잡이 그 단계를 **떠난 방식** |
+
+- **`outcome` 규칙.** 다음 단계로 넘어갔거나 초안을 저장했으면 `completed`, 워커 예외나 타임아웃 판정이면
+  `failed`, 사용자 취소면 `canceled` 다. 취소는 단계 경계에서 발견되므로 그때는 **막 끝낸 단계**가 `canceled`
+  로 닫히고, 들어가지 않은 단계는 기록되지 않는다. 단계 길이의 정상 분포는 `outcome="completed"` 만 본다.
+- **잡을 가리키는 값은 태그에 없다.** jobId·memberId·areaCode 를 넣으면 잡마다 시계열이 생긴다. 조합은
+  4 × 2 × 3 = 24 개로 닫혀 있다. 한 잡을 따라가는 것은 로그다 —
+  `AI plan job step done jobId= step= order= mode= outcome= elapsedMs=`.
+- **재는 구간은 워커가 단계에 들어간 뒤부터 다음 전이까지다.** PENDING 대기(큐)는 들어가지 않는다 —
+  그것은 `executor_*{name="aiPlanTaskExecutor"}` 가 본다.
+- 히스토그램 버킷을 연다. 범위는 10ms ~ RUNNING 타임아웃(`ai.plan.job.running-timeout-seconds`, 기본 300초).
+- **구현 방식**: ai-service `planner` 도메인, `AiPlanJobMetricsPort` + `MicrometerAiPlanJobMetricsAdapter`.
+  기록은 `AiPlanWorker.StepTimer` 한곳에서 로그와 함께 하고, 기록 실패는 잡 결과를 바꾸지 않는다(warn 로그).
+  잡이 돌아야 시계열이 생기므로 재기동 직후에는 값이 없다.
+
+PromQL 예.
+
+```promql
+# 단계별 p95 (모드별, 1시간 창)
+histogram_quantile(0.95,
+  sum by (le, step, mode) (rate(ai_plan_job_step_seconds_bucket{outcome="completed"}[1h])))
+
+# 전체 단계 소요 가운데 DRAFTING(LLM) 이 차지하는 비중 (모드별)
+sum by (mode) (rate(ai_plan_job_step_seconds_sum{step="DRAFTING", outcome="completed"}[1h]))
+  / sum by (mode) (rate(ai_plan_job_step_seconds_sum{outcome="completed"}[1h]))
+
+# 단계별 실패·취소 비율
+sum by (step, outcome) (rate(ai_plan_job_step_seconds_count{outcome!="completed"}[1h]))
+  / ignoring(outcome) group_left sum by (step) (rate(ai_plan_job_step_seconds_count[1h]))
+```
+
+비중의 분모에는 뒤에서 실패한 잡의 앞 단계(`completed`)도 들어간다. 실패가 드문 동안은 무시할 만하고,
+실패율이 높을 때는 먼저 세 번째 쿼리를 본다.
+
 ## 외부 API 지표
 
 Resilience4j 가 자동으로 노출한다.
@@ -217,6 +265,7 @@ batch-service 는 제공처 단위로 인스턴스를 나눠 다섯 개를 쓴�
 | 5xx 비율 | `sum by (service) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))` |
 | **데이터 신선도** | `time() - place_import_last_success_timestamp` (소스별 stat 패널) |
 | 배치 결과 | `place_import_rows` 소스·결과별 막대 |
+| AI 일정 단계 p95 | 위 "AI 일정 잡 지표" 첫 쿼리 (step · mode 별 선) |
 | JVM 힙 | `jvm_memory_used_bytes{area="heap"}` |
 
 ## 빠른 점검
