@@ -40,7 +40,6 @@ export function PasswordResetView() {
 
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
 
   // 쿨다운은 "남은 초" state 를 감산하지 않고 시작 시각을 들고 매 렌더 다시 계산한다 —
   // 백그라운드 탭에서 setInterval 이 스로틀링돼도 남은 초가 어긋나지 않는다 (form-guide.md §2)
@@ -251,14 +250,12 @@ export function PasswordResetView() {
           submitting={resetForm.isSubmitting}
           cooldownSeconds={cooldownSeconds}
           resending={isResending}
-          showPassword={showPassword}
           // 오류가 떠 있으면 성공 안내를 끈다 — role=status 와 role=alert 가 동시에 뜬다
           notice={resetForm.errors.form === null ? messages.auth.resetCodeSent : undefined}
           onValueChange={(key, value) => {
             setResetErrorStatus(null)
             resetForm.setValue(key, value)
           }}
-          onTogglePassword={() => setShowPassword((previous) => !previous)}
           onSubmit={() => void resetForm.submit()}
           onResend={handleResend}
           onChangeEmail={() => {

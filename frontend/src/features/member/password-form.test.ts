@@ -66,6 +66,32 @@ describe('PasswordFormFields — 모드별 필드 구성', () => {
     expect(markup).toContain(messages.form.passwordLength)
   })
 
+  it('새 비밀번호 규칙을 가입 · 재설정과 같은 문구로 미리 보여 준다 (#1080)', () => {
+    expect(render({ mode: 'change' })).toContain(messages.form.passwordRule)
+    expect(render({ mode: 'setup' })).toContain(messages.form.passwordRule)
+  })
+
+  /*
+    칸이 둘이라 버튼 이름이 같으면 스크린리더에 어느 칸의 토글인지 들리지 않는다 (#1080).
+    각 토글은 자기 칸을 `aria-controls` 로 가리킨다.
+  */
+  it('두 칸 모두 눈 토글이 있고, 이름이 대상 칸을 말한다', () => {
+    const markup = render({ mode: 'change' })
+
+    expect(markup).toContain(`aria-label="${messages.member.currentPasswordShow}"`)
+    expect(markup).toContain('aria-controls="currentPassword"')
+    expect(markup).toContain(`aria-label="${messages.member.newPasswordShow}"`)
+    expect(markup).toContain('aria-controls="newPassword"')
+    expect(markup).not.toContain(`aria-label="${messages.auth.passwordShow}"`)
+  })
+
+  it('최초 설정 모드는 새 비밀번호 칸의 토글 하나다', () => {
+    const markup = render({ mode: 'setup' })
+
+    expect(markup.match(/aria-pressed="false"/g)).toHaveLength(1)
+    expect(markup).toContain('aria-controls="newPassword"')
+  })
+
   it('폼 전체 오류는 role="alert" 로 알린다', () => {
     const markup = render({ errors: { fields: {}, form: '비밀번호가 일치하지 않습니다.' } })
 

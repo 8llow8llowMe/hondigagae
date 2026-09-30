@@ -33,6 +33,19 @@ export const formMessages = {
   // MEMBER_117
   ageOver14Required: '만 14세 이상만 가입할 수 있습니다.',
 
+  /*
+    새 비밀번호 규칙 안내 — 입력란 아래 `Field.hint` (#1080). 가입 3단계 · 비밀번호 재설정 ·
+    마이페이지 변경/설정이 같은 문구를 쓴다.
+
+    **백엔드 문구의 복제본이 아니다.** 위 `passwordLength`(MEMBER_104) · `passwordPattern`
+    (MEMBER_105)은 틀린 뒤의 문장이라 둘로 갈리고 "…해야 합니다" 로 끝난다 — 미리 보여 줄
+    자리에는 규칙 **전체**(길이 + 문자 구성)를 한 줄로 준다. 규칙의 정본은 여전히 스키마
+    (`lib/form/password-pattern.ts` + `.min(8).max(20)`)다. 규칙이 바뀌면 여기도 고친다.
+
+    틀리면 이 줄 대신 오류가 선다 (`Field` 는 hint 와 error 를 함께 그리지 않는다).
+  */
+  passwordRule: '8~20자, 영문 · 숫자 · 특수문자 각 1자 이상',
+
   /** 응답 형태를 해석하지 못했을 때의 최후 문구 */
   submitFailed: '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.',
 } as const
@@ -45,7 +58,9 @@ export const authMessages = {
   emailLabel: '이메일',
   passwordLabel: '비밀번호',
   /*
-    비밀번호 표시 토글의 이름 (`aria-label`) — 로그인 · 비밀번호 찾기 2단계가 함께 쓴다.
+    비밀번호 표시 토글의 이름 (`aria-label`) — `PasswordInput` 의 기본값이다 (#1080).
+    로그인 · 회원가입 3단계 · 비밀번호 찾기 2단계가 쓴다. 칸이 둘인 마이페이지는 대상을
+    붙인 자기 문구를 넘긴다 (`memberMessages.currentPasswordShow` 등).
 
     **아이콘은 `aria-hidden` 이라 이 문구가 버튼의 유일한 이름이다.** 예전에는 입력란
     **옆**에 선 텍스트 버튼이라 `표시` / `숨기기` 두 글자였는데, 눈 아이콘이 입력란

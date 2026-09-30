@@ -1,7 +1,7 @@
 import { Button } from '@/components/button'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
-import { Input } from '@/components/input'
+import { PasswordInput } from '@/components/password-input'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 
@@ -29,8 +29,11 @@ export type PasswordFormFieldsProps = {
  * `autoComplete` 를 정확히 준다. 비밀번호 관리자가 **현재 비밀번호와 새 비밀번호를
  * 구분하지 못하면** 저장된 값을 새 비밀번호 칸에 채워 넣는다.
  *
- * 표시 토글을 두지 않는다. 로그인과 달리 이 화면은 **두 개의 비밀번호 칸**이 있어
- * 토글이 둘이 되고, 어느 쪽이 보이는 상태인지가 화면에서 읽히지 않는다.
+ * **두 칸 다 눈 토글을 단다** (#1080 — 가입 · 재설정과 같은 `PasswordInput`). 예전에는
+ * "토글이 둘이면 어느 쪽이 보이는 상태인지 읽히지 않는다" 며 두지 않았는데, 토글이 입력란
+ * **안**으로 들어간 뒤로는 칸마다 자기 눈 아이콘과 자기 값(점 ↔ 글자)이 함께 보여 어느 칸이
+ * 열렸는지가 그 칸에서 읽힌다. 소리로 듣는 쪽을 위해 버튼 이름에 대상 칸을 붙인다
+ * (`현재 비밀번호 표시` · `새 비밀번호 표시`).
  */
 export function PasswordFormFields({
   mode,
@@ -64,13 +67,16 @@ export function PasswordFormFields({
           error={errors.fields.currentPassword}
           required
         >
-          <Input
+          <PasswordInput
             id="currentPassword"
-            type="password"
             autoComplete="current-password"
             value={currentPassword}
             onValueChange={onCurrentPasswordChange}
             invalid={errors.fields.currentPassword !== undefined}
+            revealLabels={{
+              show: messages.member.currentPasswordShow,
+              hide: messages.member.currentPasswordHide,
+            }}
           />
         </Field>
       )}
@@ -79,16 +85,19 @@ export function PasswordFormFields({
         id="newPassword"
         label={messages.member.newPasswordLabel}
         error={errors.fields.newPassword}
-        hint={messages.form.passwordPattern}
+        hint={messages.form.passwordRule}
         required
       >
-        <Input
+        <PasswordInput
           id="newPassword"
-          type="password"
           autoComplete="new-password"
           value={newPassword}
           onValueChange={onNewPasswordChange}
           invalid={errors.fields.newPassword !== undefined}
+          revealLabels={{
+            show: messages.member.newPasswordShow,
+            hide: messages.member.newPasswordHide,
+          }}
         />
       </Field>
 

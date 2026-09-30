@@ -63,6 +63,15 @@ export const memberMessages = {
   passwordTitle: '비밀번호 관리',
   currentPasswordLabel: '현재 비밀번호',
   newPasswordLabel: '새 비밀번호',
+  /*
+    표시 토글의 이름 (#1080). **이 화면에는 비밀번호 칸이 둘이다** — 로그인 · 가입의
+    `비밀번호 표시` 를 그대로 쓰면 버튼 목록으로 훑는 스크린리더에 같은 이름이 둘 들려
+    어느 칸의 버튼인지 알 수 없다. 대상 칸의 라벨을 앞에 붙인다.
+  */
+  currentPasswordShow: '현재 비밀번호 표시',
+  currentPasswordHide: '현재 비밀번호 숨기기',
+  newPasswordShow: '새 비밀번호 표시',
+  newPasswordHide: '새 비밀번호 숨기기',
   passwordChangeSubmit: '변경하기',
   passwordSetupSubmit: '설정하기',
   passwordSetupDescription: '비밀번호를 설정하면 이메일로도 로그인할 수 있어요.',
