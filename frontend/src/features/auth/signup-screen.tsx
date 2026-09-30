@@ -3,9 +3,11 @@
 import { useCallback, useState } from 'react'
 
 import { SignupForm } from '@/features/auth/signup-form'
+import { SignupLoginPrompt } from '@/features/auth/signup-parts'
 import { SocialLoginButtons } from '@/features/auth/social-login-buttons'
 import {
   NO_SIGNUP_CONSENT,
+  setAllSignupConsent,
   type SignupConsent,
   type SignupConsentKey,
 } from '@/lib/auth/signup-consent'
@@ -27,15 +29,29 @@ export function SignupScreen({ returnTo }: { returnTo: string }) {
     setConsent((previous) => ({ ...previous, [key]: checked }))
   }, [])
 
+  const handleConsentAllChange = useCallback((checked: boolean) => {
+    setConsent(setAllSignupConsent(checked))
+  }, [])
+
   return (
     <div className="flex flex-col gap-6">
-      <SignupForm returnTo={returnTo} consent={consent} onConsentChange={handleConsentChange} />
+      <SignupForm
+        returnTo={returnTo}
+        consent={consent}
+        onConsentChange={handleConsentChange}
+        onConsentAllChange={handleConsentAllChange}
+      />
       {/*
         소셜 로그인은 폼 아래에 둔다 — 기본 수단은 이메일 가입이다. `consent` 를 넘기는
         것이 곧 "여기는 가입 화면" 이라는 신호다: 로그인 화면은 넘기지 않아 동의 없이
         그대로 눌린다 (기존 회원 로그인은 동의와 무관하다).
       */}
       <SocialLoginButtons returnTo={returnTo} consent={consent} />
+      {/*
+        화면 맨 아래 — 가입 수단(이메일 · 소셜)을 다 본 뒤에 "이미 계정이 있다" 는 출구를
+        둔다. 로그인 화면의 "회원가입" 링크와 짝이다 (#1083).
+      */}
+      <SignupLoginPrompt returnTo={returnTo} />
     </div>
   )
 }

@@ -10,7 +10,11 @@ import { messages } from '@/lib/messages'
 const noop = () => undefined
 
 describe('EmailStep', () => {
-  it('단계 표시를 텍스트로 렌더한다 — 색·아이콘만으로 표현하지 않는다', () => {
+  /*
+    단계 표시는 제목 바로 아래(`SignupHeading`)로 옮겼다 (#1083). 단계 컴포넌트가 또 그리면
+    한 화면에 "3단계 중 1단계" 가 두 번 선다 — 위치 이동이 복제로 끝나지 않게 잠근다.
+  */
+  it('단계 표시를 그리지 않는다 — 제목 아래 SignupHeading 의 몫이다', () => {
     const markup = renderToStaticMarkup(
       createElement(EmailStep, {
         values: { email: '' },
@@ -23,7 +27,7 @@ describe('EmailStep', () => {
       }),
     )
 
-    expect(markup).toContain(messages.auth.stepOf(1, 3))
+    expect(markup).not.toContain(messages.auth.stepOf(1, 3))
     expect(markup).toContain('autoComplete="username"')
   })
 
@@ -306,10 +310,84 @@ describe('CodeStep', () => {
   })
 })
 
+describe('진행 중인 이메일 — 2·3단계가 라벨과 함께 보인다 (#1083)', () => {
+  const LONG_EMAIL = 'verylongaddress.for.jeju.trip@example.com'
+
+  it('2단계는 "받는 이메일" 라벨을 붙인다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(CodeStep, {
+        email: LONG_EMAIL,
+        values: { code: '' },
+        errors: NO_FORM_ERRORS,
+        errorStatus: null,
+        submitting: false,
+        cooldownSeconds: 0,
+        resending: false,
+        onValueChange: noop,
+        onSubmit: noop,
+        onResend: noop,
+        onChangeEmail: noop,
+        onRetry: noop,
+      }),
+    )
+
+    expect(markup).toContain(
+      `<dt class="text-caption text-fg-muted">${messages.auth.codeRecipientLabel}</dt>`,
+    )
+    expect(markup).toContain(LONG_EMAIL)
+    expect(markup).toContain('break-all')
+  })
+
+  it('3단계에도 이메일을 "가입할 이메일" 로 보인다 — 비밀번호 입력보다 먼저다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(ProfileStep, {
+        email: LONG_EMAIL,
+        values: { password: '', name: '', nickname: '' },
+        errors: NO_FORM_ERRORS,
+        errorStatus: null,
+        submitting: false,
+        duplicateEmail: null,
+        returnTo: '/',
+        onValueChange: noop,
+        onSubmit: noop,
+        onRetry: noop,
+      }),
+    )
+
+    expect(markup).toContain(messages.auth.signupEmailLabel)
+    expect(markup).toContain(LONG_EMAIL)
+    expect(markup.indexOf(LONG_EMAIL)).toBeLessThan(markup.indexOf('id="password"'))
+  })
+
+  /*
+    값 표시이지 입력이 아니다 — 이메일은 1단계에서 정해졌고 3단계에서 고칠 수 없다. 입력처럼
+    보이면 고치려다 막힌다.
+  */
+  it('3단계의 이메일은 입력 필드가 아니다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(ProfileStep, {
+        email: LONG_EMAIL,
+        values: { password: '', name: '', nickname: '' },
+        errors: NO_FORM_ERRORS,
+        errorStatus: null,
+        submitting: false,
+        duplicateEmail: null,
+        returnTo: '/',
+        onValueChange: noop,
+        onSubmit: noop,
+        onRetry: noop,
+      }),
+    )
+
+    expect(markup).not.toContain('type="email"')
+  })
+})
+
 describe('ProfileStep', () => {
   it('비밀번호·이름·닉네임을 렌더한다', () => {
     const markup = renderToStaticMarkup(
       createElement(ProfileStep, {
+        email: 'a@b.c',
         values: { password: '', name: '', nickname: '' },
         errors: NO_FORM_ERRORS,
         errorStatus: null,
@@ -331,6 +409,7 @@ describe('ProfileStep', () => {
   it('이메일 중복이면 로그인 링크를 함께 준다', () => {
     const markup = renderToStaticMarkup(
       createElement(ProfileStep, {
+        email: 'a@b.c',
         values: { password: '', name: '', nickname: '' },
         errors: { fields: {}, form: '이미 가입된 이메일 (a@b.c)입니다.' },
         errorStatus: 409,
@@ -351,6 +430,7 @@ describe('ProfileStep', () => {
   it('5xx 면 ErrorState 와 재시도 버튼을 렌더한다', () => {
     const markup = renderToStaticMarkup(
       createElement(ProfileStep, {
+        email: 'a@b.c',
         values: { password: '', name: '', nickname: '' },
         errors: NO_FORM_ERRORS,
         errorStatus: 500,
@@ -372,6 +452,7 @@ describe('ProfileStep', () => {
     // 회원가입-세부명세.md D4 "단계·입력값 유지"를 어긴다
     const markup = renderToStaticMarkup(
       createElement(ProfileStep, {
+        email: 'a@b.c',
         values: { password: 'pw', name: '홍길동', nickname: '길동이' },
         errors: NO_FORM_ERRORS,
         errorStatus: 500,
@@ -394,6 +475,7 @@ describe('ProfileStep', () => {
   it('notice 가 있으면 role=status 로 렌더한다 — 2단계 성공 안내', () => {
     const markup = renderToStaticMarkup(
       createElement(ProfileStep, {
+        email: 'a@b.c',
         values: { password: '', name: '', nickname: '' },
         errors: NO_FORM_ERRORS,
         errorStatus: null,
@@ -414,6 +496,7 @@ describe('ProfileStep', () => {
   it('notice 가 없으면 안내를 렌더하지 않는다', () => {
     const markup = renderToStaticMarkup(
       createElement(ProfileStep, {
+        email: 'a@b.c',
         values: { password: '', name: '', nickname: '' },
         errors: NO_FORM_ERRORS,
         errorStatus: null,

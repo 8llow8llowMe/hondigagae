@@ -42,6 +42,42 @@ export function isSignupConsentComplete(consent: SignupConsent): boolean {
 }
 
 /**
+ * "전체 동의" 를 눌렀을 때의 다음 값 — 이슈 #1083.
+ *
+ * **전체 동의는 저장하는 값이 아니다.** 체크 상태는 `isSignupConsentComplete` 에서
+ * 파생한다. 따로 들면 "셋 다 켰는데 전체는 꺼져 있음" · "하나를 껐는데 전체는 켜져
+ * 있음" 을 맞춰 주는 코드가 두 방향 다 필요하고, 하나라도 빠지면 화면이 거짓말을 한다.
+ * 파생값이면 그 두 방향이 공짜다. 여기 남는 것은 반대쪽 — 전체를 눌러 셋을 한꺼번에
+ * 바꾸는 한 방향뿐이다.
+ *
+ * 키 목록을 돌며 만든다. 항목이 늘어도 전체 동의가 새 항목을 빠뜨리지 않는다.
+ */
+export function setAllSignupConsent(checked: boolean): SignupConsent {
+  const next = { ...NO_SIGNUP_CONSENT }
+  for (const key of SIGNUP_CONSENT_KEYS) next[key] = checked
+  return next
+}
+
+/**
+ * 바꾼 동의 항목의 오류만 지운다. `useForm.setValue` 의 기본 동작과 같은 판단이다 —
+ * 전체를 지우면 아직 켜지 않은 항목의 안내까지 사라진다. 전체 동의는 세 키를 한꺼번에
+ * 넘긴다.
+ *
+ * **지울 것이 없으면 입력을 그대로 돌려준다.** setState 갱신 함수 안에서 쓰므로 새
+ * 객체를 만들면 바뀐 것이 없는데도 다시 그려진다.
+ */
+export function clearConsentErrors(
+  errors: FormErrors,
+  keys: readonly SignupConsentKey[],
+): FormErrors {
+  if (keys.every((key) => errors.fields[key] === undefined)) return errors
+
+  const fields = { ...errors.fields }
+  for (const key of keys) delete fields[key]
+  return { fields, form: errors.form }
+}
+
+/**
  * 필드 없는 동의 오류 코드가 가리키는 **체크박스 후보**.
  *
  * `MEMBER_115/116/117` 은 web 경계의 `@AssertTrue` 라 `field` 가 함께 오지만,

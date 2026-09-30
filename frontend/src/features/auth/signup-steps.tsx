@@ -9,6 +9,7 @@ import { FormAlert } from '@/components/form-alert'
 import { FormNotice } from '@/components/form-notice'
 import { Input } from '@/components/input'
 import type { CodeValues, EmailValues, SignupProfileValues } from '@/features/auth/schemas'
+import { SignupEmailSummary } from '@/features/auth/signup-parts'
 import { classify } from '@/lib/api/error'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
@@ -21,6 +22,9 @@ import { messages } from '@/lib/messages'
  * 5xx·무응답은 `errorStatus` 로 구분해 `ErrorState` 로 대체 렌더한다. 429(쿨다운·잠금)는
  * `classify` 가 `'rate-limited'` 로 분류해 여기 걸리지 않는다 — `FormAlert` 로만 보여준다.
  * `LoginFormFields` 가 이미 세운 패턴이다.
+ *
+ * **단계 표시는 여기 없다** (#1083). 제목 바로 아래 — 화면 단위 동의 블록보다 위 — 에
+ * 서야 해서 `SignupHeading`(`signup-parts.tsx`)이 그린다.
  */
 
 export type EmailStepProps = {
@@ -63,8 +67,6 @@ export function EmailStep({
           onRetry={onRetry}
         />
       )}
-      {/* 단계 표시는 텍스트로도 읽힌다 — 색·아이콘만으로 표현하지 않는다 (D6) */}
-      <p className="text-caption text-fg-muted">{messages.auth.stepOf(1, 3)}</p>
       <FormAlert message={errors.form} />
 
       <Field id="email" label={messages.auth.emailLabel} error={errors.fields.email} required>
@@ -145,11 +147,9 @@ export function CodeStep({
           onRetry={onRetry}
         />
       )}
-      <p className="text-caption text-fg-muted">{messages.auth.stepOf(2, 3)}</p>
+      <SignupEmailSummary label={messages.auth.codeRecipientLabel} email={email} />
       <FormNotice message={notice ?? null} />
       <FormAlert message={errors.form} />
-      {/* 이메일은 줄바꿈 기회가 없는 토큰이다 — 긴 이메일이 375px 폭에서 넘치지 않게 break-all */}
-      <p className="text-body-2 text-fg-muted break-all">{email}</p>
 
       <Field id="code" label={messages.auth.codeLabel} error={errors.fields.code} required>
         <Input
@@ -191,6 +191,8 @@ export function CodeStep({
 }
 
 export type ProfileStepProps = {
+  /** 2단계에서 인증을 마친 이메일. 이 단계에서는 고칠 수 없어 값으로만 보인다 (#1083) */
+  email: string
   values: SignupProfileValues
   errors: FormErrors
   errorStatus: number | null
@@ -207,6 +209,7 @@ export type ProfileStepProps = {
 }
 
 export function ProfileStep({
+  email,
   values,
   errors,
   errorStatus,
@@ -239,7 +242,7 @@ export function ProfileStep({
           onRetry={onRetry}
         />
       )}
-      <p className="text-caption text-fg-muted">{messages.auth.stepOf(3, 3)}</p>
+      <SignupEmailSummary label={messages.auth.signupEmailLabel} email={email} />
       <FormNotice message={notice ?? null} />
       <FormAlert message={errors.form} />
 

@@ -7,6 +7,7 @@ import { SocialLoginButtons } from '@/features/auth/social-login-buttons'
 import { type OAuthProviderId, oauthProviderName } from '@/lib/auth/oauth-provider'
 import {
   NO_SIGNUP_CONSENT,
+  setAllSignupConsent,
   type SignupConsent,
   type SignupConsentKey,
 } from '@/lib/auth/signup-consent'
@@ -48,6 +49,10 @@ export function SocialSignupConsentScreen({ provider, returnTo }: SocialSignupCo
     setConsent((previous) => ({ ...previous, [key]: checked }))
   }, [])
 
+  const handleConsentAllChange = useCallback((checked: boolean) => {
+    setConsent(setAllSignupConsent(checked))
+  }, [])
+
   // 타입상 `null` 이 아니지만 `oauthProviderName` 의 계약은 `string | null` 이다
   const providerName = oauthProviderName(provider) ?? provider
 
@@ -56,10 +61,10 @@ export function SocialSignupConsentScreen({ provider, returnTo }: SocialSignupCo
       <div className="flex flex-col gap-2">
         <h1 className="text-title-1 text-fg font-bold">{messages.auth.socialSignupConsentTitle}</h1>
         {/*
-          **왜 제공자를 한 번 더 거치는지 말한다.** 인가코드는 1회용이고 `state` 는 서버가
-          조회와 동시에 지우므로(Redis GETDEL) 방금 받은 것으로 재시도할 방법이 없다.
-          다만 제공자 쪽 동의는 이미 끝나 있어 동의 화면 없이 곧장 돌아온다 — 이 말이
-          없으면 사용자는 "또 처음부터" 로 읽고 이탈한다.
+          **남은 일이 버튼 하나라는 것을 말한다.** 인가코드는 1회용이고 `state` 는 서버가
+          조회와 동시에 지우므로(Redis GETDEL) 제공자를 한 번 더 거쳐야 한다 — 그 이유까지
+          화면에 적던 것을 #1083 에서 걷었다. 사용자에게 필요한 것은 이유가 아니라 "무엇을
+          누르면 끝나는지" 이고, 그 말이 "또 처음부터" 로 읽히는 것도 막는다.
         */}
         <p className="text-body-2 text-fg-muted">
           {messages.auth.socialSignupConsentNotice(providerName)}
@@ -75,6 +80,7 @@ export function SocialSignupConsentScreen({ provider, returnTo }: SocialSignupCo
         consent={consent}
         errors={NO_FORM_ERRORS}
         onConsentChange={handleConsentChange}
+        onConsentAllChange={handleConsentAllChange}
       />
 
       {/*
