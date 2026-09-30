@@ -14,6 +14,9 @@ public record AiPlanJob(
     // 지금 밟고 있는 세부 단계. PENDING 이면 아직 없다(null).
     // 종결 상태에서는 마지막으로 밟은 단계가 남는다 - 실패 지점을 아는 것이 진단이다.
     AiPlanJobStep step,
+    // 지금 단계에 들어간 서버 시각 (#985). 단계와 함께만 바뀐다. PENDING 이면 null 이고,
+    // 이 필드가 생기기 전에 저장된 잡을 읽어도 null 이다(역직렬화가 빠진 필드를 null 로 채운다).
+    Instant stepStartedAt,
     String errorCode,
     String errorMessage,
     Instant createdAt,
@@ -31,9 +34,9 @@ public record AiPlanJob(
             .build();
     }
 
-    /** 세부 단계만 옮긴다. 상태는 그대로 RUNNING 이다. */
-    public AiPlanJob atStep(AiPlanJobStep next) {
-        return toBuilder().step(next).build();
+    /** 세부 단계만 옮기고 그 단계에 들어간 시각을 적는다. 상태는 그대로 RUNNING 이다. */
+    public AiPlanJob atStep(AiPlanJobStep next, Instant now) {
+        return toBuilder().step(next).stepStartedAt(now).build();
     }
 
     /**
@@ -78,6 +81,7 @@ public record AiPlanJob(
             .requestParams(requestParams)
             .status(status)
             .step(step)
+            .stepStartedAt(stepStartedAt)
             .errorCode(errorCode)
             .errorMessage(errorMessage)
             .createdAt(createdAt)

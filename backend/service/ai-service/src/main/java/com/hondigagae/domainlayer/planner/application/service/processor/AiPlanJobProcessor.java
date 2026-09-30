@@ -138,6 +138,9 @@ public class AiPlanJobProcessor {
             .jobId(job.jobId())
             .status(job.status())
             .step(job.step())
+            // 경과 시간은 지금 흐르고 있는 단계에만 의미가 있다. 종결 잡은 저장소에 마지막 단계 시각이 남아 있어도
+            // 내리지 않는다 — 내리면 화면이 끝난 작업 위에 계속 늘어나는 경과 시간을 그릴 수 있다.
+            .stepStartedAt(job.status() == AiPlanJobStatus.RUNNING ? job.stepStartedAt() : null)
             // 생성 조건은 제출 때 저장한 requestParams 가 그대로 근거다 — 따로 보관하지 않는다.
             // 상태와 무관하게 채운다: 브라우저를 넘어온 화면은 초안을 담을 때 조건이 필요하고,
             // 그것만 따로 물어볼 수단이 없다 (#488).

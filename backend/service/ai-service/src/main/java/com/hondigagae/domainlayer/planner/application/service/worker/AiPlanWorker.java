@@ -161,7 +161,7 @@ public class AiPlanWorker {
         if (latest.status().isTerminal()) {
             throw new JobCanceledException(step, latest.status());
         }
-        AiPlanJob advanced = aiPlanJobStorePort.save(latest.atStep(step));
+        AiPlanJob advanced = aiPlanJobStorePort.save(latest.atStep(step, Instant.now()));
         if (advanced.status().isTerminal()) {
             throw new JobCanceledException(step, advanced.status());
         }
