@@ -346,7 +346,8 @@ mutation 후 무효화 대상을 **명세와 코드 양쪽에 명시한다.**
 | **항목 방문 체크**           | `planKeys.detail(planId)` (**판정은 무효화하지 않는다** — 아래)                      |
 | **항목 시작 시각** (#1053)   | `planKeys.detail(planId)` + `planKeys.walkSafety(planId)` (판정 제외 — 아래)         |
 | **일정 쓰기 전부** (#1055)   | 각 행에 더해 `planKeys.briefings(planId)` — 반려견 수정은 `briefingAll()` (아래)     |
-| 반려견 등록/수정             | `petKeys.all` (수정은 + `planKeys.briefingAll()` — 위)                               |
+| **일정 상태 변경** (#1058)   | detail 교체 + `list` · `briefings` (완료 ↔ 진행만 + `weather` · `walkSafety`)        |
+| 반려견 등록/수정             | `petKeys.all` (수정은 + `briefingAll` · `weatherAll` · `walkSafetyAll` — 아래)       |
 | **반려견 삭제**              | `petKeys.all` + `planKeys.all` (지운 아이 상세·집계는 재조회 제외 — 아래)            |
 | 프로필 수정 / 이미지 변경    | `memberKeys.me()`                                                                    |
 | **AI 일정 → 일정 확정 저장** | `planKeys.all` + `aiPlanKeys.job(jobId)` (작업이 담은 일정을 싣는다 — #1041, 아래)   |
@@ -376,6 +377,13 @@ mutation 후 무효화 대상을 **명세와 코드 양쪽에 명시한다.**
   수 없어 `invalidateAllPlanBriefings` 로 전부 버린다. 날짜는 가리지 않는다(`planKeys.briefings(planId)`
   prefix). 반려견 삭제는 `planKeys.all` 로 이미 덮인다. 새 쓰기 경로가 빠지면
   `plan-briefing-invalidation.test.ts` 가 쓰기 API 호출처를 훑어 잡는다.
+- **판정 · 산책 위험도도 반려견 특성을 읽는다** (#1058). 둘 다 `PlanWeatherProcessor.loadConditions` 로
+  특성을 받는다 — 진행 중 일정은 지금 프로필, 완료 일정은 완료 시점 스냅샷(#629). 그래서 브리핑과 같은
+  두 쓰기가 이 둘도 버린다. **반려견 수정**은 동행 일정을 가려낼 수 없어 `planKeys.weatherAll()` ·
+  `planKeys.walkSafetyAll()` prefix 로 전부 버린다(곧바로 목록으로 떠나 낡음 표시뿐이다). **상태 변경**은
+  브리핑과 달리 **완료로 들어가거나 나올 때만** 그 일정의 두 key 를 버린다(`changesPetConditionSource`) —
+  상세 화면이 관찰 중이라 버리면 곧바로 장소마다 원격 호출로 다시 받는데, 초안 ↔ 확정은 둘 다 지금
+  프로필이라 입력이 그대로다. 빠짐은 같은 `plan-briefing-invalidation.test.ts` 가 잡는다.
 - **반려견 삭제는 일정까지 무효화하고, 지운 아이의 key 는 다시 받지 않는다** (#1042). 삭제 응답이 온
   시점에 plan-service 가 다견 일정의 `petIds` 에서 그 아이를 이미 뗐다 — 일정 캐시를 두면 30초 동안
   지운 아이가 일정에 남아 보인다. 반대로 `petKeys.all` 을 그대로 무효화하면 **아직 화면이 관찰 중인
