@@ -391,6 +391,54 @@ describe('PlaceDetailSection — 동반 정보 없음 (#530)', () => {
   })
 })
 
+/*
+  #1066 — `lg` 미만에는 동반이 **세 번** 섰다: 이름 아래 칩 줄 · 판정 요약 `동반` 줄 ·
+  `반려견 동반` 체크리스트. 요약이 `lg:hidden` 이라 칩 묶음은 반대로 `lg` 부터만 세운다.
+  DOM 은 폭마다 나누지 않는다 — 클래스로만 가른다 (`.rail-layout-detail` 주석의 규칙).
+*/
+describe('PlaceDetailSection — 동반 칩은 요약이 없는 폭에서만 (#1066)', () => {
+  /** 머리(`<header>`)만 떼어 본다 — 동반 문구는 아래 체크리스트에도 있다 */
+  function header(markup: string): string {
+    return markup.slice(markup.indexOf('<header'), markup.indexOf('</header>'))
+  }
+
+  it('동반 칩 묶음을 lg 부터만 세운다', () => {
+    const head = header(render())
+    const wrapper = /<span class="hidden lg:contents">(.*?)<\/span><\/div>/.exec(head)
+
+    expect(wrapper?.[1]).toContain(placeDetail.petAllowanceType.name)
+    expect(wrapper?.[1]).toContain(placeDetail.petInfo?.allowedPetSize.name ?? '')
+  })
+
+  it('실내 여부를 알면 lg 미만에서 태그 줄 자체를 세우지 않는다 — 빈 줄이 gap 을 먹는다', () => {
+    const head = header(render({ place: { ...placeDetail, indoor: true } }))
+
+    expect(head).toContain('flex-wrap items-center gap-1.5 hidden lg:flex')
+  })
+
+  it('실내 여부를 모르면 태그 줄이 모든 폭에 선다 — 모름 배지는 요약에 없다', () => {
+    const head = header(render({ place: { ...placeDetail, indoor: null } }))
+
+    expect(head).toContain(messages.place.rowIndoorUnknown)
+    expect(head).not.toContain('hidden lg:flex')
+  })
+
+  it('칩이 하나도 없으면 어느 폭에서도 태그 줄을 만들지 않는다', () => {
+    const head = header(
+      render({
+        place: {
+          ...placeDetail,
+          indoor: true,
+          petInfo: null,
+          petAllowanceType: { code: 'UNKNOWN', name: '동반 정보 없음', description: null },
+        },
+      }),
+    )
+
+    expect(head).not.toContain('gap-1.5')
+  })
+})
+
 describe('PlaceDetailSection — 외부 원문 처리', () => {
   it('개요의 br 태그를 개행으로 바꿔 평문으로 렌더한다', () => {
     const markup = render()
