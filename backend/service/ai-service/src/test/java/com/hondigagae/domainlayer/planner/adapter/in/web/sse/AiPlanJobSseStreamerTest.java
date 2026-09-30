@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -20,6 +21,7 @@ import com.hondigagae.domainlayer.planner.application.port.in.AiPlanWebUseCase;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStatus;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStep;
 import com.hondigagae.global.properties.AiPlanJobProperties;
+import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -56,7 +58,11 @@ class AiPlanJobSseStreamerTest {
     private final List<RecordingEmitter> emitters = new ArrayList<>();
 
     private Consumer<AiPlanJobInfo> subscriber;
-    private boolean unsubscribed;
+    private int unsubscribeCount;
+    /** 구독이 걸리는 순간 콜백에 넘길 상태. 구독 직후 종결 이벤트가 오는 경합을 재현한다. */
+    private AiPlanJobInfo deliverOnSubscribe;
+    /** 새로 만드는 emitter 의 send 가 던질 예외. */
+    private IOException sendFailure;
     private Runnable heartbeat;
 
     private AiPlanJobSseStreamer streamer;
@@ -66,14 +72,21 @@ class AiPlanJobSseStreamerTest {
         when(useCase.getJobInfo(JOB_ID, MEMBER_ID)).thenAnswer(invocation -> reads.pop().get());
         when(useCase.subscribeJobUpdates(eq(JOB_ID), eq(MEMBER_ID), any())).thenAnswer(invocation -> {
             subscriber = invocation.getArgument(2);
-            return (AiPlanJobSubscription) () -> unsubscribed = true;
+            if (deliverOnSubscribe != null) {
+                subscriber.accept(deliverOnSubscribe);
+            }
+            return (AiPlanJobSubscription) () -> unsubscribeCount++;
         });
         when(scheduler.scheduleAtFixedRate(any(), anyLong(), anyLong(), eq(TimeUnit.SECONDS))).thenAnswer(invocation -> {
             heartbeat = invocation.getArgument(0);
             return heartbeatFuture;
         });
-        streamer = new AiPlanJobSseStreamer(useCase, new AiPlanPresenter(), new AiPlanJobProperties(0, 0, 0), scheduler, timeout -> {
-            RecordingEmitter emitter = new RecordingEmitter(timeout);
+        streamer = streamerWith(new AiPlanPresenter());
+    }
+
+    private AiPlanJobSseStreamer streamerWith(AiPlanPresenter presenter) {
+        return new AiPlanJobSseStreamer(useCase, presenter, new AiPlanJobProperties(0, 0, 0), scheduler, timeout -> {
+            RecordingEmitter emitter = new RecordingEmitter(timeout, sendFailure);
             emitters.add(emitter);
             return emitter;
         });
@@ -138,7 +151,7 @@ class AiPlanJobSseStreamerTest {
 
         assertThat(lastFrame().status().code()).isEqualTo(AiPlanJobStatus.FAILED.name());
         assertThat(emitter().completed).isTrue();
-        assertThat(unsubscribed).isTrue();
+        assertThat(unsubscribeCount).isEqualTo(1);
         verify(heartbeatFuture).cancel(false);
     }
 
@@ -226,6 +239,92 @@ class AiPlanJobSseStreamerTest {
             .isLessThan(AiPlanJobSseStreamer.progressRank(info(AiPlanJobStatus.CANCELED, null)));
     }
 
+    // 종료 경로 — 어느 길로 닫혀도 구독과 하트비트가 한 번씩 풀린다 ──────────────
+
+    @Test
+    @DisplayName("응답 변환이 실패하면 연결을 닫는다 — 순위를 올린 채 남아 종결을 영영 못 보내지 않는다")
+    void closesStreamWhenPresenterFails() {
+        AiPlanJobSseStreamer failing = streamerWith(new AiPlanPresenter() {
+            @Override
+            public AiPlanJobStatusResponse toJobStatusResponse(AiPlanJobInfo info) {
+                if (info.status().isTerminal()) {
+                    throw new IllegalArgumentException("broken terminal frame");
+                }
+                return super.toJobStatusResponse(info);
+            }
+        });
+        reads.add(() -> running(AiPlanJobStep.DRAFTING));
+        reads.add(() -> running(AiPlanJobStep.DRAFTING));
+        failing.stream(JOB_ID, MEMBER_ID);
+
+        publish(info(AiPlanJobStatus.COMPLETED, AiPlanJobStep.DRAFTING));
+
+        assertThat(emitter().completed).isTrue();
+        assertThat(unsubscribeCount).isEqualTo(1);
+        verify(heartbeatFuture, times(1)).cancel(false);
+    }
+
+    @Test
+    @DisplayName("구독이 걸리자마자 종결되면 늦게 붙은 구독·하트비트를 정확히 한 번씩 푼다")
+    void releasesResourcesOnceWhenTerminalArrivesDuringSubscribe() {
+        deliverOnSubscribe = info(AiPlanJobStatus.COMPLETED, AiPlanJobStep.DRAFTING);
+        reads.add(() -> running(AiPlanJobStep.DRAFTING));
+        reads.add(() -> info(AiPlanJobStatus.COMPLETED, AiPlanJobStep.DRAFTING));
+
+        streamer.stream(JOB_ID, MEMBER_ID);
+
+        assertThat(frames()).extracting(frame -> frame.status().code()).containsExactly(AiPlanJobStatus.COMPLETED.name());
+        assertThat(emitter().completed).isTrue();
+        assertThat(unsubscribeCount).isEqualTo(1);
+        verify(heartbeatFuture, times(1)).cancel(false);
+    }
+
+    @Test
+    @DisplayName("전송이 IOException 이면 구독을 풀고 하트비트를 멈춘다")
+    void releasesResourcesWhenSendFails() {
+        sendFailure = new IOException("broken pipe");
+        reads.add(() -> running(AiPlanJobStep.CONDITIONS));
+        reads.add(() -> running(AiPlanJobStep.CONDITIONS));
+
+        streamer.stream(JOB_ID, MEMBER_ID);
+
+        assertThat(unsubscribeCount).isEqualTo(1);
+        verify(heartbeatFuture, times(1)).cancel(false);
+        // 닫힌 뒤의 이벤트·하트비트는 아무것도 하지 않는다.
+        publish(running(AiPlanJobStep.CANDIDATES));
+        runHeartbeats(AiPlanJobSseStreamer.STATUS_RECHECK_EVERY_N_HEARTBEATS);
+        assertThat(unsubscribeCount).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("emitter 타임아웃이면 닫고 자원을 푼다")
+    void closesOnEmitterTimeout() {
+        reads.add(() -> running(AiPlanJobStep.CONDITIONS));
+        reads.add(() -> running(AiPlanJobStep.CONDITIONS));
+        streamer.stream(JOB_ID, MEMBER_ID);
+
+        emitter().timeoutCallback.run();
+        emitter().timeoutCallback.run();
+
+        assertThat(emitter().completed).isTrue();
+        assertThat(unsubscribeCount).isEqualTo(1);
+        verify(heartbeatFuture, times(1)).cancel(false);
+    }
+
+    @Test
+    @DisplayName("연결 오류면 자원을 풀고, 뒤이은 완료 콜백은 다시 풀지 않는다")
+    void releasesOnceOnEmitterErrorThenCompletion() {
+        reads.add(() -> running(AiPlanJobStep.CONDITIONS));
+        reads.add(() -> running(AiPlanJobStep.CONDITIONS));
+        streamer.stream(JOB_ID, MEMBER_ID);
+
+        emitter().errorCallback.accept(new IOException("client gone"));
+        emitter().completionCallback.run();
+
+        assertThat(unsubscribeCount).isEqualTo(1);
+        verify(heartbeatFuture, times(1)).cancel(false);
+    }
+
     // 픽스처 ──────────────────────────────────────────────────────────────
 
     /** 워커의 발행을 흉내 낸다. 구독 전이면 사라진다 — Redis pub/sub 이 그렇다. */
@@ -267,14 +366,37 @@ class AiPlanJobSseStreamerTest {
     private static final class RecordingEmitter extends SseEmitter {
 
         private final List<AiPlanJobStatusResponse> frames = new ArrayList<>();
+        private final IOException sendFailure;
         private boolean completed;
+        private Runnable timeoutCallback;
+        private Runnable completionCallback;
+        private Consumer<Throwable> errorCallback;
 
-        private RecordingEmitter(Long timeout) {
+        private RecordingEmitter(Long timeout, IOException sendFailure) {
             super(timeout);
+            this.sendFailure = sendFailure;
         }
 
         @Override
-        public void send(SseEventBuilder builder) {
+        public void onTimeout(Runnable callback) {
+            timeoutCallback = callback;
+        }
+
+        @Override
+        public void onCompletion(Runnable callback) {
+            completionCallback = callback;
+        }
+
+        @Override
+        public void onError(Consumer<Throwable> callback) {
+            errorCallback = callback;
+        }
+
+        @Override
+        public void send(SseEventBuilder builder) throws IOException {
+            if (sendFailure != null) {
+                throw sendFailure;
+            }
             for (DataWithMediaType part : builder.build()) {
                 if (part.getData() instanceof AiPlanJobStatusResponse response) {
                     frames.add(response);
