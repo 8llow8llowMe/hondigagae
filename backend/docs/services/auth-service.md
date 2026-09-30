@@ -180,6 +180,103 @@
 - 클라이언트 IP 는 `ClientIpResolver`(X-Forwarded-For → X-Real-IP → remoteAddr)로 얻고
   Redis 고정 윈도우 카운터(장애 시 fail-open — 상한은 남용 방어지 정합성 장치가 아니다)로 센다.
 
+## 메일 템플릿 (#1062)
+
+인증 메일 7종의 본문은 Java 문자열이 아니라 Thymeleaf HTML 템플릿이다. 발송은 여전히
+`JavaMailSenderAdapter`(`MailSendPort` 구현, `@Async("authMailTaskExecutor")`)가 하고, 본문 렌더링만
+같은 패키지의 `MailTemplateRenderer` 가 맡는다. 발송·렌더링 실패는 마스킹된 이메일로 로그만 남기고
+예외를 던지지 않는다 — 사용자는 쿨다운 이후 재요청한다.
+
+- 위치: `service/auth-service/src/main/resources/templates/mail/`
+- 엔진: `org.thymeleaf:thymeleaf` 만 쓴다(`spring-boot-starter-thymeleaf` 아님 — REST 서비스에 MVC 뷰
+  리졸버를 들이지 않는다). `TemplateEngine` 은 빈이 아니라 `MailTemplateRenderer` 안에서 만든다
+  (`ClassLoaderTemplateResolver`, prefix `templates/mail/`, suffix `.html`, HTML 모드, UTF-8, 캐시 on).
+- `layout.html` 이 틀(배경·카드·로고·푸터)을 갖고, 각 메일은
+  `th:replace="~{layout :: mail(preheader=…, heading='…', content=~{::content})}"` 로 미리보기 문구·제목·본문만 넘긴다.
+
+| 포트 메서드 | 템플릿 | 제목 |
+| --- | --- | --- |
+| `sendVerificationCode` | `verification-code.html` | `[혼디가개] 이메일 인증코드 안내` |
+| `sendAlreadyRegisteredNotice` | `already-registered.html` | `[혼디가개] 회원가입 안내` |
+| `sendPasswordResetCode` | `password-reset-code.html` | `[혼디가개] 비밀번호 재설정 안내` |
+| `sendPasswordResetNotRegisteredNotice` | `password-reset-not-registered.html` | `[혼디가개] 비밀번호 재설정 안내` |
+| `sendPasswordResetSocialOnlyNotice` | `password-reset-social-only.html` | `[혼디가개] 비밀번호 재설정 안내` |
+| `sendSocialLinkedNotice` | `social-linked.html` | `[혼디가개] 소셜 로그인 연결 안내` |
+| `sendPasswordRemovedNotice` | `password-removed.html` | `[혼디가개] 소셜 전용 계정 전환 안내` |
+
+### 고칠 때
+
+- 문구만 바꾸면 템플릿 파일만 고친다. 제목은 `JavaMailSenderAdapter` 의 상수다.
+- 새 메일은 `layout.html` 을 쓰는 템플릿 + `MailTemplateRenderer` 메서드 + 포트 메서드 순으로 더하고,
+  `MailTemplateRendererTest` 에 렌더링 케이스를 붙인다. 템플릿은 컴파일로 검증되지 않는다 — 조각 표현식
+  오타는 발송 시점에야 드러나고 그때는 로그 한 줄뿐이라, 테스트가 유일한 게이트다.
+- 색은 `frontend/DESIGN.md` 토큰의 **실제 값**을 인라인으로 쓴다 (배경 `#F5F6F8`, 카드 `#FFFFFF`/테두리
+  `#E3E5EA`, 본문 `#15181D`, 보조 `#596069`, 푸터 `#878D96`, 코드 상자 `#EEF0F3`,
+  보안 경고 `#B91C1C`).
+
+### 로고
+
+- 머리에는 **로크업 이미지만** 둔다. 워드마크 "혼디가개" 를 라이브 텍스트로 그리지 않는다 — 외부 노출은
+  로크업을 쓴다는 프론트 브랜드 규칙이다. 이미지가 차단되면 `alt="혼디가개"` 가 대신 읽힌다.
+- 원본은 `frontend/docs/hondi_img/logo-lockup.svg`(초록 발자국 `#2E9B6B` + 워드마크 `#15181D`, Pretendard ExtraBold
+  아웃라인)이고, 메일용은 이를 **3배(633x144 px) 투명 PNG** 두 장으로 래스터화해
+  `service/auth-service/src/main/resources/mail/` 에 둔다. 메일에서는 `155x35` 로 표시한다.
+
+| 파일 | Content-ID | 워드마크 | 쓰이는 곳 |
+| --- | --- | --- | --- |
+| `logo-lockup.png` | `hondigagae-logo` | `#15181D` + 얇은 흰 외곽선 | 기본 (라이트, 그리고 다크를 모르는 클라이언트 전부) |
+| `logo-lockup-dark.png` | `hondigagae-logo-dark` | `#FFFFFF` | `prefers-color-scheme: dark` 를 따르는 클라이언트, Outlook 앱(`[data-ogsc]`) |
+
+- **왜 투명 + 흰 외곽선인가.** 불투명 배경(`#F5F6F8`)으로 채우면 다크 모드에서 어두운 페이지 위에 밝은 상자가 뜬다.
+  투명으로 두면 그 상자는 사라지지만, 페이지만 반전하고 이미지는 그대로 두는 클라이언트(Gmail 앱 등 강제 반전)에서
+  어두운 워드마크가 어두운 배경에 묻힌다. 그래서 기본 PNG 의 워드마크 아래에 흰 외곽선을 깐다 — 밝은 배경에서는
+  보이지 않고, 강제 반전된 어두운 배경에서는 글자 윤곽을 살린다.
+- **다크 교체.** `layout.html` 은 라이트 이미지(`.logo-light`)와, 인라인 `display:none; mso-hide:all; max-height:0;
+  overflow:hidden;` 으로 숨긴 다크 이미지 래퍼(`.logo-dark-wrap`)를 함께 둔다. `<head>` 의 `<style>` 이
+  `@media (prefers-color-scheme: dark)` 와 `[data-ogsc]` 에서만 둘을 바꾸고, 같은 조건에서 페이지·카드·본문 색도
+  어두운 값으로 덮어쓴다(`m-page`/`m-card`/`m-text`/`m-muted`/`m-code`/`m-warn` 클래스, `!important`).
+  `<style>` 을 버리는 클라이언트에서는 다크 이미지가 인라인 스타일로 숨은 채 라이트 메일이 그대로 보인다.
+- **클라이언트 지원 한계.** Apple Mail·iOS 메일·Outlook(macOS/iOS 일부)은 미디어 쿼리를 따른다. Gmail(웹·앱)은
+  `prefers-color-scheme` 을 무시하고 앱이 색을 강제로 반전한다 — 이때는 교체가 일어나지 않고 흰 외곽선이 대비를 맡는다.
+- **기본은 CID 인라인 첨부**다. 어댑터가 메일을 multipart(related)로 만들어 두 PNG 를 위 Content-ID 로
+  `addInline(..., "image/png")` 한다. 외부 이미지 차단과 무관하게 보이고, 로고를 따로 호스팅할 필요가 없다.
+  기동 시 두 리소스를 확인하고, 없으면 error 로그를 남긴 채 그 파트 없이 보낸다(발송은 막지 않는다).
+- `MAIL_LOGO_URL` 을 채우면 그 URL 을 라이트 이미지 `src` 로 쓰고 **다크 교체 블록과 인라인 파트를 모두 뺀다**
+  (단일 HTML 파트). URL 로고에는 다크 짝이 없어서, 모든 모드에서 같은 이미지가 보인다 — 그 PNG 도 투명 + 외곽선으로 만든다.
+- 로고가 바뀌면 SVG 에서 두 장을 다시 만든다(예: Playwright `deviceScaleFactor: 3` 로 SVG 만 담은 투명 배경 페이지의
+  요소 스크린샷, `omitBackground: true`).
+  - 기본: 워드마크 그룹에 흰 외곽선 — `stroke="#FFFFFF"`, `paint-order="stroke"`, `stroke-width` 는 워드마크 로컬 단위로 7,
+    외곽선이 잘리지 않게 사방 2px 여백.
+  - 다크: 워드마크 그룹 `fill` 을 `#FFFFFF` 로 바꾼다(외곽선 없음). 발자국 심볼 색은 그대로.
+  - 가로세로 비율이 바뀌면 `layout.html` 의 두 `<img>` 의 `width`/`height`(속성과 인라인 스타일 둘 다)를 같은 비율로 고친다.
+    `MailTemplateRendererTest` 가 두 리소스의 존재를 확인한다.
+
+### 메일 HTML 제약 — 웹 페이지와 다르다
+
+- **기본 스타일은 전부 인라인.** `<style>` 블록은 클라이언트마다 잘라 내거나 무시하므로 **다크 모드 덮어쓰기 전용**으로만
+  쓴다 — `<style>` 이 없어도 라이트 메일이 온전해야 한다. **CSS 변수(`var(--…)`)는 못 쓴다.**
+- 레이아웃은 **`table`** 로 짠다. flex·grid 는 Outlook 에서 깨진다. 최대 폭 480px 가운데 정렬.
+- 이미지는 **PNG**(CID 인라인 또는 절대 URL). SVG 는 대부분의 클라이언트가 막는다. `alt`·`width`·`height` 를 반드시 준다
+  (이미지 차단 상태에서도 레이아웃이 유지되고 "혼디가개" 가 읽힌다). 웹폰트에 기대지 않는다 —
+  `Pretendard` 가 없으면 `Apple SD Gothic Neo` / `Malgun Gothic` 으로 떨어진다.
+- 동적 값(인증코드, provider 이름)은 **`th:text` 로만** 출력한다. `th:utext` 는 쓰지 않는다 — 이스케이프가 꺼진다.
+- 미리보기 문구(preheader)는 숨김 `div` 로 넣는다. 코드 메일은 받은편지함에서 바로 보이도록 코드를 담는다.
+
+### 발신자 설정 (전부 선택)
+
+| env | 프로퍼티 | 비었을 때 |
+| --- | --- | --- |
+| `MAIL_FROM_NAME` | `auth.mail.from-name` | `혼디가개` |
+| `MAIL_FROM_ADDRESS` | `auth.mail.from-address` | `spring.mail.username` 에서 유도 |
+| `MAIL_LOGO_URL` | `auth.mail.logo-url` | jar 에 든 로크업 PNG 를 CID 인라인으로 첨부 |
+
+- 발신 주소는 `from-address` → `spring.mail.username`(`MAIL_USERNAME`) 순이다. username 에 `@` 가 없고
+  메일 호스트가 `gmail.com` 으로 끝나면 `@gmail.com` 을 붙인다. 그래도 완전한 주소가 안 되면 From 헤더를
+  넣지 않고 SMTP 서버가 인증 계정으로 채우게 둔다(#1062 이전 동작).
+- Gmail SMTP 는 From 주소로 **계정 본인 주소나 Gmail 에 등록한 별칭**만 허용한다. 다른 주소를 넣으면 계정
+  주소로 바뀌어 나간다.
+- 세 값은 `application.yml` 공통 `auth.mail` 에 있어 모든 프로필에 적용된다(`AuthMailProperties`).
+
 ## 비밀번호 재설정 (일반 계정 전용)
 
 - `POST /password/reset/send-code` — **응답은 항상 200** 이고 분기는 메일 내용으로만 전달한다:
