@@ -45,8 +45,6 @@ export const favoriteMessages = {
   sortFixed: '최근 저장순',
   /** `12/100곳`. 상한을 미리 말해 저장 실패로 알게 되는 것을 막는다 (아트보드 01) */
   countOfMax: '{count}/{max}곳',
-  /** 상한에 닿기 전. 남은 여유를 상시 표기한다 */
-  remaining: '{remaining}곳 더 저장할 수 있어요',
   /** 상한 도달 — 숨기지 않고 이유와 해결 방법을 함께 낸다 (아트보드 02) */
   limitReachedBadge: '가득 찼어요',
   /**

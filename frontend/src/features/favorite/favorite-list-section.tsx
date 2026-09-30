@@ -60,13 +60,11 @@ export function FavoriteListSection({
   onToggle,
 }: FavoriteListSectionProps) {
   const limitReached = totalCount >= MAX_FAVORITE_COUNT
-  const remaining = MAX_FAVORITE_COUNT - totalCount
 
   /**
    * **개수는 목록이 실제로 있을 때만 말한다.** 로딩 중에는 아직 모르고(0/100 은 거짓말이다),
    * 오류에는 셀 수 없으며, 0건에는 `EmptyState` 가 같은 말을 이미 한다 —
-   * "0/100곳 · 100곳 더 저장할 수 있어요" 를 "아직 저장한 장소가 없어요" 위에 겹쳐 두면
-   * 빈 화면에 숫자만 두 줄 는다.
+   * "0/100곳" 을 "아직 저장한 장소가 없어요" 위에 겹쳐 두면 빈 화면에 숫자만 는다.
    */
   const countable = !loading && errorStatus === null && places.length > 0
 
@@ -86,21 +84,17 @@ export function FavoriteListSection({
         ) : undefined
       }
       /*
-        **상한을 숨기지 않고 미리 말한다** — 아트보드 01·02. 100곳에 닿아서야 저장
-        버튼이 실패하는 것보다, 남은 여유를 상시 보여 주는 쪽이 싸다.
-        도달했을 때는 배지 + 이유를 함께 낸다: 배지만으로는 무엇을 해야 하는지 모른다.
+        **상한은 부제의 `N/100곳` 한 곳이 말한다** — 아트보드 01·02. 100곳에 닿아서야 저장
+        버튼이 실패하지 않게 상한을 미리 보여 주는 목적은 그 표기로 지켜진다.
+        예전에 이 자리에 있던 `{n}곳 더 저장할 수 있어요` 는 바로 옆 `N/100곳` 을 뺄셈으로
+        다시 말한 문장이라 걷었다 (#1066).
+        도달했을 때만 배지 + 이유를 함께 낸다: 배지만으로는 무엇을 해야 하는지 모른다.
       */
       trailing={
-        countable ? (
-          limitReached ? (
-            <Badge tone="neutral" size="sm">
-              {messages.favorite.limitReachedBadge}
-            </Badge>
-          ) : (
-            <p className="text-caption text-fg-muted tabular-nums">
-              {messages.favorite.remaining.replace('{remaining}', String(remaining))}
-            </p>
-          )
+        countable && limitReached ? (
+          <Badge tone="neutral" size="sm">
+            {messages.favorite.limitReachedBadge}
+          </Badge>
         ) : undefined
       }
     >
