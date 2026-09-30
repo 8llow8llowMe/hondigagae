@@ -72,6 +72,19 @@ export const authMessages = {
   toSignup: '회원가입',
   toLogin: '로그인하기',
 
+  /*
+    로그인 화면 재배치 · 이메일 기억하기 (#1081, 로그인-세부명세 D10).
+
+    **라벨이 "아이디" 가 아니라 "이메일" 이다** — 이 서비스의 로그인 아이디는 이메일이고,
+    "로그인 상태 유지" 와 헷갈리지 않게 무엇을 기억하는지 말한다.
+    캡션은 **무엇이 남는지(이메일만) · 언제 끄는지(공용 기기)** 두 가지를 한 줄에 담는다.
+  */
+  rememberEmail: '이메일 기억하기',
+  rememberEmailCaption: '이 기기에 이메일만 저장돼요. 공용 기기에서는 해제해 주세요.',
+  capsLockOn: 'Caps Lock이 켜져 있어요.',
+  loginDivider: '또는',
+  signupPrompt: '아직 회원이 아니신가요?',
+
   alreadyLoggedIn: '이미 로그인되어 있어요',
   logout: '로그아웃',
   goBack: '이어서 이용하기',
@@ -176,7 +189,8 @@ export const authMessages = {
     여부를 일부러 감추는데(항상 성공 응답) 화면이 그것을 흘리면 계정 열거가 된다.
     발송 성공 문구는 이메일 존재 여부와 무관하게 늘 `resetCodeSent` 하나다.
   */
-  forgotPassword: '비밀번호를 잊으셨나요?',
+  /* 로그인 화면 비밀번호 아래 한 줄의 오른쪽 링크 — 체크박스와 한 줄에 서도록 짧게 (#1081) */
+  forgotPassword: '비밀번호 찾기',
   resetTitle: '비밀번호 찾기',
   resetEmailHeading: '가입한 이메일을 알려주세요',
   resetEmailDescription: '비밀번호를 새로 만들 수 있는 코드를 보내드려요.',
