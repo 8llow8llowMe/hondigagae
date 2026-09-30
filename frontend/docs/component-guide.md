@@ -310,6 +310,12 @@ export type ButtonProps = (IconOnly | WithLabel) & BaseButtonProps
 
 **클릭으로 연 것은 고정된다** — hover 가 끝나도 닫히지 않는다. 읽는 도중에 사라지면 읽을 수 없다.
 
+**팝오버를 펴는 쪽은 `align` 이 정한다** (#1065). 기본 `end` 는 아이콘 오른쪽 끝에 맞춰 왼쪽으로
+편다 — 값 오른쪽에 붙는 아이콘(체감온도 라벨)의 자리다. **카드 제목 옆 아이콘은 `start`** 다.
+제목이 카드 왼쪽에서 시작해, 왼쪽으로 펴면 768 한 컬럼에서 말풍선이 화면 밖으로 나간다. 제목 옆에
+둘 때는 `Surface` 의 `titleTrailing` 자리를 쓴다 — `title` 안에 넣으면 버튼 이름이 섹션 이름
+(`aria-labelledby`)에 섞인다.
+
 ## 8. 파일 내부 순서
 
 ```tsx
