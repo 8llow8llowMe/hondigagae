@@ -20,7 +20,7 @@ export type InfoTipAlign = 'start' | 'end'
  * **제목 옆에서 `end` 를 쓰면 카드 밖으로 나간다.** 768 한 컬럼에서 `오늘 나가기 좋은 권역`
  * 끝이 x≈250 인데 말풍선이 256 이라 왼쪽 끝이 화면 밖이 된다.
  */
-const ALIGN: Record<InfoTipAlign, string> = {
+export const INFO_TIP_ALIGN_CLASS: Record<InfoTipAlign, string> = {
   end: 'right-0',
   start: 'left-0',
 }
@@ -70,7 +70,10 @@ export function InfoTip({
 }: {
   label: string
   children: ReactNode
-  /** 팝오버를 펴는 쪽. 위 `ALIGN` 표가 정본이다 — 기본은 예전 그대로 왼쪽으로 편다 */
+  /**
+   * 팝오버를 펴는 쪽. 위 `INFO_TIP_ALIGN_CLASS` 표가 정본이다 — 기본은 예전 그대로 왼쪽으로 편다.
+   * 라벨 바로 뒤 자리도 `start` 다 (#1066 — AI 일정 반려견 라벨에서 768 실측 `x = -44`).
+   */
   align?: InfoTipAlign
   className?: string
 }) {
@@ -184,14 +187,14 @@ export function InfoTip({
           /*
             **기본은 왼쪽으로 편다** (`right-0`). 이 아이콘이 처음 붙은 자리는 값의 오른쪽이고,
             레일은 폭이 400 이라 오른쪽으로 펴면 열 밖으로 나간다. 제목 옆 아이콘은 반대라
-            `align="start"` 를 준다 (`ALIGN`).
+            `align="start"` 를 준다 (`INFO_TIP_ALIGN_CLASS`).
 
             `w-64`(256) 는 `feelsLikeBasis` 100자가 4~5줄로 접히는 폭이다. 더 좁히면 줄이
             늘어 말풍선이 세로로 서고, 더 넓히면 레일(400 − 인셋 48 = 352)을 넘는다.
           */
           className={cn(
             'bg-bg border-border text-body-2 text-fg absolute top-full z-40 mt-2 w-64 rounded-lg border p-3 break-keep shadow-md',
-            ALIGN[align],
+            INFO_TIP_ALIGN_CLASS[align],
           )}
         >
           {children}

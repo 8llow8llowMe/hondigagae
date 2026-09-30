@@ -327,8 +327,9 @@ export function AiPlanCreateForm({
         id="petIds"
         label={messages.aiPlan.fieldPet}
         required
+        /* 라벨 바로 뒤라 열의 왼쪽이다 — 기본(왼쪽으로 펴기)이면 768 에서 화면 밖으로 나간다 */
         trailing={
-          <InfoTip label={messages.aiPlan.fieldPetHintLabel}>
+          <InfoTip label={messages.aiPlan.fieldPetHintLabel} align="start">
             {messages.aiPlan.fieldPetHint}
           </InfoTip>
         }
