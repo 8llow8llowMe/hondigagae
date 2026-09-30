@@ -150,8 +150,16 @@ describe('AiPlanCreateForm — 반려견은 체크박스 여러 마리 (#128)', 
     expect(html.split('checked=""').length - 1).toBeGreaterThanOrEqual(2)
   })
 
-  it('선택 근거를 안내한다', () => {
-    expect(render()).toContain(messages.aiPlan.fieldPetHint)
+  /*
+    #1066 — 선택 근거는 상시 줄이 아니라 라벨 옆 `InfoTip` 이다. 첫 렌더는 닫힌 상태라
+    본문은 서지 않고 여는 버튼만 선다 (내용은 연 뒤 — `info-tip.test.ts`).
+  */
+  it('선택 근거를 라벨 옆 InfoTip 으로 연다 — 상시 줄로 세우지 않는다', () => {
+    const html = render()
+    const legend = html.slice(html.indexOf('<legend'), html.indexOf('</legend>'))
+
+    expect(legend).toContain(`aria-label="${messages.aiPlan.fieldPetHintLabel}"`)
+    expect(html).not.toContain(messages.aiPlan.fieldPetHint)
   })
 })
 
