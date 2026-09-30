@@ -341,12 +341,12 @@ mutation 후 무효화 대상을 **명세와 코드 양쪽에 명시한다.**
 
 | mutation                     | invalidate                                                                           |
 | ---------------------------- | ------------------------------------------------------------------------------------ |
-| 일정 생성/수정/삭제          | `planKeys.all`                                                                       |
-| 일자 항목 교체               | `planKeys.detail(planId)`                                                            |
+| 일정 생성/수정/삭제          | 생성 `all` · 수정 detail 교체 + `list`·`weather`·`walkSafety` · 삭제 `list`          |
+| 일자 항목 교체               | `setQueryData(detail)` + `weather` + `walkSafety` (id 재발급 — D15-6)                |
 | **항목 방문 체크**           | `planKeys.detail(planId)` (**판정은 무효화하지 않는다** — 아래)                      |
 | **항목 시작 시각** (#1053)   | `planKeys.detail(planId)` + `planKeys.walkSafety(planId)` (판정 제외 — 아래)         |
 | **일정 쓰기 전부** (#1055)   | 각 행에 더해 `planKeys.briefings(planId)` — 반려견 수정은 `briefingAll()` (아래)     |
-| 반려견 등록/수정             | `petKeys.all`                                                                        |
+| 반려견 등록/수정             | `petKeys.all` (수정은 + `planKeys.briefingAll()` — 위)                               |
 | **반려견 삭제**              | `petKeys.all` + `planKeys.all` (지운 아이 상세·집계는 재조회 제외 — 아래)            |
 | 프로필 수정 / 이미지 변경    | `memberKeys.me()`                                                                    |
 | **AI 일정 → 일정 확정 저장** | `planKeys.all` + `aiPlanKeys.job(jobId)` (작업이 담은 일정을 싣는다 — #1041, 아래)   |
