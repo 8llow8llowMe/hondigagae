@@ -240,6 +240,10 @@ describe('토큰 사용 — 표면 규칙 (DESIGN.md §0 · 3a)', () => {
       // 넣는 것이 규칙을 무너뜨리는 경로이므로, 여기 추가하기 전에 그것이 **실제로
       // 페이지 위에 뜨는지** 먼저 확인한다.
       'src/features/plan/plan-editable-item-row.tsx',
+      // ── 사진 위에 뜨는 칩 (#1069 · DESIGN.md §6) ─────────────────────────
+      // 홈 추천 카드의 동반 칩은 사진 면 위에 `absolute` 로 떠 있다. 밝은 사진(하늘 · 흰 벽)
+      // 위에서 흰 칩의 경계가 사라져 그림자로 되찾는다 — 카드 자체에는 그림자가 없다
+      'src/features/home/place-insight-card.tsx',
     ]
 
     const found = FILES.filter(({ path }) => !FLOATING.includes(path.replace(/\\/g, '/'))).flatMap(

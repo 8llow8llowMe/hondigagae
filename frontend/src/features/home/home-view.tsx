@@ -13,7 +13,11 @@ import { Canvas, Surface, SurfaceList, SurfaceStack } from '@/components/surface
 import { useNearbyFacilities } from '@/features/emergency/use-nearby-facilities'
 import { AboutIntroCard } from '@/features/home/about-intro-card'
 import { IndoorAlternativesSection } from '@/features/home/indoor-alternatives-section'
-import { PlaceInsightRow } from '@/features/home/place-insight-row'
+import {
+  PlaceCardsEndCard,
+  PlaceInsightCard,
+  PlaceInsightCardList,
+} from '@/features/home/place-insight-card'
 import { ProfileCard } from '@/features/home/profile-card'
 import { RegionalWeatherSection } from '@/features/home/regional-weather-section'
 import { SuitabilityListSkeleton } from '@/features/home/suitability-list-skeleton'
@@ -38,6 +42,7 @@ import { hospitalBannerDescription, pickNearestHospital } from '@/lib/emergency/
 import { getCurrentPosition, type PositionResult } from '@/lib/geo/current-position'
 import { DEFAULT_BASIS_PLACE_ID, isDefaultBasis } from '@/lib/insight/basis-place'
 import { collectIndoorAlternatives } from '@/lib/insight/indoor'
+import { pickCardReason, placeCardsEnd } from '@/lib/insight/place-cards'
 import {
   appliedFactorsOf,
   pickTopPlaces,
@@ -299,10 +304,6 @@ export function HomeView({
   const scored = visible.filter((data) => data.score !== null)
   const unscored = visible.filter((data) => data.score === null)
 
-  const remaining = Math.max(0, places.length - visible.length)
-  /** 모바일 버튼·데스크톱 링크가 같은 문장을 쓴다 — 남은 수가 아니라 전체 수다 (#905 R7) */
-  const allPlacesLabel = messages.home.allPlaces.replace('{n}', String(places.length))
-
   /*
     카드 전부에 똑같이 붙는 문장은 장소별 근거가 아니라 **이 화면의 전제**다 (#304).
     카드에서 걷어 목록 위에 한 번만 적는다 — 남는 문장이 곧 장소 간 차이가 된다.
@@ -310,6 +311,19 @@ export function HomeView({
   const { shared: sharedReasons, perPlace: placeReasons } = splitSharedReasons(
     scored.map((data) => data.reasons),
   )
+
+  /*
+    끝 카드 (#1069). 카드가 칸을 다 채우지 못한 날만 선다 — 목록 아래 버튼 줄 둘(`점수를
+    내지 못한 곳` · `전체 보기`)이 이 한 장으로 합쳐졌다. 3곳이 다 차면 끝 카드 없이 머리의
+    `장소 찾기` 가 맡는다. **수는 전체 수다** — 남은 수로 쓰면 같은 링크가 추천 수에 따라
+    다른 수를 말한다 (#905 R7).
+  */
+  const endCard = placeCardsEnd({
+    cards: scored.length,
+    unscored: unscored.length,
+    total: places.length,
+    capacity: TOP_PLACE_COUNT,
+  })
 
   /*
     비 예보일 때의 실내 대안. **추가 호출이 없다** — 위 적합도 응답에 이미 들어 있다.
@@ -687,16 +701,13 @@ export function HomeView({
                 </InfoTip>
               )
             }
-            description={
-              /*
-                **개수는 반영 축이 없어도 남는다.** 둘은 다른 사실이다 — 무엇을 반영했는지는
-                모를 수 있어도 목록이 몇 곳인지는 언제나 안다. 모바일은 자리가 없어 예전부터
-                개수를 적지 않았다.
-              */
-              <p className="text-caption text-fg-muted hidden font-medium tabular-nums md:block">
-                {places.length}곳
-              </p>
-            }
+            /*
+              **`N곳` 개수 줄을 걷었다** (#1069). #1065 가 반영 축을 ⓘ 로 옮기며 남긴 데스크톱
+              전용 한 줄인데, 끝 카드가 `장소 N곳 전체 보기` 로 같은 수를 말하게 되면서 한 카드
+              안에서 같은 사실이 두 번 섰다 (DESIGN.md §1). 3곳이 다 차 끝 카드가 없는 날에는
+              수가 빠지지만, 그날 할 일은 수를 읽는 것이 아니라 머리의 `장소 찾기` 다 — 요약
+              화면에서 목록 전체 수는 결정을 바꾸지 않는다. 모바일은 원래 이 줄이 없었다.
+            */
             trailing={
               <ButtonLink href="/places" className="hidden md:inline-flex">
                 {messages.home.findPlaces}
@@ -736,15 +747,11 @@ export function HomeView({
             )}
 
             {/*
-              **목록과 머리말 사이에 1px 선을 넣는다** (#530). 카드 제목 · 부제 · 공통 근거가
-              전부 같은 인셋의 본문 글줄이라, 선이 없으면 첫 행이 바로 위 문장과 한 덩어리로
-              읽혔다 — `SurfaceList` 는 **항목 사이에만** 선을 긋고 첫 항목 위는 카드의
-              몫이라고 정해 두었다 (`components/surface.tsx`). 그 몫을 여기서 낸다.
+              **목록 위 1px 선을 걷었다** (#1069). #530 은 행 목록의 첫 행이 바로 위 글줄과 한
+              덩어리로 읽혀 선을 그었는데, 이제 첫 항목이 **사진 면**이라 머리말과 저절로 갈린다.
+              선을 남기면 사진 위에 가로줄이 하나 더 서서 카드 경계가 두 겹이 된다.
 
-              **행을 감싼 쪽에 건다.** 목록에 걸면 `unscored` · `remaining` 행이 있는 날과
-              없는 날에 선의 개수가 갈리지 않지만, 스켈레톤 · 오류 · 빈 상태에는 선이 붙지
-              않아야 한다 — 그 셋은 행이 아니라 **카드가 통째로 하는 말**이라 위에 선을
-              그으면 머리말에서 떨어져 나온다.
+              스켈레톤 · 오류 · 빈 상태는 예전처럼 **카드가 통째로 하는 말**이다.
             */}
             {pending && visible.length === 0 ? (
               <SuitabilityListSkeleton />
@@ -771,78 +778,34 @@ export function HomeView({
                 }
               />
             ) : (
-              <div
-                aria-busy={refetching || undefined}
-                className={cn('border-border border-t', refetching && 'opacity-55')}
+              /*
+                **순위로 접지 않는다** (#1069). 행 시절에는 1등만 펼치고 2·3등을 접었는데(#307),
+                카드는 크기가 같고 위계는 **순서**가 만든다 — 1위가 캐러셀의 첫 장, 그리드의
+                왼쪽 칸이다. 접으면 동반 여부까지 접혀 2위 이하의 첫 질문이 비었다.
+
+                **점수를 못 낸 곳은 카드가 아니다** (#428) — 끝 카드 안의 한 줄로 개수만 말한다.
+
+                **카드 구성이 바뀌면 틀을 새로 세운다(`key`).** 적합도 세 건은 따로 도착해 목록이
+                `[끝 카드]` → `[1위, 2위, 끝 카드]` 처럼 앞쪽에 카드가 끼어든다. 스냅 컨테이너는
+                배치가 바뀌면 **직전에 붙어 있던 항목을 따라 다시 스냅한다** — 768 실측에서 먼저
+                선 끝 카드를 따라가 scrollLeft 가 0 → 1014 → 446 으로 밀려, 첫 화면이 1위가 아니라
+                끝 카드였다. 새로 세우면 스크롤이 0 에서 시작해 **1위가 항상 첫 장이다.** 같은
+                구성의 재조회(`refetching`)는 key 가 같아 스크롤을 건드리지 않는다.
+              */
+              <PlaceInsightCardList
+                key={`${scored.map((data) => data.placeId).join(',')}|${endCard === null ? '' : 'end'}`}
+                busy={refetching}
               >
-                <SurfaceList>
-                  {scored.map((data, index) => (
-                    <PlaceInsightRow
-                      key={data.placeId}
-                      data={data}
-                      place={placeById.get(data.placeId)}
-                      /*
-                        1등만 펼치고 나머지는 접는다 (#307). 홈은 요약 화면인데 세 장이
-                        전부 펼쳐져 있어 "요약" 이 아니라 "짧은 목록" 이었다 —
-                        `DESIGN.md` §1 "낮은 우선순위는 접는다".
-                      */
-                      collapsed={index > 0}
-                      reasons={placeReasons[index] ?? data.reasons}
-                    />
-                  ))}
-                </SurfaceList>
-
-                {/*
-                  **점수를 못 낸 곳은 접어서 개수로만 말한다** (#428). §1 "낮은 우선순위는
-                  접는다". 예전에는 이 항목들이 목록 맨 위에서 썸네일·배지 넷을 달고
-                  가장 큰 자리를 차지했다.
-
-                  **지우지는 않는다.** 목록에서 빼면 사용자는 그 장소가 조회되지 않았다는
-                  것조차 모른 채 "후보가 둘" 이라고 읽는다 — 권역 섹션이 예보 없는 권역을
-                  남기는 것과 같은 이유다.
-
-                  펼침을 두지 않고 `/places` 로 보낸다. 홈은 요약 화면이고, 점수가 없는
-                  장소를 홈에서 더 볼 이유가 없다.
-                */}
-                {unscored.length > 0 && (
-                  <Link
-                    href="/places"
-                    className="text-body-2 text-fg-muted hover:bg-band focus-visible:ring-brand-500 border-border flex min-h-11 items-center justify-between gap-2 border-t px-4 font-medium tabular-nums focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none md:px-5"
-                  >
-                    <span>
-                      {messages.home.unscoredPlaces.replace('{n}', String(unscored.length))}
-                    </span>
-                    <span aria-hidden>›</span>
-                  </Link>
-                )}
-
-                {remaining > 0 && (
-                  <div className="border-border border-t px-4 py-3 md:px-5 md:py-4">
-                    {/*
-                      모바일은 테두리 버튼, 데스크톱은 텍스트 링크 (아트보드).
-
-                      **두 폭이 같은 문장이다** (#905 R7). 예전에는 모바일이 남은 수(`17곳 더
-                      보기`), 데스크톱이 전체 수(`20곳 전체 보기`)라 같은 `/places` 링크가 폭마다
-                      다른 수를 말했다. 꺾쇠는 텍스트 링크에만 붙는다 — 버튼은 외형이 이미 누를
-                      수 있다고 말한다.
-                    */}
-                    <ButtonLink
-                      href="/places"
-                      variant="secondary"
-                      className="flex w-full tabular-nums md:hidden"
-                    >
-                      {allPlacesLabel}
-                    </ButtonLink>
-                    <Link
-                      href="/places"
-                      className="text-body-1 text-link focus-visible:ring-brand-500 hidden min-h-11 items-center gap-1 font-semibold tabular-nums focus-visible:ring-2 focus-visible:outline-none md:flex"
-                    >
-                      {allPlacesLabel}
-                      <span aria-hidden>›</span>
-                    </Link>
-                  </div>
-                )}
-              </div>
+                {scored.map((data, index) => (
+                  <PlaceInsightCard
+                    key={data.placeId}
+                    data={data}
+                    place={placeById.get(data.placeId)}
+                    reason={pickCardReason(placeReasons[index] ?? data.reasons)}
+                  />
+                ))}
+                {endCard !== null && <PlaceCardsEndCard end={endCard} />}
+              </PlaceInsightCardList>
             )}
           </Surface>
 

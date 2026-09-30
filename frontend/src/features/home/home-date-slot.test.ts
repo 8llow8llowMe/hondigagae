@@ -97,23 +97,35 @@ describe('홈 기준 장소 — 404 복구 (#530)', () => {
 })
 
 /*
-  **목록과 머리말 사이 1px 선** (#530). 카드 제목 · 부제 · 공통 근거가 전부 같은 인셋의
-  본문 글줄이라, 선이 없으면 첫 행이 바로 위 문장과 한 덩어리로 읽혔다. `SurfaceList` 는
-  항목 **사이에만** 선을 긋고 첫 항목 위는 카드의 몫이다 (`components/surface.tsx`).
+  **목록 위 1px 선을 걷었다** (#1069). #530 은 행 목록의 첫 행이 바로 위 글줄과 한 덩어리로
+  읽혀 선을 그었는데, 카드의 첫 항목은 **사진 면**이라 머리말과 저절로 갈린다. 선을 남기면
+  사진 위에 가로줄이 하나 더 서서 카드 경계가 두 겹이 된다.
 */
-describe('홈 적합도 목록 — 첫 행 위 구분선 (#530)', () => {
-  it('행을 감싼 쪽이 위 1px 선을 그린다', () => {
-    expect(HOME).toContain("cn('border-border border-t', refetching && 'opacity-55')")
+describe('홈 추천 카드 — 목록 위 구분선 (#1069)', () => {
+  it('카드 틀을 선으로 감싸지 않는다', () => {
+    const list = HOME.indexOf('<PlaceInsightCardList')
+    const before = HOME.slice(Math.max(0, list - 1200), list)
+
+    expect(list).toBeGreaterThan(-1)
+    expect(before).not.toContain('border-t')
   })
 
-  /*
-    **스켈레톤 · 오류 · 빈 상태에는 붙지 않는다.** 그 셋은 행이 아니라 카드가 통째로 하는
-    말이라, 위에 선을 그으면 머리말에서 떨어져 나온다.
-  */
+  /* 스켈레톤 · 오류 · 빈 상태도 선이 없다 — 행이 아니라 카드가 통째로 하는 말이다 */
   it('상태 화면에는 선을 두르지 않는다', () => {
     const emptyState = HOME.indexOf('<EmptyState')
     const before = HOME.slice(Math.max(0, emptyState - 200), emptyState)
 
     expect(before).not.toContain('border-t')
+  })
+
+  /*
+    **카드 구성이 바뀌면 틀을 새로 세운다.** 적합도 세 건이 따로 도착하면 앞쪽에 카드가
+    끼어드는데, 스냅 컨테이너는 직전에 붙어 있던 항목(먼저 선 끝 카드)을 따라 다시 스냅해
+    768 실측에서 첫 화면이 1위가 아니라 끝 카드였다. key 가 카드 id 들을 담아야 한다.
+  */
+  it('틀의 key 가 카드 구성을 담는다', () => {
+    const list = HOME.slice(HOME.indexOf('<PlaceInsightCardList'))
+
+    expect(list.slice(0, 200)).toContain('scored.map((data) => data.placeId)')
   })
 })

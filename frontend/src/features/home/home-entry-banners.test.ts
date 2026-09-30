@@ -78,23 +78,26 @@ describe('홈 → AI 일정 생성 배너 (#905 R1)', () => {
   `장소 17곳 더 보기`(남은 수), 데스크톱 링크가 `장소 20곳 전체 보기 ›`(전체 수)였다.
 */
 describe('홈 → 장소 목록 링크 문구 (#905 R7)', () => {
-  it('모바일·데스크톱이 같은 문구 하나를 쓴다', () => {
-    const label = HOME.indexOf('const allPlacesLabel')
+  /*
+    **#1069 이후 링크는 끝 카드 한 장이다** — 모바일 버튼 · 데스크톱 링크 두 벌이 걷혔다.
+    그래도 수는 **전체 수**여야 한다: 남은 수로 쓰면 같은 링크가 추천 수에 따라 다른 수를 말한다.
+    (끝 카드의 문구 · 꺾쇠는 `place-insight-card.test.ts` 가 잠근다)
+  */
+  it('끝 카드에 넘기는 수가 전체 장소 수다', () => {
+    const end = HOME.indexOf('placeCardsEnd({')
 
+    expect(end).toBeGreaterThan(-1)
+    expect(HOME.slice(end, end + 200)).toContain('total: places.length')
     expect(HOME).not.toContain('morePlaces')
-    expect(HOME.slice(label, label + 120)).toContain('String(places.length)')
-    expect(HOME.match(/\{allPlacesLabel\}/g)).toHaveLength(2)
   })
 
   it('남은 수 문구 키가 남아 있지 않다', () => {
     expect(Object.keys(messages.home)).not.toContain('morePlaces')
   })
 
-  /* 버튼은 외형이 누를 수 있다고 이미 말한다 — 꺾쇠는 텍스트 링크에만 장식으로 붙는다 */
-  it('꺾쇠는 문구가 아니라 텍스트 링크의 aria-hidden 조각이다', () => {
-    const desktop = HOME.slice(HOME.lastIndexOf('{allPlacesLabel}'))
-
-    expect(messages.home.allPlaces).not.toContain('›')
-    expect(desktop.slice(0, 80)).toContain('<span aria-hidden>›</span>')
+  /* 목록 아래 버튼 줄 두 개를 걷었다 — 같은 `/places` 링크가 끝 카드와 겹쳐 서지 않는다 */
+  it('목록 아래 버튼 줄이 남아 있지 않다', () => {
+    expect(HOME).not.toContain('allPlacesLabel')
+    expect(HOME).not.toContain('unscoredPlaces')
   })
 })

@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils/cn'
  *
  * - 골든타임 — `WalkTimesSkeleton`
  * - 권역 비교 — `RegionalWeatherSkeleton` (제목 없는 카드다. 제목은 응답과 함께 선다)
- * - 맞는 곳 목록 — `SuitabilityListSkeleton` (한 열 두 행)
+ * - 갈 만한 곳 — `SuitabilityListSkeleton` (사진 카드 두 장, #1069)
  *
  * - 판정 — `WalkVerdictSkeleton` (`HomeView` 의 `walkSafety.isPending` 과 같은 것)
  *
@@ -98,7 +98,7 @@ export default function HomeLoading() {
           <Surface
             lead
             title={<Skeleton className="h-7 w-48 md:h-9 md:w-64" />}
-            description={<Skeleton className="hidden h-4.5 w-40 md:block" />}
+            /* 제목 아래 줄이 없다 — `N곳` 개수 줄을 #1069 에서 걷었다 (`home-view.tsx`) */
             /* `장소 찾기` 버튼 자리 — md 이상에서만 선다 */
             trailing={<Skeleton className="hidden h-11 w-24 shrink-0 md:block" />}
             aria-busy
