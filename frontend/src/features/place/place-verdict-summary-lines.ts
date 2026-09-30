@@ -1,4 +1,4 @@
-import { formatCelsius } from '@/lib/format/celsius'
+import { formatStandaloneCelsius } from '@/lib/format/celsius'
 import { splitDay } from '@/lib/insight/congestion'
 import { messages } from '@/lib/messages'
 import type { PlaceCongestionResponse, WalkSafetyResponse } from '@/types/insight'
@@ -69,7 +69,8 @@ function walkLine(walk: WalkSource): VerdictSummaryLine | null {
   if (walk.loading) return { label, value: null, anchorId: VERDICT_ANCHOR.walk }
   if (walk.failed || walk.data === null) return null
 
-  const feelsLike = formatCelsius(walk.data.feelsLikeCelsius)
+  // 요약 한 줄 안의 한 값이다 — 아래 패널 hero 와 같은 표기를 쓴다 (#1067)
+  const feelsLike = formatStandaloneCelsius(walk.data.feelsLikeCelsius)
   const grade = walk.data.walkSafetyLevel.name
   const value =
     feelsLike === null

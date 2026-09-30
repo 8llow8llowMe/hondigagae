@@ -5,6 +5,7 @@ import { MetricValue, MetricWord } from '@/components/metric'
 import { ReasonList } from '@/components/reason-list'
 import { Skeleton } from '@/components/skeleton'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
+import { formatStandaloneCelsius } from '@/lib/format/celsius'
 import { formatDistance } from '@/lib/format/distance'
 import { displayTemperature, supportingTemperatures } from '@/lib/insight/temperature'
 import { suitabilityTone } from '@/lib/insight/tone'
@@ -202,6 +203,14 @@ function TemperatureValue({ weather }: { weather: DailyWeatherItem }) {
   const temperature = displayTemperature(weather)
   if (temperature === null) return null
 
+  /*
+    **혼자 서는 값이다** (#1067) — 일정 일자 판정의 큰 숫자와 같은 자리·같은 표기다.
+    정수면 `.0` 을 뗀다. 아래 받치는 줄(`TemperatureRange`)은 최고·최저를 나란히 맞대 읽는
+    쌍이라 소수 1자리를 그대로 둔다.
+  */
+  const value = formatStandaloneCelsius(temperature.value)
+  if (value === null) return null
+
   return (
     <MetricValue
       label={
@@ -209,7 +218,7 @@ function TemperatureValue({ weather }: { weather: DailyWeatherItem }) {
           ? messages.place.detailFeelsLikeTemperature
           : messages.place.detailMaxTemperature
       }
-      value={temperature.value.toFixed(1)}
+      value={value}
       unit={messages.place.detailTemperatureUnit}
     />
   )

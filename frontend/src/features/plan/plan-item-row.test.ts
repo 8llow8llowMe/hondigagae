@@ -421,6 +421,19 @@ describe('PlanItemRow — 항목 산책 위험도 (#625)', () => {
     expect(markup).not.toContain(messages.plan.verdictFeelsLikeLabel)
   })
 
+  /*
+    #1067 — 시각·배지 뒤에 이어 붙는 한 값이라 **혼자 서는 값**이다. 항목 사이에 칸을 맞춘
+    열이 없어 `.0` 이 자릿수를 맞춰 주지 않는다.
+  */
+  it('체감온도가 정수면 소수점을 뗀다', () => {
+    const markup = renderWithWalkSafety(
+      planItemWalkSafety({ planItemId: 'i-1', feelsLikeCelsius: 33 }),
+    )
+
+    expect(markup).toContain(`${messages.plan.walkSafetyFeelsLikeLabel} 33℃`)
+    expect(markup).not.toContain('33.0')
+  })
+
   it('시각이 없으면 산책도 체감온도도 없다 — 시각 줄 자체가 없다 (D14-3 회귀)', () => {
     const model: PlanItemRowModel = {
       item: { ...planDetail.items[0]!, startTime: null },

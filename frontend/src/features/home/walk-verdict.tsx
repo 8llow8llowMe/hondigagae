@@ -7,7 +7,7 @@ import { ChevronDownIcon } from '@/components/icons'
 import { InfoTip } from '@/components/info-tip'
 import { MetricValue, MetricWord } from '@/components/metric'
 import { ReasonList } from '@/components/reason-list'
-import { formatCelsius } from '@/lib/format/celsius'
+import { formatStandaloneCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
@@ -93,8 +93,11 @@ export function WalkVerdict({
 
     **참고 열지수를 여기 곁들이지 않는다.** 홈은 요약면이고 이 줄은 접힌 상태에서 한 줄이다.
     참고값과 그것을 참고값이라 말하는 문장은 장소 상세의 펼침 근거가 함께 맡는다.
+
+    **혼자 서는 값이다** (#1067) — 정수면 `.0` 을 뗀다. 같은 카드의 시간대 표는 칸이 늘어서
+    소수 1자리를 유지한다(`formatCelsius`, DESIGN.md §3-3).
   */
-  const feelsLike = formatCelsius(data.feelsLikeCelsius)
+  const feelsLike = formatStandaloneCelsius(data.feelsLikeCelsius)
   const summary = [
     feelsLike === null ? null : `${messages.home.feelsLikeLabel} ${feelsLike}℃`,
     `${data.placeTitle} ${messages.home.basisSuffix}`,

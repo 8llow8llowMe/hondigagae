@@ -104,6 +104,17 @@ describe('PlanDayVerdict — 판정 옆 큰 숫자 (#253)', () => {
   })
 
   /*
+    #1067 — 일자 카드마다 하나씩 서는 **혼자 서는 값**이다. 카드 사이에 칸을 맞춘 열이 없어
+    `.0` 이 자릿수를 맞춰 주지 않는다. 소수가 의미 있는 값(`33.4`)은 위 테스트가 지킨다.
+  */
+  it('정수 값은 소수점을 떼어 그린다', () => {
+    const html = render({ weather: weather({ maxFeelsLikeTemperature: 33 }) })
+
+    expect(html).toContain('>33</span>')
+    expect(html).not.toContain('33.0')
+  })
+
+  /*
     **최고기온과 나란히 세우지 않는다.** 둘 다 ℃ 라 숫자가 두 개 붙으면 어느 쪽이
     무엇인지 라벨을 읽어야 알 수 있고, "큰 숫자 하나" 라는 이 자리의 성격이 사라진다.
   */
@@ -113,7 +124,9 @@ describe('PlanDayVerdict — 판정 옆 큰 숫자 (#253)', () => {
     })
 
     expect(html).not.toContain(messages.plan.verdictTemperatureLabel)
+    // 혼자 서는 값은 `.0` 을 떼므로(#1067) 두 모양을 다 막는다
     expect(html).not.toContain('26.0')
+    expect(html).not.toContain('>26</span>')
   })
 
   /*
@@ -133,7 +146,7 @@ describe('PlanDayVerdict — 판정 옆 큰 숫자 (#253)', () => {
       }),
     })
 
-    expect(html).toContain('24.0')
+    expect(html).toContain('>24</span>')
     expect(html).toContain(messages.plan.verdictFeelsLikeLabel)
     // 단서가 값 옆에서 무엇이 섰는지 말한다 — 최고기온을 체감온도라고 부르지 않는다
     expect(html).toContain(messages.plan.verdictFallbackMetric.replace('{source}', '중기예보'))

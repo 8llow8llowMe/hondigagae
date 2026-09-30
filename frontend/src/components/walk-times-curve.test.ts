@@ -205,6 +205,46 @@ describe('WalkTimesCurve — 중립 면 캡션 (#671 C-2)', () => {
   })
 })
 
+/*
+  #1067 — **칸이 늘어선 표는 소수 1자리를 유지한다.** 혼자 서는 값은 `formatStandaloneCelsius`
+  로 `.0` 을 떼지만, 이 표에는 `31.5` 가 섞여 있어 `.0` 만 떼면 칸마다 자릿수가 달라져 값을
+  가로로 비교할 수 없다 (DESIGN.md §3-3). 이 표가 혼자 서는 값의 표기로 바뀌면 여기가 깨진다.
+*/
+describe('WalkTimesCurve — 칸 자릿수 (#1067 회귀)', () => {
+  const MIXED: HourlyWalkSafetyItem[] = [
+    {
+      ...hour('2026-09-13T17:00:00', 'CAUTION', '주의'),
+      temperature: 31,
+      estimatedPavementCelsius: 48,
+    },
+    {
+      ...hour('2026-09-13T18:00:00', 'SAFE', '안전'),
+      temperature: 29.5,
+      estimatedPavementCelsius: 41.2,
+    },
+  ]
+
+  const cellValues = () =>
+    renderToStaticMarkup(
+      createElement(WalkTimesCurve, { hourly: MIXED, goldenStart: null, goldenEnd: null }),
+    )
+      .split('<li ')
+      .slice(1)
+      // sr-only 낱말을 걷고 칸의 보이는 숫자만 남긴다
+      .map((cell) => [...cell.matchAll(/(-?\d+(?:\.\d+)?)℃/g)].map((match) => match[1]))
+
+  it('정수 값도 칸 안에서는 `.0` 을 붙여 소수 1자리로 그린다', () => {
+    expect(cellValues()[0]).toEqual(['31.0', '48.0'])
+  })
+
+  it('모든 칸의 온도가 같은 자릿수(소수 1자리)다', () => {
+    const values = cellValues().flat()
+
+    expect(values).toEqual(['31.0', '48.0', '29.5', '41.2'])
+    expect(values.every((value) => /^-?\d+\.\d$/.test(value ?? ''))).toBe(true)
+  })
+})
+
 describe('WalkTimesCurve — 빈 곡선', () => {
   it('남은 예보가 없으면 아무것도 그리지 않는다 — 판정 자리가 이미 말한다', () => {
     expect(

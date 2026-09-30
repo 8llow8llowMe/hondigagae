@@ -188,8 +188,26 @@ describe('WalkVerdict — 체감온도 라벨 (#259)', () => {
       더 생겼다. 확인할 것은 낱말이 자기 요소의 **텍스트 시작**에 선다는 것이다.
     */
     expect(markup).toContain(`>${messages.home.feelsLikeLabel}`)
-    // 모바일 접힌 줄 — 라벨과 값이 한 문장으로 붙는다
-    expect(markup).toContain(`>${messages.home.feelsLikeLabel} 33.0℃`)
+    // 모바일 접힌 줄 — 라벨과 값이 한 문장으로 붙는다. 혼자 서는 값이라 `.0` 을 뗀다 (#1067)
+    expect(markup).toContain(`>${messages.home.feelsLikeLabel} 33℃`)
+  })
+
+  /*
+    #1067 — **혼자 서는 값은 정수면 `.0` 을 뗀다.** hero 와 접힌 줄 둘 다다. 시간대 표는
+    `formatCelsius` 로 소수 1자리를 유지한다(`walk-times-curve.test.ts` 가 지킨다).
+  */
+  it('hero 와 접힌 줄에 `33.0` 이 아니라 `33` 을 그린다', () => {
+    const markup = render(walkSafety)
+
+    expect(markup).toContain('>33</span>')
+    expect(markup).not.toContain('33.0')
+  })
+
+  it('소수가 의미 있는 값은 1자리를 그대로 둔다', () => {
+    const markup = render({ ...walkSafety, feelsLikeCelsius: 27.5 })
+
+    expect(markup).toContain('>27.5</span>')
+    expect(markup).toContain(`${messages.home.feelsLikeLabel} 27.5℃`)
   })
 
   /*
@@ -205,7 +223,7 @@ describe('WalkVerdict — 체감온도 라벨 (#259)', () => {
 
     expect(markup).not.toContain(`aria-label="${messages.home.feelsLikeBasisLabel}"`)
     // 값은 그대로 남는다 — 사라지는 것은 근거를 여는 버튼뿐이다
-    expect(markup).toContain('33.0')
+    expect(markup).toContain('>33</span>')
   })
 
   /*
@@ -225,7 +243,8 @@ describe('WalkVerdict — 체감온도 라벨 (#259)', () => {
 
     // hero 라벨 자리가 사라진다
     expect(markup).not.toContain(`>${messages.home.feelsLikeLabel}</span>`)
-    expect(markup).not.toContain('33.0')
+    expect(markup).not.toContain('>33</span>')
+    expect(markup).not.toContain('33℃')
     // 접힌 요약줄은 온도를 빼고 기준 장소만 남긴다 — `·` 만 남아 떠 있지 않다
     expect(markup).toContain(`>${walkSafety.placeTitle} ${messages.home.basisSuffix}<`)
   })
@@ -236,13 +255,13 @@ describe('WalkVerdict — 체감온도 라벨 (#259)', () => {
   한동안 `heatIndexCelsius` 를 계속 읽었다. **그동안 라벨은 줄곧 `체감온도` 였다** — 그래서
   라벨만 보는 테스트로는 이 버그를 잡을 수 없었다. 값을 봐야 한다.
 
-  fixture 가 두 필드를 **다른 숫자**(33.0 vs 40.2)로 두는 이유가 이것이다.
+  fixture 가 두 필드를 **다른 숫자**(33 vs 40.2)로 두는 이유가 이것이다.
 */
 describe('WalkVerdict — 판정값은 체감온도다 (#292)', () => {
   it('`feelsLikeCelsius` 를 그리고 참고 열지수는 그리지 않는다', () => {
     const markup = render(walkSafety)
 
-    expect(markup).toContain('33.0')
+    expect(markup).toContain('>33</span>')
     expect(markup).not.toContain('40.2')
   })
 
@@ -253,7 +272,7 @@ describe('WalkVerdict — 판정값은 체감온도다 (#292)', () => {
   it('열지수가 없어도 체감온도는 그대로 그린다', () => {
     const markup = render({ ...walkSafety, heatIndexCelsius: null, heatIndexBasis: null })
 
-    expect(markup).toContain('33.0')
+    expect(markup).toContain('>33</span>')
     expect(markup).toContain(messages.home.feelsLikeLabel)
   })
 })

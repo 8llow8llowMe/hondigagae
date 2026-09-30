@@ -68,8 +68,8 @@ describe('PlaceWalkSafetyPanel — 등급과 수치', () => {
   it('노면 온도와 체감온도에 ℃ 를 붙이고, 노면은 추정임을 밝힌다', () => {
     const markup = render()
 
-    expect(markup).toContain('58.0')
-    expect(markup).toContain('33.0')
+    expect(markup).toContain('>58</span>')
+    expect(markup).toContain('>33</span>')
     expect(markup).toContain(messages.place.detailTemperatureUnit)
     expect(markup).toContain(messages.place.detailPavement)
     expect(markup).toContain('추정')
@@ -128,20 +128,33 @@ describe('PlaceWalkSafetyPanel — 등급과 수치', () => {
       낱말로 단정하면 화면이 맞아도 실패한다. `MetricValue` 라벨은 자기 span 이다.
     */
     expect(markup).not.toContain(`>${messages.place.detailFeelsLike}</span>`)
-    expect(markup).not.toContain('33.0')
+    expect(markup).not.toContain('>33</span>')
   })
 
   /*
-    **소수점 1자리를 유지한다.** `35` 와 `35.0` 이 섞이면 자릿수가 흔들려 값을 비교할 수
-    없다 (`formatCelsius`).
+    **혼자 서는 값은 정수면 `.0` 을 뗀다** (#1067 · `formatStandaloneCelsius`). hero 체감온도와
+    그 아래 노면온도 한 줄은 자릿수를 맞댈 이웃이 없다 — 예전에는 `formatCelsius` 로
+    `31.0` · `50.0` 을 그렸다. 칸이 늘어선 시간대 표는 소수 1자리를 유지한다
+    (`walk-times-curve.test.ts`).
   */
-  it('정수 값도 소수점 1자리로 그린다', () => {
+  it('정수 값은 소수점을 떼어 그린다', () => {
     const markup = render({
       data: { ...walkSafety, feelsLikeCelsius: 31, estimatedPavementCelsius: 50 },
     })
 
-    expect(markup).toContain('31.0')
-    expect(markup).toContain('50.0')
+    expect(markup).toContain('>31</span>')
+    expect(markup).toContain('>50</span>')
+    expect(markup).not.toContain('31.0')
+    expect(markup).not.toContain('50.0')
+  })
+
+  it('소수가 의미 있는 값은 1자리를 그대로 둔다', () => {
+    const markup = render({
+      data: { ...walkSafety, feelsLikeCelsius: 27.5, estimatedPavementCelsius: 47.3 },
+    })
+
+    expect(markup).toContain('>27.5</span>')
+    expect(markup).toContain('>47.3</span>')
   })
 
   /*
@@ -161,6 +174,8 @@ describe('PlaceWalkSafetyPanel — 등급과 수치', () => {
     })
 
     expect(markup).not.toContain('0.0')
+    // 혼자 서는 값은 `.0` 을 떼므로 0도는 `>0<` 으로 선다 — 그 모양도 없어야 한다 (#1067)
+    expect(markup).not.toContain('>0</span>')
     expect(markup).not.toContain(messages.place.detailPavement)
     // 등급은 그대로 남는다 — 수치가 없어도 판정은 있다
     expect(markup).toContain(walkSafety.walkSafetyLevel.name)
@@ -178,14 +193,14 @@ describe('PlaceWalkSafetyPanel — 등급과 수치', () => {
 /*
   #292. BE `46f35e4` 가 판정 기준을 NOAA 열지수 → 기상청 체감온도로 바꿨는데 이 패널은
   한동안 `heatIndexCelsius` 를 계속 읽었다. **라벨은 줄곧 `체감온도` 였다** — 라벨만 보는
-  테스트로는 잡히지 않는 종류의 버그다. fixture 가 두 필드를 다른 숫자(33.0 vs 40.2)로
+  테스트로는 잡히지 않는 종류의 버그다. fixture 가 두 필드를 다른 숫자(33 vs 40.2)로
   두는 이유가 이것이다.
 */
 describe('PlaceWalkSafetyPanel — 판정값과 참고값의 위계 (#292)', () => {
   it('hero 는 `feelsLikeCelsius` 다', () => {
     const markup = render()
 
-    expect(markup).toContain('33.0')
+    expect(markup).toContain('>33</span>')
   })
 
   /*
@@ -204,6 +219,14 @@ describe('PlaceWalkSafetyPanel — 판정값과 참고값의 위계 (#292)', () 
 
     expect(markup).toContain(messages.place.detailHeatIndexReference)
     expect(markup).toContain('40.2')
+  })
+
+  // 말풍선 안 한 값이라 혼자 서는 값이다 — hero 체감온도와 같은 표기를 쓴다 (#1067)
+  it('참고 열지수도 정수면 소수점을 뗀다', () => {
+    const markup = renderBasis({ ...walkSafety, heatIndexCelsius: 41 })
+
+    expect(markup).toContain('>41</span>')
+    expect(markup).not.toContain('41.0')
   })
 
   /*
@@ -348,7 +371,7 @@ describe('PlaceWalkSafetyPanel — 기준 줄', () => {
     const markup = render({ petName: null })
 
     expect(markup).toContain(walkSafety.walkSafetyLevel.name)
-    expect(markup).toContain('58.0')
+    expect(markup).toContain('>58</span>')
     expect(markup).not.toContain('몽실이')
   })
 })

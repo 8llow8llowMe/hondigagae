@@ -100,6 +100,34 @@ describe('verdictSummaryLines — 지금 산책 줄', () => {
   })
 
   /*
+    #1067 — 요약 한 줄 안의 한 값이라 **혼자 서는 값**이다. 아래 패널 hero 와 같은 표기를
+    쓴다 — 같은 값을 두 자리가 `33.0℃` · `33℃` 로 다르게 적으면 다른 값으로 읽힌다.
+  */
+  it('체감온도가 정수면 소수점을 뗀다', () => {
+    const whole = {
+      data: { ...walkSafetyFixture, feelsLikeCelsius: 33 },
+      loading: false,
+      failed: false,
+    }
+
+    expect(valueOf(messages.place.detailSummaryWalkLabel, placeDetail, whole)).toBe(
+      `${walkSafetyFixture.walkSafetyLevel.name} · 체감 33℃`,
+    )
+  })
+
+  it('소수가 의미 있는 체감온도는 1자리를 그대로 둔다', () => {
+    const fractional = {
+      data: { ...walkSafetyFixture, feelsLikeCelsius: 27.5 },
+      loading: false,
+      failed: false,
+    }
+
+    expect(valueOf(messages.place.detailSummaryWalkLabel, placeDetail, fractional)).toContain(
+      '체감 27.5℃',
+    )
+  })
+
+  /*
     **`0.0℃` 로 채우면 영하 판정으로 읽힌다** — `PlaceWalkSafetyPanel` 이 hero 자리를
     비우는 것과 같은 근거다.
   */
