@@ -65,8 +65,17 @@ function isDelistedFailure(error: unknown): boolean {
  * 이유는 **어느 갈래가 카드를 스스로 그리는지 상태를 아는 쪽만 알기 때문**이다 (#451).
  */
 export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolean }) {
-  const { query, phase, polling, recheck, cancel, canceling, cancelFailed, elapsedMs } =
-    useAiPlanJob(jobId)
+  const {
+    query,
+    phase,
+    polling,
+    recheck,
+    cancel,
+    canceling,
+    cancelFailed,
+    elapsedMs,
+    stepElapsedMs,
+  } = useAiPlanJob(jobId)
 
   /*
     **조건은 `sessionStorage` 에서 읽는다** (명세 S5 함정 1). 지연 초기화로 한 번만 읽어
@@ -228,6 +237,7 @@ export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolea
           */
           conditionSummary={conditionSummary}
           elapsedMs={elapsedMs}
+          stepElapsedMs={stepElapsedMs}
           onRecheck={recheck}
           rechecking={query.isFetching}
           /*

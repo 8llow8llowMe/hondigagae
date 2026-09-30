@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
+import { aiPlanJobQueryFn } from '@/features/ai-plan/job-query'
 import { AI_PLAN_JOB_QUERY_OPTIONS, aiPlanKeys } from '@/features/ai-plan/queries'
 import { useAiPlanJobStream } from '@/features/ai-plan/use-ai-plan-job-stream'
+import { stepElapsedMsOf } from '@/lib/ai-plan/elapsed'
 import {
   JOB_STREAM_SAFETY_POLL_MS,
   jobPollInterval,
@@ -13,7 +15,7 @@ import {
   shouldKeepPolling,
 } from '@/lib/ai-plan/job'
 import { mergeJobUpdate } from '@/lib/ai-plan/job-stream'
-import { cancelAiPlanJob, fetchAiPlanJob } from '@/lib/api/ai-plan'
+import { cancelAiPlanJob } from '@/lib/api/ai-plan'
 import { ApiError } from '@/lib/api/error'
 import type { AiPlanJob } from '@/types/ai-plan'
 
@@ -40,6 +42,12 @@ export function useAiPlanJob(jobId: string) {
   const queryClient = useQueryClient()
   const streaming = useAiPlanJobStream(jobId)
   const [elapsedMs, setElapsedMs] = useState(0)
+  /*
+    **시계가 마지막으로 가리킨 시각** (#1057) — 단계 경과를 렌더에서 계산하려고 든다. tick 이 단계
+    경과까지 직접 세면, 새 단계가 들어온 순간 다음 tick 까지 1초 동안 **앞 단계의 초**가 남는다.
+    시각만 들고 있으면 새 `stepStartedAt` 이 들어오는 렌더에서 바로 맞는 값이 된다.
+  */
+  const [nowMs, setNowMs] = useState<number | null>(null)
   const [canceling, setCanceling] = useState(false)
   const [cancelFailed, setCancelFailed] = useState(false)
   const startedAt = useRef<number | null>(null)
@@ -53,6 +61,7 @@ export function useAiPlanJob(jobId: string) {
     watchedJobId.current = jobId
     startedAt.current = null
     setElapsedMs(0)
+    setNowMs(null)
     // 앞 작업의 취소 실패 문구가 새 작업의 진행 화면에 남지 않게 한다
     setCancelFailed(false)
   }
@@ -63,13 +72,10 @@ export function useAiPlanJob(jobId: string) {
       **첫 조회는 구독 여부와 무관하게 한 번 돈다.** 구독이 열리기까지의 공백을 메우고,
       스트림이 아예 열리지 않는 환경(프록시가 SSE 를 막는 경우)에서도 화면이 데이터를 받는다.
 
-      늦게 도착한 응답이 구독이 받은 종결 상태를 되돌리지 않게 `mergeJobUpdate` 로 거른다.
+      늦게 도착한 응답이 구독이 받은 더 앞선 상태를 되돌리지 않게 `mergeJobUpdate` 로 거른다
+      (`aiPlanJobQueryFn`, #1057).
     */
-    queryFn: async (): Promise<AiPlanJob> => {
-      const fetched = await fetchAiPlanJob(jobId)
-      const cached = queryClient.getQueryData<AiPlanJob>(aiPlanKeys.job(jobId))
-      return mergeJobUpdate(cached, fetched)
-    },
+    queryFn: aiPlanJobQueryFn(queryClient, jobId),
     staleTime: AI_PLAN_JOB_QUERY_OPTIONS.staleTime,
     gcTime: AI_PLAN_JOB_QUERY_OPTIONS.gcTime,
     retry: AI_PLAN_JOB_QUERY_OPTIONS.retry,
@@ -109,7 +115,9 @@ export function useAiPlanJob(jobId: string) {
     const timer = globalThis.setInterval(() => {
       const startedTime = startedAt.current
       if (startedTime === null) return
-      setElapsedMs(Date.now() - startedTime)
+      const now = Date.now()
+      setElapsedMs(now - startedTime)
+      setNowMs(now)
     }, TICK_MS)
 
     return () => globalThis.clearInterval(timer)
@@ -166,12 +174,19 @@ export function useAiPlanJob(jobId: string) {
      * 않았다. 대기 화면이 이 값을 그리면 그 비용이 **1초마다 갱신되는 생존 신호**가 된다.
      */
     elapsedMs,
+    /**
+     * 현재 단계에서 지난 시간(ms) (#1057). 서버의 `stepStartedAt` 기준이라 새로고침해도 이어진다.
+     * 시각이 없거나(PENDING · 종결 · 옛 데이터) 시계가 아직 돌지 않았으면 null 이다 — 진행 화면이
+     * 경과 줄에서 그 부분만 뺀다.
+     */
+    stepElapsedMs: stepElapsedMsOf(query.data?.stepStartedAt, nowMs),
     /** 아직 결과를 기다리는 중인가 (상한 초과와 무관하게 작업 자체의 상태다) */
     polling,
     /** 상한 초과 후 `다시 확인하기`. 시계도 다시 돌린다 */
     recheck: () => {
       startedAt.current = null
       setElapsedMs(0)
+      setNowMs(null)
       void query.refetch()
     },
     /** 그만두기 — 협조적 취소라 즉시 멈추지 않는다 (#250) */

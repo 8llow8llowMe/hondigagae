@@ -349,7 +349,7 @@ function RegenerateJob({
 }) {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { query, phase, polling, recheck, elapsedMs } = useAiPlanJob(jobId)
+  const { query, phase, polling, recheck, elapsedMs, stepElapsedMs } = useAiPlanJob(jobId)
 
   /** `PLAN_004` 로 막힌 장소. 초안을 버리지 않고 그 항목만 빼고 다시 담는다 (R6) */
   const [excludedPlaceIds, setExcludedPlaceIds] = useState<ReadonlySet<string>>(EMPTY_SET)
@@ -561,6 +561,7 @@ function RegenerateJob({
             그 일자**이고 `RegenerateShell` 의 머리가 이미 그것을 말한다.
           */
           elapsedMs={elapsedMs}
+          stepElapsedMs={stepElapsedMs}
           onRecheck={recheck}
           rechecking={query.isFetching}
           /*
