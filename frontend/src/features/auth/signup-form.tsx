@@ -13,11 +13,14 @@ import {
   type SignupProfileValues,
 } from '@/features/auth/schemas'
 import { SignupConsentFields } from '@/features/auth/signup-consent-fields'
+import { SignupHeading } from '@/features/auth/signup-parts'
 import { CodeStep, EmailStep, ProfileStep } from '@/features/auth/signup-steps'
 import { sendEmailCode, signup, verifyEmailCode } from '@/lib/api/auth'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
 import {
+  clearConsentErrors,
   hasConsentErrors,
+  SIGNUP_CONSENT_KEYS,
   type SignupConsent,
   type SignupConsentKey,
   toConsentErrors,
@@ -52,9 +55,16 @@ export type SignupFormProps = {
   returnTo: string
   consent: SignupConsent
   onConsentChange: (key: SignupConsentKey, checked: boolean) => void
+  /** 전체 동의 (#1083). 셋을 한꺼번에 바꾸는 것은 소유자(`SignupScreen`)의 몫이다 */
+  onConsentAllChange: (checked: boolean) => void
 }
 
-export function SignupForm({ returnTo, consent, onConsentChange }: SignupFormProps) {
+export function SignupForm({
+  returnTo,
+  consent,
+  onConsentChange,
+  onConsentAllChange,
+}: SignupFormProps) {
   const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -308,15 +318,19 @@ export function SignupForm({ returnTo, consent, onConsentChange }: SignupFormPro
    */
   const handleConsentChange = useCallback(
     (key: SignupConsentKey, checked: boolean) => {
-      setConsentErrors((previous) => {
-        if (previous.fields[key] === undefined) return previous
-        const fields = { ...previous.fields }
-        delete fields[key]
-        return { fields, form: previous.form }
-      })
+      setConsentErrors((previous) => clearConsentErrors(previous, [key]))
       onConsentChange(key, checked)
     },
     [onConsentChange],
+  )
+
+  /** 전체 동의는 세 값을 한꺼번에 바꾸므로 세 항목의 오류를 함께 지운다 (#1083) */
+  const handleConsentAllChange = useCallback(
+    (checked: boolean) => {
+      setConsentErrors((previous) => clearConsentErrors(previous, SIGNUP_CONSENT_KEYS))
+      onConsentAllChange(checked)
+    },
+    [onConsentAllChange],
   )
 
   /**
@@ -373,21 +387,22 @@ export function SignupForm({ returnTo, consent, onConsentChange }: SignupFormPro
     동의를 3단계 안에 가두면 소셜로 가입하려는 사용자는 동의할 방법이 없다 — 인가코드가
     1회용이라 콜백에서 받을 수도 없다 (회원가입-세부명세.md D8-5).
 
-    제목 바로 아래에 두어 "무엇에 동의하고 가입하는지" 를 입력 전에 읽게 한다. 3단계에서는
-    이 자리가 곧 제출 버튼 위이기도 하다.
+    제목·단계 표시 바로 아래에 두어 "무엇에 동의하고 가입하는지" 를 입력 전에 읽게 한다.
+    단계 표시가 이 블록보다 먼저인 이유는 `SignupHeading` 의 JSDoc 에 있다 (#1083).
   */
   const consentBlock = (
     <SignupConsentFields
       consent={consent}
       errors={consentErrors}
       onConsentChange={handleConsentChange}
+      onConsentAllChange={handleConsentAllChange}
     />
   )
 
   if (step === 'email') {
     return (
       <div ref={containerRef} className="flex flex-col gap-6">
-        <h1 className="text-title-1 text-fg font-bold">{messages.auth.signupTitle}</h1>
+        <SignupHeading step={1} />
         {consentBlock}
         <EmailStep
           values={emailForm.values}
@@ -410,7 +425,7 @@ export function SignupForm({ returnTo, consent, onConsentChange }: SignupFormPro
   if (step === 'code') {
     return (
       <div ref={containerRef} className="flex flex-col gap-6">
-        <h1 className="text-title-1 text-fg font-bold">{messages.auth.signupTitle}</h1>
+        <SignupHeading step={2} />
         {consentBlock}
         <CodeStep
           email={email}
@@ -442,9 +457,10 @@ export function SignupForm({ returnTo, consent, onConsentChange }: SignupFormPro
 
   return (
     <div ref={containerRef} className="flex flex-col gap-6">
-      <h1 className="text-title-1 text-fg font-bold">{messages.auth.signupTitle}</h1>
+      <SignupHeading step={3} />
       {consentBlock}
       <ProfileStep
+        email={email}
         values={profileForm.values}
         errors={profileStepErrors}
         errorStatus={profileErrorStatus}

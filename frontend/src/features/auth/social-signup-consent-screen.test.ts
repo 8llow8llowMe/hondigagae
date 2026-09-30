@@ -85,6 +85,18 @@ describe('소셜 동의 화면 — 제공자를 한 번 더 거치는 이유를 
     expect(naver).toContain(messages.auth.socialSignupConsentNotice('네이버'))
   })
 
+  /*
+    안내가 부르는 이름과 버튼 글자가 같아야 사용자가 "그 버튼" 을 찾는다 (#1083). 버튼
+    문구는 각 사 가이드가 정한 `… 로그인` 이다 (DESIGN.md §2-8).
+  */
+  it('안내가 버튼 문구를 그대로 부른다', () => {
+    for (const name of ['카카오', '네이버']) {
+      expect(messages.auth.socialSignupConsentNotice(name)).toContain(
+        messages.auth.socialLoginLabel(name),
+      )
+    }
+  })
+
   it('화면 제목이 할 일을 그대로 말한다', () => {
     expect(kakao).toContain(messages.auth.socialSignupConsentTitle)
   })

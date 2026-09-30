@@ -63,6 +63,19 @@ export const authMessages = {
 
   signupTitle: '회원가입',
   stepOf: (current: number, total: number) => `${total}단계 중 ${current}단계`,
+  /*
+    회원가입 하단의 로그인 입구 (#1083). 질문과 링크를 나눈다 — **링크 글자는 "로그인"
+    하나다.** 질문까지 링크로 묶으면 접근 가능한 이름이 문장이 되어 링크 목록에서 무엇을
+    하는 링크인지 한눈에 안 읽힌다.
+  */
+  haveAccountPrompt: '이미 계정이 있나요?',
+  haveAccountLink: '로그인',
+  /*
+    2·3단계에서 "어느 이메일로 진행 중인가" 를 라벨과 함께 보인다 (#1083). 이메일만 덩그러니
+    두면 무엇을 가리키는 값인지 읽히지 않는다. 단계마다 그 이메일의 역할이 달라 라벨도 둘이다.
+  */
+  codeRecipientLabel: '받는 이메일',
+  signupEmailLabel: '가입할 이메일',
   sendCode: '인증코드 받기',
   sendingCode: '전송 중',
   codeSent: '메일로 인증코드를 보냈어요.',
@@ -90,6 +103,11 @@ export const authMessages = {
     `resultMessage` 를 그대로 쓴다 (클라이언트 검증 문구는 `formMessages` 의 복제본).
   */
   consentHeading: '가입 동의',
+  /*
+    전체 동의 (#1083). **세 항목이 전부 필수라 "전체" 가 곧 "필수 전체" 다** — 선택 동의가
+    생기면 이 문구와 `setAllSignupConsent` 의 범위를 함께 다시 정해야 한다.
+  */
+  consentAllLabel: '모두 동의해요',
   termsConsentLabel: '(필수) 이용약관에 동의해요',
   privacyConsentLabel: '(필수) 개인정보 처리방침에 동의해요',
   ageConsentLabel: '(필수) 만 14세 이상이에요',
@@ -123,12 +141,18 @@ export const authMessages = {
   */
   socialSignupConsentTitle: '가입 동의만 하면 돼요',
   /*
-    왜 제공자를 한 번 더 거치는지 한 줄로 알린다. 인가코드는 1회용이라 방금 받은
-    코드로 재시도할 수 없다 — 다만 제공자 쪽 동의는 이미 끝났으므로 동의 화면 없이
-    곧장 돌아온다. 이 말이 없으면 사용자는 "또 처음부터" 로 읽는다.
+    이 화면에서 남은 일 하나를 말한다 (#1083 에서 단순화).
+
+    #707 초안은 **왜** 제공자를 한 번 더 거치는지(인가코드 1회용 · 동의 화면 생략)까지
+    설명했는데, 두 줄이 넘고 "보안상 방금 받은 인증" 같은 기술 용어가 섞였다. 사용자에게
+    필요한 것은 이유가 아니라 **무엇을 누르면 끝나는지**다. "또 처음부터" 로 읽히는 것은
+    "한 번 더 누르면 끝나요" 가 막는다 — 남은 일이 버튼 하나라는 말이기 때문이다.
+
+    **버튼 문구를 그대로 부른다** (`socialLoginLabel`). 버튼이 `카카오 로그인` 인데 안내가
+    "카카오로 계속하기" 를 말하면 사용자는 찾는 버튼이 없다고 읽는다 (DESIGN.md §2-8).
   */
   socialSignupConsentNotice: (provider: string) =>
-    `${provider} 동의는 이미 마쳤어요. 보안상 방금 받은 인증을 다시 쓸 수 없어 ${provider}를 한 번 더 거치지만, 동의 화면 없이 곧장 돌아와요.`,
+    `아래 항목에 동의하고 ${provider} 로그인을 한 번 더 누르면 가입이 끝나요.`,
 
   /*
     비밀번호 찾기 (이슈 #85 · 비밀번호찾기-세부명세.md D5).

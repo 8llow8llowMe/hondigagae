@@ -17,6 +17,7 @@ function render(props: Record<string, unknown> = {}): string {
       consent: NO_SIGNUP_CONSENT,
       errors: NO_FORM_ERRORS,
       onConsentChange: noop,
+      onConsentAllChange: noop,
       ...props,
     }),
   )
@@ -87,5 +88,57 @@ describe('SignupConsentFields — 가입 동의 3종 (#688)', () => {
 
   it('오류가 없으면 aria-invalid 를 켜지 않는다', () => {
     expect(render()).not.toContain('aria-invalid')
+  })
+})
+
+/*
+  전체 동의 (#1083). **체크 상태는 셋에서 파생한다** — 따로 들지 않으므로 "하나라도 풀리면
+  전체도 풀림" 이 렌더 결과로 드러난다. 체크박스 넷의 `checked` 를 id 로 짚어 센다.
+*/
+function isChecked(markup: string, id: string): boolean {
+  const tag = markup.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))?.[0]
+  if (tag === undefined) throw new Error(`#${id} 가 없다`)
+  return tag.includes('checked=""')
+}
+
+const ALL = { termsAgreed: true, privacyAgreed: true, ageOver14Confirmed: true }
+
+describe('SignupConsentFields — 전체 동의 (#1083)', () => {
+  it('"모두 동의해요" 체크박스가 가입 동의 그룹 안, 세 항목보다 먼저 선다', () => {
+    const markup = render()
+
+    expect(markup).toContain('id="consentAll"')
+    expect(markup).toContain(messages.auth.consentAllLabel)
+    // 그룹 이름(legend) 안에 들어야 "가입 동의, 모두 동의해요" 로 함께 읽힌다
+    expect(markup.indexOf('id="consentAll"')).toBeGreaterThan(markup.indexOf('<fieldset'))
+    expect(markup.indexOf('id="consentAll"')).toBeLessThan(markup.indexOf('</fieldset>'))
+    expect(markup.indexOf('id="consentAll"')).toBeLessThan(markup.indexOf('id="termsAgreed"'))
+  })
+
+  it('셋 다 켜져 있으면 전체 동의도 켜져 있다', () => {
+    expect(isChecked(render({ consent: ALL }), 'consentAll')).toBe(true)
+  })
+
+  it('하나라도 꺼져 있으면 전체 동의도 꺼져 있다', () => {
+    for (const key of Object.keys(ALL)) {
+      const markup = render({ consent: { ...ALL, [key]: false } })
+
+      expect(isChecked(markup, 'consentAll')).toBe(false)
+      expect(isChecked(markup, key)).toBe(false)
+    }
+  })
+
+  it('아무것도 동의하지 않았으면 전체 동의도 꺼져 있다', () => {
+    expect(isChecked(render(), 'consentAll')).toBe(false)
+  })
+
+  it('aria-controls 로 한꺼번에 바꾸는 세 항목을 가리킨다', () => {
+    expect(render()).toContain('aria-controls="termsAgreed privacyAgreed ageOver14Confirmed"')
+  })
+
+  it('비활성이면 전체 동의도 함께 잠긴다', () => {
+    const markup = render({ disabled: true })
+
+    expect(markup.match(/<input[^>]*disabled=""/g) ?? []).toHaveLength(4)
   })
 })
