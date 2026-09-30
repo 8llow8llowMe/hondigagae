@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 import { fieldErrorId } from '@/components/field'
 import { cn } from '@/lib/utils/cn'
 
@@ -17,6 +19,15 @@ export type CheckboxGroupProps = {
   onValuesChange: (values: string[]) => void
   error?: string | undefined
   required?: boolean
+  /**
+   * 라벨 뒤에 붙는 보조 요소 — `InfoTip` 같은 것 (#1066). 없으면 아무것도 그리지 않는다.
+   *
+   * **있을 때는 그룹 이름을 라벨 글자로 좁힌다** (`aria-labelledby`). `<legend>` 안의 내용이
+   * 통째로 fieldset 의 이름이 되는데, 거기에 버튼 이름("… 기준")까지 섞이면 체크박스로
+   * 들어갈 때마다 그룹 이름이 보조 설명 버튼과 함께 읽힌다. 없을 때는 지금처럼 legend 가
+   * 이름을 맡는다 — 기존 사용처의 마크업이 바뀌지 않는다 (component-guide.md §9).
+   */
+  trailing?: ReactNode
   className?: string
 }
 
@@ -49,9 +60,11 @@ export function CheckboxGroup({
   onValuesChange,
   error,
   required = false,
+  trailing,
   className,
 }: CheckboxGroupProps) {
   const invalid = error !== undefined
+  const labelId = trailing === undefined ? undefined : `${id}-label`
 
   function toggle(value: string): void {
     onValuesChange(
@@ -64,13 +77,17 @@ export function CheckboxGroup({
       className={cn('flex flex-col gap-1', className)}
       aria-invalid={invalid ? true : undefined}
       aria-describedby={invalid ? fieldErrorId(id) : undefined}
+      aria-labelledby={labelId}
     >
       <legend className="text-body-2 text-fg mb-1 font-medium">
-        {label}
+        {labelId === undefined ? label : <span id={labelId}>{label}</span>}
         {required && (
           <span aria-hidden="true" className="text-danger-500 ml-1">
             *
           </span>
+        )}
+        {trailing !== undefined && (
+          <span className="ml-2 inline-flex align-middle">{trailing}</span>
         )}
       </legend>
 

@@ -35,7 +35,13 @@ export const aiPlanMessages = {
   periodSummary: '{days}일 일정이에요.',
 
   fieldPet: '함께 갈 반려견',
+  /**
+   * 라벨 옆 `InfoTip` 안에 든다 (#1066). 상시 줄로 두면 반려견 목록 바로 밑에서 행동을
+   * 바꾸지 않는 설명이 매번 한 줄을 차지한다 — 궁금한 사람만 연다.
+   */
   fieldPetHint: '반려견의 크기·민감도가 장소 선택과 하루 이동량에 반영돼요.',
+  /** 위 `InfoTip` 의 버튼 이름이자 모바일 시트 제목. 무엇에 대한 설명인지를 적는다 */
+  fieldPetHintLabel: '반려견 정보가 쓰이는 곳',
 
   fieldBudget: '예산 (선택)',
   fieldBudgetUnit: '만원',

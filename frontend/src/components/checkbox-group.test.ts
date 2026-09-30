@@ -68,3 +68,32 @@ describe('오류 배선 — RadioGroup 과 같다', () => {
     expect(render()).toContain('<legend')
   })
 })
+
+/*
+  #1066 — AI 일정 만들기의 `fieldPetHint` 를 라벨 옆 `InfoTip` 으로 옮기며 연 슬롯이다.
+  **그룹 이름에 보조 버튼의 이름이 섞이지 않아야** 한다: `<legend>` 안의 내용이 통째로
+  fieldset 의 이름이 되므로, 슬롯이 있을 때는 라벨 글자만 `aria-labelledby` 로 가리킨다.
+*/
+describe('CheckboxGroup — 라벨 옆 trailing 슬롯', () => {
+  const TRAILING = createElement('button', { type: 'button', 'aria-label': '선택 기준' }, '?')
+
+  it('슬롯이 없으면 이름을 legend 에 맡긴다 — 기존 동작 그대로', () => {
+    expect(render()).not.toContain('aria-labelledby')
+  })
+
+  it('슬롯을 legend 안, 라벨 뒤에 그린다', () => {
+    const markup = render({ trailing: TRAILING })
+    const legend = markup.slice(markup.indexOf('<legend'), markup.indexOf('</legend>'))
+
+    expect(legend).toContain('aria-label="선택 기준"')
+    expect(legend.indexOf('함께 갈 반려견')).toBeLessThan(legend.indexOf('aria-label="선택 기준"'))
+  })
+
+  it('슬롯이 있으면 그룹 이름은 라벨 글자만 가리킨다', () => {
+    const markup = render({ trailing: TRAILING })
+    const labelId = /aria-labelledby="([^"]+)"/.exec(markup)?.[1]
+
+    expect(labelId).toBeDefined()
+    expect(markup).toContain(`id="${labelId}">함께 갈 반려견</span>`)
+  })
+})

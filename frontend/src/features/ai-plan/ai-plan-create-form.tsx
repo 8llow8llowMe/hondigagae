@@ -9,6 +9,7 @@ import { Chip, ChipGroup } from '@/components/chip'
 import { DateField } from '@/components/date-field'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
+import { InfoTip } from '@/components/info-tip'
 import { Textarea } from '@/components/textarea'
 import { AiPlanDetailsDisclosure } from '@/features/ai-plan/ai-plan-details-disclosure'
 import { AiPlanOptionsSection } from '@/features/ai-plan/ai-plan-options-section'
@@ -318,26 +319,28 @@ export function AiPlanCreateForm({
       </div>
 
       {/*
-        안내는 그룹 바로 아래 8px 이다. 앞서 `-mt-3` 으로 위 여백을 되돌려 붙이고
-        있었는데, 그 값은 부모의 `gap-5` 를 상쇄하려던 것이라 부모가 바뀌면 어긋난다 —
-        그룹과 안내를 한 상자에 넣어 간격을 직접 준다.
+        **선택 근거는 라벨 옆 `InfoTip` 안에 둔다** (#1066). 그룹 아래 상시 줄이던 때는
+        반려견 행마다 `describePet` 이 이미 크기·민감도를 적는데 그 아래에서 "크기·민감도가
+        반영돼요" 를 한 번 더 말했다 — 행동을 바꾸지 않는 설명이라 원할 때 여는 채널로 옮긴다.
       */}
-      <div className="flex flex-col gap-2">
-        <CheckboxGroup
-          id="petIds"
-          label={messages.aiPlan.fieldPet}
-          required
-          options={pets.map((pet) => ({
-            value: pet.petId,
-            label: pet.name,
-            description: describePet(pet),
-          }))}
-          values={values.petIds}
-          onValuesChange={(petIds) => onValueChange('petIds', petIds)}
-          error={errors.fields.petIds}
-        />
-        <p className="text-caption text-fg-muted">{messages.aiPlan.fieldPetHint}</p>
-      </div>
+      <CheckboxGroup
+        id="petIds"
+        label={messages.aiPlan.fieldPet}
+        required
+        trailing={
+          <InfoTip label={messages.aiPlan.fieldPetHintLabel}>
+            {messages.aiPlan.fieldPetHint}
+          </InfoTip>
+        }
+        options={pets.map((pet) => ({
+          value: pet.petId,
+          label: pet.name,
+          description: describePet(pet),
+        }))}
+        values={values.petIds}
+        onValuesChange={(petIds) => onValueChange('petIds', petIds)}
+        error={errors.fields.petIds}
+      />
 
       {/*
         자유 입력은 **접기 밖에 남는다.** 기본값이 없고 결과 품질에 가장 크게 기여하는
