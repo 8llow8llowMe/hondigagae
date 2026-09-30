@@ -32,6 +32,18 @@ export type PlanStatusActionSpec = {
   direction: PlanStatusActionDirection
 }
 
+/**
+ * 이 전이가 서버가 읽는 반려견 특성의 **출처**를 바꾸는가 (#1058).
+ *
+ * 판정 · 산책 위험도 · 브리핑은 특성을 상태에 따라 읽는다 — 완료 일정은 완료 시점 스냅샷,
+ * 진행 중(초안 · 확정)은 지금 프로필이다 (`PlanWeatherProcessor.loadConditions`, #629).
+ * 그래서 **완료로 들어가거나 나오는 전이만** 입력을 바꾼다. 초안 ↔ 확정은 둘 다 지금 프로필이라
+ * 판정을 다시 받을 이유가 없다 — 판정 재조회는 장소마다 원격 호출이라 공짜가 아니다.
+ */
+export function changesPetConditionSource(kind: PlanStatusActionKind): boolean {
+  return kind === 'complete' || kind === 'reopen'
+}
+
 export function planStatusActions(statusCode: string): PlanStatusActionSpec[] {
   if (statusCode === 'DRAFT') {
     return [{ kind: 'confirm', nextStatus: 'CONFIRMED', variant: 'primary', direction: 'forward' }]

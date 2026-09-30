@@ -15,6 +15,7 @@ import { PetPhotoSection } from '@/features/pet/pet-photo-section'
 import { PET_INVALIDATE_KEY } from '@/features/pet/queries'
 import { usePetDetail } from '@/features/pet/use-pet-detail'
 import { invalidateAllPlanBriefings } from '@/features/plan/plan-briefing-invalidation'
+import { planKeys } from '@/features/plan/queries'
 import { classify, toErrorStatus } from '@/lib/api/error'
 import { updatePet } from '@/lib/api/pet'
 import { messages } from '@/lib/messages'
@@ -128,6 +129,14 @@ export function PetEditView({ petId }: { petId: string }) {
               void queryClient.invalidateQueries({ queryKey: PET_INVALIDATE_KEY })
               // 진행 중인 일정의 브리핑은 이 아이의 특성으로 판정한다 (#1055)
               void invalidateAllPlanBriefings(queryClient)
+              /*
+                판정 · 산책 위험도도 같은 특성을 읽는다 (#1058, `PlanWeatherProcessor.loadConditions`).
+                그 아이와 동행하는 일정을 가려내려면 일정 캐시를 뒤져야 하고 캐시에 없는 일정의
+                key 도 남아 있을 수 있어, 브리핑처럼 prefix 로 통째로 버린다. 곧바로 목록으로
+                떠나 관찰자가 없으니 낡음 표시뿐이다 — 다시 열 때 받는다.
+              */
+              void queryClient.invalidateQueries({ queryKey: planKeys.weatherAll() })
+              void queryClient.invalidateQueries({ queryKey: planKeys.walkSafetyAll() })
               router.replace('/pets')
             }}
           />

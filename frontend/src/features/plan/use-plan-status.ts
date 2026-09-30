@@ -9,7 +9,11 @@ import { planKeys } from '@/features/plan/queries'
 import { updatePlan } from '@/lib/api/plan'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
-import type { PlanStatusActionKind, PlanStatusActionSpec } from '@/lib/plan/status-action'
+import {
+  changesPetConditionSource,
+  type PlanStatusActionKind,
+  type PlanStatusActionSpec,
+} from '@/lib/plan/status-action'
 
 const ACTION_ERRORS: Record<PlanStatusActionKind, string> = {
   confirm: messages.plan.statusConfirmError,
@@ -31,7 +35,8 @@ const ACTION_ERRORS: Record<PlanStatusActionKind, string> = {
  *
  * **`{ status }` 하나만 보낸다.** `PUT` 은 부분 수정이라 제목·기간을 함께 실으면 화면이
  * 들고 있던 낡은 값으로 덮어쓸 위험이 생긴다 (`PlanCommandProcessor.updatePlan`).
- * 응답이 `PlanDetailResponse` 전체라 `setQueryData` 로 갈아끼우고 목록 · 브리핑만 무효화한다.
+ * 응답이 `PlanDetailResponse` 전체라 `setQueryData` 로 갈아끼우고 목록 · 브리핑을 무효화한다
+ * (완료 ↔ 진행 전환은 판정 · 산책 위험도까지 — 아래).
  */
 export function usePlanStatus(planId: string) {
   const queryClient = useQueryClient()
@@ -56,6 +61,16 @@ export function usePlanStatus(planId: string) {
           완료를 되돌리면 브리핑의 기준이 바뀐다.
         */
         void invalidatePlanBriefing(queryClient, planId)
+        /*
+          **판정 · 산책 위험도는 완료로 들어가거나 나올 때만 버린다** (#1058). 둘도 같은 특성을
+          읽지만(`PlanWalkSafetyProcessor` 도 `loadConditions` 를 쓴다), 브리핑과 달리 상세 화면이
+          지금 관찰 중이라 버리면 곧바로 다시 받는다 — 장소마다 원격 호출이다. 초안 ↔ 확정은
+          특성의 출처가 그대로라 받을 이유가 없다 (`changesPetConditionSource`).
+        */
+        if (changesPetConditionSource(action.kind)) {
+          void queryClient.invalidateQueries({ queryKey: planKeys.weather(planId) })
+          void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(planId) })
+        }
       })
       .catch((error: unknown) => {
         setErrorMessage(apiErrorToFormErrors(error, ACTION_ERRORS[action.kind]).form)
