@@ -9,6 +9,7 @@ import { MetricValue, MetricWord } from '@/components/metric'
 import { ReasonList } from '@/components/reason-list'
 import { formatStandaloneCelsius } from '@/lib/format/celsius'
 import { walkSafetyTone } from '@/lib/insight/tone'
+import { withoutWarningReason } from '@/lib/insight/verdict-reasons'
 import { messages } from '@/lib/messages'
 import { cn } from '@/lib/utils/cn'
 import type { WalkSafetyResponse } from '@/types/insight'
@@ -300,8 +301,12 @@ export function WalkVerdict({
 
           저장소의 다른 근거 목록 넷(일정 하루 판정 · 장소 적합도 · 장소 산책 위험도 ·
           AI 초안)은 모두 이것을 쓴다.
+
+          **특보 줄은 홈에서 뺀다** (#1065, `withoutWarningReason`). 최상단 띠가 배지로 종류까지
+          이미 말하고 이 카드가 바로 아래라 같은 사실이 한눈에 두 번 보였다 (DESIGN.md §1
+          "기상특보는 화면당 1회" 의 홈 예외). 서버 문장은 그대로이고 여기서 표시만 거른다.
         */}
-        <ReasonList reasons={data.reasons} />
+        <ReasonList reasons={withoutWarningReason(data.reasons, data.weatherWarning)} />
 
         {/*
           **`saferWindow` 줄을 홈에서 걷었다** (#349). 이 섹션은 "지금 나가도 되나" 만

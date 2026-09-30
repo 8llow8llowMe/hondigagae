@@ -152,6 +152,33 @@ describe('L1 Surface — 섹션', () => {
   })
 
   /*
+    **`titleTrailing` — 제목 바로 옆 자리** (#1065). 홈 권역·추천 카드가 제목 옆 ⓘ 를 둔다.
+    `h2` 안에 넣으면 `aria-labelledby` 로 이 제목을 가리키는 섹션 이름에 버튼 이름이 섞인다.
+  */
+  describe('titleTrailing', () => {
+    const tip = createElement('button', { type: 'button', 'aria-label': '점수 설명' })
+
+    it('h2 밖, 제목 바로 뒤 형제로 선다', () => {
+      const markup = render({ titleId: 'region-heading', titleTrailing: tip })
+      const headingEnd = markup.indexOf('</h2>')
+
+      expect(markup.slice(0, headingEnd)).not.toContain('aria-label="점수 설명"')
+      expect(markup.slice(headingEnd)).toMatch(/^<\/h2><button[^>]*aria-label="점수 설명"/)
+    })
+
+    it('주면 제목이 줄어들 수 있다 — 긴 제목이 옆 자리를 밀어내지 않는다', () => {
+      expect(render({ titleTrailing: tip })).toMatch(/<h2[^>]*class="[^"]*min-w-0/)
+    })
+
+    it('주지 않으면 예전 마크업 그대로다 — 제목을 감싸는 줄을 만들지 않는다', () => {
+      const markup = render()
+
+      expect(markup).toContain('<div class="min-w-0"><h2')
+      expect(markup).not.toMatch(/<h2[^>]*class="[^"]*min-w-0/)
+    })
+  })
+
+  /*
     **`trailingWrap` — 길이가 데이터로 정해지는 trailing** (#1016). 일정 상세 동선 카드가
     일자 탭(최대 30일)을 제목 줄 오른쪽에 둔다. 기본 `shrink-0` 덩어리면 390 에서 넘친다.
   */

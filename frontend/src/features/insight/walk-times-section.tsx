@@ -422,14 +422,15 @@ function goldenWindowStatusOf(data: WalkTimesResponse): GoldenWindowStatusCode {
  *
  * **곡선이 초록인데 왜 추천이 없는지**를 말하는 것이 이 자리의 일이다. 그 어긋남이 이
  * 이슈의 제보였다.
+ *
+ * **설명 문단을 걷었다** (#1065). 두 번째 줄(`기상특보 경보가 있는 날은 시간대가 좋아 보여도
+ * 추천하지 않아요. 곡선은 근거로 …`)은 첫 줄 `경보가 발효 중이라 추천하지 않아요` 를 한 번 더
+ * 말하고, 곡선이 근거라는 것은 바로 아래 곡선이 스스로 보인다. 경보 날 홈에서 같은 경보
+ * 이야기가 네 번(띠 · 판정 근거 · 여기 · 권역) 나오던 것 중 하나다. **곡선은 그대로 둔다.**
+ * 이 섹션은 올레 코스 상세도 함께 쓰므로 거기서도 같이 바뀐다.
  */
 function SuppressedByWarning() {
-  return (
-    <div className="flex flex-col gap-1">
-      <p className="text-body-1 text-fg-muted font-semibold">{messages.home.goldenSuppressed}</p>
-      <p className="text-body-2 text-fg-muted">{messages.home.goldenSuppressedDesc}</p>
-    </div>
-  )
+  return <p className="text-body-1 text-fg-muted font-semibold">{messages.home.goldenSuppressed}</p>
 }
 
 function NoGoldenWindow() {

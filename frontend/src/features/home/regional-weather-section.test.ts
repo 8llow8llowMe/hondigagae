@@ -96,6 +96,18 @@ describe('RegionalWeatherSection — 추천 없음 사유 (#905 R2)', () => {
     expect(markup).not.toContain(messages.home.regionNoneForecast)
   })
 
+  /*
+    #1065. 경보 사유는 **한 줄**이다. 예전 앞 문장(`기상특보 경보가 발효 중이라 권역을 추천하지
+    않아요`)은 바로 위 `regionNone` 과 최상단 띠가 이미 말한다. 남는 것은 "표를 참고로 읽어라"
+    뿐이고, 그것이 #905 R2 의 모순(점수는 있는데 추천이 없다)을 푼다.
+  */
+  it('경보 사유는 참고용이라는 한 줄만 남긴다 (#1065)', () => {
+    const markup = render(BAD_DAY)
+
+    expect(messages.home.regionNoneWarning).toContain('참고용')
+    expect(markup).not.toContain('권역을 추천하지 않아요')
+  })
+
   it('예보를 못 받아 추천이 빈 날은 예보를 사유로 든다', () => {
     const markup = render(NO_FORECAST_DAY)
 
@@ -163,18 +175,15 @@ describe('RegionalWeatherSection — 비교표', () => {
   })
 
   /*
-    **#342 에서 하단 보조 문구를 걷었고 #638 이 머리로 올렸다.** 걷은 이유는 위치였다 —
-    표 아래 한 줄은 배지를 다 읽은 뒤에야 닿아서, 무엇의 100인지 모르는 채로 다섯 칸을
-    훑게 된다. 점수의 뜻은 이제 카드 제목 아래(`Surface description`)가 말한다.
+    **#342 에서 하단 보조 문구를 걷었다.** 표 아래 한 줄은 배지를 다 읽은 뒤에야 닿아서,
+    무엇의 100인지 모르는 채로 다섯 칸을 훑게 된다. 점수의 뜻은 이제 제목 옆 ⓘ 가,
+    만점은 배지가 말한다 (#638 → #1065).
   */
   it('보조 문구를 표 아래로 되돌리지 않는다', () => {
     const markup = render(GOOD_DAY)
-    const caption = markup.indexOf(messages.home.regionScoreCaption)
-    const firstCell = markup.indexOf('w-44')
 
     expect(markup).not.toContain('날씨만 본 점수')
-    expect(caption).toBeGreaterThan(-1)
-    expect(caption).toBeLessThan(firstCell)
+    expect(markup).not.toContain(messages.home.regionScoreInfo)
   })
 })
 
@@ -183,33 +192,59 @@ describe('RegionalWeatherSection — 비교표', () => {
   이었는데 만점도 단위도 어디에도 없었다. 같은 화면의 장소 적합도는 `90 /100` 으로 쓰고
   있어서, 권역 배지만 축이 다른 값처럼 보였다.
 */
-describe('RegionalWeatherSection — 점수 라벨 (#638)', () => {
-  it('카드 제목 아래에서 점수의 뜻과 만점을 밝힌다', () => {
-    expect(render(GOOD_DAY)).toContain(messages.home.regionScoreCaption)
-  })
-
-  it('점수 배지에 단위를 붙인다', () => {
+describe('RegionalWeatherSection — 점수 라벨 (#638 → #1065)', () => {
+  /*
+    #1065. 제목 아래 상시 캡션(`반려견 활동 적합도 · 100점 만점`)을 걷고 제목 옆 ⓘ 로 옮겼다.
+    `InfoTip` 은 열렸을 때만 내용을 그리므로 첫 렌더에는 **트리거만** 선다.
+  */
+  it('제목 아래 상시 캡션을 두지 않고 제목 옆에 ⓘ 를 둔다', () => {
     const markup = render(GOOD_DAY)
-    const score = GOOD_DAY.regions.find((r) => r.weatherScore !== null)?.weatherScore as number
+    const heading = markup.indexOf('id="region-heading"')
+    const headingEnd = markup.indexOf('</h2>', heading)
+    const tip = markup.indexOf(`aria-label="${messages.home.regionScoreInfoLabel}"`)
 
-    expect(markup).toContain(messages.home.regionScoreUnit.replace('{score}', String(score)))
+    expect(markup).not.toContain('100점 만점')
+    expect(tip).toBeGreaterThan(headingEnd)
+    expect(tip).toBeLessThan(markup.indexOf('w-44'))
   })
 
   /*
-    예보를 못 받은 권역은 `0점` 이 아니라 `예보 없음` 이다 — 모르는 것과 나쁜 것은 다르다.
-    마크업 전체에서 `0점` 을 금지할 수는 없다 (캡션이 `100점 만점` 이다). 그 권역의 칸만 본다.
+    **ⓘ 는 `h2` 밖이다.** 섹션이 `aria-labelledby` 로 이 `h2` 를 가리키므로, 버튼이 안에
+    들어가면 버튼 이름이 섹션 이름에 섞인다.
   */
-  it('예보 없는 권역에 단위를 붙이지 않는다', () => {
+  it('ⓘ 버튼 이름이 제목(섹션 이름)에 섞이지 않는다', () => {
+    const markup = render(GOOD_DAY)
+    const start = markup.indexOf('id="region-heading"')
+    const heading = markup.slice(start, markup.indexOf('</h2>', start))
+
+    expect(heading).toContain(messages.home.regionHeading)
+    expect(heading).not.toContain('<button')
+  })
+
+  /* 만점을 배지가 말한다 — 캡션이 ⓘ 로 들어가면서 칸마다 `/100` 을 붙인다 */
+  it('점수 배지가 만점까지 말한다', () => {
+    const markup = render(GOOD_DAY)
+    const score = GOOD_DAY.regions.find((r) => r.weatherScore !== null)?.weatherScore as number
+
+    expect(markup).toContain(`${score}/100`)
+    expect(markup).not.toContain(`${score}점`)
+  })
+
+  /*
+    예보를 못 받은 권역은 `0/100` 이 아니라 `예보 없음` 이다 — 모르는 것과 나쁜 것은 다르다.
+    그 권역의 칸만 본다.
+  */
+  it('예보 없는 권역에 만점 표기를 붙이지 않는다', () => {
     const markup = render(GOOD_DAY)
     const cell = markup.slice(markup.indexOf('한라산권'))
 
     expect(cell).toContain(messages.home.regionScoreUnavailable)
-    expect(cell).not.toContain('점<')
+    expect(cell).not.toContain('/100')
   })
 
-  /* 스켈레톤은 제목도 캡션도 없는 표면이다 — 로딩 중에 캡션만 먼저 뜨면 안 된다 */
-  it('로딩 중에는 캡션을 내지 않는다', () => {
-    expect(render(null, true)).not.toContain(messages.home.regionScoreCaption)
+  /* 스켈레톤은 제목도 ⓘ 도 없는 표면이다 — 로딩 중에 물음표만 먼저 뜨면 안 된다 */
+  it('로딩 중에는 ⓘ 를 내지 않는다', () => {
+    expect(render(null, true)).not.toContain(messages.home.regionScoreInfoLabel)
   })
 })
 
