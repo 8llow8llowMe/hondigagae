@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanJobMode;
 import com.hondigagae.domainlayer.planner.application.model.AiPlanStepOutcome;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStep;
-import com.hondigagae.global.properties.AiPlanJobProperties;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Timer;
@@ -24,8 +23,7 @@ import org.junit.jupiter.api.Test;
 class MicrometerAiPlanJobMetricsAdapterTest {
 
     private final SimpleMeterRegistry registry = new SimpleMeterRegistry();
-    private final MicrometerAiPlanJobMetricsAdapter adapter =
-        new MicrometerAiPlanJobMetricsAdapter(registry, new AiPlanJobProperties(0, 0, 0));
+    private final MicrometerAiPlanJobMetricsAdapter adapter = new MicrometerAiPlanJobMetricsAdapter(registry);
 
     @Test
     @DisplayName("태그는 step·mode·outcome 셋뿐이다 — 잡·회원·지역을 가리키는 값은 없다")
@@ -52,7 +50,7 @@ class MicrometerAiPlanJobMetricsAdapterTest {
     }
 
     @Test
-    @DisplayName("히스토그램 버킷을 연다 — 서버 여러 대의 p95 를 histogram_quantile 로 합산하려면 필요하다")
+    @DisplayName("버킷은 정한 10개뿐이다 — p95 합산에 필요하되 기본 퍼센타일 히스토그램(수십 개)은 열지 않는다")
     void publishesHistogramBuckets() {
         AtomicReference<DistributionStatisticConfig> configured = new AtomicReference<>();
         registry.config().meterFilter(new MeterFilter() {
@@ -65,9 +63,10 @@ class MicrometerAiPlanJobMetricsAdapterTest {
 
         adapter.recordStep(AiPlanJobStep.CANDIDATES, AiPlanJobMode.FULL, AiPlanStepOutcome.COMPLETED, Duration.ofSeconds(2));
 
-        assertThat(configured.get().isPercentileHistogram()).isTrue();
-        // RUNNING 타임아웃(기본 300초)까지 버킷이 닿아야 DRAFTING 의 꼬리가 +Inf 로 뭉개지지 않는다.
-        assertThat(configured.get().getMaximumExpectedValueAsDouble()).isEqualTo(Duration.ofSeconds(300).toNanos());
+        assertThat(configured.get().isPercentileHistogram()).isNotEqualTo(Boolean.TRUE);
+        assertThat(configured.get().getServiceLevelObjectiveBoundaries()).hasSize(10)
+            // RUNNING 타임아웃(기본 300초)까지 닿아야 DRAFTING 의 꼬리가 +Inf 로 뭉개지지 않는다.
+            .contains((double) Duration.ofSeconds(300).toNanos(), (double) Duration.ofMillis(100).toNanos());
     }
 
     private long countOf(String outcome) {
