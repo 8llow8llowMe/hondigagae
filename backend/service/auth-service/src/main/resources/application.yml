@@ -29,6 +29,12 @@ auth:
   login:
     max-failure-count: ${AUTH_LOGIN_MAX_FAILURE_COUNT:5}
     lock-duration: ${AUTH_LOGIN_LOCK_DURATION:PT10M}
+  # 인증 메일 발신자 표시·로고 (#1062). 전부 선택 — 비면 "혼디가개" / SMTP 계정 주소 / 인라인(CID) 로크업 로고.
+  # 프로필 yml 의 auth: 블록은 키 단위로 병합되므로 여기 한 곳에 두면 모든 프로필에 적용된다.
+  mail:
+    from-name: ${MAIL_FROM_NAME:혼디가개}
+    from-address: ${MAIL_FROM_ADDRESS:}
+    logo-url: ${MAIL_LOGO_URL:}
 
 logging:
   level:

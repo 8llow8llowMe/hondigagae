@@ -15,6 +15,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     // 이메일 인증코드 발송
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    // 인증 메일 HTML 템플릿 렌더링 (#1062). REST 서비스라 MVC 뷰 리졸버를 끌어오는 starter 대신 엔진만 쓴다.
+    implementation 'org.thymeleaf:thymeleaf'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     // 반려견 삭제 직후 plan-service 에 동행 목록 대사를 요청한다 (#972) — 이 서비스의 첫 서비스 간 호출이다.

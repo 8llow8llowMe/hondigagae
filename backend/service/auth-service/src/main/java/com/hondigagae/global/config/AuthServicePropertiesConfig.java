@@ -2,6 +2,7 @@ package com.hondigagae.global.config;
 
 import com.hondigagae.common.config.JasyptPropertiesConfig;
 import com.hondigagae.common.config.SwaggerPropertiesConfig;
+import com.hondigagae.global.properties.AuthMailProperties;
 import com.hondigagae.global.properties.AuthSessionProperties;
 import com.hondigagae.global.properties.EmailSendLimitProperties;
 import com.hondigagae.global.properties.LegalDocumentProperties;
@@ -26,7 +27,7 @@ import org.springframework.context.annotation.Import;
 })
 @EnableConfigurationProperties({
     LoginAttemptProperties.class, AuthSessionProperties.class, EmailSendLimitProperties.class,
-    LegalDocumentProperties.class, WithdrawnEmailProperties.class
+    LegalDocumentProperties.class, WithdrawnEmailProperties.class, AuthMailProperties.class
 })
 public class AuthServicePropertiesConfig {
 
