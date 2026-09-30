@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 
 import { useQueryClient } from '@tanstack/react-query'
 
+import { clearSavedLoginEmail, forgetsSavedLoginEmail } from '@/lib/auth/saved-login-email'
+
 /**
  * 로그인 화면이 이유를 안내해야 하는 이탈.
  *
@@ -38,6 +40,14 @@ export function useSessionExit() {
   return useCallback(
     (reason?: ReauthReason) => {
       queryClient.clear()
+      /*
+        **탈퇴 · 소셜 전용 전환이면 기억한 이메일을 지운다** (#1081). 그 이메일로는 더 이상
+        이메일 로그인을 할 수 없다. 로그인 화면이 `?reauth=` 를 보고 지우지 않는 이유:
+        쿼리는 누구나 만들 수 있는 링크라 **실제 성공과 무관하게** 지워지고, 여기는 서버가
+        성공을 돌려준 뒤에만 온다. 이동 **전에** 지우므로 로그인 화면이 저장값을 읽을 때
+        이미 비어 있다.
+      */
+      if (forgetsSavedLoginEmail(reason)) clearSavedLoginEmail()
 
       const href = reason === undefined ? '/login' : `/login?reauth=${reason}`
       router.replace(href)
