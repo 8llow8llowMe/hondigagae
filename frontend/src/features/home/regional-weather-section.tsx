@@ -1,5 +1,6 @@
 'use client'
 
+import { Badge } from '@/components/badge'
 import {
   CloudIcon,
   PartlyCloudyIcon,
@@ -7,17 +8,26 @@ import {
   SleetIcon,
   SnowIcon,
   SunIcon,
+  UmbrellaIcon,
 } from '@/components/icons'
 import { InfoTip } from '@/components/info-tip'
-import { MetricBadge } from '@/components/metric'
+import { METRIC_FILL_TONE, MetricBadge, MetricValue } from '@/components/metric'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { Skeleton } from '@/components/skeleton'
 import { Surface } from '@/components/surface'
-import { formatCelsius } from '@/lib/format/celsius'
+import {
+  regionTemperatureText,
+  scoreBarPercent,
+  soleRecommendedCode,
+} from '@/lib/insight/region-cell'
 import { sortRegionsByScore } from '@/lib/insight/region-order'
 import { findTiedTop, type TiedTopRegions } from '@/lib/insight/region-tie'
 import { suitabilityTone } from '@/lib/insight/tone'
-import { resolveWeatherGlyph, type WeatherIconKind } from '@/lib/insight/weather-icon'
+import {
+  resolveWeatherGlyph,
+  type WeatherGlyphResolution,
+  type WeatherIconKind,
+} from '@/lib/insight/weather-icon'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -60,6 +70,9 @@ export function RegionalWeatherSection({
   // 조회 실패는 섹션을 통째로 숨긴다 — 홈의 최소 골격에 이 섹션은 없다 (공통명세 S4-1)
   if (data === null) return loading ? <RegionalWeatherSkeleton /> : null
 
+  // 헤드라인이 `가장 나아요` 라고 말하는 날의 그 권역만 칸에 `추천` 을 단다 (#1068)
+  const recommendedCode = soleRecommendedCode(data.regions, data.recommendedRegion)
+
   return (
     /*
       **아래 밴드가 사라졌다** (#428). 3a 에서는 카드 사이 간격이 경계라, 섹션이 스스로
@@ -71,9 +84,9 @@ export function RegionalWeatherSection({
       레이아웃 밖 최상단이라 그 역할까지 함께 가져갔다.
     */
     /*
-      **점수의 뜻은 제목 옆 ⓘ 가, 만점은 배지가 말한다** (#1065). #638 은 배지가 `100` 뿐이라
-      무엇의 100인지 화면 어디에도 없어서 제목 아래 상시 캡션(`반려견 활동 적합도 · 100점
-      만점`)을 세웠다. 그 목적 중 **만점**은 배지 표기 `56/100` 이 칸마다 대신 말하고,
+      **점수의 뜻은 제목 옆 ⓘ 가, 만점은 점수 옆 `/100` 이 말한다** (#1065 · #1068). #638 은 배지가
+      `100` 뿐이라 무엇의 100인지 화면 어디에도 없어서 제목 아래 상시 캡션(`반려견 활동 적합도 ·
+      100점 만점`)을 세웠다. 그 목적 중 **만점**은 `56 /100` 이 칸마다 대신 말하고,
       **점수의 뜻**은 매일 읽을 문장이 아니라 원할 때 여는 설명이라 `InfoTip` 으로 옮겼다 —
       홈 첫 화면의 상시 글줄을 하나 줄인다.
 
@@ -120,31 +133,28 @@ export function RegionalWeatherSection({
         마지막 칸이 65px 만 보이며 잘렸다 (#395). 폭이 뷰포트마다 달라지면 같은 칸이
         화면마다 다른 물건처럼 보이고, 잘린 칸은 "더 있다" 가 아니라 "깨졌다" 로 읽힌다.
 
-        **152 였던 값을 176 으로 올렸다** (#412). 152 의 산식이 틀려 있었다 — "값 묶음
-        136 + 칸 인셋 12 = 148 에 4px 여유" 라고 적었는데, **인셋은 첫 칸에만 없다.**
-        둘째 칸부터는 `pl-3`(12) + `border-l`(1) 이 매번 들어가 값 자리가
-        **78.6 → 65.6px** 로 줄었다. 가장 넓은 줄 `최고 31.0℃` 가 62.9px 이라 남는 것이
-        **2.7px** 이었고, 폰트 렌더링이 조금만 달라지면 `최고` 와 `27.0℃` 사이에서 줄이
-        접혀 칸 높이가 배로 뛰었다. 첫 칸만 멀쩡해 보여 더 늦게 드러났다.
+        **152 였던 값을 176 으로 올렸다** (#412). 152 의 산식이 틀려 있었다 — **인셋은
+        첫 칸에만 없다.** 둘째 칸부터는 `pl-3`(12) + `border-l`(1) 이 매번 들어가 값 자리가
+        13px 줄었고, 당시 가로로 늘어선 `아이콘 · 숫자 · 배지` 세 자리가 그 13px 에서 접혔다.
+        첫 칸만 멀쩡해 보여 더 늦게 드러났다.
 
-        **184 의 산식**: 인셋 13 + 아이콘 24 + gap 8 + 숫자 자리 88 + gap 8 + 배지 41.4
-        = 182.4. 숫자 자리를 `lg:w-22`(88px)로 **고정**해 62.9px 짜리 줄에 25px 여유를
-        둔다 — 이 여유가 폰트가 달라져도 접히지 않게 하는 몫이다.
+        **좁은 폭은 한 단 아래다** (#530, `w-44` 176). 세로 목록을 걷고 모든 폭에서 가로
+        레일이 되면서 375 의 가용폭 343 이 이 칸의 새 기준이 됐다 — 184 로 두면 둘째 칸이
+        159px 만 보인다.
 
-        **좁은 폭은 한 단 아래다** (#530, `w-44` 176 + 숫자 자리 `w-20` 80). 세로 목록을
-        걷고 모든 폭에서 가로 레일이 되면서 375 의 가용폭 343 이 이 칸의 새 기준이 됐다 —
-        184 로 두면 둘째 칸이 159px 만 보인다. **둘은 반드시 함께 내린다**: 칸만 줄이면
-        숫자 자리 88 이 174.4 를 요구해 값 줄이 조용히 접힌다 (위 #412 의 재발이다).
-        80 도 62.9px 짜리 줄에 17.1px 을 남긴다.
+        **#1068 에서 칸 안이 세로 줄 넷이 됐다** (`이름 · 점수 · 막대 · 날씨`). 예전에는
+        `아이콘 | 숫자 세 줄 | 배지` 가 **가로로** 한 줄에 서서 셋이 폭을 나눠 가졌고, 그래서
+        숫자 자리(`w-20`/`lg:w-22`)와 배지 여백이 #412 · #638 · #1065 에서 번갈아 눌렸다.
+        이제 줄마다 칸 폭(둘째 칸부터 163 · `lg` 171)을 **혼자** 쓴다 — 가장 넓은 줄
+        (`☀ 24–31℃`, `서귀포권 [추천]`)도 100px 안팎이라 값이 칸을 다툴 일이 없다.
+        산식은 `styles/overlay-and-region-cell.test.ts` 가, 실제 줄 수는
+        `e2e/region-score-badge.spec.ts` 가 잡는다.
 
-        **배지가 41.4 인 것은 `size="score"`(px-3) 때문이다.** 숫자만 담는 배지라
-        낱말용 8px 에서는 조여 보였다 (`components/metric.tsx`). 배지를 더 키우면
-        **숫자 자리가 눌린다** — `w-20`/`lg:w-22` 는 하한이 아니라 상한이라, 남는 폭이
-        모자라면 조용히 줄어든다. 그래서 이 둘은 함께 움직여야 하고 테스트가 그 관계를 잡는다.
+        **그래도 칸 폭은 그대로 둔다.** 폭은 값이 아니라 **레일**이 정한다 — 아래 1440 상한과
+        375 의 둘째 칸이 그 기준이고, 칸 안이 여유로워졌다고 넓히면 그 둘이 깨진다.
 
         **상한은 187.4 다.** 1440 의 우측 열 가용폭이 953 이라 `(953−16)/5 = 187.4` 를
         넘기면 **1440 에서도 화살표가 남는다.** 184 는 936 이라 들어간다 (실측).
-        배지를 `px-4`(49.4)로 키우면 필요 폭이 190.4 가 되어 이 상한을 넘는다.
 
         **1280 에서는 화살표가 남는다.** `184×5 + gap 4×4 = 936` 이 1280 의 가용폭 793 을
         넘긴다 — #395 는 이것을 피하려고 152 를 골랐지만, 그 선택이 지키려던 "한 줄"
@@ -182,7 +192,11 @@ export function RegionalWeatherSection({
           )}
         >
           {sortRegionsByScore(data.regions).map((region) => (
-            <RegionRow key={region.region.code} item={region} />
+            <RegionRow
+              key={region.region.code}
+              item={region}
+              recommended={region.region.code === recommendedCode}
+            />
           ))}
         </ul>
 
@@ -318,26 +332,22 @@ const WEATHER_COLORS: Record<WeatherIconKind, string> = {
 }
 
 /**
- * 권역 행의 날씨 그림 — `DESIGN.md` §9-1 (2026-09-08 결정) (#314).
+ * 권역 칸의 날씨 그림 — `DESIGN.md` §9-1 (2026-09-08 결정) (#314).
  *
  * **선 아이콘이다.** §9-1 이 이모지도 허용하지만 *"한 화면에서 이모지와 선 아이콘을 섞지
  * 않는다"* 고 못박았고, 홈에는 이미 선 아이콘만 서 있다 (병원 배너 · 시계 · 셰브론).
  * 이 자리에만 이모지를 두면 그 규칙을 이 화면이 어긴다.
  *
  * **날씨 전용 색을 쓴다** (#342). `--weather-*` 는 등급(`--metric-*`)과 다른 축이다 —
- * #314 는 배지와 같은 축으로 읽힐 것을 걱정해 무채색으로 갔지만, 다섯 줄을 훑을 때
+ * #314 는 배지와 같은 축으로 읽힐 것을 걱정해 무채색으로 갔지만, 다섯 칸을 훑을 때
  * 비 오는 권역을 찾는 것이 이 자리의 용도라 색이 그 일을 한다. 흐림만 색이 없다.
  *
  * **`sr-only` 로 서버 `name` 을 남긴다.** 아이콘은 스크린리더에 아무 말도 못 한다.
  *
- * **숫자를 대체하지 않는다.** 아이콘이 대신하는 것은 낱말(`맑음`)이지 `최고 28.0℃` ·
+ * **숫자를 대체하지 않는다.** 아이콘이 대신하는 것은 낱말(`맑음`)이지 `24–31℃` ·
  * `강수 0%` 같은 측정값이 아니다 (§9-1).
  */
-function WeatherGlyph({ item }: { item: RegionWeatherItem }) {
-  const glyph = resolveWeatherGlyph(item.skyState, item.precipitationType)
-
-  if (glyph === null) return null
-
+function WeatherGlyph({ glyph }: { glyph: WeatherGlyphResolution }) {
   // 그림이 없는 코드는 서버 낱말을 그대로 적는다 — 빈 자리로 두지도, 틀린 그림을 그리지도 않는다
   if (glyph.kind === null) return <span>{glyph.name}</span>
 
@@ -345,7 +355,7 @@ function WeatherGlyph({ item }: { item: RegionWeatherItem }) {
 
   /*
     **24px 이다** (§9 "24px 기본"). 16px 인라인이던 것을 키웠다 — 값 줄 안에 흐르는
-    글자가 아니라 행 왼쪽의 독립된 자리가 됐다.
+    글자가 아니라 줄 왼쪽의 독립된 자리다.
   */
   return (
     <span className={cn('inline-flex shrink-0 items-center', WEATHER_COLORS[glyph.kind])}>
@@ -356,133 +366,143 @@ function WeatherGlyph({ item }: { item: RegionWeatherItem }) {
 }
 
 /**
- * 한 권역 행.
+ * 한 권역 칸 — **점수가 주인공이다** (#1068).
+ *
+ * 예전 칸은 `최고`·`최저`·`강수` 세 줄 옆에 작은 회색 배지(`56/100`)를 세워, 이 섹션이 답하는
+ * "오늘 어디로" 의 답(점수)이 날씨 값보다 약하게 읽혔다. **글을 줄이지 않고 형태로 바꾼다** —
+ * 정보는 그대로다: 점수 · 만점 · 등급(색 + 막대) · 하늘 · 기온 폭 · 강수.
+ *
+ * ```text
+ * 서귀포권        [추천]    이름 (14/600) · 서버 추천 날의 단독 1위만 표시
+ * 86 /100                   22/900 등급 색 -500 · 단위 12 --fg-muted  (MetricValue row)
+ * ━━━━━━━━━━━━━━━░░░        3px 막대 — 길이 = 점수, 색 = 등급 -500, 트랙 --band
+ * ☀ 24–31℃                  날씨 아이콘 24 · 14/600
+ * ☂ 강수 10%                우산 16 · 12 --fg-muted
+ * ```
  *
  * **점수가 없으면 "예보 없음" 이지 0 이 아니다.** 모르는 것과 나쁜 것을 구분하는 것이
- * 이 서비스의 규칙이라, 빈 자리를 0 으로 채우지 않는다.
+ * 이 서비스의 규칙이라, 빈 자리를 0 으로 채우지 않는다 — 막대도 **점선**이라 0점의 빈 트랙과
+ * 모양으로 갈린다 (DESIGN.md §2-3 `UNKNOWN`).
  */
-function RegionRow({ item }: { item: RegionWeatherItem }) {
-  const known = item.weatherScore !== null
-  const maxTemperature = formatCelsius(item.maxTemperature)
-  const minTemperature = formatCelsius(item.minTemperature)
-  const hasNumbers =
-    maxTemperature !== null || minTemperature !== null || item.maxPrecipitationProbability !== null
+function RegionRow({ item, recommended }: { item: RegionWeatherItem; recommended: boolean }) {
+  const glyph = resolveWeatherGlyph(item.skyState, item.precipitationType)
+  const temperature = regionTemperatureText(item.minTemperature, item.maxTemperature)
+  const precipitation = item.maxPrecipitationProbability
+  const hasSky = glyph !== null || temperature !== null
 
   return (
     /*
-      세로 칸이다 — 이름 위, 값 아래. 칸 사이는 왼쪽 1px 선이 잇고 첫 칸에는 두지 않는다.
+      세로 칸이다 — 위에서 아래로 줄 넷. 칸 사이는 왼쪽 1px 선이 잇고 첫 칸에는 두지 않는다.
 
-      **한 컬럼용 가로 행 변형을 걷었다** (#530). 그 형태는 이름 ↔ 값을 양끝으로 벌린
-      전폭 행이라 값끼리 세로로 줄을 서지 않았고, **권역을 서로 견주는 일**을 좁은 폭에서만
-      포기하고 있었다.
+      **줄마다 칸 폭을 혼자 쓴다** (#1068). 예전에는 `아이콘 | 숫자 | 배지` 가 가로로 한 줄에
+      서서 폭을 나눠 가졌고, 배지가 넓어질 때마다 숫자 자리가 눌려 값 줄이 접혔다 (#412 ·
+      #638 · #1065). 세로로 쌓으면 그 경쟁이 없다.
     */
-    <li className="border-border/60 flex w-44 shrink-0 snap-start flex-col items-start gap-1 border-l pl-3 first:border-l-0 first:pl-0 last:snap-end lg:w-46">
-      <span className="text-body-2 min-w-0 font-semibold">{item.region.name}</span>
-
-      {/*
-        **아이콘 / 숫자 / 배지 세 자리로 가른다** (#342). 숫자 두 값을 세로로 쌓는다.
-
-        **이 배치가 칸 접힘을 푼다.** 예전에는 값 넷이 가로로 흘러 `아이콘 16 + 최고 62 +
-        강수 52 + 배지 34 + gap 24 ≈ 188px` 를 요구했고, 칸이 실측 143~156px 라 두 줄로
-        접혔다 (#314 이전부터 그랬다). 세로로 쌓으면 `아이콘 24 + 숫자 62 + 배지 34 +
-        gap 16 ≈ 136px` 로 줄어 한 줄에 들어간다.
-
-        **숫자 줄이 둘에서 셋으로 늘었다** (#352, 최저기온). 가장 넓은 줄은
-        `최고 31.0℃`(62.9px)이고 `최저 24.0℃` 도 같은 폭이라 늘어난 것은 높이뿐이다.
-
-        **그때 잰 `79px` 는 첫 칸 값이었다** (#412). 나머지 네 칸은 인셋 13px 이 더 빠져
-        65.6px 이고, 62.9px 짜리 줄에 2.7px 만 남아 있었다. 지금은 숫자 자리를
-        `w-20`(80) / `lg:w-22`(88)로 고정해 어느 칸에서도 같은 폭이다.
-
-        **간격이 8 → 4 다** (#1065). 배지가 `86점` → `86/100` 으로 넓어져(390 실측 60.8px,
-        `100/100` 은 68.5px) 둘째 칸부터 숫자 자리가 62.2px 로 눌리며 `최고 31.0℃`(62.9)가
-        접혔다. 칸 폭은 `lg` 상한 187.4 때문에 못 올리고, 이 간격 두 칸(8)과 배지 여백
-        (`score` 8 → 4, `metric.tsx`) 8 을 합쳐 16 을 되찾는다 — `100/100` 에서도 숫자 자리
-        70.5px(여유 7.6)다. 산식은 `overlay-and-region-cell.test.ts` 가 잡는다.
-      */}
-      <span className="text-caption text-fg-muted flex w-full items-center gap-1 font-medium tabular-nums">
+    <li className="border-border/60 flex w-44 shrink-0 snap-start flex-col gap-2 border-l pl-3 first:border-l-0 first:pl-0 last:snap-end lg:w-46">
+      <span className="flex items-center gap-2">
+        <span className="text-body-2 min-w-0 font-semibold">{item.region.name}</span>
         {/*
-          **다섯 줄을 훑을 때 낱말보다 픽토그램이 빠르다** (#314). `skyState` · `precipitationType`
-          이 이미 응답에 오는데 화면이 둘 다 버리고 있었다 — BE 작업 없이 붙일 수 있었다.
+          **서버 추천 날의 단독 1위에만 선다** (`soleRecommendedCode`). 경보 날 · 동점 날에는
+          헤드라인이 한 곳을 가리키지 않으므로 칸도 가리키지 않는다.
+
+          **등급 배지가 아니다.** 점수는 바로 아래 숫자가 말하고, 이것은 "서버가 고른 곳" 이라는
+          표시라 `MetricBadge` 가 아니라 `Badge` 다. `ml-auto` 로 칸 오른쪽에 붙인다.
         */}
-        <WeatherGlyph item={item} />
-
-        {/*
-          **숫자 세 값은 좌측 정렬로 쌓는다.** `최고` · `최저` · `강수` 라벨이 줄머리에
-          서므로 왼쪽이 읽는 기준선이다 — 우측 정렬로 두면 라벨이 들쭉날쭉해진다. 값의
-          자릿수는 `tabular-nums`(부모가 준다)가 이미 맞춰 준다.
-
-          **온도에 라벨을 붙인다** (#206). `maxTemperature` 인데 숫자만 두면 무슨 온도인지
-          알 수 없다 — 바로 위 추천 문장(서버 완성형)은 "최고기온 26도" 라고 말한다.
-          `minTemperature` 와 값이 같은 날이 많아 드러나지 않았을 뿐이다 (DESIGN.md §2-3).
-
-          값이 없으면 자리 자체가 없다 — 라벨만 남기지 않고, **셋 다 없으면 감싼 자리도
-          내지 않는다.** 빈 flex 항목을 남기면 부모의 `gap-2` 가 그 자리에도 붙어
-          예보를 못 받은 권역(`한라산권`)의 배지가 8px 밀린다.
-
-          그래서 배지는 `justify-between` 에 기대지 않고 `ml-auto` 로 밀어 붙인다 —
-          자식이 배지 하나뿐인 칸(`한라산권`)에서 `justify-between` 은 그것을 **왼쪽**에
-          두고, 다섯 칸의 배지가 열을 이루지 못한다 (1280 실측: 넷은 우측 끝, 하나는 85px 앞).
-
-          **그래서 `justify-between` 을 걷었다** (#412). `ml-auto` 가 남는 공간을 전부
-          먹어 버리므로 `justify-between` 은 애초에 발동할 자리가 없다 — 실측으로 확인했다
-          (빼도 다섯 칸의 배지 우측 끝이 617·797·977·1157·1337 로 한 픽셀도 안 움직인다).
-          같은 일을 두 규칙이 하면 나중에 어느 쪽을 고쳐야 하는지 알 수 없다.
-
-          **`ml-auto` 는 반대로 필수다.** 함께 걷으면 `한라산권` 배지가 1337 → 1236 으로
-          100px 어긋난다. 이 칸만 아이콘도 숫자도 없어 배지가 곧 첫 자식이기 때문이다.
-
-          **남는 공간을 줄이는 쪽으로 고쳤다.** 칸이 184 가 되면서 `ml-auto` 가 먹는 틈이
-          34.7px 까지 벌어져 배지가 숫자에서 떨어져 보였다 — 숫자 자리를 88px 로 고정해
-          9.6px 로 되돌렸다 (152 시절의 10.7px 과 같은 밀도다). 좁은 폭(176 + 80)도 같은
-          9.6px 이다 — 칸과 숫자 자리를 **같이** 한 단 내렸기 때문이다.
-        */}
-        {hasNumbers && (
-          <span className="flex w-20 flex-col items-start lg:w-22">
-            {maxTemperature !== null && (
-              <span>
-                {messages.home.regionTempPrefix} {maxTemperature}℃
-              </span>
-            )}
-            {/*
-              **최저기온은 최고 바로 아래다** (#352). 서버가 이미 주고 있던 값인데 화면이
-              버리고 있었다 — 하루 폭을 모르면 최고 31.0℃ 가 몇 시의 이야기인지 알 수 없다.
-
-              **접두가 `최고`/`최저` 로 길이가 같아** 두 줄의 숫자 왼쪽 끝이 맞는다.
-              값이 없으면 이 줄만 빠지고 최고·강수는 그대로 선다.
-            */}
-            {minTemperature !== null && (
-              <span>
-                {messages.home.regionMinTempPrefix} {minTemperature}℃
-              </span>
-            )}
-            {item.maxPrecipitationProbability !== null && (
-              <span>강수 {item.maxPrecipitationProbability}%</span>
-            )}
-          </span>
-        )}
-
-        {known ? (
-          <MetricBadge
-            size="score"
-            tone={suitabilityTone(levelOf(item.weatherScore as number))}
-            className="ml-auto"
-          >
-            {/*
-              **만점을 배지가 말한다** (#1065). #638 은 `{score}점` 으로 단위만 붙이고 만점은
-              카드 캡션에 맡겼는데, 그 캡션이 ⓘ 로 들어가면서 만점을 말할 자리가 배지뿐이다.
-              같은 홈의 장소 적합도가 `90 /100` 으로 쓰므로 두 점수가 같은 표기를 갖는다.
-            */}
-            {messages.home.regionScoreUnit.replace('{score}', String(item.weatherScore))}
-          </MetricBadge>
-        ) : (
-          /* `unknown` 톤은 점선 테두리를 쓴다 — 0 점과 다른 모양이어야 한다 (DESIGN.md §2-3) */
-          <MetricBadge tone="unknown" className="ml-auto">
-            {messages.home.regionScoreUnavailable}
-          </MetricBadge>
+        {recommended && (
+          <Badge tone="brand" size="sm" strong className="ml-auto shrink-0">
+            {messages.home.regionRecommendedMark}
+          </Badge>
         )}
       </span>
+
+      <ScoreBlock score={item.weatherScore} />
+
+      {/*
+        **날씨 값은 두 줄이다** (#1068). `최고`·`최저` 두 줄을 `24–31℃` 한 줄로 합쳤다 — 기온
+        표기는 #1067 의 "혼자 서는 값"(`formatStandaloneCelsius`)이다. 한쪽만 온 날에는 범위를
+        만들 수 없어 그 값의 이름(`최고 31℃`)을 붙인다 (`regionTemperatureText`).
+
+        값이 없으면 자리 자체가 없다 — 라벨만 남기지 않고, **다 없으면 감싼 자리도 내지 않는다.**
+        빈 flex 항목을 남기면 칸의 `gap-2` 가 그 자리에도 붙는다 (예보 없는 `한라산권`).
+      */}
+      {(hasSky || precipitation !== null) && (
+        <span className="flex flex-col gap-1">
+          {hasSky && (
+            <span className="text-body-2 flex items-center gap-2 font-semibold tabular-nums">
+              {/*
+                **다섯 칸을 훑을 때 낱말보다 픽토그램이 빠르다** (#314). `skyState` ·
+                `precipitationType` 이 이미 응답에 오는데 화면이 둘 다 버리고 있었다.
+              */}
+              {glyph !== null && <WeatherGlyph glyph={glyph} />}
+              {temperature !== null && <span>{temperature}</span>}
+            </span>
+          )}
+          {precipitation !== null && (
+            <span className="text-caption text-fg-muted flex items-center gap-1 font-medium tabular-nums">
+              {/* 값의 이름표다 — 맑은 날에도 선다. 날씨 색을 받지 않는다 (`UmbrellaIcon`) */}
+              <UmbrellaIcon size={16} />
+              {messages.home.regionPrecipitation.replace('{percent}', String(precipitation))}
+            </span>
+          )}
+        </span>
+      )}
     </li>
+  )
+}
+
+/**
+ * 점수 한 줄 + 3px 막대 (#1068).
+ *
+ * **숫자는 22/900 등급 색 `-500` 이다** — DESIGN.md §2-3 *"등급 색을 숫자에 쓸 때는 22px 이상 +
+ * weight 900 에만"*. 크기는 `MetricValue` 의 `row` 하나다 (§3-3 "행 안의 점수는 22/900"). 같은
+ * 홈의 장소 적합도(`90 /100`)와 같은 컴포넌트라 두 점수가 같은 모양이다.
+ *
+ * **막대는 숫자가 이미 말한 값을 모양으로 한 번 더 보여 준다** — 다섯 칸을 훑을 때 길이가 숫자보다
+ * 빨리 견줘진다. 색은 등급 면(`METRIC_FILL_TONE`, `-500` · 글자를 얹지 않는다)이고 트랙은 `--band`
+ * 다. **`aria-hidden` 이다** — 새 정보가 아니라 바로 위 숫자의 그림이라, 보조기기에 두 번
+ * 읽히지 않게 한다. §10 의 "진행률 링·게이지" 가 아니다: 링은 숫자를 **대신**하고, 이 막대는
+ * 숫자 **옆**에서 §2-3 이 말한 "색 + 텍스트 + 지표 바" 의 한 채널이다.
+ *
+ * **예보가 없으면 점선이다** (§2-3 `UNKNOWN`). 0점은 빈 트랙(실선 면)이고 예보 없음은 점선이라
+ * **색이 아니라 모양**으로 갈린다. 숫자 자리에는 `예보 없음` 을 적는다 — 0 을 쓰지 않는다.
+ * 점선 색은 `--metric-unknown-500`(점선 전용 토큰)이다 — 선이 유일한 채널이 아니라 바로 위
+ * 낱말이 뜻을 함께 말한다 (§2-3 "선 안에 글자가 있으면 이 규칙이 아니다" 와 같은 판단).
+ *
+ * **두 갈래의 높이가 같다.** 숫자 줄이 `title-1` 줄높이(30)라 `예보 없음` 배지도 같은 높이
+ * 안에 앉혀 둔다 — 갈리면 칸마다 막대와 날씨 줄의 높이가 어긋나 다섯 칸이 열을 이루지 못한다.
+ */
+function ScoreBlock({ score }: { score: number | null }) {
+  if (score === null) {
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="flex h-7.5 items-center">
+          <MetricBadge tone="unknown">{messages.home.regionScoreUnavailable}</MetricBadge>
+        </span>
+        <span
+          aria-hidden
+          className="border-metric-unknown-500 block h-0.75 w-full border-t-3 border-dashed"
+        />
+      </div>
+    )
+  }
+
+  const tone = suitabilityTone(levelOf(score))
+
+  /*
+    **`div` 다.** `MetricValue` 가 `div` 를 렌더해 `span` 안에 두면 잘못된 중첩이다
+    (`place-insight-row.tsx` 가 같은 이유로 적어 둔 자리).
+  */
+  return (
+    <div className="flex flex-col gap-1">
+      <MetricValue value={score} unit={messages.home.regionScoreUnit} tone={tone} />
+      <span aria-hidden className="bg-band block h-0.75 w-full overflow-hidden rounded-full">
+        <span
+          className={cn('block h-full rounded-full', METRIC_FILL_TONE[tone])}
+          // 길이가 곧 값이라 유틸리티로 적을 수 없다 — 0~100 을 %로 그대로 옮긴다
+          style={{ width: `${scoreBarPercent(score)}%` }}
+        />
+      </span>
+    </div>
   )
 }
 
@@ -509,6 +529,10 @@ function levelOf(score: number): string {
  * 안에 서므로, 골격과 실화면의 높이 차가 곧 그 카드의 밀림이다. 마지막 칸이 `h-24` 이던 동안
  * 골격 206 · 실화면 267(768 이상, 375 는 198 · 277)이라 데이터가 오면 카드가 61px 내려갔다.
  * `h-40` 으로 270 · 262 — 밀림 −3 · 15.
+ *
+ * **#1068 에서 실화면이 다시 달라졌다** — 칸이 `이름 · 점수 · 막대 · 날씨 두 줄` 이 되면서
+ * 280(768 이상) · 268(390). `h-40` 이면 768 이상에서 카드가 10px 밀려 `h-42` 로 278 · 270
+ * (밀림 2 · −2)이다. 칸 구성을 바꾸면 이 값을 다시 잰다.
  */
 export function RegionalWeatherSkeleton() {
   return (
@@ -516,7 +540,7 @@ export function RegionalWeatherSkeleton() {
       <div aria-hidden className="flex flex-col gap-3 px-4 py-4 md:px-5 md:py-5">
         <Skeleton className="h-5 w-36" />
         <Skeleton className="h-6 w-52" />
-        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-42 w-full" />
       </div>
     </Surface>
   )
