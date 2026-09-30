@@ -48,6 +48,19 @@ describe('ProfileCard — 반려견이 선택된 갈래', () => {
     expect(blockClasses.filter((name) => /^bg-/.test(name))).toEqual([])
   })
 
+  /*
+    #1065. 헤더의 반려견 선택기가 모든 폭에서 같은 ▾ 를 단다 — 한 화면에 "바꾸는 곳" 표시가
+    두 번 서지 않게 여기서는 뗀다. **기능은 남는다** — 누르면 목록이 열리는 트리거 그대로다.
+  */
+  it('이름 옆에 ▾ 를 달지 않고, 누르면 여는 트리거는 남긴다', () => {
+    const name = markup.indexOf(`>${pet.name}</span>`)
+    const afterName = markup.slice(name, markup.indexOf('</button>'))
+
+    expect(name).toBeGreaterThan(-1)
+    expect(afterName).not.toContain('<svg')
+    expect(markup).toContain('aria-haspopup="menu"')
+  })
+
   it('반려견이 없으면 등록 유도 행으로 떨어진다', () => {
     const empty = renderToStaticMarkup(createElement(ProfileCard, { pets: [], totalCount: 0 }))
 

@@ -8,6 +8,7 @@ import {
   SnowIcon,
   SunIcon,
 } from '@/components/icons'
+import { InfoTip } from '@/components/info-tip'
 import { MetricBadge } from '@/components/metric'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { Skeleton } from '@/components/skeleton'
@@ -70,18 +71,23 @@ export function RegionalWeatherSection({
       레이아웃 밖 최상단이라 그 역할까지 함께 가져갔다.
     */
     /*
-      **제목 아래 캡션이 점수의 뜻과 만점을 밝힌다** (#638). 배지가 `100` 뿐이던 동안에는
-      무엇의 100인지 화면 어디에도 없었다 — #342 는 "배지가 날씨 값 바로 옆이라 자리가
-      말한다" 고 보고 보조 문구를 걷었는데, 값 묶음이 세로로 쌓이면서 배지가 숫자에서
-      떨어져(`ml-auto`) 그 전제가 무너졌다.
+      **점수의 뜻은 제목 옆 ⓘ 가, 만점은 배지가 말한다** (#1065). #638 은 배지가 `100` 뿐이라
+      무엇의 100인지 화면 어디에도 없어서 제목 아래 상시 캡션(`반려견 활동 적합도 · 100점
+      만점`)을 세웠다. 그 목적 중 **만점**은 배지 표기 `56/100` 이 칸마다 대신 말하고,
+      **점수의 뜻**은 매일 읽을 문장이 아니라 원할 때 여는 설명이라 `InfoTip` 으로 옮겼다 —
+      홈 첫 화면의 상시 글줄을 하나 줄인다.
 
-      **하단이 아니라 머리다.** 표 아래 한 줄은 배지를 다 읽은 뒤에야 닿는다.
-      `Surface` 가 이미 받는 `description` 자리라 새 자리를 만들지 않는다.
+      **하단으로 되돌리지 않는다** (#342 · #638). 표 아래 한 줄은 배지를 다 읽은 뒤에야 닿는다.
     */
     <Surface
       titleId="region-heading"
       title={messages.home.regionHeading}
-      description={messages.home.regionScoreCaption}
+      titleTrailing={
+        /* 제목이 카드 왼쪽에서 시작하므로 말풍선은 오른쪽으로 편다 (`InfoTip` 의 `ALIGN`) */
+        <InfoTip label={messages.home.regionScoreInfoLabel} align="start">
+          {messages.home.regionScoreInfo}
+        </InfoTip>
+      }
     >
       <div className={cn('pb-3', INSET_CLASS.card)}>
         <Recommendation data={data} />
@@ -268,7 +274,7 @@ function Recommendation({ data }: { data: RegionalWeatherResponse }) {
  * **전부 동점이면 이름을 나열하지 않는다.** 다섯을 늘어놓아도 "고를 것이 없다" 는 뜻은
  * 같은데 줄만 길어진다.
  *
- * 이름 구분자는 ` · ` 다 — 같은 카드의 다른 문장(캡션)과 같은 기호를 쓴다.
+ * 이름 구분자는 ` · ` 다 — 이 저장소가 나열에 쓰는 기호다 (`goldenRunsJoin` 과 같다).
  */
 function headline(recommended: CodeNameMetadata, tied: TiedTopRegions): string {
   if (tied.regions.length < 2) {
@@ -387,8 +393,14 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
         **그때 잰 `79px` 는 첫 칸 값이었다** (#412). 나머지 네 칸은 인셋 13px 이 더 빠져
         65.6px 이고, 62.9px 짜리 줄에 2.7px 만 남아 있었다. 지금은 숫자 자리를
         `w-20`(80) / `lg:w-22`(88)로 고정해 어느 칸에서도 같은 폭이다.
+
+        **간격이 8 → 4 다** (#1065). 배지가 `86점` → `86/100` 으로 넓어져(390 실측 60.8px,
+        `100/100` 은 68.5px) 둘째 칸부터 숫자 자리가 62.2px 로 눌리며 `최고 31.0℃`(62.9)가
+        접혔다. 칸 폭은 `lg` 상한 187.4 때문에 못 올리고, 이 간격 두 칸(8)과 배지 여백
+        (`score` 8 → 4, `metric.tsx`) 8 을 합쳐 16 을 되찾는다 — `100/100` 에서도 숫자 자리
+        70.5px(여유 7.6)다. 산식은 `overlay-and-region-cell.test.ts` 가 잡는다.
       */}
-      <span className="text-caption text-fg-muted flex w-full items-center gap-2 font-medium tabular-nums">
+      <span className="text-caption text-fg-muted flex w-full items-center gap-1 font-medium tabular-nums">
         {/*
           **다섯 줄을 훑을 때 낱말보다 픽토그램이 빠르다** (#314). `skyState` · `precipitationType`
           이 이미 응답에 오는데 화면이 둘 다 버리고 있었다 — BE 작업 없이 붙일 수 있었다.
@@ -457,8 +469,9 @@ function RegionRow({ item }: { item: RegionWeatherItem }) {
             className="ml-auto"
           >
             {/*
-              **단위를 붙인다** (#638). 숫자만 두면 개수인지 순위인지 점수인지 배지가
-              말하지 못한다 — 만점은 카드 캡션이 말하고 여기서는 한 글자만 붙인다.
+              **만점을 배지가 말한다** (#1065). #638 은 `{score}점` 으로 단위만 붙이고 만점은
+              카드 캡션에 맡겼는데, 그 캡션이 ⓘ 로 들어가면서 만점을 말할 자리가 배지뿐이다.
+              같은 홈의 장소 적합도가 `90 /100` 으로 쓰므로 두 점수가 같은 표기를 갖는다.
             */}
             {messages.home.regionScoreUnit.replace('{score}', String(item.weatherScore))}
           </MetricBadge>

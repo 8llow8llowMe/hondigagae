@@ -190,6 +190,7 @@ export function SurfaceStack({
 export function Surface({
   title,
   titleId,
+  titleTrailing,
   description,
   lead,
   leading,
@@ -218,6 +219,17 @@ export function Surface({
    * 속성으로 또 적으면 두 곳이 갈린다.
    */
   titleId?: string | undefined
+  /**
+   * 제목 **바로 옆** 한 자리 — 보조 설명을 여는 `InfoTip` 이 쓴다 (#1065).
+   *
+   * **`title` 안에 넣지 않는 이유.** `title` 은 `h2` 안에 들어가고, `titleId` 로 섹션을
+   * `aria-labelledby` 하는 카드는 그 `h2` 의 글자가 곧 섹션 이름이다. 버튼을 `h2` 안에
+   * 두면 버튼 이름(`권역 점수 설명`)이 제목에 섞여 섹션 이름이 두 문장이 된다.
+   *
+   * **`trailing` 과 다르다.** `trailing` 은 줄 **오른쪽 끝**의 액션이고, 이것은 제목 글자에
+   * 붙어 "이 제목에 대한 설명" 으로 읽혀야 한다 — 끝으로 밀리면 무엇의 설명인지 멀어진다.
+   */
+  titleTrailing?: ReactNode
   /** 제목 아래 한 줄. `h2` 밖이라 `p` 를 넣어도 마크업이 깨지지 않는다 */
   description?: ReactNode
   /** 제목을 크게 쓰는 주 섹션 (홈 "오늘 갈 만한 곳") */
@@ -330,6 +342,7 @@ export function Surface({
                   <HeadTitleRow
                     title={title}
                     titleId={titleId}
+                    titleTrailing={titleTrailing}
                     description={description}
                     lead={lead}
                     trailing={trailing}
@@ -343,6 +356,7 @@ export function Surface({
               <HeadTitleRow
                 title={title}
                 titleId={titleId}
+                titleTrailing={titleTrailing}
                 description={description}
                 lead={lead}
                 trailing={trailing}
@@ -383,6 +397,7 @@ export function Surface({
 function HeadTitleRow({
   title,
   titleId,
+  titleTrailing,
   description,
   lead,
   trailing,
@@ -390,12 +405,28 @@ function HeadTitleRow({
 }: {
   title: ReactNode
   titleId?: string | undefined
+  titleTrailing?: ReactNode
   description?: ReactNode
   lead?: boolean | undefined
   trailing?: ReactNode
   trailingWrap: boolean
 }) {
   if (title === undefined) return null
+
+  const heading = (
+    <h2
+      id={titleId}
+      className={cn(
+        'text-title-2 text-fg font-semibold break-keep',
+        lead ? 'md:text-display md:font-extrabold' : 'md:text-title-1 md:font-bold',
+        titleId !== undefined && 'scroll-mt-20',
+        // 옆 자리가 있으면 줄어들어 접혀야 한다 — 아니면 긴 제목이 옆 자리를 밀어낸다
+        titleTrailing !== undefined && 'min-w-0',
+      )}
+    >
+      {title}
+    </h2>
+  )
 
   return (
     <div
@@ -412,17 +443,19 @@ function HeadTitleRow({
           말고 **앵커 이동**도 있다. 헤더가 `sticky top-0 h-14` 라 여백이 없으면 뛴 제목이
           헤더 뒤로 들어간다 — 약관 목차가 같은 이유로 같은 값을 쓴다
           (`legal-document-view.tsx`). 호출부마다 다시 적게 하면 한 곳이 빠진다.
+
+          **`titleTrailing` 은 `h2` 밖 형제다** (#1065) — 섹션 이름(`aria-labelledby`)에
+          버튼 이름이 섞이지 않는다. 간격 4 는 `InfoTip` 의 `-m-3` 이 레이아웃 폭을 20 으로
+          되돌린 뒤의 값이라, 물음표가 제목 끝 글자에 붙어 "이 제목의 설명" 으로 읽힌다.
         */}
-        <h2
-          id={titleId}
-          className={cn(
-            'text-title-2 text-fg font-semibold break-keep',
-            lead ? 'md:text-display md:font-extrabold' : 'md:text-title-1 md:font-bold',
-            titleId !== undefined && 'scroll-mt-20',
-          )}
-        >
-          {title}
-        </h2>
+        {titleTrailing === undefined ? (
+          heading
+        ) : (
+          <div className="flex items-center gap-1">
+            {heading}
+            {titleTrailing}
+          </div>
+        )}
         {description !== undefined && <div className="mt-1">{description}</div>}
       </div>
       {trailing !== undefined && (

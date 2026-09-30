@@ -8,6 +8,7 @@ import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { EmergencyIcon } from '@/components/icons'
+import { InfoTip } from '@/components/info-tip'
 import { Canvas, Surface, SurfaceList, SurfaceStack } from '@/components/surface'
 import { useNearbyFacilities } from '@/features/emergency/use-nearby-facilities'
 import { AboutIntroCard } from '@/features/home/about-intro-card'
@@ -273,7 +274,6 @@ export function HomeView({
   */
   const applied = appliedFactorsOf(loaded)
   const sortNote = messages.home.sortNote[applied]
-  const sortNoteShort = messages.home.sortNoteShort[applied]
 
   const placeById = new Map(places.map((place) => [place.placeId, place]))
 
@@ -672,23 +672,30 @@ export function HomeView({
             lead
             titleId="suitability-heading"
             title={heading}
+            /*
+              **반영 축은 제목 옆 ⓘ 안이다** (#1065). 예전에는 제목 아래 상시 캡션(`날씨·혼잡도
+              반영`)이었다 — 매일 같은 말이라 읽히지 않으면서 홈 첫 화면에 글줄을 하나 더 세웠다.
+              **문구는 응답에 따라 바뀌는 그대로다** (`appliedFactorsOf`) — 장소 세 장이 전부
+              `혼잡도 정보 없음` 인 날 "혼잡도 반영" 이라고 말하지 않는다.
+
+              **둘 다 반영되지 않았으면 ⓘ 자체가 없다.** 눌러도 할 말이 없는 물음표를 두지 않는다.
+            */
+            titleTrailing={
+              sortNote === null ? undefined : (
+                <InfoTip label={messages.home.sortNoteLabel} align="start">
+                  {sortNote}
+                </InfoTip>
+              )
+            }
             description={
-              <>
-                {/*
-                  **개수는 반영 축이 없어도 남는다.** 둘은 다른 사실이다 — 무엇을 반영했는지는
-                  모를 수 있어도 목록이 몇 곳인지는 언제나 안다.
-                */}
-                <p className="text-caption text-fg-muted hidden font-medium tabular-nums md:block">
-                  {sortNote === null ? '' : `${sortNote} · `}
-                  {places.length}곳
-                </p>
-                {/* 모바일은 자리가 없어 개수를 빼고 반영 축만 적는다 — 없으면 줄 자체를 그리지 않는다 */}
-                {sortNoteShort !== null && (
-                  <p className="text-caption text-fg-muted font-medium md:hidden">
-                    {sortNoteShort}
-                  </p>
-                )}
-              </>
+              /*
+                **개수는 반영 축이 없어도 남는다.** 둘은 다른 사실이다 — 무엇을 반영했는지는
+                모를 수 있어도 목록이 몇 곳인지는 언제나 안다. 모바일은 자리가 없어 예전부터
+                개수를 적지 않았다.
+              */
+              <p className="text-caption text-fg-muted hidden font-medium tabular-nums md:block">
+                {places.length}곳
+              </p>
             }
             trailing={
               <ButtonLink href="/places" className="hidden md:inline-flex">

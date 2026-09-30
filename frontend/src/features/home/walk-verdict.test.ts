@@ -109,14 +109,38 @@ describe('WalkVerdict — 기상특보 (#349)', () => {
   })
 
   /*
-    **배지가 사라져도 정보는 남는다.** 서버가 보내는 `WEATHER_WARNING_ACTIVE` 문장이
-    무엇을 조심해야 하는지 말한다 — 배지는 그 사실을 문단 밖으로 올리는 강조였을 뿐이고,
-    강조는 이제 최상단 스트립이 맡는다.
+    **근거의 특보 줄도 홈에서는 뺀다** (#1065). #349 는 "배지가 사라져도 근거 문장이 정보를
+    남긴다" 고 두었는데, 홈은 최상단 스트립이 배지로 **종류까지** 말하고 이 카드가 바로
+    아래라 같은 사실이 한눈에 두 번 보였다. 서버 문장은 그대로이고 표시만 거른다 —
+    장소 상세는 패널마다 자기 배지를 그리는 구조라 현행 유지다 (DESIGN.md §1).
   */
-  it('근거 목록의 특보 문장은 그대로 남는다', () => {
+  it('특보가 있으면 근거의 특보 줄을 그리지 않고 나머지는 남긴다', () => {
     const markup = render({
       ...walkSafety,
       weatherWarning: HEAT_WAVE_WARNING,
+      reasons: [
+        {
+          code: 'WEATHER_WARNING_ACTIVE',
+          name: '기상특보 발효',
+          description: '폭염 경보 발효 중입니다. 더위가 심합니다.',
+        },
+        {
+          code: 'PAVEMENT_HOT',
+          name: '노면 온도',
+          description: '아스팔트 표면은 약 58도로 추정됩니다.',
+        },
+      ],
+    })
+
+    expect(markup).not.toContain('폭염 경보 발효 중입니다.')
+    expect(markup).toContain('아스팔트 표면은 약 58도로 추정됩니다.')
+  })
+
+  /* 띠가 비는 날(같은 응답의 특보가 없다)에는 걸러낼 전제가 없다 — 줄을 남긴다 */
+  it('특보가 없는 응답이면 특보 줄도 그대로 둔다', () => {
+    const markup = render({
+      ...walkSafety,
+      weatherWarning: null,
       reasons: [
         {
           code: 'WEATHER_WARNING_ACTIVE',

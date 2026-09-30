@@ -125,13 +125,19 @@ const BADGE_SURFACE: Record<MetricBadgeSurface, Record<MetricTone, string>> = {
  * `py` 가 아니라 **용도**가 둘을 가른다 — 여기는 숫자, `md` 는 서버 문구다). 새로 쓸 곳이
  * 생기면 그 줄에 `Badge` 가 함께 오는지 먼저 본다.
  *
+ * **다시 4px 로 내렸다** (#1065). 배지가 `86점` → `86/100` 으로 만점까지 말하게 되면서
+ * 세 글자가 늘었고(390 실측 60.8px, `100/100` 은 68.5px), 권역 칸의 숫자 자리가 다시
+ * 눌려 `최고 31.0℃` 가 접혔다. 숫자 여섯~일곱 자가 든 배지는 스스로 폭이 충분해 여백이
+ * 무게를 보탤 이유가 더 약해졌다. 줄어든 8 과 권역 값 줄 간격(8 → 4)을 합쳐 숫자 자리를
+ * 되찾는다 (`regional-weather-section.tsx`).
+ *
  * **여백을 다시 키우려면 담는 칸을 함께 본다.** `src/styles/overlay-and-region-cell.test.ts`
  * 가 이 파일의 값을 읽어 칸 폭과 함께 검사한다.
  */
 const BADGE_SIZE: Record<MetricBadgeSize, string> = {
   sm: 'h-5 px-2',
   md: 'px-2 py-1',
-  score: 'px-2 py-1',
+  score: 'px-1 py-1',
 }
 
 export type MetricBadgeSize = 'sm' | 'md' | 'score'

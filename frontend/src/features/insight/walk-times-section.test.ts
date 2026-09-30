@@ -600,6 +600,18 @@ describe('WalkTimesSection — 골든타임이 없는 이유 (#270)', () => {
   })
 
   /*
+    #1065. 보류 문구는 한 줄이다. 뒤따르던 설명 문단은 첫 줄의 "경보라서" 를 되풀이했고,
+    "곡선은 근거로 두었다" 는 곡선이 스스로 보여 준다 — 경보 날 홈에서 같은 경보 이야기가
+    네 번 나오던 것 중 하나였다.
+  */
+  it('보류에 설명 문단을 붙이지 않는다 (#1065)', () => {
+    const markup = render(SUPPRESSED_DAY)
+
+    expect(markup).toContain(messages.home.goldenSuppressed)
+    expect(markup).not.toContain('기상특보 경보가 있는 날은')
+  })
+
+  /*
     **판정 순서를 화면이 다시 짜지 않는다.** 서버 `GoldenWindowStatus.of` 가 예보 → 경보 →
     구간 순으로 정한다. 서버가 `SUPPRESSED_BY_WARNING` 이라고 하면 곡선에 구간이 보여도
     보류다 — 화면이 곡선을 다시 읽어 뒤집으면 두 규칙이 갈린다.

@@ -5,7 +5,6 @@ import Link from 'next/link'
 
 import { Badge } from '@/components/badge'
 import { ButtonLink } from '@/components/button'
-import { ChevronDownIcon } from '@/components/icons'
 import { PetAvatar } from '@/components/pet-avatar'
 import { useSelectedPetStore } from '@/features/nav/selected-pet-store'
 import { MAX_PET_COUNT } from '@/lib/api/pet'
@@ -20,6 +19,9 @@ import type { Pet } from '@/types/pet'
  *
  * **프로필 블록 전체가 반려견 스위처다.** 판정의 기준을 바꾸는 컨트롤이라 화면 밖에
  * 숨기지 않는다 — 숨어 있으면 사용자가 왜 값이 바뀌었는지 모른다.
+ *
+ * **다만 ▾ 는 달지 않는다** (#1065). 바꾸는 신호는 헤더의 반려견 선택기가 모든 폭에서 이미
+ * 준다 — 같은 기능의 표시가 한 화면에 두 번 서지 않게 이쪽은 누르는 자리로만 남는다.
  *
  * 사진 80(모바일) / 96(데스크톱) **원형**. 원형은 사진·아바타에만 허용된 곡선이다.
  * 폴백 순서는 업로드 사진 → **기본 그림**이다 (`PetAvatar`, #1022). **빈 원형을 남기지 않는다.**
@@ -114,9 +116,16 @@ export function ProfileCard({ pets, totalCount }: { pets: Pet[]; totalCount: num
         <PetAvatar size="hero" url={selected.profileImageUrl} />
 
         <span className="min-w-0 flex-1">
+          {/*
+            **이름 옆 ▾ 를 뗐다** (#1065). 헤더의 반려견 선택기(`PetSwitcher`)가 모든 폭에서 같은
+            ▾ 를 달고 서 있어, 한 화면에 "반려견을 바꾸는 곳" 이 두 번 표시됐다. 이 블록의
+            역할은 **판정의 화자(누구 기준인가)** 이고, 바꾸는 신호는 헤더 하나가 맡는다.
+
+            **누르면 여전히 목록이 열린다** — 기능은 지우지 않고 표시만 걷었다. 트리거는
+            `aria-haspopup="menu"` 를 그대로 갖는다.
+          */}
           <span ref={nameRef} className="flex items-center gap-1">
             <span className="text-title-1 text-fg truncate font-bold">{selected.name}</span>
-            <ChevronDownIcon size={18} className="text-fg-subtle shrink-0" />
           </span>
           <span className="text-body-2 text-fg-muted block tabular-nums">
             {describePet(selected, { size: true })}
