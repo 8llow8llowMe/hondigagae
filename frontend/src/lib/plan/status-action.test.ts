@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { planPhaseOf } from '@/lib/plan/date'
 import {
+  changesPetConditionSource,
   forwardStatusAction,
   planStatusActionLayout,
   planStatusActions,
@@ -34,6 +35,18 @@ describe('planStatusActions — 일정 상태 버튼', () => {
   it('모르는 코드에서는 버튼을 만들지 않는다', () => {
     expect(planStatusActions('ARCHIVED')).toEqual([])
     expect(planStatusActions('')).toEqual([])
+  })
+})
+
+describe('changesPetConditionSource — 반려견 특성의 출처가 바뀌는 전이 (#1058)', () => {
+  it('완료로 들어가거나 완료에서 나오는 전이다', () => {
+    expect(changesPetConditionSource('complete')).toBe(true)
+    expect(changesPetConditionSource('reopen')).toBe(true)
+  })
+
+  it('초안 ↔ 확정은 둘 다 지금 프로필을 읽어 출처가 그대로다', () => {
+    expect(changesPetConditionSource('confirm')).toBe(false)
+    expect(changesPetConditionSource('revert-draft')).toBe(false)
   })
 })
 

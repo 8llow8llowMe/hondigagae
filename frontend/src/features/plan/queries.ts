@@ -13,12 +13,16 @@ export const planKeys = {
    * 일자별 판정. **상세와 key 를 나눈다** — 판정만 5xx 로 실패해도 일정 본문은
    * 그대로 남아야 하고(D5), 그 섹션만 따로 재조회할 수 있어야 한다.
    */
-  weather: (planId: string) => [...planKeys.all, 'weather', planId] as const,
+  weather: (planId: string) => [...planKeys.weatherAll(), planId] as const,
+  /** 모든 일정의 판정 — 반려견 특성을 고쳤을 때의 prefix (#1058, `briefingAll` 과 같은 판단) */
+  weatherAll: () => [...planKeys.all, 'weather'] as const,
   /**
    * 항목 산책 위험도 (#625). **상세·판정과 또 나눈다** — 한쪽이 5xx 로 죽어도 다른 쪽은
    * 살아 있어야 하고(D5), 일괄 교체 뒤 이 절만 무효화할 수 있어야 한다 (D15-6).
    */
-  walkSafety: (planId: string) => [...planKeys.all, 'walkSafety', planId] as const,
+  walkSafety: (planId: string) => [...planKeys.walkSafetyAll(), planId] as const,
+  /** 모든 일정의 산책 위험도 — 반려견 특성을 고쳤을 때의 prefix (#1058) */
+  walkSafetyAll: () => [...planKeys.all, 'walkSafety'] as const,
   /**
    * 응급 브리핑 (#125). **상세·판정과 key 를 또 나눈다** — 별도 화면이고 한쪽이 실패해도
    * 다른 쪽은 살아 있어야 한다.

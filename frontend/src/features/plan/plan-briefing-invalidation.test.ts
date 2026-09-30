@@ -139,6 +139,46 @@ describe('일정 쓰기 뒤 브리핑 무효화 (#1055)', () => {
 })
 
 /*
+  **판정 · 산책 위험도도 반려견 특성을 읽는다** (#1058). 둘 다 `PlanWeatherProcessor.loadConditions`
+  로 특성을 받는다 — 진행 중 일정은 지금 프로필, 완료 일정은 완료 시점 스냅샷(#629). #1055 가
+  브리핑만 버려 이 둘이 옛 특성으로 남았다.
+*/
+describe('반려견 특성이 바뀐 뒤 판정 · 산책 위험도 무효화 (#1058)', () => {
+  it('원인 재현 — 브리핑만 버리면 판정 · 산책 위험도는 신선한 채로 남는다', async () => {
+    const queryClient = client()
+    const weather = observed(queryClient, planKeys.weather(PLAN_ID))
+    const walkSafety = observed(queryClient, planKeys.walkSafety(PLAN_ID))
+
+    await invalidateAllPlanBriefings(queryClient)
+    await settle()
+
+    expect(weather.calls).toBe(0)
+    expect(walkSafety.calls).toBe(0)
+  })
+
+  it('prefix 는 모든 일정의 판정 · 산책 위험도를 다시 받는다 — 상세 · 브리핑은 두고', async () => {
+    const queryClient = client()
+    const weather = observed(queryClient, planKeys.weather(PLAN_ID))
+    const otherWeather = observed(queryClient, planKeys.weather(OTHER_PLAN_ID))
+    const walkSafety = observed(queryClient, planKeys.walkSafety(PLAN_ID))
+    const otherWalkSafety = observed(queryClient, planKeys.walkSafety(OTHER_PLAN_ID))
+    const detail = observed(queryClient, planKeys.detail(PLAN_ID))
+    const briefing = observed(queryClient, planKeys.briefing(PLAN_ID, DAY_ONE))
+
+    await queryClient.invalidateQueries({ queryKey: planKeys.weatherAll() })
+    await queryClient.invalidateQueries({ queryKey: planKeys.walkSafetyAll() })
+    await settle()
+
+    expect(weather.calls).toBe(1)
+    expect(otherWeather.calls).toBe(1)
+    expect(walkSafety.calls).toBe(1)
+    expect(otherWalkSafety.calls).toBe(1)
+    expect(detail.calls).toBe(0)
+    expect(briefing.calls).toBe(0)
+  })
+})
+
+/*
   **경로가 늘어도 빠지지 않게 쓰기 API 기준으로 훑는다.** 호출처를 이름으로 나열하면 새 담기
   경로가 생겼을 때 이 목록도 같이 빠진다. 기존 일정의 항목·기간·동행견·상태를 바꾸는 API 를
   쓰는 파일은 모두 브리핑을 무효화해야 한다.
@@ -226,6 +266,25 @@ describe('일정 쓰기 호출처가 브리핑을 무효화한다 (#1055)', () =
 
   it.each(petWriters)('%s 가 모든 일정의 브리핑을 무효화한다', (file) => {
     expect(readSourceWithoutComments(file)).toMatch(/\binvalidateAllPlanBriefings\(/)
+  })
+
+  // #1058 — 브리핑과 같은 입력(반려견 특성)을 읽는 두 key. 가려낼 수 없어 prefix 로 버린다
+  it.each(petWriters)('%s 가 모든 일정의 판정 · 산책 위험도를 무효화한다', (file) => {
+    const source = readSourceWithoutComments(file)
+    expect(source).toMatch(/queryKey:\s*planKeys\.weatherAll\(\)/)
+    expect(source).toMatch(/queryKey:\s*planKeys\.walkSafetyAll\(\)/)
+  })
+
+  /*
+    상태 변경은 **완료로 들어가거나 나올 때만** 특성의 출처(스냅샷 ↔ 지금 프로필)가 바뀐다 (#1058).
+    전이 판정은 `changesPetConditionSource` 가 들고(테스트는 `status-action.test.ts`), 여기서는
+    호출처가 그 판정으로 그 일정의 두 key 를 버리는지만 본다.
+  */
+  it('상태 변경이 특성 출처가 바뀌는 전이에서 그 일정의 판정 · 산책 위험도를 무효화한다', () => {
+    const source = readSourceWithoutComments('src/features/plan/use-plan-status.ts')
+    expect(source).toMatch(/\bchangesPetConditionSource\(action\.kind\)/)
+    expect(source).toMatch(/queryKey:\s*planKeys\.weather\(planId\)/)
+    expect(source).toMatch(/queryKey:\s*planKeys\.walkSafety\(planId\)/)
   })
 
   it('import 판정이 별칭 · 여러 줄 import 를 잡는다', () => {
