@@ -17,11 +17,18 @@ import com.hondigagae.domainlayer.planner.application.info.AiPlanSubmissionInfo;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStatus;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanJobStep;
 import com.hondigagae.domainlayer.planner.domain.model.AiPlanSubmissionStatus;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
 @Component
 public class AiPlanPresenter {
+
+    /** 서비스 기준 시간대. 국내 여행 서비스라 화면이 읽는 시각은 KST 오프셋으로 내린다. */
+    private static final ZoneId SERVICE_ZONE = ZoneId.of("Asia/Seoul");
 
     public AiPlanSubmitResponse toSubmitResponse(AiPlanSubmissionInfo info) {
         AiPlanSubmissionStatus status = info.submissionStatus();
@@ -40,6 +47,7 @@ public class AiPlanPresenter {
             // 아직 시작하지 않았으면(PENDING) 단계가 없다. 0 이나 1 로 채우면 화면이 시작한 것으로 그린다.
             .step(step == null ? null : step.toMetadata())
             .stepOrder(step == null ? null : step.order())
+            .stepStartedAt(toOffsetText(info.stepStartedAt()))
             .totalSteps(AiPlanJobStep.total())
             .conditions(toConditionsResponse(info.conditions()))
             .planDraft(toDraftResponse(info.planDraft()))
@@ -137,5 +145,16 @@ public class AiPlanPresenter {
             .items(items)
             .totalCount(items.size())
             .build();
+    }
+
+    /**
+     * 서버 시각을 오프셋이 붙은 ISO-8601 문자열로 (#985). 오프셋을 붙여야 화면이 기기 시간대와 무관하게
+     * 경과 시간을 뺄 수 있다. 밀리초까지 자른다 — 경과 시간 표시에 그 아래는 필요 없고, 플랫폼마다 자릿수가 달라진다.
+     */
+    private String toOffsetText(Instant instant) {
+        if (instant == null) {
+            return null;
+        }
+        return DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(instant.truncatedTo(ChronoUnit.MILLIS).atZone(SERVICE_ZONE).toOffsetDateTime());
     }
 }

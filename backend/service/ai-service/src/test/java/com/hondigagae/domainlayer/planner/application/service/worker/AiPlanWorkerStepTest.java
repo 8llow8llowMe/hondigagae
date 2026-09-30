@@ -156,6 +156,20 @@ class AiPlanWorkerStepTest {
         assertThat(candidates.requestedSigunguCode).isNull();
     }
 
+    @Test
+    @DisplayName("단계에 들어갈 때마다 시작 시각을 새로 적는다 — 종결 뒤에도 마지막 단계 시각이 저장소에 남는다")
+    void stampsStepStartedAtOnEveryTransition() {
+        FakeJobStore store = new FakeJobStore(pendingJob(null));
+        Instant before = Instant.now();
+
+        worker(store, new FakeJobEvents(), new RecordingLlm()).runJob(JOB_ID);
+
+        assertThat(store.observedStepStarts).hasSize(AiPlanJobStep.total()).doesNotContainNull()
+            .allSatisfy(start -> assertThat(start).isAfterOrEqualTo(before));
+        assertThat(store.observedStepStarts).isSortedAccordingTo(Instant::compareTo);
+        assertThat(store.current().stepStartedAt()).isEqualTo(store.observedStepStarts.getLast());
+    }
+
     // 단계별 소요 지표 (#985) ────────────────────────────────────────────────
 
     @Test
@@ -291,6 +305,8 @@ class AiPlanWorkerStepTest {
 
         private AiPlanJob job;
         private final List<AiPlanJobStep> observedSteps = new ArrayList<>();
+        /** 단계 전이마다 저장된 단계 시작 시각. observedSteps 와 같은 순서다. */
+        private final List<Instant> observedStepStarts = new ArrayList<>();
         /** 이 단계에 들어가려는 순간 취소된 것으로 만든다. 다른 인스턴스의 취소를 흉내 낸다. */
         private AiPlanJobStep cancelBefore;
 
@@ -335,6 +351,7 @@ class AiPlanWorkerStepTest {
             }
             if (saving.step() != null && !Objects.equals(saving.step(), job.step())) {
                 observedSteps.add(saving.step());
+                observedStepStarts.add(saving.stepStartedAt());
             }
             job = saving;
             return saving;

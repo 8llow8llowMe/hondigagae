@@ -25,6 +25,13 @@ public record AiPlanJobStatusResponse(
     @Schema(description = "몇 번째 단계인지 (1부터). PENDING 이면 null", example = "3", nullable = true)
     Integer stepOrder,
 
+    @Schema(description = "현재 단계에 들어간 서버 시각 (ISO-8601, 서비스 기준 시간대 Asia/Seoul 오프셋 포함, 밀리초까지). "
+        + "이 단계에서 경과 시간을 그릴 때 쓴다. 지어낸 진행률이 아니다 — 단계가 얼마나 남았는지는 말하지 않는다. "
+        + "RUNNING 이고 단계가 있을 때만 채워지고, PENDING · 종결(COMPLETED · FAILED · CANCELED)이면 null. "
+        + "배포 직전부터 돌던 작업은 첫 단계 전이 전까지 null 일 수 있다",
+        example = "2026-09-30T14:03:12.345+09:00", nullable = true)
+    String stepStartedAt,
+
     @Schema(description = "전체 단계 수. 화면의 \"n / m 단계\" 에서 m 이다. 단계가 늘면 이 값도 함께 늘어난다", example = "4")
     int totalSteps,
 
