@@ -19,6 +19,7 @@ export function PlanDayMoveAddModal({
   day,
   saving,
   blocked,
+  resetsVisits,
   formError,
   onSubmit,
   onClose,
@@ -27,6 +28,8 @@ export function PlanDayMoveAddModal({
   day: number
   saving: boolean
   blocked: boolean
+  /** 그 일자에 '다녀옴' 체크가 있다 — 넣으면 지워진다 (#1066) */
+  resetsVisits: boolean
   formError: string | null
   /** 검증을 통과한 입력값. 공백 걷기·100자 자르기는 `appendMoveItemPayload` 가 한다 */
   onSubmit: (title: string) => void
@@ -75,6 +78,7 @@ export function PlanDayMoveAddModal({
       formError={formError}
       saving={saving}
       blocked={blocked}
+      resetsVisits={resetsVisits}
       onSubmit={handleSubmit}
       inputRef={inputRef}
     />

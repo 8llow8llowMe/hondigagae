@@ -172,8 +172,8 @@ describe('지도 갈래의 떠 있는 머리 (#556)', () => {
     // 폭 400 은 `.map-panel-width`(globals.css)와 같은 값이다 — 그 클래스는 `lg:` variant 를
     // 만들 수 없어 Tailwind 유틸리티로 쓴다 (`plan-add-place-view` 주석)
     expect(mapBranch).toContain('lg:w-100')
-    // 패널은 그만큼 내려온다 — 겹치면 둘 다 못 읽는다
-    expect(mapBranch).toContain('panelTopInset={PANEL_TOP_INSET}')
+    // 패널은 그만큼 내려온다 — 겹치면 둘 다 못 읽는다. 머리에 '다녀옴' 경고가 서면 그만큼 더 (#1066)
+    expect(mapBranch).toContain('panelTopInset={PANEL_TOP_INSET + headExtra}')
   })
 
   /*

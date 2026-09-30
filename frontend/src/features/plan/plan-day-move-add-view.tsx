@@ -36,6 +36,11 @@ export type PlanDayMoveAddViewProps = {
    * 것을 덮어 한쪽이 사라진다 — 그동안 제출을 잠근다 (F6 "담기 중 다른 담기").
    */
   blocked: boolean
+  /**
+   * 그 일자에 '다녀옴' 체크가 있다 (#1066). 이동·휴식을 넣는 것도 일괄 교체라 새
+   * `planItemId` 가 발급되고 그 날의 체크가 초기화된다 — 넣기 전에 여기서 알린다.
+   */
+  resetsVisits?: boolean
   onSubmit: () => void
   inputRef?: Ref<HTMLInputElement>
 }
@@ -57,6 +62,7 @@ export function PlanDayMoveAddView({
   formError,
   saving,
   blocked,
+  resetsVisits = false,
   onSubmit,
   inputRef,
 }: PlanDayMoveAddViewProps) {
@@ -110,6 +116,16 @@ export function PlanDayMoveAddView({
             {...(inputRef === undefined ? {} : { ref: inputRef })}
           />
         </Field>
+
+        {/*
+          **입력 아래, 오류 위다.** 제목을 쓰는 동안 가리지 않고, 넣기 직전 시선이 닿는
+          자리다 (#1066). 체크가 없는 날에는 서지 않는다 — 잃을 것이 없다.
+        */}
+        {resetsVisits && (
+          <p className="text-caption text-fg-muted font-medium break-keep">
+            {messages.plan.visitResetOnMoveNotice}
+          </p>
+        )}
 
         <FormAlert message={formError} />
       </form>
