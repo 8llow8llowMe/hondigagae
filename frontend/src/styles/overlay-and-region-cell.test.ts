@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { messages } from '@/lib/messages'
 import { readSource as repoSource, stripComments as withoutComments } from '@/test/source'
 
 /**
- * 값이 **두 곳에 나뉘어 있어 눈으로는 못 잡는** 산술 두 건의 회귀 검사 — 이슈 #412 · #530.
+ * 값이 **두 곳에 나뉘어 있어 눈으로는 못 잡는** 산술 두 건의 회귀 검사 — 이슈 #412 · #530 · #1068.
  *
- *  (1) 권역 칸 폭 ↔ 숫자 자리 폭. 둘 중 하나만 고치면 값 줄이 조용히 접힌다.
+ *  (1) 권역 칸 폭 ↔ 칸 안에서 가장 넓은 줄. 칸 폭은 레일이 정하고 줄 폭은 글자가 정한다.
  *  (2) `BottomSheet` 데스크톱 폭 ↔ `Modal` 기본 폭. 갈리면 같은 화면에서 뜨는 오버레이
  *      두 계열의 폭이 달라진다.
  */
@@ -22,131 +21,95 @@ function px(step: string | undefined): number {
  * 원문 그대로 훑으면 걷어낸 클래스가 여전히 있는 것처럼 잡힌다.
  */
 
-describe('권역 칸 — 폭 산식 (#412 · #530)', () => {
+describe('권역 칸 — 폭 산식 (#412 · #530 · #1068)', () => {
   const source = withoutComments(repoSource('src/features/home/regional-weather-section.tsx'))
 
   /*
-    **152 가 틀렸던 이유가 여기 있다.** `pl-3` + `border-l` 는 첫 칸을 뺀 네 칸에만
-    붙는데(`first:pl-0` · `first:border-l-0`), 예전 산식은 인셋을 한 번만 세고
-    "4px 여유" 라고 적었다. 실제로 둘째 칸부터 값 자리가 65.6px 이라 `최고 31.0℃`(62.9px)
-    옆에 2.7px 만 남았고, 폰트 렌더링이 조금만 달라져도 접혔다.
-  */
-  /**
-   * 점수 배지 폭 = 좌우 여백 + 나머지.
-   *
-   * **나머지 25.1px 은 숫자 세 자리(`100`, `tabular-nums`) + 투명 테두리 2px 이다.**
-   * 390 실측(#638)으로 다시 잡았다 — `px-3` 짜리 배지가 `100` 만 담을 때 49.1px 이고
-   * 여백 24 를 빼면 25.1 이 남는다. 테두리를 따로 더하면 이중으로 세게 된다.
-   *
-   * **#412 가 적어 둔 17.4 를 갈았다.** 그 값은 다른 환경에서 잰 것이라 이 저장소의
-   * 기준 폰트에서는 7.7px 낙관적이었고, 낙관적인 모델은 여유가 얼마 없을 때만 문제가 된다 —
-   * `점` 이 붙으면서 정확히 그 국면이 됐다.
-   */
-  function scoreBadgeWidth(): number {
-    const metric = withoutComments(repoSource('src/components/metric.tsx'))
-    const pad = px(/score:\s*'px-(\d+)/.exec(metric)?.[1])
+    **#1068 이전의 산식은 가로 경쟁이었다.** `아이콘 | 숫자 세 줄 | 점수 배지` 가 한 줄에 서서
+    칸 폭을 나눠 가졌고, 배지가 `100` → `100점`(#638) → `100/100`(#1065)으로 넓어질 때마다
+    숫자 자리(`w-20`/`lg:w-22`, 하한이 아니라 상한)가 조용히 눌려 `최고 31.0℃` 가 접혔다.
+    이 파일이 배지 여백과 칸 폭을 함께 읽어 그 관계를 잡았다.
 
-    return 25.1 + unitWidth() + pad * 2
+    **#1068 에서 칸 안이 세로 줄 넷이 됐다** (`이름 [추천] · 점수 · 막대 · 날씨`). 줄마다 칸
+    폭을 혼자 쓰므로 검사도 "가장 넓은 한 줄이 칸 안에 드는가" 로 바뀐다.
+  */
+
+  /**
+   * 칸 안 글자 자리 = 칸 − 인셋 13.
+   *
+   * **인셋은 첫 칸에만 없다** (#412). 둘째 칸부터 `pl-3`(12) + `border-l`(1) 이 매번 들어간다 —
+   * 예전 산식이 이것을 한 번만 세서 첫 칸만 멀쩡해 보였다.
+   */
+  function content(cell: number): number {
+    return cell - 13
   }
 
-  /**
-   * 배지가 숫자 뒤에 더 담는 글자의 폭 — `regionScoreUnit` 의 `{score}` 밖 (#638 · #1065).
-   *
-   * **글자 종류마다 폭이 다르다** — 전부 `text-caption`(12px) semibold 390 실측이다.
-   *  - 한글 한 글자 10.4px (#638 — `100점` 59.5 에서 `100` 49.1 을 뺀 값)
-   *  - 숫자 한 자 7.7px (`tabular-nums` — #1065 `100/100` 68.5 와 `86/100` 60.8 의 차)
-   *  - `/` 4.3px (#1065 — `/100` 27.4 에서 숫자 셋을 뺀 값)
-   *
-   * **`100점` 이던 배지가 `100/100` 이 됐다** (#1065). 한 글자당 10.4 로 세던 옛 모델은
-   * `/100` 을 41.6 으로 과대평가한다 — 모델이 틀리면 여유를 잘못 읽는다.
-   *
-   * **문구에서 읽는다.** 표기가 바뀌면 산식이 따라 움직여야 하는데, 숫자를 여기 박아 두면
-   * 그때 조용히 어긋난다.
-   */
-  function unitWidth(): number {
-    return [...messages.home.regionScoreUnit.replace('{score}', '')].reduce(
-      (sum, char) => sum + (/\d/.test(char) ? 7.7 : char === '/' ? 4.3 : 10.4),
-      0,
+  /** 기온 줄의 flex 간격 (`gap-N`). 날씨 아이콘 ↔ 기온 사이에 든다 */
+  function skyGap(): number {
+    return px(
+      /text-body-2 flex items-center gap-(\d+) font-semibold tabular-nums/.exec(source)?.[1],
     )
   }
 
-  /** 값 줄의 flex 간격 (`gap-N`). 아이콘 ↔ 숫자, 숫자 ↔ 배지 두 칸에 든다 */
-  function rowGap(): number {
-    return px(/flex w-full items-center gap-(\d+) font-medium tabular-nums/.exec(source)?.[1])
+  /** 이름 줄의 flex 간격. 권역 이름 ↔ `추천` 사이에 든다 */
+  function nameGap(): number {
+    return px(
+      /<span className="flex items-center gap-(\d+)">\s*<span className="text-body-2 min-w-0/.exec(
+        source,
+      )?.[1],
+    )
   }
 
   /**
-   * 숫자 자리에 **실제로** 남는 폭 = 칸 − 인셋 13 − 아이콘 24 − gap × 2 − 배지.
+   * 가장 넓은 두 줄 — 전부 390 실측(2026-10-01, #1068)이다.
    *
-   * **`w-20`/`lg:w-22` 는 하한이 아니라 상한이다.** 이 값이 선언한 폭보다 작으면 숫자
-   * 자리가 조용히 눌리고, 화면에 드러나는 것은 넘침이 아니라 **값 줄 접힘**이다 (#412).
-   * 그래서 선언값이 아니라 **남는 폭**으로 잰다 — 선언값으로 재면 눌린 칸을 놓친다.
+   *  - **기온 줄**: 아이콘 24 + gap + 글자. 글자는 소수가 양쪽에 붙은 `27.5–31.5℃`(84.0px, 14/600)로
+   *    잰다 — mock 의 `24–31℃` 는 58.5px 이지만 #1067 표기는 의미 있는 소수를 버리지 않으므로
+   *    여름 날 두 값 모두 `.5` 가 되는 것이 이 줄의 최악이다. 영하(`-3.5–4.5℃` 72.3)보다 넓다.
+   *  - **이름 줄**: 네 글자 이름(`제주시권` 48.4, 14/600) + gap + `추천` 배지 36.8. 서버 권역
+   *    이름이 전부 네 글자 이하다(`제주시권` · `서귀포권` · `한라산권`).
    *
-   * **배지는 세 자리 점수(`100/100`)로 잰다** — `25.1` 이 숫자 셋의 폭이다. 두 자리가 흔하지만
-   * 섬 전체가 맑은 날 다섯 칸이 전부 100 이 된다 (#638 실측).
+   * **글자 폭은 소스에 없다 — 폰트가 정한다.** 그래서 실측을 여기 적고, 실제 줄 수는
+   * `e2e/region-score-badge.spec.ts` 가 `Range.getClientRects` 로 다시 잰다.
    */
-  function effectiveNums(cell: number): number {
-    return cell - 13 - 24 - rowGap() * 2 - scoreBadgeWidth()
+  function widestLine(): number {
+    const sky = 24 + skyGap() + 84.0
+    const name = 48.4 + nameGap() + 36.8
+
+    return Math.max(sky, name)
   }
 
-  /** 가장 넓은 값 줄 `최고 31.0℃` 의 실측 폭. `최저 24.0℃` 도 같다 */
-  const WIDEST_LINE = 62.9
-
-  /*
-    **배지 여백과 칸 폭은 함께 움직여야 한다** (#412 후속). 숫자 자리 폭은 하한이 아니라
-    상한이라, 배지가 넓어지면 그 값 아래로 **조용히** 눌린다 — 화면은 한동안
-    멀쩡해 보이다가 폰트가 달라지는 환경에서 접힌다. 그래서 배지 쪽 값을
-    `metric.tsx` 에서 읽어 와 검사한다.
-  */
   /**
-   * 두 단계다 — 좁은 폭(`w-44` + `w-20`)과 `lg`(`lg:w-46` + `lg:w-22`).
+   * 두 단계다 — 좁은 폭(`w-44`)과 `lg`(`lg:w-46`).
    *
    * **#530 에서 모든 폭이 가로 레일이 되면서 좁은 쪽이 새로 생겼다.** 그쪽이 더 빡빡하니
-   * 검사도 그쪽이 먼저다 — 칸만 한 단 내리고 숫자 자리를 88 로 두면 174.4 를 요구해
-   * 값 줄이 조용히 접힌다 (#412 의 재발이다).
+   * 검사도 그쪽이 먼저다.
    */
-  function widths(): {
-    narrow: { cell: number; nums: number }
-    wide: { cell: number; nums: number }
-  } {
+  function widths(): { narrow: number; wide: number } {
     const cell = /w-(\d+) shrink-0 snap-start flex-col[^"]*lg:w-(\d+)/.exec(source)
-    const nums = /flex w-(\d+) flex-col items-start lg:w-(\d+)/.exec(source)
 
-    return {
-      narrow: { cell: px(cell?.[1]), nums: px(nums?.[1]) },
-      wide: { cell: px(cell?.[2]), nums: px(nums?.[2]) },
-    }
+    return { narrow: px(cell?.[1]), wide: px(cell?.[2]) }
   }
 
-  /*
-    **선언한 숫자 자리를 다 담지는 못한다** (#638). 배지가 `100점` 으로 늘면서 둘째 칸부터
-    선언 80 아래로 눌린다 — 390 실측으로 `px-3` 이면 **63.6px** 만 남아 가장 넓은 줄
-    62.9 에 **0.6px** 이었다. 겨울의 `최저 -3.0℃` 처럼 부호 한 글자가 붙으면 그 자리에서
-    접힌다. 그래서 배지 여백을 8 로 내려 **71.5px**(여유 8.6)로 되돌렸다.
+  it('칸 안 글자 자리가 가장 넓은 줄을 담는다', () => {
+    expect(skyGap()).not.toBeNaN()
+    expect(nameGap()).not.toBeNaN()
 
-    **#1065 에서 한 번 더 걸렸다.** 배지가 `100/100` 이 되자 390 실측 숫자 자리가 54.5px 로
-    눌려 실제로 접혔다(두 자리 `86/100` 도 62.2). 배지 여백 8 → 4 와 값 줄 간격 8 → 4 로
-    16 을 되찾아 **70.5px**(여유 7.6)다.
-
-    배지를 다시 키우거나 값 줄이 길어지면 여기서 먼저 걸린다.
-  */
-  it('칸 폭이 눌린 뒤에도 가장 넓은 값 줄을 담는다', () => {
-    for (const { cell, nums } of Object.values(widths())) {
+    for (const cell of Object.values(widths())) {
       expect(cell).not.toBeNaN()
-      expect(nums).not.toBeNaN()
 
       // 폰트 렌더링이 달라져도 접히지 않을 몫 5px 을 남긴다
-      expect(effectiveNums(cell)).toBeGreaterThanOrEqual(WIDEST_LINE + 5)
+      expect(content(cell)).toBeGreaterThanOrEqual(widestLine() + 5)
     }
   })
 
   /*
     **1440 에서 화살표가 남지 않아야 한다.** 우측 열 가용폭이 953 이고 칸 5개 + gap 4×4
     이므로 칸 상한은 `(953 − 16) / 5 = 187.4` 다. 1280(가용 793)은 어떤 폭으로도 못
-    지키지만(155 이하가 필요한데 그 폭으로는 값이 접힌다) 1440 은 지킬 수 있다.
+    지키지만(155 이하가 필요하다) 1440 은 지킬 수 있다.
   */
   it('칸 폭이 1440 상한을 넘지 않는다', () => {
-    expect(widths().wide.cell).toBeLessThanOrEqual((953 - 16) / 5)
+    expect(widths().wide).toBeLessThanOrEqual((953 - 16) / 5)
   })
 
   /*
@@ -155,38 +118,34 @@ describe('권역 칸 — 폭 산식 (#412 · #530)', () => {
     반쯤 잘린 칸은 "깨졌다" 로 읽힌다. 176 은 둘째 칸이 163/176(93%) 이라 살아 있다.
   */
   it('좁은 폭 칸이 375 에서 둘째 칸을 절반 넘게 보여 준다', () => {
-    const { cell } = widths().narrow
+    const { narrow } = widths()
 
-    expect(343 - cell - 4).toBeGreaterThanOrEqual(cell / 2)
-  })
-
-  /* 숫자만 담는 배지라 낱말용 `md`(8px)와 갈랐다 — 갈라 둔 것이 되돌려지지 않게 잡는다 */
-  it('점수 배지가 score 크기를 쓴다', () => {
-    expect(source).toContain('size="score"')
-  })
-
-  /* 가장 넓은 줄이 `최고 31.0℃` = 62.9px 이다. 폰트가 달라져도 접히지 않을 몫을 남긴다 */
-  it('숫자 자리가 가장 넓은 줄보다 넉넉하다', () => {
-    for (const { nums } of Object.values(widths())) {
-      expect(nums).toBeGreaterThanOrEqual(80)
-    }
+    expect(343 - narrow - 4).toBeGreaterThanOrEqual(narrow / 2)
   })
 
   /*
-    **`ml-auto` 는 배지 열을 세우는 유일한 장치다.** 아이콘도 숫자도 없는 칸(`한라산권`)
-    에서는 배지가 곧 첫 자식이라, 걷으면 그 칸만 100px 앞으로 나온다.
+    **#1068 에서 걷은 가로 배치가 되살아나지 않게 잡는다.** 숫자 자리(`w-20`)나 점수 배지
+    (`size="score"`)가 칸에 돌아오면 폭 경쟁이 되살아나고, 위 산식은 그것을 보지 못한다.
   */
-  it('배지가 ml-auto 로 열을 이룬다', () => {
+  it('칸에 고정 숫자 자리와 점수 배지를 되살리지 않는다', () => {
+    expect(source).not.toMatch(/flex w-\d+ flex-col items-start/)
+    expect(source).not.toContain('size="score"')
+  })
+
+  /*
+    **`ml-auto` 가 `추천` 을 칸 오른쪽에 붙인다.** `lg:` 한정이 되살아나면 좁은 폭에서만
+    이름 옆에 붙어 칸마다 자리가 갈린다 (#530).
+  */
+  it('추천 표시가 폭 분기 없이 ml-auto 로 붙는다', () => {
     expect(source).toContain('ml-auto')
-    // `lg:` 한정이 되살아나면 좁은 폭에서 `한라산권` 배지만 100px 앞으로 나온다 (#530)
     expect(source).not.toContain('lg:ml-auto')
   })
 
   /*
-    **`ml-auto` 가 남는 공간을 전부 먹으므로 `justify-between` 은 발동할 자리가 없다.**
+    **`ml-auto` 가 남는 공간을 전부 먹으므로 `justify-between` 은 발동할 자리가 없다** (#412).
     같은 일을 두 규칙이 하면 나중에 어느 쪽을 고쳐야 하는지 알 수 없어 걷었다.
   */
-  it('값 묶음에 justify-between 을 되살리지 않는다', () => {
+  it('칸에 justify-between 을 되살리지 않는다', () => {
     expect(source).not.toContain('justify-between')
   })
 })

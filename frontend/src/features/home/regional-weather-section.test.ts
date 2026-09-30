@@ -221,12 +221,17 @@ describe('RegionalWeatherSection — 점수 라벨 (#638 → #1065)', () => {
     expect(heading).not.toContain('<button')
   })
 
-  /* 만점을 배지가 말한다 — 캡션이 ⓘ 로 들어가면서 칸마다 `/100` 을 붙인다 */
-  it('점수 배지가 만점까지 말한다', () => {
+  /*
+    만점을 칸마다 말한다 — 캡션이 ⓘ 로 들어가면서(#1065). #1068 부터 숫자와 단위가 갈려
+    `MetricValue` 의 단위 자리에 `/100` 이 선다 (장소 적합도와 같은 모양).
+  */
+  it('점수 옆에 만점 단위가 선다', () => {
     const markup = render(GOOD_DAY)
     const score = GOOD_DAY.regions.find((r) => r.weatherScore !== null)?.weatherScore as number
 
-    expect(markup).toContain(`${score}/100`)
+    expect(messages.home.regionScoreUnit).toBe('/100')
+    expect(markup).toContain(`>${score}</span>`)
+    expect(markup).toContain(`>${messages.home.regionScoreUnit}</span>`)
     expect(markup).not.toContain(`${score}점`)
   })
 
@@ -351,16 +356,16 @@ describe('RegionalWeatherSection — 날씨 아이콘 (#342)', () => {
   })
 
   /*
-    값이 둘 다 없는 권역(`한라산권`)에 빈 flex 항목을 남기면 부모의 `gap-2` 가 그 자리에도
-    붙어 배지가 8px 밀린다. 두 줄로 쌓으면서 감싼 `<span>` 이 생겨 처음 생긴 갈래다.
+    값이 다 없는 권역(`한라산권`)에 빈 flex 항목을 남기면 칸의 `gap-2` 가 그 자리에도 붙는다.
+    #1068 에서 날씨 값이 `아이콘 + 기온` · `강수` 두 줄로 묶이면서 감싼 `<span>` 이 생겼다.
   */
   /* 클래스 문자열이 실제 마크업과 같아야 한다 — 갈리면 이 단언이 헛되이 통과한다 */
-  it('값이 없는 권역에 빈 숫자 자리를 남기지 않는다', () => {
+  it('값이 없는 권역에 빈 날씨 자리를 남기지 않는다', () => {
     const markup = render(GOOD_DAY)
-    const numbers = '<span class="flex w-20 flex-col items-start lg:w-22">'
+    const weather = '<span class="flex flex-col gap-1">'
 
-    expect(markup).toContain(numbers)
-    expect(markup).not.toContain(`${numbers}</span>`)
+    expect(markup).toContain(weather)
+    expect(markup).not.toContain(`${weather}</span>`)
   })
 })
 
@@ -439,106 +444,219 @@ describe('RegionalWeatherSection — 상태', () => {
 })
 
 /*
-  **#206.** 표가 온도를 숫자만 그려서 `27.0℃` 가 최고기온인지 최저인지 알 수 없었다.
-  바로 위 추천 문장은 서버가 준 완성형이라 "최고기온 26도, 강수확률 20% 로 …" 라고
-  정확히 말하는데, 같은 카드 안에서 표에만 라벨이 없었다.
-
-  dev 는 `minTemperature === maxTemperature` 인 날이 많아 드러나지 않았다 —
-  값이 갈리는 순간 사용자가 무슨 온도인지 알 수 없다 (DESIGN.md §2-3).
+  **#206 → #352 → #1068.** 표가 온도를 숫자만 그려 `27.0℃` 가 최고인지 최저인지 알 수 없었고
+  (#206), 최저를 버리고 있었다(#352). 두 값이 `최고`·`최저` 두 줄로 섰는데, #1068 에서
+  `24–31℃` 한 줄로 합쳤다 — 범위의 순서(낮은 값 → 높은 값)가 두 라벨이 하던 일을 한다.
+  갈래 전체는 `lib/insight/region-cell.test.ts` 가 갖고, 여기서는 칸에 실제로 서는지만 본다.
 */
-describe('RegionalWeatherSection — 온도 라벨 (#206)', () => {
-  it('온도가 최고기온임을 밝힌다', () => {
-    const markup = render(GOOD_DAY)
-    const max = GOOD_DAY.regions.find((r) => r.maxTemperature !== null)?.maxTemperature as number
-
-    expect(markup).toContain(`${messages.home.regionTempPrefix} ${max.toFixed(1)}℃`)
-  })
-
-  /* 예보를 못 받은 권역에는 라벨만 남지 않아야 한다 — 값이 없으면 자리 자체가 없다 */
-  it('온도가 없는 권역에 라벨만 남기지 않는다', () => {
-    const markup = render({
-      ...GOOD_DAY,
-      regions: GOOD_DAY.regions.map((region) => ({
-        ...region,
-        minTemperature: null,
-        maxTemperature: null,
-      })),
-    })
-
-    expect(markup).not.toContain(messages.home.regionTempPrefix)
-  })
-})
-
-/*
-  **#352.** 서버가 `minTemperature` 를 이미 주고 있었는데 화면이 버렸다. 최고만 있으면
-  31.0℃ 한 값으로 읽히는데, 아침 산책을 계획하는 사람에게는 그 값이 몇 시의 이야기인지가
-  판단을 가른다.
-
-  dev 는 `minTemperature === maxTemperature` 인 날이 많아 이 차이가 드러나지 않는다 —
-  그래서 mock 이 24.0 / 31.0 으로 갈라 둔 값으로 검사한다.
-*/
-describe('RegionalWeatherSection — 최저기온 (#352)', () => {
-  it('최고 아래에 최저기온을 라벨과 함께 낸다', () => {
-    const markup = render(GOOD_DAY)
-    const region = GOOD_DAY.regions.find((r) => r.minTemperature !== null)
-    const min = region?.minTemperature as number
-
-    expect(markup).toContain(`${messages.home.regionMinTempPrefix} ${min.toFixed(1)}℃`)
-  })
-
-  /* 최고 → 최저 → 강수 순서다. 접두 길이가 같아 두 줄의 숫자 왼쪽 끝이 맞는다 */
-  it('최고보다 뒤, 강수보다 앞에 선다', () => {
+describe('RegionalWeatherSection — 기온 한 줄 (#206 · #352 → #1068)', () => {
+  /* mock 은 최저 24.0 · 최고 31.0 — #1067 표기라 `.0` 을 뗀다 */
+  it('최저와 최고를 한 줄 범위로 쓴다', () => {
     const markup = render(GOOD_DAY)
 
-    const max = markup.indexOf(messages.home.regionTempPrefix)
-    const min = markup.indexOf(messages.home.regionMinTempPrefix)
-    const rain = markup.indexOf('강수 ')
-
-    expect(max).toBeGreaterThanOrEqual(0)
-    expect(min).toBeGreaterThan(max)
-    expect(rain).toBeGreaterThan(min)
+    expect(markup).toContain('24–31℃')
+    expect(markup).not.toContain('31.0℃')
   })
 
-  it('최고와 최저의 접두 길이가 같다 — 숫자 왼쪽 끝이 어긋나지 않는다', () => {
-    expect(messages.home.regionMinTempPrefix.length).toBe(messages.home.regionTempPrefix.length)
+  it('두 값이 다 오면 최고·최저 라벨을 붙이지 않는다', () => {
+    const markup = render(GOOD_DAY)
+
+    expect(markup).not.toContain(`${messages.home.regionTempPrefix} `)
+    expect(markup).not.toContain(`${messages.home.regionMinTempPrefix} `)
   })
 
-  /* 최저만 없는 날에 라벨만 남기지 않는다. 최고·강수는 그대로 서야 한다 */
-  it('최저기온이 없으면 그 줄만 빠지고 최고·강수는 남는다', () => {
+  /* 한쪽만 오면 범위를 못 만든다 — 접두 없이 `31℃` 만 두면 #206 이 되살아난다 */
+  it('최저가 없으면 최고임을 밝히고 강수는 그대로 남는다', () => {
     const markup = render({
       ...GOOD_DAY,
       regions: GOOD_DAY.regions.map((region) => ({ ...region, minTemperature: null })),
     })
 
-    expect(markup).not.toContain(messages.home.regionMinTempPrefix)
-    expect(markup).toContain(messages.home.regionTempPrefix)
-    expect(markup).toContain('강수 ')
+    expect(markup).toContain(`${messages.home.regionTempPrefix} 31℃`)
+    expect(markup).toContain('강수 10%')
+  })
+
+  /* 기온 → 강수 순서다. 하늘 아이콘이 기온 줄 머리에 선다 */
+  it('기온 줄이 강수 줄보다 앞에 선다', () => {
+    const markup = render(GOOD_DAY)
+
+    expect(markup.indexOf('24–31℃')).toBeGreaterThan(-1)
+    expect(markup.indexOf('강수 ')).toBeGreaterThan(markup.indexOf('24–31℃'))
   })
 
   /*
-    셋 다 없으면 감싼 `<span>` 자체를 내지 않는다 — 빈 flex 항목을 남기면 부모의 `gap-2`
-    가 그 자리에도 붙어 배지가 8px 밀린다 (#342 가 두 값일 때 잡아 둔 갈래).
+    다 없으면 감싼 `<span>` 자체를 내지 않는다 — 빈 flex 항목을 남기면 칸의 `gap-2` 가 그
+    자리에도 붙는다 (#342 가 두 값일 때 잡아 둔 갈래).
   */
-  it('세 값이 다 없으면 감싼 자리도 내지 않는다', () => {
+  it('날씨 값이 다 없으면 감싼 자리도 내지 않는다', () => {
     const markup = render({
       ...GOOD_DAY,
       regions: GOOD_DAY.regions.map((region) => ({
         ...region,
+        skyState: null,
+        precipitationType: null,
         minTemperature: null,
         maxTemperature: null,
         maxPrecipitationProbability: null,
       })),
     })
 
-    expect(markup).not.toContain('<span class="flex flex-col items-start">')
+    expect(markup).not.toContain('<span class="flex flex-col gap-1">')
+    expect(markup).not.toContain('강수 ')
   })
 })
 
-describe('RegionalWeatherSkeleton — 높이 (#963)', () => {
-  it('마지막 칸이 h-40 이다 — 1024 이상에서 바로 아래 소개 카드가 데이터 도착 때 밀리지 않게', () => {
-    // 실측(2026-09-28): 실화면 267(768+) · 277(375). h-24 이던 골격 206 · 198 은 카드를 61px 밀었다
+/** 칸 하나의 마크업 — `<li` 부터 `</li>` 까지 */
+function cellOf(markup: string, name: string): string {
+  const at = markup.indexOf(`>${name}</span>`)
+  const start = markup.lastIndexOf('<li', at)
+
+  return markup.slice(start, markup.indexOf('</li>', at))
+}
+
+/*
+  **#1068 — 점수를 주인공으로.** 점수가 작은 회색 배지(`56/100`)라 날씨 값 세 줄보다 약하게
+  읽혔다. 이 섹션이 답하는 "오늘 어디로" 의 답이 점수인데 위계가 뒤집혀 있었다.
+*/
+describe('RegionalWeatherSection — 점수 시각화 (#1068)', () => {
+  /* GOOD_DAY: 서귀포권 86(높음) · 서부권 78 · 제주시권 72 · 동부권 64(보통) */
+  it('점수가 22/900 숫자다', () => {
+    const cell = cellOf(render(GOOD_DAY), '서귀포권')
+
+    expect(cell).toContain('text-title-1')
+    expect(cell).toContain('font-black')
+    expect(cell).toContain('>86</span>')
+  })
+
+  /* `SuitabilityLevel.from` 경계와 같다 — 80 이상 높음 · 60 이상 보통 · 그 아래 낮음 */
+  it('등급 색은 -500 층이고 80 / 60 에서 갈린다', () => {
+    const markup = render(GOOD_DAY)
+
+    expect(cellOf(markup, '서귀포권')).toContain('text-metric-high-500')
+    expect(cellOf(markup, '동부권')).toContain('text-metric-mid-500')
+    // 경보 날 mock 은 전부 60 미만이다
+    expect(cellOf(render(BAD_DAY), '서귀포권')).toContain('text-metric-low-500')
+  })
+
+  /* 등급 색을 12px 글자에 쓰지 않는다 — `/100` 단위는 `--fg-muted` 다 (§2-3) */
+  it('단위는 등급 색이 아니다', () => {
+    const cell = cellOf(render(GOOD_DAY), '서귀포권')
+    const end = cell.indexOf('>/100<')
+    const unit = cell.slice(cell.lastIndexOf('<span', end), end)
+
+    expect(unit).toContain('text-fg-muted')
+    expect(unit).not.toContain('metric')
+  })
+
+  it('3px 막대의 길이가 점수이고 색이 등급 면이다', () => {
+    const cell = cellOf(render(GOOD_DAY), '서귀포권')
+
+    expect(cell).toContain('h-0.75')
+    expect(cell).toContain('bg-metric-high-500')
+    expect(cell).toContain('width:86%')
+  })
+
+  /* 막대는 바로 위 숫자의 그림이다 — 보조기기에 점수가 두 번 읽히지 않는다 */
+  it('막대는 보조기기에 읽히지 않는다', () => {
+    const cell = cellOf(render(GOOD_DAY), '서귀포권')
+    const bar = cell.slice(cell.lastIndexOf('<span', cell.indexOf('h-0.75')))
+
+    expect(bar).toMatch(/^<span aria-hidden="true"/)
+  })
+
+  /*
+    모르는 것과 나쁜 것은 다르다 — 0점은 빈 트랙(실선 면), 예보 없음은 점선이다. 숫자 자리에
+    `0` 을 쓰지 않고 낱말을 적는다 (§2-3 `UNKNOWN`).
+  */
+  it('예보 없는 권역은 점선 막대 + 예보 없음이다', () => {
+    const cell = cellOf(render(GOOD_DAY), '한라산권')
+
+    expect(cell).toContain(messages.home.regionScoreUnavailable)
+    expect(cell).toContain('border-dashed')
+    expect(cell).not.toContain('bg-band')
+    expect(cell).not.toContain('font-black')
+  })
+
+  it('0점은 점선이 아니라 빈 트랙이다', () => {
+    const markup = render({
+      ...GOOD_DAY,
+      regions: GOOD_DAY.regions.map((region) =>
+        region.region.name === '동부권' ? { ...region, weatherScore: 0 } : region,
+      ),
+    })
+    const cell = cellOf(markup, '동부권')
+
+    expect(cell).toContain('bg-band')
+    expect(cell).toContain('width:0%')
+    expect(cell).not.toContain('border-dashed')
+  })
+
+  /* 강수는 우산 아이콘 + 낱말 한 줄이다 — 아이콘이 `강수` 를 대신하지 않는다 (§9-1) */
+  it('강수는 우산 아이콘과 낱말을 함께 쓴다', () => {
+    const cell = cellOf(render(GOOD_DAY), '서귀포권')
+    const rain = cell.slice(cell.lastIndexOf('<span', cell.indexOf('강수 10%')))
+
+    expect(rain).toMatch(/^<span class="text-caption text-fg-muted[^"]*"><svg/)
+    expect(rain).toContain('width="16"')
+  })
+
+  /* 날씨 아이콘 24 는 그대로다 — 기온 줄 머리로 옮겼을 뿐이다 */
+  it('날씨 아이콘이 기온 줄 머리에 24px 로 선다', () => {
+    const cell = cellOf(render(GOOD_DAY), '서귀포권')
+    const icon = cell.indexOf('width="24"')
+
+    expect(icon).toBeGreaterThan(-1)
+    expect(cell.indexOf('24–31℃')).toBeGreaterThan(icon)
+  })
+})
+
+/*
+  **#1068 — 추천 표시.** 서버가 추천을 낸 날 그 권역 칸에만 붙는다. 헤드라인(`가장 나아요`)과
+  같은 날에만 서야 문장과 표가 같은 곳을 가리킨다.
+*/
+describe('RegionalWeatherSection — 추천 표시 (#1068)', () => {
+  const mark = `>${messages.home.regionRecommendedMark}</span>`
+
+  it('서버 추천 권역 칸에만 붙는다', () => {
+    const markup = render(GOOD_DAY)
+
+    expect(cellOf(markup, '서귀포권')).toContain(mark)
+    for (const name of ['제주시권', '동부권', '서부권', '한라산권']) {
+      expect(cellOf(markup, name)).not.toContain(mark)
+    }
+  })
+
+  /* 경보 날 — 서버가 막아 둔 문을 칸 표시가 다시 열지 않는다 */
+  it('추천이 없는 날에는 어느 칸에도 없다', () => {
+    expect(render(BAD_DAY)).not.toContain(mark)
+  })
+
+  /* 동점 날 헤드라인은 한 곳을 단정하지 않는다 (#638) — 칸도 고르지 않는다 */
+  it('최고점이 동점인 날에는 어느 칸에도 없다', () => {
+    expect(render(TIED_DAY)).not.toContain(mark)
+    expect(render(TWO_TIED_DAY)).not.toContain(mark)
+  })
+
+  /* 등급 배지가 아니다 — "서버가 고른 곳" 표시라 `Badge` 의 brand 톤이다 */
+  it('등급 배지가 아니라 추천 표시 배지다', () => {
+    const cell = cellOf(render(GOOD_DAY), '서귀포권')
+    const end = cell.indexOf(mark)
+    const badge = cell.slice(cell.lastIndexOf('<span', end), end)
+
+    expect(badge).toContain('bg-metric-high-100')
+    expect(badge).toContain('ml-auto')
+    expect(badge).not.toContain('border-transparent')
+  })
+})
+
+describe('RegionalWeatherSkeleton — 높이 (#963 → #1068)', () => {
+  it('마지막 칸이 h-42 다 — 1024 이상에서 바로 아래 소개 카드가 데이터 도착 때 밀리지 않게', () => {
+    /*
+      실측(2026-10-01, #1068): 실화면 280(768+) · 268(390). `h-40` 골격 270 · 262 는 768 이상에서
+      카드를 10px 밀었다 — `h-42` 로 278 · 270 (밀림 2 · −2).
+    */
     const markup = renderToStaticMarkup(createElement(RegionalWeatherSkeleton))
-    expect(markup).toContain('h-40 w-full')
-    expect(markup).not.toContain('h-24')
+    expect(markup).toContain('h-42 w-full')
+    expect(markup).not.toContain('h-40')
   })
 })
