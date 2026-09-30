@@ -4,7 +4,6 @@ import { messages } from '@/lib/messages'
 import { petSizeVerdict } from '@/lib/place/pet-size'
 import { toPlainText } from '@/lib/place/text'
 import { withParenthesizedParticle, withTopicParticle } from '@/lib/text/korean'
-import { cn } from '@/lib/utils/cn'
 import type { EnumMetadata } from '@/types/api'
 import type { PlacePetInfo } from '@/types/place'
 
@@ -17,7 +16,8 @@ import type { PlacePetInfo } from '@/types/place'
  *
  * 두 가지를 반드시 붙인다:
  *  1. **반려견을 대입한 줄** — "체중 제한" 을 옮기는 것과 "몽실이는 소형견이라 해당하지
- *     않아요" 까지 쓰는 것은 규정 전달과 판단 지원의 차이다 (아트보드 주석)
+ *     않아요" 까지 쓰는 것은 규정 전달과 판단 지원의 차이다 (아트보드 주석). **절의 맨 위,
+ *     조건 목록 앞에 결론 문장으로 선다** (#1066)
  *  2. **현장 확인 문구** — 동반 조건은 관광 API 값이라 최신이 아닐 수 있다. 이 줄이 없으면
  *     우리가 보증한 것으로 읽힌다
  */
@@ -55,7 +55,22 @@ export function PlacePetInfoSection({
 
   return (
     <div className="flex flex-col gap-4">
-      {(lines.length > 0 || verdict !== null) && (
+      {/*
+        ── 우리 아이 기준 결론 — **맨 위다** (#1066)
+
+        예전에는 체크 목록의 **마지막 줄**(흐린 글자)이었다. 원문 조건이 7줄 넘게 서는
+        장소에서는 "그래서 우리 아이는 되나" 의 답이 목록을 다 읽은 뒤에야 나왔다 — 방문자가
+        이 절에서 가장 먼저 묻는 것이 그 답이다. 아래 조건 줄은 결론의 근거로 읽힌다.
+
+        **목록 항목이 아니라 문장이다.** 체크 아이콘은 "이런 조건이 있다" 는 표시라, `들어가기
+        어려울 수 있어요` · `판단할 수 없어요` 에 초록 체크를 붙이면 결론과 아이콘이 반대 말을
+        한다. 2열 격자에 넣으면 결론이 첫 조건과 나란히 한 칸을 나눠 쓴다.
+      */}
+      {verdict !== null && (
+        <p className="text-body-2 text-fg font-semibold break-keep">{verdict}</p>
+      )}
+
+      {lines.length > 0 && (
         /*
           2열은 폭이 있을 때만이다. 1024~1279 는 좌측 400 레일을 뺀 우측이 좁아 한 열로
           되돌린다 — 두 열로 두면 문장이 어절마다 끊긴다. 768~1023 은 한 컬럼이라 전폭이다.
@@ -64,7 +79,6 @@ export function PlacePetInfoSection({
           {lines.map((line) => (
             <PetInfoLine key={line.label} label={line.label} value={line.value} />
           ))}
-          {verdict !== null && <PetInfoLine value={verdict} muted />}
         </ul>
       )}
 
@@ -75,15 +89,7 @@ export function PlacePetInfoSection({
   )
 }
 
-function PetInfoLine({
-  label,
-  value,
-  muted = false,
-}: {
-  label?: string
-  value: string
-  muted?: boolean
-}) {
+function PetInfoLine({ label, value }: { label: string; value: string }) {
   return (
     <li className="flex items-start gap-2">
       {/*
@@ -94,8 +100,8 @@ function PetInfoLine({
         0 이 1px, 4 가 3px 어긋나 가까운 쪽을 고른다.
       */}
       <CheckIcon size={20} aria-hidden className="text-metric-high-500 shrink-0" />
-      <span className={cn('text-body-2 flex-1 break-keep', muted ? 'text-fg-muted' : 'text-fg')}>
-        {label !== undefined && <span className="text-fg-muted">{label} </span>}
+      <span className="text-body-2 text-fg flex-1 break-keep">
+        <span className="text-fg-muted">{label} </span>
         {/* 개행이 있는 원문(etcAcmpyInfo)이 한 줄로 뭉치지 않게 한다 */}
         <span className="whitespace-pre-line">{value}</span>
       </span>

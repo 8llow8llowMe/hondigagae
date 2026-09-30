@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { InfoTip } from '@/components/info-tip'
 import { MetricBadge } from '@/components/metric'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { Skeleton } from '@/components/skeleton'
@@ -80,21 +81,43 @@ export function PlaceCongestionPanel({
     data === null || isCongestionEmpty(data)
       ? null
       : formatCongestionRange(data.fromDate, data.toDate)
+  /*
+    **예측 범위 안내는 차트가 설 때만 연다** — `PanelBody` 의 정상 갈래와 같은 조건이다.
+    로딩·실패·자료 없음에서는 "30일까지 있어요" 가 눈앞 화면과 어긋난다.
+  */
+  const charted = !loading && !failed && data !== null && hasCongestionAnswer(data)
 
   return (
     <div className={cn('flex flex-col gap-3 py-4', INSET)}>
       <div className="flex items-baseline justify-between gap-3">
-        {/*
-          `scroll-mt-20` 은 판정 요약 3줄의 `덜 붐비는 날` 이 이리로 뛰기 때문이다 (#650).
-          이 `h2` 는 **패널이 직접 그린다** — `Surface` 는 `title` 없이 `titleId` 만 받아
-          `aria-labelledby` 로만 쓰므로 `Surface` 쪽 `scroll-mt` 가 여기엔 닿지 않는다.
-        */}
-        <h2
-          id={CONGESTION_HEADING_ID}
-          className="text-title-2 text-fg scroll-mt-20 font-semibold break-keep"
-        >
-          {messages.place.detailCongestionTitle}
-        </h2>
+        <div className="flex min-w-0 items-center gap-2">
+          {/*
+            `scroll-mt-20` 은 판정 요약 3줄의 `덜 붐비는 날` 이 이리로 뛰기 때문이다 (#650).
+            이 `h2` 는 **패널이 직접 그린다** — `Surface` 는 `title` 없이 `titleId` 만 받아
+            `aria-labelledby` 로만 쓰므로 `Surface` 쪽 `scroll-mt` 가 여기엔 닿지 않는다.
+          */}
+          <h2
+            id={CONGESTION_HEADING_ID}
+            className="text-title-2 text-fg scroll-mt-20 font-semibold break-keep"
+          >
+            {messages.place.detailCongestionTitle}
+          </h2>
+          {/*
+            ── 예측 범위 (#1066) — **상시 각주에서 제목 옆 `InfoTip` 으로**
+
+            #603 은 이 문장을 "기본 상태에서 보인다" 로 정했다. 목적은 이 카드가 적합도보다
+            멀리 본다는 것을 첫 화면에서 읽히게 하는 것이었는데, 바로 옆 기간 꼬리표
+            (`8.29 – 9.27`)가 그 말을 이미 한다 — 각주는 같은 사실을 차트 아래에서 한 번 더
+            말했다. **7일 보기에서도 연다.** 예전 각주는 30일 보기에만 섰지만, 이 안내는 지금
+            펼친 기간이 아니라 예측이 닿는 범위의 이야기이고, 토글을 누를 때마다 제목 옆
+            버튼이 생겼다 사라지면 제목 줄이 흔들린다.
+          */}
+          {charted && (
+            <InfoTip label={messages.place.detailCongestionRangeTipLabel}>
+              {messages.place.detailCongestionExtendedNote}
+            </InfoTip>
+          )}
+        </div>
         {/* 기간이 없으면 꼬리표 자체를 내지 않는다 — 라벨만 남은 자리를 두지 않는다 */}
         {range !== null && (
           <span className="text-caption text-fg-muted shrink-0 font-medium tabular-nums">
@@ -168,15 +191,45 @@ function PanelBody({
 
       <Chart items={data.dailyCongestions} pickedDate={data.leastCrowded.date} days={days} />
 
-      {hasUnknown && (
-        <p className="text-caption text-fg-muted">{messages.place.detailCongestionUnknownNote}</p>
-      )}
-      {days === CONGESTION_DAYS.month && (
-        <p className="text-caption text-fg-muted">{messages.place.detailCongestionExtendedNote}</p>
-      )}
-
-      <DaysToggle days={days} onDaysChange={onDaysChange} />
+      {/*
+        토글과 범례가 **차트 바로 아래 한 줄**을 나눠 쓴다 (#1066). 예전에는 점선 각주 ·
+        예측 범위 각주 · 토글이 세 줄로 쌓였다 — 예측 범위는 제목 옆 `InfoTip` 으로 갔고,
+        점선 각주는 범례로 줄었다.
+      */}
+      <div className="flex items-center justify-between gap-3">
+        <DaysToggle days={days} onDaysChange={onDaysChange} />
+        {hasUnknown && <UnknownLegend />}
+      </div>
     </>
+  )
+}
+
+/**
+ * 점선 범례 — `[점선 견본] 모름` (#1066).
+ *
+ * **숨기지 않고 형태만 줄인다.** 이 표시가 없으면 빈 칸이 "한산한 날" 로 읽힌다 — 서버가
+ * 모르는 날짜를 목록에서 빼지 않는 이유와 같다. 문장 각주(`점선은 아직 모르는 날이에요.
+ * 한산하다는 뜻이 아니에요.`)는 차트 아래 한 줄을 늘 차지했는데, 뜻은 견본 + 낱말로도
+ * 선다: 차트에 있는 것과 **같은 점선**이 바로 옆에서 `모름` 이라고 이름을 붙인다.
+ *
+ * **보조기기에는 문장 그대로 읽힌다.** 견본은 그림이라 `aria-hidden`, `모름` 한 낱말은
+ * 무엇이 모른다는 것인지 말하지 않으므로 보이는 글자를 가리고 예전 각주 문장을 `sr-only`
+ * 로 준다. 칸마다 붙는 `정보 없음` 라벨과 겹치지만, 이 줄은 "빈 칸 = 한산" 오독을 막는
+ * 설명이라 칸 라벨이 대신하지 못한다.
+ *
+ * 견본은 트랙과 **같은 토큰·같은 선 굵기**다(`border-2 border-dashed
+ * border-metric-unknown-500`) — 다르게 그리면 범례가 무엇을 가리키는지 흐려진다.
+ */
+function UnknownLegend() {
+  return (
+    <p className="text-caption text-fg-muted flex shrink-0 items-center gap-2">
+      <span
+        aria-hidden
+        className="border-metric-unknown-500 size-3 shrink-0 rounded-sm border-2 border-dashed"
+      />
+      <span aria-hidden>{messages.place.detailCongestionUnknownLegend}</span>
+      <span className="sr-only">{messages.place.detailCongestionUnknownNote}</span>
+    </p>
   )
 }
 

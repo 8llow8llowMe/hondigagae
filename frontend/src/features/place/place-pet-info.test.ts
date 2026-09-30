@@ -98,6 +98,53 @@ describe('sizeVerdictLine — 규정을 옮기는 것과 판단을 돕는 것은
   })
 })
 
+function renderWithPet(petName: string | null) {
+  return renderToStaticMarkup(
+    createElement(PlacePetInfoSection, {
+      petInfo,
+      allowance: placeDetail.petAllowanceType,
+      sourceText: null,
+      tel: null,
+      petName,
+      petSizeCode: petName === null ? null : 'SMALL',
+      petSizeName: petName === null ? null : '소형견',
+    }),
+  )
+}
+
+/*
+  #1066 — 결론이 7줄 조건 목록의 **마지막 흐린 줄**이었다. "우리 아이는 되나" 가 이 절의 첫
+  질문이라 맨 위로 올리고, 체크 아이콘이 붙는 목록 항목에서 뺀다 — `들어가기 어려울 수
+  있어요` 에 초록 체크가 붙으면 결론과 아이콘이 반대 말을 한다.
+*/
+describe('PlacePetInfoSection — 우리 아이 기준 결론이 맨 위다 (#1066)', () => {
+  const VERDICT = '몽실이(소형견)은 들어갈 수 있어요.'
+
+  it('결론이 조건 목록보다 앞에 선다', () => {
+    const html = renderWithPet('몽실이')
+
+    expect(html.indexOf(VERDICT)).toBeGreaterThan(-1)
+    expect(html.indexOf(VERDICT)).toBeLessThan(html.indexOf('<ul'))
+    expect(html.indexOf(VERDICT)).toBeLessThan(html.indexOf(messages.place.detailPetScope))
+  })
+
+  it('결론은 체크 목록 항목이 아니다', () => {
+    const html = renderWithPet('몽실이')
+    const list = html.slice(html.indexOf('<ul'), html.indexOf('</ul>'))
+
+    expect(list).not.toContain(VERDICT)
+    // 조건 줄 수만큼만 항목이 선다 — 결론 몫의 `li` 가 없다
+    expect(list.split('<li').length - 1).toBe(petInfoLines(petInfo, null).length)
+  })
+
+  it('기준 반려견이 없으면 결론 없이 조건 목록부터 선다', () => {
+    const html = renderWithPet(null)
+
+    expect(html).not.toContain('들어갈 수 있어요')
+    expect(html).toContain(messages.place.detailPetScope)
+  })
+})
+
 function renderEmpty(allowance: { code: string; name: string; description: string | null } | null) {
   return renderToStaticMarkup(
     createElement(PlacePetInfoSection, {

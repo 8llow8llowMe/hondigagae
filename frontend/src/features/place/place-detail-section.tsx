@@ -191,6 +191,8 @@ export function PlaceDetailSection({
   const sourceLine = infoSourceLine(place, copyright)
   // 좌표가 없으면 `PlaceMiniMap` 이 스스로 사라진다 — 그때는 방문 정보를 두 열로 나누지 않는다
   const hasMap = toLatLng({ lat: place.lat, lng: place.lng }) !== null
+  // 머리 태그 줄의 동반 칩(동반 등급 · 허용 크기 · 목줄)이 하나라도 서는가
+  const hasPetTags = place.petAllowanceType.code !== 'UNKNOWN' || place.petInfo !== null
 
   return (
     <article>
@@ -292,42 +294,67 @@ export function PlaceDetailSection({
                 {/* 거리는 기준점이 없어 쓰지 않는다. 실내 여부는 #16 으로 들어왔다 */}
                 <p className="text-body-2 text-fg-muted">{metaLine(place)}</p>
 
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {/*
-                  **`UNKNOWN` 이면 그리지 않는다** (#530) — 목록 행과 같은 처리다
-                  (`place-row.tsx` 의 `PlaceBadges` 주석이 근거를 갖고 있다). 서버 `name` 이
-                  `정보 없음` 이라 옆 태그에 걸려 읽힌다. **동반 조건을 감추는 것이 아니다** —
-                  아래 `반려견 동반` 섹션이 `PlacePetInfoSection` 으로 같은 `allowance` 를
-                  받아 문장으로 말한다 (`place-pet-info.tsx`).
+                {/*
+                  **태그 줄 자체를 폭에 맞춰 세운다** (#1066). 아래 동반 칩 묶음이 `lg` 미만에서
+                  빠지면, 실내 여부를 알 때는 이 줄에 남는 것이 없다 — 빈 `div` 를 두면 머리의
+                  `gap-3` 이 한 번 더 끼어 소개 위가 12px 벌어진다. 칩이 하나도 없는 장소는 어느
+                  폭에서도 줄을 만들지 않는다.
                 */}
-                  {place.petAllowanceType.code !== 'UNKNOWN' && (
-                    <Badge tone="neutral" size="sm">
-                      {place.petAllowanceType.name}
-                    </Badge>
-                  )}
-                  {place.petInfo !== null && (
-                    <>
-                      <Badge tone="neutral" size="sm">
-                        {place.petInfo.allowedPetSize.name}
-                      </Badge>
-                      {place.petInfo.leashRequired && (
-                        <Badge tone="neutral" size="sm">
-                          {messages.place.detailLeashRequired}
-                        </Badge>
-                      )}
-                    </>
-                  )}
-                  {/*
+                {(hasPetTags || place.indoor === null) && (
+                  <div
+                    className={cn(
+                      'flex-wrap items-center gap-1.5',
+                      place.indoor === null ? 'flex' : 'hidden lg:flex',
+                    )}
+                  >
+                    {/*
+                    ── 동반 칩 묶음 — **`lg` 부터만 선다** (#1066)
+
+                    `lg` 미만에는 바로 아래 판정 요약의 `동반` 줄(`동반 가능 · 소형견`)이 같은 두
+                    값을 말하고, 그 아래 `반려견 동반` 체크리스트가 세 번째로 말했다 — 한 화면에
+                    같은 사실이 세 번 섰다. 요약이 `lg:hidden` 이라 **요약이 서는 폭과 칩이 빠지는
+                    폭을 같은 경계(`lg`)로 맞춘다.** 목줄 칩은 요약에 없지만 체크리스트가 첫
+                    화면 근처에서 말한다.
+
+                    **`UNKNOWN` 이면 그리지 않는다** (#530) — 목록 행과 같은 처리다
+                    (`place-row.tsx` 의 `PlaceBadges` 주석이 근거를 갖고 있다). 서버 `name` 이
+                    `정보 없음` 이라 옆 태그에 걸려 읽힌다. **동반 조건을 감추는 것이 아니다** —
+                    아래 `반려견 동반` 섹션이 `PlacePetInfoSection` 으로 같은 `allowance` 를
+                    받아 문장으로 말한다 (`place-pet-info.tsx`).
+                  */}
+                    {hasPetTags && (
+                      <span className="hidden lg:contents">
+                        {place.petAllowanceType.code !== 'UNKNOWN' && (
+                          <Badge tone="neutral" size="sm">
+                            {place.petAllowanceType.name}
+                          </Badge>
+                        )}
+                        {place.petInfo !== null && (
+                          <>
+                            <Badge tone="neutral" size="sm">
+                              {place.petInfo.allowedPetSize.name}
+                            </Badge>
+                            {place.petInfo.leashRequired && (
+                              <Badge tone="neutral" size="sm">
+                                {messages.place.detailLeashRequired}
+                              </Badge>
+                            )}
+                          </>
+                        )}
+                      </span>
+                    )}
+                    {/*
                   실내 여부를 모르면 점선으로 "모름" 을 드러낸다 — 목록 행과 같은 처리다
                   (`place-row.tsx`). 숨기면 실내만·야외만 필터에서 이 장소가 왜 사라지는지
                   설명할 길이 없고, 여기는 그 필터를 가진 목록에서 들어오는 화면이다.
                 */}
-                  {place.indoor === null && (
-                    <MetricBadge tone="unknown" size="sm">
-                      {messages.place.rowIndoorUnknown}
-                    </MetricBadge>
-                  )}
-                </div>
+                    {place.indoor === null && (
+                      <MetricBadge tone="unknown" size="sm">
+                        {messages.place.rowIndoorUnknown}
+                      </MetricBadge>
+                    )}
+                  </div>
+                )}
               </header>
 
               {/*

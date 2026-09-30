@@ -223,6 +223,9 @@ describe('PlaceCongestionPanel — 자료가 없으면 차트를 그리지 않�
 
     expect(markup).not.toContain(messages.place.detailCongestionUnknownNote)
     expect(markup).not.toContain(messages.place.detailCongestionExtendedNote)
+    // 범례도 제목 옆 안내 버튼도 서지 않는다 (#1066) — 눈앞 화면과 어긋나는 말이다
+    expect(markup).not.toContain(`>${messages.place.detailCongestionUnknownLegend}<`)
+    expect(markup).not.toContain(messages.place.detailCongestionRangeTipLabel)
   })
 
   /* 문구 키를 새로 만들지도, 같은 말을 두 번 내지도 않는다 */
@@ -407,6 +410,34 @@ describe('PlaceCongestionPanel — UNKNOWN 날짜', () => {
     expect(markup).toContain(messages.place.detailCongestionUnknownNote)
   })
 
+  /*
+    #1066 — 점선의 뜻은 **숨기지 않고 형태만 줄인다.** 문장 각주 대신 점선 견본 + `모름`
+    범례가 보이고, 예전 문장은 보조기기용 이름으로 남는다 (`모름` 한 낱말은 무엇을
+    모른다는 것인지 말하지 않는다).
+  */
+  it('점선의 뜻은 견본 + 모름 범례로 보이고 문장은 sr-only 로 남는다', () => {
+    const markup = render()
+
+    expect(markup).toContain(
+      `<span aria-hidden="true">${messages.place.detailCongestionUnknownLegend}</span>`,
+    )
+    expect(markup).toContain(
+      `<span class="sr-only">${messages.place.detailCongestionUnknownNote}</span>`,
+    )
+    // 견본은 트랙과 같은 선이다 — 다르게 그리면 범례가 무엇을 가리키는지 흐려진다
+    expect(markup).toContain(
+      'border-metric-unknown-500 size-3 shrink-0 rounded-sm border-2 border-dashed',
+    )
+  })
+
+  it('범례는 토글과 한 줄이다 — 차트 아래에 문장 줄을 쌓지 않는다', () => {
+    const markup = render()
+    const row = markup.slice(markup.lastIndexOf('<div class="flex items-center justify-between'))
+
+    expect(row).toContain(messages.place.detailCongestionCollapse)
+    expect(row).toContain(messages.place.detailCongestionUnknownLegend)
+  })
+
   /* 모르는 날이 없으면 점선의 뜻을 설명할 이유도 없다 */
   it('모르는 날이 없으면 점선 설명을 내지 않는다', () => {
     const allKnown = {
@@ -415,8 +446,10 @@ describe('PlaceCongestionPanel — UNKNOWN 날짜', () => {
         (item) => item.concentrationRate !== null,
       ),
     }
+    const markup = render({ data: allKnown })
 
-    expect(render({ data: allKnown })).not.toContain(messages.place.detailCongestionUnknownNote)
+    expect(markup).not.toContain(messages.place.detailCongestionUnknownNote)
+    expect(markup).not.toContain(`>${messages.place.detailCongestionUnknownLegend}<`)
   })
 })
 
@@ -436,11 +469,35 @@ describe('PlaceCongestionPanel — 기간', () => {
     expect(render({ days: CONGESTION_DAYS.week })).toContain(messages.place.detailCongestionExpand)
   })
 
-  it('30일에서는 되돌리는 버튼과 예측 범위를 말한다', () => {
-    const markup = render()
+  it('30일에서는 되돌리는 버튼을 준다', () => {
+    expect(render()).toContain(messages.place.detailCongestionCollapse)
+  })
 
-    expect(markup).toContain(messages.place.detailCongestionCollapse)
-    expect(markup).toContain(messages.place.detailCongestionExtendedNote)
+  /*
+    #1066 — 예측 범위는 차트 아래 상시 각주가 아니라 **제목 옆 `InfoTip`** 이다. 기간
+    꼬리표(`9.1 – 9.7`)가 이미 보여 #603 의 "기본 상태에서 보인다" 목적은 그쪽이 지킨다.
+    첫 렌더는 닫힌 상태라 본문은 서지 않는다 (`info-tip.test.ts`).
+  */
+  it('예측 범위는 제목 옆 안내 버튼으로 연다 — 상시 각주가 아니다', () => {
+    const markup = render()
+    const head = markup.slice(0, markup.indexOf('</h2>') + 200)
+
+    expect(head).toContain(`aria-label="${messages.place.detailCongestionRangeTipLabel}"`)
+    expect(markup).not.toContain(messages.place.detailCongestionExtendedNote)
+  })
+
+  /* 예측이 닿는 범위의 이야기라 펼친 기간과 무관하다 — 토글마다 제목 줄이 흔들리지 않게 */
+  it('7일 보기에서도 같은 안내 버튼이 선다', () => {
+    expect(render({ days: CONGESTION_DAYS.week })).toContain(
+      `aria-label="${messages.place.detailCongestionRangeTipLabel}"`,
+    )
+  })
+
+  it('로딩 · 실패에는 안내 버튼을 내지 않는다', () => {
+    const label = `aria-label="${messages.place.detailCongestionRangeTipLabel}"`
+
+    expect(render({ data: null, loading: true })).not.toContain(label)
+    expect(render({ data: null, failed: true })).not.toContain(label)
   })
 
   /*
