@@ -650,6 +650,9 @@ export function PlanDetailSection({
         saving={addMove.adding}
         // 이 모달 자신의 저장은 `saving` 이 말한다. 여기는 **다른** 일괄 교체가 도는 중인지다
         blocked={addPlace.adding || itemTime.saving}
+        resetsVisits={
+          moveDay !== null && (days[moveDay - 1]?.items.some((item) => item.visited) ?? false)
+        }
         formError={
           moveDay !== null && addMove.failure?.day === moveDay
             ? addMove.failure.error.message

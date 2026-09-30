@@ -66,6 +66,18 @@ const SHEET_MAX_TOP_INSET = 248
 const PANEL_TOP_INSET = 136
 
 /**
+ * 머리 카드에 '다녀옴' 초기화 경고(#1066)가 설 때 위 두 상수에 더하는 높이(px).
+ *
+ * 그 줄은 **체크가 있는 날에만** 서서 늘 더하지 않는다 — 없는 날까지 늘리면 시트와 패널이
+ * 빈 자리만큼 내려앉는다.
+ *
+ * **26 은 실측이다** (2026-09-30, 캡션 18 + 위 여백 8): 머리 카드가 375·390 에서 54 → 80,
+ * 768·1440 에서 104 → 130 이 됐고 네 폭 모두 한 줄이다. 카카오 SDK 가 실패한 폴백 갈래에서
+ * 잰 값이라 카드 높이만 확인됐다 — 지도가 뜬 상태의 시트 상한 · 패널 겹침은 재지 못했다.
+ */
+const VISIT_NOTICE_EXTRA = 26
+
+/**
  * 장소를 골라 일자에 담는 화면 — 세부명세 F2.
  *
  * **모달·시트가 아니라 라우트다** (F5-1). 장소 목록이 필터 + 무한 스크롤이라 모달에
@@ -221,6 +233,16 @@ export function PlanAddPlaceView({
   const places = list.data === undefined ? [] : mergeSlices(list.data.pages)
   const lastPage = list.data?.pages.at(-1)
   const addedPlaceIds = placeIdsOf(group.items)
+  /*
+    **담기가 그 날의 '다녀옴' 을 지운다** (#1066). 담기는 일괄 교체라 새 `planItemId` 가
+    발급된다. 일정 상세의 상시 줄을 걷고 **고치러 들어온 이 화면의 머리**로 옮겼다 —
+    잃을 것(체크)이 있는 날에만 선다. 두 보기가 같은 판단을 쓴다.
+  */
+  const visitResetNotice = group.items.some((item) => item.visited)
+    ? messages.plan.visitResetOnAddNotice
+    : null
+  /** 지도 갈래 머리 카드가 그 경고만큼 커진 높이 — 시트 상한 · 패널 시작점이 함께 내려간다 */
+  const headExtra = visitResetNotice === null ? 0 : VISIT_NOTICE_EXTRA
 
   const onAdd = (selected: PlaceSummary) =>
     addPlace.add({
@@ -282,6 +304,16 @@ export function PlanAddPlaceView({
                     {messages.plan.addPlaceTitle.replace('{day}', String(day))}
                   </h1>
                 </div>
+                {/*
+                  부제는 걷었지만 **이 경고는 남긴다** — 부제는 제목이 이미 한 말이고, 이것은
+                  담기 전에만 쓸모 있는 말이다. 카드가 한 줄 커지는 만큼 아래 두 상수도 함께
+                  늘린다 (`VISIT_NOTICE_EXTRA`).
+                */}
+                {visitResetNotice !== null && (
+                  <p className="text-caption text-fg-muted mt-2 font-medium break-keep">
+                    {visitResetNotice}
+                  </p>
+                )}
               </div>
             }
             /*
@@ -292,8 +324,8 @@ export function PlanAddPlaceView({
             */
             listHref={listHref}
             mapHref={mapHref}
-            sheetMaxTopInset={SHEET_MAX_TOP_INSET}
-            panelTopInset={PANEL_TOP_INSET}
+            sheetMaxTopInset={SHEET_MAX_TOP_INSET + headExtra}
+            panelTopInset={PANEL_TOP_INSET + headExtra}
             mutedPlaceIds={addedPlaceIds}
             renderRowAction={(place) =>
               planAddPlaceAction(place, {
@@ -335,6 +367,7 @@ export function PlanAddPlaceView({
       day={day}
       backHref={backHref}
       planTitle={detail.data.title}
+      notice={visitResetNotice}
       listHref={listHref}
       mapHref={mapHref}
       view={view}
@@ -420,8 +453,11 @@ export function PlanAddPlaceView({
  * **덤으로 제목 탐색 개요가 고쳐진다.** #451 이 "이 화면만 `h2 필터` 가 `h1` 보다 먼저인
  * 채로 남는다" 고 적어 둔 것은 제목이 **보이는** 페이지 머리라 레일 앞으로 못 올렸기
  * 때문이었는데, 제목이 카드 머리로 들어가면서 그 제약이 풀렸다.
+ *
+ * **export 는 테스트 몫이다** — `PlanAddPlaceView` 는 조회 훅을 들어 node 환경에서 렌더되지
+ * 않는다(`testing-guide.md` §1). 머리의 '다녀옴' 경고(#1066)를 이 껍데기로 잰다.
  */
-function PlanAddPlaceShell({
+export function PlanAddPlaceShell({
   day,
   backHref,
   planTitle,
@@ -429,12 +465,15 @@ function PlanAddPlaceShell({
   mapHref,
   view,
   tools,
+  notice = null,
   children,
 }: {
   day: number
   backHref: string
   /** 아직 못 받았으면 생략한다 — 제목은 `day` 만으로 쓸 수 있다 */
   planTitle?: string | undefined
+  /** 부제 아래 한 줄 — '다녀옴' 초기화 경고 (#1066). 없으면 줄 자체가 없다 */
+  notice?: string | null
   listHref: string
   mapHref: string
   view: ViewMode
@@ -459,9 +498,14 @@ function PlanAddPlaceShell({
         titleId="plan-add-place-heading"
         title={title}
         description={
-          <p className="text-caption text-fg-muted font-medium">
-            {planTitle === undefined ? subtitle : `${planTitle} · ${subtitle}`}
-          </p>
+          <>
+            <p className="text-caption text-fg-muted font-medium">
+              {planTitle === undefined ? subtitle : `${planTitle} · ${subtitle}`}
+            </p>
+            {notice !== null && (
+              <p className="text-caption text-fg-muted mt-1 font-medium break-keep">{notice}</p>
+            )}
+          </>
         }
         /* 네 화면이 같은 세그먼트 컨트롤을 쓴다 */
         trailing={

@@ -232,16 +232,13 @@ export function PlanDaySection({
         </div>
 
         {/*
-        일괄 교체 모델과 부딪히는 지점을 화면이 먼저 말한다 (#124). 편집·담기 두 진입점이
-        모두 이 줄 위의 버튼에서 시작하므로 경고를 그 아래 한 번만 둔다.
-        **편집 중에는 감춘다** — 그때는 편집기 자체가 저장 지점을 들고 있다.
-      */}
-        {!editing && hasVisited && (
-          <p className="text-caption text-fg-muted mt-2 font-medium">
-            {messages.plan.visitResetNotice}
-          </p>
-        )}
-
+          **다녀옴 초기화 경고는 여기 없다** (#1066). 예전에는 체크가 있는 날마다 제목 아래
+          상시 줄이었는데, 다녀옴은 여행 중에 쓰는 기능이라 여행 기간 내내 일자마다 붙어
+          있었다 — 경고가 배경음이 되어 정작 고칠 때 읽히지 않는다. **고치러 들어가는 순간**
+          알린다: `순서 편집` 은 아래 편집기 위, `장소 추가` 는 그 화면 머리, `이동·휴식 추가`
+          는 모달 안, 실내 대안 `담기` 는 그 목록 머리다. "잃기 전에 알린다" 는 목적은
+          그대로다 — 넷 다 저장 전에 선다.
+        */}
         <PlanDayVerdict
           verdict={verdict}
           petConditionApplied={petConditionApplied}
@@ -298,7 +295,20 @@ export function PlanDaySection({
 
       {editing ? (
         // 편집기 행이 카드 인셋을 스스로 갖는다 — 목록은 카드 폭을 다 쓴다
-        <div className="border-border border-t">{editor}</div>
+        <div className="border-border border-t">
+          {/*
+            **편집을 연 자리의 맨 위다** (#1066). 편집기의 저장이 일괄 교체라 새 `planItemId`
+            가 발급되고 그 날의 체크가 초기화된다 — 순서를 다 고친 뒤 저장 버튼 옆에서 알면
+            늦다. 편집기 안이 아니라 여기 두는 이유: 편집기는 무엇을 잃는지(`visited`)를
+            모르고, 알게 하려면 prop 을 하나 더 뚫어야 한다. 이 카드가 이미 안다.
+          */}
+          {hasVisited && (
+            <p className={cn('text-caption text-fg-muted pt-3 font-medium', INSET_CLASS.card)}>
+              {messages.plan.visitResetOnEditNotice}
+            </p>
+          )}
+          {editor}
+        </div>
       ) : rows.length === 0 ? (
         <p
           className={cn('text-body-2 text-fg-muted border-border border-t py-6', INSET_CLASS.card)}
@@ -395,6 +405,7 @@ export function PlanDaySection({
             disabled={add.busy}
             error={add.error}
             onAdd={add.onAdd}
+            resetsVisits={hasVisited}
           />
         </div>
       )}

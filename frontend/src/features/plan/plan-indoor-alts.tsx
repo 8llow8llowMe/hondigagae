@@ -38,6 +38,7 @@ export function PlanIndoorAlternatives({
   disabled,
   error,
   onAdd,
+  resetsVisits = false,
 }: {
   alternatives: PlanAlternativePlaceItem[]
   /** placeId → 보강 결과. 없으면 그 행은 제목과 거리만 남는다 */
@@ -51,6 +52,11 @@ export function PlanIndoorAlternatives({
   /** **이 일자에서** 난 실패만 온다 */
   error: PlanDaySaveError | null
   onAdd: (alternative: PlanAlternativePlaceItem) => void
+  /**
+   * 그 일자에 '다녀옴' 체크가 있다 (#1066). 여기 `담기` 도 일괄 교체라 그 날의 체크가
+   * 초기화된다 — 들어가는 화면 없이 카드 안에서 바로 저장하므로 **목록 머리가 진입 자리**다.
+   */
+  resetsVisits?: boolean
 }) {
   if (alternatives.length === 0) return null
 
@@ -74,6 +80,11 @@ export function PlanIndoorAlternatives({
         <RainIcon size={14} className="shrink-0" />
         {messages.plan.indoorAlternativesTitle}
       </h4>
+      {resetsVisits && (
+        <p className="text-caption text-fg-muted mt-1 font-medium break-keep">
+          {messages.plan.visitResetOnAddNotice}
+        </p>
+      )}
 
       {/*
         **줄 사이 선은 `ul` 이 갖고 첫 줄은 받지 않는다** — 저장소 공통 패턴이다
