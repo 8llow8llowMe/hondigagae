@@ -169,6 +169,20 @@ const SIZE: Record<ButtonSize, string> = {
 - uncontrolled(내부 state) 모드를 함께 지원하지 않는다. 두 모드 지원은 "값이 안 바뀌는" 버그의 대표 원인이다.
 - 폼 라이브러리와의 결합도 controlled가 전제다 (`form-guide.md`).
 - 예외: `Modal`/`BottomSheet` 의 열림 상태는 사용처가 항상 소유한다 (`open` + `onClose`).
+- **값이 아닌 표시 상태는 컴포넌트가 갖는다.** `InfoTip` 의 열림, `PasswordInput` 의 가려짐/보임(#1080)이 그렇다 — 제출에 실리지 않고 사용처가 읽거나 되돌릴 일이 없다. 이것은 "두 모드 지원" 이 아니다: 그 상태에는 controlled 모드가 **아예 없다.** 값(`value`)은 여전히 controlled 다. 사용처가 그 상태를 알아야 하는 순간(예: 제출 뒤 다시 가리기)이 생기면 그때 controlled 로 **바꾼다** — 두 모드를 함께 열지 않는다.
+
+### `PasswordInput` — 비밀번호 칸은 이것 하나다 ([#1080](https://github.com/8llow8llowMe/hondigagae/issues/1080))
+
+`Input` 을 감싸 입력란 **안**에 눈 토글(`ghost` · `md` · `iconOnly`, 44×44)을 세운다. `type` · `action` · `suffix` 는 받지 않는다 — 표시 상태와 토글 자리가 정한다.
+
+| prop              | 뜻                                                                                                          |
+| ----------------- | ----------------------------------------------------------------------------------------------------------- |
+| `Input` 의 나머지 | `id` · `value` · `onValueChange` · `invalid` · `autoComplete` · `ref` 그대로                                |
+| `revealLabels?`   | `{ show, hide }` 버튼 이름. 기본 `비밀번호 표시` / `비밀번호 숨기기`. **한 화면에 칸이 둘 이상이면 넘긴다** |
+
+- 토글은 `aria-label`(상태별) · `aria-pressed` · `aria-controls={id}` 를 단다. 아이콘은 `aria-hidden`.
+- 규칙 안내는 이 컴포넌트가 아니라 감싸는 `Field.hint` 가 한다 (`messages.form.passwordRule`).
+- 쓰는 곳: 회원가입 3단계 · 비밀번호 재설정 · 마이페이지 변경/설정. **로그인 폼은 아직 자기 토글을 들고 있다** — 같은 배선이라 옮기는 것은 후속이다 (옮기면 `LoginFormFields` 의 `showPassword` · `onTogglePassword` prop 이 걷힌다).
 
 ## 6. ref
 
