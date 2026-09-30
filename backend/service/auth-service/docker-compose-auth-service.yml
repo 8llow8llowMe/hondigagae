@@ -58,6 +58,10 @@ x-auth-service-environment: &auth_service_environment
   MAIL_PORT: ${MAIL_PORT:-587}
   MAIL_USERNAME: ${MAIL_USERNAME:-}
   MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+  # 메일 발신자 표시·로고 (#1062). 비면 앱이 "혼디가개" / SMTP 계정 주소 / 인라인(CID) 로크업 로고로 채운다.
+  MAIL_FROM_NAME: ${MAIL_FROM_NAME:-}
+  MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-}
+  MAIL_LOGO_URL: ${MAIL_LOGO_URL:-}
   # 카카오는 로그인 전용이다. 지도는 클라이언트 JS SDK 가 그리고 서버는 카카오 API 를 부르지 않는다.
   OAUTH_KAKAO_CLIENT_ID: ${OAUTH_KAKAO_CLIENT_ID:-}
   OAUTH_KAKAO_CLIENT_SECRET: ${OAUTH_KAKAO_CLIENT_SECRET:-}
