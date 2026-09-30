@@ -345,6 +345,7 @@ mutation 후 무효화 대상을 **명세와 코드 양쪽에 명시한다.**
 | 일자 항목 교체               | `planKeys.detail(planId)`                                                            |
 | **항목 방문 체크**           | `planKeys.detail(planId)` (**판정은 무효화하지 않는다** — 아래)                      |
 | **항목 시작 시각** (#1053)   | `planKeys.detail(planId)` + `planKeys.walkSafety(planId)` (판정 제외 — 아래)         |
+| **일정 쓰기 전부** (#1055)   | 각 행에 더해 `planKeys.briefings(planId)` — 반려견 수정은 `briefingAll()` (아래)     |
 | 반려견 등록/수정             | `petKeys.all`                                                                        |
 | **반려견 삭제**              | `petKeys.all` + `planKeys.all` (지운 아이 상세·집계는 재조회 제외 — 아래)            |
 | 프로필 수정 / 이미지 변경    | `memberKeys.me()`                                                                    |
@@ -366,6 +367,15 @@ mutation 후 무효화 대상을 **명세와 코드 양쪽에 명시한다.**
   `Response<Void>` 라 무효화로만 이어받고, 판정은 시각을 읽지 않아 두지만 **산책 위험도는 시각이
   직접 입력이라 무효화한다.** 모달은 상세 재조회를 기다린 뒤 닫는다 — 먼저 닫으면 토스트 아래 칩이
   옛 시각을 보인다 (`docs/features/plan/일자편집-세부명세.md` G4).
+- **출발 전 브리핑(`planKeys.briefing`)은 일정 쓰기 전부가 버린다** (#1055). 표준값은 인사이트(5분)지만
+  응답의 `schedule`(첫/마지막 항목 시각 · 방문 수 · 대표 장소)은 예보가 아니라 **그날 항목 그대로**다
+  (`PlanBriefingProcessor.toScheduleInfo`). 판정·산책 위험도와 달리 경로마다 갈리지 않아 — 방문 체크도
+  `visitedCount` 를 바꾼다 — 호출처가 key 를 적지 않고 `invalidatePlanBriefing(queryClient, planId)`
+  하나를 부른다. 대상은 항목 시각 · 방문 체크 · 일자 일괄 교체 전 경로 · 일정 수정(기간·제목·동행견) ·
+  상태 변경(완료 일정은 특성 스냅샷을 쓴다, #629)이고, **반려견 수정**은 그 아이와 동행하는 일정을 가려낼
+  수 없어 `invalidateAllPlanBriefings` 로 전부 버린다. 날짜는 가리지 않는다(`planKeys.briefings(planId)`
+  prefix). 반려견 삭제는 `planKeys.all` 로 이미 덮인다. 새 쓰기 경로가 빠지면
+  `plan-briefing-invalidation.test.ts` 가 쓰기 API 호출처를 훑어 잡는다.
 - **반려견 삭제는 일정까지 무효화하고, 지운 아이의 key 는 다시 받지 않는다** (#1042). 삭제 응답이 온
   시점에 plan-service 가 다견 일정의 `petIds` 에서 그 아이를 이미 뗐다 — 일정 캐시를 두면 30초 동안
   지운 아이가 일정에 남아 보인다. 반대로 `petKeys.all` 을 그대로 무효화하면 **아직 화면이 관찰 중인
