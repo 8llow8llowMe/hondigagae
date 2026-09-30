@@ -95,10 +95,13 @@ describe('FavoriteListSection — 헤더 (아트보드 01)', () => {
     expect(markup).toContain('12/100곳')
   })
 
-  it('상한 전에는 남은 여유를 상시 표기한다', () => {
+  it('상한 전에는 `N/100곳` 하나로만 말한다 — 남은 곳 수를 다시 적지 않는다 (#1066)', () => {
     const markup = render({ places: [favoritePlaceItem()], totalCount: 12 })
 
-    expect(markup).toContain('88곳 더 저장할 수 있어요')
+    expect(markup).toContain('12/100곳')
+    // 옆 `12/100곳` 을 뺄셈으로 다시 말하던 문장 (회귀 감시)
+    expect(markup).not.toContain('88곳')
+    expect(markup).not.toContain('더 저장할 수 있어요')
     expect(markup).not.toContain(messages.favorite.limitReachedBadge)
   })
 
@@ -241,7 +244,6 @@ describe('FavoriteListSection — 개수 줄은 셀 수 있을 때만 (#462)', (
 
     expect(markup).toContain(messages.favorite.emptyTitle)
     expect(markup).not.toContain('0/100곳')
-    expect(markup).not.toContain('100곳 더 저장할 수 있어요')
   })
 })
 
