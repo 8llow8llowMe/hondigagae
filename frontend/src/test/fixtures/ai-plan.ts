@@ -1,4 +1,9 @@
-import type { AiPlanDraft, AiPlanRequestSnapshot, AiPlanScheduleItem } from '@/types/ai-plan'
+import type {
+  AiPlanDraft,
+  AiPlanJob,
+  AiPlanRequestSnapshot,
+  AiPlanScheduleItem,
+} from '@/types/ai-plan'
 
 /**
  * 출처: backend ai-service `AiPlanScheduleItem` · `AiPlanDayItem` · `AiPlanDraftResponse` ·
@@ -38,4 +43,28 @@ export const aiPlanSnapshot: AiPlanRequestSnapshot = {
   pets: [{ petId: '123456789012000001', name: '몽실이' }],
   budget: 300_000,
   requestNote: '실내 위주로',
+}
+
+/**
+ * 작업 상태 한 건 — 상태 코드만 정하고 나머지는 빈 값이다 (#1057).
+ *
+ * **단계 · 시각은 기본이 null 이다** (PENDING 의 모양). 단계를 밟는 `RUNNING` 은 `stepOrder` ·
+ * `stepStartedAt` 을 덮어 만든다. 필드가 늘면 여기 한 곳을 고친다 — 테스트마다 인라인 팩토리를
+ * 두면 한쪽만 고쳐진다.
+ */
+export function aiPlanJob(code: string, overrides: Partial<AiPlanJob> = {}): AiPlanJob {
+  return {
+    jobId: 'job-1',
+    status: { code, name: code, description: null },
+    step: null,
+    stepOrder: null,
+    totalSteps: 4,
+    stepStartedAt: null,
+    planDraft: null,
+    errorCode: null,
+    errorMessage: null,
+    conditions: null,
+    committedPlanId: null,
+    ...overrides,
+  }
 }

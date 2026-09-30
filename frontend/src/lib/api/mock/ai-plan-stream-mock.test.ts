@@ -132,6 +132,41 @@ describe('resolveMockStream — 프레임 순서', () => {
     expect(orders).toEqual([null, 1, 2, 3, 4, 4])
   })
 
+  /*
+    **단계 프레임이 그 프레임이 나가는 시각을 싣는다 (#1057).** 백엔드는 워커가 단계를 저장할 때의
+    시각을 싣는다. mock 은 워커 대신 시간이 진행을 끌고 가므로(`delayMs` 는 직전 프레임과의 간격)
+    그 누적이 곧 단계에 들어간 순간이다. PENDING · 종결은 null 이다.
+  */
+  it('RUNNING 프레임이 단계에 들어간 시각을 싣는다 — 누적 지연만큼 뒤다', () => {
+    const openedAt = Date.now()
+    const result = stream(newJob())
+
+    if (result?.kind !== 'stream') throw new Error('스트림이 아니다')
+    let sentAt = openedAt
+    const offsets = result.frames.map((frame) => {
+      sentAt += frame.delayMs
+      const startedAt = (frame.data as AiPlanJob).stepStartedAt
+      return startedAt === null ? null : Date.parse(startedAt) - sentAt
+    })
+
+    expect(offsets[0]).toBeNull()
+    expect(offsets.at(-1)).toBeNull()
+    // 테스트가 시각을 읽은 순간과 mock 이 읽은 순간의 차이만 남는다
+    for (const offset of offsets.slice(1, -1)) {
+      expect(offset).not.toBeNull()
+      expect(Math.abs(offset ?? Infinity)).toBeLessThan(1_000)
+    }
+  })
+
+  it('단계 시각은 서비스 시간대 오프셋을 단다 — 백엔드와 같은 모양', () => {
+    const result = stream(newJob())
+
+    if (result?.kind !== 'stream') throw new Error('스트림이 아니다')
+    const startedAt = (result.frames[1]?.data as AiPlanJob).stepStartedAt
+
+    expect(startedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}\+09:00$/)
+  })
+
   it('PENDING 스냅샷에는 단계가 없다 — 아직 시작하지 않았다', () => {
     const result = stream(newJob())
 

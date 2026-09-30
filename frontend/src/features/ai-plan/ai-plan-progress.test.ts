@@ -201,11 +201,83 @@ describe('AiPlanProgress — 경과 시간 (#710)', () => {
       **값을 담은 요소 자체가 `aria-hidden` 이어야 한다.** 낭독 영역 밖에 두는 것만으로는
       부족하다 — 나중에 누가 이 줄을 `role="status"` 안으로 옮기면 그날부터 매 초 읽힌다.
     */
-    expect(html).toMatch(/<p aria-hidden="true"[^>]*>1분 12초 지남/)
+    expect(html).toMatch(/<div aria-hidden="true"[^>]*><p>1분 12초 지남/)
   })
 
   it('상한 초과 화면에서도 얼마나 기다렸는지 말한다', () => {
     expect(render({ phase: 'exceeded', elapsedMs: 330_000 })).toContain('5분 30초')
+  })
+})
+
+/*
+  **현재 단계에서 지난 시간을 경과 줄 아래 둘째 줄에 둔다 (#1057).** 같은 줄에 붙이면 375 폭에서
+  1분이 넘는 순간 두 줄로 접히고, 새 단계에 들어간 1초 동안 그 부분이 빠져 한 줄로 돌아온다 —
+  그때마다 아래 `그만두기` 가 튄다(실측). 그래서 단계에 들어가 있는 동안 둘째 줄은 자리를 늘 차지한다.
+*/
+describe('AiPlanProgress — 단계 경과 (#1057)', () => {
+  /** 경과 묶음(`aria-hidden` div) 안의 줄 — 순서대로 */
+  function captionLines(html: string): string[] {
+    const block = /<div aria-hidden="true"[^>]*>((?:<p>[^<]*<\/p>)+)<\/div>/.exec(html)?.[1] ?? ''
+    return [...block.matchAll(/<p>([^<]*)<\/p>/g)].map((match) => match[1] ?? '')
+  }
+
+  it('전체 경과 아래 줄에 이 단계의 경과를 둔다 — 전체에 대한 약속은 위 줄에 한 번만', () => {
+    const html = render({ elapsedMs: 72_000, stepElapsedMs: 65_000 })
+
+    expect(captionLines(html)).toEqual(['1분 12초 지남 · 보통 1~2분쯤 걸려요', '이 단계 1분 5초째'])
+  })
+
+  it('두 줄 다 낭독 영역 밖이다 — 1초마다 읽히지 않는다', () => {
+    const html = render({
+      elapsedMs: 72_000,
+      stepElapsedMs: 45_000,
+      stepProgress: { order: 4, total: 4 },
+    })
+
+    const live = /<div role="status"[^>]*>(.*?)<\/div><div aria-hidden/.exec(html)?.[1] ?? ''
+    // 잡은 영역이 실제 낭독 영역인지부터 — 비어 있으면 아래 단언이 공짜로 통과한다
+    expect(live).toContain('4 / 4단계')
+    expect(live).not.toContain('초째')
+    expect(captionLines(html)).toContain('이 단계 45초째')
+  })
+
+  /*
+    **표기할 수 없는 순간에도 자리는 남긴다.** 새 단계에 들어간 첫 1초 · 기기 시계가 서버보다 늦어
+    음수인 동안이다. 줄이 빠졌다 돌아오면 그 아래가 튄다.
+  */
+  it.each([
+    ['1초 전이면', 400],
+    ['음수면', -3_000],
+  ])('%s 글자만 비우고 둘째 줄 자리는 남긴다', (_, stepElapsedMs) => {
+    const lines = captionLines(render({ elapsedMs: 72_000, stepElapsedMs }))
+
+    expect(lines).toEqual(['1분 12초 지남 · 보통 1~2분쯤 걸려요', '\u00a0'])
+  })
+
+  // 서버가 단계 시작 시각을 주지 않았다 — PENDING · 종결 · 필드 전에 저장된 잡
+  it.each([
+    ['값이 없으면', undefined],
+    ['null 이면', null],
+  ])('%s 둘째 줄이 없다', (_, stepElapsedMs) => {
+    // 생략은 키를 빼서 만든다 (`exactOptionalPropertyTypes`)
+    const html = render(
+      stepElapsedMs === undefined ? { elapsedMs: 72_000 } : { elapsedMs: 72_000, stepElapsedMs },
+    )
+
+    expect(captionLines(html)).toEqual(['1분 12초 지남 · 보통 1~2분쯤 걸려요'])
+  })
+
+  it('전체 경과가 없으면 두 줄 다 없다 — 단계 경과만 홀로 서지 않는다', () => {
+    const html = render({ stepElapsedMs: 45_000 })
+
+    expect(html).not.toContain('초째')
+    expect(html).not.toContain('지남')
+  })
+
+  it('상한 초과 화면도 같은 두 줄을 쓴다', () => {
+    const html = render({ phase: 'exceeded', elapsedMs: 330_000, stepElapsedMs: 320_000 })
+
+    expect(html).toContain('<p>5분 30초 지남 · 보통 1~2분쯤 걸려요</p><p>이 단계 5분 20초째</p>')
   })
 })
 

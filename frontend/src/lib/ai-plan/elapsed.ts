@@ -37,3 +37,29 @@ export function formatElapsed(elapsedMs: number): string | null {
 
   return rest === 0 ? `${minutes}분` : `${minutes}분 ${rest}초`
 }
+
+/**
+ * 현재 단계에서 지난 시간(ms) (#1057). 서버가 준 단계 시작 시각(`stepStartedAt`)과 `nowMs` 의 차이다.
+ *
+ * **새로고침해도 0 으로 돌아가지 않는다** — 전체 경과(`useAiPlanJob` 의 `elapsedMs`)는 이 화면이
+ * 구독을 시작한 때부터 세지만, 이것은 서버 시각이라 작업이 실제로 머문 시간이다.
+ *
+ * **null 이면 그리지 않는다** — 시각이 없거나(PENDING · 종결 · 필드 전에 저장된 잡) 읽을 수 없거나
+ * 시계가 아직 돌지 않았을 때다. 시각은 오프셋을 달고 오므로 기기 시간대와 무관하게 뺄 수 있다.
+ *
+ * **음수는 거르지 않는다.** 기기 시계가 서버보다 늦으면 나오는데, 표기(`formatElapsed`)가 이미
+ * 음수를 null 로 읽는다 — 두 곳에서 따로 거르면 규칙이 갈린다. 기기 시계가 빠르면 그만큼 더 크게
+ * 보인다 — **크게 어긋난 시계는 감수한다**(공통명세 S7-1). 이 값은 진행률이 아니라 **"멈추지
+ * 않았다"** 는 신호이고, 새로고침 직후에는 전체 경과보다 큰 것이 정상이라 가려낼 수도 없다.
+ */
+export function stepElapsedMsOf(
+  stepStartedAt: string | null | undefined,
+  nowMs: number | null,
+): number | null {
+  if (typeof stepStartedAt !== 'string' || nowMs === null) return null
+
+  const startedMs = Date.parse(stepStartedAt)
+  if (Number.isNaN(startedMs)) return null
+
+  return nowMs - startedMs
+}

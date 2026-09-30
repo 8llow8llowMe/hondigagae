@@ -36,6 +36,11 @@ export type AiPlanProgressProps = {
    */
   elapsedMs?: number
   /**
+   * 현재 단계에서 지난 시간 (#1057, `lib/ai-plan/elapsed.ts` 의 `stepElapsedMsOf`). 경과 줄 아래
+   * `이 단계 n초째` 로 선다. **null(생략)이면 그 줄이 없고, 1초 미만 · 음수면 자리만 남긴다.**
+   */
+  stepElapsedMs?: number | null
+  /**
    * 무엇을 만들고 있는지 (#710). 조건을 잃었으면 null 이고 블록째 그리지 않는다.
    *
    * 하루 재생성(#451)은 `null` 이다 — 그 화면은 조건이 아니라 **일정과 일자**가 맥락이고
@@ -89,6 +94,7 @@ export function AiPlanProgress({
   canceling,
   cancelFailed,
   elapsedMs,
+  stepElapsedMs = null,
   conditionSummary = null,
   inset = 'main',
 }: AiPlanProgressProps) {
@@ -138,11 +144,7 @@ export function AiPlanProgress({
         <AiPlanJobBlock inset={inset}>
           <h2 className="text-title-2 text-fg font-semibold">{messages.aiPlan.jobExceededTitle}</h2>
           <p className="text-body-2 text-fg-muted">{messages.aiPlan.jobExceededDescription}</p>
-          {elapsed !== null && (
-            <p className="text-caption text-fg-muted tabular-nums">
-              {messages.aiPlan.jobElapsed.replace('{elapsed}', elapsed)}
-            </p>
-          )}
+          {elapsed !== null && <ElapsedCaption elapsed={elapsed} stepElapsedMs={stepElapsedMs} />}
         </AiPlanJobBlock>
 
         <AiPlanJobCondition
@@ -230,9 +232,7 @@ export function AiPlanProgress({
           쓸모가 있다.
         */}
             {elapsed !== null && (
-              <p aria-hidden className="text-caption text-fg-muted tabular-nums">
-                {messages.aiPlan.jobElapsed.replace('{elapsed}', elapsed)}
-              </p>
+              <ElapsedCaption elapsed={elapsed} stepElapsedMs={stepElapsedMs} hidden />
             )}
           </div>
           <StateCharacter pose="leash" className="-mb-5" />
@@ -264,6 +264,43 @@ export function AiPlanProgress({
         </p>
       </AiPlanJobBlock>
     </AiPlanJobFrame>
+  )
+}
+
+/**
+ * 경과 줄 (#710) + 단계 경과 둘째 줄 (#1057).
+ *
+ * **둘째 줄은 단계에 들어가 있는 동안 자리를 늘 차지한다.** `stepElapsedMs` 가 null 이 아니면(서버가
+ * 단계 시작 시각을 줬으면) 줄을 세우고, 표기할 수 없는 순간(1초 미만 · 기기 시계가 늦어 음수)에는
+ * **글자만 비운다.** 새 단계에 들어갈 때마다 줄이 빠졌다 돌아오면 그 아래 `그만두기` 가 튄다.
+ * null 이 되는 것은 PENDING → 첫 단계 · 종결처럼 화면 모양이 어차피 바뀌는 순간뿐이다.
+ *
+ * `hidden` 이면 **값을 담은 요소 자체가** `aria-hidden` 이다 — 1초마다 바뀌는 값이라 낭독 영역 밖에
+ * 두는 것만으로는 부족하다(누가 `role="status"` 안으로 옮기면 그날부터 매 초 읽힌다). 상한 초과
+ * 화면은 시계가 멈춰 값이 바뀌지 않으므로 숨기지 않는다.
+ */
+function ElapsedCaption({
+  elapsed,
+  stepElapsedMs,
+  hidden = false,
+}: {
+  elapsed: string
+  stepElapsedMs: number | null
+  hidden?: boolean
+}) {
+  const stepElapsed = stepElapsedMs === null ? null : formatElapsed(stepElapsedMs)
+
+  return (
+    <div aria-hidden={hidden || undefined} className="text-caption text-fg-muted tabular-nums">
+      <p>{messages.aiPlan.jobElapsed.replace('{elapsed}', elapsed)}</p>
+      {stepElapsedMs !== null && (
+        <p>
+          {stepElapsed === null
+            ? '\u00a0'
+            : messages.aiPlan.jobStepElapsed.replace('{stepElapsed}', stepElapsed)}
+        </p>
+      )}
+    </div>
   )
 }
 

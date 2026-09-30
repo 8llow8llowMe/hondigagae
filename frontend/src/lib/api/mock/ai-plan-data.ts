@@ -408,11 +408,18 @@ export function resolveAiPlanStreamMock(
     **스냅샷이 이미 `RUNNING` 이면 첫 단계를 다시 보내지 않는다** — 구독 전에 지나간
     단계다.
   */
-  const stepFrames = STEPS.map((step, index) => ({
-    delayMs: STREAM_STEP_MS * (index + 1),
-    event: JOB_STREAM_EVENT,
-    data: jobBody(job, 'RUNNING', step.code),
-  })).slice(snapshot === 'PENDING' ? 0 : 1)
+  /*
+    **단계 프레임은 그 프레임이 나가는 시각을 싣는다** (#1057). `delayMs` 는 직전 프레임과의 간격이라
+    누적이 곧 워커가 단계에 들어간 순간이다 — 백엔드도 워커가 단계를 저장한 시각을 싣는다.
+  */
+  let sentAt = Date.now() + STREAM_SNAPSHOT_MS
+  const stepFrames = STEPS.map((step, index) => ({ step, delayMs: STREAM_STEP_MS * (index + 1) }))
+    // 자른 뒤에 누적한다 — 보내지 않는 프레임의 간격은 흐르지 않는다
+    .slice(snapshot === 'PENDING' ? 0 : 1)
+    .map(({ step, delayMs }) => {
+      sentAt += delayMs
+      return { delayMs, event: JOB_STREAM_EVENT, data: jobBody(job, 'RUNNING', step.code, sentAt) }
+    })
 
   return {
     kind: 'stream',
@@ -790,6 +797,11 @@ function jobStatus(memberId: string, jobId: string): MockResult {
   return ok<AiPlanJob>(jobBody(job, status))
 }
 
+/** 서비스 시간대(`Asia/Seoul`, 일광 절약 없음) 오프셋을 단 ISO-8601 — 백엔드 `AiPlanPresenter` 와 같은 모양 */
+function toServiceIso(epochMs: number): string {
+  return new Date(epochMs + 9 * 60 * 60 * 1000).toISOString().replace('Z', '+09:00')
+}
+
 /**
  * 상태 하나에 해당하는 작업 조회 본문.
  *
@@ -802,6 +814,8 @@ function jobBody(
   status: JobStatusCode,
   /** 단계를 직접 지정한다 — 스트림이 `RUNNING` 안에서 단계를 옮길 때 쓴다 (#250) */
   stepCode: string | null = stepCodeOf(job, status),
+  /** 그 단계에 들어간 시각(ms) — 스트림만 안다. `RUNNING` 이고 단계가 있을 때만 실린다 (#1057) */
+  stepStartedAtMs: number | null = null,
 ): AiPlanJob {
   /*
     **단계는 상태와 함께 움직인다** (#250). `PENDING` 이면 `step`·`stepOrder` 가 **null** 이고,
@@ -814,6 +828,16 @@ function jobBody(
     step,
     stepOrder: stepIndex < 0 ? null : stepIndex + 1,
     totalSteps: TOTAL_STEPS,
+    /*
+      **단계 시작 시각은 스트림만 싣는다** (#1057). 스트림은 시간이 진행을 끌고 가 단계에 들어가는
+      순간을 알지만, 폴링 mock 은 조회 횟수로 단계를 옮겨 그 순간이 없다. 폴링의 null 은 계약이
+      허용하는 값이다 — 필드가 생기기 전에 저장된 잡이 그렇게 읽힌다(`ai-service.md` "옛 저장
+      데이터와 호환"). PENDING · 종결은 서버처럼 null 이다.
+    */
+    stepStartedAt:
+      status === 'RUNNING' && step !== null && stepStartedAtMs !== null
+        ? toServiceIso(stepStartedAtMs)
+        : null,
   }
 
   /*
