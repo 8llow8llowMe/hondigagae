@@ -16,6 +16,7 @@ import {
   type AddToPlanDayOption,
   PlaceAddToPlanPicker,
 } from '@/features/plan/place-add-to-plan-picker'
+import { invalidatePlanBriefing } from '@/features/plan/plan-briefing-invalidation'
 import { PlanCreateForm } from '@/features/plan/plan-create-form'
 import { PlanListSkeleton } from '@/features/plan/plan-list-skeleton'
 import { planKeys } from '@/features/plan/queries'
@@ -407,6 +408,8 @@ function useAddWalkCourseToPlan({
         (next) => {
           queryClient.setQueryData(planKeys.detail(planId), next)
           void queryClient.invalidateQueries({ queryKey: planKeys.weather(planId) })
+          // 코스도 브리핑의 항목 수 · 첫/마지막 항목에 든다 (#1055)
+          void invalidatePlanBriefing(queryClient, planId)
           void queryClient.invalidateQueries({ queryKey: planKeys.list() })
 
           showToast({

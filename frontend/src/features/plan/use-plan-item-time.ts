@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { useToast } from '@/components/toast'
+import { invalidatePlanBriefing } from '@/features/plan/plan-briefing-invalidation'
 import { planKeys } from '@/features/plan/queries'
 import { changeItemStartTime } from '@/lib/api/plan'
 import { messages } from '@/lib/messages'
@@ -103,6 +104,8 @@ export function usePlanItemTime({
             */
             // 바뀐 시각이 곧 그 항목의 판정 입력이다 (D15-6). 따로 받는 절이라 기다리지 않는다
             void queryClient.invalidateQueries({ queryKey: planKeys.walkSafety(planId) })
+            // 브리핑의 첫/마지막 항목 시각이 이 값이다 (#1055). 별도 화면이라 기다리지 않는다
+            void invalidatePlanBriefing(queryClient, planId)
             /*
               **판정(`planKeys.weather`)은 무효화하지 않는다.** 일자 판정은 항목 구성·순서(첫 장소
               항목)로 계산되고 시각을 읽지 않는다(`PlanWeatherProcessor` 실측) — 방문 체크와
