@@ -46,9 +46,7 @@ function codeStep(overrides: Partial<PasswordResetCodeStepProps> = {}) {
       submitting: false,
       cooldownSeconds: 0,
       resending: false,
-      showPassword: false,
       onValueChange: noop,
-      onTogglePassword: noop,
       onSubmit: noop,
       onResend: noop,
       onChangeEmail: noop,
@@ -158,29 +156,31 @@ describe('PasswordResetCodeStep', () => {
     expect(odd).toContain('<span aria-live="polite" class="sr-only"></span>')
   })
 
-  it('비밀번호 표시 토글이 상태를 aria-pressed 로 알린다', () => {
-    expect(codeStep({ showPassword: false })).toContain('aria-pressed="false"')
-    expect(codeStep({ showPassword: true })).toContain('aria-pressed="true"')
+  /*
+    토글의 두 상태(가려짐 ↔ 보임)와 이름 · `aria-controls` 배선은 `PasswordInput` 이 갖고
+    `components/password-input.test.ts` 가 본다. 여기서는 **이 칸이 그 토글을 쓴다** 는 것만
+    고정한다 — 로그인 폼에서 옮겨 온 배선이 이 화면에서 빠지지 않게 (#1080).
+  */
+  it('새 비밀번호 칸에 눈 토글이 있고, 가려진 채로 시작한다', () => {
+    const markup = codeStep()
+
+    expect(markup).toContain('type="password"')
+    expect(markup).toContain('aria-pressed="false"')
+    expect(markup).toContain(`aria-label="${messages.auth.passwordShow}"`)
+    expect(markup).toContain('aria-controls="newPassword"')
   })
 
-  /*
-    **아이콘 버튼의 이름은 `aria-label` 뿐이다** — 눈 아이콘이 `aria-hidden` 이라
-    라벨이 빠지면 스크린리더에 이름 없는 버튼으로 남는다. `Button` 의 `iconOnly` 유니온이
-    타입으로 강제하지만, 문구가 상태를 따라 바뀌는 것까지는 타입이 못 본다.
-  */
-  it('눈 아이콘이 상태별 이름을 갖는다 — 아이콘 자체는 이름이 없다', () => {
-    expect(codeStep({ showPassword: false })).toContain(
-      `aria-label="${messages.auth.passwordShow}"`,
-    )
-    expect(codeStep({ showPassword: true })).toContain(`aria-label="${messages.auth.passwordHide}"`)
+  it('비밀번호 규칙을 틀리기 전에 보여 준다 (#1080)', () => {
+    expect(codeStep()).toContain(messages.form.passwordRule)
   })
 
-  /*
-    아이콘이 입력란 **안**으로 들어가 시각적으로만 붙어 있다 — 텍스트 버튼일 때는 바로 옆
-    자리가 그 관계를 말했다. `aria-controls` 가 어느 입력란을 여닫는지 잇는다.
-  */
-  it('토글이 자기가 여닫는 입력란을 가리킨다', () => {
-    expect(codeStep()).toContain('aria-controls="newPassword"')
+  it('틀리면 규칙 자리를 오류가 대신한다 — 두 줄이 겹쳐 서지 않는다', () => {
+    const markup = codeStep({
+      errors: { fields: { newPassword: messages.form.passwordLength }, form: null },
+    })
+
+    expect(markup).toContain(messages.form.passwordLength)
+    expect(markup).not.toContain(messages.form.passwordRule)
   })
 })
 

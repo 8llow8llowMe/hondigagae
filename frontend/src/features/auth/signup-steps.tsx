@@ -8,6 +8,7 @@ import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
 import { FormNotice } from '@/components/form-notice'
 import { Input } from '@/components/input'
+import { PasswordInput } from '@/components/password-input'
 import type { CodeValues, EmailValues, SignupProfileValues } from '@/features/auth/schemas'
 import { SignupEmailSummary } from '@/features/auth/signup-parts'
 import { classify } from '@/lib/api/error'
@@ -255,15 +256,19 @@ export function ProfileStep({
         </Link>
       )}
 
+      {/*
+        규칙은 **틀리기 전에** 보인다 (#1080) — 오류가 서면 그 자리를 오류가 대신한다.
+        비밀번호 확인 칸은 두지 않는다. 눈 토글로 친 값을 직접 보고 고친다 (회원가입-세부명세 D6).
+      */}
       <Field
         id="password"
         label={messages.auth.passwordLabel}
         error={errors.fields.password}
+        hint={messages.form.passwordRule}
         required
       >
-        <Input
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="new-password"
           value={values.password}
           onValueChange={(value) => onValueChange('password', value)}

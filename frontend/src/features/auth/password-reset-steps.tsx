@@ -5,8 +5,8 @@ import { ErrorState } from '@/components/error-state'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
 import { FormNotice } from '@/components/form-notice'
-import { EyeIcon, EyeOffIcon } from '@/components/icons'
 import { Input } from '@/components/input'
+import { PasswordInput } from '@/components/password-input'
 import type { EmailValues, PasswordResetValues } from '@/features/auth/schemas'
 import { classify } from '@/lib/api/error'
 import type { FormErrors } from '@/lib/form/field-errors'
@@ -96,11 +96,9 @@ export type PasswordResetCodeStepProps = {
   cooldownSeconds: number
   /** 재발송이 인플라이트인가. 쿨다운과 별개로 이중 클릭을 막는다 (form-guide.md §6) */
   resending: boolean
-  showPassword: boolean
   /** 발송 성공 안내. **이메일 존재 여부와 무관하게 늘 같은 문구다** (계정 열거 방지) */
   notice?: string | undefined
   onValueChange: (key: keyof PasswordResetValues, value: string) => void
-  onTogglePassword: () => void
   onSubmit: () => void
   onResend: () => void
   onChangeEmail: () => void
@@ -115,10 +113,8 @@ export function PasswordResetCodeStep({
   submitting,
   cooldownSeconds,
   resending,
-  showPassword,
   notice,
   onValueChange,
-  onTogglePassword,
   onSubmit,
   onResend,
   onChangeEmail,
@@ -192,28 +188,16 @@ export function PasswordResetCodeStep({
         id="newPassword"
         label={messages.auth.newPasswordLabel}
         error={errors.fields.newPassword}
+        hint={messages.form.passwordRule}
         required
       >
-        {/* 입력란 안 눈 아이콘 — 배선·근거 전부 `LoginFormFields` 와 같다 */}
-        <Input
+        {/* 입력란 안 눈 토글 — 가입 3단계 · 마이페이지와 같은 `PasswordInput` 이다 (#1080) */}
+        <PasswordInput
           id="newPassword"
-          type={showPassword ? 'text' : 'password'}
           autoComplete="new-password"
           value={values.newPassword}
           onValueChange={(value) => onValueChange('newPassword', value)}
           invalid={errors.fields.newPassword !== undefined}
-          action={
-            <Button
-              variant="ghost"
-              size="md"
-              iconOnly
-              aria-label={showPassword ? messages.auth.passwordHide : messages.auth.passwordShow}
-              aria-pressed={showPassword}
-              aria-controls="newPassword"
-              leading={showPassword ? <EyeOffIcon size={20} /> : <EyeIcon size={20} />}
-              onClick={onTogglePassword}
-            />
-          }
         />
       </Field>
 
