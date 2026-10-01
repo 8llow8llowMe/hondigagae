@@ -164,7 +164,20 @@ password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
 - **안내(`hint`)도 `aria-describedby` 로 잇는다** ([#1100](https://github.com/8llow8llowMe/hondigagae/issues/1100)).
   정상이면 hint, 오류면 오류 하나 — 화면에 보이는 것만이다. `Field` 에 `hint` · `error` 를 주면 안쪽
   입력이 알아서 가리킨다(`component-guide.md` §7). 입력에 따로 넘기지 않는다.
-- **폼 전체 오류는 `role="alert"`** 로 낸다. 제출 후 화면 변화가 없으면 스크린리더 사용자가 실패를 모른다.
+- **폼 전체 오류는 반드시 읽힌다** — 제출 후 화면 변화가 없으면 스크린리더 사용자가 실패를 모른다.
+  읽히는 길은 **`role="alert"` 이거나 포커스 이동이거나, 둘 중 하나만**이다
+  ([#1102](https://github.com/8llow8llowMe/hondigagae/issues/1102)). 둘 다 두면 알림이 나타나며 한 번,
+  포커스가 옮겨 오며 한 번 — 같은 문구를 두 번 읽는다.
+  - **포커스가 그 표시로 오면 역할을 뗀다**(`announce="focus"`). 포커스를 주지 않는 쪽을 고르지 않은
+    이유: 그러면 #1078 이 막은 `BODY` 낙하가 돌아온다.
+  - **포커스가 다른 칸으로 가면 `role="alert"` 다**(`announce="live"`) — 필드 오류가 먼저인 실패(반려견
+    폼의 "N개 확인" 요약), 로그인 401(비밀번호 칸, 로그인 D4), 단계 되돌림 안내(새 단계의 첫 입력, D6).
+  - 판정은 `submitFailureAnnounce(errors, errorStatus)` 하나 — **포커스 순서의 첫 대상이 그 표시인가**
+    다. 포커스 effect 와 같은 함수를 봐야 "역할을 뗐는데 포커스도 안 간" 무음 실패가 없다. 위의 두
+    예외 갈래는 호출부가 `live` 로 덮는다.
+  - **`FormAlert` 의 기본값은 `live` 그대로다.** 포커스를 옮기지 않는 나머지 29개 파일(38곳)은 바뀌지 않는다.
+    `focus` 는 포커스를 실제로 옮기는 자리(지금은 `FormFailure`)만 넘긴다. `FormFailure.announce` 는
+    필수다.
 - 제출 실패 시 **화면에서 첫 번째로 보이는 오류 필드로 포커스를 옮긴다.**
   - **판정 기준은 DOM 순서다.** zod 스키마의 키 선언 순서가 아니다 — 두 순서는 언제든 어긋날 수
     있고, 어긋나면 포커스가 위의 오류를 지나쳐 아래로 간다 ([#560](https://github.com/8llow8llowMe/hondigagae/issues/560)
@@ -189,10 +202,25 @@ password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
     폼 전체 실패는 **한 자리에 하나만** 선다 — 일시 장애(`ErrorState` `flush` + 재시도)이거나
     `FormAlert` 이거나. 판정은 `src/lib/form/form-failure-display.ts` 의 `formFailureDisplay`
     하나고, 화면과 포커스(`focusSubmitFailure(container, errors, errorStatus)`)가 같은 함수를 본다.
-    일시 장애의 바깥 상자가 `role="alert"` · `tabIndex={-1}` · `data-form-temporary-error` 를 단다.
+    일시 장애의 바깥 상자가 `tabIndex={-1}` · `data-form-temporary-error` 를 단다(`role="alert"` 는
+    `announce="live"` 일 때만 — 위 낭독 경로 규칙, #1102).
     인증 폼과 반려견 등록 · 수정 폼이 `src/components/form-failure.tsx` 의 `FormFailure` 를 쓴다 —
     두 feature 가 쓰므로 #1101 에서 `features/auth/` 에서 공용으로 올렸다(component-guide.md §9).
     제목을 가진 카드 안이면 `headingLevel={3}` 을 준다(반려견 폼).
+  - **값을 고치면 일시 장애가 통째로 걷힌다** (#1102). 호출부가 `errorStatus` 를 비우기 **직전에**
+    `setErrors((prev) => formErrorsAfterEdit(prev, errorStatus))` 로 서버 문구(`errors.form`)도 걷는다.
+    상태만 비우면 5xx 에도 채워 둔 서버 문구로 `FormAlert` 가 서서, 일시 장애가 "서비스를 일시적으로
+    사용할 수 없습니다." 알림으로 **모양을 바꿨다**. 표시 판정(`formFailureDisplay`)은 고칠 수 없었다
+    — `(문구, null)` 이 "401 뒤 값을 고쳤다"(알림을 남긴다)와 같은 입력이라서다. 재시도 전까지는
+    아무것도 서지 않는다(5xx 문구는 원래 그려진 적이 없어 잃는 정보가 없다).
+- **재전송 뒤에도 포커스를 놓지 않는다** (#1102). 가입 · 재설정 2단계 `다시 보내기` 는 요청 중
+  `loading`, 끝나면 성공이든 429 든 쿨다운으로 `disabled` 라 포커스가 `BODY` 로 떨어졌다(실측: 성공 ·
+  429 · 503 여섯 갈래 모두). `submitCount` 경로 밖이라 재전송 횟수 effect 가 `focusResendResult` 를
+  부른다 — **성공은 폼의 첫 입력(코드 칸)**, 막혔으면 제출 실패와 같은 순서(429 알림 · 5xx 일시 장애).
+  성공은 포커스를 잃었을 때만 옮긴다(요청 중 코드 칸을 눌러 둔 사람의 자리를 빼앗지 않는다). 성공
+  안내(`FormNotice`)로 보내지 않는 이유: 문구가 그대로라 다시 읽힐 것이 없고, 쿨다운 진입은 버튼 옆
+  `aria-live` 가 "다시 보내기 (60초 후 가능)" 으로 이미 알린다. 재전송이 성공하면 직전 폼 전체 실패
+  (429 · 5xx 문구)도 걷는다.
   - **단계를 되돌리는 실패**(`AUTH_005` · `MEMBER_006` · `AUTH_017`)는 단계 전환 effect 가 새 단계의
     첫 입력으로 옮긴다. 제출 실패 effect 는 단계 가드로 비켜선다 — 둘이 포커스를 다투지 않게.
 - 비밀번호 표시 토글은 `aria-pressed` 로 상태를 알린다.
@@ -215,7 +243,7 @@ password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
 - [ ] zod 스키마에 대응 백엔드 코드 주석이 있다
 - [ ] 서버 400 을 `field-errors` 로 병합한다 (`fieldErrors` 형태·문자열 형태 둘 다)
 - [ ] 필드별 첫 오류만 표시한다
-- [ ] 폼 전체 오류가 `role="alert"` 로 나온다
+- [ ] 폼 전체 오류가 `role="alert"` 또는 포커스 이동 중 **하나로** 읽힌다 (§8, #1102)
 - [ ] 제출 중 중복 방지가 두 겹이다
 - [ ] 제출 실패 시 `focusFirstError` 로 **화면의 첫 오류** 필드에 포커스가 간다 (§8)
 - [ ] 401 / 409 / 429 분기를 화면 문구로 확정했다
