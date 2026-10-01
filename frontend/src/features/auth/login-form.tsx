@@ -10,8 +10,8 @@ import { Checkbox } from '@/components/checkbox'
 import { ErrorState } from '@/components/error-state'
 import { Field } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
-import { EyeIcon, EyeOffIcon } from '@/components/icons'
 import { Input } from '@/components/input'
+import { PasswordInput } from '@/components/password-input'
 import { enterSession } from '@/features/auth/enter-session'
 import { loginSchema, type LoginValues } from '@/features/auth/schemas'
 import { login, type LoginResult } from '@/lib/api/auth'
@@ -33,13 +33,11 @@ export type LoginFormFieldsProps = {
   /** 실패한 요청의 HTTP 상태. 성공했거나 아직 요청을 보내지 않았으면 null */
   errorStatus: number | null
   submitting: boolean
-  showPassword: boolean
   /** "이메일 기억하기" 체크 상태 — 로그인-세부명세 D10 */
   remember: boolean
   /** 비밀번호 입력 중 Caps Lock 이 켜져 있는가. 키 이벤트가 알려 줄 때까지는 false */
   capsLock: boolean
   onValueChange: (key: keyof LoginValues, value: string) => void
-  onTogglePassword: () => void
   onRememberChange: (checked: boolean) => void
   onCapsLockChange: (on: boolean) => void
   onSubmit: () => void
@@ -50,27 +48,20 @@ export type LoginFormFieldsProps = {
  * 표시 전용. 상태를 갖지 않아 node 환경에서 렌더 테스트가 된다
  * — docs/testing-guide.md §1.
  *
- * **비밀번호 표시 토글은 입력란 안 눈 아이콘이다.** 예전에는 `표시` / `숨기기` 텍스트
- * 버튼이 입력란 **옆에** 섰다 — `iconOnly` 가 타입으로 `children` 을 금지하는데
- * (component-guide.md §7) 그때는 눈 아이콘 자산이 없어 쓰면 빈 버튼이 됐기 때문이다.
- * 자산이 생겼으니(`EyeIcon` · `EyeOffIcon`) 원래 자리로 옮긴다: 버튼이 가져가던 44px +
- * gap 8px 가 입력란으로 돌아가 **입력란이 열 끝까지 선다.**
- *
- * **이름은 아이콘이 아니라 `aria-label` 이 준다** — 아이콘은 `aria-hidden` 이다.
- * `표시` / `숨기기` 두 글자는 옆에 입력란이 보일 때만 뜻이 통하므로, 소리로만 듣는
- * 쪽에는 `비밀번호 표시` / `비밀번호 숨기기` 로 대상까지 말한다. 상태는 그대로
- * `aria-pressed` 가 알린다.
+ * **비밀번호 칸은 공용 `PasswordInput` 이다** (#1080 이 남긴 로그인 이관을 #1081 에서 닫는다).
+ * 눈 토글의 배선(`aria-label` · `aria-pressed` · `aria-controls` · 44×44 `ghost`)은 원래 이
+ * 파일의 것을 그대로 옮긴 것이라 동작은 같다. 표시 상태는 컴포넌트가 갖는다 — 폼 값이 아니라
+ * 칸의 표시 방식이라서다 (`password-input.tsx` 머리주석). 그래서 이 표시 전용 컴포넌트에서
+ * `showPassword` · `onTogglePassword` prop 이 빠졌다.
  */
 export function LoginFormFields({
   values,
   errors,
   errorStatus,
   submitting,
-  showPassword,
   remember,
   capsLock,
   onValueChange,
-  onTogglePassword,
   onRememberChange,
   onCapsLockChange,
   onSubmit,
@@ -131,9 +122,12 @@ export function LoginFormFields({
         hint={capsLock ? messages.auth.capsLockOn : undefined}
         required
       >
-        <Input
+        {/*
+          Caps Lock 이벤트는 `PasswordInput` 이 `Input` 으로 그대로 넘기는 native prop 이라 공용
+          컴포넌트를 고치지 않고 받는다.
+        */}
+        <PasswordInput
           id="password"
-          type={showPassword ? 'text' : 'password'}
           autoComplete="current-password"
           // 마지막 칸이라 엔터가 곧 제출이다 — 키보드에 "이동" 대신 "완료" 성격을 준다 (L6)
           enterKeyHint="done"
@@ -150,26 +144,6 @@ export function LoginFormFields({
           value={values.password}
           onValueChange={(value) => onValueChange('password', value)}
           invalid={errors.fields.password !== undefined}
-          action={
-            /*
-              `ghost` 다 — 입력란 **안**에 서는 버튼이라 자기 면을 가지면 입력란 안에 상자가
-              하나 더 생긴다. hover 에서만 `--band` 가 깔린다.
-
-              `aria-controls` 로 어느 입력란을 여닫는지 잇는다. 텍스트 버튼일 때는 바로 옆에
-              붙어 있어 자리가 그 관계를 말했지만, 아이콘은 입력란 안으로 들어가 시각적으로만
-              붙어 있다.
-            */
-            <Button
-              variant="ghost"
-              size="md"
-              iconOnly
-              aria-label={showPassword ? messages.auth.passwordHide : messages.auth.passwordShow}
-              aria-pressed={showPassword}
-              aria-controls="password"
-              leading={showPassword ? <EyeOffIcon size={20} /> : <EyeIcon size={20} />}
-              onClick={onTogglePassword}
-            />
-          }
         />
       </Field>
 
@@ -222,7 +196,6 @@ export function LoginFormFields({
 
 export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initialEmail: string }) {
   const queryClient = useQueryClient()
-  const [showPassword, setShowPassword] = useState(false)
   /*
     **기본은 꺼짐이다** (#1081). 저장값은 마운트 뒤 effect 에서 읽어 켠다 — 서버 렌더에는
     `localStorage` 가 없고, 렌더 중에 읽으면 서버와 첫 클라이언트 렌더가 갈려 hydration
@@ -324,7 +297,6 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
         errors={errors}
         errorStatus={errorStatus}
         submitting={isSubmitting || entering}
-        showPassword={showPassword}
         remember={remember}
         capsLock={capsLock}
         onValueChange={(key, value) => {
@@ -334,7 +306,6 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
           setErrorStatus(null)
           setValue(key, value)
         }}
-        onTogglePassword={() => setShowPassword((previous) => !previous)}
         onRememberChange={(checked) => {
           setRemember(checked)
           // 해제는 **즉시** 지운다 (#1081) — 로그인하지 않고 떠나도 이 기기에 남지 않게

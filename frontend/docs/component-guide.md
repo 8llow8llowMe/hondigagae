@@ -182,7 +182,7 @@ const SIZE: Record<ButtonSize, string> = {
 
 - 토글은 `aria-label`(상태별) · `aria-pressed` · `aria-controls={id}` 를 단다. 아이콘은 `aria-hidden`.
 - 규칙 안내는 이 컴포넌트가 아니라 감싸는 `Field.hint` 가 한다 (`messages.form.passwordRule`).
-- 쓰는 곳: 회원가입 3단계 · 비밀번호 재설정 · 마이페이지 변경/설정. **로그인 폼은 아직 자기 토글을 들고 있다** — 같은 배선이라 옮기는 것은 후속이다 (옮기면 `LoginFormFields` 의 `showPassword` · `onTogglePassword` prop 이 걷힌다).
+- 쓰는 곳: 로그인 · 회원가입 3단계 · 비밀번호 재설정 · 마이페이지 변경/설정. 로그인은 #1081 에서 옮겼다 — `LoginFormFields` 의 `showPassword` · `onTogglePassword` prop 이 걷혔고, Caps Lock 안내용 키 이벤트는 native prop 으로 그대로 넘긴다.
 
 ## 6. ref
 

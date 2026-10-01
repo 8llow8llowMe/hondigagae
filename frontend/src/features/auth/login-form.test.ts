@@ -18,11 +18,9 @@ function render(overrides: Partial<LoginFormFieldsProps> = {}) {
     errors: NO_FORM_ERRORS,
     errorStatus: null,
     submitting: false,
-    showPassword: false,
     remember: false,
     capsLock: false,
     onValueChange: () => undefined,
-    onTogglePassword: () => undefined,
     onRememberChange: () => undefined,
     onCapsLockChange: () => undefined,
     onSubmit: () => undefined,
@@ -71,9 +69,14 @@ describe('LoginFormFields', () => {
     expect(markup).toContain(messages.auth.loginSubmitting)
   })
 
-  it('비밀번호 표시 토글이 aria-pressed 를 반영한다', () => {
-    expect(render({ showPassword: false })).toContain('aria-pressed="false"')
-    expect(render({ showPassword: true })).toContain('aria-pressed="true"')
+  it('비밀번호 칸은 공용 PasswordInput 이다 — 가려진 채 시작하고 토글이 칸을 가리킨다', () => {
+    // 누른 뒤의 상태는 `password-input.test.ts` 의 `passwordReveal` 이 본다 (#1080)
+    const markup = render()
+
+    expect(markup).toMatch(/id="password"[^>]*type="password"|type="password"[^>]*id="password"/)
+    expect(markup).toContain('aria-pressed="false"')
+    expect(markup).toContain('aria-controls="password"')
+    expect(markup).toContain(`aria-label="${messages.auth.passwordShow}"`)
   })
 
   it('5xx 면 ErrorState 와 재시도 버튼을 렌더한다', () => {
