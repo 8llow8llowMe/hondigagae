@@ -221,9 +221,16 @@ export const authMessages = {
     두 화면의 결과가 같으므로(정본 D8-3) 그 자리에서 실제로 일어나는 일이 로그인이다.
   */
   socialLoginLabel: (provider: string) => `${provider} 로그인`,
-  socialRetryLabel: (provider: string) => `${provider} 다시 시도`,
   oauthExchanging: '로그인하고 있어요',
   oauthInvalidTitle: '잘못된 접근이에요',
   oauthInvalidDescription: '로그인 화면에서 다시 시도해 주세요.',
   oauthFailedTitle: '로그인하지 못했어요',
+  /*
+    **콜백 실패의 버튼은 목적지대로 말한다** (#1079). 예전에는 `카카오 다시 시도` · `다시 시도` ·
+    `로그인하기` 셋이 섞였는데 셋 다 `/login` 으로 갔다 — 라벨만 보고 누르면 제공자 인가 화면이
+    아니라 로그인 화면이 떴다. 여기서 authorize 를 다시 부르지 않는다는 기본 결정이라
+    (`oauth-error.ts`) 라벨을 목적지에 맞췄다. 재설정 완료의 `toLoginScreen`(`로그인으로`)과
+    갈라 둔 것은 그 화면이 범위 밖이어서다.
+  */
+  oauthToLoginScreen: '로그인 화면으로',
 } as const

@@ -30,6 +30,7 @@ describe('OAuthCallbackStatus', () => {
     expect(markup).toContain(messages.auth.oauthInvalidTitle)
     expect(markup).toContain(messages.auth.oauthInvalidDescription)
     expect(markup).toContain('href="/login"')
+    expect(markup).toContain(`>${messages.auth.oauthToLoginScreen}</a>`)
   })
 
   it('AUTH_008 은 서버 문구를 그대로 낸다 — 어느 소셜인지 서버가 말한다', () => {
@@ -45,11 +46,16 @@ describe('OAuthCallbackStatus', () => {
 
     expect(markup).toContain('이미 카카오(으)로 가입된 계정입니다.')
     // 같은 소셜을 다시 눌러도 결과가 같으므로 "다시 시도" 로 안내하지 않는다
-    expect(markup).toContain(messages.auth.toLogin)
-    expect(markup).not.toContain(messages.auth.socialRetryLabel('네이버'))
+    expect(markup).toContain(messages.auth.oauthToLoginScreen)
+    expect(markup).not.toContain(messages.common.retry)
   })
 
-  it('동의가 필요하면 제공자 이름이 든 버튼을 준다', () => {
+  /*
+    #1079 — 예전 라벨은 "카카오 다시 시도" 였는데 목적지는 `/login` 이었다. 누르면 제공자가
+    아니라 로그인 화면이 떠 라벨이 거짓이 됐다. authorize 를 여기서 다시 부르지 않는다는 기본
+    결정이라 라벨을 목적지에 맞췄다.
+  */
+  it('동의가 필요해도 버튼은 목적지대로 "로그인 화면으로" 다 — 서버 문구가 사유를 말한다', () => {
     const markup = render('kakao', {
       status: 'failed',
       returnTo: '/',
@@ -57,7 +63,9 @@ describe('OAuthCallbackStatus', () => {
     })
 
     expect(markup).toContain('소셜 계정의 이메일 제공 동의가 필요합니다.')
-    expect(markup).toContain(messages.auth.socialRetryLabel('카카오'))
+    expect(markup).toContain('href="/login"')
+    expect(markup).toContain(`>${messages.auth.oauthToLoginScreen}</a>`)
+    expect(markup).not.toContain('카카오 다시 시도')
   })
 
   it('모르는 provider 로 들어와도 라벨이 깨지지 않는다', () => {
@@ -68,7 +76,7 @@ describe('OAuthCallbackStatus', () => {
       error: domainError(400, 'AUTH_009', '소셜 계정의 이메일 제공 동의가 필요합니다.'),
     })
 
-    expect(markup).toContain(messages.common.retry)
+    expect(markup).toContain(messages.auth.oauthToLoginScreen)
     expect(markup).not.toContain('function')
   })
 
@@ -84,7 +92,7 @@ describe('OAuthCallbackStatus', () => {
     })
 
     expect(markup).toContain('유효하지 않은 소셜 로그인 요청입니다.')
-    expect(markup).toContain(messages.common.retry)
+    expect(markup).toContain(messages.auth.oauthToLoginScreen)
   })
 
   it('AUTH_014(502)도 서버 문구가 살아남는다 — 일시 장애 문구로 덮이지 않는다', () => {
@@ -98,10 +106,53 @@ describe('OAuthCallbackStatus', () => {
       ),
     })
 
-    // 5xx 경로(FormAlert)로 가지만 문구는 서버 것이다
-    expect(markup).toContain('role="alert"')
     expect(markup).toContain('소셜 로그인 제공자와 통신할 수 없습니다.')
   })
+
+  /*
+    #1079 — 예전에는 5xx 만 제목 없이 `FormAlert` + "다시 시도"(실제로는 `/login` 링크)였다.
+    다른 실패와 같은 모양(제목 · 사유 · 로그인 화면으로)으로 맞춘다. 콜백에서 재시도할 수단이
+    없으므로(`code` 1회용) `ErrorState` 가 아니다.
+  */
+  it('5xx 도 "로그인하지 못했어요" 제목과 로그인 화면 링크다 — 알림 상자가 아니다', () => {
+    const markup = render('kakao', {
+      status: 'failed',
+      returnTo: '/',
+      error: domainError(502, 'AUTH_014', '소셜 로그인 제공자와 통신할 수 없습니다.'),
+    })
+
+    expect(markup).toContain(`>${messages.auth.oauthFailedTitle}</h1>`)
+    expect(markup).not.toContain('role="alert"')
+    expect(markup).toContain('href="/login"')
+    expect(markup).toContain(`>${messages.auth.oauthToLoginScreen}</a>`)
+  })
+
+  it.each([
+    { name: '잘못된 접근', exchange: { status: 'invalid' } as const },
+    {
+      name: '도메인 실패',
+      exchange: {
+        status: 'failed',
+        returnTo: '/',
+        error: domainError(400, 'AUTH_009', '소셜 계정의 이메일 제공 동의가 필요합니다.'),
+      } as const,
+    },
+    {
+      name: '5xx',
+      exchange: { status: 'failed', returnTo: '/', error: new ApiError(500, null, null) } as const,
+    },
+  ])(
+    '$name — 제목이 화면의 h1 이고 인증 카드 안에서 여백을 한 번 더 먹지 않는다 (#1079)',
+    ({ exchange }) => {
+      const markup = render('kakao', exchange)
+
+      expect(markup.match(/<h1/g)).toHaveLength(1)
+      expect(markup).not.toContain('<h2')
+      // 카드(`px-4 py-6 md:px-5`)가 이미 여백을 갖는다 — 예전에는 제목이 x=49(다른 화면 33)였다
+      expect(markup).not.toContain('py-12')
+      expect(markup).not.toContain('md:px-10')
+    },
+  )
 
   it('문구 없는 5xx 는 일시 장애 문구로 떨어진다', () => {
     const markup = render('kakao', {
