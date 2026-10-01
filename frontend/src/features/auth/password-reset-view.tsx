@@ -17,6 +17,7 @@ import { resetPassword, sendPasswordResetCode } from '@/lib/api/auth'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
 import { remainingSeconds } from '@/lib/form/cooldown'
 import { apiErrorToFormErrors, type FormErrors } from '@/lib/form/field-errors'
+import { focusSubmitFailure } from '@/lib/form/submit-failure-focus'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
 
@@ -84,7 +85,15 @@ export function PasswordResetView() {
   useEffect(() => {
     if (previousStepRef.current === step) return
     previousStepRef.current = step
-    if (step === 'done') return
+    /*
+      완료 화면에는 입력이 없다. 예전에는 여기서 그냥 돌아가, 제출 중 `disabled` 가 된 버튼과
+      함께 폼이 사라지며 포커스가 `BODY` 로 떨어졌다 (#1078 실측). 남은 할 일인 "로그인 화면으로"
+      링크로 옮긴다 — 완료 문구는 단계 제목의 live 영역이 이미 읽는다.
+    */
+    if (step === 'done') {
+      containerRef.current?.querySelector<HTMLElement>('a[href]')?.focus()
+      return
+    }
     const focusId = step === 'email' ? 'email' : 'code'
     containerRef.current?.querySelector<HTMLElement>(`#${focusId}`)?.focus()
   }, [step])
@@ -167,11 +176,19 @@ export function PasswordResetView() {
   // 틀린 것은 코드지 비밀번호가 아니다. submitCount 만 의존하는 이유는 use-form.ts 참고
   useEffect(() => {
     if (resetForm.submitCount === 0) return
+    // AUTH_005 · AUTH_017 로 1단계에 되돌아갔으면 단계 전환 effect 가 이메일로 옮긴다
+    if (step !== 'code') return
     if (resetForm.errors.fields.code !== undefined) {
       // keepError: 방금 띄운 코드 오류를 이 호출이 지우면 무음 실패가 된다
       resetForm.setValue('code', '', { keepError: true })
       containerRef.current?.querySelector<HTMLElement>('#code')?.focus()
+      return
     }
+    /*
+      코드는 맞게 냈는데 막힌 경우 — 약한 새 비밀번호(클라이언트 · `AUTH_106/107/108`), 429,
+      5xx (#1078). 예전에는 여기서 아무것도 하지 않아 포커스가 버튼에 남거나 `BODY` 로 떨어졌다.
+    */
+    focusSubmitFailure(containerRef.current, resetForm.errors)
   }, [resetForm.submitCount])
 
   const handleResend = useCallback(() => {
@@ -205,6 +222,15 @@ export function PasswordResetView() {
     stepBackMessage !== null
       ? { fields: emailForm.errors.fields, form: stepBackMessage }
       : emailForm.errors
+
+  /*
+    **1단계 제출 실패 뒤 포커스** (#1078) — 빈 이메일은 이메일 칸, 429 · 5xx 는 알림으로.
+    되돌림 안내가 섞인 화면 값(`emailStepErrors`)을 넘긴다. 트리거는 `submitCount` 하나다.
+  */
+  useEffect(() => {
+    if (emailForm.submitCount === 0 || step !== 'email') return
+    focusSubmitFailure(containerRef.current, emailStepErrors)
+  }, [emailForm.submitCount])
 
   const heading =
     step === 'email'

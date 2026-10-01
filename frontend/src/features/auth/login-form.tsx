@@ -24,6 +24,7 @@ import {
 } from '@/lib/auth/saved-login-email'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { focusFirstError, hasFieldErrors } from '@/lib/form/focus-first-error'
+import { focusSubmitFailure } from '@/lib/form/submit-failure-focus'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
 
@@ -265,7 +266,15 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
     if (errorStatus === 401) {
       setValue('password', '')
       formContainerRef.current?.querySelector<HTMLElement>('#password')?.focus()
+      return
     }
+
+    /*
+      그 밖의 폼 전체 오류(5xx · 무응답 · 429 `AUTH_015` · 400 `MEMBER_007`)는 알림으로 보낸다
+      (#1078). 제출 중 버튼이 `disabled` 가 되며 포커스가 `BODY` 로 떨어지고, 돌려 보낼
+      필드가 없어 거기 남았다 — 키보드 사용자가 문서 맨 위에서 다시 시작했다.
+    */
+    focusSubmitFailure(formContainerRef.current, errors)
   }, [submitCount])
 
   /*
