@@ -190,8 +190,9 @@ password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
     `FormAlert` 이거나. 판정은 `src/lib/form/form-failure-display.ts` 의 `formFailureDisplay`
     하나고, 화면과 포커스(`focusSubmitFailure(container, errors, errorStatus)`)가 같은 함수를 본다.
     일시 장애의 바깥 상자가 `role="alert"` · `tabIndex={-1}` · `data-form-temporary-error` 를 단다.
-    인증 폼은 `features/auth/form-failure.tsx` 의 `FormFailure` 를 쓴다. 반려견 폼은 아직 둘이 함께
-    선다(#1079 범위 밖).
+    인증 폼과 반려견 등록 · 수정 폼이 `src/components/form-failure.tsx` 의 `FormFailure` 를 쓴다 —
+    두 feature 가 쓰므로 #1101 에서 `features/auth/` 에서 공용으로 올렸다(component-guide.md §9).
+    제목을 가진 카드 안이면 `headingLevel={3}` 을 준다(반려견 폼).
   - **단계를 되돌리는 실패**(`AUTH_005` · `MEMBER_006` · `AUTH_017`)는 단계 전환 effect 가 새 단계의
     첫 입력으로 옮긴다. 제출 실패 effect 는 단계 가드로 비켜선다 — 둘이 포커스를 다투지 않게.
 - 비밀번호 표시 토글은 `aria-pressed` 로 상태를 알린다.
