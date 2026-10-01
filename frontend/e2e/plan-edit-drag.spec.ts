@@ -37,6 +37,7 @@ async function openEditor(page: Page): Promise<Locator> {
  * 한 칸 대신 두 칸이 옮겨졌다. 끌기 판정이 아니라 **좌표가 낡은 것**이라 여기서 막는다.
  */
 async function settle(page: Page, list: Locator) {
+  // hydration 대기가 아니라 늦게 오는 조각의 도착 대기다 — 마운트 표식으로 옮기지 않는다 (#1103)
   await page.waitForLoadState('networkidle')
   await expect
     .poll(async () => {

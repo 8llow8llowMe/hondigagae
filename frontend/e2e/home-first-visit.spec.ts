@@ -78,6 +78,12 @@ for (const viewport of [
 
     test('소개 카드 링크가 하나만 보이고 스크롤 없이 첫 화면 안에 있다', async ({ page }) => {
       await page.goto('/')
+      /*
+        **hydration 대기가 아니라 데이터 도착 대기다 — 마운트 표식으로 옮기지 않는다** (#1103).
+        이 테스트가 잡는 회귀는 권역 비교(클라이언트 조회)가 도착하며 골격과 실화면 높이 차만큼
+        카드를 밀어 내리는 것이다 (#963). 마운트 직후에 재면 골격 위에서 재게 되어 그 밀림을
+        보지 못한다.
+      */
       await page.waitForLoadState('networkidle')
 
       const intro = page
