@@ -85,10 +85,6 @@ export const authMessages = {
   loginDivider: '또는',
   signupPrompt: '아직 회원이 아니신가요?',
 
-  alreadyLoggedIn: '이미 로그인되어 있어요',
-  logout: '로그아웃',
-  goBack: '이어서 이용하기',
-
   signupTitle: '회원가입',
   stepOf: (current: number, total: number) => `${total}단계 중 ${current}단계`,
   /*

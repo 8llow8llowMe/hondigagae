@@ -32,7 +32,7 @@ describe('소셜 동의 화면 페이지 — 제공자 세그먼트', () => {
 
   /*
     **순서가 계약이다.** 뒤로 미루면 잘못된 주소에 쿠키 복호화 비용을 태우고, 세션이
-    있는 사용자에게는 404 대신 `LoggedInNotice` 가 나가 같은 주소가 세션 유무로 다른
+    있는 사용자에게는 404 대신 목적지 리다이렉트가 나가 같은 주소가 세션 유무로 다른
     상태를 답한다.
   */
   it('세션을 읽기 전에 거른다', () => {
@@ -48,10 +48,10 @@ describe('소셜 동의 화면 페이지 — 제공자 세그먼트', () => {
     expect(source).toContain('safeReturnTo(returnTo)')
   })
 
-  /* 이미 로그인한 사용자에게 가입 동의를 다시 묻지 않는다 — `/signup` 과 같은 처리다 */
-  it('세션이 있으면 LoggedInNotice 로 보낸다', () => {
-    expect(source).toContain('<LoggedInNotice returnTo={target} />')
-  })
+  /*
+    세션이 있을 때의 리다이렉트(#1082)는 여기서 보지 않는다 — `app/(auth)/authed-redirect.test.ts`
+    가 세션 모듈을 목으로 바꿔 페이지를 **실제로 불러** `/login` · `/signup` 과 함께 본다.
+  */
 
   /*
     **`loading.tsx` 를 두지 않는다.** 경계가 있으면 응답이 먼저 스트리밍돼 `notFound()`

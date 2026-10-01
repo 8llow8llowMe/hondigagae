@@ -1,9 +1,8 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 
 import type { Metadata } from 'next'
 
 import { AuthCardDog } from '@/features/auth/auth-card-dog'
-import { LoggedInNotice } from '@/features/auth/logged-in-notice'
 import { SocialSignupConsentScreen } from '@/features/auth/social-signup-consent-screen'
 import { isOAuthProvider } from '@/lib/auth/oauth-provider'
 import { readSession } from '@/lib/auth/session'
@@ -45,7 +44,7 @@ export default async function SocialSignupConsentPage({
     실패를 세지 못한다 (`proxy.ts` 의 잘못된 장소 id 처리와 같은 이유).
 
     **세션을 읽기 전에 거른다.** 뒤로 미루면 잘못된 주소에 쿠키 복호화 비용을 태우는 데다,
-    세션이 있는 사용자에게는 404 대신 `LoggedInNotice` 가 나가 **같은 주소가 세션 유무로
+    세션이 있는 사용자에게는 404 대신 목적지 리다이렉트가 나가 **같은 주소가 세션 유무로
     다른 상태를 답한다.** 이 순서는 `page.test.ts` 가 잠근다.
   */
   if (!isOAuthProvider(provider)) notFound()
@@ -55,7 +54,8 @@ export default async function SocialSignupConsentPage({
   const target = safeReturnTo(returnTo)
   const session = await readSession()
 
-  if (session !== null) return <LoggedInNotice returnTo={target} />
+  // 이미 로그인한 사용자에게 가입 동의를 다시 묻지 않는다 — `/signup` 과 같은 처리 (#1082)
+  if (session !== null) redirect(target)
 
   return (
     <>
