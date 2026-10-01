@@ -144,11 +144,35 @@ test.describe('제출 실패 뒤 포커스 (#1078)', () => {
     await expect(formAlert(page)).toContainText(DEMO_EMAIL)
   })
 
+  /*
+    **503 은 알림이 아니라 폼 안 일시 장애 표시로 간다** (#1079). 5xx 에서는 `FormAlert` 가 서지
+    않는다 — 같은 실패를 일시 장애와 서버 문구로 두 번 말하던 것을 걷었다. 대상이 알림에 남아
+    있으면 찾지 못하고 이메일 칸으로 떨어진다.
+  */
+  test('로그인 503: 알림이 아니라 일시 장애 표시에 있고, 다음 Tab 이 다시 시도다', async ({
+    page,
+  }) => {
+    await page.route('**/api/bff/auth/login', (route) =>
+      route.fulfill(failure(503, 'COMMON_503', '서비스를 일시적으로 사용할 수 없습니다.')),
+    )
+    await open(page, '/login')
+
+    await page.locator('#email').fill(DEMO_EMAIL)
+    await page.locator('#password').fill('password123!')
+    await page.getByRole('button', { name: messages.auth.loginSubmit, exact: true }).click()
+
+    const temporary = page.locator('[data-form-temporary-error]')
+    await expect(temporary).toBeFocused()
+    await expect(temporary).toContainText(messages.common.temporaryErrorTitle)
+    // 서버 문구 알림이 함께 서지 않는다
+    await expect(formAlert(page)).toHaveCount(0)
+    await expect(page.getByText('서비스를 일시적으로 사용할 수 없습니다.')).toHaveCount(0)
+
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('button', { name: messages.common.retry })).toBeFocused()
+  })
+
   const LOGIN_FAILURES = [
-    {
-      label: '503',
-      response: failure(503, 'COMMON_503', '서비스를 일시적으로 사용할 수 없습니다.'),
-    },
     { label: '429 AUTH_015', response: failure(429, 'AUTH_015', '로그인 시도가 너무 많습니다.') },
     {
       label: '400 MEMBER_007',
