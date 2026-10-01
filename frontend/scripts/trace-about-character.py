@@ -22,10 +22,22 @@
 - 초록 밴드(`IntroBand tone="brand"`, 배경 `--brand-700`) 위에 서는 두 장은 **머리 위로 솟은 귀**
   만 `--brand-500` 이다(#1089). 귀 · 배경이 같은 값이라 귀가 그레인 무늬로만 남아 흐릿했다.
   초록 층에서 가장 위 하위 경로를 떼어 칠한다(`split_band_ear`) — 도형은 그대로다.
+- **황갈 · 초록 층은 자기 칠과 같은 색 선으로 원본 1px 바깥까지 넓힌다(`seal`, #1095).** 크림 층이
+  실루엣 전체이고 색 층을 따로 따서 얹으므로 두 윤곽이 바깥 테두리를 같이 쓰는데, 정확히 겹치지
+  않는다 — 색 층이 안쪽에서 멈춘 곳(대부분 원본 1px 이하)으로 크림이 비치고, 겹친 곳도 두 테두리의
+  안티앨리어싱이 섞여 크림이 샌다. 초록 밴드 위에서 흰 테로 보였다. 넓히면 바깥 테두리를 색 층이
+  혼자 그린다. 접힘 선이 원본 1px 씩 굵어지지만(히어로 황갈 면적 +9%) 표시 크기에서 구분되지 않는다.
+  위의 "실루엣 가장자리에서 1px 넓힘" 만으로는 이 틈이 닫히지 않았다.
+  **남은 얇은 테는 원본 PNG 에서 온다.** 원본 가장자리가 투명이 아니라 흰 바탕과 섞여 있어(발 아래
+  `rgb(255,253,235)` · 불투명도 60%) `alpha > 128` 실루엣에 들고 크림으로 분류된다 — 폭 약 2px 이라
+  1px 봉합이 절반만 덮는다. 2px 봉합은 코 · 목줄 · 다리 줄무늬가 눈에 띄게 굵어져(마무리 황갈 +39%)
+  택하지 않았다. 마저 없애려면 다시 딸 때 `classify` 앞에서 가장자리의 흰 섞임 픽셀을 이웃 색으로
+  바꾼다(원본 691×836 PNG 가 필요하다 — 저장소의 올려다보기 PNG 는 346×418 로 줄인 것이다).
 
-이미 딴 SVG 에 귀만 다시 칠할 때(potrace · 원본 PNG 없이):
+이미 딴 SVG 를 고칠 때(potrace · 원본 PNG 없이, 표준 라이브러리만):
 
     python3 scripts/trace-about-character.py --band-ear public/illustrations/about
+    python3 scripts/trace-about-character.py --seal public/illustrations/about
 """
 
 import os
@@ -45,6 +57,10 @@ PALETTE = {
 }
 # 초록 밴드 위에 서는 자세 — 히어로 · 마무리 (#1089)
 BAND_EAR = {'dog-sit-lookup', 'dog-sit-front'}
+# 바깥 테두리를 색 층이 그리게 넓히는 층(#1095). 선 굵기는 path 좌표(3배 그림의 px)로 원본 2px —
+# 양쪽으로 1px 씩. 모서리는 둥글게 이어 뾰족한 연결이 실루엣 밖으로 튀지 않게 한다.
+SEALED = (PALETTE['tan'], PALETTE['green'], PALETTE['band-ear'])
+SEAL_W = 2 * UP
 # 층마다 potrace 인자 — 황갈은 가는 접힘 선이 많아 더 매끈하게
 POTRACE = {
     'cream': ['-a', '1.1', '-O', '0.6'],
@@ -160,6 +176,34 @@ def recolor_band_ear(outdir):
         print(name, 'ear split')
 
 
+def seal(tag):
+    """색 층 path 에 같은 색 선을 두른다. 이미 둘렀거나 색 층이 아니면 그대로 둔다."""
+    fill = re.match(r'\s*<path fill="(#[0-9a-f]{6})"', tag)
+    if fill is None or fill.group(1) not in SEALED or ' stroke=' in tag:
+        return tag
+    c = fill.group(1)
+    return tag.replace(
+        f'<path fill="{c}"', f'<path fill="{c}" stroke="{c}" stroke-width="{SEAL_W}" stroke-linejoin="round"', 1
+    )
+
+
+def seal_dogs(outdir):
+    """이미 딴 개 SVG 의 색 층을 넓혀 다시 쓴다 — potrace · 원본 PNG 가 필요 없다."""
+    for name, kind, _, _ in JOBS:
+        if kind != 'dog':
+            continue
+        dst = f'{outdir}/{name}.svg'
+        with open(dst, encoding='utf-8') as f:
+            svg = f.read()
+        sealed = re.sub(r'    <path [^>]*/>', lambda m: seal(m.group(0)), svg)
+        if sealed == svg:
+            print(name, 'skip')
+            continue
+        with open(dst, 'w', encoding='utf-8') as f:
+            f.write(sealed)
+        print(name, 'sealed')
+
+
 def potrace(mask, turd, args):
     with tempfile.TemporaryDirectory() as d:
         pbm = os.path.join(d, 'm.pbm')
@@ -222,14 +266,14 @@ def trace(src, dst, kind, display_w, fid):
             body += green_paths(attrs, d, os.path.basename(dst)[:-4] in BAND_EAR)
             continue
         body.append(f'    <path fill="{PALETTE[name]}"{attrs}d="{d}"/>')
-    return write(dst, w, h, body, display_w, fid)
+    return write(dst, w, h, [seal(tag) for tag in body], display_w, fid)
 
 
 if __name__ == '__main__':
-    if sys.argv[1] == '--band-ear':
-        recolor_band_ear(sys.argv[2])
+    if sys.argv[1] in ('--band-ear', '--seal'):
+        (recolor_band_ear if sys.argv[1] == '--band-ear' else seal_dogs)(sys.argv[2])
         sys.exit(0)
-    # 다시 딸 때만 필요하다 — `--band-ear` 는 표준 라이브러리만 쓴다
+    # 다시 딸 때만 필요하다 — `--band-ear` · `--seal` 은 표준 라이브러리만 쓴다
     import numpy as np
     from PIL import Image
 

@@ -195,11 +195,32 @@ describe('에셋 (#930 — SVG)', () => {
     expect([...colors(read(CHARACTER.heatLines.src))]).toEqual([HEAT])
   })
 
-  it('외곽선 · 그라디언트가 없다 — 선은 열기 선의 모양 자체뿐이다', () => {
+  /**
+   * 개 몸의 선은 **자기 칠과 같은 색**일 때만 있다 — 다른 색 외곽선이 아니라 색 층을 넓히는 봉합이다
+   * (#1095). 크림 실루엣 위에 따로 딴 색 층을 얹어서, 두 윤곽이 같이 쓰는 바깥 테두리에 크림이
+   * 비쳤다(틈 · 안티앨리어싱 번짐). 크림 · 눈은 봉합하지 않는다.
+   */
+  const SEALED = ['#d4b487', '#1d6646', BAND_EAR]
+
+  it('외곽선 · 그라디언트가 없다 — 개 몸의 선은 자기 칠과 같은 색뿐이다', () => {
     for (const [name, asset] of Object.entries(CHARACTER)) {
       const svg = read(asset.src)
       expect(svg, name).not.toMatch(/Gradient/)
-      if (name !== 'heatLines') expect(svg, name).not.toMatch(/stroke=/)
+      if (name === 'heatLines') continue
+      for (const tag of svg.match(/<path [^>]*>/g) ?? []) {
+        const stroke = tag.match(/ stroke="(#[0-9a-f]{6})"/)?.[1]
+        if (stroke !== undefined) expect(tag, name).toContain(`fill="${stroke}"`)
+      }
+    }
+  })
+
+  it('황갈 · 초록 층은 전부 봉합하고 크림 · 눈은 봉합하지 않는다 (#1095)', () => {
+    for (const [name, asset] of Object.entries(CHARACTER)) {
+      if (name === 'heatLines') continue
+      for (const tag of read(asset.src).match(/<path [^>]*>/g) ?? []) {
+        const fill = tag.match(/fill="(#[0-9a-f]{6})"/)?.[1] ?? ''
+        expect(/ stroke="/.test(tag), `${name} ${fill}`).toBe(SEALED.includes(fill))
+      }
     }
   })
 
