@@ -144,8 +144,8 @@ export function AboutView() {
         </div>
         {/*
           예시는 자기 열을 갖는다 — `VerdictSpecimen` 이 grid 아이템이면 열 폭을 알 수 없다.
-          캐릭터(#917)는 카드와 같은 패럴랙스 래퍼 안에서 카드 밖 왼쪽 아래에 선다. 1024 미만은
-          카드 아래에 앉을 자리(`.about-hero-dog-room`)를 연다.
+          캐릭터(#917)는 카드와 같은 패럴랙스 래퍼 안에서 카드 밖 왼쪽 아래에 선다.
+          `.about-hero-dog-room` 이 768–1023 은 카드 왼쪽, 768 미만은 카드 윗변 위 자리를 연다(#1089).
         */}
         <div className="about-hero-dog-room lg:col-span-5">
           <HeroParallax className="relative">

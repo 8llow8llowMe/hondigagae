@@ -135,8 +135,15 @@ describe('에셋 (#930 — SVG)', () => {
    * 기존 일러스트(`public/illustrations/*.svg`)에 이미 있는 값 · 토큰 값만 쓴다 — 새 색을 만들지
    * 않는다. 크림 `#f2e6c9` · 황갈 `#d4b487` 은 일러스트 값, 초록 `#1d6646` = `--brand-700`,
    * 눈 `#15181d` = `--fg`, 열기 선 `#d54040` = 곡선의 노면 선(`--metric-critical-500`).
+   *
+   * 초록 밴드(배경 `--brand-700`) 위 두 장은 솟은 귀만 `#2e9b6b` = `--brand-500` 이다(#1089) —
+   * 귀가 배경과 같은 값이라 그레인 무늬로만 남았다. 다른 장은 연한 밴드 위라 그대로다.
    */
   const DOG_COLORS = ['#f2e6c9', '#d4b487', '#1d6646', '#15181d']
+  const BAND_EAR = '#2e9b6b'
+  const ON_BRAND_BAND = new Set(['sitLookup', 'sitFront'])
+  const allowed = (name: string) =>
+    ON_BRAND_BAND.has(name) ? [...DOG_COLORS, BAND_EAR] : DOG_COLORS
   const HEAT = '#d54040'
 
   it('width/height 가 파일의 viewBox 와 같다', () => {
@@ -156,10 +163,18 @@ describe('에셋 (#930 — SVG)', () => {
       if (name === 'heatLines') continue
       const used = colors(read(asset.src))
       expect(
-        [...used].every((hex) => DOG_COLORS.includes(hex)),
+        [...used].every((hex) => allowed(name).includes(hex)),
         `${name}: ${[...used].join(' ')}`,
       ).toBe(true)
       expect(used.has(HEAT), name).toBe(false)
+    }
+  })
+
+  it('초록 밴드 위 두 장은 솟은 귀 하나만 brand-500 이다 — 목줄 · 코 · 패드는 brand-700 그대로', () => {
+    for (const name of ON_BRAND_BAND) {
+      const svg = read(CHARACTER[name as keyof typeof CHARACTER].src)
+      expect(svg.match(new RegExp(`<path fill="${BAND_EAR}"`, 'g')), name).toHaveLength(1)
+      expect(svg, name).toContain('<path fill="#1d6646"')
     }
   })
 
@@ -169,7 +184,9 @@ describe('에셋 (#930 — SVG)', () => {
       const paths = read(asset.src).match(/<path [^>]*>/g) ?? []
       expect(paths.length, name).toBeGreaterThan(0)
       for (const tag of paths) {
-        expect(DOG_COLORS.includes(tag.match(/fill="(#[0-9a-f]{6})"/)?.[1] ?? ''), name).toBe(true)
+        expect(allowed(name).includes(tag.match(/fill="(#[0-9a-f]{6})"/)?.[1] ?? ''), name).toBe(
+          true,
+        )
       }
     }
   })

@@ -1214,9 +1214,12 @@ body {
   **색 · 그림자 · duration 을 새로 두지 않는다.** 등장은 `about-word-in`(200), 자세 전환은
   색 · 투명도 150, 열기 선은 변형 200 이다(DESIGN.md §8). 반복 애니메이션은 없다.
 
-  - `.about-hero-dog` — 히어로. 판정 카드와 같은 패럴랙스 래퍼 기준 `absolute`. 1024 미만은
-    카드 **아래** 왼쪽에 앉는다(카드 모서리에 겹치면 캡션 · 이유 줄을 가린다) —
-    `.about-hero-dog-room` 이 그 자리를 연다. 개 높이 = 폭 × 836/691.
+  - `.about-hero-dog` — 히어로. 판정 카드와 같은 패럴랙스 래퍼 기준 `absolute`.
+    `.about-hero-dog-room` 이 자리를 연다(#1089). 768 이상은 카드 왼쪽 바깥에서 카드를 올려다본다
+    — 768–1023 은 카드를 들여쓴다. 768 미만은 카드가 전체 폭을 써야 해서(수치 칸 셋) 카드 **윗변
+    위** 오른쪽에 발을 대고 버튼 줄 오른쪽 빈 곳에 앉는다(질문 2 와 같은 자리 방식). 카드 아래
+    자리(#917)는 절 끝에 덩그러니 남았고, 카드 모서리에 겹치면 캡션 · 이유 줄을 가린다.
+    개 높이 = 폭 × 836/691.
   - `.about-pose*` — 질문 2 자세 스택. 폭 변수 `--about-pose-w` 하나로 세 장 · 열기 선 · 위
     여백(`-room`, 무대 예시 덩어리 `.about-stage-frame`)이 같이 움직인다. 높이 .87W 는 가장
     높은 장(산책)의 비율이다.
@@ -1224,36 +1227,49 @@ body {
 */
 .about-hero-dog {
   position: absolute;
-  inset-inline-start: 0.5rem;
-  inset-block-start: 100%;
-  inline-size: 6rem;
+  inset-block-end: 100%;
+  inset-inline-end: 0;
+  inline-size: 7.5rem;
   pointer-events: none;
   animation: about-word-in 200ms ease-out 500ms both;
 }
 
+/*
+  768 미만 위 여백 = 개 높이(145) − 카피 열과의 틈(`gap-8`) + 7. 개가 두 번째 버튼(오른쪽 끝 271)과
+  가로로 겹치는 360–390 에서 머리가 버튼 줄 아래 7px 에 온다.
+*/
 .about-hero-dog-room {
-  padding-block-end: 4.75rem;
+  padding-block-start: 7.5rem;
 }
 
+/*
+  768 이상 — 개가 카드 왼쪽 바깥에 앉아 카드 머리(제목 줄)를 올려다본다. 코(폭의 .99)가 카드 글자
+  (안쪽 21px)보다 약 7px 앞, 카드 테두리 안쪽 14px 에 온다. 발은 카드 아랫변보다 12px 아래다.
+  1024 이상에서 -13.5rem 은 코가 제목 첫 글자에 걸렸다(#1089 실측).
+*/
 @media (width >= 48rem) {
+  .about-hero-dog {
+    inset-block: auto -0.75rem;
+    inset-inline: -11rem auto;
+    inline-size: 12rem;
+  }
+
+  /* 카드를 개 몫(시작 위치와 같은 값)만큼 들여쓴다 — 개 꼬리가 열 왼쪽 끝에 닿는다 */
   .about-hero-dog-room {
-    padding-block-end: 3.25rem;
+    padding-block-start: 0;
+    padding-inline-start: 11rem;
   }
 }
 
 @media (width >= 64rem) {
+  /* 1024 이상은 카드 열 바깥(카피 열과의 사이)에 서므로 들여쓰지 않는다 */
   .about-hero-dog {
-    /*
-      카드 글자(안쪽 21px)에 닿지 않는 가장 가까운 자리 — 가슴(폭의 .91)이 카드 테두리 안쪽
-      16px 까지, 코(.99)는 수치 칸과 이유 줄 사이 빈 띠에 온다. 시안의 -104 는 캡션 첫 글자를 가렸다.
-    */
-    inset-inline-start: -7.5rem;
-    inset-block: auto -1.75rem;
-    inline-size: 9.375rem;
+    inset-inline-start: -14rem;
+    inline-size: 15rem;
   }
 
   .about-hero-dog-room {
-    padding-block-end: 0;
+    padding-inline-start: 0;
   }
 }
 
