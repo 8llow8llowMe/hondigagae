@@ -23,6 +23,28 @@ import { expect, type Page, test } from '@playwright/test'
  * 갈래에만 서고(`global-header.tsx`), 인증 화면 안의 링크는 이제 그 화면에 닿기 전에 리다이렉트된다.
  * 그래서 `next/link` 가 부르는 것과 같은 라우터 인스턴스의 `push` 를 직접 부른다. 문서가 바뀌지
  * 않았다는 것은 창에 심어 둔 표식이 살아 있는지로 확인한다.
+ *
+ * ### 부르기 전에 라우터가 **마운트**됐는지 기다린다 (#1094)
+ *
+ * `window.next.router` 는 **hydration 전에도 있다** — 모듈이 로드될 때 심긴다
+ * (`next/dist/client/components/app-router-instance.js`). 그런데 `push` 가 실제로 쓰는
+ * dispatch 는 hydration **렌더** 중에 심기고, 그 dispatch 가 부르는 `setState` 는 **커밋**
+ * 뒤에야 받아들여진다. 그 사이에 부르면 React 가 "Can't perform a React state update on a
+ * component that hasn't mounted yet" 을 남기고 업데이트를 **버린다** — RSC 요청은 나가고
+ * 서버는 307(`NEXT_REDIRECT;replace;/`)로 답하는데 화면과 URL 은 출발점에 머문다.
+ *
+ * `main` 이 보이는 것은 **서버 HTML** 이라 hydration 신호가 아니다. 로컬에서는 hydration 이
+ * 빨라 늘 통과했고, 느린 CI(Turbopack dev)에서 재시도까지 깨졌다. CPU 를 6배 늦추면 로컬에서도
+ * 10회 중 8회 같은 경고와 함께 깨진다.
+ *
+ * 마운트 신호는 **`history.state.__NA`** 다. 앱 라우터의 `HistoryUpdater` 가 커밋 때
+ * (`useInsertionEffect`) 현재 항목에 남기는 표식이라, 이것이 있으면 dispatch 의 주인이
+ * 마운트돼 있다. `networkidle` 은 "500ms 동안 요청이 없다" 는 추정이라 고르지 않았다.
+ *
+ * **사용자에게는 생기지 않는다.** hydration 전의 링크 클릭은 `next/link` 의 핸들러가 아직 없어
+ * 브라우저가 문서째 이동하고, 그 요청은 307 로 간다(첫 테스트가 본다). 앱 코드의 `router.push` 는
+ * 이벤트 핸들러·effect 안에서만 불려 마운트 뒤다. 라우터를 마운트 전에 부를 수 있는 것은
+ * 창에서 직접 부르는 이 헬퍼뿐이다.
  */
 
 type NextWindow = Window & {
@@ -32,6 +54,10 @@ type NextWindow = Window & {
 
 /** 문서를 바꾸지 않고 Next 라우터로 이동한다 — 표식이 살아 있으면 클라이언트 이동이었다 */
 async function clientPush(page: Page, href: string) {
+  // 마운트 전에 부르면 push 가 버려진다 (#1094, 위 주석)
+  await page.waitForFunction(
+    () => (window.history.state as { __NA?: unknown } | null)?.__NA === true,
+  )
   await page.evaluate((target) => {
     const w = window as NextWindow
     w.__noReload = true
