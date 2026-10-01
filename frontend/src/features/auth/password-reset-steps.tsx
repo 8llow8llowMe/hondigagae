@@ -1,15 +1,13 @@
 'use client'
 
 import { Button, ButtonLink } from '@/components/button'
-import { ErrorState } from '@/components/error-state'
 import { Field } from '@/components/field'
-import { FormAlert } from '@/components/form-alert'
 import { FormNotice } from '@/components/form-notice'
 import { Input } from '@/components/input'
 import { PasswordInput } from '@/components/password-input'
+import { FormFailure } from '@/features/auth/form-failure'
 import type { EmailValues, PasswordResetValues } from '@/features/auth/schemas'
 import { VerificationCodeInput } from '@/features/auth/verification-code-input'
-import { classify } from '@/lib/api/error'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 
@@ -17,10 +15,11 @@ import { messages } from '@/lib/messages'
  * 비밀번호 찾기의 두 단계와 완료 화면. 전부 **상태 없는 표시 컴포넌트**다 —
  * `PasswordResetView` 가 상태·요청을 소유한다 (docs/testing-guide.md §1).
  *
- * 5xx·무응답만 `ErrorState` 로 위에 얹는다. **폼을 대체하지 않는다** — 갈아치우면
+ * 폼 전체 실패는 `FormFailure` 한 자리다 (#1079) — 5xx·무응답이면 폼 안 일시 장애(재시도
+ * 있음), 그 밖은 `FormAlert` 로 **둘 중 하나만** 선다. **폼을 대체하지 않는다** — 갈아치우면
  * 이메일 오타를 고칠 수단이 사라진다 (`login-form.tsx` · `signup-steps.tsx` 와 같은 판단).
  * 429(`AUTH_003` 쿨다운 · `AUTH_016` IP 상한)는 `classify` 가 `'rate-limited'` 라
- * 여기 걸리지 않고 `FormAlert` 로만 보인다 — 재시도 버튼을 주면 상한만 더 소모한다.
+ * 일시 장애가 아니고 `FormAlert` 로만 보인다 — 재시도 버튼을 주면 상한만 더 소모한다.
  */
 
 export type PasswordResetEmailStepProps = {
@@ -42,8 +41,6 @@ export function PasswordResetEmailStep({
   onSubmit,
   onRetry,
 }: PasswordResetEmailStepProps) {
-  const isTemporaryError = errorStatus !== null && classify(errorStatus) === 'temporary'
-
   return (
     <form
       noValidate
@@ -53,19 +50,12 @@ export function PasswordResetEmailStep({
         onSubmit()
       }}
     >
-      {isTemporaryError && (
-        <ErrorState
-          title={messages.common.temporaryErrorTitle}
-          description={messages.common.temporaryErrorDescription}
-          onRetry={onRetry}
-        />
-      )}
       {/*
         `AUTH_005`(만료·미발급)·`AUTH_017`(5회 초과)로 되돌아온 사유도 여기로 온다.
         오류라서 `FormNotice`(role=status)가 아니라 `FormAlert`(role=alert)다
         — `signup-form.tsx` 의 stepBackMessage 와 같은 처리.
       */}
-      <FormAlert message={errors.form} />
+      <FormFailure message={errors.form} errorStatus={errorStatus} onRetry={onRetry} />
 
       <p className="text-body-2 text-fg-muted">{messages.auth.resetEmailDescription}</p>
 
@@ -121,8 +111,6 @@ export function PasswordResetCodeStep({
   onChangeEmail,
   onRetry,
 }: PasswordResetCodeStepProps) {
-  const isTemporaryError = errorStatus !== null && classify(errorStatus) === 'temporary'
-
   const isCoolingDown = cooldownSeconds > 0
   // 매 초 갱신되는 카운트다운을 aria-live 에 그대로 실으면 초마다 읽힌다.
   // 보이는 초는 버튼 라벨(비-live)에 두고 알림은 10초 단위로만 낸다 — CodeStep 과 같은 처리
@@ -137,15 +125,8 @@ export function PasswordResetCodeStep({
         onSubmit()
       }}
     >
-      {isTemporaryError && (
-        <ErrorState
-          title={messages.common.temporaryErrorTitle}
-          description={messages.common.temporaryErrorDescription}
-          onRetry={onRetry}
-        />
-      )}
       <FormNotice message={notice ?? null} />
-      <FormAlert message={errors.form} />
+      <FormFailure message={errors.form} errorStatus={errorStatus} onRetry={onRetry} />
       {/* 이메일은 줄바꿈 기회가 없는 토큰이다 — 375px 폭에서 넘치지 않게 break-all */}
       <p className="text-body-2 text-fg-muted break-all">{email}</p>
 

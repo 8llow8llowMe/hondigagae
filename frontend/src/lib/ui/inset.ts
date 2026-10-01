@@ -63,6 +63,29 @@ export const INSET_CLASS: Record<Inset, string> = {
 }
 
 /**
+ * 상태 컴포넌트(`EmptyState` · `ErrorState`)의 여백 축 — `inset` 이거나 `flush` 다 (#1079).
+ *
+ * **`flush` 는 담는 쪽이 이미 여백을 가진 자리 전용이다.** 상태 자신의 세로 48(`py-12`)과 좌우
+ * 인셋을 둘 다 걷는다. 인증 셸 카드(`px-4 py-6 md:px-5`) 안에서 그 여백을 한 번 더 먹어 소셜
+ * 콜백 제목이 x=49 에 섰고(다른 인증 화면은 33), 폼 안의 일시 장애는 폼을 밀어 375 에서 소셜
+ * 버튼을 접힘선 밑으로 보냈다.
+ *
+ * **둘을 함께 주지 못하게 타입으로 막는다.** 함께 주면 어느 쪽이 이기는지 호출부에서 안 보인다.
+ * 카드 안 목록 상태처럼 **카드 글줄과 세로선만 맞추면 되는 자리는 여전히 `inset="card"` 다** —
+ * 거기서는 세로 48 이 상태를 목록 사이에서 띄우는 몫이다.
+ */
+export type StatePlacement = { inset?: Inset; flush?: false } | { flush: true; inset?: never }
+
+/** `StatePlacement` 를 바깥 상자의 여백 클래스로 — 두 상태 컴포넌트가 같은 값을 쓴다 */
+export function statePlacementClass(placement: {
+  inset?: Inset | undefined
+  flush?: boolean | undefined
+}): string {
+  if (placement.flush === true) return ''
+  return `py-12 ${INSET_CLASS[placement.inset ?? 'main']}`
+}
+
+/**
  * 레일 블록이 좌우로 흘러넘쳐야 할 때 (가로 스크롤 줄 등). 인셋을 음수 margin 으로
  * 상쇄하고 같은 값을 padding 으로 되돌려, 스크롤 내용이 여백 밖까지 이어지되 첫·마지막
  * 항목은 여백 안에 선다.
