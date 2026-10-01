@@ -1008,15 +1008,23 @@ describe('PlanBriefingSection — 접근성 계약 (명세 D6)', () => {
     expect(warning).toBeLessThan(weather)
   })
 
-  it('전날에는 각주가 일정 카드보다 앞이다 — 접힌 카드 자리에서 말한다', () => {
+  /*
+    **각주는 머리 카드 안이다** (D14-1). 예전에는 카드 사이 회색 바닥 위 글줄이었다 — 태블릿 ·
+    데스크톱에서 어느 카드의 말인지 흐렸다. 머리(`</header>`) 안, 날씨 카드 앞에 선다.
+  */
+  it('전날 각주는 머리 카드 안에 있다 — 바닥 위 글줄이 아니다', () => {
     const markup = renderEve()
-    const weather = markup.indexOf(`>${messages.plan.briefingWeatherEveHeading}<`)
     const footnote = markup.indexOf(messages.plan.briefingEveFootnote)
-    const schedule = markup.indexOf(`>${messages.plan.briefingScheduleEveHeading}<`)
+    const headerEnd = markup.indexOf('</header>')
 
-    expect(weather).toBeGreaterThanOrEqual(0)
-    expect(footnote).toBeGreaterThan(weather)
-    expect(schedule).toBeGreaterThan(footnote)
+    expect(footnote).toBeGreaterThanOrEqual(0)
+    expect(footnote).toBeGreaterThan(markup.indexOf('<h1'))
+    expect(footnote).toBeLessThan(headerEnd)
+    expect(headerEnd).toBeLessThan(markup.indexOf(`>${messages.plan.briefingWeatherEveHeading}<`))
+  })
+
+  it('당일에는 머리에 각주가 없다', () => {
+    expect(render()).not.toContain(messages.plan.briefingEveFootnote)
   })
 })
 
@@ -1027,33 +1035,51 @@ describe('PlanBriefingHeader — h1 은 어느 갈래에도 있다 (명세 D6)',
   */
   it('갈래를 알면 제목이 갈래를 말한다', () => {
     const header = (kind: 'TODAY' | 'EVE') =>
-      renderToStaticMarkup(
-        createElement(PlanBriefingHeader, { planId: 'p-1', kind, subtitle: null }),
-      )
+      renderToStaticMarkup(createElement(PlanBriefingHeader, { planId: 'p-1', kind }))
 
     expect(header('TODAY')).toContain(`>${messages.plan.briefingHeadingToday}</h1>`)
     expect(header('EVE')).toContain(`>${messages.plan.briefingHeadingEve}</h1>`)
     expect(messages.plan.briefingHeadingToday).toBe(messages.plan.briefingBannerTodayTitle)
   })
 
-  it('부제가 없어도 h1 과 돌아가기가 선다', () => {
-    const markup = renderToStaticMarkup(
-      createElement(PlanBriefingHeader, { planId: 'p-1', subtitle: null }),
-    )
+  it('응답 전에도 h1 과 돌아가기가 선다', () => {
+    const markup = renderToStaticMarkup(createElement(PlanBriefingHeader, { planId: 'p-1' }))
 
     expect(markup).toContain(`>${messages.plan.briefingHeading}<`)
     expect(markup).toContain(messages.plan.briefingBack)
     expect(markup).toContain('href="/plans/p-1"')
   })
 
-  it('부제가 있으면 그대로 그린다', () => {
+  /*
+    **머리는 카드다** (D14-1). 회색 바닥 위 글줄이던 것을 일정 상세 개요 카드처럼 L1 면에 담았다.
+    `Surface` 의 면 · 테두리 클래스로 본다 — 여는 태그가 `<header` 보다 앞이어야 한다.
+  */
+  it('머리를 카드 면에 담는다', () => {
+    const markup = renderToStaticMarkup(createElement(PlanBriefingHeader, { planId: 'p-1' }))
+    const surfaceTag = markup.slice(0, markup.indexOf('<header'))
+
+    expect(surfaceTag).toContain('bg-bg ')
+    expect(surfaceTag).toContain('border-border')
+  })
+
+  /* 일정 이름과 날짜를 두 줄로 — 예전 부제 한 줄은 셋이 같은 캡션 무게였다 */
+  it('일정 이름과 날짜 줄을 따로 세운다', () => {
     const markup = renderToStaticMarkup(
       createElement(PlanBriefingHeader, {
         planId: 'p-1',
-        subtitle: '몽실이와 제주 2박 3일 · 2일차 09-13 (일)',
+        kind: 'TODAY',
+        trip: { title: '몽실이와 제주 2박 3일', dateLine: '9월 13일 (일) · 2일차' },
       }),
     )
 
-    expect(markup).toContain('2일차 09-13 (일)')
+    expect(markup).toContain('>몽실이와 제주 2박 3일</p>')
+    expect(markup).toContain('>9월 13일 (일) · 2일차</p>')
+  })
+
+  it('응답의 날짜와 일차로 날짜 줄을 만든다', () => {
+    const markup = render({ planTitle: '초코와 가을 서귀포', date: '2026-09-13', day: 2 })
+
+    expect(markup).toContain('>초코와 가을 서귀포</p>')
+    expect(markup).toContain('>9월 13일 (일) · 2일차</p>')
   })
 })

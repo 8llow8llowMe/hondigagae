@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 
-import { Canvas, SurfaceStack } from '@/components/surface'
+import { Canvas } from '@/components/surface'
 import { PlanBriefingOutOfRange, PlanBriefingView } from '@/features/plan/plan-briefing-view'
 import { planKeys } from '@/features/plan/queries'
 import { ApiError } from '@/lib/api/error'
@@ -83,21 +83,17 @@ export default async function PlanBriefingPage({ params }: { params: Params }) {
   const target = pickBriefingDate(plan.startDate, plan.endDate, todayDay(new Date()))
 
   /*
-    **3층 표면** (`DESIGN.md §0`). 폭은 응급 브리핑(#460) · 일정 만들기(#453)와 같은
-    `max-w-2xl` — 레일 없는 한 단 화면의 카드 폭을 셋이 같은 값으로 쓴다.
-
-    **머리(돌아가기 · `h1` · 부제)는 뷰가 그린다** — 부제가 응답에서 오는데 머리와 한
-    덩어리여야 하기 때문이다 (`plan-briefing-view.tsx` 머리주석).
+    **3층 표면** (`DESIGN.md §0`). 바닥(`Canvas`)만 여기서 칠하고 **배치는 뷰가 정한다** (D14-2) —
+    정상 · 대기는 일정 상세와 같은 두 열(`rail-layout`), 오류 · 기간 밖은 `max-w-2xl` 한 줄
+    가운데다. 머리 카드의 일정 이름 · 날짜는 응답에서 오므로 머리도 뷰가 그린다.
   */
   return (
     <Canvas as="main" id="main-content">
-      <SurfaceStack className="mx-auto w-full max-w-2xl">
-        {target === null ? (
-          <PlanBriefingOutOfRange planId={planId} />
-        ) : (
-          <PlanBriefingView planId={planId} target={target} />
-        )}
-      </SurfaceStack>
+      {target === null ? (
+        <PlanBriefingOutOfRange planId={planId} />
+      ) : (
+        <PlanBriefingView planId={planId} target={target} />
+      )}
     </Canvas>
   )
 }

@@ -1,16 +1,18 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import type { ReactNode } from 'react'
 
 import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { Skeleton } from '@/components/skeleton'
-import { Surface } from '@/components/surface'
+import { Surface, SurfaceStack } from '@/components/surface'
 import { usePetList } from '@/features/pet/use-pet-list'
 import {
   briefingHeadingOf,
   PlanBriefingHeader,
+  PlanBriefingLayout,
   PlanBriefingSection,
 } from '@/features/plan/plan-briefing-section'
 import { planKeys } from '@/features/plan/queries'
@@ -23,11 +25,9 @@ import { conditionKey, INSIGHT_QUERY_OPTIONS, insightKeys } from '@/lib/insight/
 import { messages } from '@/lib/messages'
 import { basisPetNameOf } from '@/lib/plan/basis-pet'
 import { BRIEFING_REASON_LOOKUP_FAILED, type BriefingTarget } from '@/lib/plan/briefing'
-import { formatPlanDay } from '@/lib/plan/date'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { WalkTimesResponse } from '@/types/insight'
-import type { PlanBriefingResponse } from '@/types/plan'
 
 /**
  * 출발 전 여행 브리핑 화면 (#626) — 조회를 든 쪽.
@@ -37,9 +37,10 @@ import type { PlanBriefingResponse } from '@/types/plan'
  * 서버 렌더가 그만큼 붙잡힌다. **응급 브리핑이 같은 이유로 자기 응답을 프리페치하지 않는다.**
  * 404 가드에 필요한 것은 일정 상세뿐이고 그것은 페이지가 이미 데웠다.
  *
- * **머리까지 이 뷰가 그린다.** 부제(`{제목} · {N}일차 …`)가 응답에서 오는데 `h1` 과 한
- * 덩어리라, 페이지(서버)가 머리를 그리면 부제가 다른 스택 자식으로 떨어져 사이에 카드
- * 간격(24)이 생긴다 (`plan-emergency-view.tsx` 와 같은 처리).
+ * **배치까지 이 뷰가 그린다** (D14-2). 대기 · 정상은 두 열(`PlanBriefingLayout`)이고 머리
+ * 카드가 좌측 맨 위에 선다 — 정상 갈래의 머리는 `PlanBriefingSection` 이 응답 값으로 그린다.
+ * **오류 · 기간 밖은 한 줄 가운데**다(`StateColumn`). 우측에 세울 것이 없어 두 열로 두면
+ * 400 레일 하나에 카드가 몰리고 오른쪽이 통째로 빈다.
  */
 export function PlanBriefingView({ planId, target }: { planId: string; target: BriefingTarget }) {
   const briefing = useQuery({
@@ -116,15 +117,31 @@ export function PlanBriefingView({ planId, target }: { planId: string; target: B
     ...INSIGHT_QUERY_OPTIONS,
   })
 
-  return (
-    <>
-      <PlanBriefingHeader planId={planId} kind={target.kind} subtitle={subtitleOf(data)} />
+  if (briefing.isPending) {
+    return (
+      <PlanBriefingLayout
+        aside={
+          <>
+            <PlanBriefingHeader planId={planId} kind={target.kind} />
+            <Surface aria-label={briefingHeadingOf(target.kind)} aria-busy>
+              <PlanBriefingSkeleton />
+            </Surface>
+          </>
+        }
+        /* 골격도 두 열이다 — 응답이 오는 순간 머리 카드가 가운데에서 왼쪽으로 옮겨 가지 않게 */
+        main={
+          <Surface>
+            <PlanBriefingSkeleton />
+          </Surface>
+        }
+      />
+    )
+  }
 
-      {briefing.isPending ? (
-        <Surface aria-label={briefingHeadingOf(target.kind)} aria-busy>
-          <PlanBriefingSkeleton />
-        </Surface>
-      ) : briefing.isError || data === undefined ? (
+  if (briefing.isError || data === undefined) {
+    return (
+      <StateColumn>
+        <PlanBriefingHeader planId={planId} kind={target.kind} />
         <Surface aria-label={briefingHeadingOf(target.kind)}>
           <BriefingError
             planId={planId}
@@ -132,54 +149,43 @@ export function PlanBriefingView({ planId, target }: { planId: string; target: B
             onRetry={() => void briefing.refetch()}
           />
         </Surface>
-      ) : (
-        <PlanBriefingSection
-          briefing={data}
-          /*
-            **`kind` 를 그대로 내려보낸다** (#733). 갈래 판정은 `pickBriefingDate` 하나가
-            갖고, 화면은 그 값을 문구·카드 노출에 쓴다 — 여기서 날짜를 다시 비교하면
-            판정 축이 둘이 된다.
-          */
-          kind={target.kind}
-          basisPetName={basisPetNameOf(
-            data.basisPetId,
-            data.petIds,
-            new Map((pets.data?.pets ?? []).map((pet) => [pet.petId, pet.name])),
-          )}
-          curve={{
-            hourly: curve.data?.hourly ?? null,
-            failed: curve.isError,
-            onRetry: () => void curve.refetch(),
-          }}
-          /*
-            **브리핑 응답을 다시 부른다** — `LOOKUP_FAILED` 는 브리핑이 원격 조회에 실패한
-            것이라 곡선만 다시 불러도 특보·골든타임은 비어 있다 (#716 · 명세 D9-2).
-          */
-          onRetry={() => void briefing.refetch()}
-        />
+      </StateColumn>
+    )
+  }
+
+  return (
+    <PlanBriefingSection
+      briefing={data}
+      /*
+        **`kind` 를 그대로 내려보낸다** (#733). 갈래 판정은 `pickBriefingDate` 하나가
+        갖고, 화면은 그 값을 문구·카드 노출에 쓴다 — 여기서 날짜를 다시 비교하면
+        판정 축이 둘이 된다.
+      */
+      kind={target.kind}
+      basisPetName={basisPetNameOf(
+        data.basisPetId,
+        data.petIds,
+        new Map((pets.data?.pets ?? []).map((pet) => [pet.petId, pet.name])),
       )}
-    </>
+      curve={{
+        hourly: curve.data?.hourly ?? null,
+        failed: curve.isError,
+        onRetry: () => void curve.refetch(),
+      }}
+      /*
+        **브리핑 응답을 다시 부른다** — `LOOKUP_FAILED` 는 브리핑이 원격 조회에 실패한
+        것이라 곡선만 다시 불러도 특보·골든타임은 비어 있다 (#716 · 명세 D9-2).
+      */
+      onRetry={() => void briefing.refetch()}
+    />
   )
 }
 
 /**
- * `{제목} · 9월 13일 (일) · 2일차` — **응답의 값으로 만든다.**
- *
- * 화면이 고른 날짜를 쓰지 않는다. 서버는 자기 `Clock` 을 보므로 자정 전후에 FE 가 고른
- * 날짜와 응답의 `date`·`day` 가 갈릴 수 있다 (`lib/plan/briefing.ts` 주석).
- *
- * **날짜 모양은 `formatPlanDay` 가 소유한다** (#732 · #733). 예전에는 여기서
- * `date.slice(5)` + `weekdayOf` 로 `09-13 (일)` 을 조립했는데, 같은 일정의 개요는
- * `2026년 9월 13일 (일)` 이라 **같은 날을 두 모양으로** 불렀다. 포맷터가 `null` 을 주는
- * (못 읽는) 날짜는 서버 문자열을 그대로 세운다 — 부제 한 줄 때문에 화면을 접지 않는다.
+ * 오류 · 기간 밖의 한 줄 — `max-w-2xl` 가운데 (응급 브리핑 #460 · 일정 만들기 #453 과 같은 폭).
  */
-function subtitleOf(data: PlanBriefingResponse | undefined): string | null {
-  if (data === undefined) return null
-
-  return messages.plan.briefingSubtitle
-    .replace('{title}', data.planTitle)
-    .replace('{date}', formatPlanDay(data.date) ?? data.date)
-    .replace('{day}', String(data.day))
+function StateColumn({ children }: { children: ReactNode }) {
+  return <SurfaceStack className="mx-auto w-full max-w-2xl">{children}</SurfaceStack>
 }
 
 /**
@@ -242,8 +248,8 @@ function PlanBriefingSkeleton() {
  */
 export function PlanBriefingOutOfRange({ planId }: { planId: string }) {
   return (
-    <>
-      <PlanBriefingHeader planId={planId} subtitle={null} />
+    <StateColumn>
+      <PlanBriefingHeader planId={planId} />
 
       <Surface aria-label={messages.plan.briefingHeading}>
         <EmptyState
@@ -257,6 +263,6 @@ export function PlanBriefingOutOfRange({ planId }: { planId: string }) {
           }
         />
       </Surface>
-    </>
+    </StateColumn>
   )
 }
