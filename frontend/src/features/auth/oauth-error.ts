@@ -5,11 +5,15 @@ import { isSignupConsentCode } from '@/lib/auth/signup-consent'
  *
  * **문구는 여기서 만들지 않는다.** 여덟 개 오류 코드의 `resultMessage` 가 이미 사유와
  * 행동을 안내하고(`AuthErrorCode` 실측), `AUTH_008` 은 어느 소셜로 가입됐는지까지
- * 말해 준다. `errorCode` 로 가르는 것은 **버튼이 무엇을 말해야 하는가**뿐이다 (정본 D1).
+ * 말해 준다. `errorCode` 로 가르는 것은 **버튼이 어디로 가는가**뿐이다 (정본 D1).
  *
- * 목적지는 셋 다 `/login` 이다. **콜백에서 재시도하지 않는다** — `code` 는 1회용이고
- * `state` 는 서버가 조회와 동시에 지운다(Redis GETDEL). 이 화면에 남아 다시 부르면
- * 무조건 `AUTH_010` 이다.
+ * 목적지는 `signup-consent` 하나를 빼고 `/login` 이다. **콜백에서 재시도하지 않는다** —
+ * `code` 는 1회용이고 `state` 는 서버가 조회와 동시에 지운다(Redis GETDEL). 이 화면에 남아
+ * 다시 부르면 무조건 `AUTH_010` 이다.
+ *
+ * **라벨은 목적지대로다** (#1079). `consent` · `signin` · `retry` 는 셋 다 `/login` 이라 버튼이
+ * 같은 말(`로그인 화면으로`)을 한다 — 셋을 가른 것은 사유를 기록하려는 것이고, 그 사유는 서버
+ * 문구가 화면에 말한다. 콜백에서 authorize 를 다시 부르게 되면 `consent` 만 라벨이 갈린다.
  */
 export type OAuthNextAction =
   /** 제공자 동의 화면에서 항목을 켜고 다시 시도해야 한다 */

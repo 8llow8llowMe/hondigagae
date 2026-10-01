@@ -2,12 +2,11 @@
 
 import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
-import { FormAlert } from '@/components/form-alert'
 import { Skeleton } from '@/components/skeleton'
 import { oauthNextAction } from '@/features/auth/oauth-error'
 import { type OAuthExchangeState, useOAuthExchange } from '@/features/auth/use-oauth-exchange'
-import { ApiError, classify } from '@/lib/api/error'
-import { isOAuthProvider, oauthProviderName } from '@/lib/auth/oauth-provider'
+import { ApiError } from '@/lib/api/error'
+import { isOAuthProvider } from '@/lib/auth/oauth-provider'
 import { apiErrorToFormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 
@@ -51,8 +50,20 @@ function signupConsentPath(provider: string, returnTo: string): string {
  * **성공 상태가 없다.** 성공하면 곧바로 원래 가려던 곳으로 보내므로 그릴 것이 없다
  * (정본 D5). 성공 화면을 만들면 이동 전에 한 프레임 깜빡인다.
  *
- * 실패의 다음 행동은 셋 다 `/login` 이다. `code` 는 소모됐고 `state` 는 서버가 지웠으므로
- * **이 화면에서 재시도할 방법이 없다** — 이동이므로 버튼이 아니라 링크(`ButtonLink`)다.
+ * 실패의 다음 행동은 동의 누락 하나를 빼고 `/login` 이다. `code` 는 소모됐고 `state` 는
+ * 서버가 지웠으므로 **이 화면에서 재시도할 방법이 없다** — 이동이므로 버튼이 아니라
+ * 링크(`ButtonLink`)이고, 라벨도 목적지대로 `로그인 화면으로` 다 (#1079).
+ *
+ * ## 실패 화면은 한 모양이다 (#1079)
+ *
+ * **잘못된 접근 · 도메인 실패 · 5xx 셋 다 `EmptyState` 다** — 제목 · 사유 · 다음 행동. 예전에는
+ * 5xx 만 제목 없이 `FormAlert` + `다시 시도`(실제로는 `/login` 링크)였다. 5xx 여도 `ErrorState`
+ * 가 아닌 것은 재시도 수단이 없어서다(`onRetry` 가 필수인 컴포넌트다).
+ *
+ * - **제목이 화면의 `h1` 이다** (`headingLevel={1}`). 이 화면에는 상태 말고 이름이 될 것이 없고,
+ *   인증 셸은 `h1` 을 그리지 않는다. 다른 인증 화면 셋은 각자 `h1` 을 갖는다.
+ * - **`flush` 다.** 인증 셸 카드(`px-4 py-6 md:px-5`)가 이미 여백을 갖는데 `EmptyState` 가
+ *   `py-12` + `main` 인셋을 한 번 더 먹어 제목이 x=49 에 섰다(375 · 다른 인증 화면은 33).
  */
 export function OAuthCallbackStatus({
   provider,
@@ -61,14 +72,14 @@ export function OAuthCallbackStatus({
   provider: string
   exchange: OAuthExchangeState
 }) {
-  const providerName = oauthProviderName(provider)
-
   if (exchange.status === 'invalid') {
     return (
       <EmptyState
         title={messages.auth.oauthInvalidTitle}
         description={messages.auth.oauthInvalidDescription}
-        action={<ButtonLink href={LOGIN_PATH}>{messages.auth.toLoginScreen}</ButtonLink>}
+        action={<ButtonLink href={LOGIN_PATH}>{messages.auth.oauthToLoginScreen}</ButtonLink>}
+        headingLevel={1}
+        flush
       />
     )
   }
@@ -94,37 +105,20 @@ export function OAuthCallbackStatus({
     apiErrorToFormErrors(exchange.error, messages.common.temporaryErrorDescription).form ??
     messages.common.temporaryErrorDescription
 
-  const status = exchange.error instanceof ApiError ? exchange.error.status : null
-  const resultCode = exchange.error instanceof ApiError ? exchange.error.resultCode : null
-
   /*
-    5xx·무응답은 우리가 고칠 수 있는 것이 없다 — 입력 오류처럼 보이지 않게 `FormAlert` 로
-    짧게 알리고 로그인으로 돌려보낸다 (정본 D5 마지막 행).
-
-    **`AUTH_014`(502, 제공자 통신 불가)도 여기로 온다.** `classify` 가 5xx 를 전부
-    `'temporary'` 로 보기 때문인데, 그래도 문구는 서버 것(`message`)이라 "제공자와 통신할
-    수 없다" 는 사유가 그대로 전달된다. 우리 일시 장애 문구로 덮이지 않는다.
+    **5xx 도 같은 갈래다** (#1079). `AUTH_014`(502, 제공자 통신 불가)의 문구는 서버 것(`message`)
+    이라 "제공자와 통신할 수 없다" 는 사유가 그대로 전달되고, 문구 없는 5xx · 무응답은 일시 장애
+    문구로 떨어진다.
   */
-  if (status !== null && classify(status) === 'temporary') {
-    return (
-      <div className="flex flex-col items-start gap-3">
-        <FormAlert message={message} />
-        <ButtonLink href={LOGIN_PATH} variant="secondary">
-          {messages.common.retry}
-        </ButtonLink>
-      </div>
-    )
-  }
-
+  const resultCode = exchange.error instanceof ApiError ? exchange.error.resultCode : null
   const action = oauthNextAction(resultCode)
+  /*
+    라벨은 **목적지가 정한다** (#1079). `consent` · `signin` · `retry` 셋 다 `/login` 이라 같은
+    라벨이다 — 예전의 `카카오 다시 시도` 는 누르면 제공자가 아니라 로그인 화면이 떠 거짓이었다.
+    무엇을 고쳐야 하는지는 서버 문구(`description`)가 말한다.
+  */
   const label =
-    action === 'consent' && providerName !== null
-      ? messages.auth.socialRetryLabel(providerName)
-      : action === 'signup-consent'
-        ? messages.auth.toSignupConsent
-        : action === 'signin'
-          ? messages.auth.toLogin
-          : messages.common.retry
+    action === 'signup-consent' ? messages.auth.toSignupConsent : messages.auth.oauthToLoginScreen
 
   /*
     **동의 누락만 목적지가 다르다** (#688). 동의는 `/authorize` 를 부르기 **전에만**
@@ -146,6 +140,8 @@ export function OAuthCallbackStatus({
       title={messages.auth.oauthFailedTitle}
       description={message}
       action={<ButtonLink href={destination}>{label}</ButtonLink>}
+      headingLevel={1}
+      flush
     />
   )
 }
