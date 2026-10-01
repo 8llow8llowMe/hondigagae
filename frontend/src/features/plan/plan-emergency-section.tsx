@@ -15,12 +15,15 @@ import type {
 } from '@/types/emergency'
 
 /**
- * 페이지 머리 — 돌아가기 · `h1` · 반경 안내. **카드가 아니다** (§0 의 페이지 머리 예외 —
- * 장소 상세 #443 · 일정 상세 #447 · 담기 #451 이 정한 "L0 위 제목 줄").
+ * 머리 카드 — 돌아가기 · `h1` · 반경 안내 (#1117).
  *
- * 인셋은 카드 안 글줄과 같은 `card` 다 — 아래 카드의 첫 글자와 세로선이 맞아야 한다.
- * 카드 테두리 1px 만큼(44 vs 45) 어긋나는 것은 같은 PR 들이 의도한 값이다.
- * 데스크톱 세로 여백은 `SurfaceStack` 의 `md:p-6` 이 준다 (`plan-emergency-view` 와 같다).
+ * **카드다** (DESIGN.md §0 머리 카드). 예전에는 §0 의 페이지 머리 예외를 따라 회색 바닥 위
+ * 글줄이었는데, 여행 브리핑(#1115)이 같은 머리를 카드로 올리면서 일정 상세에서 들어가는 형제
+ * 두 화면의 머리 모양이 갈렸다. 반경 안내는 이 화면 전체가 무엇을 기준으로 찾았는지를 말하는
+ * 사실이라, `h1` 과 함께 머리 카드가 담는다 — 판정은 역할로 한다(#475): 응답 전 `h1` 만
+ * 남는 동안에도 카드다.
+ *
+ * 인셋은 카드 안 글줄과 같은 `card` 다 — 아래 일자 카드의 첫 글자와 세로선이 맞는다.
  *
  * **반경 안내는 응답이 와야 쓸 수 있다** — 그래서 `null` 이면 그 줄을 비운다. 반경과 개수는
  * 서버 고정이라 조절 컨트롤을 두지 않고 사실만 적는다 — 조절할 수 있는 것처럼 보이면
@@ -34,7 +37,8 @@ export function PlanEmergencyHeader({
   radiusMeters: number | null
 }) {
   return (
-    /*
+    <Surface>
+      {/*
         **모바일만 flex 다** (#539). `md:block` 으로 데스크톱을 원래의 블록 흐름으로 되돌린다 —
         `BackLink` 에 `md:basis-full` 을 주는 방식은 줄바꿈과 **폭**이 한 속성에 묶여 있어,
         데스크톱에서 링크 상자가 줄 전체(실측 1832px)가 되고 클릭 영역과 포커스 링이 함께
@@ -44,15 +48,18 @@ export function PlanEmergencyHeader({
         줄 높이(30px)로 맞춰 두므로, 제목이 두 줄이 되거나 옆에 더 높은 것이 서도 아이콘이
         따라 내려가지 않는다. 줄 사이 `gap-x-1` 은 포커스 링(2px)이 제목 첫 글자를 덮지
         않게 하는 최소값이다.
-      */
-    <header
-      className={cn(
-        'flex flex-wrap items-start gap-x-1 pt-4 pb-4 md:block md:pt-0 md:pb-0',
-        INSET_CLASS.card,
-      )}
-    >
-      <BackLink href={`/plans/${planId}`} label={messages.plan.emergencyBack} variant="titleRow" />
-      {/*
+
+        세로 여백은 카드 안이라 모든 폭에서 `py-4 md:py-5` 다 — 여행 브리핑 머리 카드와 같은 값.
+      */}
+      <header
+        className={cn('flex flex-wrap items-start gap-x-1 py-4 md:block md:py-5', INSET_CLASS.card)}
+      >
+        <BackLink
+          href={`/plans/${planId}`}
+          label={messages.plan.emergencyBack}
+          variant="titleRow"
+        />
+        {/*
         **제목과 부제가 한 덩어리다.** 부제를 헤더 직속에 두면 모바일에서 제목만 아이콘
         만큼(40px) 밀려 한 헤더 안에 왼쪽 기준선이 둘이 된다 (`lib/ui/inset.ts` 가 지그재그
         기준선을 실패 사례로 적어 둔 그 모양이다).
@@ -61,20 +68,21 @@ export function PlanEmergencyHeader({
         길어지는 순간 제목이 다음 줄로 내려가고 **아이콘만 혼자 한 줄에 남는다.** 320에서
         여유가 55px 뿐이다(실측).
       */}
-      <div className="min-w-0 flex-1 md:flex-none">
-        <h1 className="text-title-1 text-fg lg:text-display font-bold break-keep md:mt-1 lg:font-extrabold">
-          {messages.plan.emergencyHeading}
-        </h1>
-        {radiusMeters !== null && (
-          <p className="text-caption text-fg-muted mt-1 font-medium">
-            {messages.plan.emergencyRadiusNote.replace(
-              '{km}',
-              String(Math.round(radiusMeters / 1000)),
-            )}
-          </p>
-        )}
-      </div>
-    </header>
+        <div className="min-w-0 flex-1 md:flex-none">
+          <h1 className="text-title-1 text-fg lg:text-display font-bold break-keep md:mt-1 lg:font-extrabold">
+            {messages.plan.emergencyHeading}
+          </h1>
+          {radiusMeters !== null && (
+            <p className="text-caption text-fg-muted mt-1 font-medium">
+              {messages.plan.emergencyRadiusNote.replace(
+                '{km}',
+                String(Math.round(radiusMeters / 1000)),
+              )}
+            </p>
+          )}
+        </div>
+      </header>
+    </Surface>
   )
 }
 

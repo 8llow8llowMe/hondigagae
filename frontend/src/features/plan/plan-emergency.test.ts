@@ -95,7 +95,7 @@ describe('PlanEmergencySection — 빈 경우', () => {
 
 /*
   **3층 표면** (`DESIGN.md §0`, #460 — 로드맵 #455 의 7번). 일정 상세(#447)와 같은 판정 —
-  일자마다 카드 하나, 장소 묶음은 카드 안 L2, 머리는 L0 위.
+  일자마다 카드 하나, 장소 묶음은 카드 안 L2. 머리는 #1117 부터 머리 카드다 (여행 브리핑 #1115 와 같다).
 */
 describe('PlanEmergencySection — 3층 표면 (#460)', () => {
   const daysWithSpots = DATA.days.filter((day) => day.spots.length > 0).length
@@ -109,7 +109,7 @@ describe('PlanEmergencySection — 3층 표면 (#460)', () => {
     )
   })
 
-  it('h1 은 카드 밖 — 섹션은 h1 을 그리지 않는다', () => {
+  it('섹션은 h1 을 그리지 않는다 — h1 은 머리 카드가 갖는다', () => {
     expect(render()).not.toContain('<h1')
   })
 
@@ -136,14 +136,28 @@ describe('PlanEmergencySection — 3층 표면 (#460)', () => {
     expect(markup).toContain('px-4 md:px-5')
   })
 
-  it('페이지 머리는 카드 인셋에 서고 카드는 아니다', () => {
+  /*
+    **머리는 카드다** (#1117 · DESIGN.md §0 머리 카드). 회색 바닥 위 글줄이던 것을 여행 브리핑
+    (#1115)과 같이 L1 면에 담았다. 여는 태그 순서로 본다 — 카드(`<section`)가 `<header` 를 감싼다.
+  */
+  it('머리는 카드 면에 담기고 글줄은 카드 인셋에 선다', () => {
     const header = renderToStaticMarkup(
       createElement(PlanEmergencyHeader, { planId: PLAN, radiusMeters: DATA.radiusMeters }),
     )
 
-    expect(header).toMatch(/^<header class="[^"]*px-4 md:px-5"/)
-    expect(header).not.toContain('<section')
-    expect(header).not.toContain('rounded-lg')
+    expect(header).toMatch(
+      /^<section [^>]*class="bg-bg border-border border-y md:rounded-lg md:border"[^>]*><header class="[^"]*px-4 md:px-5"/,
+    )
+    expect(header.match(/<section /g)).toHaveLength(1)
+  })
+
+  it('응답 전(반경 없음)에도 머리는 카드다 — 상태마다 모양이 갈리지 않는다', () => {
+    const header = renderToStaticMarkup(
+      createElement(PlanEmergencyHeader, { planId: PLAN, radiusMeters: null }),
+    )
+
+    expect(header.startsWith('<section ')).toBe(true)
+    expect(header).toContain('<h1')
   })
 })
 
