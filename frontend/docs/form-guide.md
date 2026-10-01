@@ -182,6 +182,13 @@ password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
     effect 는 필드 오류만 다룰 때 그대로 두고, 폼 전체 오류가 날 수 있는 폼은 이 함수를 부른다.
   - `FormAlert` 는 그래서 `tabIndex={-1}` + `data-form-alert` 를 단다. 찾는 쪽은 `role="alert"`
     가 아니라 이 속성을 본다 — `next dev` 오버레이도 `alert` 다.
+  - **5xx · 무응답이면 알림 자리가 폼 안 일시 장애 표시다** ([#1079](https://github.com/8llow8llowMe/hondigagae/issues/1079)).
+    폼 전체 실패는 **한 자리에 하나만** 선다 — 일시 장애(`ErrorState` `flush` + 재시도)이거나
+    `FormAlert` 이거나. 판정은 `src/lib/form/form-failure-display.ts` 의 `formFailureDisplay`
+    하나고, 화면과 포커스(`focusSubmitFailure(container, errors, errorStatus)`)가 같은 함수를 본다.
+    일시 장애의 바깥 상자가 `role="alert"` · `tabIndex={-1}` · `data-form-temporary-error` 를 단다.
+    인증 폼은 `features/auth/form-failure.tsx` 의 `FormFailure` 를 쓴다. 반려견 폼은 아직 둘이 함께
+    선다(#1079 범위 밖).
   - **단계를 되돌리는 실패**(`AUTH_005` · `MEMBER_006` · `AUTH_017`)는 단계 전환 effect 가 새 단계의
     첫 입력으로 옮긴다. 제출 실패 effect 는 단계 가드로 비켜선다 — 둘이 포커스를 다투지 않게.
 - 비밀번호 표시 토글은 `aria-pressed` 로 상태를 알린다.

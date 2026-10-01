@@ -382,6 +382,11 @@ function resolveTone() { ... }
 | `EmptyState` | `title`, `description?`, `action?`, `character?`      | **슬롯 없음** |
 | `ErrorState` | `title`, `description?`, `onRetry` (**필수**)         | 필수          |
 
+둘 다 여백 축을 **`inset` 이거나 `flush`** 로 받는다 (`StatePlacement`, `src/lib/ui/inset.ts`). `flush`
+는 담는 쪽이 이미 여백을 가진 자리(인증 셸 카드 · 폼 안) 전용이고 상태 자신의 세로 48 과 좌우 인셋을
+둘 다 걷는다 (#1079). 둘을 함께 주는 것은 타입이 막는다. `EmptyState.headingLevel` 의 `1` 은 화면
+전체가 그 상태이고 위에 `h1` 이 없을 때만이다(소셜 콜백) — 크기는 그대로다.
+
 - `EmptyState` 에 `onRetry` prop을 추가하자는 요청은 거절한다. 404에 재시도 버튼을 붙이는 경로가 열린다 (`api-integration-guide.md` §3).
 - `ErrorState` 의 `onRetry` 는 **필수 prop**이다. optional로 두면 빠진다.
 - `EmptyState.action` 은 재시도가 아니라 **다음 행동**이다 (예: "다른 지역 선택하기").
