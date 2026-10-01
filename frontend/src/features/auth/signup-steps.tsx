@@ -59,7 +59,12 @@ export function EmailStep({
         onSubmit()
       }}
     >
-      <FormFailure message={errors.form} errorStatus={errorStatus} onRetry={onRetry} />
+      <FormFailure
+        message={errors.form}
+        errorStatus={errorStatus}
+        submitting={submitting}
+        onRetry={onRetry}
+      />
 
       <Field id="email" label={messages.auth.emailLabel} error={errors.fields.email} required>
         <Input
@@ -132,7 +137,13 @@ export function CodeStep({
     >
       <SignupEmailSummary label={messages.auth.codeRecipientLabel} email={email} />
       <FormNotice message={notice ?? null} />
-      <FormFailure message={errors.form} errorStatus={errorStatus} onRetry={onRetry} />
+      <FormFailure
+        message={errors.form}
+        errorStatus={errorStatus}
+        // 재발송도 새 요청이다 — 그 결과를 기다리는 동안 직전 실패를 세워 두지 않는다 (#1084)
+        submitting={submitting || resending}
+        onRetry={onRetry}
+      />
 
       <Field id="code" label={messages.auth.codeLabel} error={errors.fields.code} required>
         {/* 입력 중에 대문자화 · 공백 제거 — 재설정 2단계와 같은 칸이다 (#1078) */}
@@ -215,7 +226,12 @@ export function ProfileStep({
     >
       <SignupEmailSummary label={messages.auth.signupEmailLabel} email={email} />
       <FormNotice message={notice ?? null} />
-      <FormFailure message={errors.form} errorStatus={errorStatus} onRetry={onRetry} />
+      <FormFailure
+        message={errors.form}
+        errorStatus={errorStatus}
+        submitting={submitting}
+        onRetry={onRetry}
+      />
 
       {duplicateEmail !== null && (
         <Link

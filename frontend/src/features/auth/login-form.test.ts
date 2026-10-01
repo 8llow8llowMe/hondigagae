@@ -175,6 +175,26 @@ describe('LoginFormFields', () => {
   })
 })
 
+describe('LoginFormFields — 제출 중 (#1084 L2)', () => {
+  it('다시 낸 요청이 도는 동안 직전 401 알림을 걷는다', () => {
+    const failed = {
+      errors: { fields: {}, form: '이메일 또는 비밀번호가 올바르지 않습니다.' },
+      errorStatus: 401,
+    }
+
+    expect(render(failed)).toContain('이메일 또는 비밀번호가 올바르지 않습니다.')
+    expect(render({ ...failed, submitting: true })).not.toContain(
+      '이메일 또는 비밀번호가 올바르지 않습니다.',
+    )
+  })
+
+  it('재시도한 5xx 도 도는 동안에는 일시 장애를 걷는다 — 눌렸는지가 보인다', () => {
+    expect(render({ errorStatus: 503, submitting: true })).not.toContain(
+      messages.common.temporaryErrorTitle,
+    )
+  })
+})
+
 describe('LoginDivider', () => {
   it('"또는" 만 읽히고 선은 숨긴다', () => {
     const markup = renderToStaticMarkup(createElement(LoginDivider))

@@ -245,8 +245,11 @@ export function DateField({
             */
             'text-body-1 h-11 w-full cursor-pointer rounded-md border pr-10 pl-3 text-left',
             'placeholder:text-fg-subtle',
-            'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
-            invalid ? 'border-danger-500' : 'border-border-strong',
+            'focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
+            // 오류 상태의 링은 테두리와 같은 빨강이다 — 이유는 `input.tsx` 같은 자리 주석 (#1084 L5)
+            invalid
+              ? 'border-danger-500 focus-visible:ring-danger-500'
+              : 'border-border-strong focus-visible:ring-brand-500',
           )}
         />
         {/* 장식이다 — 입력 자체가 이미 열기 버튼이라 여기에 별도 버튼을 두지 않는다 */}

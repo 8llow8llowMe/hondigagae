@@ -68,12 +68,23 @@ export type SocialLoginButtonsProps = {
    * 늘어도 호출부가 원하는 부분집합을 그대로 말할 수 있다.
    */
   providers?: readonly OAuthProviderId[]
+  /**
+   * 같은 화면의 **다른 로그인 수단이 진행 중**이면 켠다 (#1084 L2) — 로그인 화면에서 이메일
+   * 로그인 요청이 도는 동안이다.
+   *
+   * 예전에는 "로그인 중" 버튼 아래의 소셜 버튼이 그대로 눌렸다. 누르면 이메일 로그인 응답을
+   * 기다리는 사이 제공자 인가 화면으로 떠나, 이메일 로그인이 성공했는지 실패했는지 모른 채
+   * 세션 두 개가 경주한다. 안내 문구는 달지 않는다 — 1초 남짓 지나면 저절로 풀리고, 그 동안
+   * 이유는 바로 위 "로그인 중" 버튼이 말한다.
+   */
+  disabled?: boolean
 }
 
 export function SocialLoginButtons({
   returnTo,
   consent,
   providers = OAUTH_PROVIDERS,
+  disabled = false,
 }: SocialLoginButtonsProps) {
   const [error, setError] = useState<string | null>(null)
   // 어느 버튼이 진행 중인지. 두 버튼에 같은 loading 을 걸면 누르지 않은 쪽도 도는 것처럼 보인다
@@ -90,7 +101,7 @@ export function SocialLoginButtons({
   const consentBlocked = consent !== undefined && !isSignupConsentComplete(consent)
 
   const start = (provider: string) => {
-    if (startingRef.current || consentBlocked) return
+    if (startingRef.current || consentBlocked || disabled) return
     startingRef.current = true
     setPending(provider)
     setError(null)
@@ -135,7 +146,7 @@ export function SocialLoginButtons({
             */
             leading={brand.mark}
             loading={pending === provider}
-            disabled={consentBlocked || (pending !== null && pending !== provider)}
+            disabled={disabled || consentBlocked || (pending !== null && pending !== provider)}
             onClick={() => start(provider)}
           >
             {messages.auth.socialLoginLabel(name)}

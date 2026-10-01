@@ -10,6 +10,17 @@ export type FormFailureProps = {
   message: string | null
   /** 실패한 요청의 HTTP 상태. 성공했거나 아직 요청을 보내지 않았으면 null */
   errorStatus: number | null
+  /**
+   * 새 요청이 날아가는 중인가 — 그 동안에는 **직전 실패를 걷는다** (#1084 L2).
+   *
+   * 예전에는 401 알림("이메일 또는 비밀번호가 …")이 다시 낸 요청이 도는 동안에도 그대로 서
+   * 있어, 버튼은 "로그인 중" 인데 화면은 "실패했다" 를 함께 말했다. 직전 실패는 새 시도가
+   * 시작된 순간 낡은 정보다 — 결과가 다시 실패면 그때 다시 선다. 일시 장애(5xx)도 같다:
+   * 재시도를 누른 뒤에도 "잠시 문제가 생겼어요" 가 남으면 눌렸는지 알 수 없다.
+   *
+   * **필수다.** 선택으로 두면 새 호출부가 빠뜨려도 타입체커가 말하지 않는다.
+   */
+  submitting: boolean
   onRetry: () => void
 }
 
@@ -34,16 +45,23 @@ export type FormFailureProps = {
  * feature 안에 둔다 — 쓰는 곳이 인증 하나다 (component-guide.md §9). 반려견 폼(`pet-form.tsx`)도
  * 같은 이중 표시를 들고 있지만 #1079 범위 밖이다.
  */
-export function FormFailure({ message, errorStatus, onRetry }: FormFailureProps) {
+export function FormFailure({ message, errorStatus, submitting, onRetry }: FormFailureProps) {
+  if (submitting) return null
+
   const display = formFailureDisplay(message, errorStatus)
 
   if (display.kind === 'temporary') {
     return (
       /*
         포커스 테두리를 지우지 않는다 — `FormAlert` 와 같다. 키보드로 온 사람이 "지금 여기" 를
-        알아야 한다.
+        알아야 한다. **색은 토큰 링이다** (#1084) — 값과 이유는 `FormAlert` 와 같다(그쪽 주석).
       */
-      <div role="alert" tabIndex={-1} data-form-temporary-error="" className="rounded-md">
+      <div
+        role="alert"
+        tabIndex={-1}
+        data-form-temporary-error=""
+        className="focus-visible:ring-brand-500 rounded-md focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+      >
         <ErrorState
           title={messages.common.temporaryErrorTitle}
           description={messages.common.temporaryErrorDescription}
