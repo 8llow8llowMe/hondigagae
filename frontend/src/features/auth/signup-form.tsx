@@ -28,6 +28,7 @@ import {
 import { remainingSeconds } from '@/lib/form/cooldown'
 import { apiErrorToFormErrors, type FormErrors, NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { focusFirstError } from '@/lib/form/focus-first-error'
+import { focusSubmitFailure } from '@/lib/form/submit-failure-focus'
 import { useForm } from '@/lib/form/use-form'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { validate } from '@/lib/form/validate'
@@ -204,6 +205,8 @@ export function SignupForm({
   // (use-form.ts 의 submitCount 주석, login-form.tsx 의 같은 패턴 참고)
   useEffect(() => {
     if (codeForm.submitCount === 0) return
+    // AUTH_005 로 1단계에 되돌아갔으면 단계 전환 effect 가 이메일로 옮긴다 — 겹치지 않는다
+    if (step !== 'code') return
     if (codeForm.errors.fields.code !== undefined) {
       // keepError: true — 방금 표시한 코드 필드 오류를 이 호출이 지우면 안 된다.
       // setValue 의 기본 동작은 "사용자가 고쳤다"로 보고 그 필드 오류를 지우는데,
@@ -212,7 +215,10 @@ export function SignupForm({
       // 실패를 확인했다(use-form.ts 의 setValue JSDoc 참고).
       codeForm.setValue('code', '', { keepError: true })
       containerRef.current?.querySelector<HTMLElement>('#code')?.focus()
+      return
     }
+    // 코드 오류가 아닌 실패(429 · 5xx · 무응답)는 알림으로 — `BODY` 에 남기지 않는다 (#1078)
+    focusSubmitFailure(containerRef.current, codeForm.errors)
   }, [codeForm.submitCount])
 
   const profileForm = useForm<SignupProfileValues, void>({
@@ -381,6 +387,36 @@ export function SignupForm({
   const profileStepErrors: FormErrors = hasConsentErrors(consentErrors)
     ? { fields: profileForm.errors.fields, form: null }
     : profileForm.errors
+
+  /*
+    **1 · 3단계 제출 실패 뒤 포커스** (#1078). 2단계는 위 `codeForm` effect 가 맡는다.
+
+    예전에는 둘 다 effect 가 없었다 — 1단계를 빈 채로 내면 포커스가 버튼에 남았고, 3단계 409
+    (`MEMBER_001`)는 제출 중 `disabled` 가 된 버튼에서 포커스가 `BODY` 로 떨어졌다. 대상 순서는
+    `focusSubmitFailure` 하나가 정한다: 첫 오류 필드 → 폼 전체 알림 → 폼의 첫 입력.
+
+    트리거는 `submitCount` 하나다 (`use-form.ts` JSDoc). **화면에 보이는 오류**를 넘긴다 —
+    1단계는 되돌림 안내가 섞인 값, 3단계는 동의 오류가 붙은 값이다.
+
+    단계 가드: 3단계의 `MEMBER_006` 은 1단계로 되돌리고, 그 이동은 단계 전환 effect 가
+    이메일 칸으로 옮긴다(D6). 여기서 또 옮기면 되돌림 알림과 이메일 칸이 포커스를 다툰다.
+  */
+  useEffect(() => {
+    if (emailForm.submitCount === 0 || step !== 'email') return
+    focusSubmitFailure(containerRef.current, emailStepErrors)
+  }, [emailForm.submitCount])
+
+  useEffect(() => {
+    if (profileForm.submitCount === 0 || step !== 'profile') return
+    /*
+      서버가 돌려준 동의 오류(`MEMBER_115/116/117` · `MEMBER_010/011`)도 같은 제출의 결과다.
+      프로필 오류와 합쳐 넘기면 `focusFirstError` 가 문서 순서로 고른다 — 동의 블록이 위다.
+    */
+    focusSubmitFailure(containerRef.current, {
+      fields: { ...profileStepErrors.fields, ...consentErrors.fields },
+      form: profileStepErrors.form,
+    })
+  }, [profileForm.submitCount])
 
   /*
     **동의 블록은 모든 단계에서 보인다.** 같은 화면의 소셜 버튼이 1단계부터 눌리는데,

@@ -7,6 +7,7 @@ import { Field, fieldErrorId } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
 import { FormNotice } from '@/components/form-notice'
 import { Input } from '@/components/input'
+import { FORM_ALERT_SELECTOR } from '@/lib/form/submit-failure-focus'
 
 describe('Field', () => {
   it('label 을 입력 id 에 연결한다', () => {
@@ -87,6 +88,18 @@ describe('FormAlert', () => {
 
   it('메시지가 없으면 아무것도 렌더하지 않는다', () => {
     expect(renderToStaticMarkup(createElement(FormAlert, { message: null }))).toBe('')
+  })
+
+  /*
+    제출 실패 뒤 포커스 대상이다 (#1078). 탭 순서에는 끼지 않고(-1) 프로그램으로만 받는다.
+    `focusSubmitFailure` 는 `role` 이 아니라 이 속성으로 찾는다 — 둘이 어긋나면 포커스가 BODY 로 샌다.
+  */
+  it('프로그램 포커스를 받는다 — tabindex=-1 과 data-form-alert', () => {
+    const markup = renderToStaticMarkup(createElement(FormAlert, { message: '잠겼습니다.' }))
+
+    expect(markup).toContain('tabindex="-1"')
+    expect(markup).toContain('data-form-alert=""')
+    expect(FORM_ALERT_SELECTOR).toBe('[data-form-alert]')
   })
 })
 
