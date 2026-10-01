@@ -347,6 +347,13 @@ pnpm e2e:report     # 마지막 실행 리포트
 
 폴백을 재도 층 규약 검증은 유효하다 — 폴백이 같은 규약을 따르도록 그려져 있는 것이 그 이유다. 막으려는 것은 **교체되는 순간에 걸리는 것** 하나다.
 
+### 라우터를 창에서 직접 부르면 마운트를 기다린다 (#1094)
+
+`window.next.router` 는 **hydration 전에도 있다.** 커밋 전에 `push` 를 부르면 React 가 "hasn't mounted yet" 경고를 남기고 업데이트를 버려, RSC 요청과 서버 리다이렉트는 나가는데 URL 은 출발점에 머문다. **`main` 이 보이는 것은 서버 HTML 이라 신호가 아니다** — 로컬은 hydration 이 빨라 늘 통과하고 느린 CI 에서만 재시도까지 깨졌다.
+
+- ✅ 부르기 전에 `history.state.__NA === true` 를 기다린다 — 앱 라우터가 커밋 때 남기는 표식이다 (`authed-auth-redirect.spec.ts` 의 `clientPush`).
+- ✅ 로컬 재현은 CDP `Emulation.setCPUThrottlingRate`(6배)로 한다. 고치기 전 스펙이 20회 중 20회 같은 모양으로 깨졌다.
+
 ### 로그인
 
 `e2e/auth.setup.ts` 가 **실제 로그인 폼으로** 들어가 `storageState` 를 만들고, 나머지 스펙이 그것을 나눠 쓴다. 세션 쿠키를 `seal()` 로 위조하지 않는다 — 그러면 로그인 경로가 검증되지 않고 세션 형식이 바뀔 때 그 파일만 조용히 낡는다. 계정은 목 저장소의 일반 계정(`demo@hondigagae.dev`)이다 (`src/lib/api/mock/store.ts`).
