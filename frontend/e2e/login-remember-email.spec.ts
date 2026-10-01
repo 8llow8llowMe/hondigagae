@@ -64,6 +64,8 @@ test('체크를 켜고 로그인하면 로그아웃 뒤 재방문에 이메일�
     로그아웃은 기억을 남긴다 (#1081). **헤더 계정 메뉴로 나간다** — `/login` 의 "이미 로그인됨"
     화면을 거치지 않는 것은 그 화면이 서버 리다이렉트로 바뀔 예정이라서다 (#1082).
   */
+  // 로그인 성공은 문서째 새로 받는다 (#1075) — 메뉴 버튼이 hydration 전에 눌리면 열리지 않는다
+  await page.waitForLoadState('networkidle')
   await page.getByRole('button', { name: '내 정보 메뉴 열기' }).click()
   await page.getByRole('menuitem', { name: messages.member.logout }).click()
   await expect(page.getByRole('button', { name: '내 정보 메뉴 열기' })).toHaveCount(0)
