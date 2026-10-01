@@ -1102,8 +1102,20 @@ export const planMessages = {
   sharedExpiredDescription: '링크를 만든 사람에게 새 링크를 요청해 주세요.',
   sharedErrorTitle: '일정을 불러오지 못했어요',
   // ── 출발 전 여행 브리핑 (#626) ────────────────────────────────────────────
+  /**
+   * 갈래가 없는 기간 밖 화면의 `h1` · 카드 접근 이름이다. **갈래가 있으면(대기 · 오류 포함)
+   * 아래 둘을 쓴다** (`briefingHeadingOf`) — 진입 배너가 `오늘의 브리핑` 이라고 불러 놓고 들어온 화면이 `여행 브리핑`
+   * 이면 같은 문이 두 이름을 갖는다.
+   */
   briefingHeading: '여행 브리핑',
-  briefingPageTitle: '출발 전 여행 브리핑',
+  /** 진입 배너 제목(`briefingBannerTodayTitle`)과 같은 말이다 */
+  briefingHeadingToday: '오늘의 브리핑',
+  briefingHeadingEve: '내일 출발 브리핑',
+  /**
+   * 문서 `<title>`. **`출발 전` 을 걷었다** — 여행 중에 여는 갈래(`TODAY`)가 대부분인데 탭
+   * 제목이 출발 전이라고 말했다. 메타데이터는 갈래를 모르는 서버 상수라 중립 이름을 쓴다.
+   */
+  briefingPageTitle: '여행 브리핑',
   briefingBack: '일정으로 돌아가기',
   /**
    * `{title}` · `{date}` · `{day}` 치환 — 값은 전부 **응답**의 것이다.
@@ -1145,9 +1157,19 @@ export const planMessages = {
   briefingStaleRangeDescription: '일정 기간이 바뀐 것 같아요. 일정을 다시 열어 주세요',
   briefingErrorTitle: '브리핑을 불러오지 못했어요',
 
-  briefingScheduleHeading: '그날 일정',
-  /** `{count}` · `{visited}` 치환. **`visited` 가 0 이어도 적는다** — 그 0 이 정보다 */
-  briefingScheduleCounts: '항목 {count}개 · 다녀온 곳 {visited}개',
+  /**
+   * 일정 카드 제목 — **날씨 카드처럼 갈래를 제목이 말한다.** 예전 `그날 일정` 은 이 화면이
+   * 보는 날이 언제인지 말하지 않았다. 전날 갈래가 보는 날은 출발일이라 `내일` 이다.
+   */
+  briefingScheduleTodayHeading: '오늘 일정',
+  briefingScheduleEveHeading: '내일 일정',
+  /**
+   * `{count}` · `{visited}` 치환. **`visited` 가 0 이어도 적는다** — 그 0 이 정보다.
+   *
+   * `항목` 은 데이터 모델의 말이라 걷었다. 세는 말도 `곳` 이 `개` 보다 앞 줄 동선의 `사이
+   * N곳` 과 맞는다 — 다만 숙박·메모처럼 장소가 아닌 항목도 세므로 앞은 `일정 N개` 다.
+   */
+  briefingScheduleCounts: '일정 {count}개 · 다녀온 곳 {visited}곳',
   /**
    * 동선의 처음과 마지막 사이에 낀 항목 수 — `{count}` 치환 (#733).
    *

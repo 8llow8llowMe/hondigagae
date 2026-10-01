@@ -572,10 +572,10 @@ describe('PlanBriefingSection — 좌표 폴백 (명세 D9-3)', () => {
 })
 
 describe('PlanBriefingSection — 그날 일정 (명세 D5-1)', () => {
-  it('항목 수와 다녀온 수를 적는다 — 0 도 정보다', () => {
+  it('일정 수와 다녀온 수를 적는다 — 0 도 정보다', () => {
     const markup = render({ schedule: planBriefingSchedule({ itemCount: 4, visitedCount: 0 }) })
 
-    expect(markup).toContain('항목 4개 · 다녀온 곳 0개')
+    expect(markup).toContain('일정 4개 · 다녀온 곳 0곳')
   })
 
   it('항목이 0개면 빈 상태와 담기 링크를 내고 동선을 그리지 않는다', () => {
@@ -917,7 +917,7 @@ describe('PlanBriefingSection — 접근성 계약 (명세 D6)', () => {
     const markup = render()
 
     for (const heading of [
-      messages.plan.briefingScheduleHeading,
+      messages.plan.briefingScheduleTodayHeading,
       messages.plan.briefingWeatherTodayHeading,
       messages.plan.briefingWarningHeading,
       messages.plan.briefingWalkHeading,
@@ -927,20 +927,115 @@ describe('PlanBriefingSection — 접근성 계약 (명세 D6)', () => {
     expect(markup.split('<h2').length - 1).toBe(4)
   })
 
-  it('카드 순서는 일정 → 날씨 → 특보 → 골든타임이다', () => {
-    const markup = render()
-    const order = [
-      messages.plan.briefingScheduleHeading,
+  /*
+    **결론이 먼저다** (명세 D13-1). 예전에는 일정이 맨 위라 판정이 첫 화면 밖으로 밀렸다.
+    `indexOf` 는 제목 `>…<` 로 찾는다 — `오늘 일정` 은 `오늘 날씨와 적합도` 안에 없지만,
+    제목이 바뀌어 부분 문자열이 겹치는 날 순서 단언이 헛통과하지 않게 경계를 붙인다.
+  */
+  function headingOrder(markup: string, headings: string[]): number[] {
+    return headings.map((heading) => markup.indexOf(`>${heading}<`))
+  }
+
+  it('카드 순서는 날씨 → 특보 → 골든타임 → 일정이다', () => {
+    const order = headingOrder(render(), [
       messages.plan.briefingWeatherTodayHeading,
       messages.plan.briefingWarningHeading,
       messages.plan.briefingWalkHeading,
-    ].map((heading) => markup.indexOf(heading))
+      messages.plan.briefingScheduleTodayHeading,
+    ])
 
+    expect(order.every((at) => at >= 0)).toBe(true)
     expect(order).toEqual([...order].sort((a, b) => a - b))
+  })
+
+  /*
+    **발효 중인 특보만 맨 위로 올라간다** (D13-2). 자리를 고정하지 않는 이유는 D8-6 이 그대로
+    맞기 때문이다 — 특보 없는 날까지 맨 위에 두면 화면이 "없음" 으로 시작한다.
+  */
+  it('발효 중인 특보가 있으면 특보 카드가 맨 위다', () => {
+    const order = headingOrder(render({ weatherWarning: planBriefingWarning() }), [
+      messages.plan.briefingWarningHeading,
+      messages.plan.briefingWeatherTodayHeading,
+      messages.plan.briefingWalkHeading,
+      messages.plan.briefingScheduleTodayHeading,
+    ])
+
+    expect(order.every((at) => at >= 0)).toBe(true)
+    expect(order).toEqual([...order].sort((a, b) => a - b))
+  })
+
+  it('확인하지 못한 특보는 맨 위로 올리지 않는다 — 값이 있을 때만 올린다', () => {
+    const markup = render({
+      weatherWarning: null,
+      weatherWarningUnavailableReasonCode: 'LOOKUP_FAILED',
+      weatherWarningUnavailableReason: '기상특보 정보를 가져오지 못했습니다.',
+    })
+    const [weather, warning] = headingOrder(markup, [
+      messages.plan.briefingWeatherTodayHeading,
+      messages.plan.briefingWarningHeading,
+    ]) as [number, number]
+
+    expect(weather).toBeGreaterThanOrEqual(0)
+    expect(weather).toBeLessThan(warning)
+  })
+
+  it('특보 카드는 어느 갈래에도 한 장뿐이다', () => {
+    const count = (markup: string) =>
+      markup.split(`>${messages.plan.briefingWarningHeading}<`).length - 1
+
+    for (const warning of [null, planBriefingWarning()]) {
+      expect(count(render({ weatherWarning: warning }))).toBe(1)
+    }
+  })
+
+  /*
+    **자정 경계** — FE 는 전날로 골랐는데 서버가 경보를 실어 온 갈래 (D11-2). 접히지 않고
+    맨 위에 한 장이다.
+  */
+  it('전날 갈래에 경보가 실려 오면 맨 위에 한 장 선다', () => {
+    const markup = renderEve({
+      weatherWarning: planBriefingWarning(),
+      weatherWarningUnavailableReasonCode: null,
+      weatherWarningUnavailableReason: null,
+    })
+    const [warning, weather] = headingOrder(markup, [
+      messages.plan.briefingWarningHeading,
+      messages.plan.briefingWeatherEveHeading,
+    ]) as [number, number]
+
+    expect(markup.split(`>${messages.plan.briefingWarningHeading}<`).length - 1).toBe(1)
+    expect(warning).toBeGreaterThanOrEqual(0)
+    expect(warning).toBeLessThan(weather)
+  })
+
+  it('전날에는 각주가 일정 카드보다 앞이다 — 접힌 카드 자리에서 말한다', () => {
+    const markup = renderEve()
+    const weather = markup.indexOf(`>${messages.plan.briefingWeatherEveHeading}<`)
+    const footnote = markup.indexOf(messages.plan.briefingEveFootnote)
+    const schedule = markup.indexOf(`>${messages.plan.briefingScheduleEveHeading}<`)
+
+    expect(weather).toBeGreaterThanOrEqual(0)
+    expect(footnote).toBeGreaterThan(weather)
+    expect(schedule).toBeGreaterThan(footnote)
   })
 })
 
 describe('PlanBriefingHeader — h1 은 어느 갈래에도 있다 (명세 D6)', () => {
+  /*
+    **제목이 진입 배너와 같은 말이다** (D13-5). 배너 `오늘의 브리핑` 을 누르고 들어온 화면이
+    `여행 브리핑` 이었다.
+  */
+  it('갈래를 알면 제목이 갈래를 말한다', () => {
+    const header = (kind: 'TODAY' | 'EVE') =>
+      renderToStaticMarkup(
+        createElement(PlanBriefingHeader, { planId: 'p-1', kind, subtitle: null }),
+      )
+
+    expect(header('TODAY')).toContain(`>${messages.plan.briefingHeadingToday}</h1>`)
+    expect(header('EVE')).toContain(`>${messages.plan.briefingHeadingEve}</h1>`)
+    expect(messages.plan.briefingHeadingToday).toBe(messages.plan.briefingBannerTodayTitle)
+  })
+
   it('부제가 없어도 h1 과 돌아가기가 선다', () => {
     const markup = renderToStaticMarkup(
       createElement(PlanBriefingHeader, { planId: 'p-1', subtitle: null }),
