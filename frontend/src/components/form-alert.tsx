@@ -1,8 +1,18 @@
+import type { FailureAnnounce } from '@/lib/form/submit-failure-focus'
 import { cn } from '@/lib/utils/cn'
 
 export type FormAlertProps = {
   /** 없으면 아무것도 렌더하지 않는다 */
   message: string | null
+  /**
+   * 무엇으로 읽히는가 — **기본값 `live`(`role="alert"`)** 는 지금까지의 동작 그대로다 (#1102).
+   *
+   * `focus` 는 **나타난 뒤 포커스가 이 알림으로 옮겨 오는 자리** 전용이다 — 역할을 떼고 포커스
+   * 하나로 읽힌다. 둘 다 두면 알림 낭독과 포커스 낭독이 같은 문구를 두 번 읽는다. 포커스를 실제로
+   * 옮기지 않는 자리에 `focus` 를 주면 **아무것도 읽히지 않는다** — 그래서 값은 손으로 고르지 않고
+   * 포커스 effect 와 같은 판정(`submitFailureAnnounce`)에서 받는다. 지금은 `FormFailure` 만 넘긴다.
+   */
+  announce?: FailureAnnounce | undefined
   className?: string
 }
 
@@ -13,13 +23,15 @@ export type FormAlertProps = {
  * 사용자가 실패했다는 것을 알 수 없다 — docs/form-guide.md §8.
  *
  * 5xx 는 이것이 아니라 `ErrorState` 를 쓴다. 여기는 입력을 고쳐야 하는 실패다.
+ *
+ * **포커스를 받는 자리면 `announce="focus"`** — 그때는 포커스가 낭독 경로다 (#1102, 위 prop).
  */
-export function FormAlert({ message, className }: FormAlertProps) {
+export function FormAlert({ message, announce = 'live', className }: FormAlertProps) {
   if (message === null) return null
 
   return (
     <p
-      role="alert"
+      role={announce === 'live' ? 'alert' : undefined}
       /*
         **제출 실패 뒤 포커스 대상이다** (#1078). 제출 중 버튼이 `disabled` 가 되면 포커스가
         `BODY` 로 떨어지는데, 필드 오류 없이 이것만 서는 실패(5xx · 429 · 409 …)에서는 돌려

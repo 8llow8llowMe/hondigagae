@@ -12,6 +12,7 @@ import type { CodeValues, EmailValues, SignupProfileValues } from '@/features/au
 import { SignupEmailSummary } from '@/features/auth/signup-parts'
 import { VerificationCodeInput } from '@/features/auth/verification-code-input'
 import type { FormErrors } from '@/lib/form/field-errors'
+import { type FailureAnnounce, submitFailureAnnounce } from '@/lib/form/submit-failure-focus'
 import { messages } from '@/lib/messages'
 
 /**
@@ -33,6 +34,12 @@ export type EmailStepProps = {
   errors: FormErrors
   errorStatus: number | null
   submitting: boolean
+  /**
+   * 폼 전체 실패가 무엇으로 읽히는가 (#1102). 생략하면 포커스 순서의 첫 대상으로 정한다
+   * (`submitFailureAnnounce`). 되돌림 안내처럼 포커스를 이메일 칸으로 보내는 갈래는 `SignupForm`
+   * 이 `live` 를 넘긴다.
+   */
+  announce?: FailureAnnounce | undefined
   onValueChange: (key: keyof EmailValues, value: string) => void
   onSubmit: () => void
   onRetry: () => void
@@ -43,6 +50,7 @@ export function EmailStep({
   errors,
   errorStatus,
   submitting,
+  announce = submitFailureAnnounce(errors, errorStatus),
   onValueChange,
   onSubmit,
   onRetry,
@@ -63,6 +71,7 @@ export function EmailStep({
         message={errors.form}
         errorStatus={errorStatus}
         submitting={submitting}
+        announce={announce}
         onRetry={onRetry}
       />
 
@@ -142,6 +151,8 @@ export function CodeStep({
         errorStatus={errorStatus}
         // 재발송도 새 요청이다 — 그 결과를 기다리는 동안 직전 실패를 세워 두지 않는다 (#1084)
         submitting={submitting || resending}
+        // 제출 · 재전송 실패 뒤 포커스와 같은 판정이다 (#1102, `resendFocusTargets`)
+        announce={submitFailureAnnounce(errors, errorStatus)}
         onRetry={onRetry}
       />
 
@@ -230,6 +241,7 @@ export function ProfileStep({
         message={errors.form}
         errorStatus={errorStatus}
         submitting={submitting}
+        announce={submitFailureAnnounce(errors, errorStatus)}
         onRetry={onRetry}
       />
 

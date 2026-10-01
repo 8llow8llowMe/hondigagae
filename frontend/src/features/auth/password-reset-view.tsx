@@ -19,7 +19,12 @@ import { resetPassword, sendPasswordResetCode } from '@/lib/api/auth'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
 import { remainingSeconds } from '@/lib/form/cooldown'
 import { apiErrorToFormErrors, type FormErrors } from '@/lib/form/field-errors'
-import { focusSubmitFailure } from '@/lib/form/submit-failure-focus'
+import { formErrorsAfterEdit } from '@/lib/form/form-failure-display'
+import {
+  focusResendResult,
+  focusSubmitFailure,
+  type ResendResult,
+} from '@/lib/form/submit-failure-focus'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
 
@@ -50,6 +55,11 @@ export function PasswordResetView() {
   const [, forceCooldownTick] = useState(0)
   const [isResending, setResending] = useState(false)
   const resendingRef = useRef(false)
+  // 재발송이 **끝났다**는 사건 — 포커스 effect 의 트리거다 (#1102, `signup-form.tsx` 와 같다)
+  const [resendOutcome, setResendOutcome] = useState<{ count: number; result: ResendResult }>({
+    count: 0,
+    result: 'sent',
+  })
 
   // AUTH_005/AUTH_017 로 1단계에 되돌아왔을 때 이유를 싣는다. 도착 시점엔 resetForm 오류지만
   // 그 단계는 더 이상 화면에 없다 — 되돌아간 1단계에 따로 실어야 사용자가 이유를 안다 (D4)
@@ -199,16 +209,28 @@ export function PasswordResetView() {
     resendingRef.current = true
     setResending(true)
     setCodeAction('resend')
+    let result: ResendResult = 'failed'
     void sendPasswordResetCode(email)
       .then(() => {
+        result = 'sent'
         setCooldownStartedAt(Date.now())
         setResetErrorStatus(null)
+        /*
+          직전 폼 전체 실패를 걷는다 (#1102). 남기면 성공한 재발송 위에 앞선 429 · 5xx 문구가
+          알림으로 다시 서고, 아래 `notice` 조건이 그것을 오류로 보고 "메일을 보냈어요" 를 지운다.
+          이전 값을 받는 형태인 이유는 `signup-form.tsx` 의 같은 자리와 같다(이 콜백의 오류는 낡았다).
+        */
+        resetForm.setErrors((previous) =>
+          previous.form === null ? previous : { fields: previous.fields, form: null },
+        )
       })
       .catch((error: unknown) => {
         if (error instanceof ApiError && error.kind === 'rate-limited') {
           // AUTH_003(이메일 60초) · AUTH_016(IP 상한) 둘 다 429 다. 쿨다운을 유지해 버튼을
-          // 계속 비활성으로 두고, 원인은 서버 문구가 갈라 준다 — 우리가 짓지 않는다
+          // 계속 비활성으로 두고, 원인은 서버 문구가 갈라 준다 — 우리가 짓지 않는다.
+          // 상태도 429 로 둔다 (#1102) — 직전 5xx 상태가 남아 있으면 이 알림이 일시 장애에 가린다
           setCooldownStartedAt(Date.now())
+          setResetErrorStatus(error.status)
           resetForm.setErrors(apiErrorToFormErrors(error, messages.form.submitFailed))
           return
         }
@@ -217,8 +239,25 @@ export function PasswordResetView() {
       .finally(() => {
         resendingRef.current = false
         setResending(false)
+        // `loading` 이 풀리는 같은 렌더에서 센다 — 요청 중에는 `FormFailure` 가 직전 실패를 걷는다
+        setResendOutcome((previous) => ({ count: previous.count + 1, result }))
       })
   }, [cooldownSeconds, email, resetForm.setErrors])
+
+  /*
+    **재발송 뒤 포커스** (#1102). 버튼이 요청 중 `loading`, 끝나면 쿨다운으로 `disabled` 라 포커스가
+    `BODY` 로 떨어졌다(실측: 성공 · 429 · 503 모두). 성공이면 코드 칸(포커스를 잃었을 때만), 막혔으면
+    제출 실패와 같은 순서다 — `resendFocusTargets` · `focusResendResult`.
+  */
+  useEffect(() => {
+    if (resendOutcome.count === 0 || step !== 'code') return
+    focusResendResult(
+      containerRef.current,
+      resendOutcome.result,
+      resetForm.errors,
+      resetErrorStatus,
+    )
+  }, [resendOutcome])
 
   const emailStepErrors: FormErrors =
     stepBackMessage !== null
@@ -263,9 +302,13 @@ export function PasswordResetView() {
           errors={emailStepErrors}
           errorStatus={emailErrorStatus}
           submitting={emailForm.isSubmitting}
+          // 되돌림 안내는 단계 전환 effect 가 이메일 칸으로 옮긴다(D6) — 알림이 낭독 경로다 (#1102)
+          announce={stepBackMessage !== null ? 'live' : undefined}
           onValueChange={(key, value) => {
             setStepBackMessage(null)
-            // 값을 고치면 5xx/무응답의 일시 장애 표시를 걷는다 — 로그인·회원가입과 동일
+            // 값을 고치면 5xx/무응답의 일시 장애 표시를 걷는다 — 로그인·회원가입과 동일.
+            // 서버 문구도 함께 걷는다 — 남기면 그 문구로 알림이 선다 (#1102)
+            emailForm.setErrors((previous) => formErrorsAfterEdit(previous, emailErrorStatus))
             setEmailErrorStatus(null)
             emailForm.setValue(key, value)
           }}
@@ -286,6 +329,8 @@ export function PasswordResetView() {
           // 오류가 떠 있으면 성공 안내를 끈다 — role=status 와 role=alert 가 동시에 뜬다
           notice={resetForm.errors.form === null ? messages.auth.resetCodeSent : undefined}
           onValueChange={(key, value) => {
+            // 서버 문구도 함께 걷는다 — 상태만 비우면 일시 장애가 알림으로 바뀐다 (#1102)
+            resetForm.setErrors((previous) => formErrorsAfterEdit(previous, resetErrorStatus))
             setResetErrorStatus(null)
             resetForm.setValue(key, value)
           }}

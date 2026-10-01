@@ -3,6 +3,7 @@
 import { ErrorState } from '@/components/error-state'
 import { FormAlert } from '@/components/form-alert'
 import { formFailureDisplay } from '@/lib/form/form-failure-display'
+import type { FailureAnnounce } from '@/lib/form/submit-failure-focus'
 import { messages } from '@/lib/messages'
 
 export type FormFailureProps = {
@@ -21,6 +22,18 @@ export type FormFailureProps = {
    * **필수다.** 선택으로 두면 새 호출부가 빠뜨려도 타입체커가 말하지 않는다.
    */
   submitting: boolean
+  /**
+   * 무엇으로 읽히는가 — 제출 실패 뒤 **포커스가 이 자리로 오면 `focus`**, 다른 칸으로 가면
+   * `live`(`role="alert"`) 다 (#1102). 둘 다 두면 같은 문구를 두 번 읽는다.
+   *
+   * 호출부가 포커스 effect 와 **같은 판정**(`submitFailureAnnounce(errors, errorStatus)`)으로
+   * 넘긴다. 그 effect 가 포커스를 다른 데로 보내는 갈래(로그인 401 · 단계 되돌림 안내)는
+   * 호출부가 `live` 로 덮는다.
+   *
+   * **필수다** — `submitting` 과 같은 이유다. 기본값을 두면 새 호출부가 포커스 배선과 어긋난
+   * 값을 조용히 받는다(`focus` 인데 포커스를 안 옮기면 아무것도 읽히지 않는다).
+   */
+  announce: FailureAnnounce
   onRetry: () => void
   /**
    * 일시 장애 제목의 heading 레벨 — **제목을 가진 `Surface` 안이면 `3`** 이다 (#1101 · #456①).
@@ -41,10 +54,13 @@ export type FormFailureProps = {
  * `formFailureDisplay` 하나가 정한다 — 제출 실패 뒤 포커스(`focusSubmitFailure`)도 같은 함수다.
  *
  * **일시 장애는 폼을 대체하지 않는다.** 입력은 그대로 남아 오타를 고칠 수 있다(로그인 D4) —
- * 값을 고치면 호출부가 `errorStatus` 를 비워 이 자리가 걷힌다.
+ * 값을 고치면 호출부가 `errorStatus` 를 비워 이 자리가 걷힌다. **서버 문구(`errors.form`)도
+ * `formErrorsAfterEdit` 로 함께 걷는다** — 상태만 비우면 그 문구로 알림이 서서 일시 장애가 서버
+ * 문구 알림으로 모양을 바꿨다 (#1102).
  *
  * **일시 장애의 바깥 상자가 `FormAlert` 의 두 몫을 넘겨받는다.**
- * - `role="alert"` — 숨긴 `FormAlert` 가 하던 알림이다. 제출 뒤 화면 변화를 스크린리더가 안다
+ * - 낭독 — 숨긴 `FormAlert` 가 하던 일이다. 제출 뒤 화면 변화를 스크린리더가 안다. **`announce`
+ *   가 `live` 일 때만 `role="alert"`** 다 — 포커스가 오는 자리(`focus`)면 포커스가 읽는다 (#1102)
  * - `tabIndex={-1}` + `data-form-temporary-error` — 제출 실패 뒤 포커스 대상이다. 재시도 버튼이
  *   아니라 상자인 이유는 `submit-failure-focus.ts` 에 있다(오프라인이면 버튼이 걷힌다)
  *
@@ -59,6 +75,7 @@ export function FormFailure({
   message,
   errorStatus,
   submitting,
+  announce,
   onRetry,
   headingLevel = 2,
 }: FormFailureProps) {
@@ -73,7 +90,7 @@ export function FormFailure({
         알아야 한다. **색은 토큰 링이다** (#1084) — 값과 이유는 `FormAlert` 와 같다(그쪽 주석).
       */
       <div
-        role="alert"
+        role={announce === 'live' ? 'alert' : undefined}
         tabIndex={-1}
         data-form-temporary-error=""
         className="focus-visible:ring-brand-500 rounded-md focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
@@ -89,5 +106,7 @@ export function FormFailure({
     )
   }
 
-  return <FormAlert message={display.kind === 'alert' ? display.message : null} />
+  return (
+    <FormAlert message={display.kind === 'alert' ? display.message : null} announce={announce} />
+  )
 }

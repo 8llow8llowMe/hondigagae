@@ -94,13 +94,17 @@ describe('PasswordResetEmailStep', () => {
     })
 
     expect(markup).not.toContain(messages.common.temporaryErrorTitle)
-    expect(markup).toContain('role="alert"')
+    // 제출 실패 뒤 포커스가 이 알림으로 온다 — 포커스가 읽어 role=alert 는 없다 (#1102)
+    expect(markup).toContain('data-form-alert=""')
+    expect(markup).not.toContain('role="alert"')
     expect(markup).toContain('인증코드 요청이 너무 잦습니다')
   })
 
   it('되돌아온 사유는 role=alert 로 알린다 — role=status 가 아니다', () => {
-    // AUTH_005/AUTH_017 로 1단계에 되돌아온 경우. 성공 안내가 아니라 실패 사유다
+    // AUTH_005/AUTH_017 로 1단계에 되돌아온 경우. 성공 안내가 아니라 실패 사유다.
+    // 포커스는 단계 전환 effect 가 이메일 칸으로 옮기므로 `PasswordResetView` 가 live 를 넘긴다 (#1102)
     const markup = emailStep({
+      announce: 'live',
       errors: {
         fields: {},
         form: '인증코드 시도 횟수를 초과했습니다. 인증코드를 다시 요청해주세요.',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { type Dispatch, type SetStateAction, useCallback, useRef, useState } from 'react'
 
 import type { ZodType } from 'zod'
 
@@ -35,7 +35,11 @@ export type UseFormReturn<TValues> = {
     value: TValues[K],
     options?: { keepError?: boolean },
   ) => void
-  setErrors: (errors: FormErrors) => void
+  /**
+   * 오류를 통째로 바꾼다. **이전 값을 받는 함수도 된다** (#1102) — 요청이 끝난 뒤(재전송)처럼
+   * 렌더 시점의 `errors` 가 낡았을 수 있는 자리에서 쓴다. 값만 받던 예전 호출은 그대로다.
+   */
+  setErrors: Dispatch<SetStateAction<FormErrors>>
   reset: (values?: TValues) => void
   submit: () => Promise<void>
   /**

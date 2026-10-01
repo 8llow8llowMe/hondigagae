@@ -28,7 +28,12 @@ import {
 import { remainingSeconds } from '@/lib/form/cooldown'
 import { apiErrorToFormErrors, type FormErrors, NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { focusFirstError } from '@/lib/form/focus-first-error'
-import { focusSubmitFailure } from '@/lib/form/submit-failure-focus'
+import { formErrorsAfterEdit } from '@/lib/form/form-failure-display'
+import {
+  focusResendResult,
+  focusSubmitFailure,
+  type ResendResult,
+} from '@/lib/form/submit-failure-focus'
 import { useForm } from '@/lib/form/use-form'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { validate } from '@/lib/form/validate'
@@ -80,6 +85,14 @@ export function SignupForm({
   const [duplicateEmail, setDuplicateEmail] = useState<string | null>(null)
   const [isResending, setResending] = useState(false)
   const resendingRef = useRef(false)
+  /*
+    재전송이 **끝났다**는 사건 — 포커스 effect 의 트리거다 (#1102). `submitCount` 와 같은 이유로
+    결과 값이 아니라 횟수를 센다: 같은 결과가 연달아 나도 effect 가 다시 돈다.
+  */
+  const [resendOutcome, setResendOutcome] = useState<{ count: number; result: ResendResult }>({
+    count: 0,
+    result: 'sent',
+  })
 
   // AUTH_005(코드 만료)/MEMBER_006(인증 미완료)로 1단계에 되돌아왔을 때 보여줄 안내.
   // 두 오류 모두 도착 시점엔 codeForm/profileForm 오류로 세팅되지만 그 단계는 더 이상
@@ -297,16 +310,29 @@ export function SignupForm({
     resendingRef.current = true
     setResending(true)
     setCodeAction('resend')
+    let result: ResendResult = 'failed'
     void sendEmailCode(email)
       .then(() => {
+        result = 'sent'
         setCooldownStartedAt(Date.now())
         setCodeErrorStatus(null)
+        /*
+          직전 폼 전체 실패를 걷는다 (#1102). 남기면 성공한 재전송 위에 앞선 429 문구("잠시 후
+          다시 요청해주세요")나 5xx 서버 문구가 알림으로 다시 선다 — 상태를 비웠으니 일시 장애가
+          아니라 알림이 된다. 이전 값을 받는 형태인 이유: 이 콜백은 요청 전에 만들어져
+          `codeForm.errors` 가 낡았다(그 사이 고친 필드 오류를 되살리면 안 된다).
+        */
+        codeForm.setErrors((previous) =>
+          previous.form === null ? previous : { fields: previous.fields, form: null },
+        )
       })
       .catch((error: unknown) => {
         if (error instanceof ApiError && error.kind === 'rate-limited') {
           // 쿨다운을 유지해 재전송 버튼을 계속 비활성 상태로 둔다(D4). ErrorState 가
-          // 아니라 FormAlert 로만 보여준다 — codeForm 오류에 실어 CodeStep 이 그대로 렌더한다
+          // 아니라 FormAlert 로만 보여준다 — codeForm 오류에 실어 CodeStep 이 그대로 렌더한다.
+          // 상태도 429 로 둔다 (#1102) — 직전 5xx 상태가 남아 있으면 이 알림이 일시 장애에 가린다
           setCooldownStartedAt(Date.now())
+          setCodeErrorStatus(error.status)
           codeForm.setErrors(apiErrorToFormErrors(error, messages.form.submitFailed))
           return
         }
@@ -315,8 +341,25 @@ export function SignupForm({
       .finally(() => {
         resendingRef.current = false
         setResending(false)
+        /*
+          `loading` 이 풀리는 **같은 렌더**에서 센다 — 요청 중에는 `FormFailure` 가 직전 실패를
+          걷어(`submitting || resending`) effect 가 찾을 알림이 아직 없다.
+        */
+        setResendOutcome((previous) => ({ count: previous.count + 1, result }))
       })
   }, [cooldownSeconds, email, codeForm.setErrors])
+
+  /*
+    **재전송 뒤 포커스** (#1102). 재전송 버튼은 요청 중 `loading`, 끝나면 성공이든 429 든 쿨다운으로
+    `disabled` 라 포커스가 `BODY` 로 떨어졌다(실측: 성공 · 429 · 503 모두). 성공이면 코드 칸,
+    막혔으면 제출 실패와 같은 순서(429 알림 · 5xx 일시 장애)다 — `resendFocusTargets`.
+    성공은 포커스를 잃었을 때만 옮긴다(요청 중에 코드 칸을 눌러 둔 사람의 자리를 빼앗지 않는다) —
+    `focusResendResult`.
+  */
+  useEffect(() => {
+    if (resendOutcome.count === 0 || step !== 'code') return
+    focusResendResult(containerRef.current, resendOutcome.result, codeForm.errors, codeErrorStatus)
+  }, [resendOutcome])
 
   /**
    * 동의 값을 바꾸면 그 항목의 오류만 지운다. `useForm.setValue` 의 기본 동작과 같은
@@ -451,9 +494,13 @@ export function SignupForm({
           errors={emailStepErrors}
           errorStatus={emailErrorStatus}
           submitting={emailForm.isSubmitting}
+          // 되돌림 안내는 단계 전환 effect 가 이메일 칸으로 옮긴다(D6) — 알림이 낭독 경로다 (#1102)
+          announce={stepBackMessage !== null ? 'live' : undefined}
           onValueChange={(key, value) => {
             setStepBackMessage(null)
-            // 입력을 고치면 5xx/무응답의 일시 장애 표시를 걷는다 — I1 과 동일한 패턴
+            // 입력을 고치면 5xx/무응답의 일시 장애 표시를 걷는다 — I1 과 동일한 패턴.
+            // 서버 문구도 함께 걷는다 — 남기면 그 문구로 알림이 선다 (#1102)
+            emailForm.setErrors((previous) => formErrorsAfterEdit(previous, emailErrorStatus))
             setEmailErrorStatus(null)
             emailForm.setValue(key, value)
           }}
@@ -479,7 +526,8 @@ export function SignupForm({
           resending={isResending}
           notice={messages.auth.codeSent}
           onValueChange={(key, value) => {
-            // 입력을 고치면 5xx/무응답의 일시 장애 표시를 걷는다 — I1 과 동일한 패턴
+            // 입력을 고치면 5xx/무응답의 일시 장애 표시를 걷는다 — I1 과 동일한 패턴 (#1102 서버 문구도)
+            codeForm.setErrors((previous) => formErrorsAfterEdit(previous, codeErrorStatus))
             setCodeErrorStatus(null)
             codeForm.setValue(key, value)
           }}
@@ -523,7 +571,8 @@ export function SignupForm({
           // 계속 보여야 한다(정본 D4). 지우는 지점은 profileForm 의 다음 제출 결과
           // (성공 / 409 아닌 다른 오류)뿐이다 — 그 외에는 값을 고쳐도 이 화면에서
           // 할 수 있는 일이 없다(이메일은 1단계 값이라 여기서 못 바꾼다).
-          // 입력을 고치면 5xx/무응답의 일시 장애 표시를 걷는다 — I1 과 동일한 패턴
+          // 입력을 고치면 5xx/무응답의 일시 장애 표시를 걷는다 — I1 과 동일한 패턴 (#1102 서버 문구도)
+          profileForm.setErrors((previous) => formErrorsAfterEdit(previous, profileErrorStatus))
           setProfileErrorStatus(null)
           profileForm.setValue(key, value)
         }}

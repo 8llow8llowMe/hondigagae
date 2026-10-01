@@ -24,7 +24,12 @@ import {
 } from '@/lib/auth/saved-login-email'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { focusFirstError, hasFieldErrors } from '@/lib/form/focus-first-error'
-import { focusSubmitFailure } from '@/lib/form/submit-failure-focus'
+import { formErrorsAfterEdit } from '@/lib/form/form-failure-display'
+import {
+  type FailureAnnounce,
+  focusSubmitFailure,
+  submitFailureAnnounce,
+} from '@/lib/form/submit-failure-focus'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
 
@@ -34,6 +39,11 @@ export type LoginFormFieldsProps = {
   /** 실패한 요청의 HTTP 상태. 성공했거나 아직 요청을 보내지 않았으면 null */
   errorStatus: number | null
   submitting: boolean
+  /**
+   * 폼 전체 실패가 무엇으로 읽히는가 (#1102). 생략하면 포커스 순서의 첫 대상으로 정한다
+   * (`submitFailureAnnounce`). 401 처럼 포커스를 다른 칸으로 보내는 갈래는 `LoginForm` 이 넘긴다.
+   */
+  announce?: FailureAnnounce | undefined
   /** "이메일 기억하기" 체크 상태 — 로그인-세부명세 D10 */
   remember: boolean
   /** 비밀번호 입력 중 Caps Lock 이 켜져 있는가. 키 이벤트가 알려 줄 때까지는 false */
@@ -60,6 +70,7 @@ export function LoginFormFields({
   errors,
   errorStatus,
   submitting,
+  announce = submitFailureAnnounce(errors, errorStatus),
   remember,
   capsLock,
   onValueChange,
@@ -90,6 +101,7 @@ export function LoginFormFields({
         message={errors.form}
         errorStatus={errorStatus}
         submitting={submitting}
+        announce={announce}
         onRetry={onRetry}
       />
 
@@ -225,7 +237,7 @@ export function LoginForm({ returnTo, initialEmail, onSubmittingChange }: LoginF
   // 첫 오류 필드·비밀번호 재포커스에 쓴다 — 필드 id 로 실제 입력 요소를 찾는다.
   const formContainerRef = useRef<HTMLDivElement>(null)
 
-  const { values, errors, isSubmitting, setValue, submit, submitCount } = useForm<
+  const { values, errors, isSubmitting, setValue, setErrors, submit, submitCount } = useForm<
     LoginValues,
     LoginResult
   >({
@@ -324,11 +336,14 @@ export function LoginForm({ returnTo, initialEmail, onSubmittingChange }: LoginF
         errors={errors}
         errorStatus={errorStatus}
         submitting={isSubmitting || entering}
+        // 401 은 위 effect 가 비밀번호 칸으로 보낸다(D4) — 알림이 유일한 낭독 경로다 (#1102)
+        announce={errorStatus === 401 ? 'live' : undefined}
         remember={remember}
         capsLock={capsLock}
         onValueChange={(key, value) => {
           // 값을 고치면 5xx/무응답의 일시 장애 표시를 걷는다 — 로그인-세부명세.md D4/D5(폼은 그대로
-          // 유지), 이슈 #24 최종 리뷰 I1.
+          // 유지), 이슈 #24 최종 리뷰 I1. 서버 문구도 함께 걷는다 — 남기면 그 문구로 알림이 선다 (#1102)
+          setErrors((previous) => formErrorsAfterEdit(previous, errorStatus))
           setErrorStatus(null)
           setValue(key, value)
         }}

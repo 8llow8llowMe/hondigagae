@@ -147,6 +147,29 @@ describe('FormAlert', () => {
     expect(FORM_ALERT_SELECTOR).toBe('[data-form-alert]')
   })
 
+  /*
+    #1102 — 포커스를 받는 알림이 `role="alert"` 이기도 하면 알림 낭독과 포커스 낭독이 겹친다.
+    `announce="focus"` 는 역할을 떼고 포커스 하나로 읽힌다. 기본값은 지금 그대로다 — 인증 밖
+    30여 곳은 포커스를 옮기지 않으므로 알림이 유일한 낭독 경로다.
+  */
+  it('announce 기본값은 live — role=alert 그대로다', () => {
+    const markup = renderToStaticMarkup(createElement(FormAlert, { message: '잠겼습니다.' }))
+
+    expect(markup).toContain('role="alert"')
+  })
+
+  it('announce=focus 면 role 을 떼고 포커스 대상 배선은 남긴다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(FormAlert, { message: '잠겼습니다.', announce: 'focus' }),
+    )
+
+    expect(markup).not.toContain('role=')
+    expect(markup).not.toContain('aria-live')
+    expect(markup).toContain('tabindex="-1"')
+    expect(markup).toContain('data-form-alert=""')
+    expect(markup).toContain('잠겼습니다.')
+  })
+
   // #1084 — 예전에는 브라우저 기본 테두리(`rgb(0,95,204)` 파랑)로 그려졌다
   it('포커스 테두리는 토큰 링이다 — 채움만 있는 상자라 offset 을 둔다', () => {
     const markup = renderToStaticMarkup(createElement(FormAlert, { message: '잠겼습니다.' }))

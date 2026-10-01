@@ -12,7 +12,8 @@ import { petFormSchema } from '@/features/pet/schemas'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
 import { PET_LIMIT_EXCEEDED_CODE } from '@/lib/api/pet'
 import type { FormErrors } from '@/lib/form/field-errors'
-import { focusSubmitFailure } from '@/lib/form/submit-failure-focus'
+import { formErrorsAfterEdit } from '@/lib/form/form-failure-display'
+import { focusSubmitFailure, submitFailureAnnounce } from '@/lib/form/submit-failure-focus'
 import { useForm } from '@/lib/form/use-form'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { messages } from '@/lib/messages'
@@ -139,6 +140,12 @@ export function PetFormFields({
         message={alertMessage}
         errorStatus={errorStatus}
         submitting={submitting}
+        /*
+          포커스 effect(`focusSubmitFailure`)와 같은 판정이다 (#1102). 필드 오류 요약("N개")은
+          포커스가 필드로 가므로 알림(`live`)으로, 서버 문구 · 일시 장애는 포커스가 와서 읽힌다.
+          판정에 넘기는 것은 요약이 아니라 `errors` 다 — effect 가 보는 값과 같아야 한다.
+        */
+        announce={submitFailureAnnounce(errors, errorStatus)}
         onRetry={onRetry}
         headingLevel={3}
       />
@@ -338,26 +345,24 @@ export function PetForm({ initialValues, submitLabel, onSave, onSaved }: PetForm
   const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const { values, errors, isSubmitting, isDirty, setValue, submit, submitCount } = useForm<
-    PetFormValues,
-    Pet
-  >({
-    schema: petFormSchema,
-    initialValues,
-    onSubmit: async (submitted) => {
-      try {
-        // 빈 값을 null 로, enum 을 code 로 — 이 변환을 건너뛰면
-        // birthYm: '' 가 400(PET_104)이 된다 (공통명세 S3-3)
-        const result = await onSave(toPetSavePayload(submitted))
-        setErrorStatus(null)
-        return result
-      } catch (error) {
-        setErrorStatus(toStatus(error))
-        throw error
-      }
-    },
-    onSuccess: (pet) => onSaved(pet),
-  })
+  const { values, errors, isSubmitting, isDirty, setValue, setErrors, submit, submitCount } =
+    useForm<PetFormValues, Pet>({
+      schema: petFormSchema,
+      initialValues,
+      onSubmit: async (submitted) => {
+        try {
+          // 빈 값을 null 로, enum 을 code 로 — 이 변환을 건너뛰면
+          // birthYm: '' 가 400(PET_104)이 된다 (공통명세 S3-3)
+          const result = await onSave(toPetSavePayload(submitted))
+          setErrorStatus(null)
+          return result
+        } catch (error) {
+          setErrorStatus(toStatus(error))
+          throw error
+        }
+      },
+      onSuccess: (pet) => onSaved(pet),
+    })
 
   useUnsavedWarning(isDirty && !isSubmitting)
 
@@ -386,7 +391,9 @@ export function PetForm({ initialValues, submitLabel, onSave, onSaved }: PetForm
         submitting={isSubmitting}
         submitLabel={submitLabel}
         onValueChange={(key, value) => {
-          // 5xx 를 받은 뒤 값을 고치면 ErrorState 를 걷는다 — 등록-세부명세 D4
+          // 5xx 를 받은 뒤 값을 고치면 ErrorState 를 걷는다 — 등록-세부명세 D4. 서버 문구도
+          // 함께 걷는다 — 상태만 비우면 그 문구로 알림이 서서 일시 장애가 모양을 바꾼다 (#1102)
+          setErrors((previous) => formErrorsAfterEdit(previous, errorStatus))
           setErrorStatus(null)
           setValue(key, value)
 
