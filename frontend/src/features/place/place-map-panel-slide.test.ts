@@ -41,7 +41,20 @@ describe('패널은 갈아끼우지 않고 슬라이드한다 (#531)', () => {
   */
   it('미는 거리가 globals.css 에 있고 왼쪽 여백까지 포함한다', () => {
     expect(globals).toContain('.map-panel-collapsed')
-    expect(globals).toMatch(/translateX\(calc\(-100% - 1rem\)\)/)
+    expect(globals).toMatch(/translateX\(calc\(-100% - 3\.5rem\)\)/)
+  })
+
+  /*
+    **접기 탭까지 화면 밖으로 나가야 한다** (#1123). 탭은 패널 오른쪽 밖으로 24(`-right-6`)
+    튀어나와 있어, 여백 16 만 더해 밀면 접힌 뒤에도 x 0~24 에 남아 펼치기 버튼(16~60) 밑에
+    깔렸다 — 손잡이 `<` `>` 가 동시에 보인다. 미는 여분 = 여백 16 + 탭 24 + 그림자 번짐 16.
+  */
+  it('미는 여분이 왼쪽 여백 + 접기 탭 폭 + 그림자 번짐보다 작지 않다', () => {
+    const extraRem = Number(/translateX\(calc\(-100% - ([\d.]+)rem\)\)/.exec(globals)?.[1])
+    const tabPx = 24
+    expect(mapView).toContain('absolute top-0 -right-6 flex h-11 w-6')
+
+    expect(extraRem * 16).toBeGreaterThanOrEqual(16 + tabPx + 16)
   })
 
   /*
