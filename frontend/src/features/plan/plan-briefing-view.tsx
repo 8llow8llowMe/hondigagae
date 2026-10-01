@@ -8,7 +8,11 @@ import { ErrorState } from '@/components/error-state'
 import { Skeleton } from '@/components/skeleton'
 import { Surface } from '@/components/surface'
 import { usePetList } from '@/features/pet/use-pet-list'
-import { PlanBriefingHeader, PlanBriefingSection } from '@/features/plan/plan-briefing-section'
+import {
+  briefingHeadingOf,
+  PlanBriefingHeader,
+  PlanBriefingSection,
+} from '@/features/plan/plan-briefing-section'
 import { planKeys } from '@/features/plan/queries'
 import { clientFetch } from '@/lib/api/client'
 import { ApiError } from '@/lib/api/error'
@@ -114,14 +118,14 @@ export function PlanBriefingView({ planId, target }: { planId: string; target: B
 
   return (
     <>
-      <PlanBriefingHeader planId={planId} subtitle={subtitleOf(data)} />
+      <PlanBriefingHeader planId={planId} kind={target.kind} subtitle={subtitleOf(data)} />
 
       {briefing.isPending ? (
-        <Surface aria-label={messages.plan.briefingHeading} aria-busy>
+        <Surface aria-label={briefingHeadingOf(target.kind)} aria-busy>
           <PlanBriefingSkeleton />
         </Surface>
       ) : briefing.isError || data === undefined ? (
-        <Surface aria-label={messages.plan.briefingHeading}>
+        <Surface aria-label={briefingHeadingOf(target.kind)}>
           <BriefingError
             planId={planId}
             error={briefing.error}
