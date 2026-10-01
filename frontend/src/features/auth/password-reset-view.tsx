@@ -17,6 +17,7 @@ import {
 } from '@/features/auth/schemas'
 import { resetPassword, sendPasswordResetCode } from '@/lib/api/auth'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
+import { codeStepAfterResend, type ResendOutcome } from '@/lib/form/code-step-after-resend'
 import { remainingSeconds } from '@/lib/form/cooldown'
 import { apiErrorToFormErrors, type FormErrors } from '@/lib/form/field-errors'
 import { formErrorsAfterEdit } from '@/lib/form/form-failure-display'
@@ -203,6 +204,20 @@ export function PasswordResetView() {
     focusSubmitFailure(containerRef.current, resetForm.errors, resetErrorStatus)
   }, [resetForm.submitCount])
 
+  /*
+    재발송 결과를 코드 칸에 반영한다 (#1109) — 판정은 `codeStepAfterResend` 하나다(가입 2단계와 같다).
+    새 비밀번호 값 · 오류는 건드리지 않는다. `keepError: true` 인 이유는 `signup-form.tsx` 의 같은
+    자리와 같다(오류는 판정이 돌려준 갱신 함수가 다룬다).
+  */
+  const applyResendOutcome = useCallback(
+    (outcome: ResendOutcome) => {
+      const next = codeStepAfterResend(outcome)
+      resetForm.setErrors(next.errors)
+      if (next.clearCode) resetForm.setValue('code', '', { keepError: true })
+    },
+    [resetForm.setErrors, resetForm.setValue],
+  )
+
   const handleResend = useCallback(() => {
     // 쿨다운 가드에 재진입 가드(ref)를 겹친다 — disabled 반영 전 연속 클릭을 막는다
     if (cooldownSeconds > 0 || resendingRef.current) return
@@ -216,13 +231,11 @@ export function PasswordResetView() {
         setCooldownStartedAt(Date.now())
         setResetErrorStatus(null)
         /*
-          직전 폼 전체 실패를 걷는다 (#1102). 남기면 성공한 재발송 위에 앞선 429 · 5xx 문구가
-          알림으로 다시 서고, 아래 `notice` 조건이 그것을 오류로 보고 "메일을 보냈어요" 를 지운다.
-          이전 값을 받는 형태인 이유는 `signup-form.tsx` 의 같은 자리와 같다(이 콜백의 오류는 낡았다).
+          직전 폼 전체 실패(#1102)와 코드 칸 오류 · 값(#1109)을 걷는다. 남기면 성공한 재발송 위에
+          앞선 429 · 5xx 문구가 알림으로 다시 서고(아래 `notice` 조건이 그것을 오류로 보고 "메일을
+          보냈어요" 를 지운다), 새 코드를 받을 칸에 불일치 오류와 무효가 된 옛 코드가 남는다.
         */
-        resetForm.setErrors((previous) =>
-          previous.form === null ? previous : { fields: previous.fields, form: null },
-        )
+        applyResendOutcome({ result: 'sent' })
       })
       .catch((error: unknown) => {
         if (error instanceof ApiError && error.kind === 'rate-limited') {
@@ -231,10 +244,16 @@ export function PasswordResetView() {
           // 상태도 429 로 둔다 (#1102) — 직전 5xx 상태가 남아 있으면 이 알림이 일시 장애에 가린다
           setCooldownStartedAt(Date.now())
           setResetErrorStatus(error.status)
-          resetForm.setErrors(apiErrorToFormErrors(error, messages.form.submitFailed))
+          // 코드 칸 오류 · 값은 남기고 429 문구를 얹는다 — 새 코드가 오지 않았다 (#1109)
+          applyResendOutcome({
+            result: 'failed',
+            failure: apiErrorToFormErrors(error, messages.form.submitFailed),
+          })
           return
         }
         setResetErrorStatus(error instanceof ApiError ? error.status : NO_RESPONSE_STATUS)
+        // 5xx · 무응답 — 코드 칸은 그대로, 일시 장애는 상태 코드가 세운다 (#1109)
+        applyResendOutcome({ result: 'failed', failure: null })
       })
       .finally(() => {
         resendingRef.current = false
@@ -242,7 +261,7 @@ export function PasswordResetView() {
         // `loading` 이 풀리는 같은 렌더에서 센다 — 요청 중에는 `FormFailure` 가 직전 실패를 걷는다
         setResendOutcome((previous) => ({ count: previous.count + 1, result }))
       })
-  }, [cooldownSeconds, email, resetForm.setErrors])
+  }, [cooldownSeconds, email, applyResendOutcome])
 
   /*
     **재발송 뒤 포커스** (#1102). 버튼이 요청 중 `loading`, 끝나면 쿨다운으로 `disabled` 라 포커스가

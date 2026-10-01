@@ -25,6 +25,7 @@ import {
   type SignupConsentKey,
   toConsentErrors,
 } from '@/lib/auth/signup-consent'
+import { codeStepAfterResend, type ResendOutcome } from '@/lib/form/code-step-after-resend'
 import { remainingSeconds } from '@/lib/form/cooldown'
 import { apiErrorToFormErrors, type FormErrors, NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { focusFirstError } from '@/lib/form/focus-first-error'
@@ -303,6 +304,20 @@ export function SignupForm({
   // 조건과 근거는 useUnsavedWarning 의 JSDoc 에 있다 (form-guide.md §7).
   useUnsavedWarning(step === 'profile' && profileForm.isDirty && !profileForm.isSubmitting)
 
+  /*
+    재전송 결과를 코드 칸에 반영한다 (#1109) — 판정은 `codeStepAfterResend` 하나다(재설정 2단계와 같다).
+    값을 비울 때 `keepError: true` 인 이유: 오류는 판정이 돌려준 갱신 함수가 `setErrors` 로 다룬다.
+    `setValue` 의 기본 동작("사용자가 고쳤다" → 그 필드 오류 삭제)이 겹치면 판정이 둘로 갈린다.
+  */
+  const applyResendOutcome = useCallback(
+    (outcome: ResendOutcome) => {
+      const next = codeStepAfterResend(outcome)
+      codeForm.setErrors(next.errors)
+      if (next.clearCode) codeForm.setValue('code', '', { keepError: true })
+    },
+    [codeForm.setErrors, codeForm.setValue],
+  )
+
   const handleResend = useCallback(() => {
     // 쿨다운 가드에 더해 재진입 가드(ref)를 겹친다 — disabled 반영 전 빠른 연속
     // 클릭으로 sendEmailCode 가 중복 호출되는 것을 막는다 (form-guide.md §6)
@@ -317,14 +332,12 @@ export function SignupForm({
         setCooldownStartedAt(Date.now())
         setCodeErrorStatus(null)
         /*
-          직전 폼 전체 실패를 걷는다 (#1102). 남기면 성공한 재전송 위에 앞선 429 문구("잠시 후
-          다시 요청해주세요")나 5xx 서버 문구가 알림으로 다시 선다 — 상태를 비웠으니 일시 장애가
-          아니라 알림이 된다. 이전 값을 받는 형태인 이유: 이 콜백은 요청 전에 만들어져
-          `codeForm.errors` 가 낡았다(그 사이 고친 필드 오류를 되살리면 안 된다).
+          직전 폼 전체 실패(#1102)와 코드 칸 오류 · 값(#1109)을 걷는다. 남기면 성공한 재전송 위에
+          앞선 429 문구("잠시 후 다시 요청해주세요")나 5xx 서버 문구가 알림으로 다시 서고(상태를
+          비웠으니 일시 장애가 아니라 알림이 된다), 새 코드를 받을 칸에 "인증코드가 일치하지
+          않습니다" 와 무효가 된 옛 코드가 남는다.
         */
-        codeForm.setErrors((previous) =>
-          previous.form === null ? previous : { fields: previous.fields, form: null },
-        )
+        applyResendOutcome({ result: 'sent' })
       })
       .catch((error: unknown) => {
         if (error instanceof ApiError && error.kind === 'rate-limited') {
@@ -333,10 +346,16 @@ export function SignupForm({
           // 상태도 429 로 둔다 (#1102) — 직전 5xx 상태가 남아 있으면 이 알림이 일시 장애에 가린다
           setCooldownStartedAt(Date.now())
           setCodeErrorStatus(error.status)
-          codeForm.setErrors(apiErrorToFormErrors(error, messages.form.submitFailed))
+          // 코드 칸 오류 · 값은 남기고 429 문구를 얹는다 — 새 코드가 오지 않았다 (#1109)
+          applyResendOutcome({
+            result: 'failed',
+            failure: apiErrorToFormErrors(error, messages.form.submitFailed),
+          })
           return
         }
         setCodeErrorStatus(error instanceof ApiError ? error.status : NO_RESPONSE_STATUS)
+        // 5xx · 무응답 — 코드 칸은 그대로, 일시 장애는 상태 코드가 세운다 (#1109)
+        applyResendOutcome({ result: 'failed', failure: null })
       })
       .finally(() => {
         resendingRef.current = false
@@ -347,7 +366,7 @@ export function SignupForm({
         */
         setResendOutcome((previous) => ({ count: previous.count + 1, result }))
       })
-  }, [cooldownSeconds, email, codeForm.setErrors])
+  }, [cooldownSeconds, email, applyResendOutcome])
 
   /*
     **재전송 뒤 포커스** (#1102). 재전송 버튼은 요청 중 `loading`, 끝나면 성공이든 429 든 쿨다운으로
