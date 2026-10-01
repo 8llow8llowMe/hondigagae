@@ -50,9 +50,12 @@ export function Textarea({
       className={cn(
         'text-body-1 min-h-11 w-full rounded-md border px-3 py-2',
         'placeholder:text-fg-subtle',
-        'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
+        'focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        invalid ? 'border-danger-500' : 'border-border-strong',
+        // 오류 상태의 링은 테두리와 같은 빨강이다 — 이유는 `input.tsx` 같은 자리 주석 (#1084 L5)
+        invalid
+          ? 'border-danger-500 focus-visible:ring-danger-500'
+          : 'border-border-strong focus-visible:ring-brand-500',
         className,
       )}
       {...rest}

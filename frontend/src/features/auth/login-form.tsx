@@ -13,6 +13,7 @@ import { PasswordInput } from '@/components/password-input'
 import { enterSession } from '@/features/auth/enter-session'
 import { FormFailure } from '@/features/auth/form-failure'
 import { loginSchema, type LoginValues } from '@/features/auth/schemas'
+import { SocialLoginButtons } from '@/features/auth/social-login-buttons'
 import { login, type LoginResult } from '@/lib/api/auth'
 import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
 import {
@@ -85,7 +86,12 @@ export function LoginFormFields({
         "폼은 그대로 유지"(D4)를 어긴다 — 이메일 오타를 고칠 수단이 없어진다. `onValueChange`
         의 `setErrorStatus(null)` 도 입력 요소가 살아있어야 발동한다 — 이슈 #24 최종 리뷰 I1.
       */}
-      <FormFailure message={errors.form} errorStatus={errorStatus} onRetry={onRetry} />
+      <FormFailure
+        message={errors.form}
+        errorStatus={errorStatus}
+        submitting={submitting}
+        onRetry={onRetry}
+      />
 
       <Field id="email" label={messages.auth.emailLabel} error={errors.fields.email} required>
         <Input
@@ -185,7 +191,18 @@ export function LoginFormFields({
   )
 }
 
-export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initialEmail: string }) {
+export type LoginFormProps = {
+  returnTo: string
+  initialEmail: string
+  /**
+   * 요청이 도는지(성공 뒤 이동 대기 포함)를 바깥에 알린다 — 같은 화면의 소셜 버튼을 잠그는
+   * 데 쓴다 (#1084 L2, `LoginMethods`). 요청을 낼 때 `true`, 실패로 끝나면 `false` 다.
+   * 클라이언트 검증에서 막히면 요청이 없으므로 부르지 않는다.
+   */
+  onSubmittingChange: (submitting: boolean) => void
+}
+
+export function LoginForm({ returnTo, initialEmail, onSubmittingChange }: LoginFormProps) {
   const queryClient = useQueryClient()
   /*
     **기본은 꺼짐이다** (#1081). 저장값은 마운트 뒤 effect 에서 읽어 켠다 — 서버 렌더에는
@@ -215,6 +232,14 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
     schema: loginSchema,
     initialValues: { email: initialEmail, password: '' },
     onSubmit: async (submitted) => {
+      /*
+        **요청을 내는 바로 그 틱에 알린다** (#1084 L2). `useForm` 이 `isSubmitting` 을 켜는 것과
+        같은 배치라 소셜 버튼이 버튼의 "로그인 중" 과 한 렌더에 잠긴다. 처음에는 `submitting`
+        을 effect 로 내보냈는데, 실측(375 · dev)에서 "로그인 중" 이 보인 직후에도 소셜 버튼이
+        아직 눌렸다 — effect 가 그린 뒤에 돌고, 거기서 부른 부모 setState 가 한 번 더 렌더를
+        기다린다. 그 틈이 막으려던 바로 그 클릭이다.
+      */
+      onSubmittingChange(true)
       try {
         const result = await login(submitted)
         setErrorStatus(null)
@@ -229,6 +254,8 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
       } catch (error) {
         // ApiError 가 아니면 전송 단계 실패(무응답)로 본다 — src/lib/api/error.ts 의 관례와 같다
         setErrorStatus(error instanceof ApiError ? error.status : NO_RESPONSE_STATUS)
+        // 성공이면 풀지 않는다 — 이동이 끝날 때까지 잠근다(`entering` 과 같은 이유)
+        onSubmittingChange(false)
         throw error
       }
     },
@@ -315,6 +342,45 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
         onRetry={() => void submit()}
       />
     </div>
+  )
+}
+
+/**
+ * 로그인 화면의 **두 로그인 수단과 출구** — 이메일 폼 · "또는" · 소셜 버튼 · 회원가입 입구.
+ *
+ * 넷을 한 클라이언트 경계로 묶는 이유는 하나다: **이메일 로그인이 도는 동안 소셜 버튼을
+ * 잠근다** (#1084 L2). 페이지는 서버 컴포넌트라 형제 사이의 상태를 들 수 없다. 묶는 것은
+ * 그 상태 하나뿐이라 조각의 배치 · 간격은 페이지의 `gap-4` 를 그대로 쓴다 — Fragment 다.
+ */
+export function LoginMethods({
+  returnTo,
+  initialEmail,
+}: {
+  returnTo: string
+  initialEmail: string
+}) {
+  const [emailSubmitting, setEmailSubmitting] = useState(false)
+
+  return (
+    <>
+      <LoginForm
+        returnTo={returnTo}
+        initialEmail={initialEmail}
+        onSubmittingChange={setEmailSubmitting}
+      />
+      {/*
+        소셜 로그인은 폼 아래에 둔다 — 기본 수단은 이메일 로그인이다. "또는" 이 두 수단이
+        서로 대신한다는 것을 말한다: 선 없이 붙어 있으면 소셜 버튼이 이메일 로그인의 다음
+        단계로 읽힌다 (#1081).
+
+        **소셜 로그인은 기억한 이메일을 읽지도 쓰지도 않는다.** 제공자가 이메일을 정하므로
+        우리가 채울 칸이 없고, 성공해도 그 이메일이 이메일 로그인에 쓰일 수 있는 계정인지
+        (비밀번호가 있는지) 모른다.
+      */}
+      <LoginDivider />
+      <SocialLoginButtons returnTo={returnTo} disabled={emailSubmitting} />
+      <LoginSignupPrompt returnTo={returnTo} />
+    </>
   )
 }
 

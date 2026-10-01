@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 import { Button, ButtonLink } from '@/components/button'
 import { Field } from '@/components/field'
 import { FormNotice } from '@/components/form-notice'
@@ -55,9 +57,12 @@ export function PasswordResetEmailStep({
         오류라서 `FormNotice`(role=status)가 아니라 `FormAlert`(role=alert)다
         — `signup-form.tsx` 의 stepBackMessage 와 같은 처리.
       */}
-      <FormFailure message={errors.form} errorStatus={errorStatus} onRetry={onRetry} />
-
-      <p className="text-body-2 text-fg-muted">{messages.auth.resetEmailDescription}</p>
+      <FormFailure
+        message={errors.form}
+        errorStatus={errorStatus}
+        submitting={submitting}
+        onRetry={onRetry}
+      />
 
       <Field id="email" label={messages.auth.emailLabel} error={errors.fields.email} required>
         <Input
@@ -126,7 +131,13 @@ export function PasswordResetCodeStep({
       }}
     >
       <FormNotice message={notice ?? null} />
-      <FormFailure message={errors.form} errorStatus={errorStatus} onRetry={onRetry} />
+      <FormFailure
+        message={errors.form}
+        errorStatus={errorStatus}
+        // 재발송도 새 요청이다 — 그 결과를 기다리는 동안 직전 실패를 세워 두지 않는다 (#1084)
+        submitting={submitting || resending}
+        onRetry={onRetry}
+      />
       {/* 이메일은 줄바꿈 기회가 없는 토큰이다 — 375px 폭에서 넘치지 않게 break-all */}
       <p className="text-body-2 text-fg-muted break-all">{email}</p>
 
@@ -199,15 +210,62 @@ export function PasswordResetCodeStep({
  */
 export function PasswordResetDone({ email }: { email: string }) {
   return (
-    <div className="flex flex-col items-start gap-2">
-      <p className="text-body-2 text-fg-muted">{messages.auth.resetDoneDescription}</p>
-      <ButtonLink
-        href={`/login?${new URLSearchParams({ email }).toString()}`}
-        size="lg"
-        className="mt-2"
-      >
+    <div className="flex flex-col items-start">
+      <ButtonLink href={`/login?${new URLSearchParams({ email }).toString()}`} size="lg">
         {messages.auth.toLoginScreen}
       </ButtonLink>
     </div>
+  )
+}
+
+export type PasswordResetHeadingProps = {
+  /** 지금 단계의 제목 — "가입한 이메일을 알려주세요" 등 */
+  heading: string
+  /** 제목 바로 아래 설명 줄. 없는 단계(2단계)는 넘기지 않는다 */
+  description?: string | undefined
+}
+
+/**
+ * 단계 제목 + 설명 줄 (#1084 L3).
+ *
+ * **둘을 한 묶음으로 둔다 — 사이는 4 다** (DESIGN.md §4 "제목 아래 캡션/설명 줄"). 예전에는
+ * 제목이 화면 쪽(`gap-6`)에, 설명이 폼 안에 따로 있어 그 사이에 24 가 벌어졌고, 실패 알림이
+ * 서면 알림이 **제목과 설명 사이에** 끼었다. 완료 화면의 전 기기 로그아웃 안내도 같은 이유로
+ * 여기로 왔다 — `PasswordResetDone` 은 이제 이동 버튼 하나다.
+ *
+ * **live 영역은 묶음 전체다.** 단계는 시각적으로만 바뀌어 스크린리더에는 아무 일도 없는 것과
+ * 같으므로 제목을 알린다(정본 D6). 설명까지 넣는 이유는 완료 화면이다: 포커스가 "로그인으로"
+ * 버튼으로 옮겨 가 "모든 기기에서 로그아웃했어요" 가 예전에는 읽히지 않았다.
+ */
+export function PasswordResetHeading({ heading, description }: PasswordResetHeadingProps) {
+  return (
+    <div aria-live="polite" className="flex flex-col gap-1">
+      <p className="text-body-1 text-fg font-semibold">{heading}</p>
+      {description !== undefined && <p className="text-body-2 text-fg-muted">{description}</p>}
+    </div>
+  )
+}
+
+/**
+ * 1 · 2단계 아래 "로그인으로" (#1084 L3, 정본 D4).
+ *
+ * 비밀번호가 기억난 사람이나 잘못 들어온 사람에게 **브라우저 뒤로 가기 말고는 길이 없었다.**
+ * 완료 화면에는 그리지 않는다 — 그 화면의 주 행동이 같은 목적지의 버튼이라 두 번 말하게 된다.
+ *
+ * **쿼리를 싣지 않는다.** 이메일은 URL 에 올리지 않고(D3, 예외는 완료 뒤 1회 이동뿐),
+ * `returnTo` 는 재설정이 처음부터 이어받지 않는다(로그인-세부명세 D10).
+ *
+ * 누르는 자리는 `min-h-11` 로 44 다 — 로그인 화면의 "비밀번호 찾기" 와 같은 모양이다.
+ */
+export function PasswordResetLoginLink() {
+  return (
+    <p className="flex justify-center">
+      <Link
+        href="/login"
+        className="text-body-2 text-fg-muted inline-flex min-h-11 items-center px-1 underline"
+      >
+        {messages.auth.toLoginScreen}
+      </Link>
+    </p>
   )
 }

@@ -27,6 +27,11 @@ export function FormAlert({ message, className }: FormAlertProps) {
         `role` 이 아니라 이 속성을 본다 (`lib/form/submit-failure-focus.ts`).
 
         포커스 테두리를 지우지 않는다 — 키보드로 온 사람이 "지금 여기" 를 알아야 한다.
+
+        **색은 토큰 링으로 바꾼다** (#1084). 예전에는 아무것도 주지 않아 브라우저 기본
+        테두리(`rgb(0,95,204)` 파랑)가 그려졌다 — 화면의 다른 포커스는 전부 `--brand-500`
+        초록이라 여기만 다른 제품처럼 보였다. 테두리 없이 채움만 있는 상자라 `ring-offset-2`
+        다 (DESIGN.md §2-4 포커스 링 표): 링이 `--danger-100` 채움에 붙으면 묻힌다.
       */
       tabIndex={-1}
       data-form-alert=""
@@ -35,6 +40,7 @@ export function FormAlert({ message, className }: FormAlertProps) {
       // 회귀는 src/styles/token-usage.test.ts 가 막는다.
       className={cn(
         'text-body-2 text-danger-700 bg-danger-100 rounded-md px-3 py-2 break-words',
+        'focus-visible:ring-brand-500 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
         className,
       )}
     >

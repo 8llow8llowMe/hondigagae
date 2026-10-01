@@ -7,6 +7,7 @@ import { Field, fieldErrorId } from '@/components/field'
 import { FormAlert } from '@/components/form-alert'
 import { FormNotice } from '@/components/form-notice'
 import { Input } from '@/components/input'
+import { Textarea } from '@/components/textarea'
 import { FORM_ALERT_SELECTOR } from '@/lib/form/submit-failure-focus'
 
 describe('Field', () => {
@@ -74,6 +75,50 @@ describe('Input', () => {
     expect(markup).not.toContain('aria-invalid')
     expect(markup).not.toContain('aria-describedby')
   })
+
+  /*
+    #1084 L5 — 오류 상태에 포커스하면 빨간 테두리에 초록 링 1px 이 붙어 두 색이 다퉜다.
+    링 색은 테두리를 따른다. `PasswordInput` · `VerificationCodeInput` 이 이 칸을 그대로 쓴다.
+  */
+  it('오류 상태면 포커스 링이 테두리와 같은 빨강이다 — 초록 링이 붙지 않는다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(Input, {
+        id: 'email',
+        value: '',
+        onValueChange: () => undefined,
+        invalid: true,
+      }),
+    )
+
+    expect(markup).toContain('border-danger-500')
+    expect(markup).toContain('focus-visible:ring-danger-500')
+    expect(markup).not.toContain('ring-brand-500')
+  })
+
+  it('정상 상태의 포커스 링은 그대로 초록이다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(Input, { id: 'email', value: '', onValueChange: () => undefined }),
+    )
+
+    expect(markup).toContain('focus-visible:ring-brand-500')
+    expect(markup).not.toContain('ring-danger-500')
+  })
+})
+
+describe('Textarea — 오류 상태 포커스 링 (#1084)', () => {
+  it('Textarea 도 오류면 빨간 링이다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(Textarea, {
+        id: 'memo',
+        value: '',
+        onValueChange: () => undefined,
+        invalid: true,
+      }),
+    )
+
+    expect(markup).toContain('focus-visible:ring-danger-500')
+    expect(markup).not.toContain('ring-brand-500')
+  })
 })
 
 describe('FormAlert', () => {
@@ -100,6 +145,15 @@ describe('FormAlert', () => {
     expect(markup).toContain('tabindex="-1"')
     expect(markup).toContain('data-form-alert=""')
     expect(FORM_ALERT_SELECTOR).toBe('[data-form-alert]')
+  })
+
+  // #1084 — 예전에는 브라우저 기본 테두리(`rgb(0,95,204)` 파랑)로 그려졌다
+  it('포커스 테두리는 토큰 링이다 — 채움만 있는 상자라 offset 을 둔다', () => {
+    const markup = renderToStaticMarkup(createElement(FormAlert, { message: '잠겼습니다.' }))
+
+    expect(markup).toContain('focus-visible:ring-brand-500')
+    expect(markup).toContain('focus-visible:ring-offset-2')
+    expect(markup).toContain('focus-visible:outline-none')
   })
 })
 

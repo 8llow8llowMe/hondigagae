@@ -97,9 +97,18 @@ export function Input({
         */
         'bg-bg',
         'placeholder:text-fg-subtle',
-        'focus-visible:ring-brand-500 focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
+        'focus-visible:ring-1 focus-visible:ring-offset-0 focus-visible:outline-none',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        invalid ? 'border-danger-500' : 'border-border-strong',
+        /*
+          **오류 상태의 포커스 링은 테두리와 같은 빨강이다** (#1084 L5, DESIGN.md §2-4 포커스 링).
+          예전에는 링이 늘 `--brand-500` 이라, 빨간 테두리에 초록 1px 이 붙어 **빨강·초록 두 줄**이
+          그려졌다 — "틀렸다" 와 "여기 있다" 가 서로 다른 색으로 다퉜다. 같은 색이면 링이 테두리를
+          두 겹(2px)으로 굵혀 위치를 말하고, 색은 오류 하나만 말한다. 링을 지우지 않는다(WCAG 2.4.7).
+          `--danger-500` 은 흰 배경 4.53:1 이라 비텍스트 3:1 을 넘는다(§2-6).
+        */
+        invalid
+          ? 'border-danger-500 focus-visible:ring-danger-500'
+          : 'border-border-strong focus-visible:ring-brand-500',
         /*
           값 위에 겹치지 않게 오른쪽을 비운다. 폭은 아래 span 과 짝이다 — 표기는
           40(`pr-10`), 버튼은 48(`pr-12`)이다.

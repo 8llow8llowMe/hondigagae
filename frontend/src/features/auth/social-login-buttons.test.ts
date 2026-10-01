@@ -126,3 +126,25 @@ describe('소셜 로그인 버튼 — 가입 동의 게이트 (#688)', () => {
     expect(allowed).not.toContain(messages.auth.socialConsentRequired)
   })
 })
+
+/*
+  #1084 L2 — 이메일 로그인이 도는 동안 아래 소셜 버튼이 그대로 눌렸다. 누르면 이메일 응답을
+  기다리는 사이 제공자 화면으로 떠난다. 잠그는 배선은 `LoginMethods` 이고 이 prop 이 받는다.
+*/
+describe('소셜 로그인 버튼 — 다른 로그인이 도는 동안 잠근다 (#1084)', () => {
+  it('disabled 면 두 버튼 다 비활성이다', () => {
+    const locked = renderToStaticMarkup(
+      createElement(SocialLoginButtons, { returnTo: '/', disabled: true }),
+    )
+    const buttons = locked.match(/<button[^>]*>/g) ?? []
+
+    expect(buttons).toHaveLength(2)
+    for (const button of buttons) expect(button).toContain('disabled=""')
+  })
+
+  it('기본은 잠그지 않는다', () => {
+    for (const button of markup.match(/<button[^>]*>/g) ?? []) {
+      expect(button).not.toContain('disabled=""')
+    }
+  })
+})

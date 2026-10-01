@@ -9,6 +9,8 @@ import {
   PasswordResetDone,
   PasswordResetEmailStep,
   type PasswordResetEmailStepProps,
+  PasswordResetHeading,
+  PasswordResetLoginLink,
 } from '@/features/auth/password-reset-steps'
 import { NO_FORM_ERRORS } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
@@ -185,13 +187,20 @@ describe('PasswordResetCodeStep', () => {
 })
 
 describe('PasswordResetDone', () => {
-  it('전 기기 로그아웃 사실을 알린다', () => {
-    const markup = renderToStaticMarkup(
+  // 안내 문장은 제목 묶음(`PasswordResetHeading`)으로 옮겼다 — 제목 아래 4 에 붙는다 (#1084 L3)
+  it('전 기기 로그아웃 안내는 여기가 아니라 제목 아래 설명 줄이 한다', () => {
+    const done = renderToStaticMarkup(
       createElement(PasswordResetDone, { email: 'demo@hondigagae.dev' }),
     )
+    const heading = renderToStaticMarkup(
+      createElement(PasswordResetHeading, {
+        heading: messages.auth.resetDoneTitle,
+        description: messages.auth.resetDoneDescription,
+      }),
+    )
 
-    expect(markup).toContain(messages.auth.resetDoneDescription)
-    expect(markup).toContain('모든 기기')
+    expect(done).not.toContain(messages.auth.resetDoneDescription)
+    expect(heading).toContain('모든 기기')
   })
 
   it('로그인 링크에 이메일을 미리 채운다', () => {
@@ -230,5 +239,81 @@ describe('두 단계 — 5xx 에는 일시 장애 하나만 선다 (#1079)', () 
     expect(html).not.toContain(SERVER_MESSAGE)
     expect(html).not.toContain('data-form-alert')
     expect(html).not.toContain('py-12')
+  })
+})
+
+/*
+  #1084 L3 — 단계 제목과 설명 줄 사이가 24 넘게 벌어져 있었다(제목은 화면 쪽 `gap-6`, 설명은
+  폼 안). DESIGN.md §4 는 "제목 아래 캡션/설명 줄" 을 4 로 정한다.
+*/
+describe('PasswordResetHeading — 제목 아래 설명 줄은 4 다 (#1084)', () => {
+  const markup = renderToStaticMarkup(
+    createElement(PasswordResetHeading, {
+      heading: messages.auth.resetEmailHeading,
+      description: messages.auth.resetEmailDescription,
+    }),
+  )
+
+  it('제목과 설명이 gap-1 한 묶음이고 제목이 먼저다', () => {
+    expect(markup.startsWith('<div aria-live="polite" class="flex flex-col gap-1">')).toBe(true)
+    expect(markup.indexOf(messages.auth.resetEmailHeading)).toBeLessThan(
+      markup.indexOf(messages.auth.resetEmailDescription),
+    )
+  })
+
+  it('설명이 없는 단계는 제목 한 줄이다', () => {
+    const codeHeading = renderToStaticMarkup(
+      createElement(PasswordResetHeading, { heading: messages.auth.resetCodeHeading }),
+    )
+
+    expect(codeHeading.match(/<p/g)).toHaveLength(1)
+  })
+
+  it('1단계 폼은 설명 줄을 다시 그리지 않는다 — 실패 알림이 제목과 설명 사이에 끼던 자리다', () => {
+    expect(
+      emailStep({ errorStatus: 429, errors: { fields: {}, form: '잠겼습니다.' } }),
+    ).not.toContain(messages.auth.resetEmailDescription)
+  })
+})
+
+describe('PasswordResetLoginLink — 1 · 2단계의 로그인 복귀 (#1084, 정본 D4)', () => {
+  const markup = renderToStaticMarkup(createElement(PasswordResetLoginLink))
+
+  it('쿼리 없이 /login 으로 간다 — 이메일을 URL 에 올리지 않는다 (D3)', () => {
+    expect(markup).toContain('href="/login"')
+    expect(markup).toContain(messages.auth.toLoginScreen)
+  })
+
+  it('누르는 자리가 44 다', () => {
+    expect(markup).toContain('min-h-11')
+  })
+})
+
+/*
+  #1084 L4 — 가입은 "인증코드 받기", 재설정은 "코드 받기" 였고 재발송은 명세(D4 "다시 보내기")와
+  다른 "재전송" 이었다. 같은 메일 · 같은 칸이라 말도 같아야 한다.
+*/
+describe('용어 — 인증코드 받기 · 다시 보내기 (#1084)', () => {
+  it('재설정 발송 버튼은 가입 발송 버튼과 같은 말이다', () => {
+    expect(messages.auth.resetSendCode).toBe(messages.auth.sendCode)
+    expect(emailStep()).toContain('인증코드 받기')
+  })
+
+  it('재발송 버튼은 "다시 보내기" 다 — 쿨다운 중에도 같은 말로 시작한다', () => {
+    expect(codeStep()).toContain('다시 보내기')
+    expect(codeStep({ cooldownSeconds: 42 })).toContain('다시 보내기 (42초 후 가능)')
+    expect(codeStep({ cooldownSeconds: 42 })).not.toContain('재전송')
+  })
+})
+
+describe('두 단계 — 요청이 도는 동안 직전 실패를 걷는다 (#1084 L2)', () => {
+  const failed = { errors: { fields: {}, form: '잠겼습니다.' }, errorStatus: 429 }
+
+  it.each([
+    { name: '1단계 제출 중', markup: () => emailStep({ ...failed, submitting: true }) },
+    { name: '2단계 제출 중', markup: () => codeStep({ ...failed, submitting: true }) },
+    { name: '2단계 재발송 중', markup: () => codeStep({ ...failed, resending: true }) },
+  ])('$name', ({ markup }) => {
+    expect(markup()).not.toContain('잠겼습니다.')
   })
 })

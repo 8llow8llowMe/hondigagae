@@ -6,6 +6,8 @@ import {
   PasswordResetCodeStep,
   PasswordResetDone,
   PasswordResetEmailStep,
+  PasswordResetHeading,
+  PasswordResetLoginLink,
 } from '@/features/auth/password-reset-steps'
 import {
   emailSchema,
@@ -238,17 +240,22 @@ export function PasswordResetView() {
       : step === 'code'
         ? messages.auth.resetCodeHeading
         : messages.auth.resetDoneTitle
+  // 2단계는 설명 줄이 없다 — 어느 이메일인지는 폼 안의 이메일 줄이 말한다
+  const description =
+    step === 'email'
+      ? messages.auth.resetEmailDescription
+      : step === 'done'
+        ? messages.auth.resetDoneDescription
+        : undefined
 
   return (
     <div ref={containerRef} className="flex flex-col gap-6">
       <h1 className="text-title-1 text-fg font-bold">{messages.auth.resetTitle}</h1>
       {/*
         단계는 시각적으로만 바뀐다 — 스크린리더에는 아무 일도 일어나지 않은 것과 같다.
-        현재 단계 제목을 live 영역으로도 내보낸다 (정본 D6).
+        현재 단계 제목(과 설명 줄)을 live 영역으로도 내보낸다 (정본 D6, `PasswordResetHeading`).
       */}
-      <p aria-live="polite" className="text-body-1 text-fg font-semibold">
-        {heading}
-      </p>
+      <PasswordResetHeading heading={heading} description={description} />
 
       {step === 'email' && (
         <PasswordResetEmailStep
@@ -295,6 +302,8 @@ export function PasswordResetView() {
       )}
 
       {step === 'done' && <PasswordResetDone email={email} />}
+
+      {step !== 'done' && <PasswordResetLoginLink />}
     </div>
   )
 }

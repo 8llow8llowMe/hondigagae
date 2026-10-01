@@ -107,8 +107,13 @@ export const authMessages = {
   verifyCode: '확인',
   verifyingCode: '확인 중',
   codeVerified: '이메일 인증이 완료됐어요.',
-  resendCode: '재전송',
-  resendCooldown: (seconds: number) => `재전송 (${seconds}초 후 가능)`,
+  /*
+    재발송 라벨은 **"다시 보내기"** 다 (#1084 L4, 비밀번호찾기-세부명세 D4). 예전 `재전송` 은
+    명세와 달랐고, 발송 버튼(`인증코드 받기`)과 짝이 맞지 않았다 — 받는 쪽 말과 보내는 쪽 말이
+    섞였다. 가입 2단계와 재설정 2단계가 이 키 하나를 같이 쓴다.
+  */
+  resendCode: '다시 보내기',
+  resendCooldown: (seconds: number) => `다시 보내기 (${seconds}초 후 가능)`,
   changeEmail: '이메일 다시 입력',
   nameLabel: '이름',
   nicknameLabel: '닉네임',
@@ -190,7 +195,8 @@ export const authMessages = {
   resetTitle: '비밀번호 찾기',
   resetEmailHeading: '가입한 이메일을 알려주세요',
   resetEmailDescription: '비밀번호를 새로 만들 수 있는 코드를 보내드려요.',
-  resetSendCode: '코드 받기',
+  // 가입 1단계(`sendCode`)와 같은 말이다 (#1084 L4) — 같은 메일 · 같은 칸인데 "코드 받기" 로 갈려 있었다
+  resetSendCode: '인증코드 받기',
   resetSendingCode: '보내는 중',
   resetCodeSent: '메일을 보냈어요. 받은 편지함을 확인해 주세요.',
   resetCodeHeading: '메일로 받은 코드를 입력해 주세요',
