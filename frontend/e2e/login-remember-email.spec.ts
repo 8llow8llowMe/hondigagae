@@ -10,7 +10,7 @@ import { messages } from '../src/lib/messages'
  * 시점과, 마운트 뒤 effect 가 채우는 값의 우선순위. 저장 · 판정 함수 자체는
  * `saved-login-email.test.ts` 가 본다.
  *
- * 세션 없이 시작한다 — 세션이 있으면 `/login` 이 폼 대신 "이미 로그인되어 있어요" 를 그린다.
+ * 세션 없이 시작한다 — 세션이 있으면 `/login` 이 폼을 그리지 않고 `returnTo` 로 리다이렉트한다 (#1082).
  */
 const STORAGE_KEY = SAVED_LOGIN_EMAIL_STORAGE_KEY
 const CAPTION = messages.auth.rememberEmailCaption
@@ -61,8 +61,8 @@ test('체크를 켜고 로그인하면 로그아웃 뒤 재방문에 이메일�
   expect(await readSaved(page)).toBe(MOCK_ACCOUNT.email)
 
   /*
-    로그아웃은 기억을 남긴다 (#1081). **헤더 계정 메뉴로 나간다** — `/login` 의 "이미 로그인됨"
-    화면을 거치지 않는 것은 그 화면이 서버 리다이렉트로 바뀔 예정이라서다 (#1082).
+    로그아웃은 기억을 남긴다 (#1081). **헤더 계정 메뉴로 나간다** — 세션이 있으면 `/login` 은
+    서버 리다이렉트라 그 자리에 로그아웃 버튼이 없다 (#1082).
   */
   // 로그인 성공은 문서째 새로 받는다 (#1075) — 메뉴 버튼이 hydration 전에 눌리면 열리지 않는다
   await page.waitForLoadState('networkidle')
