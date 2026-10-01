@@ -1,10 +1,12 @@
 import Link from 'next/link'
 
+import type { ReactNode } from 'react'
+
 import { BackLink } from '@/components/back-link'
 import { Badge } from '@/components/badge'
 import { ButtonLink } from '@/components/button'
 import { EmptyState } from '@/components/empty-state'
-import { Surface } from '@/components/surface'
+import { Surface, SurfaceStack } from '@/components/surface'
 import { WalkTimesCurve } from '@/components/walk-times-curve'
 import { WeatherWarningBadge } from '@/components/weather-warning-badge'
 import { PlaceMiniMap } from '@/features/place/place-mini-map'
@@ -18,6 +20,7 @@ import {
   type BriefingTarget,
 } from '@/lib/plan/briefing'
 import { type BriefingDayFact, briefingDayFacts } from '@/lib/plan/briefing-day-facts'
+import { formatPlanDay } from '@/lib/plan/date'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { HourlyWalkSafetyItem } from '@/types/insight'
@@ -46,19 +49,6 @@ export type PlanBriefingCurve = {
 }
 
 /**
- * 페이지 머리 — 돌아가기 · `h1` · 부제. **카드가 아니다** (§0 의 페이지 머리 예외).
- *
- * 인셋은 카드 안 글줄과 같은 `card` 다 — 아래 카드의 첫 글자와 세로선이 맞아야 한다
- * (`plan-emergency-section.tsx` 의 같은 머리와 문자 그대로 같은 처리다).
- *
- * **`h1` 은 로딩·오류·기간 밖 갈래에도 있다** — 없으면 문서 최상위 제목이 상태 문구의
- * `h2` 가 된다. 그래서 부제(`subtitle`)만 `null` 을 허용하고 머리 자체는 늘 선다.
- *
- * **제목은 갈래를 따른다.** 진입 배너가 `오늘의 브리핑` 이라고 부르고 들어온 화면이
- * `여행 브리핑` 이었다 — 같은 문이 두 이름이었다. 갈래는 응답 전에 이미 정해져 있어
- * (`pickBriefingDate`) 대기·오류 갈래도 같은 제목이다. 기간 밖만 갈래가 없어 중립 이름이다.
- */
-/**
  * 갈래별 화면 이름 — `h1` 과 대기·오류 카드의 접근 이름이 같은 값을 쓴다 (D13-5).
  * 기간 밖(`null`)만 중립 이름이다.
  */
@@ -68,38 +58,99 @@ export function briefingHeadingOf(kind: BriefingTarget['kind'] | null): string {
   return messages.plan.briefingHeading
 }
 
+/** 머리 카드가 응답에서 받는 두 줄 — 일정 이름 · `10월 2일 (금) · 1일차` */
+export type PlanBriefingTrip = { title: string; dateLine: string }
+
+/**
+ * 머리 카드 — 돌아가기 · `h1` · 일정 이름 · 날짜 줄 · (전날) 각주 (D14-1).
+ *
+ * **카드다.** 예전에는 §0 의 "페이지 머리(h1)는 카드가 아니다" 예외를 따라 회색 바닥 위에
+ * 글줄만 섰는데, 태블릿 · 데스크톱에서 그 글줄이 흰 카드 사이에 떠 있어 어느 것의 제목인지
+ * 흐렸고, 전날 각주까지 바닥 위에 떠 **회색 위 글줄이 두 군데**였다. 일정 상세가 같은 판단으로
+ * `h1` 을 개요 카드에 담는다(`plan-overview-panel.tsx`) — 이 머리도 h1 하나가 아니라 일정
+ * 이름 · 날짜 · 각주를 담는 묶음이라 카드 판정 3문을 통과한다.
+ *
+ * **일정 이름과 날짜를 두 줄로 가른다.** 예전 부제 `{제목} · {날짜} · {N}일차` 한 줄은
+ * 캡션 크기에 셋이 같은 무게로 붙어, 무엇에 대한 브리핑인지가 날짜와 같은 크기였다.
+ *
+ * **`h1` 은 로딩·오류·기간 밖 갈래에도 있다** — 없으면 문서 최상위 제목이 상태 문구의
+ * `h2` 가 된다. 그래서 `trip` 만 `null` 을 허용하고 머리 자체는 늘 선다.
+ */
 export function PlanBriefingHeader({
   planId,
   kind = null,
-  subtitle,
+  trip = null,
+  note = null,
 }: {
   planId: string
   /** 기간 밖(`pickBriefingDate` 가 `null`)이면 비운다 */
   kind?: BriefingTarget['kind'] | null
-  /** 응답이 와야 쓸 수 있다 — `null` 이면 그 줄을 비운다 */
-  subtitle: string | null
+  /** 응답이 와야 쓸 수 있다 — `null` 이면 두 줄을 비운다 */
+  trip?: PlanBriefingTrip | null
+  /** 전날 각주 (D11-1) — 접힌 카드 둘이 무엇인지 머리에서 말한다 */
+  note?: string | null
 }) {
-  const heading = briefingHeadingOf(kind)
-
   return (
-    <header
-      className={cn(
-        'flex flex-wrap items-start gap-x-1 pt-4 pb-4 md:block md:pt-0 md:pb-0',
-        INSET_CLASS.card,
-      )}
-    >
-      <BackLink href={`/plans/${planId}`} label={messages.plan.briefingBack} variant="titleRow" />
+    <Surface>
+      <header
+        className={cn('flex flex-wrap items-start gap-x-1 py-4 md:block md:py-5', INSET_CLASS.card)}
+      >
+        <BackLink href={`/plans/${planId}`} label={messages.plan.briefingBack} variant="titleRow" />
 
-      {/* 제목과 부제가 한 덩어리다 — 응급 브리핑 머리와 같은 이유(기준선이 둘이 되지 않게) */}
-      <div className="min-w-0 flex-1 md:flex-none">
-        <h1 className="text-title-1 text-fg lg:text-display font-bold break-keep md:mt-1 lg:font-extrabold">
-          {heading}
-        </h1>
-        {subtitle !== null && (
-          <p className="text-caption text-fg-muted mt-1 font-medium break-keep">{subtitle}</p>
+        {/* 제목과 아래 두 줄이 한 덩어리다 — 모바일에서 돌아가기 아이콘 옆 한 세로선에 선다 (#539) */}
+        <div className="min-w-0 flex-1 md:mt-1 md:flex-none">
+          <h1 className="text-title-1 text-fg lg:text-display font-bold break-keep lg:font-extrabold">
+            {briefingHeadingOf(kind)}
+          </h1>
+          {trip !== null && (
+            <>
+              <p className="text-body-1 text-fg mt-2 font-semibold break-keep">{trip.title}</p>
+              <p className="text-caption text-fg-muted mt-1 font-medium tabular-nums">
+                {trip.dateLine}
+              </p>
+            </>
+          )}
+        </div>
+
+        {/*
+          **각주는 이 카드의 마지막 구획이다** (D14-1). 예전에는 카드 사이 회색 바닥 위에 떠
+          있었다 — 자기 제목이 없어 카드는 아니지만(§0), 바닥 위 글줄로 두면 어느 카드의 말인지
+          흐리다. 머리가 "내일 출발" 이라고 말한 바로 아래가 "그래서 무엇이 아직 없는지" 의 자리다.
+          굵기는 본문(400)이고 톤은 예고형이다 (D11-1).
+        */}
+        {note !== null && (
+          <p className="text-body-2 text-fg-muted border-border mt-4 basis-full border-t pt-3 break-keep">
+            {note}
+          </p>
         )}
-      </div>
-    </header>
+      </header>
+    </Surface>
+  )
+}
+
+/**
+ * 브리핑 배치 — 1024 이상은 두 열, 미만은 한 줄 (D14-2).
+ *
+ * **좌 400 = 오늘(내일) 상태**(머리 · 특보 · 날씨와 적합도), **우 = 언제 · 어디서**(산책 시간 ·
+ * 일정)다. 예전에는 `max-w-2xl` 한 줄이 1280 · 1440 가운데에 서서 좌우로 회색이 각 300px
+ * 넘게 비었고, 전날 갈래는 카드 두 장이라 화면이 텅 비어 보였다. 일정 상세 · 홈과 같은 2단
+ * grid(`rail-layout`, 400 + 가변)라 상세 → 브리핑을 오가도 머리 카드가 같은 자리에 선다 — 일정
+ * 상세의 `rail-layout-split` 변형은 쓰지 않는다(좌측이 위 · 아래로 갈리지 않는다).
+ *
+ * **곡선이 우측인 이유** — 시각 칸 가로 스크롤러라 넓은 열에서 더 많은 시각을 한 번에 보인다.
+ *
+ * **DOM 순서가 곧 한 줄 순서다** — 좌측 스택 다음 우측 스택. 1024 미만 순서(D13-1)가 그대로다.
+ * 좌측은 sticky 를 걸지 않는다 — 특보 날에는 뷰포트보다 길어져 아래가 닿지 않는다(홈 #905 실측).
+ *
+ * 우측 `pt-2 md:pt-0 lg:pt-6` 은 일정 상세 우측 열과 같은 값이다 — 한 줄일 때 두 스택이 맞닿는
+ * 자리에 모바일 카드 간격 8 을, 768 에서는 좌측 스택의 아래 패딩 24 하나만 남긴다.
+ */
+export function PlanBriefingLayout({ aside, main }: { aside: ReactNode; main: ReactNode }) {
+  return (
+    <div className="rail-layout">
+      <SurfaceStack className="lg:pr-3">{aside}</SurfaceStack>
+      <SurfaceStack className="pt-2 md:pt-0 lg:pt-6 lg:pl-3">{main}</SurfaceStack>
+    </div>
   )
 }
 
@@ -119,6 +170,10 @@ export function PlanBriefingHeader({
  * 늘 맨 위에 두면 화면이 "없음" 으로 시작한다는 D8-6 의 근거는 그대로 맞다 — 그래서 자리를
  * 고정하지 않고 **값이 있을 때만** 올린다. 경보 날 스크린샷(폭염 주의보)에서 특보가 세 번째
  * 카드라 첫 화면에 닿지 않았다.
+ *
+ * **머리 카드까지 여기서 그린다** (D14). 머리의 일정 이름 · 날짜 줄은 응답에서 오고, 전날
+ * 각주는 접힘 판정(`isDeferredDay`)을 따르므로 둘 다 이 컴포넌트가 이미 아는 값이다. 대기 ·
+ * 오류 갈래의 머리는 `PlanBriefingView` 가 같은 `PlanBriefingHeader` 로 그린다.
  *
  * **표현 전용이다** — 조회는 `PlanBriefingView` 가 갖는다 (이 저장소 테스트가 jsdom 없이
  * 문자열로 검증하므로 훅을 든 컴포넌트는 provider 없이 렌더할 수 없다).
@@ -165,116 +220,134 @@ export function PlanBriefingSection({
   )
 
   return (
-    <>
-      {warningFirst && warningCard}
-
-      {/*
-        **담을 것이 없으면 카드를 세우지 않는다** (#788 · 명세 D11-1). 판정과 지표 줄이
-        둘 다 빠지는 날(오늘 출발인데 항목 0개)에 제목만 남은 카드가 섰다 — 두 조각의
-        `null` 은 각자 옳고, 카드 하나를 통째로 내주는 쪽이 여기뿐이라 판정도 여기 있다.
-      */}
-      {!blankWeather && (
-        <Surface
-          title={
-            kind === 'EVE'
-              ? messages.plan.briefingWeatherEveHeading
-              : messages.plan.briefingWeatherTodayHeading
-          }
-        >
-          {/*
-            **지표 줄이 판정 위다** (D13-3). `맑음 · 최고 · 최저 · 강수` 는 날씨 앱처럼 훑는
-            값이라 카드의 첫 줄이고, 판정 밴드가 그 날씨를 반려견 기준으로 읽어 준다. 예전에는
-            판정 아래 회색 캡션이라 근거 문장 셋을 지나야 하늘 상태가 나왔다.
-          */}
-          <div className={INSET_CLASS.card}>
-            <DayFactsRow weather={briefing.weather?.weather ?? null} />
-
-            {briefing.weather === null ? (
-              <p className="text-body-2 text-fg-muted py-4">
-                {messages.plan.briefingWeatherMissing}
-              </p>
-            ) : (
-              /*
-                **일정 상세와 같은 컴포넌트다** — 서버가 같은 `PlanDayWeatherItem` 을 주므로
-                (`PlanWeatherPresenter.toDayItem`) 여기서 다른 것을 만들면 두 화면이 갈린다.
-
-                `failed={false}` — 이 카드만 따로 실패하는 경로가 없다. 브리핑은 한 응답이라
-                날씨가 안 오면 화면 전체가 오류 갈래로 간다.
-
-                **`petConditionApplied` 를 그대로 넘긴다** (명세 D5-2). 일반 조건 판정을
-                알리는 줄은 이 컴포넌트가 이미 갖고 있어서, 화면 아래 같은 줄을 한 번 더
-                두지 않는다 — 응답의 두 자리 중 **최상위 값 하나만** 말한다 (D5-4).
-                `walkTimes.petConditionApplied` 는 읽지 않는다.
-              */
-              <PlanDayVerdict
-                verdict={briefing.weather}
-                petConditionApplied={briefing.petConditionApplied}
-                basisPetName={basisPetName}
-                failed={false}
-                onRetry={() => undefined}
-                dayHasItems={briefing.schedule.itemCount > 0}
-              />
-            )}
-          </div>
-        </Surface>
-      )}
-
-      {/*
-        **각주는 카드가 아니다** (DESIGN.md §0 의 카드 판정 3문 — 자기 제목이 없다).
-        `Surface` 로 감싸면 접은 카드 둘이 카드 하나로 바뀔 뿐이다.
-
-        굵기는 본문(400)이다 — 이슈가 지적한 `16px/600 + 보조 텍스트 색` 을 되풀이하지
-        않는다. 모바일에서 `Surface` 가 전폭이라 인셋은 카드 안 글줄과 같은 `card` 다.
-
-        **날씨 카드 바로 아래다** (D13-1). 접힌 것이 특보·골든타임이라 그 자리에서 말한다 —
-        일정 카드 뒤에 두면 화면 맨 끝 한 줄이 되어 무엇이 접혔는지와 떨어진다.
-      */}
-      {deferred && (
-        <p className={cn('text-body-2 text-fg-muted py-4 break-keep', INSET_CLASS.card)}>
-          {messages.plan.briefingEveFootnote}
-        </p>
-      )}
-
-      {/*
-        **전날에는 이 둘을 그리지 않는다** (#733). 서버가 당일에만 채우는 값이라
-        (`today === false` 면 둘 다 null + 이유 문장) 카드가 정상 크기로 서서 안내 한 줄만
-        담았다 — 화면 아래 절반이 값 없는 카드였다.
-      */}
-      {!deferred && (
+    <PlanBriefingLayout
+      aside={
         <>
-          {!warningFirst && warningCard}
+          <PlanBriefingHeader
+            planId={briefing.planId}
+            kind={kind}
+            trip={tripOf(briefing)}
+            /*
+              **전날에는 특보 · 골든타임 카드를 그리지 않고** (#733) 그 사실을 머리 각주로 말한다
+              (D14-1). 서버가 당일에만 채우는 값이라 카드가 서면 안내 한 줄만 담는다.
+            */
+            note={deferred ? messages.plan.briefingEveFootnote : null}
+          />
 
-          <Surface title={messages.plan.briefingWalkHeading}>
-            <WalkTimesCard
+          {warningFirst && warningCard}
+
+          {/*
+            **담을 것이 없으면 카드를 세우지 않는다** (#788 · 명세 D11-1). 판정과 지표 줄이
+            둘 다 빠지는 날(오늘 출발인데 항목 0개)에 제목만 남은 카드가 섰다 — 두 조각의
+            `null` 은 각자 옳고, 카드 하나를 통째로 내주는 쪽이 여기뿐이라 판정도 여기 있다.
+          */}
+          {!blankWeather && (
+            <Surface
+              title={
+                kind === 'EVE'
+                  ? messages.plan.briefingWeatherEveHeading
+                  : messages.plan.briefingWeatherTodayHeading
+              }
+            >
+              {/*
+                **지표 줄이 판정 위다** (D13-3). `맑음 · 최고 · 최저 · 강수` 는 날씨 앱처럼 훑는
+                값이라 카드의 첫 줄이고, 판정 밴드가 그 날씨를 반려견 기준으로 읽어 준다. 예전에는
+                판정 아래 회색 캡션이라 근거 문장 셋을 지나야 하늘 상태가 나왔다.
+              */}
+              <div className={INSET_CLASS.card}>
+                <DayFactsRow weather={briefing.weather?.weather ?? null} />
+
+                {briefing.weather === null ? (
+                  <p className="text-body-2 text-fg-muted py-4">
+                    {messages.plan.briefingWeatherMissing}
+                  </p>
+                ) : (
+                  /*
+                    **일정 상세와 같은 컴포넌트다** — 서버가 같은 `PlanDayWeatherItem` 을 주므로
+                    (`PlanWeatherPresenter.toDayItem`) 여기서 다른 것을 만들면 두 화면이 갈린다.
+
+                    `failed={false}` — 이 카드만 따로 실패하는 경로가 없다. 브리핑은 한 응답이라
+                    날씨가 안 오면 화면 전체가 오류 갈래로 간다.
+
+                    **`petConditionApplied` 를 그대로 넘긴다** (명세 D5-2). 일반 조건 판정을
+                    알리는 줄은 이 컴포넌트가 이미 갖고 있어서, 화면 아래 같은 줄을 한 번 더
+                    두지 않는다 — 응답의 두 자리 중 **최상위 값 하나만** 말한다 (D5-4).
+                    `walkTimes.petConditionApplied` 는 읽지 않는다.
+                  */
+                  <PlanDayVerdict
+                    verdict={briefing.weather}
+                    petConditionApplied={briefing.petConditionApplied}
+                    basisPetName={basisPetName}
+                    failed={false}
+                    onRetry={() => undefined}
+                    dayHasItems={briefing.schedule.itemCount > 0}
+                  />
+                )}
+              </div>
+            </Surface>
+          )}
+
+          {/* 발효 중이 아닌 특보(없음 · 확인 못 함)는 날씨 다음 제자리다 (D13-2) */}
+          {!deferred && !warningFirst && warningCard}
+        </>
+      }
+      main={
+        <>
+          {!deferred && (
+            <Surface title={messages.plan.briefingWalkHeading}>
+              <WalkTimesCard
+                planId={briefing.planId}
+                day={briefing.day}
+                walkTimes={briefing.walkTimes}
+                reasonCode={briefing.walkTimesUnavailableReasonCode}
+                reason={briefing.walkTimesUnavailableReason}
+                representativePlaceTitle={briefing.schedule.representativePlaceTitle}
+                hasItems={briefing.schedule.itemCount > 0}
+                curve={curve}
+                onRetry={onRetry}
+              />
+            </Surface>
+          )}
+
+          {/*
+            **일정은 마지막이다** (D13-1) — 판정을 다 읽은 뒤 `이 날 일정 보기` 로 나간다.
+            제목도 날씨 카드처럼 갈래가 말한다.
+          */}
+          <Surface
+            title={
+              kind === 'EVE'
+                ? messages.plan.briefingScheduleEveHeading
+                : messages.plan.briefingScheduleTodayHeading
+            }
+          >
+            <ScheduleCard
               planId={briefing.planId}
               day={briefing.day}
-              walkTimes={briefing.walkTimes}
-              reasonCode={briefing.walkTimesUnavailableReasonCode}
-              reason={briefing.walkTimesUnavailableReason}
-              representativePlaceTitle={briefing.schedule.representativePlaceTitle}
-              hasItems={briefing.schedule.itemCount > 0}
-              curve={curve}
-              onRetry={onRetry}
+              schedule={briefing.schedule}
             />
           </Surface>
         </>
-      )}
-
-      {/*
-        **일정은 마지막이다** (D13-1) — 판정을 다 읽은 뒤 `이 날 일정 보기` 로 나간다.
-        제목도 날씨 카드처럼 갈래가 말한다.
-      */}
-      <Surface
-        title={
-          kind === 'EVE'
-            ? messages.plan.briefingScheduleEveHeading
-            : messages.plan.briefingScheduleTodayHeading
-        }
-      >
-        <ScheduleCard planId={briefing.planId} day={briefing.day} schedule={briefing.schedule} />
-      </Surface>
-    </>
+      }
+    />
   )
+}
+
+/**
+ * 머리 카드의 두 줄 — **응답의 값으로 만든다** (D14-1).
+ *
+ * 화면이 고른 날짜를 쓰지 않는다. 서버는 자기 `Clock` 을 보므로 자정 전후에 FE 가 고른
+ * 날짜와 응답의 `date`·`day` 가 갈릴 수 있다 (`lib/plan/briefing.ts` 주석).
+ *
+ * **날짜 모양은 `formatPlanDay` 가 소유한다** (#732 · #733). 포맷터가 `null` 을 주는(못 읽는)
+ * 날짜는 서버 문자열을 그대로 세운다 — 날짜 줄 하나 때문에 머리를 접지 않는다.
+ */
+function tripOf(briefing: PlanBriefingResponse): PlanBriefingTrip {
+  return {
+    title: briefing.planTitle,
+    dateLine: messages.plan.briefingDateLine
+      .replace('{date}', formatPlanDay(briefing.date) ?? briefing.date)
+      .replace('{day}', String(briefing.day)),
+  }
 }
 
 /**
