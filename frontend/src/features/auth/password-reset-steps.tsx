@@ -8,6 +8,7 @@ import { FormNotice } from '@/components/form-notice'
 import { Input } from '@/components/input'
 import { PasswordInput } from '@/components/password-input'
 import type { EmailValues, PasswordResetValues } from '@/features/auth/schemas'
+import { VerificationCodeInput } from '@/features/auth/verification-code-input'
 import { classify } from '@/lib/api/error'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
@@ -149,12 +150,9 @@ export function PasswordResetCodeStep({
       <p className="text-body-2 text-fg-muted break-all">{email}</p>
 
       <Field id="code" label={messages.auth.codeLabel} error={errors.fields.code} required>
-        <Input
+        {/* 입력 중에 대문자화 · 공백 제거 — 가입 2단계와 같은 칸이다 (#1078) */}
+        <VerificationCodeInput
           id="code"
-          type="text"
-          // 백엔드 예시가 A2B3C4D5 로 영숫자 혼합이다. numeric 이면 영문자를 못 넣는다 (D6)
-          inputMode="text"
-          autoComplete="one-time-code"
           value={values.code}
           onValueChange={(value) => onValueChange('code', value)}
           invalid={errors.fields.code !== undefined}

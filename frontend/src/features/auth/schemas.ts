@@ -1,6 +1,7 @@
 import { z, type ZodType } from 'zod'
 
 import type { SignupConsent, SignupConsentKey } from '@/lib/auth/signup-consent'
+import { normalizeVerificationCode } from '@/lib/auth/verification-code'
 import { EMAIL_PATTERN } from '@/lib/form/email-pattern'
 import { PASSWORD_PATTERN } from '@/lib/form/password-pattern'
 import { messages } from '@/lib/messages'
@@ -18,9 +19,22 @@ export const emailSchema = z.object({
     .pipe(z.email({ pattern: EMAIL_PATTERN, message: messages.form.emailInvalid })),
 })
 
+/**
+ * AUTH_104 — 가입 2단계 · 재설정이 같이 쓰는 인증코드 칸.
+ *
+ * **검사 전에 정규화한다** (#1078). 입력 핸들러(`VerificationCodeInput`)가 이미 고치지만,
+ * 입력 이벤트를 건너뛰는 경로가 있어도 보내는 값이 같아야 한다. 정규화가 먼저라 공백뿐인
+ * 값은 "비어 있음" 으로 막힌다 — 공백을 보내 `AUTH_004`(불일치)를 맞고, 재설정에서는 5번 중
+ * 한 번을 날리는 일이 없다.
+ */
+const verificationCodeField = z
+  .string()
+  .transform(normalizeVerificationCode)
+  .pipe(z.string().min(1, messages.form.codeRequired))
+
 /** AUTH_104 */
 export const codeSchema = z.object({
-  code: z.string().min(1, messages.form.codeRequired),
+  code: verificationCodeField,
 })
 
 /**
@@ -107,8 +121,8 @@ export const signupConsentSchema: ZodType<SignupConsent> = z.object(signupConsen
  * 재설정이 같은 비밀번호를 두고 통과·거부로 갈린다.
  */
 export const passwordResetSchema = z.object({
-  // AUTH_104
-  code: z.string().min(1, messages.form.codeRequired),
+  // AUTH_104 — 가입 2단계와 같은 칸이다 (정규화 포함, #1078)
+  code: verificationCodeField,
   newPassword: z
     .string()
     .min(1, messages.form.passwordRequired)
