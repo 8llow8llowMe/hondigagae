@@ -19,8 +19,9 @@ describe('enterSession', () => {
     클라이언트 이동했다가 proxy 가 `/login?returnTo=…` 로 보낸 기록을 **`/pets/new` 의 트리 =
     로그인 화면** 으로 남긴다. 그 뒤 `router.replace('/pets/new')` 는 요청 없이 캐시를 써서
     로그인 화면에 머물고, `router.refresh()` 가 그 자리를 새 쿠키로 다시 그려
-    `LoggedInNotice` 가 뜬다. `refresh` 는 segment cache 만 비우고 route cache 는 그대로
-    둔다(`next/dist/client/components/router-reducer/reducers/refresh-reducer.js`).
+    `LoggedInNotice` 가 떴다(그 안내는 #1082 에서 리다이렉트로 바뀌었다). `refresh` 는
+    segment cache 만 비우고 route cache 는 그대로 둔다
+    (`next/dist/client/components/router-reducer/reducers/refresh-reducer.js`).
 
     이 줄이 `router.replace` 로 돌아가면 증상이 되살아난다.
   */

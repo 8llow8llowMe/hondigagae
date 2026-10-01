@@ -1,7 +1,8 @@
+import { redirect } from 'next/navigation'
+
 import type { Metadata } from 'next'
 
 import { AuthCardDog } from '@/features/auth/auth-card-dog'
-import { LoggedInNotice } from '@/features/auth/logged-in-notice'
 import { LoginDivider, LoginForm, LoginSignupPrompt } from '@/features/auth/login-form'
 import { SignupDoneNotice } from '@/features/auth/signup-done-notice'
 import { SocialLoginButtons } from '@/features/auth/social-login-buttons'
@@ -22,7 +23,8 @@ export default async function LoginPage({
   const target = safeReturnTo(returnTo)
   const session = await readSession()
 
-  if (session !== null) return <LoggedInNotice returnTo={target} />
+  // 이미 로그인했으면 안내하지 않고 목적지로 보낸다 (#1082, 로그인 세부명세 D3)
+  if (session !== null) redirect(target)
 
   return (
     <div className="flex flex-col gap-4">

@@ -1,7 +1,8 @@
+import { redirect } from 'next/navigation'
+
 import type { Metadata } from 'next'
 
 import { AuthCardDog } from '@/features/auth/auth-card-dog'
-import { LoggedInNotice } from '@/features/auth/logged-in-notice'
 import { SignupScreen } from '@/features/auth/signup-screen'
 import { readSession } from '@/lib/auth/session'
 import { safeReturnTo } from '@/lib/http/redirect'
@@ -19,7 +20,8 @@ export default async function SignupPage({
   const target = safeReturnTo(returnTo)
   const session = await readSession()
 
-  if (session !== null) return <LoggedInNotice returnTo={target} />
+  // 이미 로그인했으면 안내하지 않고 목적지로 보낸다 (#1082, 회원가입 세부명세 D5)
+  if (session !== null) redirect(target)
 
   /*
     회원가입 화면에도 소셜 버튼을 둔다. 미가입 이메일이면 서버가 자동으로 가입시키므로
