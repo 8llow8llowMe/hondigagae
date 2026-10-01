@@ -19,6 +19,13 @@
   빠지면 그 바깥에 크림 테가 남는다.
 - 황갈은 흐린 뒤 반 문턱으로 고른다(`smooth`) — 가는 접힘 선이 들쭉날쭉하게 따진다.
 - 색은 새로 만들지 않는다 — 기존 일러스트 값 · 토큰 값 (`about-character.test.ts` 가 잠근다).
+- 초록 밴드(`IntroBand tone="brand"`, 배경 `--brand-700`) 위에 서는 두 장은 **머리 위로 솟은 귀**
+  만 `--brand-500` 이다(#1089). 귀 · 배경이 같은 값이라 귀가 그레인 무늬로만 남아 흐릿했다.
+  초록 층에서 가장 위 하위 경로를 떼어 칠한다(`split_band_ear`) — 도형은 그대로다.
+
+이미 딴 SVG 에 귀만 다시 칠할 때(potrace · 원본 PNG 없이):
+
+    python3 scripts/trace-about-character.py --band-ear public/illustrations/about
 """
 
 import os
@@ -27,17 +34,17 @@ import subprocess
 import sys
 import tempfile
 
-import numpy as np
-from PIL import Image
-
 UP = 3
 PALETTE = {
     'cream': '#f2e6c9',  # 기존 일러스트 크림
     'tan': '#d4b487',  # 기존 일러스트 황갈
     'green': '#1d6646',  # --brand-700
+    'band-ear': '#2e9b6b',  # --brand-500 — 초록 밴드 위 솟은 귀(#1089)
     'eye': '#15181d',  # --fg
     'red': '#d54040',  # 곡선의 노면 선과 같은 값
 }
+# 초록 밴드 위에 서는 자세 — 히어로 · 마무리 (#1089)
+BAND_EAR = {'dog-sit-lookup', 'dog-sit-front'}
 # 층마다 potrace 인자 — 황갈은 가는 접힘 선이 많아 더 매끈하게
 POTRACE = {
     'cream': ['-a', '1.1', '-O', '0.6'],
@@ -47,7 +54,7 @@ POTRACE = {
 }
 # (파일, 종류, 최대 표시 폭 px — globals.css 캐릭터 블록, 그레인 결을 맞추는 데 쓴다, id)
 JOBS = [
-    ('dog-sit-lookup', 'dog', 150, 'dl'),
+    ('dog-sit-lookup', 'dog', 240, 'dl'),
     ('dog-leash', 'dog', 196 * 0.936, 'dw'),
     ('dog-stand', 'dog', 196 * 0.904, 'ds'),
     ('dog-hot', 'dog', 196 * 0.981, 'dh'),
@@ -96,6 +103,61 @@ def classify(rgb, alpha):
     for m in (tan, green):
         m |= dilate(m, UP) & rim
     return {'tan': smooth(tan, UP) & ~green & alpha, 'green': green, 'eye': eye}
+
+
+def top_y(sub):
+    """potrace 하위 경로(M 뒤 상대 c · l)의 가장 높은 y — 조절점 포함. potrace 좌표는 y 가 위로 커진다."""
+    arity = {'m': 2, 'l': 2, 'c': 6}
+    y, best = 0.0, float('-inf')
+    cmd, vals = None, []
+    for token in re.findall(r'[A-Za-z]|-?\d+(?:\.\d+)?', sub):
+        if token.isalpha():
+            cmd, vals = token, []
+            continue
+        vals.append(float(token))
+        if cmd is None or len(vals) < arity.get(cmd.lower(), 0):
+            continue
+        ys = vals[1::2]
+        if cmd.isupper():
+            best, y = max(best, *ys), ys[-1]
+        else:
+            best, y = max(best, *(y + v for v in ys)), y + ys[-1]
+        vals = []
+    return best
+
+
+def split_band_ear(d):
+    """초록 층 d 를 (솟은 귀, 나머지) 로 나눈다 — 귀 = 가장 위로 올라간 하위 경로."""
+    subs = [s.strip() for s in re.split(r'(?=M)', d) if s.strip()]
+    ear = max(range(len(subs)), key=lambda i: top_y(subs[i]))
+    return subs[ear], ' '.join(s for i, s in enumerate(subs) if i != ear)
+
+
+def green_paths(fill_attrs, d, band_ear):
+    if not band_ear:
+        return [f'    <path fill="{PALETTE["green"]}"{fill_attrs}d="{d}"/>']
+    ear, rest = split_band_ear(d)
+    return [
+        f'    <path fill="{PALETTE["band-ear"]}"{fill_attrs}d="{ear}"/>',
+        f'    <path fill="{PALETTE["green"]}"{fill_attrs}d="{rest}"/>',
+    ]
+
+
+def recolor_band_ear(outdir):
+    """이미 딴 SVG 의 초록 층을 나눠 다시 쓴다 — potrace · 원본 PNG 가 필요 없다."""
+    pattern = re.compile(rf'    <path fill="{PALETTE["green"]}"( [^>]*)d="([^"]+)"/>')
+    for name in sorted(BAND_EAR):
+        dst = f'{outdir}/{name}.svg'
+        with open(dst, encoding='utf-8') as f:
+            svg = f.read()
+        match = pattern.search(svg)
+        if match is None or PALETTE['band-ear'] in svg:
+            print(name, 'skip')
+            continue
+        svg = svg.replace(match.group(0), '\n'.join(green_paths(match.group(1), match.group(2), True)))
+        with open(dst, 'w', encoding='utf-8') as f:
+            f.write(svg)
+        print(name, 'ear split')
 
 
 def potrace(mask, turd, args):
@@ -155,11 +217,22 @@ def trace(src, dst, kind, display_w, fid):
         if res is None:
             continue
         transform, d = res
-        body.append(f'    <path fill="{PALETTE[name]}" transform="scale({1 / UP:.6f}) {transform}" d="{d}"/>')
+        attrs = f' transform="scale({1 / UP:.6f}) {transform}" '
+        if name == 'green':
+            body += green_paths(attrs, d, os.path.basename(dst)[:-4] in BAND_EAR)
+            continue
+        body.append(f'    <path fill="{PALETTE[name]}"{attrs}d="{d}"/>')
     return write(dst, w, h, body, display_w, fid)
 
 
 if __name__ == '__main__':
+    if sys.argv[1] == '--band-ear':
+        recolor_band_ear(sys.argv[2])
+        sys.exit(0)
+    # 다시 딸 때만 필요하다 — `--band-ear` 는 표준 라이브러리만 쓴다
+    import numpy as np
+    from PIL import Image
+
     srcdir, outdir = sys.argv[1], sys.argv[2]
     os.makedirs(outdir, exist_ok=True)
     for name, kind, display_w, fid in JOBS:
