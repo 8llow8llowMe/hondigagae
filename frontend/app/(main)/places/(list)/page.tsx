@@ -87,6 +87,11 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
             filters={filters}
             authed={authed}
             searchable
+            /*
+              **데스크톱 패널 머리의 제목** (#1121). 주면 1024 이상에서 보기 토글이 지도
+              우상단이 아니라 패널 머리 줄 오른쪽에 선다 — 목록 카드 제목 줄과 같은 관계다.
+            */
+            title={messages.place.pageTitle}
             listHref={listHref}
             mapHref={mapHref}
           />

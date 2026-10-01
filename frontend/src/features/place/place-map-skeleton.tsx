@@ -73,8 +73,9 @@ function FilterBarSkeleton() {
  *
  * 흉내 내는 것(1280 · 390 실측, 2026-09-29):
  * - 바닥 — `MapCanvas` 의 SDK 대기 면과 같은 `bg-bg-sunken`, 높이는 `.map-canvas-height`
- * - 우상단 — 보기 토글(88×44), 1024 미만은 그 왼쪽 검색(입력 + 아이콘 버튼 44)
- * - 데스크톱 — 좌측 400 패널(`top-6 bottom-8 left-4`): 검색 줄 61 · 필터 줄 111 · 개수 줄 35 · 행
+ * - 우상단 — 1024 미만만: 보기 토글(88×44)과 그 왼쪽 검색(입력 + 아이콘 버튼 44)
+ * - 데스크톱 — 좌측 400 패널(`top-6 bottom-8 left-4`): 머리 줄(제목 · 토글, #1121) 52 ·
+ *   검색 줄 61 · 필터 줄 111 · 개수 줄 35 · 행
  * - 모바일 — `MapSheet` 를 **그대로** 쓴다(`mid`). 머리 높이(그래버 · 필터 102 · 개수 42)가
  *   시트 자신의 것이라 두 벌로 두면 갈린다
  *
@@ -95,7 +96,8 @@ export function PlaceMapSkeleton() {
             <Skeleton className="h-11 min-w-0 flex-1 rounded-md" />
             <Skeleton className="size-11 shrink-0 rounded-md" />
           </div>
-          <Skeleton className="h-11 w-22 shrink-0 rounded-md" />
+          {/* 1024 이상은 토글이 패널 머리 줄로 간다 (#1121) */}
+          <Skeleton className="h-11 w-22 shrink-0 rounded-md lg:hidden" />
         </div>
       </div>
 
@@ -103,6 +105,11 @@ export function PlaceMapSkeleton() {
       <div className="absolute top-6 bottom-8 left-4 z-30 hidden lg:block">
         <div className="map-panel-width h-full">
           <div className="bg-bg border-border flex h-full w-full flex-col overflow-hidden rounded-xl rounded-tr-none border shadow-lg">
+            {/* 머리 줄 — 제목 · 보기 토글 (#1121). 선 없이 아래 검색 줄과 한 덩어리다 */}
+            <div aria-hidden className="flex items-center justify-between gap-3 ps-4 pe-3 pt-2">
+              <Skeleton className="h-6.5 w-24" />
+              <Skeleton className="h-11 w-22 shrink-0 rounded-md" />
+            </div>
             <div aria-hidden className="border-border flex gap-2 border-b px-3 py-2">
               <Skeleton className="h-11 min-w-0 flex-1 rounded-md" />
               <Skeleton className="h-11 w-16 shrink-0 rounded-md" />
