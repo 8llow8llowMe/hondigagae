@@ -507,10 +507,8 @@ export function PlanAddPlaceShell({
             )}
           </>
         }
-        /* 네 화면이 같은 세그먼트 컨트롤을 쓴다 */
-        trailing={
-          <ViewToggle current={view} listHref={listHref} mapHref={mapHref} variant="icon" />
-        }
+        /* 네 화면이 같은 보기 전환 버튼을 쓴다 — 카드 제목 줄은 `sm`(36) 이다 (#1125) */
+        trailing={<ViewToggle current={view} listHref={listHref} mapHref={mapHref} size="sm" />}
         /* `titleRow` — 모바일에서 제목 왼쪽 같은 줄에 선다 (#539, `Surface` 머리가 감싼다) */
         leading={<BackLink href={backHref} label={messages.plan.addPlaceBack} variant="titleRow" />}
         tools={tools}

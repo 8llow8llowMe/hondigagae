@@ -19,9 +19,9 @@ import { FACILITY_TYPE_CODES, type FacilityFilters, type FacilityTypeCode } from
  * 다른 크기가 되어 눈이 먼저 큰 칸으로 간다 — 택일 축에서 특정 값이 시각적으로 우대되면
  * 안 된다. 개수가 붙어 라벨이 길어져도 칸은 그대로다.
  *
- * **`ViewToggle` 의 문법을 그대로 쓴다** — `overflow-hidden` 테두리 한 겹 + 칸 사이
- * `border-l`. 다만 선택 표시는 `Chip` 쪽 토큰(`bg-band`)이다. `ViewToggle` 의 반전
- * (`bg-fg text-bg`)을 가져오면 필터 한 축이 화면에서 가장 검은 덩어리가 되어, 정작 급할 때
+ * **예전 `ViewToggle` 세그먼트의 문법을 그대로 쓴다** — `overflow-hidden` 테두리 한 겹 + 칸 사이
+ * `border-l` (`ViewToggle` 은 #1125 에서 글자 버튼 하나가 됐다). 다만 선택 표시는 `Chip` 쪽
+ * 토큰(`bg-band`)이다. 그 세그먼트의 반전(`bg-fg text-bg`)을 가져오면 필터 한 축이 화면에서 가장 검은 덩어리가 되어, 정작 급할 때
  * 봐야 할 목록보다 먼저 눈에 들어온다.
  *
  * **`role="radiogroup"` + `aria-checked` 다.** `ChipGroup`/`Chip` 의 배타 축과 같은 계약이라

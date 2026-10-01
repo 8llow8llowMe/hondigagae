@@ -152,10 +152,8 @@ export function EmergencyListView({ listHref, mapHref }: { listHref: string; map
               <p className="text-caption text-fg-muted font-medium tabular-nums">{subtitle}</p>
             )
           }
-          /* 네 화면이 같은 세그먼트 컨트롤을 쓴다 */
-          trailing={
-            <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
-          }
+          /* 네 화면이 같은 보기 전환 버튼을 쓴다 — 카드 제목 줄은 `sm`(36) 이다 (#1125) */
+          trailing={<ViewToggle current="list" listHref={listHref} mapHref={mapHref} size="sm" />}
           /*
             **검색은 `lg:hidden` 이 아니다** (#584). 아래 칩 줄은 레일이 같은 축을 두 번
             보여주지 않도록 데스크톱에서 숨지만, 검색은 레일에 짝이 없다 — 레일에 넣으면

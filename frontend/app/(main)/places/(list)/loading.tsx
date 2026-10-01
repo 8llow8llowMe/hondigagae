@@ -86,7 +86,7 @@ function PlaceListLoading() {
           title={messages.place.pageTitle}
           description={<Skeleton variant="text" className="hidden h-5 w-56 lg:block" />}
           /* 보기 토글 자리 — 링크가 아직 없으므로 크기만 잡는다 */
-          trailing={<Skeleton variant="text" className="h-11 w-22 shrink-0" />}
+          trailing={<Skeleton variant="text" className="h-9 w-25 shrink-0" />}
           tools={
             <div className={cn('flex items-start gap-2 pt-3', INSET_CLASS.card)}>
               <Skeleton variant="text" className="h-11 flex-1" />

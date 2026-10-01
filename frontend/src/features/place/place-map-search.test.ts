@@ -42,7 +42,7 @@ describe('지도 보기의 검색 자리 (#596)', () => {
 
     const tag = overlay.slice(search, overlay.indexOf('/>', search))
     expect(tag).toContain('lg:hidden')
-    // 375 에 245 밖에 없다 — 글자 버튼이면 입력이 177 로 줄어 placeholder 가 잘린다
+    // 375 에 225 밖에 없다(보기 전환 110, #1125) — 글자 제출 버튼이면 입력이 157 로 줄어 placeholder 가 잘린다
     expect(tag).toContain('compact')
     // 768 에서 538 로 벌어지지 않게 상한을 둔다
     expect(tag).toContain('max-w-md')

@@ -73,7 +73,7 @@ function FilterBarSkeleton() {
  *
  * 흉내 내는 것(1280 · 390 실측, 2026-09-29):
  * - 바닥 — `MapCanvas` 의 SDK 대기 면과 같은 `bg-bg-sunken`, 높이는 `.map-canvas-height`
- * - 우상단 — 보기 토글(88×44), 1024 미만은 그 왼쪽 검색(입력 + 아이콘 버튼 44)
+ * - 우상단 — 보기 전환 버튼(110×44, #1125), 1024 미만은 그 왼쪽 검색(입력 + 아이콘 버튼 44)
  * - 데스크톱 — 좌측 400 패널(`top-6 bottom-8 left-4`): 검색 줄 61 · 필터 줄 111 · 개수 줄 35 · 행
  * - 모바일 — `MapSheet` 를 **그대로** 쓴다(`mid`). 머리 높이(그래버 · 필터 102 · 개수 42)가
  *   시트 자신의 것이라 두 벌로 두면 갈린다
@@ -95,7 +95,7 @@ export function PlaceMapSkeleton() {
             <Skeleton className="h-11 min-w-0 flex-1 rounded-md" />
             <Skeleton className="size-11 shrink-0 rounded-md" />
           </div>
-          <Skeleton className="h-11 w-22 shrink-0 rounded-md" />
+          <Skeleton className="h-11 w-28 shrink-0 rounded-lg" />
         </div>
       </div>
 

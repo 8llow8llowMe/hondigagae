@@ -566,18 +566,11 @@ export function PlaceMapView({
 
           <div className="pointer-events-auto flex shrink-0 flex-col items-end gap-2">
             {/*
-          **폭에 따라 두 벌을 두지 않는다** (#240). 아이콘형 하나로 통일했다 — 지도 위에
-          글자 버튼이 얹히면 지도를 가리고, 이름은 `title` 호버 툴팁과 `aria-label` 이 맡는다.
-        */}
-            {showToggle && (
-              <ViewToggle
-                current="map"
-                listHref={listHref}
-                mapHref={mapHref}
-                variant="icon"
-                className="shadow-md"
-              />
-            )}
+              **폭에 따라 두 벌을 두지 않는다** (#240). 갈 곳 하나만 말하는 글자 버튼이다
+              (#1125) — 예전 아이콘 두 칸이 `title` 툴팁으로 메우던 이름을 글자가 직접 말한다.
+              높이 44 는 같은 줄의 검색 · 아래 `내 위치` 와 맞춘 값이다.
+            */}
+            {showToggle && <ViewToggle current="map" listHref={listHref} mapHref={mapHref} />}
 
             {/* 제주 밖이면 렌더하지 않는다 — 눌러도 갈 곳이 없다 */}
             {inJeju && <MapLocateButton onLocate={locate} />}

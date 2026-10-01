@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils/cn'
  * 서울에서 눌러도 갈 곳이 없고(`lib/geo/jeju-bounds.ts`), 눌리는 버튼을 두면 왜 아무 일도
  * 안 일어나는지 화면이 설명해야 한다.
  *
- * 크기는 44 — `ViewToggle` 아이콘형과 같은 값이고 그 바로 아래에 세로로 붙는다.
+ * 크기는 44 — 지도 위 `ViewToggle`(`md`)과 같은 높이이고 그 바로 아래에 세로로 붙는다.
  */
 export function MapLocateButton({
   onLocate,
