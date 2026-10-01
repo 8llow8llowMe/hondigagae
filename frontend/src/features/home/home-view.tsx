@@ -21,6 +21,7 @@ import {
 import { ProfileCard } from '@/features/home/profile-card'
 import { RegionalWeatherSection } from '@/features/home/regional-weather-section'
 import { SuitabilityListSkeleton } from '@/features/home/suitability-list-skeleton'
+import { TripBannerCard } from '@/features/home/trip-banner'
 import { UpcomingPlanRow } from '@/features/home/upcoming-plan-row'
 import {
   useRegionalWeather,
@@ -54,7 +55,7 @@ import { pickWeatherWarning } from '@/lib/insight/weather-warning'
 import { messages } from '@/lib/messages'
 import { resolveSelectedPet } from '@/lib/nav/selected-pet'
 import { planPhaseOf } from '@/lib/plan/date'
-import { pickUpcomingPlans } from '@/lib/plan/upcoming'
+import { pickHomePlans } from '@/lib/plan/trip-banner'
 import { withCompanionParticle } from '@/lib/text/korean'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -356,7 +357,17 @@ export function HomeView({
   const verdictSlotShown = basisPlaceId !== null
 
   const today = dayToLocalNoon(todayIso)
-  const upcomingPlans = today === null ? [] : pickUpcomingPlans(plans, today, UPCOMING_PLAN_COUNT)
+
+  /*
+    **첫 화면 여행 배너와 맨 아래 일정 섹션** (#1113 · 명세 D5-1c). 배너는 출발 7일 안쪽 ·
+    여행 중인 일정 하나이고, 그 일정은 아래 섹션에서 빠진다 — 같은 목적지가 두 번 서지 않는다.
+    빼고 남는 것이 없으면 섹션째 숨는다 (`pickHomePlans`). 게스트는 배너도 섹션도 없다.
+  */
+  const homePlans =
+    today === null ? null : pickHomePlans(plans, today, todayIso, UPCOMING_PLAN_COUNT)
+  const tripBanner = authed ? (homePlans?.banner ?? null) : null
+  const upcomingPlans = homePlans?.upcoming ?? []
+  const planSectionShown = authed && (homePlans?.sectionShown ?? true)
 
   /*
     섹션 제목은 **고른 일정을 따라간다** (#561). `UPCOMING_PLAN_COUNT === 1` 이라 이 섹션에
@@ -407,6 +418,13 @@ export function HomeView({
         */}
         {/* 열 사이 24 — 마주 보는 쪽만 절반을 낸다 (globals.css `.rail-layout` 주석, #559) */}
         <SurfaceStack className="lg:sticky lg:top-16 lg:self-start lg:pr-3">
+          {/*
+            여행 배너의 **1024 미만 자리** (#1113) — 첫 카드. 한 컬럼에서 우측 열은 좌측 레일
+            뒤에 붙어(375 y≈1128) 거기 두면 첫 화면에 닿지 않는다. 1024 이상은 우측 열 머리의
+            사본이 서고 이쪽은 `display: none` 이다 — 서비스 소개 카드(#963)와 같은 처리다.
+          */}
+          {tripBanner !== null && <TripBannerCard banner={tripBanner} className="lg:hidden" />}
+
           {/*
             **카드 하나에 셋을 담는다** — `[누구 · 지금 안전한가 · 언제 나가나]`.
             아래 병원 배너가 `[위급하면]` 으로 두 번째 카드다. 이 레일이 두 이야기라는
@@ -659,6 +677,15 @@ export function HomeView({
         */}
         <SurfaceStack className="lg:pl-3">
           {/*
+            여행 배너의 **1024 이상 자리** (#1113) — 우측 열 머리, `오늘 나가기 좋은 권역` 위.
+            우측은 "오늘 어디로" 의 열이고 이미 짠 여행이 그 첫 답이다. 좌측 레일 머리에 두면
+            "누구 · 지금 안전한가" 카드가 밀리고 레일 sticky 예산(머리주석)을 다시 깬다.
+          */}
+          {tripBanner !== null && (
+            <TripBannerCard banner={tripBanner} className="hidden lg:block" />
+          )}
+
+          {/*
             권역 비교가 이 열의 머리다. **아래 "맞는 곳" 과 같은 질문을 넓은 단위로 먼저
             답한다** — 권역(어느 권역) → 장소(어느 곳) 로 좁혀 읽힌다.
 
@@ -822,8 +849,11 @@ export function HomeView({
             <IndoorAlternativesSection alternatives={indoorAlternatives} />
           )}
 
-          {/* 다가오는 일정(여행 중이면 제목이 바뀐다). 미로그인이면 섹션 미렌더 */}
-          {authed && (
+          {/*
+            다가오는 일정(여행 중이면 제목이 바뀐다). 미로그인이면 섹션 미렌더. 여행 배너가
+            유일한 다가오는 일정을 가져갔으면 섹션째 숨는다 (`planSectionShown`).
+          */}
+          {planSectionShown && (
             <Surface
               titleId="plan-heading"
               title={

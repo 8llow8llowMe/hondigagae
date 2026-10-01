@@ -425,6 +425,19 @@ export const homeMessages = {
   noUpcomingPlanTitle: '다가오는 일정이 없어요',
   noUpcomingPlanDesc: '지난 일정은 일정 목록에서 볼 수 있어요.',
   /**
+   * 홈 첫 화면 여행 배너 (#1113 · 명세 D5-1c). 갈래는 `pickTripBanner` 가 정한다.
+   *
+   * **당일 · 전날 제목은 일정 상세의 브리핑 배너와 같은 말이다** — `오늘의 브리핑` 앞머리는
+   * `plan.briefingBannerTodayTitle`, 전날은 `plan.briefingBannerEveTitle` 그대로다. 같은 문이
+   * 홈과 상세에서 다른 이름을 갖지 않는다. 당일에는 몇 일차인지를 붙인다 — 홈에는 상세처럼
+   * 일자 카드가 옆에 없다.
+   *
+   * `{day}` · `{days}` · `{title}` · `{date}` 치환. `{date}` 는 `formatPlanDay()` 의 `10월 6일 (화)`.
+   */
+  tripBannerTodayTitle: '오늘의 브리핑 · {day}일차',
+  tripBannerSoonTitle: 'D-{days} · {title}',
+  tripBannerSoonDescription: '{date} 출발',
+  /**
    * AI 일정 생성 배너 (#905 R1). 모바일 탭에 AI 항목이 없어 홈이 그 진입점을 맡는다.
    * **무엇을 넣으면 무엇이 나오는지**를 말한다 — 입력(반려견·기간)과 결과(하루 단위 초안).
    */
