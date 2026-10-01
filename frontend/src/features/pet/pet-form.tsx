@@ -4,16 +4,15 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/button'
 import { Checkbox } from '@/components/checkbox'
-import { ErrorState } from '@/components/error-state'
 import { Field } from '@/components/field'
-import { FormAlert } from '@/components/form-alert'
+import { FormFailure } from '@/components/form-failure'
 import { Input } from '@/components/input'
 import { RadioGroup } from '@/components/radio-group'
 import { petFormSchema } from '@/features/pet/schemas'
-import { ApiError, classify, NO_RESPONSE_STATUS } from '@/lib/api/error'
+import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
 import { PET_LIMIT_EXCEEDED_CODE } from '@/lib/api/pet'
 import type { FormErrors } from '@/lib/form/field-errors'
-import { focusFirstError } from '@/lib/form/focus-first-error'
+import { focusSubmitFailure } from '@/lib/form/submit-failure-focus'
 import { useForm } from '@/lib/form/use-form'
 import { useUnsavedWarning } from '@/lib/form/use-unsaved-warning'
 import { messages } from '@/lib/messages'
@@ -85,11 +84,6 @@ export function PetFormFields({
   onSubmit,
   onRetry,
 }: PetFormFieldsProps) {
-  // 5xx·무응답만 ErrorState 다. **폼을 대체하지 않고 위에 얹는다** — 대체하면
-  // 입력값을 고칠 수단이 사라져 새로고침밖에 남지 않는다
-  // (등록-세부명세 D5, 이슈 #24 최종 리뷰 I1).
-  const isTemporaryError = errorStatus !== null && classify(errorStatus) === 'temporary'
-
   /*
     **제출 실패를 필드 밖에서도 말한다** (#538). 아홉 필드가 375 에서 네 화면이라, 틀린
     필드가 접힘 아래면 빨간 글자가 화면에 없어 **무엇이 잘못됐는지 알 수 없었다.**
@@ -97,7 +91,7 @@ export function PetFormFields({
     **토스트로 내지 않는다.** `styling-guide.md` §3-2 가 "오류를 토스트로 말하지 않는다 —
     오류는 섹션 안에 남아야 다시 시도할 수 있다" 를 규칙으로 박아 뒀고, 여기가 정확히 그
     이유가 성립하는 자리다: 요약이 사라지면 스크롤해 내려간 뒤 남은 개수를 다시 볼 길이
-    없다. `FormAlert` 는 `role="alert"` 라 스크린리더에도 닿는다 (form-guide.md §8).
+    없다. 알림은 `role="alert"` 라 스크린리더에도 닿는다 (form-guide.md §8).
 
     **개수를 세는 것으로 충분한 이유** — 어느 필드인지는 포커스가 이미 옮겨 가서 말하고
     (아래 `submitCount` effect), 필드마다의 문구는 그 자리에 남아 있다. 여기서 필드명을
@@ -108,6 +102,7 @@ export function PetFormFields({
     내려받지 않아도 같은 것을 판정한다. 그래서 이 컴포넌트는 표시 전용으로 남는다.
 
     서버가 준 폼 전체 오류가 있으면 그쪽이 이긴다 — 요약("N개")보다 구체적이다.
+    5xx · 무응답이면 둘 다 아니고 일시 장애 하나만 선다 — 아래 `FormFailure` 가 정한다.
   */
   const invalidCount = Object.keys(errors.fields).length
   const alertMessage =
@@ -125,21 +120,28 @@ export function PetFormFields({
         onSubmit()
       }}
     >
-      {isTemporaryError && (
-        /*
-          카드는 이 파일이 아니라 호출부가 그린다 — 등록(`pet-create-view`)·수정
-          (`pet-edit-view`) **둘 다** `<Surface lead title=...>` 안이라 제목을 한 단
-          내린다 (#456①). 갈리는 호출부가 없어 prop 으로 뚫지 않았다.
-        */
-        <ErrorState
-          headingLevel={3}
-          inset="card"
-          title={messages.common.temporaryErrorTitle}
-          description={messages.common.temporaryErrorDescription}
-          onRetry={onRetry}
-        />
-      )}
-      <FormAlert message={alertMessage} />
+      {/*
+        **폼 전체 실패는 한 자리에 하나만 선다** (#1101 — 인증 폼 #1079 와 같은 규칙). 예전에는
+        5xx 에서 일시 장애 `ErrorState` 아래에 서버 문구 `FormAlert` 가 또 섰다
+        (`apiErrorToFormErrors` 가 5xx 에도 `form` 을 채운다). 무엇이 서는지는 `FormFailure` 가
+        `formFailureDisplay` 로 정하고, 제출 실패 뒤 포커스(`focusSubmitFailure`)도 같은 함수다.
+
+        일시 장애는 **폼을 대체하지 않고 위에 얹는다** — 대체하면 입력값을 고칠 수단이 사라져
+        새로고침밖에 남지 않는다 (등록-세부명세 D5, 이슈 #24 최종 리뷰 I1).
+
+        카드는 이 파일이 아니라 호출부가 그린다 — 등록(`pet-create-view`)·수정
+        (`pet-edit-view`) **둘 다** `<Surface lead title=...>` 안이라 제목을 한 단
+        내린다 (#456①). 갈리는 호출부가 없어 prop 으로 뚫지 않았다. 여백은 `FormFailure` 의
+        `flush` 다 — 호출부가 이미 카드 인셋(16/20)을 두르고 있어, 예전 `inset="card"` 는 그
+        인셋과 세로 48 을 한 번 더 먹었다.
+      */}
+      <FormFailure
+        message={alertMessage}
+        errorStatus={errorStatus}
+        submitting={submitting}
+        onRetry={onRetry}
+        headingLevel={3}
+      />
 
       <section className="flex flex-col gap-4">
         <h3 className="text-title-2 text-fg font-semibold">기본 정보</h3>
@@ -365,7 +367,14 @@ export function PetForm({ initialValues, submitLabel, onSave, onSaved }: PetForm
     // 대상은 DOM 순서로 고른다 — 이 화면은 스키마 순서와 화면 순서가 **우연히** 맞아
     // 증상이 없었을 뿐이다 (#560)
     if (submitCount === 0) return
-    focusFirstError(containerRef.current, errors)
+    /*
+      **필드 오류가 없는 실패에서도 포커스를 놓지 않는다** (#1101 · form-guide.md §8). 제출 중
+      버튼이 `disabled` 가 되며 포커스가 `BODY` 로 떨어지고, 5xx · 무응답 · `PET_002` 처럼 폼
+      전체 오류로만 오는 실패 뒤에는 돌려 보낼 곳이 없었다. 순서는 첫 오류 필드 → 일시 장애
+      상자(5xx) 또는 알림 → 첫 입력. `errorStatus` 는 화면이 `FormFailure` 에 넘기는 것과 같은
+      값이다 — 둘이 같은 판정을 봐야 숨긴 알림으로 포커스를 보내지 않는다.
+    */
+    focusSubmitFailure(containerRef.current, errors, errorStatus)
   }, [submitCount])
 
   return (

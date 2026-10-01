@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { FormFailure } from '@/features/auth/form-failure'
+import { FormFailure } from '@/components/form-failure'
 import { messages } from '@/lib/messages'
 
 function render(message: string | null, errorStatus: number | null, submitting = false) {
@@ -53,6 +53,38 @@ describe('FormFailure', () => {
 
   it('보여 줄 실패가 없으면 아무것도 그리지 않는다', () => {
     expect(render(null, null)).toBe('')
+  })
+})
+
+/*
+  #1101 — 반려견 폼은 제목을 가진 카드(`Surface lead title=...`) 안이라 일시 장애 제목을 한 단
+  내린다 (#456①). 인증 폼은 화면 `h1` 바로 아래라 기본값 `h2` 그대로다.
+*/
+describe('FormFailure — 일시 장애 제목 레벨 (#1101)', () => {
+  function renderWithHeading(headingLevel?: 2 | 3) {
+    return renderToStaticMarkup(
+      createElement(FormFailure, {
+        message: null,
+        errorStatus: 503,
+        submitting: false,
+        onRetry: () => undefined,
+        ...(headingLevel === undefined ? {} : { headingLevel }),
+      }),
+    )
+  }
+
+  it('기본값은 h2 다 — 인증 폼의 기존 동작', () => {
+    const markup = renderWithHeading()
+
+    expect(markup).toContain(`>${messages.common.temporaryErrorTitle}</h2>`)
+    expect(markup).not.toContain('<h3')
+  })
+
+  it('headingLevel 3 이면 h3 로 내린다', () => {
+    const markup = renderWithHeading(3)
+
+    expect(markup).toContain(`>${messages.common.temporaryErrorTitle}</h3>`)
+    expect(markup).not.toContain('<h2')
   })
 })
 

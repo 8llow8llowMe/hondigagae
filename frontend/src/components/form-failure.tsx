@@ -22,13 +22,22 @@ export type FormFailureProps = {
    */
   submitting: boolean
   onRetry: () => void
+  /**
+   * 일시 장애 제목의 heading 레벨 — **제목을 가진 `Surface` 안이면 `3`** 이다 (#1101 · #456①).
+   *
+   * 인증 폼은 화면 `h1` 바로 아래라 기본값 `2` 다. 반려견 폼은 등록 · 수정 둘 다
+   * `<Surface lead title=...>` 의 `h2` 안이라 `3` 을 준다 — 카드 내용의 제목이 카드 자신의
+   * 제목과 형제가 되면 안 된다. 값과 이유의 정본은 `ErrorState.headingLevel` 이다.
+   */
+  headingLevel?: 2 | 3
 }
 
 /**
- * 인증 폼의 **폼 전체 실패 자리** — 일시 장애이거나 알림이거나, 둘 중 하나만 선다 (#1079).
+ * 폼의 **폼 전체 실패 자리** — 일시 장애이거나 알림이거나, 둘 중 하나만 선다 (#1079).
  *
  * 예전에는 로그인 · 가입 세 단계 · 재설정 두 단계 여섯 자리가 같은 두 줄(`ErrorState` 를 위에
- * 얹고 그 아래 `FormAlert`)을 따로 들고 있었고, 5xx 에서 둘이 함께 섰다. 무엇이 서는지는
+ * 얹고 그 아래 `FormAlert`)을 따로 들고 있었고, 5xx 에서 둘이 함께 섰다. 반려견 등록 · 수정
+ * 폼(`pet-form.tsx`)도 같은 이중 표시였다(#1101). 무엇이 서는지는
  * `formFailureDisplay` 하나가 정한다 — 제출 실패 뒤 포커스(`focusSubmitFailure`)도 같은 함수다.
  *
  * **일시 장애는 폼을 대체하지 않는다.** 입력은 그대로 남아 오타를 고칠 수 있다(로그인 D4) —
@@ -39,13 +48,20 @@ export type FormFailureProps = {
  * - `tabIndex={-1}` + `data-form-temporary-error` — 제출 실패 뒤 포커스 대상이다. 재시도 버튼이
  *   아니라 상자인 이유는 `submit-failure-focus.ts` 에 있다(오프라인이면 버튼이 걷힌다)
  *
- * `ErrorState` 는 `flush` 다 — 인증 카드가 이미 여백을 갖고 있어, 기본값(세로 48 + 좌우 인셋)을
- * 두면 폼이 그만큼 밀린다. 제목은 `h2` 다: 화면의 `h1`(로그인 · 회원가입 …) 바로 아래다.
+ * `ErrorState` 는 `flush` 다 — 폼을 담은 카드(인증 셸 · 반려견 `Surface`)가 이미 여백을 갖고
+ * 있어, 기본값(세로 48 + 좌우 인셋)을 두면 폼이 그만큼 밀린다. 제목 레벨은 `headingLevel`.
  *
- * feature 안에 둔다 — 쓰는 곳이 인증 하나다 (component-guide.md §9). 반려견 폼(`pet-form.tsx`)도
- * 같은 이중 표시를 들고 있지만 #1079 범위 밖이다.
+ * **`src/components/` 에 둔다** (#1101) — 인증 · 반려견 두 feature 가 쓴다 (component-guide.md §9,
+ * architecture-guide.md §3 "feature 간 직접 임포트를 피한다"). #1079 에서는 쓰는 곳이 인증
+ * 하나라 `features/auth/` 에 있었다. 도메인 용어가 prop 에 없어 이름은 그대로다.
  */
-export function FormFailure({ message, errorStatus, submitting, onRetry }: FormFailureProps) {
+export function FormFailure({
+  message,
+  errorStatus,
+  submitting,
+  onRetry,
+  headingLevel = 2,
+}: FormFailureProps) {
   if (submitting) return null
 
   const display = formFailureDisplay(message, errorStatus)
@@ -66,6 +82,7 @@ export function FormFailure({ message, errorStatus, submitting, onRetry }: FormF
           title={messages.common.temporaryErrorTitle}
           description={messages.common.temporaryErrorDescription}
           onRetry={onRetry}
+          headingLevel={headingLevel}
           flush
         />
       </div>
