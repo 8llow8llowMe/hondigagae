@@ -64,8 +64,12 @@ import { EmptyState } from '@/components/empty-state'
 import { ErrorState } from '@/components/error-state'
 import { openingTags, readSourceWithoutComments as code } from '@/test/source'
 
+/**
+ * `FormFailure` 도 상태다 — 일시 장애 갈래에서 `ErrorState` 를 그리고 `headingLevel` 을 그대로
+ * 넘긴다 (#1101). 반려견 폼이 `ErrorState` 대신 이것을 쓰므로 함께 집는다.
+ */
 function stateTags(source: string): string[] {
-  return openingTags(source, /<(?:Empty|Error)State\b/g)
+  return openingTags(source, /<(?:(?:Empty|Error)State|FormFailure)\b/g)
 }
 
 /**

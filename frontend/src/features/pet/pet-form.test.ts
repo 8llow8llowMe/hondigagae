@@ -240,6 +240,76 @@ describe('PetFormFields — 제출 실패 요약 (#538)', () => {
   })
 })
 
+/*
+  **#1101.** 5xx 에서 일시 장애 `ErrorState` 아래에 서버 문구 `FormAlert` 가 또 섰다 —
+  `apiErrorToFormErrors` 가 5xx 에도 `form` 을 채우기 때문이다. 같은 실패를 두 번 말하고 폼이
+  아래로 밀렸다. 인증 폼(#1079)과 같은 `FormFailure` 한 자리로 줄인다.
+*/
+describe('PetFormFields — 폼 전체 실패는 한 자리에 하나만 (#1101)', () => {
+  const SERVER_MESSAGE = '서비스를 일시적으로 사용할 수 없습니다.'
+
+  it('5xx 면 일시 장애 하나만 선다 — 서버 문구 알림이 함께 서지 않는다', () => {
+    const markup = render({ errorStatus: 503, errors: { fields: {}, form: SERVER_MESSAGE } })
+
+    expect(markup).toContain(messages.common.temporaryErrorTitle)
+    expect(markup).not.toContain(SERVER_MESSAGE)
+    expect(markup).not.toContain('data-form-alert')
+    // 재시도 수단도 하나다 — 설명 문구("잠시 후 다시 시도해 주세요")와 갈라 버튼 글자로 센다
+    expect(markup.split(`>${messages.common.retry}</button>`)).toHaveLength(2)
+  })
+
+  it('무응답도 일시 장애다 — 문구가 없어도 상태 코드가 판정한다', () => {
+    const markup = render({ errorStatus: 0 })
+
+    expect(markup).toContain(messages.common.temporaryErrorTitle)
+    expect(markup).not.toContain('data-form-alert')
+  })
+
+  it('일시 장애 상자가 제출 실패 뒤 포커스 대상이고 role=alert 로 알린다', () => {
+    const markup = render({ errorStatus: 503, errors: { fields: {}, form: SERVER_MESSAGE } })
+
+    expect(markup).toContain('data-form-temporary-error=""')
+    expect(markup.match(/role="alert"/g)).toHaveLength(1)
+  })
+
+  /* 카드 제목(`h2`) 안이다 — 폼 섹션 제목과 같은 `h3` 로 내린다 (#456①) */
+  it('일시 장애 제목은 h3 다', () => {
+    const markup = render({ errorStatus: 503 })
+
+    expect(markup).toContain(`>${messages.common.temporaryErrorTitle}</h3>`)
+  })
+
+  /* 폼이 이미 카드 인셋(16/20) 안이다 — 세로 48 · 좌우 인셋을 또 먹으면 폼이 밀린다 */
+  it('일시 장애는 폼 안에서 자기 여백을 갖지 않는다', () => {
+    const markup = render({ errorStatus: 503 })
+
+    expect(markup).not.toContain('py-12')
+  })
+
+  it('400 폼 전체 오류는 알림 하나다 — 일시 장애가 서지 않는다', () => {
+    const markup = render({
+      errorStatus: 400,
+      errors: { fields: {}, form: messages.pet.limitReached },
+    })
+
+    expect(markup).toContain('data-form-alert')
+    expect(markup).toContain(messages.pet.limitReached)
+    expect(markup).not.toContain('data-form-temporary-error')
+  })
+
+  /* #1084 L2 와 같다 — 다시 낸 요청이 도는 동안 직전 실패는 낡은 정보다 */
+  it.each([
+    { name: '5xx 일시 장애', status: 503, form: SERVER_MESSAGE },
+    { name: '400 알림', status: 400, form: messages.pet.limitReached },
+  ])('제출 중에는 직전 실패($name)를 걷는다', ({ status, form }) => {
+    const markup = render({ errorStatus: status, errors: { fields: {}, form }, submitting: true })
+
+    expect(markup).not.toContain('data-form-temporary-error')
+    expect(markup).not.toContain('data-form-alert')
+    expect(markup).not.toContain('role="alert"')
+  })
+})
+
 describe('PetFormFields — 3칸 선택 카드와 하단 바 (#538)', () => {
   /* 셋 다 3지선다다. 한 줄에 서야 필수 넷이 한 화면 안으로 들어온다 */
   it('크기 · 활동량 · 사회성이 3칸 그리드다', () => {

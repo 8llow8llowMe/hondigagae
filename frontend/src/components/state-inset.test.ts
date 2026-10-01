@@ -96,8 +96,6 @@ const INSET_REQUIRED = [
     `plan-list-section` 이 값을 직접 적는다 (`headingLevel` 과 같은 판단).
   */
   { path: 'src/features/plan/plan-list-section.tsx', states: 4 },
-  /* 등록·수정 두 화면 모두 제목 있는 카드 안이다 */
-  { path: 'src/features/pet/pet-form.tsx', states: 1 },
   /*
     `plan-detail-section.tsx` 의 `aria-label` 카드 안. 제목이 없어 레벨은 2 로 남는다.
 
@@ -121,6 +119,20 @@ describe('카드 안 상태 컴포넌트는 인셋을 명시한다 (#485)', () =
       // 기본값 `main`(md 40) 으로 흘러가면 카드 글줄과 20px 갈린다
       expect(tag).toMatch(/\binset="/)
     }
+  })
+
+  /*
+    **반려견 폼은 목록에서 빠졌다** (#1101). 등록 · 수정 두 화면 모두 제목 있는 카드 안이고
+    폼을 감싼 `div` 가 이미 카드 인셋(`INSET_CLASS.card`)을 두른다 — 그 안의 일시 장애가
+    `inset="card"` 를 또 주면 인셋과 세로 48 을 한 번 더 먹는다. 이제 상태를 직접 그리지 않고
+    `FormFailure`(`flush`) 가 그린다. 여기서는 **상태 태그가 다시 생기지 않는다**를 잠근다 —
+    생기면 이중 표시(#1101)와 이중 인셋이 함께 돌아온다.
+  */
+  it('반려견 폼은 상태를 직접 그리지 않는다 — FormFailure 가 flush 로 그린다 (#1101)', () => {
+    const source = code('src/features/pet/pet-form.tsx')
+
+    expect(stateTags(source)).toHaveLength(0)
+    expect(source).toContain('<FormFailure')
   })
 })
 
