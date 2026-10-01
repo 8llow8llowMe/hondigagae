@@ -43,9 +43,16 @@ export default function EmergencyLoading() {
         <div aria-hidden className="rail-column hidden lg:block" />
 
         <SurfaceStack className="list-column">
+          {/*
+            **제목 id 는 실화면(`emergency-list-heading`)과 갈라 둔다** (#1103). 첫 문서 진입에서는
+            이 폴백과 `div[hidden]` 에 도착한 실화면이 한 문서에 함께 있다 — React 가 공개를
+            `requestAnimationFrame` · `setTimeout` 으로 미루므로(`$RC` → `$RV`) 그 겹침이 `load`
+            뒤까지 이어질 수 있다. id 가 같으면 그동안 `#emergency-list-heading` 이 둘을 가리킨다.
+            섹션 이름표(`aria-labelledby`)는 이 id 를 따라가므로 이름은 실화면과 같다.
+          */}
           <Surface
             fill
-            titleId="emergency-list-heading"
+            titleId="emergency-list-heading-loading"
             title={messages.emergency.pageTitle}
             /* 개수 부제 — 응답이 오면 선다 (잘린 목록일 때만 빠진다) */
             description={<Skeleton className="h-4.5 w-40" />}

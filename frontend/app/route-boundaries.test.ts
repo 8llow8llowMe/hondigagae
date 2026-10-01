@@ -166,7 +166,27 @@ describe('로딩 골격 넷 — 폴백 중에도 랜드마크와 이름이 선�
 
     expect(markup).not.toMatch(/<main[^>]*class="[^"]*rail-layout/)
     expect(markup).toContain('<div class="rail-layout rail-layout-filter">')
-    expect(markup).toContain('id="emergency-list-heading"')
+  })
+
+  /*
+    **폴백은 실화면의 제목 id 를 쓰지 않는다** (#1103). 스트리밍 중에는 폴백과 `div[hidden]` 에
+    도착한 실화면이 **한 문서에 함께 있다** — React 가 공개를 `requestAnimationFrame` ·
+    `setTimeout` 으로 미뤄서(`$RC` → `$RB` → `$RV`) `load` 뒤까지 이어질 수 있다. id 가 같으면
+    그동안 `getElementById` · `#id` 선택자가 둘을 가리키고 e2e 가 strict mode 위반으로 깨졌다.
+    이름표(제목 글자 · `aria-labelledby`)는 그대로 두고 id 만 가른다.
+  */
+  it('병원·약국 — 폴백 제목 id 가 실화면과 다르고 섹션 이름표는 그 id 를 가리킨다', () => {
+    const markup = render(EmergencyLoading)
+
+    expect(markup).not.toContain('id="emergency-list-heading"')
+    expect(markup).toContain('aria-labelledby="emergency-list-heading-loading"')
+    expect(markup).toContain(
+      `id="emergency-list-heading-loading" class="text-title-2 text-fg font-semibold break-keep md:text-title-1 md:font-bold scroll-mt-20">${messages.emergency.pageTitle}</h2>`,
+    )
+    // 실화면은 그대로 — e2e 와 `aria-labelledby` 가 이 id 를 본다
+    expect(code('src/features/emergency/emergency-list-view.tsx')).toContain(
+      'titleId="emergency-list-heading"',
+    )
   })
 
   it('홈 — 좌측 레일의 sticky 클래스가 실화면과 같은 자리에 있다', () => {
