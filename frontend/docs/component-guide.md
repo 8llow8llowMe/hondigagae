@@ -247,6 +247,20 @@ type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
 | `EmptyState` / `ErrorState` | 제목이 heading 요소여야 한다. **레벨은 담는 곳이 정한다** — `headingLevel` (`styling-guide.md` §3-1)                                        |
 | `InfoTip`                   | hover · focus · click **셋 다** 열고 `Esc`·바깥 클릭이 닫는다. `title` 속성을 쓰지 않는다. `md` 미만은 `BottomSheet` 로 떨어뜨린다          |
 
+### 폼 실패 표시는 한 길로만 읽힌다 — `announce` ([#1102](https://github.com/8llow8llowMe/hondigagae/issues/1102))
+
+`FormAlert` · `FormFailure` 는 `role="alert"`(`announce="live"`)이거나 포커스 대상(`announce="focus"`,
+역할 없음)이거나 **둘 중 하나**다. 둘 다면 알림이 나타나며 한 번, 포커스가 옮겨 오며 한 번 같은
+문구를 읽는다. 판정과 예외는 `form-guide.md` §8 이 정본이다.
+
+- `FormAlert.announce` 는 **선택, 기본값 `live`** — 지금까지의 동작이다. 쓰는 30개 파일(39곳) 중
+  `FormFailure` 만 `announce` 를 넘긴다. 포커스를 옮기지 않는 자리에 `focus` 를 주면 아무것도 읽히지 않는다.
+- `FormFailure.announce` 는 **필수** — 호출부 일곱 자리(로그인 · 가입 세 단계 · 재설정 두 단계 ·
+  반려견 폼)가 포커스 effect 와 같은 판정(`submitFailureAnnounce`)으로 넘긴다. `submitting` 을
+  필수로 둔 것과 같은 이유다.
+- `tabIndex={-1}` · `data-form-alert` · `data-form-temporary-error` 는 두 값 모두 그대로다 — 포커스를
+  찾는 쪽은 역할이 아니라 이 속성을 본다.
+
 ### `role="radiogroup"` 은 키보드 규약까지 함께 온다 ([#825](https://github.com/8llow8llowMe/hondigagae/issues/825))
 
 `role="radiogroup"` + `role="radio"` 를 쓰는 순간 WAI-ARIA 가 요구하는 것이 둘 더 있다. 문법만 맞추고
