@@ -86,6 +86,21 @@ describe('LoginFormFields', () => {
     expect(markup).toContain(messages.common.retry)
   })
 
+  it('5xx 면 서버 문구 알림을 함께 세우지 않는다 — 같은 실패를 두 번 말하지 않는다 (#1079)', () => {
+    // `apiErrorToFormErrors` 는 5xx 에도 `form` 을 채운다. 예전에는 그것이 FormAlert 로 또 섰다
+    const markup = render({
+      errorStatus: 503,
+      errors: { fields: {}, form: '서비스를 일시적으로 사용할 수 없습니다.' },
+    })
+
+    expect(markup).toContain(messages.common.temporaryErrorTitle)
+    expect(markup).not.toContain('서비스를 일시적으로 사용할 수 없습니다.')
+    expect(markup).not.toContain('data-form-alert')
+    expect(markup).toContain('data-form-temporary-error')
+    // 폼 안이라 ErrorState 가 자기 여백(세로 48)을 갖지 않는다 — 375 에서 폼을 밀던 몫
+    expect(markup).not.toContain('py-12')
+  })
+
   it('무응답이면 ErrorState 와 재시도 버튼을 렌더한다', () => {
     // NO_RESPONSE_STATUS(0) — classify(0) 은 'temporary' 다
     const markup = render({ errorStatus: 0 })

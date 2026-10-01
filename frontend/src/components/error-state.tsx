@@ -5,23 +5,23 @@ import type { ReactNode } from 'react'
 import { Button } from '@/components/button'
 import { useOnline } from '@/lib/hooks/use-online'
 import { messages } from '@/lib/messages'
-import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
+import { type StatePlacement, statePlacementClass } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
-export type ErrorStateProps = {
+export type ErrorStateProps = StatePlacement & {
   title: string
   description?: string | undefined
   /** 필수 prop 이다. optional 로 두면 빠진다 (component-guide.md §10) */
   onRetry: () => void
   retryLabel?: string
-  /**
-   * 좌우 여백 축 (DESIGN.md §7). **좌측 레일 안에 놓을 때는 `rail` 을 준다.**
-   *
-   * 예전에는 `md:px-10` 이 하드코딩돼 있어, 홈 판정 자리에서 로딩(24) → 오류(40) →
-   * 성공(24) 이 서로 다른 인셋을 썼다 — 재시도를 누르는 동안 글자가 좌우로 움직였다.
-   * 오류 화면에서 유일하게 만지는 것이 그 버튼이라 가장 눈에 띄는 자리였다.
-   */
-  inset?: Inset
+  /*
+    `inset` — 좌우 여백 축 (DESIGN.md §7). **좌측 레일 안에 놓을 때는 `rail` 을 준다.**
+    예전에는 `md:px-10` 이 하드코딩돼 있어, 홈 판정 자리에서 로딩(24) → 오류(40) →
+    성공(24) 이 서로 다른 인셋을 썼다 — 재시도를 누르는 동안 글자가 좌우로 움직였다.
+
+    `flush` — **폼 안처럼 담는 쪽이 이미 여백을 가진 자리**에서 자기 여백을 걷는다 (#1079).
+    둘은 `StatePlacement` 로 함께 주지 못한다 (`lib/ui/inset.ts`).
+  */
   /**
    * 제목의 heading 레벨 — **제목을 가진 `Surface` 안이면 `3`** 이다 (#456① · #469).
    *
@@ -72,7 +72,8 @@ export function ErrorStateView({
   description,
   onRetry,
   retryLabel = messages.common.retry,
-  inset = 'main',
+  inset,
+  flush,
   headingLevel = 2,
   action,
   className,
@@ -81,7 +82,13 @@ export function ErrorStateView({
   const Heading = `h${headingLevel}` as const
 
   return (
-    <div className={cn('flex flex-col items-start gap-2 py-12', INSET_CLASS[inset], className)}>
+    <div
+      className={cn(
+        'flex flex-col items-start gap-2',
+        statePlacementClass({ inset, flush }),
+        className,
+      )}
+    >
       <Heading className="text-body-1 text-fg font-semibold">
         {offline ? messages.common.offlineTitle : title}
       </Heading>

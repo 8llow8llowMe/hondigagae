@@ -3,16 +3,14 @@
 import Link from 'next/link'
 
 import { Button } from '@/components/button'
-import { ErrorState } from '@/components/error-state'
 import { Field } from '@/components/field'
-import { FormAlert } from '@/components/form-alert'
 import { FormNotice } from '@/components/form-notice'
 import { Input } from '@/components/input'
 import { PasswordInput } from '@/components/password-input'
+import { FormFailure } from '@/features/auth/form-failure'
 import type { CodeValues, EmailValues, SignupProfileValues } from '@/features/auth/schemas'
 import { SignupEmailSummary } from '@/features/auth/signup-parts'
 import { VerificationCodeInput } from '@/features/auth/verification-code-input'
-import { classify } from '@/lib/api/error'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
 
@@ -21,9 +19,10 @@ import { messages } from '@/lib/messages'
  * 상태를 가진 컴포넌트는 node 테스트 환경에서 렌더되지 않는다
  * — docs/testing-guide.md §1, 로그인 화면의 `LoginFormFields` 와 같은 구조.
  *
- * 5xx·무응답은 `errorStatus` 로 구분해 `ErrorState` 로 대체 렌더한다. 429(쿨다운·잠금)는
- * `classify` 가 `'rate-limited'` 로 분류해 여기 걸리지 않는다 — `FormAlert` 로만 보여준다.
- * `LoginFormFields` 가 이미 세운 패턴이다.
+ * 폼 전체 실패는 `FormFailure` 한 자리다 (#1079). 5xx·무응답은 `errorStatus` 로 구분해 폼 안
+ * 일시 장애(재시도 있음)를, 그 밖은 `FormAlert` 를 — **둘 중 하나만** 그린다. 429(쿨다운·잠금)는
+ * `classify` 가 `'rate-limited'` 로 분류해 일시 장애가 아니다 — `FormAlert` 로만 보여준다.
+ * `LoginFormFields` 와 같은 자리다.
  *
  * **단계 표시는 여기 없다** (#1083). 제목 바로 아래 — 화면 단위 동의 블록보다 위 — 에
  * 서야 해서 `SignupHeading`(`signup-parts.tsx`)이 그린다.
@@ -51,8 +50,6 @@ export function EmailStep({
   // **폼을 대체하지 않고 위에 얹는다.** early return 으로 폼을 통째로 갈아치우면
   // 명세의 "단계·입력값 유지"(회원가입-세부명세.md D4)를 어긴다 — 이슈 #24 최종
   // 리뷰 I1 재수정. login-form.tsx 의 LoginFormFields 와 같은 패턴.
-  const isTemporaryError = errorStatus !== null && classify(errorStatus) === 'temporary'
-
   return (
     <form
       noValidate
@@ -62,14 +59,7 @@ export function EmailStep({
         onSubmit()
       }}
     >
-      {isTemporaryError && (
-        <ErrorState
-          title={messages.common.temporaryErrorTitle}
-          description={messages.common.temporaryErrorDescription}
-          onRetry={onRetry}
-        />
-      )}
-      <FormAlert message={errors.form} />
+      <FormFailure message={errors.form} errorStatus={errorStatus} onRetry={onRetry} />
 
       <Field id="email" label={messages.auth.emailLabel} error={errors.fields.email} required>
         <Input
@@ -126,8 +116,6 @@ export function CodeStep({
   // **폼을 대체하지 않고 위에 얹는다.** early return 으로 폼을 통째로 갈아치우면
   // 명세의 "단계·입력값 유지"(회원가입-세부명세.md D4)를 어긴다 — 이슈 #24 최종
   // 리뷰 I1 재수정. login-form.tsx 의 LoginFormFields 와 같은 패턴.
-  const isTemporaryError = errorStatus !== null && classify(errorStatus) === 'temporary'
-
   const isCoolingDown = cooldownSeconds > 0
   // 매 초 갱신되는 카운트다운을 그대로 aria-live 에 실으면 초마다 읽힌다.
   // 화면에 보이는 초는 버튼 라벨(비-live)에 두고, 스크린리더 알림은 10초 단위로만 낸다 (D6)
@@ -142,16 +130,9 @@ export function CodeStep({
         onSubmit()
       }}
     >
-      {isTemporaryError && (
-        <ErrorState
-          title={messages.common.temporaryErrorTitle}
-          description={messages.common.temporaryErrorDescription}
-          onRetry={onRetry}
-        />
-      )}
       <SignupEmailSummary label={messages.auth.codeRecipientLabel} email={email} />
       <FormNotice message={notice ?? null} />
-      <FormAlert message={errors.form} />
+      <FormFailure message={errors.form} errorStatus={errorStatus} onRetry={onRetry} />
 
       <Field id="code" label={messages.auth.codeLabel} error={errors.fields.code} required>
         {/* 입력 중에 대문자화 · 공백 제거 — 재설정 2단계와 같은 칸이다 (#1078) */}
@@ -223,8 +204,6 @@ export function ProfileStep({
   // **폼을 대체하지 않고 위에 얹는다.** early return 으로 폼을 통째로 갈아치우면
   // 명세의 "단계·입력값 유지"(회원가입-세부명세.md D4)를 어긴다 — 이슈 #24 최종
   // 리뷰 I1 재수정. login-form.tsx 의 LoginFormFields 와 같은 패턴.
-  const isTemporaryError = errorStatus !== null && classify(errorStatus) === 'temporary'
-
   return (
     <form
       noValidate
@@ -234,16 +213,9 @@ export function ProfileStep({
         onSubmit()
       }}
     >
-      {isTemporaryError && (
-        <ErrorState
-          title={messages.common.temporaryErrorTitle}
-          description={messages.common.temporaryErrorDescription}
-          onRetry={onRetry}
-        />
-      )}
       <SignupEmailSummary label={messages.auth.signupEmailLabel} email={email} />
       <FormNotice message={notice ?? null} />
-      <FormAlert message={errors.form} />
+      <FormFailure message={errors.form} errorStatus={errorStatus} onRetry={onRetry} />
 
       {duplicateEmail !== null && (
         <Link

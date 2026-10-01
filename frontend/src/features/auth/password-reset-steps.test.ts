@@ -210,3 +210,25 @@ describe('PasswordResetDone', () => {
     expect(markup).not.toContain(messages.auth.resetDoneTitle)
   })
 })
+
+/*
+  #1079 — 5xx 에서 일시 장애와 서버 문구 알림이 함께 섰다. `apiErrorToFormErrors` 가 5xx 에도
+  `form` 을 채우기 때문이다. 두 단계 모두 같은 자리(`FormFailure`)를 쓰는지 잠근다.
+*/
+describe('두 단계 — 5xx 에는 일시 장애 하나만 선다 (#1079)', () => {
+  const SERVER_MESSAGE = '서비스를 일시적으로 사용할 수 없습니다.'
+  const failed = { errors: { fields: {}, form: SERVER_MESSAGE }, errorStatus: 503 }
+
+  it.each([
+    { name: '1단계', markup: () => emailStep(failed) },
+    { name: '2단계', markup: () => codeStep(failed) },
+  ])('$name', ({ markup }) => {
+    const html = markup()
+
+    expect(html).toContain(messages.common.temporaryErrorTitle)
+    expect(html).toContain('data-form-temporary-error')
+    expect(html).not.toContain(SERVER_MESSAGE)
+    expect(html).not.toContain('data-form-alert')
+    expect(html).not.toContain('py-12')
+  })
+})

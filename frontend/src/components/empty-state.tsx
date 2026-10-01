@@ -1,16 +1,18 @@
 import type { ReactNode } from 'react'
 
 import { StateCharacter, type StateCharacterPose } from '@/components/character'
-import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
+import { type StatePlacement, statePlacementClass } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 
-export type EmptyStateProps = {
+export type EmptyStateProps = StatePlacement & {
   title: string
   description?: string | undefined
   /** 재시도가 아니라 **다음 행동** 이다 (예: "필터 초기화") */
   action?: ReactNode
-  /** 좌우 여백 축 (DESIGN.md §7). 좌측 레일 안에 놓을 때는 `rail` — `ErrorState` 와 같다 */
-  inset?: Inset
+  /*
+    `inset` — 좌우 여백 축 (DESIGN.md §7). 좌측 레일 안에 놓을 때는 `rail` — `ErrorState` 와 같다.
+    `flush` — 담는 쪽이 이미 여백을 가진 자리(인증 셸 카드)에서 자기 여백을 걷는다 (#1079).
+  */
   /**
    * 제목의 heading 레벨 — **담는 면이 `h2` 를 그리면 `3`** 이다 (#456① · #469).
    *
@@ -30,8 +32,12 @@ export type EmptyStateProps = {
    *
    * **레벨만 바꾸고 크기는 그대로다.** 카드 제목(`text-title-2`)보다 이미 작은
    * `text-body-1` 이라 더 줄일 것이 없다 — 바뀌는 것은 문서 개요뿐이다.
+   *
+   * **`1` 은 화면 전체가 이 상태인 자리 — 위에 `h1` 이 없을 때만이다** (#1079, 인증 셸의 소셜
+   * 콜백). `not-found.tsx` 처럼 `sr-only` `h1` 을 따로 두면 같은 제목을 두 번 읽는다. 크기는
+   * 여기서도 그대로다 — 큰 제목은 실패를 사건처럼 보이게 한다(아래 컴포넌트 JSDoc).
    */
-  headingLevel?: 2 | 3
+  headingLevel?: 1 | 2 | 3
   /**
    * 글 묶음 옆에 앉는 캐릭터 (#939, DESIGN.md §0-5). **허용 자리 목록에 있는 호출부만 넘긴다**
    * — `character.test.ts` 가 목록 밖의 사용을 잡는다.
@@ -59,11 +65,13 @@ export function EmptyState({
   title,
   description,
   action,
-  inset = 'main',
+  inset,
+  flush,
   headingLevel = 2,
   character,
   className,
 }: EmptyStateProps) {
+  const placement = statePlacementClass({ inset, flush })
   const Heading = `h${headingLevel}` as const
 
   const body = (
@@ -76,11 +84,7 @@ export function EmptyState({
   )
 
   if (character === undefined) {
-    return (
-      <div className={cn('flex flex-col items-start gap-2 py-12', INSET_CLASS[inset], className)}>
-        {body}
-      </div>
-    )
+    return <div className={cn('flex flex-col items-start gap-2', placement, className)}>{body}</div>
   }
 
   /*
@@ -91,7 +95,7 @@ export function EmptyState({
     수백 px 떨어져 무엇을 연기하는지 끊긴다. 글 바로 옆(`gap-6`)이다.
   */
   return (
-    <div className={cn('flex items-end gap-6 py-12', INSET_CLASS[inset], className)}>
+    <div className={cn('flex items-end gap-6', placement, className)}>
       <div className="flex min-w-0 flex-col items-start gap-2">{body}</div>
       <StateCharacter pose={character} />
     </div>

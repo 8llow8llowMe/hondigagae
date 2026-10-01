@@ -512,3 +512,75 @@ describe('ProfileStep', () => {
     expect(markup).not.toContain('role="status"')
   })
 })
+
+/*
+  #1079 — 5xx 에서 일시 장애와 서버 문구 알림이 함께 섰다. `apiErrorToFormErrors` 가 5xx 에도
+  `form` 을 채우기 때문이다. 세 단계 모두 같은 자리(`FormFailure`)를 쓰는지 잠근다.
+*/
+describe('세 단계 — 5xx 에는 일시 장애 하나만 선다 (#1079)', () => {
+  const SERVER_MESSAGE = '서비스를 일시적으로 사용할 수 없습니다.'
+  const failed = { errors: { fields: {}, form: SERVER_MESSAGE }, errorStatus: 503 }
+
+  const steps = [
+    {
+      name: 'EmailStep',
+      markup: () =>
+        renderToStaticMarkup(
+          createElement(EmailStep, {
+            values: { email: '' },
+            submitting: false,
+            onValueChange: noop,
+            onSubmit: noop,
+            onRetry: noop,
+            ...failed,
+          }),
+        ),
+    },
+    {
+      name: 'CodeStep',
+      markup: () =>
+        renderToStaticMarkup(
+          createElement(CodeStep, {
+            email: 'a@b.c',
+            values: { code: '' },
+            submitting: false,
+            cooldownSeconds: 0,
+            resending: false,
+            onValueChange: noop,
+            onSubmit: noop,
+            onResend: noop,
+            onChangeEmail: noop,
+            onRetry: noop,
+            ...failed,
+          }),
+        ),
+    },
+    {
+      name: 'ProfileStep',
+      markup: () =>
+        renderToStaticMarkup(
+          createElement(ProfileStep, {
+            email: 'a@b.c',
+            values: { password: '', name: '', nickname: '' },
+            submitting: false,
+            duplicateEmail: null,
+            returnTo: '/',
+            onValueChange: noop,
+            onSubmit: noop,
+            onRetry: noop,
+            ...failed,
+          }),
+        ),
+    },
+  ]
+
+  it.each(steps)('$name', ({ markup }) => {
+    const html = markup()
+
+    expect(html).toContain(messages.common.temporaryErrorTitle)
+    expect(html).toContain('data-form-temporary-error')
+    expect(html).not.toContain(SERVER_MESSAGE)
+    expect(html).not.toContain('data-form-alert')
+    expect(html).not.toContain('py-12')
+  })
+})

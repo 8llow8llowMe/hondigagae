@@ -218,7 +218,7 @@ export function SignupForm({
       return
     }
     // 코드 오류가 아닌 실패(429 · 5xx · 무응답)는 알림으로 — `BODY` 에 남기지 않는다 (#1078)
-    focusSubmitFailure(containerRef.current, codeForm.errors)
+    focusSubmitFailure(containerRef.current, codeForm.errors, codeErrorStatus)
   }, [codeForm.submitCount])
 
   const profileForm = useForm<SignupProfileValues, void>({
@@ -393,17 +393,19 @@ export function SignupForm({
 
     예전에는 둘 다 effect 가 없었다 — 1단계를 빈 채로 내면 포커스가 버튼에 남았고, 3단계 409
     (`MEMBER_001`)는 제출 중 `disabled` 가 된 버튼에서 포커스가 `BODY` 로 떨어졌다. 대상 순서는
-    `focusSubmitFailure` 하나가 정한다: 첫 오류 필드 → 폼 전체 알림 → 폼의 첫 입력.
+    `focusSubmitFailure` 하나가 정한다: 첫 오류 필드 → 폼 전체 알림(5xx 면 폼 안 일시 장애,
+    #1079) → 폼의 첫 입력.
 
     트리거는 `submitCount` 하나다 (`use-form.ts` JSDoc). **화면에 보이는 오류**를 넘긴다 —
-    1단계는 되돌림 안내가 섞인 값, 3단계는 동의 오류가 붙은 값이다.
+    1단계는 되돌림 안내가 섞인 값, 3단계는 동의 오류가 붙은 값이다. 상태 코드도 화면
+    (`FormFailure`)에 넘기는 것과 같은 값이다.
 
     단계 가드: 3단계의 `MEMBER_006` 은 1단계로 되돌리고, 그 이동은 단계 전환 effect 가
     이메일 칸으로 옮긴다(D6). 여기서 또 옮기면 되돌림 알림과 이메일 칸이 포커스를 다툰다.
   */
   useEffect(() => {
     if (emailForm.submitCount === 0 || step !== 'email') return
-    focusSubmitFailure(containerRef.current, emailStepErrors)
+    focusSubmitFailure(containerRef.current, emailStepErrors, emailErrorStatus)
   }, [emailForm.submitCount])
 
   useEffect(() => {
@@ -412,10 +414,14 @@ export function SignupForm({
       서버가 돌려준 동의 오류(`MEMBER_115/116/117` · `MEMBER_010/011`)도 같은 제출의 결과다.
       프로필 오류와 합쳐 넘기면 `focusFirstError` 가 문서 순서로 고른다 — 동의 블록이 위다.
     */
-    focusSubmitFailure(containerRef.current, {
-      fields: { ...profileStepErrors.fields, ...consentErrors.fields },
-      form: profileStepErrors.form,
-    })
+    focusSubmitFailure(
+      containerRef.current,
+      {
+        fields: { ...profileStepErrors.fields, ...consentErrors.fields },
+        form: profileStepErrors.form,
+      },
+      profileErrorStatus,
+    )
   }, [profileForm.submitCount])
 
   /*
@@ -447,7 +453,7 @@ export function SignupForm({
           submitting={emailForm.isSubmitting}
           onValueChange={(key, value) => {
             setStepBackMessage(null)
-            // 5xx/무응답 ErrorState 에서 입력을 고치면 폼으로 복귀한다 — I1 과 동일한 패턴
+            // 입력을 고치면 5xx/무응답의 일시 장애 표시를 걷는다 — I1 과 동일한 패턴
             setEmailErrorStatus(null)
             emailForm.setValue(key, value)
           }}
@@ -473,7 +479,7 @@ export function SignupForm({
           resending={isResending}
           notice={messages.auth.codeSent}
           onValueChange={(key, value) => {
-            // 5xx/무응답 ErrorState 에서 입력을 고치면 폼으로 복귀한다 — I1 과 동일한 패턴
+            // 입력을 고치면 5xx/무응답의 일시 장애 표시를 걷는다 — I1 과 동일한 패턴
             setCodeErrorStatus(null)
             codeForm.setValue(key, value)
           }}
@@ -517,7 +523,7 @@ export function SignupForm({
           // 계속 보여야 한다(정본 D4). 지우는 지점은 profileForm 의 다음 제출 결과
           // (성공 / 409 아닌 다른 오류)뿐이다 — 그 외에는 값을 고쳐도 이 화면에서
           // 할 수 있는 일이 없다(이메일은 1단계 값이라 여기서 못 바꾼다).
-          // 5xx/무응답 ErrorState 에서 입력을 고치면 폼으로 복귀한다 — I1 과 동일한 패턴
+          // 입력을 고치면 5xx/무응답의 일시 장애 표시를 걷는다 — I1 과 동일한 패턴
           setProfileErrorStatus(null)
           profileForm.setValue(key, value)
         }}

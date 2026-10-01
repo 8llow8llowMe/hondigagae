@@ -7,15 +7,14 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/button'
 import { Checkbox } from '@/components/checkbox'
-import { ErrorState } from '@/components/error-state'
 import { Field } from '@/components/field'
-import { FormAlert } from '@/components/form-alert'
 import { Input } from '@/components/input'
 import { PasswordInput } from '@/components/password-input'
 import { enterSession } from '@/features/auth/enter-session'
+import { FormFailure } from '@/features/auth/form-failure'
 import { loginSchema, type LoginValues } from '@/features/auth/schemas'
 import { login, type LoginResult } from '@/lib/api/auth'
-import { ApiError, classify, NO_RESPONSE_STATUS } from '@/lib/api/error'
+import { ApiError, NO_RESPONSE_STATUS } from '@/lib/api/error'
 import {
   clearSavedLoginEmail,
   readSavedLoginEmail,
@@ -68,17 +67,6 @@ export function LoginFormFields({
   onSubmit,
   onRetry,
 }: LoginFormFieldsProps) {
-  // 5xx·무응답만 ErrorState 다. 게이트웨이가 죽었을 때 입력 오류로 오해하지 않게
-  // 재시도 수단을 준다 — 로그인-세부명세.md D4/D5. 429(잠금)는 여기 포함하지 않는다:
-  // classify(429) 는 'rate-limited' 라 시간이 지나야 풀리는데 재시도 버튼을 주면
-  // 오히려 잠금을 연장한다 — 아래 FormAlert 경로로 그대로 둔다.
-  //
-  // **폼을 대체하지 않고 위에 얹는다.** early return 으로 폼을 통째로 갈아치우면
-  // 명세의 "폼은 그대로 유지"(D4)를 어긴다 — 입력 필드가 사라져 이메일 오타를
-  // 고칠 수단이 없어진다. `onValueChange` 의 `setErrorStatus(null)` 도 입력
-  // 요소가 살아있어야 발동할 수 있다 — 이슈 #24 최종 리뷰 I1 재수정.
-  const isTemporaryError = errorStatus !== null && classify(errorStatus) === 'temporary'
-
   return (
     <form
       noValidate
@@ -88,14 +76,16 @@ export function LoginFormFields({
         onSubmit()
       }}
     >
-      {isTemporaryError && (
-        <ErrorState
-          title={messages.common.temporaryErrorTitle}
-          description={messages.common.temporaryErrorDescription}
-          onRetry={onRetry}
-        />
-      )}
-      <FormAlert message={errors.form} />
+      {/*
+        5xx·무응답은 일시 장애(재시도 있음), 그 밖의 폼 전체 오류는 서버 문구 알림 — **둘 중
+        하나만** 선다 (#1079, 로그인-세부명세 D4/D5). 429(잠금)는 알림이다: 재시도 버튼을 주면
+        잠금을 연장한다.
+
+        **폼을 대체하지 않고 위에 얹는다.** early return 으로 폼을 통째로 갈아치우면 명세의
+        "폼은 그대로 유지"(D4)를 어긴다 — 이메일 오타를 고칠 수단이 없어진다. `onValueChange`
+        의 `setErrorStatus(null)` 도 입력 요소가 살아있어야 발동한다 — 이슈 #24 최종 리뷰 I1.
+      */}
+      <FormFailure message={errors.form} errorStatus={errorStatus} onRetry={onRetry} />
 
       <Field id="email" label={messages.auth.emailLabel} error={errors.fields.email} required>
         <Input
@@ -271,10 +261,11 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
 
     /*
       그 밖의 폼 전체 오류(5xx · 무응답 · 429 `AUTH_015` · 400 `MEMBER_007`)는 알림으로 보낸다
-      (#1078). 제출 중 버튼이 `disabled` 가 되며 포커스가 `BODY` 로 떨어지고, 돌려 보낼
+      (#1078). 5xx · 무응답이면 알림이 아니라 폼 안 일시 장애 표시다 (#1079) — 화면에 무엇이
+      서는지를 같은 `errorStatus` 로 판정한다. 제출 중 버튼이 `disabled` 가 되며 포커스가 `BODY` 로 떨어지고, 돌려 보낼
       필드가 없어 거기 남았다 — 키보드 사용자가 문서 맨 위에서 다시 시작했다.
     */
-    focusSubmitFailure(formContainerRef.current, errors)
+    focusSubmitFailure(formContainerRef.current, errors, errorStatus)
   }, [submitCount])
 
   /*
@@ -309,8 +300,7 @@ export function LoginForm({ returnTo, initialEmail }: { returnTo: string; initia
         remember={remember}
         capsLock={capsLock}
         onValueChange={(key, value) => {
-          // 5xx/무응답을 받으면 ErrorState 가 폼을 대체해 입력을 고칠 수단이 사라진다.
-          // 값을 고치면 다시 폼으로 돌아오게 한다 — 로그인-세부명세.md D4/D5(폼은 그대로
+          // 값을 고치면 5xx/무응답의 일시 장애 표시를 걷는다 — 로그인-세부명세.md D4/D5(폼은 그대로
           // 유지), 이슈 #24 최종 리뷰 I1.
           setErrorStatus(null)
           setValue(key, value)

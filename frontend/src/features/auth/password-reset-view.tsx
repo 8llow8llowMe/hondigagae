@@ -188,7 +188,7 @@ export function PasswordResetView() {
       코드는 맞게 냈는데 막힌 경우 — 약한 새 비밀번호(클라이언트 · `AUTH_106/107/108`), 429,
       5xx (#1078). 예전에는 여기서 아무것도 하지 않아 포커스가 버튼에 남거나 `BODY` 로 떨어졌다.
     */
-    focusSubmitFailure(containerRef.current, resetForm.errors)
+    focusSubmitFailure(containerRef.current, resetForm.errors, resetErrorStatus)
   }, [resetForm.submitCount])
 
   const handleResend = useCallback(() => {
@@ -229,7 +229,7 @@ export function PasswordResetView() {
   */
   useEffect(() => {
     if (emailForm.submitCount === 0 || step !== 'email') return
-    focusSubmitFailure(containerRef.current, emailStepErrors)
+    focusSubmitFailure(containerRef.current, emailStepErrors, emailErrorStatus)
   }, [emailForm.submitCount])
 
   const heading =
@@ -258,7 +258,7 @@ export function PasswordResetView() {
           submitting={emailForm.isSubmitting}
           onValueChange={(key, value) => {
             setStepBackMessage(null)
-            // 5xx/무응답 ErrorState 에서 값을 고치면 폼으로 복귀한다 — 로그인·회원가입과 동일
+            // 값을 고치면 5xx/무응답의 일시 장애 표시를 걷는다 — 로그인·회원가입과 동일
             setEmailErrorStatus(null)
             emailForm.setValue(key, value)
           }}
