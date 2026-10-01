@@ -239,7 +239,7 @@ type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Button`                    | `type` 기본값 `"button"` (form 안에서 의도치 않은 submit 방지). `loading` 이면 `disabled` + `aria-busy`                                     |
 | `Chip` / `Tab`              | `aria-pressed` / `aria-selected` 를 상태와 동기                                                                                             |
-| `Input` 계열                | `label` 연결(`id`/`htmlFor`), `error` 시 `aria-invalid` + `aria-describedby`                                                                |
+| `Input` 계열                | `label` 연결(`id`/`htmlFor`), `error` 시 `aria-invalid`. `aria-describedby` 는 `Field` 가 보인 안내 · 오류 하나 (#1100)                     |
 | `Modal` / `BottomSheet`     | focus trap, `Esc` 닫기, 열릴 때 body 스크롤 잠금, 닫힐 때 트리거로 포커스 복귀                                                              |
 | `RadioGroup`                | `<fieldset>` + `<legend>` 로 그룹 라벨. 각 항목의 `<label htmlFor>` 가 자기 input 을 가리킴. `error` 시 `aria-invalid` + `aria-describedby` |
 | `Checkbox`                  | 자체 `<label htmlFor>`. `error` 시 `aria-invalid` + `aria-describedby`                                                                      |
@@ -276,6 +276,33 @@ type ButtonProps = { ref?: React.Ref<HTMLButtonElement> } & ...
 **폼의 `RadioGroup`(`components/radio-group.tsx`)은 손대지 않는다.** 그쪽은 네이티브
 `<input type="radio">` 라 브라우저가 roving `tabindex` 와 화살표 이동을 이미 준다 — 직접 구현하면
 오히려 어긋난다.
+
+### `aria-describedby` 는 `Field` 가 정한다 ([#1100](https://github.com/8llow8llowMe/hondigagae/issues/1100))
+
+입력란이 가리키는 설명은 **화면에 실제로 보이는 것만**이다. 무엇이 보이는지는 `Field` 만 안다 —
+오류가 있으면 hint 를 감추고 그 자리에 오류를 그린다(#1080).
+
+| `Field` 상태     | 그리는 것        | 입력란 `aria-describedby` |
+| ---------------- | ---------------- | ------------------------- |
+| hint 만          | `fieldHintId()`  | `<id>-hint`               |
+| 오류 (hint 무관) | `fieldErrorId()` | `<id>-error` 하나         |
+| 둘 다 없음       | —                | 걸지 않는다               |
+
+- id 규칙(`fieldErrorId` · `fieldHintId`)과 판정(`fieldDescription`)은 `components/field.tsx` 한 곳이다.
+  `Field` 의 렌더도 같은 판정을 본다 — 그리는 조건과 가리키는 조건이 갈리지 않게.
+- **`Field` 가 context 로 내려준다** (`components/field-context.tsx`). 입력은
+  `useFieldDescribedBy(id, fallback)` 로 읽는다. 사용처의 입력에 prop 을 하나 더 두면 `Field` 의 `hint` 와
+  따로 놀아, 열다섯 곳 중 한 곳이 빠져도 아무도 모른다.
+- **id 가 같을 때만 가져간다.** `Field` 밖이거나 id 가 다르면 지금처럼
+  `invalid ? fieldErrorId(id) : undefined` 다 — 오류 문구를 직접 그리는 자리의 동작이다.
+- **`'use client'` 는 `field-context.tsx` 에만 있다.** `createContext` 는 서버 그래프에 없다. `Field` 는
+  지시어 없이 그 Provider 를 렌더하므로 서버 컴포넌트에서도 그려지고, id 규칙도 서버에서 부를 수 있다.
+  훅을 읽는 `Input` · `Textarea` 는 `'use client'` 다.
+- 쓰는 입력: `Input` · `Textarea` · `DateField`, 그리고 `Input` 을 감싼 `PasswordInput` · `AmountInput` ·
+  `VerificationCodeInput`. 새 입력을 만들면 같은 훅을 쓴다. 잠그는 테스트는
+  `components/field-description.test.ts` 다.
+- 선택 계열(`RadioGroup` · `CheckboxGroup` · `Checkbox`)은 `Field` 를 쓰지 않고 hint 도 없다 — 선택지
+  설명은 라벨 안에 있어 이름과 함께 읽힌다(아래 절).
 
 ### 선택 계열은 `Field` 로 감싸지 않는다
 

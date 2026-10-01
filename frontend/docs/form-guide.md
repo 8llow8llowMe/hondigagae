@@ -161,6 +161,9 @@ password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
 
 - 모든 입력에 `label` 을 연결한다 (`id` / `htmlFor`). placeholder 를 label 대신 쓰지 않는다.
 - 오류 시 `aria-invalid="true"` + `aria-describedby` 로 오류 메시지를 연결한다.
+- **안내(`hint`)도 `aria-describedby` 로 잇는다** ([#1100](https://github.com/8llow8llowMe/hondigagae/issues/1100)).
+  정상이면 hint, 오류면 오류 하나 — 화면에 보이는 것만이다. `Field` 에 `hint` · `error` 를 주면 안쪽
+  입력이 알아서 가리킨다(`component-guide.md` §7). 입력에 따로 넘기지 않는다.
 - **폼 전체 오류는 `role="alert"`** 로 낸다. 제출 후 화면 변화가 없으면 스크린리더 사용자가 실패를 모른다.
 - 제출 실패 시 **화면에서 첫 번째로 보이는 오류 필드로 포커스를 옮긴다.**
   - **판정 기준은 DOM 순서다.** zod 스키마의 키 선언 순서가 아니다 — 두 순서는 언제든 어긋날 수
