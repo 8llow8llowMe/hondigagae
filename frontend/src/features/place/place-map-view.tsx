@@ -72,6 +72,7 @@ export function PlaceMapView({
   fill = false,
   searchable = false,
   head,
+  title,
   listHref,
   mapHref,
   renderRowAction,
@@ -118,7 +119,23 @@ export function PlaceMapView({
    */
   head?: ReactNode
   /**
-   * 지도 우상단에 떠 있는 보기 전환의 목적지. **둘 다 있어야 토글을 그린다.**
+   * 데스크톱 좌측 패널 **머리 줄의 제목**이다 (#1121). 주면 1024 이상에서 패널 맨 위에
+   * `제목 ··· [목록|지도]` 줄이 서고, 보기 토글이 지도 우상단에서 **그 줄로 옮겨 간다.**
+   *
+   * **토글을 패널로 들인 이유.** 우상단 토글은 1440 기준 x≈1310 에 홀로 떠서 사용자가 보고
+   * 있는 패널(16~416)과 ~900px 떨어져 있었고, 바로 아래 `내 위치` 와 한 스택이라 화면 전환이
+   * 아니라 **지도 도구**로 읽혔다. 목록 보기의 토글이 주 카드 제목 줄 오른쪽에 서므로, 지도
+   * 보기도 주 표면(패널)의 제목 줄 오른쪽에 두면 두 보기의 관계가 같다 — 픽셀 자리는 달라도.
+   *
+   * **1024 미만은 그대로다.** 패널이 없고 시트뿐이라 두 보기 모두 우상단 `[검색][토글]` 이다.
+   *
+   * **머리(`head`)가 있는 화면은 주지 않는다** — 담기 지도는 떠 있는 머리 카드가 이미 제목을
+   * 갖는다. 패널에 제목을 또 세우면 한 기둥에 같은 제목이 두 번 선다.
+   */
+  title?: string | undefined
+  /**
+   * 보기 전환의 목적지. **둘 다 있어야 토글을 그린다.** 자리는 지도 우상단이고, `title` 을
+   * 함께 주면 1024 이상에서만 패널 머리 줄로 옮겨 간다 (#1121).
    * 헤더가 토글을 갖는 화면은 주지 않는다 — 같은 컨트롤이 두 개 뜨면 안 된다.
    *
    * 예전에는 이 컴포넌트가 `'/places'` 를 하드코딩해 링크를 만들었다. 그래서 다른
@@ -431,6 +448,8 @@ export function PlaceMapView({
   })
   /** 둘 다 있을 때만 그린다 — 헤더가 토글을 갖는 화면은 주지 않는다 */
   const showToggle = listHref !== undefined && mapHref !== undefined
+  /** 1024 이상에서 토글이 우상단이 아니라 패널 머리 줄에 선다 (#1121, `title` 주석) */
+  const toggleInPanel = showToggle && title !== undefined
 
   return (
     /*
@@ -569,13 +588,17 @@ export function PlaceMapView({
           **폭에 따라 두 벌을 두지 않는다** (#240). 아이콘형 하나로 통일했다 — 지도 위에
           글자 버튼이 얹히면 지도를 가리고, 이름은 `title` 호버 툴팁과 `aria-label` 이 맡는다.
         */}
+            {/*
+              **패널 머리가 토글을 가지면 1024 이상에서 여기서 숨긴다** (#1121). 그 폭에서
+              우상단에 남는 것은 지도 도구(`내 위치`)뿐이다.
+            */}
             {showToggle && (
               <ViewToggle
                 current="map"
                 listHref={listHref}
                 mapHref={mapHref}
                 variant="icon"
-                className="shadow-md"
+                className={cn('shadow-md', toggleInPanel && 'lg:hidden')}
               />
             )}
 
@@ -603,8 +626,9 @@ export function PlaceMapView({
       */}
       <div
         className={cn(
-          // 상단은 보기 전환 토글과 **같은 높이**다 (lg 헤더의 `pt-6`) — 8px 어긋나면
-          // 지도 위에 뜬 두 표면이 서로 삐뚤어져 보인다
+          // 상단은 우상단 컨트롤 줄과 **같은 높이**다 (lg 헤더의 `pt-6`) — 8px 어긋나면
+          // 지도 위에 뜬 두 표면이 서로 삐뚤어져 보인다. 1024 이상에서 그 줄에 남는 것은
+          // `내 위치` 이고 보기 토글은 이 패널의 머리 줄이다 (#1121)
           //
           // 하단은 32 다. **카카오 축척·로고 막대가 지도 왼쪽 아래 20px 를 쓴다** —
           // 16 이었을 때는 패널이 그 위에 바로 얹혀 축척이 눌려 보였다 (실측: 막대가
@@ -634,6 +658,33 @@ export function PlaceMapView({
           <ChevronRightIcon size={20} />
         </button>
 
+        {/*
+          **접힌 패널에도 토글이 남는다 — 펼치기 버튼 옆** (#1121). 패널 머리 줄의 토글은 패널과
+          함께 밀려나므로, 접으면 화면을 바꿀 길이 사라진다. 펼치기 버튼과 같은 결로 **항상
+          마운트된 채 나타나고 사라진다** — 열려 있는 동안은 `inert` 라 Tab 이 들르지 않고
+          보조기기에도 토글이 하나만 들린다.
+
+          `left-13`(52) 은 펼치기 버튼 44 + 간격 8 이다. 그림자는 우상단 토글과 같은 `shadow-md` 다 —
+          같은 컨트롤이 자리마다 다른 그림자를 갖지 않게 한다 (DESIGN §6 의 떠 있는 카드 값).
+        */}
+        {toggleInPanel && (
+          <div
+            inert={panelOpen}
+            className={cn(
+              'absolute top-0 left-13 transition-opacity',
+              panelOpen && 'pointer-events-none opacity-0',
+            )}
+          >
+            <ViewToggle
+              current="map"
+              listHref={listHref}
+              mapHref={mapHref}
+              variant="icon"
+              className="shadow-md"
+            />
+          </div>
+        )}
+
         {/* 접기 탭이 패널 **밖으로** 튀어나오므로 여기서 자르지 않는다 */}
         <div
           inert={!panelOpen}
@@ -652,13 +703,28 @@ export function PlaceMapView({
             */}
           <div className="bg-bg border-border flex h-full w-full flex-col overflow-hidden rounded-xl rounded-tr-none border shadow-lg">
             {/*
-                **패널 머리에는 필터가 온다.** 예전에는 "지도에 보이는 곳 20" 이 제목으로
-                앉아 있었는데, 제목이 할 일이 없는 자리다 — 이 패널이 무엇인지는 안에 든
-                목록이 이미 말한다. 개수는 아래 캡션으로 내렸다.
-              */}
+              **머리 줄 — 제목과 보기 토글** (#1121). 예전에는 "지도에 보이는 곳 20" 이 제목으로
+              앉아 있다가 걷혔다 — 제목이 할 일이 없는 자리였고 개수는 아래 캡션으로 내렸다.
+              이제 제목은 **보기 토글의 짝**으로 돌아온다: 목록 보기의 주 카드가 제목 줄
+              오른쪽에 토글을 두는 것과 같은 관계다 (`title` 주석). 그래서 화면이 `title` 을
+              줄 때만 선다.
+
+              **선을 긋지 않는다.** 바로 아래 검색 줄과 한 덩어리의 머리라, 사이에 선이 서면
+              제목이 따로 떠 있는 띠로 읽힌다. 아래 여백은 검색 줄의 `py-2` 가 맡는다.
+
+              제목은 `h2` 다 — 진짜 `h1` 은 페이지의 `sr-only` 사본이고, 목록 보기 카드도
+              같은 문자열을 `h2` 로 낸다 (#556). 1024 미만은 패널째 `hidden` 이라 들리지 않는다.
+            */}
+            {toggleInPanel && (
+              <div className="flex items-center justify-between gap-3 ps-4 pe-3 pt-2">
+                <h2 className="text-title-2 text-fg min-w-0 font-bold break-keep">{title}</h2>
+                <ViewToggle current="map" listHref={listHref} mapHref={mapHref} variant="icon" />
+              </div>
+            )}
+
             {/*
-              **검색이 패널 맨 위다** (#596) — 목록 갈래가 검색을 칩 위에 두는 것과 같은
-              순서다. 검색어는 목록을 좁히는 **범위**이고 칩은 그 안의 축이다.
+              **검색이 머리 줄 바로 아래다** (#596 · #1121) — 목록 갈래가 검색을 칩 위에 두는
+              것과 같은 순서다. 검색어는 목록을 좁히는 **범위**이고 칩은 그 안의 축이다.
 
               **`compact` 가 아니다.** 이 패널 툴바 안쪽은 374px 로 목록 갈래의 모바일
               검색(343px)보다 넓다 — 글자 버튼이 들어가는 자리에서 아이콘으로 줄이면 같은
