@@ -163,10 +163,8 @@ export default async function PlacesPage({ searchParams }: { searchParams: Searc
               {filterSummaryLine(filters)}
             </p>
           }
-          /* 네 화면이 같은 세그먼트 컨트롤을 쓴다 — 아트보드 05 마지막 단락 */
-          trailing={
-            <ViewToggle current="list" listHref={listHref} mapHref={mapHref} variant="icon" />
-          }
+          /* 네 화면이 같은 보기 전환 버튼을 쓴다 — 아트보드 05 마지막 단락. 카드 제목 줄은 `sm`(36) 이다 (#1125) */
+          trailing={<ViewToggle current="list" listHref={listHref} mapHref={mapHref} size="sm" />}
           /*
             **검색과 칩이 머리 안이다** (#556). 둘 다 목록을 좁히는 도구이고, `fill` 머리는
             고정이라 목록을 내려가도 "무엇으로 좁히고 있었는지" 가 화면에 남는다 — 예전에는

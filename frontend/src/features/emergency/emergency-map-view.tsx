@@ -603,13 +603,7 @@ export function EmergencyMapView({ listHref, mapHref }: { listHref: string; mapH
           />
 
           <div className="pointer-events-auto flex shrink-0 flex-col items-end gap-2">
-            <ViewToggle
-              current="map"
-              listHref={listHref}
-              mapHref={mapHref}
-              variant="icon"
-              className="shadow-md"
-            />
+            <ViewToggle current="map" listHref={listHref} mapHref={mapHref} />
 
             {/* 제주 밖이면 렌더하지 않는다 — 눌러도 갈 곳이 없다 */}
             {board.inJeju && <MapLocateButton onLocate={board.locate} />}

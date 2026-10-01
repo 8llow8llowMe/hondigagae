@@ -57,7 +57,7 @@ export default function EmergencyLoading() {
             /* 개수 부제 — 응답이 오면 선다 (잘린 목록일 때만 빠진다) */
             description={<Skeleton className="h-4.5 w-40" />}
             /* 보기 토글 자리 — 링크가 아직 없으므로 크기만 잡는다 */
-            trailing={<Skeleton className="h-11 w-22 shrink-0" />}
+            trailing={<Skeleton className="h-9 w-25 shrink-0" />}
             tools={
               <div aria-hidden>
                 {/* 검색 — 입력 + 검색 버튼, 둘 다 44 */}
