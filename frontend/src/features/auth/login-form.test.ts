@@ -52,8 +52,14 @@ describe('LoginFormFields', () => {
     expect(markup).toContain('aria-invalid="true"')
   })
 
-  it('폼 전체 오류를 role=alert 로 렌더한다', () => {
+  /*
+    401 은 포커스가 비밀번호 칸으로 간다(로그인 D4) — `LoginForm` 이 `announce="live"` 를 넘겨
+    알림이 유일한 낭독 경로가 된다 (#1102).
+  */
+  it('401 폼 전체 오류는 role=alert 로 렌더한다 — 포커스가 비밀번호 칸으로 가는 갈래', () => {
     const markup = render({
+      errorStatus: 401,
+      announce: 'live',
       errors: { fields: {}, form: '이메일 또는 비밀번호가 올바르지 않습니다.' },
     })
 
@@ -121,13 +127,18 @@ describe('LoginFormFields', () => {
     expect(markup).toContain('typo@example')
   })
 
-  it('429 면 재시도 버튼 없이 서버 문구를 role=alert 로 렌더한다', () => {
+  /*
+    429 는 제출 실패 뒤 포커스가 알림으로 온다(#1078) — 포커스가 낭독 경로라 `role="alert"` 를
+    떼야 같은 문구를 두 번 읽지 않는다 (#1102). `announce` 를 생략하면 그 판정이 기본값이다.
+  */
+  it('429 면 재시도 버튼 없이 서버 문구 알림을 렌더하고, 포커스가 읽으므로 role=alert 가 없다', () => {
     const markup = render({
       errorStatus: 429,
       errors: { fields: {}, form: '너무 많은 시도가 있었어요. 잠시 후 다시 이용해 주세요.' },
     })
 
-    expect(markup).toContain('role="alert"')
+    expect(markup).toContain('data-form-alert=""')
+    expect(markup).not.toContain('role="alert"')
     expect(markup).toContain('너무 많은 시도가 있었어요. 잠시 후 다시 이용해 주세요.')
     expect(markup).not.toContain(messages.common.retry)
     expect(markup).not.toContain(messages.common.temporaryErrorTitle)

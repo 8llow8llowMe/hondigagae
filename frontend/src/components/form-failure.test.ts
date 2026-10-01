@@ -6,9 +6,20 @@ import { describe, expect, it } from 'vitest'
 import { FormFailure } from '@/components/form-failure'
 import { messages } from '@/lib/messages'
 
-function render(message: string | null, errorStatus: number | null, submitting = false) {
+function render(
+  message: string | null,
+  errorStatus: number | null,
+  submitting = false,
+  announce: 'live' | 'focus' = 'focus',
+) {
   return renderToStaticMarkup(
-    createElement(FormFailure, { message, errorStatus, submitting, onRetry: () => undefined }),
+    createElement(FormFailure, {
+      message,
+      errorStatus,
+      submitting,
+      announce,
+      onRetry: () => undefined,
+    }),
   )
 }
 
@@ -28,12 +39,11 @@ describe('FormFailure', () => {
     expect(markup.match(/<button/g)).toHaveLength(1)
   })
 
-  it('일시 장애는 제출 실패 뒤 포커스 대상이고 role=alert 로 알린다 — FormAlert 가 하던 일이다', () => {
+  it('일시 장애는 제출 실패 뒤 포커스 대상이다 — FormAlert 가 하던 일이다', () => {
     const markup = render(null, 0)
 
     expect(markup).toContain('data-form-temporary-error=""')
     expect(markup).toContain('tabindex="-1"')
-    expect(markup).toContain('role="alert"')
   })
 
   it('일시 장애는 폼 안에서 자기 여백을 갖지 않는다 — 폼을 밀지 않는다', () => {
@@ -57,6 +67,36 @@ describe('FormFailure', () => {
 })
 
 /*
+  #1102 — 포커스를 받는 표시가 `role="alert"` 이기도 해서 알림 낭독과 포커스 낭독이 겹쳤다.
+  어느 쪽으로 읽힐지는 호출부가 포커스 effect 와 같은 판정(`submitFailureAnnounce`)으로 넘긴다.
+*/
+describe('FormFailure — 낭독 경로는 하나다 (#1102)', () => {
+  it.each([
+    { name: '일시 장애', message: null, status: 503 },
+    { name: '알림', message: '로그인 시도가 너무 많습니다.', status: 429 },
+  ])('$name: focus 면 role 이 없다 — 포커스가 읽는다', ({ message, status }) => {
+    const markup = render(message, status, false, 'focus')
+
+    expect(markup).not.toContain('role="alert"')
+    expect(markup).not.toContain('aria-live')
+    expect(markup).toContain('tabindex="-1"')
+  })
+
+  it.each([
+    { name: '일시 장애', message: null, status: 503 },
+    {
+      name: '알림 — 로그인 401 · 되돌림 안내처럼 포커스가 다른 칸으로 갈 때',
+      message: '틀렸어요',
+      status: 401,
+    },
+  ])('$name: live 면 role=alert 하나다', ({ message, status }) => {
+    const markup = render(message, status, false, 'live')
+
+    expect(markup.match(/role="alert"/g)).toHaveLength(1)
+  })
+})
+
+/*
   #1101 — 반려견 폼은 제목을 가진 카드(`Surface lead title=...`) 안이라 일시 장애 제목을 한 단
   내린다 (#456①). 인증 폼은 화면 `h1` 바로 아래라 기본값 `h2` 그대로다.
 */
@@ -67,6 +107,7 @@ describe('FormFailure — 일시 장애 제목 레벨 (#1101)', () => {
         message: null,
         errorStatus: 503,
         submitting: false,
+        announce: 'focus',
         onRetry: () => undefined,
         ...(headingLevel === undefined ? {} : { headingLevel }),
       }),

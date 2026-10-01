@@ -84,7 +84,10 @@ describe('EmailStep', () => {
     expect(markup).toContain(messages.common.temporaryErrorTitle)
   })
 
-  it('429 는 ErrorState 를 쓰지 않고 서버 문구를 role=alert 로 렌더한다', () => {
+  /*
+    429 는 제출 실패 뒤 포커스가 알림으로 온다 — 포커스가 낭독 경로라 role=alert 를 뗀다 (#1102).
+  */
+  it('429 는 ErrorState 를 쓰지 않고 서버 문구 알림을 렌더한다 — 포커스가 읽어 role=alert 는 없다', () => {
     const markup = renderToStaticMarkup(
       createElement(EmailStep, {
         values: { email: '' },
@@ -97,9 +100,34 @@ describe('EmailStep', () => {
       }),
     )
 
-    expect(markup).toContain('role="alert"')
+    expect(markup).toContain('data-form-alert=""')
+    expect(markup).not.toContain('role="alert"')
     expect(markup).toContain('너무 많은 시도가 있었어요. 잠시 후 다시 이용해 주세요.')
     expect(markup).not.toContain(messages.common.temporaryErrorTitle)
+  })
+
+  /*
+    되돌림 안내(AUTH_005 · MEMBER_006)는 단계 전환 effect 가 이메일 칸으로 옮긴다 — 포커스가 알림에
+    오지 않으므로 `SignupForm` 이 `live` 를 넘겨 알림이 낭독 경로가 된다 (#1102).
+  */
+  it('announce=live(되돌림 안내) 면 role=alert 로 알린다', () => {
+    const markup = renderToStaticMarkup(
+      createElement(EmailStep, {
+        values: { email: '' },
+        errors: {
+          fields: {},
+          form: '인증코드가 만료되었거나 발급되지 않았습니다. 다시 요청해주세요.',
+        },
+        errorStatus: null,
+        submitting: false,
+        announce: 'live',
+        onValueChange: noop,
+        onSubmit: noop,
+        onRetry: noop,
+      }),
+    )
+
+    expect(markup.match(/role="alert"/g)).toHaveLength(1)
   })
 })
 
@@ -219,7 +247,7 @@ describe('CodeStep', () => {
     expect(markup).toContain('WRONG1')
   })
 
-  it('429(쿨다운) 는 ErrorState 를 쓰지 않고 서버 문구를 role=alert 로 렌더하며 재전송은 비활성 유지한다', () => {
+  it('429(쿨다운) 는 ErrorState 를 쓰지 않고 서버 문구 알림을 렌더하며 재전송은 비활성 유지한다', () => {
     const markup = renderToStaticMarkup(
       createElement(CodeStep, {
         email: 'a@b.c',
@@ -237,7 +265,9 @@ describe('CodeStep', () => {
       }),
     )
 
-    expect(markup).toContain('role="alert"')
+    // 재전송 뒤 포커스가 이 알림으로 온다 — 포커스가 읽어 role=alert 는 없다 (#1102)
+    expect(markup).toContain('data-form-alert=""')
+    expect(markup).not.toContain('role="alert"')
     expect(markup).toContain('너무 많은 시도가 있었어요. 잠시 후 다시 이용해 주세요.')
     expect(markup).not.toContain(messages.common.temporaryErrorTitle)
     expect(markup).toContain('disabled')

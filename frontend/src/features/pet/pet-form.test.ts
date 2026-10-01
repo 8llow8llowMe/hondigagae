@@ -131,10 +131,15 @@ describe('PetFormFields — 오류 표시', () => {
     expect(markup).toContain(messages.pet.sizeTypeRequired)
   })
 
-  it('폼 전체 오류는 role="alert" 로 렌더한다', () => {
+  /*
+    필드 오류 없이 서버 문구만 오면(`PET_002`) 제출 실패 뒤 포커스가 그 알림으로 온다 — 포커스가
+    낭독 경로라 role=alert 를 뗀다 (#1102). 필드 요약은 포커스가 필드로 가므로 아래처럼 live 다.
+  */
+  it('폼 전체 오류는 알림으로 렌더하고, 포커스가 읽으므로 role=alert 가 없다', () => {
     const markup = render({ errors: { fields: {}, form: messages.pet.limitReached } })
 
-    expect(markup).toContain('role="alert"')
+    expect(markup).toContain('data-form-alert=""')
+    expect(markup).not.toContain('role="alert"')
     expect(markup).toContain(messages.pet.limitReached)
   })
 
@@ -265,11 +270,11 @@ describe('PetFormFields — 폼 전체 실패는 한 자리에 하나만 (#1101)
     expect(markup).not.toContain('data-form-alert')
   })
 
-  it('일시 장애 상자가 제출 실패 뒤 포커스 대상이고 role=alert 로 알린다', () => {
+  it('일시 장애 상자가 제출 실패 뒤 포커스 대상이고, 포커스가 읽으므로 role=alert 가 없다 (#1102)', () => {
     const markup = render({ errorStatus: 503, errors: { fields: {}, form: SERVER_MESSAGE } })
 
     expect(markup).toContain('data-form-temporary-error=""')
-    expect(markup.match(/role="alert"/g)).toHaveLength(1)
+    expect(markup).not.toContain('role="alert"')
   })
 
   /* 카드 제목(`h2`) 안이다 — 폼 섹션 제목과 같은 `h3` 로 내린다 (#456①) */

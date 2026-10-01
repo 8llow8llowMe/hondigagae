@@ -11,6 +11,7 @@ import { PasswordInput } from '@/components/password-input'
 import type { EmailValues, PasswordResetValues } from '@/features/auth/schemas'
 import { VerificationCodeInput } from '@/features/auth/verification-code-input'
 import type { FormErrors } from '@/lib/form/field-errors'
+import { type FailureAnnounce, submitFailureAnnounce } from '@/lib/form/submit-failure-focus'
 import { messages } from '@/lib/messages'
 
 /**
@@ -29,6 +30,12 @@ export type PasswordResetEmailStepProps = {
   errors: FormErrors
   errorStatus: number | null
   submitting: boolean
+  /**
+   * 폼 전체 실패가 무엇으로 읽히는가 (#1102). 생략하면 포커스 순서의 첫 대상으로 정한다
+   * (`submitFailureAnnounce`). 되돌림 안내처럼 포커스를 이메일 칸으로 보내는 갈래는
+   * `PasswordResetView` 가 `live` 를 넘긴다.
+   */
+  announce?: FailureAnnounce | undefined
   onValueChange: (key: keyof EmailValues, value: string) => void
   onSubmit: () => void
   onRetry: () => void
@@ -39,6 +46,7 @@ export function PasswordResetEmailStep({
   errors,
   errorStatus,
   submitting,
+  announce = submitFailureAnnounce(errors, errorStatus),
   onValueChange,
   onSubmit,
   onRetry,
@@ -55,12 +63,14 @@ export function PasswordResetEmailStep({
       {/*
         `AUTH_005`(만료·미발급)·`AUTH_017`(5회 초과)로 되돌아온 사유도 여기로 온다.
         오류라서 `FormNotice`(role=status)가 아니라 `FormAlert`(role=alert)다
-        — `signup-form.tsx` 의 stepBackMessage 와 같은 처리.
+        — `signup-form.tsx` 의 stepBackMessage 와 같은 처리. 포커스는 단계 전환 effect 가 이메일
+        칸으로 옮기므로 그 갈래는 `announce="live"` 로 온다 (#1102).
       */}
       <FormFailure
         message={errors.form}
         errorStatus={errorStatus}
         submitting={submitting}
+        announce={announce}
         onRetry={onRetry}
       />
 
@@ -136,6 +146,8 @@ export function PasswordResetCodeStep({
         errorStatus={errorStatus}
         // 재발송도 새 요청이다 — 그 결과를 기다리는 동안 직전 실패를 세워 두지 않는다 (#1084)
         submitting={submitting || resending}
+        // 제출 · 재발송 실패 뒤 포커스와 같은 판정이다 (#1102, `resendFocusTargets`)
+        announce={submitFailureAnnounce(errors, errorStatus)}
         onRetry={onRetry}
       />
       {/* 이메일은 줄바꿈 기회가 없는 토큰이다 — 375px 폭에서 넘치지 않게 break-all */}
