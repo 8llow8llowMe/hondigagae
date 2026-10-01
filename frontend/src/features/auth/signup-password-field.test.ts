@@ -19,6 +19,7 @@ const noop = () => undefined
 function render(overrides: Partial<ProfileStepProps> = {}) {
   return renderToStaticMarkup(
     createElement(ProfileStep, {
+      email: 'a@b.c',
       values: { password: '', name: '', nickname: '' },
       errors: NO_FORM_ERRORS,
       errorStatus: null,
