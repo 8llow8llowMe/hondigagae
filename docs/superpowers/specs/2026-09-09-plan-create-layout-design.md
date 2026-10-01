@@ -2,7 +2,7 @@
 
 > 대상: `/plans/new` (직접 만들기) · `/ai-plans/new` (AI 일정 조건 입력)
 > 작성: 2026-09-09
-> 상태: 설계 확정 · 계획 `docs/superpowers/plans/2026-09-09-plan-create-layout.md` — 착수 이슈 미생성
+> 상태: **구현 완료** (#354 · PR #365, 2026-09-09) — 계획 `docs/superpowers/plans/2026-09-09-plan-create-layout.md`
 
 **Goal:** 두 만들기 화면에서 **"할 일이 많아 보이는" 거부감**을 없앤다. 화면을 쪼개지 않고,
 (1) 달력이 화면을 밀어내지 않게 하고 (2) 기본값이 있는 선택 항목을 접어 rest 상태를 가볍게 한다.

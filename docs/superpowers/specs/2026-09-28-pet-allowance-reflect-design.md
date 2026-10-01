@@ -2,7 +2,7 @@
 
 > 대상: `backend/service/batch-service` `domainlayer/placeimport`
 > 작성: 2026-09-28
-> 상태: **설계 확정** (#886)
+> 상태: **구현 완료** (#886 · PR #969, 2026-09-28)
 
 **Goal:** TourAPI 장소의 `place.pet_allowance_type` · `allowed_pet_size` 를 이미 적재된 두 근거 —
 `place_pet_info`(#877) 와 **병합으로 흡수된 행**(`merged_into_id`) — 로 채운다. 목록 필터 · 적합도 ·

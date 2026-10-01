@@ -1,5 +1,6 @@
 # 긴급 시설 화면을 장소 찾기 지도 문법으로 통일 — 설계
 
+> 상태: **구현 완료** (#353 · PR #373, 2026-09-09)
 > **작성일**: 2026-09-09
 > **이슈**: [#353](https://github.com/8llow8llowMe/hondigagae/issues/353) · 브랜치 `refactor/fe/353-emergency-map-unification`
 > **대상**: `frontend/` — `/emergency`
