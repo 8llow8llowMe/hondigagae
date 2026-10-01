@@ -1,6 +1,9 @@
+'use client'
+
 import type { InputHTMLAttributes, ReactNode, Ref } from 'react'
 
 import { fieldErrorId } from '@/components/field'
+import { useFieldDescribedBy } from '@/components/field-context'
 import { cn } from '@/lib/utils/cn'
 
 type NativeProps = Omit<
@@ -72,6 +75,8 @@ export function Input({
 }: InputProps) {
   // 표기와 버튼은 같은 자리를 쓴다. 둘 다 오면 겹치므로 하나만 그린다는 것을 한 값으로 못박는다
   const trailing = action ?? (suffix === undefined ? undefined : suffix)
+  // `Field` 안이면 `Field` 가 그린 안내 · 오류를 가리킨다 — `field-context.tsx` (#1100)
+  const describedBy = useFieldDescribedBy(id, invalid ? fieldErrorId(id) : undefined)
 
   const field = (
     <input
@@ -79,7 +84,7 @@ export function Input({
       value={value}
       onChange={(event) => onValueChange(event.target.value)}
       aria-invalid={invalid ? true : undefined}
-      aria-describedby={invalid ? fieldErrorId(id) : undefined}
+      aria-describedby={describedBy}
       className={cn(
         // 높이 44 — §7 의 하한이 아니라 **폼 컨트롤 높이**다 (#883). 같은 줄의 입력·버튼이 서로 맞는 값이라 한쪽만 내리면 어긋난다
         'text-body-1 h-11 w-full rounded-md border px-3',

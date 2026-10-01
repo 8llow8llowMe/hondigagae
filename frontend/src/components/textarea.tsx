@@ -1,6 +1,9 @@
+'use client'
+
 import type { Ref, TextareaHTMLAttributes } from 'react'
 
 import { fieldErrorId } from '@/components/field'
+import { useFieldDescribedBy } from '@/components/field-context'
 import { cn } from '@/lib/utils/cn'
 
 type NativeProps = Omit<
@@ -25,7 +28,7 @@ export type TextareaProps = NativeProps & {
  *
  * **`Input` 을 재사용할 수 없어 따로 둔다.** `<input>` 과 `<textarea>` 는 다른 요소고
  * native prop 집합도 다르다(`rows`). 대신 **접근성 배선은 같은 규칙을 공유한다** —
- * `aria-invalid` 와 `fieldErrorId()` 기반 `aria-describedby` 를 화면마다 다시 만들면
+ * `aria-invalid` 와 `Field` 가 정하는 `aria-describedby` 를 화면마다 다시 만들면
  * 한 곳이 빠져도 아무도 모른다 (component-guide.md §7).
  *
  * 높이만 `Input` 과 다르다. `h-11`(44px) 대신 `rows` 로 정하고 `min-h` 로 하한만 맞춘다.
@@ -39,6 +42,9 @@ export function Textarea({
   className,
   ...rest
 }: TextareaProps) {
+  // `Field` 안이면 `Field` 가 그린 안내 · 오류를 가리킨다 — `field-context.tsx` (#1100)
+  const describedBy = useFieldDescribedBy(id, invalid ? fieldErrorId(id) : undefined)
+
   return (
     <textarea
       id={id}
@@ -46,7 +52,7 @@ export function Textarea({
       rows={rows}
       onChange={(event) => onValueChange(event.target.value)}
       aria-invalid={invalid ? true : undefined}
-      aria-describedby={invalid ? fieldErrorId(id) : undefined}
+      aria-describedby={describedBy}
       className={cn(
         'text-body-1 min-h-11 w-full rounded-md border px-3 py-2',
         'placeholder:text-fg-subtle',
