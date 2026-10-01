@@ -114,4 +114,13 @@ describe('resendFocusTargets', () => {
   it('5xx 면 일시 장애 상자 → 첫 입력', () => {
     expect(resendFocusTargets('failed', NO_FORM_ERRORS, 503)).toEqual(['temporary', 'input'])
   })
+
+  it('틀린 코드 뒤 429 면 남은 코드 칸 오류가 먼저다 — 실패 표시는 live 로 읽힌다 (#1109)', () => {
+    const errors = {
+      fields: { code: '인증코드가 일치하지 않습니다.' },
+      form: '잠시 후 다시 요청해주세요.',
+    }
+    expect(resendFocusTargets('failed', errors, 429)).toEqual(['field', 'alert', 'input'])
+    expect(submitFailureAnnounce(errors, 429)).toBe('live')
+  })
 })

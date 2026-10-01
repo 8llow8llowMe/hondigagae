@@ -124,6 +124,9 @@ export type ResendResult = 'sent' | 'failed'
  *   않는다: 안내 문구는 바뀌지 않아 다시 읽힐 것이 없고, 쿨다운 진입은 버튼 옆 `aria-live` 가
  *   "다시 보내기 (60초 후 가능)" 으로 이미 알린다.
  * - **`failed` → 제출 실패와 같은 순서** — 429 는 알림, 5xx · 무응답은 일시 장애 상자.
+ *   틀린 코드(`AUTH_004`) 뒤라 코드 칸 오류가 남아 있으면(실패는 그 오류를 걷지 않는다, #1109
+ *   `codeStepAfterResend`) 첫 대상은 그 칸이고, 실패 표시는 `submitFailureAnnounce` 가 `live` 로
+ *   준다 — 로그인 401 과 같은 모양이다.
  */
 export function resendFocusTargets(
   result: ResendResult,

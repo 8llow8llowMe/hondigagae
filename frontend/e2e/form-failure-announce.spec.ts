@@ -71,6 +71,9 @@ test.describe('세션 없이 — 인증 화면', () => {
         email: 'resend-1102@hondigagae.dev',
         send: messages.auth.sendCode,
         api: '**/api/bff/auth/email/send-code',
+        verifyApi: '**/api/bff/auth/email/verify-code',
+        submit: messages.auth.verifyCode,
+        needsNewPassword: false,
       },
       {
         name: '재설정 2단계',
@@ -78,8 +81,47 @@ test.describe('세션 없이 — 인증 화면', () => {
         email: 'linked@hondigagae.dev',
         send: messages.auth.resetSendCode,
         api: '**/api/bff/auth/password/reset/send-code',
+        verifyApi: '**/api/bff/auth/password/reset',
+        submit: messages.auth.resetSubmit,
+        needsNewPassword: true,
       },
     ] as const
+
+    const CODE_MISMATCH = '인증코드가 일치하지 않습니다.'
+    const codeError = (page: Page) => page.locator('main #code-error')
+
+    /*
+      2단계에서 틀린 코드를 낸다 — 코드 칸 오류(`AUTH_004`)가 서고 칸이 비워진 뒤 포커스가 그
+      칸으로 온다. 응답은 가로채서 준다: 목 서버의 불일치 횟수는 프로세스 전역이라(재설정은 5회째
+      `AUTH_017`) 테스트끼리 섞이면 결과가 바뀐다.
+    */
+    async function submitWrongCode(page: Page, screen: (typeof SCREENS)[number]): Promise<void> {
+      await page.route(screen.verifyApi, (route) =>
+        route.fulfill(failure(400, 'AUTH_004', CODE_MISMATCH)),
+      )
+      await page.locator('#code').fill('WRONGCDE')
+      if (screen.needsNewPassword) await page.locator('#newPassword').fill('password123!')
+      await page.getByRole('button', { name: screen.submit, exact: true }).click()
+      await expect(codeError(page)).toHaveText(CODE_MISMATCH)
+      await expect(page.locator('#code')).toBeFocused()
+      await page.unroute(screen.verifyApi)
+    }
+
+    /** 쿨다운을 넘긴 뒤 키보드로 `다시 보내기` 를 누른다 — 2단계에 이미 있을 때 */
+    async function resendAgain(page: Page): Promise<void> {
+      await page.clock.fastForward('01:05')
+      const resend = page.getByRole('button', { name: messages.auth.resendCode, exact: true })
+      await expect(resend).toBeEnabled()
+      await resend.focus()
+      await page.keyboard.press('Enter')
+    }
+
+    /** 1단계에서 코드를 받아 2단계로 간다 */
+    async function toCodeStep(page: Page, screen: (typeof SCREENS)[number]): Promise<void> {
+      await page.locator('#email').fill(screen.email)
+      await page.getByRole('button', { name: screen.send }).click()
+      await expect(page.locator('#code')).toBeFocused()
+    }
 
     /** 2단계로 가서 쿨다운(60초)을 넘긴 뒤, 키보드로 `다시 보내기` 를 누른다 */
     async function resendFromCodeStep(
@@ -87,19 +129,11 @@ test.describe('세션 없이 — 인증 화면', () => {
       screen: (typeof SCREENS)[number],
       response?: ReturnType<typeof failure>,
     ): Promise<void> {
-      await page.locator('#email').fill(screen.email)
-      await page.getByRole('button', { name: screen.send }).click()
-      await expect(page.locator('#code')).toBeFocused()
-
-      await page.clock.fastForward('01:05')
-      const resend = page.getByRole('button', { name: messages.auth.resendCode, exact: true })
-      await expect(resend).toBeEnabled()
-
+      await toCodeStep(page, screen)
       if (response !== undefined) {
         await page.route(screen.api, (route) => route.fulfill(response))
       }
-      await resend.focus()
-      await page.keyboard.press('Enter')
+      await resendAgain(page)
     }
 
     for (const screen of SCREENS) {
@@ -157,6 +191,77 @@ test.describe('세션 없이 — 인증 화면', () => {
 
         await expect(page.locator('#code')).toBeFocused()
         await expect(formAlert(page)).toHaveCount(0)
+      })
+
+      /*
+        **틀린 코드 뒤 재전송 (#1109)**. 성공하면 옛 코드는 무효다 — 코드 칸의 불일치 오류와 값을
+        함께 걷는다. 판정은 `code-step-after-resend.test.ts` 가 보고, 여기서는 실제 화면에 그렇게
+        반영되는지(두 상태 갱신이 한 화면으로 합쳐지는지)와 포커스를 본다.
+      */
+      test(`${screen.name}: 틀린 코드 뒤 재전송이 성공하면 코드 칸 오류와 값을 걷는다 (#1109)`, async ({
+        page,
+      }) => {
+        await page.clock.install()
+        await open(page, screen.path)
+        await toCodeStep(page, screen)
+        await submitWrongCode(page, screen)
+
+        await resendAgain(page)
+        await expect(page.locator('#code')).toBeFocused()
+        await expect(codeError(page)).toHaveCount(0)
+        await expect(page.locator('#code')).toHaveValue('')
+        await expect(page.locator('#code')).not.toHaveAttribute('aria-invalid', 'true')
+
+        // 옛 코드를 치다 만 채로 다시 보내도 값이 비워진다 — 칸에 남은 것은 무효가 된 코드다
+        await page.keyboard.type('ab')
+        await expect(page.locator('#code')).toHaveValue('AB')
+        await resendAgain(page)
+        await expect(page.locator('#code')).toHaveValue('')
+        await expect(page.locator('#code')).toBeFocused()
+        // 비운 뒤에도 입력 정규화가 그대로다(대문자 · 커서) — #1078 `VerificationCodeInput`
+        await page.keyboard.type('cd')
+        await expect(page.locator('#code')).toHaveValue('CD')
+      })
+
+      test(`${screen.name}: 틀린 코드 뒤 재전송이 429 면 코드 칸 오류는 남는다 (#1109)`, async ({
+        page,
+      }) => {
+        await page.clock.install()
+        await open(page, screen.path)
+        await toCodeStep(page, screen)
+        await submitWrongCode(page, screen)
+
+        await page.route(screen.api, (route) => route.fulfill(TOO_MANY))
+        await resendAgain(page)
+        await expect(formAlert(page)).toHaveText('잠시 후 다시 요청해주세요.')
+        await expect(codeError(page)).toHaveText(CODE_MISMATCH)
+        /*
+          첫 대상은 남은 오류 칸이다(제출 실패와 같은 순서) — 그래서 429 알림은 포커스가 아니라
+          `role="alert"` 로 읽힌다. 로그인 401 과 같은 모양이다.
+        */
+        await expect(page.locator('#code')).toBeFocused()
+        await expect(liveAlerts(page)).toHaveCount(1)
+        await expect(liveAlerts(page)).toHaveAttribute('data-form-alert', '')
+      })
+
+      test(`${screen.name}: 재전송이 429 · 503 이면 친 값을 지우지 않는다 (#1109)`, async ({
+        page,
+      }) => {
+        await page.clock.install()
+        await open(page, screen.path)
+        await toCodeStep(page, screen)
+        await page.keyboard.type('ab')
+
+        await page.route(screen.api, (route) => route.fulfill(TOO_MANY))
+        await resendAgain(page)
+        await expect(formAlert(page)).toBeFocused()
+        await expect(page.locator('#code')).toHaveValue('AB')
+
+        await page.unroute(screen.api)
+        await page.route(screen.api, (route) => route.fulfill(UNAVAILABLE))
+        await resendAgain(page)
+        await expect(temporary(page)).toBeFocused()
+        await expect(page.locator('#code')).toHaveValue('AB')
       })
     }
   })
