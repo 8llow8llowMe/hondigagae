@@ -29,16 +29,17 @@ prop 은 `ReactNode` 슬롯이 아니라 **자세 유니온**(`StateCharacterPos
 
 **새 값을 임의로 추가하지 않는다.** 추가는 `DESIGN.md` 갱신과 함께 한다.
 
-| 컴포넌트      | `variant`                                                                                                      | `size`               | 기본값                          |
-| ------------- | -------------------------------------------------------------------------------------------------------------- | -------------------- | ------------------------------- |
-| `Button`      | `primary` \| `secondary` \| `ghost` \| `danger` \| `dangerOutline` \| `kakao` \| `inverse` \| `inverseOutline` | `sm` \| `md` \| `lg` | `primary` / `md`                |
-| `Badge`       | `neutral` \| `brand` \| `accent` \| `danger`                                                                   | `sm` \| `md`         | `neutral` / `md`                |
-| `MetricBadge` | `tone`: `critical` \| `high` \| `mid` \| `low` \| `unknown` · `axis`: `suitability` \| `congestion` (#652)     | `sm` \| `md`         | 톤 없음 (필수) / `md` · 축 없음 |
-| `MetricWord`  | `tone` 위와 동일                                                                                               | — (`emphasis` 고정)  | 없음 (필수)                     |
-| `MetricValue` | `tone` 위와 동일 (생략 = 중립)                                                                                 | `hero` \| `row`      | `row`                           |
-| `Chip`        | `selected` \| `exclusive` (외형 variant 없음)                                                                  | —                    | 다중 축                         |
-| `Input`       | — (에러는 `error` prop)                                                                                        | `md` \| `lg`         | `md`                            |
-| `BackLink`    | `inline` \| `titleRow`                                                                                         | —                    | `inline`                        |
+| 컴포넌트      | `variant`                                                                                                      | `size`               | 기본값                                     |
+| ------------- | -------------------------------------------------------------------------------------------------------------- | -------------------- | ------------------------------------------ |
+| `Button`      | `primary` \| `secondary` \| `ghost` \| `danger` \| `dangerOutline` \| `kakao` \| `inverse` \| `inverseOutline` | `sm` \| `md` \| `lg` | `primary` / `md`                           |
+| `Badge`       | `neutral` \| `brand` \| `accent` \| `danger`                                                                   | `sm` \| `md`         | `neutral` / `md`                           |
+| `MetricBadge` | `tone`: `critical` \| `high` \| `mid` \| `low` \| `unknown` · `axis`: `suitability` \| `congestion` (#652)     | `sm` \| `md`         | 톤 없음 (필수) / `md` · 축 없음            |
+| `MetricWord`  | `tone` 위와 동일                                                                                               | — (`emphasis` 고정)  | 없음 (필수)                                |
+| `MetricValue` | `tone` 위와 동일 (생략 = 중립)                                                                                 | `hero` \| `row`      | `row`                                      |
+| `Chip`        | `selected` \| `exclusive` (외형 variant 없음)                                                                  | —                    | 다중 축                                    |
+| `Input`       | — (에러는 `error` prop)                                                                                        | `md` \| `lg`         | `md`                                       |
+| `BackLink`    | `inline` \| `titleRow`                                                                                         | —                    | `inline`                                   |
+| `ViewToggle`  | — (반대쪽 보기로 가는 글자 버튼 하나, #1125)                                                                   | `sm` \| `md`         | `md` (지도 위 44 · 카드 제목 줄은 `sm` 36) |
 
 > **`Badge` 의 `warn` · `info` 톤은 3차 세트에서 폐기했다** (DESIGN.md §2-7).
 > 측정값은 경고가 아니므로 등급은 `MetricBadge` 로 가고, 파란 정보 톤은 팔레트에 없다.
