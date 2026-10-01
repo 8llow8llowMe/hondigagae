@@ -347,12 +347,26 @@ pnpm e2e:report     # 마지막 실행 리포트
 
 폴백을 재도 층 규약 검증은 유효하다 — 폴백이 같은 규약을 따르도록 그려져 있는 것이 그 이유다. 막으려는 것은 **교체되는 순간에 걸리는 것** 하나다.
 
-### 라우터를 창에서 직접 부르면 마운트를 기다린다 (#1094)
+#### 폴백은 실화면과 같은 id 를 쓰지 않는다 (#1103)
 
-`window.next.router` 는 **hydration 전에도 있다.** 커밋 전에 `push` 를 부르면 React 가 "hasn't mounted yet" 경고를 남기고 업데이트를 버려, RSC 요청과 서버 리다이렉트는 나가는데 URL 은 출발점에 머문다. **`main` 이 보이는 것은 서버 HTML 이라 신호가 아니다** — 로컬은 hydration 이 빨라 늘 통과하고 느린 CI 에서만 재시도까지 깨졌다.
+첫 문서 진입에서는 **폴백과 실화면이 한 문서에 함께 있다.** 서버가 폴백을 먼저 흘리고, 실화면은 뒤이어 `<div hidden id="S:0">` 에 도착한 다음 `$RC` 가 자리를 바꾼다. 그 교체는 즉시가 아니다 — `$RC` 는 경계를 `$RB` 에 모아 두고 `$RV` 를 `requestAnimationFrame`(앞선 공개가 있었으면 그로부터 300ms 뒤까지 `setTimeout`)으로 미룬다. 그래서 겹침이 **`load` 뒤까지** 이어질 수 있고, `goto` 가 돌아온 직후의 단언이 그 창에 걸린다.
 
-- ✅ 부르기 전에 `history.state.__NA === true` 를 기다린다 — 앱 라우터가 커밋 때 남기는 표식이다 (`authed-auth-redirect.spec.ts` 의 `clientPush`).
-- ✅ 로컬 재현은 CDP `Emulation.setCPUThrottlingRate`(6배)로 한다. 고치기 전 스펙이 20회 중 20회 같은 모양으로 깨졌다.
+- **`#id` 선택자와 `getElementById` 는 `div[hidden]` 안도 본다.** 폴백이 실화면과 같은 id 를 그리면 그동안 두 노드가 잡혀 `strict mode violation … resolved to 2 elements` 로 깨진다. CI 에서 `emergency-search.spec.ts` 가 실제로 그랬다 — 첫째 노드는 `getByRole('region')` 으로 이름 붙는 폴백, 둘째는 접근성 트리에 없어 `locator('#emergency-list').getByText(…)` 로만 불리는 숨은 실화면이었다. CPU 6배 스로틀에 `waitUntil: 'commit'` 으로 겹침 창을 노리면 고치기 전 10회 중 4회 같은 메시지로 깨지고, 고친 뒤 20회 중 0회다.
+- ✅ **앱 쪽에서 id 를 가른다** — 폴백 제목은 `<실화면 id>-loading` 을 쓴다(`emergency/loading.tsx`). `Surface` 의 `aria-labelledby` 가 그 id 를 따라가므로 섹션 이름은 실화면과 같다. 실화면 id 를 가리키는 쪽(e2e · 앵커)은 그대로 둔다.
+- ❌ 스펙에서 `.first()` · `.last()` 로 하나를 고르지 않는다. 어느 쪽이 먼저인지가 스트림 순서에 달려 있어, 폴백을 잰 채 통과할 수 있다.
+- 역할 로케이터(`getByRole`)는 `hidden` 안을 보지 않아 이 창에 걸리지 않는다. 그래도 id 를 가르는 이유는 **문서에 같은 id 가 둘인 상태 자체**가 `aria-labelledby` · 앵커 이동을 흔들기 때문이다.
+
+> 같은 모양이 남은 폴백 — `plans/(list)/loading.tsx`(`plan-list-heading`) · `olle/(list)/loading.tsx`(`walk-course-list-heading`). 지금은 그 id 로 찾는 스펙이 없어 깨지지 않는다. 후속으로 같은 방식으로 가른다.
+
+### hydration 은 `networkidle` 이 아니라 마운트 표식으로 기다린다 (#1094 · #1103)
+
+`window.next.router` 는 **hydration 전에도 있다.** 커밋 전에 `push` 를 부르면 React 가 "hasn't mounted yet" 경고를 남기고 업데이트를 버려, RSC 요청과 서버 리다이렉트는 나가는데 URL 은 출발점에 머문다. 클릭·입력도 같다 — 핸들러가 붙기 전이면 React 에 닿지 않는다. **`main` 이 보이는 것은 서버 HTML 이라 신호가 아니다** — 로컬은 hydration 이 빨라 늘 통과하고 느린 CI 에서만 재시도까지 깨졌다(#1094). `waitForLoadState('networkidle')` 도 신호가 아니다 — "500ms 동안 요청이 없다" 는 추정이라 느린 hydration 을 보장하지 못하고, 요청이 이어지는 화면에서는 풀리지 않는다.
+
+- ✅ **`e2e/helpers/app-router.ts` 의 두 함수를 쓴다.** `test.beforeEach` 에서 `trackAppRouterMount(page)`, 누르거나 라우터를 부르기 직전에 `waitForAppRouterMounted(page)`. 신호는 앱 라우터의 `HistoryUpdater` 가 커밋 때(`useInsertionEffect`) 남기는 `history.state.__NA` 다.
+- ⚠️ **`__NA` 만 보면 속는다.** 같은 URL 로 다시 `goto` 하거나 `reload` 하면 새 문서가 이전 문서의 `history.state` 를 들고 시작해 hydration 전부터 `__NA` 가 참이다(2026-10-01 실측 — 다른 URL 로의 `goto` · `location.replace` 는 `null` 로 시작). 그래서 헬퍼는 문서 시작 때의 `history.state` 를 init script 로 붙잡고 **그 객체가 바뀐 뒤의** `__NA` 를 기다린다. `trackAppRouterMount` 없이 부르면 이유를 대고 실패한다.
+- ⚠️ **`loading.tsx` 경계 안은 덮지 않는다.** React 는 서버가 완성해 보낸 Suspense 경계의 hydration 을 오프스크린 우선순위로 미뤄, 루트 커밋(`__NA`) 뒤에 따로 끝날 수 있다. 지금 사용처(`(auth)` 폼 · 헤더 계정 메뉴 · `window.next.router`)는 경계 밖이다. 경계 안 요소라면 그 화면 고유의 신호(effect 가 채우는 값 — `login-remember-email` 의 `toBeChecked()` 같은 것)를 쓴다.
+- ✅ **`networkidle` 은 네트워크 정착이 목적일 때만 남기고 그 이유를 옆에 적는다.** 지금 둘이다 — `home-first-visit`(권역 비교 응답이 소개 카드를 밀어 내리는지 재야 해서 데이터 도착 뒤에 잰다, #963) · `plan-edit-drag` 의 `settle`(늦게 오는 조각이 카드 좌표를 밀지 않게, #1029).
+- ✅ 로컬 재현은 CDP `Emulation.setCPUThrottlingRate`(6배)로 한다. **스펙을 고치지 말고 임시 복사본에 `beforeEach` 로 끼운다.** #1094 는 고치기 전 스펙이 20회 중 20회 같은 모양으로 깨졌다. #1103 은 헬퍼로 옮긴 여섯 스펙을 6배에서 5회씩(170회) 돌려 무결이었다.
 
 ### 로그인
 
