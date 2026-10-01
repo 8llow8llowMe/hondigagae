@@ -58,6 +58,16 @@ export function AccountMenu() {
    *
    * `replace` 를 쓴다. 뒤로가기로 방금 떠난 보호 화면에 되돌아가지 않게 한다.
    * `refresh` 는 서버 컴포넌트가 들고 있는 세션 상태(전역 nav 등)까지 다시 그린다.
+   *
+   * **`refresh` 는 헤더만을 위한 줄이 아니다 — 로그인 때 받은 라우터 캐시의 데이터를 비운다**
+   * (#1099). 뒤로가기는 BFCache 에서 요청 없이 그리는데, 거기에 직전 사용자의 일정 · 닉네임이
+   * 실린 RSC 가 남아 있다. `refresh` 가 segment cache 와 BFCache 를 통째로 무효화해 다음 이동이
+   * 서버에 다시 묻게 하고, proxy 가 로그인으로 보낸다. 빼면 로그아웃 뒤 뒤로가기가 직전 사용자의
+   * 마이페이지를 요청 0건으로 그린다 (`e2e/logout-router-cache.spec.ts`).
+   *
+   * `enterSession` 처럼 `location.replace` 로 바꾸지 않는다. 새 문서가 오기 전에 뒤로가기를
+   * 누르면 브라우저가 그 이동을 취소하고 **같은 문서의 캐시로** 돌아가, 직전 화면에 머문다(실측).
+   * 응답 ~ 이동 완료 사이의 틈과 버린 대안은 인증 공통명세 S7.
    */
   async function handleLogout() {
     if (loggingOut) return

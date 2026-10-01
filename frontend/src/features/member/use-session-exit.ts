@@ -51,7 +51,11 @@ export function useSessionExit() {
 
       const href = reason === undefined ? '/login' : `/login?reauth=${reason}`
       router.replace(href)
-      // 서버 컴포넌트가 들고 있는 세션 상태(전역 nav 등)까지 다시 그린다
+      /*
+        서버 컴포넌트가 들고 있는 세션 상태(전역 nav 등)까지 다시 그리고, **로그인 때 받은 라우터
+        캐시(segment cache · BFCache)를 비운다** (#1099). 빼면 뒤로가기가 직전 사용자 화면을 요청
+        없이 그린다. `location.replace` 로 바꾸지 않는 이유는 `account-menu.tsx` 의 `handleLogout`.
+      */
       router.refresh()
     },
     [queryClient, router],
