@@ -11,6 +11,7 @@ import { Input } from '@/components/input'
 import { PasswordInput } from '@/components/password-input'
 import type { CodeValues, EmailValues, SignupProfileValues } from '@/features/auth/schemas'
 import { SignupEmailSummary } from '@/features/auth/signup-parts'
+import { VerificationCodeInput } from '@/features/auth/verification-code-input'
 import { classify } from '@/lib/api/error'
 import type { FormErrors } from '@/lib/form/field-errors'
 import { messages } from '@/lib/messages'
@@ -153,12 +154,9 @@ export function CodeStep({
       <FormAlert message={errors.form} />
 
       <Field id="code" label={messages.auth.codeLabel} error={errors.fields.code} required>
-        <Input
+        {/* 입력 중에 대문자화 · 공백 제거 — 재설정 2단계와 같은 칸이다 (#1078) */}
+        <VerificationCodeInput
           id="code"
-          type="text"
-          // 백엔드 예시가 A3K7MP2X 로 영숫자 혼합이다. numeric 이면 영문자를 못 넣는다 (D6)
-          inputMode="text"
-          autoComplete="one-time-code"
           value={values.code}
           onValueChange={(value) => onValueChange('code', value)}
           invalid={errors.fields.code !== undefined}

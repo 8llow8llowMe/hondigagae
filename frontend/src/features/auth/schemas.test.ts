@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { loginSchema, passwordResetSchema, signupProfileSchema } from '@/features/auth/schemas'
+import {
+  codeSchema,
+  loginSchema,
+  passwordResetSchema,
+  signupProfileSchema,
+} from '@/features/auth/schemas'
 import { validate } from '@/lib/form/validate'
 import { messages } from '@/lib/messages'
 
@@ -105,5 +110,37 @@ describe('passwordResetSchema — 회원가입과 같은 비밀번호 규칙이�
 
     expect(result.ok).toBe(false)
     if (!result.ok) expect(Object.keys(result.errors.fields)).toEqual(['newPassword'])
+  })
+})
+
+/*
+  **입력 핸들러가 이미 고치지만 스키마도 고친다** (#1078). 자동완성처럼 입력 이벤트를 건너뛰는
+  경로가 있어도 보내는 값은 같아야 한다 — 백엔드는 대소문자를 가려 비교한다.
+*/
+describe('인증코드 — 제출 직전 정규화 (#1078)', () => {
+  it('가입 2단계: 소문자 · 공백을 대문자 8자로 고쳐 보낸다', () => {
+    const result = validate(codeSchema, { code: ' a3k7 mp2x ' })
+
+    expect(result).toEqual({ ok: true, data: { code: 'A3K7MP2X' } })
+  })
+
+  it('가입 2단계: 공백뿐이면 비어 있다고 막는다 — 공백을 보내 AUTH_004 를 맞지 않는다', () => {
+    const result = validate(codeSchema, { code: '   ' })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.fields.code).toBe(messages.form.codeRequired)
+  })
+
+  it('재설정: 정규화한 코드를 보내고 새 비밀번호는 건드리지 않는다', () => {
+    const result = validate(passwordResetSchema, { code: 'r7m2 k9qx', newPassword: 'abcd123!' })
+
+    expect(result).toEqual({ ok: true, data: { code: 'R7M2K9QX', newPassword: 'abcd123!' } })
+  })
+
+  it('재설정: 공백뿐인 코드는 비어 있다고 막는다', () => {
+    const result = validate(passwordResetSchema, { code: ' ', newPassword: 'abcd123!' })
+
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors.fields.code).toBe(messages.form.codeRequired)
   })
 })
