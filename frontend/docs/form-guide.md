@@ -173,6 +173,17 @@ password: z.string().min(8, ...).max(20, ...).regex(PASSWORD_PATTERN, ...)
   - **접힌 섹션 안의 필드는 먼저 펼친다.** 포커스를 옮길 요소가 마운트돼 있지 않고 오류 메시지도
     화면에 없어 제출이 조용히 실패한다. 펼침 판정도 "첫 오류" 가 아니라 **"오류 중 하나라도 접기
     안인가"** 로 본다 (`ai-plan-create-form.tsx` 의 `COLLAPSED_FIELDS`).
+- **필드 오류가 없는 실패에서도 포커스를 놓지 않는다** ([#1078](https://github.com/8llow8llowMe/hondigagae/issues/1078)).
+  제출 중 버튼이 `disabled` 가 되면 브라우저는 포커스를 `BODY` 로 떨어뜨리고, 실패해서 버튼이
+  살아나도 돌려주지 않는다. 5xx · 429 · 409 처럼 폼 전체 오류로만 오는 실패 뒤에 키보드 사용자가
+  문서 맨 위에서 다시 시작했다 (실측: 로그인 503 · 429 · `MEMBER_007`, 가입 409, 재설정 완료).
+  - 순서는 `src/lib/form/submit-failure-focus.ts` 의 `focusSubmitFailure` 하나가 정한다:
+    **첫 오류 필드 → 폼 전체 알림(`FormAlert`) → 폼의 첫 입력.** `focusFirstError` 를 부르던
+    effect 는 필드 오류만 다룰 때 그대로 두고, 폼 전체 오류가 날 수 있는 폼은 이 함수를 부른다.
+  - `FormAlert` 는 그래서 `tabIndex={-1}` + `data-form-alert` 를 단다. 찾는 쪽은 `role="alert"`
+    가 아니라 이 속성을 본다 — `next dev` 오버레이도 `alert` 다.
+  - **단계를 되돌리는 실패**(`AUTH_005` · `MEMBER_006` · `AUTH_017`)는 단계 전환 effect 가 새 단계의
+    첫 입력으로 옮긴다. 제출 실패 effect 는 단계 가드로 비켜선다 — 둘이 포커스를 다투지 않게.
 - 비밀번호 표시 토글은 `aria-pressed` 로 상태를 알린다.
 
 ## 9. 테스트
