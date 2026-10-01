@@ -2,6 +2,7 @@ import { expect, type Page, test } from '@playwright/test'
 
 import { MOCK_EMAIL_CODE, MOCK_PASSWORD_RESET_CODE } from '../src/lib/api/mock/auth-data'
 import { messages } from '../src/lib/messages'
+import { trackAppRouterMount, waitForAppRouterMounted } from './helpers/app-router'
 
 /**
  * **인증코드 정규화와 제출 실패 뒤 포커스** — 이슈 #1078.
@@ -19,6 +20,10 @@ import { messages } from '../src/lib/messages'
  */
 test.use({ storageState: { cookies: [], origins: [] } })
 
+test.beforeEach(async ({ page }) => {
+  await trackAppRouterMount(page)
+})
+
 /** `MOCK_API=true` 저장소의 일반 계정 (`src/lib/api/mock/store.ts`) */
 const DEMO_EMAIL = 'demo@hondigagae.dev'
 /**
@@ -29,10 +34,14 @@ const RESET_ACCOUNT = { email: 'linked@hondigagae.dev', password: 'password123!'
 
 const formAlert = (page: Page) => page.locator('[data-form-alert]')
 
-/** 클릭이 React 에 닿으려면 hydration 이 끝나야 한다 */
+/**
+ * 클릭이 React 에 닿으려면 hydration 이 끝나야 한다 — `networkidle` 추정이 아니라 마운트
+ * 표식을 기다린다 (#1103, `helpers/app-router.ts`). `(auth)` 에는 `loading.tsx` 가 없어 폼이
+ * 루트 커밋과 함께 hydrate 된다.
+ */
 async function open(page: Page, path: string): Promise<void> {
   await page.goto(path)
-  await page.waitForLoadState('networkidle')
+  await waitForAppRouterMounted(page)
 }
 
 /** 가입 2단계까지 간다 */

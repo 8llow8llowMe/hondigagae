@@ -2,6 +2,7 @@ import { expect, type Page, test } from '@playwright/test'
 
 import { SAVED_LOGIN_EMAIL_STORAGE_KEY } from '../src/lib/auth/saved-login-email'
 import { messages } from '../src/lib/messages'
+import { trackAppRouterMount, waitForAppRouterMounted } from './helpers/app-router'
 
 /**
  * **로그인 화면의 "이메일 기억하기"** — 로그인-세부명세 D10 (#1081).
@@ -23,6 +24,10 @@ const CAPTION = messages.auth.rememberEmailCaption
 const MOCK_ACCOUNT = { email: 'demo@hondigagae.dev', password: 'password123!' } as const
 
 test.use({ storageState: { cookies: [], origins: [] } })
+
+test.beforeEach(async ({ page }) => {
+  await trackAppRouterMount(page)
+})
 
 async function readSaved(page: Page): Promise<string | null> {
   return page.evaluate((key) => globalThis.localStorage.getItem(key), STORAGE_KEY)
@@ -46,8 +51,8 @@ test('체크를 켜고 로그인하면 로그아웃 뒤 재방문에 이메일�
   await page.goto('/login')
   // 기본은 꺼짐 — 저장값이 없으면 켜지지 않는다
   await expect(page.locator('#remember-email')).not.toBeChecked()
-  // 클릭이 React 에 닿으려면 hydration 이 끝나야 한다
-  await page.waitForLoadState('networkidle')
+  // 클릭이 React 에 닿으려면 hydration 이 끝나야 한다 — 마운트 표식으로 기다린다 (#1103)
+  await waitForAppRouterMounted(page)
 
   await page.locator('#email').fill(MOCK_ACCOUNT.email)
   await page.locator('#password').fill(MOCK_ACCOUNT.password)
@@ -64,8 +69,12 @@ test('체크를 켜고 로그인하면 로그아웃 뒤 재방문에 이메일�
     로그아웃은 기억을 남긴다 (#1081). **헤더 계정 메뉴로 나간다** — 세션이 있으면 `/login` 은
     서버 리다이렉트라 그 자리에 로그아웃 버튼이 없다 (#1082).
   */
-  // 로그인 성공은 문서째 새로 받는다 (#1075) — 메뉴 버튼이 hydration 전에 눌리면 열리지 않는다
-  await page.waitForLoadState('networkidle')
+  /*
+    로그인 성공은 문서째 새로 받는다 (#1075) — 메뉴 버튼이 hydration 전에 눌리면 열리지 않는다.
+    **새 문서의 마운트를 기다린다** (#1103). `location.replace` 로 열린 문서는 `history.state` 가
+    비어 시작하므로 이전 문서의 `__NA` 에 속지 않는다 — 헬퍼가 그래도 시작 상태와 견준다.
+  */
+  await waitForAppRouterMounted(page)
   await page.getByRole('button', { name: '내 정보 메뉴 열기' }).click()
   await page.getByRole('menuitem', { name: messages.member.logout }).click()
   await expect(page.getByRole('button', { name: '내 정보 메뉴 열기' })).toHaveCount(0)

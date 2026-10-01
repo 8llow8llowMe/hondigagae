@@ -1,5 +1,7 @@
 import { expect, type Page, test } from '@playwright/test'
 
+import { trackAppRouterMount, waitForAppRouterMounted } from './helpers/app-router'
+
 /**
  * **로그인한 채 인증 화면에 오면 안내 대신 목적지로 간다** (#1082).
  *
@@ -40,6 +42,8 @@ import { expect, type Page, test } from '@playwright/test'
  * 마운트 신호는 **`history.state.__NA`** 다. 앱 라우터의 `HistoryUpdater` 가 커밋 때
  * (`useInsertionEffect`) 현재 항목에 남기는 표식이라, 이것이 있으면 dispatch 의 주인이
  * 마운트돼 있다. `networkidle` 은 "500ms 동안 요청이 없다" 는 추정이라 고르지 않았다.
+ * 대기는 공용 헬퍼 `waitForAppRouterMounted`(`helpers/app-router.ts`)로 옮겼다 (#1103) —
+ * 같은 URL 재방문·새로고침에서 이전 문서의 `__NA` 가 남는 함정까지 그쪽이 막는다.
  *
  * **사용자에게는 생기지 않는다.** hydration 전의 링크 클릭은 `next/link` 의 핸들러가 아직 없어
  * 브라우저가 문서째 이동하고, 그 요청은 307 로 간다(첫 테스트가 본다). 앱 코드의 `router.push` 는
@@ -55,9 +59,7 @@ type NextWindow = Window & {
 /** 문서를 바꾸지 않고 Next 라우터로 이동한다 — 표식이 살아 있으면 클라이언트 이동이었다 */
 async function clientPush(page: Page, href: string) {
   // 마운트 전에 부르면 push 가 버려진다 (#1094, 위 주석)
-  await page.waitForFunction(
-    () => (window.history.state as { __NA?: unknown } | null)?.__NA === true,
-  )
+  await waitForAppRouterMounted(page)
   await page.evaluate((target) => {
     const w = window as NextWindow
     w.__noReload = true
@@ -72,6 +74,10 @@ async function stayedInDocument(page: Page): Promise<boolean> {
 }
 
 test.describe('로그인한 채 인증 화면에 오면 (#1082)', () => {
+  test.beforeEach(async ({ page }) => {
+    await trackAppRouterMount(page)
+  })
+
   test('/login 은 307 로 returnTo 에 보낸다', async ({ page }) => {
     const response = await page.goto('/login?returnTo=%2Fmypage')
 

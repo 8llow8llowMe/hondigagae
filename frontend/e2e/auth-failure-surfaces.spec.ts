@@ -1,6 +1,7 @@
 import { expect, type Page, test } from '@playwright/test'
 
 import { messages } from '../src/lib/messages'
+import { trackAppRouterMount, waitForAppRouterMounted } from './helpers/app-router'
 
 /**
  * **인증 화면의 실패 표면** — 이슈 #1079.
@@ -17,6 +18,10 @@ import { messages } from '../src/lib/messages'
  * 세션 없이 시작한다 — 세션이 있으면 인증 화면이 목적지로 보낸다 (#1082).
  */
 test.use({ storageState: { cookies: [], origins: [] } })
+
+test.beforeEach(async ({ page }) => {
+  await trackAppRouterMount(page)
+})
 
 const PHONE = { width: 375, height: 812 } as const
 
@@ -114,7 +119,8 @@ test.describe('로그인 5xx (#1079)', () => {
       route.fulfill(failure(503, 'COMMON_503', '서비스를 일시적으로 사용할 수 없습니다.')),
     )
     await page.goto('/login')
-    await page.waitForLoadState('networkidle')
+    // 입력·제출이 React 에 닿으려면 hydration 이 끝나야 한다 — 마운트 표식으로 기다린다 (#1103)
+    await waitForAppRouterMounted(page)
 
     const kakao = page.getByRole('button', { name: messages.auth.socialLoginLabel('카카오') })
     const before = await kakao.boundingBox()
