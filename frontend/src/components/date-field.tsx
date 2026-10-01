@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 
 import { Calendar, dayLabel } from '@/components/calendar'
 import { fieldErrorId } from '@/components/field'
+import { useFieldDescribedBy } from '@/components/field-context'
 import { PlanIcon } from '@/components/icons'
 import { type AnchoredPosition, anchoredPosition } from '@/lib/ui/anchored-position'
 import { useOverlay } from '@/lib/ui/overlay'
@@ -105,6 +106,8 @@ export function DateField({
   */
   const [selfOpen, setSelfOpen] = useState(false)
   const open = openProp ?? selfOpen
+  // `Field` 안이면 `Field` 가 그린 안내 · 오류를 가리킨다 — `field-context.tsx` (#1100)
+  const describedBy = useFieldDescribedBy(id, invalid ? fieldErrorId(id) : undefined)
   const setOpen = useCallback(
     (next: boolean) => {
       // controlled 면 부모만 상태를 바꾼다. 둘 다 쓰면 한쪽이 뒤늦게 되돌린다
@@ -227,7 +230,7 @@ export function DateField({
           aria-haspopup="dialog"
           {...(open ? { 'aria-controls': panelId } : {})}
           aria-invalid={invalid ? true : undefined}
-          aria-describedby={invalid ? fieldErrorId(id) : undefined}
+          aria-describedby={describedBy}
           onClick={() => setOpen(true)}
           // readOnly 라 타이핑은 들어오지 않지만 Enter·Space 는 열기여야 한다
           onKeyDown={(event) => {
