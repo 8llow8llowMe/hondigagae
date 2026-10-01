@@ -639,7 +639,8 @@ export function PlaceMapView({
           inert={!panelOpen}
           className={cn(
             'map-panel-width relative h-full transition-transform',
-            // 닫히면 패널 오른쪽 끝이 뷰포트 x=0 에 닿도록 자기 폭 + 왼쪽 여백(16)만큼 민다.
+            // 닫히면 자기 폭 + 왼쪽 여백(16) + 밖으로 튀어나온 접기 탭(24) + 그림자 번짐(16)만큼
+            // 민다 — 탭까지 화면 밖으로 나가야 펼치기 버튼과 겹치지 않는다 (#1123).
             // `-translate-x-full`(폭만큼)로는 `left-4` 때문에 16px 조각이 남는다.
             // 값이 `calc()` 라 globals.css 의 이름 있는 클래스다 (`.map-panel-collapsed`)
             !panelOpen && 'map-panel-collapsed',

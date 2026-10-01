@@ -1826,11 +1826,16 @@ body {
   자기 폭(400)에 **컨테이너의 왼쪽 여백 16(`left-4`)을 더해** 민다. 폭만큼(`-100%`)만
   밀면 패널 오른쪽 끝이 x=16 에 남아 16px 조각이 지도 위에 걸친다.
 
+  **그 위에 접기 탭 24(`-right-6`)와 그림자 번짐 16 을 더 민다** (#1123). 패널 오른쪽 끝만
+  x=0 에 맞추던 때는 패널 밖으로 튀어나온 탭이 x 0~24 에 그대로 남아, 접힌 상태에서
+  펼치기 버튼(16~60) 밑에 `<` 가 깔려 손잡이 둘이 겹쳐 보였다(1440 실측). 패널의
+  `shadow-lg` 도 왼쪽 끝에 회색 띠로 비쳤다. `1rem + 1.5rem + 1rem` = 3.5rem 이다.
+
   **`calc()` 라 여기 있다** — arbitrary value 안의 함수는 Tailwind 가 조용히 무시할 수
   있어 lint 가 막는다 (`eslint.config.mjs` 의 `no-restricted-syntax`).
 */
 .map-panel-collapsed {
-  transform: translateX(calc(-100% - 1rem));
+  transform: translateX(calc(-100% - 3.5rem));
 }
 
 /*
