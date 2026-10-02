@@ -43,8 +43,9 @@ import lombok.extern.slf4j.Slf4j;
  * 통째로 버리면 맞는 말까지 잃는다. 남는 문장이 없으면 근거는 버리고, 메모는 후보 데이터로
  * 만든 서버 문구로 바꾼다. 장소가 없는 항목(식사 자리 · 이동)은 메모를 비운다 — 지어 채울 사실이 없다.
  *
- * <p>항목 종류(숙박 유형 장소는 {@code LODGING})는 {@link OllamaLlmAdapter} 가 먼저 맞춰 둔다.
- * 이 클래스는 그 결과를 믿고 {@code itemType} 으로 숙박을 가른다.
+ * <p>항목 종류는 {@link OllamaLlmAdapter} 가 후보 분류로 정해 둔다(숙박 → {@code LODGING}, #1128). 그날 밤
+ * 숙소(모델이 적은 {@code lodging} 번호)도 어댑터가 그날 끝에 {@code LODGING} 항목으로 붙여 넘긴다.
+ * 이 클래스는 그 결과를 믿고 {@code itemType} 으로 숙박을 가른다 — <b>마지막 날 숙박을 빼는 규칙은 여기 하나다.</b>
  */
 @Slf4j
 final class AiPlanDraftFactGuard {
@@ -52,6 +53,12 @@ final class AiPlanDraftFactGuard {
     /** 후보의 {@code contentTypeName}. tour-service {@code ContentType} 의 표시명이다. */
     static final String LODGING_CONTENT_TYPE = "숙박";
     static final String RESTAURANT_CONTENT_TYPE = "음식점";
+
+    /**
+     * 숙소 항목의 서버 문구. 메모가 통째로 빠졌을 때와, 어댑터가 그날 {@code lodging} 번호로 숙박 항목을
+     * 붙일 때 같이 쓴다 — 모델은 숙소 메모를 쓰지 않는다 (#1128).
+     */
+    static final String LODGING_NOTE = "반려견과 함께 묵는 숙소예요.";
 
     /** 이 온도 이상인 날만 "덥다" 고 말할 수 있다. 프롬프트의 "최고기온 31℃ 이상인 날" 과 같은 값이다. */
     static final double HOT_DAY_MAX_TEMPERATURE = 31.0d;
@@ -229,7 +236,7 @@ final class AiPlanDraftFactGuard {
             return null;
         }
         if (LODGING_CONTENT_TYPE.equals(place.contentTypeName())) {
-            return "반려견과 함께 묵는 숙소예요.";
+            return LODGING_NOTE;
         }
         if (RESTAURANT_CONTENT_TYPE.equals(place.contentTypeName())) {
             return "반려견과 함께 들르는 음식점·카페예요.";

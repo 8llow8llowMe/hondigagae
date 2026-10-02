@@ -119,6 +119,6 @@ class AiPlanTaskExecutorTest {
     }
 
     private AiLlmProperties defaultLlmProperties() {
-        return new AiLlmProperties(null, null, null, null, null, null, null, null, null, null, null);
+        return new AiLlmProperties(null, null, null, null, null, null, null, null, null, null, null, null);
     }
 }

@@ -8,6 +8,7 @@ import com.hondigagae.domainlayer.planner.application.model.DayWeatherOutlook;
 import com.hondigagae.domainlayer.planner.application.model.PackingChecklistQuery;
 import com.hondigagae.domainlayer.planner.application.model.PetCondition;
 import com.hondigagae.domainlayer.planner.application.model.PlaceCandidate;
+import com.hondigagae.domainlayer.planner.application.model.PlanOutline;
 import com.hondigagae.global.properties.AiLlmProperties;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -40,6 +41,13 @@ class PlanPromptSizeTest {
 
     /** 운영 기본 후보 수 (`ai-llm.place-candidate-size`). */
     private static final int PRODUCTION_CANDIDATE_SIZE = 50;
+
+    /**
+     * 출력 스키마 지시의 상한(문자). 줄이기 전 2,944자, #1128 뒤 2,246자(Windows 측정 — 들여쓰기 출력이
+     * {@code System.lineSeparator()} 라 Linux 에서는 줄 수만큼 짧다). 고정 머리말과 들여쓰기가 대부분이라
+     * 필드 설명보다 필드 개수가 크기를 정한다. 필드를 되살리면 이 상한에 걸린다.
+     */
+    private static final int SCHEMA_CHARS_LIMIT = 2_500;
 
     private final AiPlanPromptFactory promptFactory = new AiPlanPromptFactory();
     private final BeanOutputConverter<LlmPlanDraftResponse> outputConverter =
@@ -75,7 +83,7 @@ class PlanPromptSizeTest {
             + promptFactory.userPrompt(query(PRODUCTION_CANDIDATE_SIZE))
             + outputConverter.getFormat();
         AiLlmProperties defaults =
-            new AiLlmProperties(null, null, null, null, null, null, null, null, null, null, null);
+            new AiLlmProperties(null, null, null, null, null, null, null, null, null, null, null, null);
 
         assertThat(defaults.contextTokens()).isGreaterThan(prompt.length());
         // 출력도 같은 창에 들어간다. 프롬프트 + 출력 예산이 창을 넘으면 다시 잘린다.
@@ -91,6 +99,38 @@ class PlanPromptSizeTest {
         // 후보 한 곳이 한 줄이라 개수에 비례한다. place-candidate-size 를 올릴 때
         // context-tokens 도 함께 봐야 한다는 뜻이다.
         assertThat(large).isGreaterThan(small * 5);
+    }
+
+    /*
+     * #1128. dev 디코드가 18.6 tok/s 고정이라 출력 토큰이 곧 대기 시간이다. 프롬프트에 18자리 아이디가 있으면
+     * 모델이 그것을 항목마다 옮겨 적는다(6~9토큰) — 실제 tour-service 길이의 아이디로 재생성 맥락까지 함께 본다.
+     */
+    @Test
+    @DisplayName("일정 · 재생성 프롬프트에 18자리 아이디가 없다 — 모델이 옮겨 적을 숫자를 주지 않는다 (#1128)")
+    void promptCarriesNoLongIds() {
+        AiPlanGenerationQuery regenerate = AiPlanGenerationQuery.builder()
+            .areaCode("39").startDate("2026-09-09").endDate("2026-09-12")
+            .regenerateDay(2)
+            .planOutline(PlanOutline.builder().planId(7L).days(List.of(
+                PlanOutline.PlanOutlineDay.builder().day(1).items(List.of(PlanOutline.PlanOutlineItem.builder()
+                    .title("제주 반려견 동반 카페 1호점").itemType("PLACE").placeId(212481712381923329L).build())).build())).build())
+            .placeCandidates(candidates(PRODUCTION_CANDIDATE_SIZE))
+            .build();
+
+        assertThat(promptFactory.userPrompt(query(PRODUCTION_CANDIDATE_SIZE))).doesNotContainPattern("\\d{10,}");
+        assertThat(promptFactory.userPrompt(regenerate)).doesNotContainPattern("\\d{10,}");
+    }
+
+    @Test
+    @DisplayName("출력 스키마는 후보 번호 · 메모 · 숙소 번호 · 근거 코드와 설명만 묻는다 — 서버가 채울 필드를 모델에게 쓰게 하지 않는다 (#1128)")
+    void outputSchemaAsksOnlyWhatTheServerCannotFill() {
+        String schema = outputConverter.getFormat();
+
+        assertThat(schema).contains("\"place\"").contains("\"note\"").contains("\"lodging\"")
+            .contains("\"code\"").contains("\"description\"");
+        assertThat(schema).doesNotContain("\"itemType\"").doesNotContain("\"placeId\"")
+            .doesNotContain("\"title\"").doesNotContain("\"name\"");
+        assertThat(schema.length()).isLessThan(SCHEMA_CHARS_LIMIT);
     }
 
     /** 준비물 프롬프트는 후보 목록이 없다 — 그 차이가 크기 차이의 대부분이다. */

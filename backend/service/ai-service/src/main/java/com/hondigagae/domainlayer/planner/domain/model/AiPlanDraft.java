@@ -40,7 +40,8 @@ public record AiPlanDraft(
         // 항목 종류. plan-service 와 같은 enum 을 쓴다 - 문자열로 두면 코드가 조용히 어긋난다.
         PlanItemType itemType,
         // 장소 식별자. plan-service 저장 시 targetId 가 된다.
-        // 이동(MOVE)처럼 특정 장소가 없거나, 후보 밖 장소라 연결을 끊은 경우 null 이다.
+        // 어댑터가 만드는 초안 항목에는 언제나 후보 장소가 있다(#1128 — 장소 없는 항목은 버린다).
+        // nullable 인 것은 plan-service 의 targetId(이동 MOVE 는 대상이 없다)와 모양을 맞춘 것이다.
         Long placeId,
         String title,
         String note
