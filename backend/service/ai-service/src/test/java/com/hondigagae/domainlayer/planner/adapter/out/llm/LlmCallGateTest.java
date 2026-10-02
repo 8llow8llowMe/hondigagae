@@ -154,7 +154,7 @@ class LlmCallGateTest {
 
     private LlmCallGate gate(long queueWaitMs) {
         return new LlmCallGate(new AiLlmProperties(
-            null, null, null, null, null, queueWaitMs, null, null, null, null, null));
+            null, null, null, null, null, queueWaitMs, null, null, null, null, null, null));
     }
 
     private static void sleep(long millis) {

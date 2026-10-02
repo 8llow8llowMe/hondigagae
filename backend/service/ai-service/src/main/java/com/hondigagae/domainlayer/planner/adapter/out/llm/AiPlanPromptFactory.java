@@ -35,34 +35,38 @@ public class AiPlanPromptFactory {
      *
      * <p>규칙을 굳이 적는 이유는 각각 실제로 틀릴 수 있는 지점이기 때문이다 - 후보 밖 장소를
      * 지어내는 것, 반려견이 아니라 사람 기준으로 짜는 것, 근거를 일반론으로 적는 것.
+     *
+     * <p><b>규칙 번호를 옮기지 않는다.</b> 문서와 주석이 "규칙 9번(조사)" · "규칙 11번(같은 장소)" 처럼
+     * 번호로 부른다. 출력 스키마를 줄일 때(#1128) 새 스키마와 어긋난 규칙(1 · 2 · 3 · 4 · 7 · 11)은 같은 자리에서
+     * 고쳐 썼다 — 장소는 후보 번호로, 장소 없는 항목은 없이, 숙소는 그날의 lodging 으로.
      */
     private static final String SYSTEM_PROMPT = """
         당신은 반려견과 함께하는 제주 여행 일정을 설계하는 전문가입니다.
 
         지켜야 할 규칙:
-        1. 일정에 넣는 장소는 반드시 사용자가 준 후보 목록 안에서만 고릅니다. 목록에 없는 장소는
-           이름이 떠오르더라도 절대 쓰지 않습니다. placeId 는 목록의 값을 그대로 옮깁니다.
+        1. 장소는 사용자가 준 후보 목록 안에서만 고르고, 후보 줄 앞의 번호로 적습니다. 목록에 없는
+           장소는 이름이 떠오르더라도 절대 쓰지 않습니다.
         2. 사람이 아니라 반려견 기준으로 짭니다. 하루 이동을 과하게 넣지 말고, 활동 사이에
-           쉬는 자리를 둡니다.
-        3. 하루에 식사 항목(MEAL)을 최소 한 번 넣되, 후보에 식음료 장소가 없으면 억지로
-           넣지 않습니다. 없는 것을 있다고 하지 않는 편이 낫습니다.
-        4. 근거(reasons)는 후보 데이터에 적힌 사실로만 씁니다. "좋은 곳입니다" 같은 일반론이
-           아니라 실내 여부, 동반 조건, 분류처럼 목록에서 확인되는 내용을 적습니다.
+           카페처럼 쉬어 갈 후보를 둡니다.
+        3. 식사는 음식점 후보가 있을 때만 그 후보로 넣습니다. 없으면 넣지 않습니다.
+           없는 것을 있다고 하지 않는 편이 낫습니다.
+        4. 근거(reasons)는 최대 3개, 후보 데이터에 적힌 사실로만 씁니다. "좋은 곳입니다" 같은
+           일반론이 아니라 실내 여부, 동반 조건, 분류처럼 목록에서 확인되는 내용을 적습니다.
         5. 확신할 수 없는 것은 적지 않습니다. 운영시간, 요금, 예약 가능 여부는 후보 목록에
            없으므로 언급하지 않습니다.
-        6. 근거와 항목 메모는 사용자에게 그대로 보이는 문장입니다. 대괄호([ ]) 같은 기호 표기를
+        6. 근거와 메모는 사용자에게 그대로 보이는 문장입니다. 대괄호([ ]) 같은 기호 표기를
            쓰지 말고, 일자는 "2일차", 여러 날은 "1~3일차" 처럼 자연스러운 문장으로 적습니다.
-        7. 모든 항목에 title 과 note 를 채웁니다. 장소가 없는 식사 항목도 "점심 식사" 처럼 무엇을
-           하는 자리인지 적습니다. 빈 문자열로 두면 사용자에게 이름 없는 빈 줄이 보입니다.
+        7. 모든 항목에는 후보 번호가 있어야 합니다. 장소가 없는 항목(빈 식사 자리, 이동)은
+           만들지 않습니다. 메모는 한 문장으로 짧게(25자 안팎) 씁니다.
         8. 사용자에게 보이는 문장은 "~해요" 체로 씁니다. "~한다", "~합니다", "~해라" 를 섞지
            않습니다. 한 초안 안에서 말투가 갈리면 안 됩니다.
         9. 장소명 뒤에 조사(은/는, 이/가, 을/를)를 붙이지 않습니다. 장소명이 숫자나 영문으로
            끝나면 받침 판정이 어긋나므로("애월코스트34은"), 조사가 필요 없는 문장으로 바꿔 씁니다.
         10. 반려견의 생애 단계는 입력에 적힌 표현만 씁니다. 입력에 없는 "노령견", "노견",
             "어린 강아지" 같은 단정을 덧붙이지 않습니다.
-        11. 같은 장소를 여러 날에 넣지 않습니다. 날마다 다른 곳을 고릅니다. 숙박(LODGING)은
-            예외입니다 — 같은 숙소에 이어 묵는 것은 자연스럽습니다. 단, 마지막 날에는 숙박을 넣지
-            않습니다. 그날 밤은 집으로 돌아갑니다.
+        11. 같은 장소를 여러 날에 넣지 않습니다. 날마다 다른 곳을 고릅니다. 숙박 후보는 항목에
+            넣지 않고, 그날 밤 묵을 숙박 후보 번호를 그날의 lodging 에 적습니다 — 같은 숙소에 이어
+            묵어도 됩니다. 마지막 날 lodging 은 null 입니다. 그날 밤은 집으로 돌아갑니다.
         12. 후보 사이의 이동 거리와 혼잡도는 입력에 없습니다. "이동 거리가 짧다", "한적하다" 처럼
             쓰지 않습니다. 반려견 성향 때문에 고른 곳은 성향으로만 설명합니다("사람을 불편해하는
             아이라"). 더위는 날씨 전망의 최고기온이 31℃ 이상인 날에만 말합니다.
@@ -172,16 +176,22 @@ public class AiPlanPromptFactory {
         appendWeatherSection(prompt, query);
         appendRegenerateSection(prompt, query);
 
-        prompt.append("\n후보 장소 (이 목록 안에서만 고를 것)\n");
-        for (PlaceCandidate candidate : query.safeCandidates()) {
-            prompt.append("- ");
+        /*
+          후보는 아이디가 아니라 번호로 싣는다 (#1128). 18자리 placeId 는 항목마다 6~9토큰이라 그대로 옮겨
+          쓰게 하면 그만큼 디코드가 늘고, 옮겨 적다 틀릴 자리도 생긴다. 번호는 safeCandidates() 순서의 1-based
+          인덱스이고 어댑터가 같은 목록에서 되돌린다 — 이 순서가 둘 사이의 계약이다.
+        */
+        prompt.append("\n후보 장소 (이 목록 안에서만 고르고, 줄 앞의 번호로 적을 것)\n");
+        List<PlaceCandidate> candidates = query.safeCandidates();
+        for (int index = 0; index < candidates.size(); index++) {
+            PlaceCandidate candidate = candidates.get(index);
+            prompt.append("- ").append(index + 1).append(". ");
             if (query.safePinnedPlaceIds().contains(candidate.placeId())) {
                 prompt.append("[필수 포함] ");
             } else if (query.safeFavoritePlaceIds().contains(candidate.placeId())) {
                 prompt.append("[선호] ");
             }
-            prompt.append("placeId=").append(candidate.placeId())
-                .append(" | ").append(candidate.title())
+            prompt.append(candidate.title())
                 .append(" | ").append(nullSafe(candidate.contentTypeName()))
                 .append(" | ").append(candidate.indoorText())
                 .append(" | 동반: ").append(nullSafe(candidate.petAllowanceName()));
@@ -200,8 +210,18 @@ public class AiPlanPromptFactory {
             prompt.append('\n');
         }
 
-        prompt.append("\n위 조건으로 ").append(resolveDayCount(query)).append("일 일정을 만들어 주세요.");
+        if (isRegenerate(query)) {
+            // 재생성은 그날 하루만 출력시킨다 — "N일 일정을 만들어 주세요" 로 끝내면 위 절의 지시와 맞서 전체를 다시 쓴다.
+            prompt.append("\n위 조건으로 ").append(query.regenerateDay()).append("일차 하루 일정만 만들어 주세요.");
+        } else {
+            prompt.append("\n위 조건으로 ").append(resolveDayCount(query)).append("일 일정을 만들어 주세요.");
+        }
         return prompt.toString();
+    }
+
+    /** 하루 재생성인가. 워커가 regenerateDay 와 planOutline 을 함께 채운다 — 둘 중 하나만 있으면 전체 생성으로 본다. */
+    private static boolean isRegenerate(AiPlanGenerationQuery query) {
+        return query.regenerateDay() != null && query.planOutline() != null;
     }
 
     /**
@@ -313,21 +333,31 @@ public class AiPlanPromptFactory {
     }
 
     /**
-     * 하루 재생성 절. 기존 일정 전체를 보여 주고 지정한 날만 새로 짜게 한다 —
-     * 이 절이 없으면 "재생성"이 아니라 완전히 새로운 일정이 나온다.
+     * 하루 재생성 절. 기존 일정은 <b>겹치지 않게 하는 맥락</b>으로만 보여 주고, 지정한 날 하루만 출력하게 한다.
+     *
+     * <p>전에는 "나머지 날은 그대로 유지해 전체 일정을 출력할 것" 이었다. 화면은 그날 하루만 쓰는데
+     * ({@code plan-day-regenerate-view.tsx} 가 대상 일자만 거른다) 모델은 7일치를 다시 써서, 하루 재생성의
+     * 디코드가 전체 생성과 같았다 (#1128). 다른 날 장소를 넣지 말라는 지시가 기존 일정을 싣는 이유다 —
+     * 숙소는 규칙 11 대로 이어 묵을 수 있다. 그래도 다른 날이 오면 어댑터가 대상 일자만 남긴다.
      */
     private void appendRegenerateSection(StringBuilder prompt, AiPlanGenerationQuery query) {
-        PlanOutline outline = query.planOutline();
-        if (outline == null || query.regenerateDay() == null) {
+        if (!isRegenerate(query)) {
             return;
         }
-        prompt.append("\n기존 일정\n");
-        appendOutlineDays(prompt, outline);
-        prompt.append("- 위 일정에서 ").append(query.regenerateDay())
-            .append("일차만 새로 구성할 것. 나머지 날은 기존 항목을 순서까지 그대로 유지해 전체 일정을 출력할 것\n");
+        int target = query.regenerateDay();
+        prompt.append("\n기존 일정 (겹치지 않게 참고만 할 것)\n");
+        appendOutlineDays(prompt, query.planOutline());
+        prompt.append("- ").append(dayLabel(target)).append("만 새로 짜서 그날 하루만 출력할 것. days 에는 ")
+            .append(dayLabel(target)).append(" 하나만 담을 것\n");
+        prompt.append("- 다른 날에 있는 장소는 넣지 말 것. 숙소는 이어 묵어도 됨\n");
     }
 
-    /** 일정 개요의 일자별 줄. 하루 재생성·준비물 생성 프롬프트가 같은 표기를 쓰도록 한 곳에 둔다. */
+    /**
+     * 일정 개요의 일자별 줄. 하루 재생성·준비물 생성 프롬프트가 같은 표기를 쓰도록 한 곳에 둔다.
+     *
+     * <p>아이디는 싣지 않는다 (#1128). 둘 다 이름으로 충분하다 — 재생성은 겹치지 않게 보는 맥락이고(출력은
+     * 후보 번호다), 준비물은 아이디를 쓰지 않는다. 18자리 숫자는 토큰만 먹고, 모델이 출력에 흉내 낼 거리가 된다.
+     */
     private void appendOutlineDays(StringBuilder prompt, PlanOutline outline) {
         for (PlanOutline.PlanOutlineDay day : outline.safeDays()) {
             prompt.append(dayLabel(day.day()));
@@ -336,9 +366,6 @@ public class AiPlanPromptFactory {
             }
             for (PlanOutline.PlanOutlineItem item : day.safeItems()) {
                 prompt.append(" · ").append(item.title() == null ? "이름없음" : item.title());
-                if (item.placeId() != null) {
-                    prompt.append("(placeId=").append(item.placeId()).append(')');
-                }
             }
             prompt.append('\n');
         }

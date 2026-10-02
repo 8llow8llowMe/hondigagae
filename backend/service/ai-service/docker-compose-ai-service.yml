@@ -66,6 +66,7 @@ x-ai-service-environment: &ai_service_environment
   AI_LLM_TEMPERATURE: ${AI_LLM_TEMPERATURE:-0.2}
   AI_LLM_REASONING_EFFORT: ${AI_LLM_REASONING_EFFORT:-low}
   AI_LLM_PLACE_CANDIDATE_SIZE: ${AI_LLM_PLACE_CANDIDATE_SIZE:-50}
+  AI_LLM_KEEP_ALIVE: ${AI_LLM_KEEP_ALIVE:-30m}
 
 x-logging: &default-logging
   driver: "json-file"

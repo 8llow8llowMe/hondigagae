@@ -117,6 +117,7 @@ Ollama 가 없어도 기동은 되지만(연결은 첫 호출 때) 일정 생성
 | `AI_LLM_TIMEOUT_MS` | `120000` | 모델 호출 read timeout |
 | `AI_LLM_PLACE_CANDIDATE_SIZE` | `50` | 프롬프트에 싣는 후보 장소 수 |
 | `AI_LLM_CONTEXT_TOKENS` | `16384` | 컨텍스트 창(num_ctx). **비우면 Ollama 가 2048 로 잡아 프롬프트가 잘린다** — 줄이려면 후보 수도 함께 줄인다 |
+| `AI_LLM_KEEP_ALIVE` | `30m` | 호출 뒤 모델을 메모리에 붙들어 둘 시간(Ollama keep_alive). 짧으면 첫 요청에 모델 로드가 붙고, 길면 공유 메모리를 오래 쥔다. `-1` 은 상주 |
 
 일정 생성을 실제로 돌리려면 tour-service 도 함께 떠 있어야 한다 — 후보 장소를
 tour-service 에서 받아 오기 때문이다. 프론트 개발자는 이 조합을 로컬에 띄우지 않고

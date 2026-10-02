@@ -58,8 +58,8 @@ import org.springframework.stereotype.Component;
  *   <li><b>구조화 출력</b> - {@link BeanOutputConverter} 가 {@link LlmPlanDraftResponse} 에서
  *       JSON 스키마를 유도해 프롬프트에 싣고, 응답 파싱까지 맡는다. Ollama 의 {@code format=json}
  *       과 함께 걸어 모델이 낸 문자열을 정규식으로 뜯는 코드가 없게 한다</li>
- *   <li><b>환각 방지</b> - 후보 장소를 프롬프트로 주고, 돌아온 placeId 를 다시 후보 집합과
- *       대조한다. 프롬프트만으로는 부족하다 - 규칙을 어기는 일이 드물게 있다</li>
+ *   <li><b>환각 방지</b> - 후보 장소에 번호를 붙여 주고 모델은 번호만 적는다. 아이디 · 이름 · 종류는
+ *       서버가 그 번호의 후보에서 채우므로 지어낼 자리가 없고, 목록 밖 번호는 버린다 (#1128)</li>
  *   <li><b>서킷</b> - 인스턴스 {@code llm}. 정상 응답이 수십 초라 slow-call 임계를 read
  *       timeout 과 연동해 사실상 끈다</li>
  *   <li><b>토큰 카운터</b> - 로컬 LLM 이라 비용은 없지만 GPU 점유의 근거 데이터로 남긴다</li>
@@ -74,13 +74,23 @@ public class OllamaLlmAdapter implements AiLlmPort {
     public static final String CIRCUIT_NAME = "llm";
 
     /**
-     * 항목 종류를 정하지 못했을 때의 값.
-     *
-     * <p>후보 목록이 전부 장소이고 초안 항목의 대부분이 장소 방문이라 {@code PLACE} 가 가장 덜
-     * 틀린다. 무엇보다 {@code targetId} 를 {@code place.id} 로 읽게 하는 유형이라, 확인된
-     * 아이디의 뜻과 어긋나지 않는다.
+     * 초안 근거의 상한. 프롬프트(규칙 4)와 같은 값이다 — 근거는 개요 카드에 한 번 나오는 요약이라 셋이면
+     * 충분하고, 하나마다 한 문장씩 디코드 시간이 붙는다 (#1128).
      */
-    private static final PlanItemType DEFAULT_ITEM_TYPE = PlanItemType.PLACE;
+    private static final int MAX_REASONS = 3;
+
+    /**
+     * 근거 코드 → 화면 이름. 모델은 이름을 쓰지 않는다 (#1128) — 같은 코드에 매번 다른 이름을 지어 붙이던
+     * 자리이고, 그 토큰도 아낀다. 이름은 응답 계약({@code AiPlanReasonItem})이 적어 둔 표시명과 같다.
+     */
+    private static final Map<String, String> REASON_NAMES = Map.of(
+        "PET_ALLOWED", "반려견 동반 가능",
+        "WEATHER_OK", "날씨 양호",
+        "INDOOR_ALTERNATIVE", "실내 대안",
+        "REST_SLOT", "휴식 시간 확보");
+
+    /** 표에 없는 코드의 이름. 코드를 그대로 내보내면 화면에 {@code CAFE_OK} 같은 기호가 보인다. */
+    private static final String DEFAULT_REASON_NAME = "추천 이유";
 
     /** 파싱 실패 때 로그에 남길 응답 원문 길이. 원인을 가르는 데는 앞부분으로 충분하다. */
     private static final int RAW_RESPONSE_LOG_LIMIT = 500;
@@ -130,10 +140,24 @@ public class OllamaLlmAdapter implements AiLlmPort {
 
         ChatResponse response = request(query);
         LlmPlanDraftResponse draft = extractDraft(response);
-        AiPlanDraft domain = toDomain(draft, candidates);
-        // 후보 대조(아이디 · 이름 · 종류) 다음이 사실 대조다. 종류가 맞춰진 뒤라야 숙박을 가를 수 있다 (#975).
-        return new AiPlanDraftFactGuard(indexById(candidates), aiPlanPromptFactory.resolveDayCount(query),
+        AiPlanDraft domain = toDomain(draft, query);
+        // 번호 → 후보(아이디 · 이름 · 종류) 다음이 사실 대조다. 종류가 정해진 뒤라야 숙박을 가를 수 있다 (#975).
+        AiPlanDraft guarded = new AiPlanDraftFactGuard(indexById(candidates), aiPlanPromptFactory.resolveDayCount(query),
             maxTemperatureByDay(query)).apply(domain);
+        return limitReasons(guarded);
+    }
+
+    /**
+     * 근거를 {@value #MAX_REASONS} 개로 자른다. <b>사실 대조 뒤에 자른다</b> — 앞에서 자르면 확인할 수 없어 빠질
+     * 근거(거리 · 혼잡)가 자리를 차지해 맞는 근거가 셋보다 적게 남는다. 모델이 앞에 둔 것을 남긴다.
+     */
+    private AiPlanDraft limitReasons(AiPlanDraft draft) {
+        List<AiPlanDraftReason> reasons = safeList(draft.reasons());
+        if (reasons.size() <= MAX_REASONS) {
+            return draft;
+        }
+        log.info("LLM plan carried more reasons than allowed count={} max={} - trimmed", reasons.size(), MAX_REASONS);
+        return AiPlanDraft.builder().days(draft.days()).reasons(List.copyOf(reasons.subList(0, MAX_REASONS))).build();
     }
 
     private Map<Long, PlaceCandidate> indexById(List<PlaceCandidate> candidates) {
@@ -262,7 +286,10 @@ public class OllamaLlmAdapter implements AiLlmPort {
     }
 
     private OllamaChatOptions buildRequestOptions() {
-        OllamaChatOptions.Builder builder = OllamaChatOptions.builder().format("json");
+        OllamaChatOptions.Builder builder = OllamaChatOptions.builder().format("json")
+            // 요청마다 싣는다 — Ollama 의 keep_alive 는 요청 단위 값이라, 빠뜨린 요청 하나가 서버 기본(5분)으로
+            // 되돌려 놓는다. 그러면 뜸한 dev 에서 첫 요청마다 모델 로드가 붙는다 (#1128).
+            .keepAlive(aiLlmProperties.keepAlive());
         // gpt-oss 계열은 low/medium/high 추론 강도를 지원한다. 미지원 모델로 교체해도
         // 기동이 깨지지 않도록 알 수 없는 값은 모델 기본값에 맡긴다.
         String reasoningEffort = aiLlmProperties.reasoningEffort();
@@ -383,7 +410,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
      * <ul>
      *   <li>{@code prefillMs} 가 크다 → 프롬프트가 길다. {@code ai-llm.place-candidate-size} 를 줄인다</li>
      *   <li>{@code decodeMs} 가 크다 → 출력이 길거나 장비가 느리다. 프롬프트를 줄여도 거의 그대로다</li>
-     *   <li>{@code loadMs} 가 0 이 아니다 → 모델이 내려갔다 다시 올라왔다. {@code OLLAMA_KEEP_ALIVE} 를 본다</li>
+     *   <li>{@code loadMs} 가 0 이 아니다 → 모델이 내려갔다 다시 올라왔다. {@code ai-llm.keep-alive} 를 본다</li>
      *   <li>{@code elapsedMs} 와 {@code totalMs} 차이가 크다 → 대기·전송이 끼었다.
      *       {@code OLLAMA_NUM_PARALLEL=1} 이라 다른 요청을 기다린 것일 수 있다 (#508)</li>
      * </ul>
@@ -456,71 +483,55 @@ public class OllamaLlmAdapter implements AiLlmPort {
     }
 
     /**
-     * 모델 응답을 도메인 모델로 옮기면서 <b>후보에 없는 장소를 걸러낸다.</b>
+     * 모델 응답을 도메인 모델로 옮긴다. <b>모델이 적은 것은 후보 번호와 메모뿐이고, 나머지는 서버가 후보에서
+     * 채운다</b> (#1128).
      *
-     * <p>프롬프트에 "목록 안에서만 고르라"고 적어 두었지만 그것만 믿지 않는다. 규칙을 어기는
-     * 일이 드물게 있고, 그때 생기는 결과가 나쁘다 - 존재하지 않는 장소가 일정에 들어가면
-     * plan-service 저장 단계에서 터지거나 지도에 찍히지 않는다.
-     *
-     * <p>걸러낸 항목은 <b>버리지 않고 장소 연결만 끊는다.</b> "카페에서 휴식" 같은 항목 자체는
-     * 일정의 흐름으로 쓸모가 있고, 사용자가 직접 장소를 고르면 된다.
-     *
-     * <p><b>이름이 없는 항목은 반대로 버린다</b> (#487). 모델이 {@code title} 과 {@code note} 를
-     * 둘 다 빈 문자열로 둔 {@code MEAL} 항목을 내놓는 일이 있는데, 장소 연결이 끊긴 항목과 달리
-     * 이쪽은 <b>남길 것이 하나도 없다</b> — "카페에서 휴식"은 사용자가 장소만 고르면 살아나지만,
-     * 이름도 메모도 없는 줄은 무엇을 하라는 것인지 알 방법이 없다. 그대로 두면 화면에 "이름이 없는
-     * 항목"으로 그려지고, 담으면 그 빈 줄이 일정에도 남는다.
-     *
-     * <p>스키마에 {@code @NotBlank} 를 걸지 않고 여기서 거르는 이유는 <b>한 항목 때문에 초안 전체를
-     * 잃지 않기 위해서다.</b> {@code BeanOutputConverter} 단계에서 막으면 파싱 실패가 되어
-     * {@code LLM_RESPONSE_INVALID} 로 작업이 통째로 죽는데, 나머지 항목은 멀쩡하다.
-     * 프롬프트가 1차 방어, 여기가 마지막 방어인 것은 {@link LlmTextCleaner} 와 같은 결이다.
-     *
-     * <p><b>항목 종류도 같은 이유로 다시 본다.</b> 모델이 {@code WALK} 를 골라 놓고 후보 목록의
-     * {@code place.id} 를 실어 보내면 두 아이디 공간이 섞인다 — plan-service 에서 {@code WALK} 의
-     * {@code targetId} 는 {@code walk_course.id} 이고, 그 유형은 장소 존재 검증에서 빠지므로
-     * <b>틀린 아이디가 조용히 저장된다.</b> {@link #resolveItemType} 이 그것을 맞춘다.
+     * <ul>
+     *   <li><b>번호 → 후보.</b> {@code place} 는 프롬프트 후보 목록({@code query.safeCandidates()} 순서)의
+     *       1부터 시작하는 번호다. 아이디 · 이름은 그 후보의 값이다 — 모델이 이름을 조금씩 바꿔 적거나 18자리
+     *       아이디를 옮기다 틀릴 자리가 애초에 없다</li>
+     *   <li><b>번호가 없거나 목록 밖이면 항목을 버린다.</b> 전에는 장소 연결만 끊고 모델이 적은 이름으로
+     *       남겼지만, 이제 이름을 모델이 쓰지 않으므로 남길 것이 없다 — 이름도 장소도 없는 줄은 화면에
+     *       "이름이 없는 항목" 으로 그려지고 담으면 일정에도 남는다(#487 과 같은 결과). 한 항목 때문에 초안
+     *       전체를 잃지 않도록 스키마에서 막지 않고 여기서 거른다</li>
+     *   <li><b>종류는 후보 분류로 정한다</b> ({@link #itemTypeOf}). 모델이 종류를 고르던 때는 {@code WALK} 에
+     *       {@code place.id} 를 실어 두 아이디 공간이 섞이거나(#89) 콘도를 {@code PLACE} 로 적는 일(#975)을
+     *       뒤에서 바로잡아야 했다. 초안에는 {@code PLACE} · {@code MEAL} · {@code LODGING} 만 나온다</li>
+     *   <li><b>숙소는 그날의 {@code lodging} 번호로 받아 그날 끝에 붙인다</b> ({@link #appendLodging}). 같은
+     *       숙소에 이어 묵을 때 항목 · 메모를 날마다 다시 쓰게 하지 않으려는 것이다. 마지막 날 숙박을 빼는
+     *       규칙은 {@link AiPlanDraftFactGuard} 하나가 갖는다</li>
+     *   <li><b>하루 재생성이면 대상 일자만 남긴다</b> ({@link #targetDays}). 화면은 그날만 쓴다</li>
+     *   <li><b>근거 이름은 코드로 서버가 채운다</b> ({@link #reasonName})</li>
+     * </ul>
      */
-    private AiPlanDraft toDomain(LlmPlanDraftResponse draft, List<PlaceCandidate> candidates) {
+    private AiPlanDraft toDomain(LlmPlanDraftResponse draft, AiPlanGenerationQuery query) {
+        List<PlaceCandidate> candidates = query.safeCandidates();
         Map<Long, PlaceCandidate> candidateById = indexById(candidates);
-        Set<Long> knownIds = candidateById.keySet();
 
-        // 조사 교정이 쓸 이름. 후보 밖 장소는 우리가 아는 이름이 아니라 손대지 않는다.
+        // 조사 교정이 쓸 이름. 후보 이름만 우리가 아는 이름이다.
         List<String> candidateTitles = candidates.stream().map(PlaceCandidate::title).toList();
 
         List<AiPlanDraftDay> days = new ArrayList<>();
-        int hallucinated = 0;
-        int nameless = 0;
+        int dropped = 0;
         /*
          * 일자 간 장소 중복 감지 (#570). 1일차·2일차가 둘 다 `애월한담공원` 으로 시작한 적이 있다.
          * **숙소는 세지 않는다** — 같은 곳에 이어 묵는 것이 정상이고, 그건 결과 항목의
-         * `itemType == LODGING` 으로 갈린다. 그 값은 resolveItemType 이 후보의 contentTypeName(숙박)으로
-         * 먼저 맞춰 둔다 (#975).
+         * `itemType == LODGING` 으로 갈린다. 그 값은 itemTypeOf 가 후보의 contentTypeName(숙박)으로 정한다.
          */
         Map<Long, Set<Integer>> nonLodgingPlaceDays = new LinkedHashMap<>();
 
-        for (LlmPlanDraftResponse.LlmPlanDay day : safeList(draft.days())) {
+        for (LlmPlanDraftResponse.LlmPlanDay day : targetDays(safeList(draft.days()), query.regenerateDay())) {
             List<AiPlanDraftItem> items = new ArrayList<>();
             for (LlmPlanDraftResponse.LlmPlanItem item : safeList(day.items())) {
-                Long placeId = item.placeId();
-                boolean unknownPlace = placeId != null && !knownIds.contains(placeId);
-                if (unknownPlace) {
-                    hallucinated++;
-                    log.warn("LLM returned a place outside the candidate list placeId={} title={}",
-                        placeId, item.title());
-                }
-                PlaceCandidate matched = unknownPlace || placeId == null ? null : candidateById.get(placeId);
-                // 후보에 있으면 우리 데이터의 이름을 쓴다. 모델이 이름을 조금씩 바꿔 적는 일이 있다.
-                String title = matched != null ? matched.title() : item.title();
-                // 내놓을 이름이 없으면 버린다. 판정 기준은 "모델이 비웠는가" 가 아니라 "이름이 남았는가" 다.
-                if (isBlank(title)) {
-                    nameless++;
-                    log.warn("LLM returned an item without a title day={} itemType={} note={} - dropped",
-                        day.day(), item.itemType(), item.note());
+                PlaceCandidate matched = candidateAt(candidates, item.place());
+                if (matched == null) {
+                    dropped++;
+                    log.warn("LLM returned an item without a valid candidate number day={} place={} candidates={} note={} - dropped",
+                        day.day(), item.place(), candidates.size(), item.note());
                     continue;
                 }
-                PlanItemType itemType = resolveItemType(item.itemType(), matched);
-                if (matched != null && itemType != PlanItemType.LODGING) {
+                PlanItemType itemType = itemTypeOf(matched);
+                if (itemType != PlanItemType.LODGING) {
                     nonLodgingPlaceDays
                         .computeIfAbsent(matched.placeId(), ignored -> new LinkedHashSet<>())
                         .add(day.day());
@@ -528,34 +539,132 @@ public class OllamaLlmAdapter implements AiLlmPort {
 
                 items.add(AiPlanDraftItem.builder()
                     .itemType(itemType)
-                    // 후보 밖 장소는 연결만 끊는다. 항목 자체는 일정의 흐름으로 쓸모가 있다.
-                    .placeId(matched == null ? null : matched.placeId())
-                    .title(title)
+                    .placeId(matched.placeId())
+                    .title(matched.title())
                     .note(cleanUserFacing(item.note(), candidateTitles))
                     .build());
             }
+            appendLodging(items, day, candidates);
             days.add(AiPlanDraftDay.builder().day(day.day()).items(items).build());
         }
 
-        if (hallucinated > 0) {
-            log.warn("LLM plan contained {} places outside the candidate list; place links dropped", hallucinated);
-        }
-        if (nameless > 0) {
-            log.warn("LLM plan contained {} items without a title; items dropped", nameless);
+        if (dropped > 0) {
+            log.warn("LLM plan contained {} items without a valid candidate number; items dropped", dropped);
         }
         warnOnRepeatedPlaces(nonLodgingPlaceDays, candidateById);
 
         return AiPlanDraft.builder()
             .days(days)
-            // 근거 이름·설명과 항목 메모는 사용자에게 그대로 보이는 문장이다 — 준비물 이유와 같은 정리를 거친다.
+            // 근거 설명과 항목 메모는 사용자에게 그대로 보이는 문장이다 — 준비물 이유와 같은 정리를 거친다.
             .reasons(safeList(draft.reasons()).stream()
                 .map(reason -> AiPlanDraftReason.builder()
                     .code(reason.code())
-                    .name(cleanUserFacing(reason.name(), candidateTitles))
+                    .name(reasonName(reason.code()))
                     .description(cleanUserFacing(reason.description(), candidateTitles))
                     .build())
                 .toList())
             .build();
+    }
+
+    /**
+     * 프롬프트의 후보 번호를 후보로 되돌린다. 번호는 {@code safeCandidates()} 순서의 1부터 시작하는 인덱스다 —
+     * 프롬프트({@code AiPlanPromptFactory#userPrompt})가 같은 목록 순서로 매긴다. 없거나 범위 밖이면 null 이다.
+     */
+    private static PlaceCandidate candidateAt(List<PlaceCandidate> candidates, Integer number) {
+        if (number == null || number < 1 || number > candidates.size()) {
+            return null;
+        }
+        return candidates.get(number - 1);
+    }
+
+    /**
+     * 항목 종류. <b>후보 분류가 정한다</b> — 숙박은 {@code LODGING}, 음식점은 {@code MEAL}, 그 밖은 {@code PLACE}.
+     *
+     * <p>셋 다 {@code targetId} 가 {@code place.id} 인 유형이라({@link PlanItemType#isPlaceTarget}) 후보 아이디와
+     * 뜻이 어긋나지 않는다. {@code WALK} 는 나오지 않는다 — 그 {@code targetId} 는 {@code walk_course.id} 인데
+     * ai-service 는 산책 코스 후보를 본 적이 없다. 산책이라는 성격은 메모에 남는다.
+     */
+    private static PlanItemType itemTypeOf(PlaceCandidate candidate) {
+        if (AiPlanDraftFactGuard.LODGING_CONTENT_TYPE.equals(candidate.contentTypeName())) {
+            return PlanItemType.LODGING;
+        }
+        if (AiPlanDraftFactGuard.RESTAURANT_CONTENT_TYPE.equals(candidate.contentTypeName())) {
+            return PlanItemType.MEAL;
+        }
+        return PlanItemType.PLACE;
+    }
+
+    /**
+     * 그날의 {@code lodging} 번호를 그날 끝의 숙박 항목으로 펼친다. 메모는 서버 문구다 — 모델은 숙소 메모를 쓰지 않는다.
+     *
+     * <ul>
+     *   <li><b>숙박 후보가 아니면 붙이지 않는다.</b> 카페 번호를 적었다고 카페에서 묵는 일정을 만들 수는 없다</li>
+     *   <li><b>그날 마지막 항목이 이미 같은 숙소면 붙이지 않는다.</b> 규칙을 어기고 숙소를 항목에도 적은 경우다</li>
+     *   <li><b>마지막 날인지는 보지 않는다.</b> 그날 숙박을 빼는 것은 {@link AiPlanDraftFactGuard} 의 규칙이고,
+     *       여기서도 빼면 규칙의 주인이 둘이 된다</li>
+     * </ul>
+     */
+    private void appendLodging(List<AiPlanDraftItem> items, LlmPlanDraftResponse.LlmPlanDay day, List<PlaceCandidate> candidates) {
+        if (day.lodging() == null) {
+            return;
+        }
+        PlaceCandidate stay = candidateAt(candidates, day.lodging());
+        if (stay == null) {
+            log.warn("LLM lodging number is outside the candidate list day={} lodging={} candidates={} - ignored",
+                day.day(), day.lodging(), candidates.size());
+            return;
+        }
+        if (itemTypeOf(stay) != PlanItemType.LODGING) {
+            log.warn("LLM lodging number points to a non-lodging candidate day={} lodging={} placeId={} contentType={} - ignored",
+                day.day(), day.lodging(), stay.placeId(), stay.contentTypeName());
+            return;
+        }
+        if (!items.isEmpty() && Long.valueOf(stay.placeId()).equals(items.get(items.size() - 1).placeId())) {
+            return;
+        }
+        items.add(AiPlanDraftItem.builder()
+            .itemType(PlanItemType.LODGING)
+            .placeId(stay.placeId())
+            .title(stay.title())
+            .note(AiPlanDraftFactGuard.LODGING_NOTE)
+            .build());
+    }
+
+    /**
+     * 하루 재생성이면 대상 일자만 남긴다. 전체 생성({@code regenerateDay == null})은 그대로다.
+     *
+     * <p>프롬프트가 "그날 하루만 출력할 것" 이라고 시키지만 그것만 믿지 않는다 — 다른 날이 섞여 오면 담기 화면은
+     * 어차피 그날만 쓰고, 나머지는 응답만 키운다. 모델이 하루만 냈는데 번호가 다르면 그것이 대상 일자의 답이다 —
+     * 번호를 바로잡는다. 여러 날을 냈는데 대상 일자가 없으면 고를 근거가 없어 비운다(화면은 "그날이 없다" 로 실패를
+     * 알린다 — 빈 일자와 뜻이 다르다).
+     */
+    private List<LlmPlanDraftResponse.LlmPlanDay> targetDays(List<LlmPlanDraftResponse.LlmPlanDay> days, Integer regenerateDay) {
+        if (regenerateDay == null) {
+            return days;
+        }
+        Optional<LlmPlanDraftResponse.LlmPlanDay> target = days.stream().filter(day -> day.day() == regenerateDay).findFirst();
+        if (target.isPresent()) {
+            if (days.size() > 1) {
+                log.warn("LLM regenerate response carried other days target={} returnedDays={} - kept the target day only",
+                    regenerateDay, days.size());
+            }
+            return List.of(target.get());
+        }
+        if (days.size() == 1) {
+            LlmPlanDraftResponse.LlmPlanDay only = days.get(0);
+            log.warn("LLM regenerate response numbered the day differently day={} target={} - renumbered", only.day(), regenerateDay);
+            return List.of(new LlmPlanDraftResponse.LlmPlanDay(regenerateDay, only.items(), only.lodging()));
+        }
+        log.warn("LLM regenerate response has no target day target={} returnedDays={} - no day kept", regenerateDay, days.size());
+        return List.of();
+    }
+
+    /** 근거 코드의 화면 이름. 표에 없는 코드는 일반 이름으로 — 모르는 코드를 그대로 보여 주지 않는다. */
+    private static String reasonName(String code) {
+        if (code == null || code.isBlank()) {
+            return DEFAULT_REASON_NAME;
+        }
+        return REASON_NAMES.getOrDefault(code.trim().toUpperCase(Locale.ROOT), DEFAULT_REASON_NAME);
     }
 
     /**
@@ -585,72 +694,7 @@ public class OllamaLlmAdapter implements AiLlmPort {
         });
     }
 
-    /**
-     * 항목 종류를 정한다. <b>장소가 실린 항목은 반드시 장소 유형이어야 한다.</b>
-     *
-     * <p>ai-service 는 산책 코스를 본 적이 없다 — 후보 목록은 tour-service 의 장소뿐이라
-     * {@code walk_course.id} 를 알 방법이 없다. 그러므로 <b>장소가 확인된 {@code WALK} 항목은
-     * 있을 수 없고</b>, 그것은 유형이 틀린 것이지 아이디가 틀린 것이 아니다 — 아이디는 후보
-     * 집합과 대조해 확인했고, 유형은 모델이 자유롭게 적은 값이다.
-     *
-     * <p>그래서 확인된 쪽을 남기고 유형을 {@code PLACE} 로 바로잡는다. 반대로 아이디를 끊으면
-     * 지도 표시와 장소 요약이 함께 사라지는데, "해안 산책로에서 산책"이 실제로 우리 데이터에
-     * 있는 장소를 가리키고 있었다면 잃을 이유가 없다. 산책이라는 성격은 {@code title} 과
-     * {@code note} 에 그대로 남는다.
-     *
-     * <p>모르는 코드도 같은 자리에서 접는다. plan-service 의 {@code itemType} 은 enum 이라
-     * 모델이 {@code "CAFE"} 처럼 적으면 사용자가 담는 순간 400 이 난다 — 초안을 만든 쪽이
-     * 저장 가능한 값만 내려 주는 편이 맞다.
-     *
-     * @param matched 후보 집합에서 확인된 장소. null 이면 이 항목에 장소가 없다
-     */
-    private PlanItemType resolveItemType(String code, PlaceCandidate matched) {
-        Optional<PlanItemType> parsed = PlanItemType.from(code);
-        /*
-          숙박 유형은 모델 말보다 후보 데이터를 믿는다 (#975). 콘도를 PLACE 로 적어 "해안가 산책" 자리에
-          넣은 적이 있다. 종류가 LODGING 이어야 마지막 날 숙박 규칙과 일자 간 중복 예외가 이 항목을 알아본다.
-          숙소에서 먹는 MEAL(조식)은 그대로 둔다 — 식사 자리지 묵는 자리가 아니다.
-          반대로 숙박이 아닌 곳을 LODGING 으로 적으면 음식점은 식사로, 그 밖은 장소 방문으로 되돌린다.
-        */
-        if (matched != null) {
-            boolean lodgingPlace = AiPlanDraftFactGuard.LODGING_CONTENT_TYPE.equals(matched.contentTypeName());
-            PlanItemType claimed = parsed.orElse(null);
-            if (lodgingPlace && claimed != PlanItemType.LODGING && claimed != PlanItemType.MEAL) {
-                log.warn("LLM put a lodging place on a non-lodging item type itemType={} placeId={} correcting to {}",
-                    code, matched.placeId(), PlanItemType.LODGING);
-                return PlanItemType.LODGING;
-            }
-            if (!lodgingPlace && claimed == PlanItemType.LODGING) {
-                PlanItemType corrected = AiPlanDraftFactGuard.RESTAURANT_CONTENT_TYPE.equals(matched.contentTypeName())
-                    ? PlanItemType.MEAL : DEFAULT_ITEM_TYPE;
-                log.warn("LLM put a non-lodging place on LODGING placeId={} contentType={} correcting to {}",
-                    matched.placeId(), matched.contentTypeName(), corrected);
-                return corrected;
-            }
-        }
-        if (parsed.isEmpty()) {
-            log.warn("LLM returned an unknown item type itemType={} falling back to {}", code, DEFAULT_ITEM_TYPE);
-            return DEFAULT_ITEM_TYPE;
-        }
-
-        PlanItemType itemType = parsed.get();
-        if (matched != null && !itemType.isPlaceTarget()) {
-            log.warn("LLM put a place on a non-place item type itemType={} placeId={} correcting to {}",
-                itemType, matched.placeId(), DEFAULT_ITEM_TYPE);
-            return DEFAULT_ITEM_TYPE;
-        }
-        return itemType;
-    }
-
     private <T> List<T> safeList(List<T> values) {
         return values == null ? List.of() : values;
-    }
-
-    /**
-     * 내놓을 이름이 없는가. {@code null} · 빈 문자열 · 공백뿐인 값을 모두 같게 본다 — 셋 다 화면에서
-     * "보여 줄 이름이 없다"로 똑같이 끝난다.
-     */
-    private boolean isBlank(String text) {
-        return text == null || text.isBlank();
     }
 }

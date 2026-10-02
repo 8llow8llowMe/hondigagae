@@ -72,12 +72,30 @@ class AiPlanPromptFactoryTest {
      * 지시가 **아예 없었다.** 숙소까지 함께 못박지 않으면 모델이 숙소를 날마다 바꾼다.
      */
     @Test
-    @DisplayName("시스템 프롬프트가 일자 간 장소 중복을 막고 숙소는 예외로 둔다 (#570)")
+    @DisplayName("시스템 프롬프트가 일자 간 장소 중복을 막고 숙소는 그날의 lodging 으로 이어 묵게 한다 (#570 · #1128)")
     void systemPromptForbidsRepeatingPlacesAcrossDays() {
         String system = factory.systemPrompt();
 
         assertThat(system).contains("같은 장소를 여러 날에 넣지 않습니다");
-        assertThat(system).contains("LODGING");
+        assertThat(system).contains("그날의 lodging 에 적습니다");
+        assertThat(system).contains("마지막 날 lodging 은 null");
+    }
+
+    /*
+     * #1128. 출력 스키마를 후보 번호 + 메모로 줄였는데 시스템 프롬프트가 옛 스키마(placeId 옮기기, title 채우기,
+     * 장소 없는 식사 항목)를 가르치면 모델이 둘 사이에서 갈린다. 새 스키마의 규칙이 실리고 옛 지시가 사라졌는지 본다.
+     */
+    @Test
+    @DisplayName("시스템 프롬프트가 후보 번호 · 장소 없는 항목 금지 · 짧은 메모 · 근거 3개를 지시하고 옛 스키마 지시는 없다 (#1128)")
+    void systemPromptMatchesTheCompactSchema() {
+        String system = factory.systemPrompt();
+
+        assertThat(system).contains("후보 줄 앞의 번호로 적습니다");
+        assertThat(system).contains("장소가 없는 항목(빈 식사 자리, 이동)은");
+        assertThat(system).contains("음식점 후보가 있을 때만");
+        assertThat(system).contains("25자 안팎");
+        assertThat(system).contains("최대 3개");
+        assertThat(system).doesNotContain("placeId").doesNotContain("title").doesNotContain("점심 식사");
     }
 
     @Test
@@ -162,8 +180,10 @@ class AiPlanPromptFactoryTest {
 
         String prompt = factory.userPrompt(query);
 
-        assertThat(prompt).contains("[필수 포함] placeId=1");
-        assertThat(prompt).doesNotContain("[필수 포함] placeId=2");
+        // 번호가 줄 맨 앞이다 — 모델이 적을 값이 태그에 가려지지 않는다
+        assertThat(prompt).contains("\n- 1. [필수 포함] 꼭갈곳 | ");
+        assertThat(prompt).contains("\n- 2. 보통후보 | ");
+        assertThat(prompt).doesNotContain("[필수 포함] 보통후보");
         assertThat(prompt).contains("1곳을 빠짐없이 일정에 배치할 것");
     }
 
@@ -183,9 +203,9 @@ class AiPlanPromptFactoryTest {
 
         String prompt = factory.userPrompt(query);
 
-        assertThat(prompt).contains("[필수 포함] placeId=1");
-        assertThat(prompt).contains("[선호] placeId=2");
-        assertThat(prompt).doesNotContain("[선호] placeId=1");
+        assertThat(prompt).contains("- 1. [필수 포함] 필수이자선호 | ");
+        assertThat(prompt).contains("- 2. [선호] 선호만 | ");
+        assertThat(prompt).doesNotContain("[선호] 필수이자선호");
         assertThat(prompt).contains("우선 배치할 것. 필수는 아님");
     }
 
@@ -225,7 +245,7 @@ class AiPlanPromptFactoryTest {
     }
 
     @Test
-    @DisplayName("하루 재생성이면 기존 일정과 해당 일차만 새로 짜라는 지시가 실린다")
+    @DisplayName("하루 재생성이면 기존 일정은 중복 회피 맥락으로만 싣고 그날 하루만 출력하게 한다 (#1128)")
     void regenerateSectionCarriesOutlineAndInstruction() {
         AiPlanGenerationQuery query = AiPlanGenerationQuery.builder()
             .areaCode("39")
@@ -245,9 +265,26 @@ class AiPlanPromptFactoryTest {
 
         String prompt = factory.userPrompt(query);
 
-        assertThat(prompt).contains("기존 일정");
-        assertThat(prompt).contains("사려니숲길(placeId=11)");
-        assertThat(prompt).contains("2일차만 새로 구성할 것");
+        assertThat(prompt).contains("기존 일정 (겹치지 않게 참고만 할 것)");
+        // 기존 일정 줄은 이름만 싣는다 — 출력은 후보 번호라 아이디가 쓸 데가 없다
+        assertThat(prompt).contains("\n1일차 · 사려니숲길\n");
+        assertThat(prompt).doesNotContain("placeId");
+        assertThat(prompt).contains("2일차만 새로 짜서 그날 하루만 출력할 것. days 에는 2일차 하나만 담을 것");
+        assertThat(prompt).contains("다른 날에 있는 장소는 넣지 말 것");
+        // 전체를 다시 출력하라던 옛 지시와, 그와 맞서는 "N일 일정" 마무리가 남지 않는다
+        assertThat(prompt).doesNotContain("전체 일정을 출력할 것");
+        assertThat(prompt).doesNotContain("2일 일정을 만들어 주세요");
+        assertThat(prompt).endsWith("2일차 하루 일정만 만들어 주세요.");
+    }
+
+    @Test
+    @DisplayName("후보 줄은 1부터 시작하는 번호로 싣고 18자리 placeId 를 싣지 않는다 (#1128)")
+    void candidateLinesUseNumbersInsteadOfIds() {
+        String prompt = factory.userPrompt(query(List.of()));
+
+        assertThat(prompt).contains("\n- 1. 장소 | 관광지 | 실내 | 동반: 동반 가능 | 입장크기: 소형견 | 체중제한: 10kg | 분류: 여행지 | 제주\n");
+        assertThat(prompt).doesNotContain("placeId");
+        assertThat(prompt).endsWith("2일 일정을 만들어 주세요.");
     }
 
     @Test
@@ -284,9 +321,10 @@ class AiPlanPromptFactoryTest {
         assertThat(prompt).contains("함께 여행하는 반려견");
         assertThat(prompt).contains("체중: 3.5kg");
         assertThat(prompt).contains("- 2일차 2026-09-02 | 강수형태: 비 | 강수확률 80%");
-        assertThat(prompt).contains("\n1일차 · 해안 산책로(placeId=11)");
+        // 일정 줄은 재생성 프롬프트와 공유한다 — 준비물은 아이디를 쓰지 않아 이름만 싣는다 (#1128)
+        assertThat(prompt).contains("\n1일차 · 해안 산책로\n");
         assertThat(prompt).contains("여행 일정");
-        assertThat(prompt).contains("해안 산책로(placeId=11)");
+        assertThat(prompt).doesNotContain("placeId");
         assertThat(prompt).contains("준비물 목록을 만들어 주세요");
         // 배치 지시는 일정 생성 전용 — 준비물 프롬프트에는 실리지 않는다
         assertThat(prompt).doesNotContain("실내 후보 위주로 배치할 것");
