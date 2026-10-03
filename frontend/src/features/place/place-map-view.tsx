@@ -22,7 +22,7 @@ import { usePlaceList } from '@/features/place/use-place-list'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
 import { type LatLng, SELECTED_PLACE_MAP_LEVEL, toLatLng } from '@/lib/geo/coord'
-import { getCurrentPosition } from '@/lib/geo/current-position'
+import { getCurrentPosition, getPositionIfGranted, offersLocate } from '@/lib/geo/current-position'
 import { shouldOfferResearch } from '@/lib/map/research-offer'
 import type { MapSdkFailure } from '@/lib/map/sdk'
 import {
@@ -190,22 +190,27 @@ export function PlaceMapView({
   const [failure, setFailure] = useState<MapSdkFailure | null>(null)
   /** 밖에서 지도 중심을 옮길 때만 값이 든다 (현재 위치 버튼) */
   const [center, setCenter] = useState<LatLng | null>(null)
-  /** 현재 위치가 제주 안인가. 알기 전까지는 `false` 라 버튼이 나중에 나타난다 */
-  const [inJeju, setInJeju] = useState(false)
+  /**
+   * "내 위치" 버튼을 그릴까. 알기 전까지는 `false` 라 버튼이 나중에 나타난다 —
+   * 제주 밖에서 버튼이 한 번 보였다가 사라지는 것보다 늦게 나타나는 편이 낫다.
+   */
+  const [locatable, setLocatable] = useState(false)
 
   /*
     ── 현재 위치 ────────────────────────────────────────────────────────────
 
-    **버튼을 그릴지 정하기 위해 먼저 묻는다.** 제주 밖에서는 눌러도 갈 곳이 없어
-    (`lib/geo/jeju-bounds.ts`) 버튼 자체를 두지 않는데, 그 판정에 좌표가 필요하다.
-    `getCurrentPosition()` 은 제주 밖 좌표를 `fallback` 으로 내려주므로 `granted` 하나로
-    "제주 안" 을 판정할 수 있다 — 화면이 경계 상자를 다시 알 필요가 없다.
+    **버튼을 그릴지 정하려고 들여다볼 뿐, 묻지 않는다** (#1133). 제주 밖에서는 눌러도 갈
+    곳이 없어(`lib/geo/jeju-bounds.ts`) 버튼 자체를 두지 않는데, 그 판정에 좌표가 필요하다.
+    예전에는 그 좌표를 얻으려고 마운트에서 `getCurrentPosition()` 을 불러 **들어오자마자
+    권한 팝업이 떴다** — Lighthouse `geolocation-on-start`. 지금은 이미 허용된 경우에만
+    읽는다(`getPositionIfGranted()`).
 
-    홈(#180)·긴급 시설이 이미 같은 자리(마운트)에서 같은 함수를 부른다. 여기서 다른
-    시점에 물으면 브라우저 권한 프롬프트가 화면마다 다른 순간에 뜬다.
+    **아직 묻지 않았으면(`unasked`) 버튼을 그린다** (`offersLocate`). 묻는 자리가 그
+    버튼뿐이라, 감추면 이 화면에서 위치를 켤 길이 사라진다. 제주 밖인지는 눌러 본 뒤에야
+    안다 — 그때 `locate` 가 버튼을 거둔다.
   */
   useEffect(() => {
-    void getCurrentPosition().then((result) => setInJeju(result.kind === 'granted'))
+    void getPositionIfGranted().then((result) => setLocatable(offersLocate(result)))
   }, [])
 
   /*
@@ -216,7 +221,7 @@ export function PlaceMapView({
   const locate = useCallback(() => {
     void getCurrentPosition().then((result) => {
       const granted = result.kind === 'granted'
-      setInJeju(granted)
+      setLocatable(granted)
       if (granted) setCenter({ lat: result.lat, lng: result.lng })
     })
   }, [])
@@ -572,8 +577,8 @@ export function PlaceMapView({
             */}
             {showToggle && <ViewToggle current="map" listHref={listHref} mapHref={mapHref} />}
 
-            {/* 제주 밖이면 렌더하지 않는다 — 눌러도 갈 곳이 없다 */}
-            {inJeju && <MapLocateButton onLocate={locate} />}
+            {/* 제주 밖·거부·미지원이면 렌더하지 않는다 — 눌러도 같은 답이다 */}
+            {locatable && <MapLocateButton onLocate={locate} />}
           </div>
         </div>
       </div>

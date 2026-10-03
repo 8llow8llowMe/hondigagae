@@ -26,7 +26,18 @@ export const JEJU_QUERY_CENTER = { lat: 33.4996213, lng: 126.5311884 } as const
  * 제주 밖 좌표로 조회하면 오류가 아니라 조용한 0건이 와서(`lib/geo/jeju-bounds.ts`)
  * 화면이 고장처럼 보인다. 그래서 폴백으로 내려 제주 기준으로 조회한다.
  */
-export type PositionFailure = 'denied' | 'timeout' | 'unsupported' | 'outside'
+/**
+ * `unasked` — **권한을 묻지 않았다** (#1133). `getPositionIfGranted()` 만 낸다.
+ *
+ * 실패가 아니라 "아직 모른다" 다. 화면 진입에서는 권한 팝업을 띄우지 않으므로, 허용
+ * 전(prompt)이거나 Permissions API 로 알 수 없으면 좌표를 읽지 않고 이 값으로 내린다.
+ * `denied`·`unsupported` 와 갈라 둔 이유는 **다음 행동이 다르기 때문**이다 — 사용자가
+ * "내 위치" 를 누르면 그때 물을 수 있다. 그래서 그 버튼을 감추면 안 된다.
+ *
+ * `getCurrentPosition()` 은 **언제나 묻기 때문에** 이 값을 내지 않는다. 그것만 쓰는
+ * 긴급 시설 화면의 문구 분기가 이 갈래를 모르는 이유다.
+ */
+export type PositionFailure = 'denied' | 'timeout' | 'unsupported' | 'outside' | 'unasked'
 
 export type PositionResult =
   | { kind: 'granted'; lat: number; lng: number }
@@ -90,6 +101,72 @@ export function getCurrentPosition(): Promise<PositionResult> {
       { timeout: TIMEOUT_MS, maximumAge: 5 * 60_000 },
     )
   })
+}
+
+/**
+ * **이미 허용된 경우에만** 현재 위치를 읽는다. 권한을 묻지 않는다 (#1133).
+ *
+ * 화면 진입에서 자동으로 부르는 쪽(홈 · `/places` 지도)이 쓴다. 진입하자마자
+ * `getCurrentPosition()` 을 부르면 브라우저가 권한 팝업을 띄운다 — Lighthouse 가
+ * `geolocation-on-start` 로 잡았고, 검색으로 처음 들어온 사람에게 첫 화면 팝업은
+ * 무엇을 왜 허용하라는지 모르는 채 받는 질문이라 이탈 요인이다.
+ *
+ * **묻는 것은 사용자가 누른 버튼의 몫이다** — "내 위치" 버튼은 그대로
+ * `getCurrentPosition()` 을 부른다. 그 순간에는 왜 묻는지가 화면에 드러나 있다.
+ *
+ * 허용(`granted`)이면 `getCurrentPosition()` 을 그대로 거친다 — 제주 밖 폴백·우리 시계
+ * 규칙을 여기서 다시 짜지 않는다. 그 밖에는 **같은 모양의 폴백**(제주 기준 좌표)이라
+ * 호출부는 지금까지처럼 좌표 하나로 조회한다:
+ *  - `denied` → `denied`. 거부한 사람에게 다시 물을 수 없다
+ *  - `prompt` · Permissions API 없음 · `query` 실패 → `unasked`. 모를 뿐 물을 수는 있다
+ *    (Permissions API 가 없다고 `unsupported` 로 내리면 화면이 "내 위치" 를 감춘다)
+ */
+export async function getPositionIfGranted(): Promise<PositionResult> {
+  if (typeof navigator === 'undefined' || navigator.geolocation === undefined) {
+    return { ...JEJU_QUERY_CENTER, kind: 'fallback', reason: 'unsupported' }
+  }
+
+  const state = await readGeolocationPermission()
+
+  if (state === 'granted') return getCurrentPosition()
+
+  return {
+    ...JEJU_QUERY_CENTER,
+    kind: 'fallback',
+    reason: state === 'denied' ? 'denied' : 'unasked',
+  }
+}
+
+/**
+ * 진입 때 읽은 결과로 **"내 위치" 버튼을 그릴지** 정한다 (#1133).
+ *
+ * 허용돼 제주 안이면 당연히 그리고, **아직 묻지 않았어도(`unasked`) 그린다** — 진입에서
+ * 묻지 않으니 묻는 자리가 그 버튼뿐이다. 감추면 위치를 켤 길이 사라진다. 거부·미지원·
+ * 제주 밖은 눌러도 같은 답이라 그리지 않는다. `timeout` 도 그리지 않는다 — 진입에서는
+ * 나오지 않는 갈래(묻지 않았으니)지만, 나온다면 "지금 위치를 못 잡는다" 는 뜻이다.
+ */
+export function offersLocate(result: PositionResult): boolean {
+  return result.kind === 'granted' || result.reason === 'unasked'
+}
+
+/**
+ * 위치 권한 상태. **알 수 없으면 `unknown`** 이다 — 던지지 않는다.
+ *
+ * `navigator.permissions` 가 없는 브라우저가 있고, 있어도 `geolocation` 이름을 몰라
+ * 거절(TypeError)하는 구현이 있다. 어느 쪽이든 "허용됐다고 확인하지 못했다" 이므로 묻지
+ * 않는 쪽으로 떨어진다.
+ */
+async function readGeolocationPermission(): Promise<PermissionState | 'unknown'> {
+  // 타입 정의는 늘 있다고 말하지만 런타임에는 없는 브라우저가 있다
+  const permissions = navigator.permissions as Permissions | undefined
+  if (permissions === undefined) return 'unknown'
+
+  try {
+    const status = await permissions.query({ name: 'geolocation' })
+    return status.state
+  } catch {
+    return 'unknown'
+  }
 }
 
 /**
