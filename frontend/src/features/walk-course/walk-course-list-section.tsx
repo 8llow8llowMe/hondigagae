@@ -22,6 +22,17 @@ import { hasCoordinates } from '@/lib/walk-course/coordinates'
 import type { WalkCourseFilters, WalkCourseSummary } from '@/types/walk-course'
 
 /**
+ * 사진을 **바로 받는** 앞쪽 카드 수 (#1132). 나머지는 지연 로드다.
+ *
+ * 첫 카드 사진이 `/olle` 의 LCP 인데 lazy 라, 브라우저가 레이아웃을 마친 뒤에야 요청을
+ * 냈다 (2026-10-03 Lighthouse 모바일 LCP 6.8s · `lcp-lazy-loaded` 실패). 모바일 1열에서
+ * 첫 화면에 서는 것은 첫 장과 둘째 장의 윗부분이다. 1280+ 3열의 셋째 장은 지연 로드로
+ * 남지만 첫 화면이라 곧바로 요청된다 — **이 값은 LCP 후보를 앞세우는 것이지 첫 화면을
+ * 전부 세는 것이 아니다.** 원본 사진(장당 500~780KB)이라 늘릴수록 첫 요청이 무거워진다.
+ */
+export const WALK_COURSE_PRIORITY_CARD_COUNT = 2
+
+/**
  * 기준 줄에 들어갈 값. **응답의 `appliedPetActivityLevel` 이 있을 때만 만든다** — 로컬
  * 상태가 아니라 **응답**을 믿는다 (공통명세 S4-1 규칙 5).
  *
@@ -304,8 +315,13 @@ function WalkCourseListBody({
         (공통명세 S3) — 목록 끝의 `마지막 장소예요` 줄도 이 화면의 말이 아니다.
       */}
       <WalkCourseCardGrid inset={inset}>
-        {courses.map((course) => (
-          <WalkCourseRow key={course.walkCourseId} course={course} filters={filters} />
+        {courses.map((course, index) => (
+          <WalkCourseRow
+            key={course.walkCourseId}
+            course={course}
+            filters={filters}
+            priority={index < WALK_COURSE_PRIORITY_CARD_COUNT}
+          />
         ))}
       </WalkCourseCardGrid>
     </>

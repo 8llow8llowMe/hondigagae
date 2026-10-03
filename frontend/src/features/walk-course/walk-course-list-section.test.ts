@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  WALK_COURSE_PRIORITY_CARD_COUNT,
   WalkCourseListSection,
   type WalkCourseListSectionProps,
 } from '@/features/walk-course/walk-course-list-section'
@@ -388,5 +389,36 @@ describe('WalkCourseListSection — 로딩 골격이 실제 카드와 같다 (#8
   it('열 머리를 그리지 않는다', () => {
     expect(render({ loading: true })).not.toContain('walk-course-row-grid')
     expect(render()).not.toContain('walk-course-row-grid')
+  })
+})
+
+describe('WalkCourseListSection — 첫 화면 사진 우선 로드 (#1132)', () => {
+  /** 사진이 있는 코스 n개. walkCourseId 는 key 라 서로 달라야 한다 */
+  function coursesWithPhotos(count: number) {
+    return Array.from({ length: count }, (_, index) => ({
+      ...WALK_COURSE_WITH_COORDS,
+      walkCourseId: `69111671002163033${String(index).padStart(2, '0')}`,
+    }))
+  }
+
+  /*
+    **첫 카드 사진이 `/olle` 의 LCP 였는데 lazy 였다** (2026-10-03 Lighthouse 모바일 LCP
+    6.8s · `lcp-lazy-loaded` 실패). 앞 몇 장만 바로 받고 나머지는 그대로 지연 로드다.
+  */
+  it(`앞 ${String(WALK_COURSE_PRIORITY_CARD_COUNT)}장만 바로 받고 나머지는 지연 로드다`, () => {
+    const count = WALK_COURSE_PRIORITY_CARD_COUNT + 3
+    const tags = render({ courses: coursesWithPhotos(count), totalCount: count }).match(
+      /<img[^>]*>/g,
+    )
+
+    expect(tags).toHaveLength(count)
+    tags?.slice(0, WALK_COURSE_PRIORITY_CARD_COUNT).forEach((tag) => {
+      expect(tag).toContain('loading="eager"')
+      expect(tag).toMatch(/fetchpriority="high"/i)
+    })
+    tags?.slice(WALK_COURSE_PRIORITY_CARD_COUNT).forEach((tag) => {
+      expect(tag).toContain('loading="lazy"')
+      expect(tag).not.toMatch(/fetchpriority/i)
+    })
   })
 })
