@@ -51,4 +51,12 @@ describe('공개 화면 메타데이터 배선 (#1130)', () => {
 
     expect(source).toContain('isIndexablePlace(place) ? {} : { robots: NOINDEX_FOLLOW }')
   })
+
+  it.each([
+    ['app/(main)/(home)/page.tsx', '<JsonLd data={siteJsonLd(siteUrl())} />'],
+    ['app/(main)/places/[placeId]/page.tsx', 'placeJsonLd(place, siteUrl())'],
+    ['app/(main)/olle/[walkCourseId]/page.tsx', 'walkCourseJsonLd(course, siteUrl())'],
+  ])('%s — 구조화 데이터를 낸다 (#1131)', (path, probe) => {
+    expect(code(path)).toContain(probe)
+  })
 })

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 import type { Metadata } from 'next'
 
+import { JsonLd } from '@/components/json-ld'
 import { Canvas } from '@/components/surface'
 import { PlaceDetailInvalidId } from '@/features/place/place-detail-section'
 import { PlaceDetailView } from '@/features/place/place-detail-view'
@@ -16,8 +17,10 @@ import { messages } from '@/lib/messages'
 import { placeDetailFallbackTitle } from '@/lib/place/detail-title'
 import { isPlaceId } from '@/lib/place/place-id'
 import { getServerQueryClient } from '@/lib/query/query-client'
+import { breadcrumbJsonLd, placeJsonLd } from '@/lib/seo/json-ld'
 import { NOINDEX_FOLLOW, pageMetadata } from '@/lib/seo/page-metadata'
 import { isIndexablePlace, placeSeoDescription, placeSeoTitle } from '@/lib/seo/place'
+import { SITE_NAME, siteUrl } from '@/lib/seo/site'
 import type { PlaceDetail } from '@/types/place'
 
 /**
@@ -110,8 +113,9 @@ export default async function PlaceDetailPage({ params }: { params: Params }) {
   //
   // retry: false 가 중요하다. 전역 기본값(5xx 2회 재시도)을 상속하면 백엔드가 죽었을 때
   // 서버 렌더가 재시도 백오프만큼 통째로 블로킹된다 (architecture-guide.md §9).
+  let place: PlaceDetail | null = null
   try {
-    await queryClient.fetchQuery({
+    place = await queryClient.fetchQuery({
       queryKey: placeKeys.detail(placeId),
       queryFn: () => loadPlaceDetail(placeId),
       retry: false,
@@ -136,6 +140,25 @@ export default async function PlaceDetailPage({ params }: { params: Params }) {
   */
   return (
     <Canvas as="main" id="main-content">
+      {/*
+        구조화 데이터 (#1131). **서버가 장소를 받았을 때만** 낸다 — 5xx 로 클라이언트가 다시
+        그리는 갈래에는 서버가 아는 사실이 없다.
+      */}
+      {place !== null && (
+        <JsonLd
+          data={[
+            placeJsonLd(place, siteUrl()),
+            breadcrumbJsonLd(
+              [
+                { name: SITE_NAME, path: '/' },
+                { name: messages.place.pageTitle, path: '/places' },
+                { name: place.title, path: `/places/${placeId}` },
+              ],
+              siteUrl(),
+            ),
+          ]}
+        />
+      )}
       <HydrationBoundary state={dehydrate(queryClient)}>
         <PlaceDetailView placeId={placeId} authed={session !== null} />
       </HydrationBoundary>
