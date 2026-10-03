@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { LandingView, type LandingViewProps } from '@/features/landing/landing-view'
+import { PLACE_PRIORITY_ROW_COUNT } from '@/features/place/place-list-section'
 import { messages } from '@/lib/messages'
 import { placeSummary } from '@/test/fixtures/place'
 
@@ -37,6 +38,22 @@ describe('LandingView (#1134)', () => {
 
   it('장소 행이 상세로 가는 링크다', () => {
     expect(render()).toContain(`href="/places/${placeSummary.placeId}"`)
+  })
+
+  it('앞 행만 먼저 받는다 — 장소 목록과 같은 수 (#1132)', () => {
+    const places = Array.from({ length: PLACE_PRIORITY_ROW_COUNT + 2 }, (_, index) => ({
+      ...placeSummary,
+      placeId: String(index + 1),
+      firstImage2: 'https://tong.visitkorea.or.kr/cms/resource/1/1_image3_1.jpg',
+    }))
+    const markup = render({ places })
+
+    // `<img>` 만 센다 — React 가 첫 이미지용 `<link rel="preload">` 에도 같은 속성을 싣는다
+    const images = [...markup.matchAll(/<img [^>]*>/g)].map((match) => match[0])
+
+    expect(images.filter((tag) => /fetchpriority="high"/i.test(tag))).toHaveLength(
+      PLACE_PRIORITY_ROW_COUNT,
+    )
   })
 
   it('다음 페이지는 크롤러가 따라가는 <a href> 다', () => {
