@@ -15,8 +15,9 @@ import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { placeDetailFallbackTitle } from '@/lib/place/detail-title'
 import { isPlaceId } from '@/lib/place/place-id'
-import { toPlainText } from '@/lib/place/text'
 import { getServerQueryClient } from '@/lib/query/query-client'
+import { NOINDEX_FOLLOW, pageMetadata } from '@/lib/seo/page-metadata'
+import { isIndexablePlace, placeSeoDescription, placeSeoTitle } from '@/lib/seo/place'
 import type { PlaceDetail } from '@/types/place'
 
 /**
@@ -31,8 +32,6 @@ import type { PlaceDetail } from '@/types/place'
  * (docs/architecture-guide.md §7)
  */
 type Params = Promise<{ placeId: string }>
-
-const DESCRIPTION_LIMIT = 120
 
 /**
  * `generateMetadata` 와 페이지 렌더가 같은 요청 안에서 백엔드를 두 번 부르지 않게 한다.
@@ -55,9 +54,18 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   try {
     const place = await loadPlaceDetail(placeId)
 
+    /*
+      **검색 문구는 동반 조건으로 시작하고, 정규 주소와 공유 카드를 이 장소로 못박는다** (#1130).
+      동반 정보가 없는 곳은 색인하지 않는다 — 사이트맵과 같은 판정(`isIndexablePlace`)이다.
+    */
     return {
-      title: `${place.title} · 혼디가개`,
-      description: summarize(place),
+      ...pageMetadata({
+        title: placeSeoTitle(place),
+        description: placeSeoDescription(place),
+        path: `/places/${placeId}`,
+        image: place.firstImage,
+      }),
+      ...(isIndexablePlace(place) ? {} : { robots: NOINDEX_FOLLOW }),
     }
   } catch (error) {
     // 조회 실패를 메타데이터 단계에서 화면 실패로 만들지 않는다. 판정은 페이지가 한다
@@ -133,13 +141,4 @@ export default async function PlaceDetailPage({ params }: { params: Params }) {
       </HydrationBoundary>
     </Canvas>
   )
-}
-
-/** 개요는 HTML 원문이다. 평문으로 바꾼 뒤 잘라 쓴다 */
-function summarize(place: PlaceDetail): string {
-  const overview = toPlainText(place.overview)
-  const source = overview ?? place.addr1 ?? messages.place.pageDescription
-  const single = source.replace(/\s+/g, ' ')
-
-  return single.length <= DESCRIPTION_LIMIT ? single : `${single.slice(0, DESCRIPTION_LIMIT)}…`
 }

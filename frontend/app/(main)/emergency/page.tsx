@@ -2,13 +2,16 @@ import { Canvas } from '@/components/surface'
 import { EmergencyListView } from '@/features/emergency/emergency-list-view'
 import { EmergencyMapView } from '@/features/emergency/emergency-map-view'
 import { messages } from '@/lib/messages'
+import { pageMetadata } from '@/lib/seo/page-metadata'
 import { parseEmergencyBoardParams, toEmergencyBoardQuery } from '@/lib/url/emergency-filters'
 import { EMERGENCY_DEFAULT_VIEW, parseViewMode, viewModeHref } from '@/lib/url/view-mode'
 
-export const metadata = {
-  title: `${messages.emergency.pageTitle} · 혼디가개`,
-  description: messages.emergency.pageDescription,
-}
+/** 정규 주소는 쿼리(권역·필터·보기) 없는 `/emergency` 다 (#1130) */
+export const metadata = pageMetadata({
+  title: `${messages.seo.emergencyTitle} · 혼디가개`,
+  description: messages.seo.emergencyDescription,
+  path: '/emergency',
+})
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 

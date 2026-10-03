@@ -1,7 +1,20 @@
 import Link from 'next/link'
 
+import type { Metadata } from 'next'
+
 import { BrandSymbol } from '@/components/brand/symbol'
 import { Wordmark } from '@/components/brand/wordmark'
+import { NOINDEX_FOLLOW } from '@/lib/seo/page-metadata'
+
+/**
+ * **이 그룹 화면은 색인하지 않는다** (#1130). 로그인·가입·비밀번호 찾기·소셜 콜백은 검색으로
+ * 찾아올 화면이 아니고, 헤더가 `/login?returnTo=…` 처럼 쿼리만 다른 주소를 여럿 링크해
+ * 크롤러에게는 같은 화면이 수십 개로 보인다. 그룹 레이아웃에 한 번 두면 화면 넷이 상속한다
+ * — 화면이 `robots` 를 따로 내지 않는 한 덮이지 않는다.
+ *
+ * `robots.txt` 로 막지 않는 이유는 `lib/seo/robots.ts` 머리주석.
+ */
+export const metadata: Metadata = { robots: NOINDEX_FOLLOW }
 
 /**
  * 인증 화면 셸.
