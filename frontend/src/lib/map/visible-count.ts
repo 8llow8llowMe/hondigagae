@@ -12,7 +12,8 @@ import { messages } from '@/lib/messages'
  *    그리고 선택이 풀렸어도 `bounds` 가 아직 그 확대를 못 따라잡은 stale 상태
  *    (`emergency-map-view.tsx` 의 `boundsStale`).
  *  - `/places`: 목록이 **마지막으로 조회한 영역**을 세는데 지도가 그 자리에서 벗어났을 때
- *    (`place-map-view.tsx` 의 `searchedBounds`).
+ *    (`place-map-view.tsx` 의 `searchedBounds`). **재검색 전 첫 화면도 그렇다** (#1143) —
+ *    영역 필터가 꺼져 있어 지도 밖 장소도 목록에 남는다.
  *
  * 순수 함수라 `visible-count.test.ts` 가 표로 고정한다 — 상태 전이는 브라우저로만 잰다.
  */
