@@ -15,13 +15,19 @@ import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
+import { pageMetadata } from '@/lib/seo/page-metadata'
 import { parsePlaceFilters, toPlaceFilterQuery } from '@/lib/url/place-filters'
 import { parseViewMode, PLACES_DEFAULT_VIEW, viewModeHref } from '@/lib/url/view-mode'
 
-export const metadata = {
-  title: `${messages.place.pageTitle} · 혼디가개`,
-  description: messages.place.pageDescription,
-}
+/**
+ * **정규 주소는 필터 없는 `/places` 다** (#1130). 필터·보기 쿼리 조합마다 같은 목록이 다른
+ * URL 로 색인되지 않게 한다. 조합별 검색어 페이지는 랜딩(#1134)이 맡는다.
+ */
+export const metadata = pageMetadata({
+  title: `${messages.seo.placesTitle} · 혼디가개`,
+  description: messages.seo.placesDescription,
+  path: '/places',
+})
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 

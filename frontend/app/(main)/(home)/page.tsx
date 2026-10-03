@@ -9,7 +9,9 @@ import { placeListPath } from '@/lib/api/place'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
 import { todayDay, weekdayOf } from '@/lib/date/day'
+import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
+import { pageMetadata } from '@/lib/seo/page-metadata'
 import { DEFAULT_PLACE_FILTERS } from '@/lib/url/place-filters'
 import type { SliceResponse } from '@/types/api'
 import type { PlaceSummary } from '@/types/place'
@@ -20,10 +22,12 @@ function formatTodayLabel(todayIso: string): string {
   return `${todayIso} (${weekdayOf(todayIso) ?? ''}) · 제주시`
 }
 
-export const metadata = {
-  title: '혼디가개',
-  description: '반려견과 함께하는 제주 여행을 설계합니다.',
-}
+/** 검색어가 든 제목·설명과 정규 주소 (#1130). 문구 근거는 `lib/messages/seo.ts` 머리주석 */
+export const metadata = pageMetadata({
+  title: messages.seo.homeTitle,
+  description: messages.seo.homeDescription,
+  path: '/',
+})
 
 /**
  * 홈 — 홈-세부명세 D3.

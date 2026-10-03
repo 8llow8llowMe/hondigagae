@@ -12,6 +12,8 @@ import { walkCourseDetailPath } from '@/lib/api/walk-course'
 import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
+import { pageMetadata } from '@/lib/seo/page-metadata'
+import { walkCourseSeoDescription, walkCourseSeoTitle } from '@/lib/seo/walk-course'
 import { parseWalkCourseFilters, walkCourseFilterHref } from '@/lib/url/walk-course-filters'
 import { walkCourseDetailFallbackMetadata } from '@/lib/walk-course/detail-title'
 import { isWalkCourseId } from '@/lib/walk-course/id'
@@ -65,18 +67,21 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   try {
     const course = await loadWalkCourse(walkCourseId)
 
-    return {
-      title: `${course.courseLabel} ${course.name} · 혼디가개`,
-      description: messages.walkCourse.pageDescription,
-      /*
-        **정규 주소를 못박는다** ([#783](https://github.com/8llow8llowMe/hondigagae/issues/783)).
-        목록 행이 되돌림용 쿼리(`?activity=…&sort=…`)를 실어 보내면서 **같은 코스가 조합 수만큼
-        서로 다른 크롤 가능 URL** 이 됐다. 그 쿼리는 이 화면의 조회 파라미터가 아니라 돌아갈
-        곳을 적어 둔 것뿐이라 순전한 중복이다 — 공개 SEO 화면이므로(`architecture-guide.md` §9)
-        여기서 하나로 모은다.
-      */
-      alternates: { canonical: `/olle/${walkCourseId}` },
-    }
+    /*
+      **정규 주소를 못박는다** ([#783](https://github.com/8llow8llowMe/hondigagae/issues/783)).
+      목록 행이 되돌림용 쿼리(`?activity=…&sort=…`)를 실어 보내면서 **같은 코스가 조합 수만큼
+      서로 다른 크롤 가능 URL** 이 됐다. 그 쿼리는 이 화면의 조회 파라미터가 아니라 돌아갈
+      곳을 적어 둔 것뿐이라 순전한 중복이다 — 공개 SEO 화면이므로(`architecture-guide.md` §9)
+      여기서 하나로 모은다.
+
+      **설명은 코스마다 다르다** (#1130). 예전에는 29개 코스가 전부 목록 화면 설명을 썼다.
+    */
+    return pageMetadata({
+      title: walkCourseSeoTitle(course),
+      description: walkCourseSeoDescription(course),
+      path: `/olle/${walkCourseId}`,
+      image: course.firstImage,
+    })
   } catch (error) {
     /*
       조회 실패를 메타데이터 단계에서 화면 실패로 만들지 않는다. **다만 제목은 본문과 같은

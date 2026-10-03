@@ -2,6 +2,7 @@ import { Canvas } from '@/components/surface'
 import { LegalDocumentView } from '@/features/legal/legal-document-view'
 import { termsOfService } from '@/lib/legal/terms-of-service'
 import { messages } from '@/lib/messages'
+import { pageMetadata } from '@/lib/seo/page-metadata'
 
 /**
  * 이용약관 — 이슈 #610.
@@ -12,10 +13,11 @@ import { messages } from '@/lib/messages'
  *
  * **데이터 조회가 없다.** 본문이 상수라 프리페치할 것도, 로딩 상태도 없다.
  */
-export const metadata = {
+export const metadata = pageMetadata({
   title: `${messages.legal.termsTitle} · 혼디가개`,
   description: messages.legal.termsDescription,
-}
+  path: '/terms',
+})
 
 export default function TermsPage() {
   return (

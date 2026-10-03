@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from 'next'
 
 import { ScrollbarReveal } from '@/components/scrollbar-reveal'
 import { MASK_ICON_COLOR, THEME_COLOR } from '@/lib/brand/chrome-colors'
+import { messages } from '@/lib/messages'
 import { QueryProvider } from '@/lib/query/query-provider'
+import { SITE_NAME, siteUrl } from '@/lib/seo/site'
 
 // Pretendard Variable — unicode-range 로 분할된 dynamic subset.
 // 브라우저가 **페이지에 실제 등장한 글자 범위만** 내려받는다 (조각 평균 31KB).
@@ -13,15 +15,27 @@ import './globals.css'
 
 /**
  * 배포 도메인. `metadataBase` 가 없으면 Next 가 `og:image` 를 상대 경로로 내보내고
- * 카카오톡·트위터 크롤러는 그것을 못 읽는다.
+ * 카카오톡·트위터 크롤러는 그것을 못 읽는다. 화면마다 내는 `canonical` 도 이 도메인을 붙여
+ * 절대 주소가 된다.
  *
- * 값은 `NEXT_PUBLIC_SITE_URL` 로 주입한다. 메타데이터는 서버에서만 만들어지지만 비밀이
- * 아니고, BossPickSeoul Vault(kv/bosspickseoul/frontend)와 **키 이름을 같게** 두기 위해
- * `NEXT_PUBLIC_` 접두사를 쓴다. 빌드 시점에 인라인되므로 dev/prod 를 각각 빌드하고,
- * `process.env` 는 반드시 리터럴로 접근한다 (동적 인덱싱은 치환되지 않는다).
+ * 값은 `NEXT_PUBLIC_SITE_URL` 이다 — 읽는 곳은 `lib/seo/site.ts` 하나다 (#1130). 메타데이터는
+ * 서버에서만 만들어지지만 비밀이 아니고, BossPickSeoul Vault(kv/bosspickseoul/frontend)와
+ * **키 이름을 같게** 두기 위해 `NEXT_PUBLIC_` 접두사를 쓴다.
  *   dev = https://dev.hondigagae.com / prod = https://www.hondigagae.com
  */
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
+const SITE_URL = siteUrl()
+
+/**
+ * 검색엔진 소유 확인 (#1130). **값이 없으면 태그를 내지 않는다** — dev 빌드나 아직 등록 전인
+ * 운영에 빈 `content` 가 나가면 확인 도구가 실패로 센다.
+ *
+ * Vault(`kv/hondigagae/frontend/{env}/env`)에 넣으면 Jenkins 가 빌드 환경으로 그대로 넘긴다
+ * (`Jenkinsfile.frontend-common.groovy` `readBuildEnvValues`). 필수 키가 아니다.
+ * 구글은 Search Console **도메인 속성(DNS TXT)** 으로 확인하면 이 태그가 필요 없다. 네이버
+ * 서치어드바이저는 DNS 확인이 없어 태그가 필요하다.
+ */
+const GOOGLE_SITE_VERIFICATION = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
+const NAVER_SITE_VERIFICATION = process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION
 
 /**
  * 브랜드 에셋 배선 — 아트보드 `혼디가개 브랜드 자산` 5절.
@@ -48,8 +62,12 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
  */
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: '혼디가개',
-  description: '반려견과 함께하는 제주 여행을 설계합니다.',
+  /*
+    **화면이 제목을 내지 않을 때의 기본값이다.** 공개 화면은 전부 `pageMetadata()` 로 제 것을
+    낸다 (#1130). 여기 값은 검색 결과에 나갈 일이 거의 없지만, 나간다면 검색어가 든 쪽이 낫다.
+  */
+  title: SITE_NAME,
+  description: messages.seo.homeDescription,
   manifest: '/site.webmanifest',
   icons: {
     /*
@@ -79,13 +97,23 @@ export const metadata: Metadata = {
       다른 문장을 쓰면 그림과 글이 어긋난다.
     */
     description: '동반 가능한 장소부터 오늘 산책하기 좋은 시간까지 한 번에 확인해요',
-    url: SITE_URL,
+    /*
+      **`url` 을 두지 않는다** (#1130). 여기 두면 `openGraph` 를 내지 않는 화면 전부가 상속해
+      `og:url` 이 홈이 되고, 카카오톡·페이스북이 그 화면의 공유를 홈으로 모은다. 공개 화면은
+      `pageMetadata()` 가 제 주소를 낸다.
+    */
   },
   /*
     `twitter:image` 를 따로 두지 않는다. 트위터는 `twitter:image` 가 없으면 `og:image` 를
     읽으므로 같은 1200 × 630 을 두 번 실을 이유가 없다. 카드 종류만 알린다.
   */
   twitter: { card: 'summary_large_image' },
+  verification: {
+    ...(GOOGLE_SITE_VERIFICATION && { google: GOOGLE_SITE_VERIFICATION }),
+    ...(NAVER_SITE_VERIFICATION && {
+      other: { 'naver-site-verification': NAVER_SITE_VERIFICATION },
+    }),
+  },
 }
 
 /**

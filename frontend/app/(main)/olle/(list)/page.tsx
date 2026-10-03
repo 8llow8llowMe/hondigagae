@@ -9,15 +9,18 @@ import { type WalkCourseListParams, walkCourseListPath } from '@/lib/api/walk-co
 import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
+import { pageMetadata } from '@/lib/seo/page-metadata'
 import { parseWalkCourseFilters } from '@/lib/url/walk-course-filters'
 import { representativePet, resolveActivityParam } from '@/lib/walk-course/activity'
 import type { PetList } from '@/types/pet'
 import type { WalkCourseList } from '@/types/walk-course'
 
-export const metadata = {
-  title: `${messages.walkCourse.pageTitle} · 혼디가개`,
-  description: messages.walkCourse.pageDescription,
-}
+/** 정규 주소는 쿼리(활동량·정렬) 없는 `/olle` 다 (#1130) */
+export const metadata = pageMetadata({
+  title: `${messages.seo.walkCoursesTitle} · 혼디가개`,
+  description: messages.seo.walkCoursesDescription,
+  path: '/olle',
+})
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 

@@ -2,11 +2,13 @@ import { Canvas } from '@/components/surface'
 import { AboutView } from '@/features/about/about-view'
 import { MarkAboutSeen } from '@/features/about/mark-about-seen'
 import { messages } from '@/lib/messages'
+import { pageMetadata } from '@/lib/seo/page-metadata'
 
-export const metadata = {
+export const metadata = pageMetadata({
   title: `${messages.about.title} · 혼디가개`,
   description: messages.about.description,
-}
+  path: '/about',
+})
 
 /**
  * 서비스 소개 — `/about` (#611 → #635).

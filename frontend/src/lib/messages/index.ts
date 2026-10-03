@@ -12,6 +12,7 @@ import { memberMessages } from '@/lib/messages/member'
 import { petMessages } from '@/lib/messages/pet'
 import { placeMessages } from '@/lib/messages/place'
 import { planMessages } from '@/lib/messages/plan'
+import { seoMessages } from '@/lib/messages/seo'
 import { walkCourseMessages } from '@/lib/messages/walk-course'
 
 /**
@@ -52,4 +53,5 @@ export const messages = {
   member: memberMessages,
   form: formMessages,
   auth: authMessages,
+  seo: seoMessages,
 } as const
