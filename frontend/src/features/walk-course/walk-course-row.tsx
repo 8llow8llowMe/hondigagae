@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 import { formatCourseDistance } from '@/lib/format/distance'
+import { imageLoadingProps } from '@/lib/image/loading'
 import { imageSrc } from '@/lib/image/remote-host'
 import { type Inset, INSET_CLASS } from '@/lib/ui/inset'
 import { walkCourseFilterHref } from '@/lib/url/walk-course-filters'
@@ -88,6 +89,7 @@ export function WalkCourseCardGrid({
 export function WalkCourseRow({
   course,
   filters,
+  priority = false,
 }: {
   course: WalkCourseSummary
   /**
@@ -97,6 +99,11 @@ export function WalkCourseRow({
    * 실어 보내야 `코스 목록으로` 가 같은 목록으로 돌아간다. 없으면 쿼리 없이 간다.
    */
   filters?: WalkCourseFilters | undefined
+  /**
+   * 첫 화면 카드면 사진을 바로 받는다 (`lib/image/loading.ts`, #1132). 몇 번째 카드인지는
+   * 목록이 안다 — `WALK_COURSE_PRIORITY_CARD_COUNT`.
+   */
+  priority?: boolean
 }) {
   const thumbnail = imageSrc(course.firstImage)
   const distance = formatCourseDistance(course.distanceKm)
@@ -153,6 +160,7 @@ export function WalkCourseRow({
               /* 열 수와 같이 간다 — 1280+ 3열 · 768+ 2열 · 그 아래 1열 */
               sizes="(min-width: 1280px) 33vw, (min-width: 768px) 50vw, 100vw"
               className="object-cover"
+              {...imageLoadingProps(priority)}
             />
           </div>
         )}

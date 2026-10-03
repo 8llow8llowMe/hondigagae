@@ -180,6 +180,29 @@ describe('WalkCourseRow — 이미지 (D1-1)', () => {
     expect(render(WALK_COURSE_WITH_COORDS)).toContain('alt=""')
   })
 
+  it('기본은 지연 로드다 (#1132)', () => {
+    const img = /<img[^>]*>/.exec(render(WALK_COURSE_WITH_COORDS))?.[0] ?? ''
+
+    expect(img).toContain('loading="lazy"')
+    expect(img).not.toMatch(/fetchpriority/i)
+  })
+
+  /*
+    **첫 카드 사진이 `/olle` 의 LCP 다** (2026-10-03 Lighthouse 모바일 6.8s,
+    `lcp-lazy-loaded` 실패). 몇 번째 카드인지는 목록이 안다 — 카드는 prop 으로 받는다.
+  */
+  it('priority 면 바로 받고 우선순위를 올린다 (#1132)', () => {
+    const img =
+      /<img[^>]*>/.exec(
+        renderToStaticMarkup(
+          createElement(WalkCourseRow, { course: WALK_COURSE_WITH_COORDS, priority: true }),
+        ),
+      )?.[0] ?? ''
+
+    expect(img).toContain('loading="eager"')
+    expect(img).toMatch(/fetchpriority="high"/i)
+  })
+
   /**
    * **사진이 이름 위에 온다** (시안 A4 — 사진 위에 아무것도 얹지 않는다). 마크업 순서로
    * 잰다 — 클래스만 보면 DOM 순서가 바뀌어도 초록이다.
