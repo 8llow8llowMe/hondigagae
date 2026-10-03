@@ -35,7 +35,7 @@ export function WalkCourseHero({ image }: { image: string }) {
         /* 1024 이상은 두 열이라 히어로가 콘텐츠 폭의 절반이다 */
         sizes="(min-width: 1024px) 50vw, (min-width: 768px) 720px, 100vw"
         className="object-cover"
-        priority
+        preload
       />
     </div>
   )
