@@ -667,3 +667,32 @@ export function toEmergencyBoardQuery(params: EmergencyBoardParams): string
 `/emergency` 에만 참이다.
 
 **프리페치가 없는 화면은 클라이언트 훅이 읽기까지 한다.** `/places` 는 서버 프리페치가 있어 `page.tsx` 가 읽고 `usePlaceFilterNav` 는 쓰기만 하지만, `/emergency` 는 좌표가 브라우저에만 있어 프리페치가 없다(§9). 읽기를 페이지에 두면 지도 → 패널 → 시트로 조건을 prop 으로 꿰야 하고 그 사슬이 끊기면 두 갈래가 다른 조건을 본다. `useEmergencyNav` 가 `useSearchParams()` 로 직접 읽는 이유다.
+
+## 11. 검색 노출 (SEO) ([#1130](https://github.com/8llow8llowMe/hondigagae/issues/1130))
+
+> 근거와 측정은 `docs/seo-review-2026-10-03.md`. 여기는 **코드가 지킬 규칙**만 적는다.
+
+| 무엇                | 어디                                    | 규칙                                                                                                           |
+| ------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 기준 도메인         | `src/lib/seo/site.ts`                   | `NEXT_PUBLIC_SITE_URL` 을 읽는 곳은 여기 하나다. **운영(`https://www.hondigagae.com`)만 색인한다**             |
+| `robots.txt`        | `app/robots.ts` · `lib/seo/robots.ts`   | 운영이 아니면 `Disallow: /`. 운영은 `/api/` · `/oauth/` · `proxy.ts` `PROTECTED_PATHS` 만 막는다               |
+| `sitemap.xml`       | `app/sitemap.ts` · `lib/seo/sitemap.ts` | 요청마다 만든다(`force-dynamic`). 정적 공개 화면 + 올레 전량 + **색인 대상 장소**. 실패해도 500 을 내지 않는다 |
+| 화면 메타데이터     | `lib/seo/page-metadata.ts`              | 공개 화면은 **`pageMetadata({ title, description, path, image })` 를 거친다** (`app/seo-metadata.test.ts`)     |
+| 검색 문구           | `lib/messages/seo.ts`                   | 화면 `h1` 과 따로 둔다. 제목은 사람들이 치는 말(제주 · 반려견 · 강아지 · 애견동반)을 담는다                    |
+| 장소 상세 색인 여부 | `lib/seo/place.ts` `isIndexablePlace`   | 동반 정보가 `UNKNOWN` 이거나 `delisted` 면 `noindex, follow`. **사이트맵도 같은 함수를 쓴다**                  |
+| 인증 화면           | `app/(auth)/layout.tsx`                 | 그룹 레이아웃에서 `noindex, follow`                                                                            |
+
+**지킬 것**
+
+- **공개 화면을 추가하면 `pageMetadata()` 로 제 경로를 내고, `STATIC_PUBLIC_PATHS`(사이트맵)에 넣고,
+  `app/seo-metadata.test.ts` 의 표에 한 줄 더한다.** 빠뜨리면 그 화면은 루트 `openGraph` 를 상속한다.
+- **루트 `openGraph` 에 `url` 을 두지 않는다.** 두면 `openGraph` 를 내지 않는 화면 전부의 `og:url` 이
+  홈이 되고, 카카오톡·페이스북이 그 화면의 공유를 홈으로 모은다 (#1130 이전 상태).
+- **화면이 `openGraph` 를 내면 `app/opengraph-image.png` 파일 규약이 그 화면에서 빠진다** (dev 실측).
+  `pageMetadata()` 가 이미지를 받지 못하면 같은 파일의 라우트(`BRAND_SHARE_IMAGE`)를 직접 적는 이유다.
+- **`canonical` 은 쿼리 없는 경로다.** 필터·보기·되돌림용 쿼리 조합이 같은 화면의 다른 URL 로 색인되지
+  않게 한다 (#783 과 같은 이유).
+- **`robots.txt` 로 막지 않는 화면이 있다** — 로그인·가입·공유 일정. 막으면 크롤러가 페이지 안의
+  `noindex` 를 읽지 못해, 외부 링크만으로 주소가 검색 결과에 남는다. 메타 `robots` 로 끈다.
+- **검색엔진 소유 확인 값**(`NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` · `NEXT_PUBLIC_NAVER_SITE_VERIFICATION`)은
+  Vault 선택 키다. 비면 태그를 내지 않는다.
