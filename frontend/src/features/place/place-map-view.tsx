@@ -21,15 +21,21 @@ import { useNearbyPlaces } from '@/features/place/use-nearby-places'
 import { usePlaceList } from '@/features/place/use-place-list'
 import { ApiError, toErrorStatus } from '@/lib/api/error'
 import { mergeSlices } from '@/lib/api/slice'
-import { type LatLng, SELECTED_PLACE_MAP_LEVEL, toLatLng } from '@/lib/geo/coord'
+import { type LatLng, SELECTED_PLACE_MAP_LEVEL } from '@/lib/geo/coord'
 import { getCurrentPosition, getPositionIfGranted, offersLocate } from '@/lib/geo/current-position'
+import {
+  areaAfterIdle,
+  areaAfterResearch,
+  INITIAL_PLACE_MAP_AREA,
+  type PlaceMapArea,
+  placesInArea,
+} from '@/lib/map/place-map-area'
 import { shouldOfferResearch } from '@/lib/map/research-offer'
 import type { MapSdkFailure } from '@/lib/map/sdk'
 import {
   boundsCenter,
   boundsRadiusMeters,
   isSameViewport,
-  isWithinBounds,
   type MapBounds,
 } from '@/lib/map/viewport'
 import { visibleCountLabel } from '@/lib/map/visible-count'
@@ -164,24 +170,36 @@ export function PlaceMapView({
 
   const [bounds, setBounds] = useState<MapBounds | null>(null)
   /*
-    **지금 목록이 대응하는 지도 영역.** 첫 `idle` 에 한 번 놓이고, 그 뒤로 이 값을 옮기는
-    것은 **"이 지역에서 재검색" 버튼뿐**이다 (#396 의 규칙을 이 화면에도 들였다).
+    **영역이 둘이다** (#1143, `lib/map/place-map-area.ts`).
+
+    - `searchedBounds` — **지금 목록이 대응하는 지도 영역.** 이 값을 놓는 것은 **"이 지역에서
+      재검색" 버튼뿐**이다 (#396 의 규칙을 이 화면에도 들였다). 재검색 전에는 `null` 이라
+      목록·핀을 거르지 않는다.
+    - `originBounds` — **재검색 권유의 기준.** 첫 `idle` 에 놓이고 재검색 때 같이 옮겨 간다.
 
     예전에는 `movedBounds` 였고 `idle` 마다 갱신되며 **스스로 재조회**했다. 그래서 한
     장소를 눌러 확대하거나 화면을 조금만 옮겨도 그 프레임 기준으로 목록을 다시 불러와,
     방금 보던 결과가 통째로 갈렸다 — 조회를 시킨 적이 없는데 목록이 흔들린다.
 
-    **목록 필터의 기준도 이것이다** (`bounds` 가 아니다). 그래서 지도를 옮기거나 한 곳을
-    골라 확대해도 목록·핀이 그대로 남는다 — `/emergency` 가 선택 순간에만 `frozenBounds`
-    로 얼려 두는 일을, 이 화면은 이 하나로 항상 한다.
+    **목록 필터의 기준은 `searchedBounds` 다** (`bounds` 가 아니다). 그래서 지도를 옮기거나
+    한 곳을 골라 확대해도 목록·핀이 그대로 남는다 — `/emergency` 가 선택 순간에만
+    `frozenBounds` 로 얼려 두는 일을, 이 화면은 이 하나로 항상 한다.
+
+    **첫 `idle` 이 목록 필터를 켜지 않는다** (#1143). 예전에는 하나의 `searchedBounds` 를 첫
+    `idle` 이 채웠고, 서버 렌더·첫 페인트에 선 행이 SDK 가 뜨는 순간 지도 밖 장소만큼 빠져
+    아래 행이 당겨졌다 — Lighthouse 모바일 CLS 0.159, 범인이 시트 행이었다. 권유의 자는
+    처음부터 있어야 해서 그 일만 `originBounds` 로 떼어 냈다.
   */
-  const [searchedBounds, setSearchedBounds] = useState<MapBounds | null>(null)
+  const [area, setArea] = useState<PlaceMapArea>(INITIAL_PLACE_MAP_AREA)
+  const searchedBounds = area.searched
+  const originBounds = area.origin
   /*
     재검색을 한 번이라도 눌렀는가 — **목록 캐시 ↔ 주변 조회를 가르는 유일한 스위치**다.
 
     처음에는 목록 캐시를 재사용한다 (architecture-guide.md §9 "지도 뷰: 별도 조회 금지").
-    `searchedBounds` 만으로는 이 둘을 가를 수 없다 — 첫 `idle` 에도 값이 들어오기 때문에
-    그것으로 조회를 켜면 들어오자마자 프리페치한 캐시를 버린다.
+    #1143 뒤로 `searchedBounds !== null` 과 늘 같은 값이지만 **스위치를 따로 둔다** — 영역은
+    목록 필터의 자리이고 이것은 데이터 출처의 자리다. 영역 쪽이 다시 첫 `idle` 에 채워지는
+    변경이 와도 들어오자마자 프리페치한 캐시를 버리는 일이 없게 한다.
   */
   const [researched, setResearched] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -235,6 +253,12 @@ export function PlaceMapView({
   const searchCenter = searchedBounds === null ? null : boundsCenter(searchedBounds)
   const searchRadius = searchedBounds === null ? 0 : boundsRadiusMeters(searchedBounds)
   /*
+    **권유의 자는 조회 자리와 따로 잰다** (#1143). 재검색 전에는 `searchedBounds` 가 없으므로
+    그것으로 재면 버튼이 영영 뜨지 않는다. 재검색 뒤에는 두 영역이 같아 값도 같다.
+  */
+  const originCenter = originBounds === null ? null : boundsCenter(originBounds)
+  const originRadius = originBounds === null ? 0 : boundsRadiusMeters(originBounds)
+  /*
     **조회 시점을 사용자가 쥔다** (#396 의 규칙을 이 화면에도 들였다). 예전에는 `idle`
     마다 자동으로 나갔고(#240 에서 체크박스를 걷으며 "지도를 옮기는 것이 곧 '여기를 보여
     줘' 다" 로 정리했다), 그 전제가 **한 곳을 골라 확대하는 조작**에서 깨졌다 — 확대는
@@ -259,7 +283,8 @@ export function PlaceMapView({
   )
 
   /*
-    **마지막으로 조회한 영역** 안에 든 것만 목록에 남긴다.
+    **마지막으로 조회한 영역** 안에 든 것만 목록에 남긴다. 재검색 전에는 거르지 않는다
+    (#1143) — 서버가 그린 행이 SDK 로드 순간 빠지지 않게.
 
     **지금 보고 있는 `bounds` 가 아니다.** 그러면 지도를 옮기거나 한 곳을 골라 확대하는
     것만으로 목록이 줄어, 재조회를 막아도 "목록이 흔들린다" 는 문제가 그대로 남는다 —
@@ -268,16 +293,7 @@ export function PlaceMapView({
 
     영역이 옮겨 갔다는 사실은 캡션(`countLine`)과 재검색 버튼이 말한다.
   */
-  const visible = useMemo(() => {
-    if (searchedBounds === null) return places
-
-    return places.filter((place) => {
-      const coord = toLatLng(place)
-      // 좌표가 없는 곳은 지도가 판단할 수 없다. 숨기지 않고 남긴다 —
-      // 목록으로도 같은 정보에 도달할 수 있어야 한다 (이슈 #14 완료 조건)
-      return coord === null || isWithinBounds(searchedBounds, coord)
-    })
-  }, [places, searchedBounds])
+  const visible = useMemo(() => placesInArea(places, searchedBounds), [places, searchedBounds])
 
   /*
     **내용이 같으면 같은 Set 으로 취급한다.** `mutedPlaceIds` 는 참조 동등성으로만
@@ -314,14 +330,18 @@ export function PlaceMapView({
     setBounds(next)
 
     /*
-      **첫 영역이 목록의 기준 자리가 된다 — 조회는 하지 않는다.** 들어오자마자 주변
-      검색으로 갈아타면 프리페치한 목록 캐시를 버리게 되고, 첫 화면이 반경 밖이라
-      비어 보인다 (실제로 그랬다). 그래서 `researched` 는 건드리지 않는다.
+      **첫 영역은 재검색 권유의 기준만 된다 — 목록을 거르지도, 조회하지도 않는다.**
+
+      목록 필터를 켜지 않는 이유 (#1143): 서버 렌더·첫 페인트의 행은 프리페치한 첫 페이지
+      전체인데, 여기서 거르면 SDK 가 뜨는 순간 지도 밖 장소가 빠지며 아래 행이 당겨진다.
+      조회를 켜지 않는 이유: 들어오자마자 주변 검색으로 갈아타면 프리페치한 목록 캐시를
+      버리게 되고, 첫 화면이 반경 밖이라 비어 보인다 (실제로 그랬다). 그래서 `researched`
+      는 건드리지 않는다.
 
       그 뒤의 `idle` 은 **`bounds` 만** 옮긴다 — 재검색을 권할지 판단하고 캡션 문구를
-      고르는 데만 쓰인다. `searchedBounds` 를 옮기는 것은 버튼뿐이다.
+      고르는 데만 쓰인다. `searchedBounds` 를 놓는 것은 버튼뿐이다.
     */
-    if (!userMoved) setSearchedBounds(next)
+    setArea((current) => areaAfterIdle(current, next, userMoved))
   }, [])
 
   /**
@@ -334,7 +354,7 @@ export function PlaceMapView({
   const researchHere = useCallback(() => {
     if (bounds === null) return
 
-    setSearchedBounds(bounds)
+    setArea(areaAfterResearch(bounds))
     setResearched(true)
   }, [bounds])
 
@@ -411,13 +431,18 @@ export function PlaceMapView({
     다른 것을 주장한다. 개수 자체는 그대로 참이라 숫자는 두고 문구만 바꾼다 —
     `/emergency` 가 선택·stale 구간에서 쓰는 것과 같은 함수다 (`lib/map/visible-count.ts`).
 
-    `isSameViewport` 는 둘 중 하나가 `null` 이면 `false` 다 — 첫 `idle` 전에는 영역
-    필터가 아예 걸리지 않으므로 그때도 "목록 N곳" 이 맞다.
+    `isSameViewport` 는 둘 중 하나가 `null` 이면 `false` 다 — **재검색 전에는 영역 필터가
+    아예 걸리지 않으므로** 첫 화면 내내 "목록 N곳" 이다 (#1143). 지도 밖 장소도 목록에
+    남아 있으니 "지도에 보이는" 이 거짓이 된다. 예전에는 첫 `idle` 에 필터가 켜지며
+    "지도에 보이는 N곳" 으로 바뀌었고, 그때 빠진 행이 레이아웃을 흔들었다.
   */
   const countLine = visibleCountLabel(visible.length, !isSameViewport(searchedBounds, bounds))
   /*
     조회한 자리에서 충분히 벗어났을 때만 재검색을 권한다 (#396). 판정은
     `shouldOfferResearch` 순수 함수가 갖는다 — 임계값이 반경에 비례한다.
+
+    **자는 `originBounds` 다 — `searchedBounds` 가 아니다** (#1143). 재검색 전에는 목록
+    영역이 없어도 "첫 화면에서 충분히 벗어났나" 는 재야 한다. 재검색 뒤에는 두 영역이 같다.
 
     **`originScreenRadius` 를 넘긴다.** 이 화면은 조회 반경을 화면에서 역산하므로
     축소가 곧 "더 넓게 찾아 줘" 다 — 중심이 한 픽셀도 안 움직여도 재조회할 이유가
@@ -429,10 +454,10 @@ export function PlaceMapView({
   */
   const offerResearch = shouldOfferResearch({
     bounds,
-    origin: searchCenter,
-    radius: searchRadius,
+    origin: originCenter,
+    radius: originRadius,
     suppressed: false,
-    originScreenRadius: searchRadius,
+    originScreenRadius: originRadius,
   })
   /** 둘 다 있을 때만 그린다 — 헤더가 토글을 갖는 화면은 주지 않는다 */
   const showToggle = listHref !== undefined && mapHref !== undefined
