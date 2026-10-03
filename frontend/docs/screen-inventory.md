@@ -881,6 +881,14 @@
 
 **일정에 코스 담기는 §4 다** — [#620](https://github.com/8llow8llowMe/hondigagae/issues/620) (`itemType=WALK`).
 
+## 5-4. 검색어 랜딩 — **구현 완료** ([#1134](https://github.com/8llow8llowMe/hondigagae/issues/1134))
+
+| 화면        | 경로            | API                                                                                | 상태                                                                                |
+| ----------- | --------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 검색어 랜딩 | `/jeju/[topic]` | `GET /places?contentType=…&petAllowanceType=ALLOWED&size=50[&lastPlaceId=]` (공개) | **구현 완료** — 숙소 · 관광지 · 식당·카페 3종. 서버 렌더만, 페이지는 `?after=` 링크 |
+
+명세: `docs/features/landing/검색랜딩-세부명세.md`. 모르는 `topic` 은 404, 5xx 는 `error.tsx`(500).
+
 ## 6. 대기 — 백엔드 미착수
 
 **아래 화면은 만들지 않는다.** 호출부·mock도 만들지 않는다.
