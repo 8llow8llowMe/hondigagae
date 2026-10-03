@@ -93,6 +93,17 @@ navigator.geolocation.getCurrentPosition(onOk, onFail, { timeout: 8000 })
 
 - **권한 거부·타임아웃 분기를 반드시 처리한다.** 실패 시 제주 중심 기본 좌표로 폴백하고, 그 사실을 화면에 알린다.
 - `navigator` 는 브라우저 전용이다. helper 안에서 `typeof navigator === 'undefined'` 가드.
+- **화면 진입에서 권한을 묻지 않는다** ([#1133](https://github.com/8llow8llowMe/hondigagae/issues/1133)).
+  마운트 effect 에서 `getCurrentPosition()` 을 부르면 들어오자마자 권한 팝업이 뜬다 — Lighthouse
+  `geolocation-on-start` 가 홈 · `/places` 에서 잡았고, 검색으로 처음 들어온 사람에게는 이탈
+  요인이다. 진입에서는 **`getPositionIfGranted()`** 를 쓴다: `navigator.permissions.query` 가
+  `granted` 면 `getCurrentPosition()` 결과, 아니면 묻지 않고 같은 모양의 폴백
+  (`denied` → `denied`, 허용 전·Permissions API 없음·`query` 실패 → `unasked`).
+  **묻는 것은 사용자가 누른 버튼의 몫이다** ("내 위치" → `getCurrentPosition()`). 그래서
+  `unasked` 에서 그 버튼을 감추지 않는다 (`offersLocate()`).
+  **예외는 `/emergency` 하나다** — 위치가 그 화면의 목적이라 진입에서 묻는다
+  (`features/emergency/공통명세.md` E5). 예외를 늘리려면 `src/lib/geo/geolocation-on-start.test.ts`
+  를 함께 고친다.
 - **`timeout` 옵션만 믿지 않는다.** 권한이 막힌 일부 환경은 성공도 실패도 부르지 않고 그냥
   조용하다(실측). 그러면 Promise 가 영영 pending 이고 화면이 스켈레톤에서 멈춘다 — 급할 때
   여는 긴급 시설 화면에서 그것은 "느림" 이 아니라 "고장" 이다. `getCurrentPosition()` 은
