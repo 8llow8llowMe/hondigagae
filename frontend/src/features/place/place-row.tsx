@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { Badge } from '@/components/badge'
 import { ChevronRightIcon, ImageIcon } from '@/components/icons'
 import { MetricBadge } from '@/components/metric'
-import { imageSrc } from '@/lib/image/remote-host'
+import { imageLoadingProps } from '@/lib/image/loading'
+import { listThumbnailSrc } from '@/lib/image/thumbnail'
 import { messages } from '@/lib/messages'
 import { placeIllustration } from '@/lib/place/illustration'
 import { placeMetaLine } from '@/lib/place/meta'
@@ -24,22 +25,34 @@ import type { PlaceSummary } from '@/types/place'
  * 값이 하나로 고정될 수 없다. 기본값을 `card` 로 두는 것은 3a 가 정본이기 때문이고,
  * 카드 밖 사용처가 스스로 밝히게 한다.
  *
- * 썸네일 80(모바일) / 96(데스크톱) · radius 8. **`firstImage` 가 null 이어도 같은
+ * 썸네일 80(모바일) / 96(데스크톱) · radius 8. **사진이 null 이어도 같은
  * 크기의 "이미지 없음" 타일을 남긴다** — 행 높이가 흔들리면 목록을 훑을 수 없다.
  * (장소 상세의 `PhotoGallery` 는 반대다. 0장이면 섹션을 아예 렌더하지 않는다.)
+ *
+ * **`priority` 는 첫 화면에 서는 몇 행만 준다** (#1132). 목록이 index 로 정한다
+ * (`place-list-section.tsx`) — 행은 자기가 몇 번째인지 모른다.
  *
  * **목록 API 가 적합도 점수를 주지 않으므로 배지·점수를 그리지 않는다** —
  * 근거를 댈 수 없다. 적합도는 상세에서만 말한다 (docs/screen-inventory.md §3).
  * 같은 이유로 아트보드의 **거리(`4.1km`)와 설명 한 줄도 그리지 않는다** — 목록 응답에 없다.
  */
-export function PlaceRow({ place, inset = 'card' }: { place: PlaceSummary; inset?: Inset }) {
+export function PlaceRow({
+  place,
+  inset = 'card',
+  priority = false,
+}: {
+  place: PlaceSummary
+  inset?: Inset
+  /** 첫 화면 행이면 썸네일을 바로 받는다 (`lib/image/loading.ts`) */
+  priority?: boolean
+}) {
   return (
     <li className={INSET_CLASS[inset]}>
       <Link
         href={`/places/${place.placeId}`}
         className="focus-visible:ring-brand-500 @container flex items-center gap-3 py-3 focus-visible:ring-2 focus-visible:-outline-offset-2 focus-visible:outline-none @lg:gap-5 @lg:py-4"
       >
-        <PlaceRowContent place={place} />
+        <PlaceRowContent place={place} priority={priority} />
         <ChevronRightIcon size={20} className="text-fg-subtle shrink-0" />
       </Link>
     </li>
@@ -80,6 +93,7 @@ export function PlaceRow({ place, inset = 'card' }: { place: PlaceSummary; inset
 export function PlaceRowContent({
   place,
   titleHref,
+  priority = false,
 }: {
   place: PlaceSummary
   /**
@@ -87,8 +101,19 @@ export function PlaceRowContent({
    * 링크 안에 링크가 중첩된다.
    */
   titleHref?: string
+  /**
+   * 첫 화면 행이면 썸네일을 바로 받는다 (`lib/image/loading.ts`, #1132).
+   * **기본은 지연 로드다** — 지도 패널·담기 화면은 주지 않는다. 지도 화면의 LCP 는 지도
+   * 타일이라, 행 사진의 우선순위를 올리면 그 타일과 대역폭을 다툰다.
+   */
+  priority?: boolean
 }) {
-  const thumbnail = imageSrc(place.firstImage)
+  /*
+    **작은 사진(`firstImage2`, 150×100 · ~20KB)이 먼저다** (#1132). 이 칸은 80~96px 인데
+    `firstImage` 는 940px 원본(500~780KB)이라, 그것을 쓰던 `/places` 한 화면이 이미지만
+    6.5MB 였다. 판정·폴백 규칙은 `listThumbnailSrc` 가 갖는다.
+  */
+  const thumbnail = listThumbnailSrc(place.firstImage2, place.firstImage)
   const illustration = placeIllustration(place.contentType.code)
   const meta = placeMetaLine(place.addr1, place.indoor)
 
@@ -99,10 +124,18 @@ export function PlaceRowContent({
         {thumbnail !== null ? (
           <Image
             src={thumbnail}
+            /*
+              **장소명을 alt 로 주지 않는다** (#1132 에서 다시 따졌다). 이 사진은 행 링크
+              (`PlaceRow`)·선택 버튼(지도 패널) **안**에 있고, 같은 컨트롤 안 `h3` 가 이미
+              장소명을 말한다 — alt 에도 이름을 주면 접근 이름이 `{장소명} {장소명} …` 으로
+              두 번 읽힌다. 담기 화면(`titleHref`)은 제목 링크가 바로 옆이라 같은 결론이다.
+              사진이 덧붙이는 정보가 없으므로 장식이다.
+            */
             alt=""
             fill
             sizes="(min-width: 1024px) 96px, 80px"
             className="object-cover"
+            {...imageLoadingProps(priority)}
           />
         ) : illustration !== null ? (
           /*
