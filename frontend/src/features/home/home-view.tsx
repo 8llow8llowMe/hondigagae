@@ -40,7 +40,7 @@ import { DEFAULT_RADIUS_METERS } from '@/lib/api/emergency'
 import { toPetCondition } from '@/lib/api/insight'
 import { dayToLocalNoon } from '@/lib/date/day'
 import { hospitalBannerDescription, pickNearestHospital } from '@/lib/emergency/nearest'
-import { getCurrentPosition, type PositionResult } from '@/lib/geo/current-position'
+import { getPositionIfGranted, type PositionResult } from '@/lib/geo/current-position'
 import { DEFAULT_BASIS_PLACE_ID, isDefaultBasis } from '@/lib/insight/basis-place'
 import { collectIndoorAlternatives } from '@/lib/insight/indoor'
 import { pickCardReason, placeCardsEnd } from '@/lib/insight/place-cards'
@@ -228,9 +228,14 @@ export function HomeView({
     setDefaultBasisGone(true)
   }, [basisGone, pickedBasisPlaceId])
   /*
-    골든타임 좌표 (#180). **`/emergency` 와 같은 `getCurrentPosition()` 을 쓴다** — 거부·
-    타임아웃·미지원을 그 함수가 이미 구분해 처리하고, 어느 경우에도 제주 중심 좌표를
+    골든타임 좌표 (#180). **`/emergency` 와 같은 모듈(`lib/geo/current-position`)을 쓴다** —
+    거부·타임아웃·미지원을 그 모듈이 이미 구분해 처리하고, 어느 경우에도 제주 중심 좌표를
     돌려준다. 여기서 위치 로직을 새로 짜면 두 화면이 다르게 굴게 된다.
+
+    **진입에서 권한을 묻지 않는다** (#1133) — `getPositionIfGranted()` 는 이미 허용된
+    경우에만 좌표를 읽고, 아니면 묻지 않고 제주 중심으로 내린다. 홈은 검색으로 처음
+    들어오는 화면이라 첫 화면 권한 팝업이 이탈 요인이다(Lighthouse `geolocation-on-start`).
+    골든타임은 제주 기준으로도 답이 서고, 병원 배너는 `granted` 일 때만 실제 시설을 쓴다.
 
     예전에는 제주시청 좌표를 상수로 박아 뒀는데, **그 값이 `JEJU_QUERY_CENTER` 의 폴백과
     같은 값이었다** — 같은 뜻의 상수가 둘이면 반드시 갈라진다.
@@ -241,7 +246,7 @@ export function HomeView({
   const [position, setPosition] = useState<PositionResult | null>(null)
 
   useEffect(() => {
-    void getCurrentPosition().then(setPosition)
+    void getPositionIfGranted().then(setPosition)
   }, [])
 
   const walkTimes = useWalkTimes(position, condition)
