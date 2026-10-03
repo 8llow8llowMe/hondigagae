@@ -23,6 +23,16 @@ const SKELETON_COUNT = 6
  */
 const LOAD_MORE_SKELETON_COUNT = 2
 
+/**
+ * 썸네일을 **바로 받는** 앞쪽 행 수 (#1132). 나머지는 지연 로드다.
+ *
+ * 4 는 첫 화면에 서는 행 수다 — 375×812 에서 머리·검색·칩 아래로 행(104~124px)이 네 개
+ * 남짓 들어오고, 1280+ 2열에서는 첫 두 줄이 된다. 더 늘리면 접힌 아래 행까지 첫 화면
+ * 요청과 대역폭을 다투고, 줄이면 보이는 행이 늦게 채워진다. 썸네일이 `firstImage2`
+ * (~20KB)라 네 장이 첫 화면 전송량에 보태는 몫은 작다.
+ */
+export const PLACE_PRIORITY_ROW_COUNT = 4
+
 export type PlaceListSectionProps = {
   places: readonly PlaceSummary[]
   loading: boolean
@@ -48,8 +58,10 @@ export type PlaceListSectionProps = {
    * 일정에 담는 화면(#82)이 같은 4상태(로딩·오류·빈 결과·목록)와 무한 스크롤을
    * 쓰면서 행만 다르다. **상태 로직을 복제하지 않으려고 행만 갈아끼운다** —
    * 반대로 이 컴포넌트가 일정 도메인을 알면 place → plan 역참조가 된다.
+   *
+   * `index` 는 0부터다. 기본 행은 그것으로 첫 화면 행을 가린다(`PLACE_PRIORITY_ROW_COUNT`).
    */
-  renderRow?: (place: PlaceSummary) => ReactNode
+  renderRow?: (place: PlaceSummary, index: number) => ReactNode
   /**
    * 기본 행·스켈레톤과 **빈·오류 상태**의 좌우 인셋. **이 목록을 담는 곳이 정한다**
    * (`inset.ts`). 네 상태가 서로 다른 축에 서면 목록이 바뀌는 순간 왼쪽 선이 뛴다 (#451).
@@ -102,7 +114,14 @@ export function PlaceListSection({
   inset = 'card',
   headingLevel = 2,
   columns = 1,
-  renderRow = (place) => <PlaceRow key={place.placeId} place={place} inset={inset} />,
+  renderRow = (place, index) => (
+    <PlaceRow
+      key={place.placeId}
+      place={place}
+      inset={inset}
+      priority={index < PLACE_PRIORITY_ROW_COUNT}
+    />
+  ),
 }: PlaceListSectionProps) {
   if (loading) {
     return (
@@ -197,7 +216,7 @@ export function PlaceListSection({
         구분선이 빠진다.** 스켈레톤도 같은 목록의 항목이라 `li` 로 두는 것이 맞다.
       */}
       <SurfaceList columns={columns}>
-        {places.map((place) => renderRow(place))}
+        {places.map((place, index) => renderRow(place, index))}
         {loadingMore &&
           Array.from({ length: LOAD_MORE_SKELETON_COUNT }, (_, index) => (
             <PlaceRowSkeleton key={`load-more-${index}`} inset={inset} />

@@ -3,7 +3,11 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { describe, expect, it } from 'vitest'
 
-import { PlaceListSection, type PlaceListSectionProps } from '@/features/place/place-list-section'
+import {
+  PLACE_PRIORITY_ROW_COUNT,
+  PlaceListSection,
+  type PlaceListSectionProps,
+} from '@/features/place/place-list-section'
 import { messages } from '@/lib/messages'
 import { placeSummary } from '@/test/fixtures/place'
 
@@ -127,5 +131,51 @@ describe('PlaceListSection — 무한 스크롤', () => {
     const markup = render({ places: [placeSummary], hasNext: true, loadingMore: false })
 
     expect(markup).not.toContain('animate-pulse')
+  })
+})
+
+describe('PlaceListSection — 첫 화면 사진 우선 로드 (#1132)', () => {
+  /** 사진이 있는 행 n개. placeId 는 key 라 서로 달라야 한다 */
+  function placesWithPhotos(count: number) {
+    return Array.from({ length: count }, (_, index) => ({
+      ...placeSummary,
+      placeId: `21248171238192${String(index).padStart(4, '0')}`,
+      firstImage2: `http://tong.visitkorea.or.kr/cms/resource/60/${String(index)}_image3_1.jpg`,
+    }))
+  }
+
+  function imgTags(markup: string) {
+    return markup.match(/<img[^>]*>/g) ?? []
+  }
+
+  it(`앞 ${String(PLACE_PRIORITY_ROW_COUNT)}행만 바로 받고 나머지는 지연 로드다`, () => {
+    const tags = imgTags(render({ places: placesWithPhotos(PLACE_PRIORITY_ROW_COUNT + 3) }))
+
+    expect(tags).toHaveLength(PLACE_PRIORITY_ROW_COUNT + 3)
+    tags.slice(0, PLACE_PRIORITY_ROW_COUNT).forEach((tag) => {
+      expect(tag).toContain('loading="eager"')
+      expect(tag).toMatch(/fetchpriority="high"/i)
+    })
+    tags.slice(PLACE_PRIORITY_ROW_COUNT).forEach((tag) => {
+      expect(tag).toContain('loading="lazy"')
+      expect(tag).not.toMatch(/fetchpriority/i)
+    })
+  })
+
+  /*
+    **첫 화면이 몇 행인지는 기본 행이 정한다** — `renderRow` 를 갈아끼운 담기 화면은 자기
+    행의 로드 방식도 자기가 정한다. 그쪽이 index 를 받아 쓸 수 있게 넘기기는 한다.
+  */
+  it('renderRow 에 index 를 넘긴다', () => {
+    const seen: number[] = []
+    render({
+      places: placesWithPhotos(3),
+      renderRow: (place, index) => {
+        seen.push(index)
+        return createElement('li', { key: place.placeId }, place.title)
+      },
+    })
+
+    expect(seen).toEqual([0, 1, 2])
   })
 })

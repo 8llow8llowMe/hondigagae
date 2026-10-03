@@ -8,6 +8,10 @@ import { messages } from '@/lib/messages'
 import { placeSummary } from '@/test/fixtures/place'
 import type { PlaceSummary } from '@/types/place'
 
+/** TourAPI 의 두 크기 — 940×627 원본과 150×100 썸네일 (2026-10-03 실측) */
+const LARGE_IMAGE = 'http://tong.visitkorea.or.kr/cms/resource/60/2666460_image2_1.jpg'
+const SMALL_IMAGE = 'http://tong.visitkorea.or.kr/cms/resource/60/2666460_image3_1.jpg'
+
 function render(place = placeSummary) {
   return renderToStaticMarkup(createElement(PlaceRow, { place }))
 }
@@ -143,6 +147,20 @@ describe('PlaceRow — nullable 처리', () => {
     expect(markup).toContain('size-20')
   })
 
+  /*
+    **사진에 장소명을 alt 로 주지 않는다** (#1132 에서 다시 따졌다). 사진은 행 링크 **안**에
+    있고 같은 링크 안 `h3` 가 장소명을 말한다 — alt 에도 이름을 주면 링크 이름이
+    `{장소명} {장소명} …` 으로 두 번 읽힌다. 지도 패널(선택 버튼 안)·담기 화면(제목 옆)도
+    같은 `PlaceRowContent` 라 이름이 늘 바로 옆에 있다.
+  */
+  it('썸네일 사진의 alt 는 빈 문자열이다 — 이름은 같은 행 제목이 말한다', () => {
+    const markup = render({ ...placeSummary, firstImage2: SMALL_IMAGE })
+    const img = /<img[^>]*>/.exec(markup)?.[0] ?? ''
+
+    expect(img).toContain('alt=""')
+    expect(img).not.toContain(`alt="${placeSummary.title}"`)
+  })
+
   it('addr1 이 null 이면 주소를 빼고 실내/야외만 남긴다', () => {
     const markup = render({ ...placeSummary, addr1: null })
 
@@ -254,5 +272,64 @@ describe('PlaceRow — 동반 정보 없음 (#530)', () => {
     }
 
     expect(render(sameWording)).toContain('정보 없음')
+  })
+})
+
+describe('PlaceRow — 썸네일 전송량 (#1132)', () => {
+  /*
+    80~96px 칸에 940px 원본(`firstImage`, 500~780KB)을 받던 것을 같은 응답의
+    `firstImage2`(150×100, ~20KB)로 바꿨다. 판정 규칙은 `lib/image/thumbnail.ts` 가 잠그고,
+    여기서는 **행이 그 함수를 거쳐 작은 쪽을 고르는지**만 본다.
+  */
+  it('firstImage2 가 있으면 작은 사진을 쓰고 원본을 내보내지 않는다', () => {
+    const markup = render({ ...placeSummary, firstImage: LARGE_IMAGE, firstImage2: SMALL_IMAGE })
+
+    expect(markup).toContain('2666460_image3_1.jpg')
+    expect(markup).not.toContain('2666460_image2_1.jpg')
+  })
+
+  it('firstImage2 가 없으면 firstImage 로 떨어진다', () => {
+    const markup = render({ ...placeSummary, firstImage: LARGE_IMAGE, firstImage2: null })
+
+    expect(markup).toContain('2666460_image2_1.jpg')
+  })
+
+  it('작은 사진도 허용 목록 판정을 거친다 — 밖 호스트면 URL 을 내보내지 않는다', () => {
+    const markup = render({
+      ...placeSummary,
+      firstImage: null,
+      firstImage2: 'http://cdn.not-allowed.invalid/photo/a.jpg',
+    })
+
+    expect(markup).not.toContain('not-allowed.invalid')
+    expect(markup).toContain('/illustrations/place-tourist_spot.webp')
+  })
+})
+
+describe('PlaceRow — 첫 화면 사진 우선 로드 (#1132)', () => {
+  function img(markup: string) {
+    return /<img[^>]*>/.exec(markup)?.[0] ?? ''
+  }
+
+  it('기본은 지연 로드다', () => {
+    const tag = img(render({ ...placeSummary, firstImage2: SMALL_IMAGE }))
+
+    expect(tag).toContain('loading="lazy"')
+    // HTML 속성 이름은 대소문자를 가리지 않는다 — React 가 `fetchPriority` 로 내보낸다
+    expect(tag).not.toMatch(/fetchpriority/i)
+  })
+
+  it('priority 면 바로 받고 우선순위를 올린다', () => {
+    const tag = img(
+      renderToStaticMarkup(
+        createElement(PlaceRow, {
+          place: { ...placeSummary, firstImage2: SMALL_IMAGE },
+          priority: true,
+        }),
+      ),
+    )
+
+    expect(tag).toContain('loading="eager"')
+    expect(tag).toMatch(/fetchpriority="high"/i)
   })
 })
