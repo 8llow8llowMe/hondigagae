@@ -336,11 +336,11 @@ function MobileCarousel({
                   fill
                   sizes="342px"
                   /*
-                    **첫 장만 앞세운다.** 데스크톱 모자이크의 대표도 `priority` 인데 **같은
+                    **첫 장만 앞세운다.** 데스크톱 모자이크의 대표도 `preload` 인데 **같은
                     URL** 이다(`unoptimized` 라 원본 그대로) — 보이지 않는 갈래의 대표가
                     따로 받아지지 않는다.
                   */
-                  priority={position === 0}
+                  preload={position === 0}
                   className="object-cover"
                   // 끌 때 브라우저 기본 이미지 드래그(고스트)가 스크롤을 가로챈다
                   draggable={false}
@@ -404,14 +404,7 @@ function DesktopStrip({
       >
         <div className="bg-band relative overflow-hidden rounded-md">
           <GalleryTileButton position={0} onOpen={onOpen}>
-            <Image
-              src={lead.src}
-              alt={title}
-              fill
-              sizes="590px"
-              priority
-              className="object-cover"
-            />
+            <Image src={lead.src} alt={title} fill sizes="590px" preload className="object-cover" />
           </GalleryTileButton>
         </div>
 
