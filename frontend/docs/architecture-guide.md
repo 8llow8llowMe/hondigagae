@@ -694,5 +694,7 @@ export function toEmergencyBoardQuery(params: EmergencyBoardParams): string
   않게 한다 (#783 과 같은 이유).
 - **`robots.txt` 로 막지 않는 화면이 있다** — 로그인·가입·공유 일정. 막으면 크롤러가 페이지 안의
   `noindex` 를 읽지 못해, 외부 링크만으로 주소가 검색 결과에 남는다. 메타 `robots` 로 끈다.
+- **검색어 랜딩(`/jeju/[topic]`, #1134)은 `lib/landing/topics.ts` 의 `LANDING_TOPICS` 하나를 라우트 · 사이트맵 ·
+  푸터가 같이 읽는다.** 주제를 더하면 세 곳이 함께 바뀐다. 명세는 `docs/features/landing/검색랜딩-세부명세.md`.
 - **검색엔진 소유 확인 값**(`NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` · `NEXT_PUBLIC_NAVER_SITE_VERIFICATION`)은
   Vault 선택 키다. 비면 태그를 내지 않는다.

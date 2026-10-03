@@ -2,6 +2,7 @@ import type { MetadataRoute } from 'next'
 
 import { paths } from '@/lib/api/paths'
 import { walkCourseListPath } from '@/lib/api/walk-course'
+import { LANDING_TOPICS, landingPath } from '@/lib/landing/topics'
 import { INDEXABLE_PET_ALLOWANCES } from '@/lib/seo/place'
 import { absoluteUrl } from '@/lib/seo/site'
 import { DEFAULT_PLACE_FILTERS, toPlaceApiQuery } from '@/lib/url/place-filters'
@@ -92,6 +93,11 @@ export function toSitemap(
   return [
     ...STATIC_PUBLIC_PATHS.map((path) => ({
       url: absoluteUrl(path, base),
+      changeFrequency: 'daily' as const,
+    })),
+    // 검색어 랜딩 첫 페이지 (#1134). 다음 페이지는 랜딩 안 링크로 닿는다
+    ...LANDING_TOPICS.map((topic) => ({
+      url: absoluteUrl(landingPath(topic), base),
       changeFrequency: 'daily' as const,
     })),
     ...walkCourseIds.map((id) => ({

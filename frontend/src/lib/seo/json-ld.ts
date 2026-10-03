@@ -53,6 +53,23 @@ export function breadcrumbJsonLd(items: BreadcrumbItem[], base: string): JsonLd 
 }
 
 /**
+ * 목록 페이지(검색어 랜딩, #1134)의 항목. 각 항목은 상세 페이지 주소만 가리킨다 — 구글의
+ * "요약 페이지 + 별도 상세 페이지" 모양이다.
+ */
+export function itemListJsonLd(items: BreadcrumbItem[], base: string): JsonLd {
+  return {
+    '@context': CONTEXT,
+    '@type': 'ItemList',
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      url: absoluteUrl(item.path, base),
+    })),
+  }
+}
+
+/**
  * 콘텐츠 타입 코드 → schema.org 타입. **화면 문구가 아니라 어휘 대응이다** — 서버 enum 의
  * `name` 을 한국어로 다시 쓰는 매핑 테이블이 아니다.
  *
