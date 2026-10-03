@@ -14,6 +14,8 @@
 export const seoMessages = {
   /** 장소 상세 제목·설명에서 서버 동반 이름(`동반 가능`) 앞에 붙는 말 */
   petPrefix: '반려견',
+  /** 구조화 데이터 `amenityFeature` 의 이름 (#1131) — 검색엔진만 읽는다 */
+  petFeatureName: '반려견 동반',
 
   homeTitle: '혼디가개 — 제주 반려견 동반 여행, 강아지랑 갈 곳·숙소·산책 코스',
   homeDescription:

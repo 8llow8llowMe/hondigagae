@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 
+import { JsonLd } from '@/components/json-ld'
 import { HomeView } from '@/features/home/home-view'
 import { ABOUT_SEEN_COOKIE, hasSeenAbout } from '@/lib/about/seen-cookie'
 import { paths } from '@/lib/api/paths'
@@ -11,7 +12,9 @@ import { readSession } from '@/lib/auth/session'
 import { todayDay, weekdayOf } from '@/lib/date/day'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
+import { siteJsonLd } from '@/lib/seo/json-ld'
 import { pageMetadata } from '@/lib/seo/page-metadata'
+import { siteUrl } from '@/lib/seo/site'
 import { DEFAULT_PLACE_FILTERS } from '@/lib/url/place-filters'
 import type { SliceResponse } from '@/types/api'
 import type { PlaceSummary } from '@/types/place'
@@ -78,6 +81,8 @@ export default async function HomePage() {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
+      {/* 사이트 이름 · 운영 주체 구조화 데이터 (#1131). 보이지 않는다 */}
+      <JsonLd data={siteJsonLd(siteUrl())} />
       <HomeView
         authed={authed}
         showAboutIntro={!authed && !seenAbout}

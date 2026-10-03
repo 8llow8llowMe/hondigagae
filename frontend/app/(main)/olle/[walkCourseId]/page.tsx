@@ -3,6 +3,7 @@ import { cache } from 'react'
 import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 import type { Metadata } from 'next'
 
+import { JsonLd } from '@/components/json-ld'
 import { Canvas } from '@/components/surface'
 import { walkCourseKeys } from '@/features/walk-course/queries'
 import { WalkCourseDetailInvalidId } from '@/features/walk-course/walk-course-detail-section'
@@ -12,7 +13,9 @@ import { walkCourseDetailPath } from '@/lib/api/walk-course'
 import { readSession } from '@/lib/auth/session'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
+import { breadcrumbJsonLd, walkCourseJsonLd } from '@/lib/seo/json-ld'
 import { pageMetadata } from '@/lib/seo/page-metadata'
+import { SITE_NAME, siteUrl } from '@/lib/seo/site'
 import { walkCourseSeoDescription, walkCourseSeoTitle } from '@/lib/seo/walk-course'
 import { parseWalkCourseFilters, walkCourseFilterHref } from '@/lib/url/walk-course-filters'
 import { walkCourseDetailFallbackMetadata } from '@/lib/walk-course/detail-title'
@@ -145,8 +148,9 @@ export default async function WalkCourseDetailPage({
     `retry: false` — 전역 기본값(5xx 2회)을 상속하면 백엔드가 죽었을 때 서버 렌더가
     재시도 백오프만큼 통째로 블로킹된다 (`architecture-guide.md` §9).
   */
+  let course: WalkCourseDetail | null = null
   try {
-    await queryClient.fetchQuery({
+    course = await queryClient.fetchQuery({
       queryKey: walkCourseKeys.detail(walkCourseId),
       queryFn: () => loadWalkCourse(walkCourseId),
       retry: false,
@@ -158,6 +162,22 @@ export default async function WalkCourseDetailPage({
   // `main` 이 L0 바닥이다 (`DESIGN.md §0`) — 카드를 쌓는 일은 `WalkCourseDetailSection` 이 맡는다
   return (
     <Canvas as="main" id="main-content">
+      {/* 구조화 데이터 (#1131). 서버가 코스를 받았을 때만 낸다 */}
+      {course !== null && (
+        <JsonLd
+          data={[
+            walkCourseJsonLd(course, siteUrl()),
+            breadcrumbJsonLd(
+              [
+                { name: SITE_NAME, path: '/' },
+                { name: messages.walkCourse.pageTitle, path: '/olle' },
+                { name: `${course.courseLabel} ${course.name}`, path: `/olle/${walkCourseId}` },
+              ],
+              siteUrl(),
+            ),
+          ]}
+        />
+      )}
       <HydrationBoundary state={dehydrate(queryClient)}>
         <WalkCourseDetailView
           walkCourseId={walkCourseId}
