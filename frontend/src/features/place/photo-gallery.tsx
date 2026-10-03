@@ -265,6 +265,22 @@ function MobileCarousel({
 }) {
   const trackRef = useRef<HTMLUListElement>(null)
   const [index, setIndex] = useState(0)
+  /*
+    **지금까지 닿은 가장 먼 장** — 사진(`<img>`)을 그 다음 장까지만 만든다 (#1132).
+
+    상세 첫 화면에 갤러리 원본 8장(약 4MB)이 다 내려왔다 (2026-10-03 Lighthouse 모바일).
+    가려진 장은 `loading="lazy"` 였는데도 그랬다 — 크롬이 스크롤 컨테이너 안의 지연
+    이미지를 여유 거리(수천 px) 안이면 미리 받는 것으로 보이고, 342px 여덟 장은 그 안이다.
+    그래서 브라우저 판단에 맡기지 않고 **닿지 않은 장은 `<img>` 를 만들지 않는다.**
+
+    **`+1` 은 옆에 물린 장이다.** 첫 화면에서도 둘째 장 왼쪽이 보이므로("넘길 수 있다" 는
+    신호) 그 장은 처음부터 있어야 하고, 넘길 때마다 다음에 물릴 장이 하나씩 생긴다.
+    뒤로 돌아가도 걷지 않는다 — 이미 받은 사진을 다시 지우면 깜빡이기만 한다.
+
+    **자리·버튼은 그대로 둔다.** `li` 크기가 고정이라 사진이 늦게 붙어도 밀리지 않고,
+    뷰어를 여는 버튼과 그 이름(`{n}번째 사진 크게 보기`)은 사진 유무와 상관없다.
+  */
+  const [reach, setReach] = useState(0)
   const { grabbing, handlers } = useDragScroll(trackRef)
 
   const syncIndex = useCallback(() => {
@@ -276,7 +292,9 @@ function MobileCarousel({
 
     // 항목 폭 + gap 으로 나눈다. scrollLeft 를 항목 수로 나누면 마지막에서 어긋난다.
     const step = item.clientWidth + 8
-    setIndex(Math.min(images.length - 1, Math.round(track.scrollLeft / step)))
+    const next = Math.min(images.length - 1, Math.round(track.scrollLeft / step))
+    setIndex(next)
+    setReach((previous) => Math.max(previous, next))
   }, [images.length])
 
   useEffect(() => {
@@ -310,17 +328,24 @@ function MobileCarousel({
             style={{ width: 'var(--gallery-w-mobile)', height: 'var(--gallery-h-mobile)' }}
           >
             <GalleryTileButton position={position} onOpen={onOpen}>
-              <Image
-                src={image.src}
-                // 대표 이미지는 장식이 아니라 콘텐츠다 — 장소명을 alt 로 준다
-                alt={position === 0 ? title : (image.imgName ?? '')}
-                fill
-                sizes="342px"
-                priority={position === 0}
-                className="object-cover"
-                // 끌 때 브라우저 기본 이미지 드래그(고스트)가 스크롤을 가로챈다
-                draggable={false}
-              />
+              {position <= reach + 1 && (
+                <Image
+                  src={image.src}
+                  // 대표 이미지는 장식이 아니라 콘텐츠다 — 장소명을 alt 로 준다
+                  alt={position === 0 ? title : (image.imgName ?? '')}
+                  fill
+                  sizes="342px"
+                  /*
+                    **첫 장만 앞세운다.** 데스크톱 모자이크의 대표도 `priority` 인데 **같은
+                    URL** 이다(`unoptimized` 라 원본 그대로) — 보이지 않는 갈래의 대표가
+                    따로 받아지지 않는다.
+                  */
+                  priority={position === 0}
+                  className="object-cover"
+                  // 끌 때 브라우저 기본 이미지 드래그(고스트)가 스크롤을 가로챈다
+                  draggable={false}
+                />
+              )}
             </GalleryTileButton>
           </li>
         ))}
