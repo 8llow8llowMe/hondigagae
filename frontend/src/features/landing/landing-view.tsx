@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import { EmptyState } from '@/components/empty-state'
 import { Surface, SurfaceList, SurfaceStack } from '@/components/surface'
+import { PLACE_PRIORITY_ROW_COUNT } from '@/features/place/place-list-section'
 import { PlaceRow } from '@/features/place/place-row'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -36,7 +37,7 @@ export type LandingViewProps = {
  * 제목이 곧 내용이다 — 검색으로 들어온 사람이 "맞게 왔다" 를 첫 줄에서 확인한다.
  *
  * **행은 `PlaceRow` 그대로다.** `/places` 목록과 같은 행이라 랜딩에서 본 장소가 목록에서도
- * 같은 모양으로 보인다. 앞 몇 행만 먼저 받는 처치(#1132)가 생기면 여기도 같이 받는다.
+ * 같은 모양으로 보인다. 앞 몇 행만 먼저 받는 수(`PLACE_PRIORITY_ROW_COUNT`, #1132)도 목록과 같다.
  */
 export function LandingView({
   heading,
@@ -82,8 +83,12 @@ export function LandingView({
           />
         ) : (
           <SurfaceList aria-label={copy.listTitle}>
-            {places.map((place) => (
-              <PlaceRow key={place.placeId} place={place} />
+            {places.map((place, index) => (
+              <PlaceRow
+                key={place.placeId}
+                place={place}
+                priority={index < PLACE_PRIORITY_ROW_COUNT}
+              />
             ))}
           </SurfaceList>
         )}
