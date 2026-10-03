@@ -169,6 +169,67 @@ describe('PhotoGallery — 뷰어 열기 (+N 뒤의 사진)', () => {
   })
 })
 
+describe('PhotoGallery — 첫 화면에 내려오는 사진 (#1132)', () => {
+  /*
+    모바일 캐러셀과 데스크톱 모자이크가 **둘 다 마크업에 있고 CSS 로 갈린다**
+    (`md:hidden` / `hidden md:block`). 그래서 갈래별로 잘라서 센다 — 통째로 세면 한쪽에서
+    늘어난 장수를 다른 쪽이 가린다.
+  */
+  function split(markup: string) {
+    const at = markup.indexOf('<div class="hidden md:block">')
+    return { mobile: markup.slice(0, at), desktop: markup.slice(at) }
+  }
+
+  function imgTags(markup: string) {
+    return markup.match(/<img[^>]*>/g) ?? []
+  }
+
+  /*
+    **8장이 첫 화면에 다 내려왔다** (2026-10-03 Lighthouse 모바일, 상세 4.9MB). 캐러셀의
+    가려진 장은 `loading="lazy"` 였는데도 그랬다 — 크롬이 스크롤 컨테이너 안의 지연
+    이미지를 여유 거리(수천 px) 안이면 미리 받는 것으로 보이고, 342px 여덟 장은 그 안이다.
+    브라우저 판단에 맡기지 않고 **아직 닿지 않은 장은 `<img>` 자체를 만들지 않는다.**
+  */
+  it('모바일 캐러셀은 첫 장과 옆에 물린 둘째 장만 사진을 만든다', () => {
+    const { mobile } = split(render(8))
+    const tags = imgTags(mobile)
+
+    expect(tags).toHaveLength(2)
+    expect(tags[0]).toContain('place-1.jpg')
+    expect(tags[1]).toContain('place-2.jpg')
+  })
+
+  /* 사진을 만들지 않은 장도 자리·버튼은 그대로다 — 넘기기·카운터·뷰어 열기가 같다 */
+  it('사진을 아직 만들지 않은 장도 자리와 뷰어 버튼은 남는다', () => {
+    const { mobile } = split(render(8))
+
+    expect(mobile.match(/<li /g)).toHaveLength(8)
+    expect(mobile).toContain(messages.place.galleryOpenAction.replace('{index}', '8'))
+  })
+
+  it('데스크톱은 보이는 세 장만 만든다 — +N 뒤의 사진은 뷰어에서만 받는다', () => {
+    const { desktop } = split(render(8))
+
+    expect(imgTags(desktop)).toHaveLength(3)
+    expect(desktop).not.toContain('place-4.jpg')
+  })
+
+  /*
+    첫 장만 앞세운다. 모바일 첫 장과 데스크톱 대표는 **같은 URL** 이라(`unoptimized`)
+    보이지 않는 갈래의 대표가 따로 받아지지 않는다.
+  */
+  it('첫 장만 바로 받고 나머지는 지연 로드다', () => {
+    const { mobile, desktop } = split(render(8))
+    const [mobileLead, mobileNext] = imgTags(mobile)
+    const [desktopLead, ...desktopThumbs] = imgTags(desktop)
+
+    expect(mobileLead).not.toContain('loading="lazy"')
+    expect(desktopLead).not.toContain('loading="lazy"')
+    expect(mobileNext).toContain('loading="lazy"')
+    desktopThumbs.forEach((tag) => expect(tag).toContain('loading="lazy"'))
+  })
+})
+
 describe('PhotoGallery — 미등록 호스트', () => {
   it('next/image 가 던지지 않도록 허용 호스트가 아닌 것은 걸러낸다', () => {
     const markup = renderToStaticMarkup(
