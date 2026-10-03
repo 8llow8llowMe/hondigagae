@@ -105,9 +105,12 @@ describe('toSitemap', () => {
   const sitemap = toSitemap(PRODUCTION_SITE_URL, { placeIds: ['10'], walkCourseIds: ['20'] })
   const urls = sitemap.map((entry) => entry.url)
 
-  it('정적 공개 화면 · 코스 · 장소를 절대 주소로 싣는다', () => {
+  it('정적 공개 화면 · 검색어 랜딩 · 코스 · 장소를 절대 주소로 싣는다', () => {
     expect(urls).toEqual([
       ...STATIC_PUBLIC_PATHS.map((path) => new URL(path, PRODUCTION_SITE_URL).toString()),
+      'https://www.hondigagae.com/jeju/pet-friendly-stays',
+      'https://www.hondigagae.com/jeju/pet-friendly-places',
+      'https://www.hondigagae.com/jeju/pet-friendly-restaurants',
       'https://www.hondigagae.com/olle/20',
       'https://www.hondigagae.com/places/10',
     ])

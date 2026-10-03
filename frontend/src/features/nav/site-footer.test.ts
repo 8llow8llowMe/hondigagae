@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { SiteFooter } from '@/features/nav/site-footer'
+import { LANDING_TOPICS, landingPath } from '@/lib/landing/topics'
 import { LEGAL_LINKS } from '@/lib/legal/links'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -67,11 +68,21 @@ describe('SiteFooter — 내용 (#399)', () => {
     **개수가 아니라 목록을 센다.** 개수만 보면 죽은 링크 하나가 살아 있는 링크 하나와
     맞바뀌어도 통과한다. 순서는 DOM 순서다 — 약관 묶음이 `/about` 보다 위에 있다.
   */
-  it('갈 곳 있는 링크만 둔다 — 약관 둘과 /about 뿐이다', () => {
+  it('갈 곳 있는 링크만 둔다 — 검색어 랜딩 셋(#1134) · 약관 둘 · /about 뿐이다', () => {
     expect(markup.match(/href="([^"]*)"/g)).toEqual([
+      ...LANDING_TOPICS.map((topic) => `href="${landingPath(topic)}"`),
       ...LEGAL_LINKS.map((link) => `href="${link.href}"`),
       'href="/about"',
     ])
+  })
+
+  it('검색어 랜딩 링크도 44px 탭 영역을 갖는다 (#1134)', () => {
+    for (const topic of LANDING_TOPICS) {
+      const tag = [...markup.matchAll(/<a [^>]*>/g)]
+        .map((match) => match[0])
+        .find((open) => open.includes(`href="${landingPath(topic)}"`))
+      expect(tag).toContain('min-h-11')
+    }
   })
 
   /*

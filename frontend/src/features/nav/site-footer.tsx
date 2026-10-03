@@ -1,6 +1,7 @@
 import Link from 'next/link'
 
 import { Wordmark } from '@/components/brand/wordmark'
+import { LANDING_TOPICS, landingCopy, landingPath } from '@/lib/landing/topics'
 import { LEGAL_LINKS } from '@/lib/legal/links'
 import { messages } from '@/lib/messages'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -68,6 +69,25 @@ export function SiteFooter() {
             */}
             <Wordmark />
             <p className="text-body-2 text-fg-muted">{messages.footer.tagline}</p>
+            {/*
+              **검색어 랜딩으로 가는 내부 링크** (#1134). 크롤러가 사이트맵 말고도 링크로 닿게
+              하고, 데스크톱 사람에게는 "제주 애견동반 숙소" 같은 질문의 바로가기가 된다. 목록은
+              `LANDING_TOPICS` 하나를 읽는다 — 라우트·사이트맵과 같은 것이다.
+            */}
+            <nav aria-label={messages.landing.footerNavLabel}>
+              <ul className="flex flex-wrap gap-x-4 gap-y-0">
+                {LANDING_TOPICS.map((topic) => (
+                  <li key={topic.slug}>
+                    <Link
+                      href={landingPath(topic)}
+                      className="text-caption text-fg-muted hover:text-fg focus-visible:ring-brand-500 inline-flex min-h-11 items-center font-medium focus-visible:ring-2 focus-visible:outline-none"
+                    >
+                      {landingCopy(topic).linkLabel}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
           </div>
 
           {/*

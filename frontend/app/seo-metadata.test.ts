@@ -59,4 +59,13 @@ describe('공개 화면 메타데이터 배선 (#1130)', () => {
   ])('%s — 구조화 데이터를 낸다 (#1131)', (path, probe) => {
     expect(code(path)).toContain(probe)
   })
+
+  it('검색어 랜딩도 pageMetadata 와 JSON-LD 를 낸다 (#1134)', () => {
+    const source = code('app/(main)/jeju/[topic]/page.tsx')
+
+    expect(source).toContain('pageMetadata(')
+    expect(source).toContain('path: landingPath(topic, after)')
+    expect(source).toContain('itemListJsonLd(')
+    expect(source).toContain('notFound()')
+  })
 })
