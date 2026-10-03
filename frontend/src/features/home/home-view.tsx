@@ -51,6 +51,7 @@ import {
   splitSharedReasons,
 } from '@/lib/insight/reasons'
 import { clearRecentPlaceId, isBasisPlaceGone, readRecentPlaceId } from '@/lib/insight/recent-place'
+import { walkTimesBasis, walkTimesQueryPosition } from '@/lib/insight/walk-times-position'
 import { pickWeatherWarning } from '@/lib/insight/weather-warning'
 import { messages } from '@/lib/messages'
 import { resolveSelectedPet } from '@/lib/nav/selected-pet'
@@ -249,7 +250,11 @@ export function HomeView({
     void getPositionIfGranted().then(setPosition)
   }, [])
 
-  const walkTimes = useWalkTimes(position, condition)
+  /*
+    **위치를 알기 전에도 조회한다** (#1142) — 서버가 같은 좌표로 미리 받아 둔 캐시를 그대로 써서
+    LCP 문장이 첫 HTML 에 들어간다. 판정은 `lib/insight/walk-times-position.ts`.
+  */
+  const walkTimes = useWalkTimes(walkTimesQueryPosition(position), condition)
   const regionalWeather = useRegionalWeather(condition)
 
   /*
@@ -555,8 +560,8 @@ export function HomeView({
           */}
             <WalkTimesSection
               data={walkTimes.data ?? null}
-              loading={position === null || walkTimes.isPending}
-              basis={position !== null && position.kind === 'fallback' ? 'jeju' : 'current'}
+              loading={walkTimes.isPending}
+              basis={walkTimesBasis(position, walkTimes.isPlaceholderData)}
               /*
               **조회는 성공했는데 날씨를 못 받은 경우의 재조회** (#262). 위 주석의 "조회
               실패는 섹션을 숨긴다" 와 다른 갈래다 — 저쪽은 `data === null`(HTTP 실패)이고

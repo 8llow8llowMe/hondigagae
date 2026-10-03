@@ -5,11 +5,14 @@ import { dehydrate, HydrationBoundary } from '@tanstack/react-query'
 import { JsonLd } from '@/components/json-ld'
 import { HomeView } from '@/features/home/home-view'
 import { ABOUT_SEEN_COOKIE, hasSeenAbout } from '@/lib/about/seen-cookie'
+import { walkTimesPath } from '@/lib/api/insight'
 import { paths } from '@/lib/api/paths'
 import { placeListPath } from '@/lib/api/place'
 import { serverFetch } from '@/lib/api/server'
 import { readSession } from '@/lib/auth/session'
 import { todayDay, weekdayOf } from '@/lib/date/day'
+import { conditionKey, insightKeys } from '@/lib/insight/queries'
+import { WALK_TIMES_PREFETCH_POSITION } from '@/lib/insight/walk-times-position'
 import { messages } from '@/lib/messages'
 import { getServerQueryClient } from '@/lib/query/query-client'
 import { siteJsonLd } from '@/lib/seo/json-ld'
@@ -17,6 +20,7 @@ import { pageMetadata } from '@/lib/seo/page-metadata'
 import { siteUrl } from '@/lib/seo/site'
 import { DEFAULT_PLACE_FILTERS } from '@/lib/url/place-filters'
 import type { SliceResponse } from '@/types/api'
+import type { WalkTimesResponse } from '@/types/insight'
 import type { PlaceSummary } from '@/types/place'
 import type { PlanSummaryItem } from '@/types/plan'
 
@@ -63,7 +67,34 @@ export default async function HomePage() {
           accessToken: session.accessToken,
         }).catch(() => null)
 
-  const [places, plans] = await Promise.all([placesPromise, plansPromise])
+  /*
+    **골든타임 문장을 서버에서 받아 둔다** (#1142). 홈의 LCP 요소인데, 클라이언트가 위치를 판정한
+    뒤에야 조회해 FCP 보다 약 5초 늦게 그려졌다. 비로그인 첫 화면은 늘 제주 중심 · 조건 없음이라
+    (`lib/insight/walk-times-position.ts`) 같은 key 로 캐시에 넣으면 첫 HTML 에 문장이 들어간다.
+    반려견 조건이 있는 로그인 사용자는 key 가 달라 예전처럼 클라이언트가 받는다.
+
+    공개 API 이고 약 80ms 라 장소 · 일정과 **병렬로** 받는다. 실패하면 클라이언트가 받는다.
+  */
+  const walkTimesPromise = serverFetch<WalkTimesResponse>(
+    walkTimesPath(WALK_TIMES_PREFETCH_POSITION.lat, WALK_TIMES_PREFETCH_POSITION.lng, null),
+  ).catch(() => null)
+
+  const [places, plans, walkTimes] = await Promise.all([
+    placesPromise,
+    plansPromise,
+    walkTimesPromise,
+  ])
+
+  if (walkTimes !== null) {
+    queryClient.setQueryData(
+      insightKeys.walkTimes(
+        WALK_TIMES_PREFETCH_POSITION.lat,
+        WALK_TIMES_PREFETCH_POSITION.lng,
+        conditionKey(null),
+      ),
+      walkTimes,
+    )
+  }
 
   /*
     **오늘은 서버가 정한다.** 클라이언트에서 `new Date()` 를 부르면 하이드레이션이
