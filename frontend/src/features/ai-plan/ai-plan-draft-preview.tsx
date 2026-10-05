@@ -5,6 +5,7 @@ import { Surface, SurfaceList } from '@/components/surface'
 import { AiPlanDraftItemRow } from '@/features/ai-plan/ai-plan-draft-item-row'
 import { formatBudget } from '@/lib/ai-plan/budget'
 import { draftItemDistances } from '@/lib/ai-plan/draft-distance'
+import { draftItemThumbnail } from '@/lib/ai-plan/draft-thumbnail'
 import { draftItemCount } from '@/lib/ai-plan/draft-to-plan'
 import type { LatLng } from '@/lib/geo/coord'
 import { messages } from '@/lib/messages'
@@ -32,6 +33,11 @@ export type AiPlanDraftPreviewProps = {
    * 보강이 아직이거나 실패했거나 원천에 좌표가 없는 경우다.
    */
   coords: ReadonlyMap<string, LatLng>
+  /**
+   * `placeId` → 썸네일 src. 같은 보강 결과에서 나온다 (#1127). **`null` 은 사진 없음(확정),
+   * 키가 없으면 보강 중이다** — 행이 둘을 다르게 그린다 (`lib/ai-plan/draft-thumbnail.ts`).
+   */
+  thumbnails: ReadonlyMap<string, string | null>
   /**
    * 담을 수 없는 `placeId` — `PLAN_004` 원인 후보. 상세 응답의 `delisted: true`(200)와
    * 병합(404)이 함께 들어 있다 (#146)
@@ -80,6 +86,7 @@ export function AiPlanDraftPreview({
   totalDays,
   metaLines,
   coords,
+  thumbnails,
   delistedPlaceIds,
   excludedPlaceIds,
   committed,
@@ -225,6 +232,7 @@ export function AiPlanDraftPreview({
                   item={item}
                   ordinal={index + 1}
                   meta={item.placeId === null ? undefined : metaLines.get(item.placeId)}
+                  thumbnail={draftItemThumbnail(item, thumbnails)}
                   distanceMeters={distances[index] ?? null}
                   delisted={item.placeId !== null && delistedPlaceIds.has(item.placeId)}
                   excluded={item.placeId !== null && excludedPlaceIds.has(item.placeId)}

@@ -46,6 +46,8 @@ function render(overrides: Partial<AiPlanDraftPreviewProps> = {}) {
     metaLines: new Map([['212481712381923328', '제주시 한림읍 · 야외']]),
     // 좌표는 기본으로 비운다 — 거리 문구는 전용 describe 에서만 켠다
     coords: EMPTY_COORDS,
+    // 썸네일도 기본으로 비운다(보강 중) — 썸네일 문구는 전용 describe 에서만 켠다
+    thumbnails: new Map(),
     delistedPlaceIds: EMPTY_SET,
     excludedPlaceIds: EMPTY_SET,
     committed: false,
@@ -254,6 +256,75 @@ describe('AiPlanDraftPreview — delisting 과 빼기', () => {
 
     expect(html).toContain('line-through')
     expect(html).toContain('협재해수욕장')
+  })
+})
+
+/*
+  **사진 → 유형 일러스트 → 회색 타일** — 일정 상세와 같은 순서다 (#1127 · #842).
+  dev 실측으로 사진 없는 장소가 70% 라 일러스트가 예외가 아니라 기본이다.
+*/
+describe('AiPlanDraftPreview — 썸네일 (#1127)', () => {
+  const PLACE_ID = '212481712381923328'
+  const PHOTO = 'https://tong.visitkorea.or.kr/cms/resource/01/1_image3_1.jpg'
+
+  function renderOne(
+    overrides: Partial<AiPlanScheduleItem>,
+    thumbnails: ReadonlyMap<string, string | null>,
+  ) {
+    return render({
+      draft: { days: [{ day: 1, items: [item(overrides)] }], reasons: [] },
+      thumbnails,
+    })
+  }
+
+  it('보강으로 얻은 사진을 그린다', () => {
+    const html = renderOne({}, new Map([[PLACE_ID, PHOTO]]))
+
+    // 테스트 환경의 next/image 는 `/_next/image?url=` 로 감싸 내보낸다
+    expect(html).toContain(encodeURIComponent(PHOTO))
+    expect(html).not.toContain('/illustrations/')
+  })
+
+  it('사진이 없는 장소는 항목 유형 일러스트가 선다', () => {
+    const html = renderOne({ itemType: 'LODGING' }, new Map([[PLACE_ID, null]]))
+
+    expect(html).toMatch(/<img[^>]*src="\/illustrations\/place-lodging\.webp"[^>]*alt=""/)
+  })
+
+  /* 초안의 itemType 은 LLM 산출 raw string 이다 — 유형을 지어내지 않는다 (공통명세 S6) */
+  it('모르는 유형은 회색 타일이다', () => {
+    const html = renderOne({ itemType: 'SOMETHING_NEW' }, new Map([[PLACE_ID, null]]))
+
+    expect(html).not.toContain('/illustrations/')
+    expect(html).not.toContain('tong.visitkorea.or.kr')
+  })
+
+  /*
+    **보강 중에는 일러스트를 먼저 그리지 않는다.** 사진이 있는 장소에서 일러스트 → 사진으로
+    바뀌어 깜박인다. 회색 타일로 기다린다.
+  */
+  it('보강 중이면 회색 타일로 기다린다', () => {
+    const html = renderOne({ itemType: 'PLACE' }, new Map())
+
+    expect(html).not.toContain('/illustrations/')
+    expect(html).toContain('협재해수욕장')
+  })
+
+  it('placeId 가 없는 항목은 기다리지 않고 바로 유형 일러스트다', () => {
+    const html = renderOne({ placeId: null, itemType: 'MEAL' }, new Map())
+
+    expect(html).toContain('/illustrations/place-restaurant.webp')
+  })
+
+  /* 순번은 타일 좌상단 흰 원형 칩이다 — 담은 뒤 일정 상세와 같은 모양 (#856) */
+  it('순번 칩이 타일 안의 흰 원형이다', () => {
+    const html = renderOne({}, new Map([[PLACE_ID, null]]))
+    const chip = /<span aria-hidden="true" class="([^"]*)">1<\/span>/.exec(html)?.[1] ?? ''
+
+    expect(chip).toContain('absolute')
+    expect(chip).toContain('bg-bg')
+    expect(chip).toContain('rounded-full')
+    expect(chip).toContain('border-border-strong')
   })
 })
 
