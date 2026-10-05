@@ -5,6 +5,7 @@ import { useMemo } from 'react'
 import { useQueries } from '@tanstack/react-query'
 
 import { PLACE_QUERY_OPTIONS, placeKeys } from '@/features/place/queries'
+import { settledDraftThumbnail } from '@/lib/ai-plan/draft-thumbnail'
 import { draftPlaceIds } from '@/lib/ai-plan/draft-to-plan'
 import { clientFetch } from '@/lib/api/client'
 import { ApiError } from '@/lib/api/error'
@@ -42,6 +43,9 @@ import type { PlaceDetail } from '@/types/place'
  *
  * 실내 여부도 같은 응답에서 온다 (#112). **행이 쓸 메타 줄을 여기서 조립한다** — 행은
  * 표시 전용이라 `indoor` 의 null 판정을 컴포넌트에 두면 렌더 테스트에서만 잡힌다.
+ *
+ * 썸네일도 같은 응답에서 온다 (#1127). **보강 중(미정)과 사진 없음(확정)을 가른다** —
+ * 판정은 `lib/ai-plan/draft-thumbnail.ts` 가 갖는다.
  */
 export function useDraftPlaces(draft: AiPlanDraft | null) {
   const placeIds = useMemo(() => (draft === null ? [] : draftPlaceIds(draft)), [draft])
@@ -65,12 +69,20 @@ export function useDraftPlaces(draft: AiPlanDraft | null) {
     const metaLines = new Map<string, string>()
     const coords = new Map<string, LatLng>()
     const delisted = new Set<string>()
+    const thumbnails = new Map<string, string | null>()
 
     results.forEach((result, index) => {
       const placeId = placeIds[index]
       if (placeId === undefined) return
 
       const detail = result.data
+
+      /*
+        **보강 중이면 넣지 않는다** — 키가 없는 것이 "아직 모른다" 다. 실패(404 · 5xx)는
+        `null`(사진 없음)로 확정해 행이 일러스트로 넘어가게 한다.
+      */
+      const thumbnail = settledDraftThumbnail({ pending: result.isPending, detail })
+      if (thumbnail !== undefined) thumbnails.set(placeId, thumbnail)
 
       /*
         **판정은 `lib/place/availability.ts` 가 갖는다.** 여기에 인라인으로 두었던 것이
@@ -111,6 +123,8 @@ export function useDraftPlaces(draft: AiPlanDraft | null) {
     return {
       metaLines,
       coords,
+      /** `placeId` → 썸네일 src. `null` 은 사진 없음(확정), 키가 없으면 보강 중이다 */
+      thumbnails,
       /** 담을 수 없는 장소 — delisted(200 + 플래그)와 병합(404)이 함께 들어 있다 */
       delistedPlaceIds: delisted,
       /** 아직 채워지는 중인가. 미리보기를 막지는 않는다 — 주소가 늦게 붙을 뿐이다 */

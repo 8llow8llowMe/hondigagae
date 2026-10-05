@@ -122,7 +122,7 @@ export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolea
   )
   const snapshot = stored ?? restored
 
-  const { metaLines, coords, delistedPlaceIds } = useDraftPlaces(draft)
+  const { metaLines, coords, thumbnails, delistedPlaceIds } = useDraftPlaces(draft)
 
   const conditionSummary = useMemo(() => summarize(snapshot), [snapshot])
 
@@ -303,6 +303,7 @@ export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolea
           totalDays={totalDays}
           metaLines={metaLines}
           coords={coords}
+          thumbnails={thumbnails}
           delistedPlaceIds={delistedPlaceIds}
           excludedPlaceIds={EMPTY_SET}
           committed
@@ -332,6 +333,7 @@ export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolea
           totalDays={null}
           metaLines={metaLines}
           coords={coords}
+          thumbnails={thumbnails}
           delistedPlaceIds={delistedPlaceIds}
           excludedPlaceIds={EMPTY_SET}
           committed={false}
@@ -363,6 +365,7 @@ export function AiPlanJobView({ jobId, authed }: { jobId: string; authed: boolea
         snapshot={snapshot}
         metaLines={metaLines}
         coords={coords}
+        thumbnails={thumbnails}
         delistedPlaceIds={delistedPlaceIds}
       />
     </AiPlanJobShell>
@@ -526,6 +529,7 @@ function AiPlanCommitContainer({
   snapshot,
   metaLines,
   coords,
+  thumbnails,
   delistedPlaceIds,
 }: {
   jobId: string
@@ -533,6 +537,7 @@ function AiPlanCommitContainer({
   snapshot: AiPlanRequestSnapshot
   metaLines: ReadonlyMap<string, string>
   coords: ReadonlyMap<string, LatLng>
+  thumbnails: ReadonlyMap<string, string | null>
   delistedPlaceIds: ReadonlySet<string>
 }) {
   const router = useRouter()
@@ -635,6 +640,7 @@ function AiPlanCommitContainer({
         totalDays={totalDays}
         metaLines={metaLines}
         coords={coords}
+        thumbnails={thumbnails}
         delistedPlaceIds={delistedPlaceIds}
         excludedPlaceIds={excludedPlaceIds}
         committed={false}

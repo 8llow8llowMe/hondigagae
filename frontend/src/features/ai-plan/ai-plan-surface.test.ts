@@ -347,7 +347,11 @@ describe('완료 — 담기 패널은 카드 밖 L0 다 (#473)', () => {
   it('초안 항목 행이 자기 구분선·페이지 인셋을 갖지 않는다', () => {
     expect(itemRow).toContain('INSET_CLASS.card')
     expect(itemRow).not.toContain('md:px-10')
-    expect(itemRow).not.toContain('border-b')
+    /*
+      **낱말 경계로 본다** (#1127). 썸네일 순번 칩의 `border-border-strong` 이 부분 문자열로
+      `border-b` 를 품는다 — 그것은 칩의 테두리 색이지 행 구분선이 아니다.
+    */
+    expect(itemRow).not.toMatch(/\bborder-b\b/)
   })
 })
 

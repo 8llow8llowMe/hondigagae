@@ -1,8 +1,13 @@
+import Image from 'next/image'
+
 import { Badge } from '@/components/badge'
+import { ImageIcon } from '@/components/icons'
+import type { DraftThumbnail } from '@/lib/ai-plan/draft-thumbnail'
 import { itemTypeLabel } from '@/lib/ai-plan/item-type'
 import { formatDistance } from '@/lib/format/distance'
 import { isLongTrip } from '@/lib/geo/distance'
 import { messages } from '@/lib/messages'
+import { planItemIllustration } from '@/lib/plan/illustration'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { AiPlanScheduleItem } from '@/types/ai-plan'
@@ -11,6 +16,14 @@ export type AiPlanDraftItemRowProps = {
   item: AiPlanScheduleItem
   /** 그 일자 안의 1부터 시작하는 번호 (아트보드 03 의 원형 숫자) */
   ordinal: number
+  /**
+   * 썸네일 src (#1127). **`null` 은 사진 없음(확정) → 유형 일러스트, `undefined` 는 보강 중 →
+   * 회색 타일**이다. 판정은 `lib/ai-plan/draft-thumbnail.ts` 가 한다.
+   *
+   * **optional 이 아니다** — `undefined` 가 "보강 중" 이라는 뜻을 가져서, prop 을 빠뜨린
+   * 호출부가 영영 회색 타일로 남는 것을 타입이 막게 한다.
+   */
+  thumbnail: DraftThumbnail
   /**
    * 보강으로 얻은 메타 줄 (`제주시 한림읍 · 야외`). **초안에 없어 항목당
    * `GET /places/{placeId}` 로 채운다** (명세 S6). 아직 못 받았거나 `placeId` 가 null 이면
@@ -48,6 +61,7 @@ export type AiPlanDraftItemRowProps = {
 export function AiPlanDraftItemRow({
   item,
   ordinal,
+  thumbnail,
   meta,
   delisted = false,
   excluded = false,
@@ -57,6 +71,12 @@ export function AiPlanDraftItemRow({
   // **`title`/`note` 는 nullable 이다** — 서버 DTO 에 제약이 없다 (`types/ai-plan.ts`)
   const title = (item.title ?? '').trim()
   const note = (item.note ?? '').trim()
+  /*
+    **사진이 없다고 확정된 뒤에만 일러스트를 고른다.** 보강 중에 먼저 그리면 사진이 있는
+    장소가 일러스트 → 사진으로 깜박인다. 초안의 `itemType` 은 LLM 산출 raw string 이라
+    모르는 값이 올 수 있고, 그때는 `null` 이 와서 회색 타일로 남는다 (공통명세 S6).
+  */
+  const illustration = thumbnail === null ? planItemIllustration(item.itemType) : null
 
   /*
     **L1 카드 안의 L2 항목이다** (`DESIGN.md §0`, #473). 구분선은 `SurfaceList` 가 항목
@@ -74,15 +94,45 @@ export function AiPlanDraftItemRow({
       )}
     >
       {/*
-        **보정이 필요 없다** (#334). 24px 배지와 옆 제목 줄(`body-1` 16/24)의 높이가 같아
-        이상값이 0 이다 — 예전 `mt-0.5` 는 배지를 2px 내려 놓고 있었다.
+        **썸네일 타일 — 일정 상세 행(`plan-item-row.tsx`)과 같은 모양이다** (#1127). 담기 전과
+        담은 뒤가 같은 항목을 같은 얼굴로 보여 준다. 크기(80/96) · 폴백 순서(사진 → 유형
+        일러스트 #842 → 회색) · 순번 칩(#856)이 그쪽 결정을 그대로 따른다.
+
+        빼기로 표시한 항목은 행 전체가 `opacity-60` 이라 타일에 따로 주지 않는다.
       */}
-      <span
-        aria-hidden
-        className="bg-band text-caption text-fg-muted flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-semibold tabular-nums"
-      >
-        {ordinal}
-      </span>
+      <div className="bg-band relative size-20 shrink-0 overflow-hidden rounded-md lg:size-24">
+        {typeof thumbnail === 'string' ? (
+          <Image
+            src={thumbnail}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 96px, 80px"
+            className="object-cover"
+          />
+        ) : illustration !== null ? (
+          /*
+            저장소 안의 정적 SVG/webp 라 `next/image` 가 아니라 `<img>` 다. 장식이므로
+            `alt=""` — 무엇인지는 제목과 유형 배지가 낱말로 말한다 (`plan-item-row.tsx` 와 같다).
+          */
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={illustration} alt="" className="absolute inset-0 size-full object-cover" />
+        ) : (
+          <span className="text-fg-subtle absolute inset-0 flex items-center justify-center">
+            <ImageIcon size={20} />
+          </span>
+        )}
+
+        {/*
+          순번 칩 — 타일 좌상단 흰 원형. 순서 표시라 a11y 트리에서 뺀다. 모양의 근거
+          (테두리 · 그림자 금지 · 크기)는 `plan-item-row.tsx` 의 같은 칩 주석이 정본이다 (#856).
+        */}
+        <span
+          aria-hidden
+          className="bg-bg text-fg border-border-strong text-caption absolute top-1 left-1 inline-flex size-5 items-center justify-center rounded-full border font-bold tabular-nums"
+        >
+          {ordinal}
+        </span>
+      </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
