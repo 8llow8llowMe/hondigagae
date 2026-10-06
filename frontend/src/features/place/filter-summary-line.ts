@@ -1,4 +1,9 @@
-import { CONTENT_TYPE_LABEL, INDOOR_LABEL, SIGUNGU_LABEL } from '@/features/place/filter-labels'
+import {
+  INDOOR_LABEL,
+  PLACE_KIND_LABEL,
+  placeKindOf,
+  SIGUNGU_LABEL,
+} from '@/features/place/filter-labels'
 import { messages } from '@/lib/messages'
 import type { PlaceFilters } from '@/types/place'
 
@@ -21,7 +26,9 @@ export function filterSummaryLine(filters: PlaceFilters): string {
   if (filters.sigunguCode !== null) {
     parts.push(SIGUNGU_LABEL[filters.sigunguCode] ?? filters.sigunguCode)
   }
-  if (filters.contentType !== null) parts.push(CONTENT_TYPE_LABEL[filters.contentType])
+  // 카페는 유형이 아니라 종류다 — `음식점` 이 아니라 `카페` 라고 쓴다 (#1156)
+  const kind = placeKindOf(filters)
+  if (kind !== null) parts.push(PLACE_KIND_LABEL[kind])
   if (filters.indoor !== null) {
     parts.push(filters.indoor ? INDOOR_LABEL.indoor : INDOOR_LABEL.outdoor)
   }

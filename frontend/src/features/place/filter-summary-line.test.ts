@@ -13,6 +13,16 @@ describe('filterSummaryLine — 제목 아래 부제', () => {
     expect(filterSummaryLine({ ...DEFAULT_PLACE_FILTERS, keyword: '성산' })).toBe('성산')
   })
 
+  it('카페를 고르면 음식점이 아니라 카페라고 쓴다 (#1156)', () => {
+    expect(
+      filterSummaryLine({
+        ...DEFAULT_PLACE_FILTERS,
+        contentType: 'RESTAURANT',
+        sourceCategory: '카페',
+      }),
+    ).toBe('카페')
+  })
+
   it('시군구 코드를 라벨로 바꾼다', () => {
     expect(filterSummaryLine({ ...DEFAULT_PLACE_FILTERS, sigunguCode: '4' })).toBe('제주시')
     expect(filterSummaryLine({ ...DEFAULT_PLACE_FILTERS, sigunguCode: '3' })).toBe('서귀포시')

@@ -9,7 +9,7 @@ import { FilterListHeading } from '@/components/filter-list'
 import { CheckIcon, ChevronDownIcon, SlidersIcon } from '@/components/icons'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { useSelectedPet } from '@/features/nav/use-selected-pet'
-import { CONTENT_TYPE_LABEL, SIGUNGU_LABEL } from '@/features/place/filter-labels'
+import { PLACE_KIND_LABEL, placeKindOf, SIGUNGU_LABEL } from '@/features/place/filter-labels'
 import {
   ContentTypeField,
   IndoorField,
@@ -80,10 +80,9 @@ export function PlaceFilterChips({
     filters.sigunguCode === null
       ? messages.place.filterRegionLabel
       : (SIGUNGU_LABEL[filters.sigunguCode] ?? messages.place.filterRegionLabel)
+  const kind = placeKindOf(filters)
   const contentTypeLabel =
-    filters.contentType === null
-      ? messages.place.filterContentTypeLabel
-      : CONTENT_TYPE_LABEL[filters.contentType]
+    kind === null ? messages.place.filterContentTypeLabel : PLACE_KIND_LABEL[kind]
   // "더보기" 안의 두 축 중 하나라도 걸려 있으면 칩이 켜져 있어야 한다 — 접힌 곳에 걸린
   // 필터는 결과만 줄이고 이유는 보이지 않는다
   const moreActive = filters.indoor !== null || filters.petSizeType !== null
@@ -147,7 +146,7 @@ export function PlaceFilterChips({
 
           <Chip
             className="shrink-0"
-            selected={filters.contentType !== null}
+            selected={kind !== null}
             expanded={open === 'contentType'}
             onSelect={() => openSheet('contentType')}
           >

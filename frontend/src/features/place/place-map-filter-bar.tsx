@@ -10,16 +10,18 @@ import { ChevronDownIcon, SlidersIcon } from '@/components/icons'
 import { ScrollRailArrows, useScrollRail } from '@/components/scroll-rail'
 import { useSelectedPet } from '@/features/nav/use-selected-pet'
 import {
-  CONTENT_TYPE_FILTER_ORDER,
-  CONTENT_TYPE_LABEL,
+  PLACE_KIND_FILTER_ORDER,
+  PLACE_KIND_LABEL,
+  placeKindOf,
   SIGUNGU_LABEL,
+  withPlaceKind,
 } from '@/features/place/filter-labels'
 import { IndoorField, PetSizeField, RegionField } from '@/features/place/place-filter-fields'
 import { usePlaceFilterNav } from '@/features/place/use-place-filter-nav'
 import { messages } from '@/lib/messages'
 import { DEFAULT_PLACE_FILTERS, toPlaceFilterQuery } from '@/lib/url/place-filters'
 import { cn } from '@/lib/utils/cn'
-import type { ContentTypeCode, PlaceFilters } from '@/types/place'
+import type { PlaceFilters } from '@/types/place'
 
 /** 열려 있는 시트. `null` 이면 닫힘 */
 type OpenSheet = 'region' | 'more'
@@ -67,6 +69,7 @@ export function PlaceMapFilterBar({
 }) {
   const { apply, reset } = usePlaceFilterNav()
   const { pet } = useSelectedPet(authed)
+  const kind = placeKindOf(filters)
 
   const [open, setOpen] = useState<OpenSheet | null>(null)
   // 시트 초안. 열 때 현재 값을 복사하고 적용 전까지 URL 을 건드리지 않는다
@@ -123,19 +126,20 @@ export function PlaceMapFilterBar({
         >
           <Chip
             exclusive
-            selected={filters.contentType === null}
-            onSelect={() => apply({ ...filters, contentType: null })}
+            selected={kind === null}
+            onSelect={() => apply(withPlaceKind(filters, null))}
           >
             {messages.place.filterAll}
           </Chip>
-          {CONTENT_TYPE_FILTER_ORDER.map((code: ContentTypeCode) => (
+          {/* 카페는 음식점 바로 뒤 한 선택지다 — 유형이 아니라 원천 분류다 (#1156) */}
+          {PLACE_KIND_FILTER_ORDER.map((option) => (
             <Chip
-              key={code}
+              key={option}
               exclusive
-              selected={filters.contentType === code}
-              onSelect={() => apply({ ...filters, contentType: code })}
+              selected={kind === option}
+              onSelect={() => apply(withPlaceKind(filters, option))}
             >
-              {CONTENT_TYPE_LABEL[code]}
+              {PLACE_KIND_LABEL[option]}
             </Chip>
           ))}
         </ChipGroup>
