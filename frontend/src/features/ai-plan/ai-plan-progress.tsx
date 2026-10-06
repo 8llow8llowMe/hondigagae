@@ -108,22 +108,18 @@ export function AiPlanProgress({
 
   const elapsed = elapsedMs === undefined ? null : formatElapsed(elapsedMs)
 
-  /**
-   * `className` 은 **레이아웃 유틸리티만** 받는다 (component-guide.md §3).
-   *
-   * 진행 화면에서 `-ml-3` 을 주는 이유: `ghost` 는 배경이 없어 좌우 padding 이 여백으로만
-   * 보이고, 그대로 두면 버튼 글자가 위아래 문단보다 12px 안으로 들어가 **문단 정렬이
-   * 어긋난 것처럼 읽힌다.** 상한 초과 화면에서는 채운 버튼 옆에 서므로 그대로 둔다.
-   */
-  const cancelButton = (className = '') =>
+  /*
+    **테두리 있는 `secondary` · 기본 높이(44)다** (#1180). 예전에는 `ghost` · `sm`(32) 이라 배경도
+    테두리도 없이 바로 아래 설명 문단의 소제목처럼 읽혔다(2026-10-06 사용성 점검 2회차, 실측 72×32)
+    — DESIGN.md §7 의 터치 타깃 44 에도 못 미쳤다. 실패 화면이 `ghost` 를 걷은 것과 같은 이유다
+    (`ai-plan-failed.tsx` — 채움 · 테두리 옆에서 버튼으로 읽히지 않았다). 상한 초과 화면에서도 같은
+    모양이다 — `확인` 과 나란히 서도 둘 다 고를 수 있는 길이다.
+
+    면이 생겨 글자 정렬을 맞추던 `-ml-3` 도 걷었다 — 이제 면의 경계가 위아래 문단과 같은 선에 선다.
+  */
+  const cancelButton =
     onCancel === null ? null : (
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={onCancel}
-        loading={canceling}
-        className={className}
-      >
+      <Button variant="secondary" onClick={onCancel} loading={canceling}>
         {messages.aiPlan.jobCancel}
       </Button>
     )
@@ -161,7 +157,7 @@ export function AiPlanProgress({
             <Button variant="secondary" onClick={onRecheck} loading={rechecking}>
               {messages.aiPlan.jobExceededAction}
             </Button>
-            {cancelButton()}
+            {cancelButton}
           </div>
         </AiPlanJobBlock>
       </AiPlanJobFrame>
@@ -249,7 +245,7 @@ export function AiPlanProgress({
         {cancelFailed && (
           <p className="text-body-2 text-danger-900">{messages.aiPlan.jobCancelFailed}</p>
         )}
-        {cancelButton('-ml-3')}
+        {cancelButton}
         {/*
           **버튼의 한계를 먼저, 화면을 떠나도 된다는 말을 나중에.** 둘 다 이 자리에서
           필요하지만 순서가 뒤집히면 `그만두기` 바로 아래 문장이 그 버튼과 무관한 말이 되고,
