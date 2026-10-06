@@ -1055,10 +1055,11 @@ export const planMessages = {
     '링크를 아는 사람은 로그인 없이 이 일정을 볼 수 있어요. 예산과 메모는 보이지 않아요.',
   shareIssueAction: '링크 만들기',
   shareIssueError: '링크를 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
-  shareLoadError: '공유 링크를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+  /** 5xx · 무응답의 일시 장애 제목 (#1159). 설명과 재시도 버튼은 공통 문구를 쓴다 */
+  shareLoadErrorTitle: '공유 링크를 불러오지 못했어요',
   /**
    * 서버 문구가 없는 4xx(래퍼 없는 게이트웨이 404·403 등)의 폴백 (#979). **재시도를 권하지
-   * 않는다** — 다시 불러도 결과가 같다. 5xx·무응답은 위 `shareLoadError` 다.
+   * 않는다** — 다시 불러도 결과가 같다. 5xx·무응답은 위 `shareLoadErrorTitle` 일시 장애다.
    */
   shareLoadFailed: '공유 링크를 불러오지 못했어요.',
   shareLinkFieldLabel: '공유 링크 주소',

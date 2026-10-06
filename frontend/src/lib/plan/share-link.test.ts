@@ -4,8 +4,10 @@ import { ApiError } from '@/lib/api/error'
 import { messages } from '@/lib/messages'
 import {
   isShareablePlan,
+  shareContentState,
   shareExpiryLabel,
-  shareLoadErrorMessage,
+  shareFailureAnnounce,
+  shareLoadFailure,
   shareMenuState,
   shareUrlOf,
   shouldRetryShareLinkQuery,
@@ -111,29 +113,29 @@ describe('만료 안내 (shareExpiryLabel)', () => {
  * 없음)이 오류 갈래로 들어온다** — 예전에는 404 를 통째로 null 로 접어 가려졌다. 404 에
  * "잠시 후 다시 시도해 주세요" 를 말하면 재시도할 것이 없는데 재시도를 권하게 된다.
  */
-describe('발급 모달 조회 실패 문구 (shareLoadErrorMessage)', () => {
-  it('5xx 는 일시 장애 문구다', () => {
-    expect(shareLoadErrorMessage(new ApiError(503, null, null))).toBe(messages.plan.shareLoadError)
+describe('발급 모달 조회 실패 (shareLoadFailure)', () => {
+  it('5xx 는 일시 장애다 — 재시도 버튼이 선다 (#1159)', () => {
+    expect(shareLoadFailure(new ApiError(503, null, null))).toEqual({ kind: 'temporary' })
   })
 
-  it('무응답도 일시 장애 문구다', () => {
-    expect(shareLoadErrorMessage(new TypeError('Failed to fetch'))).toBe(
-      messages.plan.shareLoadError,
-    )
+  it('무응답도 일시 장애다', () => {
+    expect(shareLoadFailure(new TypeError('Failed to fetch'))).toEqual({ kind: 'temporary' })
   })
 
   it('404 PLAN_001 은 서버 문구를 그대로 쓴다', () => {
     expect(
-      shareLoadErrorMessage(new ApiError(404, 'PLAN_001', '존재하지 않는 여행 일정입니다.')),
-    ).toBe('존재하지 않는 여행 일정입니다.')
+      shareLoadFailure(new ApiError(404, 'PLAN_001', '존재하지 않는 여행 일정입니다.')),
+    ).toEqual({ kind: 'alert', message: '존재하지 않는 여행 일정입니다.' })
   })
 
   /* 래퍼 없는 게이트웨이 404·403 — 재시도를 권하지 않는 폴백이어야 한다 */
   it('서버 문구가 없는 4xx 는 재시도를 권하지 않는 폴백 문구다', () => {
     for (const status of [404, 403]) {
-      const message = shareLoadErrorMessage(new ApiError(status, null, null))
-      expect(message).toBe(messages.plan.shareLoadFailed)
-      expect(message).not.toContain('다시 시도')
+      expect(shareLoadFailure(new ApiError(status, null, null))).toEqual({
+        kind: 'alert',
+        message: messages.plan.shareLoadFailed,
+      })
+      expect(messages.plan.shareLoadFailed).not.toContain('다시 시도')
     }
   })
 })
@@ -176,5 +178,64 @@ describe('공유 메뉴 항목 상태 (shareMenuState, #1154)', () => {
 
   it('모르는 상태는 감춘다 — 확정하면 열린다고 약속할 근거가 없다', () => {
     expect(shareMenuState('ARCHIVED')).toBe('hidden')
+  })
+})
+
+/**
+ * 발급 모달 본문 갈래 (#1159). **재시도 중이면 실패보다 골격이 먼저**고, 그것은 사용자가 누른
+ * 재시도일 때만이다 — 렌더 테스트는 `state` 를 직접 넣으므로 이 우선순위를 거치지 않는다.
+ */
+describe('발급 모달 본문 갈래 (shareContentState)', () => {
+  const temporary = { kind: 'temporary' } as const
+  const base = {
+    isPending: false,
+    isFetching: false,
+    retryPhase: 'idle' as const,
+    failure: null,
+    hasLink: false,
+  }
+
+  it.each([
+    ['처음 불러오는 중', { isPending: true }, 'loading'],
+    ['5xx · 무응답', { failure: temporary }, 'unavailable'],
+    ['404 등 서버 문구', { failure: { kind: 'alert', message: '없음' } as const }, 'error'],
+    ['공유 중이 아님(200 + null)', {}, 'idle'],
+    ['공유 중', { hasLink: true }, 'shared'],
+    [
+      '누른 재시도가 도는 중 — 실패가 남아 있어도 골격',
+      { failure: temporary, retryPhase: 'running' as const, isFetching: true },
+      'loading',
+    ],
+    [
+      '재시도 요청은 끝났고 결과가 아직 안 그려짐',
+      { failure: temporary, retryPhase: 'settled' as const, isFetching: true },
+      'loading',
+    ],
+    ['재시도 결과가 그려짐', { failure: temporary, retryPhase: 'settled' as const }, 'unavailable'],
+    // 무효화 · refetchOnReconnect 같은 배경 재조회는 보던 자리를 지우지 않는다
+    ['누르지 않은 배경 재조회', { failure: temporary, isFetching: true }, 'unavailable'],
+    [
+      '포커스를 준 뒤의 배경 재조회',
+      { hasLink: true, retryPhase: 'focused' as const, isFetching: true },
+      'shared',
+    ],
+  ])('%s → %s', (_, overrides, expected) => {
+    expect(shareContentState({ ...base, ...overrides })).toBe(expected)
+  })
+})
+
+/**
+ * 실패 표시의 낭독 경로 (#1159 · #1102). `focus` 를 주고 포커스를 안 옮기면 **아무것도 읽히지
+ * 않는다** — 그래서 `idle`(포커스가 `닫기` 에 있거나, 포커스를 준 결과가 이미 바뀐 뒤)은 `live` 다.
+ */
+describe('발급 모달 실패 낭독 (shareFailureAnnounce)', () => {
+  it('재시도를 누르지 않은 실패는 role="alert" 로 읽힌다', () => {
+    expect(shareFailureAnnounce('idle')).toBe('live')
+  })
+
+  it('재시도 결과는 포커스가 읽는다 — 역할을 함께 두면 두 번 읽는다', () => {
+    for (const phase of ['running', 'settled', 'focused'] as const) {
+      expect(shareFailureAnnounce(phase)).toBe('focus')
+    }
   })
 })

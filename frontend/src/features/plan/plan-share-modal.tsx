@@ -6,15 +6,21 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/button'
 import { ConfirmModal } from '@/components/confirm-modal'
+import { ErrorState } from '@/components/error-state'
 import { FormAlert } from '@/components/form-alert'
 import { Modal } from '@/components/modal'
 import { Skeleton } from '@/components/skeleton'
 import { PLAN_QUERY_OPTIONS, planKeys } from '@/features/plan/queries'
 import { fetchPlanShareLink, issuePlanShareLink, revokePlanShareLink } from '@/lib/api/plan'
+import type { FailureAnnounce } from '@/lib/form/submit-failure-focus'
 import { messages } from '@/lib/messages'
 import {
+  type PlanShareState,
+  shareContentState,
   shareExpiryLabel,
-  shareLoadErrorMessage,
+  shareFailureAnnounce,
+  shareLoadFailure,
+  type ShareRetryPhase,
   shareUrlOf,
   shouldRetryShareLinkQuery,
 } from '@/lib/plan/share-link'
@@ -22,6 +28,13 @@ import type { PlanShareLink } from '@/types/plan'
 
 /** 복사됨 표시를 되돌리기까지 */
 const COPIED_RESET_MS = 2000
+
+/**
+ * 재시도 결과가 서면 포커스를 받을 자리 — **본문 안 문서 순서로 첫 번째**다 (#1159).
+ * 일시 장애면 그 상자(버튼보다 앞), 서버 문구 알림이면 그 알림, 공유 중이 아니면 `링크 만들기`,
+ * 공유 중이면 주소 칸(라벨과 주소를 함께 읽는다 — 무엇이 불러와졌는지가 곧 결과다).
+ */
+const RETRY_RESULT_FOCUS_SELECTOR = '[data-share-temporary-error], [data-form-alert], button, input'
 
 /**
  * 일정 공유 링크 발급·폐기 (#628).
@@ -52,11 +65,13 @@ export function PlanShareModal({
 }) {
   const queryClient = useQueryClient()
   const closeRef = useRef<HTMLButtonElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
 
   const [copied, setCopied] = useState(false)
   const [copyFailed, setCopyFailed] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const [retryPhase, setRetryPhase] = useState<ShareRetryPhase>('idle')
 
   /*
     **`origin` 을 state 로 든다.** 서버 렌더에는 `window` 가 없어 첫 렌더에서 읽으면
@@ -70,6 +85,8 @@ export function PlanShareModal({
     error,
     isPending,
     isError,
+    isFetching,
+    refetch,
   } = useQuery({
     queryKey: planKeys.shareLink(planId),
     // 공유 중이 아니면 `null` 이다 (#979) — 404 를 잡아 접지 않는다. 일정이 없는 PLAN_001 은 오류다
@@ -79,6 +96,53 @@ export function PlanShareModal({
     retry: shouldRetryShareLinkQuery,
     enabled: open,
   })
+
+  // 재시도 중이면 실패보다 골격이 먼저다 — 우선순위와 이유는 `shareContentState`
+  const failure = isError ? shareLoadFailure(error) : null
+  const contentState = shareContentState({
+    isPending,
+    isFetching,
+    retryPhase,
+    failure,
+    hasLink: link !== null && link !== undefined,
+  })
+
+  function handleRetry() {
+    /*
+      **누르기 전에 포커스를 본문 상자로 옮긴다.** 재시도 버튼이 골격으로 바뀌며 사라지면
+      브라우저는 포커스를 `BODY` 로 떨어뜨린다 — 모달 밖이다 (`form-guide.md` §8, #1078).
+    */
+    contentRef.current?.focus()
+    setRetryPhase('running')
+    void refetch().then(() =>
+      // 그 사이 모달을 닫았으면(`idle`) 늦게 온 결과가 상태를 되살리지 않는다
+      setRetryPhase((phase) => (phase === 'running' ? 'settled' : phase)),
+    )
+  }
+
+  useEffect(() => {
+    /*
+      **포커스를 준 결과가 바뀌기 시작하면 `idle` 로 돌아간다.** 그 뒤의 실패(`링크 만들기` 뒤
+      무효화 등)에는 포커스가 오지 않으므로 `role="alert"` 로 읽혀야 한다 (`shareFailureAnnounce`).
+    */
+    if (retryPhase === 'focused') {
+      if (isFetching) setRetryPhase('idle')
+      return
+    }
+
+    // 재시도 결과가 그려진 뒤에 포커스를 옮긴다 — 요청이 끝난 것과 결과가 그려진 것은 따로 온다
+    if (retryPhase !== 'settled' || isFetching) return
+
+    const container = contentRef.current
+    const target = container?.querySelector<HTMLElement>(RETRY_RESULT_FOCUS_SELECTOR)
+    ;(target ?? container)?.focus()
+    setRetryPhase('focused')
+  }, [retryPhase, isFetching])
+
+  function handleClose() {
+    setRetryPhase('idle')
+    onClose()
+  }
 
   function afterChange(next: PlanShareLink | null) {
     queryClient.setQueryData(planKeys.shareLink(planId), next)
@@ -137,29 +201,42 @@ export function PlanShareModal({
     <>
       <Modal
         open={open}
-        onClose={onClose}
+        onClose={handleClose}
         title={messages.plan.shareTitle}
         description={messages.plan.shareDescription}
         size="md"
         initialFocusRef={closeRef}
         footer={
-          <Button ref={closeRef} variant="secondary" onClick={onClose}>
+          <Button ref={closeRef} variant="secondary" onClick={handleClose}>
             {messages.common.close}
           </Button>
         }
       >
-        <PlanShareContent
-          state={isPending ? 'loading' : isError ? 'error' : link ? 'shared' : 'idle'}
-          errorMessage={shareLoadErrorMessage(error)}
-          url={url}
-          expiry={expiry}
-          issuing={issue.isPending}
-          copied={copied}
-          copyFailed={copyFailed}
-          onIssue={() => issue.mutate()}
-          onCopy={() => void handleCopy()}
-          onRevoke={() => setConfirming(true)}
-        />
+        {/*
+          재시도 중 포커스를 맡는 상자다 — `tabIndex={-1}` 이라 탭 순서에는 들지 않는다.
+          포커스 테두리는 지우지 않는다(`FormAlert` 와 같은 토큰 링).
+        */}
+        <div
+          ref={contentRef}
+          tabIndex={-1}
+          aria-busy={(contentState === 'loading' && !isPending) || undefined}
+          className="focus-visible:ring-brand-500 rounded-md focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+        >
+          <PlanShareContent
+            state={contentState}
+            errorMessage={failure?.kind === 'alert' ? failure.message : null}
+            announce={shareFailureAnnounce(retryPhase)}
+            url={url}
+            expiry={expiry}
+            issuing={issue.isPending}
+            copied={copied}
+            copyFailed={copyFailed}
+            onRetry={handleRetry}
+            onIssue={() => issue.mutate()}
+            onCopy={() => void handleCopy()}
+            onRevoke={() => setConfirming(true)}
+          />
+        </div>
 
         <FormAlert message={actionError} />
       </Modal>
@@ -179,19 +256,22 @@ export function PlanShareModal({
   )
 }
 
-/** 모달 본문의 네 갈래. 데이터는 `PlanShareModal` 이 들고, 이쪽은 그리기만 한다 */
-export type PlanShareState = 'loading' | 'error' | 'idle' | 'shared'
+// 본문 갈래 판정은 `shareContentState` 가 한다 — 데이터는 `PlanShareModal` 이 들고, 이쪽은 그리기만 한다
+export type { PlanShareState }
 
 export type PlanShareContentProps = {
   state: PlanShareState
-  /** `error` 갈래의 문구. 5xx 는 일시 장애 문구, 404 `PLAN_001` 등은 서버 문구다 */
-  errorMessage: string
+  /** `error` 갈래의 서버 문구. 그 밖의 갈래에서는 `null` 이다 */
+  errorMessage: string | null
+  /** 실패 표시가 무엇으로 읽히는가 — 판정과 이유는 `shareFailureAnnounce` (#1102) */
+  announce: FailureAnnounce
   /** 공유 중인데 `null` 이면 아직 `origin` 을 못 읽은 첫 렌더다 — 복사를 잠근다 */
   url: string | null
   expiry: string | null
   issuing: boolean
   copied: boolean
   copyFailed: boolean
+  onRetry: () => void
   onIssue: () => void
   onCopy: () => void
   onRevoke: () => void
@@ -208,17 +288,44 @@ export type PlanShareContentProps = {
 export function PlanShareContent({
   state,
   errorMessage,
+  announce,
   url,
   expiry,
   issuing,
   copied,
   copyFailed,
+  onRetry,
   onIssue,
   onCopy,
   onRevoke,
 }: PlanShareContentProps) {
   if (state === 'loading') return <Skeleton className="h-24 w-full" />
-  if (state === 'error') return <FormAlert message={errorMessage} />
+  if (state === 'unavailable') {
+    return (
+      /*
+        **상자가 낭독과 포커스를 맡는다** — `FormFailure` 의 일시 장애와 같은 모양이다. 재시도 버튼이
+        아니라 상자인 이유: 오프라인이면 `ErrorState` 가 버튼을 걷는다(#912).
+        `headingLevel={3}` — 모달 제목(`h2`) 안의 내용이다.
+      */
+      <div
+        role={announce === 'live' ? 'alert' : undefined}
+        tabIndex={-1}
+        data-share-temporary-error=""
+        className="focus-visible:ring-brand-500 rounded-md focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+      >
+        <ErrorState
+          title={messages.plan.shareLoadErrorTitle}
+          description={messages.common.temporaryErrorDescription}
+          onRetry={onRetry}
+          headingLevel={3}
+          flush
+        />
+      </div>
+    )
+  }
+
+  // 404 `PLAN_001` 등 — 다시 불러도 결과가 같다. 재시도를 두지 않는다 (#979)
+  if (state === 'error') return <FormAlert message={errorMessage} announce={announce} />
 
   if (state === 'idle') {
     return (

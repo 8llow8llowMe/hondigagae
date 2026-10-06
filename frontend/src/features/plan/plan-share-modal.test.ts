@@ -16,12 +16,14 @@ import { messages } from '@/lib/messages'
 function render(overrides: Partial<PlanShareContentProps> = {}): string {
   const props: PlanShareContentProps = {
     state: 'idle',
-    errorMessage: messages.plan.shareLoadError,
+    errorMessage: null,
+    announce: 'live',
     url: null,
     expiry: null,
     issuing: false,
     copied: false,
     copyFailed: false,
+    onRetry: () => undefined,
     onIssue: () => undefined,
     onCopy: () => undefined,
     onRevoke: () => undefined,
@@ -40,7 +42,10 @@ describe('공유 모달 — 아직 공유 중이 아닐 때', () => {
   })
 
   it('404 를 오류로 그리지 않는다 — 처음 공유하는 사람이 보는 화면이다', () => {
-    expect(render()).not.toContain(messages.plan.shareLoadError)
+    const html = render()
+
+    expect(html).not.toContain(messages.plan.shareLoadErrorTitle)
+    expect(html).not.toContain(messages.common.retry)
   })
 })
 
@@ -96,11 +101,35 @@ describe('공유 모달 — 공유 중일 때', () => {
 })
 
 describe('공유 모달 — 불러오기 실패', () => {
-  it('5xx 는 오류로 말한다', () => {
-    const html = render({ state: 'error' })
+  /* #1159 — 예전에는 "잠시 후 다시 시도해 주세요." 만 있고 버튼이 없어 모달을 닫았다 열어야 했다 */
+  it('5xx · 무응답은 일시 장애로 말하고 다시 시도를 둔다', () => {
+    const html = render({ state: 'unavailable' })
 
-    expect(html).toContain(messages.plan.shareLoadError)
+    expect(html).toContain(messages.plan.shareLoadErrorTitle)
+    expect(html).toContain(messages.common.temporaryErrorDescription)
+    expect(html).toContain(`>${messages.common.retry}</button>`)
     expect(html).not.toContain(messages.plan.shareIssueAction)
+  })
+
+  it('일시 장애 제목은 모달 제목(h2) 아래 h3 이다', () => {
+    expect(render({ state: 'unavailable' })).toMatch(
+      new RegExp(`<h3[^>]*>${messages.plan.shareLoadErrorTitle}</h3>`),
+    )
+  })
+
+  /*
+    낭독 경로는 하나만 (form-guide.md §8, #1102). 처음 실패는 포커스가 `닫기` 에 있어 `alert` 로,
+    재시도 뒤에는 포커스가 상자로 오므로 역할을 뗀다 — 둘 다 두면 같은 문구를 두 번 읽는다.
+  */
+  it('처음 실패는 role="alert" 로, 재시도 뒤에는 포커스로 읽힌다', () => {
+    const live = render({ state: 'unavailable', announce: 'live' })
+    const focus = render({ state: 'unavailable', announce: 'focus' })
+
+    expect(live).toContain('role="alert"')
+    expect(focus).not.toContain('role="alert"')
+    // 재시도 결과의 포커스 대상 — 버튼이 아니라 상자다(오프라인이면 버튼이 걷힌다)
+    const box = /<div[^>]*data-share-temporary-error=""[^>]*>/.exec(focus)?.[0] ?? ''
+    expect(box).toContain('tabindex="-1"')
   })
 
   /*
@@ -111,7 +140,13 @@ describe('공유 모달 — 불러오기 실패', () => {
     const html = render({ state: 'error', errorMessage: '존재하지 않는 여행 일정입니다.' })
 
     expect(html).toContain('존재하지 않는 여행 일정입니다.')
-    expect(html).not.toContain(messages.plan.shareLoadError)
+    expect(html).not.toContain(messages.plan.shareLoadErrorTitle)
     expect(html).not.toContain(messages.plan.shareIssueAction)
+  })
+
+  it('404 에는 다시 시도를 두지 않는다 — 다시 불러도 결과가 같다', () => {
+    const html = render({ state: 'error', errorMessage: '존재하지 않는 여행 일정입니다.' })
+
+    expect(html).not.toContain(messages.common.retry)
   })
 })
