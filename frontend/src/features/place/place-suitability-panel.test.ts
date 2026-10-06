@@ -223,6 +223,13 @@ describe('PlaceSuitabilityPanel — 반려견이 없으면 판정을 말하지 �
     expect(render({ petName: null, authed: true })).toContain('/pets/new')
   })
 
+  /* 등록을 마치면 이 장소로 돌아온다 (#1153) — 예전에는 반려견 목록에 멈췄다 */
+  it('반려견 등록 링크가 이 장소로 돌아올 곳을 싣는다', () => {
+    expect(render({ petName: null, authed: true })).toMatch(
+      /href="\/pets\/new\?returnTo=%2Fplaces%2F[0-9]+"/,
+    )
+  })
+
   it('예보가 없으면 숫자 자리를 만들지 않고 안내만 남긴다', () => {
     const markup = render({ petName: null, data: { ...suitability, weather: null } })
 

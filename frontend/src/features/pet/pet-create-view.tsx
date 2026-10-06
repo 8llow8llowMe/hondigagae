@@ -27,7 +27,15 @@ import { cn } from '@/lib/utils/cn'
  * **`목록으로` 는 이 카드 밖이다** — 액션은 카드가 아니다(§0 판정에서 "액션 바" 가
  * 빠진다). 페이지가 L0 바닥 위에 세운다.
  */
-export function PetCreateView() {
+export function PetCreateView({
+  returnTo = null,
+}: {
+  /**
+   * 등록을 마치면 돌아갈 곳 (#1153). AI 일정 · 일정 만들기처럼 하던 일 도중에 빠져나온 경우다.
+   * `null` 이면 지금처럼 반려견 목록이다. 검증은 페이지가 `petCreateReturnTo` 로 끝냈다.
+   */
+  returnTo?: string | null
+}) {
   const router = useRouter()
   const queryClient = useQueryClient()
   // `ToastProvider` 는 `(main)` 레이아웃이고 이 화면도 `/pets/new` 라 그 안이다
@@ -41,8 +49,9 @@ export function PetCreateView() {
           initialValues={EMPTY_PET_FORM_VALUES}
           submitLabel={messages.pet.register}
           onSave={async (payload) => {
+            let pet
             try {
-              return await createPet(payload)
+              pet = await createPet(payload)
             } catch (error) {
               // PET_002 는 필드 오류가 아니다. 붙일 필드가 없고(상한은 요청 전체의
               // 성질이다), 목록에서 이미 막고 있으므로 여기까지 온 것은 다른 탭에서
@@ -53,9 +62,21 @@ export function PetCreateView() {
               }
               throw error
             }
+
+            /*
+              **재조회를 기다린 뒤 떠난다** (#1153). 돌아가는 화면(AI 일정 · 일정 만들기 ·
+              장소 · 올레)은 반려견 여부를 프리페치 없이 캐시의 목록으로 판정한다 — 기다리지
+              않으면 캐시에 남은 빈 목록으로 "먼저 반려견을 등록해 주세요" 가 잠깐 선다.
+              목록 쿼리는 헤더 스위처가 늘 쥐고 있어 활성이다.
+
+              **`onSaved` 가 아니라 여기서 기다린다** — 폼(`useForm`)은 `onSubmit` 만 기다리고
+              `onSuccess` 는 기다리지 않는다. 여기서 기다리면 그동안 버튼도 제출 중으로 남는다.
+              재조회가 실패해도 `invalidateQueries` 는 던지지 않아 등록 성공이 뒤집히지 않는다.
+            */
+            await queryClient.invalidateQueries({ queryKey: PET_INVALIDATE_KEY })
+            return pet
           }}
           onSaved={(pet) => {
-            void queryClient.invalidateQueries({ queryKey: PET_INVALIDATE_KEY })
             /*
               **토스트가 맞는 자리다** — `styling-guide.md` §3-2 의 "이미 끝났다". 오류를
               토스트로 말하지 않는 규칙과 부딪히지 않는다: 이것은 성공 알림이다.
@@ -69,8 +90,13 @@ export function PetCreateView() {
             showToast({
               message: messages.pet.registeredToast.replace('{name}', withObjectParticle(pet.name)),
             })
-            // push 를 쓰면 뒤로가기로 폼에 돌아와 같은 반려견을 두 번 등록할 수 있다
-            router.replace('/pets')
+            /*
+              push 를 쓰면 뒤로가기로 폼에 돌아와 같은 반려견을 두 번 등록할 수 있다.
+              **하던 일이 있으면 그리로 돌아간다** (#1153) — 목록에 멈추면 사용자가 AI 일정
+              화면을 스스로 다시 찾아야 했다. 토스트는 `(main)` 레이아웃의 provider 라 돌아간
+              화면에서도 보인다.
+            */
+            router.replace(returnTo ?? '/pets')
           }}
         />
       </div>

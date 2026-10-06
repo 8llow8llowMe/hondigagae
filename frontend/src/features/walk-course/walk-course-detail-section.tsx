@@ -239,6 +239,7 @@ export function WalkCourseDetailSection({
             onRetry={onWalkTimesRetry}
             authed={authed}
             petRegistered={petRegistered}
+            returnTo={courseHrefWithFilters(course.walkCourseId, backHref)}
           />
 
           {/*
@@ -464,4 +465,14 @@ function DetailSkeleton() {
       </Surface>
     </div>
   )
+}
+
+/**
+ * 반려견을 등록하고 돌아올 이 코스의 주소 (#1153). **목록 필터 쿼리를 함께 싣는다** — 상세의
+ * `코스 목록으로`(`backHref`)는 그 쿼리로 필터를 되살리는데(#783), 경로만 실으면 돌아온 뒤
+ * 목록으로 갈 때 필터가 사라진다. 쿼리는 페이지가 이미 화이트리스트로 걸러 조립한 것이다.
+ */
+function courseHrefWithFilters(walkCourseId: string, backHref: string): string {
+  const query = backHref.indexOf('?')
+  return `/olle/${walkCourseId}${query === -1 ? '' : backHref.slice(query)}`
 }

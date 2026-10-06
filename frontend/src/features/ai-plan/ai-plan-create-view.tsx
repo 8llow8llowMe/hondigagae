@@ -18,6 +18,7 @@ import { MANWON, toAiPlanSubmitPayload } from '@/lib/ai-plan/submit'
 import { submitAiPlan } from '@/lib/api/ai-plan'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
+import { petCreateHref } from '@/lib/pet/return-to'
 import { totalDaysBetween } from '@/lib/plan/date'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -89,7 +90,12 @@ export function AiPlanCreateView({
           title={messages.aiPlan.noPetTitle}
           character="sitFront"
           description={messages.aiPlan.noPetDescription}
-          action={<ButtonLink href="/pets/new">{messages.aiPlan.noPetAction}</ButtonLink>}
+          // 등록을 마치면 이 폼으로 돌아온다 (#1153)
+          action={
+            <ButtonLink href={petCreateHref('/ai-plans/new')}>
+              {messages.aiPlan.noPetAction}
+            </ButtonLink>
+          }
         />
       </AiPlanCreateSurface>
     )

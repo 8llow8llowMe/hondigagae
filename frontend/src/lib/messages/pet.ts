@@ -76,6 +76,8 @@ export const petMessages = {
   deleteDialogLabel: '반려견 삭제',
   cancel: '취소',
   backToList: '목록으로',
+  /** 하던 화면에서 등록으로 빠졌을 때(`returnTo`)의 취소 링크 — 목록이 아니라 그 화면으로 간다 (#1153) */
+  backToPrevious: '이전 화면으로',
 
   /**
    * 등록 성공 토스트 — `{name}` 치환. **토스트가 맞는 자리다**: 끝난 일을 알리고
