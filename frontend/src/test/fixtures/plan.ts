@@ -19,6 +19,7 @@ import type {
   PlanItemPlace,
   PlanItemWalkCourse,
   PlanItemWalkSafetyItem,
+  SharedPlanItem,
 } from '@/types/plan'
 
 /**
@@ -44,6 +45,20 @@ export function planItemPlace(overrides: Partial<PlanItemPlace> = {}): PlanItemP
     firstImage: null,
     lat: 33.3608276172,
     lng: 126.7818122232,
+    ...overrides,
+  }
+}
+
+/** 공유받은 일정의 항목 (#628) — 읽기 전용 행이 받는 모양이다. 기본은 사진 없는 `PLACE` */
+export function sharedPlanItem(overrides: Partial<SharedPlanItem> = {}): SharedPlanItem {
+  return {
+    day: 1,
+    sequence: 0,
+    itemType: { code: 'PLACE', name: '장소', description: null },
+    targetId: '212481712381923328',
+    title: '협재해수욕장',
+    startTime: null,
+    place: planItemPlace(),
     ...overrides,
   }
 }

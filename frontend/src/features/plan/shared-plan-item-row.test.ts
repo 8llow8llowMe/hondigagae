@@ -4,22 +4,11 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
 import { SharedPlanItemRow } from '@/features/plan/shared-plan-item-row'
-import { planItemPlace } from '@/test/fixtures/plan'
+import { sharedPlanItem } from '@/test/fixtures/plan'
 import type { SharedPlanItem } from '@/types/plan'
 
 function render(overrides: Partial<SharedPlanItem> = {}) {
-  const item: SharedPlanItem = {
-    day: 1,
-    sequence: 0,
-    itemType: { code: 'PLACE', name: '장소', description: null },
-    targetId: '212481712381923328',
-    title: '협재해수욕장',
-    startTime: null,
-    place: planItemPlace({ firstImage: null }),
-    ...overrides,
-  }
-
-  return renderToStaticMarkup(createElement(SharedPlanItemRow, { item }))
+  return renderToStaticMarkup(createElement(SharedPlanItemRow, { item: sharedPlanItem(overrides) }))
 }
 
 /*
