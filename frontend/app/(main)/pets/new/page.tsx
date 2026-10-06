@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Canvas, SurfaceStack } from '@/components/surface'
 import { PetCreateView } from '@/features/pet/pet-create-view'
 import { messages } from '@/lib/messages'
+import { petCreateReturnTo } from '@/lib/pet/return-to'
 
 export const metadata = {
   title: `${messages.pet.newTitle} · 혼디가개`,
@@ -20,7 +21,14 @@ export const metadata = {
  * **폭이 `max-w-lg`(512)에서 `max-w-2xl`(672)로 넓어졌다** — 일정 만들기와 같은 한 단
  * 폭이다. 512 는 테두리 없는 폼일 때의 값이고, 카드가 좌우 인셋 20 을 더 먹는다.
  */
-export default function PetNewPage() {
+export default async function PetNewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ returnTo?: string | string[] }>
+}) {
+  // 하던 일로 돌아갈 곳 (#1153). 못 쓰는 값이면 null — 지금처럼 목록으로 간다
+  const returnTo = petCreateReturnTo((await searchParams).returnTo)
+
   return (
     <Canvas as="main" id="main-content">
       <SurfaceStack className="mx-auto w-full max-w-2xl">
@@ -30,19 +38,22 @@ export default function PetNewPage() {
         */}
         <h1 className="sr-only">{messages.pet.newTitle}</h1>
 
-        <PetCreateView />
+        <PetCreateView returnTo={returnTo} />
 
         {/*
           **`목록으로` 는 카드 밖이다.** 액션은 카드가 아니다 (§0 판정에서 "액션 바" 가
           빠진다 — 일정 만들기 #453 의 취소 링크와 같은 자리). L0 바닥 위에 그대로 선다.
+
+          **하던 일이 있으면 그 화면으로 돌아간다** (#1153) — 등록을 그만둔 사용자를 목록에
+          세우면 하던 화면을 다시 찾아야 한다. 문구도 `목록으로` 가 아니게 된다.
         */}
         <Link
-          href="/pets"
+          href={returnTo ?? '/pets'}
           // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다). 텍스트 크기는 그대로 두고
           // 히트 영역만 키운다
           className="text-body-2 text-fg-muted inline-flex h-11 items-center justify-center self-center underline"
         >
-          {messages.pet.backToList}
+          {returnTo === null ? messages.pet.backToList : messages.pet.backToPrevious}
         </Link>
       </SurfaceStack>
     </Canvas>

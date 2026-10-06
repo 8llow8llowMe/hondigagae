@@ -10,6 +10,7 @@ import { formatDistance } from '@/lib/format/distance'
 import { displayTemperature, supportingTemperatures } from '@/lib/insight/temperature'
 import { suitabilityTone } from '@/lib/insight/tone'
 import { messages } from '@/lib/messages'
+import { petCreateHref } from '@/lib/pet/return-to'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import type { DailyWeatherItem, PlaceSuitabilityResponse } from '@/types/insight'
@@ -177,7 +178,8 @@ function GuestBlock({ data, authed }: { data: PlaceSuitabilityResponse; authed: 
       <div className="bg-band flex flex-col items-start gap-1 rounded-md p-3">
         <p className="text-body-2 text-fg">{messages.place.detailGuestCta}</p>
         <Link
-          href={authed ? '/pets/new' : '/login'}
+          // 등록을 마치면 이 장소로 돌아온다 (#1153)
+          href={authed ? petCreateHref(`/places/${data.placeId}`) : '/login'}
           // 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다)
           className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center rounded-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
         >

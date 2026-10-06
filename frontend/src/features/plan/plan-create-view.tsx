@@ -17,6 +17,7 @@ import { planFormSchema } from '@/features/plan/schemas'
 import { createPlan } from '@/lib/api/plan'
 import { useForm } from '@/lib/form/use-form'
 import { messages } from '@/lib/messages'
+import { petCreateHref } from '@/lib/pet/return-to'
 import { toPlanCreatePayload } from '@/lib/plan/form'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
@@ -80,7 +81,10 @@ export function PlanCreateView({
           headingLevel={3}
           title={messages.plan.noPetTitle}
           description={messages.plan.noPetDescription}
-          action={<ButtonLink href="/pets/new">{messages.plan.noPetAction}</ButtonLink>}
+          // 등록을 마치면 이 폼으로 돌아온다 (#1153)
+          action={
+            <ButtonLink href={petCreateHref('/plans/new')}>{messages.plan.noPetAction}</ButtonLink>
+          }
         />
       </PlanCreateSurface>
     )

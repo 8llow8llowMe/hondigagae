@@ -70,7 +70,8 @@ describe('등록 — 카드 하나 (#464)', () => {
   })
 
   it('목록으로 는 카드 밖이다 — 페이지가 세운다', () => {
-    expect(newPage).toContain('href="/pets"')
+    // 하던 일이 있으면 그 화면으로, 없으면 목록으로 간다 (#1153) — 어느 쪽이든 페이지가 세운다
+    expect(newPage).toContain("href={returnTo ?? '/pets'}")
     expect(createView).not.toContain('backToList')
   })
 

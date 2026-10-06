@@ -38,6 +38,7 @@ function render(
       walkTimes,
       loading,
       onRetry: vi.fn(),
+      returnTo: '/olle/1',
       ...guest,
     }),
   )
@@ -271,7 +272,9 @@ describe('WalkCourseGoldenSlot — 반려견 등록 안내 (#777)', () => {
    */
   it('갈리는 것은 링크가 데려가는 곳뿐이다', () => {
     expect(render(COORDS, WALK_TIMES, false, GUEST)).toContain('href="/login"')
-    expect(render(COORDS, WALK_TIMES, false, NO_PET)).toContain('href="/pets/new"')
+    expect(render(COORDS, WALK_TIMES, false, NO_PET)).toContain(
+      'href="/pets/new?returnTo=%2Folle%2F1"',
+    )
   })
 
   it('반려견이 있으면 안내를 붙이지 않는다', () => {

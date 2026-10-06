@@ -5,6 +5,7 @@ import { SurfaceList } from '@/components/surface'
 import { PlanListSkeleton } from '@/features/plan/plan-list-skeleton'
 import { PlanRow } from '@/features/plan/plan-row'
 import { messages } from '@/lib/messages'
+import { petCreateHref } from '@/lib/pet/return-to'
 import { planCompanionsOf } from '@/lib/plan/companion-pets'
 import { groupPlans } from '@/lib/plan/list'
 import { INSET_CLASS } from '@/lib/ui/inset'
@@ -234,7 +235,8 @@ function NoPlans({ hasPets, firstPetName }: { hasPets: boolean; firstPetName: st
         title={messages.plan.noPetTitle}
         character="sitFront"
         description={messages.plan.noPetDescription}
-        action={<ButtonLink href="/pets/new">{messages.plan.noPetAction}</ButtonLink>}
+        // 등록을 마치면 일정 목록으로 돌아온다 (#1153)
+        action={<ButtonLink href={petCreateHref('/plans')}>{messages.plan.noPetAction}</ButtonLink>}
       />
     )
   }

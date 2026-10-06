@@ -144,7 +144,8 @@ describe('일정 목록 — 상태 화면', () => {
 
   it('반려견이 0마리면 만들기가 아니라 등록으로 보낸다 — petId 가 필수다', () => {
     const html = render({ plans: [], hasPets: false, firstPetName: null })
-    expect(html).toContain('/pets/new')
+    // 등록을 마치면 일정 목록으로 돌아온다 (#1153)
+    expect(html).toContain('/pets/new?returnTo=%2Fplans')
     expect(html).not.toContain('/plans/new')
   })
 

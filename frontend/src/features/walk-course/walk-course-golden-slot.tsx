@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Surface } from '@/components/surface'
 import { WalkTimesSection } from '@/features/insight/walk-times-section'
 import { messages } from '@/lib/messages'
+import { petCreateHref } from '@/lib/pet/return-to'
 import { INSET_CLASS } from '@/lib/ui/inset'
 import { cn } from '@/lib/utils/cn'
 import { hasCoordinates, type WalkCourseCoordinates } from '@/lib/walk-course/coordinates'
@@ -74,6 +75,7 @@ export function WalkCourseGoldenSlot({
   onRetry,
   authed,
   petRegistered,
+  returnTo,
 }: {
   course: WalkCourseCoordinates
   walkTimes: WalkTimesResponse | null
@@ -81,6 +83,8 @@ export function WalkCourseGoldenSlot({
   onRetry: () => void
   /** 안내 링크가 로그인으로 갈지 반려견 등록으로 갈지 가른다 (#777) */
   authed: boolean
+  /** 반려견을 등록하고 돌아올 이 코스의 경로 (#1153) — `course` 는 좌표만 들고 있어 id 가 없다 */
+  returnTo: string
   /**
    * 판정의 기준이 될 반려견이 있는가 — 없으면 등록 안내가 선다 (#777).
    *
@@ -129,7 +133,9 @@ export function WalkCourseGoldenSlot({
         유도를 붙이지 않기로 한 근거가 그대로 여기 적용된다: *"지키지 못할 약속"* 을
         만들지 않는다. 로딩 중에도 같은 이유로 붙이지 않는다.
       */}
-      {petRegistered || !hasVerdict(walkTimes) ? null : <RegisterPetNotice authed={authed} />}
+      {petRegistered || !hasVerdict(walkTimes) ? null : (
+        <RegisterPetNotice authed={authed} returnTo={returnTo} />
+      )}
     </Surface>
   )
 }
@@ -156,7 +162,7 @@ function hasVerdict(walkTimes: WalkTimesResponse | null): boolean {
  * **상자는 카드 인셋 안에 선다.** 각진 불투명 면이 radius 12 모서리를 덮지 않게 한다
  * (`DESIGN.md` §0) — 바로 위 `NoCoordinates` 의 상자와 같은 규칙이다.
  */
-function RegisterPetNotice({ authed }: { authed: boolean }) {
+function RegisterPetNotice({ authed, returnTo }: { authed: boolean; returnTo: string }) {
   return (
     <div className={cn('pb-4 md:pb-5', INSET_CLASS.card)}>
       <div className="bg-band flex flex-col items-start gap-1 rounded-md px-4 py-3">
@@ -164,7 +170,8 @@ function RegisterPetNotice({ authed }: { authed: boolean }) {
 
         {/* 높이 44 — 규칙이 아니라 이 자리에서 고른 값이다 (#883 이 §7 하한을 지도 타깃으로 좁혔다) */}
         <Link
-          href={authed ? '/pets/new' : '/login'}
+          // 등록을 마치면 이 코스로 돌아온다 (#1153)
+          href={authed ? petCreateHref(returnTo) : '/login'}
           className="text-body-2 text-link hover:text-link-hover focus-visible:ring-brand-500 inline-flex h-11 items-center font-semibold focus-visible:ring-2 focus-visible:outline-none"
         >
           {messages.home.registerPet}
