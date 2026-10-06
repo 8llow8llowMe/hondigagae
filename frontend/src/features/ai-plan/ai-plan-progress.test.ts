@@ -140,6 +140,23 @@ describe('AiPlanProgress — 세부 단계 (#250)', () => {
 })
 
 describe('AiPlanProgress — 그만두기 (#250)', () => {
+  /*
+    **버튼으로 보이고 44 다** (#1180). `ghost` · `sm`(32) 이라 아래 설명 문단의 소제목처럼 읽혔다
+    (2026-10-06 사용성 점검 2회차, 실측 72×32).
+  */
+  it.each(['normal', 'exceeded'] as const)(
+    '%s 화면의 그만두기는 테두리 있는 44px 버튼이다',
+    (phase) => {
+      const html = render({ phase, onCancel: () => undefined })
+      const button = /<button[^>]*>(?:(?!<\/button>).)*?그만두기<\/button>/s.exec(html)?.[0] ?? ''
+
+      expect(button).not.toBe('')
+      expect(button).toContain('h-11')
+      expect(button).not.toContain('h-8')
+      expect(button).not.toContain('-ml-3')
+    },
+  )
+
   it('onCancel 이 없으면 버튼을 그리지 않는다', () => {
     expect(render()).not.toContain(messages.aiPlan.jobCancel)
   })
