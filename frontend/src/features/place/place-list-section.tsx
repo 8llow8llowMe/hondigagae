@@ -10,6 +10,7 @@ import { PlaceRowSkeleton } from '@/features/place/place-row-skeleton'
 import { classify } from '@/lib/api/error'
 import { toMessage } from '@/lib/api/response'
 import { messages } from '@/lib/messages'
+import { searchEmptyCopy } from '@/lib/place/search-empty'
 import type { Inset } from '@/lib/ui/inset'
 import type { PlaceSummary } from '@/types/place'
 
@@ -191,13 +192,9 @@ export function PlaceListSection({
           **설명은 검색어만 탓하지 않는다** — 필터가 함께 걸려 있을 수 있어 둘 다 짚고,
           `초기화` 버튼은 그대로다 (그 버튼이 검색어까지 지운다 — `DEFAULT_PLACE_FILTERS`).
         */
-        title={
-          keyword === null
-            ? messages.place.emptyTitle
-            : messages.place.searchEmptyTitle.replace('{keyword}', keyword)
-        }
+        title={keyword === null ? messages.place.emptyTitle : searchEmptyCopy(keyword).title}
         description={
-          keyword === null ? messages.place.emptyDescription : messages.place.searchEmptyDescription
+          keyword === null ? messages.place.emptyDescription : searchEmptyCopy(keyword).description
         }
         action={
           <Button variant="secondary" size="md" onClick={onResetFilters}>
