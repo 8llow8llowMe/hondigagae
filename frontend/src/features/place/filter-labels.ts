@@ -72,6 +72,27 @@ export const PLACE_KIND_LABEL: Record<PlaceKind, string> = {
   CAFE: '카페',
 }
 
+/**
+ * 장소 행의 유형 배지 글자 (#1181).
+ *
+ * **카페 분류인 음식점은 `카페` 라고 쓴다.** `카페` 칩(위 `withPlaceKind`)으로 찾은 결과가 전부
+ * `음식점` 배지라, 고른 것과 다른 이름으로 말했다(2026-10-06 사용성 점검 2회차). 칩과 같은 판정
+ * (`RESTAURANT` + 원천 분류 `카페`)이라 칩을 고르지 않은 전체 목록에서도 같은 곳은 같은 이름이다.
+ *
+ * **매핑표가 아니다** — 쓰는 글자는 서버가 준 원천 분류 문자열 그대로다(서버 enum 렌더 규칙,
+ * styling-guide.md §7). 다른 원천 분류(`펜션` · `미술관` …)로 넓히지 않는다: 그 값들은 유형
+ * 배지와 갈리는 이유가 없거나 화면에서 고를 수 없는 축이라, 넓히면 배지 체계가 원천마다 달라진다.
+ */
+export function placeTypeLabel(place: {
+  contentType: { code: string; name: string }
+  sourceCategory: string | null
+}): string {
+  if (place.contentType.code === 'RESTAURANT' && place.sourceCategory === CAFE_SOURCE_CATEGORY) {
+    return place.sourceCategory
+  }
+  return place.contentType.name
+}
+
 /** 지금 걸린 종류. 없으면 `null`(전체). 주소로 카페 분류만 걸려 와도 카페로 읽는다 */
 export function placeKindOf(filters: PlaceFilters): PlaceKind | null {
   if (filters.sourceCategory === CAFE_SOURCE_CATEGORY) return 'CAFE'
