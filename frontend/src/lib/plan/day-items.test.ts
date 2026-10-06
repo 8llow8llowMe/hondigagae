@@ -7,6 +7,7 @@ import {
   appendWalkCourseItemPayload,
   hasEditChanges,
   ITEM_TITLE_MAX,
+  itemInsertIndex,
   moveEditItem,
   placeIdsOf,
   planDayItemsPayload,
@@ -565,5 +566,79 @@ describe('validateMoveTitle — 이동·휴식 제목 검증 (#1014)', () => {
 
   it('보통 제목은 통과한다', () => {
     expect(validateMoveTitle('차로 이동')).toBeNull()
+  })
+})
+
+/*
+  **담기는 그날 끝에 붙은 숙박 앞이다** (#1175). 2회차 사용성 점검에서 카페가 숙박 뒤에 붙어
+  숙소에서 38.7km 를 되돌아가는 순서가 됐다 — 사용자가 순서 편집으로 직접 옮겨야 했다.
+*/
+describe('itemInsertIndex · 담기 자리 — 끝에 붙은 숙박 앞 (#1175)', () => {
+  // 순서는 배열 자리가 정한다 — `sequence` 는 되싣는 쪽이 다시 매긴다
+  const lodging = (planItemId: string, title: string) =>
+    planItem({
+      planItemId,
+      day: 2,
+      sequence: 0,
+      title,
+      targetId: '212481712381923399',
+      itemType: { code: 'LODGING', name: '숙박', description: null },
+    })
+  const place = { placeId: '212481712381923350', title: '오설록 티뮤지엄' }
+
+  it('숙박이 없으면 맨 끝이다 — 예전 동작 그대로', () => {
+    expect(itemInsertIndex(ITEMS)).toBe(ITEMS.length)
+  })
+
+  it('마지막이 숙박이면 그 앞에 넣는다', () => {
+    const payload = appendPlaceItemPayload([...ITEMS, lodging('l', '숙소')], 2, place)
+
+    expect(payload.items.map((item) => item.title)).toEqual([
+      '미술관',
+      '시장',
+      '이동',
+      place.title,
+      '숙소',
+    ])
+    // 번호는 놓인 순서대로 0부터다 — 숙소가 한 칸 밀린다
+    expect(payload.items.map((item) => item.sequence)).toEqual([0, 1, 2, 3, 4])
+  })
+
+  it('끝에 숙박이 연달아 있으면 그 묶음 전체의 앞이다', () => {
+    const items = [...ITEMS, lodging('l1', '숙소 체크인'), lodging('l2', '숙소 2')]
+
+    expect(itemInsertIndex(items)).toBe(ITEMS.length)
+  })
+
+  it('중간의 숙박(아침 체크아웃)은 그날의 끝이 아니다 — 맨 끝에 붙인다', () => {
+    const items = [lodging('l', '체크아웃'), ...ITEMS]
+
+    expect(itemInsertIndex(items)).toBe(items.length)
+  })
+
+  it('숙박만 있는 날은 맨 앞이다', () => {
+    expect(itemInsertIndex([lodging('l', '숙소')])).toBe(0)
+  })
+
+  it('밀려난 숙박의 targetId · itemType 이 그대로 되실린다', () => {
+    const last = appendPlaceItemPayload([...ITEMS, lodging('l', '숙소')], 2, place).items.at(-1)
+
+    expect(last?.itemType).toBe('LODGING')
+    expect(last?.targetId).toBe('212481712381923399')
+  })
+
+  it('산책 코스 담기도 같은 자리다', () => {
+    const payload = appendWalkCourseItemPayload([...ITEMS, lodging('l', '숙소')], 2, {
+      walkCourseId: '777777777777000001',
+      title: '올레 7코스',
+    })
+
+    expect(payload.items.map((item) => item.title).slice(-2)).toEqual(['올레 7코스', '숙소'])
+  })
+
+  it('이동·휴식 추가는 여전히 맨 끝이다 — 숙소 앞 이동인지 숙소에서의 휴식인지 모른다', () => {
+    const payload = appendMoveItemPayload([...ITEMS, lodging('l', '숙소')], 2, { title: '휴식' })
+
+    expect(payload.items.at(-1)?.title).toBe('휴식')
   })
 })
