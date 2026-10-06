@@ -24,8 +24,24 @@ const DIR = fileURLToPath(new URL('./', import.meta.url))
 
 /** 백엔드 오류코드 주석. 이 줄 바로 다음의 문구는 복제본이라 톤을 바꾸지 않는다 */
 const BACKEND_CODE = /^\s*\/\/\s*[A-Z]+_\d+/
-/** 합쇼체 종결 — `~습니다` · `~입니다` */
-const FORMAL = /'[^']*(습니다|입니다)\.?'/
+/**
+ * 합쇼체 종결 — `~ㅂ니다` 전부(`~습니다` · `~입니다` · `~깁니다` · `~됩니다` …).
+ *
+ * **예전에는 `습니다|입니다` 둘만 봤다** (#1182). 그래서 `하루 이동이 깁니다.` 가 이 검사를 지나쳐
+ * 같은 카드의 해요체 문구 옆에 혼자 합쇼체로 서 있었다. 받침 `ㅂ` 이 앞 음절에 붙는 형태라
+ * 낱말로는 다 셀 수 없어 `니다` 종결로 본다.
+ */
+const FORMAL = /'[^']*니다\.?'/
+
+/**
+ * 서버 enum metadata 복제본(`{ code, name, description }`)의 줄인가 — 같은 객체 안(같은 줄이나
+ * 두 줄 위까지)에 `code:` 가 있다. **서버 원문이라 톤을 바꾸지 않는다** — 오류코드 복제본과 같은
+ * 예외다(`pet.ts` 의 `ActivityLevel` · `SocialityLevel`). `description:` 키만으로 가르지 않는 이유:
+ * FE 가 쓴 `description` 도 있다(`about.ts`).
+ */
+function isEnumCopy(lines: string[], index: number): boolean {
+  return [0, 1, 2].some((back) => /\bcode: '/.test(lines[index - back] ?? ''))
+}
 
 function messageFiles(): { name: string; lines: string[] }[] {
   return readdirSync(DIR)
@@ -45,6 +61,7 @@ describe('문구 어미 — 해요체로 통일한다 (DESIGN.md §1)', () => {
         if (line.trim().startsWith('*') || line.trim().startsWith('//')) return []
         // 바로 위에 백엔드 오류코드가 달린 줄은 복제본이다
         if (BACKEND_CODE.test(lines[index - 1] ?? '')) return []
+        if (isEnumCopy(lines, index)) return []
 
         return [`${name}:${index + 1} ${line.trim()}`]
       }),
