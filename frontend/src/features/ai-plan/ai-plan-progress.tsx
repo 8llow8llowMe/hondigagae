@@ -107,6 +107,7 @@ export function AiPlanProgress({
     step?.description ?? status?.description ?? messages.aiPlan.jobProgressFallback
 
   const elapsed = elapsedMs === undefined ? null : formatElapsed(elapsedMs)
+  const stepElapsed = stepElapsedMs === null ? null : formatElapsed(stepElapsedMs)
 
   /*
     **테두리 있는 `secondary` · 기본 높이(44)다** (#1180). 예전에는 `ghost` · `sm`(32) 이라 배경도
@@ -208,10 +209,38 @@ export function AiPlanProgress({
                 `gap` 은 눈금과 글줄 사이에만 있어야 한다.
               */}
                   <span className="tabular-nums">
-                    {messages.aiPlan.jobStepProgress
-                      .replace('{order}', String(stepProgress.order))
-                      .replace('{total}', String(stepProgress.total))}
-                    {step !== null && ` · ${step.name}`}
+                    {/*
+                      **`n / m단계` 숫자를 걷고 단계 이름만 둔다** (#1176 · 사용자 결정 2026-10-06).
+                      `일정 구성`(LLM 호출)이 전체의 90% 이상이라 1초 뒤부터 끝날 때까지(약 2분)
+                      `4 / 4단계` 에 머물렀고, 마지막 단계에서 2분을 기다리니 "거의 끝났는데 멈췄다" 로
+                      읽혔다. 눈금(지나간 칸 · 지금 칸)은 남는다 — 앞의 셋이 끝났고 긴 하나가 남았다는
+                      구조는 숫자 없이도 보인다. 서버가 단계 이름을 주지 않으면 예전 숫자로 떨어진다.
+                    */}
+                    {step !== null
+                      ? step.name
+                      : messages.aiPlan.jobStepProgress
+                          .replace('{order}', String(stepProgress.order))
+                          .replace('{total}', String(stepProgress.total))}
+                    {/*
+                      **단계 경과가 이름 옆이다** (#1176). 예전에는 전체 경과 아래 둘째 줄(#1057)이라
+                      `4 / 4단계` 와 멀었다 — "이 단계가 오래 걸리고 있다" 는 이름 옆에서 읽혀야 한다.
+                      **낭독 영역 안이지만 `aria-hidden` 이다** — 1초마다 바뀌는 값이라 읽히면 소음이다
+                      (#710). 서버 시각 기준이라 새로고침해도 0 으로 돌아가지 않는다.
+                    */}
+                    {/*
+                      **단계에 들어가 있는 동안 자리를 늘 차지한다** (#1057 의 규칙 그대로). 320 실측에서
+                      이 꼬리가 붙으면 줄이 둘이 되는데(375 · 390 은 늘 한 줄, 최대 228px), 새 단계 첫
+                      1초 · 음수처럼 표기할 수 없는 순간에 빠지면 한 줄로 돌아와 아래가 튄다 — 그때는
+                      **글자만 숨긴다**(`invisible`). 꼬리는 한 덩어리로 넘어간다(`whitespace-nowrap`).
+                    */}
+                    {stepElapsedMs !== null && (
+                      <span
+                        aria-hidden
+                        className={cn('whitespace-nowrap', stepElapsed === null && 'invisible')}
+                      >
+                        {` · ${messages.aiPlan.jobStepElapsedInline.replace('{stepElapsed}', stepElapsed ?? '0초')}`}
+                      </span>
+                    )}
                   </span>
                 </p>
               )}
@@ -228,7 +257,8 @@ export function AiPlanProgress({
           쓸모가 있다.
         */}
             {elapsed !== null && (
-              <ElapsedCaption elapsed={elapsed} stepElapsedMs={stepElapsedMs} hidden />
+              /* 단계 경과는 위 단계 줄로 올라갔다 (#1176) — 여기는 전체 경과 한 줄이다 */
+              <ElapsedCaption elapsed={elapsed} stepElapsedMs={null} hidden />
             )}
           </div>
           <StateCharacter pose="leash" className="-mb-5" />
@@ -315,7 +345,8 @@ function ElapsedCaption({
  * 접었다 — 그 비율은 실행마다 다르고, 고정 비율로 그리면 그 순간부터 거짓이 된다
  * (`AiPlanJobStep` 머리주석: "화면이 단계를 지어내면 거짓 진행률이 된다").
  *
- * `aria-hidden` 이다 — 옆의 `n / m단계` 가 같은 것을 말하고 그쪽이 낭독된다.
+ * `aria-hidden` 이다 — 옆의 단계 이름이 낭독된다. **#1176 부터 `n / m단계` 숫자는 서지 않는다**
+ * (단계 이름이 없을 때의 폴백만 남았다) — 이 눈금이 그 숫자의 일을 눈으로만 한다.
  */
 function StepTicks({ progress }: { progress: JobStepProgress }) {
   return (

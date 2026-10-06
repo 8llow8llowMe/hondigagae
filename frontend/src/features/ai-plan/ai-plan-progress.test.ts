@@ -105,11 +105,15 @@ describe('AiPlanProgress — 세부 단계 (#250)', () => {
     description: '여행 지역에서 반려견 동반이 확인된 장소를 모읍니다.',
   }
 
-  it('서버가 준 n / m 과 단계 이름을 그린다', () => {
+  /*
+    **단계 이름만 그리고 `n / m단계` 숫자는 걷는다** (#1176 · 사용자 결정 2026-10-06). `일정 구성` 이
+    전체의 90% 이상이라 1초 뒤부터 끝날 때까지 `4 / 4단계` 에 머물러 "거의 끝났는데 멈췄다" 로 읽혔다.
+  */
+  it('서버가 준 단계 이름을 그리고 n / m 숫자는 걷는다', () => {
     const html = render({ step: STEP, stepProgress: { order: 2, total: 4 } })
 
-    expect(html).toContain('2 / 4단계')
     expect(html).toContain(STEP.name)
+    expect(html).not.toContain('2 / 4단계')
   })
 
   /*
@@ -127,7 +131,7 @@ describe('AiPlanProgress — 세부 단계 (#250)', () => {
     **총 단계 수를 화면이 적지 않는다.** 백엔드가 단계를 늘리면 이 숫자도 함께 늘어야
     한다 — 상수로 박아 두면 `5 / 4 단계` 가 나간다.
   */
-  it('총 단계 수는 서버 값을 따른다', () => {
+  it('단계 이름이 없으면 서버 숫자로 떨어진다 — 총 단계 수는 서버 값을 따른다', () => {
     expect(render({ stepProgress: { order: 5, total: 6 } })).toContain('5 / 6단계')
   })
 
@@ -135,7 +139,7 @@ describe('AiPlanProgress — 세부 단계 (#250)', () => {
     const html = render({ step: STEP, stepProgress: { order: 2, total: 4 } })
     const liveRegion = html.slice(html.indexOf('aria-live'))
 
-    expect(liveRegion).toContain('2 / 4단계')
+    expect(liveRegion).toContain(STEP.name)
   })
 })
 
@@ -227,51 +231,69 @@ describe('AiPlanProgress — 경과 시간 (#710)', () => {
 })
 
 /*
-  **현재 단계에서 지난 시간을 경과 줄 아래 둘째 줄에 둔다 (#1057).** 같은 줄에 붙이면 375 폭에서
-  1분이 넘는 순간 두 줄로 접히고, 새 단계에 들어간 1초 동안 그 부분이 빠져 한 줄로 돌아온다 —
-  그때마다 아래 `그만두기` 가 튄다(실측). 그래서 단계에 들어가 있는 동안 둘째 줄은 자리를 늘 차지한다.
+  **단계 경과는 단계 이름 옆이다** (#1176). #1057 은 전체 경과 아래 둘째 줄에 뒀는데, `4 / 4단계` 와
+  멀어 "이 단계가 오래 걸린다" 가 단계 표시에서 읽히지 않았다. 숫자를 걷으면서 이름 옆으로 올렸다 —
+  `일정 구성 · 1분 12초째`. 상한 초과 화면은 단계 줄이 없어 예전 두 줄 그대로다.
 */
-describe('AiPlanProgress — 단계 경과 (#1057)', () => {
+describe('AiPlanProgress — 단계 경과 (#1057 → #1176)', () => {
+  const DRAFTING = { code: 'DRAFTING', name: '일정 구성', description: '일정을 구성합니다.' }
+
   /** 경과 묶음(`aria-hidden` div) 안의 줄 — 순서대로 */
   function captionLines(html: string): string[] {
     const block = /<div aria-hidden="true"[^>]*>((?:<p>[^<]*<\/p>)+)<\/div>/.exec(html)?.[1] ?? ''
     return [...block.matchAll(/<p>([^<]*)<\/p>/g)].map((match) => match[1] ?? '')
   }
 
-  it('전체 경과 아래 줄에 이 단계의 경과를 둔다 — 전체에 대한 약속은 위 줄에 한 번만', () => {
-    const html = render({ elapsedMs: 72_000, stepElapsedMs: 65_000 })
+  it('단계 이름 옆에 이 단계의 경과가 서고, 경과 묶음은 전체 경과 한 줄이다', () => {
+    const html = render({
+      elapsedMs: 72_000,
+      stepElapsedMs: 65_000,
+      step: DRAFTING,
+      stepProgress: { order: 4, total: 4 },
+    })
 
-    expect(captionLines(html)).toEqual(['1분 12초 지남 · 보통 1~2분쯤 걸려요', '이 단계 1분 5초째'])
+    expect(html).toMatch(
+      new RegExp(
+        `${DRAFTING.name}<span aria-hidden="true" class="whitespace-nowrap"> · 1분 5초째</span>`,
+      ),
+    )
+    expect(captionLines(html)).toEqual(['1분 12초 지남 · 보통 1~2분쯤 걸려요'])
   })
 
-  it('두 줄 다 낭독 영역 밖이다 — 1초마다 읽히지 않는다', () => {
+  it('단계 경과는 낭독 영역 안이지만 aria-hidden 이다 — 1초마다 읽히지 않는다', () => {
     const html = render({
       elapsedMs: 72_000,
       stepElapsedMs: 45_000,
+      step: DRAFTING,
       stepProgress: { order: 4, total: 4 },
     })
 
     const live = /<div role="status"[^>]*>(.*?)<\/div><div aria-hidden/.exec(html)?.[1] ?? ''
     // 잡은 영역이 실제 낭독 영역인지부터 — 비어 있으면 아래 단언이 공짜로 통과한다
-    expect(live).toContain('4 / 4단계')
-    expect(live).not.toContain('초째')
-    expect(captionLines(html)).toContain('이 단계 45초째')
+    expect(live).toContain(DRAFTING.name)
+    // 낭독 영역 안의 `초째` 는 전부 aria-hidden 안이다
+    expect(live.replace(/<span aria-hidden="true"[^>]*>[^<]*<\/span>/g, '')).not.toContain('초째')
   })
 
   /*
-    **표기할 수 없는 순간에도 자리는 남긴다.** 새 단계에 들어간 첫 1초 · 기기 시계가 서버보다 늦어
-    음수인 동안이다. 줄이 빠졌다 돌아오면 그 아래가 튄다.
+    **표기할 수 없는 순간에도 자리는 남긴다** (#1057 규칙). 새 단계 첫 1초 · 기기 시계가 서버보다 늦어
+    음수인 동안이다. 320 에서는 이 꼬리가 둘째 줄이라, 빠졌다 돌아오면 아래가 튄다(실측).
   */
   it.each([
     ['1초 전이면', 400],
     ['음수면', -3_000],
-  ])('%s 글자만 비우고 둘째 줄 자리는 남긴다', (_, stepElapsedMs) => {
-    const lines = captionLines(render({ elapsedMs: 72_000, stepElapsedMs }))
+  ])('%s 꼬리 글자만 숨기고 자리는 남긴다', (_, stepElapsedMs) => {
+    const html = render({
+      elapsedMs: 72_000,
+      stepElapsedMs,
+      step: DRAFTING,
+      stepProgress: { order: 4, total: 4 },
+    })
 
-    expect(lines).toEqual(['1분 12초 지남 · 보통 1~2분쯤 걸려요', '\u00a0'])
+    expect(html).toContain('class="whitespace-nowrap invisible"')
+    expect(captionLines(html)).toEqual(['1분 12초 지남 · 보통 1~2분쯤 걸려요'])
   })
 
-  // 서버가 단계 시작 시각을 주지 않았다 — PENDING · 종결 · 필드 전에 저장된 잡
   it.each([
     ['값이 없으면', undefined],
     ['null 이면', null],
@@ -284,7 +306,7 @@ describe('AiPlanProgress — 단계 경과 (#1057)', () => {
     expect(captionLines(html)).toEqual(['1분 12초 지남 · 보통 1~2분쯤 걸려요'])
   })
 
-  it('전체 경과가 없으면 두 줄 다 없다 — 단계 경과만 홀로 서지 않는다', () => {
+  it('단계 줄이 없으면 단계 경과도 없다 — 경과 묶음에 홀로 서지 않는다', () => {
     const html = render({ stepElapsedMs: 45_000 })
 
     expect(html).not.toContain('초째')
