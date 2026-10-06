@@ -122,6 +122,21 @@ export const authMessages = {
   signupDone: '가입이 완료됐어요. 로그인해 주세요.',
 
   /*
+    **로그인을 요구하는 이유** (#1157). 홈의 `AI로 일정 짜기` 를 누른 비로그인 사용자가 아무
+    설명 없이 로그인 폼을 마주했다 (2026-10-06 사용성 점검). 돌아갈 곳(`returnTo`)으로 무엇을
+    하려고 왔는지 말한다 — 표는 `lib/auth/login-reason.ts`.
+  */
+  loginReason: '{purpose} 로그인이 필요해요.',
+  signupReason: '{purpose} 계정이 필요해요.',
+  purposeAiPlan: 'AI 일정을 만들려면',
+  purposePlan: '일정을 만들고 관리하려면',
+  purposePet: '반려견을 등록하려면',
+  purposeFavorite: '저장한 장소를 보려면',
+  purposeMypage: '내 정보를 보려면',
+  /** 보호 경로가 아닌 곳의 동작(장소 상세의 일정에 담기 등)에서 왔을 때 */
+  purposeGeneric: '이 기능을 쓰려면',
+
+  /*
     가입 동의·만 14세 확인 (이슈 #688).
 
     **세 항목 다 필수라 "선택" 이 없다.** 라벨에 `(필수)` 를 붙이는 것은 장식이 아니라,

@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 
 import { AuthCardDog } from '@/features/auth/auth-card-dog'
 import { LoginMethods } from '@/features/auth/login-form'
+import { LoginReasonNotice } from '@/features/auth/login-reason-notice'
 import { SignupDoneNotice } from '@/features/auth/signup-done-notice'
 import { ReauthNotice } from '@/features/member/reauth-notice'
 import { readSession } from '@/lib/auth/session'
@@ -31,6 +32,13 @@ export default async function LoginPage({
       <SignupDoneNotice signedUp={signedUp} />
       {/* 비밀번호 변경·소셜 전용 전환·탈퇴로 세션이 끊긴 경우 그 이유를 알린다 */}
       <ReauthNotice reauth={reauth} />
+      {/*
+        왜 로그인이 필요한지 (#1157). **다른 안내가 섰으면 내지 않는다** — 가입 완료 · 재로그인
+        안내가 이미 이 화면에 온 이유를 말하고 있어, 둘을 쌓으면 첫 줄이 가려진다.
+      */}
+      {signedUp !== '1' && reauth === undefined && (
+        <LoginReasonNotice returnTo={target} screen="login" />
+      )}
       {/* 이메일 폼 · "또는" · 소셜 버튼 · 회원가입 입구 — 한 클라이언트 경계다 (#1084, `LoginMethods`) */}
       <LoginMethods returnTo={target} initialEmail={email ?? ''} />
     </div>
