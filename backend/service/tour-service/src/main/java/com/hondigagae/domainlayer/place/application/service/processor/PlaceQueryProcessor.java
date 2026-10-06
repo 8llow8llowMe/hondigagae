@@ -35,7 +35,7 @@ public class PlaceQueryProcessor {
 
     public PlaceSummariesInfo getPlaces(PlaceSearchCriteria criteria) {
         PlaceSearchCriteria query = criteria.toBuilder()
-            .keyword(PlaceKeyword.normalize(criteria.keyword()).orElse(null))
+            .keyword(PlaceKeyword.normalizeForSearch(criteria.keyword()).orElse(null))
             .build();
         if (query.keyword() != null) {
             var cached = placeSearchCachePort.findList(query);
@@ -65,7 +65,7 @@ public class PlaceQueryProcessor {
      */
     public NearbyPlacesInfo getNearbyPlaces(NearbyPlaceCriteria criteria) {
         NearbyPlaceCriteria query = criteria.toBuilder()
-            .keyword(PlaceKeyword.normalize(criteria.keyword()).orElse(null))
+            .keyword(PlaceKeyword.normalizeForSearch(criteria.keyword()).orElse(null))
             .build();
         if (query.keyword() != null) {
             var cached = placeSearchCachePort.findNearby(query);

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.hondigagae.domainlayer.place.adapter.out.persistence.entity.PlaceEntity;
 import com.hondigagae.domainlayer.place.application.model.NearbyPlaceCriteria;
 import com.hondigagae.domainlayer.place.application.model.PlaceSearchCriteria;
+import com.hondigagae.domainlayer.place.domain.enums.ContentType;
 import com.hondigagae.domainlayer.place.domain.enums.PlaceSource;
 import com.hondigagae.persistence.config.QuerydslConfigurer;
 import com.hondigagae.shared.travel.place.AllowedPetSize;
@@ -105,6 +106,106 @@ class PlaceRepositoryKeywordSearchTest {
         assertThat(found).extracting(PlaceEntity::getTitle).containsExactly("성산일출봉");
     }
 
+    @Test
+    @DisplayName("각 검색어가 이름 또는 주소 중 서로 다른 필드에 있어도 모두 있으면 찾는다")
+    void matchesEveryTokenAcrossTitleAndAddress() {
+        placeRepository.save(place(20L, "성산 바다 카페", "제주특별자치도 서귀포시 고성리"));
+        placeRepository.save(place(21L, "성산 바다 카페", "제주특별자치도 제주시 애월읍"));
+        placeRepository.save(place(22L, "고성리 전망대", "제주특별자치도 서귀포시"));
+
+        Slice<PlaceEntity> page = placeRepository.searchByCriteria(listCriteria("성산 고성리"));
+
+        assertThat(page.getContent()).extracting(PlaceEntity::getId).containsExactly(20L);
+    }
+
+    @Test
+    @DisplayName("같은 필드의 검색어는 떨어져 있거나 역순이어도 모두 있으면 찾는다")
+    void matchesNonAdjacentAndReversedTokensInSameField() {
+        placeRepository.save(place(30L, "고성리 해변 산책 성산 카페", "제주특별자치도 서귀포시"));
+
+        Slice<PlaceEntity> page = placeRepository.searchByCriteria(listCriteria("성산 고성리"));
+
+        assertThat(page.getContent()).extracting(PlaceEntity::getId).containsExactly(30L);
+    }
+
+    @Test
+    @DisplayName("유니코드 공백으로 나뉜 여러 검색어를 정규화해 모두 찾는다")
+    void normalizesUnicodeWhitespaceBetweenTokens() {
+        placeRepository.save(place(31L, "성산 바다 카페", "제주특별자치도 서귀포시 고성리"));
+
+        Slice<PlaceEntity> page = placeRepository.searchByCriteria(
+            listCriteria("\u00A0성산\u3000고성리\u00A0"));
+
+        assertThat(page.getContent()).extracting(PlaceEntity::getId).containsExactly(31L);
+    }
+
+    @Test
+    @DisplayName("영문 여러 검색어는 대소문자와 관계없이 모두 찾는다")
+    void matchesMultipleTokensCaseInsensitively() {
+        placeRepository.save(place(32L, "Jeju Dog Cafe", "Seogwipo City"));
+        placeRepository.save(place(33L, "Jeju Dog Park", "Seogwipo City"));
+
+        Slice<PlaceEntity> page = placeRepository.searchByCriteria(listCriteria("jEjU cAfE"));
+
+        assertThat(page.getContent()).extracting(PlaceEntity::getId).containsExactly(32L);
+    }
+
+    @Test
+    @DisplayName("여러 검색어의 LIKE 특수문자는 각각 리터럴로 처리한다")
+    void specialLikeCharactersAreLiteralForEveryToken() {
+        placeRepository.save(place(40L, "100% 바다_카페 C\\길", "제주특별자치도 제주시"));
+        placeRepository.save(place(41L, "100퍼센트 바다X카페", "제주특별자치도 제주시"));
+
+        Slice<PlaceEntity> page = placeRepository.searchByCriteria(listCriteria("  100% \t 바다_   C\\길  "));
+
+        assertThat(page.getContent()).extracting(PlaceEntity::getId).containsExactly(40L);
+    }
+
+    @Test
+    @DisplayName("주변 검색은 모든 검색어와 기존 필터·노출 조건을 함께 적용한다")
+    void nearbyCombinesAllTokensWithFiltersAndVisibility() {
+        placeRepository.save(nearbyBuilder(50L, "성산 반려견 카페", "고성리", "33.4580", "126.9420")
+            .sourceCategory("카페")
+            .build());
+        placeRepository.save(nearbyBuilder(51L, "성산 반려견 식당", "고성리", "33.4581", "126.9421")
+            .sourceCategory("식당")
+            .build());
+        placeRepository.save(nearbyBuilder(52L, "성산 반려견 카페", "고성리", "33.4582", "126.9422")
+            .sourceCategory("카페")
+            .delistedAt(LocalDateTime.now())
+            .build());
+        placeRepository.save(nearbyBuilder(53L, "성산 반려견 카페", "애월읍", "33.4583", "126.9423")
+            .sourceCategory("카페")
+            .build());
+
+        List<PlaceEntity> found = placeRepository.searchNearby(NearbyPlaceCriteria.builder()
+            .lat(33.4580)
+            .lng(126.9420)
+            .radius(3_000)
+            .contentType(ContentType.TOURIST_SPOT)
+            .sourceCategory("카페")
+            .keyword("성산 고성리")
+            .size(20)
+            .build());
+
+        assertThat(found).extracting(PlaceEntity::getId).containsExactly(50L);
+    }
+
+    @Test
+    @DisplayName("목록 검색은 여러 검색어와 커서를 함께 적용한다")
+    void listCombinesAllTokensWithCursor() {
+        placeRepository.save(place(60L, "성산 카페", "고성리"));
+        placeRepository.save(place(61L, "성산 카페", "고성리"));
+
+        PlaceSearchCriteria criteria = listCriteria("성산 고성리").toBuilder()
+            .lastPlaceId(60L)
+            .build();
+
+        assertThat(placeRepository.searchByCriteria(criteria).getContent())
+            .extracting(PlaceEntity::getId)
+            .containsExactly(61L);
+    }
+
     private PlaceSearchCriteria listCriteria(String keyword) {
         return PlaceSearchCriteria.builder().areaCode("39").keyword(keyword).size(20).build();
     }
@@ -118,6 +219,15 @@ class PlaceRepositoryKeywordSearchTest {
             .lat(new BigDecimal(lat))
             .lng(new BigDecimal(lng))
             .build();
+    }
+
+    private PlaceEntity.PlaceEntityBuilder nearbyBuilder(
+        long id, String title, String addr1, String lat, String lng
+    ) {
+        return baseBuilder(id, title)
+            .addr1(addr1)
+            .lat(new BigDecimal(lat))
+            .lng(new BigDecimal(lng));
     }
 
     private PlaceEntity.PlaceEntityBuilder baseBuilder(long id, String title) {

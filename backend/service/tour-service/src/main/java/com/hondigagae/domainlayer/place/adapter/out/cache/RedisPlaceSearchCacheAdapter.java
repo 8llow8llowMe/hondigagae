@@ -33,8 +33,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class RedisPlaceSearchCacheAdapter implements PlaceSearchCachePort {
 
-    private static final String LIST_KEY_FORMAT = "%s:tour:place:list:%s";
-    private static final String NEARBY_KEY_FORMAT = "%s:tour:place:nearby:%s";
+    private static final String LIST_KEY_FORMAT = "%s:tour:place:list:v2:%s";
+    private static final String NEARBY_KEY_FORMAT = "%s:tour:place:nearby:v2:%s";
 
     private final StringRedisTemplate stringRedisTemplate;
     private final RedisProperties redisProperties;

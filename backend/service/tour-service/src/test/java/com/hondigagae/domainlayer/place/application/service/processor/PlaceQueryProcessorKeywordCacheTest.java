@@ -1,7 +1,9 @@
 package com.hondigagae.domainlayer.place.application.service.processor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.hondigagae.domainlayer.place.application.exception.PlaceException;
 import com.hondigagae.domainlayer.place.application.info.NearbyPlacesInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceSummariesInfo;
 import com.hondigagae.domainlayer.place.application.info.PlaceSummaryInfo;
@@ -37,13 +39,13 @@ class PlaceQueryProcessorKeywordCacheTest {
 
         PlaceQueryProcessor processor = new PlaceQueryProcessor(countingRepo(dbCalls), cache);
         PlaceSummariesInfo info = processor.getPlaces(PlaceSearchCriteria.builder()
-            .keyword("  성산  ")
+            .keyword("  성산   고성리  ")
             .size(20)
             .build());
 
         assertThat(info.places()).extracting(PlaceSummaryInfo::title).containsExactly("성산일출봉");
         assertThat(dbCalls).hasValue(0);
-        assertThat(cache.listLookups).containsExactly("성산");
+        assertThat(cache.listLookups).containsExactly("성산 고성리");
     }
 
     @Test
@@ -78,6 +80,52 @@ class PlaceQueryProcessorKeywordCacheTest {
         assertThat(dbCalls).hasValue(1);
         assertThat(cache.listLookups).isEmpty();
         assertThat(cache.storedLists).isEmpty();
+    }
+
+    @Test
+    @DisplayName("단어 상한을 넘으면 캐시와 DB 접근 전에 거부한다")
+    void tooManyTokensAreRejectedBeforeCacheAndRepository() {
+        AtomicInteger dbCalls = new AtomicInteger();
+        RecordingCache cache = new RecordingCache();
+        PlaceQueryProcessor processor = new PlaceQueryProcessor(countingRepo(dbCalls), cache);
+
+        assertThatThrownBy(() -> processor.getPlaces(PlaceSearchCriteria.builder()
+            .keyword("하나 둘 셋 넷 다섯 여섯")
+            .size(20)
+            .build()))
+            .isInstanceOf(PlaceException.class);
+
+        assertThat(dbCalls).hasValue(0);
+        assertThat(cache.listLookups).isEmpty();
+        assertThat(cache.storedLists).isEmpty();
+    }
+
+    @Test
+    @DisplayName("주변 검색도 단어 상한을 넘으면 캐시와 DB 접근 전에 거부한다")
+    void nearbyTooManyTokensAreRejectedBeforeCacheAndRepository() {
+        AtomicInteger dbCalls = new AtomicInteger();
+        RecordingCache cache = new RecordingCache();
+        PlaceRepositoryPort repository = new EmptyPlaceRepositoryPort() {
+            @Override
+            public List<Place> findNearby(NearbyPlaceCriteria criteria) {
+                dbCalls.incrementAndGet();
+                return List.of();
+            }
+        };
+        PlaceQueryProcessor processor = new PlaceQueryProcessor(repository, cache);
+
+        assertThatThrownBy(() -> processor.getNearbyPlaces(NearbyPlaceCriteria.builder()
+            .lat(33.45)
+            .lng(126.94)
+            .radius(3_000)
+            .keyword("하나 둘 셋 넷 다섯 여섯")
+            .size(20)
+            .build()))
+            .isInstanceOf(PlaceException.class);
+
+        assertThat(dbCalls).hasValue(0);
+        assertThat(cache.nearbyLookups).isEmpty();
+        assertThat(cache.storedNearby).isEmpty();
     }
 
     private static Place place(long id, String title) {
@@ -126,6 +174,8 @@ class PlaceQueryProcessorKeywordCacheTest {
     private static final class RecordingCache implements PlaceSearchCachePort {
         private final List<String> listLookups = new ArrayList<>();
         private final List<PlaceSearchCriteria> storedLists = new ArrayList<>();
+        private final List<NearbyPlaceCriteria> nearbyLookups = new ArrayList<>();
+        private final List<NearbyPlaceCriteria> storedNearby = new ArrayList<>();
         private PlaceSummariesInfo listHit;
 
         @Override
@@ -141,11 +191,13 @@ class PlaceQueryProcessorKeywordCacheTest {
 
         @Override
         public Optional<NearbyPlacesInfo> findNearby(NearbyPlaceCriteria criteria) {
+            nearbyLookups.add(criteria);
             return Optional.empty();
         }
 
         @Override
         public void putNearby(NearbyPlaceCriteria criteria, NearbyPlacesInfo info) {
+            storedNearby.add(criteria);
         }
     }
 
